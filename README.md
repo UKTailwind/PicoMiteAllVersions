@@ -2,6 +2,7 @@
 This contains files to build MMbasic to run on both RP2040 and RP2350
 
 Change CMakeLists.txt line 4 to determine which variant to build<br>
+<br>
 RP2040<br>
 set(COMPILE PICO)<br>
 set(COMPILE VGA)<br>
