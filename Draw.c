@@ -6122,7 +6122,8 @@ void fun_map(void){
             error("Invalid for Mode 1, use tiles");
         break;
         case SCREENMODE2:
-            if(cl>15)error("Mode 2 has 16 colours - 0 to 15");
+        case SCREENMODE3:
+            if(cl>15)error("Mode has 16 colours - 0 to 15");
             targ=T_INT;
             iret=((cl & 1000)<<20) | ((cl & 0b110)<<13) | ((cl & 0b1)<<7);
         break;
@@ -6132,6 +6133,7 @@ void fun_map(void){
 void cmd_map(void){
 	unsigned char *p;
     if(Option.CPU_Speed==126000)error("CPUSPEED >= 252000 for colour mapping");
+    if(DISPLAY_TYPE==SCREENMODE1)error("Invalid for Mode 1, use tiles");
     if((p=checkstring(cmdline, (unsigned char *)"RESET"))) {
         while(QVgaScanLine!=480){}
         for(int i=0;i<16;i++)remap[i]=RGB121map[i];

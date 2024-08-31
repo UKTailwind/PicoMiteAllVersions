@@ -2059,7 +2059,7 @@ void __not_in_flash_func(QVgaLine1)()
                     low= map16[*p & 0xF];
                     high=map16[(*p & 0xF0)>>4];
                     low2= map16[*q & 0xF];
-                    high2=map16[(*q &0xF0)>>4];
+                    high2=map16[(*q & 0xF0)>>4];
                     p++;q++;
                     if(low2!=transparentlow)low=low2;
                     if(high2!=transparenthigh)high=high2;
