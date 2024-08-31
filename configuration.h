@@ -34,16 +34,18 @@ extern "C" {
         #define HEAP_MEMORY_SIZE (180*1024) 
         #define FLASH_TARGET_OFFSET (768 * 1024) 
         #ifdef HDMI
+            #define MAXMODES 4
             #ifdef USBKEYBOARD
                 #define MagicKey 0x15482136
                 #define HEAPTOP 0x2007C000
             #else
-               #define MagicKey 0x21472430
+                #define MagicKey 0x21472430
                 #define HEAPTOP 0x2007C000
             #endif
             #define MAX_CPU     315000 
             #define MIN_CPU     315000
         #else
+            #define MAXMODES 3
             #ifdef USBKEYBOARD
                 #define MagicKey 0x18386236
                 #define HEAPTOP 0x2007C000
@@ -64,6 +66,7 @@ extern "C" {
             #define MagicKey 0x21343430
             #define HEAPTOP 0x2003f100
         #endif
+        #define MAXMODES 2
         #define MAXVARS             512                     // 8 + MAXVARLEN + MAXDIM * 2  (ie, 56 bytes) - these do not incl array members
         #define HEAP_MEMORY_SIZE (100*1024) 
         #define MAX_CPU     378000 
@@ -74,10 +77,9 @@ extern "C" {
     #define MODE1HALF  MODE1SIZE/2
     #define MODE2SIZE  320*240/2
     #define MODE3SIZE  640*480/2
-    #define MODE4SIZE  320*240
+    #define MODE4SIZE  320*240*2
     #define MODE5SIZE  640*480/4
-    #define MODE6SIZE  320*240*3
-    #define MODE7SIZE  320*240*2
+    #define MODE6SIZE  320*240
 #endif
 
 #ifdef PICOMITEWEB

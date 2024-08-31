@@ -2645,17 +2645,13 @@ void MIPS64 __not_in_flash_func(HDMICore)(void){
                         *p++=map16[d&0xf];
                     }
                     break;
-                case SCREENMODE4: //320x240x256 colour
+                case SCREENMODE4: //320x240xRGB555 colour
                     for(int i=0; i<320 ; i++){
-                        int d=DisplayBuf[(Line_dup)*320+i];
-                        int l=LayerBuf[(Line_dup)*320+i];
-                        if(l!=transparent){
-                            *p++=map256[l];
-                            *p++=map256[l];
-                        } else {
-                            *p++=map256[d];
-                            *p++=map256[d];
-                        }
+                        uint8_t* d=&DisplayBuf[(Line_dup)*640+i*2];
+                        int c=*d++;
+                        c|=((*d++)<<8);
+                        *p++=c;
+                        *p++=c;
                     }
                     break;
                 case SCREENMODE5: //640x480x4 colour
@@ -2687,13 +2683,17 @@ void MIPS64 __not_in_flash_func(HDMICore)(void){
                         }
                     }
                     break;
-                case SCREENMODE6: //320x240xRGB555 colour
+                case SCREENMODE6: //320x240x256 colour
                     for(int i=0; i<320 ; i++){
-                        uint8_t* d=&DisplayBuf[(Line_dup)*640+i*2];
-                        int c=*d++;
-                        c|=((*d++)<<8);
-                        *p++=c;
-                        *p++=c;
+                        int d=DisplayBuf[(Line_dup)*320+i];
+                        int l=LayerBuf[(Line_dup)*320+i];
+                        if(l!=transparent){
+                            *p++=map256[l];
+                            *p++=map256[l];
+                        } else {
+                            *p++=map256[d];
+                            *p++=map256[d];
+                        }
                     }
                     break;
                 default:
@@ -3104,6 +3104,8 @@ int MIPS16 main(){
     else QVGA_CLKDIV= 1;
 #endif
 #endif
+    systick_hw->csr = 0x5;
+    systick_hw->rvr = 0x00FFFFFF;
     ticks_per_second = Option.CPU_Speed*1000;
     // The serial clock won't vary from this point onward, so we can configure
     // the UART etc.

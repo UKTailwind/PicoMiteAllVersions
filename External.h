@@ -172,6 +172,7 @@ New, more portable, method of manipulating an I/O pin
 #define EXT_DS18B20_RESERVED    0x100                 // this pin is reserved for DS18B20 and cannot be used
 #define EXT_COM_RESERVED        0x200                 // this pin is reserved and SETPIN and PIN cannot be used
 #define EXT_BOOT_RESERVED       0x400                 // this pin is reserved at bootup and cannot be used
+
 extern const char *PinFunction[];
 extern volatile int ExtCurrentConfig[NBRPINS + 1];
 extern volatile int INT0Count, INT0Value, INT0InitTimer, INT0Timer;
@@ -215,7 +216,7 @@ void gpio_callback(uint gpio, uint32_t events);
 #define CP_IGNORE_RESERVED   0b0100     // the function will ignore reserved pins (EXT_COM_RESERVED and EXT_BOOT_RESERVED)
 #define CP_IGNORE_BOOTRES    0b1000     // the function will ignore the boot reserved pins (EXT_BOOT_RESERVED)
 #define setuptime (12-(Option.CPU_Speed-250000)/50000)
-#define shortpause(a){systick_hw->cvr=0;while(systick_hw->cvr>a){};}
+#define shortpause(a){systick_hw->cvr=0;asm("NOP");asm("NOP");asm("NOP");asm("NOP");asm("NOP");while(systick_hw->cvr>a){};}
 extern int CheckPin(int pin, int action);
 extern unsigned int CFuncInt1;
 extern unsigned int CFuncInt2;

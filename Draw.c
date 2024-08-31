@@ -4204,6 +4204,7 @@ void cmd_sprite(void) {
     if(WriteBuf==NULL)error("Not available on physical display");
 #endif
     if(Option.DISPLAY_TYPE == 0) error("Display not configured");
+    if(DISPLAY_TYPE==SCREENMODE4)error("Not available for this display mode");
     if ((p = checkstring(cmdline, (unsigned char *)"SHOW SAFE"))) {
         int layer, mode=1;
         getargs(&p, 11, (unsigned char*)",");
@@ -4905,16 +4906,16 @@ void restorepanel(void){
 }
 void setframebuffer(void){
     if(!((Option.DISPLAY_TYPE>I2C_PANEL && Option.DISPLAY_TYPE < BufferedPanel) || (Option.DISPLAY_TYPE>=SSDPANEL && Option.DISPLAY_TYPE<VIRTUAL)))return;
-    DrawRectangle=DrawRectangleColour;
-    DrawBitmap= DrawBitmapColour;
-    ScrollLCD=ScrollLCDColour;
-    DrawBuffer=DrawBufferColour;
-    ReadBLITBuffer=ReadBufferColour;
-    DrawBLITBuffer=DrawBufferColour;
-    ReadBuffer=ReadBufferColour;
-    DrawBufferFast=DrawBufferColourFast;
-    ReadBufferFast=ReadBufferColourFast;
-    DrawPixel=DrawPixelColour;
+    DrawRectangle=DrawRectangle16;
+    DrawBitmap= DrawBitmap16;
+    ScrollLCD=ScrollLCD16;
+    DrawBuffer=DrawBuffer16;
+    ReadBLITBuffer=ReadBuffer16;
+    DrawBLITBuffer=DrawBuffer16;
+    ReadBuffer=ReadBuffer16;
+    DrawBufferFast=DrawBuffer16Fast;
+    ReadBufferFast=ReadBuffer16Fast;
+    DrawPixel=DrawPixel16;
 }
 void closeframebuffer(void){
 #ifdef PICOMITE
@@ -5688,7 +5689,7 @@ void cmd_blit(void) {
         if(y2 + h > VRes) h = VRes - y2;
         if(w < 1 || h < 1 || x1 < 0 || x1 + w > HRes || x2 < 0 || x2 + w > HRes || y1 < 0 || y1 + h > VRes || y2 < 0 || y2 + h > VRes) return;
 #ifdef PICOMITEVGA
-        if(DISPLAY_TYPE==SCREENMODE2){
+        if(DISPLAY_TYPE==SCREENMODE2 || DISPLAY_TYPE==SCREENMODE3){
             if((w & 1)==0 && (x1 & 1)==0 && (x2 & 1)==0){ //Easiest case - byte move in the x direction with w even
                 if(y1<y2){
                     for(int y=h-1; y>=0;y--){
@@ -5813,7 +5814,41 @@ void cmd_blit(void) {
                 }
                 return;
             }
-        } else if(DISPLAY_TYPE && DISPLAY_TYPE==SCREENMODE1){
+        } else if(DISPLAY_TYPE && DISPLAY_TYPE==SCREENMODE4){
+            unsigned char *buff = NULL;
+            int max_x;
+            if(x1 >= x2) {
+                max_x = 1;
+                buff = GetMemory((max_x * h)<<1);
+                while(w > max_x){
+                    ReadBufferFast(x1, y1, x1 + max_x - 1, y1 + h - 1, buff);
+                    DrawBufferFast(x2, y2, x2 + max_x - 1, y2 + h - 1, -1, buff);
+                    x1 += max_x;
+                    x2 += max_x;
+                    w -= max_x;
+                }
+                ReadBufferFast(x1, y1, x1 + w - 1, y1 + h - 1, buff);
+                DrawBufferFast(x2, y2, x2 + w - 1, y2 + h - 1, -1, buff);
+                FreeMemory(buff);
+            }
+            if(x1 < x2) {
+                int start_x1, start_x2;
+                max_x = 1;
+                buff = GetMemory((max_x * h)<<1);
+                start_x1 = x1 + w - max_x;
+                start_x2 = x2 + w - max_x;
+                while(w > max_x){
+                    ReadBufferFast(start_x1, y1, start_x1 + max_x - 1, y1 + h - 1, buff);
+                    DrawBufferFast(start_x2, y2, start_x2 + max_x - 1, y2 + h - 1, -1, buff);
+                    w -= max_x;
+                    start_x1 -= max_x;
+                    start_x2 -= max_x;
+                }
+                ReadBufferFast(x1, y1, x1 + w - 1, y1 + h - 1, buff);
+                DrawBufferFast(x2, y2, x2 + w - 1, y2 + h - 1, -1, buff);
+                FreeMemory(buff);
+            }
+       } else if(DISPLAY_TYPE && DISPLAY_TYPE==SCREENMODE1){
             unsigned char *buff = NULL;
             int max_x, ww;
             ww=w;
@@ -6133,7 +6168,7 @@ void fun_map(void){
 void cmd_map(void){
 	unsigned char *p;
     if(Option.CPU_Speed==126000)error("CPUSPEED >= 252000 for colour mapping");
-    if(DISPLAY_TYPE==SCREENMODE1)error("Invalid for Mode 1, use tiles");
+    if(!(DISPLAY_TYPE==SCREENMODE2 || DISPLAY_TYPE==SCREENMODE3 ))error("Invalid for this screen mode");
     if((p=checkstring(cmdline, (unsigned char *)"RESET"))) {
         while(QVgaScanLine!=480){}
         for(int i=0;i<16;i++)remap[i]=RGB121map[i];
@@ -6165,6 +6200,7 @@ void cmd_tile(void){
     unsigned char *tp;
     uint32_t bcolour=0xFFFFFFFF,fcolour=0xFFFFFFFF;
     int xlen=1,ylen=1;
+    if(DISPLAY_TYPE!=SCREENMODE1)error("Invalid for this screen mode");
     if(checkstring(cmdline,(unsigned char *)"RESET")){
         for(int x=0;x<X_TILE;x++){
             for(int y=0;y<Y_TILE;y++){
@@ -6209,10 +6245,175 @@ void cmd_tile(void){
     }
 }
 #else
+void DrawRectangle555(int x1, int y1, int x2, int y2, int c){
+    int x,y,t;
+    uint16_t col=((c & 0xf8)>>3) | ((c& 0xf800)>>6) | ((c & 0xf80000)>>9);
+    if(x1 < 0) x1 = 0;
+    if(x1 >= HRes) x1 = HRes - 1;
+    if(x2 < 0) x2 = 0; 
+    if(x2 >= HRes) x2 = HRes - 1;
+    if(y1 < 0) y1 = 0;
+    if(y1 >= VRes) y1 = VRes - 1;
+    if(y2 < 0) y2 = 0;
+    if(y2 >= VRes) y2 = VRes - 1;
+    if(x2 <= x1) { t = x1; x1 = x2; x2 = t; }
+    if(y2 <= y1) { t = y1; y1 = y2; y2 = t; }
+    for(y=y1;y<=y2;y++){
+        uint16_t *p=(uint16_t *)((uint8_t *)(WriteBuf+((y*HRes+x1)*2)));
+        for(x=x1;x<=x2;x++){
+            *p++=col;
+       }
+    }
+}
+void DrawBitmap555(int x1, int y1, int width, int height, int scale, int fc, int bc, unsigned char *bitmap){
+    int i, j, k, m, x, y;
+//    unsigned char mask;
+    if(x1>=HRes || y1>=VRes || x1+width*scale<0 || y1+height*scale<0)return;
+    uint16_t fcolour = RGB555(fc);
+    uint16_t bcolour = RGB555(bc);
+    for(i = 0; i < height; i++) {                                   // step thru the font scan line by line
+        for(j = 0; j < scale; j++) {                                // repeat lines to scale the font
+            for(k = 0; k < width; k++) {                            // step through each bit in a scan line
+                for(m = 0; m < scale; m++) {                        // repeat pixels to scale in the x axis
+                    x=x1 + k * scale + m ;
+                    y=y1 + i * scale + j ;
+                    if(x >= 0 && x < HRes && y >= 0 && y < VRes) {  // if the coordinates are valid
+	                    uint16_t *p=(uint16_t *)(((uint32_t) WriteBuf)+(y*(HRes<<1))+(x<<1));
+                        if((bitmap[((i * width) + k)/8] >> (((height * width) - ((i * width) + k) - 1) %8)) & 1) {
+                            *p=fcolour;
+                        } else {
+                            if(bc>=0){
+                                *p=bcolour;
+                            }
+                        }
+                   }
+                }
+            }
+        }
+    }
+}
+
+void DrawBuffer555(int x1, int y1, int x2, int y2, unsigned char *p){
+	int x,y, t;
+    union colourmap
+    {
+    char rgbbytes[4];
+    unsigned int rgb;
+    } c;
+    uint16_t fcolour;
+    uint16_t *pp;
+    // make sure the coordinates are kept within the display area
+    if(x2 <= x1) { t = x1; x1 = x2; x2 = t; }
+    if(y2 <= y1) { t = y1; y1 = y2; y2 = t; }
+    if(x1 < 0) x1 = 0;
+    if(x1 >= HRes) x1 = HRes - 1;
+    if(x2 < 0) x2 = 0;
+    if(x2 >= HRes) x2 = HRes - 1;
+    if(y1 < 0) y1 = 0;
+    if(y1 >= VRes) y1 = VRes - 1;
+    if(y2 < 0) y2 = 0;
+    if(y2 >= VRes) y2 = VRes - 1;
+	for(y=y1;y<=y2;y++){
+    	for(x=x1;x<=x2;x++){
+	        c.rgbbytes[0]=*p++; //this order swaps the bytes to match the .BMP file
+	        c.rgbbytes[1]=*p++;
+	        c.rgbbytes[2]=*p++;
+            fcolour = RGB555(c.rgb);
+            pp=(uint16_t *)(((uint32_t) WriteBuf)+(y*(HRes<<1))+(x<<1));
+            *pp=fcolour;
+        }
+    }
+}
+void DrawBuffer555Fast(int x1, int y1, int x2, int y2, int blank, unsigned char *p){
+	int x,y,t;
+    uint16_t c;
+    uint16_t *pp, *qq=(uint16_t *)p;
+    // make sure the coordinates are kept within the display area
+    if(x2 <= x1) { t = x1; x1 = x2; x2 = t; }
+    if(y2 <= y1) { t = y1; y1 = y2; y2 = t; }
+	for(y=y1;y<=y2;y++){
+    	for(x=x1;x<=x2;x++){
+            if(x>=0 && x<HRes && y>=0 && y<VRes){
+                pp=(uint16_t *)(WriteBuf+(y*(HRes<<1))+(x<<1));
+                c=*qq++;
+                if(c!=sprite_transparent || blank==-1)*pp = c;
+            }
+        }
+    }
+}
+void DrawPixel555(int x, int y, int c){
+    if(x<0 || y<0 || x>=HRes || y>=VRes)return;
+    uint16_t colour = RGB555(c);
+	uint16_t *p=(uint16_t *)(((uint32_t) WriteBuf)+(y*(HRes<<1))+(x<<1));
+    *p=colour;
+}
+void ReadBuffer555(int x1, int y1, int x2, int y2, unsigned char *c){
+    int x,y,t;
+    uint16_t *pp;
+    if(x2 <= x1) { t = x1; x1 = x2; x2 = t; }
+    if(y2 <= y1) { t = y1; y1 = y2; y2 = t; }
+    int xx1=x1, yy1=y1, xx2=x2, yy2=y2;
+    if(x1 < 0) xx1 = 0;
+    if(x1 >= HRes) xx1 = HRes - 1;
+    if(x2 < 0) xx2 = 0;
+    if(x2 >= HRes) xx2 = HRes - 1;
+    if(y1 < 0) yy1 = 0;
+    if(y1 >= VRes) yy1 = VRes - 1;
+    if(y2 < 0) yy2 = 0;
+    if(y2 >= VRes) yy2 = VRes - 1;
+	for(y=yy1;y<=yy2;y++){
+    	for(x=xx1;x<=xx2;x++){
+	        pp=(uint16_t *)(((uint32_t) WriteBuf)+(y*(HRes<<1))+(x<<1));
+            t=*pp;
+            *c++=((t&0x1F)<<3);
+            *c++=(((t>>5)&0x1F)<<3);
+            *c++=(((t>>10)&0x1F)<<3);
+        }
+    }
+}
+void ReadBuffer555Fast(int x1, int y1, int x2, int y2, unsigned char *c){
+    int x,y,t;
+    uint16_t *pp, *qq=(uint16_t *)c;
+    if(x2 <= x1) { t = x1; x1 = x2; x2 = t; }
+    if(y2 <= y1) { t = y1; y1 = y2; y2 = t; }
+    int xx1=x1, yy1=y1, xx2=x2, yy2=y2;
+    if(x1 < 0) xx1 = 0;
+    if(x1 >= HRes) xx1 = HRes - 1;
+    if(x2 < 0) xx2 = 0;
+    if(x2 >= HRes) xx2 = HRes - 1;
+    if(y1 < 0) yy1 = 0;
+    if(y1 >= VRes) yy1 = VRes - 1;
+    if(y2 < 0) yy2 = 0;
+    if(y2 >= VRes) yy2 = VRes - 1;
+	for(y=yy1;y<=yy2;y++){
+    	for(x=xx1;x<=xx2;x++){
+	        pp=(uint16_t *)(((uint32_t) WriteBuf)+(y*(HRes<<1))+(x<<1));
+            *qq++=*pp;
+        }
+    }
+}
+void ScrollLCD555(int lines){
+    if(lines==0)return;
+     if(lines >= 0) {
+        for(int i=0;i<VRes-lines;i++) {
+            int d=i*(HRes<<1),s=(i+lines)*(HRes<<1); 
+            for(int c=0;c<(HRes<<1);c++)WriteBuf[d+c]=WriteBuf[s+c];
+        }
+        DrawRectangle(0, VRes-lines, HRes - 1, VRes - 1, PromptBC); // erase the lines to be scrolled off
+    } else {
+    	lines=-lines;
+        for(int i=VRes-1;i>=lines;i--) {
+            int d=i*(HRes<<1),s=(i-lines)*(HRes<<1); 
+            for(int c=0;c<(HRes<<1);c++)WriteBuf[d+c]=WriteBuf[s+c];
+        }
+        DrawRectangle(0, 0, HRes - 1, lines - 1, PromptBC); // erase the lines introduced at the top
+    }
+}
 void cmd_tile(void){
    unsigned char *tp;
     uint32_t bcolour=0xFFFFFFFF,fcolour=0xFFFFFFFF;
     int xlen=1,ylen=1;
+    if(DISPLAY_TYPE!=SCREENMODE1)error("Invalid for this screen mode");
     if(checkstring(cmdline,(unsigned char *)"RESET")){
         for(int x=0;x<X_TILE;x++){
             for(int y=0;y<Y_TILE;y++){
@@ -6257,6 +6458,7 @@ void cmd_tile(void){
 void cmd_map(void){
 	unsigned char *p;
     static bool first=true;
+    if(!(DISPLAY_TYPE==SCREENMODE2 || DISPLAY_TYPE==SCREENMODE3 ))error("Invalid for this screen mode");
     if((p=checkstring(cmdline, (unsigned char *)"RESET"))) {
         while(v_scanline!=2){}
         for(int i=0;i<16;i++)map16[i]=remap[i]=RGB555(MAP16DEF[i]);
@@ -6289,14 +6491,17 @@ void cmd_map(void){
 #endif
 
 void cmd_mode(void){
-    int mode =getint(cmdline,1,3);
-    if(mode==3){
+    int mode =getint(cmdline,1,MAXMODES);
+    if(mode==4){
+        DISPLAY_TYPE=SCREENMODE4; 
+        ScreenSize=MODE4SIZE;
+    } else if(mode==3){
         DISPLAY_TYPE=SCREENMODE3; 
         ScreenSize=MODE3SIZE;
     } else if(mode==2){
         DISPLAY_TYPE=SCREENMODE2; 
         ScreenSize=MODE2SIZE;
-    } else {
+    } else { //mode=1
 #ifdef rp2350
         tilefcols=(uint16_t *)((uint8_t*)FRAMEBUFFER+(MODE1SIZE*3));
         tilebcols=(uint16_t *)((uint8_t*)FRAMEBUFFER+(MODE1SIZE*4));
@@ -6318,7 +6523,7 @@ void cmd_mode(void){
     memset(WriteBuf, 0, ScreenSize);
     CurrentX = CurrentY =0;
     ClearScreen(Option.DefaultBC);
-    if(mode==2){
+    if(mode==2 || mode==4){
         SetFont((6<<4) | 1) ;
     } else SetFont(1) ;
 #ifdef USBKEYBOARD
@@ -6362,7 +6567,7 @@ void cmd_refresh(void){
 	Display_Refresh();
 }
 
-void DrawPixelColour(int x, int y, int c){
+void DrawPixel16(int x, int y, int c){
     if(x<0 || y<0 || x>=HRes || y>=VRes)return;
     if(Option.DISPLAY_TYPE>=VIRTUAL && WriteBuf==NULL) WriteBuf=GetMemory(640*480/8);
     unsigned char colour = ((c & 0x800000)>> 20) | ((c & 0xC000)>>13) | ((c & 0x80)>>7);
@@ -6375,7 +6580,7 @@ void DrawPixelColour(int x, int y, int c){
         *p |= colour;
     }
 }
-void DrawRectangleColour(int x1, int y1, int x2, int y2, int c){
+void DrawRectangle16(int x1, int y1, int x2, int y2, int c){
     int x,y,x1p,x2p,t;
 //    unsigned char mask;
     unsigned char colour = ((c & 0x800000)>> 20) | ((c & 0xC000)>>13) | ((c & 0x80)>>7);
@@ -6412,7 +6617,7 @@ void DrawRectangleColour(int x1, int y1, int x2, int y2, int c){
         }
     }
 }
-void DrawBitmapColour(int x1, int y1, int width, int height, int scale, int fc, int bc, unsigned char *bitmap){
+void DrawBitmap16(int x1, int y1, int width, int height, int scale, int fc, int bc, unsigned char *bitmap){
     int i, j, k, m, x, y;
 //    unsigned char mask;
     if(x1>=HRes || y1>=VRes || x1+width*scale<0 || y1+height*scale<0)return;
@@ -6454,7 +6659,7 @@ void DrawBitmapColour(int x1, int y1, int width, int height, int scale, int fc, 
 
 }
 
-void ScrollLCDColour(int lines){
+void ScrollLCD16(int lines){
     if(lines==0)return;
      if(lines >= 0) {
         for(int i=0;i<VRes-lines;i++) {
@@ -6471,7 +6676,7 @@ void ScrollLCDColour(int lines){
         DrawRectangle(0, 0, HRes - 1, lines - 1, PromptBC); // erase the lines introduced at the top
     }
 }
-void DrawBufferColour(int x1, int y1, int x2, int y2, unsigned char *p){
+void DrawBuffer16(int x1, int y1, int x2, int y2, unsigned char *p){
 	int x,y, t;
     union colourmap
     {
@@ -6509,7 +6714,7 @@ void DrawBufferColour(int x1, int y1, int x2, int y2, unsigned char *p){
         }
     }
 }
-void DrawBufferColourFast(int x1, int y1, int x2, int y2, int blank, unsigned char *p){
+void DrawBuffer16Fast(int x1, int y1, int x2, int y2, int blank, unsigned char *p){
 	int x,y, t,toggle=0;
     unsigned char c,w;
     uint8_t *pp;
@@ -6548,7 +6753,7 @@ void DrawBufferColourFast(int x1, int y1, int x2, int y2, int blank, unsigned ch
         }
     }
 }
-void ReadBufferColour(int x1, int y1, int x2, int y2, unsigned char *c){
+void ReadBuffer16(int x1, int y1, int x2, int y2, unsigned char *c){
     int x,y,t;
     uint8_t *pp;
     if(Option.DISPLAY_TYPE>=VIRTUAL && WriteBuf==NULL) WriteBuf=GetMemory(640*480/8);
@@ -6590,7 +6795,7 @@ void ReadBufferColour(int x1, int y1, int x2, int y2, unsigned char *c){
         }
     }
 }
-void ReadBufferColourFast(int x1, int y1, int x2, int y2, unsigned char *c){
+void ReadBuffer16Fast(int x1, int y1, int x2, int y2, unsigned char *c){
     int x,y,t,toggle=0;
     uint8_t *pp;
     if(x2 <= x1) { t = x1; x1 = x2; x2 = t; }
@@ -6622,7 +6827,7 @@ void ReadBufferColourFast(int x1, int y1, int x2, int y2, unsigned char *c){
 void Display_Refresh(void){
 }
 #endif
-void DrawPixelMono(int x, int y, int c){
+void DrawPixel2(int x, int y, int c){
     if(x<0 || y<0 || x>=HRes || y>=VRes)return;
     if(Option.DISPLAY_TYPE>=VIRTUAL && WriteBuf==NULL) WriteBuf=GetMemory(640*480/8);
 	uint8_t *p=(uint8_t *)(((uint32_t) WriteBuf)+(y*(HRes>>3))+(x>>3));
@@ -6630,7 +6835,7 @@ void DrawPixelMono(int x, int y, int c){
 	if(c)*p |=bit;
 	else *p &= ~bit;
 }
-void DrawRectangleMono(int x1, int y1, int x2, int y2, int c){
+void DrawRectangle2(int x1, int y1, int x2, int y2, int c){
     int x,y,x1p, x2p, t;
     unsigned char mask;
     unsigned char *p;
@@ -6697,7 +6902,7 @@ void DrawRectangleMono(int x1, int y1, int x2, int y2, int c){
     }
 }
 
-void DrawBitmapMono(int x1, int y1, int width, int height, int scale, int fc, int bc, unsigned char *bitmap){
+void DrawBitmap2(int x1, int y1, int width, int height, int scale, int fc, int bc, unsigned char *bitmap){
     int i, j, k, m, x, y, loc;
     unsigned char mask;
     if(x1>=HRes || y1>=VRes || x1+width*scale<0 || y1+height*scale<0)return;
@@ -6808,7 +7013,7 @@ void DrawBitmapMono(int x1, int y1, int width, int height, int scale, int fc, in
     }
 }
 
-void ScrollLCDMono(int lines){
+void ScrollLCD2(int lines){
     if(lines==0)return;
 
      if(lines >= 0) {
@@ -6864,7 +7069,7 @@ void ScrollLCDMono(int lines){
         DrawRectangle(0, 0, HRes - 1, lines - 1, 0); // erase the lines introduced at the top
     }
 }
-void DrawBufferMono(int x1, int y1, int x2, int y2, unsigned char *p){
+void DrawBuffer2(int x1, int y1, int x2, int y2, unsigned char *p){
 	int x,y, t, loc;
     unsigned char mask;
     union colourmap
@@ -6903,7 +7108,7 @@ void DrawBufferMono(int x1, int y1, int x2, int y2, unsigned char *p){
         }
     }
 }
-void DrawBufferMonoFast(int x1, int y1, int x2, int y2, int blank, unsigned char *p){
+void DrawBuffer2Fast(int x1, int y1, int x2, int y2, int blank, unsigned char *p){
 	int x,y, t, loc, toggle=0;
     unsigned char mask;
     // make sure the coordinates are kept within the display area
@@ -6937,7 +7142,7 @@ void DrawBufferMonoFast(int x1, int y1, int x2, int y2, int blank, unsigned char
     }
 }
 
-void ReadBufferMono(int x1, int y1, int x2, int y2, unsigned char *c){
+void ReadBuffer2(int x1, int y1, int x2, int y2, unsigned char *c){
     int x,y,t,loc;
 //    uint8_t *pp;
     unsigned char mask;
@@ -6978,7 +7183,7 @@ void ReadBufferMono(int x1, int y1, int x2, int y2, unsigned char *c){
     }
 }
 
-void ReadBufferMonoFast(int x1, int y1, int x2, int y2, unsigned char *c){
+void ReadBuffer2Fast(int x1, int y1, int x2, int y2, unsigned char *c){
     int x,y,t,loc,toggle=0;;
 //    uint8_t *pp;
     unsigned char mask;
@@ -7029,23 +7234,23 @@ void MIPS16 InitDisplayVirtual(void){
     DisplayHRes = HRes = display_details[Option.DISPLAY_TYPE].horizontal;
     DisplayVRes = VRes = display_details[Option.DISPLAY_TYPE].vertical;
 	if(Option.DISPLAY_TYPE==VIRTUAL_M){
-		DrawRectangle=DrawRectangleMono;
-		DrawBitmap= DrawBitmapMono;
-		ScrollLCD=ScrollLCDMono;
-		DrawBuffer=DrawBufferMono;
-		ReadBuffer=ReadBufferMono;
-		DrawBufferFast=DrawBufferMonoFast;
-		ReadBufferFast=ReadBufferMonoFast;
-		DrawPixel=DrawPixelMono;
+		DrawRectangle=DrawRectangle2;
+		DrawBitmap= DrawBitmap2;
+		ScrollLCD=ScrollLCD2;
+		DrawBuffer=DrawBuffer2;
+		ReadBuffer=ReadBuffer2;
+		DrawBufferFast=DrawBuffer2Fast;
+		ReadBufferFast=ReadBuffer2Fast;
+		DrawPixel=DrawPixel2;
 	} else {
-		DrawRectangle=DrawRectangleColour;
-		DrawBitmap= DrawBitmapColour;
-		ScrollLCD=ScrollLCDColour;
-		DrawBuffer=DrawBufferColour;
-		ReadBuffer=ReadBufferColour;
-		DrawBufferFast=DrawBufferColourFast;
-		ReadBufferFast=ReadBufferColourFast;
-    	DrawPixel=DrawPixelColour;
+		DrawRectangle=DrawRectangle16;
+		DrawBitmap= DrawBitmap16;
+		ScrollLCD=ScrollLCD16;
+		DrawBuffer=DrawBuffer16;
+		ReadBuffer=ReadBuffer16;
+		DrawBufferFast=DrawBuffer16Fast;
+		ReadBufferFast=ReadBuffer16Fast;
+    	DrawPixel=DrawPixel16;
 	}
 	if(WriteBuf==NULL)WriteBuf=GetMemory(640*480/8);
 }
@@ -7181,30 +7386,54 @@ void MIPS16 ResetDisplay(void) {
     PromptFC = Option.DefaultFC;
     PromptBC = Option.DefaultBC;
 #ifdef PICOMITEVGA
-        HRes=DISPLAY_TYPE == SCREENMODE3 ? 640: (DISPLAY_TYPE == SCREENMODE2 ? 320 : 640);
-        VRes=DISPLAY_TYPE == SCREENMODE3 ? 480: (DISPLAY_TYPE == SCREENMODE2 ? 240 : 480);
-        ScreenSize=(DISPLAY_TYPE == SCREENMODE3 ? MODE3SIZE: (DISPLAY_TYPE == SCREENMODE2 ? MODE2SIZE : MODE1SIZE));
+        HRes=((DISPLAY_TYPE == SCREENMODE1 ||  DISPLAY_TYPE == SCREENMODE3) ? 640: 320);
+        VRes=((DISPLAY_TYPE == SCREENMODE1 ||  DISPLAY_TYPE == SCREENMODE3) ? 480: 240);
+        switch(DISPLAY_TYPE){
+            case SCREENMODE1:
+                ScreenSize=MODE1SIZE;
+                break;
+            case SCREENMODE2:
+                ScreenSize=MODE2SIZE;
+                break;
+            case SCREENMODE3:
+                ScreenSize=MODE3SIZE;
+                break;
+            case SCREENMODE4:
+                ScreenSize=MODE4SIZE;
+                break;
+        }
 #ifndef HDMI
         VGAxoffset=0,VGAyoffset=0;
 #endif
         if(DISPLAY_TYPE == SCREENMODE2 || DISPLAY_TYPE == SCREENMODE3){
-            DrawRectangle=DrawRectangleColour;
-            DrawBitmap= DrawBitmapColour;
-            ScrollLCD=ScrollLCDColour;
-            DrawBuffer=DrawBufferColour;
-            ReadBuffer=ReadBufferColour;
-            DrawBufferFast=DrawBufferColourFast;
-            ReadBufferFast=ReadBufferColourFast;
-            DrawPixel=DrawPixelColour;
+            DrawRectangle=DrawRectangle16;
+            DrawBitmap= DrawBitmap16;
+            ScrollLCD=ScrollLCD16;
+            DrawBuffer=DrawBuffer16;
+            ReadBuffer=ReadBuffer16;
+            DrawBufferFast=DrawBuffer16Fast;
+            ReadBufferFast=ReadBuffer16Fast;
+            DrawPixel=DrawPixel16;
+#ifdef HDMI
+        } else if(DISPLAY_TYPE == SCREENMODE4){
+            DrawRectangle=DrawRectangle555;
+            DrawBitmap= DrawBitmap555;
+            ScrollLCD=ScrollLCD555;
+            DrawBuffer=DrawBuffer555;
+            ReadBuffer=ReadBuffer555;
+            DrawBufferFast=DrawBuffer555Fast;
+            ReadBufferFast=ReadBuffer555Fast;
+            DrawPixel=DrawPixel555;
+#endif
         } else {
-            DrawRectangle=DrawRectangleMono;
-            DrawBitmap= DrawBitmapMono;
-            ScrollLCD=ScrollLCDMono;
-            DrawBuffer=DrawBufferMono;
-            ReadBuffer=ReadBufferMono;
-            DrawBufferFast=DrawBufferMonoFast;
-            ReadBufferFast=ReadBufferMonoFast;
-            DrawPixel=DrawPixelMono;
+            DrawRectangle=DrawRectangle2;
+            DrawBitmap= DrawBitmap2;
+            ScrollLCD=ScrollLCD2;
+            DrawBuffer=DrawBuffer2;
+            ReadBuffer=ReadBuffer2;
+            DrawBufferFast=DrawBuffer2Fast;
+            ReadBufferFast=ReadBuffer2Fast;
+            DrawPixel=DrawPixel2;
             PromptFC = gui_fcolour= RGB121map[Option.VGAFC & 0xf];
             PromptBC = gui_bcolour= RGB121map[Option.VGABC & 0xf];
         }

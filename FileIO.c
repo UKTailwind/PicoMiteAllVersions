@@ -1405,7 +1405,7 @@ void MIPS16 cmd_save(void)
     if (!InitSDCard()) return;
     fnbr = FindFreeFileNbr();
     if ((p = checkstring(cmdline, (unsigned char *)"COMPRESSED IMAGE")) != NULL){
-        if(!(ReadBuffer==ReadBufferColour || ReadBuffer==ReadBufferMono))error("Invalid for this display");
+        if(!(ReadBuffer==ReadBuffer16 || ReadBuffer==ReadBuffer2))error("Invalid for this display");
         unsigned int nbr;
         int i, x, y, w, h, filesize;
         union colourmap
@@ -1559,7 +1559,7 @@ void MIPS16 cmd_save(void)
     }
     if ((p = checkstring(cmdline, (unsigned char *)"IMAGE")) != NULL)
     {
-        if(ReadBuffer==ReadBufferColour || ReadBuffer==ReadBufferMono){
+        if(ReadBuffer==ReadBuffer16 || ReadBuffer==ReadBuffer2){
 	        unsigned int nbr;
 	        int i, x, y, w, h, filesize;
 	        union colourmap
