@@ -471,8 +471,10 @@ void MIPS16 cmd_memory(void) {
     int CFunctSize, CFunctSizeK, CFunctNbr, CFunctPercent, FontSize, FontSizeK, FontNbr, FontPercent, LibrarySizeK, LibraryPercent,LibraryMaxK;
     unsigned int CurrentRAM, *pint;
 
-    CurrentRAM = HEAP_MEMORY_SIZE + MAXVARS * sizeof(struct s_vartbl) + PSRAMsize;
-
+    CurrentRAM = HEAP_MEMORY_SIZE + MAXVARS * sizeof(struct s_vartbl);
+#ifdef rp2350
+    CurrentRAM+=PSRAMsize;
+#endif
     // calculate the space allocated to variables on the heap
     for(i = VarCnt = vsize = var = 0; var < MAXVARS; var++) {
         if(vartbl[var].type == T_NOTYPE) continue;
@@ -903,7 +905,7 @@ void __not_in_flash_func(MBitsSet)(unsigned char *addr, int bits) {
     i = ((((unsigned int)addr/PAGESIZE)) & (PAGESPERWORD - 1)) * PAGEBITS; // get the position of the bits in the word
     *p = (bits << i) | (*p & (~(((1 << PAGEBITS) -1) << i)));
 }
-
+#ifdef rp2350
 void __not_in_flash_func(*GetPSMemory)(int size) {
     unsigned int j, n;
     unsigned char *addr;
@@ -927,7 +929,7 @@ void __not_in_flash_func(*GetPSMemory)(int size) {
     error("Not enough memory");
     return NULL;                                                    // keep the compiler happy
 }    
-
+#endif
 
 void __not_in_flash_func(*GetMemory)(int size) {
     unsigned int j, n;

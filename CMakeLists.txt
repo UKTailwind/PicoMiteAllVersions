@@ -1,14 +1,18 @@
 cmake_minimum_required(VERSION 3.13)
 # Valid builds are PICO, PICOUSB, VGA, VGAUSB, HDMI(rp2350 only), HDMIUSB(rp2350 only), WEB(rp2040 only)
 
-set(COMPILE PICORP2350)
+set(COMPILE PICOUSB)
 
 if (COMPILE STREQUAL "HDMI" OR COMPILE STREQUAL "HDMIUSB"  OR COMPILE STREQUAL "VGARP2350"  OR COMPILE STREQUAL "VGAUSBRP2350"  OR COMPILE STREQUAL "PICORP2350"  OR COMPILE STREQUAL "PICOUSBRP2350" )
 	set(PICO_PLATFORM rp2350)
 	set(PICO_BOARD pimoroni_pga2350)
 else()
 	set(PICO_PLATFORM rp2040)
-	set(PICO_BOARD pico)
+	if (COMPILE STREQUAL "WEB")
+		set(PICO_BOARD pico_w)
+	else()
+		set(PICO_BOARD pico)
+	endif()
 endif()
 include(pico_sdk_import.cmake)
 project(test_project C CXX ASM)
@@ -113,7 +117,9 @@ endif()
 
 if (COMPILE STREQUAL "VGAUSB" OR COMPILE STREQUAL "PICOUSB" OR COMPILE STREQUAL "HDMIUSB" OR COMPILE STREQUAL "PICOUSBRP2350" OR COMPILE STREQUAL "VGAUSBRP2350")
 	Pico_enable_stdio_usb(PicoMite 0)
-	target_include_directories(PicoMite PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+	target_include_directories(PicoMite PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}
+	${CMAKE_CURRENT_SOURCE_DIR}/usb_host_files
+		)
 else()
 	Pico_enable_stdio_usb(PicoMite 1)
 endif()

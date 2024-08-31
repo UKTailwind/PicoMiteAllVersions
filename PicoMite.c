@@ -3229,7 +3229,9 @@ int MIPS16 main(){
     USBenabled=true;
     
 #endif
+#ifdef rp2350
     if(PSRAMsize){MMPrintString("Total of ");PInt(PSRAMsize/(1024*1024));MMPrintString(" Mbytes PSRAM available\r\n");}
+#endif
 	if(setjmp(mark) != 0) {
      // we got here via a long jump which means an error or CTRL-C or the program wants to exit to the command prompt
         FlashLoad = 0;
