@@ -17,5 +17,13 @@ set(COMPILE PICOUSBRP2350)<br>
 set(COMPILE VGAUSBRP2350)<br>
 set(COMPILE HDMI)<br>
 set(COMPILE HDMIUSB)<br>
-
+<br>
+Any of the RP2350 variants or the RP2040 variants can be built by simply changing the set(COMPILE aaaa)<br>
+However, to swap between a rp2040 build and a rp2350 build (or vis versa) needs a different build directory.
+The process for doing this is as follows:<br>
+Close VSCode
+Rename the current build directory - e.g. build -> buildrp2040
+Rename the inactive build directory - e.g. buildrp2350 -> build
+edit CMakeLists.txt to choose a setting for the other chip and save it - e.g.  set(COMPILE PICO) -> set(COMPILE PICORP2350)
+Restart VSCode
 
