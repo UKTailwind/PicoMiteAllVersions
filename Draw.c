@@ -7211,8 +7211,8 @@ void MIPS16 ResetDisplay(void) {
 #else
 #ifdef rp2350
         if(DISPLAY_TYPE==SCREENMODE1){
-            tilefcols=(uint16_t *)((uint8_t*)FRAMEBUFFER+(MODE1SIZE*3));
-            tilebcols=(uint16_t *)((uint8_t*)FRAMEBUFFER+(MODE1SIZE*4));
+            tilefcols=(uint16_t *)((uint32_t)FRAMEBUFFER+(MODE1SIZE*3));
+            tilebcols=(uint16_t *)((uint32_t)FRAMEBUFFER+(MODE1SIZE*3)+MODE1HALF);
         }
 #endif
         for(int x=0;x<X_TILE;x++){

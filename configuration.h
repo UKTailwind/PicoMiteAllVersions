@@ -71,6 +71,7 @@ extern "C" {
         #define MAXSUBFUN           256                     // each entry takes up 4 bytes
     #endif
     #define MODE1SIZE  640*480/8
+    #define MODE1HALF  MODE1SIZE/2
     #define MODE2SIZE  320*240/2
     #define MODE3SIZE  640*480/2
     #define MODE4SIZE  320*240
@@ -95,7 +96,7 @@ extern "C" {
 #ifdef PICOMITE
     #define MIN_CPU     48000
     #ifdef rp2350
-        #define HEAP_MEMORY_SIZE (180*1024) 
+        #define HEAP_MEMORY_SIZE (256*1024) 
         #define MAXVARS             768                     // 8 + MAXVARLEN + MAXDIM * 2  (ie, 56 bytes) - these do not incl array members
         #define FLASH_TARGET_OFFSET (768 * 1024) 
         #define MAX_CPU     378000

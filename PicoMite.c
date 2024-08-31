@@ -2704,8 +2704,8 @@ void MIPS64 __not_in_flash_func(HDMICore)(void){
 }
 void settiles(void){
     if(DISPLAY_TYPE!=SCREENMODE1)return;
-    tilefcols=(uint16_t *)DisplayBuf+(MODE1SIZE*3);
-    tilebcols=tilefcols+(640/8)*(480/8); //minimum tilesize is 8x8
+    tilefcols=(uint16_t *)((uint32_t)FRAMEBUFFER+(MODE1SIZE*3));
+    tilebcols=(uint16_t *)((uint32_t)FRAMEBUFFER+(MODE1SIZE*3)+MODE1HALF);
     ytileheight=12;
     X_TILE=640/8;Y_TILE=480/ytileheight;
     for(int x=0;x<X_TILE;x++){
