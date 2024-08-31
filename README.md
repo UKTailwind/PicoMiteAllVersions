@@ -19,7 +19,7 @@ set(COMPILE HDMI)<br>
 set(COMPILE HDMIUSB)<br>
 <br>
 Any of the RP2350 variants or the RP2040 variants can be built by simply changing the set(COMPILE aaaa)<br>
-However, to swap between a rp2040 build and a rp2350 build (or vis versa) needs a different build directory.
+However, to swap between a rp2040 build and a rp2350 build (or visa versa) needs a different build directory.
 The process for doing this is as follows:<br>
 Close VSCode
 Rename the current build directory - e.g. build -> buildrp2040
