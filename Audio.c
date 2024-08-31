@@ -139,8 +139,6 @@ volatile uint8_t mono;
 //int debug = 0;
 drwav *mywav;
 drflac *myflac;
-//drflac* myflac=NULL;
-//drmp3 mymp3;
 a_flist *alist=NULL;
 uint8_t trackplaying=0, trackstoplay=0;
 unsigned short *noisetable=NULL;
@@ -155,7 +153,7 @@ int *streamreadpointer=NULL;
 char *streambuffer=NULL;
 char WAVfilename[FF_MAX_LFN]={0};
 #ifdef rp2350
-drmp3 mymp3;
+drmp3 *mymp3;
 float *fbuff1, *fbuff2;
 #endif
 void* my_malloc(size_t sz, void* pUserData)
@@ -656,6 +654,12 @@ void CloseAudio(int all){
 	memset(mywav,0,sizeof(drwav));
 	if(was_playing == P_FLAC || was_playing == P_PAUSE_FLAC )FreeMemorySafe((void **)&myflac);
 	if(was_playing == P_WAV || was_playing == P_PAUSE_WAV )FreeMemorySafe((void **)&mywav);
+#ifdef rp2350
+	if((was_playing == P_MP3 || was_playing == P_PAUSE_MP3 ) && Option.AUDIO_L){
+		drmp3_uninit(mymp3);
+		FreeMemorySafe((void **)&mymp3);
+	}
+#endif
     int i;
     for(i=0;i<MAXSOUNDS;i++){
     	sound_PhaseM_left[i]=0;
@@ -817,18 +821,19 @@ void mp3callback(char *p, int position){
     if(CurrentlyPlaying == P_MP3){
     	CloseAudio(0);
     }
-    if(drmp3_init(&mymp3, (drmp3_read_proc)onRead, (drmp3_seek_proc)onSeek, NULL,  &allocationCallbacks)==DRMP3_FALSE)error("Mp3 init");
+	mymp3=GetMemory(sizeof(drmp3));
+    if(drmp3_init(mymp3, (drmp3_read_proc)onRead, (drmp3_seek_proc)onSeek, NULL,  &allocationCallbacks)==DRMP3_FALSE)error("Mp3 init");
     FreeMemorySafe((void *)&sbuff1);
     FreeMemorySafe((void *)&sbuff2);
 //	PInt(mymp3.channels);MMPrintString(" Channels\r\n");
 //	PInt(mymp3.sampleRate);MMPrintString(" Sample rate\r\n");
-	mono=(mymp3.channels == 1 ? 1 : 0);
+	mono=(mymp3->channels == 1 ? 1 : 0);
     sbuff1 = GetMemory(WAV_BUFFER_SIZE*4);
     sbuff2 = GetMemory(WAV_BUFFER_SIZE*4);
     fbuff1 = (float *)sbuff1;
     fbuff2 = (float *)sbuff2;
-	setrate(mymp3.sampleRate);
-    bcount[1]=drmp3_read_pcm_frames_f32(&mymp3, WAV_BUFFER_SIZE/2, (float*)sbuff1) * mymp3.channels;
+	setrate(mymp3->sampleRate);
+    bcount[1]=drmp3_read_pcm_frames_f32(mymp3, WAV_BUFFER_SIZE/2, (float*)sbuff1) * mymp3->channels;
     fconvert(fbuff1, (uint16_t *)sbuff1, bcount[1]);
     wav_filesize=bcount[1];
     CurrentlyPlaying = P_MP3;
@@ -1905,11 +1910,11 @@ void checkWAVinput(void){
 #ifdef rp2350
 			} else if(CurrentlyPlaying == P_MP3){
 				if(swingbuf==2){
-					bcount[1]=drmp3_read_pcm_frames_f32(&mymp3, WAV_BUFFER_SIZE/2, (float*)sbuff1) * mymp3.channels;
+					bcount[1]=drmp3_read_pcm_frames_f32(mymp3, WAV_BUFFER_SIZE/2, (float*)sbuff1) * mymp3->channels;
 					fconvert(fbuff1, (uint16_t *)sbuff1, bcount[1]);
 					wav_filesize = bcount[1];
 				} else {
-					bcount[2]=drmp3_read_pcm_frames_f32(&mymp3, WAV_BUFFER_SIZE/2, (float*)sbuff2) * mymp3.channels;
+					bcount[2]=drmp3_read_pcm_frames_f32(mymp3, WAV_BUFFER_SIZE/2, (float*)sbuff2) * mymp3->channels;
 					fconvert(fbuff2, (uint16_t *)sbuff2, bcount[2]);
 					wav_filesize = bcount[2];
 				}
@@ -1972,7 +1977,10 @@ void audio_checks(void){
 			if(CurrentlyPlaying == P_MOD)FreeMemory((void *)mcontext);
             if(CurrentlyPlaying == P_WAV)FreeMemorySafe((void **)&mywav);
 #ifdef rp2350
-            if(CurrentlyPlaying == P_MP3)drmp3_uninit(&mymp3);
+            if(CurrentlyPlaying == P_MP3){
+				drmp3_uninit(mymp3);
+				FreeMemorySafe((void **)&mymp3);
+			}
 #endif
             FreeMemorySafe((void **)&sbuff1);
             FreeMemorySafe((void **)&sbuff2);

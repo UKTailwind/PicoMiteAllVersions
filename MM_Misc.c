@@ -442,7 +442,7 @@ void fun_epoch(void){
         targ = T_INT;
 }
 
-void cmd_pause(void) {
+/*void cmd_pause(void) {
 	static int interrupted = false;
     MMFLOAT f;
     static int64_t end,count;
@@ -498,6 +498,68 @@ void cmd_pause(void) {
 		}
     }
 	uSec(end);
+}*/
+void cmd_pause(void) {
+	static int interrupted = false;
+    float f;
+    f = getnumber(cmdline) * 1000;                                     // get the pulse width
+    static uint64_t end, interruptend;
+    
+    if(f < 0) error("Number out of bounds");
+    if(f < 0.005) return;
+
+	/*if(f < 1.5) {
+        
+		uSec(f * 1000);                                         // if less than 1.5mS do the pause right now
+		return;                                                 // and exit straight away
+    }*/
+
+	if(InterruptReturn == NULL) {
+		// we are running pause in a normal program
+		// first check if we have reentered (from an interrupt) and only zero the timer if we have NOT been interrupted.
+		// This means an interrupted pause will resume from where it was when interrupted
+		if(!interrupted) end = time_us_64()+f;
+		interrupted = false;
+
+		while(1) {
+            uint64_t now, pause;
+            now = pause = time_us_64();
+            pause += 100;
+            if(f<1500.0)pause +=2000;
+            while(now < pause && now < end){
+                now = time_us_64();
+            }
+            if(now >= end)return;
+			CheckAbort();
+			if(check_interrupt()) {
+				// if there is an interrupt fake the return point to the start of this stmt
+				// and return immediately to the program processor so that it can send us off
+				// to the interrupt routine.  When the interrupt routine finishes we should reexecute
+				// this stmt and because the variable interrupted is static we can see that we need to
+				// resume pausing rather than start a new pause time.
+				while(*cmdline && *cmdline != cmdtoken) cmdline--;	// step back to find the command token
+				InterruptReturn = cmdline;							// point to it
+				interrupted = true;								    // show that this stmt was interrupted
+				return;											    // and let the interrupt run
+			}
+		}
+        interrupted = false;
+	} else {
+		// we are running pause in an interrupt, this is much simpler but note that
+		// we use a different timer from the main pause code (above)
+		interruptend=time_us_64() + f;
+		while(1) {
+            uint64_t now, pause;
+            now = pause = time_us_64();
+            if(f<1500.0)pause +=2000;
+            pause += 100;
+            while(now < pause && now < interruptend){
+                now = time_us_64();
+            }
+            if(now >= interruptend)return;
+			CheckAbort();
+        }
+	}
 }
 
 void cmd_longString(void){

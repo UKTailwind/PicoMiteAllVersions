@@ -113,8 +113,13 @@ extern const uint32_t MAP4LDEF[4];
 extern volatile uint8_t transparent;
 extern volatile uint v_scanline;
 #else
+#ifdef rp2350
+extern uint16_t *tilefcols;
+extern uint16_t *tilebcols;
+#else
 extern uint16_t tilefcols[];
 extern uint16_t tilebcols[];
+#endif
 #endif
 extern void __not_in_flash_func(QVgaCore)(void);
 extern uint32_t core1stack[];
@@ -201,14 +206,19 @@ extern uint16_t SD_CLK_PIN,SD_MOSI_PIN,SD_MISO_PIN, SD_CS_PIN;
 extern bool screen320;
 extern void clear320(void);
 #ifdef PICOMITEVGA
-#ifndef HDMI
-extern uint32_t __attribute__ ((aligned (256))) M_Foreground[16];
-extern uint32_t __attribute__ ((aligned (256))) M_Background[16];
-extern uint16_t __attribute__ ((aligned (256))) tilefcols[80*40];
-extern uint16_t __attribute__ ((aligned (256))) tilebcols[80*40];
-extern void VGArecovery(int pin);
-extern volatile int VGAxoffset,VGAyoffset;
-#endif
+	#ifndef HDMI
+		extern uint32_t __attribute__ ((aligned (256))) M_Foreground[16];
+		extern uint32_t __attribute__ ((aligned (256))) M_Background[16];
+		#ifdef rp2350
+			extern uint16_t *tilefcols;
+			extern uint16_t *tilebcols;
+		#else
+			extern uint16_t __attribute__ ((aligned (256))) tilefcols[80*40];
+			extern uint16_t __attribute__ ((aligned (256))) tilebcols[80*40];
+		#endif
+		extern void VGArecovery(int pin);
+		extern volatile int VGAxoffset,VGAyoffset;
+	#endif
 #endif
 #ifdef PICOMITEWEB
 	extern volatile int WIFIconnected;

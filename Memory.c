@@ -49,10 +49,15 @@ char __attribute__ ((aligned (256))) FRAMEBUFFER[320*240*2];
 char __attribute__ ((aligned (256))) FRAMEBUFFER[640*480/8];
 #endif
 #ifdef PICOMITEVGA
+#ifdef rp2350
+uint16_t *tilefcols=(uint16_t *)((uint8_t*)FRAMEBUFFER+(MODE1SIZE*3));
+uint16_t *tilebcols=(uint16_t *)((uint8_t*)FRAMEBUFFER+(MODE1SIZE*4));
+#else
+uint16_t __attribute__ ((aligned (256))) tilefcols[80*40];
+uint16_t __attribute__ ((aligned (256))) tilebcols[80*40];
+#endif
 #ifdef HDMI
 uint16_t HDMIlines[2][640]={0};
-uint16_t *tilefcols;
-uint16_t *tilebcols;
 int X_TILE=80, Y_TILE=40;
 uint32_t core1stack[128];
 int ytileheight=480/12;
@@ -63,8 +68,6 @@ uint32_t M_Foreground[16] ={
 uint32_t M_Background[16] ={
 0xffff,0xfff0,0xff0f,0xff00,0xf0ff,0xf0f0,0xf00f,0xf000,0x0fff,0x0ff0,0x0f0f,0x0f00,0x00ff,0x00f0,0x000f,0x0000
 };
-uint16_t __attribute__ ((aligned (256))) tilefcols[80*40];
-uint16_t __attribute__ ((aligned (256))) tilebcols[80*40];
 int ytileheight=16;
 #endif
 unsigned char *WriteBuf=(unsigned char *)FRAMEBUFFER;

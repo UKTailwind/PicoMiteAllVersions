@@ -6295,6 +6295,16 @@ void cmd_mode(void){
         DISPLAY_TYPE=SCREENMODE2; 
         ScreenSize=MODE2SIZE;
     } else {
+#ifdef rp2350
+        tilefcols=(uint16_t *)((uint8_t*)FRAMEBUFFER+(MODE1SIZE*3));
+        tilebcols=(uint16_t *)((uint8_t*)FRAMEBUFFER+(MODE1SIZE*4));
+        for(int x=0;x<X_TILE;x++){
+            for(int y=0;y<Y_TILE;y++){
+                tilefcols[y*X_TILE+x]=Option.VGAFC;
+                tilebcols[y*X_TILE+x]=Option.VGABC;
+           }
+        }
+#endif
         DISPLAY_TYPE=SCREENMODE1;
         ScreenSize=MODE1SIZE;
 #ifdef HDMI
@@ -7199,6 +7209,12 @@ void MIPS16 ResetDisplay(void) {
 #ifdef HDMI
         settiles();
 #else
+#ifdef rp2350
+        if(DISPLAY_TYPE==SCREENMODE1){
+            tilefcols=(uint16_t *)((uint8_t*)FRAMEBUFFER+(MODE1SIZE*3));
+            tilebcols=(uint16_t *)((uint8_t*)FRAMEBUFFER+(MODE1SIZE*4));
+        }
+#endif
         for(int x=0;x<X_TILE;x++){
             for(int y=0;y<Y_TILE;y++){
                 tilefcols[y*X_TILE+x]=Option.VGAFC;
