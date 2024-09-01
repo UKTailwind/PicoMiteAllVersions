@@ -230,7 +230,9 @@ void ScrollDown(void);
 void MarkMode(unsigned char *cb, unsigned char *buf);
 void PositionCursor(unsigned char *curp);
 extern void setterminal();
-
+bool modmode=false;
+int oldfont;
+int oldmode;
 #define MAXCLIP 1024
 // edit command:
 //  EDIT              Will run the full screen editor on the current program memory, if run after an error will place the cursor on the error line
@@ -242,10 +244,19 @@ void cmd_edit(void) {
     optioncolourcodesave=Option.ColourCode;
 #ifdef PICOMITEVGA
     editactive=1;
-//    int mode = DISPLAY_TYPE;
-    if(HRes!=640)DISPLAY_TYPE=SCREENMODE1;
+    oldmode = DISPLAY_TYPE;
+    oldfont=PromptFont;
+    if(HRes!=640){
+        DISPLAY_TYPE=SCREENMODE1;
+        modmode=true;
+    }
     memset(WriteBuf, 0, ScreenSize);
     ResetDisplay();
+    if(modmode){
+        SetFont(1);
+        PromptFont=1;
+    }
+
 #endif
     if(CurrentLinePtr) error("Invalid in a program");
     if(Option.ColourCode) {
@@ -701,6 +712,12 @@ void FullScreenEditor(int xx, int yy, char *fname) {
                             editactive=0;
                             Y_TILE=OptionY_TILESave;
                             ytileheight=ytileheightsave;
+                            if(modmode){
+                                DISPLAY_TYPE=oldmode;
+                                ResetDisplay();
+                                SetFont(oldfont);
+                                PromptFont=oldfont;
+                            }
 #endif                          
                             if(c != ESC && TextChanged && fname==NULL) SaveToProgMemory();
                             if(c != ESC && TextChanged && fname) {

@@ -89,6 +89,8 @@ extern "C" {
     #include "lwip/udp.h"
 #endif
 #ifdef PICOMITEVGA
+    uint16_t map16[16]={0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};
+    volatile uint8_t transparent=0;
     #ifndef HDMI
     #include "Include.h"
     #endif
@@ -243,12 +245,9 @@ MMFLOAT FAdd(MMFLOAT a, MMFLOAT b){ return a + b; }
 MMFLOAT FSub(MMFLOAT a, MMFLOAT b){ return a - b; }
 MMFLOAT FDiv(MMFLOAT a, MMFLOAT b){ return a / b; }
 uint32_t CFunc_delay_us;
-#ifdef PICOMITEVGA
-uint16_t map16[16]={0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};
 #ifndef HDMI
 volatile int VGAxoffset=0,VGAyoffset=0;
 int QVGA_CLKDIV;	// SM divide clock ticks
-#endif
 #endif
 void PIOExecute(int pion, int sm, uint32_t ins){
     PIO pio = (pion ? pio1: pio0);
@@ -1945,6 +1944,7 @@ void __not_in_flash_func(QVgaLine0)()
 void __not_in_flash_func(QVgaLine1)()
 {
     int i,line,bufinx;
+    uint8_t transparent16=(uint8_t)transparent;
 	// Clear the interrupt request for DMA control channel
 	dma_hw->ints0 = (1u << QVGA_DMA_PIO);
 
@@ -2029,15 +2029,14 @@ void __not_in_flash_func(QVgaLine1)()
                 register unsigned char *p=&DisplayBuf[line * 160];
                 register unsigned char *q=&LayerBuf[line * 160];
                 register int low, high, low2, high2;
-//                register uint16_t *r=fbuff[VGAnextbuf];
                 for(int i=VGAxoffset;i<160;i++){
                     low= map16[*p & 0xF];
                     high=map16[(*p & 0xF0)>>4];
                     low2= map16[*q & 0xF];
                     high2=map16[(*q &0xF0)>>4];
                     p++;q++;
-                    if(low2!=transparentlow)low=low2;
-                    if(high2!=transparenthigh)high=high2;
+                    if(low2!=transparent16)low=low2;
+                    if(high2!=transparent16)high=high2;
                     fbuff[VGAnextbuf][i]=(low | (low<<4) | (high<<8) | (high<<12));
                 }
                 for(int i=0;i<VGAxoffset;i++){
@@ -2046,8 +2045,8 @@ void __not_in_flash_func(QVgaLine1)()
                     low2= map16[*q & 0xF];
                     high2=map16[(*q &0xF0)>>4];
                     p++;q++;
-                    if(low2!=transparentlow)low=low2;
-                    if(high2!=transparenthigh)high=high2;
+                    if(low2!=transparent16)low=low2;
+                    if(high2!=transparent16)high=high2;
                     fbuff[VGAnextbuf][i]=(low | (low<<4) | (high<<8) | (high<<12));
                 }
             } else {
@@ -2057,12 +2056,11 @@ void __not_in_flash_func(QVgaLine1)()
                 register uint8_t *r=(uint8_t *)fbuff[VGAnextbuf];
                 for(int i=0;i<320;i++){
                     low= map16[*p & 0xF];
-                    high=map16[(*p & 0xF0)>>4];
+                    high=map16[(*p++ & 0xF0)>>4];
                     low2= map16[*q & 0xF];
-                    high2=map16[(*q & 0xF0)>>4];
-                    p++;q++;
-                    if(low2!=transparentlow)low=low2;
-                    if(high2!=transparenthigh)high=high2;
+                    high2=map16[(*q++ & 0xF0)>>4];
+                    if(low2!=transparent16)low=low2;
+                    if(high2!=transparent16)high=high2;
                     *r++=low | (high<<4);
                 }
             }
@@ -2386,14 +2384,7 @@ const uint32_t MAP256DEF[256] =
 };
 const uint32_t MAP16DEF[16] = {0x00,0xFF,0x4000,0x40ff,0x8000,0x80ff,0xff00,0xffff,0xff0000,0xff00FF,0xff4000,0xff40ff,0xff8000,0xff80ff,0xffff00,0xffffff};
 const uint32_t MAP4DEF[4] = {0,0xFF,0xFF00,0xFF0000};
-const uint32_t MAP2DEF[2] = {0,0xFFFFFF};
-const uint32_t MAP4LDEF[4] = {0xFFFF,0xFF00FF,0xFFFF00,0xFFFFFF};
 uint16_t map256[256];
-uint16_t map16[16];
-uint16_t map4[4];
-uint16_t map4l[4];
-uint16_t map2[2];
-volatile uint8_t transparent=0;
 static uint32_t vblank_line_vsync_off[] = {
     HSTX_CMD_RAW_REPEAT | MODE_H_FRONT_PORCH,
     SYNC_V1_H1,
@@ -2427,6 +2418,9 @@ static uint32_t vactive_line[] = {
 };
 uint16_t RGB555(uint32_t c){
     return ((c & 0xf8)>>3) | ((c& 0xf800)>>6) | ((c & 0xf80000)>>9);
+}
+uint8_t RGB332(uint32_t c){
+    return ((c & 0b111000000000000000000000)>>16) | ((c & 0b1110000000000000)>>11) | ((c & 0b11000000)>>6);
 }
 uint8_t RGB121(uint32_t c){
     return ((c & 0x800000)>> 20) | ((c & 0xC000)>>13) | ((c & 0x80)>>7);
@@ -2479,11 +2473,6 @@ void MIPS64 __not_in_flash_func(HDMICore)(void){
     int last_line=2,load_line, line_to_load, Line_dup;
     for(int i=0;i<256;i++)map256[i]=RGB555(MAP256DEF[i]);
     for(int i=0;i<16;i++)map16[i]=RGB555(MAP16DEF[i]);
-    for(int i=0;i<4;i++){
-        map4[i]=RGB555(MAP4DEF[i]);
-        map4l[i]=RGB555(MAP4LDEF[i]);
-    }
-    for(int i=0;i<2;i++)map2[i]=RGB555(MAP2DEF[i]);
 
         // Configure HSTX's TMDS encoder for RGB332
         hstx_ctrl_hw->expand_tmds =
@@ -2584,18 +2573,22 @@ void MIPS64 __not_in_flash_func(HDMICore)(void){
 
     while (1){
         if(v_scanline!=last_line){
+            uint8_t transparent16=(uint8_t)transparent;
             last_line=v_scanline;
             load_line=v_scanline - (MODE_V_TOTAL_LINES - MODE_V_ACTIVE_LINES);
             Line_dup=load_line>>1;
             line_to_load = last_line & 1;
+            uint8_t l,d;
+            int pp;
             uint16_t *p=HDMIlines[line_to_load];
             if(load_line>=0 && load_line<MODE_V_ACTIVE_LINES){
                 __dmb();
                 switch(DISPLAY_TYPE){
                 case SCREENMODE1: //640x480x2 colour
                     uint16_t *fcol=tilefcols+load_line/ytileheight*X_TILE, *bcol=tilebcols+load_line/ytileheight*X_TILE; //get the relevant tile
+                    pp= load_line*80;
                     for(int i=0; i<80 ; i++){
-                        int d=DisplayBuf[load_line*80+i];
+                        d=DisplayBuf[pp+i];
                         *p++ = (d&0x1) ? *fcol : *bcol;
                         d>>=1;
                         *p++ = (d&0x1) ? *fcol : *bcol;
@@ -2616,11 +2609,10 @@ void MIPS64 __not_in_flash_func(HDMICore)(void){
                     }
                     break;
                 case SCREENMODE2: //320x240x16 colour with support for a top layer
-                    int pp= (Line_dup)*160;
-                    uint8_t l,d;
+                    pp= (Line_dup)*160;
                     for(int i=0; i<160 ; i++){
                         l=LayerBuf[pp+i];d=DisplayBuf[pp+i];
-                        if((l&0xf)!=transparent){
+                        if((l&0xf)!=transparent16){
                             *p++=map16[l&0xf];
                             *p++=map16[l&0xf];
                         } else {
@@ -2628,7 +2620,7 @@ void MIPS64 __not_in_flash_func(HDMICore)(void){
                             *p++=map16[d&0xf];
                         }
                         d>>=4;l>>=4;
-                        if((l&0xf)!=transparent){
+                        if((l&0xf)!=transparent16){
                             *p++=map16[l&0xf];
                             *p++=map16[l&0xf];
                         } else {
@@ -2638,55 +2630,38 @@ void MIPS64 __not_in_flash_func(HDMICore)(void){
                     }
                     break;
                 case SCREENMODE3: //640x480x16 colour
+                    pp= load_line*320;
                     for(int i=0; i<320 ; i++){
-                        int d=DisplayBuf[load_line*320+i];
-                        *p++=map16[d&0xf];
-                        d>>=4;
-                        *p++=map16[d&0xf];
+                        d=DisplayBuf[pp+i];
+                        l=LayerBuf[pp+i];
+                        if((l&0xf)!=transparent16){
+                            *p++=map16[l&0xf];
+                        } else {
+                            *p++=map16[d&0xf];
+                        }
+                        d>>=4;l>>=4;
+                        if((l&0xf)!=transparent16){
+                            *p++=map16[l&0xf];
+                        } else {
+                            *p++=map16[d&0xf];
+                        }
                     }
                     break;
                 case SCREENMODE4: //320x240xRGB555 colour
-                    for(int i=0; i<320 ; i++){
-                        uint8_t* d=&DisplayBuf[(Line_dup)*640+i*2];
+                    pp=(Line_dup)*640;
+                    for(int i=0; i<640 ; i+=2){
+                        uint8_t* d=&DisplayBuf[pp+i];
                         int c=*d++;
                         c|=((*d++)<<8);
                         *p++=c;
                         *p++=c;
                     }
                     break;
-                case SCREENMODE5: //640x480x4 colour
-                    for(int i=0; i<160 ; i++){
-                        int d=DisplayBuf[load_line*160+i];
-                        int l=LayerBuf[load_line*160+i];
-                        if(l!=transparent){
-                            *p++=map4l[l & 0x03];
-                        } else {
-                            *p++=map4[d & 0x03];
-                        }
-                        d>>=2;
-                        if(l!=transparent){
-                            *p++=map4l[l & 0x03];
-                        } else {
-                            *p++=map4[d & 0x03];
-                        }
-                        d>>=2;
-                        if(l!=transparent){
-                            *p++=map4l[l & 0x03];
-                        } else {
-                            *p++=map4[d & 0x03];
-                        }
-                        d>>=2;
-                        if(l!=transparent){
-                            *p++=map4l[l & 0x03];
-                        } else {
-                            *p++=map4[d & 0x03];
-                        }
-                    }
-                    break;
-                case SCREENMODE6: //320x240x256 colour
+                case SCREENMODE5: //320x240x256 colour
+                    pp=Line_dup*320;
                     for(int i=0; i<320 ; i++){
-                        int d=DisplayBuf[(Line_dup)*320+i];
-                        int l=LayerBuf[(Line_dup)*320+i];
+                        int d=DisplayBuf[pp+i];
+                        int l=LayerBuf[pp+i];
                         if(l!=transparent){
                             *p++=map256[l];
                             *p++=map256[l];

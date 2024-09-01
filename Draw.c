@@ -119,7 +119,7 @@ char CMM1=0;
 short HRes = 0, VRes = 0;
 short lastx,lasty;
 const int CMM1map[16]={BLACK,BLUE,GREEN,CYAN,RED,MAGENTA,YELLOW,WHITE,MYRTLE,COBALT,MIDGREEN,CERULEAN,RUST,FUCHSIA,BROWN,LILAC};
-int RGB121map[16],remap[16];
+int RGB121map[16],remap[256];
 // pointers to the drawing primitives
 #ifndef PICOMITEWEB
 struct D3D* struct3d[MAX3D + 1] = { NULL };
@@ -143,7 +143,6 @@ volatile int CursorTimer=0;               // used to time the flashing cursor
 extern volatile int QVgaScanLine;
 extern uint16_t map16[16];
 bool mergedread=0;
-int transparenthigh=0,transparentlow=0;
 int ScreenSize=0;
 #else
     int map[16]={0};
@@ -3435,8 +3434,12 @@ void cmd_cls(void) {
     } else {
 #ifdef PICOMITEVGA
         if(WriteBuf==LayerBuf && DISPLAY_TYPE==SCREENMODE2 && LayerBuf!=DisplayBuf){
-            uint8_t colour=transparentlow|transparenthigh;
+            uint8_t colour=transparent|(transparent<<4);
             memset(WriteBuf,colour,HRes*VRes/2);
+#ifdef HDMI
+        } else if(WriteBuf==LayerBuf && DISPLAY_TYPE==SCREENMODE5 && LayerBuf!=DisplayBuf){
+            memset(WriteBuf,transparent,HRes*VRes);
+#endif
         } else
 #endif
         ClearScreen(gui_bcolour);
@@ -5814,12 +5817,12 @@ void cmd_blit(void) {
                 }
                 return;
             }
-        } else if(DISPLAY_TYPE && DISPLAY_TYPE==SCREENMODE4){
+        } else if(DISPLAY_TYPE && (DISPLAY_TYPE==SCREENMODE4 || DISPLAY_TYPE==SCREENMODE5)){
             unsigned char *buff = NULL;
             int max_x;
             if(x1 >= x2) {
                 max_x = 1;
-                buff = GetMemory((max_x * h)<<1);
+                buff = GetMemory((max_x * h) * (DISPLAY_TYPE==SCREENMODE4 ? 2 : 1));
                 while(w > max_x){
                     ReadBufferFast(x1, y1, x1 + max_x - 1, y1 + h - 1, buff);
                     DrawBufferFast(x2, y2, x2 + max_x - 1, y2 + h - 1, -1, buff);
@@ -5834,7 +5837,7 @@ void cmd_blit(void) {
             if(x1 < x2) {
                 int start_x1, start_x2;
                 max_x = 1;
-                buff = GetMemory((max_x * h)<<1);
+                buff = GetMemory((max_x * h) * (DISPLAY_TYPE==SCREENMODE4 ? 2 : 1));
                 start_x1 = x1 + w - max_x;
                 start_x2 = x2 + w - max_x;
                 while(w > max_x){
@@ -6154,14 +6157,19 @@ void fun_map(void){
 	int cl=getint(ep,0,255);
     switch(DISPLAY_TYPE){
         case SCREENMODE1:
-            error("Invalid for Mode 1, use tiles");
+        case SCREENMODE4:
+            error("Invalid for Mode");
         break;
         case SCREENMODE2:
         case SCREENMODE3:
             if(cl>15)error("Mode has 16 colours - 0 to 15");
             targ=T_INT;
-            iret=((cl & 1000)<<20) | ((cl & 0b110)<<13) | ((cl & 0b1)<<7);
-        break;
+            iret=((cl & 0b1000)<<20) | ((cl & 0b110)<<13) | ((cl & 0b1)<<7);
+            break;
+        case SCREENMODE5:
+            targ=T_INT;
+            iret=((cl & 0b11100000)<<16) | ((cl & 0b00011100)<<11) | ((cl & 0b11)<<6);
+            break;
     }
 }
 #ifndef HDMI
@@ -6409,6 +6417,168 @@ void ScrollLCD555(int lines){
         DrawRectangle(0, 0, HRes - 1, lines - 1, PromptBC); // erase the lines introduced at the top
     }
 }
+void DrawRectangle256(int x1, int y1, int x2, int y2, int c){
+    int y,t;
+    uint8_t colour =RGB332(c);
+    if(x1 < 0) x1 = 0;
+    if(x1 >= HRes) x1 = HRes - 1;
+    if(x2 < 0) x2 = 0; 
+    if(x2 >= HRes) x2 = HRes - 1;
+    if(y1 < 0) y1 = 0;
+    if(y1 >= VRes) y1 = VRes - 1;
+    if(y2 < 0) y2 = 0;
+    if(y2 >= VRes) y2 = VRes - 1;
+    if(x2 <= x1) { t = x1; x1 = x2; x2 = t; }
+    if(y2 <= y1) { t = y1; y1 = y2; y2 = t; }
+    for(y=y1;y<=y2;y++){
+        uint8_t *p=WriteBuf+(y*HRes+x1);
+        memset(p,colour,x2-x1+1);
+    }
+}
+void DrawBitmap256(int x1, int y1, int width, int height, int scale, int fc, int bc, unsigned char *bitmap){
+    int i, j, k, m, x, y;
+//    unsigned char mask;
+    if(x1>=HRes || y1>=VRes || x1+width*scale<0 || y1+height*scale<0)return;
+    uint8_t fcolour = RGB332(fc);
+    uint8_t bcolour = RGB332(bc);
+    for(i = 0; i < height; i++) {                                   // step thru the font scan line by line
+        for(j = 0; j < scale; j++) {                                // repeat lines to scale the font
+            for(k = 0; k < width; k++) {                            // step through each bit in a scan line
+                for(m = 0; m < scale; m++) {                        // repeat pixels to scale in the x axis
+                    x=x1 + k * scale + m ;
+                    y=y1 + i * scale + j ;
+                    if(x >= 0 && x < HRes && y >= 0 && y < VRes) {  // if the coordinates are valid
+	                    uint8_t *p=(uint8_t *)((uint32_t)(WriteBuf+y*HRes+x));
+                        if((bitmap[((i * width) + k)/8] >> (((height * width) - ((i * width) + k) - 1) %8)) & 1) {
+                            *p=fcolour;
+                        } else {
+                            if(bc>=0){
+                                *p=bcolour;
+                            }
+                        }
+                   }
+                }
+            }
+        }
+    }
+}
+
+void DrawBuffer256(int x1, int y1, int x2, int y2, unsigned char *p){
+	int x,y, t;
+    union colourmap
+    {
+    char rgbbytes[4];
+    unsigned int rgb;
+    } c;
+    uint8_t fcolour;
+    uint8_t *pp;
+    // make sure the coordinates are kept within the display area
+    if(x2 <= x1) { t = x1; x1 = x2; x2 = t; }
+    if(y2 <= y1) { t = y1; y1 = y2; y2 = t; }
+    if(x1 < 0) x1 = 0;
+    if(x1 >= HRes) x1 = HRes - 1;
+    if(x2 < 0) x2 = 0;
+    if(x2 >= HRes) x2 = HRes - 1;
+    if(y1 < 0) y1 = 0;
+    if(y1 >= VRes) y1 = VRes - 1;
+    if(y2 < 0) y2 = 0;
+    if(y2 >= VRes) y2 = VRes - 1;
+	for(y=y1;y<=y2;y++){
+    	for(x=x1;x<=x2;x++){
+	        c.rgbbytes[0]=*p++; //this order swaps the bytes to match the .BMP file
+	        c.rgbbytes[1]=*p++;
+	        c.rgbbytes[2]=*p++;
+            fcolour = RGB332(c.rgb);
+            pp=(uint8_t *)((uint32_t)(WriteBuf+y*HRes+x));
+            *pp=fcolour;
+        }
+    }
+}
+void DrawBuffer256Fast(int x1, int y1, int x2, int y2, int blank, unsigned char *p){
+	int x,y,t;
+    uint8_t c;
+    uint8_t *pp, *qq=(uint8_t *)p;
+    // make sure the coordinates are kept within the display area
+    if(x2 <= x1) { t = x1; x1 = x2; x2 = t; }
+    if(y2 <= y1) { t = y1; y1 = y2; y2 = t; }
+	for(y=y1;y<=y2;y++){
+    	for(x=x1;x<=x2;x++){
+            if(x>=0 && x<HRes && y>=0 && y<VRes){
+                pp=(uint8_t *)((uint32_t)(WriteBuf+y*HRes+x));
+                c=*qq++;
+                if(c!=sprite_transparent || blank==-1)*pp = c;
+            }
+        }
+    }
+}
+void DrawPixel256(int x, int y, int c){
+    if(x<0 || y<0 || x>=HRes || y>=VRes)return;
+    uint8_t colour = RGB332(c);
+	uint8_t *p=(uint8_t *)((uint32_t)(WriteBuf+y*HRes+x));
+    *p=colour;
+}
+void ReadBuffer256(int x1, int y1, int x2, int y2, unsigned char *c){
+    int x,y,t;
+    uint8_t *pp;
+    if(x2 <= x1) { t = x1; x1 = x2; x2 = t; }
+    if(y2 <= y1) { t = y1; y1 = y2; y2 = t; }
+    int xx1=x1, yy1=y1, xx2=x2, yy2=y2;
+    if(x1 < 0) xx1 = 0;
+    if(x1 >= HRes) xx1 = HRes - 1;
+    if(x2 < 0) xx2 = 0;
+    if(x2 >= HRes) xx2 = HRes - 1;
+    if(y1 < 0) yy1 = 0;
+    if(y1 >= VRes) yy1 = VRes - 1;
+    if(y2 < 0) yy2 = 0;
+    if(y2 >= VRes) yy2 = VRes - 1;
+	for(y=yy1;y<=yy2;y++){
+    	for(x=xx1;x<=xx2;x++){
+	        pp=(uint8_t *)((uint32_t)(WriteBuf+y*HRes+x));
+            t=*pp;
+            *c++=((t & 0x3)<<6);
+            *c++=(((t>>2) & 0x7)<<5);
+            *c++=(((t>>5) & 0x7)<<5);
+        }
+    }
+}
+void ReadBuffer256Fast(int x1, int y1, int x2, int y2, unsigned char *c){
+    int x,y,t;
+    uint8_t *pp, *qq=(uint8_t *)c;
+    if(x2 <= x1) { t = x1; x1 = x2; x2 = t; }
+    if(y2 <= y1) { t = y1; y1 = y2; y2 = t; }
+    int xx1=x1, yy1=y1, xx2=x2, yy2=y2;
+    if(x1 < 0) xx1 = 0;
+    if(x1 >= HRes) xx1 = HRes - 1;
+    if(x2 < 0) xx2 = 0;
+    if(x2 >= HRes) xx2 = HRes - 1;
+    if(y1 < 0) yy1 = 0;
+    if(y1 >= VRes) yy1 = VRes - 1;
+    if(y2 < 0) yy2 = 0;
+    if(y2 >= VRes) yy2 = VRes - 1;
+	for(y=yy1;y<=yy2;y++){
+    	for(x=xx1;x<=xx2;x++){
+	        pp=(uint8_t *)((uint32_t)(WriteBuf+y*HRes+x));
+            *qq++=*pp;
+        }
+    }
+}
+void ScrollLCD256(int lines){
+    if(lines==0)return;
+     if(lines >= 0) {
+        for(int i=0;i<VRes-lines;i++) {
+            int d=i*HRes,s=(i+lines)*HRes; 
+            for(int c=0;c<(HRes);c++)WriteBuf[d+c]=WriteBuf[s+c];
+        }
+        DrawRectangle(0, VRes-lines, HRes - 1, VRes - 1, PromptBC); // erase the lines to be scrolled off
+    } else {
+    	lines=-lines;
+        for(int i=VRes-1;i>=lines;i--) {
+            int d=i*HRes,s=(i-lines)*HRes; 
+            for(int c=0;c<(HRes<<1);c++)WriteBuf[d+c]=WriteBuf[s+c];
+        }
+        DrawRectangle(0, 0, HRes - 1, lines - 1, PromptBC); // erase the lines introduced at the top
+    }
+}
 void cmd_tile(void){
    unsigned char *tp;
     uint32_t bcolour=0xFFFFFFFF,fcolour=0xFFFFFFFF;
@@ -6458,31 +6628,56 @@ void cmd_tile(void){
 void cmd_map(void){
 	unsigned char *p;
     static bool first=true;
-    if(!(DISPLAY_TYPE==SCREENMODE2 || DISPLAY_TYPE==SCREENMODE3 ))error("Invalid for this screen mode");
+    if(!(DISPLAY_TYPE==SCREENMODE2 || DISPLAY_TYPE==SCREENMODE3  || DISPLAY_TYPE==SCREENMODE5 ))error("Invalid for this screen mode");
     if((p=checkstring(cmdline, (unsigned char *)"RESET"))) {
         while(v_scanline!=2){}
-        for(int i=0;i<16;i++)map16[i]=remap[i]=RGB555(MAP16DEF[i]);
+        if(DISPLAY_TYPE==SCREENMODE5)for(int i=0;i<256;i++)map256[i]=remap[i]=RGB555(MAP256DEF[i]);
+        else for(int i=0;i<16;i++)map16[i]=remap[i]=RGB555(MAP16DEF[i]);
         first=false;
     } else if(checkstring(cmdline, (unsigned char *)"GRAYSCALE") || checkstring(cmdline, (unsigned char *)"GREYSCALE")) {
         while(v_scanline!=2){}
-        for(int i=1;i<=16;i++)map16[i-1]=remap[i-1]=RGB555((i*16-(16-i+1))*65536+(i*16-(16-i+1))*256+(i*16-(16-i+1)));
+        if(DISPLAY_TYPE==SCREENMODE5) {
+            for(int i=1;i<=32;i++){
+                int j=i*8-(8-i/4+1);
+                if(j<0)j=0;
+                map256[i-1]=remap[i-1]=RGB555(j*65536 + j*256 + j);
+                map256[i+32-1]=remap[i+32-1]=RGB555(j);
+                map256[i+64-1]=remap[i+64-1]=RGB555(j*256 );
+                map256[i+96-1]=remap[i+96-1]=RGB555(j*256 + j);
+                map256[i+128-1]=remap[i+128-1]=RGB555(j*65536);
+                map256[i+160-1]=remap[i+160-1]=RGB555(j*65536 + j);
+                map256[i+192-1]=remap[i+192-1]=RGB555(j*65536 + j*256);
+                map256[i+224-1]=remap[i+224-1]=RGB555(j*65536 + j*256 + j);
+            }
+        } else {
+            for(int i=1;i<=16;i++){
+                int j=i*16-(16-i+1);
+                map16[i-1]=remap[i-1]= RGB555(j*65536+j*256+j);
+            }
+        }
         first=false;
     } else if((p=checkstring(cmdline, (unsigned char *)"MAXIMITE"))) {
         while(v_scanline!=2){}
-        for(int i=0;i<16;i++)map16[i]=remap[i]=RGB555(CMM1map[i]);
+        if(DISPLAY_TYPE==SCREENMODE5)for(int i=0;i<16;i++)map256[i]=remap[i]=RGB555(CMM1map[i]);
+        else for(int i=0;i<16;i++)map16[i]=remap[i]=RGB555(CMM1map[i]);
         first=false;
     } else if((p=checkstring(cmdline, (unsigned char *)"SET"))) {
         while(v_scanline!=2){}
-         for(int i=0;i<16;i++)map16[i]=remap[i];
+        if(DISPLAY_TYPE==SCREENMODE5) for(int i=0;i<256;i++)map256[i]=remap[i];
+        else for(int i=0;i<16;i++){
+            map16[i]=remap[i];
+        }
     } else {
-    	int cl = getinteger(cmdline);
+    	int cl = getint(cmdline,0,255);
+        if(DISPLAY_TYPE!=SCREENMODE5 && cl >15)error("Mode supports 16 colours (0-15)");
 		while(*cmdline && tokenfunction(*cmdline) != op_equal) cmdline++;
 		if(!*cmdline) error("Invalid syntax");
 		++cmdline;
 		if(!*cmdline) error("Invalid syntax");
 		int col=getColour((char *)cmdline,0);
         if(first){
-            for(int i=0;i<16;i++)remap[i]=RGB555(MAP16DEF[i]);
+            if(DISPLAY_TYPE==SCREENMODE5)for(int i=0;i<256;i++)remap[i]=RGB555(MAP256DEF[i]);
+            else for(int i=0;i<16;i++)remap[i]=RGB555(MAP16DEF[i]);
             first=false;
         }
 		remap[cl]=RGB555(col);
@@ -6492,7 +6687,11 @@ void cmd_map(void){
 
 void cmd_mode(void){
     int mode =getint(cmdline,1,MAXMODES);
-    if(mode==4){
+    closeframebuffer();
+    if(mode==5){
+        DISPLAY_TYPE=SCREENMODE5; 
+        ScreenSize=MODE5SIZE;
+    } else if(mode==4){
         DISPLAY_TYPE=SCREENMODE4; 
         ScreenSize=MODE4SIZE;
     } else if(mode==3){
@@ -6523,9 +6722,13 @@ void cmd_mode(void){
     memset(WriteBuf, 0, ScreenSize);
     CurrentX = CurrentY =0;
     ClearScreen(Option.DefaultBC);
-    if(mode==2 || mode==4){
+    if(DISPLAY_TYPE==SCREENMODE2 || DISPLAY_TYPE==SCREENMODE4 || DISPLAY_TYPE==SCREENMODE5){
         SetFont((6<<4) | 1) ;
-    } else SetFont(1) ;
+        PromptFont=(6<<4) | 1;
+    } else {
+        SetFont(1) ;
+        PromptFont = 1;
+    }
 #ifdef USBKEYBOARD
 	clearrepeat();
 #endif	
@@ -6780,13 +6983,13 @@ void ReadBuffer16(int x1, int y1, int x2, int y2, unsigned char *c){
                 t=colours[(*pp)>>4];
 #ifdef PICOMITEVGA
                 q=colours[(*qq)>>4];
-                if(!(((*qq)>>4)==transparentlow) && mergedread)t=q;
+                if(!(((*qq)>>4)==transparent) && mergedread)t=q;
 #endif
             } else {
                 t=colours[(*pp)&0x0F];
 #ifdef PICOMITEVGA
                 q=colours[(*qq)&0x0F];
-                 if(!(((*qq)&0x0F)==transparentlow) && mergedread)t=q;
+                 if(!(((*qq)&0x0F)==transparent) && mergedread)t=q;
 #endif
             }
             *c++=(t&0xFF);
@@ -7401,6 +7604,9 @@ void MIPS16 ResetDisplay(void) {
             case SCREENMODE4:
                 ScreenSize=MODE4SIZE;
                 break;
+            case SCREENMODE5:
+                ScreenSize=MODE5SIZE;
+                break;
         }
 #ifndef HDMI
         VGAxoffset=0,VGAyoffset=0;
@@ -7424,6 +7630,15 @@ void MIPS16 ResetDisplay(void) {
             DrawBufferFast=DrawBuffer555Fast;
             ReadBufferFast=ReadBuffer555Fast;
             DrawPixel=DrawPixel555;
+        } else if(DISPLAY_TYPE == SCREENMODE5){
+            DrawRectangle=DrawRectangle256;
+            DrawBitmap= DrawBitmap256;
+            ScrollLCD=ScrollLCD256;
+            DrawBuffer=DrawBuffer256;
+            ReadBuffer=ReadBuffer256;
+            DrawBufferFast=DrawBuffer256Fast;
+            ReadBufferFast=ReadBuffer256Fast;
+            DrawPixel=DrawPixel256;
 #endif
         } else {
             DrawRectangle=DrawRectangle2;
@@ -8287,50 +8502,206 @@ void MIPS16 fun_3D(void){
 #endif
 #ifdef PICOMITEVGA
 void closeframebuffer(void){
-#ifndef rp2350
-    if(FrameBuf!=DisplayBuf)FreeMemory(FrameBuf);
-    if(DisplayBuf!=LayerBuf){
-        unsigned char *temp= LayerBuf;
-        LayerBuf=DisplayBuf;
-        FreeMemory(temp);
-    }
+    if(FrameBuf!=DisplayBuf){
+        if(WriteBuf==FrameBuf)WriteBuf=DisplayBuf;
+        switch(DISPLAY_TYPE){
+            case SCREENMODE1:
+            case SCREENMODE2:
+#ifdef rp2350
+                FrameBuf=DisplayBuf;
 #else
-    if(DISPLAY_TYPE==SCREENMODE3){
-        if(FrameBuf!=DisplayBuf)FreeMemory(FrameBuf);
-        if(DisplayBuf!=LayerBuf){
-            unsigned char *temp= LayerBuf;
-            LayerBuf=DisplayBuf;
-            FreeMemory(temp);
+                FreeMemory(FrameBuf);
+#endif
+                break;
+#ifdef rp2350
+            case SCREENMODE3:
+                FreeMemory(FrameBuf);
+                break;
+#ifdef HDMI
+            case SCREENMODE4:
+            case SCREENMODE5:
+                FreeMemory(FrameBuf);
+                break;
+#endif
+#endif
+        }
+    } 
+    if(LayerBuf!=DisplayBuf){
+        if(WriteBuf==LayerBuf)WriteBuf=DisplayBuf;
+        unsigned char *temp= LayerBuf;
+        switch(DISPLAY_TYPE){
+            case SCREENMODE2:
+                transparent=0;
+            case SCREENMODE1:
+#ifdef rp2350
+                LayerBuf=DisplayBuf;
+#else
+                LayerBuf=DisplayBuf;
+                FreeMemory(temp);
+#endif
+                break;
+#ifdef rp2350
+            case SCREENMODE3:
+                LayerBuf=DisplayBuf;
+                FreeMemory(temp);
+                break;
+#ifdef HDMI
+            case SCREENMODE4:
+                LayerBuf=DisplayBuf;
+                FreeMemory(temp);
+                break;
+            case SCREENMODE5:
+                LayerBuf=DisplayBuf;
+                transparent=0;
+                break;
+#endif
+#endif
         }
     }
-#endif
 	WriteBuf=(unsigned char *)FRAMEBUFFER;
 	DisplayBuf=(unsigned char *)FRAMEBUFFER;
 	LayerBuf=(unsigned char *)FRAMEBUFFER;
 	FrameBuf=(unsigned char *)FRAMEBUFFER;
-#ifndef HDMI
-    transparentlow=transparenthigh=0;
-#else
     transparent=0;
-#endif
 }
 void cmd_framebuffer(void){
+/*
+RP2040 version support just modes 1 and 2
+RP2350 vversions support modes 1 to 5
+All modes can have a framebuffer and a layer buffer but only modes 2 and 5 automatically display the layer buffer over the top of the main display
+In all other cases it is just another framebuffer that can be used to build up images to be copied to the main display
+For VGA/HDMI Layer buffers and framebuffers have exactly the same resolution as the main display (unlike TFT displays)
+For RP2350 Modes 1 and 2 both buffers are in the allocated Video Memory (640x240 bytes == 320x240x2)
+For RP2350 Mode 5 the layer buffer is in the allocated video memory
+All other buffers are allocated out of variable space using GetMemory
+NB: for RP2350 with PSRAM buffers may be allocated in the slower external memory
+Buffer sizes are:
+    #define MODE1SIZE  640*480/8
+    #define MODE2SIZE  320*240/2
+    #define MODE3SIZE  640*480/2
+    #define MODE4SIZE  320*240*2
+    #define MODE5SIZE  320*240
+
+*/
     unsigned char *p;
     if((p=checkstring(cmdline, (unsigned char *)"CREATE"))) {
         if(FrameBuf==DisplayBuf){
-            if(DISPLAY_TYPE==SCREENMODE1 || DISPLAY_TYPE==SCREENMODE2){
+            switch(DISPLAY_TYPE){
+                case SCREENMODE1:
+                case SCREENMODE2:
 #ifdef rp2350
-                FrameBuf=DisplayBuf+2*ScreenSize;
-                memset(FrameBuf,0,ScreenSize);
+                    FrameBuf=DisplayBuf+2*ScreenSize;
 #else
-                FrameBuf=GetMemory(ScreenSize);
+                    FrameBuf=GetMemory(ScreenSize);
 #endif
-            if(checkstring(p, (unsigned char *)"R"))memcpy(FrameBuf,DisplayBuf,ScreenSize);
-            }
+                    break;
 #ifdef rp2350
-            if(DISPLAY_TYPE==SCREENMODE3) FrameBuf=GetMemory(ScreenSize);
+                case SCREENMODE3:
+                    FrameBuf=GetMemory(ScreenSize);
+                    break;
+#ifdef HDMI
+                case SCREENMODE4:
+                case SCREENMODE5:
+                    FrameBuf=GetMemory(ScreenSize);
+                    break;
 #endif
+#endif
+            }
         } else error("Framebuffer already exists");
+        memset(FrameBuf,0,ScreenSize);
+
+    } else if((p=checkstring(cmdline, (unsigned char *)"LAYER"))) {
+        int colour=0;
+        if(LayerBuf==DisplayBuf){
+            getargs(&p,1,(unsigned char *)",");
+            switch(DISPLAY_TYPE){
+                case SCREENMODE2:
+                    if(argc==1)transparent=getint(argv[0],0,15);
+                    colour=transparent | (transparent<<4);
+                case SCREENMODE1:
+#ifdef rp2350
+                    LayerBuf=DisplayBuf+ScreenSize;
+#else
+                    FrameBuf=GetMemory(ScreenSize);
+#endif
+                    break;
+#ifdef rp2350
+                case SCREENMODE3:
+                    if(argc==1)transparent=getint(argv[0],0,15);
+                    LayerBuf=GetMemory(ScreenSize);
+                    if(LayerBuf>(uint8_t *)PSRAMbase && LayerBuf< (uint8_t *)(PSRAMbase + 1024*1024*16))error("Layer Buffer must be in tightly coupled RAM, declare before other variables");
+                    colour=transparent | (transparent<<4);
+                    break;
+#ifdef HDMI
+                case SCREENMODE4:
+                    LayerBuf=GetMemory(ScreenSize);
+                    break;
+                case SCREENMODE5:
+                    LayerBuf=DisplayBuf+ScreenSize;
+                    if(argc==1)transparent=getint(argv[0],0,255);
+                    colour=transparent;
+                    break;
+#endif
+#endif
+            }
+        } else error("Framebuffer already exists");
+        memset(LayerBuf,colour,ScreenSize);
+    } else if((p=checkstring(cmdline, (unsigned char *)"CLOSE"))) {
+        if(checkstring(p, (unsigned char *)"F")){
+            if(WriteBuf==FrameBuf)WriteBuf=DisplayBuf;
+            switch(DISPLAY_TYPE){
+                case SCREENMODE1:
+                case SCREENMODE2:
+#ifdef rp2350
+                    FrameBuf=DisplayBuf;
+#else
+                    FreeMemory(FrameBuf);
+#endif
+                    break;
+#ifdef rp2350
+                case SCREENMODE3:
+                    FreeMemory(FrameBuf);
+                    break;
+#ifdef HDMI
+                case SCREENMODE4:
+                case SCREENMODE5:
+                    FreeMemory(FrameBuf);
+                    break;
+#endif
+#endif
+            }
+        } else if(checkstring(p, (unsigned char *)"L")){
+            if(WriteBuf==LayerBuf)WriteBuf=DisplayBuf;
+            unsigned char *temp= LayerBuf;
+            switch(DISPLAY_TYPE){
+                case SCREENMODE2:
+                    transparent=0;
+                case SCREENMODE1:
+#ifdef rp2350
+                    LayerBuf=DisplayBuf;
+#else
+                    LayerBuf=DisplayBuf;
+                    FreeMemory(temp);
+#endif
+                    break;
+#ifdef rp2350
+                case SCREENMODE3:
+                    LayerBuf=DisplayBuf;
+                    FreeMemory(temp);
+                    break;
+#ifdef HDMI
+                case SCREENMODE4:
+                    LayerBuf=DisplayBuf;
+                    FreeMemory(temp);
+                    break;
+               case SCREENMODE5:
+                    LayerBuf=DisplayBuf;
+                    transparent=0;
+                    break;
+#endif
+#endif
+            }
+        } else  closeframebuffer();
     } else if((p=checkstring(cmdline, (unsigned char *)"WRITE"))) {
         if(checkstring(p, (unsigned char *)"N"))WriteBuf=DisplayBuf;
         else if(checkstring(p, (unsigned char *)"L")){
@@ -8385,60 +8756,6 @@ void cmd_framebuffer(void){
         VGAxoffset=x;
         VGAyoffset=y;
 #endif
-    } else if((p=checkstring(cmdline, (unsigned char *)"LAYER"))) {
-        getargs(&p,1,(unsigned char *)",");
-        if(Option.CPU_Speed==126000)error("CPUSPEED =252000 for layers");
-        if(DISPLAY_TYPE==SCREENMODE2 || DISPLAY_TYPE==SCREENMODE1){
-#ifndef HDMI
-            int transparent=0;
-            if(argc==1)transparent=getint(argv[0],0,15);
-            transparentlow=transparent;
-            transparenthigh=transparent;
-            if(LayerBuf==DisplayBuf){
-#ifdef rp2350
-            LayerBuf=DisplayBuf+ScreenSize;
-#else
-                LayerBuf=GetMemory(ScreenSize);
-#endif
-            } 
-#else
-            LayerBuf=DisplayBuf+ScreenSize;
-            if(argc==1)transparent=getint(argv[0],0,15);
-
-#endif
-            uint8_t clear=transparent | (transparent<<4);
-            transparentlow=transparent;
-            transparenthigh=transparent;
-            memset(LayerBuf,clear,ScreenSize);
-        } else if(DISPLAY_TYPE==SCREENMODE3){
-            if(LayerBuf==DisplayBuf){
-                LayerBuf=GetMemory(ScreenSize);
-            } 
-        } else error("Not available in this screen mode");
-    } else if((p=checkstring(cmdline, (unsigned char *)"CLOSE"))) {
-        if(checkstring(p, (unsigned char *)"F")){
-            if(WriteBuf==FrameBuf)WriteBuf=DisplayBuf;
-#ifndef rp2350
-            if(FrameBuf!=DisplayBuf)FreeMemory(FrameBuf);
-#endif
-            if(DISPLAY_TYPE==SCREENMODE3 && FrameBuf!=DisplayBuf)FreeMemory(FrameBuf);
-            FrameBuf=DisplayBuf;
-        } else if(checkstring(p, (unsigned char *)"L")){
-            if(WriteBuf==LayerBuf)WriteBuf=DisplayBuf;
-#ifndef rp2350
-            if(DisplayBuf!=LayerBuf){
-                unsigned char *temp= LayerBuf;
-                LayerBuf=DisplayBuf;
-                FreeMemory(temp);
-            }
-#else
-            if(DISPLAY_TYPE==SCREENMODE3 && FrameBuf!=DisplayBuf){
-                unsigned char *temp= LayerBuf;
-                LayerBuf=DisplayBuf;
-                FreeMemory(temp);
-            } else LayerBuf=DisplayBuf;
-#endif
-        } else  closeframebuffer();
     } else if((p=checkstring(cmdline, (unsigned char *)"COPY"))) {
         getargs(&p,5,(unsigned char *)",");
         if(!(argc==3 || argc==5))error("Syntax");

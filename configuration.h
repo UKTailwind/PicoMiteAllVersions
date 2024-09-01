@@ -34,7 +34,7 @@ extern "C" {
         #define HEAP_MEMORY_SIZE (180*1024) 
         #define FLASH_TARGET_OFFSET (768 * 1024) 
         #ifdef HDMI
-            #define MAXMODES 4
+            #define MAXMODES 5
             #ifdef USBKEYBOARD
                 #define MagicKey 0x15482136
                 #define HEAPTOP 0x2007C000

@@ -3214,10 +3214,18 @@ void MIPS16 cmd_option(void) {
     tp = checkstring(cmdline, (unsigned char *)"DEFAULT MODE");
     if(tp) {
 #ifdef rp2350
-        int mode=getint(tp,1,3);
+        int mode=getint(tp,1,MAXMODES);
         if(mode==3){
             Option.DISPLAY_TYPE=SCREENMODE3; 
             Option.DefaultFont = 1 ;
+#ifdef HDMI
+        } else if(mode==4){
+            Option.DISPLAY_TYPE=SCREENMODE4; 
+            Option.DefaultFont=(6<<4) | 1 ;
+        } else if(mode==5){
+            Option.DISPLAY_TYPE=SCREENMODE5; 
+            Option.DefaultFont=(6<<4) | 1 ;
+#endif
         } else if(mode==2){
             Option.DISPLAY_TYPE=SCREENMODE2; 
             Option.DefaultFont=(6<<4) | 1 ;
@@ -3226,7 +3234,7 @@ void MIPS16 cmd_option(void) {
             Option.DefaultFont= 1 ;
         }
 #else
-        int mode=getint(tp,1,2);
+        int mode=getint(tp,1,MAXMODES);
         if(mode==2){
             Option.DISPLAY_TYPE=SCREENMODE2; 
             Option.DefaultFont=(6<<4) | 1 ;
