@@ -256,7 +256,13 @@ void cmd_edit(void) {
         SetFont(1);
         PromptFont=1;
 #ifdef PICOMITEVGA
-    if(DISPLAY_TYPE==SCREENMODE3)for (int i=0;i<16;i++)map16[i]=i;
+#ifdef rp2350
+    #ifdef HDMI
+        if(DISPLAY_TYPE==SCREENMODE3)for(int i=0;i<16;i++)map16[i]=remap[i]=RGB555(MAP16DEF[i]);
+    #else
+        if(DISPLAY_TYPE==SCREENMODE3)for(int i=0;i<16;i++)map16[i]=remap[i]=i;
+    #endif
+#endif
 #endif
     }
 #endif

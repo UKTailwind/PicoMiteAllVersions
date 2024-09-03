@@ -91,6 +91,7 @@ extern "C" {
 #ifdef PICOMITEVGA
     uint16_t map16[16]={0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};
     volatile uint8_t transparent=0;
+    volatile int VGAxoffset=0,VGAyoffset=0;
     #ifndef HDMI
     #include "Include.h"
     #endif
@@ -247,7 +248,6 @@ MMFLOAT FSub(MMFLOAT a, MMFLOAT b){ return a - b; }
 MMFLOAT FDiv(MMFLOAT a, MMFLOAT b){ return a / b; }
 uint32_t CFunc_delay_us;
 #ifndef HDMI
-volatile int VGAxoffset=0,VGAyoffset=0;
 int QVGA_CLKDIV;	// SM divide clock ticks
 #endif
 void PIOExecute(int pion, int sm, uint32_t ins){
@@ -1971,8 +1971,6 @@ void __not_in_flash_func(QVgaLine1)()
 	{
 		QVgaFrame++;	// increment frame counter
 		line = 0; 	// restart scanline
-        tile=0;
-        tc=0;
 	}
 	QVgaScanLine = line;	// store new scanline
 
@@ -2004,12 +2002,7 @@ void __not_in_flash_func(QVgaLine1)()
                 if(line<0)line+=480;
                 unsigned char *p=&DisplayBuf[line * 80];
                 unsigned char *pp=&LayerBuf[line * 80];
-                if(tc==ytileheight){
-                    tile++;
-                    tc=0;
-                }
-                tc++;
-                register int pos=tile*X_TILE, low, high;
+                register int pos=line/ytileheight*X_TILE, low, high;
                 for(i=VGAxoffset;i<160;i+=2){
                     low= (*p & 0xF) | (*pp & 0xF);
                     high=(*p++ >>4) | (*pp++ >>4);
@@ -2031,37 +2024,47 @@ void __not_in_flash_func(QVgaLine1)()
                 register unsigned char *p=&DisplayBuf[line * 160];
                 register unsigned char *q=&LayerBuf[line * 160];
                 register int low, high, low2, high2;
+                register uint16_t *r=(uint16_t *)fbuff[VGAnextbuf];
                 for(int i=VGAxoffset;i<160;i++){
-                    low= map16[*p & 0xF];
-                    high=map16[(*p & 0xF0)>>4];
-                    low2= map16[*q & 0xF];
-                    high2=map16[(*q &0xF0)>>4];
-                    p++;q++;
+                    low= map16[p[i] & 0xF];
+                    high=map16[(p[i] & 0xF0)>>4];
+                    low2= map16[q[i] & 0xF];
+                    high2=map16[(q[i] & 0xF0)>>4];
                     if(low2!=transparent16)low=low2;
                     if(high2!=transparent16)high=high2;
-                    fbuff[VGAnextbuf][i]=(low | (low<<4) | (high<<8) | (high<<12));
+                    *r++=(low | (low<<4) | (high<<8) | (high<<12));
                 }
                 for(int i=0;i<VGAxoffset;i++){
-                    low= map16[*p & 0xF];
-                    high=map16[(*p & 0xF0)>>4];
-                    low2= map16[*q & 0xF];
-                    high2=map16[(*q &0xF0)>>4];
-                    p++;q++;
+                    low= map16[p[i] & 0xF];
+                    high=map16[(p[i] & 0xF0)>>4];
+                    low2= map16[q[i] & 0xF];
+                    high2=map16[(q[i] & 0xF0)>>4];
                     if(low2!=transparent16)low=low2;
                     if(high2!=transparent16)high=high2;
-                    fbuff[VGAnextbuf][i]=(low | (low<<4) | (high<<8) | (high<<12));
+                    *r++=(low | (low<<4) | (high<<8) | (high<<12));
                 }
 #ifdef rp2350
             } else {
+                line-=VGAyoffset;
+                if(line<0)line+=480;
                 register unsigned char *p=&DisplayBuf[line * 320];
                 register unsigned char *q=&LayerBuf[line * 320];
                 register int low, high, low2, high2;
                 register uint8_t *r=(uint8_t *)fbuff[VGAnextbuf];
-                for(int i=0;i<320;i++){
-                    low= map16[*p & 0xF];
-                    high=map16[(*p++ & 0xF0)>>4];
-                    low2= map16[*q & 0xF];
-                    high2=map16[(*q++ & 0xF0)>>4];
+                for(int i=VGAxoffset;i<320;i++){
+                    low= map16[p[i] & 0xF];
+                    high=map16[(p[i] & 0xF0)>>4];
+                    low2= map16[q[i] & 0xF];
+                    high2=map16[(q[i] & 0xF0)>>4];
+                    if(low2!=transparent16)low=low2;
+                    if(high2!=transparent16)high=high2;
+                    *r++=low | (high<<4);
+                }
+                for(int i=0;i<VGAxoffset;i++){
+                    low= map16[p[i] & 0xF];
+                    high=map16[(p[i] & 0xF0)>>4];
+                    low2= map16[q[i] & 0xF];
+                    high2=map16[(q[i] & 0xF0)>>4];
                     if(low2!=transparent16)low=low2;
                     if(high2!=transparent16)high=high2;
                     *r++=low | (high<<4);
@@ -2474,7 +2477,7 @@ void MIPS64 __not_in_flash_func(dma_irq_handler)() {
 
 
 void MIPS64 __not_in_flash_func(HDMICore)(void){
-    int last_line=2,load_line, line_to_load, Line_dup;
+    int last_line=2,load_line, line_to_load, line;
     for(int i=0;i<256;i++)map256[i]=RGB555(MAP256DEF[i]);
     for(int i=0;i<16;i++)map16[i]=RGB555(MAP16DEF[i]);
 
@@ -2594,8 +2597,10 @@ void MIPS64 __not_in_flash_func(HDMICore)(void){
         if(v_scanline!=last_line){
             uint8_t transparent16=(uint8_t)transparent;
             last_line=v_scanline;
-            load_line=v_scanline - (MODE_V_TOTAL_LINES - MODE_V_ACTIVE_LINES);
-            Line_dup=load_line>>1;
+            load_line=line=v_scanline - (MODE_V_TOTAL_LINES - MODE_V_ACTIVE_LINES);
+            if(HRes==320)line>>=1;
+            line-=VGAyoffset;
+            if(line<0)line+=VRes;
             line_to_load = last_line & 1;
             uint8_t l,d;
             int pp;
@@ -2604,32 +2609,66 @@ void MIPS64 __not_in_flash_func(HDMICore)(void){
                 __dmb();
                 switch(DISPLAY_TYPE){
                 case SCREENMODE1: //640x480x2 colour
-                    uint16_t *fcol=tilefcols+load_line/ytileheight*X_TILE, *bcol=tilebcols+load_line/ytileheight*X_TILE; //get the relevant tile
-                    pp= load_line*80;
-                    for(int i=0; i<80 ; i++){
+                    uint16_t *fcol=tilefcols+line/ytileheight*X_TILE, *bcol=tilebcols+line/ytileheight*X_TILE; //get the relevant tile
+                    pp= line*80;
+                    for(int i=VGAxoffset; i<80 ; i++){
                         d=DisplayBuf[pp+i];
-                        *p++ = (d&0x1) ? *fcol : *bcol;
+                        *p++ = (d&0x1) ? fcol[i] : bcol[i];
                         d>>=1;
-                        *p++ = (d&0x1) ? *fcol : *bcol;
+                        *p++ = (d&0x1) ? fcol[i] : bcol[i];
                         d>>=1;
-                        *p++ = (d&0x1) ? *fcol : *bcol;
+                        *p++ = (d&0x1) ? fcol[i] : bcol[i];
                         d>>=1;
-                        *p++ = (d&0x1) ? *fcol : *bcol;
+                        *p++ = (d&0x1) ? fcol[i] : bcol[i];
                         d>>=1;
-                        *p++ = (d&0x1) ? *fcol : *bcol;
+                        *p++ = (d&0x1) ? fcol[i] : bcol[i];
                         d>>=1;
-                        *p++ = (d&0x1) ? *fcol : *bcol;
+                        *p++ = (d&0x1) ? fcol[i] : bcol[i];
                         d>>=1;
-                        *p++ = (d&0x1) ? *fcol : *bcol;
+                        *p++ = (d&0x1) ? fcol[i] : bcol[i];
                         d>>=1;
-                        *p++ = (d&0x1) ? *fcol : *bcol;
-                        fcol++;
-                        bcol++;
+                        *p++ = (d&0x1) ? fcol[i] : bcol[i];
+                    }
+                    for(int i=0; i<VGAxoffset ; i++){
+                        d=DisplayBuf[pp+i];
+                        *p++ = (d&0x1) ? fcol[i] : bcol[i];
+                        d>>=1;
+                        *p++ = (d&0x1) ? fcol[i] : bcol[i];
+                        d>>=1;
+                        *p++ = (d&0x1) ? fcol[i] : bcol[i];
+                        d>>=1;
+                        *p++ = (d&0x1) ? fcol[i] : bcol[i];
+                        d>>=1;
+                        *p++ = (d&0x1) ? fcol[i] : bcol[i];
+                        d>>=1;
+                        *p++ = (d&0x1) ? fcol[i] : bcol[i];
+                        d>>=1;
+                        *p++ = (d&0x1) ? fcol[i] : bcol[i];
+                        d>>=1;
+                        *p++ = (d&0x1) ? fcol[i] : bcol[i];
                     }
                     break;
                 case SCREENMODE2: //320x240x16 colour with support for a top layer
-                    pp= (Line_dup)*160;
-                    for(int i=0; i<160 ; i++){
+                    pp= (line)*160;
+                    for(int i=VGAxoffset; i<160 ; i++){
+                        l=LayerBuf[pp+i];d=DisplayBuf[pp+i];
+                        if((l&0xf)!=transparent16){
+                            *p++=map16[l&0xf];
+                            *p++=map16[l&0xf];
+                        } else {
+                            *p++=map16[d&0xf];
+                            *p++=map16[d&0xf];
+                        }
+                        d>>=4;l>>=4;
+                        if((l&0xf)!=transparent16){
+                            *p++=map16[l&0xf];
+                            *p++=map16[l&0xf];
+                        } else {
+                            *p++=map16[d&0xf];
+                            *p++=map16[d&0xf];
+                        }
+                    }
+                    for(int i=0; i<VGAxoffset ; i++){
                         l=LayerBuf[pp+i];d=DisplayBuf[pp+i];
                         if((l&0xf)!=transparent16){
                             *p++=map16[l&0xf];
@@ -2649,8 +2688,23 @@ void MIPS64 __not_in_flash_func(HDMICore)(void){
                     }
                     break;
                 case SCREENMODE3: //640x480x16 colour
-                    pp= load_line*320;
-                    for(int i=0; i<320 ; i++){
+                    pp= line*320;
+                    for(int i=VGAxoffset;i<320;i++){
+                        d=DisplayBuf[pp+i];
+                        l=LayerBuf[pp+i];
+                        if((l&0xf)!=transparent16){
+                            *p++=map16[l&0xf];
+                        } else {
+                            *p++=map16[d&0xf];
+                        }
+                        d>>=4;l>>=4;
+                        if((l&0xf)!=transparent16){
+                            *p++=map16[l&0xf];
+                        } else {
+                            *p++=map16[d&0xf];
+                        }
+                    }
+                    for(int i=0;i<VGAxoffset;i++){
                         d=DisplayBuf[pp+i];
                         l=LayerBuf[pp+i];
                         if((l&0xf)!=transparent16){
@@ -2667,8 +2721,15 @@ void MIPS64 __not_in_flash_func(HDMICore)(void){
                     }
                     break;
                 case SCREENMODE4: //320x240xRGB555 colour
-                    pp=(Line_dup)*640;
-                    for(int i=0; i<640 ; i+=2){
+                    pp=line*640;
+                    for(int i=VGAxoffset; i<640 ; i+=2){
+                        uint8_t* d=&DisplayBuf[pp+i];
+                        int c=*d++;
+                        c|=((*d++)<<8);
+                        *p++=c;
+                        *p++=c;
+                    }
+                    for(int i=0; i<VGAxoffset ; i+=2){
                         uint8_t* d=&DisplayBuf[pp+i];
                         int c=*d++;
                         c|=((*d++)<<8);
@@ -2677,8 +2738,19 @@ void MIPS64 __not_in_flash_func(HDMICore)(void){
                     }
                     break;
                 case SCREENMODE5: //320x240x256 colour
-                    pp=Line_dup*320;
-                    for(int i=0; i<320 ; i++){
+                    pp=line*320;
+                    for(int i=VGAxoffset; i<320 ; i++){
+                        int d=DisplayBuf[pp+i];
+                        int l=LayerBuf[pp+i];
+                        if(l!=transparent){
+                            *p++=map256[l];
+                            *p++=map256[l];
+                        } else {
+                            *p++=map256[d];
+                            *p++=map256[d];
+                        }
+                    }
+                    for(int i=0; i<VGAxoffset ; i++){
                         int d=DisplayBuf[pp+i];
                         int l=LayerBuf[pp+i];
                         if(l!=transparent){

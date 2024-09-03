@@ -3682,6 +3682,10 @@ void ResetOptions(void)
     #ifdef USBKEYBOARD
         #ifdef HDMI
             Option.CPU_Speed = 315000;
+            Option.HDMIclock=2;
+            Option.HDMId0=0;
+            Option.HDMId1=6;
+            Option.HDMId2=4;
         #else
             Option.CPU_Speed = 252000;
         #endif

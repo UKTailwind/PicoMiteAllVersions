@@ -238,7 +238,7 @@ void MIPS16 cmd_pio(void){
         if(PIO2==false && pior==2)error("PIO 2 not available");
         PIO pio = (pior==0 ? pio0: (pior==1 ? pio1: pio2));
 #else
-        PIO pio = (pior==0 ?  pio1: pio0);
+        PIO pio = (pior==0 ?  pio0: pio1);
 #endif
         int sm=getint(argv[2],0,3);
         for(i = 4; i < argc; i += 2) {
@@ -259,7 +259,7 @@ void MIPS16 cmd_pio(void){
         if(PIO2==false && pior==2)error("PIO 2 not available");
         PIO pio = (pior==0 ? pio0: (pior==1 ? pio1: pio2));
 #else
-        PIO pio = (pior==0 ? pio1: pio0);
+        PIO pio = (pior==0 ?  pio0: pio1);
 #endif
         int sm=getint(argv[2],0,3);
         int count=getint(argv[4],0,MAX_ARG_COUNT-3);
@@ -291,7 +291,7 @@ void MIPS16 cmd_pio(void){
         if(PIO2==false && pior==2)error("PIO 2 not available");
         PIO pio = (pior==0 ? pio0: (pior==1 ? pio1: pio2));
 #else
-        PIO pio = (pior==0 ? pio1: pio0);
+        PIO pio = (pior==0 ?  pio0: pio1);
 #endif
         int sm=getint(argv[2],0,3);
         dma_rx_pio=pior;
@@ -384,7 +384,7 @@ void MIPS16 cmd_pio(void){
         if(PIO2==false && pior==2)error("PIO 2 not available");
         PIO pio = (pior==0 ? pio0: (pior==1 ? pio1: pio2));
 #else
-        PIO pio = (pior==0 ? pio1: pio0);
+        PIO pio = (pior==0 ?  pio0: pio1);
 #endif
         int sm=getint(argv[2],0,3);
         dma_tx_pio=pior;
@@ -504,7 +504,7 @@ void MIPS16 cmd_pio(void){
         if(PIO2==false && pior==2)error("PIO 2 not available");
         PIO pio = (pior==0 ? pio0: (pior==1 ? pio1: pio2));
 #else
-        PIO pio = (pior==0 ? pio1: pio0);
+        PIO pio = (pior==0 ?  pio0: pio1);
 #endif
         int sm=getint(argv[2],0,3);
         nbr = getinteger(argv[4]);
@@ -551,7 +551,7 @@ void MIPS16 cmd_pio(void){
         if(PIO2==false && pior==2)error("PIO 2 not available");
         PIO pio = (pior==0 ? pio0: (pior==1 ? pio1: pio2));
 #else
-        PIO pio = (pior==0 ? pio1: pio0);
+        PIO pio = (pior==0 ?  pio0: pio1);
 #endif
         int slot=getint(argv[2],0,31);
         int instruction=getint(argv[4],0,0xFFFF);
@@ -570,7 +570,7 @@ void MIPS16 cmd_pio(void){
 #ifdef rp2350
         PIO pio = (pior==0 ? pio0: (pior==1 ? pio1: pio2));
 #else
-        PIO pio = (pior==0 ? pio1: pio0);
+        PIO pio = (pior==0 ?  pio0: pio1);
 #endif
         unsigned int ins=0;
         char *ss=(char *)getCstring(argv[2]);
@@ -1103,7 +1103,7 @@ void MIPS16 cmd_pio(void){
         if(PIO2==false && pior==2)error("PIO 2 not available");
         PIO pio = (pior==0 ? pio0: (pior==1 ? pio1: pio2));
 #else
-        PIO pio = (pior==0 ? pio1: pio0);
+        PIO pio = (pior==0 ?  pio0: pio1);
 #endif
         for(int sm=0;sm<4;sm++){
             hw_clear_bits(&pio->ctrl, 1 << (PIO_CTRL_SM_ENABLE_LSB + sm));
@@ -1146,7 +1146,7 @@ void MIPS16 cmd_pio(void){
         if(PIO2==false && pior==2)error("PIO 2 not available");
         PIO pio = (pior==0 ? pio0: (pior==1 ? pio1: pio2));
 #else
-        PIO pio = (pior==0 ? pio1: pio0);
+        PIO pio = (pior==0 ?  pio0: pio1);
 #endif
         int toarraysize=parseintegerarray(argv[2],&a1int,2,1,dims, true);
         if(toarraysize!=8)error("Array size");
@@ -1167,7 +1167,7 @@ void MIPS16 cmd_pio(void){
         if(PIO2==false && pior==2)error("PIO 2 not available");
         PIO pio = (pior==0 ? pio0: (pior==1 ? pio1: pio2));
 #else
-        PIO pio = (pior==0 ? pio1: pio0);
+        PIO pio = (pior==0 ?  pio0: pio1);
 #endif
         int sm=getint(argv[2],0,3);
         pio_sm_clear_fifos(pio,sm);
@@ -1186,7 +1186,7 @@ void MIPS16 cmd_pio(void){
         if(PIO2==false && pior==2)error("PIO 2 not available");
         PIO pio = (pior==0 ? pio0: (pior==1 ? pio1: pio2));
 #else
-        PIO pio = (pior==0 ? pio1: pio0);
+        PIO pio = (pior==0 ?  pio0: pio1);
 #endif
         int sm=getint(argv[2],0,3);
         pio_sm_set_enabled(pio, sm, false);
@@ -1205,7 +1205,7 @@ void MIPS16 cmd_pio(void){
         if(PIO2==false && pior==2)error("PIO 2 not available");
         PIO pio = (pior==0 ? pio0: (pior==1 ? pio1: pio2));
 #else
-        PIO pio = (pior==0 ? pio1: pio0);
+        PIO pio = (pior==0 ?  pio0: pio1);
 #endif
         int sm=getint(argv[2],0,3);
         float clock=getnumber(argv[4]);
@@ -1329,7 +1329,7 @@ void fun_pio(void){
         if(PIO2==false && pior==2)error("PIO 2 not available");
         PIO pio = (pior==0 ? pio0: (pior==1 ? pio1: pio2));
 #else
-        PIO pio = (pior==0 ? pio1: pio0);
+        PIO pio = (pior==0 ?  pio0: pio1);
 #endif
         iret=pio->fstat; // jmp pin
         targ=T_INT;
@@ -1361,7 +1361,7 @@ void fun_pio(void){
         if(PIO2==false && pior==2)error("PIO 2 not available");
         PIO pio = (pior==0 ? pio0: (pior==1 ? pio1: pio2));
 #else
-        PIO pio = (pior==0 ? pio1: pio0);
+        PIO pio = (pior==0 ?  pio0: pio1);
 #endif
         iret=pio->fdebug; // jmp pin
         targ=T_INT;
@@ -1377,7 +1377,7 @@ void fun_pio(void){
         if(PIO2==false && pior==2)error("PIO 2 not available");
         PIO pio = (pior==0 ? pio0: (pior==1 ? pio1: pio2));
 #else
-        PIO pio = (pior==0 ? pio1: pio0);
+        PIO pio = (pior==0 ?  pio0: pio1);
 #endif
         if(argc==1)iret=pio->flevel; // jmp pin
         else {

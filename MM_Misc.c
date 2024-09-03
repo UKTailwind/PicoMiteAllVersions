@@ -2422,19 +2422,19 @@ option system i2c GP26, GP27*/
         
         if(checkstring(p,(unsigned char *) "OLIMEX"))  {
             strcpy((char *)Option.platform,"OLIMEX");
-            Option.AUDIO_L=PINMAP[27];
-            Option.AUDIO_R=PINMAP[28];
+            Option.AUDIO_L=PINMAP[26];
+            Option.AUDIO_R=PINMAP[27];
             Option.modbuffsize=192;
             Option.modbuff = true; 
-            Option.AUDIO_SLICE=checkslice(PINMAP[27],PINMAP[28], 0);
+            Option.AUDIO_SLICE=checkslice(PINMAP[26],PINMAP[27], 0);
             Option.SD_CS=PINMAP[22];
             Option.SD_CLK_PIN=PINMAP[6];
             Option.SD_MOSI_PIN=PINMAP[7];
             Option.SD_MISO_PIN=PINMAP[4];
             Option.HDMIclock=1;
             Option.HDMId0=3;
-            Option.HDMId1=5;
-            Option.HDMId2=7;
+            Option.HDMId1=7;
+            Option.HDMId2=5;
             SaveOptions();
             printoptions();uSec(100000);
             _excep_code = RESET_COMMAND;

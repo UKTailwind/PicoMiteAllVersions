@@ -155,6 +155,7 @@ extern int PrintPixelMode;
 extern char CMM1;
 extern int ScreenSize;
 extern char LCDAttrib;
+extern int remap[];
 
 typedef struct SVD {
 	FLOAT3D x;

@@ -36,10 +36,10 @@ extern "C" {
         #ifdef HDMI
             #define MAXMODES 5
             #ifdef USBKEYBOARD
-                #define MagicKey 0x15482142
+                #define MagicKey 0x15282142
                 #define HEAPTOP 0x2007C000
             #else
-                #define MagicKey 0x21472710
+                #define MagicKey 0x21473310
                 #define HEAPTOP 0x2007C000
             #endif
             #define MAX_CPU     315000 

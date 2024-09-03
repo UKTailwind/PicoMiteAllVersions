@@ -94,17 +94,17 @@ extern datetime_t rtc_t;
 #else
 extern bool rp2350a;
 extern uint32_t PSRAMsize;
+extern uint16_t RGB555(uint32_t c);
+extern const uint32_t MAP16DEF[16];
 #endif
 #ifdef HDMI
 extern uint16_t *tilefcols;
 extern uint16_t *tilebcols;
-extern uint16_t RGB555(uint32_t c);
 extern uint8_t RGB332(uint32_t c);
 extern void settiles(void);
 extern uint16_t map256[256];
 extern uint16_t map16[16];
 extern const uint32_t MAP256DEF[256];
-extern const uint32_t MAP16DEF[16];
 extern volatile uint v_scanline;
 #else
 #ifdef rp2350
@@ -199,6 +199,7 @@ extern uint8_t *buff320;
 extern uint16_t SD_CLK_PIN,SD_MOSI_PIN,SD_MISO_PIN, SD_CS_PIN;
 extern bool screen320;
 extern void clear320(void);
+extern volatile int VGAxoffset,VGAyoffset;
 #ifdef PICOMITEVGA
 	extern volatile uint8_t transparent;
 	extern uint16_t map16[16];
@@ -213,7 +214,6 @@ extern void clear320(void);
 			extern uint16_t __attribute__ ((aligned (256))) tilebcols[80*40];
 		#endif
 		extern void VGArecovery(int pin);
-		extern volatile int VGAxoffset,VGAyoffset;
 	#endif
 #endif
 #ifdef PICOMITEWEB

@@ -7608,9 +7608,7 @@ void MIPS16 ResetDisplay(void) {
                 ScreenSize=MODE5SIZE;
                 break;
         }
-#ifndef HDMI
         VGAxoffset=0,VGAyoffset=0;
-#endif
         if(DISPLAY_TYPE == SCREENMODE2 || DISPLAY_TYPE == SCREENMODE3){
             DrawRectangle=DrawRectangle16;
             DrawBitmap= DrawBitmap16;
@@ -8622,14 +8620,17 @@ Buffer sizes are:
 #ifdef rp2350
                     LayerBuf=DisplayBuf+ScreenSize;
 #else
-                    FrameBuf=GetMemory(ScreenSize);
+                    LayerBuf=GetMemory(ScreenSize);
 #endif
                     break;
 #ifdef rp2350
                 case SCREENMODE3:
                     if(argc==1)transparent=getint(argv[0],0,15);
                     LayerBuf=GetMemory(ScreenSize);
-                    if(LayerBuf>(uint8_t *)PSRAMbase && LayerBuf< (uint8_t *)(PSRAMbase + 1024*1024*16))error("Layer Buffer must be in tightly coupled RAM, declare before other variables");
+                    if(LayerBuf>(uint8_t *)PSRAMbase && LayerBuf< (uint8_t *)(PSRAMbase + 1024*1024*16)){
+                        FreeMemory(LayerBuf);
+                        error("Layer Buffer must be in tightly coupled RAM, declare before other variables");
+                    }
                     colour=transparent | (transparent<<4);
                     break;
 #ifdef HDMI
@@ -8732,25 +8733,74 @@ Buffer sizes are:
             #else
             while(QVgaScanLine!=480){}
             #endif
-#ifndef HDMI
     } else if((p=checkstring(cmdline, (unsigned char *)"OFFSET"))) {
+#ifndef HDMI
         int x=0,y=0;
         getargs(&p,5,(unsigned char *)",");
-        if(Option.CPU_Speed==126000)error("CPUSPEED =252000 for offsets");
+        if(Option.CPU_Speed==126000)error("CPUSPEED >= 252000 for offsets");
+        if(DISPLAY_TYPE==SCREENMODE2){
+#ifndef rp2350
+        if(Option.CPU_Speed!=378000)error("CPUSPEED 378000 for mode 2 offsets");
+#endif
+            x=getint(argv[0],0,318);
+            if(x & 1)error("Multiples of 2 only");
+            x/=2;
+            if(argc>=3 && *argv[2])y=getint(argv[2],0,239);
+#ifdef rp2350
+        } else if(DISPLAY_TYPE==SCREENMODE3){
+//            if(Option.CPU_Speed!=378000)error("CPUSPEED = 378000 for mode 3 offsets");
+            x=getint(argv[0],0,638);
+            if(x & 1)error("Multiples of 2 only");
+            x/=2;
+            if(argc>=3 && *argv[2])y=getint(argv[2],0,479);
+#endif
+        } else {
+            x=getint(argv[0],0,632);
+            if(x & 7)error("Multiples of 8 only");
+            x/=4;
+            if(argc>=3 && *argv[2])y=getint(argv[2],0,479);
+        }
+        if(argc==5){
+            #ifndef HDMI
+            if(checkstring(argv[4],(unsigned char *)"B")) while(QVgaScanLine!=480){}
+            #else
+            if(checkstring(argv[4],(unsigned char *)"B")) while(v_scanline!=2){}
+            #endif
+        }
+        VGAxoffset=x;
+        VGAyoffset=y;
+//        PInt(VGAxoffset);PIntComma(VGAyoffset);PRet();
+#else
+        int x=0,y=0;
+        getargs(&p,5,(unsigned char *)",");
         if(DISPLAY_TYPE==SCREENMODE2){
             x=getint(argv[0],0,318);
             if(x & 1)error("Multiples of 2 only");
             x/=2;
-            if(argc>=3 && *argv[2])y=getint(argv[2],0,238);
+            if(argc>=3 && *argv[2])y=getint(argv[2],0,239);
+        } else if(DISPLAY_TYPE==SCREENMODE3){
+            x=getint(argv[0],0,638);
+            if(x & 1)error("Multiples of 2 only");
+            x/=2;
+            if(argc>=3 && *argv[2])y=getint(argv[2],0,479);
+        } else if(DISPLAY_TYPE==SCREENMODE4){
+            x=getint(argv[0],0,319);
+            x*=2;
+            if(argc>=3 && *argv[2])y=getint(argv[2],0,479);
+        } else if(DISPLAY_TYPE==SCREENMODE5){
+            x=getint(argv[0],0,319);
+            if(argc>=3 && *argv[2])y=getint(argv[2],0,479);
         } else {
             x=getint(argv[0],0,632);
-            if(x & 15)error("Multiples of 16 only");
+            if(x & 7)error("Multiples of 8 only");
             x/=8;
             if(argc>=3 && *argv[2])y=getint(argv[2],0,479);
         }
         if(argc==5){
             #ifndef HDMI
             if(checkstring(argv[4],(unsigned char *)"B")) while(QVgaScanLine!=480){}
+            #else
+            if(checkstring(argv[4],(unsigned char *)"B")) while(v_scanline!=2){}
             #endif
         }
         VGAxoffset=x;
