@@ -2051,6 +2051,7 @@ void __not_in_flash_func(QVgaLine1)()
                     if(high2!=transparent16)high=high2;
                     fbuff[VGAnextbuf][i]=(low | (low<<4) | (high<<8) | (high<<12));
                 }
+#ifdef rp2350
             } else {
                 register unsigned char *p=&DisplayBuf[line * 320];
                 register unsigned char *q=&LayerBuf[line * 320];
@@ -2065,6 +2066,7 @@ void __not_in_flash_func(QVgaLine1)()
                     if(high2!=transparent16)high=high2;
                     *r++=low | (high<<4);
                 }
+#endif
             }
             VGAnextbuf ^=1;
             VGAnowbuf ^=1;
