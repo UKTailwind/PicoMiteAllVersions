@@ -255,8 +255,10 @@ void cmd_edit(void) {
     if(modmode){
         SetFont(1);
         PromptFont=1;
+#ifdef PICOMITEVGA
+    if(DISPLAY_TYPE==SCREENMODE3)for (int i=0;i<16;i++)map16[i]=i;
+#endif
     }
-
 #endif
     if(CurrentLinePtr) error("Invalid in a program");
     if(Option.ColourCode) {

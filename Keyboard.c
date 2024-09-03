@@ -1005,7 +1005,7 @@ void processcode(unsigned char Code){
 /***************************************************************************************************
 change notification interrupt service routine
 ****************************************************************************************************/
-void __not_in_flash_func(CNInterrupt)(int dd)
+void __not_in_flash_func(CNInterrupt)(uint64_t dd)
 {
 //  static char Key12 = false;
   static unsigned char Code = 0;

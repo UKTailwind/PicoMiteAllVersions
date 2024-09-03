@@ -1759,6 +1759,10 @@ void MIPS16 printoptions(void){
             else if(Option.VGABC==0x0000)MMPrintString(" BLACK");
         PRet();
     }
+#else
+if(Option.HDMIclock!=2 || Option.HDMId0!=0 || Option.HDMId1!=6 ||Option.HDMId2!=4){
+    PO("HDMI PINS ");PInt(Option.HDMIclock);PIntComma(Option.HDMId0);PIntComma(Option.HDMId1);PIntComma(Option.HDMId2);PRet();
+}
 #endif
 #else
     if(Option.CPU_Speed!=133000){
@@ -2147,6 +2151,7 @@ void MIPS16 configure(unsigned char *p){
     } else {
         if(checkstring(p,(unsigned char *) "LIST")){
 #ifdef PICOMITEVGA
+#ifndef HDMI
             MMPrintString("PICOGAME 4-PWM\r\n");
             MMPrintString("PICOGAME 4\r\n");
 #ifdef USBKEYBOARD
@@ -2158,6 +2163,10 @@ void MIPS16 configure(unsigned char *p){
             MMPrintString("VGA Design 2\r\n");
             MMPrintString("SWEETIEPI\r\n");
             MMPrintString("VGA Basic\r\n");
+#endif
+#else
+            MMPrintString("OLIMEX\r\n");
+            MMPrintString("HDMIBasic\r\n");
 #endif
 #endif
 #if defined(PICOMITE) || defined(PICOMITEWEB)
@@ -2398,6 +2407,39 @@ option system i2c GP26, GP27*/
             SoftReset();
         }
 #endif
+#else
+        if(checkstring(p,(unsigned char *) "HDMIBASIC"))  {
+            strcpy((char *)Option.platform,"HDMIbasic");
+            Option.SD_CS=7;
+            Option.SD_CLK_PIN=4;
+            Option.SD_MOSI_PIN=5;
+            Option.SD_MISO_PIN=6;
+            SaveOptions();
+            printoptions();uSec(100000);
+            _excep_code = RESET_COMMAND;
+            SoftReset();
+        }
+        
+        if(checkstring(p,(unsigned char *) "OLIMEX"))  {
+            strcpy((char *)Option.platform,"OLIMEX");
+            Option.AUDIO_L=PINMAP[27];
+            Option.AUDIO_R=PINMAP[28];
+            Option.modbuffsize=192;
+            Option.modbuff = true; 
+            Option.AUDIO_SLICE=checkslice(PINMAP[27],PINMAP[28], 0);
+            Option.SD_CS=PINMAP[22];
+            Option.SD_CLK_PIN=PINMAP[6];
+            Option.SD_MOSI_PIN=PINMAP[7];
+            Option.SD_MISO_PIN=PINMAP[4];
+            Option.HDMIclock=1;
+            Option.HDMId0=3;
+            Option.HDMId1=5;
+            Option.HDMId2=7;
+            SaveOptions();
+            printoptions();uSec(100000);
+            _excep_code = RESET_COMMAND;
+            SoftReset();
+        }
 #endif
 #endif
 #if defined(PICOMITE) || defined(PICOMITEWEB)
@@ -2787,6 +2829,26 @@ void MIPS16 cmd_option(void) {
 		return;
 	}
 #ifdef rp2350
+    tp = checkstring(cmdline, (unsigned char *)"HDMI PINS");
+    if(tp) {
+        getargs(&tp,7,(unsigned char *)",");
+        if(argc!=7)error("Syntax");
+        uint8_t clock=getint(argv[0],0,7);
+        uint8_t d0=getint(argv[2],0,7);
+        uint8_t d1=getint(argv[4],0,7);
+        uint8_t d2=getint(argv[6],0,7);
+        if((clock & 0x6)==(d0 & 0x6) || (clock & 0x6)==(d1 & 0x6) || (clock & 0x6)==(d2 & 0x6) || (d0 & 0x6)==(d1 & 0x6) || (d0 & 0x6)==(d2 & 0x6) || (d1 & 0x6)==(d2 & 0x6))error("Channels not unique");
+        Option.HDMIclock=clock;
+        Option.HDMId0=d0;
+        Option.HDMId1=d1;
+        Option.HDMId2=d2;
+        SaveOptions();
+        _excep_code = RESET_COMMAND;
+        SoftReset();
+        return;
+    }
+#ifdef HDMI
+#endif
     tp = checkstring(cmdline, (unsigned char *)"PSRAM PIN");
     if(tp) {
         int pin1;

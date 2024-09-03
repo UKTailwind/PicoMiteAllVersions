@@ -252,7 +252,7 @@ FATFS FatFs;
 union uFileTable FileTable[MAXOPENFILES + 1];
 volatile BYTE SDCardStat = STA_NOINIT | STA_NODISK;
 int OptionFileErrorAbort = true;
-static uint32_t irqs;
+volatile uint32_t irqs;
 void disable_interrupts(void)
 {
   irqs=save_and_disable_interrupts();
@@ -260,6 +260,7 @@ void disable_interrupts(void)
 void enable_interrupts(void)
 {
     restore_interrupts(irqs);
+    irqs=0;
 }
 void ErrorThrow(int e, int type)
 {
@@ -3696,6 +3697,10 @@ void ResetOptions(void)
     #else
         #ifdef HDMI
             Option.CPU_Speed = 315000;
+            Option.HDMIclock=2;
+            Option.HDMId0=0;
+            Option.HDMId1=6;
+            Option.HDMId2=4;
         #else
             Option.VGA_HSYNC=21;
             Option.VGA_BLUE=24;

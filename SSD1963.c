@@ -180,7 +180,7 @@ void MIPS16 ConfigDisplaySSD(unsigned char *p) {
 void Write16bitCommand(int cmd) {
     PinSetBit(SSD1963_DC_PIN, LATCLR);
     nop;nop;nop;nop;nop; nop; 
-    gpio_put_masked(0xFFFF,cmd); nop;nop;nop;nop;nop;nop;
+    gpio_put_masked64(0xFFFF,cmd); nop;nop;nop;nop;nop;nop;
     gpio_put(SSD1963_WR_GPPIN,0);nop;nop;nop;nop;nop; nop; ;gpio_put(SSD1963_WR_GPPIN,1);nop;nop;nop;nop;nop;nop;
     PinSetBit(SSD1963_DC_PIN, LATSET);
     nop;
@@ -188,7 +188,7 @@ void Write16bitCommand(int cmd) {
 
 // Write an 8 bit data word to the SSD1963
 void WriteData16bit(int data) {
-    gpio_put_masked(0xFFFF,data);  nop;nop;nop;nop;nop; nop; 
+    gpio_put_masked64(0xFFFF,data);  nop;nop;nop;nop;nop; nop; 
     gpio_put(SSD1963_WR_GPPIN,0);nop;nop;nop;nop;nop; nop; gpio_put(SSD1963_WR_GPPIN,1);nop;nop;nop;nop;nop;nop;
 }
 // Write sequential 16 bit command with the same 16 bit data word n times to the IPS_4_16
@@ -486,10 +486,10 @@ void MIPS16 InitIPS_4_16(void){
     int t=0;
     //read the id to see if OTM8009A or NT35510
     WriteComand(0xDA00);
-    gpio_set_dir_in_masked((Option.DISPLAY_TYPE>SSD_PANEL_8 ? 0xFFFF : 0xFF));
+    gpio_set_dir_in_masked64((Option.DISPLAY_TYPE>SSD_PANEL_8 ? 0xFFFF : 0xFF));
     t=ReadData() ; // dummy read
     t=ReadData() ; // dummy read
-    gpio_set_dir_out_masked((Option.DISPLAY_TYPE>SSD_PANEL_8 ? 0xFFFF : 0xFF));
+    gpio_set_dir_out_masked64((Option.DISPLAY_TYPE>SSD_PANEL_8 ? 0xFFFF : 0xFF));
 //    MMPrintString("ID1=");PIntH(t);PRet();
     if ((t & 0x7F) == 0x55){   //was ((t & 0x7F) == 0x55) //((t & 0x71) == 0x51)
         // NT35510 IPS Display detected. Identified in code by (LCDAttrib==1)
@@ -703,7 +703,7 @@ void MIPS16 InitDisplaySSD(void) {
 
 // Write a command byte to the SSD1963
 void WriteComand(int cmd) {
-    gpio_put_masked((Option.DISPLAY_TYPE>SSD_PANEL_8 ? 0xFFFF : 0xFF),cmd);
+    gpio_put_masked64((Option.DISPLAY_TYPE>SSD_PANEL_8 ? 0xFFFF : 0xFF),cmd);
     gpio_put(SSD1963_DC_GPPIN,0);
     gpio_put(SSD1963_WR_GPPIN,0);nop;gpio_put(SSD1963_WR_GPPIN,1);
     gpio_put(SSD1963_DC_GPPIN,1);
@@ -712,7 +712,7 @@ void WriteComand(int cmd) {
 
 // Write an 8 bit data word to the SSD1963
 void WriteData(int data) {
-    gpio_put_masked((Option.DISPLAY_TYPE>SSD_PANEL_8 ? 0xFFFF : 0xFF),data);
+    gpio_put_masked64((Option.DISPLAY_TYPE>SSD_PANEL_8 ? 0xFFFF : 0xFF),data);
     gpio_put(SSD1963_WR_GPPIN,0);nop;gpio_put(SSD1963_WR_GPPIN,1);
 }
 
@@ -720,14 +720,14 @@ void WriteData(int data) {
 // For the 100 pin chip write RGB colour over an 8 bit bus
 void WriteColor(unsigned int c) {
     if(Option.DISPLAY_TYPE>SSD_PANEL_8){
-        gpio_put_masked(0xFFFF,c);
+        gpio_put_masked64(0xFFFF,c);
         gpio_put(SSD1963_WR_GPPIN,0);nop;gpio_put(SSD1963_WR_GPPIN,1);
     } else {
-        gpio_put_masked(0b11111111,(c >> 16));
+        gpio_put_masked64(0b11111111,(c >> 16));
         nop;gpio_put(SSD1963_WR_GPPIN,0);nop;nop;gpio_put(SSD1963_WR_GPPIN,1);
-        gpio_put_masked(0b11111111,(c >> 8));
+        gpio_put_masked64(0b11111111,(c >> 8));
         nop;gpio_put(SSD1963_WR_GPPIN,0);nop;nop;gpio_put(SSD1963_WR_GPPIN,1);
-        nop;gpio_put_masked(0b11111111,c);
+        nop;gpio_put_masked64(0b11111111,c);
         gpio_put(SSD1963_WR_GPPIN,0);nop;nop;gpio_put(SSD1963_WR_GPPIN,1);
     }
 }
@@ -736,7 +736,7 @@ void WriteColor(unsigned int c) {
 
 // Slowly write a command byte to the SSD1963
 static void WriteComandSlow(int cmd) {
-    gpio_put_masked((Option.DISPLAY_TYPE>SSD_PANEL_8 ? 0xFFFF : 0xFF),cmd);
+    gpio_put_masked64((Option.DISPLAY_TYPE>SSD_PANEL_8 ? 0xFFFF : 0xFF),cmd);
     gpio_put(SSD1963_DC_GPPIN,0);
     gpio_put(SSD1963_WR_GPPIN,0);uSec(5);gpio_put(SSD1963_WR_GPPIN,1);
     gpio_put(SSD1963_DC_GPPIN,1);
@@ -745,7 +745,7 @@ static void WriteComandSlow(int cmd) {
 
 // Slowly write an 8 bit data word to the SSD1963
 void WriteDataSlow(int data) {
-    gpio_put_masked((Option.DISPLAY_TYPE>SSD_PANEL_8 ? 0xFFFF : 0xFF),data );
+    gpio_put_masked64((Option.DISPLAY_TYPE>SSD_PANEL_8 ? 0xFFFF : 0xFF),data );
     gpio_put(SSD1963_WR_GPPIN,0);uSec(5);gpio_put(SSD1963_WR_GPPIN,1);
 }
 
@@ -753,12 +753,12 @@ void WriteDataSlow(int data) {
 // Read a byte from the SSD1963
 inline __attribute((always_inline)) unsigned int ReadData(void) {
     gpio_put(SSD1963_RD_GPPIN,0);nop;nop;nop;nop;nop;nop;gpio_put(SSD1963_RD_GPPIN,1);
-    return (gpio_get_all() & (Option.DISPLAY_TYPE>SSD_PANEL_8 ? 0xFFFF : 0xFF));
+    return (gpio_get_all64() & (Option.DISPLAY_TYPE>SSD_PANEL_8 ? 0xFFFF : 0xFF));
 }
 
 unsigned int ReadDataIPS(void) {
     gpio_put(SSD1963_RD_GPPIN,0);nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;gpio_put(SSD1963_RD_GPPIN,1);
-    return (gpio_get_all() & (Option.DISPLAY_TYPE>SSD_PANEL_8 ? 0xFFFF : 0xFF));
+    return (gpio_get_all64() & (Option.DISPLAY_TYPE>SSD_PANEL_8 ? 0xFFFF : 0xFF));
 }
 
 // Slowly read a byte from the SSD1963
@@ -767,7 +767,7 @@ unsigned int ReadDataSlow(void) {
     uSec(2);
     gpio_put(SSD1963_RD_GPPIN,1);
     uSec(2);
-    return (gpio_get_all() & (Option.DISPLAY_TYPE>SSD_PANEL_8 ? 0xFFFF : 0xFF));
+    return (gpio_get_all64() & (Option.DISPLAY_TYPE>SSD_PANEL_8 ? 0xFFFF : 0xFF));
 }
 
 
@@ -1194,7 +1194,7 @@ void PhysicalDrawRect(int x1, int y1, int x2, int y2, int c) {
         c=((c>>8) & 0xf800) | ((c>>5) & 0x07e0) | ((c>>3) & 0x001f);
         i=(x2 - x1 + 1) * (y2 - y1 + 1);
         while(i--){
-            gpio_put_masked(0x2FFFF,c);
+            gpio_put_masked64(0x2FFFF,c);
             //nop;gpio_put(SSD1963_WR_GPPIN,0);
             nop;gpio_put(SSD1963_WR_GPPIN,1);
         }
@@ -1350,14 +1350,14 @@ void DrawBufferSSD1963(int x1, int y1, int x2, int y2, unsigned char* p) {
                             WriteColor(((c.rgb>>8) & 0xf800) | ((c.rgb>>5) & 0x07e0) | ((c.rgb>>3) & 0x001f));
                         } else {
                             if(toggle==0){
-                                gpio_put_masked(0xFFFF,((c.rgb>>8) & 0xf800) | ((c.rgb>>8) & 0x00fc));
+                                gpio_put_masked64(0xFFFF,((c.rgb>>8) & 0xf800) | ((c.rgb>>8) & 0x00fc));
                                 nop;gpio_put(SSD1963_WR_GPPIN,0);nop;gpio_put(SSD1963_WR_GPPIN,1);
                                 bl=(c.rgb & 0x00f8); //save blue
                                 toggle=1;
                             } else {
-                                gpio_put_masked(0xFFFF,(bl<<8) | ((c.rgb>>16) & 0x00f8));
+                                gpio_put_masked64(0xFFFF,(bl<<8) | ((c.rgb>>16) & 0x00f8));
                                 nop;gpio_put(SSD1963_WR_GPPIN,0);nop;gpio_put(SSD1963_WR_GPPIN,1);
-                                gpio_put_masked(0xFFFF,((c.rgb) & 0xfc00) | ((c.rgb) & 0x00f8));
+                                gpio_put_masked64(0xFFFF,((c.rgb) & 0xfc00) | ((c.rgb) & 0x00f8));
                                 nop;gpio_put(SSD1963_WR_GPPIN,0);nop;gpio_put(SSD1963_WR_GPPIN,1);
                                 toggle=0;
                             }
@@ -1369,7 +1369,7 @@ void DrawBufferSSD1963(int x1, int y1, int x2, int y2, unsigned char* p) {
         if(LCDAttrib==2)LCDAttrib=0;
         if((LCDAttrib==1) && (toggle==1)){
    			// extra packet needed
-            gpio_put_masked(0xFFFF,(bl<<8) | ((c.rgb>>8) & 0x00f8));
+            gpio_put_masked64(0xFFFF,(bl<<8) | ((c.rgb>>8) & 0x00f8));
             nop;gpio_put(SSD1963_WR_GPPIN,0);nop;gpio_put(SSD1963_WR_GPPIN,1);
         }
     }
@@ -1446,13 +1446,13 @@ void DrawBLITBufferSSD1963(int x1, int y1, int x2, int y2, unsigned char* p) {
         SetAreaSSD1963(x1, y1, x2, VRes - 1);                       // if the box splits over the frame buffer boundary
         WriteComand(CMD_WR_MEMSTART);
         for(i = (x2 - x1 + 1) * ((VRes - 1) - y1 + 1); i > 0; i--){
-            gpio_put_masked(0x2FFFF,*pp++);
+            gpio_put_masked64(0x2FFFF,*pp++);
             nop;gpio_put(SSD1963_WR_GPPIN,1);
         }
         SetAreaSSD1963(x1, 0, x2, y2 - VRes );
         WriteComand(CMD_WR_MEMSTART);
         for(i = (x2 - x1 + 1) * (y2 - VRes + 1); i > 0; i--) {
-            gpio_put_masked(0x2FFFF,*pp++);
+            gpio_put_masked64(0x2FFFF,*pp++);
             nop;gpio_put(SSD1963_WR_GPPIN,1);
         }
     } else {
@@ -1466,7 +1466,7 @@ void DrawBLITBufferSSD1963(int x1, int y1, int x2, int y2, unsigned char* p) {
         for(int y=y1;y<=y2;y++){
             for(int x=x1;x<=x2;x++){
                 if(x>=0 && x<HRes && y>=0 && y<VRes){
-                    gpio_put_masked(0x2FFFF,*pp++);
+                    gpio_put_masked64(0x2FFFF,*pp++);
                     nop;gpio_put(SSD1963_WR_GPPIN,1);
                 } else pp++;
             }
@@ -1567,7 +1567,7 @@ void ReadBufferSSD1963(int x1, int y1, int x2, int y2, unsigned char* p) {
     if(y2 >= VRes) {
         SetAreaSSD1963(x1, y1, x2, VRes - 1);                       // if the box splits over the frame buffer boundary
         WriteComand(CMD_RD_MEMSTART);
-        gpio_set_dir_in_masked((Option.DISPLAY_TYPE>SSD_PANEL_8 ? 0xFFFF : 0xFF));
+        gpio_set_dir_in_masked64((Option.DISPLAY_TYPE>SSD_PANEL_8 ? 0xFFFF : 0xFF));
         i=(x2 - x1 + 1) * ((VRes - 1) - y1 + 1);
         uSec(10);
         for( ; i > 1; i--) {                                        // NB loop counter terminates 1 pixel earlier
@@ -1576,11 +1576,11 @@ void ReadBufferSSD1963(int x1, int y1, int x2, int y2, unsigned char* p) {
             *p++ = c.rgbbytes[1];
             *p++ = c.rgbbytes[2];
         }
-        gpio_set_dir_out_masked((Option.DISPLAY_TYPE>SSD_PANEL_8 ? 0xFFFF : 0xFF));
+        gpio_set_dir_out_masked64((Option.DISPLAY_TYPE>SSD_PANEL_8 ? 0xFFFF : 0xFF));
         uSec(10);
         SetAreaSSD1963(x1, 0, x2, y2 - VRes );
         WriteComand(CMD_RD_MEMSTART);
-        gpio_set_dir_in_masked((Option.DISPLAY_TYPE>SSD_PANEL_8 ? 0xFFFF : 0xFF));
+        gpio_set_dir_in_masked64((Option.DISPLAY_TYPE>SSD_PANEL_8 ? 0xFFFF : 0xFF));
         uSec(10);
          for(i = (x2 - x1 + 1) * (y2 - VRes + 1); i > 1; i--) {     // NB loop counter terminates 1 pixel earlier
             c.rgb = ReadColor();
@@ -1588,7 +1588,7 @@ void ReadBufferSSD1963(int x1, int y1, int x2, int y2, unsigned char* p) {
             *p++ = c.rgbbytes[1];
             *p++ = c.rgbbytes[2];
         }
-        gpio_set_dir_out_masked((Option.DISPLAY_TYPE>SSD_PANEL_8 ? 0xFFFF : 0xFF));
+        gpio_set_dir_out_masked64((Option.DISPLAY_TYPE>SSD_PANEL_8 ? 0xFFFF : 0xFF));
         uSec(10);
     } else {
         if(Option.DISPLAY_TYPE == ILI9341_8){
@@ -1609,7 +1609,7 @@ void ReadBufferSSD1963(int x1, int y1, int x2, int y2, unsigned char* p) {
             WriteComand(CMD_RD_MEMSTART);
         }
         
-        gpio_set_dir_in_masked((Option.DISPLAY_TYPE>SSD_PANEL_8 ? 0xFFFF : 0xFF));
+        gpio_set_dir_in_masked64((Option.DISPLAY_TYPE>SSD_PANEL_8 ? 0xFFFF : 0xFF));
         uSec(2);
         if(Option.DISPLAY_TYPE==ILI9341_8 || Option.DISPLAY_TYPE==ILI9341_16 || Option.DISPLAY_TYPE == IPS_4_16 )ReadDataSlow();
         for(i = (x2 - x1 + 1) * (y2 - y1 + 1); i > 0; i--){
@@ -1659,7 +1659,7 @@ void ReadBufferSSD1963(int x1, int y1, int x2, int y2, unsigned char* p) {
                 *p++=c.rgbbytes[2];
             }
         }
-        gpio_set_dir_out_masked((Option.DISPLAY_TYPE>SSD_PANEL_8 ? 0xFFFF : 0xFF));
+        gpio_set_dir_out_masked64((Option.DISPLAY_TYPE>SSD_PANEL_8 ? 0xFFFF : 0xFF));
         if(Option.DISPLAY_TYPE==ILI9341_16){
             Write16bitCommand(ILI9341_PIXELFORMAT) ; 
             WriteData16bit(0x55);
@@ -1731,24 +1731,24 @@ void ReadBLITBufferSSD1963(int x1, int y1, int x2, int y2, unsigned char* p) {
     if(y2 >= VRes) {
         SetAreaSSD1963(x1, y1, x2, VRes - 1);                       // if the box splits over the frame buffer boundary
         WriteComand(CMD_RD_MEMSTART);
-        gpio_set_dir_in_masked(0xFFFF);
+        gpio_set_dir_in_masked64(0xFFFF);
         i=(x2 - x1 + 1) * ((VRes - 1) - y1 + 1);
         uSec(2);
         for( ; i > 1; i--) {                                        // NB loop counter terminates 1 pixel earlier
             gpio_put(SSD1963_RD_GPPIN,0);nop;nop;nop;nop;nop;nop;gpio_put(SSD1963_RD_GPPIN,1);
-            *pp++ =  (gpio_get_all() & 0xFFFF);
+            *pp++ =  (gpio_get_all64() & 0xFFFF);
         }
-        gpio_set_dir_out_masked(0xFFFF);
+        gpio_set_dir_out_masked64(0xFFFF);
         uSec(2);
         SetAreaSSD1963(x1, 0, x2, y2 - VRes );
         WriteComand(CMD_RD_MEMSTART);
-        gpio_set_dir_in_masked(0xFFFF);
+        gpio_set_dir_in_masked64(0xFFFF);
         uSec(2);
         for(i = (x2 - x1 + 1) * (y2 - VRes + 1); i > 1; i--) {     // NB loop counter terminates 1 pixel earlier
             gpio_put(SSD1963_RD_GPPIN,0);nop;nop;nop;nop;nop;nop;gpio_put(SSD1963_RD_GPPIN,1);
-            *pp++ =  (gpio_get_all() & 0xFFFF);
+            *pp++ =  (gpio_get_all64() & 0xFFFF);
         }
-        gpio_set_dir_out_masked(0xFFFF);
+        gpio_set_dir_out_masked64(0xFFFF);
         uSec(2);
     } else {
         if(Option.DISPLAY_TYPE==IPS_4_16) {
@@ -1759,7 +1759,7 @@ void ReadBLITBufferSSD1963(int x1, int y1, int x2, int y2, unsigned char* p) {
             SetAreaSSD1963(x1, y1 , x2, y2);                                // setup the area to be filled
             WriteComand(CMD_RD_MEMSTART);
         }
-        gpio_set_dir_in_masked(0xFFFF);
+        gpio_set_dir_in_masked64(0xFFFF);
         uSec(2);
         for(i = (x2 - x1 + 1) * (y2 - y1 + 1); i > 0; i--){
             if(Option.DISPLAY_TYPE==IPS_4_16) {
@@ -1789,10 +1789,10 @@ void ReadBLITBufferSSD1963(int x1, int y1, int x2, int y2, unsigned char* p) {
                 }
             } else {
                 gpio_put(SSD1963_RD_GPPIN,0);nop;nop;nop;nop;nop;nop;gpio_put(SSD1963_RD_GPPIN,1);
-                *pp++ =  (gpio_get_all() & 0xFFFF);
+                *pp++ =  (gpio_get_all64() & 0xFFFF);
             }
         }
-        gpio_set_dir_out_masked(0xFFFF);
+        gpio_set_dir_out_masked64(0xFFFF);
     }
 }
 void ReadBLITBuffer320(int x1, int y1, int x2, int y2, unsigned char* p) {
@@ -1838,9 +1838,9 @@ void MIPS16 fun_getscanline(void){
         targ = T_INT;
     } else {
         WriteComand(CMD_GET_SCANLINE);
-        gpio_set_dir_in_masked(0xFF);
+        gpio_set_dir_in_masked64(0xFF);
         iret = (ReadData() << 8) | ReadData();                          // get the scan line
-        gpio_set_dir_out_masked(0xFF);
+        gpio_set_dir_out_masked64(0xFF);
         targ = T_INT;
     }
 }

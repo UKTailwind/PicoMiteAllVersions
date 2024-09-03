@@ -49,6 +49,7 @@ void MIPS16 cmd_xmodem(void) {
 
     BreakKeySave = BreakKey;
     BreakKey = 0;
+    if(Option.SerialConsole)uart_set_irq_enables((Option.SerialConsole & 3)==1 ? uart0 : uart1, false, false);
 
     if(*cmdline == 0 || *cmdline == '\'') {
         // no file name, so this is a transfer to/from program memory
@@ -107,21 +108,30 @@ void MIPS16 cmd_xmodem(void) {
 
 
 int _inbyte(int timeout) {
-  int c;
+    int c;
 
-  PauseTimer = 0;
-  while(PauseTimer < timeout) {
-      c = getConsole();
-      if(c != -1) {
-          return c;
-      }
-  }
-  return -1;
+    PauseTimer = 0;
+    if(!Option.SerialConsole){
+        while(PauseTimer < timeout) {
+            c = getConsole();
+            if(c != -1) {
+                return c;
+            }
+        }
+    } else {
+        while(PauseTimer < timeout && !uart_is_readable((Option.SerialConsole & 3)==1 ? uart0 : uart1)) {}
+        if(PauseTimer < timeout) return uart_getc((Option.SerialConsole & 3)==1 ? uart0 : uart1);
+    }
+    return -1;
+}
+char _outbyte(char c, int f){
+    if(!Option.SerialConsole)SerialConsolePutC(c,f);
+    else uart_putc_raw((Option.SerialConsole & 3)==1 ? uart0 : uart1, c);
+    return c;
 }
 
-
 // for the MX470 we don't want any XModem data echoed to the LCD panel
-#define MMputchar(c,d) SerialConsolePutC(c,d)
+//#define _outbyte(c,d) SerialConsolePutC(c,d)
 
 
 /***********************************************************************************************
@@ -190,14 +200,14 @@ void xmodemReceive(char *sp, int maxbytes, int fnbr, int crunch) {
         // first establish communication with the remote
     while(1) {
         for( retry = 0; retry < 32; ++retry) {
-            if(trychar) MMputchar(trychar,1);
+            if(trychar) _outbyte(trychar,1);
             if ((c = _inbyte((DLY_1S)<<1)) >= 0) {
                 switch (c) {
                 case SOH:
                     goto start_recv;
                 case EOT:
                     flushinput();
-                    MMputchar(ACK,1);;
+                    _outbyte(ACK,1);;
                     if(sp != NULL) {
                         if(maxbytes <= 0) error("Not enough memory");
                         *sp++ = 0;                                  // terminate the data
@@ -205,7 +215,7 @@ void xmodemReceive(char *sp, int maxbytes, int fnbr, int crunch) {
                     return;                                         // no more data
                 case CAN:
                     flushinput();
-                    MMputchar(ACK,1);
+                    _outbyte(ACK,1);
                     error("Cancelled by remote");
                     break;
                 default:
@@ -214,9 +224,9 @@ void xmodemReceive(char *sp, int maxbytes, int fnbr, int crunch) {
             }
         }
         flushinput();
-        MMputchar(CAN,1);
-        MMputchar(CAN,1);
-        MMputchar(CAN,1);
+        _outbyte(CAN,1);
+        _outbyte(CAN,1);
+        _outbyte(CAN,1);
         error("Remote did not respond");                            // no sync
 
     start_recv:
@@ -253,17 +263,17 @@ void xmodemReceive(char *sp, int maxbytes, int fnbr, int crunch) {
             }
             if (--retrans <= 0) {
                 flushinput();
-                MMputchar(CAN,1);
-                MMputchar(CAN,1);
-                MMputchar(CAN,1);
+                _outbyte(CAN,1);
+                _outbyte(CAN,1);
+                _outbyte(CAN,1);
                 error("Too many errors");
             }
-            MMputchar(ACK,1);
+            _outbyte(ACK,1);
             continue;
         }
     reject:
         flushinput();
-        MMputchar(NAK,1);
+        _outbyte(NAK,1);
     }
 }
 
@@ -287,7 +297,7 @@ void xmodemTransmit(char *p, int fnbr) {
                   goto start_trans;
               case CAN:
                   if ((c = _inbyte(DLY_1S)) == CAN) {
-                      MMputchar(ACK,1);;
+                      _outbyte(ACK,1);;
                       flushinput();
                       error("Cancelled by remote");
                   }
@@ -297,9 +307,9 @@ void xmodemTransmit(char *p, int fnbr) {
               }
           }
       }
-      MMputchar(CAN,1);;
-      MMputchar(CAN,1);;
-      MMputchar(CAN,1);;
+      _outbyte(CAN,1);;
+      _outbyte(CAN,1);;
+      _outbyte(CAN,1);;
       flushinput();
       error("Remote did not respond");                              // no sync
 
@@ -337,7 +347,7 @@ void xmodemTransmit(char *p, int fnbr) {
               for (retry = 0; retry < MAXRETRANS && !MMAbort; ++retry) {
                   // send the block
                   for (i = 0; i < X_BLOCK_SIZE+4 && !MMAbort; ++i) {
-                      MMputchar(xbuff[i],1);
+                      _outbyte(xbuff[i],1);
                   }
                   // check the response
                   if ((c = _inbyte(DLY_1S)) >= 0 ) {
@@ -346,7 +356,7 @@ void xmodemTransmit(char *p, int fnbr) {
                           ++packetno;
                           goto start_trans;
                       case CAN:                                     // cancelled by remote
-                          MMputchar(ACK,1);;
+                          _outbyte(ACK,1);;
                           flushinput();
                           error("Cancelled by remote");
                           break;
@@ -357,9 +367,9 @@ void xmodemTransmit(char *p, int fnbr) {
                   }
               }
               // too many retrys... give up
-              MMputchar(CAN,1);;
-              MMputchar(CAN,1);;
-              MMputchar(CAN,1);;
+              _outbyte(CAN,1);;
+              _outbyte(CAN,1);;
+              _outbyte(CAN,1);;
               flushinput();
               error("Too many errors");
           }
@@ -367,7 +377,7 @@ void xmodemTransmit(char *p, int fnbr) {
           // finished sending - send end of text
           else {
               for (retry = 0; retry < 10; ++retry) {
-                  MMputchar(EOT,1);
+                  _outbyte(EOT,1);
                   if ((c = _inbyte((DLY_1S)<<1)) == ACK) break;
               }
               flushinput();

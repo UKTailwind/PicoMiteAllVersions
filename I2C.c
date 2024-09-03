@@ -1613,12 +1613,12 @@ void __not_in_flash_func(capture)(char *buff){
 	while (ST_PCLK){} // wait for clock to go back low /
 	for(int i=0;i<160;i++){
 		while (!ST_PCLK){} // wait for clock to go high /
-		*k++=gpio_get_all()>>PinDef[D0].GPno;
+		*k++=gpio_get_all64()>>PinDef[D0].GPno;
 		while (ST_PCLK){} // wait for clock to go back low /
 
 		// second byte/
 		while (!ST_PCLK){} // wait for clock to go high /
-		*k++=gpio_get_all()>>PinDef[D0].GPno;
+		*k++=gpio_get_all64()>>PinDef[D0].GPno;
 		while (ST_PCLK){} // wait for clock to go back low /
 	}
 	while(ST_HREF){} // wait for the first line to end*/
@@ -1627,12 +1627,12 @@ void __not_in_flash_func(capture)(char *buff){
 		while(!ST_HREF){} // wait for the first line to end
 		for(int i=0;i<160;i++){
 			while (!ST_PCLK){} // wait for clock to go high /
-			*k++=gpio_get_all()>>PinDef[D0].GPno;
+			*k++=gpio_get_all64()>>PinDef[D0].GPno;
 			while (ST_PCLK){} // wait for clock to go back low /
 
 			// second byte/
 			while (!ST_PCLK){} // wait for clock to go high /
-			*k++=gpio_get_all()>>PinDef[D0].GPno;
+			*k++=gpio_get_all64()>>PinDef[D0].GPno;
 			while (ST_PCLK){} // wait for clock to go back low /
 		}
 		while(ST_HREF){} // wait for the first line to end

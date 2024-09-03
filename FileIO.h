@@ -112,7 +112,10 @@ struct option_s {
     int  TOUCH_YZERO;
     float TOUCH_XSCALE;
     float TOUCH_YSCALE; //72 16=88
-    unsigned int fullrefresh;
+    uint8_t HDMIclock;
+    uint8_t HDMId0;
+    uint8_t HDMId1;
+    uint8_t HDMId2;
     unsigned int FlashSize; //8=96
     unsigned char SD_CS;
     unsigned char SYSTEM_MOSI;
