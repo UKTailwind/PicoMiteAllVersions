@@ -58,11 +58,11 @@ extern "C" {
         #endif
     #else
         #ifdef USBKEYBOARD
-            #define FLASH_TARGET_OFFSET (720 * 1024) 
+            #define FLASH_TARGET_OFFSET (768 * 1024) 
             #define MagicKey 0x15486236
             #define HEAPTOP 0x2003F800
         #else
-            #define FLASH_TARGET_OFFSET (688 * 1024) 
+            #define FLASH_TARGET_OFFSET (720 * 1024) 
             #define MagicKey 0x21343430
             #define HEAPTOP 0x2003f100
         #endif

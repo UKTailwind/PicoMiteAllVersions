@@ -3262,7 +3262,7 @@ void MIPS16 cmd_option(void) {
    	    if(CurrentLinePtr) error("Invalid in a program");
         int CPU_Speed=getint(tp, MIN_CPU,MAX_CPU);
 #ifndef HMDI
-        if(!(CPU_Speed==126000 || CPU_Speed==252000 || CPU_Speed==378000))error("CpuSpeed 126000, 252000 or 378000 only");
+        if(!(CPU_Speed==157500 || CPU_Speed==315000 || CPU_Speed==126000 || CPU_Speed==252000 || CPU_Speed==378000))error("CpuSpeed 126000, 252000, 378000, 157500 or 315000 only");
 #endif
         Option.CPU_Speed=CPU_Speed;
         Option.X_TILE=80;

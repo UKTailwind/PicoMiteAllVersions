@@ -29,7 +29,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 void xmodemTransmit(char *p, int fnbr);
 void xmodemReceive(char *sp, int maxbytes, int fnbr, int crunch);
 int FindFreeFileNbr(void);
-
+bool rcvnoint;
 
 void MIPS16 cmd_xmodem(void) {
     char *buf, BreakKeySave, *p, *fromp;
@@ -49,7 +49,6 @@ void MIPS16 cmd_xmodem(void) {
 
     BreakKeySave = BreakKey;
     BreakKey = 0;
-    if(Option.SerialConsole)uart_set_irq_enables((Option.SerialConsole & 3)==1 ? uart0 : uart1, false, false);
 
     if(*cmdline == 0 || *cmdline == '\'') {
         // no file name, so this is a transfer to/from program memory
@@ -94,8 +93,14 @@ void MIPS16 cmd_xmodem(void) {
         fname = (char *)getFstring(cmdline);                                // get the file name
 
         if(rcv) {
+
+            if(Option.SerialConsole){
+                rcvnoint=true;
+                uart_set_irq_enables((Option.SerialConsole & 3)==1 ? uart0 : uart1, false, false);
+            } else rcvnoint=false;
             if(!BasicFileOpen(fname, fnbr, FA_WRITE | FA_CREATE_ALWAYS)) return;
             xmodemReceive(NULL, 0, fnbr, false);
+            if(rcvnoint)uart_set_irq_enables((Option.SerialConsole & 3)==1 ? uart0 : uart1, true, false);
         } else {
             if(!BasicFileOpen(fname, fnbr, FA_READ)) return;
             xmodemTransmit(NULL, fnbr);
@@ -111,7 +116,7 @@ int _inbyte(int timeout) {
     int c;
 
     PauseTimer = 0;
-    if(!Option.SerialConsole){
+    if(!rcvnoint){
         while(PauseTimer < timeout) {
             c = getConsole();
             if(c != -1) {
@@ -125,7 +130,7 @@ int _inbyte(int timeout) {
     return -1;
 }
 char _outbyte(char c, int f){
-    if(!Option.SerialConsole)SerialConsolePutC(c,f);
+    if(!rcvnoint)SerialConsolePutC(c,f);
     else uart_putc_raw((Option.SerialConsole & 3)==1 ? uart0 : uart1, c);
     return c;
 }
