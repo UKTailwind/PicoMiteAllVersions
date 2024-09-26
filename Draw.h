@@ -101,7 +101,10 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #define PIN_RESTART         9997                                // reset caused by entering 0 at the PIN prompt
 #define RESTART_NOAUTORUN   9996                                // reset required after changing the LCD or touch config
 #define PinRead(a)  gpio_get(PinDef[a].GPno)
-
+#define LCDMaxV 480
+#define LCDMaxH 800
+#define VMaxV 480
+#define VMaxH 640
 extern int GetJustification(char *p, int *jh, int *jv, int *jo);
 extern void cmd_guiBasic(void);
 extern void DrawLine(int x1, int y1, int x2, int y2, int w, int c);
@@ -155,7 +158,7 @@ extern int PrintPixelMode;
 extern char CMM1;
 extern int ScreenSize;
 extern char LCDAttrib;
-extern int remap[];
+extern uint32_t remap[];
 
 typedef struct SVD {
 	FLOAT3D x;
@@ -235,7 +238,7 @@ extern struct spritebuffer spritebuff[MAXBLITBUF+1];
 extern struct blitbuffer blitbuff[MAXBLITBUF+1];
 //extern int layer_in_use[MAXLAYER + 1];
 extern void closeall3d(void);
-extern void closeframebuffer(void);
+extern void closeframebuffer(char layer);
 extern void closeallsprites(void);
 extern char* COLLISIONInterrupt;
 extern bool CollisionFound;

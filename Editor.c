@@ -69,7 +69,7 @@ int optioncolourcodesave;
 int editactive=0;
 static int r_on=0;
 void DisplayPutClever(char c){
-    if(DISPLAY_TYPE==SCREENMODE1 && markmode && Option.ColourCode && ytileheight==12 && gui_font==1){
+    if((DISPLAY_TYPE==SCREENMODE1 && markmode && Option.ColourCode && ytileheight==gui_font_height && gui_font_width % 8 ==0)){
     if(c >= FontTable[gui_font >> 4][2] && c < FontTable[gui_font >> 4][2] + FontTable[gui_font >> 4][3]) {
         if(CurrentX + gui_font_width > HRes) {
             DisplayPutClever('\r');
@@ -96,11 +96,18 @@ void DisplayPutClever(char c){
                     return;
     }
 #ifdef HDMI
-    if(r_on)tilebcols[CurrentY/gui_font_height*X_TILE+CurrentX/gui_font_width]=0xFFFF;
+    if(r_on){
+        if(Option.CPU_Speed!=Freq720P){
+            for(int i=0; i< gui_font_width / 8; i++)tilebcols[CurrentY/gui_font_height*X_TILE+CurrentX/gui_font_width+i]=0xFFFF;
+        }
+        else {
+            for(int i=0; i< gui_font_width / 8; i++)tilebcols_w[CurrentY/gui_font_height*X_TILE+CurrentX/gui_font_width+i]=0xFF;
+        }
+    }
 #else
-    if(r_on)tilebcols[CurrentY/gui_font_height*X_TILE+CurrentX/gui_font_width]=0x1111;
+    if(r_on)for(int i=0; i< gui_font_width / 8; i++)tilebcols[CurrentY/gui_font_height*X_TILE+CurrentX/gui_font_width]=0x1111;
 #endif
-    else tilebcols[CurrentY/gui_font_height*X_TILE+CurrentX/gui_font_width]=Option.VGABC;
+    else for(int i=0; i< gui_font_width / 8; i++)tilebcols[CurrentY/gui_font_height*X_TILE+CurrentX/gui_font_width+i]=Option.VGABC;
     CurrentX += gui_font_width;
     } else DisplayPutC(c);
 }
@@ -155,7 +162,8 @@ static char (*SSputchar)(char buff, int flush)=SerialConsolePutC;
             case DISPLAY_CLS:       ClearScreen(gui_bcolour);
                                     break;
 #ifdef PICOMITEVGA
-            case REVERSE_VIDEO:     if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==12 && gui_font==1){
+            case REVERSE_VIDEO:     
+            if((DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==gui_font_height && gui_font==1)){
                                         r_on^=1;
                                     } else {
                                         t = gui_fcolour;
@@ -164,12 +172,30 @@ static char (*SSputchar)(char buff, int flush)=SerialConsolePutC;
                                     }
                                     break;
             case CLEAR_TO_EOL:      DrawBox(CurrentX, CurrentY, HRes-1, CurrentY + gui_font_height-1, 0, 0, DISPLAY_TYPE==SCREENMODE1 ? 0 : gui_bcolour);
-                                    if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==12 && gui_font==1){
-                                        for(int x=CurrentX/gui_font_width;x<X_TILE;x++){
-                                                tilefcols[CurrentY/gui_font_height*X_TILE+x]=Option.VGAFC;
-                                                tilebcols[CurrentY/gui_font_height*X_TILE+x]=Option.VGABC;
+#ifdef HDMI
+                                    if(Option.CPU_Speed==315){
+#endif
+                                        if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==gui_font_height && gui_font==1){
+                                            for(int x=CurrentX/gui_font_width;x<X_TILE;x++){
+                                                for(int i=0;i<gui_font_width/8;i++){
+                                                    tilefcols[CurrentY/gui_font_height*X_TILE+x+i]=Option.VGAFC;
+                                                    tilebcols[CurrentY/gui_font_height*X_TILE+x+i]=Option.VGABC;
+                                                }
+                                            }
+                                        }
+#ifdef HDMI
+                                    } else {
+                                        if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==gui_font_height && gui_font==15){
+                                            for(int x=CurrentX/gui_font_width;x<X_TILE;x++){
+                                                for(int i=0;i<gui_font_width/8;i++){
+                                                    tilefcols_w[CurrentY/gui_font_height*X_TILE+x+i]=Option.VGAFC;
+                                                    tilebcols_w[CurrentY/gui_font_height*X_TILE+x+i]=Option.VGABC;
+                                                }
+                                            }
                                         }
                                     }
+#endif
+
                                     break;
 #else
             case REVERSE_VIDEO:     t = gui_fcolour;
@@ -187,7 +213,15 @@ static char (*SSputchar)(char buff, int flush)=SerialConsolePutC;
             case DRAW_LINE:         DrawBox(0, gui_font_height * (Option.Height - 2), HRes - 1, VRes - 1, 0, 0, (DISPLAY_TYPE==SCREENMODE1 ? 0 :gui_bcolour));
                                     DrawLine(0, VRes - gui_font_height - 6, HRes - 1, VRes - gui_font_height - 6, 1, GUI_C_LINE);
 #ifdef PICOMITEVGA
-                                    if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==12 && gui_font==1)for(int i=0; i<80; i++)tilefcols[38*X_TILE+i]=Option.VGAFC;
+#ifdef HDMI
+                                    if(Option.CPU_Speed!=Freq720P){
+#endif
+                                        if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==12 && gui_font==1)for(int i=0; i<80; i++)tilefcols[38*X_TILE+i]=Option.VGAFC;
+#ifdef HDMI
+                                    } else {
+                                        if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==24 && gui_font==15)for(int i=0; i<160; i++)tilefcols_w[76*X_TILE+i]=Option.VGAFC;
+                                    }
+#endif
 #endif
                                     CurrentX = 0; CurrentY = VRes - gui_font_height;
                                     break;
@@ -243,18 +277,29 @@ void cmd_edit(void) {
     getargs(&cmdline,1,(unsigned char *)",");
     optioncolourcodesave=Option.ColourCode;
 #ifdef PICOMITEVGA
+    modmode=false;
     editactive=1;
     oldmode = DISPLAY_TYPE;
     oldfont=PromptFont;
-    if(HRes!=640){
+    if(HRes==320){
         DISPLAY_TYPE=SCREENMODE1;
         modmode=true;
     }
-    memset(WriteBuf, 0, ScreenSize);
     ResetDisplay();
+    memset(WriteBuf, 0, ScreenSize);
     if(modmode){
-        SetFont(1);
-        PromptFont=1;
+#ifdef HDMI
+        if(Option.CPU_Speed!=Freq720P){
+#endif
+            SetFont(1);
+            PromptFont=1;
+#ifdef HDMI
+        } else {
+            SetFont(2<<4 | 1);
+            PromptFont=2<<4 | 1;
+        }
+#endif
+    }
 #ifdef PICOMITEVGA
 #ifdef rp2350
     #ifdef HDMI
@@ -264,17 +309,21 @@ void cmd_edit(void) {
     #endif
 #endif
 #endif
-    }
+
 #endif
     if(CurrentLinePtr) error("Invalid in a program");
     if(Option.ColourCode) {
         gui_fcolour = WHITE;
         gui_bcolour = BLACK;
     }
-    if(Option.DISPLAY_CONSOLE == true && gui_font_width > 16) error("Font is too large");
+    if(Option.DISPLAY_CONSOLE == true && gui_font_width > 16*HRes/640) error("Font is too large");
     if(Option.DISPLAY_TYPE>=VIRTUAL && WriteBuf)FreeMemorySafe((void **)&WriteBuf);
     ClearVars(0);
     ClearRuntime();
+    if(HRes==640){
+        SetFont(1);
+        PromptFont=1;
+    }
 #ifdef PICOMITEWEB
     cleanserver();
 #endif
@@ -379,8 +428,9 @@ void FullScreenEditor(int xx, int yy, char *fname) {
   OptionY_TILESave=Y_TILE;
   if(!Option.ColourCode)ytileheight=16;
   else {
-    ytileheight=12;
-    Y_TILE=40;
+    ytileheight=gui_font_height;
+    Y_TILE=VRes/ytileheight;
+    if(VRes % ytileheight)Y_TILE++;
   }
 #endif
   printScreen();                                                  // draw the screen

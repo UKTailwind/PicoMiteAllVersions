@@ -90,7 +90,13 @@ extern "C" {
 #endif
 #ifdef PICOMITEVGA
     uint16_t map16[16]={0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};
+    uint32_t map16pairs[16];
     volatile uint8_t transparent=0;
+    volatile uint8_t transparents=0;
+#ifdef HDMI
+    uint16_t map16d[16];
+    uint32_t map16q[16];
+#endif
     // 126 MHz timings
 int QVGA_TOTAL;// total clock ticks (= QVGA_HSYNC + QVGA_BP + WIDTH*QVGA_CPP[1600] + QVGA_FP)
 int QVGA_HSYNC;	// horizontal sync clock ticks
@@ -507,8 +513,8 @@ int __not_in_flash_func(getConsole)(void) {
 }
 
 void putConsole(int c, int flush) {
-    DisplayPutC(c);
-    SerialConsolePutC(c, flush);
+    if(OptionConsole & 2)DisplayPutC(c);
+    if(OptionConsole & 1)SerialConsolePutC(c, flush);
 }
 // put a character out to the serial console
 char SerialConsolePutC(char c, int flush) {
@@ -1915,7 +1921,17 @@ void __not_in_flash_func(QVgaLine0)()
                     *q++=(M_Foreground[high]& tilefcols[pos]) | (M_Background[high] & tilebcols[pos]) ;
                     pos++;
                 }
-            } else if(DISPLAY_TYPE==SCREENMODE2){
+#ifdef rp2350
+            } else if(DISPLAY_TYPE==SCREENMODE3){
+                register unsigned char *p=&DisplayBuf[line * 320];
+                register uint8_t *r=(uint8_t *)fbuff[VGAnextbuf];
+                for(int i=0;i<320;i++){
+                    register int low= *p & 0xF;
+                    register int high=*p++ >>4;
+                    *r++=low | (high<<4);
+                }
+#endif
+            } else {
                 line>>=1;
                 register unsigned char *p=&DisplayBuf[line * 160];
                 register uint16_t *r=fbuff[VGAnextbuf];
@@ -1923,12 +1939,6 @@ void __not_in_flash_func(QVgaLine0)()
                     register int low= *p & 0xF;
                     register int high=*p++ >>4;
                     *r++=(low | (low<<4) | (high<<8) | (high<<12));
-                }
-            } else {
-                register unsigned char *p=&DisplayBuf[line * 320];
-                register uint8_t *r=(uint8_t *)fbuff[VGAnextbuf];
-                for(int i=0;i<320;i++){
-                    *r++=*p++;
                 }
             }
             VGAnextbuf ^=1;
@@ -1958,7 +1968,12 @@ void __not_in_flash_func(QVgaLine0)()
 void __not_in_flash_func(QVgaLine1)()
 {
     int i,line;
+    uint8_t l,d;
     uint8_t transparent16=(uint8_t)transparent;
+#ifdef rp2350
+    uint8_t s;
+    uint8_t transparent16s=(uint8_t)transparents;
+#endif
 	// Clear the interrupt request for DMA control channel
 	dma_hw->ints0 = (1u << QVGA_DMA_PIO);
 
@@ -2047,18 +2062,39 @@ void __not_in_flash_func(QVgaLine1)()
 #endif
             } else {
                 line>>=1;
-                if(line<0)line+=240;
-                register unsigned char *p=&DisplayBuf[line * 160];
-                register unsigned char *q=&LayerBuf[line * 160];
+                register unsigned char *dd=&DisplayBuf[line * 160];
+                register unsigned char *ll=&LayerBuf[line * 160];
+#ifdef rp2350
+                register unsigned char *ss=&SecondLayer[line * 160];
+                if(ss==dd){
+                    ss=ll;
+                    transparent16s=transparent16;
+                }
+                register int low3, high3;
+#endif
                 register int low, high, low2, high2;
                 register uint16_t *r=(uint16_t *)fbuff[VGAnextbuf];
                 for(int i=0;i<160;i++){
-                    low= map16[p[i] & 0xF];
-                    high=map16[(p[i] & 0xF0)>>4];
-                    low2= map16[q[i] & 0xF];
-                    high2=map16[(q[i] & 0xF0)>>4];
+                    d=*dd++;
+                    l=*ll++;
+                    low= map16[d & 0xF];
+                    d>>=4;
+                    high=map16[d];
+                    low2= map16[l & 0xF];
+                    l>>=4;
+                    high2=map16[l];
+#ifdef rp2350
+                    s=*ss++;
+                    low3= map16[s & 0xF];
+                    s>>=4;
+                    high3=map16[s];
+#endif
                     if(low2!=transparent16)low=low2;
                     if(high2!=transparent16)high=high2;
+#ifdef rp2350
+                    if(low3!=transparent16s)low=low3;
+                    if(high3!=transparent16s)high=high3;
+#endif
                     *r++=(low | (low<<4) | (high<<8) | (high<<12));
                 }
             }
@@ -2092,10 +2128,10 @@ void QVgaPioInit()
 {
 	int i;
     if((Option.CPU_Speed % 126000) ==0){
-        QVGA_TOTAL= 4004;// total clock ticks (= QVGA_HSYNC + QVGA_BP + WIDTH*QVGA_CPP[1600] + QVGA_FP)
+        QVGA_TOTAL= 4000;// total clock ticks (= QVGA_HSYNC + QVGA_BP + WIDTH*QVGA_CPP[1600] + QVGA_FP)
         QVGA_HSYNC = 480;	// horizontal sync clock ticks
-        QVGA_BP	= 242;	// back porch clock ticks
-        QVGA_FP	= 82;	// front porch clock ticks
+        QVGA_BP	= 240;	// back porch clock ticks
+        QVGA_FP	= 80;	// front porch clock ticks
         // QVGA vertical timings
         QVGA_VACT	= 480;	// V active scanlines (= 2*HEIGHT)
         QVGA_VFRONT	= 10;	// V front porch
@@ -2352,6 +2388,16 @@ extern uint16_t HDMIlines[2][640];
 #define MODE_V_SYNC_WIDTH    3
 #define MODE_V_BACK_PORCH    16
 
+#define MODE_H_W_SYNC_POLARITY 1
+#define MODE_H_W_FRONT_PORCH   110
+#define MODE_H_W_SYNC_WIDTH    40
+#define MODE_H_W_BACK_PORCH    220
+
+#define MODE_V_W_SYNC_POLARITY 1
+#define MODE_V_W_FRONT_PORCH   5
+#define MODE_V_W_SYNC_WIDTH    5
+#define MODE_V_W_BACK_PORCH    20
+
 #define MODE_H_TOTAL_PIXELS ( \
     MODE_H_FRONT_PORCH + MODE_H_SYNC_WIDTH + \
     MODE_H_BACK_PORCH  + MODE_H_ACTIVE_PIXELS \
@@ -2360,6 +2406,15 @@ extern uint16_t HDMIlines[2][640];
     MODE_V_FRONT_PORCH + MODE_V_SYNC_WIDTH + \
     MODE_V_BACK_PORCH  + MODE_V_ACTIVE_LINES \
 )
+#define MODE_H_W_TOTAL_PIXELS ( \
+    MODE_H_W_FRONT_PORCH + MODE_H_W_SYNC_WIDTH + \
+    MODE_H_W_BACK_PORCH  + MODE_H_W_ACTIVE_PIXELS \
+)
+#define MODE_V_W_TOTAL_LINES  ( \
+    MODE_V_W_FRONT_PORCH + MODE_V_W_SYNC_WIDTH + \
+    MODE_V_W_BACK_PORCH  + MODE_V_W_ACTIVE_LINES \
+)
+
 volatile int mode = 1;
 #define HSTX_CMD_RAW         (0x0u << 12)
 #define HSTX_CMD_RAW_REPEAT  (0x1u << 12)
@@ -2406,57 +2461,20 @@ const uint32_t MAP256DEF[256] =
 const uint32_t MAP16DEF[16] = {0x00,0xFF,0x5500,0x55ff,0xAA00,0xAAff,0xff00,0xffff,0xff0000,0xff00FF,0xff5500,0xff55ff,0xffAA00,0xffAAff,0xffff00,0xffffff};
 const uint32_t MAP4DEF[4] = {0,0xFF,0xFF00,0xFF0000};
 uint16_t map256[256];
-static uint32_t vblank_line_vsync_off[] = {
-    HSTX_CMD_RAW_REPEAT | MODE_H_FRONT_PORCH,
-    SYNC_V1_H1,
-    HSTX_CMD_RAW_REPEAT | MODE_H_SYNC_WIDTH,
-    SYNC_V1_H0,
-    HSTX_CMD_RAW_REPEAT | (MODE_H_BACK_PORCH + MODE_H_ACTIVE_PIXELS),
-    SYNC_V1_H1,
-    HSTX_CMD_NOP
-};
-
-static uint32_t vblank_line_vsync_on[] = {
-    HSTX_CMD_RAW_REPEAT | MODE_H_FRONT_PORCH,
-    SYNC_V0_H1,
-    HSTX_CMD_RAW_REPEAT | MODE_H_SYNC_WIDTH,
-    SYNC_V0_H0,
-    HSTX_CMD_RAW_REPEAT | (MODE_H_BACK_PORCH + MODE_H_ACTIVE_PIXELS),
-    SYNC_V0_H1,
-    HSTX_CMD_NOP
-};
-
-static uint32_t vactive_line[] = {
-    HSTX_CMD_RAW_REPEAT | MODE_H_FRONT_PORCH,
-    SYNC_V1_H1,
-    HSTX_CMD_NOP,
-    HSTX_CMD_RAW_REPEAT | MODE_H_SYNC_WIDTH,
-    SYNC_V1_H0,
-    HSTX_CMD_NOP,
-    HSTX_CMD_RAW_REPEAT | MODE_H_BACK_PORCH,
-    SYNC_V1_H1,
-    HSTX_CMD_TMDS       | MODE_H_ACTIVE_PIXELS
-};
-uint16_t RGB555(uint32_t c){
-    return ((c & 0xf8)>>3) | ((c& 0xf800)>>6) | ((c & 0xf80000)>>9);
-}
-uint8_t RGB332(uint32_t c){
-    return ((c & 0b111000000000000000000000)>>16) | ((c & 0b1110000000000000)>>11) | ((c & 0b11000000)>>6);
-}
-uint8_t RGB121(uint32_t c){
-    return ((c & 0x800000)>> 20) | ((c & 0xC000)>>13) | ((c & 0x80)>>7);
-}
+static uint32_t vblank_line_vsync_off[7] ;
+static uint32_t vblank_line_vsync_on[7];
+static uint32_t vactive_line[9];
 static bool dma_pong = false;
 
 // A ping and a pong are cued up initially, so the first time we enter this
 // handler it is to cue up the second ping after the first ping has completed.
 // This is the third scanline overall (-> =2 because zero-based).
-volatile uint v_scanline = 2;
+volatile int32_t v_scanline = 2;
 
 // During the vertical active period, we take two IRQs per scanline: one to
 // post the command list, and another to post the pixels.
 static bool vactive_cmdlist_posted = false;
-void MIPS64 __not_in_flash_func(dma_irq_handler)() {
+void MIPS64 __not_in_flash_func(dma_irq_handler0)() {
     // dma_pong indicates the channel that just finished, which is the one
     // we're about to reload.
     uint ch_num = dma_pong ? DMACH_PONG : DMACH_PING;
@@ -2485,31 +2503,444 @@ void MIPS64 __not_in_flash_func(dma_irq_handler)() {
         v_scanline = (v_scanline + 1) % MODE_V_TOTAL_LINES;
     } 
 }
+void MIPS64 __not_in_flash_func(dma_irq_handler1)() {
+    // dma_pong indicates the channel that just finished, which is the one
+    // we're about to reload.
+    uint ch_num = dma_pong ? DMACH_PONG : DMACH_PING;
+    dma_channel_hw_t *ch = &dma_hw->ch[ch_num];
+    dma_hw->intr = 1u << ch_num;
+    dma_pong = !dma_pong;
+ 
+    if (v_scanline >= MODE_V_W_FRONT_PORCH && v_scanline < (MODE_V_W_FRONT_PORCH + MODE_V_W_SYNC_WIDTH)) {
+        ch->read_addr = (uintptr_t)vblank_line_vsync_on;
+        ch->transfer_count = count_of(vblank_line_vsync_on);
+    } else if (v_scanline < MODE_V_W_FRONT_PORCH + MODE_V_W_SYNC_WIDTH + MODE_V_W_BACK_PORCH) {
+        ch->read_addr = (uintptr_t)vblank_line_vsync_off;
+        ch->transfer_count = count_of(vblank_line_vsync_off);
+    } else if (!vactive_cmdlist_posted) {
+        ch->read_addr = (uintptr_t)vactive_line;
+        ch->transfer_count = count_of(vactive_line);
+        vactive_cmdlist_posted = true;
+    } else {
+//        ch->read_addr = (uintptr_t)&FRAMEBUFFER[(v_scanline - (MODE_V_W_TOTAL_LINES - MODE_V_W_ACTIVE_LINES)) * MODE_H_W_ACTIVE_PIXELS];
+        ch->read_addr = (uintptr_t)HDMIlines[v_scanline & 1];
+        ch->transfer_count = MODE_H_W_ACTIVE_PIXELS/4;
+        vactive_cmdlist_posted = false;
+    }
+
+    if (!vactive_cmdlist_posted) {
+        v_scanline = (v_scanline + 1) % MODE_V_W_TOTAL_LINES;
+    } 
+}
+
 // ----------------------------------------------------------------------------
 // Main program
 
-
-
-void MIPS64 __not_in_flash_func(HDMICore)(void){
+void MIPS64 __not_in_flash_func(HDMIloop0)(void){
     int last_line=2,load_line, line_to_load, line;
-    for(int i=0;i<256;i++)map256[i]=RGB555(MAP256DEF[i]);
-    for(int i=0;i<16;i++)map16[i]=RGB555(MAP16DEF[i]);
+    while (1){
+        if(v_scanline!=last_line){
+            uint8_t transparent16=(uint8_t)transparent;
+            uint8_t transparent16s=(uint8_t)transparents;
+            last_line=v_scanline;
+            load_line=line=v_scanline - (MODE_V_TOTAL_LINES - MODE_V_ACTIVE_LINES);
+            if(HRes==320)line>>=1;
+            line_to_load = last_line & 1;
+            uint8_t l,d,s;
+            int pp;
+            uint16_t *p=HDMIlines[line_to_load];
+            if(load_line>=0 && load_line<MODE_V_ACTIVE_LINES){
+                __dmb();
+                switch(DISPLAY_TYPE){
+                case SCREENMODE1: //640x480x2 colour
+                    uint16_t *fcol=tilefcols+line/ytileheight*X_TILE, *bcol=tilebcols+line/ytileheight*X_TILE; //get the relevant tile
+                    pp= line*80;
+                    for(int i=0; i<80 ; i++){
+                        d=DisplayBuf[pp+i];
+                        *p++ = (d&0x1) ? fcol[i] : bcol[i];
+                        d>>=1;
+                        *p++ = (d&0x1) ? fcol[i] : bcol[i];
+                        d>>=1;
+                        *p++ = (d&0x1) ? fcol[i] : bcol[i];
+                        d>>=1;
+                        *p++ = (d&0x1) ? fcol[i] : bcol[i];
+                        d>>=1;
+                        *p++ = (d&0x1) ? fcol[i] : bcol[i];
+                        d>>=1;
+                        *p++ = (d&0x1) ? fcol[i] : bcol[i];
+                        d>>=1;
+                        *p++ = (d&0x1) ? fcol[i] : bcol[i];
+                        d>>=1;
+                        *p++ = (d&0x1) ? fcol[i] : bcol[i];
+                    }
+                    break;
+                case SCREENMODE2: //320x240x16 colour with support for a top layer
+                    {
+                        pp= (line)*160;
+                        uint32_t *up=(uint32_t *)p;
+                        register unsigned char *dd=&DisplayBuf[pp];
+                        register unsigned char *ll=&LayerBuf[pp];
+                        register unsigned char *ss=&SecondLayer[pp];
+                        if(ss==dd){
+                            ss=ll;
+                            transparent16s=transparent16;
+                        }
+                        for(int i=0; i<160 ; i++){
+                            l=ll[i];d=dd[i];s=ss[i];
+                            if((s&0xf)!=transparent16s){
+                                *up++=map16pairs[s&0xf];
+                            } else {
+                                if((l&0xf)!=transparent16){
+                                    *up++=map16pairs[l&0xf];
+                                } else {
+                                    *up++=map16pairs[d&0xf];
+                                }
+                            }
+                            d>>=4;l>>=4;s>>=4;
+                            if((s&0xf)!=transparent16s){
+                                *up++=map16pairs[s&0xf];
+                            } else {
+                                if((l&0xf)!=transparent16){
+                                    *up++=map16pairs[l&0xf];
+                                } else {
+                                    *up++=map16pairs[d&0xf];
+                                }
+                            }
+                        }
+                    }
+                    break;
+                case SCREENMODE3: //640x480x16 colour
+                    pp= line*320;
+                    for(int i=0;i<320;i++){
+                        d=DisplayBuf[pp+i];
+                        l=LayerBuf[pp+i];
+                        if((l&0xf)!=transparent16){
+                            *p++=map16[l&0xf];
+                        } else {
+                            *p++=map16[d&0xf];
+                        }
+                        d>>=4;l>>=4;
+                        if((l&0xf)!=transparent16){
+                            *p++=map16[l&0xf];
+                        } else {
+                            *p++=map16[d&0xf];
+                        }
+                    }
+                    break;
+                case SCREENMODE4: //320x240xRGB555 colour
+                    pp=line*640;
+                    for(int i=0; i<640 ; i+=2){
+                        uint8_t* d=&DisplayBuf[pp+i];
+                        int c=*d++;
+                        c|=((*d++)<<8);
+                        *p++=c;
+                        *p++=c;
+                    }
+                    break;
+                case SCREENMODE5: //320x240x256 colour
+                    pp=line*320;
+                    register unsigned char *dd=&DisplayBuf[pp];
+                    register unsigned char *ll=&LayerBuf[pp];
+                    register unsigned char *ss=&SecondLayer[pp];
+                    if(ss==dd){
+                        ss=ll;
+                        transparent16s=transparent16;
+                    }
+                    for(int i=0; i<320 ; i++){
+                        int d=dd[i];
+                        int l=ll[i];
+                        int s=ss[i];
+                        if(s!=transparent16s){
+                            *p++=map256[s];
+                            *p++=map256[s];
+                        } else {
+                            if(l!=transparent16){
+                                *p++=map256[l];
+                                *p++=map256[l];
+                            } else {
+                                *p++=map256[d];
+                                *p++=map256[d];
+                            }
+                        }
+                    }
+                    break;
+                default:
+                }
+            }
+        }
+    }
+}
+void MIPS64 __not_in_flash_func(HDMIloop1)(void){
+    int last_line=2,load_line, line_to_load, Line_dup, Line_quad;
+    while(1){
+        if(v_scanline!=last_line){
+            last_line=v_scanline;
+            load_line=v_scanline - (MODE_V_W_TOTAL_LINES - MODE_V_W_ACTIVE_LINES);
+            Line_dup=load_line>>1;
+            Line_quad=load_line>>2;
+            line_to_load = last_line & 1;
+            if(load_line>=0 && load_line<MODE_V_W_ACTIVE_LINES){
+                __dmb();
+                switch(DISPLAY_TYPE){
+                case SCREENMODE1: //1289x720x2 colour with tiles
+                    {
+                        uint8_t *p=(uint8_t *)HDMIlines[line_to_load];
+                        uint8_t *fcol_w=tilefcols_w+load_line/ytileheight*X_TILE, *bcol_w=tilebcols_w+load_line/ytileheight*X_TILE; //get the relevant tile
+                        uint32_t *pp=(uint32_t *)&DisplayBuf[load_line*MODE_H_W_ACTIVE_PIXELS/8];
+                        uint32_t d=*pp;
+                        for(int i=0; i<MODE_H_W_ACTIVE_PIXELS/32 ; i++){
+                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
+                            d>>=1;
+                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
+                            d>>=1;
+                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
+                            d>>=1;
+                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
+                            d>>=1;
+                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
+                            d>>=1;
+                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
+                            d>>=1;
+                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
+                            d>>=1;
+                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
+                            d>>=1;
+                            fcol_w++;
+                            bcol_w++;
+                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
+                            d>>=1;
+                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
+                            d>>=1;
+                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
+                            d>>=1;
+                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
+                            d>>=1;
+                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
+                            d>>=1;
+                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
+                            d>>=1;
+                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
+                            d>>=1;
+                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
+                            d>>=1;
+                            fcol_w++;
+                            bcol_w++;
+                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
+                            d>>=1;
+                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
+                            d>>=1;
+                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
+                            d>>=1;
+                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
+                            d>>=1;
+                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
+                            d>>=1;
+                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
+                            d>>=1;
+                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
+                            d>>=1;
+                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
+                            d>>=1;
+                            fcol_w++;
+                            bcol_w++;
+                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
+                            d>>=1;
+                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
+                            d>>=1;
+                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
+                            d>>=1;
+                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
+                            d>>=1;
+                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
+                            d>>=1;
+                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
+                            d>>=1;
+                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
+                            d>>=1;
+                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
+                            fcol_w++;
+                            bcol_w++;
+                            d=*(++pp);
+                        }
+                    }
+                    break;
+                case SCREENMODE2: //320 x 180 x 4bit-colour mapped to 256
+                    {
+                        uint32_t *p=(uint32_t *)HDMIlines[line_to_load];
+                        uint8_t l,d,s;
+                        int pp= (Line_quad)*MODE_H_W_ACTIVE_PIXELS/8;
+                        for(int i=0; i<MODE_H_W_ACTIVE_PIXELS/8 ; i++){
+                            l=LayerBuf[pp+i];d=DisplayBuf[pp+i];s=SecondLayer[pp+i];
+                            if((s&0xf)!=transparents){
+                                *p++=map16q[s&0xf];
+                            } else {
+                                if((l&0xf)!=transparent){
+                                    *p++=map16q[l&0xf];
+                                } else {
+                                    *p++=map16q[d&0xf];
+                                }
+                            }
+                            d>>=4;l>>=4;s>>=4;
+                            if((s&0xf)!=transparents){
+                                *p++=map16q[s&0xf];
+                            } else {
+                                if((l&0xf)!=transparent){
+                                    *p++=map16q[l&0xf];
+                                } else {
+                                    *p++=map16q[d&0xf];
+                                }
+                            }
+                        }
+                    }
+                    break;
+            case SCREENMODE3: //640 x 360 x 4bit-colour mapped to 256
+                    {
+                        int pp= (Line_dup)*MODE_H_W_ACTIVE_PIXELS/4;
+                        uint16_t *p=(uint16_t *)HDMIlines[line_to_load];
+                        uint8_t l,d;
+                        for(int i=0; i<MODE_H_W_ACTIVE_PIXELS/4 ; i++){
+                            l=LayerBuf[pp+i];d=DisplayBuf[pp+i];
+                            if((l&0xf)!=transparent){
+                                *p++=map16d[l&0xf];
+                            } else {
+                                *p++=map16d[d&0xf];
+                            }
+                            d>>=4;l>>=4;
+                            if((l&0xf)!=transparent){
+                                *p++=map16d[l&0xf];
+                            } else {
+                                *p++=map16d[d&0xf];
+                            }
+                        }
+                    }
+                    break;
+                case SCREENMODE5: //320 x 180 x 8bit-colour 
+                    {
+                        uint8_t *p=(uint8_t *)HDMIlines[line_to_load];
+                        uint8_t l,d,s;
+                        int pp= (Line_quad)*MODE_H_W_ACTIVE_PIXELS/4;
+                        for(int i=0; i<MODE_H_W_ACTIVE_PIXELS/4 ; i++){
+                            l=LayerBuf[pp+i];d=DisplayBuf[pp+i];s=SecondLayer[pp+i];
+                            if(s!=transparents){
+                                *p++=s;
+                                *p++=s;
+                                *p++=s;
+                                *p++=s;
+                            } else {
+                                if(l!=transparent){
+                                    *p++=l;
+                                    *p++=l;
+                                    *p++=l;
+                                    *p++=l;
+                                } else {
+                                    *p++=d;
+                                    *p++=d;
+                                    *p++=d;
+                                    *p++=d;
+                                }
+                            }
+                        }
+                    }
+                    break;
+                default:
+                }
+            }
+        }
+    }
+}
 
+void HDMICore(void){
+    for(int i=0;i<256;i++)map256[i]=RGB555(MAP256DEF[i]);
+    for(int i=0;i<16;i++){
+        map16[i]=RGB555(MAP16DEF[i]);
+        map16pairs[i]=map16[i] | (map16[i]<<16);
+        map16d[i]=(RGB332(MAP16DEF[i])<<8) | RGB332(MAP16DEF[i]);
+        map16q[i]=(RGB332(MAP16DEF[i])<<24) | (RGB332(MAP16DEF[i])<<16) | (RGB332(MAP16DEF[i])<<8) | RGB332(MAP16DEF[i]);
+    }
+    if(Option.CPU_Speed!=Freq720P){
+        vblank_line_vsync_off[0] =       HSTX_CMD_RAW_REPEAT | MODE_H_FRONT_PORCH;
+        vblank_line_vsync_off[1] =       SYNC_V1_H1;
+        vblank_line_vsync_off[2] =       HSTX_CMD_RAW_REPEAT | MODE_H_SYNC_WIDTH;
+        vblank_line_vsync_off[3] =       SYNC_V1_H0;
+        vblank_line_vsync_off[4] =       HSTX_CMD_RAW_REPEAT | (MODE_H_BACK_PORCH + MODE_H_ACTIVE_PIXELS);
+        vblank_line_vsync_off[5] =       SYNC_V1_H1;
+        vblank_line_vsync_off[6] =       HSTX_CMD_NOP;
+
+        vblank_line_vsync_on[0] =    HSTX_CMD_RAW_REPEAT | MODE_H_FRONT_PORCH;
+        vblank_line_vsync_on[1] =    SYNC_V0_H1;
+        vblank_line_vsync_on[2] =    HSTX_CMD_RAW_REPEAT | MODE_H_SYNC_WIDTH;
+        vblank_line_vsync_on[3] =    SYNC_V0_H0,
+        vblank_line_vsync_on[4] =    HSTX_CMD_RAW_REPEAT | (MODE_H_BACK_PORCH + MODE_H_ACTIVE_PIXELS);
+        vblank_line_vsync_on[5] =    SYNC_V0_H1;
+        vblank_line_vsync_on[6] =    HSTX_CMD_NOP;
+
+        vactive_line[0] =    HSTX_CMD_RAW_REPEAT | MODE_H_FRONT_PORCH;
+        vactive_line[1] =    SYNC_V1_H1;
+        vactive_line[2] =    HSTX_CMD_NOP;
+        vactive_line[3] =    HSTX_CMD_RAW_REPEAT | MODE_H_SYNC_WIDTH;
+        vactive_line[4] =    SYNC_V1_H0;
+        vactive_line[5] =    HSTX_CMD_NOP;
+        vactive_line[6] =    HSTX_CMD_RAW_REPEAT | MODE_H_BACK_PORCH;
+        vactive_line[7] =    SYNC_V1_H1;
+        vactive_line[8] =    HSTX_CMD_TMDS       | MODE_H_ACTIVE_PIXELS;
+    } else {
+        vblank_line_vsync_off[0] =    HSTX_CMD_RAW_REPEAT | MODE_H_W_FRONT_PORCH;
+        vblank_line_vsync_off[1] =    SYNC_V1_H1;
+        vblank_line_vsync_off[2] =    HSTX_CMD_RAW_REPEAT | MODE_H_W_SYNC_WIDTH;
+        vblank_line_vsync_off[3] =    SYNC_V1_H0;
+        vblank_line_vsync_off[4] =    HSTX_CMD_RAW_REPEAT | (MODE_H_W_BACK_PORCH + MODE_H_W_ACTIVE_PIXELS);
+        vblank_line_vsync_off[5] =    SYNC_V1_H1;
+        vblank_line_vsync_off[6] =    HSTX_CMD_NOP;
+
+        vblank_line_vsync_on[0] =    HSTX_CMD_RAW_REPEAT | MODE_H_W_FRONT_PORCH;
+        vblank_line_vsync_on[1] =    SYNC_V0_H1;
+        vblank_line_vsync_on[2] =    HSTX_CMD_RAW_REPEAT | MODE_H_W_SYNC_WIDTH;
+        vblank_line_vsync_on[3] =    SYNC_V0_H0;
+        vblank_line_vsync_on[4] =    HSTX_CMD_RAW_REPEAT | (MODE_H_W_BACK_PORCH + MODE_H_W_ACTIVE_PIXELS);
+        vblank_line_vsync_on[5] =    SYNC_V0_H1;
+        vblank_line_vsync_on[6] =    HSTX_CMD_NOP;
+
+        vactive_line[0] =    HSTX_CMD_RAW_REPEAT | MODE_H_W_FRONT_PORCH;
+        vactive_line[1] =    SYNC_V1_H1;
+        vactive_line[2] =    HSTX_CMD_NOP;
+        vactive_line[3] =    HSTX_CMD_RAW_REPEAT | MODE_H_W_SYNC_WIDTH,
+        vactive_line[4] =    SYNC_V1_H0;
+        vactive_line[5] =    HSTX_CMD_NOP;
+        vactive_line[6] =    HSTX_CMD_RAW_REPEAT | MODE_H_W_BACK_PORCH;
+        vactive_line[7] =    SYNC_V1_H1;
+        vactive_line[8] =    HSTX_CMD_TMDS       | MODE_H_W_ACTIVE_PIXELS;
+    }
         // Configure HSTX's TMDS encoder for RGB332
         hstx_ctrl_hw->expand_tmds =
-            29 << HSTX_CTRL_EXPAND_TMDS_L0_ROT_LSB   |
-            4  << HSTX_CTRL_EXPAND_TMDS_L0_NBITS_LSB |
-            2 << HSTX_CTRL_EXPAND_TMDS_L1_ROT_LSB   |
-            4  << HSTX_CTRL_EXPAND_TMDS_L1_NBITS_LSB |
-            7 << HSTX_CTRL_EXPAND_TMDS_L2_ROT_LSB   |
-            4  << HSTX_CTRL_EXPAND_TMDS_L2_NBITS_LSB ;
+            (Option.CPU_Speed!=Freq720P ? 
+                (29 << HSTX_CTRL_EXPAND_TMDS_L0_ROT_LSB   |
+                4  << HSTX_CTRL_EXPAND_TMDS_L0_NBITS_LSB |
+                2 << HSTX_CTRL_EXPAND_TMDS_L1_ROT_LSB   |
+                4  << HSTX_CTRL_EXPAND_TMDS_L1_NBITS_LSB |
+                7 << HSTX_CTRL_EXPAND_TMDS_L2_ROT_LSB   |
+                4  << HSTX_CTRL_EXPAND_TMDS_L2_NBITS_LSB) 
+                :
+                (2  << HSTX_CTRL_EXPAND_TMDS_L2_NBITS_LSB |
+                0  << HSTX_CTRL_EXPAND_TMDS_L2_ROT_LSB   |
+                2  << HSTX_CTRL_EXPAND_TMDS_L1_NBITS_LSB |
+                29 << HSTX_CTRL_EXPAND_TMDS_L1_ROT_LSB   |
+                1  << HSTX_CTRL_EXPAND_TMDS_L0_NBITS_LSB |
+                26 << HSTX_CTRL_EXPAND_TMDS_L0_ROT_LSB));
+
         // Pixels (TMDS) come in 4 8-bit chunks. Control symbols (RAW) are an
         // entire 32-bit word.
         hstx_ctrl_hw->expand_shift =
-            2 << HSTX_CTRL_EXPAND_SHIFT_ENC_N_SHIFTS_LSB |
-            16 << HSTX_CTRL_EXPAND_SHIFT_ENC_SHIFT_LSB |
-            1 << HSTX_CTRL_EXPAND_SHIFT_RAW_N_SHIFTS_LSB |
-            0 << HSTX_CTRL_EXPAND_SHIFT_RAW_SHIFT_LSB; 
+            (Option.CPU_Speed!=Freq720P ? 
+                (2 << HSTX_CTRL_EXPAND_SHIFT_ENC_N_SHIFTS_LSB |
+                16 << HSTX_CTRL_EXPAND_SHIFT_ENC_SHIFT_LSB |
+                1 << HSTX_CTRL_EXPAND_SHIFT_RAW_N_SHIFTS_LSB |
+                0 << HSTX_CTRL_EXPAND_SHIFT_RAW_SHIFT_LSB)
+                :
+                (4 << HSTX_CTRL_EXPAND_SHIFT_ENC_N_SHIFTS_LSB |
+                8 << HSTX_CTRL_EXPAND_SHIFT_ENC_SHIFT_LSB |
+                1 << HSTX_CTRL_EXPAND_SHIFT_RAW_N_SHIFTS_LSB |
+                0 << HSTX_CTRL_EXPAND_SHIFT_RAW_SHIFT_LSB));
+
 
         // Serial output config: clock period of 5 cycles, pop from command
         // expander every 5 cycles, shift the output shiftreg by 2 every cycle.
@@ -2601,127 +3032,34 @@ void MIPS64 __not_in_flash_func(HDMICore)(void){
 
     dma_hw->ints0 = (1u << DMACH_PING) | (1u << DMACH_PONG);
     dma_hw->inte0 = (1u << DMACH_PING) | (1u << DMACH_PONG);
-    irq_set_exclusive_handler(DMA_IRQ_0, dma_irq_handler);
+    irq_set_exclusive_handler(DMA_IRQ_0, Option.CPU_Speed!=Freq720P? dma_irq_handler0 : dma_irq_handler1);
     irq_set_enabled(DMA_IRQ_0, true);
 
 //    bus_ctrl_hw->priority = 1;
     dma_channel_start(DMACH_PING);
-
-    while (1){
-        if(v_scanline!=last_line){
-            uint8_t transparent16=(uint8_t)transparent;
-            last_line=v_scanline;
-            load_line=line=v_scanline - (MODE_V_TOTAL_LINES - MODE_V_ACTIVE_LINES);
-            if(HRes==320)line>>=1;
-            line_to_load = last_line & 1;
-            uint8_t l,d;
-            int pp;
-            uint16_t *p=HDMIlines[line_to_load];
-            if(load_line>=0 && load_line<MODE_V_ACTIVE_LINES){
-                __dmb();
-                switch(DISPLAY_TYPE){
-                case SCREENMODE1: //640x480x2 colour
-                    uint16_t *fcol=tilefcols+line/ytileheight*X_TILE, *bcol=tilebcols+line/ytileheight*X_TILE; //get the relevant tile
-                    pp= line*80;
-                    for(int i=0; i<80 ; i++){
-                        d=DisplayBuf[pp+i];
-                        *p++ = (d&0x1) ? fcol[i] : bcol[i];
-                        d>>=1;
-                        *p++ = (d&0x1) ? fcol[i] : bcol[i];
-                        d>>=1;
-                        *p++ = (d&0x1) ? fcol[i] : bcol[i];
-                        d>>=1;
-                        *p++ = (d&0x1) ? fcol[i] : bcol[i];
-                        d>>=1;
-                        *p++ = (d&0x1) ? fcol[i] : bcol[i];
-                        d>>=1;
-                        *p++ = (d&0x1) ? fcol[i] : bcol[i];
-                        d>>=1;
-                        *p++ = (d&0x1) ? fcol[i] : bcol[i];
-                        d>>=1;
-                        *p++ = (d&0x1) ? fcol[i] : bcol[i];
-                    }
-                    break;
-                case SCREENMODE2: //320x240x16 colour with support for a top layer
-                    pp= (line)*160;
-                    for(int i=0; i<160 ; i++){
-                        l=LayerBuf[pp+i];d=DisplayBuf[pp+i];
-                        if((l&0xf)!=transparent16){
-                            *p++=map16[l&0xf];
-                            *p++=map16[l&0xf];
-                        } else {
-                            *p++=map16[d&0xf];
-                            *p++=map16[d&0xf];
-                        }
-                        d>>=4;l>>=4;
-                        if((l&0xf)!=transparent16){
-                            *p++=map16[l&0xf];
-                            *p++=map16[l&0xf];
-                        } else {
-                            *p++=map16[d&0xf];
-                            *p++=map16[d&0xf];
-                        }
-                    }
-                    break;
-                case SCREENMODE3: //640x480x16 colour
-                    pp= line*320;
-                    for(int i=0;i<320;i++){
-                        d=DisplayBuf[pp+i];
-                        l=LayerBuf[pp+i];
-                        if((l&0xf)!=transparent16){
-                            *p++=map16[l&0xf];
-                        } else {
-                            *p++=map16[d&0xf];
-                        }
-                        d>>=4;l>>=4;
-                        if((l&0xf)!=transparent16){
-                            *p++=map16[l&0xf];
-                        } else {
-                            *p++=map16[d&0xf];
-                        }
-                    }
-                    break;
-                case SCREENMODE4: //320x240xRGB555 colour
-                    pp=line*640;
-                    for(int i=0; i<640 ; i+=2){
-                        uint8_t* d=&DisplayBuf[pp+i];
-                        int c=*d++;
-                        c|=((*d++)<<8);
-                        *p++=c;
-                        *p++=c;
-                    }
-                    break;
-                case SCREENMODE5: //320x240x256 colour
-                    pp=line*320;
-                    for(int i=0; i<320 ; i++){
-                        int d=DisplayBuf[pp+i];
-                        int l=LayerBuf[pp+i];
-                        if(l!=transparent){
-                            *p++=map256[l];
-                            *p++=map256[l];
-                        } else {
-                            *p++=map256[d];
-                            *p++=map256[d];
-                        }
-                    }
-                     break;
-                default:
-                }
-            }
-        }
-    }
+    if(Option.CPU_Speed!=Freq720P)HDMIloop0();
+    else HDMIloop1();
 }
 void settiles(void){
     if(DISPLAY_TYPE!=SCREENMODE1)return;
-    tilefcols=(uint16_t *)((uint32_t)FRAMEBUFFER+(MODE1SIZE*3));
-    tilebcols=(uint16_t *)((uint32_t)FRAMEBUFFER+(MODE1SIZE*3)+MODE1HALF);
-    ytileheight=12;
-    X_TILE=640/8;Y_TILE=480/ytileheight;
-    for(int x=0;x<X_TILE;x++){
-        for(int y=0;y<Y_TILE;y++){
-            tilefcols[y*X_TILE+x]=RGB555(Option.DefaultFC);
-            tilebcols[y*X_TILE+x]=RGB555(Option.DefaultBC);
+    if(Option.CPU_Speed!=Freq720P){
+        tilefcols=(uint16_t *)((uint32_t)FRAMEBUFFER+(MODE1SIZE*3));
+        tilebcols=(uint16_t *)((uint32_t)FRAMEBUFFER+(MODE1SIZE*3)+MODE1HALF);
+        ytileheight=12;
+        X_TILE=640/8;Y_TILE=480/ytileheight;
+        for(int x=0;x<X_TILE;x++){
+            for(int y=0;y<Y_TILE;y++){
+                tilefcols[y*X_TILE+x]=RGB555(Option.DefaultFC);
+                tilebcols[y*X_TILE+x]=RGB555(Option.DefaultBC);
+            }
         }
+    } else {
+        tilefcols_w=(uint8_t *)DisplayBuf+MODE1SIZE_W;
+        tilebcols_w=tilefcols_w+(MODE_H_W_ACTIVE_PIXELS/8)*(MODE_V_W_ACTIVE_LINES/8); //minimum tilesize is 8x8
+        memset(tilefcols_w,RGB332(Option.DefaultFC),(MODE_H_W_ACTIVE_PIXELS/8)*(MODE_V_W_ACTIVE_LINES/8)*sizeof(uint8_t));
+        memset(tilebcols_w,RGB332(Option.DefaultBC),(MODE_H_W_ACTIVE_PIXELS/8)*(MODE_V_W_ACTIVE_LINES/8)*sizeof(uint8_t));
+        ytileheight=24;
+        X_TILE=1280/8;Y_TILE=720/ytileheight;
     }
 }
 
@@ -2857,7 +3195,7 @@ void MIPS16 updatebootcount(void){
     boot_count+=1;
     err=lfs_file_rewind(&lfs, &lfs_file);
     err=lfs_file_write(&lfs, &lfs_file, &boot_count, sizeof(boot_count));
-    err=lfs_file_close(&lfs, &lfs_file);	
+    err=lfs_file_close(&lfs, &lfs_file);
 }
 
 /**
@@ -3021,7 +3359,7 @@ int MIPS16 main(){
         SaveOptions();
     }
 #else
-    if(Option.CPU_Speed!=315000){
+    if(!(Option.CPU_Speed!=Freq720P || Option.CPU_Speed==Freq720P )){
         Option.CPU_Speed=315000;
         SaveOptions();
     }
@@ -3055,9 +3393,22 @@ int MIPS16 main(){
         }
     }
 #endif
+    vreg_disable_voltage_limit ();
+#ifdef rp2350
+    volatile uint32_t *qmi_m0_timing=(uint32_t *)0x400d000c;
+#endif
     if(Option.CPU_Speed>200000 && Option.CPU_Speed<=300000 )vreg_set_voltage(VREG_VOLTAGE_1_25);  // Std default @ boot is 1_10
-    if(Option.CPU_Speed>300000 )vreg_set_voltage(VREG_VOLTAGE_1_30);  // Std default @ boot is 1_10
-    uSec(100);
+    else if(Option.CPU_Speed>300000  && Option.CPU_Speed<=378000 )vreg_set_voltage(VREG_VOLTAGE_1_30);  // Std default @ boot is 1_10
+#ifdef rp2350
+    else if(Option.CPU_Speed>378000)vreg_set_voltage(VREG_VOLTAGE_1_50);  // Std default @ boot is 1_10
+#endif
+    sleep_ms(10);
+#ifdef rp2350
+    *qmi_m0_timing = 0x60007204;
+    if(Option.CPU_Speed>288000)*qmi_m0_timing = 0x60007203;
+    else *qmi_m0_timing = 0x60007202;
+    sleep_ms(2);
+#endif
     set_sys_clock_khz(Option.CPU_Speed, false);
     PWM_FREQ=44100;
 #ifndef USBKEYBOARD
@@ -3086,13 +3437,15 @@ int MIPS16 main(){
     if(Option.CPU_Speed<=200000)modclock(2);
 #else
 #ifdef HDMI
-    clock_configure(
-        clk_hstx,
-        0,                                                // No glitchless mux
-        CLOCKS_CLK_PERI_CTRL_AUXSRC_VALUE_CLKSRC_PLL_SYS, // System PLL on AUX mux
-        315000 * 1000,                               // Input frequency
-        157500 * 1000                                // Output (must be same as no divider)
-    );
+    if(Option.CPU_Speed!=Freq720P){
+        clock_configure(
+            clk_hstx,
+            0,                                                // No glitchless mux
+            CLOCKS_CLK_PERI_CTRL_AUXSRC_VALUE_CLKSRC_PLL_SYS, // System PLL on AUX mux
+            315000 * 1000,                               // Input frequency
+            157500 * 1000                                // Output (must be same as no divider)
+        );
+    }
 #endif 
     if(Option.PSRAM_CS_PIN){
         gpio_set_function(PinDef[Option.PSRAM_CS_PIN].GPno, GPIO_FUNC_XIP_CS1); // CS for PSRAM
@@ -3108,7 +3461,7 @@ int MIPS16 main(){
     _excep_code=excep;
 #ifdef PICOMITEVGA
 #ifndef HDMI
-    if(Option.CPU_Speed == 315000 || Option.CPU_Speed == 252000)QVGA_CLKDIV= 2;
+    if(Option.CPU_Speed == 252000 || Option.CPU_Speed == 315000 )QVGA_CLKDIV= 2;
     else if(Option.CPU_Speed == 378000)QVGA_CLKDIV= 3;
     else QVGA_CLKDIV= 1;
 #endif
@@ -3170,7 +3523,7 @@ int MIPS16 main(){
         multicore_launch_core1_with_stack(HDMICore,core1stack,512);
         core1stack[0]=0x12345678;
         uSec(1000);
-        #else
+    #else
         X_TILE=Option.X_TILE;
         Y_TILE=Option.Y_TILE;
         ytileheight=X_TILE==80? 12 : 16;
@@ -3197,7 +3550,6 @@ int MIPS16 main(){
         }
     }
     WatchdogSet = false;
-
     if(_excep_code == INVALID_CLOCKSPEED) {
         MMPrintString("\r\n\nInvalid clock speed - reset to default\r\n");
     }
@@ -3246,7 +3598,7 @@ int MIPS16 main(){
 	if(setjmp(mark) != 0) {
      // we got here via a long jump which means an error or CTRL-C or the program wants to exit to the command prompt
         FlashLoad = 0;
-        LoadOptions();
+//        LoadOptions();
 #ifdef USBKEYBOARD
 	    clearrepeat();
 #endif	    

@@ -56,7 +56,7 @@ void MIPS16 cmd_xmodem(void) {
         if(Option.DISPLAY_TYPE>=VIRTUAL && WriteBuf)FreeMemorySafe((void **)&WriteBuf);
         if(rcv)ClearProgram();                                             // we need all the RAM
         else {
-            closeframebuffer();
+            closeframebuffer('A');
             CloseAudio(1);
             ClearVars(0);
         }

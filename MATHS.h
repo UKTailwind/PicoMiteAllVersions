@@ -96,5 +96,48 @@ extern volatile unsigned int AHRSTimer;
 #define CRC64_DEFAULT_POLYNOME      0x42F0E1EBA9EA3693
 #define CRC64_ECMA64                0x42F0E1EBA9EA3693
 #define CRC64_ISO64                 0x000000000000001B
+typedef struct {
+
+	/* Controller gains */
+	MMFLOAT Kp;
+	MMFLOAT Ki;
+	MMFLOAT Kd;
+
+	/* Derivative low-pass filter time constant */
+	MMFLOAT tau;
+
+	/* Output limits */
+	MMFLOAT limMin;
+	MMFLOAT limMax;
+	
+	/* Integrator limits */
+	MMFLOAT limMinInt;
+	MMFLOAT limMaxInt;
+
+	/* Sample time (in seconds) */
+	MMFLOAT T;
+
+	/* Controller "memory" */
+	MMFLOAT integrator;
+	MMFLOAT prevError;			/* Required for integrator */
+	MMFLOAT differentiator;
+	MMFLOAT prevMeasurement;		/* Required for differentiator */
+
+	/* Controller output */
+	MMFLOAT out;
+
+} PIDController;
+
+typedef struct PIDchan {
+	unsigned char *interrupt;
+    int process;
+    PIDController *PIDparams;
+    uint64_t timenext;
+    bool active;
+}s_PIDchan;
+extern s_PIDchan PIDchannels[MAXPID+1];
+
+MMFLOAT PIDController_Update(PIDController *pid, MMFLOAT setpoint, MMFLOAT measurement);
+
 
 #endif

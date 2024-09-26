@@ -133,6 +133,15 @@ void getfullfilepath(char *p, char *q);
 void fullpath(char *q);
 int FatFSFileSystemSave=0;
 #define overlap (VRes % (FontTable[gui_font >> 4][1] * (gui_font & 0b1111)) ? 0 : 1)
+#ifdef rp2350
+typedef struct sa_dlist {
+    char from[32];
+    char to[32];
+} a_dlist;
+a_dlist *dlist;
+int nDefines;
+int LineCount=0;
+#endif
 /******************************************************************************************
 Text for the file related error messages reported by MMBasic
 ******************************************************************************************/
@@ -1105,11 +1114,9 @@ void MIPS16 cmd_rmdir(void)
     }
 }
 
-void cmd_chdir(void){
+void chdir(char *p){
 	int i;
-    char *p;
     char rp[STRINGSIZE],oldfilepath[STRINGSIZE];
-    p = (char *)getFstring(cmdline);  // get the directory name and convert to a standard C string
     if(drivecheck(p,&i)!=FatFSFileSystem+1) error("Only valid on current drive");
     if(strcmp(p,".")==0)return; //nothing to do
     if(strlen(p)==0)return;//nothing to do
@@ -1149,7 +1156,11 @@ void cmd_chdir(void){
 	ErrorCheck(0); // error if the pathname was invalid
 
 }
-
+void cmd_chdir(void){
+    char *p;
+    p = (char *)getFstring(cmdline);  // get the directory name and convert to a standard C string
+    chdir(p);
+}
 void fun_cwd(void)
 {
     sret = CtoM((unsigned char *)GetCWD());
@@ -1514,7 +1525,7 @@ void MIPS16 cmd_save(void)
                 c.rgbbytes[2]=*p++; //this order swaps the bytes to match the .BMP file
                 c.rgbbytes[1]=*p++;
                 c.rgbbytes[0]=*p++;
-                fcolour = ((c.rgb & 0x800000)>> 20) | ((c.rgb & 0xC000)>>13) | ((c.rgb & 0x80)>>7);
+                fcolour = RGB121(c.rgb);
                 if(k & 1){
                     *pp |=fcolour;
                     pp++;
@@ -1667,7 +1678,7 @@ void MIPS16 cmd_save(void)
 	                c.rgbbytes[2]=*p++; //this order swaps the bytes to match the .BMP file
 		            c.rgbbytes[1]=*p++;
 		            c.rgbbytes[0]=*p++;
-	                fcolour = ((c.rgb & 0x800000)>> 20) | ((c.rgb & 0xC000)>>13) | ((c.rgb & 0x80)>>7);
+	                fcolour = RGB121(c.rgb);
 	                if(k & 1){
 	                    *pp |=(fcolour);
 	                    pp++;
@@ -1800,6 +1811,357 @@ void MIPS16 cmd_save(void)
         FileClose(fnbr);
     }
 }
+#ifdef rp2350
+#define loadbuffsize EDIT_BUFFER_SIZE-sizeof(a_dlist)*MAXDEFINES-4096
+int cmpstr(char *s1,char *s2)
+{
+  unsigned char *p1 = (unsigned char *) s1;
+  unsigned char *p2 = (unsigned char *) s2;
+  unsigned char c1, c2;
+
+  if (p1 == p2)
+    return 0;
+
+  do
+    {
+      c1 = tolower (*p1++);
+      c2 = tolower (*p2++);
+      if (c1 == '\0') return 0;
+    }
+  while (c1 == c2);
+
+  return c1 - c2;
+}
+
+int massage(char *buff){
+	int i=nDefines;
+	while(i--){
+		char *p=dlist[i].from;
+		while(*p){
+			*p=toupper(*p);
+			p++;
+		}
+		p=dlist[i].to;
+		while(*p){
+			*p=toupper(*p);
+			p++;
+		}
+		STR_REPLACE(buff,dlist[i].from,dlist[i].to);
+	}
+	STR_REPLACE(buff,"=<","<=");
+	STR_REPLACE(buff,"=>",">=");
+	STR_REPLACE(buff," ,",",");
+	STR_REPLACE(buff,", ",",");
+	STR_REPLACE(buff," *","*");
+	STR_REPLACE(buff,"* ","*");
+	STR_REPLACE(buff,"- ","-");
+	STR_REPLACE(buff," /","/");
+	STR_REPLACE(buff,"/ ","/");
+	STR_REPLACE(buff,"= ","=");
+	STR_REPLACE(buff,"+ ","+");
+	STR_REPLACE(buff," )",")");
+	STR_REPLACE(buff,") ",")");
+	STR_REPLACE(buff,"( ","(");
+	STR_REPLACE(buff,"> ",">");
+	STR_REPLACE(buff,"< ","<");
+	STR_REPLACE(buff," '","'");
+	return strlen(buff);
+}
+void importfile(char *pp, char *tp, char **p, uint32_t buf, int convertdebug, bool message){
+    int fnbr;
+    char buff[256];
+    char qq[FF_MAX_LFN] = {0};
+    int importlines=0;
+    int ignore=0;
+	char *fname, *sbuff, *op, *ip;
+    int c, slen, data;
+    fnbr = FindFreeFileNbr();
+    char  *q;
+    if((q=strchr((char *)tp,34)) == 0) error("Syntax");
+    q++;
+    if((q=strchr(q,34)) == 0) error("Syntax");
+    fname = (char *)getFstring((unsigned char *)tp);
+    fnbr = FindFreeFileNbr();
+    if (strchr((char *)fname, '.') == NULL) strcat((char *)fname, ".INC");
+	q=&fname[strlen(fname)-4];
+	if(strcasecmp(q,".inc")!=0)error("must be a .inc file");
+	if(!(fname[1]==':' && (fname[0] == 'A' || fname[0]=='a' || fname[0] == 'B' || fname[0]=='b'))) {strcpy(qq,pp);strcat(qq,fname);}
+	else strcpy(qq,fname);
+    if(message){MMPrintString("Importing ");MMPrintString(qq);PRet();}
+    if (!BasicFileOpen(qq, fnbr, FA_READ)) return;
+    **p='\'';
+    *p+=1;
+    **p='#';
+    *p+=1;
+    strcpy(*p,qq);
+    *p+=strlen(qq);
+    **p='\r';
+    *p+=1;
+    **p='\n';
+    *p+=1;
+    while(!FileEOF(fnbr)) {
+    	int toggle=0, len=0;// while waiting for the end of file
+    	sbuff=buff;
+        if(((uint32_t)*p - buf) >= loadbuffsize) {
+            FreeMemorySafe((void **)&buf);
+            FreeMemorySafe((void **)&dlist);
+            error("Not enough memory");
+        }
+        memset(buff,0,256);
+		MMgetline(fnbr, (char *)buff);									    // get the input line
+		data=0;
+		importlines++;
+		LineCount++;
+		routinechecks();
+		len=strlen(buff);
+		toggle=0;
+		for(c=0;c<strlen(buff);c++){
+			if(buff[c] == TAB) buff[c] = ' ';
+		}
+		while(*sbuff==' '){
+			sbuff++;
+			len--;
+		}
+		if(ignore && sbuff[0]!='#')*sbuff='\'';
+		if(strncasecmp(sbuff,"rem ",4)==0 || (len==3 && strncasecmp(sbuff,"rem",3)==0 )){
+			sbuff+=2;
+			*sbuff='\'';
+			continue;
+		}
+		if(strncasecmp(sbuff,"data ",5)==0)data=1;
+		slen=len;
+		op=sbuff;
+		ip=sbuff;
+		while(*ip){
+			if(*ip==34){
+				if(toggle==0)toggle=1;
+				else toggle=0;
+			}
+			if(!toggle && (*ip==' ' || *ip==':')){
+				*op++=*ip++; //copy the first space
+				while(*ip==' '){
+					ip++;
+					len--;
+				}
+			}
+			else *op++=*ip++;
+		}
+		slen=len;
+		if(!(toupper(sbuff[0])=='R' && toupper(sbuff[1])=='U' && toupper(sbuff[2])=='N' && (strlen(sbuff)==3 || sbuff[3]==' '))){
+			toggle=0;
+			for(c=0;c<slen;c++){
+				if(!(toggle || data))sbuff[c]=toupper(sbuff[c]);
+				if(sbuff[c]==34){
+					if(toggle==0)toggle=1;
+					else toggle=0;
+				}
+			}
+		}
+		toggle=0;
+		for(c=0;c<slen;c++){
+			if(sbuff[c]==34){
+				if(toggle==0)toggle=1;
+				else toggle=0;
+			}
+			if(!toggle && sbuff[c]==39 && len==slen){
+				len=c;//get rid of comments
+				break;
+			}
+		}
+		if(sbuff[0]=='#'){
+			unsigned char *tp=checkstring((unsigned char *)&sbuff[1], (unsigned char *)"DEFINE");
+			if(tp){
+				getargs(&tp,3,(unsigned char *)",");
+				if(nDefines>=MAXDEFINES){
+				    FreeMemorySafe((void *)&buf);
+				    FreeMemorySafe((void *)&dlist);
+					error("Too many #DEFINE statements");
+				}
+				strcpy(dlist[nDefines].from,(char *)getCstring(argv[0]));
+				strcpy(dlist[nDefines].to,(char *)getCstring(argv[2]));
+				nDefines++;
+                ClearTempMemory();
+			} else {
+				if(cmpstr("COMMENT END",&sbuff[1])==0)ignore=0;
+				if(cmpstr("COMMENT START",&sbuff[1])==0)ignore=1;
+				if(cmpstr("MMDEBUG ON",&sbuff[1])==0)convertdebug=0;
+				if(cmpstr("MMDEBUG OFF",&sbuff[1])==0)convertdebug=1;
+				if(cmpstr("INCLUDE ",&sbuff[1])==0){
+                    FreeMemorySafe((void **)&buf);
+                    FreeMemorySafe((void **)&dlist);
+					error("Can't import from an import");
+				}
+			}
+		} else {
+			if(toggle)sbuff[len++]=34;
+			sbuff[len++]=39;
+			sbuff[len]=0;
+			len=massage(sbuff); //can't risk crushing lines with a quote in them
+			if((sbuff[0]!=39) || (sbuff[0]==39 && sbuff[1]==39)){
+				memcpy(*p,sbuff,len);
+				*p+=len;
+				**p='\n';
+				*p+=1;
+			}
+		}
+    }
+    FileClose(fnbr);
+    return ;
+}
+
+// load a file into program memory
+int FileLoadCMM2Program(char *fname, bool message) {
+    int fnbr;
+    char *p,*op, *ip, *buf, *sbuff, buff[STRINGSIZE];
+    char pp[FF_MAX_LFN] = {0};
+    int c;
+    int convertdebug=1;
+    int ignore=0;
+    nDefines=0;
+    LineCount=0;
+    int importlines=0, data;
+    if (!InitSDCard()) return false;
+    ClearProgram(); // clear any leftovers from the previous program
+    fnbr = FindFreeFileNbr();
+    p = (char *)getFstring((unsigned char *)fname);
+    if (strchr((char *)p, '.') == NULL) strcat((char *)p, ".bas");
+    char q[FF_MAX_LFN]={0};
+    FatFSFileSystemSave=FatFSFileSystem;
+    getfullfilename(p,q);
+    int CurrentFileSystem=FatFSFileSystem;
+    FatFSFileSystem=FatFSFileSystemSave;
+    strcpy(pp,CurrentFileSystem? "B:":"A:");
+    strcat(pp,fullpathname[FatFSFileSystem]);
+    strcat(pp,"/");
+    chdir(pp);
+    if (!BasicFileOpen(p, fnbr, FA_READ)) return false;
+    p = buf = GetMemory(loadbuffsize);
+    *p++='\'';
+    *p++='#';
+    strcpy(p,CurrentFileSystem? "B:":"A:");
+    p+=2;
+    strcpy(p,q);
+    p+=strlen(q);
+    *p++='\r';
+    *p++='\n';
+    dlist=GetMemory(sizeof(a_dlist)*MAXDEFINES);
+
+    while(!FileEOF(fnbr)) {                                     // while waiting for the end of file
+    	int toggle=0, len=0, slen;// while waiting for the end of file
+    	sbuff=buff;
+        if((p - buf) >= loadbuffsize) {
+            FreeMemorySafe((void **)&buf);
+            FreeMemorySafe((void **)&dlist);
+            error("Not enough memory");
+        }
+        memset(buff,0,256);
+		MMgetline(fnbr, (char *)buff);									    // get the input line
+		data=0;
+		importlines++;
+		LineCount++;
+    	routinechecks();
+		len=strlen(buff);
+		toggle=0;
+		for(c=0;c<strlen(buff);c++){
+			if(buff[c] == TAB) buff[c] = ' ';
+		}
+		while(sbuff[0]==' '){ //strip leading spaces
+			sbuff++;
+			len--;
+		}
+		if(ignore && sbuff[0]!='#')*sbuff='\'';
+		if(strncasecmp(sbuff,"rem ",4)==0 || (len==3 && strncasecmp(sbuff,"rem",3)==0 )){
+			sbuff+=2;
+			*sbuff='\'';
+			continue;
+		}
+		if(strncasecmp(sbuff,"mmdebug ",7)==0 && convertdebug==1){
+			sbuff+=6;
+			*sbuff='\'';
+			continue;
+		}
+		if(strncasecmp(sbuff,"data ",5)==0)data=1;
+		slen=len;
+		op=sbuff;
+		ip=sbuff;
+		while(*ip){
+			if(*ip==34){
+				if(toggle==0)toggle=1;
+				else toggle=0;
+			}
+			if(!toggle && (*ip==' ' || *ip==':')){
+				*op++=*ip++; //copy the first space
+				while(*ip==' '){
+					ip++;
+					len--;
+				}
+			} else *op++=*ip++;
+		}
+		slen=len;
+		if(sbuff[0]=='#'){
+			unsigned char *tp=checkstring((unsigned char *)&sbuff[1], (unsigned char *)"DEFINE");
+			if(tp){
+				getargs(&tp,3,(unsigned char *)",");
+				if(nDefines>=MAXDEFINES){
+				    FreeMemorySafe((void *)&buf);
+				    FreeMemorySafe((void *)&dlist);
+					error("Too many #DEFINE statements");
+				}
+				strcpy(dlist[nDefines].from,(char *)getCstring(argv[0]));
+				strcpy(dlist[nDefines].to,(char *)getCstring(argv[2]));
+				nDefines++;
+			} else {
+				if(cmpstr("COMMENT END",&sbuff[1])==0)ignore=0;
+				if(cmpstr("COMMENT START",&sbuff[1])==0)ignore=1;
+				if(cmpstr("MMDEBUG ON",&sbuff[1])==0)convertdebug=0;
+				if(cmpstr("MMDEBUG OFF",&sbuff[1])==0)convertdebug=1;
+				if(cmpstr("INCLUDE",&sbuff[1])==0){
+					importfile(pp, &sbuff[8],&p, (uint32_t)buf, convertdebug, message);
+                    ClearTempMemory();
+				}
+			}
+		} else {
+			if(!(toupper(sbuff[0])=='R' && toupper(sbuff[1])=='U' && toupper(sbuff[2])=='N' && (strlen(sbuff)==3 || sbuff[3]==' '))){
+				toggle=0;
+				for(c=0;c<slen;c++){
+					if(!(toggle || data))sbuff[c]=toupper(sbuff[c]);
+					if(sbuff[c]==34){
+						if(toggle==0)toggle=1;
+						else toggle=0;
+					}
+				}
+			}
+			toggle=0;
+			for(c=0;c<slen;c++){
+				if(sbuff[c]==34){
+					if(toggle==0)toggle=1;
+					else toggle=0;
+				}
+				if(!toggle && sbuff[c]==39 && len==slen){
+					len=c;//get rid of comments
+					break;
+				}
+			}
+			if(toggle)sbuff[len++]=34;
+			sbuff[len++]=39;
+			sbuff[len]=0;
+			len=massage(sbuff); //can't risk crushing lines with a quote in them
+			if((sbuff[0]!=39) || (sbuff[0]==39 && sbuff[1]==39)){
+				memcpy(p,sbuff,len);
+				p+=len;
+				*p++='\n';
+			}
+		}
+
+    }
+    *p = 0;                                                         // terminate the string in RAM
+    FileClose(fnbr);
+    SaveProgramToFlash((unsigned char *)buf, false);
+    FreeMemorySafe((void **)&buf);
+    FreeMemorySafe((void **)&dlist);
+    return true;
+}
+#endif
 // load a file into program memory
 int FileLoadProgram(unsigned char *fname)
 {
@@ -1844,6 +2206,52 @@ int FileLoadProgram(unsigned char *fname)
     SaveProgramToFlash((unsigned char *)buf, false);
     return true;
 }
+#ifdef rp2350
+
+void MIPS16 loadCMM2(unsigned char *p, bool autorun, bool message)
+{
+    getargs(&p, 1, (unsigned char *)",");
+    if (!(argc & 1) || argc == 0)
+        error("Syntax");
+    if (CurrentLinePtr != NULL && !autorun)
+        error("Invalid in a program");
+
+    if (!FileLoadCMM2Program((char *)argv[0], message))
+        return;
+    FlashLoad = 0;
+    if (autorun)
+    {
+        if (*ProgMemory != 0x01)
+            return; // no program to run
+        ClearRuntime();
+        WatchdogSet = false;
+        PrepareProgram(true);
+        IgnorePIN = false;
+        if(Option.LIBRARY_FLASH_SIZE == MAX_PROG_SIZE) ExecuteProgram(ProgMemory - Option.LIBRARY_FLASH_SIZE);  // run anything that might be in the library
+        nextstmt = ProgMemory;
+    }
+    return;
+}
+void MIPS16 cmd_loadCMM2(void){
+    bool autorun=false;
+    getargs(&cmdline,3,(unsigned char *)",");
+    if (argc == 3)
+    {
+        if (toupper(*argv[2]) == 'R')
+            autorun = true;
+        else
+            error("Syntax");
+    }
+    else if (CurrentLinePtr != NULL)
+        error("Invalid in a program");
+    
+    loadCMM2(argv[0],autorun,true);
+}
+/*void MIPS16 cmd_RunCMM2(void){
+    loadCMM2(cmdline,true,false);
+}*/
+
+#endif
 
 void MIPS16 cmd_load(void)
 {
@@ -1862,7 +2270,6 @@ void MIPS16 cmd_load(void)
         LoadJPGImage(p);
         return;
     }
-
     getargs(&cmdline, 3, (unsigned char *)",");
     if (!(argc & 1) || argc == 0)
         error("Syntax");
@@ -1891,7 +2298,6 @@ void MIPS16 cmd_load(void)
         nextstmt = ProgMemory;
     }
 }
-
 char __not_in_flash_func(FileGetChar)(int fnbr)
 {
     char ch;
@@ -2064,7 +2470,7 @@ void MIPS16 CloseAllFiles(void)
 #ifndef PICOMITEWEB
     closeall3d();
 #endif
-    closeframebuffer();
+    closeframebuffer('A');
     for (i = 1; i <= MAXOPENFILES; i++)
     {
         if (FileTable[i].com != 0)
@@ -2720,7 +3126,9 @@ void MIPS16 cmd_files(void)
         *cmdline='"';
     }
     ClearVars(0);
+    int oldfont=PromptFont;
     ClearRuntime();
+    SetFont(oldfont);
     int i, c, dirs, ListCnt, currentsize;
     uint32_t currentdate;
     char *p, extension[8];
@@ -2780,7 +3188,7 @@ void MIPS16 cmd_files(void)
         FreeMemorySafe((void **)&flist);
     closeallsprites();
 #ifndef PICOMITEWEB
-    closeframebuffer();
+    closeframebuffer('A');
     closeall3d();
 #endif
     CloseAudio(1);
@@ -3073,6 +3481,7 @@ void MIPS16 cmd_files(void)
                 memset(inpbuf, 0, STRINGSIZE);
                 FatFSFileSystem=FatFSFileSystemSave;
                 Option.NoScroll=noscroll;
+                PromptFont=oldfont;
                 longjmp(mark, 1);
             }
             if (flist[i].fn[0] == 'D')
@@ -3135,6 +3544,7 @@ void MIPS16 cmd_files(void)
                         memset(inpbuf, 0, STRINGSIZE);
                         ShowCursor(false);
                         FatFSFileSystem=FatFSFileSystemSave;
+                        PromptFont=oldfont;
                         longjmp(mark, 1);
                     }
                     c = -1;
@@ -3172,6 +3582,7 @@ void MIPS16 cmd_files(void)
         memset(inpbuf, 0, STRINGSIZE);
         FatFSFileSystem=FatFSFileSystemSave;
         Option.NoScroll=noscroll;
+        PromptFont=oldfont;
         longjmp(mark, 1);
 
 }

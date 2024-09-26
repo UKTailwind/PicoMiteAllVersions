@@ -32,17 +32,17 @@ extern "C" {
         #define MAXSUBFUN           512                     // each entry takes up 4 bytes
         #define MAXVARS             768                     // 8 + MAXVARLEN + MAXDIM * 2  (ie, 56 bytes) - these do not incl array members
         #define HEAP_MEMORY_SIZE (180*1024) 
-        #define FLASH_TARGET_OFFSET (768 * 1024) 
+        #define FLASH_TARGET_OFFSET (800 * 1024) 
         #ifdef HDMI
             #define MAXMODES 5
             #ifdef USBKEYBOARD
                 #define MagicKey 0x15282142
                 #define HEAPTOP 0x2007C000
             #else
-                #define MagicKey 0x21473310
+                #define MagicKey 0x21473740
                 #define HEAPTOP 0x2007C000
             #endif
-            #define MAX_CPU     315000 
+            #define MAX_CPU     Freq720P 
             #define MIN_CPU     315000
         #else
             #define MAXMODES 3
@@ -50,7 +50,7 @@ extern "C" {
                 #define MagicKey 0x18386236
                 #define HEAPTOP 0x2007C000
             #else
-                #define MagicKey 0x21222430
+                #define MagicKey 0x21222526
                 #define HEAPTOP 0x2007C000
             #endif
             #define MAX_CPU     378000 
@@ -80,6 +80,13 @@ extern "C" {
     #define MODE4SIZE  320*240*2
     #define MODE5SIZE  640*480/4
     #define MODE6SIZE  320*240
+    #define MODE_H_W_ACTIVE_PIXELS 1280
+    #define MODE_V_W_ACTIVE_LINES 720
+    #define MODE1SIZE_W  MODE_H_W_ACTIVE_PIXELS * MODE_V_W_ACTIVE_LINES /8
+    #define MODE2SIZE_W  (MODE_H_W_ACTIVE_PIXELS/4) * (MODE_V_W_ACTIVE_LINES/4)/2
+    #define MODE3SIZE_W  (MODE_H_W_ACTIVE_PIXELS/2) * (MODE_V_W_ACTIVE_LINES/2)/2
+    #define MODE5SIZE_W  (MODE_H_W_ACTIVE_PIXELS/4) * (MODE_V_W_ACTIVE_LINES/4)
+    #define Freq720P 372000
 #endif
 
 #ifdef PICOMITEWEB
@@ -101,13 +108,13 @@ extern "C" {
         #define HEAP_MEMORY_SIZE (256*1024) 
         #define MAXVARS             768                     // 8 + MAXVARLEN + MAXDIM * 2  (ie, 56 bytes) - these do not incl array members
         #define FLASH_TARGET_OFFSET (768 * 1024) 
-        #define MAX_CPU     378000
+        #define MAX_CPU     396000
         #define MAXSUBFUN           512                     // each entry takes up 4 bytes
         #ifdef USBKEYBOARD
             #define MagicKey 0x15486342
             #define HEAPTOP 0x2007C000
         #else
-            #define MagicKey 0x21343430
+            #define MagicKey 0x21343123
             #define HEAPTOP 0x2007C000
         #endif
     #else
@@ -166,6 +173,7 @@ extern "C" {
 #define MAXERRMSG           64                      // max error msg size (MM.ErrMsg$ is truncated to this)
 #define MAXSOUNDS           4
 #define MAXKEYLEN           64 
+#define MAXPID 8
 // define the maximum number of arguments to PRINT, INPUT, WRITE, ON, DIM, ERASE, DATA and READ
 // each entry uses zero bytes.  The number is limited by the length of a command line
 #define MAX_ARG_COUNT       50
@@ -255,6 +263,7 @@ extern "C" {
 #define MAXCOLLISIONS 4
 #define MAXLAYER   4
 #define MAXCONTROLS 200
+#define MAXDEFINES  16
 //#define DO_NOT_RESET (1 << 5)
 //#define HEARTBEAT    (1 << 6)
 #define HEARTBEATpin  43

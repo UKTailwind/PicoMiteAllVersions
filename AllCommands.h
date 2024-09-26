@@ -152,7 +152,10 @@ void cmd_map(void);
 #ifdef PICOMITEWEB
     void cmd_web(void);
 #endif
-
+#ifdef rp2350
+	void  cmd_loadCMM2(void);
+	void  cmd_RunCMM2(void);
+#endif
 void op_invalid(void);
 void op_exp(void);
 void op_mul(void);
@@ -456,6 +459,10 @@ void fun_map(void);
 #endif
 	{ (unsigned char *)"Configure",		T_CMD,				0, cmd_configure	},
 	{ (unsigned char *)"Colour",         T_CMD,                      0, cmd_colour	},
+#ifdef rp2350
+	{ (unsigned char *)"CMM2 Load",		T_CMD,				0, cmd_loadCMM2	},
+	{ (unsigned char *)"CMM2 Run",		T_CMD,				0, cmd_RunCMM2	},
+#endif
     { (unsigned char *)"",   0,                  0, cmd_null,    }                   // this dummy entry is always at the end
 #endif
 /**********************************************************************************
@@ -602,6 +609,5 @@ void fun_map(void);
 	  { (unsigned char *)"CtrlVal(",       T_FUN | T_NBR | T_STR,      0, fun_ctrlval    },
 #endif
     { (unsigned char *)"",   0,                  0, cmd_null,    }                   // this dummy entry is always at the end
-
 #endif
 

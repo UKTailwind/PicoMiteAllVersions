@@ -71,9 +71,15 @@ extern int MemSize(void *addr);
 extern unsigned char MMHeap[];
 extern unsigned char *WriteBuf;
 extern unsigned char *FrameBuf;
+extern unsigned char *SecondFrame;
 extern unsigned char *DisplayBuf;
 extern unsigned char *LayerBuf;
-extern char FRAMEBUFFER[];
+extern unsigned char *SecondLayer;
+#ifdef rp2350
+extern char FRAMEBUFFER[320*240*2];
+#else
+extern char FRAMEBUFFER[640*480/8];
+#endif
 struct s_ctrl {
     short int x1, y1, x2, y2;           // the coordinates of the touch sensitive area
     int fc, bc;                         // foreground and background colours

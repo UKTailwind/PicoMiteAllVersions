@@ -127,7 +127,7 @@ extern int VarIndex;                            // index of the current variable
 extern int LocalIndex;                          // used to track the level of local variables
 
 extern int OptionBase;                          // value of OPTION BASE
-extern unsigned char OptionExplicit, OptionEscape;                     // true if OPTION EXPLICIT has been used
+extern unsigned char OptionExplicit, OptionEscape, OptionConsole;                     // true if OPTION EXPLICIT has been used
 extern unsigned char DefaultType;                        // the default type if a variable is not specifically typed
 
 
@@ -301,6 +301,7 @@ extern unsigned char *nextstmt;                          // Pointer to the next 
 extern unsigned char PromptString[MAXPROMPTLEN];                                    // the prompt for input, an empty string means use the default
 extern int multi;
 extern void str_replace(char *target, const char *needle, const char *replacement);
+extern void  MIPS16 STR_REPLACE(char *target, const char *needle, const char *replacement);
 #if defined(MMFAMILY)
 extern unsigned char FunKey[NBRPROGKEYS][MAXKEYLEN + 1]; // used by the programmable function keys
 #endif

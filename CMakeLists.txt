@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.13)
 # Valid builds are PICO, PICOUSB, VGA, VGAUSB, HDMI(rp2350 only), HDMIUSB(rp2350 only), WEB(rp2040 only)
 
-set(COMPILE HDMI)
+set(COMPILE PICORP2350)
 
 if (COMPILE STREQUAL "HDMI" OR COMPILE STREQUAL "HDMIUSB"  OR COMPILE STREQUAL "VGARP2350"  OR COMPILE STREQUAL "VGAUSBRP2350"  OR COMPILE STREQUAL "PICORP2350"  OR COMPILE STREQUAL "PICOUSBRP2350" )
 	set(PICO_PLATFORM rp2350)
@@ -55,7 +55,11 @@ add_executable(PicoMite
 	hxcmod.c
     VS1053.c
 )
-
+if (COMPILE STREQUAL "HDMI" OR COMPILE STREQUAL "HDMIUSB"  OR COMPILE STREQUAL "VGARP2350"  OR COMPILE STREQUAL "VGAUSBRP2350"  OR COMPILE STREQUAL "PICORP2350"  OR COMPILE STREQUAL "PICOUSBRP2350" )
+	target_sources(PicoMite PRIVATE
+	assember.S
+	)
+endif()
 if (COMPILE STREQUAL "WEB")
     target_sources(PicoMite PRIVATE 
 	ssd1963.c 
@@ -94,6 +98,12 @@ else()
 	Keyboard.c )
 endif()
 
+if (PICO_PLATFORM STREQUAL rp2350)
+	target_sources(PicoMite PRIVATE 
+	assember.S
+	)
+endif()
+
 set_source_files_properties(mmc_stm32.c PROPERTIES COMPILE_FLAGS -O2)
 set_source_files_properties(ff.c PROPERTIES COMPILE_FLAGS -Os)
 set_source_files_properties(GUI.c PROPERTIES COMPILE_FLAGS -Os)
@@ -107,10 +117,11 @@ set_source_files_properties(hxcmod.c PROPERTIES COMPILE_FLAGS -Os)
 set_source_files_properties(MATHS.c PROPERTIES COMPILE_FLAGS -Os)
 set_source_files_properties(Editor.c PROPERTIES COMPILE_FLAGS -Os)
 
-pico_define_boot_stage2(slower_boot2 ${PICO_DEFAULT_BOOT_STAGE2_FILE})
-target_compile_definitions(slower_boot2 PRIVATE PICO_FLASH_SPI_CLKDIV=4)
-pico_set_boot_stage2(PicoMite slower_boot2)
-
+if (COMPILE STREQUAL "VGAUSB" OR COMPILE STREQUAL "VGA" OR COMPILE STREQUAL "PICO" OR COMPILE STREQUAL "PICOUSB" OR COMPILE STREQUAL "WEB")
+	pico_define_boot_stage2(slower_boot2 ${PICO_DEFAULT_BOOT_STAGE2_FILE})
+	target_compile_definitions(slower_boot2 PRIVATE PICO_FLASH_SPI_CLKDIV=4)
+	pico_set_boot_stage2(PicoMite slower_boot2)
+endif()
 if (COMPILE STREQUAL "VGAUSB" OR COMPILE STREQUAL "VGA" OR COMPILE STREQUAL "VGAUSBRP2350" OR COMPILE STREQUAL "VGARP2350")
 	pico_generate_pio_header(PicoMite ${CMAKE_CURRENT_LIST_DIR}/PicoMiteVGA.pio)
 endif()
@@ -155,7 +166,7 @@ if(COMPILE STREQUAL "PICORP2350")
 	target_compile_options(PicoMite PRIVATE -DPICOMITE
 											-DNDEBUG
 											-Drp2350
-											-DPICO_FLASH_SPI_CLKDIV=4
+											-DPICO_FLASH_SPI_CLKDIV=6
 											-DPICO_XOSC_STARTUP_DELAY_MULTIPLIER=64 
 											-DPICO_FLASH_SIZE_BYTES=16777216
 											-DPICO_STACK_SIZE=0x2000
@@ -169,7 +180,6 @@ if(COMPILE STREQUAL "PICOUSBRP2350")
 											-DNDEBUG
 											-Drp2350
 											-DUSBKEYBOARD
-											-DPICO_FLASH_SPI_CLKDIV=4
 											-DPICO_XOSC_STARTUP_DELAY_MULTIPLIER=64 
 											-DPICO_FLASH_SIZE_BYTES=16777216
 											-DPICO_STACK_SIZE=0x2000
@@ -206,7 +216,7 @@ if(COMPILE STREQUAL "VGARP2350")
 	target_compile_options(PicoMite PRIVATE -DPICOMITEVGA
 											-DNDEBUG
 											-Drp2350
-											-DPICO_FLASH_SPI_CLKDIV=4
+											-DPICO_FLASH_SPI_CLKDIV=3
 											-DPICO_XOSC_STARTUP_DELAY_MULTIPLIER=64 
 											-DPICO_FLASH_SIZE_BYTES=16777216
 											-DPICO_STACK_SIZE=0x2000
@@ -220,7 +230,6 @@ if(COMPILE STREQUAL "VGAUSBRP2350")
 											-DNDEBUG
 											-DUSBKEYBOARD
 											-Drp2350
-											-DPICO_FLASH_SPI_CLKDIV=4
 											-DPICO_XOSC_STARTUP_DELAY_MULTIPLIER=64 
 											-DPICO_FLASH_SIZE_BYTES=16777216
 											-DPICO_STACK_SIZE=0x2000
@@ -235,7 +244,6 @@ if(COMPILE STREQUAL "HDMI")
 	target_compile_options(PicoMite PRIVATE -DPICOMITEVGA
 											-DHDMI
 											-Drp2350
-											-DPICO_FLASH_SPI_CLKDIV=4
 											-DPICO_XOSC_STARTUP_DELAY_MULTIPLIER=64 
 											-DPICO_FLASH_SIZE_BYTES=16777216
 											-DPICO_STACK_SIZE=0x2000
@@ -249,7 +257,6 @@ if(COMPILE STREQUAL "HDMIUSB")
 											-DUSBKEYBOARD
 											-DHDMI
 											-Drp2350
-											-DPICO_FLASH_SPI_CLKDIV=4
 											-DPICO_XOSC_STARTUP_DELAY_MULTIPLIER=64 
 											-DPICO_FLASH_SIZE_BYTES=16777216
 											-DPICO_STACK_SIZE=0x2000

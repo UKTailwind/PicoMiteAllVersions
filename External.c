@@ -3135,7 +3135,7 @@ void MIPS16 ClearExternalIO(void) {
     InterruptUsed = false;
 	InterruptReturn = NULL;
     irq_set_enabled(DMA_IRQ_1, false);
-    closeframebuffer();
+    closeframebuffer('A');
     if(CallBackEnabled==1) gpio_set_irq_enabled_with_callback(PinDef[IRpin].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false, &gpio_callback);
     else if(CallBackEnabled & 1){
         gpio_set_irq_enabled(PinDef[IRpin].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
@@ -3191,6 +3191,7 @@ void MIPS16 ClearExternalIO(void) {
     IrState = IR_CLOSED;
     IrInterrupt = NULL;
     IrGotMsg = false;
+    memset(&PIDchannels,0,sizeof(s_PIDchan)*(MAXPID+1));
 #ifdef rp2350
 #ifdef HDMI
 	for(i = 1; i < (rp2350a ? 44:NBRPINS) ; i++) {

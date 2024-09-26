@@ -86,7 +86,7 @@ int VarIndex;                                                       // Global se
 int Localvarcnt;                                                         // number of LOCAL variables
 int Globalvarcnt;                                                         // number of GLOBAL variables
 int LocalIndex;                                                     // used to track the level of local variables
-unsigned char OptionExplicit, OptionEscape;                                                // used to force the declaration of variables before their use
+unsigned char OptionExplicit, OptionEscape, OptionConsole;                                                // used to force the declaration of variables before their use
 unsigned char DefaultType;                                                   // the default type if a variable is not specifically typed
 int emptyarray=0;
 int TempStringClearStart;                                           // used to prevent clearing of space in an expression that called a FUNCTION
@@ -412,7 +412,7 @@ void   MIPS16 PrepareProgram(int ErrAbort) {
     char printvar[MAXVARLEN+1];
 #endif
     unsigned char *p1, *p2;
-    for(i = FONT_BUILTIN_NBR; i < FONT_TABLE_SIZE; i++)
+    for(i = FONT_BUILTIN_NBR; i < FONT_TABLE_SIZE-1; i++)
         FontTable[i] = NULL;                                        // clear the font table
 
     
@@ -2766,7 +2766,6 @@ void MIPS16 error(char *msg, ...) {
 #endif
 
     LoadOptions();                                                  // make sure that the option struct is in a clean state
-
     if(Option.DISPLAY_CONSOLE) {
         #ifdef PICOMITEVGA
             WriteBuf=(unsigned char *)FRAMEBUFFER;
@@ -2837,8 +2836,13 @@ void MIPS16 error(char *msg, ...) {
     MMPrintString(tstr);
     #ifndef PICOMITEVGA
     if (!Option.DISPLAY_CONSOLE && Option.DISPLAY_TYPE>I2C_PANEL) {
+        int width=Option.Width;
+        int height=Option.Height;
         LCD_error(line_num, p, MMErrMsg);
+        Option.Width=width;
+        Option.Height=height;
     }
+    
     #endif
     cmd_end();
 }
@@ -3144,6 +3148,7 @@ void MIPS16 ClearRuntime(void) {
 #endif	
     OptionExplicit = false;
     OptionEscape = false;
+    OptionConsole=3;
     DefaultType = T_NBR;
     ds18b20Timers = NULL;                                           // InitHeap() will recover the memory allocated to this array
     findlabel(NULL);                                                // clear the label cache

@@ -1763,6 +1763,7 @@ void MIPS16 printoptions(void){
 if(Option.HDMIclock!=2 || Option.HDMId0!=0 || Option.HDMId1!=6 ||Option.HDMId2!=4){
     PO("HDMI PINS ");PInt(Option.HDMIclock);PIntComma(Option.HDMId0);PIntComma(Option.HDMId1);PIntComma(Option.HDMId2);PRet();
 }
+if(Option.CPU_Speed==Freq720P)PO2Str("WIDESCREEN", "ENABLE");
 #endif
 #else
     if(Option.CPU_Speed!=133000){
@@ -2743,6 +2744,14 @@ void MIPS16 cmd_option(void) {
         OptionEscape = true;
         return;
     }
+    tp = checkstring(cmdline, (unsigned char *)"CONSOLE");
+    if(tp) {
+        if(checkstring(tp,(unsigned char *) "BOTH"))OptionConsole=3;
+        else if(checkstring(tp,(unsigned char *) "SERIAL"))OptionConsole=1;
+        else if(checkstring(tp,(unsigned char *) "SCREEN"))OptionConsole=2;
+        else error("Syntax");
+        return;
+    }
     tp = checkstring(cmdline, (unsigned char *)"DEFAULT");
     if(tp) {
         if(checkstring(tp,(unsigned char *) "INTEGER"))  { DefaultType = T_INT;  return; }
@@ -2829,6 +2838,7 @@ void MIPS16 cmd_option(void) {
 		return;
 	}
 #ifdef rp2350
+#ifdef HDMI
     tp = checkstring(cmdline, (unsigned char *)"HDMI PINS");
     if(tp) {
         getargs(&tp,7,(unsigned char *)",");
@@ -2847,7 +2857,24 @@ void MIPS16 cmd_option(void) {
         SoftReset();
         return;
     }
-#ifdef HDMI
+    tp = checkstring(cmdline, (unsigned char *)"WIDESCREEN");
+    if(tp) {
+        if(checkstring(tp, (unsigned char *)"OFF") || checkstring(tp, (unsigned char *)"DISABLE")){
+            Option.CPU_Speed = 315000; 
+            Option.DISPLAY_TYPE = SCREENMODE1;
+            Option.DefaultFont = 1 ;
+        }     
+        else if(checkstring(tp, (unsigned char *)"ON") || checkstring(tp, (unsigned char *)"ENABLE")){
+            Option.CPU_Speed = Freq720P; 
+            Option.DISPLAY_TYPE=SCREENMODE1;
+            Option.DefaultFont=(2<<4) | 1 ;
+        }      
+        else error("Syntax");
+        SaveOptions();
+        _excep_code = RESET_COMMAND;
+        SoftReset();
+        return;
+    }
 #endif
     tp = checkstring(cmdline, (unsigned char *)"PSRAM PIN");
     if(tp) {
@@ -3119,20 +3146,22 @@ void MIPS16 cmd_option(void) {
         }
 #ifdef PICOMITEVGA
 #ifdef HDMI
-        int fcolour=RGB555(Option.DefaultFC);
-        int bcolour=RGB555(Option.DefaultBC);
+        int fcolour=Option.CPU_Speed!=Freq720P? RGB555(Option.DefaultFC) : RGB332(Option.DefaultFC);
+        int bcolour=Option.CPU_Speed!=Freq720P? RGB555(Option.DefaultBC) : RGB332(Option.DefaultBC);
 #else
-        int  fcolour = ((Option.DefaultFC & 0x800000)>> 20) | ((Option.DefaultFC & 0xC000)>>13) | ((Option.DefaultFC & 0x80)>>7);
+        int  fcolour = RGB121(Option.DefaultFC);
         fcolour= (fcolour<<12) | (fcolour<<8) | (fcolour<<4) | fcolour;
-        int bcolour = ((Option.DefaultBC & 0x800000)>> 20) | ((Option.DefaultBC & 0xC000)>>13) | ((Option.DefaultBC & 0x80)>>7);
+        int bcolour = RGB121(Option.DefaultBC);
         bcolour= (bcolour<<12) | (bcolour<<8) | (bcolour<<4) | bcolour;
 #endif
+#ifndef HDMI
         for(int xp=0;xp<X_TILE;xp++){
             for(int yp=0;yp<Y_TILE;yp++){
                 tilefcols[yp*X_TILE+xp]=(uint16_t)fcolour;
                 tilebcols[yp*Y_TILE+xp]=(uint16_t)bcolour;
             }
         }
+#endif
         Option.VGAFC=fcolour;
         Option.VGABC=bcolour;
 #endif
@@ -3262,7 +3291,7 @@ void MIPS16 cmd_option(void) {
    	    if(CurrentLinePtr) error("Invalid in a program");
         int CPU_Speed=getint(tp, MIN_CPU,MAX_CPU);
 #ifndef HMDI
-        if(!(CPU_Speed==157500 || CPU_Speed==315000 || CPU_Speed==126000 || CPU_Speed==252000 || CPU_Speed==378000))error("CpuSpeed 126000, 252000, 378000, 157500 or 315000 only");
+        if(!(CPU_Speed==157500 || CPU_Speed!=Freq720P || CPU_Speed==126000 || CPU_Speed==252000 || CPU_Speed==378000 || CPU_Speed==504000))error("CpuSpeed 126000, 252000, 378000, 157500 or 315000 only");
 #endif
         Option.CPU_Speed=CPU_Speed;
         Option.X_TILE=80;
@@ -3307,7 +3336,7 @@ void MIPS16 cmd_option(void) {
 #endif
         SaveOptions();
         DISPLAY_TYPE= Option.DISPLAY_TYPE;
-	    memset(WriteBuf, 0, 38400);
+	    memset(WriteBuf, 0, ScreenSize);
         ResetDisplay();
         CurrentX = CurrentY =0;
         if(Option.DISPLAY_TYPE!=SCREENMODE1)ClearScreen(Option.DefaultBC);
@@ -4517,6 +4546,12 @@ void fun_info(void){
             iret = Option.Height;
             targ = T_INT;
             return;
+        } else if(checkstring(tp, (unsigned char *)"CONSOLE")){
+			if(Option.DISPLAY_CONSOLE)strcpy((char *)sret,"Both");
+			else strcpy((char *)sret,"Serial");
+            CtoM(sret);
+            targ=T_STR;
+            return;
         } else if(checkstring(tp, (unsigned char *)"WIDTH")){
             iret = Option.Width;
             targ = T_INT;
@@ -4600,13 +4635,8 @@ void fun_info(void){
             return;
 #endif            
         } else if(checkstring(ep, (unsigned char *)"PATH")){
-            if(ProgMemory[0]==1 && ProgMemory[1]==39 && ProgMemory[2]==35){
-                strcpy((char *)sret,(char *)&ProgMemory[3]);
-                for(int i=strlen((char *)sret)-1;i>0;i--){
-                    if(sret[i]!='/')sret[i]=0;
-                    else break;
-                }
-            } else strcpy((char *)sret,"NONE");
+            strcpy((char *)sret,GetCWD());
+            if(sret[strlen((char *)sret)-1]!='/')strcat((char *)sret,"/");
             CtoM(sret);
             targ=T_STR;
             return;
@@ -5129,6 +5159,13 @@ int checkdetailinterrupts(void) {
     int i, v;
     char *intaddr;
     static char rti[2];
+    for(int i=1;i<=MAXPID;i++){
+        if(PIDchannels[i].interrupt!=NULL && time_us_64()>PIDchannels[i].timenext && PIDchannels[i].active){
+            PIDchannels[i].timenext=time_us_64()+(PIDchannels[i].PIDparams->T * 1000000);
+            intaddr=(char *)PIDchannels[i].interrupt;
+            goto GotAnInterrupt;
+        }
+    }
 
     // check for an  ON KEY loc  interrupt
     if(KeyInterrupt != NULL && Keycomplete) {

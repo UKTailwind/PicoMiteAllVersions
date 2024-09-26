@@ -57,6 +57,8 @@ uint16_t __attribute__ ((aligned (256))) tilefcols[80*40];
 uint16_t __attribute__ ((aligned (256))) tilebcols[80*40];
 #endif
 #ifdef HDMI
+uint8_t *tilefcols_w; 
+uint8_t *tilebcols_w;
 uint16_t HDMIlines[2][640]={0};
 int X_TILE=80, Y_TILE=40;
 uint32_t core1stack[128];
@@ -74,6 +76,8 @@ unsigned char *WriteBuf=(unsigned char *)FRAMEBUFFER;
 unsigned char *DisplayBuf=(unsigned char *)FRAMEBUFFER;
 unsigned char *LayerBuf=(unsigned char *)FRAMEBUFFER;
 unsigned char *FrameBuf=(unsigned char *)FRAMEBUFFER;
+unsigned char *SecondLayer=(unsigned char *)FRAMEBUFFER;
+unsigned char *SecondFrame=(unsigned char *)FRAMEBUFFER;
 #endif
 #ifdef PICOMITE
 struct s_ctrl CTRLS[MAXCONTROLS];
@@ -929,7 +933,7 @@ void __not_in_flash_func(*GetPSMemory)(int size) {
     // out of memory
     TempStringClearStart = 0;
     ClearTempMemory();                                               // hopefully this will give us enough to print the prompt
-    error("Not enough memory");
+    error("Not enough PSRAM memory");
     return NULL;                                                    // keep the compiler happy
 }    
 #endif
@@ -957,7 +961,7 @@ void __not_in_flash_func(*GetMemory)(int size) {
 #endif
     TempStringClearStart = 0;
     ClearTempMemory();                                               // hopefully this will give us enough to print the prompt
-    error("Not enough memory");
+    error("Not enough Heap memory");
     return NULL;                                                    // keep the compiler happy
 }    
 
@@ -969,7 +973,7 @@ void *GetAlignedMemory(int size) {
     for(;size>0;addr+=PAGESIZE, size-=PAGESIZE){
          if(!(MBitsGet(addr) & PUSED)){
             MBitsSet(addr,PUSED);
-         } else error("Not enough memory");
+         } else error("Not enough Aigned memory");
     }
     addr-=PAGESIZE;
     MBitsSet(addr, PUSED | PLAST); 

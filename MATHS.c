@@ -99,6 +99,7 @@ struct tagMTRand *g_myrand=NULL;
 #define LOWER_MASK		0x7fffffff
 #define TEMPERING_MASK_B	0x9d2c5680
 #define TEMPERING_MASK_C	0xefc60000
+s_PIDchan PIDchannels[MAXPID+1]={0};
 
 inline static void m_seedRand(MTRand* rand, unsigned long seed) {
   /* set initial seeds to mt[STATE_VECTOR_LENGTH] using the generator
@@ -583,6 +584,66 @@ MMFLOAT farr2d(MMFLOAT *arr,int d1, int a, int b){
 int64_t iarr2d(int64_t *arr,int d1, int a, int b){
 	arr+=d1*b+a;
 	return *arr;
+}
+MMFLOAT PIDController_Update(PIDController *pid, MMFLOAT setpoint, MMFLOAT measurement) {
+
+	/*
+	* Error signal
+	*/
+    MMFLOAT error = setpoint - measurement;
+
+
+	/*
+	* Proportional
+	*/
+    MMFLOAT proportional = pid->Kp * error;
+	/*
+	* Integral
+	*/
+    pid->integrator = pid->integrator + 0.5 * pid->Ki * pid->T * (error + pid->prevError);
+	/* Anti-wind-up via integrator clamping */
+    if (pid->integrator > pid->limMaxInt) {
+
+        pid->integrator = pid->limMaxInt;
+
+    } else if (pid->integrator < pid->limMinInt) {
+
+        pid->integrator = pid->limMinInt;
+
+    }
+
+
+	/*
+	* Derivative (band-limited differentiator)
+	*/
+		
+    pid->differentiator = -(2.0 * pid->Kd * (measurement - pid->prevMeasurement)	/* Note: derivative on measurement, therefore minus sign in front of equation! */
+                        + (2.0 * pid->tau - pid->T) * pid->differentiator)
+                        / (2.0 * pid->tau + pid->T);
+
+
+	/*
+	* Compute output and apply limits
+	*/
+    pid->out = proportional + pid->integrator + pid->differentiator;
+
+    if (pid->out > pid->limMax) {
+
+        pid->out = pid->limMax;
+
+    } else if (pid->out < pid->limMin) {
+
+        pid->out = pid->limMin;
+
+    }
+
+	/* Store error and measurement for later use */
+    pid->prevError       = error;
+    pid->prevMeasurement = measurement;
+
+	/* Return controller output */
+    return pid->out;
+
 }
 void cmd_math(void){
 	unsigned char *tp;
@@ -1262,6 +1323,35 @@ void cmd_math(void){
 			return;
 		}
 	} else {
+		tp = checkstring(cmdline, (unsigned char *)"PID");
+		if(tp) {
+			unsigned char * pi;
+			if((pi=checkstring(tp, (unsigned char *)"START"))){
+				int channel = getint(pi,1,MAXPID);
+				if(PIDchannels[channel].interrupt==NULL)error("Channel not initialised");
+				PIDchannels[channel].timenext=time_us_64() + (PIDchannels[channel].PIDparams->T * 1000);
+				PIDchannels[channel].active=true;
+				InterruptUsed=true;
+			} else if((pi=checkstring(tp, (unsigned char *)"STOP"))){
+				int channel = getint(pi,1,MAXPID);
+				if(PIDchannels[channel].interrupt==NULL)error("Channel not initialised");
+				PIDchannels[channel].active=false;
+			} else if((pi=checkstring(tp, (unsigned char *)"CLOSE"))){
+				int channel = getint(pi,1,MAXPID);
+				memset(&PIDchannels[channel],0,sizeof(s_PIDchan));
+			} else if((pi=checkstring(tp, (unsigned char *)"INIT"))){
+				getargs(&pi,5,(unsigned char *)",");
+				if(argc!=5)error("Syntax");
+				MMFLOAT *q1=NULL;
+				int channel = getint(argv[0],1,MAXPID);
+				int card=parsefloatrarray(argv[2],&q1,2,1, NULL, true);
+				PIDchannels[channel].PIDparams=(PIDController *)q1;
+				if(card!=14)error("Argument 2 must be a 14 element floating point array");
+				if(PIDchannels[channel].PIDparams->T < 0.001)error("Invalid update rate");
+				PIDchannels[channel].interrupt=GetIntAddress(argv[4]);	
+			} else error("Syntax");
+			return;
+		}
 		tp = checkstring(cmdline, (unsigned char *)"ADD");
 		if(tp) {
 			int i,card1=1, card2=1;
@@ -1500,6 +1590,21 @@ void fun_math(void){
 	short dims[MAXDIM]={0};
 #endif
 	skipspace(ep);
+	if(toupper(*ep)=='P'){
+		tp = checkstring(ep, (unsigned char *)"PID");
+		if(tp){
+			getargs(&tp, 5,(unsigned char *)",");
+			if(argc != 5)error("Syntax");
+			int channel=getint(argv[0],1,MAXPID);
+			MMFLOAT setpoint=getnumber(argv[2]);
+			MMFLOAT measurement=getnumber(argv[4]);
+			if(PIDchannels[channel].interrupt==NULL)error("Channel not configured");
+			if(!PIDchannels[channel].active)error("Channel not active");
+			fret=PIDController_Update(PIDchannels[channel].PIDparams, setpoint, measurement);
+			targ=T_NBR;
+			return;
+		}
+	}
 	if(toupper(*ep)=='A'){
 		tp = checkstring(ep, (unsigned char *)"ATAN3");
 		if(tp) {

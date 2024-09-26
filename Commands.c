@@ -41,7 +41,7 @@ void flist(int, int, int);
 char *KeyInterrupt=NULL;
 unsigned char* SaveNextDataLine = NULL;
 void execute_one_command(unsigned char *p);
-extern void STR_REPLACE(unsigned char *target, const unsigned char *needle, const unsigned char *replacement);
+extern void  MIPS16 STR_REPLACE(char *target, const char *needle, const char *replacement);
 void ListNewLine(int *ListCnt, int all);
 char MMErrMsg[MAXERRMSG];                                           // the error message
 volatile bool Keycomplete=false;
@@ -441,8 +441,7 @@ void MIPS16 ListProgram(unsigned char *p, int all) {
 }
 
 
-
-void MIPS16 cmd_run(void) {
+void MIPS16 do_run(unsigned char *cmdline, bool CMM2mode) {
 /*	skipspace(cmdline);
 	if(*cmdline && *cmdline != '\''){
 		if(!FileLoadProgram(cmdline))return;
@@ -450,7 +449,9 @@ void MIPS16 cmd_run(void) {
 	ClearRuntime();*/
     // RUN [ filename$ ] [, cmd_args$ ]
     unsigned char *filename = (unsigned char *)"", *cmd_args = (unsigned char *)"";
-    getargs(&cmdline, 3, (unsigned char *)",");
+	unsigned char *cmdbuf=GetMemory(256);
+	memcpy(cmdbuf,cmdline,STRINGSIZE);
+    getargs(&cmdbuf, 3, (unsigned char *)",");
 	    switch (argc) {
         case 0:
             break;
@@ -462,7 +463,7 @@ void MIPS16 cmd_run(void) {
             break;
         default:
             filename = getCstring(argv[0]);
-            cmd_args = getCstring(argv[2]);
+            if(*argv[2])cmd_args = getCstring(argv[2]);
             break;
     }
 
@@ -475,8 +476,15 @@ void MIPS16 cmd_run(void) {
     }
     unsigned char *pcmd_args = buf + strlen((char *)filename) + 3; // *** THW 16/4/23
 
-    if (*filename && !FileLoadProgram(buf)) return;
-
+#ifdef rp2350
+    if(CMM2mode){
+		if (*filename && !FileLoadCMM2Program((char *)buf,false)) return;
+	} else {
+#endif
+		if (*filename && !FileLoadProgram(buf)) return;
+#ifdef rp2350
+	}
+#endif
     ClearRuntime();
     PrepareProgram(true);
     if(Option.DISPLAY_CONSOLE && (SPIREAD  || Option.NoScroll)){ClearScreen(gui_bcolour);CurrentX=0;CurrentY=0;}
@@ -500,8 +508,13 @@ void MIPS16 cmd_run(void) {
 #endif
 	nextstmt = ProgMemory;
 }
+void MIPS16 cmd_run(void){
+	do_run(cmdline,false);
+}
 
-
+void MIPS16 cmd_RunCMM2(void){
+	do_run(cmdline,true);
+}
 
 void  MIPS16 cmd_continue(void) {
     if(*cmdline == tokenFOR) {
@@ -523,7 +536,7 @@ void  MIPS16 cmd_continue(void) {
 }
 
 void MIPS16 cmd_new(void) {
-	closeframebuffer();
+	closeframebuffer('A');
 	checkend(cmdline);
 	ClearProgram();
 	FlashLoad=0;
@@ -818,12 +831,14 @@ void cmd_end(void) {
     InterruptReturn = NULL ; 
     memset(inpbuf,0,STRINGSIZE);
 	CloseAudio(1);
-	closeframebuffer();
+	closeframebuffer('A');
     ADCDualBuffering=0;
 	WatchdogSet = false;
 	dmarunning = false;
 	if(g_myrand)FreeMemory((void *)g_myrand);
 	g_myrand=NULL;
+	OptionConsole=3;
+	SSPrintString("\033[?25h"); //in case application has turned the cursor off
 #ifdef PICOMITEWEB
 	close_tcpclient();
 #endif
