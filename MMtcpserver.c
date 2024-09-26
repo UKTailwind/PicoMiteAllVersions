@@ -240,7 +240,8 @@ static err_t tcp_server_accept(void *arg, struct tcp_pcb *client_pcb, err_t err)
         return ERR_VAL;
     }
     for(pcb=0;pcb<=MaxPcb;pcb++){
-        if(pcb==MaxPcb)error("No free connections");
+        if(pcb==MaxPcb)MMPrintString("Warning: No free connections\r\n");
+//        if(pcb==MaxPcb)error("No free connections");
         if(state->client_pcb[pcb]==NULL){
                 state->client_pcb[pcb] = client_pcb;
                 break;
