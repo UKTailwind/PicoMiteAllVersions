@@ -43,7 +43,7 @@ extern "C" {
                 #define HEAPTOP 0x2007C000
             #endif
             #define MAX_CPU     Freq720P 
-            #define MIN_CPU     315000
+            #define MIN_CPU     252000
         #else
             #define MAXMODES 3
             #ifdef USBKEYBOARD
@@ -87,6 +87,7 @@ extern "C" {
     #define MODE3SIZE_W  (MODE_H_W_ACTIVE_PIXELS/2) * (MODE_V_W_ACTIVE_LINES/2)/2
     #define MODE5SIZE_W  (MODE_H_W_ACTIVE_PIXELS/4) * (MODE_V_W_ACTIVE_LINES/4)
     #define Freq720P 372000
+    #define Freq480P 315000
 #endif
 
 #ifdef PICOMITEWEB

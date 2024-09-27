@@ -6676,7 +6676,7 @@ void cmd_map(void){
     static bool first=true;
     if(!(DISPLAY_TYPE==SCREENMODE2 || DISPLAY_TYPE==SCREENMODE3  || DISPLAY_TYPE==SCREENMODE5 ))error("Invalid for this screen mode");
     if((p=checkstring(cmdline, (unsigned char *)"RESET"))) {
-        while(v_scanline!=2){}
+        while(v_scanline!=0){}
         if(DISPLAY_TYPE==SCREENMODE5)for(int i=0;i<256;i++)map256[i]=remap[i]=RGB555(MAP256DEF[i]);
         else if(Option.CPU_Speed!=Freq720P)for(int i=0;i<16;i++){
             map16[i]=remap[i]=RGB555(MAP16DEF[i]);
@@ -6686,7 +6686,7 @@ void cmd_map(void){
         else if(DISPLAY_TYPE==SCREENMODE2)for(int i=0;i<16;i++) map16q[i]=remap[i]=RGB332(MAP16DEF[i]) | (RGB332(MAP16DEF[i])<<8) | (RGB332(MAP16DEF[i])<<16) | (RGB332(MAP16DEF[i])<<24);
         first=false;
     } else if((checkstring(cmdline, (unsigned char *)"GRAYSCALE") || checkstring(cmdline, (unsigned char *)"GREYSCALE")) && Option.CPU_Speed!=Freq720P) {
-        while(v_scanline!=2){}
+        while(v_scanline!=0){}
         if(DISPLAY_TYPE==SCREENMODE5) {
             for(int i=1;i<=32;i++){
                 int j=i*8-(8-i/4+1);
@@ -6709,7 +6709,7 @@ void cmd_map(void){
         }
         first=false;
     } else if((p=checkstring(cmdline, (unsigned char *)"MAXIMITE"))) {
-        while(v_scanline!=2){}
+        while(v_scanline!=0){}
         if(DISPLAY_TYPE==SCREENMODE5)for(int i=0;i<16;i++)map256[i]=remap[i]=RGB555(CMM1map[i]);
         else for(int i=0;i<16;i++){
             map16[i]=remap[i]=RGB555(CMM1map[i]);
@@ -6721,7 +6721,7 @@ void cmd_map(void){
         }
         first=false;
     } else if((p=checkstring(cmdline, (unsigned char *)"SET"))) {
-        while(v_scanline!=2){}
+        while(v_scanline!=0){}
         if(DISPLAY_TYPE==SCREENMODE5) for(int i=0;i<256;i++)map256[i]=remap[i];
         else for(int i=0;i<16;i++){
             if(Option.CPU_Speed!=Freq720P){map16[i]=remap[i];map16pairs[i]=map16[i] | (map16[i]<<16);}
@@ -7324,15 +7324,20 @@ void ScrollLCD2(int lines){
 #else
 //********************
 #endif
-    	int ya=Y_TILE==40? 12 : 16;
-        if(lines % ya ==0){
+    	int ya=ytileheight;
+        if((lines % ya ==0)){
             int offset=lines/ya;
             for(int y=0;y<Y_TILE-offset;y++){
                 int d=y*X_TILE;
                 int s=(y+offset)*X_TILE;
                 for(int x=0;x<X_TILE;x++){
-                tilefcols[d+x]=tilefcols[s+x];
-                tilebcols[d+x]=tilebcols[s+x];
+                    if(Option.CPU_Speed!=Freq720P){
+                        tilefcols[d+x]=tilefcols[s+x];
+                        tilebcols[d+x]=tilebcols[s+x];
+                    } else {
+                        tilefcols_w[d+x]=tilefcols_w[s+x];
+                        tilebcols_w[d+x]=tilebcols_w[s+x];
+                    }
                 }
             }
         }
@@ -7348,17 +7353,22 @@ void ScrollLCD2(int lines){
 #ifndef HDMI
         while(QVgaScanLine!=0){}
 #else
-//********************
+        while(v_scanline!=0){}
 #endif
-    	int ya=Y_TILE==40? 12 : 16;
-        if(lines % ya ==0){
+    	int ya=ytileheight;
+        if((lines % ya ==0)){
             int offset=lines/ya;
             for(int y=Y_TILE-1;y>=offset;y--){
                 int d=y*X_TILE;
                 int s=(y-offset)*X_TILE;
                 for(int x=0;x<X_TILE;x++){
-                tilefcols[d+x]=tilefcols[s+x];
-                tilebcols[d+x]=tilebcols[s+x];
+                    if(Option.CPU_Speed!=Freq720P){
+                        tilefcols[d+x]=tilefcols[s+x];
+                        tilebcols[d+x]=tilebcols[s+x];
+                    } else {
+                        tilefcols_w[d+x]=tilefcols_w[s+x];
+                        tilebcols_w[d+x]=tilebcols_w[s+x];
+                    }
                 }
             }
         }
@@ -8922,7 +8932,7 @@ Widescreen:
         }
     } else if((p=checkstring(cmdline, (unsigned char *)"WAIT"))) {
             #ifdef HDMI
-            while(v_scanline!=2){}
+            while(v_scanline!=0){}
             #else
             while(QVgaScanLine!=0){}
             #endif
@@ -8946,7 +8956,7 @@ Widescreen:
         if(argc==5){
             if(checkstring(argv[4],(unsigned char *)"B")){
                 #ifdef HDMI
-                while(v_scanline!=0){}
+                while(v_scanline!=0){} 
                 #else
                 while(QVgaScanLine!=0){}
             #endif

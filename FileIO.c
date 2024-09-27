@@ -4092,7 +4092,7 @@ void ResetOptions(void)
     Option.Y_TILE=40;
     #ifdef USBKEYBOARD
         #ifdef HDMI
-            Option.CPU_Speed = 315000;
+            Option.CPU_Speed = Freq480P;
             Option.HDMIclock=2;
             Option.HDMId0=0;
             Option.HDMId1=6;
@@ -4111,7 +4111,7 @@ void ResetOptions(void)
         Option.ColourCode=1;
     #else
         #ifdef HDMI
-            Option.CPU_Speed = 315000;
+            Option.CPU_Speed = Freq480P;
             Option.HDMIclock=2;
             Option.HDMId0=0;
             Option.HDMId1=6;

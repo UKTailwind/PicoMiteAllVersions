@@ -2166,8 +2166,12 @@ void MIPS16 configure(unsigned char *p){
             MMPrintString("VGA Basic\r\n");
 #endif
 #else
+#ifdef USBKEYBOARD
+            MMPrintString("HDMIUSB\r\n");
+#else
             MMPrintString("OLIMEX\r\n");
             MMPrintString("HDMIBasic\r\n");
+#endif
 #endif
 #endif
 #if defined(PICOMITE) || defined(PICOMITEWEB)
@@ -2409,6 +2413,47 @@ option system i2c GP26, GP27*/
         }
 #endif
 #else
+#ifdef USBKEYBOARD
+/*
+OPTION SERIAL CONSOLE COM2,GP8,GP9
+OPTION SYSTEM I2C GP20,GP21
+OPTION FLASH SIZE 4194304
+OPTION COLOURCODE ON
+OPTION KEYBOARD US
+OPTION CPUSPEED (KHz) 315000
+OPTION SDCARD GP22, GP26, GP27, GP28
+OPTION AUDIO GP10,GP11', ON PWM CHANNEL 5
+OPTION RTC AUTO ENABLE
+OPTION MODBUFF ENABLE  192
+OPTION PLATFORM HDMIUSB
+*/
+        if(checkstring(p,(unsigned char *) "HDMIUSB"))  {
+            ResetOptions();
+            strcpy((char *)Option.platform,"HDMIUSB");
+            Option.ColourCode = 1;
+            Option.CPU_Speed =315000;
+            Option.SD_CS=PINMAP[22];
+            Option.SD_CLK_PIN=PINMAP[26];
+            Option.SD_MOSI_PIN=PINMAP[27];
+            Option.SD_MISO_PIN=PINMAP[28];
+            Option.AUDIO_L=PINMAP[10];
+            Option.AUDIO_R=PINMAP[11];
+            Option.modbuffsize=192;
+            Option.modbuff = true; 
+            Option.AUDIO_SLICE=checkslice(PINMAP[10],PINMAP[11], 0);
+            Option.SYSTEM_I2C_SDA=PINMAP[20];
+            Option.SYSTEM_I2C_SCL=PINMAP[21];
+            Option.RTC = true;
+            Option.SerialTX=PINMAP[8];
+            Option.SerialRX=PINMAP[9];
+            Option.SerialConsole=2;
+            SaveOptions();
+            printoptions();uSec(100000);
+            _excep_code = RESET_COMMAND;
+            SoftReset();
+        }
+        
+#else
         if(checkstring(p,(unsigned char *) "HDMIBASIC"))  {
             strcpy((char *)Option.platform,"HDMIbasic");
             Option.SD_CS=7;
@@ -2420,7 +2465,6 @@ option system i2c GP26, GP27*/
             _excep_code = RESET_COMMAND;
             SoftReset();
         }
-        
         if(checkstring(p,(unsigned char *) "OLIMEX"))  {
             strcpy((char *)Option.platform,"OLIMEX");
             Option.AUDIO_L=PINMAP[26];
@@ -2441,6 +2485,7 @@ option system i2c GP26, GP27*/
             _excep_code = RESET_COMMAND;
             SoftReset();
         }
+#endif
 #endif
 #endif
 #if defined(PICOMITE) || defined(PICOMITEWEB)
@@ -2860,7 +2905,7 @@ void MIPS16 cmd_option(void) {
     tp = checkstring(cmdline, (unsigned char *)"WIDESCREEN");
     if(tp) {
         if(checkstring(tp, (unsigned char *)"OFF") || checkstring(tp, (unsigned char *)"DISABLE")){
-            Option.CPU_Speed = 315000; 
+            Option.CPU_Speed = Freq480P; 
             Option.DISPLAY_TYPE = SCREENMODE1;
             Option.DefaultFont = 1 ;
         }     
