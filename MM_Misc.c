@@ -2431,7 +2431,7 @@ OPTION PLATFORM HDMIUSB
             ResetOptions();
             strcpy((char *)Option.platform,"HDMIUSB");
             Option.ColourCode = 1;
-            Option.CPU_Speed =315000;
+            Option.CPU_Speed =Freq480P;
             Option.SD_CS=PINMAP[22];
             Option.SD_CLK_PIN=PINMAP[26];
             Option.SD_MOSI_PIN=PINMAP[27];
@@ -2455,7 +2455,9 @@ OPTION PLATFORM HDMIUSB
         
 #else
         if(checkstring(p,(unsigned char *) "HDMIBASIC"))  {
+            ResetOptions();
             strcpy((char *)Option.platform,"HDMIbasic");
+            Option.ColourCode = 1;
             Option.SD_CS=7;
             Option.SD_CLK_PIN=4;
             Option.SD_MOSI_PIN=5;
@@ -2466,7 +2468,9 @@ OPTION PLATFORM HDMIUSB
             SoftReset();
         }
         if(checkstring(p,(unsigned char *) "OLIMEX"))  {
+            ResetOptions();
             strcpy((char *)Option.platform,"OLIMEX");
+            Option.ColourCode = 1;
             Option.AUDIO_L=PINMAP[26];
             Option.AUDIO_R=PINMAP[27];
             Option.modbuffsize=192;

@@ -7331,13 +7331,17 @@ void ScrollLCD2(int lines){
                 int d=y*X_TILE;
                 int s=(y+offset)*X_TILE;
                 for(int x=0;x<X_TILE;x++){
+#ifdef HDMI
                     if(Option.CPU_Speed!=Freq720P){
+#endif
                         tilefcols[d+x]=tilefcols[s+x];
                         tilebcols[d+x]=tilebcols[s+x];
+#ifdef HDMI
                     } else {
                         tilefcols_w[d+x]=tilefcols_w[s+x];
                         tilebcols_w[d+x]=tilebcols_w[s+x];
                     }
+#endif
                 }
             }
         }
@@ -7362,13 +7366,17 @@ void ScrollLCD2(int lines){
                 int d=y*X_TILE;
                 int s=(y-offset)*X_TILE;
                 for(int x=0;x<X_TILE;x++){
+#ifdef HDMI
                     if(Option.CPU_Speed!=Freq720P){
+#endif
                         tilefcols[d+x]=tilefcols[s+x];
                         tilebcols[d+x]=tilebcols[s+x];
+#ifdef HDMI
                     } else {
                         tilefcols_w[d+x]=tilefcols_w[s+x];
                         tilebcols_w[d+x]=tilebcols_w[s+x];
                     }
+#endif
                 }
             }
         }

@@ -31,6 +31,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "hardware/adc.h"
 #include "hardware/structs/systick.h"
 #include "hardware/structs/pwm.h"
+#include "hardware/structs/pads_bank0.h"
 #include "hardware/structs/adc.h"
 #include "hardware/dma.h"
 #include <hardware/structs/ioqspi.h>
@@ -308,6 +309,8 @@ void __not_in_flash_func(ExtSet)(int pin, int val){
             pinmask|=(1<<PinDef[pin].GPno);
             if(val)pinmask|=(1<<PinDef[pin].GPno);
             else pinmask &= (~(1<<PinDef[pin].GPno));
+            gpio_set_input_enabled(PinDef[pin].GPno,false);
+            last_adc=99;
         }
 //        INTEnableInterrupts();
     }
@@ -465,6 +468,7 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
         case EXT_NOT_CONFIG:    tris = 1; ana = 1;
 //                                gpio_init(PinDef[pin].GPno); 
 //		                        gpio_set_input_hysteresis_enabled(PinDef[pin].GPno,true);
+                                gpio_set_input_enabled(PinDef[pin].GPno,false);
                                 switch(ExtCurrentConfig[pin]){      //Disable the pin numbers used by the special function code
                                      case EXT_IR:
 				                        IRpin=99;
@@ -591,12 +595,14 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
                                 break;
 
 #ifdef rp2350
+        case EXT_ADCRAW:
         case EXT_ANA_IN:        if(!(PinDef[pin].mode & ANALOG_IN)) error("Invalid configuration");
                                 if(pin<=44 && rp2350a==0) error("Invalid configuration");
                                 if(pin> 44 && rp2350a) error("Invalid configuration");
                                 tris = 1; ana = 0; 
                                 break;
 #else
+        case EXT_ADCRAW:
         case EXT_ANA_IN:        if(!(PinDef[pin].mode & ANALOG_IN)) error("Invalid configuration");
                                 tris = 1; ana = 0; 
                                 break;
@@ -609,8 +615,8 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
                                     if(cfg==EXT_CNT_IN && option>=3)edge = GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE;
                                     if(option==1 || option==4)gpio_pull_down (PinDef[pin].GPno);
                                     if(option==2 || option==5)gpio_pull_up (PinDef[pin].GPno);
-                                irq_set_priority(13,0);
-                                PinSetBit(pin,TRISSET);
+                                    irq_set_priority(13,0);
+                                    PinSetBit(pin,TRISSET);
                                     if(pin == Option.INT1pin) {
                                     if(!CallBackEnabled){
                                         gpio_set_irq_enabled_with_callback(PinDef[pin].GPno, edge , true, &gpio_callback);
@@ -895,7 +901,7 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
     uSec(2);
 }
 int64_t __not_in_flash_func(ExtInp)(int pin){
-    if(ExtCurrentConfig[pin]==EXT_ANA_IN){
+    if(ExtCurrentConfig[pin]==EXT_ANA_IN || ExtCurrentConfig[pin]==EXT_ADCRAW){
         if(last_adc!=pin){
             last_adc=pin;
             adc_select_input(PinDef[pin].ADCpin);
@@ -929,6 +935,8 @@ void MIPS16 cmd_setpin(void) {
         value = EXT_NOT_CONFIG;
     else if(checkstring(argv[2], (unsigned char *)"AIN"))
         value = EXT_ANA_IN;
+    else if(checkstring(argv[2], (unsigned char *)"ARAW"))
+        value = EXT_ADCRAW;
     else if(checkstring(argv[2], (unsigned char *)"DIN"))
         value = EXT_DIG_IN;
     else if(checkstring(argv[2], (unsigned char *)"FIN"))
@@ -1138,7 +1146,8 @@ void MIPS16 cmd_setpin(void) {
 process:
     // check for any options
     switch(value) {
-    	case EXT_ANA_IN:if(argc == 5) {
+    	case EXT_ANA_IN:
+        case EXT_ADCRAW: if(argc == 5) {
     						option = getint((argv[4]), 8, 12);
     						if(option & 1)error("Invalid bit count");
         					} else
@@ -1305,6 +1314,11 @@ void fun_pin(void) {
                             else if(pin == Option.INT4pin)  fret = (MMFLOAT)(ExtInp(pin)) * (MMFLOAT)1000.0 / (MMFLOAT)INT4InitTimer;
                             targ = T_NBR;
                             return;
+        case EXT_ADCRAW:
+                            if(ADCDualBuffering || dmarunning)error("ADC in use");
+                            iret=ExtInp(pin); 
+                            targ=T_INT;
+                            return;  
         case EXT_ANA_IN:    
                             if(ADCDualBuffering || dmarunning)error("ADC in use");
                             for(i = 0; i < ANA_AVERAGE; i++) {

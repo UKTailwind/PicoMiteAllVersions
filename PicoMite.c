@@ -440,7 +440,9 @@ void __not_in_flash_func(routinechecks)(void){
 #ifdef USBKEYBOARD
     if(USBenabled){
         tuh_task();
-        if(mSecTimer>2000)hid_app_task();
+        if(mSecTimer>2000){
+            hid_app_task();
+        }
     }
 #else
 	 static int c, read=0;
@@ -3360,7 +3362,7 @@ int MIPS16 main(){
     }
 #else
     if(!(Option.CPU_Speed!=Freq720P || Option.CPU_Speed==Freq720P )){
-        Option.CPU_Speed=315000;
+        Option.CPU_Speed=Freq480P;
         SaveOptions();
     }
 #endif
@@ -3370,7 +3372,7 @@ int MIPS16 main(){
     if(_excep_code == RESET_CLOCKSPEED) {
 #ifdef PICOMITEVGA
 #ifdef HDMI
-        Option.CPU_Speed=315000;              // init the options if this is the very first startup
+        Option.CPU_Speed=Freq480P;              // init the options if this is the very first startup
 #else
         Option.CPU_Speed=126000;              // init the options if this is the very first startup
 #endif
@@ -3396,6 +3398,7 @@ int MIPS16 main(){
     vreg_disable_voltage_limit ();
 #ifdef rp2350
     volatile uint32_t *qmi_m0_timing=(uint32_t *)0x400d000c;
+    volatile uint32_t *qmi_m1_timing=(uint32_t *)0x400d0020;
 #endif
     if(Option.CPU_Speed>200000 && Option.CPU_Speed<=300000 )vreg_set_voltage(VREG_VOLTAGE_1_25);  // Std default @ boot is 1_10
     else if(Option.CPU_Speed>300000  && Option.CPU_Speed<=378000 )vreg_set_voltage(VREG_VOLTAGE_1_30);  // Std default @ boot is 1_10
@@ -3404,9 +3407,9 @@ int MIPS16 main(){
 #endif
     sleep_ms(10);
 #ifdef rp2350
-    *qmi_m0_timing = 0x60007204;
-    if(Option.CPU_Speed>288000)*qmi_m0_timing = 0x60007203;
-    else *qmi_m0_timing = 0x60007202;
+    *qmi_m0_timing = *qmi_m1_timing = 0x60007204;
+    if(Option.CPU_Speed>288000)*qmi_m0_timing = *qmi_m1_timing = 0x60007203;
+    else *qmi_m0_timing = *qmi_m1_timing = 0x60007202;
     sleep_ms(2);
 #endif
     set_sys_clock_khz(Option.CPU_Speed, false);
@@ -3442,8 +3445,8 @@ int MIPS16 main(){
             clk_hstx,
             0,                                                // No glitchless mux
             CLOCKS_CLK_PERI_CTRL_AUXSRC_VALUE_CLKSRC_PLL_SYS, // System PLL on AUX mux
-            315000 * 1000,                               // Input frequency
-            157500 * 1000                                // Output (must be same as no divider)
+            Freq480P * 1000,                               // Input frequency
+            Freq480P * 500                                // Output (must be same as no divider)
         );
     }
 #endif 

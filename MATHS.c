@@ -2304,7 +2304,7 @@ void fun_math(void){
 				}
 			}
 			targ=T_NBR;
-			fret=sqrt(var/card1);
+			fret=sqrt(var/(card1-1));
 			return;
 		}
 

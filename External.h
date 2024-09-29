@@ -153,21 +153,22 @@ New, more portable, method of manipulating an I/O pin
 #define EXT_PWM6B        43
 #define EXT_PWM7A        44
 #define EXT_PWM7B        45
+#define EXT_ADCRAW       46
 #ifdef rp2350
-#define EXT_PWM8A        46
-#define EXT_PWM8B        47
-#define EXT_PWM9A        48
-#define EXT_PWM9B        49
-#define EXT_PWM10A        50
-#define EXT_PWM10B        51
-#define EXT_PWM11A        52
-#define EXT_PWM11B        53
-#define EXT_PIO0_OUT      54
-#define EXT_PIO1_OUT      55
-#define EXT_PIO2_OUT      56
+#define EXT_PWM8A        47
+#define EXT_PWM8B        48
+#define EXT_PWM9A        49
+#define EXT_PWM9B        50
+#define EXT_PWM10A        51
+#define EXT_PWM10B        52
+#define EXT_PWM11A        53
+#define EXT_PWM11B        54
+#define EXT_PIO0_OUT      55
+#define EXT_PIO1_OUT      56
+#define EXT_PIO2_OUT      57
 #else
-#define EXT_PIO0_OUT      46
-#define EXT_PIO1_OUT      47
+#define EXT_PIO0_OUT      47
+#define EXT_PIO1_OUT      48
 #endif
 #define EXT_DS18B20_RESERVED    0x100                 // this pin is reserved for DS18B20 and cannot be used
 #define EXT_COM_RESERVED        0x200                 // this pin is reserved and SETPIN and PIN cannot be used
