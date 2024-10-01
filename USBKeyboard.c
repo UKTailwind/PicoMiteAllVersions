@@ -1010,6 +1010,13 @@ static inline bool is_xbox(uint8_t dev_addr)
 		   || (vid == 0x11c1 && pid == 0x9101) // EasySMX Wireless, c, PC Mode, D-input, emulation
          );
 }
+static inline bool is_specific(uint8_t dev_addr)
+{
+  uint16_t vid, pid;
+  tuh_vid_pid_get(dev_addr, &vid, &pid);
+  return ( (vid == 0x810 && pid == 0xE501)    // EasySMX Wireless, u, Android mode (u)		 
+         );
+}
 void process_xbox(uint8_t const* report, uint16_t len, uint8_t n)
 {
 	//PInt(len);
@@ -1147,25 +1154,45 @@ bool diff_report(sony_ds4_report_t const* rpt1, sony_ds4_report_t const* rpt2)
 
   return result;
 }
-void process_gamepad(uint8_t const* report, uint16_t len, uint8_t n){
+void process_generic_gamepad(uint8_t const* report, uint16_t len, uint8_t n){
 	nunstruct[n].type=SNES;
-	uint16_t b=0;
-	if(report[5] & 0x10)b|=1<<10;
-	if(report[5] & 0x20)b|=1<<11;
-	if(report[5] & 0x40)b|=1<<13;
-	if(report[5] & 0x80)b|=1<<12;
-	if(report[6] & 1)b|=1<<4;
-	if(report[6] & 2)b|=1;
-	if(report[6] & 0x10)b|=1<<3;
-	if(report[6] & 0x20)b|=1<<1;
-	if(report[0] < 0x7f)b|=1<<8;
-	if(report[0] > 0x7f)b|=1<<6;
-	if(report[1] < 0x7f)b|=1<<7;
-	if(report[1] > 0x7f)b|=1<<5;
-	if((b ^ nunstruct[n].x0) & nunstruct[n].x1){
-		nunfoundc[n]=1;
-	}
-	nunstruct[n].x0=b;
+		uint16_t b=0;
+		if(report[5] & 0x10)b|=1<<10;
+		if(report[5] & 0x20)b|=1<<11;
+		if(report[5] & 0x40)b|=1<<13;
+		if(report[5] & 0x80)b|=1<<12;
+		if(report[6] & 1)b|=1<<4;
+		if(report[6] & 2)b|=1;
+		if(report[6] & 0x10)b|=1<<3;
+		if(report[6] & 0x20)b|=1<<1;
+		if(report[0] < 0x7f)b|=1<<8;
+		if(report[0] > 0x7f)b|=1<<6;
+		if(report[1] < 0x7f)b|=1<<7;
+		if(report[1] > 0x7f)b|=1<<5;
+		if((b ^ nunstruct[n].x0) & nunstruct[n].x1){
+			nunfoundc[n]=1;
+		}
+		nunstruct[n].x0=b;
+}
+void process_specific_gamepad(uint8_t const* report, uint16_t len, uint8_t n){
+	nunstruct[n].type=SNES;
+		uint16_t b=0;
+		if(report[5] & 0x10)b|=1<<10;
+		if(report[5] & 0x20)b|=1<<11;
+		if(report[5] & 0x40)b|=1<<13;
+		if(report[5] & 0x80)b|=1<<12;
+		if(report[6] & 1)b|=1<<4;
+		if(report[6] & 2)b|=1;
+		if(report[6] & 0x10)b|=1<<3;
+		if(report[6] & 0x20)b|=1<<1;
+		if(report[3] < 0x40)b|=1<<8;
+		if(report[3] > 0xC0)b|=1<<6;
+		if(report[4] < 0x40)b|=1<<7;
+		if(report[4] > 0xC0)b|=1<<5;
+		if((b ^ nunstruct[n].x0) & nunstruct[n].x1){
+			nunfoundc[n]=1;
+		}
+		nunstruct[n].x0=b;
 }
 void process_sony_ds3(uint8_t const* report, uint16_t len, uint8_t n)
 {
@@ -1503,19 +1530,16 @@ void tuh_hid_report_received_cb(uint8_t dev_addr, uint8_t instance, uint8_t cons
 
 	default:
 //		MMPrintString("HID receive boot gamepad report\r\n");
-		if ( is_sony_ds4(dev_addr) )
-		{
+		if ( is_sony_ds4(dev_addr) ){
 			process_sony_ds4(report, len, n+1);
-		} 
-		else if ( is_sony_ds3(dev_addr) )
-		{
+		} else if ( is_sony_ds3(dev_addr) ){
 			process_sony_ds3(report, len, n+1);
-		}			
-		else if ( is_xbox(dev_addr) )
-		{
+		} else if ( is_xbox(dev_addr) ){
 			process_xbox(report, len, n+1);
+		} else if ( is_specific(dev_addr) ){
+			process_specific_gamepad(report, len, n+1);
 		}  else {
-			process_gamepad(report, len, n+1);
+			process_generic_gamepad(report, len, n+1);
 		}
 	}
 	HID[n].report_requested=false;

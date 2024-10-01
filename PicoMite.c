@@ -3625,6 +3625,7 @@ int MIPS16 main(){
 #ifndef USBKEYBOARD
     pico_get_unique_board_id_string (id_out,12);
 #endif
+#ifdef rp2350
     if(Option.PSRAM_CS_PIN){
         gpio_set_function(PinDef[Option.PSRAM_CS_PIN].GPno, GPIO_FUNC_XIP_CS1); // CS for PSRAM
         xip_ctrl_hw->ctrl|=XIP_CTRL_WRITABLE_M1_BITS;
@@ -3633,6 +3634,7 @@ int MIPS16 main(){
             SaveOptions();
         }
     }
+#endif
     clock_configure(
         clk_peri,
         0,                                                // No glitchless mux
