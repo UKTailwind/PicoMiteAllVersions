@@ -271,57 +271,93 @@ void stringsort(unsigned char *sarray, int n, int offset, long long *index, int 
 	unsigned char temp;
 	int reverse= 1-((flags & 1)<<1);
     while (s){
-      s=0;
-      for(i=1;i<n;i++){
-        s2=i*offset+sarray;
-        s1=(i-1)*offset+sarray;
-        ii = *s1 < *s2 ? *s1 : *s2; //get the smaller  length
-        p1 = s1 + 1; p2 = s2 + 1;
-        k=0; //assume the strings match
-        while((ii--) && (k==0)) {
-          if(flags & 2){
-			  if(toupper(*p1) > toupper(*p2)){
-				k=reverse; //earlier in the array is bigger
-			  }
-			  if(toupper(*p1) < toupper(*p2)){
-				 k=-reverse; //later in the array is bigger
-			  }
-          } else {
-			  if(*p1 > *p2){
-				k=reverse; //earlier in the array is bigger
-			  }
-			  if(*p1 < *p2){
-				 k=-reverse; //later in the array is bigger
-			  }
-          }
-          p1++; p2++;
+        s=0;
+        for(i=1;i<n;i++){
+            s2=i*offset+sarray;
+            s1=(i-1)*offset+sarray;
+            ii = *s1 < *s2 ? *s1 : *s2; //get the smaller  length
+            p1 = s1 + 1; p2 = s2 + 1;
+            k=0; //assume the strings match
+            while((ii--) && (k==0)) {
+            if(flags & 2){
+                if(toupper(*p1) > toupper(*p2)){
+                    k=reverse; //earlier in the array is bigger
+                }
+                if(toupper(*p1) < toupper(*p2)){
+                    k=-reverse; //later in the array is bigger
+                }
+            } else {
+                if(*p1 > *p2){
+                    k=reverse; //earlier in the array is bigger
+                }
+                if(*p1 < *p2){
+                    k=-reverse; //later in the array is bigger
+                }
+            }
+            p1++; p2++;
+            }
+        // if up to this point the strings match
+        // make the decision based on which one is shorter
+            if(k==0){
+                if(*s1 > *s2) k=reverse;
+                if(*s1 < *s2) k=-reverse;
+            }
+            if (k==1){ // if earlier is bigger swap them round
+                ii = *s1 > *s2 ? *s1 : *s2; //get the bigger length
+                ii++;
+                p1=s1;p2=s2;
+                while(ii--){
+                temp=*p1;
+                *p1=*p2;
+                *p2=temp;
+                p1++; p2++;
+                }
+                s=1;
+                if(index!=NULL){
+                    isave=index[i-1+startpoint];
+                    index[i-1+startpoint]=index[i+startpoint];
+                    index[i+startpoint]=isave;
+                }
+            }
         }
-      // if up to this point the strings match
-      // make the decision based on which one is shorter
-      if(k==0){
-        if(*s1 > *s2) k=reverse;
-        if(*s1 < *s2) k=-reverse;
-      }
-      if (k==1){ // if earlier is bigger swap them round
-        ii = *s1 > *s2 ? *s1 : *s2; //get the bigger length
-        ii++;
-        p1=s1;p2=s2;
-        while(ii--){
-          temp=*p1;
-          *p1=*p2;
-          *p2=temp;
-          p1++; p2++;
-        }
-        s=1;
-        if(index!=NULL){
-        	isave=index[i-1+startpoint];
-        	index[i-1+startpoint]=index[i+startpoint];
-        	index[i+startpoint]=isave;
-        }
-      }
     }
-  }
+    if((flags & 5) == 5){
+        for(i=n-1;i>=0;i--){
+            s2=i*offset+sarray;
+            if(*s2 !=0)break;
+        }
+        i++;
+        if(i){
+            s2=(n-i)*offset+sarray;
+            memmove(s2,sarray,offset*i);
+            memset(sarray,0,offset*(n-i));
+            if(index!=NULL){
+                long long int *newindex=(long long int *)GetTempMemory(n* sizeof(long long int));
+                memmove(&newindex[n-i],&index[startpoint],i*sizeof(long long int));
+                memmove(newindex,&index[startpoint+i],(n-i)*sizeof(long long int));
+                memmove(&index[startpoint],newindex,n*sizeof(long long int));
+            }
+        }
+    } else if(flags & 4){
+        for(i=0;i<n;i++){
+            s2=i*offset+sarray;
+            if(*s2 !=0)break;
+        }
+        if(i){
+            s2=i*offset+sarray;
+            memmove(sarray,s2,offset*(n-i));
+            s2=(n-i)*offset+sarray;
+            memset(s2,0,offset*i);
+            if(index!=NULL){
+                long long int *newindex=(long long int *)GetTempMemory(n* sizeof(long long int));
+                memmove(newindex,&index[startpoint+i],(n-i)*sizeof(long long int));
+                memmove(&newindex[n-i],&index[startpoint],i*sizeof(long long int));
+                memmove(&index[startpoint],newindex,n*sizeof(long long int));
+            }
+        }
+    }
 }
+
 void cmd_sort(void){
     MMFLOAT *a3float=NULL;
     int64_t *a3int=NULL,*a4int=NULL;
@@ -334,7 +370,7 @@ void cmd_sort(void){
         int card=parseintegerarray(argv[2],&a4int,2,1,NULL,true)-1;
     	if(card !=size)error("Array size mismatch");
     }
-    if(argc>=5 && *argv[4])flags=getint(argv[4],0,3);
+    if(argc>=5 && *argv[4])flags=getint(argv[4],0,7);
     if(argc>=7 && *argv[6])startpoint=getint(argv[6],OptionBase,size+OptionBase);
     size-=startpoint;
     if(argc==9)size=getint(argv[8],1,size+1+OptionBase)-1;
@@ -350,7 +386,7 @@ void cmd_sort(void){
     } else if(a3str!=NULL){
     	a3str+=((startpoint)*(maxsize+1));
     	if(a4int!=NULL)for(i=0;i<truesize+1;i++)a4int[i]=i+OptionBase;
-    	stringsort(a3str,  size+1,maxsize+1, a4int, flags, startpoint);
+    	stringsort(a3str, size+1,maxsize+1, a4int, flags, startpoint);
     }
 }
 // this is invoked as a command (ie, TIMER = 0)
@@ -1763,7 +1799,8 @@ void MIPS16 printoptions(void){
 if(Option.HDMIclock!=2 || Option.HDMId0!=0 || Option.HDMId1!=6 ||Option.HDMId2!=4){
     PO("HDMI PINS ");PInt(Option.HDMIclock);PIntComma(Option.HDMId0);PIntComma(Option.HDMId1);PIntComma(Option.HDMId2);PRet();
 }
-if(Option.CPU_Speed==Freq720P)PO2Str("WIDESCREEN", "ENABLE");
+if(Option.CPU_Speed==Freq720P)PO2Str("RESOLUTION", "1280x720");
+if(Option.CPU_Speed==FreqXGA)PO2Str("RESOLUTION", "1024x768");
 #endif
 #else
     if(Option.CPU_Speed!=133000){
@@ -2153,8 +2190,6 @@ void MIPS16 configure(unsigned char *p){
         if(checkstring(p,(unsigned char *) "LIST")){
 #ifdef PICOMITEVGA
 #ifndef HDMI
-            MMPrintString("PICOGAME 4-PWM\r\n");
-            MMPrintString("PICOGAME 4\r\n");
 #ifdef USBKEYBOARD
             MMPrintString("CMM1.5\r\n");
 #else
@@ -2193,53 +2228,6 @@ void MIPS16 configure(unsigned char *p){
         }       
 #ifdef PICOMITEVGA
 #ifndef HDMI
-        if(checkstring(p,(unsigned char *) "PICOGAME 4PWM"))  {
-            Option.ColourCode = 1;
-            Option.SYSTEM_I2C_SDA=PINMAP[12];
-            Option.SYSTEM_I2C_SCL=PINMAP[13];
-            Option.SD_CS=PINMAP[27];
-            Option.SD_CLK_PIN=PINMAP[15];
-            Option.SD_MOSI_PIN=PINMAP[28];
-            Option.SD_MISO_PIN=PINMAP[14];
-            Option.VGA_HSYNC=PINMAP[10];
-            Option.VGA_BLUE=PINMAP[4];
-            Option.AUDIO_L=PINMAP[18];
-            Option.AUDIO_R=PINMAP[19];
-            Option.modbuffsize=192;
-            Option.modbuff = true; 
-            Option.AUDIO_SLICE=checkslice(PINMAP[18],PINMAP[19], 0);
-            strcpy((char *)Option.platform,"PICOGAME 4-PWM");
-            SaveOptions();
-            printoptions();uSec(100000);
-            _excep_code = RESET_COMMAND;
-            SoftReset();
-        }
-        if(checkstring(p,(unsigned char *) "PICOGAME 4"))  {
-            Option.ColourCode = 1;
-            Option.SYSTEM_I2C_SDA=PINMAP[12];
-            Option.SYSTEM_I2C_SCL=PINMAP[13];
-            Option.SD_CS=PINMAP[27];
-            Option.SD_CLK_PIN=PINMAP[15];
-            Option.SD_MOSI_PIN=PINMAP[28];
-            Option.SD_MISO_PIN=PINMAP[14];
-            Option.VGA_HSYNC=PINMAP[10];
-            Option.VGA_BLUE=PINMAP[4];
-            Option.AUDIO_CLK_PIN=PINMAP[18];
-            Option.AUDIO_MOSI_PIN=PINMAP[19];
-            Option.AUDIO_MISO_PIN=PINMAP[20];
-            Option.AUDIO_CS_PIN=PINMAP[17];
-            Option.AUDIO_DCS_PIN=PINMAP[21];
-            Option.AUDIO_DREQ_PIN=PINMAP[22];
-            Option.AUDIO_RESET_PIN=PINMAP[16];
-            Option.AUDIO_SLICE=checkslice(PINMAP[19],PINMAP[19], 1);
-            Option.modbuffsize=192;
-            Option.modbuff = true; 
-            strcpy((char *)Option.platform,"PICOGAME 4");
-            SaveOptions();
-            printoptions();uSec(100000);
-            _excep_code = RESET_COMMAND;
-            SoftReset();
-        }
 #ifdef USBKEYBOARD
         if(checkstring(p,(unsigned char *) "CMM1.5"))  {
             ResetOptions();
@@ -2906,15 +2894,20 @@ void MIPS16 cmd_option(void) {
         SoftReset();
         return;
     }
-    tp = checkstring(cmdline, (unsigned char *)"WIDESCREEN");
+    tp = checkstring(cmdline, (unsigned char *)"RESOLUTION");
     if(tp) {
-        if(checkstring(tp, (unsigned char *)"OFF") || checkstring(tp, (unsigned char *)"DISABLE")){
+        if(checkstring(tp, (unsigned char *)"640") || checkstring(tp, (unsigned char *)"640x480")){
             Option.CPU_Speed = Freq480P; 
             Option.DISPLAY_TYPE = SCREENMODE1;
             Option.DefaultFont = 1 ;
         }     
-        else if(checkstring(tp, (unsigned char *)"ON") || checkstring(tp, (unsigned char *)"ENABLE")){
+        else if(checkstring(tp, (unsigned char *)"1280") || checkstring(tp, (unsigned char *)"1280x720")){
             Option.CPU_Speed = Freq720P; 
+            Option.DISPLAY_TYPE=SCREENMODE1;
+            Option.DefaultFont=(2<<4) | 1 ;
+        }      
+        else if(checkstring(tp, (unsigned char *)"1024") || checkstring(tp, (unsigned char *)"1024x768")){
+            Option.CPU_Speed = FreqXGA; 
             Option.DISPLAY_TYPE=SCREENMODE1;
             Option.DefaultFont=(2<<4) | 1 ;
         }      
@@ -3195,8 +3188,8 @@ void MIPS16 cmd_option(void) {
         }
 #ifdef PICOMITEVGA
 #ifdef HDMI
-        int fcolour=Option.CPU_Speed!=Freq720P? RGB555(Option.DefaultFC) : RGB332(Option.DefaultFC);
-        int bcolour=Option.CPU_Speed!=Freq720P? RGB555(Option.DefaultBC) : RGB332(Option.DefaultBC);
+        int fcolour=Option.CPU_Speed==Freq480P? RGB555(Option.DefaultFC) : RGB332(Option.DefaultFC);
+        int bcolour=Option.CPU_Speed==Freq480P? RGB555(Option.DefaultBC) : RGB332(Option.DefaultBC);
 #else
         int  fcolour = RGB121(Option.DefaultFC);
         fcolour= (fcolour<<12) | (fcolour<<8) | (fcolour<<4) | fcolour;
@@ -3340,7 +3333,7 @@ void MIPS16 cmd_option(void) {
    	    if(CurrentLinePtr) error("Invalid in a program");
         int CPU_Speed=getint(tp, MIN_CPU,MAX_CPU);
 #ifndef HMDI
-        if(!(CPU_Speed==157500 || CPU_Speed!=Freq720P || CPU_Speed==126000 || CPU_Speed==252000 || CPU_Speed==378000 || CPU_Speed==504000))error("CpuSpeed 126000, 252000, 378000, 157500 or 315000 only");
+        if(!(CPU_Speed==157500 || CPU_Speed==126000 || CPU_Speed==252000 || CPU_Speed==378000 || CPU_Speed==315000))error("CpuSpeed 126000, 252000, 378000, 157500 or 315000 only");
 #endif
         Option.CPU_Speed=CPU_Speed;
         Option.X_TILE=80;
@@ -3544,15 +3537,14 @@ void MIPS16 cmd_option(void) {
     tp = checkstring(cmdline, (unsigned char *)"DISPLAY");
     if(tp) {
         getargs(&tp, 3, (unsigned char *)",");
-        if(Option.DISPLAY_CONSOLE && argc>1 ) error("Cannot change LCD console");
-        if(argc >= 1) Option.Height = getint(argv[0], 5, 100);
-        if(argc == 3) Option.Width = getint(argv[2], 37, 240);
-        if (Option.DISPLAY_CONSOLE) {
-           setterminal((Option.Height > SCREENHEIGHT)?Option.Height:SCREENHEIGHT,(Option.Width > SCREENWIDTH)?Option.Width:SCREENWIDTH);                                                    // or height is > 24
-        }else{
-          setterminal(Option.Height,Option.Width);
-        }
-        if(argc >= 1 )SaveOptions();  //Only save if necessary
+        if(argc!=3)error("Syntax");
+        if(Option.DISPLAY_CONSOLE) error("Cannot change LCD console");
+        int Height = getint(argv[0], 5, 100);
+        int Width = getint(argv[2], 37, 240);
+        Option.Width=Width;
+        Option.Height=Height;
+        SaveOptions();
+        setterminal(Option.Height,Option.Width);
         return;
     }
     tp = checkstring(cmdline, (unsigned char *)"CASE");
@@ -4116,7 +4108,11 @@ void fun_device(void){
     sret = GetTempMemory(STRINGSIZE);                                        // this will last for the life of the command
 #ifdef PICOMITEVGA
 #ifdef USBKEYBOARD
+#ifdef HDMI
+    strcpy((char *)sret, "PicoMiteHDMIUSB");
+#else
     strcpy((char *)sret, "PicoMiteVGAUSB");
+#endif
 #else
 #ifdef HDMI
     strcpy((char *)sret, "PicoMiteHDMI");
@@ -4208,7 +4204,7 @@ int ExistsDir(char *p, char *q, int *filesystem){
     return ireturn;
 }
 
-void fun_info(void){
+void MIPS16 fun_info(void){
     unsigned char *tp;
     sret = GetTempMemory(STRINGSIZE);                                  // this will last for the life of the command
     if(checkstring(ep, (unsigned char *)"AUTORUN")){

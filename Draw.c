@@ -461,7 +461,7 @@ void ClearScreen(int c) {
     if(DISPLAY_TYPE==SCREENMODE1){
 #ifdef HDMI
         memset(DisplayBuf,0,ScreenSize);
-        if(Option.CPU_Speed!=Freq720P){
+        if(Option.CPU_Speed==Freq480P){
             uint16_t bcolour = RGB555(c);
             for(int x=0;x<X_TILE;x++){
                 for(int y=0;y<Y_TILE;y++){
@@ -6637,16 +6637,16 @@ void cmd_tile(void){
         getargs(&cmdline, 11, (unsigned char *)",");
         if(!(DISPLAY_TYPE==SCREENMODE1))return;
         if(argc<5)error("Syntax");
-        int x=getint(argv[0],0,X_TILE);
-        int y=getint(argv[2],0,Y_TILE);
+        int x=getint(argv[0],0,X_TILE-1);
+        int y=getint(argv[2],0,Y_TILE-1);
         int tilebcolour, tilefcolour ;
         if(*argv[4]){
             tilefcolour = getColour((char *)argv[4], 0);
-            fcolour = Option.CPU_Speed!=Freq720P ? RGB555(tilefcolour):  RGB332(tilefcolour);
+            fcolour = Option.CPU_Speed==Freq480P ? RGB555(tilefcolour):  RGB332(tilefcolour);
         }
         if(argc>=7 && *argv[6]){
             tilebcolour = getColour((char *)argv[6], 0);
-            bcolour = Option.CPU_Speed!=Freq720P ? RGB555(tilebcolour):  RGB332(tilebcolour);
+            bcolour = Option.CPU_Speed==Freq480P ? RGB555(tilebcolour):  RGB332(tilebcolour);
         }
         if(argc>=9 && *argv[8]){
             xlen=getint(argv[8],1,X_TILE-x);
@@ -6657,7 +6657,7 @@ void cmd_tile(void){
         for(int xp=x;xp<x+xlen;xp++){
             for(int yp=y;yp<y+ylen;yp++){
 #ifdef HDMI
-                if(Option.CPU_Speed!=Freq720P){
+                if(Option.CPU_Speed==Freq480P){
 #endif
                     if(fcolour!=0xFFFFFFFF) tilefcols[yp*X_TILE+xp]=(uint16_t)fcolour;
                     if(bcolour!=0xFFFFFFFF) tilebcols[yp*X_TILE+xp]=(uint16_t)bcolour;
@@ -6678,14 +6678,14 @@ void cmd_map(void){
     if((p=checkstring(cmdline, (unsigned char *)"RESET"))) {
         while(v_scanline!=0){}
         if(DISPLAY_TYPE==SCREENMODE5)for(int i=0;i<256;i++)map256[i]=remap[i]=RGB555(MAP256DEF[i]);
-        else if(Option.CPU_Speed!=Freq720P)for(int i=0;i<16;i++){
+        else if(Option.CPU_Speed==Freq480P)for(int i=0;i<16;i++){
             map16[i]=remap[i]=RGB555(MAP16DEF[i]);
             map16pairs[i]=map16[i] | (map16[i]<<16);
         }
         else if(DISPLAY_TYPE==SCREENMODE3)for(int i=0;i<16;i++) map16d[i]=remap[i]=RGB332(MAP16DEF[i]) | (RGB332(MAP16DEF[i])<<8);
         else if(DISPLAY_TYPE==SCREENMODE2)for(int i=0;i<16;i++) map16q[i]=remap[i]=RGB332(MAP16DEF[i]) | (RGB332(MAP16DEF[i])<<8) | (RGB332(MAP16DEF[i])<<16) | (RGB332(MAP16DEF[i])<<24);
         first=false;
-    } else if((checkstring(cmdline, (unsigned char *)"GRAYSCALE") || checkstring(cmdline, (unsigned char *)"GREYSCALE")) && Option.CPU_Speed!=Freq720P) {
+    } else if((checkstring(cmdline, (unsigned char *)"GRAYSCALE") || checkstring(cmdline, (unsigned char *)"GREYSCALE")) && Option.CPU_Speed==Freq480P) {
         while(v_scanline!=0){}
         if(DISPLAY_TYPE==SCREENMODE5) {
             for(int i=1;i<=32;i++){
@@ -6715,8 +6715,8 @@ void cmd_map(void){
             map16[i]=remap[i]=RGB555(CMM1map[i]);
             map16pairs[i]=map16[i] | (map16[i]<<16);
 #ifdef HDMI
-            if(DISPLAY_TYPE==SCREENMODE3 && Option.CPU_Speed==Freq720P)map16d[i]=remap[i]=RGB332(CMM1map[i]) | (RGB332(CMM1map[i])<<8);
-            if(DISPLAY_TYPE==SCREENMODE2 && Option.CPU_Speed==Freq720P)map16q[i]=remap[i]=RGB332(CMM1map[i]) | (RGB332(CMM1map[i])<<8)| (RGB332(CMM1map[i])<<16)| (RGB332(CMM1map[i])<<24);
+            if(DISPLAY_TYPE==SCREENMODE3 && Option.CPU_Speed!=Freq480P)map16d[i]=remap[i]=RGB332(CMM1map[i]) | (RGB332(CMM1map[i])<<8);
+            if(DISPLAY_TYPE==SCREENMODE2 && Option.CPU_Speed!=Freq480P)map16q[i]=remap[i]=RGB332(CMM1map[i]) | (RGB332(CMM1map[i])<<8)| (RGB332(CMM1map[i])<<16)| (RGB332(CMM1map[i])<<24);
 #endif
         }
         first=false;
@@ -6724,7 +6724,7 @@ void cmd_map(void){
         while(v_scanline!=0){}
         if(DISPLAY_TYPE==SCREENMODE5) for(int i=0;i<256;i++)map256[i]=remap[i];
         else for(int i=0;i<16;i++){
-            if(Option.CPU_Speed!=Freq720P){map16[i]=remap[i];map16pairs[i]=map16[i] | (map16[i]<<16);}
+            if(Option.CPU_Speed==Freq480P){map16[i]=remap[i];map16pairs[i]=map16[i] | (map16[i]<<16);}
             else if(DISPLAY_TYPE==SCREENMODE3)map16d[i]=remap[i];
             else if(DISPLAY_TYPE==SCREENMODE2)map16q[i]=remap[i];
         }
@@ -6738,12 +6738,12 @@ void cmd_map(void){
 		int col=getColour((char *)cmdline,0);
         if(first){
             if(DISPLAY_TYPE==SCREENMODE5)for(int i=0;i<256;i++)remap[i]=RGB555(MAP256DEF[i]);
-            else if(Option.CPU_Speed!=Freq720P)for(int i=0;i<16;i++)remap[i]=RGB555(MAP16DEF[i]);
+            else if(Option.CPU_Speed==Freq480P)for(int i=0;i<16;i++)remap[i]=RGB555(MAP16DEF[i]);
             else if(DISPLAY_TYPE==SCREENMODE3)for(int i=0;i<16;i++)remap[i]=RGB332(MAP16DEF[i]) | (RGB332(MAP16DEF[i])<<8);
             else if(DISPLAY_TYPE==SCREENMODE2)for(int i=0;i<16;i++)remap[i]=RGB332(MAP16DEF[i]) | (RGB332(MAP16DEF[i])<<8) | (RGB332(MAP16DEF[i])<<16) | (RGB332(MAP16DEF[i])<<24);
             first=false;
         }
-		if(Option.CPU_Speed!=Freq720P)remap[cl]=RGB555(col);
+		if(Option.CPU_Speed==Freq480P)remap[cl]=RGB555(col);
         else if(DISPLAY_TYPE==SCREENMODE3)remap[cl]=RGB332(col) | (RGB332(col)<<8);
         else if(DISPLAY_TYPE==SCREENMODE2)remap[cl]=RGB332(col) | (RGB332(col)<<8) | (RGB332(col)<<16) | (RGB332(col)<<24);
     }
@@ -6755,22 +6755,22 @@ void cmd_mode(void){
     closeframebuffer('A');
     if(mode==5){
         DISPLAY_TYPE=SCREENMODE5; 
-        ScreenSize=Option.CPU_Speed!=Freq720P? MODE5SIZE : MODE5SIZE_W;
+        ScreenSize=MODE5SIZE;
     } else if(mode==4){
-        if(Option.CPU_Speed==Freq720P)error("Mode not available in widescreen");
+        if(Option.CPU_Speed!=Freq480P)error("Mode not available in this resolution");
         DISPLAY_TYPE=SCREENMODE4; 
         ScreenSize=MODE4SIZE;
     } else if(mode==3){
         DISPLAY_TYPE=SCREENMODE3; 
-        ScreenSize=Option.CPU_Speed!=Freq720P? MODE3SIZE : MODE3SIZE_W;
+        ScreenSize=MODE3SIZE;
     } else if(mode==2){
         DISPLAY_TYPE=SCREENMODE2; 
-        ScreenSize=Option.CPU_Speed!=Freq720P? MODE2SIZE : MODE2SIZE_W;
+        ScreenSize=MODE2SIZE;
     } else { //mode=1
 #ifdef rp2350
 #ifndef HDMI
         tilefcols=(uint16_t *)((uint8_t*)FRAMEBUFFER+(MODE1SIZE*3));
-        tilebcols=(uint16_t *)((uint8_t*)FRAMEBUFFER+(MODE1SIZE*4));
+        tilebcols=(uint16_t *)((uint8_t*)FRAMEBUFFER+(MODE1SIZE*3)+(MODE1SIZE>>1));
         for(int x=0;x<X_TILE;x++){
             for(int y=0;y<Y_TILE;y++){
                 tilefcols[y*X_TILE+x]=Option.VGAFC;
@@ -6780,7 +6780,7 @@ void cmd_mode(void){
 #endif
 #endif
         DISPLAY_TYPE=SCREENMODE1;
-        ScreenSize=Option.CPU_Speed!=Freq720P? MODE1SIZE : MODE1SIZE_W;
+        ScreenSize=MODE1SIZE;
 #ifdef HDMI
         settiles();
 #endif
@@ -6791,7 +6791,7 @@ void cmd_mode(void){
     CurrentX = CurrentY =0;
     ClearScreen(Option.DefaultBC);
 #ifdef HDMI
-    if(Option.CPU_Speed!=Freq720P){
+    if(Option.CPU_Speed==Freq480P){
 #endif
         if(DISPLAY_TYPE==SCREENMODE2 || DISPLAY_TYPE==SCREENMODE4 || DISPLAY_TYPE==SCREENMODE5){
             SetFont((6<<4) | 1) ;
@@ -7225,8 +7225,8 @@ void DrawBitmap2(int x1, int y1, int width, int height, int scale, int fc, int b
             // the bitmap is aligned with the tiles
             int bcolour, fcolour ;
 #ifdef HDMI
-            fcolour = Option.CPU_Speed!=Freq720P? RGB555(fc) : RGB332(fc);
-            bcolour = Option.CPU_Speed!=Freq720P? RGB555(bc) : RGB332(bc);
+            fcolour = Option.CPU_Speed==Freq480P? RGB555(fc) : RGB332(fc);
+            bcolour = Option.CPU_Speed==Freq480P? RGB555(bc) : RGB332(bc);
 #else
             fcolour = ((fc & 0x800000)>> 20) | ((fc & 0xC000)>>13) | ((fc & 0x80)>>7);
             fcolour= (fcolour<<12) | (fcolour<<8) | (fcolour<<4) | fcolour;
@@ -7239,7 +7239,7 @@ void DrawBitmap2(int x1, int y1, int width, int height, int scale, int fc, int b
             int h=height*scale/ya;
 //            int pos;
 #ifdef HDMI
-            if(Option.CPU_Speed!=Freq720P){
+            if(Option.CPU_Speed==Freq480P){
 #endif
                 for(int yy=yt;yy<yt+h;yy++){
                     for(int xx=xt; xx<xt+w;xx++){
@@ -7322,7 +7322,7 @@ void ScrollLCD2(int lines){
 #ifndef HDMI
         while(QVgaScanLine!=0){}
 #else
-//********************
+        while(v_scanline!=0){} 
 #endif
     	int ya=ytileheight;
         if((lines % ya ==0)){
@@ -7332,7 +7332,7 @@ void ScrollLCD2(int lines){
                 int s=(y+offset)*X_TILE;
                 for(int x=0;x<X_TILE;x++){
 #ifdef HDMI
-                    if(Option.CPU_Speed!=Freq720P){
+                    if(Option.CPU_Speed==Freq480P){
 #endif
                         tilefcols[d+x]=tilefcols[s+x];
                         tilebcols[d+x]=tilebcols[s+x];
@@ -7367,7 +7367,7 @@ void ScrollLCD2(int lines){
                 int s=(y-offset)*X_TILE;
                 for(int x=0;x<X_TILE;x++){
 #ifdef HDMI
-                    if(Option.CPU_Speed!=Freq720P){
+                    if(Option.CPU_Speed==Freq480P){
 #endif
                         tilefcols[d+x]=tilefcols[s+x];
                         tilebcols[d+x]=tilebcols[s+x];
@@ -7582,9 +7582,13 @@ void fun_getscanline(void){
         iret = v_scanline - 30;
         if(iret<0)iret+=750;
         targ=T_INT;
-    } else {
+    } else if(Option.CPU_Speed==Freq480P){
         iret = v_scanline - 20;
         if(iret<0)iret+=500;
+        targ=T_INT;
+    } else if(Option.CPU_Speed==FreqXGA){
+        iret = v_scanline - 38;
+        if(iret<0)iret+=806;
         targ=T_INT;
     }
 }
@@ -7711,28 +7715,32 @@ void MIPS16 ResetDisplay(void) {
     PromptFC = Option.DefaultFC;
     PromptBC = Option.DefaultBC;
 #ifdef PICOMITEVGA
-        if(Option.CPU_Speed!=Freq720P){
+        if(!(Option.CPU_Speed==Freq720P || Option.CPU_Speed==FreqXGA)){
             HRes=((DISPLAY_TYPE == SCREENMODE1 ||  DISPLAY_TYPE == SCREENMODE3) ? 640: 320);
             VRes=((DISPLAY_TYPE == SCREENMODE1 ||  DISPLAY_TYPE == SCREENMODE3) ? 480: 240);
-        } else {
+        } else if(Option.CPU_Speed==Freq720P){
             HRes=(DISPLAY_TYPE == SCREENMODE1 ? 1280 : ((DISPLAY_TYPE==SCREENMODE2 || DISPLAY_TYPE==SCREENMODE5) ? 320 : 640));
             VRes=(DISPLAY_TYPE == SCREENMODE1 ? 720 :  ((DISPLAY_TYPE==SCREENMODE2 || DISPLAY_TYPE==SCREENMODE5) ? 180 : 360));
-        }
+        } else if(Option.CPU_Speed==FreqXGA){
+            HRes=(DISPLAY_TYPE == SCREENMODE1 ? 1024 : ((DISPLAY_TYPE==SCREENMODE2 || DISPLAY_TYPE==SCREENMODE5) ? 256 : 512));
+            VRes=(DISPLAY_TYPE == SCREENMODE1 ? 768 :  ((DISPLAY_TYPE==SCREENMODE2 || DISPLAY_TYPE==SCREENMODE5) ? 192 : 384));
+        } 
+        
         switch(DISPLAY_TYPE){
             case SCREENMODE1:
-                ScreenSize=(Option.CPU_Speed!=Freq720P ? MODE1SIZE: MODE1SIZE_W);
+                ScreenSize= MODE1SIZE;
                 break;
             case SCREENMODE2:
-                ScreenSize=(Option.CPU_Speed!=Freq720P ? MODE2SIZE: MODE2SIZE_W);
+                ScreenSize=MODE2SIZE;
                 break;
             case SCREENMODE3:
-                ScreenSize=(Option.CPU_Speed!=Freq720P ? MODE3SIZE: MODE3SIZE_W);
+                ScreenSize=MODE3SIZE;
                 break;
             case SCREENMODE4:
                 ScreenSize=MODE4SIZE;
                 break;
             case SCREENMODE5:
-                ScreenSize=(Option.CPU_Speed!=Freq720P ? MODE5SIZE: MODE5SIZE_W);
+                ScreenSize=MODE5SIZE;
                 break;
         }
         if(DISPLAY_TYPE == SCREENMODE2 || DISPLAY_TYPE == SCREENMODE3){
@@ -7781,8 +7789,8 @@ void MIPS16 ResetDisplay(void) {
 #else
 #ifdef rp2350
         if(DISPLAY_TYPE==SCREENMODE1){
-            tilefcols=(uint16_t *)((uint32_t)FRAMEBUFFER+(MODE1SIZE*3));
-            tilebcols=(uint16_t *)((uint32_t)FRAMEBUFFER+(MODE1SIZE*3)+MODE1HALF);
+            tilefcols=(uint16_t *)((uint32_t)FRAMEBUFFER+(MODE1SIZE_S*3));
+            tilebcols=(uint16_t *)((uint32_t)FRAMEBUFFER+(MODE1SIZE_S*3)+(MODE1SIZE>>1));
         }
 #endif
         for(int x=0;x<X_TILE;x++){
@@ -8737,11 +8745,11 @@ All other buffers are allocated out of variable space using GetMemory
 NB: for RP2350 with PSRAM buffers may be allocated in the slower external memory
 Buffer sizes are:
 Normal:
-    #define MODE1SIZE  VMaxH*VMaxV/8
-    #define MODE2SIZE  320*240/2
-    #define MODE3SIZE  VMaxH*VMaxV/2
-    #define MODE4SIZE  320*240*2
-    #define MODE5SIZE  320*240
+    #define MODE1SIZE_S  VMaxH*VMaxV/8
+    #define MODE2SIZE_S  320*240/2
+    #define MODE3SIZE_S  VMaxH*VMaxV/2
+    #define MODE4SIZE_S  320*240*2
+    #define MODE5SIZE_S  320*240
 
 Widescreen:
     #define MODE1SIZE_W  1280 *720 /8

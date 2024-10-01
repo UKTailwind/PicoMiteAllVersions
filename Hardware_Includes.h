@@ -222,6 +222,11 @@ extern void clear320(void);
 		#endif
 		extern void VGArecovery(int pin);
 	#endif
+	extern int MODE1SIZE;
+	extern int MODE2SIZE;
+	extern int MODE3SIZE;
+	extern int MODE4SIZE;
+	extern int MODE5SIZE;
 #endif
 #ifdef PICOMITEWEB
 	extern volatile int WIFIconnected;

@@ -214,12 +214,19 @@ static char (*SSputchar)(char buff, int flush)=SerialConsolePutC;
                                     DrawLine(0, VRes - gui_font_height - 6, HRes - 1, VRes - gui_font_height - 6, 1, GUI_C_LINE);
 #ifdef PICOMITEVGA
 #ifdef HDMI
-                                    if(Option.CPU_Speed!=Freq720P){
+                                    if(Option.CPU_Speed==Freq480P){
 #endif
                                         if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==12 && gui_font==1)for(int i=0; i<80; i++)tilefcols[38*X_TILE+i]=Option.VGAFC;
+                                    
 #ifdef HDMI
+                                    } else if(Option.CPU_Speed==FreqXGA){
+                                        if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==32 && gui_font==65)for(int i=0; i<128; i++)tilefcols_w[22*X_TILE+i]=Option.VGAFC;
+                                        if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==24 && gui_font==33)for(int i=0; i<128; i++)tilefcols_w[30*X_TILE+i]=Option.VGAFC;
+                                        if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==12 && gui_font==1)for(int i=0; i<128; i++)tilefcols_w[62*X_TILE+i]=Option.VGAFC;
                                     } else {
-                                        if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==24 && gui_font==15)for(int i=0; i<160; i++)tilefcols_w[76*X_TILE+i]=Option.VGAFC;
+                                        if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==32 && gui_font==65)for(int i=0; i<160; i++)tilefcols_w[20*X_TILE+i]=Option.VGAFC;
+                                        if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==24 && gui_font==33)for(int i=0; i<160; i++)tilefcols_w[28*X_TILE+i]=Option.VGAFC;
+                                        if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==12 && gui_font==1)for(int i=0; i<160; i++)tilefcols_w[58*X_TILE+i]=Option.VGAFC;
                                     }
 #endif
 #endif

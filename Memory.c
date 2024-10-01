@@ -50,8 +50,8 @@ char __attribute__ ((aligned (256))) FRAMEBUFFER[640*480/8];
 #endif
 #ifdef PICOMITEVGA
 #ifdef rp2350
-uint16_t *tilefcols=(uint16_t *)((uint32_t)FRAMEBUFFER+(MODE1SIZE*3));
-uint16_t *tilebcols=(uint16_t *)((uint32_t)FRAMEBUFFER+(MODE1SIZE*3)+MODE1HALF);
+uint16_t *tilefcols=(uint16_t *)((uint32_t)FRAMEBUFFER+(MODE1SIZE_S*3));
+uint16_t *tilebcols=(uint16_t *)((uint32_t)FRAMEBUFFER+(MODE1SIZE_S*3)+(MODE1SIZE_S>>1));
 #else
 uint16_t __attribute__ ((aligned (256))) tilefcols[80*40];
 uint16_t __attribute__ ((aligned (256))) tilebcols[80*40];

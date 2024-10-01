@@ -906,7 +906,12 @@ int64_t __not_in_flash_func(ExtInp)(int pin){
             last_adc=pin;
             adc_select_input(PinDef[pin].ADCpin);
         }
-        return adc_read();          
+        int a= adc_read();   
+        if(adc_hw->cs & (ADC_CS_ERR_STICKY_BITS | ADC_CS_ERR_BITS)) {
+            hw_set_bits(&adc_hw->cs, ADC_CS_ERR_STICKY_BITS);
+            a=-1;
+        }
+        return a;      
     } else if(ExtCurrentConfig[pin] == EXT_FREQ_IN || ExtCurrentConfig[pin] == EXT_PER_IN) {
       // select input channel
         if(pin == Option.INT1pin) return INT1Value;

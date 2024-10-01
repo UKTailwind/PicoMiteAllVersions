@@ -73,21 +73,26 @@ extern "C" {
         #define MIN_CPU     126000
         #define MAXSUBFUN           256                     // each entry takes up 4 bytes
     #endif
-    #define MODE1SIZE  640*480/8
-    #define MODE1HALF  MODE1SIZE/2
-    #define MODE2SIZE  320*240/2
-    #define MODE3SIZE  640*480/2
-    #define MODE4SIZE  320*240*2
-    #define MODE5SIZE  640*480/4
-    #define MODE6SIZE  320*240
+    #define MODE1SIZE_S  640*480/8
+    #define MODE2SIZE_S  320*240/2
+    #define MODE3SIZE_S  640*480/2
+    #define MODE4SIZE_S  320*240*2
+    #define MODE5SIZE_S  640*480/4
     #define MODE_H_W_ACTIVE_PIXELS 1280
     #define MODE_V_W_ACTIVE_LINES 720
     #define MODE1SIZE_W  MODE_H_W_ACTIVE_PIXELS * MODE_V_W_ACTIVE_LINES /8
     #define MODE2SIZE_W  (MODE_H_W_ACTIVE_PIXELS/4) * (MODE_V_W_ACTIVE_LINES/4)/2
     #define MODE3SIZE_W  (MODE_H_W_ACTIVE_PIXELS/2) * (MODE_V_W_ACTIVE_LINES/2)/2
     #define MODE5SIZE_W  (MODE_H_W_ACTIVE_PIXELS/4) * (MODE_V_W_ACTIVE_LINES/4)
+    #define MODE_H_L_ACTIVE_PIXELS 1024
+    #define MODE_V_L_ACTIVE_LINES 768
+    #define MODE1SIZE_L  MODE_H_L_ACTIVE_PIXELS * MODE_V_L_ACTIVE_LINES /8
+    #define MODE2SIZE_L  (MODE_H_L_ACTIVE_PIXELS/4) * (MODE_V_L_ACTIVE_LINES/4)/2
+    #define MODE3SIZE_L  (MODE_H_L_ACTIVE_PIXELS/2) * (MODE_V_L_ACTIVE_LINES/2)/2
+    #define MODE5SIZE_L  (MODE_H_L_ACTIVE_PIXELS/4) * (MODE_V_L_ACTIVE_LINES/4)
     #define Freq720P 372000
     #define Freq480P 315000
+    #define FreqXGA 324000
 #endif
 
 #ifdef PICOMITEWEB
@@ -109,7 +114,7 @@ extern "C" {
         #define HEAP_MEMORY_SIZE (256*1024) 
         #define MAXVARS             768                     // 8 + MAXVARLEN + MAXDIM * 2  (ie, 56 bytes) - these do not incl array members
         #define FLASH_TARGET_OFFSET (768 * 1024) 
-        #define MAX_CPU     396000
+        #define MAX_CPU     378000
         #define MAXSUBFUN           512                     // each entry takes up 4 bytes
         #ifdef USBKEYBOARD
             #define MagicKey 0x15486342
@@ -209,7 +214,7 @@ extern "C" {
 #define MAXCFUNCTION	20
 #define SAVEDVARS_FLASH_SIZE 16384
 #define FLASH_ERASE_SIZE 4096
-#define MAX3D   8
+#define MAX3D   8 
 #define MAXCAM  3
 #define MAX_POLYGON_VERTICES 10
 #define MAXBLITBUF 64
