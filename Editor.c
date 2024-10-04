@@ -54,7 +54,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #define VT100_C_KEYWORD         "\033[36m"      // Cyan                 Cyan
 #define VT100_C_QUOTE           "\033[35m"      // Green                Green
 #define VT100_C_NUMBER          "\033[32m"      // Red                  Red
-#define VT100_C_LINE            "\033[37m"      // White                Grey
+#define VT100_C_LINE            "\033[35m"      // White                Grey
 #define VT100_C_STATUS          "\033[37m"      // Black                Brown
 #define VT100_C_ERROR           "\033[31m"      // Red                  Red
 
@@ -97,17 +97,28 @@ void DisplayPutClever(char c){
     }
 #ifdef HDMI
     if(r_on){
-        if(Option.CPU_Speed!=Freq720P){
-            for(int i=0; i< gui_font_width / 8; i++)tilebcols[CurrentY/gui_font_height*X_TILE+CurrentX/gui_font_width+i]=0xFFFF;
+        if(Option.CPU_Speed==Freq480P){
+            if(r_on)for(int i=0; i< gui_font_width / 8; i++)tilebcols[CurrentY/gui_font_height*X_TILE+CurrentX/8+i]=RGB555(BLUE);
         }
         else {
-            for(int i=0; i< gui_font_width / 8; i++)tilebcols_w[CurrentY/gui_font_height*X_TILE+CurrentX/gui_font_width+i]=0xFF;
+            if(r_on)for(int i=0; i< gui_font_width / 8; i++)tilebcols_w[CurrentY/gui_font_height*X_TILE+CurrentX/8+i]=RGB332(BLUE);
         }
     }
 #else
-    if(r_on)for(int i=0; i< gui_font_width / 8; i++)tilebcols[CurrentY/gui_font_height*X_TILE+CurrentX/gui_font_width]=0x1111;
+    if(r_on)for(int i=0; i< gui_font_width / 8; i++)tilebcols[CurrentY/gui_font_height*X_TILE+CurrentX/8+i]=0x1111;
 #endif
-    else for(int i=0; i< gui_font_width / 8; i++)tilebcols[CurrentY/gui_font_height*X_TILE+CurrentX/gui_font_width+i]=Option.VGABC;
+#ifdef HDMI
+    else {
+        if(Option.CPU_Speed==Freq480P){
+            for(int i=0; i< gui_font_width / 8; i++)tilebcols[CurrentY/gui_font_height*X_TILE+CurrentX/8+i]=Option.VGABC;
+        }
+        else {
+            for(int i=0; i< gui_font_width / 8; i++)tilebcols_w[CurrentY/gui_font_height*X_TILE+CurrentX/8+i]=Option.VGABC;
+        }
+    }
+#else
+    else for(int i=0; i< gui_font_width / 8; i++)tilebcols[CurrentY/gui_font_height*X_TILE+CurrentX/8+i]=Option.VGABC;
+#endif
     CurrentX += gui_font_width;
     } else DisplayPutC(c);
 }
@@ -163,8 +174,8 @@ static char (*SSputchar)(char buff, int flush)=SerialConsolePutC;
                                     break;
 #ifdef PICOMITEVGA
             case REVERSE_VIDEO:     
-            if((DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==gui_font_height && gui_font==1)){
-                                        r_on^=1;
+            if((DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==gui_font_height)){
+                                    r_on^=1;
                                     } else {
                                         t = gui_fcolour;
                                         gui_fcolour = gui_bcolour;
@@ -173,27 +184,29 @@ static char (*SSputchar)(char buff, int flush)=SerialConsolePutC;
                                     break;
             case CLEAR_TO_EOL:      DrawBox(CurrentX, CurrentY, HRes-1, CurrentY + gui_font_height-1, 0, 0, DISPLAY_TYPE==SCREENMODE1 ? 0 : gui_bcolour);
 #ifdef HDMI
-                                    if(Option.CPU_Speed==315){
-#endif
-                                        if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==gui_font_height && gui_font==1){
-                                            for(int x=CurrentX/gui_font_width;x<X_TILE;x++){
-                                                for(int i=0;i<gui_font_width/8;i++){
-                                                    tilefcols[CurrentY/gui_font_height*X_TILE+x+i]=Option.VGAFC;
-                                                    tilebcols[CurrentY/gui_font_height*X_TILE+x+i]=Option.VGABC;
-                                                }
+                                    if(Option.CPU_Speed==Freq480P){
+                                        if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==gui_font_height){
+                                            for(int x=CurrentX/8;x<X_TILE;x++){
+                                                tilefcols[CurrentY/ytileheight*X_TILE+x]=RGB555(gui_fcolour);
+                                                tilebcols[CurrentY/ytileheight*X_TILE+x]=RGB555(gui_bcolour);
                                             }
                                         }
-#ifdef HDMI
                                     } else {
-                                        if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==gui_font_height && gui_font==15){
-                                            for(int x=CurrentX/gui_font_width;x<X_TILE;x++){
-                                                for(int i=0;i<gui_font_width/8;i++){
-                                                    tilefcols_w[CurrentY/gui_font_height*X_TILE+x+i]=Option.VGAFC;
-                                                    tilebcols_w[CurrentY/gui_font_height*X_TILE+x+i]=Option.VGABC;
-                                                }
+                                        if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==gui_font_height){
+                                            for(int x=CurrentX/8;x<X_TILE;x++){
+                                                tilefcols_w[CurrentY/ytileheight*X_TILE+x]=RGB332(gui_fcolour);
+                                                tilebcols_w[CurrentY/ytileheight*X_TILE+x]=RGB332(gui_bcolour);
                                             }
                                         }
                                     }
+#else
+                                        if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==gui_font_height){
+                                            for(int x=CurrentX/8;x<X_TILE;x++){
+                                                tilefcols[CurrentY/ytileheight*X_TILE+x]=Option.VGAFC;
+                                                tilebcols[CurrentY/ytileheight*X_TILE+x]=Option.VGABC;
+                                            }
+                                        }
+
 #endif
 
                                     break;
@@ -215,19 +228,18 @@ static char (*SSputchar)(char buff, int flush)=SerialConsolePutC;
 #ifdef PICOMITEVGA
 #ifdef HDMI
                                     if(Option.CPU_Speed==Freq480P){
-#endif
-                                        if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==12 && gui_font==1)for(int i=0; i<80; i++)tilefcols[38*X_TILE+i]=Option.VGAFC;
-                                    
-#ifdef HDMI
+                                        if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==12 && gui_font==1)for(int i=0; i<80; i++)tilefcols[38*X_TILE+i]=RGB555(MAGENTA);
                                     } else if(Option.CPU_Speed==FreqXGA){
-                                        if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==32 && gui_font==65)for(int i=0; i<128; i++)tilefcols_w[22*X_TILE+i]=Option.VGAFC;
-                                        if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==24 && gui_font==33)for(int i=0; i<128; i++)tilefcols_w[30*X_TILE+i]=Option.VGAFC;
-                                        if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==12 && gui_font==1)for(int i=0; i<128; i++)tilefcols_w[62*X_TILE+i]=Option.VGAFC;
-                                    } else {
-                                        if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==32 && gui_font==65)for(int i=0; i<160; i++)tilefcols_w[20*X_TILE+i]=Option.VGAFC;
-                                        if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==24 && gui_font==33)for(int i=0; i<160; i++)tilefcols_w[28*X_TILE+i]=Option.VGAFC;
-                                        if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==12 && gui_font==1)for(int i=0; i<160; i++)tilefcols_w[58*X_TILE+i]=Option.VGAFC;
+                                        if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==32 && gui_font==65)for(int i=0; i<128; i++)tilefcols_w[22*X_TILE+i]=RGB332(MAGENTA);
+                                        if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==24 && gui_font==33)for(int i=0; i<128; i++)tilefcols_w[30*X_TILE+i]=RGB332(MAGENTA);
+                                        if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==12 && gui_font==1)for(int i=0; i<128; i++)tilefcols_w[62*X_TILE+i]=RGB332(MAGENTA);
+                                    } else if(Option.CPU_Speed==Freq720P){
+                                        if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==32 && gui_font==65)for(int i=0; i<160; i++)tilefcols_w[20*X_TILE+i]=RGB332(MAGENTA);
+                                        if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==24 && gui_font==33)for(int i=0; i<160; i++)tilefcols_w[28*X_TILE+i]=RGB332(MAGENTA);
+                                        if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==12 && gui_font==1)for(int i=0; i<160; i++)tilefcols_w[58*X_TILE+i]=RGB332(MAGENTA);
                                     }
+#else
+                                        if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==12 && gui_font==1)for(int i=0; i<80; i++)tilefcols[38*X_TILE+i]=0x9999;
 #endif
 #endif
                                     CurrentX = 0; CurrentY = VRes - gui_font_height;
@@ -255,12 +267,12 @@ int TextChanged;                  // true if the program has been modified and t
 #define EDIT  1                   // used to select the status line string
 #define MARK  2
 
-void FullScreenEditor(int x, int y, char *fname);
+void FullScreenEditor(int x, int y, char *fname, int edit_buff_size, bool reset);
 char *findLine(int ln, int *inmulti);
 void printLine(int ln); 
 void printScreen(void);
 void SCursor(int x, int y);
-int editInsertChar(unsigned char c, char *multi);
+int editInsertChar(unsigned char c, char *multi, int edit_buff_size);
 void PrintFunctKeys(int);
 void PrintStatus(void);
 void SaveToProgMemory(void);
@@ -277,18 +289,19 @@ int oldmode;
 #define MAXCLIP 1024
 // edit command:
 //  EDIT              Will run the full screen editor on the current program memory, if run after an error will place the cursor on the error line
-void cmd_edit(void) {
+void edit(unsigned char *cmdline, bool reset) {
     unsigned char *fromp, *p=NULL;
-    int y, x;
+    int y, x, edit_buff_size ;
     char name[FF_MAX_LFN] ;   
     getargs(&cmdline,1,(unsigned char *)",");
+    if(reset==false && argc==0)error("Syntax");
     optioncolourcodesave=Option.ColourCode;
 #ifdef PICOMITEVGA
     modmode=false;
     editactive=1;
     oldmode = DISPLAY_TYPE;
     oldfont=PromptFont;
-    if(HRes==320){
+    if(HRes<512){
         DISPLAY_TYPE=SCREENMODE1;
         modmode=true;
     }
@@ -296,7 +309,7 @@ void cmd_edit(void) {
     memset(WriteBuf, 0, ScreenSize);
     if(modmode){
 #ifdef HDMI
-        if(Option.CPU_Speed!=Freq720P){
+        if(Option.CPU_Speed==Freq480P){
 #endif
             SetFont(1);
             PromptFont=1;
@@ -318,15 +331,17 @@ void cmd_edit(void) {
 #endif
 
 #endif
-    if(CurrentLinePtr) error("Invalid in a program");
+    if(CurrentLinePtr && reset) error("Invalid in a program");
     if(Option.ColourCode) {
         gui_fcolour = WHITE;
         gui_bcolour = BLACK;
     }
     if(Option.DISPLAY_CONSOLE == true && gui_font_width > 16*HRes/640) error("Font is too large");
     if(Option.DISPLAY_TYPE>=VIRTUAL && WriteBuf)FreeMemorySafe((void **)&WriteBuf);
-    ClearVars(0);
-    ClearRuntime();
+    if(reset){
+        ClearVars(0);
+        ClearRuntime();
+    }
     if(HRes==640){
         SetFont(1);
         PromptFont=1;
@@ -334,7 +349,14 @@ void cmd_edit(void) {
 #ifdef PICOMITEWEB
     cleanserver();
 #endif
-    EdBuff = GetTempMemory(EDIT_BUFFER_SIZE);
+    if(reset){
+        EdBuff = GetTempMemory(EDIT_BUFFER_SIZE);
+        edit_buff_size=EDIT_BUFFER_SIZE;
+    } else {
+        int s=LargestContiguousHeap()-2048*3;
+        EdBuff = GetTempMemory(s);
+        edit_buff_size=s;
+    }
     *EdBuff = 0;
 
     VHeight = Option.Height - 2;
@@ -415,15 +437,20 @@ void cmd_edit(void) {
         if(edy < 0) edy = 0;                                        // compensate if we are near the start
         y = y - edy;                                                // y is the line on the screen
     }
-    m_alloc(M_VAR);                                                 //clean up clipboard usage
-    FullScreenEditor(x,y, argc==1 ? name: NULL);
-    memset(tknbuf, 0, STRINGSIZE);                                  // zero this so that nextstmt is pointing to the end of program
+    if(reset)m_alloc(M_VAR);                                                 //clean up clipboard usage
+    FullScreenEditor(x,y, argc==1 ? name: NULL, edit_buff_size, reset);
+    if(reset)memset(tknbuf, 0, STRINGSIZE);                                  // zero this so that nextstmt is pointing to the end of program
     MMCharPos = 0;
 }
 
+void cmd_edit(void){
+    edit(cmdline, true);
+}
+void cmd_editfile(void){
+    edit(cmdline, FALSE);
+}
 
-
-void FullScreenEditor(int xx, int yy, char *fname) {
+void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool reset) {
   int c, i;
   unsigned char buf[MAXCLIP+2], clipboard[MAXCLIP+2];
   unsigned char *p, *tp, BreakKeySave;
@@ -488,7 +515,7 @@ void FullScreenEditor(int xx, int yy, char *fname) {
                                   buf[i + 1] = 0;                                 // make sure that the end of the buffer is zeroed
                               while(i) buf[i--] = ' ';                            // now, place our spaces in the typeahead buffer
                           }
-                          if(!editInsertChar('\n',&multi)) break;                        // insert the newline
+                          if(!editInsertChar('\n',&multi, edit_buff_size)) break;                        // insert the newline
                           TextChanged = true;
                           nbrlines++;
                           if(!(cury < VHeight - 1))                               // if we are NOT at the bottom
@@ -602,7 +629,7 @@ void FullScreenEditor(int xx, int yy, char *fname) {
                           p = txtp;
                           c = *p;
                           currdel=*p;
-                          if(p!=EdBuff+EDIT_BUFFER_SIZE-1)nextdel=p[1];
+                          if(p!=EdBuff+edit_buff_size-1)nextdel=p[1];
                           else nextdel=0;
                           if(p!=EdBuff){
                           lastdel=*(--p);
@@ -783,6 +810,25 @@ void FullScreenEditor(int xx, int yy, char *fname) {
                                 SetFont(oldfont);
                                 PromptFont=oldfont;
                             }
+#ifdef HDMI
+                            if(Option.CPU_Speed==Freq480P){
+                                tilefcols=(uint16_t *)((uint32_t)FRAMEBUFFER+(MODE1SIZE*3));
+                                tilebcols=(uint16_t *)((uint32_t)FRAMEBUFFER+(MODE1SIZE*3)+(MODE1SIZE>>1));
+                                X_TILE=MODE_H_ACTIVE_PIXELS/8;Y_TILE=MODE_V_ACTIVE_LINES/8;
+                                for(int x=0;x<X_TILE;x++){
+                                    for(int y=0;y<Y_TILE;y++){
+                                        tilefcols[y*X_TILE+x]=RGB555(Option.DefaultFC);
+                                        tilebcols[y*X_TILE+x]=RGB555(Option.DefaultBC);
+                                    }
+                                }
+                            } else {
+                                tilefcols_w=(uint8_t *)DisplayBuf+MODE1SIZE;
+                                tilebcols_w=tilefcols_w+(MODE_H_ACTIVE_PIXELS/8)*(MODE_V_ACTIVE_LINES/8); //minimum tilesize is 8x8
+                                memset(tilefcols_w,RGB332(Option.DefaultFC),(MODE_H_ACTIVE_PIXELS/8)*(MODE_V_ACTIVE_LINES/8)*sizeof(uint8_t));
+                                memset(tilebcols_w,RGB332(Option.DefaultBC),(MODE_H_ACTIVE_PIXELS/8)*(MODE_V_ACTIVE_LINES/8)*sizeof(uint8_t));
+                                X_TILE=MODE_H_ACTIVE_PIXELS/8;Y_TILE=MODE_V_ACTIVE_LINES/ytileheight;
+                            }
+#endif
 #endif                          
                             if(c != ESC && TextChanged && fname==NULL) SaveToProgMemory();
                             if(c != ESC && TextChanged && fname) {
@@ -813,6 +859,7 @@ void FullScreenEditor(int xx, int yy, char *fname) {
                                 } while (*p);
                                 FileClose(fnbr1);
                             }
+                            if(reset==false)return;
                             if(c == ESC || c == CTRLKEY('Q') || c == F1 || fname) cmd_end();
                             // this must be save, exit and run.  We have done the first two, now do the run part.
                             ClearRuntime();
@@ -903,7 +950,7 @@ void FullScreenEditor(int xx, int yy, char *fname) {
                           }
                           TextChanged = true;
                           if(insert || *txtp == '\n' || *txtp == 0) {
-                              if(!editInsertChar(c, &multi)) break;                       // insert it
+                              if(!editInsertChar(c, &multi, edit_buff_size)) break;                       // insert it
                           } else
                               *txtp++ = c;                                        // or just overtype
                                 printLine(edy + cury);                            // redraw the whole line so that colour coding will occur
@@ -1457,11 +1504,11 @@ void SCursor(int x, int y) {
 
 // move the text down by one char starting at the current position in the text
 // and insert a character
-int editInsertChar(unsigned char c, char *multi) {
+int editInsertChar(unsigned char c, char *multi, int edit_buff_size) {
     unsigned char *p;
 
     for(p = EdBuff; *p; p++);                                         // find the end of the text in memory
-    if(p >= EdBuff + EDIT_BUFFER_SIZE - 10) {                         // and check that we have the space (allow 10 bytes for slack)
+    if(p >= EdBuff + edit_buff_size - 10) {                         // and check that we have the space (allow 10 bytes for slack)
         editDisplayMsg((unsigned char *)" OUT OF MEMORY ");
         return false;
     }

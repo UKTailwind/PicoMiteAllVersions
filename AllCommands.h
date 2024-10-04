@@ -101,6 +101,7 @@ void cmd_mode(void);
 void cmd_3D(void);
 void cmd_framebuffer(void);
 void cmd_edit(void);
+void cmd_editfile(void);
 void cmd_port(void);
 void cmd_adc(void);
 void cmd_ir(void);
@@ -386,6 +387,7 @@ void fun_map(void);
   	{ (unsigned char *)"FRAMEBUFFER",     T_CMD,                     0, cmd_framebuffer   },
 	{ (unsigned char *)"Sprite",           T_CMD,                      0, cmd_sprite	},
 	{ (unsigned char *)"Blit",           T_CMD,                      0, cmd_blit	},
+    { (unsigned char *)"Edit File",   T_CMD,              0, cmd_editfile     },
     { (unsigned char *)"Edit",   T_CMD,              0, cmd_edit     },
     { (unsigned char *)"ADC",		T_CMD,			0, cmd_adc        },
     { (unsigned char *)"Pin(",		T_CMD | T_FUN,		0, cmd_pin          },

@@ -62,6 +62,7 @@ extern void FreeMemory(unsigned char *addr);
 extern void InitHeap(void);
 extern unsigned char *HeapBottom(void);
 extern int FreeSpaceOnHeap(void);
+extern int LargestContiguousHeap(void);
 extern unsigned char *DOS_ProgMemory;
 extern void *ReAllocMemory(void *addr, size_t msize);
 extern void FreeMemorySafe(void **addr);

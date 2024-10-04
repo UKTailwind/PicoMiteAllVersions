@@ -221,6 +221,10 @@ extern void clear320(void);
 			extern uint16_t __attribute__ ((aligned (256))) tilebcols[80*40];
 		#endif
 		extern void VGArecovery(int pin);
+	#else
+	extern int MODE_H_SYNC_POLARITY, MODE_V_TOTAL_LINES, MODE_ACTIVE_LINES, MODE_ACTIVE_PIXELS;
+	extern int MODE_H_ACTIVE_PIXELS, MODE_H_FRONT_PORCH, MODE_H_SYNC_WIDTH, MODE_H_BACK_PORCH;
+	extern int MODE_V_SYNC_POLARITY ,MODE_V_ACTIVE_LINES ,MODE_V_FRONT_PORCH, MODE_V_SYNC_WIDTH, MODE_V_BACK_PORCH;
 	#endif
 	extern int MODE1SIZE;
 	extern int MODE2SIZE;

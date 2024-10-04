@@ -996,6 +996,16 @@ int FreeSpaceOnHeap(void) {
     return nbr * PAGESIZE;
 }    
     
+int LargestContiguousHeap(void) {
+    unsigned int nbr;
+    unsigned char *addr;
+    nbr = 0;
+    for(addr = MMHeap; addr < MMHeap + HEAP_MEMORY_SIZE - PAGESIZE; addr += PAGESIZE){
+        if(!(MBitsGet(addr) & PUSED)) nbr++;
+        else break;
+    }
+    return nbr * PAGESIZE;
+}    
 
 
 unsigned int UsedHeap(void) {

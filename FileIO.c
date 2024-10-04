@@ -2255,6 +2255,7 @@ void MIPS16 cmd_loadCMM2(void){
 
 void MIPS16 cmd_load(void)
 {
+    int oldfont=PromptFont;
     int autorun = false;
     unsigned char *p;
 
@@ -2279,12 +2280,10 @@ void MIPS16 cmd_load(void)
             autorun = true;
         else
             error("Syntax");
-    }
-    else if (CurrentLinePtr != NULL)
-        error("Invalid in a program");
-
-    if (!FileLoadProgram(argv[0]))
+    }  else if (CurrentLinePtr != NULL) error("Invalid in a program");
+    if (!FileLoadProgram(argv[0])){
         return;
+    }
     FlashLoad = 0;
     if (autorun)
     {
@@ -2297,6 +2296,8 @@ void MIPS16 cmd_load(void)
         if(Option.LIBRARY_FLASH_SIZE == MAX_PROG_SIZE) ExecuteProgram(ProgMemory - Option.LIBRARY_FLASH_SIZE);  // run anything that might be in the library
         nextstmt = ProgMemory;
     }
+    SetFont(oldfont);
+    PromptFont=oldfont;
 }
 char __not_in_flash_func(FileGetChar)(int fnbr)
 {
