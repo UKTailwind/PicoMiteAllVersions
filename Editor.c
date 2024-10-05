@@ -396,6 +396,7 @@ void edit(unsigned char *cmdline, bool reset) {
     } else {
         char *fname = (char *)getFstring(argv[0]);
         char c;
+        int fsize;
         strcpy(name,fname);
         if(!ExistsFile(name)){
             if (strchr(name, '.') == NULL) strcat(name, ".bas");
@@ -405,6 +406,9 @@ void edit(unsigned char *cmdline, bool reset) {
             int fnbr1;
             fnbr1 = FindFreeFileNbr();
             BasicFileOpen(name, fnbr1, FA_READ);
+            if(filesource[fnbr1]!=FLASHFILE)  fsize = f_size(FileTable[fnbr1].fptr);
+            else fsize = lfs_file_size(&lfs,FileTable[WAV_fnbr].lfsptr);
+            if(fsize > edit_buff_size - 10) error("Out of memory");
             p=EdBuff;
             do
             { // while waiting for the end of file

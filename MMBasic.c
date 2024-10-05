@@ -2704,6 +2704,7 @@ void MIPS16 LCD_error(int line_num, const char *line_txt, const char* error_msg)
 
     // Restore display property values.
     SetFont(old_font);
+    PromptFont=old_font;
     Option.DISPLAY_CONSOLE = old_console;
     gui_fcolour = old_fcolour;
     gui_bcolour = old_bcolour;
@@ -2720,7 +2721,6 @@ void MIPS16 error(char *msg, ...) {
     char *p, *tp, tstr[STRINGSIZE * 2];
     va_list ap;
     ScrewUpTimer = 0;
-    
     // first build the error message in the global string MMErrMsg
     if(MMerrno == 0) MMerrno = 16;                                  // indicate an error
     memset(tstr, 0, STRINGSIZE * 2);                                 // clear any previous string
@@ -2776,6 +2776,25 @@ void MIPS16 error(char *msg, ...) {
         SetFont(PromptFont);
         gui_fcolour = PromptFC;
         gui_bcolour = PromptBC;
+        if((DISPLAY_TYPE==SCREENMODE2 || DISPLAY_TYPE==SCREENMODE4 || DISPLAY_TYPE==SCREENMODE5) && gui_font_width>6){
+            SetFont((6<<4) | 1) ;
+            PromptFont=(6<<4) | 1;
+        } else {
+#ifdef HDMI
+            if((Option.CPU_Speed==Freq480P || DISPLAY_TYPE==SCREENMODE3) && gui_font_width>8){
+                SetFont(1) ;
+                PromptFont = 1;
+            } else if(gui_font_width>16){
+                SetFont((2<<4) | 1) ;
+                PromptFont=(2<<4) | 1;
+            }
+#else
+            if(gui_font_width>8){
+                SetFont(1) ;
+                PromptFont = 1;
+            }
+#endif
+        }
         if(CurrentX != 0) MMPrintString("\r\n");                   // error message should be on a new line
     }
     if(MMCharPos > 1) MMPrintString("\r\n");

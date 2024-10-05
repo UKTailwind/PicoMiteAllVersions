@@ -835,6 +835,8 @@ void cmd_end(void) {
     ADCDualBuffering=0;
 	WatchdogSet = false;
 	dmarunning = false;
+	WAVInterrupt = NULL;
+	WAVcomplete = 0;
 	if(g_myrand)FreeMemory((void *)g_myrand);
 	g_myrand=NULL;
 	OptionConsole=3;

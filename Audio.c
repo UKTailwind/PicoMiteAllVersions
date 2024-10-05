@@ -800,6 +800,7 @@ void wavcallback(char *p){
 	pwm_set_irq_enabled(AUDIO_SLICE, true);
 }
 void mp3callback(char *p, int position){
+	int actualrate;
     if(strchr((char *)p, '.') == NULL) strcat((char *)p, ".mp3");
     if(CurrentlyPlaying == P_MP3){
     	CloseAudio(0);
@@ -827,12 +828,22 @@ void mp3callback(char *p, int position){
     FreeMemorySafe((void *)&sbuff2);
 //	PInt(mymp3.channels);MMPrintString(" Channels\r\n");
 //	PInt(mymp3.sampleRate);MMPrintString(" Sample rate\r\n");
-	mono=(mymp3->channels == 1 ? 1 : 0);
     sbuff1 = GetMemory(WAV_BUFFER_SIZE*4);
     sbuff2 = GetMemory(WAV_BUFFER_SIZE*4);
     fbuff1 = (float *)sbuff1;
     fbuff2 = (float *)sbuff2;
-	setrate(mymp3->sampleRate);
+	mono=(mymp3->channels == 1 ? 1 : 0);
+	if(Option.AUDIO_L){
+		audiorepeat=1;
+		actualrate=mymp3->sampleRate;
+		while(actualrate<PWM_FREQ){
+			actualrate +=mymp3->sampleRate;
+			audiorepeat++;
+		}
+		setrate(actualrate);
+	} else {
+		setrate(mymp3->sampleRate);
+	}
     bcount[1]=drmp3_read_pcm_frames_f32(mymp3, WAV_BUFFER_SIZE/2, (float*)sbuff1) * mymp3->channels;
     fconvert(fbuff1, (uint16_t *)sbuff1, bcount[1]);
     wav_filesize=bcount[1];

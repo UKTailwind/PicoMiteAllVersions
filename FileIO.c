@@ -2167,9 +2167,11 @@ int FileLoadProgram(unsigned char *fname)
 {
     int fnbr;
     char *p, *buf;
-    int c;
+    int c,oldfont=gui_font;
     if (!InitSDCard()) return false;
     ClearProgram(); // clear any leftovers from the previous program
+    SetFont(oldfont);
+    PromptFont=oldfont;
     fnbr = FindFreeFileNbr();
     p = (char *)getFstring(fname);
     if (strchr((char *)p, '.') == NULL) strcat((char *)p, ".bas");
@@ -2282,11 +2284,12 @@ void MIPS16 cmd_load(void)
             error("Syntax");
     }  else if (CurrentLinePtr != NULL) error("Invalid in a program");
     if (!FileLoadProgram(argv[0])){
+        SetFont(oldfont);
+        PromptFont=oldfont;
         return;
     }
     FlashLoad = 0;
-    if (autorun)
-    {
+    if (autorun) {
         if (*ProgMemory != 0x01)
             return; // no program to run
         ClearRuntime();

@@ -1665,7 +1665,11 @@ void MIPS16 printoptions(void){
 //	LoadOptions();
 #ifdef PICOMITEVGA
 #ifdef USBKEYBOARD
+#ifdef HDMI
+    MMPrintString("\rPicoMiteHDMI MMBasic USB Version " VERSION "\r\n");
+#else
     MMPrintString("\rPicoMiteVGA MMBasic USB Edition  " VERSION "\r\n");
+#endif
 #else
 #ifdef HDMI
     MMPrintString("\rPicoMiteHDMI MMBasic Version " VERSION "\r\n");
@@ -3332,8 +3336,10 @@ void MIPS16 cmd_option(void) {
     if(tp) {
    	    if(CurrentLinePtr) error("Invalid in a program");
         int CPU_Speed=getint(tp, MIN_CPU,MAX_CPU);
-#ifndef HMDI
-        if(!(CPU_Speed==157500 || CPU_Speed==126000 || CPU_Speed==252000 || CPU_Speed==378000 || CPU_Speed==315000))error("CpuSpeed 126000, 252000, 378000, 157500 or 315000 only");
+#ifndef HDMI
+        if(!(CPU_Speed==157500 || CPU_Speed==126000 || CPU_Speed==252000 || CPU_Speed==378000 || CPU_Speed==315000))error("CPU speed 126000, 157500, 252000, 315000 or 378000 only");
+#else
+        error("CPU speed is fixed for HDMI");
 #endif
         Option.CPU_Speed=CPU_Speed;
         Option.X_TILE=80;
