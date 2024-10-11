@@ -26,6 +26,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include <stdarg.h>
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
+#include "hardware/dma.h"
 int CurrentSPIDevice=NONE_SPI_DEVICE;
 const struct Displays display_details[]={
 		{0,"", SDCARD_SPI_SPEED, 0, 0, 0, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
@@ -1072,9 +1073,6 @@ void DefineRegionSPI(int xstart, int ystart, int xend, int yend, int rw) {
 void spisendfast(unsigned char *n, int i){
 		xmit_byte_multi(n,i);//		HAL_SPI_Transmit(&hspi3,coord,4,500);
 }
-
-
-
 // Draw a filled rectangle
 // this is the basic drawing promitive used by most drawing routines
 //    x1, y1, x2, y2 - the coordinates
@@ -1647,27 +1645,28 @@ void DisplayNotSet(void) {
 // The MX470 uses SPI channel 2 which it has exclusive control of (needed because touch can be used at any time)
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+extern uint16_t SPI_CLK_PIN;
 // config the SPI port for output
 // it will not touch the port if it has already been opened
 void SPISpeedSet(int device){
     if(CurrentSPIDevice != device){
-		if(device==SDFAST || device==SDSLOW) {
+		if(device==SDSLOW || (device==SDFAST && SPI_CLK_PIN!= SD_CLK_PIN)) {
 //			MMPrintString("Slow Bitbang\r\n");
 			xchg_byte= BitBangSwapSPI;
 			xmit_byte_multi=BitBangSendSPI;
 			rcvr_byte_multi=BitBangReadSPI;
 			SET_SPI_CLK=BitBangSetClk; 
-#ifndef PICOMITEVGA
 			SET_SPI_CLK(SD_SPI_SPEED, false, false);
-		}
-		else {
+		} else {
 			if(PinDef[Option.SYSTEM_CLK].mode & SPI0SCK && PinDef[Option.SYSTEM_MOSI].mode & SPI0TX  && PinDef[Option.SYSTEM_MISO].mode & SPI0RX  ) {
 //				MMPrintString("SPI0\r\n");
 				xchg_byte= HW0SwapSPI;
 				xmit_byte_multi=HW0SendSPI;
 				rcvr_byte_multi=HW0ReadSPI;
 				SET_SPI_CLK=HW0Clk;
+                gpio_set_input_enabled(PinDef[Option.SYSTEM_CLK].GPno,false);
+                gpio_set_input_enabled(PinDef[Option.SYSTEM_MOSI].GPno,false);
+                gpio_set_input_enabled(PinDef[Option.SYSTEM_MISO].GPno,false);
 			} else if(PinDef[Option.SYSTEM_CLK].mode & SPI1SCK && PinDef[Option.SYSTEM_MOSI].mode & SPI1TX  && PinDef[Option.SYSTEM_MISO].mode & SPI1RX ){
 //				MMPrintString("SPI1\r\n");
 				xchg_byte= HW1SwapSPI;
@@ -1682,7 +1681,6 @@ void SPISpeedSet(int device){
 				SET_SPI_CLK=BitBangSetClk; 
 			}
 			SET_SPI_CLK(display_details[device].speed, display_details[device].CPOL, display_details[device].CPHASE);
-#endif
 		}
 		CurrentSPIDevice=device;
     }

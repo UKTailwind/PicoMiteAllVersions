@@ -800,7 +800,6 @@ void wavcallback(char *p){
 	pwm_set_irq_enabled(AUDIO_SLICE, true);
 }
 void mp3callback(char *p, int position){
-	int actualrate;
     if(strchr((char *)p, '.') == NULL) strcat((char *)p, ".mp3");
     if(CurrentlyPlaying == P_MP3){
     	CloseAudio(0);
@@ -814,6 +813,7 @@ void mp3callback(char *p, int position){
 		return;
 	}
 #ifdef rp2350
+	int actualrate;
 	drmp3_allocation_callbacks allocationCallbacks;
     allocationCallbacks.pUserData = NULL;
     allocationCallbacks.onMalloc  = my_malloc;
@@ -1646,7 +1646,7 @@ void MIPS16 cmd_play(void) {
 #ifndef rp2350
 		if(!Option.AUDIO_MISO_PIN)error("Only available with VS1053 audio");
 #else
-        if(Option.CPU_Speed<200000)error("CPUSPEED >=200000 for MP3 playback");
+        if(Option.CPU_Speed<200000 && !Option.AUDIO_MISO_PIN)error("CPUSPEED >=200000 for MP3 playback");
 #endif
 		if(CurrentlyPlaying==P_WAVOPEN)CloseAudio(1);
         if(CurrentlyPlaying != P_NOTHING) error("Sound output in use for $",PlayingStr[CurrentlyPlaying]);
@@ -1988,7 +1988,7 @@ void audio_checks(void){
 			if(CurrentlyPlaying == P_MOD)FreeMemory((void *)mcontext);
             if(CurrentlyPlaying == P_WAV)FreeMemorySafe((void **)&mywav);
 #ifdef rp2350
-            if(CurrentlyPlaying == P_MP3){
+            if(CurrentlyPlaying == P_MP3 && Option.AUDIO_MISO_PIN==0){
 				drmp3_uninit(mymp3);
 				FreeMemorySafe((void **)&mymp3);
 			}

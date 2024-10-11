@@ -407,7 +407,7 @@ void edit(unsigned char *cmdline, bool reset) {
             fnbr1 = FindFreeFileNbr();
             BasicFileOpen(name, fnbr1, FA_READ);
             if(filesource[fnbr1]!=FLASHFILE)  fsize = f_size(FileTable[fnbr1].fptr);
-            else fsize = lfs_file_size(&lfs,FileTable[WAV_fnbr].lfsptr);
+            else fsize = lfs_file_size(&lfs,FileTable[fnbr1].lfsptr);
             if(fsize > edit_buff_size - 10) error("Out of memory");
             p=EdBuff;
             do

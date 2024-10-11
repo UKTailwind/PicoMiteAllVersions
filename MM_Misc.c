@@ -44,6 +44,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "hardware/pio_instructions.h"
 #include <malloc.h>
 #include "xregex.h"
+#include "hardware/structs/pwm.h"
 #ifdef USBKEYBOARD
 extern int caps_lock;
 extern int num_lock;
@@ -4026,10 +4027,12 @@ void MIPS16 cmd_option(void) {
                 Option.SYSTEM_CLK=pin1;
                 Option.SYSTEM_MOSI=pin2;
                 Option.SYSTEM_MISO=pin3;
+                MMPrintString("SPI channel 0 in use for SDcard\r\n");
 			} else if(PinDef[pin1].mode & SPI1SCK && PinDef[pin2].mode & SPI1TX  && PinDef[pin3].mode & SPI1RX  && !Option.SYSTEM_CLK){
                 Option.SYSTEM_CLK=pin1;
                 Option.SYSTEM_MOSI=pin2;
                 Option.SYSTEM_MISO=pin3;
+                MMPrintString("SPI channel 1 in use for SDcard\r\n");
 			} else {
 #endif
                 Option.SD_CLK_PIN=pin1;
@@ -4555,6 +4558,14 @@ void MIPS16 fun_info(void){
 			else iret=0;
 			targ=T_INT;
 			return;
+		} else if(checkstring(tp, (unsigned char *)"AUDIO")){
+            if(Option.AUDIO_L)strcpy((char *)sret,"PWM");
+            else if(Option.AUDIO_MISO_PIN)strcpy((char *)sret,"VS1053");
+            else if(Option.AUDIO_CLK_PIN)strcpy((char *)sret,"SPI");
+            else strcpy((char *)sret,"NONE");
+            CtoM(sret);
+            targ=T_STR;
+			return;
 		} else if(checkstring(tp, (unsigned char *)"BREAK")){
 			iret=BreakKey;
 			targ=T_INT;
@@ -4574,7 +4585,11 @@ void MIPS16 fun_info(void){
             targ=T_STR;
             return;
  		} else if(checkstring(tp, (unsigned char *)"KEYBOARD")){
+#ifdef USBKEYBOARD
+            strcpy((char *)sret,(char *)KBrdList[(int)Option.USBKeyboard]);
+#else
             strcpy((char *)sret,(char *)KBrdList[(int)Option.KeyboardConfig]);
+#endif
             CtoM(sret);
             targ=T_STR;
             return;
@@ -4648,14 +4663,22 @@ void MIPS16 fun_info(void){
             targ=T_INT;
             return;
         } else if((tp=checkstring(ep, (unsigned char *)"PWM COUNT"))){
+#ifdef rp2350
+            int channel=getint(tp,0,rp2350a? 7 : 11);
+#else
             int channel=getint(tp,0,7);
+#endif
             iret=pwm_hw->slice[channel].top;
             targ=T_INT;
             return;
         } else if((tp=checkstring(ep, (unsigned char *)"PWM DUTY"))){
             getargs(&tp,3,(unsigned char *)",");
             if(argc!=3)error("Syntax");
+#ifdef rp2350
+            int channel=getint(argv[0],0,rp2350a? 7 : 11);
+#else
             int channel=getint(argv[0],0,7);
+#endif
             int AorB=getint(argv[2],0,1);
             if(AorB)iret=((pwm_hw->slice[channel].cc) >> 16);
             else iret=(pwm_hw->slice[channel].cc & 0xFFFF);

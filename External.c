@@ -259,7 +259,7 @@ void PinSetBit(int pin, unsigned int offset) {
         return;
 	case TRISCLR:
         gpio_set_dir(PinDef[pin].GPno, GPIO_OUT);
-        gpio_set_drive_strength (PinDef[pin].GPno, GPIO_DRIVE_STRENGTH_12MA);
+        gpio_set_drive_strength (PinDef[pin].GPno, GPIO_DRIVE_STRENGTH_8MA);
         uSec(2);
         return;
 	case CNPUSET:
@@ -692,7 +692,7 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
 #endif
         case EXT_DIG_OUT:       if(!(PinDef[pin].mode & DIGITAL_OUT)) error("Invalid configuration");
                                 tris = 0; ana = 1; 
-                                gpio_set_drive_strength(PinDef[pin].GPno,GPIO_DRIVE_STRENGTH_12MA);
+                                gpio_set_drive_strength(PinDef[pin].GPno,GPIO_DRIVE_STRENGTH_8MA);
                                 break;
 #ifndef PICOMITEWEB
         case EXT_HEARTBEAT:     if(!(pin==43)) error("Invalid configuration");

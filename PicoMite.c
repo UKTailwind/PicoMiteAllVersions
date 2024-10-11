@@ -42,6 +42,7 @@ extern "C" {
 #include "hardware/structs/timer.h"
 #include "hardware/vreg.h"
 #include "hardware/structs/pads_qspi.h"
+#include "pico/unique_id.h"
 
 #ifdef USBKEYBOARD
     #include "tusb.h"
@@ -3622,9 +3623,7 @@ int MIPS16 main(){
 #endif
     set_sys_clock_khz(Option.CPU_Speed, false);
     PWM_FREQ=44100;
-#ifndef USBKEYBOARD
     pico_get_unique_board_id_string (id_out,12);
-#endif
 #ifdef rp2350
     if(Option.PSRAM_CS_PIN){
         gpio_set_function(PinDef[Option.PSRAM_CS_PIN].GPno, GPIO_FUNC_XIP_CS1); // CS for PSRAM
