@@ -119,11 +119,11 @@ int QVGA_VTOT;	// total scanlines (= QVGA_VSYNC + QVGA_VBACK + QVGA_VACT + QVGA_
     #endif
     #ifdef USBKEYBOARD
         #ifdef HDMI
-            #define MES_SIGNON  "\rPicoMiteHDMI MMBasic USB Edition " VERSION "\r\n"\
+            #define MES_SIGNON  "\rPicoMiteHDMI MMBasic USB " CHIP " Edition V"VERSION "\r\n"\
                                 "Copyright " YEAR " Geoff Graham\r\n"\
                                 "Copyright " YEAR2 " Peter Mather\r\n\r\n"
         #else
-            #define MES_SIGNON  "\rPicoMiteVGA MMBasic USB Edition " VERSION "\r\n"\
+            #define MES_SIGNON  "\rPicoMiteVGA MMBasic USB " CHIP " Edition V"VERSION "\r\n"\
                                 "Copyright " YEAR " Geoff Graham\r\n"\
                                 "Copyright " YEAR2 " Peter Mather\r\n\r\n"
         #endif
@@ -133,11 +133,11 @@ int QVGA_VTOT;	// total scanlines (= QVGA_VSYNC + QVGA_VBACK + QVGA_VACT + QVGA_
         bool USBenabled=false;
     #else
         #ifdef HDMI
-            #define MES_SIGNON  "\rPicoMiteHDMI MMBasic Version " VERSION "\r\n"\
+            #define MES_SIGNON  "\rPicoMiteHDMI MMBasic " CHIP " Edition V"VERSION "\r\n"\
                                 "Copyright " YEAR " Geoff Graham\r\n"\
                                 "Copyright " YEAR2 " Peter Mather\r\n\r\n"
         #else
-            #define MES_SIGNON  "\rPicoMiteVGA MMBasic Version " VERSION "\r\n"\
+            #define MES_SIGNON  "\rPicoMiteVGA MMBasic " CHIP " Edition V"VERSION "\r\n"\
                                 "Copyright " YEAR " Geoff Graham\r\n"\
                                 "Copyright " YEAR2 " Peter Mather\r\n\r\n"
         #endif
@@ -145,7 +145,7 @@ int QVGA_VTOT;	// total scanlines (= QVGA_VSYNC + QVGA_VBACK + QVGA_VACT + QVGA_
 
 #endif
 #ifdef PICOMITEWEB
-    #define MES_SIGNON  "\rWebMite MMBasic Version " VERSION "\r\n"\
+    #define MES_SIGNON  "\rWebMite MMBasic " CHIP " Edition V"VERSION "\r\n"\
                         "Copyright " YEAR " Geoff Graham\r\n"\
                         "Copyright " YEAR2 " Peter Mather\r\n\r\n"
     volatile int WIFIconnected=0;
@@ -157,7 +157,7 @@ int QVGA_VTOT;	// total scanlines (= QVGA_VSYNC + QVGA_VBACK + QVGA_VACT + QVGA_
     #ifdef USBKEYBOARD
         #include "tusb.h"
         #include "host/hcd.h"
-        #define MES_SIGNON  "\rPicoMite MMBasic USB Edition " VERSION "\r\n"\
+        #define MES_SIGNON  "\rPicoMite MMBasic USB " CHIP " Edition V"VERSION "\r\n"\
                             "Copyright " YEAR " Geoff Graham\r\n"\
                             "Copyright " YEAR2 " Peter Mather\r\n\r\n"
         extern void hid_app_task(void);
@@ -167,7 +167,7 @@ int QVGA_VTOT;	// total scanlines (= QVGA_VSYNC + QVGA_VBACK + QVGA_VACT + QVGA_
         #include "pico/multicore.h"
         mutex_t	frameBufferMutex;					// mutex to lock frame buffer
     #else
-        #define MES_SIGNON  "\rPicoMite MMBasic Version " VERSION "\r\n"\
+        #define MES_SIGNON  "\rPicoMite MMBasic " CHIP " Edition V"VERSION "\r\n"\
                             "Copyright " YEAR " Geoff Graham\r\n"\
                             "Copyright " YEAR2 " Peter Mather\r\n\r\n"
         #include "pico/multicore.h"
@@ -3610,10 +3610,13 @@ int MIPS16 main(){
     volatile uint32_t *qmi_m0_timing=(uint32_t *)0x400d000c;
     volatile uint32_t *qmi_m1_timing=(uint32_t *)0x400d0020;
 #endif
-    if(Option.CPU_Speed>200000 && Option.CPU_Speed<=300000 )vreg_set_voltage(VREG_VOLTAGE_1_25);  // Std default @ boot is 1_10
+    if(Option.CPU_Speed<=200000)vreg_set_voltage(VREG_VOLTAGE_1_10);
+    else if(Option.CPU_Speed>200000 && Option.CPU_Speed<=300000 )vreg_set_voltage(VREG_VOLTAGE_1_25);  // Std default @ boot is 1_10
     else if(Option.CPU_Speed>300000  && Option.CPU_Speed<=378000 )vreg_set_voltage(VREG_VOLTAGE_1_30);  // Std default @ boot is 1_10
 #ifdef rp2350
-    if(Option.CPU_Speed>=320000 && !rp2350a)vreg_set_voltage(VREG_VOLTAGE_1_50);  // Std default @ boot is 1_10
+    else vreg_set_voltage(VREG_VOLTAGE_1_40);  // Std default @ boot is 1_10
+#else
+    else vreg_set_voltage(VREG_VOLTAGE_1_30); 
 #endif
     sleep_ms(10);
 #ifdef rp2350
@@ -3751,14 +3754,44 @@ int MIPS16 main(){
         core1stack[0]=0x12345678;
     #endif
 #endif
+        strcpy((char *)inpbuf,MES_SIGNON); 
+#ifdef rp2350
+    #ifdef PICOMITEVGA
+        #ifdef HDMI
+            #ifdef USBKEYBOARD
+                inpbuf[32]=(rp2350a?'A':'B');
+            #else
+                inpbuf[28]=(rp2350a?'A':'B');
+            #endif
+        #else
+            #ifdef USBKEYBOARD
+                inpbuf[31]=(rp2350a?'A':'B');
+            #else
+                inpbuf[27]=(rp2350a?'A':'B');
+            #endif
+        #endif
+    #else
+        #ifdef USBKEYBOARD
+            inpbuf[28]=(rp2350a?'A':'B');
+        #else
+            inpbuf[24]=(rp2350a?'A':'B');
+        #endif
+    #endif
+#endif
     if(!(_excep_code == RESTART_NOAUTORUN || _excep_code == INVALID_CLOCKSPEED || _excep_code == WATCHDOG_TIMEOUT || (_excep_code==POSSIBLE_WATCHDOG && watchdog_caused_reboot()))){
         if(Option.Autorun==0 ){
-            if(!(_excep_code == RESET_COMMAND || _excep_code == SOFT_RESET))MMPrintString(MES_SIGNON); //MMPrintString(b);                                 // print sign on message
+            if(!(_excep_code == RESET_COMMAND || _excep_code == SOFT_RESET)){
+                MMPrintString((char *)inpbuf); // print sign on message
+                memset(inpbuf,0,STRINGSIZE);
+            }
         } else {
             if(Option.Autorun!=MAXFLASHSLOTS+1){
                 ProgMemory=(unsigned char *)(flash_target_contents+(Option.Autorun-1)*MAX_PROG_SIZE);
             }
-            if(*ProgMemory != 0x01 ) MMPrintString(MES_SIGNON); 
+            if(*ProgMemory != 0x01 ) {
+                MMPrintString((char *)inpbuf);
+                memset(inpbuf,0,STRINGSIZE);
+            }
         }
     }
     WatchdogSet = false;

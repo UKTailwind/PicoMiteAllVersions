@@ -358,7 +358,7 @@ void MIPS16 cmd_list(void) {
     	int ListCnt = 1;
     	step=Option.DISPLAY_CONSOLE ? HRes/gui_font_width/20 : 5;
         if(Option.DISPLAY_CONSOLE && (SPIREAD  || Option.NoScroll)){ClearScreen(gui_bcolour);CurrentX=0;CurrentY=0;}
-		int x=6;
+		int x=9;
 		char** c=GetTempMemory((TokenTableSize+x)*sizeof(*c)+(TokenTableSize+x)*18);
 		for(i=0;i<TokenTableSize+x;i++){
 				c[m]= (char *)((int)c + sizeof(char *) * (TokenTableSize+x) + m*18);
@@ -366,8 +366,10 @@ void MIPS16 cmd_list(void) {
 	   			else if(m==TokenTableSize)strcpy(c[m],"=>");
     			else if(m==TokenTableSize+1)strcpy(c[m],"=<");
     			else if(m==TokenTableSize+2)strcpy(c[m],"MM.Fontwidth");
-    			else if(m==TokenTableSize+3)strcpy(c[m],"MM.HPOS");
-    			else if(m==TokenTableSize+4)strcpy(c[m],"MM.VPOS");
+    			else if(m==TokenTableSize+3)strcpy(c[m],"MM.Fontheight");
+    			else if(m==TokenTableSize+4)strcpy(c[m],"MM.HPOS");
+    			else if(m==TokenTableSize+5)strcpy(c[m],"MM.VPOS");
+    			else if(m==TokenTableSize+6)strcpy(c[m],"MM.PS2");
     			else strcpy(c[m],"MM.Info$(");
 				m++;
 		}

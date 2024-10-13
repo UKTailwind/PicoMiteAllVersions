@@ -2766,7 +2766,9 @@ void MIPS16 error(char *msg, ...) {
 #endif
 
     LoadOptions();                                                  // make sure that the option struct is in a clean state
+    OptionConsole=1;
     if(Option.DISPLAY_CONSOLE) {
+        OptionConsole=3;
         #ifdef PICOMITEVGA
             WriteBuf=(unsigned char *)FRAMEBUFFER;
             DisplayBuf=(unsigned char *)FRAMEBUFFER;

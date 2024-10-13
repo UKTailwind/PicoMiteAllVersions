@@ -43,7 +43,7 @@ extern "C" {
                 #define HEAPTOP 0x2007C000
             #endif
             #define MAX_CPU     Freq720P 
-            #define MIN_CPU     252000
+            #define MIN_CPU     Freq480P
         #else
             #define MAXMODES 3
             #ifdef USBKEYBOARD

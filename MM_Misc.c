@@ -2791,6 +2791,7 @@ void MIPS16 cmd_option(void) {
         if(checkstring(tp,(unsigned char *) "BOTH"))OptionConsole=3;
         else if(checkstring(tp,(unsigned char *) "SERIAL"))OptionConsole=1;
         else if(checkstring(tp,(unsigned char *) "SCREEN"))OptionConsole=2;
+        else if(checkstring(tp,(unsigned char *) "NONE"))OptionConsole=0;
         else error("Syntax");
         return;
     }
@@ -3035,6 +3036,7 @@ void MIPS16 cmd_option(void) {
             Option.SerialRX=0;
             Option.SerialConsole = 0; 
             SaveOptions(); 
+            _excep_code = RESET_COMMAND;
             SoftReset();
             return;
         } else {
@@ -3060,6 +3062,7 @@ void MIPS16 cmd_option(void) {
             Option.SerialConsole = 1; 
             if(argc==5)Option.SerialConsole=(checkstring(argv[4],(unsigned char *)"B") ? 5: 1);
             SaveOptions(); 
+            _excep_code = RESET_COMMAND;
             SoftReset();
             return;
         checkcom2:
@@ -3073,6 +3076,7 @@ void MIPS16 cmd_option(void) {
             Option.SerialConsole = 2; 
             if(argc==5)Option.SerialConsole=(checkstring(argv[4],(unsigned char *)"B") ? 6: 2);
             SaveOptions(); 
+            _excep_code = RESET_COMMAND;
             SoftReset();
         }  
     }
@@ -3093,6 +3097,9 @@ void MIPS16 cmd_option(void) {
 #ifndef PICOMITEWEB
     tp = checkstring(cmdline, (unsigned char *)"PICO");
     if(tp) {
+#ifdef rp2350
+        if(!rp2350a)error("Invalid for RP2350B");
+#endif
         if(checkstring(tp, (unsigned char *)"OFF") || checkstring(tp, (unsigned char *)"DISABLE"))      Option.AllPins = 1; 
         else if(checkstring(tp, (unsigned char *)"ON") || checkstring(tp, (unsigned char *)"ENABLE"))      Option.AllPins = 0; 
         else error("Syntax");
@@ -3111,6 +3118,9 @@ void MIPS16 cmd_option(void) {
 #endif
     tp = checkstring(cmdline, (unsigned char *)"HEARTBEAT");
     if(tp) {
+#ifdef rp2350
+        if(!rp2350a)error("Invalid for RP2350B");
+#endif
         if(checkstring(tp, (unsigned char *)"OFF") || checkstring(tp, (unsigned char *)"DISABLE"))      Option.NoHeartbeat = 1; 
         else if(checkstring(tp, (unsigned char *)"ON") || checkstring(tp, (unsigned char *)"ENABLE"))      Option.NoHeartbeat = 0; 
         else error("Syntax");
@@ -3128,6 +3138,7 @@ void MIPS16 cmd_option(void) {
     }
     tp = checkstring(cmdline, (unsigned char *)"LCDPANEL NOCONSOLE");
     if(tp){
+   	    if(CurrentLinePtr) error("Invalid in a program");
         Option.Height = SCREENHEIGHT; Option.Width = SCREENWIDTH;
         Option.DISPLAY_CONSOLE = 0;
         Option.DefaultFC = WHITE;
@@ -3137,15 +3148,14 @@ void MIPS16 cmd_option(void) {
         Option.NoScroll=0;
         Option.Height = SCREENHEIGHT;
         Option.Width = SCREENWIDTH;
-        if(!CurrentLinePtr) {
-            SaveOptions();
-            setterminal(Option.Height,Option.Width);
-            ClearScreen(Option.DefaultBC);
-        }
+        SaveOptions();
+        setterminal(Option.Height,Option.Width);
+        ClearScreen(Option.DefaultBC);
         return;
     }
     tp = checkstring(cmdline, (unsigned char *)"LCDPANEL CONSOLE");
     if(tp) {
+   	    if(CurrentLinePtr) error("Invalid in a program");
         Option.NoScroll = 0;
         if(!(Option.DISPLAY_TYPE==ST7789B || Option.DISPLAY_TYPE==ILI9488 || Option.DISPLAY_TYPE==ILI9341 || Option.DISPLAY_TYPE>=VGADISPLAY))Option.NoScroll=1;
         if(!(Option.DISPLAY_ORIENTATION == DISPLAY_LANDSCAPE) && Option.DISPLAY_TYPE==SSDTYPE) error("Landscape only");
@@ -3332,16 +3342,11 @@ void MIPS16 cmd_option(void) {
         SoftReset();
         return;
     }
-#endif
      tp = checkstring(cmdline, (unsigned char *)"CPUSPEED");
     if(tp) {
    	    if(CurrentLinePtr) error("Invalid in a program");
         int CPU_Speed=getint(tp, MIN_CPU,MAX_CPU);
-#ifndef HDMI
         if(!(CPU_Speed==157500 || CPU_Speed==126000 || CPU_Speed==252000 || CPU_Speed==378000 || CPU_Speed==315000))error("CPU speed 126000, 157500, 252000, 315000 or 378000 only");
-#else
-        error("CPU speed is fixed for HDMI");
-#endif
         Option.CPU_Speed=CPU_Speed;
         Option.X_TILE=80;
         Option.Y_TILE=40;
@@ -3350,6 +3355,7 @@ void MIPS16 cmd_option(void) {
         SoftReset();
         return;
     }
+#endif
 
     tp = checkstring(cmdline, (unsigned char *)"DEFAULT MODE");
     if(tp) {
@@ -3589,6 +3595,10 @@ void MIPS16 cmd_option(void) {
 
     tp = checkstring(cmdline, (unsigned char *)"POWER");
     if(tp) {
+#ifdef rp2350
+        if(!rp2350a)error("Invalid for RP2350B");
+#endif
+        if(Option.AllPins)error("OPTION PICO set");
         if(checkstring(tp, (unsigned char *)"PWM"))  Option.PWM = true;
         if(checkstring(tp, (unsigned char *)"PFM"))  Option.PWM = false;
         SaveOptions();
