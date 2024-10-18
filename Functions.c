@@ -470,6 +470,39 @@ void fun_bin(void) {
     DoHexOctBin(2);
 }
 
+/*void fun_instr(void) {
+	unsigned char *s1 = NULL, *s2 = NULL;
+	int start = 0;
+	getargs(&ep, 5, (unsigned char *)",");
+
+	if(argc == 5) {
+		start = getint(argv[0], 1, MAXSTRLEN + 1) - 1;
+		s1 = getstring(argv[2]);
+		s2 = getstring(argv[4]);
+	}
+	else if(argc == 3) {
+		start = 0;
+		s1 = getstring(argv[0]);
+		s2 = getstring(argv[2]);
+	}
+	else
+		error("Argument count");
+
+    targ = T_INT;
+	if(start > *s1 - *s2 + 1 || *s2 == 0)
+		iret = 0;
+	else {
+		// find s2 in s1 using MMBasic strings
+		int i;
+		for(i = start; i < *s1 - *s2 + 1; i++) {
+			if(memcmp(s1 + i + 1, s2 + 1, *s2) == 0) {
+				iret = i + 1;
+				return;
+			}
+		}
+	}
+	iret = 0;
+}*/
 
 
 // syntax:  nbr = INSTR([start,] string1, string2)
@@ -477,22 +510,22 @@ void fun_bin(void) {
 // returns an integer
 void fun_instr(void) {
 	unsigned char *s1 = NULL, *s2 = NULL;
-	int start = 0, n = 0 ;
+	int t, start = 0, n = 0 ;
     unsigned char *ss;
     MMFLOAT f;
     long long int  i64;
 	getargs(&ep, 7, (unsigned char *)",");
 	if(!(argc==3 || argc==5 || argc==7))error("Syntax");
-    targ = T_NOTYPE;
-    evaluate(argv[0], &f, &i64, &ss, &targ, false);                   // get the value and type of the argument
-    if(targ & T_NBR){
+    t = T_NOTYPE;
+    evaluate(argv[0], &f, &i64, &ss, &t, false);                   // get the value and type of the argument
+    if(t & T_NBR){
         n=2;
 		start=getint(argv[0],0,255)-1;
-    } else if(targ & T_INT){
+    } else if(t & T_INT){
 		n=2;
 		start=getint(argv[0],0,255)-1;
-    } else if(targ & T_STR){
-
+    } else if(t & T_STR){
+		n=0;
 	} else error("Syntax");
 	if(argc < (n==2 ? 7 : 5)){
 		s1 = getstring(argv[0+n]);
@@ -512,6 +545,7 @@ void fun_instr(void) {
 		}
 		iret = 0;
 	} else {
+		printf("Regex\r\n");
 		regex_t regex;
 		int reti;
 		regmatch_t pmatch;
@@ -766,6 +800,7 @@ void fun_val(void) {
 
 void fun_eval(void) {
     unsigned char *s, *st, *temp_tknbuf;
+	int t;
     temp_tknbuf = GetTempMemory(STRINGSIZE);
     strcpy((char *)temp_tknbuf, (char *)tknbuf);                                    // first save the current token buffer in case we are in immediate mode
     // we have to fool the tokeniser into thinking that it is processing a program line entered at the console
@@ -777,12 +812,13 @@ void fun_eval(void) {
 	multi=false;
     tokenise(true);                                                 // and tokenise it (the result is in tknbuf)
   	strcpy((char *)st, (char *)(tknbuf + 2 + sizeof(CommandToken)));
-    targ = T_NOTYPE;
-    evaluate(st, &fret, &iret, &s, &targ, false);                   // get the value and type of the argument
-    if(targ & T_STR) {
+    t = T_NOTYPE;
+    evaluate(st, &fret, &iret, &s, &t, false);                   // get the value and type of the argument
+    if(t & T_STR) {
         Mstrcpy(st, s);                                             // if it is a string then save it
         sret = st;
     }
+	targ=t;
     strcpy((char *)tknbuf, (char *)temp_tknbuf);                                    // restore the saved token buffer
 }
 

@@ -114,7 +114,7 @@ extern "C" {
         #define HEAP_MEMORY_SIZE (256*1024) 
         #define MAXVARS             768                     // 8 + MAXVARLEN + MAXDIM * 2  (ie, 56 bytes) - these do not incl array members
         #define FLASH_TARGET_OFFSET (768 * 1024) 
-        #define MAX_CPU     378000
+        #define MAX_CPU     396000
         #define MAXSUBFUN           512                     // each entry takes up 4 bytes
         #ifdef USBKEYBOARD
             #define MagicKey 0x15486342

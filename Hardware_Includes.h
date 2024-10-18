@@ -267,7 +267,7 @@ typedef struct tagMTRand {
 
 void seedRand(unsigned long seed);
 unsigned long genRandLong(MTRand* rand);
-double genRand(MTRand* rand);
+MMFLOAT genRand(MTRand* rand);
 extern struct tagMTRand *g_myrand;
 #if defined(MSVCC)
 #define mkdir _mkdir

@@ -238,7 +238,7 @@ void SoftReset(void){
 	watchdog_enable(1, 1);
 	while(1);
 }
-void PinSetBit(int pin, unsigned int offset) {
+void __not_in_flash_func(PinSetBit)(int pin, unsigned int offset) {
 	switch (offset){
 	case LATCLR:
 		gpio_set_pulls(PinDef[pin].GPno,false,false);
@@ -255,10 +255,12 @@ void PinSetBit(int pin, unsigned int offset) {
 		return;
 	case TRISSET:
         gpio_set_dir(PinDef[pin].GPno, GPIO_IN);
+	    gpio_set_input_enabled(PinDef[pin].GPno, true);
         uSec(2);
         return;
 	case TRISCLR:
         gpio_set_dir(PinDef[pin].GPno, GPIO_OUT);
+        gpio_set_input_enabled(PinDef[pin].GPno, false);
         gpio_set_drive_strength (PinDef[pin].GPno, GPIO_DRIVE_STRENGTH_8MA);
         uSec(2);
         return;
@@ -2384,7 +2386,7 @@ void LCD_Byte(int Data, int Flag, int Wait_uSec) {
 void LcdPinSet(int pin, int val) {
     PinSetBit(pin, val ? LATSET : LATCLR);
 }
-int64_t __not_in_flash_func(DHmem)(int pin){
+int64_t DHmem(int pin){
     int timeout = 400;
     long long int r;
     int i;

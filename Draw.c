@@ -1872,7 +1872,6 @@ void cmd_line(void) {
 		} else {
             long long int *x1ptr, *y1ptr, *x2ptr, *y2ptr, *wptr, *cptr;
             MMFLOAT *x1fptr, *y1fptr, *x2fptr, *y2fptr, *wfptr, *cfptr;
-            
             getargs(&cmdline, 11,(unsigned char *)",");
             if(!(argc & 1) || argc < 3) error("Argument count");
             getargaddress(argv[0], &x1ptr, &x1fptr, &n);
@@ -1893,6 +1892,10 @@ void cmd_line(void) {
                 if(argc>=7 && *argv[6])y2 = getinteger(argv[6]);
                 else {
                     y2=CurrentY;CurrentY=y1;
+                }
+                if(x1==CurrentX && y1==CurrentY){
+                    CurrentX=x2;
+                    CurrentY=y2;
                 }
                 if(argc > 7 && *argv[8]){
                     w = getint(argv[8], 1, 100);
@@ -4831,7 +4834,7 @@ void fun_sprite(void) {
     else if (t == 7) {
         int rbnbr = 0;
         int x1 = 0, y1 = 0, h1 = 0, w1 = 0;
-        double vector;
+        MMFLOAT vector;
         if (argc < 5)error((char *)"Syntax");
         if (*argv[4] == '#') argv[4]++;
         rbnbr = (int)getint(argv[4], 1, MAXBLITBUF);
@@ -8979,11 +8982,11 @@ Widescreen:
             } else error("Syntax");
         }
         if(d!=s)
-//            #ifdef rp2350
-//                _Z10copy_wordsPKmPmm((uint32_t *)s, (uint32_t *)d, ScreenSize>>2);
-//            #else
+            #ifdef rp2350
+                _Z10copy_wordsPKmPmm((uint32_t *)s, (uint32_t *)d, ScreenSize>>2);
+            #else
                 memcpy(d,s,ScreenSize);
-//            #endif
+            #endif
         else error("Buffer not created");
     } else error("Syntax");
 }

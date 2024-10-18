@@ -358,7 +358,7 @@ void MIPS16 cmd_list(void) {
     	int ListCnt = 1;
     	step=Option.DISPLAY_CONSOLE ? HRes/gui_font_width/20 : 5;
         if(Option.DISPLAY_CONSOLE && (SPIREAD  || Option.NoScroll)){ClearScreen(gui_bcolour);CurrentX=0;CurrentY=0;}
-		int x=9;
+		int x=8;
 		char** c=GetTempMemory((TokenTableSize+x)*sizeof(*c)+(TokenTableSize+x)*18);
 		for(i=0;i<TokenTableSize+x;i++){
 				c[m]= (char *)((int)c + sizeof(char *) * (TokenTableSize+x) + m*18);
@@ -599,11 +599,7 @@ void MIPS16 cmd_clear(void) {
 }
 
 
-#ifdef PICOMITEWEB
 void cmd_goto(void) {
-#else
-void __no_inline_not_in_flash_func(cmd_goto)(void) {
-#endif
 	if(isnamestart(*cmdline))
 		nextstmt = findlabel(cmdline);								// must be a label
 	else

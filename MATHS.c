@@ -30,7 +30,7 @@ MMFLOAT PI;
 typedef MMFLOAT complex cplx;
 typedef float complex fcplx;
 void cmd_FFT(unsigned char *pp);
-const double chitable[51][15]={
+const MMFLOAT chitable[51][15]={
 		{0.995,0.99,0.975,0.95,0.9,0.5,0.2,0.1,0.05,0.025,0.02,0.01,0.005,0.002,0.001},
 		{0.0000397,0.000157,0.000982,0.00393,0.0158,0.455,1.642,2.706,3.841,5.024,5.412,6.635,7.879,9.550,10.828},
 		{0.0100,0.020,0.051,0.103,0.211,1.386,3.219,4.605,5.991,7.378,7.824,9.210,10.597,12.429,13.816},
@@ -156,8 +156,8 @@ unsigned long genRandLong(MTRand* rand) {
 /**
  * Generates a pseudo-randomly generated double in the range [0..1].
  */
-double genRand(MTRand* rand) {
-  return((double)genRandLong(rand) / (unsigned long)0xffffffff);
+MMFLOAT genRand(MTRand* rand) {
+  return((MMFLOAT)genRandLong(rand) / (unsigned long)0xffffffff);
 }
 
 MMFLOAT determinant(MMFLOAT **matrix,int size);

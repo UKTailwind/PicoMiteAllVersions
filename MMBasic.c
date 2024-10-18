@@ -1282,11 +1282,10 @@ void __not_in_flash_func(*DoExpression)(unsigned char *p, int *t) {
 //  if *t = T_STR or T_NBR or T_INT will throw an error if the result is not the correct type
 //  if *t = T_NOTYPE it will not throw an error and will return the type found in *t
 // this will check that the expression is terminated correctly and throw an error if not.  flags & E_NOERROR will suppress that check
-unsigned char __not_in_flash_func(*evaluate)(unsigned char *p, MMFLOAT *fa, long long int  *ia, unsigned char **sa, int *ta, int flags) {
+unsigned char MIPS16 __not_in_flash_func(*evaluate)(unsigned char *p, MMFLOAT *fa, long long int  *ia, unsigned char **sa, int *ta, int flags) {
     int o;
     int t = *ta;
     unsigned char *s;
-
     p = getvalue(p, fa, ia, &s, &o, &t);                            // get the left hand side of the expression, the operator is returned in o
     while(o != E_END) p = doexpr(p, fa, ia, &s, &o, &t);            // get the right hand side of the expression and evaluate the operator in o
 
@@ -3474,7 +3473,7 @@ void __not_in_flash_func(Mstrcpy)(unsigned char *dest, unsigned char *src) {
 
 
 // concatenate two MMBasic strings
-void __not_in_flash_func(Mstrcat)(unsigned char *dest, unsigned char *src) {
+void Mstrcat(unsigned char *dest, unsigned char *src) {
     int i;
     i = *src;
     *dest += i;
@@ -3486,7 +3485,7 @@ void __not_in_flash_func(Mstrcat)(unsigned char *dest, unsigned char *src) {
 
 // compare two MMBasic style strings
 // returns 1 if s1 > s2  or  0 if s1 = s2  or  -1 if s1 < s2
-int __not_in_flash_func(Mstrcmp)(unsigned char *s1, unsigned char *s2) {
+int Mstrcmp(unsigned char *s1, unsigned char *s2) {
     register int i;
     register unsigned char *p1, *p2;
 

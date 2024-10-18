@@ -3782,7 +3782,6 @@ int MIPS16 main(){
         if(Option.Autorun==0 ){
             if(!(_excep_code == RESET_COMMAND || _excep_code == SOFT_RESET)){
                 MMPrintString((char *)inpbuf); // print sign on message
-                memset(inpbuf,0,STRINGSIZE);
             }
         } else {
             if(Option.Autorun!=MAXFLASHSLOTS+1){
@@ -3790,10 +3789,10 @@ int MIPS16 main(){
             }
             if(*ProgMemory != 0x01 ) {
                 MMPrintString((char *)inpbuf);
-                memset(inpbuf,0,STRINGSIZE);
             }
         }
     }
+    memset(inpbuf,0,STRINGSIZE);
     WatchdogSet = false;
     if(_excep_code == INVALID_CLOCKSPEED) {
         MMPrintString("\r\n\nInvalid clock speed - reset to default\r\n");
@@ -3868,7 +3867,10 @@ int MIPS16 main(){
     SPIatRisk=((Option.DISPLAY_TYPE>I2C_PANEL && Option.DISPLAY_TYPE<BufferedPanel) && Option.SD_CLK_PIN==0);
 #endif
         PrepareProgram(true);
-        if(FindSubFun((unsigned char *)"MM.STARTUP", 0) >= 0) ExecuteProgram((unsigned char *)"MM.STARTUP\0");
+        if(FindSubFun((unsigned char *)"MM.STARTUP", 0) >= 0) {
+            ExecuteProgram((unsigned char *)"MM.STARTUP\0");
+            memset(inpbuf,0,STRINGSIZE);
+        }
         if(Option.Autorun && _excep_code != RESTART_DOAUTORUN) {
             ClearRuntime();
             PrepareProgram(true);

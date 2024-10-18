@@ -607,8 +607,8 @@ void fun_map(void);
 	{ (unsigned char *)"Json$(",		T_FUN | T_STR,          0, fun_json		},
 #endif
 #ifdef PICOMITE
-	  { (unsigned char *)"MsgBox(",        T_FUN | T_INT,              0, fun_msgbox     },
-	  { (unsigned char *)"CtrlVal(",       T_FUN | T_NBR | T_STR,      0, fun_ctrlval    },
+//	  { (unsigned char *)"MsgBox(",        T_FUN | T_INT,              0, fun_msgbox     },
+//	  { (unsigned char *)"CtrlVal(",       T_FUN | T_NBR | T_STR,      0, fun_ctrlval    },
 #endif
     { (unsigned char *)"",   0,                  0, cmd_null,    }                   // this dummy entry is always at the end
 #endif
