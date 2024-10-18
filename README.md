@@ -1,5 +1,5 @@
 # PicoMiteRP2350
-This contains files to build MMbasic V6.00.00RC8 to run on both RP2040 and RP2350
+This contains files to build MMbasic V6.00.00RC9 to run on both RP2040 and RP2350
 
 Change CMakeLists.txt line 4 to determine which variant to build<br>
 <br>
