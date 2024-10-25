@@ -1017,6 +1017,14 @@ static inline bool is_specific(uint8_t dev_addr)
   return ( (vid == 0x810 && pid == 0xE501)    // EasySMX Wireless, u, Android mode (u)		 
          );
 }
+static inline bool is_generic(uint8_t dev_addr)
+{
+  uint16_t vid, pid;
+  tuh_vid_pid_get(dev_addr, &vid, &pid);
+  return ( (vid == 0x810 && pid == 0xE501)    // EasySMX Wireless, u, Android mode (u)		 
+		   || (vid == 2079 && pid == 58369) // EasySMX Wireless, c, PC Mode, D-input, emulation
+         );
+}
 void process_xbox(uint8_t const* report, uint16_t len, uint8_t n)
 {
 	//PInt(len);
@@ -1329,8 +1337,14 @@ void hid_app_task(void)
 // can be used to parse common/simple enough descriptor.
 // Note: if report descriptor length > CFG_TUH_ENUMERATION_BUFSIZE, it will be skipped
 // therefore report_desc = NULL, desc_len = 0
-int FindFreeSlot(void){
-	for(int i=0;i<4;i++){
+int FindFreeSlot(uint8_t itf_protocol){
+	if ( itf_protocol == HID_ITF_PROTOCOL_KEYBOARD && !HID[0].active) return 0;
+	if ( itf_protocol == HID_ITF_PROTOCOL_MOUSE && !HID[1].active) return 1;
+	if ( itf_protocol == HID_ITF_PROTOCOL_NONE){
+		if(!HID[2].active) return 2;
+		if(!HID[3].active) return 3;
+	}
+	for(int i=3;i>=0;i--){
 		if(!HID[i].active)return i;
 	}
 	return -1;
@@ -1344,12 +1358,14 @@ int FindFreeSlot(void){
 void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance, uint8_t const* desc_report, uint16_t desc_len)
 {
 	__dsb();
-//  uint16_t pid,vid;
+  uint16_t pid,vid;
   uint8_t itf_protocol = tuh_hid_interface_protocol(dev_addr, instance);
 //  PInt(itf_protocol);
-//  tuh_vid_pid_get(dev_addr, &vid, &pid);
-  int slot=FindFreeSlot();
+  tuh_vid_pid_get(dev_addr, &vid, &pid);
+  int slot=FindFreeSlot(itf_protocol);
   if(slot==-1)error("USB device limit reached");
+  HID[slot].vid=vid;
+  HID[slot].pid=pid;
 //  char buff[STRINGSIZE];
 //  PIntHC(vid);PIntHC(pid);PRet();
 //  sprintf(buff,"HID device address = %d, instance = %d is mounted\r\n", dev_addr, instance);
@@ -1451,7 +1467,7 @@ void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance, uint8_t const* desc_re
 			HID[slot].report_timer=-(10+(slot+2)*500);
 			HID[slot].active=true;
 		 	HID[slot].report_requested=false;
-		} else {
+		} else if ( is_generic(dev_addr) ) {
 			if(!CurrentLinePtr) {MMPrintString("Generic Gamepad Connected on channel ");PInt(slot+1);MMPrintString("\r\n> ");}
 			HID[slot].Device_address = dev_addr;
 			HID[slot].Device_instance = instance;
@@ -1461,7 +1477,7 @@ void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance, uint8_t const* desc_re
 			HID[slot].Device_type=SNES;
 			HID[slot].active=true;
 			HID[slot].report_requested=false;
-		}
+		} else return;
 	}
 	Current_USB_devices++;
 }

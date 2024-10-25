@@ -166,6 +166,7 @@ New, more portable, method of manipulating an I/O pin
 #define EXT_PIO0_OUT      55
 #define EXT_PIO1_OUT      56
 #define EXT_PIO2_OUT      57
+#define EXT_FAST_TIMER    58
 #else
 #define EXT_PIO0_OUT      47
 #define EXT_PIO1_OUT      48

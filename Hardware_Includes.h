@@ -141,6 +141,8 @@ typedef struct s_HID {
 	uint8_t Device_type;
 	uint8_t report_rate;
 	int16_t report_timer;
+	uint16_t vid;
+	uint16_t pid;
 	bool active;
 	bool report_requested;
 	bool notfirsttime;

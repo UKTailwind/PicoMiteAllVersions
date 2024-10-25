@@ -1594,7 +1594,7 @@ void MIPS16 __not_in_flash_func(cmd_return)(void) {
 
 
 
-void __not_in_flash_func(cmd_endfun)(void) {
+void cmd_endfun(void) {
  	checkend(cmdline);
 	if(gosubindex == 0 || gosubstack[gosubindex - 1] != NULL) error("Nothing to return to");
 	nextstmt = (unsigned char *)"\0\0\0";                                            // now terminate this run of ExecuteProgram()

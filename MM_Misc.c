@@ -2208,6 +2208,8 @@ void MIPS16 configure(unsigned char *p){
 #else
 #ifdef USBKEYBOARD
             MMPrintString("HDMIUSB\r\n");
+            MMPrintString("OLIMEX USB\r\n");
+            MMPrintString("PICO COMPUTER\r\n");
 #else
             MMPrintString("OLIMEX\r\n");
             MMPrintString("HDMIBasic\r\n");
@@ -2420,9 +2422,10 @@ OPTION RTC AUTO ENABLE
 OPTION MODBUFF ENABLE  192
 OPTION PLATFORM HDMIUSB
 */
-        if(checkstring(p,(unsigned char *) "HDMIUSB"))  {
+        if(checkstring(p,(unsigned char *) "HDMIUSB") || checkstring(p,(unsigned char *) "PICO COMPUTER") )  {
             ResetOptions();
-            strcpy((char *)Option.platform,"HDMIUSB");
+            if(checkstring(p,(unsigned char *) "HDMIUSB") )strcpy((char *)Option.platform,"HDMIUSB");
+            else strcpy((char *)Option.platform,"PICO COMPUTER");
             Option.ColourCode = 1;
             Option.CPU_Speed =Freq480P;
             Option.SD_CS=PINMAP[22];
@@ -2440,6 +2443,31 @@ OPTION PLATFORM HDMIUSB
             Option.SerialTX=PINMAP[8];
             Option.SerialRX=PINMAP[9];
             Option.SerialConsole=2;
+            SaveOptions();
+            printoptions();uSec(100000);
+            _excep_code = RESET_COMMAND;
+            SoftReset();
+        }
+        if(checkstring(p,(unsigned char *) "OLIMEXUSB"))  {
+            ResetOptions();
+            strcpy((char *)Option.platform,"OLIMEXUSB");
+            Option.ColourCode = 1;
+            Option.AUDIO_L=PINMAP[26];
+            Option.AUDIO_R=PINMAP[27];
+            Option.modbuffsize=192;
+            Option.modbuff = true; 
+            Option.AUDIO_SLICE=checkslice(PINMAP[26],PINMAP[27], 0);
+            Option.SD_CS=PINMAP[22];
+            Option.SD_CLK_PIN=PINMAP[6];
+            Option.SD_MOSI_PIN=PINMAP[7];
+            Option.SD_MISO_PIN=PINMAP[4];
+            Option.HDMIclock=1;
+            Option.HDMId0=3;
+            Option.HDMId1=7;
+            Option.HDMId2=5;
+            Option.SerialTX=PINMAP[0];
+            Option.SerialRX=PINMAP[1];
+            Option.SerialConsole=1;
             SaveOptions();
             printoptions();uSec(100000);
             _excep_code = RESET_COMMAND;
@@ -4486,6 +4514,18 @@ void MIPS16 fun_info(void){
     } 
 #endif
 #ifdef USBKEYBOARD
+    else if((tp=checkstring(ep, (unsigned char *)"USB VID"))){
+        int n=getint((unsigned char *)tp,1,4);
+        iret=HID[n-1].vid;
+        targ=T_INT;
+        return;
+    }
+    else if((tp=checkstring(ep, (unsigned char *)"USB PID"))){
+        int n=getint((unsigned char *)tp,1,4);
+        iret=HID[n-1].pid;
+        targ=T_INT;
+        return;
+    }
     else if((tp=checkstring(ep, (unsigned char *)"USB"))){
         int n=getint((unsigned char *)tp,0,4);
         if(n==0)iret=Current_USB_devices;

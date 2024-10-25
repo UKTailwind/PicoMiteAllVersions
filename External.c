@@ -87,20 +87,24 @@ const char *PinFunction[] = {
         "PWM6B",
         "PWM7A",
         "PWM7B",
+        "ADCRAW",
 #ifdef rp2350
-        "PWM8A"
-        "PWM8B"
-        "PWM9A"
-        "PWM9B"
-        "PWM10A"
-        "PWM10B"
-        "PWM11A"
-        "PWM11B"
+        "PWM8A",
+        "PWM8B",
+        "PWM9A",
+        "PWM9B",
+        "PWM10A",
+        "PWM10B",
+        "PWM11A",
+        "PWM11B",
 #endif
         "PIO0",
-        "PIO1"
 #ifdef rp2350
-        "PIO2"
+        "PIO1",
+        "PIO2",
+        "FFIN"
+#else
+        "PIO1"
 #endif
 };
 ;
@@ -166,6 +170,8 @@ uint8_t I2C0SCLpin=99;
 uint8_t slice0=0,slice1=0,slice2=0,slice3=0,slice4=0,slice5=0,slice6=0,slice7=0;
 #ifdef rp2350
 uint8_t slice8=0,slice9=0,slice10=0,slice11=0;
+bool fast_timer_active=false;
+volatile uint64_t INT5Count, INT5Value, INT5InitTimer, INT5Timer;
 #endif
 bool dmarunning=false;
 bool ADCDualBuffering=false;
@@ -229,6 +235,14 @@ int codecheck(unsigned char *line){
 	} else return 4;
 	return 0;
 }
+#ifdef rp2350
+void __not_in_flash_func(on_pwm_wrap_1)(void) {
+    pwm_clear_irq(0);
+    INT5Count++;
+}
+
+#endif
+
 void SoftReset(void){
     _excep_code = SOFT_RESET;
 #ifdef USBKEYBOARD
@@ -321,7 +335,6 @@ void __not_in_flash_func(ExtSet)(int pin, int val){
         if(pin == Option.INT2pin) INT2Count=val;
         if(pin == Option.INT3pin) INT3Count=val;
         if(pin == Option.INT4pin) INT4Count=val;
-
     }
     else
         error("Pin %/| is not an output",pin,pin);
@@ -453,6 +466,12 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
         else gpio_set_irq_enabled(PinDef[pin].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
         CallBackEnabled &= (~16);
     }
+    #ifdef rp2350
+    if(pin==FAST_TIMER_PIN && ExtCurrentConfig[pin]==EXT_FAST_TIMER){
+        slice0=0;
+        pwm_set_irq1_enabled(0, false);
+    }
+    #endif
  
 
     // make sure any pullups/pulldowns are removed in case we are changing from a digital input
@@ -617,7 +636,7 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
                                     if(cfg==EXT_CNT_IN && option>=3)edge = GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE;
                                     if(option==1 || option==4)gpio_pull_down (PinDef[pin].GPno);
                                     if(option==2 || option==5)gpio_pull_up (PinDef[pin].GPno);
-                                    irq_set_priority(13,0);
+                                    irq_set_priority(IO_IRQ_BANK0,0);
                                     PinSetBit(pin,TRISSET);
                                     if(pin == Option.INT1pin) {
                                     if(!CallBackEnabled){
@@ -761,6 +780,8 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
         case EXT_PWM2A:         if(!(PinDef[pin].mode & PWM2A)) error("Invalid configuration");
                                 if((PWM2Apin!=99 && PWM2Apin!=pin)) error("Already Set to pin %",PWM2Apin);
                                 PWM2Apin=pin;
+                                gpio_set_drive_strength (PinDef[pin].GPno, GPIO_DRIVE_STRENGTH_8MA);
+                                gpio_set_slew_rate(PinDef[pin].GPno,GPIO_SLEW_RATE_FAST);
                                 break;
         case EXT_PWM3A:         if(!(PinDef[pin].mode & PWM3A)) error("Invalid configuration");
                                 if((PWM3Apin!=99 && PWM3Apin!=pin)) error("Already Set to pin %",PWM3Apin);
@@ -849,6 +870,27 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
                                 if((PWM11Bpin!=99 && PWM11Bpin!=pin)) error("Blready Set to pin %",PWM11Bpin);
                                 PWM11Bpin=pin;
                                 break;
+        case EXT_FAST_TIMER:    if(!(PinDef[pin].mode & PWM0B)) error("Invalid configuration");
+                                if((PWM0Bpin!=99 && PWM0Bpin!=pin)) error("Already Set to pin %",PWM0Bpin);
+                                PWM0Bpin=pin;
+                                INT5Count = INT5Value = 0;
+                                INT5Timer = INT5InitTimer = option;  // only used for frequency and period measurement
+                                tris = 1; ana = 1;
+//                                PinSetBit(pin,TRISSET);
+                                gpio_set_input_hysteresis_enabled(PinDef[pin].GPno,true);
+                                gpio_set_function(PinDef[pin].GPno, GPIO_FUNC_PWM);
+                                pwm_config cfg = pwm_get_default_config();
+                                pwm_config_set_clkdiv_mode(&cfg, PWM_DIV_B_RISING);
+                                pwm_config_set_clkdiv(&cfg, 1);
+                                pwm_init(0, &cfg, false);
+                                pwm_set_wrap(0, 49999);
+                                pwm_clear_irq(0);
+                                irq_set_exclusive_handler(PWM_IRQ_WRAP_1, on_pwm_wrap_1);
+                                irq_set_enabled(PWM_IRQ_WRAP_1, true);
+                                irq_set_priority(PWM_IRQ_WRAP_1,0);
+	                            pwm_set_irq1_enabled(0, true);
+                                pwm_set_enabled(0, true);
+                                break;
 #endif
         case EXT_I2C0SDA:       if(!(PinDef[pin].mode & I2C0SDA)) error("Invalid configuration");
                                 if(I2C0locked)error("I2C in use for SYSTEM I2C");
@@ -902,8 +944,14 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
 #endif
     uSec(2);
 }
+extern int adc_clk_div;
 int64_t __not_in_flash_func(ExtInp)(int pin){
     if(ExtCurrentConfig[pin]==EXT_ANA_IN || ExtCurrentConfig[pin]==EXT_ADCRAW){
+        if(adc_clk_div!=adc_hw->div){
+            float div=((ADC_CLK_SPEED/96.0)/500000.0*96.000);
+            adc_set_clkdiv(div);
+        }
+
         if(last_adc!=pin){
             last_adc=pin;
             adc_select_input(PinDef[pin].ADCpin);
@@ -980,6 +1028,10 @@ void MIPS16 cmd_setpin(void) {
         value = EXT_PWM6A;
     else if(checkstring(argv[2], (unsigned char *)"PWM7A"))
         value = EXT_PWM7A;
+#ifdef rp2350
+    else if(checkstring(argv[2], (unsigned char *)"FFIN"))
+        value = EXT_FAST_TIMER;
+#endif
 #ifdef rp2350
     else if(checkstring(argv[2], (unsigned char *)"PWM8A"))
         value = EXT_PWM8A;
@@ -1188,10 +1240,21 @@ process:
                                 option = 1;
                             break;
         case EXT_CNT_IN:   if(argc == 5)
-                                option = getint((argv[4]), 1, 5);
+                                option = getint((argv[4]), 1, 10);
                             else
                                 option = 1;
                             break;
+#ifdef rp2350
+        case EXT_FAST_TIMER:    if(pin!=FAST_TIMER_PIN)error("Use pin2/GP1 for fast counter");
+                            if(BacklightSlice==0)error("Channel in use for backlight");
+                            if(Option.AUDIO_SLICE==0)error("Channel in use for Audio");
+                            if(CameraSlice==0)error("Channel in use for Camera");
+                            if(argc == 5)
+                                option = getint((argv[4]), 1, 100000);
+                            else
+                                option = 1000;
+                            break;
+#endif
         case EXT_DIG_OUT:
         case EXT_HEARTBEAT:   
                             option=0;
@@ -1307,6 +1370,12 @@ void fun_pin(void) {
                             iret = ExtInp(pin);
                             targ = T_INT;
                             return;
+#ifdef rp2350
+        case EXT_FAST_TIMER:
+                            fret = (MMFLOAT)INT5Value  * (MMFLOAT)1000.0 / (MMFLOAT)INT5InitTimer;
+                            targ = T_NBR;
+                            return;
+#endif
         case EXT_PER_IN:	// if period measurement get the count and average it over the number of cycles
                             if(pin == Option.INT1pin) fret = (MMFLOAT)ExtInp(pin) / (MMFLOAT)INT1InitTimer;
                             else if(pin == Option.INT2pin)  fret = (MMFLOAT)ExtInp(pin) / (MMFLOAT)INT2InitTimer;
@@ -1944,6 +2013,7 @@ void MIPS16 cmd_pwm(void){
     int CPU_Speed=frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_PERI);
 #ifdef rp2350
     int slice=getint(argv[0],0,rp2350a ? 7:11);
+    if(slice==0 && ExtCurrentConfig[FAST_TIMER_PIN]==EXT_FAST_TIMER)error("Channel in use for fast frequency");
 #else
     int slice=getint(argv[0],0,7);
 #endif
@@ -2010,6 +2080,9 @@ void MIPS16 cmd_pwm(void){
     pwm_set_phase_correct(slice,(phase==2? true : false));
     if(slice==0 && PWM0Apin==99 && duty1>=0.0)error("Pin not set for PWM");
     if(slice==0 && PWM0Bpin==99 && duty2>=0.0)error("Pin not set for PWM");
+#ifdef rp2350
+    if(slice==0 && fast_timer_active)error("Channel 0 in use for fast timer");
+#endif
     if(slice==1 && PWM1Apin==99 && duty1>=0.0)error("Pin not set for PWM");
     if(slice==1 && PWM1Bpin==99 && duty2>=0.0)error("Pin not set for PWM");
     if(slice==2 && PWM2Apin==99 && duty1>=0.0)error("Pin not set for PWM");
@@ -2865,7 +2938,7 @@ void cmd_adc(void){
         int nbr=getint(argv[2],1,4); //number of ADC channels
 #endif
         frequency=(float)getnumber(argv[0])*nbr;
-        if(frequency<48000000.0/65536.0 || frequency> 48000000.0/96.0)error("Invalid frequency");
+        if(frequency<ADC_CLK_SPEED/65536.0 || frequency> ADC_CLK_SPEED/96.0)error("Invalid frequency");
 #ifdef rp2350
 if(rp2350a){
         if(!(ExtCurrentConfig[31] == EXT_ANA_IN || ExtCurrentConfig[31] == EXT_NOT_CONFIG)) error("Pin GP26 is not off or an ADC input");
@@ -2964,7 +3037,7 @@ if(rp2350a){
             false,   // We won't see the ERR bit because of 8 bit reads; disable.
             true     // Shift each sample to 8 bits when pushing to FIFO
         );
-        float div=(500000.0/frequency*96.000);
+        float div=((ADC_CLK_SPEED/96.0)/frequency*96.000);
         if(div==96.0)div=0;
         adcint=adcint1;
         adc_set_clkdiv(div);
@@ -3014,7 +3087,7 @@ if(rp2350a){
         getargs(&tp,1,(unsigned char *)",");
         if(!ADCopen)error("Not open");
         float localfrequency=(float)getnumber(argv[0])*ADCopen;
-        if(localfrequency<48000000.0/65536.0 || localfrequency> 48000000.0/96.0)error("Invalid frequency");
+        if(localfrequency<ADC_CLK_SPEED/65536.0 || localfrequency> ADC_CLK_SPEED/96.0)error("Invalid frequency");
         frequency=localfrequency;
 		return;
 	}
@@ -3079,7 +3152,7 @@ if(rp2350a){
             false,   // We won't see the ERR bit because of 8 bit reads; disable.
             false     // Shift each sample to 8 bits when pushing to FIFO
         );
-        float div=(500000.0/frequency*96.000);
+        float div=((ADC_CLK_SPEED/96.0)/frequency*96.000);
         if(div==96.0)div=0;
         adc_set_clkdiv(div);
         // Set up the DMA to start transferring data as soon as it appears in FIFO
@@ -3132,7 +3205,8 @@ if(rp2350a){
         dma_channel_abort(ADC_dma_chan);
         dma_channel_abort(ADC_dma_chan2);
         adc_set_round_robin(0);
-        adc_set_clkdiv(0);
+        float div=((ADC_CLK_SPEED/96.0)/500000.0*96.000);
+        adc_set_clkdiv(div);
         ExtCfg(31, EXT_NOT_CONFIG, 0);
         if(ADCopen>=2)ExtCfg(32, EXT_NOT_CONFIG, 0);
         if(ADCopen>=3)ExtCfg(34, EXT_NOT_CONFIG, 0);
@@ -3156,6 +3230,9 @@ void MIPS16 ClearExternalIO(void) {
     InterruptUsed = false;
 	InterruptReturn = NULL;
     irq_set_enabled(DMA_IRQ_1, false);
+#ifdef rp2350
+    irq_set_enabled(PWM_IRQ_WRAP_1, false);
+#endif
     closeframebuffer('A');
     if(CallBackEnabled==1) gpio_set_irq_enabled_with_callback(PinDef[IRpin].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false, &gpio_callback);
     else if(CallBackEnabled & 1){

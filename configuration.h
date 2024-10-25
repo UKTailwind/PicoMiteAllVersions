@@ -265,6 +265,8 @@ extern "C" {
 #define PWM10B    549755813888
 #define PWM11A    1099511627776
 #define PWM11B    2199023255552
+#define FAST_TIMER 4398046511104
+#define FAST_TIMER_PIN 2
 #endif
 #define MAXCOLLISIONS 4
 #define MAXLAYER   4
@@ -291,6 +293,7 @@ extern "C" {
 #define PIO_TX_DMA2 6
 #define SPI_DMA_OUT 5
 #define SPI_DMA_IN 10
+#define ADC_CLK_SPEED   ((float)Option.CPU_Speed*1000)
 #define PROGSTART (FLASH_TARGET_OFFSET + FLASH_ERASE_SIZE + SAVEDVARS_FLASH_SIZE + ((MAXFLASHSLOTS) * MAX_PROG_SIZE))
 #define TOP_OF_SYSTEM_FLASH  (FLASH_TARGET_OFFSET + FLASH_ERASE_SIZE + SAVEDVARS_FLASH_SIZE + ((MAXFLASHSLOTS+1) * MAX_PROG_SIZE))
 #define RoundUpK4(a)     (((a) + (4096 - 1)) & (~(4096 - 1)))// round up to the nearest page size      [position 131:9]	

@@ -43,6 +43,7 @@ extern "C" {
 #include "hardware/vreg.h"
 #include "hardware/structs/pads_qspi.h"
 #include "pico/unique_id.h"
+#include "hardware/pwm.h"
 
 #ifdef USBKEYBOARD
     #include "tusb.h"
@@ -186,6 +187,7 @@ unsigned int _excep_peek;
 void CheckAbort(void);
 void TryLoadProgram(void);
 unsigned char lastchar=0;
+int adc_clk_div;
 unsigned char BreakKey = BREAK_KEY;                                          // defaults to CTRL-C.  Set to zero to disable the break function
 volatile char ConsoleRxBuf[CONSOLE_RX_BUF_SIZE]={0};
 volatile int ConsoleRxBufHead = 0;
@@ -1427,6 +1429,27 @@ bool MIPS16 __not_in_flash_func(timer_callback)(repeating_timer_t *rt)
     if(processtick){
         static int IrTimeout, IrTick, NextIrTick;
         int ElapsedMicroSec, IrDevTmp, IrCmdTmp;
+#ifdef rp2350
+    if(ExtCurrentConfig[FAST_TIMER_PIN] == EXT_FAST_TIMER && --INT5Timer <= 0) { 
+        static uint64_t now,last=0;
+        uint32_t hi = INT5Count;
+        uint32_t lo;
+        do {
+            // Read the lower 32 bits
+            lo = pwm_get_counter(0);
+            // Now read the upper 32 bits again and
+            // check that it hasn't incremented. If it has loop around
+            // and read the lower 32 bits again to get an accurate value
+            uint32_t next_hi = INT5Count;
+            if (hi == next_hi) break;
+            hi = next_hi;
+        } while (true);
+        now=((uint64_t) hi *50000) + lo;
+        INT5Value=now-last;
+        last=now;
+        INT5Timer = INT5InitTimer; 
+    }
+#endif
         AHRSTimer++;
         InkeyTimer++;                                                     // used to delay on an escape character
         PauseTimer++;													// used by the PAUSE command
@@ -3650,7 +3673,16 @@ int MIPS16 main(){
         watchdog_enable(1, 1);
         while(1);
     }
-
+    clock_configure(
+        clk_adc,
+        0,                                                // No glitchless mux
+        CLOCKS_CLK_PERI_CTRL_AUXSRC_VALUE_CLKSRC_PLL_SYS, // System PLL on AUX mux
+        Option.CPU_Speed * 1000,                               // Input frequency
+        Option.CPU_Speed * 1000                                // Output (must be same as no divider)
+    );
+    float div=((ADC_CLK_SPEED/96.0)/500000.0*96.000);
+    adc_set_clkdiv(div);
+    adc_clk_div=adc_hw->div;
     systick_hw->csr = 0x5;
     systick_hw->rvr = 0x00FFFFFF;
 #ifdef PICOMITE

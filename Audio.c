@@ -51,7 +51,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #endif
 #include "dr_flac.h"
 #include "hxcmod.h"
-#include "vs1053.h"
+#include "VS1053.h"
 extern BYTE MDD_SDSPI_CardDetectState(void);
 #define MAXALBUM 20
 extern int InitSDCard(void);
@@ -723,7 +723,7 @@ void playvs1053(int mode){
 	nextbuf=2;
 	ppos=0;
 	playreadcomplete=0;
-	pwm_set_irq_enabled(AUDIO_SLICE, true);
+	pwm_set_irq0_enabled(AUDIO_SLICE, true);
 	uint64_t t=time_us_64();
 	while(1){ //read all the headers without stalling
 		checkWAVinput();
@@ -797,7 +797,7 @@ void wavcallback(char *p){
     nextbuf=2;
     ppos=0;
     playreadcomplete=0;
-	pwm_set_irq_enabled(AUDIO_SLICE, true);
+	pwm_set_irq0_enabled(AUDIO_SLICE, true);
 }
 void mp3callback(char *p, int position){
     if(strchr((char *)p, '.') == NULL) strcat((char *)p, ".mp3");
@@ -852,7 +852,7 @@ void mp3callback(char *p, int position){
     nextbuf=2;
     ppos=0;
     playreadcomplete=0;
-	pwm_set_irq_enabled(AUDIO_SLICE, true);
+	pwm_set_irq0_enabled(AUDIO_SLICE, true);
 //	MMPrintString("Playing ");MMPrintString(p);PRet();
 #endif
 }
@@ -917,7 +917,7 @@ void flaccallback(char *p){
     nextbuf=2;
     ppos=0;
     playreadcomplete=0;
-	pwm_set_irq_enabled(AUDIO_SLICE, true);
+	pwm_set_irq0_enabled(AUDIO_SLICE, true);
 }
 void rampvolume(int l, int r, int channel, int target){
 	if(optionfastaudio){
@@ -1102,9 +1102,9 @@ void MIPS16 cmd_play(void) {
         if(argc == 3) vol_right = getint(argv[2], 0, 100);
 		if(CurrentlyPlaying==P_TONE && vol_left!=vol_right && mono)mono=0;
 		if(Option.AUDIO_MISO_PIN && CurrentlyPlaying!=P_NOTHING){
-			pwm_set_irq_enabled(AUDIO_SLICE, false);
+			pwm_set_irq0_enabled(AUDIO_SLICE, false);
 			setVolumes(vol_left, vol_right);
-			pwm_set_irq_enabled(AUDIO_SLICE, true);
+			pwm_set_irq0_enabled(AUDIO_SLICE, true);
 		}
         return;
     }
@@ -1144,7 +1144,7 @@ void MIPS16 cmd_play(void) {
 	// This should now be an exact multiple of the number per waveform
 				PlayDuration=(((uint64_t)(duration/hw))*hw)+1;
 			}
-			pwm_set_irq_enabled(AUDIO_SLICE, false);
+			pwm_set_irq0_enabled(AUDIO_SLICE, false);
 			PhaseM_left =  f_left  / (float)PWM_FREQ * 4096.0;
 			PhaseM_right = f_right  / (float)PWM_FREQ * 4096.0;
 			WAV_fnbr=0;
@@ -1157,7 +1157,7 @@ void MIPS16 cmd_play(void) {
 				if(Option.AUDIO_MISO_PIN)playimmediatevs1053(P_TONE);
 			}
 			CurrentlyPlaying = P_TONE;
-			pwm_set_irq_enabled(AUDIO_SLICE, true);
+			pwm_set_irq0_enabled(AUDIO_SLICE, true);
 			return;
 		}
     }
@@ -1283,7 +1283,7 @@ void MIPS16 cmd_play(void) {
         if(!(CurrentlyPlaying == P_SOUND || CurrentlyPlaying==P_PAUSE_SOUND)){
 			setrate(PWM_FREQ);
 			if(Option.AUDIO_MISO_PIN)playimmediatevs1053(P_SOUND);
-    		pwm_set_irq_enabled(AUDIO_SLICE, true);
+    		pwm_set_irq0_enabled(AUDIO_SLICE, true);
 		}
         CurrentlyPlaying = P_SOUND;
         return;
@@ -1479,7 +1479,7 @@ void MIPS16 cmd_play(void) {
 		playreadcomplete=0;
 		CurrentlyPlaying=P_STREAM;
 		setrate(16000); //16KHz should be fast enough
-		pwm_set_irq_enabled(AUDIO_SLICE, true);
+		pwm_set_irq0_enabled(AUDIO_SLICE, true);
 		return;
 	}
 	if((tp = checkstring(cmdline, (unsigned char *)"MIDI"))) {
@@ -1802,7 +1802,7 @@ void MIPS16 cmd_play(void) {
         playreadcomplete=0;
         setrate(48000);
 		audiorepeat=3;
-    	pwm_set_irq_enabled(AUDIO_SLICE, true);
+    	pwm_set_irq0_enabled(AUDIO_SLICE, true);
 		Timer1=500;
 		while(Timer1){
 			checkWAVinput();
@@ -1869,7 +1869,7 @@ void StopAudio(void) {
 			}
 			setrate(PWM_FREQ);
 		}
-		pwm_set_irq_enabled(AUDIO_SLICE, false);
+		pwm_set_irq0_enabled(AUDIO_SLICE, false);
         ppos=0;
         if(Option.AUDIO_MISO_PIN && (CurrentlyPlaying == P_TONE || CurrentlyPlaying==P_SOUND))CurrentlyPlaying = P_WAVOPEN;
 		else CurrentlyPlaying = P_NOTHING;
@@ -1997,7 +1997,7 @@ void audio_checks(void){
             FreeMemorySafe((void **)&sbuff2);
             FreeMemorySafe((void **)&alist);
             if(Option.AUDIO_MISO_PIN){
-    			pwm_set_irq_enabled(AUDIO_SLICE, false);
+    			pwm_set_irq0_enabled(AUDIO_SLICE, false);
 				CurrentlyPlaying = P_NOTHING;
 			} else StopAudio();
             FileClose(WAV_fnbr);

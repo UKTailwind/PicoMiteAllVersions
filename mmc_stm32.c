@@ -53,7 +53,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #ifdef PICOMITEVGA
 #include "Include.h"
 #endif
-#include "vs1053.h"
+#include "VS1053.h"
 //#include "integer.h"
 int SPISpeed=0xFF;
 //#define SD_CS_PIN Option.SD_CS
@@ -1611,7 +1611,6 @@ void InitReservedIO(void) {
 			irq_set_exclusive_handler(PWM_IRQ_WRAP, on_pwm_wrap);
 			irq_set_enabled(PWM_IRQ_WRAP, true);
 			irq_set_priority(PWM_IRQ_WRAP,255);
-			pwm_set_enabled(AUDIO_SLICE, true);
 		}
 	}
 
