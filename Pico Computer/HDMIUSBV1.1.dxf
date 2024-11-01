@@ -1,0 +1,762 @@
+  0
+SECTION
+  2
+HEADER
+  9
+$ACADVER
+  1
+AC1009
+  9
+$EXTMAX
+ 10
+124.0
+ 20
+62.0
+ 30
+0.0
+  9
+$EXTMIN
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+  9
+$INSUNITS
+ 70
+     4
+  9
+$LUNITS
+ 70
+     2
+  9
+$LUPREC
+ 70
+     4
+  9
+$MEASUREMENT
+ 70
+     1
+  0
+ENDSEC
+  0
+SECTION
+  2
+TABLES
+  0
+TABLE
+  2
+LAYER
+ 70
+     1
+  0
+LAYER
+  2
+0
+ 70
+     0
+ 62
+     7
+  6
+Continuous
+  0
+LAYER
+  2
+Default
+ 70
+     0
+ 62
+    70
+  6
+Continuous
+  0
+ENDTAB
+  0
+TABLE
+  2
+APPID
+ 70
+     1
+  0
+APPID
+  2
+ACAD
+ 70
+     0
+  0
+ENDTAB
+  0
+ENDSEC
+  0
+SECTION
+  2
+ENTITIES
+  0
+POLYLINE
+  8
+Default
+ 66
+     1
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+ 70
+     1
+  0
+VERTEX
+  8
+Default
+ 10
+0.0
+ 20
+0.0
+ 42
+0.0
+  0
+VERTEX
+  8
+Default
+ 10
+124.0
+ 20
+0.0
+ 42
+0.0
+  0
+VERTEX
+  8
+Default
+ 10
+124.0
+ 20
+27.0
+ 42
+0.0
+  0
+VERTEX
+  8
+Default
+ 10
+0.0
+ 20
+27.0
+ 42
+0.0
+  0
+SEQEND
+  0
+POLYLINE
+  8
+Default
+ 66
+     1
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+ 70
+     1
+  0
+VERTEX
+  8
+Default
+ 10
+25.4
+ 20
+7.0
+ 42
+0.0
+  0
+VERTEX
+  8
+Default
+ 10
+40.4
+ 20
+7.0
+ 42
+0.0
+  0
+VERTEX
+  8
+Default
+ 10
+40.4
+ 20
+23.5
+ 42
+0.0
+  0
+VERTEX
+  8
+Default
+ 10
+25.4
+ 20
+23.5
+ 42
+0.0
+  0
+SEQEND
+  0
+POLYLINE
+  8
+Default
+ 66
+     1
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+ 70
+     1
+  0
+VERTEX
+  8
+Default
+ 10
+48.5
+ 20
+7.0
+ 42
+0.0
+  0
+VERTEX
+  8
+Default
+ 10
+63.2
+ 20
+7.0
+ 42
+0.0
+  0
+VERTEX
+  8
+Default
+ 10
+63.2
+ 20
+23.5
+ 42
+0.0
+  0
+VERTEX
+  8
+Default
+ 10
+48.5
+ 20
+23.5
+ 42
+0.0
+  0
+SEQEND
+  0
+POLYLINE
+  8
+Default
+ 66
+     1
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+ 70
+     1
+  0
+VERTEX
+  8
+Default
+ 10
+82.3
+ 20
+7.0
+ 42
+0.0
+  0
+VERTEX
+  8
+Default
+ 10
+97.0
+ 20
+7.0
+ 42
+0.0
+  0
+VERTEX
+  8
+Default
+ 10
+97.0
+ 20
+10.0
+ 42
+0.0
+  0
+VERTEX
+  8
+Default
+ 10
+82.3
+ 20
+10.0
+ 42
+0.0
+  0
+SEQEND
+  0
+POLYLINE
+  8
+Default
+ 66
+     1
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+ 70
+     1
+  0
+VERTEX
+  8
+Default
+ 10
+0.0
+ 20
+35.0
+ 42
+0.0
+  0
+VERTEX
+  8
+Default
+ 10
+124.0
+ 20
+35.0
+ 42
+0.0
+  0
+VERTEX
+  8
+Default
+ 10
+124.0
+ 20
+62.0
+ 42
+0.0
+  0
+VERTEX
+  8
+Default
+ 10
+0.0
+ 20
+62.0
+ 42
+0.0
+  0
+SEQEND
+  0
+POLYLINE
+  8
+Default
+ 66
+     1
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+ 70
+     1
+  0
+VERTEX
+  8
+Default
+ 10
+14.0
+ 20
+41.75
+ 42
+0.0
+  0
+VERTEX
+  8
+Default
+ 10
+45.8
+ 20
+41.75
+ 42
+0.0
+  0
+VERTEX
+  8
+Default
+ 10
+45.8
+ 20
+48.0
+ 42
+0.0
+  0
+VERTEX
+  8
+Default
+ 10
+14.0
+ 20
+48.0
+ 42
+0.0
+  0
+SEQEND
+  0
+POLYLINE
+  8
+Default
+ 66
+     1
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+ 70
+     1
+  0
+VERTEX
+  8
+Default
+ 10
+80.0
+ 20
+41.0
+ 42
+0.0
+  0
+VERTEX
+  8
+Default
+ 10
+85.0
+ 20
+41.0
+ 42
+0.4142135623731
+  0
+VERTEX
+  8
+Default
+ 10
+88.5
+ 20
+44.5
+ 42
+0.4142135623731
+  0
+VERTEX
+  8
+Default
+ 10
+88.5
+ 20
+44.5
+ 42
+0.4142135623731
+  0
+VERTEX
+  8
+Default
+ 10
+85.0
+ 20
+48.0
+ 42
+0.0
+  0
+VERTEX
+  8
+Default
+ 10
+80.0
+ 20
+48.0
+ 42
+0.4142135623731
+  0
+VERTEX
+  8
+Default
+ 10
+76.5
+ 20
+44.5
+ 42
+0.4142135623731
+  0
+VERTEX
+  8
+Default
+ 10
+76.5
+ 20
+44.5
+ 42
+0.4142135623731
+  0
+SEQEND
+  0
+POLYLINE
+  8
+Default
+ 66
+     1
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+ 70
+     1
+  0
+VERTEX
+  8
+Default
+ 10
+68.5
+ 20
+42.5
+ 42
+0.0
+  0
+VERTEX
+  8
+Default
+ 10
+74.0
+ 20
+42.5
+ 42
+0.0
+  0
+VERTEX
+  8
+Default
+ 10
+74.0
+ 20
+48.0
+ 42
+0.0
+  0
+VERTEX
+  8
+Default
+ 10
+68.5
+ 20
+48.0
+ 42
+0.0
+  0
+SEQEND
+  0
+CIRCLE
+  8
+Default
+ 10
+104.25
+ 20
+44.75
+ 30
+0.0
+ 40
+3.0
+  0
+CIRCLE
+  8
+Default
+ 10
+94.0
+ 20
+46.5
+ 30
+0.0
+ 40
+2.5
+  0
+POLYLINE
+  8
+Default
+ 66
+     1
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+ 70
+     1
+  0
+VERTEX
+  8
+Default
+ 10
+51.5
+ 20
+42.0
+ 42
+0.0
+  0
+VERTEX
+  8
+Default
+ 10
+61.0
+ 20
+42.0
+ 42
+0.0
+  0
+VERTEX
+  8
+Default
+ 10
+64.0
+ 20
+44.0
+ 42
+0.0
+  0
+VERTEX
+  8
+Default
+ 10
+64.0
+ 20
+49.0
+ 42
+0.0
+  0
+VERTEX
+  8
+Default
+ 10
+48.5
+ 20
+49.0
+ 42
+0.0
+  0
+VERTEX
+  8
+Default
+ 10
+48.5
+ 20
+44.0
+ 42
+0.0
+  0
+SEQEND
+  0
+POLYLINE
+  8
+Default
+ 66
+     1
+ 10
+0.0
+ 20
+0.0
+ 30
+0.0
+ 70
+     1
+  0
+VERTEX
+  8
+Default
+ 10
+68.0
+ 20
+7.5
+ 42
+0.0
+  0
+VERTEX
+  8
+Default
+ 10
+68.0
+ 20
+10.5
+ 42
+0.0
+  0
+VERTEX
+  8
+Default
+ 10
+77.5
+ 20
+10.5
+ 42
+0.0
+  0
+VERTEX
+  8
+Default
+ 10
+77.5
+ 20
+7.5
+ 42
+0.0
+  0
+VERTEX
+  8
+Default
+ 10
+75.5
+ 20
+6.5
+ 42
+0.0
+  0
+VERTEX
+  8
+Default
+ 10
+70.0
+ 20
+6.5
+ 42
+0.0
+  0
+SEQEND
+  0
+ENDSEC
+  0
+EOF
