@@ -1,4 +1,4 @@
-/**
+/*
  * @file
  * MQTT client
  *
@@ -59,7 +59,7 @@
 #include <string.h>
 #if LWIP_TCP && LWIP_CALLBACK_API
 
-/**
+/*
  * MQTT_DEBUG: Default is off.
  */
 #if !defined MQTT_DEBUG || defined __DOXYGEN__
@@ -74,7 +74,7 @@
 
 #undef LWIP_DEBUGF
 #define LWIP_DEBUGF
-/**
+/*
  * MQTT client connection states
  */
 enum {
@@ -84,7 +84,7 @@ enum {
   MQTT_CONNECTED
 };
 
-/**
+/*
  * MQTT control message types
  */
 enum mqtt_message_type {
@@ -104,11 +104,11 @@ enum mqtt_message_type {
   MQTT_MSG_TYPE_DISCONNECT = 14
 };
 
-/** Helpers to extract control packet type and qos from first byte in fixed header */
+/* Helpers to extract control packet type and qos from first byte in fixed header */
 #define MQTT_CTL_PACKET_TYPE(fixed_hdr_byte0) ((fixed_hdr_byte0 & 0xf0) >> 4)
 #define MQTT_CTL_PACKET_QOS(fixed_hdr_byte0) ((fixed_hdr_byte0 & 0x6) >> 1)
 
-/**
+/*
  * MQTT connect flags, only used in CONNECT message
  */
 enum mqtt_connect_flag {
@@ -141,7 +141,7 @@ static void mqtt_cyclic_timer(void *arg);
   "DISCONNECT"
 };*/
 
-/**
+/*
  * Message type value to string
  * @param msg_type see enum mqtt_message_type
  *
@@ -159,7 +159,7 @@ mqtt_msg_type_to_str(u8_t msg_type)
 #endif
 
 
-/**
+/*
  * Generate MQTT packet identifier
  * @param client MQTT client
  * @return New packet identifier, range 1 to 65535
@@ -177,7 +177,7 @@ msg_generate_packet_id(mqtt_client_t *client)
 /*--------------------------------------------------------------------------------------------------------------------- */
 /* Output ring buffer */
 
-/** Add single item to ring buffer */
+/* Add single item to ring buffer */
 static void
 mqtt_ringbuf_put(struct mqtt_ringbuf_t *rb, u8_t item)
 {
@@ -188,7 +188,7 @@ mqtt_ringbuf_put(struct mqtt_ringbuf_t *rb, u8_t item)
   }
 }
 
-/** Return pointer to ring buffer get position */
+/* Return pointer to ring buffer get position */
 static u8_t *
 mqtt_ringbuf_get_ptr(struct mqtt_ringbuf_t *rb)
 {
@@ -206,7 +206,7 @@ mqtt_ringbuf_advance_get_idx(struct mqtt_ringbuf_t *rb, u16_t len)
   }
 }
 
-/** Return number of bytes in ring buffer */
+/* Return number of bytes in ring buffer */
 static u16_t
 mqtt_ringbuf_len(struct mqtt_ringbuf_t *rb)
 {
@@ -217,13 +217,13 @@ mqtt_ringbuf_len(struct mqtt_ringbuf_t *rb)
   return (u16_t)len;
 }
 
-/** Return number of bytes free in ring buffer */
+/* Return number of bytes free in ring buffer */
 #define mqtt_ringbuf_free(rb) (MQTT_OUTPUT_RINGBUF_SIZE - mqtt_ringbuf_len(rb))
 
-/** Return number of bytes possible to read without wrapping around */
+/* Return number of bytes possible to read without wrapping around */
 #define mqtt_ringbuf_linear_read_length(rb) LWIP_MIN(mqtt_ringbuf_len(rb), (MQTT_OUTPUT_RINGBUF_SIZE - (rb)->get))
 
-/**
+/*
  * Try send as many bytes as possible from output ring buffer
  * @param rb Output ring buffer
  * @param tpcb TCP connection handle
@@ -272,7 +272,7 @@ mqtt_output_send(struct mqtt_ringbuf_t *rb, struct altcp_pcb *tpcb)
 /*--------------------------------------------------------------------------------------------------------------------- */
 /* Request queue */
 
-/**
+/*
  * Create request item
  * @param r_objs Pointer to request objects
  * @param r_objs_len Number of array entries
@@ -302,7 +302,7 @@ mqtt_create_request(struct mqtt_request_t *r_objs, size_t r_objs_len, u16_t pkt_
 }
 
 
-/**
+/*
  * Append request to pending request queue
  * @param tail Pointer to request queue tail pointer
  * @param r Request to append
@@ -332,7 +332,7 @@ mqtt_append_request(struct mqtt_request_t **tail, struct mqtt_request_t *r)
 }
 
 
-/**
+/*
  * Delete request item
  * @param r Request item to delete
  */
@@ -344,7 +344,7 @@ mqtt_delete_request(struct mqtt_request_t *r)
   }
 }
 
-/**
+/*
  * Remove a request item with a specific packet identifier from request queue
  * @param tail Pointer to request queue tail pointer
  * @param pkt_id Packet identifier of request to take
@@ -380,7 +380,7 @@ mqtt_take_request(struct mqtt_request_t **tail, u16_t pkt_id)
   return iter;
 }
 
-/**
+/*
  * Handle requests timeout
  * @param tail Pointer to request queue tail pointer
  * @param t Time since last call in seconds
@@ -410,7 +410,7 @@ mqtt_request_time_elapsed(struct mqtt_request_t **tail, u8_t t)
   }
 }
 
-/**
+/*
  * Free all request items
  * @param tail Pointer to request queue tail pointer
  */
@@ -425,7 +425,7 @@ mqtt_clear_requests(struct mqtt_request_t **tail)
   }
   *tail = NULL;
 }
-/**
+/*
  * Initialize all request items
  * @param r_objs Pointer to request objects
  * @param r_objs_len Number of array entries
@@ -478,7 +478,7 @@ mqtt_output_append_string(struct mqtt_ringbuf_t *rb, const char *str, u16_t leng
   }
 }
 
-/**
+/*
  * Append fixed header
  * @param rb Output ring buffer
  * @param msg_type see enum mqtt_message_type
@@ -502,7 +502,7 @@ mqtt_output_append_fixed_header(struct mqtt_ringbuf_t *rb, u8_t msg_type, u8_t f
 }
 
 
-/**
+/*
  * Check output buffer space
  * @param rb Output ring buffer
  * @param r_length Remaining length after fixed header
@@ -526,7 +526,7 @@ mqtt_output_check_space(struct mqtt_ringbuf_t *rb, u16_t r_length)
 }
 
 
-/**
+/*
  * Close connection to server
  * @param client MQTT client
  * @param reason Reason for disconnection
@@ -566,7 +566,7 @@ mqtt_close(mqtt_client_t *client, mqtt_connection_status_t reason)
 }
 
 
-/**
+/*
  * Interval timer, called every MQTT_CYCLIC_TIMER_INTERVAL seconds in MQTT_CONNECTING and MQTT_CONNECTED states
  * @param arg MQTT client
  */
@@ -621,7 +621,7 @@ mqtt_cyclic_timer(void *arg)
 }
 
 
-/**
+/*
  * Send PUBACK, PUBREC or PUBREL response message
  * @param client MQTT client
  * @param msg PUBACK, PUBREC or PUBREL
@@ -645,7 +645,7 @@ pub_ack_rec_rel_response(mqtt_client_t *client, u8_t msg, u16_t pkt_id, u8_t qos
   return err;
 }
 
-/**
+/*
  * Subscribe response from server
  * @param r Matching request
  * @param result Result code from server
@@ -659,7 +659,7 @@ mqtt_incomming_suback(struct mqtt_request_t *r, u8_t result)
 }
 
 
-/**
+/*
  * Complete MQTT message received or buffer full
  * @param client MQTT client
  * @param fixed_hdr_len length of fixed header
@@ -831,7 +831,7 @@ out_disconnect:
 }
 
 
-/**
+/*
  * MQTT incoming message parser
  * @param client MQTT client
  * @param p PBUF chain of received data
@@ -929,7 +929,7 @@ mqtt_parse_incoming(mqtt_client_t *client, struct pbuf *p)
 }
 
 
-/**
+/*
  * TCP received callback function. @see tcp_recv_fn
  * @param arg MQTT client
  * @param p PBUF chain of received data
@@ -973,7 +973,7 @@ mqtt_tcp_recv_cb(void *arg, struct altcp_pcb *pcb, struct pbuf *p, err_t err)
 }
 
 
-/**
+/*
  * TCP data sent callback function. @see tcp_sent_fn
  * @param arg MQTT client
  * @param tpcb TCP connection handle
@@ -1008,7 +1008,7 @@ mqtt_tcp_sent_cb(void *arg, struct altcp_pcb *tpcb, u16_t len)
   return ERR_OK;
 }
 
-/**
+/*
  * TCP error callback function. @see tcp_err_fn
  * @param arg MQTT client
  * @param err Error encountered
@@ -1025,7 +1025,7 @@ mqtt_tcp_err_cb(void *arg, err_t err)
   mqtt_close(client, MQTT_CONNECT_DISCONNECTED);
 }
 
-/**
+/*
  * TCP poll callback function. @see tcp_poll_fn
  * @param arg MQTT client
  * @param tpcb TCP connection handle
@@ -1042,7 +1042,7 @@ mqtt_tcp_poll_cb(void *arg, struct altcp_pcb *tpcb)
   return ERR_OK;
 }
 
-/**
+/*
  * TCP connect callback function. @see tcp_connected_fn
  * @param arg MQTT client
  * @param err Always ERR_OK, mqtt_tcp_err_cb is called in case of error
@@ -1086,7 +1086,7 @@ mqtt_tcp_connect_cb(void *arg, struct altcp_pcb *tpcb, err_t err)
 /* Public API */
 
 
-/**
+/*
  * @ingroup mqtt
  * MQTT publish function.
  * @param client MQTT client
@@ -1166,7 +1166,7 @@ mqtt_publish(mqtt_client_t *client, const char *topic, const void *payload, u16_
 }
 
 
-/**
+/*
  * @ingroup mqtt
  * MQTT subscribe/unsubscribe function.
  * @param client MQTT client
@@ -1234,7 +1234,7 @@ mqtt_sub_unsub(mqtt_client_t *client, const char *topic, u8_t qos, mqtt_request_
 }
 
 
-/**
+/*
  * @ingroup mqtt
  * Set callback to handle incoming publish requests from server
  * @param client MQTT client
@@ -1253,7 +1253,7 @@ mqtt_set_inpub_callback(mqtt_client_t *client, mqtt_incoming_publish_cb_t pub_cb
   client->inpub_arg = arg;
 }
 
-/**
+/*
  * @ingroup mqtt
  * Create a new MQTT client instance
  * @return Pointer to instance on success, NULL otherwise
@@ -1265,7 +1265,7 @@ mqtt_client_new(void)
   return (mqtt_client_t *)mem_calloc(1, sizeof(mqtt_client_t));
 }
 
-/**
+/*
  * @ingroup mqtt
  * Free MQTT client instance
  * @param client Pointer to instance to be freed
@@ -1276,7 +1276,7 @@ mqtt_client_free(mqtt_client_t *client)
   mem_free(client);
 }
 
-/**
+/*
  * @ingroup mqtt
  * Connect to MQTT server
  * @param client MQTT client
@@ -1436,7 +1436,7 @@ tcp_fail:
 }
 
 
-/**
+/*
  * @ingroup mqtt
  * Disconnect from MQTT server
  * @param client MQTT client
@@ -1454,7 +1454,7 @@ mqtt_disconnect(mqtt_client_t *client)
   }
 }
 
-/**
+/*
  * @ingroup mqtt
  * Check connection with server
  * @param client MQTT client

@@ -1,3 +1,7 @@
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 /* This file redefines all regex external names before including
    a renamed copy of glibc's regex.h.  */
 
@@ -27,3 +31,4 @@
 #include "xregex2.h"
 
 #endif /* xregex.h */
+/*  @endcond */

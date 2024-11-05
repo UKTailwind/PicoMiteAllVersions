@@ -1,3 +1,7 @@
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 /* Definitions for data structures and routines for the regular
    expression library, version 0.12.
 
@@ -562,3 +566,4 @@ version-control: t
 trim-versions-without-asking: nil
 End:
 */
+/*  @endcond */

@@ -1,4 +1,8 @@
-/***********************************************************************************************************************
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
+/* *********************************************************************************************************************
 PicoMite MMBasic
 
 SSD1963.h
@@ -254,3 +258,4 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 
 
 #endif
+/*  @endcond */

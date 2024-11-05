@@ -1,4 +1,4 @@
-/**
+/*
  *
  * @file tftp.c
  *
@@ -40,7 +40,7 @@
  *
  */
 
-/**
+/*
  * @defgroup tftp TFTP client/server
  * @ingroup apps
  *
@@ -437,7 +437,7 @@ tftp_tmr(void *arg)
   }
 }
 
-/**
+/*
  * Initialize TFTP client/server.
  * @param mode TFTP mode (client/server)
  * @param ctx TFTP callback struct
@@ -471,7 +471,7 @@ tftp_init_common(u8_t mode, const struct tftp_context *ctx)
   return ERR_OK;
 }
 
-/** @ingroup tftp
+/* @ingroup tftp
  * Initialize TFTP server.
  * @param ctx TFTP callback struct
  */
@@ -481,7 +481,7 @@ tftp_init_server(const struct tftp_context *ctx)
   return tftp_init_common(LWIP_TFTP_MODE_SERVER, ctx);
 }
 
-/** @ingroup tftp
+/* @ingroup tftp
  * Initialize TFTP client.
  * @param ctx TFTP callback struct
  */
@@ -491,7 +491,7 @@ tftp_init_client(const struct tftp_context *ctx)
   return tftp_init_common(LWIP_TFTP_MODE_CLIENT, ctx);
 }
 
-/** @ingroup tftp
+/* @ingroup tftp
  * Deinitialize ("turn off") TFTP client/server.
  */
 void tftp_cleanup(void)

@@ -1,4 +1,8 @@
-/***********************************************************************************************************************
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
+/* *********************************************************************************************************************
 PicoMite MMBasic
 
 SPI-LCD.h.c
@@ -465,4 +469,4 @@ extern void ScrollLCDSPI(int lines);
 extern void SetCS(void);
 extern int GetLineILI9341(void);
 #endif
-
+/*  @endcond */

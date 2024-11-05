@@ -1,3 +1,7 @@
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 /* VS1053b flac patch */
 
 #if 0
@@ -1588,3 +1592,4 @@ const unsigned short dtab[8423] = { /* Data to write */
     0xfffd, 0xffff, 0x0001, 0x0000, 0x0000, 0x0000, 0x0004, 0x0000,
     0xfffa, 0xffff, 0x0004, 0x0000, 0xffff, 0xffff, 0x0050
 };
+/*  @endcond */

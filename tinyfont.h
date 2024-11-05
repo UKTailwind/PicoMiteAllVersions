@@ -1,3 +1,7 @@
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 /*
  * tinyfont.h
  *
@@ -109,3 +113,4 @@ const unsigned char font4x6[292] ={
 		};
 
 #endif /* TINYFONT_H_ */
+/*  @endcond */
