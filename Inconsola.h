@@ -1,3 +1,7 @@
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 // Inconsola2.c
 // Font type    : Full (95 characters)
 // Font size    : 24x32 pixels
@@ -290,3 +294,4 @@ const int Inconsola[2281] = {
 0x00000000,0x00000000,0xE0030000,0x70F80720,0x0CE03F0E,0x0700C00F,0x00000000,0x00000000,
 0x00000000,0x00000000,0x00000000,0x00000000,0x00000000,0x00000000,0x00000000,0x00000000,
 };
+/*  @endcond */

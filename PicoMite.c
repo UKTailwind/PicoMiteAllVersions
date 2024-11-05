@@ -203,6 +203,7 @@ volatile unsigned int diskchecktimer = DISKCHECKRATE;
 volatile unsigned int clocktimer=60*60*1000;
 volatile unsigned int PauseTimer = 0;
 volatile unsigned int ClassicTimer = 0;
+volatile unsigned int NunchuckTimer = 0;
 volatile unsigned int IntPauseTimer = 0;
 volatile unsigned int Timer1=0, Timer2=0, Timer3=0, Timer4=0, Timer5=0;		                       //1000Hz decrement timer
 volatile unsigned int KeyCheck=2000;
@@ -238,7 +239,6 @@ volatile bool processtick = true;
 unsigned char WatchdogSet = false;
 unsigned char IgnorePIN = false;
 unsigned char SPIatRisk = false;
-bool timer_callback(repeating_timer_t *rt);
 uint32_t __uninitialized_ram(_excep_code);
 unsigned char lastcmd[STRINGSIZE*2];                                           // used to store the last command in case it is needed by the EDIT command
 FATFS fs;                 // Work area (file system object) for logical drive
@@ -431,7 +431,12 @@ static inline CommandToken commandtbl_decode(const unsigned char *p){
 }
 
 void __not_in_flash_func(routinechecks)(void){
-    static int when=0, classicread=0;
+    static int when=0;
+    if(abs((time_us_64()-mSecTimer*1000))> 5000){
+        cancel_repeating_timer(&timer);
+        add_repeating_timer_us(-1000, timer_callback, NULL, &timer);
+        mSecTimer=time_us_64()/1000;
+    }
     if (CurrentlyPlaying == P_WAV || CurrentlyPlaying == P_FLAC || CurrentlyPlaying==P_MP3 || CurrentlyPlaying==P_MIDI ){
 #ifdef PICOMITE
         if(SPIatRisk)mutex_enter_blocking(&frameBufferMutex);			// lock the frame buffer
@@ -445,8 +450,8 @@ void __not_in_flash_func(routinechecks)(void){
     if(++when & 7 && CurrentLinePtr) return;
 #ifdef USBKEYBOARD
     if(USBenabled){
-        tuh_task();
         if(mSecTimer>2000){
+            tuh_task();
             hid_app_task();
         }
     }
@@ -494,16 +499,28 @@ void __not_in_flash_func(routinechecks)(void){
     }
 #endif
     if(classic1 && ClassicTimer>=10){
-        if(classicread==0){
+        if(classicread==false){
 			WiiSend(sizeof(readcontroller),(char *)readcontroller);
-            classicread=1;
+            classicread=true;
         } else {
-            classicread=0;
+            classicread=false;
             classic1=2;
 			WiiReceive(6, (char *)nunbuff);
             classicproc();
         }
         ClassicTimer=0;
+    }
+    if(nunchuck1 && NunchuckTimer>=10){
+        if(nunchuckread==false){
+			WiiSend(sizeof(readcontroller),(char *)readcontroller);
+            nunchuckread=true;
+        } else {
+            nunchuckread=false;
+            nunchuck1=2;
+			WiiReceive(6, (char *)nunbuff);
+            nunproc();
+        }
+        NunchuckTimer=0;
     }
 }
 
@@ -1473,6 +1490,7 @@ bool MIPS16 __not_in_flash_func(timer_callback)(repeating_timer_t *rt)
         if(Timer1)Timer1--;
         if(KeyCheck)KeyCheck--;
         ClassicTimer++;
+        NunchuckTimer++;
         if(diskchecktimer && (Option.SD_CS || Option.CombinedCS))diskchecktimer--;
 	    if(++CursorTimer > CURSOR_OFF + CURSOR_ON) CursorTimer = 0;		// used to control cursor blink rate
         if(CFuncmSec) CallCFuncmSec();                                  // the 1mS tick for CFunctions (see CFunction.c)
@@ -3725,6 +3743,7 @@ int MIPS16 main(){
 	stdio_init_all();
     adc_init();
     adc_set_temp_sensor_enabled(true);
+    mSecTimer=time_us_64()/1000;
     add_repeating_timer_us(-1000, timer_callback, NULL, &timer);
     InitReservedIO();
     ClearExternalIO();
@@ -3733,7 +3752,10 @@ int MIPS16 main(){
     ConsoleTxBufHead = 0;
     ConsoleTxBufTail = 0;
     InitHeap();              										// initilise memory allocation
-    uSecFunc(10);
+    uSecFunc(1000);
+    disable_interrupts();
+    enable_interrupts();
+    mSecTimer=time_us_64()/1000;
     DISPLAY_TYPE = Option.DISPLAY_TYPE;
     // negative timeout means exact delay (rather than delay between callbacks)
 	OptionErrorSkip = false;

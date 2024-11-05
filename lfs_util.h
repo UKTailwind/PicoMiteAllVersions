@@ -1,3 +1,7 @@
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 /*
  * lfs utility functions
  *
@@ -241,3 +245,4 @@ static inline void lfs_free(void *p) {
 
 #endif
 #endif
+/*  @endcond */

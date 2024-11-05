@@ -22,6 +22,15 @@ LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON A
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
 
 ************************************************************************************************************************/
+/**
+* @file GUI.c
+* @author Geoff Graham, Peter Mather
+* @brief Source for GUI MMBasic commands and functions
+*/
+/**
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 
 
 #include "MMBasic_Includes.h"
@@ -382,6 +391,7 @@ int GetCtrlParams(int type, unsigned char *p) {
     return r;
 }
 
+/*  @endcond */
 
 void cmd_gui(void) {
     int r;
@@ -769,6 +779,10 @@ void cmd_GUIpage(unsigned char *p) {
     }
 }
 
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2119,7 +2133,7 @@ void ServiceInterrupts(void) {
     TempMemoryIsChanged = true;                                     // signal that temporary memory should be checked
 }
 
-
+/*  @endcond */
 
 void fun_msgbox(void) {
     int i, j, k;
@@ -2326,6 +2340,10 @@ void cmd_ctrlval(void) {
 
     if(!(Ctrl[r].state & CTRL_DISABLED2)) UpdateControl(r);         // don't update if the gauge is disabled by a keypad (updating may mess they keypad)
 }
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 
 
 void fun_mmhpos(void) {
@@ -2404,3 +2422,4 @@ void CheckGui(void) {
         }
     }
 }
+/*  @endcond */

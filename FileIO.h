@@ -1,4 +1,8 @@
-/***********************************************************************************************************************
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
+/* *********************************************************************************************************************
 PicoMite MMBasic
 
 FileIO.h
@@ -242,3 +246,4 @@ extern union uFileTable FileTable[MAXOPENFILES + 1];
 }
 #endif
 #endif /* __FILEIO_H */
+/*  @endcond */

@@ -22,6 +22,16 @@ LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON A
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
 
 ************************************************************************************************************************/
+/**
+* @file SPI.c
+* @author Geoff Graham, Peter Mather
+* @brief Source for SPI MMBasic commands and functions
+*/
+/**
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
+
 
 
 #include "MMBasic_Includes.h"
@@ -33,6 +43,7 @@ long long int *GetReceiveDataBuffer(unsigned char *p, unsigned int *nbr);
 
 uint8_t spibits=8;
 uint8_t spi2bits=8;
+/*  @endcond */
 void cmd_spi(void) {
 	    int speed;
     unsigned char *p;
@@ -123,7 +134,10 @@ void fun_spi(void) {
 
 }
 
-
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 
 void SPIClose(void){
     if(SPI0TXpin!=99){
@@ -135,6 +149,8 @@ void SPIClose(void){
         }
     }
 }
+/*  @endcond */
+
 
 void cmd_spi2(void) {
 	int speed;
@@ -227,6 +243,10 @@ void fun_spi2(void) {
 
 }
 
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 
 
 void SPI2Close(void){
@@ -319,3 +339,4 @@ long long int *GetReceiveDataBuffer(unsigned char *p, unsigned int *nbr) {
         else error("Invalid variable");
     return ptr;
 }
+/*  @endcond */

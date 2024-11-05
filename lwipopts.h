@@ -1,3 +1,7 @@
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 #ifndef _LWIPOPTS_H
 #define _LWIPOPTS_H
 
@@ -26,3 +30,4 @@ extern char MMErrMsg[];
 #include <stdio.h>
 #include <stdlib.h>
 #endif
+/*  @endcond */

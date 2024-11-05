@@ -1,4 +1,8 @@
-/***********************************************************************************************************************
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
+/* *********************************************************************************************************************
 PicoMite MMBasic
 
 Custom.h
@@ -36,7 +40,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "lwip/err.h"
 #endif
 
-/**********************************************************************************
+/* ********************************************************************************
  the C language function associated with commands, functions or operators should be
  declared here
 **********************************************************************************/
@@ -133,4 +137,5 @@ extern bool PIO2;
 
 #endif
 
+/*  @endcond */
 

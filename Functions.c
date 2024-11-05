@@ -22,6 +22,15 @@ LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON A
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
 
 ************************************************************************************************************************/
+/**
+* @file Functions.c
+* @author Geoff Graham, Peter Mather
+* @brief Source for standard MMBasic commands
+*/
+/**
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 
 #include <math.h>
 #include "stdlib.h"
@@ -29,6 +38,10 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "Hardware_Includes.h"
 #include <float.h>
 #include "xregex.h"
+#ifdef rp2350
+#include "pico\rand.h"
+#endif
+
 extern long long int  llabs (long long int  n);
 
 
@@ -95,6 +108,7 @@ static int MInStr(char *srch, char c) {
             return true;
     return false;
 }
+/*  @endcond */
 
 void fun_bound(void){
 	int which=1;
@@ -106,6 +120,10 @@ void fun_bound(void){
 	if(iret==-1)iret=0;
 	targ=T_INT;
 }
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 
 // scan through string p and return p if it points to any char in delims
 // this will skip any quoted text (quote delimiters in quotes)
@@ -123,6 +141,8 @@ static int scan_for_delimiter(int start, unsigned char *p, unsigned char *delims
     }
     return i;
 }
+/*  @endcond */
+
 void fun_call(void){
 	int i;
     long long int i64 = 0;
@@ -431,6 +451,10 @@ void fun_exp(void) {
 	fret = exp(getnumber(ep));
     targ = T_NBR;
 }
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 
 // utility function used by HEX$(), OCT$() and BIN$()
 void DoHexOctBin(int base) {
@@ -446,6 +470,7 @@ void DoHexOctBin(int base) {
     targ = T_STR;
 }
 
+/*  @endcond */
 
 
 // return the hexadecimal representation of a number
@@ -469,41 +494,6 @@ void fun_oct(void) {
 void fun_bin(void) {
     DoHexOctBin(2);
 }
-
-/*void fun_instr(void) {
-	unsigned char *s1 = NULL, *s2 = NULL;
-	int start = 0;
-	getargs(&ep, 5, (unsigned char *)",");
-
-	if(argc == 5) {
-		start = getint(argv[0], 1, MAXSTRLEN + 1) - 1;
-		s1 = getstring(argv[2]);
-		s2 = getstring(argv[4]);
-	}
-	else if(argc == 3) {
-		start = 0;
-		s1 = getstring(argv[0]);
-		s2 = getstring(argv[2]);
-	}
-	else
-		error("Argument count");
-
-    targ = T_INT;
-	if(start > *s1 - *s2 + 1 || *s2 == 0)
-		iret = 0;
-	else {
-		// find s2 in s1 using MMBasic strings
-		int i;
-		for(i = start; i < *s1 - *s2 + 1; i++) {
-			if(memcmp(s1 + i + 1, s2 + 1, *s2) == 0) {
-				iret = i + 1;
-				return;
-			}
-		}
-	}
-	iret = 0;
-}*/
-
 
 // syntax:  nbr = INSTR([start,] string1, string2)
 //          find the position of string2 in string1 starting at start chars in string1
@@ -715,7 +705,11 @@ void fun_rad(void) {
 // generate a random number that is greater than or equal to 0 but less than 1
 // n = RND()
 void fun_rnd(void) {
+#ifdef rp2350
+	fret = (MMFLOAT)get_rand_32()/(MMFLOAT)0x100000000;
+#else
 	fret = (MMFLOAT)rand()/((MMFLOAT)RAND_MAX + (MMFLOAT)RAND_MAX/1000000);
+#endif
     targ = T_NBR;
 }
 
@@ -1020,12 +1014,17 @@ void __not_in_flash_func(fun_inkey)(void){
 }
 
 
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 
 // used by ACos() and ASin() below
 MMFLOAT arcsinus(MMFLOAT x) {
      return 2.0L * atan(x / (1.0L + sqrt(1.0L - x * x)));
 }
 
+/*  @endcond */
 
 // Return the arcsine (in radians) of the argument 'number'.
 // n = ASIN(number)
@@ -1060,7 +1059,10 @@ void fun_acos(void) {
      targ = T_NBR;
 }
 
-
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 // utility function to do the max/min comparison and return the value
 // it is only called by fun_max() and fun_min() below.
 void do_max_min(int cmp) {
@@ -1077,7 +1079,7 @@ void do_max_min(int cmp) {
     fret = nbr;
     targ = T_NBR;
 }
-
+/*  @endcond */
 
 void fun_max(void) {
     do_max_min(1);
@@ -1087,7 +1089,15 @@ void fun_max(void) {
 void fun_min(void) {
     do_max_min(0);
 }
+#ifdef rp2350
 void __not_in_flash_func(fun_ternary)(void){
+ #else
+#ifdef PICOMITEVGA
+void fun_ternary(void){
+#else
+void __not_in_flash_func(fun_ternary)(void){
+#endif
+#endif
     MMFLOAT f = 0;
     long long int i64 = 0;
     unsigned char *s = NULL;

@@ -1,3 +1,7 @@
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 #define __BMPDECODER_C__
 /******************************************************************************
 
@@ -518,4 +522,5 @@ BYTE BMP_bDecode_memory(int x, int y, int xlen, int ylen, int fnbr, char *p)
         FreeMemory((void *)linebuff);
         return 0;
 }
+/*  @endcond */
 

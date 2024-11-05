@@ -1,4 +1,8 @@
-/***********************************************************************************************************************
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
+/* *********************************************************************************************************************
 PicoMite MMBasic
 
 GPS.h
@@ -205,22 +209,22 @@ struct minmea_sentence_vtg {
     enum minmea_faa_mode faa_mode;
 };
 
-/**
+/* 
  * Calculate raw sentence checksum. Does not check sentence integrity.
  */
 uint8_t minmea_checksum(const char *sentence);
 
-/**
+/* 
  * Check sentence validity and checksum. Returns true for valid sentences.
  */
 bool minmea_check(const char *sentence, bool strict);
 
-/**
+/* 
  * Determine talker identifier.
  */
 bool minmea_talker_id(char talker[3], const char *sentence);
 
-/**
+/* 
  * Determine sentence identifier.
  */
 
@@ -228,7 +232,7 @@ void processgps(void);
 
 enum minmea_sentence_id minmea_sentence_id(const char *sentence, bool strict);
 
-/**
+/* 
  * Scanf-like processor for NMEA sentences. Supports the following formats:
  * c - single character (char *)
  * d - direction, returned as 1/-1, default 0 (int *)
@@ -252,12 +256,12 @@ bool minmea_parse_gst(struct minmea_sentence_gst *frame, const char *sentence);
 bool minmea_parse_gsv(struct minmea_sentence_gsv *frame, const char *sentence);
 bool minmea_parse_vtg(struct minmea_sentence_vtg *frame, const char *sentence);
 
-/**
+/* 
  * Convert GPS UTC date/time representation to a UNIX timestamp.
  */
 int minmea_gettime(struct timespec *ts, const struct minmea_date *date, const struct minmea_time *time_);
 
-/**
+/* 
  * Rescale a fixed-point value to a different scale. Rounds towards zero.
  */
 
@@ -268,3 +272,4 @@ int minmea_gettime(struct timespec *ts, const struct minmea_date *date, const st
 #endif
 
 /* vim: set ts=4 sw=4 et: */
+/*  @endcond */

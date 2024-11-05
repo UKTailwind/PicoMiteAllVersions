@@ -22,6 +22,15 @@ LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON A
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
 
 ************************************************************************************************************************/
+/**
+* @file Memory.c
+* @author Geoff Graham, Peter Mather
+* @brief Source for the MMBasic Memory command
+*/
+/**
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 
 
 
@@ -115,6 +124,7 @@ short StrTmpIndex = 0;                                                // index t
 /***********************************************************************************************************************
  MMBasic commands
 ************************************************************************************************************************/
+/*  @endcond */
 void MIPS16 cmd_memory(void) {
 	unsigned char *p,*tp;
     tp = checkstring(cmdline, (unsigned char *)"PACK");
@@ -687,7 +697,10 @@ void MIPS16 cmd_memory(void) {
 	MMPrintString((char *)inpbuf);
 }
 
-
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 
 /***********************************************************************************************************************
  Public memory management functions
@@ -1079,3 +1092,5 @@ void __not_in_flash_func(FreeMemorySafe)(void **addr){
 #endif
 	}
 }
+/*  @endcond */
+

@@ -1,3 +1,7 @@
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 /*
  * The little filesystem
  *
@@ -699,3 +703,4 @@ int lfs_migrate(lfs_t *lfs, const struct lfs_config *cfg);
 #endif
 
 #endif
+/*  @endcond */

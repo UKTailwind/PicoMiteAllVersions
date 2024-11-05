@@ -1,3 +1,7 @@
+/**
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 /***********************************************************************************************************************
 PicoMite MMBasic
 
@@ -98,3 +102,4 @@ void fun_touch(void);
     extern int GetTouchAxis(int);
 
 #endif
+/*  @endcond */

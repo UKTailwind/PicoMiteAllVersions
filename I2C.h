@@ -1,4 +1,8 @@
-/***********************************************************************************************************************
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
+/* *********************************************************************************************************************
 PicoMite MMBasic
 
 I2C.h
@@ -83,8 +87,8 @@ extern char *I2C2_Slave_Send_IntLine;                                // pointer 
 extern char *I2C2_Slave_Receive_IntLine;                             // pointer to the slave receive interrupt line number
 extern void I2C_Send_Command(char command);
 extern void CheckI2CKeyboard(int noerror, int read);
-extern void cmd_camera(unsigned char *p);
-extern void cmd_Classic(unsigned char *p);
+extern void cmd_camera(void);
+extern void cmd_Classic(void);
 extern void cameraclose(void);
 typedef struct {
   uint8_t reg;   ///< Register address
@@ -125,15 +129,17 @@ typedef struct s_nunstruct {
     	uint8_t classic[6];
 		int16_t gyro[3], accs[3];
 } a_nunstruct;
-extern volatile int classic1;
+extern volatile uint8_t classic1, nunchuck1;
 extern char *nunInterruptc[];
 extern bool nunfoundc[];
 extern void classicproc(void);
+extern void nunproc(void);
 extern uint8_t nunbuff[];
 extern const unsigned char readcontroller[1];
-extern volatile struct s_nunstruct nunstruct[5];
+extern volatile struct s_nunstruct nunstruct[6];
 extern void WiiReceive(int nbr, char *p);
 extern void WiiSend(int nbr, char *p);
+extern bool classicread, nunchuckread;
 #define REG_GAIN                    0x00         // Gain lower 8 bits (rest in vref 
     #define REG_BLUE                    0x01         // blue gain 
     #define REG_RED                     0x02         // red gain 
@@ -481,3 +487,4 @@ extern void WiiSend(int nbr, char *p);
 
     #endif
 #endif
+/*  @endcond */

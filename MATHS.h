@@ -1,4 +1,8 @@
-/***********************************************************************************************************************
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
+/* *********************************************************************************************************************
 PicoMite MMBasic
 
 MATHS.h
@@ -141,3 +145,4 @@ MMFLOAT PIDController_Update(PIDController *pid, MMFLOAT setpoint, MMFLOAT measu
 
 
 #endif
+/*  @endcond */

@@ -1,10 +1,3 @@
-/*
- * Keyboard.c
- *
- *  Created on: 20 Apr 2019
- *      Author: Peter
- */
-
 /***************************************************************************************************************************
 MMBasic
 
@@ -35,13 +28,22 @@ Thanks to Muller Fabrice (France), Alberto Leibovich (Argentina) and the other c
 the non US keyboard layouts
 
 ****************************************************************************************************************************/
+/** 
+* @file USBKeyboard.c
+* @author Geoff Graham, Peter Mather
+* @brief Source for the MMBasic gamepad and mouse commands
+*/
+/*
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
 #include "tusb.h"
 #include "hardware/structs/usb.h"
 extern volatile int ConsoleRxBufHead;
-extern volatile int ConsoleRxBufTail;
+extern volatile int ConsoleRxBufTail; 
 extern volatile int keytimer;
 int justset = 0;
 // extern char ConsoleRxBuf[];
@@ -1349,11 +1351,11 @@ int FindFreeSlot(uint8_t itf_protocol){
 	}
 	return -1;
 }
-/*static struct
-{
-  uint8_t report_count;
-  tuh_hid_report_info_t report_info[MAX_REPORT];
-}hid_info[CFG_TUH_HID];*/
+//static struct
+//{
+//  uint8_t report_count;
+//  tuh_hid_report_info_t report_info[MAX_REPORT];
+//}hid_info[CFG_TUH_HID];
 
 void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance, uint8_t const* desc_report, uint16_t desc_len)
 {
@@ -1413,9 +1415,6 @@ void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance, uint8_t const* desc_re
   // Therefore for this simple example, we only need to parse generic report descriptor (with built-in parser)
 	if ( itf_protocol == HID_ITF_PROTOCOL_MOUSE )
 	{
-//		char mode[]={0xf3, 0xc8, 0xf3, 0x64, 0xf3, 0x50};
-//		hid_info[instance].report_count = tuh_hid_parse_report_descriptor(hid_info[instance].report_info, MAX_REPORT, desc_report, desc_len);
-	//		printf("HID has %u reports \r\n", hid_info[instance].report_count);
 		HID[slot].Device_address = dev_addr;
 		HID[slot].Device_instance = instance;
 		HID[slot].Device_type=HID_ITF_PROTOCOL_MOUSE;
@@ -1829,15 +1828,19 @@ static void process_mouse_report(hid_mouse_report_t const * report, uint8_t n)
 		nunfoundc[n]=1;
 	}
 	nunstruct[n].x0=report->buttons & 0b111;
+	nunstruct[n].x1=nunstruct[n].ax/(FontTable[gui_font >> 4][0] * (gui_font & 0b1111));
+	nunstruct[n].y1=nunstruct[n].ay/(FontTable[gui_font >> 4][1] * (gui_font & 0b1111));
 }
 
   //------------- cursor movement -------------//
 //  cursor_movement(report->x, report->y, report->wheel);
 //}
-void cmd_gamepad(unsigned char *p){
+/*  @endcond */
+
+void cmd_gamepad(void){
 	unsigned char *tp=NULL;
 	int n;
-	if((tp=checkstring(p,(unsigned char *)"INTERRUPT ENABLE"))){
+	if((tp=checkstring(cmdline,(unsigned char *)"INTERRUPT ENABLE"))){
 		getargs(&tp,5,(unsigned char *)",");
 		if(!(argc==3 || argc==5))error("Syntax");
 		n=getint(argv[0],1,4);
@@ -1846,14 +1849,14 @@ void cmd_gamepad(unsigned char *p){
 		nunstruct[n].x1=0b1111111111111111;
 		if(argc==5)nunstruct[n].x1=getint(argv[4],0,0b1111111111111111);
 		return;
-	} else if((tp = checkstring(p, (unsigned char *)"HAPTIC"))){
+	} else if((tp = checkstring(cmdline, (unsigned char *)"HAPTIC"))){
 		getargs(&tp,5,(unsigned char *)",");
 		if(!(argc==5))error("Syntax");
 		n=getint(argv[0],1,4)-1;
 		if(HID[n].Device_type!=PS4)error("PS4 only");
 		HID[n].motorleft=getint(argv[2],0,255);
 		HID[n].motorright=getint(argv[4],0,255);
-	} else if((tp = checkstring(p, (unsigned char *)"COLOUR"))){
+	} else if((tp = checkstring(cmdline, (unsigned char *)"COLOUR"))){
 		getargs(&tp,3,(unsigned char *)",");
 		if(!(argc==3))error("Syntax");
 		n=getint(argv[0],1,4)-1;
@@ -1862,41 +1865,39 @@ void cmd_gamepad(unsigned char *p){
 		HID[n].r=colour>>16;
 		HID[n].g=(colour>>8) & 0xff;
 		HID[n].b=colour & 0xff;
-	} else if((tp = checkstring(p, (unsigned char *)"HAPTIC"))){
+	} else if((tp = checkstring(cmdline, (unsigned char *)"HAPTIC"))){
 		getargs(&tp,5,(unsigned char *)",");
 		if(!(argc==5))error("Syntax");
 		n=getint(argv[0],1,4)-1;
 		if(HID[n].Device_type!=PS4)error("PS4 only");
 		HID[n].motorleft=getint(argv[2],0,255);
 		HID[n].motorright=getint(argv[4],0,255);
-	} else if((tp = checkstring(p, (unsigned char *)"INTERRUPT DISABLE"))){
+	} else if((tp = checkstring(cmdline, (unsigned char *)"INTERRUPT DISABLE"))){
 		getargs(&tp,1,(unsigned char *)",");
 		n=getint(argv[0],1,4);
 		nunInterruptc[n]=NULL;
 	} else error("Syntax");
 }
-void cmd_mouse(unsigned char *p){
+void cmd_mouse(void){
 	unsigned char *tp=NULL;
 	int n;
-	if((tp=checkstring(p,(unsigned char *)"INTERRUPT ENABLE"))){
+	if((tp=checkstring(cmdline,(unsigned char *)"INTERRUPT ENABLE"))){
 		getargs(&tp,3,(unsigned char *)",");
 		if(!(argc==3))error("Syntax");
 		n=getint(argv[0],1,4);
 		nunInterruptc[n] = (char *)GetIntAddress(argv[2]);					// get the interrupt location
 		InterruptUsed = true;
 		return;
-	} else if((tp = checkstring(p, (unsigned char *)"SET"))){
+	} else if((tp = checkstring(cmdline, (unsigned char *)"SET"))){
 		getargs(&tp,7,(unsigned char *)",");
 		if(!(argc==7))error("Syntax");
 		n=getint(argv[0],1,4);
 		nunstruct[n].ax=getint(argv[2],-HRes,HRes);
 		nunstruct[n].ay=getint(argv[4],-VRes,VRes);
 		nunstruct[n].az=getint(argv[6],-1000000,1000000); 
-	} else if((tp = checkstring(p, (unsigned char *)"INTERRUPT DISABLE"))){
+	} else if((tp = checkstring(cmdline, (unsigned char *)"INTERRUPT DISABLE"))){
 		getargs(&tp,1,(unsigned char *)",");
 		n=getint(argv[0],1,4);
 		nunInterruptc[n]=NULL;
 	} else error("Syntax");
 }
-
-

@@ -1,3 +1,7 @@
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 /*
 FLAC audio decoder. Choice of public domain or MIT-0. See license statements at the end of this file.
 dr_flac - v0.12.39 - 2022-09-17
@@ -1316,7 +1320,7 @@ DRFLAC_API drflac_bool32 drflac_next_cuesheet_track(drflac_cuesheet_track_iterat
 #endif  /* dr_flac_h */
 
 
-/************************************************************************************************************************************************************
+/* **********************************************************************************************************************************************************
  ************************************************************************************************************************************************************
 
  IMPLEMENTATION
@@ -12505,3 +12509,4 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
+/*  @endcond */

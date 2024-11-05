@@ -1,3 +1,7 @@
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 /*
  * To change this license header, choose License Headers in Project Properties.
  * To change this template file, choose Tools | Templates
@@ -103,3 +107,4 @@ const unsigned char F_6x8_LE[580] = {
 		0x00,0x04,0xAA,0x90,0x00,0x00, // Chr$(126)  ~
 		0x00,0x02,0x14,0x8B,0xE0,0x00 // Chr$(127)
 };
+/*  @endcond */

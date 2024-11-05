@@ -1,3 +1,7 @@
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 /*
 WAV audio loader and writer. Choice of public domain or MIT-0. See license statements at the end of this file.
 dr_wav - v0.13.8 - 2023-03-25
@@ -1289,7 +1293,7 @@ DRWAV_API drwav_bool32 drwav_fourcc_equal(const drwav_uint8* a, const char* b);
 #endif  /* dr_wav_h */
 
 
-/************************************************************************************************************************************************************
+/* **********************************************************************************************************************************************************
  ************************************************************************************************************************************************************
 
  IMPLEMENTATION
@@ -8376,3 +8380,4 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
+/*  @endcond */

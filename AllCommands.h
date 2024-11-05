@@ -1,4 +1,8 @@
-/**********************************************************************************
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
+/* ********************************************************************************
  the C language function associated with commands, functions or operators should be
  declared here
 **********************************************************************************/
@@ -105,10 +109,10 @@ void cmd_editfile(void);
 void cmd_port(void);
 void cmd_adc(void);
 void cmd_ir(void);
-void cmd_lcd(unsigned char *p);
-void cmd_keypad(unsigned char *p);
+void cmd_lcd(void);
+void cmd_keypad();
 void cmd_backlight(void);
-void cmd_bitbang(void);
+void cmd_device(void);
 void cmd_sync(void);
 void cmd_setpin(void);
 void cmd_pulse(void);
@@ -142,7 +146,7 @@ void cmd_spi2(void);
 void cmd_xmodem(void);
 void cmd_ctrlval(void);
 void cmd_GUIpage(unsigned char *p);
-void cmd_gamepad(unsigned char *tp);
+void cmd_gamepad(void);
 void cmd_sprite(void);
 void cmd_comment(void);
 void cmd_endcomment(void);
@@ -150,6 +154,13 @@ void cmd_blitmemory(void);
 void cmd_configure(void);
 void cmd_colourmap(void);
 void cmd_map(void);
+void cmd_WS2812(void);
+void cmd_DHT22(void);
+void cmd_Classic(void);
+void cmd_Nunchuck(void);
+void cmd_mouse(void);
+void cmd_camera(void);
+void cmd_Servo(void);
 #ifdef PICOMITEWEB
     void cmd_web(void);
 #endif
@@ -295,7 +306,7 @@ void fun_dev(void);
 void fun_map(void);
 #endif
 
-/**********************************************************************************
+/* ********************************************************************************
  All command tokens tokens (eg, PRINT, FOR, etc) should be inserted in this table
 **********************************************************************************/
 #ifdef INCLUDE_COMMAND_TABLE
@@ -401,7 +412,7 @@ void fun_map(void);
 #else
   	{ (unsigned char *)"GUI",            T_CMD,                      0, cmd_guiMX170   },
 #endif
-	{ (unsigned char *)"Device",              T_CMD,			0, cmd_bitbang        },
+	{ (unsigned char *)"Device",              T_CMD,			0, cmd_device        },
 	{ (unsigned char *)"PWM",		T_CMD,		0, cmd_pwm		},
 	{ (unsigned char *)"CSub",           T_CMD,              0, cmd_cfunction},
 	{ (unsigned char *)"End CSub",       T_CMD,              0, cmd_null     },
@@ -437,12 +448,20 @@ void fun_map(void);
 	{ (unsigned char *)"Files",		T_CMD,				0, cmd_files	},
 	{ (unsigned char *)"New",		T_CMD,				0, cmd_new	},
 	{ (unsigned char *)"Autosave",		T_CMD,				0, cmd_autosave	},
+	{ (unsigned char *)"WS2812",		T_CMD,				0, cmd_WS2812	},
+	{ (unsigned char *)"Keypad",		T_CMD,				0, cmd_keypad	},
+	{ (unsigned char *)"Humid",		T_CMD,				0, cmd_DHT22	},
+	{ (unsigned char *)"LCD",		T_CMD,				0, cmd_lcd	},
+	{ (unsigned char *)"Wii Classic",		T_CMD,				0, cmd_Classic	},
+	{ (unsigned char *)"Wii Nunchuck",		T_CMD,				0, cmd_Nunchuck	},
+	{ (unsigned char *)"Servo",		T_CMD,				0, cmd_Servo	},
 #ifdef PICOMITEVGA
   	{ (unsigned char *)"TILE",            T_CMD,                     0, cmd_tile   },
   	{ (unsigned char *)"MODE",            T_CMD,                     0, cmd_mode   },
   	{ (unsigned char *)"Map(",            T_CMD | T_FUN  ,           0, cmd_map   },
 	{ (unsigned char *)"Map",            T_CMD,           0, cmd_map   },
 #else
+    { (unsigned char *)"Camera",         T_CMD,                      0, cmd_camera },
     { (unsigned char *)"Refresh",         T_CMD,                      0, cmd_refresh },
 #endif
 #ifdef PICOMITE
@@ -458,6 +477,9 @@ void fun_map(void);
 #endif
 #ifndef USBKEYBOARD
 	{ (unsigned char *)"Update Firmware",		T_CMD,				0, cmd_update},
+#else
+	{ (unsigned char *)"Mouse",		T_CMD,				0, cmd_mouse	},
+	{ (unsigned char *)"Gamepad",		T_CMD,				0, cmd_gamepad	},
 #endif
 	{ (unsigned char *)"Configure",		T_CMD,				0, cmd_configure	},
 	{ (unsigned char *)"Colour",         T_CMD,                      0, cmd_colour	},
@@ -467,7 +489,7 @@ void fun_map(void);
 #endif
     { (unsigned char *)"",   0,                  0, cmd_null,    }                   // this dummy entry is always at the end
 #endif
-/**********************************************************************************
+/* ********************************************************************************
  All other tokens (keywords, functions, operators) should be inserted in this table
 **********************************************************************************/
 #ifdef INCLUDE_TOKEN_TABLE
@@ -607,9 +629,11 @@ void fun_map(void);
 	{ (unsigned char *)"Json$(",		T_FUN | T_STR,          0, fun_json		},
 #endif
 #ifdef PICOMITE
-//	  { (unsigned char *)"MsgBox(",        T_FUN | T_INT,              0, fun_msgbox     },
-//	  { (unsigned char *)"CtrlVal(",       T_FUN | T_NBR | T_STR,      0, fun_ctrlval    },
+	  { (unsigned char *)"MsgBox(",        T_FUN | T_INT,              0, fun_msgbox     },
+	  { (unsigned char *)"CtrlVal(",       T_FUN | T_NBR | T_STR,      0, fun_ctrlval    },
 #endif
     { (unsigned char *)"",   0,                  0, cmd_null,    }                   // this dummy entry is always at the end
 #endif
+/*  @endcond */
+
 

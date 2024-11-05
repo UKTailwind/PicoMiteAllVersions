@@ -1,3 +1,7 @@
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 /*
 uPNG -- derived from LodePNG version 20100808
 Copyright (c) 2005-2010 Lode Vandevenne
@@ -73,3 +77,4 @@ const unsigned char*	upng_get_buffer		(const upng_t* upng);
 unsigned				upng_get_size		(const upng_t* upng);
 
 #endif /*defined(UPNG_H)*/
+/*  @endcond */

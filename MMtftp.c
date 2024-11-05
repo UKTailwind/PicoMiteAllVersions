@@ -33,7 +33,7 @@ void tftp_close(void* handle){
 int tftp_read(void* handle, void* buf, int bytes){
     int n_read;
     int fnbr=*(int *)handle;
-    if(FatFSFileSystem)  f_read(FileTable[fnbr].fptr, buf, bytes, (UINT *)&n_read);
+    if(filesource[fnbr]==FATFSFILE)  f_read(FileTable[fnbr].fptr, buf, bytes, (UINT *)&n_read);
     else n_read=lfs_file_read(&lfs, FileTable[fnbr].lfsptr, buf, bytes);
     return n_read;
 }

@@ -1,3 +1,7 @@
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 /*
   Copyright (c) 2009-2017 Dave Gamble and cJSON contributors
 
@@ -298,3 +302,4 @@ CJSON_PUBLIC(void) cJSON_free(void *object);
 #endif
 
 #endif
+/*  @endcond */

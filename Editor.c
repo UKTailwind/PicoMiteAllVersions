@@ -22,6 +22,15 @@ LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON A
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
 
 ************************************************************************************************************************/
+/**
+* @file Audio.c
+* @author Geoff Graham, Peter Mather
+* @brief Source for Editor MMBasic commands
+*/
+/**
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
@@ -447,15 +456,26 @@ void edit(unsigned char *cmdline, bool reset) {
     MMCharPos = 0;
 }
 
+/*  @endcond */
 void cmd_edit(void){
     edit(cmdline, true);
 }
 void cmd_editfile(void){
     edit(cmdline, FALSE);
 }
-
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
+#ifdef USBKEYBOARD
+#ifndef PICOMITE
+    static short lastx1=9999, lasty1=9999;
+    static uint16_t lastfc, lastbc;
+    static bool leftpushed=false, rightpushed=false, middlepushed=false;
+#endif
+#endif
 void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool reset) {
-  int c, i;
+  int c=-1, i;
   unsigned char buf[MAXCLIP+2], clipboard[MAXCLIP+2];
   unsigned char *p, *tp, BreakKeySave;
   static char currdel=0, nextdel=0, lastdel=0, multi=false;
@@ -466,40 +486,92 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool rese
   OptionY_TILESave=Y_TILE;
   if(!Option.ColourCode)ytileheight=16;
   else {
-    ytileheight=gui_font_height;
-    Y_TILE=VRes/ytileheight;
-    if(VRes % ytileheight)Y_TILE++;
+        ytileheight=gui_font_height;
+        Y_TILE=VRes/ytileheight;
+        if(VRes % ytileheight)Y_TILE++;
   }
 #endif
-  printScreen();                                                  // draw the screen
-  SCursor(xx, yy);
-  drawstatusline = true;
-  unsigned char lastkey = 0;
-  int y, statuscount;
-  clipboard[0] = 0;
-  buf[0]=0;
-  insert = true;
-  TextChanged = false;
+    printScreen();                                                  // draw the screen
+    SCursor(xx, yy);
+    drawstatusline = true;
+    unsigned char lastkey = 0;
+    int y, statuscount;
+    clipboard[0] = 0;
+    buf[0]=0;
+    insert = true;
+    TextChanged = false;
     BreakKeySave = BreakKey;
     BreakKey = 0;
     while(1) {
-      statuscount = 0;
-      do {
-          ShowCursor(true);
-          c = MMInkey();
-          if(statuscount++ == 5000) PrintStatus();
-      } while(c == -1);
-      ShowCursor(false);
+        statuscount = 0;
+        do {
+#ifdef USBKEYBOARD
+#ifndef PICOMITE
+            c=-1;
+            if(HID[1].Device_type==2 && DISPLAY_TYPE==SCREENMODE1){
+                if(!nunstruct[2].L)leftpushed=false;
+                if(!nunstruct[2].R)rightpushed=false;
+                if(!nunstruct[2].C)middlepushed=false;
+                if(nunstruct[2].y1!=lasty1 || nunstruct[2].x1!=lastx1){
+                    if(lastx1!=9999){
+                        tilefcols[lasty1*X_TILE+lastx1]=lastfc;
+                        tilebcols[lasty1*X_TILE+lastx1]=lastbc;
+                    }
+                    lastx1=nunstruct[2].x1;
+                    lasty1=nunstruct[2].y1;
+                    if(lasty1>=VHeight)lasty1=VHeight-1;
+                    lastfc=tilefcols[lasty1*X_TILE+lastx1];
+                    lastbc=tilebcols[lasty1*X_TILE+lastx1];
+                    tilefcols[lasty1*X_TILE+lastx1]=RGB555(RED);
+                    tilebcols[lasty1*X_TILE+lastx1]=RGB555(WHITE);
+                    }
+                if((nunstruct[2].L && leftpushed==false && rightpushed==false && middlepushed==false) ||
+                    (nunstruct[2].R && leftpushed==false && rightpushed==false && middlepushed==false) ||
+                    (nunstruct[2].C && leftpushed==false && rightpushed==false && middlepushed==false)){
+                    if(nunstruct[2].L)leftpushed=true;
+                    else if(nunstruct[2].R)rightpushed=true;
+                    else middlepushed=true;
+                    if(lastx1 >= 0 && lastx1 < VWidth && lasty1 >= 0 && lasty1 < VHeight) {  // c == ' ' means mouse down and no shift, ctrl, etc
+                        ShowCursor(false);
+                        // first position on the y axis
+                        while(*txtp != 0 && lasty1 > cury)                                       // assume we have to move down the screen
+                            if(*txtp++ == '\n') cury++;
+                        while(txtp != EdBuff && lasty1 < cury)                                   // assume we have to move up the screen
+                            if(*--txtp == '\n') cury--;
+                        while(txtp != EdBuff && *(txtp - 1) != '\n') txtp--;                // move to the beginning of the line
+                        for(curx = 0; curx < lastx1 && *txtp && *txtp != '\n'; curx++) txtp++;   // now position on the x axis
+                        PositionCursor(txtp);
+                        ShowCursor(true);
+                        tilefcols[lasty1*X_TILE+lastx1]=lastfc;
+                        tilebcols[lasty1*X_TILE+lastx1]=lastbc;
+                    } 
+                    if(rightpushed==true){
+                        c=F4;
+                    }
+                    if(middlepushed==true){
+                        c=F5;
+                    }
+                }
+            }
+            ShowCursor(true);
+            if(!((rightpushed==true && c==F4) || (middlepushed==true && c==F5)))
+#endif
+#endif
+            c = MMInkey();
 
-      if(drawstatusline) PrintFunctKeys(EDIT);
-      drawstatusline = false;
-      if(c == TAB) {
-            strcpy((char *)buf, "        ");
-            buf[Option.Tab - ((edx + curx) % Option.Tab)] = 0;
-      } else {
-          buf[0] = c;
-          buf[1] = 0;
-      }
+            if(statuscount++ == 5000) PrintStatus();
+        } while(c == -1);
+        ShowCursor(false);
+
+        if(drawstatusline) PrintFunctKeys(EDIT);
+        drawstatusline = false;
+        if(c == TAB) {
+                strcpy((char *)buf, "        ");
+                buf[Option.Tab - ((edx + curx) % Option.Tab)] = 0;
+        } else {
+            buf[0] = c;
+            buf[1] = 0;
+        }
       do {
           if(buf[0] == BreakKeySave) buf[0] = ESC;                                // if the user tried to break turn it into an escape
           switch(buf[0]) {
@@ -1000,12 +1072,65 @@ void PositionCursor(unsigned char *curp) {
 // implement the mark mode (when the user presses F4)
 void MarkMode(unsigned char *cb, unsigned char *buf) {
     unsigned char *p, *mark, *oldmark;
-    int c, x, y, i, oldx, oldy, txtpx, txtpy, errmsg = false;
+    int c=-1, x, y, i, oldx, oldy, txtpx, txtpy, errmsg = false;
 
     PrintFunctKeys(MARK);
     oldmark = mark = txtp;
     txtpx = oldx = curx; txtpy = oldy = cury;
     while(1) {
+        c=-1;
+#ifdef USBKEYBOARD
+#ifndef PICOMITE
+        if(HID[1].Device_type==2 && DISPLAY_TYPE==SCREENMODE1){
+            if(!nunstruct[2].L)leftpushed=false;
+            if(!nunstruct[2].R)rightpushed=false;
+            if(!nunstruct[2].C)middlepushed=false;
+            if(nunstruct[2].y1!=lasty1 || nunstruct[2].x1!=lastx1){
+                if(lastx1!=9999){
+                    tilefcols[lasty1*X_TILE+lastx1]=lastfc;
+                    tilebcols[lasty1*X_TILE+lastx1]=lastbc;
+                }
+                lastx1=nunstruct[2].x1;
+                lasty1=nunstruct[2].y1;
+                if(lasty1>=VHeight)lasty1=VHeight-1;
+                lastfc=tilefcols[lasty1*X_TILE+lastx1];
+                lastbc=tilebcols[lasty1*X_TILE+lastx1];
+                tilefcols[lasty1*X_TILE+lastx1]=RGB555(RED);
+                tilebcols[lasty1*X_TILE+lastx1]=RGB555(WHITE);
+                }
+            if((nunstruct[2].L && leftpushed==false && rightpushed==false && middlepushed==false) ||
+                (nunstruct[2].R && leftpushed==false && rightpushed==false && middlepushed==false) ||
+                (nunstruct[2].C && leftpushed==false && rightpushed==false && middlepushed==false)){
+                if(nunstruct[2].L)leftpushed=true;
+                else if(nunstruct[2].R)rightpushed=true;
+                else middlepushed=true;
+                if(lastx1 >= 0 && lastx1 < VWidth && lasty1 >= 0 && lasty1 < VHeight) {  // c == ' ' means mouse down and no shift, ctrl, etc
+            //        unsigned char * mtxtp=txtp;
+                    p=txtp;
+                    // first position on the y axis
+                    while(*p != 0 && lasty1 > cury)                                       // assume we have to move down the screen
+                        if(*p++ == '\n') cury++;
+                    while(p != EdBuff && lasty1 < cury)                                   // assume we have to move up the screen
+                        if(*--p == '\n') cury--;
+                    while(p != EdBuff && *(p - 1) != '\n') p--;                // move to the beginning of the line
+                    for(curx = 0; curx < lastx1 && *p && *p != '\n'; curx++) p++;   // now position on the x axis
+                    PositionCursor(p);
+                    mark=p;
+                } 
+                if(rightpushed==true){
+                    c=F4;
+                }
+                if(middlepushed==true){
+                    c=F5;
+                }
+                if(leftpushed==true ){
+                   c=9999;
+                }
+            }
+        }
+        if(!((rightpushed==true && c==F4) || (middlepushed==true && c==F5)  || (leftpushed==true && c==9999)))
+#endif
+#endif
         c = MMInkey();
         if(c != -1 && errmsg) {
             PrintFunctKeys(MARK);
@@ -1106,6 +1231,15 @@ void MarkMode(unsigned char *cb, unsigned char *buf) {
                       *cb = 0;
                       if(c == F5 || c == CTRLKEY('Y')) {
                           PositionCursor(txtp);
+#ifdef USBKEYBOARD
+#ifndef PICOMITE
+                        if(HID[1].Device_type==2 && DISPLAY_TYPE==SCREENMODE1){     
+                            nunstruct[2].ax =curx*FontTable[gui_font >> 4][0] * (gui_font & 0b1111);
+                            nunstruct[2].ay =cury*FontTable[gui_font >> 4][1] * (gui_font & 0b1111);
+                            lastx1=9999;lasty1=9999;
+                        }                    
+#endif 
+#endif                         
                           return;
                       }
                       // fall through
@@ -1119,8 +1253,17 @@ void MarkMode(unsigned char *cb, unsigned char *buf) {
                       *p++ = 0; *p++ = 0;
                       TextChanged = true;
                       PositionCursor(txtp);
+#ifdef USBKEYBOARD
+#ifndef PICOMITE
+                        if(HID[1].Device_type==2 && DISPLAY_TYPE==SCREENMODE1){     
+                            nunstruct[2].ax =curx*FontTable[gui_font >> 4][0] * (gui_font & 0b1111);
+                            nunstruct[2].ay =cury*FontTable[gui_font >> 4][1] * (gui_font & 0b1111);
+                            lastx1=9999;lasty1=9999;
+                        }                    
+#endif 
+#endif                         
                       return;
-
+            case 9999: break;
             default:    continue;
         }
 
@@ -1145,7 +1288,6 @@ void MarkMode(unsigned char *cb, unsigned char *buf) {
             }
         }
         fflush(stdout);
-
         oldmark = mark; oldx = x; oldy = y;
 
         // now draw the marked area
@@ -1694,3 +1836,4 @@ void ScrollDown(void) {
 }
 
 #endif
+/*  @endcond */

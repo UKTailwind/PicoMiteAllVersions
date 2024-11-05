@@ -1,3 +1,7 @@
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 ///////////////////////////////////////////////////////////////////////////////////
 //-------------------------------------------------------------------------------//
 //-------------------------------------------------------------------------------//
@@ -277,3 +281,4 @@ int hxcmod_fillbuffer( modcontext * modctx, msample * outbuffer, unsigned long n
 void hxcmod_unload( modcontext * modctx );
 
 #endif
+/*  @endcond */

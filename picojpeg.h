@@ -1,3 +1,7 @@
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 //------------------------------------------------------------------------------
 // picojpeg - Public domain, Rich Geldreich <richgel99@gmail.com>
 //------------------------------------------------------------------------------
@@ -142,3 +146,4 @@ extern uint8_t *gInBuf;
 #endif
 
 #endif // PICOJPEG_H
+/*  @endcond */

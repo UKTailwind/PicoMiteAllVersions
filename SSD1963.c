@@ -22,6 +22,15 @@ LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON A
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
 
 ************************************************************************************************************************/
+/**
+* @file SSD1963.c
+* @author Geoff Graham, Peter Mather
+* @brief Source for getscanline MMBasic function
+*/
+/**
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
@@ -1828,6 +1837,8 @@ void ReadBLITBuffer320(int x1, int y1, int x2, int y2, unsigned char* p) {
     HRes=320;
     VRes=240;
 }
+/*  @endcond */
+
 void MIPS16 fun_getscanline(void){
     if(Option.DISPLAY_TYPE < SSDPANEL && !(Option.DISPLAY_TYPE==ILI9341 || Option.DISPLAY_TYPE==ST7789B || Option.DISPLAY_TYPE==ILI9488)) {
         iret=-1;
@@ -1844,6 +1855,10 @@ void MIPS16 fun_getscanline(void){
         targ = T_INT;
     }
 }
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 
 
 /***********************************************************************************************
@@ -2015,4 +2030,5 @@ void ScrollSSD1963(int lines) {
 
     ScrollStart = t;
 }
+/*  @endcond */
 

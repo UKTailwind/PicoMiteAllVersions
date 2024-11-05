@@ -1,3 +1,7 @@
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 /*
  * Copyright (c) 2020 Raspberry Pi (Trading) Ltd.
  *
@@ -19,7 +23,7 @@
 #define PARAM_ASSERTIONS_ENABLED_PIO 0
 #endif
 
-/** \file hardware/pio.h
+/*  \file hardware/pio.h
  *  \defgroup hardware_pio hardware_pio
  *
  * Programmable I/O (PIO) API
@@ -49,7 +53,7 @@ extern "C" {
 
 static_assert(PIO_SM0_SHIFTCTRL_FJOIN_RX_LSB == PIO_SM0_SHIFTCTRL_FJOIN_TX_LSB + 1, "");
 
-/** \brief FIFO join states
+/*  \brief FIFO join states
  *  \ingroup hardware_pio
  */
 enum pio_fifo_join {
@@ -58,7 +62,7 @@ enum pio_fifo_join {
     PIO_FIFO_JOIN_RX = 2,
 };
 
-/** \brief MOV status types
+/*  \brief MOV status types
  *  \ingroup hardware_pio
  */
 enum pio_mov_status_type {
@@ -68,7 +72,7 @@ enum pio_mov_status_type {
 
 typedef pio_hw_t *PIO;
 
-/** Identifier for the first (PIO 0) hardware PIO instance (for use in PIO functions).
+/*  Identifier for the first (PIO 0) hardware PIO instance (for use in PIO functions).
  *
  * e.g. pio_gpio_init(pio0, 5)
  *
@@ -76,9 +80,9 @@ typedef pio_hw_t *PIO;
  * @{
  */
 #define pio0 pio0_hw
-/** @} */
+/*  @} */
 
-/** Identifier for the second (PIO 1) hardware PIO instance (for use in PIO functions).
+/*  Identifier for the second (PIO 1) hardware PIO instance (for use in PIO functions).
  *
  * e.g. pio_gpio_init(pio1, 5)
  *
@@ -86,9 +90,9 @@ typedef pio_hw_t *PIO;
  * @{
  */
 #define pio1 pio1_hw
-/** @} */
+/*  @} */
 
-/** \brief PIO state machine configuration
+/*  \brief PIO state machine configuration
  *  \defgroup sm_config sm_config
  *  \ingroup hardware_pio
  *
@@ -97,7 +101,7 @@ typedef pio_hw_t *PIO;
  *
  */
 
-/** \brief PIO Configuration structure
+/*  \brief PIO Configuration structure
  *  \ingroup sm_config
  */
 typedef struct {
@@ -1311,3 +1315,4 @@ bool pio_sm_is_claimed(PIO pio, uint sm);
 #endif
 
 #endif // _PIO_H_
+/*  @endcond */

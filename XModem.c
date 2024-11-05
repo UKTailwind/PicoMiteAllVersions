@@ -22,6 +22,15 @@ LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON A
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
 
 ************************************************************************************************************************/
+/**
+* @file XModem.c
+* @author Geoff Graham, Peter Mather
+* @brief Source for the MMBasic XMODEM command
+*/
+/**
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
@@ -30,6 +39,8 @@ void xmodemTransmit(char *p, int fnbr);
 void xmodemReceive(char *sp, int maxbytes, int fnbr, int crunch);
 int FindFreeFileNbr(void);
 bool rcvnoint;
+
+/*  @endcond */
 
 void MIPS16 cmd_xmodem(void) {
     char *buf, BreakKeySave, *p, *fromp;
@@ -91,19 +102,18 @@ void MIPS16 cmd_xmodem(void) {
         if(!InitSDCard()) return;
         fnbr = FindFreeFileNbr();
         fname = (char *)getFstring(cmdline);                                // get the file name
-
+        if(Option.SerialConsole){
+            rcvnoint=true;
+            uart_set_irq_enables((Option.SerialConsole & 3)==1 ? uart0 : uart1, false, false);
+        } else rcvnoint=false;
         if(rcv) {
-
-            if(Option.SerialConsole){
-                rcvnoint=true;
-                uart_set_irq_enables((Option.SerialConsole & 3)==1 ? uart0 : uart1, false, false);
-            } else rcvnoint=false;
             if(!BasicFileOpen(fname, fnbr, FA_WRITE | FA_CREATE_ALWAYS)) return;
             xmodemReceive(NULL, 0, fnbr, false);
             if(rcvnoint)uart_set_irq_enables((Option.SerialConsole & 3)==1 ? uart0 : uart1, true, false);
         } else {
             if(!BasicFileOpen(fname, fnbr, FA_READ)) return;
             xmodemTransmit(NULL, fnbr);
+            if(rcvnoint)uart_set_irq_enables((Option.SerialConsole & 3)==1 ? uart0 : uart1, true, false);
         }
         FileClose(fnbr);
     }
@@ -111,21 +121,24 @@ void MIPS16 cmd_xmodem(void) {
     cmd_end();
 }
 
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 
 int _inbyte(int timeout) {
     int c;
-
-    PauseTimer = 0;
+    uint64_t timer=time_us_64()+timeout*1000;
     if(!rcvnoint){
-        while(PauseTimer < timeout) {
+        while(time_us_64() < timer) {
             c = getConsole();
             if(c != -1) {
                 return c;
             }
         }
     } else {
-        while(PauseTimer < timeout && !uart_is_readable((Option.SerialConsole & 3)==1 ? uart0 : uart1)) {}
-        if(PauseTimer < timeout) return uart_getc((Option.SerialConsole & 3)==1 ? uart0 : uart1);
+        while(time_us_64() < timer && !uart_is_readable((Option.SerialConsole & 3)==1 ? uart0 : uart1)) {}
+        if(time_us_64() < timer) return uart_getc((Option.SerialConsole & 3)==1 ? uart0 : uart1);
     }
     return -1;
 }
@@ -372,9 +385,9 @@ void xmodemTransmit(char *p, int fnbr) {
                   }
               }
               // too many retrys... give up
-              _outbyte(CAN,1);;
-              _outbyte(CAN,1);;
-              _outbyte(CAN,1);;
+              _outbyte(CAN,1);
+              _outbyte(CAN,1);
+              _outbyte(CAN,1);
               flushinput();
               error("Too many errors");
           }
@@ -393,3 +406,4 @@ void xmodemTransmit(char *p, int fnbr) {
   }
 }
 
+/*  @endcond */

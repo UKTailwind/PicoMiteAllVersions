@@ -1,3 +1,7 @@
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 #ifndef _LWIPOPTS_EXAMPLE_COMMONH_H
 #define _LWIPOPTS_EXAMPLE_COMMONH_H
 
@@ -91,3 +95,4 @@
 #define DHCP_DEBUG                  LWIP_DBG_OFF
 
 #endif /* __LWIPOPTS_H__ */
+/*  @endcond */

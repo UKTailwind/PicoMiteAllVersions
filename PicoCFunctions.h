@@ -1,4 +1,8 @@
-/*******************************************************************************************
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
+/* *****************************************************************************************
 *
 *  Definitions used when calling MMBasic Interpreter API Functions from CFunctions
 *  For PicoMite MMBasic V5.07.05
@@ -202,9 +206,9 @@ struct s_vartbl {                               // structure of the variable tab
 #define T_BLOCKED   0x40                            // Hash table entry blocked after ERASE
 
 
-//***************************************************************************************************
+//* *************************************************************************************************
 // Constants and definitions copied from the Micromite MkII and Micromite Plus source
-//***************************************************************************************************
+//* *************************************************************************************************
 
 //The Option structure
 struct option_s {
@@ -409,3 +413,4 @@ struct option_s {
 #define EXT_BOOT_RESERVED       0x400                 // this pin is reserved at bootup and cannot be used
 #define NOP()  __asm volatile ("nop")
 #define USERLCDPANEL            25
+/*  @endcond */

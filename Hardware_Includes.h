@@ -1,4 +1,8 @@
-/***********************************************************************************************************************
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
+/* *********************************************************************************************************************
 PicoMite MMBasic
 
 Hardware_Includes.h
@@ -246,7 +250,7 @@ extern void clear320(void);
 #ifdef USBKEYBOARD
 extern void clearrepeat(void);
 	extern uint8_t Current_USB_devices;
-	extern void cmd_mouse(unsigned char *p);
+	extern void cmd_mouse(void);
 	extern bool USBenabled;
 #endif
 int __not_in_flash_func(MMInkey)(void);
@@ -376,3 +380,4 @@ extern struct tagMTRand *g_myrand;
 #include "GPS.h"
 #include "Audio.h"
 #include "PS2Keyboard.h"
+/*  @endcond */

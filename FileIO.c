@@ -22,6 +22,15 @@ LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON A
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ************************************************************************************************************************/
+/**
+* @file FileIO.c
+* @author Geoff Graham, Peter Mather
+* @brief Source for file handling MMBasic commands and functions
+*/
+/**
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
 #include "ff.h"
@@ -269,6 +278,7 @@ void disable_interrupts(void)
 void enable_interrupts(void)
 {
     restore_interrupts(irqs);
+    mSecTimer=time_us_64()/1000;
     irqs=0;
 }
 void ErrorThrow(int e, int type)
@@ -345,6 +355,7 @@ int __not_in_flash_func(fs_flash_sync)(const struct lfs_config *c)
 {
     return 0;
 }
+/*  @endcond */
 void MIPS16 cmd_disk(void){
     char *p=(char *)getCstring(cmdline);
     char *b=GetTempMemory(STRINGSIZE);
@@ -658,6 +669,10 @@ void MIPS16 cmd_flash(void)
     else
         error("Syntax");
 }
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 
 void ErrorCheck(int fnbr)
 { // checks for an error, if fnbr is specified frees up the filehandle before sending error
@@ -688,7 +703,8 @@ char *GetCWD(void)
         return b;
     }
 }
-void LoadImage(unsigned char *p)
+/*  @endcond */
+void cmd_LoadImage(unsigned char *p)
 {
     int fnbr;
     int xOrigin, yOrigin;
@@ -719,6 +735,10 @@ void LoadImage(unsigned char *p)
     if (Option.Refresh)
         Display_Refresh();
 }
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 #ifndef max
 #define max(a, b) (((a) > (b)) ? (a) : (b))
 #endif
@@ -743,8 +763,9 @@ unsigned char pjpeg_need_bytes_callback(unsigned char *pBuf, unsigned char buf_s
     g_nInFileOfs += n;
     return 0;
 }
+/*  @endcond */
 
-void LoadJPGImage(unsigned char *p)
+void cmd_LoadJPGImage(unsigned char *p)
 {
     pjpeg_image_info_t image_info;
     int mcu_x = 0;
@@ -1113,6 +1134,10 @@ void MIPS16 cmd_rmdir(void)
         ErrorCheck(0);
     }
 }
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 
 void chdir(char *p){
 	int i;
@@ -1156,6 +1181,7 @@ void chdir(char *p){
 	ErrorCheck(0); // error if the pathname was invalid
 
 }
+/*  @endcond */
 void cmd_chdir(void){
     char *p;
     p = (char *)getFstring(cmdline);  // get the directory name and convert to a standard C string
@@ -1333,6 +1359,10 @@ void MIPS16 cmd_kill(void)
         FatFSFileSystem=FatFSFileSystemSave;
     }
 }
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 
 void positionfile(int fnbr, int idx){
     char *buff;
@@ -1359,6 +1389,7 @@ void positionfile(int fnbr, int idx){
     }
 
 }
+/*  @endcond */
 void cmd_seek(void)
 {
     int fnbr, idx;
@@ -1811,6 +1842,10 @@ void MIPS16 cmd_save(void)
         FileClose(fnbr);
     }
 }
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 #ifdef rp2350
 #define loadbuffsize EDIT_BUFFER_SIZE-sizeof(a_dlist)*MAXDEFINES-4096
 int cmpstr(char *s1,char *s2)
@@ -2234,6 +2269,8 @@ void MIPS16 loadCMM2(unsigned char *p, bool autorun, bool message)
     }
     return;
 }
+/*  @endcond */
+
 void MIPS16 cmd_loadCMM2(void){
     bool autorun=false;
     getargs(&cmdline,3,(unsigned char *)",");
@@ -2264,13 +2301,13 @@ void MIPS16 cmd_load(void)
     p = checkstring(cmdline, (unsigned char *)"IMAGE");
     if (p)
     {
-        LoadImage(p);
+        cmd_LoadImage(p);
         return;
     }
     p = checkstring(cmdline, (unsigned char *)"JPG");
     if (p)
     {
-        LoadJPGImage(p);
+        cmd_LoadJPGImage(p);
         return;
     }
     getargs(&cmdline, 3, (unsigned char *)",");
@@ -2302,6 +2339,10 @@ void MIPS16 cmd_load(void)
     SetFont(oldfont);
     PromptFont=oldfont;
 }
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 char __not_in_flash_func(FileGetChar)(int fnbr)
 {
     char ch;
@@ -2782,6 +2823,8 @@ int drivecheck(char *p, int *waste){
         return FatFSFileSystem+1;
     }
 }
+/*  @endcond */
+
 void MIPS16 cmd_copy(void)
 {
     unsigned char *p=GetTempMemory(STRINGSIZE);
@@ -2979,6 +3022,10 @@ void MIPS16 cmd_copy(void)
     }
     FatFSFileSystem=FatFSFileSystemSave;
 } 
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 
 int resolve_path(char *path, char *result, char *pos)
 {
@@ -3119,6 +3166,7 @@ void getfullfilepath(char *p, char *q){
     if(q[strlen(q)-1]!='/')strcat(q,"/");
     strcat(q,pp);
 }
+/*  @endcond */
 
 void MIPS16 cmd_files(void)
 {
@@ -3590,6 +3638,10 @@ void MIPS16 cmd_files(void)
         longjmp(mark, 1);
 
 }
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 // remove unnecessary text
 void CrunchData(unsigned char **p, int c)
 {
@@ -3634,6 +3686,8 @@ void CrunchData(unsigned char **p, int c)
     }
     *((*p)++) = lastch = c;
 }
+/*  @endcond */
+
 void cmd_autosave(void)
 {
     unsigned char *buf, *p;
@@ -3735,6 +3789,10 @@ readin:;
         ExecuteProgram(tknbuf); // execute the line straight away
     }
 }
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 
 void FileOpen(char *fname, char *fmode, char *ffnbr)
 {
@@ -3756,6 +3814,7 @@ void FileOpen(char *fname, char *fmode, char *ffnbr)
     fnbr = getinteger((unsigned char *)ffnbr);
     BasicFileOpen(fname, fnbr, mode);
 }
+/*  @endcond */
 
 void cmd_open(void)
 {
@@ -4031,6 +4090,11 @@ void cmd_close(void)
         }
     }
 }
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
+
 void CheckSDCard(void)
 {
     if (!(SDCardStat & STA_NOINIT))
@@ -4269,6 +4333,7 @@ void FlashWriteClose(void)
     }
     enable_interrupts();
 }
+/*  @endcond */
 
 /*******************************************************************************************************************
  The variables are stored in a reserved flash area (which in total is 2K).
@@ -4490,6 +4555,10 @@ void MIPS16 cmd_var(void)
     }
     error("Unknown command");
 }
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 
 void ClearSavedVars(void)
 {
@@ -4509,3 +4578,4 @@ void SaveOptions(void)
     flash_range_program(FLASH_TARGET_OFFSET, (const uint8_t *)&Option, sizeof(struct option_s));
     enable_interrupts();
 }
+/*  @endcond */

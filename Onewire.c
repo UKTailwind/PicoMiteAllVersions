@@ -41,6 +41,16 @@ option) any later version.
  DEALINGS IN THE SOFTWARE.
 
 ************************************************************************************************************************/
+/**
+* @file Onewire.c
+* @author Geoff Graham, Peter Mather
+* @brief Source for GPS MMBasic function
+*/
+/**
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
+
 
 
 
@@ -112,6 +122,7 @@ int ow_verify(int pin, int alarm_only);
 void ow_serialNum(unsigned char *serialnum_buf, int do_read);
 void ow_familySearchSetup(int search_family);
 void ow_skipFamily(void);
+/*  @endcond */
 
 // the main OneWire command
 void cmd_onewire(void) {
@@ -131,6 +142,10 @@ void cmd_onewire(void) {
         error("Unknown command");
 }
 
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 
 
 
@@ -164,6 +179,7 @@ void Init_ds18b20(int pin, int precision) {
     ExtCfg(pin, EXT_DS18B20_RESERVED, 0);
 }
 
+/*  @endcond */
 
 void cmd_ds18b20(void) {
     int pin, precision;
@@ -218,6 +234,10 @@ void fun_ds18b20(void) {
     targ = T_NBR;
 }
 
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 
 
 /****************************************************************************************************************************
@@ -382,6 +402,8 @@ void owRead(unsigned char *p) {
 //        8 = skip current family
 //       16 = verify
 //
+/*  @endcond */
+
 void fun_owSearch(void) {
 	int pin, flag, alarm, i;
     union map
@@ -444,6 +466,10 @@ void fun_owSearch(void) {
 	return;
 }
 #endif
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 
 #if defined(INCLUDE_CRC)
 void fun_owCRC8(void){
@@ -490,11 +516,16 @@ void fun_owCRC16(void){
 	fret = (MMFLOAT)us;
 }
 #endif
+/*  @endcond */
 
 void fun_mmOW(void) {
 	iret = mmOWvalue;
     targ = T_INT;
 }
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 
 
 void ow_pinChk(int pin) {
@@ -930,3 +961,4 @@ unsigned char docrc8(unsigned char cdata) {
 	return utilcrc8;
 }
 #endif
+/*  @endcond */

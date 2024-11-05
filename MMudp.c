@@ -1,3 +1,7 @@
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
 #include "lwip/udp.h"
@@ -126,3 +130,4 @@ void cmd_udp(unsigned char *p){
         return;
     }
 }
+/*  @endcond */

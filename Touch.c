@@ -22,6 +22,14 @@ LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON A
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
 
 ************************************************************************************************************************/
+/** @file Touch.c
+* @author Geoff Graham, Peter Mather
+* @brief Source for the MMBasic Touch function
+*/
+/*
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 
 
 #include "MMBasic_Includes.h"
@@ -237,6 +245,7 @@ void __not_in_flash_func(TDelay)(void)     // provides a small (~200ns) delay fo
     shortpause(T);
 }
 
+/*  @endcond */
 
 // the MMBasic TOUCH() function
 void fun_touch(void) {

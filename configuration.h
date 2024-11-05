@@ -1,4 +1,8 @@
-/***********************************************************************************************************************
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
+/* *********************************************************************************************************************
 PicoMite MMBasic
 
 configuration.h
@@ -124,16 +128,16 @@ extern "C" {
             #define HEAPTOP 0x2007C000
         #endif
     #else
-        #define HEAP_MEMORY_SIZE (132*1024) 
+        #define HEAP_MEMORY_SIZE (128*1024) 
         #define MAXVARS             512                     // 8 + MAXVARLEN + MAXDIM * 2  (ie, 56 bytes) - these do not incl array members
-        #define FLASH_TARGET_OFFSET (720 * 1024) 
+        #define FLASH_TARGET_OFFSET (768 * 1024) 
         #define MAX_CPU     420000
         #define MAXSUBFUN           256                     // each entry takes up 4 bytes
         #ifdef USBKEYBOARD
-            #define MagicKey 0x21343429
+            #define MagicKey 0x21341429
             #define HEAPTOP 0x2003EC00
         #else
-            #define MagicKey 0x71743430
+            #define MagicKey 0x71743220
             #define HEAPTOP 0x2003f100
         #endif
     #endif
@@ -189,17 +193,17 @@ extern "C" {
 #define STR_FLOAT_DIGITS 6                            // number of significant digits to use when converting MMFLOAT to a string
 #define NBRSETTICKS         4                       // the number of SETTICK interrupts available
 #ifndef PICOMITEWEB
-#ifdef rp2350
-#define PIOMAX 3
-#define NBRPINS             62
-#define PSRAMbase 0x11000000
+    #ifdef rp2350
+        #define PIOMAX 3
+        #define NBRPINS             62
+        #define PSRAMbase 0x11000000
+    #else
+        #define PIOMAX 2
+        #define NBRPINS             44
+    #endif
 #else
-#define PIOMAX 2
-#define NBRPINS             44
-#endif
-#else
-#define PIOMAX 2
-#define NBRPINS             40
+    #define PIOMAX 2
+    #define NBRPINS             40
 #endif
 #define MAXPROMPTLEN        49                      // max length of a prompt incl the terminating null
 #define BREAK_KEY           3                       // the default value (CTRL-C) for the break key.  Reset at the command prompt.
@@ -301,3 +305,4 @@ extern "C" {
 }
 #endif
 #endif /* __CONFIGURATION_H */
+/*  @endcond */

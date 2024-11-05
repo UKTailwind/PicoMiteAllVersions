@@ -1,4 +1,8 @@
-/**
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
+/* 
  * This is a driver library for VS1053 MP3 Codec Breakout
  * (Ogg Vorbis / MP3 / AAC / WMA / FLAC / MIDI Audio Codec Chip).
  * Adapted for Espressif ESP8266 and ESP32 boards.
@@ -145,3 +149,4 @@ enum VS1053_I2S_RATE {
     void VS1053reset(uint8_t _reset_pin);
 
 #endif
+/*  @endcond */

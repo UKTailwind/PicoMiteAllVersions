@@ -1,9 +1,9 @@
 /***********************************************************************************************************************
 PicoMite MMBasic
 
-commands.c
+* @file commands.c
 
-<COPYRIGHT HOLDERS>  Geoff Graham, Peter Mather
+<COPYRIGHT HOLDERS>  @author Geoff Graham, Peter Mather
 Copyright (c) 2021, <COPYRIGHT HOLDERS> All rights reserved. 
 Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met: 
 1.	Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
@@ -21,8 +21,17 @@ INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, B
 LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, 
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
 
-************************************************************************************************************************/
 
+************************************************************************************************************************/
+/**
+* @file Commands.c
+* @author Geoff Graham, Peter Mather
+* @brief Source for standard MMBasic commands
+*/
+/**
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 
 
 #include "MMBasic_Includes.h"
@@ -85,7 +94,12 @@ static inline CommandToken commandtbl_decode(const unsigned char *p){
 void __not_in_flash_func(cmd_null)(void) {
 	// do nothing (this is just a placeholder for commands that have no action)
 }
-
+/** @endcond */
+/** 
+ * This command increments an integer or a float or concatenates two strings
+ * @param a the integer, float or string to be changed
+ * @param b OPTIONAL for integers and floats - defaults to 1. Otherwise the amount to increment the number or the string to concatenate
+ */
 void MIPS16 __not_in_flash_func(cmd_inc)(void){
 	unsigned char *p, *q;
     int vtype;
@@ -257,6 +271,10 @@ void  MIPS16 __not_in_flash_func(cmd_let)(void) {
 	}
 	checkend(p1);
 }
+/**
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 int MIPS16 as_strcmpi (const char *s1, const char *s2)
 {
   const unsigned char *p1 = (const unsigned char *) s1;
@@ -277,7 +295,6 @@ int MIPS16 as_strcmpi (const char *s1, const char *s2)
 
   return c1 - c2;
 }
-
 void MIPS16 sortStrings(char **arr, int n)
 {
     char temp[16];
@@ -312,95 +329,6 @@ void MIPS16 ListFile(char *pp, int all) {
 	}
 	FileClose(fnbr);
 }
-
-void MIPS16 cmd_list(void) {
-	unsigned char *p;
-	int i,j,k,m,step;
-    if((p = checkstring(cmdline, (unsigned char *)"ALL"))) {
-        if(!(*p == 0 || *p == '\'')) {
-        	if(Option.DISPLAY_CONSOLE && (SPIREAD  || Option.NoScroll)){ClearScreen(gui_bcolour);CurrentX=0;CurrentY=0;}
-        	getargs(&p,1,(unsigned char *)",");
-        	char *buff=GetTempMemory(STRINGSIZE);
-        	strcpy(buff,(char *)getCstring(argv[0]));
-    		if(strchr(buff, '.') == NULL) strcat(buff, ".bas");
-            ListFile(buff, true);
-        } else {
-        	if(Option.DISPLAY_CONSOLE && (SPIREAD  || Option.NoScroll)){ClearScreen(gui_bcolour);CurrentX=0;CurrentY=0;}
-        	ListProgram(ProgMemory, true);
-        	checkend(p);
-        }
-   } else if((p = checkstring(cmdline, (unsigned char *)"COMMANDS"))) {
-    	int ListCnt = 1;
-    	step=Option.DISPLAY_CONSOLE ? HRes/gui_font_width/20 : 5;
-        if(Option.DISPLAY_CONSOLE && (SPIREAD  || Option.NoScroll)){ClearScreen(gui_bcolour);CurrentX=0;CurrentY=0;}
-    	m=0;
-		int x=0;
-		char** c=GetTempMemory((CommandTableSize+x)*sizeof(*c)+(CommandTableSize+x)*18);
-		for(i=0;i<CommandTableSize+x;i++){
-				c[m]= (char *)((int)c + sizeof(char *) * (CommandTableSize+x) + m*18);
-				if(m<CommandTableSize)strcpy(c[m],(char *)commandtbl[i].name);
-    			m++;
-		}
-    	sortStrings(c,m);
-    	for(i=1;i<m;i+=step){
-    		for(k=0;k<step;k++){
-        		if(i+k<m){
-        			MMPrintString(c[i+k]);
-        			if(k!=(step-1))for(j=strlen(c[i+k]);j<15;j++)MMputchar(' ',1);
-        		}
-    		}
-			if(Option.DISPLAY_CONSOLE)ListNewLine(&ListCnt, 0);
-    		else MMPrintString("\r\n");
-    	}
-		MMPrintString("Total of ");PInt(m-1);MMPrintString(" commands\r\n");
-    } else if((p = checkstring(cmdline, (unsigned char *)"FUNCTIONS"))) {
-    	m=0;
-    	int ListCnt = 1;
-    	step=Option.DISPLAY_CONSOLE ? HRes/gui_font_width/20 : 5;
-        if(Option.DISPLAY_CONSOLE && (SPIREAD  || Option.NoScroll)){ClearScreen(gui_bcolour);CurrentX=0;CurrentY=0;}
-		int x=8;
-		char** c=GetTempMemory((TokenTableSize+x)*sizeof(*c)+(TokenTableSize+x)*18);
-		for(i=0;i<TokenTableSize+x;i++){
-				c[m]= (char *)((int)c + sizeof(char *) * (TokenTableSize+x) + m*18);
-				if(m<TokenTableSize)strcpy(c[m],(char *)tokentbl[i].name);
-	   			else if(m==TokenTableSize)strcpy(c[m],"=>");
-    			else if(m==TokenTableSize+1)strcpy(c[m],"=<");
-    			else if(m==TokenTableSize+2)strcpy(c[m],"MM.Fontwidth");
-    			else if(m==TokenTableSize+3)strcpy(c[m],"MM.Fontheight");
-    			else if(m==TokenTableSize+4)strcpy(c[m],"MM.HPOS");
-    			else if(m==TokenTableSize+5)strcpy(c[m],"MM.VPOS");
-    			else if(m==TokenTableSize+6)strcpy(c[m],"MM.PS2");
-    			else strcpy(c[m],"MM.Info$(");
-				m++;
-		}
-    	sortStrings(c,m);
-    	for(i=1;i<m;i+=step){
-    		for(k=0;k<step;k++){
-        		if(i+k<m){
-        			MMPrintString(c[i+k]);
-        			if(k!=(step-1))for(j=strlen(c[i+k]);j<15;j++)MMputchar(' ',1);
-        		}
-    		}
-			if(Option.DISPLAY_CONSOLE)ListNewLine(&ListCnt, 0);
-    		else MMPrintString("\r\n");
-    	}
-		MMPrintString("Total of ");PInt(m-1);MMPrintString(" functions and operators\r\n");
-    } else {
-        if(!(*cmdline == 0 || *cmdline == '\'')) {
-        	getargs(&cmdline,1,(unsigned char *)",");
-        	if(Option.DISPLAY_CONSOLE && (SPIREAD  || Option.NoScroll)){ClearScreen(gui_bcolour);CurrentX=0;CurrentY=0;}
-        	char *buff=GetTempMemory(STRINGSIZE);
-        	strcpy(buff,(char *)getCstring(argv[0]));
-    		if(strchr(buff, '.') == NULL) strcat(buff, ".bas");
-			ListFile(buff, false);
-        } else {
-        	if(Option.DISPLAY_CONSOLE && (SPIREAD  || Option.NoScroll)){ClearScreen(gui_bcolour);CurrentX=0;CurrentY=0;}
-			ListProgram(ProgMemory, false);
-			checkend(cmdline);
-		}
-    }
-}
-
 
 void MIPS16 ListNewLine(int *ListCnt, int all) {
 	unsigned char noscroll=Option.NoScroll;
@@ -510,6 +438,96 @@ void MIPS16 do_run(unsigned char *cmdline, bool CMM2mode) {
 #endif
 	nextstmt = ProgMemory;
 }
+/** @endcond */
+void MIPS16 cmd_list(void) {
+	unsigned char *p;
+	int i,j,k,m,step;
+    if((p = checkstring(cmdline, (unsigned char *)"ALL"))) {
+        if(!(*p == 0 || *p == '\'')) {
+        	if(Option.DISPLAY_CONSOLE && (SPIREAD  || Option.NoScroll)){ClearScreen(gui_bcolour);CurrentX=0;CurrentY=0;}
+        	getargs(&p,1,(unsigned char *)",");
+        	char *buff=GetTempMemory(STRINGSIZE);
+        	strcpy(buff,(char *)getCstring(argv[0]));
+    		if(strchr(buff, '.') == NULL) strcat(buff, ".bas");
+            ListFile(buff, true);
+        } else {
+        	if(Option.DISPLAY_CONSOLE && (SPIREAD  || Option.NoScroll)){ClearScreen(gui_bcolour);CurrentX=0;CurrentY=0;}
+        	ListProgram(ProgMemory, true);
+        	checkend(p);
+        }
+   } else if((p = checkstring(cmdline, (unsigned char *)"COMMANDS"))) {
+    	int ListCnt = 1;
+    	step=Option.DISPLAY_CONSOLE ? HRes/gui_font_width/20 : 5;
+        if(Option.DISPLAY_CONSOLE && (SPIREAD  || Option.NoScroll)){ClearScreen(gui_bcolour);CurrentX=0;CurrentY=0;}
+    	m=0;
+		int x=0;
+		char** c=GetTempMemory((CommandTableSize+x)*sizeof(*c)+(CommandTableSize+x)*18);
+		for(i=0;i<CommandTableSize+x;i++){
+				c[m]= (char *)((int)c + sizeof(char *) * (CommandTableSize+x) + m*18);
+				if(m<CommandTableSize)strcpy(c[m],(char *)commandtbl[i].name);
+    			m++;
+		}
+    	sortStrings(c,m);
+    	for(i=1;i<m;i+=step){
+    		for(k=0;k<step;k++){
+        		if(i+k<m){
+        			MMPrintString(c[i+k]);
+        			if(k!=(step-1))for(j=strlen(c[i+k]);j<15;j++)MMputchar(' ',1);
+        		}
+    		}
+			if(Option.DISPLAY_CONSOLE)ListNewLine(&ListCnt, 0);
+    		else MMPrintString("\r\n");
+    	}
+		MMPrintString("Total of ");PInt(m-1);MMPrintString(" commands\r\n");
+    } else if((p = checkstring(cmdline, (unsigned char *)"FUNCTIONS"))) {
+    	m=0;
+    	int ListCnt = 1;
+    	step=Option.DISPLAY_CONSOLE ? HRes/gui_font_width/20 : 5;
+        if(Option.DISPLAY_CONSOLE && (SPIREAD  || Option.NoScroll)){ClearScreen(gui_bcolour);CurrentX=0;CurrentY=0;}
+		int x=8;
+		char** c=GetTempMemory((TokenTableSize+x)*sizeof(*c)+(TokenTableSize+x)*18);
+		for(i=0;i<TokenTableSize+x;i++){
+				c[m]= (char *)((int)c + sizeof(char *) * (TokenTableSize+x) + m*18);
+				if(m<TokenTableSize)strcpy(c[m],(char *)tokentbl[i].name);
+	   			else if(m==TokenTableSize)strcpy(c[m],"=>");
+    			else if(m==TokenTableSize+1)strcpy(c[m],"=<");
+    			else if(m==TokenTableSize+2)strcpy(c[m],"MM.Fontwidth");
+    			else if(m==TokenTableSize+3)strcpy(c[m],"MM.Fontheight");
+    			else if(m==TokenTableSize+4)strcpy(c[m],"MM.HPOS");
+    			else if(m==TokenTableSize+5)strcpy(c[m],"MM.VPOS");
+    			else if(m==TokenTableSize+6)strcpy(c[m],"MM.PS2");
+    			else strcpy(c[m],"MM.Info$(");
+				m++;
+		}
+    	sortStrings(c,m);
+    	for(i=1;i<m;i+=step){
+    		for(k=0;k<step;k++){
+        		if(i+k<m){
+        			MMPrintString(c[i+k]);
+        			if(k!=(step-1))for(j=strlen(c[i+k]);j<15;j++)MMputchar(' ',1);
+        		}
+    		}
+			if(Option.DISPLAY_CONSOLE)ListNewLine(&ListCnt, 0);
+    		else MMPrintString("\r\n");
+    	}
+		MMPrintString("Total of ");PInt(m-1);MMPrintString(" functions and operators\r\n");
+    } else {
+        if(!(*cmdline == 0 || *cmdline == '\'')) {
+        	getargs(&cmdline,1,(unsigned char *)",");
+        	if(Option.DISPLAY_CONSOLE && (SPIREAD  || Option.NoScroll)){ClearScreen(gui_bcolour);CurrentX=0;CurrentY=0;}
+        	char *buff=GetTempMemory(STRINGSIZE);
+        	strcpy(buff,(char *)getCstring(argv[0]));
+    		if(strchr(buff, '.') == NULL) strcat(buff, ".bas");
+			ListFile(buff, false);
+        } else {
+        	if(Option.DISPLAY_CONSOLE && (SPIREAD  || Option.NoScroll)){ClearScreen(gui_bcolour);CurrentX=0;CurrentY=0;}
+			ListProgram(ProgMemory, false);
+			checkend(cmdline);
+		}
+    }
+}
+
+
 void MIPS16 cmd_run(void){
 	do_run(cmdline,false);
 }
@@ -1994,7 +2012,10 @@ void cmd_on(void) {
 //    IgnorePIN = false;
 }
 
-
+/**
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 // utility routine used by DoDim() below and other places in the interpreter
 // checks if the type has been explicitly specified as in DIM FLOAT A, B, ... etc
 unsigned char *CheckIfTypeSpecified(unsigned char *p, int *type, int AllowDefaultType) {
@@ -2043,6 +2064,7 @@ unsigned char *SetValue(unsigned char *p, int t, void *v) {
     return p;
 }
 
+/** @endcond */
 
 
 // define a variable
@@ -2185,6 +2207,10 @@ void  cmd_const(void) {
     }
 }
 
+/**
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 
 // utility function used by llist() below
 // it copys a command or function honouring the case selected by the user
@@ -2362,6 +2388,8 @@ void execute(char* mycmd) {
 		longjmp(jmprun, 1);
 	}
 }
+/** @endcond */
+
 void cmd_execute(void) {
 	execute((char*)cmdline);
 }

@@ -22,6 +22,15 @@ LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON A
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
 
 ************************************************************************************************************************/
+/**
+* @file I2C.c
+* @author Geoff Graham, Peter Mather
+* @brief Source for I2C MMBasic commands
+*/
+/**
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 
 
 #include "MMBasic_Includes.h"
@@ -96,17 +105,18 @@ const unsigned char nuninit[2]={0xF0,0x55};
 const unsigned char nuninit2[2]={0xFB,0x0};
 const unsigned char readcontroller[1]={0};
 const unsigned char nunid[1]={0xFC};
-volatile int classic1=0;
+const unsigned char nuncalib[1]={0x20};
+volatile uint8_t classic1=false,nunchuck1=false;
 uint8_t nunbuff[10];
 uint32_t swap32(uint32_t in)
 {
   in = __builtin_bswap32(in);
   return in;
 }
-volatile struct s_nunstruct nunstruct[5];
-char *nunInterruptc[5]={NULL};
-bool nunfoundc[5]={false};
-
+volatile struct s_nunstruct nunstruct[6];
+char *nunInterruptc[6]={NULL};
+bool nunfoundc[6]={false};
+bool classicread=0, nunchuckread=0;
 /*******************************************************************************************
 							  I2C related commands in MMBasic
                               ===============================
@@ -225,6 +235,7 @@ void InitDisplayI2C(int InitOnly){
     }
 }
 #endif
+/*  @endcond */
 
 void cmd_i2c(void) {
     unsigned char *p;//, *pp;
@@ -276,6 +287,10 @@ void cmd_i2c2(void) {
     else
         error("Unknown command");
 }
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 
 void __not_in_flash_func(i2c0_irq_handler)(void) {
     // Get interrupt status
@@ -519,8 +534,7 @@ char CvtCharsToBCD(unsigned char *p, int min, int max) {
     return ((t / 10) << 4) | (t % 10);
 }
 
-
-
+/*  @endcond */
 void MIPS16 cmd_rtc(void) {
     char buff[7];                                                   // Received data is stored here
     int DS1307;
@@ -676,6 +690,10 @@ void MIPS16 cmd_rtc(void) {
         error("Unknown command");
 
 }
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 
 // enable the I2C1 module - master mode
 void i2cEnable(unsigned char *p) {
@@ -1260,11 +1278,16 @@ void i2c2_masterCommand(int timer, unsigned char *I2C2_Rcv_Buffer) {
 		}
 	}
 }
+/*  @endcond */
 
 void fun_mmi2c(void) {
 	iret = mmI2Cvalue;
     targ = T_INT;
 }
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 void WiiSend(int nbr, char *p){
 	if(I2C0locked){
         I2C_Sendlen = nbr;                                                // send one byte
@@ -1298,45 +1321,110 @@ void WiiReceive(int nbr, char *p){
         i2c2_masterCommand(1,(unsigned char *)p);
 	}
 }
+void nunproc(void){
+	static int lastc=0,lastz=0;
+	nunstruct[5].x=nunbuff[0];
+	nunstruct[5].y=nunbuff[1];
+	nunstruct[5].ax=nunbuff[2]<<2;
+	nunstruct[5].ay=nunbuff[3]<<2;
+	nunstruct[5].az=nunbuff[4]<<2;
+	nunstruct[5].Z=(~(nunbuff[5] & 1)) & 1;
+	nunstruct[5].C=(~((nunbuff[5] & 2)>>1)) & 1;
+	nunstruct[5].ax += ((nunbuff[5]>>2) & 3);
+	nunstruct[5].ay += ((nunbuff[5]>>4) & 3);
+	nunstruct[5].az += ((nunbuff[5]>>6) & 3);
+	if(lastc==0 && nunstruct[5].C){
+		lastc=1;
+		nunfoundc[5]=1;
+	}
+	if(lastz==0 && nunstruct[5].Z){
+		lastz=1;
+		nunfoundc[5]=1;
+	}
+	if(nunstruct[5].C==0)lastc=0;
+	if(nunstruct[5].Z==0)lastz=0;
+}
 
-void MIPS16 cmd_Classic(unsigned char *p){
+/*  @endcond */
+void MIPS16 cmd_Nunchuck(void){
 	unsigned char *tp=NULL;
 	uint32_t id=0;
-	if((tp=checkstring(p,(unsigned char *)"OPEN"))){
+	if((tp=checkstring(cmdline,(unsigned char *)"OPEN"))){
+		getargs(&tp,1,(unsigned char *)",");
+		if(!(I2C0locked || I2C1locked))error("SYSTEM I2C not configured");
+		if(classic1 || nunchuck1)error("Already open");
+		memset((void*)&nunstruct[5].x,0,sizeof(nunstruct[5]));
+		int retry=5;
+		do {
+			WiiSend(sizeof(nuninit),(char *)nuninit);
+			uSec(5000);
+		} while(mmI2Cvalue && retry--);
+		if(mmI2Cvalue)error("Nunchuck not connected");
+		WiiSend(sizeof(nuninit2),(char *)nuninit2);
+		if(mmI2Cvalue)error("Nunchuck not connected");
+		uSec(5000);
+		retry=5;
+		do {
+			WiiSend(sizeof(nunid),(char *)nunid);
+			uSec(5000);
+			WiiReceive(4,(char *)&id);
+			uSec(5000);
+		} while(mmI2Cvalue && retry--);
+		if(mmI2Cvalue)error("Device ID not returned");
+		nunstruct[5].type=swap32(id);
+		if(nunstruct[5].type!=0xA4200000)error("Device connected is not a Nunchuck");
+		uSec(5000);
+		retry=5;
+		nunbuff[5]=0;
+		if(argc==1){
+			nunInterruptc[5] = (char *)GetIntAddress(argv[0]);					// get the interrupt location
+			InterruptUsed = true;
+		}
+		nunchuck1=1;
+		while(nunchuck1==1)routinechecks();
+		if(nunbuff[5]==0 || nunbuff[5]==255){
+			nunchuck1=0;
+			error("Nunchuck not responding");
+		}
+		nunproc();
+		return;
+	} else if((tp = checkstring(cmdline, (unsigned char *)"CLOSE"))){
+		if(!nunchuck1)error("Not open");
+		nunchuck1=0;
+		nunchuckread=false;
+		WiiReceive(6, (char *)nunbuff);
+		nunInterruptc[5]=NULL;
+	}
+}
+
+void MIPS16 cmd_Classic(void){
+	unsigned char *tp=NULL;
+	uint32_t id=0;
+	if((tp=checkstring(cmdline,(unsigned char *)"OPEN"))){
 		getargs(&tp,3,(unsigned char *)",");
 		if(!(I2C0locked || I2C1locked))error("SYSTEM I2C not configured");
-		if(classic1)error("Already open");
+		if(classic1 || nunchuck1)error("Already open");
 		memset((void*)&nunstruct[0].x,0,sizeof(nunstruct[0]));
 		int retry=5;
 		do {
 			WiiSend(sizeof(nuninit),(char *)nuninit);
 			uSec(5000);
 		} while(mmI2Cvalue && retry--);
-		if(mmI2Cvalue)error("Wii device not connected1");
+		if(mmI2Cvalue)error("Classic not connected");
 		WiiSend(sizeof(nuninit2),(char *)nuninit2);
-		if(mmI2Cvalue)error("Wii device not connected2");
-		uSec(5000);
-		WiiSend(sizeof(nunid),(char *)nunid);
-		if(mmI2Cvalue)error("Wii device not connected3");
-		WiiReceive(4,(char *)&id);
-		if(mmI2Cvalue)error("Wii device not connected4");
-		nunstruct[0].type=swap32(id);
+		if(mmI2Cvalue)error("Classic not connected");
 		uSec(5000);
 		retry=5;
-		nunbuff[0]=0;
-		while((nunbuff[0]==0 || nunbuff[0]==255) && retry--){
-			WiiSend(sizeof(readcontroller),(char *)readcontroller);
-			if(mmI2Cvalue)error("Classic not connected");
-			uSec(16000);
-			memset(nunbuff,0,6);
-			WiiReceive(6, (char *)nunbuff);
-			if(mmI2Cvalue)error("Classic not connected");
-			uSec(16000);
-		}
-		if(nunbuff[0]==0 || nunbuff[0]==255){
-			classic1=0;
-			error("Classic not responding");
-		}
+		do {
+			WiiSend(sizeof(nunid),(char *)nunid);
+			uSec(5000);
+			WiiReceive(4,(char *)&id);
+			uSec(5000);
+		} while(mmI2Cvalue && retry--);
+		if(mmI2Cvalue)error("Device ID not returned");
+		nunstruct[0].type=swap32(id);
+		if(nunstruct[0].type==0xA4200000)error("Device connected is a Nunchuck");
+		uSec(5000);
 		if(argc>=1){
 			nunInterruptc[0] = (char *)GetIntAddress(argv[0]);					// get the interrupt location
 			InterruptUsed = true;
@@ -1345,14 +1433,25 @@ void MIPS16 cmd_Classic(unsigned char *p){
 		}
 		classic1=1;
 		while(classic1==1)routinechecks();
+		if(nunbuff[0]==0 || nunbuff[0]==255){
+			classic1=0;
+			error("Classic not responding");
+		}
 		classicproc();
 		return;
-	} else if((tp = checkstring(p, (unsigned char *)"CLOSE"))){
+	} else if((tp = checkstring(cmdline, (unsigned char *)"CLOSE"))){
 		if(!classic1)error("Not open");
 		classic1=0;
+		classicread=false;
+		WiiReceive(6, (char *)nunbuff);
 		nunInterruptc[0]=NULL;
 	}
 }
+
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 
 void classicproc(void){
 //	int ax; //classic left x
@@ -1649,14 +1748,17 @@ void saturation(int s)  //-2 to 2
   ov7670_set(0x54, 0x80 + 0x20 * s);
   ov7670_set(0x58, 0x9e);  //matrix signs
 }
-void MIPS16 cmd_camera(unsigned char *p){
+
+/*  @endcond */
+
+void MIPS16 cmd_camera(void){
     union colourmap
     {
         char rgbbytes[4];
         unsigned int rgb;
     } c;
 	unsigned char *tp=NULL;
-	if((tp=checkstring(p,(unsigned char *)"OPEN"))){
+	if((tp=checkstring(cmdline,(unsigned char *)"OPEN"))){
 		int pin1,pin2,pin3,pin4,pin5,pin6;
 		getargs(&tp,11,(unsigned char *)",");
 		if(argc!=11)error("Syntax");
@@ -1979,10 +2081,10 @@ void MIPS16 cmd_camera(unsigned char *p){
 			if(time_us_64()>us)error("Timeout on camera VSYNC signal");
 
 //			OV7670_test_pattern(OV7670_TEST_PATTERN_COLOR_BAR);
-		} else if((tp=checkstring(p,(unsigned char *)"TEST"))){
+		} else if((tp=checkstring(cmdline,(unsigned char *)"TEST"))){
 			getargs(&tp,1,(unsigned char *)",");
 			OV7670_test_pattern(getint(argv[0],0,3));
-		} else if((tp=checkstring(p,(unsigned char *)"REGISTER"))){
+		} else if((tp=checkstring(cmdline,(unsigned char *)"REGISTER"))){
 			getargs(&tp,3,(unsigned char *)",");
 			if(!XCLK)error("Camera not open");
 			int a=getint(argv[0],0,255);
@@ -1991,7 +2093,7 @@ void MIPS16 cmd_camera(unsigned char *p){
 			ov7670_set(a,b);
 			MMPrintString("Register &H");PIntH(a);MMPrintString(" was &H");PIntH(c);MMPrintString(" now &H");PIntH(b);PRet();
 
-		} else if((tp=checkstring(p,(unsigned char *)"CHANGE"))){
+		} else if((tp=checkstring(cmdline,(unsigned char *)"CHANGE"))){
 			int size=0;
 			unsigned char *cp=NULL;
 			int totaldifference=0,difference;
@@ -2056,7 +2158,7 @@ void MIPS16 cmd_camera(unsigned char *p){
 				}
 			}
 			*outdiff=(MMFLOAT)totaldifference/(160.0*120.0*255.0)*100.0;
-		} else if((tp=checkstring(p,(unsigned char *)"CAPTURE"))){
+		} else if((tp=checkstring(cmdline,(unsigned char *)"CAPTURE"))){
 			getargs(&tp,5,(unsigned char *)",");
 			int xs=0,ys=0;
 			if(!XCLK)error("Camera not open");
@@ -2097,7 +2199,7 @@ void MIPS16 cmd_camera(unsigned char *p){
 					}
 				}
 			}
-		} else if (checkstring(p,(unsigned char *)"CLOSE")){
+		} else if (checkstring(cmdline,(unsigned char *)"CLOSE")){
 			cameraclose();
 		} else error("Syntax");
 }

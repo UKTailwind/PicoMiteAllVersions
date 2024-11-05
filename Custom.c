@@ -22,6 +22,15 @@ LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON A
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
 
 ************************************************************************************************************************/
+/**
+* @file Custom.c
+* @author Geoff Graham, Peter Mather
+* @brief Source for PIO, JSON and WEB MMBasic commands and function
+*/
+/**
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 #include <stdio.h>
 
 #include "MMBasic_Includes.h"
@@ -218,6 +227,7 @@ int checkblock(char *p){
         }
         return data;
 }
+/*  @endcond */
 void MIPS16 cmd_pio(void){
     unsigned char *tp;
     #ifdef rp2350
@@ -1406,6 +1416,10 @@ void fun_pio(void){
 
 
 }
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 
 #ifdef PICOMITEWEB
 char *scan_dest=NULL;
@@ -1443,6 +1457,8 @@ static int scan_result(void *env, const cyw43_ev_scan_result_t *result) {
     } 
     return 0;
 }
+/*  @endcond */
+
 void cmd_web(void){
         unsigned char *tp;
         tp=checkstring(cmdline, (unsigned char *)"CONNECT");

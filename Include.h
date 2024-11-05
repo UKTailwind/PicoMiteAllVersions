@@ -1,3 +1,7 @@
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 // ****************************************************************************
 //
 //                                 Main code
@@ -126,3 +130,4 @@ INLINE void cb()
 
 
 #endif // _MAIN_H
+/*  @endcond */

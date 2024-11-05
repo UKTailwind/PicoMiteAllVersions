@@ -21,6 +21,15 @@ LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON A
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
 
 ************************************************************************************************************************/
+/**
+* @file GPS.c
+* @author Geoff Graham, Peter Mather
+* @brief Source for GPS MMBasic function
+*/
+/**
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 
 /* ************************************************************************** */
 /* ************************************************************************** */
@@ -305,6 +314,8 @@ timegm(const struct tm *tm)
 //int ExampleInterfaceFunction(int param1, int param2) {
 //    return 0;
 //}
+/*  @endcond */
+
 void fun_GPS(void){
     sret = GetTempMemory(STRINGSIZE);                                    // this will last for the life of the command
     if(!GPSchannel) error("GPS not activated");
@@ -358,6 +369,10 @@ void fun_GPS(void){
     }
     else error("Invalid command");
 }
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
   
     
 void processgps(void){
@@ -684,5 +699,6 @@ void GPS_parse(char *nmea) {
 
   return;
 }
+/*  @endcond */
 
 

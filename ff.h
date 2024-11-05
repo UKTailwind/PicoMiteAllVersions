@@ -1,3 +1,7 @@
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 /*----------------------------------------------------------------------------/
 /  FatFs - Generic FAT Filesystem module  R0.14                               /
 /-----------------------------------------------------------------------------/
@@ -430,3 +434,4 @@ int ff_del_syncobj (FF_SYNC_t sobj);	/* Delete a sync object */
 #endif
 
 #endif /* FF_DEFINED */
+/*  @endcond */

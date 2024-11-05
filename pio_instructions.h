@@ -1,3 +1,7 @@
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 /*
  * Copyright (c) 2020 Raspberry Pi (Trading) Ltd.
  *
@@ -177,3 +181,4 @@ inline static uint pio_encode_nop(void) {
 #endif
 
 #endif
+/*  @endcond */

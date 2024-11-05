@@ -22,6 +22,16 @@ LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON A
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
 
 ************************************************************************************************************************/
+/**
+* @file MATHS.c
+* @author Geoff Graham, Peter Mather
+* @brief Source for MATHS MMBasic commands and functions
+*/
+/**
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
+
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
 #include <math.h>
@@ -645,6 +655,8 @@ MMFLOAT PIDController_Update(PIDController *pid, MMFLOAT setpoint, MMFLOAT measu
     return pid->out;
 
 }
+/*  @endcond */
+
 void cmd_math(void){
 	unsigned char *tp;
     int t = T_NBR;
@@ -1571,6 +1583,11 @@ void cmd_math(void){
 
 	error("Syntax");
 }
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
+
 fcplx getComplex(unsigned char *in){
 	int64_t i=getinteger(in);
 	fcplx x;
@@ -1582,6 +1599,8 @@ void retComplex(fcplx in){
 	memcpy(&iret, &in, 8);
 	targ=T_INT;
 }
+/*  @endcond */
+
 void fun_math(void){
 	unsigned char *tp, *tp1;
 #ifdef rp2350
@@ -2356,6 +2375,10 @@ static size_t reverse_bits(size_t val, int width) {
 		result = (result << 1) | (val & 1U);
 	return result;
 }
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 
 bool Fft_transformRadix2(double complex vec[], size_t n, bool inverse) {
 	// Length variables
@@ -2403,6 +2426,7 @@ bool Fft_transformRadix2(double complex vec[], size_t n, bool inverse) {
 	FreeMemory((void *)exptable);
 	return true;
 }
+/*  @endcond */
 
 
 void cmd_FFT(unsigned char *pp){
@@ -2550,6 +2574,11 @@ void cmd_SensorFusion(char *passcmdline){
     }
     error("Invalid command");
 }
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
+
 void MadgwickQuaternionUpdate(MMFLOAT ax, MMFLOAT ay, MMFLOAT az, MMFLOAT gx, MMFLOAT gy, MMFLOAT gz, MMFLOAT mx, MMFLOAT my, MMFLOAT mz, MMFLOAT beta, MMFLOAT deltat, MMFLOAT *pitch, MMFLOAT *yaw, MMFLOAT *roll)
         {
             MMFLOAT q1 = q[0], q2 = q[1], q3 = q[2], q4 = q[3];   // short name local variable for readability
@@ -2881,3 +2910,4 @@ MMFLOAT determinant(MMFLOAT **matrix,int size)
    dealloc2df(m_minor,size,size);
    return (det);
 }
+/*  @endcond */

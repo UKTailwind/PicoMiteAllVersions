@@ -479,124 +479,50 @@ void fun_epoch(void){
         targ = T_INT;
 }
 
-/*void cmd_pause(void) {
-	static int interrupted = false;
-    MMFLOAT f;
-    static int64_t end,count;
-    int64_t start, stop, tick;
-    f = getnumber(cmdline);                                         // get the pulse width
-    if(f < 0) error("Number out of bounds");
-    if(f < 0.05) return;
 
-	if(f < 1.5) {
-		uSec(f * 1000);                                             // if less than 1.5mS do the pause right now
-		return;                                                     // and exit straight away
-    }
-    if(!interrupted){
-        count=(int64_t)(f*1000);
-        start=time_us_64();
-        tick=PauseTimer;
-        while(PauseTimer==tick){}  //wait for the next clock tick
-        stop=time_us_64();
-        count-=(stop-start);
-        end = (count % 1000); //get the number of ticks remaining
-        count/=1000;
-        PauseTimer=0;
-    }
-    if(count){
-		if(InterruptReturn == NULL) {
-			// we are running pause in a normal program
-			// first check if we have reentered (from an interrupt) and only zero the timer if we have NOT been interrupted.
-			// This means an interrupted pause will resume from where it was when interrupted
-			if(!interrupted) PauseTimer = 0;
-			interrupted = false;
-
-			while(PauseTimer < count) {
-				CheckAbort();
-				if(check_interrupt()) {
-					// if there is an interrupt fake the return point to the start of this stmt
-					// and return immediately to the program processor so that it can send us off
-					// to the interrupt routine.  When the interrupt routine finishes we should reexecute
-					// this stmt and because the variable interrupted is static we can see that we need to
-					// resume pausing rather than start a new pause time.
-					while(*cmdline && *cmdline != cmdtoken) cmdline--;	// step back to find the command token
-					InterruptReturn = cmdline;							// point to it
-					interrupted = true;								    // show that this stmt was interrupted
-					return;											    // and let the interrupt run
-				}
-			}
-			interrupted = false;
-		}
-		else {
-			// we are running pause in an interrupt, this is much simpler but note that
-			// we use a different timer from the main pause code (above)
-			IntPauseTimer = 0;
-			while(IntPauseTimer < FloatToInt32(f)) CheckAbort();
-		}
-    }
-	uSec(end);
-}*/
 void cmd_pause(void) {
-	static int interrupted = false;
-    float f;
-    f = getnumber(cmdline) * 1000;                                     // get the pulse width
-    static uint64_t end, interruptend;
-    
+    static int interrupted = false;
+    MMFLOAT f;
+    static uint64_t PauseTimer, IntPauseTimer;
+    f = getnumber(cmdline)*1000;                                         // get the pulse width
     if(f < 0) error("Number out of bounds");
-    if(f < 0.005) return;
+    if(f < 2) return;
 
-	/*if(f < 1.5) {
-        
-		uSec(f * 1000);                                         // if less than 1.5mS do the pause right now
-		return;                                                 // and exit straight away
-    }*/
+    if(f < 1500) {
+        PauseTimer=time_us_64()+(uint64_t)f;   
+        while(time_us_64() <  PauseTimer){}                                       // if less than 1.5mS do the pause right now
+        return;                                                     // and exit straight away
+      }
 
-	if(InterruptReturn == NULL) {
-		// we are running pause in a normal program
-		// first check if we have reentered (from an interrupt) and only zero the timer if we have NOT been interrupted.
-		// This means an interrupted pause will resume from where it was when interrupted
-		if(!interrupted) end = time_us_64()+f;
-		interrupted = false;
-
-		while(1) {
-            uint64_t now, pause;
-            now = pause = time_us_64();
-            pause += 100;
-            if(f<1500.0)pause +=2000;
-            while(now < pause && now < end){
-                now = time_us_64();
-            }
-            if(now >= end)return;
-			CheckAbort();
-			if(check_interrupt()) {
-				// if there is an interrupt fake the return point to the start of this stmt
-				// and return immediately to the program processor so that it can send us off
-				// to the interrupt routine.  When the interrupt routine finishes we should reexecute
-				// this stmt and because the variable interrupted is static we can see that we need to
-				// resume pausing rather than start a new pause time.
-				while(*cmdline && *cmdline != cmdtoken) cmdline--;	// step back to find the command token
-				InterruptReturn = cmdline;							// point to it
-				interrupted = true;								    // show that this stmt was interrupted
-				return;											    // and let the interrupt run
-			}
-		}
+    if(InterruptReturn == NULL) {
+        // we are running pause in a normal program
+        // first check if we have reentered (from an interrupt) and only zero the timer if we have NOT been interrupted.
+        // This means an interrupted pause will resume from where it was when interrupted
+        if(!interrupted) PauseTimer = time_us_64();
         interrupted = false;
-	} else {
-		// we are running pause in an interrupt, this is much simpler but note that
-		// we use a different timer from the main pause code (above)
-		interruptend=time_us_64() + f;
-		while(1) {
-            uint64_t now, pause;
-            now = pause = time_us_64();
-            if(f<1500.0)pause +=2000;
-            pause += 100;
-            while(now < pause && now < interruptend){
-                now = time_us_64();
+
+        while(time_us_64() < FloatToInt32(f) + PauseTimer) {
+            CheckAbort();
+            if(check_interrupt()) {
+                // if there is an interrupt fake the return point to the start of this stmt
+                // and return immediately to the program processor so that it can send us off
+                // to the interrupt routine.  When the interrupt routine finishes we should reexecute
+                // this stmt and because the variable interrupted is static we can see that we need to
+                // resume pausing rather than start a new pause time.
+                while(*cmdline && *cmdline != cmdtoken) cmdline--;  // step back to find the command token
+                InterruptReturn = cmdline;                          // point to it
+                interrupted = true;                                 // show that this stmt was interrupted
+                return;                                             // and let the interrupt run
             }
-            if(now >= interruptend)return;
-			CheckAbort();
         }
-	}
+          interrupted = false;
+    }
+    else {
+        // we are running pause in an interrupt, this is much simpler but note that
+        // we use a different timer from the main pause code (above)
+        IntPauseTimer = time_us_64();
+        while( time_us_64()< FloatToInt32(f) + IntPauseTimer ) CheckAbort();
+    }
 }
 
 void cmd_longString(void){
@@ -4325,6 +4251,10 @@ void MIPS16 fun_info(void){
             CtoM(sret);
             targ=T_STR;
             return;
+        } else if((tp=checkstring(ep, (unsigned char *)"DEBUG"))){
+            iret=abs(time_us_64()-mSecTimer*1000);
+            targ=T_INT;
+            return; 
         } else if(checkstring(ep, (unsigned char *)"DISK SIZE")){
             if(FatFSFileSystem){
                 if(!InitSDCard()) error((char *)FErrorMsg[20]);					// setup the SD card
@@ -5395,7 +5325,7 @@ int checkdetailinterrupts(void) {
         goto GotAnInterrupt;
     }
 #endif
-    for(int i=0;i<5;i++){
+    for(int i=0;i<6;i++){
         if(nunInterruptc[i] !=NULL && nunfoundc[i]){
             nunfoundc[i]=false;
             intaddr=nunInterruptc[i];

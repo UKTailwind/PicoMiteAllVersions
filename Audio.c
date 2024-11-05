@@ -22,6 +22,15 @@ LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON A
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
 
 ************************************************************************************************************************/
+/**
+* @file Audio.c
+* @author Geoff Graham, Peter Mather
+* @brief Source for Audio MMBasic command
+*/
+/**
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 #include <stdio.h>
 #include <stdbool.h>                                // Pascal
 #include <stdint.h>                                 // Pascal
@@ -979,6 +988,7 @@ void setnoise(void){
     return;
 
 }
+/*  @endcond */
 // The MMBasic command:  PLAY
 void MIPS16 cmd_play(void) {
     unsigned char *tp;
@@ -1840,6 +1850,10 @@ void MIPS16 cmd_play(void) {
 
     error("Unknown command");
 }
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 
 /******************************************************************************************
 Timer interrupt.
@@ -2006,3 +2020,4 @@ void audio_checks(void){
          }
     }
 }
+/*  @endcond */

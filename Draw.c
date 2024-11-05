@@ -22,7 +22,15 @@ LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON A
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
 
 ************************************************************************************************************************/
-
+/**
+* @file Draw.c
+* @author Geoff Graham, Peter Mather
+* @brief Source for Graphics MMBasic commands and functions
+*/
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
@@ -207,6 +215,8 @@ uint8_t RGB121(uint32_t c){
     return ((c & 0x800000)>> 20) | ((c & 0xC000)>>13) | ((c & 0x80)>>7);
 }
 
+/*  @endcond */
+
 void MIPS16 cmd_guiMX170(void) {
     unsigned char *p;
 
@@ -371,8 +381,10 @@ void MIPS16 cmd_guiMX170(void) {
     }
     error("Unknown command");
 }
-
-
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 
 void  getargaddress (unsigned char *p, long long int **ip, MMFLOAT **fp, int *n){
     unsigned char *ptr=NULL;
@@ -1213,6 +1225,7 @@ int SizeTriangle(int x0, int y0, int x1, int y1, int x2, int y2) {
 	}
     return n;
 }
+/*  @endcond */
 
 void cmd_RestoreTriangle(unsigned char *p){
     getargs(&p, 1, (unsigned char*)",");
@@ -1250,7 +1263,10 @@ void cmd_ReadTriangle(unsigned char *p){
         *buff++=y3;
         SaveTriangle(bnbr,blitbuff[bnbr].blitbuffptr);
 }
-
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 
 /******************************************************************************************
  Print a char on the LCD display
@@ -1461,8 +1477,7 @@ int GetJustification(char *p, int *jh, int *jv, int *jo) {
     return *p == 0;
 }
 
-
-
+/*  @endcond */
 void cmd_text(void) {
     int x, y, font, scale, fc, bc;
     char *s;
@@ -1662,6 +1677,10 @@ void cmd_circle(void) {
     }
     if(Option.Refresh)Display_Refresh();
 }
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 static short xb0,xb1,yb0,yb1;
 void MIPS16 drawAAPixel( int x , int y , MMFLOAT brightness, uint32_t c){
     union colourmap
@@ -1777,6 +1796,7 @@ void MIPS16 drawAALine(MMFLOAT x0 , MMFLOAT y0 , MMFLOAT x1 , MMFLOAT y1, uint32
 		}
 	}
 }
+/*  @endcond */
 
 void cmd_line(void) {
     if(Option.DISPLAY_TYPE == 0) error("Display not configured");
@@ -2034,7 +2054,10 @@ void cmd_box(void) {
     }
     if(Option.Refresh)Display_Refresh();
 }
-
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 
 void MIPS16 bezier(float x0, float y0, float x1, float y1, float x2, float y2, float x3, float y3, int c){
     float tmp,tmp1,tmp2,tmp3,tmp4,tmp5,tmp6,tmp7,tmp8,t=0.0,xt=x0,yt=y0;
@@ -2142,6 +2165,8 @@ void MIPS16 pointcalc(int angle, int x, int y, int r2, int *x0, int * y0){
 		}
 	}
 }
+/*  @endcond */
+
 void MIPS16 cmd_arc(void){
 	// Parameters are:
 	// X coordinate of centre of arc
@@ -2223,6 +2248,11 @@ void MIPS16 cmd_arc(void){
 	Option.Refresh=save_refresh;
     if(Option.Refresh)Display_Refresh();
 }
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
+
 typedef struct {
     unsigned char red;
     unsigned char green;
@@ -2520,7 +2550,7 @@ void polygon(unsigned char *p, int close){
     	}
     }
 }
-
+/*  @endcond */
 void cmd_polygon(void){
     polygon(cmdline,1);
 }
@@ -2728,6 +2758,10 @@ void cmd_triangle(void) {                                           // thanks to
     }
     if(Option.Refresh)Display_Refresh();
 }
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 char getnextuncompressednibble(char **s, int reset){
     static int toggle=0;
     if(reset){
@@ -2898,6 +2932,7 @@ void docompressed(char *fc,int x1, int y1, int w, int h, int8_t blank){
         }
     }
 }
+/*  @endcond */
 
 void cmd_blitmemory(void){
     int x1, y1, w, h;
@@ -3054,6 +3089,10 @@ void cmd_blitmemory(void){
         }
     }
 }
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 
 int blitother(void){
     int x1, y1, x2, y2, w, h;
@@ -3438,6 +3477,7 @@ int blitother(void){
     }
     return 0;
 }
+/*  @endcond */
 void cmd_cls(void) {
     if(Option.DISPLAY_TYPE == 0) error("Display not configured");
 #ifdef PICOMITE
@@ -3512,8 +3552,10 @@ void fun_rgb(void) {
         error("Syntax");
     targ = T_INT;
 }
-
-
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 
 void fun_mmhres(void) {
     iret = HRes;
@@ -4224,6 +4266,7 @@ void ScrollBufferV(int lines, int blank) {
         }
     }
 }
+/*  @endcond */
 
 void cmd_sprite(void) {
     int x1, y1, w, h, bnbr;
@@ -4899,6 +4942,10 @@ void fun_sprite(void) {
     }
     targ = T_INT;
 }
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 #ifndef PICOMITEVGA
 void restorepanel(void){
     if(Option.DISPLAY_TYPE>I2C_PANEL && Option.DISPLAY_TYPE < BufferedPanel){
@@ -5263,6 +5310,7 @@ void merge(uint8_t colour){
     __dmb();
 #endif
 }
+/*  @endcond */
 void cmd_framebuffer(void){
     unsigned char *p=NULL;
     if((p=checkstring(cmdline, (unsigned char *)"CREATE"))) {
@@ -6284,6 +6332,10 @@ void cmd_tile(void){
     }
 }
 #else
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 void DrawRectangle555(int x1, int y1, int x2, int y2, int c){
     int x,y,t;
     uint16_t col=((c & 0xf8)>>3) | ((c& 0xf800)>>6) | ((c & 0xf80000)>>9);
@@ -6619,6 +6671,8 @@ void ScrollLCD256(int lines){
         DrawRectangle(0, 0, HRes - 1, lines - 1, PromptBC); // erase the lines introduced at the top
     }
 }
+/*  @endcond */
+
 void cmd_tile(void){
    unsigned char *tp;
     uint32_t bcolour=0xFFFFFFFF,fcolour=0xFFFFFFFF;
@@ -6822,6 +6876,11 @@ void cmd_mode(void){
 #endif	
 }
 #endif
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
+/*  @endcond */
 void fun_mmcharwidth(void) {
   if(Option.DISPLAY_TYPE == 0) error("Display not configured");
     iret = FontTable[gui_font >> 4][0] * (gui_font & 0b1111);
@@ -6834,6 +6893,7 @@ void fun_mmcharheight(void) {
     iret = FontTable[gui_font >> 4][1] * (gui_font & 0b1111);
     targ = T_INT;
 }
+/*  @endcond */
 
 
 
@@ -6857,6 +6917,10 @@ void cmd_refresh(void){
     low_y=0; high_y=DisplayVRes-1; low_x=0; high_x=DisplayHRes-1;
 	Display_Refresh();
 }
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 
 void DrawPixel16(int x, int y, int c){
     if(x<0 || y<0 || x>=HRes || y>=VRes)return;
@@ -7577,6 +7641,7 @@ void MIPS16 InitDisplayVirtual(void){
 	if(WriteBuf==NULL)WriteBuf=GetMemory(VMaxH*VMaxV/8);
 }
 
+/*  @endcond */
 
 #ifdef PICOMITEVGA
 #ifdef HDMI
@@ -7602,6 +7667,10 @@ void fun_getscanline(void){
 }
 #endif
 #else
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 // Draw a filled rectangle
 // this is the basic drawing primitive used by most drawing routines
 //    x1, y1, x2, y2 - the coordinates
@@ -8245,6 +8314,8 @@ void MIPS16 diagnose3d(int n, FLOAT3D x, FLOAT3D y, FLOAT3D z, int sort){
 		MMPrintString(" so the face is ");MMPrintString(struct3d[n]->dots[sortindex]>0 ? "Hidden" : "Showing");PRet();
 	}
 }
+/*  @endcond */
+
 void MIPS16 cmd_3D(void){
 	unsigned char *p;
 	if((p=checkstring(cmdline, (unsigned char *)"CREATE"))) {
@@ -8634,6 +8705,11 @@ void MIPS16 fun_3D(void){
 	} else error("Syntax");
 	targ=T_NBR;
 }
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
+
 #endif
 #ifdef PICOMITEVGA
 void closeframebuffer(char layer){
@@ -8735,6 +8811,8 @@ void closeframebuffer(char layer){
     SecondFrame=(unsigned char *)FRAMEBUFFER;
     transparent=0;
 }
+/*  @endcond */
+
 void cmd_framebuffer(void){
 /*
 RP2040 version support just modes 1 and 2

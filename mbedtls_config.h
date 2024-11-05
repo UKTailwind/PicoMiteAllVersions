@@ -1,3 +1,7 @@
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 /* Workaround for some mbedtls source files using INT_MAX without including limits.h */
 #include <limits.h>
 
@@ -60,4 +64,5 @@
 #define MBEDTLS_ECP_C
 #define MBEDTLS_ECDSA_C
 #define MBEDTLS_ASN1_WRITE_C
+/*  @endcond */
 

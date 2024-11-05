@@ -22,6 +22,15 @@ LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON A
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
 
 ************************************************************************************************************************/
+/**
+* @file Operators.c
+* @author Geoff Graham, Peter Mather
+* @brief Source for standard MMBasic operators
+*/
+/**
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
@@ -56,6 +65,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 void  __not_in_flash_func(op_invalid)(void) {
 	error("Syntax error");
 }
+/*  @endcond */
 
 
 void  __not_in_flash_func(op_exp)(void) {
@@ -130,6 +140,10 @@ void  __not_in_flash_func(op_mod)(void) {
 }
 
 
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
 
 long long int  __not_in_flash_func(compare)(void) {
     long long int  r;
@@ -151,7 +165,7 @@ long long int  __not_in_flash_func(compare)(void) {
      targ = T_INT;									// always return an float, even if the args are string
      return r;
 }
-
+/*  @endcond */
 
 void  __not_in_flash_func(op_ne)(void) {
     if(targ & T_INT)

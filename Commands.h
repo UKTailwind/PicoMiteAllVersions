@@ -1,4 +1,8 @@
-/***********************************************************************************************************************
+/* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
+/* *********************************************************************************************************************
 PicoMite MMBasic
 
 commands.h
@@ -87,3 +91,4 @@ struct sa_data{
 extern struct sa_data datastore[MAXRESTORE];
 extern int restorepointer;
 #endif
+/*  @endcond */
