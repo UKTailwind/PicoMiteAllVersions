@@ -1,5 +1,7 @@
 # PicoMiteRP2350
-This contains files to build MMbasic V6.00.00RC10 to run on both RP2040 and RP2350
+This contains files to build MMbasic V6.00.00RC15 to run on both RP2040 and RP2350
+Compile with GCC 13.3.1 arm-none-eabi
+Replace src\rp2_common\pico_stdio_usb\stdio_usb_descriptors.c with the version from the development branch of the sdk
 
 Change CMakeLists.txt line 4 to determine which variant to build<br>
 <br>
