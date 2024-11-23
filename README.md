@@ -1,8 +1,8 @@
 # PicoMiteRP2350
 This contains files to build MMbasic V6.00.00RC17 to run on both RP2040 and RP2350<br>
 Compile with GCC 13.3.1 arm-none-eabi<br>
-Replace src\rp2_common\pico_stdio_usb\stdio_usb_descriptors.c with the version from the development branch of the sdk
-Replace src\rp2_common\pico_multicore\multicore.c and src\rp2_common\pico_multicore\include\pico\multicore.h with the version from the development branch of the sdk
+Replace pico-sdk\src\rp2_common\pico_stdio_usb\stdio_usb_descriptors.c with the version from the development branch of the sdk<br>
+Replace  pico-sdk\src\rp2_common\pico_multicore\multicore.c and  pico-sdk\src\rp2_common\pico_multicore\include\pico\multicore.h with the version from the development branch of the sdk<br>
 
 Change CMakeLists.txt line 4 to determine which variant to build<br>
 <br>
