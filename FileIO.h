@@ -83,7 +83,9 @@ struct option_s {
     int CPU_Speed; 
     unsigned int Telnet;    // used to store the size of the program flash (also start of the LIBRARY code)
     int DefaultFC, DefaultBC;      // the default colours
-    int DefaultBrightness;         // default backlight brightness //40
+    short DefaultBrightness;         // default backlight brightness //40
+    unsigned char KEYBOARD_CLOCK;
+    unsigned char KEYBOARD_DATA;
     uint16_t VGAFC, VGABC;      // the default colours 36=56
 //
     // display related

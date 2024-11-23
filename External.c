@@ -121,10 +121,11 @@ const char *PinFunction[] = {
 ;
 
 volatile int ExtCurrentConfig[NBRPINS + 1];
-volatile int INT1Count, INT1Value, INT1InitTimer, INT1Timer;
-volatile int INT2Count, INT2Value, INT2InitTimer, INT2Timer;
-volatile int INT3Count, INT3Value, INT3InitTimer, INT3Timer;
-volatile int INT4Count, INT4Value, INT4InitTimer, INT4Timer;
+volatile int INT1Value, INT1InitTimer, INT1Timer;
+volatile int INT2Value, INT2InitTimer, INT2Timer;
+volatile int INT3Value, INT3InitTimer, INT3Timer;
+volatile int INT4Value, INT4InitTimer, INT4Timer;
+volatile int64_t INT1Count,INT2Count,INT3Count, INT4Count;
 uint64_t uSecoffset=0;
 uint32_t pinmask=0;
 volatile uint64_t IRoffset=0;
@@ -265,7 +266,15 @@ void SoftReset(void){
 	watchdog_enable(1, 1);
 	while(1);
 }
+#ifdef rp2350
 void __not_in_flash_func(PinSetBit)(int pin, unsigned int offset) {
+ #else
+#ifdef PICOMITEVGA
+void PinSetBit(int pin, unsigned int offset) {
+#else
+void __not_in_flash_func(PinSetBit)(int pin, unsigned int offset) {
+#endif
+#endif
 	switch (offset){
 	case LATCLR:
 		gpio_set_pulls(PinDef[pin].GPno,false,false);
@@ -500,14 +509,16 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
     for(i = 0; i < NBRINTERRUPTS; i++)
         if(inttbl[i].pin == pin)
             inttbl[i].pin = 0;                                      // start off by disable a software interrupt (if set) on this pin
-    gpio_init(PinDef[pin].GPno); 
+    gpio_set_input_enabled(PinDef[pin].GPno,false);
+    gpio_deinit(PinDef[pin].GPno); 
     gpio_set_input_hysteresis_enabled(PinDef[pin].GPno,true);
-
+    if(cfg!=EXT_NOT_CONFIG)gpio_init(PinDef[pin].GPno); 
     switch(cfg) {
         case EXT_NOT_CONFIG:    tris = 1; ana = 1;
 //                                gpio_init(PinDef[pin].GPno); 
 //		                        gpio_set_input_hysteresis_enabled(PinDef[pin].GPno,true);
                                 gpio_set_input_enabled(PinDef[pin].GPno,false);
+                                gpio_deinit(PinDef[pin].GPno);
                                 switch(ExtCurrentConfig[pin]){      //Disable the pin numbers used by the special function code
                                      case EXT_IR:
 				                        IRpin=99;
@@ -992,7 +1003,11 @@ int64_t __not_in_flash_func(ExtInp)(int pin){
             if(pin == Option.INT2pin) return INT2Count;
             if(pin == Option.INT3pin) return INT3Count;
             if(pin == Option.INT4pin) return INT4Count;
-    } else return  gpio_get(PinDef[pin].GPno);
+    }  else if(ExtCurrentConfig[pin] == EXT_DIG_OUT) {
+        return gpio_get_out_level(PinDef[pin].GPno);
+    }  else {
+        return  gpio_get(PinDef[pin].GPno);
+    }
     return 0;
 }
 /*  @endcond */
@@ -1234,7 +1249,14 @@ process:
 
         case EXT_DIG_IN:    if(argc == 5) {
                                 if(checkstring(argv[4], (unsigned char *)"PULLUP")) option = CNPUSET;
-                                else if(checkstring(argv[4], (unsigned char *)"PULLDOWN")) option = CNPDSET;
+                                else if(checkstring(argv[4], (unsigned char *)"PULLDOWN")) {
+#ifdef rp2350
+                                    PinSetBit(pin,TRISCLR);
+                                    PinSetBit(pin,LATCLR);
+                                    PinSetBit(pin,TRISSET);
+#endif
+                                    option = CNPDSET;
+                                }
                                 else error("Invalid configuration");
                             } else
                                 option = 0;
@@ -1243,7 +1265,14 @@ process:
         case EXT_INT_LO:
         case EXT_INT_BOTH:  if(argc == 7) {
                                 if(checkstring(argv[6], (unsigned char *)"PULLUP")) option = CNPUSET;
-                                else if(checkstring(argv[6], (unsigned char *)"PULLDOWN")) option = CNPDSET;
+                                else if(checkstring(argv[6], (unsigned char *)"PULLDOWN")) {
+#ifdef rp2350
+                                    PinSetBit(pin,TRISCLR);
+                                    PinSetBit(pin,LATCLR);
+                                    PinSetBit(pin,TRISSET);
+#endif
+                                    option = CNPDSET;
+                                }
                                 else error("Invalid configuration");
                             } else
                                 option = 0;
@@ -2600,7 +2629,11 @@ int64_t DHmem(int pin){
 
 void cmd_DHT22(void) {
      int pin;
+    union colourmap {
+    unsigned char dhtbytes[8];
     long long int r;
+    } dht;
+//    long long int r;
     int dht11=0;
     MMFLOAT *temp, *humid;
 
@@ -2626,21 +2659,21 @@ void cmd_DHT22(void) {
     }
     ExtCfg(pin, EXT_DIG_OUT, 0);
     
-    // pulse the pin low for 1mS
-    uSec(1000+dht11*18000);
+    // pulse the pin low for 1.5mS
+    uSec(1500+dht11*18000);
     // we have all 40 bits
     // first validate against the checksum
-    if((r=DHmem(pin))==-1) goto error_exit;
-    if( ( ( ((r >> 8) & 0xff) + ((r >> 16) & 0xff) + ((r >> 24) & 0xff) + ((r >> 32) & 0xff) ) & 0xff) != (r & 0xff)) goto error_exit;                                           // returning temperature
+    if((dht.r=DHmem(pin))==-1) goto error_exit;
+    if((uint8_t)(dht.dhtbytes[4]+dht.dhtbytes[3]+dht.dhtbytes[2]+dht.dhtbytes[1])!=dht.dhtbytes[0])goto error_exit; 
+//    if( ( (uint8_t)( ((r >> 8) & 0xff) + ((r >> 16) & 0xff) + ((r >> 24) & 0xff) + ((r >> 32) & 0xff) ) & 0xff) != (r & 0xff)) goto error_exit;                                           // returning temperature
     if(dht11==0){
-		*temp = (MMFLOAT)((r >> 8) &0x7fff) / 10.0;                       // get the temperature
-		if((r >> 8) &0x8000) *temp = -*temp;                            // the top bit is the sign
-		*humid = (MMFLOAT)(r >> 24) / 10.0;                               // get the humidity
+		*temp = (MMFLOAT)((dht.r >> 8) &0x7fff) / 10.0;                       // get the temperature
+		if((dht.r >> 8) &0x8000) *temp = -*temp;                            // the top bit is the sign
+		*humid = (MMFLOAT)(dht.r >> 24) / 10.0;                               // get the humidity
     } else {
-		*temp = (MMFLOAT)((signed char)((r>>16) & 0xFF));                       // get the temperature
-		*humid = (MMFLOAT)((signed char)(r >> 32));                               // get the humidity
+		*temp = (MMFLOAT)(dht.dhtbytes[2])+(MMFLOAT)(dht.dhtbytes[1])/10.0;                       // get the temperature
+		*humid =(MMFLOAT)(dht.dhtbytes[4])+(MMFLOAT)(dht.dhtbytes[3])/10.0;                               // get the humidity
     }
-    if((uint8_t)((r>>32) & 0xFF) + (uint8_t)((r>>24) & 0xFF) + (uint8_t)((r>>16) & 0xFF) + (uint8_t)((r>>8) & 0xFF) != (uint8_t)(r & 0xFF))goto error_exit;
     goto normal_exit;
 
 error_exit:
@@ -3214,7 +3247,7 @@ if(rp2350a){
         if(!(argc == 3))error("Argument count");
         ADCmax=0;
         ADCpos=0;
-        adcint2=NULL;
+        adcint1=adcint2=NULL;
         int64_t *adcval=NULL;
 #ifdef rp2350
         int dims[MAXDIM];
@@ -3223,10 +3256,13 @@ if(rp2350a){
 #endif
         int card1=parseintegerarray(argv[0], &adcval, 1, 1, dims, true);
         adcint1=(uint8_t *)adcval;
+        adcval=NULL;
         ADCmax=parseintegerarray(argv[2], &adcval, 2, 1, dims, true);
         adcint2=(uint8_t *)adcval;
         if(card1!=ADCmax)error("Array size mismatch %,%",card1, ADCmax);
         ADCmax *=8;
+        dma_channel_cleanup(ADC_dma_chan);
+        dma_channel_cleanup(ADC_dma_chan2);
         adc_init();
         adc_set_round_robin(ADCopen==1 ? 1 : ADCopen==2 ? 3 : ADCopen==3 ? 7 : 15);
         adc_fifo_setup(
@@ -3277,7 +3313,7 @@ if(rp2350a){
         dma_start_channel_mask(1u << ADC_dma_chan2);
         adc_run(true);
         adcint=adcint2;
-        ADCDualBuffering=true;
+        ADCDualBuffering=false;
 		return;
 	}
 
@@ -3406,10 +3442,24 @@ if(rp2350a){
         adc_set_round_robin(0);
         float div=((ADC_CLK_SPEED/96.0)/500000.0*96.000);
         adc_set_clkdiv(div);
+#ifdef rp2350
+if(rp2350a){
         ExtCfg(31, EXT_NOT_CONFIG, 0);
         if(ADCopen>=2)ExtCfg(32, EXT_NOT_CONFIG, 0);
         if(ADCopen>=3)ExtCfg(34, EXT_NOT_CONFIG, 0);
         if(ADCopen>=4)ExtCfg(44, EXT_NOT_CONFIG, 0);
+} else {
+        ExtCfg(55, EXT_NOT_CONFIG, 0);
+        if(ADCopen>=2)ExtCfg(56, EXT_NOT_CONFIG, 0);
+        if(ADCopen>=3)ExtCfg(57, EXT_NOT_CONFIG, 0);
+        if(ADCopen>=4)ExtCfg(58, EXT_NOT_CONFIG, 0);
+}
+#else
+        ExtCfg(31, EXT_NOT_CONFIG, 0);
+        if(ADCopen>=2)ExtCfg(32, EXT_NOT_CONFIG, 0);
+        if(ADCopen>=3)ExtCfg(34, EXT_NOT_CONFIG, 0);
+        if(ADCopen>=4)ExtCfg(44, EXT_NOT_CONFIG, 0);
+#endif
         ADCopen=0;
         adcint=adcint1=adcint2=NULL;
         ADCDualBuffering=false;
@@ -3590,10 +3640,24 @@ void MIPS16 ClearExternalIO(void) {
         I2C1SDApin=99;
         I2C1SCLpin=99;	
     }
+#ifdef rp2350
+if(rp2350a){
     if(ADCopen) ExtCfg(31, EXT_NOT_CONFIG, 0);
     if(ADCopen>=2)ExtCfg(32, EXT_NOT_CONFIG, 0);
     if(ADCopen>=3)ExtCfg(34, EXT_NOT_CONFIG, 0);
-//    if(ADCopen>=4)ExtCfg(44, EXT_NOT_CONFIG, 0);
+    if(ADCopen>=4)ExtCfg(44, EXT_NOT_CONFIG, 0);
+} else {
+    if(ADCopen) ExtCfg(55, EXT_NOT_CONFIG, 0);
+    if(ADCopen>=2)ExtCfg(56, EXT_NOT_CONFIG, 0);
+    if(ADCopen>=3)ExtCfg(57, EXT_NOT_CONFIG, 0);
+    if(ADCopen>=4)ExtCfg(58, EXT_NOT_CONFIG, 0);
+}
+#else
+    if(ADCopen) ExtCfg(31, EXT_NOT_CONFIG, 0);
+    if(ADCopen>=2)ExtCfg(32, EXT_NOT_CONFIG, 0);
+    if(ADCopen>=3)ExtCfg(34, EXT_NOT_CONFIG, 0);
+    if(ADCopen>=4)ExtCfg(44, EXT_NOT_CONFIG, 0);
+#endif
     ADCopen=0;
     adc_set_round_robin(0);
     adc_set_clkdiv(0);
@@ -3804,7 +3868,7 @@ void __not_in_flash_func(IRHandler)(void) {
     }
 void __not_in_flash_func(gpio_callback)(uint gpio, uint32_t events) {
 #ifndef USBKEYBOARD
-    if(!(Option.KeyboardConfig == NO_KEYBOARD || Option.KeyboardConfig == CONFIG_I2C ) && gpio==PinDef[KEYBOARD_CLOCK].GPno) CNInterrupt(gpio_get_all64());
+    if(!(Option.KeyboardConfig == NO_KEYBOARD || Option.KeyboardConfig == CONFIG_I2C ) && gpio==PinDef[Option.KEYBOARD_CLOCK].GPno) CNInterrupt(gpio_get_all64());
 #endif
     if(gpio==PinDef[IRpin].GPno)IRHandler();
     if(gpio==PinDef[Option.INT1pin].GPno)TM_EXTI_Handler_1();

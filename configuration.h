@@ -40,21 +40,21 @@ extern "C" {
         #ifdef HDMI
             #define MAXMODES 5
             #ifdef USBKEYBOARD
-                #define MagicKey 0x15282142
+                #define MagicKey 0x17842142
                 #define HEAPTOP 0x2007C000
             #else
-                #define MagicKey 0x21473740
+                #define MagicKey 0x21381740
                 #define HEAPTOP 0x2007C000
             #endif
             #define MAX_CPU     Freq720P 
-            #define MIN_CPU     Freq480P
+            #define MIN_CPU     Freq252P
         #else
             #define MAXMODES 3
             #ifdef USBKEYBOARD
-                #define MagicKey 0x18386236
+                #define MagicKey 0x14342236
                 #define HEAPTOP 0x2007C000
             #else
-                #define MagicKey 0x21222526
+                #define MagicKey 0x21682526
                 #define HEAPTOP 0x2007C000
             #endif
             #define MAX_CPU     378000 
@@ -63,11 +63,11 @@ extern "C" {
     #else
         #ifdef USBKEYBOARD
             #define FLASH_TARGET_OFFSET (768 * 1024) 
-            #define MagicKey 0x15486236
+            #define MagicKey 0x15427236
             #define HEAPTOP 0x2003F800
         #else
             #define FLASH_TARGET_OFFSET (720 * 1024) 
-            #define MagicKey 0x21343430
+            #define MagicKey 0x21315430
             #define HEAPTOP 0x2003f100
         #endif
         #define MAXMODES 2
@@ -96,6 +96,7 @@ extern "C" {
     #define MODE5SIZE_L  (MODE_H_L_ACTIVE_PIXELS/4) * (MODE_V_L_ACTIVE_LINES/4)
     #define Freq720P 372000
     #define Freq480P 315000
+    #define Freq252P 252000
     #define FreqXGA 324000
 #endif
 

@@ -4189,6 +4189,8 @@ void ResetOptions(void)
             Option.VGA_BLUE=24;
             Option.CPU_Speed = 126000;
         #endif
+        Option.KEYBOARD_CLOCK=KEYBOARDCLOCK;
+        Option.KEYBOARD_DATA=KEYBOARDDATA;
         Option.KeyboardConfig = CONFIG_US;
     #endif
 #else
@@ -4234,6 +4236,12 @@ void ResetOptions(void)
     Option.VGA_BLUE=24;
     uint8_t txbuf[4] = {0x9f};
     uint8_t rxbuf[4] = {0};
+#ifdef rp2350
+    if(!rp2350){
+        Option.NoHeartbeat=1;
+        Option.AllPins=1;
+    }
+#endif
     disable_interrupts();
     flash_do_cmd(txbuf, rxbuf, 4);
     Option.FlashSize= 1 << rxbuf[3];

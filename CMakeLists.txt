@@ -15,7 +15,7 @@ else()
 	endif()
 endif()
 include(pico_sdk_import.cmake)
-project(test_project C CXX ASM)
+project(PicoMite C CXX ASM)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 set(PICO_NO_COPRO_DIS 1)
@@ -49,11 +49,11 @@ add_executable(PicoMite
 	GPS.c
 	Audio.c
 	CFunction.c
-    	picojpeg.c 
-    	lfs.c
-    	lfs_util.c
+    picojpeg.c 
+    lfs.c
+    lfs_util.c
 	hxcmod.c
-    	VS1053.c
+    VS1053.c
 )
 if (COMPILE STREQUAL "HDMI" OR COMPILE STREQUAL "HDMIUSB"  OR COMPILE STREQUAL "VGARP2350"  OR COMPILE STREQUAL "VGAUSBRP2350"  OR COMPILE STREQUAL "PICORP2350"  OR COMPILE STREQUAL "PICOUSBRP2350" )
 	target_sources(PicoMite PRIVATE
@@ -65,15 +65,15 @@ if (COMPILE STREQUAL "WEB")
 	SSD1963.c 
 	Touch.c     
 	cJSON.c
-    	mqtt.c
-    	MMMqtt.c
-    	MMTCPclient.c
-    	MMtelnet.c
-    	MMntp.c
-    	MMtcpserver.c
-    	tftp.c
-    	MMtftp.c
-    	MMudp.c
+    mqtt.c
+    MMMqtt.c
+    MMTCPclient.c
+    MMtelnet.c
+    MMntp.c
+    MMtcpserver.c
+    tftp.c
+    MMtftp.c
+    MMudp.c
 )
 	set_source_files_properties(cJSON.c PROPERTIES COMPILE_FLAGS -Os)
 	target_include_directories(PicoMite PRIVATE
@@ -139,146 +139,51 @@ pico_enable_stdio_uart(PicoMite 0)
 pico_add_extra_outputs(PicoMite)
 pico_set_printf_implementation(PicoMite compiler)
 
-
-if(COMPILE STREQUAL "PICO")
-	target_compile_options(PicoMite PRIVATE -DPICOMITE
-											-DNDEBUG
-											-DPICO_STDIO_USB_ENABLE_RESET_VIA_VENDOR_INTERFACE=0 											-DPICO_XOSC_STARTUP_DELAY_MULTIPLIER=64 
-											-DPICO_FLASH_SIZE_BYTES=16777216
-											-DPICO_HEAP_SIZE=$<IF:$<STREQUAL:COMPILE,WEB>,0x2000,0x800>
-											-DPICO_STACK_SIZE=$<IF:$<STREQUAL:COMPILE,WEB>,0x1000,0x2000>
-											-DPICO_CORE1_STACK_SIZE=0x00
-											-O2
-											-Wall)
-endif()
-if(COMPILE STREQUAL "PICOUSB")
-	target_compile_options(PicoMite PRIVATE -DPICOMITE
-											-DUSBKEYBOARD
-											-DPICO_STDIO_USB_ENABLE_RESET_VIA_VENDOR_INTERFACE=0 											-DPICO_XOSC_STARTUP_DELAY_MULTIPLIER=64 
-											-DPICO_FLASH_SIZE_BYTES=16777216
-											-DPICO_HEAP_SIZE=$<IF:$<STREQUAL:COMPILE,WEB>,0x2000,0x800>
-											-DPICO_STACK_SIZE=$<IF:$<STREQUAL:COMPILE,WEB>,0x1000,0x2000>
-											-DPICO_CORE1_STACK_SIZE=0x00
-											-O2
-											-Wall)
-endif()
-if(COMPILE STREQUAL "PICORP2350")
-	target_compile_options(PicoMite PRIVATE -DPICOMITE
-											-DNDEBUG
-											-Drp2350
-											-DPICO_STDIO_USB_ENABLE_RESET_VIA_VENDOR_INTERFACE=0 											-DPICO_FLASH_SPI_CLKDIV=6
-											-DPICO_XOSC_STARTUP_DELAY_MULTIPLIER=64 
-											-DPICO_FLASH_SIZE_BYTES=16777216
-											-DPICO_STACK_SIZE=0x2000
-											-DPICO_CORE1_STACK_SIZE=0x0
-											-DPICO_HEAP_SIZE=0x2000 
-											-O2
-											-Wall)
-endif()
-if(COMPILE STREQUAL "PICOUSBRP2350")
-	target_compile_options(PicoMite PRIVATE -DPICOMITE
-											-DNDEBUG
-											-Drp2350
-											-DPICO_STDIO_USB_ENABLE_RESET_VIA_VENDOR_INTERFACE=0 											-DUSBKEYBOARD
-											-DPICO_XOSC_STARTUP_DELAY_MULTIPLIER=64 
-											-DPICO_FLASH_SIZE_BYTES=16777216
-											-DPICO_STACK_SIZE=0x2000
-											-DPICO_CORE1_STACK_SIZE=0x0
-											-DPICO_HEAP_SIZE=0x2000 
-											-O2
-											-Wall)
+target_compile_options(PicoMite PRIVATE -DNDEBUG
+										-DPICO_STDIO_USB_ENABLE_RESET_VIA_VENDOR_INTERFACE=0 											-DPICO_XOSC_STARTUP_DELAY_MULTIPLIER=64 
+										-DPICO_CLOCK_AJDUST_PERI_CLOCK_WITH_SYS_CLOCK
+										-DPICO_XOSC_STARTUP_DELAY_MULTIPLIER=64 
+										-DPICO_FLASH_SIZE_BYTES=16777216
+										-DPICO_STACK_SIZE=$<IF:$<STREQUAL:COMPILE,WEB>,0x1000,0x2000>
+										-DPICO_CORE1_STACK_SIZE=0x00
+										-O2
+										-Wall)
+if (COMPILE STREQUAL "HDMI" OR COMPILE STREQUAL "HDMIUSB" OR COMPILE STREQUAL "PICORP2350" OR COMPILE STREQUAL "PICOUSBRP2350" OR COMPILE STREQUAL "VGARP2350" OR COMPILE STREQUAL "VGAUSBRP2350")
+target_compile_options(PicoMite PRIVATE -Drp2350
+										-DPICO_HEAP_SIZE=0x2000 
+										-DPICO_FLASH_SPI_CLKDIV=4
+										)
+else()
+target_compile_options(PicoMite PRIVATE -DPICO_HEAP_SIZE=$<IF:$<STREQUAL:COMPILE,WEB>,0x2000,0x800>
+										)
 endif()
 
-if(COMPILE STREQUAL "VGA")
-	target_compile_options(PicoMite PRIVATE -DPICOMITEVGA
-											-DNDEBUG
-											-DPICO_STDIO_USB_ENABLE_RESET_VIA_VENDOR_INTERFACE=0 											-DPICO_XOSC_STARTUP_DELAY_MULTIPLIER=64 
-											-DPICO_FLASH_SIZE_BYTES=16777216
-											-DPICO_HEAP_SIZE=$<IF:$<STREQUAL:COMPILE,WEB>,0x2000,0x800>
-											-DPICO_STACK_SIZE=$<IF:$<STREQUAL:COMPILE,WEB>,0x1000,0x2000>
-											-DPICO_CORE1_STACK_SIZE=0x00
-											-O2
-											-Wall)
+if (COMPILE STREQUAL "PICO" OR COMPILE STREQUAL "PICOUSB" OR COMPILE STREQUAL "PICORP2350" OR COMPILE STREQUAL "PICOUSBRP2350")
+target_compile_options(PicoMite PRIVATE -DPICOMITE
+										)
 endif()
-if(COMPILE STREQUAL "VGAUSB")
-	target_compile_options(PicoMite PRIVATE -DPICOMITEVGA
-											-DUSBKEYBOARD
-											-DNDEBUG
-											-DPICO_STDIO_USB_ENABLE_RESET_VIA_VENDOR_INTERFACE=0 											-DPICO_XOSC_STARTUP_DELAY_MULTIPLIER=64 
-											-DPICO_FLASH_SIZE_BYTES=16777216
-											-DPICO_HEAP_SIZE=$<IF:$<STREQUAL:COMPILE,WEB>,0x2000,0x800>
-											-DPICO_STACK_SIZE=$<IF:$<STREQUAL:COMPILE,WEB>,0x1000,0x2000>
-											-DPICO_CORE1_STACK_SIZE=0x00
-											-O2
-											-Wall)
-	 endif()
-if(COMPILE STREQUAL "VGARP2350")
-	target_compile_options(PicoMite PRIVATE -DPICOMITEVGA
-											-DNDEBUG
-											-Drp2350
-											-DPICO_STDIO_USB_ENABLE_RESET_VIA_VENDOR_INTERFACE=0 											-DPICO_FLASH_SPI_CLKDIV=3
-											-DPICO_XOSC_STARTUP_DELAY_MULTIPLIER=64 
-											-DPICO_FLASH_SIZE_BYTES=16777216
-											-DPICO_STACK_SIZE=0x2000
-											-DPICO_CORE1_STACK_SIZE=0x0
-											-DPICO_HEAP_SIZE=0x2000 
-											-O2
-											-Wall)
-endif()
-if(COMPILE STREQUAL "VGAUSBRP2350")
-	target_compile_options(PicoMite PRIVATE -DPICOMITEVGA
-											-DNDEBUG
-											-DUSBKEYBOARD
-											-Drp2350
-											-DPICO_STDIO_USB_ENABLE_RESET_VIA_VENDOR_INTERFACE=0 											-DPICO_XOSC_STARTUP_DELAY_MULTIPLIER=64 
-											-DPICO_FLASH_SIZE_BYTES=16777216
-											-DPICO_STACK_SIZE=0x2000
-											-DPICO_CORE1_STACK_SIZE=0x0
-											-DPICO_HEAP_SIZE=0x2000 
-											-O2
-											-Wall)
 
+if (COMPILE STREQUAL "VGA" OR COMPILE STREQUAL "VGAUSB" OR COMPILE STREQUAL "VGARP2350" OR COMPILE STREQUAL "VGAUSBRP2350" OR COMPILE STREQUAL "HDMI" OR COMPILE STREQUAL "HDMIUSB")
+target_compile_options(PicoMite PRIVATE -DPICOMITEVGA
+										)
+endif()
 
+if (COMPILE STREQUAL "HDMI" OR COMPILE STREQUAL "HDMIUSB")
+target_compile_options(PicoMite PRIVATE -DHDMI
+										)
 endif()
-if(COMPILE STREQUAL "HDMI")
-	target_compile_options(PicoMite PRIVATE -DPICOMITEVGA
-											-DHDMI
-											-Drp2350
-											-DPICO_STDIO_USB_ENABLE_RESET_VIA_VENDOR_INTERFACE=0 											-DPICO_XOSC_STARTUP_DELAY_MULTIPLIER=64 
-											-DPICO_FLASH_SIZE_BYTES=16777216
-											-DPICO_STACK_SIZE=0x2000
-											-DPICO_CORE1_STACK_SIZE=0x0
-											-DPICO_HEAP_SIZE=0x2000 
-											-O2
-											-Wall)
-endif()
-if(COMPILE STREQUAL "HDMIUSB")
-	target_compile_options(PicoMite PRIVATE -DPICOMITEVGA
-											-DUSBKEYBOARD
-											-DHDMI
-											-Drp2350
-											-DPICO_STDIO_USB_ENABLE_RESET_VIA_VENDOR_INTERFACE=0 											-DPICO_XOSC_STARTUP_DELAY_MULTIPLIER=64 
-											-DPICO_FLASH_SIZE_BYTES=16777216
-											-DPICO_STACK_SIZE=0x2000
-											-DPICO_CORE1_STACK_SIZE=0x0
-											-DPICO_HEAP_SIZE=0x2000 
-											-O2
-											-Wall)
+
+if (COMPILE STREQUAL "PICOUSB" OR COMPILE STREQUAL "PICOUSBRP2350" OR COMPILE STREQUAL "VGAUSB" OR COMPILE STREQUAL "VGAUSBRP2350" OR COMPILE STREQUAL "HDMIUSB")
+target_compile_options(PicoMite PRIVATE -DUSBKEYBOARD
+										)
 endif()
 
 if(COMPILE STREQUAL "WEB")
 	target_compile_options(PicoMite PRIVATE -DPICOMITEWEB 
 											-DCYW43_HOST_NAME="WebMite" 
 											-DPICO_CYW43_ARCH_POLL
-											-DNDEBUG
-											-DPICO_STDIO_USB_ENABLE_RESET_VIA_VENDOR_INTERFACE=0 											-DPICO_XOSC_STARTUP_DELAY_MULTIPLIER=64 
-											-DPICO_FLASH_SIZE_BYTES=16777216
-											-DPICO_HEAP_SIZE=$<IF:$<STREQUAL:COMPILE,WEB>,0x2000,0x800>
-											-DPICO_STACK_SIZE=$<IF:$<STREQUAL:COMPILE,WEB>,0x1000,0x2000>
-											-DPICO_CORE1_STACK_SIZE=0x00
-											-O2
-											-Wall)
- endif()
+											)
+endif()
 
 
 target_link_libraries(PicoMite

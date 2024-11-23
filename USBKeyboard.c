@@ -1865,13 +1865,6 @@ void cmd_gamepad(void){
 		HID[n].r=colour>>16;
 		HID[n].g=(colour>>8) & 0xff;
 		HID[n].b=colour & 0xff;
-	} else if((tp = checkstring(cmdline, (unsigned char *)"HAPTIC"))){
-		getargs(&tp,5,(unsigned char *)",");
-		if(!(argc==5))error("Syntax");
-		n=getint(argv[0],1,4)-1;
-		if(HID[n].Device_type!=PS4)error("PS4 only");
-		HID[n].motorleft=getint(argv[2],0,255);
-		HID[n].motorright=getint(argv[4],0,255);
 	} else if((tp = checkstring(cmdline, (unsigned char *)"INTERRUPT DISABLE"))){
 		getargs(&tp,1,(unsigned char *)",");
 		n=getint(argv[0],1,4);

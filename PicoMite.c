@@ -404,7 +404,7 @@ const struct s_PinDef PinDef[]={
     #ifdef rp2350
 		{ 45, 30, "GP30", DIGITAL_IN | DIGITAL_OUT | SPI1SCK | I2C1SDA | PWM7A  ,99 , 7},           // pseudo pin 45
 		{ 46, 31, "GP31", DIGITAL_IN | DIGITAL_OUT | SPI1TX | I2C1SCL| PWM7B  ,99 , 135},           // pseudo pin 46
-		{ 47, 32, "GP32", DIGITAL_IN | DIGITAL_OUT | UART0TX | SPI0RX | I2C0SDA| EXT_PWM8A  ,99 , 8},           // pseudo pin 47
+		{ 47, 32, "GP32", DIGITAL_IN | DIGITAL_OUT | UART0TX | SPI0RX | I2C0SDA| PWM8A  ,99 , 8},           // pseudo pin 47
 		{ 48, 33, "GP33", DIGITAL_IN | DIGITAL_OUT | UART0RX | I2C0SCL| PWM8B  ,99 , 136},           // pseudo pin 48
 		{ 49, 34, "GP34", DIGITAL_IN | DIGITAL_OUT | SPI0SCK | I2C1SDA| PWM9A  ,99 , 9},           // pseudo pin 49
 		{ 50, 35, "GP35", DIGITAL_IN | DIGITAL_OUT | SPI0TX | I2C1SCL| PWM9B  ,99 , 137},           // pseudo pin 50
@@ -1728,6 +1728,8 @@ void __not_in_flash_func(CheckAbort)(void) {
             }
         }
 #endif
+        cmdline=GetTempMemory(STRINGSIZE);
+        strcpy((char *)cmdline,"noend");
         cmd_end();
     }
 }
@@ -1978,7 +1980,7 @@ void __not_in_flash_func(QVgaLine0)()
                     *r++=low | (high<<4);
                 }
 #endif
-            } else {
+            } else { //MODE 2
                 line>>=1;
                 register unsigned char *p=&DisplayBuf[line * 160];
                 register uint16_t *r=fbuff[VGAnextbuf];
@@ -2107,7 +2109,7 @@ void __not_in_flash_func(QVgaLine1)()
                     *r++=low | (high<<4);
                 }
 #endif
-            } else {
+            } else { //mode 2
                 line>>=1;
                 register unsigned char *dd=&DisplayBuf[line * 160];
                 register unsigned char *ll=&LayerBuf[line * 160];
@@ -2435,6 +2437,18 @@ extern uint16_t HDMIlines[2][640];
 #define MODE_V_S_SYNC_WIDTH    3
 #define MODE_V_S_BACK_PORCH    16
 
+#define MODE_H_F_SYNC_POLARITY 0
+#define MODE_H_F_ACTIVE_PIXELS 640
+#define MODE_H_F_FRONT_PORCH   16
+#define MODE_H_F_SYNC_WIDTH    96
+#define MODE_H_F_BACK_PORCH    48
+
+#define MODE_V_F_SYNC_POLARITY 0
+#define MODE_V_F_ACTIVE_LINES 480
+#define MODE_V_F_FRONT_PORCH   10
+#define MODE_V_F_SYNC_WIDTH    2
+#define MODE_V_F_BACK_PORCH    33
+
 #define MODE_H_W_SYNC_POLARITY 1
 #define MODE_H_W_FRONT_PORCH   110
 #define MODE_H_W_SYNC_WIDTH    40
@@ -2463,6 +2477,14 @@ extern uint16_t HDMIlines[2][640];
 #define MODE_V_S_TOTAL_LINES  ( \
     MODE_V_S_FRONT_PORCH + MODE_V_S_SYNC_WIDTH + \
     MODE_V_S_BACK_PORCH  + MODE_V_S_ACTIVE_LINES \
+)
+#define MODE_H_F_TOTAL_PIXELS ( \
+    MODE_H_F_FRONT_PORCH + MODE_H_F_SYNC_WIDTH + \
+    MODE_H_F_BACK_PORCH  + MODE_H_F_ACTIVE_PIXELS \
+)
+#define MODE_V_F_TOTAL_LINES  ( \
+    MODE_V_F_FRONT_PORCH + MODE_V_F_SYNC_WIDTH + \
+    MODE_V_F_BACK_PORCH  + MODE_V_F_ACTIVE_LINES \
 )
 #define MODE_H_W_TOTAL_PIXELS ( \
     MODE_H_W_FRONT_PORCH + MODE_H_W_SYNC_WIDTH + \
@@ -2582,13 +2604,13 @@ void MIPS64 __not_in_flash_func(HDMIloop0)(void){
             uint8_t transparent16=(uint8_t)transparent;
             uint8_t transparent16s=(uint8_t)transparents;
             last_line=v_scanline;
-            load_line=line=v_scanline - (MODE_V_S_TOTAL_LINES - MODE_V_S_ACTIVE_LINES);
+            load_line=line=v_scanline - (MODE_V_TOTAL_LINES - MODE_V_ACTIVE_LINES);
             if(HRes==320)line>>=1;
             line_to_load = last_line & 1;
             uint8_t l,d,s;
             int pp;
             uint16_t *p=HDMIlines[line_to_load];
-            if(load_line>=0 && load_line<MODE_V_S_ACTIVE_LINES){
+            if(load_line>=0 && load_line<MODE_V_ACTIVE_LINES){
                 __dmb();
                 switch(DISPLAY_TYPE){
                 case SCREENMODE1: //640x480x2 colour
@@ -3113,6 +3135,26 @@ void HDMICore(void){
         MODE4SIZE=0L;
         MODE4SIZE=MODE5SIZE_W;
         PIXELS_PER_WORD=4;
+    } else if(Option.CPU_Speed==Freq252P){
+        MODE_H_SYNC_POLARITY=MODE_H_F_SYNC_POLARITY;
+        MODE_ACTIVE_LINES=MODE_V_F_ACTIVE_LINES;
+        MODE_ACTIVE_PIXELS=MODE_H_F_ACTIVE_PIXELS;
+        MODE_V_TOTAL_LINES=MODE_V_F_TOTAL_LINES;
+        MODE_H_ACTIVE_PIXELS=MODE_H_F_ACTIVE_PIXELS;
+        MODE_H_FRONT_PORCH=MODE_H_F_FRONT_PORCH;
+        MODE_H_SYNC_WIDTH=MODE_H_F_SYNC_WIDTH;
+        MODE_H_BACK_PORCH=MODE_H_F_BACK_PORCH;
+        MODE_V_SYNC_POLARITY=MODE_V_F_SYNC_POLARITY;
+        MODE_V_ACTIVE_LINES=MODE_V_F_ACTIVE_LINES;
+        MODE_V_FRONT_PORCH=MODE_V_F_FRONT_PORCH;
+        MODE_V_SYNC_WIDTH=MODE_V_F_SYNC_WIDTH;
+        MODE_V_BACK_PORCH=MODE_V_F_BACK_PORCH;
+        MODE1SIZE=MODE1SIZE_S;
+        MODE2SIZE=MODE2SIZE_S;
+        MODE3SIZE=MODE3SIZE_S;
+        MODE4SIZE=MODE3SIZE_S;
+        MODE4SIZE=MODE5SIZE_S;
+        PIXELS_PER_WORD=2;
     }  else {
         MODE_H_SYNC_POLARITY=MODE_H_S_SYNC_POLARITY;
         MODE_ACTIVE_LINES=MODE_V_S_ACTIVE_LINES;
@@ -3164,7 +3206,7 @@ void HDMICore(void){
     vactive_line[8] =    HSTX_CMD_TMDS       | MODE_H_ACTIVE_PIXELS;
         // Configure HSTX's TMDS encoder for RGB332
     hstx_ctrl_hw->expand_tmds =
-        (Option.CPU_Speed==Freq480P ? 
+        ((Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P ) ? 
             (29 << HSTX_CTRL_EXPAND_TMDS_L0_ROT_LSB   |
             4  << HSTX_CTRL_EXPAND_TMDS_L0_NBITS_LSB |
             2 << HSTX_CTRL_EXPAND_TMDS_L1_ROT_LSB   |
@@ -3182,7 +3224,7 @@ void HDMICore(void){
     // Pixels (TMDS) come in 4 8-bit chunks. Control symbols (RAW) are an
     // entire 32-bit word.
     hstx_ctrl_hw->expand_shift =
-        (Option.CPU_Speed==Freq480P ? 
+        ((Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P ) ? 
             (2 << HSTX_CTRL_EXPAND_SHIFT_ENC_N_SHIFTS_LSB |
             16 << HSTX_CTRL_EXPAND_SHIFT_ENC_SHIFT_LSB |
             1 << HSTX_CTRL_EXPAND_SHIFT_RAW_N_SHIFTS_LSB |
@@ -3289,13 +3331,13 @@ void HDMICore(void){
 
 //    bus_ctrl_hw->priority = 1;
     dma_channel_start(DMACH_PING);
-    if(Option.CPU_Speed==Freq480P)HDMIloop0();
+    if(Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P )HDMIloop0();
     else if(Option.CPU_Speed==FreqXGA)HDMIloop1();
     else HDMIloop2();
 }
 void settiles(void){
     if(DISPLAY_TYPE!=SCREENMODE1)return;
-    if(Option.CPU_Speed==Freq480P){
+    if(Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P ){
         tilefcols=(uint16_t *)((uint32_t)FRAMEBUFFER+(MODE1SIZE*3));
         tilebcols=(uint16_t *)((uint32_t)FRAMEBUFFER+(MODE1SIZE*3)+(MODE1SIZE>>1));
         ytileheight=12;
@@ -3612,7 +3654,7 @@ int MIPS16 main(){
         SaveOptions();
     }
 #else
-    if(!(Option.CPU_Speed!=Freq720P || Option.CPU_Speed==Freq720P  || Option.CPU_Speed==FreqXGA )){
+    if(!(Option.CPU_Speed==Freq720P || Option.CPU_Speed==Freq252P   || Option.CPU_Speed==Freq480P|| Option.CPU_Speed==FreqXGA )){
         Option.CPU_Speed=Freq480P;
         SaveOptions();
     }
@@ -3648,8 +3690,8 @@ int MIPS16 main(){
 #endif
     vreg_disable_voltage_limit ();
 #ifdef rp2350
-    volatile uint32_t *qmi_m0_timing=(uint32_t *)0x400d000c;
-    volatile uint32_t *qmi_m1_timing=(uint32_t *)0x400d0020;
+//    volatile uint32_t *qmi_m0_timing=(uint32_t *)0x400d000c;
+//    volatile uint32_t *qmi_m1_timing=(uint32_t *)0x400d0020;
 #endif
     if(Option.CPU_Speed<=200000)vreg_set_voltage(VREG_VOLTAGE_1_10);
     else if(Option.CPU_Speed>200000 && Option.CPU_Speed<=300000 )vreg_set_voltage(VREG_VOLTAGE_1_25);  // Std default @ boot is 1_10
@@ -3661,9 +3703,9 @@ int MIPS16 main(){
 #endif
     sleep_ms(10);
 #ifdef rp2350
-    *qmi_m0_timing = *qmi_m1_timing = 0x60007204;
-    if(Option.CPU_Speed<288000)*qmi_m0_timing = *qmi_m1_timing = 0x60007202;
-    sleep_ms(2);
+//    *qmi_m0_timing = *qmi_m1_timing = 0x60007204;
+//    if(Option.CPU_Speed<288000)*qmi_m0_timing = *qmi_m1_timing = 0x60007202;
+//    sleep_ms(2);
 #endif
     set_sys_clock_khz(Option.CPU_Speed, false);
     PWM_FREQ=44100;
@@ -3678,13 +3720,13 @@ int MIPS16 main(){
         }
     }
 #endif
-    clock_configure(
+/*    clock_configure(
         clk_peri,
         0,                                                // No glitchless mux
         CLOCKS_CLK_PERI_CTRL_AUXSRC_VALUE_CLKSRC_PLL_SYS, // System PLL on AUX mux
         Option.CPU_Speed * 1000,                               // Input frequency
         Option.CPU_Speed * 1000                                // Output (must be same as no divider)
-    );
+    );*/
     if(clock_get_hz(clk_usb)!=48000000){
         ResetAllFlash();              // init the options if this is the very first startup
         _excep_code=INVALID_CLOCKSPEED;
@@ -3710,13 +3752,13 @@ int MIPS16 main(){
     if(Option.CPU_Speed<=200000)modclock(2);
 #else
 #ifdef HDMI
-    if(Option.CPU_Speed==Freq480P){
+    if(Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P){
         clock_configure(
             clk_hstx,
             0,                                                // No glitchless mux
             CLOCKS_CLK_PERI_CTRL_AUXSRC_VALUE_CLKSRC_PLL_SYS, // System PLL on AUX mux
-            Freq480P * 1000,                               // Input frequency
-            Freq480P * 500                                // Output (must be same as no divider)
+            Option.CPU_Speed * 1000,                               // Input frequency
+            Option.CPU_Speed * 500                                // Output (must be same as no divider)
         );
     }
 #endif 

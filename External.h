@@ -181,11 +181,12 @@ New, more portable, method of manipulating an I/O pin
 
 extern const char *PinFunction[];
 extern volatile int ExtCurrentConfig[NBRPINS + 1];
-extern volatile int INT0Count, INT0Value, INT0InitTimer, INT0Timer;
-extern volatile int INT1Count, INT1Value, INT1InitTimer, INT1Timer;
-extern volatile int INT2Count, INT2Value, INT2InitTimer, INT2Timer;
-extern volatile int INT3Count, INT3Value, INT3InitTimer, INT3Timer;
-extern volatile int INT4Count, INT4Value, INT4InitTimer, INT4Timer;
+extern volatile int INT0Value, INT0InitTimer, INT0Timer;
+extern volatile int INT1Value, INT1InitTimer, INT1Timer;
+extern volatile int INT2Value, INT2InitTimer, INT2Timer;
+extern volatile int INT3Value, INT3InitTimer, INT3Timer;
+extern volatile int INT4Value, INT4InitTimer, INT4Timer;
+extern volatile int64_t INT1Count,INT2Count,INT3Count, INT4Count;
 extern volatile uint64_t INT5Count, INT5Value, INT5InitTimer, INT5Timer;
 extern void PinSetBit(int pin, unsigned int offset);
 extern int PinRead(int pin);

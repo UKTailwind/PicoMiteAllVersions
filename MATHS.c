@@ -1348,8 +1348,6 @@ void cmd_math(void){
 				int channel = getint(pi,1,MAXPID);
 				if(PIDchannels[channel].interrupt==NULL)error("Channel not initialised");
 				PIDchannels[channel].active=false;
-			} else if((pi=checkstring(tp, (unsigned char *)"CLOSE"))){
-				int channel = getint(pi,1,MAXPID);
 				memset(&PIDchannels[channel],0,sizeof(s_PIDchan));
 			} else if((pi=checkstring(tp, (unsigned char *)"INIT"))){
 				getargs(&pi,5,(unsigned char *)",");

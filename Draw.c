@@ -190,7 +190,15 @@ const int colours[16]={0x00,0xFF,0x4000,0x40ff,0x8000,0x80ff,0xff00,0xffff,0xff0
 void MIPS16 initFonts(void){    
 	FontTable[0] = (unsigned char *)font1;
 	FontTable[1] = (unsigned char *)Misc_12x20_LE;
+	#ifdef PICOMITEVGA
+    #ifdef HDMI
 	FontTable[2] = (unsigned char *)Hom_16x24_LE;
+    #else
+	FontTable[2] = (unsigned char *)arial_bold;
+    #endif
+	#else
+	FontTable[2] = (unsigned char *)Hom_16x24_LE;
+	#endif
 	FontTable[3] = (unsigned char *)Fnt_10x16;
 	FontTable[4] = (unsigned char *)Inconsola;
 	FontTable[5] = (unsigned char *)ArialNumFontPlus;
@@ -359,7 +367,11 @@ void MIPS16 cmd_guiMX170(void) {
         #endif
                 DrawCircle(rand() % HRes, rand() % VRes, (rand() % t) + t/5, 1, 1, rgb((rand() % 8)*256/8, (rand() % 8)*256/8, (rand() % 8)*256/8), 1);
                 #ifdef PICOMITEVGA
-                uSec(5000);
+                #ifdef HDMI
+                while(v_scanline!=0){} 
+                #else
+                while(QVgaScanLine!=0){}
+                #endif
                 #endif
             }
             ClearScreen(gui_bcolour);
@@ -473,7 +485,7 @@ void ClearScreen(int c) {
     if(DISPLAY_TYPE==SCREENMODE1){
 #ifdef HDMI
         memset(DisplayBuf,0,ScreenSize);
-        if(Option.CPU_Speed==Freq480P){
+        if(Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P ){
             uint16_t bcolour = RGB555(c);
             for(int x=0;x<X_TILE;x++){
                 for(int y=0;y<Y_TILE;y++){
@@ -3097,161 +3109,7 @@ void cmd_blitmemory(void){
 int blitother(void){
     int x1, y1, x2, y2, w, h;
     unsigned char *p;
-/*    if ((p = checkstring(cmdline, (unsigned char*)"MEMORY"))) {
-        int8_t blank=-1;
-        getargs(&p, 7, (unsigned char*)",");
-        if(argc<5)error("Syntax");
-        char *from=(char *)GetPeekAddr(argv[0]);
-        x1 = (int)getinteger(argv[2]);
-        y1 = (int)getinteger(argv[4]);
-        uint16_t *size=(uint16_t *)from;
-        w=(size[0] & 0x7FFF);
-        h=(size[1] & 0x7FFF);
-        from+=4;
-        if(argc==7)blank=getint(argv[6],-1,15);
-        if(size[0] & 0x8000 || size[1] &  0x8000) {
-            docompressed(from, x1, y1, w, h, blank);
-        } else {
-#ifndef PICOMITEVGA
-            if(!WriteBuf){
-                if(blank==-1){
-                    char *fc=from;
-                    char tobuff[w/2], *to;
-                    int ww=w;
-                    int xx1=x1;
-                    if(x1<0){
-                        ww+=x1;
-                        xx1=0;
-                    }
-                    if(x1+w>HRes){
-                        ww=HRes-x1;
-                    }
-                    getnextuncompressednibble(&fc,1); //reset the decoder
-                    for(int y=y1;y<y1+h;y++){
-                        to=tobuff;
-                        int otoggle=0;
-                        for(int x=x1;x<x1+w;x++){
-                            if(y<0 || y>=VRes){
-                                getnextuncompressednibble(&fc,0);
-                                continue;
-                            }
-                            if(x>=0 && x<HRes){
-                                if(otoggle==0){
-                                    *to=getnextuncompressednibble(&fc,0);
-                                    otoggle ^=1;
-                                } else {
-                                    *to|=(getnextuncompressednibble(&fc,0)<<4);
-                                    otoggle^=1;
-                                    to++;
-                                }
-                            } else getnextuncompressednibble(&fc,0);
-                        }
-                        if(ww>0 && xx1<HRes)copyframetoscreen((unsigned char *)tobuff,xx1, xx1+ww-1, y, y, 0);            
-                    }
-                } else {
-                    char *fc=from;
-                    char tobuff[w/2], *to;
-                    getnextuncompressednibble(&fc,1); //reset the decoder
-                    for(int y=y1;y<y1+h;y++){
-                        int x=x1;
-                        while(1){
-                            to=tobuff;
-                            int otoggle=0;
-                            char c;
-                            int ww=0;
-                            int xx=-1;
-                            while((c=getnextuncompressednibble(&fc,0))==blank){
-                                x++;
-                                if(x==x1+w)break;
-                            }
-                            if(x==x1+w)break; //nothing found so exit
-                            *to=c;
-                            otoggle ^=1;
-                            xx=x;
-                            x++;
-                            ww=1;
-                            if(xx!=x1+w-1){
-                                while((c=getnextuncompressednibble(&fc,0))!=blank){
-                                    x++;
-                                    ww++;
-                                    if(otoggle==0){
-                                        *to=c;
-                                        otoggle ^=1;
-                                    } else {
-                                        *to|=(c<<4);
-                                        otoggle^=1;
-                                        to++;
-                                    }
-                                    if(x==x1+w)break;
-                                }
-                            }
-                            x++;
-                            if(xx+ww>HRes){
-                                ww=HRes-xx;
-                            }
-                            if(xx>=0 && ww>0 && y>=0 && y<VRes)copyframetoscreen((unsigned char *)tobuff,xx, xx+ww-1, y, y, 0);
-                            if(xx<0 && xx+ww>=0){
-                                char *t=tobuff-(xx/2)-(xx&1);
-                                ww+=xx;
-                                if(ww>0)copyframetoscreen((unsigned char *)t,0, ww-1, y, y, xx&1);
-                            }
-                            if(x>=x1+w)break;
-                       }           
-                    }
-                }
-            } else 
-#endif
-            if(x1 %2 == 0 && w % 2 == 0 && blank==-1){
-                char c, *to;
-                for(int y=y1;y<y1+h;y++){
-                    to=(char *)WriteBuf+y*(HRes>>1)+(x1>>1);
-                    for(int x=x1;x<x1+w;x+=2){
-                        c=*from++;
-                        if(y<0 || y>=VRes)continue;
-                        if(x>=0 && x<HRes)*to=c;
-                        to++;
-                    }               
-                }
-            } else { 
-                int otoggle=0,itoggle=0; //input will always start on a byte boundary
-                char c,*to;
-                for(int y=y1;y<y1+h;y++){ //loop though all of the output lines
-                    to=(char *)WriteBuf+y*(HRes>>1)+(x1>>1); //get the byte that will start the output
-                    if(x1 & 1)otoggle=1; // if x1 is odd then we will start on the high nibble
-                    else otoggle=0;
-                    for(int x=x1;x<x1+w;x++){
-                        if(itoggle==0){
-                            c=*from & 0x0f;
-                            itoggle=1;
-                        } else {
-                            c= *from >>4;
-                            from++;
-                            itoggle=0;
-                        }
-                        if(y<0 || y>=VRes)continue;
-                        if(otoggle==0){
-                            if(x>=0 && x<HRes){
-                                if(c!=blank){
-                                    *to &= 0xF0;
-                                    *to |=c;
-                                }
-                            }
-                        } else {
-                            if(x>=0 && x<HRes){
-                                if(c!=blank){
-                                    *to &=0x0f;
-                                    *to |= (c<<4);
-                                }
-                            }
-                            to++;
-                        }
-                        otoggle^=1;
-                    }
-                }
-            }
-        }
-        return 1;
-    }  else */if ((p = checkstring(cmdline, (unsigned char*)"COMPRESSED"))) {
+if ((p = checkstring(cmdline, (unsigned char*)"COMPRESSED"))) {
         int8_t blank=-1;
         getargs(&p, 7, (unsigned char*)",");
         if(argc<5)error("Syntax");
@@ -3276,7 +3134,9 @@ int blitother(void){
         else if(checkstring(argv[0],(unsigned char*)"F"))s=FrameBuf;
 #ifdef PICOMITEVGA
         else if(checkstring(argv[0],(unsigned char*)"N"))s=DisplayBuf;
+#ifdef rp2350
         else if(checkstring(argv[0],(unsigned char*)"T"))s=SecondLayer;
+#endif
 #else
         else if(checkstring(argv[0],(unsigned char*)"N"))s=NULL;
 #endif
@@ -3285,7 +3145,9 @@ int blitother(void){
         else if(checkstring(argv[2],(unsigned char*)"F"))d=FrameBuf;
 #ifdef PICOMITEVGA
         else if(checkstring(argv[2],(unsigned char*)"N"))d=DisplayBuf;
+#ifdef rp2350
         else if(checkstring(argv[2],(unsigned char*)"T"))d=SecondLayer;
+#endif
 #else
         else if(checkstring(argv[2],(unsigned char*)"N"))d=NULL;
 #endif
@@ -6184,7 +6046,7 @@ void MIPS16 cmd_font(void) {
         }
     }
 }
-
+#ifdef PICOMITEVGA
 void cmd_colourmap(void){
     long long int *cptr=NULL, *fptr=NULL;
     MMFLOAT *cfptr=NULL, *ffptr=NULL;
@@ -6214,11 +6076,12 @@ void cmd_colourmap(void){
     if(nf!=n)error("Array size mismatch %, %",n,nf);
     for(int i=0;i<n;i++){
         int in=(cptr == NULL ? cfptr[i] : cptr[i]);
+        if(n>=16)error("Input range error on element %",i);
         if(fptr==NULL)ffptr[i]=map[in];
         else fptr[i]=map[in];
     }
 }
-
+#endif
 void cmd_colour(void) {
     getargs(&cmdline, 3, (unsigned char *)",");
     if(argc < 1) error("Argument count");
@@ -6699,11 +6562,11 @@ void cmd_tile(void){
         int tilebcolour, tilefcolour ;
         if(*argv[4]){
             tilefcolour = getColour((char *)argv[4], 0);
-            fcolour = Option.CPU_Speed==Freq480P ? RGB555(tilefcolour):  RGB332(tilefcolour);
+            fcolour = (Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P ) ? RGB555(tilefcolour):  RGB332(tilefcolour);
         }
         if(argc>=7 && *argv[6]){
             tilebcolour = getColour((char *)argv[6], 0);
-            bcolour = Option.CPU_Speed==Freq480P ? RGB555(tilebcolour):  RGB332(tilebcolour);
+            bcolour = (Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P ) ? RGB555(tilebcolour):  RGB332(tilebcolour);
         }
         if(argc>=9 && *argv[8]){
             xlen=getint(argv[8],1,X_TILE-x);
@@ -6714,7 +6577,7 @@ void cmd_tile(void){
         for(int xp=x;xp<x+xlen;xp++){
             for(int yp=y;yp<y+ylen;yp++){
 #ifdef HDMI
-                if(Option.CPU_Speed==Freq480P){
+                if(Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P ){
 #endif
                     if(fcolour!=0xFFFFFFFF) tilefcols[yp*X_TILE+xp]=(uint16_t)fcolour;
                     if(bcolour!=0xFFFFFFFF) tilebcols[yp*X_TILE+xp]=(uint16_t)bcolour;
@@ -6735,14 +6598,14 @@ void cmd_map(void){
     if((p=checkstring(cmdline, (unsigned char *)"RESET"))) {
         while(v_scanline!=0){}
         if(DISPLAY_TYPE==SCREENMODE5)for(int i=0;i<256;i++)map256[i]=remap[i]=RGB555(MAP256DEF[i]);
-        else if(Option.CPU_Speed==Freq480P)for(int i=0;i<16;i++){
+        else if(Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P )for(int i=0;i<16;i++){
             map16[i]=remap[i]=RGB555(MAP16DEF[i]);
             map16pairs[i]=map16[i] | (map16[i]<<16);
         }
         else if(DISPLAY_TYPE==SCREENMODE3)for(int i=0;i<16;i++) map16d[i]=remap[i]=RGB332(MAP16DEF[i]) | (RGB332(MAP16DEF[i])<<8);
         else if(DISPLAY_TYPE==SCREENMODE2)for(int i=0;i<16;i++) map16q[i]=remap[i]=RGB332(MAP16DEF[i]) | (RGB332(MAP16DEF[i])<<8) | (RGB332(MAP16DEF[i])<<16) | (RGB332(MAP16DEF[i])<<24);
         first=false;
-    } else if((checkstring(cmdline, (unsigned char *)"GRAYSCALE") || checkstring(cmdline, (unsigned char *)"GREYSCALE")) && Option.CPU_Speed==Freq480P) {
+    } else if((checkstring(cmdline, (unsigned char *)"GRAYSCALE") || checkstring(cmdline, (unsigned char *)"GREYSCALE")) && (Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P )) {
         while(v_scanline!=0){}
         if(DISPLAY_TYPE==SCREENMODE5) {
             for(int i=1;i<=32;i++){
@@ -6772,8 +6635,8 @@ void cmd_map(void){
             map16[i]=remap[i]=RGB555(CMM1map[i]);
             map16pairs[i]=map16[i] | (map16[i]<<16);
 #ifdef HDMI
-            if(DISPLAY_TYPE==SCREENMODE3 && Option.CPU_Speed!=Freq480P)map16d[i]=remap[i]=RGB332(CMM1map[i]) | (RGB332(CMM1map[i])<<8);
-            if(DISPLAY_TYPE==SCREENMODE2 && Option.CPU_Speed!=Freq480P)map16q[i]=remap[i]=RGB332(CMM1map[i]) | (RGB332(CMM1map[i])<<8)| (RGB332(CMM1map[i])<<16)| (RGB332(CMM1map[i])<<24);
+            if(DISPLAY_TYPE==SCREENMODE3 && (Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P ))map16d[i]=remap[i]=RGB332(CMM1map[i]) | (RGB332(CMM1map[i])<<8);
+            if(DISPLAY_TYPE==SCREENMODE2 && (Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P ))map16q[i]=remap[i]=RGB332(CMM1map[i]) | (RGB332(CMM1map[i])<<8)| (RGB332(CMM1map[i])<<16)| (RGB332(CMM1map[i])<<24);
 #endif
         }
         first=false;
@@ -6781,7 +6644,7 @@ void cmd_map(void){
         while(v_scanline!=0){}
         if(DISPLAY_TYPE==SCREENMODE5) for(int i=0;i<256;i++)map256[i]=remap[i];
         else for(int i=0;i<16;i++){
-            if(Option.CPU_Speed==Freq480P){map16[i]=remap[i];map16pairs[i]=map16[i] | (map16[i]<<16);}
+            if(Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P ){map16[i]=remap[i];map16pairs[i]=map16[i] | (map16[i]<<16);}
             else if(DISPLAY_TYPE==SCREENMODE3)map16d[i]=remap[i];
             else if(DISPLAY_TYPE==SCREENMODE2)map16q[i]=remap[i];
         }
@@ -6795,12 +6658,12 @@ void cmd_map(void){
 		int col=getColour((char *)cmdline,0);
         if(first){
             if(DISPLAY_TYPE==SCREENMODE5)for(int i=0;i<256;i++)remap[i]=RGB555(MAP256DEF[i]);
-            else if(Option.CPU_Speed==Freq480P)for(int i=0;i<16;i++)remap[i]=RGB555(MAP16DEF[i]);
+            else if(Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P )for(int i=0;i<16;i++)remap[i]=RGB555(MAP16DEF[i]);
             else if(DISPLAY_TYPE==SCREENMODE3)for(int i=0;i<16;i++)remap[i]=RGB332(MAP16DEF[i]) | (RGB332(MAP16DEF[i])<<8);
             else if(DISPLAY_TYPE==SCREENMODE2)for(int i=0;i<16;i++)remap[i]=RGB332(MAP16DEF[i]) | (RGB332(MAP16DEF[i])<<8) | (RGB332(MAP16DEF[i])<<16) | (RGB332(MAP16DEF[i])<<24);
             first=false;
         }
-		if(Option.CPU_Speed==Freq480P)remap[cl]=RGB555(col);
+		if(Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P )remap[cl]=RGB555(col);
         else if(DISPLAY_TYPE==SCREENMODE3)remap[cl]=RGB332(col) | (RGB332(col)<<8);
         else if(DISPLAY_TYPE==SCREENMODE2)remap[cl]=RGB332(col) | (RGB332(col)<<8) | (RGB332(col)<<16) | (RGB332(col)<<24);
     }
@@ -6814,7 +6677,7 @@ void cmd_mode(void){
         DISPLAY_TYPE=SCREENMODE5; 
         ScreenSize=MODE5SIZE;
     } else if(mode==4){
-        if(Option.CPU_Speed!=Freq480P)error("Mode not available in this resolution");
+        if(!(Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P))error("Mode not available in this resolution");
         DISPLAY_TYPE=SCREENMODE4; 
         ScreenSize=MODE4SIZE;
     } else if(mode==3){
@@ -6848,7 +6711,7 @@ void cmd_mode(void){
     CurrentX = CurrentY =0;
     ClearScreen(Option.DefaultBC);
 #ifdef HDMI
-    if(Option.CPU_Speed==Freq480P){
+    if(Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P ){
 #endif
         if(DISPLAY_TYPE==SCREENMODE2 || DISPLAY_TYPE==SCREENMODE4 || DISPLAY_TYPE==SCREENMODE5){
             SetFont((6<<4) | 1) ;
@@ -7292,8 +7155,8 @@ void DrawBitmap2(int x1, int y1, int width, int height, int scale, int fc, int b
             // the bitmap is aligned with the tiles
             int bcolour, fcolour ;
 #ifdef HDMI
-            fcolour = Option.CPU_Speed==Freq480P? RGB555(fc) : RGB332(fc);
-            bcolour = Option.CPU_Speed==Freq480P? RGB555(bc) : RGB332(bc);
+            fcolour = (Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P )? RGB555(fc) : RGB332(fc);
+            bcolour = (Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P )? RGB555(bc) : RGB332(bc);
 #else
             fcolour = ((fc & 0x800000)>> 20) | ((fc & 0xC000)>>13) | ((fc & 0x80)>>7);
             fcolour= (fcolour<<12) | (fcolour<<8) | (fcolour<<4) | fcolour;
@@ -7306,7 +7169,7 @@ void DrawBitmap2(int x1, int y1, int width, int height, int scale, int fc, int b
             int h=height*scale/ya;
 //            int pos;
 #ifdef HDMI
-            if(Option.CPU_Speed==Freq480P){
+            if(Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P ){
 #endif
                 for(int yy=yt;yy<yt+h;yy++){
                     for(int xx=xt; xx<xt+w;xx++){
@@ -7399,7 +7262,7 @@ void ScrollLCD2(int lines){
                 int s=(y+offset)*X_TILE;
                 for(int x=0;x<X_TILE;x++){
 #ifdef HDMI
-                    if(Option.CPU_Speed==Freq480P){
+                    if(Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P ){
 #endif
                         tilefcols[d+x]=tilefcols[s+x];
                         tilebcols[d+x]=tilebcols[s+x];
@@ -7434,7 +7297,7 @@ void ScrollLCD2(int lines){
                 int s=(y-offset)*X_TILE;
                 for(int x=0;x<X_TILE;x++){
 #ifdef HDMI
-                    if(Option.CPU_Speed==Freq480P){
+                    if(Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P ){
 #endif
                         tilefcols[d+x]=tilefcols[s+x];
                         tilebcols[d+x]=tilebcols[s+x];
@@ -7650,7 +7513,7 @@ void fun_getscanline(void){
         iret = v_scanline - 30;
         if(iret<0)iret+=750;
         targ=T_INT;
-    } else if(Option.CPU_Speed==Freq480P){
+    } else if(Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P ){
         iret = v_scanline - 20;
         if(iret<0)iret+=500;
         targ=T_INT;
@@ -8838,9 +8701,15 @@ Widescreen:
     #define MODE3SIZE_W  (1280/2) * (720/2)/2
     #define MODE5SIZE_W  (1280/4) * (720/4)
 
+XGA:
+    #define MODE1SIZE_W  `1024 *768 /8
+    #define MODE2SIZE_W  (1024/4) * (768/4)/2
+    #define MODE3SIZE_W  (1024/2) * (768/2)/2
+    #define MODE5SIZE_W  (1024/4) * (768/4)
 
 */
     unsigned char *p;
+#ifdef rp2350
     if((p=checkstring(cmdline, (unsigned char *)"CREATE 2"))) {
         int colour=0;
         if(SecondFrame==DisplayBuf){
@@ -8866,7 +8735,9 @@ Widescreen:
             }
         } else error("Framebuffer 2 already exists");
         memset(SecondFrame,colour,ScreenSize);
-    } else if((p=checkstring(cmdline, (unsigned char *)"CREATE"))) {
+    } else 
+#endif
+    if((p=checkstring(cmdline, (unsigned char *)"CREATE"))) {
         if(FrameBuf==DisplayBuf){
             switch(DISPLAY_TYPE){
                 case SCREENMODE1:
@@ -8893,6 +8764,7 @@ Widescreen:
         } else error("Framebuffer already exists");
         memset(FrameBuf,0,ScreenSize);
 
+#ifdef rp2350
     } else if((p=checkstring(cmdline, (unsigned char *)"LAYER TOP"))) {
         int colour=0;
         if(SecondLayer==DisplayBuf){
@@ -8901,17 +8773,12 @@ Widescreen:
                 case SCREENMODE2:
                     if(argc==1)transparents=getint(argv[0],0,15);
                     colour=transparents | (transparents<<4);
-#ifdef rp2350
                     if(ScreenSize<sizeof(FRAMEBUFFER)/4)SecondLayer=DisplayBuf+3*ScreenSize;
                     else SecondLayer=GetMemory(ScreenSize);
-#else
-                    SecondLayer=GetMemory(ScreenSize);
-#endif
                     break;
                 case SCREENMODE1:
                     SecondLayer=GetMemory(ScreenSize);
                     break;
-#ifdef rp2350
                 case SCREENMODE3:
                     if(argc==1)transparents=getint(argv[0],0,15);
                     SecondLayer=GetMemory(ScreenSize);
@@ -8935,10 +8802,10 @@ Widescreen:
                     colour=transparents;
                     break;
 #endif
-#endif
             }
         } else error("Framebuffer already exists");
         memset(SecondLayer,colour,ScreenSize);
+#endif
     } else if((p=checkstring(cmdline, (unsigned char *)"LAYER"))) {
         int colour=0;
         if(LayerBuf==DisplayBuf){
@@ -8985,10 +8852,12 @@ Widescreen:
             closeframebuffer('F');
         } else if(checkstring(p, (unsigned char *)"L")){
             closeframebuffer('T');
+#ifdef rp2350
         } else if(checkstring(p, (unsigned char *)"T")){
             closeframebuffer('L');
         } else if(checkstring(p, (unsigned char *)"2")){
             closeframebuffer('2');
+#endif
         } else  closeframebuffer('A');
     } else if((p=checkstring(cmdline, (unsigned char *)"WRITE"))) {
         if(checkstring(p, (unsigned char *)"N"))WriteBuf=DisplayBuf;
@@ -8996,6 +8865,7 @@ Widescreen:
             if(LayerBuf==DisplayBuf)error("Layer not created");
             WriteBuf=LayerBuf;
         }
+#ifdef rp2350
         else if(checkstring(p, (unsigned char *)"T")){
             if(SecondLayer==DisplayBuf)error("Layer 2 not created");
             WriteBuf=SecondLayer;
@@ -9004,6 +8874,7 @@ Widescreen:
             if(SecondFrame==DisplayBuf)error("Frame 2 not created");
             WriteBuf=SecondFrame;
         }
+#endif
         else if(checkstring(p, (unsigned char *)"F")){
             if(FrameBuf==DisplayBuf)error("Frame buffer not created");
              WriteBuf=FrameBuf;

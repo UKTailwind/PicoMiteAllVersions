@@ -352,7 +352,6 @@ void fun_map(void);
 	{ (unsigned char *)"Next",		T_CMD,				0, cmd_next	},
 	{ (unsigned char *)"On",			T_CMD,				0, cmd_on	},
 	{ (unsigned char *)"Print",		T_CMD,				0, cmd_print	},
-	{ (unsigned char *)"Randomize",          T_CMD,				0, cmd_randomize},
 	{ (unsigned char *)"Read",		T_CMD,				0, cmd_read	},
 	{ (unsigned char *)"Rem",		T_CMD,				0, cmd_null,	},
 	{ (unsigned char *)"Restore",            T_CMD,				0, cmd_restore	},
@@ -391,7 +390,6 @@ void fun_map(void);
 	{ (unsigned char *)"RBox",           T_CMD,                      0, cmd_rbox	},
 	{ (unsigned char *)"CLS",            T_CMD,                      0, cmd_cls	},
 	{ (unsigned char *)"Font",           T_CMD,                      0, cmd_font	},
-	{ (unsigned char *)"Colour Map",         T_CMD,                      0, cmd_colourmap	},
   	{ (unsigned char *)"Triangle",       T_CMD,                      0, cmd_triangle   },
 	{ (unsigned char *)"Arc",            T_CMD,                      0, cmd_arc	},
 	{ (unsigned char *)"Polygon",        T_CMD,                  	 0, cmd_polygon	},
@@ -454,12 +452,14 @@ void fun_map(void);
 	{ (unsigned char *)"LCD",		T_CMD,				0, cmd_lcd	},
 	{ (unsigned char *)"Wii Classic",		T_CMD,				0, cmd_Classic	},
 	{ (unsigned char *)"Wii Nunchuck",		T_CMD,				0, cmd_Nunchuck	},
+	{ (unsigned char *)"Wii",		T_CMD,				0, cmd_Classic	},
 	{ (unsigned char *)"Servo",		T_CMD,				0, cmd_Servo	},
 #ifdef PICOMITEVGA
   	{ (unsigned char *)"TILE",            T_CMD,                     0, cmd_tile   },
   	{ (unsigned char *)"MODE",            T_CMD,                     0, cmd_mode   },
   	{ (unsigned char *)"Map(",            T_CMD | T_FUN  ,           0, cmd_map   },
 	{ (unsigned char *)"Map",            T_CMD,           0, cmd_map   },
+	{ (unsigned char *)"Colour Map",         T_CMD,                      0, cmd_colourmap	},
 #else
     { (unsigned char *)"Camera",         T_CMD,                      0, cmd_camera },
     { (unsigned char *)"Refresh",         T_CMD,                      0, cmd_refresh },
@@ -486,6 +486,8 @@ void fun_map(void);
 #ifdef rp2350
 	{ (unsigned char *)"CMM2 Load",		T_CMD,				0, cmd_loadCMM2	},
 	{ (unsigned char *)"CMM2 Run",		T_CMD,				0, cmd_RunCMM2	},
+#else
+	{ (unsigned char *)"Randomize",          T_CMD,				0, cmd_randomize},
 #endif
     { (unsigned char *)"",   0,                  0, cmd_null,    }                   // this dummy entry is always at the end
 #endif

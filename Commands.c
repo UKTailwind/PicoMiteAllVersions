@@ -100,7 +100,15 @@ void __not_in_flash_func(cmd_null)(void) {
  * @param a the integer, float or string to be changed
  * @param b OPTIONAL for integers and floats - defaults to 1. Otherwise the amount to increment the number or the string to concatenate
  */
+#ifdef rp2350
 void MIPS16 __not_in_flash_func(cmd_inc)(void){
+ #else
+#ifdef PICOMITEVGA
+void MIPS16 cmd_inc(void){
+#else
+void MIPS16 __not_in_flash_func(cmd_inc)(void){
+#endif
+#endif
 	unsigned char *p, *q;
     int vtype;
 	getargs(&cmdline,3,(unsigned char *)",");
@@ -820,6 +828,10 @@ void cmd_end(void) {
         busy_wait_ms(100);
     }
 #endif
+	if(FindSubFun((unsigned char *)"MM.END", 0) >= 0 && checkstring(cmdline,(unsigned char *)"NOEND")==NULL) {
+		ExecuteProgram((unsigned char *)"MM.END\0");
+		memset(inpbuf,0,STRINGSIZE);
+	}
     if(!(MMerrno == 16))hw_clear_bits(&watchdog_hw->ctrl, WATCHDOG_CTRL_ENABLE_BITS);
     irq_set_enabled(DMA_IRQ_1, false);
     dma_hw->abort = ((1u << dma_rx_chan2) | (1u << dma_rx_chan));
@@ -1495,9 +1507,8 @@ void cmd_error(void) {
 }
 
 
-
-
-void cmd_randomize(void) {
+#ifndef rp2350
+	void cmd_randomize(void) {
 	int i;
 	getargs(&cmdline,1,(unsigned char *)",");
 	if(argc==1)i = getinteger(argv[0]);
@@ -1505,6 +1516,7 @@ void cmd_randomize(void) {
 	if(i < 0) error("Number out of bounds");
 	srand(i);
 }
+#endif
 
 // this is the Sub or Fun command
 // it simply skips over text until it finds the end of it

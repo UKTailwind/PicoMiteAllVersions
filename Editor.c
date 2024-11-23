@@ -106,7 +106,7 @@ void DisplayPutClever(char c){
     }
 #ifdef HDMI
     if(r_on){
-        if(Option.CPU_Speed==Freq480P){
+        if(Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P ){
             if(r_on)for(int i=0; i< gui_font_width / 8; i++)tilebcols[CurrentY/gui_font_height*X_TILE+CurrentX/8+i]=RGB555(BLUE);
         }
         else {
@@ -118,7 +118,7 @@ void DisplayPutClever(char c){
 #endif
 #ifdef HDMI
     else {
-        if(Option.CPU_Speed==Freq480P){
+        if(Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P ){
             for(int i=0; i< gui_font_width / 8; i++)tilebcols[CurrentY/gui_font_height*X_TILE+CurrentX/8+i]=Option.VGABC;
         }
         else {
@@ -193,7 +193,7 @@ static char (*SSputchar)(char buff, int flush)=SerialConsolePutC;
                                     break;
             case CLEAR_TO_EOL:      DrawBox(CurrentX, CurrentY, HRes-1, CurrentY + gui_font_height-1, 0, 0, DISPLAY_TYPE==SCREENMODE1 ? 0 : gui_bcolour);
 #ifdef HDMI
-                                    if(Option.CPU_Speed==Freq480P){
+                                    if(Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P ){
                                         if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==gui_font_height){
                                             for(int x=CurrentX/8;x<X_TILE;x++){
                                                 tilefcols[CurrentY/ytileheight*X_TILE+x]=RGB555(gui_fcolour);
@@ -236,7 +236,7 @@ static char (*SSputchar)(char buff, int flush)=SerialConsolePutC;
                                     DrawLine(0, VRes - gui_font_height - 6, HRes - 1, VRes - gui_font_height - 6, 1, GUI_C_LINE);
 #ifdef PICOMITEVGA
 #ifdef HDMI
-                                    if(Option.CPU_Speed==Freq480P){
+                                    if(Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P ){
                                         if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==12 && gui_font==1)for(int i=0; i<80; i++)tilefcols[38*X_TILE+i]=RGB555(MAGENTA);
                                     } else if(Option.CPU_Speed==FreqXGA){
                                         if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==32 && gui_font==65)for(int i=0; i<128; i++)tilefcols_w[22*X_TILE+i]=RGB332(MAGENTA);
@@ -318,7 +318,7 @@ void edit(unsigned char *cmdline, bool reset) {
     memset(WriteBuf, 0, ScreenSize);
     if(modmode){
 #ifdef HDMI
-        if(Option.CPU_Speed==Freq480P){
+        if(Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P ){
 #endif
             SetFont(1);
             PromptFont=1;
@@ -555,8 +555,13 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool rese
             }
             ShowCursor(true);
             if(!((rightpushed==true && c==F4) || (middlepushed==true && c==F5)))
+#else
+            ShowCursor(true);
 #endif
+#else
+            ShowCursor(true);
 #endif
+
             c = MMInkey();
 
             if(statuscount++ == 5000) PrintStatus();
@@ -887,7 +892,7 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool rese
                                 PromptFont=oldfont;
                             }
 #ifdef HDMI
-                            if(Option.CPU_Speed==Freq480P){
+                            if(Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P ){
                                 tilefcols=(uint16_t *)((uint32_t)FRAMEBUFFER+(MODE1SIZE*3));
                                 tilebcols=(uint16_t *)((uint32_t)FRAMEBUFFER+(MODE1SIZE*3)+(MODE1SIZE>>1));
                                 X_TILE=MODE_H_ACTIVE_PIXELS/8;Y_TILE=MODE_V_ACTIVE_LINES/8;

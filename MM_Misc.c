@@ -1680,6 +1680,10 @@ void MIPS16 printoptions(void){
         }
         PRet();
     } 
+    if(!(Option.KEYBOARD_CLOCK==11 || Option.KEYBOARD_DATA==12)){
+        PO("PS2 PINS"); MMPrintString((char *)PinDef[Option.KEYBOARD_CLOCK].pinname);
+        MMputchar(',',1);;MMPrintString((char *)PinDef[Option.KEYBOARD_DATA].pinname);PRet();
+    }
 #endif   
     if(Option.KeyboardConfig == CONFIG_I2C)PO2Str("KEYBOARD", "I2C");
     if(Option.NoHeartbeat)PO2Str("HEARTBEAT", "OFF");
@@ -2856,17 +2860,23 @@ void MIPS16 cmd_option(void) {
     }
     tp = checkstring(cmdline, (unsigned char *)"RESOLUTION");
     if(tp) {
-        if(checkstring(tp, (unsigned char *)"640") || checkstring(tp, (unsigned char *)"640x480")){
-            Option.CPU_Speed = Freq480P; 
-            Option.DISPLAY_TYPE = SCREENMODE1;
+        getargs(&tp,3,(unsigned char *)",");
+        if((checkstring(argv[0], (unsigned char *)"640")) || (checkstring(argv[0], (unsigned char *)"640x480"))){
+            if(argc==3){
+                int i=getint(argv[2],252000,315000);
+                if(!(i==315000 || i==252000))error("Invalid speed");
+                if(i==315000) Option.CPU_Speed = Freq480P;
+                else Option.CPU_Speed = Freq252P;
+            } else Option.CPU_Speed = Freq480P; 
+            Option.DISPLAY_TYPE=SCREENMODE1;
             Option.DefaultFont = 1 ;
         }     
-        else if(checkstring(tp, (unsigned char *)"1280") || checkstring(tp, (unsigned char *)"1280x720")){
+        else if(checkstring(argv[0], (unsigned char *)"1280") || checkstring(argv[0], (unsigned char *)"1280x720")){
             Option.CPU_Speed = Freq720P; 
             Option.DISPLAY_TYPE=SCREENMODE1;
             Option.DefaultFont=(2<<4) | 1 ;
         }      
-        else if(checkstring(tp, (unsigned char *)"1024") || checkstring(tp, (unsigned char *)"1024x768")){
+        else if(checkstring(argv[0], (unsigned char *)"1024") || checkstring(argv[0], (unsigned char *)"1024x768")){
             Option.CPU_Speed = FreqXGA; 
             Option.DISPLAY_TYPE=SCREENMODE1;
             Option.DefaultFont=(2<<4) | 1 ;
@@ -2922,8 +2932,8 @@ void MIPS16 cmd_option(void) {
 #endif
         getargs(&tp,9,(unsigned char *)",");
 #ifndef USBKEYBOARD
-        if(ExtCurrentConfig[KEYBOARD_CLOCK] != EXT_NOT_CONFIG && Option.KeyboardConfig == NO_KEYBOARD)  error("Pin %/| is in use",KEYBOARD_CLOCK,KEYBOARD_CLOCK);
-        if(ExtCurrentConfig[KEYBOARD_DATA] != EXT_NOT_CONFIG && Option.KeyboardConfig == NO_KEYBOARD)  error("Pin %/| is in use",KEYBOARD_DATA,KEYBOARD_DATA);
+        if(ExtCurrentConfig[Option.KEYBOARD_CLOCK] != EXT_NOT_CONFIG && Option.KeyboardConfig == NO_KEYBOARD)  error("Pin %/| is in use",Option.KEYBOARD_CLOCK,Option.KEYBOARD_CLOCK);
+        if(ExtCurrentConfig[KEYBOARDDATA] != EXT_NOT_CONFIG && Option.KeyboardConfig == NO_KEYBOARD)  error("Pin %/| is in use",KEYBOARDDATA,KEYBOARDDATA);
         if(checkstring(argv[0], (unsigned char *)"US"))	Option.KeyboardConfig = CONFIG_US;
 		else if(checkstring(argv[0], (unsigned char *)"FR"))	Option.KeyboardConfig = CONFIG_FR;
 		else if(checkstring(argv[0], (unsigned char *)"GR"))	Option.KeyboardConfig = CONFIG_GR;
@@ -2959,6 +2969,8 @@ void MIPS16 cmd_option(void) {
 #else
         if(argc>=3 && *argv[2])Option.capslock=getint(argv[2],0,1);
         if(argc>=5 && *argv[4])Option.numlock=getint(argv[4],0,1);
+		if(argc>=7 && *argv[6])Option.RepeatStart=getint(argv[6],100,2000);
+		if(argc>=9 && *argv[8])Option.RepeatRate=getint(argv[8],25,2000);
 #endif        
         SaveOptions();
         _excep_code = RESET_COMMAND;
@@ -3157,8 +3169,8 @@ void MIPS16 cmd_option(void) {
         }
 #ifdef PICOMITEVGA
 #ifdef HDMI
-        int fcolour=Option.CPU_Speed==Freq480P? RGB555(Option.DefaultFC) : RGB332(Option.DefaultFC);
-        int bcolour=Option.CPU_Speed==Freq480P? RGB555(Option.DefaultBC) : RGB332(Option.DefaultBC);
+        int fcolour=(Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P )? RGB555(Option.DefaultFC) : RGB332(Option.DefaultFC);
+        int bcolour=(Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P )? RGB555(Option.DefaultBC) : RGB332(Option.DefaultBC);
 #else
         int  fcolour = RGB121(Option.DefaultFC);
         fcolour= (fcolour<<12) | (fcolour<<8) | (fcolour<<4) | fcolour;
@@ -4011,6 +4023,32 @@ void MIPS16 cmd_option(void) {
         SoftReset();
         return;
     }
+#ifndef USBKEYBOARD
+    tp = checkstring(cmdline, (unsigned char *)"PS2 PINS");
+	if(tp) {
+        int pin1,pin2;
+        unsigned char code;
+		getargs(&tp,3,(unsigned char *)",");
+        if(argc!=3)error("Syntax");
+        if(!(code=codecheck(argv[0])))argv[0]+=2;
+        pin1 = getinteger(argv[0]);
+        if(!code)pin1=codemap(pin1);
+        if(IsInvalidPin(pin1)) error("Invalid pin");
+        if(ExtCurrentConfig[pin1] != EXT_NOT_CONFIG)  error("Pin %/| is in use",pin1,pin1);
+        if(!(code=codecheck(argv[2])))argv[2]+=2;
+        pin2 = getinteger(argv[2]);
+        if(!code)pin2=codemap(pin2);
+        if(IsInvalidPin(pin2)) error("Invalid pin");
+        if(ExtCurrentConfig[pin2] != EXT_NOT_CONFIG)  error("Pin %/| is in use",pin2,pin2);
+        Option.KEYBOARD_CLOCK=pin1;
+        Option.KEYBOARD_DATA=pin2;
+        SaveOptions();
+        _excep_code = RESET_COMMAND;
+        SoftReset();
+        return;
+	}
+
+#endif
 	tp = checkstring(cmdline, (unsigned char *)"DISK SAVE");
     if(tp){
         getargs(&tp,1,(unsigned char *)",");
@@ -5301,13 +5339,13 @@ int checkdetailinterrupts(void) {
         }
     }
 #endif
-#ifdef PICOMITEVGA
+//#ifdef PICOMITEVGA
     if (COLLISIONInterrupt != NULL && CollisionFound) {
         CollisionFound = false;
         intaddr = (char *)COLLISIONInterrupt;									    // set the next stmt to the interrupt location
         goto GotAnInterrupt;
     }
-#endif
+//#endif
 #ifdef PICOMITEWEB
     if(TCPreceived && TCPreceiveInterrupt){
         intaddr = (char *)TCPreceiveInterrupt;                                   // get a pointer to the interrupt routine

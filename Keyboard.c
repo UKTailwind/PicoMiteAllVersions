@@ -418,29 +418,29 @@ const char keyE0Codes_ES[56] =
 
 void KBDIntEnable(int status)
 {
-  PinSetBit(KEYBOARD_CLOCK, TRISSET); // if tris = 1 then it is an input
-  PinSetBit(KEYBOARD_DATA, TRISSET);  // if tris = 1 then it is an input
-  PinSetBit(KEYBOARD_CLOCK, CNPUSET); // if tris = 1 then it is an input
-  PinSetBit(KEYBOARD_DATA, CNPUSET);  // if tris = 1 then it is an input
+  PinSetBit(Option.KEYBOARD_CLOCK, TRISSET); // if tris = 1 then it is an input
+  PinSetBit(KEYBOARDDATA, TRISSET);  // if tris = 1 then it is an input
+  PinSetBit(Option.KEYBOARD_CLOCK, CNPUSET); // if tris = 1 then it is an input
+  PinSetBit(KEYBOARDDATA, CNPUSET);  // if tris = 1 then it is an input
   if (status)
   {
     if (!CallBackEnabled)
     {
       CallBackEnabled = 32;
-      gpio_set_irq_enabled_with_callback(PinDef[KEYBOARD_CLOCK].GPno, GPIO_IRQ_EDGE_FALL, true, &gpio_callback);
+      gpio_set_irq_enabled_with_callback(PinDef[Option.KEYBOARD_CLOCK].GPno, GPIO_IRQ_EDGE_FALL, true, &gpio_callback);
     }
     else
     {
       CallBackEnabled |= 32;
-      gpio_set_irq_enabled(PinDef[KEYBOARD_CLOCK].GPno, GPIO_IRQ_EDGE_FALL, true);
+      gpio_set_irq_enabled(PinDef[Option.KEYBOARD_CLOCK].GPno, GPIO_IRQ_EDGE_FALL, true);
     }
   }
   else
   {
     if (CallBackEnabled == 32)
-      gpio_set_irq_enabled_with_callback(PinDef[KEYBOARD_CLOCK].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false, &gpio_callback);
+      gpio_set_irq_enabled_with_callback(PinDef[Option.KEYBOARD_CLOCK].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false, &gpio_callback);
     else
-      gpio_set_irq_enabled(PinDef[KEYBOARD_CLOCK].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
+      gpio_set_irq_enabled(PinDef[Option.KEYBOARD_CLOCK].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
     CallBackEnabled &= (~32);
   }
 }
@@ -479,15 +479,15 @@ void sendCommand(int cmd)
   for (j = i = 0; i < 8; i++)
     j += ((cmd >> i) & 1);
   cmd = (cmd & 0xff) | (((j + 1) & 1) << 8);
-  PinSetBit(KEYBOARD_CLOCK, TRISCLR);
-  PinSetBit(KEYBOARD_CLOCK, LATCLR);
+  PinSetBit(Option.KEYBOARD_CLOCK, TRISCLR);
+  PinSetBit(Option.KEYBOARD_CLOCK, LATCLR);
   uSec(250);
-  PinSetBit(KEYBOARD_DATA, TRISCLR);
-  PinSetBit(KEYBOARD_DATA, LATCLR);
-  PinSetBit(KEYBOARD_CLOCK, TRISSET);
+  PinSetBit(KEYBOARDDATA, TRISCLR);
+  PinSetBit(KEYBOARDDATA, LATCLR);
+  PinSetBit(Option.KEYBOARD_CLOCK, TRISSET);
   InkeyTimer = 0;
   uSec(2);
-  while (PinRead(KEYBOARD_CLOCK))
+  while (PinRead(Option.KEYBOARD_CLOCK))
     if (InkeyTimer >= 500)
     {         // wait for the keyboard to pull the clock low
       return; // wait for the keyboard to pull the clock low
@@ -498,18 +498,18 @@ void sendCommand(int cmd)
   {
     if (cmd & 1)
     {
-      PinSetBit(KEYBOARD_DATA, LATSET);
+      PinSetBit(KEYBOARDDATA, LATSET);
     }
     else
     {
-      PinSetBit(KEYBOARD_DATA, LATCLR);
+      PinSetBit(KEYBOARDDATA, LATCLR);
     }
-    while (!PinRead(KEYBOARD_CLOCK))
+    while (!PinRead(Option.KEYBOARD_CLOCK))
       if (InkeyTimer >= 500)
       {         // wait for the keyboard to pull the clock low
         return; // wait for the keyboard to pull the clock low
       }
-    while (PinRead(KEYBOARD_CLOCK))
+    while (PinRead(Option.KEYBOARD_CLOCK))
       if (InkeyTimer >= 500)
       {         // wait for the keyboard to pull the clock low
         return; // wait for the keyboard to pull the clock low
@@ -517,20 +517,20 @@ void sendCommand(int cmd)
     cmd >>= 1;
   }
 
-  //    PinSetBit(KEYBOARD_CLOCK, TRISSET);
-  PinSetBit(KEYBOARD_DATA, TRISSET);
+  //    PinSetBit(Option.KEYBOARD_CLOCK, TRISSET);
+  PinSetBit(KEYBOARDDATA, TRISSET);
 
-  while (PinRead(KEYBOARD_DATA))
+  while (PinRead(KEYBOARDDATA))
     if (InkeyTimer >= 500)
     {         // wait for the keyboard to pull the clock low
       return; // wait for the keyboard to pull the clock low
     }         // wait for the keyboard to pull data low (ACK)
-  while (PinRead(KEYBOARD_CLOCK))
+  while (PinRead(Option.KEYBOARD_CLOCK))
     if (InkeyTimer >= 500)
     {         // wait for the keyboard to pull the clock low
       return; // wait for the keyboard to pull the clock low
     }         // wait for the clock to go low
-  while (!(PinRead(KEYBOARD_CLOCK)) || !(PinRead(KEYBOARD_DATA)))
+  while (!(PinRead(Option.KEYBOARD_CLOCK)) || !(PinRead(KEYBOARDDATA)))
     if (InkeyTimer >= 500)
     {         // wait for the keyboard to pull the clock low
       return; // wait for the keyboard to pull the clock low
@@ -1009,10 +1009,10 @@ void __not_in_flash_func(CNInterrupt)(uint64_t dd)
 {
 //  static char Key12 = false;
   static unsigned char Code = 0;
-  int d = dd & (1<<PinDef[KEYBOARD_DATA].GPno);
+  int d = dd & (1<<PinDef[KEYBOARDDATA].GPno);
 
   // Make sure it was a falling edge
-  if (!(dd & (1<<PinDef[KEYBOARD_CLOCK].GPno)))
+  if (!(dd & (1<<PinDef[Option.KEYBOARD_CLOCK].GPno)))
   {
     if(!Timer3)PS2State=PS2START;
     switch (PS2State)

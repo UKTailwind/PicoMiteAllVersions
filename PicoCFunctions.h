@@ -1,11 +1,7 @@
-/* 
- * @cond
- * The following section will be excluded from the documentation.
- */
-/* *****************************************************************************************
+/*******************************************************************************************
 *
 *  Definitions used when calling MMBasic Interpreter API Functions from CFunctions
-*  For PicoMite MMBasic V5.07.05
+*  For PicoMite MMBasic V6.00.00
 *
 *  This file is public domain and may be used without license.
 *
@@ -15,26 +11,36 @@
 *  NB: Base address has changed from previous versions to match V5.07.05
 *  V1.6.3  struct option_s updated to match 5.07.05 as defined in fileIO.h
 *  V1.6.4  Additional links
-*  v1.6.5  Latest Beta27 and PICOMITEVGA PICOMITEWEB Compiled with GCC 11.2.1
-*
-*
-*  Note: Use ? HEX$(MM.INFO(CALLTABLE)) to verify the location of the callatble.
-*  The BaseAddress should be changed to match the value returned it it is different.
-*  It can vary depending on which version of GCC is used to compile.
+*  v1.6.5  Latest Beta29 and PICOMITEVGA PICOMITEWEB Compiled with GCC 11.2.1
+*  v1.6.6  Updated to match 5.07.07 and 5.07.08b5 updates for fixed IP address
+*  v1.6.7  Updated to match 5.07.08 release matches option_s and CSubComplete now char
+*  v2.0.0  Updated for MMBasic 6.00.00 and also for RP2350 chip.
+*          BaseAddress is different for PICO and PICO2 Set the correct #define
+*          Note: Use ? HEX$(MM.INFO(CALLTABLE)) to verify the location of the calltable.
+*          struct option_s updated to match v6.00.00RC15
 *
 ******************************************************************************************/
+/*** Uncomment one of these three  ***/
 #define PICOMITE
 //#define PICOMITEVGA
 //#define PICOMITEWEB
 
+/***  Uncomment this define if using PICO2 Chip  ***/
+#define PICORP2350
+
+/*****************************************************************************************/
 #define MAXVARLEN           32                      // maximum length of a variable name
 #define MAXDIM              5                       // maximum nbr of dimensions to an array
 #define MMFLOAT double
 #define MAXKEYLEN 64
 
 //Addresses in the API Table for the pointers to each function
-//#define BaseAddress   0x10000304    //GCC 10.2.1
-#define BaseAddress   0x10000308    //GCC 11.2.1/GCC 12.2.1
+#ifdef PICORP2350
+  #define BaseAddress   0x1000023C
+#else
+  #define BaseAddress   0x100002D4
+#endif
+
 #define Vector_uSec               (*(unsigned int *)(BaseAddress+0x00))       // void uSec(unsigned int us)
 #define Vector_putConsole         (*(unsigned int *)(BaseAddress+0x04))       // void putConsole(int C))
 #define Vector_getConsole         (*(unsigned int *)(BaseAddress+0x08))       // int getConsole(void)
@@ -87,9 +93,12 @@
 #define Vector_AudioOutput        *(unsigned int *)(BaseAddress+0xC4)         // AudioOutput(int left, int right)
 #define Vector_IDiv    			  (*(unsigned int *)(BaseAddress+0xC8))       // int IDiv(int a, int b){ return a / b; }
 #define Vector_AUDIO_WRAP         (*(volatile unsigned int *)(BaseAddress+0xCC))// AUDIO_WRAP
-#define Vector_CFuncInt3          *(unsigned int *)(BaseAddress+0xD0 )        // CFuncInt1
-#define Vector_CFuncInt4          *(unsigned int *)(BaseAddress+0xD4)         // CFuncInt2
+#define Vector_CFuncInt3          *(unsigned int *)(BaseAddress+0xD0 )        // CFuncInt3
+#define Vector_CFuncInt4          *(unsigned int *)(BaseAddress+0xD4)         // CFuncInt4
 #define Vector_PIOExecute         (*(unsigned int *)(BaseAddress+0xD8))       // void PioExecute(int pio, int sm, uint32_t instruction)
+
+
+
 //Macros to call each function.
 #define uSec(a)                         ((void  (*)(unsigned long long )) Vector_uSec) (a)
 #define putConsole(a,b)                 ((void(*)(int, int)) Vector_putConsole) (a,b)
@@ -144,7 +153,7 @@
 #define DrawPixel(a,b,c)                ((void(*)(int, int, int)) Vector_DrawPixel) (a,b,c)
 #define RoutineChecks()                 ((void (*)(void)) Vector_RoutineChecks) ()
 #define GetPageAddress(a)               ((int(*)(int)) Vector_GetPageAddress) (a)
-#define memcpy(a,b,c)                   ((void (*)(void *, void *, int)) Vector_mycopysafe) (a,b,c)
+//#define memcpy(a,b,c)                   ((void (*)(void *, void *, int)) Vector_mycopysafe) (a,b,c)
 #define IntToFloat(a)                   ((MMFLOAT (*)(long long)) Vector_IntToFloat) (a)
 #define FloatToInt(a)                   ((long long (*)(MMFLOAT)) Vector_FloatToInt) (a)
 #define Option 							(*(struct option_s *)(unsigned int)Vector_Option)
@@ -166,7 +175,8 @@
 #define FCmp(a,b)                       ((int (*)(MMFLOAT, MMFLOAT)) Vector_FCmp) (a,b)
 #define CFuncInt1                       (*(unsigned int *) Vector_CFuncInt1)
 #define CFuncInt2                       (*(unsigned int *) Vector_CFuncInt2)
-#define Interrupt                       (*(unsigned int *) Vector_CSubComplete)
+//#define Interrupt                       (*(unsigned int *) Vector_CSubComplete)
+#define Interrupt                       (*(char *) Vector_CSubComplete)   //CSubComplete now char in 5.08.00
 #define AudioOutputVector               (*(unsigned int *) Vector_AudioOutput)
 #define AudioOutput(a,b)                ((void (*)(uint16_t, uint16_t)) (*(unsigned int *)Vector_AudioOutput)) (a, b)
 #define IDiv(a,b)                       ((int (*)(int, int)) Vector_IDiv) (a,b)
@@ -174,6 +184,9 @@
 #define CFuncInt3                       (*(unsigned int *) Vector_CFuncInt3)
 #define CFuncInt4                       (*(unsigned int *) Vector_CFuncInt4)
 #define PIOExecute(a,b,c)               ((void (*)(int, int, unsigned int)) Vector_PIOExecute) (a,b,c)
+
+
+
 // the structure of the variable table, passed to the CFunction as a pointer Vector_vartbl which is #defined as vartbl
 struct s_vartbl {                               // structure of the variable table
    char name[MAXVARLEN];                       // variable's name
@@ -206,11 +219,12 @@ struct s_vartbl {                               // structure of the variable tab
 #define T_BLOCKED   0x40                            // Hash table entry blocked after ERASE
 
 
-//* *************************************************************************************************
+//***************************************************************************************************
 // Constants and definitions copied from the Micromite MkII and Micromite Plus source
-//* *************************************************************************************************
+//***************************************************************************************************
 
 //The Option structure
+
 struct option_s {
     int  Magic;
     char Autorun;
@@ -228,45 +242,51 @@ struct option_s {
     int  PIN;
     int  Baudrate;
     int  ColourCode;
-    int CPU_Speed; 
-    unsigned int Telnet;    // used to store the size of the program flash (also start of the LIBRARY code)
-    int DefaultFC, DefaultBC;      // the default colours
-    int DefaultBrightness;         // default backlight brightness //40
+    int CPU_Speed;
+    unsigned int Telnet;           // 40 used to store status on console OFF/ON/BOTH
+    int DefaultFC, DefaultBC;      // 44 the default colours
+    int DefaultBrightness;         // 48 default backlight brightness //40
    // uint16_t VGAFC, VGABC;      // the default colours 36=56
-    unsigned short VGAFC, VGABC;      // the default colours 36=56
+    unsigned short VGAFC, VGABC;  // the default colours 36=56  //50?
 //
     // display related
     unsigned char DefaultFont;
     unsigned char KeyboardConfig;
     unsigned char RTC_Clock;
-    unsigned char RTC_Data; //4=60
+    unsigned char RTC_Data; //4=60             //54
 //
     #ifdef PICOMITE
-        int MaxCtrls;                // maximum number of controls allowed //48
+        int MaxCtrls;                  // maximum number of controls allowed //48
     #endif
+
     #ifdef PICOMITEWEB
-        uint16_t TCP_PORT;                // maximum number of controls allowed //48
+        uint16_t TCP_PORT;             // maximum number of controls allowed //48
         uint16_t ServerResponceTime;
     #endif
     #ifdef PICOMITEVGA
         int16_t X_TILE;                // maximum number of controls allowed //48
         int16_t Y_TILE;                // maximum number of controls allowed //48
     #endif
-        // for the SPI LCDs 4=64
+
+
+    // for the SPI LCDs 4=64
     unsigned char LCD_CD;
     unsigned char LCD_CS;
     unsigned char LCD_Reset;
     // touch related
     unsigned char TOUCH_CS;
     unsigned char TOUCH_IRQ;
-    char TOUCH_SWAPXY; 
+    char TOUCH_SWAPXY;
     unsigned char repeat;
     char disabletftp;//56   8=72
     int  TOUCH_XZERO;
     int  TOUCH_YZERO;
     float TOUCH_XSCALE;
     float TOUCH_YSCALE; //72 16=88
-    unsigned int fullrefresh;
+    unsigned char HDMIclock;
+    unsigned char HDMId0;
+    unsigned char HDMId1;
+    unsigned char HDMId2;
     unsigned int FlashSize; //8=96
     unsigned char SD_CS;
     unsigned char SYSTEM_MOSI;
@@ -278,12 +298,12 @@ struct option_s {
     char LCD_RD;                   // used for the RD pin for SSD1963  //8=104
     unsigned char AUDIO_L;
     unsigned char AUDIO_R;
-    unsigned char AUDIO_SLICE; 
+    unsigned char AUDIO_SLICE;
     unsigned char SDspeed;
-    unsigned char pins[8];  //12=116                // general use storage for CFunctions written by PeterM //86
+    unsigned char pins[8];  //8=116                // general use storage for CFunctions written by PeterM //86
     char LCDVOP;
     char I2Coffset;
-    unsigned char NoHeartbeat; 
+    unsigned char NoHeartbeat;
     char Refresh;
     unsigned char SYSTEM_I2C_SDA;
     unsigned char SYSTEM_I2C_SCL;
@@ -291,7 +311,7 @@ struct option_s {
     char PWM;  //8=124
     unsigned char INT1pin;
     unsigned char INT2pin;
-    unsigned char INT3pin; 
+    unsigned char INT3pin;
     unsigned char INT4pin;
     unsigned char SD_CLK_PIN;
     unsigned char SD_MOSI_PIN;
@@ -299,20 +319,59 @@ struct option_s {
     unsigned char SerialConsole; //8=132
     unsigned char SerialTX;
     unsigned char SerialRX;
-    unsigned char numlock; 
+    unsigned char numlock;
     unsigned char capslock; //4=136
     unsigned int LIBRARY_FLASH_SIZE; // 4=140
-    unsigned char x[116]; //116=256
-    unsigned char F1key[MAXKEYLEN]; //204
-    unsigned char F5key[MAXKEYLEN]; //268
-    unsigned char F6key[MAXKEYLEN]; //332
-    unsigned char F7key[MAXKEYLEN]; //396
-    unsigned char F8key[MAXKEYLEN]; //460
-    unsigned char F9key[MAXKEYLEN]; //524
-    unsigned char SSID[MAXKEYLEN];  //588
-    unsigned char PASSWORD[MAXKEYLEN]; //652=768
+    unsigned char AUDIO_CLK_PIN;
+    unsigned char AUDIO_MOSI_PIN;
+    unsigned char SYSTEM_I2C_SLOW;
+    unsigned char AUDIO_CS_PIN;     //+4=144
+    #ifdef PICOMITEWEB
+        uint16_t UDP_PORT;
+        uint16_t UDPServerResponceTime;
+        char hostname[32];
+        char ipaddress[16];
+        char mask[16];
+        char gateway[16];
+        unsigned char x[1];  //112=256
+    #else
+        unsigned char x[85]; //112=256
+    #endif
+    unsigned char PSRAM_CS_PIN;
+    unsigned char BGR;
+    unsigned char NoScroll;
+    unsigned char CombinedCS;
+    unsigned char USBKeyboard;
+    unsigned char VGA_HSYNC;
+    unsigned char VGA_BLUE;
+    unsigned char AUDIO_MISO_PIN;
+    unsigned char AUDIO_DCS_PIN;
+    unsigned char AUDIO_DREQ_PIN;
+    unsigned char AUDIO_RESET_PIN;
+    unsigned char SSD_DC;
+    unsigned char SSD_WR;
+    unsigned char SSD_RD;
+    unsigned char SSD_RESET;
+    unsigned char BackLightLevel;
+    unsigned char NoReset;
+    unsigned char AllPins;
+    unsigned char modbuff;
+	short RepeatStart;
+	short RepeatRate;
+    int modbuffsize;                // +18=
+
+    unsigned char F1key[MAXKEYLEN];    //64=320
+    unsigned char F5key[MAXKEYLEN];    //64=384
+    unsigned char F6key[MAXKEYLEN];    //64=448
+    unsigned char F7key[MAXKEYLEN];    //64=512
+    unsigned char F8key[MAXKEYLEN];    //64=576
+    unsigned char F9key[MAXKEYLEN];    //64=640
+    unsigned char SSID[MAXKEYLEN];     //64=704
+    unsigned char PASSWORD[MAXKEYLEN]; //64=768
+    unsigned char platform[32];
+    unsigned char extensions[96];
     // To enable older CFunctions to run any new options *MUST* be added at the end of the list
-} __attribute__((packed));
+}  __attribute__((packed));
 
 
 // Define the offsets from the PORT address
@@ -413,4 +472,3 @@ struct option_s {
 #define EXT_BOOT_RESERVED       0x400                 // this pin is reserved at bootup and cannot be used
 #define NOP()  __asm volatile ("nop")
 #define USERLCDPANEL            25
-/*  @endcond */

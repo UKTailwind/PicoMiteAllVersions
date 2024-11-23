@@ -535,7 +535,6 @@ void fun_instr(void) {
 		}
 		iret = 0;
 	} else {
-		printf("Regex\r\n");
 		regex_t regex;
 		int reti;
 		regmatch_t pmatch;
