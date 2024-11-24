@@ -1653,14 +1653,14 @@ void InitReservedIO(void) {
 #ifndef USBKEYBOARD
 	if(!(Option.KeyboardConfig==NO_KEYBOARD || Option.KeyboardConfig==CONFIG_I2C)){
 		ExtCfg(Option.KEYBOARD_CLOCK, EXT_BOOT_RESERVED, 0);
-    	ExtCfg(KEYBOARDDATA, EXT_BOOT_RESERVED, 0);
+    	ExtCfg(Option.KEYBOARD_DATA, EXT_BOOT_RESERVED, 0);
 		gpio_init(PinDef[Option.KEYBOARD_CLOCK].GPno);
 		gpio_set_pulls(PinDef[Option.KEYBOARD_CLOCK].GPno,true,false);
 		gpio_set_dir(PinDef[Option.KEYBOARD_CLOCK].GPno, GPIO_IN);
 		gpio_set_input_hysteresis_enabled(PinDef[Option.KEYBOARD_CLOCK].GPno,true);
-		gpio_init(PinDef[KEYBOARDDATA].GPno);
-		gpio_set_pulls(PinDef[KEYBOARDDATA].GPno,true,false);
-		gpio_set_dir(PinDef[KEYBOARDDATA].GPno, GPIO_IN);
+		gpio_init(PinDef[Option.KEYBOARD_DATA].GPno);
+		gpio_set_pulls(PinDef[Option.KEYBOARD_DATA].GPno,true,false);
+		gpio_set_dir(PinDef[Option.KEYBOARD_DATA].GPno, GPIO_IN);
 	}
 #endif	
 }

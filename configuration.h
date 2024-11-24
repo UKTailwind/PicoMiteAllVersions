@@ -138,7 +138,7 @@ extern "C" {
             #define MagicKey 0x21341429
             #define HEAPTOP 0x2003EC00
         #else
-            #define MagicKey 0x71743220
+            #define MagicKey 0x71743244
             #define HEAPTOP 0x2003f100
         #endif
     #endif

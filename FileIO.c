@@ -4152,6 +4152,8 @@ void ResetOptions(void)
     Option.DefaultBrightness = 100;
     Option.Baudrate = CONSOLE_BAUDRATE;
     Option.PROG_FLASH_SIZE=MAX_PROG_SIZE;
+    Option.KEYBOARD_CLOCK=KEYBOARDCLOCK;
+    Option.KEYBOARD_DATA=KEYBOARDDATA;
 #ifdef PICOMITEVGA
     Option.DISPLAY_CONSOLE = 1;
     Option.DISPLAY_TYPE = SCREENMODE1;
@@ -4189,8 +4191,6 @@ void ResetOptions(void)
             Option.VGA_BLUE=24;
             Option.CPU_Speed = 126000;
         #endif
-        Option.KEYBOARD_CLOCK=KEYBOARDCLOCK;
-        Option.KEYBOARD_DATA=KEYBOARDDATA;
         Option.KeyboardConfig = CONFIG_US;
     #endif
 #else

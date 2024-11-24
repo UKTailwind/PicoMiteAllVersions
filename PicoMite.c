@@ -44,6 +44,8 @@ extern "C" {
 #include "hardware/structs/pads_qspi.h"
 #include "pico/unique_id.h"
 #include "hardware/pwm.h"
+#define COPYRIGHT   "Copyright " YEAR " Geoff Graham\r\n"\
+                    "Copyright " YEAR2 " Peter Mather\r\n\r\n"
 
 #ifdef USBKEYBOARD
     #include "tusb.h"
@@ -120,13 +122,9 @@ int QVGA_VTOT;	// total scanlines (= QVGA_VSYNC + QVGA_VBACK + QVGA_VACT + QVGA_
     #endif
     #ifdef USBKEYBOARD
         #ifdef HDMI
-            #define MES_SIGNON  "\rPicoMiteHDMI MMBasic USB " CHIP " Edition V"VERSION "\r\n"\
-                                "Copyright " YEAR " Geoff Graham\r\n"\
-                                "Copyright " YEAR2 " Peter Mather\r\n\r\n"
+            #define MES_SIGNON  "\rPicoMiteHDMI MMBasic USB " CHIP " Edition V"VERSION "\r\n"
         #else
-            #define MES_SIGNON  "\rPicoMiteVGA MMBasic USB " CHIP " Edition V"VERSION "\r\n"\
-                                "Copyright " YEAR " Geoff Graham\r\n"\
-                                "Copyright " YEAR2 " Peter Mather\r\n\r\n"
+            #define MES_SIGNON  "\rPicoMiteVGA MMBasic USB " CHIP " Edition V"VERSION "\r\n"
         #endif
         extern void hid_app_task(void);
         volatile int keytimer=0;
@@ -134,21 +132,15 @@ int QVGA_VTOT;	// total scanlines (= QVGA_VSYNC + QVGA_VBACK + QVGA_VACT + QVGA_
         bool USBenabled=false;
     #else
         #ifdef HDMI
-            #define MES_SIGNON  "\rPicoMiteHDMI MMBasic " CHIP " Edition V"VERSION "\r\n"\
-                                "Copyright " YEAR " Geoff Graham\r\n"\
-                                "Copyright " YEAR2 " Peter Mather\r\n\r\n"
+            #define MES_SIGNON  "\rPicoMiteHDMI MMBasic " CHIP " Edition V"VERSION "\r\n"
         #else
-            #define MES_SIGNON  "\rPicoMiteVGA MMBasic " CHIP " Edition V"VERSION "\r\n"\
-                                "Copyright " YEAR " Geoff Graham\r\n"\
-                                "Copyright " YEAR2 " Peter Mather\r\n\r\n"
+            #define MES_SIGNON  "\rPicoMiteVGA MMBasic " CHIP " Edition V"VERSION "\r\n"
         #endif
 #endif
 
 #endif
 #ifdef PICOMITEWEB
-    #define MES_SIGNON  "\rWebMite MMBasic " CHIP " Edition V"VERSION "\r\n"\
-                        "Copyright " YEAR " Geoff Graham\r\n"\
-                        "Copyright " YEAR2 " Peter Mather\r\n\r\n"
+    #define MES_SIGNON  "\rWebMite MMBasic " CHIP " Edition V"VERSION "\r\n"
     volatile int WIFIconnected=0;
     int startupcomplete=0;
     void ProcessWeb(int mode);
@@ -158,9 +150,7 @@ int QVGA_VTOT;	// total scanlines (= QVGA_VSYNC + QVGA_VBACK + QVGA_VACT + QVGA_
     #ifdef USBKEYBOARD
         #include "tusb.h"
         #include "host/hcd.h"
-        #define MES_SIGNON  "\rPicoMite MMBasic USB " CHIP " Edition V"VERSION "\r\n"\
-                            "Copyright " YEAR " Geoff Graham\r\n"\
-                            "Copyright " YEAR2 " Peter Mather\r\n\r\n"
+        #define MES_SIGNON  "\rPicoMite MMBasic USB " CHIP " Edition V"VERSION "\r\n"
         extern void hid_app_task(void);
         volatile int keytimer=0;
         extern void USB_bus_reset(void);
@@ -168,9 +158,7 @@ int QVGA_VTOT;	// total scanlines (= QVGA_VSYNC + QVGA_VBACK + QVGA_VACT + QVGA_
         #include "pico/multicore.h"
         mutex_t	frameBufferMutex;					// mutex to lock frame buffer
     #else
-        #define MES_SIGNON  "\rPicoMite MMBasic " CHIP " Edition V"VERSION "\r\n"\
-                            "Copyright " YEAR " Geoff Graham\r\n"\
-                            "Copyright " YEAR2 " Peter Mather\r\n\r\n"
+        #define MES_SIGNON  "\rPicoMite MMBasic " CHIP " Edition V"VERSION "\r\n"
         #include "pico/multicore.h"
         mutex_t	frameBufferMutex;					// mutex to lock frame buffer
         #endif
@@ -429,7 +417,7 @@ const char DaysInMonth[] = { 0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 }
 static inline CommandToken commandtbl_decode(const unsigned char *p){
     return ((CommandToken)(p[0] & 0x7f)) | ((CommandToken)(p[1] & 0x7f)<<7);
 }
-
+char banner[64];
 void __not_in_flash_func(routinechecks)(void){
     static int when=0;
     if(abs((time_us_64()-mSecTimer*1000))> 5000){
@@ -3850,41 +3838,43 @@ int MIPS16 main(){
         core1stack[0]=0x12345678;
     #endif
 #endif
-        strcpy((char *)inpbuf,MES_SIGNON); 
+        strcpy((char *)banner,MES_SIGNON); 
 #ifdef rp2350
     #ifdef PICOMITEVGA
         #ifdef HDMI
             #ifdef USBKEYBOARD
-                inpbuf[32]=(rp2350a?'A':'B');
+                banner[32]=(rp2350a?'A':'B');
             #else
-                inpbuf[28]=(rp2350a?'A':'B');
+                banner[28]=(rp2350a?'A':'B');
             #endif
         #else
             #ifdef USBKEYBOARD
-                inpbuf[31]=(rp2350a?'A':'B');
+                banner[31]=(rp2350a?'A':'B');
             #else
-                inpbuf[27]=(rp2350a?'A':'B');
+                banner[27]=(rp2350a?'A':'B');
             #endif
         #endif
     #else
         #ifdef USBKEYBOARD
-            inpbuf[28]=(rp2350a?'A':'B');
+            banner[28]=(rp2350a?'A':'B');
         #else
-            inpbuf[24]=(rp2350a?'A':'B');
+            banner[24]=(rp2350a?'A':'B');
         #endif
     #endif
 #endif
     if(!(_excep_code == RESTART_NOAUTORUN || _excep_code == INVALID_CLOCKSPEED || _excep_code == WATCHDOG_TIMEOUT || (_excep_code==POSSIBLE_WATCHDOG && watchdog_caused_reboot()))){
         if(Option.Autorun==0 ){
             if(!(_excep_code == RESET_COMMAND || _excep_code == SOFT_RESET)){
-                MMPrintString((char *)inpbuf); // print sign on message
+                MMPrintString((char *)banner); // print sign on message
+                MMPrintString((char *)COPYRIGHT); // print sign on message
             }
         } else {
             if(Option.Autorun!=MAXFLASHSLOTS+1){
                 ProgMemory=(unsigned char *)(flash_target_contents+(Option.Autorun-1)*MAX_PROG_SIZE);
             }
             if(*ProgMemory != 0x01 ) {
-                MMPrintString((char *)inpbuf);
+                MMPrintString((char *)banner);
+                MMPrintString((char *)COPYRIGHT); // print sign on message
             }
         }
     }

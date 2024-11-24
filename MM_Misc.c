@@ -52,6 +52,7 @@ extern int scroll_lock;
 extern int KeyDown[7];
 #endif
 extern int last_adc;
+extern char banner[];
 uint32_t getTotalHeap(void) {
    extern char __StackLimit, __bss_end__;
    
@@ -1590,32 +1591,9 @@ void PO5Int(char *s1, int n1, int n2, int n3, int n4) {
 
 void MIPS16 printoptions(void){
 //	LoadOptions();
-#ifdef PICOMITEVGA
-#ifdef USBKEYBOARD
-#ifdef HDMI
-    MMPrintString("\rPicoMiteHDMI MMBasic USB Version " VERSION "\r\n");
-#else
-    MMPrintString("\rPicoMiteVGA MMBasic USB Edition  " VERSION "\r\n");
-#endif
-#else
-#ifdef HDMI
-    MMPrintString("\rPicoMiteHDMI MMBasic Version " VERSION "\r\n");
-#else
-    MMPrintString("\rPicoMiteVGA MMBasic Version " VERSION "\r\n");
-#endif
-#endif
-#endif    
-#ifdef PICOMITEWEB
+    MMPrintString(banner);
+#ifndef PICOMITEVGA
     int i=Option.DISPLAY_ORIENTATION;
-    MMPrintString("\rWebMite MMBasic Version " VERSION "\r\n");    
-#endif 
-#ifdef PICOMITE
-    int i=Option.DISPLAY_ORIENTATION;
-#ifdef USBKEYBOARD
-    MMPrintString("\rPicoMite MMBasic USB Edition  " VERSION "\r\n");
-#else
-    MMPrintString("\rPicoMite MMBasic Version " VERSION "\r\n");
-#endif
 #endif     
 
     if(Option.SerialConsole){
@@ -1680,7 +1658,7 @@ void MIPS16 printoptions(void){
         }
         PRet();
     } 
-    if(!(Option.KEYBOARD_CLOCK==11 || Option.KEYBOARD_DATA==12)){
+    if(!((Option.KEYBOARD_CLOCK==11 && Option.KEYBOARD_DATA==12) ||(Option.KEYBOARD_CLOCK==0 && Option.KEYBOARD_DATA==0)) && Option.KeyboardConfig != NO_KEYBOARD){
         PO("PS2 PINS"); MMPrintString((char *)PinDef[Option.KEYBOARD_CLOCK].pinname);
         MMputchar(',',1);;MMPrintString((char *)PinDef[Option.KEYBOARD_DATA].pinname);PRet();
     }
@@ -2933,7 +2911,7 @@ void MIPS16 cmd_option(void) {
         getargs(&tp,9,(unsigned char *)",");
 #ifndef USBKEYBOARD
         if(ExtCurrentConfig[Option.KEYBOARD_CLOCK] != EXT_NOT_CONFIG && Option.KeyboardConfig == NO_KEYBOARD)  error("Pin %/| is in use",Option.KEYBOARD_CLOCK,Option.KEYBOARD_CLOCK);
-        if(ExtCurrentConfig[KEYBOARDDATA] != EXT_NOT_CONFIG && Option.KeyboardConfig == NO_KEYBOARD)  error("Pin %/| is in use",KEYBOARDDATA,KEYBOARDDATA);
+        if(ExtCurrentConfig[Option.KEYBOARD_DATA] != EXT_NOT_CONFIG && Option.KeyboardConfig == NO_KEYBOARD)  error("Pin %/| is in use",Option.KEYBOARD_DATA,Option.KEYBOARD_DATA);
         if(checkstring(argv[0], (unsigned char *)"US"))	Option.KeyboardConfig = CONFIG_US;
 		else if(checkstring(argv[0], (unsigned char *)"FR"))	Option.KeyboardConfig = CONFIG_FR;
 		else if(checkstring(argv[0], (unsigned char *)"GR"))	Option.KeyboardConfig = CONFIG_GR;
