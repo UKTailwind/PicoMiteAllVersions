@@ -6075,8 +6075,8 @@ void cmd_colourmap(void){
     nf=parsenumberarray(argv[2],&ffptr,&fptr,1,1,NULL,false);
     if(nf!=n)error("Array size mismatch %, %",n,nf);
     for(int i=0;i<n;i++){
-        int in=(cptr == NULL ? cfptr[i] : cptr[i]);
-        if(n>=16)error("Input range error on element %",i);
+        int in=(cptr == NULL ? (int)cfptr[i] : cptr[i]);
+        if(in>=16)error("Input range error on element %",i);
         if(fptr==NULL)ffptr[i]=map[in];
         else fptr[i]=map[in];
     }
