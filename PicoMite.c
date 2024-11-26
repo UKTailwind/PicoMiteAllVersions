@@ -3858,7 +3858,11 @@ int MIPS16 main(){
         #ifdef USBKEYBOARD
             banner[28]=(rp2350a?'A':'B');
         #else
-            banner[24]=(rp2350a?'A':'B');
+            #ifdef PICOMITEWEB
+                banner[23]=(rp2350a?'A':'B');
+            #else
+                banner[24]=(rp2350a?'A':'B');
+            #endif
         #endif
     #endif
 #endif
