@@ -18,6 +18,7 @@ set(COMPILE PICOUSBRP2350)<br>
 set(COMPILE VGAUSBRP2350)<br>
 set(COMPILE HDMI)<br>
 set(COMPILE HDMIUSB)<br>
+set(COMPILE WEBRP2350)<br>
 <br>
 Any of the RP2350 variants or the RP2040 variants can be built by simply changing the set(COMPILE aaaa)<br>
 However, to swap between a rp2040 build and a rp2350 build (or visa versa) needs a different build directory.
