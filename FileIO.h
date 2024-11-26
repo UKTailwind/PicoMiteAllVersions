@@ -95,15 +95,15 @@ struct option_s {
     unsigned char RTC_Data; //4=60
 //
     #ifdef PICOMITE
-        int MaxCtrls;                // maximum number of controls allowed //48
+        int dummy;                // maximum number of controls allowed //64
     #endif
     #ifdef PICOMITEWEB
-        uint16_t TCP_PORT;                // maximum number of controls allowed //48
+        uint16_t TCP_PORT;                // maximum number of controls allowed //64
         uint16_t ServerResponceTime;
     #endif
     #ifdef PICOMITEVGA
-        int16_t X_TILE;                // maximum number of controls allowed //48
-        int16_t Y_TILE;                // maximum number of controls allowed //48
+        int16_t X_TILE;                // maximum number of controls allowed //64
+        int16_t Y_TILE;                // maximum number of controls allowed //64
     #endif
         // for the SPI LCDs 4=64
     unsigned char LCD_CD;
@@ -119,10 +119,14 @@ struct option_s {
     int  TOUCH_YZERO;
     float TOUCH_XSCALE;
     float TOUCH_YSCALE; //72 16=88
+#ifdef GUICONTROLS
+    int MaxCtrls;
+#else
     uint8_t HDMIclock;
     uint8_t HDMId0;
     uint8_t HDMId1;
     uint8_t HDMId2;
+#endif
     unsigned int FlashSize; //8=96
     unsigned char SD_CS;
     unsigned char SYSTEM_MOSI;
@@ -136,7 +140,7 @@ struct option_s {
     unsigned char AUDIO_R;
     unsigned char AUDIO_SLICE; 
     unsigned char SDspeed;
-    unsigned char pins[8];  //12=116                // general use storage for CFunctions written by PeterM //86
+    unsigned char pins[8];  //20=116                // general use storage for CFunctions written by PeterM //86
     char LCDVOP;
     char I2Coffset;
     unsigned char NoHeartbeat; 
@@ -161,7 +165,7 @@ struct option_s {
     unsigned char AUDIO_CLK_PIN;
     unsigned char AUDIO_MOSI_PIN;
     unsigned char SYSTEM_I2C_SLOW;
-    unsigned char AUDIO_CS_PIN;
+    unsigned char AUDIO_CS_PIN; //4=144
     #ifdef PICOMITEWEB
         uint16_t UDP_PORT;                // maximum number of controls allowed //48
         uint16_t UDPServerResponceTime;
@@ -169,9 +173,9 @@ struct option_s {
         char ipaddress[16];
         char mask[16];
         char gateway[16];
-        unsigned char x[1]; //108=256
+        unsigned char x[1]; //85=229
     #else
-        unsigned char x[85]; //112=256
+        unsigned char x[85]; //85=229
     #endif
     unsigned char PSRAM_CS_PIN;
     unsigned char BGR;
@@ -179,7 +183,7 @@ struct option_s {
     unsigned char CombinedCS;
     unsigned char USBKeyboard;
     unsigned char VGA_HSYNC;
-    unsigned char VGA_BLUE;
+    unsigned char VGA_BLUE; //7=236
     unsigned char AUDIO_MISO_PIN;
     unsigned char AUDIO_DCS_PIN;
     unsigned char AUDIO_DREQ_PIN;
@@ -187,24 +191,24 @@ struct option_s {
     unsigned char SSD_DC;
     unsigned char SSD_WR;
     unsigned char SSD_RD;
-    signed char SSD_RESET;
+    signed char SSD_RESET; //8=244
     unsigned char BackLightLevel;
     unsigned char NoReset;
     unsigned char AllPins;
-    unsigned char modbuff;
+    unsigned char modbuff; //4=248
 	short RepeatStart;
 	short RepeatRate;
-    int modbuffsize;
-    unsigned char F1key[MAXKEYLEN]; //204
-    unsigned char F5key[MAXKEYLEN]; //268
-    unsigned char F6key[MAXKEYLEN]; //332
-    unsigned char F7key[MAXKEYLEN]; //396
-    unsigned char F8key[MAXKEYLEN]; //460
-    unsigned char F9key[MAXKEYLEN]; //524
-    unsigned char SSID[MAXKEYLEN];  //588
-    unsigned char PASSWORD[MAXKEYLEN]; //652=768
-    unsigned char platform[32];
-    unsigned char extensions[96];
+    int modbuffsize; //8=256
+    unsigned char F1key[MAXKEYLEN]; 
+    unsigned char F5key[MAXKEYLEN]; 
+    unsigned char F6key[MAXKEYLEN]; 
+    unsigned char F7key[MAXKEYLEN]; 
+    unsigned char F8key[MAXKEYLEN]; 
+    unsigned char F9key[MAXKEYLEN]; 
+    unsigned char SSID[MAXKEYLEN];  
+    unsigned char PASSWORD[MAXKEYLEN]; //512=768
+    unsigned char platform[32]; 
+    unsigned char extensions[96]; //128=896 == 7 XMODEM blocks
     // To enable older CFunctions to run any new options *MUST* be added at the end of the list
 } __attribute__((packed));
 extern unsigned char *CFunctionFlash, *CFunctionLibrary;

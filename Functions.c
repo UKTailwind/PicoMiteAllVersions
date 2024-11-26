@@ -1090,7 +1090,7 @@ void fun_min(void) {
 }
 #ifdef rp2350
 void __not_in_flash_func(fun_ternary)(void){
- #else
+#else
 #ifdef PICOMITEVGA
 void fun_ternary(void){
 #else

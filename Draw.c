@@ -160,10 +160,14 @@ int ScreenSize=0;
 #else
     int map[16]={0};
     #ifdef PICOMITEWEB
+    #ifndef rp2350
     short gui_font_width, gui_font_height;
     int last_bcolour, last_fcolour;
     volatile int CursorTimer=0;               // used to time the flashing cursor
     int display_backlight;                  // the brightness of the backlight (1 to 100)
+    #else
+    #endif
+    extern int InvokingCtrl;
     #else
     extern int InvokingCtrl;
     bool mergerunning=false;
@@ -266,7 +270,7 @@ void MIPS16 cmd_guiMX170(void) {
         return;
     }
 #ifndef PICOMITEVGA
-#ifndef PICOMITEWEB
+#ifdef GUICONTROLS
     if((p = checkstring(cmdline, (unsigned char *)"BEEP"))) {
         if(Option.TOUCH_Click == 0) error("Click option not set");
         ClickTimer = getint(p, 0, INT_MAX) + 1;
@@ -1440,7 +1444,7 @@ void GUIPrintString(int x, int y, int fnt, int jh, int jv, int jo, int fc, int b
         if(jv == JUSTIFY_BOTTOM) CurrentY -= (strlen(str) * GetFontWidth(fnt));
     }
     while(*str) {
-#ifdef PICOMITE
+#ifdef GUICONTROLS
         if(*str == 0xff && Ctrl[InvokingCtrl].type == 10) {
 //            fc = rgb(0, 0, 255);                                // this is specially for GUI FORMATBOX
             str++;
@@ -3342,7 +3346,7 @@ if ((p = checkstring(cmdline, (unsigned char*)"COMPRESSED"))) {
 /*  @endcond */
 void cmd_cls(void) {
     if(Option.DISPLAY_TYPE == 0) error("Display not configured");
-#ifdef PICOMITE
+#ifdef GUICONTROLS
     HideAllControls();
 #endif
     skipspace(cmdline);
@@ -7736,7 +7740,7 @@ void MIPS16 ResetDisplay(void) {
         }
 #endif
 #else
-#ifndef PICOMITEWEB
+#ifdef GUICONTROLS
     ResetGUI();
 #endif
 #endif

@@ -3093,11 +3093,13 @@ void MIPS16 __not_in_flash_func(ClearVars)(int level) {
                 }
             }
 #ifdef rp2350
+#ifndef PICOMITEWEB
 			if(((vartbl[i].type & T_STR) || vartbl[i].dims[0] != 0) && !(vartbl[i].type & T_PTR)) {
 				if((uint32_t)vartbl[i].val.s>(uint32_t)PSRAMbase && (uint32_t)vartbl[i].val.s<(uint32_t)PSRAMbase + PSRAMsize){
                     FreeMemorySafe((void **)&vartbl[i].val.s);                        // free any memory (if allocated)
                 }
             }
+#endif
 #endif
 			memset(&vartbl[i],0,sizeof(struct s_vartbl));
 		}
@@ -3193,7 +3195,7 @@ void MIPS16 ClearRuntime(void) {
     varcnt = 0;
     CurrentLinePtr = ContinuePoint = NULL;
     for(i = 0;  i < MAXSUBFUN; i++)  subfun[i] = NULL;
-#ifdef PICOMITE
+#ifdef GUICONTROLS
     for(i = 1; i < Option.MaxCtrls; i++) {
         memset(&Ctrl[i],0,sizeof(struct s_ctrl));
         Ctrl[i].state = Ctrl[i].type = 0;

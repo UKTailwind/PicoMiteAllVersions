@@ -119,7 +119,11 @@ bool PIO2=false;
 #endif
 #ifdef PICOMITEVGA
 #ifdef rp2350
+#ifdef HDMI
+bool PIO0=true;
+#else
 bool PIO0=false;
+#endif
 bool PIO1=true;
 bool PIO2=true;
 #else

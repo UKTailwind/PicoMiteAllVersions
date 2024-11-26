@@ -1394,7 +1394,7 @@ void SetColour(unsigned char *p, int DoVT100) {
     // the list must be terminated with a NULL
     char *twokeywordtbl[] = {
         "BASE", "EXPLICIT", "DEFAULT", "BREAK", "AUTORUN", "BAUDRATE", "DISPLAY",
-#if defined(PICOMITE)
+#if defined(GUICONTROLS)
         "BUTTON", "SWITCH", "CHECKBOX", "RADIO", "LED", "FRAME", "NUMBERBOX", "SPINBOX", "TEXTBOX", "DISPLAYBOX", "CAPTION", "DELETE",
         "DISABLE", "HIDE", "ENABLE", "SHOW", "FCOLOUR", "BCOLOUR", "REDRAW", "BEEP", "INTERRUPT",
 #endif

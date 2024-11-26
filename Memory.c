@@ -89,16 +89,18 @@ unsigned char *SecondLayer=(unsigned char *)FRAMEBUFFER;
 unsigned char *SecondFrame=(unsigned char *)FRAMEBUFFER;
 #endif
 #ifdef PICOMITE
-struct s_ctrl CTRLS[MAXCONTROLS];
-struct s_ctrl *Ctrl=NULL;
-unsigned char *WriteBuf=NULL;
-unsigned char *LayerBuf=NULL;
-unsigned char *FrameBuf=NULL;
+    unsigned char *WriteBuf=NULL;
+    unsigned char *LayerBuf=NULL;
+    unsigned char *FrameBuf=NULL;
+#endif
+#ifdef GUICONTROLS
+    struct s_ctrl CTRLS[MAXCONTROLS];
+    struct s_ctrl *Ctrl=NULL;
 #endif
 #ifdef PICOMITEWEB
-unsigned char *WriteBuf=NULL;
-unsigned char *LayerBuf=NULL;
-unsigned char *FrameBuf=NULL;
+    unsigned char *WriteBuf=NULL;
+    unsigned char *LayerBuf=NULL;
+    unsigned char *FrameBuf=NULL;
 #endif
 
 unsigned int mmap[HEAP_MEMORY_SIZE/ PAGESIZE / PAGESPERWORD]={0};
@@ -748,9 +750,11 @@ void m_alloc(int type) {
                         ProgMemory = (uint8_t *)flash_progmemory;
                         memset(MMHeap,0,HEAP_MEMORY_SIZE);
 #ifdef rp2350
+#ifndef PICOMITEWEB
                         if(PSRAMsize)memset((uint8_t *)PSRAMbase,0,PSRAMsize);
 #endif
-#ifdef PICOMITE
+#endif
+#ifdef GUICONTROLS
                         if(Option.MaxCtrls) Ctrl=(struct s_ctrl *)CTRLS;
 #endif
                         break;
@@ -837,9 +841,10 @@ void TestStackOverflow(void) {
 
 
 void __not_in_flash_func(FreeMemory)(unsigned char *addr) {
-    int bits;
     if(addr == NULL) return;
 #ifdef rp2350
+#ifndef PICOMITEWEB
+    int bits;
     if(addr>(unsigned char *)PSRAMbase && addr<(unsigned char *)(PSRAMbase+PSRAMsize)){
         do {
             bits = SBitsGet(addr);
@@ -854,6 +859,15 @@ void __not_in_flash_func(FreeMemory)(unsigned char *addr) {
         } while(bits != (PUSED | PLAST));
     }
 #else
+    int bits;
+    do {
+        bits = MBitsGet(addr);
+        MBitsSet(addr, 0);
+        addr += PAGESIZE;
+    } while(bits != (PUSED | PLAST));
+#endif
+#else
+    int bits;
     do {
         bits = MBitsGet(addr);
         MBitsSet(addr, 0);
@@ -891,6 +905,7 @@ void InitHeap(void) {
 ************************************************************************************************************************/
 
 #ifdef rp2350
+#ifndef PICOMITEWEB
 unsigned int __not_in_flash_func(SBitsGet)(unsigned char *addr) {
     unsigned int i, *p;
     addr -= (unsigned int)PSRAMbase;
@@ -906,6 +921,7 @@ void __not_in_flash_func(SBitsSet)(unsigned char *addr, int bits) {
     i = ((((unsigned int)addr/PAGESIZE)) & (PAGESPERWORD - 1)) * PAGEBITS; // get the position of the bits in the word
     *p = (bits << i) | (*p & (~(((1 << PAGEBITS) -1) << i)));
 }
+#endif
 #endif
 
 unsigned int __not_in_flash_func(MBitsGet)(unsigned char *addr) {
@@ -926,6 +942,7 @@ void __not_in_flash_func(MBitsSet)(unsigned char *addr, int bits) {
     *p = (bits << i) | (*p & (~(((1 << PAGEBITS) -1) << i)));
 }
 #ifdef rp2350
+#ifndef PICOMITEWEB
 void __not_in_flash_func(*GetPSMemory)(int size) {
     unsigned int j, n;
     unsigned char *addr;
@@ -948,7 +965,8 @@ void __not_in_flash_func(*GetPSMemory)(int size) {
     ClearTempMemory();                                               // hopefully this will give us enough to print the prompt
     error("Not enough PSRAM memory");
     return NULL;                                                    // keep the compiler happy
-}    
+}  
+#endif  
 #endif
 
 void __not_in_flash_func(*GetMemory)(int size) {
@@ -970,7 +988,9 @@ void __not_in_flash_func(*GetMemory)(int size) {
     }
     // out of memory
 #ifdef rp2350
+#ifndef PICOMITEWEB
     if(PSRAMsize)return GetPSMemory(size);
+#endif
 #endif
     TempStringClearStart = 0;
     ClearTempMemory();                                               // hopefully this will give us enough to print the prompt
@@ -1001,10 +1021,12 @@ int FreeSpaceOnHeap(void) {
     for(addr = MMHeap + HEAP_MEMORY_SIZE - PAGESIZE; addr >= MMHeap; addr -= PAGESIZE)
         if(!(MBitsGet(addr) & PUSED)) nbr++;
 #ifdef rp2350
+#ifndef PICOMITEWEB
     if(PSRAMsize){
         for(addr = (unsigned char*)(PSRAMbase + PSRAMsize - PAGESIZE); addr >= (unsigned char*)PSRAMbase; addr -= PAGESIZE)
             if(!(SBitsGet(addr) & PUSED)) nbr++;
     }
+#endif
 #endif
     return nbr * PAGESIZE;
 }    
@@ -1028,10 +1050,12 @@ unsigned int UsedHeap(void) {
     for(addr = MMHeap + HEAP_MEMORY_SIZE - PAGESIZE; addr >= MMHeap; addr -= PAGESIZE)
         if(MBitsGet(addr) & PUSED) nbr++;
 #ifdef rp2350
+#ifndef PICOMITEWEB
     if(PSRAMsize){
         for(addr = (unsigned char*)(PSRAMbase + PSRAMsize - PAGESIZE); addr >= (unsigned char*)PSRAMbase; addr -= PAGESIZE)
             if(SBitsGet(addr) & PUSED) nbr++;
     }
+#endif
 #endif
     return nbr * PAGESIZE;
 }    
@@ -1040,6 +1064,7 @@ int MemSize(void *addr){ //returns the amount of heap memory allocated to an add
     int i=0;
     int bits;
 #ifdef rp2350
+#ifndef PICOMITEWEB
     if(addr>(void *)PSRAMbase && addr<(void *)(PSRAMbase+PSRAMsize)){
         if(addr >= (void *)PSRAMbase && addr < (void *)(PSRAMbase + PSRAMsize)){
             do {
@@ -1059,7 +1084,16 @@ int MemSize(void *addr){ //returns the amount of heap memory allocated to an add
         }
         return i;
     }
-
+#else
+    if(addr >= (void *)MMHeap && addr < (void *)(MMHeap + HEAP_MEMORY_SIZE)){
+        do {
+            bits = MBitsGet(addr);
+            addr += PAGESIZE;
+            i+=PAGESIZE;
+        } while(bits != (PUSED | PLAST));
+    }
+    return i;
+#endif
 #else
     if(addr >= (void *)MMHeap && addr < (void *)(MMHeap + HEAP_MEMORY_SIZE)){
         do {
@@ -1088,7 +1122,9 @@ void __not_in_flash_func(FreeMemorySafe)(void **addr){
 	if(*addr!=NULL){
         if(*addr >= (void *)MMHeap && *addr < (void *)(MMHeap + HEAP_MEMORY_SIZE)) {FreeMemory(*addr);*addr=NULL;}
 #ifdef rp2350
+#ifndef PICOMITEWEB
         if(*addr >= (void *)PSRAMbase && *addr < (void *)(PSRAMbase + PSRAMsize)) {FreeMemory(*addr);*addr=NULL;}
+#endif
 #endif
 	}
 }

@@ -405,7 +405,7 @@ void fun_map(void);
 	{ (unsigned char *)"Port(",		T_CMD | T_FUN,		0, cmd_port	    },
 	{ (unsigned char *)"IR",                 T_CMD,			0, cmd_ir           },
 	{ (unsigned char *)"Blit Memory",           T_CMD,                      0, cmd_blitmemory	},
-#ifdef PICOMITE
+#ifdef GUICONTROLS
   	{ (unsigned char *)"GUI",            T_CMD,                      0, cmd_gui   },
 #else
   	{ (unsigned char *)"GUI",            T_CMD,                      0, cmd_guiMX170   },
@@ -464,12 +464,13 @@ void fun_map(void);
     { (unsigned char *)"Camera",         T_CMD,                      0, cmd_camera },
     { (unsigned char *)"Refresh",         T_CMD,                      0, cmd_refresh },
 #endif
-#ifdef PICOMITE
-	{ (unsigned char *)"Backlight",		T_CMD,		0, cmd_backlight		},
+#ifdef GUICONTROLS
 	{ (unsigned char *)"CtrlVal(",       T_CMD | T_FUN,              0, cmd_ctrlval    },
 #endif
+#ifdef PICOMITE
+	{ (unsigned char *)"Backlight",		T_CMD,		0, cmd_backlight		},
+#endif
 #ifdef PICOMITEWEB
-    { (unsigned char *)"NOP", T_CMD,				0, cmd_null 	}, //padding to keep tokens the same
 	{ (unsigned char *)"Backlight",		T_CMD,		0, cmd_backlight		},
     { (unsigned char *)"WEB",       T_CMD,              0, cmd_web	    },
 #else
@@ -630,7 +631,7 @@ void fun_map(void);
 #ifdef PICOMITEWEB
 	{ (unsigned char *)"Json$(",		T_FUN | T_STR,          0, fun_json		},
 #endif
-#ifdef PICOMITE
+#ifdef GUICONTROLS
 	  { (unsigned char *)"MsgBox(",        T_FUN | T_INT,              0, fun_msgbox     },
 	  { (unsigned char *)"CtrlVal(",       T_FUN | T_NBR | T_STR,      0, fun_ctrlval    },
 #endif

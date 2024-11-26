@@ -101,16 +101,23 @@ extern "C" {
 #endif
 
 #ifdef PICOMITEWEB
-    #include "lwipopts_examples_common.h"
+#ifdef rp2350
+    #define MAXSUBFUN           512                     // each entry takes up 4 bytes
+    #define MAXVARS             768                    // 8 + MAXVARLEN + MAXDIM * 2  (ie, 56 bytes) - these do not incl array members
+    #define HEAP_MEMORY_SIZE (160*1024) 
+#else
+    #define MAXSUBFUN           256                     // each entry takes up 4 bytes
     #define MAXVARS             480                    // 8 + MAXVARLEN + MAXDIM * 2  (ie, 56 bytes) - these do not incl array members
+    #define HEAP_MEMORY_SIZE (88*1024) 
+#endif
+
+    #include "lwipopts_examples_common.h"
     #define FLASH_TARGET_OFFSET (1024 * 1024) 
     #define MagicKey 0x51386325
     #define HEAPTOP 0x2003ec00
-    #define HEAP_MEMORY_SIZE (88*1024) 
     #define MaxPcb 8
     #define MAX_CPU     252000
     #define MIN_CPU     126000
-    #define MAXSUBFUN           256                     // each entry takes up 4 bytes
 #endif
 
 #ifdef PICOMITE
@@ -203,7 +210,11 @@ extern "C" {
         #define NBRPINS             44
     #endif
 #else
-    #define PIOMAX 2
+    #ifdef rp2350
+        #define PIOMAX 3
+    #else
+        #define PIOMAX 2
+    #endif
     #define NBRPINS             40
 #endif
 #define MAXPROMPTLEN        49                      // max length of a prompt incl the terminating null

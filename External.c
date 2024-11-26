@@ -1310,7 +1310,7 @@ process:
     }
     // this allows the user to set a software interrupt on the touch IRQ pin if the GUI environment is not enabled
     if(pin == Option.TOUCH_IRQ)
-    #ifdef PICOMITE
+    #ifdef GUICONTROLS
     if(Option.MaxCtrls==0) 
     #endif
     {
@@ -3011,8 +3011,8 @@ void cmd_device(void){
 		return;
 	}
 #endif
-    tp = checkstring(ep, (unsigned char *)"WII");
-    if(tp==NULL)tp = checkstring(ep, (unsigned char *)"CLASSIC");
+    tp = checkstring(cmdline, (unsigned char *)"WII CLASSIC");
+    if(tp==NULL)tp = checkstring(cmdline, (unsigned char *)"WII");
 	if(tp) {
         cmdline=tp;
 		cmd_Classic();
@@ -3167,11 +3167,26 @@ void cmd_adc(void){
 #ifndef PICOMITEWEB
         int nbr=getint(argv[2],1,4); //number of ADC channels
 #else
-        int nbr=getint(argv[2],1,4); //number of ADC channels
+        int nbr=getint(argv[2],1,3); //number of ADC channels
 #endif
         frequency=(float)getnumber(argv[0])*nbr;
         if(frequency<ADC_CLK_SPEED/65536.0 || frequency> ADC_CLK_SPEED/96.0)error("Invalid frequency");
 #ifdef rp2350
+#ifdef PICOMITEWEB
+        if(!(ExtCurrentConfig[31] == EXT_ANA_IN || ExtCurrentConfig[31] == EXT_NOT_CONFIG)) error("Pin GP26 is not off or an ADC input");
+        if(ExtCurrentConfig[31] == EXT_NOT_CONFIG)ExtCfg(31, EXT_ANA_IN, 0);
+        ExtCfg(31, EXT_COM_RESERVED, 0);
+        if(nbr>=2){
+            if(!(ExtCurrentConfig[32] == EXT_ANA_IN || ExtCurrentConfig[32] == EXT_NOT_CONFIG)) error("Pin GP27 is not off or an ADC input");
+            if(ExtCurrentConfig[32] == EXT_NOT_CONFIG)ExtCfg(32, EXT_ANA_IN, 0);
+            ExtCfg(32, EXT_COM_RESERVED, 0);
+        }
+        if(nbr>=3){
+            if(!(ExtCurrentConfig[34] == EXT_ANA_IN || ExtCurrentConfig[34] == EXT_NOT_CONFIG)) error("Pin GP28 is not off or an ADC input");
+            if(ExtCurrentConfig[34] == EXT_NOT_CONFIG)ExtCfg(34, EXT_ANA_IN, 0);
+            ExtCfg(34, EXT_COM_RESERVED, 0);
+        }
+#else
 if(rp2350a){
         if(!(ExtCurrentConfig[31] == EXT_ANA_IN || ExtCurrentConfig[31] == EXT_NOT_CONFIG)) error("Pin GP26 is not off or an ADC input");
         if(ExtCurrentConfig[31] == EXT_NOT_CONFIG)ExtCfg(31, EXT_ANA_IN, 0);
@@ -3211,6 +3226,7 @@ if(rp2350a){
             ExtCfg(58, EXT_COM_RESERVED, 0);
         }
 }
+#endif
 #else
         if(!(ExtCurrentConfig[31] == EXT_ANA_IN || ExtCurrentConfig[31] == EXT_NOT_CONFIG)) error("Pin GP26 is not off or an ADC input");
         if(ExtCurrentConfig[31] == EXT_NOT_CONFIG)ExtCfg(31, EXT_ANA_IN, 0);
@@ -3683,12 +3699,13 @@ if(rp2350a){
 #ifdef PICOMITEVGA
     CollisionFound = false;
     COLLISIONInterrupt=NULL;
-#else
+#endif
+#endif
+#ifdef GUICONTROLS
     gui_int_down = false;
     gui_int_up = false;
     GuiIntDownVector=NULL;
     GuiIntUpVector=NULL;
-#endif
 #endif
     dmarunning=false;
     ADCDualBuffering=false;

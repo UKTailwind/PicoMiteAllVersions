@@ -102,7 +102,7 @@ void __not_in_flash_func(cmd_null)(void) {
  */
 #ifdef rp2350
 void MIPS16 __not_in_flash_func(cmd_inc)(void){
- #else
+#else
 #ifdef PICOMITEVGA
 void MIPS16 cmd_inc(void){
 #else
@@ -636,7 +636,11 @@ void cmd_goto(void) {
 
 
 #ifdef PICOMITEWEB
+#ifdef rp2350
+void MIPS16 __not_in_flash_func(cmd_if)(void) {
+#else
 void cmd_if(void) {
+#endif
 #else
 void MIPS16 __not_in_flash_func(cmd_if)(void) {
 #endif
@@ -785,7 +789,11 @@ retest_an_if:
 
 
 #ifdef PICOMITEWEB
+#ifdef rp2350
+void MIPS16 __not_in_flash_func(cmd_else)(void) {
+#else
 void cmd_else(void) {
+#endif
 #else
 void MIPS16 __not_in_flash_func(cmd_else)(void) {
 #endif
@@ -1125,7 +1133,11 @@ void MIPS16 cmd_trace(void) {
 
 // FOR command
 #ifndef PICOMITE
+#ifdef rp2350
+void MIPS16 __not_in_flash_func(cmd_for)(void) {
+#else
 void cmd_for(void) {
+#endif
 #else
 void MIPS16 __not_in_flash_func(cmd_for)(void) {
 #endif
@@ -1248,7 +1260,11 @@ void MIPS16 __not_in_flash_func(cmd_for)(void) {
 
 
 #ifndef PICOMITE
+#ifdef rp2350
+void MIPS16 __not_in_flash_func(cmd_next)(void) {
+#else
 void cmd_next(void) {
+#endif
 #else
 void MIPS16 __not_in_flash_func(cmd_next)(void) {
 #endif
@@ -1332,7 +1348,11 @@ void MIPS16 __not_in_flash_func(cmd_next)(void) {
 
 
 #ifdef PICOMITEWEB
+#ifdef rp2350
+void MIPS16 __not_in_flash_func(cmd_do)(void) {
+#else
 void cmd_do(void) {
+#endif
 #else
 void MIPS16 __not_in_flash_func(cmd_do)(void) {
 #endif
@@ -1407,7 +1427,11 @@ void MIPS16 __not_in_flash_func(cmd_do)(void) {
 
 
 #ifdef PICOMITEWEB
+#ifdef rp2350
+void MIPS16 __not_in_flash_func(cmd_loop)(void) {
+#else
 void cmd_loop(void) {
+#endif
 #else
 void MIPS16 __not_in_flash_func(cmd_loop)(void) {
 #endif

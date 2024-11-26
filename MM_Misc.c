@@ -1168,8 +1168,7 @@ void cmd_ireturn(void){
     if(LocalIndex)    ClearVars(LocalIndex--);                        // delete any local variables
     TempMemoryIsChanged = true;                                     // signal that temporary memory should be checked
     *CurrentInterruptName = 0;                                        // for static vars we are not in an interrupt
-#ifndef PICOMITEVGA
-#ifndef PICOMITEWEB
+#ifdef GUICONTROLS
     if(DelayedDrawKeyboard) {
         DrawKeyboard(1);                                            // the pop-up GUI keyboard should be drawn AFTER the pen down interrupt
         DelayedDrawKeyboard = false;
@@ -1178,7 +1177,6 @@ void cmd_ireturn(void){
         DrawFmtBox(1);                                              // the pop-up GUI keyboard should be drawn AFTER the pen down interrupt
         DelayedDrawFmtBox = false;
     }
-#endif
 #endif
 	if(SaveOptionErrorSkip>0)OptionErrorSkip=SaveOptionErrorSkip+1;
     strcpy(MMErrMsg , SaveErrorMessage);
@@ -1778,7 +1776,7 @@ if(Option.CPU_Speed==FreqXGA)PO2Str("RESOLUTION", "1024x768");
     if(Option.DISPLAY_TYPE >= VIRTUAL){
         PO("LCDPANEL"); MMPrintString((char *)display_details[Option.DISPLAY_TYPE].name); PRet();
     } 
-    #ifdef PICOMITE
+    #ifdef GUICONTROLS
     if(Option.MaxCtrls)PO2Int("GUI CONTROLS", Option.MaxCtrls);
     #endif
     #ifdef PICOMITEWEB
@@ -3403,18 +3401,6 @@ void MIPS16 cmd_option(void) {
         return;
     }
 #else
-#ifdef PICOMITE
-    tp = checkstring(cmdline,(unsigned char *)"GUI CONTROLS");
-    if(tp) {
-        getargs(&tp, 1, (unsigned char *)",");
-    	if(CurrentLinePtr) error("Invalid in a program");
-        Option.MaxCtrls=getint(argv[0],0,MAXCONTROLS-1);
-        if(Option.MaxCtrls)Option.MaxCtrls++;
-        SaveOptions();
-        _excep_code = RESET_COMMAND;
-        SoftReset();
-    }
-#endif
     tp = checkstring(cmdline, (unsigned char *)"CPUSPEED");
     if(tp) {
         uint32_t speed=0;    
@@ -3504,6 +3490,18 @@ void MIPS16 cmd_option(void) {
         setterminal(Option.Height,Option.Width);
         return;
     }
+#ifdef GUICONTROLS
+    tp = checkstring(cmdline,(unsigned char *)"GUI CONTROLS");
+    if(tp) {
+        getargs(&tp, 1, (unsigned char *)",");
+    	if(CurrentLinePtr) error("Invalid in a program");
+        Option.MaxCtrls=getint(argv[0],0,MAXCONTROLS-1);
+        if(Option.MaxCtrls)Option.MaxCtrls++;
+        SaveOptions();
+        _excep_code = RESET_COMMAND;
+        SoftReset();
+    }
+#endif
     tp = checkstring(cmdline, (unsigned char *)"CASE");
     if(tp) {
         if(checkstring(tp, (unsigned char *)"LOWER"))    { Option.Listcase = CONFIG_LOWER; SaveOptions(); return; }
@@ -4807,6 +4805,10 @@ void MIPS16 fun_info(void){
         fret = (MMFLOAT)time_us_64()/1000000.0;
         targ = T_NBR;
         return;
+    } else if((tp=checkstring(ep, (unsigned char *)"WTF"))){
+        iret = TokenTableSize;
+        targ = T_INT;
+        return;
     } else error("Syntax");
 }
 
@@ -5302,7 +5304,7 @@ int checkdetailinterrupts(void) {
         }
     }
 
-#ifdef PICOMITE
+#ifdef GUICONTROLS
     if(Ctrl!=NULL){
         if(gui_int_down && GuiIntDownVector) {                          // interrupt on pen down
             intaddr = GuiIntDownVector;                                 // get a pointer to the interrupt routine
@@ -5317,6 +5319,7 @@ int checkdetailinterrupts(void) {
         }
     }
 #endif
+
 //#ifdef PICOMITEVGA
     if (COLLISIONInterrupt != NULL && CollisionFound) {
         CollisionFound = false;
@@ -5486,7 +5489,7 @@ GotAnInterrupt:
     return 1;
 }
 int __not_in_flash_func(check_interrupt)(void) {
-#ifdef PICOMITE
+#ifdef GUICONTROLS
     if(Ctrl!=NULL){
         if(!(DelayedDrawKeyboard || DelayedDrawFmtBox || calibrate))ProcessTouch();
         if(CheckGuiFlag) CheckGui();                                    // This implements a LED flash

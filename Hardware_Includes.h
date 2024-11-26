@@ -376,6 +376,9 @@ extern struct tagMTRand *g_myrand;
 #ifdef PICOMITEWEB
 	#include "SSD1963.h"
 	#include "Touch.h"
+	#ifdef rp2350
+		#include "GUI.h"
+	#endif
 #endif
 #include "GPS.h"
 #include "Audio.h"

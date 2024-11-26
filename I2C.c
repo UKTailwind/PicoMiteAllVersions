@@ -1394,7 +1394,7 @@ void MIPS16 cmd_Nunchuck(void){
 		nunchuckread=false;
 		WiiReceive(6, (char *)nunbuff);
 		nunInterruptc[5]=NULL;
-	}
+	} else error("Syntax");
 }
 
 void MIPS16 cmd_Classic(void){
@@ -1445,7 +1445,7 @@ void MIPS16 cmd_Classic(void){
 		classicread=false;
 		WiiReceive(6, (char *)nunbuff);
 		nunInterruptc[0]=NULL;
-	}
+	} else error("Syntax");
 }
 
 /* 

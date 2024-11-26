@@ -253,7 +253,7 @@ void fun_touch(void) {
         iret = GetTouch(GET_X_AXIS);
     else if(checkstring(ep, (unsigned char *)"Y"))
         iret = GetTouch(GET_Y_AXIS);
-#ifndef PICOMITEWEB
+#ifdef GUICONTROLS
     else if(checkstring(ep, (unsigned char *)"REF"))
         iret = CurrentRef;
     else if(checkstring(ep, (unsigned char *)"LASTREF"))

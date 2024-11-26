@@ -390,6 +390,7 @@ const struct s_PinDef PinDef[]={
 		{ 44, 29, "GP29", DIGITAL_IN | DIGITAL_OUT | ANALOG_IN | UART0RX | I2C0SCL | PWM6B, 3, 134},// pseudo pin 44
     #endif
     #ifdef rp2350
+    #ifndef PICOMITEWEB
 		{ 45, 30, "GP30", DIGITAL_IN | DIGITAL_OUT | SPI1SCK | I2C1SDA | PWM7A  ,99 , 7},           // pseudo pin 45
 		{ 46, 31, "GP31", DIGITAL_IN | DIGITAL_OUT | SPI1TX | I2C1SCL| PWM7B  ,99 , 135},           // pseudo pin 46
 		{ 47, 32, "GP32", DIGITAL_IN | DIGITAL_OUT | UART0TX | SPI0RX | I2C0SDA| PWM8A  ,99 , 8},           // pseudo pin 47
@@ -409,6 +410,7 @@ const struct s_PinDef PinDef[]={
 		{ 61, 46, "GP46", DIGITAL_IN | DIGITAL_OUT | ANALOG_IN | SPI1SCK | I2C1SDA| PWM11A  ,6 , 11},           // pseudo pin 61
 		{ 62, 47, "GP47", DIGITAL_IN | DIGITAL_OUT | ANALOG_IN | SPI1TX | I2C1SCL| PWM11B  ,7 , 139},           // pseudo pin 62
 
+    #endif
     #endif
 };
 char alive[]="\033[?25h";
@@ -464,9 +466,10 @@ void __not_in_flash_func(routinechecks)(void){
 #endif
 	if(GPSchannel)processgps();
     if(diskchecktimer == 0)CheckSDCard();
-#ifdef PICOMITE
+#ifdef GUICONTROLS
     if(Ctrl)ProcessTouch();
 #endif
+
 //        if(tud_cdc_connected() && KeyCheck==0){
 //            SSPrintString(alive);
 //        }
@@ -1529,7 +1532,7 @@ bool MIPS16 __not_in_flash_func(timer_callback)(repeating_timer_t *rt)
             IrDevTmp = ((IrBits >> 16) & 0xffff);
             IrCmdTmp = ((IrBits >> 8) & 0xff);
         }
-#ifdef PICOMITE
+#ifdef GUICONTROLS
     // check on the touch panel, is the pen down?
 
     TouchTimer++;
@@ -3439,6 +3442,7 @@ void __no_inline_not_in_flash_func(modclock)(uint16_t speed){
        ssi_hw->ssienr=1;
 }
 #else
+#ifndef PICOMITEWEB
 uint32_t testPSRAM(void){
     uint32_t *p=(uint32_t *)PSRAMbase;
     uint32_t *q=(uint32_t *)PSRAMbase;
@@ -3455,6 +3459,7 @@ uint32_t testPSRAM(void){
     if(p[8*1024*1024/4-1]==0x12345678)return 8*1024*1024;
     return 16*1024*1024;
 }
+#endif
 #endif
 lfs_t lfs;
 lfs_dir_t lfs_dir;
@@ -3699,6 +3704,7 @@ int MIPS16 main(){
     PWM_FREQ=44100;
     pico_get_unique_board_id_string (id_out,12);
 #ifdef rp2350
+#ifndef PICOMITEWEB
     if(Option.PSRAM_CS_PIN){
         gpio_set_function(PinDef[Option.PSRAM_CS_PIN].GPno, GPIO_FUNC_XIP_CS1); // CS for PSRAM
         xip_ctrl_hw->ctrl|=XIP_CTRL_WRITABLE_M1_BITS;
@@ -3708,13 +3714,7 @@ int MIPS16 main(){
         }
     }
 #endif
-/*    clock_configure(
-        clk_peri,
-        0,                                                // No glitchless mux
-        CLOCKS_CLK_PERI_CTRL_AUXSRC_VALUE_CLKSRC_PLL_SYS, // System PLL on AUX mux
-        Option.CPU_Speed * 1000,                               // Input frequency
-        Option.CPU_Speed * 1000                                // Output (must be same as no divider)
-    );*/
+#endif
     if(clock_get_hz(clk_usb)!=48000000){
         ResetAllFlash();              // init the options if this is the very first startup
         _excep_code=INVALID_CLOCKSPEED;

@@ -255,7 +255,7 @@ struct option_s {
     unsigned char RTC_Clock;
     unsigned char RTC_Data; //4=60             //54
 //
-    #ifdef PICOMITE
+    #ifdef GUICONTROLS
         int MaxCtrls;                  // maximum number of controls allowed //48
     #endif
 
