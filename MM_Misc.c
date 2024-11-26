@@ -53,6 +53,7 @@ extern int KeyDown[7];
 #endif
 extern int last_adc;
 extern char banner[];
+extern char *pinsearch(int pin);
 uint32_t getTotalHeap(void) {
    extern char __StackLimit, __bss_end__;
    
@@ -4633,6 +4634,18 @@ void MIPS16 fun_info(void){
             int t=0;
             char code, *ptr;
             char *string=GetTempMemory(STRINGSIZE);
+            skipspace(tp);
+        #ifdef PICOMITEWEB
+            iret=0;
+	        if((tp[0]=='G' || tp[0]=='g') && (tp[1]=='P' || tp[1]=='p') && tp[2]=='2' && tp[3]=='3')iret=41;
+	        if((tp[0]=='G' || tp[0]=='g') && (tp[1]=='P' || tp[1]=='p') && tp[2]=='2' && tp[3]=='4')iret=42;
+	        if((tp[0]=='G' || tp[0]=='g') && (tp[1]=='P' || tp[1]=='p') && tp[2]=='2' && tp[3]=='5')iret=43;
+	        if((tp[0]=='G' || tp[0]=='g') && (tp[1]=='P' || tp[1]=='p') && tp[2]=='2' && tp[3]=='9')iret=44;
+            if(iret){
+                targ=T_INT;
+                return;
+            }
+        #endif
             if(codecheck(tp))evaluate(tp, &f, &i64, &ss, &t, false);
             if(t & T_STR ){
                 ptr=(char *)getCstring(tp);
@@ -4640,10 +4653,28 @@ void MIPS16 fun_info(void){
             } else {
                 strcpy(string,(char *)tp);
             }
+        #ifdef PICOMITEWEB
+            iret=0;
+	        if((string[0]=='G' || string[0]=='g') && (string[1]=='P' || string[1]=='p') && string[2]=='2' && string[3]=='3')iret=41;
+	        if((string[0]=='G' || string[0]=='g') && (string[1]=='P' || string[1]=='p') && string[2]=='2' && string[3]=='4')iret=42;
+	        if((string[0]=='G' || string[0]=='g') && (string[1]=='P' || string[1]=='p') && string[2]=='2' && string[3]=='5')iret=43;
+	        if((string[0]=='G' || string[0]=='g') && (string[1]=='P' || string[1]=='p') && string[2]=='2' && string[3]=='9')iret=44;
+            if(iret){
+                targ=T_INT;
+                return;
+            }
+        #endif
             if(!(code=codecheck( (unsigned char *)string)))string+=2;  
             else error("Syntax");
             pin = getinteger((unsigned char *)string);
             if(!code)pin=codemap(pin);
+        #ifdef PICOMITEWEB
+            if(pin>=41 && pin<=44){
+                iret=pin;
+                targ=T_INT;
+                return;
+            }
+        #endif
             if(IsInvalidPin(pin))error("Invalid pin");
             iret=pin;
             targ=T_INT;
@@ -4684,9 +4715,28 @@ void MIPS16 fun_info(void){
             if(!(code=codecheck(tp)))tp+=2;
             pin = getinteger(tp);
             if(!code)pin=codemap(pin);
+        #ifdef HDMI
+            if(pin>=16 && pin<=25){
+                strcpy((char *)sret,"Boot Reserved : HDMI");
+                CtoM(sret);
+                targ=T_STR;
+                return;
+            }
+        #endif
+        #ifdef PICOMITEWEB
+            if(pin>=41 && pin<=44){
+                strcpy((char *)sret,"Boot Reserved : CYW43");
+                CtoM(sret);
+                targ=T_STR;
+                return;
+            }
+        #endif
             if(IsInvalidPin(pin))strcpy((char *)sret,"Invalid");
             else strcpy((char *)sret,PinFunction[ExtCurrentConfig[pin] & 0xFF]);
-            if(ExtCurrentConfig[pin] & EXT_BOOT_RESERVED)strcat((char *)sret, ": Boot Reserved");
+            if(ExtCurrentConfig[pin] & EXT_BOOT_RESERVED){
+                strcpy((char *)sret, "Boot Reserved : ");
+                strcat((char *)sret,pinsearch(pin));
+            }
             if(ExtCurrentConfig[pin] & EXT_COM_RESERVED)strcat((char *)sret, ": Reserved for function");
             if(ExtCurrentConfig[pin] & EXT_DS18B20_RESERVED)strcat((char *)sret, ": In use for DS18B20");
             CtoM(sret);
@@ -4805,8 +4855,12 @@ void MIPS16 fun_info(void){
         fret = (MMFLOAT)time_us_64()/1000000.0;
         targ = T_NBR;
         return;
-    } else if((tp=checkstring(ep, (unsigned char *)"WTF"))){
-        iret = TokenTableSize;
+    } else if((tp=checkstring(ep, (unsigned char *)"MAX GP"))){
+#ifdef rp2350
+        iret=(rp2350a ? 29 : 47);
+#else
+        iret=29;
+#endif
         targ = T_INT;
         return;
     } else error("Syntax");

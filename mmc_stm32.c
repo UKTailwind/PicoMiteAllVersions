@@ -1665,5 +1665,74 @@ void InitReservedIO(void) {
 #endif	
 }
 
-
+char *pinsearch(int pin){
+	char *buff=GetTempMemory(STRINGSIZE);
+#ifndef PICOMITEVGA
+	if(pin==Option.LCD_CD)strcpy(buff,"LCD CD");
+	else if(pin==Option.LCD_CS)strcpy(buff,"LCD CS");
+	else if(pin==Option.LCD_RD)strcpy(buff,"LCD RD");
+	else if(pin==Option.LCD_Reset)strcpy(buff,"LCD Reset");
+	else if(pin==Option.DISPLAY_BL)strcpy(buff,"LCD BACKLIGHT");
+	else if(pin==PINMAP[Option.SSD_DC] && Option.DISPLAY_TYPE>=SSDPANEL && Option.DISPLAY_TYPE<VIRTUAL_C)strcpy(buff,"SSD DC");
+	else if(pin==PINMAP[Option.SSD_WR] && Option.DISPLAY_TYPE>=SSDPANEL && Option.DISPLAY_TYPE<VIRTUAL_C)strcpy(buff,"SSD WR");
+	else if(pin==PINMAP[Option.SSD_RD] && Option.DISPLAY_TYPE>=SSDPANEL && Option.DISPLAY_TYPE<VIRTUAL_C)strcpy(buff,"SSD RD");
+	else if(pin==PINMAP[Option.SSD_RESET])strcpy(buff,"SSD RESET");
+	else if(pin==1 && Option.SSD_DC)strcpy(buff,"SSD D0");
+	else if(pin==2 && Option.SSD_DC)strcpy(buff,"SSD D1");
+	else if(pin==4 && Option.SSD_DC)strcpy(buff,"SSD D2");
+	else if(pin==5 && Option.SSD_DC)strcpy(buff,"SSD D3");
+	else if(pin==6 && Option.SSD_DC)strcpy(buff,"SSD D4");
+	else if(pin==7 && Option.SSD_DC)strcpy(buff,"SSD D5");
+	else if(pin==9 && Option.SSD_DC)strcpy(buff,"SSD D6");
+	else if(pin==10 && Option.SSD_DC)strcpy(buff,"SSD D7");
+	else if(pin==11 && Option.SSD_DC && Option.DISPLAY_TYPE>SSD_PANEL_8 && Option.DISPLAY_TYPE<VIRTUAL_C)strcpy(buff,"SSD D8");
+	else if(pin==12 && Option.SSD_DC && Option.DISPLAY_TYPE>SSD_PANEL_8 && Option.DISPLAY_TYPE<VIRTUAL_C)strcpy(buff,"SSD D9");
+	else if(pin==14 && Option.SSD_DC && Option.DISPLAY_TYPE>SSD_PANEL_8 && Option.DISPLAY_TYPE<VIRTUAL_C)strcpy(buff,"SSD D10");
+	else if(pin==15 && Option.SSD_DC && Option.DISPLAY_TYPE>SSD_PANEL_8 && Option.DISPLAY_TYPE<VIRTUAL_C)strcpy(buff,"SSD D11");
+	else if(pin==16 && Option.SSD_DC && Option.DISPLAY_TYPE>SSD_PANEL_8 && Option.DISPLAY_TYPE<VIRTUAL_C)strcpy(buff,"SSD D12");
+	else if(pin==17 && Option.SSD_DC && Option.DISPLAY_TYPE>SSD_PANEL_8 && Option.DISPLAY_TYPE<VIRTUAL_C)strcpy(buff,"SSD D13");
+	else if(pin==19 && Option.SSD_DC && Option.DISPLAY_TYPE>SSD_PANEL_8 && Option.DISPLAY_TYPE<VIRTUAL_C)strcpy(buff,"SSD D14");
+	else if(pin==20 && Option.SSD_DC && Option.DISPLAY_TYPE>SSD_PANEL_8 && Option.DISPLAY_TYPE<VIRTUAL_C)strcpy(buff,"SSD D15");
+	else
+#endif
+	if(pin==Option.KEYBOARD_CLOCK)strcpy(buff,"KEYBOARD CLOCK");
+	else if(pin==Option.KEYBOARD_DATA)strcpy(buff,"KEYBOARD DATA");
+	else if(pin==Option.SerialTX)strcpy(buff,"CONSOLE TX");
+	else if(pin==Option.SerialRX)strcpy(buff,"CONSOLE RX");
+	else if(pin==Option.AUDIO_R)strcpy(buff,"AUDIO R");
+	else if(pin==Option.AUDIO_L)strcpy(buff,"AUDIO L");
+	else if(pin==Option.AUDIO_CLK_PIN)strcpy(buff,"AUDIO SPI CLK");
+	else if(pin==Option.AUDIO_MISO_PIN)strcpy(buff,"AUDIO SPI MISO");
+	else if(pin==Option.AUDIO_MOSI_PIN)strcpy(buff,"AUDIO SPI MOSI");
+	else if(pin==Option.AUDIO_CS_PIN)strcpy(buff,"AUDIO CS");
+	else if(pin==Option.AUDIO_DREQ_PIN)strcpy(buff,"AUDIO DREQ");
+	else if(pin==Option.AUDIO_DCS_PIN)strcpy(buff,"AUDIO DCS");
+	else if(pin==Option.AUDIO_RESET_PIN)strcpy(buff,"AUDIO RESET");
+	else if(pin==Option.SYSTEM_I2C_SCL)strcpy(buff,"SYSTEM I2C SCL");
+	else if(pin==Option.SYSTEM_I2C_SDA)strcpy(buff,"SYSTEM I2C SDS");
+	else if(pin==Option.TOUCH_CS)strcpy(buff,"TOUCH CS");
+	else if(pin==Option.TOUCH_IRQ)strcpy(buff,"TOUCH IRQ");
+	else if(pin==Option.SD_CS)strcpy(buff,"SD CS");
+	else if(pin==Option.SD_CLK_PIN)strcpy(buff,"SD CLK");
+	else if(pin==Option.SD_MISO_PIN)strcpy(buff,"SD MISO");
+	else if(pin==Option.SD_MOSI_PIN)strcpy(buff,"SD MOSI");
+	else if(pin==Option.SYSTEM_CLK)strcpy(buff,"SPI SYSTEM CLK");
+	else if(pin==Option.SYSTEM_MOSI)strcpy(buff,"SPI SYSTEM MOSI");
+	else if(pin==Option.SYSTEM_MISO)strcpy(buff,"SPI SYSTEM MISO");
+#ifdef PICOMITEVGA
+#ifndef HDMI
+	else if(pin==Option.VGA_BLUE)strcpy(buff,"VGA BLUE");
+	else if(pin==Option.VGA_HSYNC)strcpy(buff,"VGA HSYNC");
+	else if(pin==PINMAP[PinDef[Option.VGA_HSYNC].GPno+1])strcpy(buff,"VGA VSYNC");
+	else if(pin==PINMAP[PinDef[Option.VGA_BLUE].GPno+1])strcpy(buff,"VGA GREEN L");
+	else if(pin==PINMAP[PinDef[Option.VGA_BLUE].GPno+2])strcpy(buff,"VGA GREEN H");
+	else if(pin==PINMAP[PinDef[Option.VGA_BLUE].GPno+3])strcpy(buff,"VGA RED");
+#endif
+#endif
+#ifdef rp2350
+	else if(pin==Option.PSRAM_CS_PIN)strcpy(buff,"PSRAM CS");
+#endif
+	else strcpy(buff, "NOT KNOWN");
+	return buff;
+}
 
