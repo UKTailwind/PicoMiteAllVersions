@@ -29,7 +29,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "pico/stdlib.h"
 #include "hardware/clocks.h"
 #include <time.h>
-#include "upng.h"
+//#include "upng.h"
 #include <complex.h>
 #include "pico/bootrom.h"
 #include "hardware/structs/systick.h"
@@ -4753,8 +4753,15 @@ void MIPS16 fun_info(void){
             return;
 #endif            
         } else if(checkstring(ep, (unsigned char *)"PATH")){
-            strcpy((char *)sret,GetCWD());
-            if(sret[strlen((char *)sret)-1]!='/')strcat((char *)sret,"/");
+//            strcpy((char *)sret,GetCWD());
+//            if(sret[strlen((char *)sret)-1]!='/')strcat((char *)sret,"/");
+            if(ProgMemory[0]==1 && ProgMemory[1]==39 && ProgMemory[2]==35){
+                strcpy((char *)sret,(char *)&ProgMemory[3]);
+                for(int i=strlen((char *)sret)-1;i>0;i--){
+                    if(sret[i]!='/')sret[i]=0;
+                    else break;
+                }
+            } else strcpy((char *)sret,"NONE");
             CtoM(sret);
             targ=T_STR;
             return;

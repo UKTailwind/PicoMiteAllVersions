@@ -2286,12 +2286,98 @@ void MIPS16 cmd_loadCMM2(void){
     
     loadCMM2(argv[0],autorun,true);
 }
-/*void MIPS16 cmd_RunCMM2(void){
-    loadCMM2(cmdline,true,false);
-}*/
 
 #endif
+#ifdef rp2350
+void LoadPNG(unsigned char *p) {
+//	int fnbr;
+	int xOrigin, yOrigin,w,h, transparent=0, cutoff=20;
+    int maxW=HRes;
+	int maxH=VRes;
+	upng_t* upng;
+	// get the command line arguments
+	getargs(&p, 9, (unsigned char *)",");                                            // this MUST be the first executable line in the function
+    if(argc == 0) error("Argument count");
+    if(!InitSDCard()) return;
 
+    unsigned char *q = getFstring(argv[0]);                                        // get the file name
+
+    xOrigin = yOrigin = 0;
+	if(argc >= 3 && *argv[2]) xOrigin = getinteger(argv[2]);                    // get the x origin (optional) argument
+	if(argc >= 5 && *argv[4]){
+		yOrigin = getinteger(argv[4]);                    // get the y origin (optional) argument
+	}
+	if(argc >= 7 && *argv[6])transparent=getint(argv[6],-1,15);
+    if(transparent!=-1)transparent=RGB121map[transparent];
+    if(argc==9)cutoff=getint(argv[8],1,254);
+	if(strchr((char *)q, '.') == NULL) strcat((char *)q, ".png");
+    upng = upng_new_from_file((char *)q);
+	routinechecks();
+    upng_header(upng);
+    w=upng_get_width(upng);
+    h= upng_get_height(upng);
+    if(w+xOrigin >maxW || h+yOrigin >maxH){
+        upng_free(upng);
+        error("Image too large");
+    }
+    if(!(upng_get_format(upng)==3)){
+        upng_free(upng);
+        error("Invalid format, must be RGBA8888");
+    }
+	routinechecks();
+    upng_decode(upng);
+    unsigned char *rr;
+	routinechecks();
+    rr=(unsigned char *)upng_get_buffer(upng);
+    unsigned char *pp=rr;
+    unsigned char *ppp=rr;
+    char d[3];
+    if(transparent==-1){
+        unsigned char *buff = GetTempMemory(w*h*3);
+        ReadBuffer(xOrigin, yOrigin, xOrigin+w-1, yOrigin+h-1,buff);
+        for(int i=0;i<w*h;i++){
+            d[0]=rr[2];
+            d[1]=rr[1];
+            d[2]=rr[0];
+            if(rr[3]>cutoff){
+                pp[0]=d[0];
+                pp[1]=d[1];
+                pp[2]=d[2];
+            } else {
+                pp[0]=buff[0];
+                pp[1]=buff[1];
+                pp[2]=buff[2];
+            }
+            pp+=3;
+            rr+=4;
+            buff+=3;
+        }
+        DrawBuffer(xOrigin, yOrigin, xOrigin+w-1, yOrigin+h-1,ppp);
+    } else {
+    for(int i=0;i<w*h;i++){
+        d[0]=rr[2];
+        d[1]=rr[1];
+        d[2]=rr[0];
+        if(rr[3]>cutoff){
+            pp[0]=d[0];
+            pp[1]=d[1];
+            pp[2]=d[2];
+        } else {
+            pp[0]=(transparent & 0xFF0000)>>16;
+            pp[1]=(transparent & 0xFF00)>>8;
+            pp[2]=(transparent & 0xFF);
+        }
+        pp+=3;
+        rr+=4;
+    }
+        DrawBuffer(xOrigin, yOrigin, xOrigin+w-1, yOrigin+h-1,ppp);
+    }
+    upng_free(upng);
+#ifdef USBKEYBOARD
+	clearrepeat();
+#endif
+}
+#endif
 void MIPS16 cmd_load(void)
 {
     int oldfont=PromptFont;
@@ -2310,6 +2396,14 @@ void MIPS16 cmd_load(void)
         cmd_LoadJPGImage(p);
         return;
     }
+#ifdef rp2350
+    p = checkstring(cmdline, (unsigned char *)"PNG");
+    if (p)
+    {
+        LoadPNG(p);
+        return;
+    }
+#endif
     getargs(&cmdline, 3, (unsigned char *)",");
     if (!(argc & 1) || argc == 0)
         error("Syntax");

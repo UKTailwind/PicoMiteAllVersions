@@ -1520,7 +1520,7 @@ void cmd_port(void) {
 	getargs(&cmdline, NBRPINS * 4, (unsigned char *)",");
 
 	if((argc & 0b11) != 0b11) error("Invalid syntax");
-
+    if(!strchr((char *)cmdline,')'))error ("Syntax");
     // step over the equals sign and get the value for the assignment
 	while(*cmdline && tokenfunction(*cmdline) != op_equal) cmdline++;
 	if(!*cmdline) error("Invalid syntax");

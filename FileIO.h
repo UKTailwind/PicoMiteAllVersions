@@ -32,6 +32,9 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 extern "C" {
 #endif
 #include "ff.h"
+#ifdef rp2350
+#include "upng.h"
+#endif
 // File related I/O
 unsigned char MMfputc(unsigned char c, int fnbr);
 int MMfgetc(int filenbr);

@@ -313,8 +313,9 @@ void edit(unsigned char *cmdline, bool reset) {
     if(HRes<512){
         DISPLAY_TYPE=SCREENMODE1;
         modmode=true;
+        ResetDisplay();
     }
-    ResetDisplay();
+//    
     memset(WriteBuf, 0, ScreenSize);
     if(modmode){
 #ifdef HDMI
@@ -351,7 +352,7 @@ void edit(unsigned char *cmdline, bool reset) {
         ClearVars(0);
         ClearRuntime();
     }
-    if(HRes==640){
+    if(HRes==640 || HRes==512){
         SetFont(1);
         PromptFont=1;
     }
@@ -892,23 +893,33 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool rese
                                 PromptFont=oldfont;
                             }
 #ifdef HDMI
-                            if(Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P ){
-                                tilefcols=(uint16_t *)((uint32_t)FRAMEBUFFER+(MODE1SIZE*3));
-                                tilebcols=(uint16_t *)((uint32_t)FRAMEBUFFER+(MODE1SIZE*3)+(MODE1SIZE>>1));
-                                X_TILE=MODE_H_ACTIVE_PIXELS/8;Y_TILE=MODE_V_ACTIVE_LINES/8;
-                                for(int x=0;x<X_TILE;x++){
-                                    for(int y=0;y<Y_TILE;y++){
-                                        tilefcols[y*X_TILE+x]=RGB555(Option.DefaultFC);
-                                        tilebcols[y*X_TILE+x]=RGB555(Option.DefaultBC);
-                                    }
-                                }
-                            } else {
-                                tilefcols_w=(uint8_t *)DisplayBuf+MODE1SIZE;
-                                tilebcols_w=tilefcols_w+(MODE_H_ACTIVE_PIXELS/8)*(MODE_V_ACTIVE_LINES/8); //minimum tilesize is 8x8
-                                memset(tilefcols_w,RGB332(Option.DefaultFC),(MODE_H_ACTIVE_PIXELS/8)*(MODE_V_ACTIVE_LINES/8)*sizeof(uint8_t));
-                                memset(tilebcols_w,RGB332(Option.DefaultBC),(MODE_H_ACTIVE_PIXELS/8)*(MODE_V_ACTIVE_LINES/8)*sizeof(uint8_t));
-                                X_TILE=MODE_H_ACTIVE_PIXELS/8;Y_TILE=MODE_V_ACTIVE_LINES/ytileheight;
-                            }
+        while(v_scanline!=0){}
+        if(DISPLAY_TYPE==SCREENMODE5)for(int i=0;i<256;i++)map256[i]=remap[i]=RGB555(MAP256DEF[i]);
+        else if(Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P )for(int i=0;i<16;i++){
+            map16[i]=remap[i]=RGB555(MAP16DEF[i]);
+            map16pairs[i]=map16[i] | (map16[i]<<16);
+        }
+        else if(DISPLAY_TYPE==SCREENMODE3)for(int i=0;i<16;i++) map16d[i]=remap[i]=RGB332(MAP16DEF[i]) | (RGB332(MAP16DEF[i])<<8);
+        else if(DISPLAY_TYPE==SCREENMODE2)for(int i=0;i<16;i++) map16q[i]=remap[i]=RGB332(MAP16DEF[i]) | (RGB332(MAP16DEF[i])<<8) | (RGB332(MAP16DEF[i])<<16) | (RGB332(MAP16DEF[i])<<24);
+            if(DISPLAY_TYPE==SCREENMODE1)  {
+                if(Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P ){
+                    tilefcols=(uint16_t *)((uint32_t)FRAMEBUFFER+(MODE1SIZE*3));
+                    tilebcols=(uint16_t *)((uint32_t)FRAMEBUFFER+(MODE1SIZE*3)+(MODE1SIZE>>1));
+                    X_TILE=MODE_H_ACTIVE_PIXELS/8;Y_TILE=MODE_V_ACTIVE_LINES/8;
+                    for(int x=0;x<X_TILE;x++){
+                        for(int y=0;y<Y_TILE;y++){
+                            tilefcols[y*X_TILE+x]=RGB555(Option.DefaultFC);
+                            tilebcols[y*X_TILE+x]=RGB555(Option.DefaultBC);
+                        }
+                    }
+                } else {
+                    tilefcols_w=(uint8_t *)DisplayBuf+MODE1SIZE;
+                    tilebcols_w=tilefcols_w+(MODE_H_ACTIVE_PIXELS/8)*(MODE_V_ACTIVE_LINES/8); //minimum tilesize is 8x8
+                    memset(tilefcols_w,RGB332(Option.DefaultFC),(MODE_H_ACTIVE_PIXELS/8)*(MODE_V_ACTIVE_LINES/8)*sizeof(uint8_t));
+                    memset(tilebcols_w,RGB332(Option.DefaultBC),(MODE_H_ACTIVE_PIXELS/8)*(MODE_V_ACTIVE_LINES/8)*sizeof(uint8_t));
+                    X_TILE=MODE_H_ACTIVE_PIXELS/8;Y_TILE=MODE_V_ACTIVE_LINES/ytileheight;
+                }
+            }
 #endif
 #endif                          
                             if(c != ESC && TextChanged && fname==NULL) SaveToProgMemory();
