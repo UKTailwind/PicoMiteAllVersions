@@ -72,7 +72,7 @@ unsigned char *StartEditPoint = NULL;
 int StartEditChar = 0;
 static bool markmode=false;
 extern void routinechecks(void);
-int optioncolourcodesave;
+int8_t optioncolourcodesave;
 #if !defined(LITE)
 #ifdef PICOMITEVGA
 int editactive=0;

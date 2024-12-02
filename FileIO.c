@@ -278,6 +278,7 @@ void disable_interrupts(void)
 void enable_interrupts(void)
 {
     restore_interrupts(irqs);
+    SecondsTimer+=(time_us_64()/1000 - mSecTimer);
     mSecTimer=time_us_64()/1000;
     irqs=0;
 }

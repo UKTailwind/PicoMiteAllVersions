@@ -36,13 +36,14 @@ volatile uint8_t seconds_buf[4] = {0};
 // Called with results of operation
 static void ntp_result(NTP_T* state, int status, time_t *result) {
     if (status == 0 && result) {
+        int year, month, day, hour, minute, second;
         *result=*result+timeadjust;
         struct tm *utc = gmtime(result);
         char buff[STRINGSIZE]={0};
         sprintf(buff,"got ntp response: %02d/%02d/%04d %02d:%02d:%02d\r\n", utc->tm_mday, utc->tm_mon + 1, utc->tm_year + 1900,
                utc->tm_hour, utc->tm_min, utc->tm_sec);
         if(!optionsuppressstatus)MMPrintString(buff);
-        mT4IntEnable(0);
+//        mT4IntEnable(0);
         hour = utc->tm_hour;
         minute = utc->tm_min;
         second = utc->tm_sec;
@@ -51,7 +52,8 @@ static void ntp_result(NTP_T* state, int status, time_t *result) {
         year = utc->tm_year + 1900;
         month = utc->tm_mon + 1;
         day = utc->tm_mday;
-        mT4IntEnable(1);
+//        mT4IntEnable(1);
+        TimeOffsetToUptime=get_epoch(year, month, day, hour, minute, second)-time_us_64()/1000000;
     }
 }
 

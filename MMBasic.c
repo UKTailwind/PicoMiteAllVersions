@@ -3180,6 +3180,7 @@ void MIPS16 ClearRuntime(void) {
     findlabel(NULL);                                                // clear the label cache
     OptionErrorSkip = 0;
 	optionangle=1.0;
+    optionfulltime=false;
     optionfastaudio=0;
     optionlogging=false;
 #ifndef PICOMITEVGA

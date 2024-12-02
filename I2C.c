@@ -496,14 +496,16 @@ void RtcGetTime(int noerror) {
 		I2C2_Sendlen = 0;
 		if(!DoRtcI2C(DS1307 ? 0x68 : 0x51, (unsigned char *)buff)) goto error_exit;
 	}
-    mT4IntEnable(0);
+//    mT4IntEnable(0);
+    int year, month, day, hour, minute, second;
     second = ((buff[0] & 0x7f) >> 4) * 10 + (buff[0] & 0x0f);
     minute = ((buff[1] & 0x7f) >> 4) * 10 + (buff[1] & 0x0f);
     hour = ((buff[2] & 0x3f) >> 4) * 10 + (buff[2] & 0x0f);
     day = ((buff[DS1307 ? 4:3] & 0x3f) >> 4) * 10 + (buff[DS1307 ? 4:3] & 0x0f);
     month = ((buff[5] & 0x1f) >> 4) * 10 + (buff[5] & 0x0f);
     year = (buff[6] >> 4) * 10 + (buff[6] & 0x0f) + 2000;
-    mT4IntEnable(1);
+//    mT4IntEnable(1);
+    TimeOffsetToUptime=get_epoch(year, month, day, hour, minute, second)-time_us_64()/1000000;
     return;
 
 error_exit:

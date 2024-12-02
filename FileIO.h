@@ -82,7 +82,10 @@ struct option_s {
 //
     int  PIN;
     int  Baudrate;
-    int  ColourCode;
+    int8_t ColourCode;
+    unsigned char MOUSE_CLOCK;
+    unsigned char MOUSE_DATA;
+    char spare;
     int CPU_Speed; 
     unsigned int Telnet;    // used to store the size of the program flash (also start of the LIBRARY code)
     int DefaultFC, DefaultBC;      // the default colours
