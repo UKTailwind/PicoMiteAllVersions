@@ -1,4 +1,8 @@
 /* 
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
+/* 
  * The MIT License (MIT)
  *
  * Copyright (c) 2019 Ha Thach (tinyusb.org)
@@ -95,7 +99,7 @@
 // Size of buffer to hold descriptors and other data used for enumeration
 #define CFG_TUH_ENUMERATION_BUFSIZE 256
 
-#define CFG_TUH_HUB                 1 // number of supported hubs
+#define CFG_TUH_HUB                 2 // number of supported hubs
 #define CFG_TUH_CDC                 0
 #define CFG_TUH_HID                 (4*CFG_TUH_DEVICE_MAX)  // typical keyboard + mouse device can have 3-4 HID interfaces
 #define CFG_TUH_MSC                 0
@@ -124,3 +128,4 @@
 #endif
 
 #endif /* _TUSB_CONFIG_H_ */
+/*  @endcond */
