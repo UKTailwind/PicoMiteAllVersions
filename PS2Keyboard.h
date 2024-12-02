@@ -38,6 +38,7 @@ provisions:
 // global keyboard functions
 extern void initKeyboard(void);
 extern void CNInterrupt(uint64_t dd);
+extern void MNInterrupt(uint64_t dd);
 extern void CheckKeyboard(void);
 extern volatile int PS2code;
 extern volatile bool PS2int;

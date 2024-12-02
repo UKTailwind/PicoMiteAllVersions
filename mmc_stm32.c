@@ -46,7 +46,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "hardware/spi.h"
 #include "hardware/i2c.h"
 #include "hardware/dma.h"
-
+#include "MM_Misc.h"
 #ifdef PICOMITEWEB
 #include "pico/cyw43_arch.h"
 #endif
@@ -54,6 +54,9 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "Include.h"
 #endif
 #include "VS1053.h"
+#ifndef PICOMITEWEB
+#include "pico/multicore.h"
+#endif
 //#include "integer.h"
 int SPISpeed=0xFF;
 //#define SD_CS_PIN Option.SD_CS
@@ -275,7 +278,9 @@ void __not_in_flash_func(on_pwm_wrap)(void) {
 	static uint32_t noiseleft[MAXSOUNDS]={0}, noiseright[MAXSOUNDS]={0};
 	static int repeatcount=1;
     // play a tone
-//	__dmb();
+#ifndef PICOMITEWEB
+	__dmb();
+#endif
     pwm_clear_irq(AUDIO_SLICE);
 	if(Option.AUDIO_MISO_PIN){
 		int32_t left=0, right=0;
@@ -1177,6 +1182,8 @@ DRESULT disk_ioctl(
 
 DWORD get_fattime(void){
     DWORD i;
+    int year, month, day, hour, minute, second;
+    gettimefromepoch(&year, &month, &day, &hour, &minute, &second);
     i = ((year-1980) & 0x7F)<<25;
     i |= (month & 0xF)<<21;
     i |= (day & 0x1F)<<16;
@@ -1611,7 +1618,7 @@ void InitReservedIO(void) {
 			irq_set_exclusive_handler(PWM_IRQ_WRAP, on_pwm_wrap);
 			irq_set_enabled(PWM_IRQ_WRAP, true);
 			irq_set_priority(PWM_IRQ_WRAP,255);
-		}
+ 		}
 	}
 
 #ifndef PICOMITEWEB

@@ -1837,7 +1837,7 @@ static void process_mouse_report(hid_mouse_report_t const * report, uint8_t n)
 //}
 /*  @endcond */
 
-void cmd_gamepad(void){
+void cmd_gamepad(void){ 
 	unsigned char *tp=NULL;
 	int n;
 	if((tp=checkstring(cmdline,(unsigned char *)"INTERRUPT ENABLE"))){
@@ -1893,4 +1893,5 @@ void cmd_mouse(void){
 		n=getint(argv[0],1,4);
 		nunInterruptc[n]=NULL;
 	} else error("Syntax");
+
 }

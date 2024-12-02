@@ -51,6 +51,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 extern MMFLOAT FDiv(MMFLOAT a, MMFLOAT b);
 extern MMFLOAT FMul(MMFLOAT a, MMFLOAT b);
 extern MMFLOAT FSub(MMFLOAT a, MMFLOAT b);
+extern int MOUSE_CLOCK,MOUSE_DATA;
 const char *PinFunction[] = {	
         "OFF",
 		"AIN",
@@ -201,7 +202,8 @@ volatile uint8_t *adcint=NULL;
 uint8_t *adcint1=NULL; 
 uint8_t *adcint2=NULL; 
 MMFLOAT ADCscale[4], ADCbottom[4];
-
+extern volatile struct s_nunstruct mousestruct;
+extern void mouse0close(void);
 //Vector to CFunction routine called every command (ie, from the BASIC interrupt checker)
 
 uint64_t readusclock(void){
@@ -922,7 +924,7 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
                                 irq_set_enabled(PWM_IRQ_WRAP_1, true);
                                 irq_set_priority(PWM_IRQ_WRAP_1,0);
 	                            pwm_set_irq1_enabled(0, true);
-                                pwm_set_enabled(0, true);
+                                pwm_set_enabled(0, true); 
                                 break;
 #endif
         case EXT_I2C0SDA:       if(!(PinDef[pin].mode & I2C0SDA)) error("Invalid configuration");
@@ -2820,6 +2822,7 @@ void fun_dev(void){
         else if(checkstring(argv[2], (unsigned char *)"T"))iret=nunstruct[n].type;
         else iret=0;
         targ=T_INT;
+#ifdef USBKEYBOARD
     } else if((tp=checkstring(ep,(unsigned char *)"MOUSE"))){
 /*        Returns data from a PS2 mouse
         'funct' is a 1 letter code indicating the information to return as follows:
@@ -2843,8 +2846,29 @@ void fun_dev(void){
         else if(checkstring(argv[2], (unsigned char *)"M"))iret=nunstruct[n].C;
         else if(checkstring(argv[2], (unsigned char *)"W"))iret=nunstruct[n].az;
         else if(checkstring(argv[2], (unsigned char *)"D")){iret=nunstruct[n].Z;nunstruct[n].Z=0;}
-        else iret=0;
+        else error("Syntax");
         targ=T_INT;
+#else
+   } else if((tp=checkstring(ep,(unsigned char *)"MOUSE"))){
+        if(!MOUSE_CLOCK)error("Mouse not enabled");
+        getargs(&tp,3,(unsigned char *)",");
+        getint(argv[0],0,0);
+        char *p=(char *)argv[2];
+        if(toupper(*p)=='X')iret=mousestruct.ax;
+        else if(toupper(*p)=='Y')iret=mousestruct.ay;
+        else if(toupper(*p)=='L')iret=mousestruct.Z;
+        else if(toupper(*p)=='R')iret=mousestruct.C;
+        else if(toupper(*p)=='M')iret=mousestruct.L;
+        else if(toupper(*p)=='W')iret=mousestruct.az;
+        else if(toupper(*p)=='T')iret=mousestruct.classic[0];
+        else if(toupper(*p)=='D')iret=mousestruct.R;
+        else if(toupper(*p)=='Z'){
+            iret=mousestruct.az;
+            mousestruct.az=0;
+        }
+        else error("Syntax");
+        targ = T_INT;
+#endif
     } else error("Syntax");
 
 }
@@ -3517,7 +3541,7 @@ void MIPS16 ClearExternalIO(void) {
         gpio_set_irq_enabled(PinDef[Option.INT1pin].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
         CallBackEnabled &= (~2);
     }
-    if(CallBackEnabled==2) gpio_set_irq_enabled_with_callback(PinDef[Option.INT2pin].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false, &gpio_callback);
+    if(CallBackEnabled==4) gpio_set_irq_enabled_with_callback(PinDef[Option.INT2pin].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false, &gpio_callback);
     else if(CallBackEnabled & 4){
         gpio_set_irq_enabled(PinDef[Option.INT2pin].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
         CallBackEnabled &= (~4);
@@ -3687,6 +3711,7 @@ if(rp2350a){
     OnPS2GOSUB=NULL;
     PS2code=0;
     PS2int=false;
+    mouse0close();
 #endif 
     for (int i=0; i<6;i++)nunInterruptc[i]=NULL;
     if((classic1 || nunchuck1) && (classicread || nunchuckread))WiiReceive(6, (char *)nunbuff);
@@ -3890,6 +3915,7 @@ void __not_in_flash_func(IRHandler)(void) {
 void __not_in_flash_func(gpio_callback)(uint gpio, uint32_t events) {
 #ifndef USBKEYBOARD
     if(!(Option.KeyboardConfig == NO_KEYBOARD || Option.KeyboardConfig == CONFIG_I2C ) && gpio==PinDef[Option.KEYBOARD_CLOCK].GPno) CNInterrupt(gpio_get_all64());
+    if(PinDef[MOUSE_CLOCK].GPno && gpio==PinDef[MOUSE_CLOCK].GPno)MNInterrupt(gpio_get_all64());
 #endif
     if(gpio==PinDef[IRpin].GPno)IRHandler();
     if(gpio==PinDef[Option.INT1pin].GPno)TM_EXTI_Handler_1();

@@ -278,8 +278,6 @@ void MIPS16 InitDisplaySPI(int InitOnly) {
     switch(Option.DISPLAY_TYPE) {
 		case ILI9488:
 		case ILI9488W:
-			DisplayHRes = 480;
-			DisplayVRes = 320;
 			ResetController();
 			if(Option.DISPLAY_TYPE==ILI9488){
 				spi_write_command(0xE0); // Positive Gamma Control
@@ -422,8 +420,6 @@ void MIPS16 InitDisplaySPI(int InitOnly) {
 			}
  			break;
 		case ILI9481IPS:
-			DisplayHRes = 480;
-			DisplayVRes = 320;
 			ResetController();
 			//3.5IPS ILI9481+CMI	
 			spi_write_command(0x01); //Soft_rese
@@ -833,11 +829,11 @@ void MIPS16 InitDisplaySPI(int InitOnly) {
         	break;
     }
     if(Option.DISPLAY_ORIENTATION & 1) {
-        VRes=DisplayVRes;
         HRes=DisplayHRes;
+        VRes=DisplayVRes;
     } else {
-        VRes=DisplayHRes;
         HRes=DisplayVRes;
+        VRes=DisplayHRes;
     }
     if(!InitOnly) {
     	ResetDisplay();

@@ -99,6 +99,7 @@ extern "C" {
     uint32_t map16pairs[16];
     volatile uint8_t transparent=0;
     volatile uint8_t transparents=0;
+    volatile int RGBtransparent=0;
     int MODE1SIZE=MODE1SIZE_S, MODE2SIZE=MODE2SIZE_S, MODE3SIZE=MODE3SIZE_S, MODE4SIZE=MODE4SIZE_S, MODE5SIZE=MODE5SIZE_S;
 #ifdef HDMI
     uint16_t map16d[16];
@@ -183,6 +184,10 @@ volatile int ConsoleRxBufTail = 0;
 volatile char ConsoleTxBuf[CONSOLE_TX_BUF_SIZE]={0};
 volatile int ConsoleTxBufHead = 0;
 volatile int ConsoleTxBufTail = 0;
+#ifndef USBKEYBOARD
+extern void initMouse0(int sensitivity);
+volatile unsigned int MouseTimer = 0;
+#endif
 volatile unsigned int AHRSTimer = 0;
 volatile unsigned int InkeyTimer = 0;
 volatile long long int mSecTimer = 0;                               // this is used to count mSec
@@ -197,12 +202,12 @@ volatile unsigned int Timer1=0, Timer2=0, Timer3=0, Timer4=0, Timer5=0;		       
 volatile unsigned int KeyCheck=2000;
 volatile int ds18b20Timer = -1;
 volatile unsigned int ScrewUpTimer = 0;
-volatile int second = 0;                                            // date/time counters
-volatile int minute = 0;
-volatile int hour = 0;
-volatile int day = 1;
-volatile int month = 1;
-volatile int year = 2000;
+//volatile int second = 0;                                            // date/time counters
+//volatile int minute = 0;
+//volatile int hour = 0;
+//volatile int day = 1;
+//volatile int month = 1;
+//volatile int year = 2000;
 volatile unsigned int GPSTimer = 0;
 volatile unsigned int SecondsTimer = 0;
 volatile unsigned int I2CTimer = 0;
@@ -874,7 +879,7 @@ void MIPS16 EditInputLine(void) {
                 	    if((CharIndex==l4-1 || CharIndex==l3-1|| CharIndex==l2-1 ) && CharIndex < strlen((const char *)inpbuf)-1 ){SerialConsolePutC(inpbuf[CharIndex+1],0);SSPrintString("\b");}
                         CharIndex++;
                       }
-                      insert=false; //right always switches to OVER
+//                      insert=false; //right always switches to OVER
                      break;
                 case CTRLKEY(']'):
                 case DEL:
@@ -1472,6 +1477,8 @@ bool MIPS16 __not_in_flash_func(timer_callback)(repeating_timer_t *rt)
                 HID[i].report_timer++;
             }
         }
+#else
+        MouseTimer++;
 #endif
         if(clocktimer)clocktimer--;
         if(Timer5)Timer5--;
@@ -1600,7 +1607,7 @@ bool MIPS16 __not_in_flash_func(timer_callback)(repeating_timer_t *rt)
         if(ExtCurrentConfig[PinDef[HEARTBEATpin].pin]==EXT_HEARTBEAT)gpio_xor_mask64(1<<PinDef[HEARTBEATpin].GPno);
     #endif
             // keep track of the time and date
-        if(++second >= 60) {
+/*        if(++second >= 60) {
             second = 0 ;
             if(++minute >= 60) {
                 minute = 0;
@@ -1615,8 +1622,8 @@ bool MIPS16 __not_in_flash_func(timer_callback)(repeating_timer_t *rt)
                     }
                 }
             }
+        }*/
         }
-    }
     }
   return 1;
 }
@@ -2683,10 +2690,18 @@ void MIPS64 __not_in_flash_func(HDMIloop0)(void){
                     pp=line*640;
                     for(int i=0; i<640 ; i+=2){
                         uint8_t* d=&DisplayBuf[pp+i];
+                        uint8_t* l=&LayerBuf[pp+i];
                         int c=*d++;
                         c|=((*d++)<<8);
-                        *p++=c;
-                        *p++=c;
+                        int ll=*l++;
+                        ll|=((*l++)<<8);
+                        if(ll!=RGBtransparent){
+                            *p++=ll;
+                            *p++=ll;
+                        } else {
+                            *p++=c;
+                            *p++=c;
+                        }
                     }
                     break;
                 case SCREENMODE5: //320x240x256 colour
@@ -3104,7 +3119,7 @@ void HDMICore(void){
         MODE2SIZE=MODE2SIZE_L;
         MODE3SIZE=MODE3SIZE_L;
         MODE4SIZE=0L;
-        MODE4SIZE=MODE5SIZE_L;
+        MODE5SIZE=MODE5SIZE_L;
         PIXELS_PER_WORD=4;
     } else if(Option.CPU_Speed==Freq720P){
         MODE_H_SYNC_POLARITY=MODE_H_W_SYNC_POLARITY;
@@ -3124,7 +3139,7 @@ void HDMICore(void){
         MODE2SIZE=MODE2SIZE_W;
         MODE3SIZE=MODE3SIZE_W;
         MODE4SIZE=0L;
-        MODE4SIZE=MODE5SIZE_W;
+        MODE5SIZE=MODE5SIZE_W;
         PIXELS_PER_WORD=4;
     } else if(Option.CPU_Speed==Freq252P){
         MODE_H_SYNC_POLARITY=MODE_H_F_SYNC_POLARITY;
@@ -3143,8 +3158,8 @@ void HDMICore(void){
         MODE1SIZE=MODE1SIZE_S;
         MODE2SIZE=MODE2SIZE_S;
         MODE3SIZE=MODE3SIZE_S;
-        MODE4SIZE=MODE3SIZE_S;
-        MODE4SIZE=MODE5SIZE_S;
+        MODE4SIZE=MODE4SIZE_S;
+        MODE5SIZE=MODE5SIZE_S;
         PIXELS_PER_WORD=2;
     }  else {
         MODE_H_SYNC_POLARITY=MODE_H_S_SYNC_POLARITY;
@@ -3163,8 +3178,8 @@ void HDMICore(void){
         MODE1SIZE=MODE1SIZE_S;
         MODE2SIZE=MODE2SIZE_S;
         MODE3SIZE=MODE3SIZE_S;
-        MODE4SIZE=MODE3SIZE_S;
-        MODE4SIZE=MODE5SIZE_S;
+        MODE4SIZE=MODE4SIZE_S;
+        MODE5SIZE=MODE5SIZE_S;
         PIXELS_PER_WORD=2;
     }
     TRANSFER_COUNT=MODE_H_ACTIVE_PIXELS/PIXELS_PER_WORD;

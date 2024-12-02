@@ -217,13 +217,13 @@ void MIPS16 initFonts(void){
 	FontTable[14] = NULL;
 	FontTable[15] = NULL;
 }
-uint16_t RGB555(uint32_t c){
+uint16_t __not_in_flash_func(RGB555)(uint32_t c){
     return ((c & 0xf8)>>3) | ((c& 0xf800)>>6) | ((c & 0xf80000)>>9);
 }
-uint8_t RGB332(uint32_t c){
+uint8_t __not_in_flash_func(RGB332)(uint32_t c){
     return ((c & 0b111000000000000000000000)>>16) | ((c & 0b1110000000000000)>>11) | ((c & 0b11000000)>>6);
 }
-uint8_t RGB121(uint32_t c){
+uint8_t __not_in_flash_func(RGB121)(uint32_t c){
     return ((c & 0x800000)>> 20) | ((c & 0xC000)>>13) | ((c & 0x80)>>7);
 }
 
@@ -8918,15 +8918,13 @@ XGA:
                 case SCREENMODE3:
                     if(argc==1)transparent=getint(argv[0],0,15);
                     LayerBuf=GetMemory(ScreenSize);
-                    if(LayerBuf>(uint8_t *)PSRAMbase && LayerBuf< (uint8_t *)(PSRAMbase + 1024*1024*16)){
-                        FreeMemory(LayerBuf);
-                        error("Layer Buffer must be in tightly coupled RAM, declare before other variables");
-                    }
                     colour=transparent | (transparent<<4);
                     break;
 #ifdef HDMI
                 case SCREENMODE4:
                     LayerBuf=GetMemory(ScreenSize);
+                    if(argc==1)RGBtransparent=RGB555(getColour((char *)argv[0],0));
+                    else RGBtransparent=0;
                     break;
                 case SCREENMODE5:
                     if(ScreenSize<sizeof(FRAMEBUFFER)/2)LayerBuf=DisplayBuf+ScreenSize;
@@ -8936,7 +8934,13 @@ XGA:
                     break;
 #endif
 #endif
+                }
+#ifdef rp2350
+            if(LayerBuf>(uint8_t *)PSRAMbase && LayerBuf< (uint8_t *)(PSRAMbase + 1024*1024*16)){
+                FreeMemory(LayerBuf);
+                error("Layer Buffer must be in tightly coupled RAM, declare before other variables");
             }
+#endif        
         } else error("Framebuffer already exists");
         memset(LayerBuf,colour,ScreenSize);
     } else if((p=checkstring(cmdline, (unsigned char *)"CLOSE"))) {

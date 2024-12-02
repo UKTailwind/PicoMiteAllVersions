@@ -50,7 +50,11 @@ extern int caps_lock;
 extern int num_lock;
 extern int scroll_lock;
 extern int KeyDown[7];
+#else
+extern char *mouse0Interruptc;
+extern volatile int mouse0foundc;
 #endif
+int64_t TimeOffsetToUptime=1704067200;
 extern int last_adc;
 extern char banner[];
 extern char *pinsearch(int pin);
@@ -176,6 +180,7 @@ extern void WriteData(int data);
 char *CSubInterrupt;
 MMFLOAT optionangle=1.0;
 bool optionfastaudio=false;
+bool optionfulltime=false;
 bool screen320=false;
 bool optionlogging=false;
 volatile bool CSubComplete=false;
@@ -406,9 +411,26 @@ void __not_in_flash_func(fun_timer)(void) {
     fret = (MMFLOAT)(time_us_64()-timeroffset)/1000.0;
     targ = T_NBR;
 }
+uint64_t gettimefromepoch(int *year, int *month, int *day, int *hour, int *minute, int *second){
+    struct tm  *tm;
+    struct tm tma;
+    tm=&tma;
+    uint64_t fulltime=time_us_64();
+    time_t epochnow=fulltime/1000000 + TimeOffsetToUptime;
+    tm=gmtime(&epochnow);
+    *year=tm->tm_year+1900;
+    *month=tm->tm_mon+1;
+    *day=tm->tm_mday;
+    *hour=tm->tm_hour;
+    *minute=tm->tm_min;
+    *second=tm->tm_sec;
+    return fulltime;
+}
 void fun_datetime(void){
     sret = GetTempMemory(STRINGSIZE);                                    // this will last for the life of the command
     if(checkstring(ep, (unsigned char *)"NOW")){
+        int year, month, day, hour, minute, second;
+        gettimefromepoch(&year, &month, &day, &hour, &minute, &second);
         IntToStrPad((char *)sret, day, '0', 2, 10);
         sret[2] = '-'; IntToStrPad((char *)sret + 3, month, '0', 2, 10);
         sret[5] = '-'; IntToStr((char *)sret + 6, year, 10);
@@ -432,6 +454,18 @@ void fun_datetime(void){
     }
     CtoM(sret);
     targ = T_STR;
+}
+time_t get_epoch(int year, int month,int day, int hour,int minute, int second){
+    struct tm  *tm;
+    struct tm tma;
+    tm=&tma;
+    tm->tm_year = year - 1900;
+    tm->tm_mon = month - 1;
+    tm->tm_mday = day;
+    tm->tm_hour = hour;
+    tm->tm_min = minute;
+    tm->tm_sec = second;
+    return timegm(tm);
 }
 
 void fun_epoch(void){
@@ -469,6 +503,8 @@ void fun_epoch(void){
             tm->tm_min = min;
             tm->tm_sec = s;
     } else {
+        int year, month, day, hour, minute, second;
+        gettimefromepoch(&year, &month, &day, &hour, &minute, &second);
         tm->tm_year = year - 1900;
         tm->tm_mon = month - 1;
         tm->tm_mday = day;
@@ -929,8 +965,8 @@ void fun_LLen(void) {
 
 
 
-void update_clock(void){
-/*    RTC_TimeTypeDef sTime;
+/*void update_clock(void){
+    RTC_TimeTypeDef sTime;
     RTC_DateTypeDef sDate;
     sTime.Hours = hour;
     sTime.Minutes = minute;
@@ -949,8 +985,8 @@ void update_clock(void){
     if (HAL_RTC_SetDate(&hrtc, &sDate, RTC_FORMAT_BIN) != HAL_OK)
     {
         error("RTC hardware error");
-    }*/
-}
+    }
+}*/
 
 
 // this is invoked as a command (ie, date$ = "6/7/2010")
@@ -1005,8 +1041,9 @@ void cmd_date(void) {
 	    {
 	        error("Year is not valid");
 	    }
-
-		mT4IntEnable(0);       										// disable the timer interrupt to prevent any conflicts while updating
+        int year, month, day, hour, minute, second;
+        gettimefromepoch(&year, &month, &day, &hour, &minute, &second);
+//		mT4IntEnable(0);       										// disable the timer interrupt to prevent any conflicts while updating
 		day = dd;
 		month = mm;
 		year = yy;
@@ -1020,13 +1057,16 @@ void cmd_date(void) {
 	    tm=gmtime(&timestamp);
 	    day_of_week=tm->tm_wday;
 	    if(day_of_week==0)day_of_week=7;
-		update_clock();
-		mT4IntEnable(1);       										// enable interrupt
+        TimeOffsetToUptime=get_epoch(year, month, day, hour, minute, second)-time_us_64()/1000000;
+//		update_clock();
+//		mT4IntEnable(1);       										// enable interrupt
 	}
 }
 
 // this is invoked as a function
 void fun_date(void) {
+    int year, month, day, hour, minute, second;
+    gettimefromepoch(&year, &month, &day, &hour, &minute, &second);
     sret = GetTempMemory(STRINGSIZE);                                    // this will last for the life of the command
     IntToStrPad((char *)sret, day, '0', 2, 10);
     sret[2] = '-'; IntToStrPad((char *)sret + 3, month, '0', 2, 10);
@@ -1072,6 +1112,8 @@ void fun_day(void) {
         if(i==0)i=7;
         strcpy((char *)sret,daystrings[i]);
     } else {
+        int year, month, day, hour, minute, second;
+        gettimefromepoch(&year, &month, &day, &hour, &minute, &second);
         tm->tm_year = year - 1900;
         tm->tm_mon = month - 1;
         tm->tm_mday = day;
@@ -1105,23 +1147,25 @@ void cmd_time(void) {
 	if(!*cmdline) error("Syntax");
 	++cmdline;
     evaluate(cmdline, &f, &i64, &ss, &t, false);
+    int year, month, day, hour, minute, second;
+    gettimefromepoch(&year, &month, &day, &hour, &minute, &second);
 	if(t & T_STR){
-	arg = getCstring(cmdline);
-	{
-		getargs(&arg, 5,(unsigned char *)":");								// this is a macro and must be the first executable stmt in a block
-		if(argc%2 == 0) error("Syntax");
-		h = atoi((char *)argv[0]);
-		if(argc >= 3) m = atoi((char *)argv[2]);
-		if(argc == 5) s = atoi((char *)argv[4]);
-		if(h < 0 || h > 23 || m < 0 || m > 59 || s < 0 || s > 59) error("Invalid time");
-		mT4IntEnable(0);       										// disable the timer interrupt to prevent any conflicts while updating
-		hour = h;
-		minute = m;
-		second = s;
-		SecondsTimer = 0;
-		update_clock();
-    	mT4IntEnable(1);       										// enable interrupt
-    }
+        arg = getCstring(cmdline);
+        {
+            getargs(&arg, 5,(unsigned char *)":");								// this is a macro and must be the first executable stmt in a block
+            if(argc%2 == 0) error("Syntax");
+            h = atoi((char *)argv[0]);
+            if(argc >= 3) m = atoi((char *)argv[2]);
+            if(argc == 5) s = atoi((char *)argv[4]);
+            if(h < 0 || h > 23 || m < 0 || m > 59 || s < 0 || s > 59) error("Invalid time");
+//            mT4IntEnable(0);       										// disable the timer interrupt to prevent any conflicts while updating
+            hour = h;
+            minute = m;
+            second = s;
+            SecondsTimer = 0;
+    //		update_clock();
+//            mT4IntEnable(1);       										// enable interrupt
+        }
 	} else {
 		struct tm  *tm;
 		struct tm tma;
@@ -1136,14 +1180,15 @@ void cmd_time(void) {
 	    time_t timestamp = timegm(tm); /* See README.md if your system lacks timegm(). */
 	    timestamp+=offset;
 	    tm=gmtime(&timestamp);
-		mT4IntEnable(0);       										// disable the timer interrupt to prevent any conflicts while updating
+//		mT4IntEnable(0);       										// disable the timer interrupt to prevent any conflicts while updating
 		hour = tm->tm_hour;
 		minute = tm->tm_min;
 		second = tm->tm_sec;
 		SecondsTimer = 0;
-		update_clock();
-    	mT4IntEnable(1);       										// enable interrupt
+//		update_clock();
+//    	mT4IntEnable(1);       										// enable interrupt
 	}
+    TimeOffsetToUptime=get_epoch(year, month, day, hour, minute, second)-time_us_64()/1000000;
 }
 
 
@@ -1151,10 +1196,15 @@ void cmd_time(void) {
 
 // this is invoked as a function
 void fun_time(void) {
+    int year, month, day, hour, minute, second;
     sret = GetTempMemory(STRINGSIZE);                                  // this will last for the life of the command
-     IntToStrPad((char *)sret, hour, '0', 2, 10);
+    uint64_t fulltime=gettimefromepoch(&year, &month, &day, &hour, &minute, &second);
+    IntToStrPad((char *)sret, hour, '0', 2, 10);
     sret[2] = ':'; IntToStrPad((char *)sret + 3, minute, '0', 2, 10);
     sret[5] = ':'; IntToStrPad((char *)sret + 6, second, '0', 2, 10);
+    if(optionfulltime){
+        sret[8] = '.'; IntToStrPad((char *)sret + 9, (fulltime/1000) % 1000, '0', 3, 10);
+    }
     CtoM(sret);
     targ = T_STR;
 }
@@ -2059,8 +2109,13 @@ void MIPS16 ConfigDisplayUser(unsigned char *tp){
 }
 void MIPS16 clear320(void){
     if(SPI480){
-        HRes=480;
-        VRes=320;
+        if(Option.DISPLAY_ORIENTATION & 1) {
+            HRes=DisplayHRes;
+            VRes=DisplayVRes;
+        } else {
+            HRes=DisplayVRes;
+            VRes=DisplayHRes;
+        }
         return;
     }
     screen320=0;
@@ -2076,20 +2131,30 @@ void MIPS16 clear320(void){
         ReadBLITBuffer = ReadBufferSSD1963;
     }
     if(Option.DISPLAY_TYPE!=SSD1963_4_16){
+    if(Option.DISPLAY_ORIENTATION & 1) {
         HRes=800;
         VRes=480;
     } else {
         HRes=480;
+        VRes=800;
+    }
+    } else {
+    if(Option.DISPLAY_ORIENTATION & 1) {
+        HRes=480;
         VRes=272;
+    } else {
+        HRes=272;
+        VRes=480;
+    }
     }
     FreeMemorySafe((void **)&buff320);
     return;
 }
-void MIPS16 clearSPI320(void){
-    HRes=480;
-    VRes=320;
-    return;
-}
+//void MIPS16 clearSPI320(void){
+//    HRes=480;
+//    VRes=320;
+//    return;
+//}
 
 #endif
 
@@ -2145,6 +2210,7 @@ void MIPS16 configure(unsigned char *p){
 #ifdef USBKEYBOARD
         if(checkstring(p,(unsigned char *) "CMM1.5"))  {
             ResetOptions();
+            Option.CPU_Speed=252000;
             Option.AllPins = 1; 
             Option.ColourCode = 1;
             Option.SYSTEM_I2C_SDA=PINMAP[14];
@@ -2170,6 +2236,7 @@ void MIPS16 configure(unsigned char *p){
 #else
         if(checkstring(p,(unsigned char *) "PICOMITEVGA V1.1"))  {
             ResetOptions();
+            Option.CPU_Speed=252000;
             Option.AllPins = 1; 
             Option.ColourCode = 1;
             Option.SYSTEM_I2C_SDA=PINMAP[14];
@@ -2195,6 +2262,7 @@ void MIPS16 configure(unsigned char *p){
         }
         if(checkstring(p,(unsigned char *) "PICOMITEVGA V1.0"))  {
             ResetOptions();
+            Option.CPU_Speed=252000;
             Option.AllPins = 1; 
             Option.ColourCode = 1;
             Option.SYSTEM_I2C_SDA=PINMAP[14];
@@ -2219,6 +2287,7 @@ void MIPS16 configure(unsigned char *p){
         }
         if(checkstring(p,(unsigned char *) "VGA DESIGN 1"))  {
             ResetOptions();
+            Option.CPU_Speed=252000;
             Option.ColourCode = 1;
             Option.SYSTEM_CLK=PINMAP[10];
             Option.SYSTEM_MOSI=PINMAP[11];
@@ -2234,6 +2303,7 @@ void MIPS16 configure(unsigned char *p){
         }
         if(checkstring(p,(unsigned char *) "VGA DESIGN 2"))  {
             ResetOptions();
+            Option.CPU_Speed=252000;
             Option.ColourCode = 1;
             Option.SYSTEM_I2C_SDA=PINMAP[14];
             Option.SYSTEM_I2C_SCL=PINMAP[15];
@@ -2681,11 +2751,17 @@ void MIPS16 cmd_option(void) {
 		if(checkstring(tp, (unsigned char *)"OFF"))	{ optionfastaudio=0; return; }
 		if(checkstring(tp, (unsigned char *)"ON"))	{ optionfastaudio=1; return; }
 	}
+	tp = checkstring(cmdline, (unsigned char *)"MILLISECONDS");
+	if(tp) {
+		if(checkstring(tp, (unsigned char *)"OFF"))	{ optionfulltime=0; return; }
+		if(checkstring(tp, (unsigned char *)"ON"))	{ optionfulltime=1; return; }
+	}
 
 #ifndef PICOMITEVGA
 	tp = checkstring(cmdline, (unsigned char *)"LCD320");
 	if(tp) {
         if(!( SSD16TYPE || Option.DISPLAY_TYPE==IPS_4_16 || SPI480))error("Only available on SSD1963, 480x320 SPI displays and IPS_4_16 displays");
+        if(!(Option.DISPLAY_ORIENTATION==LANDSCAPE || Option.DISPLAY_ORIENTATION==RLANDSCAPE))error("Only available in landscape mode");
         if(( SSD16TYPE || Option.DISPLAY_TYPE==IPS_4_16)){
             if(checkstring(tp, (unsigned char *)"OFF"))	{ 
                 clear320();
@@ -4646,6 +4722,21 @@ void MIPS16 fun_info(void){
                 return;
             }
         #endif
+        #ifdef HDMI
+            iret=0;
+	        if((tp[0]=='G' || tp[0]=='g') && (tp[1]=='P' || tp[1]=='p') && tp[2]=='1' && tp[3]=='2')iret=16;
+	        if((tp[0]=='G' || tp[0]=='g') && (tp[1]=='P' || tp[1]=='p') && tp[2]=='1' && tp[3]=='3')iret=17;
+	        if((tp[0]=='G' || tp[0]=='g') && (tp[1]=='P' || tp[1]=='p') && tp[2]=='1' && tp[3]=='4')iret=19;
+	        if((tp[0]=='G' || tp[0]=='g') && (tp[1]=='P' || tp[1]=='p') && tp[2]=='1' && tp[3]=='5')iret=20;
+	        if((tp[0]=='G' || tp[0]=='g') && (tp[1]=='P' || tp[1]=='p') && tp[2]=='1' && tp[3]=='6')iret=21;
+	        if((tp[0]=='G' || tp[0]=='g') && (tp[1]=='P' || tp[1]=='p') && tp[2]=='1' && tp[3]=='7')iret=22;
+	        if((tp[0]=='G' || tp[0]=='g') && (tp[1]=='P' || tp[1]=='p') && tp[2]=='1' && tp[3]=='8')iret=24;
+	        if((tp[0]=='G' || tp[0]=='g') && (tp[1]=='P' || tp[1]=='p') && tp[2]=='1' && tp[3]=='9')iret=25;
+             if(iret){
+                targ=T_INT;
+                return;
+            }
+        #endif
             if(codecheck(tp))evaluate(tp, &f, &i64, &ss, &t, false);
             if(t & T_STR ){
                 ptr=(char *)getCstring(tp);
@@ -4660,6 +4751,21 @@ void MIPS16 fun_info(void){
 	        if((string[0]=='G' || string[0]=='g') && (string[1]=='P' || string[1]=='p') && string[2]=='2' && string[3]=='5')iret=43;
 	        if((string[0]=='G' || string[0]=='g') && (string[1]=='P' || string[1]=='p') && string[2]=='2' && string[3]=='9')iret=44;
             if(iret){
+                targ=T_INT;
+                return;
+            }
+        #endif
+        #ifdef HDMI
+            iret=0;
+	        if((string[0]=='G' || string[0]=='g') && (string[1]=='P' || string[1]=='p') && string[2]=='1' && string[3]=='2')iret=16;
+	        if((string[0]=='G' || string[0]=='g') && (string[1]=='P' || string[1]=='p') && string[2]=='1' && string[3]=='3')iret=17;
+	        if((string[0]=='G' || string[0]=='g') && (string[1]=='P' || string[1]=='p') && string[2]=='1' && string[3]=='4')iret=19;
+	        if((string[0]=='G' || string[0]=='g') && (string[1]=='P' || string[1]=='p') && string[2]=='1' && string[3]=='5')iret=20;
+	        if((string[0]=='G' || string[0]=='g') && (string[1]=='P' || string[1]=='p') && string[2]=='1' && string[3]=='6')iret=21;
+	        if((string[0]=='G' || string[0]=='g') && (string[1]=='P' || string[1]=='p') && string[2]=='1' && string[3]=='7')iret=22;
+	        if((string[0]=='G' || string[0]=='g') && (string[1]=='P' || string[1]=='p') && string[2]=='1' && string[3]=='8')iret=24;
+	        if((string[0]=='G' || string[0]=='g') && (string[1]=='P' || string[1]=='p') && string[2]=='1' && string[3]=='9')iret=25;
+             if(iret){
                 targ=T_INT;
                 return;
             }
@@ -4777,7 +4883,8 @@ void MIPS16 fun_info(void){
             OptionFileErrorAbort=0;
             FatFSFileSystemSave = FatFSFileSystem;
             FatFSFileSystem=1;
-            if(!InitSDCard())strcpy((char *)sret,"Not present");
+            if(!Option.SD_CS)strcpy((char *)sret,"Not Configured");
+            else if(!InitSDCard())strcpy((char *)sret,"Not present");
             else  strcpy((char *)sret,"Ready");
             CtoM(sret);
             targ=T_STR;
@@ -5412,7 +5519,13 @@ int checkdetailinterrupts(void) {
             goto GotAnInterrupt;
         }
     }
-
+#ifndef USBKEYBOARD
+    if (mouse0Interruptc != NULL && mouse0foundc) {
+        mouse0foundc = false;
+        intaddr = (char *)mouse0Interruptc;									    // set the next stmt to the interrupt location
+        goto GotAnInterrupt;
+    }
+#endif
     if(ADCInterrupt && dmarunning){
         if(!dma_channel_is_busy(ADC_dma_chan)){
             __compiler_memory_barrier();

@@ -49,6 +49,9 @@ unsigned char KBDBuf;
 int KState, KCount, KParity;
 extern volatile int ConsoleRxBufHead;
 extern volatile int ConsoleRxBufTail;
+extern int MOUSE_CLOCK,MOUSE_DATA;
+extern void initMouse0(int sensitivity);
+extern void mouse0close(void);
 int justset = 0;
 // extern char ConsoleRxBuf[];
 
@@ -1007,7 +1010,6 @@ change notification interrupt service routine
 ****************************************************************************************************/
 void __not_in_flash_func(CNInterrupt)(uint64_t dd)
 {
-//  static char Key12 = false;
   static unsigned char Code = 0;
   int d = dd & (1<<PinDef[Option.KEYBOARD_DATA].GPno);
 
@@ -1068,3 +1070,4 @@ void __not_in_flash_func(CNInterrupt)(uint64_t dd)
     }
   }
 }
+

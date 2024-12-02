@@ -65,12 +65,15 @@ extern volatile unsigned int diskchecktimer;
 extern volatile int ds18b20Timer;
 extern volatile int CursorTimer;
 extern volatile unsigned int I2CTimer;
-extern volatile int second;
-extern volatile int minute;
-extern volatile int hour;
-extern volatile int day;
-extern volatile int month;
-extern volatile int year;
+#ifndef USBKEYBOARD
+extern volatile unsigned int MouseTimer;
+#endif
+//extern volatile int second;
+//extern volatile int minute;
+//extern volatile int hour;
+//extern volatile int day;
+//extern volatile int month;
+//extern volatile int year;
 extern volatile unsigned int SecondsTimer;
 extern volatile int day_of_week;
 extern unsigned char WatchdogSet;
@@ -215,6 +218,7 @@ extern void clear320(void);
 #ifdef PICOMITEVGA
 	extern volatile uint8_t transparent;
 	extern volatile uint8_t transparents;
+	extern volatile int RGBtransparent;
 	extern uint16_t map16[16];
 	#ifndef HDMI
 		extern uint16_t __attribute__ ((aligned (256))) M_Foreground[16];

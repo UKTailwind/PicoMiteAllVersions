@@ -733,9 +733,12 @@ void playvs1053(int mode){
 	ppos=0;
 	playreadcomplete=0;
 	pwm_set_irq0_enabled(AUDIO_SLICE, true);
+	pwm_set_enabled(AUDIO_SLICE, true); 
 	uint64_t t=time_us_64();
+	uSec(25);
 	while(1){ //read all the headers without stalling
 		checkWAVinput();
+		uSec(25);
 		if(time_us_64()-t>500000)break;
 	}
 }
@@ -807,6 +810,7 @@ void wavcallback(char *p){
     ppos=0;
     playreadcomplete=0;
 	pwm_set_irq0_enabled(AUDIO_SLICE, true);
+	pwm_set_enabled(AUDIO_SLICE, true); 
 }
 void mp3callback(char *p, int position){
     if(strchr((char *)p, '.') == NULL) strcat((char *)p, ".mp3");
@@ -862,6 +866,7 @@ void mp3callback(char *p, int position){
     ppos=0;
     playreadcomplete=0;
 	pwm_set_irq0_enabled(AUDIO_SLICE, true);
+	pwm_set_enabled(AUDIO_SLICE, true); 
 //	MMPrintString("Playing ");MMPrintString(p);PRet();
 #endif
 }
@@ -927,6 +932,8 @@ void flaccallback(char *p){
     ppos=0;
     playreadcomplete=0;
 	pwm_set_irq0_enabled(AUDIO_SLICE, true);
+	pwm_set_enabled(AUDIO_SLICE, true); 
+
 }
 void rampvolume(int l, int r, int channel, int target){
 	if(optionfastaudio){
@@ -1115,6 +1122,7 @@ void MIPS16 cmd_play(void) {
 			pwm_set_irq0_enabled(AUDIO_SLICE, false);
 			setVolumes(vol_left, vol_right);
 			pwm_set_irq0_enabled(AUDIO_SLICE, true);
+			pwm_set_enabled(AUDIO_SLICE, true); 
 		}
         return;
     }
@@ -1168,6 +1176,7 @@ void MIPS16 cmd_play(void) {
 			}
 			CurrentlyPlaying = P_TONE;
 			pwm_set_irq0_enabled(AUDIO_SLICE, true);
+			pwm_set_enabled(AUDIO_SLICE, true); 
 			return;
 		}
     }
@@ -1294,6 +1303,7 @@ void MIPS16 cmd_play(void) {
 			setrate(PWM_FREQ);
 			if(Option.AUDIO_MISO_PIN)playimmediatevs1053(P_SOUND);
     		pwm_set_irq0_enabled(AUDIO_SLICE, true);
+			pwm_set_enabled(AUDIO_SLICE, true); 
 		}
         CurrentlyPlaying = P_SOUND;
         return;
@@ -1490,6 +1500,7 @@ void MIPS16 cmd_play(void) {
 		CurrentlyPlaying=P_STREAM;
 		setrate(16000); //16KHz should be fast enough
 		pwm_set_irq0_enabled(AUDIO_SLICE, true);
+		pwm_set_enabled(AUDIO_SLICE, true); 
 		return;
 	}
 	if((tp = checkstring(cmdline, (unsigned char *)"MIDI"))) {
@@ -1813,6 +1824,7 @@ void MIPS16 cmd_play(void) {
         setrate(48000);
 		audiorepeat=3;
     	pwm_set_irq0_enabled(AUDIO_SLICE, true);
+		pwm_set_enabled(AUDIO_SLICE, true); 
 		Timer1=500;
 		while(Timer1){
 			checkWAVinput();
