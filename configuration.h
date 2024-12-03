@@ -64,11 +64,11 @@ extern "C" {
         #ifdef USBKEYBOARD
             #define FLASH_TARGET_OFFSET (800 * 1024) 
             #define MagicKey 0x15197236
-            #define HEAPTOP 0x2003F800
+            #define HEAPTOP 0x2003FB00
         #else
             #define FLASH_TARGET_OFFSET (752 * 1024) 
             #define MagicKey 0x21635430
-            #define HEAPTOP 0x2003f100
+            #define HEAPTOP 0x2003fc00
         #endif
         #define MAXMODES 2
         #define MAXVARS             512                     // 8 + MAXVARLEN + MAXDIM * 2  (ie, 56 bytes) - these do not incl array members
@@ -144,7 +144,7 @@ extern "C" {
         #define MAXSUBFUN           256                     // each entry takes up 4 bytes
         #ifdef USBKEYBOARD
             #define MagicKey 0x21691429
-            #define HEAPTOP 0x2003EC00
+            #define HEAPTOP 0x2003E400
         #else
             #define MagicKey 0x71213244
             #define HEAPTOP 0x2003f100

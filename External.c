@@ -51,7 +51,6 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 extern MMFLOAT FDiv(MMFLOAT a, MMFLOAT b);
 extern MMFLOAT FMul(MMFLOAT a, MMFLOAT b);
 extern MMFLOAT FSub(MMFLOAT a, MMFLOAT b);
-extern int MOUSE_CLOCK,MOUSE_DATA;
 const char *PinFunction[] = {	
         "OFF",
 		"AIN",
@@ -202,7 +201,6 @@ volatile uint8_t *adcint=NULL;
 uint8_t *adcint1=NULL; 
 uint8_t *adcint2=NULL; 
 MMFLOAT ADCscale[4], ADCbottom[4];
-extern volatile struct s_nunstruct mousestruct;
 extern void mouse0close(void);
 //Vector to CFunction routine called every command (ie, from the BASIC interrupt checker)
 
@@ -2822,7 +2820,6 @@ void fun_dev(void){
         else if(checkstring(argv[2], (unsigned char *)"T"))iret=nunstruct[n].type;
         else iret=0;
         targ=T_INT;
-#ifdef USBKEYBOARD
     } else if((tp=checkstring(ep,(unsigned char *)"MOUSE"))){
 /*        Returns data from a PS2 mouse
         'funct' is a 1 letter code indicating the information to return as follows:
@@ -2848,27 +2845,6 @@ void fun_dev(void){
         else if(checkstring(argv[2], (unsigned char *)"D")){iret=nunstruct[n].Z;nunstruct[n].Z=0;}
         else error("Syntax");
         targ=T_INT;
-#else
-   } else if((tp=checkstring(ep,(unsigned char *)"MOUSE"))){
-        if(!MOUSE_CLOCK)error("Mouse not enabled");
-        getargs(&tp,3,(unsigned char *)",");
-        getint(argv[0],0,0);
-        char *p=(char *)argv[2];
-        if(toupper(*p)=='X')iret=mousestruct.ax;
-        else if(toupper(*p)=='Y')iret=mousestruct.ay;
-        else if(toupper(*p)=='L')iret=mousestruct.Z;
-        else if(toupper(*p)=='R')iret=mousestruct.C;
-        else if(toupper(*p)=='M')iret=mousestruct.L;
-        else if(toupper(*p)=='W')iret=mousestruct.az;
-        else if(toupper(*p)=='T')iret=mousestruct.classic[0];
-        else if(toupper(*p)=='D')iret=mousestruct.R;
-        else if(toupper(*p)=='Z'){
-            iret=mousestruct.az;
-            mousestruct.az=0;
-        }
-        else error("Syntax");
-        targ = T_INT;
-#endif
     } else error("Syntax");
 
 }
@@ -3711,7 +3687,7 @@ if(rp2350a){
     OnPS2GOSUB=NULL;
     PS2code=0;
     PS2int=false;
-    mouse0close();
+    if(!Option.MOUSE_CLOCK)mouse0close();
 #endif 
     for (int i=0; i<6;i++)nunInterruptc[i]=NULL;
     if((classic1 || nunchuck1) && (classicread || nunchuckread))WiiReceive(6, (char *)nunbuff);

@@ -35,7 +35,6 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
 
-
 #define CTRLKEY(a) (a & 0x1f)
 
 
@@ -341,6 +340,9 @@ void edit(unsigned char *cmdline, bool reset) {
 #endif
 
 #endif
+#ifndef USBKEYBOARD
+    if(mouse0==false && Option.MOUSE_CLOCK)initMouse0(0);  //see if there is a mouse to initialise 
+#endif
     if(CurrentLinePtr && reset) error("Invalid in a program");
     if(Option.ColourCode) {
         gui_fcolour = WHITE;
@@ -468,8 +470,9 @@ void cmd_editfile(void){
  * @cond
  * The following section will be excluded from the documentation.
  */
-#ifdef USBKEYBOARD
+//#ifdef USBKEYBOARD
 #ifndef PICOMITE
+#ifndef PICOMITEWEB
     static short lastx1=9999, lasty1=9999;
     static uint16_t lastfc, lastbc;
     static bool leftpushed=false, rightpushed=false, middlepushed=false;
@@ -506,10 +509,15 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool rese
     while(1) {
         statuscount = 0;
         do {
-#ifdef USBKEYBOARD
-#ifndef PICOMITE
+//#ifdef USBKEYBOARD
+#ifndef PICOMITE 
+#ifndef PICOMITEWEB
             c=-1;
+#ifdef USBKEYBOARD
             if(HID[1].Device_type==2 && DISPLAY_TYPE==SCREENMODE1){
+#else
+            if(mouse0 && DISPLAY_TYPE==SCREENMODE1){
+#endif
                 if(!nunstruct[2].L)leftpushed=false;
                 if(!nunstruct[2].R)rightpushed=false;
                 if(!nunstruct[2].C)middlepushed=false;
@@ -523,8 +531,13 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool rese
                     if(lasty1>=VHeight)lasty1=VHeight-1;
                     lastfc=tilefcols[lasty1*X_TILE+lastx1];
                     lastbc=tilebcols[lasty1*X_TILE+lastx1];
+#ifdef HDMI
                     tilefcols[lasty1*X_TILE+lastx1]=RGB555(RED);
                     tilebcols[lasty1*X_TILE+lastx1]=RGB555(WHITE);
+#else
+                    tilefcols[lasty1*X_TILE+lastx1]=(RGB121(RED)<<12) | (RGB121(RED)<<8) | (RGB121(RED)<<4) | RGB121(RED);
+                    tilebcols[lasty1*X_TILE+lastx1]=(RGB121(WHITE)<<12) | (RGB121(WHITE)<<8) | (RGB121(WHITE)<<4) | RGB121(WHITE);
+#endif
                     }
                 if((nunstruct[2].L && leftpushed==false && rightpushed==false && middlepushed==false) ||
                     (nunstruct[2].R && leftpushed==false && rightpushed==false && middlepushed==false) ||
@@ -549,7 +562,7 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool rese
                     if(rightpushed==true){
                         c=F4;
                     }
-                    if(middlepushed==true){
+                    else if(middlepushed==true){
                         c=F5;
                     }
                 }
@@ -1095,9 +1108,13 @@ void MarkMode(unsigned char *cb, unsigned char *buf) {
     txtpx = oldx = curx; txtpy = oldy = cury;
     while(1) {
         c=-1;
-#ifdef USBKEYBOARD
 #ifndef PICOMITE
+#ifndef PICOMITEWEB
+#ifdef USBKEYBOARD
         if(HID[1].Device_type==2 && DISPLAY_TYPE==SCREENMODE1){
+#else
+        if(mouse0 && DISPLAY_TYPE==SCREENMODE1){
+#endif
             if(!nunstruct[2].L)leftpushed=false;
             if(!nunstruct[2].R)rightpushed=false;
             if(!nunstruct[2].C)middlepushed=false;
@@ -1111,8 +1128,13 @@ void MarkMode(unsigned char *cb, unsigned char *buf) {
                 if(lasty1>=VHeight)lasty1=VHeight-1;
                 lastfc=tilefcols[lasty1*X_TILE+lastx1];
                 lastbc=tilebcols[lasty1*X_TILE+lastx1];
-                tilefcols[lasty1*X_TILE+lastx1]=RGB555(RED);
-                tilebcols[lasty1*X_TILE+lastx1]=RGB555(WHITE);
+#ifdef HDMI
+                    tilefcols[lasty1*X_TILE+lastx1]=RGB555(RED);
+                    tilebcols[lasty1*X_TILE+lastx1]=RGB555(WHITE);
+#else
+                    tilefcols[lasty1*X_TILE+lastx1]=(RGB121(RED)<<12) | (RGB121(RED)<<8) | (RGB121(RED)<<4) | RGB121(RED);
+                    tilebcols[lasty1*X_TILE+lastx1]=(RGB121(WHITE)<<12) | (RGB121(WHITE)<<8) | (RGB121(WHITE)<<4) | RGB121(WHITE);
+#endif
                 }
             if((nunstruct[2].L && leftpushed==false && rightpushed==false && middlepushed==false) ||
                 (nunstruct[2].R && leftpushed==false && rightpushed==false && middlepushed==false) ||
@@ -1247,15 +1269,19 @@ void MarkMode(unsigned char *cb, unsigned char *buf) {
                       *cb = 0;
                       if(c == F5 || c == CTRLKEY('Y')) {
                           PositionCursor(txtp);
-#ifdef USBKEYBOARD
 #ifndef PICOMITE
+#ifndef PICOMITEWEB
+#ifdef USBKEYBOARD
                         if(HID[1].Device_type==2 && DISPLAY_TYPE==SCREENMODE1){     
+#else
+                        if(mouse0 && DISPLAY_TYPE==SCREENMODE1){ 
+#endif 
                             nunstruct[2].ax =curx*FontTable[gui_font >> 4][0] * (gui_font & 0b1111);
                             nunstruct[2].ay =cury*FontTable[gui_font >> 4][1] * (gui_font & 0b1111);
                             lastx1=9999;lasty1=9999;
                         }                    
-#endif 
 #endif                         
+#endif
                           return;
                       }
                       // fall through
@@ -1269,14 +1295,18 @@ void MarkMode(unsigned char *cb, unsigned char *buf) {
                       *p++ = 0; *p++ = 0;
                       TextChanged = true;
                       PositionCursor(txtp);
-#ifdef USBKEYBOARD
 #ifndef PICOMITE
+#ifndef PICOMITEWEB
+#ifdef USBKEYBOARD
                         if(HID[1].Device_type==2 && DISPLAY_TYPE==SCREENMODE1){     
+#else
+                        if(mouse0 && DISPLAY_TYPE==SCREENMODE1){     
+#endif 
                             nunstruct[2].ax =curx*FontTable[gui_font >> 4][0] * (gui_font & 0b1111);
                             nunstruct[2].ay =cury*FontTable[gui_font >> 4][1] * (gui_font & 0b1111);
                             lastx1=9999;lasty1=9999;
                         }                    
-#endif 
+#endif
 #endif                         
                       return;
             case 9999: break;

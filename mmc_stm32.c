@@ -1669,6 +1669,10 @@ void InitReservedIO(void) {
 		gpio_set_pulls(PinDef[Option.KEYBOARD_DATA].GPno,true,false);
 		gpio_set_dir(PinDef[Option.KEYBOARD_DATA].GPno, GPIO_IN);
 	}
+	if(Option.MOUSE_CLOCK){
+		ExtCfg(Option.MOUSE_CLOCK, EXT_BOOT_RESERVED, 0);
+    	ExtCfg(Option.MOUSE_DATA, EXT_BOOT_RESERVED, 0);
+	}
 #endif	
 }
 

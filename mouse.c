@@ -24,10 +24,9 @@ provisions:
 
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
-volatile struct s_nunstruct mousestruct;
 char *mouse0Interruptc=NULL;
 volatile int mouse0foundc=0;
-volatile int mouse0=0;
+bool mouse0=false;
 int mouseID=0;
 volatile int readreturn=-1;
 static volatile int PS2State, KCount, KParity, runmode=0;
@@ -39,7 +38,7 @@ volatile unsigned int bno=0;
 volatile unsigned char LastCode = 0;
 void setstream(void);
 void mouse_init();
-static void sendCommand(int cmd);
+static bool sendCommand(int cmd);
 int ReadReturn(int timeout);
 // definition of the mouse PS/2 state machine
 #define PS2START    0
@@ -55,7 +54,6 @@ int ReadReturn(int timeout);
 void MouseKBDIntEnable(int status){
 if (status)
   {
-	mouse0=1;
 	PinSetBit(MOUSE_CLOCK, TRISSET);                                         // same for data
 	PinSetBit(MOUSE_DATA, TRISSET);                                          // data low
     if (!CallBackEnabled)
@@ -89,8 +87,8 @@ void mousecheck(int n){
 		return;
 	}
     MouseKBDIntEnable(0);      											// disable interrupt in case called from within CNInterrupt()
-	runmode=0;
-    mouse0=0;
+	  runmode=0;
+    mouse0=false;
     ExtCfg(MOUSE_CLOCK, EXT_NOT_CONFIG, 0);
     ExtCfg(MOUSE_DATA, EXT_NOT_CONFIG, 0);
     PS2State = PS2START;
@@ -101,9 +99,14 @@ initMouse
 Initialise the mouse routine.
 ****************************************************************************************************/
 void initMouse0(int sensitivity) {
-	if(!MOUSE_CLOCK)return;
-	ExtCfg(MOUSE_CLOCK, EXT_COM_RESERVED, 0);
-	ExtCfg(MOUSE_DATA, EXT_COM_RESERVED, 0);
+	if(!(MOUSE_CLOCK || Option.MOUSE_CLOCK))return;
+  if(!Option.MOUSE_CLOCK){
+    ExtCfg(MOUSE_CLOCK, EXT_COM_RESERVED, 0);
+    ExtCfg(MOUSE_DATA, EXT_COM_RESERVED, 0);
+  } else {
+    MOUSE_CLOCK=Option.MOUSE_CLOCK;
+    MOUSE_DATA=Option.MOUSE_DATA;
+  }
 	gpio_init(PinDef[MOUSE_CLOCK].GPno);
 	gpio_set_pulls(PinDef[MOUSE_CLOCK].GPno,true,false);
 	gpio_set_dir(PinDef[MOUSE_CLOCK].GPno, GPIO_IN);
@@ -111,7 +114,7 @@ void initMouse0(int sensitivity) {
 	gpio_init(PinDef[MOUSE_DATA].GPno);
 	gpio_set_pulls(PinDef[MOUSE_DATA].GPno,true,false);
 	gpio_set_dir(PinDef[MOUSE_DATA].GPno, GPIO_IN);
-    int maxW=HRes;
+  int maxW=HRes;
 	int maxH=VRes;
 	mouseID=0;
 	runmode=0;
@@ -120,7 +123,7 @@ void initMouse0(int sensitivity) {
 	// This stops them from floating and generating random chars when no mouse is attached
 
     // reserve the mouse pins
-	sendCommand(0xFF);                                              // Reset
+	if(!sendCommand(0xFF))return;                                              // Reset
 	ReadReturn(500);
 	sendCommand(0xF5);                                              // Turn off streaming
 	ReadReturn(5);
@@ -163,33 +166,34 @@ void initMouse0(int sensitivity) {
 
     // setup Change Notification interrupt
     PS2State = PS2START;
-	memset((struct s_nunstruct *)&mousestruct,0,sizeof(struct s_nunstruct));
-    mousestruct.classic[0]=mouseID;
-    mousestruct.type=0; //used for the double click timer
-    mousestruct.ax=maxW/2;
-    mousestruct.ay=maxH/2;
+	memset((struct s_nunstruct *)&nunstruct[2],0,sizeof(struct s_nunstruct));
+    nunstruct[2].classic[0]=mouseID;
+    nunstruct[2].type=0; //used for the double click timer
+    nunstruct[2].ax=maxW/2;
+    nunstruct[2].ay=maxH/2;
 	runmode=1;
 	Code = 0;
 	bno=0;
 	LastCode = 0;
 //	 __HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_3);
     MouseKBDIntEnable(1);       										// enable interrupt
+  mouse0=true;
 }
 void mouse0close(void){
-	if(!mouse0)return;
-	mouseID=0;
-	runmode=0;
-	sendCommand(0xFF);                                              // Turn off streaming
-	ReadReturn(5);
+    if(!mouse0)return;
+    mouseID=0;
+    runmode=0;
+    sendCommand(0xFF);                                              // Turn off streaming
+    ReadReturn(5);
     MouseKBDIntEnable(0);      											// disable interrupt in case called from within CNInterrupt()
-	ExtCfg(MOUSE_CLOCK, EXT_NOT_CONFIG, 0);
+	  ExtCfg(MOUSE_CLOCK, EXT_NOT_CONFIG, 0);
     ExtCfg(MOUSE_DATA, EXT_NOT_CONFIG, 0);
-    mouse0=0;
-	runmode=0;
+    mouse0=false;
+  	runmode=0;
     mouse0Interruptc=NULL;
-	memset((struct s_nunstruct *)&mousestruct,0,sizeof(struct s_nunstruct));
+  	memset((struct s_nunstruct *)&nunstruct[2],0,sizeof(struct s_nunstruct));
 }
-static void sendCommand(int cmd)
+static bool sendCommand(int cmd)
 {
   int i, j;
 
@@ -208,7 +212,7 @@ static void sendCommand(int cmd)
   while (PinRead(MOUSE_CLOCK))
     if (InkeyTimer >= 500)
     {         // wait for the keyboard to pull the clock low
-      return; // wait for the keyboard to pull the clock low
+      return false; // wait for the keyboard to pull the clock low
     }
 
   // send each bit including parity
@@ -225,12 +229,12 @@ static void sendCommand(int cmd)
     while (!PinRead(MOUSE_CLOCK))
       if (InkeyTimer >= 500)
       {         // wait for the keyboard to pull the clock low
-        return; // wait for the keyboard to pull the clock low
+        return false; // wait for the keyboard to pull the clock low
       }
     while (PinRead(MOUSE_CLOCK))
       if (InkeyTimer >= 500)
       {         // wait for the keyboard to pull the clock low
-        return; // wait for the keyboard to pull the clock low
+        return false; // wait for the keyboard to pull the clock low
       }
     cmd >>= 1;
   }
@@ -241,18 +245,19 @@ static void sendCommand(int cmd)
   while (PinRead(MOUSE_DATA))
     if (InkeyTimer >= 500)
     {         // wait for the keyboard to pull the clock low
-      return; // wait for the keyboard to pull the clock low
+      return false; // wait for the keyboard to pull the clock low
     }         // wait for the keyboard to pull data low (ACK)
   while (PinRead(MOUSE_CLOCK))
     if (InkeyTimer >= 500)
     {         // wait for the keyboard to pull the clock low
-      return; // wait for the keyboard to pull the clock low
+      return false; // wait for the keyboard to pull the clock low
     }         // wait for the clock to go low
   while (!(PinRead(MOUSE_CLOCK)) || !(PinRead(MOUSE_DATA)))
     if (InkeyTimer >= 500)
     {         // wait for the keyboard to pull the clock low
-      return; // wait for the keyboard to pull the clock low
+      return false; // wait for the keyboard to pull the clock low
     }
+  return true;
 }
 /***************************************************************************************************
 sendCommand - Send a command to to mouse.
@@ -331,24 +336,24 @@ void __not_in_flash_func(MNInterrupt)(uint64_t dd) {
                             bno=0;
                             if(mouse[0] & 0b10000)mouse[1] |=0xFF00;
                             if(mouse[0] & 0b100000)mouse[2] |=0xFF00;
-                            mousestruct.ax+=mouse[1];
-                            if(mousestruct.ax<0)mousestruct.ax=0;
-                            if(mousestruct.ax>=maxW)mousestruct.ax=maxW-1;
-                            mousestruct.ay-=mouse[2];
+                            nunstruct[2].ax+=mouse[1];
+                            if(nunstruct[2].ax<0)nunstruct[2].ax=0;
+                            if(nunstruct[2].ax>=maxW)nunstruct[2].ax=maxW-1;
+                            nunstruct[2].ay-=mouse[2];
                             mouseupdated=1;
-                             if(mousestruct.ay<0)mousestruct.ay=0;
-                            if(mousestruct.ay>=maxH)mousestruct.ay=maxH-1;
-                            mousestruct.Z = mouse[0] & 0b1;
-                            mousestruct.C=(mouse[0] & 0b10)>>1;
-                            mousestruct.L=(mouse[0] & 0b100)>>2;
-                            if(mousestruct.type>1000) mousestruct.R=0;
+                             if(nunstruct[2].ay<0)nunstruct[2].ay=0;
+                            if(nunstruct[2].ay>=maxH)nunstruct[2].ay=maxH-1;
+                            nunstruct[2].L = mouse[0] & 0b1;
+                            nunstruct[2].R=(mouse[0] & 0b10)>>1;
+                            nunstruct[2].C=(mouse[0] & 0b100)>>2;
+                            if(nunstruct[2].type>1000) nunstruct[2].Z=0;
                             if((mouse[0] & 3) != (LastCode & 3)){
                             	if((mouse[0] & 1) && !(LastCode & 1) && (mSecTimer-lefttimer>16)){ //left button press
-                            		mouse0foundc=1;
-                            		if(mousestruct.type>=500 || mousestruct.type<100) mousestruct.type=0;
+                            		nunfoundc[2]=1;
+                            		if(nunstruct[2].type>=500 || nunstruct[2].type<100) nunstruct[2].type=0;
                             		else {
-                            			mousestruct.R=1;
-                            			mousestruct.type=500 ;
+                            			nunstruct[2].Z=1;
+                            			nunstruct[2].type=500 ;
                             		}
                             		lefttimer=mSecTimer;
                             	}
@@ -361,8 +366,10 @@ void __not_in_flash_func(MNInterrupt)(uint64_t dd) {
                             LastCode=mouse[0];
                             if(mouseID==3){
                             	if(mouse[3] & 0x80)mouse[3]|=0xFF00;
-                            	mousestruct.az=(volatile int)mousestruct.az+mouse[3];
+                            	nunstruct[2].az=(volatile int)nunstruct[2].az+mouse[3];
                             }
+                            nunstruct[2].x1=nunstruct[2].ax/(FontTable[gui_font >> 4][0] * (gui_font & 0b1111));
+                            nunstruct[2].y1=nunstruct[2].ay/(FontTable[gui_font >> 4][1] * (gui_font & 0b1111));
                        }
                     }
                 }
@@ -373,41 +380,61 @@ void __not_in_flash_func(MNInterrupt)(uint64_t dd) {
 }
 void cmd_mouse(void){
 	unsigned char *tp=NULL;
+  int n;
   if((tp=checkstring(cmdline, (unsigned char *)"OPEN"))){
-  getargs(&tp,5,(unsigned char *)",");
-	int n=0;
-	char code;
-	if(!(code=codecheck(argv[0])))argv[0]+=2;
-	int pin1 = getinteger(argv[0]);
-	if(!code)pin1=codemap(pin1);
-	if(!(code=codecheck(argv[2])))argv[2]+=2;
-	int pin2 = getinteger(argv[2]);
-	if(!code)pin2=codemap(pin2);
-    if(IsInvalidPin(pin1)) error("Invalid pin %/|",pin1,pin1);
-    if(IsInvalidPin(pin2)) error("Invalid pin %/|",pin2,pin2);
-    if(ExtCurrentConfig[pin1] >= EXT_COM_RESERVED )  error("Pin %/| is in use",pin1,pin1);
-    if(ExtCurrentConfig[pin2] >= EXT_COM_RESERVED )  error("Pin %/| is in use",pin2,pin2);
-	if(argc==5)n=getint(argv[4],0,8);
-  	MOUSE_CLOCK=pin1;
-	MOUSE_DATA=pin2;
-	initMouse0(n);
+      getargs(&tp,7,(unsigned char *)",");
+//      if(Option.MOUSE_CLOCK)error("Already open");
+      if(!(argc==5))error("Syntax");
+      getint(argv[0],2,2);
+      char code;
+      if(!(code=codecheck(argv[2])))argv[2]+=2;
+      int pin1 = getinteger(argv[2]);
+      if(!code)pin1=codemap(pin1);
+      if(!(code=codecheck(argv[4])))argv[4]+=2;
+      int pin2 = getinteger(argv[4]);
+      if(!code)pin2=codemap(pin2);
+      if(IsInvalidPin(pin1)) error("Invalid pin %/|",pin1,pin1);
+      if(IsInvalidPin(pin2)) error("Invalid pin %/|",pin2,pin2);
+      if(!(pin1==Option.MOUSE_CLOCK && pin2==Option.MOUSE_DATA)){
+        if(ExtCurrentConfig[pin1] >= EXT_COM_RESERVED )  error("Pin %/| is in use",pin1,pin1);
+        if(ExtCurrentConfig[pin2] >= EXT_COM_RESERVED )  error("Pin %/| is in use",pin2,pin2);
+      }
+      if(Option.MOUSE_CLOCK && !(pin1==Option.MOUSE_CLOCK && pin2==Option.MOUSE_DATA))error("OPTION MOUSE declared with different pins");
+      MOUSE_CLOCK=pin1;
+      MOUSE_DATA=pin2;
+      if(!mouse0)initMouse0(0);
+      if(!mouse0){
+        MOUSE_CLOCK=0;
+        MOUSE_DATA=0;
+        error("Open failed");
+      }
   } else  if((tp=checkstring(cmdline, (unsigned char *)"CLOSE"))){
+      getargs(&tp,1,(unsigned char *)",");
+      if(!mouse0)error("Not open");
+      if(Option.MOUSE_CLOCK)error("Option MOUSE set - close invalid");
+      n=getint(argv[0],2,2);
       mouse0close();
-	} else if((tp=checkstring(cmdline,(unsigned char *)"INTERRUPT ENABLE"))){
-		getargs(&tp,1,(unsigned char *)",");
-		mouse0Interruptc = (char *)GetIntAddress(argv[0]);					// get the interrupt location
-		InterruptUsed = true;
-		mouse0foundc=0;
-		return;
+	} else 	if((tp=checkstring(cmdline,(unsigned char *)"INTERRUPT ENABLE"))){
+      getargs(&tp,3,(unsigned char *)",");
+      if(!mouse0)error("Not open");
+      if(!(argc==3))error("Syntax");
+      n=getint(argv[0],2,2);
+      nunInterruptc[n] = (char *)GetIntAddress(argv[2]);					// get the interrupt location
+      InterruptUsed = true;
+      return;
 	} else if((tp = checkstring(cmdline, (unsigned char *)"SET"))){
-		getargs(&tp,5,(unsigned char *)",");
-		if(!(argc==5))error("Syntax");
-		mousestruct.ax=getint(argv[0],-HRes,HRes);
-		mousestruct.ay=getint(argv[2],-VRes,VRes);
-		mousestruct.az=getint(argv[4],-1000000,1000000); 
+      getargs(&tp,7,(unsigned char *)",");
+      if(!mouse0)error("Not open");
+      if(!(argc==7))error("Syntax");
+      n=getint(argv[0],2,2);
+      nunstruct[n].ax=getint(argv[2],-HRes,HRes);
+      nunstruct[n].ay=getint(argv[4],-VRes,VRes);
+      nunstruct[n].az=getint(argv[6],-1000000,1000000); 
 	} else if((tp = checkstring(cmdline, (unsigned char *)"INTERRUPT DISABLE"))){
-		mouse0Interruptc=NULL;
-		mouse0foundc=0;
-  }else error("Syntax");
+      getargs(&tp,1,(unsigned char *)",");
+      if(!mouse0)error("Not open");
+      n=getint(argv[0],2,2);
+      nunInterruptc[n]=NULL;
+	} else error("Syntax");
 }
 

@@ -444,6 +444,9 @@ void MIPS16 do_run(unsigned char *cmdline, bool CMM2mode) {
     if(v==NULL)findvar((unsigned char *)"MM.ADDRESS$", V_FIND | V_DIM_VAR | T_CONST);
 	cleanserver();
 #endif
+#ifndef USBKEYBOARD
+    if(mouse0==false && Option.MOUSE_CLOCK)initMouse0(0);  //see if there is a mouse to initialise 
+#endif
 	nextstmt = ProgMemory;
 }
 /** @endcond */
@@ -879,6 +882,9 @@ void cmd_end(void) {
 	SSPrintString("\033[?25h"); //in case application has turned the cursor off
 #ifdef PICOMITEWEB
 	close_tcpclient();
+#endif
+#ifndef USBKEYBOARD
+    if(mouse0==false && Option.MOUSE_CLOCK)initMouse0(0);  //see if there is a mouse to initialise 
 #endif
 	longjmp(mark, 1);												// jump back to the input prompt
 }

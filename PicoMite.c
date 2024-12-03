@@ -1478,6 +1478,7 @@ bool MIPS16 __not_in_flash_func(timer_callback)(repeating_timer_t *rt)
             }
         }
 #else
+		nunstruct[2].type++;
         MouseTimer++;
 #endif
         if(clocktimer)clocktimer--;
@@ -3991,6 +3992,9 @@ int MIPS16 main(){
             }       
         }
     }
+#ifndef USBKEYBOARD
+    initMouse0(0);
+#endif
     while(1) {
     if(Option.DISPLAY_CONSOLE) {
         SetFont(PromptFont);

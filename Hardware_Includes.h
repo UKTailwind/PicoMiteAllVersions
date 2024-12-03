@@ -67,6 +67,9 @@ extern volatile int CursorTimer;
 extern volatile unsigned int I2CTimer;
 #ifndef USBKEYBOARD
 extern volatile unsigned int MouseTimer;
+extern void initMouse0(int sensitivity);
+extern bool mouse0;
+extern int MOUSE_CLOCK,MOUSE_DATA;
 #endif
 //extern volatile int second;
 //extern volatile int minute;

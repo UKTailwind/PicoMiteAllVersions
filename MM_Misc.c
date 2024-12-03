@@ -1709,7 +1709,11 @@ void MIPS16 printoptions(void){
     } 
     if(!((Option.KEYBOARD_CLOCK==11 && Option.KEYBOARD_DATA==12) ||(Option.KEYBOARD_CLOCK==0 && Option.KEYBOARD_DATA==0)) && Option.KeyboardConfig != NO_KEYBOARD){
         PO("PS2 PINS"); MMPrintString((char *)PinDef[Option.KEYBOARD_CLOCK].pinname);
-        MMputchar(',',1);;MMPrintString((char *)PinDef[Option.KEYBOARD_DATA].pinname);PRet();
+        MMputchar(',',0);MMPrintString((char *)PinDef[Option.KEYBOARD_DATA].pinname);PRet();
+    }
+    if(Option.MOUSE_CLOCK){
+        PO("MOUSE"); MMPrintString((char *)PinDef[Option.MOUSE_CLOCK].pinname);
+        MMputchar(',',0);MMPrintString((char *)PinDef[Option.MOUSE_DATA].pinname);PRet();
     }
 #endif   
     if(Option.KeyboardConfig == CONFIG_I2C)PO2Str("KEYBOARD", "I2C");
@@ -4100,6 +4104,34 @@ void MIPS16 cmd_option(void) {
         SoftReset();
         return;
 	}
+    tp = checkstring(cmdline, (unsigned char *)"MOUSE");
+	if(tp) {
+        if(checkstring(tp,(unsigned char *)"DISABLE")){
+            Option.MOUSE_CLOCK=0;
+            Option.MOUSE_DATA=0;
+        } else {
+            int pin1,pin2;
+            unsigned char code;
+            getargs(&tp,3,(unsigned char *)",");
+            if(argc!=3)error("Syntax");
+            if(!(code=codecheck(argv[0])))argv[0]+=2;
+            pin1 = getinteger(argv[0]);
+            if(!code)pin1=codemap(pin1);
+            if(IsInvalidPin(pin1)) error("Invalid pin");
+            if(ExtCurrentConfig[pin1] != EXT_NOT_CONFIG)  error("Pin %/| is in use",pin1,pin1);
+            if(!(code=codecheck(argv[2])))argv[2]+=2;
+            pin2 = getinteger(argv[2]);
+            if(!code)pin2=codemap(pin2);
+            if(IsInvalidPin(pin2)) error("Invalid pin");
+            if(ExtCurrentConfig[pin2] != EXT_NOT_CONFIG)  error("Pin %/| is in use",pin2,pin2);
+            Option.MOUSE_CLOCK=pin1;
+            Option.MOUSE_DATA=pin2;
+        }
+        SaveOptions();
+        _excep_code = RESET_COMMAND;
+        SoftReset();
+        return;
+	}
 
 #endif
 	tp = checkstring(cmdline, (unsigned char *)"DISK SAVE");
@@ -5519,13 +5551,6 @@ int checkdetailinterrupts(void) {
             goto GotAnInterrupt;
         }
     }
-#ifndef USBKEYBOARD
-    if (mouse0Interruptc != NULL && mouse0foundc) {
-        mouse0foundc = false;
-        intaddr = (char *)mouse0Interruptc;									    // set the next stmt to the interrupt location
-        goto GotAnInterrupt;
-    }
-#endif
     if(ADCInterrupt && dmarunning){
         if(!dma_channel_is_busy(ADC_dma_chan)){
             __compiler_memory_barrier();
