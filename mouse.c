@@ -32,7 +32,7 @@ volatile int readreturn=-1;
 static volatile int PS2State, KCount, KParity, runmode=0;
 bool mouseupdated=false;
 volatile unsigned char Code = 0;
-int MOUSE_CLOCK,MOUSE_DATA;
+int MOUSE_CLOCK=0,MOUSE_DATA=0;
 volatile short mouse[4];
 volatile unsigned int bno=0;
 volatile unsigned char LastCode = 0;
@@ -188,6 +188,8 @@ void mouse0close(void){
     MouseKBDIntEnable(0);      											// disable interrupt in case called from within CNInterrupt()
 	  ExtCfg(MOUSE_CLOCK, EXT_NOT_CONFIG, 0);
     ExtCfg(MOUSE_DATA, EXT_NOT_CONFIG, 0);
+    MOUSE_CLOCK=0;
+    MOUSE_DATA=0;
     mouse0=false;
   	runmode=0;
     mouse0Interruptc=NULL;
@@ -425,11 +427,11 @@ void cmd_mouse(void){
 	} else if((tp = checkstring(cmdline, (unsigned char *)"SET"))){
       getargs(&tp,7,(unsigned char *)",");
       if(!mouse0)error("Not open");
-      if(!(argc==7))error("Syntax");
+      if(!(argc==7 || argc==5))error("Syntax");
       n=getint(argv[0],2,2);
-      nunstruct[n].ax=getint(argv[2],-HRes,HRes);
-      nunstruct[n].ay=getint(argv[4],-VRes,VRes);
-      nunstruct[n].az=getint(argv[6],-1000000,1000000); 
+      nunstruct[n].ax=getint(argv[2],0,HRes-1);
+      nunstruct[n].ay=getint(argv[4],0,VRes-1);
+      if(argc==5)nunstruct[n].az=getint(argv[6],-128,127); 
 	} else if((tp = checkstring(cmdline, (unsigned char *)"INTERRUPT DISABLE"))){
       getargs(&tp,1,(unsigned char *)",");
       if(!mouse0)error("Not open");

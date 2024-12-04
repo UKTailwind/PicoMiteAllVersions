@@ -1883,11 +1883,11 @@ void cmd_mouse(void){
 		return;
 	} else if((tp = checkstring(cmdline, (unsigned char *)"SET"))){
 		getargs(&tp,7,(unsigned char *)",");
-		if(!(argc==7))error("Syntax");
-		n=getint(argv[0],1,4);
-		nunstruct[n].ax=getint(argv[2],-HRes,HRes);
-		nunstruct[n].ay=getint(argv[4],-VRes,VRes);
-		nunstruct[n].az=getint(argv[6],-1000000,1000000); 
+		if(!(argc==7 || argc==5))error("Syntax");
+		n=getint(argv[0],2,2);
+		nunstruct[n].ax=getint(argv[2],0,HRes-1);
+		nunstruct[n].ay=getint(argv[4],0,VRes-1);
+		if(argc==5)nunstruct[n].az=getint(argv[6],-128,127); 
 	} else if((tp = checkstring(cmdline, (unsigned char *)"INTERRUPT DISABLE"))){
 		getargs(&tp,1,(unsigned char *)",");
 		n=getint(argv[0],1,4);

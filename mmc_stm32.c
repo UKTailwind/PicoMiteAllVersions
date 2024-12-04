@@ -1708,6 +1708,8 @@ char *pinsearch(int pin){
 #endif
 	if(pin==Option.KEYBOARD_CLOCK)strcpy(buff,"KEYBOARD CLOCK");
 	else if(pin==Option.KEYBOARD_DATA)strcpy(buff,"KEYBOARD DATA");
+	else if(pin==Option.MOUSE_CLOCK)strcpy(buff,"MOUSE CLOCK");
+	else if(pin==Option.MOUSE_DATA)strcpy(buff,"MOUSE DATA");
 	else if(pin==Option.SerialTX)strcpy(buff,"CONSOLE TX");
 	else if(pin==Option.SerialRX)strcpy(buff,"CONSOLE RX");
 	else if(pin==Option.AUDIO_R)strcpy(buff,"AUDIO R");

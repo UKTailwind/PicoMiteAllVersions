@@ -3891,7 +3891,7 @@ void __not_in_flash_func(IRHandler)(void) {
 void __not_in_flash_func(gpio_callback)(uint gpio, uint32_t events) {
 #ifndef USBKEYBOARD
     if(!(Option.KeyboardConfig == NO_KEYBOARD || Option.KeyboardConfig == CONFIG_I2C ) && gpio==PinDef[Option.KEYBOARD_CLOCK].GPno) CNInterrupt(gpio_get_all64());
-    if(PinDef[MOUSE_CLOCK].GPno && gpio==PinDef[MOUSE_CLOCK].GPno)MNInterrupt(gpio_get_all64());
+    if(MOUSE_CLOCK && gpio==PinDef[MOUSE_CLOCK].GPno)MNInterrupt(gpio_get_all64());
 #endif
     if(gpio==PinDef[IRpin].GPno)IRHandler();
     if(gpio==PinDef[Option.INT1pin].GPno)TM_EXTI_Handler_1();
