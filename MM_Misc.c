@@ -1708,7 +1708,7 @@ void MIPS16 printoptions(void){
         PRet();
     } 
     if(!((Option.KEYBOARD_CLOCK==11 && Option.KEYBOARD_DATA==12) ||(Option.KEYBOARD_CLOCK==0 && Option.KEYBOARD_DATA==0)) && Option.KeyboardConfig != NO_KEYBOARD){
-        PO("PS2 PINS"); MMPrintString((char *)PinDef[Option.KEYBOARD_CLOCK].pinname);
+        PO("KEYBOARD PINS"); MMPrintString((char *)PinDef[Option.KEYBOARD_CLOCK].pinname);
         MMputchar(',',0);MMPrintString((char *)PinDef[Option.KEYBOARD_DATA].pinname);PRet();
     }
     if(Option.MOUSE_CLOCK){
@@ -2973,6 +2973,62 @@ void MIPS16 cmd_option(void) {
 		return;
 	}
 
+#else
+    tp = checkstring(cmdline, (unsigned char *)"PS2 PINS");
+    if(tp==NULL)tp = checkstring(cmdline, (unsigned char *)"KEYBOARD PINS");
+	if(tp) {
+        int pin1,pin2;
+        unsigned char code;
+		getargs(&tp,3,(unsigned char *)",");
+        if(Option.KEYBOARD_CLOCK)error("Keyboard must be disabled to change pins");
+        if(argc!=3)error("Syntax");
+        if(!(code=codecheck(argv[0])))argv[0]+=2;
+        pin1 = getinteger(argv[0]);
+        if(!code)pin1=codemap(pin1);
+        if(IsInvalidPin(pin1)) error("Invalid pin");
+        if(ExtCurrentConfig[pin1] != EXT_NOT_CONFIG)  error("Pin %/| is in use",pin1,pin1);
+        if(!(code=codecheck(argv[2])))argv[2]+=2;
+        pin2 = getinteger(argv[2]);
+        if(!code)pin2=codemap(pin2);
+        if(IsInvalidPin(pin2)) error("Invalid pin");
+        if(ExtCurrentConfig[pin2] != EXT_NOT_CONFIG)  error("Pin %/| is in use",pin2,pin2);
+        Option.KEYBOARD_CLOCK=pin1;
+        Option.KEYBOARD_DATA=pin2;
+        SaveOptions();
+        _excep_code = RESET_COMMAND;
+        SoftReset();
+        return;
+	}
+    tp = checkstring(cmdline, (unsigned char *)"MOUSE");
+	if(tp) {
+        if(checkstring(tp,(unsigned char *)"DISABLE")){
+            Option.MOUSE_CLOCK=0;
+            Option.MOUSE_DATA=0;
+        } else {
+            int pin1,pin2;
+            unsigned char code;
+            getargs(&tp,3,(unsigned char *)",");
+            if(Option.MOUSE_CLOCK)error("Mouse must be disabled to change pins");
+            if(argc!=3)error("Syntax");
+            if(!(code=codecheck(argv[0])))argv[0]+=2;
+            pin1 = getinteger(argv[0]);
+            if(!code)pin1=codemap(pin1);
+            if(IsInvalidPin(pin1)) error("Invalid pin");
+            if(ExtCurrentConfig[pin1] != EXT_NOT_CONFIG)  error("Pin %/| is in use",pin1,pin1);
+            if(!(code=codecheck(argv[2])))argv[2]+=2;
+            pin2 = getinteger(argv[2]);
+            if(!code)pin2=codemap(pin2);
+            if(IsInvalidPin(pin2)) error("Invalid pin");
+            if(ExtCurrentConfig[pin2] != EXT_NOT_CONFIG)  error("Pin %/| is in use",pin2,pin2);
+            Option.MOUSE_CLOCK=pin1;
+            Option.MOUSE_DATA=pin2;
+        }
+        SaveOptions();
+        _excep_code = RESET_COMMAND;
+        SoftReset();
+        return;
+	}
+
 #endif
     tp = checkstring(cmdline, (unsigned char *)"KEYBOARD");
 	if(tp) {
@@ -2982,6 +3038,8 @@ void MIPS16 cmd_option(void) {
 			Option.KeyboardConfig = NO_KEYBOARD;
             Option.capslock=0;
             Option.numlock=0;
+            Option.KEYBOARD_CLOCK=0;
+            Option.KEYBOARD_DATA=0;
             SaveOptions();
             _excep_code = RESET_COMMAND;
             SoftReset();
@@ -2989,8 +3047,13 @@ void MIPS16 cmd_option(void) {
 #endif
         getargs(&tp,9,(unsigned char *)",");
 #ifndef USBKEYBOARD
+        if(!Option.KEYBOARD_CLOCK){
+            Option.KEYBOARD_CLOCK=KEYBOARDCLOCK;
+            Option.KEYBOARD_DATA=KEYBOARDDATA;
+        }
         if(ExtCurrentConfig[Option.KEYBOARD_CLOCK] != EXT_NOT_CONFIG && Option.KeyboardConfig == NO_KEYBOARD)  error("Pin %/| is in use",Option.KEYBOARD_CLOCK,Option.KEYBOARD_CLOCK);
         if(ExtCurrentConfig[Option.KEYBOARD_DATA] != EXT_NOT_CONFIG && Option.KeyboardConfig == NO_KEYBOARD)  error("Pin %/| is in use",Option.KEYBOARD_DATA,Option.KEYBOARD_DATA);
+
         if(checkstring(argv[0], (unsigned char *)"US"))	Option.KeyboardConfig = CONFIG_US;
 		else if(checkstring(argv[0], (unsigned char *)"FR"))	Option.KeyboardConfig = CONFIG_FR;
 		else if(checkstring(argv[0], (unsigned char *)"GR"))	Option.KeyboardConfig = CONFIG_GR;
@@ -2999,7 +3062,7 @@ void MIPS16 cmd_option(void) {
 		else if(checkstring(argv[0], (unsigned char *)"ES"))	Option.KeyboardConfig = CONFIG_ES;
 		else if(checkstring(argv[0], (unsigned char *)"BE"))	Option.KeyboardConfig = CONFIG_BE;
 		else if(checkstring(argv[0], (unsigned char *)"BR"))	Option.KeyboardConfig = CONFIG_BR;
-		else if(checkstring(argv[0], (unsigned char *)"I2C")) Option.KeyboardConfig = CONFIG_I2C;
+		else if(checkstring(argv[0], (unsigned char *)"I2C"))   Option.KeyboardConfig = CONFIG_I2C;
 #else
         if(checkstring(argv[0], (unsigned char *)"US"))	Option.USBKeyboard = CONFIG_US;
 		else if(checkstring(argv[0], (unsigned char *)"FR"))	Option.USBKeyboard = CONFIG_FR;
@@ -3318,6 +3381,8 @@ void MIPS16 cmd_option(void) {
    	    if(CurrentLinePtr) error("Invalid in a program");
         if(checkstring(tp, (unsigned char *)"OFF"))Option.disabletftp=1;
         else if(checkstring(tp, (unsigned char *)"ON"))Option.disabletftp=0;
+        else if(checkstring(tp, (unsigned char *)"ENABLE"))Option.disabletftp=0;
+        else if(checkstring(tp, (unsigned char *)"DISABLE"))Option.disabletftp=1;
         else error("Syntax");
         SaveOptions();
          _excep_code = RESET_COMMAND;
@@ -4080,60 +4145,6 @@ void MIPS16 cmd_option(void) {
         SoftReset();
         return;
     }
-#ifndef USBKEYBOARD
-    tp = checkstring(cmdline, (unsigned char *)"PS2 PINS");
-	if(tp) {
-        int pin1,pin2;
-        unsigned char code;
-		getargs(&tp,3,(unsigned char *)",");
-        if(argc!=3)error("Syntax");
-        if(!(code=codecheck(argv[0])))argv[0]+=2;
-        pin1 = getinteger(argv[0]);
-        if(!code)pin1=codemap(pin1);
-        if(IsInvalidPin(pin1)) error("Invalid pin");
-        if(ExtCurrentConfig[pin1] != EXT_NOT_CONFIG)  error("Pin %/| is in use",pin1,pin1);
-        if(!(code=codecheck(argv[2])))argv[2]+=2;
-        pin2 = getinteger(argv[2]);
-        if(!code)pin2=codemap(pin2);
-        if(IsInvalidPin(pin2)) error("Invalid pin");
-        if(ExtCurrentConfig[pin2] != EXT_NOT_CONFIG)  error("Pin %/| is in use",pin2,pin2);
-        Option.KEYBOARD_CLOCK=pin1;
-        Option.KEYBOARD_DATA=pin2;
-        SaveOptions();
-        _excep_code = RESET_COMMAND;
-        SoftReset();
-        return;
-	}
-    tp = checkstring(cmdline, (unsigned char *)"MOUSE");
-	if(tp) {
-        if(checkstring(tp,(unsigned char *)"DISABLE")){
-            Option.MOUSE_CLOCK=0;
-            Option.MOUSE_DATA=0;
-        } else {
-            int pin1,pin2;
-            unsigned char code;
-            getargs(&tp,3,(unsigned char *)",");
-            if(argc!=3)error("Syntax");
-            if(!(code=codecheck(argv[0])))argv[0]+=2;
-            pin1 = getinteger(argv[0]);
-            if(!code)pin1=codemap(pin1);
-            if(IsInvalidPin(pin1)) error("Invalid pin");
-            if(ExtCurrentConfig[pin1] != EXT_NOT_CONFIG)  error("Pin %/| is in use",pin1,pin1);
-            if(!(code=codecheck(argv[2])))argv[2]+=2;
-            pin2 = getinteger(argv[2]);
-            if(!code)pin2=codemap(pin2);
-            if(IsInvalidPin(pin2)) error("Invalid pin");
-            if(ExtCurrentConfig[pin2] != EXT_NOT_CONFIG)  error("Pin %/| is in use",pin2,pin2);
-            Option.MOUSE_CLOCK=pin1;
-            Option.MOUSE_DATA=pin2;
-        }
-        SaveOptions();
-        _excep_code = RESET_COMMAND;
-        SoftReset();
-        return;
-	}
-
-#endif
 	tp = checkstring(cmdline, (unsigned char *)"DISK SAVE");
     if(tp){
         getargs(&tp,1,(unsigned char *)",");
@@ -4644,6 +4655,9 @@ void MIPS16 fun_info(void){
 		CtoM(sret);
 	    targ=T_STR;
 		return;
+	} else if((tp=checkstring(ep, (unsigned char *)"ONEWIRE"))){
+        fun_mmOW();
+        return;
 	} else if((tp=checkstring(ep, (unsigned char *)"OPTION"))){
         if(checkstring(tp, (unsigned char *)"AUTORUN")){
 			if(Option.Autorun == false)strcpy((char *)sret,"Off");

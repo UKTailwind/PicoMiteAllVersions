@@ -3940,7 +3940,8 @@ int MIPS16 main(){
     hcd_port_reset_end(BOARD_TUH_RHPORT);
     tuh_init(BOARD_TUH_RHPORT);
     USBenabled=true;
-    
+#else
+    initMouse0(0);
 #endif
 #ifdef rp2350
     if(PSRAMsize){MMPrintString("Total of ");PInt(PSRAMsize/(1024*1024));MMPrintString(" Mbytes PSRAM available\r\n");}
@@ -3992,9 +3993,6 @@ int MIPS16 main(){
             }       
         }
     }
-#ifndef USBKEYBOARD
-    initMouse0(0);
-#endif
     while(1) {
     if(Option.DISPLAY_CONSOLE) {
         SetFont(PromptFont);

@@ -954,14 +954,14 @@ void fun_lcase(void) {
 
 // function (which looks like a pre defined variable) to return the version number
 // it pulls apart the VERSION string to generate the number
-void fun_version(void){
+/*void fun_version(void){
 	char *p;
     fret = strtol(VERSION, &p, 10);
     fret += (MMFLOAT)strtol(p + 1, &p, 10) / 100;
     fret += (MMFLOAT)strtol(p + 1, &p, 10) / 10000;
     fret += (MMFLOAT)strtol(p + 1, &p, 10) / 1000000;
     targ = T_NBR;
-}
+}*/
 
 
 

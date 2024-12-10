@@ -39,19 +39,16 @@ the non US keyboard layouts
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
 void setLEDs(int num, int caps, int scroll);
-void sendCommand(int cmd);
+bool sendCommand(int cmd, int clock, int data);
 volatile char CapsLock;
 volatile char NumLock;
 volatile int setleds = 0;
 // PS2 KBD state machine and buffer
-volatile int PS2State;
+static volatile int PS2State;
 unsigned char KBDBuf;
-int KState, KCount, KParity;
+static int KCount, KParity;
 extern volatile int ConsoleRxBufHead;
 extern volatile int ConsoleRxBufTail;
-extern int MOUSE_CLOCK,MOUSE_DATA;
-extern void initMouse0(int sensitivity);
-extern void mouse0close(void);
 int justset = 0;
 // extern char ConsoleRxBuf[];
 
@@ -422,7 +419,7 @@ const char keyE0Codes_ES[56] =
 void KBDIntEnable(int status)
 {
   PinSetBit(Option.KEYBOARD_CLOCK, TRISSET); // if tris = 1 then it is an input
-  PinSetBit(Option.KEYBOARD_DATA, TRISSET);  // if tris = 1 then it is an input
+  PinSetBit(Option.KEYBOARD_CLOCK, TRISSET);  // if tris = 1 then it is an input
   PinSetBit(Option.KEYBOARD_CLOCK, CNPUSET); // if tris = 1 then it is an input
   PinSetBit(Option.KEYBOARD_DATA, CNPUSET);  // if tris = 1 then it is an input
   if (status)
@@ -474,26 +471,31 @@ void initKeyboard(void)
 /***************************************************************************************************
 sendCommand - Send a command to to keyboard.
 ****************************************************************************************************/
-void sendCommand(int cmd)
+bool sendCommand(int cmd, int clock, int data)
 {
   int i, j;
 
   // calculate the parity and add to the command as the 9th bit
-  for (j = i = 0; i < 8; i++)
-    j += ((cmd >> i) & 1);
+  for (j = i = 0; i < 8; i++) j += ((cmd >> i) & 1);
   cmd = (cmd & 0xff) | (((j + 1) & 1) << 8);
-  PinSetBit(Option.KEYBOARD_CLOCK, TRISCLR);
-  PinSetBit(Option.KEYBOARD_CLOCK, LATCLR);
-  uSec(250);
-  PinSetBit(Option.KEYBOARD_DATA, TRISCLR);
-  PinSetBit(Option.KEYBOARD_DATA, LATCLR);
-  PinSetBit(Option.KEYBOARD_CLOCK, TRISSET);
   InkeyTimer = 0;
-  uSec(2);
-  while (PinRead(Option.KEYBOARD_CLOCK))
+/*  while (!PinRead(clock)) //wait for clock high
     if (InkeyTimer >= 500)
     {         // wait for the keyboard to pull the clock low
-      return; // wait for the keyboard to pull the clock low
+      return false; // wait for the keyboard to pull the clock low
+    }*/
+  PinSetBit(clock, TRISCLR);
+  PinSetBit(clock, LATCLR);
+  uSec(250);
+  PinSetBit(data, TRISCLR);
+  PinSetBit(data, LATCLR);
+  uSec(2);
+  PinSetBit(clock, TRISSET);
+  uSec(2);
+  while (PinRead(clock))
+    if (InkeyTimer >= 500)
+    {         // wait for the keyboard to pull the clock low
+      return false; // wait for the keyboard to pull the clock low
     }
 
   // send each bit including parity
@@ -501,43 +503,44 @@ void sendCommand(int cmd)
   {
     if (cmd & 1)
     {
-      PinSetBit(Option.KEYBOARD_DATA, LATSET);
+      PinSetBit(data, LATSET);
     }
     else
     {
-      PinSetBit(Option.KEYBOARD_DATA, LATCLR);
+      PinSetBit(data, LATCLR);
     }
-    while (!PinRead(Option.KEYBOARD_CLOCK))
+    while (!PinRead(clock))
       if (InkeyTimer >= 500)
       {         // wait for the keyboard to pull the clock low
-        return; // wait for the keyboard to pull the clock low
+        return false; // wait for the keyboard to pull the clock low
       }
-    while (PinRead(Option.KEYBOARD_CLOCK))
+    while (PinRead(clock))
       if (InkeyTimer >= 500)
       {         // wait for the keyboard to pull the clock low
-        return; // wait for the keyboard to pull the clock low
+        return false; // wait for the keyboard to pull the clock low
       }
     cmd >>= 1;
   }
 
-  //    PinSetBit(Option.KEYBOARD_CLOCK, TRISSET);
-  PinSetBit(Option.KEYBOARD_DATA, TRISSET);
+  //    PinSetBit(clock, TRISSET);
+  PinSetBit(data, TRISSET);
 
-  while (PinRead(Option.KEYBOARD_DATA))
+  while (PinRead(data))
     if (InkeyTimer >= 500)
     {         // wait for the keyboard to pull the clock low
-      return; // wait for the keyboard to pull the clock low
+      return false; // wait for the keyboard to pull the clock low
     }         // wait for the keyboard to pull data low (ACK)
-  while (PinRead(Option.KEYBOARD_CLOCK))
+  while (PinRead(clock))
     if (InkeyTimer >= 500)
     {         // wait for the keyboard to pull the clock low
-      return; // wait for the keyboard to pull the clock low
+      return false; // wait for the keyboard to pull the clock low
     }         // wait for the clock to go low
-  while (!(PinRead(Option.KEYBOARD_CLOCK)) || !(PinRead(Option.KEYBOARD_DATA)))
+  while (!(PinRead(clock)) || !(PinRead(data)))
     if (InkeyTimer >= 500)
     {         // wait for the keyboard to pull the clock low
-      return; // wait for the keyboard to pull the clock low
+      return false; // wait for the keyboard to pull the clock low
     }
+  return true;
 }
 
 // set the keyboard LEDs
@@ -546,13 +549,13 @@ void setLEDs(int caps, int num, int scroll)
   setleds = 0;
   KBDIntEnable(0); // disable interrupt while we play
   PS2State = PS2START;
-  sendCommand(0xED); // Set/Reset Status Indicators Command
+  sendCommand(0xED, Option.KEYBOARD_CLOCK, Option.KEYBOARD_DATA); // Set/Reset Status Indicators Command
   uSec(50000);
-  sendCommand(((caps & 1) << 2) | ((num & 1) << 1) | (scroll & 1)); // set the various LEDs
+  sendCommand(((caps & 1) << 2) | ((num & 1) << 1) | (scroll & 1), Option.KEYBOARD_CLOCK, Option.KEYBOARD_DATA); // set the various LEDs
   uSec(50000);
-  sendCommand(0xF3); // Set/Reset Status Indicators Command
+  sendCommand(0xF3, Option.KEYBOARD_CLOCK, Option.KEYBOARD_DATA); // Set/Reset Status Indicators Command
   uSec(50000);
-  sendCommand(Option.repeat);
+  sendCommand(Option.repeat, Option.KEYBOARD_CLOCK, Option.KEYBOARD_DATA);
   KBDIntEnable(1); // re enable interrupt
   justset = 1;
 }
@@ -1055,8 +1058,10 @@ void __not_in_flash_func(CNInterrupt)(uint64_t dd)
         KParity ^= 0x80;  // PS2DAT == 1
       if (KParity & 0x80) // parity odd, continue
         PS2State = PS2STOP;
-      else
+      else {
         PS2State = PS2ERROR;
+        putConsole('q',1);
+      }
       break;
 
     case PS2STOP:

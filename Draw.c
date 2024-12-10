@@ -366,6 +366,7 @@ void MIPS16 cmd_guiMX170(void) {
             int t;
             t = ((HRes > VRes) ? HRes : VRes) / 7;
             while(getConsole() < '\r') {
+                routinechecks();
         #ifdef PICOMITEWEB
                 {if(startupcomplete)ProcessWeb(1);}
         #endif

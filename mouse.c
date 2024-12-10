@@ -32,7 +32,7 @@ volatile int readreturn=-1;
 static volatile int PS2State, KCount, KParity, runmode=0;
 bool mouseupdated=false;
 volatile unsigned char Code = 0;
-int MOUSE_CLOCK=0,MOUSE_DATA=0;
+int MOUSE_CLOCK,MOUSE_DATA;
 volatile short mouse[4];
 volatile unsigned int bno=0;
 volatile unsigned char LastCode = 0;
@@ -114,6 +114,8 @@ void initMouse0(int sensitivity) {
 	gpio_init(PinDef[MOUSE_DATA].GPno);
 	gpio_set_pulls(PinDef[MOUSE_DATA].GPno,true,false);
 	gpio_set_dir(PinDef[MOUSE_DATA].GPno, GPIO_IN);
+  gpio_set_drive_strength(PinDef[MOUSE_DATA].GPno,GPIO_DRIVE_STRENGTH_8MA);
+  gpio_set_drive_strength(PinDef[MOUSE_CLOCK].GPno,GPIO_DRIVE_STRENGTH_8MA);
   int maxW=HRes;
 	int maxH=VRes;
 	mouseID=0;
@@ -188,8 +190,6 @@ void mouse0close(void){
     MouseKBDIntEnable(0);      											// disable interrupt in case called from within CNInterrupt()
 	  ExtCfg(MOUSE_CLOCK, EXT_NOT_CONFIG, 0);
     ExtCfg(MOUSE_DATA, EXT_NOT_CONFIG, 0);
-    MOUSE_CLOCK=0;
-    MOUSE_DATA=0;
     mouse0=false;
   	runmode=0;
     mouse0Interruptc=NULL;
@@ -325,8 +325,9 @@ void __not_in_flash_func(MNInterrupt)(uint64_t dd) {
                 if(d) KParity ^= 0x80;                				// PS2DAT == 1
                 if (KParity & 0x80)  {  								// parity odd, continue
                     PS2State = PS2STOP;
-				} else
+				        } else {
                     PS2State = PS2ERROR;
+                }
                 break;
             case PS2STOP:
                 if(d) {                 							// PS2DAT == 1
@@ -406,6 +407,10 @@ void cmd_mouse(void){
       MOUSE_DATA=pin2;
       if(!mouse0)initMouse0(0);
       if(!mouse0){
+        if(!Option.MOUSE_CLOCK){
+          ExtCfg(MOUSE_CLOCK, EXT_NOT_CONFIG, 0);
+          ExtCfg(MOUSE_DATA, EXT_NOT_CONFIG, 0);
+        }
         MOUSE_CLOCK=0;
         MOUSE_DATA=0;
         error("Open failed");
@@ -427,11 +432,11 @@ void cmd_mouse(void){
 	} else if((tp = checkstring(cmdline, (unsigned char *)"SET"))){
       getargs(&tp,7,(unsigned char *)",");
       if(!mouse0)error("Not open");
-      if(!(argc==7 || argc==5))error("Syntax");
+      if(!(argc==7))error("Syntax");
       n=getint(argv[0],2,2);
-      nunstruct[n].ax=getint(argv[2],0,HRes-1);
-      nunstruct[n].ay=getint(argv[4],0,VRes-1);
-      if(argc==5)nunstruct[n].az=getint(argv[6],-128,127); 
+      nunstruct[n].ax=getint(argv[2],-HRes,HRes);
+      nunstruct[n].ay=getint(argv[4],-VRes,VRes);
+      nunstruct[n].az=getint(argv[6],-1000000,1000000); 
 	} else if((tp = checkstring(cmdline, (unsigned char *)"INTERRUPT DISABLE"))){
       getargs(&tp,1,(unsigned char *)",");
       if(!mouse0)error("Not open");

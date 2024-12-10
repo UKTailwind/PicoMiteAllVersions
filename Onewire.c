@@ -163,6 +163,7 @@ void Init_ds18b20(int pin, int precision) {
     // set up initial pin status (open drain, output, high)
     ow_pinChk(pin);
     ExtCfg(pin, EXT_NOT_CONFIG, 0);                                 // set pin to unconfigured
+    gpio_init(PinDef[pin].GPno); 
     ow_reset(pin);
 	disable_interrupts();
     ow_writeByte(pin, 0xcc);                                        // command skip the ROM
@@ -259,9 +260,11 @@ void owReset(unsigned char *p) {
 
 // set up initial pin status (open drain, output, high)
 	ExtCfg(pin, EXT_NOT_CONFIG, 0);									// set pin to unconfigured
+    gpio_init(PinDef[pin].GPno); 
 	PinSetBit(pin, LATSET);
 	PinSetBit(pin, ODCSET);
 	ow_reset(pin);
+    ExtCfg(pin, EXT_NOT_CONFIG, 0);
 	return;
 }
 void owWriteCore(int pin, int * buf, int len, int flag){
@@ -316,6 +319,7 @@ void owWrite(unsigned char *p) {
 
 // set up initial pin status (open drain, output, high)
 	ExtCfg(pin, EXT_NOT_CONFIG, 0);									// set pin to unconfigured
+    gpio_init(PinDef[pin].GPno); 
 	PinSetBit(pin, LATSET);
 	PinSetBit(pin, ODCSET);
     PinSetBit(pin, TRISCLR);                                        // this line added by JH
@@ -328,6 +332,7 @@ void owWrite(unsigned char *p) {
 		PinSetBit(pin, LATSET);
 		PinSetBit(pin, TRISCLR);
 	}
+    ExtCfg(pin, EXT_NOT_CONFIG, 0);
 	return;
 }
 
@@ -370,6 +375,7 @@ void owRead(unsigned char *p) {
 
 // set up initial pin status (open drain, output, high)
 	ExtCfg(pin, EXT_NOT_CONFIG, 0);									// set pin to unconfigured
+    gpio_init(PinDef[pin].GPno); 
 	PinSetBit(pin, LATSET);
 	PinSetBit(pin, ODCSET);
 
@@ -389,7 +395,7 @@ void owRead(unsigned char *p) {
             else
                 *((long long int *)ptr) = buf[i];
 	}
-
+    ExtCfg(pin, EXT_NOT_CONFIG, 0);
 	return;
 }
 
@@ -438,6 +444,7 @@ void fun_owSearch(void) {
 
 	// set up initial pin status (open drain, output, high)
 	ExtCfg(pin, EXT_NOT_CONFIG, 0);									// set pin to unconfigured
+    gpio_init(PinDef[pin].GPno); 
 	PinSetBit(pin, LATSET);
 	PinSetBit(pin, ODCSET);
 

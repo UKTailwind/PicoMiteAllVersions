@@ -2843,6 +2843,7 @@ void fun_dev(void){
         else if(checkstring(argv[2], (unsigned char *)"M"))iret=nunstruct[n].C;
         else if(checkstring(argv[2], (unsigned char *)"W"))iret=nunstruct[n].az;
         else if(checkstring(argv[2], (unsigned char *)"D")){iret=nunstruct[n].Z;nunstruct[n].Z=0;}
+        else if(checkstring(argv[2], (unsigned char *)"T"))iret=nunstruct[n].classic[0];
         else error("Syntax");
         targ=T_INT;
     } else error("Syntax");
@@ -3890,8 +3891,10 @@ void __not_in_flash_func(IRHandler)(void) {
     }
 void __not_in_flash_func(gpio_callback)(uint gpio, uint32_t events) {
 #ifndef USBKEYBOARD
-    if(!(Option.KeyboardConfig == NO_KEYBOARD || Option.KeyboardConfig == CONFIG_I2C ) && gpio==PinDef[Option.KEYBOARD_CLOCK].GPno) CNInterrupt(gpio_get_all64());
-    if(MOUSE_CLOCK && gpio==PinDef[MOUSE_CLOCK].GPno)MNInterrupt(gpio_get_all64());
+    static uint64_t data;
+    data=gpio_get_all64();
+    if(Option.KEYBOARD_CLOCK) if( !(Option.KeyboardConfig == NO_KEYBOARD || Option.KeyboardConfig == CONFIG_I2C ) && gpio==PinDef[Option.KEYBOARD_CLOCK].GPno) CNInterrupt(data);
+    if(MOUSE_CLOCK && gpio==PinDef[MOUSE_CLOCK].GPno)MNInterrupt(data);
 #endif
     if(gpio==PinDef[IRpin].GPno)IRHandler();
     if(gpio==PinDef[Option.INT1pin].GPno)TM_EXTI_Handler_1();

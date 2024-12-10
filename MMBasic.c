@@ -956,30 +956,40 @@ void  MIPS16 str_replace(char *target, const char *needle, const char *replaceme
 void  MIPS16 STR_REPLACE(char *target, const char *needle, const char *replacement){
 	char *ip=target;
 	int toggle=0;
-	while(*ip){
-		if(*ip==34){
-			if(toggle==0)toggle=1;
-			else toggle=0;
-		}
-		if(toggle && *ip==' '){
-			*ip=0xFF;
-		}
-		if(toggle && *ip=='.'){
-			*ip=0xFE;
-		}
-		if(toggle && *ip=='='){
-			*ip=0xFD;
-		}
-		ip++;
-	}
-	str_replace(target, needle, replacement);
-	ip=target;
-	while(*ip){
-		if(*ip==0xFF)*ip=' ';
-		if(*ip==0xFE)*ip='.';
-		if(*ip==0xFD)*ip='=';
-		ip++;
-	}
+    char *comment=NULL;
+    skipspace(ip);
+    if(!(toupper(*ip)=='R' && toupper(ip[1])=='E' && toupper(ip[2])=='M' )){
+        while(*ip){
+            if(*ip==34){
+                if(toggle==0)toggle=1;
+                else toggle=0;
+            }
+            if(toggle && *ip==' '){
+                *ip=0xFF;
+            }
+            if(toggle && *ip=='.'){
+                *ip=0xFE;
+            }
+            if(toggle && *ip=='='){
+                *ip=0xFD;
+            }
+            if(toggle==0 && *ip=='\''){
+                comment=ip;
+                *ip=0;
+                break;
+            }
+            ip++;
+        }
+        str_replace(target, needle, replacement);
+        ip=target;
+        if(comment)*comment='\'';
+        while(*ip){
+            if(*ip==0xFF)*ip=' ';
+            if(*ip==0xFE)*ip='.';
+            if(*ip==0xFD)*ip='=';
+            ip++;
+        }
+    }
 
 }
 
@@ -1009,15 +1019,19 @@ void  MIPS16 tokenise(int console) {
         if(*p < ' ' || *p == 0x7f)  *p = ' ';
         p++;
     }
-    STR_REPLACE((char *)inpbuf,"MM.INFO$","MM.INFO");
-    STR_REPLACE((char *)inpbuf,"=>",">=");
-    STR_REPLACE((char *)inpbuf,"=<","<=");
-    STR_REPLACE((char *)inpbuf,"MM.FONTHEIGHT","MM.INFO(FONTHEIGHT)");
-    STR_REPLACE((char *)inpbuf,"MM.FONTWIDTH","MM.INFO(FONTWIDTH)");
-    STR_REPLACE((char *)inpbuf,"MM.PS2","MM.INFO(PS2)");
-    STR_REPLACE((char *)inpbuf,"MM.HPOS","MM.INFO(HPOS)");
-    STR_REPLACE((char *)inpbuf,"MM.VPOS","MM.INFO(VPOS)");
-    STR_REPLACE((char *)inpbuf,"SPRITE MEMORY","BLIT MEMORY");
+    if(multi==false){
+        STR_REPLACE((char *)inpbuf,"MM.INFO$","MM.INFO");
+        STR_REPLACE((char *)inpbuf,"=>",">=");
+        STR_REPLACE((char *)inpbuf,"=<","<=");
+        STR_REPLACE((char *)inpbuf,"MM.FONTHEIGHT","MM.INFO(FONTHEIGHT)");
+        STR_REPLACE((char *)inpbuf,"MM.FONTWIDTH","MM.INFO(FONTWIDTH)");
+        STR_REPLACE((char *)inpbuf,"MM.PS2","MM.INFO(PS2)");
+        STR_REPLACE((char *)inpbuf,"MM.VER","MM.INFO(VERSION)");
+        STR_REPLACE((char *)inpbuf,"MM.HPOS","MM.INFO(HPOS)");
+        STR_REPLACE((char *)inpbuf,"MM.VPOS","MM.INFO(VPOS)");
+        STR_REPLACE((char *)inpbuf,"MM.ONEWIRE","MM.INFO(ONEWIRE)");
+        STR_REPLACE((char *)inpbuf,"SPRITE MEMORY","BLIT MEMORY");
+    }
     // setup the input and output buffers
     p = inpbuf;
     op = tknbuf;
