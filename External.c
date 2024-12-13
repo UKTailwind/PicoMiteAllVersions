@@ -970,10 +970,19 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
 #else
     else if(cfg>=EXT_PWM0A && cfg<=EXT_PWM7B)gpio_set_function(PinDef[pin].GPno, GPIO_FUNC_PWM);
 #endif
-    else if(cfg==EXT_PIO0_OUT)gpio_set_function(PinDef[pin].GPno, GPIO_FUNC_PIO0);
-    else if(cfg==EXT_PIO1_OUT)gpio_set_function(PinDef[pin].GPno, GPIO_FUNC_PIO1);
+    else if(cfg==EXT_PIO0_OUT){
+	    gpio_set_input_enabled(PinDef[pin].GPno, true);
+        gpio_set_function(PinDef[pin].GPno, GPIO_FUNC_PIO0);
+    }
+    else if(cfg==EXT_PIO1_OUT){
+	    gpio_set_input_enabled(PinDef[pin].GPno, true);
+        gpio_set_function(PinDef[pin].GPno, GPIO_FUNC_PIO1);
+    }
 #ifdef rp2350
-    else if(cfg==EXT_PIO2_OUT)gpio_set_function(PinDef[pin].GPno, GPIO_FUNC_PIO2);
+    else if(cfg==EXT_PIO2_OUT){
+	    gpio_set_input_enabled(PinDef[pin].GPno, true);
+        gpio_set_function(PinDef[pin].GPno, GPIO_FUNC_PIO2);
+    }
 #endif
     uSec(2);
 }
@@ -3565,8 +3574,8 @@ void MIPS16 ClearExternalIO(void) {
     IrGotMsg = false;
     memset(&PIDchannels,0,sizeof(s_PIDchan)*(MAXPID+1));
 #ifdef rp2350
-#ifdef HDMI
-	for(i = 1; i < (rp2350a ? 44:NBRPINS) ; i++) {
+#ifdef PICOMITEWEB
+	for(i = 1; i < (NBRPINS) ; i++) {
 		if(CheckPin(i, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED)) {    // don't reset invalid or boot reserved pins
           ExtCfg(i, EXT_NOT_CONFIG, 0);                                       // all set to unconfigured
 		}

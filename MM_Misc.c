@@ -4995,12 +4995,7 @@ void MIPS16 fun_info(void){
             targ=T_INT;
             return;
         } else if(checkstring(ep, (unsigned char *)"VERSION")){
-            char *p;
-            fret = (MMFLOAT)strtol(VERSION, &p, 10);
-            fret += (MMFLOAT)strtol(p + 1, &p, 10) / (MMFLOAT)100.0;
-            fret += (MMFLOAT)strtol(p + 1, &p, 10) / (MMFLOAT)10000.0;
-            fret += (MMFLOAT)strtol(p + 1, &p, 10) / (MMFLOAT)1000000.0;
-            targ=T_NBR;
+            fun_version();
             return;
         } else if(checkstring(ep, (unsigned char *)"VPOS")){
             iret = CurrentY;

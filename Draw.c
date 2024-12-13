@@ -6765,6 +6765,7 @@ void cmd_map(void){
 
 void cmd_mode(void){
     int mode =getint(cmdline,1,MAXMODES);
+    if(mode+SCREENMODE1-1==DISPLAY_TYPE)return;
     closeframebuffer('A');
     if(mode==5){
         DISPLAY_TYPE=SCREENMODE5; 

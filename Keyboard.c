@@ -419,7 +419,7 @@ const char keyE0Codes_ES[56] =
 void KBDIntEnable(int status)
 {
   PinSetBit(Option.KEYBOARD_CLOCK, TRISSET); // if tris = 1 then it is an input
-  PinSetBit(Option.KEYBOARD_CLOCK, TRISSET);  // if tris = 1 then it is an input
+  PinSetBit(Option.KEYBOARD_DATA, TRISSET);  // if tris = 1 then it is an input
   PinSetBit(Option.KEYBOARD_CLOCK, CNPUSET); // if tris = 1 then it is an input
   PinSetBit(Option.KEYBOARD_DATA, CNPUSET);  // if tris = 1 then it is an input
   if (status)

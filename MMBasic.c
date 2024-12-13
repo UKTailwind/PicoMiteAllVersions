@@ -956,7 +956,7 @@ void  MIPS16 str_replace(char *target, const char *needle, const char *replaceme
 void  MIPS16 STR_REPLACE(char *target, const char *needle, const char *replacement){
 	char *ip=target;
 	int toggle=0;
-    char *comment=NULL;
+    char comment[STRINGSIZE]={0};
     skipspace(ip);
     if(!(toupper(*ip)=='R' && toupper(ip[1])=='E' && toupper(ip[2])=='M' )){
         while(*ip){
@@ -974,7 +974,7 @@ void  MIPS16 STR_REPLACE(char *target, const char *needle, const char *replaceme
                 *ip=0xFD;
             }
             if(toggle==0 && *ip=='\''){
-                comment=ip;
+                strcpy(comment,ip);
                 *ip=0;
                 break;
             }
@@ -982,7 +982,9 @@ void  MIPS16 STR_REPLACE(char *target, const char *needle, const char *replaceme
         }
         str_replace(target, needle, replacement);
         ip=target;
-        if(comment)*comment='\'';
+        if(comment[0]=='\''){
+            strcat(target,comment);
+        }
         while(*ip){
             if(*ip==0xFF)*ip=' ';
             if(*ip==0xFE)*ip='.';
@@ -990,7 +992,6 @@ void  MIPS16 STR_REPLACE(char *target, const char *needle, const char *replaceme
             ip++;
         }
     }
-
 }
 
 

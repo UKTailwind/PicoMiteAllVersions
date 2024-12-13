@@ -1722,7 +1722,7 @@ char *pinsearch(int pin){
 	else if(pin==Option.AUDIO_DCS_PIN)strcpy(buff,"AUDIO DCS");
 	else if(pin==Option.AUDIO_RESET_PIN)strcpy(buff,"AUDIO RESET");
 	else if(pin==Option.SYSTEM_I2C_SCL)strcpy(buff,"SYSTEM I2C SCL");
-	else if(pin==Option.SYSTEM_I2C_SDA)strcpy(buff,"SYSTEM I2C SDS");
+	else if(pin==Option.SYSTEM_I2C_SDA)strcpy(buff,"SYSTEM I2C SDA");
 	else if(pin==Option.TOUCH_CS)strcpy(buff,"TOUCH CS");
 	else if(pin==Option.TOUCH_IRQ)strcpy(buff,"TOUCH IRQ");
 	else if(pin==Option.SD_CS)strcpy(buff,"SD CS");

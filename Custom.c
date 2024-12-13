@@ -1230,6 +1230,19 @@ void MIPS16 cmd_pio(void){
         if(argc>9 && *argv[10])mypio.shiftctrl= getint(argv[10],0,0xFFFFFFFF);
         if(argc>11) start=getint(argv[12],0,31);
         mypio.clkdiv = (uint32_t) (clock * (1 << 16));
+#ifdef rp2350
+        #ifdef PICOMITEWEB
+	        for(int i = 1; i < (NBRPINS) ; i++) {
+        #else
+	        for(int i = 1; i < (rp2350a ? 44:NBRPINS) ; i++) {
+        #endif
+#else
+	for(int i = 1; i < (NBRPINS) ; i++) {
+#endif
+		if(CheckPin(i, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED)) {    // don't reset invalid or boot reserved pins
+	                gpio_set_input_enabled(PinDef[i].GPno, true);
+		}
+	}
         pio_sm_set_config(pio, sm, &mypio);
         pio_sm_init(pio, sm, start, &mypio);
         pio_sm_clear_fifos(pio,sm);
