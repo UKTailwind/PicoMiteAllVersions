@@ -2900,6 +2900,7 @@ void MIPS16 cmd_option(void) {
     tp = checkstring(cmdline, (unsigned char *)"HDMI PINS");
     if(tp) {
         getargs(&tp,7,(unsigned char *)",");
+    	if(CurrentLinePtr) error("Invalid in a program");
         if(argc!=7)error("Syntax");
         uint8_t clock=getint(argv[0],0,7);
         uint8_t d0=getint(argv[2],0,7);
@@ -2918,6 +2919,7 @@ void MIPS16 cmd_option(void) {
     tp = checkstring(cmdline, (unsigned char *)"RESOLUTION");
     if(tp) {
         getargs(&tp,3,(unsigned char *)",");
+    	if(CurrentLinePtr) error("Invalid in a program");
         if((checkstring(argv[0], (unsigned char *)"640")) || (checkstring(argv[0], (unsigned char *)"640x480"))){
             if(argc==3){
                 int i=getint(argv[2],252000,315000);
@@ -2950,6 +2952,7 @@ void MIPS16 cmd_option(void) {
         int pin1;
         unsigned char code;
         getargs(&tp,1,(unsigned char *)",");
+    	if(CurrentLinePtr) error("Invalid in a program");
         if(!(code=codecheck(argv[0])))argv[0]+=2;
         pin1 = getinteger(argv[0]);
         if(!code)pin1=codemap(pin1);
@@ -2980,6 +2983,7 @@ void MIPS16 cmd_option(void) {
         int pin1,pin2;
         unsigned char code;
 		getargs(&tp,3,(unsigned char *)",");
+    	if(CurrentLinePtr) error("Invalid in a program");
         if(Option.KEYBOARD_CLOCK)error("Keyboard must be disabled to change pins");
         if(argc!=3)error("Syntax");
         if(!(code=codecheck(argv[0])))argv[0]+=2;
@@ -3001,6 +3005,7 @@ void MIPS16 cmd_option(void) {
 	}
     tp = checkstring(cmdline, (unsigned char *)"MOUSE");
 	if(tp) {
+    	if(CurrentLinePtr) error("Invalid in a program");
         if(checkstring(tp,(unsigned char *)"DISABLE")){
             Option.MOUSE_CLOCK=0;
             Option.MOUSE_DATA=0;
@@ -3720,6 +3725,7 @@ void MIPS16 cmd_option(void) {
     if(tp) {
         unsigned char *p=NULL;
         int i, size=0;
+    	if(CurrentLinePtr) error("Invalid in a program");
         if((p=checkstring(tp, (unsigned char *)"ENABLE"))){
             if(!Option.modbuff)       { 
                 getargs(&p,1,(unsigned char *)",");
@@ -3775,8 +3781,8 @@ void MIPS16 cmd_option(void) {
     if(tp) {
         int pin1,pin2, slice;
         unsigned char *p;
+    	if(CurrentLinePtr) error("Invalid in a program");
         if(checkstring(tp, (unsigned char *)"DISABLE")){
-   	        if(CurrentLinePtr) error("Invalid in a program");
             disable_audio();
             SaveOptions();
             _excep_code = RESET_COMMAND;
@@ -3854,7 +3860,6 @@ void MIPS16 cmd_option(void) {
         if((p=checkstring(tp, (unsigned char *)"SPI"))){
             int pin1,pin2,pin3;
             getargs(&p,5,(unsigned char *)",");
-            if(CurrentLinePtr) error("Invalid in a program");
             if(argc!=5)error("Syntax");
             if(Option.AUDIO_CLK_PIN || Option.AUDIO_L)error("Audio already configured");
             unsigned char code;
@@ -3891,7 +3896,6 @@ void MIPS16 cmd_option(void) {
             return;
         }
     	getargs(&tp,3,(unsigned char *)",");
-   	    if(CurrentLinePtr) error("Invalid in a program");
          if(argc!=3)error("Syntax");
         if(Option.AUDIO_CLK_PIN || Option.AUDIO_L)error("Audio already configured");
         unsigned char code;
@@ -4064,6 +4068,7 @@ void MIPS16 cmd_option(void) {
 #endif
 	tp = checkstring(cmdline, (unsigned char *)"SDCARD");
     int pin1, pin2, pin3, pin4;
+    if(CurrentLinePtr) error("Invalid in a program");
     if(tp) {
         if(checkstring(tp, (unsigned char *)"DISABLE")){
             FatFSFileSystem=0;
@@ -4090,7 +4095,6 @@ void MIPS16 cmd_option(void) {
 #else
         if(!(argc==1 || argc==7))error("Syntax");
 #endif
-   	    if(CurrentLinePtr) error("Invalid in a program");
          if(Option.SD_CS || Option.CombinedCS)error("SDcard already configured");
         if(argc==1 && !Option.SYSTEM_CLK)error("System SPI not configured");
         unsigned char code;
@@ -4167,6 +4171,7 @@ void MIPS16 cmd_option(void) {
 	tp = checkstring(cmdline, (unsigned char *)"DISK LOAD");
     if(tp){
         getargs(&tp,1,(unsigned char *)",");
+    	if(CurrentLinePtr) error("Invalid in a program");
         if(!(argc==1))error("Syntax");
         int fnbr = FindFreeFileNbr();
         int fsize;
@@ -4320,13 +4325,6 @@ void MIPS16 fun_info(void){
         CtoM(sret);
         targ=T_STR;
         return;
-#ifdef PICOMITEWEB
-    } else if((tp=checkstring(ep, (unsigned char *)"TCP REQUEST"))){
-        int i=getint(tp,1,MaxPcb)-1;
-        iret=TCPstate->inttrig[i];
-        targ=T_INT;
-        return;
-#endif
 #ifdef PICOMITEVGA
     } else if((tp=checkstring(ep, (unsigned char *)"TILE HEIGHT"))){
         iret=ytileheight;
@@ -4538,7 +4536,20 @@ void MIPS16 fun_info(void){
         targ=T_STR;
         return;
 #ifdef PICOMITEWEB
-    } else if(checkstring(ep,(unsigned char *)"IP ADDRESS")){  
+    } else if((tp=checkstring(ep, (unsigned char *)"TCP REQUEST"))){
+        int i=getint(tp,1,MaxPcb)-1;
+        iret=TCPstate->inttrig[i];
+        targ=T_INT;
+        return;
+    } else if((tp=checkstring(ep, (unsigned char *)"TCP PORT"))){
+        iret=Option.TCP_PORT;
+        targ=T_INT;
+        return;
+    } else if((tp=checkstring(ep, (unsigned char *)"UDP PORT"))){
+        iret=Option.UDP_PORT;
+        targ=T_INT;
+        return;
+     } else if(checkstring(ep,(unsigned char *)"IP ADDRESS")){  
         strcpy((char *)sret,ip4addr_ntoa(netif_ip4_addr(netif_list)));
         CtoM(sret);
         targ=T_STR;

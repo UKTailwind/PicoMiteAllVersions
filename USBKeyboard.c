@@ -1644,6 +1644,12 @@ void USR_KEYBRD_ProcessData(uint8_t data)
 {
   int sendCRLF=2;
 	if(data==0)return;
+	if (BreakKey && data == BreakKey)
+	{                                      // if the user wants to stop the progran
+	MMAbort = true;                      // set the flag for the interpreter to see
+	ConsoleRxBufHead = ConsoleRxBufTail; // empty the buffer
+											// break;
+	}
 	if(data=='\n'){
 		if(sendCRLF==3)USR_KEYBRD_ProcessData('\r');
 		if(sendCRLF==2)data='\r';

@@ -841,9 +841,18 @@ void cmd_end(void) {
         busy_wait_ms(100);
     }
 #endif
-	if(FindSubFun((unsigned char *)"MM.END", 0) >= 0 && checkstring(cmdline,(unsigned char *)"NOEND")==NULL) {
-		ExecuteProgram((unsigned char *)"MM.END\0");
-		memset(inpbuf,0,STRINGSIZE);
+	getargs(&cmdline,1,(unsigned char *)",");
+	if(argc==1){
+		if(FindSubFun((unsigned char *)"MM.END", 0) >= 0 && checkstring(argv[0],(unsigned char *)"NOEND")==NULL) {
+			ExecuteProgram((unsigned char *)"MM.END\0");
+			memset(inpbuf,0,STRINGSIZE);
+		} else {
+    		unsigned char *cmd_args = (unsigned char *)"";
+            cmd_args = getCstring(argv[0]);
+			void *ptr = findvar((unsigned char *)"MM.ENDLINE$", V_FIND);
+    		strcpy(ptr, (char *)cmd_args ); // *** THW 16/4/23
+			CtoM(ptr);
+    	}
 	}
     if(!(MMerrno == 16))hw_clear_bits(&watchdog_hw->ctrl, WATCHDOG_CTRL_ENABLE_BITS);
     irq_set_enabled(DMA_IRQ_1, false);

@@ -516,6 +516,7 @@ int   MIPS16 PrepareProgramExt(unsigned char *p, int i, unsigned char **CFunPtr,
                 MMPrintString("Error: Too many subroutines and functions - erasing program\r\n");
                 uSec(100000);
                 ClearProgram();
+                cmdline=NULL;
                 cmd_end();
             }
             subfun[i++] = p++;                                      // save the address and step over the token
@@ -1871,6 +1872,7 @@ void hashlabels(unsigned char *p,int ErrAbort){
                 MMPrintString("Error: Too many labels - erasing program\r\n");
                 uSec(100000);
                 ClearProgram();
+                cmdline=NULL;
                 cmd_end();
             }
     		funtbl[hash].index=(uint32_t)lastp;
@@ -2883,6 +2885,7 @@ void MIPS16 error(char *msg, ...) {
     }
     
     #endif
+    cmdline=NULL;
     cmd_end();
 }
 

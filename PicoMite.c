@@ -1729,6 +1729,7 @@ void __not_in_flash_func(CheckAbort)(void) {
 #endif
         cmdline=GetTempMemory(STRINGSIZE);
         strcpy((char *)cmdline,"noend");
+        cmdline=NULL;
         cmd_end();
     }
 }
@@ -3634,7 +3635,6 @@ void WebConnect(void){
 }
 #endif
 
-
 int MIPS16 main(){
     static int ErrorInPrompt;
     int i;
@@ -3959,6 +3959,16 @@ int MIPS16 main(){
 		*tknbuf = 0;											// we do not want to run whatever is in the token buffer
 		optionangle=1.0;
         savewatchdog = WatchdogSet = false;
+		char *ptr = findvar((unsigned char *)"MM.ENDLINE$", V_NOFIND_NULL);
+        if(ptr && *ptr){
+            CurrentLinePtr=0;
+            memcpy(inpbuf,ptr,*ptr+1);
+            *ptr=0;
+            MtoC(inpbuf);
+            *ptr=0;
+            tokenise(true);
+            goto autorun;
+        }
     } else {
         if(*ProgMemory == 0x01 ) ClearVars(0);
         else {

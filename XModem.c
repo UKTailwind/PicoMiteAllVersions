@@ -118,6 +118,7 @@ void MIPS16 cmd_xmodem(void) {
         FileClose(fnbr);
     }
     BreakKey = BreakKeySave;
+    cmdline=NULL;
     cmd_end();
 }
 

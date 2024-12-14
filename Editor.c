@@ -965,7 +965,10 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool rese
                                 FileClose(fnbr1);
                             }
                             if(reset==false)return;
-                            if(c == ESC || c == CTRLKEY('Q') || c == F1 || fname) cmd_end();
+                            if(c == ESC || c == CTRLKEY('Q') || c == F1 || fname) {
+                                cmdline=NULL;
+                                cmd_end();
+                            }
                             // this must be save, exit and run.  We have done the first two, now do the run part.
                             ClearRuntime();
 //                            WatchdogSet = false;
