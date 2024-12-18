@@ -974,6 +974,9 @@ void  MIPS16 STR_REPLACE(char *target, const char *needle, const char *replaceme
             if(toggle && *ip=='='){
                 *ip=0xFD;
             }
+            if(toggle && *ip=='\\'){
+                *ip=0xFC;
+            }
             if(toggle==0 && *ip=='\''){
                 strcpy(comment,ip);
                 *ip=0;
@@ -990,6 +993,7 @@ void  MIPS16 STR_REPLACE(char *target, const char *needle, const char *replaceme
             if(*ip==0xFF)*ip=' ';
             if(*ip==0xFE)*ip='.';
             if(*ip==0xFD)*ip='=';
+            if(*ip==0xFC)*ip='\\';
             ip++;
         }
     }

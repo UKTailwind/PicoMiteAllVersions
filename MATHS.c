@@ -36,6 +36,10 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "Hardware_Includes.h"
 #include <math.h>
 #include <complex.h>
+#define CBC 1
+#define CTR 1
+#define ECB 1
+#include "aes.h"
 MMFLOAT PI;
 typedef MMFLOAT complex cplx;
 typedef float complex fcplx;
@@ -607,6 +611,105 @@ int parseany(unsigned char *tp, MMFLOAT **a1float, int64_t **a1int, unsigned cha
 	} else error("Syntax");
 	return *length;
 }
+int parseAES(uint8_t *p,uint8_t *keyx, uint8_t *inx, uint8_t *ivx, int64_t **outint, unsigned char **outstr, MMFLOAT **outfloat){
+	int64_t *a1int=NULL, *a2int=NULL, *a3int=NULL, *a4int=NULL;
+	unsigned char *a1str=NULL, *a2str=NULL,*a3str=NULL,*a4str=NULL;
+	MMFLOAT *a1float=NULL, *a2float=NULL, *a3float=NULL, *a4float=NULL;
+	int card1, card2, card3;
+	getargs(&p,7,(unsigned char *)",");
+	if(ivx==NULL){
+		if(argc!=5)error("Syntax");
+	} else {
+		if(argc<5)error("Syntax");
+	}
+	*outstr=NULL;
+	*outint=NULL;
+	int length=0;
+	card1= parseany(argv[0], &a1float, &a1int, &a1str, &length, false);
+	if(card1!=16)error("Key must be 16 elements long");
+	length=0;
+	card2= parseany(argv[2], &a2float, &a2int, &a2str, &length, false);
+	if(card2 % 16)error("input must be multiple of 16 elements long");
+	if(card2 >256)error("input must be <= 256 elements long");
+	length=0;
+	card3= parseany(argv[4], &a3float, &a3int, &a3str, &length, false);
+	//	card3=parseintegerarray(argv[4],&a3int,3,0, NULL, true);
+	if(card3!=card2 && a3str==NULL)error("Array size mismatch");
+	if(argc==7){
+		length=0;
+		card1= parseany(argv[6], &a4float, &a4int, &a4str, &length, false);
+		if(card1!=16)error("Initialisation vector must be 16 elements long");
+		if(a4int!=NULL){
+			for(int i=0;i<16;i++){
+				if(a4int[i]<0 || a4int[i]>255)error("Key number out of bounds 0-255");
+				ivx[i]=a4int[i];
+			}
+		} else if (a4float!=NULL){
+			for(int i=0;i<16;i++){
+				if(a4float[i]<0 || a4float[i]>255)error("Key number out of bounds 0-255");
+				ivx[i]=a4float[i];
+			}
+		} else if(a4str!=NULL){
+			for(int i=0;i<16;i++){
+				ivx[i]=a4str[i+1];
+			}
+		}
+	}
+
+	if(a1int!=NULL){
+		for(int i=0;i<16;i++){
+			if(a1int[i]<0 || a1int[i]>255)error("Key number out of bounds 0-255");
+			keyx[i]=a1int[i];
+		}
+	} else if (a1float!=NULL){
+		for(int i=0;i<16;i++){
+			if(a1float[i]<0 || a1float[i]>255)error("Key number out of bounds 0-255");
+			keyx[i]=a1float[i];
+		}
+	} else if(a1str!=NULL){
+		for(int i=0;i<16;i++){
+			keyx[i]=a1str[i+1];
+		}
+	}
+	if(a2int!=NULL){
+		for(int i=0;i<card2;i++){
+			if(a2int[i]<0 || a2int[i]>255)error("input number out of bounds 0-255");
+			inx[i]=a2int[i];
+		}
+	} else if (a2float!=NULL){
+		for(int i=0;i<card2;i++){
+			if(a2float[i]<0 || a2float[i]>255)error("input number out of bounds 0-255");
+			inx[i]=a2float[i];
+		}
+	} else if(a2str!=NULL){
+		for(int i=0;i<card2;i++){
+			inx[i]=a2str[i+1];
+		}
+	}
+	if(a3int!=NULL){
+		*outint=a3int;
+	} else if (a3float!=NULL){
+		*outfloat=a3float;
+	} else if(a3str!=NULL){
+		*outstr=a3str;
+	}
+	return card2;
+}
+void returnAES(int64_t *outint, MMFLOAT *outflt, uint8_t *outstr, uint8_t *inx, int card){
+	if(outint!=NULL){
+		for(int i=0;i<card;i++){
+			outint[i]=inx[i];
+		}
+	} else if(outflt!=NULL){
+		for(int i=0;i<card;i++){
+			outflt[i]=(MMFLOAT)inx[i];
+		}
+	} else if(outstr!=NULL){
+		if(card==256)error("Too many elements for string output");
+		memcpy(&outstr[1],inx,card);
+		*outstr=card;
+	}
+}
 MMFLOAT farr2d(MMFLOAT *arr,int d1, int a, int b){
 	arr+=d1*b+a;
 	return *arr;
@@ -1043,17 +1146,24 @@ void cmd_math(void){
 			int j, numcols=0;
 			MMFLOAT *a1float=NULL;
 			int64_t *a1int=NULL;
-			getargs(&tp, 1,(unsigned char *)",");
-			if(!(argc == 1)) error("Argument count");
+			getargs(&tp, 3,(unsigned char *)",");
+			if(!(argc == 1 || argc==3)) error("Argument count");
 			numcols=parsenumberarray(argv[0],&a1float,&a1int,1,1, dims, false);
 			if(a1float!=NULL){
+				if(argc==3)error("Trying to print a float in HEX");
 				PFlt(*a1float++);
 				for(j=1;j<numcols;j++)PFltComma(*a1float++);
 				PRet();
 			} else {
-				PInt(*a1int++);
-				for(j=1;j<numcols;j++)PIntComma(*a1int++);
-				PRet();
+				if(checkstring(argv[2],(unsigned char *)"HEX")){
+					PIntH(*a1int++);
+					for(j=1;j<numcols;j++)PIntHC(*a1int++);
+					PRet();
+				} else {
+					PInt(*a1int++);
+					for(j=1;j<numcols;j++)PIntComma(*a1int++);
+					PRet();
+				}
 			}
 			return;
 		}
@@ -1355,6 +1465,57 @@ void cmd_math(void){
 			return;
 		}
 	} else {
+		tp = checkstring(cmdline, (unsigned char *)"AES128");
+		if(tp) {
+			struct AES_ctx ctx;
+ 			int64_t *outint=NULL;
+			unsigned char *outstr=NULL;
+			MMFLOAT *outflt=NULL;
+			unsigned char keyx[16], inx[256];
+			unsigned char * p;
+			int card;
+			if((p=checkstring(tp, (unsigned char *)"ENCRYPT CBC"))){
+   				uint8_t iv[]  = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f };
+				card= parseAES(p, &keyx[0], &inx[0], &iv[0], &outint, &outstr, &outflt);
+				AES_init_ctx_iv(&ctx, keyx, iv);
+				AES_CBC_encrypt_buffer(&ctx, inx, card);
+				returnAES(outint, outflt, outstr, inx, card);
+				return;
+			} else if((p=checkstring(tp, (unsigned char *)"DECRYPT CBC"))){
+   				uint8_t iv[]  = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f };
+				card= parseAES(p, &keyx[0], &inx[0], &iv[0], &outint, &outstr, &outflt);
+				AES_init_ctx_iv(&ctx, keyx, iv);
+				AES_CBC_decrypt_buffer(&ctx, inx, card);
+				returnAES(outint, outflt, outstr, inx, card);
+				return;
+			} else if((p=checkstring(tp, (unsigned char *)"ENCRYPT ECB"))){
+				card= parseAES(p, &keyx[0], &inx[0], NULL, &outint, &outstr, &outflt);
+				AES_init_ctx(&ctx, keyx);
+				AES_ECB_encrypt(&ctx, inx);
+				returnAES(outint, outflt, outstr, inx, card);
+				return;
+			} else if((p=checkstring(tp, (unsigned char *)"DECRYPT ECB"))){
+				card= parseAES(p, &keyx[0], &inx[0], NULL, &outint, &outstr, &outflt);
+				AES_init_ctx(&ctx, keyx);
+				AES_ECB_decrypt(&ctx, inx);
+				returnAES(outint, outflt, outstr, inx, card);
+				return;
+			} else if((p=checkstring(tp, (unsigned char *)"ENCRYPT CTR"))){
+			    uint8_t iv[16]  = { 0xf0, 0xf1, 0xf2, 0xf3, 0xf4, 0xf5, 0xf6, 0xf7, 0xf8, 0xf9, 0xfa, 0xfb, 0xfc, 0xfd, 0xfe, 0xff };
+				card= parseAES(p, &keyx[0], &inx[0], &iv[0], &outint, &outstr, &outflt);
+				AES_init_ctx_iv(&ctx, keyx, iv);
+				AES_CTR_xcrypt_buffer(&ctx, inx, card);
+				returnAES(outint, outflt, outstr, inx, card);
+				return;
+			} else if((p=checkstring(tp, (unsigned char *)"DECRYPT CTR"))){
+			    uint8_t iv[16]  = { 0xf0, 0xf1, 0xf2, 0xf3, 0xf4, 0xf5, 0xf6, 0xf7, 0xf8, 0xf9, 0xfa, 0xfb, 0xfc, 0xfd, 0xfe, 0xff };
+				card= parseAES(p, &keyx[0], &inx[0], &iv[0], &outint, &outstr, &outflt);
+				AES_init_ctx_iv(&ctx, keyx, iv);
+				AES_CTR_xcrypt_buffer(&ctx, inx, card);
+				returnAES(outint, outflt, outstr, inx, card);
+				return;
+			}
+		}
 		tp = checkstring(cmdline, (unsigned char *)"PID");
 		if(tp) {
 			unsigned char * pi;

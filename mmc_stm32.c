@@ -1679,7 +1679,7 @@ void InitReservedIO(void) {
 char *pinsearch(int pin){
 	char *buff=GetTempMemory(STRINGSIZE);
 #ifndef PICOMITEVGA
-	if(pin==Option.LCD_CD)strcpy(buff,"LCD CD");
+	if(pin==Option.LCD_CD)strcpy(buff,"LCD DC");
 	else if(pin==Option.LCD_CS)strcpy(buff,"LCD CS");
 	else if(pin==Option.LCD_RD)strcpy(buff,"LCD RD");
 	else if(pin==Option.LCD_Reset)strcpy(buff,"LCD Reset");

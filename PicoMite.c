@@ -4072,7 +4072,10 @@ autorun:
             CurrentLinePtr = 0;
         }
         ExecuteProgram(tknbuf);                                     // execute the line straight away
-        if(i)cmd_end();
+        if(i){
+            cmdline=NULL;
+            cmd_end();
+        }
         else {
             memset(inpbuf,0,STRINGSIZE);
 	        longjmp(mark, 1);												// jump back to the input prompt

@@ -2949,6 +2949,13 @@ void MIPS16 cmd_option(void) {
 #endif
     tp = checkstring(cmdline, (unsigned char *)"PSRAM PIN");
     if(tp) {
+		if(checkstring(tp, (unsigned char *)"DISABLE")){
+            Option.PSRAM_CS_PIN=0;
+            SaveOptions();
+            _excep_code = RESET_COMMAND;
+            SoftReset();
+            return;
+        }
         int pin1;
         unsigned char code;
         getargs(&tp,1,(unsigned char *)",");
@@ -3459,6 +3466,7 @@ void MIPS16 cmd_option(void) {
             Option.DefaultFont = 1 ;
 #ifdef HDMI
         } else if(mode==4){
+            if(!(Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P))error("Mode not available in this resolution");
             Option.DISPLAY_TYPE=SCREENMODE4; 
             Option.DefaultFont=(6<<4) | 1 ;
         } else if(mode==5){

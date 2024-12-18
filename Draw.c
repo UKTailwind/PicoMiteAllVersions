@@ -489,7 +489,7 @@ void ClearScreen(int c) {
 #ifdef PICOMITEVGA
     if(DISPLAY_TYPE==SCREENMODE1){
 #ifdef HDMI
-        memset(DisplayBuf,0,ScreenSize);
+        memset(WriteBuf,0,ScreenSize);
         if(Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P ){
             uint16_t bcolour = RGB555(c);
             for(int x=0;x<X_TILE;x++){
