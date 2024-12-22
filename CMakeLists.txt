@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.13)
 # Valid builds are PICO, PICOUSB, VGA, VGAUSB, HDMI(rp2350 only), HDMIUSB(rp2350 only), WEB(rp2040 only)
 
-set(COMPILE VGA)
+set(COMPILE HDMIUSB)
 
 if (COMPILE STREQUAL "HDMI" OR COMPILE STREQUAL "WEBRP2350" OR COMPILE STREQUAL "HDMIUSB"  OR COMPILE STREQUAL "VGARP2350"  OR COMPILE STREQUAL "VGAUSBRP2350"  OR COMPILE STREQUAL "PICORP2350"  OR COMPILE STREQUAL "PICOUSBRP2350" )
 	set(PICO_PLATFORM rp2350)
@@ -58,6 +58,7 @@ add_executable(PicoMite
     lfs_util.c
 	hxcmod.c
     VS1053.c
+	aes.c
 )
 if (COMPILE STREQUAL "WEB" OR COMPILE STREQUAL "WEBRP2350" )
     target_sources(PicoMite PRIVATE 
@@ -119,7 +120,7 @@ set_source_files_properties(regex.c PROPERTIES COMPILE_FLAGS -Os)
 set_source_files_properties(hxcmod.c PROPERTIES COMPILE_FLAGS -Os)
 set_source_files_properties(MATHS.c PROPERTIES COMPILE_FLAGS -Os)
 set_source_files_properties(Editor.c PROPERTIES COMPILE_FLAGS -Os)
-
+set_source_files_properties(aes.c PROPERTIES COMPILE_FLAGS -Os)
 if (COMPILE STREQUAL "VGAUSB" OR COMPILE STREQUAL "VGA" OR COMPILE STREQUAL "PICO" OR COMPILE STREQUAL "PICOUSB" OR COMPILE STREQUAL "WEB")
 	pico_define_boot_stage2(slower_boot2 ${PICO_DEFAULT_BOOT_STAGE2_FILE})
 	target_compile_definitions(slower_boot2 PRIVATE PICO_FLASH_SPI_CLKDIV=4)
@@ -157,7 +158,7 @@ target_compile_options(PicoMite PRIVATE -Drp2350
 										-DPICO_FLASH_SPI_CLKDIV=4
 										)
 else()
-target_compile_options(PicoMite PRIVATE -DPICO_HEAP_SIZE=$<IF:$<STREQUAL:COMPILE,WEB>,0x2000,0x800>
+target_compile_options(PicoMite PRIVATE -DPICO_HEAP_SIZE=$<IF:$<STREQUAL:COMPILE,WEB>,0x2000,0x4000>
 										)
 endif()
 

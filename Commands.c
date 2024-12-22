@@ -530,7 +530,9 @@ void MIPS16 cmd_list(void) {
         	if(Option.DISPLAY_CONSOLE && (SPIREAD  || Option.NoScroll)){ClearScreen(gui_bcolour);CurrentX=0;CurrentY=0;}
         	char *buff=GetTempMemory(STRINGSIZE);
         	strcpy(buff,(char *)getCstring(argv[0]));
-    		if(strchr(buff, '.') == NULL) strcat(buff, ".bas");
+    		if(strchr(buff, '.') == NULL) {
+				if(!ExistsFile(buff))strcat(buff, ".bas");
+			}
 			ListFile(buff, false);
         } else {
         	if(Option.DISPLAY_CONSOLE && (SPIREAD  || Option.NoScroll)){ClearScreen(gui_bcolour);CurrentX=0;CurrentY=0;}
@@ -647,7 +649,15 @@ void MIPS16 __not_in_flash_func(cmd_if)(void) {
 void cmd_if(void) {
 #endif
 #else
+#ifndef rp2350
+#ifdef PICOMITEVGA
+void cmd_if(void) {
+#else
 void MIPS16 __not_in_flash_func(cmd_if)(void) {
+#endif
+#else
+void MIPS16 __not_in_flash_func(cmd_if)(void) {
+#endif
 #endif
  	int r, i, testgoto, testelseif;
 	unsigned char ss[3];														// this will be used to split up the argument line
@@ -800,7 +810,15 @@ void MIPS16 __not_in_flash_func(cmd_else)(void) {
 void cmd_else(void) {
 #endif
 #else
+#ifndef rp2350
+#ifdef PICOMITEVGA
+void cmd_else(void) {
+#else
 void MIPS16 __not_in_flash_func(cmd_else)(void) {
+#endif
+#else
+void MIPS16 __not_in_flash_func(cmd_else)(void) {
+#endif
 #endif
 	int i;
 	unsigned char *p, *tp;
@@ -849,7 +867,8 @@ void cmd_end(void) {
 		} else {
     		unsigned char *cmd_args = (unsigned char *)"";
             cmd_args = getCstring(argv[0]);
-			void *ptr = findvar((unsigned char *)"MM.ENDLINE$", V_FIND);
+			void *ptr = findvar((unsigned char *)"MM.ENDLINE$", T_STR| V_NOFIND_NULL);  
+			if(ptr==NULL)ptr = findvar((unsigned char *)"MM.ENDLINE$", V_FIND |V_DIM_VAR);
     		strcpy(ptr, (char *)cmd_args ); // *** THW 16/4/23
 			CtoM(ptr);
     	}

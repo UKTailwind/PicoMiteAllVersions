@@ -4635,7 +4635,7 @@ void cmd_sprite(void) {
         spritebuff[bnbr].blitstoreptr = GetMemory((xlen * ylen +4 )>>1);
         memset(q,0xFF,xlen * ylen * 3);
         fnbr = FindFreeFileNbr();
-        if(!BasicFileOpen((char *)p, fnbr, FA_READ)) return;
+        if(!BasicFileOpen((char *)pp, fnbr, FA_READ)) return;
         BMP_bDecode_memory(xOrigin, yOrigin, xlen, ylen, fnbr, q);
         spritebuff[bnbr].w=xlen;
         spritebuff[bnbr].h=ylen;

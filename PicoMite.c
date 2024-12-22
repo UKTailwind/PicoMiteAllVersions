@@ -44,6 +44,9 @@ extern "C" {
 #include "hardware/structs/pads_qspi.h"
 #include "pico/unique_id.h"
 #include "hardware/pwm.h"
+#ifdef rp2350
+#include "hardware/structs/qmi.h"
+#endif
 #define COPYRIGHT   "Copyright " YEAR " Geoff Graham\r\n"\
                     "Copyright " YEAR2 " Peter Mather\r\n\r\n"
 
@@ -3704,7 +3707,7 @@ int MIPS16 main(){
 #endif
     if(Option.CPU_Speed<=200000)vreg_set_voltage(VREG_VOLTAGE_1_10);
     else if(Option.CPU_Speed>200000 && Option.CPU_Speed<=300000 )vreg_set_voltage(VREG_VOLTAGE_1_25);  // Std default @ boot is 1_10
-    else if(Option.CPU_Speed>300000  && Option.CPU_Speed<=378000 )vreg_set_voltage(VREG_VOLTAGE_1_30);  // Std default @ boot is 1_10
+    else if(Option.CPU_Speed>300000  && Option.CPU_Speed<=320000 )vreg_set_voltage(VREG_VOLTAGE_1_30);  // Std default @ boot is 1_10
 #ifdef rp2350
     else vreg_set_voltage(VREG_VOLTAGE_1_40);  // Std default @ boot is 1_10
 #else
@@ -3712,11 +3715,26 @@ int MIPS16 main(){
 #endif
     sleep_ms(10);
 #ifdef rp2350
-//    *qmi_m0_timing = *qmi_m1_timing = 0x60007204;
-//    if(Option.CPU_Speed<288000)*qmi_m0_timing = *qmi_m1_timing = 0x60007202;
-//    sleep_ms(2);
+#define QMI_COOLDOWN 30    // 0xc0000000 [31:30] COOLDOWN     (0x1) Chip select cooldown period
+#define QMI_PAGEBREAK 28        // 0x30000000 [29:28] PAGEBREAK    (0x0) When page break is enabled, chip select will...
+#define QMI_SELECT_SETUP 25        // 0x02000000 [25]    SELECT_SETUP (0) Add up to one additional system clock cycle of setup...
+#define QMI_SELECT_HOLD 23        // 0x01800000 [24:23] SELECT_HOLD  (0x0) Add up to three additional system clock cycles of active...
+#define QMI_MAX_SELECT 17        // 0x007e0000 [22:17] MAX_SELECT   (0x00) Enforce a maximum assertion duration for this window's...
+#define QMI_MIN_DESELECT 12        // 0x0001f000 [16:12] MIN_DESELECT (0x00) After this window's chip select is deasserted, it...
+#define QMI_RXDELAY 8          // 0x00000700 [10:8]  RXDELAY      (0x0) Delay the read data sample timing, in units of one half...
+#define QMI_CLKDIV 0           // 0x000000ff [7:0]   CLKDIV       (0x04) Clock divisor
+    if(Option.PSRAM_CS_PIN)qmi_hw->m[1].timing = (1<<QMI_COOLDOWN) | (2<<QMI_PAGEBREAK) | (3<<QMI_SELECT_HOLD) | (18<<QMI_MAX_SELECT) | (4<<QMI_MIN_DESELECT) | (6<<QMI_RXDELAY) | (6<<QMI_CLKDIV);
+    if(Option.CPU_Speed<=288000)qmi_hw->m[0].timing = 0x40006202;
+    if(Option.CPU_Speed<=150000)qmi_hw->m[1].timing = 0x60006102;
+    sleep_ms(2);
 #endif
     set_sys_clock_khz(Option.CPU_Speed, false);
+#ifdef rp2350
+    if(Option.PSRAM_CS_PIN)qmi_hw->m[1].timing = (1<<QMI_COOLDOWN) | (2<<QMI_PAGEBREAK) | (3<<QMI_SELECT_HOLD) | (18<<QMI_MAX_SELECT) | (4<<QMI_MIN_DESELECT) | (6<<QMI_RXDELAY) | (6<<QMI_CLKDIV);
+    if(Option.CPU_Speed<=288000)qmi_hw->m[0].timing = 0x40006202;
+    if(Option.CPU_Speed<=150000)qmi_hw->m[1].timing = 0x60006102;
+    sleep_ms(2);
+#endif
     PWM_FREQ=44100;
     pico_get_unique_board_id_string (id_out,12);
 #ifdef rp2350

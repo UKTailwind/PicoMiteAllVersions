@@ -53,6 +53,9 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 	#include "pico/multicore.h"
 	extern mutex_t	frameBufferMutex;
 #endif
+#ifdef rp2350
+#include "hardware/structs/qmi.h"
+#endif
 extern const uint8_t *flash_target_contents;
 extern const uint8_t *flash_option_contents;
 extern const uint8_t *SavedVarsFlash;
@@ -66,6 +69,12 @@ int dirflags;
 int GPSfnbr = 0;
 int lfs_FileFnbr=0;
 int FatFSFileSystem=0; //Assume we are using flash file system
+#ifdef rp2350
+static uint32_t m1_rfmt;
+static uint32_t m1_timing;
+static uint32_t m0_rfmt;
+static uint32_t m0_timing;
+#endif
 
 // 8*8*4 bytes * 3 = 768
 int16_t *gCoeffBuf;
@@ -271,12 +280,40 @@ union uFileTable FileTable[MAXOPENFILES + 1];
 volatile BYTE SDCardStat = STA_NOINIT | STA_NODISK;
 int OptionFileErrorAbort = true;
 volatile uint32_t irqs;
+#ifdef rp2350
+static void save_psram_settings(void) {
+    // We're about to invalidate the XIP cache, clean it first to commit any dirty writes to PSRAM
+    uint8_t *maintenance_ptr = (uint8_t *)XIP_MAINTENANCE_BASE;
+    for (int i = 1; i < 16 * 1024; i += 8) {
+        maintenance_ptr[i] = 0;
+    }
+
+    m1_timing = qmi_hw->m[1].timing;
+    m1_rfmt = qmi_hw->m[1].rfmt;
+    m0_timing = qmi_hw->m[0].timing;
+    m0_rfmt = qmi_hw->m[0].rfmt;
+}
+
+static void restore_psram_settings(void) {
+    qmi_hw->m[1].timing = m1_timing;
+    qmi_hw->m[1].rfmt = m1_rfmt;
+    qmi_hw->m[0].timing = m0_timing;
+    qmi_hw->m[0].rfmt = m0_rfmt;
+}
+#endif
+
 void disable_interrupts(void)
 {
-  irqs=save_and_disable_interrupts();
+#ifdef rp2350
+    save_psram_settings();
+#endif
+    irqs=save_and_disable_interrupts();
 }
 void enable_interrupts(void)
 {
+#ifdef rp2350
+    restore_psram_settings();
+#endif
     restore_interrupts(irqs);
     SecondsTimer+=(time_us_64()/1000 - mSecTimer);
     mSecTimer=time_us_64()/1000;
@@ -3801,7 +3838,7 @@ void cmd_autosave(void)
             for(int i=0;i<MaxPcb;i++)FreeMemory(TCPstate->buffer_recv[i]);
         }
 #endif
-        p = buf = GetMemory(EDIT_BUFFER_SIZE);
+        p = buf = GetTempMemory(EDIT_BUFFER_SIZE);
         char * fromp  = (char *)ProgMemory;
         p = buf;
         while(*fromp != 0xff) {
@@ -3823,7 +3860,7 @@ void cmd_autosave(void)
             error("Syntax");
     }
     ClearProgram(); // clear any leftovers from the previous program
-    p = buf = GetMemory(EDIT_BUFFER_SIZE);
+    p = buf = GetTempMemory(EDIT_BUFFER_SIZE);
     CrunchData(&p, 0); // initialise the crunch data subroutine
 readin:;
     while ((c = MMInkey()) != 0x1a && c != F1 && c != F2)
@@ -3869,7 +3906,7 @@ readin:;
           //    ClearSavedVars();                                               // clear any saved variables
     SaveProgramToFlash(buf, true);
     ClearSavedVars(); // clear any saved variables
-    FreeMemory(buf);
+//    FreeMemory(buf);
 #ifdef PICOMITEWEB
         if(TCPstate){
             for(int i=0;i<MaxPcb;i++)TCPstate->buffer_recv[i]=GetMemory(TCP_READ_BUFFER_SIZE);

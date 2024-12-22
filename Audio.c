@@ -784,7 +784,7 @@ void wavcallback(char *p){
 	if(Option.AUDIO_L){
 		audiorepeat=1;
 		actualrate=mywav->sampleRate;
-		while(actualrate<PWM_FREQ){
+		while(actualrate<32000){
 			actualrate +=mywav->sampleRate;
 			audiorepeat++;
 		}

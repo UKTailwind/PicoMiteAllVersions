@@ -272,8 +272,8 @@ void SoftReset(void){
 }
 #ifdef rp2350
 void __not_in_flash_func(PinSetBit)(int pin, unsigned int offset) {
- #else
-#ifdef PICOMITEVGA
+#else
+#if defined(PICOMITEVGA) || defined(PICOMITEWEB)
 void PinSetBit(int pin, unsigned int offset) {
 #else
 void __not_in_flash_func(PinSetBit)(int pin, unsigned int offset) {
@@ -343,7 +343,19 @@ int IsInvalidPin(int pin) {
     if(PinDef[pin].mode & UNUSED) return true;
     return false;
 }
+#ifdef PICOMITEWEB
+void ExtSet(int pin, int val){
+#else
+#ifndef rp2350
+#ifdef PICOMITEVGA
+void ExtSet(int pin, int val){
+#else
 void __not_in_flash_func(ExtSet)(int pin, int val){
+#endif
+#else
+void __not_in_flash_func(ExtSet)(int pin, int val){
+#endif
+#endif
 
     if(ExtCurrentConfig[pin] == EXT_NOT_CONFIG || ExtCurrentConfig[pin] == EXT_DIG_OUT/* || ExtCurrentConfig[pin] == EXT_OC_OUT*/) {
         PinSetBit(pin, val ? LATSET : LATCLR);
@@ -987,7 +999,15 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
     uSec(2);
 }
 extern int adc_clk_div;
+#ifndef rp2350
+#ifdef PICOMITEVGA
+int64_t ExtInp(int pin){
+#else
 int64_t __not_in_flash_func(ExtInp)(int pin){
+#endif
+#else
+int64_t __not_in_flash_func(ExtInp)(int pin){
+#endif
     if(ExtCurrentConfig[pin]==EXT_ANA_IN || ExtCurrentConfig[pin]==EXT_ADCRAW){
         if(adc_clk_div!=adc_hw->div){
             float div=((ADC_CLK_SPEED/96.0)/500000.0*96.000);

@@ -36,6 +36,9 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "Hardware_Includes.h"
 #include <math.h>
 #include <complex.h>
+#ifdef rp2350
+#include "pico\rand.h"
+#endif
 #define CBC 1
 #define CTR 1
 #define ECB 1
@@ -165,6 +168,106 @@ unsigned long genRandLong(MTRand* rand) {
   y ^= (y << 15) & TEMPERING_MASK_C;
   y ^= (y >> 18);
   return y;
+}
+
+unsigned char b64_chr[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+unsigned int b64_int(unsigned int ch) {
+
+	// ASCII to base64_int
+	// 65-90  Upper Case  >>  0-25
+	// 97-122 Lower Case  >>  26-51
+	// 48-57  Numbers     >>  52-61
+	// 43     Plus (+)    >>  62
+	// 47     Slash (/)   >>  63
+	// 61     Equal (=)   >>  64~
+	if (ch==43)
+	return 62;
+	if (ch==47)
+	return 63;
+	if (ch==61)
+	return 64;
+	if ((ch>47) && (ch<58))
+	return ch + 4;
+	if ((ch>64) && (ch<91))
+	return ch - 'A';
+	if ((ch>96) && (ch<123))
+	return (ch - 'a') + 26;
+	return 0;
+}
+
+unsigned int b64e_size(unsigned int in_size) {
+
+	// size equals 4*floor((1/3)*(in_size+2));
+	int i, j = 0;
+	for (i=0;i<in_size;i++) {
+		if (i % 3 == 0)
+		j += 1;
+	}
+	return (4*j);
+}
+
+unsigned int b64d_size(unsigned int in_size) {
+
+	return ((3*in_size)/4);
+}
+
+unsigned int b64_encode(const unsigned char* in, unsigned int in_len, unsigned char* out) {
+
+	unsigned int i=0, j=0, k=0, s[3];
+	
+	for (i=0;i<in_len;i++) {
+		s[j++]=*(in+i);
+		if (j==3) {
+			out[k+0] = b64_chr[ (s[0]&255)>>2 ];
+			out[k+1] = b64_chr[ ((s[0]&0x03)<<4)+((s[1]&0xF0)>>4) ];
+			out[k+2] = b64_chr[ ((s[1]&0x0F)<<2)+((s[2]&0xC0)>>6) ];
+			out[k+3] = b64_chr[ s[2]&0x3F ];
+			j=0; k+=4;
+		}
+	}
+	
+	if (j) {
+		if (j==1)
+			s[1] = 0;
+		out[k+0] = b64_chr[ (s[0]&255)>>2 ];
+		out[k+1] = b64_chr[ ((s[0]&0x03)<<4)+((s[1]&0xF0)>>4) ];
+		if (j==2)
+			out[k+2] = b64_chr[ ((s[1]&0x0F)<<2) ];
+		else
+			out[k+2] = '=';
+		out[k+3] = '=';
+		k+=4;
+	}
+
+	out[k] = '\0';
+	
+	return k;
+}
+
+unsigned int b64_decode(const unsigned char* in, unsigned int in_len, unsigned char* out) {
+
+	unsigned int i=0, j=0, k=0, s[4];
+	
+	for (i=0;i<in_len;i++) {
+		s[j++]=b64_int(*(in+i));
+		if (j==4) {
+			out[k+0] = ((s[0]&255)<<2)+((s[1]&0x30)>>4);
+			if (s[2]!=64) {
+				out[k+1] = ((s[1]&0x0F)<<4)+((s[2]&0x3C)>>2);
+				if ((s[3]!=64)) {
+					out[k+2] = ((s[2]&0x03)<<6)+(s[3]); k+=3;
+				} else {
+					k+=2;
+				}
+			} else {
+				k+=1;
+			}
+			j=0;
+		}
+	}
+	
+	return k;
 }
 
 /**
@@ -611,11 +714,11 @@ int parseany(unsigned char *tp, MMFLOAT **a1float, int64_t **a1int, unsigned cha
 	} else error("Syntax");
 	return *length;
 }
-int parseAES(uint8_t *p,uint8_t *keyx, uint8_t *inx, uint8_t *ivx, int64_t **outint, unsigned char **outstr, MMFLOAT **outfloat){
+unsigned char * parseAES(uint8_t *p, int ivadd, uint8_t *keyx, uint8_t *ivx, int64_t **outint, unsigned char **outstr, MMFLOAT **outfloat, int *card2){
 	int64_t *a1int=NULL, *a2int=NULL, *a3int=NULL, *a4int=NULL;
 	unsigned char *a1str=NULL, *a2str=NULL,*a3str=NULL,*a4str=NULL;
 	MMFLOAT *a1float=NULL, *a2float=NULL, *a3float=NULL, *a4float=NULL;
-	int card1, card2, card3;
+	int card1, card3;
 	getargs(&p,7,(unsigned char *)",");
 	if(ivx==NULL){
 		if(argc!=5)error("Syntax");
@@ -628,13 +731,13 @@ int parseAES(uint8_t *p,uint8_t *keyx, uint8_t *inx, uint8_t *ivx, int64_t **out
 	card1= parseany(argv[0], &a1float, &a1int, &a1str, &length, false);
 	if(card1!=16)error("Key must be 16 elements long");
 	length=0;
-	card2= parseany(argv[2], &a2float, &a2int, &a2str, &length, false);
-	if(card2 % 16)error("input must be multiple of 16 elements long");
-	if(card2 >256)error("input must be <= 256 elements long");
+	*card2= parseany(argv[2], &a2float, &a2int, &a2str, &length, false);
+	if(*card2 % 16)error("input must be multiple of 16 elements long");
+//	if(card2 >256)error("input must be <= 256 elements long");
+	unsigned char *inx=(unsigned char *)GetTempMemory(*card2+16);
 	length=0;
 	card3= parseany(argv[4], &a3float, &a3int, &a3str, &length, false);
-	//	card3=parseintegerarray(argv[4],&a3int,3,0, NULL, true);
-	if(card3!=card2 && a3str==NULL)error("Array size mismatch");
+	if(card3!=*card2 + ivadd && a3str==NULL)error("Array size mismatch");
 	if(argc==7){
 		length=0;
 		card1= parseany(argv[6], &a4float, &a4int, &a4str, &length, false);
@@ -672,17 +775,17 @@ int parseAES(uint8_t *p,uint8_t *keyx, uint8_t *inx, uint8_t *ivx, int64_t **out
 		}
 	}
 	if(a2int!=NULL){
-		for(int i=0;i<card2;i++){
+		for(int i=0;i<*card2;i++){
 			if(a2int[i]<0 || a2int[i]>255)error("input number out of bounds 0-255");
 			inx[i]=a2int[i];
 		}
 	} else if (a2float!=NULL){
-		for(int i=0;i<card2;i++){
+		for(int i=0;i<*card2;i++){
 			if(a2float[i]<0 || a2float[i]>255)error("input number out of bounds 0-255");
 			inx[i]=a2float[i];
 		}
 	} else if(a2str!=NULL){
-		for(int i=0;i<card2;i++){
+		for(int i=0;i<*card2;i++){
 			inx[i]=a2str[i+1];
 		}
 	}
@@ -693,21 +796,83 @@ int parseAES(uint8_t *p,uint8_t *keyx, uint8_t *inx, uint8_t *ivx, int64_t **out
 	} else if(a3str!=NULL){
 		*outstr=a3str;
 	}
-	return card2;
+	return inx;
 }
-void returnAES(int64_t *outint, MMFLOAT *outflt, uint8_t *outstr, uint8_t *inx, int card){
+unsigned char * parseB64(uint8_t *p,int64_t **outint, unsigned char **outstr, MMFLOAT **outfloat, int *card1, int *card2){
+	int64_t *a1int=NULL, *a3int=NULL;
+	unsigned char *a1str=NULL,*a3str=NULL;
+	MMFLOAT *a1float=NULL, *a3float=NULL;
+	getargs(&p,3,(unsigned char *)",");
+	if(argc!=3)error("Syntax");
+	*outstr=NULL;
+	*outint=NULL;
+	int length=0;
+	*card1= parseany(argv[0], &a1float, &a1int, &a1str, &length, false);
+	length=0;
+	*card2= parseany(argv[2], &a3float, &a3int, &a3str, &length, false);
+	unsigned char *keyx=(unsigned char *)GetTempMemory(b64e_size(*card1)+1);
+	if(a1int!=NULL){
+		for(int i=0;i<*card1;i++){
+			if(a1int[i]<0 || a1int[i]>255)error("Key number out of bounds 0-255");
+			keyx[i]=a1int[i];
+		}
+	} else if (a1float!=NULL){
+		for(int i=0;i<*card1;i++){
+			if(a1float[i]<0 || a1float[i]>255)error("Key number out of bounds 0-255");
+			keyx[i]=a1float[i];
+		}
+	} else if(a1str!=NULL){
+		for(int i=0;i<*card1;i++){
+			keyx[i]=a1str[i+1];
+		}
+	}
+	if(a3int!=NULL){
+		*outint=a3int;
+	} else if (a3float!=NULL){
+		*outfloat=a3float;
+	} else if(a3str!=NULL){
+		*outstr=a3str;
+	}
+	return keyx;
+}
+void returnAES(int64_t *outint, MMFLOAT *outflt, uint8_t *outstr, uint8_t *inx, uint8_t *iv, int card){
 	if(outint!=NULL){
-		for(int i=0;i<card;i++){
-			outint[i]=inx[i];
+		if(iv){
+			for(int i=0;i<16;i++){
+				outint[i]=iv[i];
+			}
+			for(int i=16;i<card+16;i++){
+				outint[i]=inx[i-16];
+			}
+		}  else {
+			for(int i=0;i<card;i++){
+				outint[i]=inx[i];
+			}
 		}
 	} else if(outflt!=NULL){
-		for(int i=0;i<card;i++){
-			outflt[i]=(MMFLOAT)inx[i];
+		if(iv){
+			for(int i=0;i<16;i++){
+				outflt[i]=iv[i];
+			}
+			for(int i=16;i<card+16;i++){
+				outflt[i]=inx[i-16];
+			}
+		}  else {
+			for(int i=0;i<card;i++){
+				outflt[i]=inx[i];
+			}
 		}
 	} else if(outstr!=NULL){
-		if(card==256)error("Too many elements for string output");
-		memcpy(&outstr[1],inx,card);
-		*outstr=card;
+		if(iv){
+			if(card+16>=256)error("Too many elements for string output");
+			memcpy(&outstr[1],iv,16);
+			memcpy(&outstr[17],inx,card);
+			*outstr=card+16;
+		} else {
+			if(card>=256)error("Too many elements for string output");
+			memcpy(&outstr[1],inx,card);
+			*outstr=card;
+		}
 	}
 }
 MMFLOAT farr2d(MMFLOAT *arr,int d1, int a, int b){
@@ -779,7 +944,13 @@ MMFLOAT PIDController_Update(PIDController *pid, MMFLOAT setpoint, MMFLOAT measu
 
 }
 /*  @endcond */
-
+uint8_t getrnd(void){
+#ifdef rp2350
+	return get_rand_32() & 0xFF;
+#else
+	return rand() & 0xFF;
+#endif
+}
 void cmd_math(void){
 	unsigned char *tp;
     int t = T_NBR;
@@ -1471,50 +1642,60 @@ void cmd_math(void){
  			int64_t *outint=NULL;
 			unsigned char *outstr=NULL;
 			MMFLOAT *outflt=NULL;
-			unsigned char keyx[16], inx[256];
+			unsigned char keyx[16];
 			unsigned char * p;
 			int card;
+//unsigned char * parseAES(uint8_t *p, int ivadd, uint8_t *keyx, uint8_t *ivx, int64_t **outint, unsigned char **outstr, MMFLOAT **outfloat, int *card2){
 			if((p=checkstring(tp, (unsigned char *)"ENCRYPT CBC"))){
-   				uint8_t iv[]  = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f };
-				card= parseAES(p, &keyx[0], &inx[0], &iv[0], &outint, &outstr, &outflt);
+				uint8_t iv[16];
+				for(int i=0;i<16;i++)iv[i]=getrnd();
+				uint8_t *inx= parseAES(p, 16, &keyx[0], &iv[0], &outint, &outstr, &outflt, &card);
 				AES_init_ctx_iv(&ctx, keyx, iv);
 				AES_CBC_encrypt_buffer(&ctx, inx, card);
-				returnAES(outint, outflt, outstr, inx, card);
+				returnAES(outint, outflt, outstr, inx, iv, card);
 				return;
 			} else if((p=checkstring(tp, (unsigned char *)"DECRYPT CBC"))){
-   				uint8_t iv[]  = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f };
-				card= parseAES(p, &keyx[0], &inx[0], &iv[0], &outint, &outstr, &outflt);
-				AES_init_ctx_iv(&ctx, keyx, iv);
-				AES_CBC_decrypt_buffer(&ctx, inx, card);
-				returnAES(outint, outflt, outstr, inx, card);
+//   				uint8_t iv[16]16  = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f };
+				uint8_t *inx = parseAES(p, -16, &keyx[0], NULL, &outint, &outstr, &outflt, &card);
+				AES_init_ctx_iv(&ctx, keyx, inx);
+				AES_CBC_decrypt_buffer(&ctx, &inx[16], card-16);
+				returnAES(outint, outflt, outstr, &inx[16], NULL, card-16);
 				return;
 			} else if((p=checkstring(tp, (unsigned char *)"ENCRYPT ECB"))){
-				card= parseAES(p, &keyx[0], &inx[0], NULL, &outint, &outstr, &outflt);
-				AES_init_ctx(&ctx, keyx);
-				AES_ECB_encrypt(&ctx, inx);
-				returnAES(outint, outflt, outstr, inx, card);
+				struct AES_ctx ctxcopy;
+				uint8_t *inx = parseAES(p, 0, &keyx[0], NULL, &outint, &outstr, &outflt, &card);
+				AES_init_ctx(&ctxcopy, keyx);
+				for(int i=0;i<card;i+=16){
+					memcpy(&ctx,&ctxcopy,sizeof(ctx));
+					AES_ECB_encrypt(&ctx, &inx[i]);
+				}
+				returnAES(outint, outflt, outstr, inx, NULL, card);
 				return;
 			} else if((p=checkstring(tp, (unsigned char *)"DECRYPT ECB"))){
-				card= parseAES(p, &keyx[0], &inx[0], NULL, &outint, &outstr, &outflt);
-				AES_init_ctx(&ctx, keyx);
-				AES_ECB_decrypt(&ctx, inx);
-				returnAES(outint, outflt, outstr, inx, card);
+				struct AES_ctx ctxcopy;
+				uint8_t *inx = parseAES(p, 0, &keyx[0], NULL, &outint, &outstr, &outflt, &card);
+				AES_init_ctx(&ctxcopy, keyx);
+				for(int i=0;i<card;i+=16){
+					memcpy(&ctx,&ctxcopy,sizeof(ctx));
+					AES_ECB_decrypt(&ctx, &inx[i]);
+				}
+				returnAES(outint, outflt, outstr, inx, NULL, card);
 				return;
 			} else if((p=checkstring(tp, (unsigned char *)"ENCRYPT CTR"))){
-			    uint8_t iv[16]  = { 0xf0, 0xf1, 0xf2, 0xf3, 0xf4, 0xf5, 0xf6, 0xf7, 0xf8, 0xf9, 0xfa, 0xfb, 0xfc, 0xfd, 0xfe, 0xff };
-				card= parseAES(p, &keyx[0], &inx[0], &iv[0], &outint, &outstr, &outflt);
+				uint8_t iv[16];
+				for(int i=0;i<16;i++)iv[i]=getrnd();
+				uint8_t *inx= parseAES(p, 16, &keyx[0], &iv[0], &outint, &outstr, &outflt, &card);
 				AES_init_ctx_iv(&ctx, keyx, iv);
 				AES_CTR_xcrypt_buffer(&ctx, inx, card);
-				returnAES(outint, outflt, outstr, inx, card);
+				returnAES(outint, outflt, outstr, inx, iv, card);
 				return;
 			} else if((p=checkstring(tp, (unsigned char *)"DECRYPT CTR"))){
-			    uint8_t iv[16]  = { 0xf0, 0xf1, 0xf2, 0xf3, 0xf4, 0xf5, 0xf6, 0xf7, 0xf8, 0xf9, 0xfa, 0xfb, 0xfc, 0xfd, 0xfe, 0xff };
-				card= parseAES(p, &keyx[0], &inx[0], &iv[0], &outint, &outstr, &outflt);
-				AES_init_ctx_iv(&ctx, keyx, iv);
-				AES_CTR_xcrypt_buffer(&ctx, inx, card);
-				returnAES(outint, outflt, outstr, inx, card);
+				uint8_t *inx = parseAES(p, -16, &keyx[0], NULL, &outint, &outstr, &outflt, &card);
+				AES_init_ctx_iv(&ctx, keyx, inx);
+				AES_CTR_xcrypt_buffer(&ctx, &inx[16], card-16);
+				returnAES(outint, outflt, outstr, &inx[16], NULL, card-16);
 				return;
-			}
+			} else error("Syntax");
 		}
 		tp = checkstring(cmdline, (unsigned char *)"PID");
 		if(tp) {
@@ -2543,6 +2724,37 @@ void fun_math(void){
 			fret=genRand(g_myrand);
 			targ = T_NBR;
 			return;
+		}
+	} else {
+		tp = checkstring(ep, (unsigned char *)"BASE64");
+		if(tp) {
+ 			int64_t *outint=NULL;
+			unsigned char *outstr=NULL;
+			MMFLOAT *outflt=NULL;
+			unsigned char * p;
+			int card, card2;
+			if((p=checkstring(tp, (unsigned char *)"ENCODE"))){
+				unsigned char *inx=parseB64(p, &outint, &outstr, &outflt, &card, &card2);
+				if(!outstr && card2 < b64e_size(card)) error("Output array too small");
+				if(outstr && b64e_size(card) > 255) error("Output exceeds string size");
+				unsigned char *out =(unsigned char *)GetTempMemory(b64e_size(card+1));
+				int size = b64_encode(inx, card, out);
+				returnAES(outint, outflt, outstr, out, NULL, size);
+				iret=size;
+				targ=T_INT;
+				return;
+			} else if((p=checkstring(tp, (unsigned char *)"DECODE"))){
+				unsigned char *inx=parseB64(p, &outint, &outstr, &outflt, &card, &card2);
+				if(!outstr && card2 < b64d_size(card)) error("Output array too small");
+				if(outstr && b64d_size(card) > 255) error("Output exceeds string size");
+				unsigned char *out =(unsigned char *)GetTempMemory(b64e_size(card+1));
+				int size = b64_decode(inx,card,out);
+				returnAES(outint, outflt, outstr, out, NULL, size);
+				iret=size;
+				targ=T_INT;
+				return;
+			} else error("Syntax");
+
 		}
 	}
 	error("Syntax");
