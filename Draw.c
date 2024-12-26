@@ -487,7 +487,7 @@ void DrawPixelNormal(int x, int y, int c) {
 void ClearScreen(int c) {
     DrawRectangle(0, 0, HRes - 1, VRes - 1, c);
 #ifdef PICOMITEVGA
-    if(DISPLAY_TYPE==SCREENMODE1){
+    if(DISPLAY_TYPE==SCREENMODE1 && WriteBuf==DisplayBuf){
 #ifdef HDMI
         memset(WriteBuf,0,ScreenSize);
         if(Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P ){
@@ -3351,7 +3351,7 @@ void cmd_cls(void) {
     HideAllControls();
 #endif
     skipspace(cmdline);
-    if(!(*cmdline == 0 || *cmdline == '\'')){
+    if(!(*cmdline == 0 || *cmdline == '\'')){ //Colour specified
 #ifdef PICOMITEVGA
         if(DISPLAY_TYPE==SCREENMODE2 || DISPLAY_TYPE==SCREENMODE3 ){
             int fc=getint(cmdline, 0, WHITE);
@@ -3364,15 +3364,18 @@ void cmd_cls(void) {
 #else
         ClearScreen(getint(cmdline, 0, WHITE));
 #endif
-    } else {
+    } else { //Default colour
 #ifdef PICOMITEVGA
         if((WriteBuf==LayerBuf && (DISPLAY_TYPE==SCREENMODE2 || DISPLAY_TYPE==SCREENMODE3 ) && LayerBuf!=DisplayBuf)
         || (WriteBuf==SecondLayer && (DISPLAY_TYPE==SCREENMODE2 || DISPLAY_TYPE==SCREENMODE3 ) && SecondLayer!=DisplayBuf)){
             uint8_t colour=(WriteBuf==LayerBuf ? transparent|(transparent<<4) :  transparents|(transparents<<4)) ;
             memset(WriteBuf,colour,HRes*VRes/2);
 #ifdef HDMI
-        } else if(WriteBuf==LayerBuf && DISPLAY_TYPE==SCREENMODE5 && LayerBuf!=DisplayBuf){
+        } else if(WriteBuf==LayerBuf && (DISPLAY_TYPE==SCREENMODE5 ) && LayerBuf!=DisplayBuf){
             memset(WriteBuf,transparent,HRes*VRes);
+        } else if(WriteBuf==LayerBuf && (DISPLAY_TYPE==SCREENMODE4 ) && LayerBuf!=DisplayBuf){
+            uint16_t *p=(uint16_t *)WriteBuf;
+            for(int i=0;i<HRes*VRes;i++)*p++=RGBtransparent;
 #endif
         } else
 #endif

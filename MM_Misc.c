@@ -867,7 +867,7 @@ void cmd_longString(void){
             return;
         } else if((p=checkstring(tp, (unsigned char *)"DECRYPT CBC"))){
             uint8_t iv[16];
-            parselongAES(p, -16, &keyx[0], &iv[0], &src, &dest);
+            parselongAES(p, -16, &keyx[0], NULL, &src, &dest);
             dest[0]=src[0]-16;
             qq=(char *)&src[1];
             q=(char *)&dest[1];
@@ -916,7 +916,7 @@ void cmd_longString(void){
             return;
         } else if((p=checkstring(tp, (unsigned char *)"DECRYPT CTR"))){
             uint8_t iv[16];
-            parselongAES(p, -16, &keyx[0], &iv[0], &src, &dest);
+            parselongAES(p, -16, &keyx[0], NULL, &src, &dest);
             dest[0]=src[0]-16;
             qq=(char *)&src[1];
             q=(char *)&dest[1];
@@ -2021,7 +2021,7 @@ if(Option.CPU_Speed==FreqXGA)PO2Str("RESOLUTION", "1024x768");
         PO("LCDPANEL"); MMPrintString((char *)display_details[Option.DISPLAY_TYPE].name); PRet();
     } 
     #ifdef GUICONTROLS
-    if(Option.MaxCtrls)PO2Int("GUI CONTROLS", Option.MaxCtrls);
+    if(Option.MaxCtrls)PO2Int("GUI CONTROLS", Option.MaxCtrls-1);
     #endif
     #ifdef PICOMITEWEB
     if(*Option.SSID){

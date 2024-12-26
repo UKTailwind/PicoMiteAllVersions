@@ -3646,6 +3646,11 @@ int MIPS16 main(){
     rp2350a=(*((io_ro_32*)(SYSINFO_BASE + SYSINFO_PACKAGE_SEL_OFFSET)) & 1);
 #endif
     LoadOptions();
+    if(!rp2350a){
+        gpio_init(47);
+        gpio_set_dir(47, GPIO_OUT);
+        gpio_put(47,GPIO_PIN_SET);
+    }
     uint32_t excep=_excep_code;
     if(  Option.Baudrate == 0 ||
         !(Option.Tab==2 || Option.Tab==3 || Option.Tab==4 ||Option.Tab==8) ||
@@ -3709,7 +3714,7 @@ int MIPS16 main(){
     else if(Option.CPU_Speed>200000 && Option.CPU_Speed<=300000 )vreg_set_voltage(VREG_VOLTAGE_1_25);  // Std default @ boot is 1_10
     else if(Option.CPU_Speed>300000  && Option.CPU_Speed<=320000 )vreg_set_voltage(VREG_VOLTAGE_1_30);  // Std default @ boot is 1_10
 #ifdef rp2350
-    else vreg_set_voltage(VREG_VOLTAGE_1_40);  // Std default @ boot is 1_10
+    else vreg_set_voltage(VREG_VOLTAGE_1_50);  // Std default @ boot is 1_10
 #else
     else vreg_set_voltage(VREG_VOLTAGE_1_30); 
 #endif
@@ -3723,14 +3728,14 @@ int MIPS16 main(){
 #define QMI_MIN_DESELECT 12        // 0x0001f000 [16:12] MIN_DESELECT (0x00) After this window's chip select is deasserted, it...
 #define QMI_RXDELAY 8          // 0x00000700 [10:8]  RXDELAY      (0x0) Delay the read data sample timing, in units of one half...
 #define QMI_CLKDIV 0           // 0x000000ff [7:0]   CLKDIV       (0x04) Clock divisor
-    if(Option.PSRAM_CS_PIN)qmi_hw->m[1].timing = (1<<QMI_COOLDOWN) | (2<<QMI_PAGEBREAK) | (3<<QMI_SELECT_HOLD) | (18<<QMI_MAX_SELECT) | (4<<QMI_MIN_DESELECT) | (6<<QMI_RXDELAY) | (6<<QMI_CLKDIV);
+    qmi_hw->m[1].timing = (1<<QMI_COOLDOWN) | (2<<QMI_PAGEBREAK) | (3<<QMI_SELECT_HOLD) | (18<<QMI_MAX_SELECT) | (4<<QMI_MIN_DESELECT) | (6<<QMI_RXDELAY) | (6<<QMI_CLKDIV);
     if(Option.CPU_Speed<=288000)qmi_hw->m[0].timing = 0x40006202;
     if(Option.CPU_Speed<=150000)qmi_hw->m[1].timing = 0x60006102;
     sleep_ms(2);
 #endif
     set_sys_clock_khz(Option.CPU_Speed, false);
 #ifdef rp2350
-    if(Option.PSRAM_CS_PIN)qmi_hw->m[1].timing = (1<<QMI_COOLDOWN) | (2<<QMI_PAGEBREAK) | (3<<QMI_SELECT_HOLD) | (18<<QMI_MAX_SELECT) | (4<<QMI_MIN_DESELECT) | (6<<QMI_RXDELAY) | (6<<QMI_CLKDIV);
+    qmi_hw->m[1].timing = (1<<QMI_COOLDOWN) | (2<<QMI_PAGEBREAK) | (3<<QMI_SELECT_HOLD) | (18<<QMI_MAX_SELECT) | (4<<QMI_MIN_DESELECT) | (6<<QMI_RXDELAY) | (6<<QMI_CLKDIV);
     if(Option.CPU_Speed<=288000)qmi_hw->m[0].timing = 0x40006202;
     if(Option.CPU_Speed<=150000)qmi_hw->m[1].timing = 0x60006102;
     sleep_ms(2);
