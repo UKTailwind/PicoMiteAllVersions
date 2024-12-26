@@ -1010,6 +1010,8 @@ static inline bool is_xbox(uint8_t dev_addr)
   tuh_vid_pid_get(dev_addr, &vid, &pid);
   return ( (vid == 0x11c0 && pid == 0x5500)    // EasySMX Wireless, u, Android mode (u)		 
 		   || (vid == 0x11c1 && pid == 0x9101) // EasySMX Wireless, c, PC Mode, D-input, emulation
+           || (vid == 0x057e && pid == 0x2009)             
+           || (vid == 0x2F24 && pid == 0x0048)             		   
          );
 }
 static inline bool is_specific(uint8_t dev_addr)
@@ -1458,7 +1460,12 @@ void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance, uint8_t const* desc_re
 		}
 		else if ( is_xbox(dev_addr) )
 		{
-			if(!CurrentLinePtr) {MMPrintString("XBox Controller Connected on channel ");PInt(slot+1);MMPrintString("\r\n> ");}
+			if(!CurrentLinePtr) {
+                MMPrintString("XBox Controller Connected on channel ");PInt(slot+1);
+                MMPrintString(" (pid=&H");PIntH(pid);
+                MMPrintString(", vid=&H");PIntH(vid);MMPrintString(")");
+                MMPrintString("\r\n> ");
+			}
 			HID[slot].Device_address = dev_addr;
 			HID[slot].Device_instance = instance;
 			HID[slot].Device_type=XBOX;
