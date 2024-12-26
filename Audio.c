@@ -157,8 +157,8 @@ int noloop=0;
 int8_t XDCS=-1,XCS=-1,DREQ=-1,XRST=-1;
 uint8_t midienabled=0;
 int streamsize=0;
-int *streamwritepointer=NULL;
-int *streamreadpointer=NULL;
+volatile int *streamwritepointer=NULL;
+volatile int *streamreadpointer=NULL;
 char *streambuffer=NULL;
 char WAVfilename[FF_MAX_LFN]={0};
 #ifdef rp2350

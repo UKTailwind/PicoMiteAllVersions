@@ -83,8 +83,8 @@ extern int PWM_FREQ;
 extern void (*AudioOutput)(uint16_t left, uint16_t right);
 extern uint16_t AUDIO_SPI, AUDIO_CLK_PIN,AUDIO_MOSI_PIN,AUDIO_MISO_PIN, AUDIO_CS_PIN, AUDIO_RESET_PIN, AUDIO_DREQ_PIN, AUDIO_DCS_PIN, AUDIO_LDAC_PIN;
 extern int streamsize;
-extern int *streamwritepointer;
-extern int *streamreadpointer;
+extern volatile int *streamwritepointer;
+extern volatile int *streamreadpointer;
 extern char *streambuffer;
 extern char WAVfilename[FF_MAX_LFN];
 typedef struct sa_flist {

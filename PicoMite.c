@@ -1670,8 +1670,8 @@ void __not_in_flash_func(ProcessWeb)(int mode){
 //                    printf("Warning PCB %d still open\r\n", i);
                     if(state->buffer_recv[i]){
                             tcp_server_close(state,i);
-//                            error("No response to request from connection no. %",i+1);
-                            printf("Warning: No response to request from connection no. %d\r\n",i+1);
+                            error("No response to request from connection no. %",i+1);
+//                            printf("Warning: No response to request from connection no. %d\r\n",i+1);
                     }
                     tcp_server_close(state,i);
                     state->client_pcb[i]=(struct tcp_pcb *)44;
@@ -3646,11 +3646,13 @@ int MIPS16 main(){
     rp2350a=(*((io_ro_32*)(SYSINFO_BASE + SYSINFO_PACKAGE_SEL_OFFSET)) & 1);
 #endif
     LoadOptions();
+#ifdef rp2350
     if(!rp2350a){
         gpio_init(47);
         gpio_set_dir(47, GPIO_OUT);
         gpio_put(47,GPIO_PIN_SET);
     }
+#endif
     uint32_t excep=_excep_code;
     if(  Option.Baudrate == 0 ||
         !(Option.Tab==2 || Option.Tab==3 || Option.Tab==4 ||Option.Tab==8) ||
@@ -3714,7 +3716,7 @@ int MIPS16 main(){
     else if(Option.CPU_Speed>200000 && Option.CPU_Speed<=300000 )vreg_set_voltage(VREG_VOLTAGE_1_25);  // Std default @ boot is 1_10
     else if(Option.CPU_Speed>300000  && Option.CPU_Speed<=320000 )vreg_set_voltage(VREG_VOLTAGE_1_30);  // Std default @ boot is 1_10
 #ifdef rp2350
-    else vreg_set_voltage(VREG_VOLTAGE_1_50);  // Std default @ boot is 1_10
+    else vreg_set_voltage(VREG_VOLTAGE_1_30);  // Std default @ boot is 1_10
 #else
     else vreg_set_voltage(VREG_VOLTAGE_1_30); 
 #endif

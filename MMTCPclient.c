@@ -56,15 +56,15 @@ static err_t tcp_client_close(void *arg) {
     TCP_CLIENT_T *state = (TCP_CLIENT_T*)arg;
     err_t err = ERR_OK;
     if (state->tcp_pcb != NULL) {
-        tcp_arg(state->tcp_pcb, NULL);
-        tcp_poll(state->tcp_pcb, NULL, 0);
-        tcp_sent(state->tcp_pcb, NULL);
-        tcp_recv(state->tcp_pcb, NULL);
-        tcp_err(state->tcp_pcb, NULL);
-        err = tcp_close(state->tcp_pcb);
+        tcp_arg((struct tcp_pcb *)state->tcp_pcb, NULL);
+        tcp_poll((struct tcp_pcb *)state->tcp_pcb, NULL, 0);
+        tcp_sent((struct tcp_pcb *)state->tcp_pcb, NULL);
+        tcp_recv((struct tcp_pcb *)state->tcp_pcb, NULL);
+        tcp_err((struct tcp_pcb *)state->tcp_pcb, NULL);
+        err = tcp_close((struct tcp_pcb *)state->tcp_pcb);
         if (err != ERR_OK) {
 //            DEBUG_printf("close failed %d, calling abort\n", err);
-            tcp_abort(state->tcp_pcb);
+            tcp_abort((struct tcp_pcb *)state->tcp_pcb);
             err = ERR_ABRT;
         }
         state->tcp_pcb = NULL;
@@ -92,17 +92,19 @@ err_t tcp_client_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err
     // cyw43_arch_lwip_begin IS needed
 //    cyw43_arch_lwip_check();
     if (p->tot_len > 0) {
-//        DEBUG_printf("recv %d err %d\r\n", p->tot_len, err);
+//#ifdef rp2350
+        routinechecks(); //don't know why I'm doing this but it solves a race condition for the RP2350
+//#endif
         // Receive the buffer
         const uint16_t buffer_left = state->BUF_SIZE - state->buffer_len;
-        state->buffer_len += pbuf_copy_partial(p, state->buffer + state->buffer_len,
+        state->buffer_len += pbuf_copy_partial(p, (void *)state->buffer + state->buffer_len,
                                                p->tot_len > buffer_left ? buffer_left : p->tot_len, 0);
         tcp_recved(tpcb, p->tot_len);
-//        cyw43_arch_lwip_begin();
+        cyw43_arch_lwip_begin();
         uint64_t *x=(uint64_t *)state->buffer;
         x--;
         *x=state->buffer_len;
-//        cyw43_arch_lwip_end();
+        cyw43_arch_lwip_end();
     }
     pbuf_free(p);
     return ERR_OK;
@@ -117,7 +119,6 @@ err_t tcp_client_recv_stream(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, er
     // cyw43_arch_lwip_begin IS needed
 //    cyw43_arch_lwip_check();
     if (p->tot_len > 0) {
-//        cyw43_arch_lwip_begin();
         for(int j=0;j<p->tot_len;j++){
             state->buffer[*state->buffer_write]= ((char *)p->payload)[j];
             *state->buffer_write = (*state->buffer_write + 1) % state->BUF_SIZE;     // advance the head of the queue
@@ -153,12 +154,12 @@ static bool tcp_client_open(void *arg) {
         return false;
     }
 
-    tcp_arg(state->tcp_pcb, state);
+    tcp_arg((struct tcp_pcb *)state->tcp_pcb, state);
 //    tcp_poll(state->tcp_pcb, tcp_client_poll, POLL_TIME_S * 2);
-    tcp_sent(state->tcp_pcb, tcp_client_sent);
-    if(state->buffer_write==NULL)tcp_recv(state->tcp_pcb, tcp_client_recv);
-    else tcp_recv(state->tcp_pcb, tcp_client_recv_stream);
-    tcp_err(state->tcp_pcb, tcp_client_err);
+    tcp_sent((struct tcp_pcb *)state->tcp_pcb, tcp_client_sent);
+    if(state->buffer_write==NULL)tcp_recv((struct tcp_pcb *)state->tcp_pcb, tcp_client_recv);
+    else tcp_recv((struct tcp_pcb *)state->tcp_pcb, tcp_client_recv_stream);
+    tcp_err((struct tcp_pcb *)state->tcp_pcb, tcp_client_err);
 
     state->buffer_len = 0;
 
@@ -167,7 +168,7 @@ static bool tcp_client_open(void *arg) {
     // these calls are a no-op and can be omitted, but it is a good practice to use them in
     // case you switch the cyw43_arch type later.
 //    cyw43_arch_lwip_begin();
-    err_t err = tcp_connect(state->tcp_pcb, &state->remote_addr, state->TCP_PORT, tcp_client_connected);
+    err_t err = tcp_connect((struct tcp_pcb *)state->tcp_pcb, &state->remote_addr, state->TCP_PORT, tcp_client_connected);
 //    cyw43_arch_lwip_end();
 
     return err == ERR_OK;
@@ -273,7 +274,7 @@ int cmd_tcpclient(void){
             state->BUF_SIZE=size;
             state->buffer=q;
             state->buffer_len=0;
-            err_t err = tcp_write(state->tcp_pcb, &request[1], (uint32_t)request[0], 0);
+            err_t err = tcp_write((struct tcp_pcb *)state->tcp_pcb, &request[1], (uint32_t)request[0], 0);
             if(err)error("write failed %",err);
             Timer4=timeout;
             while(!state->buffer_len && Timer4)ProcessWeb(0);
@@ -310,7 +311,7 @@ int cmd_tcpclient(void){
             state->BUF_SIZE=size;
             state->buffer=q;
             state->buffer_len=0;
-            err_t err = tcp_write(state->tcp_pcb, &request[1], (uint32_t)request[0], 0);
+            err_t err = tcp_write((struct tcp_pcb *)state->tcp_pcb, &request[1], (uint32_t)request[0], 0);
             if(err)error("write failed %",err);
             return 1;
     }

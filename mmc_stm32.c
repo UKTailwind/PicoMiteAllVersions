@@ -207,72 +207,9 @@ int __not_in_flash_func(getsound)(int i,int mode){
 	}
 	return 0;
 }
-#ifdef rp2350
-#ifndef PICOMITEVGA
-#define sendcount 32
-extern uint8_t cs_pin;
-extern uint8_t dcs_pin;
-extern uint8_t dreq_pin;
-volatile bool spidmadone=true;
-void __not_in_flash_func(DMAint)()
-{
-	// Clear the interrupt request for DMA control channel
-	dma_hw->ints1 = (1u << SPI_DMA_IN);
-    irq_set_enabled(DMA_IRQ_1, false);
-    gpio_put(dcs_pin,GPIO_PIN_SET);
-	spidmadone=true;
-}
-
-static void __not_in_flash_func(sdi_send_buffer_local)(uint8_t *data, size_t len) {
-	static dma_channel_config cfg = {0};
-	while(!spidmadone){}
-	if(cfg.ctrl==0){
-		cfg = dma_channel_get_default_config(SPI_DMA_OUT);
-		channel_config_set_transfer_data_size(&cfg, DMA_SIZE_8);
-		channel_config_set_read_increment(&cfg, true);
-		channel_config_set_write_increment(&cfg, false);
-		channel_config_set_dreq(&cfg, spi_get_dreq(PinDef[Option.AUDIO_CLK_PIN].mode & SPI0SCK ? spi0 : spi1, true));
-		dma_channel_configure(SPI_DMA_OUT, &cfg,
-					&spi_get_hw(PinDef[Option.AUDIO_CLK_PIN].mode & SPI0SCK ? spi0 : spi1)->dr, // write address
-					NULL, // read address
-					0, // element count (each element is of size transfer_data_size)
-					false); // start immediately
-		cfg = dma_channel_get_default_config(SPI_DMA_IN);
-		channel_config_set_transfer_data_size(&cfg, DMA_SIZE_8);
-		channel_config_set_dreq(&cfg, spi_get_dreq(PinDef[Option.AUDIO_CLK_PIN].mode & SPI0SCK ? spi0 : spi1, false));
-		channel_config_set_read_increment(&cfg, false);
-		channel_config_set_write_increment(&cfg, false);
-		dma_channel_configure(SPI_DMA_IN, &cfg,
-					NULL, // write address
-					&spi_get_hw(PinDef[Option.AUDIO_CLK_PIN].mode & SPI0SCK ? spi0 : spi1)->dr, // read address
-					0, // element count (each element is of size transfer_data_size)
-					false); // don't start yet
-
-		dma_channel_set_irq1_enabled(SPI_DMA_IN, true);
-
-
-// set DMA IRQ handler
-		irq_set_exclusive_handler(DMA_IRQ_1, DMAint);
-	}
-    gpio_put(cs_pin,GPIO_PIN_SET);
-    gpio_put(dcs_pin,GPIO_PIN_RESET);
-	while (!(gpio_get(dreq_pin))) {
-	}
-	dma_channel_set_trans_count(SPI_DMA_IN,len,false);
-	dma_channel_set_trans_count(SPI_DMA_OUT,len,false);
-	dma_channel_set_read_addr(SPI_DMA_OUT,data,false);
-	irq_set_enabled(DMA_IRQ_1, true);
-	dma_start_channel_mask((1u << SPI_DMA_IN) | (1u << SPI_DMA_OUT));
-	spidmadone=false;
-}
-#else
 #define sdi_send_buffer_local(a,b) sdi_send_buffer(a,b)
 #define sendcount 64
-#endif
-#else
-#define sdi_send_buffer_local(a,b) sdi_send_buffer(a,b)
-#define sendcount 64
-#endif
+#define sendstream 32
 void __not_in_flash_func(on_pwm_wrap)(void) {
 	static int noisedwellleft[MAXSOUNDS]={0}, noisedwellright[MAXSOUNDS]={0};
 	static uint32_t noiseleft[MAXSOUNDS]={0}, noiseright[MAXSOUNDS]={0};
@@ -287,7 +224,7 @@ void __not_in_flash_func(on_pwm_wrap)(void) {
 		if(!(gpio_get(PinDef[Option.AUDIO_DREQ_PIN].GPno)))return;
 		if(!(CurrentlyPlaying == P_TONE || CurrentlyPlaying == P_SOUND)){
 			VSbuffer=VS1053free();
-			if(VSbuffer>1023-sendcount)return;
+			if(VSbuffer>1023-(CurrentlyPlaying == P_STREAM ? sendstream :sendcount))return;
 		}
     	if(CurrentlyPlaying == P_FLAC || CurrentlyPlaying == P_WAV ||CurrentlyPlaying == P_MP3 || CurrentlyPlaying == P_MIDI || CurrentlyPlaying==P_MOD) {
 			if(bcount[1]==0 && bcount[2]==0 && playreadcomplete==1){
@@ -311,18 +248,18 @@ void __not_in_flash_func(on_pwm_wrap)(void) {
 			if(rp==wp)return;
 			int i = wp - rp;
 			if(i < 0) i += streamsize;
-			if(i>32){
-				if(streamsize-rp>32){
-					sdi_send_buffer_local((uint8_t *)&streambuffer[rp],32);
-					rp+=32;
+			if(i>sendstream){
+				if(streamsize-rp>sendcount){
+					sdi_send_buffer((uint8_t *)&streambuffer[rp],sendstream);
+					rp+=sendstream;
 				} else {
-					char buff[32];
+					char buff[sendstream];
 					int j=0;
-					while(j<32){
+					while(j<sendstream){
 						buff[j++]=streambuffer[rp];
 						rp = (rp + 1) % streamsize;
 					}
-					sdi_send_buffer_local((uint8_t *)buff,32);
+					sdi_send_buffer((uint8_t *)buff,sendstream);
 				}
 			}
 			*streamreadpointer=rp;
@@ -365,8 +302,8 @@ void __not_in_flash_func(on_pwm_wrap)(void) {
 //			}
 			left=((leftv/Lcount)-2000)*16;
 			right=((rightv/Rcount)-2000)*16;
-			sdi_send_buffer_local((uint8_t *)&left,2);
-			sdi_send_buffer_local((uint8_t *)&right,2);
+			sdi_send_buffer((uint8_t *)&left,2);
+			sdi_send_buffer((uint8_t *)&right,2);
 		} else if(CurrentlyPlaying == P_TONE){
 			if(!SoundPlay){
 				StopAudio();
@@ -386,8 +323,8 @@ void __not_in_flash_func(on_pwm_wrap)(void) {
 					if(PhaseAC_left>=4096.0)PhaseAC_left-=4096.0;
 					if(PhaseAC_right>=4096.0)PhaseAC_right-=4096.0;
 				}
-				sdi_send_buffer_local((uint8_t *)&left,2);
-				sdi_send_buffer_local((uint8_t *)&right,2);
+				sdi_send_buffer((uint8_t *)&left,2);
+				sdi_send_buffer((uint8_t *)&right,2);
 			}
 		}
 	} else {
