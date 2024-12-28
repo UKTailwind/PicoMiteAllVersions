@@ -466,7 +466,9 @@ void MIPS16 cmd_list(void) {
         	ListProgram(ProgMemory, true);
         	checkend(p);
         }
-   } else if((p = checkstring(cmdline, (unsigned char *)"COMMANDS"))) {
+   	} else if((p = checkstring(cmdline, (unsigned char *)"VARIABLES"))) {
+		
+   	} else if((p = checkstring(cmdline, (unsigned char *)"COMMANDS"))) {
     	int ListCnt = 1;
     	step=Option.DISPLAY_CONSOLE ? HRes/gui_font_width/20 : 5;
         if(Option.DISPLAY_CONSOLE && (SPIREAD  || Option.NoScroll)){ClearScreen(gui_bcolour);CurrentX=0;CurrentY=0;}

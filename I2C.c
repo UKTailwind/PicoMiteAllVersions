@@ -703,7 +703,7 @@ void i2cEnable(unsigned char *p) {
 	getargs(&p, 3, (unsigned char *)",");
 	if(argc != 3) error("Invalid syntax");
 	speed = getinteger(argv[0]);
-	if(!(speed ==100 || speed == 400)) error("Valid speeds 100, 400");
+	if(!(speed ==100 || speed == 400 || speed == 1000)) error("Valid speeds 100, 400, 1000");
 	timeout = getinteger(argv[2]);
 	if(timeout < 0 || (timeout > 0 && timeout < 100)) error("Number out of bounds" );
 	if(I2C_enabled || I2C_Status & I2C_Status_Slave) error("I2C already OPEN");
@@ -717,7 +717,7 @@ void i2c2Enable(unsigned char *p) {
 	getargs(&p, 3, (unsigned char *)",");
 	if(argc != 3) error("Invalid syntax");
 	speed = getinteger(argv[0]);
-	if(!(speed ==100 || speed == 400)) error("Valid speeds 100, 400");
+	if(!(speed ==100 || speed == 400 || speed == 1000)) error("Valid speeds 100, 400, 1000");
 	timeout = getinteger(argv[2]);
 	if(timeout < 0 || (timeout > 0 && timeout < 100)) error("Number out of bounds" );
 	if(I2C2_enabled || I2C2_Status & I2C_Status_Slave) error("I2C already OPEN");
@@ -1123,23 +1123,6 @@ void i2c2Receive(unsigned char *p) {
 Enable the I2C1 module - master mode
 ***************************************************************************************************/
 void i2c_enable(int bps) {
-//    HAL_I2C_DeInit(&hi2c1);
-//    ExtCfg(I2C0SDApin, EXT_NOT_CONFIG, 0);
-//    ExtCfg(I2C0SCLpin, EXT_NOT_CONFIG, 0);
-/*    PinSetBit(I2C0SDApin, TRISSET);
-    if(PinRead(I2C0SDApin) == 0) {
-    	int i;
-        // it appears as if something is holding SLA low
-        // try pulsing the clock to get rid of it
-        PinSetBit(I2C0SCLpin, TRISCLR);
-        PinSetBit(I2C0SCLpin, LATCLR);
-        for(i = 0; i < 20; i++) {
-            uSec(100);
-            PinSetBit(I2C0SCLpin, LATINV);
-            if(PinRead(I2C0SDApin) == 0) break;
-        }
-        PinSetBit(I2C0SCLpin, TRISSET);
-    }*/
     ExtCfg(I2C0SDApin, EXT_COM_RESERVED, 0);
     ExtCfg(I2C0SCLpin, EXT_COM_RESERVED, 0);
 	i2c_init(i2c0, bps * 1000);
@@ -1148,23 +1131,6 @@ void i2c_enable(int bps) {
 	I2C_enabled=1;
 }
 void i2c2_enable(int bps) {
-//    HAL_I2C_DeInit(&hi2c2);
-/*    ExtCfg(I2C1SDApin, EXT_NOT_CONFIG, 0);
-    ExtCfg(I2C1SCLpin, EXT_NOT_CONFIG, 0);
-    PinSetBit(I2C1SDApin, TRISSET);
-    if(PinRead(I2C1SDApin) == 0) {
-        int i;
-        // it appears as if something is holding SLA low
-        // try pulsing the clock to get rid of it
-        PinSetBit(I2C1SCLpin, TRISCLR);
-        PinSetBit(I2C1SCLpin, LATCLR);
-        for(i = 0; i < 20; i++) {
-           uSec(100);
-           PinSetBit(I2C1SCLpin, LATINV);
-           if(PinRead(I2C1SDApin) == 0) break;
-        }
-        PinSetBit(I2C1SCLpin, TRISSET);
-    }*/
     ExtCfg(I2C1SDApin, EXT_COM_RESERVED, 0);
     ExtCfg(I2C1SCLpin, EXT_COM_RESERVED, 0);
 	i2c_init(i2c1, bps * 1000);
