@@ -69,7 +69,7 @@ void MIPS16 cmd_xmodem(void) {
         else {
             closeframebuffer('A');
             CloseAudio(1);
-            ClearVars(0);
+            ClearVars(0,true);
         }
         buf = GetTempMemory(EDIT_BUFFER_SIZE);
         if(rcv) {

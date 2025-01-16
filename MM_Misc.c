@@ -47,7 +47,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "hardware/structs/pwm.h"
 #include "aes.h"
 #ifdef rp2350
-#include "pico\rand.h"
+#include "pico/rand.h"
 #endif
 #ifdef USBKEYBOARD
 extern int caps_lock;
@@ -390,21 +390,21 @@ void cmd_sort(void){
     	if(card !=size)error("Array size mismatch");
     }
     if(argc>=5 && *argv[4])flags=getint(argv[4],0,7);
-    if(argc>=7 && *argv[6])startpoint=getint(argv[6],OptionBase,size+OptionBase);
+    if(argc>=7 && *argv[6])startpoint=getint(argv[6],g_OptionBase,size+g_OptionBase);
     size-=startpoint;
-    if(argc==9)size=getint(argv[8],1,size+1+OptionBase)-1;
-    if(startpoint)startpoint-=OptionBase;
+    if(argc==9)size=getint(argv[8],1,size+1+g_OptionBase)-1;
+    if(startpoint)startpoint-=g_OptionBase;
     if(a3float!=NULL){
     	a3float+=startpoint;
-    	if(a4int!=NULL)for(i=0;i<truesize+1;i++)a4int[i]=i+OptionBase;
+    	if(a4int!=NULL)for(i=0;i<truesize+1;i++)a4int[i]=i+g_OptionBase;
     	floatsort(a3float, size+1, a4int, flags, startpoint);
     } else if(a3int!=NULL){
     	a3int+=startpoint;
-    	if(a4int!=NULL)for(i=0;i<truesize+1;i++)a4int[i]=i+OptionBase;
+    	if(a4int!=NULL)for(i=0;i<truesize+1;i++)a4int[i]=i+g_OptionBase;
     	integersort(a3int,  size+1, a4int, flags, startpoint);
     } else if(a3str!=NULL){
     	a3str+=((startpoint)*(maxsize+1));
-    	if(a4int!=NULL)for(i=0;i<truesize+1;i++)a4int[i]=i+OptionBase;
+    	if(a4int!=NULL)for(i=0;i<truesize+1;i++)a4int[i]=i+g_OptionBase;
     	stringsort(a3str, size+1,maxsize+1, a4int, flags, startpoint);
     }
 }
@@ -587,9 +587,9 @@ void cmd_longString(void){
         if(argc != 5)error("Argument count");
         j=(parseintegerarray(argv[0],&dest,1,1,NULL,true)-1)*8-1;
         q=(uint8_t *)&dest[1];
-        p = getint(argv[2],OptionBase,j-OptionBase);
+        p = getint(argv[2],g_OptionBase,j-g_OptionBase);
         nbr=getint(argv[4],0,255);
-        q[p-OptionBase]=nbr;
+        q[p-g_OptionBase]=nbr;
         return;
     }
     tp = checkstring(cmdline, (unsigned char *)"APPEND");
@@ -771,20 +771,24 @@ void cmd_longString(void){
         int64_t *dest=NULL;
         char *q=NULL;
         int j, fnbr=0;
-        getargs(&tp, 3, (unsigned char *)",");
-        if(argc == 3){
+        bool docrlf=true;
+        getargs(&tp, 5, (unsigned char *)",;");
+        if(argc==5)error("Syntax");
+        if(argc >= 3){
             if(*argv[0] == '#')argv[0]++;                                 // check if the first arg is a file number
             fnbr = getinteger(argv[0]);                                 // get the number
             parseintegerarray(argv[2],&dest,2,1,NULL,true);
+            if(*argv[3]==';')docrlf=false;
         } else {
             parseintegerarray(argv[0],&dest,1,1,NULL,true);
-        }
+            if(*argv[1]==';')docrlf=false;
+         }
         q=(char *)&dest[1];
         j=dest[0];
         while(j--){
             MMfputc(*q++, fnbr);
         }
-        MMfputs((unsigned char *)"\2\r\n", fnbr);
+        if(docrlf)MMfputs((unsigned char *)"\2\r\n", fnbr);
         return;
     }
     tp = checkstring(cmdline, (unsigned char *)"LCASE");
@@ -1053,15 +1057,15 @@ void fun_LGetByte(void){
         if(argc != 3)error("Argument count");
         j=(parseintegerarray(argv[0],&src,2,1,NULL,false)-1)*8;
         s=(uint8_t *)&src[1];
-        start = getint(argv[2],OptionBase,j-OptionBase);
-        iret=s[start-OptionBase];
+        start = getint(argv[2],g_OptionBase,j-g_OptionBase);
+        iret=s[start-g_OptionBase];
         targ = T_INT;
 }
 
 
 void fun_LInstr(void){
         int64_t *src=NULL;
-        char *srch;
+        char srch[STRINGSIZE];
         char *str=NULL;
         int slen,found=0,i,j,n;
         getargs(&ep, 7, (unsigned char *)",");
@@ -1071,7 +1075,7 @@ void fun_LInstr(void){
         else start=0;
         j=(parseintegerarray(argv[0],&src,2,1,NULL,false)-1);
         str=(char *)&src[0];
-        srch=(char *)getstring(argv[2]);
+        Mstrcpy((unsigned char *)srch,(unsigned char *)getstring(argv[2]));
         if(argc<7){
             slen=*srch;
             iret=0;
@@ -1095,7 +1099,7 @@ void fun_LInstr(void){
             MMFLOAT *temp=NULL;
             MtoC((unsigned char *)srch);
             temp = findvar(argv[6], V_FIND);
-            if(!(vartbl[VarIndex].type & T_NBR)) error("Invalid variable");
+            if(!(g_vartbl[g_VarIndex].type & T_NBR)) error("Invalid variable");
             reti = regcomp(&regex, srch, 0);
             if( reti ) {
                 regfree(&regex);
@@ -1405,8 +1409,8 @@ void cmd_ireturn(void){
     checkend(cmdline);
     nextstmt = InterruptReturn;
     InterruptReturn = NULL;
-    if(LocalIndex)    ClearVars(LocalIndex--);                        // delete any local variables
-    TempMemoryIsChanged = true;                                     // signal that temporary memory should be checked
+    if(g_LocalIndex)    ClearVars(g_LocalIndex--, true);                        // delete any local variables
+    g_TempMemoryIsChanged = true;                                     // signal that temporary memory should be checked
     *CurrentInterruptName = 0;                                        // for static vars we are not in an interrupt
 #ifdef GUICONTROLS
     if(DelayedDrawKeyboard) {
@@ -1435,7 +1439,7 @@ void MIPS16 cmd_library(void) {
         if(CurrentLinePtr) error("Invalid in a program");
         if(*ProgMemory != 0x01) return;
         checkend(p);
-        ClearRuntime();
+        ClearRuntime(true);
         TempPtr = m = MemBuff = GetTempMemory(EDIT_BUFFER_SIZE);
 
         rem = GetCommandValue((unsigned char *)"Rem");
@@ -2158,7 +2162,9 @@ if(Option.CPU_Speed==FreqXGA)PO2Str("RESOLUTION", "1024x768");
 #ifdef rp2350
     if(Option.PSRAM_CS_PIN!=0)PO2Str("PSRAM PIN", PinDef[Option.PSRAM_CS_PIN].pinname);
 #endif
+    if(Option.heartbeatpin!=43)PO2Str("HEARTBEAT PIN", PinDef[Option.heartbeatpin].pinname);
 }
+
 int MIPS16 checkslice(int pin1,int pin2, int ignore){
     if((PinDef[pin1].slice & 0xf) != (PinDef[pin2].slice &0xf)) error("Pins not on same PWM slice");
     if(!ignore){
@@ -2620,7 +2626,7 @@ OPTION PLATFORM HDMIUSB
         }
         if(checkstring(p,(unsigned char *) "OLIMEXUSB"))  {
             ResetOptions();
-            strcpy((char *)Option.platform,"OLIMEXUSB");
+            strcpy((char *)Option.platform,"OLIMEX USB");
             Option.ColourCode = 1;
             Option.AUDIO_L=PINMAP[26];
             Option.AUDIO_R=PINMAP[27];
@@ -2922,14 +2928,14 @@ void MIPS16 cmd_option(void) {
  
     tp = checkstring(cmdline, (unsigned char *)"BASE");
     if(tp) {
-        if(DimUsed) error("Must be before DIM or LOCAL");
-        OptionBase = getint(tp, 0, 1);
+        if(g_DimUsed) error("Must be before DIM or LOCAL");
+        g_OptionBase = getint(tp, 0, 1);
         return;
     }
 
     tp = checkstring(cmdline, (unsigned char *)"EXPLICIT");
     if(tp) {
-//        if(varcnt != 0) error("Variables already defined");
+        if(g_varcnt != 0) error("Variables already defined");
         OptionExplicit = true;
         return;
     }
@@ -3154,7 +3160,7 @@ void MIPS16 cmd_option(void) {
         if(!code)pin1=codemap(pin1);
         if(IsInvalidPin(pin1)) error("Invalid pin");
         if(ExtCurrentConfig[pin1] != EXT_NOT_CONFIG)  error("Pin | is in use",pin1);
-        if(!(pin1==1 || pin1==11 || pin1==26 || pin1==62))error("Invalid pin for PSRAM chip select (GP0,GP8,GP19,GP47)");
+        if(!(pin1==1 || pin1==11 || pin1==25 || pin1==62))error("Invalid pin for PSRAM chip select (GP0,GP8,GP19,GP47)");
         Option.PSRAM_CS_PIN=pin1;
         SaveOptions();
         _excep_code = RESET_COMMAND;
@@ -3405,15 +3411,37 @@ void MIPS16 cmd_option(void) {
 #endif
     tp = checkstring(cmdline, (unsigned char *)"HEARTBEAT");
     if(tp) {
-#ifdef rp2350
-        if(!rp2350a)error("Invalid for RP2350B");
-#endif
         if(checkstring(tp, (unsigned char *)"OFF") || checkstring(tp, (unsigned char *)"DISABLE"))      Option.NoHeartbeat = 1; 
-        else if(checkstring(tp, (unsigned char *)"ON") || checkstring(tp, (unsigned char *)"ENABLE"))      Option.NoHeartbeat = 0; 
-        else error("Syntax");
+        else {
+#ifdef PICOMITEWEB
+            if(checkstring(tp, (unsigned char *)"ON") || checkstring(tp, (unsigned char *)"ENABLE"))      Option.NoHeartbeat = 0; 
+            else error("Syntax");
+            SaveOptions();
+            return;
+        }
+#else
+            unsigned char *p=NULL;
+            p=checkstring(tp, (unsigned char *)"ON");
+            if(p==NULL)p=checkstring(tp, (unsigned char *)"ENABLE");
+                if(p){
+                    getargs(&p,1,(unsigned char *)",");
+                    if(argc){
+                        unsigned char code,pin1;
+                        if(!(code=codecheck(p)))p+=2;
+                        pin1 = getinteger(p);
+                        if(!code)pin1=codemap(pin1);
+                        if(IsInvalidPin(pin1)) error("Invalid pin");
+                        if(ExtCurrentConfig[pin1] != EXT_NOT_CONFIG)  error("Pin %/| is in use",pin1,pin1);
+                        Option.NoHeartbeat = 0;
+                        Option.heartbeatpin=pin1;
+                        SaveOptions();
+                        _excep_code = RESET_COMMAND;
+                        SoftReset();
+                    } else Option.NoHeartbeat = 0; 
+                } else error("Syntax");
+            }
         SaveOptions();
-#ifndef PICOMITEWEB
-        if(CheckPin(43, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED)){
+        if(CheckPin(HEARTBEATpin, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED)){
             if(Option.NoHeartbeat==0){
                 gpio_init(PinDef[HEARTBEATpin].GPno);
                 gpio_set_dir(PinDef[HEARTBEATpin].GPno, GPIO_OUT);
@@ -4880,7 +4908,7 @@ void MIPS16 fun_info(void){
             targ=T_STR;
             return;
 		} else if(checkstring(tp, (unsigned char *)"BASE")){
-			if(OptionBase==1)iret=1;
+			if(g_OptionBase==1)iret=1;
 			else iret=0;
 			targ=T_INT;
 			return;
@@ -5200,7 +5228,7 @@ void MIPS16 fun_info(void){
     }
     else if(*ep=='v' || *ep=='V'){
         if(checkstring(ep, (unsigned char *)"VARCNT")){
-            iret=(int64_t)((uint32_t)varcnt);
+            iret=(int64_t)((uint32_t)g_varcnt);
             targ=T_INT;
             return;
         } else if(checkstring(ep, (unsigned char *)"VERSION")){
@@ -5213,6 +5241,10 @@ void MIPS16 fun_info(void){
         } else error("Syntax");
 	} else if(checkstring(ep, (unsigned char *)"WRITEBUFF")){
         iret=(int64_t)((uint32_t)WriteBuf);
+        targ=T_INT;
+        return;
+	} else if(checkstring(ep, (unsigned char *)"TEST")){
+        iret=(int64_t)((uint32_t)NBRPINS);
         targ=T_INT;
         return;
     } else if((tp=checkstring(ep, (unsigned char *)"UPTIME"))){
@@ -5411,12 +5443,12 @@ void cmd_poke(void) {
         if(argc != 5) error("Argument count");
 
         if(checkstring(argv[0], (unsigned char *)"VARTBL")) {
-            *((char *)vartbl + (unsigned int)getinteger(argv[2])) = getinteger(argv[4]);
+            *((char *)g_vartbl + (unsigned int)getinteger(argv[2])) = getinteger(argv[4]);
             return;
         }
         if((p = checkstring(argv[0], (unsigned char *)"VAR"))) {
             pp = findvar(p, V_FIND | V_EMPTY_OK | V_NOFIND_ERR);
-            if(vartbl[VarIndex].type & T_CONST) error("Cannot change a constant");
+            if(g_vartbl[g_VarIndex].type & T_CONST) error("Cannot change a constant");
             *((char *)pp + (unsigned int)getinteger(argv[2])) = getinteger(argv[4]);
             return;
         }
@@ -5479,29 +5511,29 @@ void fun_peek(void) {
     if((p = checkstring(argv[0], (unsigned char *)"BP"))){
         if(argc != 1) error("Syntax");
         findvar(p, V_FIND  | V_NOFIND_ERR);
-        if(!(vartbl[VarIndex].type & T_INT))error("Not integer variable");
-        iret = *(unsigned char *)(uint32_t)vartbl[VarIndex].val.i;
-        vartbl[VarIndex].val.i++;
+        if(!(g_vartbl[g_VarIndex].type & T_INT))error("Not integer variable");
+        iret = *(unsigned char *)(uint32_t)g_vartbl[g_VarIndex].val.i;
+        g_vartbl[g_VarIndex].val.i++;
         targ = T_INT;
         return;
     }
     if((p = checkstring(argv[0], (unsigned char *)"WP"))){
         if(argc != 1) error("Syntax");
         findvar(p, V_FIND  | V_NOFIND_ERR);
-        if(!(vartbl[VarIndex].type & T_INT))error("Not integer variable");
-        if(vartbl[VarIndex].val.i & 3)error("Not on word boundary");
-        iret = *(unsigned int *)(uint32_t)vartbl[VarIndex].val.i;
-        vartbl[VarIndex].val.i+=4;
+        if(!(g_vartbl[g_VarIndex].type & T_INT))error("Not integer variable");
+        if(g_vartbl[g_VarIndex].val.i & 3)error("Not on word boundary");
+        iret = *(unsigned int *)(uint32_t)g_vartbl[g_VarIndex].val.i;
+        g_vartbl[g_VarIndex].val.i+=4;
         targ = T_INT;
         return;
     }
     if((p = checkstring(argv[0], (unsigned char *)"SP"))){
         if(argc != 1) error("Syntax");
         findvar(p, V_FIND  | V_NOFIND_ERR);
-        if(!(vartbl[VarIndex].type & T_INT))error("Not integer variable");
-        if(vartbl[VarIndex].val.i & 1)error("Not on short boundary");
-        iret = *(unsigned short *)(uint32_t)vartbl[VarIndex].val.i;
-        vartbl[VarIndex].val.i+=2;
+        if(!(g_vartbl[g_VarIndex].type & T_INT))error("Not integer variable");
+        if(g_vartbl[g_VarIndex].val.i & 1)error("Not on short boundary");
+        iret = *(unsigned short *)(uint32_t)g_vartbl[g_VarIndex].val.i;
+        g_vartbl[g_VarIndex].val.i+=2;
         targ = T_INT;
         return;
     }
@@ -5515,7 +5547,7 @@ void fun_peek(void) {
     if((p = checkstring(argv[0], (unsigned char *)"VARHEADER"))){
         if(argc != 1) error("Syntax");
         pp = findvar(p, V_FIND | V_EMPTY_OK | V_NOFIND_ERR);
-        iret = (unsigned int)&vartbl[VarIndex].name[0];
+        iret = (unsigned int)&g_vartbl[g_VarIndex].name[0];
         targ = T_INT;
         return;
         }
@@ -5577,7 +5609,7 @@ void fun_peek(void) {
     }
 
     if((checkstring(argv[0], (unsigned char *)"VARTBL"))){
-        iret = *((char *)vartbl + (int)getinteger(argv[2]));
+        iret = *((char *)g_vartbl + (int)getinteger(argv[2]));
         targ = T_INT;
         return;
     }
@@ -5881,7 +5913,7 @@ int checkdetailinterrupts(void) {
 
     // an interrupt was found if we jumped to here
 GotAnInterrupt:
-    LocalIndex++;                                                   // IRETURN will decrement this
+    g_LocalIndex++;                                                   // IRETURN will decrement this
     if(OptionErrorSkip>0)SaveOptionErrorSkip=OptionErrorSkip;
     else SaveOptionErrorSkip = 0;
     OptionErrorSkip=0;
@@ -5899,7 +5931,7 @@ GotAnInterrupt:
         if(gosubindex >= MAXGOSUB) error("Too many SUBs for interrupt");
         errorstack[gosubindex] = CurrentLinePtr;
         gosubstack[gosubindex++] = (unsigned char *)rti;                             // return from the subroutine to the dummy IRETURN command
-        LocalIndex++;                                               // return from the subroutine will decrement LocalIndex
+        g_LocalIndex++;                                               // return from the subroutine will decrement g_LocalIndex
         skipelement(intaddr);                                       // point to the body of the subroutine
     }
     nextstmt = (unsigned char *)intaddr;                                             // the next command will be in the interrupt routine

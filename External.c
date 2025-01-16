@@ -761,7 +761,7 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
                                 gpio_set_drive_strength(PinDef[pin].GPno,GPIO_DRIVE_STRENGTH_8MA);
                                 break;
 #ifndef PICOMITEWEB
-        case EXT_HEARTBEAT:     if(!(pin==43)) error("Invalid configuration");
+        case EXT_HEARTBEAT:     if(!(pin=HEARTBEATpin)) error("Invalid configuration");
                                 tris = 0; ana = 1; 
                                 break;
 #endif
@@ -899,6 +899,7 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
                                 PWM7Bpin=pin;
                                 break;
 #ifdef rp2350
+#ifndef PICOMITEWEB
         case EXT_PWM8B:         if(!(PinDef[pin].mode & PWM8B) || rp2350a) error("Invalid configuration");
                                 if((PWM8Bpin!=99 && PWM8Bpin!=pin)) error("Blready Set to pin %",PWM8Bpin);
                                 PWM8Bpin=pin;
@@ -915,6 +916,7 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
                                 if((PWM11Bpin!=99 && PWM11Bpin!=pin)) error("Blready Set to pin %",PWM11Bpin);
                                 PWM11Bpin=pin;
                                 break;
+#endif
         case EXT_FAST_TIMER:    if(!(PinDef[pin].mode & PWM0B)) error("Invalid configuration");
                                 if((PWM0Bpin!=99 && PWM0Bpin!=pin)) error("Already Set to pin %",PWM0Bpin);
                                 PWM0Bpin=pin;
@@ -1780,13 +1782,13 @@ void cmd_ir(void) {
         if(argc%2 == 0 || argc == 0) error("Invalid syntax");
         IrVarType = 0;
         IrDev = findvar(argv[0], V_FIND);
-        if(vartbl[VarIndex].type & T_CONST) error("Cannot change a constant");
-        if(vartbl[VarIndex].type & T_STR)  error("Invalid variable");
-        if(vartbl[VarIndex].type & T_NBR) IrVarType |= 0b01;
+        if(g_vartbl[g_VarIndex].type & T_CONST) error("Cannot change a constant");
+        if(g_vartbl[g_VarIndex].type & T_STR)  error("Invalid variable");
+        if(g_vartbl[g_VarIndex].type & T_NBR) IrVarType |= 0b01;
         IrCmd = findvar(argv[2], V_FIND);
-        if(vartbl[VarIndex].type & T_CONST) error("Cannot change a constant");
-        if(vartbl[VarIndex].type & T_STR)  error("Invalid variable");
-        if(vartbl[VarIndex].type & T_NBR) IrVarType |= 0b10;
+        if(g_vartbl[g_VarIndex].type & T_CONST) error("Cannot change a constant");
+        if(g_vartbl[g_VarIndex].type & T_STR)  error("Invalid variable");
+        if(g_vartbl[g_VarIndex].type & T_NBR) IrVarType |= 0b10;
         InterruptUsed = true;
         IrInterrupt = GetIntAddress(argv[4]);							// get the interrupt location
         IrInit();
@@ -2440,8 +2442,8 @@ void cmd_keypad(void) {
         if(argc%2 == 0 || argc < 17) error("Invalid syntax");
         if(KeypadInterrupt != NULL) error("Already open");
         KeypadVar = findvar(argv[0], V_FIND);
-        if(vartbl[VarIndex].type & T_CONST) error("Cannot change a constant");
-        if(!(vartbl[VarIndex].type & T_NBR)) error("Floating point variable required");
+        if(g_vartbl[g_VarIndex].type & T_CONST) error("Cannot change a constant");
+        if(!(g_vartbl[g_VarIndex].type & T_NBR)) error("Floating point variable required");
         InterruptUsed = true;
         KeypadInterrupt = GetIntAddress(argv[2]);					// get the interrupt location
         for(i = 0; i < 8; i++) {
@@ -2675,9 +2677,9 @@ void cmd_DHT22(void) {
 
     // get the two variables
 	temp = findvar(argv[2], V_FIND);
-	if(!(vartbl[VarIndex].type & T_NBR)) error("Invalid variable");
+	if(!(g_vartbl[g_VarIndex].type & T_NBR)) error("Invalid variable");
 	humid = findvar(argv[4], V_FIND);
-	if(!(vartbl[VarIndex].type & T_NBR)) error("Invalid variable");
+	if(!(g_vartbl[g_VarIndex].type & T_NBR)) error("Invalid variable");
 
     // get the pin number and set it up
     // get the pin number and set it up
@@ -3095,10 +3097,10 @@ void cmd_device(void){
         int baudrate=getint(argv[2],110,230400);
         unsigned char *string=NULL;
         string = findvar(argv[4], V_FIND);
-	    if(!(vartbl[VarIndex].type & T_STR)) error("Invalid variable");
+	    if(!(g_vartbl[g_VarIndex].type & T_STR)) error("Invalid variable");
         int timeout=getint(argv[6],1,100000)*1000;
         void *status=findvar(argv[8], V_FIND);
-        int type=vartbl[VarIndex].type;
+        int type=g_vartbl[g_VarIndex].type;
 	    if(!(type & (T_NBR | T_INT))) error("Invalid variable");
         if(argc>9 && *argv[10])maxchars=getint(argv[10],1,255);
         if(argc==13)termchars=(char *)getstring(argv[12]);
@@ -3623,7 +3625,7 @@ void MIPS16 ClearExternalIO(void) {
         if(CheckPin(42, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED))ExtCfg(42,EXT_DIG_IN,0);
         if(CheckPin(44, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED))ExtCfg(44,EXT_ANA_IN,0);
     }
-    if(CheckPin(43, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED) && !Option.NoHeartbeat){
+    if(CheckPin(HEARTBEATpin, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED) && !Option.NoHeartbeat){
         gpio_init(PinDef[HEARTBEATpin].GPno);
         gpio_set_dir(PinDef[HEARTBEATpin].GPno, GPIO_OUT);
         ExtCurrentConfig[PinDef[HEARTBEATpin].pin]=EXT_HEARTBEAT;

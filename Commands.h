@@ -29,7 +29,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include <stdbool.h>
 #if !defined(INCLUDE_COMMAND_TABLE) && !defined(INCLUDE_TOKEN_TABLE)
 
-struct s_forstack {
+typedef struct s_forstack {
     unsigned char *forptr;                           // pointer to the FOR command in program memory
     unsigned char *nextptr;                          // pointer to the NEXT command in program memory
     void *var;                              // value of the FOR variable
@@ -43,25 +43,25 @@ struct s_forstack {
         MMFLOAT f;                            // the STEP value if it is a float
         long long int  i;                    // the STEP value if it is an integer
     } stepvalue;
-};
+}forstackval;
 
-extern struct s_forstack forstack[MAXFORLOOPS + 1] ;
-extern int forindex;
+extern struct s_forstack g_forstack[MAXFORLOOPS + 1] ;
+extern int g_forindex;
 
-struct s_dostack {
+typedef struct s_dostack {
     unsigned char *evalptr;                          // pointer to the expression to be evaluated
     unsigned char *loopptr;                          // pointer to the loop statement
     unsigned char *doptr;                            // pointer to the DO statement
     unsigned char level;                             // the sub/function level that the loop was created
-};
+}dostackval;
 
-extern struct s_dostack dostack[MAXDOLOOPS];
-extern int doindex;
+extern struct s_dostack g_dostack[MAXDOLOOPS];
+extern int g_doindex;
 
 extern unsigned char *gosubstack[MAXGOSUB];
 extern unsigned char *errorstack[MAXGOSUB];
 extern int gosubindex;
-extern unsigned char DimUsed;
+extern unsigned char g_DimUsed;
 
 //extern unsigned char *GetFileName(char* CmdLinePtr, unsigned char *LastFilePtr);
 //extern void mergefile(unsigned char *fname, unsigned char *MemPtr);
@@ -88,6 +88,8 @@ struct sa_data{
     unsigned char* SaveNextDataLine;
     int SaveNextData;
 };
+extern void SaveContext(void);
+extern void RestoreContext(bool keep);
 extern struct sa_data datastore[MAXRESTORE];
 extern int restorepointer;
 #endif

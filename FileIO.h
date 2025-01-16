@@ -54,7 +54,7 @@ void LoadOptions(void);
 void CrunchData(unsigned char **p, int c);
 int FileEOF(int fnbr);
 void ClearSavedVars(void);
-int FileLoadProgram(unsigned char *fname);
+int FileLoadProgram(unsigned char *fname, bool chain);
 int FileLoadCMM2Program(char *fname, bool message);
 void SaveOptions(void);
 void ResetAllFlash(void);
@@ -179,10 +179,10 @@ struct option_s {
         char ipaddress[16];
         char mask[16];
         char gateway[16];
-        unsigned char x[1]; //85=229
     #else
-        unsigned char x[85]; //85=229
+        unsigned char x[84]; //85=229
     #endif
+    unsigned char heartbeatpin;
     unsigned char PSRAM_CS_PIN;
     unsigned char BGR;
     unsigned char NoScroll;

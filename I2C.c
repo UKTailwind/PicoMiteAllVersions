@@ -647,8 +647,8 @@ void MIPS16 cmd_rtc(void) {
 			*I2C_Send_Buffer = getint(argv[0], 0, 255);                 // the register to read
 		}
         ptr = findvar(argv[2], V_FIND);
-        if(vartbl[VarIndex].type & T_CONST) error("Cannot change a constant");
-        if(vartbl[VarIndex].type & T_STR)  error("Invalid variable");
+        if(g_vartbl[g_VarIndex].type & T_CONST) error("Cannot change a constant");
+        if(g_vartbl[g_VarIndex].type & T_STR)  error("Invalid variable");
 
         if(!(DS1307 = DoRtcI2C(0x68, NULL))) {
             if(!DoRtcI2C(0x51, NULL)) error("RTC not responding");
@@ -667,7 +667,7 @@ void MIPS16 cmd_rtc(void) {
 			I2C2_Sendlen = 0;
 		}
         if(!DoRtcI2C(DS1307 ? 0x68 : 0x51, (unsigned char *)buff)) error("RTC not responding1");
-        if(vartbl[VarIndex].type & T_NBR)
+        if(g_vartbl[g_VarIndex].type & T_NBR)
             *(MMFLOAT *)ptr = buff[0];
         else
             *(long long int *)ptr = buff[0];
@@ -765,22 +765,22 @@ void i2cSend(unsigned char *p) {
 	} else {		// an array of MMFLOAT, integer or a string
 		ptr = findvar(argv[6], V_NOFIND_NULL | V_EMPTY_OK);
 		if(ptr == NULL) error("Invalid variable");
-		if((vartbl[VarIndex].type & T_STR) && vartbl[VarIndex].dims[0] == 0) {		// string
+		if((g_vartbl[g_VarIndex].type & T_STR) && g_vartbl[g_VarIndex].dims[0] == 0) {		// string
 			cptr = (unsigned char *)ptr;
 			cptr++;																	// skip the length byte in a MMBasic string
 			for (i = 0; i < sendlen; i++) {
 				I2C_Send_Buffer[i] = (int)(*(cptr + i));
 			}
-		} else if((vartbl[VarIndex].type & T_NBR) && vartbl[VarIndex].dims[0] > 0 && vartbl[VarIndex].dims[1] == 0) {		// numeric array
-			if( (((MMFLOAT *)ptr - vartbl[VarIndex].val.fa) + sendlen) > (vartbl[VarIndex].dims[0] + 1 - OptionBase) ) {
+		} else if((g_vartbl[g_VarIndex].type & T_NBR) && g_vartbl[g_VarIndex].dims[0] > 0 && g_vartbl[g_VarIndex].dims[1] == 0) {		// numeric array
+			if( (((MMFLOAT *)ptr - g_vartbl[g_VarIndex].val.fa) + sendlen) > (g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase) ) {
 				error("Insufficient data");
 			} else {
 				for (i = 0; i < sendlen; i++) {
 					I2C_Send_Buffer[i] = (int)(*((MMFLOAT *)ptr + i));
 				}
 			}
-		} else if((vartbl[VarIndex].type & T_INT) && vartbl[VarIndex].dims[0] > 0 && vartbl[VarIndex].dims[1] == 0) {		// integer array
-			if( (((long long int *)ptr - vartbl[VarIndex].val.ia) + sendlen) > (vartbl[VarIndex].dims[0] + 1 - OptionBase) ) {
+		} else if((g_vartbl[g_VarIndex].type & T_INT) && g_vartbl[g_VarIndex].dims[0] > 0 && g_vartbl[g_VarIndex].dims[1] == 0) {		// integer array
+			if( (((long long int *)ptr - g_vartbl[g_VarIndex].val.ia) + sendlen) > (g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase) ) {
 				error("Insufficient data");
 			} else {
 				for (i = 0; i < sendlen; i++) {
@@ -819,22 +819,22 @@ void i2cSendSlave(unsigned char *p, int channel) {
 	} else {		// an array of MMFLOAT, integer or a string
 		ptr = findvar(argv[2], V_NOFIND_NULL | V_EMPTY_OK);
 		if(ptr == NULL) error("Invalid variable");
-		if((vartbl[VarIndex].type & T_STR) && vartbl[VarIndex].dims[0] == 0) {		// string
+		if((g_vartbl[g_VarIndex].type & T_STR) && g_vartbl[g_VarIndex].dims[0] == 0) {		// string
 			cptr = (unsigned char *)ptr;
 			cptr++;																	// skip the length byte in a MMBasic string
 			for (i = 0; i < sendlen; i++) {
 				bbuff[i] = (int)(*(cptr + i));
 			}
-		} else if((vartbl[VarIndex].type & T_NBR) && vartbl[VarIndex].dims[0] > 0 && vartbl[VarIndex].dims[1] == 0) {		// numeric array
-			if( (((MMFLOAT *)ptr - vartbl[VarIndex].val.fa) + sendlen) > (vartbl[VarIndex].dims[0] + 1 - OptionBase) ) {
+		} else if((g_vartbl[g_VarIndex].type & T_NBR) && g_vartbl[g_VarIndex].dims[0] > 0 && g_vartbl[g_VarIndex].dims[1] == 0) {		// numeric array
+			if( (((MMFLOAT *)ptr - g_vartbl[g_VarIndex].val.fa) + sendlen) > (g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase) ) {
 				error("Insufficient data");
 			} else {
 				for (i = 0; i < sendlen; i++) {
 					bbuff[i] = (int)(*((MMFLOAT *)ptr + i));
 				}
 			}
-		} else if((vartbl[VarIndex].type & T_INT) && vartbl[VarIndex].dims[0] > 0 && vartbl[VarIndex].dims[1] == 0) {		// integer array
-			if( (((long long int *)ptr - vartbl[VarIndex].val.ia) + sendlen) > (vartbl[VarIndex].dims[0] + 1 - OptionBase) ) {
+		} else if((g_vartbl[g_VarIndex].type & T_INT) && g_vartbl[g_VarIndex].dims[0] > 0 && g_vartbl[g_VarIndex].dims[1] == 0) {		// integer array
+			if( (((long long int *)ptr - g_vartbl[g_VarIndex].val.ia) + sendlen) > (g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase) ) {
 				error("Insufficient data");
 			} else {
 				for (i = 0; i < sendlen; i++) {
@@ -872,22 +872,22 @@ void i2c2Send(unsigned char *p) {
 	} else {		// an array of MMFLOAT, integer or a string
 		ptr = findvar(argv[6], V_NOFIND_NULL | V_EMPTY_OK);
 		if(ptr == NULL) error("Invalid variable");
-		if((vartbl[VarIndex].type & T_STR) && vartbl[VarIndex].dims[0] == 0) {		// string
+		if((g_vartbl[g_VarIndex].type & T_STR) && g_vartbl[g_VarIndex].dims[0] == 0) {		// string
 			cptr = (unsigned char *)ptr;
 			cptr++;																	// skip the length byte in a MMBasic string
 			for (i = 0; i < sendlen; i++) {
 				I2C_Send_Buffer[i] = (int)(*(cptr + i));
 			}
-		} else if((vartbl[VarIndex].type & T_NBR) && vartbl[VarIndex].dims[0] > 0 && vartbl[VarIndex].dims[1] == 0) {		// numeric array
-			if( (((MMFLOAT *)ptr - vartbl[VarIndex].val.fa) + sendlen) > (vartbl[VarIndex].dims[0] + 1 - OptionBase) ) {
+		} else if((g_vartbl[g_VarIndex].type & T_NBR) && g_vartbl[g_VarIndex].dims[0] > 0 && g_vartbl[g_VarIndex].dims[1] == 0) {		// numeric array
+			if( (((MMFLOAT *)ptr - g_vartbl[g_VarIndex].val.fa) + sendlen) > (g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase) ) {
 				error("Insufficient data");
 			} else {
 				for (i = 0; i < sendlen; i++) {
 					I2C_Send_Buffer[i] = (int)(*((MMFLOAT *)ptr + i));
 				}
 			}
-		} else if((vartbl[VarIndex].type & T_INT) && vartbl[VarIndex].dims[0] > 0 && vartbl[VarIndex].dims[1] == 0) {		// integer array
-			if( (((long long int *)ptr - vartbl[VarIndex].val.ia) + sendlen) > (vartbl[VarIndex].dims[0] + 1 - OptionBase) ) {
+		} else if((g_vartbl[g_VarIndex].type & T_INT) && g_vartbl[g_VarIndex].dims[0] > 0 && g_vartbl[g_VarIndex].dims[1] == 0) {		// integer array
+			if( (((long long int *)ptr - g_vartbl[g_VarIndex].val.ia) + sendlen) > (g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase) ) {
 				error("Insufficient data");
 			} else {
 				for (i = 0; i < sendlen; i++) {
@@ -940,29 +940,29 @@ void i2cReceive(unsigned char *p) {
 	rcvlen = getinteger(argv[4]);
 	if(rcvlen < 1) error("Number out of bounds");
 	ptr = findvar(argv[6], V_FIND | V_EMPTY_OK);
-    if(vartbl[VarIndex].type & T_CONST) error("Cannot change a constant");
+    if(g_vartbl[g_VarIndex].type & T_CONST) error("Cannot change a constant");
 	if(ptr == NULL) error("Invalid variable");
-	if(vartbl[VarIndex].type & T_NBR) {
-        if(vartbl[VarIndex].dims[1] != 0) error("Invalid variable");
-        if(vartbl[VarIndex].dims[0] <= 0) {		// Not an array
+	if(g_vartbl[g_VarIndex].type & T_NBR) {
+        if(g_vartbl[g_VarIndex].dims[1] != 0) error("Invalid variable");
+        if(g_vartbl[g_VarIndex].dims[0] <= 0) {		// Not an array
             if(rcvlen != 1) error("Invalid variable");
         } else {		// An array
-            if( (((MMFLOAT *)ptr - vartbl[VarIndex].val.fa) + rcvlen) > (vartbl[VarIndex].dims[0] + 1 - OptionBase) )
+            if( (((MMFLOAT *)ptr - g_vartbl[g_VarIndex].val.fa) + rcvlen) > (g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase) )
                 error("Insufficient space in array");
         }
         I2C_Rcvbuf_Float = (MMFLOAT*)ptr;
-    } else if(vartbl[VarIndex].type & T_INT) {
-        if(vartbl[VarIndex].dims[1] != 0) error("Invalid variable");
-        if(vartbl[VarIndex].dims[0] <= 0) {		// Not an array
+    } else if(g_vartbl[g_VarIndex].type & T_INT) {
+        if(g_vartbl[g_VarIndex].dims[1] != 0) error("Invalid variable");
+        if(g_vartbl[g_VarIndex].dims[0] <= 0) {		// Not an array
             if(rcvlen != 1) error("Invalid variable");
         } else {		// An array
-            if( (((long long int *)ptr - vartbl[VarIndex].val.ia) + rcvlen) > (vartbl[VarIndex].dims[0] + 1 - OptionBase) )
+            if( (((long long int *)ptr - g_vartbl[g_VarIndex].val.ia) + rcvlen) > (g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase) )
                 error("Insufficient space in array");
         }
         I2C_Rcvbuf_Int = (long long int *)ptr;
-    } else if(vartbl[VarIndex].type & T_STR) {
+    } else if(g_vartbl[g_VarIndex].type & T_STR) {
 		if(rcvlen < 1 || rcvlen > 255) error("Number out of bounds");
-        if(vartbl[VarIndex].dims[0] != 0) error("Invalid variable");
+        if(g_vartbl[g_VarIndex].dims[0] != 0) error("Invalid variable");
         *(char *)ptr = rcvlen;
         I2C_Rcvbuf_String = (char *)ptr + 1;
     } else error("Invalid variable");
@@ -974,7 +974,7 @@ void i2cReceive(unsigned char *p) {
 	i2c_masterCommand(1, (unsigned char *)buff);
 //	PIntComma(rcvlen);
 //	PInt((uint32_t)I2C_Rcvbuf_String);PRet();
-//	if(vartbl[VarIndex].type & T_STR)*(char *)ptr = rcvlen;
+//	if(g_vartbl[g_VarIndex].type & T_STR)*(char *)ptr = rcvlen;
 }
 void i2cReceiveSlave(unsigned char *p, int channel) {
 	int rcvlen;
@@ -994,35 +994,35 @@ void i2cReceiveSlave(unsigned char *p, int channel) {
 	rcvlen = getinteger(argv[0]);
 	if(rcvlen < 1 || rcvlen > 255) error("Number out of bounds");
 	ptr = findvar(argv[2], V_FIND | V_EMPTY_OK);
-    if(vartbl[VarIndex].type & T_CONST) error("Cannot change a constant");
+    if(g_vartbl[g_VarIndex].type & T_CONST) error("Cannot change a constant");
 	if(ptr == NULL) error("Invalid variable");
-	if(vartbl[VarIndex].type & T_NBR) {
-        if(vartbl[VarIndex].dims[1] != 0) error("Invalid variable");
-        if(vartbl[VarIndex].dims[0] <= 0) {		// Not an array
+	if(g_vartbl[g_VarIndex].type & T_NBR) {
+        if(g_vartbl[g_VarIndex].dims[1] != 0) error("Invalid variable");
+        if(g_vartbl[g_VarIndex].dims[0] <= 0) {		// Not an array
             if(rcvlen != 1) error("Invalid variable");
         } else {		// An array
-            if( (((MMFLOAT *)ptr - vartbl[VarIndex].val.fa) + rcvlen) > (vartbl[VarIndex].dims[0] + 1 - OptionBase) )
+            if( (((MMFLOAT *)ptr - g_vartbl[g_VarIndex].val.fa) + rcvlen) > (g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase) )
                 error("Insufficient space in array");
         }
         I2C_Rcvbuf_Float = (MMFLOAT*)ptr;
-    } else if(vartbl[VarIndex].type & T_INT) {
-        if(vartbl[VarIndex].dims[1] != 0) error("Invalid variable");
-        if(vartbl[VarIndex].dims[0] <= 0) {		// Not an array
+    } else if(g_vartbl[g_VarIndex].type & T_INT) {
+        if(g_vartbl[g_VarIndex].dims[1] != 0) error("Invalid variable");
+        if(g_vartbl[g_VarIndex].dims[0] <= 0) {		// Not an array
             if(rcvlen != 1) error("Invalid variable");
         } else {		// An array
-            if( (((long long int *)ptr - vartbl[VarIndex].val.ia) + rcvlen) > (vartbl[VarIndex].dims[0] + 1 - OptionBase) )
+            if( (((long long int *)ptr - g_vartbl[g_VarIndex].val.ia) + rcvlen) > (g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase) )
                 error("Insufficient space in array");
         }
         I2C_Rcvbuf_Int = (long long int *)ptr;
-    } else if(vartbl[VarIndex].type & T_STR) {
-        if(vartbl[VarIndex].dims[0] != 0) error("Invalid variable");
+    } else if(g_vartbl[g_VarIndex].type & T_STR) {
+        if(g_vartbl[g_VarIndex].dims[0] != 0) error("Invalid variable");
         *(char *)ptr = rcvlen;
         I2C_Rcvbuf_String = (char *)ptr + 1;
     } else error("Invalid variable");
     ptr = findvar(argv[4], V_FIND);
-    if(vartbl[VarIndex].type & T_CONST) error("Cannot change a constant");
-    if(vartbl[VarIndex].type & T_NBR)  rcvdlenFloat = (MMFLOAT *)ptr;
-    else if(vartbl[VarIndex].type & T_INT) rcvdlenInt = (long long int *)ptr;
+    if(g_vartbl[g_VarIndex].type & T_CONST) error("Cannot change a constant");
+    if(g_vartbl[g_VarIndex].type & T_NBR)  rcvdlenFloat = (MMFLOAT *)ptr;
+    else if(g_vartbl[g_VarIndex].type & T_INT) rcvdlenInt = (long long int *)ptr;
 	else error("Invalid variable");
 
 	unsigned char *bbuff;
@@ -1085,29 +1085,29 @@ void i2c2Receive(unsigned char *p) {
 	rcvlen = getinteger(argv[4]);
 	if(rcvlen < 1) error("Number out of bounds");
 	ptr = findvar(argv[6], V_FIND | V_EMPTY_OK);
-    if(vartbl[VarIndex].type & T_CONST) error("Cannot change a constant");
+    if(g_vartbl[g_VarIndex].type & T_CONST) error("Cannot change a constant");
 	if(ptr == NULL) error("Invalid variable");
-	if(vartbl[VarIndex].type & T_NBR) {
-        if(vartbl[VarIndex].dims[1] != 0) error("Invalid variable");
-        if(vartbl[VarIndex].dims[0] <= 0) {		// Not an array
+	if(g_vartbl[g_VarIndex].type & T_NBR) {
+        if(g_vartbl[g_VarIndex].dims[1] != 0) error("Invalid variable");
+        if(g_vartbl[g_VarIndex].dims[0] <= 0) {		// Not an array
             if(rcvlen != 1) error("Invalid variable");
         } else {		// An array
-            if( (((MMFLOAT *)ptr - vartbl[VarIndex].val.fa) + rcvlen) > (vartbl[VarIndex].dims[0] + 1 - OptionBase) )
+            if( (((MMFLOAT *)ptr - g_vartbl[g_VarIndex].val.fa) + rcvlen) > (g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase) )
                 error("Insufficient space in array");
         }
         I2C2_Rcvbuf_Float = (MMFLOAT*)ptr;
-    } else if(vartbl[VarIndex].type & T_INT) {
-        if(vartbl[VarIndex].dims[1] != 0) error("Invalid variable");
-        if(vartbl[VarIndex].dims[0] <= 0) {		// Not an array
+    } else if(g_vartbl[g_VarIndex].type & T_INT) {
+        if(g_vartbl[g_VarIndex].dims[1] != 0) error("Invalid variable");
+        if(g_vartbl[g_VarIndex].dims[0] <= 0) {		// Not an array
             if(rcvlen != 1) error("Invalid variable");
         } else {		// An array
-            if( (((long long int *)ptr - vartbl[VarIndex].val.ia) + rcvlen) > (vartbl[VarIndex].dims[0] + 1 - OptionBase) )
+            if( (((long long int *)ptr - g_vartbl[g_VarIndex].val.ia) + rcvlen) > (g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase) )
                 error("Insufficient space in array");
         }
         I2C2_Rcvbuf_Int = (long long int *)ptr;
-    } else if(vartbl[VarIndex].type & T_STR) {
+    } else if(g_vartbl[g_VarIndex].type & T_STR) {
 		if(rcvlen < 1 || rcvlen > 255) error("Number out of bounds");
-        if(vartbl[VarIndex].dims[0] != 0) error("Invalid variable");
+        if(g_vartbl[g_VarIndex].dims[0] != 0) error("Invalid variable");
         *(char *)ptr = rcvlen;
         I2C2_Rcvbuf_String = (char *)ptr + 1;
     } else error("Invalid variable");
@@ -2076,7 +2076,7 @@ void MIPS16 cmd_camera(void){
 			cp = (unsigned char *)aint;
     // get the two variables
 			MMFLOAT *outdiff = findvar(argv[2], V_FIND);
-			if(!(vartbl[VarIndex].type & T_NBR)) error("Invalid variable");
+			if(!(g_vartbl[g_VarIndex].type & T_NBR)) error("Invalid variable");
 			if(size<160*120/8)error("Array too small");
 			int picout=0;
 			if(argc>=5){

@@ -51,9 +51,9 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 
 extern unsigned char *strtmp[];                                       // used to track temporary string space on the heap
 extern int TempMemoryTop;                                           // this is the last index used for allocating temp memory
-extern bool TempMemoryIsChanged;						                // used to prevent unnecessary scanning of strtmp[]
+extern bool g_TempMemoryIsChanged;						                // used to prevent unnecessary scanning of strtmp[]
 
-typedef enum _M_Req {M_PROG, M_VAR} M_Req;
+typedef enum _M_Req {M_PROG, M_VAR, M_LIMITED} M_Req;
 
 extern void m_alloc(int type);
 extern void *GetMemory(int  msize);
@@ -63,7 +63,7 @@ extern void ClearTempMemory(void);
 extern void ClearSpecificTempMemory(void *addr);
 extern void TestStackOverflow(void);
 extern void FreeMemory(unsigned char *addr);
-extern void InitHeap(void);
+extern void InitHeap(bool all);
 extern unsigned char *HeapBottom(void);
 extern int FreeSpaceOnHeap(void);
 extern int LargestContiguousHeap(void);

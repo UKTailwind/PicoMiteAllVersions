@@ -67,6 +67,25 @@ void  __not_in_flash_func(op_invalid)(void) {
 }
 /*  @endcond */
 
+/*constexpr std::int64_t powint(std::int64_t base, int exp)
+{
+	assert(exp >= 0 && "powint: exp parameter has negative value");
+
+	// Handle 0 case
+	if (base == 0)
+		return (exp == 0) ? 1 : 0;
+
+	std::int64_t result{ 1 };
+	while (exp > 0)
+	{
+		if (exp & 1)  // if exp is odd
+			result *= base;
+		exp /= 2;
+		base *= base;
+	}
+
+	return result;
+}*/
 
 void  __not_in_flash_func(op_exp)(void) {
     long long int  i;
@@ -123,8 +142,6 @@ void  __not_in_flash_func(op_add)(void) {
 		Mstrcat(sret, sarg2);
 	}
 }
-
-
 
 void  __not_in_flash_func(op_subtract)(void) {
 	if(targ & T_NBR)

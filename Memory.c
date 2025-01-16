@@ -69,9 +69,9 @@ uint16_t __attribute__ ((aligned (256))) tilebcols[80*40];
 uint8_t *tilefcols_w; 
 uint8_t *tilebcols_w;
 uint16_t HDMIlines[2][640]={0};
-int X_TILE=80, Y_TILE=40;
+volatile int X_TILE=80, Y_TILE=40;
 uint32_t core1stack[128];
-int ytileheight=480/12;
+volatile int ytileheight=480/12;
 #else
 uint16_t M_Foreground[16] ={
 0x0000,0x000F,0x00f0,0x00ff,0x0f00,0x0f0F,0x0ff0,0x0fff,0xf000,0xf00F,0xf0f0,0xf0ff,0xff00,0xff0F,0xfff0,0xffff
@@ -79,7 +79,7 @@ uint16_t M_Foreground[16] ={
 uint16_t M_Background[16] ={
 0xffff,0xfff0,0xff0f,0xff00,0xf0ff,0xf0f0,0xf00f,0xf000,0x0fff,0x0ff0,0x0f0f,0x0f00,0x00ff,0x00f0,0x000f,0x0000
 };
-int ytileheight=16;
+volatile int ytileheight=16;
 #endif
 unsigned char *WriteBuf=(unsigned char *)FRAMEBUFFER;
 unsigned char *DisplayBuf=(unsigned char *)FRAMEBUFFER;
@@ -105,19 +105,19 @@ unsigned char *SecondFrame=(unsigned char *)FRAMEBUFFER;
 
 unsigned int mmap[HEAP_MEMORY_SIZE/ PAGESIZE / PAGESPERWORD]={0};
 #ifdef rp2350
-unsigned int psmap[8*1024*1024/ PAGESIZE / PAGESPERWORD]={0};
+unsigned int psmap[6*1024*1024/ PAGESIZE / PAGESPERWORD]={0};
 unsigned int SBitsGet(unsigned char *addr);
 void SBitsSet(unsigned char *addr, int bits);
 #endif
 unsigned int MBitsGet(unsigned char *addr);
 void MBitsSet(unsigned char *addr, int bits);
-volatile char *StrTmp[MAXTEMPSTRINGS];                                       // used to track temporary string space on the heap
-volatile char StrTmpLocalIndex[MAXTEMPSTRINGS];                              // used to track the LocalIndex for each temporary string space on the heap
+volatile char *g_StrTmp[MAXTEMPSTRINGS];                                       // used to track temporary string space on the heap
+volatile char g_StrTmpLocalIndex[MAXTEMPSTRINGS];                              // used to track the g_LocalIndex for each temporary string space on the heap
 
 void *getheap(int size);
 unsigned int UsedHeap(void);
-bool TempMemoryIsChanged = false;						            // used to prevent unnecessary scanning of strtmp[]
-short StrTmpIndex = 0;                                                // index to the next unallocated slot in strtmp[]
+bool g_TempMemoryIsChanged = false;						            // used to prevent unnecessary scanning of strtmp[]
+short g_StrTmpIndex = 0;                                                // index to the next unallocated slot in strtmp[]
 
 
 
@@ -496,22 +496,22 @@ void MIPS16 cmd_memory(void) {
 #endif
     // calculate the space allocated to variables on the heap
     for(i = VarCnt = vsize = var = 0; var < MAXVARS; var++) {
-        if(vartbl[var].type == T_NOTYPE) continue;
+        if(g_vartbl[var].type == T_NOTYPE) continue;
         VarCnt++;  vsize += sizeof(struct s_vartbl);
-        if(vartbl[var].val.s == NULL) continue;
-        if(vartbl[var].type & T_PTR) continue;
-        nbr = vartbl[var].dims[0] + 1 - OptionBase;
-        if(vartbl[var].dims[0]) {
-            for(j = 1; j < MAXDIM && vartbl[var].dims[j]; j++)
-                nbr *= (vartbl[var].dims[j] + 1 - OptionBase);
-            if(vartbl[var].type & T_NBR)
+        if(g_vartbl[var].val.s == NULL) continue;
+        if(g_vartbl[var].type & T_PTR) continue;
+        nbr = g_vartbl[var].dims[0] + 1 - g_OptionBase;
+        if(g_vartbl[var].dims[0]) {
+            for(j = 1; j < MAXDIM && g_vartbl[var].dims[j]; j++)
+                nbr *= (g_vartbl[var].dims[j] + 1 - g_OptionBase);
+            if(g_vartbl[var].type & T_NBR)
                 i += MRoundUp(nbr * sizeof(MMFLOAT));
-            else if(vartbl[var].type & T_INT)
+            else if(g_vartbl[var].type & T_INT)
                 i += MRoundUp(nbr * sizeof(long long int));
             else
-                i += MRoundUp(nbr * (vartbl[var].size + 1));
+                i += MRoundUp(nbr * (g_vartbl[var].size + 1));
         } else
-            if(vartbl[var].type & T_STR)
+            if(g_vartbl[var].type & T_STR)
                 i += STRINGSIZE;
     }
     VarSize = (vsize + i + 512)/1024;                               // this is the memory allocated to variables
@@ -723,7 +723,7 @@ void MIPS16 cmd_memory(void) {
           |--------------------|
           |   Variable Table   |
           |     (grows up)     |
-          |--------------------|   <<<   vartbl and DOS_vartbl
+          |--------------------|   <<<   g_vartbl and DOS_vartbl
           
           
           |--------------------|
@@ -745,15 +745,17 @@ void MIPS16 cmd_memory(void) {
 
 void m_alloc(int type) {
     switch(type) {
-        case M_PROG:    // this is called initially in InitBasic() to set the base pointer for program memory
-                        // everytime the program size is adjusted up or down this must be called to check for memory overflow
-                        ProgMemory = (uint8_t *)flash_progmemory;
-                        memset(MMHeap,0,HEAP_MEMORY_SIZE);
+
+        case M_PROG:
 #ifdef rp2350
 #ifndef PICOMITEWEB
                         if(PSRAMsize)memset((uint8_t *)PSRAMbase,0,PSRAMsize);
 #endif
 #endif
+        case M_LIMITED:    // this is called initially in InitBasic() to set the base pointer for program memory
+                        // everytime the program size is adjusted up or down this must be called to check for memory overflow
+                        ProgMemory = (uint8_t *)flash_progmemory;
+                        memset(MMHeap,0,HEAP_MEMORY_SIZE);
 #ifdef GUICONTROLS
                         if(Option.MaxCtrls) Ctrl=(struct s_ctrl *)CTRLS;
 #endif
@@ -761,7 +763,7 @@ void m_alloc(int type) {
                         
         case M_VAR:     // this must be called to initialises the variable memory pointer
                         // everytime the variable table is increased this must be called to verify that enough memory is free
-                        memset(vartbl,0,MAXVARS * sizeof(struct s_vartbl));
+                        memset(g_vartbl,0,MAXVARS * sizeof(struct s_vartbl));
                         break;
     }
 }
@@ -778,11 +780,11 @@ void m_alloc(int type) {
 // The space only lasts for the length of the command.
 // A pointer to the space is saved in an array so that it can be returned at the end of the command
 void __not_in_flash_func(*GetTempMemory)(int NbrBytes) {
-    if(StrTmpIndex >= MAXTEMPSTRINGS) error("Not enough memory");
-    StrTmpLocalIndex[StrTmpIndex] = LocalIndex;
-    StrTmp[StrTmpIndex] = GetMemory(NbrBytes);
-    TempMemoryIsChanged = true;
-    return (void *)StrTmp[StrTmpIndex++];
+    if(g_StrTmpIndex >= MAXTEMPSTRINGS) error("Not enough memory");
+    g_StrTmpLocalIndex[g_StrTmpIndex] = g_LocalIndex;
+    g_StrTmp[g_StrTmpIndex] = GetMemory(NbrBytes);
+    g_TempMemoryIsChanged = true;
+    return (void *)g_StrTmp[g_StrTmpIndex++];
 }
 
 
@@ -794,15 +796,15 @@ void __not_in_flash_func(*GetTempMemory)(int NbrBytes) {
 
 
 // clear any temporary string spaces (these last for just the life of a command) and return the memory to the heap
-// this will not clear memory allocated with a local index less than LocalIndex, sub/funs will increment LocalIndex
+// this will not clear memory allocated with a local index less than g_LocalIndex, sub/funs will increment g_LocalIndex
 // and this prevents the automatic use of ClearTempMemory from clearing memory allocated before calling the sub/fun
 void __not_in_flash_func(ClearTempMemory)(void) {
-    while(StrTmpIndex > 0) {
-        if(StrTmpLocalIndex[StrTmpIndex - 1] >= LocalIndex) {
-            StrTmpIndex--;
-            FreeMemory((void *)StrTmp[StrTmpIndex]);
-            StrTmp[StrTmpIndex] = NULL;
-            TempMemoryIsChanged = false;
+    while(g_StrTmpIndex > 0) {
+        if(g_StrTmpLocalIndex[g_StrTmpIndex - 1] >= g_LocalIndex) {
+            g_StrTmpIndex--;
+            FreeMemory((void *)g_StrTmp[g_StrTmpIndex]);
+            g_StrTmp[g_StrTmpIndex] = NULL;
+            g_TempMemoryIsChanged = false;
         } else
             break;
     }
@@ -812,14 +814,14 @@ void __not_in_flash_func(ClearTempMemory)(void) {
 
 void __not_in_flash_func(ClearSpecificTempMemory)(void *addr) {
     int i;
-    for(i = 0; i < StrTmpIndex; i++) {
-        if(StrTmp[i] == addr) {
+    for(i = 0; i < g_StrTmpIndex; i++) {
+        if(g_StrTmp[i] == addr) {
             FreeMemory(addr);
-            StrTmp[i] = NULL;
-            StrTmpIndex--;
-            while(i < StrTmpIndex) {
-                StrTmp[i] = StrTmp[i + 1];
-                StrTmpLocalIndex[i] = StrTmpLocalIndex[i + 1];
+            g_StrTmp[i] = NULL;
+            g_StrTmpIndex--;
+            while(i < g_StrTmpIndex) {
+                g_StrTmp[i] = g_StrTmp[i + 1];
+                g_StrTmpLocalIndex[i] = g_StrTmpLocalIndex[i + 1];
                 i++;
             }
             return;
@@ -835,7 +837,7 @@ void TestStackOverflow(void) {
 //    if(y<x){
 //        x=y;PIntH(x);PRet();
 //    }
-    if(y< HEAPTOP) error("Stack overflow, expression too complex at depth %",LocalIndex);
+    if(y< HEAPTOP) error("Stack overflow, expression too complex at depth %",g_LocalIndex);
 }
 
 
@@ -878,13 +880,13 @@ void __not_in_flash_func(FreeMemory)(unsigned char *addr) {
 
 
 
-void InitHeap(void) {
+void InitHeap(bool all) {
     int i;
     memset(mmap,0,sizeof(mmap));
 #ifdef rp2350
-    memset(psmap,0,sizeof(psmap));
+    if(all)memset(psmap,0,sizeof(psmap));
 #endif
-    for(i = 0; i < MAXTEMPSTRINGS; i++) StrTmp[i] = NULL;
+    for(i = 0; i < MAXTEMPSTRINGS; i++) g_StrTmp[i] = NULL;
 #ifdef PICOMITEVGA
     WriteBuf=(unsigned char *)FRAMEBUFFER;
     DisplayBuf=(unsigned char *)FRAMEBUFFER;

@@ -64,6 +64,7 @@ extern const uint8_t *flash_progmemory;
 extern const uint8_t *flash_libgmemory;
 extern void routinechecks(void);
 extern bool mergedread;
+extern int TraceOn;
 struct option_s __attribute__ ((aligned (256))) Option;
 int dirflags;
 int GPSfnbr = 0;
@@ -74,6 +75,7 @@ static uint32_t m1_rfmt;
 static uint32_t m1_timing;
 static uint32_t m0_rfmt;
 static uint32_t m0_timing;
+int MemLoadProgram(unsigned char *fname, unsigned char *ram);
 #endif
 
 // 8*8*4 bytes * 3 = 768
@@ -411,6 +413,207 @@ void MIPS16 cmd_disk(void){
     }
     error((char *)"Syntax");
 }
+#if defined(rp2350) && !defined(PICOMITEWEB)
+extern unsigned int mmap[HEAP_MEMORY_SIZE/ PAGESIZE / PAGESPERWORD];
+extern unsigned int psmap[7*1024*1024/ PAGESIZE / PAGESPERWORD];
+void MIPS16 cmd_psram(void)
+{
+    if(!Option.PSRAM_CS_PIN)error("PSRAM not enabled");
+    unsigned char *p;
+    if ((p = checkstring(cmdline, (unsigned char *)"ERASE ALL")))
+    {
+        memset((void *)PSRAMblock, 0, PSRAMblocksize);
+    }
+    else if ((p = checkstring(cmdline, (unsigned char *)"ERASE")))
+    {
+        int i = getint(p, 1, MAXRAMSLOTS);
+        uint8_t *j = (uint8_t *)PSRAMblock + ((i - 1) * MAX_PROG_SIZE);
+        memset(j,0,MAX_PROG_SIZE);
+     }
+    else if ((p = checkstring(cmdline, (unsigned char *)"OVERWRITE")))
+    {
+        int i = getint(p, 1, MAXRAMSLOTS);
+        uint8_t *j = (uint8_t *)PSRAMblock + ((i - 1) * MAX_PROG_SIZE);
+        memset(j,0,MAX_PROG_SIZE);
+        uint8_t *q = ProgMemory;
+        memcpy(j,q,MAX_PROG_SIZE);
+    }
+    else if ((p = checkstring(cmdline, (unsigned char *)"LIST")))
+    {
+        int j, i, k;
+        int *pp;
+        getargs(&p, 3, (unsigned char *)",");
+        if (argc)
+        {
+            int i = getint(argv[0], 1, MAXRAMSLOTS);
+            ProgMemory =  (uint8_t *)PSRAMblock + ((i - 1) * MAX_PROG_SIZE);
+        	if(Option.DISPLAY_CONSOLE && (SPIREAD  || Option.NoScroll)){ClearScreen(gui_bcolour);CurrentX=0;CurrentY=0;}
+            if (argc == 1)
+                ListProgram(ProgMemory, false);
+            else if (argc == 3 && checkstring(argv[2], (unsigned char *)"ALL"))
+            {
+                ListProgram(ProgMemory, true);
+            }
+            else
+                error("Syntax");
+            ProgMemory = (unsigned char *)flash_progmemory;
+        }
+        else
+        {
+            int n=MAXRAMSLOTS;
+            for (i = 1; i <= n; i++)
+            {
+                k = 0;
+                j = MAX_PROG_SIZE >> 2;
+                pp = (int *)(PSRAMblock + ((i - 1) * MAX_PROG_SIZE));
+                while (j--)
+                    if (*pp++ != 0x0)
+                    {
+                        char buff[STRINGSIZE] = {0};
+                        MMPrintString(" RAM Slot ");
+                        PInt(i);
+                        MMPrintString(" in use");
+                        pp--;
+                        if ((unsigned char)*pp == T_NEWLINE)
+                        {
+                            MMPrintString(": \"");
+                            llist((unsigned char *)buff, (unsigned char *)pp);
+                            MMPrintString(buff);
+                            MMPrintString("\"\r\n");
+                        }
+                        else
+                            MMPrintString("\r\n");
+                        k = 1;
+                        break;
+                    }
+                if (k == 0)
+                {
+                    MMPrintString(" RAM Slot ");
+                    PInt(i);
+                    MMPrintString(" available\r\n");
+                }
+            }
+        }
+    }
+    else if ((p = checkstring(cmdline, (unsigned char *)"DISK LOAD")))
+    {
+        int fsize,overwrite=0;
+        getargs(&p,5,(unsigned char *)",");
+        if(!(argc==3 || argc==5))error("Syntax");
+        int i = getint(argv[0], 1, MAXRAMSLOTS);
+        if(argc==5){
+            if(checkstring(argv[4],(unsigned char *)"O") || checkstring(argv[4],(unsigned char *)"OVERWRITE"))overwrite=1;
+            else error("Syntax");
+        }
+        uint32_t *c = (uint32_t *)(PSRAMblock + ((i - 1) * MAX_PROG_SIZE));
+        if (*c != 0x0 && overwrite==0) error("Already programmed");
+        int fnbr = FindFreeFileNbr();
+        if (!InitSDCard())  return;
+        char *pp = (char *)getFstring(argv[2]);
+        if (!BasicFileOpen((char *)pp, fnbr, FA_READ)) return;
+		if(filesource[fnbr]!=FLASHFILE)  fsize = f_size(FileTable[fnbr].fptr);
+		else fsize = lfs_file_size(&lfs,FileTable[fnbr].lfsptr);
+        if(fsize>MAX_PROG_SIZE)error("File size % cannot exceed %",fsize,MAX_PROG_SIZE);
+        uint8_t *q=(uint8_t *)c;
+        memset(q,0,MAX_PROG_SIZE);
+        for(int k = 0; k < fsize; k++){        // write to the flash byte by byte
+           *q++=FileGetChar(fnbr);
+        }
+        FileClose(fnbr);
+    }
+    else if ((p = checkstring(cmdline, (unsigned char *)"FILE LOAD")))
+    {
+        int overwrite=0;
+        getargs(&p,5,(unsigned char *)",");
+        if(!(argc==3 || argc==5))error("Syntax");
+        int i = getint(argv[0], 1, MAXRAMSLOTS);
+        if(argc==5){
+            if(checkstring(argv[4],(unsigned char *)"O") || checkstring(argv[4],(unsigned char *)"OVERWRITE"))overwrite=1;
+            else error("Syntax");
+        }
+        uint8_t *c = (uint8_t *)(PSRAMblock + ((i - 1) * MAX_PROG_SIZE));
+        if (*c != 0x0 && overwrite==0) error("Already programmed");
+		ClearTempMemory();
+        SaveContext();
+        MemLoadProgram(argv[2],c);
+        RestoreContext(false);
+    }
+    else if ((p = checkstring(cmdline, (unsigned char *)"SAVE")))
+    {
+        int i = getint(p, 1, MAXRAMSLOTS);
+        uint8_t *c = (uint8_t *)(PSRAMblock + ((i - 1) * MAX_PROG_SIZE));
+        if (*c != 0x0)
+            error("Already programmed");
+        uint8_t *q = ProgMemory;
+        memcpy(c,q,MAX_PROG_SIZE);
+    }
+    else if ((p = checkstring(cmdline, (unsigned char *)"LOAD")))
+    {
+        if (CurrentLinePtr)
+            error("Invalid in program");
+        int j = (Option.PROG_FLASH_SIZE >> 2), i = getint(p, 1, MAXRAMSLOTS);
+        disable_interrupts();
+        flash_range_erase(PROGSTART, MAX_PROG_SIZE);
+        enable_interrupts();
+        j = (MAX_PROG_SIZE >> 2);
+        uSec(250000);
+        int *pp = (int *)flash_progmemory;
+        while (j--)
+            if (*pp++ != 0xFFFFFFFF)
+            {
+                error("Erase error");
+            }
+        disable_interrupts();
+        uint8_t *q = (uint8_t *)(PSRAMblock + ((i - 1) * MAX_PROG_SIZE));
+        uint8_t *writebuff = GetTempMemory(4096);
+        if (*q == 0xFF)
+        {
+            enable_interrupts();
+            FlashWriteInit(PROGRAM_FLASH);
+            flash_range_erase(realflashpointer, MAX_PROG_SIZE);
+            FlashWriteByte(0);
+            FlashWriteByte(0);
+            FlashWriteByte(0); // terminate the program in flash
+            FlashWriteClose();
+            error("Flash slot empty");
+        }
+        for (int k = 0; k < MAX_PROG_SIZE; k += 4096)
+        {
+            for (int j = 0; j < 4096; j++)
+                writebuff[j] = *q++;
+            flash_range_program((PROGSTART + k), writebuff, 4096);
+        }
+        enable_interrupts();
+        FlashLoad = 0;
+    }
+    else if ((p = checkstring(cmdline, (unsigned char *)"CHAIN")))
+    {
+        if (!CurrentLinePtr)
+            error("Invalid at command prompt");
+        int i = getint(p, 0, MAXRAMSLOTS);
+        if(i) ProgMemory = (unsigned char *)(PSRAMblock + ((i - 1) * MAX_PROG_SIZE));
+        else ProgMemory = (unsigned char *)(flash_target_contents + MAXFLASHSLOTS * MAX_PROG_SIZE);
+        FlashLoad = i;
+        PrepareProgram(true);
+        nextstmt = (unsigned char *)ProgMemory;
+    }
+    else if ((p = checkstring(cmdline, (unsigned char *)"RUN")))
+    {
+        int i = getint(p, 0, MAXRAMSLOTS);
+        if(i) ProgMemory = (unsigned char *)(uint8_t *)PSRAMblock + ((i - 1) * MAX_PROG_SIZE);
+        else ProgMemory = (unsigned char *)(flash_target_contents + MAXFLASHSLOTS * MAX_PROG_SIZE);
+        ClearRuntime(true);
+        FlashLoad = i;
+        PrepareProgram(true);
+        // Create a global constant MM.CMDLINE$ containing the empty string.
+        (void) findvar((unsigned char *)"MM.CMDLINE$", V_FIND | V_DIM_VAR | T_CONST);
+        if(Option.LIBRARY_FLASH_SIZE == MAX_PROG_SIZE) ExecuteProgram(LibMemory);  // run anything that might be in the library
+        nextstmt = (unsigned char *)ProgMemory;
+    }
+    else
+        error("Syntax");
+}
+#endif
 void MIPS16 cmd_flash(void)
 {
     unsigned char *p;
@@ -696,7 +899,7 @@ void MIPS16 cmd_flash(void)
          if(Option.LIBRARY_FLASH_SIZE==MAX_PROG_SIZE && i==MAXFLASHSLOTS) error("Library is using Slot % ",MAXFLASHSLOTS);
         if(i) ProgMemory = (unsigned char *)(flash_target_contents + (i - 1) * MAX_PROG_SIZE);
         else ProgMemory = (unsigned char *)(flash_target_contents + MAXFLASHSLOTS * MAX_PROG_SIZE);
-        ClearRuntime();
+        ClearRuntime(true);
         FlashLoad = i;
         PrepareProgram(true);
         // Create a global constant MM.CMDLINE$ containing the empty string.
@@ -1065,6 +1268,7 @@ void fun_dir(void)
         {
             if(FSsave==1){
                     FSerror = f_readdir(&djd, &fnod); // Get a directory item
+                MMPrintString(fnod.fname);PRet();
                 if (FSerror != FR_OK || !fnod.fname[0])
                     break; // Terminate if any error or end of directory
                 if (pattern_matching(pp, fnod.fname, 0, 0) && (fnod.fattrib & AM_DIR) && !(fnod.fattrib & AM_SYS))
@@ -1072,6 +1276,7 @@ void fun_dir(void)
             } else {
                 FSerror=lfs_dir_read(&lfs, &lfs_dir_dir, &lfs_info_dir);
                 strcpy(fnod.fname,lfs_info_dir.name);
+                MMPrintString(fnod.fname);PRet();
                 if(FSerror==0)                    
                     break;
                 if (lfs_info_dir.type==LFS_TYPE_DIR && pattern_matching(pp, lfs_info_dir.name, 0, 0) && !(strcmp(lfs_info_dir.name,".")==0 || strcmp(lfs_info_dir.name,"..")==0 )){
@@ -1210,8 +1415,8 @@ void chdir(char *p){
 //    MMPrintString(filepath[FatFSFileSystem]);
 	if(FatFSFileSystem)FSerror = f_chdir(&filepath[FatFSFileSystem][2]); //finally change directory always using an absolute pathname
     else {
-//        MMPrintString(&filepath[FatFSFileSystem][3]);PRet();
-        FSerror=lfs_dir_open(&lfs, &lfs_dir, &filepath[FatFSFileSystem][3]);
+        if(filepath[FatFSFileSystem][3]==0)FSerror=lfs_dir_open(&lfs, &lfs_dir, "/");
+        else FSerror=lfs_dir_open(&lfs, &lfs_dir, &filepath[FatFSFileSystem][3]);
         if(!FSerror)lfs_dir_close(&lfs, &lfs_dir);
     }
     if(FSerror==-2)FSerror=-3;
@@ -1485,6 +1690,11 @@ void MIPS16 cmd_save(void)
     int maxW = HRes;
     if (!InitSDCard()) return;
     fnbr = FindFreeFileNbr();
+    if ((p = checkstring(cmdline, (unsigned char *)"CONTEXT")) != NULL){
+        SaveContext();
+        if(checkstring(p, (unsigned char *)"CLEAR"))ClearVars(0,false);
+        return;
+    }
     if ((p = checkstring(cmdline, (unsigned char *)"COMPRESSED IMAGE")) != NULL){
         if(!(ReadBuffer==ReadBuffer16 || ReadBuffer==ReadBuffer2))error("Invalid for this display");
         unsigned int nbr;
@@ -1546,6 +1756,7 @@ void MIPS16 cmd_save(void)
             w = getint(argv[6], 1, maxW - x);
             h = getint(argv[8], 1, maxH - y);
         }
+        if(w & 1)error("Width must be a multiple of 2 for compressed image save");
         filesize = 54 + 16* 4 + w * h / 2;
         bmpfileheader[2] = (unsigned char)(filesize);
         bmpfileheader[3] = (unsigned char)(filesize >> 8);
@@ -1624,6 +1835,7 @@ void MIPS16 cmd_save(void)
             }
             if(FSerror>0)FSerror=0;
             ErrorCheck(fnbr);
+            
         }
 #ifdef PICOMITEVGA
         mergedread=0;
@@ -2236,13 +2448,23 @@ int FileLoadCMM2Program(char *fname, bool message) {
 }
 #endif
 // load a file into program memory
-int FileLoadProgram(unsigned char *fname)
+int FileLoadProgram(unsigned char *fname, bool chain)
 {
     int fnbr;
     char *p, *buf;
     int c,oldfont=gui_font;
     if (!InitSDCard()) return false;
-    ClearProgram(); // clear any leftovers from the previous program
+//    ClearProgram(); // clear any leftovers from the previous program
+    initFonts();
+    m_alloc(chain? M_LIMITED :M_PROG);                                           // init the variables for program memory
+    if(Option.DISPLAY_TYPE>=VIRTUAL && WriteBuf)FreeMemorySafe((void **)&WriteBuf);
+    ClearRuntime(chain? false : true);
+//    ProgMemory[0] = ProgMemory[1] = ProgMemory[3] = ProgMemory[4] = 0;
+    PSize = 0;
+    StartEditPoint = NULL;
+    StartEditChar= 0;
+    ProgramChanged = false;
+    TraceOn = false;
     SetFont(oldfont);
     PromptFont=oldfont;
     fnbr = FindFreeFileNbr();
@@ -2282,6 +2504,383 @@ int FileLoadProgram(unsigned char *fname)
     return true;
 }
 #ifdef rp2350
+volatile uint32_t realmempointer;
+void MemWriteBlock(void){
+    int i;
+    uint32_t address=realmempointer-32;
+    if(address % 32)error("Memory write address");
+    memcpy((char *)address,(char*)&MemWord.i64[0],32);
+	for(i=0;i<8;i++)MemWord.i32[i]=0xFFFFFFFF;
+}
+void MemWriteByte(unsigned char b) {
+	realmempointer++;
+	MemWord.i8[mi8p]=b;
+	mi8p++;
+	mi8p %= 32;
+	if(mi8p==0){
+		MemWriteBlock();
+	}
+}
+void MemWriteWord(unsigned int i) {
+	MemWriteByte(i & 0xFF);
+	MemWriteByte((i>>8) & 0xFF);
+	MemWriteByte((i>>16) & 0xFF);
+	MemWriteByte((i>>24) & 0xFF);
+}
+
+void MemWriteAlign(void) {
+	  while(mi8p != 0) {
+		  MemWriteByte(0x0);
+	  }
+	  MemWriteWord(0xFFFFFFFF);
+}
+void MemWriteClose(void){
+	  while(mi8p != 0) {
+		  MemWriteByte(0xff);
+	  }
+
+}
+
+void MIPS16 SaveProgramToRAM(unsigned char *pm, int msg, uint8_t *ram) {
+    unsigned char *p, fontnbr, prevchar = 0, buf[STRINGSIZE];
+    unsigned short endtoken, tkn;
+    int nbr, i, n, SaveSizeAddr;
+    multi=false;
+    uint32_t storedupdates[MAXCFUNCTION], updatecount=0, realmemsave;
+    initFonts();
+#ifdef USBKEYBOARD
+	clearrepeat();
+#endif	
+    memcpy(buf, tknbuf, STRINGSIZE);                                // save the token buffer because we are going to use it
+    memset(ram,0xFF,MAX_PROG_SIZE);
+    realmempointer=(volatile uint32_t)ram;
+    nbr = 0;
+    // this is used to count the number of bytes written to ram
+    while(*pm) {
+        p = inpbuf;
+        while(!(*pm == 0 || *pm == '\r' || (*pm == '\n' && prevchar != '\r'))) {
+            if(*pm == TAB) {
+                do {*p++ = ' ';
+                    if((p - inpbuf) >= MAXSTRLEN) goto exiterror;
+                } while((p - inpbuf) % 2);
+            } else {
+                if(isprint((uint8_t)*pm)) {
+                    *p++ = *pm;
+                    if((p - inpbuf) >= MAXSTRLEN) goto exiterror;
+                }
+            }
+            prevchar = *pm++;
+        }
+        if(*pm) prevchar = *pm++;                                   // step over the end of line char but not the terminating zero
+        *p = 0;                                                     // terminate the string in inpbuf
+
+        if(*inpbuf == 0 && (*pm == 0 || (!isprint((uint8_t)*pm) && pm[1] == 0))) break; // don't save a trailing newline
+
+        tokenise(false);                                            // turn into executable code
+        p = tknbuf;
+        while(!(p[0] == 0 && p[1] == 0)) {
+            MemWriteByte(*p++); nbr++;
+
+            if(((uint32_t)realmempointer - (uint32_t)ram) >= MAX_PROG_SIZE - 5)  goto exiterror;
+        }
+        MemWriteByte(0); nbr++;                              // terminate that line in flash
+    }
+    MemWriteByte(0);
+    MemWriteAlign();                                            // this will flush the buffer and step the flash write pointer to the next word boundary
+    // now we must scan the program looking for CFUNCTION/CSUB/DEFINEFONT statements, extract their data and program it into the flash used by  CFUNCTIONs
+     // programs are terminated with two zero bytes and one or more bytes of 0xff.  The CFunction area starts immediately after that.
+     // the format of a CFunction/CSub/Font in flash is:
+     //   Unsigned Int - Address of the CFunction/CSub in program memory (points to the token representing the "CFunction" keyword) or NULL if it is a font
+     //   Unsigned Int - The length of the CFunction/CSub/Font in bytes including the Offset (see below)
+     //   Unsigned Int - The Offset (in words) to the main() function (ie, the entry point to the CFunction/CSub).  Omitted in a font.
+     //   word1..wordN - The CFunction/CSub/Font code
+     // The next CFunction/CSub/Font starts immediately following the last word of the previous CFunction/CSub/Font
+    int firsthex=1;
+    realmemsave= realmempointer;
+    p = (unsigned char *)ram ;                                             // start scanning program memory
+    while(*p != 0xff) {
+    	nbr++;
+        if(*p == 0) p++;                                            // if it is at the end of an element skip the zero marker
+        if(*p == 0) break;                                          // end of the program
+        if(*p == T_NEWLINE) {
+            CurrentLinePtr = p;
+            p++;                                                    // skip the newline token
+        }
+        if(*p == T_LINENBR) p += 3;                                 // step over the line number
+
+        skipspace(p);
+        if(*p == T_LABEL) {
+            p += p[1] + 2;                                          // skip over the label
+            skipspace(p);                                           // and any following spaces
+        }
+        tkn=p[0] & 0x7f;
+        tkn |= ((unsigned short)(p[1] & 0x7f)<<7);
+        if(tkn == cmdCSUB || tkn == GetCommandValue((unsigned char *)"DefineFont")) {      // found a CFUNCTION, CSUB or DEFINEFONT token
+            if(tkn == GetCommandValue((unsigned char *)"DefineFont")) {
+             endtoken = GetCommandValue((unsigned char *)"End DefineFont");
+             p+=2;                                                // step over the token
+             skipspace(p);
+             if(*p == '#') p++;
+             fontnbr = getint(p, 1, FONT_TABLE_SIZE);
+                                                 // font 6 has some special characters, some of which depend on font 1
+             if(fontnbr == 1 || fontnbr == 6 || fontnbr == 7) {
+                error("Cannot redefine fonts 1, 6 or 7");
+             }
+             realmempointer+=4;
+             skipelement(p);                                     // go to the end of the command
+             p--;
+            } else {
+                endtoken = GetCommandValue((unsigned char *)"End CSub");
+                realmempointer+=4;
+                fontnbr = 0;
+                firsthex=0;
+                p++;
+            }
+             SaveSizeAddr = realmempointer;                                // save where we are so that we can write the CFun size in here
+             realmempointer+=4;
+             p++;
+             skipspace(p);
+             if(!fontnbr) { //process CSub 
+                 if(!isnamestart((uint8_t)*p)){
+                    error("Function name");
+                 }  
+                 do { p++; } while(isnamechar((uint8_t)*p));
+                 skipspace(p);
+                 if(!(isxdigit((uint8_t)p[0]) && isxdigit((uint8_t)p[1]) && isxdigit((uint8_t)p[2]))) {
+                     skipelement(p);
+                     p++;
+                    if(*p == T_NEWLINE) {
+                        CurrentLinePtr = p;
+                        p++;                                        // skip the newline token
+                    }
+                    if(*p == T_LINENBR) p += 3;                     // skip over a line number
+                 }
+             }
+             do {
+                 while(*p && *p != '\'') {
+                     skipspace(p);
+                     n = 0;
+                     for(i = 0; i < 8; i++) {
+                         if(!isxdigit((uint8_t)*p)) {
+                            error("Invalid hex word");
+                         }
+                         if(((uint32_t)realmempointer - (uint32_t)ram) >= MAX_PROG_SIZE - 5) goto exiterror;
+                         n = n << 4;
+                         if(*p <= '9')
+                             n |= (*p - '0');
+                         else
+                             n |= (toupper(*p) - 'A' + 10);
+                         p++;
+                     }
+                     realmempointer+=4;
+                     skipspace(p);
+                     if(firsthex){
+                    	 firsthex=0;
+                    	 if(((n>>16) & 0xff) < 0x20){
+                            error("Can't define non-printing characters");
+                         }
+                     }
+                 }
+                 // we are at the end of a embedded code line
+                 while(*p) p++;                                      // make sure that we move to the end of the line
+                 p++;                                                // step to the start of the next line
+                 if(*p == 0) {
+                     error("Missing END declaration");
+                 }
+                 if(*p == T_NEWLINE) {
+                     CurrentLinePtr = p;
+                     p++;                                            // skip the newline token
+                 }
+                 if(*p == T_LINENBR) p += 3;                         // skip over the line number
+                 skipspace(p);
+                tkn=p[0] & 0x7f;
+                tkn |= ((unsigned short)(p[1] & 0x7f)<<7);
+             } while(tkn != endtoken);
+             storedupdates[updatecount++]=realmempointer - SaveSizeAddr - 4;
+         }
+         while(*p) p++;                                              // look for the zero marking the start of the next element
+     }
+    realmempointer = realmemsave ;
+    updatecount=0;
+    p = (unsigned char *)ram;                                              // start scanning program memory
+     while(*p != 0xff) {
+     	nbr++;
+         if(*p == 0) p++;                                            // if it is at the end of an element skip the zero marker
+         if(*p == 0) break;                                          // end of the program
+         if(*p == T_NEWLINE) {
+             CurrentLinePtr = p;
+             p++;                                                    // skip the newline token
+         }
+         if(*p == T_LINENBR) p += 3;                                 // step over the line number
+
+         skipspace(p);
+         if(*p == T_LABEL) {
+             p += p[1] + 2;                                          // skip over the label
+             skipspace(p);                                           // and any following spaces
+         }
+         tkn=p[0] & 0x7f;
+         tkn |= ((unsigned short)(p[1] & 0x7f)<<7);
+         if(tkn == cmdCSUB || tkn == GetCommandValue((unsigned char *)"DefineFont")) {      // found a CFUNCTION, CSUB or DEFINEFONT token
+         if(tkn == GetCommandValue((unsigned char *)"DefineFont")) {      // found a CFUNCTION, CSUB or DEFINEFONT token
+             endtoken = GetCommandValue((unsigned char *)"End DefineFont");
+             p+=2;                                                // step over the token
+             skipspace(p);
+             if(*p == '#') p++;
+             fontnbr = getint(p, 1, FONT_TABLE_SIZE);
+                                                 // font 6 has some special characters, some of which depend on font 1
+             if(fontnbr == 1 || fontnbr == 6 || fontnbr == 7) {
+                 error("Cannot redefine fonts 1, 6, or 7");
+             }
+
+             //FlashWriteWord(fontnbr - 1);                        // a low number (< FONT_TABLE_SIZE) marks the entry as a font
+             // B31 = 1 now marks entry as font.
+             MemWriteByte(fontnbr - 1);
+             MemWriteByte(0x00);  
+             MemWriteByte(0x00);
+             MemWriteByte(0x80);    
+           
+
+             skipelement(p);                                     // go to the end of the command
+             p--;
+         } else {
+             endtoken = GetCommandValue((unsigned char *)"End CSub");
+             MemWriteWord((unsigned int)(p-ram));               // if a CFunction/CSub save a relative pointer to the declaration
+             fontnbr = 0;
+             p++;
+         }
+            SaveSizeAddr = realmempointer;                                // save where we are so that we can write the CFun size in here
+             MemWriteWord(storedupdates[updatecount++]);                        // leave this blank so that we can later do the write
+             p++;
+             skipspace(p);
+             if(!fontnbr) {
+                 if(!isnamestart((uint8_t)*p))  {
+                    error("Function name");
+                 }
+                 do { p++; } while(isnamechar(*p));
+                 skipspace(p);
+                 if(!(isxdigit(p[0]) && isxdigit(p[1]) && isxdigit(p[2]))) {
+                     skipelement(p);
+                     p++;
+                    if(*p == T_NEWLINE) {
+                        CurrentLinePtr = p;
+                        p++;                                        // skip the newline token
+                    }
+                    if(*p == T_LINENBR) p += 3;                     // skip over a line number
+                 }
+             }
+             do {
+                 while(*p && *p != '\'') {
+                     skipspace(p);
+                     n = 0;
+                     for(i = 0; i < 8; i++) {
+                         if(!isxdigit(*p)) {
+                            error("Invalid hex word");
+                         }
+                         if(((uint32_t)realmempointer - (uint32_t)ram) >= MAX_PROG_SIZE - 5) goto exiterror;
+                         n = n << 4;
+                         if(*p <= '9')
+                             n |= (*p - '0');
+                         else
+                             n |= (toupper(*p) - 'A' + 10);
+                         p++;
+                     }
+
+                     MemWriteWord(n);
+                     skipspace(p);
+                 }
+                 // we are at the end of a embedded code line
+                 while(*p) p++;                                      // make sure that we move to the end of the line
+                 p++;                                                // step to the start of the next line
+                 if(*p == 0) {
+                    error("Missing END declaration");
+                 }
+                 if(*p == T_NEWLINE) {
+                    CurrentLinePtr = p;
+                    p++;                                        // skip the newline token
+                 }
+                 if(*p == T_LINENBR) p += 3;                     // skip over a line number
+                 skipspace(p);
+                tkn=p[0] & 0x7f;
+                tkn |= ((unsigned short)(p[1] & 0x7f)<<7);
+              } while(tkn != endtoken);
+         }
+         while(*p) p++;                                              // look for the zero marking the start of the next element
+     }
+     MemWriteWord(0xffffffff);                                // make sure that the end of the CFunctions is terminated with an erased word
+     MemWriteClose();                                              // this will flush the buffer and step the flash write pointer to the next word boundary
+    if(msg) {                                                       // if requested by the caller, print an informative message
+        if(MMCharPos > 1) MMPrintString("\r\n");                    // message should be on a new line
+        MMPrintString("Saved ");
+        IntToStr((char *)tknbuf, nbr + 3, 10);
+        MMPrintString((char *)tknbuf);
+        MMPrintString(" bytes\r\n");
+    }
+    memcpy(tknbuf, buf, STRINGSIZE);                                // restore the token buffer in case there are other commands in it
+//    initConsole();
+#ifdef USBKEYBOARD
+	clearrepeat();
+#endif
+    return;
+
+    // we only get here in an error situation while writing the program to flash
+    exiterror:
+        MemWriteByte(0); MemWriteByte(0); MemWriteByte(0);    // terminate the program in flash
+        MemWriteClose();
+        error("Not enough memory");
+}
+int MemLoadProgram(unsigned char *fname, unsigned char *ram)
+{
+    int fnbr;
+    char *p, *buf;
+    int c,oldfont=gui_font;
+    if (!InitSDCard()) return false;
+    initFonts();
+    m_alloc(M_LIMITED);                                           // init the variables for program memory
+    if(Option.DISPLAY_TYPE>=VIRTUAL && WriteBuf)FreeMemorySafe((void **)&WriteBuf);
+    ClearRuntime(false);
+    PSize = 0;
+    StartEditPoint = NULL;
+    StartEditChar= 0;
+    ProgramChanged = false;
+    TraceOn = false;
+    SetFont(oldfont);
+    PromptFont=oldfont;
+    fnbr = FindFreeFileNbr();
+    p = (char *)getFstring(fname);
+    if (strchr((char *)p, '.') == NULL) strcat((char *)p, ".bas");
+    char q[FF_MAX_LFN]={0};
+    FatFSFileSystemSave=FatFSFileSystem;
+    getfullfilename(p,q);
+    int CurrentFileSystem=FatFSFileSystem;
+    FatFSFileSystem=FatFSFileSystemSave;
+    if (!BasicFileOpen(p, fnbr, FA_READ)) return false;
+    p = buf = GetTempMemory(EDIT_BUFFER_SIZE-2048); // get all the memory while leaving space for the couple of buffers defined and the file handle
+    *p++='\'';
+    *p++='#';
+    strcpy(p,CurrentFileSystem? "B:":"A:");
+    p+=2;
+    strcpy(p,q);
+    p+=strlen(q);
+    *p++='\r';
+    *p++='\n';
+    while (!FileEOF(fnbr))
+    { // while waiting for the end of file
+        if ((p - buf) >= EDIT_BUFFER_SIZE - 2048 - 512)
+            error("Not enough memory");
+        c = FileGetChar(fnbr) & 0x7f;
+        if (isprint(c) || c == '\r' || c == '\n' || c == TAB)
+        {
+            if (c == TAB)
+                c = ' ';
+            *p++ = c; // get the input into RAM
+        }
+    }
+    *p = 0; // terminate the string in RAM
+    FileClose(fnbr);
+    ClearSavedVars(); // clear any saved variables
+    SaveProgramToRAM((unsigned char *)buf, false, ram);
+    return true;
+}
 
 void MIPS16 loadCMM2(unsigned char *p, bool autorun, bool message)
 {
@@ -2298,7 +2897,7 @@ void MIPS16 loadCMM2(unsigned char *p, bool autorun, bool message)
     {
         if (*ProgMemory != 0x01)
             return; // no program to run
-        ClearRuntime();
+        ClearRuntime(true);
         WatchdogSet = false;
         PrepareProgram(true);
         IgnorePIN = false;
@@ -2422,6 +3021,13 @@ void MIPS16 cmd_load(void)
     int autorun = false;
     unsigned char *p;
 
+    p = checkstring(cmdline, (unsigned char *)"CONTEXT");
+    if (p)
+    {
+        if(checkstring(p, (unsigned char *)"KEEP"))RestoreContext(true);
+        else RestoreContext(false);
+        return;
+    }
     p = checkstring(cmdline, (unsigned char *)"IMAGE");
     if (p)
     {
@@ -2452,7 +3058,7 @@ void MIPS16 cmd_load(void)
         else
             error("Syntax");
     }  else if (CurrentLinePtr != NULL) error("Invalid in a program");
-    if (!FileLoadProgram(argv[0])){
+    if (!FileLoadProgram(argv[0], false)){
         SetFont(oldfont);
         PromptFont=oldfont;
         return;
@@ -2461,7 +3067,7 @@ void MIPS16 cmd_load(void)
     if (autorun) {
         if (*ProgMemory != 0x01)
             return; // no program to run
-        ClearRuntime();
+        ClearRuntime(true);
         WatchdogSet = false;
         PrepareProgram(true);
         IgnorePIN = false;
@@ -3302,16 +3908,21 @@ void getfullfilepath(char *p, char *q){
 
 void MIPS16 cmd_files(void)
 {
-    if(CurrentLinePtr) error("Invalid in a program");
+//    if(CurrentLinePtr) error("Invalid in a program");
     int waste=0, t=FatFSFileSystem+1;
-    if(*cmdline){
+    unsigned char cmdbuffer[STRINGSIZE]={0};
+    unsigned char *cmdbuf=cmdbuffer;
+    strcpy((char *)cmdbuf,(char *)cmdline);
+    if(*cmdbuf){
         t = drivecheck((char *)getFstring(cmdline),&waste);
-        cmdline+=waste;
-        *cmdline='"';
+        cmdbuf+=waste;
+        *cmdbuf='"';
     }
-    ClearVars(0);
     int oldfont=PromptFont;
-    ClearRuntime();
+    if(!CurrentLinePtr){
+        ClearVars(0,true);
+        ClearRuntime(true);
+    }
     SetFont(oldfont);
     int i, c, dirs, ListCnt, currentsize;
     uint32_t currentdate;
@@ -3327,9 +3938,9 @@ void MIPS16 cmd_files(void)
     memset(&djd, 0, sizeof(DIR));
     memset(&fnod, 0, sizeof(FILINFO));
     fcnt = 0;
-    if (*cmdline)
+    if (*cmdbuf)
     {
-        getargs(&cmdline, 3, (unsigned char *)",");
+        getargs(&cmdbuf, 3, (unsigned char *)",");
         if (!(argc == 1 || argc == 3))
             error("Syntax");
         p = (char *)getFstring(argv[0]);
@@ -3364,19 +3975,14 @@ void MIPS16 cmd_files(void)
                 error("Syntax");
         }
     }
+    if(CurrentLinePtr){
+        CloseAudio(1);
+        SaveContext();
+        ClearVars(0,false);
+        InitHeap(false);
+    }
     if (pp[0] == 0)
         strcpy(pp, "*");
-    if (CurrentLinePtr)
-        error("Invalid in a program");
-    if (flist)
-        FreeMemorySafe((void **)&flist);
-    closeallsprites();
-#ifndef PICOMITEWEB
-    closeframebuffer('A');
-    closeall3d();
-#endif
-    CloseAudio(1);
-    flist = GetMemory(sizeof(s_flist) * MAXFILES);
     FatFSFileSystem=t-1;
     if (!InitSDCard())
         error((char *)FErrorMsg[20]); // setup the SD card
@@ -3389,6 +3995,7 @@ void MIPS16 cmd_files(void)
     if(FatFSFileSystem==0) FSerror=lfs_dir_open(&lfs, &lfs_dir, fullpathname[FatFSFileSystem]);
     else FSerror = f_findfirst(&djd, &fnod, fullpathname[FatFSFileSystem], pp);
     ErrorCheck(0);
+    flist = GetMemory(sizeof(s_flist) * MAXFILES);
         // add the file to the list, search for the next and keep looping until no more files
         if(FatFSFileSystem){
             while (FSerror == FR_OK && fnod.fname[0])
@@ -3655,19 +4262,6 @@ void MIPS16 cmd_files(void)
             #ifdef PICOMITEWEB
                 ProcessWeb(1);
             #endif
-            routinechecks();
-            if (MMAbort)
-            {
-                FreeMemorySafe((void **)&flist);
-                if(FatFSFileSystem) f_closedir(&djd);
-                else lfs_dir_close(&lfs, &lfs_dir);
-                WDTimer = 0; // turn off the watchdog timer
-                memset(inpbuf, 0, STRINGSIZE);
-                FatFSFileSystem=FatFSFileSystemSave;
-                Option.NoScroll=noscroll;
-                PromptFont=oldfont;
-                longjmp(mark, 1);
-            }
             if (flist[i].fn[0] == 'D')
             {
                 dirs++;
@@ -3691,17 +4285,13 @@ void MIPS16 cmd_files(void)
                 strcat(outbuff,"  ");
             }
                 strcat(outbuff,flist[i].fn + 1);
-//                ListCnt+=(strlen(outbuff)/Option.Width + 1);
-//                if((strlen(outbuff) % Option.Width)==0)ListCnt--;
-//                strcat(outbuff,"\r\n");
-//                MMPrintString(outbuff);
                 char *pp=outbuff;
 				while(*pp) {
-					if(MMCharPos >= Option.Width) ListNewLine(&ListCnt, 0);
+					if(MMCharPos >= Option.Width) ListNewLine(&ListCnt, 1);
 					MMputchar(*pp++,0);
 				}
 				fflush(stdout);
-				ListNewLine(&ListCnt, 0);
+				ListNewLine(&ListCnt, 1);
             // check if it is more than a screen full
             if (ListCnt >= Option.Height-overlap && i < fcnt)
             {
@@ -3729,7 +4319,10 @@ void MIPS16 cmd_files(void)
                         ShowCursor(false);
                         FatFSFileSystem=FatFSFileSystemSave;
                         PromptFont=oldfont;
-                        longjmp(mark, 1);
+                        if(CurrentLinePtr)RestoreContext(false);
+                        MMAbort=false;
+                        return;
+//                        longjmp(mark, 1);
                     }
                     c = -1;
                     if (ConsoleRxBufHead != ConsoleRxBufTail)
@@ -3767,7 +4360,9 @@ void MIPS16 cmd_files(void)
         FatFSFileSystem=FatFSFileSystemSave;
         Option.NoScroll=noscroll;
         PromptFont=oldfont;
-        longjmp(mark, 1);
+        if(CurrentLinePtr)RestoreContext(false);
+        return;
+//        longjmp(mark, 1);
 
 }
 /* 
@@ -3829,10 +4424,10 @@ void cmd_autosave(void)
     if (CurrentLinePtr)error("Invalid in a program");
     char *tp=(char *)checkstring(cmdline,(unsigned char *)"APPEND");
     if(tp){
-        ClearVars(0);
+        ClearVars(0,true);
         CloseAudio(1);
         CloseAllFiles();
-        ClearExternalIO();                                              // this MUST come before InitHeap()
+        ClearExternalIO();                                              // this MUST come before InitHeap(true)
 #ifdef PICOMITEWEB
         if(TCPstate){
             for(int i=0;i<MaxPcb;i++)FreeMemory(TCPstate->buffer_recv[i]);
@@ -3906,15 +4501,15 @@ readin:;
           //    ClearSavedVars();                                               // clear any saved variables
     SaveProgramToFlash(buf, true);
     ClearSavedVars(); // clear any saved variables
-//    FreeMemory(buf);
-#ifdef PICOMITEWEB
+    ClearTempMemory(); 
+ #ifdef PICOMITEWEB
         if(TCPstate){
             for(int i=0;i<MaxPcb;i++)TCPstate->buffer_recv[i]=GetMemory(TCP_READ_BUFFER_SIZE);
         }
 #endif
     if (c == F2)
     {
-        ClearVars(0);
+        ClearVars(0,true);
         strcpy((char *)inpbuf, "RUN\r\n");
         multi=false;
         tokenise(true);         // turn into executable code
@@ -4368,8 +4963,9 @@ void ResetOptions(void)
     Option.VGA_BLUE=24;
     uint8_t txbuf[4] = {0x9f};
     uint8_t rxbuf[4] = {0};
+    Option.heartbeatpin = 43;
 #ifdef rp2350
-    if(!rp2350){
+    if(!rp2350a){
         Option.NoHeartbeat=1;
         Option.AllPins=1;
     }
@@ -4515,9 +5111,9 @@ void MIPS16 cmd_var(void)
             }
             else
                 vdata = findvar(bufp, type | V_FIND); // find or create a non arrayed variable
-            if (TypeMask(vartbl[VarIndex].type) != TypeMask(type))
+            if (TypeMask(g_vartbl[g_VarIndex].type) != TypeMask(type))
                 error("$ type conflict", bufp);
-            if (vartbl[VarIndex].type & T_CONST)
+            if (g_vartbl[g_VarIndex].type & T_CONST)
                 error("$ is a constant", bufp);
             bufp += strlen((char *)bufp) + 1; // step over the name and the terminating zero byte
             if (array)
@@ -4527,10 +5123,10 @@ void MIPS16 cmd_var(void)
                 nbr |= (*bufp++) << 16;
                 nbr |= (*bufp++) << 24;
                 nbr2 = 1;
-                for (j = 0; vartbl[VarIndex].dims[j] != 0 && j < MAXDIM; j++)
-                    nbr2 *= (vartbl[VarIndex].dims[j] + 1 - OptionBase);
+                for (j = 0; g_vartbl[g_VarIndex].dims[j] != 0 && j < MAXDIM; j++)
+                    nbr2 *= (g_vartbl[g_VarIndex].dims[j] + 1 - g_OptionBase);
                 if (type & T_STR)
-                    nbr2 *= vartbl[VarIndex].size + 1;
+                    nbr2 *= g_vartbl[g_VarIndex].size + 1;
                 if (type & T_NBR)
                     nbr2 *= sizeof(MMFLOAT);
                 if (type & T_INT)
@@ -4566,8 +5162,8 @@ void MIPS16 cmd_var(void)
         {
             checkend(skipvar(argv[i], false));
             VarDataList[i / 2] = findvar(argv[i], V_NOFIND_ERR | V_EMPTY_OK);
-            VarList[i / 2] = VarIndex;
-            if ((vartbl[VarIndex].type & (T_CONST | T_PTR)) || vartbl[VarIndex].level != 0)
+            VarList[i / 2] = g_VarIndex;
+            if ((g_vartbl[g_VarIndex].type & (T_CONST | T_PTR)) || g_vartbl[g_VarIndex].level != 0)
                 error("Invalid variable");
             p = &argv[i][strlen((char *)argv[i]) - 1]; // pointer to the last char
             if (*p == ')')
@@ -4646,24 +5242,24 @@ void MIPS16 cmd_var(void)
         // now save the variables listed in this invocation of VAR SAVE
         for (i = 0; i < argc; i += 2)
         {
-            VarIndex = VarList[i / 2];                   // previously saved index to the variable
+            g_VarIndex = VarList[i / 2];                   // previously saved index to the variable
             vdata = VarDataList[i / 2];                  // pointer to the variable's data
-            type = TypeMask(vartbl[VarIndex].type);      // get the variable's type
-            type |= (vartbl[VarIndex].type & T_IMPLIED); // set the implied flag
-            array = (vartbl[VarIndex].dims[0] != 0);
+            type = TypeMask(g_vartbl[g_VarIndex].type);      // get the variable's type
+            type |= (g_vartbl[g_VarIndex].type & T_IMPLIED); // set the implied flag
+            array = (g_vartbl[g_VarIndex].dims[0] != 0);
 
             nbr = 1; // number of elements to save
             if (array)
             { // if this is an array calculate the number of elements
-                for (j = 0; vartbl[VarIndex].dims[j] != 0 && j < MAXDIM; j++)
-                    nbr *= (vartbl[VarIndex].dims[j] + 1 - OptionBase);
+                for (j = 0; g_vartbl[g_VarIndex].dims[j] != 0 && j < MAXDIM; j++)
+                    nbr *= (g_vartbl[g_VarIndex].dims[j] + 1 - g_OptionBase);
                 type |= 0x80; // an array has the top bit set
             }
 
             if (type & T_STR)
             {
                 if (array)
-                    nbr *= (vartbl[VarIndex].size + 1);
+                    nbr *= (g_vartbl[g_VarIndex].size + 1);
                 else
                     nbr = *vdata + 1; // for a simple string variable just save the string
             }
@@ -4677,7 +5273,7 @@ void MIPS16 cmd_var(void)
                 error("Not enough memory");
             }
             FlashWriteByte(type); // save its type
-            for (j = 0, p = vartbl[VarIndex].name; *p && j < MAXVARLEN; p++, j++)
+            for (j = 0, p = g_vartbl[g_VarIndex].name; *p && j < MAXVARLEN; p++, j++)
                 FlashWriteByte(*p); // save the name
             FlashWriteByte(0);      // terminate the name
             if (array)

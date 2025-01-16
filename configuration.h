@@ -36,7 +36,7 @@ extern "C" {
         #define MAXSUBFUN           512                     // each entry takes up 4 bytes
         #define MAXVARS             768                     // 8 + MAXVARLEN + MAXDIM * 2  (ie, 56 bytes) - these do not incl array members
         #define HEAP_MEMORY_SIZE (180*1024) 
-        #define FLASH_TARGET_OFFSET (848 * 1024) 
+        #define FLASH_TARGET_OFFSET (864 * 1024) 
         #ifdef HDMI
             #define MAXMODES 5
             #ifdef USBKEYBOARD
@@ -66,11 +66,11 @@ extern "C" {
         #endif
     #else
         #ifdef USBKEYBOARD
-            #define FLASH_TARGET_OFFSET (800 * 1024) 
+            #define FLASH_TARGET_OFFSET (8323* 1024) 
             #define MagicKey 0x15197236
             #define HEAPTOP 0x2003FB00
         #else
-            #define FLASH_TARGET_OFFSET (784 * 1024) 
+            #define FLASH_TARGET_OFFSET (816 * 1024) 
             #define MagicKey 0x21639130
             #define HEAPTOP 0x2003fc00
         #endif
@@ -137,7 +137,7 @@ extern "C" {
             #define MagicKey 0x15939342
             #define HEAPTOP 0x2007C000
         #else
-            #define MagicKey 0x7284312
+            #define MagicKey 0x72843126
             #define HEAPTOP 0x2007C000
         #endif
     #else
@@ -166,6 +166,7 @@ extern "C" {
 #define SAVEDVARS_FLASH_SIZE 16384
 #define FLASH_ERASE_SIZE 4096
 #define MAXFLASHSLOTS 3
+#define MAXRAMSLOTS 5
 #define MAXVARHASH				MAXVARS/2 
 
 // more static memory allocations (less important)
@@ -210,6 +211,8 @@ extern "C" {
         #define PIOMAX 3
         #define NBRPINS             62
         #define PSRAMbase 0x11000000
+        #define PSRAMblock (PSRAMbase+PSRAMsize+0x40000)
+        #define PSRAMblocksize 0x1C0000
     #else
         #define PIOMAX 2
         #define NBRPINS             44
@@ -295,7 +298,7 @@ extern "C" {
 #define MAXDEFINES  16
 //#define DO_NOT_RESET (1 << 5)
 //#define HEARTBEAT    (1 << 6)
-#define HEARTBEATpin  43
+#define HEARTBEATpin  Option.heartbeatpin
 #define PATH_MAX 1024
 // QVGA PIO and state machines
 #define QVGA_PIO	pio0	// QVGA PIO

@@ -39,7 +39,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include <float.h>
 #include "xregex.h"
 #ifdef rp2350
-#include "pico\rand.h"
+#include "pico/rand.h"
 #endif
 
 extern long long int  llabs (long long int  n);
@@ -115,8 +115,8 @@ void fun_bound(void){
 	getargs(&ep, 3,(unsigned char *)",");
 	if(argc==3)which=getint(argv[2],0,MAXDIM);
     findvar(argv[0], V_FIND | V_EMPTY_OK | V_NOFIND_ERR);
-	if(which==0)iret=OptionBase;
-	else iret=vartbl[VarIndex].dims[which-1];
+	if(which==0)iret=g_OptionBase;
+	else iret=g_vartbl[g_VarIndex].dims[which-1];
 	if(iret==-1)iret=0;
 	targ=T_INT;
 }
@@ -544,7 +544,7 @@ void fun_instr(void) {
 		strcpy(p,(char *)getCstring(argv[2+n]));
 		if(argc==5+n){
 			temp = findvar(argv[4+n], V_FIND);
-			if(!(vartbl[VarIndex].type & T_NBR)) error("Invalid variable");
+			if(!(g_vartbl[g_VarIndex].type & T_NBR)) error("Invalid variable");
 		}
 		reti = regcomp(&regex, p, 0);
 		if( reti ){

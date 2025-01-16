@@ -69,8 +69,8 @@
 #define Vector_SoftReset          (*(unsigned int *)(BaseAddress+0x54))       // void SoftReset(void)
 #define Vector_error              (*(unsigned int *)(BaseAddress+0x58))       // void error(char *msg)
 #define Vector_ProgFlash          (*(unsigned int *)(BaseAddress+0x5C))       // ProgFlash
-#define Vector_vartbl             (*(unsigned int *)(BaseAddress+0x60))       // vartbl
-#define Vector_varcnt             (*(unsigned int *)(BaseAddress+0x64))       // varcnt
+#define Vector_vartbl             (*(unsigned int *)(BaseAddress+0x60))       // g_vartbl
+#define Vector_varcnt             (*(unsigned int *)(BaseAddress+0x64))       // g_varcnt
 #define Vector_DrawBuffer         *(unsigned int *)(BaseAddress+0x68 )        // void DrawRectangle(int x1, int y1, int x2, int y2, int C))
 #define Vector_ReadBuffer         *(unsigned int *)(BaseAddress+0x6c )        // void DrawRectangle(int x1, int y1, int x2, int y2, int C))
 #define Vector_FloatToStr         (*(unsigned int *)(BaseAddress+0x70))       // convert a float to a string including scientific notation if necessary
@@ -130,8 +130,8 @@
 #define SoftReset()                     ((void (*)(void)) Vector_SoftReset) ()
 #define error(a)                        ((void (*)(char *)) Vector_error) (a)
 #define ProgFlash                       ((int *) Vector_ProgFlash)
-#define vartbl                          (*(struct s_vartbl *) Vector_vartbl)
-#define varcnt                          (*(unsigned int *) Vector_varcnt)
+#define g_vartbl                          (*(struct s_vartbl *) Vector_vartbl)
+#define g_varcnt                          (*(unsigned int *) Vector_varcnt)
 #define DrawBuffer(a,b,c,d,e)           ((void (*)(int,int,int,int,char *)) (*(unsigned int *)Vector_DrawBuffer)) (a,b,c,d,e)
 #define DrawBufferVector                (*(unsigned int *)Vector_DrawBuffer)
 #define ReadBuffer(a,b,c,d,e)           ((void (*)(int,int,int,int,char *)) (*(unsigned int *)Vector_ReadBuffer)) (a,b,c,d,e)
@@ -191,7 +191,7 @@
 
 
 
-// the structure of the variable table, passed to the CFunction as a pointer Vector_vartbl which is #defined as vartbl
+// the structure of the variable table, passed to the CFunction as a pointer Vector_vartbl which is #defined as g_vartbl
 struct s_vartbl {                               // structure of the variable table
   char name[MAXVARLEN];                       // variable's name
   char type;                                  // its type (T_NUM, T_INT or T_STR)
@@ -211,7 +211,7 @@ struct s_vartbl {                               // structure of the variable tab
 //  Useful macros
 
 
-// Types used to define a variable in the variable table (vartbl).   Often they are ORed together.
+// Types used to define a variable in the variable table (g_vartbl).   Often they are ORed together.
 // Also used in tokens and arguments to functions
 #define T_NOTYPE       0                            // type not set or discovered
 #define T_NBR       0x01                            // number (or float) type

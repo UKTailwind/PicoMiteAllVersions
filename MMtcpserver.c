@@ -679,12 +679,12 @@ int cmd_tcpserver(void){
                 if(argc!=3)error("Syntax");
                 int pcb=getint(argv[0],1,MaxPcb)-1;
                 ptr1 = findvar(argv[2], V_FIND | V_EMPTY_OK | V_NOFIND_ERR);
-                if(vartbl[VarIndex].type & T_INT) {
-                        if(vartbl[VarIndex].dims[1] != 0) error("Invalid variable");
-                        if(vartbl[VarIndex].dims[0] <= 0) {      // Not an array
+                if(g_vartbl[g_VarIndex].type & T_INT) {
+                        if(g_vartbl[g_VarIndex].dims[1] != 0) error("Invalid variable");
+                        if(g_vartbl[g_VarIndex].dims[0] <= 0) {      // Not an array
                                 error("Argument 2 must be integer array");
                         }
-                        size=(vartbl[VarIndex].dims[0] - OptionBase +1)*8;
+                        size=(g_vartbl[g_VarIndex].dims[0] - g_OptionBase +1)*8;
                         dest = (long long int *)ptr1;
                         dest[0]=0;
                         q=(uint8_t *)&dest[1];
@@ -710,7 +710,7 @@ int cmd_tcpserver(void){
                 int pcb = getint(argv[0],1,MaxPcb)-1;
                 parseintegerarray(argv[2],&dest,2,1,NULL,false);
                 q=(uint8_t *)&dest[1];
-//                int j=(vartbl[VarIndex].dims[0] - OptionBase);
+//                int j=(g_vartbl[g_VarIndex].dims[0] - g_OptionBase);
                 state->buffer_sent[pcb]=q;
                 int bufflen=dest[0];
                 state->to_send[pcb] = state->total_sent[pcb] = state->sent_len[pcb]=0;

@@ -523,11 +523,11 @@ void MIPS16 cmd_pio(void){
         int sm=getint(argv[2],0,3);
         nbr = getinteger(argv[4]);
         dd = findvar(argv[6], V_FIND | V_EMPTY_OK | V_NOFIND_ERR);
-        if(((vartbl[VarIndex].type & T_INT) && vartbl[VarIndex].dims[0] > 0 && vartbl[VarIndex].dims[1] == 0))
+        if(((g_vartbl[g_VarIndex].type & T_INT) && g_vartbl[g_VarIndex].dims[0] > 0 && g_vartbl[g_VarIndex].dims[1] == 0))
         {		// integer array
-            if( (((long long int *)dd - vartbl[VarIndex].val.ia) + nbr) > (vartbl[VarIndex].dims[0] + 1 - OptionBase) )
+            if( (((long long int *)dd - g_vartbl[g_VarIndex].val.ia) + nbr) > (g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase) )
                 error("Insufficient array size");
-        }  else  if ((vartbl[VarIndex].type & T_INT) && vartbl[VarIndex].dims[0] == 0 && nbr==1){
+        }  else  if ((g_vartbl[g_VarIndex].type & T_INT) && g_vartbl[g_VarIndex].dims[0] == 0 && nbr==1){
             // single variable
         }  else error("Invalid variable");
         
@@ -1057,7 +1057,7 @@ void MIPS16 cmd_pio(void){
                                 for(int i=PIOstart; i<PIOstart+totallines;i++){
                                         if(!(instructions[i] & 0x1E000)){ // jmp instructions needs resolving
                                                 int notfound=1;
-                                                for(int j=PIOstart;j<totallines;j++){
+                                                for(int j=PIOstart;j<PIOstart+totallines;j++){
                                                         if(strcasecmp(&labelsneeded[i*MAXLABEL],&labelsfound[j*MAXLABEL])==0) {
                                                                 instructions[i] |=j; 
                                                                 notfound=0;
@@ -1136,10 +1136,10 @@ void MIPS16 cmd_pio(void){
         int size=getinteger(argv[2]);
         if(!(size==256 || size==512 || size==1024 || size== 2048 || size==4096 || size==8192 || size==16384 || size==32768))error("Not power of 2");
         findvar(argv[0], V_FIND | V_NOFIND_ERR);
-        if ((vartbl[VarIndex].type & T_INT) && vartbl[VarIndex].dims[0] == 0 && vartbl[VarIndex].level==0){
-                vartbl[VarIndex].val.s =(unsigned char *)GetAlignedMemory(size);
-                vartbl[VarIndex].size=255;
-                vartbl[VarIndex].dims[0] = size/8-1+OptionBase;
+        if ((g_vartbl[g_VarIndex].type & T_INT) && g_vartbl[g_VarIndex].dims[0] == 0 && g_vartbl[g_VarIndex].level==0){
+                g_vartbl[g_VarIndex].val.s =(unsigned char *)GetAlignedMemory(size);
+                g_vartbl[g_VarIndex].size=255;
+                g_vartbl[g_VarIndex].dims[0] = size/8-1+g_OptionBase;
         }  else error("Invalid variable");
         return;
     }
@@ -1495,12 +1495,12 @@ void cmd_web(void){
                 void *ptr1 = NULL;
                 if(*tp){
                         ptr1 = findvar(tp, V_FIND | V_EMPTY_OK);
-                        if(vartbl[VarIndex].type & T_INT) {
-                                if(vartbl[VarIndex].dims[1] != 0) error("Invalid variable");
-                                if(vartbl[VarIndex].dims[0] <= 0) {		// Not an array
+                        if(g_vartbl[g_VarIndex].type & T_INT) {
+                                if(g_vartbl[g_VarIndex].dims[1] != 0) error("Invalid variable");
+                                if(g_vartbl[g_VarIndex].dims[0] <= 0) {		// Not an array
                                         error("Argument 1 must be integer array");
                                 }
-                                scan_size=(vartbl[VarIndex].dims[0]-OptionBase)*8;
+                                scan_size=(g_vartbl[g_VarIndex].dims[0]-g_OptionBase)*8;
                                 scan_dest = (char *)ptr1;
                                 scan_dest[8]=0;
                         } else error("Argument 1 must be integer array");
@@ -1557,9 +1557,9 @@ void fun_json(void){
     getargs(&ep, 3, (unsigned char *)",");
     char *a=GetTempMemory(STRINGSIZE);
     ptr1 = findvar(argv[0], V_FIND | V_EMPTY_OK);
-    if(vartbl[VarIndex].type & T_INT) {
-    if(vartbl[VarIndex].dims[1] != 0) error("Invalid variable");
-    if(vartbl[VarIndex].dims[0] <= 0) {		// Not an array
+    if(g_vartbl[g_VarIndex].type & T_INT) {
+    if(g_vartbl[g_VarIndex].dims[1] != 0) error("Invalid variable");
+    if(g_vartbl[g_VarIndex].dims[0] <= 0) {		// Not an array
         error("Argument 1 must be integer array");
     }
     dest = (long long int *)ptr1;

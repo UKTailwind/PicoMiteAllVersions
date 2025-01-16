@@ -43,7 +43,7 @@ extern "C" {
 #include <limits.h>
 #include <math.h>
 #include <stdint.h>
-
+#include <stdbool.h>
 #if defined(MAXIMITE) || defined(UBW32) || defined(DUINOMITE) || defined(COLOUR)
   #define MMFAMILY
 #endif
@@ -122,15 +122,21 @@ typedef struct s_vartbl {                               // structure of the vari
     }  val;
 } vartbl_val;
 
-extern struct s_vartbl vartbl[];
+typedef struct s_hash {                            
+	short hash;                                
+    short level;                       
+} hash_val;
 
-extern int varcnt;                              // number of variables defined (eg, largest index into the variable table)
-extern int Localvarcnt;                              // number of LOCAL variables defined (eg, largest index into the variable table)
-extern int Globalvarcnt;                              // number of GLOBAL variables defined (eg, largest index into the variable table)
-extern int VarIndex;                            // index of the current variable.  set after the findvar() function has found/created a variable
-extern int LocalIndex;                          // used to track the level of local variables
+extern struct s_vartbl g_vartbl[];
 
-extern int OptionBase;                          // value of OPTION BASE
+extern int g_varcnt;                              // number of variables defined (eg, largest index into the variable table)
+//extern int g_Localvarcnt;                              // number of LOCAL variables defined (eg, largest index into the variable table)
+extern int g_Globalvarcnt;                              // number of GLOBAL variables defined (eg, largest index into the variable table)
+extern int g_Localvarcnt;                              // number of GLOBAL variables defined (eg, largest index into the variable table)
+extern int g_VarIndex;                            // index of the current variable.  set after the findvar() function has found/created a variable
+extern int g_LocalIndex;                          // used to track the level of local variables
+
+extern int g_OptionBase;                          // value of OPTION BASE
 extern unsigned char OptionExplicit, OptionEscape, OptionConsole;                     // true if OPTION EXPLICIT has been used
 extern unsigned char DefaultType;                        // the default type if a variable is not specifically typed
 
@@ -252,9 +258,9 @@ long long int  FloatToInt64(MMFLOAT x);
 void makeargs(unsigned char **tp, int maxargs, unsigned char *argbuf, unsigned char *argv[], int *argc, unsigned char *delim);
 void *findvar(unsigned char *, int);
 void erasearray(unsigned char *n);
-void  ClearVars(int level);
+void  ClearVars(int level, bool all);
 void  ClearStack(void);
-void  ClearRuntime(void);
+void  ClearRuntime(bool all);
 void  ClearProgram(void);
 void *DoExpression(unsigned char *p, int *t);
 unsigned char *GetNextCommand(unsigned char *p, unsigned char **CLine, unsigned char *EOFMsg) ;

@@ -1533,12 +1533,12 @@ void DrawSingleKey(int is_alpha, int x1, int y1, int x2, int y2, char *s, int fc
 //        strcpy(callstr, "MM.KEYPRESS"); IntToStrPad(callstr + strlen(callstr), InvokingCtrl, ' ', 4, 10);
 //        strcat(callstr, ", \""); strcat(callstr, key); strcat(callstr, "\"");
 //        callstr[strlen(callstr)+1] = 0;                             // two NULL chars required to terminate the call
-//        LocalIndex++;
+//        g_LocalIndex++;
 //        InCallback = true;
 //        ExecuteProgram(callstr);
 //        InCallback = false;
-//        LocalIndex--;
-//        TempMemoryIsChanged = true;                                 // signal that temporary memory should be checked
+//        g_LocalIndex--;
+//        g_TempMemoryIsChanged = true;                                 // signal that temporary memory should be checked
 //        nextstmt = nextstmtSaved;
 //    }
 //}
@@ -2117,7 +2117,7 @@ void ServiceInterrupts(void) {
     char p[4]={0};
 
     CheckAbort();
-    LocalIndex++;                                                   // preserve the current temporary string memory allocations
+    g_LocalIndex++;                                                   // preserve the current temporary string memory allocations
     ttp = (char *)nextstmt;                                                 // save the globals used by commands
     tcmdtoken = cmdtoken;
     s = (char *)cmdline;
@@ -2129,8 +2129,8 @@ void ServiceInterrupts(void) {
     cmdline = (unsigned char *)s;                                                    // restore the globals
     cmdtoken = tcmdtoken;
     nextstmt = (unsigned char *)ttp;
-    LocalIndex--;
-    TempMemoryIsChanged = true;                                     // signal that temporary memory should be checked
+    g_LocalIndex--;
+    g_TempMemoryIsChanged = true;                                     // signal that temporary memory should be checked
 }
 
 /*  @endcond */

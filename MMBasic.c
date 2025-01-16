@@ -70,10 +70,7 @@ const struct s_tokentbl tokentbl[] = {
 };
 #undef INCLUDE_TOKEN_TABLE
 
-struct s_hash {                            
-	short hash;                                
-    short level;                       
-};
+
 static inline CommandToken commandtbl_decode(const unsigned char *p){
     return ((CommandToken)(p[0] & 0x7f)) | ((CommandToken)(p[1] & 0x7f)<<7);
 }
@@ -84,12 +81,12 @@ struct s_funtbl funtbl[MAXSUBFUN];
 //void hashlabels(int errabort);
 void hashlabels(unsigned char *p,int ErrAbort);
 #endif
-struct s_vartbl __attribute__ ((aligned (64))) vartbl[MAXVARS]={0};                                            // this table stores all variables
-int varcnt;                                                         // number of variables
-int VarIndex;                                                       // Global set by findvar after a variable has been created or found
-int Localvarcnt;                                                         // number of LOCAL variables
-int Globalvarcnt;                                                         // number of GLOBAL variables
-int LocalIndex;                                                     // used to track the level of local variables
+struct s_vartbl __attribute__ ((aligned (64))) g_vartbl[MAXVARS]={0};                                            // this table stores all variables
+int g_varcnt;                                                         // number of variables
+int g_VarIndex;                                                       // Global set by findvar after a variable has been created or found
+int g_Localvarcnt;                                                         // number of LOCAL variables
+int g_Globalvarcnt;                                                         // number of GLOBAL variables
+int g_LocalIndex;                                                     // used to track the level of local variables
 unsigned char OptionExplicit, OptionEscape, OptionConsole;                                                // used to force the declaration of variables before their use
 unsigned char DefaultType;                                                   // the default type if a variable is not specifically typed
 int emptyarray=0;
@@ -105,8 +102,8 @@ unsigned char tknbuf[STRINGSIZE];                                            // 
 //unsigned char lastcmd[STRINGSIZE];                                           // used to store the last command in case it is needed by the EDIT command
 unsigned char PromptString[MAXPROMPTLEN];                                    // the prompt for input, an empty string means use the default
 int ProgramChanged;                                                 // true if the program in memory has been changed and not saved
-struct s_hash hashlist[MAXVARS/2]={0};
-int hashlistpointer=0;
+struct s_hash g_hashlist[MAXVARS/2]={0};
+int g_hashlistpointer=0;
 unsigned char *LibMemory;                                           //This is where the library is stored. At the last flash slot (4)
 int multi=false;
 unsigned char *ProgMemory;                                                      // program memory, this is where the program is stored
@@ -114,7 +111,7 @@ int PSize;                                                          // the size 
 
 int NextData;                                                       // used to track the next item to read in DATA & READ stmts
 unsigned char *NextDataLine;                                                 // used to track the next line to read in DATA & READ stmts
-int OptionBase;                                                     // track the state of OPTION BASE
+int g_OptionBase;                                                     // track the state of OPTION BASE
 //#if defined(MMFAMILY) || defined(DOS)
 //unsigned char *ModuleTable[MAXMODULES];                                      // list of pointers to libraries a(also called modules) loaded in memory;
 //int NbrModules;                                                     // the number of libraries/modules currently loaded
@@ -366,7 +363,7 @@ void MIPS16 __not_in_flash_func(ExecuteProgram)(unsigned char *p) {
             skipspace(cmdline);
             skipelement(nextstmt);
             if(*p && *p != '\'') {                                  // ignore a comment line
-                SaveLocalIndex = LocalIndex;                        // save this if we need to cleanup after an error
+                SaveLocalIndex = g_LocalIndex;                        // save this if we need to cleanup after an error
                 if(setjmp(ErrNext) == 0) {                          // return to the else leg of this if error and OPTION ERROR SKIP/IGNORE is in effect
                     if(p[0]>= C_BASETOKEN && p[1]>=C_BASETOKEN){
                         cmdtoken=commandtbl_decode(p);
@@ -382,11 +379,11 @@ void MIPS16 __not_in_flash_func(ExecuteProgram)(unsigned char *p) {
                             error("Unknown command");
                     }
                 } else {
-                    LocalIndex = SaveLocalIndex;                    // restore so that we can clean up any memory leaks
+                    g_LocalIndex = SaveLocalIndex;                    // restore so that we can clean up any memory leaks
                     ClearTempMemory();
                 }
                 if(OptionErrorSkip > 0) OptionErrorSkip--;        // if OPTION ERROR SKIP decrement the count - we do not error if it is greater than zero
-                if(TempMemoryIsChanged) ClearTempMemory();          // at the end of each command we need to clear any temporary string vars
+                if(g_TempMemoryIsChanged) ClearTempMemory();          // at the end of each command we need to clear any temporary string vars
 #ifndef PICOMITEWEB
                 if(core1stack[0]!=0x12345678)error("CPU2 Stack overflow");
 #endif
@@ -705,7 +702,7 @@ void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, in
     CommandToken tkn=commandtbl_decode(SubLinePtr);
     if(tkn == cmdCSUB) {
         CallCFunction(SubLinePtr, tp, p, CallersLinePtr);           // run the CSUB
-        TempMemoryIsChanged = true;                                 // signal that temporary memory should be checked
+        g_TempMemoryIsChanged = true;                                 // signal that temporary memory should be checked
         return;
     }
    // from now on we have a user defined sub or function (not a C routine)
@@ -751,8 +748,8 @@ void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, in
                 if(!(FindSubFun(argv1[i], 1) >= 0 && strchr((char *)argv1[i], '(') != NULL)) {
                     // yes, this is a valid variable.  set argvalue to point to the variable's data and argtype to its type
                     argval[i].s = findvar(argv1[i], V_FIND | V_EMPTY_OK);        // get a pointer to the variable's data
-                    argtype[i] = vartbl[VarIndex].type;                          // and the variable's type
-                    argVarIndex[i] = VarIndex;
+                    argtype[i] = g_vartbl[g_VarIndex].type;                          // and the variable's type
+                    argVarIndex[i] = g_VarIndex;
                     if(argtype[i] & T_CONST) {
                         argtype[i] = 0;                                          // we don't want to point to a constant
                     } else {
@@ -778,7 +775,7 @@ void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, in
     // now we step through the parameters in the definition of the sub/fun
     // for each one we create the local variable and compare its type to that supplied in the callers list
     CurrentLinePtr = SubLinePtr;                                    // any errors must be at the definition
-    LocalIndex++;
+    g_LocalIndex++;
     for(i = 0; i < argc2; i += 2) {                                 // count through the arguments in the definition of the sub/fun
         ArgType = T_NOTYPE;
         tp = skipvar(argv2[i], false);                              // point to after the variable
@@ -790,27 +787,27 @@ void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, in
         }
         ArgType |= (V_FIND | V_DIM_VAR | V_LOCAL | V_EMPTY_OK);
         tp = findvar(argv2[i], ArgType);                            // declare the local variable
-        if(vartbl[VarIndex].dims[0] > 0) error("Argument list");    // if it is an array it must be an empty array
+        if(g_vartbl[g_VarIndex].dims[0] > 0) error("Argument list");    // if it is an array it must be an empty array
         
         CurrentLinePtr = CallersLinePtr;                            // report errors at the caller
 
         // if the definition called for an array, special processing and checking will be required
-        if(vartbl[VarIndex].dims[0] == -1) {
+        if(g_vartbl[g_VarIndex].dims[0] == -1) {
             int j;
-            if(vartbl[argVarIndex[i]].dims[0] == 0) error("Expected an array");
-            if(TypeMask(vartbl[VarIndex].type) != TypeMask(argtype[i])) error("Incompatible type: $", argv1[i]);
-            vartbl[VarIndex].val.s = NULL;
+            if(g_vartbl[argVarIndex[i]].dims[0] == 0) error("Expected an array");
+            if(TypeMask(g_vartbl[g_VarIndex].type) != TypeMask(argtype[i])) error("Incompatible type: $", argv1[i]);
+            g_vartbl[g_VarIndex].val.s = NULL;
             for(j = 0; j < MAXDIM; j++)                             // copy the dimensions of the supplied variable into our local variable
-                vartbl[VarIndex].dims[j] = vartbl[argVarIndex[i]].dims[j];
+                g_vartbl[g_VarIndex].dims[j] = g_vartbl[argVarIndex[i]].dims[j];
         }
 
         // if this is a pointer check and the type is NOT the same as that requested in the sub/fun definition
-        if((argtype[i] & T_PTR) && TypeMask(vartbl[VarIndex].type) != TypeMask(argtype[i])) {
-            if((TypeMask(vartbl[VarIndex].type) & T_STR) || (TypeMask(argtype[i]) & T_STR))
+        if((argtype[i] & T_PTR) && TypeMask(g_vartbl[g_VarIndex].type) != TypeMask(argtype[i])) {
+            if((TypeMask(g_vartbl[g_VarIndex].type) & T_STR) || (TypeMask(argtype[i]) & T_STR))
                 error("Incompatible type: $", argv1[i]);
             // make this into an ordinary argument
-            if(vartbl[argVarIndex[i]].type & T_PTR) {
-                argval[i].i = *vartbl[argVarIndex[i]].val.ia;       // get the value if the supplied argument is a pointer
+            if(g_vartbl[argVarIndex[i]].type & T_PTR) {
+                argval[i].i = *g_vartbl[argVarIndex[i]].val.ia;       // get the value if the supplied argument is a pointer
             } else {
                 argval[i].i = *(long long int *)argval[i].s;        // get the value if the supplied argument is an ordinary variable
             }
@@ -820,26 +817,26 @@ void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, in
         // if this is a pointer (note: at this point the caller type and the required type must be the same)
         if(argtype[i] & T_PTR) {
             // the argument supplied was a variable so we must setup the local variable as a pointer
-            if((vartbl[VarIndex].type & T_STR) && vartbl[VarIndex].val.s != NULL) {
-                FreeMemorySafe((void **)&vartbl[VarIndex].val.s);                            // free up the local variable's memory if it is a pointer to a string
+            if((g_vartbl[g_VarIndex].type & T_STR) && g_vartbl[g_VarIndex].val.s != NULL) {
+                FreeMemorySafe((void **)&g_vartbl[g_VarIndex].val.s);                            // free up the local variable's memory if it is a pointer to a string
                 }
-            vartbl[VarIndex].val.s = argval[i].s;                              // point to the data of the variable supplied as an argument
-            vartbl[VarIndex].type |= T_PTR;                                    // set the type to a pointer
-            vartbl[VarIndex].size = vartbl[argVarIndex[i]].size;               // just in case it is a string copy the size
+            g_vartbl[g_VarIndex].val.s = argval[i].s;                              // point to the data of the variable supplied as an argument
+            g_vartbl[g_VarIndex].type |= T_PTR;                                    // set the type to a pointer
+            g_vartbl[g_VarIndex].size = g_vartbl[argVarIndex[i]].size;               // just in case it is a string copy the size
         // this is not a pointer
         } else if(argtype[i] != 0) {                                           // in getting the memory argtype[] is initialised to zero
             // the parameter was an expression or a just straight variables with different types (therefore not a pointer))
-            if((vartbl[VarIndex].type & T_STR) && (argtype[i] & T_STR)) {      // both are a string
-                Mstrcpy(vartbl[VarIndex].val.s, argval[i].s);
+            if((g_vartbl[g_VarIndex].type & T_STR) && (argtype[i] & T_STR)) {      // both are a string
+                Mstrcpy(g_vartbl[g_VarIndex].val.s, argval[i].s);
                 FreeMemorySafe((void **)&argval[i].s);
-            } else if((vartbl[VarIndex].type & T_NBR) && (argtype[i] & T_NBR)) // both are a float
-                vartbl[VarIndex].val.f = argval[i].f;
-            else if((vartbl[VarIndex].type & T_NBR) && (argtype[i] & T_INT))   // need a float but supplied an integer
-                vartbl[VarIndex].val.f = argval[i].i;
-            else if((vartbl[VarIndex].type & T_INT) && (argtype[i] & T_INT))   // both are integers
-                vartbl[VarIndex].val.i = argval[i].i;
-            else if((vartbl[VarIndex].type & T_INT) && (argtype[i] & T_NBR))   // need an integer but was supplied with a float
-                vartbl[VarIndex].val.i = FloatToInt64(argval[i].f);
+            } else if((g_vartbl[g_VarIndex].type & T_NBR) && (argtype[i] & T_NBR)) // both are a float
+                g_vartbl[g_VarIndex].val.f = argval[i].f;
+            else if((g_vartbl[g_VarIndex].type & T_NBR) && (argtype[i] & T_INT))   // need a float but supplied an integer
+                g_vartbl[g_VarIndex].val.f = argval[i].i;
+            else if((g_vartbl[g_VarIndex].type & T_INT) && (argtype[i] & T_INT))   // both are integers
+                g_vartbl[g_VarIndex].val.i = argval[i].i;
+            else if((g_vartbl[g_VarIndex].type & T_INT) && (argtype[i] & T_NBR))   // need an integer but was supplied with a float
+                g_vartbl[g_VarIndex].val.i = FloatToInt64(argval[i].f);
             else
                 error("Incompatible type: $", argv1[i]);
         }
@@ -853,7 +850,7 @@ void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, in
    
     strcpy((char *)CurrentSubFunName, (char *)fun_name);
     // if it is a defined command we simply point to the first statement in our command and allow ExecuteProgram() to carry on as before
-    // exit from the sub is via cmd_return which will decrement LocalIndex
+    // exit from the sub is via cmd_return which will decrement g_LocalIndex
     if(!isfun) {
         skipelement(p);
         nextstmt = p;                                               // point to the body of the subroutine
@@ -868,13 +865,13 @@ void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, in
     //   - Get the variable's value and save that in the return value globals (fret or sret)
     //   - Return to the expression parser
     tp = findvar(fun_name, FunType | V_FUNCT);                      // declare the local variable
-    FunType = vartbl[VarIndex].type;
+    FunType = g_vartbl[g_VarIndex].type;
     if(FunType & T_STR) {
-        FreeMemorySafe((void **)&vartbl[VarIndex].val.s);                         // free the memory if it is a string
-        vartbl[VarIndex].type |= T_PTR;
-        LocalIndex--;                                               // allocate the memory at the previous level
-        vartbl[VarIndex].val.s = tp = GetTempMemory(STRINGSIZE);    // and use our own memory
-        LocalIndex++;
+        FreeMemorySafe((void **)&g_vartbl[g_VarIndex].val.s);                         // free the memory if it is a string
+        g_vartbl[g_VarIndex].type |= T_PTR;
+        g_LocalIndex--;                                               // allocate the memory at the previous level
+        g_vartbl[g_VarIndex].val.s = tp = GetTempMemory(STRINGSIZE);    // and use our own memory
+        g_LocalIndex++;
     }
     skipelement(p);                                                 // point to the body of the function
 
@@ -897,8 +894,8 @@ void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, in
     else
         *sa = tp;                                                   // for a string we just need to return the local memory
     *typ = FunType;                                                 // save the function type for the caller
-	ClearVars(LocalIndex--);                                        // delete any local variables
-    TempMemoryIsChanged = true;                                     // signal that temporary memory should be checked
+	ClearVars(g_LocalIndex--, true);                                        // delete any local variables
+    g_TempMemoryIsChanged = true;                                     // signal that temporary memory should be checked
 	gosubindex--;
 }
 
@@ -1190,6 +1187,7 @@ void  MIPS16 tokenise(int console) {
                     STR_REPLACE((char *)inpbuf,"RP2040-LCD-0.96","RP2040LCD0.96");
                     STR_REPLACE((char *)inpbuf,"RP2040-GEEK","RP2040GEEK");
                     STR_REPLACE((char *)inpbuf,"PICOGAME 4-PWM","PICOGAME 4PWM");
+                    STR_REPLACE((char *)inpbuf,"OLIMEX USB","OLIMEXUSB");
                 }
                 continue;
             }
@@ -1597,7 +1595,7 @@ unsigned char MIPS16 __not_in_flash_func(*getvalue)(unsigned char *p, MMFLOAT *f
             CurrentLinePtr = SaveCurrentLinePtr;
         } else {
             s = (unsigned char *)findvar(p, V_FIND);                         // if it is a string then the string pointer is automatically set
-            t = TypeMask(vartbl[VarIndex].type);
+            t = TypeMask(g_vartbl[g_VarIndex].type);
             if(t & T_NBR) f = (*(MMFLOAT *)s);
             if(t & T_INT) i64 = (*(long long int  *)s);
         }
@@ -2114,7 +2112,7 @@ void MIPS16 __not_in_flash_func(*findvar)(unsigned char *p, int action) {
 	char  *tp, *ip;
     int dim[MAXDIM]={0}, dnbr;
 //	if(__get_MSP() < (uint32_t)&stackcheck-0x5000){
-//		error("Expression is too complex at depth %",LocalIndex);
+//		error("Expression is too complex at depth %",g_LocalIndex);
 //	}
     vtype = dnbr = emptyarray = 0;
     // first zero the array used for holding the dimension values
@@ -2183,7 +2181,7 @@ void MIPS16 __not_in_flash_func(*findvar)(unsigned char *p, int action) {
                 if(targ == T_STR) dnbr = MAXDIM;                    // force an error to be thrown later (with the correct message)
                 if(targ == T_NBR) in = FloatToInt32(f);
                 dim[i/2] = in;
-                if(dim[i/2] < OptionBase) error("Dimensions");
+                if(dim[i/2] < g_OptionBase) error("Dimensions");
             }
         }
     }
@@ -2200,46 +2198,46 @@ void MIPS16 __not_in_flash_func(*findvar)(unsigned char *p, int action) {
     if(OriginalGlobalHash<MAXVARS/2)OriginalGlobalHash+=MAXVARS/2;
 	globalifree=-1;
 	tmp=-1;
-    if(LocalIndex){ //search
-		if(vartbl[LocalhashIndex].type == T_NOTYPE){
+    if(g_LocalIndex){ //search
+		if(g_vartbl[LocalhashIndex].type == T_NOTYPE){
 			localifree = LocalhashIndex;
 		} else {
-			while(vartbl[LocalhashIndex].name[0]!=0){
+			while(g_vartbl[LocalhashIndex].name[0]!=0){
 				ip=(char *)name;
-				tp=(char *)vartbl[LocalhashIndex].name;
-				if(vartbl[LocalhashIndex].type==T_BLOCKED)tmp=LocalhashIndex;
+				tp=(char *)g_vartbl[LocalhashIndex].name;
+				if(g_vartbl[LocalhashIndex].type==T_BLOCKED)tmp=LocalhashIndex;
 				if(*ip++ == *tp++) {                 // preliminary quick check
 					j = namelen-1;
 					while(j > 0 && *ip == *tp) {                              // compare each letter
 						j--; ip++; tp++;
 					}
 					if(j == 0  && (*(char *)tp == 0 || namelen == MAXVARLEN)) {       // found a matching name
-						if(vartbl[LocalhashIndex].level == LocalIndex) break; //matching global while not in a subroutine
+						if(g_vartbl[LocalhashIndex].level == g_LocalIndex) break; //matching global while not in a subroutine
 					}
 				}
 				LocalhashIndex++;
 				LocalhashIndex %= MAXVARS/2;
                 if(LocalhashIndex==OriginalLocalHash)error("Too many local variables");
 			}
-			if(vartbl[LocalhashIndex].name[0]==0){ // not found
+			if(g_vartbl[LocalhashIndex].name[0]==0){ // not found
 				localifree=LocalhashIndex;
 				if(tmp!=-1){
 					localifree=tmp;
-					vartbl[LocalhashIndex].type=T_NOTYPE;
-					vartbl[LocalhashIndex].name[0]=0;
+					g_vartbl[LocalhashIndex].type=T_NOTYPE;
+					g_vartbl[LocalhashIndex].name[0]=0;
 				}
 			}
 		}
-		if(vartbl[LocalhashIndex].name[0]==0){ // not found in the local table so try the global
+		if(g_vartbl[LocalhashIndex].name[0]==0){ // not found in the local table so try the global
 			tmp=-1;
 			globalifree=-1;
-			if(vartbl[GlobalhashIndex].type == T_NOTYPE){
+			if(g_vartbl[GlobalhashIndex].type == T_NOTYPE){
 				globalifree = GlobalhashIndex;
 			} else {
-				while(vartbl[GlobalhashIndex].name[0]!=0){
+				while(g_vartbl[GlobalhashIndex].name[0]!=0){
 					ip=(char *)name;
-					tp=(char *)vartbl[GlobalhashIndex].name;
-					if(vartbl[GlobalhashIndex].type==T_BLOCKED)tmp=GlobalhashIndex;
+					tp=(char *)g_vartbl[GlobalhashIndex].name;
+					if(g_vartbl[GlobalhashIndex].type==T_BLOCKED)tmp=GlobalhashIndex;
 					if(*ip++ == *tp++) {                 // preliminary quick check
 						j = namelen-1;
 						while(j > 0 && *ip == *tp) {                              // compare each letter
@@ -2253,25 +2251,25 @@ void MIPS16 __not_in_flash_func(*findvar)(unsigned char *p, int action) {
 					if(GlobalhashIndex==MAXVARS)GlobalhashIndex=MAXVARS/2;
                     if(GlobalhashIndex==OriginalGlobalHash)error("Too many global variables");
 				}
-				if(vartbl[GlobalhashIndex].name[0]==0){ // not found
+				if(g_vartbl[GlobalhashIndex].name[0]==0){ // not found
 					globalifree=GlobalhashIndex;
 					if(tmp!=-1){
 						globalifree=tmp;
-						vartbl[GlobalhashIndex].type=T_NOTYPE;
-						vartbl[GlobalhashIndex].name[0]=0;
+						g_vartbl[GlobalhashIndex].type=T_NOTYPE;
+						g_vartbl[GlobalhashIndex].name[0]=0;
 					}
 				}
 			}
 		}
     } else {
     	localifree=9999; //set a marker that a local variable is irrelevant
-		if(vartbl[GlobalhashIndex].type == T_NOTYPE){
+		if(g_vartbl[GlobalhashIndex].type == T_NOTYPE){
 			globalifree = GlobalhashIndex;
 		} else {
-			while(vartbl[GlobalhashIndex].name[0]!=0){
+			while(g_vartbl[GlobalhashIndex].name[0]!=0){
 				ip=(char *)name;
-				tp=(char *)vartbl[GlobalhashIndex].name;
-				if(vartbl[GlobalhashIndex].type==T_BLOCKED)tmp=GlobalhashIndex;
+				tp=(char *)g_vartbl[GlobalhashIndex].name;
+				if(g_vartbl[GlobalhashIndex].type==T_BLOCKED)tmp=GlobalhashIndex;
 				if(*ip++ == *tp++) {                 // preliminary quick check
 					j = namelen-1;
 					while(j > 0 && *ip == *tp) {                              // compare each letter
@@ -2284,17 +2282,17 @@ void MIPS16 __not_in_flash_func(*findvar)(unsigned char *p, int action) {
 				GlobalhashIndex++;
 				if(GlobalhashIndex==MAXVARS)GlobalhashIndex=MAXVARS/2;
 			}
-			if(vartbl[GlobalhashIndex].name[0]==0){ // not found
+			if(g_vartbl[GlobalhashIndex].name[0]==0){ // not found
 				globalifree=GlobalhashIndex;
 				if(tmp!=-1){
 					globalifree=tmp;
-					vartbl[GlobalhashIndex].type=T_NOTYPE;
-					vartbl[GlobalhashIndex].name[0]=0;
+					g_vartbl[GlobalhashIndex].type=T_NOTYPE;
+					g_vartbl[GlobalhashIndex].name[0]=0;
 				}
 			}
 		}
     }
-//	MMPrintString("search status : ");PInt(LocalIndex);PIntComma(localifree);PIntComma(LocalhashIndex);PIntComma(globalifree);PIntComma(GlobalhashIndex);
+//	MMPrintString("search status : ");PInt(g_LocalIndex);PIntComma(localifree);PIntComma(LocalhashIndex);PIntComma(globalifree);PIntComma(GlobalhashIndex);
 //	MMPrintString((action & V_LOCAL ? " LOCAL" : "      "));MMPrintString((action & V_LOCAL ? " DIM" : "    "));PRet();
 	// At this point we know if a local variable has been found or if a global variable has been found
     if(action & V_LOCAL) {
@@ -2320,12 +2318,12 @@ void MIPS16 __not_in_flash_func(*findvar)(unsigned char *p, int action) {
 //    MMPrintString(name);PIntComma(i);MMPrintString((ifree==-1 ? " - found" : " - not there"));PRet();
 
     // if we found an existing and matching variable
-    // set the global VarIndex indicating the index in the table
-    if(ifree==-1 && vartbl[i].name[0] != 0) {
-        VarIndex = vindex = i;
+    // set the global g_VarIndex indicating the index in the table
+    if(ifree==-1 && g_vartbl[i].name[0] != 0) {
+        g_VarIndex = vindex = i;
 
         // check that the dimensions match
-        for(i = 0; i < MAXDIM && vartbl[vindex].dims[i] != 0; i++);
+        for(i = 0; i < MAXDIM && g_vartbl[vindex].dims[i] != 0; i++);
         if(dnbr == -1) {
             if(i == 0) error("Array dimensions");
         } else {
@@ -2333,45 +2331,45 @@ void MIPS16 __not_in_flash_func(*findvar)(unsigned char *p, int action) {
         }
 
         if(vtype == 0) {
-            if(!(vartbl[vindex].type & (DefaultType | T_IMPLIED))) error("$ Different type already declared", name);
+            if(!(g_vartbl[vindex].type & (DefaultType | T_IMPLIED))) error("$ Different type already declared", name);
         } else {
-            if(!(vartbl[vindex].type & vtype)) error("$ Different type already declared", name);
+            if(!(g_vartbl[vindex].type & vtype)) error("$ Different type already declared", name);
         }
 
         // if it is a non arrayed variable or an empty array it is easy, just calculate and return a pointer to the value
-        if(dnbr == -1 || vartbl[vindex].dims[0] == 0) {
-            if(dnbr == -1 || vartbl[vindex].type & (T_PTR | T_STR))
-                return vartbl[vindex].val.s;                        // if it is a string or pointer just return the pointer to the data
+        if(dnbr == -1 || g_vartbl[vindex].dims[0] == 0) {
+            if(dnbr == -1 || g_vartbl[vindex].type & (T_PTR | T_STR))
+                return g_vartbl[vindex].val.s;                        // if it is a string or pointer just return the pointer to the data
             else
-                if(vartbl[vindex].type & (T_INT))
-                    return &(vartbl[vindex].val.i);                 // must be an integer, point to its value
+                if(g_vartbl[vindex].type & (T_INT))
+                    return &(g_vartbl[vindex].val.i);                 // must be an integer, point to its value
                 else
-                    return &(vartbl[vindex].val.f);                 // must be a straight number (float), point to its value
+                    return &(g_vartbl[vindex].val.f);                 // must be a straight number (float), point to its value
          }
 
         // if we reached this point it must be a reference to an existing array
         // check that we are not using DIM and that all parameters are within the dimensions
         if(action & V_DIM_VAR) error("Cannot re dimension array");
         for(i = 0; i < dnbr; i++) {
-            if(dim[i] > vartbl[vindex].dims[i] || dim[i] < OptionBase)
+            if(dim[i] > g_vartbl[vindex].dims[i] || dim[i] < g_OptionBase)
                 error("Index out of bounds");
         }
 
         // then calculate the index into the array.  Bug fix by Gerard Sexton.
-        nbr = dim[0] - OptionBase;
+        nbr = dim[0] - g_OptionBase;
         j = 1;
         for(i = 1; i < dnbr; i++) {
-            j *= (vartbl[vindex].dims[i - 1] + 1 - OptionBase);
-            nbr += (dim[i] - OptionBase) * j;
+            j *= (g_vartbl[vindex].dims[i - 1] + 1 - g_OptionBase);
+            nbr += (dim[i] - g_OptionBase) * j;
         }
         // finally return a pointer to the value
-        if(vartbl[vindex].type & T_NBR)
-            return vartbl[vindex].val.s + (nbr * sizeof(MMFLOAT));
+        if(g_vartbl[vindex].type & T_NBR)
+            return g_vartbl[vindex].val.s + (nbr * sizeof(MMFLOAT));
         else
-            if(vartbl[vindex].type & T_INT)
-                return vartbl[vindex].val.s + (nbr * sizeof(long long int));
+            if(g_vartbl[vindex].type & T_INT)
+                return g_vartbl[vindex].val.s + (nbr * sizeof(long long int));
             else
-                return vartbl[vindex].val.s + (nbr * (vartbl[vindex].size + 1));
+                return g_vartbl[vindex].val.s + (nbr * (g_vartbl[vindex].size + 1));
     }
 
     // we reached this point if no existing variable has been found
@@ -2424,7 +2422,7 @@ void MIPS16 __not_in_flash_func(*findvar)(unsigned char *p, int action) {
 
     // if it is an array we must be dimensioning it
     // if it is a string array we skip over the dimension values and look for the LENGTH keyword
-    // and if found find the string size and change the vartbl entry
+    // and if found find the string size and change the g_vartbl entry
       if(action & V_DIM_VAR) {
           if(vtype & T_STR) {
             i = 0;
@@ -2450,52 +2448,52 @@ void MIPS16 __not_in_flash_func(*findvar)(unsigned char *p, int action) {
 
  // if we are adding to the top, increment the number of vars
 	if(ifree>=MAXVARS/2){
-		Globalvarcnt++;
-		if(Globalvarcnt>=MAXVARS/2)error("Not enough Global variable memory");
+		g_Globalvarcnt++;
+		if(g_Globalvarcnt>=MAXVARS/2)error("Not enough Global variable memory");
 	} else {
-		Localvarcnt++;
-		if(Localvarcnt>=MAXVARS/2)error("Not enough Local variable memory");
+		g_Localvarcnt++;
+		if(g_Localvarcnt>=MAXVARS/2)error("Not enough Local variable memory");
 	}
-	varcnt=Globalvarcnt+Localvarcnt;
-    VarIndex = vindex = ifree;
+	g_varcnt=g_Globalvarcnt+g_Localvarcnt;
+    g_VarIndex = vindex = ifree;
 
     // initialise it: save the name, set the initial value to zero and set the type
-    s = name;  x = vartbl[ifree].name; j = namelen;
+    s = name;  x = g_vartbl[ifree].name; j = namelen;
     while(j--) *x++ = *s++;
     if(namelen < MAXVARLEN)*x++ = 0;
-    vartbl[ifree].type = vtype | (action & (T_IMPLIED | T_CONST));
+    g_vartbl[ifree].type = vtype | (action & (T_IMPLIED | T_CONST));
     if(ifree<MAXVARS/2){
-    	hashlist[hashlistpointer].level=LocalIndex;
-    	hashlist[hashlistpointer++].hash=ifree;
-        vartbl[ifree].level = LocalIndex;
-    } else vartbl[ifree].level = 0;
-//    cleardims(&vartbl[ifree].dims[0]);
-    for(j = 0; j < MAXDIM; j++) vartbl[ifree].dims[j] = 0;
-//    MMPrintString("Creating variable : ");MMPrintString(vartbl[ifree].name);MMPrintString(", at depth : ");PInt(vartbl[ifree].level);MMPrintString(", hash key : ");PInt(ifree);PRet();
+    	g_hashlist[g_hashlistpointer].level=g_LocalIndex;
+    	g_hashlist[g_hashlistpointer++].hash=ifree;
+        g_vartbl[ifree].level = g_LocalIndex;
+    } else g_vartbl[ifree].level = 0;
+//    cleardims(&g_vartbl[ifree].dims[0]);
+    for(j = 0; j < MAXDIM; j++) g_vartbl[ifree].dims[j] = 0;
+//    MMPrintString("Creating variable : ");MMPrintString(g_vartbl[ifree].name);MMPrintString(", at depth : ");PInt(g_vartbl[ifree].level);MMPrintString(", Type : ");PInt(vtype);MMPrintString(", hash key : ");PInt(ifree);PRet();
     // the easy request is for is a non array numeric variable, so just initialise to
     // zero and return the pointer
     if(dnbr == 0) {
         if(vtype & T_NBR) {
-            vartbl[ifree].val.f = 0;
-            return &(vartbl[ifree].val.f);
+            g_vartbl[ifree].val.f = 0;
+            return &(g_vartbl[ifree].val.f);
         } else if(vtype & T_INT) {
-            vartbl[ifree].val.i = 0;
-            return &(vartbl[ifree].val.i);
+            g_vartbl[ifree].val.i = 0;
+            return &(g_vartbl[ifree].val.i);
         }
     }
 
     // if this is a definition of an empty array (only used in the parameter list for a sub/function)
     if(dnbr == -1) {
-        vartbl[vindex].dims[0] = -1;                                // let the caller know that this is an empty array and needs more work
-        return vartbl[vindex].val.s;                                // just return a pointer to the data element as it will be replaced in the sub/fun with a pointer
+        g_vartbl[vindex].dims[0] = -1;                                // let the caller know that this is an empty array and needs more work
+        return g_vartbl[vindex].val.s;                                // just return a pointer to the data element as it will be replaced in the sub/fun with a pointer
     }
 
     // if this is an array copy the array dimensions and calculate the overall size
     // for a non array string this will leave nbr = 1 which is just what we want
     for(nbr = 1, i = 0; i < dnbr; i++) {
-        if(dim[i] <= OptionBase) error("Dimensions");
-        vartbl[vindex].dims[i] = dim[i];
-        nbr *= (dim[i] + 1 - OptionBase);
+        if(dim[i] <= g_OptionBase) error("Dimensions");
+        g_vartbl[vindex].dims[i] = dim[i];
+        nbr *= (dim[i] + 1 - g_OptionBase);
     }
 
     // we now have a string, an array of strings or an array of numbers
@@ -2504,10 +2502,10 @@ void MIPS16 __not_in_flash_func(*findvar)(unsigned char *p, int action) {
     // First, set the important characteristics of the variable to indicate that the
     // variable is not allocated.  Thus, if GetMemory() fails with "not enough memory",
     // the variable will remain not allocated
-    vartbl[ifree].val.s = NULL;
-    vartbl[ifree].type = T_BLOCKED;
-    i = *vartbl[ifree].name;   *vartbl[ifree].name = 0;
-	j = vartbl[ifree].dims[0]; vartbl[ifree].dims[0] = 0;
+    g_vartbl[ifree].val.s = NULL;
+    g_vartbl[ifree].type = T_BLOCKED;
+    i = *g_vartbl[ifree].name;   *g_vartbl[ifree].name = 0;
+	j = g_vartbl[ifree].dims[0]; g_vartbl[ifree].dims[0] = 0;
 
 
 	// Now, grab the memory
@@ -2517,7 +2515,7 @@ void MIPS16 __not_in_flash_func(*findvar)(unsigned char *p, int action) {
         else mptr = GetMemory(tmp);
     }  else {
     	tmp=(nbr * (size + 1));
-    	if(tmp<=(MAXDIM-1)*sizeof(short) && j==0)mptr = (void *)&vartbl[ifree].dims[1];
+    	if(tmp<=(MAXDIM-1)*sizeof(short) && j==0)mptr = (void *)&g_vartbl[ifree].dims[1];
     	else if(tmp<=256)mptr = GetMemory(STRINGSIZE);
         else mptr = GetMemory(tmp);
     }
@@ -2526,11 +2524,11 @@ void MIPS16 __not_in_flash_func(*findvar)(unsigned char *p, int action) {
     // If we reached here the memory request was successful, so restore the details of
     // the variable that were saved previously and set the variables pointer to the
     // allocated memory
-    vartbl[ifree].type = vtype | (action & (T_IMPLIED | T_CONST));
-    *vartbl[ifree].name = i;
-    vartbl[ifree].dims[0] = j;
-    vartbl[ifree].size = size;
-    vartbl[ifree].val.s = mptr;
+    g_vartbl[ifree].type = vtype | (action & (T_IMPLIED | T_CONST));
+    *g_vartbl[ifree].name = i;
+    g_vartbl[ifree].dims[0] = j;
+    g_vartbl[ifree].size = size;
+    g_vartbl[ifree].val.s = mptr;
     return mptr;
 }
 
@@ -3096,79 +3094,81 @@ Various routines to clear memory or the interpreter's state
 // clear (or delete) variables
 // if level is not zero it will only delete local variables at that level or greater
 // if level is zero to will delete all variables and reset global settings
-void MIPS16 __not_in_flash_func(ClearVars)(int level) {
+void MIPS16 __not_in_flash_func(ClearVars)(int level, bool all) {
    int i, newhashpointer,hashcurrent,hashnext;
 
     // first step through the variable table and delete local variables at that level or greater
 	if(level){
-		newhashpointer=hashlistpointer; //save the current number of stored values
-		for(i=hashlistpointer-1;i>=0;i--){ //delete in reverse order of creation
-			if(hashlist[i].level>= level){
-				hashnext = hashcurrent = hashlist[i].hash;
+		newhashpointer=g_hashlistpointer; //save the current number of stored values
+		for(i=g_hashlistpointer-1;i>=0;i--){ //delete in reverse order of creation
+			if(g_hashlist[i].level>= level){
+				hashnext = hashcurrent = g_hashlist[i].hash;
 				hashnext++;
 				hashnext %= MAXVARS/2;
-				if(((vartbl[hashcurrent].type & T_STR) || vartbl[hashcurrent].dims[0] != 0) && !(vartbl[hashcurrent].type & T_PTR) && ((uint32_t)vartbl[hashcurrent].val.s<(uint32_t)MMHeap + HEAP_MEMORY_SIZE)&& ((uint32_t)vartbl[hashcurrent].val.s>(uint32_t)MMHeap)) {
-					FreeMemorySafe((void **)&vartbl[hashcurrent].val.s);
+				if(((g_vartbl[hashcurrent].type & T_STR) || g_vartbl[hashcurrent].dims[0] != 0) && !(g_vartbl[hashcurrent].type & T_PTR) && ((uint32_t)g_vartbl[hashcurrent].val.s<(uint32_t)MMHeap + HEAP_MEMORY_SIZE)&& ((uint32_t)g_vartbl[hashcurrent].val.s>(uint32_t)MMHeap)) {
+					FreeMemorySafe((void **)&g_vartbl[hashcurrent].val.s);
 					// free any memory (if allocated)
 				}
-//				MMPrintString("Deleting ");MMPrintString(vartbl[hashlist[i].hash].name);PIntComma(hashlist[i].level);PIntComma(hashlist[i].hash);PRet();
-				hashlist[i].level=-1;
+//				MMPrintString("Deleting ");MMPrintString(g_vartbl[g_hashlist[i].hash].name);PIntComma(g_hashlist[i].level);PIntComma(g_hashlist[i].hash);PRet();
+				g_hashlist[i].level=-1;
 				newhashpointer=i; //set the new highest index
-				memset(&vartbl[hashcurrent],0,sizeof(struct s_vartbl));
-				if(vartbl[hashnext].type){
-					vartbl[hashcurrent].type = T_BLOCKED ;                                // block slot
-					vartbl[hashcurrent].name[0] = '~';                                      // safety precaution
+				memset(&g_vartbl[hashcurrent],0,sizeof(struct s_vartbl));
+				if(g_vartbl[hashnext].type){
+					g_vartbl[hashcurrent].type = T_BLOCKED ;                                // block slot
+					g_vartbl[hashcurrent].name[0] = '~';                                      // safety precaution
 				}
-				Localvarcnt--;
+				g_Localvarcnt--;
 			}
 		}
-		hashlistpointer=newhashpointer;
+		g_hashlistpointer=newhashpointer;
 	} else {
 		for(i = 0; i < MAXVARS; i++) {
-			if(((vartbl[i].type & T_STR) || vartbl[i].dims[0] != 0) && !(vartbl[i].type & T_PTR)) {
-				if((uint32_t)vartbl[i].val.s>(uint32_t)MMHeap && (uint32_t)vartbl[i].val.s<(uint32_t)MMHeap + HEAP_MEMORY_SIZE){
-                    FreeMemorySafe((void **)&vartbl[i].val.s);                        // free any memory (if allocated)
+			if(((g_vartbl[i].type & T_STR) || g_vartbl[i].dims[0] != 0) && !(g_vartbl[i].type & T_PTR)) {
+				if((uint32_t)g_vartbl[i].val.s>(uint32_t)MMHeap && (uint32_t)g_vartbl[i].val.s<(uint32_t)MMHeap + HEAP_MEMORY_SIZE){
+                    FreeMemorySafe((void **)&g_vartbl[i].val.s);                        // free any memory (if allocated)
                 }
             }
 #ifdef rp2350
 #ifndef PICOMITEWEB
-			if(((vartbl[i].type & T_STR) || vartbl[i].dims[0] != 0) && !(vartbl[i].type & T_PTR)) {
-				if((uint32_t)vartbl[i].val.s>(uint32_t)PSRAMbase && (uint32_t)vartbl[i].val.s<(uint32_t)PSRAMbase + PSRAMsize){
-                    FreeMemorySafe((void **)&vartbl[i].val.s);                        // free any memory (if allocated)
+            if(all){
+                if(((g_vartbl[i].type & T_STR) || g_vartbl[i].dims[0] != 0) && !(g_vartbl[i].type & T_PTR)) {
+                    if((uint32_t)g_vartbl[i].val.s>(uint32_t)PSRAMbase && (uint32_t)g_vartbl[i].val.s<(uint32_t)PSRAMbase + PSRAMsize){
+                        FreeMemorySafe((void **)&g_vartbl[i].val.s);                        // free any memory (if allocated)
+                    }
                 }
             }
 #endif
 #endif
-			memset(&vartbl[i],0,sizeof(struct s_vartbl));
+			memset(&g_vartbl[i],0,sizeof(struct s_vartbl));
 		}
 	}
    // then step through the for...next table and remove any loops at the level or greater
-    for(i = 0; i < forindex; i++) {
-        if(forstack[i].level >= level) {
-            forindex = i;
+    for(i = 0; i < g_forindex; i++) {
+        if(g_forstack[i].level >= level) {
+            g_forindex = i;
             break;
         }
     }
 
     // also step through the do...loop table and remove any loops at the level or greater
-    for(i = 0; i < doindex; i++) {
-        if(dostack[i].level >= level) {
-            doindex = i;
+    for(i = 0; i < g_doindex; i++) {
+        if(g_dostack[i].level >= level) {
+            g_doindex = i;
             break;
         }
     }
 
     if(level != 0) return;
 
-    forindex = doindex = 0;
-    LocalIndex = 0;                                                 // signal that all space is to be cleared
+    g_forindex = g_doindex = 0;
+    g_LocalIndex = 0;                                                 // signal that all space is to be cleared
     ClearTempMemory();                                              // clear temp string space
     // we can now delete all variables by zeroing the counters
-    Localvarcnt = 0;
-    Globalvarcnt = 0;
-    OptionBase = 0;
-    DimUsed = false;
-    hashlistpointer=0;
+    g_Localvarcnt = 0;
+    g_Globalvarcnt = 0;
+    g_OptionBase = 0;
+    g_DimUsed = false;
+    g_hashlistpointer=0;
 }
 
 
@@ -3177,18 +3177,18 @@ void MIPS16 __not_in_flash_func(ClearVars)(int level) {
 void  MIPS16 ClearStack(void) {
     NextData = 0;
 	NextDataLine = ProgMemory;
-    forindex = 0;
-    doindex = 0;
+    g_forindex = 0;
+    g_doindex = 0;
     gosubindex = 0;
-    LocalIndex = 0;
-    TempMemoryIsChanged = true;                                     // signal that temporary memory should be checked
+    g_LocalIndex = 0;
+    g_TempMemoryIsChanged = true;                                     // signal that temporary memory should be checked
     InterruptReturn = NULL;
 }
 
 
 // clear the runtime (eg, variables, external I/O, etc) includes ClearStack() and ClearVars()
 // this is done before running a program
-void MIPS16 ClearRuntime(void) {
+void MIPS16 ClearRuntime(bool all) {
     int i;
 #ifdef PICOMITEWEB
     if(TCPstate){
@@ -3205,7 +3205,7 @@ void MIPS16 ClearRuntime(void) {
     optionsuppressstatus=0;
 #endif
     CloseAllFiles();
-    ClearExternalIO();                                              // this MUST come before InitHeap()
+    ClearExternalIO();                                              // this MUST come before InitHeap(true)
     ClearStack();
 #ifdef USBKEYBOARD
 	clearrepeat();
@@ -3214,7 +3214,7 @@ void MIPS16 ClearRuntime(void) {
     OptionEscape = false;
     OptionConsole=3;
     DefaultType = T_NBR;
-    ds18b20Timers = NULL;                                           // InitHeap() will recover the memory allocated to this array
+    ds18b20Timers = NULL;                                           // InitHeap(true) will recover the memory allocated to this array
     findlabel(NULL);                                                // clear the label cache
     OptionErrorSkip = 0;
 	optionangle=1.0;
@@ -3226,12 +3226,12 @@ void MIPS16 ClearRuntime(void) {
 #endif
     MMerrno = 0;                                                    // clear the error flags
    *MMErrMsg = 0;
-    InitHeap();
-    m_alloc(M_VAR);
-    ClearVars(0);
+    InitHeap(true);
+    m_alloc(all? M_VAR : M_LIMITED);
+    ClearVars(0,true);
     memset(datastore, 0, sizeof(struct sa_data) * MAXRESTORE);
     restorepointer = 0;
-    varcnt = 0;
+    g_varcnt = 0;
     CurrentLinePtr = ContinuePoint = NULL;
     for(i = 0;  i < MAXSUBFUN; i++)  subfun[i] = NULL;
 #ifdef GUICONTROLS
@@ -3245,14 +3245,14 @@ void MIPS16 ClearRuntime(void) {
 
 
 
-// clear everything including program memory (includes ClearStack() and ClearRuntime())
+// clear everything including program memory (includes ClearStack() and ClearRuntime(true))
 // this is used before loading a program
 void MIPS16 ClearProgram(void) {
-//    InitHeap();
+//    InitHeap(true);
     initFonts();
     m_alloc(M_PROG);                                           // init the variables for program memory
     if(Option.DISPLAY_TYPE>=VIRTUAL && WriteBuf)FreeMemorySafe((void **)&WriteBuf);
-    ClearRuntime();
+    ClearRuntime(true);
 //    ProgMemory[0] = ProgMemory[1] = ProgMemory[3] = ProgMemory[4] = 0;
     PSize = 0;
     StartEditPoint = NULL;

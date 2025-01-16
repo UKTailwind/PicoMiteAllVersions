@@ -351,8 +351,8 @@ void edit(unsigned char *cmdline, bool reset) {
     if(Option.DISPLAY_CONSOLE == true && gui_font_width > 16*HRes/640) error("Font is too large");
     if(Option.DISPLAY_TYPE>=VIRTUAL && WriteBuf)FreeMemorySafe((void **)&WriteBuf);
     if(reset){
-        ClearVars(0);
-        ClearRuntime();
+        ClearVars(0,true);
+        ClearRuntime(true);
     }
     if(HRes==640 || HRes==512){
         SetFont(1);
@@ -464,6 +464,8 @@ void cmd_edit(void){
     edit(cmdline, true);
 }
 void cmd_editfile(void){
+    SaveContext();
+    ClearVars(0,FALSE);
     edit(cmdline, FALSE);
 }
 /* 
@@ -964,13 +966,16 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool rese
                                 } while (*p);
                                 FileClose(fnbr1);
                             }
-                            if(reset==false)return;
+                            if(reset==false){
+                                RestoreContext(false);
+                                return;
+                            }
                             if(c == ESC || c == CTRLKEY('Q') || c == F1 || fname) {
                                 cmdline=NULL;
                                 cmd_end();
                             }
                             // this must be save, exit and run.  We have done the first two, now do the run part.
-                            ClearRuntime();
+                            ClearRuntime(true);
 //                            WatchdogSet = false;
                             PrepareProgram(true);
                             // Create a global constant MM.CMDLINE$ containing the empty string.

@@ -414,13 +414,13 @@ void  getargaddress (unsigned char *p, long long int **ip, MMFLOAT **fp, int *n)
         return;
     }
     ptr = findvar((unsigned char *)pp, V_FIND | V_EMPTY_OK | V_NOFIND_NULL);
-    if(ptr && vartbl[VarIndex].type & (T_NBR | T_INT)) {
-        if(vartbl[VarIndex].dims[0] <= 0){ //simple variable
+    if(ptr && g_vartbl[g_VarIndex].type & (T_NBR | T_INT)) {
+        if(g_vartbl[g_VarIndex].dims[0] <= 0){ //simple variable
             *n=1;
             return;
         } else { // array or array element
-            if(*n == 0)*n=vartbl[VarIndex].dims[0] + 1 - OptionBase;
-            else *n = (vartbl[VarIndex].dims[0] + 1 - OptionBase)< *n ? (vartbl[VarIndex].dims[0] + 1 - OptionBase) : *n;
+            if(*n == 0)*n=g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase;
+            else *n = (g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase)< *n ? (g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase) : *n;
             skipspace(p);
             do {
                 p++;
@@ -435,8 +435,8 @@ void  getargaddress (unsigned char *p, long long int **ip, MMFLOAT **fp, int *n)
                 }
             }
         }
-        if(vartbl[VarIndex].dims[1] != 0) error("Invalid variable");
-        if(vartbl[VarIndex].type & T_NBR)*fp = (MMFLOAT*)ptr;
+        if(g_vartbl[g_VarIndex].dims[1] != 0) error("Invalid variable");
+        if(g_vartbl[g_VarIndex].type & T_NBR)*fp = (MMFLOAT*)ptr;
         else *ip = (long long int *)ptr;
     } else {
     	*n=1; //may be a function call
@@ -2669,7 +2669,7 @@ void MIPS16 fun_at(void) {
     //      where x and y are ASCII string integers.
     //      Assumes overall font size of 6x12 pixels (480/80 x 432/36), including gaps between characters and lines
 
-    sprintf(buf, "\033[%d;%df", (int)CurrentY/(FontTable[gui_font >> 4][1] * (gui_font & 0b1111))+1, (int)CurrentX/(FontTable[gui_font >> 4][0] * (gui_font & 0b1111)));
+    sprintf(buf, "\033[%d;%df", (int)CurrentY/(FontTable[gui_font >> 4][1] * (gui_font & 0b1111))+1, (int)CurrentX/(FontTable[gui_font >> 4][0] * (gui_font & 0b1111))+1);
     SSPrintString(buf);								                // send it to the USB
 	if(PrintPixelMode==2 || PrintPixelMode==5)SSPrintString("\033[7m");
     targ=T_STR;
@@ -6257,7 +6257,7 @@ void cmd_tile(void){
     } else if((tp=checkstring(cmdline,(unsigned char *)"HEIGHT"))){
         ytileheight=getint(tp,12,VRes);
         Y_TILE=VRes/ytileheight;
-        if(Y_TILE % ytileheight)Y_TILE++;
+        if(VRes % ytileheight)Y_TILE++;
         ClearScreen(Option.DefaultBC);
     } else {
         getargs(&cmdline, 11, (unsigned char *)",");
@@ -6648,7 +6648,7 @@ void cmd_tile(void){
         ytileheight=getint(tp,8,VRes);
         Y_TILE=VRes/ytileheight;
         if(VRes % ytileheight)Y_TILE++;
-        ClearScreen(-1);
+        ClearScreen(Option.DefaultBC);
     } else {
         getargs(&cmdline, 11, (unsigned char *)",");
         if(!(DISPLAY_TYPE==SCREENMODE1))return;
@@ -7646,11 +7646,11 @@ void MIPS16 DrawRectangleUser(int x1, int y1, int x2, int y2, int c){
         strcat(callstr, ","); IntToStr(callstr + strlen(callstr), y2, 10);
         strcat(callstr, ","); IntToStr(callstr + strlen(callstr), c, 10);
         callstr[strlen(callstr)+1] = 0;                             // two NULL chars required to terminate the call
-        LocalIndex++;
+        g_LocalIndex++;
         ExecuteProgram((unsigned char *)callstr);
         nextstmt = nextstmtSaved;
-        LocalIndex--;
-        TempMemoryIsChanged = true;                                 // signal that temporary memory should be checked
+        g_LocalIndex--;
+        g_TempMemoryIsChanged = true;                                 // signal that temporary memory should be checked
     } else
         error("MM.USER_RECTANGLE not defined");
 }
@@ -7676,10 +7676,10 @@ void MIPS16 DrawBitmapUser(int x1, int y1, int width, int height, int scale, int
         strcat(callstr, ","); IntToStr(callstr + strlen(callstr), bc, 10);
         strcat(callstr, ",&H"); IntToStr(callstr + strlen(callstr), (unsigned int)bitmap, 16);
         callstr[strlen(callstr)+1] = 0;                             // two NULL chars required to terminate the call
-        LocalIndex++;
+        g_LocalIndex++;
         ExecuteProgram((unsigned char *)callstr);
-        LocalIndex--;
-        TempMemoryIsChanged = true;                                 // signal that temporary memory should be checked
+        g_LocalIndex--;
+        g_TempMemoryIsChanged = true;                                 // signal that temporary memory should be checked
         nextstmt = nextstmtSaved;
     } else
         error("MM.USER_BITMAP not defined");
@@ -8387,7 +8387,7 @@ void MIPS16 cmd_3D(void){
 			struct3d[n]->facecount[f]=*facecount++;
 			if(struct3d[n]->facecount[f]<3){
 				Free3DMemory(n);
-				error("Vertex count less than 3 for face %",f+OptionBase);
+				error("Vertex count less than 3 for face %",f+g_OptionBase);
 			}
 			if(struct3d[n]->facecount[f]>struct3d[n]->vmax)struct3d[n]->vmax=struct3d[n]->facecount[f];
 			struct3d[n]->facestart[f]=struct3d[n]->tot_face_x_vert;
@@ -8404,7 +8404,7 @@ void MIPS16 cmd_3D(void){
 		}
 		for(f=0;f<struct3d[n]->nf;f++){
 			if(linecolour!=NULL){
-				int index=(*linecolour++) - OptionBase;
+				int index=(*linecolour++) - g_OptionBase;
 				if(index>=colourcount || index<0){
 					Free3DMemory(n);
 					error("Edge colour Index %",index);
@@ -8412,7 +8412,7 @@ void MIPS16 cmd_3D(void){
 				struct3d[n]->line[f]=struct3d[n]->colours[index];
 			} else struct3d[n]->line[f]=gui_fcolour;
 			if(fillcolour!=NULL){
-				int index=(*fillcolour++) - OptionBase;
+				int index=(*fillcolour++) - g_OptionBase;
 				if(index>=colourcount || index<0){
 					Free3DMemory(n);
 					error("Fill colour Index %",index);

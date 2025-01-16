@@ -302,8 +302,8 @@ const void * const CallTable[] __attribute__((section(".text")))  = {	(void *)uS
 																		(void *)SoftReset, //0x54
 																		(void *)error,	//0x58
 																		(void *)&ProgMemory,	//0x5c
-																		(void *)&vartbl, //0x60
-																		(void *)&varcnt,  //0x64
+																		(void *)&g_vartbl, //0x60
+																		(void *)&g_varcnt,  //0x64
 																		(void *)&DrawBuffer,	//0x68
 																		(void *)&ReadBuffer,	//0x6c
 																		(void *)&FloatToStr,	//0x70
@@ -596,7 +596,11 @@ int kbhitConsole(void) {
 // check if there is a keystroke waiting in the buffer and, if so, return with the char
 // returns -1 if no char waiting
 // the main work is to check for vt100 escape code sequences and map to Maximite codes
+#if (defined(PICOMITEVGA) || defined(PICOMITEWEB)) && !defined(rp2350)
+int MMInkey(void) {
+#else
 int __not_in_flash_func(MMInkey)(void) {
+#endif
     unsigned int c = -1;                                            // default no character
     unsigned int tc = -1;                                           // default no character
     unsigned int ttc = -1;                                          // default no character
@@ -658,8 +662,13 @@ int __not_in_flash_func(MMInkey)(void) {
         if(c == '2') {
             if(tc =='0' || tc == '1') return F9 + (tc - '0');   // F9 and F10
             if(tc =='3' || tc == '4') return F11 + (tc - '3');  // F11 and F12
-            if(tc =='5') return F3 + 0x20;                      // SHIFT-F3
+            if(tc =='5' || tc=='6') return F3 + 0x20 + tc-'5';                      // SHIFT-F3 and F4
+            if(tc =='8' || tc=='9') return F5 + 0x20 + tc-'8';                      // SHIFT-F5 and F6
         }
+        if(c == '3') {
+            if(tc >='1' && tc <= '4') return F7 + 0x20 + (tc - '1');   // SHIFT-F7 to F10
+        }
+        //NB: SHIFT F1, F2, F11, and F12 don't appear to generate anything
     }
     // nothing worked so bomb out
     c1 = '['; c2 = c; c3 = tc; c4 = ttc;
@@ -1896,11 +1905,11 @@ uint32_t* ScanLineCBNext;	// next control buffer
 volatile int QVgaScanLine; // current processed scan line 0... (next displayed scan line)
 volatile uint32_t QVgaFrame;	// frame counter
 uint16_t fbuff[2][160]={0};
-int X_TILE=80, Y_TILE=40;
+volatile int X_TILE=80, Y_TILE=40;
 // saved integer divider state
 // VGA DMA handler - called on end of every scanline
 static int VGAnextbuf=0,VGAnowbuf=1, tile=0, tc=0;
-void __not_in_flash_func(QVgaLine0)()
+void MIPS32 __not_in_flash_func(QVgaLine0)()
 {
     int i,line;
 	// Clear the interrupt request for DMA control channel
@@ -2017,7 +2026,7 @@ void __not_in_flash_func(QVgaLine0)()
 	// restore integer divider state
 //	hw_divider_restore_state(&SaveDividerState);
 }
-void __not_in_flash_func(QVgaLine1)()
+void MIPS32 __not_in_flash_func(QVgaLine1)()
 {
     int i,line;
     uint8_t l,d;
@@ -2078,6 +2087,7 @@ void __not_in_flash_func(QVgaLine1)()
             if(DISPLAY_TYPE==SCREENMODE1){
                 uint16_t *q=&fbuff[VGAnextbuf][0];
                 unsigned char *p=&DisplayBuf[line * 80];
+                unsigned char *pp=&LayerBuf[line * 80];
                 if(tc==ytileheight){
                     tile++;
                     tc=0;
@@ -2085,13 +2095,15 @@ void __not_in_flash_func(QVgaLine1)()
                 tc++;
                 register int pos=tile*X_TILE;
                 for(i=0;i<40;i++){
-                    register int low= *p & 0xF;
-                    register int high=*p++ >>4;
+                    register int d=*p++ | *pp++;
+                    register int low= d & 0xF;
+                    register int high=d >>4;
                     *q++=(M_Foreground[low] & tilefcols[pos]) | (M_Background[low] & tilebcols[pos]) ;
                     *q++=(M_Foreground[high]& tilefcols[pos]) | (M_Background[high] & tilebcols[pos]) ;
                     pos++;
-                    low= *p & 0xF;
-                    high=*p++ >>4;
+                    d=*p++ | *pp++;
+                    low= d & 0xF;
+                    high=d++ >>4;
                     *q++=(M_Foreground[low] & tilefcols[pos]) | (M_Background[low] & tilebcols[pos]) ;
                     *q++=(M_Foreground[high]& tilefcols[pos]) | (M_Background[high] & tilebcols[pos]) ;
                     pos++;
@@ -2620,7 +2632,7 @@ void MIPS64 __not_in_flash_func(HDMIloop0)(void){
                     uint16_t *fcol=tilefcols+line/ytileheight*X_TILE, *bcol=tilebcols+line/ytileheight*X_TILE; //get the relevant tile
                     pp= line*80;
                     for(int i=0; i<80 ; i++){
-                        d=DisplayBuf[pp+i];
+                        d=DisplayBuf[pp+i] | LayerBuf[pp+i];
                         *p++ = (d&0x1) ? fcol[i] : bcol[i];
                         d>>=1;
                         *p++ = (d&0x1) ? fcol[i] : bcol[i];
@@ -2759,7 +2771,8 @@ void MIPS64 __not_in_flash_func(HDMIloop1)(void){
                         uint8_t *p=(uint8_t *)HDMIlines[line_to_load];
                         uint8_t *fcol_w=tilefcols_w+load_line/ytileheight*X_TILE, *bcol_w=tilebcols_w+load_line/ytileheight*X_TILE; //get the relevant tile
                         uint32_t *pp=(uint32_t *)&DisplayBuf[load_line*MODE_H_L_ACTIVE_PIXELS/8];
-                        uint32_t d=*pp;
+                        uint32_t *qq=(uint32_t *)&LayerBuf[load_line*MODE_H_L_ACTIVE_PIXELS/8];
+                        uint32_t d=*pp | *qq;
                         for(int i=0; i<MODE_H_L_ACTIVE_PIXELS/32 ; i++){
                             *p++ = (d&0x1) ? *fcol_w : *bcol_w;
                             d>>=1;
@@ -2832,7 +2845,7 @@ void MIPS64 __not_in_flash_func(HDMIloop1)(void){
                             *p++ = (d&0x1) ? *fcol_w : *bcol_w;
                             fcol_w++;
                             bcol_w++;
-                            d=*(++pp);
+                            d=*(++pp) | *(++qq);
                         }
                     }
                     break;
@@ -2937,7 +2950,8 @@ void MIPS64 __not_in_flash_func(HDMIloop2)(void){
                         uint8_t *p=(uint8_t *)HDMIlines[line_to_load];
                         uint8_t *fcol_w=tilefcols_w+load_line/ytileheight*X_TILE, *bcol_w=tilebcols_w+load_line/ytileheight*X_TILE; //get the relevant tile
                         uint32_t *pp=(uint32_t *)&DisplayBuf[load_line*MODE_H_W_ACTIVE_PIXELS/8];
-                        uint32_t d=*pp;
+                        uint32_t *qq=(uint32_t *)&LayerBuf[load_line*MODE_H_W_ACTIVE_PIXELS/8];
+                        uint32_t d=*pp | *qq;
                         for(int i=0; i<MODE_H_W_ACTIVE_PIXELS/32 ; i++){
                             *p++ = (d&0x1) ? *fcol_w : *bcol_w;
                             d>>=1;
@@ -3010,7 +3024,7 @@ void MIPS64 __not_in_flash_func(HDMIloop2)(void){
                             *p++ = (d&0x1) ? *fcol_w : *bcol_w;
                             fcol_w++;
                             bcol_w++;
-                            d=*(++pp);
+                            d=*(++pp) | *(++qq) ;
                         }
                     }
                     break;
@@ -3473,11 +3487,9 @@ uint32_t testPSRAM(void){
     q=(uint32_t *)PSRAMbase;
     p[16*1024*1024/4-1]=0x12345678;
     __dmb();
-    if(p[1*1024*1024/4-1]==0x12345678)return 1*1024*1024;
-    if(p[2*1024*1024/4-1]==0x12345678)return 2*1024*1024;
-    if(p[4*1024*1024/4-1]==0x12345678)return 4*1024*1024;
-    if(p[8*1024*1024/4-1]==0x12345678)return 8*1024*1024;
-    return 16*1024*1024;
+    if(p[4*1024*1024/4-1]==0x12345678)return 2*1024*1024;
+    if(p[8*1024*1024/4-1]==0x12345678)return 6*1024*1024;
+    return 14*1024*1024;
 }
 #endif
 #endif
@@ -3825,7 +3837,7 @@ int MIPS16 main(){
     ConsoleRxBufTail = 0;
     ConsoleTxBufHead = 0;
     ConsoleTxBufTail = 0;
-    InitHeap();              										// initilise memory allocation
+    InitHeap(true);              										// initilise memory allocation
     uSecFunc(1000);
     disable_interrupts();
     enable_interrupts();
@@ -3998,7 +4010,7 @@ int MIPS16 main(){
             goto autorun;
         }
     } else {
-        if(*ProgMemory == 0x01 ) ClearVars(0);
+        if(*ProgMemory == 0x01 ) ClearVars(0,true);
         else {
             ClearProgram();
         }
@@ -4017,7 +4029,7 @@ int MIPS16 main(){
             memset(inpbuf,0,STRINGSIZE);
         }
         if(Option.Autorun && _excep_code != RESTART_DOAUTORUN) {
-            ClearRuntime();
+            ClearRuntime(true);
             PrepareProgram(true);
             if(*ProgMemory == 0x01 ){
                 memset(tknbuf,0,STRINGSIZE);
@@ -4041,7 +4053,7 @@ int MIPS16 main(){
         MMAbort = false;
         BreakKey = BREAK_KEY;
         EchoOption = true;
-        LocalIndex = 0;                                             // this should not be needed but it ensures that all space will be cleared
+        g_LocalIndex = 0;                                             // this should not be needed but it ensures that all space will be cleared
         ClearTempMemory();                                          // clear temp string space (might have been used by the prompt)
         CurrentLinePtr = NULL;                                      // do not use the line number in error reporting
         if(MMCharPos > 1) MMPrintString("\r\n");                    // prompt should be on a new line

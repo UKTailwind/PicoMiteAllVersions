@@ -277,8 +277,8 @@ unsigned int *GetSendDataList(unsigned char *p, unsigned int *nbr) {
 		if(ptr == NULL) error("Invalid variable");
 
         // now check if it is a non array string
-		if(vartbl[VarIndex].type & T_STR) {
-            if(vartbl[VarIndex].dims[0] != 0) error("Invalid variable");
+		if(g_vartbl[g_VarIndex].type & T_STR) {
+            if(g_vartbl[g_VarIndex].dims[0] != 0) error("Invalid variable");
             if(*((char *)ptr) < *nbr) error("Insufficient data");
             ptr += sizeof(char);                                    // skip the length byte in a MMBasic string
             for (i = 0; i < *nbr; i++) {
@@ -289,14 +289,14 @@ unsigned int *GetSendDataList(unsigned char *p, unsigned int *nbr) {
 		}
 
         // if it is a MMFLOAT or integer do some sanity checks
-        if(vartbl[VarIndex].dims[1] != 0) error("Invalid variable");
+        if(g_vartbl[g_VarIndex].dims[1] != 0) error("Invalid variable");
         if(*nbr > 1) {
-            if(vartbl[VarIndex].dims[0] == 0) error("Invalid variable");
-            if(*nbr > (vartbl[VarIndex].dims[0] + 1 - OptionBase)) error("Insufficient data");
+            if(g_vartbl[g_VarIndex].dims[0] == 0) error("Invalid variable");
+            if(*nbr > (g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase)) error("Insufficient data");
         }
 
         // now check if it is a MMFLOAT
-        if(vartbl[VarIndex].type & T_NBR) {
+        if(g_vartbl[g_VarIndex].type & T_NBR) {
             for (i = 0; i < *nbr; i++) {
                 buf[i] = FloatToInt32(*(MMFLOAT *)ptr);
                 ptr += sizeof(MMFLOAT);
@@ -305,7 +305,7 @@ unsigned int *GetSendDataList(unsigned char *p, unsigned int *nbr) {
         }
 
         // try for an integer
-        if(vartbl[VarIndex].type & T_INT)  {
+        if(g_vartbl[g_VarIndex].type & T_INT)  {
             for (i = 0; i < *nbr; i++) {
                 buf[i] = *(unsigned int *)ptr;
                 ptr += sizeof(long long int);
@@ -332,8 +332,8 @@ long long int *GetReceiveDataBuffer(unsigned char *p, unsigned int *nbr) {
     *nbr = getinteger(argv[0]);
     ptr = findvar(argv[2], V_NOFIND_NULL | V_EMPTY_OK);
     if(ptr == NULL) error("Invalid variable");
-	if((vartbl[VarIndex].type & T_INT) && vartbl[VarIndex].dims[0] > 0 && vartbl[VarIndex].dims[1] == 0) {		// integer array
-        if( (((long long int *)ptr - vartbl[VarIndex].val.ia) + *nbr) > (vartbl[VarIndex].dims[0] + 1 - OptionBase) )
+	if((g_vartbl[g_VarIndex].type & T_INT) && g_vartbl[g_VarIndex].dims[0] > 0 && g_vartbl[g_VarIndex].dims[1] == 0) {		// integer array
+        if( (((long long int *)ptr - g_vartbl[g_VarIndex].val.ia) + *nbr) > (g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase) )
             error("Insufficient array size");
 	}
         else error("Invalid variable");

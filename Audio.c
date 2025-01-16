@@ -635,6 +635,9 @@ drwav_bool32 onSeek(void  *userdata,  int offset,  drwav_seek_origin origin){
     return 1;
 }
 void CloseAudio(int all){
+#ifdef rp2350
+	if(!Option.PSRAM_CS_PIN)
+#endif
 	modbuff =  (Option.modbuff ?  (char *)(XIP_BASE + RoundUpK4(TOP_OF_SYSTEM_FLASH)) : NULL);
 	int was_playing=CurrentlyPlaying;
 	bcount[1] = bcount[2] = wav_filesize = 0;
@@ -668,6 +671,7 @@ void CloseAudio(int all){
 		drmp3_uninit(mymp3);
 		FreeMemorySafe((void **)&mymp3);
 	}
+	if(Option.PSRAM_CS_PIN && was_playing == P_MOD)FreeMemorySafe((void **)&modbuff);
 #endif
     int i;
     for(i=0;i<MAXSOUNDS;i++){
@@ -1478,13 +1482,13 @@ void MIPS16 cmd_play(void) {
 		streamsize=parseintegerarray(argv[0], &aint, 1, 1, NULL, true) * 8;
 		streambuffer=(char *)aint;
 		ptr1 = findvar(argv[2], V_FIND | V_EMPTY_OK | V_NOFIND_ERR);
-		if(vartbl[VarIndex].type & T_INT) {
-				if(vartbl[VarIndex].dims[0] != 0) error("Argument 2 must be an integer");
+		if(g_vartbl[g_VarIndex].type & T_INT) {
+				if(g_vartbl[g_VarIndex].dims[0] != 0) error("Argument 2 must be an integer");
 				streamreadpointer = (int *)ptr1;
 		} else error("Argument 2 must be an integer");
 		ptr1 = findvar(argv[4], V_FIND | V_EMPTY_OK | V_NOFIND_ERR);
-		if(vartbl[VarIndex].type & T_INT) {
-				if(vartbl[VarIndex].dims[0] != 0) error("Argument 3 must be an integer");
+		if(g_vartbl[g_VarIndex].type & T_INT) {
+				if(g_vartbl[g_VarIndex].dims[0] != 0) error("Argument 3 must be an integer");
 				streamwritepointer = (int *)ptr1;
 		} else error("Argument 3 must be an integer");
 		XCS=PinDef[Option.AUDIO_CS_PIN].GPno;
@@ -1733,12 +1737,12 @@ void MIPS16 cmd_play(void) {
 	}
     if((tp = checkstring(cmdline, (unsigned char *)"MODFILE"))) {
         getargs(&tp, 3,(unsigned char *)",");                                  // this MUST be the first executable line in the function
-        char *p, *r;
+        char *p;
         int i __attribute((unused))=0,fsize;
         modfilesamplerate=16000;
 		if(CurrentlyPlaying==P_WAVOPEN)CloseAudio(1);
         if(CurrentlyPlaying != P_NOTHING) error("Sound output in use");
-		if(!modbuff)error("Mod playback not enabled");
+		if(!(modbuff || Option.PSRAM_CS_PIN))error("Mod playback not enabled");
         if(!InitSDCard()) return;
         sbuff1 = GetMemory(WAV_BUFFER_SIZE);
         sbuff2 = GetMemory(WAV_BUFFER_SIZE);
@@ -1766,17 +1770,30 @@ void MIPS16 cmd_play(void) {
         i=0;
 		if(filesource[WAV_fnbr]!=FLASHFILE)  fsize = f_size(FileTable[WAV_fnbr].fptr);
 		else fsize = lfs_file_size(&lfs,FileTable[WAV_fnbr].lfsptr);
-		if(RoundUpK4(fsize)>1024*Option.modbuffsize)error("File too large for modbuffer");
-        r = GetTempMemory(256);
-		char *check=modbuff;
 		int alreadythere=1;
-        while(!FileEOF(WAV_fnbr)) { 
-			if(*check++ != FileGetChar(WAV_fnbr)){
-				alreadythere=0;
-				break;
+#ifdef rp2350
+		if(!Option.PSRAM_CS_PIN){
+#endif
+			if(RoundUpK4(fsize)>1024*Option.modbuffsize)error("File too large for modbuffer");
+			char *check=modbuff;
+			while(!FileEOF(WAV_fnbr)) { 
+				if(*check++ != FileGetChar(WAV_fnbr)){
+					alreadythere=0;
+					break;
+				}
 			}
-        }
+#ifdef rp2350
+		} else {
+			modbuff=GetMemory(RoundUpK4(fsize));
+			positionfile(WAV_fnbr,0);
+			char *r=modbuff;
+			while(!FileEOF(WAV_fnbr)) { 
+				*r++=FileGetChar(WAV_fnbr);
+			}
+		}
+#endif
 		if(!alreadythere){
+			unsigned char *r = GetTempMemory(256);
 			positionfile(WAV_fnbr,0);
 			uint32_t j = RoundUpK4(TOP_OF_SYSTEM_FLASH);
 			disable_interrupts();

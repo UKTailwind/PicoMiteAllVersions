@@ -85,7 +85,7 @@ long long int MIPS16 CallCFunction(unsigned char *CmdPtr, unsigned char *ArgList
             // if this is a straight variable we want to pass a pointer to its value in RAM
             if(isnamestart((uint8_t)*argv[i]) && (*skipvar(argv[i], false) == 0 || *skipvar(argv[i], false) == ')') && !(FindSubFun(argv[i], 1) >= 0 && strchr((const char *)argv[i], '(') != NULL)) {
                 arg[i/2] = findvar(argv[i], V_FIND | V_EMPTY_OK /* | V_NOFIND_ERR */ );   // if the argument
-                if(typ[i/2] != 0 && !(TypeMask(vartbl[VarIndex].type) & typ[i/2])) error("Incompatible type");
+                if(typ[i/2] != 0 && !(TypeMask(g_vartbl[g_VarIndex].type) & typ[i/2])) error("Incompatible type");
             } else {
                 // else it must be an expression of some sort
                 // get the value based on the type specified in the definition
@@ -136,11 +136,11 @@ void CallCFuncmSec(void){
 // save the interpreter state if re entering it
 void CallExecuteProgram(char *p) {
     unsigned char *nextstmtSaved = nextstmt;
-    LocalIndex++;
+    g_LocalIndex++;
     ExecuteProgram((unsigned char *)p);
     nextstmt = nextstmtSaved;
-    LocalIndex--;
-    TempMemoryIsChanged = true;                                     // signal that temporary memory should be checked
+    g_LocalIndex--;
+    g_TempMemoryIsChanged = true;                                     // signal that temporary memory should be checked
 }
 
 // If the CFuncmInt1 vector is set then call the CFunction

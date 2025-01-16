@@ -161,6 +161,8 @@ void cmd_Nunchuck(void);
 void cmd_mouse(void);
 void cmd_camera(void);
 void cmd_Servo(void);
+void cmd_chain(void);
+void cmd_psram(void);
 #ifdef PICOMITEWEB
     void cmd_web(void);
 #endif
@@ -455,6 +457,7 @@ void fun_map(void);
 	{ (unsigned char *)"Wii",		T_CMD,				0, cmd_Classic	},
 	{ (unsigned char *)"Servo",		T_CMD,				0, cmd_Servo	},
 	{ (unsigned char *)"Mouse",		T_CMD,				0, cmd_mouse	},
+	{ (unsigned char *)"Chain",		T_CMD,				0, cmd_chain	},
 #ifdef PICOMITEVGA
   	{ (unsigned char *)"TILE",            T_CMD,                     0, cmd_tile   },
   	{ (unsigned char *)"MODE",            T_CMD,                     0, cmd_mode   },
@@ -488,6 +491,9 @@ void fun_map(void);
 	{ (unsigned char *)"CMM2 Load",		T_CMD,				0, cmd_loadCMM2	},
 	{ (unsigned char *)"CMM2 Run",		T_CMD,				0, cmd_RunCMM2	},
 	{ (unsigned char *)"Randomize",          T_CMD,				0, cmd_null},
+#ifndef PICOMITEWEB
+	{ (unsigned char *)"Ram",		T_CMD,				0, cmd_psram	},
+#endif
 #else
 	{ (unsigned char *)"Randomize",          T_CMD,				0, cmd_randomize},
 #endif

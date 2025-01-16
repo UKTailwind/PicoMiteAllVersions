@@ -62,14 +62,14 @@ int restorepointer = 0;
 
 
 // stack to keep track of nested FOR/NEXT loops
-struct s_forstack forstack[MAXFORLOOPS + 1];
-int forindex;
+struct s_forstack g_forstack[MAXFORLOOPS + 1];
+int g_forindex;
 
 
 
 // stack to keep track of nested DO/LOOP loops
-struct s_dostack dostack[MAXDOLOOPS];
-int doindex;                                // counts the number of nested DO/LOOP loops
+struct s_dostack g_dostack[MAXDOLOOPS];
+int g_doindex;                                // counts the number of nested DO/LOOP loops
 
 
 // stack to keep track of GOSUBs, SUBs and FUNCTIONs
@@ -77,7 +77,7 @@ unsigned char *gosubstack[MAXGOSUB];
 unsigned char *errorstack[MAXGOSUB];
 int gosubindex;
 
-unsigned char DimUsed = false;						// used to catch OPTION BASE after DIM has been used
+unsigned char g_DimUsed = false;						// used to catch OPTION BASE after DIM has been used
 
 int TraceOn;                                // used to track the state of TRON/TROFF
 unsigned char *TraceBuff[TRACE_BUFF_SIZE];
@@ -114,8 +114,8 @@ void MIPS16 __not_in_flash_func(cmd_inc)(void){
 	getargs(&cmdline,3,(unsigned char *)",");
 	if(argc==1){
 		p = findvar(argv[0], V_FIND);
-		if(vartbl[VarIndex].type & T_CONST) error("Cannot change a constant");
-        vtype = TypeMask(vartbl[VarIndex].type);
+		if(g_vartbl[g_VarIndex].type & T_CONST) error("Cannot change a constant");
+        vtype = TypeMask(g_vartbl[g_VarIndex].type);
         if(vtype & T_STR) error("Invalid variable");                // sanity check
 		if(vtype & T_NBR)
             (*(MMFLOAT *)p) = (*(MMFLOAT *)p) + 1.0;
@@ -123,8 +123,8 @@ void MIPS16 __not_in_flash_func(cmd_inc)(void){
 		else error("Syntax");
 	} else {
 		p = findvar(argv[0], V_FIND);
-		if(vartbl[VarIndex].type & T_CONST) error("Cannot change a constant");
-        vtype = TypeMask(vartbl[VarIndex].type);
+		if(g_vartbl[g_VarIndex].type & T_CONST) error("Cannot change a constant");
+        vtype = TypeMask(g_vartbl[g_VarIndex].type);
         if(vtype & T_STR){
         	q=getstring(argv[2]);
     		if(*p + *q > MAXSTRLEN) error("String too long");
@@ -251,18 +251,18 @@ void  MIPS16 __not_in_flash_func(cmd_let)(void) {
 
 	// create the variable and get the length if it is a string
 	p2 = findvar(cmdline, V_FIND);
-    size = vartbl[VarIndex].size;
-    if(vartbl[VarIndex].type & T_CONST) error("Cannot change a constant");
+    size = g_vartbl[g_VarIndex].size;
+    if(g_vartbl[g_VarIndex].type & T_CONST) error("Cannot change a constant");
 
 	// step over the equals sign, evaluate the rest of the command and save in the variable
 	p1++;
-	if(vartbl[VarIndex].type & T_STR) {
+	if(g_vartbl[g_VarIndex].type & T_STR) {
 		t = T_STR;
 		p1 = evaluate(p1, &f, &i64, &s, &t, false);
 		if(*s > size) error("String too long");
 		Mstrcpy(p2, s);
 	}
-	else if(vartbl[VarIndex].type & T_NBR) {
+	else if(g_vartbl[g_VarIndex].type & T_NBR) {
 		t = T_NBR;
 		p1 = evaluate(p1, &f, &i64, &s, &t, false);
 		if(t & T_NBR)
@@ -380,11 +380,6 @@ void MIPS16 ListProgram(unsigned char *p, int all) {
 
 
 void MIPS16 do_run(unsigned char *cmdline, bool CMM2mode) {
-/*	skipspace(cmdline);
-	if(*cmdline && *cmdline != '\''){
-		if(!FileLoadProgram(cmdline))return;
-	}
-	ClearRuntime();*/
     // RUN [ filename$ ] [, cmd_args$ ]
     unsigned char *filename = (unsigned char *)"", *cmd_args = (unsigned char *)"";
 	unsigned char *cmdbuf=GetMemory(256);
@@ -419,11 +414,11 @@ void MIPS16 do_run(unsigned char *cmdline, bool CMM2mode) {
 		if (*filename && !FileLoadCMM2Program((char *)buf,false)) return;
 	} else {
 #endif
-		if (*filename && !FileLoadProgram(buf)) return;
+		if (*filename && !FileLoadProgram(buf, false)) return;
 #ifdef rp2350
 	}
 #endif
-    ClearRuntime();
+    ClearRuntime(true);
     PrepareProgram(true);
     if(Option.DISPLAY_CONSOLE && (SPIREAD  || Option.NoScroll)){ClearScreen(gui_bcolour);CurrentX=0;CurrentY=0;}
     // Create a global constant MM.CMDLINE$ containing 'cmd_args'.
@@ -555,13 +550,13 @@ void MIPS16 cmd_RunCMM2(void){
 
 void  MIPS16 cmd_continue(void) {
     if(*cmdline == tokenFOR) {
-        if(forindex == 0) error("No FOR loop is in effect");
-        nextstmt = forstack[forindex - 1].nextptr;
+        if(g_forindex == 0) error("No FOR loop is in effect");
+        nextstmt = g_forstack[g_forindex - 1].nextptr;
         return;
     }
     if(checkstring(cmdline, (unsigned char *)"DO")) {
-        if(doindex == 0) error("No DO loop is in effect");
-        nextstmt = dostack[doindex - 1].loopptr;
+        if(g_doindex == 0) error("No DO loop is in effect");
+        nextstmt = g_dostack[g_doindex - 1].loopptr;
         return;
     }
     // must be a normal CONTINUE
@@ -600,28 +595,28 @@ void MIPS16 cmd_erase(void) {
 
 		makeupper((unsigned char *)p);                                               // all variables are stored as uppercase
 		for(j = MAXVARS/2; j < MAXVARS; j++) {
-            s = p;  x = (char *)vartbl[j].name; len = strlen(p);
+            s = p;  x = (char *)g_vartbl[j].name; len = strlen(p);
             while(len > 0 && *s == *x) {                            // compare the variable to the name that we have
                 len--; s++; x++;
             }
             if(!(len == 0 && (*x == 0 || strlen(p) == MAXVARLEN))) continue;
     		// found the variable
-			if(((vartbl[j].type & T_STR) || vartbl[j].dims[0] != 0) && !(vartbl[j].type & T_PTR)) {
-				FreeMemory(vartbl[j].val.s);                        // free any memory (if allocated)
-				vartbl[j].val.s=NULL;
+			if(((g_vartbl[j].type & T_STR) || g_vartbl[j].dims[0] != 0) && !(g_vartbl[j].type & T_PTR)) {
+				FreeMemory(g_vartbl[j].val.s);                        // free any memory (if allocated)
+				g_vartbl[j].val.s=NULL;
 			}
 			k=j+1;
 			if(k==MAXVARS)k=MAXVARS/2;
-			if(vartbl[k].type){
-				vartbl[j].name[0]='~';
-				vartbl[j].type=T_BLOCKED;
+			if(g_vartbl[k].type){
+				g_vartbl[j].name[0]='~';
+				g_vartbl[j].type=T_BLOCKED;
 			} else {
-				vartbl[j].name[0]=0;
-				vartbl[j].type=T_NOTYPE;
+				g_vartbl[j].name[0]=0;
+				g_vartbl[j].type=T_NOTYPE;
 			}
-			vartbl[j].dims[0] = 0;                                    // and again
-			vartbl[j].level = 0;
-			Globalvarcnt--;
+			g_vartbl[j].dims[0] = 0;                                    // and again
+			g_vartbl[j].level = 0;
+			g_Globalvarcnt--;
 			break;
 		}
 		if(j == MAXVARS) error("Cannot find $", p);
@@ -629,8 +624,8 @@ void MIPS16 cmd_erase(void) {
 }
 void MIPS16 cmd_clear(void) {
 	checkend(cmdline);
-	if(LocalIndex)error("Invalid in a subroutine");
-	ClearVars(0);
+	if(g_LocalIndex)error("Invalid in a subroutine");
+	ClearVars(0,true);
 }
 
 
@@ -853,7 +848,7 @@ void MIPS16 __not_in_flash_func(cmd_else)(void) {
 
 
 
-void cmd_end(void) {
+void do_end(bool ecmd) {
 #ifdef PICOMITE
     if(mergerunning){
         multicore_fifo_push_blocking(0xFF);
@@ -861,19 +856,21 @@ void cmd_end(void) {
         busy_wait_ms(100);
     }
 #endif
-	getargs(&cmdline,1,(unsigned char *)",");
-	if(argc==1){
-		if(FindSubFun((unsigned char *)"MM.END", 0) >= 0 && checkstring(argv[0],(unsigned char *)"NOEND")==NULL) {
-			ExecuteProgram((unsigned char *)"MM.END\0");
-			memset(inpbuf,0,STRINGSIZE);
-		} else {
-    		unsigned char *cmd_args = (unsigned char *)"";
-            cmd_args = getCstring(argv[0]);
-			void *ptr = findvar((unsigned char *)"MM.ENDLINE$", T_STR| V_NOFIND_NULL);  
-			if(ptr==NULL)ptr = findvar((unsigned char *)"MM.ENDLINE$", V_FIND |V_DIM_VAR);
-    		strcpy(ptr, (char *)cmd_args ); // *** THW 16/4/23
-			CtoM(ptr);
-    	}
+	if(ecmd){
+			getargs(&cmdline,1,(unsigned char *)",");
+		if(argc==1){
+			if(FindSubFun((unsigned char *)"MM.END", 0) >= 0 && checkstring(argv[0],(unsigned char *)"NOEND")==NULL) {
+				ExecuteProgram((unsigned char *)"MM.END\0");
+				memset(inpbuf,0,STRINGSIZE);
+			} else {
+				unsigned char *cmd_args = (unsigned char *)"";
+				cmd_args = getCstring(argv[0]);
+				void *ptr = findvar((unsigned char *)"MM.ENDLINE$", T_STR| V_NOFIND_NULL);  
+				if(ptr==NULL)ptr = findvar((unsigned char *)"MM.ENDLINE$", V_FIND |V_DIM_VAR);
+				strcpy(ptr, (char *)cmd_args ); // *** THW 16/4/23
+				CtoM(ptr);
+			}
+		}
 	}
     if(!(MMerrno == 16))hw_clear_bits(&watchdog_hw->ctrl, WATCHDOG_CTRL_ENABLE_BITS);
     irq_set_enabled(DMA_IRQ_1, false);
@@ -905,6 +902,9 @@ void cmd_end(void) {
 	closeframebuffer('A');
     ADCDualBuffering=0;
 	WatchdogSet = false;
+    WDTimer = 0;
+	hw_clear_bits(&watchdog_hw->ctrl, WATCHDOG_CTRL_ENABLE_BITS);
+	_excep_code=0;
 	dmarunning = false;
 	WAVInterrupt = NULL;
 	WAVcomplete = 0;
@@ -918,9 +918,244 @@ void cmd_end(void) {
 #ifndef USBKEYBOARD
     if(mouse0==false && Option.MOUSE_CLOCK)initMouse0(0);  //see if there is a mouse to initialise 
 #endif
+}
+void cmd_end(void) {
+	do_end(true);
 	longjmp(mark, 1);												// jump back to the input prompt
 }
+extern unsigned int mmap[HEAP_MEMORY_SIZE/ PAGESIZE / PAGESPERWORD];
+extern unsigned int psmap[7*1024*1024/ PAGESIZE / PAGESPERWORD];
+extern struct s_hash g_hashlist[MAXVARS/2];
+extern int g_hashlistpointer;
+extern short g_StrTmpIndex;
+extern bool g_TempMemoryIsChanged;
+extern volatile char *g_StrTmp[MAXTEMPSTRINGS];                                       // used to track temporary string space on the heap
+extern volatile char g_StrTmpLocalIndex[MAXTEMPSTRINGS];                              // used to track the g_LocalIndex for each temporary string space on the heap
+void SaveContext(void){
+#if defined(rp2350) && !defined(PICOMITEWEB)
+	if(Option.PSRAM_CS_PIN){
+		ClearTempMemory();
+		uint8_t *p=(uint8_t *)PSRAMbase+PSRAMsize;
+		memcpy(p,  &g_StrTmpIndex, sizeof(g_StrTmpIndex));
+		p+=sizeof(g_StrTmpIndex);
+		memcpy(p,  &g_TempMemoryIsChanged, sizeof(g_TempMemoryIsChanged));
+		p+=sizeof(g_TempMemoryIsChanged);
+		memcpy(p,  (void *)g_StrTmp, sizeof(g_StrTmp));
+		p+=sizeof(g_StrTmp);
+		memcpy(p,  (void *)g_StrTmpLocalIndex, sizeof(g_StrTmpLocalIndex));
+		p+=sizeof(g_StrTmpLocalIndex);
+		memcpy(p,  &g_LocalIndex, sizeof(g_LocalIndex));
+		p+=sizeof(g_LocalIndex);
+		memcpy(p,  &g_OptionBase, sizeof(g_OptionBase));
+		p+=sizeof(g_OptionBase);
+		memcpy(p,  &g_DimUsed, sizeof(g_DimUsed));
+		p+=sizeof(g_DimUsed);
+		memcpy(p,  &g_varcnt, sizeof(g_varcnt));
+		p+=sizeof(g_varcnt);
+		memcpy(p,  &g_Globalvarcnt, sizeof(g_Globalvarcnt));
+		p+=sizeof(g_Globalvarcnt);
+		memcpy(p,  &g_Localvarcnt, sizeof(g_Localvarcnt));
+		p+=sizeof(g_Localvarcnt);
+		memcpy(p,  &g_hashlistpointer, sizeof(g_hashlistpointer));
+		p+=sizeof(g_hashlistpointer);
+		memcpy(p,  &g_forindex, sizeof(g_forindex));
+		p+=sizeof(g_forindex);
+		memcpy(p,  &g_doindex, sizeof(g_doindex));
+		p+=sizeof(g_doindex);
+		memcpy(p,  g_forstack, sizeof(struct s_forstack)*MAXFORLOOPS);
+		p+=sizeof(struct s_forstack)*MAXFORLOOPS;
+		memcpy(p,  g_dostack, sizeof(struct s_dostack)*MAXDOLOOPS);
+		p+=sizeof(struct s_dostack)*MAXDOLOOPS;
+		memcpy(p,  g_vartbl, sizeof(struct s_vartbl)*MAXVARS);
+		p+=sizeof(struct s_vartbl)*MAXVARS;
+		memcpy(p,  g_hashlist, sizeof(struct s_hash)*MAXVARS/2);
+		p+=sizeof(struct s_hash)*MAXVARS/2;
+		memcpy(p,  MMHeap, HEAP_MEMORY_SIZE+256);
+		p+=HEAP_MEMORY_SIZE+256;
+		memcpy(p,  mmap, sizeof(mmap));
+		p+=sizeof(mmap);
+		memcpy(p, psmap, sizeof(psmap));
+		p+=sizeof(psmap);
+	} else {
+#endif
+		lfs_file_t lfs_file;
+		if(ExistsFile("A:/.vars")){
+			lfs_remove(&lfs, "/.vars");
+		}
+		int sizeneeded= sizeof(g_StrTmpIndex)+ sizeof(g_TempMemoryIsChanged)+sizeof(g_StrTmp)+sizeof(g_StrTmpLocalIndex)+sizeof(g_Localvarcnt)+
+		sizeof(g_LocalIndex)+sizeof(g_OptionBase)+sizeof(g_DimUsed)+sizeof(g_varcnt)+sizeof(g_Globalvarcnt)+
+		sizeof(g_hashlistpointer)+sizeof(g_forindex)+sizeof(g_doindex)+sizeof(struct s_forstack)*MAXFORLOOPS+sizeof(struct s_dostack)*MAXDOLOOPS+
+		sizeof(struct s_vartbl)*MAXVARS+sizeof(struct s_hash)*MAXVARS/2+HEAP_MEMORY_SIZE+256+sizeof(mmap);
+		if(sizeneeded>=Option.FlashSize-(Option.modbuff ? 1024*Option.modbuffsize : 0)-RoundUpK4(TOP_OF_SYSTEM_FLASH)-lfs_fs_size(&lfs)*4096)error("Not enough free space on A: drive: % needed",sizeneeded);
+		lfs_file_open(&lfs, &lfs_file, ".vars", LFS_O_RDWR | LFS_O_CREAT);;
+		int dt=get_fattime();
+		ClearTempMemory();
+		lfs_setattr(&lfs, ".vars", 'A', &dt,   4);
+		lfs_file_write(&lfs, &lfs_file, &g_StrTmpIndex, sizeof(g_StrTmpIndex));
+		lfs_file_write(&lfs, &lfs_file, &g_TempMemoryIsChanged, sizeof(g_TempMemoryIsChanged));
+		lfs_file_write(&lfs, &lfs_file, (void *)g_StrTmp, sizeof(g_StrTmp));
+		lfs_file_write(&lfs, &lfs_file, (void *)g_StrTmpLocalIndex, sizeof(g_StrTmpLocalIndex));
+		lfs_file_write(&lfs, &lfs_file, &g_LocalIndex, sizeof(g_LocalIndex));
+		lfs_file_write(&lfs, &lfs_file, &g_OptionBase, sizeof(g_OptionBase));
+		lfs_file_write(&lfs, &lfs_file, &g_DimUsed, sizeof(g_DimUsed));
+		lfs_file_write(&lfs, &lfs_file, &g_varcnt, sizeof(g_varcnt));
+		lfs_file_write(&lfs, &lfs_file, &g_Globalvarcnt, sizeof(g_Globalvarcnt));
+		lfs_file_write(&lfs, &lfs_file, &g_Localvarcnt, sizeof(g_Globalvarcnt));
+		lfs_file_write(&lfs, &lfs_file, &g_hashlistpointer, sizeof(g_hashlistpointer));
+		lfs_file_write(&lfs, &lfs_file, &g_forindex, sizeof(g_forindex));
+		lfs_file_write(&lfs, &lfs_file, &g_doindex, sizeof(g_doindex));
+		lfs_file_write(&lfs, &lfs_file, g_forstack, sizeof(struct s_forstack)*MAXFORLOOPS);
+		lfs_file_write(&lfs, &lfs_file, g_dostack, sizeof(struct s_dostack)*MAXDOLOOPS);
+		lfs_file_write(&lfs, &lfs_file, g_vartbl, sizeof(struct s_vartbl)*MAXVARS);
+		lfs_file_write(&lfs, &lfs_file, g_hashlist, sizeof(struct s_hash)*MAXVARS/2);
+		lfs_file_write(&lfs, &lfs_file, MMHeap, HEAP_MEMORY_SIZE+256);
+		lfs_file_write(&lfs, &lfs_file, mmap, sizeof(mmap));
+		lfs_file_close(&lfs, &lfs_file);
+#if defined(rp2350) && !defined(PICOMITEWEB)
+	}
+#endif
 
+}
+void RestoreContext(bool keep){
+#if defined(rp2350) && !defined(PICOMITEWEB)
+	if(Option.PSRAM_CS_PIN){
+		uint8_t *p=(uint8_t *)PSRAMbase+PSRAMsize;
+		memcpy(&g_StrTmpIndex, p, sizeof(g_StrTmpIndex));
+		p+=sizeof(g_StrTmpIndex);
+		memcpy(&g_TempMemoryIsChanged, p, sizeof(g_TempMemoryIsChanged));
+		p+=sizeof(g_TempMemoryIsChanged);
+		memcpy((void *)g_StrTmp, p, sizeof(g_StrTmp));
+		p+=sizeof(g_StrTmp);
+		memcpy((void *)g_StrTmpLocalIndex, p, sizeof(g_StrTmpLocalIndex));
+		p+=sizeof(g_StrTmpLocalIndex);
+		memcpy(&g_LocalIndex, p, sizeof(g_LocalIndex));
+		p+=sizeof(g_LocalIndex);
+		memcpy(&g_OptionBase, p, sizeof(g_OptionBase));
+		p+=sizeof(g_OptionBase);
+		memcpy(&g_DimUsed, p, sizeof(g_DimUsed));
+		p+=sizeof(g_DimUsed);
+		memcpy(&g_varcnt, p, sizeof(g_varcnt));
+		p+=sizeof(g_varcnt);
+		memcpy(&g_Globalvarcnt, p, sizeof(g_Globalvarcnt));
+		p+=sizeof(g_Globalvarcnt);
+		memcpy(&g_Localvarcnt, p, sizeof(g_Localvarcnt));
+		p+=sizeof(g_Localvarcnt);
+		memcpy(&g_hashlistpointer, p, sizeof(g_hashlistpointer));
+		p+=sizeof(g_hashlistpointer);
+		memcpy(&g_forindex, p, sizeof(g_forindex));
+		p+=sizeof(g_forindex);
+		memcpy(&g_doindex, p, sizeof(g_doindex));
+		p+=sizeof(g_doindex);
+		memcpy(g_forstack, p, sizeof(struct s_forstack)*MAXFORLOOPS);
+		p+=sizeof(struct s_forstack)*MAXFORLOOPS;
+		memcpy(g_dostack, p, sizeof(struct s_dostack)*MAXDOLOOPS);
+		p+=sizeof(struct s_dostack)*MAXDOLOOPS;
+		memcpy(g_vartbl, p, sizeof(struct s_vartbl)*MAXVARS);
+		p+=sizeof(struct s_vartbl)*MAXVARS;
+		memcpy(g_hashlist, p, sizeof(struct s_hash)*MAXVARS/2);
+		p+=sizeof(struct s_hash)*MAXVARS/2;
+		memcpy(MMHeap, p, HEAP_MEMORY_SIZE+256);
+		p+=HEAP_MEMORY_SIZE+256;
+		memcpy(mmap, p, sizeof(mmap));
+		p+=sizeof(mmap);
+		memcpy(psmap, p, sizeof(psmap));
+		p+=sizeof(psmap);
+	} else {
+#endif
+		lfs_file_t lfs_file;
+		if(!ExistsFile("A:/.vars"))error("Internal error");
+		lfs_file_open(&lfs, &lfs_file, "/.vars", LFS_O_RDONLY);
+		lfs_file_read(&lfs, &lfs_file, &g_StrTmpIndex, sizeof(g_StrTmpIndex));
+		lfs_file_read(&lfs, &lfs_file, &g_TempMemoryIsChanged, sizeof(g_TempMemoryIsChanged));
+		lfs_file_read(&lfs, &lfs_file, (void *)g_StrTmp, sizeof(g_StrTmp));
+		lfs_file_read(&lfs, &lfs_file, (void *)g_StrTmpLocalIndex, sizeof(g_StrTmpLocalIndex));
+		lfs_file_read(&lfs, &lfs_file, &g_LocalIndex, sizeof(g_LocalIndex));
+		lfs_file_read(&lfs, &lfs_file, &g_OptionBase, sizeof(g_OptionBase));
+		lfs_file_read(&lfs, &lfs_file, &g_DimUsed, sizeof(g_DimUsed));
+		lfs_file_read(&lfs, &lfs_file, &g_varcnt, sizeof(g_varcnt));
+		lfs_file_read(&lfs, &lfs_file, &g_Globalvarcnt, sizeof(g_Globalvarcnt));
+		lfs_file_read(&lfs, &lfs_file, &g_Localvarcnt, sizeof(g_Globalvarcnt));
+		lfs_file_read(&lfs, &lfs_file, &g_hashlistpointer, sizeof(g_hashlistpointer));
+		lfs_file_read(&lfs, &lfs_file, &g_forindex, sizeof(g_forindex));
+		lfs_file_read(&lfs, &lfs_file, &g_doindex, sizeof(g_doindex));
+		lfs_file_read(&lfs, &lfs_file, g_forstack, sizeof(struct s_forstack)*MAXFORLOOPS);
+		lfs_file_read(&lfs, &lfs_file, g_dostack, sizeof(struct s_dostack)*MAXDOLOOPS);
+		lfs_file_read(&lfs, &lfs_file, g_vartbl, sizeof(struct s_vartbl)*MAXVARS);
+		lfs_file_read(&lfs, &lfs_file, g_hashlist, sizeof(struct s_hash)*MAXVARS/2);
+		lfs_file_read(&lfs, &lfs_file, MMHeap, HEAP_MEMORY_SIZE+256);
+		lfs_file_read(&lfs, &lfs_file, mmap, sizeof(mmap));
+		lfs_file_close(&lfs, &lfs_file);
+		if(!keep)lfs_remove(&lfs, "/.vars");
+#if defined(rp2350) && !defined(PICOMITEWEB)
+	}
+#endif
+}
+extern void chdir(char *p);
+void MIPS16 do_chain(unsigned char *cmdline){
+    unsigned char *filename = (unsigned char *)"", *cmd_args = (unsigned char *)"";
+	unsigned char *cmdbuf=GetMemory(256);
+	memcpy(cmdbuf,cmdline,STRINGSIZE);
+    getargs(&cmdbuf, 3, (unsigned char *)",");
+	    switch (argc) {
+        case 0:
+            break;
+        case 1:
+            filename = getCstring(argv[0]);
+            break;
+        case 2:
+            cmd_args = getCstring(argv[1]);
+            break;
+        default:
+            filename = getCstring(argv[0]);
+            if(*argv[2])cmd_args = getCstring(argv[2]);
+            break;
+    }
+
+    // The memory allocated by getCstring() is not preserved across
+    // a call to FileLoadProgram() so we need to cache 'filename' and
+    // 'cmd_args' on the stack.
+    unsigned char buf[MAXSTRLEN + 1];
+    if (snprintf((char *)buf, MAXSTRLEN + 1, "\"%s\",%s", filename, cmd_args) > MAXSTRLEN) {
+        error("RUN command line too long");
+    }
+	FreeMemory(cmdbuf);
+    unsigned char *pcmd_args = buf + strlen((char *)filename) + 3; // *** THW 16/4/23
+    *cmdline=0;
+	do_end(false);
+	SaveContext();
+	ClearVars(0,false);
+	InitHeap(false);
+	if (*filename && !FileLoadProgram(buf, true)) return;
+    ClearRuntime(false);
+    PrepareProgram(true);
+	RestoreContext(false);
+    if(Option.DISPLAY_CONSOLE && (SPIREAD  || Option.NoScroll)){ClearScreen(gui_bcolour);CurrentX=0;CurrentY=0;}
+    // Create a global constant MM.CMDLINE$ containing 'cmd_args'.
+    void *ptr = findvar((unsigned char *)"MM.CMDLINE$", V_NOFIND_ERR);
+    CtoM(pcmd_args);
+    memcpy(ptr, pcmd_args, *pcmd_args + 1); // *** THW 16/4/23
+
+    IgnorePIN = false;
+	if(Option.LIBRARY_FLASH_SIZE == MAX_PROG_SIZE) ExecuteProgram(LibMemory );       // run anything that might be in the library
+    if(*ProgMemory != T_NEWLINE) return;                             // no program to run
+#ifdef PICOMITEWEB
+    void *v;
+    v = findvar((unsigned char *)"MM.TOPIC$", T_STR | V_NOFIND_NULL);    // create the variable
+    if(v==NULL)findvar((unsigned char *)"MM.TOPIC$", V_FIND | V_DIM_VAR | T_CONST);
+    v = findvar((unsigned char *)"MM.MESSAGE$", T_STR | V_NOFIND_NULL);    // create the variable
+    if(v==NULL)findvar((unsigned char *)"MM.MESSAGE$", V_FIND | V_DIM_VAR | T_CONST);
+    v = findvar((unsigned char *)"MM.ADDRESS$", T_STR | V_NOFIND_NULL);    // create the variable
+    if(v==NULL)findvar((unsigned char *)"MM.ADDRESS$", V_FIND | V_DIM_VAR | T_CONST);
+	cleanserver();
+#endif
+#ifndef USBKEYBOARD
+    if(mouse0==false && Option.MOUSE_CLOCK)initMouse0(0);  //see if there is a mouse to initialise 
+#endif
+	nextstmt = ProgMemory;
+}
+void cmd_chain(void){
+	do_chain(cmdline);
+}
 
 void cmd_select(void) {
     int i, type;
@@ -1119,13 +1354,13 @@ void cmd_input(void) {
 		}
 		*sp = 0;													// terminate the string
 		tp = findvar(argv[i], V_FIND);								// get the variable and save its new value
-        if(vartbl[VarIndex].type & T_CONST) error("Cannot change a constant");
-		if(vartbl[VarIndex].type & T_STR) {
-    		if(strlen((char *)s) > vartbl[VarIndex].size) error("String too long");
+        if(g_vartbl[g_VarIndex].type & T_CONST) error("Cannot change a constant");
+		if(g_vartbl[g_VarIndex].type & T_STR) {
+    		if(strlen((char *)s) > g_vartbl[g_VarIndex].size) error("String too long");
 			strcpy((char *)tp, (char *)s);
 			CtoM(tp);												// convert to a MMBasic string
 		} else
-		if(vartbl[VarIndex].type & T_INT) {
+		if(g_vartbl[g_VarIndex].type & T_INT) {
     		*((long long int  *)tp) = strtoll((char *)s, (char **)&sp, 10);			// convert to an integer
 		}
 		else
@@ -1206,54 +1441,54 @@ void MIPS16 __not_in_flash_func(cmd_for)(void) {
 		while(*vname && vname[strlen((char *)vname) - 1] == ' ') vname[strlen((char *)vname) - 1] = 0;
 		vlen = strlen((char *)vname);
 		vptr = findvar(argv[0], V_FIND);					        // create the variable
-        if(vartbl[VarIndex].type & T_CONST) error("Cannot change a constant");
-        vtype = TypeMask(vartbl[VarIndex].type);
+        if(g_vartbl[g_VarIndex].type & T_CONST) error("Cannot change a constant");
+        vtype = TypeMask(g_vartbl[g_VarIndex].type);
 		if(vtype & T_STR) error("Invalid variable");                // sanity check
 
 		// check if the FOR variable is already in the stack and remove it if it is
 		// this is necessary as the program can jump out of the loop without hitting
 		// the NEXT statement and this will eventually result in a stack overflow
-		for(i = 0; i < forindex ;i++) {
-			if(forstack[i].var == vptr && forstack[i].level == LocalIndex) {
-				while(i < forindex - 1) {
-					forstack[i].forptr = forstack[i+1].forptr;
-					forstack[i].nextptr = forstack[i+1].nextptr;
-					forstack[i].var = forstack[i+1].var;
-					forstack[i].vartype = forstack[i+1].vartype;
-					forstack[i].level = forstack[i+1].level;
-					forstack[i].tovalue.i = forstack[i+1].tovalue.i;
-					forstack[i].stepvalue.i = forstack[i+1].stepvalue.i;
+		for(i = 0; i < g_forindex ;i++) {
+			if(g_forstack[i].var == vptr && g_forstack[i].level == g_LocalIndex) {
+				while(i < g_forindex - 1) {
+					g_forstack[i].forptr = g_forstack[i+1].forptr;
+					g_forstack[i].nextptr = g_forstack[i+1].nextptr;
+					g_forstack[i].var = g_forstack[i+1].var;
+					g_forstack[i].vartype = g_forstack[i+1].vartype;
+					g_forstack[i].level = g_forstack[i+1].level;
+					g_forstack[i].tovalue.i = g_forstack[i+1].tovalue.i;
+					g_forstack[i].stepvalue.i = g_forstack[i+1].stepvalue.i;
 					i++;
 				}
-				forindex--;
+				g_forindex--;
 				break;
 			}
 		}
 
-        if(forindex == MAXFORLOOPS) error("Too many nested FOR loops");
+        if(g_forindex == MAXFORLOOPS) error("Too many nested FOR loops");
 
-		forstack[forindex].var = vptr;								// save the variable index
-		forstack[forindex].vartype = vtype;							// save the type of the variable
-		forstack[forindex].level = LocalIndex;						// save the level of the variable in terms of sub/funs
-        forindex++;                                                 // incase functions use for loops
+		g_forstack[g_forindex].var = vptr;								// save the variable index
+		g_forstack[g_forindex].vartype = vtype;							// save the type of the variable
+		g_forstack[g_forindex].level = g_LocalIndex;						// save the level of the variable in terms of sub/funs
+        g_forindex++;                                                 // incase functions use for loops
         if(vtype & T_NBR) {
             *(MMFLOAT *)vptr = getnumber(argv[2]);					// get the starting value for a float and save
-            forstack[forindex - 1].tovalue.f = getnumber(argv[4]);		// get the to value and save
+            g_forstack[g_forindex - 1].tovalue.f = getnumber(argv[4]);		// get the to value and save
             if(argc == 7)
-                forstack[forindex - 1].stepvalue.f = getnumber(argv[6]);// get the step value for a float and save
+                g_forstack[g_forindex - 1].stepvalue.f = getnumber(argv[6]);// get the step value for a float and save
             else
-                forstack[forindex - 1].stepvalue.f = 1.0;				// default is +1
+                g_forstack[g_forindex - 1].stepvalue.f = 1.0;				// default is +1
         } else {
             *(long long int  *)vptr = getinteger(argv[2]);			// get the starting value for an integer and save
-            forstack[forindex - 1].tovalue.i = getinteger(argv[4]);		// get the to value and save
+            g_forstack[g_forindex - 1].tovalue.i = getinteger(argv[4]);		// get the to value and save
             if(argc == 7)
-                forstack[forindex - 1].stepvalue.i = getinteger(argv[6]);// get the step value for an integer and save
+                g_forstack[g_forindex - 1].stepvalue.i = getinteger(argv[6]);// get the step value for an integer and save
             else
-                forstack[forindex - 1].stepvalue.i = 1;					// default is +1
+                g_forstack[g_forindex - 1].stepvalue.i = 1;					// default is +1
         }
-        forindex--;
+        g_forindex--;
 
-		forstack[forindex].forptr = nextstmt + 1;					// return to here when looping
+		g_forstack[g_forindex].forptr = nextstmt + 1;					// return to here when looping
 
 		// now find the matching NEXT command
         t = 1; p = nextstmt;
@@ -1274,23 +1509,23 @@ void MIPS16 __not_in_flash_func(cmd_for)(void) {
 					t--;											// no luck, just decrement our stack counter
 			}
 			if(t == 0) {											// found the matching NEXT
-				forstack[forindex].nextptr = p;					// pointer to the start of the NEXT command
+				g_forstack[g_forindex].nextptr = p;					// pointer to the start of the NEXT command
 				break;
 			}
 		}
 
         // test the loop value at the start
-        if(forstack[forindex].vartype & T_INT)
-            test = (forstack[forindex].stepvalue.i >= 0 && *(long long int  *)vptr > forstack[forindex].tovalue.i) || (forstack[forindex].stepvalue.i < 0 && *(long long int  *)vptr < forstack[forindex].tovalue.i) ;
+        if(g_forstack[g_forindex].vartype & T_INT)
+            test = (g_forstack[g_forindex].stepvalue.i >= 0 && *(long long int  *)vptr > g_forstack[g_forindex].tovalue.i) || (g_forstack[g_forindex].stepvalue.i < 0 && *(long long int  *)vptr < g_forstack[g_forindex].tovalue.i) ;
         else
-            test = (forstack[forindex].stepvalue.f >= 0 && *(MMFLOAT *)vptr > forstack[forindex].tovalue.f) || (forstack[forindex].stepvalue.f < 0 && *(MMFLOAT *)vptr < forstack[forindex].tovalue.f) ;
+            test = (g_forstack[g_forindex].stepvalue.f >= 0 && *(MMFLOAT *)vptr > g_forstack[g_forindex].tovalue.f) || (g_forstack[g_forindex].stepvalue.f < 0 && *(MMFLOAT *)vptr < g_forstack[g_forindex].tovalue.f) ;
 
         if(test) {
 			// loop is invalid at the start, so go to the end of the NEXT command
 			skipelement(p);            // find the command after the NEXT command
 			nextstmt = p;              // this is where we will continue
 		} else {
-			forindex++;					// save the loop data and continue on with the command after the FOR statement
+			g_forindex++;					// save the loop data and continue on with the command after the FOR statement
         }
 	}
 }
@@ -1324,15 +1559,15 @@ void MIPS16 __not_in_flash_func(cmd_next)(void) {
 	loopback:
 	// first search the for stack for a loop with the same variable specified on the NEXT's line
 	if(vcnt) {
-		for(i = forindex - 1; i >= 0; i--)
+		for(i = g_forindex - 1; i >= 0; i--)
 			for(vindex = vcnt - 1; vindex >= 0 ; vindex--)
-				if(forstack[i].var == vtbl[vindex])
+				if(g_forstack[i].var == vtbl[vindex])
 					goto breakout;
 	} else {
 		// if no variables specified search the for stack looking for an entry with the same program position as
 		// this NEXT statement. This cheats by using the cmdline as an identifier and may not work inside an IF THEN ELSE
-        for(i = 0; i < forindex; i++) {
-            p = forstack[i].nextptr + sizeof(CommandToken);
+        for(i = 0; i < g_forindex; i++) {
+            p = g_forstack[i].nextptr + sizeof(CommandToken);
             skipspace(p);
             if(p == cmdline) goto breakout;
         }
@@ -1344,28 +1579,28 @@ void MIPS16 __not_in_flash_func(cmd_next)(void) {
 
 	// found a match
 	// apply the STEP value to the variable and test against the TO value
-    if(forstack[i].vartype & T_INT) {
-        *(long long int  *)forstack[i].var += forstack[i].stepvalue.i;
-	    test = (forstack[i].stepvalue.i >= 0 && *(long long int  *)forstack[i].var > forstack[i].tovalue.i) || (forstack[i].stepvalue.i < 0 && *(long long int  *)forstack[i].var < forstack[i].tovalue.i) ;
+    if(g_forstack[i].vartype & T_INT) {
+        *(long long int  *)g_forstack[i].var += g_forstack[i].stepvalue.i;
+	    test = (g_forstack[i].stepvalue.i >= 0 && *(long long int  *)g_forstack[i].var > g_forstack[i].tovalue.i) || (g_forstack[i].stepvalue.i < 0 && *(long long int  *)g_forstack[i].var < g_forstack[i].tovalue.i) ;
     } else {
-        *(MMFLOAT *)forstack[i].var += forstack[i].stepvalue.f;
-	    test = (forstack[i].stepvalue.f >= 0 && *(MMFLOAT *)forstack[i].var > forstack[i].tovalue.f) || (forstack[i].stepvalue.f < 0 && *(MMFLOAT *)forstack[i].var < forstack[i].tovalue.f) ;
+        *(MMFLOAT *)g_forstack[i].var += g_forstack[i].stepvalue.f;
+	    test = (g_forstack[i].stepvalue.f >= 0 && *(MMFLOAT *)g_forstack[i].var > g_forstack[i].tovalue.f) || (g_forstack[i].stepvalue.f < 0 && *(MMFLOAT *)g_forstack[i].var < g_forstack[i].tovalue.f) ;
     }
 
     if(test) {
 		// the loop has terminated
 		// remove the entry in the table, then skip forward to the next element and continue on from there
-		while(i < forindex - 1) {
-			forstack[i].forptr = forstack[i+1].forptr;
-			forstack[i].nextptr = forstack[i+1].nextptr;
-			forstack[i].var = forstack[i+1].var;
-			forstack[i].vartype = forstack[i+1].vartype;
-			forstack[i].level = forstack[i+1].level;
-			forstack[i].tovalue.i = forstack[i+1].tovalue.i;
-			forstack[i].stepvalue.i = forstack[i+1].stepvalue.i;
+		while(i < g_forindex - 1) {
+			g_forstack[i].forptr = g_forstack[i+1].forptr;
+			g_forstack[i].nextptr = g_forstack[i+1].nextptr;
+			g_forstack[i].var = g_forstack[i+1].var;
+			g_forstack[i].vartype = g_forstack[i+1].vartype;
+			g_forstack[i].level = g_forstack[i+1].level;
+			g_forstack[i].tovalue.i = g_forstack[i+1].tovalue.i;
+			g_forstack[i].stepvalue.i = g_forstack[i+1].stepvalue.i;
 			i++;
 		}
-		forindex--;
+		g_forindex--;
 		if(vcnt > 0) {
 			// remove that entry from our FOR stack
 			for(; vindex < vcnt - 1; vindex++) vtbl[vindex] = vtbl[vindex + 1];
@@ -1378,7 +1613,7 @@ void MIPS16 __not_in_flash_func(cmd_next)(void) {
 
 	} else {
 		// we have not reached the terminal value yet, so go back and loop again
-		nextstmt = forstack[i].forptr;
+		nextstmt = g_forstack[i].forptr;
 	}
 }
 
@@ -1407,25 +1642,25 @@ void MIPS16 __not_in_flash_func(cmd_do)(void) {
 	// check if this loop is already in the stack and remove it if it is
 	// this is necessary as the program can jump out of the loop without hitting
 	// the LOOP or WEND stmt and this will eventually result in a stack overflow
-	for(i = 0; i < doindex ;i++) {
-		if(dostack[i].doptr == nextstmt) {
-			while(i < doindex - 1) {
-				dostack[i].evalptr = dostack[i+1].evalptr;
-				dostack[i].loopptr = dostack[i+1].loopptr;
-				dostack[i].doptr = dostack[i+1].doptr;
-				dostack[i].level = dostack[i+1].level;
+	for(i = 0; i < g_doindex ;i++) {
+		if(g_dostack[i].doptr == nextstmt) {
+			while(i < g_doindex - 1) {
+				g_dostack[i].evalptr = g_dostack[i+1].evalptr;
+				g_dostack[i].loopptr = g_dostack[i+1].loopptr;
+				g_dostack[i].doptr = g_dostack[i+1].doptr;
+				g_dostack[i].level = g_dostack[i+1].level;
 				i++;
 			}
-			doindex--;
+			g_doindex--;
 			break;
 		}
 	}
 
 	// add our pointers to the top of the stack
-	if(doindex == MAXDOLOOPS) error("Too many nested DO or WHILE loops");
-	dostack[doindex].evalptr = evalp;
-	dostack[doindex].doptr = nextstmt;
-	dostack[doindex].level = LocalIndex;
+	if(g_doindex == MAXDOLOOPS) error("Too many nested DO or WHILE loops");
+	g_dostack[g_doindex].evalptr = evalp;
+	g_dostack[g_doindex].doptr = nextstmt;
+	g_dostack[g_doindex].level = g_LocalIndex;
 
 	// now find the matching LOOP command
 	i = 1; p = nextstmt;
@@ -1436,12 +1671,12 @@ void MIPS16 __not_in_flash_func(cmd_do)(void) {
 		if(tkn == cmdLOOP) i--;									// exited a nested loop
 
 		if(i == 0) {												// found our matching LOOP or WEND stmt
-			dostack[doindex].loopptr = p;
+			g_dostack[g_doindex].loopptr = p;
 			break;
 		}
 	}
 
-    if(dostack[doindex].evalptr != NULL) {
+    if(g_dostack[g_doindex].evalptr != NULL) {
 		// if this is a DO WHILE ... LOOP statement
 		// search the LOOP statement for a WHILE or UNTIL token (p is pointing to the matching LOOP statement)
 		p+=sizeof(CommandToken);
@@ -1450,12 +1685,12 @@ void MIPS16 __not_in_flash_func(cmd_do)(void) {
 		if(*p == tokenUNTIL) error("LOOP has an UNTIL test");
 	}
 
-	doindex++;
+	g_doindex++;
 
     // do the evaluation (if there is something to evaluate) and if false go straight to the command after the LOOP or WEND statement
-    if(dostack[doindex - 1].evalptr != NULL && getnumber(dostack[doindex - 1].evalptr) == 0) {
-        doindex--;                                                  // remove the entry in the table
-        nextstmt = dostack[doindex].loopptr;                        // point to the LOOP or WEND statement
+    if(g_dostack[g_doindex - 1].evalptr != NULL && getnumber(g_dostack[g_doindex - 1].evalptr) == 0) {
+        g_doindex--;                                                  // remove the entry in the table
+        nextstmt = g_dostack[g_doindex].loopptr;                        // point to the LOOP or WEND statement
         skipelement(nextstmt);                                      // skip to the next command
     }
 
@@ -1478,14 +1713,14 @@ void MIPS16 __not_in_flash_func(cmd_loop)(void) {
 	int i;
 
 	// search the do table looking for an entry with the same program position as this LOOP statement
-	for(i = 0; i < doindex ;i++) {
-        p = dostack[i].loopptr + sizeof(CommandToken);
+	for(i = 0; i < g_doindex ;i++) {
+        p = g_dostack[i].loopptr + sizeof(CommandToken);
         skipspace(p);
         if(p == cmdline) {
 			// found a match
 			// first check if the DO statement had a WHILE component
 			// if not find the WHILE statement here and evaluate it
-			if(dostack[i].evalptr == NULL) {						// if it was a DO without a WHILE
+			if(g_dostack[i].evalptr == NULL) {						// if it was a DO without a WHILE
 				if(*cmdline >= 0x80) {								// if there is something
 					if(*cmdline == tokenWHILE)
 						tst = (getnumber(++cmdline) != 0);			// evaluate the expression
@@ -1500,18 +1735,18 @@ void MIPS16 __not_in_flash_func(cmd_loop)(void) {
 				}
 			}
 			else {													// if was DO WHILE
-				tst = (getnumber(dostack[i].evalptr) != 0);			// evaluate its expression
+				tst = (getnumber(g_dostack[i].evalptr) != 0);			// evaluate its expression
 				checkend(cmdline);									// make sure that there is nothing else
 			}
 
 			// test the expression value and reset the program pointer if we are still looping
 			// otherwise remove this entry from the do stack
 			if(tst)
-				nextstmt = dostack[i].doptr;						// loop again
+				nextstmt = g_dostack[i].doptr;						// loop again
 			else {
 				// the loop has terminated
 				// remove the entry in the table, then just let the default nextstmt run and continue on from there
-                doindex = i;
+                g_doindex = i;
 				// just let the default nextstmt run
 			}
 			return;
@@ -1523,8 +1758,8 @@ void MIPS16 __not_in_flash_func(cmd_loop)(void) {
 
 
 void cmd_exitfor(void) {
-	if(forindex == 0) error("No FOR loop is in effect");
-	nextstmt = forstack[--forindex].nextptr;
+	if(g_forindex == 0) error("No FOR loop is in effect");
+	nextstmt = g_forstack[--g_forindex].nextptr;
 	checkend(cmdline);
 	skipelement(nextstmt);
 }
@@ -1532,8 +1767,8 @@ void cmd_exitfor(void) {
 
 
 void cmd_exit(void) {
-	if(doindex == 0) error("No DO loop is in effect");
-	nextstmt = dostack[--doindex].loopptr;
+	if(g_doindex == 0) error("No DO loop is in effect");
+	nextstmt = g_dostack[--g_doindex].loopptr;
 	checkend(cmdline);
 	skipelement(nextstmt);
 }
@@ -1642,7 +1877,7 @@ void cmd_gosub(void) {
 
    errorstack[gosubindex] = CurrentLinePtr;
    gosubstack[gosubindex++] = (unsigned char *)return_to;
-   LocalIndex++;
+   g_LocalIndex++;
    CurrentLinePtr = nextstmt;
 }
 
@@ -1650,8 +1885,8 @@ void cmd_mid(void){
 	unsigned char *p;
 	getargs(&cmdline,5,(unsigned char *)",");
 	findvar(argv[0], V_NOFIND_ERR);
-    if(vartbl[VarIndex].type & T_CONST) error("Cannot change a constant");
-	if(!(vartbl[VarIndex].type & T_STR)) error("Not a string");
+    if(g_vartbl[g_VarIndex].type & T_CONST) error("Cannot change a constant");
+	if(!(g_vartbl[g_VarIndex].type & T_STR)) error("Not a string");
 	char *sourcestring=(char *)getstring(argv[0]);
 	int start=getint(argv[2],1,sourcestring[0]);
 	int num=0;
@@ -1677,8 +1912,8 @@ void cmd_mid(void){
 void MIPS16 __not_in_flash_func(cmd_return)(void) {
  	checkend(cmdline);
 	if(gosubindex == 0 || gosubstack[gosubindex - 1] == NULL) error("Nothing to return to");
-    ClearVars(LocalIndex--);                                        // delete any local variables
-    TempMemoryIsChanged = true;                                     // signal that temporary memory should be checked
+    ClearVars(g_LocalIndex--, true);                                        // delete any local variables
+    g_TempMemoryIsChanged = true;                                     // signal that temporary memory should be checked
 	nextstmt = gosubstack[--gosubindex];                            // return to the caller
     CurrentLinePtr = errorstack[gosubindex];
 }
@@ -1721,11 +1956,11 @@ void MIPS16 cmd_read(void) {
             if(*argv[i] != ',') error("Syntax");
         } else {
 			findvar(argv[i], V_FIND | V_EMPTY_OK);
-			if(vartbl[VarIndex].type & T_CONST) error("Cannot change a constant");
+			if(g_vartbl[g_VarIndex].type & T_CONST) error("Cannot change a constant");
 			card=1;
 			if(emptyarray){ //empty array
 				for(k=0;k<MAXDIM;k++){
-					j=(vartbl[VarIndex].dims[k] - OptionBase + 1);
+					j=(g_vartbl[g_VarIndex].dims[k] - g_OptionBase + 1);
 					if(j)card *= j;
 				}
 			}
@@ -1742,18 +1977,18 @@ void MIPS16 cmd_read(void) {
 		card=1;
 		if(emptyarray){ //empty array
 			for(k=0;k<MAXDIM;k++){
-				j=(vartbl[VarIndex].dims[k] - OptionBase + 1);
+				j=(g_vartbl[g_VarIndex].dims[k] - g_OptionBase + 1);
 				if(j)card *= j;
 			}
 		}
 		for(k=0;k<card;k++){
 			if(k){
-				if(vartbl[VarIndex].type & (T_INT | T_NBR))ptr+=8;
-				else ptr+=vartbl[VarIndex].size+1;
+				if(g_vartbl[g_VarIndex].type & (T_INT | T_NBR))ptr+=8;
+				else ptr+=g_vartbl[g_VarIndex].size+1;
 				vtbl[vcnt]=(char *)ptr;
 			}
-			vtype[vcnt] = TypeMask(vartbl[VarIndex].type);
-			vsize[vcnt] = vartbl[VarIndex].size;
+			vtype[vcnt] = TypeMask(g_vartbl[g_VarIndex].type);
+			vsize[vcnt] = g_vartbl[g_VarIndex].size;
 			vcnt++;
 		}
     }
@@ -1935,13 +2170,13 @@ void MIPS16 cmd_restore(void) {
 		} else {
 			void *ptr=findvar(cmdline,V_NOFIND_NULL);
 			if(ptr){
-				if(vartbl[VarIndex].type & T_NBR) {
-					if(vartbl[VarIndex].dims[0] > 0) { // Not an array
+				if(g_vartbl[g_VarIndex].type & T_NBR) {
+					if(g_vartbl[g_VarIndex].dims[0] > 0) { // Not an array
 						error("Syntax");
 					}
 					NextDataLine = findline(getinteger(cmdline), true);
-				} else if(vartbl[VarIndex].type & T_INT) {
-					if(vartbl[VarIndex].dims[0] > 0) { // Not an array
+				} else if(g_vartbl[g_VarIndex].type & T_INT) {
+					if(g_vartbl[g_VarIndex].dims[0] > 0) { // Not an array
 						error("Syntax");
 					}
 					NextDataLine = findline(getinteger(cmdline), true);
@@ -1982,10 +2217,10 @@ void cmd_lineinput(void) {
 
 	if(argc - i != 1) error("Syntax");
 	vp = findvar(argv[i], V_FIND);
-    if(vartbl[VarIndex].type & T_CONST) error("Cannot change a constant");
-	if(!(vartbl[VarIndex].type & T_STR)) error("Invalid variable");
+    if(g_vartbl[g_VarIndex].type & T_CONST) error("Cannot change a constant");
+	if(!(g_vartbl[g_VarIndex].type & T_STR)) error("Invalid variable");
 	MMgetline(fnbr, (char *)inpbuf);									    // get the input line
-	if(strlen((char *)inpbuf) > vartbl[VarIndex].size) error("String too long");
+	if(strlen((char *)inpbuf) > g_vartbl[g_VarIndex].size) error("String too long");
 	strcpy((char *)vp, (char *)inpbuf);
 	CtoM(vp);														// convert to a MMBasic string
 }
@@ -2075,7 +2310,7 @@ void cmd_on(void) {
 			if(gosubindex >= MAXGOSUB) error("Too many nested GOSUB");
             errorstack[gosubindex] = CurrentLinePtr;
 			gosubstack[gosubindex++] = nextstmt;
-        	LocalIndex++;
+        	g_LocalIndex++;
 		}
 
 		if(isnamestart(*argv[r*2]))
@@ -2170,12 +2405,12 @@ void MIPS16 cmd_dim(void) {
             }
 
             if(cmdtoken == cmdLOCAL) {
-                if(LocalIndex == 0) error("Invalid here");
+                if(g_LocalIndex == 0) error("Invalid here");
                 type |= V_LOCAL;                                    // local if defined in a sub/fun
             }
 
             if(cmdtoken == cmdSTATIC) {
-                if(LocalIndex == 0) error("Invalid here");
+                if(g_LocalIndex == 0) error("Invalid here");
                 // create a unique global name
                 if(*CurrentInterruptName)
                     strcpy((char *)VarName, CurrentInterruptName);          // we must be in an interrupt sub
@@ -2192,30 +2427,30 @@ void MIPS16 cmd_dim(void) {
 
             v = findvar(VarName, type | V_NOFIND_NULL);             // check if the variable exists
             typeSave = type;
-            VIndexSave = VarIndex;
+            VIndexSave = g_VarIndex;
 			if(v == NULL) {											// if not found
                 v = findvar(VarName, type | V_FIND | V_DIM_VAR);    // create the variable
-                type = TypeMask(vartbl[VarIndex].type);
-                VIndexSave = VarIndex;
+                type = TypeMask(g_vartbl[g_VarIndex].type);
+                VIndexSave = g_VarIndex;
                 *chPosit = chSave;                                  // restore the char previously removed
-                if(vartbl[VarIndex].dims[0] == -1) error("Array dimensions");
-                if(vartbl[VarIndex].dims[0] > 0) {
-                    DimUsed = true;                                 // prevent OPTION BASE from being used
-                    v = vartbl[VarIndex].val.s;
+                if(g_vartbl[g_VarIndex].dims[0] == -1) error("Array dimensions");
+                if(g_vartbl[g_VarIndex].dims[0] > 0) {
+                    g_DimUsed = true;                                 // prevent OPTION BASE from being used
+                    v = g_vartbl[g_VarIndex].val.s;
                 }
                 while(*p && *p != '\'' && tokenfunction(*p) != op_equal) p++;	// search through the line looking for the equals sign
             	if(tokenfunction(*p) == op_equal) {
                     p++;                                            // step over the equals sign
                     skipspace(p);
-                    if(vartbl[VarIndex].dims[0] > 0 && *p == '(') {
+                    if(g_vartbl[g_VarIndex].dims[0] > 0 && *p == '(') {
                         // calculate the overall size of the array
-                        for(j = 1, k = 0; k < MAXDIM && vartbl[VIndexSave].dims[k]; k++) {
-                            j *= (vartbl[VIndexSave].dims[k] + 1 - OptionBase);
+                        for(j = 1, k = 0; k < MAXDIM && g_vartbl[VIndexSave].dims[k]; k++) {
+                            j *= (g_vartbl[VIndexSave].dims[k] + 1 - g_OptionBase);
                         }
                         do {
                             p++;                                    // step over the opening bracket or terminating comma
                             p = SetValue(p, type, v);
-                            if(type & T_STR) v = (char *)v + vartbl[VIndexSave].size + 1;
+                            if(type & T_STR) v = (char *)v + g_vartbl[VIndexSave].size + 1;
                             if(type & T_NBR) v = (char *)v + sizeof(MMFLOAT);
                             if(type & T_INT) v = (char *)v + sizeof(long long int);
                             skipspace(p); j--;
@@ -2236,14 +2471,14 @@ void MIPS16 cmd_dim(void) {
                 tv = findvar(argv[i], typeSave | V_LOCAL | V_NOFIND_NULL);    						// check if the local variable exists
                 if(tv != NULL) error("$ already declared", argv[i]);
                 tv = findvar(argv[i], typeSave | V_LOCAL | V_FIND | V_DIM_VAR);         			// create the variable
-                if(vartbl[VIndexSave].dims[0] > 0 || (vartbl[VIndexSave].type & T_STR)) {
+                if(g_vartbl[VIndexSave].dims[0] > 0 || (g_vartbl[VIndexSave].type & T_STR)) {
                     FreeMemory(tv);                                                                 // we don't need the memory allocated to the local
-                    vartbl[VarIndex].val.s = vartbl[VIndexSave].val.s;                              // point to the memory of the global variable
+                    g_vartbl[g_VarIndex].val.s = g_vartbl[VIndexSave].val.s;                              // point to the memory of the global variable
                 } else
-                    vartbl[VarIndex].val.ia = &(vartbl[VIndexSave].val.i);                    		// point to the data of the variable
-                vartbl[VarIndex].type = vartbl[VIndexSave].type | T_PTR;           					// set the type to a pointer
-                vartbl[VarIndex].size = vartbl[VIndexSave].size;                   					// just in case it is a string copy the size
-                for(j = 0; j < MAXDIM; j++) vartbl[VarIndex].dims[j] = vartbl[VIndexSave].dims[j];  // just in case it is an array copy the dimensions
+                    g_vartbl[g_VarIndex].val.ia = &(g_vartbl[VIndexSave].val.i);                    		// point to the data of the variable
+                g_vartbl[g_VarIndex].type = g_vartbl[VIndexSave].type | T_PTR;           					// set the type to a pointer
+                g_vartbl[g_VarIndex].size = g_vartbl[VIndexSave].size;                   					// just in case it is a string copy the size
+                for(j = 0; j < MAXDIM; j++) g_vartbl[g_VarIndex].dims[j] = g_vartbl[VIndexSave].dims[j];  // just in case it is an array copy the dimensions
 			}
         }
     }
@@ -2269,14 +2504,14 @@ void  cmd_const(void) {
         v = DoExpression(p, &type);                                 // evaluate the constant's value
         type = TypeMask(type);
         type |= V_FIND | V_DIM_VAR | T_CONST | T_IMPLIED;
-        if(LocalIndex != 0) type |= V_LOCAL;                        // local if defined in a sub/fun
+        if(g_LocalIndex != 0) type |= V_LOCAL;                        // local if defined in a sub/fun
         findvar(argv[i], type);                                     // create the variable
-        if(vartbl[VarIndex].dims[0] != 0) error("Invalid constant");
-        if(TypeMask(vartbl[VarIndex].type) != TypeMask(type)) error("Invalid constant");
+        if(g_vartbl[g_VarIndex].dims[0] != 0) error("Invalid constant");
+        if(TypeMask(g_vartbl[g_VarIndex].type) != TypeMask(type)) error("Invalid constant");
         else {
-            if(type & T_NBR) vartbl[VarIndex].val.f = *(MMFLOAT *)v;           // and set its value
-            if(type & T_INT) vartbl[VarIndex].val.i = *(long long int  *)v;
-            if(type & T_STR) Mstrcpy((unsigned char *)vartbl[VarIndex].val.s, (unsigned char *)v);
+            if(type & T_NBR) g_vartbl[g_VarIndex].val.f = *(MMFLOAT *)v;           // and set its value
+            if(type & T_INT) g_vartbl[g_VarIndex].val.i = *(long long int  *)v;
+            if(type & T_STR) Mstrcpy((unsigned char *)g_vartbl[g_VarIndex].val.s, (unsigned char *)v);
         }
     }
 }
@@ -2436,7 +2671,7 @@ void execute(char* mycmd) {
 		ScrewUpTimer = 1000;
 		ExecuteProgram(tknbuf);                                              // execute the function's code
 		ScrewUpTimer = 0;
-		// TempMemoryIsChanged = true;                                     // signal that temporary memory should be checked
+		// g_TempMemoryIsChanged = true;                                     // signal that temporary memory should be checked
 		if(CurrentLinePtr)nextstmt = ttp;
 		return;
 	}

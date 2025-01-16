@@ -369,8 +369,8 @@ void owRead(unsigned char *p) {
     if (len != ((argc - 5) >> 1)) error("Argument count");
     for (i = 0; i < len; i++) {
         ptr = findvar(argv[i + i + 6], V_FIND);
-        if(vartbl[VarIndex].type & T_CONST) error("Cannot change a constant");
-        if (!(vartbl[VarIndex].type & (T_NBR | T_INT)) || vartbl[VarIndex].dims[0] != 0) error("Invalid variable");
+        if(g_vartbl[g_VarIndex].type & T_CONST) error("Cannot change a constant");
+        if (!(g_vartbl[g_VarIndex].type & (T_NBR | T_INT)) || g_vartbl[g_VarIndex].dims[0] != 0) error("Invalid variable");
     }
 
 // set up initial pin status (open drain, output, high)
@@ -390,7 +390,7 @@ void owRead(unsigned char *p) {
 
 	for (i = 0; i < len; i++) {
 			ptr = findvar(argv[i + i + 6], V_FIND);
-            if(vartbl[VarIndex].type & T_NBR)
+            if(g_vartbl[g_VarIndex].type & T_NBR)
                 *((MMFLOAT *)ptr) = buf[i];
             else
                 *((long long int *)ptr) = buf[i];
