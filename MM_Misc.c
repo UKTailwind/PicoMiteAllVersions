@@ -2935,7 +2935,6 @@ void MIPS16 cmd_option(void) {
 
     tp = checkstring(cmdline, (unsigned char *)"EXPLICIT");
     if(tp) {
-        if(g_varcnt != 0) error("Variables already defined");
         OptionExplicit = true;
         return;
     }

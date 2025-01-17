@@ -1267,8 +1267,7 @@ void fun_dir(void)
         for (;;)
         {
             if(FSsave==1){
-                    FSerror = f_readdir(&djd, &fnod); // Get a directory item
-                MMPrintString(fnod.fname);PRet();
+                FSerror = f_readdir(&djd, &fnod); // Get a directory item
                 if (FSerror != FR_OK || !fnod.fname[0])
                     break; // Terminate if any error or end of directory
                 if (pattern_matching(pp, fnod.fname, 0, 0) && (fnod.fattrib & AM_DIR) && !(fnod.fattrib & AM_SYS))

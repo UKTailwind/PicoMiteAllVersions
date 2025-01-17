@@ -266,6 +266,9 @@ void fun_touch(void) {
         iret = TOUCH_DOWN;
     else if(checkstring(ep, (unsigned char *)"UP"))
         iret = !TOUCH_DOWN;
+#else
+    else if(checkstring(ep, (unsigned char *)"DOWN"))
+        iret = (PinRead(Option.TOUCH_IRQ) ? 0 : 1);
 #endif        
     else
         error("Invalid argument");

@@ -82,7 +82,7 @@ struct s_funtbl funtbl[MAXSUBFUN];
 void hashlabels(unsigned char *p,int ErrAbort);
 #endif
 struct s_vartbl __attribute__ ((aligned (64))) g_vartbl[MAXVARS]={0};                                            // this table stores all variables
-int g_varcnt;                                                         // number of variables
+int g_varcnt=0;                                                         // number of variables
 int g_VarIndex;                                                       // Global set by findvar after a variable has been created or found
 int g_Localvarcnt;                                                         // number of LOCAL variables
 int g_Globalvarcnt;                                                         // number of GLOBAL variables
@@ -1547,18 +1547,19 @@ unsigned char MIPS16 __not_in_flash_func(*getvalue)(unsigned char *p, MMFLOAT *f
         *oo = ro;
         return p;                                                   // return straight away as we already have the next operator
     }
-		if(tokenfunction(*p) == op_add) {
-			int ro;
-			p++; t = T_NOTYPE;
-			p = getvalue(p, &f, &i64, &s, &ro, &t);                     // get the next value
-			skipspace(p);
-			*fa = f;                                                    // save what we have
-			*ia = i64;
-			*sa = s;
-			*ta = t;
-			*oo = ro;
-			return p;                                                   // return straight away as we already have the next operator
-		}
+
+    if(tokenfunction(*p) == op_add) {
+        int ro;
+        p++; t = T_NOTYPE;
+        p = getvalue(p, &f, &i64, &s, &ro, &t);                     // get the next value
+        skipspace(p);
+        *fa = f;                                                    // save what we have
+        *ia = i64;
+        *sa = s;
+        *ta = t;
+        *oo = ro;
+        return p;                                                   // return straight away as we already have the next operator
+    }
 
 
     // if a function execute it and save the result
