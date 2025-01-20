@@ -55,7 +55,8 @@ extern char *WAVInterrupt;
 extern bool WAVcomplete;
 extern int WAV_fnbr;
 extern int PWM_FREQ;
-extern char *sbuff1, *sbuff2, *modbuff;
+extern char *sbuff1, *sbuff2,  *modbuff;
+extern int32_t *xbuff1, *xbuff2; 
 extern volatile uint32_t bcount[3];
 extern volatile int wav_filesize;                                    // head and tail of the ring buffer for com1
 extern uint8_t trackplaying, trackstoplay;
@@ -68,6 +69,7 @@ extern const unsigned short squaretable[];
 extern volatile float PhaseM_left, PhaseM_right;
 extern volatile unsigned char PWM_count;
 extern uint16_t *playbuff;
+extern int32_t *uplaybuff;
 extern volatile int sound_v_left[MAXSOUNDS];
 extern volatile int sound_v_right[MAXSOUNDS];
 extern volatile float sound_PhaseAC_left[MAXSOUNDS], sound_PhaseAC_right[MAXSOUNDS];

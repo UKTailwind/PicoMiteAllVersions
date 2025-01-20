@@ -38,6 +38,8 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "hardware/dma.h"
 #include "hardware/structs/bus_ctrl.h"
 #include "hardware/structs/dma.h"
+#include "hardware/irq.h"
+#include "hardware/pwm.h"
 #ifdef PICOMITEWEB
 #define CJSON_NESTING_LIMIT 100
 #include "cJSON.h"
@@ -214,6 +216,50 @@ int getirqnum(char *p){
         }
         return data;
 }
+void pio_init(int pior, int sm, uint32_t pinctrl, uint32_t execctrl, uint32_t shiftctrl, int start, float clock){
+        pio_sm_config mypio=pio_get_default_sm_config();
+#ifdef rp2350
+        PIO pio = (pior==0 ? pio0: (pior==1 ? pio1: pio2));
+#else
+        PIO pio = (pior==0 ? pio0: pio1);
+#endif
+        clock=(float)Option.CPU_Speed*1000.0/clock;
+        int sidebase=(pinctrl & 0b111110000000000)>>10;
+        int setbase=(pinctrl & 0b1111100000)>>5;
+        int outbase=(pinctrl & 0b11111);
+        int sidecount=(pinctrl & 0xE0000000)>>29;
+        int setcount=(pinctrl & 0x1C000000)>>26;
+        int outcount=(pinctrl & 0x3F00000)>>20;
+        int inbase=(pinctrl & 0xF8000)>>15;
+        int opt=(execctrl>>30) & 1;
+        sm_config_set_sideset_pins(&mypio, sidebase);
+        sm_config_set_out_pins(&mypio, outbase, outcount);
+        sm_config_set_set_pins(&mypio, setbase, setcount);
+        sm_config_set_in_pins(&mypio, inbase);
+        sm_config_set_sideset(&mypio,sidecount,false,false);
+        mypio.clkdiv = (uint32_t) (clock * (1 << 16));
+        mypio.execctrl=execctrl;
+        mypio.shiftctrl=shiftctrl;
+        #ifdef rp2350
+        #ifdef PICOMITEWEB
+                for(int i = 1; i < (NBRPINS) ; i++) {
+        #else
+                for(int i = 1; i < (rp2350a ? 44:NBRPINS) ; i++) {
+        #endif
+        #else
+        for(int i = 1; i < (NBRPINS) ; i++) {
+        #endif
+                if(CheckPin(i, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED)) {    // don't reset invalid or boot reserved pins
+                        gpio_set_input_enabled(PinDef[i].GPno, true);
+                }
+        }
+        if(sidecount)pio_sm_set_consecutive_pindirs(pio, sm, sidebase, sidecount-opt, true);
+        if(outcount)pio_sm_set_consecutive_pindirs(pio, sm, outbase, outcount, true);
+        if(setcount)pio_sm_set_consecutive_pindirs(pio, sm, setbase, setcount, true);
+        pio_sm_set_config(pio, sm, &mypio);
+        pio_sm_init(pio, sm, start, &mypio);
+        pio_sm_clear_fifos(pio,sm);
+}
 int checkblock(char *p){
         int data=0;
         char *pp;
@@ -231,6 +277,63 @@ int checkblock(char *p){
         }
         return data;
 }
+#ifdef rp2350
+void start_i2s(int pior, int sm){
+    if(!Option.audio_i2c_bclk)return;
+	extern bool PIO2;
+        extern void on_pwm_wrap(void);
+
+        PIO pio = (pior==0 ? pio0: (pior==1 ? pio1: pio2));
+        struct pio_program program;
+        program.length=32;
+        program.origin=0;
+        const uint16_t prog[]={    0xe03e, //  0: set    x, 30           side 0     
+            0x8880, //  1: pull   noblock         side 1     
+            0x6001, //  2: out    pins, 1         side 0     
+            0x0842, //  3: jmp    x--, 2          side 1     
+            0xf03e, //  4: set    x, 30           side 2     
+            0x9880, //  5: pull   noblock         side 3     
+            0x7001, //  6: out    pins, 1         side 2     
+            0x1846, //  7: jmp    x--, 6          side 3   
+            0,0,0,0,0,0,0,0,  
+            0,0,0,0,0,0,0,0,  
+            0,0,0,0,0,0,0,0  
+        };
+        program.instructions=(const uint16_t *)&prog;
+        for(int sm=0;sm<4;sm++)hw_clear_bits(&pio->ctrl, 1 << (PIO_CTRL_SM_ENABLE_LSB + sm));
+        pio_clear_instruction_memory(pio);
+        pio_add_program(pio,&program);
+	gpio_set_input_enabled(PinDef[Option.audio_i2c_data].GPno, true);
+        gpio_set_function(PinDef[Option.audio_i2c_data].GPno, GPIO_FUNC_PIO2);
+	gpio_set_input_enabled(PinDef[Option.audio_i2c_bclk].GPno, true);
+        gpio_set_function(PinDef[Option.audio_i2c_bclk].GPno, GPIO_FUNC_PIO2);
+	gpio_set_input_enabled(PinDef[Option.audio_i2c_bclk].GPno+1, true);
+        gpio_set_function(PinDef[Option.audio_i2c_bclk].GPno+1, GPIO_FUNC_PIO2);
+        ExtCfg(Option.audio_i2c_bclk, EXT_BOOT_RESERVED, 0);
+        ExtCfg(Option.audio_i2c_data, EXT_BOOT_RESERVED, 0);
+        ExtCfg(PINMAP[PinDef[Option.audio_i2c_bclk].GPno+1], EXT_BOOT_RESERVED, 0);
+        int start=0,execctrl=0x7000,shiftctrl=0x40000000, pinctrl=0;
+	float clock=(float)(2822400*2);
+        pinctrl=(2<<29); // no of side set pins
+        pinctrl|=(1<<20); // no of OUT pins
+        pinctrl|=(PinDef[Option.audio_i2c_data].GPno); // OUT base
+        pinctrl|=(PinDef[Option.audio_i2c_bclk].GPno<<10);  // SIDE SET base
+        pio_init(pior, sm, pinctrl, execctrl, shiftctrl, start, clock);
+        pio_sm_clear_fifos(pio,sm);
+        pio_sm_restart(pio, sm);
+        pio_sm_set_enabled(pio, sm, true);
+        AUDIO_SLICE=Option.AUDIO_SLICE;
+        AUDIO_WRAP=(Option.CPU_Speed*10)/441  - 1 ;
+        pwm_set_wrap(AUDIO_SLICE, AUDIO_WRAP);
+        pwm_clear_irq(AUDIO_SLICE);
+        irq_set_exclusive_handler(PWM_IRQ_WRAP, on_pwm_wrap);
+        irq_set_enabled(PWM_IRQ_WRAP, true);
+        irq_set_priority(PWM_IRQ_WRAP,255);
+	pwm_set_enabled(AUDIO_SLICE, true); 
+	PIO2=false;
+}
+#endif
+
 /*  @endcond */
 void MIPS16 cmd_pio(void){
     unsigned char *tp;
@@ -239,6 +342,13 @@ void MIPS16 cmd_pio(void){
     #else
     short dims[MAXDIM]={0};
     #endif
+#ifdef rp2350
+    tp = checkstring(cmdline, (unsigned char *)"I2S");
+    if(tp){
+        start_i2s(2,0);
+        return;
+    }
+#endif
     tp = checkstring(cmdline, (unsigned char *)"EXECUTE");
     if(tp){
         int i;
@@ -332,6 +442,8 @@ void MIPS16 cmd_pio(void){
         dma_channel_config c = dma_channel_get_default_config(dma_rx_chan);
         channel_config_set_read_increment(&c, false);
         channel_config_set_transfer_data_size(&c, dmasize);
+        if(dma_rx_pio==2)channel_config_set_dreq(&c, 20+sm);
+        else channel_config_set_dreq(&c, pio_get_dreq(pio, sm, true));
         channel_config_set_dreq(&c, pio_get_dreq(pio, sm, false));
         if(argc==13){
                 int size=getinteger(argv[12]);
@@ -424,7 +536,9 @@ void MIPS16 cmd_pio(void){
         }
         dma_channel_config c = dma_channel_get_default_config(dma_tx_chan);
         channel_config_set_write_increment(&c, false);
-        channel_config_set_dreq(&c, pio_get_dreq(pio, sm, true));
+        if(dma_tx_pio==2)channel_config_set_dreq(&c, 16+sm);
+        else channel_config_set_dreq(&c, pio_get_dreq(pio, sm, true));
+
         channel_config_set_transfer_data_size(&c, dmasize);
         if(argc==13){
                 int size=getinteger(argv[12]);
@@ -1211,41 +1325,21 @@ void MIPS16 cmd_pio(void){
         int start=0;
         getargs(&tp,13,(unsigned char *)",");
         if(argc<5)error("Syntax");
-        pio_sm_config mypio=pio_get_default_sm_config();
         int pior=getint(argv[0],0,PIOMAX-1);
         if(PIO0==false && pior==0)error("PIO 0 not available");
         if(PIO1==false && pior==1)error("PIO 1 not available");
 #ifdef rp2350
         if(PIO2==false && pior==2)error("PIO 2 not available");
-        PIO pio = (pior==0 ? pio0: (pior==1 ? pio1: pio2));
-#else
-        PIO pio = (pior==0 ?  pio0: pio1);
 #endif
         int sm=getint(argv[2],0,3);
         float clock=getnumber(argv[4]);
         if(clock<CLKMIN || clock> CLKMAX)error("Clock must be in range % to %",CLKMIN,CLKMAX);
-        clock=(float)Option.CPU_Speed*1000.0/clock;
-        if(argc>5 && *argv[6])mypio.pinctrl = getint(argv[6],0,0xFFFFFFFF);
-        if(argc>7 && *argv[8])mypio.execctrl= getint(argv[8],0,0xFFFFFFFF);
-        if(argc>9 && *argv[10])mypio.shiftctrl= getint(argv[10],0,0xFFFFFFFF);
+        int pinctrl=0, execctrl=0,shiftctrl=0;
+        if(argc>5 && *argv[6])pinctrl = getint(argv[6],0,0xFFFFFFFF);
+        if(argc>7 && *argv[8])execctrl= getint(argv[8],0,0xFFFFFFFF);
+        if(argc>9 && *argv[10])shiftctrl= getint(argv[10],0,0xFFFFFFFF);
         if(argc>11) start=getint(argv[12],0,31);
-        mypio.clkdiv = (uint32_t) (clock * (1 << 16));
-#ifdef rp2350
-        #ifdef PICOMITEWEB
-	        for(int i = 1; i < (NBRPINS) ; i++) {
-        #else
-	        for(int i = 1; i < (rp2350a ? 44:NBRPINS) ; i++) {
-        #endif
-#else
-	for(int i = 1; i < (NBRPINS) ; i++) {
-#endif
-		if(CheckPin(i, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED)) {    // don't reset invalid or boot reserved pins
-	                gpio_set_input_enabled(PinDef[i].GPno, true);
-		}
-	}
-        pio_sm_set_config(pio, sm, &mypio);
-        pio_sm_init(pio, sm, start, &mypio);
-        pio_sm_clear_fifos(pio,sm);
+        pio_init(pior, sm, pinctrl, execctrl, shiftctrl, start, clock);
         return;
     }
     error("Syntax");

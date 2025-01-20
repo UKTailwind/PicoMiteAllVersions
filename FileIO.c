@@ -1275,7 +1275,6 @@ void fun_dir(void)
             } else {
                 FSerror=lfs_dir_read(&lfs, &lfs_dir_dir, &lfs_info_dir);
                 strcpy(fnod.fname,lfs_info_dir.name);
-                MMPrintString(fnod.fname);PRet();
                 if(FSerror==0)                    
                     break;
                 if (lfs_info_dir.type==LFS_TYPE_DIR && pattern_matching(pp, lfs_info_dir.name, 0, 0) && !(strcmp(lfs_info_dir.name,".")==0 || strcmp(lfs_info_dir.name,"..")==0 )){

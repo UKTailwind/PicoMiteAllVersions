@@ -2113,11 +2113,15 @@ if(Option.CPU_Speed==FreqXGA)PO2Str("RESOLUTION", "1024x768");
     	MMPrintString(buff);
     }
 #endif
-    if(Option.AUDIO_L || Option.AUDIO_CLK_PIN){
+    if(Option.AUDIO_L || Option.AUDIO_CLK_PIN || Option.audio_i2c_bclk){
         PO("AUDIO");
         if(Option.AUDIO_L){
             MMPrintString((char *)PinDef[Option.AUDIO_L].pinname);MMputchar(',',1);
             MMPrintString((char *)PinDef[Option.AUDIO_R].pinname);
+        } else if(Option.audio_i2c_data){
+            MMPrintString((char *)"I2S ");
+            MMPrintString((char *)PinDef[Option.audio_i2c_bclk].pinname);MMputchar(',',1);
+            MMPrintString((char *)PinDef[Option.audio_i2c_data].pinname);
         } else if(!Option.AUDIO_DCS_PIN){
             MMPrintString((char *)"SPI ");
             MMPrintString((char *)PinDef[Option.AUDIO_CS_PIN].pinname);MMputchar(',',1);
@@ -2162,7 +2166,7 @@ if(Option.CPU_Speed==FreqXGA)PO2Str("RESOLUTION", "1024x768");
 #ifdef rp2350
     if(Option.PSRAM_CS_PIN!=0)PO2Str("PSRAM PIN", PinDef[Option.PSRAM_CS_PIN].pinname);
 #endif
-    if(Option.heartbeatpin!=43)PO2Str("HEARTBEAT PIN", PinDef[Option.heartbeatpin].pinname);
+    if(Option.heartbeatpin!=43 && !Option.NoHeartbeat)PO2Str("HEARTBEAT PIN", PinDef[Option.heartbeatpin].pinname);
 }
 
 int MIPS16 checkslice(int pin1,int pin2, int ignore){
@@ -2279,6 +2283,17 @@ void disable_audio(void){
     if(!IsInvalidPin(Option.AUDIO_RESET_PIN))ExtCurrentConfig[Option.AUDIO_RESET_PIN] = EXT_DIG_IN ;   
     if(!IsInvalidPin(Option.AUDIO_RESET_PIN))ExtCfg(Option.AUDIO_RESET_PIN, EXT_NOT_CONFIG, 0);
 
+    if(!IsInvalidPin(Option.audio_i2c_bclk))ExtCurrentConfig[Option.audio_i2c_bclk] = EXT_DIG_IN ;   
+    if(!IsInvalidPin(Option.audio_i2c_bclk))ExtCfg(Option.audio_i2c_bclk, EXT_NOT_CONFIG, 0);
+
+
+    if(!IsInvalidPin(PINMAP[PinDef[Option.audio_i2c_bclk].GPno+1]))ExtCurrentConfig[PINMAP[PinDef[Option.audio_i2c_bclk].GPno+1]] = EXT_DIG_IN ;   
+    if(!IsInvalidPin(PINMAP[PinDef[Option.audio_i2c_bclk].GPno+1]))ExtCfg(PINMAP[PinDef[Option.audio_i2c_bclk].GPno+1], EXT_NOT_CONFIG, 0);
+
+
+    if(!IsInvalidPin(Option.audio_i2c_data))ExtCurrentConfig[Option.audio_i2c_data] = EXT_DIG_IN ;   
+    if(!IsInvalidPin(Option.audio_i2c_data))ExtCfg(Option.audio_i2c_data, EXT_NOT_CONFIG, 0);
+
     Option.AUDIO_L=0;
     Option.AUDIO_R=0;
     Option.AUDIO_CLK_PIN=0;
@@ -2288,6 +2303,8 @@ void disable_audio(void){
     Option.AUDIO_RESET_PIN=0;
     Option.AUDIO_MOSI_PIN=0;
     Option.AUDIO_MISO_PIN=0;
+    Option.audio_i2c_bclk=0;
+    Option.audio_i2c_data=0;
     Option.AUDIO_SLICE=99;
 }
 #ifndef PICOMITEVGA
@@ -4112,6 +4129,39 @@ void MIPS16 cmd_option(void) {
             Option.AUDIO_CLK_PIN=pin2;
             Option.AUDIO_MOSI_PIN=pin3;
             slice=checkslice(pin2,pin2, 1);
+            if((PinDef[Option.DISPLAY_BL].slice & 0x7f) == slice) error("Channel in use for backlight");
+            Option.AUDIO_SLICE=slice;
+            SaveOptions();
+            _excep_code = RESET_COMMAND;
+            SoftReset();
+            return;
+        }
+        if((p=checkstring(tp, (unsigned char *)"I2S"))){
+            int pin1,pin2,pin3;
+            getargs(&p,3,(unsigned char *)",");
+            if(argc!=3)error("Syntax");
+            if(Option.AUDIO_CLK_PIN || Option.AUDIO_L || Option.audio_i2c_bclk)error("Audio already configured");
+            unsigned char code;
+//
+            if(!(code=codecheck(argv[0])))argv[0]+=2;
+            pin1 = getinteger(argv[0]);
+            if(!code)pin1=codemap(pin1);
+            if(IsInvalidPin(pin1)) error("Invalid pin");
+            if(ExtCurrentConfig[pin1] != EXT_NOT_CONFIG)  error("Pin %/| is in use",pin1,pin1);
+//
+            if(!(code=codecheck(argv[2])))argv[2]+=2;
+            pin2 = getinteger(argv[2]);
+            if(!code)pin2=codemap(pin2);
+            if(IsInvalidPin(pin2)) error("Invalid pin");
+            if(ExtCurrentConfig[pin2] != EXT_NOT_CONFIG)  error("Pin %/| is in use",pin2,pin2);
+//
+            pin3 = PINMAP[PinDef[pin1].GPno+1];
+            if(IsInvalidPin(pin3)) error("Invalid pin");
+            if(ExtCurrentConfig[pin3] != EXT_NOT_CONFIG)  error("Pin %/| is in use",pin3,pin3);
+//
+            Option.audio_i2c_bclk=pin1;
+            Option.audio_i2c_data=pin2;
+            slice=checkslice(pin1,pin1, 1);
             if((PinDef[Option.DISPLAY_BL].slice & 0x7f) == slice) error("Channel in use for backlight");
             Option.AUDIO_SLICE=slice;
             SaveOptions();

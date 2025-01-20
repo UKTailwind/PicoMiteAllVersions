@@ -57,6 +57,10 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #ifndef PICOMITEWEB
 #include "pico/multicore.h"
 #endif
+#ifdef rp2350
+#include "hardware/pio.h"
+#include "hardware/pio_instructions.h"
+#endif
 //#include "integer.h"
 int SPISpeed=0xFF;
 //#define SD_CS_PIN Option.SD_CS
@@ -219,6 +223,137 @@ void __not_in_flash_func(on_pwm_wrap)(void) {
 	__dmb();
 #endif
     pwm_clear_irq(AUDIO_SLICE);
+#ifdef rp2350
+	if(Option.audio_i2c_bclk){
+		if((pio2->flevel & 0xf) > 6)return;
+		static int32_t left=0, right=0;
+		if(CurrentlyPlaying == P_TONE){
+			if(!SoundPlay){
+				StopAudio();
+				WAVcomplete = true;
+			} else {
+				while((pio2->flevel & 0xf)!=8){
+					SoundPlay--;
+					if(mono){
+						left=(((((SineTable[(int)PhaseAC_left]-2000)  * mapping[vol_left])))*512);
+						PhaseAC_left = PhaseAC_left + PhaseM_left;
+						PhaseAC_right=PhaseAC_left;
+						if(PhaseAC_left>=4096.0)PhaseAC_left-=4096.0;
+						right=left;
+					} else {
+						left=(((((SineTable[(int)PhaseAC_left]-2000)  * mapping[vol_left])))*512);
+						right=(((((SineTable[(int)PhaseAC_right]-2000)  * mapping[vol_right])))*512);
+						PhaseAC_left = PhaseAC_left + PhaseM_left;
+						PhaseAC_right = PhaseAC_right + PhaseM_right;
+						if(PhaseAC_left>=4096.0)PhaseAC_left-=4096.0;
+						if(PhaseAC_right>=4096.0)PhaseAC_right-=4096.0;
+					}
+					pio_sm_put_blocking(pio2, 0, left);
+					pio_sm_put_blocking(pio2, 0, right);
+				}
+			}
+			return;
+		} else if(CurrentlyPlaying == P_WAV  || CurrentlyPlaying == P_FLAC  || CurrentlyPlaying == P_MOD  || CurrentlyPlaying == P_MP3) {
+			while((pio2->flevel & 0xf)!=8){
+				if(--repeatcount){
+					pio_sm_put_blocking(pio2, 0, left);
+					pio_sm_put_blocking(pio2, 0, right);
+				} else {
+					repeatcount=audiorepeat;
+					if(bcount[1]==0 && bcount[2]==0 && playreadcomplete==1){
+						pwm_set_irq_enabled(AUDIO_SLICE, false);
+					}
+					if(swingbuf){ //buffer is primed
+						if(swingbuf==1)uplaybuff=xbuff1;
+						else uplaybuff=xbuff2;
+						if((CurrentlyPlaying == P_WAV || CurrentlyPlaying == P_FLAC || CurrentlyPlaying == P_MP3) && mono){
+							left=right=uplaybuff[ppos];
+							ppos++;
+						} else {
+							if(ppos<bcount[swingbuf]){
+								left=uplaybuff[ppos];
+								right=uplaybuff[ppos+1];
+								ppos+=2;
+							}
+						}
+						pio_sm_put_blocking(pio2, 0, (uint32_t)left);
+						pio_sm_put_blocking(pio2, 0, (uint32_t)right);
+						if(ppos==bcount[swingbuf]){
+							int psave=ppos;
+							bcount[swingbuf]=0;
+							ppos=0;
+							if(swingbuf==1)swingbuf=2;
+							else swingbuf=1;
+							if(bcount[swingbuf]==0 && !playreadcomplete){ //nothing ready yet so flip back
+								if(swingbuf==1){
+									swingbuf=2;
+									nextbuf=1;
+								}
+								else {
+									swingbuf=1;
+									nextbuf=2;
+								}
+								bcount[swingbuf]=psave;
+								ppos=0;
+							}
+						}
+					}
+				}
+			}
+			return;
+		} else if(CurrentlyPlaying == P_SOUND) {
+			while((pio2->flevel & 0xf)!=8){
+				int i,j;
+				int leftv=0, rightv=0;
+				for(i=0;i<MAXSOUNDS;i++){ //first update the 8 sound pointers
+					if(sound_mode_left[i]!=nulltable){
+						if(sound_mode_left[i]!=whitenoise){
+							sound_PhaseAC_left[i] = sound_PhaseAC_left[i] + sound_PhaseM_left[i];
+							if(sound_PhaseAC_left[i]>=4096.0)sound_PhaseAC_left[i]-=4096.0;
+							leftv+=getsound(i,0);
+						} else {
+							if(noisedwellleft[i]<=0){
+								noisedwellleft[i]=sound_PhaseM_left[i];
+								noiseleft[i]=rand() % 3800+100;
+							}
+							if(noisedwellleft[i])noisedwellleft[i]--;
+							j = (int)noiseleft[i];
+							j= (j-2000)*mapping[sound_v_left[i]]/2000;
+							leftv+=j;
+						}
+					}
+					if(sound_mode_right[i]!=nulltable){
+						if(sound_mode_right[i]!=whitenoise){
+							sound_PhaseAC_right[i] = sound_PhaseAC_right[i] + sound_PhaseM_right[i];
+							if(sound_PhaseAC_right[i]>=4096.0)sound_PhaseAC_right[i]-=4096.0;
+							rightv += getsound(i,1);
+						}  else {
+							if(noisedwellright[i]<=0){
+								noisedwellright[i]=sound_PhaseM_right[i];
+								noiseright[i]=rand() % 3800+100;
+							}
+							if(noisedwellright[i])noisedwellright[i]--;
+							j = (int)noiseright[i];
+							j= (j-2000)*mapping[sound_v_right[i]]/2000;
+							rightv+=j;
+						}
+					}
+				}
+				pio_sm_put_blocking(pio2, 0,leftv*2000*512);
+				pio_sm_put_blocking(pio2, 0,rightv*2000*512);
+			}
+			return;
+		} else if(CurrentlyPlaying == P_STOP) {
+			return;
+		} else {
+			while((pio2->flevel & 0xf)!=8){
+				pio_sm_put_blocking(pio2, 0,0);
+				pio_sm_put_blocking(pio2, 0,0);
+			}
+			return;
+		}
+ 	}
+#endif
 	if(Option.AUDIO_MISO_PIN){
 		int32_t left=0, right=0;
 		if(!(gpio_get(PinDef[Option.AUDIO_DREQ_PIN].GPno)))return;

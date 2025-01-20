@@ -2142,7 +2142,7 @@ void MIPS16 cmd_Servo(void){
     MMFLOAT duty1=-1.0, duty2=-1.0;
     getargs(&cmdline,5,(unsigned char *)",");
     if(!(argc>=3))error("Syntax");
-    int CPU_Speed=frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_PERI);
+    int CPU_Speed=Option.CPU_Speed;
 #ifdef rp2350
     int slice=getint(argv[0],0,rp2350a ? 7:11);
     if(slice==0 && ExtCurrentConfig[FAST_TIMER_PIN]==EXT_FAST_TIMER)error("Channel in use for fast frequency");
@@ -2347,7 +2347,7 @@ void MIPS16 cmd_pwm(void){
     MMFLOAT duty1=-1.0, duty2=-1.0;
     getargs(&cmdline,11,(unsigned char *)",");
     if(!(argc>=3))error("Syntax");
-    int CPU_Speed=frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_PERI);
+    int CPU_Speed=Option.CPU_Speed;
 #ifdef rp2350
     int slice=getint(argv[0],0,rp2350a ? 7:11);
     if(slice==0 && ExtCurrentConfig[FAST_TIMER_PIN]==EXT_FAST_TIMER)error("Channel in use for fast frequency");

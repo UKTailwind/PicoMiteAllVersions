@@ -46,6 +46,7 @@ extern "C" {
 #include "hardware/pwm.h"
 #ifdef rp2350
 #include "hardware/structs/qmi.h"
+extern void start_i2s(int pio, int sm);
 #endif
 #define COPYRIGHT   "Copyright " YEAR " Geoff Graham\r\n"\
                     "Copyright " YEAR2 " Peter Mather\r\n\r\n"
@@ -3517,7 +3518,6 @@ void MIPS16 updatebootcount(void){
     err=lfs_file_write(&lfs, &lfs_file, &boot_count, sizeof(boot_count));
     err=lfs_file_close(&lfs, &lfs_file);
 }
-
 /**
  * @brief Transforms input beginning with * into a corresponding RUN command.
  *
@@ -3755,7 +3755,7 @@ int MIPS16 main(){
     if(Option.CPU_Speed<=324000)qmi_hw->m[1].timing = (1<<QMI_COOLDOWN) | (2<<QMI_PAGEBREAK) | (3<<QMI_SELECT_HOLD) | (18<<QMI_MAX_SELECT) | (4<<QMI_MIN_DESELECT) | (4<<QMI_RXDELAY) | (4<<QMI_CLKDIV);
     if(Option.CPU_Speed<=288000)qmi_hw->m[0].timing = 0x40006202;
     if(Option.CPU_Speed<=150000)qmi_hw->m[1].timing = 0x60006102;
-    sleep_ms(2);
+    sleep_ms(5);
 #endif
     PWM_FREQ=44100;
     pico_get_unique_board_id_string (id_out,12);
@@ -3771,7 +3771,7 @@ int MIPS16 main(){
     }
 #endif
 #endif
-    if(clock_get_hz(clk_usb)!=48000000){
+    if((clock_get_hz(clk_usb)!=48000000)){
         ResetAllFlash();              // init the options if this is the very first startup
         _excep_code=INVALID_CLOCKSPEED;
         watchdog_enable(1, 1);
@@ -3985,6 +3985,7 @@ int MIPS16 main(){
 #endif
 #ifdef rp2350
     if(PSRAMsize){MMPrintString("Total of ");PInt(PSRAMsize/(1024*1024));MMPrintString(" Mbytes PSRAM available\r\n");}
+    start_i2s(2,0);
 #endif
 	if(setjmp(mark) != 0) {
      // we got here via a long jump which means an error or CTRL-C or the program wants to exit to the command prompt
