@@ -1,5 +1,5 @@
 # PicoMiteRP2350
-This contains files to build MMbasic V6.00.02b1 to run on both RP2040 and RP2350<br>
+This contains files to build MMbasic V6.00.02b2 to run on both RP2040 and RP2350<br>
 Compile with GCC 13.3.1 arm-none-eabi<br>
 Build with sdk V2.1.0 but replace gpio.c with the one included here<br>
 Change CMakeLists.txt line 4 to determine which variant to build<br>
