@@ -101,6 +101,7 @@ extern const void * const CallTable[];
 struct s_inttbl inttbl[NBRINTERRUPTS];
 unsigned char *InterruptReturn;
 extern const char *FErrorMsg[];
+extern uint64_t __uninitialized_ram(_persistent);
 uint8_t *buff320=NULL;
 #ifdef PICOMITEWEB
 	char *MQTTInterrupt=NULL;
@@ -5115,6 +5116,10 @@ void MIPS16 fun_info(void){
         #endif
             if(IsInvalidPin(pin))error("Invalid pin");
             iret=pin;
+            targ=T_INT;
+            return;
+        } else if((tp=checkstring(ep, (unsigned char *)"PERSISTENT"))){
+            iret=_persistent;
             targ=T_INT;
             return;
         } else if((tp=checkstring(ep, (unsigned char *)"PIO RX DMA"))){

@@ -275,7 +275,7 @@ int TextChanged;                  // true if the program has been modified and t
 #define EDIT  1                   // used to select the status line string
 #define MARK  2
 
-void FullScreenEditor(int x, int y, char *fname, int edit_buff_size, bool reset);
+void FullScreenEditor(int x, int y, char *fname, int edit_buff_size, bool cmdfile);
 char *findLine(int ln, int *inmulti);
 void printLine(int ln); 
 void printScreen(void);
@@ -297,13 +297,22 @@ int oldmode;
 #define MAXCLIP 1024
 // edit command:
 //  EDIT              Will run the full screen editor on the current program memory, if run after an error will place the cursor on the error line
-void edit(unsigned char *cmdline, bool reset) {
+void edit(unsigned char *cmdline, bool cmdfile) {
     unsigned char *fromp, *p=NULL;
     int y, x, edit_buff_size ;
-    char name[FF_MAX_LFN] ;   
-    getargs(&cmdline,1,(unsigned char *)",");
-    if(reset==false && argc==0)error("Syntax");
     optioncolourcodesave=Option.ColourCode;
+    char name[STRINGSIZE], *filename=NULL;
+    getargs(&cmdline,1,(unsigned char *)",");
+    if(argc){
+        strcpy(name,(char *)getFstring(argv[0]));
+        filename=name;
+    }
+    if(CurrentLinePtr && cmdfile) error("Invalid in a program");
+    if(argc==0 && !cmdfile)error("Syntax");
+    if(!cmdfile){
+        SaveContext();
+        ClearVars(0,FALSE);
+    }
 #ifdef PICOMITEVGA
     modmode=false;
     editactive=1;
@@ -343,14 +352,13 @@ void edit(unsigned char *cmdline, bool reset) {
 #ifndef USBKEYBOARD
     if(mouse0==false && Option.MOUSE_CLOCK)initMouse0(0);  //see if there is a mouse to initialise 
 #endif
-    if(CurrentLinePtr && reset) error("Invalid in a program");
-    if(Option.ColourCode) {
+   if(Option.ColourCode) {
         gui_fcolour = WHITE;
         gui_bcolour = BLACK;
     }
     if(Option.DISPLAY_CONSOLE == true && gui_font_width > 16*HRes/640) error("Font is too large");
     if(Option.DISPLAY_TYPE>=VIRTUAL && WriteBuf)FreeMemorySafe((void **)&WriteBuf);
-    if(reset){
+    if(cmdfile){
         ClearVars(0,true);
         ClearRuntime(true);
     }
@@ -361,14 +369,14 @@ void edit(unsigned char *cmdline, bool reset) {
 #ifdef PICOMITEWEB
     cleanserver();
 #endif
-    if(reset){
+//    if(cmdfile){
         EdBuff = GetTempMemory(EDIT_BUFFER_SIZE);
         edit_buff_size=EDIT_BUFFER_SIZE;
-    } else {
-        int s=LargestContiguousHeap()-2048*3;
-        EdBuff = GetTempMemory(s);
-        edit_buff_size=s;
-    }
+//    } else {
+//        int s=LargestContiguousHeap()-2048*3;
+//        EdBuff = GetTempMemory(s);
+//        edit_buff_size=s;
+//    }
     *EdBuff = 0;
 
     VHeight = Option.Height - 2;
@@ -376,7 +384,7 @@ void edit(unsigned char *cmdline, bool reset) {
     edx = edy = curx = cury = y = x = tempx = 0;
     txtp = EdBuff;
     *tknbuf = 0;
-    if(argc==0){
+    if(filename==NULL){
         fromp  = ProgMemory;
         p = EdBuff;
         nbrlines = 0;
@@ -406,18 +414,18 @@ void edit(unsigned char *cmdline, bool reset) {
             if(fromp[0] == 0 || fromp[0] == 0xff) break;
         }
     } else {
-        char *fname = (char *)getFstring(argv[0]);
+//        char *fname = (char *)filename;
         char c;
         int fsize;
-        strcpy(name,fname);
-        if(!ExistsFile(name)){
-            if (strchr(name, '.') == NULL) strcat(name, ".bas");
+//        strcpy(name,fname);
+        if(!ExistsFile(filename)){
+            if (strchr(filename, '.') == NULL) strcat(filename, ".bas");
         }
-        if(!fstrstr(name,".bas"))Option.ColourCode=0;
-        if(ExistsFile(name)){
+        if(!fstrstr(filename,".bas"))Option.ColourCode=0;
+        if(ExistsFile(filename)){
             int fnbr1;
             fnbr1 = FindFreeFileNbr();
-            BasicFileOpen(name, fnbr1, FA_READ);
+            BasicFileOpen(filename, fnbr1, FA_READ);
             if(filesource[fnbr1]!=FLASHFILE)  fsize = f_size(FileTable[fnbr1].fptr);
             else fsize = lfs_file_size(&lfs,FileTable[fnbr1].lfsptr);
             if(fsize > edit_buff_size - 10) error("Out of memory");
@@ -453,9 +461,9 @@ void edit(unsigned char *cmdline, bool reset) {
         if(edy < 0) edy = 0;                                        // compensate if we are near the start
         y = y - edy;                                                // y is the line on the screen
     }
-    if(reset)m_alloc(M_VAR);                                                 //clean up clipboard usage
-    FullScreenEditor(x,y, argc==1 ? name: NULL, edit_buff_size, reset);
-    if(reset)memset(tknbuf, 0, STRINGSIZE);                                  // zero this so that nextstmt is pointing to the end of program
+    if(cmdfile)m_alloc(M_VAR);                                                 //clean up clipboard usage
+    FullScreenEditor(x,y, filename, edit_buff_size, cmdfile);
+    if(cmdfile)memset(tknbuf, 0, STRINGSIZE);                                  // zero this so that nextstmt is pointing to the end of program
     MMCharPos = 0;
 }
 
@@ -464,9 +472,7 @@ void cmd_edit(void){
     edit(cmdline, true);
 }
 void cmd_editfile(void){
-    SaveContext();
-    ClearVars(0,FALSE);
-    edit(cmdline, FALSE);
+     edit(cmdline, FALSE);
 }
 /* 
  * @cond
@@ -480,7 +486,7 @@ void cmd_editfile(void){
     static bool leftpushed=false, rightpushed=false, middlepushed=false;
 #endif
 #endif
-void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool reset) {
+void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdfile) {
   int c=-1, i;
   unsigned char buf[MAXCLIP+2], clipboard[MAXCLIP+2];
   unsigned char *p, *tp, BreakKeySave;
@@ -966,7 +972,7 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool rese
                                 } while (*p);
                                 FileClose(fnbr1);
                             }
-                            if(reset==false){
+                            if(cmdfile==false){
                                 RestoreContext(false);
                                 return;
                             }
@@ -1422,7 +1428,7 @@ int EditCompStr(char *p, char *tkn) {
 
 // this function does the syntax colour coding
 // p = pointer to the current character to be printed
-//     or NULL if the colour coding is to be reset to normal
+//     or NULL if the colour coding is to be cmdfile to normal
 //
 // it keeps track of where it is in the line using static variables
 // so it must be fed all chars from the start of the line
@@ -1458,7 +1464,7 @@ void SetColour(unsigned char *p, int DoVT100) {
     };
 
 
-    // reset everything back to normal
+    // cmdfile everything back to normal
     if(p == NULL) {
         innumber = inquote = inkeyword = incomment = intext = false;
         twokeyword = NULL;
@@ -1511,7 +1517,7 @@ void SetColour(unsigned char *p, int DoVT100) {
 
     if(inquote) return;
 
-    // if we are displaying a keyword check that it is still actually in the keyword and reset if not
+    // if we are displaying a keyword check that it is still actually in the keyword and cmdfile if not
     if(inkeyword) {
         if(isnamechar(*p) || *p == '$') return;
         gui_fcolour = GUI_C_NORMAL;
@@ -1520,7 +1526,7 @@ void SetColour(unsigned char *p, int DoVT100) {
         return;
     }
 
-    // if we are displaying a number check that we are still actually in it and reset if not
+    // if we are displaying a number check that we are still actually in it and cmdfile if not
     // this is complicated because numbers can be in hex or scientific notation
     if(innumber) {
         if(!isdigit(*p) && !(toupper(*p) >= 'A' && toupper(*p) <= 'F') && toupper(*p) != 'O' && toupper(*p) != 'H' && *p != '.') {

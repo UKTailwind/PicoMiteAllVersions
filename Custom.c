@@ -216,7 +216,7 @@ int getirqnum(char *p){
         }
         return data;
 }
-void pio_init(int pior, int sm, uint32_t pinctrl, uint32_t execctrl, uint32_t shiftctrl, int start, float clock){
+void pio_init(int pior, int sm, uint32_t pinctrl, uint32_t execctrl, uint32_t shiftctrl, int start, float clock, bool sideout, bool setout, bool outout){
         pio_sm_config mypio=pio_get_default_sm_config();
 #ifdef rp2350
         PIO pio = (pior==0 ? pio0: (pior==1 ? pio1: pio2));
@@ -253,9 +253,9 @@ void pio_init(int pior, int sm, uint32_t pinctrl, uint32_t execctrl, uint32_t sh
                         gpio_set_input_enabled(PinDef[i].GPno, true);
                 }
         }
-        if(sidecount)pio_sm_set_consecutive_pindirs(pio, sm, sidebase, sidecount-opt, true);
-        if(outcount)pio_sm_set_consecutive_pindirs(pio, sm, outbase, outcount, true);
-        if(setcount)pio_sm_set_consecutive_pindirs(pio, sm, setbase, setcount, true);
+        if(sidecount && sideout)pio_sm_set_consecutive_pindirs(pio, sm, sidebase, sidecount-opt, true);
+        if(outcount && outout)pio_sm_set_consecutive_pindirs(pio, sm, outbase, outcount, true);
+        if(setcount && setout)pio_sm_set_consecutive_pindirs(pio, sm, setbase, setcount, false);
         pio_sm_set_config(pio, sm, &mypio);
         pio_sm_init(pio, sm, start, &mypio);
         pio_sm_clear_fifos(pio,sm);
@@ -318,7 +318,7 @@ void start_i2s(int pior, int sm){
         pinctrl|=(1<<20); // no of OUT pins
         pinctrl|=(PinDef[Option.audio_i2c_data].GPno); // OUT base
         pinctrl|=(PinDef[Option.audio_i2c_bclk].GPno<<10);  // SIDE SET base
-        pio_init(pior, sm, pinctrl, execctrl, shiftctrl, start, clock);
+        pio_init(pior, sm, pinctrl, execctrl, shiftctrl, start, clock, true,false,true);
         pio_sm_clear_fifos(pio,sm);
         pio_sm_restart(pio, sm);
         pio_sm_set_enabled(pio, sm, true);
@@ -1323,7 +1323,8 @@ void MIPS16 cmd_pio(void){
     tp = checkstring(cmdline, (unsigned char *)"INIT MACHINE");
     if(tp){
         int start=0;
-        getargs(&tp,13,(unsigned char *)",");
+        bool setout=false,sideout=false,outout=false;
+        getargs(&tp,19,(unsigned char *)",");
         if(argc<5)error("Syntax");
         int pior=getint(argv[0],0,PIOMAX-1);
         if(PIO0==false && pior==0)error("PIO 0 not available");
@@ -1338,8 +1339,11 @@ void MIPS16 cmd_pio(void){
         if(argc>5 && *argv[6])pinctrl = getint(argv[6],0,0xFFFFFFFF);
         if(argc>7 && *argv[8])execctrl= getint(argv[8],0,0xFFFFFFFF);
         if(argc>9 && *argv[10])shiftctrl= getint(argv[10],0,0xFFFFFFFF);
-        if(argc>11) start=getint(argv[12],0,31);
-        pio_init(pior, sm, pinctrl, execctrl, shiftctrl, start, clock);
+        if(argc>11 && *argv[12]) start=getint(argv[12],0,31);
+        if(argc>13 && *argv[14]) sideout=getint(argv[14],0,1);
+        if(argc>15 && *argv[16]) setout=getint(argv[16],0,1);
+        if(argc>171 && *argv[18]) outout=getint(argv[18],0,1);
+        pio_init(pior, sm, pinctrl, execctrl, shiftctrl, start, clock, sideout, setout, outout);
         return;
     }
     error("Syntax");

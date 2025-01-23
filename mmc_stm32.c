@@ -248,16 +248,16 @@ void __not_in_flash_func(on_pwm_wrap)(void) {
 						if(PhaseAC_left>=4096.0)PhaseAC_left-=4096.0;
 						if(PhaseAC_right>=4096.0)PhaseAC_right-=4096.0;
 					}
-					pio_sm_put_blocking(pio2, 0, left);
-					pio_sm_put_blocking(pio2, 0, right);
+					pio_sm_put(pio2, 0, left);
+					pio_sm_put(pio2, 0, right);
 				}
 			}
 			return;
 		} else if(CurrentlyPlaying == P_WAV  || CurrentlyPlaying == P_FLAC  || CurrentlyPlaying == P_MOD  || CurrentlyPlaying == P_MP3) {
 			while((pio2->flevel & 0xf)!=8){
 				if(--repeatcount){
-					pio_sm_put_blocking(pio2, 0, left);
-					pio_sm_put_blocking(pio2, 0, right);
+					pio_sm_put(pio2, 0, left);
+					pio_sm_put(pio2, 0, right);
 				} else {
 					repeatcount=audiorepeat;
 					if(bcount[1]==0 && bcount[2]==0 && playreadcomplete==1){
@@ -276,8 +276,8 @@ void __not_in_flash_func(on_pwm_wrap)(void) {
 								ppos+=2;
 							}
 						}
-						pio_sm_put_blocking(pio2, 0, (uint32_t)left);
-						pio_sm_put_blocking(pio2, 0, (uint32_t)right);
+						pio_sm_put(pio2, 0, (uint32_t)left);
+						pio_sm_put(pio2, 0, (uint32_t)right);
 						if(ppos==bcount[swingbuf]){
 							int psave=ppos;
 							bcount[swingbuf]=0;
@@ -339,16 +339,20 @@ void __not_in_flash_func(on_pwm_wrap)(void) {
 						}
 					}
 				}
-				pio_sm_put_blocking(pio2, 0,leftv*2000*512);
-				pio_sm_put_blocking(pio2, 0,rightv*2000*512);
+				pio_sm_put(pio2, 0,leftv*2000*512);
+				pio_sm_put(pio2, 0,rightv*2000*512);
 			}
 			return;
 		} else if(CurrentlyPlaying == P_STOP) {
+			while((pio2->flevel & 0xf)!=8){
+					pio_sm_put(pio2, 0, left);
+					pio_sm_put(pio2, 0, right);
+			}
 			return;
 		} else {
 			while((pio2->flevel & 0xf)!=8){
-				pio_sm_put_blocking(pio2, 0,0);
-				pio_sm_put_blocking(pio2, 0,0);
+					pio_sm_put(pio2, 0, left);
+					pio_sm_put(pio2, 0, right);
 			}
 			return;
 		}

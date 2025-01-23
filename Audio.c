@@ -651,8 +651,10 @@ void CloseAudio(int all){
 #endif
 	modbuff =  (Option.modbuff ?  (char *)(XIP_BASE + RoundUpK4(TOP_OF_SYSTEM_FLASH)) : NULL);
 	int was_playing=CurrentlyPlaying;
-	bcount[1] = bcount[2] = wav_filesize = 0;
-	swingbuf = nextbuf = playreadcomplete = 0;
+	if(!Option.audio_i2c_bclk){
+		bcount[1] = bcount[2] = wav_filesize = 0;
+		swingbuf = nextbuf = playreadcomplete = 0;
+	}
 //	if((CurrentlyPlaying == P_FLAC || CurrentlyPlaying == P_WAV ||CurrentlyPlaying == P_MP3 ||CurrentlyPlaying == P_MIDI || CurrentlyPlaying==P_MOD) && Option.AUDIO_MISO_PIN)stopSong();
 //	WAVInterrupt = NULL;
 	StopAudio();
@@ -936,7 +938,11 @@ void flaccallback(char *p){
     allocationCallbacks.onRealloc = my_realloc;
     allocationCallbacks.onFree    = my_free;
     myflac=drflac_open((drflac_read_proc)onRead, (drflac_seek_proc)onSeek, NULL, &allocationCallbacks);
-    if(myflac->sampleRate>44100*((int)(Option.CPU_Speed/126000)))error("Max %KHz sample rate",44100*((int)(Option.CPU_Speed/126000)));
+#ifdef rp2350
+    if(myflac->sampleRate>48000*((int)((float)Option.CPU_Speed/126000.0f)))error("Max %KHz sample rate",48000*((int)((float)Option.CPU_Speed/126000.0f)));
+#else
+    if(myflac->sampleRate>44100*((int)((float)Option.CPU_Speed/126000.0f)))error("Max %KHz sample rate",44100*((int)((float)Option.CPU_Speed/126000.0f)));
+#endif
 //	PInt(myflac->channels);MMPrintString(" Channels\r\n");
 //	PInt(myflac->bitsPerSample);MMPrintString(" Bits per sample\r\n");
 //	PInt(myflac->sampleRate);MMPrintString(" Sample rate\r\n");
@@ -1935,13 +1941,14 @@ Used to send data to the DAC
 *******************************************************************************************/
 
 /******************************************************************************************
-Stop playing the music or tone
+Stop playing the music or toneb:
+
 *******************************************************************************************/
 void StopAudio(void) {
 
 	if(CurrentlyPlaying != P_NOTHING ) {
 		int ramptime=1000000/PWM_FREQ+2;
-		if(!Option.AUDIO_MISO_PIN )
+		if(!(Option.AUDIO_MISO_PIN || Option.audio_i2c_bclk))
 		{
 			CurrentlyPlaying = P_STOP;
 			int ll,l=pwm_hw->slice[AUDIO_SLICE].cc >>16;

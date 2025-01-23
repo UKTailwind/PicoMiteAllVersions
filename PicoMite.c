@@ -237,6 +237,7 @@ unsigned char WatchdogSet = false;
 unsigned char IgnorePIN = false;
 unsigned char SPIatRisk = false;
 uint32_t __uninitialized_ram(_excep_code);
+uint64_t __uninitialized_ram(_persistent);
 unsigned char lastcmd[STRINGSIZE*2];                                           // used to store the last command in case it is needed by the EDIT command
 FATFS fs;                 // Work area (file system object) for logical drive
 bool timer_callback(repeating_timer_t *rt);

@@ -1679,7 +1679,7 @@ void MIPS16 cmd_name(void)
         ErrorCheck(0);
     }
 }
-
+extern uint64_t __uninitialized_ram(_persistent);
 void MIPS16 cmd_save(void)
 {
     int fnbr;
@@ -1688,6 +1688,10 @@ void MIPS16 cmd_save(void)
     int maxW = HRes;
     if (!InitSDCard()) return;
     fnbr = FindFreeFileNbr();
+    if((p=checkstring(cmdline, (unsigned char *)"PERSISTENT"))){
+        _persistent=getinteger(p);
+        return;
+    }
     if ((p = checkstring(cmdline, (unsigned char *)"CONTEXT")) != NULL){
         SaveContext();
         if(checkstring(p, (unsigned char *)"CLEAR"))ClearVars(0,false);
