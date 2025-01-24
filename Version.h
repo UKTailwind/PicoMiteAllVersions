@@ -29,9 +29,9 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 
 
 
-#define VERSION         "6.00.02b2"			    // define the version number
-#define YEAR			"2011-2024"			    // and the year
-#define YEAR2          "2016-2024"
+#define VERSION         "6.00.02b3"			    // define the version number
+#define YEAR			"2011-2025"			    // and the year
+#define YEAR2          "2016-2025"
 #ifdef rp2350
 #define CHIP    "RP2350 "
 #else

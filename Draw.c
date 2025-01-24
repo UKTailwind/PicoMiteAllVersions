@@ -489,7 +489,7 @@ void ClearScreen(int c) {
 #ifdef PICOMITEVGA
     if(DISPLAY_TYPE==SCREENMODE1 && WriteBuf==DisplayBuf){
 #ifdef HDMI
-        memset(WriteBuf,0,ScreenSize);
+        memset((void *)WriteBuf,0,ScreenSize);
         if(Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P ){
             uint16_t bcolour = RGB555(c);
             for(int x=0;x<X_TILE;x++){
@@ -509,7 +509,7 @@ void ClearScreen(int c) {
         }
         CurrentX=CurrentY=0;
 #else
-        memset(WriteBuf,0,ScreenSize);
+        memset((void *)WriteBuf,0,ScreenSize);
         int bcolour = RGB121(c);
         bcolour= (bcolour<<12) | (bcolour<<8) | (bcolour<<4) | bcolour;
         for(int x=0;x<X_TILE;x++){
@@ -3132,7 +3132,7 @@ if ((p = checkstring(cmdline, (unsigned char*)"COMPRESSED"))) {
     }  else if ((p = checkstring(cmdline, (unsigned char*)"FRAMEBUFFER"))) {
         int8_t blank=-1;
         int otoggle=0,itoggle=0; //input will always start on a byte boundary
-        unsigned char *s=NULL, *d=NULL;
+        volatile unsigned char *s=NULL, *d=NULL;
         getargs(&p, 17, (unsigned char*)",");
         if(argc<15)error("Syntax");
         if(checkstring(argv[0],(unsigned char*)"L"))s=LayerBuf;
@@ -3166,12 +3166,12 @@ if ((p = checkstring(cmdline, (unsigned char*)"COMPRESSED"))) {
         w = (int)getinteger(argv[12]);
         h = (int)getinteger(argv[14]);
         if(argc==17)blank=getint(argv[16],-1,15);
-        unsigned char c,*to, *from;
+        volatile unsigned char c,*to, *from;
         if(d!=NULL && s!=NULL){
             if(x1==0 && x2==0 && w==HRes && blank==-1){
                 s+=y1*HRes/2;
                 d+=y2*HRes/2;
-                memmove(d,s,h*HRes/2);
+                memmove((void *)d,(void *)s,h*HRes/2);
             } else {
                 for(int y=y1,toy=y2;y<y1+h;y++,toy++){ //loop though all of the output lines
                     from=s+y*(HRes>>1)+(x1>>1); //get the byte that will start the output
@@ -3218,7 +3218,7 @@ if ((p = checkstring(cmdline, (unsigned char*)"COMPRESSED"))) {
         else if(s!=NULL){ //writing to a physical LCD display
             if(x1==0 && x2==0 && w==HRes && blank==-1){
                 s+=y1*HRes/2;
-                copyframetoscreen(s,0,HRes-1,y2,y2+h-1,0);
+                copyframetoscreen((void *)s,0,HRes-1,y2,y2+h-1,0);
             } else {
                 if(screen320 && Option.DISPLAY_TYPE!=SSD1963_4_16)x2*=2;
                 char tobuff[w/2], *to;
@@ -3357,7 +3357,7 @@ void cmd_cls(void) {
             int fc=getint(cmdline, 0, WHITE);
             unsigned char fcolour = RGB121(fc);
             fcolour|=(fcolour<<4);
-            memset(WriteBuf,fcolour,ScreenSize);
+            memset((void *)WriteBuf,fcolour,ScreenSize);
         } else {
             ClearScreen(getint(cmdline, 0, WHITE));
         }
@@ -3369,11 +3369,11 @@ void cmd_cls(void) {
         if((WriteBuf==LayerBuf && (DISPLAY_TYPE==SCREENMODE2 || DISPLAY_TYPE==SCREENMODE3 ) && LayerBuf!=DisplayBuf)
         || (WriteBuf==SecondLayer && (DISPLAY_TYPE==SCREENMODE2 || DISPLAY_TYPE==SCREENMODE3 ) && SecondLayer!=DisplayBuf)){
             uint8_t colour=(WriteBuf==LayerBuf ? transparent|(transparent<<4) :  transparents|(transparents<<4)) ;
-            memset(WriteBuf,colour,HRes*VRes/2);
+            memset((void *)WriteBuf,colour,HRes*VRes/2);
 #ifdef HDMI
         } else if(WriteBuf==LayerBuf && (DISPLAY_TYPE==SCREENMODE5 ) && LayerBuf!=DisplayBuf){
-            memset(WriteBuf,transparent,HRes*VRes);
-        } else if(WriteBuf==LayerBuf && (DISPLAY_TYPE==SCREENMODE4 ) && LayerBuf!=DisplayBuf){
+            memset((void *)WriteBuf,transparent,HRes*VRes);
+        } else if((void *)WriteBuf==LayerBuf && (DISPLAY_TYPE==SCREENMODE4 ) && LayerBuf!=DisplayBuf){
             uint16_t *p=(uint16_t *)WriteBuf;
             for(int i=0;i<HRes*VRes;i++)*p++=RGBtransparent;
 #endif
@@ -3703,8 +3703,8 @@ void blithide(int bnbr, int free) {
     spritebuff[bnbr].active = 0;
     DrawBufferFast(x1, y1, x1 + w - 1, y1 + h - 1, -1, (unsigned char *)spritebuff[bnbr].blitstoreptr);
 }
-void expandpixel(unsigned char *ii, unsigned char *oo, int n, int mode){
-    unsigned char *o=oo,*i=ii;
+void expandpixel(volatile unsigned char *ii, volatile unsigned char *oo, int n, int mode){
+    volatile unsigned char *o=oo,*i=ii;
     int toggle=0;
     if(mode==0){
         while(n--){
@@ -3726,9 +3726,9 @@ void expandpixel(unsigned char *ii, unsigned char *oo, int n, int mode){
     }
 
 }
-void contractpixel(unsigned char *ii, unsigned char *oo, int n, int mode){
+void contractpixel(volatile unsigned char *ii, volatile unsigned char *oo, int n, int mode){
     int toggle=0;
-    unsigned char *o=oo,*i=ii;
+    volatile unsigned char *o=oo,*i=ii;
     if(mode==0){
         while(n--){
             if(toggle){
@@ -4040,14 +4040,14 @@ void MIPS16 loadarray(unsigned char* p) {
 }
 void ScrollBufferH(int pixels) {
     if (!pixels)return;
-    uint8_t *s, *d, *l, *ss, *dd;
+    volatile uint8_t *s, *d, *l, *ss, *dd;
     int y;
     if(HRes==320 && !(pixels & 1)){
         if (pixels > 0) {
             for (y = 0; y < VRes; y++) {
                 s = (((y * HRes )>>1) + WriteBuf);
                 d = s + (pixels>>1);
-                memmove(d,s,160-(pixels>>1));
+                memmove((void *)d,(void *)s,160-(pixels>>1));
             }
         } else {
             pixels = -pixels;
@@ -4055,7 +4055,7 @@ void ScrollBufferH(int pixels) {
                 s = (((y * HRes )>>1) + WriteBuf);
                 d=s;
                 s+=(pixels>>1);
-                memmove(d,s,160-(pixels>>1));
+                memmove((void *)d,(void *)s,160-(pixels>>1));
             }
         }
     } else {
@@ -4067,7 +4067,7 @@ void ScrollBufferH(int pixels) {
 	            s=ss;
 	            d=dd + pixels;
 	            expandpixel(l,s,HRes,(HRes==320?0:1));
-	            memcpy(d,s,(HRes - pixels));
+	            memcpy((void *)d,(void *)s,(HRes - pixels));
 	            contractpixel(dd,l,HRes,(HRes==320?0:1));
 	        }
 	    } else {
@@ -4078,7 +4078,7 @@ void ScrollBufferH(int pixels) {
 	            d=dd;
 	            expandpixel(l,s,HRes,(HRes==320?0:1));
 	            s += pixels;
-	            memcpy(d,s,(HRes - pixels));
+	            memcpy((void *)d,(void *)s,(HRes - pixels));
 	            contractpixel(d,l,HRes,(HRes==320?0:1));
 	        }
 	    }
@@ -5730,21 +5730,21 @@ void cmd_blit(void) {
             if((w & 1)==0 && (x1 & 1)==0 && (x2 & 1)==0){ //Easiest case - byte move in the x direction with w even
                 if(y1<y2){
                     for(int y=h-1; y>=0;y--){
-                        uint8_t *in=WriteBuf + ((y+y1)*HRes + x1)/2;
-                        uint8_t *out=WriteBuf + ((y+y2)*HRes + x2)/2;
-                        memcpy(out,in,w/2);
+                        volatile uint8_t *in=WriteBuf + ((y+y1)*HRes + x1)/2;
+                        volatile uint8_t *out=WriteBuf + ((y+y2)*HRes + x2)/2;
+                        memcpy((void *)out,(void *)in,w/2);
                     }
                 } else if(y1>y2){
                     for(int y=0;y<h;y++){
-                        uint8_t *in=WriteBuf + ((y+y1)*HRes + x1)/2;
-                        uint8_t *out=WriteBuf + ((y+y2)*HRes + x2)/2;
-                        memcpy(out,in,w/2);
+                        volatile uint8_t *in=WriteBuf + ((y+y1)*HRes + x1)/2;
+                        volatile uint8_t *out=WriteBuf + ((y+y2)*HRes + x2)/2;
+                        memcpy((void *)out,(void *)in,w/2);
                     }
                 } else {
                     for(int y=0;y<h;y++){
-                        uint8_t *in=WriteBuf + ((y+y1)*HRes + x1)/2;
-                        uint8_t *out=WriteBuf + ((y+y2)*HRes + x2)/2;
-                        memmove(out,in,w/2);
+                        volatile uint8_t *in=WriteBuf + ((y+y1)*HRes + x1)/2;
+                        volatile uint8_t *out=WriteBuf + ((y+y2)*HRes + x2)/2;
+                        memmove((void *)out,(void *)in,w/2);
                     }
                 }
                 return;
@@ -5756,11 +5756,11 @@ void cmd_blit(void) {
                 if(w & 1)n++;
                 if(y1>y2){
                     for(int y=0;y<h;y++){
-                        if(!intoggle)memcpy(inbuff,WriteBuf + ((y+y1)*HRes + x1)/2, n);
+                        if(!intoggle)memcpy(inbuff,(void *)WriteBuf + ((y+y1)*HRes + x1)/2, n);
                         else {
                             int toggle=1;
-                            uint8_t *in=WriteBuf + ((y+y1)*HRes + x1)/2;
-                            uint8_t *out=inbuff;
+                            volatile uint8_t *in=WriteBuf + ((y+y1)*HRes + x1)/2;
+                            volatile uint8_t *out=inbuff;
                             for(int x=0;x<w;x++){
                                 if(toggle){
                                     uint8_t t=*in >>4 ;
@@ -5775,16 +5775,16 @@ void cmd_blit(void) {
                             }
                         }
                         if(!outtoggle){
-                            memcpy(WriteBuf + ((y+y2)*HRes + x2)/2, inbuff, w/2);
+                            memcpy((void *)WriteBuf + ((y+y2)*HRes + x2)/2, inbuff, w/2);
                             if(w & 1){
-                                uint8_t *lastnibble=WriteBuf + ((y+y2) * HRes + x2 + w)/2;
+                                volatile uint8_t *lastnibble=WriteBuf + ((y+y2) * HRes + x2 + w)/2;
                                 *lastnibble  &= 0xf0;
                                 *lastnibble |= (inbuff[w/2] & 0xf);
                             }
                         } else {
                             int toggle=1;
-                            uint8_t *in=inbuff;
-                            uint8_t *out=WriteBuf + ((y+y2) * HRes + x2)/2;
+                            volatile uint8_t *in=inbuff;
+                            volatile uint8_t *out=WriteBuf + ((y+y2) * HRes + x2)/2;
                             for(int x=0;x<w;x++){
                                 if(toggle){
                                     uint8_t t=(*in & 0xf)<<4;
@@ -5803,11 +5803,11 @@ void cmd_blit(void) {
                     }
                 } else {
                     for(int y=h-1;y>=0;y--){
-                        if(!intoggle)memcpy(inbuff,WriteBuf + ((y+y1)*HRes + x1)/2, n);
+                        if(!intoggle)memcpy(inbuff,(void *)WriteBuf + ((y+y1)*HRes + x1)/2, n);
                         else {
                             int toggle=1;
-                            uint8_t *in=WriteBuf + ((y+y1)*HRes + x1)/2;
-                            uint8_t *out=inbuff;
+                            volatile uint8_t *in=WriteBuf + ((y+y1)*HRes + x1)/2;
+                            volatile uint8_t *out=inbuff;
                             for(int x=0;x<w;x++){
                                 if(toggle){
                                     uint8_t t=*in >>4 ;
@@ -5822,16 +5822,16 @@ void cmd_blit(void) {
                             }
                         }
                         if(!outtoggle){
-                            memcpy(WriteBuf + ((y+y2)*HRes + x2)/2, inbuff, w/2);
+                            memcpy((void *)WriteBuf + ((y+y2)*HRes + x2)/2, inbuff, w/2);
                             if(w & 1){
-                                uint8_t *lastnibble=WriteBuf + ((y+y2) * HRes + x2 + w)/2;
+                                volatile uint8_t *lastnibble=WriteBuf + ((y+y2) * HRes + x2 + w)/2;
                                 *lastnibble  &= 0xf0;
                                 *lastnibble |= (inbuff[w/2] & 0xf);
                             }
                         } else {
                             int toggle=1;
-                            uint8_t *in=inbuff;
-                            uint8_t *out=WriteBuf + ((y+y2) * HRes + x2)/2;
+                            volatile uint8_t *in=inbuff;
+                            volatile uint8_t *out=WriteBuf + ((y+y2) * HRes + x2)/2;
                             for(int x=0;x<w;x++){
                                 if(toggle){
                                     uint8_t t=(*in & 0xf)<<4;
@@ -6473,8 +6473,8 @@ void DrawRectangle256(int x1, int y1, int x2, int y2, int c){
     if(x2 <= x1) { t = x1; x1 = x2; x2 = t; }
     if(y2 <= y1) { t = y1; y1 = y2; y2 = t; }
     for(y=y1;y<=y2;y++){
-        uint8_t *p=WriteBuf+(y*HRes+x1);
-        memset(p,colour,x2-x1+1);
+        volatile uint8_t *p=WriteBuf+(y*HRes+x1);
+        memset((void *)p,colour,x2-x1+1);
     }
 }
 void DrawBitmap256(int x1, int y1, int width, int height, int scale, int fc, int bc, unsigned char *bitmap){
@@ -6770,6 +6770,7 @@ void cmd_mode(void){
     int mode =getint(cmdline,1,MAXMODES);
     if(mode+SCREENMODE1-1==DISPLAY_TYPE)return;
     closeframebuffer('A');
+    memset((void *)FRAMEBUFFER,0,sizeof(FRAMEBUFFER));
     if(mode==5){
         DISPLAY_TYPE=SCREENMODE5; 
         ScreenSize=MODE5SIZE;
@@ -6804,7 +6805,7 @@ void cmd_mode(void){
     }
 //    uSec(10000);
     ResetDisplay();
-    memset(WriteBuf, 0, ScreenSize);
+    memset((void *)WriteBuf, 0, ScreenSize);
     CurrentX = CurrentY =0;
     ClearScreen(Option.DefaultBC);
 #ifdef HDMI
@@ -7153,7 +7154,7 @@ void DrawPixel2(int x, int y, int c){
 void DrawRectangle2(int x1, int y1, int x2, int y2, int c){
     int x,y,x1p, x2p, t;
     unsigned char mask;
-    unsigned char *p;
+    volatile unsigned char *p;
     if(Option.DISPLAY_TYPE>=VIRTUAL && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
     if(x1 < 0) x1 = 0;
     if(x1 >= HRes) x1 = HRes - 1;
@@ -8683,17 +8684,17 @@ void closeframebuffer(char layer){
 #ifdef rp2350
                 FrameBuf=DisplayBuf;
 #else
-                FreeMemory(FrameBuf);
+                FreeMemory((void *)FrameBuf);
 #endif
                 break;
 #ifdef rp2350
             case SCREENMODE3:
-                FreeMemory(FrameBuf);
+                FreeMemory((void *)FrameBuf);
                 break;
 #ifdef HDMI
             case SCREENMODE4:
             case SCREENMODE5:
-                FreeMemory(FrameBuf);
+                FreeMemory((void *)FrameBuf);
                 break;
 #endif
 #endif
@@ -8701,7 +8702,7 @@ void closeframebuffer(char layer){
     } 
     if(LayerBuf!=DisplayBuf &&  (layer=='A' || layer=='L')){
         if(WriteBuf==LayerBuf)WriteBuf=DisplayBuf;
-        unsigned char *temp= LayerBuf;
+        volatile unsigned char *temp= LayerBuf;
         switch(DISPLAY_TYPE){
             case SCREENMODE2:
                 transparent=0;
@@ -8710,18 +8711,18 @@ void closeframebuffer(char layer){
                 LayerBuf=DisplayBuf;
 #else
                 LayerBuf=DisplayBuf;
-                FreeMemory(temp);
+                FreeMemory((void *)temp);
 #endif
                 break;
 #ifdef rp2350
             case SCREENMODE3:
                 LayerBuf=DisplayBuf;
-                FreeMemory(temp);
+                FreeMemory((void *)temp);
                 break;
 #ifdef HDMI
             case SCREENMODE4:
                 LayerBuf=DisplayBuf;
-                FreeMemory(temp);
+                FreeMemory((void *)temp);
                 break;
             case SCREENMODE5:
                 LayerBuf=DisplayBuf;
@@ -8732,11 +8733,11 @@ void closeframebuffer(char layer){
         }
     }
     if(SecondFrame!=DisplayBuf &&  (layer=='A' || layer=='2')){
-        FreeMemory(SecondFrame);
+        FreeMemory((void *)SecondFrame);
     }
     if(SecondLayer!=DisplayBuf &&  (layer=='A' || layer=='T')){
         if(WriteBuf==LayerBuf)WriteBuf=DisplayBuf;
-        unsigned char *temp= SecondLayer;
+        volatile unsigned char *temp= SecondLayer;
         switch(DISPLAY_TYPE){
             case SCREENMODE2:
                 transparents=0;
@@ -8744,17 +8745,17 @@ void closeframebuffer(char layer){
                 break;
             case SCREENMODE1:
                 SecondLayer=DisplayBuf;
-                FreeMemory(temp);
+                FreeMemory((void *)temp);
                 break;
 #ifdef rp2350
             case SCREENMODE3:
                 SecondLayer=DisplayBuf;
-                FreeMemory(temp);
+                FreeMemory((void *)temp);
                 break;
 #ifdef HDMI
             case SCREENMODE4:
                 SecondLayer=DisplayBuf;
-                FreeMemory(temp);
+                FreeMemory((void *)temp);
                 break;
             case SCREENMODE5:
                 SecondLayer=DisplayBuf;
@@ -8832,7 +8833,7 @@ XGA:
 #endif
             }
         } else error("Framebuffer 2 already exists");
-        memset(SecondFrame,colour,ScreenSize);
+        memset((void *)SecondFrame,colour,ScreenSize);
     } else 
 #endif
     if((p=checkstring(cmdline, (unsigned char *)"CREATE"))) {
@@ -8860,7 +8861,7 @@ XGA:
 #endif
             }
         } else error("Framebuffer already exists");
-        memset(FrameBuf,0,ScreenSize);
+        memset((void *)FrameBuf,0,ScreenSize);
 
 #ifdef rp2350
     } else if((p=checkstring(cmdline, (unsigned char *)"LAYER TOP"))) {
@@ -8881,7 +8882,7 @@ XGA:
                     if(argc==1)transparents=getint(argv[0],0,15);
                     SecondLayer=GetMemory(ScreenSize);
                     if(SecondLayer>=(uint8_t *)PSRAMbase && SecondLayer< (uint8_t *)(PSRAMbase + 1024*1024*16)){
-                        FreeMemory(SecondLayer);
+                        FreeMemory((void *)SecondLayer);
                         error("Second Layer must be in tightly coupled RAM, declare before other variables");
                     }
                     colour=transparents | (transparents<<4);
@@ -8893,7 +8894,7 @@ XGA:
                 case SCREENMODE5:
                     SecondLayer=GetMemory(ScreenSize);
                     if(SecondLayer>=(uint8_t *)PSRAMbase && SecondLayer< (uint8_t *)(PSRAMbase + 1024*1024*16)){
-                        FreeMemory(SecondLayer);
+                        FreeMemory((void *)SecondLayer);
                         error("Second Layer must be in tightly coupled RAM, declare before other variables");
                     }
                     if(argc==1)transparents=getint(argv[0],0,255);
@@ -8902,7 +8903,7 @@ XGA:
 #endif
             }
         } else error("Framebuffer already exists");
-        memset(SecondLayer,colour,ScreenSize);
+        memset((void *)SecondLayer,colour,ScreenSize);
 #endif
     } else if((p=checkstring(cmdline, (unsigned char *)"LAYER"))) {
         int colour=0;
@@ -8943,12 +8944,12 @@ XGA:
                 }
 #ifdef rp2350
             if(LayerBuf>(uint8_t *)PSRAMbase && LayerBuf< (uint8_t *)(PSRAMbase + 1024*1024*16)){
-                FreeMemory(LayerBuf);
+                FreeMemory((void *)LayerBuf);
                 error("Layer Buffer must be in tightly coupled RAM, declare before other variables");
             }
 #endif        
         } else error("Framebuffer already exists");
-        memset(LayerBuf,colour,ScreenSize);
+        memset((void *)LayerBuf,colour,ScreenSize);
     } else if((p=checkstring(cmdline, (unsigned char *)"CLOSE"))) {
         if(checkstring(p, (unsigned char *)"F")){
             closeframebuffer('F');
@@ -9010,7 +9011,7 @@ XGA:
     } else if((p=checkstring(cmdline, (unsigned char *)"COPY"))) {
         getargs(&p,5,(unsigned char *)",");
         if(!(argc==3 || argc==5))error("Syntax");
-        uint8_t *s=NULL,*d=NULL;
+        volatile uint8_t *s=NULL,*d=NULL;
         if(checkstring(argv[0],(unsigned char *)"N"))s=DisplayBuf;
         else if(checkstring(argv[0],(unsigned char *)"L"))s=LayerBuf;
         else if(checkstring(argv[0],(unsigned char *)"F"))s=FrameBuf;
@@ -9036,7 +9037,7 @@ XGA:
             #ifdef rp2350
                 _Z10copy_wordsPKmPmm((uint32_t *)s, (uint32_t *)d, ScreenSize>>2);
             #else
-                memcpy(d,s,ScreenSize);
+                memcpy((void *)d,(void *)s,ScreenSize);
             #endif
         else error("Buffer not created");
     } else error("Syntax");

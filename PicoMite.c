@@ -1965,7 +1965,7 @@ void MIPS32 __not_in_flash_func(QVgaLine0)()
         // prepare image line
             if(DISPLAY_TYPE==SCREENMODE1){
                 uint16_t *q=&fbuff[VGAnextbuf][0];
-                unsigned char *p=&DisplayBuf[line * 80];
+                volatile unsigned char *p=&DisplayBuf[line * 80];
                 if(tc==ytileheight){
                     tile++;
                     tc=0;
@@ -1986,7 +1986,7 @@ void MIPS32 __not_in_flash_func(QVgaLine0)()
                 }
 #ifdef rp2350
             } else if(DISPLAY_TYPE==SCREENMODE3){
-                register unsigned char *p=&DisplayBuf[line * 320];
+                volatile register unsigned char *p=&DisplayBuf[line * 320];
                 register uint8_t *r=(uint8_t *)fbuff[VGAnextbuf];
                 for(int i=0;i<320;i++){
                     register int low= *p & 0xF;
@@ -1996,7 +1996,7 @@ void MIPS32 __not_in_flash_func(QVgaLine0)()
 #endif
             } else { //MODE 2
                 line>>=1;
-                register unsigned char *p=&DisplayBuf[line * 160];
+                volatile register unsigned char *p=&DisplayBuf[line * 160];
                 register uint16_t *r=fbuff[VGAnextbuf];
                 for(int i=0;i<160;i++){
                     register int low= *p & 0xF;
@@ -2088,8 +2088,8 @@ void MIPS32 __not_in_flash_func(QVgaLine1)()
         // prepare image line
             if(DISPLAY_TYPE==SCREENMODE1){
                 uint16_t *q=&fbuff[VGAnextbuf][0];
-                unsigned char *p=&DisplayBuf[line * 80];
-                unsigned char *pp=&LayerBuf[line * 80];
+                volatile unsigned char *p=&DisplayBuf[line * 80];
+                volatile unsigned char *pp=&LayerBuf[line * 80];
                 if(tc==ytileheight){
                     tile++;
                     tc=0;
@@ -2112,8 +2112,8 @@ void MIPS32 __not_in_flash_func(QVgaLine1)()
                 }
 #ifdef rp2350
             } else if(DISPLAY_TYPE==SCREENMODE3){
-                register unsigned char *p=&DisplayBuf[line * 320];
-                register unsigned char *q=&LayerBuf[line * 320];
+                volatile register unsigned char *p=&DisplayBuf[line * 320];
+                volatile register unsigned char *q=&LayerBuf[line * 320];
                 register int low, high, low2, high2;
                 register uint8_t *r=(uint8_t *)fbuff[VGAnextbuf];
                 for(int i=0;i<320;i++){
@@ -2128,10 +2128,10 @@ void MIPS32 __not_in_flash_func(QVgaLine1)()
 #endif
             } else { //mode 2
                 line>>=1;
-                register unsigned char *dd=&DisplayBuf[line * 160];
-                register unsigned char *ll=&LayerBuf[line * 160];
+                volatile register unsigned char *dd=&DisplayBuf[line * 160];
+                volatile register unsigned char *ll=&LayerBuf[line * 160];
 #ifdef rp2350
-                register unsigned char *ss=&SecondLayer[line * 160];
+                volatile register unsigned char *ss=&SecondLayer[line * 160];
                 if(ss==dd){
                     ss=ll;
                     transparent16s=transparent16;
@@ -2625,16 +2625,20 @@ void MIPS64 __not_in_flash_func(HDMIloop0)(void){
             if(HRes==320)line>>=1;
             line_to_load = last_line & 1;
             uint8_t l,d,s;
+            volatile register unsigned char *dd;
+            volatile register unsigned char *ll;
             int pp;
             uint16_t *p=HDMIlines[line_to_load];
             if(load_line>=0 && load_line<MODE_V_ACTIVE_LINES){
-                __dmb();
+                __dsb();
                 switch(DISPLAY_TYPE){
                 case SCREENMODE1: //640x480x2 colour
                     uint16_t *fcol=tilefcols+line/ytileheight*X_TILE, *bcol=tilebcols+line/ytileheight*X_TILE; //get the relevant tile
                     pp= line*80;
+                    dd=&DisplayBuf[pp];
+                    ll=&LayerBuf[pp];
                     for(int i=0; i<80 ; i++){
-                        d=DisplayBuf[pp+i] | LayerBuf[pp+i];
+                        d=*dd | *ll;
                         *p++ = (d&0x1) ? fcol[i] : bcol[i];
                         d>>=1;
                         *p++ = (d&0x1) ? fcol[i] : bcol[i];
@@ -2650,15 +2654,16 @@ void MIPS64 __not_in_flash_func(HDMIloop0)(void){
                         *p++ = (d&0x1) ? fcol[i] : bcol[i];
                         d>>=1;
                         *p++ = (d&0x1) ? fcol[i] : bcol[i];
+                        ll++;dd++;
                     }
                     break;
                 case SCREENMODE2: //320x240x16 colour with support for a top layer
                     {
                         pp= (line)*160;
                         uint32_t *up=(uint32_t *)p;
-                        register unsigned char *dd=&DisplayBuf[pp];
-                        register unsigned char *ll=&LayerBuf[pp];
-                        register unsigned char *ss=&SecondLayer[pp];
+                        dd=&DisplayBuf[pp];
+                        ll=&LayerBuf[pp];
+                        volatile register unsigned char *ss=&SecondLayer[pp];
                         if(ss==dd){
                             ss=ll;
                             transparent16s=transparent16;
@@ -2708,8 +2713,8 @@ void MIPS64 __not_in_flash_func(HDMIloop0)(void){
                 case SCREENMODE4: //320x240xRGB555 colour
                     pp=line*640;
                     for(int i=0; i<640 ; i+=2){
-                        uint8_t* d=&DisplayBuf[pp+i];
-                        uint8_t* l=&LayerBuf[pp+i];
+                        volatile uint8_t* d=&DisplayBuf[pp+i];
+                        volatile uint8_t* l=&LayerBuf[pp+i];
                         int c=*d++;
                         c|=((*d++)<<8);
                         int ll=*l++;
@@ -2725,9 +2730,9 @@ void MIPS64 __not_in_flash_func(HDMIloop0)(void){
                     break;
                 case SCREENMODE5: //320x240x256 colour
                     pp=line*320;
-                    register unsigned char *dd=&DisplayBuf[pp];
-                    register unsigned char *ll=&LayerBuf[pp];
-                    register unsigned char *ss=&SecondLayer[pp];
+                    dd=&DisplayBuf[pp];
+                    ll=&LayerBuf[pp];
+                    volatile register unsigned char *ss=&SecondLayer[pp];
                     if(ss==dd){
                         ss=ll;
                         transparent16s=transparent16;
@@ -2754,6 +2759,7 @@ void MIPS64 __not_in_flash_func(HDMIloop0)(void){
                 }
             }
         }
+        systick_hw->cvr=0;
     }
 }
 void MIPS64 __not_in_flash_func(HDMIloop1)(void){
@@ -3672,6 +3678,7 @@ int MIPS16 main(){
         !(Option.Autorun>=0 && Option.Autorun<=MAXFLASHSLOTS+1) ||
         Option.CPU_Speed<MIN_CPU || Option.CPU_Speed>MAX_CPU ||
         Option.PROG_FLASH_SIZE!=MAX_PROG_SIZE ||
+        (Option.heartbeatpin==0 && Option.NoHeartbeat==0) ||
         !(Option.Magic==MagicKey)
         ){
         ResetAllFlash();              // init the options if this is the very first startup
@@ -3756,7 +3763,7 @@ int MIPS16 main(){
     if(Option.CPU_Speed<=324000)qmi_hw->m[1].timing = (1<<QMI_COOLDOWN) | (2<<QMI_PAGEBREAK) | (3<<QMI_SELECT_HOLD) | (18<<QMI_MAX_SELECT) | (4<<QMI_MIN_DESELECT) | (4<<QMI_RXDELAY) | (4<<QMI_CLKDIV);
     if(Option.CPU_Speed<=288000)qmi_hw->m[0].timing = 0x40006202;
     if(Option.CPU_Speed<=150000)qmi_hw->m[1].timing = 0x60006102;
-    sleep_ms(5);
+    sleep_ms(2);
 #endif
     PWM_FREQ=44100;
     pico_get_unique_board_id_string (id_out,12);
@@ -3772,7 +3779,7 @@ int MIPS16 main(){
     }
 #endif
 #endif
-    if((clock_get_hz(clk_usb)!=48000000)){
+    if(clock_get_hz(clk_usb)!=48000000){
         ResetAllFlash();              // init the options if this is the very first startup
         _excep_code=INVALID_CLOCKSPEED;
         watchdog_enable(1, 1);
@@ -3875,6 +3882,7 @@ int MIPS16 main(){
 #ifdef PICOMITEVGA
 //        bus_ctrl_hw->priority = BUSCTRL_BUS_PRIORITY_DMA_W_BITS | BUSCTRL_BUS_PRIORITY_DMA_R_BITS;
     #ifdef HDMI
+//    bus_ctrl_hw->priority = BUSCTRL_BUS_PRIORITY_DMA_W_BITS | BUSCTRL_BUS_PRIORITY_DMA_R_BITS | BUSCTRL_BUS_PRIORITY_PROC1_BITS;
         multicore_launch_core1_with_stack(HDMICore,core1stack,512);
         core1stack[0]=0x12345678;
         uSec(1000);
@@ -3885,7 +3893,7 @@ int MIPS16 main(){
         bus_ctrl_hw->priority=0x100;
         multicore_launch_core1_with_stack(QVgaCore,core1stack,512);
         core1stack[0]=0x12345678;
-        memset(WriteBuf, 0, 38400);
+        memset((void *)WriteBuf, 0, 38400);
     #endif
     ResetDisplay();
 #else

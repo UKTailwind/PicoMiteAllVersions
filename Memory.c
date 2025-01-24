@@ -53,7 +53,7 @@ extern const uint8_t *flash_progmemory;
 //unsigned char __attribute__ ((aligned (256))) AllMemory[ALL_MEMORY_SIZE];
 unsigned char __attribute__ ((aligned (256))) MMHeap[HEAP_MEMORY_SIZE+256]={0};
 #ifdef rp2350
-char __attribute__ ((aligned (256))) FRAMEBUFFER[320*240*2];
+volatile char __attribute__ ((aligned (256))) FRAMEBUFFER[320*240*2];
 #else
 char __attribute__ ((aligned (256))) FRAMEBUFFER[640*480/8];
 #endif
@@ -81,12 +81,12 @@ uint16_t M_Background[16] ={
 };
 volatile int ytileheight=16;
 #endif
-unsigned char *WriteBuf=(unsigned char *)FRAMEBUFFER;
-unsigned char *DisplayBuf=(unsigned char *)FRAMEBUFFER;
-unsigned char *LayerBuf=(unsigned char *)FRAMEBUFFER;
-unsigned char *FrameBuf=(unsigned char *)FRAMEBUFFER;
-unsigned char *SecondLayer=(unsigned char *)FRAMEBUFFER;
-unsigned char *SecondFrame=(unsigned char *)FRAMEBUFFER;
+volatile unsigned char *WriteBuf=(volatile unsigned char *)FRAMEBUFFER;
+volatile unsigned char *DisplayBuf=(unsigned char *)FRAMEBUFFER;
+volatile unsigned char *LayerBuf=(unsigned char *)FRAMEBUFFER;
+volatile unsigned char *FrameBuf=(unsigned char *)FRAMEBUFFER;
+volatile unsigned char *SecondLayer=(unsigned char *)FRAMEBUFFER;
+volatile unsigned char *SecondFrame=(unsigned char *)FRAMEBUFFER;
 #endif
 #ifdef PICOMITE
     unsigned char *WriteBuf=NULL;

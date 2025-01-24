@@ -4866,12 +4866,14 @@ void LoadOptions(void)
     RGB121map[15] = WHITE;
 }
 
-void ResetOptions(void)
+void ResetOptions(bool startup)
 {
-    disable_sd();
-    disable_audio();
-    disable_systemi2c();
-    disable_systemspi();
+    if(!startup){
+        disable_sd();
+        disable_audio();
+        disable_systemi2c();
+        disable_systemspi();
+    }
     memset((void *)&Option, 0, sizeof(struct option_s));
     Option.Magic = MagicKey;
     Option.Height = SCREENHEIGHT;
@@ -4981,8 +4983,8 @@ void ResetOptions(void)
 }
 void ResetAllFlash(void)
 {
+    ResetOptions(true);
     ClearSavedVars();
-    ResetOptions();
     disable_interrupts();
     for (int i = 0; i < MAXFLASHSLOTS + 1; i++)
     {

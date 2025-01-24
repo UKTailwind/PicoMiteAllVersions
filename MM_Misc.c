@@ -2377,7 +2377,7 @@ void MIPS16 clear320(void){
 
 void MIPS16 configure(unsigned char *p){
     if(!*p){
-        ResetOptions();
+        ResetOptions(false);
         _excep_code = RESET_COMMAND;
         SoftReset();
     } else {
@@ -2426,7 +2426,7 @@ void MIPS16 configure(unsigned char *p){
 #ifndef HDMI
 #ifdef USBKEYBOARD
         if(checkstring(p,(unsigned char *) "CMM1.5"))  {
-            ResetOptions();
+            ResetOptions(false);
             Option.CPU_Speed=252000;
             Option.AllPins = 1; 
             Option.ColourCode = 1;
@@ -2452,7 +2452,7 @@ void MIPS16 configure(unsigned char *p){
         }
 #else
         if(checkstring(p,(unsigned char *) "PICOMITEVGA V1.1"))  {
-            ResetOptions();
+            ResetOptions(false);
             Option.CPU_Speed=252000;
             Option.AllPins = 1; 
             Option.ColourCode = 1;
@@ -2478,7 +2478,7 @@ void MIPS16 configure(unsigned char *p){
             SoftReset();
         }
         if(checkstring(p,(unsigned char *) "PICOMITEVGA V1.0"))  {
-            ResetOptions();
+            ResetOptions(false);
             Option.CPU_Speed=252000;
             Option.AllPins = 1; 
             Option.ColourCode = 1;
@@ -2503,7 +2503,7 @@ void MIPS16 configure(unsigned char *p){
             SoftReset();
         }
         if(checkstring(p,(unsigned char *) "VGA DESIGN 1"))  {
-            ResetOptions();
+            ResetOptions(false);
             Option.CPU_Speed=252000;
             Option.ColourCode = 1;
             Option.SYSTEM_CLK=PINMAP[10];
@@ -2519,7 +2519,7 @@ void MIPS16 configure(unsigned char *p){
             SoftReset();
         }
         if(checkstring(p,(unsigned char *) "VGA DESIGN 2"))  {
-            ResetOptions();
+            ResetOptions(false);
             Option.CPU_Speed=252000;
             Option.ColourCode = 1;
             Option.SYSTEM_I2C_SDA=PINMAP[14];
@@ -2617,7 +2617,7 @@ OPTION MODBUFF ENABLE  192
 OPTION PLATFORM HDMIUSB
 */
         if(checkstring(p,(unsigned char *) "HDMIUSB") || checkstring(p,(unsigned char *) "PICO COMPUTER") )  {
-            ResetOptions();
+            ResetOptions(false);
             if(checkstring(p,(unsigned char *) "HDMIUSB") )strcpy((char *)Option.platform,"HDMIUSB");
             else strcpy((char *)Option.platform,"PICO COMPUTER");
             Option.ColourCode = 1;
@@ -2643,7 +2643,7 @@ OPTION PLATFORM HDMIUSB
             SoftReset();
         }
         if(checkstring(p,(unsigned char *) "OLIMEXUSB"))  {
-            ResetOptions();
+            ResetOptions(false);
             strcpy((char *)Option.platform,"OLIMEX USB");
             Option.ColourCode = 1;
             Option.AUDIO_L=PINMAP[26];
@@ -2670,7 +2670,7 @@ OPTION PLATFORM HDMIUSB
         
 #else
         if(checkstring(p,(unsigned char *) "HDMIBASIC"))  {
-            ResetOptions();
+            ResetOptions(false);
             strcpy((char *)Option.platform,"HDMIbasic");
             Option.ColourCode = 1;
             Option.SD_CS=7;
@@ -2683,7 +2683,7 @@ OPTION PLATFORM HDMIUSB
             SoftReset();
         }
         if(checkstring(p,(unsigned char *) "OLIMEX"))  {
-            ResetOptions();
+            ResetOptions(false);
             strcpy((char *)Option.platform,"OLIMEX");
             Option.ColourCode = 1;
             Option.AUDIO_L=PINMAP[26];
@@ -2718,7 +2718,7 @@ OPTION SDCARD GP22
 OPTION AUDIO GP20,GP21
 OPTION MODBUFF ENABLE 192 */
        if(checkstring(p,(unsigned char *) "GAMEMITE"))  {
-            ResetOptions();
+            ResetOptions(false);
             Option.CPU_Speed=252000;
             Option.ColourCode = 1;
             Option.SYSTEM_CLK=PINMAP[6];
@@ -2749,7 +2749,7 @@ OPTION MODBUFF ENABLE 192 */
             SoftReset();
        }
        if(checkstring(p,(unsigned char *) "PICORESTOUCHLCD3.5"))  {
-            ResetOptions();
+            ResetOptions(false);
             Option.CPU_Speed=252000;
             Option.ColourCode = 1;
             Option.SYSTEM_CLK=PINMAP[10];
@@ -2778,7 +2778,7 @@ OPTION MODBUFF ENABLE 192 */
             SoftReset();
        }
        if(checkstring(p,(unsigned char *) "PICO BACKPACK"))  {
-            ResetOptions();
+            ResetOptions(false);
             Option.CPU_Speed=252000;
             Option.ColourCode = 1;
             Option.SYSTEM_CLK=PINMAP[18];
@@ -2804,7 +2804,7 @@ OPTION MODBUFF ENABLE 192 */
             SoftReset();
        }
        if(checkstring(p,(unsigned char *) "PICORESTOUCHLCD2.8"))  {
-            ResetOptions();
+            ResetOptions(false);
             Option.CPU_Speed=252000;
             Option.ColourCode = 1;
             Option.SYSTEM_CLK=PINMAP[10];
@@ -2834,7 +2834,7 @@ OPTION MODBUFF ENABLE 192 */
        }
 #ifndef PICOMITEWEB
        if(checkstring(p,(unsigned char *) "RP2040LCD1.28"))  {
-            ResetOptions();
+            ResetOptions(false);
             Option.CPU_Speed=252000;
             Option.AllPins = 1; 
             Option.ColourCode = 1;
@@ -2857,7 +2857,7 @@ OPTION MODBUFF ENABLE 192 */
             SoftReset();
        }
        if(checkstring(p,(unsigned char *) "RP2040LCD0.96"))  {
-            ResetOptions();
+            ResetOptions(false);
             Option.CPU_Speed=252000;
             Option.ColourCode = 1;
             Option.NoHeartbeat = 1;
@@ -2877,7 +2877,7 @@ OPTION MODBUFF ENABLE 192 */
             SoftReset();
        }
        if(checkstring(p,(unsigned char *) "RP2040GEEK"))  {
-            ResetOptions();
+            ResetOptions(false);
             Option.CPU_Speed=252000;
             Option.ColourCode = 1;
             Option.NoHeartbeat = 1;
@@ -2904,7 +2904,7 @@ OPTION MODBUFF ENABLE 192 */
 #endif
 #else
        if(checkstring(p,(unsigned char *) "USB Edition V1.0"))  {
-            ResetOptions();
+            ResetOptions(false);
             Option.CPU_Speed=252000;
             Option.ColourCode = 1;
             Option.NoHeartbeat = 1;
@@ -2944,6 +2944,13 @@ void cmd_configure(void){
 void MIPS16 cmd_option(void) {
     unsigned char *tp;
  
+	tp = checkstring(cmdline, (unsigned char *)"NOCHECK");
+	if(tp) {
+		if(checkstring(tp, (unsigned char *)"ON"))	{ OptionNoCheck=true; return; }
+		if(checkstring(tp, (unsigned char *)"OFF"))	{ OptionNoCheck=false; return; }
+        return;
+	}
+
     tp = checkstring(cmdline, (unsigned char *)"BASE");
     if(tp) {
         if(g_DimUsed) error("Must be before DIM or LOCAL");
@@ -3726,7 +3733,7 @@ void MIPS16 cmd_option(void) {
 #endif
         SaveOptions();
         DISPLAY_TYPE= Option.DISPLAY_TYPE;
-	    memset(WriteBuf, 0, ScreenSize);
+	    memset((void *)WriteBuf, 0, ScreenSize);
         ResetDisplay();
         CurrentX = CurrentY =0;
         if(Option.DISPLAY_TYPE!=SCREENMODE1)ClearScreen(Option.DefaultBC);
@@ -4150,15 +4157,15 @@ void MIPS16 cmd_option(void) {
             if(IsInvalidPin(pin1)) error("Invalid pin");
             if(ExtCurrentConfig[pin1] != EXT_NOT_CONFIG)  error("Pin %/| is in use",pin1,pin1);
 //
+            pin3 = PINMAP[PinDef[pin1].GPno+1];
+            if(IsInvalidPin(pin3)) error("Invalid pin");
+            if(ExtCurrentConfig[pin3] != EXT_NOT_CONFIG)  error("Pin %/| is in use",pin3,pin3);
+//
             if(!(code=codecheck(argv[2])))argv[2]+=2;
             pin2 = getinteger(argv[2]);
             if(!code)pin2=codemap(pin2);
             if(IsInvalidPin(pin2)) error("Invalid pin");
-            if(ExtCurrentConfig[pin2] != EXT_NOT_CONFIG)  error("Pin %/| is in use",pin2,pin2);
-//
-            pin3 = PINMAP[PinDef[pin1].GPno+1];
-            if(IsInvalidPin(pin3)) error("Invalid pin");
-            if(ExtCurrentConfig[pin3] != EXT_NOT_CONFIG)  error("Pin %/| is in use",pin3,pin3);
+            if(ExtCurrentConfig[pin2] != EXT_NOT_CONFIG || pin2==pin1 || pin2==pin3)  error("Pin %/| is in use",pin2,pin2);
 //
             Option.audio_i2c_bclk=pin1;
             Option.audio_i2c_data=pin2;
@@ -5298,7 +5305,7 @@ void MIPS16 fun_info(void){
         targ=T_INT;
         return;
 	} else if(checkstring(ep, (unsigned char *)"TEST")){
-        iret=(int64_t)((uint32_t)NBRPINS);
+        iret=(int64_t)0;
         targ=T_INT;
         return;
     } else if((tp=checkstring(ep, (unsigned char *)"UPTIME"))){

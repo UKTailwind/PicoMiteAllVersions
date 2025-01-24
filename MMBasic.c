@@ -88,6 +88,7 @@ int g_Localvarcnt;                                                         // nu
 int g_Globalvarcnt;                                                         // number of GLOBAL variables
 int g_LocalIndex;                                                     // used to track the level of local variables
 unsigned char OptionExplicit, OptionEscape, OptionConsole;                                                // used to force the declaration of variables before their use
+bool OptionNoCheck=false;
 unsigned char DefaultType;                                                   // the default type if a variable is not specifically typed
 int emptyarray=0;
 int TempStringClearStart;                                           // used to prevent clearing of space in an expression that called a FUNCTION
@@ -387,8 +388,10 @@ void MIPS16 __not_in_flash_func(ExecuteProgram)(unsigned char *p) {
 #ifndef PICOMITEWEB
                 if(core1stack[0]!=0x12345678)error("CPU2 Stack overflow");
 #endif
-                CheckAbort();
-                check_interrupt();                                  // check for an MMBasic interrupt or touch event and handle it
+                if(!OptionNoCheck){
+                    CheckAbort();
+                    check_interrupt();                                  // check for an MMBasic interrupt or touch event and handle it
+                }
             }
             p = nextstmt;
         }

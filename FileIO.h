@@ -222,7 +222,7 @@ struct option_s {
 extern unsigned char *CFunctionFlash, *CFunctionLibrary;
 extern struct option_s Option;
 extern int FlashLoad;
-extern void ResetOptions(void);
+extern void ResetOptions(bool startup);
 extern void FlashWriteBlock(void);
 extern void FlashWriteWord(unsigned int i);
 extern void FlashWriteByte(unsigned char b);

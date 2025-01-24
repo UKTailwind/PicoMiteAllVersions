@@ -138,6 +138,7 @@ extern int g_LocalIndex;                          // used to track the level of 
 
 extern int g_OptionBase;                          // value of OPTION BASE
 extern unsigned char OptionExplicit, OptionEscape, OptionConsole;                     // true if OPTION EXPLICIT has been used
+extern bool OptionNoCheck;
 extern unsigned char DefaultType;                        // the default type if a variable is not specifically typed
 
 

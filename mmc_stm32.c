@@ -214,13 +214,13 @@ int __not_in_flash_func(getsound)(int i,int mode){
 #define sdi_send_buffer_local(a,b) sdi_send_buffer(a,b)
 #define sendcount 64
 #define sendstream 32
-void __not_in_flash_func(on_pwm_wrap)(void) {
+void MIPS32 __not_in_flash_func(on_pwm_wrap)(void) {
 	static int noisedwellleft[MAXSOUNDS]={0}, noisedwellright[MAXSOUNDS]={0};
 	static uint32_t noiseleft[MAXSOUNDS]={0}, noiseright[MAXSOUNDS]={0};
 	static int repeatcount=1;
     // play a tone
 #ifndef PICOMITEWEB
-	__dmb();
+	__dsb();
 #endif
     pwm_clear_irq(AUDIO_SLICE);
 #ifdef rp2350

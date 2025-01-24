@@ -324,7 +324,7 @@ void edit(unsigned char *cmdline, bool cmdfile) {
         ResetDisplay();
     }
 //    
-    memset(WriteBuf, 0, ScreenSize);
+    memset((void *)WriteBuf, 0, ScreenSize);
     if(modmode){
 #ifdef HDMI
         if(Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P ){
@@ -369,14 +369,8 @@ void edit(unsigned char *cmdline, bool cmdfile) {
 #ifdef PICOMITEWEB
     cleanserver();
 #endif
-//    if(cmdfile){
-        EdBuff = GetTempMemory(EDIT_BUFFER_SIZE);
-        edit_buff_size=EDIT_BUFFER_SIZE;
-//    } else {
-//        int s=LargestContiguousHeap()-2048*3;
-//        EdBuff = GetTempMemory(s);
-//        edit_buff_size=s;
-//    }
+    EdBuff = GetTempMemory(EDIT_BUFFER_SIZE);
+    edit_buff_size=EDIT_BUFFER_SIZE;
     *EdBuff = 0;
 
     VHeight = Option.Height - 2;
