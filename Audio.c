@@ -620,6 +620,20 @@ void i2sconvert(float *fbuff, int32_t *sbuff, int count){
 		sbuff[i+1]=(int32_t)((fbuff[i+1])*(float)mapping[vol_right]*1048576.0f);
 	}
 }
+void vconvert(int *fbuff, int *sbuff, int count){
+	int i;
+	for(i=0;i<(count);i+=2){
+		sbuff[i]=(int32_t)((fbuff[i])/2000*(float)mapping[vol_left]);
+		sbuff[i+1]=(int32_t)((fbuff[i+1])/2000*(float)mapping[vol_right]);
+	}
+}
+void xconvert(int32_t *ibuff, int16_t *sbuff, int count){
+	int i;
+	for(i=count-2;i>=0;i-=2){
+		ibuff[i+1]=((int32_t)sbuff[i+1]*mapping[vol_left]/2000)<<16;
+		ibuff[i]=((int32_t)sbuff[i]*mapping[vol_left]/2000)<<16;
+	}
+}
 #endif
 size_t onRead(void  *userdata,  char  *pBufferOut,   size_t bytesToRead){
     unsigned int nbr;
@@ -680,7 +694,7 @@ void CloseAudio(int all){
 	if(was_playing == P_FLAC || was_playing == P_PAUSE_FLAC )FreeMemorySafe((void **)&myflac);
 	if(was_playing == P_WAV || was_playing == P_PAUSE_WAV )FreeMemorySafe((void **)&mywav);
 #ifdef rp2350
-	if((was_playing == P_MP3 || was_playing == P_PAUSE_MP3 ) && Option.AUDIO_L){
+	if((was_playing == P_MP3 || was_playing == P_PAUSE_MP3 ) && (Option.AUDIO_L || Option.audio_i2c_bclk || Option.AUDIO_MOSI_PIN)){
 		drmp3_uninit(mymp3);
 		FreeMemorySafe((void **)&mymp3);
 	}
@@ -726,13 +740,6 @@ void iconvert(uint16_t *ibuff, int16_t *sbuff, int count){
 	for(i=0;i<(count);i+=2){
 		ibuff[i]=(uint16_t)((((((int)sbuff[i]*mapping[vol_left]/2000+32768))>>4)));
 		ibuff[i+1]=(uint16_t)((((((int)sbuff[i+1]*mapping[vol_right]/2000+32768))>>4)));
-	}
-}
-void xconvert(int32_t *ibuff, int16_t *sbuff, int count){
-	int i;
-	for(i=count-2;i>=0;i-=2){
-		ibuff[i+1]=((int32_t)sbuff[i+1]*mapping[vol_left]/2000)<<16;
-		ibuff[i]=((int32_t)sbuff[i]*mapping[vol_left]/2000)<<16;
 	}
 }
 void playvs1053(int mode){
@@ -832,12 +839,16 @@ void wavcallback(char *p){
 #ifdef rp2350
     xbuff1 = (int32_t *)sbuff1;
     xbuff2 = (int32_t *)sbuff2;
-	if(Option.audio_i2c_bclk)bcount[1]=(volatile unsigned int)drwav_read_pcm_frames_s32(mywav, WAV_BUFFER_SIZE/8, (drwav_int32*)sbuff1) * mywav->channels;
+	if(Option.audio_i2c_bclk){
+		bcount[1]=(volatile unsigned int)drwav_read_pcm_frames_s32(mywav, WAV_BUFFER_SIZE/8, (drwav_int32*)sbuff1) * mywav->channels;
+		vconvert((drwav_int32*)sbuff1,(drwav_int32*)sbuff1,bcount[1]);
+	}
 	else
 #endif
-    bcount[1]=drwav_read_pcm_frames_s16(mywav, WAV_BUFFER_SIZE/4, (drwav_int16*)sbuff1) * mywav->channels;
-//    bcount[2]=drwav_read_pcm_frames_s16(&mywav, WAV_BUFFER_SIZE/4, (drwav_int16*)sbuff2) * mywav.channels;
-    if(!Option.audio_i2c_bclk)iconvert(ibuff1, (int16_t *)sbuff1, bcount[1]);
+	{
+		bcount[1]=(volatile unsigned int)drwav_read_pcm_frames_s16(mywav, WAV_BUFFER_SIZE/4, (drwav_int16*)sbuff1) * mywav->channels;
+		iconvert(ibuff1, (int16_t *)sbuff1, bcount[1]);
+	}
 //    iconvert(ibuff2, (int16_t *)sbuff2, bcount[2]);
     wav_filesize=bcount[1];
     CurrentlyPlaying = P_WAV;
@@ -967,12 +978,16 @@ void flaccallback(char *p){
 #ifdef rp2350
     xbuff1 = (int32_t *)sbuff1;
     xbuff2 = (int32_t *)sbuff2;
-	if(Option.audio_i2c_bclk)bcount[1]=(volatile unsigned int)drflac_read_pcm_frames_s32(myflac, WAV_BUFFER_SIZE/4, (drwav_int32*)sbuff1) * myflac->channels;
+	if(Option.audio_i2c_bclk){
+		bcount[1]=(volatile unsigned int)drflac_read_pcm_frames_s32(myflac, WAV_BUFFER_SIZE/4, (drwav_int32*)sbuff1) * myflac->channels;
+		vconvert((drwav_int32*)sbuff1,(drwav_int32*)sbuff1,bcount[1]);
+	}
 	else
 #endif
-	bcount[1]=(volatile unsigned int)drflac_read_pcm_frames_s16(myflac, WAV_BUFFER_SIZE/2, (drwav_int16*)sbuff1) * myflac->channels;
-//    bcount[2]=drwav_read_pcm_frames_s16(&mywav, WAV_BUFFER_SIZE/4, (drwav_int16*)sbuff2) * mywav.channels;
-	if(!Option.audio_i2c_bclk)iconvert(ibuff1, (int16_t *)sbuff1, bcount[1]);
+	{
+		bcount[1]=(volatile unsigned int)drflac_read_pcm_frames_s16(myflac, WAV_BUFFER_SIZE/2, (drwav_int16*)sbuff1) * myflac->channels;
+		iconvert(ibuff1, (int16_t *)sbuff1, bcount[1]);
+	}
 //    iconvert(ibuff2, (int16_t *)sbuff2, bcount[2]);
     wav_filesize=bcount[1];
     CurrentlyPlaying = P_FLAC;
@@ -2005,19 +2020,29 @@ void checkWAVinput(void){
 			if(CurrentlyPlaying == P_FLAC){
 				if(swingbuf==2){
 #ifdef rp2350
-					if(Option.audio_i2c_bclk)bcount[1]=(volatile unsigned int)drflac_read_pcm_frames_s32(myflac, WAV_BUFFER_SIZE/4, (drwav_int32*)sbuff1) * myflac->channels;
+					if(Option.audio_i2c_bclk){
+						bcount[1]=(volatile unsigned int)drflac_read_pcm_frames_s32(myflac, WAV_BUFFER_SIZE/4, (drwav_int32*)sbuff1) * myflac->channels;
+						vconvert((drwav_int32*)sbuff1,(drwav_int32*)sbuff1,bcount[1]);
+					}
 					else
 #endif
-					bcount[1]=(volatile unsigned int)drflac_read_pcm_frames_s16(myflac, WAV_BUFFER_SIZE/2, (drwav_int16*)sbuff1) * myflac->channels;
-					if(!Option.audio_i2c_bclk)iconvert(ibuff1, (int16_t *)sbuff1, bcount[1]);
+					{
+						bcount[1]=(volatile unsigned int)drflac_read_pcm_frames_s16(myflac, WAV_BUFFER_SIZE/2, (drwav_int16*)sbuff1) * myflac->channels;
+						iconvert(ibuff1, (int16_t *)sbuff1, bcount[1]);
+					}
 					wav_filesize = bcount[1];
 				} else {
 #ifdef rp2350
-					if(Option.audio_i2c_bclk)bcount[2]=(volatile unsigned int)drflac_read_pcm_frames_s32(myflac, WAV_BUFFER_SIZE/4, (drwav_int32*)sbuff2) * myflac->channels;
+					if(Option.audio_i2c_bclk){
+						bcount[2]=(volatile unsigned int)drflac_read_pcm_frames_s32(myflac, WAV_BUFFER_SIZE/4, (drwav_int32*)sbuff2) * myflac->channels;
+						vconvert((drwav_int32*)sbuff2,(drwav_int32*)sbuff2,bcount[2]);
+					}
 					else
 #endif
-					bcount[2]=(volatile unsigned int)drflac_read_pcm_frames_s16(myflac, WAV_BUFFER_SIZE/2, (drwav_int16*)sbuff2) * myflac->channels;
-					if(!Option.audio_i2c_bclk)iconvert(ibuff2, (int16_t *)sbuff2, bcount[2]);
+					{
+						bcount[2]=(volatile unsigned int)drflac_read_pcm_frames_s16(myflac, WAV_BUFFER_SIZE/2, (drwav_int16*)sbuff2) * myflac->channels;
+						iconvert(ibuff2, (int16_t *)sbuff2, bcount[2]);
+					}
 					wav_filesize = bcount[2];
 				}
 				nextbuf=swingbuf;
@@ -2060,19 +2085,29 @@ void checkWAVinput(void){
 			} else if(CurrentlyPlaying == P_WAV){
 				if(swingbuf==2){
 #ifdef rp2350
-					if(Option.audio_i2c_bclk)bcount[1]=(volatile unsigned int)drwav_read_pcm_frames_s32(mywav, WAV_BUFFER_SIZE/8, (drwav_int32*)sbuff1) * mywav->channels;
+					if(Option.audio_i2c_bclk){
+						bcount[1]=(volatile unsigned int)drwav_read_pcm_frames_s32(mywav, WAV_BUFFER_SIZE/8, (drwav_int32*)sbuff1) * mywav->channels;
+						vconvert((drwav_int32*)sbuff1,(drwav_int32*)sbuff1,bcount[1]);
+					}
 					else
 #endif
-					bcount[1]=(volatile unsigned int)drwav_read_pcm_frames_s16(mywav, WAV_BUFFER_SIZE/4, (drwav_int16*)sbuff1) * mywav->channels;
-					if(!Option.audio_i2c_bclk)iconvert(ibuff1, (int16_t *)sbuff1, bcount[1]);
+					{
+						bcount[1]=(volatile unsigned int)drwav_read_pcm_frames_s16(mywav, WAV_BUFFER_SIZE/4, (drwav_int16*)sbuff1) * mywav->channels;
+						iconvert(ibuff1, (int16_t *)sbuff1, bcount[1]);
+					}
 					wav_filesize = bcount[1];
 				} else {
 #ifdef rp2350
-					if(Option.audio_i2c_bclk)bcount[2]=(volatile unsigned int)drwav_read_pcm_frames_s32(mywav, WAV_BUFFER_SIZE/8, (drwav_int32*)sbuff2) * mywav->channels;
+					if(Option.audio_i2c_bclk){
+						bcount[2]=(volatile unsigned int)drwav_read_pcm_frames_s32(mywav, WAV_BUFFER_SIZE/8, (drwav_int32*)sbuff2) * mywav->channels;
+						vconvert((drwav_int32*)sbuff2,(drwav_int32*)sbuff2,bcount[2]);
+					}
 					else
 #endif
-					bcount[2]=(volatile unsigned int)drwav_read_pcm_frames_s16(mywav, WAV_BUFFER_SIZE/4, (drwav_int16*)sbuff2) * mywav->channels;
-					if(!Option.audio_i2c_bclk)iconvert(ibuff2, (int16_t *)sbuff2, bcount[2]);
+					{
+						bcount[2]=(volatile unsigned int)drwav_read_pcm_frames_s16(mywav, WAV_BUFFER_SIZE/4, (drwav_int16*)sbuff2) * mywav->channels;
+						iconvert(ibuff1, (int16_t *)sbuff2, bcount[2]);
+					}
 					wav_filesize = bcount[2];
 				}
 				nextbuf=swingbuf;

@@ -325,7 +325,7 @@ void edit(unsigned char *cmdline, bool cmdfile) {
     }
 //    
     memset((void *)WriteBuf, 0, ScreenSize);
-    if(modmode){
+/*    if(modmode){
 #ifdef HDMI
         if(Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P ){
 #endif
@@ -337,7 +337,7 @@ void edit(unsigned char *cmdline, bool cmdfile) {
             PromptFont=2<<4 | 1;
         }
 #endif
-    }
+    }*/
 #ifdef PICOMITEVGA
 #ifdef rp2350
     #ifdef HDMI
@@ -365,6 +365,19 @@ void edit(unsigned char *cmdline, bool cmdfile) {
     if(HRes==640 || HRes==512){
         SetFont(1);
         PromptFont=1;
+    }
+    if(modmode){
+#ifdef HDMI
+        if(Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P ){
+#endif
+            SetFont(1);
+            PromptFont=1;
+#ifdef HDMI
+        } else {
+            SetFont(2<<4 | 1);
+            PromptFont=2<<4 | 1;
+        }
+#endif
     }
 #ifdef PICOMITEWEB
     cleanserver();

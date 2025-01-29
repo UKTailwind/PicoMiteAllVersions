@@ -75,19 +75,19 @@ extern void FreeMemorySafe(void **addr);
 extern int MemSize(void *addr);
 extern unsigned char MMHeap[];
 #ifdef PICOMITEVGA
-extern volatile unsigned char *WriteBuf;
-extern volatile unsigned char *FrameBuf;
-extern volatile unsigned char *SecondFrame;
-extern volatile unsigned char *DisplayBuf;
-extern volatile unsigned char *LayerBuf;
-extern volatile unsigned char *SecondLayer;
+extern unsigned char *WriteBuf;
+extern unsigned char *FrameBuf;
+extern unsigned char *SecondFrame;
+extern unsigned char *DisplayBuf;
+extern unsigned char *LayerBuf;
+extern unsigned char *SecondLayer;
 #else
 extern unsigned char *WriteBuf;
 extern unsigned char *FrameBuf;
 extern unsigned char *LayerBuf;
 #endif
 #ifdef rp2350
-extern volatile char FRAMEBUFFER[320*240*2];
+extern char FRAMEBUFFER[320*240*2];
 #else
 extern char FRAMEBUFFER[640*480/8];
 #endif

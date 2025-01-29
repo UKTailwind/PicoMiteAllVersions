@@ -225,21 +225,17 @@ void pio_init(int pior, int sm, uint32_t pinctrl, uint32_t execctrl, uint32_t sh
 #endif
         clock=(float)Option.CPU_Speed*1000.0/clock;
         int sidebase=(pinctrl & 0b111110000000000)>>10;
-        int setbase=(pinctrl & 0b1111100000)>>5;
-        int outbase=(pinctrl & 0b11111);
+        int setbase=(pinctrl &       0b1111100000)>>5;
+        int outbase=(pinctrl &            0b11111);
         int sidecount=(pinctrl & 0xE0000000)>>29;
         int setcount=(pinctrl & 0x1C000000)>>26;
         int outcount=(pinctrl & 0x3F00000)>>20;
-        int inbase=(pinctrl & 0xF8000)>>15;
+//        int inbase=(pinctrl & 0xF8000)>>15;
         int opt=(execctrl>>30) & 1;
-        sm_config_set_sideset_pins(&mypio, sidebase);
-        sm_config_set_out_pins(&mypio, outbase, outcount);
-        sm_config_set_set_pins(&mypio, setbase, setcount);
-        sm_config_set_in_pins(&mypio, inbase);
-        sm_config_set_sideset(&mypio,sidecount,false,false);
         mypio.clkdiv = (uint32_t) (clock * (1 << 16));
         mypio.execctrl=execctrl;
         mypio.shiftctrl=shiftctrl;
+        mypio.pinctrl=pinctrl;
         #ifdef rp2350
         #ifdef PICOMITEWEB
                 for(int i = 1; i < (NBRPINS) ; i++) {
@@ -255,7 +251,7 @@ void pio_init(int pior, int sm, uint32_t pinctrl, uint32_t execctrl, uint32_t sh
         }
         if(sidecount && sideout)pio_sm_set_consecutive_pindirs(pio, sm, sidebase, sidecount-opt, true);
         if(outcount && outout)pio_sm_set_consecutive_pindirs(pio, sm, outbase, outcount, true);
-        if(setcount && setout)pio_sm_set_consecutive_pindirs(pio, sm, setbase, setcount, false);
+        if(setcount && setout)pio_sm_set_consecutive_pindirs(pio, sm, setbase, setcount, true);
         pio_sm_set_config(pio, sm, &mypio);
         pio_sm_init(pio, sm, start, &mypio);
         pio_sm_clear_fifos(pio,sm);

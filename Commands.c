@@ -43,7 +43,6 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "pico/multicore.h"
 #endif
 #define overlap (VRes % (FontTable[gui_font >> 4][1] * (gui_font & 0b1111)) ? 0 : 1)
-
 #include <math.h>
 void flist(int, int, int);
 //void clearprog(void);
@@ -59,6 +58,14 @@ extern volatile unsigned int ScrewUpTimer;
 int SaveNextData = 0;
 struct sa_data datastore[MAXRESTORE];
 int restorepointer = 0;
+const uint8_t pinlist[]={ //this is a Basic program to print out the status of all the pins
+	1,132,128,95,113,37,0,
+	1,153,128,95,113,37,144,48,32,204,32,241,109,97,120,32,103,112,41,0,
+	1,168,128,34,71,80,34,133,186,95,113,37,41,44,32,241,112,105,110,110,111,32,34,71,80,34,133,186,
+	95,113,37,41,41,44,241,112,105,110,32,241,112,105,110,110,111,32,34,71,80,34,133,186,95,113,37,41,41,41,0,
+	1,166,128,0,
+    1,147,128,95,113,37,0,0
+};
 
 
 // stack to keep track of nested FOR/NEXT loops
@@ -463,6 +470,9 @@ void MIPS16 cmd_list(void) {
         }
    	} else if((p = checkstring(cmdline, (unsigned char *)"VARIABLES"))) {
 		
+   	} else if((p = checkstring(cmdline, (unsigned char *)"PINS"))) {
+		CallExecuteProgram((char *)pinlist);
+		return;
    	} else if((p = checkstring(cmdline, (unsigned char *)"COMMANDS"))) {
     	int ListCnt = 1;
     	step=Option.DISPLAY_CONSOLE ? HRes/gui_font_width/20 : 5;

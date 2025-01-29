@@ -63,6 +63,7 @@ extern int last_adc;
 extern char banner[];
 extern char *pinsearch(int pin);
 extern uint8_t getrnd(void);
+extern uint32_t restart_reason;
 extern unsigned int b64d_size(unsigned int in_size);
 extern unsigned int b64e_size(unsigned int in_size);
 extern unsigned int b64_encode(const unsigned char* in, unsigned int in_len, unsigned char* out);
@@ -4541,6 +4542,33 @@ uint32_t __get_MSP(void)
   __asm volatile ("MRS %0, msp" : "=r" (result) );
   return(result);
 }
+int FileSize(char *p){
+    char q[FF_MAX_LFN]={0};
+    int retval=0;
+    int waste=0, t=FatFSFileSystem+1;
+    int localfilesystemsave=FatFSFileSystem;
+    t = drivecheck(p,&waste);
+    p+=waste;
+    getfullfilename(p,q);
+    FatFSFileSystem=t-1;
+    if(FatFSFileSystem==0){
+        struct lfs_info lfsinfo;
+        memset(&lfsinfo,0,sizeof(DIR));
+        FSerror = lfs_stat(&lfs, q, &lfsinfo);
+        if(lfsinfo.type==LFS_TYPE_REG)retval= lfsinfo.size;
+    } else {
+        DIR djd;
+        FILINFO fnod;
+        memset(&djd,0,sizeof(DIR));
+        memset(&fnod,0,sizeof(FILINFO));
+        if(!InitSDCard()) return -1;
+        FSerror = f_stat(q, &fnod);
+        if(FSerror != FR_OK)iret=0;
+        else if(!(fnod.fattrib & AM_DIR))retval=fnod.fsize;
+    }
+    FatFSFileSystem=localfilesystemsave;
+    return retval;
+}
 int ExistsFile(char *p){
     char q[FF_MAX_LFN]={0};
     int retval=0;
@@ -4639,6 +4667,24 @@ void MIPS16 fun_info(void){
         FatFSFileSystem=FatFSFileSystemSave;
         iret=boot_count;
         targ=T_INT;
+    } else if(checkstring(ep, (unsigned char *)"BOOT")){
+        if(restart_reason==     0xFFFFFFFF)strcpy((char *)sret, "Restart");
+        else if(restart_reason==0xFFFFFFFE)strcpy((char *)sret, "S/W Watchdog");
+        else if(restart_reason==0xFFFFFFFD)strcpy((char *)sret, "H/W Watchdog");
+        else if(restart_reason==0xFFFFFFFC)strcpy((char *)sret, "Firmware update");
+#ifdef rp2350
+        else if(restart_reason & 0x30000)strcpy((char *)sret, "Power On");
+        else if(restart_reason & 0x40000)strcpy((char *)sret, "Reset Switch");
+        else if(restart_reason & 0x280000)strcpy((char *)sret, "Debug");
+#else
+        else if(restart_reason==0x100)strcpy((char *)sret, "Power On");
+        else if(restart_reason==0x10000)strcpy((char *)sret, "Reset Switch");
+        else if(restart_reason==0x100000)strcpy((char *)sret, "Debug");
+#endif
+        else sprintf((char *)sret, "Unknown code %X",(unsigned int)restart_reason);
+        CtoM(sret);
+        targ=T_STR;
+        return;
     } else if(*ep=='c' || *ep=='C'){
         if(checkstring(ep, (unsigned char *)"CALLTABLE")){
             iret = (int64_t)(uint32_t)CallTable;
@@ -4724,7 +4770,11 @@ void MIPS16 fun_info(void){
             targ=T_INT;
             return;
         } else if((tp=checkstring(ep, (unsigned char *)"FILESIZE"))){
-            DIR djd;
+            char *p = (char *)getFstring(tp);
+            iret=FileSize(p);
+            targ=T_INT;
+            return;
+/*            DIR djd;
             FILINFO fnod;
             char q[FF_MAX_LFN]={0};
             memset(&djd,0,sizeof(DIR));
@@ -4763,7 +4813,7 @@ void MIPS16 fun_info(void){
             }
             FatFSFileSystem=FatFSFileSystemSave;
             targ=T_INT;
-            return;
+            return;*/
         } else if(checkstring(ep, (unsigned char *)"FREE SPACE")){
             if(FatFSFileSystem){
                 if(!InitSDCard()) error((char *)FErrorMsg[20]);					// setup the SD card

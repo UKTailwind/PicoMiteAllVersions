@@ -197,6 +197,7 @@ extern void myprintf(char *s);
 extern int getConsole(void);
 extern void InitReservedIO(void);
 extern char SerialConsolePutC(char c, int flush);
+extern void CallExecuteProgram(char *p);
 extern long long int *GetReceiveDataBuffer(unsigned char *p, unsigned int *nbr);
 extern int ticks_per_second;
 extern volatile unsigned int GPSTimer;

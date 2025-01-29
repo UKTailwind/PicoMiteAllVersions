@@ -61,6 +61,7 @@ extern void start_i2s(int pio, int sm);
 #endif
 #ifndef rp2350
     #include "hardware/structs/ssi.h"
+    #include "hardware/vreg.h"
 #else
     #ifdef HDMI
         #include "hardware/structs/hstx_ctrl.h"
@@ -81,6 +82,7 @@ extern void start_i2s(int pio, int sm);
     #include "hardware/clocks.h"
     #include <string.h>
     #include "hardware/regs/sysinfo.h"
+    #include "hardware/regs/powman.h"
     bool rp2350a=true;
     uint32_t PSRAMsize=0;
 #endif
@@ -236,6 +238,7 @@ volatile bool processtick = true;
 unsigned char WatchdogSet = false;
 unsigned char IgnorePIN = false;
 unsigned char SPIatRisk = false;
+uint32_t restart_reason=0;
 uint32_t __uninitialized_ram(_excep_code);
 uint64_t __uninitialized_ram(_persistent);
 unsigned char lastcmd[STRINGSIZE*2];                                           // used to store the last command in case it is needed by the EDIT command
@@ -257,7 +260,6 @@ extern void CallCFuncInt2(void);
 extern volatile bool CSubComplete;
 static uint64_t __not_in_flash_func(uSecTimer)(void){ return time_us_64();}
 static int64_t PinReadFunc(int a){return gpio_get(PinDef[a].GPno);}
-extern void CallExecuteProgram(char *p);
 extern void CallCFuncmSec(void);
 extern volatile uint32_t irqs;
 #define CFUNCRAM_SIZE   256
@@ -2028,7 +2030,7 @@ void MIPS32 __not_in_flash_func(QVgaLine0)()
 	// restore integer divider state
 //	hw_divider_restore_state(&SaveDividerState);
 }
-void MIPS32 __not_in_flash_func(QVgaLine1)()
+void MIPS64 __not_in_flash_func(QVgaLine1)()
 {
     int i,line;
     uint8_t l,d;
@@ -3659,18 +3661,28 @@ void WebConnect(void){
 
 int MIPS16 main(){
     static int ErrorInPrompt;
-    int i;
+    int i=0;
     char savewatchdog=false;
+    i=watchdog_caused_reboot();
 #ifdef rp2350
+    restart_reason=powman_hw->chip_reset | i;
     rp2350a=(*((io_ro_32*)(SYSINFO_BASE + SYSINFO_PACKAGE_SEL_OFFSET)) & 1);
+#else
+    restart_reason=vreg_and_chip_reset_hw->chip_reset | i;
 #endif
+    if(_excep_code == SOFT_RESET || _excep_code == SCREWUP_TIMEOUT )restart_reason=0xFFFFFFFF;
+    if((_excep_code == WATCHDOG_TIMEOUT) & i) restart_reason=0xFFFFFFFE;
+    if((_excep_code == POSSIBLE_WATCHDOG) & i)restart_reason=0xFFFFFFFD;
     LoadOptions();
 #ifdef rp2350
+    if(rom_get_last_boot_type()==BOOT_TYPE_FLASH_UPDATE)restart_reason=0xFFFFFFFC;
     if(!rp2350a){
         gpio_init(47);
         gpio_set_dir(47, GPIO_OUT);
         gpio_put(47,GPIO_PIN_SET);
     }
+#else
+    if(restart_reason==0x10001 || restart_reason==0x101)restart_reason=0xFFFFFFFC;
 #endif
     uint32_t excep=_excep_code;
     if(  Option.Baudrate == 0 ||
@@ -3931,7 +3943,7 @@ int MIPS16 main(){
         #endif
     #endif
 #endif
-    if(!(_excep_code == RESTART_NOAUTORUN || _excep_code == INVALID_CLOCKSPEED || _excep_code == WATCHDOG_TIMEOUT || (_excep_code==POSSIBLE_WATCHDOG && watchdog_caused_reboot()))){
+    if(!(_excep_code == RESTART_NOAUTORUN || _excep_code == INVALID_CLOCKSPEED || _excep_code == SCREWUP_TIMEOUT || _excep_code == WATCHDOG_TIMEOUT || (_excep_code==POSSIBLE_WATCHDOG && watchdog_caused_reboot()))){
         if(Option.Autorun==0 ){
             if(!(_excep_code == RESET_COMMAND || _excep_code == SOFT_RESET)){
                 MMPrintString((char *)banner); // print sign on message
@@ -3950,16 +3962,25 @@ int MIPS16 main(){
     memset(inpbuf,0,STRINGSIZE);
     WatchdogSet = false;
     if(_excep_code == INVALID_CLOCKSPEED) {
-        MMPrintString("\r\n\nInvalid clock speed - reset to default\r\n");
+        MMPrintString("\r\nInvalid clock speed - reset to default\r\n");
+        restart_reason=0xFFFFFFFF;
     }
-    if(_excep_code == WATCHDOG_TIMEOUT) {
+    if(_excep_code == SCREWUP_TIMEOUT) {
+        MMPrintString("\r\nCommand timeout\r\n");
+        restart_reason=0xFFFFFFFF;
+    }
+    if(restart_reason==0xFFFFFFFE) {
         WatchdogSet = true;                                 // remember if it was a watchdog timeout
-        MMPrintString("\r\n\nMMBasic Watchdog timeout\r\n");
+        MMPrintString("\r\nMMBasic Watchdog timeout\r\n");
     }
-    if(_excep_code==POSSIBLE_WATCHDOG && watchdog_caused_reboot()){
-        MMPrintString("\r\n\nHW Watchdog timeout\r\n");
+    if(restart_reason==0xFFFFFFFD){
+        MMPrintString("\r\nHW Watchdog timeout\r\n");
         WatchdogSet = true;                                 // remember if it was a watchdog timeout
         _excep_code=0;
+    }
+    if(restart_reason==0xFFFFFFFC) {
+        WatchdogSet = true;                                 // remember if it was a watchdog timeout
+        MMPrintString("\rFirmware updated\r\n");
     }
     savewatchdog=WatchdogSet;
     if(noRTC){
