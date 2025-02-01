@@ -1256,39 +1256,68 @@ void fun_mmi2c(void) {
  * @cond
  * The following section will be excluded from the documentation.
  */
-void WiiSend(int nbr, char *p){
+void GeneralSend(unsigned int addr, int nbr, char *p){
 	if(I2C0locked){
         I2C_Sendlen = nbr;                                                // send one byte
         I2C_Rcvlen = 0;
 		memcpy(I2C_Send_Buffer,p,nbr);
-        I2C_Addr = nunaddr;                                                // address of the device
+        I2C_Addr = addr;                                                // address of the device
         i2c_masterCommand(1,NULL);
 	} else {
         I2C2_Sendlen = nbr;                                                // send one byte
         I2C2_Rcvlen = 0;
 		memcpy(I2C_Send_Buffer,p,nbr);
-        I2C2_Addr = nunaddr;                                                // address of the device
+        I2C2_Addr = addr;                                                // address of the device
         i2c2_masterCommand(1,NULL);
 	}
 }
 
-void WiiReceive(int nbr, char *p){
+void GeneralReceive(unsigned int addr, int nbr, char *p){
 	if(I2C0locked){
 		I2C_Rcvbuf_Float = NULL;
 		I2C_Rcvbuf_Int = NULL;
         I2C_Sendlen = 0;                                                // send one byte
         I2C_Rcvlen = nbr;
-        I2C_Addr = nunaddr;                                                // address of the device
+        I2C_Addr = addr;                                                // address of the device
         i2c_masterCommand(1,(unsigned char *)p);
 	} else {
 		I2C2_Rcvbuf_Float = NULL;
 		I2C2_Rcvbuf_Int = NULL;
         I2C2_Sendlen = 0;                                                // send one byte
         I2C2_Rcvlen = nbr;
-        I2C2_Addr = nunaddr;                                                // address of the device
+        I2C2_Addr = addr;                                                // address of the device
         i2c2_masterCommand(1,(unsigned char *)p);
 	}
 }
+void WiiSend(int nbr, char *p){
+	unsigned int addr=nunaddr;
+	GeneralSend(addr, nbr, p);
+}
+
+void WiiReceive(int nbr, char *p){
+	unsigned int addr=nunaddr;
+	GeneralReceive(addr, nbr, p);
+}
+
+uint8_t readRegister8(unsigned int addr, uint8_t reg){
+	uint8_t buff;
+	GeneralSend(addr,1,(char *)&reg);
+	GeneralReceive(addr,1,(char *)&buff);
+	return buff;
+}
+uint32_t readRegister32(unsigned int addr, uint8_t reg){
+	uint32_t buff;
+	GeneralSend(addr,1,(char *)&reg);
+	GeneralReceive(addr,4,(char *)&buff);
+	return buff;
+}
+void WriteRegister8(unsigned int addr, uint8_t reg, uint8_t data){
+	uint8_t buff[2];
+	buff[0]=reg;
+	buff[1]=data;
+	GeneralSend(addr,2,(char *)buff);
+}
+
 void nunproc(void){
 	static int lastc=0,lastz=0;
 	nunstruct[5].x=nunbuff[0];

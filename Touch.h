@@ -69,6 +69,8 @@ void fun_touch(void);
 
     #define GET_X_AXIS              0
     #define GET_Y_AXIS              1
+    #define GET_X_AXIS2             10
+    #define GET_Y_AXIS2             11
     #define PENIRQ_ON               3
 
     #define TOUCH_NOT_CALIBRATED    -999999
@@ -98,8 +100,56 @@ void fun_touch(void);
     extern int TOUCH_CS_PIN;
     extern int TOUCH_Click_PIN;
 
-    extern int GetTouch(int x);
+    extern int GetTouch(int x, uint8_t calibrate);
     extern int GetTouchAxis(int);
+#define FT6X36_ADDR						0x38
+#define FT6X36_REG_DEVICE_MODE			0x00
+#define FT6X36_REG_GESTURE_ID			0x01
+#define FT6X36_REG_NUM_TOUCHES			0x02
+#define FT6X36_REG_P1_XH				0x03
+#define FT6X36_REG_P1_XL				0x04
+#define FT6X36_REG_P1_YH				0x05
+#define FT6X36_REG_P1_YL				0x06
+#define FT6X36_REG_P1_WEIGHT			0x07
+#define FT6X36_REG_P1_MISC				0x08
+#define FT6X36_REG_P2_XH				0x09
+#define FT6X36_REG_P2_XL				0x0A
+#define FT6X36_REG_P2_YH				0x0B
+#define FT6X36_REG_P2_YL				0x0C
+#define FT6X36_REG_P2_WEIGHT			0x0D
+#define FT6X36_REG_P2_MISC				0x0E
+#define FT6X36_REG_THRESHHOLD			0x80
+#define FT6X36_REG_FILTER_COEF			0x85
+#define FT6X36_REG_CTRL					0x86
+#define FT6X36_REG_TIME_ENTER_MONITOR	0x87
+#define FT6X36_REG_TOUCHRATE_ACTIVE		0x88
+#define FT6X36_REG_TOUCHRATE_MONITOR	0x89 // value in ms
+#define FT6X36_REG_RADIAN_VALUE			0x91
+#define FT6X36_REG_OFFSET_LEFT_RIGHT	0x92
+#define FT6X36_REG_OFFSET_UP_DOWN		0x93
+#define FT6X36_REG_DISTANCE_LEFT_RIGHT	0x94
+#define FT6X36_REG_DISTANCE_UP_DOWN		0x95
+#define FT6X36_REG_DISTANCE_ZOOM		0x96
+#define FT6X36_REG_LIB_VERSION_H		0xA1
+#define FT6X36_REG_LIB_VERSION_L		0xA2
+#define FT6X36_REG_CHIPID				0xA3
+#define FT6X36_REG_INTERRUPT_MODE		0xA4
+#define FT6X36_REG_POWER_MODE			0xA5
+#define FT6X36_REG_FIRMWARE_VERSION		0xA6
+#define FT6X36_REG_PANEL_ID				0xA8
+#define FT6X36_REG_STATE				0xBC
 
+#define FT6X36_PMODE_ACTIVE				0x00
+#define FT6X36_PMODE_MONITOR			0x01
+#define FT6X36_PMODE_STANDBY			0x02
+#define FT6X36_PMODE_HIBERNATE			0x03
+
+#define FT6X36_VENDID					0x11
+#define FT6206_CHIPID					0x06
+#define FT6236_CHIPID					0x36
+#define FT6336_CHIPID					0x64
+
+#define FT6X36_DEFAULT_THRESHOLD		22
+#define FT6336_RESET Option.TOUCH_CS
 #endif
 /*  @endcond */

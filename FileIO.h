@@ -101,7 +101,7 @@ struct option_s {
     unsigned char RTC_Data; //4=60
 //
     #ifdef PICOMITE
-        int dummy;                // maximum number of controls allowed //64
+        char dummy[4];                // maximum number of controls allowed //64
     #endif
     #ifdef PICOMITEWEB
         uint16_t TCP_PORT;                // maximum number of controls allowed //64
@@ -146,7 +146,9 @@ struct option_s {
     unsigned char AUDIO_R;
     unsigned char AUDIO_SLICE; 
     unsigned char SDspeed;
-    unsigned char pins[6];  //20=116                // general use storage for CFunctions written by PeterM //86
+    unsigned char pins[4];  //20=116                // general use storage for CFunctions written by PeterM //86
+    unsigned char TOUCH_FT6336;
+    unsigned char THRESHOLD_FT6336;
     unsigned char audio_i2c_data;
     unsigned char audio_i2c_bclk;
     char LCDVOP;

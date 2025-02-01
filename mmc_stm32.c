@@ -1461,15 +1461,17 @@ void InitReservedIO(void) {
 		CurrentSPISpeed=NONE_SPI_SPEED;
 		dobacklight();
 	}
-	if(Option.TOUCH_CS){
-		ExtCfg(Option.TOUCH_CS, EXT_BOOT_RESERVED, 0);
-		TOUCH_CS_PIN=PinDef[Option.TOUCH_CS].GPno;
-		gpio_init(TOUCH_CS_PIN);
-		gpio_set_drive_strength(TOUCH_CS_PIN,GPIO_DRIVE_STRENGTH_8MA);
-		gpio_set_slew_rate(TOUCH_CS_PIN, GPIO_SLEW_RATE_SLOW);
-		gpio_put(TOUCH_CS_PIN,GPIO_PIN_SET);
-		if(Option.CombinedCS)gpio_set_dir(TOUCH_CS_PIN, GPIO_IN);
-		else gpio_set_dir(TOUCH_CS_PIN, GPIO_OUT);
+	if(Option.TOUCH_CS || Option.TOUCH_IRQ){
+		if(Option.TOUCH_CS){
+			ExtCfg(Option.TOUCH_CS, EXT_BOOT_RESERVED, 0);
+			TOUCH_CS_PIN=PinDef[Option.TOUCH_CS].GPno;
+			gpio_init(TOUCH_CS_PIN);
+			gpio_set_drive_strength(TOUCH_CS_PIN,GPIO_DRIVE_STRENGTH_8MA);
+			gpio_set_slew_rate(TOUCH_CS_PIN, GPIO_SLEW_RATE_SLOW);
+			gpio_put(TOUCH_CS_PIN,GPIO_PIN_SET);
+			if(Option.CombinedCS)gpio_set_dir(TOUCH_CS_PIN, GPIO_IN);
+			else gpio_set_dir(TOUCH_CS_PIN, GPIO_OUT);
+		}
 		ExtCfg(Option.TOUCH_IRQ, EXT_BOOT_RESERVED, 0);
 		TOUCH_IRQ_PIN=PinDef[Option.TOUCH_IRQ].GPno;
 		gpio_init(TOUCH_IRQ_PIN);

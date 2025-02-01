@@ -66,8 +66,24 @@ const uint8_t pinlist[]={ //this is a Basic program to print out the status of a
 	1,166,128,0,
     1,147,128,95,113,37,0,0
 };
-
-
+const uint8_t i2clist[]={ //this is a Basic program to print out the I2C devices connected to the SYSTEM I2C pins
+ 1,216,128,103,112,49,41,144,49, 0, 1,132,128,95,120,37,44,95,121,37, 0, 
+ 1,168,128,34,32,32,32,32,32,48,32,32,49,32,32,50,32,32,51,32,32,52,32,32,53,32,32,54,32,32,55,32,32,56,32,32,57,32,32,65,32,32,66,32,32,67,32,32,68,32,32,69,32,32,70,34, 0, 
+ 1,153,128,95,89,37,144,48,32,204,32,55, 0, 1,168,128,164,95,121,37,44,50,41,59,34,58,32,34,59, 0, 
+ 1,153,128,95,120,37,144,48,32,204,32,49,53, 0, 1,161,128,97,100,100,114,32,144,32,95,121,37,129,49,54,133,95,120,37, 0, 
+ 1,228,128,99,104,101,99,107,32,97,100,100,114, 0, 1,158,128,225,144,48,32,203, 0, 1,168,128,164,97,100,100,114,44,50,41,59,34,32,34,59, 0, 
+ 1,139,128, 0, 1,168,128,34,45,45,32,34,59, 0, 1,143,128, 0, 1,166,128,95,120,37, 0, 1,168,128, 0, 1,166,128,95,121,37, 0, 
+ 1,147,128,95,120,37,44,95,121,37, 0, 0
+ };
+const uint8_t i2c2list[]={ //this is a Basic program to print out the I2C2 devices connected to the SYSTEM I2C pins
+ 1,216,128,103,112,49,41,144,49, 0, 1,132,128,95,120,37,44,95,121,37, 0, 
+ 1,168,128,34,32,32,32,32,32,48,32,32,49,32,32,50,32,32,51,32,32,52,32,32,53,32,32,54,32,32,55,32,32,56,32,32,57,32,32,65,32,32,66,32,32,67,32,32,68,32,32,69,32,32,70,34, 0, 
+ 1,153,128,95,89,37,144,48,32,204,32,55, 0, 1,168,128,164,95,121,37,44,50,41,59,34,58,32,34,59, 0, 
+ 1,153,128,95,120,37,144,48,32,204,32,49,53, 0, 1,161,128,97,100,100,114,32,144,32,95,121,37,129,49,54,133,95,120,37, 0, 
+ 1,229,128,32,99,104,101,99,107,32,97,100,100,114, 0, 1,158,128,225,144,48,32,203, 0, 1,168,128,164,97,100,100,114,44,50,41,59,34,32,34,59, 0, 
+ 1,139,128, 0, 1,168,128,34,45,45,32,34,59, 0, 1,143,128, 0, 1,166,128,95,120,37, 0, 1,168,128, 0, 1,166,128,95,121,37, 0, 
+ 1,147,128,95,120,37,44,95,121,37, 0, 0
+ };
 // stack to keep track of nested FOR/NEXT loops
 struct s_forstack g_forstack[MAXFORLOOPS + 1];
 int g_forindex;
@@ -473,6 +489,11 @@ void MIPS16 cmd_list(void) {
    	} else if((p = checkstring(cmdline, (unsigned char *)"PINS"))) {
 		CallExecuteProgram((char *)pinlist);
 		return;
+   	} else if((p = checkstring(cmdline, (unsigned char *)"SYSTEM I2C"))) {
+		if(I2C0locked)CallExecuteProgram((char *)i2clist);
+		else if(I2C1locked)CallExecuteProgram((char *)i2c2list);
+		else error("System I2c not defined");
+		return;
    	} else if((p = checkstring(cmdline, (unsigned char *)"COMMANDS"))) {
     	int ListCnt = 1;
     	step=Option.DISPLAY_CONSOLE ? HRes/gui_font_width/20 : 5;
@@ -483,6 +504,7 @@ void MIPS16 cmd_list(void) {
 		for(i=0;i<CommandTableSize+x;i++){
 				c[m]= (char *)((int)c + sizeof(char *) * (CommandTableSize+x) + m*18);
 				if(m<CommandTableSize)strcpy(c[m],(char *)commandtbl[i].name);
+				if(*c[m]=='_')*c[m]='.';
     			m++;
 		}
     	sortStrings(c,m);
@@ -2582,6 +2604,7 @@ unsigned char  *llist(unsigned char *b, unsigned char *p) {
 					*b = 0;											// use nothing if it LET
 				else {
 					strCopyWithCase((char *)b, (char *)commandname(tkn));			// expand the command (if it is not LET)
+					if(*b=='_')*b='.';
                     b += strlen((char *)b);                                 // update pointer to the end of the buffer
                     if(isalpha(*(b - 1))) *b++ = ' ';               // add a space to the end of the command name
                 }

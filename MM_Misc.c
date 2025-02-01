@@ -2062,10 +2062,14 @@ if(Option.CPU_Speed==FreqXGA)PO2Str("RESOLUTION", "1024x768");
     #endif
     if(Option.TOUCH_CS) {
         PO("TOUCH"); 
+        if(Option.TOUCH_FT6336)(MMPrintString("FT6336 "));
         MMPrintString((char *)PinDef[Option.TOUCH_CS].pinname);MMputchar(',',1);;
         MMPrintString((char *)PinDef[Option.TOUCH_IRQ].pinname);
         if(Option.TOUCH_Click) {
-            MMputchar(',',1);;MMPrintString((char *)PinDef[Option.TOUCH_Click].pinname);
+            MMputchar(',',1);MMPrintString((char *)PinDef[Option.TOUCH_Click].pinname);
+        } else if(Option.TOUCH_FT6336)MMputchar(',',1);
+        if(Option.TOUCH_FT6336){
+            MMputchar(',',1);PInt(Option.THRESHOLD_FT6336);
         }
         MMPrintString("\r\n");
         if(Option.TOUCH_XZERO != 0 || Option.TOUCH_YZERO != 0) {
@@ -4137,6 +4141,10 @@ void MIPS16 cmd_option(void) {
             Option.AUDIO_CS_PIN=pin1;
             Option.AUDIO_CLK_PIN=pin2;
             Option.AUDIO_MOSI_PIN=pin3;
+#ifdef rp2350
+            if(rp2350a)slice=11;
+            else
+#endif
             slice=checkslice(pin2,pin2, 1);
             if((PinDef[Option.DISPLAY_BL].slice & 0x7f) == slice) error("Channel in use for backlight");
             Option.AUDIO_SLICE=slice;
@@ -4170,6 +4178,10 @@ void MIPS16 cmd_option(void) {
 //
             Option.audio_i2c_bclk=pin1;
             Option.audio_i2c_data=pin2;
+#ifdef rp2350
+            if(rp2350a)slice=11;
+            else
+#endif
             slice=checkslice(pin1,pin1, 1);
             if((PinDef[Option.DISPLAY_BL].slice & 0x7f) == slice) error("Channel in use for backlight");
             Option.AUDIO_SLICE=slice;
@@ -5352,10 +5364,6 @@ void MIPS16 fun_info(void){
         } else error("Syntax");
 	} else if(checkstring(ep, (unsigned char *)"WRITEBUFF")){
         iret=(int64_t)((uint32_t)WriteBuf);
-        targ=T_INT;
-        return;
-	} else if(checkstring(ep, (unsigned char *)"TEST")){
-        iret=(int64_t)0;
         targ=T_INT;
         return;
     } else if((tp=checkstring(ep, (unsigned char *)"UPTIME"))){

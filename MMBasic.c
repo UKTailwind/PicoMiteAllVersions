@@ -1045,6 +1045,13 @@ void  MIPS16 tokenise(int console) {
         STR_REPLACE((char *)inpbuf,"MM.VPOS","MM.INFO(VPOS)");
         STR_REPLACE((char *)inpbuf,"MM.ONEWIRE","MM.INFO(ONEWIRE)");
         STR_REPLACE((char *)inpbuf,"SPRITE MEMORY","BLIT MEMORY");
+        STR_REPLACE((char *)inpbuf,".program","_program");
+        STR_REPLACE((char *)inpbuf,".end program","_end program");
+        STR_REPLACE((char *)inpbuf,".side set","_side set");
+        STR_REPLACE((char *)inpbuf,".wrap target","_wrap target");
+        STR_REPLACE((char *)inpbuf,".wrap","_wrap");
+        STR_REPLACE((char *)inpbuf,".line","_line");
+        STR_REPLACE((char *)inpbuf,".label","_label");
     }
     // setup the input and output buffers
     p = inpbuf;

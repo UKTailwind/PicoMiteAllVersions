@@ -163,6 +163,27 @@ void cmd_camera(void);
 void cmd_Servo(void);
 void cmd_chain(void);
 void cmd_psram(void);
+void cmd_wrap(void);
+void cmd_wraptarget(void);
+void cmd_sideset(void);
+void cmd_PIOline(void);
+void cmd_program(void);
+void cmd_endprogram(void);
+void cmd_label(void);
+void cmd_jmp(void);
+void cmd_wait(void);
+void cmd_in(void);
+void cmd_out(void);
+void cmd_push(void);
+void cmd_pull(void);
+void cmd_mov(void);
+void cmd_nop(void);
+void cmd_irqset(void);
+void cmd_irqwait(void);
+void cmd_irqclear(void);
+void cmd_irqnowait(void);
+void cmd_irq(void);
+void cmd_set(void);
 #ifdef PICOMITEWEB
     void cmd_web(void);
 #endif
@@ -458,6 +479,27 @@ void fun_map(void);
 	{ (unsigned char *)"Servo",		T_CMD,				0, cmd_Servo	},
 	{ (unsigned char *)"Mouse",		T_CMD,				0, cmd_mouse	},
 	{ (unsigned char *)"Chain",		T_CMD,				0, cmd_chain	},
+	{ (unsigned char *)"_wrap target",		T_CMD,				0, cmd_wraptarget	},
+	{ (unsigned char *)"_wrap",		T_CMD,				0, cmd_wrap	},
+	{ (unsigned char *)"_line",		T_CMD,				0, cmd_PIOline	},
+	{ (unsigned char *)"_program",		T_CMD,				0, cmd_program	},
+	{ (unsigned char *)"_end program",		T_CMD,				0, cmd_endprogram	},
+	{ (unsigned char *)"_side set",		T_CMD,				0, cmd_sideset	},
+	{ (unsigned char *)"_label",		T_CMD,				0, cmd_label	},
+	{ (unsigned char *)"Jmp",		T_CMD,				0, cmd_jmp	},
+	{ (unsigned char *)"Wait",		T_CMD,				0, cmd_wait	},
+	{ (unsigned char *)"In",		T_CMD,				0, cmd_in	},
+	{ (unsigned char *)"Out",		T_CMD,				0, cmd_out	},
+	{ (unsigned char *)"Push",		T_CMD,				0, cmd_push	},
+	{ (unsigned char *)"Pull",		T_CMD,				0, cmd_pull	},
+	{ (unsigned char *)"Mov",		T_CMD,				0, cmd_mov	},
+	{ (unsigned char *)"Nop",		T_CMD,				0, cmd_nop	},
+	{ (unsigned char *)"IRQ SET",		T_CMD,				0, cmd_irqset	},
+	{ (unsigned char *)"IRQ WAIT",		T_CMD,				0, cmd_irqwait	},
+	{ (unsigned char *)"IRQ CLEAR",		T_CMD,				0, cmd_irqclear	},
+	{ (unsigned char *)"IRQ NOWAIT",		T_CMD,				0, cmd_irqnowait	},
+	{ (unsigned char *)"IRQ",		T_CMD,				0, cmd_irq	},
+	{ (unsigned char *)"Set",		T_CMD,				0, cmd_set	}, 
 #ifdef PICOMITEVGA
   	{ (unsigned char *)"TILE",            T_CMD,                     0, cmd_tile   },
   	{ (unsigned char *)"MODE",            T_CMD,                     0, cmd_mode   },

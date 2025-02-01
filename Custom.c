@@ -153,9 +153,10 @@ static int sidepins=0,sideopt=0,sidepinsdir=0, PIOlinenumber=0, PIOstart=0, p_wr
 static int delaypossible=5;
 static int checksideanddelay=0;
 int dirOK=2;
-static int *instructions;
-static char *labelsfound, *labelsneeded;
+static int *instructions=NULL;
+static char *labelsfound=NULL, *labelsneeded=NULL;
 int piointerrupt=0;
+static int pioinuse=99;
 static inline uint32_t pio_sm_calc_wrap(uint wrap_target, uint wrap) {
     uint32_t calc=0;
 //    valid_params_if(PIO, wrap < PIO_INSTRUCTION_COUNT);
@@ -183,9 +184,9 @@ int calcsideanddelay(char *p, int sidepins, int maxdelaybits){
                                 save=*ppp;
                                 *ppp=',';
                         }
-                data=(int)(getint((unsigned char *)ss,0,(1<<(sidepins-sideopt)))<<(8+maxdelaybits));
-                if(sideopt)data|=0x1000;
-                *ppp=save;
+                        data=(int)(getint((unsigned char *)ss,0,((1<<sidepins)-1))<<(8+maxdelaybits));
+                        if(sideopt)data|=0x1000;
+                        *ppp=save;
                 } else error("Syntax");
         }
         if((pp=fstrstr(p,"["))){
@@ -686,22 +687,26 @@ void MIPS16 cmd_pio(void){
     if(tp){
         static int wrap_target_set=0, wrap_set=0;
         getargs(&tp,3,(unsigned char *)",");
-        if(argc!=3)error("Syntax");
+        if(!argc)error("Syntax");
         int pior=getint(argv[0],0,PIOMAX-1);
         if(PIO0==false && pior==0)error("PIO 0 not available");
         if(PIO1==false && pior==1)error("PIO 1 not available");
         if(PIO2==false && pior==2)error("PIO 2 not available");
+        pioinuse=pior;
 #ifdef rp2350
         PIO pio = (pior==0 ? pio0: (pior==1 ? pio1: pio2));
 #else
         PIO pio = (pior==0 ?  pio0: pio1);
 #endif
         unsigned int ins=0;
-        char *ss=(char *)getCstring(argv[2]);
-        char *comment=strchr(ss,';');
-        if(comment)*comment=0;
-        skipspace(ss);
-        if(*ss==0)return;
+        char *ss;
+        if(argc==3){
+                ss=(char *)getCstring(argv[2]);
+                char *comment=strchr(ss,';');
+                if(comment)*comment=0;
+                skipspace(ss);
+                if(*ss==0)return;
+        } else return;
         if(!strncasecmp(ss,".PROGRAM ",9)){
                 if(dirOK!=2)error("Program already started");
                 sidepins=0,sideopt=0,sidepinsdir=0;
@@ -863,7 +868,7 @@ void MIPS16 cmd_pio(void){
                                 if(*ppp==',')*ppp=save;
                                 if(rel==1) bits |=0x10;
                                 ins |=bits;
-                       } else if(!strncasecmp(ss,"IN ",3)){
+                        } else if(!strncasecmp(ss,"IN ",3)){
                                 dirOK=0;
                                 ss+=3;
                                 ins=0x4000;checksideanddelay=1;
@@ -1190,9 +1195,10 @@ void MIPS16 cmd_pio(void){
                                                 PRet();
                                         }
                                 }
-                                FreeMemory((void *)instructions);
-                                FreeMemory((void *)labelsneeded);
-                                FreeMemory((void *)labelsfound);
+                                FreeMemorySafe((void **)&instructions);
+                                FreeMemorySafe((void **)&labelsneeded);
+                                FreeMemorySafe((void **)&labelsfound);
+                                pioinuse=99;
                                 return;
                         } else if(!strncasecmp(ss,".SIDE_SET ",10)){
                                 if(!dirOK)error("Directive must appear before instructions");
@@ -1527,6 +1533,101 @@ void fun_pio(void){
 
 
 }
+// mode determines functionality
+// bit 0 sets wheter to add a space after the text
+// bit 1 sets whether to omit the missing program check
+// bit 2 sets whether to add a colon after the text
+// bit 3 enables the diagnostic print
+void call_pio(char * instruction, uint8_t mode){
+       if((instructions==NULL || pioinuse==99) && !(mode & 2))error("Missing Program statement");
+       skipspace(cmdline);
+       char *buff=GetTempMemory(STRINGSIZE);
+       sprintf(buff,"ASSEMBLE %d, \"",pioinuse);
+       strcat(buff,instruction);
+       if(mode & 1)strcat(buff," ");
+       strcat(buff,(char *)cmdline);
+       char *p=buff;
+      while(*p){ //strip comments and loose spurrious tokens
+               if(*p==GetTokenValue((unsigned char *)"-"))*p=(unsigned char)'-';
+               if(*p==GetTokenValue((unsigned char *)"="))*p=(unsigned char)'=';
+               if(*p=='\''){
+                       *p=0;
+                       break;
+               }
+               p++;
+       }
+       // strip trailing spaces
+       p=buff+strlen(buff)-1;
+       while(*p==' ')*p--=0;
+       if(mode & 4)strcat(buff,":");
+       strcat(buff,"\"");
+       cmdline=((unsigned char *)buff);
+       if(mode & 8){MMPrintString((char *)cmdline);PRet();}
+       cmd_pio();
+}
+void cmd_program(void){
+       call_pio(".program",3);
+}
+void cmd_wrap(void){
+       call_pio(".wrap",0);
+}
+void cmd_wraptarget(void){
+       call_pio(".wrap target",0);
+}
+void cmd_PIOline(void){
+       call_pio(".line",1);
+}
+void cmd_sideset(void){
+       call_pio(".side set",1);
+}
+void cmd_endprogram(void){
+       call_pio(".end program",strlen((char *)cmdline) ? 1 : 0);
+}
+void cmd_jmp(void){
+       call_pio("jmp",1);
+}
+void cmd_wait(void){
+       call_pio("wait",1);
+}
+void cmd_in(void){
+        call_pio("in",1);
+}
+void cmd_out(void){
+        call_pio("out",strlen((char *)cmdline) ? 1 : 0);
+}
+void cmd_push(void){
+        call_pio("push",strlen((char *)cmdline) ? 1 : 0);
+}
+void cmd_pull(void){
+        call_pio("pull",1);
+}
+void cmd_mov(void){
+        call_pio("mov",1);
+}
+void cmd_nop(void){
+        call_pio("nop",0);
+}
+void cmd_irqset(void){
+        call_pio("irq set",1);
+}
+void cmd_irqwait(void){
+        call_pio("irq wait",1);
+}
+void cmd_irqclear(void){
+        call_pio("irq clear",1);
+}
+void cmd_irqnowait(void){
+        call_pio("irq mov",1);
+}
+void cmd_irq(void){
+        call_pio("irq",1);
+}
+void cmd_set(void){
+       call_pio("set",1);
+}
+void cmd_label(void){
+       call_pio("",4);
+}
 /* 
  * @cond
  * The following section will be excluded from the documentation.
@@ -1569,7 +1670,6 @@ static int scan_result(void *env, const cyw43_ev_scan_result_t *result) {
     return 0;
 }
 /*  @endcond */
-
 void cmd_web(void){
         unsigned char *tp;
         tp=checkstring(cmdline, (unsigned char *)"CONNECT");

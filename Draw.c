@@ -291,7 +291,7 @@ void MIPS16 cmd_guiMX170(void) {
 #endif
             InitDisplaySPI(true);
             InitDisplayI2C(true);
-            if(Option.TOUCH_CS) {
+            if((Option.TOUCH_CS || Option.TOUCH_IRQ) && !Option.TOUCH_CS) {
                 GetTouchValue(CMD_PENIRQ_ON);                                      // send the controller the command to turn on PenIRQ
                 GetTouchAxis(CMD_MEASURE_X);
             }
@@ -302,7 +302,7 @@ void MIPS16 cmd_guiMX170(void) {
     if((p = checkstring(cmdline, (unsigned char *)"CALIBRATE"))) {
         int tlx, tly, trx, try, blx, bly, brx, bry, midy;
         char *s;
-        if(Option.TOUCH_CS == 0) error("Touch not configured");
+        if(Option.TOUCH_CS == 0 && Option.TOUCH_IRQ ==0) error("Touch not configured");
 
         if(*p && *p != '\'') {                                      // if the calibration is provided on the command line
             getargs(&p, 9, (unsigned char *)",");
@@ -316,13 +316,18 @@ void MIPS16 cmd_guiMX170(void) {
             return;
         } else {
             if(CurrentLinePtr) error("Invalid in a program");
+            Option.TOUCH_SWAPXY = 0;
+            Option.TOUCH_XZERO = 0;
+            Option.TOUCH_YZERO = 0;
+            Option.TOUCH_XSCALE = 1.0f;
+            Option.TOUCH_YSCALE = 1.0f;
         }
         calibrate=1;
         GetCalibration(TARGET_OFFSET, TARGET_OFFSET, &tlx, &tly);
         GetCalibration(HRes - TARGET_OFFSET, TARGET_OFFSET, &trx, &try);
         if(abs(trx - tlx) < CAL_ERROR_MARGIN && abs(tly - try) < CAL_ERROR_MARGIN) {
             calibrate=0;
-            error("Touch hardware failure");
+            error("Touch hardware failure %,%,%,%",tlx,trx,tly,try);
         }
 
         GetCalibration(TARGET_OFFSET, VRes - TARGET_OFFSET, &blx, &bly);
@@ -387,8 +392,8 @@ void MIPS16 cmd_guiMX170(void) {
             int x, y;
             ClearScreen(gui_bcolour);
             while(getConsole() < '\r') {
-                x = GetTouch(GET_X_AXIS);
-                y = GetTouch(GET_Y_AXIS);
+                x = GetTouch(GET_X_AXIS, 0);
+                y = GetTouch(GET_Y_AXIS, 0);
                 if(x != TOUCH_ERROR && y != TOUCH_ERROR) DrawBox(x - 1, y - 1, x + 1, y + 1, 0, WHITE, WHITE);
             }
             ClearScreen(gui_bcolour);

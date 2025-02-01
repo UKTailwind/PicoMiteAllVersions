@@ -59,45 +59,80 @@ int TOUCH_GETIRQTRIS=0;
 // configure the touch parameters (chip select pin and the IRQ pin)
 // this is called by the OPTION TOUCH command
 void MIPS16 ConfigTouch(unsigned char *p) {
-    int pin1, pin2, pin3=0;
-    getargs(&p, 5, (unsigned char *)",");
+    int pin1, pin2=0, pin3=0;
+    bool TOUCH_FT6336=false;
+    int threshold=50;
+    unsigned char *tp=NULL;
+    if((tp=checkstring(p,(unsigned char *)"FT6336"))){
+        p=tp;
+        if(!Option.SYSTEM_I2C_SDA)error("System I2C not set");
+        TOUCH_FT6336=true;
+    }
+    getargs(&p, 7, (unsigned char *)",");
     if(!Option.SYSTEM_CLK)error("System SPI not configured");
-    if(!(argc == 3 || argc == 5)) error("Argument count");
+    if(!TOUCH_FT6336){
+        if(!(argc == 3 || argc == 5)) error("Argument count");
+    }
 	unsigned char code;
 	if(!(code=codecheck(argv[0])))argv[0]+=2;
 	pin1 = getinteger(argv[0]);
 	if(!code)pin1=codemap(pin1);
 	if(IsInvalidPin(pin1)) error("Invalid pin");
-	if(!(code=codecheck(argv[2])))argv[2]+=2;
-	pin2 = getinteger(argv[2]);
-	if(!code)pin2=codemap(pin2);
-	if(IsInvalidPin(pin2)) error("Invalid pin");
-
-    if(argc == 5) {
+    if(argc >= 3 && *argv[2]) {
+        if(!(code=codecheck(argv[2])))argv[2]+=2;
+        pin2 = getinteger(argv[2]);
+        if(!code)pin2=codemap(pin2);
+        if(IsInvalidPin(pin2)) error("Invalid pin");
+    }
+    if(argc >= 5 && *argv[4]) {
         if(!(code=codecheck(argv[4])))argv[4]+=2;
         pin3 = getinteger(argv[4]);
         if(!code)pin3=codemap(pin3);
         if(IsInvalidPin(pin3)) error("Invalid pin");
     }
+    if(TOUCH_FT6336){
+        if(argc==7) threshold=getint(argv[6],0,255);
+    }
     if(ExtCurrentConfig[pin1] != EXT_NOT_CONFIG)  error("Pin %/| is in use",pin1,pin1);
-    if(ExtCurrentConfig[pin2] != EXT_NOT_CONFIG)  error("Pin %/| is in use",pin2,pin2);
+	if(pin2)
+        if(ExtCurrentConfig[pin2] != EXT_NOT_CONFIG)  error("Pin %/| is in use",pin2,pin2);
 	if(pin3)
         if(ExtCurrentConfig[pin3] != EXT_NOT_CONFIG)  error("Pin %/| is in use",pin3,pin3);
-    Option.TOUCH_CS = pin1;
-    Option.TOUCH_IRQ = pin2;
+    Option.TOUCH_CS = (TOUCH_FT6336 ? pin2 :pin1);
+    Option.TOUCH_IRQ = (TOUCH_FT6336 ? pin1 :pin2);
     Option.TOUCH_Click = pin3;
     Option.TOUCH_XZERO = Option.TOUCH_YZERO = 0;                    // record the touch feature as not calibrated
+    Option.TOUCH_FT6336=TOUCH_FT6336;
+    Option.THRESHOLD_FT6336=threshold;
 }
 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // setup touch based on the settings saved in flash
 void MIPS16 InitTouch(void) {
-    if(!Option.TOUCH_CS) return;
-    GetTouchValue(CMD_PENIRQ_ON);                                   // send the controller the command to turn on PenIRQ
-    TOUCH_GETIRQTRIS = 1;
-    GetTouchAxis(CMD_MEASURE_X);
-    TouchIrqPortAddr = 1;
+    if(Option.TOUCH_FT6336){
+        if(!Option.TOUCH_IRQ) return; //shouldn't be needed
+        if(FT6336_RESET){ //reset the chip
+            PinSetBit(FT6336_RESET, LATCLR);
+            uSec(1000);
+            PinSetBit(FT6336_RESET, LATSET);
+            uSec(1000);
+        }
+        uSec(500000);
+        if(readRegister8(FT6X36_ADDR, FT6X36_REG_PANEL_ID) != FT6X36_VENDID)MMPrintString("Touch panel ID not found\r\n");
+        uint8_t id = readRegister8(FT6X36_ADDR, FT6X36_REG_CHIPID);
+	    if (!(id == FT6206_CHIPID || id == FT6236_CHIPID || id == FT6336_CHIPID)){PIntH(id);MMPrintString(" Touch panel not found\r\n");}
+	    WriteRegister8(FT6X36_ADDR, FT6X36_REG_DEVICE_MODE, 0x00);
+	    WriteRegister8(FT6X36_ADDR, FT6X36_REG_INTERRUPT_MODE, 0x00);
+	    WriteRegister8(FT6X36_ADDR, FT6X36_REG_CTRL, 0x00);
+	    WriteRegister8(FT6X36_ADDR, FT6X36_REG_THRESHHOLD, Option.THRESHOLD_FT6336);
+    } else {
+        if(!Option.TOUCH_CS) return;
+        GetTouchValue(CMD_PENIRQ_ON);                                   // send the controller the command to turn on PenIRQ
+        TOUCH_GETIRQTRIS = 1;
+        GetTouchAxis(CMD_MEASURE_X);
+        TouchIrqPortAddr = 1;
+    }
 
 }
 
@@ -115,20 +150,39 @@ void MIPS16 GetCalibration(int x, int y, int *xval, int *yval) {
     DrawLine(x - (TARGET_OFFSET * 3)/4, y, x + (TARGET_OFFSET * 3)/4, y, 1, WHITE);
     DrawLine(x, y - (TARGET_OFFSET * 3)/4, x, y + (TARGET_OFFSET * 3)/4, 1, WHITE);
     DrawCircle(x, y, TARGET_OFFSET/2, 1, WHITE, -1, 1);
-    while(!TOUCH_DOWN) CheckAbort();                                // wait for the touch
-    for(i = j = 0; i < 50; i++) {                                   // throw away the first 50 reads as rubbish
-        GetTouchAxis(CMD_MEASURE_X); GetTouchAxis(CMD_MEASURE_Y);
+    if(!Option.TOUCH_FT6336){
+        while(!TOUCH_DOWN) CheckAbort();                                // wait for the touch
+        for(i = j = 0; i < 50; i++) {                                   // throw away the first 50 reads as rubbish
+            GetTouchAxis(CMD_MEASURE_X); GetTouchAxis(CMD_MEASURE_Y);
+        }
+
+        // make a lot of readings and average them
+        for(i = j = 0; i < 50; i++) j += GetTouchAxis(CMD_MEASURE_X);
+        *xval = j/50;
+        for(i = j = 0; i < 50; i++) j += GetTouchAxis(CMD_MEASURE_Y);
+        *yval = j/50;
+
+        ClearScreen(BLACK);
+        while(TOUCH_DOWN) CheckAbort();                                 // wait for the touch to be lifted
+        uSec(25000);
+    } else {
+        while(!TOUCH_DOWN) CheckAbort();                                // wait for the touch
+        uSec(100000);
+//        for(i = j = 0; i < 10; i++) {                                   // throw away the first 50 reads as rubbish
+//            GetTouch(GET_X_AXIS); GetTouch(GET_Y_AXIS);
+//        }
+
+        // make a lot of readings and average them
+        for(i = j = 0; i < 5; i++) j += GetTouch(GET_X_AXIS, 1);
+        *xval = j/5;
+        for(i = j = 0; i < 5; i++) j += GetTouch(GET_Y_AXIS, 1);
+        *yval = j/5;
+
+        ClearScreen(BLACK);
+        while(TOUCH_DOWN) CheckAbort();                                 // wait for the touch to be lifted
+//       while(readRegister8(FT6X36_ADDR, FT6X36_REG_NUM_TOUCHES)) CheckAbort();                                 // wait for the touch to be lifted
+        uSec(25000);
     }
-
-    // make a lot of readings and average them
-    for(i = j = 0; i < 50; i++) j += GetTouchAxis(CMD_MEASURE_X);
-    *xval = j/50;
-    for(i = j = 0; i < 50; i++) j += GetTouchAxis(CMD_MEASURE_Y);
-    *yval = j/50;
-
-    ClearScreen(BLACK);
-    while(TOUCH_DOWN) CheckAbort();                                 // wait for the touch to be lifted
-    uSec(25000);
 }
 
 
@@ -137,21 +191,46 @@ void MIPS16 GetCalibration(int x, int y, int *xval, int *yval) {
 // if y is true the y reading will be returned, otherwise the x reading
 // this function does noise reduction and scales the reading to pixels
 // a return of TOUCH_ERROR means that the pen is not down
-int __not_in_flash_func(GetTouch)(int y) {
+int __not_in_flash_func(GetTouch)(int y, uint8_t calibrate) {
     int i;
 //    static int lastx, lasty;
 
-    if(Option.TOUCH_CS == 0) error("Touch option not set");
-    if(!Option.TOUCH_XZERO && !Option.TOUCH_YZERO) error("Touch not calibrated");
+    if(Option.TOUCH_CS == 0 && Option.TOUCH_IRQ ==0) error("Touch option not set");
+    if(Option.TOUCH_FT6336){
+        if(!Option.TOUCH_XZERO && !Option.TOUCH_YZERO && !calibrate) error("Touch not calibrated");
         if(PinRead(Option.TOUCH_IRQ)) return TOUCH_ERROR;
-        if(y) {
-            i = ((MMFLOAT)(GetTouchAxis(Option.TOUCH_SWAPXY? CMD_MEASURE_X:CMD_MEASURE_Y) - Option.TOUCH_YZERO) * Option.TOUCH_YSCALE);
-//            if(i < lasty - CAL_ERROR_MARGIN || i > lasty + CAL_ERROR_MARGIN) { lasty = i; i = TOUCH_ERROR; }
+        uint32_t in;
+        if(y>=10){
+            if(readRegister8(FT6X36_ADDR, FT6X36_REG_NUM_TOUCHES)!=2)return TOUCH_ERROR;
+            in=readRegister32(FT6X36_ADDR, FT6X36_REG_P2_XH);
+            y-=10;
+        } else in=readRegister32(FT6X36_ADDR, FT6X36_REG_P1_XH);
+        if(Option.TOUCH_SWAPXY)y=!y;
+        if(y){
+            i=(in & 0xF0000)>>8;
+            i |= (in>>24);
         } else {
-            i = ((MMFLOAT)(GetTouchAxis(Option.TOUCH_SWAPXY? CMD_MEASURE_Y:CMD_MEASURE_X) - Option.TOUCH_XZERO) * Option.TOUCH_XSCALE);
-//            if(i < lastx - CAL_ERROR_MARGIN || i > lastx + CAL_ERROR_MARGIN) { lastx = i; i = TOUCH_ERROR; }
+            i=(in & 0xF)<<8;
+            i |= ((in>>8) & 0xFF);
         }
-	if(i < 0 || i >= (y ? VRes : HRes))i=TOUCH_ERROR;
+        if(Option.TOUCH_SWAPXY)y=!y;
+        if(y){
+            i=(MMFLOAT)(i-Option.TOUCH_YZERO) * Option.TOUCH_YSCALE;
+        } else {
+            i=(MMFLOAT)(i-Option.TOUCH_XZERO) * Option.TOUCH_XSCALE;
+        }
+    } else {
+        if(!Option.TOUCH_XZERO && !Option.TOUCH_YZERO) error("Touch not calibrated");
+            if(PinRead(Option.TOUCH_IRQ)) return TOUCH_ERROR;
+            if(y) {
+                i = ((MMFLOAT)(GetTouchAxis(Option.TOUCH_SWAPXY? CMD_MEASURE_X:CMD_MEASURE_Y) - Option.TOUCH_YZERO) * Option.TOUCH_YSCALE);
+    //            if(i < lasty - CAL_ERROR_MARGIN || i > lasty + CAL_ERROR_MARGIN) { lasty = i; i = TOUCH_ERROR; }
+            } else {
+                i = ((MMFLOAT)(GetTouchAxis(Option.TOUCH_SWAPXY? CMD_MEASURE_Y:CMD_MEASURE_X) - Option.TOUCH_XZERO) * Option.TOUCH_XSCALE);
+    //            if(i < lastx - CAL_ERROR_MARGIN || i > lastx + CAL_ERROR_MARGIN) { lastx = i; i = TOUCH_ERROR; }
+            }
+        if(i < 0 || i >= (y ? VRes : HRes))i=TOUCH_ERROR;
+    }
     return i;
 }
 
@@ -250,9 +329,13 @@ void __not_in_flash_func(TDelay)(void)     // provides a small (~200ns) delay fo
 // the MMBasic TOUCH() function
 void fun_touch(void) {
     if(checkstring(ep, (unsigned char *)"X"))
-        iret = GetTouch(GET_X_AXIS);
+        iret = GetTouch(GET_X_AXIS, 0);
     else if(checkstring(ep, (unsigned char *)"Y"))
-        iret = GetTouch(GET_Y_AXIS);
+        iret = GetTouch(GET_Y_AXIS, 0);
+    else if(checkstring(ep, (unsigned char *)"DOWN"))
+        iret = TOUCH_DOWN;
+    else if(checkstring(ep, (unsigned char *)"UP"))
+        iret = !TOUCH_DOWN;
 #ifdef GUICONTROLS
     else if(checkstring(ep, (unsigned char *)"REF"))
         iret = CurrentRef;
@@ -262,16 +345,19 @@ void fun_touch(void) {
         iret = LastX;
     else if(checkstring(ep, (unsigned char *)"LASTY"))
         iret = LastY;
-    else if(checkstring(ep, (unsigned char *)"DOWN"))
-        iret = TOUCH_DOWN;
-    else if(checkstring(ep, (unsigned char *)"UP"))
-        iret = !TOUCH_DOWN;
-#else
-    else if(checkstring(ep, (unsigned char *)"DOWN"))
-        iret = (PinRead(Option.TOUCH_IRQ) ? 0 : 1);
-#endif        
-    else
-        error("Invalid argument");
+ #endif        
+    else {
+        if(Option.TOUCH_FT6336){
+            if(checkstring(ep, (unsigned char *)"X2"))
+                iret = GetTouch(GET_X_AXIS2, 0);
+            else if(checkstring(ep, (unsigned char *)"Y2"))
+                iret = GetTouch(GET_Y_AXIS2, 0);
+//            else if(checkstring(ep, (unsigned char *)"GESTURE"))
+//                iret = readRegister8(FT6X36_ADDR, FT6X36_REG_GESTURE_ID);
+            else error("Invalid argument");    
+        } else error("Invalid argument");
+
+    }        
 
     targ = T_INT;
 }

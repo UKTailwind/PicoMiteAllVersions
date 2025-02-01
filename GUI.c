@@ -1928,8 +1928,8 @@ void ProcessTouch(void) {
     if(!(TouchUp || TouchDown)) return;                             // quick exit if there is nothing to do
     if(TouchDown) {
         // touch has just occurred
-        TouchX = GetTouch(GET_X_AXIS);
-        TouchY = GetTouch(GET_Y_AXIS);
+        TouchX = GetTouch(GET_X_AXIS, 0);
+        TouchY = GetTouch(GET_Y_AXIS, 0);
         LastRef = CurrentRef = 0;
         TouchUp = TouchDown = false;
         if(TouchX == TOUCH_ERROR) return;                           // abort if the pen was lifted
@@ -2200,7 +2200,7 @@ void fun_msgbox(void) {
 
     while(1) {
         ServiceInterrupts();
-        x = GetTouch(GET_X_AXIS);  y = GetTouch(GET_Y_AXIS);
+        x = GetTouch(GET_X_AXIS, 0);  y = GetTouch(GET_Y_AXIS, 0);
         for(i = 0; i < btnnbr; i++)
             if(x >= btnx1[i] && x <= btnx2[i] && y >= btny1 && y <= btny2)
                 break;
@@ -2208,7 +2208,7 @@ void fun_msgbox(void) {
             DrawBasicButton(btnx1[i], btny1, btnx2[i], btny2, BTN_SIDE_WIDTH, 0, gui_fcolour, CTRL_NORMAL);
             SpecialPrintString(btnx1[i] + btnwidth/2 + BTN_CAPTION_SHIFT, btny1 + gui_font_height + BTN_CAPTION_SHIFT, JUSTIFY_CENTER, JUSTIFY_MIDDLE, ORIENT_NORMAL, gui_bcolour, gui_fcolour, &btn[i * MAXSTRLEN], CTRL_NORMAL);
             ClickTimer += CLICK_DURATION;                        // sound a "click"
-            while(GetTouch(GET_X_AXIS) != TOUCH_ERROR) ServiceInterrupts();
+            while(GetTouch(GET_X_AXIS, 0) != TOUCH_ERROR) ServiceInterrupts();
             SpecialDrawRBox(x1, y1, x2, y2, 25, gui_bcolour, gui_bcolour, CTRL_NORMAL);
             PopUpRedrawAll(0, false);
             iret = i + 1;
