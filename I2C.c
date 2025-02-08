@@ -69,7 +69,7 @@ static unsigned char I2C_Send_Buffer[256];                                   // 
 bool I2C_enabled=false;									// I2C enable marker
 unsigned int I2C_Timeout;									// master timeout value
 volatile unsigned int I2C_Status;										// status flags
-static int mmI2Cvalue;
+int mmI2Cvalue;
 	// value of MM.I2C
 static MMFLOAT *I2C2_Rcvbuf_Float;										// pointer to the master receive buffer for a MMFLOAT
 static long long int *I2C2_Rcvbuf_Int;								// pointer to the master receive buffer for an integer
@@ -1316,6 +1316,26 @@ void WriteRegister8(unsigned int addr, uint8_t reg, uint8_t data){
 	buff[0]=reg;
 	buff[1]=data;
 	GeneralSend(addr,2,(char *)buff);
+}
+void Write8Register16(unsigned int addr, uint16_t reg, uint8_t data){
+	uint8_t buff[3];
+	buff[0]=reg>>8;
+	buff[1]=reg & 0xFF;
+	buff[2]=data;
+	GeneralSend(addr,3,(char *)buff);
+}
+uint8_t read8Register16(unsigned int addr, uint16_t reg){
+	uint8_t buff;
+	uint8_t rbuff[2];
+	rbuff[0]=reg>>8;
+	rbuff[1]=reg & 0xFF;
+	if(I2C0locked)I2C_Status=I2C_Status_BusHold;
+	else I2C2_Status=I2C_Status_BusHold;
+	GeneralSend(addr,2,(char *)rbuff);
+	if(I2C0locked)I2C_Status=0;
+	else I2C2_Status=0;
+	GeneralReceive(addr,1,(char *)&buff);
+	return buff;
 }
 
 void nunproc(void){

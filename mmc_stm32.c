@@ -57,10 +57,8 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #ifndef PICOMITEWEB
 #include "pico/multicore.h"
 #endif
-#ifdef rp2350
 #include "hardware/pio.h"
 #include "hardware/pio_instructions.h"
-#endif
 //#include "integer.h"
 int SPISpeed=0xFF;
 //#define SD_CS_PIN Option.SD_CS
@@ -214,6 +212,8 @@ int __not_in_flash_func(getsound)(int i,int mode){
 #define sdi_send_buffer_local(a,b) sdi_send_buffer(a,b)
 #define sendcount 64
 #define sendstream 32
+extern PIO pioi2s;
+extern uint8_t i2ssm;
 void MIPS32 __not_in_flash_func(on_pwm_wrap)(void) {
 	static int noisedwellleft[MAXSOUNDS]={0}, noisedwellright[MAXSOUNDS]={0};
 	static uint32_t noiseleft[MAXSOUNDS]={0}, noiseright[MAXSOUNDS]={0};
@@ -223,16 +223,15 @@ void MIPS32 __not_in_flash_func(on_pwm_wrap)(void) {
 	__dsb();
 #endif
     pwm_clear_irq(AUDIO_SLICE);
-#ifdef rp2350
 	if(Option.audio_i2c_bclk){
-		if((pio2->flevel & 0xf) > 6)return;
+		if((pioi2s->flevel & (0xf<<(i2ssm*8))) > (0x6<<(i2ssm*8)))return;
 		static int32_t left=0, right=0;
 		if(CurrentlyPlaying == P_TONE){
 			if(!SoundPlay){
 				StopAudio();
 				WAVcomplete = true;
 			} else {
-				while((pio2->flevel & 0xf)<6){
+				while((pioi2s->flevel & (0xf<<(i2ssm*8))) < (0x6<<(i2ssm*8))){
 					SoundPlay--;
 					if(mono){
 						left=(((((SineTable[(int)PhaseAC_left]-2000)  * mapping[vol_left])))*512);
@@ -248,16 +247,16 @@ void MIPS32 __not_in_flash_func(on_pwm_wrap)(void) {
 						if(PhaseAC_left>=4096.0)PhaseAC_left-=4096.0;
 						if(PhaseAC_right>=4096.0)PhaseAC_right-=4096.0;
 					}
-					pio_sm_put_blocking(pio2, 0, left);
-					pio_sm_put_blocking(pio2, 0, right);
+					pio_sm_put_blocking(pioi2s, i2ssm, left);
+					pio_sm_put_blocking(pioi2s, i2ssm, right);
 				}
 			}
 			return;
 		} else if(CurrentlyPlaying == P_WAV  || CurrentlyPlaying == P_FLAC  || CurrentlyPlaying == P_MOD  || CurrentlyPlaying == P_MP3) {
-			while((pio2->flevel & 0xf)<6){
+			while((pioi2s->flevel & (0xf<<(i2ssm*8))) < (0x6<<(i2ssm*8))){
 				if(--repeatcount){
-					pio_sm_put_blocking(pio2, 0, left);
-					pio_sm_put_blocking(pio2, 0, right);
+					pio_sm_put_blocking(pioi2s, i2ssm, left);
+					pio_sm_put_blocking(pioi2s, i2ssm, right);
 				} else {
 					repeatcount=audiorepeat;
 					if(bcount[1]==0 && bcount[2]==0 && playreadcomplete==1){
@@ -276,8 +275,8 @@ void MIPS32 __not_in_flash_func(on_pwm_wrap)(void) {
 								ppos+=2;
 							}
 						}
-						pio_sm_put_blocking(pio2, 0, (uint32_t)left);
-						pio_sm_put_blocking(pio2, 0, (uint32_t)right);
+						pio_sm_put_blocking(pioi2s, i2ssm, (uint32_t)left);
+						pio_sm_put_blocking(pioi2s, i2ssm, (uint32_t)right);
 						if(ppos==bcount[swingbuf]){
 							int psave=ppos;
 							bcount[swingbuf]=0;
@@ -302,7 +301,7 @@ void MIPS32 __not_in_flash_func(on_pwm_wrap)(void) {
 			}
 			return;
 		} else if(CurrentlyPlaying == P_SOUND) {
-			while((pio2->flevel & 0xf)<6){
+			while((pioi2s->flevel & (0xf<<(i2ssm*8))) < (0x6<<(i2ssm*8))){
 				int i,j;
 				int leftv=0, rightv=0;
 				for(i=0;i<MAXSOUNDS;i++){ //first update the 8 sound pointers
@@ -339,25 +338,24 @@ void MIPS32 __not_in_flash_func(on_pwm_wrap)(void) {
 						}
 					}
 				}
-				pio_sm_put_blocking(pio2, 0,leftv*2000*512);
-				pio_sm_put_blocking(pio2, 0,rightv*2000*512);
+				pio_sm_put_blocking(pioi2s, i2ssm,leftv*2000*512);
+				pio_sm_put_blocking(pioi2s, i2ssm,rightv*2000*512);
 			}
 			return;
 		} else if(CurrentlyPlaying == P_STOP) {
-			while((pio2->flevel & 0xf)<6){
-					pio_sm_put(pio2, 0, left);
-					pio_sm_put(pio2, 0, right);
+			while((pioi2s->flevel & 0xf)<6){
+					pio_sm_put(pioi2s, i2ssm, left);
+					pio_sm_put(pioi2s, i2ssm, right);
 			}
 			return;
 		} else {
-			while((pio2->flevel & 0xf)<6){
-					pio_sm_put(pio2, 0, left);
-					pio_sm_put(pio2, 0, right);
+			while((pioi2s->flevel & 0xf)<6){
+					pio_sm_put(pioi2s, i2ssm, left);
+					pio_sm_put(pioi2s, i2ssm, right);
 			}
 			return;
 		}
  	}
-#endif
 	if(Option.AUDIO_MISO_PIN){
 		int32_t left=0, right=0;
 		if(!(gpio_get(PinDef[Option.AUDIO_DREQ_PIN].GPno)))return;

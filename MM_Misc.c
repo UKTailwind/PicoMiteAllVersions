@@ -2062,14 +2062,15 @@ if(Option.CPU_Speed==FreqXGA)PO2Str("RESOLUTION", "1024x768");
     #endif
     if(Option.TOUCH_CS) {
         PO("TOUCH"); 
-        if(Option.TOUCH_FT6336)(MMPrintString("FT6336 "));
+        if(Option.TOUCH_CAP==1)(MMPrintString("FT6336 "));
+        if(Option.TOUCH_CAP==2)(MMPrintString("GT911 "));
         MMPrintString((char *)PinDef[Option.TOUCH_CS].pinname);MMputchar(',',1);;
         MMPrintString((char *)PinDef[Option.TOUCH_IRQ].pinname);
         if(Option.TOUCH_Click) {
             MMputchar(',',1);MMPrintString((char *)PinDef[Option.TOUCH_Click].pinname);
-        } else if(Option.TOUCH_FT6336)MMputchar(',',1);
-        if(Option.TOUCH_FT6336){
-            MMputchar(',',1);PInt(Option.THRESHOLD_FT6336);
+        } else if(Option.TOUCH_CAP)MMputchar(',',1);
+        if(Option.TOUCH_CAP){
+            MMputchar(',',1);PInt(Option.THRESHOLD_CAP);
         }
         MMPrintString("\r\n");
         if(Option.TOUCH_XZERO != 0 || Option.TOUCH_YZERO != 0) {
@@ -5889,13 +5890,11 @@ int checkdetailinterrupts(void) {
     }
 #endif
 
-//#ifdef PICOMITEVGA
     if (COLLISIONInterrupt != NULL && CollisionFound) {
         CollisionFound = false;
         intaddr = (char *)COLLISIONInterrupt;									    // set the next stmt to the interrupt location
         goto GotAnInterrupt;
     }
-//#endif
 #ifdef PICOMITEWEB
     if(TCPreceived && TCPreceiveInterrupt){
         intaddr = (char *)TCPreceiveInterrupt;                                   // get a pointer to the interrupt routine
@@ -5949,7 +5948,6 @@ int checkdetailinterrupts(void) {
     }
 
 
-//#ifdef INCLUDE_I2C_SLAVE
 
     if ((I2C_Status & I2C_Status_Slave_Receive_Rdy)) {
         I2C_Status &= ~I2C_Status_Slave_Receive_Rdy;                // clear completed flag
@@ -5971,7 +5969,6 @@ int checkdetailinterrupts(void) {
         intaddr = I2C2_Slave_Send_IntLine;                           // set the next stmt to the interrupt location
         goto GotAnInterrupt;
     }
-//#endif
     if(WAVInterrupt != NULL && WAVcomplete) {
         WAVcomplete=false;
 		intaddr = WAVInterrupt;									    // set the next stmt to the interrupt location

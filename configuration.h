@@ -76,7 +76,7 @@ extern "C" {
         #endif
         #define MAXMODES 2
         #define MAXVARS             512                     // 8 + MAXVARLEN + MAXDIM * 2  (ie, 56 bytes) - these do not incl array members
-        #define HEAP_MEMORY_SIZE (100*1024) 
+        #define HEAP_MEMORY_SIZE (96*1024) 
         #define MAX_CPU     378000 
         #define MIN_CPU     126000
         #define MAXSUBFUN           256                     // each entry takes up 4 bytes
@@ -118,7 +118,7 @@ extern "C" {
 #endif
 
     #include "lwipopts_examples_common.h"
-    #define FLASH_TARGET_OFFSET (1056 * 1024) 
+    #define FLASH_TARGET_OFFSET (1080 * 1024) 
     #define MagicKey 0x57642325
     #define MaxPcb 8
     #define MAX_CPU     252000
@@ -303,6 +303,7 @@ extern "C" {
 // QVGA PIO and state machines
 #define QVGA_PIO	pio0	// QVGA PIO
 #define QVGA_SM		0	// QVGA state machine
+#define QVGA_I2S_SM 1   //I2S state machine when running VGA
 #define MIPS16 __attribute__ ((optimize("-Os")))
 #define MIPS32 __attribute__ ((optimize("-O2")))
 #define MIPS64 __attribute__ ((optimize("-O3")))

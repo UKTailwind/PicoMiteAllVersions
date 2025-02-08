@@ -157,6 +157,10 @@ static int *instructions=NULL;
 static char *labelsfound=NULL, *labelsneeded=NULL;
 int piointerrupt=0;
 static int pioinuse=99;
+extern bool PIO2, PIO1, PIO0;
+extern void on_pwm_wrap(void);
+PIO pioi2s;
+uint8_t i2ssm;
 static inline uint32_t pio_sm_calc_wrap(uint wrap_target, uint wrap) {
     uint32_t calc=0;
 //    valid_params_if(PIO, wrap < PIO_INSTRUCTION_COUNT);
@@ -201,6 +205,9 @@ int getirqnum(char *p){
         int data=0;
         char *pp=p;
         int rel=0;
+#ifdef rp2350
+        int prev=0,next=0;
+#endif
         skipspace(pp);
         char *ppp=pp;
         char save=0;
@@ -212,6 +219,12 @@ int getirqnum(char *p){
         data=(int)getint((unsigned char *)pp,0,7);
         if(*ppp==',')*ppp=save;
         if((pp=fstrstr(p," rel")) && (pp[4]==0 || pp[4]==' ' || pp[4]==';'))rel=1;
+#ifdef rp2350
+        if((pp=fstrstr(p," prev")) && (pp[5]==0 || pp[5]==' ' || pp[5]==';'))prev=1;
+        if((pp=fstrstr(p," next")) && (pp[5]==0 || pp[5]==' ' || pp[5]==';'))next=1;
+        if(next)data|=0b11;
+        if(prev)data|=0b01;
+#endif
         if(rel){
                 data|=0x10;
         }
@@ -274,13 +287,15 @@ int checkblock(char *p){
         }
         return data;
 }
-#ifdef rp2350
+
 void start_i2s(int pior, int sm){
     if(!Option.audio_i2c_bclk)return;
-	extern bool PIO2;
-        extern void on_pwm_wrap(void);
-
-        PIO pio = (pior==0 ? pio0: (pior==1 ? pio1: pio2));
+#ifdef rp2350
+pioi2s = (pior==0 ? pio0: (pior==1 ? pio1: pio2));
+#else
+pioi2s = (pior==0 ? pio0: pio1);
+#endif
+        i2ssm=sm;
         struct pio_program program;
         program.length=32;
         program.origin=0;
@@ -297,15 +312,22 @@ void start_i2s(int pior, int sm){
             0,0,0,0,0,0,0,0  
         };
         program.instructions=(const uint16_t *)&prog;
-        for(int sm=0;sm<4;sm++)hw_clear_bits(&pio->ctrl, 1 << (PIO_CTRL_SM_ENABLE_LSB + sm));
-        pio_clear_instruction_memory(pio);
-        pio_add_program(pio,&program);
+        for(int sm=0;sm<4;sm++)hw_clear_bits(&pioi2s->ctrl, 1 << (PIO_CTRL_SM_ENABLE_LSB + sm));
+        pio_clear_instruction_memory(pioi2s);
+        pio_add_program(pioi2s,&program);
+        hw_clear_bits(&pioi2s->ctrl, 1 << (PIO_CTRL_SM_ENABLE_LSB + sm));
 	gpio_set_input_enabled(PinDef[Option.audio_i2c_data].GPno, true);
-        gpio_set_function(PinDef[Option.audio_i2c_data].GPno, GPIO_FUNC_PIO2);
 	gpio_set_input_enabled(PinDef[Option.audio_i2c_bclk].GPno, true);
-        gpio_set_function(PinDef[Option.audio_i2c_bclk].GPno, GPIO_FUNC_PIO2);
 	gpio_set_input_enabled(PinDef[Option.audio_i2c_bclk].GPno+1, true);
+#ifdef rp2350
+        gpio_set_function(PinDef[Option.audio_i2c_bclk].GPno, GPIO_FUNC_PIO2);
+        gpio_set_function(PinDef[Option.audio_i2c_data].GPno, GPIO_FUNC_PIO2);
         gpio_set_function(PinDef[Option.audio_i2c_bclk].GPno+1, GPIO_FUNC_PIO2);
+#else
+        gpio_set_function(PinDef[Option.audio_i2c_bclk].GPno, pior==0 ? GPIO_FUNC_PIO0 : GPIO_FUNC_PIO1);
+        gpio_set_function(PinDef[Option.audio_i2c_data].GPno, pior==0 ? GPIO_FUNC_PIO0 : GPIO_FUNC_PIO1);
+        gpio_set_function(PinDef[Option.audio_i2c_bclk].GPno+1, pior==0 ? GPIO_FUNC_PIO0 : GPIO_FUNC_PIO1);
+#endif
         ExtCfg(Option.audio_i2c_bclk, EXT_BOOT_RESERVED, 0);
         ExtCfg(Option.audio_i2c_data, EXT_BOOT_RESERVED, 0);
         ExtCfg(PINMAP[PinDef[Option.audio_i2c_bclk].GPno+1], EXT_BOOT_RESERVED, 0);
@@ -316,9 +338,9 @@ void start_i2s(int pior, int sm){
         pinctrl|=(PinDef[Option.audio_i2c_data].GPno); // OUT base
         pinctrl|=(PinDef[Option.audio_i2c_bclk].GPno<<10);  // SIDE SET base
         pio_init(pior, sm, pinctrl, execctrl, shiftctrl, start, clock, true,false,true);
-        pio_sm_clear_fifos(pio,sm);
-        pio_sm_restart(pio, sm);
-        pio_sm_set_enabled(pio, sm, true);
+        pio_sm_clear_fifos(pioi2s,sm);
+        pio_sm_restart(pioi2s, sm);
+        pio_sm_set_enabled(pioi2s, sm, true);
         AUDIO_SLICE=Option.AUDIO_SLICE;
         AUDIO_WRAP=(Option.CPU_Speed*10)/441  - 1 ;
         pwm_set_wrap(AUDIO_SLICE, AUDIO_WRAP);
@@ -327,9 +349,10 @@ void start_i2s(int pior, int sm){
         irq_set_enabled(PWM_IRQ_WRAP, true);
         irq_set_priority(PWM_IRQ_WRAP,255);
 	pwm_set_enabled(AUDIO_SLICE, true); 
-	PIO2=false;
+	if(pior==2)PIO2=false;
+        else if(pior==1)PIO1=false;
+        else PIO0=false;
 }
-#endif
 
 /*  @endcond */
 void MIPS16 cmd_pio(void){
@@ -339,13 +362,6 @@ void MIPS16 cmd_pio(void){
     #else
     short dims[MAXDIM]={0};
     #endif
-#ifdef rp2350
-    tp = checkstring(cmdline, (unsigned char *)"I2S");
-    if(tp){
-        start_i2s(2,0);
-        return;
-    }
-#endif
     tp = checkstring(cmdline, (unsigned char *)"EXECUTE");
     if(tp){
         int i;
@@ -822,6 +838,7 @@ void MIPS16 cmd_pio(void){
                         } else if(!strncasecmp(ss,"WAIT ",5)){
                                 dirOK=0;
                                 ss+=4;
+                                bool PINCTRL_JMP_PIN=false;
                                 ins=0x2000;checksideanddelay=1;
                                 skipspace(ss);
                                 if(!(*ss=='1' || *ss=='0'))error("Syntax");
@@ -837,13 +854,19 @@ void MIPS16 cmd_pio(void){
                                         ss+=4;
                                 } else if(strncasecmp(ss,"PIN",3)==0 && (ss[3]==' ' || ss[3]==',')){
                                         ss+=3;
-                                        ins |=0b100000;
+                                        ins |=0b0100000;
                                 } else if(strncasecmp(ss,"IRQ",3)==0 && (ss[3]==' ' || ss[3]==',')){
                                         char *pp;
                                         ss+=3;
                                         rel=0;
                                         ins |=0b1000000;
                                         if((pp=fstrstr(ss," rel")) && (pp[4]==0 || pp[4]==' ' || pp[4]==';'))rel=1;
+#ifdef rp2350
+                                } else if(strncasecmp(ss,"JMPPIN",6)==0 && (ss[6]==' ' || ss[6]==',')){
+                                        ss+=6;
+                                        ins |=0b1100000;
+                                        PINCTRL_JMP_PIN=true;
+#endif
                                 } else error("syntax");
                                 skipspace(ss);
                                 if(*ss==','){
@@ -864,7 +887,7 @@ void MIPS16 cmd_pio(void){
                                                 *ppp=',';
                                         }
                                 } else error("Syntax");
-                                int bits=getint((unsigned char *)ss,0,rel==2? 31 : 7);
+                                int bits=getint((unsigned char *)ss,0,rel==2? 31 : PINCTRL_JMP_PIN ? 3: 7);
                                 if(*ppp==',')*ppp=save;
                                 if(rel==1) bits |=0x10;
                                 ins |=bits;
@@ -877,13 +900,13 @@ void MIPS16 cmd_pio(void){
                                         ss+=4;
                                 } else if(strncasecmp(ss,"X",1)==0 && (ss[1]==' ' || ss[1]==',') ){
                                         ss++;
-                                        ins|=0b100000;
+                                        ins|=0b00100000;
                                 } else if(strncasecmp(ss,"Y",1)==0 && (ss[1]==' ' || ss[1]==',') ){
                                         ss++;
-                                        ins|=0b1000000;
+                                        ins|=0b01000000;
                                 } else if(strncasecmp(ss,"NULL",4)==0 && (ss[4]==' ' || ss[4]==',') ){
                                         ss+=4;
-                                        ins|=0b1100000;
+                                        ins|=0b01100000;
                                 } else if(strncasecmp(ss,"ISR",3)==0 && (ss[3]==' ' || ss[3]==',') ){
                                         ss+=3;
                                         ins|=0b11000000;
@@ -922,18 +945,21 @@ void MIPS16 cmd_pio(void){
                                         ss+=4;
                                 } else if(strncasecmp(ss,"X",1)==0 && (ss[1]==' ' || ss[1]==',') ){
                                         ss++;
-                                        ins|=0b100000;
+                                        ins|=0b00100000;
                                 } else if(strncasecmp(ss,"Y",1)==0 && (ss[1]==' ' || ss[1]==',') ){
                                         ss++;
-                                        ins|=0b1000000;
+                                        ins|=0b01000000;
                                 } else if(strncasecmp(ss,"NULL",4)==0 && (ss[4]==' ' || ss[4]==',') ){
                                         ss+=4;
-                                        ins|=0b1100000;
+                                        ins|=0b01100000;
                                 } else if(strncasecmp(ss,"PINDIRS",7)==0 && (ss[7]==' ' || ss[7]==',') ){
                                         ss+=7;
                                         ins|=0b10000000;
                                 } else if(strncasecmp(ss,"PC",2)==0 && (ss[2]==' ' || ss[2]==',') ){
                                         ss+=2;
+                                        ins|=0b10100000;
+                                } else if(strncasecmp(ss,"ISR",3)==0 && (ss[3]==' ' || ss[3]==',') ){
+                                        ss+=3;
                                         ins|=0b11000000;
                                 } else if(strncasecmp(ss,"EXEC",4)==0 && (ss[4]==' ' || ss[4]==',') ){
                                         ss+=4;
@@ -980,10 +1006,15 @@ void MIPS16 cmd_pio(void){
                                         ss+=4;
                                 } else if(strncasecmp(ss,"X",1)==0 && (ss[1]==' ' || ss[1]==',') ){
                                         ss++;
-                                        ins|=0b100000;
+                                        ins|=0b00100000;
                                 } else if(strncasecmp(ss,"Y",1)==0 && (ss[1]==' ' || ss[1]==',') ){
                                         ss++;
-                                        ins|=0b1000000;
+                                        ins|=0b01000000;
+#ifdef rp2350
+                                } else if(strncasecmp(ss,"PINDIRS",7)==0 && (ss[7]==' ' || ss[7]==',') ){
+                                        ss+=7;
+                                        ins|=0b01100000;
+#endif
                                 } else if(strncasecmp(ss,"EXEC",4)==0 && (ss[4]==' ' || ss[4]==',') ){
                                         ss+=4;
                                         ins|=0b10000000;
@@ -1030,15 +1061,15 @@ void MIPS16 cmd_pio(void){
                                         if(!(ins&0x2000))error("Syntax");
                                 } else if(strncasecmp(ss,"X",1)==0 && (ss[1]==0 || ss[1]==' ' || ss[1]==',') ){
                                         ss++;
-                                        ins|=0b1;
+                                        ins|=0b001;
                                         if(!(ins&0x2000))error("Syntax");
                                 } else if(strncasecmp(ss,"Y",1)==0 && (ss[1]==0 || ss[1]==' ' || ss[1]==',') ){
                                         ss++;
-                                        ins|=0b10;
+                                        ins|=0b010;
                                         if(!(ins&0x2000))error("Syntax");
                                 } else if(strncasecmp(ss,"NULL",4)==0 && (ss[4]==0 || ss[4]==' ' || ss[4]==',') ){
                                         ss+=4;
-                                        ins|=0b11;
+                                        ins|=0b011;
                                         if(!(ins&0x2000))error("Syntax");
                                 } else if(strncasecmp(ss,"STATUS",6)==0 && (ss[6]==0 || ss[6]==' ' || ss[6]==',') ){
                                         ss+=6;
@@ -1245,6 +1276,27 @@ void MIPS16 cmd_pio(void){
         pio_clear_instruction_memory(pio);
         return;
     }
+#ifdef rp2350
+    tp = checkstring(cmdline, (unsigned char *)"SET BASE");
+    if(tp){
+        getargs(&tp,3,(unsigned char *)",");
+        if(argc<3)error("Syntax");
+        int pior=getint(argv[0],0,PIOMAX-1);
+        if(PIO0==false && pior==0)error("PIO 0 not available");
+        if(PIO1==false && pior==1)error("PIO 1 not available");
+#ifdef rp2350
+        if(PIO2==false && pior==2)error("PIO 2 not available");
+        PIO pio = (pior==0 ? pio0: (pior==1 ? pio1: pio2));
+#else
+        PIO pio = (pior==0 ?  pio0: pio1);
+#endif
+        int i=getinteger(argv[2]);
+        if(!(i==0 || i==16))error("Valid base values are 0 and 16");
+        if(rp2350a && i==16)error("Invalid for 60-pin chip");
+        pio_set_gpio_base(pio,i);
+        return;
+    }
+#endif
     tp = checkstring(cmdline, (unsigned char *)"MAKE RING BUFFER");
     if(tp){
         getargs(&tp,3,(unsigned char *)",");
@@ -1550,7 +1602,7 @@ void call_pio(char * instruction, uint8_t mode){
       while(*p){ //strip comments and loose spurrious tokens
                if(*p==GetTokenValue((unsigned char *)"-"))*p=(unsigned char)'-';
                if(*p==GetTokenValue((unsigned char *)"="))*p=(unsigned char)'=';
-               if(*p=='\''){
+               if(*p=='\'' || *p==';'){
                        *p=0;
                        break;
                }
@@ -1578,7 +1630,7 @@ void cmd_PIOline(void){
        call_pio(".line",1);
 }
 void cmd_sideset(void){
-       call_pio(".side set",1);
+       call_pio(".side_set",1);
 }
 void cmd_endprogram(void){
        call_pio(".end program",strlen((char *)cmdline) ? 1 : 0);

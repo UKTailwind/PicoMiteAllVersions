@@ -92,9 +92,7 @@ err_t tcp_client_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err
     // cyw43_arch_lwip_begin IS needed
 //    cyw43_arch_lwip_check();
     if (p->tot_len > 0) {
-//#ifdef rp2350
         routinechecks(); //don't know why I'm doing this but it solves a race condition for the RP2350
-//#endif
         // Receive the buffer
         const uint16_t buffer_left = state->BUF_SIZE - state->buffer_len;
         state->buffer_len += pbuf_copy_partial(p, (void *)state->buffer + state->buffer_len,

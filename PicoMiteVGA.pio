@@ -59,3 +59,4 @@ public output:
 	jmp	x--,output	side NOSYNC [1]	; [2] loop (N+1 pixels)
 	out	pins,BPP	side NOSYNC [2]	; [3] output pixel
 .wrap						; wrap jump to .wrap_target
+

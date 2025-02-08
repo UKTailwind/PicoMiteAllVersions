@@ -57,9 +57,9 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #define DR_MP3_FLOAT_OUTPUT
 #ifdef rp2350
 #include "dr_mp3.h"
+#endif
 #include "hardware/pio.h"
 #include "hardware/pio_instructions.h"
-#endif
 #include "dr_flac.h"
 #include "hxcmod.h"
 #include "VS1053.h"
@@ -70,6 +70,9 @@ extern const int ErrorMap[21];
 extern char *GetCWD(void);
 extern void ErrorCheck(int fnbr);
 extern const int mapping[101];
+extern PIO pioi2s;
+extern uint8_t i2ssm;
+
 /********************************************************************************************************************************************
 commands and functions
  each function is responsible for decoding a command
@@ -167,8 +170,8 @@ char WAVfilename[FF_MAX_LFN]={0};
 #ifdef rp2350
 drmp3 *mymp3;
 float *fbuff1, *fbuff2;
-int32_t *xbuff1, *xbuff2;
 #endif
+int32_t *xbuff1, *xbuff2;
 void* my_malloc(size_t sz, void* pUserData)
 {
     return GetMemory(sz);
@@ -620,6 +623,7 @@ void i2sconvert(float *fbuff, int32_t *sbuff, int count){
 		sbuff[i+1]=(int32_t)((fbuff[i+1])*(float)mapping[vol_right]*1048576.0f);
 	}
 }
+#endif
 void vconvert(int *fbuff, int *sbuff, int count){
 	int i;
 	for(i=0;i<(count);i+=2){
@@ -634,7 +638,6 @@ void xconvert(int32_t *ibuff, int16_t *sbuff, int count){
 		ibuff[i]=((int32_t)sbuff[i]*mapping[vol_left]/2000)<<16;
 	}
 }
-#endif
 size_t onRead(void  *userdata,  char  *pBufferOut,   size_t bytesToRead){
     unsigned int nbr;
 	if(filesource[WAV_fnbr]==FATFSFILE){
@@ -728,12 +731,10 @@ void setrate(int rate){
 		pwm_set_chan_level(AUDIO_SLICE, PWM_CHAN_B, AUDIO_WRAP>>1);
 	}
 	pwm_clear_irq(AUDIO_SLICE);
-#ifdef rp2350
 	if(Option.audio_i2c_bclk){
 		float clockdiv=(Option.CPU_Speed*1000.0f)/(float)(rate*128);
-		pio_sm_set_clkdiv(pio2,0,clockdiv);
+		pio_sm_set_clkdiv(pioi2s,i2ssm,clockdiv);
 	}
-#endif
 }
 void iconvert(uint16_t *ibuff, int16_t *sbuff, int count){
 	int i;
@@ -836,7 +837,6 @@ void wavcallback(char *p){
     ibuff1 = (uint16_t *)sbuff1;
     ibuff2 = (uint16_t *)sbuff2;
 	mono=(mywav->channels == 1 ? 1 : 0);
-#ifdef rp2350
     xbuff1 = (int32_t *)sbuff1;
     xbuff2 = (int32_t *)sbuff2;
 	if(Option.audio_i2c_bclk){
@@ -844,12 +844,10 @@ void wavcallback(char *p){
 		vconvert((drwav_int32*)sbuff1,(drwav_int32*)sbuff1,bcount[1]);
 	}
 	else
-#endif
 	{
 		bcount[1]=(volatile unsigned int)drwav_read_pcm_frames_s16(mywav, WAV_BUFFER_SIZE/4, (drwav_int16*)sbuff1) * mywav->channels;
 		iconvert(ibuff1, (int16_t *)sbuff1, bcount[1]);
 	}
-//    iconvert(ibuff2, (int16_t *)sbuff2, bcount[2]);
     wav_filesize=bcount[1];
     CurrentlyPlaying = P_WAV;
     swingbuf=1;
@@ -975,7 +973,6 @@ void flaccallback(char *p){
     sbuff2 = GetMemory(WAV_BUFFER_SIZE*2);
     ibuff1 = (uint16_t *)sbuff1;
     ibuff2 = (uint16_t *)sbuff2;
-#ifdef rp2350
     xbuff1 = (int32_t *)sbuff1;
     xbuff2 = (int32_t *)sbuff2;
 	if(Option.audio_i2c_bclk){
@@ -983,12 +980,10 @@ void flaccallback(char *p){
 		vconvert((drwav_int32*)sbuff1,(drwav_int32*)sbuff1,bcount[1]);
 	}
 	else
-#endif
 	{
 		bcount[1]=(volatile unsigned int)drflac_read_pcm_frames_s16(myflac, WAV_BUFFER_SIZE/2, (drwav_int16*)sbuff1) * myflac->channels;
 		iconvert(ibuff1, (int16_t *)sbuff1, bcount[1]);
 	}
-//    iconvert(ibuff2, (int16_t *)sbuff2, bcount[2]);
     wav_filesize=bcount[1];
     CurrentlyPlaying = P_FLAC;
     swingbuf=1;
@@ -1068,7 +1063,6 @@ void MIPS16 cmd_play(void) {
         CloseAudio(1);
         return;
     }
-
 	if(!(Option.AUDIO_L || Option.AUDIO_CLK_PIN || Option.audio_i2c_bclk))error((char *)"Audio not enabled");
     if((tp=checkstring(cmdline, (unsigned char *)"LOAD SOUND"))) {
 		if(Option.AUDIO_MISO_PIN)error("Not available with VS1053 audio");
@@ -1159,7 +1153,6 @@ void MIPS16 cmd_play(void) {
             error("Nothing playing");
         return;
     }
-
     if(checkstring(cmdline, (unsigned char *)"RESUME")) {
         if(CurrentlyPlaying == P_PAUSE_TONE) CurrentlyPlaying = P_TONE;
         else if(CurrentlyPlaying == P_PAUSE_SOUND) CurrentlyPlaying = P_SOUND;
@@ -1170,12 +1163,10 @@ void MIPS16 cmd_play(void) {
             error("Nothing to resume");  
         return;
     }
-
     if(checkstring(cmdline, (unsigned char *)"CLOSE")) {
         CloseAudio(1);
         return;
     }
-
     if((tp = checkstring(cmdline, (unsigned char *)"VOLUME"))) {
         getargs(&tp, 3,(unsigned char *)",");
         if(argc < 1) error("Argument count");
@@ -1190,8 +1181,6 @@ void MIPS16 cmd_play(void) {
 		}
         return;
     }
-
-
     if((tp = checkstring(cmdline, (unsigned char *)"TONE"))) {//
 		SoundPlay=1000;                                   // this MUST be the first executable line in the function
         float f_left, f_right;
@@ -1420,6 +1409,7 @@ void MIPS16 cmd_play(void) {
 							PRet();
 						}
 						trackstoplay++;
+						if(trackstoplay==MAXALBUM)break;
 					}
 				}
 				trackstoplay--;
@@ -1487,6 +1477,7 @@ void MIPS16 cmd_play(void) {
 							PRet();
 						}
 						trackstoplay++;
+						if(trackstoplay==MAXALBUM)break;
 					}
 				}
 				trackstoplay--;
@@ -1652,6 +1643,7 @@ void MIPS16 cmd_play(void) {
 							PRet();
 						}
 						trackstoplay++;
+						if(trackstoplay==MAXALBUM)break;
 					}
 				}
 				trackstoplay--;
@@ -1698,7 +1690,6 @@ void MIPS16 cmd_play(void) {
 		CloseAudio(1);
 		return;
 	}
-
 	if((tp = checkstring(cmdline, (unsigned char *)"CONTINUE"))) {
 		if(!Option.AUDIO_MISO_PIN)error("Only available with VS1053 audio");
     	int fnbr = FindFreeFileNbr();
@@ -1776,6 +1767,7 @@ void MIPS16 cmd_play(void) {
 							PRet();
 						}
 						trackstoplay++;
+						if(trackstoplay==MAXALBUM)break;
 					}
 				}
 				trackstoplay--;
@@ -1891,12 +1883,10 @@ void MIPS16 cmd_play(void) {
         wav_filesize=WAV_BUFFER_SIZE/4;
         bcount[1]=WAV_BUFFER_SIZE/4;
         bcount[2]=0;
-#ifdef rp2350
         xbuff1 = (int32_t *)sbuff1;
         xbuff2 = (int32_t *)sbuff2;
 		if(Option.audio_i2c_bclk)xconvert(xbuff1, (int16_t *)sbuff1, bcount[1]);
 		else
-#endif
 		iconvert((uint16_t *)ibuff1, (int16_t *)sbuff1, bcount[1]);
         nchannels=2;
         CurrentlyPlaying = P_MOD;
@@ -1942,7 +1932,6 @@ void MIPS16 cmd_play(void) {
         hxcmod_playsoundeffect( mcontext, sampnum, seffectnum, volume, period );
         return;
     }
-
     error("Unknown command");
 }
 /* 
@@ -2019,26 +2008,22 @@ void checkWAVinput(void){
 		} else {
 			if(CurrentlyPlaying == P_FLAC){
 				if(swingbuf==2){
-#ifdef rp2350
 					if(Option.audio_i2c_bclk){
 						bcount[1]=(volatile unsigned int)drflac_read_pcm_frames_s32(myflac, WAV_BUFFER_SIZE/4, (drwav_int32*)sbuff1) * myflac->channels;
 						vconvert((drwav_int32*)sbuff1,(drwav_int32*)sbuff1,bcount[1]);
 					}
 					else
-#endif
 					{
 						bcount[1]=(volatile unsigned int)drflac_read_pcm_frames_s16(myflac, WAV_BUFFER_SIZE/2, (drwav_int16*)sbuff1) * myflac->channels;
 						iconvert(ibuff1, (int16_t *)sbuff1, bcount[1]);
 					}
 					wav_filesize = bcount[1];
 				} else {
-#ifdef rp2350
 					if(Option.audio_i2c_bclk){
 						bcount[2]=(volatile unsigned int)drflac_read_pcm_frames_s32(myflac, WAV_BUFFER_SIZE/4, (drwav_int32*)sbuff2) * myflac->channels;
 						vconvert((drwav_int32*)sbuff2,(drwav_int32*)sbuff2,bcount[2]);
 					}
 					else
-#endif
 					{
 						bcount[2]=(volatile unsigned int)drflac_read_pcm_frames_s16(myflac, WAV_BUFFER_SIZE/2, (drwav_int16*)sbuff2) * myflac->channels;
 						iconvert(ibuff2, (int16_t *)sbuff2, bcount[2]);
@@ -2066,47 +2051,39 @@ void checkWAVinput(void){
 					if(hxcmod_fillbuffer( mcontext, (msample*)sbuff1, WAV_BUFFER_SIZE/8,NULL, noloop ))playreadcomplete = 1;
 					wav_filesize=WAV_BUFFER_SIZE/4;
 					bcount[1]=WAV_BUFFER_SIZE/4;
-#ifdef rp2350
 					if(Option.audio_i2c_bclk)xconvert(xbuff1, (int16_t *)sbuff1, bcount[1]);
 					else
-#endif
 					iconvert((uint16_t *)ibuff1, (int16_t *)sbuff1, bcount[1]);
 				} else {
 					if(hxcmod_fillbuffer( mcontext, (msample*)sbuff2, WAV_BUFFER_SIZE/8,NULL, noloop ))playreadcomplete = 1;
 					wav_filesize=WAV_BUFFER_SIZE/4;
 					bcount[2]=WAV_BUFFER_SIZE/4;
-#ifdef rp2350
 					if(Option.audio_i2c_bclk)xconvert(xbuff2, (int16_t *)sbuff2, bcount[2]);
 					else
-#endif
 					iconvert((uint16_t *)ibuff2, (int16_t *)sbuff2, bcount[2]);
 				}
 				nextbuf=swingbuf;
 			} else if(CurrentlyPlaying == P_WAV){
 				if(swingbuf==2){
-#ifdef rp2350
 					if(Option.audio_i2c_bclk){
 						bcount[1]=(volatile unsigned int)drwav_read_pcm_frames_s32(mywav, WAV_BUFFER_SIZE/8, (drwav_int32*)sbuff1) * mywav->channels;
 						vconvert((drwav_int32*)sbuff1,(drwav_int32*)sbuff1,bcount[1]);
 					}
 					else
-#endif
 					{
 						bcount[1]=(volatile unsigned int)drwav_read_pcm_frames_s16(mywav, WAV_BUFFER_SIZE/4, (drwav_int16*)sbuff1) * mywav->channels;
 						iconvert(ibuff1, (int16_t *)sbuff1, bcount[1]);
 					}
 					wav_filesize = bcount[1];
 				} else {
-#ifdef rp2350
 					if(Option.audio_i2c_bclk){
 						bcount[2]=(volatile unsigned int)drwav_read_pcm_frames_s32(mywav, WAV_BUFFER_SIZE/8, (drwav_int32*)sbuff2) * mywav->channels;
 						vconvert((drwav_int32*)sbuff2,(drwav_int32*)sbuff2,bcount[2]);
 					}
 					else
-#endif
 					{
 						bcount[2]=(volatile unsigned int)drwav_read_pcm_frames_s16(mywav, WAV_BUFFER_SIZE/4, (drwav_int16*)sbuff2) * mywav->channels;
-						iconvert(ibuff1, (int16_t *)sbuff2, bcount[2]);
+						iconvert(ibuff2, (int16_t *)sbuff2, bcount[2]);
 					}
 					wav_filesize = bcount[2];
 				}

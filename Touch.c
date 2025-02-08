@@ -42,6 +42,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "pico/multicore.h"
 extern mutex_t	frameBufferMutex;
 #endif
+#include "hardware/i2c.h"
 
 int GetTouchValue(int cmd);
 void TDelay(void);
@@ -53,44 +54,45 @@ int TOUCH_IRQ_PIN;
 int TOUCH_CS_PIN;
 int TOUCH_Click_PIN;
 int TOUCH_GETIRQTRIS=0;
-
+static int gt911_addr=GT911_ADDR;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // configure the touch parameters (chip select pin and the IRQ pin)
 // this is called by the OPTION TOUCH command
 void MIPS16 ConfigTouch(unsigned char *p) {
     int pin1, pin2=0, pin3=0;
-    bool TOUCH_FT6336=false;
+    uint8_t TOUCH_CAP=0;
     int threshold=50;
     unsigned char *tp=NULL;
-    if((tp=checkstring(p,(unsigned char *)"FT6336"))){
+    tp = checkstring(p, (unsigned char *)"FT6336");
+    if(tp)TOUCH_CAP=1;
+    if(tp==NULL)tp = checkstring(p, (unsigned char *)"GT911");
+    if(tp){
         p=tp;
         if(!Option.SYSTEM_I2C_SDA)error("System I2C not set");
-        TOUCH_FT6336=true;
+        if(!TOUCH_CAP)TOUCH_CAP=2;
     }
     getargs(&p, 7, (unsigned char *)",");
-    if(!Option.SYSTEM_CLK)error("System SPI not configured");
-    if(!TOUCH_FT6336){
+    if(!(Option.SYSTEM_CLK || TOUCH_CAP))error("System SPI not configured");
+    if(!TOUCH_CAP){
         if(!(argc == 3 || argc == 5)) error("Argument count");
-    }
+    } else if(argc<3)error("Argument count");
 	unsigned char code;
 	if(!(code=codecheck(argv[0])))argv[0]+=2;
 	pin1 = getinteger(argv[0]);
 	if(!code)pin1=codemap(pin1);
 	if(IsInvalidPin(pin1)) error("Invalid pin");
-    if(argc >= 3 && *argv[2]) {
-        if(!(code=codecheck(argv[2])))argv[2]+=2;
-        pin2 = getinteger(argv[2]);
-        if(!code)pin2=codemap(pin2);
-        if(IsInvalidPin(pin2)) error("Invalid pin");
-    }
+    if(!(code=codecheck(argv[2])))argv[2]+=2;
+    pin2 = getinteger(argv[2]);
+    if(!code)pin2=codemap(pin2);
+    if(IsInvalidPin(pin2)) error("Invalid pin");
     if(argc >= 5 && *argv[4]) {
         if(!(code=codecheck(argv[4])))argv[4]+=2;
         pin3 = getinteger(argv[4]);
         if(!code)pin3=codemap(pin3);
         if(IsInvalidPin(pin3)) error("Invalid pin");
     }
-    if(TOUCH_FT6336){
+    if(TOUCH_CAP){
         if(argc==7) threshold=getint(argv[6],0,255);
     }
     if(ExtCurrentConfig[pin1] != EXT_NOT_CONFIG)  error("Pin %/| is in use",pin1,pin1);
@@ -98,26 +100,51 @@ void MIPS16 ConfigTouch(unsigned char *p) {
         if(ExtCurrentConfig[pin2] != EXT_NOT_CONFIG)  error("Pin %/| is in use",pin2,pin2);
 	if(pin3)
         if(ExtCurrentConfig[pin3] != EXT_NOT_CONFIG)  error("Pin %/| is in use",pin3,pin3);
-    Option.TOUCH_CS = (TOUCH_FT6336 ? pin2 :pin1);
-    Option.TOUCH_IRQ = (TOUCH_FT6336 ? pin1 :pin2);
+    Option.TOUCH_CS = (TOUCH_CAP ? pin2 :pin1);
+    Option.TOUCH_IRQ = (TOUCH_CAP ? pin1 :pin2);
     Option.TOUCH_Click = pin3;
     Option.TOUCH_XZERO = Option.TOUCH_YZERO = 0;                    // record the touch feature as not calibrated
-    Option.TOUCH_FT6336=TOUCH_FT6336;
-    Option.THRESHOLD_FT6336=threshold;
+    Option.TOUCH_CAP=TOUCH_CAP;
+    Option.THRESHOLD_CAP=threshold;
 }
 
+int  gt911_dev_mode_w(uint8_t value)
+{
+  uint8_t tmp;
+
+  tmp = read8Register16(gt911_addr,GT911_DEV_MODE_REG);
+
+  if (mmI2Cvalue == 0L)
+  {
+    tmp &= ~GT911_DEV_MODE_BIT_MASK;
+    tmp |= value << GT911_DEV_MODE_BIT_POSITION;
+
+    Write8Register16(gt911_addr,GT911_DEV_MODE_REG, tmp);
+  }
+
+  return mmI2Cvalue;
+}
+int32_t  gt911_dev_mode_r(uint8_t *pValue)
+{
+
+  *pValue=read8Register16(gt911_addr,GT911_DEV_MODE_REG);
+
+  if (mmI2Cvalue == 0L)
+  {
+    *pValue &= GT911_DEV_MODE_BIT_MASK;
+    *pValue = *pValue >> GT911_DEV_MODE_BIT_POSITION;
+  }
+  return mmI2Cvalue;
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // setup touch based on the settings saved in flash
 void MIPS16 InitTouch(void) {
-    if(Option.TOUCH_FT6336){
-        if(!Option.TOUCH_IRQ) return; //shouldn't be needed
-        if(FT6336_RESET){ //reset the chip
-            PinSetBit(FT6336_RESET, LATCLR);
-            uSec(1000);
-            PinSetBit(FT6336_RESET, LATSET);
-            uSec(1000);
-        }
+    if(Option.TOUCH_CAP==1){
+        if(!Option.TOUCH_IRQ || !Option.SYSTEM_I2C_SCL) return; //shouldn't be needed
+        PinSetBit(CAP_RESET, LATCLR);
+        uSec(1000);
+        PinSetBit(CAP_RESET, LATSET);
         uSec(500000);
         if(readRegister8(FT6X36_ADDR, FT6X36_REG_PANEL_ID) != FT6X36_VENDID)MMPrintString("Touch panel ID not found\r\n");
         uint8_t id = readRegister8(FT6X36_ADDR, FT6X36_REG_CHIPID);
@@ -125,7 +152,66 @@ void MIPS16 InitTouch(void) {
 	    WriteRegister8(FT6X36_ADDR, FT6X36_REG_DEVICE_MODE, 0x00);
 	    WriteRegister8(FT6X36_ADDR, FT6X36_REG_INTERRUPT_MODE, 0x00);
 	    WriteRegister8(FT6X36_ADDR, FT6X36_REG_CTRL, 0x00);
-	    WriteRegister8(FT6X36_ADDR, FT6X36_REG_THRESHHOLD, Option.THRESHOLD_FT6336);
+	    WriteRegister8(FT6X36_ADDR, FT6X36_REG_THRESHHOLD, Option.THRESHOLD_CAP);
+        WriteRegister8(FT6X36_ADDR, FT6X36_REG_TOUCHRATE_ACTIVE, 0x01);
+    } else if(Option.TOUCH_CAP==2){
+        if(!Option.TOUCH_IRQ || !Option.SYSTEM_I2C_SCL) return; //shouldn't be needed
+        MMPrintString("Initialising GT911\r\n");
+        uint8_t read_data;
+        PinSetBit(CAP_RESET, LATCLR);
+        uSec(1000);
+        PinSetBit(CAP_RESET, LATSET);
+        uSec(500000);
+        gt911_addr=GT911_ADDR;
+        int ret=i2c_read_blocking(I2C0locked? i2c0 : i2c1, gt911_addr, &read_data, 1, false);
+        if(ret<0){
+            gt911_addr=GT911_ADDR2;
+            ret=i2c_read_blocking(I2C0locked? i2c0 : i2c1, gt911_addr, &read_data, 1, false); 
+        }
+        if(ret<0){
+            MMPrintString("GT911 controller not found\r\n");
+            return;
+        }
+        if(gt911_dev_mode_w(GT911_DEV_MODE_FACTORY) != GT911_OK){
+            MMPrintString("e0\r\n");
+        }
+        else if (gt911_dev_mode_r(&read_data) != GT911_OK){
+            MMPrintString("e1\r\n");
+        } else {
+            PInt(read_data);PRet();
+            uSec(300000);
+            if (read_data != GT911_DEV_MODE_FACTORY)
+            {
+            /* Return error to caller */
+            MMPrintString("e3\r\n");
+            }
+            else {
+                read_data = 0x04U;
+                Write8Register16(gt911_addr, GT911_TD_STAT_REG, read_data);
+                if(mmI2Cvalue!=GT911_OK){
+                    MMPrintString("e4\r\n");
+                }
+                else {
+                    uint8_t end_calibration = 0U;
+                    uSec(300000);
+                    for (int nbr_attempt = 0; ((nbr_attempt < 100U) && (end_calibration == 0U)) ; nbr_attempt++)
+                    {
+                    if (gt911_dev_mode_r(&read_data) != GT911_OK)
+                    {
+                        MMPrintString("e5\r\n");
+                        break;
+                    }
+                    if (read_data == GT911_DEV_MODE_WORKING)
+                    {
+                        /* Auto Switch to GT911_DEV_MODE_WORKING : means calibration have ended */
+                        end_calibration = 1U; /* exit for loop */
+                    }
+
+                    uSec(300000);
+                    }
+                }
+            }
+        }
     } else {
         if(!Option.TOUCH_CS) return;
         GetTouchValue(CMD_PENIRQ_ON);                                   // send the controller the command to turn on PenIRQ
@@ -150,7 +236,7 @@ void MIPS16 GetCalibration(int x, int y, int *xval, int *yval) {
     DrawLine(x - (TARGET_OFFSET * 3)/4, y, x + (TARGET_OFFSET * 3)/4, y, 1, WHITE);
     DrawLine(x, y - (TARGET_OFFSET * 3)/4, x, y + (TARGET_OFFSET * 3)/4, 1, WHITE);
     DrawCircle(x, y, TARGET_OFFSET/2, 1, WHITE, -1, 1);
-    if(!Option.TOUCH_FT6336){
+    if(!Option.TOUCH_CAP){
         while(!TOUCH_DOWN) CheckAbort();                                // wait for the touch
         for(i = j = 0; i < 50; i++) {                                   // throw away the first 50 reads as rubbish
             GetTouchAxis(CMD_MEASURE_X); GetTouchAxis(CMD_MEASURE_Y);
@@ -192,11 +278,11 @@ void MIPS16 GetCalibration(int x, int y, int *xval, int *yval) {
 // this function does noise reduction and scales the reading to pixels
 // a return of TOUCH_ERROR means that the pen is not down
 int __not_in_flash_func(GetTouch)(int y, uint8_t calibrate) {
-    int i;
+    int i=TOUCH_ERROR;
 //    static int lastx, lasty;
 
     if(Option.TOUCH_CS == 0 && Option.TOUCH_IRQ ==0) error("Touch option not set");
-    if(Option.TOUCH_FT6336){
+    if(Option.TOUCH_CAP==1){
         if(!Option.TOUCH_XZERO && !Option.TOUCH_YZERO && !calibrate) error("Touch not calibrated");
         if(PinRead(Option.TOUCH_IRQ)) return TOUCH_ERROR;
         uint32_t in;
@@ -219,6 +305,8 @@ int __not_in_flash_func(GetTouch)(int y, uint8_t calibrate) {
         } else {
             i=(MMFLOAT)(i-Option.TOUCH_XZERO) * Option.TOUCH_XSCALE;
         }
+    } else if(Option.TOUCH_CAP==2){
+    
     } else {
         if(!Option.TOUCH_XZERO && !Option.TOUCH_YZERO) error("Touch not calibrated");
             if(PinRead(Option.TOUCH_IRQ)) return TOUCH_ERROR;
@@ -347,7 +435,7 @@ void fun_touch(void) {
         iret = LastY;
  #endif        
     else {
-        if(Option.TOUCH_FT6336){
+        if(Option.TOUCH_CAP){
             if(checkstring(ep, (unsigned char *)"X2"))
                 iret = GetTouch(GET_X_AXIS2, 0);
             else if(checkstring(ep, (unsigned char *)"Y2"))

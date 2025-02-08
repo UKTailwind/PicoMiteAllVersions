@@ -485,7 +485,6 @@ void cmd_editfile(void){
  * @cond
  * The following section will be excluded from the documentation.
  */
-//#ifdef USBKEYBOARD
 #ifndef PICOMITE
 #ifndef PICOMITEWEB
     static short lastx1=9999, lasty1=9999;
@@ -524,7 +523,6 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
     while(1) {
         statuscount = 0;
         do {
-//#ifdef USBKEYBOARD
 #ifndef PICOMITE 
 #ifndef PICOMITEWEB
             c=-1;

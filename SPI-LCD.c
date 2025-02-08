@@ -114,9 +114,7 @@ int LCD_CS_PIN=0;
 int LCD_CD_PIN=0;
 int LCD_Reset_PIN=0;
 
-//#ifndef PICOMITEVGA
 unsigned char LCDBuffer[1440]={0};
-//#endif
 
 void DefineRegionSPI(int xstart, int ystart, int xend, int yend, int rw);
 void DrawBitmapSPI(int x1, int y1, int width, int height, int scale, int fc, int bc, unsigned char *bitmap);

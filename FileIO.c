@@ -4690,6 +4690,7 @@ void cmd_flush(void)
         }
     }
 }
+#define RoundUptoBlock(a)     ((((uint64_t)a) + (uint64_t)(511)) & (uint64_t)(~(511)))// round up to the nearest whole integer
 
 void fun_loc(void)
 {
@@ -4711,7 +4712,15 @@ void fun_loc(void)
         if (FileTable[fnbr].com > MAXCOMPORTS)
         {
             if(filesource[fnbr]==FLASHFILE)iret = lfs_file_tell(&lfs,FileTable[fnbr].lfsptr) + 1;
-            else iret = (*(FileTable[fnbr].fptr)).fptr + 1;
+            else {
+//                iret = (*(FileTable[fnbr].fptr)).fptr + 1;
+                if(fmode[fnbr] & FA_WRITE){
+                    iret = (*(FileTable[fnbr].fptr)).fptr + 1;
+                } else {
+                    iret = (RoundUptoBlock((*(FileTable[fnbr].fptr)).fptr)  -511 + buffpointer[fnbr]);
+                    if(iret<0)iret+=512;
+                }
+            }
         }
         else
             iret = SerialRxStatus(FileTable[fnbr].com);

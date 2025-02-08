@@ -44,9 +44,14 @@ extern "C" {
 #include "hardware/structs/pads_qspi.h"
 #include "pico/unique_id.h"
 #include "hardware/pwm.h"
+extern void start_i2s(int pio, int sm);
 #ifdef rp2350
 #include "hardware/structs/qmi.h"
-extern void start_i2s(int pio, int sm);
+#endif
+#ifdef PICOMITEVGA
+extern void start_vga_i2s(void);
+#ifndef HDMI
+#endif
 #endif
 #define COPYRIGHT   "Copyright " YEAR " Geoff Graham\r\n"\
                     "Copyright " YEAR2 " Peter Mather\r\n\r\n"
@@ -1892,7 +1897,7 @@ extern volatile int VGAscrolly;
 
 // pointer to current frame buffer
 uint QVGAOff;	// offset of QVGA PIO program
-
+uint I2SOff;
 // Scanline data buffers (commands sent to PIO)
 uint32_t ScanLineImg[3];	// image: HSYNC ... back porch ... image command
 uint32_t ScanLineFp;		// front porch
@@ -1967,7 +1972,7 @@ void MIPS32 __not_in_flash_func(QVgaLine0)()
         // prepare image line
             if(DISPLAY_TYPE==SCREENMODE1){
                 uint16_t *q=&fbuff[VGAnextbuf][0];
-                volatile unsigned char *p=&DisplayBuf[line * 80];
+                unsigned char *p=&DisplayBuf[line * 80];
                 if(tc==ytileheight){
                     tile++;
                     tc=0;
@@ -1988,7 +1993,7 @@ void MIPS32 __not_in_flash_func(QVgaLine0)()
                 }
 #ifdef rp2350
             } else if(DISPLAY_TYPE==SCREENMODE3){
-                volatile register unsigned char *p=&DisplayBuf[line * 320];
+                register unsigned char *p=&DisplayBuf[line * 320];
                 register uint8_t *r=(uint8_t *)fbuff[VGAnextbuf];
                 for(int i=0;i<320;i++){
                     register int low= *p & 0xF;
@@ -1998,7 +2003,7 @@ void MIPS32 __not_in_flash_func(QVgaLine0)()
 #endif
             } else { //MODE 2
                 line>>=1;
-                volatile register unsigned char *p=&DisplayBuf[line * 160];
+                register unsigned char *p=&DisplayBuf[line * 160];
                 register uint16_t *r=fbuff[VGAnextbuf];
                 for(int i=0;i<160;i++){
                     register int low= *p & 0xF;
@@ -2030,7 +2035,7 @@ void MIPS32 __not_in_flash_func(QVgaLine0)()
 	// restore integer divider state
 //	hw_divider_restore_state(&SaveDividerState);
 }
-void MIPS64 __not_in_flash_func(QVgaLine1)()
+void MIPS32 __not_in_flash_func(QVgaLine1)()
 {
     int i,line;
     uint8_t l,d;
@@ -2054,8 +2059,8 @@ void MIPS64 __not_in_flash_func(QVgaLine1)()
 	ScanLineCBNext = cb;
 
 	// increment scanline (1..)
-	line = QVgaScanLine; // current scanline
-	line++; 		// new current scanline
+	line = QVgaScanLine+1; // current scanline
+//	line++; 		// new current scanline
 	if (line >= QVGA_VTOT) // last scanline?
 	{
 		QVgaFrame++;	// increment frame counter
@@ -2114,8 +2119,8 @@ void MIPS64 __not_in_flash_func(QVgaLine1)()
                 }
 #ifdef rp2350
             } else if(DISPLAY_TYPE==SCREENMODE3){
-                volatile register unsigned char *p=&DisplayBuf[line * 320];
-                volatile register unsigned char *q=&LayerBuf[line * 320];
+                register unsigned char *p=&DisplayBuf[line * 320];
+                register unsigned char *q=&LayerBuf[line * 320];
                 register int low, high, low2, high2;
                 register uint8_t *r=(uint8_t *)fbuff[VGAnextbuf];
                 for(int i=0;i<320;i++){
@@ -2130,10 +2135,10 @@ void MIPS64 __not_in_flash_func(QVgaLine1)()
 #endif
             } else { //mode 2
                 line>>=1;
-                volatile register unsigned char *dd=&DisplayBuf[line * 160];
-                volatile register unsigned char *ll=&LayerBuf[line * 160];
+                register unsigned char *dd=&DisplayBuf[line * 160];
+                register unsigned char *ll=&LayerBuf[line * 160];
 #ifdef rp2350
-                volatile register unsigned char *ss=&SecondLayer[line * 160];
+                register unsigned char *ss=&SecondLayer[line * 160];
                 if(ss==dd){
                     ss=ll;
                     transparent16s=transparent16;
@@ -2142,7 +2147,28 @@ void MIPS64 __not_in_flash_func(QVgaLine1)()
 #endif
                 register int low, high, low2, high2;
                 register uint16_t *r=(uint16_t *)fbuff[VGAnextbuf];
-                for(int i=0;i<160;i++){
+                for(int i=0;i<160;i+=2){
+                    d=*dd++;
+                    l=*ll++;
+                    low= map16[d & 0xF];
+                    d>>=4;
+                    high=map16[d];
+                    low2= map16[l & 0xF];
+                    l>>=4;
+                    high2=map16[l];
+#ifdef rp2350
+                    s=*ss++;
+                    low3= map16[s & 0xF];
+                    s>>=4;
+                    high3=map16[s];
+#endif
+                    if(low2!=transparent16)low=low2;
+                    if(high2!=transparent16)high=high2;
+#ifdef rp2350
+                    if(low3!=transparent16s)low=low3;
+                    if(high3!=transparent16s)high=high3;
+#endif
+                    *r++=(low | (low<<4) | (high<<8) | (high<<12));
                     d=*dd++;
                     l=*ll++;
                     low= map16[d & 0xF];
@@ -2190,7 +2216,6 @@ void MIPS64 __not_in_flash_func(QVgaLine1)()
 	// restore integer divider state
 //	hw_divider_restore_state(&SaveDividerState);
 }
-
 // initialize QVGA PIO
 void QVgaPioInit()
 {
@@ -2220,7 +2245,6 @@ void QVgaPioInit()
     }
 	// load PIO program
 	QVGAOff = pio_add_program(QVGA_PIO, &qvga_program);
-
 
 	// configure GPIOs for use by PIO
 	for (i = QVGA_GPIO_FIRST; i <= QVGA_GPIO_LAST; i++) pio_gpio_init(QVGA_PIO, i);
@@ -4015,8 +4039,15 @@ int MIPS16 main(){
 #endif
 #ifdef rp2350
     if(PSRAMsize){MMPrintString("Total of ");PInt(PSRAMsize/(1024*1024));MMPrintString(" Mbytes PSRAM available\r\n");}
-    start_i2s(2,0);
+    start_i2s(2,1);
+#else
+#ifdef PICOMITEWEB
+    start_i2s(0,1);
+#else
+    start_i2s(1,1);
 #endif
+#endif
+   
 	if(setjmp(mark) != 0) {
      // we got here via a long jump which means an error or CTRL-C or the program wants to exit to the command prompt
         FlashLoad = 0;

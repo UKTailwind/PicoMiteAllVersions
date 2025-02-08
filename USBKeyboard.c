@@ -59,6 +59,22 @@ static void process_mouse_report(hid_mouse_report_t const * report, uint8_t n);
 //static uint8_t ds4_dev_addr = 0;
 //static uint8_t ds4_instance = 0;
 extern const char *KBrdList[];
+
+// flexible configuration of gamepads
+// each element in the array represents the bit in the bitmap
+// first array element is the index into the USB report
+// second element is the value related to the bit
+// third element is mode
+// mode 0 is bit not used
+// mode 1 is set if 1
+// mode 2 is set if 0
+// mode 3 is set if value greater than
+// mode 4 is set if value less than
+/*uint8_t gamepadmap[3][16]={
+	{0x06,0x06,0x00,0x06,0x06,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00},
+	{0x02,0x20,0x00,0x10,0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00}
+	{0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00}
+};*/
 //--------------------------------------------------------------------+
 // TinyUSB Callbacks
 //--------------------------------------------------------------------+
@@ -1004,6 +1020,7 @@ typedef struct TU_ATTR_PACKED {
 #define PS3  129
 #define SNES 130
 #define XBOX 131
+#define UNKNOWN 132
 static inline bool is_xbox(uint8_t dev_addr)
 {
   uint16_t vid, pid;
@@ -1026,6 +1043,9 @@ static inline bool is_generic(uint8_t dev_addr)
   uint16_t vid, pid;
   tuh_vid_pid_get(dev_addr, &vid, &pid);
   return ( (vid == 0x810 && pid == 0xE501)    // EasySMX Wireless, u, Android mode (u)		 
+           || (pid==0x11 && vid==0x79)
+		   || (pid==0x2060 && vid==0x583)
+		   || (pid==0xE401 && vid==0x081F9)
 		   || (vid == 2079 && pid == 58369) // EasySMX Wireless, c, PC Mode, D-input, emulation
          );
 }
@@ -1168,6 +1188,7 @@ bool diff_report(sony_ds4_report_t const* rpt1, sony_ds4_report_t const* rpt2)
 }
 void process_generic_gamepad(uint8_t const* report, uint16_t len, uint8_t n){
 	nunstruct[n].type=SNES;
+//	    static uint16_t c=0xFFFF;
 		uint16_t b=0;
 		if(report[5] & 0x10)b|=1<<10;
 		if(report[5] & 0x20)b|=1<<11;
@@ -1184,6 +1205,12 @@ void process_generic_gamepad(uint8_t const* report, uint16_t len, uint8_t n){
 		if((b ^ nunstruct[n].x0) & nunstruct[n].x1){
 			nunfoundc[n]=1;
 		}
+/*		if(b!=c){
+			PIntH(report[0]);
+			for(int i=1;i<len;i++)PIntHC(report[i]);
+			PRet();
+			c=b;
+		}*/
 		nunstruct[n].x0=b;
 }
 void process_specific_gamepad(uint8_t const* report, uint16_t len, uint8_t n){
@@ -1483,7 +1510,42 @@ void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance, uint8_t const* desc_re
 			HID[slot].Device_type=SNES;
 			HID[slot].active=true;
 			HID[slot].report_requested=false;
-		} else return;
+			for(int i=0;i< desc_len;i+=2){
+				putConsole('0',0);
+				putConsole('x',0);
+				PIntH(desc_report[i]);
+				putConsole(' ',0);
+				putConsole('0',0);
+				putConsole('x',0);
+				PIntH(desc_report[i+1]);
+				PRet();
+			}
+			
+		} else {
+			MMPrintString("Unknown Device Connected on channel ");PInt(slot+1);
+			MMPrintString(" (pid=&H");PIntH(pid);
+			MMPrintString(", vid=&H");PIntH(vid);MMPrintString(")");
+			MMPrintString("\r\n> ");
+			HID[slot].Device_address = dev_addr;
+			HID[slot].Device_instance = instance;
+			HID[slot].report_timer=-(10+(slot+2)*500);
+			HID[slot].active=false;
+			HID[slot].report_rate=20; //mSec between reports
+			HID[slot].Device_type=UNKNOWN;
+			HID[slot].active=true;
+			HID[slot].report_requested=false;
+			for(int i=0;i< desc_len;i+=2){
+				putConsole('0',0);
+				putConsole('x',0);
+				PIntH(desc_report[i]);
+				putConsole(' ',0);
+				putConsole('0',0);
+				putConsole('x',0);
+				PIntH(desc_report[i+1]);
+				PRet();
+			}
+			return;
+		}
 	}
 	Current_USB_devices++;
 }
@@ -1862,6 +1924,19 @@ void cmd_gamepad(void){
 		nunstruct[n].x1=0b1111111111111111;
 		if(argc==5)nunstruct[n].x1=getint(argv[4],0,0b1111111111111111);
 		return;
+/*	} else if((tp = checkstring(cmdline, (unsigned char *)"MAP"))){
+		#ifdef rp2350
+		int dims[MAXDIM]={0};
+		#else
+		short dims[MAXDIM]={0};
+		#endif
+		int64_t *aint=NULL;
+		getargs(&tp,1,(unsigned char *)",");
+		if(!(argc==1))error("Syntax");
+		int card=parseintegerarray(argv[0],&aint,1,2,dims,false)-1;
+		PInt(dims[0]-g_OptionBase+1);PIntComma(dims[1]-g_OptionBase+1);PRet();
+		if(!(dims[0]-g_OptionBase+1==2 && dims[1]-g_OptionBase+1==16))error("Array must be dimensioned 2x16");
+		return;*/
 	} else if((tp = checkstring(cmdline, (unsigned char *)"HAPTIC"))){
 		getargs(&tp,5,(unsigned char *)",");
 		if(!(argc==5))error("Syntax");

@@ -150,6 +150,383 @@ void fun_touch(void);
 #define FT6336_CHIPID					0x64
 
 #define FT6X36_DEFAULT_THRESHOLD		22
-#define FT6336_RESET Option.TOUCH_CS
+#define CAP_RESET Option.TOUCH_CS       
+
+#define GT911_ADDR              0x14
+#define GT911_ADDR2              0x5D
+#define   GT911_DEV_MODE_BIT_MASK        0x70U
+#define   GT911_DEV_MODE_BIT_POSITION    4U
+#define   GT911_GEST_ID_BIT_MASK        0xFFU
+#define   GT911_GEST_ID_BIT_POSITION    0U
+#define   GT911_TD_STATUS_BIT_BUFFER_STAT 0x80U
+#define   GT911_TD_STATUS_BIT_HAVEKEY     0x10U
+#define   GT911_TD_STATUS_BITS_NBTOUCHPTS 0x0FU
+//JCC adding END
+#define   GT911_TD_STATUS_BIT_MASK        0x07U
+#define   GT911_TD_STATUS_BIT_POSITION    0U
+#define GT911_MAX_X_LENGTH                  HRes
+#define GT911_MAX_Y_LENGTH                  VRes
+#define   GT911_P1_XH_EF_BIT_MASK        0xC0U
+#define   GT911_P1_XH_EF_BIT_POSITION    6U
+#define   GT911_P1_XL_TP_BIT_MASK        0xFFU
+#define   GT911_P1_XL_TP_BIT_POSITION    0U
+#define   GT911_P1_TID_BIT_MASK           0xFFU
+#define   GT911_P1_TID_BIT_POSITION       7U
+/* Current mode register of the GT911 (R/W) */
+
+/* Gesture ID register */
+#define GT911_GEST_ID_REG          0x814BU
+
+/* Gesture mode enabled */
+#define GT911_GESTURE_EN           0x8U
+
+/* Gesture Coordinates registers */
+#define GT911_START_X_L            0x814DU
+#define GT911_START_X_H            0x814EU
+#define GT911_START_Y_L            0x814FU
+#define GT911_START_Y_H            0x8150U
+#define GT911_END_X_L              0x8151U
+#define GT911_END_X_H              0x8152U
+#define GT911_END_Y_L              0x8153U
+#define GT911_END_Y_H              0x8154U
+#define GT911_WEIGHT_L             0x8155U
+#define GT911_WEIGHT_H             0x8156U
+#define GT911_HEIGHT_L             0x8157U
+#define GT911_HEIGHT_H             0x8158U
+
+
+/* Touch Data Status register : gives number of active touch points (0..5) */
+#define GT911_TD_STAT_REG          0x814EU
+
+/* P1 X, Y coordinates, weight(Point size) and track-id registers */
+#define GT911_P1_XL_REG            0x8150U
+#define GT911_P1_XH_REG            0x8151U
+#define GT911_P1_YL_REG            0x8152U
+#define GT911_P1_YH_REG            0x8153U
+#define GT911_P1_WEIGHTL_REG       0x8154U
+#define GT911_P1_WEIGHTH_REG       0x8155U
+#define GT911_P1_TID_REG           0x8157U
+
+/* P2 X, Y coordinates, weight and tid registers */
+#define GT911_P2_XL_REG            0x8158U
+#define GT911_P2_XH_REG            0x8159U
+#define GT911_P2_YL_REG            0x815AU
+#define GT911_P2_YH_REG            0x815BU
+#define GT911_P2_WEIGHTL_REG       0x815CU
+#define GT911_P2_WEIGHTH_REG       0x815DU
+#define GT911_P2_TID_REG           0x815FU
+
+/* P3 X, Y coordinates, weight and tid registers */
+#define GT911_P3_XL_REG            0x8160U
+#define GT911_P3_XH_REG            0x8161U
+#define GT911_P3_YL_REG            0x8162U
+#define GT911_P3_YH_REG            0x8163U
+#define GT911_P3_WEIGHTL_REG       0x8164U
+#define GT911_P3_WEIGHTH_REG       0x8165U
+#define GT911_P3_TID_REG           0x8167U
+
+/* P4 X, Y coordinates, weight and tid registers */
+#define GT911_P4_XL_REG            0x8168U
+#define GT911_P4_XH_REG            0x8169U
+#define GT911_P4_YL_REG            0x816AU
+#define GT911_P4_YH_REG            0x816BU
+#define GT911_P4_WEIGHTL_REG       0x816CU
+#define GT911_P4_WEIGHTH_REG       0x816DU
+#define GT911_P4_TID_REG           0x816FU
+
+/* P5 X, Y coordinates, weight and tid registers */
+#define GT911_P5_XL_REG            0x8170U
+#define GT911_P5_XH_REG            0x8171U
+#define GT911_P5_YL_REG            0x8172U
+#define GT911_P5_YH_REG            0x8173U
+#define GT911_P5_WEIGHTL_REG       0x8174U
+#define GT911_P5_WEIGHTH_REG       0x8175U
+#define GT911_P5_TID_REG           0x8177U
+
+/* Threshold for touch detection */
+#define GT911_TH_GROUP_REG         0x80U
+
+/* Filter function coefficients */
+#define GT911_TH_DIFF_REG          0x85U
+
+/* Control register */
+#define GT911_CTRL_REG             0x86U
+
+/* The time period of switching from Active mode to Monitor mode when there is no touching */
+#define GT911_TIMEENTERMONITOR_REG 0x87U
+
+/* Report rate in Active mode */
+#define GT911_PERIODACTIVE_REG     0x88U
+
+/* Report rate in Monitor mode */
+#define GT911_PERIODMONITOR_REG    0x89U
+
+/* Maximum offset while Moving Left and Moving Right gesture */
+#define GT911_OFFSET_LR_REG        0x92U
+
+/* Maximum offset while Moving Up and Moving Down gesture */
+#define GT911_OFFSET_UD_REG        0x93U
+
+/* Minimum distance while moving gesture */
+#define GT911_DIS_GESTURE_REG      0x8071U
+
+/* High 8-bit of LIB Version info */
+#define GT911_LIB_VER_H_REG        0xA1U
+
+/* Low 8-bit of LIB Version info */
+#define GT911_LIB_VER_L_REG        0xA2U
+
+/* Chip Selecting */
+#define GT911_CIPHER_REG           0xA3U
+
+/* Module_Switch1 register for Interrupt */
+#define GT911_MSW1_REG             0x804DU
+
+/* Current power mode the GT911 system is in (R) */
+#define GT911_PWR_MODE_REG         0xA5U
+
+/* GT911 firmware version */
+#define GT911_FIRMID_REG           0x8144U
+
+/* GT911 Chip identification register */
+#define GT911_CHIP_ID_REG          0x8140U
+
+/* Release code version */
+#define GT911_RELEASE_CODE_ID_REG  0xAFU
+
+/* Current operating mode the GT911 system is in (R) */
+#define GT911_COMMAND_REG          0x8040U
+
+/* Coordinates report rate (= 5+N ms) */
+#define GT911_REFRESH_RATE_REG     0x8056U
+#define GT911_REFRESH_RATE_MSK     0x0FU
+
+/* Version number configuration */
+#define GT911_CONFIG_VERS_REG      0x8047U
+
+/* Checksum configuration register */
+#define GT911_CONFIG_CHKSUM_REG    0x80FFU
+
+/* Configuration update flag register */
+#define GT911_CONFIG_FRESH_REG     0x8100U
+
+/* Command check register */
+#define GT911_COMMAND_CHK_REG      0x8046U
+
+/* Gesture configuration registers */
+#define GT911_GESTURE_PRESS_TIME   0x8072U
+#define GT911_GESTURE_TIME_ABORT   0x00U
+
+#define GT911_GESTURE_SLOPE_ADJUST 0x8073U
+#define GT911_GESTURE_ADJUST_VAL   0x00U
+
+#define GT911_GESTURE_CTRL_REG     0x8074U
+#define GT911_GESTURE_INVALID_TIM  0x0FU
+
+#define GT911_GESTURE_SWITCH1_REG  0x8075U
+#define GT911_GESTURE_SWITCH2_REG  0x8076U
+#define GT911_GESTURE_SWITCH1_VAL  0x00U
+#define GT911_GESTURE_SWITCH2_VAL  0x00U
+
+#define GT911_GESTURE_REFRESH_REG  0x8077U
+
+#define GT911_GESTURE_TH_REG       0x8078U
+#define GT911_OK                      (0)
+#define GT911_ERROR                   (-1)
+
+/* Max detectable simultaneous touches */
+#define GT911_MAX_NB_TOUCH             5U
+
+/* Touch GT911 IDs: "911" */
+#define GT911_ID                        0x00313139U
+#define GT911_ID1                       0x39U
+#define GT911_ID2                       0x31U
+#define GT911_ID3                       0x31U
+/* Possible values of GT911_DEV_MODE_REG */
+#define GT911_DEV_MODE_WORKING          0x00U
+#define GT911_DEV_MODE_FACTORY          0x04U
+
+/* Possible values of GT911_GEST_ID_REG */
+#define GT911_GEST_ID_NO_GESTURE        0x00U
+#define GT911_GEST_ID_SWIPE_RIGHT       0xAAU
+#define GT911_GEST_ID_SWIPE_LEFT        0xBBU
+#define GT911_GEST_ID_SWIPE_DOWN        0xABU
+#define GT911_GEST_ID_SWIPE_UP          0xBAU
+#define GT911_GEST_ID_DOUBLE_TAP        0xCCU
+
+/* Values Pn_XH and Pn_YH related */
+#define GT911_TOUCH_EVT_FLAG_PRESS_DOWN 0x00U
+#define GT911_TOUCH_EVT_FLAG_LIFT_UP    0x01U
+#define GT911_TOUCH_EVT_FLAG_CONTACT    0x02U
+#define GT911_TOUCH_EVT_FLAG_NO_EVENT   0x03U
+
+/* Possible values of GT911_MSW1_REG(Module_Switch1) */
+#define GT911_M_SW1_INTERRUPT_RISING    0x00U
+#define GT911_M_SW1_INTERRUPT_FALLING   0x01U
+#define GT911_M_SW1_INTERRUPT_LOW       0x02U
+#define GT911_M_SW1_INTERRUPT_HIGH      0x03U
+
+/* Mask for reading the MSW1 register without INT trigger */
+#define GT911_M_SW1_DATA_MASK           0xFCU
+/* Current mode register of the GT911 (R/W) */
+#define GT911_DEV_MODE_REG         0x8040U
+
+/* Gesture ID register */
+#define GT911_GEST_ID_REG          0x814BU
+
+/* Gesture mode enabled */
+#define GT911_GESTURE_EN           0x8U
+
+/* Gesture Coordinates registers */
+#define GT911_START_X_L            0x814DU
+#define GT911_START_X_H            0x814EU
+#define GT911_START_Y_L            0x814FU
+#define GT911_START_Y_H            0x8150U
+#define GT911_END_X_L              0x8151U
+#define GT911_END_X_H              0x8152U
+#define GT911_END_Y_L              0x8153U
+#define GT911_END_Y_H              0x8154U
+#define GT911_WEIGHT_L             0x8155U
+#define GT911_WEIGHT_H             0x8156U
+#define GT911_HEIGHT_L             0x8157U
+#define GT911_HEIGHT_H             0x8158U
+
+
+/* Touch Data Status register : gives number of active touch points (0..5) */
+#define GT911_TD_STAT_REG          0x814EU
+
+/* P1 X, Y coordinates, weight(Point size) and track-id registers */
+#define GT911_P1_XL_REG            0x8150U
+#define GT911_P1_XH_REG            0x8151U
+#define GT911_P1_YL_REG            0x8152U
+#define GT911_P1_YH_REG            0x8153U
+#define GT911_P1_WEIGHTL_REG       0x8154U
+#define GT911_P1_WEIGHTH_REG       0x8155U
+#define GT911_P1_TID_REG           0x8157U
+
+/* P2 X, Y coordinates, weight and tid registers */
+#define GT911_P2_XL_REG            0x8158U
+#define GT911_P2_XH_REG            0x8159U
+#define GT911_P2_YL_REG            0x815AU
+#define GT911_P2_YH_REG            0x815BU
+#define GT911_P2_WEIGHTL_REG       0x815CU
+#define GT911_P2_WEIGHTH_REG       0x815DU
+#define GT911_P2_TID_REG           0x815FU
+
+/* P3 X, Y coordinates, weight and tid registers */
+#define GT911_P3_XL_REG            0x8160U
+#define GT911_P3_XH_REG            0x8161U
+#define GT911_P3_YL_REG            0x8162U
+#define GT911_P3_YH_REG            0x8163U
+#define GT911_P3_WEIGHTL_REG       0x8164U
+#define GT911_P3_WEIGHTH_REG       0x8165U
+#define GT911_P3_TID_REG           0x8167U
+
+/* P4 X, Y coordinates, weight and tid registers */
+#define GT911_P4_XL_REG            0x8168U
+#define GT911_P4_XH_REG            0x8169U
+#define GT911_P4_YL_REG            0x816AU
+#define GT911_P4_YH_REG            0x816BU
+#define GT911_P4_WEIGHTL_REG       0x816CU
+#define GT911_P4_WEIGHTH_REG       0x816DU
+#define GT911_P4_TID_REG           0x816FU
+
+/* P5 X, Y coordinates, weight and tid registers */
+#define GT911_P5_XL_REG            0x8170U
+#define GT911_P5_XH_REG            0x8171U
+#define GT911_P5_YL_REG            0x8172U
+#define GT911_P5_YH_REG            0x8173U
+#define GT911_P5_WEIGHTL_REG       0x8174U
+#define GT911_P5_WEIGHTH_REG       0x8175U
+#define GT911_P5_TID_REG           0x8177U
+
+/* Threshold for touch detection */
+#define GT911_TH_GROUP_REG         0x80U
+
+/* Filter function coefficients */
+#define GT911_TH_DIFF_REG          0x85U
+
+/* Control register */
+#define GT911_CTRL_REG             0x86U
+
+/* The time period of switching from Active mode to Monitor mode when there is no touching */
+#define GT911_TIMEENTERMONITOR_REG 0x87U
+
+/* Report rate in Active mode */
+#define GT911_PERIODACTIVE_REG     0x88U
+
+/* Report rate in Monitor mode */
+#define GT911_PERIODMONITOR_REG    0x89U
+
+/* Maximum offset while Moving Left and Moving Right gesture */
+#define GT911_OFFSET_LR_REG        0x92U
+
+/* Maximum offset while Moving Up and Moving Down gesture */
+#define GT911_OFFSET_UD_REG        0x93U
+
+/* Minimum distance while moving gesture */
+#define GT911_DIS_GESTURE_REG      0x8071U
+
+/* High 8-bit of LIB Version info */
+#define GT911_LIB_VER_H_REG        0xA1U
+
+/* Low 8-bit of LIB Version info */
+#define GT911_LIB_VER_L_REG        0xA2U
+
+/* Chip Selecting */
+#define GT911_CIPHER_REG           0xA3U
+
+/* Module_Switch1 register for Interrupt */
+#define GT911_MSW1_REG             0x804DU
+
+/* Current power mode the GT911 system is in (R) */
+#define GT911_PWR_MODE_REG         0xA5U
+
+/* GT911 firmware version */
+#define GT911_FIRMID_REG           0x8144U
+
+/* GT911 Chip identification register */
+#define GT911_CHIP_ID_REG          0x8140U
+
+/* Release code version */
+#define GT911_RELEASE_CODE_ID_REG  0xAFU
+
+/* Current operating mode the GT911 system is in (R) */
+#define GT911_COMMAND_REG          0x8040U
+
+/* Coordinates report rate (= 5+N ms) */
+#define GT911_REFRESH_RATE_REG     0x8056U
+#define GT911_REFRESH_RATE_MSK     0x0FU
+
+/* Version number configuration */
+#define GT911_CONFIG_VERS_REG      0x8047U
+
+/* Checksum configuration register */
+#define GT911_CONFIG_CHKSUM_REG    0x80FFU
+
+/* Configuration update flag register */
+#define GT911_CONFIG_FRESH_REG     0x8100U
+
+/* Command check register */
+#define GT911_COMMAND_CHK_REG      0x8046U
+
+/* Gesture configuration registers */
+#define GT911_GESTURE_PRESS_TIME   0x8072U
+#define GT911_GESTURE_TIME_ABORT   0x00U
+
+#define GT911_GESTURE_SLOPE_ADJUST 0x8073U
+#define GT911_GESTURE_ADJUST_VAL   0x00U
+
+#define GT911_GESTURE_CTRL_REG     0x8074U
+#define GT911_GESTURE_INVALID_TIM  0x0FU
+
+#define GT911_GESTURE_SWITCH1_REG  0x8075U
+#define GT911_GESTURE_SWITCH2_REG  0x8076U
+#define GT911_GESTURE_SWITCH1_VAL  0x00U
+#define GT911_GESTURE_SWITCH2_VAL  0x00U
+
+#define GT911_GESTURE_REFRESH_REG  0x8077U
+
+#define GT911_GESTURE_TH_REG       0x8078U
 #endif
 /*  @endcond */

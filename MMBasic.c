@@ -113,11 +113,7 @@ int PSize;                                                          // the size 
 int NextData;                                                       // used to track the next item to read in DATA & READ stmts
 unsigned char *NextDataLine;                                                 // used to track the next line to read in DATA & READ stmts
 int g_OptionBase;                                                     // track the state of OPTION BASE
-//#if defined(MMFAMILY) || defined(DOS)
-//unsigned char *ModuleTable[MAXMODULES];                                      // list of pointers to libraries a(also called modules) loaded in memory;
-//int NbrModules;                                                     // the number of libraries/modules currently loaded
-//#endif
-    int  PrepareProgramExt(unsigned char *, int, unsigned char **, int);
+int  PrepareProgramExt(unsigned char *, int, unsigned char **, int);
 extern uint32_t core1stack[];;
 
 #if defined(MMFAMILY)
@@ -1045,13 +1041,6 @@ void  MIPS16 tokenise(int console) {
         STR_REPLACE((char *)inpbuf,"MM.VPOS","MM.INFO(VPOS)");
         STR_REPLACE((char *)inpbuf,"MM.ONEWIRE","MM.INFO(ONEWIRE)");
         STR_REPLACE((char *)inpbuf,"SPRITE MEMORY","BLIT MEMORY");
-        STR_REPLACE((char *)inpbuf,".program","_program");
-        STR_REPLACE((char *)inpbuf,".end program","_end program");
-        STR_REPLACE((char *)inpbuf,".side set","_side set");
-        STR_REPLACE((char *)inpbuf,".wrap target","_wrap target");
-        STR_REPLACE((char *)inpbuf,".wrap","_wrap");
-        STR_REPLACE((char *)inpbuf,".line","_line");
-        STR_REPLACE((char *)inpbuf,".label","_label");
     }
     // setup the input and output buffers
     p = inpbuf;
@@ -1075,6 +1064,17 @@ void  MIPS16 tokenise(int console) {
     // process the rest of the line
     firstnonwhite = true;
     labelvalid = true;
+    tp=p;
+    skipspace(tp);
+    if(*tp=='.'){
+        if(!strncasecmp((char *)tp,".SIDE SET ",10) ||
+            !strncasecmp((char *)tp,".END PROGRAM",12) ||
+            !strncasecmp((char *)tp,".WRAP",4) ||
+            !strncasecmp((char *)tp,".LINE ",5) ||
+            !strncasecmp((char *)tp,".PROGRAM ",9) ||
+            !strncasecmp((char *)tp,".LABEL ",6)
+        ) *tp='_';
+    }
     while(*p) {
 	    if(*p=='*' && p[1]=='/'){
             multi=false;

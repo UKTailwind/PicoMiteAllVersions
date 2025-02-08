@@ -124,7 +124,7 @@ typedef struct s_nunstruct {
     	unsigned short x1;
     	unsigned short y1;
     	unsigned short z1;
-    	uint32_t type;
+    	uint64_t type;
     	uint8_t calib[16];
     	uint8_t classic[6];
 		int16_t gyro[3], accs[3];
@@ -139,9 +139,12 @@ extern const unsigned char readcontroller[1];
 extern uint8_t readRegister8(unsigned int addr, uint8_t reg);
 extern void WriteRegister8(unsigned int addr, uint8_t reg, uint8_t data);
 extern uint32_t readRegister32(unsigned int addr, uint8_t reg);
+extern void Write8Register16(unsigned int addr, uint16_t reg, uint8_t data);
+extern uint8_t read8Register16(unsigned int addr, uint16_t reg);
 extern volatile struct s_nunstruct nunstruct[6];
 extern void WiiReceive(int nbr, char *p);
 extern void WiiSend(int nbr, char *p);
+extern int mmI2Cvalue;
 extern bool classicread, nunchuckread;
 #define REG_GAIN                    0x00         // Gain lower 8 bits (rest in vref 
     #define REG_BLUE                    0x01         // blue gain 
