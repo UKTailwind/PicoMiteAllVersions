@@ -156,11 +156,15 @@ int dirOK=2;
 static int *instructions=NULL;
 static char *labelsfound=NULL, *labelsneeded=NULL;
 int piointerrupt=0;
+uint8_t nextline[4]={0};
 static int pioinuse=99;
 extern bool PIO2, PIO1, PIO0;
 extern void on_pwm_wrap(void);
 PIO pioi2s;
 uint8_t i2ssm;
+#if defined( PICOMITEVGA) && !defined(HDMI)
+#include "PicoMiteI2S.pio.h"
+#endif
 static inline uint32_t pio_sm_calc_wrap(uint wrap_target, uint wrap) {
     uint32_t calc=0;
 //    valid_params_if(PIO, wrap < PIO_INSTRUCTION_COUNT);
@@ -287,15 +291,20 @@ int checkblock(char *p){
         }
         return data;
 }
-
+extern uint I2SOff;
 void start_i2s(int pior, int sm){
     if(!Option.audio_i2c_bclk)return;
+    i2ssm=sm;
+    int start=0;
 #ifdef rp2350
-pioi2s = (pior==0 ? pio0: (pior==1 ? pio1: pio2));
+        pioi2s = (pior==0 ? pio0: (pior==1 ? pio1: pio2));
 #else
-pioi2s = (pior==0 ? pio0: pio1);
+        pioi2s = (pior==0 ? pio0: pio1);
 #endif
-        i2ssm=sm;
+#if defined( PICOMITEVGA) && !defined(HDMI)
+	pio_sm_config cfg = i2s_program_get_default_config(I2SOff);
+        start=I2SOff;
+#else
         struct pio_program program;
         program.length=32;
         program.origin=0;
@@ -316,27 +325,32 @@ pioi2s = (pior==0 ? pio0: pio1);
         pio_clear_instruction_memory(pioi2s);
         pio_add_program(pioi2s,&program);
         hw_clear_bits(&pioi2s->ctrl, 1 << (PIO_CTRL_SM_ENABLE_LSB + sm));
+        #endif
 	gpio_set_input_enabled(PinDef[Option.audio_i2c_data].GPno, true);
 	gpio_set_input_enabled(PinDef[Option.audio_i2c_bclk].GPno, true);
 	gpio_set_input_enabled(PinDef[Option.audio_i2c_bclk].GPno+1, true);
 #ifdef rp2350
-        gpio_set_function(PinDef[Option.audio_i2c_bclk].GPno, GPIO_FUNC_PIO2);
-        gpio_set_function(PinDef[Option.audio_i2c_data].GPno, GPIO_FUNC_PIO2);
-        gpio_set_function(PinDef[Option.audio_i2c_bclk].GPno+1, GPIO_FUNC_PIO2);
+        gpio_set_function(PinDef[Option.audio_i2c_bclk].GPno  , pior==0 ? GPIO_FUNC_PIO0 : (pior==1? GPIO_FUNC_PIO1 : GPIO_FUNC_PIO2));
+        gpio_set_function(PinDef[Option.audio_i2c_data].GPno  , pior==0 ? GPIO_FUNC_PIO0 : (pior==1? GPIO_FUNC_PIO1 : GPIO_FUNC_PIO2));
+        gpio_set_function(PinDef[Option.audio_i2c_bclk].GPno+1, pior==0 ? GPIO_FUNC_PIO0 : (pior==1? GPIO_FUNC_PIO1 : GPIO_FUNC_PIO2));
 #else
-        gpio_set_function(PinDef[Option.audio_i2c_bclk].GPno, pior==0 ? GPIO_FUNC_PIO0 : GPIO_FUNC_PIO1);
-        gpio_set_function(PinDef[Option.audio_i2c_data].GPno, pior==0 ? GPIO_FUNC_PIO0 : GPIO_FUNC_PIO1);
+        gpio_set_function(PinDef[Option.audio_i2c_bclk].GPno  , pior==0 ? GPIO_FUNC_PIO0 : GPIO_FUNC_PIO1);
+        gpio_set_function(PinDef[Option.audio_i2c_data].GPno  , pior==0 ? GPIO_FUNC_PIO0 : GPIO_FUNC_PIO1);
         gpio_set_function(PinDef[Option.audio_i2c_bclk].GPno+1, pior==0 ? GPIO_FUNC_PIO0 : GPIO_FUNC_PIO1);
 #endif
         ExtCfg(Option.audio_i2c_bclk, EXT_BOOT_RESERVED, 0);
         ExtCfg(Option.audio_i2c_data, EXT_BOOT_RESERVED, 0);
         ExtCfg(PINMAP[PinDef[Option.audio_i2c_bclk].GPno+1], EXT_BOOT_RESERVED, 0);
-        int start=0,execctrl=0x7000,shiftctrl=0x40000000, pinctrl=0;
+        int execctrl=0x7000,shiftctrl=0x40000000, pinctrl=0;
 	float clock=(float)(2822400*2);
         pinctrl=(2<<29); // no of side set pins
         pinctrl|=(1<<20); // no of OUT pins
         pinctrl|=(PinDef[Option.audio_i2c_data].GPno); // OUT base
         pinctrl|=(PinDef[Option.audio_i2c_bclk].GPno<<10);  // SIDE SET base
+#if defined( PICOMITEVGA) && !defined(HDMI)
+        execctrl=cfg.execctrl;
+//        PIntH(execctrl);PRet();
+#endif
         pio_init(pior, sm, pinctrl, execctrl, shiftctrl, start, clock, true,false,true);
         pio_sm_clear_fifos(pioi2s,sm);
         pio_sm_restart(pioi2s, sm);
@@ -1175,7 +1189,9 @@ void MIPS16 cmd_pio(void){
                         if(!strncasecmp(ss,".LINE ",5)){
                                 if(!dirOK)error("Directive must appear before instructions");
                                 ss+=5;
-                                PIOlinenumber=getint((unsigned char *)ss,0,31);
+                                skipspace(ss);
+                                if(!strncasecmp(ss,"NEXT",4) && (ss[4]==0 || ss[4]==' '))PIOlinenumber=nextline[pioinuse];
+                                else PIOlinenumber=getint((unsigned char *)ss,0,31);
                                 PIOstart=PIOlinenumber;
                                 return;
                         } else if(!strncasecmp(ss,".WRAP TARGET",12)){
@@ -1226,6 +1242,8 @@ void MIPS16 cmd_pio(void){
                                                 PRet();
                                         }
                                 }
+                                nextline[pioinuse]=PIOstart+totallines;
+                                nextline[3]=pioinuse;
                                 FreeMemorySafe((void **)&instructions);
                                 FreeMemorySafe((void **)&labelsneeded);
                                 FreeMemorySafe((void **)&labelsfound);
@@ -1546,6 +1564,21 @@ void fun_pio(void){
         targ=T_INT;
         return;
     }
+    tp = checkstring(ep, (unsigned char *)"NEXT LINE");
+    if(tp){
+        getargs(&tp,1,(unsigned char *)",");
+        int pior=nextline[3];
+        if(argc)pior=getint(argv[0],0,PIOMAX-1);
+        if(pior==99)error("No current PIO in use");
+        if(PIO0==false && pior==0)error("PIO 0 not available");
+        if(PIO1==false && pior==1)error("PIO 1 not available");
+#ifdef rp2350
+        if(PIO2==false && pior==2)error("PIO 2 not available");
+#endif
+        iret=nextline[pior];
+        targ=T_INT;
+        return;
+}
     tp = checkstring(ep, (unsigned char *)"FLEVEL");
     if(tp){
         getargs(&tp,5,(unsigned char *)",");
@@ -1657,7 +1690,7 @@ void cmd_mov(void){
         call_pio("mov",1);
 }
 void cmd_nop(void){
-        call_pio("nop",0);
+        call_pio("nop",strlen((char *)cmdline) ? 1 : 0);
 }
 void cmd_irqset(void){
         call_pio("irq set",1);

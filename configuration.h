@@ -66,11 +66,11 @@ extern "C" {
         #endif
     #else
         #ifdef USBKEYBOARD
-            #define FLASH_TARGET_OFFSET (832* 1024) 
+            #define FLASH_TARGET_OFFSET (848* 1024) 
             #define MagicKey 0x15197236
             #define HEAPTOP 0x2003FB00
         #else
-            #define FLASH_TARGET_OFFSET (816 * 1024) 
+            #define FLASH_TARGET_OFFSET (848 * 1024) 
             #define MagicKey 0x21639130
             #define HEAPTOP 0x2003fc00
         #endif
@@ -130,7 +130,7 @@ extern "C" {
     #ifdef rp2350
         #define HEAP_MEMORY_SIZE (256*1024) 
         #define MAXVARS             768                     // 8 + MAXVARLEN + MAXDIM * 2  (ie, 56 bytes) - these do not incl array members
-        #define FLASH_TARGET_OFFSET (800 * 1024) 
+        #define FLASH_TARGET_OFFSET (832 * 1024) 
         #define MAX_CPU     (rp2350a ? 400000 : 378000)
         #define MAXSUBFUN           512                     // each entry takes up 4 bytes
         #ifdef USBKEYBOARD
@@ -143,7 +143,7 @@ extern "C" {
     #else
         #define HEAP_MEMORY_SIZE (128*1024) 
         #define MAXVARS             512                     // 8 + MAXVARLEN + MAXDIM * 2  (ie, 56 bytes) - these do not incl array members
-        #define FLASH_TARGET_OFFSET (800 * 1024) 
+        #define FLASH_TARGET_OFFSET (832 * 1024) 
         #define MAX_CPU     420000
         #define MAXSUBFUN           256                     // each entry takes up 4 bytes
         #ifdef USBKEYBOARD

@@ -1871,23 +1871,26 @@ void cmd_line(void) {
             if(nc>n)nc=n;
             if(argc>=5 && *argv[4])xs=getint(argv[4],0,HRes-1);
             if(argc>=7 && *argv[6])xinc=getint(argv[6],1,HRes-1);
-            if(argc>=9 && *argv[8])ys=getint(argv[8],0,n-1);
+            if(argc>=9 && *argv[8])ys=getint(argv[8],g_OptionBase,n-2+g_OptionBase);
             if(argc>=11 && *argv[10])yinc=getint(argv[10],1,n-1);
             c = gui_fcolour;  w = 1;                                        // setup the defaults
             if(argc == 13) c = getint(argv[12], 0, WHITE);
-            for(i=0;i<nc-1;i+=xinc){
-                int y=ys+yinc*(i/xinc);
-                x1 = xs+i;
+            int y=ys-g_OptionBase;
+            for(i=0;i<(nc-1);i++){
+                if(y>=nc)break;
+                if(y+yinc>=nc)break;
+                x1 = xs+i*xinc;
                 y1 = (y1fptr==NULL ? y1ptr[y] : (int)y1fptr[y]);
                 if(y1<0)y1=0;
                 if(y1>=VRes)y1=VRes-1;
-                x2 = xs+(i+xinc);
+                x2 = xs+(i+1)*xinc;
                 y2 = (y1fptr==NULL ? y1ptr[y+yinc] : (int)y1fptr[y+yinc]);
                 if(x1>=HRes)break; //can only get worse so stop now
                 if(x2>=HRes)x2=HRes-1;
                 if(y2<0)y2=0;
                 if(y2>=VRes)y2=VRes-1;
                 DrawLine(x1, y1, x2, y2, w, c);
+                y+=yinc;
             }
 		} else if((p=checkstring(cmdline,(unsigned char *)"GRAPH"))){
             unsigned char *pp=GetTempMemory(STRINGSIZE);
@@ -8954,7 +8957,11 @@ XGA:
             }
 #endif        
         } else error("Framebuffer already exists");
-        memset((void *)LayerBuf,colour,ScreenSize);
+        if(DISPLAY_TYPE!=SCREENMODE4)memset((void *)LayerBuf,colour,ScreenSize);
+        else {
+            uint16_t *p=(uint16_t *)LayerBuf;
+            for(int i=0;i<HRes*VRes;i++)*p++=RGBtransparent;
+        }
     } else if((p=checkstring(cmdline, (unsigned char *)"CLOSE"))) {
         if(checkstring(p, (unsigned char *)"F")){
             closeframebuffer('F');

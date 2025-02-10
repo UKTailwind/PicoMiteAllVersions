@@ -2244,6 +2244,7 @@ void QVgaPioInit()
         QVGA_VTOT	= 500;	// total scanlines (= QVGA_VSYNC + QVGA_VBACK + QVGA_VACT + QVGA_VFRONT)
     }
 	// load PIO program
+	I2SOff = pio_add_program(QVGA_PIO, &i2s_program);
 	QVGAOff = pio_add_program(QVGA_PIO, &qvga_program);
 
 	// configure GPIOs for use by PIO
@@ -2640,7 +2641,7 @@ void MIPS64 __not_in_flash_func(dma_irq_handler0)() {
 // ----------------------------------------------------------------------------
 // Main program
 
-void MIPS64 __not_in_flash_func(HDMIloop0)(void){
+void MIPS32 __not_in_flash_func(HDMIloop0)(void){
     int last_line=2,load_line, line_to_load, line;
     while (1){
         if(v_scanline!=last_line){
@@ -2651,8 +2652,8 @@ void MIPS64 __not_in_flash_func(HDMIloop0)(void){
             if(HRes==320)line>>=1;
             line_to_load = last_line & 1;
             uint8_t l,d,s;
-            volatile register unsigned char *dd;
-            volatile register unsigned char *ll;
+            register unsigned char *dd;
+            register unsigned char *ll;
             int pp;
             uint16_t *p=HDMIlines[line_to_load];
             if(load_line>=0 && load_line<MODE_V_ACTIVE_LINES){
@@ -2738,27 +2739,24 @@ void MIPS64 __not_in_flash_func(HDMIloop0)(void){
                     break;
                 case SCREENMODE4: //320x240xRGB555 colour
                     pp=line*640;
-                    for(int i=0; i<640 ; i+=2){
-                        volatile uint8_t* d=&DisplayBuf[pp+i];
-                        volatile uint8_t* l=&LayerBuf[pp+i];
-                        int c=*d++;
-                        c|=((*d++)<<8);
-                        int ll=*l++;
-                        ll|=((*l++)<<8);
-                        if(ll!=RGBtransparent){
-                            *p++=ll;
-                            *p++=ll;
+                    uint16_t* d=(uint16_t *)&DisplayBuf[pp];
+                    uint16_t* l=(uint16_t *)&LayerBuf[pp];
+                    for(int i=0; i<320 ; i++){
+                        if(*l!=RGBtransparent){
+                            *p++=*l;
+                            *p++=*l;
                         } else {
-                            *p++=c;
-                            *p++=c;
+                            *p++=*d;
+                            *p++=*d;
                         }
+                        l++;d++;
                     }
                     break;
                 case SCREENMODE5: //320x240x256 colour
                     pp=line*320;
                     dd=&DisplayBuf[pp];
                     ll=&LayerBuf[pp];
-                    volatile register unsigned char *ss=&SecondLayer[pp];
+                    register unsigned char *ss=&SecondLayer[pp];
                     if(ss==dd){
                         ss=ll;
                         transparent16s=transparent16;
@@ -2785,10 +2783,9 @@ void MIPS64 __not_in_flash_func(HDMIloop0)(void){
                 }
             }
         }
-        systick_hw->cvr=0;
     }
 }
-void MIPS64 __not_in_flash_func(HDMIloop1)(void){
+void MIPS32 __not_in_flash_func(HDMIloop1)(void){
     int last_line=2,load_line, line_to_load, Line_dup, Line_quad;
     while(1){
         if(v_scanline!=last_line){
@@ -2967,7 +2964,7 @@ void MIPS64 __not_in_flash_func(HDMIloop1)(void){
         }
     }
 }
-void MIPS64 __not_in_flash_func(HDMIloop2)(void){
+void MIPS32 __not_in_flash_func(HDMIloop2)(void){
     int last_line=2,load_line, line_to_load, Line_dup, Line_quad;
     while(1){
         if(v_scanline!=last_line){
@@ -3353,6 +3350,11 @@ void HDMICore(void){
 
     for (int i = 12; i <= 19; ++i) {
         gpio_set_function(i, 0); // HSTX
+        gpio_set_drive_strength (i, GPIO_DRIVE_STRENGTH_8MA);
+        gpio_set_slew_rate(i,GPIO_SLEW_RATE_FAST);
+        gpio_set_input_enabled(i, false);
+        gpio_set_pulls(i,false,false);
+        gpio_set_input_hysteresis_enabled(i,false);
     }
 
     // Both channels are set up identically, to transfer a whole scanline and
@@ -4039,14 +4041,15 @@ int MIPS16 main(){
 #endif
 #ifdef rp2350
     if(PSRAMsize){MMPrintString("Total of ");PInt(PSRAMsize/(1024*1024));MMPrintString(" Mbytes PSRAM available\r\n");}
-    start_i2s(2,1);
+    #if defined(PICOMITEVGA) && !defined(HMDI)
+        start_i2s(0,1);
+    #else
+        start_i2s(2,1);
+    #endif
 #else
-#ifdef PICOMITEWEB
     start_i2s(0,1);
-#else
-    start_i2s(1,1);
 #endif
-#endif
+
    
 	if(setjmp(mark) != 0) {
      // we got here via a long jump which means an error or CTRL-C or the program wants to exit to the command prompt

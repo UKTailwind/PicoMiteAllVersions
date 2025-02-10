@@ -2110,7 +2110,7 @@ void setBacklight(int level){
         I2C_Send_Command(0x81);//SETCONTRAST
         I2C_Send_Command((uint8_t)level);
     } else if(Option.DISPLAY_TYPE>=SSDPANEL && Option.DISPLAY_TYPE<VIRTUAL){
-        SetBacklightSSD1963(getint(cmdline, 0, 100));
+        SetBacklightSSD1963(level);
     } else if(Option.DISPLAY_TYPE==SSD1306SPI){
         level*=255;
         level/=100;
@@ -2849,6 +2849,14 @@ void fun_dev(void){
         else if(checkstring(argv[2], (unsigned char *)"AY"))iret=nunstruct[n].accs[1];
         else if(checkstring(argv[2], (unsigned char *)"AZ"))iret=nunstruct[n].accs[2];
         else if(checkstring(argv[2], (unsigned char *)"T"))iret=nunstruct[n].type;
+#ifdef USBKEYBOARD
+        else if(checkstring(argv[2], (unsigned char *)"RAW")){
+            sret=GetTempMemory(STRINGSIZE);
+            targ=T_STR;
+            if(HID[n-1].report)Mstrcpy(sret,HID[n-1].report);
+            return;
+        }
+#endif
         else iret=0;
         targ=T_INT;
     } else if((tp=checkstring(ep,(unsigned char *)"MOUSE"))){
@@ -3753,6 +3761,7 @@ if(rp2350a){
     g_myrand=NULL;
     CMM1=0;
     dirOK=2;
+    nextline[0]=0;nextline[1]=0;nextline[2]=0;nextline[3]=99;
     memset(pioTXlast,0,sizeof(pioTXlast));
     memset(pioRXinterrupts,0,sizeof(pioRXinterrupts));
     memset(pioTXinterrupts,0,sizeof(pioTXinterrupts));

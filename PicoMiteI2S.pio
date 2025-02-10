@@ -1,0 +1,23 @@
+
+; ============================================================================
+;                           QVGA PIO (16 instructions)
+; ============================================================================
+; Control word (right shifted):
+;  - bit 0..26 (27 bits) loop counter N
+;  - bit 27..31 (5 bits) jump address
+
+.program i2s 
+.side_set	2	; HSYNC and VSYNC output (2 bits)
+.wrap_target
+Set x,30 side 0
+Pull noblock side 1
+loop1:
+Out pins,1 side 0
+Jmp x--,loop1 side 1
+Set x,30 side 2
+Pull noblock side 3
+loop2:
+Out pins,1 side 2
+Jmp x--,loop2 side 3
+.wrap						; wrap jump to .wrap_target
+

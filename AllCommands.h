@@ -296,7 +296,6 @@ void fun_math(void);
 void fun_timer(void);
 void fun_date(void);
 void fun_time(void);
-void fun_device(void);
 void fun_keydown(void);
 void fun_peek(void);
 void fun_restart(void);

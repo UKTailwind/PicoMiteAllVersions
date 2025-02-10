@@ -132,6 +132,7 @@ extern int dirOK;
 extern bool PIO0;
 extern bool PIO1;
 extern bool PIO2;
+extern uint8_t nextline[4];
 
 #define TCP_READ_BUFFER_SIZE 2048
 

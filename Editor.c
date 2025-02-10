@@ -1464,7 +1464,8 @@ void SetColour(unsigned char *p, int DoVT100) {
     // this is a list of common keywords that should be highlighted as such
     // the list must be terminated with a NULL
     char *specialkeywords[] = {
-        "SELECT", "INTEGER", "FLOAT", "STRING", "DISPLAY", "SDCARD", "OUTPUT", "APPEND", "WRITE", "SLAVE",
+        "SELECT", "INTEGER", "FLOAT", "STRING", "DISPLAY", "SDCARD", "OUTPUT", "APPEND", "WRITE", "SLAVE","TARGET","PROGRAM",
+//        ".PROGRAM", ".END PROGRAM", ".SIDE", ".LABEL" , ".LINE",".WRAP", ".WRAP TARGET",
         NULL
     };
 
@@ -1561,9 +1562,10 @@ void SetColour(unsigned char *p, int DoVT100) {
     }
 
     // check if this is the start of a keyword
-    if(isnamestart(*p) && !intext) {
+    if(isnamechar(*p) && !intext) {
         for(i = 0; i < CommandTableSize - 1; i++) {                 // check the command table for a match
-            if(EditCompStr((char *)p, (char *)commandtbl[i].name) != 0) {
+            if(EditCompStr((char *)p, (char *)commandtbl[i].name) != 0 ||
+            ((EditCompStr((char *)&p[1], (char *)&commandtbl[i].name[1]) != 0) && *p=='.' && *commandtbl[i].name=='_')){
                 if(EditCompStr((char *)p, "REM") != 0) {                 // special case, REM is a comment
                     gui_fcolour = GUI_C_COMMENT;
                     if(DoVT100) PrintString(VT100_C_COMMENT);
@@ -1572,7 +1574,9 @@ void SetColour(unsigned char *p, int DoVT100) {
                     gui_fcolour = GUI_C_KEYWORD;
                     if(DoVT100) PrintString(VT100_C_KEYWORD);
                     inkeyword = true;
-                    if(EditCompStr((char *)p, "GUI") || EditCompStr((char *)p, "OPTION")) {
+                    if(EditCompStr((char *)p, "GUI") || 
+                    EditCompStr((char *)p, "OPTION")
+                    ) {
                         twokeyword = p;
                         while(isalnum(*twokeyword)) twokeyword++;
                         while(*twokeyword == ' ') twokeyword++;
@@ -1582,7 +1586,7 @@ void SetColour(unsigned char *p, int DoVT100) {
             }
         }
         for(i = 0; i < TokenTableSize - 1; i++) {                   // check the token table for a match
-            if(EditCompStr((char *)p, (char *)tokentbl[i].name) != 0) {
+            if(EditCompStr((char *)p, (char *)tokentbl[i].name) != 0){
                 gui_fcolour = GUI_C_KEYWORD;
                 if(DoVT100) PrintString(VT100_C_KEYWORD);
                 inkeyword = true;

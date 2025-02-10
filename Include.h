@@ -87,6 +87,7 @@ INLINE void cb()
 #include "hardware/pio.h"
 #ifndef HDMI
 	#include "PicoMiteVGA.pio.h"
+	#include "PicoMiteI2S.pio.h"
 #endif
 #ifndef USBKEYBOARD
 	#include "pico/unique_id.h"

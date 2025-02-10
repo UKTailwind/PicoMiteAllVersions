@@ -1397,7 +1397,8 @@ void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance, uint8_t const* desc_re
   if(slot==-1)error("USB device limit reached");
   HID[slot].vid=vid;
   HID[slot].pid=pid;
-//  char buff[STRINGSIZE];
+  HID[slot].report=GetMemory(STRINGSIZE);
+  //  char buff[STRINGSIZE];
 //  PIntHC(vid);PIntHC(pid);PRet();
 //  sprintf(buff,"HID device address = %d, instance = %d is mounted\r\n", dev_addr, instance);
   /* Start HID Interface */
@@ -1510,7 +1511,7 @@ void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance, uint8_t const* desc_re
 			HID[slot].Device_type=SNES;
 			HID[slot].active=true;
 			HID[slot].report_requested=false;
-			for(int i=0;i< desc_len;i+=2){
+/*			for(int i=0;i< desc_len;i+=2){
 				putConsole('0',0);
 				putConsole('x',0);
 				PIntH(desc_report[i]);
@@ -1519,7 +1520,7 @@ void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance, uint8_t const* desc_re
 				putConsole('x',0);
 				PIntH(desc_report[i+1]);
 				PRet();
-			}
+			}*/
 			
 		} else {
 			MMPrintString("Unknown Device Connected on channel ");PInt(slot+1);
@@ -1534,7 +1535,7 @@ void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance, uint8_t const* desc_re
 			HID[slot].Device_type=UNKNOWN;
 			HID[slot].active=true;
 			HID[slot].report_requested=false;
-			for(int i=0;i< desc_len;i+=2){
+/*			for(int i=0;i< desc_len;i+=2){
 				putConsole('0',0);
 				putConsole('x',0);
 				PIntH(desc_report[i]);
@@ -1543,7 +1544,7 @@ void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance, uint8_t const* desc_re
 				putConsole('x',0);
 				PIntH(desc_report[i+1]);
 				PRet();
-			}
+			}*/
 			return;
 		}
 	}
@@ -1559,26 +1560,37 @@ void tuh_hid_umount_cb(uint8_t dev_addr, uint8_t instance)
 //		PInt(i);PIntHC(HID[i].Device_type);PRet();
 		if(instance==HID[i].Device_instance && dev_addr==HID[i].Device_address && HID[i].Device_type==HID_ITF_PROTOCOL_KEYBOARD){
 			if(!CurrentLinePtr) MMPrintString("USB Keyboard Disconnected\r\n> ");
+			FreeMemorySafe((void **)&HID[i].report);
 			break;
 		}
 		else if(instance==HID[i].Device_instance && dev_addr==HID[i].Device_address && HID[i].Device_type==HID_ITF_PROTOCOL_MOUSE){
 			if(!CurrentLinePtr) MMPrintString("USB Mouse Disconnected\r\n> ");
+			FreeMemorySafe((void **)&HID[i].report);
 			break;
 		}
 		else if(instance==HID[i].Device_instance && dev_addr==HID[i].Device_address && HID[i].Device_type==PS4){
 			if(!CurrentLinePtr) MMPrintString("PS4 Controller Disconnected\r\n> ");
+			FreeMemorySafe((void **)&HID[i].report);
 			break;
 		}
 		else if(instance==HID[i].Device_instance && dev_addr==HID[i].Device_address && HID[i].Device_type==PS3){
 			if(!CurrentLinePtr) MMPrintString("PS3 Controller Disconnected\r\n> ");
+			FreeMemorySafe((void **)&HID[i].report);
 			break;
 		}
 		else if(instance==HID[i].Device_instance && dev_addr==HID[i].Device_address && HID[i].Device_type==XBOX){
 			if(!CurrentLinePtr) MMPrintString("XBox Controller Disconnected\r\n> ");
+			FreeMemorySafe((void **)&HID[i].report);
 			break;
 		}
 		else if(instance==HID[i].Device_instance && dev_addr==HID[i].Device_address && HID[i].Device_type==SNES){
 			if(!CurrentLinePtr) MMPrintString("Generic Gamepad Disconnected\r\n> ");
+			FreeMemorySafe((void **)&HID[i].report);
+			break;
+		}
+		else if(instance==HID[i].Device_instance && dev_addr==HID[i].Device_address && HID[i].Device_type==UNKNOWN){
+			if(!CurrentLinePtr) MMPrintString("Unknown Device Disconnected\r\n> ");
+			FreeMemorySafe((void **)&HID[i].report);
 			break;
 		}
 	}
@@ -1597,6 +1609,8 @@ void tuh_hid_report_received_cb(uint8_t dev_addr, uint8_t instance, uint8_t cons
 		n=i;
 		break;
 	}
+	memcpy(&HID[n].report[1],report,len);
+	HID[n].report[0]=len;
 	switch (itf_protocol)
 	{
 		case HID_ITF_PROTOCOL_KEYBOARD:
