@@ -176,8 +176,9 @@ void Init_ds18b20(int pin, int precision) {
     ow_writeByte(pin, 0x44);                                        // command start the conversion
 	enable_interrupts();
     PinSetBit(pin, LATSET);
-    PinSetBit(pin, ODCCLR);                                         // set strong pullup
-    ExtCfg(pin, EXT_DS18B20_RESERVED, 0);
+	gpio_set_dir(PinDef[pin].GPno, GPIO_OUT);
+	gpio_put(PinDef[pin].GPno,GPIO_PIN_SET);
+	ExtCfg(pin, EXT_DS18B20_RESERVED, 0);
 }
 
 /*  @endcond */
@@ -264,8 +265,7 @@ void owReset(unsigned char *p) {
 	PinSetBit(pin, LATSET);
 	PinSetBit(pin, ODCSET);
 	ow_reset(pin);
-    ExtCfg(pin, EXT_NOT_CONFIG, 0);
-	return;
+	ExtCurrentConfig[pin] = EXT_NOT_CONFIG;
 }
 void owWriteCore(int pin, int * buf, int len, int flag){
 	disable_interrupts();
@@ -329,10 +329,10 @@ void owWrite(unsigned char *p) {
 	if (flag & 0x02) ow_reset(pin);
 
 	if (flag & 0x08) {												// strong pullup required?
-		PinSetBit(pin, LATSET);
-		PinSetBit(pin, TRISCLR);
+		gpio_set_dir(PinDef[pin].GPno, GPIO_OUT);
+		gpio_put(PinDef[pin].GPno,GPIO_PIN_SET);
 	}
-    ExtCfg(pin, EXT_NOT_CONFIG, 0);
+	ExtCurrentConfig[pin] = EXT_NOT_CONFIG;
 	return;
 }
 
@@ -395,7 +395,7 @@ void owRead(unsigned char *p) {
             else
                 *((long long int *)ptr) = buf[i];
 	}
-    ExtCfg(pin, EXT_NOT_CONFIG, 0);
+	ExtCurrentConfig[pin] = EXT_NOT_CONFIG;
 	return;
 }
 
