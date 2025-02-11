@@ -160,7 +160,7 @@ typedef struct s_HID {
 	uint8_t motorright;
 	uint8_t r,g,b;
 	uint8_t sendlights;
-	uint8_t *report;
+	uint8_t report[65];
 } a_HID;
 extern volatile struct s_HID HID[4];
 extern uint32_t _excep_code;

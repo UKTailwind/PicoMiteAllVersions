@@ -2853,7 +2853,7 @@ void fun_dev(void){
         else if(checkstring(argv[2], (unsigned char *)"RAW")){
             sret=GetTempMemory(STRINGSIZE);
             targ=T_STR;
-            if(HID[n-1].report)Mstrcpy(sret,HID[n-1].report);
+            Mstrcpy(sret,(unsigned char *)HID[n-1].report);
             return;
         }
 #endif
