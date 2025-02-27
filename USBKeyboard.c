@@ -60,25 +60,84 @@ static void process_mouse_report(hid_mouse_report_t const * report, uint8_t n);
 //static uint8_t ds4_instance = 0;
 extern const char *KBrdList[];
 
-// flexible configuration of gamepads
-// each element in the array represents the bit in the bitmap
-// first array element is the index into the USB report
-// second element is the value related to the bit
-// third element is mode
-// mode 0 is bit not used
-// mode 1 is set if 1
-// mode 2 is set if 0
-// mode 3 is set if value greater than
-// mode 4 is set if value less than
-/*uint8_t gamepadmap[3][16]={
-	{0x06,0x06,0x00,0x06,0x06,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00},
-	{0x02,0x20,0x00,0x10,0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00}
-	{0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00}
-};*/
+
 //--------------------------------------------------------------------+
 // TinyUSB Callbacks
 //--------------------------------------------------------------------+
+/*
+BIT 0 Button R/R1
+BIT 1 Button start/options
+BIT 2 Button home
+BIT 3 Button select/share
+BIT 4 Button L/L1
+BIT 5 Button down cursor
+BIT 6 Button right cursor
+BIT 7 Button up cursor
+BIT 8 Button left cursor
+BIT 9 Right shoulder button 2/R2
+BIT 10 Button x/triangle
+BIT 11 Button a/circle
+BIT 12 Button y/square
+BIT 13 Button b/cross
+BIT 14 Left should button 2/L2
+BIT 15 Touchpad
+*/
+struct s_Buttons {
+	uint8_t index; // which report element relates to this bit set to 0xFF if bit not used
+// code can be a bit number 0-7 for positive if pressed
+// 128-135 for negative if pressed
+// 64 for value less than 64 if pressed
+// 192 for value greater than 192 if pressed
+	uint8_t code ; 
+};
+struct s_Gamepad {
+	uint16_t vid;
+	uint16_t pid;
+	struct s_Buttons b_R;
+	struct s_Buttons b_START;
+	struct s_Buttons b_HOME;
+	struct s_Buttons b_SELECT;
+	struct s_Buttons b_L;
+	struct s_Buttons b_DOWN;
+	struct s_Buttons b_RIGHT;
+	struct s_Buttons b_UP;
+	struct s_Buttons b_LEFT;
+	struct s_Buttons b_R2;
+	struct s_Buttons b_X;
+	struct s_Buttons b_A;
+	struct s_Buttons b_Y;
+	struct s_Buttons b_B;
+	struct s_Buttons b_L2;
+	struct s_Buttons b_TOUCH;
+};
 
+const struct s_Gamepad Gamepads[]={
+
+		{
+			.vid=0x0810, .pid=0xE501, 
+			.b_R={6,1}, .b_START={6,5}, .b_HOME={0xFF,0}, .b_SELECT={6,4 }, .b_L={6,0},
+			.b_DOWN={4,192},.b_RIGHT={3,192},.b_UP={4,64},.b_LEFT={3,64},
+			.b_R2={0xFF,0},.b_X={5,4},.b_A={5,5},.b_Y={5,7},.b_B={5,6},
+			.b_L2={0xFF,0},.b_TOUCH={0xFF,0}
+		},
+		{
+			.vid=0x081F, .pid=0xE401, 
+			.b_R={6,1}, .b_START={6,5}, .b_HOME={0xFF,0}, .b_SELECT={6,4 }, .b_L={6,0},
+			.b_DOWN={1,192},.b_RIGHT={0,192},.b_UP={1,64},.b_LEFT={0,64},
+			.b_R2={0xFF,0},.b_X={5,4},.b_A={5,5},.b_Y={5,7},.b_B={5,6},
+			.b_L2={0xFF,0},.b_TOUCH={0xFF,0}
+		},
+		{
+			0,0, 
+			{0,0}, {0,0}, {0,0}, {0,0}, {0,0},
+			{0,0}, {0,0}, {0,0}, {0,0},
+			{0,0}, {0,0}, {0,0}, {0,0}, {0,0},
+			{0,0}, {0,0}
+		},
+	};
+
+struct s_Gamepad MyGamepad={0};
+static bool monitor=false;
 void tuh_mount_cb(uint8_t dev_addr)
 {
   // application set-up
@@ -207,7 +266,7 @@ typedef enum
     USB_HID_KEYBOARD_KEYPAD_KEYBOARD_F14                                     = 0x69,
     USB_HID_KEYBOARD_KEYPAD_KEYBOARD_F15                                     = 0x6A,
     USB_HID_KEYBOARD_KEYPAD_KEYBOARD_F16                                     = 0x6B,
-    USB_HID_KEYBOARD_KEYPAD_KEYBOARD_F17                                     = 0x6C,
+    USB_HID_KEYBOARD_KEYPAD_KEYBOARD_F17                                     = 0x6C, 
     USB_HID_KEYBOARD_KEYPAD_KEYBOARD_F18                                     = 0x6D,
     USB_HID_KEYBOARD_KEYPAD_KEYBOARD_F19                                     = 0x6E,
     USB_HID_KEYBOARD_KEYPAD_KEYBOARD_F20                                     = 0x6F,
@@ -1027,27 +1086,28 @@ static inline bool is_xbox(uint8_t dev_addr)
   tuh_vid_pid_get(dev_addr, &vid, &pid);
   return ( (vid == 0x11c0 && pid == 0x5500)    // EasySMX Wireless, u, Android mode (u)		 
 		   || (vid == 0x11c1 && pid == 0x9101) // EasySMX Wireless, c, PC Mode, D-input, emulation
-           || (vid == 0x057e && pid == 0x2009)             
+//           || (vid == 0x057e && pid == 0x2009)             
            || (vid == 0x2F24 && pid == 0x0048)             		   
          );
 }
-static inline bool is_specific(uint8_t dev_addr)
+/*static inline bool is_specific(uint8_t dev_addr)
 {
   uint16_t vid, pid;
   tuh_vid_pid_get(dev_addr, &vid, &pid);
   return ( (vid == 0x810 && pid == 0xE501)    // EasySMX Wireless, u, Android mode (u)		 
          );
-}
+}*/
 static inline bool is_generic(uint8_t dev_addr)
 {
-  uint16_t vid, pid;
+  if(monitor)return true;
+  uint16_t vid, pid,i=0;
   tuh_vid_pid_get(dev_addr, &vid, &pid);
-  return ( (vid == 0x810 && pid == 0xE501)    // EasySMX Wireless, u, Android mode (u)		 
-           || (pid==0x11 && vid==0x79)
-		   || (pid==0x2060 && vid==0x583)
-		   || (pid==0xE401 && vid==0x081F9)
-		   || (vid == 2079 && pid == 58369) // EasySMX Wireless, c, PC Mode, D-input, emulation
-         );
+  if(MyGamepad.pid==pid && MyGamepad.vid==vid)return true; //user specified decode
+  while(Gamepads[i].pid){
+	  if(Gamepads[i].pid==pid && Gamepads[i].vid==vid)return true;
+	  i++;
+  }
+  return false;
 }
 void process_xbox(uint8_t const* report, uint16_t len, uint8_t n)
 {
@@ -1186,72 +1246,170 @@ bool diff_report(sony_ds4_report_t const* rpt1, sony_ds4_report_t const* rpt2)
 
   return result;
 }
-void process_generic_gamepad(uint8_t const* report, uint16_t len, uint8_t n){
+/*
+BIT 0 Button R/R1
+BIT 1 Button start/options
+BIT 2 Button home
+BIT 3 Button select/share
+BIT 4 Button L/L1
+BIT 5 Button down cursor
+BIT 6 Button right cursor
+BIT 7 Button up cursor
+BIT 8 Button left cursor
+BIT 9 Right shoulder button 2/R2
+BIT 10 Button x/triangle
+BIT 11 Button a/circle
+BIT 12 Button y/square
+BIT 13 Button b/cross
+BIT 14 Left should button 2/L2
+BIT 15 Touchpad
+*/
+#define p_R 1
+#define p_START (1<<1)
+#define p_HOME (1<<2)
+#define p_SELECT (1<<3)
+#define p_L (1<<4)
+#define p_DOWN (1<<5)
+#define p_RIGHT (1<<6)
+#define p_UP (1<<7)
+#define p_LEFT (1<<8)
+#define p_R2 (1<<9)
+#define p_X (1<<10)
+#define p_A (1<<11)
+#define p_Y (1<<12)
+#define p_B (1<<13)
+#define p_L2 (1<<14)
+#define p_TOUCH (1<<15)
+/*void process_buffalo_gamepad(uint8_t const* report, uint16_t len, uint8_t n){
 	nunstruct[n].type=SNES;
-//	    static uint16_t c=0xFFFF;
 		uint16_t b=0;
-		if(report[5] & 0x10)b|=1<<10;
-		if(report[5] & 0x20)b|=1<<11;
-		if(report[5] & 0x40)b|=1<<13;
-		if(report[5] & 0x80)b|=1<<12;
-		if(report[6] & 1)b|=1<<4;
-		if(report[6] & 2)b|=1;
-		if(report[6] & 0x10)b|=1<<3;
-		if(report[6] & 0x20)b|=1<<1;
-		if(report[0] < 0x7f)b|=1<<8;
-		if(report[0] > 0x7f)b|=1<<6;
-		if(report[1] < 0x7f)b|=1<<7;
-		if(report[1] > 0x7f)b|=1<<5;
+		if(report[1] < 0x40)b|=b_UP;
+		if(report[1] > 0xC0)b|=b_DOWN;
+		if(report[0] < 0x40)b|=b_LEFT;
+		if(report[0] > 0xC0)b|=b_RIGHT;
+		if(report[2] & 0x01)b|=b_A;
+		if(report[2] & 0x02)b|=b_B;
+		if(report[2] & 0x04)b|=b_X;
+		if(report[2] & 0x08)b|=b_Y;
+		if(report[2] & 0x10)b|=b_L;
+		if(report[2] & 0x20)b|=b_R;
+//		if(report[6] & 0x10)b|=b_SELECT;
+//		if(report[6] & 0x20)b|=b_START;
 		if((b ^ nunstruct[n].x0) & nunstruct[n].x1){
 			nunfoundc[n]=1;
 		}
-/*		if(b!=c){
-			PIntH(report[0]);
-			for(int i=1;i<len;i++)PIntHC(report[i]);
-			PRet();
-			c=b;
-		}*/
 		nunstruct[n].x0=b;
 }
 void process_specific_gamepad(uint8_t const* report, uint16_t len, uint8_t n){
 	nunstruct[n].type=SNES;
 		uint16_t b=0;
-		if(report[5] & 0x10)b|=1<<10;
-		if(report[5] & 0x20)b|=1<<11;
-		if(report[5] & 0x40)b|=1<<13;
-		if(report[5] & 0x80)b|=1<<12;
-		if(report[6] & 1)b|=1<<4;
-		if(report[6] & 2)b|=1;
-		if(report[6] & 0x10)b|=1<<3;
-		if(report[6] & 0x20)b|=1<<1;
-		if(report[3] < 0x40)b|=1<<8;
-		if(report[3] > 0xC0)b|=1<<6;
-		if(report[4] < 0x40)b|=1<<7;
-		if(report[4] > 0xC0)b|=1<<5;
+		if(report[4] < 0x40)b|=b_UP;
+		if(report[4] > 0xC0)b|=b_DOWN;
+		if(report[3] < 0x40)b|=b_LEFT;
+		if(report[3] > 0xC0)b|=b_RIGHT;
+		if(report[5] & 0x20)b|=b_A;
+		if(report[5] & 0x40)b|=b_B;
+		if(report[5] & 0x10)b|=b_X;
+		if(report[5] & 0x80)b|=b_Y;
+		if(report[6] & 0x01)b|=b_L;
+		if(report[6] & 0x02)b|=b_R;
+		if(report[6] & 0x10)b|=b_SELECT;
+		if(report[6] & 0x20)b|=b_START;
 		if((b ^ nunstruct[n].x0) & nunstruct[n].x1){
 			nunfoundc[n]=1;
 		}
 		nunstruct[n].x0=b;
+}*/
+void checkpush(uint8_t const* report, uint16_t len, struct s_Buttons button, uint16_t set, uint16_t *b){
+	if(button.index==0xFF)return;
+	if(button.code==192){
+		if(report[button.index]>192)*b |= set;
+	} else if(button.code==64){
+		if(report[button.index]<64)*b |= set;
+	} else if(button.code<8){
+		if(report[button.index]&(1<<button.code))*b |= set;
+	} else if(button.code>128 && button.code<136){
+		if((report[button.index]&(1<<button.code))==0)*b |= set;
+	} else error("Internal data error");
+
+}
+void PIntHN(unsigned long long int n, int l) {
+    char s[128];
+    for(int i=0;i<128;i++)s[i]='0';
+    IntToStr(&s[64], (int64_t)n, 16);
+    MMPrintString(&s[64-(l-strlen(&s[64]))]);
+}
+
+void process_generic_gamepad(uint8_t const* report, uint16_t len, uint8_t n){
+	if(monitor){
+		static uint8_t lastreport[64]={0};
+		if(memcmp(report, lastreport, len)){
+			PIntHN(HID[n-1].vid,4);putConsole(',',0);PIntHN(HID[n-1].pid,4);PRet();
+			PIntHN(lastreport[0],2);
+			for(int i=1;i<len;i++){putConsole(',',0);PIntHN(lastreport[i],2);}
+			PRet();
+			PIntHN(report[0],2);
+			for(int i=1;i<len;i++){putConsole(',',0);PIntHN(report[i],2);}
+			PRet();
+		}
+		memcpy(lastreport,report,len);
+		return;
+	} 
+	uint16_t b=0;
+	int i=0;
+	struct s_Gamepad Gamepad;
+	if(MyGamepad.pid==HID[n-1].pid && MyGamepad.vid==HID[n-1].vid){
+		memcpy(&Gamepad, &MyGamepad,sizeof(struct s_Gamepad));
+		goto process; //user specified decode
+	}
+	while(Gamepads[i].pid){
+		if(Gamepads[i].pid==HID[n-1].pid && Gamepads[i].vid==HID[n-1].vid)break;
+		i++;
+	}
+	if(Gamepads[i].pid==0)return;
+	memcpy(&Gamepad, &Gamepads[i],sizeof(struct s_Gamepad));
+process:;
+	nunstruct[n].type=SNES;
+	checkpush(report, len, Gamepad.b_A , p_A, &b);
+	checkpush(report, len, Gamepad.b_B, p_B, &b);
+	checkpush(report, len, Gamepad.b_DOWN , p_DOWN, &b);
+	checkpush(report, len, Gamepad.b_HOME , p_HOME, &b);
+	checkpush(report, len, Gamepad.b_L2 , p_L2, &b);
+	checkpush(report, len, Gamepad.b_L , p_L, &b);
+	checkpush(report, len, Gamepad.b_LEFT , p_LEFT, &b);
+	checkpush(report, len, Gamepad.b_R2 , p_R2, &b);
+	checkpush(report, len, Gamepad.b_R , p_R, &b);
+	checkpush(report, len, Gamepad.b_RIGHT , p_RIGHT, &b);
+	checkpush(report, len, Gamepad.b_SELECT , p_SELECT, &b);
+	checkpush(report, len, Gamepad.b_START , p_START, &b);
+	checkpush(report, len, Gamepad.b_TOUCH , p_TOUCH, &b);
+	checkpush(report, len, Gamepad.b_UP , p_UP, &b);
+	checkpush(report, len, Gamepad.b_X , p_X, &b);
+	checkpush(report, len, Gamepad.b_Y , p_Y, &b);
+	if((b ^ nunstruct[n].x0) & nunstruct[n].x1){
+		nunfoundc[n]=1;
+	}
+	nunstruct[n].x0=b;
 }
 void process_sony_ds3(uint8_t const* report, uint16_t len, uint8_t n)
 {
 	nunstruct[n].type=PS3;
 	uint16_t b=0;
-	if(report[3]&0x80)b|=1<<12;
-	if(report[3]&0x40)b|=1<<13;
-	if(report[3]&0x20)b|=1<<11;
-	if(report[3]&0x10)b|=1<<10;
-	if(report[3]&0x8)b|=1;
-	if(report[3]&0x4)b|=1<<4;
-	if(report[3]&0x2)b|=1<<9;
-	if(report[3]&0x1)b|=1<<14;
-	if(report[2]&0x80)b|=1<<8;
+	if(report[3]&0x08)b|=1;
+	if(report[2]&0x08)b|=1<<1;
+	if(report[4]&0x01)b|=1<<2;
+	if(report[2]&0x01)b|=1<<3;
+	if(report[3]&0x04)b|=1<<4;
 	if(report[2]&0x40)b|=1<<5;
 	if(report[2]&0x20)b|=1<<6;
 	if(report[2]&0x10)b|=1<<7;
-	if(report[2]&0x8)b|=1<<1;
-	if(report[2]&0x1)b|=1<<3;
-	if(report[4]&0x1)b|=1<<2;
+	if(report[2]&0x80)b|=1<<8;
+	if(report[3]&0x02)b|=1<<9;
+	if(report[3]&0x10)b|=1<<10;
+	if(report[3]&0x20)b|=1<<11;
+	if(report[3]&0x80)b|=1<<12;
+	if(report[3]&0x40)b|=1<<13;
+	if(report[3]&0x01)b|=1<<14;
 	nunstruct[n].ax=report[6];
 	nunstruct[n].ay=report[7];
 	nunstruct[n].Z=report[8];
@@ -1280,26 +1438,26 @@ void process_sony_ds4(uint8_t const* report, uint16_t len, uint8_t n)
     memcpy(&ds4_report, report, sizeof(ds4_report));
 	nunstruct[n].type=PS4;
 	uint16_t b=0;
+	if (ds4_report.r1       )b|=1;
+	if (ds4_report.option   )b|=1<<1;
+	if (ds4_report.ps       )b|=1<<2;
+	if (ds4_report.share    )b|=1<<3;
+	if (ds4_report.l1       )b|=1<<4;
+	if( ds4_report.dpad==5  )b|=1<<5;
+	if( ds4_report.dpad==3  )b|=3<<5;
+	if( ds4_report.dpad==2  )b|=1<<6;
+	if( ds4_report.dpad==1  )b|=3<<6;
+	if( ds4_report.dpad==0  )b|=1<<7;
+	if( ds4_report.dpad==6  )b|=1<<8;
+	if( ds4_report.dpad==7  )b|=((1<<8) |(1<<5));
+	if (ds4_report.r2       )b|=1<<9;
+	if (ds4_report.triangle )b|=1<<10;
+	if (ds4_report.circle   )b|=1<<11;
 	if (ds4_report.square   )b|=1<<12;
 	if (ds4_report.cross    )b|=1<<13;
-	if (ds4_report.circle   )b|=1<<11;
-	if (ds4_report.triangle )b|=1<<10;
-	if (ds4_report.r1       )b|=1;
-	if (ds4_report.l1       )b|=1<<4;
-	if (ds4_report.r2       )b|=1<<9;
 	if (ds4_report.l2       )b|=1<<14;
-	if( ds4_report.dpad==0  )b|=1<<7;
-	if( ds4_report.dpad==2  )b|=1<<6;
-	if( ds4_report.dpad==4  )b|=1<<5;
-	if( ds4_report.dpad==6  )b|=1<<8;
-	if( ds4_report.dpad==1  )b|=3<<6;
-	if( ds4_report.dpad==3  )b|=3<<5;
-	if( ds4_report.dpad==5  )b|=1<<5;
-	if( ds4_report.dpad==7  )b|=((1<<5) | (1<<8));
-	if (ds4_report.option   )b|=1<<1;
-	if (ds4_report.share    )b|=1<<3;
-	if (ds4_report.ps       )b|=1<<2;
 	if (ds4_report.tpad     )b|=1<<15;
+	if( ds4_report.dpad==4  )b|=1<<5;
 	nunstruct[n].ax=ds4_report.x;
 	nunstruct[n].ay=ds4_report.y;
 	nunstruct[n].Z=ds4_report.z;
@@ -1501,7 +1659,9 @@ void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance, uint8_t const* desc_re
 			HID[slot].active=true;
 		 	HID[slot].report_requested=false;
 		} else if ( is_generic(dev_addr) ) {
-			if(!CurrentLinePtr) {MMPrintString("Generic Gamepad Connected on channel ");PInt(slot+1);MMPrintString("\r\n> ");}
+			if(!CurrentLinePtr || monitor) {MMPrintString("Generic Gamepad Connected on channel ");PInt(slot+1);}
+			if(!CurrentLinePtr)MMPrintString("\r\n> ");
+			else PRet();
 			HID[slot].Device_address = dev_addr;
 			HID[slot].Device_instance = instance;
 			HID[slot].report_timer=-(10+(slot+2)*500);
@@ -1510,19 +1670,8 @@ void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance, uint8_t const* desc_re
 			HID[slot].Device_type=SNES;
 			HID[slot].active=true;
 			HID[slot].report_requested=false;
-/*			for(int i=0;i< desc_len;i+=2){
-				putConsole('0',0);
-				putConsole('x',0);
-				PIntH(desc_report[i]);
-				putConsole(' ',0);
-				putConsole('0',0);
-				putConsole('x',0);
-				PIntH(desc_report[i+1]);
-				PRet();
-			}*/
-			
 		} else {
-			MMPrintString("Unknown Device Connected on channel ");PInt(slot+1);
+/*			MMPrintString("Unknown Device Connected on channel ");PInt(slot+1);
 			MMPrintString(" (pid=&H");PIntH(pid);
 			MMPrintString(", vid=&H");PIntH(vid);MMPrintString(")");
 			MMPrintString("\r\n> ");
@@ -1533,7 +1682,7 @@ void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance, uint8_t const* desc_re
 			HID[slot].report_rate=20; //mSec between reports
 			HID[slot].Device_type=UNKNOWN;
 			HID[slot].active=true;
-			HID[slot].report_requested=false;
+			HID[slot].report_requested=false;*/
 /*			for(int i=0;i< desc_len;i+=2){
 				putConsole('0',0);
 				putConsole('x',0);
@@ -1626,8 +1775,8 @@ void tuh_hid_report_received_cb(uint8_t dev_addr, uint8_t instance, uint8_t cons
 			process_sony_ds3(report, len, n+1);
 		} else if ( is_xbox(dev_addr) ){
 			process_xbox(report, len, n+1);
-		} else if ( is_specific(dev_addr) ){
-			process_specific_gamepad(report, len, n+1);
+/*		} else if ( is_specific(dev_addr) ){
+			process_specific_gamepad(report, len, n+1);*/
 		}  else {
 			process_generic_gamepad(report, len, n+1);
 		}
@@ -1930,19 +2079,45 @@ void cmd_gamepad(void){
 		nunstruct[n].x1=0b1111111111111111;
 		if(argc==5)nunstruct[n].x1=getint(argv[4],0,0b1111111111111111);
 		return;
-/*	} else if((tp = checkstring(cmdline, (unsigned char *)"MAP"))){
-		#ifdef rp2350
-		int dims[MAXDIM]={0};
-		#else
-		short dims[MAXDIM]={0};
-		#endif
-		int64_t *aint=NULL;
-		getargs(&tp,1,(unsigned char *)",");
-		if(!(argc==1))error("Syntax");
-		int card=parseintegerarray(argv[0],&aint,1,2,dims,false)-1;
-		PInt(dims[0]-g_OptionBase+1);PIntComma(dims[1]-g_OptionBase+1);PRet();
-		if(!(dims[0]-g_OptionBase+1==2 && dims[1]-g_OptionBase+1==16))error("Array must be dimensioned 2x16");
-		return;*/
+	} else if((tp = checkstring(cmdline, (unsigned char *)"MONITOR"))){
+		monitor=true;
+	} else if((tp = checkstring(cmdline, (unsigned char *)"CONFIGURE"))){
+		getargs(&tp,67,(unsigned char *)",");
+		if(!(argc==67))error("Syntax");
+		MyGamepad.vid=getint(argv[0],0,0xFFFF);
+		MyGamepad.pid=getint(argv[2],0,0xFFFF);
+		MyGamepad.b_R.index=getint(argv[4],0,255);
+		MyGamepad.b_R.code=getint(argv[6],0,255);
+		MyGamepad.b_START.index=getint(argv[8],0,255);
+		MyGamepad.b_START.code=getint(argv[10],0,255);
+		MyGamepad.b_HOME.index=getint(argv[12],0,255);
+		MyGamepad.b_HOME.code=getint(argv[14],0,255);
+		MyGamepad.b_SELECT.index=getint(argv[16],0,255);
+		MyGamepad.b_SELECT.code=getint(argv[18],0,255);
+		MyGamepad.b_L.index=getint(argv[20],0,255);
+		MyGamepad.b_L.code=getint(argv[22],0,255);
+		MyGamepad.b_DOWN.index=getint(argv[24],0,255);
+		MyGamepad.b_DOWN.code=getint(argv[26],0,255);
+		MyGamepad.b_RIGHT.index=getint(argv[28],0,255);
+		MyGamepad.b_RIGHT.code=getint(argv[30],0,255);
+		MyGamepad.b_UP.index=getint(argv[32],0,255);
+		MyGamepad.b_UP.code=getint(argv[34],0,255);
+		MyGamepad.b_LEFT.index=getint(argv[36],0,255);
+		MyGamepad.b_LEFT.code=getint(argv[38],0,255);
+		MyGamepad.b_R2.index=getint(argv[40],0,255);
+		MyGamepad.b_R2.code=getint(argv[42],0,255);
+		MyGamepad.b_X.index=getint(argv[44],0,255);
+		MyGamepad.b_X.code=getint(argv[46],0,255);
+		MyGamepad.b_A.index=getint(argv[48],0,255);
+		MyGamepad.b_A.code=getint(argv[50],0,255);
+		MyGamepad.b_Y.index=getint(argv[52],0,255);
+		MyGamepad.b_Y.code=getint(argv[54],0,255);
+		MyGamepad.b_B.index=getint(argv[56],0,255);
+		MyGamepad.b_B.code=getint(argv[58],0,255);
+		MyGamepad.b_L2.index=getint(argv[60],0,255);
+		MyGamepad.b_L2.code=getint(argv[62],0,255);
+		MyGamepad.b_TOUCH.index=getint(argv[64],0,255);
+		MyGamepad.b_TOUCH.code=getint(argv[66],0,255);
 	} else if((tp = checkstring(cmdline, (unsigned char *)"HAPTIC"))){
 		getargs(&tp,5,(unsigned char *)",");
 		if(!(argc==5))error("Syntax");

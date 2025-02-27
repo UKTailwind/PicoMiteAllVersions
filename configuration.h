@@ -76,7 +76,7 @@ extern "C" {
         #endif
         #define MAXMODES 2
         #define MAXVARS             512                     // 8 + MAXVARLEN + MAXDIM * 2  (ie, 56 bytes) - these do not incl array members
-        #define HEAP_MEMORY_SIZE (96*1024) 
+        #define HEAP_MEMORY_SIZE (100*1024) 
         #define MAX_CPU     378000 
         #define MIN_CPU     126000
         #define MAXSUBFUN           256                     // each entry takes up 4 bytes
@@ -200,7 +200,7 @@ extern "C" {
 #define MAXPID 8
 // define the maximum number of arguments to PRINT, INPUT, WRITE, ON, DIM, ERASE, DATA and READ
 // each entry uses zero bytes.  The number is limited by the length of a command line
-#define MAX_ARG_COUNT       50
+#define MAX_ARG_COUNT       75
 #define STR_AUTO_PRECISION  999 
 #define STR_FLOAT_PRECISION  998 
 #define STR_SIG_DIGITS 9                            // number of significant digits to use when converting MMFLOAT to a string
@@ -316,7 +316,7 @@ extern "C" {
 #define PIO_TX_DMA 4
 #define PIO_RX_DMA2 9
 #define PIO_TX_DMA2 6
-#define ADC_CLK_SPEED   ((float)Option.CPU_Speed*1000)
+#define ADC_CLK_SPEED   (Option.CPU_Speed*500)
 #define PROGSTART (FLASH_TARGET_OFFSET + FLASH_ERASE_SIZE + SAVEDVARS_FLASH_SIZE + ((MAXFLASHSLOTS) * MAX_PROG_SIZE))
 #define TOP_OF_SYSTEM_FLASH  (FLASH_TARGET_OFFSET + FLASH_ERASE_SIZE + SAVEDVARS_FLASH_SIZE + ((MAXFLASHSLOTS+1) * MAX_PROG_SIZE))
 #define RoundUpK4(a)     (((a) + (4096 - 1)) & (~(4096 - 1)))// round up to the nearest page size      [position 131:9]	

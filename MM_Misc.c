@@ -1624,7 +1624,7 @@ void MIPS16 cmd_library(void) {
        
         int *ppp=(int *)(flash_progmemory - MAX_PROG_SIZE);
         while(i--)if(*ppp++ != 0xFFFFFFFF){
-            enable_interrupts();
+            enable_interrupts_pico();
             error("Flash erase problem");
         }
    
@@ -1665,10 +1665,10 @@ void MIPS16 cmd_library(void) {
        
         int *ppp=(int *)(flash_progmemory - MAX_PROG_SIZE);
         while(i--)if(*ppp++ != 0xFFFFFFFF){
-            enable_interrupts();
+            enable_interrupts_pico();
             error("Flash erase problem");
         }
-        enable_interrupts();
+        enable_interrupts_pico();
 
         Option.LIBRARY_FLASH_SIZE= 0;
         SaveOptions();
@@ -1757,7 +1757,7 @@ void MIPS16 cmd_library(void) {
         int i=MAX_PROG_SIZE/4;
         int *ppp=(int *)(flash_progmemory - MAX_PROG_SIZE);
         while(i--)if(*ppp++ != 0xFFFFFFFF){
-            enable_interrupts();
+            enable_interrupts_pico();
             error("Flash erase problem");
         }
         for(int k = 0; k < fsize; k++){        // write to the flash byte by byte
@@ -1964,7 +1964,7 @@ if(Option.CPU_Speed==Freq720P)PO2Str("RESOLUTION", "1280x720");
 if(Option.CPU_Speed==FreqXGA)PO2Str("RESOLUTION", "1024x768");
 #endif
 #else
-    if(Option.CPU_Speed!=133000){
+    if(Option.CPU_Speed!=200000){
         PO("CPUSPEED ");
         PInt(Option.CPU_Speed);
         MMPrintString(" 'KHz\r\n");
@@ -2173,7 +2173,11 @@ if(Option.CPU_Speed==FreqXGA)PO2Str("RESOLUTION", "1024x768");
 #ifdef rp2350
     if(Option.PSRAM_CS_PIN!=0)PO2Str("PSRAM PIN", PinDef[Option.PSRAM_CS_PIN].pinname);
 #endif
-    if(Option.heartbeatpin!=43 && !Option.NoHeartbeat)PO2Str("HEARTBEAT PIN", PinDef[Option.heartbeatpin].pinname);
+    if((Option.heartbeatpin!=43 && !Option.NoHeartbeat)
+#ifdef rp2350
+     || (Option.heartbeatpin==43 && !rp2350a)
+#endif
+    )PO2Str("HEARTBEAT PIN", PinDef[Option.heartbeatpin].pinname);
 }
 
 int MIPS16 checkslice(int pin1,int pin2, int ignore){
@@ -4487,13 +4491,13 @@ void MIPS16 cmd_option(void) {
         Option.Magic=MagicKey; //This isn't ideal but it improves the chances of a older config working in a new build
         FileClose(fnbr);
         uSec(100000);
-        disable_interrupts();
+        disable_interrupts_pico();
         flash_range_erase(FLASH_TARGET_OFFSET, FLASH_ERASE_SIZE);
-        enable_interrupts();
+        enable_interrupts_pico();
         uSec(10000);
-        disable_interrupts();
+        disable_interrupts_pico();
         flash_range_program(FLASH_TARGET_OFFSET, (const uint8_t *)&Option, 768);
-        enable_interrupts();
+        enable_interrupts_pico();
         _excep_code = RESET_COMMAND;
         SoftReset();
     }
@@ -4503,9 +4507,9 @@ void MIPS16 cmd_option(void) {
         if(Option.LIBRARY_FLASH_SIZE==MAX_PROG_SIZE) {
           uint32_t j = FLASH_TARGET_OFFSET + FLASH_ERASE_SIZE + SAVEDVARS_FLASH_SIZE + ((MAXFLASHSLOTS - 1) * MAX_PROG_SIZE);
           uSec(250000);
-          disable_interrupts();
+          disable_interrupts_pico();
           flash_range_erase(j, MAX_PROG_SIZE);
-          enable_interrupts();
+          enable_interrupts_pico();
         }
         configure(tp);
         return;
@@ -5076,9 +5080,9 @@ void MIPS16 fun_info(void){
 		} else if(checkstring(tp, (unsigned char *)"FLASH SIZE")){
             uint8_t txbuf[4] = {0x9f};
             uint8_t rxbuf[4] = {0};
-            disable_interrupts();
+            disable_interrupts_pico();
             flash_do_cmd(txbuf, rxbuf, 4);
-            enable_interrupts();
+            enable_interrupts_pico();
             iret= 1 << rxbuf[3];
 			targ=T_INT;
 			return;

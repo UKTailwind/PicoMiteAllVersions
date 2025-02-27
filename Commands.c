@@ -897,6 +897,9 @@ void do_end(bool ecmd) {
 				strcpy(ptr, (char *)cmd_args ); // *** THW 16/4/23
 				CtoM(ptr);
 			}
+		} else if(FindSubFun((unsigned char *)"MM.END", 0) >= 0 && checkstring(argv[0],(unsigned char *)"NOEND")==NULL) {
+			ExecuteProgram((unsigned char *)"MM.END\0");
+			memset(inpbuf,0,STRINGSIZE);
 		}
 	}
     if(!(MMerrno == 16))hw_clear_bits(&watchdog_hw->ctrl, WATCHDOG_CTRL_ENABLE_BITS);

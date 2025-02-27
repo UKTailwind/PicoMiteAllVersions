@@ -1748,11 +1748,9 @@ void __not_in_flash_func(CheckAbort)(void) {
             }
         }
 #endif
-        cmdline=GetTempMemory(STRINGSIZE);
-        strcpy((char *)cmdline,"noend");
-        cmdline=NULL;
-        cmd_end();
-    }
+        do_end(false);
+        longjmp(mark, 1);												// jump back to the input prompt
+}
 }
 void PRet(void){
     MMPrintString("\r\n");
@@ -1808,14 +1806,14 @@ void PFltComma(MMFLOAT n) {
 void sigbus(void){
     MMPrintString("Error: Invalid address - resetting\r\n");
 	uSec(250000);
-	disable_interrupts();
+	disable_interrupts_pico();
 //	flash_range_erase(PROGSTART, MAX_PROG_SIZE);
     LoadOptions();
     if(Option.NoReset==0){
         Option.Autorun=0;
         SaveOptions();
     }
-	enable_interrupts();
+	enable_interrupts_pico();
     memset(inpbuf,0,STRINGSIZE);
     SoftReset();
 }
@@ -3747,7 +3745,7 @@ int MIPS16 main(){
         Option.CPU_Speed=126000;              // init the options if this is the very first startup
 #endif
 #else
-        Option.CPU_Speed=133000;              // init the options if this is the very first startup
+        Option.CPU_Speed=200000;              // init the options if this is the very first startup
 #endif
         SaveOptions();
         _excep_code=INVALID_CLOCKSPEED;
@@ -3770,7 +3768,7 @@ int MIPS16 main(){
 //    volatile uint32_t *qmi_m0_timing=(uint32_t *)0x400d000c;
 //    volatile uint32_t *qmi_m1_timing=(uint32_t *)0x400d0020;
 #endif
-    if(Option.CPU_Speed<=200000)vreg_set_voltage(VREG_VOLTAGE_1_10);
+    if(Option.CPU_Speed<=200000)vreg_set_voltage(VREG_VOLTAGE_1_15);
     else if(Option.CPU_Speed>200000 && Option.CPU_Speed<=300000 )vreg_set_voltage(VREG_VOLTAGE_1_25);  // Std default @ boot is 1_10
     else if(Option.CPU_Speed>300000  && Option.CPU_Speed<=320000 )vreg_set_voltage(VREG_VOLTAGE_1_30);  // Std default @ boot is 1_10
 #ifdef rp2350
@@ -3828,10 +3826,9 @@ int MIPS16 main(){
         0,                                                // No glitchless mux
         CLOCKS_CLK_PERI_CTRL_AUXSRC_VALUE_CLKSRC_PLL_SYS, // System PLL on AUX mux
         Option.CPU_Speed * 1000,                               // Input frequency
-        Option.CPU_Speed * 1000                                // Output (must be same as no divider)
+        ADC_CLK_SPEED                                 // Output (must be same as no divider)
     );
-    float div=((ADC_CLK_SPEED/96.0)/500000.0*96.000);
-    adc_set_clkdiv(div);
+    SetADCFreq(500000);
     adc_clk_div=adc_hw->div;
     systick_hw->csr = 0x5;
     systick_hw->rvr = 0x00FFFFFF;
@@ -3885,8 +3882,8 @@ int MIPS16 main(){
     ConsoleTxBufTail = 0;
     InitHeap(true);              										// initilise memory allocation
     uSecFunc(1000);
-    disable_interrupts();
-    enable_interrupts();
+    disable_interrupts_pico();
+    enable_interrupts_pico();
     mSecTimer=time_us_64()/1000;
     DISPLAY_TYPE = Option.DISPLAY_TYPE;
     // negative timeout means exact delay (rather than delay between callbacks)
@@ -4179,7 +4176,8 @@ autorun:
         ExecuteProgram(tknbuf);                                     // execute the line straight away
         if(i){
             cmdline=NULL;
-            cmd_end();
+            do_end(false);
+            longjmp(mark, 1);												// jump back to the input prompt
         }
         else {
             memset(inpbuf,0,STRINGSIZE);
@@ -4217,7 +4215,7 @@ void MIPS16 SaveProgramToFlash(unsigned char *pm, int msg) {
     j=MAX_PROG_SIZE/4;
     int *pp=(int *)(flash_progmemory);
         while(j--)if(*pp++ != 0xFFFFFFFF){
-            enable_interrupts();
+            enable_interrupts_pico();
             error("Flash erase problem");
         }
     nbr = 0;
@@ -4290,7 +4288,7 @@ void MIPS16 SaveProgramToFlash(unsigned char *pm, int msg) {
              fontnbr = getint(p, 1, FONT_TABLE_SIZE);
                                                  // font 6 has some special characters, some of which depend on font 1
              if(fontnbr == 1 || fontnbr == 6 || fontnbr == 7) {
-                enable_interrupts();
+                enable_interrupts_pico();
                 error("Cannot redefine fonts 1, 6 or 7");
              }
              realflashpointer+=4;
@@ -4309,7 +4307,7 @@ void MIPS16 SaveProgramToFlash(unsigned char *pm, int msg) {
              skipspace(p);
              if(!fontnbr) { //process CSub 
                  if(!isnamestart((uint8_t)*p)){
-                    enable_interrupts();
+                    enable_interrupts_pico();
                     error("Function name");
                  }  
                  do { p++; } while(isnamechar((uint8_t)*p));
@@ -4330,7 +4328,7 @@ void MIPS16 SaveProgramToFlash(unsigned char *pm, int msg) {
                      n = 0;
                      for(i = 0; i < 8; i++) {
                          if(!isxdigit((uint8_t)*p)) {
-                            enable_interrupts();
+                            enable_interrupts_pico();
                             error("Invalid hex word");
                          }
                          if((int)((char *)realflashpointer - (uint32_t)PROGSTART) >= MAX_PROG_SIZE - 5) goto exiterror;
@@ -4346,7 +4344,7 @@ void MIPS16 SaveProgramToFlash(unsigned char *pm, int msg) {
                      if(firsthex){
                     	 firsthex=0;
                     	 if(((n>>16) & 0xff) < 0x20){
-                            enable_interrupts();
+                            enable_interrupts_pico();
                             error("Can't define non-printing characters");
                          }
                      }
@@ -4355,7 +4353,7 @@ void MIPS16 SaveProgramToFlash(unsigned char *pm, int msg) {
                  while(*p) p++;                                      // make sure that we move to the end of the line
                  p++;                                                // step to the start of the next line
                  if(*p == 0) {
-                     enable_interrupts();
+                     enable_interrupts_pico();
                      error("Missing END declaration");
                  }
                  if(*p == T_NEWLINE) {
@@ -4400,7 +4398,7 @@ void MIPS16 SaveProgramToFlash(unsigned char *pm, int msg) {
              fontnbr = getint(p, 1, FONT_TABLE_SIZE);
                                                  // font 6 has some special characters, some of which depend on font 1
              if(fontnbr == 1 || fontnbr == 6 || fontnbr == 7) {
-                 enable_interrupts();
+                 enable_interrupts_pico();
                  error("Cannot redefine fonts 1, 6, or 7");
              }
 
@@ -4426,7 +4424,7 @@ void MIPS16 SaveProgramToFlash(unsigned char *pm, int msg) {
              skipspace(p);
              if(!fontnbr) {
                  if(!isnamestart((uint8_t)*p))  {
-                     enable_interrupts();
+                     enable_interrupts_pico();
                      error("Function name");
                  }
                  do { p++; } while(isnamechar(*p));
@@ -4447,7 +4445,7 @@ void MIPS16 SaveProgramToFlash(unsigned char *pm, int msg) {
                      n = 0;
                      for(i = 0; i < 8; i++) {
                          if(!isxdigit(*p)) {
-                            enable_interrupts();
+                            enable_interrupts_pico();
                             error("Invalid hex word");
                          }
                          if((int)((char *)realflashpointer - (uint32_t)PROGSTART) >= MAX_PROG_SIZE - 5) goto exiterror;
@@ -4466,7 +4464,7 @@ void MIPS16 SaveProgramToFlash(unsigned char *pm, int msg) {
                  while(*p) p++;                                      // make sure that we move to the end of the line
                  p++;                                                // step to the start of the next line
                  if(*p == 0) {
-                    enable_interrupts();
+                    enable_interrupts_pico();
                     error("Missing END declaration");
                  }
                  if(*p == T_NEWLINE) {
@@ -4495,7 +4493,7 @@ void MIPS16 SaveProgramToFlash(unsigned char *pm, int msg) {
 #ifdef USBKEYBOARD
 	clearrepeat();
 #endif
-    enable_interrupts();
+    enable_interrupts_pico();
     return;
 
     // we only get here in an error situation while writing the program to flash

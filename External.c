@@ -1012,8 +1012,7 @@ int64_t __not_in_flash_func(ExtInp)(int pin){
 #endif
     if(ExtCurrentConfig[pin]==EXT_ANA_IN || ExtCurrentConfig[pin]==EXT_ADCRAW){
         if(adc_clk_div!=adc_hw->div){
-            float div=((ADC_CLK_SPEED/96.0)/500000.0*96.000);
-            adc_set_clkdiv(div);
+            SetADCFreq(500000.0);
         }
 
         if(last_adc!=pin){
@@ -1396,7 +1395,7 @@ process:
  */
 bool __no_inline_not_in_flash_func(bb_get_bootsel_button)() {
     const uint CS_PIN_INDEX = 1;
-    disable_interrupts();
+    disable_interrupts_pico();
     hw_write_masked(&ioqspi_hw->io[CS_PIN_INDEX].ctrl,
                     GPIO_OVERRIDE_LOW << IO_QSPI_GPIO_QSPI_SS_CTRL_OEOVER_LSB,
                     IO_QSPI_GPIO_QSPI_SS_CTRL_OEOVER_BITS);
@@ -1405,7 +1404,7 @@ bool __no_inline_not_in_flash_func(bb_get_bootsel_button)() {
     hw_write_masked(&ioqspi_hw->io[CS_PIN_INDEX].ctrl,
                     GPIO_OVERRIDE_NORMAL << IO_QSPI_GPIO_QSPI_SS_CTRL_OEOVER_LSB,
                     IO_QSPI_GPIO_QSPI_SS_CTRL_OEOVER_BITS);
-    enable_interrupts();
+    enable_interrupts_pico();
 
     return button_state;
 }
@@ -1558,7 +1557,7 @@ void cmd_port(void) {
 	++cmdline;
 	if(!*cmdline) error("Invalid syntax");
 	value = getinteger(cmdline);
-    uint64_t mask=0,setmask=0, readmask=gpio_get_all64();
+    uint64_t mask=0,setmask=0, readmask;
 
     for(i = 0; i < argc; i += 4) {
     	code=0;
@@ -1571,6 +1570,7 @@ void cmd_port(void) {
         	if(!code)pin=codemap(pincode);
         	else pin=pincode;
             if(IsInvalidPin(pin) || !(ExtCurrentConfig[pin] == EXT_DIG_OUT )) error("Invalid output pin");
+            gpio_set_input_enabled(PinDef[pin].GPno, true);
             mask |=(1<<PinDef[pin].GPno);
             if(value & 1)setmask |= (1<<PinDef[pin].GPno);
             value >>= 1;
@@ -1578,8 +1578,23 @@ void cmd_port(void) {
             pincode++;
         }
     } 
+    readmask=gpio_get_all64();
     readmask &=mask;
     gpio_xor_mask64(setmask ^ readmask);
+#ifdef rp2350
+    #ifdef PICOMITEWEB
+        int n=NBRPINS;
+    #else
+        int n=rp2350a ? 44: NBRPINS;
+    #endif
+#else
+    int n=NBRPINS;
+#endif
+
+    for(int i=0;i<n;i++){
+        if(mask & 1)gpio_set_input_enabled(PinDef[i].GPno, false);
+        mask>>=1;
+    }
 }
 
 
@@ -2956,9 +2971,9 @@ void cmd_WS2812(void){
     	}
     	p-=(nbr*colours);
         while(time_us_64()<endreset){}
-        disable_interrupts();
+        disable_interrupts_pico();
         WS2812e(gppin, T1H, T1L, T0H, T0L, nbr*colours, (char *)p);
-        enable_interrupts();
+        enable_interrupts_pico();
 }
 /* 
  * @cond
@@ -3116,9 +3131,9 @@ void cmd_device(void){
         int bittime=16777215 + 12  - (ticks_per_second/baudrate) ;
         int half = 16777215 + 12  - (ticks_per_second/(baudrate<<1)) ;
         if(!(gpio_get_all64() & gppin))error("Framing error");
-        disable_interrupts();
+        disable_interrupts_pico();
         int istat=serialrx(gppin, string, timeout, bittime, half, maxchars, termchars);
-        enable_interrupts();
+        enable_interrupts_pico();
         if(type & T_INT)*(int64_t *)status=(int64_t)istat;
         else *(MMFLOAT *)status=(MMFLOAT)istat;
         return;
@@ -3141,9 +3156,9 @@ void cmd_device(void){
         if(ExtCurrentConfig[pin] == EXT_NOT_CONFIG)ExtCfg(pin, EXT_DIG_OUT, 0);
         gpio_set_mask64(gppin);                                    // send the start bit
         int bittime=16777215 + 12  - (ticks_per_second/baudrate) ;
-        disable_interrupts();
+        disable_interrupts_pico();
         serialtx(gppin,string, bittime);
-        enable_interrupts();
+        enable_interrupts_pico();
 		return;
 	}
 	tp = checkstring(cmdline, (unsigned char *)"BITSTREAM");
@@ -3180,9 +3195,9 @@ void cmd_device(void){
             data[i]=16777215 + setuptime-((data[i]*ticks_per_millisecond)/1000) ;
         }
 //        data[0]+=((ticks_per_millisecond/2000)+(250000-Option.CPU_Speed)/1000);
-        disable_interrupts();
+        disable_interrupts_pico();
         bitstream(gppin,data,num);
-        enable_interrupts();
+        enable_interrupts_pico();
 		return;
 	}
     error("Syntax");
@@ -3214,7 +3229,7 @@ void cmd_adc(void){
         int nbr=getint(argv[2],1,3); //number of ADC channels
 #endif
         frequency=(float)getnumber(argv[0])*nbr;
-        if(frequency<ADC_CLK_SPEED/65536.0 || frequency> ADC_CLK_SPEED/96.0)error("Invalid frequency");
+        if(frequency<ADC_CLK_SPEED/65536.0/96.0 || frequency> ADC_CLK_SPEED/96.0)error("Invalid frequency");
 #ifdef rp2350
 #ifdef PICOMITEWEB
         if(!(ExtCurrentConfig[31] == EXT_ANA_IN || ExtCurrentConfig[31] == EXT_NOT_CONFIG)) error("Pin GP26 is not off or an ADC input");
@@ -3332,10 +3347,8 @@ if(rp2350a){
             false,   // We won't see the ERR bit because of 8 bit reads; disable.
             true     // Shift each sample to 8 bits when pushing to FIFO
         );
-        float div=((ADC_CLK_SPEED/96.0)/frequency*96.000);
-        if(div==96.0)div=0;
         adcint=adcint1;
-        adc_set_clkdiv(div);
+        SetADCFreq(frequency);
         // Set up the DMA to start transferring data as soon as it appears in FIFO
         dma_channel_config cfg = dma_channel_get_default_config(ADC_dma_chan);
 
@@ -3382,7 +3395,7 @@ if(rp2350a){
         getargs(&tp,1,(unsigned char *)",");
         if(!ADCopen)error("Not open");
         float localfrequency=(float)getnumber(argv[0])*ADCopen;
-        if(localfrequency<ADC_CLK_SPEED/65536.0 || localfrequency> ADC_CLK_SPEED/96.0)error("Invalid frequency");
+        if(localfrequency<ADC_CLK_SPEED/65536.0/96.0 || localfrequency> ADC_CLK_SPEED/96.0)error("Invalid frequency");
         frequency=localfrequency;
 		return;
 	}
@@ -3447,9 +3460,7 @@ if(rp2350a){
             false,   // We won't see the ERR bit because of 8 bit reads; disable.
             false     // Shift each sample to 8 bits when pushing to FIFO
         );
-        float div=((ADC_CLK_SPEED/96.0)/frequency*96.000);
-        if(div==96.0)div=0;
-        adc_set_clkdiv(div);
+        SetADCFreq(frequency);
         // Set up the DMA to start transferring data as soon as it appears in FIFO
         dma_channel_config cfg = dma_channel_get_default_config(ADC_dma_chan);
 
@@ -3500,9 +3511,8 @@ if(rp2350a){
         dma_channel_abort(ADC_dma_chan);
         dma_channel_abort(ADC_dma_chan2);
         adc_set_round_robin(0);
-        float div=((ADC_CLK_SPEED/96.0)/500000.0*96.000);
-        adc_set_clkdiv(div);
-#ifdef rp2350
+        SetADCFreq(500000);
+        #ifdef rp2350
 if(rp2350a){
         ExtCfg(31, EXT_NOT_CONFIG, 0);
         if(ADCopen>=2)ExtCfg(32, EXT_NOT_CONFIG, 0);
@@ -3530,6 +3540,17 @@ if(rp2350a){
 	}
     error("Syntax");
 }
+void SetADCFreq(float frequency){
+    //Our ADC clock is running at ADC_CLK_SPEED (in Hz) so we need to stretch the time to produce the required frequency
+    //The time delta for our frequency is 1/frequency*96 - 1/(ADC_CLK_SPEED) seconds
+    //This must be added to clk_div as a number of CPU clock ticks i.e. delta/(1/ADC_CLK_SPEED)
+    //Plus we need to add 95 to cater for the actual time taken for the conversion
+    double delta = 1.0/(frequency*96.0) - 1.0/((double)ADC_CLK_SPEED);
+    float div=delta/(1.0/((double)ADC_CLK_SPEED))*96.0 +95.0;
+    if(div<=96.0)div=0;
+    adc_set_clkdiv(div);
+}
+
 /* 
  * @cond
  * The following section will be excluded from the documentation.
@@ -3720,7 +3741,7 @@ if(rp2350a){
 #endif
     ADCopen=0;
     adc_set_round_robin(0);
-    adc_set_clkdiv(0);
+    SetADCFreq(500000);
     KeyInterrupt=NULL;
     OnKeyGOSUB=NULL;
 #ifndef USBKEYBOARD

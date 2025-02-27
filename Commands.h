@@ -90,6 +90,7 @@ struct sa_data{
 };
 extern void SaveContext(void);
 extern void RestoreContext(bool keep);
+extern void do_end(bool ecmd);
 extern struct sa_data datastore[MAXRESTORE];
 extern int restorepointer;
 #endif

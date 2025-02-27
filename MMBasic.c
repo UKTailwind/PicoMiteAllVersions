@@ -505,15 +505,16 @@ int   MIPS16 PrepareProgramExt(unsigned char *p, int i, unsigned char **CFunPtr,
                 int j=MAX_PROG_SIZE/4;
                 int *pp=(int *)(flash_progmemory);
                     while(j--)if(*pp++ != 0xFFFFFFFF){
-                        enable_interrupts();
+                        enable_interrupts_pico();
                         error("Flash erase problem");
                     }
-                enable_interrupts();
+                enable_interrupts_pico();
                 MMPrintString("Error: Too many subroutines and functions - erasing program\r\n");
                 uSec(100000);
                 ClearProgram();
                 cmdline=NULL;
-                cmd_end();
+                do_end(false);
+                longjmp(mark, 1);												// jump back to the input prompt
             }
             subfun[i++] = p++;                                      // save the address and step over the token
             p++; //step past rest of command token
@@ -1894,7 +1895,8 @@ void hashlabels(unsigned char *p,int ErrAbort){
                 uSec(100000);
                 ClearProgram();
                 cmdline=NULL;
-                cmd_end();
+                do_end(false);
+                longjmp(mark, 1);												// jump back to the input prompt
             }
     		funtbl[hash].index=(uint32_t)lastp;
             for(j=0;j<p[0];j++)funtbl[hash].name[j]=mytoupper(p[j+1]);
@@ -2915,7 +2917,8 @@ void MIPS16 error(char *msg, ...) {
     
     #endif
     cmdline=NULL;
-    cmd_end();
+	do_end(false);
+	longjmp(mark, 1);												// jump back to the input prompt
 }
 
 

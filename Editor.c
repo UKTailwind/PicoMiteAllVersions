@@ -983,7 +983,8 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
                             }
                             if(c == ESC || c == CTRLKEY('Q') || c == F1 || fname) {
                                 cmdline=NULL;
-                                cmd_end();
+                                do_end(false);
+                                longjmp(mark, 1);												// jump back to the input prompt
                             }
                             // this must be save, exit and run.  We have done the first two, now do the run part.
                             ClearRuntime(true);

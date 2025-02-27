@@ -119,7 +119,8 @@ void MIPS16 cmd_xmodem(void) {
     }
     BreakKey = BreakKeySave;
     cmdline=NULL;
-    cmd_end();
+	do_end(false);
+	longjmp(mark, 1);												// jump back to the input prompt
 }
 
 /* 

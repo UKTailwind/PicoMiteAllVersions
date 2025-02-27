@@ -497,8 +497,8 @@ void fun_map(void);
 	{ (unsigned char *)"IRQ WAIT",		T_CMD,				0, cmd_irqwait	},
 	{ (unsigned char *)"IRQ CLEAR",		T_CMD,				0, cmd_irqclear	},
 	{ (unsigned char *)"IRQ NOWAIT",		T_CMD,				0, cmd_irqnowait	},
-	{ (unsigned char *)"IRQ",		T_CMD,				0, cmd_irq	},
-	{ (unsigned char *)"Set",		T_CMD,				0, cmd_set	}, 
+	{ (unsigned char *)"IRQ",		T_CMD,				0, cmd_irq	}, 
+	{ (unsigned char *)"Set",		T_CMD,				0, cmd_set	},
 #ifdef PICOMITEVGA
   	{ (unsigned char *)"TILE",            T_CMD,                     0, cmd_tile   },
   	{ (unsigned char *)"MODE",            T_CMD,                     0, cmd_mode   },
