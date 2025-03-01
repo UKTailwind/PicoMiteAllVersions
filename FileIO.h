@@ -146,8 +146,9 @@ struct option_s {
     unsigned char AUDIO_R;
     unsigned char AUDIO_SLICE; 
     unsigned char SDspeed;
-    unsigned char pins[4];  //20=116                // general use storage for CFunctions written by PeterM //86
+    unsigned char pins[3];  //20=116                // general use storage for CFunctions written by PeterM //86
     unsigned char TOUCH_CAP;
+    unsigned char SSD_DATA;
     unsigned char THRESHOLD_CAP;
     unsigned char audio_i2c_data;
     unsigned char audio_i2c_bclk;

@@ -1417,23 +1417,23 @@ void InitReservedIO(void) {
 		}
 		ExtCfg(SSD1963_WR_PIN, EXT_BOOT_RESERVED, 0);gpio_init(SSD1963_WR_GPPIN);gpio_put(SSD1963_WR_GPPIN,GPIO_PIN_SET);gpio_set_dir(SSD1963_WR_GPPIN, GPIO_OUT);
 		ExtCfg(SSD1963_RD_PIN, EXT_BOOT_RESERVED, 0);gpio_init(SSD1963_RD_GPPIN);gpio_put(SSD1963_RD_GPPIN,GPIO_PIN_SET);gpio_set_dir(SSD1963_RD_GPPIN, GPIO_OUT);
-		ExtCfg(SSD1963_DAT1, EXT_BOOT_RESERVED, 0);gpio_init(SSD1963_GPDAT1);gpio_put(SSD1963_GPDAT1,GPIO_PIN_SET);gpio_set_dir(SSD1963_GPDAT1, GPIO_OUT);
-		ExtCfg(SSD1963_DAT2, EXT_BOOT_RESERVED, 0);gpio_init(SSD1963_GPDAT2);gpio_put(SSD1963_GPDAT2,GPIO_PIN_SET);gpio_set_dir(SSD1963_GPDAT2, GPIO_OUT);
-		ExtCfg(SSD1963_DAT3, EXT_BOOT_RESERVED, 0);gpio_init(SSD1963_GPDAT3);gpio_put(SSD1963_GPDAT3,GPIO_PIN_SET);gpio_set_dir(SSD1963_GPDAT3, GPIO_OUT);
-		ExtCfg(SSD1963_DAT4, EXT_BOOT_RESERVED, 0);gpio_init(SSD1963_GPDAT4);gpio_put(SSD1963_GPDAT4,GPIO_PIN_SET);gpio_set_dir(SSD1963_GPDAT4, GPIO_OUT);
-		ExtCfg(SSD1963_DAT5, EXT_BOOT_RESERVED, 0);gpio_init(SSD1963_GPDAT5);gpio_put(SSD1963_GPDAT5,GPIO_PIN_SET);gpio_set_dir(SSD1963_GPDAT5, GPIO_OUT);
-		ExtCfg(SSD1963_DAT6, EXT_BOOT_RESERVED, 0);gpio_init(SSD1963_GPDAT6);gpio_put(SSD1963_GPDAT6,GPIO_PIN_SET);gpio_set_dir(SSD1963_GPDAT6, GPIO_OUT);
-		ExtCfg(SSD1963_DAT7, EXT_BOOT_RESERVED, 0);gpio_init(SSD1963_GPDAT7);gpio_put(SSD1963_GPDAT7,GPIO_PIN_SET);gpio_set_dir(SSD1963_GPDAT7, GPIO_OUT);
-		ExtCfg(SSD1963_DAT8, EXT_BOOT_RESERVED, 0);gpio_init(SSD1963_GPDAT8);gpio_put(SSD1963_GPDAT8,GPIO_PIN_SET);gpio_set_dir(SSD1963_GPDAT8, GPIO_OUT);
+		ExtCfg(SSD1963_DAT1, EXT_BOOT_RESERVED, 0);gpio_init(SSD1963_GPDAT1);gpio_put(SSD1963_GPDAT1,GPIO_PIN_SET);gpio_set_dir(SSD1963_GPDAT1, GPIO_OUT);gpio_set_input_enabled(SSD1963_GPDAT1, true);
+		ExtCfg(SSD1963_DAT2, EXT_BOOT_RESERVED, 0);gpio_init(SSD1963_GPDAT2);gpio_put(SSD1963_GPDAT2,GPIO_PIN_SET);gpio_set_dir(SSD1963_GPDAT2, GPIO_OUT);gpio_set_input_enabled(SSD1963_GPDAT2, true);
+		ExtCfg(SSD1963_DAT3, EXT_BOOT_RESERVED, 0);gpio_init(SSD1963_GPDAT3);gpio_put(SSD1963_GPDAT3,GPIO_PIN_SET);gpio_set_dir(SSD1963_GPDAT3, GPIO_OUT);gpio_set_input_enabled(SSD1963_GPDAT3, true);
+		ExtCfg(SSD1963_DAT4, EXT_BOOT_RESERVED, 0);gpio_init(SSD1963_GPDAT4);gpio_put(SSD1963_GPDAT4,GPIO_PIN_SET);gpio_set_dir(SSD1963_GPDAT4, GPIO_OUT);gpio_set_input_enabled(SSD1963_GPDAT4, true);
+		ExtCfg(SSD1963_DAT5, EXT_BOOT_RESERVED, 0);gpio_init(SSD1963_GPDAT5);gpio_put(SSD1963_GPDAT5,GPIO_PIN_SET);gpio_set_dir(SSD1963_GPDAT5, GPIO_OUT);gpio_set_input_enabled(SSD1963_GPDAT5, true);
+		ExtCfg(SSD1963_DAT6, EXT_BOOT_RESERVED, 0);gpio_init(SSD1963_GPDAT6);gpio_put(SSD1963_GPDAT6,GPIO_PIN_SET);gpio_set_dir(SSD1963_GPDAT6, GPIO_OUT);gpio_set_input_enabled(SSD1963_GPDAT6, true);
+		ExtCfg(SSD1963_DAT7, EXT_BOOT_RESERVED, 0);gpio_init(SSD1963_GPDAT7);gpio_put(SSD1963_GPDAT7,GPIO_PIN_SET);gpio_set_dir(SSD1963_GPDAT7, GPIO_OUT);gpio_set_input_enabled(SSD1963_GPDAT7, true);
+		ExtCfg(SSD1963_DAT8, EXT_BOOT_RESERVED, 0);gpio_init(SSD1963_GPDAT8);gpio_put(SSD1963_GPDAT8,GPIO_PIN_SET);gpio_set_dir(SSD1963_GPDAT8, GPIO_OUT);gpio_set_input_enabled(SSD1963_GPDAT8, true);
         if(Option.DISPLAY_TYPE>SSD_PANEL_8){
-			ExtCfg(SSD1963_DAT9, EXT_BOOT_RESERVED, 0);gpio_init(SSD1963_GPDAT9);gpio_put(SSD1963_GPDAT9,GPIO_PIN_SET);gpio_set_dir(SSD1963_GPDAT9, GPIO_OUT);
-			ExtCfg(SSD1963_DAT10, EXT_BOOT_RESERVED, 0);gpio_init(SSD1963_GPDAT10);gpio_put(SSD1963_GPDAT10,GPIO_PIN_SET);gpio_set_dir(SSD1963_GPDAT10, GPIO_OUT);
-			ExtCfg(SSD1963_DAT11, EXT_BOOT_RESERVED, 0);gpio_init(SSD1963_GPDAT11);gpio_put(SSD1963_GPDAT11,GPIO_PIN_SET);gpio_set_dir(SSD1963_GPDAT11, GPIO_OUT);
-			ExtCfg(SSD1963_DAT12, EXT_BOOT_RESERVED, 0);gpio_init(SSD1963_GPDAT12);gpio_put(SSD1963_GPDAT12,GPIO_PIN_SET);gpio_set_dir(SSD1963_GPDAT12, GPIO_OUT);
-			ExtCfg(SSD1963_DAT13, EXT_BOOT_RESERVED, 0);gpio_init(SSD1963_GPDAT13);gpio_put(SSD1963_GPDAT13,GPIO_PIN_SET);gpio_set_dir(SSD1963_GPDAT13, GPIO_OUT);
-			ExtCfg(SSD1963_DAT14, EXT_BOOT_RESERVED, 0);gpio_init(SSD1963_GPDAT14);gpio_put(SSD1963_GPDAT14,GPIO_PIN_SET);gpio_set_dir(SSD1963_GPDAT14, GPIO_OUT);
-			ExtCfg(SSD1963_DAT15, EXT_BOOT_RESERVED, 0);gpio_init(SSD1963_GPDAT15);gpio_put(SSD1963_GPDAT15,GPIO_PIN_SET);gpio_set_dir(SSD1963_GPDAT15, GPIO_OUT);
-			ExtCfg(SSD1963_DAT16, EXT_BOOT_RESERVED, 0);gpio_init(SSD1963_GPDAT16);gpio_put(SSD1963_GPDAT16,GPIO_PIN_SET);gpio_set_dir(SSD1963_GPDAT16, GPIO_OUT);
+			ExtCfg(SSD1963_DAT9, EXT_BOOT_RESERVED, 0);gpio_init(SSD1963_GPDAT9);gpio_put(SSD1963_GPDAT9,GPIO_PIN_SET);gpio_set_dir(SSD1963_GPDAT9, GPIO_OUT);gpio_set_input_enabled(SSD1963_GPDAT9, true);
+			ExtCfg(SSD1963_DAT10, EXT_BOOT_RESERVED, 0);gpio_init(SSD1963_GPDAT10);gpio_put(SSD1963_GPDAT10,GPIO_PIN_SET);gpio_set_dir(SSD1963_GPDAT10, GPIO_OUT);gpio_set_input_enabled(SSD1963_GPDAT10, true);
+			ExtCfg(SSD1963_DAT11, EXT_BOOT_RESERVED, 0);gpio_init(SSD1963_GPDAT11);gpio_put(SSD1963_GPDAT11,GPIO_PIN_SET);gpio_set_dir(SSD1963_GPDAT11, GPIO_OUT);gpio_set_input_enabled(SSD1963_GPDAT11, true);
+			ExtCfg(SSD1963_DAT12, EXT_BOOT_RESERVED, 0);gpio_init(SSD1963_GPDAT12);gpio_put(SSD1963_GPDAT12,GPIO_PIN_SET);gpio_set_dir(SSD1963_GPDAT12, GPIO_OUT);gpio_set_input_enabled(SSD1963_GPDAT12, true);
+			ExtCfg(SSD1963_DAT13, EXT_BOOT_RESERVED, 0);gpio_init(SSD1963_GPDAT13);gpio_put(SSD1963_GPDAT13,GPIO_PIN_SET);gpio_set_dir(SSD1963_GPDAT13, GPIO_OUT);gpio_set_input_enabled(SSD1963_GPDAT13, true);
+			ExtCfg(SSD1963_DAT14, EXT_BOOT_RESERVED, 0);gpio_init(SSD1963_GPDAT14);gpio_put(SSD1963_GPDAT14,GPIO_PIN_SET);gpio_set_dir(SSD1963_GPDAT14, GPIO_OUT);gpio_set_input_enabled(SSD1963_GPDAT14, true);
+			ExtCfg(SSD1963_DAT15, EXT_BOOT_RESERVED, 0);gpio_init(SSD1963_GPDAT15);gpio_put(SSD1963_GPDAT15,GPIO_PIN_SET);gpio_set_dir(SSD1963_GPDAT15, GPIO_OUT);gpio_set_input_enabled(SSD1963_GPDAT15, true);
+			ExtCfg(SSD1963_DAT16, EXT_BOOT_RESERVED, 0);gpio_init(SSD1963_GPDAT16);gpio_put(SSD1963_GPDAT16,GPIO_PIN_SET);gpio_set_dir(SSD1963_GPDAT16, GPIO_OUT);gpio_set_input_enabled(SSD1963_GPDAT16, true);
  		}
 		dobacklight();
 	}
@@ -1755,6 +1755,7 @@ void InitReservedIO(void) {
 char *pinsearch(int pin){
 	char *buff=GetTempMemory(STRINGSIZE);
 #ifndef PICOMITEVGA
+	int ssd=PinDef[Option.SSD_DATA].GPno;
 	if(pin==Option.LCD_CD)strcpy(buff,"LCD DC");
 	else if(pin==Option.LCD_CS)strcpy(buff,"LCD CS");
 	else if(pin==Option.LCD_RD)strcpy(buff,"LCD RD");
@@ -1764,22 +1765,22 @@ char *pinsearch(int pin){
 	else if(pin==PINMAP[Option.SSD_WR] && Option.DISPLAY_TYPE>=SSDPANEL && Option.DISPLAY_TYPE<VIRTUAL_C)strcpy(buff,"SSD WR");
 	else if(pin==PINMAP[Option.SSD_RD] && Option.DISPLAY_TYPE>=SSDPANEL && Option.DISPLAY_TYPE<VIRTUAL_C)strcpy(buff,"SSD RD");
 	else if(pin==PINMAP[Option.SSD_RESET])strcpy(buff,"SSD RESET");
-	else if(pin==1 && Option.SSD_DC)strcpy(buff,"SSD D0");
-	else if(pin==2 && Option.SSD_DC)strcpy(buff,"SSD D1");
-	else if(pin==4 && Option.SSD_DC)strcpy(buff,"SSD D2");
-	else if(pin==5 && Option.SSD_DC)strcpy(buff,"SSD D3");
-	else if(pin==6 && Option.SSD_DC)strcpy(buff,"SSD D4");
-	else if(pin==7 && Option.SSD_DC)strcpy(buff,"SSD D5");
-	else if(pin==9 && Option.SSD_DC)strcpy(buff,"SSD D6");
-	else if(pin==10 && Option.SSD_DC)strcpy(buff,"SSD D7");
-	else if(pin==11 && Option.SSD_DC && Option.DISPLAY_TYPE>SSD_PANEL_8 && Option.DISPLAY_TYPE<VIRTUAL_C)strcpy(buff,"SSD D8");
-	else if(pin==12 && Option.SSD_DC && Option.DISPLAY_TYPE>SSD_PANEL_8 && Option.DISPLAY_TYPE<VIRTUAL_C)strcpy(buff,"SSD D9");
-	else if(pin==14 && Option.SSD_DC && Option.DISPLAY_TYPE>SSD_PANEL_8 && Option.DISPLAY_TYPE<VIRTUAL_C)strcpy(buff,"SSD D10");
-	else if(pin==15 && Option.SSD_DC && Option.DISPLAY_TYPE>SSD_PANEL_8 && Option.DISPLAY_TYPE<VIRTUAL_C)strcpy(buff,"SSD D11");
-	else if(pin==16 && Option.SSD_DC && Option.DISPLAY_TYPE>SSD_PANEL_8 && Option.DISPLAY_TYPE<VIRTUAL_C)strcpy(buff,"SSD D12");
-	else if(pin==17 && Option.SSD_DC && Option.DISPLAY_TYPE>SSD_PANEL_8 && Option.DISPLAY_TYPE<VIRTUAL_C)strcpy(buff,"SSD D13");
-	else if(pin==19 && Option.SSD_DC && Option.DISPLAY_TYPE>SSD_PANEL_8 && Option.DISPLAY_TYPE<VIRTUAL_C)strcpy(buff,"SSD D14");
-	else if(pin==20 && Option.SSD_DC && Option.DISPLAY_TYPE>SSD_PANEL_8 && Option.DISPLAY_TYPE<VIRTUAL_C)strcpy(buff,"SSD D15");
+	else if(pin==PINMAP[ssd] && Option.SSD_DC)strcpy(buff,"SSD D0");
+	else if(pin==PINMAP[ssd+1] && Option.SSD_DC)strcpy(buff,"SSD D1");
+	else if(pin==PINMAP[ssd+2] && Option.SSD_DC)strcpy(buff,"SSD D2");
+	else if(pin==PINMAP[ssd+3] && Option.SSD_DC)strcpy(buff,"SSD D3");
+	else if(pin==PINMAP[ssd+4] && Option.SSD_DC)strcpy(buff,"SSD D4");
+	else if(pin==PINMAP[ssd+5] && Option.SSD_DC)strcpy(buff,"SSD D5");
+	else if(pin==PINMAP[ssd+6] && Option.SSD_DC)strcpy(buff,"SSD D6");
+	else if(pin==PINMAP[ssd+7] && Option.SSD_DC)strcpy(buff,"SSD D7");
+	else if(pin==PINMAP[ssd+8] && Option.SSD_DC && Option.DISPLAY_TYPE>SSD_PANEL_8 && Option.DISPLAY_TYPE<VIRTUAL_C)strcpy(buff,"SSD D8");
+	else if(pin==PINMAP[ssd+9] && Option.SSD_DC && Option.DISPLAY_TYPE>SSD_PANEL_8 && Option.DISPLAY_TYPE<VIRTUAL_C)strcpy(buff,"SSD D9");
+	else if(pin==PINMAP[ssd+10] && Option.SSD_DC && Option.DISPLAY_TYPE>SSD_PANEL_8 && Option.DISPLAY_TYPE<VIRTUAL_C)strcpy(buff,"SSD D10");
+	else if(pin==PINMAP[ssd+11] && Option.SSD_DC && Option.DISPLAY_TYPE>SSD_PANEL_8 && Option.DISPLAY_TYPE<VIRTUAL_C)strcpy(buff,"SSD D11");
+	else if(pin==PINMAP[ssd+12] && Option.SSD_DC && Option.DISPLAY_TYPE>SSD_PANEL_8 && Option.DISPLAY_TYPE<VIRTUAL_C)strcpy(buff,"SSD D12");
+	else if(pin==PINMAP[ssd+13] && Option.SSD_DC && Option.DISPLAY_TYPE>SSD_PANEL_8 && Option.DISPLAY_TYPE<VIRTUAL_C)strcpy(buff,"SSD D13");
+	else if(pin==PINMAP[ssd+14] && Option.SSD_DC && Option.DISPLAY_TYPE>SSD_PANEL_8 && Option.DISPLAY_TYPE<VIRTUAL_C)strcpy(buff,"SSD D14");
+	else if(pin==PINMAP[ssd+15] && Option.SSD_DC && Option.DISPLAY_TYPE>SSD_PANEL_8 && Option.DISPLAY_TYPE<VIRTUAL_C)strcpy(buff,"SSD D15");
 	else
 #endif
 	if(pin==Option.KEYBOARD_CLOCK)strcpy(buff,"KEYBOARD CLOCK");

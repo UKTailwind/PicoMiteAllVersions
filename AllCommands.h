@@ -184,6 +184,7 @@ void cmd_irqclear(void);
 void cmd_irqnowait(void);
 void cmd_irq(void);
 void cmd_set(void);
+void cmd_amphersand(void);
 #ifdef PICOMITEWEB
     void cmd_web(void);
 #endif
@@ -321,6 +322,7 @@ void fun_msgbox(void);
 void fun_ctrlval(void);
 void fun_mmhpos(void);
 void fun_mmvpos(void);
+void fun_amphersand(void);
 #ifdef PICOMITEWEB
     void fun_json(void);
 #endif
@@ -493,12 +495,13 @@ void fun_map(void);
 	{ (unsigned char *)"Pull",		T_CMD,				0, cmd_pull	},
 	{ (unsigned char *)"Mov",		T_CMD,				0, cmd_mov	},
 	{ (unsigned char *)"Nop",		T_CMD,				0, cmd_nop	},
-	{ (unsigned char *)"IRQ SET",		T_CMD,				0, cmd_irqset	},
-	{ (unsigned char *)"IRQ WAIT",		T_CMD,				0, cmd_irqwait	},
-	{ (unsigned char *)"IRQ CLEAR",		T_CMD,				0, cmd_irqclear	},
-	{ (unsigned char *)"IRQ NOWAIT",		T_CMD,				0, cmd_irqnowait	},
+	{ (unsigned char *)"IRQ SET",	T_CMD,				0, cmd_irqset	},
+	{ (unsigned char *)"IRQ WAIT",	T_CMD,				0, cmd_irqwait	},
+	{ (unsigned char *)"IRQ CLEAR",	T_CMD,				0, cmd_irqclear	},
+	{ (unsigned char *)"IRQ NOWAIT",T_CMD,				0, cmd_irqnowait	},
 	{ (unsigned char *)"IRQ",		T_CMD,				0, cmd_irq	}, 
 	{ (unsigned char *)"Set",		T_CMD,				0, cmd_set	},
+	{ (unsigned char *)"_(",		T_CMD | T_FUN,				0, cmd_amphersand	},
 #ifdef PICOMITEVGA
   	{ (unsigned char *)"TILE",            T_CMD,                     0, cmd_tile   },
   	{ (unsigned char *)"MODE",            T_CMD,                     0, cmd_mode   },
@@ -666,7 +669,8 @@ void fun_map(void);
 	{ (unsigned char *)"SPI2(",	T_FUN | T_INT,		0, fun_spi2,	},
 	{ (unsigned char *)"DEVICE(",	T_FUN | T_INT| T_NBR | T_STR,		0, fun_dev,	},
 	{ (unsigned char*)"sprite(",	    T_FUN | T_INT | T_NBR,		0, fun_sprite },
-#ifdef USBKEYBOARD
+	{ (unsigned char*)"_(",	    T_FUN | T_INT ,		0, fun_amphersand },
+	#ifdef USBKEYBOARD
 	{ (unsigned char*)"KeyDown(",    T_FUN | T_INT,		0, fun_keydown	},
 #endif	
 #ifdef PICOMITEVGA

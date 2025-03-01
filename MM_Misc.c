@@ -69,7 +69,9 @@ extern unsigned int b64e_size(unsigned int in_size);
 extern unsigned int b64_encode(const unsigned char* in, unsigned int in_len, unsigned char* out);
 extern unsigned int b64_decode(const unsigned char* in, unsigned int in_len, unsigned char* out);
 void parselongAES(uint8_t *p, int ivadd, uint8_t *keyx, uint8_t *ivx, int64_t **inint, int64_t **outint);
-
+#ifndef PICOMITEVGA
+    extern int SSD1963data;
+#endif
 uint32_t getTotalHeap(void) {
    extern char __StackLimit, __bss_end__;
    
@@ -2009,17 +2011,22 @@ if(Option.CPU_Speed==FreqXGA)PO2Str("RESOLUTION", "1024x768");
         MMPrintString("\r\n");
     }
     if(Option.DISPLAY_TYPE >= SSDPANEL && Option.DISPLAY_TYPE<VIRTUAL) {
-        PO("LCDPANEL"); MMPrintString((char *)display_details[Option.DISPLAY_TYPE].name); MMPrintString(", "); MMPrintString((char *)OrientList[(int)i - 1]);
+        PO("LCDPANEL"); MMPrintString((char *)display_details[Option.DISPLAY_TYPE].name); MMPrintString(", "); 
+        MMPrintString((char *)OrientList[(int)i - 1]);
 		if(Option.DISPLAY_BL){
             MMputchar(',',1);MMPrintString((char *)PinDef[Option.DISPLAY_BL].pinname);
-		}
+		} else if(Option.SSD_DC!=(Option.DISPLAY_TYPE> SSD_PANEL_8 ? 16: 13) || Option.SSD_RESET!=(Option.DISPLAY_TYPE > SSD_PANEL_8 ? 19: 16) || (Option.SSD_DATA!=1))MMputchar(',',1);
 		if(Option.SSD_DC!=(Option.DISPLAY_TYPE> SSD_PANEL_8 ? 16: 13)){
             if(!Option.DISPLAY_BL )MMputchar(',',1);
             MMputchar(',',1);MMPrintString((char *)PinDef[PINMAP[Option.SSD_DC]].pinname);
-		}
-		if(Option.SSD_RESET!=(Option.DISPLAY_TYPE > SSD_PANEL_8 ? 19: 16)){
-            if(!Option.SSD_DC)MMputchar(',',1);
-            MMputchar(',',1);MMPrintString((char *)PinDef[PINMAP[Option.SSD_RESET]].pinname);
+		} else if(Option.SSD_RESET!=(Option.DISPLAY_TYPE > SSD_PANEL_8 ? 19: 16) || (Option.SSD_DATA!=1))MMputchar(',',1);
+		if(Option.SSD_RESET==-1){
+            MMputchar(',',1);
+            if(Option.SSD_RESET==-1) MMPrintString("NORESET");
+		} else if( (Option.SSD_DATA!=1))MMputchar(',',1);
+		if(Option.SSD_DATA!=1){
+            MMputchar(',',1);
+            MMPrintString((char *)PinDef[Option.SSD_DATA].pinname);
 		}
         PRet();
     }
@@ -3840,8 +3847,8 @@ void MIPS16 cmd_option(void) {
     if(tp) {
         if(checkstring(tp, (unsigned char *)"DISABLE")) {
     	if(CurrentLinePtr) error("Invalid in a program");
-            Option.LCD_CD = Option.LCD_CS = Option.LCD_Reset = Option.DISPLAY_TYPE = HRes = VRes = 0;
-            Option.SSD_DC = Option.SSD_WR = Option.SSD_RD;
+            Option.LCD_CD = Option.LCD_CS = Option.LCD_Reset = Option.DISPLAY_TYPE = Option.SSD_DATA= HRes = VRes = 0;
+            Option.SSD_DC = Option.SSD_WR = Option.SSD_RD=SSD1963data=0;
     		Option.TOUCH_XZERO = Option.TOUCH_YZERO = 0;                    // record the touch feature as not calibrated
             Option.SSD_RESET = -1;
             if(Option.DISPLAY_CONSOLE){

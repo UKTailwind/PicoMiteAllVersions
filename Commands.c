@@ -502,6 +502,7 @@ void MIPS16 cmd_list(void) {
 				c[m]= (char *)((int)c + sizeof(char *) * (CommandTableSize+x) + m*18);
 				if(m<CommandTableSize)strcpy(c[m],(char *)commandtbl[i].name);
 				if(*c[m]=='_')*c[m]='.';
+				if(*c[m]=='.' && c[m][1]=='(')*c[m]='*';
     			m++;
 		}
     	sortStrings(c,m);
@@ -536,6 +537,7 @@ void MIPS16 cmd_list(void) {
     			else if(m==TokenTableSize+7)strcpy(c[m],"MM.VER");
     			else if(m==TokenTableSize+8)strcpy(c[m],"MM.OneWire");
     			else strcpy(c[m],"MM.Info$(");
+				if(*c[m]=='_' && c[m][1]=='(')*c[m]='*';
 				m++;
 		}
     	sortStrings(c,m);
@@ -1912,6 +1914,21 @@ void cmd_gosub(void) {
    g_LocalIndex++;
    CurrentLinePtr = nextstmt;
 }
+void cmd_amphersand(void) {
+	int value;
+	uint32_t address;
+#ifdef rp2350
+	address=getint(cmdline,0x20000000,0x20081FFF);
+#else
+	address=getint(cmdline,0x20000000,0x20041FFF);
+#endif
+	while(*cmdline && tokenfunction(*cmdline) != op_equal) cmdline++;
+	if(!*cmdline) error("Invalid syntax");
+	++cmdline;
+	if(!*cmdline) error("Invalid syntax");
+	value = getint(cmdline,0,255);
+	*(uint8_t *)address=value;
+}
 
 void cmd_mid(void){
 	unsigned char *p;
@@ -2604,7 +2621,16 @@ unsigned char  *llist(unsigned char *b, unsigned char *p) {
 					*b = 0;											// use nothing if it LET
 				else {
 					strCopyWithCase((char *)b, (char *)commandname(tkn));			// expand the command (if it is not LET)
-					if(*b=='_')*b='.';
+					if(*b=='_'){
+						if(!strncasecmp((char *)&b[1],"SIDE SET",8) ||
+							!strncasecmp((char *)&b[1],"END PROGRAM",11) ||
+							!strncasecmp((char *)&b[1],"WRAP",4) ||
+							!strncasecmp((char *)&b[1],"LINE",4) ||
+							!strncasecmp((char *)&b[1],"PROGRAM",7) ||
+							!strncasecmp((char *)&b[1],"LABEL",5)
+						) *b='.';
+						else if(b[1]=='(')*b='*';
+					} 
                     b += strlen((char *)b);                                 // update pointer to the end of the buffer
                     if(isalpha(*(b - 1))) *b++ = ' ';               // add a space to the end of the command name
                 }
@@ -2641,7 +2667,8 @@ unsigned char  *llist(unsigned char *b, unsigned char *p) {
 
 		// must be the end of a line - so return to the caller
         while(*(b-1) == ' ' && b > b_start) --b;                    // eat any spaces on the end of the line
-		*b = 0;														// terminate the output buffer
+		*b = 0;	
+		STR_REPLACE((char *)b_start,"_(","&(");												// terminate the output buffer
 		return ++p;
 	} // end while
 }

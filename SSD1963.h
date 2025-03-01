@@ -189,42 +189,42 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
     #define SSD1963_WR_PIN  PINMAP[Option.SSD_WR]
     #define SSD1963_RD_PIN  PINMAP[Option.SSD_RD]
     #define SSD1963_RESET_PIN PINMAP[Option.SSD_RESET]
-    #define SSD1963_DAT1    1
-    #define SSD1963_DAT2    2
-    #define SSD1963_DAT3    4
-    #define SSD1963_DAT4    5
-    #define SSD1963_DAT5    6
-    #define SSD1963_DAT6    7
-    #define SSD1963_DAT7    9
-    #define SSD1963_DAT8    10
-    #define SSD1963_DAT9    11
-    #define SSD1963_DAT10    12
-    #define SSD1963_DAT11    14
-    #define SSD1963_DAT12    15
-    #define SSD1963_DAT13    16
-    #define SSD1963_DAT14    17
-    #define SSD1963_DAT15    19
-    #define SSD1963_DAT16   20
+    #define SSD1963_DAT1    Option.SSD_DATA
+    #define SSD1963_DAT2    PINMAP[PinDef[Option.SSD_DATA].GPno+1]
+    #define SSD1963_DAT3    PINMAP[PinDef[Option.SSD_DATA].GPno+2]
+    #define SSD1963_DAT4    PINMAP[PinDef[Option.SSD_DATA].GPno+3]
+    #define SSD1963_DAT5    PINMAP[PinDef[Option.SSD_DATA].GPno+4]
+    #define SSD1963_DAT6    PINMAP[PinDef[Option.SSD_DATA].GPno+5]
+    #define SSD1963_DAT7    PINMAP[PinDef[Option.SSD_DATA].GPno+6]
+    #define SSD1963_DAT8    PINMAP[PinDef[Option.SSD_DATA].GPno+7]
+    #define SSD1963_DAT9    PINMAP[PinDef[Option.SSD_DATA].GPno+8]
+    #define SSD1963_DAT10    PINMAP[PinDef[Option.SSD_DATA].GPno+9]
+    #define SSD1963_DAT11    PINMAP[PinDef[Option.SSD_DATA].GPno+10]
+    #define SSD1963_DAT12    PINMAP[PinDef[Option.SSD_DATA].GPno+11]
+    #define SSD1963_DAT13    PINMAP[PinDef[Option.SSD_DATA].GPno+12]
+    #define SSD1963_DAT14    PINMAP[PinDef[Option.SSD_DATA].GPno+13]
+    #define SSD1963_DAT15    PINMAP[PinDef[Option.SSD_DATA].GPno+14]
+    #define SSD1963_DAT16    PINMAP[PinDef[Option.SSD_DATA].GPno+15]
     #define SSD1963_DC_GPPIN  Option.SSD_DC
     #define SSD1963_WR_GPPIN  Option.SSD_WR
     #define SSD1963_RD_GPPIN  Option.SSD_RD
     #define SSD1963_RESET_GPPIN Option.SSD_RESET
-    #define SSD1963_GPDAT1    0
-    #define SSD1963_GPDAT2    1
-    #define SSD1963_GPDAT3    2
-    #define SSD1963_GPDAT4    3
-    #define SSD1963_GPDAT5    4
-    #define SSD1963_GPDAT6    5
-    #define SSD1963_GPDAT7    6
-    #define SSD1963_GPDAT8    7
-    #define SSD1963_GPDAT9    8
-    #define SSD1963_GPDAT10    9
-    #define SSD1963_GPDAT11    10
-    #define SSD1963_GPDAT12    11
-    #define SSD1963_GPDAT13    12
-    #define SSD1963_GPDAT14    13
-    #define SSD1963_GPDAT15    14
-    #define SSD1963_GPDAT16    15
+    #define SSD1963_GPDAT1    PinDef[Option.SSD_DATA].GPno
+    #define SSD1963_GPDAT2    SSD1963_GPDAT1+1
+    #define SSD1963_GPDAT3    SSD1963_GPDAT1+2
+    #define SSD1963_GPDAT4    SSD1963_GPDAT1+3
+    #define SSD1963_GPDAT5    SSD1963_GPDAT1+4
+    #define SSD1963_GPDAT6    SSD1963_GPDAT1+5
+    #define SSD1963_GPDAT7    SSD1963_GPDAT1+6
+    #define SSD1963_GPDAT8    SSD1963_GPDAT1+7
+    #define SSD1963_GPDAT9    SSD1963_GPDAT1+8
+    #define SSD1963_GPDAT10    SSD1963_GPDAT1+9
+    #define SSD1963_GPDAT11    SSD1963_GPDAT1+10
+    #define SSD1963_GPDAT12    SSD1963_GPDAT1+11
+    #define SSD1963_GPDAT13    SSD1963_GPDAT1+12
+    #define SSD1963_GPDAT14    SSD1963_GPDAT1+13
+    #define SSD1963_GPDAT15    SSD1963_GPDAT1+14
+    #define SSD1963_GPDAT16    SSD1963_GPDAT1+15
 
     #define nop asm("NOP")
 #define ILI9341_PWCTR1  0xC0

@@ -390,6 +390,16 @@ void fun_asc(void) {
     targ = T_INT;
 }
 
+void fun_amphersand(void){
+	uint32_t address;
+#ifdef rp2350
+	address=getint(ep,0x20000000,0x20081FFF);
+#else
+	address=getint(ep,0x20000000,0x20041FFF);
+#endif
+	iret=*(uint32_t *)address;
+	targ=T_INT;
+}
 
 
 // return the arctangent of a number in radians

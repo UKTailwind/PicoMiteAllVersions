@@ -758,6 +758,21 @@ void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, in
                 }
             }
 
+            // check for BYVAL or BYREF in sub/fun definition
+			skipspace(argv2[i]);
+			if(toupper(*argv2[i]) == 'B' && toupper(*(argv2[i]+1)) == 'Y') {
+				if((checkstring(argv2[i] + 2, (unsigned char *)"VAL")) != NULL) {        // if BYVAL
+					argtype[i] = 0;	                                    // remove any pointer flag in the caller
+					argv2[i] += 5;										// skip to the variable start
+				} else {
+					if((checkstring(argv2[i] + 2, (unsigned char *)"REF")) != NULL) {    // if BYREF
+						if((argtype[i] & T_PTR) == 0) error("Variable required for BYREF");
+						argv2[i] += 5;									// skip to the variable start
+					}
+				}
+				skipspace(argv2[i]);
+			}
+
             // if argument is present and is not a pointer to a variable then evaluate it as an expression
             if(argtype[i] == 0) {
                 long long int  ia;
@@ -1034,6 +1049,7 @@ void  MIPS16 tokenise(int console) {
         STR_REPLACE((char *)inpbuf,"MM.INFO$","MM.INFO");
         STR_REPLACE((char *)inpbuf,"=>",">=");
         STR_REPLACE((char *)inpbuf,"=<","<=");
+        STR_REPLACE((char *)inpbuf,"*(","_(");
         STR_REPLACE((char *)inpbuf,"MM.FONTHEIGHT","MM.INFO(FONTHEIGHT)");
         STR_REPLACE((char *)inpbuf,"MM.FONTWIDTH","MM.INFO(FONTWIDTH)");
         STR_REPLACE((char *)inpbuf,"MM.PS2","MM.INFO(PS2)");
@@ -1076,6 +1092,7 @@ void  MIPS16 tokenise(int console) {
             !strncasecmp((char *)tp,".LABEL ",6)
         ) *tp='_';
     }
+
     while(*p) {
 	    if(*p=='*' && p[1]=='/'){
             multi=false;

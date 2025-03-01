@@ -3519,11 +3519,10 @@ uint32_t testPSRAM(void){
     for(int i=0;i<65536;i++)if(*q++!=i) return 0;
     p=(uint32_t *)PSRAMbase;
     q=(uint32_t *)PSRAMbase;
-    p[16*1024*1024/4-1]=0x12345678;
+    p[8*1024*1024/4-1]=0x12345678;
     __dmb();
     if(p[4*1024*1024/4-1]==0x12345678)return 2*1024*1024;
-    if(p[8*1024*1024/4-1]==0x12345678)return 6*1024*1024;
-    return 14*1024*1024;
+    return 6*1024*1024;
 }
 #endif
 #endif

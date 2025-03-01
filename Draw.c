@@ -158,6 +158,7 @@ extern uint16_t map16[16];
 bool mergedread=0;
 int ScreenSize=0;
 #else
+    extern int SSD1963data;
     int map[16]={0};
     #ifdef PICOMITEWEB
     #ifndef rp2350
@@ -5085,7 +5086,8 @@ void copyframetoscreen(uint8_t *s,int xstart, int xend, int ystart, int yend, in
                     if(odd){
                         c=map[(*s & 0xF0)>>4];
                         *pp++=c;
-                        gpio_put_masked64(0x2FFFF,c);
+                        gpio_put(SSD1963_WR_GPPIN,0);
+                        gpio_put_masked64(0xFFFF<<SSD1963data,c<<SSD1963data);
                         nop;gpio_put(SSD1963_WR_GPPIN,1);
                         nop;gpio_put(SSD1963_WR_GPPIN,0);nop;gpio_put(SSD1963_WR_GPPIN,1);
                         s++;
@@ -5094,13 +5096,15 @@ void copyframetoscreen(uint8_t *s,int xstart, int xend, int ystart, int yend, in
                         while(x<=xend-xstart){
                             c=map[*s & 0xF];
                             *pp++=c;
-                            gpio_put_masked64(0x2FFFF,c);
+                            gpio_put(SSD1963_WR_GPPIN,0);
+                            gpio_put_masked64(0xFFFF<<SSD1963data,c<<SSD1963data);
                             nop;gpio_put(SSD1963_WR_GPPIN,1);
                             nop;gpio_put(SSD1963_WR_GPPIN,0);nop;gpio_put(SSD1963_WR_GPPIN,1);
                             if(i>1){
                                 c=map[(*s & 0xF0)>>4];
                                 *pp++=c;
-                                gpio_put_masked64(0x2FFFF,c);
+                                gpio_put(SSD1963_WR_GPPIN,0);
+                                gpio_put_masked64(0xFFFF<<SSD1963data,c<<SSD1963data);
                                 nop;gpio_put(SSD1963_WR_GPPIN,1);
                                 nop;gpio_put(SSD1963_WR_GPPIN,0);nop;gpio_put(SSD1963_WR_GPPIN,1);
                             }
@@ -5110,7 +5114,8 @@ void copyframetoscreen(uint8_t *s,int xstart, int xend, int ystart, int yend, in
                         }
                         pp=(uint16_t *)q;
                         for(int x=xstart;x<=xend;x++){
-                            gpio_put_masked64(0x2FFFF,*pp++);
+                            gpio_put(SSD1963_WR_GPPIN,0);
+                            gpio_put_masked64(0xFFFF<<SSD1963data,(*pp++)<<SSD1963data);
                             nop;gpio_put(SSD1963_WR_GPPIN,1);
                             nop;gpio_put(SSD1963_WR_GPPIN,0);nop;gpio_put(SSD1963_WR_GPPIN,1);
                         }
@@ -5122,13 +5127,15 @@ void copyframetoscreen(uint8_t *s,int xstart, int xend, int ystart, int yend, in
                         while(x<=xend-xstart){
                             c=map[*s & 0xF];
                             *pp++=c;
-                            gpio_put_masked64(0x2FFFF,c);
+                            gpio_put(SSD1963_WR_GPPIN,0);
+                            gpio_put_masked64(0xFFFF<<SSD1963data,c<<SSD1963data);
                             nop;gpio_put(SSD1963_WR_GPPIN,1);
                             nop;gpio_put(SSD1963_WR_GPPIN,0);nop;gpio_put(SSD1963_WR_GPPIN,1);
                             if(i>1){
                                 c=map[(*s & 0xF0)>>4];
                                 *pp++=c;
-                                gpio_put_masked64(0x2FFFF,c);
+                                gpio_put(SSD1963_WR_GPPIN,0);
+                                gpio_put_masked64(0xFFFF<<SSD1963data,c<<SSD1963data);
                                 nop;gpio_put(SSD1963_WR_GPPIN,1);
                                 nop;gpio_put(SSD1963_WR_GPPIN,0);nop;gpio_put(SSD1963_WR_GPPIN,1);
                             }
@@ -5138,7 +5145,8 @@ void copyframetoscreen(uint8_t *s,int xstart, int xend, int ystart, int yend, in
                         }
                         pp=(uint16_t *)q;
                         for(int x=xstart;x<=xend;x++){
-                            gpio_put_masked64(0x2FFFF,*pp++);
+                            gpio_put(SSD1963_WR_GPPIN,0);
+                            gpio_put_masked64(0xFFFF<<SSD1963data,(*pp++)<<SSD1963data);
                             nop;gpio_put(SSD1963_WR_GPPIN,1);
                             nop;gpio_put(SSD1963_WR_GPPIN,0);nop;gpio_put(SSD1963_WR_GPPIN,1);
                         }
@@ -5150,18 +5158,18 @@ void copyframetoscreen(uint8_t *s,int xstart, int xend, int ystart, int yend, in
             if(Option.DISPLAY_TYPE>SSD_PANEL_8){
                 if(odd){
                     c=map[(*s & 0xF0)>>4];
-                    gpio_put_masked64(0xFFFF,c);
+                    gpio_put_masked64(0xFFFF<<SSD1963data,c<<SSD1963data);
                     nop;gpio_put(SSD1963_WR_GPPIN,0);nop;nop;gpio_put(SSD1963_WR_GPPIN,1);
                     s++;
                     i--;
                 }
                 while(i>0){
                     c=map[*s & 0xF];
-                    gpio_put_masked64(0xFFFF,c);
+                    gpio_put_masked64(0xFFFF<<SSD1963data,c<<SSD1963data);
                     nop;gpio_put(SSD1963_WR_GPPIN,0);nop;nop;gpio_put(SSD1963_WR_GPPIN,1);
                     if(i>1){
                         c=map[(*s & 0xF0)>>4];
-                        gpio_put_masked64(0xFFFF,c);
+                        gpio_put_masked64(0xFFFF<<SSD1963data,c<<SSD1963data);
                         nop;gpio_put(SSD1963_WR_GPPIN,0);nop;nop;gpio_put(SSD1963_WR_GPPIN,1);
                     }
                     s++;
@@ -5170,30 +5178,30 @@ void copyframetoscreen(uint8_t *s,int xstart, int xend, int ystart, int yend, in
             } else {
                 if(odd){
                     c=map[(*s & 0xF0)>>4];
-                    gpio_put_masked64(0b11111111,(c >> 16));
+                    gpio_put_masked64(0b11111111<<SSD1963data,((c >> 16) & 0xff)<<SSD1963data);
                     nop;gpio_put(SSD1963_WR_GPPIN,0);nop;nop;gpio_put(SSD1963_WR_GPPIN,1);
-                    gpio_put_masked64(0b11111111,(c >> 8));
+                    gpio_put_masked64(0b11111111<<SSD1963data,((c >> 8) & 0xff)<<SSD1963data);
                     nop;gpio_put(SSD1963_WR_GPPIN,0);nop;nop;gpio_put(SSD1963_WR_GPPIN,1);
-                    nop;gpio_put_masked64(0b11111111,c);
+                    nop;gpio_put_masked64(0b11111111<<SSD1963data,(c  & 0xff)<<SSD1963data);
                     gpio_put(SSD1963_WR_GPPIN,0);nop;nop;gpio_put(SSD1963_WR_GPPIN,1);
                     s++;
                     i--;
                 }
                 while(i>0){
                     c=map[*s & 0xF];
-                    gpio_put_masked64(0b11111111,(c >> 16));
+                    gpio_put_masked64(0b11111111<<SSD1963data,((c >> 16) & 0xff)<<SSD1963data);
                     nop;gpio_put(SSD1963_WR_GPPIN,0);nop;nop;gpio_put(SSD1963_WR_GPPIN,1);
-                    gpio_put_masked64(0b11111111,(c >> 8));
+                    gpio_put_masked64(0b11111111<<SSD1963data,((c >> 8) & 0xff)<<SSD1963data);
                     nop;gpio_put(SSD1963_WR_GPPIN,0);nop;nop;gpio_put(SSD1963_WR_GPPIN,1);
-                    nop;gpio_put_masked64(0b11111111,c);
+                    nop;gpio_put_masked64(0b11111111<<SSD1963data,(c  & 0xff)<<SSD1963data);
                     gpio_put(SSD1963_WR_GPPIN,0);nop;nop;gpio_put(SSD1963_WR_GPPIN,1);
                     if(i>1){
                         c=map[(*s & 0xF0)>>4];
-                        gpio_put_masked64(0b11111111,(c >> 16));
+                        gpio_put_masked64(0b11111111<<SSD1963data,((c >> 16) & 0xff)<<SSD1963data);
                         nop;gpio_put(SSD1963_WR_GPPIN,0);nop;nop;gpio_put(SSD1963_WR_GPPIN,1);
-                        gpio_put_masked64(0b11111111,(c >> 8));
+                        gpio_put_masked64(0b11111111<<SSD1963data,((c >> 8) & 0xff)<<SSD1963data);
                         nop;gpio_put(SSD1963_WR_GPPIN,0);nop;nop;gpio_put(SSD1963_WR_GPPIN,1);
-                        nop;gpio_put_masked64(0b11111111,c);
+                        nop;gpio_put_masked64(0b11111111<<SSD1963data,(c  & 0xff)<<SSD1963data);
                         gpio_put(SSD1963_WR_GPPIN,0);nop;nop;gpio_put(SSD1963_WR_GPPIN,1);
                     }
                     s++;
