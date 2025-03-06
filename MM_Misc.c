@@ -2416,6 +2416,7 @@ void MIPS16 configure(unsigned char *p){
             MMPrintString("HDMIUSB\r\n");
             MMPrintString("OLIMEX USB\r\n");
             MMPrintString("PICO COMPUTER\r\n");
+            MMPrintString("HDMIUSBI2S\r\n");
 #else
             MMPrintString("OLIMEX\r\n");
             MMPrintString("HDMIBasic\r\n");
@@ -2654,6 +2655,42 @@ OPTION PLATFORM HDMIUSB
             Option.SerialTX=PINMAP[8];
             Option.SerialRX=PINMAP[9];
             Option.SerialConsole=2;
+            SaveOptions();
+            printoptions();uSec(100000);
+            _excep_code = RESET_COMMAND;
+            SoftReset();
+        }
+        if(checkstring(p,(unsigned char *) "HDMIUSBI2S"))  {
+            if(rp2350a)error("RP350B chips only");
+            ResetOptions(false);
+            strcpy((char *)Option.platform,"HDMIUSBI2S");
+            Option.heartbeatpin=PINMAP[25];
+            Option.NoHeartbeat=false;
+            Option.ColourCode = 1;
+            Option.modbuffsize=512;
+            Option.modbuff = true; 
+            Option.audio_i2c_bclk=PINMAP[10];
+            Option.audio_i2c_data=PINMAP[22];
+            Option.AUDIO_SLICE=11;
+            Option.SD_CS=PINMAP[29];
+            Option.SD_CLK_PIN=PINMAP[30];
+            Option.SD_MOSI_PIN=PINMAP[31];
+            Option.SD_MISO_PIN=PINMAP[32];
+            Option.SYSTEM_I2C_SDA=PINMAP[20];
+            Option.SYSTEM_I2C_SCL=PINMAP[21];
+            Option.RTC = true;
+            Option.HDMIclock=1;
+            Option.HDMId0=3;
+            Option.HDMId1=5;
+            Option.HDMId2=7;
+            Option.SerialTX=PINMAP[8];
+            Option.SerialRX=PINMAP[9];
+            Option.SerialConsole=2;
+//            Option.PSRAM_CS_PIN=PINMAP[47];
+            Option.INT1pin = PINMAP[0];
+            Option.INT2pin = PINMAP[1];
+            Option.INT3pin = PINMAP[2];
+            Option.INT4pin = PINMAP[3];
             SaveOptions();
             printoptions();uSec(100000);
             _excep_code = RESET_COMMAND;

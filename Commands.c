@@ -1917,11 +1917,30 @@ void cmd_gosub(void) {
 void cmd_amphersand(void) {
 	int value;
 	uint32_t address;
+	int64_t *ip=NULL;
+	void *ptr;
+	getargs(&cmdline,3,(unsigned char *)",");
+	if(argc==1){
 #ifdef rp2350
-	address=getint(cmdline,0x20000000,0x20081FFF);
+		address=getint(argv[0],0x20000000,0x20081FFF);
 #else
-	address=getint(cmdline,0x20000000,0x20041FFF);
+		address=getint(argv[0],0x20000000,0x20041FFF);
 #endif
+	} else {
+		ptr=findvar(argv[0], V_NOFIND_ERR);
+		if(g_vartbl[g_VarIndex].type & T_CONST) error("Cannot change a constant");
+		if(!(g_vartbl[g_VarIndex].type & T_INT)) error("Not an integer");
+		ip=ptr;
+		address=*ip;
+#ifdef rp2350
+		if(address<0x20000000 || address>0x20081fff)error("Invalid address");
+#else
+		if(address<0x20000000 || address>0x20041fff)error("Invalid address");
+#endif
+		skipspace(argv[2]);
+		if(*argv[2]==GetTokenValue((unsigned char *)"+"))(*ip)++;
+		if(*argv[2]==GetTokenValue((unsigned char *)"-"))(*ip)--;
+	}
 	while(*cmdline && tokenfunction(*cmdline) != op_equal) cmdline++;
 	if(!*cmdline) error("Invalid syntax");
 	++cmdline;
@@ -2629,7 +2648,7 @@ unsigned char  *llist(unsigned char *b, unsigned char *p) {
 							!strncasecmp((char *)&b[1],"PROGRAM",7) ||
 							!strncasecmp((char *)&b[1],"LABEL",5)
 						) *b='.';
-						else if(b[1]=='(')*b='*';
+						else if(b[1]=='(')*b='&';
 					} 
                     b += strlen((char *)b);                                 // update pointer to the end of the buffer
                     if(isalpha(*(b - 1))) *b++ = ' ';               // add a space to the end of the command name

@@ -1608,7 +1608,7 @@ void MIPS16 cmd_kill(void)
 void positionfile(int fnbr, int idx){
     char *buff;
     if(filesource[fnbr]==FLASHFILE){
-        if(idx>FileTable[fnbr].lfsptr->ctz.size)idx=FileTable[fnbr].lfsptr->ctz.size;
+//        if(idx>FileTable[fnbr].lfsptr->ctz.size)idx=FileTable[fnbr].lfsptr->ctz.size;
         FSerror = lfs_file_seek(&lfs, FileTable[fnbr].lfsptr, idx, LFS_SEEK_SET);
         if(FSerror<0)ErrorCheck(fnbr);
     } else {

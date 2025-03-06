@@ -53,13 +53,12 @@ extern "C" {
 #define T_NBR       0x01                            // number (or float) type
 #define T_STR       0x02                            // string type
 #define T_INT       0x04                            // 64 bit integer type
-#define T_BYTE      0x08                            // 8 bit unsigned integer type
-#define T_PTR       0x10                            // the variable points to another variable's data
-#define T_IMPLIED   0x20                            // the variables type does not have to be specified with a suffix
-#define T_CONST     0x40                            // the contents of this variable cannot be changed
-#define T_BLOCKED   0x80                            // Hash table entry blocked after ERASE
+#define T_PTR       0x08                            // the variable points to another variable's data
+#define T_IMPLIED   0x10                            // the variables type does not have to be specified with a suffix
+#define T_CONST     0x20                            // the contents of this variable cannot be changed
+#define T_BLOCKED   0x40                            // Hash table entry blocked after ERASE
 
-#define TypeMask(a) ((a) & (T_NBR | T_INT | T_STR | T_BYTE)) // macro to isolate the variable type bits
+#define TypeMask(a) ((a) & (T_NBR | T_INT | T_STR)) // macro to isolate the variable type bits
 
 // types of tokens.  These are or'ed with the data types above to fully define a token
 #define T_INV       0                               // an invalid token

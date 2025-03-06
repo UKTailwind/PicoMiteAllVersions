@@ -115,31 +115,38 @@ const struct s_Gamepad Gamepads[]={
 
 		{
 			.vid=0x0810, .pid=0xE501, 
-			.b_R={6,1}, .b_START={6,5}, .b_HOME={0xFF,0}, .b_SELECT={6,4 }, .b_L={6,0},
+			.b_R={6,1},.b_START={6,5},.b_HOME={0xFF,0},.b_SELECT={6,4 },.b_L={6,0},
 			.b_DOWN={4,192},.b_RIGHT={3,192},.b_UP={4,64},.b_LEFT={3,64},
 			.b_R2={0xFF,0},.b_X={5,4},.b_A={5,5},.b_Y={5,7},.b_B={5,6},
 			.b_L2={0xFF,0},.b_TOUCH={0xFF,0}
 		},
 		{
+			.vid=0x79,.pid=0x11,
+			.b_R={6,1},.b_START={6,5},.b_HOME={255,0},.b_SELECT={6,4},.b_L={6,0},
+			.b_DOWN={4,192},.b_RIGHT={3,192},.b_UP={4,64},.b_LEFT={3,64},
+			.b_R2={255,0},.b_X={5,4},.b_A={5,5},.b_Y={5,7},.b_B={5,6},
+			.b_L2={255,0},.b_TOUCH={255,0}
+		},
+		{
 			.vid=0x081F, .pid=0xE401, 
-			.b_R={6,1}, .b_START={6,5}, .b_HOME={0xFF,0}, .b_SELECT={6,4 }, .b_L={6,0},
+			.b_R={6,1},.b_START={6,5},.b_HOME={0xFF,0},.b_SELECT={6,4 },.b_L={6,0},
 			.b_DOWN={1,192},.b_RIGHT={0,192},.b_UP={1,64},.b_LEFT={0,64},
 			.b_R2={0xFF,0},.b_X={5,4},.b_A={5,5},.b_Y={5,7},.b_B={5,6},
 			.b_L2={0xFF,0},.b_TOUCH={0xFF,0}
 		},
 		{
 			.vid=0x1C59,.pid=0x26,
-		   .b_R={6,1}, .b_START={6,3},  .b_HOME={255,0},  .b_SELECT={6,2}, .b_L={6,0},
-		   .b_DOWN={1,192}, .b_RIGHT={0,192}, .b_UP={1,64},  .b_LEFT={0,64},
-		   .b_R2={255,0},  .b_X={5,7}, .b_A={5,6}, .b_Y={5,4}, .b_B={5,5},
-		   .b_L2={255,0}, .b_TOUCH={255,0}
+			.b_R={6,1},.b_START={6,3},.b_HOME={255,0},.b_SELECT={6,2},.b_L={6,0},
+			.b_DOWN={1,192},.b_RIGHT={0,192},.b_UP={1,64},.b_LEFT={0,64},
+			.b_R2={255,0},.b_X={5,7},.b_A={5,6},.b_Y={5,4},.b_B={5,5},
+			.b_L2={255,0},.b_TOUCH={255,0}
 		},
 		{
 			.vid=0x6A3,.pid=0x107,
-		   .b_R={3,7},.b_START={3,5},.b_HOME={255,0},.b_SELECT={3,4},.b_L={3,6},
-		   .b_DOWN={1,192},.b_RIGHT={0,192},.b_UP={1,64},.b_LEFT={0,64},
-		   .b_R2={3,7},.b_X={3,1},.b_A={3,3},.b_Y={3,0},.b_B={3,2},
-		   .b_L2={255,0},.b_TOUCH={255,0}
+			.b_R={3,7},.b_START={3,5},.b_HOME={255,0},.b_SELECT={3,4},.b_L={3,6},
+			.b_DOWN={1,192},.b_RIGHT={0,192},.b_UP={1,64},.b_LEFT={0,64},
+			.b_R2={3,7},.b_X={3,1},.b_A={3,3},.b_Y={3,0},.b_B={3,2},
+			.b_L2={255,0},.b_TOUCH={255,0}
 		},
 		{
 			.vid=0x11FF,.pid=0x3331,
@@ -149,6 +156,13 @@ const struct s_Gamepad Gamepads[]={
 			.b_L2={6,4},.b_TOUCH={6,7}
 		},
 		{
+			.vid=0x0583, .pid=0x2060, .b_R={0x02,0x05}, .b_START={0x02,0x07}, .b_HOME={0xFF,0x00},
+			.b_SELECT={0x02,0x06}, .b_L={0x02,0x04}, .b_DOWN={0x01,0xC0}, .b_RIGHT={0x00,0xC0},
+			.b_UP={0x01,0x40}, .b_LEFT={0x00,0x40}, .b_R2={0x03,0x05}, .b_X={0x02,0x02},
+			.b_A={0x02,0x00}, .b_Y={0x02,0x03}, .b_B={0x02,0x01}, .b_L2={0x03,0x04},
+			.b_TOUCH={0xFF,0x00}
+		},		
+		{
 			0,0, 
 			{0,0}, {0,0}, {0,0}, {0,0}, {0,0},
 			{0,0}, {0,0}, {0,0}, {0,0},
@@ -156,9 +170,9 @@ const struct s_Gamepad Gamepads[]={
 			{0,0}, {0,0}
 		},
 	};
-
+ 
 struct s_Gamepad MyGamepad={0};
-static bool monitor=false;
+static bool monitor=false,nooutput=false;
 void tuh_mount_cb(uint8_t dev_addr)
 {
   // application set-up
@@ -1362,7 +1376,7 @@ void PIntHN(unsigned long long int n, int l) {
 }
 
 void process_generic_gamepad(uint8_t const* report, uint16_t len, uint8_t n){
-	if(monitor){
+	if(monitor && !nooutput){
 		static uint8_t lastreport[64]={0};
 		if(memcmp(report, lastreport, len)){
 			PIntHN(HID[n-1].vid,4);putConsole(',',0);PIntHN(HID[n-1].pid,4);PRet();
@@ -1376,6 +1390,7 @@ void process_generic_gamepad(uint8_t const* report, uint16_t len, uint8_t n){
 		memcpy(lastreport,report,len);
 		return;
 	} 
+	if(monitor && nooutput)return;
 	uint16_t b=0;
 	int i=0;
 	struct s_Gamepad Gamepad;
@@ -2039,8 +2054,14 @@ static void process_mouse_report(hid_mouse_report_t const * report, uint8_t n)
         else if(checkstring(argv[2], (unsigned char *)"D"))iret=nunstruct[n].Z;*/
 
   //------------- button state  -------------//
+    
     static uint64_t leftpress=0;
 	static uint8_t leftstate=0;
+	if(HID[n-1].pid==0x2814 && HID[n-1].vid==0x406){
+		uint8_t *p=(uint8_t *)report;
+		p++;
+		report=(hid_mouse_report_t *)p;
+	}
 	uint64_t timenow=time_us_64();
 	if(timenow-leftpress>500000){
 		leftstate=0;
@@ -2100,6 +2121,9 @@ void cmd_gamepad(void){
 		nunstruct[n].x1=0b1111111111111111;
 		if(argc==5)nunstruct[n].x1=getint(argv[4],0,0b1111111111111111);
 		return;
+	} else if((tp = checkstring(cmdline, (unsigned char *)"MONITOR SILENT"))){
+		monitor=true;
+		nooutput=true;
 	} else if((tp = checkstring(cmdline, (unsigned char *)"MONITOR"))){
 		monitor=true;
 	} else if((tp = checkstring(cmdline, (unsigned char *)"CONFIGURE"))){

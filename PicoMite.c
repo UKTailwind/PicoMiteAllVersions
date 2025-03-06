@@ -3686,7 +3686,7 @@ int MIPS16 main(){
     static int ErrorInPrompt;
     int i=0;
     char savewatchdog=false;
-    i=watchdog_caused_reboot();
+        i=watchdog_caused_reboot();
 #ifdef rp2350
     restart_reason=powman_hw->chip_reset | i;
     rp2350a=(*((io_ro_32*)(SYSINFO_BASE + SYSINFO_PACKAGE_SEL_OFFSET)) & 1);
@@ -3699,10 +3699,15 @@ int MIPS16 main(){
     LoadOptions();
 #ifdef rp2350
     if(rom_get_last_boot_type()==BOOT_TYPE_FLASH_UPDATE)restart_reason=0xFFFFFFFC;
-    if(!rp2350a){
+    if(Option.PSRAM_CS_PIN){
         gpio_init(47);
-        gpio_set_dir(47, GPIO_OUT);
-        gpio_put(47,GPIO_PIN_SET);
+//        gpio_set_dir(47, GPIO_OUT);
+//        gpio_put(47,GPIO_PIN_SET);
+}
+    if(!rp2350a){
+//        gpio_init(47);
+//        gpio_set_dir(47, GPIO_OUT);
+//        gpio_put(47,GPIO_PIN_SET);
     }
 #else
     if(restart_reason==0x10001 || restart_reason==0x101)restart_reason=0xFFFFFFFC;
@@ -3786,6 +3791,12 @@ int MIPS16 main(){
 #define QMI_MIN_DESELECT 12        // 0x0001f000 [16:12] MIN_DESELECT (0x00) After this window's chip select is deasserted, it...
 #define QMI_RXDELAY 8          // 0x00000700 [10:8]  RXDELAY      (0x0) Delay the read data sample timing, in units of one half...
 #define QMI_CLKDIV 0           // 0x000000ff [7:0]   CLKDIV       (0x04) Clock divisor
+    pads_qspi_hw->io[0]=0x67;
+    pads_qspi_hw->io[1]=0x67;
+    pads_qspi_hw->io[2]=0x67;
+    pads_qspi_hw->io[3]=0x6B;
+    pads_qspi_hw->io[4]=0x6B;
+    pads_qspi_hw->io[5]=0x6B;
     qmi_hw->m[1].timing = (1<<QMI_COOLDOWN) | (2<<QMI_PAGEBREAK) | (3<<QMI_SELECT_HOLD) | (18<<QMI_MAX_SELECT) | (4<<QMI_MIN_DESELECT) | (6<<QMI_RXDELAY) | (5<<QMI_CLKDIV);
     if(Option.CPU_Speed<=324000)qmi_hw->m[1].timing = (1<<QMI_COOLDOWN) | (2<<QMI_PAGEBREAK) | (3<<QMI_SELECT_HOLD) | (18<<QMI_MAX_SELECT) | (4<<QMI_MIN_DESELECT) | (4<<QMI_RXDELAY) | (4<<QMI_CLKDIV);
     if(Option.CPU_Speed<=288000)qmi_hw->m[0].timing = 0x40006202;
@@ -3798,6 +3809,7 @@ int MIPS16 main(){
     if(Option.CPU_Speed<=324000)qmi_hw->m[1].timing = (1<<QMI_COOLDOWN) | (2<<QMI_PAGEBREAK) | (3<<QMI_SELECT_HOLD) | (18<<QMI_MAX_SELECT) | (4<<QMI_MIN_DESELECT) | (4<<QMI_RXDELAY) | (4<<QMI_CLKDIV);
     if(Option.CPU_Speed<=288000)qmi_hw->m[0].timing = 0x40006202;
     if(Option.CPU_Speed<=150000)qmi_hw->m[1].timing = 0x60006102;
+
     sleep_ms(2);
 #endif
     PWM_FREQ=44100;
@@ -4157,7 +4169,7 @@ int MIPS16 main(){
             if(toupper(*p)=='A')strcpy(p,"drive \"a:\"");
             if(toupper(*p)=='B')strcpy(p,"drive \"b:\"");
         }
-        if(*p=='*'){ //shortform RUN command so convert to a normal version
+        if(*p=='*' && p[1]!='('){ //shortform RUN command so convert to a normal version
                 transform_star_command((char *)inpbuf);
                 p = (char *)inpbuf;
         }

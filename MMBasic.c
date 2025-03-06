@@ -1049,7 +1049,7 @@ void  MIPS16 tokenise(int console) {
         STR_REPLACE((char *)inpbuf,"MM.INFO$","MM.INFO");
         STR_REPLACE((char *)inpbuf,"=>",">=");
         STR_REPLACE((char *)inpbuf,"=<","<=");
-        STR_REPLACE((char *)inpbuf,"*(","_(");
+        STR_REPLACE((char *)inpbuf,"&(","_(");
         STR_REPLACE((char *)inpbuf,"MM.FONTHEIGHT","MM.INFO(FONTHEIGHT)");
         STR_REPLACE((char *)inpbuf,"MM.FONTWIDTH","MM.INFO(FONTWIDTH)");
         STR_REPLACE((char *)inpbuf,"MM.PS2","MM.INFO(PS2)");

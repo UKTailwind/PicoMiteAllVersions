@@ -392,12 +392,31 @@ void fun_asc(void) {
 
 void fun_amphersand(void){
 	uint32_t address;
+	int64_t *ip=NULL;
+	void *ptr;
+	getargs(&ep,3,(unsigned char *)",");
+	if(argc==1){
 #ifdef rp2350
-	address=getint(ep,0x20000000,0x20081FFF);
+		address=getint(argv[0],0x20000000,0x20081FFF);
 #else
-	address=getint(ep,0x20000000,0x20041FFF);
+		address=getint(argv[0],0x20000000,0x20041FFF);
 #endif
-	iret=*(uint32_t *)address;
+	} else {
+		ptr=findvar(argv[0], V_NOFIND_ERR);
+		if(g_vartbl[g_VarIndex].type & T_CONST) error("Cannot change a constant");
+		if(!(g_vartbl[g_VarIndex].type & T_INT)) error("Not an integer");
+		ip=ptr;
+		address=*ip;
+#ifdef rp2350
+		if(address<0x20000000 || address>0x20081fff)error("Invalid address");
+#else
+		if(address<0x20000000 || address>0x20041fff)error("Invalid address");
+#endif
+		skipspace(argv[2]);
+		if(*argv[2]==GetTokenValue((unsigned char *)"+"))(*ip)++;
+		if(*argv[2]==GetTokenValue((unsigned char *)"-"))(*ip)--;
+	}
+	iret=*(uint8_t *)address;
 	targ=T_INT;
 }
 
