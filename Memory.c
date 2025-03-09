@@ -45,22 +45,34 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 
 extern const uint8_t *SavedVarsFlash;
 extern const uint8_t *flash_progmemory;
-
+uint32_t heap_memory_size=HEAP_MEMORY_SIZE;
 // memory management parameters
 
 // allocate static memory for programs, variables and the heap
 // this is simple memory management because DOS has plenty of memory
 //unsigned char __attribute__ ((aligned (256))) AllMemory[ALL_MEMORY_SIZE];
-unsigned char __attribute__ ((aligned (256))) MMHeap[HEAP_MEMORY_SIZE+256]={0};
 #ifdef rp2350
-char __attribute__ ((aligned (256))) FRAMEBUFFER[320*240*2];
+    #ifdef PICOMITEVGA
+        unsigned char __attribute__ ((aligned (256))) AllMemory[HEAP_MEMORY_SIZE+256 +320*240*2];
+        unsigned char *FRAMEBUFFER=AllMemory+HEAP_MEMORY_SIZE+256;
+        uint32_t framebuffersize=320*240*2;
+        #else
+        unsigned char __attribute__ ((aligned (256))) AllMemory[HEAP_MEMORY_SIZE+256];
+    #endif
 #else
-char __attribute__ ((aligned (256))) FRAMEBUFFER[640*480/8];
+    #ifdef PICOMITEVGA
+        unsigned char __attribute__ ((aligned (256))) AllMemory[HEAP_MEMORY_SIZE+256 +640*480/8];
+        unsigned char *FRAMEBUFFER=AllMemory+HEAP_MEMORY_SIZE+256;
+        uint32_t framebuffersize=640*480/8;
+        #else
+        unsigned char __attribute__ ((aligned (256))) AllMemory[HEAP_MEMORY_SIZE+256];
+    #endif
 #endif
+unsigned char *MMHeap=AllMemory;
 #ifdef PICOMITEVGA
 #ifdef rp2350
-uint16_t *tilefcols=(uint16_t *)((uint32_t)FRAMEBUFFER+(MODE1SIZE_S*3));
-uint16_t *tilebcols=(uint16_t *)((uint32_t)FRAMEBUFFER+(MODE1SIZE_S*3)+(MODE1SIZE_S>>1));
+uint16_t *tilefcols;//=(uint16_t *)((uint32_t)FRAMEBUFFER+(MODE1SIZE_S*3));
+uint16_t *tilebcols;//=(uint16_t *)((uint32_t)FRAMEBUFFER+(MODE1SIZE_S*3)+(MODE1SIZE_S>>1));
 #else
 uint16_t __attribute__ ((aligned (256))) tilefcols[80*40];
 uint16_t __attribute__ ((aligned (256))) tilebcols[80*40];
@@ -68,7 +80,7 @@ uint16_t __attribute__ ((aligned (256))) tilebcols[80*40];
 #ifdef HDMI
 uint8_t *tilefcols_w; 
 uint8_t *tilebcols_w;
-uint16_t HDMIlines[2][640]={0};
+uint16_t HDMIlines[2][800]={0};
 volatile int X_TILE=80, Y_TILE=40;
 uint32_t core1stack[128];
 volatile int ytileheight=480/12;
@@ -81,12 +93,12 @@ uint16_t M_Background[16] ={
 };
 volatile int ytileheight=16;
 #endif
-unsigned char *WriteBuf=(unsigned char *)FRAMEBUFFER;
-unsigned char *DisplayBuf=(unsigned char *)FRAMEBUFFER;
-unsigned char *LayerBuf=(unsigned char *)FRAMEBUFFER;
-unsigned char *FrameBuf=(unsigned char *)FRAMEBUFFER;
-unsigned char *SecondLayer=(unsigned char *)FRAMEBUFFER;
-unsigned char *SecondFrame=(unsigned char *)FRAMEBUFFER;
+unsigned char *WriteBuf=AllMemory+HEAP_MEMORY_SIZE+256;
+unsigned char *DisplayBuf=AllMemory+HEAP_MEMORY_SIZE+256;
+unsigned char *LayerBuf=AllMemory+HEAP_MEMORY_SIZE+256;
+unsigned char *FrameBuf=AllMemory+HEAP_MEMORY_SIZE+256;
+unsigned char *SecondLayer=AllMemory+HEAP_MEMORY_SIZE+256;
+unsigned char *SecondFrame=AllMemory+HEAP_MEMORY_SIZE+256;
 #endif
 #ifdef PICOMITE
     unsigned char *WriteBuf=NULL;
@@ -490,7 +502,7 @@ void MIPS16 cmd_memory(void) {
     int CFunctSize, CFunctSizeK, CFunctNbr, CFunctPercent, FontSize, FontSizeK, FontNbr, FontPercent, LibrarySizeK, LibraryPercent,LibraryMaxK;
     unsigned int CurrentRAM, *pint;
 
-    CurrentRAM = HEAP_MEMORY_SIZE + MAXVARS * sizeof(struct s_vartbl);
+    CurrentRAM = heap_memory_size + MAXVARS * sizeof(struct s_vartbl);
 #ifdef rp2350
     CurrentRAM+=PSRAMsize;
 #endif
@@ -755,7 +767,7 @@ void m_alloc(int type) {
         case M_LIMITED:    // this is called initially in InitBasic() to set the base pointer for program memory
                         // everytime the program size is adjusted up or down this must be called to check for memory overflow
                         ProgMemory = (uint8_t *)flash_progmemory;
-                        memset(MMHeap,0,HEAP_MEMORY_SIZE);
+                        memset(MMHeap,0,heap_memory_size);
 #ifdef GUICONTROLS
                         if(Option.MaxCtrls) Ctrl=(struct s_ctrl *)CTRLS;
 #endif
@@ -975,7 +987,7 @@ void __not_in_flash_func(*GetMemory)(int size) {
     unsigned int j, n;
     unsigned char *addr;
     j = n = (size + PAGESIZE - 1)/PAGESIZE;                         // nbr of pages rounded up
-    for(addr = MMHeap + HEAP_MEMORY_SIZE - PAGESIZE; addr >= MMHeap; addr -= PAGESIZE) {
+    for(addr = MMHeap + heap_memory_size - PAGESIZE; addr >= MMHeap; addr -= PAGESIZE) {
         if(!(MBitsGet(addr) & PUSED)) {
             if(--n == 0) {                                          // found a free slot
                 j--;
@@ -1002,8 +1014,8 @@ void __not_in_flash_func(*GetMemory)(int size) {
 
 void *GetAlignedMemory(int size) {
    unsigned char *addr=MMHeap;
-    while(((uint32_t)addr & (size-1)) && (!((MBitsGet(addr) & PUSED))) && ((uint32_t)addr<(uint32_t)MMHeap+HEAP_MEMORY_SIZE))addr+=PAGESIZE;
-    if((uint32_t)addr==(uint32_t)MMHeap+HEAP_MEMORY_SIZE)error("Not enough memory");
+    while(((uint32_t)addr & (size-1)) && (!((MBitsGet(addr) & PUSED))) && ((uint32_t)addr<(uint32_t)MMHeap+heap_memory_size))addr+=PAGESIZE;
+    if((uint32_t)addr==(uint32_t)MMHeap+heap_memory_size)error("Not enough memory");
     unsigned char *retaddr=addr;
     for(;size>0;addr+=PAGESIZE, size-=PAGESIZE){
          if(!(MBitsGet(addr) & PUSED)){
@@ -1020,7 +1032,7 @@ int FreeSpaceOnHeap(void) {
     unsigned int nbr;
     unsigned char *addr;
     nbr = 0;
-    for(addr = MMHeap + HEAP_MEMORY_SIZE - PAGESIZE; addr >= MMHeap; addr -= PAGESIZE)
+    for(addr = MMHeap + heap_memory_size - PAGESIZE; addr >= MMHeap; addr -= PAGESIZE)
         if(!(MBitsGet(addr) & PUSED)) nbr++;
 #ifdef rp2350
 #ifndef PICOMITEWEB
@@ -1037,7 +1049,7 @@ int LargestContiguousHeap(void) {
     unsigned int nbr;
     unsigned char *addr;
     nbr = 0;
-    for(addr = MMHeap; addr < MMHeap + HEAP_MEMORY_SIZE - PAGESIZE; addr += PAGESIZE){
+    for(addr = MMHeap; addr < MMHeap + heap_memory_size - PAGESIZE; addr += PAGESIZE){
         if(!(MBitsGet(addr) & PUSED)) nbr++;
         else break;
     }
@@ -1049,7 +1061,7 @@ unsigned int UsedHeap(void) {
     unsigned int nbr;
     unsigned char *addr;
     nbr = 0;
-    for(addr = MMHeap + HEAP_MEMORY_SIZE - PAGESIZE; addr >= MMHeap; addr -= PAGESIZE)
+    for(addr = MMHeap + heap_memory_size - PAGESIZE; addr >= MMHeap; addr -= PAGESIZE)
         if(MBitsGet(addr) & PUSED) nbr++;
 #ifdef rp2350
 #ifndef PICOMITEWEB
@@ -1077,7 +1089,7 @@ int MemSize(void *addr){ //returns the amount of heap memory allocated to an add
         }
         return i;
     } else {
-        if(addr >= (void *)MMHeap && addr < (void *)(MMHeap + HEAP_MEMORY_SIZE)){
+        if(addr >= (void *)MMHeap && addr < (void *)(MMHeap + heap_memory_size)){
             do {
                 bits = MBitsGet(addr);
                 addr += PAGESIZE;
@@ -1087,7 +1099,7 @@ int MemSize(void *addr){ //returns the amount of heap memory allocated to an add
         return i;
     }
 #else
-    if(addr >= (void *)MMHeap && addr < (void *)(MMHeap + HEAP_MEMORY_SIZE)){
+    if(addr >= (void *)MMHeap && addr < (void *)(MMHeap + heap_memory_size)){
         do {
             bits = MBitsGet(addr);
             addr += PAGESIZE;
@@ -1097,7 +1109,7 @@ int MemSize(void *addr){ //returns the amount of heap memory allocated to an add
     return i;
 #endif
 #else
-    if(addr >= (void *)MMHeap && addr < (void *)(MMHeap + HEAP_MEMORY_SIZE)){
+    if(addr >= (void *)MMHeap && addr < (void *)(MMHeap + heap_memory_size)){
         do {
             bits = MBitsGet(addr);
             addr += PAGESIZE;
@@ -1122,7 +1134,7 @@ void *ReAllocMemory(void *addr, size_t msize){
 }
 void __not_in_flash_func(FreeMemorySafe)(void **addr){
 	if(*addr!=NULL){
-        if(*addr >= (void *)MMHeap && *addr < (void *)(MMHeap + HEAP_MEMORY_SIZE)) {FreeMemory(*addr);*addr=NULL;}
+        if(*addr >= (void *)MMHeap && *addr < (void *)(MMHeap + heap_memory_size)) {FreeMemory(*addr);*addr=NULL;}
 #ifdef rp2350
 #ifndef PICOMITEWEB
         if(*addr >= (void *)PSRAMbase && *addr < (void *)(PSRAMbase + PSRAMsize)) {FreeMemory(*addr);*addr=NULL;}

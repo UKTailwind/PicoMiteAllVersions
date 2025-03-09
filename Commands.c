@@ -501,8 +501,8 @@ void MIPS16 cmd_list(void) {
 		for(i=0;i<CommandTableSize+x;i++){
 				c[m]= (char *)((int)c + sizeof(char *) * (CommandTableSize+x) + m*18);
 				if(m<CommandTableSize)strcpy(c[m],(char *)commandtbl[i].name);
-				if(*c[m]=='_')*c[m]='.';
-				if(*c[m]=='.' && c[m][1]=='(')*c[m]='*';
+				if(*c[m]=='_' && c[m][1]!='(')*c[m]='.';
+//				if(*c[m]=='.' && c[m][1]=='(')*c[m]='*';
     			m++;
 		}
     	sortStrings(c,m);
@@ -537,7 +537,7 @@ void MIPS16 cmd_list(void) {
     			else if(m==TokenTableSize+7)strcpy(c[m],"MM.VER");
     			else if(m==TokenTableSize+8)strcpy(c[m],"MM.OneWire");
     			else strcpy(c[m],"MM.Info$(");
-				if(*c[m]=='_' && c[m][1]=='(')*c[m]='*';
+//				if(*c[m]=='_' && c[m][1]=='(')*c[m]='*';
 				m++;
 		}
     	sortStrings(c,m);
@@ -1004,8 +1004,8 @@ void SaveContext(void){
 		p+=sizeof(struct s_vartbl)*MAXVARS;
 		memcpy(p,  g_hashlist, sizeof(struct s_hash)*MAXVARS/2);
 		p+=sizeof(struct s_hash)*MAXVARS/2;
-		memcpy(p,  MMHeap, HEAP_MEMORY_SIZE+256);
-		p+=HEAP_MEMORY_SIZE+256;
+		memcpy(p,  MMHeap, heap_memory_size+256);
+		p+=heap_memory_size+256;
 		memcpy(p,  mmap, sizeof(mmap));
 		p+=sizeof(mmap);
 		memcpy(p, psmap, sizeof(psmap));
@@ -1019,7 +1019,7 @@ void SaveContext(void){
 		int sizeneeded= sizeof(g_StrTmpIndex)+ sizeof(g_TempMemoryIsChanged)+sizeof(g_StrTmp)+sizeof(g_StrTmpLocalIndex)+sizeof(g_Localvarcnt)+
 		sizeof(g_LocalIndex)+sizeof(g_OptionBase)+sizeof(g_DimUsed)+sizeof(g_varcnt)+sizeof(g_Globalvarcnt)+
 		sizeof(g_hashlistpointer)+sizeof(g_forindex)+sizeof(g_doindex)+sizeof(struct s_forstack)*MAXFORLOOPS+sizeof(struct s_dostack)*MAXDOLOOPS+
-		sizeof(struct s_vartbl)*MAXVARS+sizeof(struct s_hash)*MAXVARS/2+HEAP_MEMORY_SIZE+256+sizeof(mmap);
+		sizeof(struct s_vartbl)*MAXVARS+sizeof(struct s_hash)*MAXVARS/2+heap_memory_size+256+sizeof(mmap);
 		if(sizeneeded>=Option.FlashSize-(Option.modbuff ? 1024*Option.modbuffsize : 0)-RoundUpK4(TOP_OF_SYSTEM_FLASH)-lfs_fs_size(&lfs)*4096)error("Not enough free space on A: drive: % needed",sizeneeded);
 		lfs_file_open(&lfs, &lfs_file, ".vars", LFS_O_RDWR | LFS_O_CREAT);;
 		int dt=get_fattime();
@@ -1042,7 +1042,7 @@ void SaveContext(void){
 		lfs_file_write(&lfs, &lfs_file, g_dostack, sizeof(struct s_dostack)*MAXDOLOOPS);
 		lfs_file_write(&lfs, &lfs_file, g_vartbl, sizeof(struct s_vartbl)*MAXVARS);
 		lfs_file_write(&lfs, &lfs_file, g_hashlist, sizeof(struct s_hash)*MAXVARS/2);
-		lfs_file_write(&lfs, &lfs_file, MMHeap, HEAP_MEMORY_SIZE+256);
+		lfs_file_write(&lfs, &lfs_file, MMHeap, heap_memory_size+256);
 		lfs_file_write(&lfs, &lfs_file, mmap, sizeof(mmap));
 		lfs_file_close(&lfs, &lfs_file);
 #if defined(rp2350) && !defined(PICOMITEWEB)
@@ -1088,8 +1088,8 @@ void RestoreContext(bool keep){
 		p+=sizeof(struct s_vartbl)*MAXVARS;
 		memcpy(g_hashlist, p, sizeof(struct s_hash)*MAXVARS/2);
 		p+=sizeof(struct s_hash)*MAXVARS/2;
-		memcpy(MMHeap, p, HEAP_MEMORY_SIZE+256);
-		p+=HEAP_MEMORY_SIZE+256;
+		memcpy(MMHeap, p, heap_memory_size+256);
+		p+=heap_memory_size+256;
 		memcpy(mmap, p, sizeof(mmap));
 		p+=sizeof(mmap);
 		memcpy(psmap, p, sizeof(psmap));
@@ -1116,7 +1116,7 @@ void RestoreContext(bool keep){
 		lfs_file_read(&lfs, &lfs_file, g_dostack, sizeof(struct s_dostack)*MAXDOLOOPS);
 		lfs_file_read(&lfs, &lfs_file, g_vartbl, sizeof(struct s_vartbl)*MAXVARS);
 		lfs_file_read(&lfs, &lfs_file, g_hashlist, sizeof(struct s_hash)*MAXVARS/2);
-		lfs_file_read(&lfs, &lfs_file, MMHeap, HEAP_MEMORY_SIZE+256);
+		lfs_file_read(&lfs, &lfs_file, MMHeap, heap_memory_size+256);
 		lfs_file_read(&lfs, &lfs_file, mmap, sizeof(mmap));
 		lfs_file_close(&lfs, &lfs_file);
 		if(!keep)lfs_remove(&lfs, "/.vars");
@@ -1463,7 +1463,6 @@ void MIPS16 __not_in_flash_func(cmd_for)(void) {
 	ss[1] = tokenTO;
 	ss[2] = tokenSTEP;
 	ss[3] = 0;
-
 	{																// start a new block
 		getargs(&cmdline, 7, ss);									// getargs macro must be the first executable stmt in a block
 		if(argc < 5 || argc == 6 || *argv[1] != ss[0] || *argv[3] != ss[1]) error("FOR with misplaced = or TO");
@@ -1654,7 +1653,7 @@ void MIPS16 __not_in_flash_func(cmd_next)(void) {
 
 
 
-#ifdef PICOMITEWEB
+#ifndef PICOMITE
 #ifdef rp2350
 void MIPS16 __not_in_flash_func(cmd_do)(void) {
 #else
@@ -2687,7 +2686,7 @@ unsigned char  *llist(unsigned char *b, unsigned char *p) {
 		// must be the end of a line - so return to the caller
         while(*(b-1) == ' ' && b > b_start) --b;                    // eat any spaces on the end of the line
 		*b = 0;	
-		STR_REPLACE((char *)b_start,"_(","&(");												// terminate the output buffer
+//		STR_REPLACE((char *)b_start,"_(","&(");												// terminate the output buffer
 		return ++p;
 	} // end while
 }

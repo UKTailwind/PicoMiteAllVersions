@@ -1914,10 +1914,14 @@ void MIPS16 printoptions(void){
     }
 #endif   
     if(Option.KeyboardConfig == CONFIG_I2C)PO2Str("KEYBOARD", "I2C");
-    if(Option.NoHeartbeat)PO2Str("HEARTBEAT", "OFF");
+#ifdef rp2350
+    if(Option.NoHeartbeat && rp2350a)PO2Str("HEARTBEAT", "OFF");
+#else
+    if(Option.NoHeartbeat )PO2Str("HEARTBEAT", "OFF");
+#endif
     if(Option.AllPins)PO2Str("PICO", "OFF");
 #ifdef PICOMITEVGA
-    if(Option.CPU_Speed!=126000)PO2Int("CPUSPEED (KHz)", Option.CPU_Speed);
+    if(Option.CPU_Speed!=252000)PO2Int("CPUSPEED (KHz)", Option.CPU_Speed);
     if(Option.DISPLAY_TYPE!=SCREENMODE1)PO2Int("DEFAULT MODE", Option.DISPLAY_TYPE-SCREENMODE1+1);
     if(Option.Height != 40 || Option.Width != 80) PO3Int("DISPLAY", Option.Height, Option.Width);
     if(Option.X_TILE==40)PO2Str("TILE SIZE", "LARGE");
@@ -1964,6 +1968,7 @@ if(Option.HDMIclock!=2 || Option.HDMId0!=0 || Option.HDMId1!=6 ||Option.HDMId2!=
 }
 if(Option.CPU_Speed==Freq720P)PO2Str("RESOLUTION", "1280x720");
 if(Option.CPU_Speed==FreqXGA)PO2Str("RESOLUTION", "1024x768");
+if(Option.CPU_Speed==FreqSVGA)PO2Str("RESOLUTION", "800x600");
 #endif
 #else
     if(Option.CPU_Speed!=200000){
@@ -2017,12 +2022,10 @@ if(Option.CPU_Speed==FreqXGA)PO2Str("RESOLUTION", "1024x768");
             MMputchar(',',1);MMPrintString((char *)PinDef[Option.DISPLAY_BL].pinname);
 		} else if(Option.SSD_DC!=(Option.DISPLAY_TYPE> SSD_PANEL_8 ? 16: 13) || Option.SSD_RESET!=(Option.DISPLAY_TYPE > SSD_PANEL_8 ? 19: 16) || (Option.SSD_DATA!=1))MMputchar(',',1);
 		if(Option.SSD_DC!=(Option.DISPLAY_TYPE> SSD_PANEL_8 ? 16: 13)){
-            if(!Option.DISPLAY_BL )MMputchar(',',1);
             MMputchar(',',1);MMPrintString((char *)PinDef[PINMAP[Option.SSD_DC]].pinname);
 		} else if(Option.SSD_RESET!=(Option.DISPLAY_TYPE > SSD_PANEL_8 ? 19: 16) || (Option.SSD_DATA!=1))MMputchar(',',1);
 		if(Option.SSD_RESET==-1){
-            MMputchar(',',1);
-            if(Option.SSD_RESET==-1) MMPrintString("NORESET");
+            MMputchar(',',1);MMPrintString("NORESET");
 		} else if( (Option.SSD_DATA!=1))MMputchar(',',1);
 		if(Option.SSD_DATA!=1){
             MMputchar(',',1);
@@ -2182,7 +2185,7 @@ if(Option.CPU_Speed==FreqXGA)PO2Str("RESOLUTION", "1024x768");
 #endif
     if((Option.heartbeatpin!=43 && !Option.NoHeartbeat)
 #ifdef rp2350
-     || (Option.heartbeatpin==43 && !rp2350a)
+     || (Option.heartbeatpin==43 && !rp2350a && !Option.NoHeartbeat)
 #endif
     )PO2Str("HEARTBEAT PIN", PinDef[Option.heartbeatpin].pinname);
 }
@@ -3213,6 +3216,11 @@ void MIPS16 cmd_option(void) {
             Option.DISPLAY_TYPE=SCREENMODE1;
             Option.DefaultFont=(2<<4) | 1 ;
         }      
+        else if(checkstring(argv[0], (unsigned char *)"800") || checkstring(argv[0], (unsigned char *)"800x600")){
+            Option.CPU_Speed = FreqSVGA; 
+            Option.DISPLAY_TYPE=SCREENMODE1;
+            Option.DefaultFont= 1 ;
+        }      
         else error("Syntax");
         SaveOptions();
         _excep_code = RESET_COMMAND;
@@ -3741,7 +3749,7 @@ void MIPS16 cmd_option(void) {
     if(tp) {
    	    if(CurrentLinePtr) error("Invalid in a program");
         int CPU_Speed=getint(tp, MIN_CPU,MAX_CPU);
-        if(!(CPU_Speed==157500 || CPU_Speed==126000 || CPU_Speed==252000 || CPU_Speed==378000 || CPU_Speed==315000))error("CPU speed 126000, 157500, 252000, 315000 or 378000 only");
+        if(!(/*CPU_Speed==157500 || CPU_Speed==126000 || */CPU_Speed==252000 || CPU_Speed==378000 || CPU_Speed==315000))error("CPU speed 126000, 157500, 252000, 315000 or 378000 only");
         Option.CPU_Speed=CPU_Speed;
         Option.X_TILE=80;
         Option.Y_TILE=40;

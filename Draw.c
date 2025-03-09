@@ -6229,7 +6229,7 @@ void fun_map(void){
 #ifndef HDMI
 void cmd_map(void){
 	unsigned char *p;
-    if(Option.CPU_Speed==126000)error("CPUSPEED >= 252000 for colour mapping");
+//    if(Option.CPU_Speed==126000)error("CPUSPEED >= 252000 for colour mapping");
     if(!(DISPLAY_TYPE==SCREENMODE2 || DISPLAY_TYPE==SCREENMODE3 ))error("Invalid for this screen mode");
     if((p=checkstring(cmdline, (unsigned char *)"RESET"))) {
         while(QVgaScanLine!=0){}
@@ -6786,7 +6786,7 @@ void cmd_mode(void){
     int mode =getint(cmdline,1,MAXMODES);
 //    if(mode+SCREENMODE1-1==DISPLAY_TYPE)return;
     closeframebuffer('A');
-    memset((void *)FRAMEBUFFER,0,sizeof(FRAMEBUFFER));
+    memset((void *)FRAMEBUFFER,0,framebuffersize);
     if(mode==5){
         DISPLAY_TYPE=SCREENMODE5; 
         ScreenSize=MODE5SIZE;
@@ -6825,7 +6825,7 @@ void cmd_mode(void){
     CurrentX = CurrentY =0;
     ClearScreen(Option.DefaultBC);
 #ifdef HDMI
-    if(Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P ){
+    if(Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P || Option.CPU_Speed==FreqSVGA){
 #endif
         if(DISPLAY_TYPE==SCREENMODE2 || DISPLAY_TYPE==SCREENMODE4 || DISPLAY_TYPE==SCREENMODE5){
             SetFont((6<<4) | 1) ;
@@ -7635,7 +7635,12 @@ void fun_getscanline(void){
         iret = v_scanline - 38;
         if(iret<0)iret+=806;
         targ=T_INT;
+    } else if(Option.CPU_Speed==FreqSVGA){
+        iret = v_scanline - 25;
+        if(iret<0)iret+=625;
+        targ=T_INT;
     }
+
 }
 #else
 void fun_getscanline(void){
@@ -7773,6 +7778,9 @@ void MIPS16 ResetDisplay(void) {
         } else if(Option.CPU_Speed==FreqXGA){
             HRes=(DISPLAY_TYPE == SCREENMODE1 ? 1024 : ((DISPLAY_TYPE==SCREENMODE2 || DISPLAY_TYPE==SCREENMODE5) ? 256 : 512));
             VRes=(DISPLAY_TYPE == SCREENMODE1 ? 768 :  ((DISPLAY_TYPE==SCREENMODE2 || DISPLAY_TYPE==SCREENMODE5) ? 192 : 384));
+        } else if(Option.CPU_Speed==FreqSVGA){
+            HRes=((DISPLAY_TYPE == SCREENMODE1 ||  DISPLAY_TYPE == SCREENMODE3) ? 800: 400);
+            VRes=((DISPLAY_TYPE == SCREENMODE1 ||  DISPLAY_TYPE == SCREENMODE3) ? 600: 300);
         } 
 #endif
         
@@ -8858,7 +8866,7 @@ XGA:
                 case SCREENMODE1:
                 case SCREENMODE2:
 #ifdef rp2350
-                    if(ScreenSize<sizeof(FRAMEBUFFER)/3)FrameBuf=DisplayBuf+2*ScreenSize;
+                    if(ScreenSize<framebuffersize/3)FrameBuf=DisplayBuf+2*ScreenSize;
                     else FrameBuf=GetMemory(ScreenSize);
 #else
                     FrameBuf=GetMemory(ScreenSize);
@@ -8888,7 +8896,7 @@ XGA:
                 case SCREENMODE2:
                     if(argc==1)transparents=getint(argv[0],0,15);
                     colour=transparents | (transparents<<4);
-                    if(ScreenSize<sizeof(FRAMEBUFFER)/4)SecondLayer=DisplayBuf+3*ScreenSize;
+                    if(ScreenSize<framebuffersize/4)SecondLayer=DisplayBuf+3*ScreenSize;
                     else SecondLayer=GetMemory(ScreenSize);
                     break;
                 case SCREENMODE1:
@@ -8931,7 +8939,7 @@ XGA:
                     colour=transparent | (transparent<<4);
                 case SCREENMODE1:
 #ifdef rp2350
-                    if(ScreenSize<sizeof(FRAMEBUFFER)/2)LayerBuf=DisplayBuf+ScreenSize;
+                    if(ScreenSize<framebuffersize/2)LayerBuf=DisplayBuf+ScreenSize;
                     else LayerBuf=GetMemory(ScreenSize);
 #else
                     LayerBuf=GetMemory(ScreenSize);
@@ -8950,7 +8958,7 @@ XGA:
                     else RGBtransparent=0;
                     break;
                 case SCREENMODE5:
-                    if(ScreenSize<sizeof(FRAMEBUFFER)/2)LayerBuf=DisplayBuf+ScreenSize;
+                    if(ScreenSize<framebuffersize/2)LayerBuf=DisplayBuf+ScreenSize;
                     else LayerBuf=GetMemory(ScreenSize);
                     if(argc==1)transparent=getint(argv[0],0,255);
                     colour=transparent;

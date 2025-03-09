@@ -528,7 +528,7 @@ void cmd_transmit(unsigned char *cmd){
         int pcb = getint(argv[0],1,MaxPcb)-1;
         fname=(char *)getCstring(argv[2]);
         if(*fname == 0) error("Cannot find file");
-        if(argc==5)buffersize=getint(argv[4],0,HEAP_MEMORY_SIZE);
+        if(argc==5)buffersize=getint(argv[4],0,heap_memory_size);
         if (ExistsFile(fname)) {
                 fn = FindFreeFileNbr();
                 if (!BasicFileOpen(fname, fn, FA_READ)) return;

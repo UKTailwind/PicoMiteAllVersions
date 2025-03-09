@@ -119,6 +119,7 @@ extern void settiles(void);
 extern uint16_t map256[256];
 extern uint16_t map16[16];
 extern uint16_t map16d[16];
+extern uint8_t map16s[16];
 extern uint32_t map16q[16];
 extern uint32_t map16pairs[16];
 extern const uint32_t MAP256DEF[256];

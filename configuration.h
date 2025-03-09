@@ -35,8 +35,8 @@ extern "C" {
     #ifdef rp2350
         #define MAXSUBFUN           512                     // each entry takes up 4 bytes
         #define MAXVARS             768                     // 8 + MAXVARLEN + MAXDIM * 2  (ie, 56 bytes) - these do not incl array members
-        #define HEAP_MEMORY_SIZE (180*1024) 
-        #define FLASH_TARGET_OFFSET (848 * 1024) 
+        #define HEAP_MEMORY_SIZE (188*1024) 
+        #define FLASH_TARGET_OFFSET (864 * 1024) 
         #ifdef HDMI
             #define MAXMODES 5
             #ifdef USBKEYBOARD
@@ -62,7 +62,7 @@ extern "C" {
 #else
             #define MAX_CPU     378000)
 #endif
-            #define MIN_CPU     126000
+            #define MIN_CPU     252000
         #endif
     #else
         #ifdef USBKEYBOARD
@@ -70,7 +70,7 @@ extern "C" {
             #define MagicKey 0x15197236
             #define HEAPTOP 0x2003FB00
         #else
-            #define FLASH_TARGET_OFFSET (848 * 1024) 
+            #define FLASH_TARGET_OFFSET (864 * 1024) 
             #define MagicKey 0x21639130
             #define HEAPTOP 0x2003fc00
         #endif
@@ -78,7 +78,7 @@ extern "C" {
         #define MAXVARS             512                     // 8 + MAXVARLEN + MAXDIM * 2  (ie, 56 bytes) - these do not incl array members
         #define HEAP_MEMORY_SIZE (100*1024) 
         #define MAX_CPU     378000 
-        #define MIN_CPU     126000
+        #define MIN_CPU     252000
         #define MAXSUBFUN           256                     // each entry takes up 4 bytes
     #endif
     #define MODE1SIZE_S  640*480/8
@@ -98,10 +98,18 @@ extern "C" {
     #define MODE2SIZE_L  (MODE_H_L_ACTIVE_PIXELS/4) * (MODE_V_L_ACTIVE_LINES/4)/2
     #define MODE3SIZE_L  (MODE_H_L_ACTIVE_PIXELS/2) * (MODE_V_L_ACTIVE_LINES/2)/2
     #define MODE5SIZE_L  (MODE_H_L_ACTIVE_PIXELS/4) * (MODE_V_L_ACTIVE_LINES/4)
+    #define MODE_H_V_ACTIVE_PIXELS 800
+    #define MODE_V_V_ACTIVE_LINES 600
+    #define MODE1SIZE_V  MODE_H_V_ACTIVE_PIXELS * MODE_V_V_ACTIVE_LINES /8
+    #define MODE2SIZE_V  (MODE_H_V_ACTIVE_PIXELS/2) * (MODE_V_V_ACTIVE_LINES/2)/2
+    #define MODE3SIZE_V  (MODE_H_V_ACTIVE_PIXELS) * (MODE_V_V_ACTIVE_LINES)/2
+    #define MODE4SIZE_V  400*300*2
+    #define MODE5SIZE_V  (MODE_H_V_ACTIVE_PIXELS/2) * (MODE_V_V_ACTIVE_LINES/2)
     #define Freq720P 372000
     #define Freq480P 315000
     #define Freq252P 252000
     #define FreqXGA 324000
+    #define FreqSVGA 360000
 #endif
 
 #ifdef PICOMITEWEB
@@ -231,7 +239,7 @@ extern "C" {
 #define FNV_offset_basis    2166136261
 #define use_hash
 #define DISKCHECKRATE       500                    //check for removal of SDcard every 200mSec
-#define EDIT_BUFFER_SIZE    HEAP_MEMORY_SIZE-2048-3*HRes// this is the maximum RAM that we can get
+#define EDIT_BUFFER_SIZE    heap_memory_size-2048-3*HRes// this is the maximum RAM that we can get
 #define SCREENWIDTH     80
 #define SCREENHEIGHT    24                          // this is the default and it can be changed using the OPTION command
 #define CONSOLE_BAUDRATE        115200               // only applies to the serial console

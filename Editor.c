@@ -245,6 +245,8 @@ static char (*SSputchar)(char buff, int flush)=SerialConsolePutC;
                                         if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==32 && gui_font==65)for(int i=0; i<160; i++)tilefcols_w[20*X_TILE+i]=RGB332(MAGENTA);
                                         if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==24 && gui_font==33)for(int i=0; i<160; i++)tilefcols_w[28*X_TILE+i]=RGB332(MAGENTA);
                                         if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==12 && gui_font==1)for(int i=0; i<160; i++)tilefcols_w[58*X_TILE+i]=RGB332(MAGENTA);
+                                    } else if(Option.CPU_Speed==FreqSVGA){
+                                        if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==12 && gui_font==1)for(int i=0; i<100; i++)tilefcols_w[48*X_TILE+i]=RGB332(MAGENTA);
                                     }
 #else
                                         if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==12 && gui_font==1)for(int i=0; i<80; i++)tilefcols[38*X_TILE+i]=0x9999;
@@ -325,19 +327,7 @@ void edit(unsigned char *cmdline, bool cmdfile) {
     }
 //    
     memset((void *)WriteBuf, 0, ScreenSize);
-/*    if(modmode){
-#ifdef HDMI
-        if(Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P ){
-#endif
-            SetFont(1);
-            PromptFont=1;
-#ifdef HDMI
-        } else {
-            SetFont(2<<4 | 1);
-            PromptFont=2<<4 | 1;
-        }
-#endif
-    }*/
+
 #ifdef PICOMITEVGA
 #ifdef rp2350
     #ifdef HDMI
@@ -368,7 +358,7 @@ void edit(unsigned char *cmdline, bool cmdfile) {
     }
     if(modmode){
 #ifdef HDMI
-        if(Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P ){
+        if(Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P  || Option.CPU_Speed==FreqSVGA ){
 #endif
             SetFont(1);
             PromptFont=1;
@@ -917,6 +907,7 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
                                 ResetDisplay();
                                 SetFont(oldfont);
                                 PromptFont=oldfont;
+                                MX470Display(DISPLAY_CLS);                        // clear screen on the MX470 display only
                             }
 #ifdef HDMI
         while(v_scanline!=0){}
@@ -925,7 +916,7 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
             map16[i]=remap[i]=RGB555(MAP16DEF[i]);
             map16pairs[i]=map16[i] | (map16[i]<<16);
         }
-        else if(DISPLAY_TYPE==SCREENMODE3)for(int i=0;i<16;i++) map16d[i]=remap[i]=RGB332(MAP16DEF[i]) | (RGB332(MAP16DEF[i])<<8);
+        else if(DISPLAY_TYPE==SCREENMODE3)for(int i=0;i<16;i++) {map16s[i]=RGB332(MAP16DEF[i]); map16d[i]=remap[i]=RGB332(MAP16DEF[i]) | (RGB332(MAP16DEF[i])<<8);}
         else if(DISPLAY_TYPE==SCREENMODE2)for(int i=0;i<16;i++) map16q[i]=remap[i]=RGB332(MAP16DEF[i]) | (RGB332(MAP16DEF[i])<<8) | (RGB332(MAP16DEF[i])<<16) | (RGB332(MAP16DEF[i])<<24);
             if(DISPLAY_TYPE==SCREENMODE1)  {
                 if(Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P ){

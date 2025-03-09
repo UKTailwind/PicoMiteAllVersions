@@ -967,5 +967,5 @@ unsigned char docrc8(unsigned char cdata) {
 	utilcrc8 = dscrc_table[utilcrc8 ^ cdata];
 	return utilcrc8;
 }
-#endif
+#endif 
 /*  @endcond */

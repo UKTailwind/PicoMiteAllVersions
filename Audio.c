@@ -693,7 +693,7 @@ void CloseAudio(int all){
 	memset(WAVfilename,0,sizeof(WAVfilename));
 	WAVcomplete = true;
 	FSerror = 0;
-	memset(mywav,0,sizeof(drwav));
+//	memset(mywav,0,sizeof(drwav));
 	if(was_playing == P_FLAC || was_playing == P_PAUSE_FLAC )FreeMemorySafe((void **)&myflac);
 	if(was_playing == P_WAV || was_playing == P_PAUSE_WAV )FreeMemorySafe((void **)&mywav);
 #ifdef rp2350
@@ -811,7 +811,7 @@ void wavcallback(char *p){
 	drwav_allocation_callbacks allocationCallbacks;
     allocationCallbacks.pUserData = NULL;
     allocationCallbacks.onMalloc  = my_malloc;
-    allocationCallbacks.onRealloc = my_realloc;
+    allocationCallbacks.onRealloc = NULL;
     allocationCallbacks.onFree    = my_free;
 	mywav=GetMemory(sizeof(drwav));
     drwav_init(mywav,(drwav_read_proc)onRead, (drwav_seek_proc)onSeek, NULL, &allocationCallbacks);

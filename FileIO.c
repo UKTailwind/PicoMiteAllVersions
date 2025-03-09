@@ -4927,7 +4927,7 @@ void ResetOptions(bool startup)
         #else
             Option.VGA_HSYNC=21;
             Option.VGA_BLUE=24;
-            Option.CPU_Speed = 126000;
+            Option.CPU_Speed = 252000;
         #endif
         Option.KEYBOARD_CLOCK=KEYBOARDCLOCK;
         Option.KEYBOARD_DATA=KEYBOARDDATA;

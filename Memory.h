@@ -29,6 +29,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 
 #include <stddef.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include "configuration.h"
 
 /* ********************************************************************************
@@ -73,7 +74,7 @@ extern void FreeMemorySafe(void **addr);
 extern void *GetAlignedMemory(int size);
 extern void FreeMemorySafe(void **addr);
 extern int MemSize(void *addr);
-extern unsigned char MMHeap[];
+extern unsigned char *MMHeap;
 #ifdef PICOMITEVGA
 extern unsigned char *WriteBuf;
 extern unsigned char *FrameBuf;
@@ -86,11 +87,10 @@ extern unsigned char *WriteBuf;
 extern unsigned char *FrameBuf;
 extern unsigned char *LayerBuf;
 #endif
-#ifdef rp2350
-extern char FRAMEBUFFER[320*240*2];
-#else
-extern char FRAMEBUFFER[640*480/8];
-#endif
+extern uint32_t heap_memory_size;
+extern unsigned char *FRAMEBUFFER;
+extern uint32_t framebuffersize;
+extern unsigned char __attribute__ ((aligned (256))) AllMemory[];
 struct s_ctrl {
     short int x1, y1, x2, y2;           // the coordinates of the touch sensitive area
     int fc, bc;                         // foreground and background colours

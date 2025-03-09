@@ -115,6 +115,7 @@ extern void start_vga_i2s(void);
 #ifdef HDMI
     uint16_t map16d[16];
     uint32_t map16q[16];
+    uint8_t  map16s[16];
 #endif
     // 126 MHz timings
 int QVGA_TOTAL;// total clock ticks (= QVGA_HSYNC + QVGA_BP + WIDTH*QVGA_CPP[1600] + QVGA_FP)
@@ -1916,7 +1917,7 @@ volatile int X_TILE=80, Y_TILE=40;
 // saved integer divider state
 // VGA DMA handler - called on end of every scanline
 static int VGAnextbuf=0,VGAnowbuf=1, tile=0, tc=0;
-void MIPS32 __not_in_flash_func(QVgaLine0)()
+/*void MIPS32 __not_in_flash_func(QVgaLine0)()
 {
     int i,line;
 	// Clear the interrupt request for DMA control channel
@@ -2032,7 +2033,7 @@ void MIPS32 __not_in_flash_func(QVgaLine0)()
 
 	// restore integer divider state
 //	hw_divider_restore_state(&SaveDividerState);
-}
+}*/
 void MIPS32 __not_in_flash_func(QVgaLine1)()
 {
     int i,line;
@@ -2391,8 +2392,8 @@ void QVgaDmaInit()
 	dma_channel_set_irq0_enabled(QVGA_DMA_PIO, true);
 
 	// set DMA IRQ handler
-    if(Option.CPU_Speed<200000)irq_set_exclusive_handler(DMA_IRQ_0, QVgaLine0);
-    else irq_set_exclusive_handler(DMA_IRQ_0, QVgaLine1);
+//    if(Option.CPU_Speed<200000)irq_set_exclusive_handler(DMA_IRQ_0, QVgaLine0);
+    /*else*/ irq_set_exclusive_handler(DMA_IRQ_0, QVgaLine1);
 	// set highest IRQ priority
 	irq_set_priority(DMA_IRQ_0, 0);
 }
@@ -2454,7 +2455,7 @@ void __not_in_flash_func(QVgaCore)()
 }
 uint32_t core1stack[128];
 #else
-extern uint16_t HDMIlines[2][640];
+extern uint16_t HDMIlines[2][800];
 // DVI constants
 
 #define TMDS_CTRL_00 0x354u
@@ -2512,6 +2513,16 @@ extern uint16_t HDMIlines[2][640];
 #define MODE_V_L_SYNC_WIDTH    6
 #define MODE_V_L_BACK_PORCH    29
 
+#define MODE_H_V_SYNC_POLARITY 1
+#define MODE_H_V_FRONT_PORCH   24
+#define MODE_H_V_SYNC_WIDTH    72
+#define MODE_H_V_BACK_PORCH    128
+
+#define MODE_V_V_SYNC_POLARITY 1
+#define MODE_V_V_FRONT_PORCH   1
+#define MODE_V_V_SYNC_WIDTH    2
+#define MODE_V_V_BACK_PORCH    22
+
 #define MODE_H_S_TOTAL_PIXELS ( \
     MODE_H_S_FRONT_PORCH + MODE_H_S_SYNC_WIDTH + \
     MODE_H_S_BACK_PORCH  + MODE_H_S_ACTIVE_PIXELS \
@@ -2543,6 +2554,14 @@ extern uint16_t HDMIlines[2][640];
 #define MODE_V_L_TOTAL_LINES  ( \
     MODE_V_L_FRONT_PORCH + MODE_V_L_SYNC_WIDTH + \
     MODE_V_L_BACK_PORCH  + MODE_V_L_ACTIVE_LINES \
+)
+#define MODE_H_V_TOTAL_PIXELS ( \
+    MODE_H_V_FRONT_PORCH + MODE_H_V_SYNC_WIDTH + \
+    MODE_H_V_BACK_PORCH  + MODE_H_V_ACTIVE_PIXELS \
+)
+#define MODE_V_V_TOTAL_LINES  ( \
+    MODE_V_V_FRONT_PORCH + MODE_V_V_SYNC_WIDTH + \
+    MODE_V_V_BACK_PORCH  + MODE_V_V_ACTIVE_LINES \
 )
 
 volatile int mode = 1;
@@ -3141,6 +3160,179 @@ void MIPS32 __not_in_flash_func(HDMIloop2)(void){
         }
     }
 }
+void MIPS32 __not_in_flash_func(HDMIloop3)(void){
+    int last_line=2,load_line, line_to_load, Line_dup;
+    while(1){
+        if(v_scanline!=last_line){
+            last_line=v_scanline;
+            load_line=v_scanline - (MODE_V_V_TOTAL_LINES - MODE_V_V_ACTIVE_LINES);
+            Line_dup=load_line>>1;
+            line_to_load = last_line & 1;
+            if(load_line>=0 && load_line<MODE_V_V_ACTIVE_LINES){
+                __dmb();
+                switch(DISPLAY_TYPE){
+                case SCREENMODE1: //800x600x2 colour with tiles
+                    {
+                        uint8_t *p=(uint8_t *)HDMIlines[line_to_load];
+                        uint8_t *fcol_w=tilefcols_w+load_line/ytileheight*X_TILE, *bcol_w=tilebcols_w+load_line/ytileheight*X_TILE; //get the relevant tile
+                        uint32_t *pp=(uint32_t *)&DisplayBuf[load_line*MODE_H_V_ACTIVE_PIXELS/8];
+                        uint32_t *qq=(uint32_t *)&LayerBuf[load_line*MODE_H_V_ACTIVE_PIXELS/8];
+                        uint32_t d=*pp | *qq;
+                        for(int i=0; i<MODE_H_V_ACTIVE_PIXELS/32 ; i++){
+                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
+                            d>>=1;
+                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
+                            d>>=1;
+                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
+                            d>>=1;
+                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
+                            d>>=1;
+                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
+                            d>>=1;
+                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
+                            d>>=1;
+                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
+                            d>>=1;
+                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
+                            d>>=1;
+                            fcol_w++;
+                            bcol_w++;
+                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
+                            d>>=1;
+                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
+                            d>>=1;
+                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
+                            d>>=1;
+                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
+                            d>>=1;
+                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
+                            d>>=1;
+                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
+                            d>>=1;
+                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
+                            d>>=1;
+                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
+                            d>>=1;
+                            fcol_w++;
+                            bcol_w++;
+                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
+                            d>>=1;
+                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
+                            d>>=1;
+                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
+                            d>>=1;
+                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
+                            d>>=1;
+                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
+                            d>>=1;
+                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
+                            d>>=1;
+                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
+                            d>>=1;
+                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
+                            d>>=1;
+                            fcol_w++;
+                            bcol_w++;
+                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
+                            d>>=1;
+                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
+                            d>>=1;
+                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
+                            d>>=1;
+                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
+                            d>>=1;
+                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
+                            d>>=1;
+                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
+                            d>>=1;
+                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
+                            d>>=1;
+                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
+                            fcol_w++;
+                            bcol_w++;
+                            d=*(++pp) | *(++qq) ;
+                        }
+                    }
+                    break;
+                case SCREENMODE2: //400 X 300 x 4bit-colour mapped to 256
+                    {
+                        uint16_t *p=(uint16_t *)HDMIlines[line_to_load];
+                        uint8_t l,d,s;
+                        int pp= (Line_dup)*MODE_H_V_ACTIVE_PIXELS/4;
+                        for(int i=0; i<MODE_H_V_ACTIVE_PIXELS/4 ; i++){
+                            l=LayerBuf[pp+i];d=DisplayBuf[pp+i];s=SecondLayer[pp+i];
+                            if((s&0xf)!=transparents){
+                                *p++=map16d[s&0xf];
+                            } else {
+                                if((l&0xf)!=transparent){
+                                    *p++=map16d[l&0xf];
+                                } else {
+                                    *p++=map16d[d&0xf];
+                                }
+                            }
+                            d>>=4;l>>=4;s>>=4;
+                            if((s&0xf)!=transparents){
+                                *p++=map16d[s&0xf];
+                            } else {
+                                if((l&0xf)!=transparent){
+                                    *p++=map16d[l&0xf];
+                                } else {
+                                    *p++=map16d[d&0xf];
+                                }
+                            }
+                        }
+                    }
+                    break;
+                case SCREENMODE3: //800 x 600 x 4bit-colour mapped to 256
+                    {
+                        int pp= load_line*MODE_H_V_ACTIVE_PIXELS/2;
+                        uint8_t *p=(uint8_t *)HDMIlines[line_to_load];
+                        uint8_t l,d;
+                        for(int i=0; i<MODE_H_V_ACTIVE_PIXELS/2 ; i++){
+                            l=LayerBuf[pp+i];d=DisplayBuf[pp+i];
+                            if((l&0xf)!=transparent){
+                                *p++=map16s[l&0xf];
+                            } else {
+                                *p++=map16s[d&0xf];
+                            }
+                            d>>=4;l>>=4;
+                            if((l&0xf)!=transparent){
+                                *p++=map16s[l&0xf];
+                            } else {
+                                *p++=map16s[d&0xf];
+                            }
+                        }
+                    }
+                    break;
+                case SCREENMODE5: //400 x 300 x 8bit-colour 
+                    {
+                        uint8_t *p=(uint8_t *)HDMIlines[line_to_load];
+                        uint8_t l,d,s;
+                        int pp= (Line_dup)*MODE_H_V_ACTIVE_PIXELS/2;
+                        for(int i=0; i<MODE_H_V_ACTIVE_PIXELS/2 ; i++){
+                            l=LayerBuf[pp+i];d=DisplayBuf[pp+i];s=SecondLayer[pp+i];
+                            if(s!=transparents){
+                                *p++=s;
+                                *p++=s;
+                            } else {
+                                if(l!=transparent){
+                                    *p++=l;
+                                    *p++=l;
+                                } else {
+                                    *p++=d;
+                                    *p++=d;
+                                }
+                            }
+                        }
+                    }
+                    break;
+                default:
+                }
+            }
+        }
+    }
+}
+
 void HDMICore(void){
     for(int i=0;i<256;i++)map256[i]=RGB555(MAP256DEF[i]);
     for(int i=0;i<16;i++){
@@ -3148,6 +3340,7 @@ void HDMICore(void){
         map16pairs[i]=map16[i] | (map16[i]<<16);
         map16d[i]=(RGB332(MAP16DEF[i])<<8) | RGB332(MAP16DEF[i]);
         map16q[i]=(RGB332(MAP16DEF[i])<<24) | (RGB332(MAP16DEF[i])<<16) | (RGB332(MAP16DEF[i])<<8) | RGB332(MAP16DEF[i]);
+        map16s[i]=RGB332(MAP16DEF[i]);
     }
     if(Option.CPU_Speed==FreqXGA){
         MODE_H_SYNC_POLARITY=MODE_H_L_SYNC_POLARITY;
@@ -3189,26 +3382,26 @@ void HDMICore(void){
         MODE4SIZE=0L;
         MODE5SIZE=MODE5SIZE_W;
         PIXELS_PER_WORD=4;
-    } else if(Option.CPU_Speed==Freq252P){
-        MODE_H_SYNC_POLARITY=MODE_H_F_SYNC_POLARITY;
-        MODE_ACTIVE_LINES=MODE_V_F_ACTIVE_LINES;
-        MODE_ACTIVE_PIXELS=MODE_H_F_ACTIVE_PIXELS;
-        MODE_V_TOTAL_LINES=MODE_V_F_TOTAL_LINES;
-        MODE_H_ACTIVE_PIXELS=MODE_H_F_ACTIVE_PIXELS;
-        MODE_H_FRONT_PORCH=MODE_H_F_FRONT_PORCH;
-        MODE_H_SYNC_WIDTH=MODE_H_F_SYNC_WIDTH;
-        MODE_H_BACK_PORCH=MODE_H_F_BACK_PORCH;
-        MODE_V_SYNC_POLARITY=MODE_V_F_SYNC_POLARITY;
-        MODE_V_ACTIVE_LINES=MODE_V_F_ACTIVE_LINES;
-        MODE_V_FRONT_PORCH=MODE_V_F_FRONT_PORCH;
-        MODE_V_SYNC_WIDTH=MODE_V_F_SYNC_WIDTH;
-        MODE_V_BACK_PORCH=MODE_V_F_BACK_PORCH;
-        MODE1SIZE=MODE1SIZE_S;
-        MODE2SIZE=MODE2SIZE_S;
-        MODE3SIZE=MODE3SIZE_S;
-        MODE4SIZE=MODE4SIZE_S;
-        MODE5SIZE=MODE5SIZE_S;
-        PIXELS_PER_WORD=2;
+    } else if(Option.CPU_Speed==FreqSVGA){
+        MODE_H_SYNC_POLARITY=MODE_H_V_SYNC_POLARITY;
+        MODE_ACTIVE_LINES=MODE_V_V_ACTIVE_LINES;
+        MODE_ACTIVE_PIXELS=MODE_H_V_ACTIVE_PIXELS;
+        MODE_V_TOTAL_LINES=MODE_V_V_TOTAL_LINES;
+        MODE_H_ACTIVE_PIXELS=MODE_H_V_ACTIVE_PIXELS;
+        MODE_H_FRONT_PORCH=MODE_H_V_FRONT_PORCH;
+        MODE_H_SYNC_WIDTH=MODE_H_V_SYNC_WIDTH;
+        MODE_H_BACK_PORCH=MODE_H_V_BACK_PORCH;
+        MODE_V_SYNC_POLARITY=MODE_V_V_SYNC_POLARITY;
+        MODE_V_ACTIVE_LINES=MODE_V_V_ACTIVE_LINES;
+        MODE_V_FRONT_PORCH=MODE_V_V_FRONT_PORCH;
+        MODE_V_SYNC_WIDTH=MODE_V_V_SYNC_WIDTH;
+        MODE_V_BACK_PORCH=MODE_V_V_BACK_PORCH;
+        MODE1SIZE=MODE1SIZE_V;
+        MODE2SIZE=MODE2SIZE_V;
+        MODE3SIZE=MODE3SIZE_V;
+        MODE4SIZE=MODE4SIZE_V;
+        MODE5SIZE=MODE5SIZE_V;
+        PIXELS_PER_WORD=4;
     }  else {
         MODE_H_SYNC_POLARITY=MODE_H_S_SYNC_POLARITY;
         MODE_ACTIVE_LINES=MODE_V_S_ACTIVE_LINES;
@@ -3278,7 +3471,7 @@ void HDMICore(void){
     // Pixels (TMDS) come in 4 8-bit chunks. Control symbols (RAW) are an
     // entire 32-bit word.
     hstx_ctrl_hw->expand_shift =
-        ((Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P ) ? 
+        ((Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P) ? 
             (2 << HSTX_CTRL_EXPAND_SHIFT_ENC_N_SHIFTS_LSB |
             16 << HSTX_CTRL_EXPAND_SHIFT_ENC_SHIFT_LSB |
             1 << HSTX_CTRL_EXPAND_SHIFT_RAW_N_SHIFTS_LSB |
@@ -3392,11 +3585,12 @@ void HDMICore(void){
     dma_channel_start(DMACH_PING);
     if(Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P )HDMIloop0();
     else if(Option.CPU_Speed==FreqXGA)HDMIloop1();
+    else if(Option.CPU_Speed==FreqSVGA)HDMIloop3();
     else HDMIloop2();
 }
 void settiles(void){
     if(DISPLAY_TYPE!=SCREENMODE1)return;
-    if(Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P ){
+    if(Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P  || Option.CPU_Speed==Freq480P){
         tilefcols=(uint16_t *)((uint32_t)FRAMEBUFFER+(MODE1SIZE*3));
         tilebcols=(uint16_t *)((uint32_t)FRAMEBUFFER+(MODE1SIZE*3)+(MODE1SIZE>>1));
         ytileheight=12;
@@ -3412,7 +3606,7 @@ void settiles(void){
         tilebcols_w=tilefcols_w+(MODE_H_ACTIVE_PIXELS/8)*(MODE_V_ACTIVE_LINES/8); //minimum tilesize is 8x8
         memset(tilefcols_w,RGB332(Option.DefaultFC),(MODE_H_ACTIVE_PIXELS/8)*(MODE_V_ACTIVE_LINES/8)*sizeof(uint8_t));
         memset(tilebcols_w,RGB332(Option.DefaultBC),(MODE_H_ACTIVE_PIXELS/8)*(MODE_V_ACTIVE_LINES/8)*sizeof(uint8_t));
-        ytileheight=24;
+        ytileheight=(Option.CPU_Speed==FreqSVGA? 12:24);
         X_TILE=MODE_H_ACTIVE_PIXELS/8;Y_TILE=MODE_V_ACTIVE_LINES/ytileheight;
     }
 }
@@ -3699,16 +3893,16 @@ int MIPS16 main(){
     LoadOptions();
 #ifdef rp2350
     if(rom_get_last_boot_type()==BOOT_TYPE_FLASH_UPDATE)restart_reason=0xFFFFFFFC;
-    if(Option.PSRAM_CS_PIN){
-        gpio_init(47);
-//        gpio_set_dir(47, GPIO_OUT);
-//        gpio_put(47,GPIO_PIN_SET);
-}
-    if(!rp2350a){
+//    if(Option.PSRAM_CS_PIN){
 //        gpio_init(47);
 //        gpio_set_dir(47, GPIO_OUT);
 //        gpio_put(47,GPIO_PIN_SET);
-    }
+//}
+//    if(!rp2350a){
+//        gpio_init(47);
+//        gpio_set_dir(47, GPIO_OUT);
+//        gpio_put(47,GPIO_PIN_SET);
+//    }
 #else
     if(restart_reason==0x10001 || restart_reason==0x101)restart_reason=0xFFFFFFFC;
 #endif
@@ -3733,7 +3927,7 @@ int MIPS16 main(){
         SaveOptions();
     }
 #else
-    if(!(Option.CPU_Speed==Freq720P || Option.CPU_Speed==Freq252P   || Option.CPU_Speed==Freq480P|| Option.CPU_Speed==FreqXGA )){
+    if(!(Option.CPU_Speed==Freq720P || Option.CPU_Speed==Freq252P   || Option.CPU_Speed==FreqSVGA || Option.CPU_Speed==Freq480P|| Option.CPU_Speed==FreqXGA )){
         Option.CPU_Speed=Freq480P;
         SaveOptions();
     }
@@ -3746,7 +3940,7 @@ int MIPS16 main(){
 #ifdef HDMI
         Option.CPU_Speed=Freq480P;              // init the options if this is the very first startup
 #else
-        Option.CPU_Speed=126000;              // init the options if this is the very first startup
+        Option.CPU_Speed=252000;              // init the options if this is the very first startup
 #endif
 #else
         Option.CPU_Speed=200000;              // init the options if this is the very first startup
@@ -3850,7 +4044,7 @@ int MIPS16 main(){
     if(Option.CPU_Speed<=200000)modclock(2);
 #else
 #ifdef HDMI
-    if(Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P){
+    if(Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P || Option.CPU_Speed==FreqSVGA){
         clock_configure(
             clk_hstx,
             0,                                                // No glitchless mux
@@ -3858,6 +4052,11 @@ int MIPS16 main(){
             Option.CPU_Speed * 1000,                               // Input frequency
             Option.CPU_Speed * 500                                // Output (must be same as no divider)
         );
+    }
+    if(Option.CPU_Speed==FreqSVGA){ //adjust the size of the heap
+        framebuffersize=400*300*2;
+        heap_memory_size=HEAP_MEMORY_SIZE-framebuffersize+320*240*2;
+        FRAMEBUFFER=AllMemory+heap_memory_size+256;
     }
 #endif 
 #endif

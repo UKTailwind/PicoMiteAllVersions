@@ -1356,13 +1356,13 @@ DRWAV_API drwav_bool32 drwav_fourcc_equal(const drwav_uint8* a, const char* b);
 #define DRWAV_ASSERT(expression)           assert(expression)
 #endif
 #ifndef DRWAV_MALLOC
-#define DRWAV_MALLOC(sz)                   malloc((sz))
+#define DRWAV_MALLOC(sz)                   GetMemory((sz))
 #endif
 #ifndef DRWAV_REALLOC
-#define DRWAV_REALLOC(p, sz)               realloc((p), (sz))
+#define DRWAV_REALLOC(p, sz)               ReAllocMemory((p), (sz))
 #endif
 #ifndef DRWAV_FREE
-#define DRWAV_FREE(p)                      free((p))
+#define DRWAV_FREE(p)                      FreeMemory((p))
 #endif
 #ifndef DRWAV_COPY_MEMORY
 #define DRWAV_COPY_MEMORY(dst, src, sz)    memcpy((dst), (src), (sz))
