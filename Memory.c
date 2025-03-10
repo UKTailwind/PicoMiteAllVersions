@@ -80,7 +80,7 @@ uint16_t __attribute__ ((aligned (256))) tilebcols[80*40];
 #ifdef HDMI
 uint8_t *tilefcols_w; 
 uint8_t *tilebcols_w;
-uint16_t HDMIlines[2][800]={0};
+uint16_t HDMIlines[2][848]={0};
 volatile int X_TILE=80, Y_TILE=40;
 uint32_t core1stack[128];
 volatile int ytileheight=480/12;

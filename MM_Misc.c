@@ -1921,7 +1921,8 @@ void MIPS16 printoptions(void){
 #endif
     if(Option.AllPins)PO2Str("PICO", "OFF");
 #ifdef PICOMITEVGA
-    if(Option.CPU_Speed!=252000)PO2Int("CPUSPEED (KHz)", Option.CPU_Speed);
+    if(!(Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq848))PO2Int("CPUSPEED (KHz)", Option.CPU_Speed);
+    if(Option.CPU_Speed==Freq848)PO2Str("WIDESCREEN", "ON");
     if(Option.DISPLAY_TYPE!=SCREENMODE1)PO2Int("DEFAULT MODE", Option.DISPLAY_TYPE-SCREENMODE1+1);
     if(Option.Height != 40 || Option.Width != 80) PO3Int("DISPLAY", Option.Height, Option.Width);
     if(Option.X_TILE==40)PO2Str("TILE SIZE", "LARGE");
@@ -1969,6 +1970,7 @@ if(Option.HDMIclock!=2 || Option.HDMId0!=0 || Option.HDMId1!=6 ||Option.HDMId2!=
 if(Option.CPU_Speed==Freq720P)PO2Str("RESOLUTION", "1280x720");
 if(Option.CPU_Speed==FreqXGA)PO2Str("RESOLUTION", "1024x768");
 if(Option.CPU_Speed==FreqSVGA)PO2Str("RESOLUTION", "800x600");
+if(Option.CPU_Speed==Freq848)PO2Str("RESOLUTION", "848x480");
 #endif
 #else
     if(Option.CPU_Speed!=200000){
@@ -3198,10 +3200,9 @@ void MIPS16 cmd_option(void) {
     	if(CurrentLinePtr) error("Invalid in a program");
         if((checkstring(argv[0], (unsigned char *)"640")) || (checkstring(argv[0], (unsigned char *)"640x480"))){
             if(argc==3){
-                int i=getint(argv[2],252000,315000);
-                if(!(i==315000 || i==252000))error("Invalid speed");
-                if(i==315000) Option.CPU_Speed = Freq480P;
-                else Option.CPU_Speed = Freq252P;
+                int i=getint(argv[2],Freq252P,Freq480P);
+                if(!(i==Freq252P || i==Freq480P))error("Invalid speed");
+                Option.CPU_Speed = i;
             } else Option.CPU_Speed = Freq480P; 
             Option.DISPLAY_TYPE=SCREENMODE1;
             Option.DefaultFont = 1 ;
@@ -3220,8 +3221,13 @@ void MIPS16 cmd_option(void) {
             Option.CPU_Speed = FreqSVGA; 
             Option.DISPLAY_TYPE=SCREENMODE1;
             Option.DefaultFont= 1 ;
+        }
+        else if(checkstring(argv[0], (unsigned char *)"848") || checkstring(argv[0], (unsigned char *)"848x480")){
+            Option.CPU_Speed = Freq848; 
+            Option.DISPLAY_TYPE=SCREENMODE1;
+            Option.DefaultFont= 1 ;
         }      
-        else error("Syntax");
+    else error("Syntax");
         SaveOptions();
         _excep_code = RESET_COMMAND;
         SoftReset();
@@ -3604,8 +3610,8 @@ void MIPS16 cmd_option(void) {
         }
 #ifdef PICOMITEVGA
 #ifdef HDMI
-        int fcolour=(Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P )? RGB555(Option.DefaultFC) : RGB332(Option.DefaultFC);
-        int bcolour=(Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P )? RGB555(Option.DefaultBC) : RGB332(Option.DefaultBC);
+        int fcolour=(FullColour ? RGB555(Option.DefaultFC) : RGB332(Option.DefaultFC));
+        int bcolour=(FullColour ? RGB555(Option.DefaultBC) : RGB332(Option.DefaultBC));
 #else
         int  fcolour = RGB121(Option.DefaultFC);
         fcolour= (fcolour<<12) | (fcolour<<8) | (fcolour<<4) | fcolour;
@@ -3748,16 +3754,33 @@ void MIPS16 cmd_option(void) {
      tp = checkstring(cmdline, (unsigned char *)"CPUSPEED");
     if(tp) {
    	    if(CurrentLinePtr) error("Invalid in a program");
+        if(Option.CPU_Speed==Freq848) error("Not available in widescreen");
         int CPU_Speed=getint(tp, MIN_CPU,MAX_CPU);
-        if(!(/*CPU_Speed==157500 || CPU_Speed==126000 || */CPU_Speed==252000 || CPU_Speed==378000 || CPU_Speed==315000))error("CPU speed 126000, 157500, 252000, 315000 or 378000 only");
+        if(!(CPU_Speed==Freq252P || CPU_Speed==Freq378P || CPU_Speed==Freq480P))error("CPU speed 252000, 315000 or 378000 only");
         Option.CPU_Speed=CPU_Speed;
-        Option.X_TILE=80;
+        Option.X_TILE=(CPU_Speed==Freq848 ? 106 : 80);
         Option.Y_TILE=40;
         SaveOptions();
         _excep_code = RESET_COMMAND;
         SoftReset();
         return;
     }
+    tp = checkstring(cmdline, (unsigned char *)"WIDESCREEN");
+    if(tp) {
+   	    if(CurrentLinePtr) error("Invalid in a program");
+        if(checkstring(tp, (unsigned char *)"OFF")){
+            Option.CPU_Speed=Freq480P;
+        } else if(checkstring(tp, (unsigned char *)"ON")){
+            Option.CPU_Speed=Freq848;
+        } else error("Syntax");
+        Option.X_TILE=(Option.CPU_Speed==Freq848 ? 106 : 80);
+        Option.Y_TILE=40;
+        SaveOptions();
+        _excep_code = RESET_COMMAND;
+        SoftReset();
+        return;
+    }
+    
 #endif
 
     tp = checkstring(cmdline, (unsigned char *)"DEFAULT MODE");
@@ -3769,7 +3792,7 @@ void MIPS16 cmd_option(void) {
             Option.DefaultFont = 1 ;
 #ifdef HDMI
         } else if(mode==4){
-            if(!(Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P))error("Mode not available in this resolution");
+            if(!(FullColour))error("Mode not available in this resolution");
             Option.DISPLAY_TYPE=SCREENMODE4; 
             Option.DefaultFont=(6<<4) | 1 ;
         } else if(mode==5){
@@ -5418,6 +5441,13 @@ void MIPS16 fun_info(void){
             iret = CurrentY;
             targ=T_INT;
             return;
+        } else if((tp=checkstring(ep, (unsigned char *)"VALID CPUSPEED"))){
+                iret=1;
+                uint32_t speed=getint(tp,MIN_CPU,MAX_CPU);
+                uint vco, postdiv1, postdiv2;
+                if (!check_sys_clock_khz(speed, &vco, &postdiv1, &postdiv2))iret=0;
+                targ=T_INT;
+                return;
         } else error("Syntax");
 	} else if(checkstring(ep, (unsigned char *)"WRITEBUFF")){
         iret=(int64_t)((uint32_t)WriteBuf);

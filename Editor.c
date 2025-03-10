@@ -105,7 +105,7 @@ void DisplayPutClever(char c){
     }
 #ifdef HDMI
     if(r_on){
-        if(Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P ){
+        if(FullColour){
             if(r_on)for(int i=0; i< gui_font_width / 8; i++)tilebcols[CurrentY/gui_font_height*X_TILE+CurrentX/8+i]=RGB555(BLUE);
         }
         else {
@@ -117,7 +117,7 @@ void DisplayPutClever(char c){
 #endif
 #ifdef HDMI
     else {
-        if(Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P ){
+        if(FullColour){
             for(int i=0; i< gui_font_width / 8; i++)tilebcols[CurrentY/gui_font_height*X_TILE+CurrentX/8+i]=Option.VGABC;
         }
         else {
@@ -192,7 +192,7 @@ static char (*SSputchar)(char buff, int flush)=SerialConsolePutC;
                                     break;
             case CLEAR_TO_EOL:      DrawBox(CurrentX, CurrentY, HRes-1, CurrentY + gui_font_height-1, 0, 0, DISPLAY_TYPE==SCREENMODE1 ? 0 : gui_bcolour);
 #ifdef HDMI
-                                    if(Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P ){
+                                    if(FullColour){
                                         if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==gui_font_height){
                                             for(int x=CurrentX/8;x<X_TILE;x++){
                                                 tilefcols[CurrentY/ytileheight*X_TILE+x]=RGB555(gui_fcolour);
@@ -235,8 +235,8 @@ static char (*SSputchar)(char buff, int flush)=SerialConsolePutC;
                                     DrawLine(0, VRes - gui_font_height - 6, HRes - 1, VRes - gui_font_height - 6, 1, GUI_C_LINE);
 #ifdef PICOMITEVGA
 #ifdef HDMI
-                                    if(Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P ){
-                                        if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==12 && gui_font==1)for(int i=0; i<80; i++)tilefcols[38*X_TILE+i]=RGB555(MAGENTA);
+                                    if(FullColour){
+                                        if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==12 && gui_font==1)for(int i=0; i<HRes/8; i++)tilefcols[38*X_TILE+i]=RGB555(MAGENTA);
                                     } else if(Option.CPU_Speed==FreqXGA){
                                         if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==32 && gui_font==65)for(int i=0; i<128; i++)tilefcols_w[22*X_TILE+i]=RGB332(MAGENTA);
                                         if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==24 && gui_font==33)for(int i=0; i<128; i++)tilefcols_w[30*X_TILE+i]=RGB332(MAGENTA);
@@ -245,11 +245,13 @@ static char (*SSputchar)(char buff, int flush)=SerialConsolePutC;
                                         if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==32 && gui_font==65)for(int i=0; i<160; i++)tilefcols_w[20*X_TILE+i]=RGB332(MAGENTA);
                                         if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==24 && gui_font==33)for(int i=0; i<160; i++)tilefcols_w[28*X_TILE+i]=RGB332(MAGENTA);
                                         if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==12 && gui_font==1)for(int i=0; i<160; i++)tilefcols_w[58*X_TILE+i]=RGB332(MAGENTA);
+                                    } else if(Option.CPU_Speed==Freq848){
+                                        if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==12 && gui_font==1)for(int i=0; i<HRes/8; i++)tilefcols_w[38*X_TILE+i]=RGB332(MAGENTA);
                                     } else if(Option.CPU_Speed==FreqSVGA){
                                         if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==12 && gui_font==1)for(int i=0; i<100; i++)tilefcols_w[48*X_TILE+i]=RGB332(MAGENTA);
                                     }
 #else
-                                        if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==12 && gui_font==1)for(int i=0; i<80; i++)tilefcols[38*X_TILE+i]=0x9999;
+                                        if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==12 && gui_font==1)for(int i=0; i<HRes/8; i++)tilefcols[38*X_TILE+i]=0x9999;
 #endif
 #endif
                                     CurrentX = 0; CurrentY = VRes - gui_font_height;
@@ -352,13 +354,13 @@ void edit(unsigned char *cmdline, bool cmdfile) {
         ClearVars(0,true);
         ClearRuntime(true);
     }
-    if(HRes==640 || HRes==512){
+    if(HRes==640 || HRes==512 || HRes==848){
         SetFont(1);
         PromptFont=1;
     }
     if(modmode){
 #ifdef HDMI
-        if(Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P  || Option.CPU_Speed==FreqSVGA ){
+        if(FullColour  || MediumRes ){
 #endif
             SetFont(1);
             PromptFont=1;
@@ -912,14 +914,14 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
 #ifdef HDMI
         while(v_scanline!=0){}
         if(DISPLAY_TYPE==SCREENMODE5)for(int i=0;i<256;i++)map256[i]=remap[i]=RGB555(MAP256DEF[i]);
-        else if(Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P )for(int i=0;i<16;i++){
+        else if(FullColour)for(int i=0;i<16;i++){
             map16[i]=remap[i]=RGB555(MAP16DEF[i]);
             map16pairs[i]=map16[i] | (map16[i]<<16);
         }
         else if(DISPLAY_TYPE==SCREENMODE3)for(int i=0;i<16;i++) {map16s[i]=RGB332(MAP16DEF[i]); map16d[i]=remap[i]=RGB332(MAP16DEF[i]) | (RGB332(MAP16DEF[i])<<8);}
         else if(DISPLAY_TYPE==SCREENMODE2)for(int i=0;i<16;i++) map16q[i]=remap[i]=RGB332(MAP16DEF[i]) | (RGB332(MAP16DEF[i])<<8) | (RGB332(MAP16DEF[i])<<16) | (RGB332(MAP16DEF[i])<<24);
             if(DISPLAY_TYPE==SCREENMODE1)  {
-                if(Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P ){
+                if(FullColour){
                     tilefcols=(uint16_t *)((uint32_t)FRAMEBUFFER+(MODE1SIZE*3));
                     tilebcols=(uint16_t *)((uint32_t)FRAMEBUFFER+(MODE1SIZE*3)+(MODE1SIZE>>1));
                     X_TILE=MODE_H_ACTIVE_PIXELS/8;Y_TILE=MODE_V_ACTIVE_LINES/8;

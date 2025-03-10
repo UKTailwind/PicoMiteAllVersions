@@ -46,7 +46,7 @@ extern "C" {
                 #define MagicKey 0x24581740
                 #define HEAPTOP 0x2007C000
             #endif
-            #define MAX_CPU     Freq720P 
+            #define MAX_CPU     Freq378P 
             #define MIN_CPU     Freq252P
         #else
             #define MAXMODES 3
@@ -81,17 +81,25 @@ extern "C" {
         #define MIN_CPU     252000
         #define MAXSUBFUN           256                     // each entry takes up 4 bytes
     #endif
-    #define MODE1SIZE_S  640*480/8
-    #define MODE2SIZE_S  320*240/2
-    #define MODE3SIZE_S  640*480/2
-    #define MODE4SIZE_S  320*240*2
-    #define MODE5SIZE_S  640*480/4
+    #define MODE_H_S_ACTIVE_PIXELS 640
+    #define MODE_V_S_ACTIVE_LINES 480
+    #define MODE1SIZE_S   MODE_H_S_ACTIVE_PIXELS     * MODE_V_S_ACTIVE_LINES /8
+    #define MODE2SIZE_S  (MODE_H_S_ACTIVE_PIXELS/2) * (MODE_V_S_ACTIVE_LINES/2)/2
+    #define MODE3SIZE_S  (MODE_H_S_ACTIVE_PIXELS)   * (MODE_V_S_ACTIVE_LINES)/2
+    #define MODE4SIZE_S  (MODE_H_S_ACTIVE_PIXELS/2) * (MODE_V_S_ACTIVE_LINES/2)*2
+    #define MODE5SIZE_S  (MODE_H_S_ACTIVE_PIXELS/2) * (MODE_V_S_ACTIVE_LINES/2)
     #define MODE_H_W_ACTIVE_PIXELS 1280
     #define MODE_V_W_ACTIVE_LINES 720
     #define MODE1SIZE_W  MODE_H_W_ACTIVE_PIXELS * MODE_V_W_ACTIVE_LINES /8
     #define MODE2SIZE_W  (MODE_H_W_ACTIVE_PIXELS/4) * (MODE_V_W_ACTIVE_LINES/4)/2
     #define MODE3SIZE_W  (MODE_H_W_ACTIVE_PIXELS/2) * (MODE_V_W_ACTIVE_LINES/2)/2
     #define MODE5SIZE_W  (MODE_H_W_ACTIVE_PIXELS/4) * (MODE_V_W_ACTIVE_LINES/4)
+    #define MODE_H_8_ACTIVE_PIXELS 848
+    #define MODE_V_8_ACTIVE_LINES 480
+    #define MODE1SIZE_8   MODE_H_8_ACTIVE_PIXELS     * MODE_V_8_ACTIVE_LINES /8
+    #define MODE2SIZE_8  (MODE_H_8_ACTIVE_PIXELS/2) * (MODE_V_8_ACTIVE_LINES/2)/2
+    #define MODE3SIZE_8  (MODE_H_8_ACTIVE_PIXELS)   * (MODE_V_8_ACTIVE_LINES)/2
+    #define MODE5SIZE_8  (MODE_H_8_ACTIVE_PIXELS/2) * (MODE_V_8_ACTIVE_LINES/2)
     #define MODE_H_L_ACTIVE_PIXELS 1024
     #define MODE_V_L_ACTIVE_LINES 768
     #define MODE1SIZE_L  MODE_H_L_ACTIVE_PIXELS * MODE_V_L_ACTIVE_LINES /8
@@ -103,13 +111,16 @@ extern "C" {
     #define MODE1SIZE_V  MODE_H_V_ACTIVE_PIXELS * MODE_V_V_ACTIVE_LINES /8
     #define MODE2SIZE_V  (MODE_H_V_ACTIVE_PIXELS/2) * (MODE_V_V_ACTIVE_LINES/2)/2
     #define MODE3SIZE_V  (MODE_H_V_ACTIVE_PIXELS) * (MODE_V_V_ACTIVE_LINES)/2
-    #define MODE4SIZE_V  400*300*2
     #define MODE5SIZE_V  (MODE_H_V_ACTIVE_PIXELS/2) * (MODE_V_V_ACTIVE_LINES/2)
     #define Freq720P 372000
     #define Freq480P 315000
     #define Freq252P 252000
-    #define FreqXGA 324000
+    #define Freq378P 378000
+    #define FreqXGA  324000
     #define FreqSVGA 360000
+    #define Freq848  336000
+    #define FullColour (Option.CPU_Speed ==Freq252P || Option.CPU_Speed ==Freq480P)
+    #define MediumRes (Option.CPU_Speed==FreqSVGA || Option.CPU_Speed==Freq848)
 #endif
 
 #ifdef PICOMITEWEB

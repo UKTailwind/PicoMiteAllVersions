@@ -2778,7 +2778,7 @@ void MIPS16 error(char *msg, ...) {
             PromptFont=(6<<4) | 1;
         } else {
 #ifdef HDMI
-            if(((Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P ) || DISPLAY_TYPE==SCREENMODE3) && gui_font_width>8){
+            if(((FullColour) || DISPLAY_TYPE==SCREENMODE3) && gui_font_width>8){
                 SetFont(1) ;
                 PromptFont = 1;
             } else if(gui_font_width>16){
