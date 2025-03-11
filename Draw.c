@@ -7778,12 +7778,18 @@ void MIPS16 ResetDisplay(void) {
 #ifdef PICOMITEVGA
 #ifdef rp2350
     if(Option.CPU_Speed==Freq848)HRes=((DISPLAY_TYPE == SCREENMODE1 ||  DISPLAY_TYPE == SCREENMODE3) ? 848: 424);
+    else if(Option.CPU_Speed==Freq400)HRes=((DISPLAY_TYPE == SCREENMODE1 ||  DISPLAY_TYPE == SCREENMODE3) ? 720: 360);
+    else if(Option.CPU_Speed==FreqSVGA)HRes=((DISPLAY_TYPE == SCREENMODE1 ||  DISPLAY_TYPE == SCREENMODE3) ? 800: 400);
     else HRes=((DISPLAY_TYPE == SCREENMODE1 ||  DISPLAY_TYPE == SCREENMODE3) ? 640: 320);
-
 #else
-    HRes=((DISPLAY_TYPE == SCREENMODE1 ||  DISPLAY_TYPE == SCREENMODE3) ? 640: 320);
+    if(Option.CPU_Speed==Freq400)HRes=((DISPLAY_TYPE == SCREENMODE1 ||  DISPLAY_TYPE == SCREENMODE3) ? 720: 360);
+    else HRes=((DISPLAY_TYPE == SCREENMODE1 ||  DISPLAY_TYPE == SCREENMODE3) ? 640: 320);
 #endif
-    VRes=((DISPLAY_TYPE == SCREENMODE1 ||  DISPLAY_TYPE == SCREENMODE3) ? 480: 240);
+    if(Option.CPU_Speed==Freq400)VRes=((DISPLAY_TYPE == SCREENMODE1 ||  DISPLAY_TYPE == SCREENMODE3) ? 400: 200);
+#ifdef rp2350
+    else if(Option.CPU_Speed==FreqSVGA)VRes=((DISPLAY_TYPE == SCREENMODE1 ||  DISPLAY_TYPE == SCREENMODE3) ? 600: 300);
+#endif
+    else VRes=((DISPLAY_TYPE == SCREENMODE1 ||  DISPLAY_TYPE == SCREENMODE3) ? 480: 240);
 #ifdef HDMI
         if(Option.CPU_Speed==Freq720P){
             HRes=(DISPLAY_TYPE == SCREENMODE1 ? 1280 : ((DISPLAY_TYPE==SCREENMODE2 || DISPLAY_TYPE==SCREENMODE5) ? 320 : 640));
@@ -7860,8 +7866,8 @@ void MIPS16 ResetDisplay(void) {
 #else
 #ifdef rp2350
         if(DISPLAY_TYPE==SCREENMODE1){
-            tilefcols=(uint16_t *)((uint32_t)FRAMEBUFFER+(MODE1SIZE_S*3));
-            tilebcols=(uint16_t *)((uint32_t)FRAMEBUFFER+(MODE1SIZE_S*3)+(MODE1SIZE>>1));
+            tilefcols=(uint16_t *)((uint32_t)FRAMEBUFFER+(MODE1SIZE*3));
+            tilebcols=(uint16_t *)((uint32_t)FRAMEBUFFER+(MODE1SIZE*3)+(MODE1SIZE>>1));
         }
 #endif
         for(int x=0;x<X_TILE;x++){

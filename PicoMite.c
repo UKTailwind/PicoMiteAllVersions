@@ -111,7 +111,7 @@ extern void start_vga_i2s(void);
     volatile uint8_t transparent=0;
     volatile uint8_t transparents=0;
     volatile int RGBtransparent=0;
-    int MODE1SIZE=MODE1SIZE_S, MODE2SIZE=MODE2SIZE_S, MODE3SIZE=MODE3SIZE_S, MODE4SIZE=MODE4SIZE_S, MODE5SIZE=MODE5SIZE_S;
+    int MODE1SIZE, MODE2SIZE, MODE3SIZE, MODE4SIZE, MODE5SIZE;
 #ifdef HDMI
     uint16_t map16d[16];
     uint32_t map16q[16];
@@ -1821,6 +1821,8 @@ void sigbus(void){
 }
 
 #ifdef PICOMITEVGA
+int vgaloop1,vgaloop2, vgaloop4, vgaloop8, vgaloop16, vgaloop32;
+
 #ifndef HDMI
 // ****************************************************************************
 //
@@ -1916,129 +1918,13 @@ volatile uint32_t QVgaFrame;	// frame counter
 #ifdef rp2350
 uint16_t fbuff[2][212]={0};
 #else
-uint16_t fbuff[2][160]={0};
+uint16_t fbuff[2][180]={0};
 #endif
 volatile int X_TILE=80, Y_TILE=40;
 // saved integer divider state
 // VGA DMA handler - called on end of every scanline
 static int VGAnextbuf=0,VGAnowbuf=1, tile=0, tc=0;
-/*void MIPS32 __not_in_flash_func(QVgaLine0)()
-{
-    int i,line;
-	// Clear the interrupt request for DMA control channel
-	dma_hw->ints0 = (1u << QVGA_DMA_PIO);
 
-	// update DMA control channel and run it
-	dma_channel_set_read_addr(QVGA_DMA_CB, ScanLineCBNext, true);
-	// save integer divider state
-//	hw_divider_save_state(&SaveDividerState);
-
-	// prepare control buffer to be processed
-	uint32_t* cb = &ScanLineCB[QVgaBufInx*CB_MAX];
-	// switch current buffer index (bufinx = current preparing buffer, MiniVgaBufInx = current running buffer)
-    QVgaBufInx ^= 1;
-	ScanLineCBNext = cb;
-
-	// increment scanline (1..)
-	line = QVgaScanLine; // current scanline
-	line++; 		// new current scanline
-	if (line >= QVGA_VTOT) // last scanline?
-	{
-		QVgaFrame++;	// increment frame counter
-		line = 0; 	// restart scanline
-        tile=0;
-        tc=0;
-	}
-	QVgaScanLine = line;	// store new scanline
-
-	// check scanline
-	line -= QVGA_VSYNC;
-	if (line < 0)
-	{
-		// VSYNC
-		*cb++ = 2;
-		*cb++ = (uint32_t)&ScanLineSync[0];
-	}
-	else
-	{
-		// front porch and back porch
-		line -= QVGA_VBACK;
-		if ((line < 0) || (line >= QVGA_VACT))
-		{
-			// dark line
-			*cb++ = 2;
-			*cb++ = (uint32_t)&ScanLineDark[0];
-		}
-
-		// image scanlines
-		else
-		{
-        // prepare image line
-            if(DISPLAY_TYPE==SCREENMODE1){
-                uint16_t *q=&fbuff[VGAnextbuf][0];
-                unsigned char *p=&DisplayBuf[line * 80];
-                if(tc==ytileheight){
-                    tile++;
-                    tc=0;
-                }
-                tc++;
-                register int pos=tile*X_TILE;
-                for(i=0;i<40;i++){
-                    register int low= *p & 0xF;
-                    register int high=*p++ >>4;
-                    *q++=(M_Foreground[low] & tilefcols[pos]) | (M_Background[low] & tilebcols[pos]) ;
-                    *q++=(M_Foreground[high]& tilefcols[pos]) | (M_Background[high] & tilebcols[pos]) ;
-                    pos++;
-                    low= *p & 0xF;
-                    high=*p++ >>4;
-                    *q++=(M_Foreground[low] & tilefcols[pos]) | (M_Background[low] & tilebcols[pos]) ;
-                    *q++=(M_Foreground[high]& tilefcols[pos]) | (M_Background[high] & tilebcols[pos]) ;
-                    pos++;
-                }
-#ifdef rp2350
-            } else if(DISPLAY_TYPE==SCREENMODE3){
-                register unsigned char *p=&DisplayBuf[line * 320];
-                register uint8_t *r=(uint8_t *)fbuff[VGAnextbuf];
-                for(int i=0;i<320;i++){
-                    register int low= *p & 0xF;
-                    register int high=*p++ >>4;
-                    *r++=low | (high<<4);
-                }
-#endif
-            } else { //MODE 2
-                line>>=1;
-                register unsigned char *p=&DisplayBuf[line * 160];
-                register uint16_t *r=fbuff[VGAnextbuf];
-                for(int i=0;i<160;i++){
-                    register int low= *p & 0xF;
-                    register int high=*p++ >>4;
-                    *r++=(low | (low<<4) | (high<<8) | (high<<12));
-                }
-            }
-            VGAnextbuf ^=1;
-            VGAnowbuf ^=1;
-
-			// HSYNC ... back porch ... image command
-			*cb++ = 3;
-			*cb++ = (uint32_t)&ScanLineImg[0];
-
-			// image data
-			*cb++ = 80;
-			*cb++ = (uint32_t)fbuff[VGAnowbuf];
-
-			// front porch
-			*cb++ = 1;
-			*cb++ = (uint32_t)&ScanLineFp;
-		}
-	}
-
-	// end mark
-	*cb++ = 0;
-	*cb = 0;
-
-	// restore integer divider state
-//	hw_divider_restore_state(&SaveDividerState);
-}*/
 void MIPS32 __not_in_flash_func(QVgaLine1)()
 {
     int i,line;
@@ -2099,15 +1985,15 @@ void MIPS32 __not_in_flash_func(QVgaLine1)()
         // prepare image line
             if(DISPLAY_TYPE==SCREENMODE1){
                 uint16_t *q=&fbuff[VGAnextbuf][0];
-                volatile unsigned char *p=&DisplayBuf[line * 80];
-                volatile unsigned char *pp=&LayerBuf[line * 80];
+                volatile unsigned char *p=&DisplayBuf[line * vgaloop8];
+                volatile unsigned char *pp=&LayerBuf[line * vgaloop8];
                 if(tc==ytileheight){
                     tile++;
                     tc=0;
                 }
                 tc++;
                 register int pos=tile*X_TILE;
-                for(i=0;i<40;i++){
+                for(i=0;i<vgaloop16;i++){
                     register int d=*p++ | *pp++;
                     register int low= d & 0xF;
                     register int high=d >>4;
@@ -2123,11 +2009,11 @@ void MIPS32 __not_in_flash_func(QVgaLine1)()
                 }
 #ifdef rp2350
             } else if(DISPLAY_TYPE==SCREENMODE3){
-                register unsigned char *p=&DisplayBuf[line * 320];
-                register unsigned char *q=&LayerBuf[line * 320];
+                register unsigned char *p=&DisplayBuf[line * vgaloop2];
+                register unsigned char *q=&LayerBuf[line * vgaloop2];
                 register int low, high, low2, high2;
                 register uint8_t *r=(uint8_t *)fbuff[VGAnextbuf];
-                for(int i=0;i<320;i++){
+                for(int i=0;i<vgaloop2;i++){
                     low= map16[p[i] & 0xF];
                     high=map16[(p[i] & 0xF0)>>4];
                     low2= map16[q[i] & 0xF];
@@ -2139,10 +2025,10 @@ void MIPS32 __not_in_flash_func(QVgaLine1)()
 #endif
             } else { //mode 2
                 line>>=1;
-                register unsigned char *dd=&DisplayBuf[line * 160];
-                register unsigned char *ll=&LayerBuf[line * 160];
+                register unsigned char *dd=&DisplayBuf[line * vgaloop4];
+                register unsigned char *ll=&LayerBuf[line * vgaloop4];
 #ifdef rp2350
-                register unsigned char *ss=&SecondLayer[line * 160];
+                register unsigned char *ss=&SecondLayer[line * vgaloop4];
                 if(ss==dd){
                     ss=ll;
                     transparent16s=transparent16;
@@ -2151,7 +2037,7 @@ void MIPS32 __not_in_flash_func(QVgaLine1)()
 #endif
                 register int low, high, low2, high2;
                 register uint16_t *r=(uint16_t *)fbuff[VGAnextbuf];
-                for(int i=0;i<160;i+=2){
+                for(int i=0;i<vgaloop4;i+=2){
                     d=*dd++;
                     l=*ll++;
                     low= map16[d & 0xF];
@@ -2204,7 +2090,7 @@ void MIPS32 __not_in_flash_func(QVgaLine1)()
 			*cb++ = (uint32_t)&ScanLineImg[0];
 
 			// image data
-			*cb++ = 80;
+			*cb++ = vgaloop8;
 			*cb++ = (uint32_t)fbuff[VGAnowbuf];
 
 			// front porch
@@ -2220,189 +2106,7 @@ void MIPS32 __not_in_flash_func(QVgaLine1)()
 	// restore integer divider state
 //	hw_divider_restore_state(&SaveDividerState);
 }
-#ifdef rp2350
-void MIPS32 __not_in_flash_func(QVgaLine2)()
-{
-    int i,line;
-    uint8_t l,d;
-    uint8_t transparent16=(uint8_t)transparent;
-#ifdef rp2350
-    uint8_t s;
-    uint8_t transparent16s=(uint8_t)transparents;
-#endif
-	// Clear the interrupt request for DMA control channel
-	dma_hw->ints0 = (1u << QVGA_DMA_PIO);
 
-	// update DMA control channel and run it
-	dma_channel_set_read_addr(QVGA_DMA_CB, ScanLineCBNext, true);
-	// save integer divider state
-//	hw_divider_save_state(&SaveDividerState);
-
-	// prepare control buffer to be processed
-	uint32_t* cb = &ScanLineCB[QVgaBufInx*CB_MAX];
-	// switch current buffer index (bufinx = current preparing buffer, MiniVgaBufInx = current running buffer)
-    QVgaBufInx ^= 1;
-	ScanLineCBNext = cb;
-
-	// increment scanline (1..)
-	line = QVgaScanLine+1; // current scanline
-//	line++; 		// new current scanline
-	if (line >= QVGA_VTOT) // last scanline?
-	{
-		QVgaFrame++;	// increment frame counter
-		line = 0; 	// restart scanline
-        tile=0;
-        tc=0;
-	}
-	QVgaScanLine = line;	// store new scanline
-
-	// check scanline
-	line -= QVGA_VSYNC;
-	if (line < 0)
-	{
-		// VSYNC
-		*cb++ = 2;
-		*cb++ = (uint32_t)&ScanLineSync[0];
-	}
-	else
-	{
-		// front porch and back porch
-		line -= QVGA_VBACK;
-		if ((line < 0) || (line >= QVGA_VACT))
-		{
-			// dark line
-			*cb++ = 2;
-			*cb++ = (uint32_t)&ScanLineDark[0];
-		}
-
-		// image scanlines
-		else
-		{
-        // prepare image line
-            if(DISPLAY_TYPE==SCREENMODE1){
-                uint16_t *q=&fbuff[VGAnextbuf][0];
-                volatile unsigned char *p=&DisplayBuf[line * 106];
-                volatile unsigned char *pp=&LayerBuf[line * 106];
-                if(tc==ytileheight){
-                    tile++;
-                    tc=0;
-                }
-                tc++;
-                register int pos=tile*X_TILE;
-                for(i=0;i<53;i++){
-                    register int d=*p++ | *pp++;
-                    register int low= d & 0xF;
-                    register int high=d >>4;
-                    *q++=(M_Foreground[low] & tilefcols[pos]) | (M_Background[low] & tilebcols[pos]) ;
-                    *q++=(M_Foreground[high]& tilefcols[pos]) | (M_Background[high] & tilebcols[pos]) ;
-                    pos++;
-                    d=*p++ | *pp++;
-                    low= d & 0xF;
-                    high=d++ >>4;
-                    *q++=(M_Foreground[low] & tilefcols[pos]) | (M_Background[low] & tilebcols[pos]) ;
-                    *q++=(M_Foreground[high]& tilefcols[pos]) | (M_Background[high] & tilebcols[pos]) ;
-                    pos++;
-                }
-#ifdef rp2350
-            } else if(DISPLAY_TYPE==SCREENMODE3){
-                register unsigned char *p=&DisplayBuf[line * 424];
-                register unsigned char *q=&LayerBuf[line * 424];
-                register int low, high, low2, high2;
-                register uint8_t *r=(uint8_t *)fbuff[VGAnextbuf];
-                for(int i=0;i<424;i++){
-                    low= map16[p[i] & 0xF];
-                    high=map16[(p[i] & 0xF0)>>4];
-                    low2= map16[q[i] & 0xF];
-                    high2=map16[(q[i] & 0xF0)>>4];
-                    if(low2!=transparent16)low=low2;
-                    if(high2!=transparent16)high=high2;
-                    *r++=low | (high<<4);
-                }
-#endif
-            } else { //mode 2
-                line>>=1;
-                register unsigned char *dd=&DisplayBuf[line * 212];
-                register unsigned char *ll=&LayerBuf[line * 212];
-#ifdef rp2350
-                register unsigned char *ss=&SecondLayer[line * 212];
-                if(ss==dd){
-                    ss=ll;
-                    transparent16s=transparent16;
-                }
-                register int low3, high3;
-#endif
-                register int low, high, low2, high2;
-                register uint16_t *r=(uint16_t *)fbuff[VGAnextbuf];
-                for(int i=0;i<212;i+=2){
-                    d=*dd++;
-                    l=*ll++;
-                    low= map16[d & 0xF];
-                    d>>=4;
-                    high=map16[d];
-                    low2= map16[l & 0xF];
-                    l>>=4;
-                    high2=map16[l];
-#ifdef rp2350
-                    s=*ss++;
-                    low3= map16[s & 0xF];
-                    s>>=4;
-                    high3=map16[s];
-#endif
-                    if(low2!=transparent16)low=low2;
-                    if(high2!=transparent16)high=high2;
-#ifdef rp2350
-                    if(low3!=transparent16s)low=low3;
-                    if(high3!=transparent16s)high=high3;
-#endif
-                    *r++=(low | (low<<4) | (high<<8) | (high<<12));
-                    d=*dd++;
-                    l=*ll++;
-                    low= map16[d & 0xF];
-                    d>>=4;
-                    high=map16[d];
-                    low2= map16[l & 0xF];
-                    l>>=4;
-                    high2=map16[l];
-#ifdef rp2350
-                    s=*ss++;
-                    low3= map16[s & 0xF];
-                    s>>=4;
-                    high3=map16[s];
-#endif
-                    if(low2!=transparent16)low=low2;
-                    if(high2!=transparent16)high=high2;
-#ifdef rp2350
-                    if(low3!=transparent16s)low=low3;
-                    if(high3!=transparent16s)high=high3;
-#endif
-                    *r++=(low | (low<<4) | (high<<8) | (high<<12));
-                }
-            }
-            VGAnextbuf ^=1;
-            VGAnowbuf ^=1;
-
-			// HSYNC ... back porch ... image command
-			*cb++ = 3;
-			*cb++ = (uint32_t)&ScanLineImg[0];
-
-			// image data
-			*cb++ = 106;
-			*cb++ = (uint32_t)fbuff[VGAnowbuf];
-
-			// front porch
-			*cb++ = 1;
-			*cb++ = (uint32_t)&ScanLineFp;
-		}
-	}
-
-	// end mark
-	*cb++ = 0;
-	*cb = 0;
-
-	// restore integer divider state
-//	hw_divider_restore_state(&SaveDividerState);
-}// initialize QVGA PIO
-#endif
 void QVgaPioInit()
 {
 	int i;
@@ -2430,6 +2134,30 @@ void QVgaPioInit()
         QVGA_VSYNC	= 6;	// length of V sync (number of scanlines)
         QVGA_VBACK	= 23;	// V back porch
         QVGA_VTOT	= 517;	// total scanlines (= QVGA_VSYNC + QVGA_VBACK + QVGA_VACT + QVGA_VFRONT)
+    } else if(Option.CPU_Speed == FreqSVGA){
+        QVGA_TOTAL= 1024*5;// total clock ticks (= QVGA_HSYNC + QVGA_BP + WIDTH*QVGA_CPP[1600] + QVGA_FP)
+        QVGA_HSYNC = 72*5;	// horizontal sync clock ticks
+        QVGA_HACT = 800;
+        QVGA_BP	= 128*5;	// back porch clock ticks
+        QVGA_FP	= 24*5;	// front porch clock ticks
+        // QVGA vertical timings
+        QVGA_VACT	= 600;	// V active scanlines (= 2*HEIGHT)
+        QVGA_VFRONT	= 1;	// V front porch
+        QVGA_VSYNC	= 2;	// length of V sync (number of scanlines)
+        QVGA_VBACK	= 22;	// V back porch
+        QVGA_VTOT	= 625;	// total scanlines (= QVGA_VSYNC + QVGA_VBACK + QVGA_VACT + QVGA_VFRONT)
+    } else if(Option.CPU_Speed == Freq400){
+        QVGA_TOTAL= 900*5;// total clock ticks (= QVGA_HSYNC + QVGA_BP + WIDTH*QVGA_CPP[1600] + QVGA_FP)
+        QVGA_HSYNC = 108*5;	// horizontal sync clock ticks
+        QVGA_HACT = 720;
+        QVGA_BP	= 54*5;	// back porch clock ticks
+        QVGA_FP	= 18*5;	// front porch clock ticks
+        // QVGA vertical timings
+        QVGA_VACT	= 400;	// V active scanlines (= 2*HEIGHT)
+        QVGA_VFRONT	= 12;	// V front porch
+        QVGA_VSYNC	= 2;	// length of V sync (number of scanlines)
+        QVGA_VBACK	= 35;	// V back porch
+        QVGA_VTOT	= 449;	// total scanlines (= QVGA_VSYNC + QVGA_VBACK + QVGA_VACT + QVGA_VFRONT)
     } else {
         QVGA_TOTAL= 4200;// total clock ticks (= QVGA_HSYNC + QVGA_BP + WIDTH*QVGA_CPP[1600] + QVGA_FP)
         QVGA_HSYNC =	320;	// horizontal sync clock ticks
@@ -2457,7 +2185,7 @@ void QVgaPioInit()
 	pio_sm_set_consecutive_pindirs(QVGA_PIO, QVGA_SM, QVGA_GPIO_HSYNC, 2, true);
 
 	// negate HSYNC and VSYNC output
-    if(Option.CPU_Speed!=Freq848){
+    if(!(Option.CPU_Speed==Freq848 || Option.CPU_Speed==FreqSVGA)){
         gpio_set_outover(QVGA_GPIO_HSYNC, GPIO_OVERRIDE_INVERT);
         gpio_set_outover(QVGA_GPIO_VSYNC, GPIO_OVERRIDE_INVERT);
     }
@@ -2595,12 +2323,17 @@ void QVgaDmaInit()
 	dma_channel_set_irq0_enabled(QVGA_DMA_PIO, true);
 
 	// set DMA IRQ handler
-#ifdef rp2350
-    if(Option.CPU_Speed==Freq848)irq_set_exclusive_handler(DMA_IRQ_0, QVgaLine2);
-    else
-#endif
     irq_set_exclusive_handler(DMA_IRQ_0, QVgaLine1);
-	// set highest IRQ priority
+    vgaloop4=QVGA_HACT/4;
+    vgaloop8=QVGA_HACT/8;
+    vgaloop16=QVGA_HACT/16;
+    vgaloop2=QVGA_HACT/2;
+    MODE1SIZE=QVGA_HACT*QVGA_VACT/8;
+    MODE2SIZE=(QVGA_HACT/2)*(QVGA_VACT/2)/2;
+    MODE3SIZE=QVGA_HACT*QVGA_VACT/2;
+    HRes=QVGA_HACT;
+    VRes=QVGA_VACT;
+// set highest IRQ priority
 	irq_set_priority(DMA_IRQ_0, 0);
 }
 
@@ -2609,7 +2342,7 @@ void QVgaInit()
 {
     X_TILE=Option.X_TILE;
     Y_TILE=Option.Y_TILE;
-    ytileheight=(X_TILE==80 || X_TILE==106)? 12 : 16;
+    ytileheight=(X_TILE==80 || X_TILE==90 || X_TILE==106)? 12 : 16;
 	// initialize PIO
 	QVgaPioInit();
 
@@ -2706,6 +2439,16 @@ extern uint16_t HDMIlines[2][800];
 #define MODE_V_8_SYNC_WIDTH    6
 #define MODE_V_8_BACK_PORCH    23
 
+#define MODE_H_4_SYNC_POLARITY 0
+#define MODE_H_4_FRONT_PORCH   18
+#define MODE_H_4_SYNC_WIDTH    108
+#define MODE_H_4_BACK_PORCH    54
+
+#define MODE_V_4_SYNC_POLARITY 0
+#define MODE_V_4_FRONT_PORCH   12
+#define MODE_V_4_SYNC_WIDTH    2
+#define MODE_V_4_BACK_PORCH    35
+
 #define MODE_H_W_SYNC_POLARITY 1
 #define MODE_H_W_FRONT_PORCH   110
 #define MODE_H_W_SYNC_WIDTH    40
@@ -2784,6 +2527,14 @@ extern uint16_t HDMIlines[2][800];
 #define MODE_V_8_TOTAL_LINES  ( \
     MODE_V_8_FRONT_PORCH + MODE_V_8_SYNC_WIDTH + \
     MODE_V_8_BACK_PORCH  + MODE_V_8_ACTIVE_LINES \
+)
+#define MODE_H_4_TOTAL_PIXELS ( \
+    MODE_H_4_FRONT_PORCH + MODE_H_4_SYNC_WIDTH + \
+    MODE_H_4_BACK_PORCH  + MODE_H_4_ACTIVE_PIXELS \
+)
+#define MODE_V_4_TOTAL_LINES  ( \
+    MODE_V_4_FRONT_PORCH + MODE_V_4_SYNC_WIDTH + \
+    MODE_V_4_BACK_PORCH  + MODE_V_4_ACTIVE_LINES \
 )
 
 volatile int mode = 1;
@@ -2880,170 +2631,26 @@ void MIPS64 __not_in_flash_func(dma_irq_handler0)() {
 // ----------------------------------------------------------------------------
 // Main program
 
-void MIPS32 __not_in_flash_func(HDMIloop0)(void){
-    int last_line=2,load_line, line_to_load, line;
-    while (1){
-        if(v_scanline!=last_line){
-            uint8_t transparent16=(uint8_t)transparent;
-            uint8_t transparent16s=(uint8_t)transparents;
-            last_line=v_scanline;
-            load_line=line=v_scanline - (MODE_V_TOTAL_LINES - MODE_V_ACTIVE_LINES);
-            if(HRes==320)line>>=1;
-            line_to_load = last_line & 1;
-            uint8_t l,d,s;
-            register unsigned char *dd;
-            register unsigned char *ll;
-            int pp;
-            uint16_t *p=HDMIlines[line_to_load];
-            if(load_line>=0 && load_line<MODE_V_ACTIVE_LINES){
-                __dsb();
-                switch(DISPLAY_TYPE){
-                case SCREENMODE1: //640x480x2 colour
-                    uint16_t *fcol=tilefcols+line/ytileheight*X_TILE, *bcol=tilebcols+line/ytileheight*X_TILE; //get the relevant tile
-                    pp= line*80;
-                    dd=&DisplayBuf[pp];
-                    ll=&LayerBuf[pp];
-                    for(int i=0; i<80 ; i++){
-                        d=*dd | *ll;
-                        *p++ = (d&0x1) ? fcol[i] : bcol[i];
-                        d>>=1;
-                        *p++ = (d&0x1) ? fcol[i] : bcol[i];
-                        d>>=1;
-                        *p++ = (d&0x1) ? fcol[i] : bcol[i];
-                        d>>=1;
-                        *p++ = (d&0x1) ? fcol[i] : bcol[i];
-                        d>>=1;
-                        *p++ = (d&0x1) ? fcol[i] : bcol[i];
-                        d>>=1;
-                        *p++ = (d&0x1) ? fcol[i] : bcol[i];
-                        d>>=1;
-                        *p++ = (d&0x1) ? fcol[i] : bcol[i];
-                        d>>=1;
-                        *p++ = (d&0x1) ? fcol[i] : bcol[i];
-                        ll++;dd++;
-                    }
-                    break;
-                case SCREENMODE2: //320x240x16 colour with support for a top layer
-                    {
-                        pp= (line)*160;
-                        uint32_t *up=(uint32_t *)p;
-                        dd=&DisplayBuf[pp];
-                        ll=&LayerBuf[pp];
-                        volatile register unsigned char *ss=&SecondLayer[pp];
-                        if(ss==dd){
-                            ss=ll;
-                            transparent16s=transparent16;
-                        }
-                        for(int i=0; i<160 ; i++){
-                            l=ll[i];d=dd[i];s=ss[i];
-                            if((s&0xf)!=transparent16s){
-                                *up++=map16pairs[s&0xf];
-                            } else {
-                                if((l&0xf)!=transparent16){
-                                    *up++=map16pairs[l&0xf];
-                                } else {
-                                    *up++=map16pairs[d&0xf];
-                                }
-                            }
-                            d>>=4;l>>=4;s>>=4;
-                            if((s&0xf)!=transparent16s){
-                                *up++=map16pairs[s&0xf];
-                            } else {
-                                if((l&0xf)!=transparent16){
-                                    *up++=map16pairs[l&0xf];
-                                } else {
-                                    *up++=map16pairs[d&0xf];
-                                }
-                            }
-                        }
-                    }
-                    break;
-                case SCREENMODE3: //640x480x16 colour
-                    pp= line*320;
-                    for(int i=0;i<320;i++){
-                        d=DisplayBuf[pp+i];
-                        l=LayerBuf[pp+i];
-                        if((l&0xf)!=transparent16){
-                            *p++=map16[l&0xf];
-                        } else {
-                            *p++=map16[d&0xf];
-                        }
-                        d>>=4;l>>=4;
-                        if((l&0xf)!=transparent16){
-                            *p++=map16[l&0xf];
-                        } else {
-                            *p++=map16[d&0xf];
-                        }
-                    }
-                    break;
-                case SCREENMODE4: //320x240xRGB555 colour
-                    pp=line*640;
-                    uint16_t* d=(uint16_t *)&DisplayBuf[pp];
-                    uint16_t* l=(uint16_t *)&LayerBuf[pp];
-                    for(int i=0; i<320 ; i++){
-                        if(*l!=RGBtransparent){
-                            *p++=*l;
-                            *p++=*l;
-                        } else {
-                            *p++=*d;
-                            *p++=*d;
-                        }
-                        l++;d++;
-                    }
-                    break;
-                case SCREENMODE5: //320x240x256 colour
-                    pp=line*320;
-                    dd=&DisplayBuf[pp];
-                    ll=&LayerBuf[pp];
-                    register unsigned char *ss=&SecondLayer[pp];
-                    if(ss==dd){
-                        ss=ll;
-                        transparent16s=transparent16;
-                    }
-                    for(int i=0; i<320 ; i++){
-                        int d=dd[i];
-                        int l=ll[i];
-                        int s=ss[i];
-                        if(s!=transparent16s){
-                            *p++=map256[s];
-                            *p++=map256[s];
-                        } else {
-                            if(l!=transparent16){
-                                *p++=map256[l];
-                                *p++=map256[l];
-                            } else {
-                                *p++=map256[d];
-                                *p++=map256[d];
-                            }
-                        }
-                    }
-                    break;
-                default:
-                }
-            }
-        }
-    }
-}
 void MIPS32 __not_in_flash_func(HDMIloop1)(void){
     int last_line=2,load_line, line_to_load, Line_dup, Line_quad;
     while(1){
         if(v_scanline!=last_line){
             last_line=v_scanline;
-            load_line=v_scanline - (MODE_V_L_TOTAL_LINES - MODE_V_L_ACTIVE_LINES);
+            load_line=v_scanline - (MODE_V_TOTAL_LINES - MODE_V_ACTIVE_LINES);
             Line_dup=load_line>>1;
             Line_quad=load_line>>2;
             line_to_load = last_line & 1;
-            if(load_line>=0 && load_line<MODE_V_L_ACTIVE_LINES){
+            if(load_line>=0 && load_line<MODE_V_ACTIVE_LINES){
                 __dmb();
                 switch(DISPLAY_TYPE){
-                case SCREENMODE1: //1289x720x2 colour with tiles
+                case SCREENMODE1: //1280x720x2 colour with tiles
                     {
                         uint8_t *p=(uint8_t *)HDMIlines[line_to_load];
                         uint8_t *fcol_w=tilefcols_w+load_line/ytileheight*X_TILE, *bcol_w=tilebcols_w+load_line/ytileheight*X_TILE; //get the relevant tile
-                        uint32_t *pp=(uint32_t *)&DisplayBuf[load_line*MODE_H_L_ACTIVE_PIXELS/8];
-                        uint32_t *qq=(uint32_t *)&LayerBuf[load_line*MODE_H_L_ACTIVE_PIXELS/8];
+                        uint32_t *pp=(uint32_t *)&DisplayBuf[load_line*vgaloop8];
+                        uint32_t *qq=(uint32_t *)&LayerBuf[load_line*vgaloop8];
                         uint32_t d=*pp | *qq;
-                        for(int i=0; i<MODE_H_L_ACTIVE_PIXELS/32 ; i++){
+                        for(int i=0; i<vgaloop32 ; i++){
                             *p++ = (d&0x1) ? *fcol_w : *bcol_w;
                             d>>=1;
                             *p++ = (d&0x1) ? *fcol_w : *bcol_w;
@@ -3123,8 +2730,8 @@ void MIPS32 __not_in_flash_func(HDMIloop1)(void){
                     {
                         uint32_t *p=(uint32_t *)HDMIlines[line_to_load];
                         uint8_t l,d,s;
-                        int pp= (Line_quad)*MODE_H_L_ACTIVE_PIXELS/8;
-                        for(int i=0; i<MODE_H_L_ACTIVE_PIXELS/8 ; i++){
+                        int pp= (Line_quad)*vgaloop8;
+                        for(int i=0; i<vgaloop8 ; i++){
                             l=LayerBuf[pp+i];d=DisplayBuf[pp+i];s=SecondLayer[pp+i];
                             if((s&0xf)!=transparents){
                                 *p++=map16q[s&0xf];
@@ -3150,10 +2757,10 @@ void MIPS32 __not_in_flash_func(HDMIloop1)(void){
                     break;
             case SCREENMODE3: //640 x 360 x 4bit-colour mapped to 256
                     {
-                        int pp= (Line_dup)*MODE_H_L_ACTIVE_PIXELS/4;
+                        int pp= (Line_dup)*vgaloop4;
                         uint16_t *p=(uint16_t *)HDMIlines[line_to_load];
                         uint8_t l,d;
-                        for(int i=0; i<MODE_H_L_ACTIVE_PIXELS/4 ; i++){
+                        for(int i=0; i<vgaloop4 ; i++){
                             l=LayerBuf[pp+i];d=DisplayBuf[pp+i];
                             if((l&0xf)!=transparent){
                                 *p++=map16d[l&0xf];
@@ -3173,8 +2780,8 @@ void MIPS32 __not_in_flash_func(HDMIloop1)(void){
                     {
                         uint8_t *p=(uint8_t *)HDMIlines[line_to_load];
                         uint8_t l,d,s;
-                        int pp= (Line_quad)*MODE_H_L_ACTIVE_PIXELS/4;
-                        for(int i=0; i<MODE_H_L_ACTIVE_PIXELS/4 ; i++){
+                        int pp= (Line_quad)*vgaloop4;
+                        for(int i=0; i<vgaloop4 ; i++){
                             l=LayerBuf[pp+i];d=DisplayBuf[pp+i];s=SecondLayer[pp+i];
                             if(s!=transparents){
                                 *p++=s;
@@ -3203,7 +2810,7 @@ void MIPS32 __not_in_flash_func(HDMIloop1)(void){
         }
     }
 }
-void MIPS32 __not_in_flash_func(HDMIloop2)(void){
+/*void MIPS32 __not_in_flash_func(HDMIloop2)(void){
     int last_line=2,load_line, line_to_load, Line_dup, Line_quad;
     while(1){
         if(v_scanline!=last_line){
@@ -3215,7 +2822,7 @@ void MIPS32 __not_in_flash_func(HDMIloop2)(void){
             if(load_line>=0 && load_line<MODE_V_W_ACTIVE_LINES){
                 __dmb();
                 switch(DISPLAY_TYPE){
-                case SCREENMODE1: //1289x720x2 colour with tiles
+                case SCREENMODE1: //1280x720x2 colour with tiles
                     {
                         uint8_t *p=(uint8_t *)HDMIlines[line_to_load];
                         uint8_t *fcol_w=tilefcols_w+load_line/ytileheight*X_TILE, *bcol_w=tilebcols_w+load_line/ytileheight*X_TILE; //get the relevant tile
@@ -3381,26 +2988,26 @@ void MIPS32 __not_in_flash_func(HDMIloop2)(void){
             }
         }
     }
-}
-void MIPS32 __not_in_flash_func(HDMIloop3)(void){
+}*/
+void MIPS32 __not_in_flash_func(HDMIloop2)(void){
     int last_line=2,load_line, line_to_load, Line_dup;
     while(1){
         if(v_scanline!=last_line){
             last_line=v_scanline;
-            load_line=v_scanline - (MODE_V_V_TOTAL_LINES - MODE_V_V_ACTIVE_LINES);
+            load_line=v_scanline - (MODE_V_TOTAL_LINES - MODE_V_ACTIVE_LINES);
             Line_dup=load_line>>1;
             line_to_load = last_line & 1;
-            if(load_line>=0 && load_line<MODE_V_V_ACTIVE_LINES){
+            if(load_line>=0 && load_line<MODE_V_ACTIVE_LINES){
                 __dmb();
                 switch(DISPLAY_TYPE){
                 case SCREENMODE1: //800x600x2 colour with tiles
                     {
                         uint8_t *p=(uint8_t *)HDMIlines[line_to_load];
                         uint8_t *fcol_w=tilefcols_w+load_line/ytileheight*X_TILE, *bcol_w=tilebcols_w+load_line/ytileheight*X_TILE; //get the relevant tile
-                        uint32_t *pp=(uint32_t *)&DisplayBuf[load_line*MODE_H_V_ACTIVE_PIXELS/8];
-                        uint32_t *qq=(uint32_t *)&LayerBuf[load_line*MODE_H_V_ACTIVE_PIXELS/8];
-                        uint32_t d=*pp | *qq;
-                        for(int i=0; i<MODE_H_V_ACTIVE_PIXELS/32 ; i++){
+                        uint16_t *pp=(uint16_t *)&DisplayBuf[load_line*vgaloop8];
+                        uint16_t *qq=(uint16_t *)&LayerBuf[load_line*vgaloop8];
+                        uint16_t d=*pp | *qq;
+                        for(int i=0; i<vgaloop16 ; i++){
                             *p++ = (d&0x1) ? *fcol_w : *bcol_w;
                             d>>=1;
                             *p++ = (d&0x1) ? *fcol_w : *bcol_w;
@@ -3435,41 +3042,6 @@ void MIPS32 __not_in_flash_func(HDMIloop3)(void){
                             d>>=1;
                             *p++ = (d&0x1) ? *fcol_w : *bcol_w;
                             d>>=1;
-                            fcol_w++;
-                            bcol_w++;
-                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
-                            d>>=1;
-                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
-                            d>>=1;
-                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
-                            d>>=1;
-                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
-                            d>>=1;
-                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
-                            d>>=1;
-                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
-                            d>>=1;
-                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
-                            d>>=1;
-                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
-                            d>>=1;
-                            fcol_w++;
-                            bcol_w++;
-                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
-                            d>>=1;
-                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
-                            d>>=1;
-                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
-                            d>>=1;
-                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
-                            d>>=1;
-                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
-                            d>>=1;
-                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
-                            d>>=1;
-                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
-                            d>>=1;
-                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
                             fcol_w++;
                             bcol_w++;
                             d=*(++pp) | *(++qq) ;
@@ -3480,8 +3052,8 @@ void MIPS32 __not_in_flash_func(HDMIloop3)(void){
                     {
                         uint16_t *p=(uint16_t *)HDMIlines[line_to_load];
                         uint8_t l,d,s;
-                        int pp= (Line_dup)*MODE_H_V_ACTIVE_PIXELS/4;
-                        for(int i=0; i<MODE_H_V_ACTIVE_PIXELS/4 ; i++){
+                        int pp= (Line_dup)*vgaloop4;
+                        for(int i=0; i<vgaloop4 ; i++){
                             l=LayerBuf[pp+i];d=DisplayBuf[pp+i];s=SecondLayer[pp+i];
                             if((l&0xf)!=transparent){
                                 *p++=map16d[l&0xf];
@@ -3499,10 +3071,10 @@ void MIPS32 __not_in_flash_func(HDMIloop3)(void){
                     break;
                 case SCREENMODE3: //800 x 600 x 4bit-colour mapped to 256
                     {
-                        int pp= load_line*MODE_H_V_ACTIVE_PIXELS/2;
+                        int pp= load_line*vgaloop2;
                         uint8_t *p=(uint8_t *)HDMIlines[line_to_load];
                         uint8_t l,d;
-                        for(int i=0; i<MODE_H_V_ACTIVE_PIXELS/2 ; i++){
+                        for(int i=0; i<vgaloop2 ; i++){
                             l=LayerBuf[pp+i];d=DisplayBuf[pp+i];
                             if((l&0xf)!=transparent){
                                 *p++=map16s[l&0xf];
@@ -3522,8 +3094,8 @@ void MIPS32 __not_in_flash_func(HDMIloop3)(void){
                     {
                         uint8_t *p=(uint8_t *)HDMIlines[line_to_load];
                         uint8_t l,d;
-                        int pp= (Line_dup)*MODE_H_V_ACTIVE_PIXELS/2;
-                        for(int i=0; i<MODE_H_V_ACTIVE_PIXELS/2 ; i++){
+                        int pp= (Line_dup)*vgaloop2;
+                        for(int i=0; i<vgaloop2 ; i++){
                             l=LayerBuf[pp+i];d=DisplayBuf[pp+i];
                             if(l!=transparent){
                                 *p++=l;
@@ -3541,125 +3113,141 @@ void MIPS32 __not_in_flash_func(HDMIloop3)(void){
         }
     }
 }
-void MIPS32 __not_in_flash_func(HDMIloop4)(void){
-    int last_line=2,load_line, line_to_load, Line_dup;
-    while(1){
+
+void MIPS32 __not_in_flash_func(HDMIloop0)(void){
+    int last_line=2,load_line, line_to_load, line;
+    while (1){
         if(v_scanline!=last_line){
+            uint8_t transparent16=(uint8_t)transparent;
+            uint8_t transparent16s=(uint8_t)transparents;
             last_line=v_scanline;
-            load_line=v_scanline - (MODE_V_8_TOTAL_LINES - MODE_V_8_ACTIVE_LINES);
-            Line_dup=load_line>>1;
+            load_line=line=v_scanline - (MODE_V_TOTAL_LINES - MODE_V_ACTIVE_LINES);
+            if(HRes==vgaloop2)line>>=1;
             line_to_load = last_line & 1;
-            if(load_line>=0 && load_line<MODE_V_8_ACTIVE_LINES){
-                __dmb();
+            uint8_t l,d,s;
+            register unsigned char *dd;
+            register unsigned char *ll;
+            int pp;
+            uint16_t *p=HDMIlines[line_to_load];
+            if(load_line>=0 && load_line<MODE_V_ACTIVE_LINES){
+                __dsb();
                 switch(DISPLAY_TYPE){
-                case SCREENMODE1: //848x480x2 colour with tiles
-                    {
-                        uint8_t *p=(uint8_t *)HDMIlines[line_to_load];
-                        uint8_t *fcol_w=tilefcols_w+load_line/ytileheight*X_TILE, *bcol_w=tilebcols_w+load_line/ytileheight*X_TILE; //get the relevant tile
-                        uint16_t *pp=(uint16_t *)&DisplayBuf[load_line*MODE_H_8_ACTIVE_PIXELS/8];
-                        uint16_t *qq=(uint16_t *)&LayerBuf[load_line*MODE_H_8_ACTIVE_PIXELS/8];
-                        uint16_t d=*pp | *qq;
-                        for(int i=0; i<MODE_H_8_ACTIVE_PIXELS/16 ; i++){
-                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
-                            d>>=1;
-                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
-                            d>>=1;
-                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
-                            d>>=1;
-                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
-                            d>>=1;
-                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
-                            d>>=1;
-                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
-                            d>>=1;
-                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
-                            d>>=1;
-                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
-                            d>>=1;
-                            fcol_w++;
-                            bcol_w++;
-                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
-                            d>>=1;
-                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
-                            d>>=1;
-                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
-                            d>>=1;
-                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
-                            d>>=1;
-                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
-                            d>>=1;
-                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
-                            d>>=1;
-                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
-                            d>>=1;
-                            *p++ = (d&0x1) ? *fcol_w : *bcol_w;
-                            d>>=1;
-                            fcol_w++;
-                            bcol_w++;
-                            d=*(++pp) | *(++qq) ;
-                        }
+                case SCREENMODE1: //720x400x2 colour
+                    uint16_t *fcol=tilefcols+line/ytileheight*X_TILE, *bcol=tilebcols+line/ytileheight*X_TILE; //get the relevant tile
+                    pp= line*vgaloop8;
+                    dd=&DisplayBuf[pp];
+                    ll=&LayerBuf[pp];
+                    for(int i=0; i<vgaloop8 ; i++){
+                        d=*dd | *ll;
+                        *p++ = (d&0x1) ? fcol[i] : bcol[i];
+                        d>>=1;
+                        *p++ = (d&0x1) ? fcol[i] : bcol[i];
+                        d>>=1;
+                        *p++ = (d&0x1) ? fcol[i] : bcol[i];
+                        d>>=1;
+                        *p++ = (d&0x1) ? fcol[i] : bcol[i];
+                        d>>=1;
+                        *p++ = (d&0x1) ? fcol[i] : bcol[i];
+                        d>>=1;
+                        *p++ = (d&0x1) ? fcol[i] : bcol[i];
+                        d>>=1;
+                        *p++ = (d&0x1) ? fcol[i] : bcol[i];
+                        d>>=1;
+                        *p++ = (d&0x1) ? fcol[i] : bcol[i];
+                        ll++;dd++;
                     }
                     break;
-                case SCREENMODE2: //424 X 240 x 4bit-colour mapped to 256
+                case SCREENMODE2: //360x200x16 colour with support for a top layer
                     {
-                        uint16_t *p=(uint16_t *)HDMIlines[line_to_load];
-                        uint8_t l,d;
-                        int pp= (Line_dup)*MODE_H_8_ACTIVE_PIXELS/4;
-                        for(int i=0; i<MODE_H_8_ACTIVE_PIXELS/4 ; i++){
-                            l=LayerBuf[pp+i];d=DisplayBuf[pp+i];
-                            if((l&0xf)!=transparent){
-                                *p++=map16d[l&0xf];
-                            } else {
-                                *p++=map16d[d&0xf];
-                            }
-                            d>>=4;l>>=4;
-                            if((l&0xf)!=transparent){
-                                *p++=map16d[l&0xf];
-                            } else {
-                                *p++=map16d[d&0xf];
-                            }
+                        pp= (line)*vgaloop4;
+                        uint32_t *up=(uint32_t *)p;
+                        dd=&DisplayBuf[pp];
+                        ll=&LayerBuf[pp];
+                        volatile register unsigned char *ss=&SecondLayer[pp];
+                        if(ss==dd){
+                            ss=ll;
+                            transparent16s=transparent16;
                         }
-                    }
-                    break;
-                case SCREENMODE3: //848 x 480 x 4bit-colour mapped to 256
-                    {
-                        int pp= load_line*MODE_H_8_ACTIVE_PIXELS/2;
-                        uint8_t *p=(uint8_t *)HDMIlines[line_to_load];
-                        uint8_t l,d;
-                        for(int i=0; i<MODE_H_8_ACTIVE_PIXELS/2 ; i++){
-                            l=LayerBuf[pp+i];d=DisplayBuf[pp+i];
-                            if((l&0xf)!=transparent){
-                                *p++=map16s[l&0xf];
+                        for(int i=0; i<vgaloop4 ; i++){
+                            l=ll[i];d=dd[i];s=ss[i];
+                            if((s&0xf)!=transparent16s){
+                                *up++=map16pairs[s&0xf];
                             } else {
-                                *p++=map16s[d&0xf];
-                            }
-                            d>>=4;l>>=4;
-                            if((l&0xf)!=transparent){
-                                *p++=map16s[l&0xf];
-                            } else {
-                                *p++=map16s[d&0xf];
-                            }
-                        }
-                    }
-                    break;
-                case SCREENMODE5: //424 x 2400 x 8bit-colour 
-                    {
-                        uint8_t *p=(uint8_t *)HDMIlines[line_to_load];
-                        uint8_t l,d,s;
-                        int pp= (Line_dup)*MODE_H_8_ACTIVE_PIXELS/2;
-                        for(int i=0; i<MODE_H_8_ACTIVE_PIXELS/2 ; i++){
-                            l=LayerBuf[pp+i];d=DisplayBuf[pp+i];s=SecondLayer[pp+i];
-                            if(s!=transparents){
-                                *p++=s;
-                                *p++=s;
-                            } else {
-                                if(l!=transparent){
-                                    *p++=l;
-                                    *p++=l;
+                                if((l&0xf)!=transparent16){
+                                    *up++=map16pairs[l&0xf];
                                 } else {
-                                    *p++=d;
-                                    *p++=d;
+                                    *up++=map16pairs[d&0xf];
                                 }
+                            }
+                            d>>=4;l>>=4;s>>=4;
+                            if((s&0xf)!=transparent16s){
+                                *up++=map16pairs[s&0xf];
+                            } else {
+                                if((l&0xf)!=transparent16){
+                                    *up++=map16pairs[l&0xf];
+                                } else {
+                                    *up++=map16pairs[d&0xf];
+                                }
+                            }
+                        }
+                    }
+                    break;
+                case SCREENMODE3: //720x400x16 colour
+                    pp= line*vgaloop2;
+                    for(int i=0;i<vgaloop2;i++){
+                        d=DisplayBuf[pp+i];
+                        l=LayerBuf[pp+i];
+                        if((l&0xf)!=transparent16){
+                            *p++=map16[l&0xf];
+                        } else {
+                            *p++=map16[d&0xf];
+                        }
+                        d>>=4;l>>=4;
+                        if((l&0xf)!=transparent16){
+                            *p++=map16[l&0xf];
+                        } else {
+                            *p++=map16[d&0xf];
+                        }
+                    }
+                    break;
+                case SCREENMODE4: //360x200xRGB555 colour
+                    pp=line*vgaloop1;
+                    uint16_t* d=(uint16_t *)&DisplayBuf[pp];
+                    uint16_t* l=(uint16_t *)&LayerBuf[pp];
+                    for(int i=0; i<vgaloop2 ; i++){
+                        if(*l!=RGBtransparent){
+                            *p++=*l;
+                            *p++=*l;
+                        } else {
+                            *p++=*d;
+                            *p++=*d;
+                        }
+                        l++;d++;
+                    }
+                    break;
+                case SCREENMODE5: //360x200x256 colour
+                    pp=line*vgaloop2;
+                    dd=&DisplayBuf[pp];
+                    ll=&LayerBuf[pp];
+                    register unsigned char *ss=&SecondLayer[pp];
+                    if(ss==dd){
+                        ss=ll;
+                        transparent16s=transparent16;
+                    }
+                    for(int i=0; i<vgaloop2 ; i++){
+                        int d=dd[i];
+                        int l=ll[i];
+                        int s=ss[i];
+                        if(s!=transparent16s){
+                            *p++=map256[s];
+                            *p++=map256[s];
+                        } else {
+                            if(l!=transparent16){
+                                *p++=map256[l];
+                                *p++=map256[l];
+                            } else {
+                                *p++=map256[d];
+                                *p++=map256[d];
                             }
                         }
                     }
@@ -3670,7 +3258,6 @@ void MIPS32 __not_in_flash_func(HDMIloop4)(void){
         }
     }
 }
-
 void HDMICore(void){
     for(int i=0;i<256;i++)map256[i]=RGB555(MAP256DEF[i]);
     for(int i=0;i<16;i++){
@@ -3758,6 +3345,26 @@ void HDMICore(void){
         MODE3SIZE=MODE3SIZE_8;
         MODE5SIZE=MODE5SIZE_8;
         PIXELS_PER_WORD=4;
+    } else if(Option.CPU_Speed==Freq400){
+        MODE_H_SYNC_POLARITY=MODE_H_4_SYNC_POLARITY;
+        MODE_ACTIVE_LINES=MODE_V_4_ACTIVE_LINES;
+        MODE_ACTIVE_PIXELS=MODE_H_4_ACTIVE_PIXELS;
+        MODE_V_TOTAL_LINES=MODE_V_4_TOTAL_LINES;
+        MODE_H_ACTIVE_PIXELS=MODE_H_4_ACTIVE_PIXELS;
+        MODE_H_FRONT_PORCH=MODE_H_4_FRONT_PORCH;
+        MODE_H_SYNC_WIDTH=MODE_H_4_SYNC_WIDTH;
+        MODE_H_BACK_PORCH=MODE_H_4_BACK_PORCH;
+        MODE_V_SYNC_POLARITY=MODE_V_4_SYNC_POLARITY;
+        MODE_V_ACTIVE_LINES=MODE_V_4_ACTIVE_LINES;
+        MODE_V_FRONT_PORCH=MODE_V_4_FRONT_PORCH;
+        MODE_V_SYNC_WIDTH=MODE_V_4_SYNC_WIDTH;
+        MODE_V_BACK_PORCH=MODE_V_4_BACK_PORCH;
+        MODE1SIZE=MODE1SIZE_4;
+        MODE2SIZE=MODE2SIZE_4;
+        MODE3SIZE=MODE3SIZE_4;
+        MODE4SIZE=MODE3SIZE_4;
+        MODE5SIZE=MODE5SIZE_4;
+        PIXELS_PER_WORD=2;
     }  else {
         MODE_H_SYNC_POLARITY=MODE_H_S_SYNC_POLARITY;
         MODE_ACTIVE_LINES=MODE_V_S_ACTIVE_LINES;
@@ -3779,6 +3386,12 @@ void HDMICore(void){
         MODE5SIZE=MODE5SIZE_S;
         PIXELS_PER_WORD=2;
     }
+    vgaloop1=MODE_H_ACTIVE_PIXELS;
+    vgaloop2=MODE_H_ACTIVE_PIXELS/2;
+    vgaloop4=MODE_H_ACTIVE_PIXELS/4;
+    vgaloop8=MODE_H_ACTIVE_PIXELS/8;
+    vgaloop16=MODE_H_ACTIVE_PIXELS/16;
+    vgaloop32=MODE_H_ACTIVE_PIXELS/32;
     TRANSFER_COUNT=MODE_H_ACTIVE_PIXELS/PIXELS_PER_WORD;
     BLANKING_COUNT=MODE_V_FRONT_PORCH + MODE_V_SYNC_WIDTH + MODE_V_BACK_PORCH;
 
@@ -3939,10 +3552,8 @@ void HDMICore(void){
 
 //    bus_ctrl_hw->priority = 1;
     dma_channel_start(DMACH_PING);
-    if(Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P )HDMIloop0();
-    else if(Option.CPU_Speed==FreqXGA)HDMIloop1();
-    else if(Option.CPU_Speed==FreqSVGA)HDMIloop3();
-    else if(Option.CPU_Speed==Freq848)HDMIloop4();
+    if(Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P || Option.CPU_Speed==Freq400)HDMIloop0();
+    else if(Option.CPU_Speed==FreqXGA || Option.CPU_Speed==Freq720P)HDMIloop1();
     else HDMIloop2();
 }
 void settiles(void){
@@ -4284,7 +3895,7 @@ int MIPS16 main(){
         SaveOptions();
     }
 #else
-    if(!(Option.CPU_Speed==Freq720P || Option.CPU_Speed==Freq252P || Option.CPU_Speed==Freq848 || Option.CPU_Speed==FreqSVGA || Option.CPU_Speed==Freq480P|| Option.CPU_Speed==FreqXGA )){
+    if(!(Option.CPU_Speed==Freq720P || Option.CPU_Speed==Freq252P || Option.CPU_Speed==Freq848  || Option.CPU_Speed==Freq400 || Option.CPU_Speed==FreqSVGA || Option.CPU_Speed==Freq480P|| Option.CPU_Speed==FreqXGA )){
         Option.CPU_Speed=Freq480P;
         SaveOptions();
     }
@@ -4427,7 +4038,7 @@ int MIPS16 main(){
     _excep_code=excep;
 #ifdef PICOMITEVGA
 #ifndef HDMI
-    if(Option.CPU_Speed == 252000 || Option.CPU_Speed == 315000  || Option.CPU_Speed == Freq848 )QVGA_CLKDIV= 2;
+    if(Option.CPU_Speed == Freq252P || Option.CPU_Speed == Freq480P  || Option.CPU_Speed == Freq848  || Option.CPU_Speed == Freq400   || Option.CPU_Speed == FreqSVGA )QVGA_CLKDIV= 2;
     else if(Option.CPU_Speed == 378000)QVGA_CLKDIV= 3;
     else QVGA_CLKDIV= 1;
 #ifdef rp2350
@@ -4442,6 +4053,18 @@ if(Option.CPU_Speed==Freq848){ //adjust the size of the heap
     MODE2SIZE=MODE2SIZE_8;
     HRes=848;
 }
+if(Option.CPU_Speed==FreqSVGA){ //adjust the size of the heap
+    framebuffersize=400*300*2;
+    heap_memory_size=HEAP_MEMORY_SIZE-framebuffersize+320*240*2;
+    FRAMEBUFFER=AllMemory+heap_memory_size+256;
+    MODE1SIZE=MODE1SIZE_V;
+    MODE2SIZE=MODE2SIZE_V;
+    MODE3SIZE=MODE3SIZE_V;
+    MODE5SIZE=MODE5SIZE_V;
+    HRes=800;
+    VRes=600;
+}
+
 #endif
 #endif
 #endif

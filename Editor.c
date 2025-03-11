@@ -236,8 +236,11 @@ static char (*SSputchar)(char buff, int flush)=SerialConsolePutC;
 #ifdef PICOMITEVGA
 #ifdef HDMI
                                     if(FullColour){
-                                        if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==12 && gui_font==1)for(int i=0; i<HRes/8; i++)tilefcols[38*X_TILE+i]=RGB555(MAGENTA);
-                                    } else if(Option.CPU_Speed==FreqXGA){
+                                        if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==gui_font_height)for(int i=0; i<HRes/8; i++)tilefcols[(Option.Height - 2)*X_TILE+i]=RGB555(MAGENTA);
+                                    } else {
+                                        if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==gui_font_height)for(int i=0; i<HRes/8; i++)tilefcols_w[(Option.Height - 2)*X_TILE+i]=RGB332(MAGENTA);
+                                    }
+                                        /*                                    } else if(Option.CPU_Speed==FreqXGA){
                                         if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==32 && gui_font==65)for(int i=0; i<128; i++)tilefcols_w[22*X_TILE+i]=RGB332(MAGENTA);
                                         if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==24 && gui_font==33)for(int i=0; i<128; i++)tilefcols_w[30*X_TILE+i]=RGB332(MAGENTA);
                                         if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==12 && gui_font==1)for(int i=0; i<128; i++)tilefcols_w[62*X_TILE+i]=RGB332(MAGENTA);
@@ -249,12 +252,12 @@ static char (*SSputchar)(char buff, int flush)=SerialConsolePutC;
                                         if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==12 && gui_font==1)for(int i=0; i<HRes/8; i++)tilefcols_w[38*X_TILE+i]=RGB332(MAGENTA);
                                     } else if(Option.CPU_Speed==FreqSVGA){
                                         if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==12 && gui_font==1)for(int i=0; i<100; i++)tilefcols_w[48*X_TILE+i]=RGB332(MAGENTA);
-                                    }
+                                    }*/
 #else
-                                        if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==12 && gui_font==1)for(int i=0; i<HRes/8; i++)tilefcols[38*X_TILE+i]=0x9999;
+                                    if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==gui_font_height)for(int i=0; i<HRes/8; i++)tilefcols[(Option.Height - 2)*X_TILE+i]=0x9999;
 #endif
 #endif
-                                    CurrentX = 0; CurrentY = VRes - gui_font_height;
+                                    CurrentX = 0; CurrentY = (VRes/gui_font_height)*gui_font_height - gui_font_height;
                                     break;
         }
 }
@@ -354,7 +357,7 @@ void edit(unsigned char *cmdline, bool cmdfile) {
         ClearVars(0,true);
         ClearRuntime(true);
     }
-    if(HRes==640 || HRes==512 || HRes==848){
+    if(HRes==640 || HRes==512 || HRes==848 || HRes==720){
         SetFont(1);
         PromptFont=1;
     }
@@ -1784,7 +1787,7 @@ void PrintStatus(void) {
     strcat(s, "       ");
     strcpy(s + 19, insert?"INS":"OVR");
 
-    MX470Cursor((VWidth - strlen(s)) * gui_font_width, VRes - gui_font_height);
+    MX470Cursor((VWidth - strlen(s)) * gui_font_width, (VRes/gui_font_height)*gui_font_height - gui_font_height);
     MX470PutS(s, GUI_C_STATUS, gui_bcolour);                        // display the string on the display attached to the MX470
 
     SCursor(VWidth - 25, VHeight + 1);

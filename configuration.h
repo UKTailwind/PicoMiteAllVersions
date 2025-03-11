@@ -88,6 +88,13 @@ extern "C" {
     #define MODE3SIZE_S  (MODE_H_S_ACTIVE_PIXELS)   * (MODE_V_S_ACTIVE_LINES)/2
     #define MODE4SIZE_S  (MODE_H_S_ACTIVE_PIXELS/2) * (MODE_V_S_ACTIVE_LINES/2)*2
     #define MODE5SIZE_S  (MODE_H_S_ACTIVE_PIXELS/2) * (MODE_V_S_ACTIVE_LINES/2)
+    #define MODE_H_4_ACTIVE_PIXELS 720
+    #define MODE_V_4_ACTIVE_LINES 400
+    #define MODE1SIZE_4   MODE_H_4_ACTIVE_PIXELS     * MODE_V_4_ACTIVE_LINES /8
+    #define MODE2SIZE_4  (MODE_H_4_ACTIVE_PIXELS/2) * (MODE_V_4_ACTIVE_LINES/2)/2
+    #define MODE3SIZE_4  (MODE_H_4_ACTIVE_PIXELS)   * (MODE_V_4_ACTIVE_LINES)/2
+    #define MODE4SIZE_4  (MODE_H_4_ACTIVE_PIXELS/2) * (MODE_V_4_ACTIVE_LINES/2)*2
+    #define MODE5SIZE_4  (MODE_H_4_ACTIVE_PIXELS/2) * (MODE_V_4_ACTIVE_LINES/2)
     #define MODE_H_W_ACTIVE_PIXELS 1280
     #define MODE_V_W_ACTIVE_LINES 720
     #define MODE1SIZE_W  MODE_H_W_ACTIVE_PIXELS * MODE_V_W_ACTIVE_LINES /8
@@ -119,7 +126,8 @@ extern "C" {
     #define FreqXGA  324000
     #define FreqSVGA 360000
     #define Freq848  336000
-    #define FullColour (Option.CPU_Speed ==Freq252P || Option.CPU_Speed ==Freq480P)
+    #define Freq400  283200
+    #define FullColour (Option.CPU_Speed ==Freq252P || Option.CPU_Speed ==Freq480P || Option.CPU_Speed ==Freq400)
     #define MediumRes (Option.CPU_Speed==FreqSVGA || Option.CPU_Speed==Freq848)
 #endif
 
