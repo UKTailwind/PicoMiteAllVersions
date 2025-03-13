@@ -1002,6 +1002,7 @@ void  MIPS16 tokenise(int console) {
         STR_REPLACE((char *)inpbuf,"=>",">=", 3);
         STR_REPLACE((char *)inpbuf,"=<","<=", 3);
         STR_REPLACE((char *)inpbuf,"SPRITE MEMORY","BLIT MEMORY",0);
+        STR_REPLACE((char *)inpbuf,"PEEK(BYTE","PEEK(INT8",0);
     }
     // setup the input and output buffers
     p = inpbuf;

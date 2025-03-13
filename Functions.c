@@ -41,7 +41,6 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #ifdef rp2350
 #include "pico/rand.h"
 #endif
-
 extern long long int  llabs (long long int  n);
 const char* overlaid_functions[]={
     "MM.HRES",
@@ -58,6 +57,10 @@ const char* overlaid_functions[]={
 	"MM.ErrMsg$",
 	"MM.WATCHDOG",
 	"MM.DEVICE$",
+	"MM.CMDLINE$",
+	"MM.MESSAGE$",
+	"MM.ADDRESS$",
+	"MM.TOPIC$"
 };
 /********************************************************************************************************************************************
  basic functions
@@ -486,8 +489,30 @@ void fun_tilde(void){
 		case MMDEVICE:
 			fun_device();
 			break;
+		case MMCMDLINE:
+			sret = GetTempMemory(STRINGSIZE);                                        // this will last for the life of the command
+			Mstrcpy(sret,cmdlinebuff);
+			targ=T_STR;
+			break;
+#ifdef PICOMITEWEB
+		case MMMESSAGE:
+			sret = GetTempMemory(STRINGSIZE);                                        // this will last for the life of the command
+			Mstrcpy(sret,messagebuff);
+			targ=T_STR;
+			break;
+		case MMTOPIC:
+			sret = GetTempMemory(STRINGSIZE);                                        // this will last for the life of the command
+			Mstrcpy(sret,topicbuff);
+			targ=T_STR;
+			break;
+		case MMADDRESS:
+			sret = GetTempMemory(STRINGSIZE);                                        // this will last for the life of the command
+			Mstrcpy(sret,addressbuff);
+			targ=T_STR;
+			break;
+#endif
 		default:
-			iret=-1;
+		iret=-1;
 	}
 }
 

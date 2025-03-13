@@ -49,7 +49,9 @@ enum {
 //static ip_addr_t mqtt_ip LWIP_MQTT_EXAMPLE_IPADDR_INIT;
 
 static mqtt_client_t* mqtt_client=NULL;
-
+unsigned char topicbuff[STRINGSIZE]={0};
+unsigned char messagebuff[STRINGSIZE]={0};
+unsigned char addressbuff[20]={0};
 typedef struct mqtt_dns_t_ {
         ip_addr_t remote;
         int complete;
@@ -97,28 +99,22 @@ struct mqtt_connect_client_info_t mqtt_client_info =
 static void
 mqtt_incoming_data_cb(void *arg, const u8_t *data, u16_t len, u8_t flags)
 {
-    void *v;
     int mylen=len;
     if(mylen>255)mylen=255;
-    v = findvar((unsigned char *)"MM.MESSAGE$", T_STR | V_NOFIND_NULL);    // create the variable
-    if(v==NULL)findvar((unsigned char *)"MM.MESSAGE$", V_FIND | V_DIM_VAR | T_CONST);
-    u8_t *p=(u8_t *)v;
-    memcpy(&p[1],data,mylen);
-    p[0]=mylen;
+    memset(messagebuff,0,sizeof(messagebuff));
+    memcpy(&messagebuff[1],data,mylen);
+    messagebuff[0]=mylen;
     MQTTComplete=1;
 }
 
 static void
 mqtt_incoming_publish_cb(void *arg, const char *topic, u32_t tot_len)
 {
-    void *v;
     int mylen=strlen(topic);
     if(mylen>255)mylen=255;
-    v = findvar((unsigned char *)"MM.TOPIC$", T_STR | V_NOFIND_NULL);    // create the variable
-    if(v==NULL)findvar((unsigned char *)"MM.TOPIC$", V_FIND | V_DIM_VAR | T_CONST);
-    u8_t *p=(u8_t *)v;
-    memcpy(&p[1],topic,mylen);
-    p[0]=mylen;
+    memset(topicbuff,0,sizeof(topicbuff));
+    memcpy(&topicbuff[1],topic,mylen);
+    topicbuff[0]=mylen;
 }
 
 static void

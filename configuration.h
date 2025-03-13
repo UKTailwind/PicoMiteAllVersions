@@ -362,6 +362,10 @@ typedef enum {
     MMERRMSG,
 	MMWATCHDOG,
 	MMDEVICE,
+	MMCMDLINE,
+	MMMESSAGE,
+    MMTOPIC,
+    MMADDRESS,
     MMEND
 } Operation;
 extern const char* overlaid_functions[];

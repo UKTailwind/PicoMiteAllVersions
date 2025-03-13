@@ -44,10 +44,13 @@ typedef struct s_forstack {
         long long int  i;                    // the STEP value if it is an integer
     } stepvalue;
 }forstackval;
+extern unsigned char topicbuff[STRINGSIZE];
+extern unsigned char messagebuff[STRINGSIZE];
+extern unsigned char addressbuff[20];
 
 extern struct s_forstack g_forstack[MAXFORLOOPS + 1] ;
 extern int g_forindex;
-
+extern unsigned char cmdlinebuff[STRINGSIZE];
 typedef struct s_dostack {
     unsigned char *evalptr;                          // pointer to the expression to be evaluated
     unsigned char *loopptr;                          // pointer to the loop statement

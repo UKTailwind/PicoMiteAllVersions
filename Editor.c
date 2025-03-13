@@ -987,7 +987,7 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
 //                            WatchdogSet = false;
                             PrepareProgram(true);
                             // Create a global constant MM.CMDLINE$ containing the empty string.
-                            (void) findvar((unsigned char *)"MM.CMDLINE$", V_FIND | V_DIM_VAR | T_CONST);
+//                            (void) findvar((unsigned char *)"MM.CMDLINE$", V_FIND | V_DIM_VAR | T_CONST);
                             if(Option.LIBRARY_FLASH_SIZE == MAX_PROG_SIZE) ExecuteProgram(LibMemory );       // run anything that might be in the library
                             if(*ProgMemory != T_NEWLINE) return;                             // no program to run
                         #ifdef PICOMITEWEB

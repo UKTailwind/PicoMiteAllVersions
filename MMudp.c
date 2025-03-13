@@ -19,25 +19,17 @@ static void
 udp_recv_func(void *arg, struct udp_pcb *upcb, struct pbuf *p, const ip_addr_t *addr, u16_t port)
 {
 LWIP_UNUSED_ARG(arg);
-	if(p == NULL)	return;
-  void *v;
-  v = findvar((unsigned char *)"MM.MESSAGE$", T_STR | V_NOFIND_NULL);    // create the variable
-  if(v==NULL)v=findvar((unsigned char *)"MM.MESSAGE$", V_FIND | V_DIM_VAR | T_CONST);
-  
+  if(p == NULL)	return;
   int len = p->len;
-  if(len>255)len=255;
-  u8_t *pp=(u8_t *)v;
-  memset(pp,0,256);
-  memcpy(&pp[1],p->payload,len);
-  pp[0]=len;
-  v = findvar((unsigned char *)"MM.ADDRESS$", T_STR | V_NOFIND_NULL);    // create the variable
-  if(v==NULL)v=findvar((unsigned char *)"MM.ADDRESS$", V_FIND | V_DIM_VAR | T_CONST);
-  pp=(u8_t *)v;
-  memset(pp,0,256);
-  sprintf((char *)&pp[1],"%d.%d.%d.%d",(int)addr->addr&0xff,(int)(addr->addr>>8)&0xff,(int)(addr->addr>>16)&0xff,(int)(addr->addr>>24)&0xff);
-  pp[0]=strlen((char *)&pp[1]);
+  if(len>=sizeof(messagebuff))len=sizeof(messagebuff)-1;
+  memset(messagebuff,0,sizeof(messagebuff));
+  memcpy(&messagebuff[1],p->payload,len);
+  messagebuff[0]=len;
+  memset(addressbuff,0,sizeof(addressbuff));
+  sprintf((char *)&addressbuff[1],"%d.%d.%d.%d",(int)addr->addr&0xff,(int)(addr->addr>>8)&0xff,(int)(addr->addr>>16)&0xff,(int)(addr->addr>>24)&0xff);
+  addressbuff[0]=strlen((char *)&addressbuff[1]);
 //	udp_sendto(upcb, p, addr, port);
-	pbuf_free(p);
+  pbuf_free(p);
   UDPreceive=1;
 
 }
@@ -60,11 +52,6 @@ void udp_server_init(void){
 
 void open_udp_server(void){
     udp_server_init();
-    void *v;
-    v = findvar((unsigned char *)"MM.MESSAGE$", T_STR | V_NOFIND_NULL);    // create the variable
-    if(v==NULL)findvar((unsigned char *)"MM.MESSAGE$", V_FIND | V_DIM_VAR | T_CONST);
-    v = findvar((unsigned char *)"MM.ADDRESS$", T_STR | V_NOFIND_NULL);    // create the variable
-    if(v==NULL)findvar((unsigned char *)"MM.ADDRESS$", V_FIND | V_DIM_VAR | T_CONST);
     return;
 }
 static void udp_dns_found(const char *hostname, const ip_addr_t *ipaddr, void *arg) {

@@ -60,8 +60,8 @@ int restorepointer = 0;
 const uint8_t pinlist[]={ //this is a Basic program to print out the status of all the pins
 	1,132,128,95,113,37,0,
 	1,153,128,95,113,37,144,48,32,204,32,241,109,97,120,32,103,112,41,0,
-	1,168,128,34,71,80,34,133,186,95,113,37,41,44,32,241,112,105,110,110,111,32,34,71,80,34,133,186,
-	95,113,37,41,41,44,241,112,105,110,32,241,112,105,110,110,111,32,34,71,80,34,133,186,95,113,37,41,41,41,0,
+	1,168,128,34,71,80,34,130,186,95,113,37,41,44,32,241,112,105,110,110,111,32,34,71,80,34,130,186,
+	95,113,37,41,41,44,241,112,105,110,32,241,112,105,110,110,111,32,34,71,80,34,130,186,95,113,37,41,41,41,0,
 	1,166,128,0,
     1,147,128,95,113,37,0,0
 };
@@ -72,9 +72,9 @@ const uint8_t i2clist[]={ //this is a Basic program to print out the I2C devices
   1, 153, 128, 121, 32, 144, 32, 48, 32, 204, 32, 55, 0, 
   1, 168, 128, 34, 32, 34, 59, 32, 164, 121, 44, 32, 49, 41, 59, 32, 34, 48, 58, 32, 34, 59, 0, 
   1, 153, 128, 120, 32, 144, 32, 48, 32, 204, 32, 49, 53, 0, 
-  1, 161, 128, 95, 97, 100, 32, 144, 32, 121, 32, 129, 32, 49, 54, 32, 133, 32, 120, 0, 
+  1, 161, 128, 95, 97, 100, 32, 144, 32, 121, 32, 133, 32, 49, 54, 32, 130, 32, 120, 0, 
   1, 158, 128, 241, 83, 89, 83, 84, 69, 77, 32, 73, 50, 67, 41, 144, 34, 73, 50, 67, 34, 32, 203, 32, 228, 128, 99, 104, 101, 99, 107, 32, 95, 97, 100, 32, 199, 32, 229, 128, 32, 99, 104, 101, 99, 107, 32, 95, 97, 100, 0, 
-  1, 158, 128, 225, 32, 144, 32, 48, 32, 203, 0, 
+  1, 158, 128, 243, 68, 41, 32, 144, 32, 48, 32, 203, 0, 
   1, 158, 128, 95, 97, 100, 32, 144, 32, 48, 32, 203, 32, 168, 128, 34, 45, 45, 32, 34, 59, 0, 
   1, 158, 128, 95, 97, 100, 32, 143, 32, 48, 32, 203, 32, 168, 128, 164, 95, 97, 100, 44, 32, 50, 41, 59, 34, 32, 34, 59, 0, 
   1, 139, 128, 0, 1, 168, 128, 34, 45, 45, 32, 34, 59, 0, 1, 143, 128, 0, 1, 166, 128, 120, 0, 
@@ -104,7 +104,7 @@ unsigned char *TraceBuff[TRACE_BUFF_SIZE];
 int TraceBuffIndex;                       // used for listing the contents of the trace buffer
 int OptionErrorSkip;                                               // how to handle an error
 int MMerrno;                                                        // the error number
-
+unsigned char cmdlinebuff[STRINGSIZE];
 const unsigned int CaseOption = 0xffffffff;	// used to store the case of the listed output
 
 static inline CommandToken commandtbl_decode(const unsigned char *p){
@@ -442,21 +442,14 @@ void MIPS16 do_run(unsigned char *cmdline, bool CMM2mode) {
     PrepareProgram(true);
     if(Option.DISPLAY_CONSOLE && (SPIREAD  || Option.NoScroll)){ClearScreen(gui_bcolour);CurrentX=0;CurrentY=0;}
     // Create a global constant MM.CMDLINE$ containing 'cmd_args'.
-    void *ptr = findvar((unsigned char *)"MM.CMDLINE$", V_FIND | V_DIM_VAR | T_CONST);
+//    void *ptr = findvar((unsigned char *)"MM.CMDLINE$", V_FIND | V_DIM_VAR | T_CONST);
     CtoM(pcmd_args);
-    memcpy(ptr, pcmd_args, *pcmd_args + 1); // *** THW 16/4/23
-
+//    memcpy(cmdlinebuff, pcmd_args, *pcmd_args + 1); // *** THW 16/4/23
+	Mstrcpy(cmdlinebuff, pcmd_args);
     IgnorePIN = false;
 	if(Option.LIBRARY_FLASH_SIZE == MAX_PROG_SIZE) ExecuteProgram(LibMemory );       // run anything that might be in the library
     if(*ProgMemory != T_NEWLINE) return;                             // no program to run
 #ifdef PICOMITEWEB
-    void *v;
-    v = findvar((unsigned char *)"MM.TOPIC$", T_STR | V_NOFIND_NULL);    // create the variable
-    if(v==NULL)findvar((unsigned char *)"MM.TOPIC$", V_FIND | V_DIM_VAR | T_CONST);
-    v = findvar((unsigned char *)"MM.MESSAGE$", T_STR | V_NOFIND_NULL);    // create the variable
-    if(v==NULL)findvar((unsigned char *)"MM.MESSAGE$", V_FIND | V_DIM_VAR | T_CONST);
-    v = findvar((unsigned char *)"MM.ADDRESS$", T_STR | V_NOFIND_NULL);    // create the variable
-    if(v==NULL)findvar((unsigned char *)"MM.ADDRESS$", V_FIND | V_DIM_VAR | T_CONST);
 	cleanserver();
 #endif
 #ifndef USBKEYBOARD
@@ -1158,21 +1151,14 @@ void MIPS16 do_chain(unsigned char *cmdline){
 	RestoreContext(false);
     if(Option.DISPLAY_CONSOLE && (SPIREAD  || Option.NoScroll)){ClearScreen(gui_bcolour);CurrentX=0;CurrentY=0;}
     // Create a global constant MM.CMDLINE$ containing 'cmd_args'.
-    void *ptr = findvar((unsigned char *)"MM.CMDLINE$", V_NOFIND_ERR);
+//    void *ptr = findvar((unsigned char *)"MM.CMDLINE$", V_NOFIND_ERR);
     CtoM(pcmd_args);
-    memcpy(ptr, pcmd_args, *pcmd_args + 1); // *** THW 16/4/23
-
+//    memcpy(cmdlinebuff, pcmd_args, *pcmd_args + 1); // *** THW 16/4/23
+	Mstrcpy(cmdlinebuff, pcmd_args);
     IgnorePIN = false;
 	if(Option.LIBRARY_FLASH_SIZE == MAX_PROG_SIZE) ExecuteProgram(LibMemory );       // run anything that might be in the library
     if(*ProgMemory != T_NEWLINE) return;                             // no program to run
 #ifdef PICOMITEWEB
-    void *v;
-    v = findvar((unsigned char *)"MM.TOPIC$", T_STR | V_NOFIND_NULL);    // create the variable
-    if(v==NULL)findvar((unsigned char *)"MM.TOPIC$", V_FIND | V_DIM_VAR | T_CONST);
-    v = findvar((unsigned char *)"MM.MESSAGE$", T_STR | V_NOFIND_NULL);    // create the variable
-    if(v==NULL)findvar((unsigned char *)"MM.MESSAGE$", V_FIND | V_DIM_VAR | T_CONST);
-    v = findvar((unsigned char *)"MM.ADDRESS$", T_STR | V_NOFIND_NULL);    // create the variable
-    if(v==NULL)findvar((unsigned char *)"MM.ADDRESS$", V_FIND | V_DIM_VAR | T_CONST);
 	cleanserver();
 #endif
 #ifndef USBKEYBOARD
@@ -2699,6 +2685,7 @@ unsigned char  *llist(unsigned char *b, unsigned char *p) {
         while(*(b-1) == ' ' && b > b_start) --b;                    // eat any spaces on the end of the line
 		*b = 0;	
 		replaceAlpha((char *)b_start, overlaid_functions) ;  //replace the user version of all the MM. functions
+		STR_REPLACE((char *)b_start, "PEEK(INT8", "PEEK(BYTE",0);
 		return ++p;
 	} // end while
 }

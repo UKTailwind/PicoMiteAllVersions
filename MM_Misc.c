@@ -5673,7 +5673,7 @@ void fun_peek(void) {
     unsigned char *p;
     void *pp;
     getargs(&ep, 3, (unsigned char *)",");
-    if((p = checkstring(argv[0], (unsigned char *)"BYTE"))){
+    if((p = checkstring(argv[0], (unsigned char *)"INT8"))){
         if(argc != 1) error("Syntax");
         iret = *(unsigned char *)GetPeekAddr(p);
         targ = T_INT;
