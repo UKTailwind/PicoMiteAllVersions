@@ -843,7 +843,7 @@ void __not_in_flash_func(ClearSpecificTempMemory)(void *addr) {
 
 
 // test the stack for overflow - this is a NULL function in the DOS version
-void TestStackOverflow(void) {
+void __not_in_flash_func(TestStackOverflow)(void) {
 //    static uint32_t x=0xFFFFFFFF;
     uint32_t y=__get_MSP();
 //    if(y<x){

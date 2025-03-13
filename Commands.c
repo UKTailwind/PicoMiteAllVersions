@@ -49,7 +49,6 @@ void flist(int, int, int);
 char *KeyInterrupt=NULL;
 unsigned char* SaveNextDataLine = NULL;
 void execute_one_command(unsigned char *p);
-extern void  MIPS16 STR_REPLACE(char *target, const char *needle, const char *replacement);
 void ListNewLine(int *ListCnt, int all);
 char MMErrMsg[MAXERRMSG];                                           // the error message
 volatile bool Keycomplete=false;
@@ -522,22 +521,16 @@ void MIPS16 cmd_list(void) {
     	int ListCnt = 1;
     	step=Option.DISPLAY_CONSOLE ? HRes/gui_font_width/20 : 5;
         if(Option.DISPLAY_CONSOLE && (SPIREAD  || Option.NoScroll)){ClearScreen(gui_bcolour);CurrentX=0;CurrentY=0;}
-		int x=10;
+		int x=3+MMEND;
 		char** c=GetTempMemory((TokenTableSize+x)*sizeof(*c)+(TokenTableSize+x)*18);
 		for(i=0;i<TokenTableSize+x;i++){
+				if(strcmp((char *)tokentbl[i].name,"~(")==0)continue;
 				c[m]= (char *)((int)c + sizeof(char *) * (TokenTableSize+x) + m*18);
 				if(m<TokenTableSize)strcpy(c[m],(char *)tokentbl[i].name);
-	   			else if(m==TokenTableSize)strcpy(c[m],"=>");
-    			else if(m==TokenTableSize+1)strcpy(c[m],"=<");
-    			else if(m==TokenTableSize+2)strcpy(c[m],"MM.Fontwidth");
-    			else if(m==TokenTableSize+3)strcpy(c[m],"MM.Fontheight");
-    			else if(m==TokenTableSize+4)strcpy(c[m],"MM.HPOS");
-    			else if(m==TokenTableSize+5)strcpy(c[m],"MM.VPOS");
-    			else if(m==TokenTableSize+6)strcpy(c[m],"MM.PS2");
-    			else if(m==TokenTableSize+7)strcpy(c[m],"MM.VER");
-    			else if(m==TokenTableSize+8)strcpy(c[m],"MM.OneWire");
+	   			else if(m<TokenTableSize+MMEND && m>=TokenTableSize)strcpy(c[m],overlaid_functions[i-TokenTableSize]);
+    			else if(m==TokenTableSize+MMEND)strcpy(c[m],"=<");
+    			else if(m==TokenTableSize+MMEND+1)strcpy(c[m],"=>");
     			else strcpy(c[m],"MM.Info$(");
-//				if(*c[m]=='_' && c[m][1]=='(')*c[m]='*';
 				m++;
 		}
     	sortStrings(c,m);
@@ -1913,40 +1906,6 @@ void cmd_gosub(void) {
    g_LocalIndex++;
    CurrentLinePtr = nextstmt;
 }
-void cmd_amphersand(void) {
-	int value;
-	uint32_t address;
-	int64_t *ip=NULL;
-	void *ptr;
-	getargs(&cmdline,3,(unsigned char *)",");
-	if(argc==1){
-#ifdef rp2350
-		address=getint(argv[0],0x20000000,0x20081FFF);
-#else
-		address=getint(argv[0],0x20000000,0x20041FFF);
-#endif
-	} else {
-		ptr=findvar(argv[0], V_NOFIND_ERR);
-		if(g_vartbl[g_VarIndex].type & T_CONST) error("Cannot change a constant");
-		if(!(g_vartbl[g_VarIndex].type & T_INT)) error("Not an integer");
-		ip=ptr;
-		address=*ip;
-#ifdef rp2350
-		if(address<0x20000000 || address>0x20081fff)error("Invalid address");
-#else
-		if(address<0x20000000 || address>0x20041fff)error("Invalid address");
-#endif
-		skipspace(argv[2]);
-		if(*argv[2]==GetTokenValue((unsigned char *)"+"))(*ip)++;
-		if(*argv[2]==GetTokenValue((unsigned char *)"-"))(*ip)--;
-	}
-	while(*cmdline && tokenfunction(*cmdline) != op_equal) cmdline++;
-	if(!*cmdline) error("Invalid syntax");
-	++cmdline;
-	if(!*cmdline) error("Invalid syntax");
-	value = getint(cmdline,0,255);
-	*(uint8_t *)address=value;
-}
 
 void cmd_mid(void){
 	unsigned char *p;
@@ -1974,6 +1933,34 @@ void cmd_mid(void){
 		sourcestring[0]+=change;
 		memcpy(&sourcestring[start],p,value[0]);
 	}
+}
+void cmd_byte(void){
+	getargs(&cmdline,3,(unsigned char *)",");
+	findvar(argv[0], V_NOFIND_ERR);
+    if(g_vartbl[g_VarIndex].type & T_CONST) error("Cannot change a constant");
+	if(!(g_vartbl[g_VarIndex].type & T_STR)) error("Not a string");
+	unsigned char *sourcestring=(unsigned char *)getstring(argv[0]);
+	int start=getint(argv[2],1,sourcestring[0]);
+	while(*cmdline && tokenfunction(*cmdline) != op_equal) cmdline++;
+	if(!*cmdline) error("Syntax");
+	++cmdline;
+	if(!*cmdline) error("Syntax");
+	int value = getint(cmdline,0,255);
+	sourcestring[start]=value;
+}
+void cmd_bit(void){
+	getargs(&cmdline,3,(unsigned char *)",");
+	uint64_t *source=(uint64_t *)findvar(argv[0], V_NOFIND_ERR);
+    if(g_vartbl[g_VarIndex].type & T_CONST) error("Cannot change a constant");
+	if(!(g_vartbl[g_VarIndex].type & T_INT)) error("Not an integer");
+	uint64_t bit=(uint64_t)1<<(uint64_t)getint(argv[2],0,63);
+	while(*cmdline && tokenfunction(*cmdline) != op_equal) cmdline++;
+	if(!*cmdline) error("Syntax");
+	++cmdline;
+	if(!*cmdline) error("Syntax");
+	int value = getint(cmdline,0,1);
+	if(value)*source|=bit;
+	else *source&=(~bit);
 }
 
 void MIPS16 __not_in_flash_func(cmd_return)(void) {
@@ -2601,7 +2588,32 @@ void strCopyWithCase(char *d, char *s) {
     *d = 0;
 }
 
+void replaceAlpha(char *str, const char *replacements[MMEND]){
+    char buffer[STRINGSIZE]; // Buffer to store the modified string
+    int bufferIndex = 0;
+    int len = strlen(str);
+    int i = 0;
 
+    while (i < len) {
+        // Check for the pattern "~(X)" where X is an uppercase letter
+        if (str[i] == '~' && str[i + 1] == '(' && isupper((int)str[i + 2]) && str[i + 3] == ')') {
+            char alpha = str[i + 2]; // Extract the letter 'alpha'
+            const char *replacement = replacements[alpha - 'A']; // Get the replacement string
+
+            // Copy the replacement string into the buffer
+            strcpy(&buffer[bufferIndex], replacement);
+            bufferIndex += strlen(replacement);
+
+            i += 4; // Move past "~(X)"
+        } else {
+            // Copy the current character to the buffer
+            buffer[bufferIndex++] = str[i++];
+        }
+    }
+
+    buffer[bufferIndex] = '\0'; // Null-terminate the buffer
+    strcpy(str,  buffer); // Copy the buffer back into the original string
+}
 // list a line into a buffer (b) given a pointer to the beginning of the line (p).
 // the returned string is a C style string (terminated with a zero)
 // this is used by cmd_list(), cmd_edit() and cmd_xmodem()
@@ -2649,7 +2661,7 @@ unsigned char  *llist(unsigned char *b, unsigned char *p) {
 						) *b='.';
 						else if(b[1]=='(')*b='&';
 					} 
-                    b += strlen((char *)b);                                 // update pointer to the end of the buffer
+						b += strlen((char *)b);                                 // update pointer to the end of the buffer
                     if(isalpha(*(b - 1))) *b++ = ' ';               // add a space to the end of the command name
                 }
 				firstnonwhite = false;
@@ -2686,7 +2698,7 @@ unsigned char  *llist(unsigned char *b, unsigned char *p) {
 		// must be the end of a line - so return to the caller
         while(*(b-1) == ' ' && b > b_start) --b;                    // eat any spaces on the end of the line
 		*b = 0;	
-//		STR_REPLACE((char *)b_start,"_(","&(");												// terminate the output buffer
+		replaceAlpha((char *)b_start, overlaid_functions) ;  //replace the user version of all the MM. functions
 		return ++p;
 	} // end while
 }

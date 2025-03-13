@@ -2133,25 +2133,25 @@ int massage(char *buff){
 			*p=toupper(*p);
 			p++;
 		}
-		STR_REPLACE(buff,dlist[i].from,dlist[i].to);
+		STR_REPLACE(buff,dlist[i].from,dlist[i].to,0);
 	}
-	STR_REPLACE(buff,"=<","<=");
-	STR_REPLACE(buff,"=>",">=");
-	STR_REPLACE(buff," ,",",");
-	STR_REPLACE(buff,", ",",");
-	STR_REPLACE(buff," *","*");
-	STR_REPLACE(buff,"* ","*");
-	STR_REPLACE(buff,"- ","-");
-	STR_REPLACE(buff," /","/");
-	STR_REPLACE(buff,"/ ","/");
-	STR_REPLACE(buff,"= ","=");
-	STR_REPLACE(buff,"+ ","+");
-	STR_REPLACE(buff," )",")");
-	STR_REPLACE(buff,") ",")");
-	STR_REPLACE(buff,"( ","(");
-	STR_REPLACE(buff,"> ",">");
-	STR_REPLACE(buff,"< ","<");
-	STR_REPLACE(buff," '","'");
+	STR_REPLACE(buff,"=<","<=",0);
+	STR_REPLACE(buff,"=>",">=",0);
+	STR_REPLACE(buff," ,",",",0);
+	STR_REPLACE(buff,", ",",",0);
+	STR_REPLACE(buff," *","*",0);
+	STR_REPLACE(buff,"* ","*",0);
+	STR_REPLACE(buff,"- ","-",0);
+	STR_REPLACE(buff," /","/",0);
+	STR_REPLACE(buff,"/ ","/",0);
+	STR_REPLACE(buff,"= ","=",0);
+	STR_REPLACE(buff,"+ ","+",0);
+	STR_REPLACE(buff," )",")",0);
+	STR_REPLACE(buff,") ",")",0);
+	STR_REPLACE(buff,"( ","(",0);
+	STR_REPLACE(buff,"> ",">",0);
+	STR_REPLACE(buff,"< ","<",0);
+	STR_REPLACE(buff," '","'",0);
 	return strlen(buff);
 }
 void importfile(char *pp, char *tp, char **p, uint32_t buf, int convertdebug, bool message){

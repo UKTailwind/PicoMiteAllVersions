@@ -40,10 +40,10 @@ extern "C" {
         #ifdef HDMI
             #define MAXMODES 5
             #ifdef USBKEYBOARD
-                #define MagicKey 0x12542142
+                #define MagicKey 0x81631124
                 #define HEAPTOP 0x2007C000
             #else
-                #define MagicKey 0x24581740
+                #define MagicKey 0x976BE2A0
                 #define HEAPTOP 0x2007C000
             #endif
             #define MAX_CPU     Freq378P 
@@ -51,10 +51,10 @@ extern "C" {
         #else
             #define MAXMODES 3
             #ifdef USBKEYBOARD
-                #define MagicKey 0x18643736
+                #define MagicKey 0x8E065904
                 #define HEAPTOP 0x2007C000
             #else
-                #define MagicKey 0x23832526
+                #define MagicKey 0x60E0AFAF
                 #define HEAPTOP 0x2007C000
             #endif
 #ifdef rp2350
@@ -67,11 +67,11 @@ extern "C" {
     #else
         #ifdef USBKEYBOARD
             #define FLASH_TARGET_OFFSET (848* 1024) 
-            #define MagicKey 0x15197236
+            #define MagicKey 0x41FAB715
             #define HEAPTOP 0x2003FB00
         #else
             #define FLASH_TARGET_OFFSET (864 * 1024) 
-            #define MagicKey 0x21639130
+            #define MagicKey 0xA052A92F
             #define HEAPTOP 0x2003fc00
         #endif
         #define MAXMODES 2
@@ -146,7 +146,7 @@ extern "C" {
 
     #include "lwipopts_examples_common.h"
     #define FLASH_TARGET_OFFSET (1080 * 1024) 
-    #define MagicKey 0x57642325
+    #define MagicKey 0x57128B1C
     #define MaxPcb 8
     #define MAX_CPU     252000
     #define MIN_CPU     126000
@@ -161,10 +161,10 @@ extern "C" {
         #define MAX_CPU     (rp2350a ? 396000 : 378000)
         #define MAXSUBFUN           512                     // each entry takes up 4 bytes
         #ifdef USBKEYBOARD
-            #define MagicKey 0x15939342
+            #define MagicKey 0xD8069F27
             #define HEAPTOP 0x2007C000
         #else
-            #define MagicKey 0x72843126
+            #define MagicKey 0x119B6ED7
             #define HEAPTOP 0x2007C000
         #endif
     #else
@@ -174,10 +174,10 @@ extern "C" {
         #define MAX_CPU     420000
         #define MAXSUBFUN           256                     // each entry takes up 4 bytes
         #ifdef USBKEYBOARD
-            #define MagicKey 0x21698929
+            #define MagicKey 0x68EFA19E
             #define HEAPTOP 0x2003E400
         #else
-            #define MagicKey 0x71235244
+            #define MagicKey 0xE1473B93
             #define HEAPTOP 0x2003f100
         #endif
     #endif
@@ -347,6 +347,24 @@ extern "C" {
 #define PROGSTART (FLASH_TARGET_OFFSET + FLASH_ERASE_SIZE + SAVEDVARS_FLASH_SIZE + ((MAXFLASHSLOTS) * MAX_PROG_SIZE))
 #define TOP_OF_SYSTEM_FLASH  (FLASH_TARGET_OFFSET + FLASH_ERASE_SIZE + SAVEDVARS_FLASH_SIZE + ((MAXFLASHSLOTS+1) * MAX_PROG_SIZE))
 #define RoundUpK4(a)     (((a) + (4096 - 1)) & (~(4096 - 1)))// round up to the nearest page size      [position 131:9]	
+typedef enum {
+    MMHRES,
+    MMVRES,
+    MMVER,
+    MMI2C,
+	MMFONTHEIGHT,
+	MMFONTWIDTH,
+	MMPS2,
+	MMHPOS,
+	MMVPOS,
+	MMONEWIRE,
+    MMERRNO,
+    MMERRMSG,
+	MMWATCHDOG,
+	MMDEVICE,
+    MMEND
+} Operation;
+extern const char* overlaid_functions[];
 #ifdef __cplusplus
 }
 #endif

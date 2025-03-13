@@ -43,8 +43,22 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #endif
 
 extern long long int  llabs (long long int  n);
-
-
+const char* overlaid_functions[]={
+    "MM.HRES",
+    "MM.VRES",
+    "MM.VER",
+	"MM.I2C",
+	"MM.FONTHEIGHT",
+	"MM.FONTWIDTH",
+	"MM.PS2",
+	"MM.HPOS",
+	"MM.VPOS",
+	"MM.ONEWIRE",
+	"MM.Errno",
+	"MM.ErrMsg$",
+	"MM.WATCHDOG",
+	"MM.DEVICE$",
+};
 /********************************************************************************************************************************************
  basic functions
  each function is responsible for decoding a basic function
@@ -389,37 +403,93 @@ void fun_asc(void) {
     	iret = *(s + 1);
     targ = T_INT;
 }
-
-void fun_amphersand(void){
-	uint32_t address;
-	int64_t *ip=NULL;
-	void *ptr;
-	getargs(&ep,3,(unsigned char *)",");
-	if(argc==1){
-#ifdef rp2350
-		address=getint(argv[0],0x20000000,0x20081FFF);
-#else
-		address=getint(argv[0],0x20000000,0x20041FFF);
-#endif
-	} else {
-		ptr=findvar(argv[0], V_NOFIND_ERR);
-		if(g_vartbl[g_VarIndex].type & T_CONST) error("Cannot change a constant");
-		if(!(g_vartbl[g_VarIndex].type & T_INT)) error("Not an integer");
-		ip=ptr;
-		address=*ip;
-#ifdef rp2350
-		if(address<0x20000000 || address>0x20081fff)error("Invalid address");
-#else
-		if(address<0x20000000 || address>0x20041fff)error("Invalid address");
-#endif
-		skipspace(argv[2]);
-		if(*argv[2]==GetTokenValue((unsigned char *)"+"))(*ip)++;
-		if(*argv[2]==GetTokenValue((unsigned char *)"-"))(*ip)--;
-	}
-	iret=*(uint8_t *)address;
+void fun_bit(void){
+	uint64_t *s;
+	uint64_t spos;
+	getargs(&ep, 3, (unsigned char *)",");
+	s=(uint64_t *)findvar(argv[0], V_NOFIND_ERR);
+	if(!(g_vartbl[g_VarIndex].type & T_INT)) error("Not an integer");
+	spos = getint(argv[2], 0,63);						    // the mid position
+	iret = (int64_t)(*s&(1<<spos))>>spos;
 	targ=T_INT;
 }
-
+void fun_byte(void){
+	unsigned char *s;
+	int spos;
+	getargs(&ep, 3, (unsigned char *)",");
+	s=(unsigned char *)findvar(argv[0], V_NOFIND_ERR);
+	if(!(g_vartbl[g_VarIndex].type & T_STR)) error("Not a string");
+	spos = getint(argv[2], 1, g_vartbl[g_VarIndex].size);						    // the mid position
+	iret = s[spos];							// this will last for the life of the command
+    targ = T_INT;
+}
+void fun_tilde(void){
+	targ=T_INT;
+/*
+    MMHRES,
+    MMVRES,
+    MMVER,
+    MMI2C,
+	MMFONTHEIGHT,
+	MMFONTWIDTH,
+	MMPS2,
+	MMHPOS,
+	MMVPOS,
+	MMONEWIRE,
+    MMERRNO,
+    MMERRMSG,
+	MMWATCHDOG,
+	MMDEVICE,
+*/
+	switch(*ep-'A'){
+		case MMHRES:
+			iret=HRes;
+			break;
+		case MMVRES:
+			iret=VRes;
+			break;
+		case MMVER:
+			fun_version();
+			break;
+		break;
+		case MMI2C:
+			iret=mmI2Cvalue;
+			break;
+		case MMFONTHEIGHT:
+			iret = FontTable[gui_font >> 4][1] * (gui_font & 0b1111);
+		case MMFONTWIDTH:
+			iret = FontTable[gui_font >> 4][0] * (gui_font & 0b1111);
+			break;
+#ifndef USBKEYBOARD
+		case MMPS2:
+			iret = (int64_t)(uint32_t)PS2code;
+			break;
+#endif
+		case MMHPOS:
+			iret = CurrentX;
+			break;
+		case MMVPOS:
+			iret = CurrentY;
+			break;
+		case MMONEWIRE:
+			iret = mmOWvalue;
+			break;
+		case MMERRNO:
+		    iret = MMerrno;
+			break;
+		case MMERRMSG:
+			fun_errmsg();
+			break;
+		case MMWATCHDOG:
+			iret = WatchdogSet;
+			break;
+		case MMDEVICE:
+			fun_device();
+			break;
+		default:
+			iret=-1;
+	}
+}
 
 // return the arctangent of a number in radians
 void fun_atn(void) {

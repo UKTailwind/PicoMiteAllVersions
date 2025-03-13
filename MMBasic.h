@@ -170,16 +170,16 @@ extern unsigned char DefaultType;                        // the default type if 
 // finishes pointing to the token or zero unsigned char if not found in the line
 #define findtoken(x)    while(*x != (tkn) && *x)x++
 #define IsDigitinline(a)	( a >= '0' && a <= '9' )
-extern const char namestart[256];
-extern const char namein[256];
-extern const char nameend[256];
-extern const char upper[256];
+//extern const char namestart[256];
+//extern const char namein[256];
+//extern const char nameend[256];
+//extern const char upper[256];
 //#define mytoupper(a) upper[(unsigned int)a]
 #define mytoupper(a) toupper(a)
 //#define isnamestart(c)  (namestart[(uint8_t)c])                    // true if valid start of a variable name
 //#define isnamechar(c)   (namein[(uint8_t)c])        // true if valid part of a variable name
 //#define isnameend(c)    (nameend[(uint8_t)c])        // true if valid at the end of a variable name
-#define isnamestart(c)  (isalpha((unsigned char)c) || c == '_')                    // true if valid start of a variable name
+#define isnamestart(c)  (isalpha((unsigned char)c) || c == '_' || c == '~')                    // true if valid start of a variable name
 #define isnamechar(c)   (isalnum((unsigned char)c) || c == '_' || c == '.')        // true if valid part of a variable name
 #define isnameend(c)    (isalnum((unsigned char)c) || c == '_' || c == '.' || c == '$' || c == '!' || c == '%')        // true if valid at the end of a variable name
 #define tokentype(i)    ((i >= C_BASETOKEN && i < TokenTableSize - 1 + C_BASETOKEN) ? (tokentbl[i - C_BASETOKEN].type) : 0)             // get the type of a token
@@ -308,8 +308,8 @@ extern unsigned char *cmdline;                           // Command line termina
 extern unsigned char *nextstmt;                          // Pointer to the next statement to be executed.
 extern unsigned char PromptString[MAXPROMPTLEN];                                    // the prompt for input, an empty string means use the default
 extern int multi;
-extern void str_replace(char *target, const char *needle, const char *replacement);
-extern void  MIPS16 STR_REPLACE(char *target, const char *needle, const char *replacement);
+extern void str_replace(char *target, const char *needle, const char *replacement, uint8_t ignore);
+extern void  MIPS16 STR_REPLACE(char *target, const char *needle, const char *replacement, uint8_t ignore);
 #if defined(MMFAMILY)
 extern unsigned char FunKey[NBRPROGKEYS][MAXKEYLEN + 1]; // used by the programmable function keys
 #endif

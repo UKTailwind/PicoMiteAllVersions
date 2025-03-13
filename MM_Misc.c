@@ -4880,46 +4880,6 @@ void MIPS16 fun_info(void){
             iret=FileSize(p);
             targ=T_INT;
             return;
-/*            DIR djd;
-            FILINFO fnod;
-            char q[FF_MAX_LFN]={0};
-            memset(&djd,0,sizeof(DIR));
-            memset(&fnod,0,sizeof(FILINFO));
-            int waste=0, t=FatFSFileSystem+1;
-            char *p = (char *)getFstring(tp);
-            targ=T_INT;
-            t = drivecheck(p,&waste);
-            p+=waste;
-            getfullfilename(p,q);
-            FatFSFileSystem=t-1;
-            iret=-1;
-            if(strcmp(q,"/")==0 || strcmp(q,"/.")==0 || strcmp(q,"/..")==0 ){iret= -2; strcpy(MMErrMsg,FErrorMsg[4]); return;}
-            if(FatFSFileSystem==0){
-                struct lfs_info lfsinfo;
-                FSerror = lfs_stat(&lfs, q, &lfsinfo);
-                if(lfsinfo.type==LFS_TYPE_DIR){iret= -2; strcpy(MMErrMsg,FErrorMsg[4]); return;}
-                if(FSerror){iret= -1; strcpy(MMErrMsg,FErrorMsg[4]); return;}
-                int fnbr=FindFreeFileNbr();
-                iret=BasicFileOpen(p,fnbr,FA_READ);
-                if(iret==false){
-                    iret=-1;
-                    targ=T_INT;
-                    return;
-                }
-                iret=lfs_file_size(&lfs,FileTable[fnbr].lfsptr);
-                FileClose(fnbr);
-            } else {
-                if(!InitSDCard()) {iret= -1; return;}
-                if(q[strlen(q)-1]=='/')strcat(q,".");
-                if(strcmp(q,"/")==0){ iret=-2; targ=T_INT; strcpy(MMErrMsg,FErrorMsg[4]); return;}
-                FSerror = f_stat(q, &fnod);
-                if((fnod.fattrib & AM_DIR)){ iret=-2; targ=T_INT; strcpy(MMErrMsg,FErrorMsg[4]); return;}
-                if(FSerror != FR_OK){ iret=-1; targ=T_INT; strcpy(MMErrMsg,FErrorMsg[4]); return;}
-                iret=fnod.fsize;
-            }
-            FatFSFileSystem=FatFSFileSystemSave;
-            targ=T_INT;
-            return;*/
         } else if(checkstring(ep, (unsigned char *)"FREE SPACE")){
             if(FatFSFileSystem){
                 if(!InitSDCard()) error((char *)FErrorMsg[20]);					// setup the SD card
@@ -5383,7 +5343,7 @@ void MIPS16 fun_info(void){
             OptionFileErrorAbort=0;
             FatFSFileSystemSave = FatFSFileSystem;
             FatFSFileSystem=1;
-            if(!Option.SD_CS)strcpy((char *)sret,"Not Configured");
+            if(!(Option.SD_CS || Option.CombinedCS))strcpy((char *)sret,"Not Configured");
             else if(!InitSDCard())strcpy((char *)sret,"Not present");
             else  strcpy((char *)sret,"Ready");
             CtoM(sret);

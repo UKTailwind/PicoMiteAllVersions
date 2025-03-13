@@ -27,7 +27,7 @@ option) any later version.
 #ifndef ONEWIRE_HEADER
 #define ONEWIRE_HEADER
 extern long long int *ds18b20Timers;
-
+extern int mmOWvalue;  
 #endif
 #endif
 /*  @endcond */

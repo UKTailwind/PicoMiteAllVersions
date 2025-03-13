@@ -1402,8 +1402,8 @@ void MIPS16 cmd_play(void) {
 						strcat(alist[trackstoplay].fn,q);
 						strcat(alist[trackstoplay].fn,"/");
 						strcat(alist[trackstoplay].fn,fno.fname);
-						str_replace(alist[trackstoplay].fn, "//", "/");
-						str_replace(alist[trackstoplay].fn, "/./", "/");
+						str_replace(alist[trackstoplay].fn, "//", "/",3);
+						str_replace(alist[trackstoplay].fn, "/./", "/",3);
 						if(!CurrentLinePtr){
 							MMPrintString(fno.fname);
 							PRet();
@@ -1470,8 +1470,8 @@ void MIPS16 cmd_play(void) {
 						strcat(alist[trackstoplay].fn,q);
 						strcat(alist[trackstoplay].fn,"/");
 						strcat(alist[trackstoplay].fn,fno.fname);
-						str_replace(alist[trackstoplay].fn, "//", "/");
-						str_replace(alist[trackstoplay].fn, "/./", "/");
+						str_replace(alist[trackstoplay].fn, "//", "/",3);
+						str_replace(alist[trackstoplay].fn, "/./", "/",3);
 						if(!CurrentLinePtr){
 							MMPrintString(fno.fname);
 							PRet();
@@ -1636,8 +1636,8 @@ void MIPS16 cmd_play(void) {
 						strcat(alist[trackstoplay].fn,q);
 						strcat(alist[trackstoplay].fn,"/");
 						strcat(alist[trackstoplay].fn,fno.fname);
-						str_replace(alist[trackstoplay].fn, "//", "/");
-						str_replace(alist[trackstoplay].fn, "/./", "/");
+						str_replace(alist[trackstoplay].fn, "//", "/",3);
+						str_replace(alist[trackstoplay].fn, "/./", "/",3);
 						if(!CurrentLinePtr){
 							MMPrintString(fno.fname);
 							PRet();
@@ -1672,10 +1672,10 @@ void MIPS16 cmd_play(void) {
 		p+=2;
 		strcpy(buff,"A:/");
 		strcat(buff,p);
-		str_replace(buff,".mp3",".mem");
-		str_replace(buff,".MP3",".mem");
-		str_replace(buff,".Mp3",".mem");
-		str_replace(buff,".mP3",".mem");
+		str_replace(buff,".mp3",".mem",1);
+		str_replace(buff,".MP3",".mem",1);
+		str_replace(buff,".Mp3",".mem",1);
+		str_replace(buff,".mP3",".mem",1);
     	if(!BasicFileOpen(buff, fnbr,  FA_WRITE | FA_CREATE_ALWAYS)) return;
 		int i;
 		if(filesource[WAV_fnbr]==FLASHFILE)i = lfs_file_tell(&lfs,FileTable[fnbr].lfsptr) + 1;
@@ -1760,8 +1760,8 @@ void MIPS16 cmd_play(void) {
 						strcat(alist[trackstoplay].fn,q);
 						strcat(alist[trackstoplay].fn,"/");
 						strcat(alist[trackstoplay].fn,fno.fname);
-						str_replace(alist[trackstoplay].fn, "//", "/");
-						str_replace(alist[trackstoplay].fn, "/./", "/");
+						str_replace(alist[trackstoplay].fn, "//", "/",3);
+						str_replace(alist[trackstoplay].fn, "/./", "/",3);
 						if(!CurrentLinePtr){
 							MMPrintString(fno.fname);
 							PRet();

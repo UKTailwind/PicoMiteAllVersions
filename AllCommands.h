@@ -184,7 +184,8 @@ void cmd_irqclear(void);
 void cmd_irqnowait(void);
 void cmd_irq(void);
 void cmd_set(void);
-void cmd_amphersand(void);
+void cmd_byte(void);
+void cmd_bit(void);
 #ifdef PICOMITEWEB
     void cmd_web(void);
 #endif
@@ -322,7 +323,9 @@ void fun_msgbox(void);
 void fun_ctrlval(void);
 void fun_mmhpos(void);
 void fun_mmvpos(void);
-void fun_amphersand(void);
+void fun_tilde(void);
+void fun_byte(void);
+void fun_bit(void);
 #ifdef PICOMITEWEB
     void fun_json(void);
 #endif
@@ -501,8 +504,9 @@ void fun_map(void);
 	{ (unsigned char *)"IRQ NOWAIT",T_CMD,				0, cmd_irqnowait	},
 	{ (unsigned char *)"IRQ",		T_CMD,				0, cmd_irq	}, 
 	{ (unsigned char *)"Set",		T_CMD,				0, cmd_set	},
-	{ (unsigned char *)"_(",		T_CMD | T_FUN,				0, cmd_amphersand	},
-#ifdef PICOMITEVGA
+	{ (unsigned char *)"Byte(",		T_CMD | T_FUN,				0, cmd_byte	},
+	{ (unsigned char *)"Bit(",		T_CMD | T_FUN,				0, cmd_bit	},
+	#ifdef PICOMITEVGA
   	{ (unsigned char *)"TILE",            T_CMD,                     0, cmd_tile   },
   	{ (unsigned char *)"MODE",            T_CMD,                     0, cmd_mode   },
   	{ (unsigned char *)"Map(",            T_CMD | T_FUN  ,           0, cmd_map   },
@@ -547,15 +551,17 @@ void fun_map(void);
  All other tokens (keywords, functions, operators) should be inserted in this table
 **********************************************************************************/
 #ifdef INCLUDE_TOKEN_TABLE
+// These 4 operators mustn't be moved
+	{ (unsigned char *)"Not",		T_OPER | T_NBR | T_INT,			3, op_not		},
+	{ (unsigned char *)"INV",			T_OPER | T_NBR | T_INT,			3, op_inv		},
+	{ (unsigned char *)"+",			T_OPER | T_NBR | T_INT | T_STR, 2, op_add		},
+	{ (unsigned char *)"-",			T_OPER | T_NBR | T_INT,		2, op_subtract          },
+//
 	{ (unsigned char *)"^",			T_OPER | T_NBR | T_INT,		0, op_exp		},
 	{ (unsigned char *)"*",			T_OPER | T_NBR | T_INT,		1, op_mul		},
 	{ (unsigned char *)"/",			T_OPER | T_NBR,                 1, op_div		},
 	{ (unsigned char *)"\\",			T_OPER | T_INT,			1, op_divint            },
 	{ (unsigned char *)"Mod",		T_OPER | T_INT,			1, op_mod		},
-	{ (unsigned char *)"+",			T_OPER | T_NBR | T_INT | T_STR, 2, op_add		},
-	{ (unsigned char *)"-",			T_OPER | T_NBR | T_INT,		2, op_subtract          },
-	{ (unsigned char *)"Not",		T_OPER | T_NBR | T_INT,			3, op_not		},
-	{ (unsigned char *)"INV",			T_OPER | T_NBR | T_INT,			3, op_inv		},
 	{ (unsigned char *)"<<",			T_OPER | T_INT,                 4, op_shiftleft		},
 	{ (unsigned char *)">>",			T_OPER | T_INT,                 4, op_shiftright	},
 	{ (unsigned char *)"<>",			T_OPER | T_NBR | T_INT | T_STR, 5, op_ne		},
@@ -592,9 +598,6 @@ void fun_map(void);
 	{ (unsigned char *)"Len(",		T_FUN  | T_INT,			0, fun_len		},
 	{ (unsigned char *)"Log(",		T_FUN  | T_NBR,			0, fun_log		},
 	{ (unsigned char *)"Mid$(",		T_FUN  | T_STR,			0, fun_mid		},
-	{ (unsigned char *)"MM.Errno",	T_FNA | T_INT,		0, fun_errno	},
-  	{ (unsigned char *)"MM.ErrMsg$", T_FNA  | T_STR,         0, fun_errmsg   },
-//	{ (unsigned char *)"MM.Ver",		T_FNA  | T_NBR,			0, fun_version          },
 	{ (unsigned char *)"Oct$(",		T_FUN  | T_STR,			0, fun_oct		},
 	{ (unsigned char *)"Pi",			T_FNA  | T_NBR,			0, fun_pi		},
 	{ (unsigned char *)"Pos",		T_FNA  | T_INT,                 0, fun_pos		},
@@ -637,15 +640,12 @@ void fun_map(void);
 	{ (unsigned char *)"Pio(",		T_FUN  | T_INT,			0, fun_pio		},
 	{ (unsigned char *)"RGB(",           	T_FUN | T_INT,		0, fun_rgb	        },
 	{ (unsigned char *)"Pixel(",           	T_FUN | T_INT,		0, fun_pixel	        },
-	{ (unsigned char *)"MM.HRes",	    	T_FNA | T_INT,		0, fun_mmhres 	    },
-	{ (unsigned char *)"MM.VRes",	    	T_FNA | T_INT,		0, fun_mmvres 	    },
 	{ (unsigned char *)"@(",				T_FUN | T_STR,		0, fun_at		},
 	{ (unsigned char *)"Pin(",		T_FUN | T_NBR | T_INT,	0, fun_pin		},
 	{ (unsigned char *)"Port(",		T_FUN | T_INT,		0, fun_port		},
 	{ (unsigned char *)"Distance(",		T_FUN | T_NBR,		0, fun_distance		},
 	{ (unsigned char *)"Pulsin(",		T_FUN | T_INT,		0, fun_pulsin		},
 	{ (unsigned char *)"GPS(",	    T_FUN | T_NBR | T_INT| T_STR,		0, fun_GPS	},
-	{ (unsigned char *)"MM.I2C",	T_FNA | T_INT,	0, fun_mmi2c		},
 	{ (unsigned char *)"Math(",	    T_FUN | T_NBR | T_INT,		0, fun_math	},
 	{ (unsigned char *)"Timer",	T_FNA | T_NBR ,		0, fun_timer	},
 	{ (unsigned char *)"LInStr(",		T_FUN | T_INT,		0, fun_LInstr		},
@@ -657,19 +657,18 @@ void fun_map(void);
 	{ (unsigned char *)"Day$(",	T_FUN | T_STR,		0, fun_day	},
 	{ (unsigned char *)"Peek(",		T_FUN  | T_INT | T_STR | T_NBR,			0, fun_peek		},
 	{ (unsigned char *)"Time$",	T_FNA | T_STR,		0, fun_time	},
-	{ (unsigned char *)"MM.Device$",	T_FNA | T_STR,		0, fun_device   },
-	{ (unsigned char *)"MM.Watchdog",T_FNA | T_INT,		0, fun_restart	},
 	{ (unsigned char *)"Epoch(",		T_FUN  | T_INT,			0, fun_epoch		},
 	{ (unsigned char *)"DateTime$(",		T_FUN | T_STR,		0, fun_datetime		},
 	{ (unsigned char *)"MM.Info(",		T_FUN | T_INT  | T_NBR| T_STR,		0, fun_info		},
 	{ (unsigned char *)"Format$(",	T_FUN  | T_STR,			0, fun_format	},
-//	{ (unsigned char *)"MM.OneWire",	T_FNA | T_INT,	0, fun_mmOW         },
 	{ (unsigned char *)"TEMPR(",	T_FUN | T_NBR,	0, fun_ds18b20      },
 	{ (unsigned char *)"SPI(",	T_FUN | T_INT,		0, fun_spi,	},
 	{ (unsigned char *)"SPI2(",	T_FUN | T_INT,		0, fun_spi2,	},
 	{ (unsigned char *)"DEVICE(",	T_FUN | T_INT| T_NBR | T_STR,		0, fun_dev,	},
 	{ (unsigned char*)"sprite(",	    T_FUN | T_INT | T_NBR,		0, fun_sprite },
-	{ (unsigned char*)"_(",	    T_FUN | T_INT ,		0, fun_amphersand },
+	{ (unsigned char *)"Byte(",	T_FUN | T_INT,		0, fun_byte,	},
+	{ (unsigned char *)"Bit(",	T_FUN | T_INT,		0, fun_bit,	},
+	{ (unsigned char*)"~(",	    T_FUN | T_INT | T_NBR | T_STR ,		0, fun_tilde },
 	#ifdef USBKEYBOARD
 	{ (unsigned char*)"KeyDown(",    T_FUN | T_INT,		0, fun_keydown	},
 #endif	

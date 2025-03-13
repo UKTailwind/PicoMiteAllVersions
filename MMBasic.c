@@ -203,7 +203,6 @@ void   MIPS16 InitBasic(void) {
     tokenGOSUB = GetTokenValue( (unsigned char *)"GoSub");
     tokenAS    = GetTokenValue( (unsigned char *)"As");
     tokenFOR   = GetTokenValue( (unsigned char *)"For");
-
     cmdLOOP  = GetCommandValue( (unsigned char *)"Loop");
     cmdIF      = GetCommandValue( (unsigned char *)"If");
     cmdENDIF   = GetCommandValue( (unsigned char *)"EndIf");
@@ -228,9 +227,9 @@ void   MIPS16 InitBasic(void) {
     cmdCSUB = GetCommandValue( (unsigned char *)"CSub");
     cmdComment = GetCommandValue( (unsigned char *)"/*");
     cmdEndComment = GetCommandValue( (unsigned char *)"*/");
-//    SInt(CommandTableSize);
-//    SIntComma(TokenTableSize);
-//    SSPrintString("\r\n");
+//  SInt(CommandTableSize);
+//  SIntComma(TokenTableSize);
+//  SSPrintString("\r\n");
 
 }
 
@@ -868,7 +867,7 @@ char  MIPS16 *fstrstr (const char *s1, const char *s2)
   return (0);
 }
 
-void  MIPS16 str_replace(char *target, const char *needle, const char *replacement)
+void  MIPS16 str_replace(char *target, const char *needle, const char *replacement, uint8_t ignoresurround)
 {
     char buffer[288] = { 0 };
     char *insert_point = &buffer[0];
@@ -884,24 +883,41 @@ void  MIPS16 str_replace(char *target, const char *needle, const char *replaceme
             strcpy(insert_point, tmp);
             break;
         }
+        char *q;
+        if(p==target){
+            ignoresurround|=1;
+            q=(char *)p;
+        } else q=(char *)p-1;
+        if( (isnamechar(*q) && !(ignoresurround & 1)) || (isnameend(p[strlen(needle)]) && !(ignoresurround & 2))){
+            // copy part before needle
+            memcpy(insert_point, tmp, p - tmp);
+            insert_point += p - tmp;
 
-        // copy part before needle
-        memcpy(insert_point, tmp, p - tmp);
-        insert_point += p - tmp;
+            // copy replacement string
+            memcpy(insert_point, needle, needle_len);
+            insert_point += needle_len;
 
-        // copy replacement string
-        memcpy(insert_point, replacement, repl_len);
-        insert_point += repl_len;
+            // adjust pointers, move on
+            tmp = p + needle_len;
+        } else {
+            // copy part before needle
+            memcpy(insert_point, tmp, p - tmp);
+            insert_point += p - tmp;
 
-        // adjust pointers, move on
-        tmp = p + needle_len;
+            // copy replacement string
+            memcpy(insert_point, replacement, repl_len);
+            insert_point += repl_len;
+
+            // adjust pointers, move on
+            tmp = p + needle_len;
+        }
     }
 
     // write altered string back to target
     strcpy(target, buffer);
 }
 
-void  MIPS16 STR_REPLACE(char *target, const char *needle, const char *replacement){
+void  MIPS16 STR_REPLACE(char *target, const char *needle, const char *replacement, uint8_t ignoresurround){
 	char *ip=target;
 	int toggle=0;
     char comment[STRINGSIZE]={0};
@@ -931,7 +947,7 @@ void  MIPS16 STR_REPLACE(char *target, const char *needle, const char *replaceme
             }
             ip++;
         }
-        str_replace(target, needle, replacement);
+        str_replace(target, needle, replacement, ignoresurround);
         ip=target;
         if(comment[0]=='\''){
             strcat(target,comment);
@@ -945,7 +961,6 @@ void  MIPS16 STR_REPLACE(char *target, const char *needle, const char *replaceme
         }
     }
 }
-
 
 /********************************************************************************************************************************************
  take an input line and turn it into a line with tokens suitable saving into memory
@@ -961,7 +976,7 @@ void  MIPS16 STR_REPLACE(char *target, const char *needle, const char *replaceme
 
 void  MIPS16 tokenise(int console) {
     unsigned char *p, *op, *tp;
-    int i;
+    int i=0;
     int firstnonwhite;
     int labelvalid;
 
@@ -972,19 +987,21 @@ void  MIPS16 tokenise(int console) {
         if(*p < ' ' || *p == 0x7f)  *p = ' ';
         p++;
     }
-    if(multi==false){
-        STR_REPLACE((char *)inpbuf,"MM.INFO$","MM.INFO");
-        STR_REPLACE((char *)inpbuf,"=>",">=");
-        STR_REPLACE((char *)inpbuf,"=<","<=");
-//        STR_REPLACE((char *)inpbuf,"&(","_(");
-        STR_REPLACE((char *)inpbuf,"MM.FONTHEIGHT","MM.INFO(FONTHEIGHT)");
-        STR_REPLACE((char *)inpbuf,"MM.FONTWIDTH","MM.INFO(FONTWIDTH)");
-        STR_REPLACE((char *)inpbuf,"MM.PS2","MM.INFO(PS2)");
-        STR_REPLACE((char *)inpbuf,"MM.VER","MM.INFO(VERSION)");
-        STR_REPLACE((char *)inpbuf,"MM.HPOS","MM.INFO(HPOS)");
-        STR_REPLACE((char *)inpbuf,"MM.VPOS","MM.INFO(VPOS)");
-        STR_REPLACE((char *)inpbuf,"MM.ONEWIRE","MM.INFO(ONEWIRE)");
-        STR_REPLACE((char *)inpbuf,"SPRITE MEMORY","BLIT MEMORY");
+    tp = inpbuf;
+    skipspace(tp);
+    if(toupper(tp[0])=='R' && toupper(tp[1])=='E' && toupper(tp[2])=='M' && tp[3]==' ')i=1;
+    if(multi==false && i==false){
+        int i=0;
+        while(i<MMEND){
+            char buff[]="~( )";
+            buff[2]=i+'A';
+            STR_REPLACE((char *)inpbuf,overlaid_functions[i],buff, false);
+            i++;
+        }
+        STR_REPLACE((char *)inpbuf,"MM.INFO$","MM.INFO",0);
+        STR_REPLACE((char *)inpbuf,"=>",">=", 3);
+        STR_REPLACE((char *)inpbuf,"=<","<=", 3);
+        STR_REPLACE((char *)inpbuf,"SPRITE MEMORY","BLIT MEMORY",0);
     }
     // setup the input and output buffers
     p = inpbuf;
@@ -1135,14 +1152,14 @@ void  MIPS16 tokenise(int console) {
                 }
                 if(match_i == GetCommandValue((unsigned char *)"*/"))multi= false;
                 if(match_i == GetCommandValue((unsigned char *)"OPTION") || match_i == GetCommandValue((unsigned char *)"CONFIGURE" )){
-                    STR_REPLACE((char *)inpbuf,"GAME*MITE","GAMEMITE");
-                    STR_REPLACE((char *)inpbuf,"PICO-RESTOUCH-LCD-3.5","PICORESTOUCHLCD3.5");
-                    STR_REPLACE((char *)inpbuf,"PICO-RESTOUCH-LCD-2.8","PICORESTOUCHLCD2.8");
-                    STR_REPLACE((char *)inpbuf,"RP2040-LCD-1.28","RP2040LCD1.28");
-                    STR_REPLACE((char *)inpbuf,"RP2040-LCD-0.96","RP2040LCD0.96");
-                    STR_REPLACE((char *)inpbuf,"RP2040-GEEK","RP2040GEEK");
-                    STR_REPLACE((char *)inpbuf,"PICOGAME 4-PWM","PICOGAME 4PWM");
-                    STR_REPLACE((char *)inpbuf,"OLIMEX USB","OLIMEXUSB");
+                    STR_REPLACE((char *)inpbuf,"GAME*MITE","GAMEMITE", false);
+                    STR_REPLACE((char *)inpbuf,"PICO-RESTOUCH-LCD-3.5","PICORESTOUCHLCD3.5",false);
+                    STR_REPLACE((char *)inpbuf,"PICO-RESTOUCH-LCD-2.8","PICORESTOUCHLCD2.8",false);
+                    STR_REPLACE((char *)inpbuf,"RP2040-LCD-1.28","RP2040LCD1.28",false);
+                    STR_REPLACE((char *)inpbuf,"RP2040-LCD-0.96","RP2040LCD0.96",false);
+                    STR_REPLACE((char *)inpbuf,"RP2040-GEEK","RP2040GEEK",false);
+                    STR_REPLACE((char *)inpbuf,"PICOGAME 4-PWM","PICOGAME 4PWM",false);
+                    STR_REPLACE((char *)inpbuf,"OLIMEX USB","OLIMEXUSB",false);
                 }
                 continue;
             }
@@ -1445,97 +1462,91 @@ unsigned char MIPS16 __not_in_flash_func(*getvalue)(unsigned char *p, MMFLOAT *f
     if(*p>=C_BASETOKEN){ //don't waste time if not a built-in function
     // special processing for the NOT operator
     // just get the next value and invert its logical value
-    if(tokenfunction(*p) == op_not) {
-        int ro;
-        p++; t = T_NOTYPE;
-        p = getvalue(p, &f, &i64, &s, &ro, &t);                     // get the next value
-        if(t &T_NBR)
-            f = (MMFLOAT)((f != 0)?0:1);                              // invert the value returned
-        else if(t & T_INT)
-            i64 = ((i64 != 0)?0:1);
-       else
-            error("Expected a number");
-        skipspace(p);
-        *fa = f;                                                    // save what we have
-        *ia = i64;
-        *sa = s;
-        *ta = t;
-        *oo = ro;
-        return p;                                                   // return straight away as we already have the next operator
-    }
-		if(tokenfunction(*p) == op_inv) {
-			int ro;
-			p++; t = T_NOTYPE;
-			p = getvalue(p, &f, &i64, &s, &ro, &t);                     // get the next value
-			if(t & T_NBR)
-				i64 = FloatToInt64(f);
-			else if(!(t & T_INT))
-				error("Expected a number");
-			i64 = ~i64;
-			t = T_INT;
-			skipspace(p);
-			*fa = f;                                                    // save what we have
-			*ia = i64;
-			*sa = s;
-			*ta = t;
-			*oo = ro;
-			return p;                                                   // return straight away as we already have the next operator
-		}
-
-		// special processing for the unary - operator
-    // just get the next value and negate it
-    if(tokenfunction(*p) == op_subtract) {
-        int ro;
-        p++; t = T_NOTYPE;
-        p = getvalue(p, &f, &i64, &s, &ro, &t);                     // get the next value
-        if(t & T_NBR)
-            f = -f;                                                 // negate the MMFLOAT returned
-        else if(t & T_INT)
-            i64 = -i64;                                             // negate the integer returned
-       else
-            error("Expected a number");
-        skipspace(p);
-        *fa = f;                                                    // save what we have
-        *ia = i64;
-        *sa = s;
-        *ta = t;
-        *oo = ro;
-        return p;                                                   // return straight away as we already have the next operator
-    }
-
-    if(tokenfunction(*p) == op_add) {
-        int ro;
-        p++; t = T_NOTYPE;
-        p = getvalue(p, &f, &i64, &s, &ro, &t);                     // get the next value
-        skipspace(p);
-        *fa = f;                                                    // save what we have
-        *ia = i64;
-        *sa = s;
-        *ta = t;
-        *oo = ro;
-        return p;                                                   // return straight away as we already have the next operator
-    }
-
-
+        if(*p<=131){
+            // special processing for the unary operators
+            if(tokenfunction(*p) == op_not) {
+                int ro;
+                p++; t = T_NOTYPE;
+                p = getvalue(p, &f, &i64, &s, &ro, &t);                     // get the next value
+                if(t &T_NBR)
+                    f = (MMFLOAT)((f != 0)?0:1);                              // invert the value returned
+                else if(t & T_INT)
+                    i64 = ((i64 != 0)?0:1);
+                else
+                    error("Expected a number");
+                skipspace(p);
+                *fa = f;                                                    // save what we have
+                *ia = i64;
+                *sa = s;
+                *ta = t;
+                *oo = ro;
+                return p;                                                   // return straight away as we already have the next operator
+            } else if(tokenfunction(*p) == op_inv) {
+                int ro;
+                p++; t = T_NOTYPE;
+                p = getvalue(p, &f, &i64, &s, &ro, &t);                     // get the next value
+                if(t & T_NBR)
+                    i64 = FloatToInt64(f);
+                else if(!(t & T_INT))
+                    error("Expected a number");
+                i64 = ~i64;
+                t = T_INT;
+                skipspace(p);
+                *fa = f;                                                    // save what we have
+                *ia = i64;
+                *sa = s;
+                *ta = t;
+                *oo = ro;
+                return p;                                                   // return straight away as we already have the next operator
+            } else  if(tokenfunction(*p) == op_subtract) {
+                int ro;
+                p++; t = T_NOTYPE;
+                p = getvalue(p, &f, &i64, &s, &ro, &t);                     // get the next value
+                if(t & T_NBR)
+                    f = -f;                                                 // negate the MMFLOAT returned
+                else if(t & T_INT)
+                    i64 = -i64;                                             // negate the integer returned
+                else
+                    error("Expected a number");
+                skipspace(p);
+                *fa = f;                                                    // save what we have
+                *ia = i64;
+                *sa = s;
+                *ta = t;
+                *oo = ro;
+                return p;                                                   // return straight away as we already have the next operator
+            } else if(tokenfunction(*p) == op_add) {
+                int ro;
+                p++; t = T_NOTYPE;
+                p = getvalue(p, &f, &i64, &s, &ro, &t);                     // get the next value
+                skipspace(p);
+                *fa = f;                                                    // save what we have
+                *ia = i64;
+                *sa = s;
+                *ta = t;
+                *oo = ro;
+                return p;                                                   // return straight away as we already have the next operator
+            }
+        } 
+        if(tokentype(*p) & (T_FUN | T_FNA)) {
     // if a function execute it and save the result
-    if(tokentype(*p) & (T_FUN | T_FNA)) {
-        int tmp;
-        tp = p;
-        // if it is a function with arguments we need to locate the closing bracket and copy the argument to
-        // a temporary variable so that functions like getarg() will work.
-        if(tokentype(*p) & T_FUN) {
-            p1 = p + 1;
-            p = getclosebracket(p);                             // find the closing bracket
-            p2 = ep = GetTempMemory(STRINGSIZE);                           // this will last for the life of the command
-            while(p1 != p) *p2++ = *p1++;
+            int tmp;
+            tp = p;
+            // if it is a function with arguments we need to locate the closing bracket and copy the argument to
+            // a temporary variable so that functions like getarg() will work.
+            if(tokentype(*p) & T_FUN) {
+                p1 = p + 1;
+                p = getclosebracket(p);                             // find the closing bracket
+                p2 = ep = GetTempMemory(STRINGSIZE);                           // this will last for the life of the command
+                while(p1 != p) *p2++ = *p1++;
+            }
+            p++;                                                        // point to after the function (without argument) or after the closing bracket
+            tmp = targ = TypeMask(tokentype(*tp));                      // set the type of the function (which might need to know this)
+            tokenfunction(*tp)();                                       // execute the function
+            if((tmp & targ) == 0) error("Internal fault 2(sorry)");      // as a safety check the function must return a type the same as set in the header
+            t = targ;                                                   // save the type of the function
+            f = fret; i64 = iret; s = sret;                             // save the result
         }
-        p++;                                                        // point to after the function (without argument) or after the closing bracket
-        tmp = targ = TypeMask(tokentype(*tp));                      // set the type of the function (which might need to know this)
-        tokenfunction(*tp)();                                       // execute the function
-        if((tmp & targ) == 0) error("Internal fault 2(sorry)");      // as a safety check the function must return a type the same as set in the header
-        t = targ;                                                   // save the type of the function
-        f = fret; i64 = iret; s = sret;                             // save the result
-    }
     } else {
     // if it is a variable or a defined function, find it and get its value
     	if(isnamestart(*p)) {
