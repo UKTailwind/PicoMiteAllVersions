@@ -354,7 +354,9 @@ typedef enum {
     MMI2C,
 	MMFONTHEIGHT,
 	MMFONTWIDTH,
+#ifndef USBKEYBOARD
 	MMPS2,
+#endif
 	MMHPOS,
 	MMVPOS,
 	MMONEWIRE,
@@ -363,9 +365,11 @@ typedef enum {
 	MMWATCHDOG,
 	MMDEVICE,
 	MMCMDLINE,
+#ifdef PICOMITEWEB
 	MMMESSAGE,
     MMTOPIC,
     MMADDRESS,
+#endif
     MMEND
 } Operation;
 extern const char* overlaid_functions[];

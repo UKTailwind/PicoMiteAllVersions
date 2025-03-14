@@ -494,7 +494,6 @@ void MIPS16 cmd_list(void) {
 				c[m]= (char *)((int)c + sizeof(char *) * (CommandTableSize+x) + m*18);
 				if(m<CommandTableSize)strcpy(c[m],(char *)commandtbl[i].name);
 				if(*c[m]=='_' && c[m][1]!='(')*c[m]='.';
-//				if(*c[m]=='.' && c[m][1]=='(')*c[m]='*';
     			m++;
 		}
     	sortStrings(c,m);
@@ -514,7 +513,7 @@ void MIPS16 cmd_list(void) {
     	int ListCnt = 1;
     	step=Option.DISPLAY_CONSOLE ? HRes/gui_font_width/20 : 5;
         if(Option.DISPLAY_CONSOLE && (SPIREAD  || Option.NoScroll)){ClearScreen(gui_bcolour);CurrentX=0;CurrentY=0;}
-		int x=3+MMEND;
+		int x=4+MMEND;
 		char** c=GetTempMemory((TokenTableSize+x)*sizeof(*c)+(TokenTableSize+x)*18);
 		for(i=0;i<TokenTableSize+x;i++){
 				if(strcmp((char *)tokentbl[i].name,"~(")==0)continue;

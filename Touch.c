@@ -282,11 +282,11 @@ int __not_in_flash_func(GetTouch)(int y) {
 
     if(Option.TOUCH_CS == 0 && Option.TOUCH_IRQ ==0) error("Touch option not set");
     if(!Option.TOUCH_XZERO && !Option.TOUCH_YZERO) error("Touch not calibrated");
-    if(PinRead(Option.TOUCH_IRQ)) return TOUCH_ERROR;
+    if(PinRead(Option.TOUCH_IRQ)){ TOUCH_GETIRQTRIS=1 ; return TOUCH_ERROR;}
     if(Option.TOUCH_CAP==1){
         uint32_t in;
         if(y>=10){
-            if(readRegister8(FT6X36_ADDR, FT6X36_REG_NUM_TOUCHES)!=2){TOUCH_GETIRQTRIS=1 ; return TOUCH_ERROR;}
+            if(readRegister8(FT6X36_ADDR, FT6X36_REG_NUM_TOUCHES)!=2){ TOUCH_GETIRQTRIS=1 ; return TOUCH_ERROR;}
             in=readRegister32(FT6X36_ADDR, FT6X36_REG_P2_XH);
             y-=10;
         } else in=readRegister32(FT6X36_ADDR, FT6X36_REG_P1_XH);
