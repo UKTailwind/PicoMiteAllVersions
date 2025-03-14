@@ -45,7 +45,6 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 
 extern const uint8_t *SavedVarsFlash;
 extern const uint8_t *flash_progmemory;
-uint32_t heap_memory_size=HEAP_MEMORY_SIZE;
 // memory management parameters
 
 // allocate static memory for programs, variables and the heap
@@ -59,16 +58,21 @@ uint32_t heap_memory_size=HEAP_MEMORY_SIZE;
         #else
         unsigned char __attribute__ ((aligned (256))) AllMemory[HEAP_MEMORY_SIZE+256];
     #endif
-#else
+    unsigned char *MMHeap=AllMemory;
+    #else
     #ifdef PICOMITEVGA
-        unsigned char __attribute__ ((aligned (256))) AllMemory[HEAP_MEMORY_SIZE+256 +640*480/8];
-        unsigned char *FRAMEBUFFER=AllMemory+HEAP_MEMORY_SIZE+256;
+        unsigned char __attribute__ ((aligned (256))) Heap[HEAP_MEMORY_SIZE+256];
+        unsigned char __attribute__ ((aligned (256))) Frame[640*480/8];
+        unsigned char *FRAMEBUFFER=Frame;
         uint32_t framebuffersize=640*480/8;
+        unsigned char *MMHeap=Heap;
         #else
         unsigned char __attribute__ ((aligned (256))) AllMemory[HEAP_MEMORY_SIZE+256];
+        unsigned char *MMHeap=AllMemory;
     #endif
 #endif
-unsigned char *MMHeap=AllMemory;
+
+uint32_t heap_memory_size=HEAP_MEMORY_SIZE;
 #ifdef PICOMITEVGA
 #ifdef rp2350
 uint16_t *tilefcols;//=(uint16_t *)((uint32_t)FRAMEBUFFER+(MODE1SIZE_S*3));
@@ -93,12 +97,21 @@ uint16_t M_Background[16] ={
 };
 volatile int ytileheight=16;
 #endif
+#ifdef rp2350
 unsigned char *WriteBuf=AllMemory+HEAP_MEMORY_SIZE+256;
 unsigned char *DisplayBuf=AllMemory+HEAP_MEMORY_SIZE+256;
 unsigned char *LayerBuf=AllMemory+HEAP_MEMORY_SIZE+256;
 unsigned char *FrameBuf=AllMemory+HEAP_MEMORY_SIZE+256;
 unsigned char *SecondLayer=AllMemory+HEAP_MEMORY_SIZE+256;
 unsigned char *SecondFrame=AllMemory+HEAP_MEMORY_SIZE+256;
+#else
+unsigned char *WriteBuf=Frame;
+unsigned char *DisplayBuf=Frame;
+unsigned char *LayerBuf=Frame;
+unsigned char *FrameBuf=Frame;
+unsigned char *SecondLayer=Frame;
+unsigned char *SecondFrame=Frame;
+#endif
 #endif
 #ifdef PICOMITE
     unsigned char *WriteBuf=NULL;

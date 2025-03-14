@@ -292,7 +292,7 @@ void MIPS16 cmd_guiMX170(void) {
 #endif
             InitDisplaySPI(true);
             InitDisplayI2C(true);
-            if((Option.TOUCH_CS || Option.TOUCH_IRQ) && !Option.TOUCH_CS) {
+            if((Option.TOUCH_CS || Option.TOUCH_IRQ) && !Option.TOUCH_CAP) {
                 GetTouchValue(CMD_PENIRQ_ON);                                      // send the controller the command to turn on PenIRQ
                 GetTouchAxis(CMD_MEASURE_X);
             }
@@ -393,8 +393,8 @@ void MIPS16 cmd_guiMX170(void) {
             int x, y;
             ClearScreen(gui_bcolour);
             while(getConsole() < '\r') {
-                x = GetTouch(GET_X_AXIS, 0);
-                y = GetTouch(GET_Y_AXIS, 0);
+                x = GetTouch(GET_X_AXIS);
+                y = GetTouch(GET_Y_AXIS);
                 if(x != TOUCH_ERROR && y != TOUCH_ERROR) DrawBox(x - 1, y - 1, x + 1, y + 1, 0, WHITE, WHITE);
             }
             ClearScreen(gui_bcolour);

@@ -2079,9 +2079,8 @@ if(Option.CPU_Speed==Freq400)PO2Str("RESOLUTION", "720x400");
     if(Option.TOUCH_CS) {
         PO("TOUCH"); 
         if(Option.TOUCH_CAP==1)(MMPrintString("FT6336 "));
-        if(Option.TOUCH_CAP==2)(MMPrintString("GT911 "));
-        MMPrintString((char *)PinDef[Option.TOUCH_CS].pinname);MMputchar(',',1);;
-        MMPrintString((char *)PinDef[Option.TOUCH_IRQ].pinname);
+        MMPrintString((char *)PinDef[Option.TOUCH_CAP==1 ? Option.TOUCH_IRQ : Option.TOUCH_CS].pinname);MMputchar(',',1);
+        MMPrintString((char *)PinDef[Option.TOUCH_CAP==1 ? Option.TOUCH_CS : Option.TOUCH_IRQ].pinname);
         if(Option.TOUCH_Click) {
             MMputchar(',',1);MMPrintString((char *)PinDef[Option.TOUCH_Click].pinname);
         } else if(Option.TOUCH_CAP)MMputchar(',',1);
@@ -3964,7 +3963,6 @@ void MIPS16 cmd_option(void) {
       if(CurrentLinePtr) error("Invalid in a program");
       if(checkstring(tp, (unsigned char *)"DISABLE")) {
             if(Option.CombinedCS)error("Touch CS in use for SDcard");
-            TouchIrqPortAddr = 0;
             Option.TOUCH_Click = Option.TOUCH_CS = Option.TOUCH_IRQ = false;
         } else  {
             if(Option.TOUCH_CS) error("Touch already configured");

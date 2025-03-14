@@ -486,7 +486,7 @@ void __not_in_flash_func(routinechecks)(void){
 	if(GPSchannel)processgps();
     if(diskchecktimer == 0)CheckSDCard();
 #ifdef GUICONTROLS
-    if(Ctrl)ProcessTouch();
+    if(Ctrl && TOUCH_GETIRQTRIS && !calibrate)ProcessTouch();
 #endif
 
 //        if(tud_cdc_connected() && KeyCheck==0){
@@ -1569,7 +1569,7 @@ bool MIPS16 __not_in_flash_func(timer_callback)(repeating_timer_t *rt)
     TouchTimer++;
     if(CheckGuiFlag) CheckGuiTimeouts();                            // are blinking LEDs in use?  If so count down their timers
 
-    if(TouchIrqPortAddr && TOUCH_GETIRQTRIS){                       // is touch enabled and the PEN IRQ pin an input?
+    if(TOUCH_GETIRQTRIS){                       // is touch enabled and the PEN IRQ pin an input?
         if(TOUCH_DOWN) {                                            // is the pen down
             if(!TouchState) {                                       // yes, it is.  If we have not reported this before
                 TouchState = TouchDown = true;                      // set the flags

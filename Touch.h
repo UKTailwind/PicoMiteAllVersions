@@ -69,8 +69,8 @@ void fun_touch(void);
 
     #define GET_X_AXIS              0
     #define GET_Y_AXIS              1
-    #define GET_X_AXIS2             10
-    #define GET_Y_AXIS2             11
+    #define GET_X_AXIS2             0x10
+    #define GET_Y_AXIS2             0x11
     #define PENIRQ_ON               3
 
     #define TOUCH_NOT_CALIBRATED    -999999
@@ -100,8 +100,9 @@ void fun_touch(void);
     extern int TOUCH_CS_PIN;
     extern int TOUCH_Click_PIN;
 
-    extern int GetTouch(int x, uint8_t calibrate);
+    extern int GetTouch(int x);
     extern int GetTouchAxis(int);
+    extern int GetTouchAxisCap(int);
 #define FT6X36_ADDR						0x38
 #define FT6X36_REG_DEVICE_MODE			0x00
 #define FT6X36_REG_GESTURE_ID			0x01

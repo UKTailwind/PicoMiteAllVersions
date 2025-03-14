@@ -454,12 +454,12 @@ void fun_tilde(void){
 		case MMVER:
 			fun_version();
 			break;
-		break;
 		case MMI2C:
 			iret=mmI2Cvalue;
 			break;
 		case MMFONTHEIGHT:
 			iret = FontTable[gui_font >> 4][1] * (gui_font & 0b1111);
+			break;
 		case MMFONTWIDTH:
 			iret = FontTable[gui_font >> 4][0] * (gui_font & 0b1111);
 			break;
