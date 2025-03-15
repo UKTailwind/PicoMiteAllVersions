@@ -2342,7 +2342,7 @@ void QVgaInit()
 {
     X_TILE=Option.X_TILE;
     Y_TILE=Option.Y_TILE;
-    ytileheight=(X_TILE==80 || X_TILE==90 || X_TILE==106)? 12 : 16;
+    ytileheight=(X_TILE==80 || X_TILE==90 || X_TILE==106 || X_TILE==100)? 12 : 16;
 	// initialize PIO
 	QVgaPioInit();
 
@@ -2760,8 +2760,46 @@ void MIPS32 __not_in_flash_func(HDMIloop1)(void){
                         int pp= (Line_dup)*vgaloop4;
                         uint16_t *p=(uint16_t *)HDMIlines[line_to_load];
                         uint8_t l,d;
-                        for(int i=0; i<vgaloop4 ; i++){
-                            l=LayerBuf[pp+i];d=DisplayBuf[pp+i];
+                        register uint8_t *dd=&DisplayBuf[pp];
+                        register uint8_t *ll=&LayerBuf[pp];
+                        for(int i=0; i<vgaloop16 ; i++){
+                            l=*ll++;d=*dd++;
+                            if((l&0xf)!=transparent){
+                                *p++=map16d[l&0xf];
+                            } else {
+                                *p++=map16d[d&0xf];
+                            }
+                            d>>=4;l>>=4;
+                            if((l&0xf)!=transparent){
+                                *p++=map16d[l&0xf];
+                            } else {
+                                *p++=map16d[d&0xf];
+                            }
+                            l=*ll++;d=*dd++;
+                            if((l&0xf)!=transparent){
+                                *p++=map16d[l&0xf];
+                            } else {
+                                *p++=map16d[d&0xf];
+                            }
+                            d>>=4;l>>=4;
+                            if((l&0xf)!=transparent){
+                                *p++=map16d[l&0xf];
+                            } else {
+                                *p++=map16d[d&0xf];
+                            }
+                            l=*ll++;d=*dd++;
+                            if((l&0xf)!=transparent){
+                                *p++=map16d[l&0xf];
+                            } else {
+                                *p++=map16d[d&0xf];
+                            }
+                            d>>=4;l>>=4;
+                            if((l&0xf)!=transparent){
+                                *p++=map16d[l&0xf];
+                            } else {
+                                *p++=map16d[d&0xf];
+                            }
+                            l=*ll++;d=*dd++;
                             if((l&0xf)!=transparent){
                                 *p++=map16d[l&0xf];
                             } else {

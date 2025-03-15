@@ -547,7 +547,7 @@ int __not_in_flash_func(FindSubFun)(unsigned char *p, int type) {
 //   cmd      = pointer to the command name used by the caller (in program memory)
 //   index    = index into subfun[i] which points to the definition of the sub or funct
 //   fa, i64a, sa and typ are pointers to where the return value is to be stored (used by functions only)
-#ifdef PICOMITEWEB
+#if defined(PICOMITEWEB) || defined(PICOMITEVGA)
 #ifdef rp2350
 void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, int index, MMFLOAT *fa, long long int  *i64a, unsigned char **sa, int *typ) {
 #else

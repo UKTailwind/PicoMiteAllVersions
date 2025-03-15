@@ -49,7 +49,9 @@ const char* overlaid_functions[]={
 	"MM.I2C",
 	"MM.FONTHEIGHT",
 	"MM.FONTWIDTH",
+#ifndef USBKEYBOARD
 	"MM.PS2",
+#endif
 	"MM.HPOS",
 	"MM.VPOS",
 	"MM.ONEWIRE",
@@ -58,9 +60,11 @@ const char* overlaid_functions[]={
 	"MM.WATCHDOG",
 	"MM.DEVICE$",
 	"MM.CMDLINE$",
+#ifdef PICOMITEWEB
 	"MM.MESSAGE$",
 	"MM.ADDRESS$",
 	"MM.TOPIC$"
+#endif
 };
 /********************************************************************************************************************************************
  basic functions

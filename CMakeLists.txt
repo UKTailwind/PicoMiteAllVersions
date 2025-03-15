@@ -153,6 +153,7 @@ target_compile_options(PicoMite PRIVATE -DNDEBUG
 										-DPICO_XOSC_STARTUP_DELAY_MULTIPLIER=64 
 										-DPICO_FLASH_SIZE_BYTES=16777216
 										-DPICO_CORE1_STACK_SIZE=0x00
+										-DPICO_MALLOC_PANIC
 										-O2
 										-Wall)
 # all RP2350 variants

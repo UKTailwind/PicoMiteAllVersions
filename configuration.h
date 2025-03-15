@@ -35,7 +35,7 @@ extern "C" {
     #ifdef rp2350
         #define MAXSUBFUN           512                     // each entry takes up 4 bytes
         #define MAXVARS             768                     // 8 + MAXVARLEN + MAXDIM * 2  (ie, 56 bytes) - these do not incl array members
-        #define HEAP_MEMORY_SIZE (188*1024) 
+        #define HEAP_MEMORY_SIZE (184*1024) 
         #define FLASH_TARGET_OFFSET (864 * 1024) 
         #ifdef HDMI
             #define MAXMODES 5
@@ -60,7 +60,7 @@ extern "C" {
 #ifdef rp2350
             #define MAX_CPU     378000
 #else
-            #define MAX_CPU     378000)
+            #define MAX_CPU     378000
 #endif
             #define MIN_CPU     252000
         #endif
@@ -268,6 +268,11 @@ extern "C" {
 #define MAX3D   8 
 #define MAXCAM  3
 #define MAX_POLYGON_VERTICES 10
+#ifdef rp2350
+    #define FreqDefault 150000
+#else
+    #define FreqDefault 200000
+#endif
 #define MAXBLITBUF 64
 #define MAXRESTORE          8
 #define CONFIG_TITLE		0

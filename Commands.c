@@ -513,11 +513,10 @@ void MIPS16 cmd_list(void) {
     	int ListCnt = 1;
     	step=Option.DISPLAY_CONSOLE ? HRes/gui_font_width/20 : 5;
         if(Option.DISPLAY_CONSOLE && (SPIREAD  || Option.NoScroll)){ClearScreen(gui_bcolour);CurrentX=0;CurrentY=0;}
-		int x=4+MMEND;
-		char** c=GetTempMemory((TokenTableSize+x)*sizeof(*c)+(TokenTableSize+x)*18);
+		int x=3+MMEND;
+		char** c=GetTempMemory((TokenTableSize+x)*sizeof(*c)+(TokenTableSize+x)*20);
 		for(i=0;i<TokenTableSize+x;i++){
-				if(strcmp((char *)tokentbl[i].name,"~(")==0)continue;
-				c[m]= (char *)((int)c + sizeof(char *) * (TokenTableSize+x) + m*18);
+				c[m]= (char *)((int)c + sizeof(char *) * (TokenTableSize+x) + m*20);
 				if(m<TokenTableSize)strcpy(c[m],(char *)tokentbl[i].name);
 	   			else if(m<TokenTableSize+MMEND && m>=TokenTableSize)strcpy(c[m],overlaid_functions[i-TokenTableSize]);
     			else if(m==TokenTableSize+MMEND)strcpy(c[m],"=<");
@@ -526,9 +525,9 @@ void MIPS16 cmd_list(void) {
 				m++;
 		}
     	sortStrings(c,m);
-    	for(i=1;i<m;i+=step){
+    	for(i=1;i<m-1;i+=step){
     		for(k=0;k<step;k++){
-        		if(i+k<m){
+        		if(i+k<m-1){
         			MMPrintString(c[i+k]);
         			if(k!=(step-1))for(j=strlen(c[i+k]);j<15;j++)MMputchar(' ',1);
         		}

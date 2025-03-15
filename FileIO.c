@@ -4898,15 +4898,13 @@ void ResetOptions(bool startup)
     Option.VGAFC = 0xFFFF;
     Option.X_TILE=80;
     Option.Y_TILE=40;
+    Option.CPU_Speed = Freq252P;
     #ifdef USBKEYBOARD
         #ifdef HDMI
-            Option.CPU_Speed = Freq480P;
             Option.HDMIclock=2;
             Option.HDMId0=0;
             Option.HDMId1=6;
             Option.HDMId2=4;
-        #else
-            Option.CPU_Speed = 252000;
         #endif
         Option.USBKeyboard = CONFIG_US;
         Option.RepeatStart=600;
@@ -4919,7 +4917,6 @@ void ResetOptions(bool startup)
         Option.ColourCode=1;
     #else
         #ifdef HDMI
-            Option.CPU_Speed = Freq480P;
             Option.HDMIclock=2;
             Option.HDMId0=0;
             Option.HDMId1=6;
@@ -4927,15 +4924,14 @@ void ResetOptions(bool startup)
         #else
             Option.VGA_HSYNC=21;
             Option.VGA_BLUE=24;
-            Option.CPU_Speed = 252000;
         #endif
         Option.KEYBOARD_CLOCK=KEYBOARDCLOCK;
         Option.KEYBOARD_DATA=KEYBOARDDATA;
         Option.KeyboardConfig = CONFIG_US;
     #endif
 #else
+    Option.CPU_Speed=FreqDefault;
     #ifdef USBKEYBOARD
-        Option.CPU_Speed = 252000;
         Option.USBKeyboard = CONFIG_US;
         Option.RepeatStart=600;
         Option.RepeatRate=150;
@@ -4946,11 +4942,6 @@ void ResetOptions(bool startup)
         Option.numlock=1;
         Option.ColourCode=1;
     #else
-        #ifdef rp2350
-            Option.CPU_Speed=150000;
-        #else
-            Option.CPU_Speed = 200000;
-        #endif
         Option.KeyboardConfig = NO_KEYBOARD;
         Option.SSD_RESET = -1;
     #endif
