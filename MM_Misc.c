@@ -1921,7 +1921,7 @@ void MIPS16 printoptions(void){
 #endif
     if(Option.AllPins)PO2Str("PICO", "OFF");
 #ifdef PICOMITEVGA
-    if(!(Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq848 || Option.CPU_Speed==Freq400))PO2Int("CPUSPEED (KHz)", Option.CPU_Speed);
+    PO2Int("CPUSPEED (KHz)", Option.CPU_Speed);
     if(Option.CPU_Speed==Freq720P)PO2Str("RESOLUTION", "1280x720");
     if(Option.CPU_Speed==FreqXGA)PO2Str("RESOLUTION", "1024x768");
     if(Option.CPU_Speed==FreqSVGA)PO2Str("RESOLUTION", "800x600");
@@ -1979,11 +1979,7 @@ if(Option.HDMIclock!=2 || Option.HDMId0!=0 || Option.HDMId1!=6 ||Option.HDMId2!=
 
 #endif
 #else
-    if(Option.CPU_Speed!=200000){
-        PO("CPUSPEED ");
-        PInt(Option.CPU_Speed);
-        MMPrintString(" 'KHz\r\n");
-    }
+    PO2Int("CPUSPEED (KHz)", Option.CPU_Speed);
     if(Option.DISPLAY_CONSOLE == true) {
         PO("LCDPANEL CONSOLE");
         if(Option.DefaultFont != (Option.DISPLAY_TYPE==SCREENMODE2? (6<<4) | 1 : 0x01 ))PInt((Option.DefaultFont>>4) +1);

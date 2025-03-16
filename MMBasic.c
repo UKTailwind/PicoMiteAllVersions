@@ -2484,7 +2484,7 @@ void MIPS16 __not_in_flash_func(*findvar)(unsigned char *p, int action) {
         else mptr = GetMemory(tmp);
     }  else {
     	tmp=(nbr * (size + 1));
-    	if(tmp<=(MAXDIM-1)*sizeof(short) && j==0)mptr = (void *)&g_vartbl[ifree].dims[1];
+    	if(tmp<=(MAXDIM-1)*sizeof(g_vartbl[ifree].dims[1]) && j==0)mptr = (void *)&g_vartbl[ifree].dims[1];
     	else if(tmp<=256)mptr = GetMemory(STRINGSIZE);
         else mptr = GetMemory(tmp);
     }

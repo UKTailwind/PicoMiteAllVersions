@@ -917,7 +917,7 @@ void do_end(bool ecmd) {
     InterruptReturn = NULL ; 
     memset(inpbuf,0,STRINGSIZE);
 	CloseAudio(1);
-	closeframebuffer('A');
+	CloseAllFiles();
     ADCDualBuffering=0;
 	WatchdogSet = false;
     WDTimer = 0;
@@ -2549,7 +2549,13 @@ void  cmd_const(void) {
         else {
             if(type & T_NBR) g_vartbl[g_VarIndex].val.f = *(MMFLOAT *)v;           // and set its value
             if(type & T_INT) g_vartbl[g_VarIndex].val.i = *(long long int  *)v;
-            if(type & T_STR) Mstrcpy((unsigned char *)g_vartbl[g_VarIndex].val.s, (unsigned char *)v);
+            if(type & T_STR) {
+				if((unsigned char)*(unsigned char *)v<(MAXDIM-1)*sizeof(g_vartbl[g_VarIndex].dims[1])){
+					FreeMemorySafe((void **)&g_vartbl[g_VarIndex].val.s);
+					g_vartbl[g_VarIndex].val.s=(void *)&g_vartbl[g_VarIndex].dims[1];
+				}
+				Mstrcpy((unsigned char *)g_vartbl[g_VarIndex].val.s, (unsigned char *)v);
+			}
         }
     }
 }

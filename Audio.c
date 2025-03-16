@@ -52,9 +52,12 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #define DR_FLAC_NO_OGG
 #define DR_MP3_IMPLEMENTATION
 #define DR_MP3_NO_STDIO
-#define DRMP3_COPY_MEMORY(dst, src, sz) memcpy((dst), (src), (sz))
-#define DRMP3_ZERO_MEMORY(p, sz) memset((p), 0, (sz))
+//#define DRMP3_COPY_MEMORY(dst, src, sz) memcpy((dst), (src), (sz))
+//#define DRMP3_ZERO_MEMORY(p, sz) memset((p), 0, (sz))
 #define DR_MP3_FLOAT_OUTPUT
+#define DR_MP3_ONLY_MP3
+#define DRMP3_DATA_CHUNK_SIZE 32768
+#define MP3_BUFFER_SIZE WAV_BUFFER_SIZE*3
 #ifdef rp2350
 #include "dr_mp3.h"
 #endif
@@ -886,8 +889,8 @@ void mp3callback(char *p, int position){
     FreeMemorySafe((void *)&sbuff2);
 //	PInt(mymp3.channels);MMPrintString(" Channels\r\n");
 //	PInt(mymp3.sampleRate);MMPrintString(" Sample rate\r\n");
-    sbuff1 = GetMemory(WAV_BUFFER_SIZE*4);
-    sbuff2 = GetMemory(WAV_BUFFER_SIZE*4);
+    sbuff1 = GetMemory(MP3_BUFFER_SIZE);
+    sbuff2 = GetMemory(MP3_BUFFER_SIZE);
     fbuff1 = (float *)sbuff1;
     fbuff2 = (float *)sbuff2;
     xbuff1 = (int32_t *)sbuff1;
@@ -904,7 +907,7 @@ void mp3callback(char *p, int position){
 	} else {
 		setrate(mymp3->sampleRate);
 	}
-    bcount[1]=drmp3_read_pcm_frames_f32(mymp3, WAV_BUFFER_SIZE/2, (float*)sbuff1) * mymp3->channels;
+    bcount[1]=drmp3_read_pcm_frames_f32(mymp3, MP3_BUFFER_SIZE/8, (float*)sbuff1) * mymp3->channels;
     if(!Option.audio_i2c_bclk)fconvert(fbuff1, (uint16_t *)sbuff1, bcount[1]);
 	else i2sconvert(fbuff1, xbuff1, bcount[1]);
     wav_filesize=bcount[1];
@@ -2034,12 +2037,12 @@ void checkWAVinput(void){
 #ifdef rp2350
 			} else if(CurrentlyPlaying == P_MP3){
 				if(swingbuf==2){
-					bcount[1]=drmp3_read_pcm_frames_f32(mymp3, WAV_BUFFER_SIZE/2, (float*)sbuff1) * mymp3->channels;
+					bcount[1]=drmp3_read_pcm_frames_f32(mymp3, MP3_BUFFER_SIZE/8, (float*)sbuff1) * mymp3->channels;
 					if(!Option.audio_i2c_bclk)fconvert(fbuff1, (uint16_t *)sbuff1, bcount[1]);
 					else i2sconvert(fbuff1, xbuff1, bcount[1]);
 					wav_filesize = bcount[1];
 				} else {
-					bcount[2]=drmp3_read_pcm_frames_f32(mymp3, WAV_BUFFER_SIZE/2, (float*)sbuff2) * mymp3->channels;
+					bcount[2]=drmp3_read_pcm_frames_f32(mymp3, MP3_BUFFER_SIZE/8, (float*)sbuff2) * mymp3->channels;
 					if(!Option.audio_i2c_bclk)fconvert(fbuff2, (uint16_t *)sbuff2, bcount[2]);
 					else i2sconvert(fbuff2, xbuff2, bcount[2]);
 					wav_filesize = bcount[2];
