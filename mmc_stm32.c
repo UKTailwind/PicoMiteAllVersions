@@ -223,7 +223,7 @@ void MIPS32 __not_in_flash_func(on_pwm_wrap)(void) {
 	__dsb();
 #endif
     pwm_clear_irq(AUDIO_SLICE);
-	if(Option.audio_i2c_bclk){
+	if(Option.audio_i2s_bclk){
 		if((pioi2s->flevel & (0xf<<(i2ssm*8))) > (0x6<<(i2ssm*8)))return;
 		static int32_t left=0, right=0;
 		if(CurrentlyPlaying == P_TONE){
@@ -1809,9 +1809,9 @@ char *pinsearch(int pin){
 	else if(pin==Option.SYSTEM_CLK)strcpy(buff,"SPI SYSTEM CLK");
 	else if(pin==Option.SYSTEM_MOSI)strcpy(buff,"SPI SYSTEM MOSI");
 	else if(pin==Option.SYSTEM_MISO)strcpy(buff,"SPI SYSTEM MISO");
-	else if(pin==Option.audio_i2c_data)strcpy(buff,"I2S DATA");
-	else if(pin==Option.audio_i2c_bclk)strcpy(buff,"I2S BCLK");
-	else if(pin==PINMAP[PinDef[Option.audio_i2c_bclk].GPno+1])strcpy(buff,"I2S LRCK");
+	else if(pin==Option.audio_i2s_data)strcpy(buff,"I2S DATA");
+	else if(pin==Option.audio_i2s_bclk)strcpy(buff,"I2S BCLK");
+	else if(pin==PINMAP[PinDef[Option.audio_i2s_bclk].GPno+1])strcpy(buff,"I2S LRCK");
 #ifdef PICOMITEVGA
 #ifndef HDMI
 	else if(pin==Option.VGA_BLUE)strcpy(buff,"VGA BLUE");

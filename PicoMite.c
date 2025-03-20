@@ -197,6 +197,8 @@ volatile int ConsoleRxBufTail = 0;
 volatile char ConsoleTxBuf[CONSOLE_TX_BUF_SIZE]={0};
 volatile int ConsoleTxBufHead = 0;
 volatile int ConsoleTxBufTail = 0;
+uint I2SOff;
+
 #ifndef USBKEYBOARD
 extern void initMouse0(int sensitivity);
 volatile unsigned int MouseTimer = 0;
@@ -1899,7 +1901,6 @@ extern volatile int VGAscrolly;
 
 // pointer to current frame buffer
 uint QVGAOff;	// offset of QVGA PIO program
-uint I2SOff;
 // Scanline data buffers (commands sent to PIO)
 uint32_t ScanLineImg[3];	// image: HSYNC ... back porch ... image command
 uint32_t ScanLineFp;		// front porch
@@ -2172,9 +2173,11 @@ void QVgaPioInit()
         QVGA_VTOT	= 500;	// total scanlines (= QVGA_VSYNC + QVGA_VBACK + QVGA_VACT + QVGA_VFRONT)
     }
 	// load PIO program
-	I2SOff = pio_add_program(QVGA_PIO, &i2s_program);
+#ifdef rp2350
+    if(piomap[QVGA_PIO_NUM] && (uint64_t)0xFFFF00000000)pio_set_gpio_base(QVGA_PIO,16);
+#endif
+    I2SOff = pio_add_program(QVGA_PIO, &i2s_program);
 	QVGAOff = pio_add_program(QVGA_PIO, &qvga_program);
-
 	// configure GPIOs for use by PIO
 	for (i = QVGA_GPIO_FIRST; i <= QVGA_GPIO_LAST; i++) pio_gpio_init(QVGA_PIO, i);
 	pio_gpio_init(QVGA_PIO, QVGA_GPIO_HSYNC);
@@ -4285,12 +4288,12 @@ if(Option.CPU_Speed==FreqSVGA){ //adjust the size of the heap
 #ifdef rp2350
     if(PSRAMsize){MMPrintString("Total of ");PInt(PSRAMsize/(1024*1024));MMPrintString(" Mbytes PSRAM available\r\n");}
     #if defined(PICOMITEVGA) && !defined(HMDI)
-        start_i2s(0,1);
+        start_i2s(QVGA_PIO_NUM,1);
     #else
         start_i2s(2,1);
     #endif
 #else
-    start_i2s(0,1);
+    start_i2s(QVGA_PIO_NUM,1);
 #endif
 
    

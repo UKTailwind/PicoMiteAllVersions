@@ -148,6 +148,9 @@ extern void setwifi(unsigned char *tp);
 volatile bool TCPreceived=false;
 char *TCPreceiveInterrupt=NULL;
 #endif
+#ifdef rp2350
+uint64_t piomap[2]={0};
+#endif
 #define MAXLABEL 16
 static int sidepins=0,sideopt=0,sidepinsdir=0, PIOlinenumber=0, PIOstart=0, p_wrap=31, p_wrap_target=0;
 static int delaypossible=5;
@@ -162,9 +165,9 @@ extern bool PIO2, PIO1, PIO0;
 extern void on_pwm_wrap(void);
 PIO pioi2s;
 uint8_t i2ssm;
-#if defined( PICOMITEVGA) && !defined(HDMI)
+//#if defined( PICOMITEVGA) && !defined(HDMI)
 #include "PicoMiteI2S.pio.h"
-#endif
+//#endif
 static inline uint32_t pio_sm_calc_wrap(uint wrap_target, uint wrap) {
     uint32_t calc=0;
 //    valid_params_if(PIO, wrap < PIO_INSTRUCTION_COUNT);
@@ -292,69 +295,66 @@ int checkblock(char *p){
         return data;
 }
 extern uint I2SOff;
+extern void start_vga_i2s(void);
+extern void start_i2s(int pio, int sm);
+
 void start_i2s(int pior, int sm){
-    if(!Option.audio_i2c_bclk)return;
+    if(!Option.audio_i2s_bclk)return;
     i2ssm=sm;
-    int start=0;
 #ifdef rp2350
         pioi2s = (pior==0 ? pio0: (pior==1 ? pio1: pio2));
 #else
         pioi2s = (pior==0 ? pio0: pio1);
 #endif
-#if defined( PICOMITEVGA) && !defined(HDMI)
-	pio_sm_config cfg = i2s_program_get_default_config(I2SOff);
-        start=I2SOff;
-#else
-        struct pio_program program;
-        program.length=32;
-        program.origin=0;
-        const uint16_t prog[]={    0xe03e, //  0: set    x, 30           side 0     
-            0x8880, //  1: pull   noblock         side 1     
-            0x6001, //  2: out    pins, 1         side 0     
-            0x0842, //  3: jmp    x--, 2          side 1     
-            0xf03e, //  4: set    x, 30           side 2     
-            0x9880, //  5: pull   noblock         side 3     
-            0x7001, //  6: out    pins, 1         side 2     
-            0x1846, //  7: jmp    x--, 6          side 3   
-            0,0,0,0,0,0,0,0,  
-            0,0,0,0,0,0,0,0,  
-            0,0,0,0,0,0,0,0  
-        };
-        program.instructions=(const uint16_t *)&prog;
-        for(int sm=0;sm<4;sm++)hw_clear_bits(&pioi2s->ctrl, 1 << (PIO_CTRL_SM_ENABLE_LSB + sm));
-        pio_clear_instruction_memory(pioi2s);
-        pio_add_program(pioi2s,&program);
-        hw_clear_bits(&pioi2s->ctrl, 1 << (PIO_CTRL_SM_ENABLE_LSB + sm));
-        #endif
-	gpio_set_input_enabled(PinDef[Option.audio_i2c_data].GPno, true);
-	gpio_set_input_enabled(PinDef[Option.audio_i2c_bclk].GPno, true);
-	gpio_set_input_enabled(PinDef[Option.audio_i2c_bclk].GPno+1, true);
+#if !defined(PICOMITEVGA) || defined(HDMI)
 #ifdef rp2350
-        gpio_set_function(PinDef[Option.audio_i2c_bclk].GPno  , pior==0 ? GPIO_FUNC_PIO0 : (pior==1? GPIO_FUNC_PIO1 : GPIO_FUNC_PIO2));
-        gpio_set_function(PinDef[Option.audio_i2c_data].GPno  , pior==0 ? GPIO_FUNC_PIO0 : (pior==1? GPIO_FUNC_PIO1 : GPIO_FUNC_PIO2));
-        gpio_set_function(PinDef[Option.audio_i2c_bclk].GPno+1, pior==0 ? GPIO_FUNC_PIO0 : (pior==1? GPIO_FUNC_PIO1 : GPIO_FUNC_PIO2));
+        if(PinDef[Option.audio_i2s_bclk].GPno+1>31 || PinDef[Option.audio_i2s_data].GPno>31)pio_set_gpio_base(pioi2s,16);
+#endif
+        I2SOff = pio_add_program(pioi2s, &i2s_program);
+
+#endif
+        gpio_set_input_enabled(PinDef[Option.audio_i2s_data].GPno, true);
+	gpio_set_input_enabled(PinDef[Option.audio_i2s_bclk].GPno, true);
+	gpio_set_input_enabled(PinDef[Option.audio_i2s_bclk].GPno+1, true);
+#ifdef rp2350
+        gpio_set_function(PinDef[Option.audio_i2s_bclk].GPno  , pior==0 ? GPIO_FUNC_PIO0 : (pior==1? GPIO_FUNC_PIO1 : GPIO_FUNC_PIO2));
+        gpio_set_function(PinDef[Option.audio_i2s_data].GPno  , pior==0 ? GPIO_FUNC_PIO0 : (pior==1? GPIO_FUNC_PIO1 : GPIO_FUNC_PIO2));
+        gpio_set_function(PinDef[Option.audio_i2s_bclk].GPno+1, pior==0 ? GPIO_FUNC_PIO0 : (pior==1? GPIO_FUNC_PIO1 : GPIO_FUNC_PIO2));
 #else
-        gpio_set_function(PinDef[Option.audio_i2c_bclk].GPno  , pior==0 ? GPIO_FUNC_PIO0 : GPIO_FUNC_PIO1);
-        gpio_set_function(PinDef[Option.audio_i2c_data].GPno  , pior==0 ? GPIO_FUNC_PIO0 : GPIO_FUNC_PIO1);
-        gpio_set_function(PinDef[Option.audio_i2c_bclk].GPno+1, pior==0 ? GPIO_FUNC_PIO0 : GPIO_FUNC_PIO1);
+        gpio_set_function(PinDef[Option.audio_i2s_bclk].GPno  , pior==0 ? GPIO_FUNC_PIO0 : GPIO_FUNC_PIO1);
+        gpio_set_function(PinDef[Option.audio_i2s_data].GPno  , pior==0 ? GPIO_FUNC_PIO0 : GPIO_FUNC_PIO1);
+        gpio_set_function(PinDef[Option.audio_i2s_bclk].GPno+1, pior==0 ? GPIO_FUNC_PIO0 : GPIO_FUNC_PIO1);
 #endif
-        ExtCfg(Option.audio_i2c_bclk, EXT_BOOT_RESERVED, 0);
-        ExtCfg(Option.audio_i2c_data, EXT_BOOT_RESERVED, 0);
-        ExtCfg(PINMAP[PinDef[Option.audio_i2c_bclk].GPno+1], EXT_BOOT_RESERVED, 0);
-        int execctrl=0x7000,shiftctrl=0x40000000, pinctrl=0;
-	float clock=(float)(2822400*2);
-        pinctrl=(2<<29); // no of side set pins
-        pinctrl|=(1<<20); // no of OUT pins
-        pinctrl|=(PinDef[Option.audio_i2c_data].GPno); // OUT base
-        pinctrl|=(PinDef[Option.audio_i2c_bclk].GPno<<10);  // SIDE SET base
-#if defined( PICOMITEVGA) && !defined(HDMI)
-        execctrl=cfg.execctrl;
-//        PIntH(execctrl);PRet();
-#endif
-        pio_init(pior, sm, pinctrl, execctrl, shiftctrl, start, clock, true,false,true);
-        pio_sm_clear_fifos(pioi2s,sm);
-        pio_sm_restart(pioi2s, sm);
+        ExtCfg(Option.audio_i2s_bclk, EXT_BOOT_RESERVED, 0);
+        ExtCfg(Option.audio_i2s_data, EXT_BOOT_RESERVED, 0);
+        ExtCfg(PINMAP[PinDef[Option.audio_i2s_bclk].GPno+1], EXT_BOOT_RESERVED, 0);
+
+	// prepare default PIO program config
+	pio_sm_config cfg = i2s_program_get_default_config(I2SOff);
+
+	// map state machine's OUT and MOV pins	
+	sm_config_set_out_pins(&cfg, PinDef[Option.audio_i2s_data].GPno, 1);
+
+	// set sideset pins (BCLK and LCLK)
+	sm_config_set_sideset_pins(&cfg, PinDef[Option.audio_i2s_bclk].GPno);
+        sm_config_set_sideset(&cfg,2, false, false);
+
+        // join FIFO to send only
+	sm_config_set_fifo_join(&cfg, PIO_FIFO_JOIN_TX);
+
+	// PIO clock divider
+        float clockdiv=(Option.CPU_Speed*1000.0f)/(float)(44100*128);
+//        pio_sm_set_clkdiv(pioi2s,i2ssm,clockdiv);
+        sm_config_set_clkdiv(&cfg, clockdiv);
+        sm_config_set_out_shift(&cfg,false,false,false);
+        sm_config_set_in_shift(&cfg,false,false,false);
+
+// initialize state machine
+	pio_sm_init(pioi2s, sm, I2SOff, &cfg);
+	pio_sm_set_consecutive_pindirs(pioi2s, sm, PinDef[Option.audio_i2s_data].GPno, 1, true);
+	pio_sm_set_consecutive_pindirs(pioi2s, sm, PinDef[Option.audio_i2s_bclk].GPno, 2, true);
         pio_sm_set_enabled(pioi2s, sm, true);
+
         AUDIO_SLICE=Option.AUDIO_SLICE;
         AUDIO_WRAP=(Option.CPU_Speed*10)/441  - 1 ;
         pwm_set_wrap(AUDIO_SLICE, AUDIO_WRAP);
@@ -1420,6 +1420,7 @@ void MIPS16 cmd_pio(void){
     }
     error("Syntax");
 }
+
 void fun_pio(void){
     unsigned char *tp;
     tp = checkstring(ep, (unsigned char *)"PINCTRL");

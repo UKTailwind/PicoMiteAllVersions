@@ -653,7 +653,6 @@ void RestoreLine(int x1,int y1,int x2,int y2, char *buff){
 
 void DrawLine(int x1, int y1, int x2, int y2, int w, int c) {
 
-
     if(y1 == y2) {
         DrawRectangle(x1, y1, x2, y2 + w - 1, c);                   // horiz line
     if(Option.Refresh)Display_Refresh();
@@ -668,6 +667,23 @@ void DrawLine(int x1, int y1, int x2, int y2, int w, int c) {
     dx = abs(x2 - x1); sx = x1 < x2 ? 1 : -1;
     dy = -abs(y2 - y1); sy = y1 < y2 ? 1 : -1;
     err = dx + dy;
+    if(w>1){
+        if(abs(dy)>dx){
+            int left=-(w-1)/2;
+            int right=w+left;
+            for(int i=left;i<right;i++){
+                if(i==0)continue;
+                DrawLine(x1+i,y1,x2+i,y2,1,c);
+            }
+        } else {
+            int top=-(w-1)/2;
+            int bottom=w+top;
+            for(int i=top;i<bottom;i++){
+                if(i==0)continue;
+                DrawLine(x1,y1+i,x2,y2+i,1,c);
+            }
+        }
+    }
     while(1) {
         DrawBuffered(x1, y1, c,0);
         e2 = 2 * err;
@@ -6149,7 +6165,24 @@ void MIPS16 cmd_font(void) {
         SetFont(((getint(argv[0], 1, FONT_TABLE_SIZE) - 1) << 4) | 1);
     if(Option.DISPLAY_CONSOLE && !CurrentLinePtr) {                 // if we are at the command prompt on the LCD
 #ifdef PICOMITEVGA
-        ytileheight=gui_font_height;
+        if(gui_font_height>=8){
+            ytileheight=gui_font_height;
+            Y_TILE=(VRes+ytileheight-1)/ytileheight;
+            for(int i=0;i<X_TILE*Y_TILE;i++){
+#if defined(rp2350) && defined(HDMI)
+                if(FullColour){
+                    tilefcols[i]=tilefcols[0];
+                    tilebcols[i]=tilebcols[0];
+                } else {
+                    tilefcols_w[i]=tilefcols_w[0];
+                    tilebcols_w[i]=tilebcols_w[0];
+                }
+#else
+                tilefcols[i]=tilefcols[0];
+                tilebcols[i]=tilebcols[0];
+#endif                
+            }
+        }
 #endif
         PromptFont = gui_font;
         if(CurrentY + gui_font_height >= VRes) {
@@ -7977,7 +8010,7 @@ void DisplayPutC(char c) {
         case '\r':  CurrentX = 0;
                     return;
         case '\n':  CurrentY += gui_font_height;
-                    if(CurrentY + gui_font_height >= VRes) {
+                    if(CurrentY + gui_font_height >= (VRes/gui_font_height)*gui_font_height) {
                         if(Option.NoScroll && Option.DISPLAY_CONSOLE){ClearScreen(gui_bcolour);CurrentX=0;CurrentY=0;}
                         else {
                             ScrollLCD(CurrentY + gui_font_height - VRes);

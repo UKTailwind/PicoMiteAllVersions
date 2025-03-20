@@ -165,8 +165,22 @@ void VGArecovery(int pin){
         ExtCurrentConfig[PINMAP[PinDef[Option.VGA_BLUE].GPno+2]]=EXT_BOOT_RESERVED;
         ExtCurrentConfig[PINMAP[PinDef[Option.VGA_BLUE].GPno+3]]=EXT_BOOT_RESERVED;
         ExtCurrentConfig[PINMAP[PinDef[Option.VGA_HSYNC].GPno+1]]=EXT_BOOT_RESERVED;
+
         if(pin)error("Pin %/| is in use",pin,pin);
- }
+#ifdef rp2350
+        piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)PinDef[Option.VGA_BLUE].GPno);
+        piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.VGA_BLUE].GPno+1));
+        piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.VGA_BLUE].GPno+2));
+        piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.VGA_BLUE].GPno+3));
+        piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)PinDef[Option.VGA_HSYNC].GPno);
+        piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.VGA_HSYNC].GPno+1));
+        if(Option.audio_i2s_bclk){
+            piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)PinDef[Option.audio_i2s_data].GPno);
+            piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)PinDef[Option.audio_i2s_bclk].GPno);
+            piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.audio_i2s_bclk].GPno+1));
+        }
+#endif
+    }
 #endif
 #endif
 extern const uint8_t *flash_target_contents;
@@ -1466,7 +1480,8 @@ void MIPS16 cmd_library(void) {
         
        //MMPrintString("\r\n Size=1 ");PInt(m - MemBuff);
         p = ProgMemory;
-        while(*p != 0xff) {
+        while(!(p[0] == 0xff && p[1] == 0xff)){
+//        while(*p != 0xff) {
             if(p[0] == 0 && p[1] == 0) break;                       // end of the program
             if(*p == T_NEWLINE) {
                 TempPtr = m;
@@ -2133,15 +2148,15 @@ if(Option.HDMIclock!=2 || Option.HDMId0!=0 || Option.HDMId1!=6 ||Option.HDMId2!=
     	MMPrintString(buff);
     }
 #endif
-    if(Option.AUDIO_L || Option.AUDIO_CLK_PIN || Option.audio_i2c_bclk){
+    if(Option.AUDIO_L || Option.AUDIO_CLK_PIN || Option.audio_i2s_bclk){
         PO("AUDIO");
         if(Option.AUDIO_L){
             MMPrintString((char *)PinDef[Option.AUDIO_L].pinname);MMputchar(',',1);
             MMPrintString((char *)PinDef[Option.AUDIO_R].pinname);
-        } else if(Option.audio_i2c_data){
+        } else if(Option.audio_i2s_data){
             MMPrintString((char *)"I2S ");
-            MMPrintString((char *)PinDef[Option.audio_i2c_bclk].pinname);MMputchar(',',1);
-            MMPrintString((char *)PinDef[Option.audio_i2c_data].pinname);
+            MMPrintString((char *)PinDef[Option.audio_i2s_bclk].pinname);MMputchar(',',1);
+            MMPrintString((char *)PinDef[Option.audio_i2s_data].pinname);
         } else if(!Option.AUDIO_DCS_PIN){
             MMPrintString((char *)"SPI ");
             MMPrintString((char *)PinDef[Option.AUDIO_CS_PIN].pinname);MMputchar(',',1);
@@ -2307,16 +2322,16 @@ void disable_audio(void){
     if(!IsInvalidPin(Option.AUDIO_RESET_PIN))ExtCurrentConfig[Option.AUDIO_RESET_PIN] = EXT_DIG_IN ;   
     if(!IsInvalidPin(Option.AUDIO_RESET_PIN))ExtCfg(Option.AUDIO_RESET_PIN, EXT_NOT_CONFIG, 0);
 
-    if(!IsInvalidPin(Option.audio_i2c_bclk))ExtCurrentConfig[Option.audio_i2c_bclk] = EXT_DIG_IN ;   
-    if(!IsInvalidPin(Option.audio_i2c_bclk))ExtCfg(Option.audio_i2c_bclk, EXT_NOT_CONFIG, 0);
+    if(!IsInvalidPin(Option.audio_i2s_bclk))ExtCurrentConfig[Option.audio_i2s_bclk] = EXT_DIG_IN ;   
+    if(!IsInvalidPin(Option.audio_i2s_bclk))ExtCfg(Option.audio_i2s_bclk, EXT_NOT_CONFIG, 0);
 
 
-    if(!IsInvalidPin(PINMAP[PinDef[Option.audio_i2c_bclk].GPno+1]))ExtCurrentConfig[PINMAP[PinDef[Option.audio_i2c_bclk].GPno+1]] = EXT_DIG_IN ;   
-    if(!IsInvalidPin(PINMAP[PinDef[Option.audio_i2c_bclk].GPno+1]))ExtCfg(PINMAP[PinDef[Option.audio_i2c_bclk].GPno+1], EXT_NOT_CONFIG, 0);
+    if(!IsInvalidPin(PINMAP[PinDef[Option.audio_i2s_bclk].GPno+1]))ExtCurrentConfig[PINMAP[PinDef[Option.audio_i2s_bclk].GPno+1]] = EXT_DIG_IN ;   
+    if(!IsInvalidPin(PINMAP[PinDef[Option.audio_i2s_bclk].GPno+1]))ExtCfg(PINMAP[PinDef[Option.audio_i2s_bclk].GPno+1], EXT_NOT_CONFIG, 0);
 
 
-    if(!IsInvalidPin(Option.audio_i2c_data))ExtCurrentConfig[Option.audio_i2c_data] = EXT_DIG_IN ;   
-    if(!IsInvalidPin(Option.audio_i2c_data))ExtCfg(Option.audio_i2c_data, EXT_NOT_CONFIG, 0);
+    if(!IsInvalidPin(Option.audio_i2s_data))ExtCurrentConfig[Option.audio_i2s_data] = EXT_DIG_IN ;   
+    if(!IsInvalidPin(Option.audio_i2s_data))ExtCfg(Option.audio_i2s_data, EXT_NOT_CONFIG, 0);
 
     Option.AUDIO_L=0;
     Option.AUDIO_R=0;
@@ -2327,8 +2342,8 @@ void disable_audio(void){
     Option.AUDIO_RESET_PIN=0;
     Option.AUDIO_MOSI_PIN=0;
     Option.AUDIO_MISO_PIN=0;
-    Option.audio_i2c_bclk=0;
-    Option.audio_i2c_data=0;
+    Option.audio_i2s_bclk=0;
+    Option.audio_i2s_data=0;
     Option.AUDIO_SLICE=99;
 }
 #ifndef PICOMITEVGA
@@ -2675,8 +2690,8 @@ OPTION PLATFORM HDMIUSB
             Option.ColourCode = 1;
             Option.modbuffsize=512;
             Option.modbuff = true; 
-            Option.audio_i2c_bclk=PINMAP[10];
-            Option.audio_i2c_data=PINMAP[22];
+            Option.audio_i2s_bclk=PINMAP[10];
+            Option.audio_i2s_data=PINMAP[22];
             Option.AUDIO_SLICE=11;
             Option.SD_CS=PINMAP[29];
             Option.SD_CLK_PIN=PINMAP[30];
@@ -3764,6 +3779,21 @@ void MIPS16 cmd_option(void) {
         if(ExtCurrentConfig[testpin] != EXT_NOT_CONFIG)VGArecovery(testpin);
         testpin=PINMAP[PinDef[pin2].GPno+3];
         if(ExtCurrentConfig[testpin] != EXT_NOT_CONFIG)VGArecovery(testpin);
+#ifdef rp2350
+        uint64_t map=0;
+        if(Option.audio_i2s_bclk){
+            map|=(uint64_t)((uint64_t)1<<(uint64_t)PinDef[Option.audio_i2s_data].GPno);
+            map|=(uint64_t)((uint64_t)1<<(uint64_t)PinDef[Option.audio_i2s_bclk].GPno);
+            map|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.audio_i2s_bclk].GPno+1));
+        }
+        map|=(uint64_t)((uint64_t)1<<(uint64_t)PinDef[pin2].GPno);
+        map|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[pin2].GPno+1));
+        map|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[pin2].GPno+2));
+        map|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[pin2].GPno+3));
+        map|=(uint64_t)((uint64_t)1<<(uint64_t)PinDef[pin1].GPno);
+        map|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[pin1].GPno+1));
+        if((map & (uint64_t)0xFFFF) && (map & (uint64_t)0xFFFF00000000))error("Attempt to define incompatible PIO pins");
+#endif
         Option.VGA_HSYNC=pin1;
         Option.VGA_BLUE=pin2;
         SaveOptions();
@@ -4261,7 +4291,7 @@ void MIPS16 cmd_option(void) {
             int pin1,pin2,pin3;
             getargs(&p,3,(unsigned char *)",");
             if(argc!=3)error("Syntax");
-            if(Option.AUDIO_CLK_PIN || Option.AUDIO_L || Option.audio_i2c_bclk)error("Audio already configured");
+            if(Option.AUDIO_CLK_PIN || Option.AUDIO_L || Option.audio_i2s_bclk)error("Audio already configured");
             unsigned char code;
 //
             if(!(code=codecheck(argv[0])))argv[0]+=2;
@@ -4279,14 +4309,25 @@ void MIPS16 cmd_option(void) {
             if(!code)pin2=codemap(pin2);
             if(IsInvalidPin(pin2)) error("Invalid pin");
             if(ExtCurrentConfig[pin2] != EXT_NOT_CONFIG || pin2==pin1 || pin2==pin3)  error("Pin %/| is in use",pin2,pin2);
+
 //
-            Option.audio_i2c_bclk=pin1;
-            Option.audio_i2c_data=pin2;
 #ifdef rp2350
+    #if defined(PICOMITEVGA) && !defined(HMDI)
+            int pio=QVGA_PIO_NUM;
+    #else
+            int pio=2;
+    #endif
+    uint64_t map=piomap[pio]; 
+            map|=(uint64_t)((uint64_t)1<< (uint64_t)PinDef[pin2].GPno);
+            map|=((uint64_t)1<< (uint64_t)PinDef[pin1].GPno);
+            map|=((uint64_t)1<<(uint64_t)(PinDef[pin1].GPno+1));
+            if((map & (uint64_t)0xFFFF) && (map & (uint64_t)0xFFFF00000000))error("Attempt to define incompatible PIO pins");
             if(rp2350a)slice=11;
             else
 #endif
             slice=checkslice(pin1,pin1, 1);
+            Option.audio_i2s_bclk=pin1;
+            Option.audio_i2s_data=pin2;
             if((PinDef[Option.DISPLAY_BL].slice & 0x7f) == slice) error("Channel in use for backlight");
             Option.AUDIO_SLICE=slice;
             SaveOptions();

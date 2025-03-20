@@ -150,8 +150,8 @@ struct option_s {
     unsigned char TOUCH_CAP;
     unsigned char SSD_DATA;
     unsigned char THRESHOLD_CAP;
-    unsigned char audio_i2c_data;
-    unsigned char audio_i2c_bclk;
+    unsigned char audio_i2s_data;
+    unsigned char audio_i2s_bclk;
     char LCDVOP;
     char I2Coffset;
     unsigned char NoHeartbeat; 

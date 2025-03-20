@@ -333,7 +333,13 @@ extern "C" {
 #define HEARTBEATpin  Option.heartbeatpin
 #define PATH_MAX 1024
 // QVGA PIO and state machines
-#define QVGA_PIO	pio0	// QVGA PIO
+#define QVGA_PIO_NUM 0	
+#ifdef rp2350
+#define QVGA_PIO (QVGA_PIO_NUM==0 ? pio0: (QVGA_PIO_NUM==1 ? pio1: pio2))
+#else
+#define QVGA_PIO (QVGA_PIO_NUM==0 ?  pio0: pio1)
+#endif
+// QVGA PIO
 #define QVGA_SM		0	// QVGA state machine
 #define QVGA_I2S_SM 1   //I2S state machine when running VGA
 #define MIPS16 __attribute__ ((optimize("-Os")))
