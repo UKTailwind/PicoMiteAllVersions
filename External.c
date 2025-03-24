@@ -339,7 +339,15 @@ void __not_in_flash_func(PinSetBit)(int pin, unsigned int offset) {
 }
 
 int IsInvalidPin(int pin) {
+#ifdef rp2350
+    #ifdef PICOMITEWEB
+        if(pin < 1 || pin > NBRPINS) return true;
+    #else
+        if(pin < 1 || pin > (rp2350a ? 44: NBRPINS)) return true;
+    #endif
+#else
     if(pin < 1 || pin > NBRPINS) return true;
+#endif
     if(PinDef[pin].mode & UNUSED) return true;
     return false;
 }

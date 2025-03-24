@@ -1848,11 +1848,10 @@ void hashlabels(unsigned char *p,int ErrAbort){
     		}
             if(hash==originalhash){
                 MMPrintString("Error: Too many labels - erasing program\r\n");
-                uSec(100000);
-                ClearProgram();
-                cmdline=NULL;
-                do_end(false);
-                longjmp(mark, 1);												// jump back to the input prompt
+                unsigned char dummy=0;
+                cmdline=&dummy;
+                cmd_new();
+                // jump back to the input prompt
             }
     		funtbl[hash].index=(uint32_t)lastp;
             for(j=0;j<p[0];j++)funtbl[hash].name[j]=mytoupper(p[j+1]);
@@ -2069,7 +2068,7 @@ void MIPS16 __not_in_flash_func(*findvar)(unsigned char *p, int action) {
 #endif
     unsigned char name[MAXVARLEN + 1];
     int i=0, j, size, ifree, globalifree, localifree, nbr, vtype, vindex, namelen, tmp;
-    unsigned char *s, *x, u;
+    unsigned char *s, *x, u, suffix=0;
     void *mptr;
 //    int hashIndex=0;
     int GlobalhashIndex, OriginalGlobalHash;
@@ -2111,14 +2110,17 @@ void MIPS16 __not_in_flash_func(*findvar)(unsigned char *p, int action) {
     if(*p == '$') {
         if((action & T_IMPLIED) && !(action & T_STR)) error("Conflicting variable type");
         vtype = T_STR;
+        suffix=1;
         p++;
     } else if(*p == '%') {
         if((action & T_IMPLIED) && !(action & T_INT)) error("Conflicting variable type");
         vtype = T_INT;
+        suffix=1;
         p++;
     } else if(*p == '!') {
         if((action & T_IMPLIED) && !(action & T_NBR)) error("Conflicting variable type");
         vtype = T_NBR;
+        suffix=1;
         p++;
     } else if((action & V_DIM_VAR) && DefaultType == T_NOTYPE && !(action & T_IMPLIED))
         error("Variable type not specified");
@@ -2431,6 +2433,7 @@ void MIPS16 __not_in_flash_func(*findvar)(unsigned char *p, int action) {
     while(j--) *x++ = *s++;
     if(namelen < MAXVARLEN)*x++ = 0;
     g_vartbl[ifree].type = vtype | (action & (T_IMPLIED | T_CONST));
+    if(suffix)g_vartbl[ifree].type|=T_EXPLICIT;
     if(ifree<MAXVARS/2){
     	g_hashlist[g_hashlistpointer].level=g_LocalIndex;
     	g_hashlist[g_hashlistpointer++].hash=ifree;
@@ -2494,6 +2497,7 @@ void MIPS16 __not_in_flash_func(*findvar)(unsigned char *p, int action) {
     // the variable that were saved previously and set the variables pointer to the
     // allocated memory
     g_vartbl[ifree].type = vtype | (action & (T_IMPLIED | T_CONST));
+    if(suffix)g_vartbl[ifree].type|=T_EXPLICIT;
     *g_vartbl[ifree].name = i;
     g_vartbl[ifree].dims[0] = j;
     g_vartbl[ifree].size = size;
@@ -3284,7 +3288,7 @@ int GetCommandValue( unsigned char *n) {
     for(i = 0; i < CommandTableSize - 1; i++)
         if(str_equal(n, commandtbl[i].name))
             return i;
-    error("Internal fault 3(sorry)");
+    error("Invalid statement in Type definition");
     return 0;
 }
 

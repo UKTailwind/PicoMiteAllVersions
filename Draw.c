@@ -653,50 +653,72 @@ void RestoreLine(int x1,int y1,int x2,int y2, char *buff){
 
 void DrawLine(int x1, int y1, int x2, int y2, int w, int c) {
 
-    if(y1 == y2) {
+    if(y1 == y2  && w>0) {
         DrawRectangle(x1, y1, x2, y2 + w - 1, c);                   // horiz line
     if(Option.Refresh)Display_Refresh();
         return;
     }
-    if(x1 == x2) {
+    if(x1 == x2 && w>0) {
         DrawRectangle(x1, y1, x2 + w - 1, y2, c);                   // vert line
     if(Option.Refresh)Display_Refresh();
         return;
     }
-    int  dx, dy, sx, sy, err, e2;
-    dx = abs(x2 - x1); sx = x1 < x2 ? 1 : -1;
-    dy = -abs(y2 - y1); sy = y1 < y2 ? 1 : -1;
-    err = dx + dy;
-    if(w>1){
-        if(abs(dy)>dx){
-            int left=-(w-1)/2;
-            int right=w+left;
-            for(int i=left;i<right;i++){
-                if(i==0)continue;
-                DrawLine(x1+i,y1,x2+i,y2,1,c);
+    if(w==1 || w==-1){
+        int  dx, dy, sx, sy, err, e2;
+        dx = abs(x2 - x1); sx = x1 < x2 ? 1 : -1;
+        dy = -abs(y2 - y1); sy = y1 < y2 ? 1 : -1;
+        err = dx + dy;
+        while(1) {
+            DrawBuffered(x1, y1, c,0);
+            e2 = 2 * err;
+            if (e2 >= dy) {
+                if (x1 == x2) break;
+                err += dy; x1 += sx;
             }
-        } else {
-            int top=-(w-1)/2;
-            int bottom=w+top;
-            for(int i=top;i<bottom;i++){
-                if(i==0)continue;
-                DrawLine(x1,y1+i,x2,y2+i,1,c);
+            if (e2 <= dx) {
+                if (y1 == y2) break;
+                err += dx; y1 += sy;
             }
         }
+        DrawBuffered(0, 0, 0, 1);
+    } else {
+    float start,end;
+    if(w<0){
+        w=abs(w);
+        start=-(w / 2.0f);
+        end=w / 2.0f;
+    } else {
+        start=0.0f;
+        end=w;
     }
-    while(1) {
-        DrawBuffered(x1, y1, c,0);
-        e2 = 2 * err;
-        if (e2 >= dy) {
-            if (x1 == x2) break;
-            err += dy; x1 += sx;
-        }
-        if (e2 <= dx) {
-            if (y1 == y2) break;
-            err += dx; y1 += sy;
+    // Calculate the line direction and length
+    float dx = x2 - x1;
+    float dy = y2 - y1;
+    float length = sqrtf(dx * dx + dy * dy);
+
+    // Normalize direction vector
+    float nx = dx / length;
+    float ny = dy / length;
+
+    // Calculate the perpendicular vector for width
+    float px = -ny;
+    float py = nx;
+
+    // Half-width adjustment
+
+    // Loop through every pixel inside the bounding rectangle of the line
+    for (int i = 0; i <= length; i++) {
+        float lineX = x1 + i * nx;
+        float lineY = y1 + i * ny;
+
+        for (float j = start; j <= end; j += 0.25f) { // Finer granularity
+            float pixelX = lineX + j * px;
+            float pixelY = lineY + j * py;
+
+            DrawPixel(roundf(pixelX), roundf(pixelY), c);
         }
     }
-    DrawBuffered(0, 0, 0, 1);
+    }
     if(Option.Refresh)Display_Refresh();
 }
 
@@ -1721,19 +1743,36 @@ void cmd_circle(void) {
  * The following section will be excluded from the documentation.
  */
 static short xb0,xb1,yb0,yb1;
-void MIPS16 drawAAPixel( int x , int y , MMFLOAT brightness, uint32_t c){
+void GetPixel(int x, int y, int *r, int *g, int *b){
+    union colourmap
+    {
+        char rgbbytes[4];
+        unsigned int rgb;
+    } c;
+    ReadBuffer(x,y,x,y,(unsigned char *)&c.rgb);
+    *r=c.rgbbytes[2];
+    *g=c.rgbbytes[1];
+    *b=c.rgbbytes[0];
+}
+
+void MIPS16 drawAAPixel( int x , int y , MMFLOAT alpha, uint32_t c){
+    int bgR, bgG, bgB;
+
+    // Get the current background color of the pixel
+    GetPixel(x, y, &bgR, &bgG, &bgB);
     union colourmap
     {
         unsigned char rgbbytes[4];
         unsigned int rgb;
     } col;
 	col.rgb=c;
-	col.rgbbytes[0]= (unsigned char)((MMFLOAT)col.rgbbytes[0]*brightness);
-	col.rgbbytes[1]= (unsigned char)((MMFLOAT)col.rgbbytes[1]*brightness);
-	col.rgbbytes[2]= (unsigned char)((MMFLOAT)col.rgbbytes[2]*brightness);
-//	if(((x>=xb0 && x<=xb1) && (y>=yb0 && y<=yb1)))
-    DrawPixel(x,y,col.rgb);
-//    else PInt(x),PIntComma(y);PRet();
+	col.rgbbytes[0]= (unsigned char)((MMFLOAT)col.rgbbytes[0]*alpha);
+	col.rgbbytes[0]+=(unsigned char)((MMFLOAT)bgB*(1.0-alpha));
+	col.rgbbytes[1]= (unsigned char)((MMFLOAT)col.rgbbytes[1]*alpha);
+	col.rgbbytes[1]+=(unsigned char)((MMFLOAT)bgG*(1.0-alpha));
+	col.rgbbytes[2]= (unsigned char)((MMFLOAT)col.rgbbytes[2]*alpha);
+	col.rgbbytes[2]+=(unsigned char)((MMFLOAT)bgR*(1.0-alpha));
+ 	if(((x>=xb0 && x<=xb1) && (y>=yb0 && y<=yb1)))DrawPixel(x,y,col.rgb);
 }
 void MIPS16 drawAALine(MMFLOAT x0 , MMFLOAT y0 , MMFLOAT x1 , MMFLOAT y1, uint32_t c, int w)
 {
@@ -1819,7 +1858,7 @@ void MIPS16 drawAALine(MMFLOAT x0 , MMFLOAT y0 , MMFLOAT x1 , MMFLOAT y1, uint32
 			rfpart = 1 - fpart;
 			MMFLOAT y = floor(intery);
 			drawAAPixel(y    , x, rfpart, c);
-			for(int i=1;i<=w;i++) drawAAPixel(y + i, x, 1, c);
+			for(int i=1;i<w;i++) drawAAPixel(y + i, x, 1, c);
 			drawAAPixel(y + w, x,  fpart, c);
 			intery = intery + gradient;
 		}
@@ -1829,7 +1868,7 @@ void MIPS16 drawAALine(MMFLOAT x0 , MMFLOAT y0 , MMFLOAT x1 , MMFLOAT y1, uint32
 			rfpart = 1 - fpart;
 			MMFLOAT y = floor(intery);
 			drawAAPixel(x, y    , rfpart, c);
-			for(int i=1;i<=w;i++) drawAAPixel(x, y + i, 1, c);
+			for(int i=1;i<w;i++) drawAAPixel(x, y + i, 1, c);
 			drawAAPixel(x, y + w,  fpart, c);
 			intery = intery + gradient;
 		}
@@ -1960,7 +1999,8 @@ void cmd_line(void) {
                     CurrentY=y2;
                 }
                 if(argc > 7 && *argv[8]){
-                    w = getint(argv[8], 1, 100);
+                    w = getint(argv[8], -100, 100);
+                    if(!w)return;
                 }
                 if(argc == 11) c = getint(argv[10], 0, WHITE);
                 DrawLine(x1, y1, x2, y2, w, c);        
@@ -1968,12 +2008,12 @@ void cmd_line(void) {
                 c = gui_fcolour;  w = 1;                                        // setup the defaults
                 if(argc > 7 && *argv[8]){
                     getargaddress(argv[8], &wptr, &wfptr, &nw); 
-                    if(nw == 1) w = getint(argv[8], 0, 100);
+                    if(nw == 1) w = getint(argv[8], -100, 100);
                     else if(nw>1) {
                         if(nw > 1 && nw < n) n=nw; //adjust the dimensionality
                         for(i=0;i<nw;i++){
                             w = (wfptr == NULL ? wptr[i] : (int)wfptr[i]);
-                            if(w < 0 || w > 100) error("% is invalid (valid is % to %)", (int)w, 0, 100);
+                            if(w < -100 || w > 100) error("% is invalid (valid is % to %)", (int)w, 0, 100);
                         }
                     }
                 }
@@ -1995,7 +2035,7 @@ void cmd_line(void) {
                     y2 = (y2fptr==NULL ? y2ptr[i] : (int)y2fptr[i]);
                     if(nw > 1) w = (wfptr==NULL ? wptr[i] : (int)wfptr[i]);
                     if(nc > 1) c = (cfptr==NULL ? cptr[i] : (int)cfptr[i]);
-                    DrawLine(x1, y1, x2, y2, w, c);
+                    if(w)DrawLine(x1, y1, x2, y2, w, c);
                 }
             }
         }

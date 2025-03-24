@@ -57,7 +57,7 @@ extern "C" {
 #define T_IMPLIED   0x10                            // the variables type does not have to be specified with a suffix
 #define T_CONST     0x20                            // the contents of this variable cannot be changed
 #define T_BLOCKED   0x40                            // Hash table entry blocked after ERASE
-
+#define T_EXPLICIT  0x80                            // Was the variable specified with a type suffix
 #define TypeMask(a) ((a) & (T_NBR | T_INT | T_STR)) // macro to isolate the variable type bits
 
 // types of tokens.  These are or'ed with the data types above to fully define a token

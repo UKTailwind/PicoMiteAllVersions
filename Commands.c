@@ -475,6 +475,63 @@ void MIPS16 cmd_list(void) {
         	checkend(p);
         }
    	} else if((p = checkstring(cmdline, (unsigned char *)"VARIABLES"))) {
+		int count=0;
+		for(int i=0;i<MAXVARS;i++){
+			if(g_vartbl[i].type & (T_INT|T_STR|T_NBR)){
+				count++;
+			}
+		}
+		if(!count)return;
+		char** c=GetTempMemory(count*sizeof(*c)+count*(MAXVARLEN+30));
+		for(int i=0,j=0;i<MAXVARS;i++){
+			char out[MAXVARLEN+30];
+			if(g_vartbl[i].type & (T_INT|T_STR|T_NBR)){
+				if(g_vartbl[i].level==0)strcpy(out,"DIM ");
+				else strcpy(out,"LOCAL ");
+				if(!(g_vartbl[i].type & T_EXPLICIT)){
+					if(g_vartbl[i].type & T_INT){
+						if(!(g_vartbl[i].type & T_EXPLICIT))strcat(out,"INTEGER ");
+					}
+					if(g_vartbl[i].type & T_STR){
+						if(!(g_vartbl[i].type & T_EXPLICIT))strcat(out,"STRING ");
+					}
+					if(g_vartbl[i].type & T_NBR){
+						if(!(g_vartbl[i].type & T_EXPLICIT))strcat(out,"FLOAT ");
+					}
+				}
+				strcat(out,(char *)g_vartbl[i].name);
+				if(g_vartbl[i].type & T_INT){
+					if(g_vartbl[i].type & T_EXPLICIT)strcat(out,"%");
+				}
+				if(g_vartbl[i].type & T_STR){
+					if(g_vartbl[i].type & T_EXPLICIT)strcat(out,"$");
+				}
+				if(g_vartbl[i].type & T_NBR){
+					if(g_vartbl[i].type & T_EXPLICIT)strcat(out,"!");
+				}
+				if(g_vartbl[i].dims[0]>0){
+					strcat(out,"(");
+					for(int k=0;k<MAXDIM;k++){
+						if(g_vartbl[i].dims[k]>0){
+							char s[20];
+							IntToStr(s, (int64_t)g_vartbl[i].dims[k], 10);
+							strcat(out,s)					;
+						}
+						if(k<MAXDIM-1 && g_vartbl[i].dims[k+1]>0)strcat(out,",");
+					}
+					strcat(out,")");
+				}
+				c[j]= (char *)((int)c + sizeof(char *) * count + j*(MAXVARLEN+30));
+				strcpy(c[j],out);
+				j++;
+			}
+		}
+		sortStrings(c,count);
+    	int ListCnt = 1;
+		for(int i=0;i<count;i++){
+			MMPrintString(c[i]);
+			if(Option.DISPLAY_CONSOLE)ListNewLine(&ListCnt, 0);
+		}
 		
    	} else if((p = checkstring(cmdline, (unsigned char *)"PINS"))) {
 		CallExecuteProgram((char *)pinlist);

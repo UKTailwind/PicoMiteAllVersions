@@ -5580,9 +5580,6 @@ void cmd_cfunction(void) {
     }
 }
 
-
-
-
 // utility function used by cmd_poke() to validate an address
 unsigned int GetPokeAddr(unsigned char *p) {
     unsigned int i;

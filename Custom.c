@@ -367,6 +367,25 @@ void start_i2s(int pior, int sm){
         else if(pior==1)PIO1=false;
         else PIO0=false;
 }
+int getGPpin(unsigned char *pinarg, int pio, int base){
+	char code;
+        int pin;
+	if(!(code=codecheck(pinarg)))pinarg+=2;
+	pin = getinteger(pinarg);
+	if(!code)pin=codemap(pin);
+        if(IsInvalidPin(pin)) error("Invalid pin");
+        if(!(ExtCurrentConfig[pin] == EXT_NOT_CONFIG || 
+                ExtCurrentConfig[pin] == EXT_DIG_IN ||
+                (ExtCurrentConfig[pin] == EXT_PIO0_OUT && pio==0) ||
+                (ExtCurrentConfig[pin] == EXT_PIO1_OUT && pio==1)
+#ifdef rp2350
+                || (ExtCurrentConfig[pin] == EXT_PIO2_OUT && pio==2)
+#endif
+        )) error("Pin in use");
+        if(PinDef[pin].GPno<base || PinDef[pin].GPno>base+31)error("Pin out of range for base %");
+        return PinDef[pin].GPno;
+
+}
 
 /*  @endcond */
 void MIPS16 cmd_pio(void){
@@ -1271,7 +1290,6 @@ void MIPS16 cmd_pio(void){
                 }
         } else error(".program must be first statement");
     }
-    
     tp = checkstring(cmdline, (unsigned char *)"CLEAR");
     if(tp){
         getargs(&tp,1,(unsigned char *)",");
@@ -1294,27 +1312,6 @@ void MIPS16 cmd_pio(void){
         pio_clear_instruction_memory(pio);
         return;
     }
-#ifdef rp2350
-    tp = checkstring(cmdline, (unsigned char *)"SET BASE");
-    if(tp){
-        getargs(&tp,3,(unsigned char *)",");
-        if(argc<3)error("Syntax");
-        int pior=getint(argv[0],0,PIOMAX-1);
-        if(PIO0==false && pior==0)error("PIO 0 not available");
-        if(PIO1==false && pior==1)error("PIO 1 not available");
-#ifdef rp2350
-        if(PIO2==false && pior==2)error("PIO 2 not available");
-        PIO pio = (pior==0 ? pio0: (pior==1 ? pio1: pio2));
-#else
-        PIO pio = (pior==0 ?  pio0: pio1);
-#endif
-        int i=getinteger(argv[2]);
-        if(!(i==0 || i==16))error("Valid base values are 0 and 16");
-        if(rp2350a && i==16)error("Invalid for 60-pin chip");
-        pio_set_gpio_base(pio,i);
-        return;
-    }
-#endif
     tp = checkstring(cmdline, (unsigned char *)"MAKE RING BUFFER");
     if(tp){
         getargs(&tp,3,(unsigned char *)",");
@@ -1329,7 +1326,6 @@ void MIPS16 cmd_pio(void){
         }  else error("Invalid variable");
         return;
     }
-
     tp = checkstring(cmdline, (unsigned char *)"PROGRAM");
     if(tp){
         struct pio_program program;
@@ -1418,9 +1414,125 @@ void MIPS16 cmd_pio(void){
         pio_init(pior, sm, pinctrl, execctrl, shiftctrl, start, clock, sideout, setout, outout);
         return;
     }
+    #ifdef rp2350
+    tp = checkstring(cmdline, (unsigned char *)"SET BASE");
+    if(tp){
+        getargs(&tp,3,(unsigned char *)",");
+        if(argc<3)error("Syntax");
+        int pior=getint(argv[0],0,PIOMAX-1);
+        if(PIO0==false && pior==0)error("PIO 0 not available");
+        if(PIO1==false && pior==1)error("PIO 1 not available");
+#ifdef rp2350
+        if(PIO2==false && pior==2)error("PIO 2 not available");
+        PIO pio = (pior==0 ? pio0: (pior==1 ? pio1: pio2));
+#else
+        PIO pio = (pior==0 ?  pio0: pio1);
+#endif
+        int i=getinteger(argv[2]);
+        if(!(i==0 || i==16))error("Valid base values are 0 and 16");
+        if(rp2350a && i==16)error("Invalid for 60-pin chip");
+        pio_set_gpio_base(pio,i);
+        return;
+    }
+#endif
+    tp = checkstring(cmdline, (unsigned char *)"CONFIGURE");
+/*PIO Configure pio, sm, clock, startaddress,
+sidesetbase, sidesetno, sidesetout, setbase, setno, setout, outbase, outno, outout, inbase,
+jmppin, wraptarget, wrap, sideenable,
+pushthreshold, pullthreshold, autopush, autopull, inshiftdir, outshiftdir, joinrcfifo, jointxfifo, joinrxfifoget, joinrxfifoput
+*/
+    if(tp){
+        int startaddress=0, base=0;
+        int sidesetbase=0, sidesetno=0, sidesetout=0, setbase=0, setno=0, setout=0, outbase=0, outno=0, outout=0, inbase=0;
+        int jmppin=-1, wraptarget=0, wrap=31, sideenable=0, sidepindir=0;;
+        int pushthreshold=0, pullthreshold=0, autopush=0, autopull=0, inshiftdir=1, outshiftdir=1, joinrxfifo=0, jointxfifo=0;
+#ifdef rp2350
+        int joinrxfifoget=0, joinrxfifoput=0;
+        getargs(&tp,57,(unsigned char *)",");
+#else
+        getargs(&tp,53,(unsigned char *)",");
+#endif
+        int pior=getint(argv[0],0,PIOMAX-1);
+        if(PIO0==false && pior==0)error("PIO 0 not available");
+        if(PIO1==false && pior==1)error("PIO 1 not available");
+#ifdef rp2350
+        if(PIO2==false && pior==2)error("PIO 2 not available");
+        PIO pio = (pior==0 ? pio0: (pior==1 ? pio1: pio2));
+        base=pio_get_gpio_base(pio);
+#else
+        PIO pio = (pior==0 ? pio0: pio1);
+#endif
+        if(base==16){
+                sidesetbase=16;
+                setbase=16;
+                outbase=16;  
+                inbase=16;
+        }
+        int sm=getint(argv[2],0,3);
+        float clock=getnumber(argv[4]);
+        if(clock<CLKMIN || clock> CLKMAX)error("Clock must be in range % to %",CLKMIN,CLKMAX);
+        if(argc>5 && *argv[6]) startaddress=getint(argv[6],0,31);
+        if(argc>7 && *argv[8]) sidesetbase=getGPpin(argv[8],pior, base);
+        if(argc>9 && *argv[10]) sidesetno=getint(argv[10],0,5);
+        if(argc>11 && *argv[12]) sidesetout=getint(argv[12],0,1);
+        if(argc>13 && *argv[14]) setbase=getGPpin(argv[14],pior, base);
+        if(argc>15 && *argv[16]) setno=getint(argv[16],0,5);
+        if(argc>17 && *argv[18]) setout=getint(argv[18],0,1);
+        if(argc>19 && *argv[20]) outbase=getGPpin(argv[20],pior, base);
+        if(argc>21 && *argv[22]) outno=getint(argv[22],0,5);
+        if(argc>23 && *argv[24]) outout=getint(argv[24],0,1);
+        if(argc>25 && *argv[26]) inbase=getGPpin(argv[26],pior, base);
+        if(argc>27 && *argv[28]) jmppin=getGPpin(argv[28],pior, base);
+        if(argc>29 && *argv[30]) wraptarget=getint(argv[30],0,31);
+        if(argc>31 && *argv[32]) wrap=getint(argv[32],0,31);
+        if(argc>33 && *argv[34]) sideenable=getint(argv[34],0,1);
+        if(sideenable+sidesetno>5)error("Max 4 sideset pins with option set");
+        if(argc>35 && *argv[36]) sidepindir=getint(argv[36],0,1); // push threshold
+        if(argc>37 && *argv[38]) pushthreshold=getint(argv[38],0,31); // push threshold
+        if(argc>39 && *argv[40]) pullthreshold=getint(argv[40],0,31); // pull threshold
+        if(argc>41 && *argv[42]) autopush=getint(argv[42],0,1); // autopush
+        if(argc>43 && *argv[44]) autopull=getint(argv[44],0,1); // autopull
+        if(argc>45 && *argv[46]) inshiftdir=getint(argv[46],0,1); // IN_SHIFTDIR
+        if(argc>47 && *argv[48]) outshiftdir=getint(argv[48],0,1); // OUT_SHIFTDIR
+        if(argc>49 && *argv[50]) joinrxfifo=getint(argv[50],0,1); // FJOIN_RX
+        if(argc>51 && *argv[52]) jointxfifo=getint(argv[52],0,1); // FJOIN_TX
+        if(joinrxfifo && jointxfifo)error("Attempt to join both RX and TX FIFOs");
+#ifdef rp2350
+        if(argc>53 && *argv[54]) joinrxfifoget=getint(argv[54],0,1); // FJOIN_RX_GET
+        if(argc>55 && *argv[56]) joinrxfifoput=getint(argv[56],0,1); // FJOIN_RX_PUT
+#endif
+        pio_set_gpio_base(pio,base);
+        pio_sm_config cfg = pio_get_default_sm_config();
+        sm_config_set_in_pin_base(&cfg, inbase);
+	if(jointxfifo)sm_config_set_fifo_join(&cfg, PIO_FIFO_JOIN_TX);
+	if(joinrxfifo)sm_config_set_fifo_join(&cfg, PIO_FIFO_JOIN_RX);
+        if(outno)sm_config_set_out_pins(&cfg, outbase, outno);
+        if(sidesetno){
+                sm_config_set_sideset_pins(&cfg,sidesetbase);
+                sm_config_set_sideset(&cfg,sidesetno+sideenable,sideenable,sidepindir);
+        }
+        if(setno){
+                sm_config_set_set_pin_base(&cfg, setbase);
+                sm_config_set_set_pin_count(&cfg, setno);
+        }
+        if(jmppin>=0)sm_config_set_jmp_pin(&cfg, jmppin);
+        sm_config_set_wrap(&cfg, wraptarget, wrap);
+        sm_config_set_in_shift(&cfg,inshiftdir,autopush,pushthreshold);
+        sm_config_set_out_shift(&cfg,outshiftdir, autopull,pullthreshold);
+#ifdef rp2350
+        if(joinrxfifoget)cfg.shiftctrl|=(1<<14);
+        if(joinrxfifoput)cfg.shiftctrl|=(1<<15);
+#endif
+        sm_config_set_clkdiv(&cfg, (Option.CPU_Speed*1000.0f)/clock);
+        pio_sm_set_config(pio, sm, &cfg);
+        pio_sm_init(pio, sm, startaddress, &cfg);
+        if(sidesetout && sidesetno)pio_sm_set_consecutive_pindirs(pio, sm, sidesetbase, sidesetno, true);
+        if(setout && setno)pio_sm_set_consecutive_pindirs(pio, sm, setbase, setno, true);
+        if(outout && outno)pio_sm_set_consecutive_pindirs(pio, sm, outbase, outno, true);
+        return;
+}
     error("Syntax");
 }
-
 void fun_pio(void){
     unsigned char *tp;
     tp = checkstring(ep, (unsigned char *)"PINCTRL");
@@ -1430,34 +1542,34 @@ void fun_pio(void){
         if(argc<3)error("Syntax");
         myret=(getint(argv[0],0,5)<<29); // no of side set pins
         if(argc>1 && *argv[2])myret|=(getint(argv[2],0,5)<<26); // no of set pins
-        if(argc>3 && *argv[4])myret|=(getint(argv[4],0,29)<<20); // no of OUT pins
+        if(argc>3 && *argv[4])myret|=(getint(argv[4],0,31)<<20); // no of OUT pins
         if(argc>5 && *argv[6]){
             if(!(toupper((char)*argv[6])=='G'))error("Syntax");
             argv[6]++;
             if(!(toupper((char)*argv[6])=='P'))error("Syntax");
             argv[6]++;
-            myret|=(getint(argv[6],0,29)<<15); // IN base
+            myret|=(getint(argv[6],0,31)<<15); // IN base
         }
         if(argc>7 && *argv[8]){
             if(!(toupper((char)*argv[8])=='G'))error("Syntax");
             argv[8]++;
             if(!(toupper((char)*argv[8])=='P'))error("Syntax");
             argv[8]++;
-            myret|=(getint(argv[8],0,29)<<10); // SIDE SET base
+            myret|=(getint(argv[8],0,31)<<10); // SIDE SET base
         }
         if(argc>9 && *argv[10]){
             if(!(toupper((char)*argv[10])=='G'))error("Syntax");
             argv[10]++;
             if(!(toupper((char)*argv[10])=='P'))error("Syntax");
             argv[10]++;
-            myret|=(getint(argv[10],0,29)<<5); // SET base
+            myret|=(getint(argv[10],0,31)<<5); // SET base
         }
         if(argc==13){
             if(!(toupper((char)*argv[12])=='G'))error("Syntax");
             argv[12]++;
             if(!(toupper((char)*argv[12])=='P'))error("Syntax");
             argv[12]++;
-            myret|=getint(argv[12],0,29); //OUT base
+            myret|=getint(argv[12],0,31); //OUT base
         }
         iret=myret;
         targ=T_INT;
@@ -1472,7 +1584,7 @@ void fun_pio(void){
         argv[0]++;
         if(!(toupper((char)*argv[0])=='P'))error("Syntax");
         argv[0]++;
-        myret=(getint(argv[0],0,29)<<24); // jmp pin
+        myret=(getint(argv[0],0,31)<<24); // jmp pin
         myret |= pio_sm_calc_wrap(getint(argv[2],0,31), getint(argv[4],0,31));
         if(argc>=7 && *argv[6])myret|=(getint(argv[6],0,1)<<29); //SIDE_PINDIR
         if(argc==9)myret|=(getint(argv[8],0,1)<<30); // SIDE_EN
