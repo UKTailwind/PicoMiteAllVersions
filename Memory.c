@@ -61,7 +61,7 @@ extern const uint8_t *flash_progmemory;
     unsigned char *MMHeap=AllMemory;
     #else
     #ifdef PICOMITEVGA
-        unsigned char __attribute__ ((aligned (256))) Heap[HEAP_MEMORY_SIZE+256];
+        unsigned char __attribute__ ((aligned (4096))) Heap[HEAP_MEMORY_SIZE+256];
         unsigned char __attribute__ ((aligned (256))) Frame[640*480/8];
         unsigned char *FRAMEBUFFER=Frame;
         uint32_t framebuffersize=640*480/8;

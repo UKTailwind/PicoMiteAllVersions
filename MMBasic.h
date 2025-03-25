@@ -179,7 +179,7 @@ extern unsigned char DefaultType;                        // the default type if 
 //#define isnamestart(c)  (namestart[(uint8_t)c])                    // true if valid start of a variable name
 //#define isnamechar(c)   (namein[(uint8_t)c])        // true if valid part of a variable name
 //#define isnameend(c)    (nameend[(uint8_t)c])        // true if valid at the end of a variable name
-#define isnamestart(c)  (isalpha((unsigned char)c) || c == '_' || c == '~')                    // true if valid start of a variable name
+#define isnamestart(c)  (isalpha((unsigned char)c) || c == '_')                    // true if valid start of a variable name
 #define isnamechar(c)   (isalnum((unsigned char)c) || c == '_' || c == '.')        // true if valid part of a variable name
 #define isnameend(c)    (isalnum((unsigned char)c) || c == '_' || c == '.' || c == '$' || c == '!' || c == '%')        // true if valid at the end of a variable name
 #define tokentype(i)    ((i >= C_BASETOKEN && i < TokenTableSize - 1 + C_BASETOKEN) ? (tokentbl[i - C_BASETOKEN].type) : 0)             // get the type of a token

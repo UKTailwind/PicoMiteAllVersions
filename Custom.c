@@ -374,14 +374,13 @@ int getGPpin(unsigned char *pinarg, int pio, int base){
 	pin = getinteger(pinarg);
 	if(!code)pin=codemap(pin);
         if(IsInvalidPin(pin)) error("Invalid pin");
-        if(!(ExtCurrentConfig[pin] == EXT_NOT_CONFIG || 
-                ExtCurrentConfig[pin] == EXT_DIG_IN ||
-                (ExtCurrentConfig[pin] == EXT_PIO0_OUT && pio==0) ||
-                (ExtCurrentConfig[pin] == EXT_PIO1_OUT && pio==1)
+        if((ExtCurrentConfig[pin] == EXT_PIO0_OUT && pio!=0) ||
+                (ExtCurrentConfig[pin] == EXT_PIO1_OUT && pio!=1)
 #ifdef rp2350
-                || (ExtCurrentConfig[pin] == EXT_PIO2_OUT && pio==2)
+                || (ExtCurrentConfig[pin] == EXT_PIO2_OUT && pio!=2)
 #endif
-        )) error("Pin in use");
+                || ExtCurrentConfig[pin] == EXT_BOOT_RESERVED
+        ) error("Pin in use");
         if(PinDef[pin].GPno<base || PinDef[pin].GPno>base+31)error("Pin out of range for base %");
         return PinDef[pin].GPno;
 
@@ -1438,13 +1437,13 @@ void MIPS16 cmd_pio(void){
     tp = checkstring(cmdline, (unsigned char *)"CONFIGURE");
 /*PIO Configure pio, sm, clock, startaddress,
 sidesetbase, sidesetno, sidesetout, setbase, setno, setout, outbase, outno, outout, inbase,
-jmppin, wraptarget, wrap, sideenable,
+jmppin, wraptarget, wrap, sideenable,sidepindir,
 pushthreshold, pullthreshold, autopush, autopull, inshiftdir, outshiftdir, joinrcfifo, jointxfifo, joinrxfifoget, joinrxfifoput
 */
     if(tp){
         int startaddress=0, base=0;
         int sidesetbase=0, sidesetno=0, sidesetout=0, setbase=0, setno=0, setout=0, outbase=0, outno=0, outout=0, inbase=0;
-        int jmppin=-1, wraptarget=0, wrap=31, sideenable=0, sidepindir=0;;
+        int jmppin=-1, wraptarget=0, wrap=31, sideenable=0, sidepindir=0;
         int pushthreshold=0, pullthreshold=0, autopush=0, autopull=0, inshiftdir=1, outshiftdir=1, joinrxfifo=0, jointxfifo=0;
 #ifdef rp2350
         int joinrxfifoget=0, joinrxfifoput=0;
@@ -1501,6 +1500,19 @@ pushthreshold, pullthreshold, autopush, autopull, inshiftdir, outshiftdir, joinr
         if(argc>53 && *argv[54]) joinrxfifoget=getint(argv[54],0,1); // FJOIN_RX_GET
         if(argc>55 && *argv[56]) joinrxfifoput=getint(argv[56],0,1); // FJOIN_RX_PUT
 #endif
+        #ifdef rp2350
+        #ifdef PICOMITEWEB
+                for(int i = 1; i < (NBRPINS) ; i++) {
+        #else
+                for(int i = 1; i < (rp2350a ? 44:NBRPINS) ; i++) {
+        #endif
+        #else
+        for(int i = 1; i < (NBRPINS) ; i++) {
+        #endif
+                if(CheckPin(i, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED)) {    // don't reset invalid or boot reserved pins
+                        gpio_set_input_enabled(PinDef[i].GPno, true);
+                }
+        }
         pio_set_gpio_base(pio,base);
         pio_sm_config cfg = pio_get_default_sm_config();
         sm_config_set_in_pin_base(&cfg, inbase);

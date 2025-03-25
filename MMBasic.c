@@ -293,7 +293,8 @@ void MIPS16 __not_in_flash_func(ExecuteProgram)(unsigned char *p) {
                         targ = T_CMD;
                         commandtbl[cmdtoken].fptr(); // execute the command
                     } else {
-                        if(!isnamestart(*p)) error("Invalid character: @", (int)(*p));
+                        if(!isnamestart(*p) && *p=='~') error("Unknown command");
+                        else if(!isnamestart(*p)) error("Invalid character: @", (int)(*p));
                         i = FindSubFun(p, false);                   // it could be a defined command
                         if(i >= 0) {                                // >= 0 means it is a user defined command
                             DefinedSubFun(false, p, i, NULL, NULL, NULL, NULL);
@@ -561,6 +562,7 @@ void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, in
     unsigned char *argbuf1; unsigned char **argv1; int argc1;
     unsigned char *argbuf2; unsigned char **argv2; int argc2;
     unsigned char fun_name[MAXVARLEN + 1];
+    unsigned char *argbyref;
 	int i;
     int ArgType, FunType;
     int *argtype;
@@ -636,16 +638,24 @@ void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, in
     if(gosubindex >= MAXGOSUB) error("Too many nested SUB/FUN");
     errorstack[gosubindex] = CallersLinePtr;
 	gosubstack[gosubindex++] = isfun ? NULL : nextstmt;             // NULL signifies that this is returned to by ending ExecuteProgram()
-
+    #define buffneeded MAX_ARG_COUNT*(sizeof(union u_argval)+ 2*sizeof(int)+3*sizeof(unsigned char *)+sizeof(unsigned char))+ 2*STRINGSIZE 
     // allocate memory for processing the arguments
-    argval = GetMemory(MAX_ARG_COUNT * sizeof(union u_argval));
+    argval=GetMemory(buffneeded);
+    argtype=(void *)argval+MAX_ARG_COUNT * sizeof(union u_argval);
+    argVarIndex = (void *)argtype+MAX_ARG_COUNT * sizeof(int);
+    argbuf1 = (void *)argVarIndex+MAX_ARG_COUNT * sizeof(int);
+    argv1 = (void *)argbuf1+STRINGSIZE;
+    argbuf2 = (void *)argv1+MAX_ARG_COUNT * sizeof(unsigned char *);
+    argv2 = (void *)argbuf2+STRINGSIZE;
+    argbyref=(void *)argv2+MAX_ARG_COUNT * sizeof(unsigned char *);
+/*    argval = GetMemory(MAX_ARG_COUNT * sizeof(union u_argval));
     argtype = GetMemory(MAX_ARG_COUNT * sizeof(int));
     argVarIndex = GetMemory(MAX_ARG_COUNT * sizeof(int));
     argbuf1 = GetMemory(STRINGSIZE); 
     argv1 = GetMemory(MAX_ARG_COUNT * sizeof(unsigned char *));  // these are for the caller
     argbuf2 = GetMemory(STRINGSIZE); 
     argv2 = GetMemory(MAX_ARG_COUNT * sizeof(unsigned char *));  // and these for the definition of the sub or function
-
+    argbyref=GetMemory(MAX_ARG_COUNT * sizeof(unsigned char));  // these are BYREF*/
     // now split up the arguments in the caller
     CurrentLinePtr = CallersLinePtr;                                // report errors at the caller
     argc1 = 0;
@@ -685,7 +695,8 @@ void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, in
             }
 
             // check for BYVAL or BYREF in sub/fun definition
-			skipspace(argv2[i]);
+            argbyref[i]=0;
+            skipspace(argv2[i]);
 			if(toupper(*argv2[i]) == 'B' && toupper(*(argv2[i]+1)) == 'Y') {
 				if((checkstring(argv2[i] + 2, (unsigned char *)"VAL")) != NULL) {        // if BYVAL
 					argtype[i] = 0;	                                    // remove any pointer flag in the caller
@@ -695,7 +706,8 @@ void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, in
 						if((argtype[i] & T_PTR) == 0) error("Variable required for BYREF");
 						argv2[i] += 5;									// skip to the variable start
 					}
-				}
+                    argbyref[i]=1;
+                }
 				skipspace(argv2[i]);
 			}
 
@@ -744,7 +756,8 @@ void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, in
 
         // if this is a pointer check and the type is NOT the same as that requested in the sub/fun definition
         if((argtype[i] & T_PTR) && TypeMask(g_vartbl[g_VarIndex].type) != TypeMask(argtype[i])) {
-            if((TypeMask(g_vartbl[g_VarIndex].type) & T_STR) || (TypeMask(argtype[i]) & T_STR))
+                if(argbyref[i]){ error("BYREF requires same types: $", argv1[i]);}
+                if((TypeMask(g_vartbl[g_VarIndex].type) & T_STR) || (TypeMask(argtype[i]) & T_STR))
                 error("Incompatible type: $", argv1[i]);
             // make this into an ordinary argument
             if(g_vartbl[argVarIndex[i]].type & T_PTR) {
@@ -784,11 +797,12 @@ void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, in
     }
 
     // temp memory used in setting up the arguments can be deleted now
-    FreeMemory((unsigned char *)argval);
+/*    FreeMemory((unsigned char *)argval);
     FreeMemory((unsigned char *)argtype); FreeMemory((unsigned char *)argVarIndex);
     FreeMemory(argbuf1); FreeMemory((unsigned char *)argv1);
     FreeMemory(argbuf2); FreeMemory((unsigned char *)argv2);
-   
+    FreeMemory((unsigned char *)argbyref);*/
+    FreeMemory((void*)argval);
     strcpy((char *)CurrentSubFunName, (char *)fun_name);
     // if it is a defined command we simply point to the first statement in our command and allow ExecuteProgram() to carry on as before
     // exit from the sub is via cmd_return which will decrement g_LocalIndex

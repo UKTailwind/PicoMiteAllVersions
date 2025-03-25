@@ -433,13 +433,16 @@ void fun_byte(void){
 void fun_tilde(void){
 	targ=T_INT;
 /*
+typedef enum {
     MMHRES,
     MMVRES,
     MMVER,
     MMI2C,
 	MMFONTHEIGHT,
 	MMFONTWIDTH,
+#ifndef USBKEYBOARD
 	MMPS2,
+#endif
 	MMHPOS,
 	MMVPOS,
 	MMONEWIRE,
@@ -447,6 +450,14 @@ void fun_tilde(void){
     MMERRMSG,
 	MMWATCHDOG,
 	MMDEVICE,
+	MMCMDLINE,
+#ifdef PICOMITEWEB
+	MMMESSAGE,
+    MMTOPIC,
+    MMADDRESS,
+#endif
+    MMEND
+} Operation;
 */
 	switch(*ep-'A'){
 		case MMHRES:

@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.13)
 # Valid builds are PICO, PICOUSB, VGA, VGAUSB, HDMI(rp2350 only), HDMIUSB(rp2350 only), WEB
 
-set(COMPILE PICO)
+set(COMPILE HDMIUSB)
 
 if (COMPILE STREQUAL "HDMI" OR COMPILE STREQUAL "WEBRP2350" OR COMPILE STREQUAL "HDMIUSB"  OR COMPILE STREQUAL "VGARP2350"  OR COMPILE STREQUAL "VGAUSBRP2350"  OR COMPILE STREQUAL "PICORP2350"  OR COMPILE STREQUAL "PICOUSBRP2350" )
 	set(PICO_PLATFORM rp2350)
@@ -26,13 +26,13 @@ set(CMAKE_CXX_STANDARD 17)
 pico_sdk_init()
 add_executable(PicoMite
 	PicoMite.c
+	Memory.c
 	regex.c 
 	MMBasic.c
 	Operators.c
 	Custom.c
 	Functions.c
 	Commands.c
-	Memory.c
 	FileIO.c
 	ff.c
 	ffsystem.c
@@ -121,6 +121,7 @@ set_source_files_properties(hxcmod.c PROPERTIES COMPILE_FLAGS -Os)
 set_source_files_properties(MATHS.c PROPERTIES COMPILE_FLAGS -Os)
 set_source_files_properties(Editor.c PROPERTIES COMPILE_FLAGS -Os)
 set_source_files_properties(aes.c PROPERTIES COMPILE_FLAGS -Os)
+pico_generate_pio_header(PicoMite ${CMAKE_CURRENT_LIST_DIR}/PicoMiteI2S.pio)
 if (COMPILE STREQUAL "VGAUSB" OR COMPILE STREQUAL "VGA" OR COMPILE STREQUAL "PICO" OR COMPILE STREQUAL "PICOUSB" OR COMPILE STREQUAL "WEB")
 	pico_define_boot_stage2(slower_boot2 ${PICO_DEFAULT_BOOT_STAGE2_FILE})
 	target_compile_definitions(slower_boot2 PRIVATE PICO_FLASH_SPI_CLKDIV=4)
@@ -128,7 +129,7 @@ if (COMPILE STREQUAL "VGAUSB" OR COMPILE STREQUAL "VGA" OR COMPILE STREQUAL "PIC
 endif()
 if (COMPILE STREQUAL "VGAUSB" OR COMPILE STREQUAL "VGA" OR COMPILE STREQUAL "VGAUSBRP2350" OR COMPILE STREQUAL "VGARP2350")
 	pico_generate_pio_header(PicoMite ${CMAKE_CURRENT_LIST_DIR}/PicoMiteVGA.pio)
-	pico_generate_pio_header(PicoMite ${CMAKE_CURRENT_LIST_DIR}/PicoMiteI2S.pio)
+#	pico_generate_pio_header(PicoMite ${CMAKE_CURRENT_LIST_DIR}/PicoMiteI2S.pio)
 endif()
 
 
@@ -160,6 +161,7 @@ target_compile_options(PicoMite PRIVATE -DNDEBUG
 if (COMPILE STREQUAL "HDMI" OR COMPILE STREQUAL "WEBRP2350" OR COMPILE STREQUAL "HDMIUSB" OR COMPILE STREQUAL "PICORP2350" OR COMPILE STREQUAL "PICOUSBRP2350" OR COMPILE STREQUAL "VGARP2350" OR COMPILE STREQUAL "VGAUSBRP2350")
 target_compile_options(PicoMite PRIVATE -Drp2350
 										-DPICO_FLASH_SPI_CLKDIV=4
+										-DPICO_PIO_USE_GPIO_BASE
 										)
 endif()
 # all PicoMite variants - enable the gui

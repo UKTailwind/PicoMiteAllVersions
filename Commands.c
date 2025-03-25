@@ -531,6 +531,7 @@ void MIPS16 cmd_list(void) {
 		for(int i=0;i<count;i++){
 			MMPrintString(c[i]);
 			if(Option.DISPLAY_CONSOLE)ListNewLine(&ListCnt, 0);
+    		else MMPrintString("\r\n");
 		}
 		
    	} else if((p = checkstring(cmdline, (unsigned char *)"PINS"))) {
@@ -2643,7 +2644,7 @@ void replaceAlpha(char *str, const char *replacements[MMEND]){
 
     while (i < len) {
         // Check for the pattern "~(X)" where X is an uppercase letter
-        if (str[i] == '~' && str[i + 1] == '(' && isupper((int)str[i + 2]) && str[i + 3] == ')') {
+        if (i<len-3 && str[i] == '~' && str[i + 1] == '(' && isupper((int)str[i + 2]) && str[i + 3] == ')') {
             char alpha = str[i + 2]; // Extract the letter 'alpha'
             const char *replacement = replacements[alpha - 'A']; // Get the replacement string
 

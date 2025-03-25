@@ -101,7 +101,7 @@ void MIPS16 ConfigDisplaySSD(unsigned char *p) {
     	Option.DISPLAY_TYPE = ILI9486_16;
     } else if(checkstring(argv[0],  (unsigned char *)"IPS_4_16")) {
     	Option.DISPLAY_TYPE = IPS_4_16;	                      /***G.A***/
-    } else
+    } else return;
 #ifdef rp2350
     if(!(argc == 3 || argc == 5 || argc == 7 || argc == 9 || (argc == 11 && !rp2350a))) error("Argument count");
 #else
