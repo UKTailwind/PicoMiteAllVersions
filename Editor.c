@@ -136,10 +136,10 @@ void DisplayPutS(char *s) {
     while(*s) DisplayPutC(*s++);
 }
 
-void printnothing(char * dummy){
+static inline void printnothing(char * dummy){
 
 }
-char nothingchar(char dummy,int flush){
+static inline char nothingchar(char dummy,int flush){
     return 0;
 }
     int OriginalFC, OriginalBC;                                     // the original fore/background colours used by MMBasic
@@ -158,7 +158,8 @@ static char (*SSputchar)(char buff, int flush)=SerialConsolePutC;
 
 //    #define dx(...) {char s[140];sprintf(s,  __VA_ARGS__); SerUSBPutS(s); SerUSBPutS("\r\n");}
 
-    void MX470PutS(char *s, int fc, int bc) {
+    static inline void MX470PutS(char *s, int fc, int bc) {
+        if(!Option.DISPLAY_CONSOLE) return;
         int tfc, tbc;
         tfc = gui_fcolour; tbc = gui_bcolour;
         gui_fcolour = fc; gui_bcolour = bc;
@@ -167,16 +168,15 @@ static char (*SSputchar)(char buff, int flush)=SerialConsolePutC;
     }
 
 
-    void MX470Cursor(int x, int y) {
-        if(Option.DISPLAY_CONSOLE) {
+    static inline void MX470Cursor(int x, int y) {
+        if(!Option.DISPLAY_CONSOLE) return;
             CurrentX = x;
             CurrentY = y;
-        }
     }
 
     void MX470Display(int fn) {
-        int t;
         if(!Option.DISPLAY_CONSOLE) return;
+        int t;
         switch(fn) {
             case DISPLAY_CLS:       ClearScreen(gui_bcolour);
                                     break;
@@ -503,6 +503,9 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
         Y_TILE=VRes/ytileheight;
         if(VRes % ytileheight)Y_TILE++;
   }
+#else 
+  char RefreshSave=Option.Refresh;
+  Option.Refresh=0;
 #endif
     printScreen();                                                  // draw the screen
     SCursor(xx, yy);
@@ -943,6 +946,8 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
                 }
             }
 #endif
+#else
+            Option.Refresh=RefreshSave;
 #endif                          
                             if(c != ESC && TextChanged && fname==NULL) SaveToProgMemory();
                             if(c != ESC && TextChanged && fname) {
@@ -1697,7 +1702,7 @@ void printScreen(void) {
         curx = 0;
         cury = i + 1;
     }
-    while(MMInkey() != -1);                                           // consume any keystrokes accumulated while redrawing the screen
+    while(getConsole() != -1);                                           // consume any keystrokes accumulated while redrawing the screen
 }
 
 
@@ -1883,7 +1888,7 @@ void Scroll(void) {
     PrintFunctKeys(EDIT);
     printLine(VHeight - 1 + edy);
     PositionCursor(txtp);
-    while(MMInkey() != -1);                                         // consume any keystrokes accumulated while redrawing the screen
+    while(getConsole() != -1);                                         // consume any keystrokes accumulated while redrawing the screen
 }
 
 
@@ -1898,7 +1903,8 @@ void ScrollDown(void) {
     printLine(edy);
     PrintFunctKeys(EDIT);
     PositionCursor(txtp);
-    while(MMInkey() != -1);                                         // consume any keystrokes accumulated while redrawing the screen
+    
+    while(getConsole() != -1)routinechecks();;                                         // consume any keystrokes accumulated while redrawing the screen
 }
 
 #endif

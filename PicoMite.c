@@ -549,12 +549,12 @@ int __not_in_flash_func(getConsole)(void) {
     return c;
 }
 
-void putConsole(int c, int flush) {
+void __not_in_flash_func(putConsole)(int c, int flush) {
     if(OptionConsole & 2)DisplayPutC(c);
     if(OptionConsole & 1)SerialConsolePutC(c, flush);
 }
 // put a character out to the serial console
-char SerialConsolePutC(char c, int flush) {
+char  __not_in_flash_func(SerialConsolePutC)(char c, int flush) {
 	if(c == '\b') {
 	   	if (MMCharPos!=1){
 		   MMCharPos -= 1;

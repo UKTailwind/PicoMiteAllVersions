@@ -101,24 +101,10 @@ commands and functions
 
  ********************************************************************************************************************************************/
 
-
 // define the PWM output frequency for making a tone
-const char* const PlayingStr[] = {"OFF",
-                                "PAUSED",
-                                "TONE",
-                                "PAUSED",
-                                "SOUND",
-                                "WAV",
-                                "PAUSED",
-                                "FLAC",
-                                "MP3",
-								"MIDI",
-                                "PAUSED",
-                                "PAUSED",
-                                "STOP",
-                                "SYNC",
-								"MOD",
-								"STREAM"
+const char* const PlayingStr[] = {"PAUSED TONE", "PAUSED FLAC", "PAUSED MP3",  "PAUSED SOUND", "PAUSED MOD", "PAUSED WAV", "", 
+    "", "TONE", "SOUND", "WAV", "FLAC", "MP3", 
+    "MIDI", "", "MOD", "STREAM","" 
 }  ;                              
 volatile unsigned char PWM_count = 0;
 volatile float PhaseM_left, PhaseM_right;
@@ -727,11 +713,13 @@ void CloseAudio(int all){
     return;
 }
 void setrate(int rate){
+	static int lastrate=0;
+	if(rate==lastrate)return;
+	lastrate=rate;
 	AUDIO_WRAP=(Option.CPU_Speed*1000)/rate  - 1 ;
 	pwm_set_wrap(AUDIO_SLICE, AUDIO_WRAP);
 	if(Option.AUDIO_L){
-		pwm_set_chan_level(AUDIO_SLICE, PWM_CHAN_A, AUDIO_WRAP>>1);
-		pwm_set_chan_level(AUDIO_SLICE, PWM_CHAN_B, AUDIO_WRAP>>1);
+		pwm_set_both_levels(AUDIO_SLICE,(int)(((AUDIO_WRAP>>1)*4000)/4096),(int)(((AUDIO_WRAP>>1)*4000)/4096));
 	}
 	pwm_clear_irq(AUDIO_SLICE);
 	if(Option.audio_i2s_bclk){
@@ -1147,11 +1135,13 @@ void MIPS16 cmd_play(void) {
     	return;
     }
     if(checkstring(cmdline, (unsigned char *)"PAUSE")) {
+		if(CurrentlyPlaying<P_STOP)return; //already paused
         if(CurrentlyPlaying == P_TONE) CurrentlyPlaying = P_PAUSE_TONE;
         else if(CurrentlyPlaying == P_SOUND) CurrentlyPlaying = P_PAUSE_SOUND;
         else if(CurrentlyPlaying == P_WAV)  CurrentlyPlaying = P_PAUSE_WAV;
         else if(CurrentlyPlaying == P_FLAC)  CurrentlyPlaying = P_PAUSE_FLAC;
         else if(CurrentlyPlaying == P_MP3)  CurrentlyPlaying = P_PAUSE_MP3;
+        else if(CurrentlyPlaying == P_MOD)  CurrentlyPlaying = P_PAUSE_MOD;
         else
             error("Nothing playing");
         return;
@@ -1162,6 +1152,7 @@ void MIPS16 cmd_play(void) {
         else if(CurrentlyPlaying == P_PAUSE_WAV) CurrentlyPlaying = P_WAV;
         else if(CurrentlyPlaying == P_PAUSE_FLAC) CurrentlyPlaying = P_FLAC;
         else if(CurrentlyPlaying == P_PAUSE_MP3)  CurrentlyPlaying = P_MP3;
+        else if(CurrentlyPlaying == P_PAUSE_MOD)  CurrentlyPlaying = P_MOD;
         else
             error("Nothing to resume");  
         return;
@@ -1216,7 +1207,7 @@ void MIPS16 cmd_play(void) {
 				hw=((float)PWM_FREQ/(float)f_left); //number of interrupts per cycle
 				duration = duration * (float)PWM_FREQ; // number of interrupts for the requested waveform
 	// This should now be an exact multiple of the number per waveform
-				PlayDuration=(((uint64_t)(duration/hw))*hw)+1;
+				PlayDuration=(((uint64_t)(duration/hw))*hw);
 			}
 			pwm_set_irq0_enabled(AUDIO_SLICE, false);
 			PhaseM_left =  f_left  / (float)PWM_FREQ * 4096.0;
@@ -1954,24 +1945,26 @@ Stop playing the music or toneb:
 void StopAudio(void) {
 
 	if(CurrentlyPlaying != P_NOTHING ) {
-		int ramptime=1000000/PWM_FREQ+2;
-		if(!(Option.AUDIO_MISO_PIN || Option.audio_i2s_bclk))
+		int ramptime=1000000/PWM_FREQ-1;
+		pwm_set_irq0_enabled(AUDIO_SLICE, false);
+		uSec(100); //
+		if(!(Option.audio_i2s_bclk))
 		{
-			CurrentlyPlaying = P_STOP;
-			int ll,l=pwm_hw->slice[AUDIO_SLICE].cc >>16;
-			int rr,r=pwm_hw->slice[AUDIO_SLICE].cc & 0xFFFF;
-			int m=(AUDIO_WRAP>>1);
+			uint32_t rr,r=right;
+			uint32_t ll,l=left;
+			uint32_t m=2000;
 			l=m-l;
 			r=m-r;
-			for(int i=50;i>=0;i--){
-				ll=m-l*i/50;
-				rr=m-r*i/50;
-				pwm_set_both_levels(AUDIO_SLICE,ll,rr);
+			for(int i=100;i>=0;i--){
+				ll=(uint32_t)((int)m-(int)l*i/100);
+				rr=(uint32_t)((int)m-(int)r*i/100);
+				AudioOutput(ll,rr);
 				uSec(ramptime);
 			}
+			CurrentlyPlaying = P_STOP;
+			uSec(ramptime*2);
 			setrate(PWM_FREQ);
 		}
-		pwm_set_irq0_enabled(AUDIO_SLICE, false);
         ppos=0;
         if(Option.AUDIO_MISO_PIN && (CurrentlyPlaying == P_TONE || CurrentlyPlaying==P_SOUND))CurrentlyPlaying = P_WAVOPEN;
 		else CurrentlyPlaying = P_NOTHING;

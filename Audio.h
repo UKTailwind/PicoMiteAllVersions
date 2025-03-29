@@ -48,7 +48,9 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 
 #ifndef AUDIO_HEADER
 #define AUDIO_HEADER
-typedef enum { P_NOTHING, P_PAUSE_TONE, P_TONE, P_PAUSE_SOUND, P_SOUND, P_WAV, P_PAUSE_WAV, P_FLAC, P_MP3, P_MIDI, P_PAUSE_FLAC, P_PAUSE_MP3, P_STOP, P_SYNC, P_MOD, P_STREAM, P_WAVOPEN} e_CurrentlyPlaying;
+typedef enum {P_PAUSE_TONE, P_PAUSE_FLAC, P_PAUSE_MP3, P_PAUSE_SOUND, P_PAUSE_MOD, P_PAUSE_WAV, P_STOP, 
+    P_NOTHING, P_TONE, P_SOUND, P_WAV, P_FLAC, P_MP3, 
+    P_MIDI, P_SYNC, P_MOD, P_STREAM, P_WAVOPEN} e_CurrentlyPlaying;
 extern const char* const PlayingStr[];
 extern volatile e_CurrentlyPlaying CurrentlyPlaying; 
 extern char *WAVInterrupt;
@@ -62,6 +64,7 @@ extern volatile int wav_filesize;                                    // head and
 extern uint8_t trackplaying, trackstoplay;
 extern void checkWAVinput(void);
 extern volatile uint64_t SoundPlay;
+extern void (*AudioOutput)(uint16_t left, uint16_t right);
 #define WAV_BUFFER_SIZE 8192
 extern const unsigned short SineTable[4096];
 extern const unsigned short nulltable[];
@@ -70,6 +73,7 @@ extern volatile float PhaseM_left, PhaseM_right;
 extern volatile unsigned char PWM_count;
 extern uint16_t *playbuff;
 extern int32_t *uplaybuff;
+extern uint16_t left,right;
 extern volatile int sound_v_left[MAXSOUNDS];
 extern volatile int sound_v_right[MAXSOUNDS];
 extern volatile float sound_PhaseAC_left[MAXSOUNDS], sound_PhaseAC_right[MAXSOUNDS];

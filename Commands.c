@@ -474,8 +474,16 @@ void MIPS16 cmd_list(void) {
         	ListProgram(ProgMemory, true);
         	checkend(p);
         }
-   	} else if((p = checkstring(cmdline, (unsigned char *)"VARIABLES"))) {
+	} else if((p = checkstring(cmdline, (unsigned char *)"VARIABLES"))) {
 		int count=0;
+		int64_t *dest=NULL;
+		char *buff=NULL;
+		int j=0;
+		getargs(&p,1,(unsigned char *)",");
+		if(argc){
+			j=(parseintegerarray(argv[0],&dest,1,1,NULL,true)-1)*8;
+			dest[0] = 0;
+		}
 		for(int i=0;i<MAXVARS;i++){
 			if(g_vartbl[i].type & (T_INT|T_STR|T_NBR)){
 				count++;
@@ -528,13 +536,28 @@ void MIPS16 cmd_list(void) {
 		}
 		sortStrings(c,count);
     	int ListCnt = 1;
-		for(int i=0;i<count;i++){
-			MMPrintString(c[i]);
-			if(Option.DISPLAY_CONSOLE)ListNewLine(&ListCnt, 0);
-    		else MMPrintString("\r\n");
+		if(dest==NULL){
+			for(int i=0;i<count;i++){
+				MMPrintString(c[i]);
+				if(Option.DISPLAY_CONSOLE)ListNewLine(&ListCnt, 0);
+				else MMPrintString("\r\n");
+			}
+		} else {
+			int ol=0;
+			buff=(char *)&dest[1];
+			for(int i=0;i<count;i++){
+				if(ol+strlen(c[i])+2 > j)error("Destination array too small");
+				else ol+=strlen(c[i])+2;
+				strcat(buff,c[i]);
+				strcat(buff,"\r\n");
+			}
+			dest[0]=ol;
 		}
 		
    	} else if((p = checkstring(cmdline, (unsigned char *)"PINS"))) {
+#if defined(PICOMITEWEB) && defined(rp2350)
+		if(!rp2350a)error("Incompatible board, RP2350A only" );
+#endif
 		CallExecuteProgram((char *)pinlist);
 		return;
    	} else if((p = checkstring(cmdline, (unsigned char *)"SYSTEM I2C"))) {

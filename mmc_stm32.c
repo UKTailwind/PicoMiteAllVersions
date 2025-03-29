@@ -77,6 +77,7 @@ int SD_SPI_SPEED=SD_SLOW_SPI_SPEED;
 //#define	FCLK_FAST()		{SD_SPI_SPEED=SD_FAST_SPI_SPEED;}/* Set fast clock (depends on the CSD) */
 extern volatile BYTE SDCardStat;
 volatile int diskcheckrate=0;
+uint16_t left=0,right=0;
 const uint8_t high[512]={[0 ... 511]=0xFF};
 int CurrentSPISpeed=NONE_SPI_SPEED;
 #define slow_clock 200000
@@ -214,7 +215,7 @@ int __not_in_flash_func(getsound)(int i,int mode){
 #define sendstream 32
 extern PIO pioi2s;
 extern uint8_t i2ssm;
-void MIPS32 __not_in_flash_func(on_pwm_wrap)(void) {
+void MIPS16 __not_in_flash_func(on_pwm_wrap)(void) {
 	static int noisedwellleft[MAXSOUNDS]={0}, noisedwellright[MAXSOUNDS]={0};
 	static uint32_t noiseleft[MAXSOUNDS]={0}, noiseright[MAXSOUNDS]={0};
 	static int repeatcount=1;
@@ -465,11 +466,11 @@ void MIPS32 __not_in_flash_func(on_pwm_wrap)(void) {
 			}
 		}
 	} else {
-		uint16_t left=0,right=0;
 		if(CurrentlyPlaying == P_TONE){
 			if(!SoundPlay){
 				StopAudio();
 				WAVcomplete = true;
+				return;
 			} else {
 				SoundPlay--;
 				if(mono){
@@ -492,6 +493,7 @@ void MIPS32 __not_in_flash_func(on_pwm_wrap)(void) {
 			repeatcount=audiorepeat;
 			if(bcount[1]==0 && bcount[2]==0 && playreadcomplete==1){
 				pwm_set_irq_enabled(AUDIO_SLICE, false);
+				return;
 			}
 			if(swingbuf){ //buffer is primed
 				if(swingbuf==1)playbuff=(uint16_t *)sbuff1;
@@ -565,11 +567,11 @@ void MIPS32 __not_in_flash_func(on_pwm_wrap)(void) {
 			}
 			left=leftv+2000;
 			right=rightv+2000;
-		} else if(CurrentlyPlaying == P_STOP) {
+		} else if(CurrentlyPlaying <= P_STOP ) {
 			return;
 		} else {
 			if(Option.AUDIO_MISO_PIN)return;
-			left=right=AUDIO_WRAP>>1;
+			left=right=2000;
 		}
 	AudioOutput(left,right);
 	}

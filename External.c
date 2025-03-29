@@ -386,8 +386,11 @@ void __not_in_flash_func(ExtSet)(int pin, int val){
         error("Pin %/| is not an output",pin,pin);
 }
 /*  @endcond */
-
+#if defined(PICOMITEVGA) && !defined(rp2350)
+    void cmd_sync(void){
+#else
 void __not_in_flash_func(cmd_sync)(void){
+#endif
 	uint64_t i;
     static uint64_t synctime=0,endtime=0;
 	getargs(&cmdline,3,(unsigned char *)",");
@@ -3893,7 +3896,7 @@ void __not_in_flash_func(TM_EXTI_Handler_4)(void) {
     }
 
 }
-void __not_in_flash_func(IRHandler)(void) {
+void MIPS16 __not_in_flash_func(IRHandler)(void) {
     int ElapsedMicroSec;
     static unsigned int LastIrBits;
         ElapsedMicroSec = readIRclock();

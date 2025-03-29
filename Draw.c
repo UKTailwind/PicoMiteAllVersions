@@ -5509,7 +5509,7 @@ void cmd_framebuffer(void){
             if(!complex) memcpy(d,s,HRes*VRes/2);
             else {
                 if(complex==1){//copying from the real display
-                    char *LCDBuffer=GetTempMemory(1440);
+                    char *LCDBuffer=GetTempMemory(HRes*3);
                     int DisplayMode=0;
                     if(DrawBufferSPI==DrawBuffer || DrawBufferSSD1963==DrawBuffer) DisplayMode=1;
                     WriteBuf=d;

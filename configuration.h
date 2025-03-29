@@ -31,20 +31,24 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #ifdef __cplusplus
 extern "C" {
 #endif
-#ifdef PICOMITEVGA
+#ifdef PICOMITEVGA 
     #ifdef rp2350
         #define MAXSUBFUN           512                     // each entry takes up 4 bytes
         #define MAXVARS             768                     // 8 + MAXVARLEN + MAXDIM * 2  (ie, 56 bytes) - these do not incl array members
+#ifdef USBKEYBOARD
+    #define HEAP_MEMORY_SIZE (184*1024) 
+#else
         #define HEAP_MEMORY_SIZE (184*1024) 
+#endif
         #define FLASH_TARGET_OFFSET (864 * 1024) 
         #ifdef HDMI
             #define MAXMODES 5
             #ifdef USBKEYBOARD
                 #define MagicKey 0x81631124
-                #define HEAPTOP 0x2007C000
+                #define HEAPTOP 0x2007D000
             #else
                 #define MagicKey 0x976BE2A0
-                #define HEAPTOP 0x2007C000
+                #define HEAPTOP 0x2007D000
             #endif
             #define MAX_CPU     Freq378P 
             #define MIN_CPU     Freq252P
@@ -68,14 +72,15 @@ extern "C" {
         #ifdef USBKEYBOARD
             #define FLASH_TARGET_OFFSET (848* 1024) 
             #define MagicKey 0x41FAB715
-            #define HEAPTOP 0x2003FB00
-        #else
+            #define HEAPTOP 0x2003F000
+            #define MAXVARS             480                     // 8 + MAXVARLEN + MAXDIM * 2  (ie, 56 bytes) - these do not incl array members
+    #else
             #define FLASH_TARGET_OFFSET (864 * 1024) 
             #define MagicKey 0xA052A92F
-            #define HEAPTOP 0x2003fc00
-        #endif
+            #define HEAPTOP 0x2003f000
+            #define MAXVARS             480                     // 8 + MAXVARLEN + MAXDIM * 2  (ie, 56 bytes) - these do not incl array members
+    #endif
         #define MAXMODES 2
-        #define MAXVARS             512                     // 8 + MAXVARLEN + MAXDIM * 2  (ie, 56 bytes) - these do not incl array members
         #define HEAP_MEMORY_SIZE (100*1024) 
         #define MAX_CPU     378000 
         #define MIN_CPU     252000
@@ -136,12 +141,12 @@ extern "C" {
     #define MAXSUBFUN           512                     // each entry takes up 4 bytes
     #define MAXVARS             768                    // 8 + MAXVARLEN + MAXDIM * 2  (ie, 56 bytes) - these do not incl array members
     #define HEAP_MEMORY_SIZE (208*1024) 
-    #define HEAPTOP 0x2007C000
+    #define HEAPTOP 0x2006E000
 #else
     #define MAXSUBFUN           256                     // each entry takes up 4 bytes
     #define MAXVARS             480                    // 8 + MAXVARLEN + MAXDIM * 2  (ie, 56 bytes) - these do not incl array members
     #define HEAP_MEMORY_SIZE (88*1024) 
-    #define HEAPTOP 0x2003ec00
+    #define HEAPTOP 0x2003D000
 #endif
 
     #include "lwipopts_examples_common.h"
@@ -155,17 +160,17 @@ extern "C" {
 #ifdef PICOMITE
     #define MIN_CPU     48000
     #ifdef rp2350
-        #define HEAP_MEMORY_SIZE (256*1024) 
+        #define HEAP_MEMORY_SIZE (304*1024) 
         #define MAXVARS             768                     // 8 + MAXVARLEN + MAXDIM * 2  (ie, 56 bytes) - these do not incl array members
         #define FLASH_TARGET_OFFSET (832 * 1024) 
         #define MAX_CPU     (rp2350a ? 396000 : 378000)
         #define MAXSUBFUN           512                     // each entry takes up 4 bytes
         #ifdef USBKEYBOARD
             #define MagicKey 0xD8069F27
-            #define HEAPTOP 0x2007C000
+            #define HEAPTOP 0x20078000
         #else
             #define MagicKey 0x119B6ED7
-            #define HEAPTOP 0x2007C000
+            #define HEAPTOP 0x20078000
         #endif
     #else
         #define HEAP_MEMORY_SIZE (128*1024) 
@@ -175,10 +180,10 @@ extern "C" {
         #define MAXSUBFUN           256                     // each entry takes up 4 bytes
         #ifdef USBKEYBOARD
             #define MagicKey 0x68EFA19E
-            #define HEAPTOP 0x2003E400
+            #define HEAPTOP 0x2003F000
         #else
             #define MagicKey 0xE1473B93
-            #define HEAPTOP 0x2003f100
+            #define HEAPTOP 0x2003EC00
         #endif
     #endif
 #endif

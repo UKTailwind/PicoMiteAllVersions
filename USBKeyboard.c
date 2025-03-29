@@ -1841,6 +1841,7 @@ uint8_t APP_MapKeyToUsage(uint8_t *report, int keyno, int modifier)
         	else if(keyCode==0x2D)return 0x5C;
         	else if(keyCode==0x14)return 0x40;
         	else if(keyCode==0x64)return 124;
+			else if(keyCode==0x30)return 126;   // 48  ~
         }
         if((modifier & KEYBOARD_MODIFIER_RIGHTALT) && Option.USBKeyboard==CONFIG_FR){
 			 if(keyCode==0x1F)     return 126;// ~

@@ -2229,7 +2229,7 @@ void MIPS16 setterminal(int height,int width){
 void fun_keydown(void) {
 	int i,n=getint(ep,0,8);
 	iret=0;
-	while(MMInkey() != -1); // clear anything in the input buffer
+	while(getConsole() != -1); // clear anything in the input buffer
 	if(n==8){
 		iret=(caps_lock ? 1: 0) |
 				(num_lock ? 2: 0) |
