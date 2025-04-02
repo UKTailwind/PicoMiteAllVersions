@@ -57,6 +57,7 @@ extern volatile unsigned int ScrewUpTimer;
 int SaveNextData = 0;
 struct sa_data datastore[MAXRESTORE];
 int restorepointer = 0;
+uint64_t g_flag=0;
 const uint8_t pinlist[]={ //this is a Basic program to print out the status of all the pins
 	1,132,128,95,113,37,0,
 	1,153,128,95,113,37,144,48,32,204,32,241,109,97,120,32,103,112,41,0,
@@ -67,18 +68,20 @@ const uint8_t pinlist[]={ //this is a Basic program to print out the status of a
 };
 const uint8_t i2clist[]={ //this is a Basic program to print out the I2C devices connected to the SYSTEM I2C pins
   1, 132, 128, 105, 110, 116, 101, 103, 101, 114, 32, 95, 97, 100, 0,
-  1, 132, 128, 105, 110, 116, 101, 103, 101, 114, 32, 120, 44, 121, 0, 
-  1, 168, 128, 34, 32, 72, 69, 88, 32, 32, 48, 32, 32, 49, 32, 32, 50, 32, 32, 51, 32, 32, 52, 32, 32, 53, 32, 32, 54, 32, 32, 55, 32, 32, 56, 32, 32, 57, 32, 32, 65, 32, 32, 66, 32, 32, 67, 32, 32, 68, 32, 32, 69, 32, 32, 70, 34, 0, 
-  1, 153, 128, 121, 32, 144, 32, 48, 32, 204, 32, 55, 0, 
-  1, 168, 128, 34, 32, 34, 59, 32, 164, 121, 44, 32, 49, 41, 59, 32, 34, 48, 58, 32, 34, 59, 0, 
-  1, 153, 128, 120, 32, 144, 32, 48, 32, 204, 32, 49, 53, 0, 
-  1, 161, 128, 95, 97, 100, 32, 144, 32, 121, 32, 133, 32, 49, 54, 32, 130, 32, 120, 0, 
-  1, 158, 128, 241, 83, 89, 83, 84, 69, 77, 32, 73, 50, 67, 41, 144, 34, 73, 50, 67, 34, 32, 203, 32, 228, 128, 99, 104, 101, 99, 107, 32, 95, 97, 100, 32, 199, 32, 229, 128, 32, 99, 104, 101, 99, 107, 32, 95, 97, 100, 0, 
+  1, 132, 128, 105, 110, 116, 101, 103, 101, 114, 32, 120, 95, 44, 121, 95, 0, 
+  1, 168, 128, 34, 32, 72, 69, 88, 32, 32, 48, 32, 32, 49, 32, 32, 50, 32, 32, 51, 32, 32, 52, 32, 32, 53, 32, 32, 54, 32, 32, 55, 32, 32, 
+  56, 32, 32, 57, 32, 32, 65, 32, 32, 66, 32, 32, 67, 32, 32, 68, 32, 32, 69, 32, 32, 70, 34, 0, 
+  1, 153, 128, 121, 95, 32, 144, 32, 48, 32, 204, 32, 55, 0, 
+  1, 168, 128, 34, 32, 34, 59, 32, 164, 121, 95, 44, 32, 49, 41, 59, 32, 34, 48, 58, 32, 34, 59, 0, 
+  1, 153, 128, 120, 95, 32, 144, 32, 48, 32, 204, 32, 49, 53, 0, 
+  1, 161, 128, 95, 97, 100, 32, 144, 32, 121, 95, 32, 133, 32, 49, 54, 32, 130, 32, 120, 95, 0, 
+  1, 158, 128, 241, 83, 89, 83, 84, 69, 77, 32, 73, 50, 67, 41, 144, 34, 73, 50, 67, 34, 32, 203, 32, 228, 128, 99, 104, 
+  101, 99, 107, 32, 95, 97, 100, 32, 199, 32, 229, 128, 32, 99, 104, 101, 99, 107, 32, 95, 97, 100, 0, 
   1, 158, 128, 243, 68, 41, 32, 144, 32, 48, 32, 203, 0, 
   1, 158, 128, 95, 97, 100, 32, 144, 32, 48, 32, 203, 32, 168, 128, 34, 45, 45, 32, 34, 59, 0, 
   1, 158, 128, 95, 97, 100, 32, 143, 32, 48, 32, 203, 32, 168, 128, 164, 95, 97, 100, 44, 32, 50, 41, 59, 34, 32, 34, 59, 0, 
-  1, 139, 128, 0, 1, 168, 128, 34, 45, 45, 32, 34, 59, 0, 1, 143, 128, 0, 1, 166, 128, 120, 0, 
-  1, 168, 128, 0, 1, 166, 128, 121, 0, 1, 147, 128, 120, 44, 121, 0,
+  1, 139, 128, 0, 1, 168, 128, 34, 45, 45, 32, 34, 59, 0, 1, 143, 128, 0, 1, 166, 128, 120, 95, 0, 
+  1, 168, 128, 0, 1, 166, 128, 121, 95, 0, 1, 147, 128, 120, 95, 44, 121, 95, 0,
   1, 147, 128, 95, 97, 100, 0,0
  };
 // stack to keep track of nested FOR/NEXT loops
@@ -325,7 +328,7 @@ int MIPS16 as_strcmpi (const char *s1, const char *s2)
 }
 void MIPS16 sortStrings(char **arr, int n)
 {
-    char temp[16];
+    char temp[STRINGSIZE];
     int i,j;
     // Sorting strings using bubble sort
     for (j=0; j<n-1; j++)
@@ -1011,6 +1014,7 @@ void do_end(bool ecmd) {
 	g_myrand=NULL;
 	OptionConsole=3;
 	SSPrintString("\033[?25h"); //in case application has turned the cursor off
+	SSPrintString("\033[97;40m");
 #ifdef PICOMITEWEB
 	close_tcpclient();
 #endif
@@ -1031,7 +1035,8 @@ extern bool g_TempMemoryIsChanged;
 extern volatile char *g_StrTmp[MAXTEMPSTRINGS];                                       // used to track temporary string space on the heap
 extern volatile char g_StrTmpLocalIndex[MAXTEMPSTRINGS];                              // used to track the g_LocalIndex for each temporary string space on the heap
 void SaveContext(void){
-#if defined(rp2350) && !defined(PICOMITEWEB)
+	CloseAudio(1);
+	#if defined(rp2350) && !defined(PICOMITEWEB)
 	if(Option.PSRAM_CS_PIN){
 		ClearTempMemory();
 		uint8_t *p=(uint8_t *)PSRAMbase+PSRAMsize;
@@ -1116,7 +1121,8 @@ void SaveContext(void){
 
 }
 void RestoreContext(bool keep){
-#if defined(rp2350) && !defined(PICOMITEWEB)
+	CloseAudio(1);
+	#if defined(rp2350) && !defined(PICOMITEWEB)
 	if(Option.PSRAM_CS_PIN){
 		uint8_t *p=(uint8_t *)PSRAMbase+PSRAMsize;
 		memcpy(&g_StrTmpIndex, p, sizeof(g_StrTmpIndex));
@@ -2013,19 +2019,17 @@ void cmd_byte(void){
 	int value = getint(cmdline,0,255);
 	sourcestring[start]=value;
 }
-void cmd_bit(void){
-	getargs(&cmdline,3,(unsigned char *)",");
-	uint64_t *source=(uint64_t *)findvar(argv[0], V_NOFIND_ERR);
-    if(g_vartbl[g_VarIndex].type & T_CONST) error("Cannot change a constant");
-	if(!(g_vartbl[g_VarIndex].type & T_INT)) error("Not an integer");
-	uint64_t bit=(uint64_t)1<<(uint64_t)getint(argv[2],0,63);
+
+void cmd_flag(void){
+	getargs(&cmdline,1,(unsigned char *)",");
+	uint64_t bit=(uint64_t)1<<(uint64_t)getint(argv[0],0,63);
 	while(*cmdline && tokenfunction(*cmdline) != op_equal) cmdline++;
 	if(!*cmdline) error("Syntax");
 	++cmdline;
 	if(!*cmdline) error("Syntax");
 	int value = getint(cmdline,0,1);
-	if(value)*source|=bit;
-	else *source&=(~bit);
+	if(value)g_flag |=bit;
+	else g_flag &=~bit;
 }
 
 void MIPS16 __not_in_flash_func(cmd_return)(void) {
@@ -2036,8 +2040,362 @@ void MIPS16 __not_in_flash_func(cmd_return)(void) {
 	nextstmt = gosubstack[--gosubindex];                            // return to the caller
     CurrentLinePtr = errorstack[gosubindex];
 }
+/*frame
+#define c_topleft  218
+#define c_topright 191
+#define c_bottomleft 192
+#define c_bottomright 217
+#define c_horizontal 196
+#define c_vertical 179
+#define c_cross 197
+#define c_tup 193
+#define c_tdown 194
+#define c_tleft 195
+#define c_tright 180
+#define c_d_topleft  201
+#define c_d_topright 187
+#define c_d_bottomleft 200
+#define c_d_bottomright 188
+#define c_d_horizontal 205
+#define c_d_vertical 186
+#define c_d_cross 206
+#define c_d_tup 202
+#define c_d_tdown 203
+#define c_d_tleft 204
+#define c_d_tright 185
 
 
+extern const int colours[16];
+extern void setterminal(void);
+unsigned short *frame=NULL, *outframe=NULL;
+bool framecursor=true;
+static int framex=0,framey=0;
+static inline void framewritechar(int x, int y, uint8_t ascii, uint8_t fcolour, uint8_t attributes){
+	if(x>=framex || y>=framey)return;
+	frame[(y*framex)+x]=ascii | (fcolour<<8) | (attributes<<12);
+}
+static inline uint16_t framegetchar(int x, int y ){
+	return frame[(y*framex)+x];
+}
+static void SCursor(int x, int y) {
+    char s[30];
+	ShowCursor(0);
+	CurrentX=x*gui_font_width;
+	CurrentY=y*gui_font_height;
+	sprintf(s,"\033[%d;%dH",y+1,x+1);
+	SSPrintString(s);
+	ShowCursor(framecursor);
+}
+static void SColour(int colour, int fore){
+    char s[24]={0};
+	int r=colour>>16;
+	int g=(colour>>8) & 0xFF;
+	int b=colour & 0xff;
+	if(fore){
+		strcpy(s,"\033[38;2;");
+		gui_fcolour=colour;
+	} else {
+		strcpy(s,"\033[48;2;");
+		gui_bcolour=colour;
+	}
+	sprintf(&s[7],"%d;%d;%dm",r,g,b);
+	SSPrintString(s);
+}
+
+void cmd_frame(void){
+	unsigned char *p=NULL;
+	if((p=checkstring(cmdline,(unsigned char *)"CREATE"))){
+		if(frame)error("Frame already exists");
+		framex=HRes/gui_font_width;
+		framey=VRes/gui_font_height;
+		frame=(uint16_t *)GetMemory(framex*framey*sizeof(uint16_t));
+		outframe=(uint16_t *)GetMemory(framex*framey*sizeof(uint16_t));
+		for(int i=0;i<framex*framey;i++)outframe[i]=0xFFFF;
+		Option.Width=framex;
+		Option.Height=framey;
+		char sp[20]={0};
+		strcpy(sp,"\033[8;");
+		IntToStr(&sp[strlen(sp)],framey,10);
+		strcat(sp,";");
+		IntToStr(&sp[strlen(sp)],framex+1,10);
+		strcat(sp,"t");
+		SSPrintString(sp);	
+		SSPrintString("\0337\033[2J\033[H");                            // vt100 clear screen and home cursor
+		ClearScreen(gui_bcolour);					//
+		return;
+	} 
+	if(!frame)error("Frame not created");
+	if((p=checkstring(cmdline,(unsigned char *)"CURSOR"))){
+		if(checkstring(p,(unsigned char *)"ON")){
+			framecursor=true;
+			SSPrintString("\033[?25h");
+		} else if(checkstring(p,(unsigned char *)"OFF")){
+			ShowCursor(0);
+			framecursor=false;
+			SSPrintString("\033[?25l");
+		} else {
+			getargs(&p,3,(unsigned char *)",");
+			if(argc<3)error("Syntax");
+			int x=getint(argv[0],0,framex-1);
+			int y=getint(argv[2],0,framey-1);
+			if(DISPLAY_TYPE==SCREENMODE1)tilefcols[y*X_TILE+x]=Option.VGAFC;
+			SCursor(x,y);
+		}
+	} else if((p=checkstring(cmdline,(unsigned char *)"BOX"))){
+		int fc=gui_fcolour;
+		bool dual=false;
+		getargs(&p,11,(unsigned char *)",");
+		if(argc<7)error("Syntax");
+		int x=getint(argv[0],0,framex-1);
+		int y=getint(argv[2],0,framey-1);
+		int w=getint(argv[4],1,framex-1-x);
+		int h=getint(argv[6],1,framey-1-y);
+		if(argc>=9 && *argv[8])fc=getint(argv[8],0,WHITE);
+		if(argc==11){
+			if(checkstring(argv[10],(unsigned char *)"DOUBLE"))dual=true;
+		}
+		fc=((fc & 0x800000)>> 20) | ((fc & 0xC000)>>13) | ((fc & 0x80)>>7);
+		framewritechar(x,y,dual ? c_d_topleft : c_topleft,fc,0);
+		framewritechar(x+w,y,dual ? c_d_topright : c_topright,fc,0);
+		framewritechar(x+w,y+h,dual ? c_d_bottomright : c_bottomright,fc,0);
+		framewritechar(x,y+h,dual ? c_d_bottomleft : c_bottomleft,fc,0);
+		for(int i=x+1;i<x+w;i++){
+			framewritechar(i,y,dual ? c_d_horizontal : c_horizontal,fc,0);
+			framewritechar(i,y+h,dual ? c_d_horizontal : c_horizontal,fc,0);
+		}
+		for(int i=y+1;i<y+h;i++){
+			framewritechar(x,i,dual ? c_d_vertical : c_vertical,fc,0);
+			framewritechar(x+w,i,dual ? c_d_vertical : c_vertical,fc,0);
+		}
+		SCursor(1,1);
+	} else if((p=checkstring(cmdline,(unsigned char *)"QBOX"))){
+		int fc=gui_fcolour;
+		bool dual=false;
+		getargs(&p,15,(unsigned char *)",");
+		if(argc<9)error("Syntax");
+		int x=getint(argv[0],0,framex-1);
+		int y=getint(argv[2],0,framey-1);
+		int w=getint(argv[4],1,framex-1-x);
+		int w2=getint(argv[6],1,framex-1-x-w);
+		int h=getint(argv[8],1,framey-1-y);
+		int h2=getint(argv[10],1,framey-1-y-h);
+		if(argc>=13 && *argv[12])fc=getint(argv[12],0,WHITE);
+		if(argc==15){
+			if(checkstring(argv[14],(unsigned char *)"DOUBLE"))dual=true;
+		}
+		fc=((fc & 0x800000)>> 20) | ((fc & 0xC000)>>13) | ((fc & 0x80)>>7);
+		framewritechar(x,y,dual ? c_d_topleft : c_topleft,fc,0);
+		framewritechar(x+w,y,dual ? c_d_tdown : c_tdown,fc,0);
+		framewritechar(x+w+w2,y,dual ? c_d_topright : c_topright,fc,0);
+		framewritechar(x,y+h,dual ? c_d_tleft : c_tleft,fc,0);
+		framewritechar(x+w,y+h,dual ? c_d_cross : c_cross,fc,0);
+		framewritechar(x+w+w2,y+h,dual ? c_d_tright : c_tright,fc,0);
+		framewritechar(x,y+h+h2,dual ? c_d_bottomleft : c_bottomleft,fc,0);
+		framewritechar(x+w,y+h+h2,dual ? c_d_tup : c_tup,fc,0);
+		framewritechar(x+w+w2,y+h+h2,dual ? c_d_bottomright : c_bottomright,fc,0);
+		for(int i=x+1;i<x+w;i++){
+			framewritechar(i,y,dual ? c_d_horizontal : c_horizontal,fc,0);
+			framewritechar(i,y+h,dual ? c_d_horizontal : c_horizontal,fc,0);
+			framewritechar(i,y+h+h2,dual ? c_d_horizontal : c_horizontal,fc,0);
+		}
+		for(int i=x+1+w;i<x+w+w2;i++){
+			framewritechar(i,y,dual ? c_d_horizontal : c_horizontal,fc,0);
+			framewritechar(i,y+h,dual ? c_d_horizontal : c_horizontal,fc,0);
+			framewritechar(i,y+h+h2,dual ? c_d_horizontal : c_horizontal,fc,0);
+		}
+		for(int i=y+1;i<y+h;i++){
+			framewritechar(x,i,dual ? c_d_vertical : c_vertical,fc,0);
+			framewritechar(x+w,i,dual ? c_d_vertical : c_vertical,fc,0);
+			framewritechar(x+w+w2,i,dual ? c_d_vertical : c_vertical,fc,0);
+		}
+		for(int i=y+1+h;i<y+h+h2;i++){
+			framewritechar(x,i,dual ? c_d_vertical : c_vertical,fc,0);
+			framewritechar(x+w,i,dual ? c_d_vertical : c_vertical,fc,0);
+			framewritechar(x+w+w2,i,dual ? c_d_vertical : c_vertical,fc,0);
+		}
+		SCursor(1,1);
+	} else if((p=checkstring(cmdline,(unsigned char *)"VBOX"))){
+		int fc=gui_fcolour;
+		bool dual=false;
+		getargs(&p,13,(unsigned char *)",");
+		if(argc<9)error("Syntax");
+		int x=getint(argv[0],0,framex-1);
+		int y=getint(argv[2],0,framey-1);
+		int w=getint(argv[4],1,framex-1-x);
+		int h=getint(argv[6],1,framey-1-y);
+		int h2=getint(argv[8],1,framey-1-y-h);
+		if(argc>=11 && *argv[10])fc=getint(argv[10],0,WHITE);
+		if(argc==13){
+			if(checkstring(argv[12],(unsigned char *)"DOUBLE"))dual=true;
+		}
+		fc=((fc & 0x800000)>> 20) | ((fc & 0xC000)>>13) | ((fc & 0x80)>>7);
+		framewritechar(x,y,dual ? c_d_topleft : c_d_topleft,fc,0);
+		framewritechar(x+w,y,dual ? c_d_topright : c_d_topright,fc,0);
+		framewritechar(x+w,y+h,dual ? c_d_tright : c_d_tright,fc,0);
+		framewritechar(x+w,y+h+h2,dual ? c_d_bottomright : c_d_bottomright,fc,0);
+		framewritechar(x,y+h+h2,dual ? c_d_bottomleft : c_d_bottomleft,fc,0);
+		framewritechar(x,y+h,dual ? c_d_tleft : c_d_tleft,fc,0);
+		for(int i=x+1;i<x+w;i++){
+			framewritechar(i,y,dual ? c_d_horizontal : c_d_horizontal,fc,0);
+			framewritechar(i,y+h,dual ? c_d_horizontal : c_d_horizontal,fc,0);
+			framewritechar(i,y+h+h2,dual ? c_d_horizontal : c_d_horizontal,fc,0);
+		}
+		for(int i=y+1;i<y+h;i++){
+			framewritechar(x,i,dual ? c_d_vertical : c_d_vertical,fc,0);
+			framewritechar(x+w,i,dual ? c_d_vertical : c_d_vertical,fc,0);
+		}
+		for(int i=y+1+h;i<y+h+h2;i++){
+			framewritechar(x,i,dual ? c_d_vertical : c_d_vertical,fc,0);
+			framewritechar(x+w,i,dual ? c_d_vertical : c_d_vertical,fc,0);
+		}
+		SCursor(1,1);
+	} else if((p=checkstring(cmdline,(unsigned char *)"HBOX"))){
+		int fc=gui_fcolour;
+		bool dual=false;
+		getargs(&p,13,(unsigned char *)",");
+		if(argc<9)error("Syntax");
+		int x=getint(argv[0],0,framex-1);
+		int y=getint(argv[2],0,framey-1);
+		int w=getint(argv[4],1,framex-1-x);
+		int w2=getint(argv[6],1,framex-1-x-w);
+		int h=getint(argv[8],1,framey-1-y);
+		if(argc>=11 && *argv[10])fc=getint(argv[10],0,WHITE);
+		if(argc==13){
+			if(checkstring(argv[12],(unsigned char *)"DOUBLE"))dual=true;
+		}
+		fc=((fc & 0x800000)>> 20) | ((fc & 0xC000)>>13) | ((fc & 0x80)>>7);
+		framewritechar(x,y,dual ? c_d_topleft : c_topleft,fc,0);
+		framewritechar(x+w,y,dual ? c_d_tdown : c_tdown,fc,0);
+		framewritechar(x+w,y+h,dual ? c_d_tup : c_tup,fc,0);
+		framewritechar(x+w+w2,y,dual ? c_d_topright : c_topright,fc,0);
+		framewritechar(x+w+w2,y+h,dual ? c_d_bottomright : c_bottomright,fc,0);
+		framewritechar(x,y+h,dual ? c_d_bottomleft : c_bottomleft,fc,0);
+		for(int i=x+1;i<x+w;i++){
+			framewritechar(i,y,dual ? c_d_horizontal : c_horizontal,fc,0);
+			framewritechar(i,y+h,dual ? c_d_horizontal : c_horizontal,fc,0);
+		}
+		for(int i=x+1+w;i<x+w+w2;i++){
+			framewritechar(i,y,dual ? c_d_horizontal : c_horizontal,fc,0);
+			framewritechar(i,y+h,dual ? c_d_horizontal : c_horizontal,fc,0);
+		}
+		for(int i=y+1;i<y+h;i++){
+			framewritechar(x,i,dual ? c_d_vertical : c_vertical,fc,0);
+			framewritechar(x+w,i,dual ? c_d_vertical : c_vertical,fc,0);
+			framewritechar(x+w+w2,i,dual ? c_d_vertical : c_vertical,fc,0);
+		}
+		SCursor(1,1);
+	} else if((p=checkstring(cmdline,(unsigned char *)"CLEAR"))){
+		memset(frame,0,framex*framey*sizeof(uint16_t));
+	} else if((p=checkstring(cmdline,(unsigned char *)"CLOSE"))){
+		if(!frame)error("Frame does not exist");
+		FreeMemorySafe((void **)&frame);
+		FreeMemorySafe((void **)&outframe);
+	} else if((p=checkstring(cmdline,(unsigned char *)"SCROLL"))){
+		int xstart=0,ystart=0,xend=framex-1,yend=framey-1, xmax=framex-1, ymax=framey-1;
+		getargs(&p,11,(unsigned char *)",");
+//		if(argc<7)error("Syntax");
+		int xs=getint(argv[0],-(xmax),xmax);
+		int ys=getint(argv[2],-(ymax),ymax);
+		if(argc>=5 && *argv[4])xstart=getint(argv[4],0,xmax);
+		if(argc>=7 && *argv[6])ystart=getint(argv[6],0,ymax);
+		if(argc>=9 && *argv[8])xend=getint(argv[8],1,xmax);
+		if(argc==11)yend=getint(argv[10],1,ymax);
+		SCursor(xstart,ystart);
+		if(DISPLAY_TYPE==SCREENMODE1)tilefcols[ystart*X_TILE+xstart]=Option.VGAFC;
+		if(abs(xs)>=0){
+			for(int y=ystart;y<=yend;y++){
+				uint16_t *line=&frame[y*framex];
+				if(xs>0){
+					memmove((uint8_t*)&line[xstart+xs],(uint8_t*)&line[xstart],(xend-xstart-xs+1)*sizeof(uint16_t));
+					memset((uint8_t*)&line[xstart],0,xs*sizeof(uint16_t));
+				} else {
+					memmove((uint8_t*)&line[xstart],(uint8_t*)&line[xstart-xs],(xend-xstart+xs+1)*sizeof(uint16_t));
+					memset((uint8_t*)&line[xend+xs+1],0,abs(xs)*sizeof(uint16_t));
+				}
+			}
+		}
+		if(ys>0){
+			uint16_t *line1=&frame[(yend)*framex+xstart];
+			uint16_t *line2=&frame[(yend-ys)*framex+xstart];
+			for(int y=yend;y>ystart-ys+1;y--){
+				memcpy((uint8_t*)line1,(uint8_t*)line2,(xend-xstart+1)*sizeof(uint16_t));
+				line1-=framex;
+				line2-=framex;
+			}
+			line1=&frame[ystart*framex+xstart];
+			for(int y=ystart;y<ystart+ys;y++){
+				memset((uint8_t*)line1,0,(xend-xstart+1)*sizeof(uint16_t));
+				line1+=framex;
+			}
+		} else if(ys<0){
+			ys=-ys;
+			uint16_t *line1=&frame[ystart*framex+xstart];
+			uint16_t *line2=&frame[(ystart+ys)*framex+xstart];
+			for(int y=ystart;y<=yend-ys;y++){
+				memcpy((uint8_t*)line1,(uint8_t*)line2,(xend-xstart+1)*sizeof(uint16_t));
+				line1+=framex;
+				line2+=framex;
+			}
+			line1=&frame[(yend-ys+1)*framex+xstart];
+			for(int y=yend-ys+1;y<=yend;y++){
+				memset((uint8_t*)line1,0,(xend-xstart+1)*sizeof(uint16_t));
+				line1+=framex;
+			}
+		}
+	} else if((p=checkstring(cmdline,(unsigned char *)"WRITE"))){
+		int savefcol=gui_fcolour;
+		int lasty=-1,lastx=-1,lastc=-1;
+		int sx=CurrentX/gui_font_width,sy=CurrentY/gui_font_height;
+		int ccursor=framecursor;
+		framecursor=0;
+		ShowCursor(0);
+		SColour(gui_bcolour,0);
+		for(int y=0;y<framey;y++){
+			for(int x=0;x<framex;x++){
+				uint16_t c=framegetchar(x,y);
+				if(c!=outframe[(y*framex)+x]){
+					outframe[(y*framex)+x]=c;
+					if(y!=lasty || x!=lastx){
+						SCursor(x,y);
+						lastx=x+1;
+						lasty=y;
+					} else lastx=x+1;
+					int outc=colours[(c>>8) & 0xF];
+					if(outc!=lastc){
+						lastc=outc;
+						SColour(outc,1);
+					}
+					if(c==0)c=' ';
+					DisplayPutC(c&0xFF);
+					SerialConsolePutC(c&0xFF,0);
+				}
+			}
+		}
+		fflush(stdout);
+		gui_fcolour=savefcol;
+		SCursor(sx,sy);
+		framecursor=ccursor;
+		ShowCursor(framecursor);
+		if(DISPLAY_TYPE==SCREENMODE1)tilefcols[sy*X_TILE+sx]=Option.VGAFC;
+		SColour(gui_fcolour,1);
+	} else {
+		int attributes=0, fc=gui_fcolour;
+		getargs(&cmdline,9,(unsigned char *)",");
+		if(argc<5)error("Syntax");
+		int x=getint(argv[0],0,framex-1);
+		int y=getint(argv[2],0,framey-1);
+		p=getCstring(argv[4]);
+		if(argc>=7 && *argv[6])fc=getint(argv[6],0,WHITE);
+		if(argc==9)attributes=getint(argv[8],0,15);
+		int l=strlen((char *)p);
+		fc=((fc & 0x800000)>> 20) | ((fc & 0xC000)>>13) | ((fc & 0x80)>>7);
+		while(l--){
+			if(x==framex){y++;x=0;}
+			if(y==framey)return;
+			framewritechar(x++,y,*p++,fc,attributes);
+		}
+	}
+}*/
 
 
 void cmd_endfun(void) {
@@ -2539,6 +2897,7 @@ void MIPS16 cmd_dim(void) {
                     VarName[k] = 0;                                 // terminate the string on a non valid char
                     break;
                 }
+				strcat((char *)VarName,".");
                 strcat((char *)VarName, (char *)argv[i]);					        // by prefixing the var name with the sub/fun name
             	StaticVar = true;
             } else

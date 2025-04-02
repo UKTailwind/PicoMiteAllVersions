@@ -78,7 +78,7 @@ extern const unsigned int CaseOption;
 extern volatile bool Keycomplete;
 extern char *KeyInterrupt;
 extern int keyselect;
-
+extern uint64_t g_flag;
 #define TRACE_BUFF_SIZE  128
 
 extern unsigned int BusSpeed;
@@ -96,5 +96,8 @@ extern void RestoreContext(bool keep);
 extern void do_end(bool ecmd);
 extern struct sa_data datastore[MAXRESTORE];
 extern int restorepointer;
+extern unsigned short *frame, *outframe;
+extern bool framecursor;
+
 #endif
 /*  @endcond */

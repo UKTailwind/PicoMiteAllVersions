@@ -3209,6 +3209,10 @@ void MIPS16 ClearRuntime(bool all) {
     optionfulltime=false;
     optionfastaudio=0;
     optionlogging=false;
+/*frame
+    frame=NULL;
+    outframe=NULL;
+*/
 #ifndef PICOMITEVGA
     if(SSD16TYPE || Option.DISPLAY_TYPE==IPS_4_16 || SPI480)clear320();
 #endif
@@ -3219,6 +3223,7 @@ void MIPS16 ClearRuntime(bool all) {
     ClearVars(0,true);
     memset(datastore, 0, sizeof(struct sa_data) * MAXRESTORE);
     restorepointer = 0;
+    g_flag=0;
     g_varcnt = 0;
     CurrentLinePtr = ContinuePoint = NULL;
     for(i = 0;  i < MAXSUBFUN; i++)  subfun[i] = NULL;

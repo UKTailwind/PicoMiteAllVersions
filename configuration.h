@@ -160,8 +160,8 @@ extern "C" {
 #ifdef PICOMITE
     #define MIN_CPU     48000
     #ifdef rp2350
-        #define HEAP_MEMORY_SIZE (304*1024) 
-        #define MAXVARS             768                     // 8 + MAXVARLEN + MAXDIM * 2  (ie, 56 bytes) - these do not incl array members
+        #define HEAP_MEMORY_SIZE (288*1024) 
+        #define MAXVARS             768                     // 8 + MAXVARLEN + MAXDIM * 4  (ie, 64 bytes) - these do not incl array members
         #define FLASH_TARGET_OFFSET (832 * 1024) 
         #define MAX_CPU     (rp2350a ? 396000 : 378000)
         #define MAXSUBFUN           512                     // each entry takes up 4 bytes
@@ -386,6 +386,7 @@ typedef enum {
     MMTOPIC,
     MMADDRESS,
 #endif
+    MMFLAG,  
     MMEND
 } Operation;
 extern const char* overlaid_functions[];

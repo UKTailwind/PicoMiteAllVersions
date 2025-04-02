@@ -186,6 +186,8 @@ void cmd_irq(void);
 void cmd_set(void);
 void cmd_byte(void);
 void cmd_bit(void);
+void cmd_flag(void);
+void cmd_frame(void);
 #ifdef PICOMITEWEB
     void cmd_web(void);
 #endif
@@ -326,6 +328,7 @@ void fun_mmvpos(void);
 void fun_tilde(void);
 void fun_byte(void);
 void fun_bit(void);
+void fun_flag(void);
 #ifdef PICOMITEWEB
     void fun_json(void);
 #endif
@@ -505,7 +508,10 @@ void fun_map(void);
 	{ (unsigned char *)"IRQ",		T_CMD,				0, cmd_irq	}, 
 	{ (unsigned char *)"Set",		T_CMD,				0, cmd_set	},
 	{ (unsigned char *)"Byte(",		T_CMD | T_FUN,				0, cmd_byte	},
-	{ (unsigned char *)"Bit(",		T_CMD | T_FUN,				0, cmd_bit	},
+	{ (unsigned char *)"Flag(",		T_CMD | T_FUN,				0, cmd_flag	},
+/*frame
+	{ (unsigned char *)"Frame",		T_CMD | T_FUN,				0, cmd_frame	},
+*/
 	#ifdef PICOMITEVGA
   	{ (unsigned char *)"TILE",            T_CMD,                     0, cmd_tile   },
   	{ (unsigned char *)"MODE",            T_CMD,                     0, cmd_mode   },
@@ -662,8 +668,8 @@ void fun_map(void);
 	{ (unsigned char *)"Day$(",	T_FUN | T_STR,		0, fun_day	},
 	{ (unsigned char *)"Peek(",		T_FUN  | T_INT | T_STR | T_NBR,			0, fun_peek		},
 	{ (unsigned char *)"Time$",	T_FNA | T_STR,		0, fun_time	},
-	{ (unsigned char*)"sprite(",	    T_FUN | T_INT | T_NBR,		0, fun_sprite },
-	{ (unsigned char *)"Bit(",	T_FUN | T_INT,		0, fun_bit,	},
+	{ (unsigned char *)"sprite(",	    T_FUN | T_INT | T_NBR,		0, fun_sprite },
+	{ (unsigned char *)"Flag(",	T_FUN | T_INT,		0, fun_flag,	},
 	{ (unsigned char *)"Epoch(",		T_FUN  | T_INT,			0, fun_epoch		},
 	{ (unsigned char *)"DateTime$(",		T_FUN | T_STR,		0, fun_datetime		},
 	{ (unsigned char *)"MM.Info(",		T_FUN | T_INT  | T_NBR| T_STR,		0, fun_info		},
@@ -686,7 +692,7 @@ void fun_map(void);
 	  { (unsigned char *)"MsgBox(",        T_FUN | T_INT,              0, fun_msgbox     },
 	  { (unsigned char *)"CtrlVal(",       T_FUN | T_NBR | T_STR,      0, fun_ctrlval    },
 #endif
-    { (unsigned char *)"",   0,                  0, cmd_null,    }                   // this dummy entry is always at the end
+{ (unsigned char *)"",   0,                  0, cmd_null,    }                   // this dummy entry is always at the end
 #endif
 /*  @endcond */
 

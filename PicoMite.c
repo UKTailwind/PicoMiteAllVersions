@@ -520,9 +520,9 @@ void __not_in_flash_func(routinechecks)(void){
 			WiiReceive(6, (char *)nunbuff);
             classicproc();
         }
-        ClassicTimer=0;
+        ClassicTimer=0; 
     }
-    if(nunchuck1 && NunchuckTimer>=10){
+    if(nunchuck1 && NunchuckTimer>=10){ 
         if(nunchuckread==false){
 			WiiSend(sizeof(readcontroller),(char *)readcontroller);
             nunchuckread=true;
@@ -534,6 +534,9 @@ void __not_in_flash_func(routinechecks)(void){
         }
         NunchuckTimer=0;
     }
+/*frame
+    if(frame && CurrentLinePtr)ShowCursor(framecursor);
+*/
 }
 
 int __not_in_flash_func(getConsole)(void) {

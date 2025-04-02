@@ -3051,6 +3051,7 @@ void MIPS16 cmd_load(void)
     }
 #endif
     getargs(&cmdline, 3, (unsigned char *)",");
+    CloseAudio(1);
     if (!(argc & 1) || argc == 0)
         error("Syntax");
     if (argc == 3)

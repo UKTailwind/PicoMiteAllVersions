@@ -63,8 +63,10 @@ const char* overlaid_functions[]={
 #ifdef PICOMITEWEB
 	"MM.MESSAGE$",
 	"MM.ADDRESS$",
-	"MM.TOPIC$"
+	"MM.TOPIC$",
 #endif
+	"MM.FLAGS",
+	"MM.END"
 };
 /********************************************************************************************************************************************
  basic functions
@@ -410,16 +412,15 @@ void fun_asc(void) {
     	iret = *(s + 1);
     targ = T_INT;
 }
-void fun_bit(void){
-	uint64_t *s;
+ 
+void fun_flag(void){
 	uint64_t spos;
-	getargs(&ep, 3, (unsigned char *)",");
-	s=(uint64_t *)findvar(argv[0], V_NOFIND_ERR);
-	if(!(g_vartbl[g_VarIndex].type & T_INT)) error("Not an integer");
-	spos = getint(argv[2], 0,63);						    // the mid position
-	iret = (int64_t)(*s&(1<<spos))>>spos;
+	getargs(&ep, 1, (unsigned char *)",");
+	spos = getint(argv[0], 0,63);						    // the mid position
+	iret = (int64_t)(g_flag & (1<<spos))>>spos;
 	targ=T_INT;
 }
+
 void fun_byte(void){
 	unsigned char *s;
 	int spos;
@@ -456,6 +457,7 @@ typedef enum {
     MMTOPIC,
     MMADDRESS,
 #endif
+	MMFLAG,
     MMEND
 } Operation;
 */
@@ -526,8 +528,11 @@ typedef enum {
 			targ=T_STR;
 			break;
 #endif
+		case  MMFLAG:
+			iret=g_flag;
+			break;
 		default:
-		iret=-1;
+			iret=-1;
 	}
 }
 
