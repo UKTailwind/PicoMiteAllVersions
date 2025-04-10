@@ -1326,10 +1326,12 @@ void cmd_math(void){
 				for(j=1;j<numcols;j++)PFltComma(*a1float++);
 				PRet();
 			} else {
-				if(checkstring(argv[2],(unsigned char *)"HEX")){
-					PIntH(*a1int++);
-					for(j=1;j<numcols;j++)PIntHC(*a1int++);
-					PRet();
+				if(argc==3){
+					if(checkstring(argv[2],(unsigned char *)"HEX")){
+						PIntH(*a1int++);
+						for(j=1;j<numcols;j++)PIntHC(*a1int++);
+						PRet();
+					} else error("Syntax");
 				} else {
 					PInt(*a1int++);
 					for(j=1;j<numcols;j++)PIntComma(*a1int++);
