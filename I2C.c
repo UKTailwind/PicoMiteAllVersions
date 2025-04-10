@@ -77,7 +77,7 @@ static char *I2C2_Rcvbuf_String;										// pointer to the master receive buffe
 static unsigned int I2C2_Addr;										// I2C device address
 static volatile unsigned int I2C2_Sendlen;							// length of the master send buffer
 static volatile unsigned int I2C2_Rcvlen;							// length of the master receive buffer
-static unsigned char I2C_Send_Buffer[256];                                   // I2C send buffer
+//static unsigned char I2C_Send_Buffer[256];                                   // I2C send buffer
 bool  I2C2_enabled=false;									// I2C enable marker
 unsigned int I2C2_Timeout;									// master timeout value
 volatile unsigned int I2C2_Status;										// status flags
@@ -754,8 +754,7 @@ void i2cSend(unsigned char *p) {
 	I2C_Status = 0;
 	if(i2c_options & 0x01) I2C_Status = I2C_Status_BusHold;
 	I2C_Addr = addr;
-	sendlen = getinteger(argv[4]);
-	if(sendlen < 1 || sendlen > 255) error("Number out of bounds");
+	sendlen = getint(argv[4],1,256);
 
 	if(sendlen == 1 || argc > 7) {		// numeric expressions for data
 		if(sendlen != ((argc - 5) >> 1)) error("Incorrect argument count");
@@ -766,6 +765,7 @@ void i2cSend(unsigned char *p) {
 		ptr = findvar(argv[6], V_NOFIND_NULL | V_EMPTY_OK);
 		if(ptr == NULL) error("Invalid variable");
 		if((g_vartbl[g_VarIndex].type & T_STR) && g_vartbl[g_VarIndex].dims[0] == 0) {		// string
+			if(sendlen > 255)error("Number out of bounds");
 			cptr = (unsigned char *)ptr;
 			cptr++;																	// skip the length byte in a MMBasic string
 			for (i = 0; i < sendlen; i++) {
@@ -861,8 +861,7 @@ void i2c2Send(unsigned char *p) {
 	I2C2_Status = 0;
 	if(i2c2_options & 0x01) I2C2_Status = I2C_Status_BusHold;
 	I2C2_Addr = addr;
-	sendlen = getinteger(argv[4]);
-	if(sendlen < 1 || sendlen > 255) error("Number out of bounds");
+	sendlen = getint(argv[4],1,256);
 
 	if(sendlen == 1 || argc > 7) {		// numeric expressions for data
 		if(sendlen != ((argc - 5) >> 1)) error("Incorrect argument count");
@@ -873,6 +872,7 @@ void i2c2Send(unsigned char *p) {
 		ptr = findvar(argv[6], V_NOFIND_NULL | V_EMPTY_OK);
 		if(ptr == NULL) error("Invalid variable");
 		if((g_vartbl[g_VarIndex].type & T_STR) && g_vartbl[g_VarIndex].dims[0] == 0) {		// string
+			if(sendlen > 255) error("Number out of bounds");
 			cptr = (unsigned char *)ptr;
 			cptr++;																	// skip the length byte in a MMBasic string
 			for (i = 0; i < sendlen; i++) {
@@ -909,7 +909,8 @@ void i2cCheck(unsigned char *p) {
 	if(!I2C_enabled)error("I2C not open");
 	addr = getinteger(argv[0]);
     if(addr<0 || addr>0x7F)error("Invalid I2C address");
-	int ret=i2c_read_blocking(i2c0, addr, &rxdata, 1, false);
+//	int ret=i2c_read_blocking(i2c0, addr, &rxdata, 1, false);
+	int ret=i2c_read_timeout_us(i2c0, addr, &rxdata, 1, false, 100);
 	mmI2Cvalue = ret < 0 ? 1 : 0;
 }
 void i2c2Check(unsigned char *p) {
@@ -919,7 +920,8 @@ void i2c2Check(unsigned char *p) {
 	if(!I2C2_enabled)error("I2C not open");
 	addr = getinteger(argv[0]);
     if(addr<0 || addr>0x7F)error("Invalid I2C address");
-	int ret=i2c_read_blocking(i2c1, addr, &rxdata, 1, false);
+//	int ret=i2c_read_blocking(i2c1, addr, &rxdata, 1, false);
+	int ret=i2c_read_timeout_us(i2c1, addr, &rxdata, 1, false, 100);
 	mmI2Cvalue = ret < 0 ? 1 : 0;
 }
 // receive data from an I2C slave - master mode
@@ -969,7 +971,7 @@ void i2cReceive(unsigned char *p) {
 	I2C_Rcvlen = rcvlen;
 
 	I2C_Sendlen = 0;
-	char *buff=GetTempMemory(STRINGSIZE);
+	char *buff=GetTempMemory(rcvlen>255 ? rcvlen+2 : STRINGSIZE);
 //	PInt((uint32_t)I2C_Rcvbuf_String);
 	i2c_masterCommand(1, (unsigned char *)buff);
 //	PIntComma(rcvlen);
@@ -1115,7 +1117,7 @@ void i2c2Receive(unsigned char *p) {
 
 	I2C2_Sendlen = 0;
 
-	char *buff=GetTempMemory(STRINGSIZE);
+	char *buff=GetTempMemory(rcvlen>255 ? rcvlen+2 : STRINGSIZE);
 	i2c2_masterCommand(1, (unsigned char *)buff);
 }
 
@@ -1187,7 +1189,7 @@ Send and/or Receive data - master mode
 ***************************************************************************************************/
 void i2c_masterCommand(int timer, unsigned char *I2C_Rcv_Buffer) {
 //	unsigned char start_type,
-	unsigned char i,i2caddr=I2C_Addr;
+	unsigned char i2caddr=I2C_Addr;
 	if(I2C_Sendlen){
 		int i2cret=i2c_write_timeout_us(i2c0, (uint8_t)i2caddr, (uint8_t *)I2C_Send_Buffer, I2C_Sendlen,(I2C_Status == I2C_Status_BusHold ? true:false), I2C_Timeout*1000);
 		mmI2Cvalue=0;
@@ -1199,7 +1201,7 @@ void i2c_masterCommand(int timer, unsigned char *I2C_Rcv_Buffer) {
 		mmI2Cvalue=0;
 		if(i2cret==PICO_ERROR_GENERIC)mmI2Cvalue=1;
 		if(i2cret==PICO_ERROR_TIMEOUT)mmI2Cvalue=2;
-		for(i=0;i<I2C_Rcvlen;i++){
+		for(int i=0;i<I2C_Rcvlen;i++){
 			if(I2C_Rcvbuf_String!=NULL){
 				*I2C_Rcvbuf_String=I2C_Rcv_Buffer[i];
 				I2C_Rcvbuf_String++;
@@ -1218,7 +1220,7 @@ void i2c_masterCommand(int timer, unsigned char *I2C_Rcv_Buffer) {
 
 void i2c2_masterCommand(int timer, unsigned char *I2C2_Rcv_Buffer) {
 //	unsigned char start_type,
-	unsigned char i,i2c2addr=I2C2_Addr;
+	unsigned char i2c2addr=I2C2_Addr;
 	if(I2C2_Sendlen){
 		int i2cret=i2c_write_timeout_us(i2c1, (uint8_t)i2c2addr, (uint8_t *)I2C_Send_Buffer, I2C2_Sendlen,(I2C2_Status == I2C_Status_BusHold ? true:false), I2C2_Timeout*1000);
 		mmI2Cvalue=0;
@@ -1230,7 +1232,7 @@ void i2c2_masterCommand(int timer, unsigned char *I2C2_Rcv_Buffer) {
 		mmI2Cvalue=0;
 		if(i2cret==PICO_ERROR_GENERIC)mmI2Cvalue=1;
 		if(i2cret==PICO_ERROR_TIMEOUT)mmI2Cvalue=2;
-		for(i=0;i<I2C2_Rcvlen;i++){
+		for(int i=0;i<I2C2_Rcvlen;i++){
 			if(I2C2_Rcvbuf_String!=NULL){
 				*I2C2_Rcvbuf_String=I2C2_Rcv_Buffer[i];
 				I2C2_Rcvbuf_String++;

@@ -1968,7 +1968,8 @@ void cmd_line(void) {
 				w = getint(argv[8], 1, 100);
 			}
             if(argc == 11) c = getint(argv[10], 0, WHITE);
-			drawAALine(x1, y1, x2, y2, c, w);
+            if(x1==x2 || y1==y2)DrawLine(x1, y1, x2, y2, w, c);
+			else drawAALine(x1, y1, x2, y2, c, w);
 			return;
 		} else {
             long long int *x1ptr, *y1ptr, *x2ptr, *y2ptr, *wptr, *cptr;
@@ -3959,7 +3960,7 @@ void MIPS16 loadsprite(unsigned char* p) {
     int mode=0;
     fnbr = FindFreeFileNbr();
     if(!InitSDCard()) return;
-    fname = (char*)getCstring(argv[0]);
+    fname = (char*)getFstring(argv[0]);
     if (argc >= 3 && *argv[2])startsprite = (int)getint(argv[2], 1, 64);
     if(argc==5)mode=getint(argv[4],0,1);
     if(strchr(fname, '.') == NULL) strcat(fname, ".spr");
@@ -6205,7 +6206,7 @@ void MIPS16 cmd_font(void) {
         SetFont(((getint(argv[0], 1, FONT_TABLE_SIZE) - 1) << 4) | 1);
     if(Option.DISPLAY_CONSOLE && !CurrentLinePtr) {                 // if we are at the command prompt on the LCD
 #ifdef PICOMITEVGA
-        if(gui_font_height>=8){
+        if(gui_font_height>=8 && (gui_font_width % 8)==0){
             ytileheight=gui_font_height;
             Y_TILE=(VRes+ytileheight-1)/ytileheight;
             for(int i=0;i<X_TILE*Y_TILE;i++){

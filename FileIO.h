@@ -75,8 +75,12 @@ struct option_s {
   //
     unsigned int PROG_FLASH_SIZE;
     unsigned int HEAP_SIZE;
+#ifndef PICOMITEVGA
     char Height;
     char Width;
+#else
+    short d2;
+#endif
     unsigned char DISPLAY_TYPE;
     char DISPLAY_ORIENTATION; //12=20
 //
@@ -121,10 +125,16 @@ struct option_s {
     char TOUCH_SWAPXY; 
     unsigned char repeat;
     char disabletftp;//56   8=72
+#ifndef PICOMITEVGA
     int  TOUCH_XZERO;
     int  TOUCH_YZERO;
     float TOUCH_XSCALE;
     float TOUCH_YSCALE; //72 16=88
+#else
+    short Height;
+    short Width;
+    char dummy[12];
+#endif
 #ifdef GUICONTROLS
     int MaxCtrls;
 #else

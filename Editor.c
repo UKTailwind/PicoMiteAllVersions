@@ -1059,7 +1059,6 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
 
               // F6 to F12 - Normal function keys
               case F6:
-                          break;
               case F7:
               case F8:
               case F9:

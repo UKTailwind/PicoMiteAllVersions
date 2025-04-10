@@ -687,12 +687,11 @@ void MIPS16 cmd_erase(void) {
 
 	getargs(&cmdline, (MAX_ARG_COUNT * 2) - 1, (unsigned char *)",");				// getargs macro must be the first executable stmt in a block
 	if((argc & 0x01) == 0) error("Argument count");
-
 	for(i = 0; i < argc; i += 2) {
 		strcpy((char *)p, (char *)argv[i]);
+		if(*argv[i] & 0x80)error("You can't erase an in-built function");
         while(!isnamechar(p[strlen(p) - 1])) p[strlen(p) - 1] = 0;
-
-		makeupper((unsigned char *)p);                                               // all variables are stored as uppercase
+		makeupper((unsigned char *)p);  
 		for(j = MAXVARS/2; j < MAXVARS; j++) {
             s = p;  x = (char *)g_vartbl[j].name; len = strlen(p);
             while(len > 0 && *s == *x) {                            // compare the variable to the name that we have
@@ -2019,7 +2018,26 @@ void cmd_byte(void){
 	int value = getint(cmdline,0,255);
 	sourcestring[start]=value;
 }
-
+void cmd_bit(void){
+	getargs(&cmdline,3,(unsigned char *)",");
+	uint64_t *source=(uint64_t *)findvar(argv[0], V_NOFIND_ERR);
+    if(g_vartbl[g_VarIndex].type & T_CONST) error("Cannot change a constant");
+	if(!(g_vartbl[g_VarIndex].type & T_INT)) error("Not an integer");
+	uint64_t bit=(uint64_t)1<<(uint64_t)getint(argv[2],0,63);
+	while(*cmdline && tokenfunction(*cmdline) != op_equal) cmdline++;
+	if(!*cmdline) error("Syntax");
+	++cmdline;
+	if(!*cmdline) error("Syntax");
+	int value = getint(cmdline,0,1);
+	if(value)*source|=bit;
+	else *source&=(~bit);
+}
+void cmd_flags(void) {
+	while(*cmdline && tokenfunction(*cmdline) != op_equal) cmdline++;
+	if(!*cmdline) error("Syntax");
+	g_flag=getinteger(++cmdline);
+}
+  
 void cmd_flag(void){
 	getargs(&cmdline,1,(unsigned char *)",");
 	uint64_t bit=(uint64_t)1<<(uint64_t)getint(argv[0],0,63);

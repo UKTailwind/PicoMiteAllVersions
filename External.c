@@ -2115,9 +2115,9 @@ void PWMoff(int slice){
     pwm_set_enabled(slice, false);
 }
 #ifndef PICOMITEVGA
-void setBacklight(int level){
+void setBacklight(int level, int setfrequency){
     if(((Option.DISPLAY_TYPE>I2C_PANEL && Option.DISPLAY_TYPE<BufferedPanel ) || (Option.DISPLAY_TYPE>=SSDPANEL && Option.DISPLAY_TYPE<VIRTUAL)) && Option.DISPLAY_BL){
-        MMFLOAT frequency=Option.DISPLAY_TYPE==ILI9488W ? 1000.0 : 50000.0;
+        MMFLOAT frequency=setfrequency ? (MMFLOAT)setfrequency : (Option.DISPLAY_TYPE==ILI9488W ? 1000.0 : 50000.0);
         int wrap=(Option.CPU_Speed*1000)/frequency;
         int high=(int)((MMFLOAT)Option.CPU_Speed/frequency*level*10.0);
         int div=1;
@@ -2148,18 +2148,21 @@ void setBacklight(int level){
 void MIPS16 cmd_backlight(void){
     getargs(&cmdline,3,(unsigned char *)",");
     int level=getint(argv[0],0,100);
+    int frequency=0;
     if(((Option.DISPLAY_TYPE>I2C_PANEL && Option.DISPLAY_TYPE<BufferedPanel ) || (Option.DISPLAY_TYPE>=SSDPANEL && Option.DISPLAY_TYPE<VIRTUAL)) && Option.DISPLAY_BL){
     } else if(Option.DISPLAY_TYPE<=I2C_PANEL){
     } else if(Option.DISPLAY_TYPE>=SSDPANEL && Option.DISPLAY_TYPE<VIRTUAL){
     } else if(Option.DISPLAY_TYPE==SSD1306SPI){
     } else error("Backlight not set up");
-    setBacklight(level);
     if(argc==3){
         if(checkstring(argv[2],(unsigned char *)"DEFAULT")){
             Option.BackLightLevel=level;
             SaveOptions();
+        } else {
+            frequency=getint(argv[2],100,100000);
         }
     }
+    setBacklight(level, frequency);
 }
 #endif
 void MIPS16 cmd_Servo(void){

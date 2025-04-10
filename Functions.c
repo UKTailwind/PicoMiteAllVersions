@@ -66,6 +66,9 @@ const char* overlaid_functions[]={
 	"MM.TOPIC$",
 #endif
 	"MM.FLAGS",
+	"MM.DISPLAY",
+	"MM.WIDTH",
+	"MM.HEIGHT",
 	"MM.END"
 };
 /********************************************************************************************************************************************
@@ -412,12 +415,22 @@ void fun_asc(void) {
     	iret = *(s + 1);
     targ = T_INT;
 }
+void fun_bit(void){
+	uint64_t *s;
+	uint64_t spos;
+	getargs(&ep, 3, (unsigned char *)",");
+	s=(uint64_t *)findvar(argv[0], V_NOFIND_ERR);
+	if(!(g_vartbl[g_VarIndex].type & T_INT)) error("Not an integer");
+	spos = getint(argv[2], 0,63);						    // the mid position
+	iret = ((int64_t)(*s&(1ll<<spos))>>spos) & 1ll;
+	targ=T_INT;
+}
  
 void fun_flag(void){
 	uint64_t spos;
 	getargs(&ep, 1, (unsigned char *)",");
 	spos = getint(argv[0], 0,63);						    // the mid position
-	iret = (int64_t)(g_flag & (1<<spos))>>spos;
+	iret = ((int64_t)(g_flag & (1ll<<spos))>>spos) & 1ll;
 	targ=T_INT;
 }
 
@@ -457,7 +470,10 @@ typedef enum {
     MMTOPIC,
     MMADDRESS,
 #endif
-	MMFLAG,
+    MMFLAG,  
+    MMDISPLAY,
+    MMWIDTH,
+    MMHEIGHT,
     MMEND
 } Operation;
 */
@@ -530,6 +546,15 @@ typedef enum {
 #endif
 		case  MMFLAG:
 			iret=g_flag;
+			break;
+		case  MMDISPLAY:
+			iret=Option.DISPLAY_CONSOLE ? 1 : 0;
+			break;
+		case  MMWIDTH:
+			iret=HRes/(short)(FontTable[gui_font >> 4][0] * (gui_font & 0b1111));
+			break;
+		case  MMHEIGHT:
+			iret=VRes/(short)(FontTable[gui_font >> 4][1] * (gui_font & 0b1111));
 			break;
 		default:
 			iret=-1;

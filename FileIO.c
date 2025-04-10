@@ -4961,8 +4961,10 @@ void ResetOptions(bool startup)
     Option.INT2pin = 10;
     Option.INT3pin = 11;
     Option.INT4pin = 12;
+#ifndef PICOMITEVGA
     Option.TOUCH_XSCALE=1.0f;
     Option.TOUCH_YSCALE=1.0f;
+#endif
     Option.DefaultBrightness = 100;
     Option.numlock = 1;
     Option.repeat = 0b101100;

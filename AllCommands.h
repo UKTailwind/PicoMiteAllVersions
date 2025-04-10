@@ -187,6 +187,7 @@ void cmd_set(void);
 void cmd_byte(void);
 void cmd_bit(void);
 void cmd_flag(void);
+void cmd_flags(void);
 void cmd_frame(void);
 #ifdef PICOMITEWEB
     void cmd_web(void);
@@ -551,7 +552,9 @@ void fun_map(void);
 #else
 	{ (unsigned char *)"Randomize",          T_CMD,				0, cmd_randomize},
 #endif
-    { (unsigned char *)"",   0,                  0, cmd_null,    }                   // this dummy entry is always at the end
+{ (unsigned char *)"Bit(",		T_CMD | T_FUN,				0, cmd_bit	},
+{ (unsigned char *)"Flags",	T_CMD | T_FUN,		0, cmd_flags	},
+{ (unsigned char *)"",   0,                  0, cmd_null,    }                   // this dummy entry is always at the end
 #endif
 /* ********************************************************************************
  All other tokens (keywords, functions, operators) should be inserted in this table
@@ -692,6 +695,7 @@ void fun_map(void);
 	  { (unsigned char *)"MsgBox(",        T_FUN | T_INT,              0, fun_msgbox     },
 	  { (unsigned char *)"CtrlVal(",       T_FUN | T_NBR | T_STR,      0, fun_ctrlval    },
 #endif
+{ (unsigned char *)"Bit(",	T_FUN | T_INT,		0, fun_bit,	},
 { (unsigned char *)"",   0,                  0, cmd_null,    }                   // this dummy entry is always at the end
 #endif
 /*  @endcond */

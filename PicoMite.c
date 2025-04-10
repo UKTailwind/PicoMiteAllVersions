@@ -4157,7 +4157,7 @@ if(Option.CPU_Speed==FreqSVGA){ //adjust the size of the heap
     InitDisplayI2C(0);
     InitDisplayVirtual();
     InitTouch();
-    if(Option.BackLightLevel)setBacklight(Option.BackLightLevel);
+    if(Option.BackLightLevel)setBacklight(Option.BackLightLevel, 0);
 #endif
     ErrorInPrompt = false;
     exception_set_exclusive_handler(HARDFAULT_EXCEPTION,sigbus);

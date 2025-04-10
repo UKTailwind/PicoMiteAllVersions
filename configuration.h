@@ -44,10 +44,10 @@ extern "C" {
         #ifdef HDMI
             #define MAXMODES 5
             #ifdef USBKEYBOARD
-                #define MagicKey 0x81631124
+                #define MagicKey 0x81613124
                 #define HEAPTOP 0x2007D000
             #else
-                #define MagicKey 0x976BE2A0
+                #define MagicKey 0x976EB2A0
                 #define HEAPTOP 0x2007D000
             #endif
             #define MAX_CPU     Freq378P 
@@ -55,10 +55,10 @@ extern "C" {
         #else
             #define MAXMODES 3
             #ifdef USBKEYBOARD
-                #define MagicKey 0x8E065904
+                #define MagicKey 0x8E605904
                 #define HEAPTOP 0x2007C000
             #else
-                #define MagicKey 0x60E0AFAF
+                #define MagicKey 0x600EAFAF
                 #define HEAPTOP 0x2007C000
             #endif
 #ifdef rp2350
@@ -71,12 +71,12 @@ extern "C" {
     #else
         #ifdef USBKEYBOARD
             #define FLASH_TARGET_OFFSET (848* 1024) 
-            #define MagicKey 0x41FAB715
+            #define MagicKey 0x41FBA715
             #define HEAPTOP 0x2003F000
             #define MAXVARS             480                     // 8 + MAXVARLEN + MAXDIM * 2  (ie, 56 bytes) - these do not incl array members
     #else
             #define FLASH_TARGET_OFFSET (864 * 1024) 
-            #define MagicKey 0xA052A92F
+            #define MagicKey 0xA0529A2F
             #define HEAPTOP 0x2003f000
             #define MAXVARS             480                     // 8 + MAXVARLEN + MAXDIM * 2  (ie, 56 bytes) - these do not incl array members
     #endif
@@ -387,6 +387,9 @@ typedef enum {
     MMADDRESS,
 #endif
     MMFLAG,  
+    MMDISPLAY,
+    MMWIDTH,
+    MMHEIGHT,
     MMEND
 } Operation;
 extern const char* overlaid_functions[];
