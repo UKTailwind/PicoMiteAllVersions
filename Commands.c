@@ -1007,6 +1007,7 @@ void do_end(bool ecmd) {
 	hw_clear_bits(&watchdog_hw->ctrl, WATCHDOG_CTRL_ENABLE_BITS);
 	_excep_code=0;
 	dmarunning = false;
+    multi=false;
 	WAVInterrupt = NULL;
 	WAVcomplete = 0;
 	if(g_myrand)FreeMemory((void *)g_myrand);

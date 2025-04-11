@@ -298,6 +298,7 @@ void ScrollDown(void);
 void MarkMode(unsigned char *cb, unsigned char *buf);
 void PositionCursor(unsigned char *curp);
 extern void setterminal();
+static int multilinecomment = false;
 bool modmode=false;
 int oldfont;
 int oldmode;
@@ -377,6 +378,7 @@ void edit(unsigned char *cmdline, bool cmdfile) {
 #ifdef PICOMITEWEB
     cleanserver();
 #endif
+    multilinecomment = false;
     EdBuff = GetTempMemory(EDIT_BUFFER_SIZE);
     edit_buff_size=EDIT_BUFFER_SIZE;
     *EdBuff = 0;
@@ -491,7 +493,8 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
   int c=-1, i;
   unsigned char buf[MAXCLIP+2], clipboard[MAXCLIP+2];
   unsigned char *p, *tp, BreakKeySave;
-  static char currdel=0, nextdel=0, lastdel=0, multi=false;
+  char currdel=0, nextdel=0, lastdel=0;
+  char multi=false;
 #ifdef PICOMITEVGA
   int OptionY_TILESave;
   int ytileheightsave;
@@ -1444,7 +1447,6 @@ void SetColour(unsigned char *p, int DoVT100) {
     unsigned char **pp;
     static int intext = false;
     static int incomment = false;
-    static int multilinecomment = false;
     static int inkeyword = false;
     static unsigned char *twokeyword = NULL;
     static int inquote = false;
@@ -1501,9 +1503,12 @@ void SetColour(unsigned char *p, int DoVT100) {
         return;
     }
     if(*p == '/' && p[1]=='*' && !inquote) {
-        gui_fcolour = GUI_C_COMMENT;
-        if(DoVT100) PrintString(VT100_C_COMMENT);
-        multilinecomment = true;
+        unsigned char *q=p;
+        if(*(--q)==(unsigned char)'\n'){
+            gui_fcolour = GUI_C_COMMENT;
+            if(DoVT100) PrintString(VT100_C_COMMENT);
+            multilinecomment = true;
+        }
         return;
     }
 
