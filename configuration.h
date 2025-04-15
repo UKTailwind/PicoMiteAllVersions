@@ -230,6 +230,7 @@ extern "C" {
 #define MAXSOUNDS           4
 #define MAXKEYLEN           64 
 #define MAXPID 8
+#define SYSTEM_HEAP_MEMORY_SIZE 4096
 // define the maximum number of arguments to PRINT, INPUT, WRITE, ON, DIM, ERASE, DATA and READ
 // each entry uses zero bytes.  The number is limited by the length of a command line
 #define MAX_ARG_COUNT       75

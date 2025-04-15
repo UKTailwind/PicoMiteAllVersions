@@ -102,8 +102,8 @@ commands and functions
  ********************************************************************************************************************************************/
 
 // define the PWM output frequency for making a tone
-const char* const PlayingStr[] = {"PAUSED TONE", "PAUSED FLAC", "PAUSED MP3",  "PAUSED SOUND", "PAUSED MOD", "PAUSED WAV", "", 
-    "", "TONE", "SOUND", "WAV", "FLAC", "MP3", 
+const char* const PlayingStr[] = {"PAUSED TONE", "PAUSED FLAC", "PAUSED MP3",  "PAUSED SOUND", "PAUSED MOD", "PAUSED WAV", "OFF", 
+    "OFF", "TONE", "SOUND", "WAV", "FLAC", "MP3", 
     "MIDI", "", "MOD", "STREAM","" 
 }  ;                              
 volatile unsigned char PWM_count = 0;

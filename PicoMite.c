@@ -4312,6 +4312,8 @@ if(Option.CPU_Speed==FreqSVGA){ //adjust the size of the heap
         ContinuePoint = nextstmt;                               // in case the user wants to use the continue command
 		*tknbuf = 0;											// we do not want to run whatever is in the token buffer
 		optionangle=1.0;
+        useoptionangle=false;
+        fastmath=false;
         savewatchdog = WatchdogSet = false;
 		char *ptr = findvar((unsigned char *)"MM.ENDLINE$", V_NOFIND_NULL);
         if(ptr && *ptr){

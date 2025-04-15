@@ -208,6 +208,8 @@ extern void WriteComand(int cmd);
 extern void WriteData(int data);
 char *CSubInterrupt;
 MMFLOAT optionangle=1.0;
+bool useoptionangle=false;
+bool fastmath=false;
 bool optionfastaudio=false;
 bool optionfulltime=false;
 bool screen320=false;
@@ -3040,8 +3042,13 @@ void MIPS16 cmd_option(void) {
     }
 	tp = checkstring(cmdline, (unsigned char *)"ANGLE");
 	if(tp) {
-		if(checkstring(tp, (unsigned char *)"DEGREES"))	{ optionangle=RADCONV; return; }
-		if(checkstring(tp, (unsigned char *)"RADIANS"))	{ optionangle=1.0; return; }
+		if(checkstring(tp, (unsigned char *)"DEGREES"))	{ optionangle=RADCONV; useoptionangle=true;return; }
+		if(checkstring(tp, (unsigned char *)"RADIANS"))	{ optionangle=1.0; useoptionangle=false; return; }
+	}
+	tp = checkstring(cmdline, (unsigned char *)"FAST TRIG");
+	if(tp) {
+		if(checkstring(tp, (unsigned char *)"ON"))	{ fastmath=true;return; }
+		if(checkstring(tp, (unsigned char *)"OFF"))	{ fastmath=false;return;  }
 	}
 
 	tp = checkstring(cmdline, (unsigned char *)"FAST AUDIO");

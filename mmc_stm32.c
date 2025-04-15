@@ -256,8 +256,8 @@ void MIPS16 __not_in_flash_func(on_pwm_wrap)(void) {
 		} else if(CurrentlyPlaying == P_WAV  || CurrentlyPlaying == P_FLAC  || CurrentlyPlaying == P_MOD  || CurrentlyPlaying == P_MP3) {
 			while((pioi2s->flevel & (0xf<<(i2ssm*8))) < (0x6<<(i2ssm*8))){
 				if(--repeatcount){
-					pio_sm_put_blocking(pioi2s, i2ssm, left);
-					pio_sm_put_blocking(pioi2s, i2ssm, right);
+					pio_sm_put(pioi2s, i2ssm, left);
+					pio_sm_put(pioi2s, i2ssm, right);
 				} else {
 					repeatcount=audiorepeat;
 					if(bcount[1]==0 && bcount[2]==0 && playreadcomplete==1){
@@ -276,8 +276,8 @@ void MIPS16 __not_in_flash_func(on_pwm_wrap)(void) {
 								ppos+=2;
 							}
 						}
-						pio_sm_put_blocking(pioi2s, i2ssm, (uint32_t)left);
-						pio_sm_put_blocking(pioi2s, i2ssm, (uint32_t)right);
+						pio_sm_put(pioi2s, i2ssm, (uint32_t)left);
+						pio_sm_put(pioi2s, i2ssm, (uint32_t)right);
 						if(ppos==bcount[swingbuf]){
 							int psave=ppos;
 							bcount[swingbuf]=0;
@@ -344,13 +344,13 @@ void MIPS16 __not_in_flash_func(on_pwm_wrap)(void) {
 			}
 			return;
 		} else if(CurrentlyPlaying == P_STOP) {
-			while((pioi2s->flevel & 0xf)<6){
+			while((pioi2s->flevel & (0xf<<(i2ssm*8))) < (0x6<<(i2ssm*8))){
 					pio_sm_put(pioi2s, i2ssm, left);
 					pio_sm_put(pioi2s, i2ssm, right);
 			}
 			return;
 		} else {
-			while((pioi2s->flevel & 0xf)<6){
+			while((pioi2s->flevel & (0xf<<(i2ssm*8))) < (0x6<<(i2ssm*8))){
 					pio_sm_put(pioi2s, i2ssm, left);
 					pio_sm_put(pioi2s, i2ssm, right);
 			}

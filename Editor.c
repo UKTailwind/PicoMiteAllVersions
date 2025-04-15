@@ -496,6 +496,7 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
   char currdel=0, nextdel=0, lastdel=0;
   char multi=false;
 #ifdef PICOMITEVGA
+  int fontinc=gui_font_width / 8; //use to decide where to position mouse cursor
   int OptionY_TILESave;
   int ytileheightsave;
   ytileheightsave=ytileheight;
@@ -537,20 +538,41 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
                 if(!nunstruct[2].C)middlepushed=false;
                 if(nunstruct[2].y1!=lasty1 || nunstruct[2].x1!=lastx1){
                     if(lastx1!=9999){
-                        tilefcols[lasty1*X_TILE+lastx1]=lastfc;
-                        tilebcols[lasty1*X_TILE+lastx1]=lastbc;
+#ifdef HDMI
+                        if(FullColour){
+#endif
+                            for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilefcols[lasty1*X_TILE+i]=lastfc;
+                            for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilebcols[lasty1*X_TILE+i]=lastbc;
+#ifdef HDMI
+                        } else {
+                            for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilefcols_w[lasty1*X_TILE+i]=lastfc;
+                            for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilebcols_w[lasty1*X_TILE+i]=lastbc;
+                        }
+#endif
                     }
                     lastx1=nunstruct[2].x1;
                     lasty1=nunstruct[2].y1;
                     if(lasty1>=VHeight)lasty1=VHeight-1;
-                    lastfc=tilefcols[lasty1*X_TILE+lastx1];
-                    lastbc=tilebcols[lasty1*X_TILE+lastx1];
 #ifdef HDMI
-                    tilefcols[lasty1*X_TILE+lastx1]=RGB555(RED);
-                    tilebcols[lasty1*X_TILE+lastx1]=RGB555(WHITE);
+                    if(FullColour){
+#endif
+                        lastfc=tilefcols[lasty1*X_TILE+lastx1*fontinc];
+                        lastbc=tilebcols[lasty1*X_TILE+lastx1*fontinc];
+#ifdef HDMI
+                    } else {
+                        lastfc=tilefcols_w[lasty1*X_TILE+lastx1*fontinc];
+                        lastbc=tilebcols_w[lasty1*X_TILE+lastx1*fontinc];
+                    }
+                    if(FullColour){
+                        for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilefcols[lasty1*X_TILE+i]=RGB555(RED);
+                        for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilebcols[lasty1*X_TILE+i]=RGB555(WHITE);
+                    } else {
+                        for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilefcols_w[lasty1*X_TILE+i]=RGB332(RED);
+                        for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilebcols_w[lasty1*X_TILE+i]=RGB332(WHITE);
+                    }
 #else
-                    tilefcols[lasty1*X_TILE+lastx1]=(RGB121(RED)<<12) | (RGB121(RED)<<8) | (RGB121(RED)<<4) | RGB121(RED);
-                    tilebcols[lasty1*X_TILE+lastx1]=(RGB121(WHITE)<<12) | (RGB121(WHITE)<<8) | (RGB121(WHITE)<<4) | RGB121(WHITE);
+                    for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilefcols[lasty1*X_TILE+i]=(RGB121(RED)<<12) | (RGB121(RED)<<8) | (RGB121(RED)<<4) | RGB121(RED);
+                    for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilebcols[lasty1*X_TILE+i]=(RGB121(WHITE)<<12) | (RGB121(WHITE)<<8) | (RGB121(WHITE)<<4) | RGB121(WHITE);
 #endif
                     }
                 if((nunstruct[2].L && leftpushed==false && rightpushed==false && middlepushed==false) ||
@@ -569,9 +591,19 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
                         while(txtp != EdBuff && *(txtp - 1) != '\n') txtp--;                // move to the beginning of the line
                         for(curx = 0; curx < lastx1 && *txtp && *txtp != '\n'; curx++) txtp++;   // now position on the x axis
                         PositionCursor(txtp);
+                        PrintStatus();
                         ShowCursor(true);
-                        tilefcols[lasty1*X_TILE+lastx1]=lastfc;
-                        tilebcols[lasty1*X_TILE+lastx1]=lastbc;
+#ifdef HDMI
+                        if(FullColour){
+#endif
+                            for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilefcols[lasty1*X_TILE+i]=lastfc;
+                            for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilebcols[lasty1*X_TILE+i]=lastbc;
+#ifdef HDMI
+                        } else {
+                            for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilefcols_w[lasty1*X_TILE+i]=lastfc;
+                            for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilebcols_w[lasty1*X_TILE+i]=lastbc;
+                        }
+#endif
                     } 
                     if(rightpushed==true){
                         c=F4;
@@ -1126,7 +1158,9 @@ void PositionCursor(unsigned char *curp) {
 void MarkMode(unsigned char *cb, unsigned char *buf) {
     unsigned char *p, *mark, *oldmark;
     int c=-1, x, y, i, oldx, oldy, txtpx, txtpy, errmsg = false;
-
+#ifdef PICOMITEVGA
+    int fontinc=gui_font_width/8;
+#endif
     PrintFunctKeys(MARK);
     oldmark = mark = txtp;
     txtpx = oldx = curx; txtpy = oldy = cury;
@@ -1144,20 +1178,41 @@ void MarkMode(unsigned char *cb, unsigned char *buf) {
             if(!nunstruct[2].C)middlepushed=false;
             if(nunstruct[2].y1!=lasty1 || nunstruct[2].x1!=lastx1){
                 if(lastx1!=9999){
-                    tilefcols[lasty1*X_TILE+lastx1]=lastfc;
-                    tilebcols[lasty1*X_TILE+lastx1]=lastbc;
+#ifdef HDMI
+                    if(FullColour){
+#endif
+                        for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilefcols[lasty1*X_TILE+i]=lastfc;
+                        for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilebcols[lasty1*X_TILE+i]=lastbc;
+#ifdef HDMI
+                    } else {
+                        for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilefcols_w[lasty1*X_TILE+i]=lastfc;
+                        for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilebcols_w[lasty1*X_TILE+i]=lastbc;
+                    }
+                    #endif
                 }
                 lastx1=nunstruct[2].x1;
                 lasty1=nunstruct[2].y1;
                 if(lasty1>=VHeight)lasty1=VHeight-1;
-                lastfc=tilefcols[lasty1*X_TILE+lastx1];
-                lastbc=tilebcols[lasty1*X_TILE+lastx1];
 #ifdef HDMI
-                    tilefcols[lasty1*X_TILE+lastx1]=RGB555(RED);
-                    tilebcols[lasty1*X_TILE+lastx1]=RGB555(WHITE);
+                if(FullColour){
+#endif
+                    lastfc=tilefcols[lasty1*X_TILE+lastx1*fontinc];
+                    lastbc=tilebcols[lasty1*X_TILE+lastx1*fontinc];
+#ifdef HDMI
+                } else {
+                    lastfc=tilefcols_w[lasty1*X_TILE+lastx1*fontinc];
+                    lastbc=tilebcols_w[lasty1*X_TILE+lastx1*fontinc];
+                }
+                if(FullColour){
+                    for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilefcols[lasty1*X_TILE+i]=RGB555(RED);
+                    for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilebcols[lasty1*X_TILE+i]=RGB555(WHITE);
+                } else {
+                    for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilefcols_w[lasty1*X_TILE+i]=RGB332(RED);
+                    for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilebcols_w[lasty1*X_TILE+i]=RGB332(WHITE);
+                }
 #else
-                    tilefcols[lasty1*X_TILE+lastx1]=(RGB121(RED)<<12) | (RGB121(RED)<<8) | (RGB121(RED)<<4) | RGB121(RED);
-                    tilebcols[lasty1*X_TILE+lastx1]=(RGB121(WHITE)<<12) | (RGB121(WHITE)<<8) | (RGB121(WHITE)<<4) | RGB121(WHITE);
+                    for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilefcols[lasty1*X_TILE+i]=(RGB121(RED)<<12) | (RGB121(RED)<<8) | (RGB121(RED)<<4) | RGB121(RED);
+                    for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilebcols[lasty1*X_TILE+i]=(RGB121(WHITE)<<12) | (RGB121(WHITE)<<8) | (RGB121(WHITE)<<4) | RGB121(WHITE);
 #endif
                 }
             if((nunstruct[2].L && leftpushed==false && rightpushed==false && middlepushed==false) ||

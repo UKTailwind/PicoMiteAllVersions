@@ -640,7 +640,7 @@ void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, in
 	gosubstack[gosubindex++] = isfun ? NULL : nextstmt;             // NULL signifies that this is returned to by ending ExecuteProgram()
     #define buffneeded MAX_ARG_COUNT*(sizeof(union u_argval)+ 2*sizeof(int)+3*sizeof(unsigned char *)+sizeof(unsigned char))+ 2*STRINGSIZE 
     // allocate memory for processing the arguments
-    argval=GetMemory(buffneeded);
+    argval=GetSystemMemory(buffneeded);
     argtype=(void *)argval+MAX_ARG_COUNT * sizeof(union u_argval);
     argVarIndex = (void *)argtype+MAX_ARG_COUNT * sizeof(int);
     argbuf1 = (void *)argVarIndex+MAX_ARG_COUNT * sizeof(int);
@@ -648,14 +648,7 @@ void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, in
     argbuf2 = (void *)argv1+MAX_ARG_COUNT * sizeof(unsigned char *);
     argv2 = (void *)argbuf2+STRINGSIZE;
     argbyref=(void *)argv2+MAX_ARG_COUNT * sizeof(unsigned char *);
-/*    argval = GetMemory(MAX_ARG_COUNT * sizeof(union u_argval));
-    argtype = GetMemory(MAX_ARG_COUNT * sizeof(int));
-    argVarIndex = GetMemory(MAX_ARG_COUNT * sizeof(int));
-    argbuf1 = GetMemory(STRINGSIZE); 
-    argv1 = GetMemory(MAX_ARG_COUNT * sizeof(unsigned char *));  // these are for the caller
-    argbuf2 = GetMemory(STRINGSIZE); 
-    argv2 = GetMemory(MAX_ARG_COUNT * sizeof(unsigned char *));  // and these for the definition of the sub or function
-    argbyref=GetMemory(MAX_ARG_COUNT * sizeof(unsigned char));  // these are BYREF*/
+
     // now split up the arguments in the caller
     CurrentLinePtr = CallersLinePtr;                                // report errors at the caller
     argc1 = 0;
@@ -1390,7 +1383,7 @@ unsigned char __not_in_flash_func(*getCstring)(unsigned char *p) {
     MtoC(tp);                                                       // convert to a C style string
     return tp;
 }
-unsigned char __not_in_flash_func(*getFstring)(unsigned char *p) {
+unsigned char *getFstring(unsigned char *p) {
     unsigned char *tp;
     tp = GetTempMemory(STRINGSIZE);                                        // this will last for the life of the command
     Mstrcpy(tp, getstring(p));                                      // get the string and save in a temp place
@@ -3206,6 +3199,8 @@ void MIPS16 ClearRuntime(bool all) {
     findlabel(NULL);                                                // clear the label cache
     OptionErrorSkip = 0;
 	optionangle=1.0;
+    useoptionangle=false;
+    fastmath=false;
     optionfulltime=false;
     optionfastaudio=0;
     optionlogging=false;

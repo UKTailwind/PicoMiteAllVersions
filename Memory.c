@@ -52,8 +52,9 @@ extern const uint8_t *flash_progmemory;
 //unsigned char __attribute__ ((aligned (256))) AllMemory[ALL_MEMORY_SIZE];
 #ifdef rp2350
     #ifdef PICOMITEVGA
-        unsigned char __attribute__ ((aligned (256))) AllMemory[HEAP_MEMORY_SIZE+256 +320*240*2];
-        unsigned char *FRAMEBUFFER=AllMemory+HEAP_MEMORY_SIZE+256;
+        unsigned char __attribute__ ((aligned (4096))) AllMemory[HEAP_MEMORY_SIZE+256];
+        unsigned char __attribute__ ((aligned (256))) video[320*240*2];
+        unsigned char *FRAMEBUFFER=video;
         uint32_t framebuffersize=320*240*2;
         #else
         unsigned char __attribute__ ((aligned (256))) AllMemory[HEAP_MEMORY_SIZE+256];
@@ -62,8 +63,8 @@ extern const uint8_t *flash_progmemory;
     #else
     #ifdef PICOMITEVGA
         unsigned char __attribute__ ((aligned (4096))) Heap[HEAP_MEMORY_SIZE+256];
-        unsigned char __attribute__ ((aligned (256))) Frame[640*480/8];
-        unsigned char *FRAMEBUFFER=Frame;
+        unsigned char __attribute__ ((aligned (256))) video[640*480/8];
+        unsigned char *FRAMEBUFFER=video;
         uint32_t framebuffersize=640*480/8;
         unsigned char *MMHeap=Heap;
         #else
@@ -105,12 +106,12 @@ unsigned char *FrameBuf=AllMemory+HEAP_MEMORY_SIZE+256;
 unsigned char *SecondLayer=AllMemory+HEAP_MEMORY_SIZE+256;
 unsigned char *SecondFrame=AllMemory+HEAP_MEMORY_SIZE+256;
 #else
-unsigned char *WriteBuf=Frame;
-unsigned char *DisplayBuf=Frame;
-unsigned char *LayerBuf=Frame;
-unsigned char *FrameBuf=Frame;
-unsigned char *SecondLayer=Frame;
-unsigned char *SecondFrame=Frame;
+unsigned char *WriteBuf=video;
+unsigned char *DisplayBuf=video;
+unsigned char *LayerBuf=video;
+unsigned char *FrameBuf=video;
+unsigned char *SecondLayer=video;
+unsigned char *SecondFrame=video;
 #endif
 #endif
 #ifdef PICOMITE
@@ -134,8 +135,8 @@ unsigned int psmap[6*1024*1024/ PAGESIZE / PAGESPERWORD]={0};
 unsigned int SBitsGet(unsigned char *addr);
 void SBitsSet(unsigned char *addr, int bits);
 #endif
-unsigned int MBitsGet(unsigned char *addr);
-void MBitsSet(unsigned char *addr, int bits);
+static inline unsigned int MBitsGet(unsigned char *addr);
+static inline void MBitsSet(unsigned char *addr, int bits);
 volatile char *g_StrTmp[MAXTEMPSTRINGS];                                       // used to track temporary string space on the heap
 volatile char g_StrTmpLocalIndex[MAXTEMPSTRINGS];                              // used to track the g_LocalIndex for each temporary string space on the heap
 
@@ -807,7 +808,7 @@ void m_alloc(int type) {
 void __not_in_flash_func(*GetTempMemory)(int NbrBytes) {
     if(g_StrTmpIndex >= MAXTEMPSTRINGS) error("Not enough memory");
     g_StrTmpLocalIndex[g_StrTmpIndex] = g_LocalIndex;
-    g_StrTmp[g_StrTmpIndex] = GetMemory(NbrBytes);
+    g_StrTmp[g_StrTmpIndex] = GetSystemMemory(NbrBytes);
     g_TempMemoryIsChanged = true;
     return (void *)g_StrTmp[g_StrTmpIndex++];
 }
@@ -837,7 +838,7 @@ void __not_in_flash_func(ClearTempMemory)(void) {
 
 
 
-void __not_in_flash_func(ClearSpecificTempMemory)(void *addr) {
+void MIPS16 ClearSpecificTempMemory(void *addr) {
     int i;
     for(i = 0; i < g_StrTmpIndex; i++) {
         if(g_StrTmp[i] == addr) {
@@ -867,7 +868,7 @@ void __not_in_flash_func(TestStackOverflow)(void) {
 
 
 
-void __not_in_flash_func(FreeMemory)(unsigned char *addr) {
+void MIPS64 __not_in_flash_func(FreeMemory)(unsigned char *addr) {
     if(addr == NULL) return;
 #ifdef rp2350
 #ifndef PICOMITEWEB
@@ -892,7 +893,7 @@ void __not_in_flash_func(FreeMemory)(unsigned char *addr) {
         MBitsSet(addr, 0);
         addr += PAGESIZE;
     } while(bits != (PUSED | PLAST));
-#endif
+    #endif
 #else
     int bits;
     do {
@@ -900,7 +901,7 @@ void __not_in_flash_func(FreeMemory)(unsigned char *addr) {
         MBitsSet(addr, 0);
         addr += PAGESIZE;
     } while(bits != (PUSED | PLAST));
-#endif
+    #endif
 }
 
 
@@ -908,6 +909,7 @@ void __not_in_flash_func(FreeMemory)(unsigned char *addr) {
 void InitHeap(bool all) {
     int i;
     memset(mmap,0,sizeof(mmap));
+    memset(MMHeap,0,heap_memory_size+256);
 #ifdef rp2350
     if(all)memset(psmap,0,sizeof(psmap));
 #endif
@@ -951,7 +953,7 @@ void __not_in_flash_func(SBitsSet)(unsigned char *addr, int bits) {
 #endif
 #endif
 
-unsigned int __not_in_flash_func(MBitsGet)(unsigned char *addr) {
+static inline __attribute__ ((always_inline)) unsigned int MBitsGet(unsigned char *addr) {
     unsigned int i, *p;
     addr -= (unsigned int)&MMHeap[0];
     p = &mmap[((unsigned int)addr/PAGESIZE) / PAGESPERWORD];        // point to the word in the memory map
@@ -961,7 +963,7 @@ unsigned int __not_in_flash_func(MBitsGet)(unsigned char *addr) {
 
 
 
-void __not_in_flash_func(MBitsSet)(unsigned char *addr, int bits) {
+static inline __attribute__ ((always_inline)) void MBitsSet(unsigned char *addr, int bits) {
     unsigned int i, *p;
     addr -= (unsigned int)&MMHeap[0];
     p = &mmap[((unsigned int)addr/PAGESIZE) / PAGESPERWORD];        // point to the word in the memory map
@@ -995,11 +997,38 @@ void __not_in_flash_func(*GetPSMemory)(int size) {
 }  
 #endif  
 #endif
-
-void __not_in_flash_func(*GetMemory)(int size) {
-    unsigned int j, n;
+void MIPS64 __not_in_flash_func(*GetSystemMemory)(int size) { //get memory from the bottom up 
+    int n=0, k;
     unsigned char *addr;
-    j = n = (size + PAGESIZE - 1)/PAGESIZE;                         // nbr of pages rounded up
+    k= (size + PAGESIZE - 1)/PAGESIZE;                         // nbr of pages rounded up
+    for(addr = MMHeap; addr < MMHeap + heap_memory_size - PAGESIZE; addr += PAGESIZE) {
+        if(!(MBitsGet(addr) & PUSED)) {
+            if(++n == k) {                                          // found a free slot
+                k--;
+                MBitsSet(addr , PUSED | PLAST);     // show that this is used and the last in the chain of pages
+                  while(k--){
+                    addr-=PAGESIZE;
+                    MBitsSet(addr,PUSED);
+                  }
+                memset(addr , 0, size);                              // zero the memory
+                return (void *)addr;
+            }
+        } else n = 0;                                               // not enough space here so reset our count
+    }
+#ifdef rp2350
+#ifndef PICOMITEWEB
+        if(PSRAMsize)return GetPSMemory(size);
+#endif
+#endif
+    TempStringClearStart = 0;
+    ClearTempMemory();                                               // hopefully this will give us enough to print the prompt
+    error("Not enough Heap memory");
+    return NULL;                                                    // keep the compiler happy
+}
+void MIPS64 __not_in_flash_func(*GetMemory)(int size) {
+    unsigned int j, n, k;
+    unsigned char *addr;
+    j = n = k= (size + PAGESIZE - 1)/PAGESIZE;                         // nbr of pages rounded up
     for(addr = MMHeap + heap_memory_size - PAGESIZE; addr >= MMHeap; addr -= PAGESIZE) {
         if(!(MBitsGet(addr) & PUSED)) {
             if(--n == 0) {                                          // found a free slot
@@ -1007,11 +1036,9 @@ void __not_in_flash_func(*GetMemory)(int size) {
                 MBitsSet(addr + (j * PAGESIZE), PUSED | PLAST);     // show that this is used and the last in the chain of pages
                 while(j--) MBitsSet(addr + (j * PAGESIZE), PUSED);  // set the other pages to show that they are used
                 memset(addr, 0, size);                              // zero the memory
- //               dp("alloc = %p (%d)", addr, size);
                 return (void *)addr;
             }
-        } else
-            n = j;                                                  // not enough space here so reset our count
+        } else n = j;                                               // not enough space here so reset our count
     }
     // out of memory
 #ifdef rp2350

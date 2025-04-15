@@ -1118,7 +1118,6 @@ void SaveContext(void){
 #if defined(rp2350) && !defined(PICOMITEWEB)
 	}
 #endif
-
 }
 void RestoreContext(bool keep){
 	CloseAudio(1);

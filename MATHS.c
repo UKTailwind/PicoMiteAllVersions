@@ -2020,7 +2020,8 @@ void fun_math(void){
 			} else if((tp=checkstring(&ep[2],(unsigned char *)"PHASE"))){
 				MMFLOAT a=(MMFLOAT)crealf(getComplex(tp));
 				MMFLOAT b=(MMFLOAT)cimagf(getComplex(tp));
-				fret=atan2(b,a)*optionangle;
+				fret=atan2(b,a);
+				if(useoptionangle)fret*=optionangle;
 				targ=T_NBR;
 			} else if((tp=checkstring(&ep[2],(unsigned char *)"CARG"))){
 				fret=(MMFLOAT)cargf(getComplex(tp));

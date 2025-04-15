@@ -563,7 +563,11 @@ typedef enum {
 
 // return the arctangent of a number in radians
 void fun_atn(void) {
-	fret = atan(getnumber(ep))*optionangle;
+	if(fastmath){
+		fret = useoptionangle ? atanf((float)getnumber(ep))*(float)optionangle : atanf((float)getnumber(ep));
+	} else {
+		fret = useoptionangle ? atan(getnumber(ep))*optionangle : atan(getnumber(ep));
+	}
     targ = T_NBR;
 }
 
@@ -573,8 +577,8 @@ void fun_atan2(void) {
     if(argc != 3)error("Syntax");
     y=getnumber(argv[0]);
     x=getnumber(argv[2]);
-    z=atan2(y,x);
-    fret=z*optionangle;
+    z=fastmath ? atan2f(y,x):atan2((float)y,(float)x);
+    fret=useoptionangle ? z*optionangle: z;
     targ = T_NBR;
 }
 
@@ -602,7 +606,11 @@ void fun_cint(void) {
 
 // return the cosine of a number in radians
 void fun_cos(void) {
-	fret = cos(getnumber(ep)/optionangle);
+	if(fastmath){
+		fret = useoptionangle ? cosf((float)getnumber(ep)/(float)optionangle) : cosf((float)getnumber(ep));
+	} else {
+		fret = useoptionangle ? cos(getnumber(ep)/optionangle) : cos(getnumber(ep));
+	}
     targ = T_NBR;
 }
 
@@ -902,7 +910,11 @@ void fun_sgn(void) {
 // Return the sine of the argument 'number' in radians.
 // n = SIN( number )
 void fun_sin(void) {
-	fret = sin(getnumber(ep)/optionangle);
+	if(fastmath){
+		fret = useoptionangle ? sinf((float)getnumber(ep)/(float)optionangle) : sinf((float)getnumber(ep));
+	} else {
+		fret = useoptionangle ? sin(getnumber(ep)/optionangle) : sin(getnumber(ep));
+	}
     targ = T_NBR;
 }
 
@@ -914,7 +926,7 @@ void fun_sqr(void) {
 	MMFLOAT f;
 	f = getnumber(ep);
 	if(f < 0) error("Negative argument");
-	fret = sqrt(f);
+	fret = fastmath ? sqrtf((float)f): sqrt(f);
     targ = T_NBR;
 }
 
@@ -923,7 +935,11 @@ void fun_sqr(void) {
 // Return the tangent of the argument 'number' in radians.
 // n = TAN( number )
 void fun_tan(void) {
-	fret = tan(getnumber(ep)/optionangle);
+	if(fastmath){
+		fret = useoptionangle ? tanf((float)getnumber(ep)/(float)optionangle) : tanf((float)getnumber(ep));
+	} else {
+		fret = useoptionangle ? tan(getnumber(ep)/optionangle) : tan(getnumber(ep));
+	}
     targ = T_NBR;
 }
 
@@ -1189,7 +1205,8 @@ void __not_in_flash_func(fun_inkey)(void){
 
 // used by ACos() and ASin() below
 MMFLOAT arcsinus(MMFLOAT x) {
-     return 2.0L * atan(x / (1.0L + sqrt(1.0L - x * x)));
+     if(fastmath) return 2.0f * atanf((float)x / (1.0f + sqrtf(1.0f - (float)x * (float)x)));
+	 else return 2.0L * atan(x / (1.0L + sqrt(1.0L - x * x)));
 }
 
 /*  @endcond */
@@ -1206,7 +1223,7 @@ void fun_asin(void) {
      } else {
           fret = arcsinus(f);
      }
-	 fret *=optionangle;
+	 if(useoptionangle)fret *=optionangle;
      targ = T_NBR;
 }
 
@@ -1223,7 +1240,7 @@ void fun_acos(void) {
      } else {
           fret = M_PI_2 - arcsinus(f);
      }
-	 fret *=optionangle;
+	 if(useoptionangle)fret *=optionangle;
      targ = T_NBR;
 }
 

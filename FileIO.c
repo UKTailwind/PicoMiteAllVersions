@@ -4846,7 +4846,7 @@ void CheckSDCard(void)
             s |= (STA_NODISK | STA_NOINIT);
             SDCardStat = s;
             ShowCursor(false);
-            MMPrintString("Warning: SDcard Removed\r\n> ");
+            if(!CurrentLinePtr)MMPrintString("Warning: SDcard Removed\r\n> ");
             FatFSFileSystem=0;
         }
     }
