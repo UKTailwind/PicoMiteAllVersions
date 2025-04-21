@@ -221,7 +221,7 @@ void MIPS16 __not_in_flash_func(on_pwm_wrap)(void) {
 	static int repeatcount=1;
     // play a tone
 #ifndef PICOMITEWEB
-	__dsb();
+//	__dsb();
 #endif
     pwm_clear_irq(AUDIO_SLICE);
 	if(Option.audio_i2s_bclk){
@@ -264,20 +264,20 @@ void MIPS16 __not_in_flash_func(on_pwm_wrap)(void) {
 						pwm_set_irq_enabled(AUDIO_SLICE, false);
 					}
 					if(swingbuf){ //buffer is primed
-						if(swingbuf==1)uplaybuff=xbuff1;
-						else uplaybuff=xbuff2;
+						if(swingbuf==1)uplaybuff=g_buff1;
+						else uplaybuff=g_buff2;
 						if((CurrentlyPlaying == P_WAV || CurrentlyPlaying == P_FLAC || CurrentlyPlaying == P_MP3) && mono){
-							left=right=uplaybuff[ppos];
+							left=right=(uplaybuff[ppos]<<16);
 							ppos++;
 						} else {
 							if(ppos<bcount[swingbuf]){
-								left=uplaybuff[ppos];
-								right=uplaybuff[ppos+1];
+								left=uplaybuff[ppos]<<16;
+								right=uplaybuff[ppos+1]<<16;
 								ppos+=2;
 							}
 						}
-						pio_sm_put(pioi2s, i2ssm, (uint32_t)left);
-						pio_sm_put(pioi2s, i2ssm, (uint32_t)right);
+						pio_sm_put(pioi2s, i2ssm, (uint32_t)(left));
+						pio_sm_put(pioi2s, i2ssm, (uint32_t)(right));
 						if(ppos==bcount[swingbuf]){
 							int psave=ppos;
 							bcount[swingbuf]=0;

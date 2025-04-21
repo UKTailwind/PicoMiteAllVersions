@@ -1,10 +1,6 @@
-/* 
- * @cond
- * The following section will be excluded from the documentation.
- */
 /*
 FLAC audio decoder. Choice of public domain or MIT-0. See license statements at the end of this file.
-dr_flac - v0.12.39 - 2022-09-17
+dr_flac - v0.12.44 - TBD
 
 David Reid - mackron@gmail.com
 
@@ -183,7 +179,7 @@ reports metadata to the application through the use of a callback, and every met
 
 The main opening APIs (`drflac_open()`, etc.) will fail if the header is not present. The presents a problem in certain scenarios such as broadcast style
 streams or internet radio where the header may not be present because the user has started playback mid-stream. To handle this, use the relaxed APIs:
-    
+
     `drflac_open_relaxed()`
     `drflac_open_with_metadata_relaxed()`
 
@@ -239,12 +235,12 @@ extern "C" {
 
 #define DRFLAC_VERSION_MAJOR     0
 #define DRFLAC_VERSION_MINOR     12
-#define DRFLAC_VERSION_REVISION  39
+#define DRFLAC_VERSION_REVISION  44
 #define DRFLAC_VERSION_STRING    DRFLAC_XSTRINGIFY(DRFLAC_VERSION_MAJOR) "." DRFLAC_XSTRINGIFY(DRFLAC_VERSION_MINOR) "." DRFLAC_XSTRINGIFY(DRFLAC_VERSION_REVISION)
 
 #include <stddef.h> /* For size_t. */
 
-/* Sized types. */
+/* Sized Types */
 typedef   signed char           drflac_int8;
 typedef unsigned char           drflac_uint8;
 typedef   signed short          drflac_int16;
@@ -277,7 +273,9 @@ typedef drflac_uint8            drflac_bool8;
 typedef drflac_uint32           drflac_bool32;
 #define DRFLAC_TRUE             1
 #define DRFLAC_FALSE            0
+/* End Sized Types */
 
+/* Decorations */
 #if !defined(DRFLAC_API)
     #if defined(DRFLAC_DLL)
         #if defined(_WIN32)
@@ -307,6 +305,7 @@ typedef drflac_uint32           drflac_bool32;
         #define DRFLAC_PRIVATE static
     #endif
 #endif
+/* End Decorations */
 
 #if defined(_MSC_VER) && _MSC_VER >= 1700   /* Visual Studio 2012 */
     #define DRFLAC_DEPRECATED       __declspec(deprecated)
@@ -325,6 +324,16 @@ typedef drflac_uint32           drflac_bool32;
 DRFLAC_API void drflac_version(drflac_uint32* pMajor, drflac_uint32* pMinor, drflac_uint32* pRevision);
 DRFLAC_API const char* drflac_version_string(void);
 
+/* Allocation Callbacks */
+typedef struct
+{
+    void* pUserData;
+    void* (* onMalloc)(size_t sz, void* pUserData);
+    void* (* onRealloc)(void* p, size_t sz, void* pUserData);
+    void  (* onFree)(void* p, void* pUserData);
+} drflac_allocation_callbacks;
+/* End Allocation Callbacks */
+
 /*
 As data is read from the client it is placed into an internal buffer for fast access. This controls the size of that buffer. Larger values means more speed,
 but also more memory. In my testing there is diminishing returns after about 4KB, but you can fiddle with this to suit your own needs. Must be a multiple of 8.
@@ -333,10 +342,21 @@ but also more memory. In my testing there is diminishing returns after about 4KB
 #define DR_FLAC_BUFFER_SIZE   4096
 #endif
 
-/* Check if we can enable 64-bit optimizations. */
+
+/* Architecture Detection */
 #if defined(_WIN64) || defined(_LP64) || defined(__LP64__)
 #define DRFLAC_64BIT
 #endif
+
+#if defined(__x86_64__) || (defined(_M_X64) && !defined(_M_ARM64EC))
+    #define DRFLAC_X64
+#elif defined(__i386) || defined(_M_IX86)
+    #define DRFLAC_X86
+#elif defined(__arm__) || defined(_M_ARM) || defined(__arm64) || defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(_M_ARM64EC)
+    #define DRFLAC_ARM
+#endif
+/* End Architecture Detection */
+
 
 #ifdef DRFLAC_64BIT
 typedef drflac_uint64 drflac_cache_t;
@@ -565,14 +585,6 @@ will be set to one of the DRFLAC_METADATA_BLOCK_TYPE_* tokens.
 */
 typedef void (* drflac_meta_proc)(void* pUserData, drflac_metadata* pMetadata);
 
-
-typedef struct
-{
-    void* pUserData;
-    void* (* onMalloc)(size_t sz, void* pUserData);
-    void* (* onRealloc)(void* p, size_t sz, void* pUserData);
-    void  (* onFree)(void* p, void* pUserData);
-} drflac_allocation_callbacks;
 
 /* Structure for internal use. Only used for decoders opened with drflac_open_memory. */
 typedef struct
@@ -1320,7 +1332,7 @@ DRFLAC_API drflac_bool32 drflac_next_cuesheet_track(drflac_cuesheet_track_iterat
 #endif  /* dr_flac_h */
 
 
-/* **********************************************************************************************************************************************************
+/************************************************************************************************************************************************************
  ************************************************************************************************************************************************************
 
  IMPLEMENTATION
@@ -1355,6 +1367,7 @@ DRFLAC_API drflac_bool32 drflac_next_cuesheet_track(drflac_cuesheet_track_iterat
 #include <stdlib.h>
 #include <string.h>
 
+/* Inline */
 #ifdef _MSC_VER
     #define DRFLAC_INLINE __forceinline
 #elif defined(__GNUC__)
@@ -1381,15 +1394,7 @@ DRFLAC_API drflac_bool32 drflac_next_cuesheet_track(drflac_cuesheet_track_iterat
 #else
     #define DRFLAC_INLINE
 #endif
-
-/* CPU architecture. */
-#if defined(__x86_64__) || defined(_M_X64)
-    #define DRFLAC_X64
-#elif defined(__i386) || defined(_M_IX86)
-    #define DRFLAC_X86
-#elif defined(__arm__) || defined(_M_ARM) || defined(__arm64) || defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)
-    #define DRFLAC_ARM
-#endif
+/* End Inline */
 
 /*
 Intrinsics Support
@@ -1627,6 +1632,7 @@ static DRFLAC_INLINE drflac_bool32 drflac_has_sse41(void)
 
 #define DRFLAC_MAX_SIMD_VECTOR_SIZE                     64  /* 64 for AVX-512 in the future. */
 
+/* Result Codes */
 typedef drflac_int32 drflac_result;
 #define DRFLAC_SUCCESS                                   0
 #define DRFLAC_ERROR                                    -1   /* A generic error. */
@@ -1682,7 +1688,10 @@ typedef drflac_int32 drflac_result;
 #define DRFLAC_CANCELLED                                -51
 #define DRFLAC_MEMORY_ALREADY_MAPPED                    -52
 #define DRFLAC_AT_END                                   -53
-#define DRFLAC_CRC_MISMATCH                             -128
+
+#define DRFLAC_CRC_MISMATCH                             -100
+/* End Result Codes */
+
 
 #define DRFLAC_SUBFRAME_CONSTANT                        0
 #define DRFLAC_SUBFRAME_VERBATIM                        1
@@ -1838,10 +1847,35 @@ static DRFLAC_INLINE drflac_uint16 drflac__swap_endian_uint16(drflac_uint16 n)
 
 static DRFLAC_INLINE drflac_uint32 drflac__swap_endian_uint32(drflac_uint32 n)
 {
+#ifdef DRFLAC_HAS_BYTESWAP32_INTRINSIC
+    #if defined(_MSC_VER) && !defined(__clang__)
+        return _byteswap_ulong(n);
+    #elif defined(__GNUC__) || defined(__clang__)
+        #if defined(DRFLAC_ARM) && (defined(__ARM_ARCH) && __ARM_ARCH >= 6) && !defined(__ARM_ARCH_6M__) && !defined(DRFLAC_64BIT)   /* <-- 64-bit inline assembly has not been tested, so disabling for now. */
+            /* Inline assembly optimized implementation for ARM. In my testing, GCC does not generate optimized code with __builtin_bswap32(). */
+            drflac_uint32 r;
+            __asm__ __volatile__ (
+            #if defined(DRFLAC_64BIT)
+                "rev %w[out], %w[in]" : [out]"=r"(r) : [in]"r"(n)   /* <-- This is untested. If someone in the community could test this, that would be appreciated! */
+            #else
+                "rev %[out], %[in]" : [out]"=r"(r) : [in]"r"(n)
+            #endif
+            );
+            return r;
+        #else
+            return __builtin_bswap32(n);
+        #endif
+    #elif defined(__WATCOMC__) && defined(__386__)
+        return _watcom_bswap32(n);
+    #else
+        #error "This compiler does not support the byte swap intrinsic."
+    #endif
+#else
     return ((n & 0xFF000000) >> 24) |
            ((n & 0x00FF0000) >>  8) |
            ((n & 0x0000FF00) <<  8) |
            ((n & 0x000000FF) << 24);
+#endif
 }
 
 static DRFLAC_INLINE drflac_uint64 drflac__swap_endian_uint64(drflac_uint64 n)
@@ -2781,7 +2815,7 @@ static DRFLAC_INLINE drflac_uint32 drflac__clz_lzcnt(drflac_cache_t x)
 
                 return r;
             }
-/*        #elif defined(DRFLAC_ARM) && (defined(__ARM_ARCH) && __ARM_ARCH >= 5) && !defined(DRFLAC_64BIT)    <-- I haven't tested 64-bit inline assembly, so only enabling this for the 32-bit build for now. */
+        #elif defined(DRFLAC_ARM) && (defined(__ARM_ARCH) && __ARM_ARCH >= 5) && !defined(__ARM_ARCH_6M__) && !defined(DRFLAC_64BIT)   /* <-- I haven't tested 64-bit inline assembly, so only enabling this for the 32-bit build for now. */
             {
                 unsigned int r;
                 __asm__ __volatile__ (
@@ -2793,7 +2827,7 @@ static DRFLAC_INLINE drflac_uint32 drflac__clz_lzcnt(drflac_cache_t x)
                 );
 
                 return r;
-            }*/
+            }
         #else
             if (x == 0) {
                 return sizeof(x)*8;
@@ -3711,7 +3745,7 @@ static drflac_bool32 drflac__decode_samples_with_residual__rice__scalar_zeroorde
     return DRFLAC_TRUE;
 }
 
-static MIPS16 drflac_bool32 drflac__decode_samples_with_residual__rice__scalar(drflac_bs* bs, drflac_uint32 bitsPerSample, drflac_uint32 count, drflac_uint8 riceParam, drflac_uint32 lpcOrder, drflac_int32 lpcShift, drflac_uint32 lpcPrecision, const drflac_int32* coefficients, drflac_int32* pSamplesOut)
+static drflac_bool32 drflac__decode_samples_with_residual__rice__scalar(drflac_bs* bs, drflac_uint32 bitsPerSample, drflac_uint32 count, drflac_uint8 riceParam, drflac_uint32 lpcOrder, drflac_int32 lpcShift, drflac_uint32 lpcPrecision, const drflac_int32* coefficients, drflac_int32* pSamplesOut)
 {
     drflac_uint32 t[2] = {0x00000000, 0xFFFFFFFF};
     drflac_uint32 zeroCountPart0 = 0;
@@ -4865,7 +4899,7 @@ Reads and decodes the residual for the sub-frame the decoder is currently sittin
 when the decoder is sitting at the very start of the RESIDUAL block. The first <order> residuals will be ignored. The
 <blockSize> and <order> parameters are used to determine how many residual values need to be decoded.
 */
-static MIPS16 drflac_bool32 drflac__decode_samples_with_residual(drflac_bs* bs, drflac_uint32 bitsPerSample, drflac_uint32 blockSize, drflac_uint32 lpcOrder, drflac_int32 lpcShift, drflac_uint32 lpcPrecision, const drflac_int32* coefficients, drflac_int32* pDecodedSamples)
+static drflac_bool32 drflac__decode_samples_with_residual(drflac_bs* bs, drflac_uint32 bitsPerSample, drflac_uint32 blockSize, drflac_uint32 lpcOrder, drflac_int32 lpcShift, drflac_uint32 lpcPrecision, const drflac_int32* coefficients, drflac_int32* pDecodedSamples)
 {
     drflac_uint8 residualMethod;
     drflac_uint8 partitionOrder;
@@ -5359,6 +5393,12 @@ static drflac_bool32 drflac__read_subframe_header(drflac_bs* bs, drflac_subframe
         return DRFLAC_FALSE;
     }
 
+    /*
+    Default to 0 for the LPC order. It's important that we always set this to 0 for non LPC
+    and FIXED subframes because we'll be using it in a generic validation check later.
+    */
+    pSubframe->lpcOrder = 0;
+
     type = (header & 0x7E) >> 1;
     if (type == 0) {
         pSubframe->subframeType = DRFLAC_SUBFRAME_CONSTANT;
@@ -5430,6 +5470,18 @@ static drflac_bool32 drflac__decode_subframe(drflac_bs* bs, drflac_frame* frame,
     subframeBitsPerSample -= pSubframe->wastedBitsPerSample;
 
     pSubframe->pSamplesS32 = pDecodedSamplesOut;
+
+    /*
+    pDecodedSamplesOut will be pointing to a buffer that was allocated with enough memory to store
+    maxBlockSizeInPCMFrames samples (as specified in the FLAC header). We need to guard against an
+    overflow here. At a higher level we are checking maxBlockSizeInPCMFrames from the header, but
+    here we need to do an additional check to ensure this frame's block size fully encompasses any
+    warmup samples which is determined by the LPC order. For non LPC and FIXED subframes, the LPC
+    order will be have been set to 0 in drflac__read_subframe_header().
+    */
+    if (frame->header.blockSizeInPCMFrames < pSubframe->lpcOrder) {
+        return DRFLAC_FALSE;
+    }
 
     switch (pSubframe->subframeType)
     {
@@ -6458,7 +6510,7 @@ static drflac_bool32 drflac__read_and_decode_metadata(drflac_read_proc onRead, d
     for (;;) {
         drflac_metadata metadata;
         drflac_uint8 isLastBlock = 0;
-        drflac_uint8 blockType;
+        drflac_uint8 blockType = 0;
         drflac_uint32 blockSize;
         if (drflac__read_and_decode_block_header(onRead, pUserData, &isLastBlock, &blockType, &blockSize) == DRFLAC_FALSE) {
             return DRFLAC_FALSE;
@@ -6668,10 +6720,10 @@ static drflac_bool32 drflac__read_and_decode_metadata(drflac_read_proc onRead, d
 
                             /* Skip to the index point count */
                             pRunningData += 35;
-                            
+
                             indexCount = pRunningData[0];
                             pRunningData += 1;
-                            
+
                             bufferSize += indexCount * sizeof(drflac_cuesheet_track_index);
 
                             /* Quick validation check. */
@@ -8120,6 +8172,7 @@ static drflac* drflac_open_with_metadata_private(drflac_read_proc onRead, drflac
 #include <wchar.h>      /* For wcslen(), wcsrtombs() */
 #endif
 
+/* Errno */
 /* drflac_result_from_errno() is only used for fopen() and wfopen() so putting it inside DR_WAV_NO_STDIO for now. If something else needs this later we can move it out. */
 #include <errno.h>
 static drflac_result drflac_result_from_errno(int e)
@@ -8241,7 +8294,7 @@ static drflac_result drflac_result_from_errno(int e)
     #ifdef ENOSYS
         case ENOSYS: return DRFLAC_NOT_IMPLEMENTED;
     #endif
-    #ifdef ENOTEMPTY
+    #if defined(ENOTEMPTY) && ENOTEMPTY != EEXIST   /* In AIX, ENOTEMPTY and EEXIST use the same value. */
         case ENOTEMPTY: return DRFLAC_DIRECTORY_NOT_EMPTY;
     #endif
     #ifdef ELOOP
@@ -8523,7 +8576,9 @@ static drflac_result drflac_result_from_errno(int e)
         default: return DRFLAC_ERROR;
     }
 }
+/* End Errno */
 
+/* fopen */
 static drflac_result drflac_fopen(FILE** ppFile, const char* pFilePath, const char* pOpenMode)
 {
 #if defined(_MSC_VER) && _MSC_VER >= 1400
@@ -8681,6 +8736,7 @@ static drflac_result drflac_wfopen(FILE** ppFile, const wchar_t* pFilePath, cons
     return DRFLAC_SUCCESS;
 }
 #endif
+/* End fopen */
 
 static size_t drflac__on_read_stdio(void* pUserData, void* bufferOut, size_t bytesToRead)
 {
@@ -11645,6 +11701,7 @@ DRFLAC_API drflac_bool32 drflac_seek_to_pcm_frame(drflac* pFlac, drflac_uint64 p
 
 /* High Level APIs */
 
+/* SIZE_MAX */
 #if defined(SIZE_MAX)
     #define DRFLAC_SIZE_MAX  SIZE_MAX
 #else
@@ -11654,6 +11711,7 @@ DRFLAC_API drflac_bool32 drflac_seek_to_pcm_frame(drflac* pFlac, drflac_uint64 p
         #define DRFLAC_SIZE_MAX  0xFFFFFFFF
     #endif
 #endif
+/* End SIZE_MAX */
 
 
 /* Using a macro as the definition of the drflac__full_decode_and_close_*() API family. Sue me. */
@@ -12037,6 +12095,23 @@ DRFLAC_API drflac_bool32 drflac_next_cuesheet_track(drflac_cuesheet_track_iterat
 /*
 REVISION HISTORY
 ================
+v0.12.44 - TBD
+  - Fix compilation for AIX OS.
+
+v0.12.43 - 2024-12-17
+  - Fix a possible buffer overflow during decoding.
+  - Improve detection of ARM64EC
+
+v0.12.42 - 2023-11-02
+  - Fix build for ARMv6-M.
+  - Fix a compilation warning with GCC.
+
+v0.12.41 - 2023-06-17
+  - Fix an incorrect date in revision history. No functional change.
+
+v0.12.40 - 2023-05-22
+  - Minor code restructure. No functional change.
+
 v0.12.39 - 2022-09-17
   - Fix compilation with DJGPP.
   - Fix compilation error with Visual Studio 2019 and the ARM build.
@@ -12467,7 +12542,7 @@ For more information, please refer to <http://unlicense.org/>
 ===============================================================================
 ALTERNATIVE 2 - MIT No Attribution
 ===============================================================================
-Copyright 2020 David Reid
+Copyright 2023 David Reid
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of
 this software and associated documentation files (the "Software"), to deal in
@@ -12484,4 +12559,3 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
-/*  @endcond */

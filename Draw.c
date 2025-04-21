@@ -2209,8 +2209,8 @@ void MIPS16 pointcalc(int angle, int x, int y, int r2, int *x0, int * y0){
 		*y0=y-r2;
 		break;
 	default:
-		c1=cosf(Rad(angle));
-		s1=sinf(Rad(angle));
+		c1=cos(Rad(angle));
+		s1=sin(Rad(angle));
 		quad = (angle / 45) % 8;
 		switch(quad){
 		case 0:
@@ -9155,11 +9155,11 @@ XGA:
             } else error("Syntax");
         }
         if(d!=s)
-            #ifdef rp2350
-                _Z10copy_wordsPKmPmm((uint32_t *)s, (uint32_t *)d, ScreenSize>>2);
-            #else
+//            #ifdef rp2350
+//                _Z10copy_wordsPKmPmm((uint32_t *)s, (uint32_t *)d, ScreenSize>>2);
+//            #else
                 memcpy((void *)d,(void *)s,ScreenSize);
-            #endif
+//            #endif
         else error("Buffer not created");
     } else error("Syntax");
 }

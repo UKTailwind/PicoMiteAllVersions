@@ -531,7 +531,7 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
     // make sure any pullups/pulldowns are removed in case we are changing from a digital input
     gpio_disable_pulls(PinDef[pin].GPno);
     // disable ADC if we are changing from a analogue input
-    if(ExtCurrentConfig[pin]==EXT_ANA_IN)PinSetBit(pin, ANSELCLR);
+    if(ExtCurrentConfig[pin]==EXT_ANA_IN || ExtCurrentConfig[pin]==EXT_ADCRAW  )PinSetBit(pin, ANSELCLR);
 
     for(i = 0; i < NBRINTERRUPTS; i++)
         if(inttbl[i].pin == pin)
@@ -974,7 +974,7 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
                               return;
   }
     ExtCurrentConfig[pin] = cfg;
-    if(cfg<=EXT_INT_BOTH){
+    if(cfg<=EXT_INT_BOTH || cfg==EXT_ADCRAW){
         //    *GetPortAddr(pin, ana ? ANSELCLR : ANSELSET) = (1 << GetPinBit(pin));// if ana = 1 then it is a digital I/O
         PinSetBit(pin, tris ? TRISSET : TRISCLR);                         // if tris = 1 then it is an input
         if(!tris && (pinmask & (1<<PinDef[pin].GPno))){

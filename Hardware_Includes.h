@@ -49,7 +49,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "ff.h"
 // global variables used in MMBasic but must be maintained outside of the interpreter
 extern int MMerrno;
-extern int ListCnt;
+//extern int ListCnt;
 extern int MMCharPos;
 extern unsigned char *StartEditPoint;
 extern int StartEditChar;

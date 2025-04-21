@@ -128,11 +128,11 @@ extern "C" {
     #define Freq480P 315000
     #define Freq252P 252000
     #define Freq378P 378000
-    #define FreqXGA  324000
+    #define FreqXGA  375000
     #define FreqSVGA 360000
     #define Freq848  336000
     #define Freq400  283200
-    #define FullColour (Option.CPU_Speed ==Freq252P || Option.CPU_Speed ==Freq480P || Option.CPU_Speed ==Freq400)
+    #define FullColour (Option.CPU_Speed ==Freq252P || Option.CPU_Speed==Freq378P || Option.CPU_Speed ==Freq480P || Option.CPU_Speed ==Freq400)
     #define MediumRes (Option.CPU_Speed==FreqSVGA || Option.CPU_Speed==Freq848)
 #endif
 

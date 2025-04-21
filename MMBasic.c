@@ -996,6 +996,16 @@ void  MIPS16 tokenise(int console) {
     }
     tp = inpbuf;
     skipspace(tp);
+    if(toupper(tp[0])=='H' && toupper(tp[1])=='E' && toupper(tp[2])=='L' && toupper(tp[3])=='P' && tp[4]==' '){
+        unsigned char *q=&tp[5];
+        skipspace(q);
+        if(*q!='"'){
+            int end=strlen((char *)q);
+            memmove(&q[1],q,strlen((char *)q));
+            *q='"';
+            q[end+1]=0;
+        }
+    }
     if(toupper(tp[0])=='R' && toupper(tp[1])=='E' && toupper(tp[2])=='M' && tp[3]==' ')i=1;
     if(multi==false && i==false){
         int i=0;
@@ -3200,7 +3210,6 @@ void MIPS16 ClearRuntime(bool all) {
     OptionErrorSkip = 0;
 	optionangle=1.0;
     useoptionangle=false;
-    fastmath=false;
     optionfulltime=false;
     optionfastaudio=0;
     optionlogging=false;
@@ -3216,6 +3225,7 @@ void MIPS16 ClearRuntime(bool all) {
     InitHeap(true);
     m_alloc(all? M_VAR : M_LIMITED);
     ClearVars(0,true);
+    memset(cmdlinebuff,0,sizeof(cmdlinebuff));
     memset(datastore, 0, sizeof(struct sa_data) * MAXRESTORE);
     restorepointer = 0;
     g_flag=0;

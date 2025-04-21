@@ -50,6 +50,7 @@ char *KeyInterrupt=NULL;
 unsigned char* SaveNextDataLine = NULL;
 void execute_one_command(unsigned char *p);
 void ListNewLine(int *ListCnt, int all);
+int printWrappedText(const char *text, int screenWidth, int listcnt, int all) ;
 char MMErrMsg[MAXERRMSG];                                           // the error message
 volatile bool Keycomplete=false;
 int keyselect=0;
@@ -347,23 +348,21 @@ void MIPS16 sortStrings(char **arr, int n)
 void MIPS16 ListFile(char *pp, int all) {
 	char buff[STRINGSIZE];
     int fnbr;
-    int i,ListCnt = 1;
+    int i,ListCnt = CurrentY/(FontTable[gui_font >> 4][1] * (gui_font & 0b1111)) + 2;
 	fnbr = FindFreeFileNbr();
 	if(!BasicFileOpen(pp, fnbr, FA_READ)) return;
 	while(!FileEOF(fnbr)) {                                     // while waiting for the end of file
 		memset(buff,0,256);
 		MMgetline(fnbr, (char *)buff);									    // get the input line
 		for(i=0;i<strlen(buff);i++)if(buff[i] == TAB) buff[i] = ' ';
-		MMPrintString(buff);
-		ListCnt+=strlen(buff)/Option.Width;
-		ListNewLine(&ListCnt, all);
+		ListCnt=printWrappedText(buff,Option.Width,ListCnt,all);
 	}
 	FileClose(fnbr);
 }
 
 void MIPS16 ListNewLine(int *ListCnt, int all) {
 	unsigned char noscroll=Option.NoScroll;
-	if(!all)Option.NoScroll=0;
+	if(!all && (void *)ReadBuffer!=(void *)DisplayNotSet)Option.NoScroll=0;
 	MMPrintString("\r\n");
 	(*ListCnt)++;
     if(!all && *ListCnt >= Option.Height-overlap) {
@@ -374,7 +373,7 @@ void MIPS16 ListNewLine(int *ListCnt, int all) {
     	MMgetchar();
     	MMPrintString("\r                 \r");
         if(Option.DISPLAY_CONSOLE){ClearScreen(gui_bcolour);CurrentX=0;CurrentY=0;}
-    	*ListCnt = 1;
+    	*ListCnt = 2;
     }
 	Option.NoScroll=noscroll;
 }
@@ -383,11 +382,11 @@ void MIPS16 ListNewLine(int *ListCnt, int all) {
 void MIPS16 ListProgram(unsigned char *p, int all) {
 	char b[STRINGSIZE];
 	char *pp;
-    int ListCnt = 1;
+    int ListCnt = CurrentY/(FontTable[gui_font >> 4][1] * (gui_font & 0b1111)) + 2;
 	while(!(*p == 0 || *p == 0xff)) {                               // normally a LIST ends at the break so this is a safety precaution
         if(*p == T_NEWLINE) {
 			p = llist((unsigned char *)b, p);                                        // otherwise expand the line
-            if(!(ListCnt==1 && b[0]=='\'' && b[1]=='#')){
+            if(!(ListCnt==CurrentY/(FontTable[gui_font >> 4][1] * (gui_font & 0b1111)) + 2 && b[0]=='\'' && b[1]=='#')){
 				pp = b;
 				while(*pp) {
 					if(MMCharPos >= Option.Width) ListNewLine(&ListCnt, all);
@@ -538,7 +537,7 @@ void MIPS16 cmd_list(void) {
 			}
 		}
 		sortStrings(c,count);
-    	int ListCnt = 1;
+    	int ListCnt = 2;
 		if(dest==NULL){
 			for(int i=0;i<count;i++){
 				MMPrintString(c[i]);
@@ -568,7 +567,7 @@ void MIPS16 cmd_list(void) {
 		else error("System I2c not defined");
 		return;
    	} else if((p = checkstring(cmdline, (unsigned char *)"COMMANDS"))) {
-    	int ListCnt = 1;
+    	int ListCnt = 2;
     	step=Option.DISPLAY_CONSOLE ? HRes/gui_font_width/20 : 5;
         if(Option.DISPLAY_CONSOLE && (SPIREAD  || Option.NoScroll)){ClearScreen(gui_bcolour);CurrentX=0;CurrentY=0;}
     	m=0;
@@ -594,7 +593,7 @@ void MIPS16 cmd_list(void) {
 		MMPrintString("Total of ");PInt(m-1);MMPrintString(" commands\r\n");
     } else if((p = checkstring(cmdline, (unsigned char *)"FUNCTIONS"))) {
     	m=0;
-    	int ListCnt = 1;
+    	int ListCnt = 2;
     	step=Option.DISPLAY_CONSOLE ? HRes/gui_font_width/20 : 5;
         if(Option.DISPLAY_CONSOLE && (SPIREAD  || Option.NoScroll)){ClearScreen(gui_bcolour);CurrentX=0;CurrentY=0;}
 		int x=3+MMEND;
@@ -637,8 +636,102 @@ void MIPS16 cmd_list(void) {
 		}
     }
 }
+#include <stdio.h>
+#include <string.h>
 
+int printWrappedText(const char *text, int screenWidth, int listcnt, int all) {
+    int length = strlen(text);
+    int start = 0; // Start index of the current line
+	char buff[STRINGSIZE];
+    while (start < length) {
+        int end = start + screenWidth; // Calculate the end index for the current line
+        if (end >= length) {
+            // If end is beyond the text length, just print the remaining text
+			memset(buff,0,STRINGSIZE);
+            sprintf(buff,"%s", text + start);
+			MMPrintString(buff);
+			ListNewLine(&listcnt, all);
+            break;
+        }
 
+        // Find the last space within the current screen width
+        int lastSpace = -1;
+        for (int i = start; i < end; i++) {
+            if (text[i] == ' ') {
+                lastSpace = i;
+            }
+        }
+
+        if (lastSpace != -1) {
+            // If a space is found, break at the space
+			memset(buff,0,STRINGSIZE);
+            sprintf(buff, "%.*s", lastSpace - start, text + start);
+			MMPrintString(buff);
+			ListNewLine(&listcnt, all);
+            start = lastSpace + 1; // Skip the space
+        } else {
+            // If no space is found, truncate at screen width
+			memset(buff,0,STRINGSIZE);
+            sprintf(buff,"%.*s", screenWidth, text + start);
+			MMPrintString(buff);
+			ListNewLine(&listcnt, all);
+            start += screenWidth;
+        }
+    }
+	return listcnt;
+}
+
+void cmd_help(void){
+	getargs(&cmdline,1,(unsigned char *)",");
+	if(!ExistsFile("A:/help.txt"))error("A:/help.txt not found");
+	if(!argc){
+		MMPrintString("Enter help and the name of the command or function\r\nUse * for multicharacter wildcard or ? for single character wildcard\r\n");
+	} else {
+		int fnbr = FindFreeFileNbr();
+		char *buff=GetTempMemory(STRINGSIZE);
+		BasicFileOpen("A:/help.txt",fnbr, FA_READ);
+		int ListCnt = CurrentY/(FontTable[gui_font >> 4][1] * (gui_font & 0b1111)) + 2;
+		char *p=(char *)getCstring(argv[0]);
+		bool end=false;
+		while (!FileEOF(fnbr))            { // while waiting for the end of file
+			memset(buff,0,STRINGSIZE);
+			char *in=buff;
+			while(1){
+				if(FileEOF(fnbr)){end=true;break;}
+				char c = FileGetChar(fnbr);
+				if(c=='\n')break;
+				if(c=='\r')continue;
+				*in++=c;
+			}
+			if(end)break;
+			skipspace(p);
+			if(buff[0]=='~'){
+				if(pattern_matching(p,&buff[1],0,0)){
+					while(1){ //loop through all lines for the command
+						memset(buff,0,STRINGSIZE);
+						char *in=buff;
+							while(1){ //get this line
+							if(FileEOF(fnbr)){end=true;break;}
+							char c = FileGetChar(fnbr);
+							if(c=='\n')break;
+							if(c=='\r')continue;
+							*in++=c;
+						}
+						if(end)break;
+						if(buff[0]=='~'){ //now we need to rewind the file to check this line
+							ListNewLine(&ListCnt, false);
+							lfs_file_seek(&lfs, FileTable[fnbr].lfsptr, -(strlen(buff)+2), LFS_SEEK_CUR);
+							break;
+						} else {
+							ListCnt=printWrappedText(buff,Option.Width-1,ListCnt,false);
+						}
+					}
+				}
+			} 
+		}
+	FileClose(fnbr);
+	}
+}
 void MIPS16 cmd_run(void){
 	do_run(cmdline,false);
 }
@@ -954,11 +1047,15 @@ void do_end(bool ecmd) {
         busy_wait_ms(100);
     }
 #endif
+if(Option.SerialConsole)while(ConsoleTxBufHead!=ConsoleTxBufTail)routinechecks();
+	fflush(stdout);
 	if(ecmd){
-			getargs(&cmdline,1,(unsigned char *)",");
+		getargs(&cmdline,1,(unsigned char *)",");
 		if(argc==1){
 			if(FindSubFun((unsigned char *)"MM.END", 0) >= 0 && checkstring(argv[0],(unsigned char *)"NOEND")==NULL) {
 				ExecuteProgram((unsigned char *)"MM.END\0");
+				if(Option.SerialConsole)while(ConsoleTxBufHead!=ConsoleTxBufTail)routinechecks();
+				fflush(stdout);
 				memset(inpbuf,0,STRINGSIZE);
 			} else {
 				unsigned char *cmd_args = (unsigned char *)"";
@@ -968,8 +1065,10 @@ void do_end(bool ecmd) {
 				strcpy(ptr, (char *)cmd_args ); // *** THW 16/4/23
 				CtoM(ptr);
 			}
-		} else if(FindSubFun((unsigned char *)"MM.END", 0) >= 0 && checkstring(argv[0],(unsigned char *)"NOEND")==NULL) {
+		} else if(FindSubFun((unsigned char *)"MM.END", 0) >= 0) {
 			ExecuteProgram((unsigned char *)"MM.END\0");
+			if(Option.SerialConsole)while(ConsoleTxBufHead!=ConsoleTxBufTail)routinechecks();
+			fflush(stdout);
 			memset(inpbuf,0,STRINGSIZE);
 		}
 	}
@@ -1037,7 +1136,7 @@ extern volatile char g_StrTmpLocalIndex[MAXTEMPSTRINGS];                        
 void SaveContext(void){
 	CloseAudio(1);
 	#if defined(rp2350) && !defined(PICOMITEWEB)
-	if(Option.PSRAM_CS_PIN){
+	if(PSRAMsize){
 		ClearTempMemory();
 		uint8_t *p=(uint8_t *)PSRAMbase+PSRAMsize;
 		memcpy(p,  &g_StrTmpIndex, sizeof(g_StrTmpIndex));
@@ -1122,7 +1221,7 @@ void SaveContext(void){
 void RestoreContext(bool keep){
 	CloseAudio(1);
 	#if defined(rp2350) && !defined(PICOMITEWEB)
-	if(Option.PSRAM_CS_PIN){
+	if(PSRAMsize){
 		uint8_t *p=(uint8_t *)PSRAMbase+PSRAMsize;
 		memcpy(&g_StrTmpIndex, p, sizeof(g_StrTmpIndex));
 		p+=sizeof(g_StrTmpIndex);

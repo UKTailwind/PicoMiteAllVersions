@@ -189,6 +189,7 @@ void cmd_bit(void);
 void cmd_flag(void);
 void cmd_flags(void);
 void cmd_frame(void);
+void cmd_help(void);
 #ifdef PICOMITEWEB
     void cmd_web(void);
 #endif
@@ -554,6 +555,7 @@ void fun_map(void);
 #endif
 { (unsigned char *)"Bit(",		T_CMD | T_FUN,				0, cmd_bit	},
 { (unsigned char *)"Flags",	T_CMD | T_FUN,		0, cmd_flags	},
+{ (unsigned char *)"Help",	T_CMD | T_FUN,		0, cmd_help	},
 { (unsigned char *)"",   0,                  0, cmd_null,    }                   // this dummy entry is always at the end
 #endif
 /* ********************************************************************************

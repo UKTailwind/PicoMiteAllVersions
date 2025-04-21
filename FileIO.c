@@ -418,7 +418,7 @@ extern unsigned int mmap[HEAP_MEMORY_SIZE/ PAGESIZE / PAGESPERWORD];
 extern unsigned int psmap[7*1024*1024/ PAGESIZE / PAGESPERWORD];
 void MIPS16 cmd_psram(void)
 {
-    if(!Option.PSRAM_CS_PIN)error("PSRAM not enabled");
+    if(!PSRAMsize)error("PSRAM not enabled");
     unsigned char *p;
     if ((p = checkstring(cmdline, (unsigned char *)"ERASE ALL")))
     {
@@ -3927,7 +3927,8 @@ void MIPS16 cmd_files(void)
         ClearRuntime(true);
     }
     SetFont(oldfont);
-    int i, c, dirs, ListCnt, currentsize;
+    int i, c, dirs, currentsize;
+    static int ListCnt=2;
     uint32_t currentdate;
     char *p, extension[8];
     int fcnt, sortorder = 0;
@@ -4256,9 +4257,9 @@ void MIPS16 cmd_files(void)
             }
         }
        // list the files with a pause every screen full
-        ListCnt = 2;
+        ListCnt = 3;
         unsigned char noscroll=Option.NoScroll;
-        Option.NoScroll=0;
+        if((void *)ReadBuffer!=(void *)DisplayNotSet && Option.DISPLAY_CONSOLE)Option.NoScroll=0;
         for (i = dirs = 0; i < fcnt; i++)
         {
             memset(outbuff,0,sizeof(outbuff));
@@ -4299,7 +4300,7 @@ void MIPS16 cmd_files(void)
             if (ListCnt >= Option.Height-overlap && i < fcnt)
             {
                 unsigned char noscroll=Option.NoScroll;
-                Option.NoScroll=0;
+                if((void *)ReadBuffer!=(void *)DisplayNotSet && Option.DISPLAY_CONSOLE)Option.NoScroll=0;
                 #ifdef USBKEYBOARD
                 clearrepeat();
                 #endif
@@ -4337,7 +4338,7 @@ void MIPS16 cmd_files(void)
                 ShowCursor(0);
                 MMPrintString("\r                 \r");
     			if(Option.DISPLAY_CONSOLE){ClearScreen(gui_bcolour);CurrentX=0;CurrentY=0;}
-                ListCnt = 1;
+                ListCnt = 2;
             }
         }
         // display the summary

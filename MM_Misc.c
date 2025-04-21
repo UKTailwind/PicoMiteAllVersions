@@ -209,7 +209,6 @@ extern void WriteData(int data);
 char *CSubInterrupt;
 MMFLOAT optionangle=1.0;
 bool useoptionangle=false;
-bool fastmath=false;
 bool optionfastaudio=false;
 bool optionfulltime=false;
 bool screen320=false;
@@ -3045,12 +3044,6 @@ void MIPS16 cmd_option(void) {
 		if(checkstring(tp, (unsigned char *)"DEGREES"))	{ optionangle=RADCONV; useoptionangle=true;return; }
 		if(checkstring(tp, (unsigned char *)"RADIANS"))	{ optionangle=1.0; useoptionangle=false; return; }
 	}
-	tp = checkstring(cmdline, (unsigned char *)"FAST TRIG");
-	if(tp) {
-		if(checkstring(tp, (unsigned char *)"ON"))	{ fastmath=true;return; }
-		if(checkstring(tp, (unsigned char *)"OFF"))	{ fastmath=false;return;  }
-	}
-
 	tp = checkstring(cmdline, (unsigned char *)"FAST AUDIO");
 	if(tp) {
 		if(checkstring(tp, (unsigned char *)"OFF"))	{ optionfastaudio=0; return; }
@@ -3705,8 +3698,8 @@ void MIPS16 cmd_option(void) {
         if((checkstring(argv[0], (unsigned char *)"640")) || (checkstring(argv[0], (unsigned char *)"640x480"))){
             if(argc==3){
 #ifdef HDMI
-                int i=getint(argv[2],Freq252P,Freq480P);
-                if(!(i==Freq252P || i==Freq480P))error("Invalid speed");
+                int i=getint(argv[2],Freq252P,Freq378P);
+                if(!(i==Freq252P || i==Freq480P || i==Freq378P))error("Invalid speed");
 #else
                 int i=getint(argv[2],Freq252P,Freq378P);
                 if(!(i==Freq252P || i==Freq480P || i==Freq378P))error("Invalid speed");
