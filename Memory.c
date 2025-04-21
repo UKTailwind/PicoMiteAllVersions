@@ -52,9 +52,8 @@ extern const uint8_t *flash_progmemory;
 //unsigned char __attribute__ ((aligned (256))) AllMemory[ALL_MEMORY_SIZE];
 #ifdef rp2350
     #ifdef PICOMITEVGA
-        unsigned char __attribute__ ((aligned (4096))) AllMemory[HEAP_MEMORY_SIZE+256];
-        unsigned char __attribute__ ((aligned (256))) video[320*240*2];
-        unsigned char *FRAMEBUFFER=video;
+        unsigned char __attribute__ ((aligned (4096))) AllMemory[HEAP_MEMORY_SIZE+256+320*240*2];
+        unsigned char *FRAMEBUFFER=AllMemory+HEAP_MEMORY_SIZE+256;
         uint32_t framebuffersize=320*240*2;
         #else
         unsigned char __attribute__ ((aligned (256))) AllMemory[HEAP_MEMORY_SIZE+256];

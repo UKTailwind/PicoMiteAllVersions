@@ -1870,7 +1870,7 @@ void editDisplayMsg(unsigned char *msg) {
     SCursor(0, VHeight + 1);
     if(Option.ColourCode) PrintString(VT100_C_ERROR);
     PrintString("\033[7m");
-    MX470Cursor(0, VRes - gui_font_height);
+    MX470Cursor(0, (VRes/gui_font_height)*gui_font_height - gui_font_height);
     PrintString((char *)msg);
     MX470PutS((char *)msg, BLACK, RED);
     if(Option.ColourCode) PrintString(VT100_C_NORMAL);
@@ -1906,14 +1906,14 @@ void GetInputString(unsigned char *prompt) {
 
     SCursor(0, VHeight + 1);
     PrintString((char *)prompt);
-    MX470Cursor(0, VRes - gui_font_height);
+    MX470Cursor(0, (VRes/gui_font_height)*gui_font_height - gui_font_height);
     MX470PutS((char *)prompt, gui_fcolour, gui_bcolour);
     for(i = 0; i < VWidth - strlen((char *)prompt); i++) {
         SSputchar(' ',1);
         MX470PutC(' ');
     }
     SCursor(strlen((char *)prompt), VHeight + 1);
-    MX470Cursor(strlen((char *)prompt) * gui_font_width, VRes - gui_font_height);
+    MX470Cursor(strlen((char *)prompt) * gui_font_width, (VRes/gui_font_height)*gui_font_height - gui_font_height);
     for(p = inpbuf; (*p = MMgetchar()) != '\r'; p++) {              // get the input
         if(*p == 0xb3 || *p == F3 || *p == ESC) { p++; break; }     // return if it is SHIFT-F3, F3 or ESC
         if(isprint(*p)) {
