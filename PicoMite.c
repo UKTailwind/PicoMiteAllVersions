@@ -3045,7 +3045,7 @@ void MIPS32 __not_in_flash_func(HDMIloop2)(void){
             if(load_line>=0 && load_line<MODE_V_L_ACTIVE_LINES){
                 __dmb();
                 switch(DISPLAY_TYPE){
-                case SCREENMODE1: //1280x720x2 colour with tiles
+                case SCREENMODE1: //1024x768x2 colour with tiles
                     {
                         uint8_t *p=(uint8_t *)HDMIlines[line_to_load];
                         uint8_t *fcol_w=tilefcols_w+load_line/ytileheight*X_TILE, *bcol_w=tilebcols_w+load_line/ytileheight*X_TILE; //get the relevant tile
@@ -3128,7 +3128,7 @@ void MIPS32 __not_in_flash_func(HDMIloop2)(void){
                         }
                     }
                     break;
-                case SCREENMODE2: //320 x 180 x 4bit-colour mapped to 256
+                case SCREENMODE2: //256 x 192 x 4bit-colour mapped to 256
                     {
                         uint32_t *p=(uint32_t *)HDMIlines[line_to_load];
                         uint8_t l,d,s;
@@ -3157,7 +3157,7 @@ void MIPS32 __not_in_flash_func(HDMIloop2)(void){
                         }
                     }
                     break;
-            case SCREENMODE3: //640 x 360 x 4bit-colour mapped to 256
+            case SCREENMODE3: //512 x 384 x 4bit-colour mapped to 256
                     {
                         int pp= (Line_dup)*MODE_H_L_ACTIVE_PIXELS/4;
                         uint16_t *p=(uint16_t *)HDMIlines[line_to_load];
@@ -3178,7 +3178,7 @@ void MIPS32 __not_in_flash_func(HDMIloop2)(void){
                         }
                     }
                     break;
-                case SCREENMODE5: //320 x 180 x 8bit-colour 
+                case SCREENMODE5: //256 x 192 x 8bit-colour 
                     {
                         uint8_t *p=(uint8_t *)HDMIlines[line_to_load];
                         uint8_t l,d,s;
@@ -3223,7 +3223,7 @@ void MIPS32 __not_in_flash_func(HDMIloop3)(void){
             if(load_line>=0 && load_line<MODE_V_ACTIVE_LINES){
                 __dmb();
                 switch(DISPLAY_TYPE){
-                case SCREENMODE1: //800x600x2 colour with tiles
+                case SCREENMODE1: //800x600x2 or 848x480x2 colour with tiles
                     {
                         uint8_t *p=(uint8_t *)HDMIlines[line_to_load];
                         uint8_t *fcol_w=tilefcols_w+load_line/ytileheight*X_TILE, *bcol_w=tilebcols_w+load_line/ytileheight*X_TILE; //get the relevant tile
@@ -3271,7 +3271,7 @@ void MIPS32 __not_in_flash_func(HDMIloop3)(void){
                         }
                     }
                     break;
-                case SCREENMODE2: //400 X 300 x 4bit-colour mapped to 256
+                case SCREENMODE2: //400 X 300 x 4bit-colour mapped to 256 or 424 X 240 x 4bit-colour mapped to 256
                     {
                         uint16_t *p=(uint16_t *)HDMIlines[line_to_load];
                         uint8_t l,d,s;
@@ -3292,7 +3292,7 @@ void MIPS32 __not_in_flash_func(HDMIloop3)(void){
                         }
                     }
                     break;
-                case SCREENMODE3: //800 x 600 x 4bit-colour mapped to 256
+                case SCREENMODE3: //800 x 600 x 4bit-colour mapped to 256 or 848 x 480 x 4bit-colour mapped to 256
                     {
                         int pp= load_line*vgaloop2;
                         uint8_t *p=(uint8_t *)HDMIlines[line_to_load];
@@ -3313,7 +3313,7 @@ void MIPS32 __not_in_flash_func(HDMIloop3)(void){
                         }
                     }
                     break;
-                case SCREENMODE5: //400 x 300 x 8bit-colour 
+                case SCREENMODE5: //400 x 300 x 8bit-colour or 424 x 240 x 8bit-colour 
                     {
                         uint8_t *p=(uint8_t *)HDMIlines[line_to_load];
                         uint8_t l,d;

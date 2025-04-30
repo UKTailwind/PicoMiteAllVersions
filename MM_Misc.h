@@ -95,6 +95,8 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 	extern int64_t TimeOffsetToUptime;
 	extern time_t get_epoch(int year, int month,int day, int hour,int minute, int second);
 	extern uint_fast64_t gettimefromepoch(int *year, int *month, int *day, int *hour, int *minute, int *second);
+	extern uint64_t __uninitialized_ram(_persistent);
+
 #endif
 #endif
 /*  @endcond */

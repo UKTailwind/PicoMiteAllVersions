@@ -39,17 +39,22 @@ extern void InitDisplaySPI(int InitOnly);
 extern void SetAndReserve(int pin, int inp, int init, int type);
 extern void OpenSpiChannel(void);
 extern void DisplayNotSet(void);
-extern void DrawRectangleSPI(int x1, int y1, int x2, int y2, int c);
-extern void DrawBufferSPI(int x1, int y1, int x2, int y2, unsigned char* p);
 extern void SPISpeedSet(int speed);
 extern void DefineRegionSPI(int xstart, int ystart, int xend, int yend, int rw);
 extern void ClearCS(int pin);
 extern void ResetController(void);
-extern void ReadBufferSPI(int x1, int y1, int x2, int y2, unsigned char* p) ;
 extern void spi_write_command(unsigned char data);
 extern void spi_write_cd(unsigned char command, int data, ...);
 extern void spi_write_data(unsigned char data);
+extern void DrawRectangleSPI(int x1, int y1, int x2, int y2, int c);
+extern void DrawBufferSPI(int x1, int y1, int x2, int y2, unsigned char* p);
 extern void DrawBitmapSPI(int x1, int y1, int width, int height, int scale, int fc, int bc, unsigned char *bitmap);
+extern void ReadBufferSPI(int x1, int y1, int x2, int y2, unsigned char* p) ;
+extern void DrawRectangleSPISCR(int x1, int y1, int x2, int y2, int c);
+extern void DrawBufferSPISCR(int x1, int y1, int x2, int y2, unsigned char* p);
+extern void DrawBitmapSPISCR(int x1, int y1, int width, int height, int scale, int fc, int bc, unsigned char *bitmap);
+extern void ReadBufferSPISCR(int x1, int y1, int x2, int y2, unsigned char* p) ;
+extern void ScrollLCDSPISCR(int lines);
 extern void set_cs(void);
 extern void __not_in_flash_func(spi_write_fast)(spi_inst_t *spi, const uint8_t *src, size_t len);
 extern void __not_in_flash_func(spi_finish)(spi_inst_t *spi);
@@ -274,59 +279,60 @@ extern void __not_in_flash_func(spi_finish)(spi_inst_t *spi);
 #define ST7789          9
 #define ILI9481         10
 #define ILI9488         11
-#define ST7789A         12
-#define ST7789B         13
-#define ILI9488W        14
-#define ST7735S_W       15
-#define GC9A01          16
-#define ILI9481IPS      17
-#define N5110			18
+#define ILI9488P        12
+#define ST7789A         13
+#define ST7789B         14
+#define ILI9488W        15
+#define ST7735S_W       16
+#define GC9A01          17
+#define ILI9481IPS      18
+#define N5110			19
 #define BufferedPanel	N5110
-#define SSD1306SPI      19
-#define ST7920			20
-#define TOUCH           21
-#define SPIReadSpeed    22
-#define ST7789RSpeed    23
-#define SLOWTOUCH       24
-#define DISP_USER       25
-#define SCREENMODE1         26
+#define SSD1306SPI      20
+#define ST7920			22
+#define TOUCH           22
+#define SPIReadSpeed    23
+#define ST7789RSpeed    24
+#define SLOWTOUCH       25
+#define DISP_USER       26
+#define SCREENMODE1         27
 #define VGADISPLAY      SCREENMODE1  
-#define SCREENMODE2       27
-#define SCREENMODE3       28
-#define SCREENMODE4       29
-#define SCREENMODE5       30
-#define SCREENMODE6       31
-#define SCREENMODE7       32
-#define SSD1963_4       33
+#define SCREENMODE2       28
+#define SCREENMODE3       29
+#define SCREENMODE4       30
+#define SCREENMODE5       31
+#define SCREENMODE6       32
+#define SCREENMODE7       33
+#define SSD1963_4       34
 #define SSDPANEL        SSD1963_4
-#define SSD1963_5       34
-#define SSD1963_5A      35
-#define SSD1963_7       36
-#define SSD1963_7A      37
-#define SSD1963_8       38
-#define ILI9341_8       39
+#define SSD1963_5       35
+#define SSD1963_5A      36
+#define SSD1963_7       37
+#define SSD1963_7A      38
+#define SSD1963_8       39
+#define ILI9341_8       40
 #define SSD_PANEL_8 ILI9341_8 
-#define SSD1963_4_16       40
-#define SSD1963_5_16       41
-#define SSD1963_5A_16      42
-#define SSD1963_7_16       43
-#define SSD1963_7A_16      44
-#define SSD1963_8_16       45
-#define ILI9341_16       46
-#define IPS_4_16        47
-#define SSD1963_5ER_16       48
-#define SSD1963_7ER_16       49
-#define ILI9486_16      50
-#define VIRTUAL_C       51
+#define SSD1963_4_16       41
+#define SSD1963_5_16       42
+#define SSD1963_5A_16      43
+#define SSD1963_7_16       44
+#define SSD1963_7A_16      45
+#define SSD1963_8_16       46
+#define ILI9341_16       47
+#define IPS_4_16        48
+#define SSD1963_5ER_16       49
+#define SSD1963_7ER_16       50
+#define ILI9486_16      51
+#define VIRTUAL_C       52
 #define VIRTUAL         VIRTUAL_C
-#define VIRTUAL_M       52
-#define VS1053slow      53
-#define VS1053fast      54
+#define VIRTUAL_M       53
+#define VS1053slow      54
+#define VS1053fast      55
 #define TFT_NOP 0x00
 #define TFT_SWRST 0x01
 #define SSDTYPE (Option.DISPLAY_TYPE>=SSDPANEL && Option.DISPLAY_TYPE<VIRTUAL_C && !(Option.DISPLAY_TYPE==ILI9341_16 || Option.DISPLAY_TYPE==ILI9341_8 || Option.DISPLAY_TYPE==IPS_4_16 || Option.DISPLAY_TYPE==ILI9486_16))
 #define SSD16TYPE (Option.DISPLAY_TYPE>SSD_PANEL_8 && Option.DISPLAY_TYPE<VIRTUAL_C && !(Option.DISPLAY_TYPE==ILI9341_16 || Option.DISPLAY_TYPE==IPS_4_16 || Option.DISPLAY_TYPE==ILI9486_16))
-#define SPIREAD (Option.DISPLAY_TYPE == ILI9341 || Option.DISPLAY_TYPE == ILI9488 || Option.DISPLAY_TYPE == ST7789B)
+#define SPIREAD (Option.DISPLAY_TYPE == ILI9341 || Option.DISPLAY_TYPE == ILI9488P || Option.DISPLAY_TYPE == ILI9488 || Option.DISPLAY_TYPE == ST7789B)
 #define FASTSCROLL (SSDTYPE || Option.DISPLAY_TYPE==SCREENMODE1 ||  Option.DISPLAY_TYPE == SCREENMODE2 || Option.DISPLAY_TYPE == VIRTUAL_C || Option.DISPLAY_ORIENTATION == VIRTUAL_M)
 #define SPI480 (Option.DISPLAY_TYPE==ILI9488 || Option.DISPLAY_TYPE==ILI9488W || Option.DISPLAY_TYPE==ILI9481 || Option.DISPLAY_TYPE==ILI9481IPS) 
 #define TFT_SLPIN 0x10

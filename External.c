@@ -3339,9 +3339,9 @@ if(rp2350a){
         adcint1=adcint2=NULL;
         int64_t *adcval=NULL;
 #ifdef rp2350
-        int dims[MAXDIM];
+        int dims[MAXDIM]={0};
 #else
-        short dims[MAXDIM];
+        short dims[MAXDIM]={0};
 #endif
         int card1=parseintegerarray(argv[0], &adcval, 1, 1, dims, true);
         adcint1=(uint8_t *)adcval;

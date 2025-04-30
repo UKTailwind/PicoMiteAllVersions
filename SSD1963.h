@@ -35,7 +35,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
     extern int SSD1963VertPulseWidth, SSD1963VertBackPorch, SSD1963VertFrontPorch;
     extern int SSD1963PClock1, SSD1963PClock2, SSD1963PClock3;
     extern int SSD1963Mode1, SSD1963Mode2;
-
+    extern int ScrollStart;
     // define global functions
     extern void InitSSD1963(void);
     extern void InitILI9341(void);
@@ -62,6 +62,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
     extern void SetAreaILI9341(int xstart, int ystart, int xend, int yend, int rw);
     extern void WriteColor(unsigned int c);
     extern void WriteComand(int cmd);
+    extern void WriteData(int data);
     extern int display_backlight;
     // cursor definition
     extern void ShowCursor(int show);

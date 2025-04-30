@@ -153,8 +153,12 @@ static char (*SSputchar)(char buff, int flush)=SerialConsolePutC;
 #endif
 // Only SSD1963 displays support H/W scrolling so for other displays it is much quicker to redraw the screen than scroll it
 // However, we don't want to redraw the serial console so we dummy out the serial writes whiole re-drawing the physical screen
-    #define MX470Scroll(n)      if(Option.DISPLAY_CONSOLE){if(!(SPIREAD  || Option.NoScroll))ScrollLCD(n);\
+#ifdef PICOMITEVGA
+    #define MX470Scroll(n) ScrollLCD(n);
+#else
+    #define MX470Scroll(n)      if(Option.DISPLAY_CONSOLE){if(!((SPIREAD && ScrollLCD != ScrollLCDSPISCR)  || Option.NoScroll))ScrollLCD(n);\
     else {PrintString=printnothing;SSputchar=nothingchar;printScreen();PrintString=SSPrintString;SSputchar=SerialConsolePutC;}}
+#endif
 
 //    #define dx(...) {char s[140];sprintf(s,  __VA_ARGS__); SerUSBPutS(s); SerUSBPutS("\r\n");}
 
@@ -232,7 +236,7 @@ static char (*SSputchar)(char buff, int flush)=SerialConsolePutC;
             case SCROLL_DOWN:
                                     break;
             case DRAW_LINE:         DrawBox(0, gui_font_height * (Option.Height - 2), HRes - 1, VRes - 1, 0, 0, (DISPLAY_TYPE==SCREENMODE1 ? 0 :gui_bcolour));
-                                    DrawLine(0, VRes - gui_font_height - 6, HRes - 1, VRes - gui_font_height - 6, 1, GUI_C_LINE);
+                                    DrawLine(0, (VRes/gui_font_height)*gui_font_height - gui_font_height - 6, HRes - 1, (VRes/gui_font_height)*gui_font_height - gui_font_height - 6, 1, GUI_C_LINE);
 #ifdef PICOMITEVGA
 #ifdef HDMI
                                     if(FullColour){
@@ -240,19 +244,6 @@ static char (*SSputchar)(char buff, int flush)=SerialConsolePutC;
                                     } else {
                                         if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==gui_font_height)for(int i=0; i<HRes/8; i++)tilefcols_w[(Option.Height - 2)*X_TILE+i]=RGB332(MAGENTA);
                                     }
-                                        /*                                    } else if(Option.CPU_Speed==FreqXGA){
-                                        if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==32 && gui_font==65)for(int i=0; i<128; i++)tilefcols_w[22*X_TILE+i]=RGB332(MAGENTA);
-                                        if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==24 && gui_font==33)for(int i=0; i<128; i++)tilefcols_w[30*X_TILE+i]=RGB332(MAGENTA);
-                                        if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==12 && gui_font==1)for(int i=0; i<128; i++)tilefcols_w[62*X_TILE+i]=RGB332(MAGENTA);
-                                    } else if(Option.CPU_Speed==Freq720P){
-                                        if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==32 && gui_font==65)for(int i=0; i<160; i++)tilefcols_w[20*X_TILE+i]=RGB332(MAGENTA);
-                                        if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==24 && gui_font==33)for(int i=0; i<160; i++)tilefcols_w[28*X_TILE+i]=RGB332(MAGENTA);
-                                        if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==12 && gui_font==1)for(int i=0; i<160; i++)tilefcols_w[58*X_TILE+i]=RGB332(MAGENTA);
-                                    } else if(Option.CPU_Speed==Freq848){
-                                        if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==12 && gui_font==1)for(int i=0; i<HRes/8; i++)tilefcols_w[38*X_TILE+i]=RGB332(MAGENTA);
-                                    } else if(Option.CPU_Speed==FreqSVGA){
-                                        if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==12 && gui_font==1)for(int i=0; i<100; i++)tilefcols_w[48*X_TILE+i]=RGB332(MAGENTA);
-                                    }*/
 #else
                                     if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==gui_font_height)for(int i=0; i<HRes/8; i++)tilefcols[(Option.Height - 2)*X_TILE+i]=0x9999;
 #endif

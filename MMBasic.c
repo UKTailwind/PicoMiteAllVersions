@@ -3218,6 +3218,18 @@ void MIPS16 ClearRuntime(bool all) {
     outframe=NULL;
 */
 #ifndef PICOMITEVGA
+    if(ScrollLCD==ScrollLCDSPISCR){
+        ScrollStart=0;
+        spi_write_command(CMD_SET_SCROLL_START);
+        spi_write_data(0);
+        spi_write_data(0);
+    }
+    if(ScrollLCD==ScrollLCDSPISCR){
+        ScrollStart=0;
+        WriteComand(CMD_SET_SCROLL_START);
+        WriteData(0);
+        WriteData(0);
+    }
     if(SSD16TYPE || Option.DISPLAY_TYPE==IPS_4_16 || SPI480)clear320();
 #endif
     MMerrno = 0;                                                    // clear the error flags

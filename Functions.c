@@ -69,6 +69,7 @@ const char* overlaid_functions[]={
 	"MM.DISPLAY",
 	"MM.WIDTH",
 	"MM.HEIGHT",
+	"MM.PERSISTENT",
 	"MM.END"
 };
 #ifndef rp2350
@@ -514,6 +515,7 @@ typedef enum {
     MMDISPLAY,
     MMWIDTH,
     MMHEIGHT,
+	MMPERSISTENT,
     MMEND
 } Operation;
 */
@@ -595,6 +597,9 @@ typedef enum {
 			break;
 		case  MMHEIGHT:
 			iret=VRes/(short)(FontTable[gui_font >> 4][1] * (gui_font & 0b1111));
+			break;
+		case  MMPERSISTENT:
+			iret=_persistent;
 			break;
 		default:
 			iret=-1;

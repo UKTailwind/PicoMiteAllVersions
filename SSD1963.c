@@ -1859,11 +1859,11 @@ void ReadBLITBuffer320(int x1, int y1, int x2, int y2, unsigned char* p) {
 /*  @endcond */
 
 void MIPS16 fun_getscanline(void){
-    if(Option.DISPLAY_TYPE < SSDPANEL && !(Option.DISPLAY_TYPE==ILI9341 || Option.DISPLAY_TYPE==ST7789B || Option.DISPLAY_TYPE==ILI9488)) {
+    if(Option.DISPLAY_TYPE < SSDPANEL && !(Option.DISPLAY_TYPE==ILI9341 || Option.DISPLAY_TYPE==ST7789B  || Option.DISPLAY_TYPE == ILI9488P || Option.DISPLAY_TYPE==ILI9488)) {
         iret=-1;
         targ = T_INT;
     }
-    if(Option.DISPLAY_TYPE==ILI9341 || Option.DISPLAY_TYPE==ST7789B || Option.DISPLAY_TYPE==ILI9488){
+    if(Option.DISPLAY_TYPE==ILI9341 || Option.DISPLAY_TYPE==ST7789B || Option.DISPLAY_TYPE==ILI9488 || Option.DISPLAY_TYPE == ILI9488P ){
         iret=GetLineILI9341();
         targ = T_INT;
     } else {

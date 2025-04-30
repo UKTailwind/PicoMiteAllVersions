@@ -4973,13 +4973,28 @@ void fun_sprite(void) {
 #ifndef PICOMITEVGA
 void restorepanel(void){
     if(Option.DISPLAY_TYPE>I2C_PANEL && Option.DISPLAY_TYPE < BufferedPanel){
-        DrawRectangle = DrawRectangleSPI;
-        DrawBitmap = DrawBitmapSPI;
-        DrawBuffer = DrawBufferSPI;
-        DrawPixel = DrawPixelNormal;
-        if(Option.DISPLAY_TYPE == ILI9341 || Option.DISPLAY_TYPE == ILI9488 || Option.DISPLAY_TYPE == ST7789B){
-            ReadBuffer = ReadBufferSPI;
-            ScrollLCD = ScrollLCDSPI;
+        if(Option.DISPLAY_ORIENTATION==PORTRAIT){
+            DrawRectangle = DrawRectangleSPISCR;
+            DrawBitmap = DrawBitmapSPISCR;
+            DrawBuffer = DrawBufferSPISCR;
+            DrawPixel = DrawPixelNormal;
+        	DrawBLITBuffer = DrawBufferSPISCR;
+            ScrollLCD = ScrollLCDSPISCR;
+            if(Option.DISPLAY_TYPE == ILI9341 || Option.DISPLAY_TYPE == ILI9488  || Option.DISPLAY_TYPE == ILI9488P || Option.DISPLAY_TYPE == ST7789B){
+                ReadBuffer = ReadBufferSPISCR;
+				ReadBLITBuffer = ReadBufferSPISCR;
+            }
+        } else {
+            DrawRectangle = DrawRectangleSPI;
+            DrawBitmap = DrawBitmapSPI;
+            DrawBuffer = DrawBufferSPI;
+            DrawPixel = DrawPixelNormal;
+        	DrawBLITBuffer = DrawBufferSPI;
+            if(Option.DISPLAY_TYPE == ILI9341 || Option.DISPLAY_TYPE == ILI9488  || Option.DISPLAY_TYPE == ILI9488P || Option.DISPLAY_TYPE == ST7789B){
+				ReadBLITBuffer = ReadBufferSPI;
+                ReadBuffer = ReadBufferSPI;
+                ScrollLCD = ScrollLCDSPI;
+            }
         }
     } else if(Option.DISPLAY_TYPE>=SSDPANEL && Option.DISPLAY_TYPE < VIRTUAL){
         if(screen320){
@@ -5066,12 +5081,12 @@ void copyframetoscreen(uint8_t *s,int xstart, int xend, int ystart, int yend, in
     }
     int i;
     int cnt=2; 
-    if(Option.DISPLAY_TYPE==ILI9488 || Option.DISPLAY_TYPE==ILI9481IPS || (Option.DISPLAY_TYPE>=SSDPANEL && Option.DISPLAY_TYPE<=SSD_PANEL_8)){
+    if(Option.DISPLAY_TYPE==ILI9488 || Option.DISPLAY_TYPE == ILI9488P  || Option.DISPLAY_TYPE==ILI9481IPS || (Option.DISPLAY_TYPE>=SSDPANEL && Option.DISPLAY_TYPE<=SSD_PANEL_8)){
         cnt=3;
     } 
     if(map[15]==0){
         for(i=0;i<16;i++){
-            if(Option.DISPLAY_TYPE==ILI9488 || Option.DISPLAY_TYPE==ILI9481IPS){
+            if(Option.DISPLAY_TYPE==ILI9488  || Option.DISPLAY_TYPE == ILI9488P || Option.DISPLAY_TYPE==ILI9481IPS){
                 col[0]=(RGB121map[i]>>16);
                 col[1]=(RGB121map[i]>>8) & 0xFF;
                 col[2]=(RGB121map[i] & 0xFF);
@@ -5277,7 +5292,7 @@ void blitmerge (int x0, int y0, int w, int h, uint8_t colour){
 #ifdef PICOMITE
     mutex_enter_blocking(&frameBufferMutex);			// lock the frame buffer
 #endif
-    if(Option.DISPLAY_TYPE==ILI9341 || Option.DISPLAY_TYPE==ST7789B || Option.DISPLAY_TYPE==ILI9488){
+    if(Option.DISPLAY_TYPE==ILI9341 || Option.DISPLAY_TYPE==ST7789B || Option.DISPLAY_TYPE==ILI9488 || Option.DISPLAY_TYPE == ILI9488P ){
         while(GetLineILI9341()!=0){}
     }
     for(int y=y0;y<y0+h;y++){
@@ -5314,7 +5329,7 @@ void merge(uint8_t colour){
 #ifdef PICOMITE
     mutex_enter_blocking(&frameBufferMutex);			// lock the frame buffer
 #endif
-    if(Option.DISPLAY_TYPE==ILI9341 || Option.DISPLAY_TYPE==ST7789B || Option.DISPLAY_TYPE==ILI9488){
+    if(Option.DISPLAY_TYPE==ILI9341 || Option.DISPLAY_TYPE==ST7789B || Option.DISPLAY_TYPE==ILI9488 || Option.DISPLAY_TYPE == ILI9488P ){
         while(GetLineILI9341()!=0){}
     }
     for(int y=0;y<VRes;y++){
@@ -5442,7 +5457,7 @@ void cmd_framebuffer(void){
             LayerBuf=GetMemory(HRes*VRes/2);
         } else error("Layer already exists");
     } else if((p=checkstring(cmdline, (unsigned char *)"WAIT"))) {
-        if(Option.DISPLAY_TYPE==ILI9341 || Option.DISPLAY_TYPE==ST7789B || Option.DISPLAY_TYPE==ILI9488){
+        if(Option.DISPLAY_TYPE==ILI9341 || Option.DISPLAY_TYPE==ST7789B || Option.DISPLAY_TYPE==ILI9488 || Option.DISPLAY_TYPE == ILI9488P ){
             while(GetLineILI9341()!=0){}
         }
     } else if((p=checkstring(cmdline, (unsigned char *)"CLOSE"))) {
@@ -7787,27 +7802,6 @@ void MIPS16 DrawBitmapUser(int x1, int y1, int width, int height, int scale, int
     } else
         error("MM.USER_BITMAP not defined");
 }
-
-
-void ScrollLCDSPI(int lines){
-    if(lines==0)return;
-     unsigned char *buff=GetMemory(3*HRes);
-     if(lines >= 0) {
-        for(int i=0;i<VRes-lines;i++) {
-        	ReadBLITBuffer(0, i+lines, HRes -1, i+lines, buff);
-			DrawBLITBuffer(0, i, HRes - 1, i, buff);        	
-        }
-        DrawRectangle(0, VRes-lines, HRes - 1, VRes - 1, gui_bcolour); // erase the lines to be scrolled off
-    } else {
-    	lines=-lines;
-        for(int i=VRes-1;i>=lines;i--) {
-        	ReadBLITBuffer(0, i-lines, HRes -1, i-lines, buff);
-			DrawBLITBuffer(0, i, HRes - 1, i, buff);        	
-        }
-        DrawRectangle(0, 0, HRes - 1, lines - 1, gui_bcolour); // erase the lines introduced at the top
-    }
-    FreeMemory(buff);
-}
 #endif
 
 /****************************************************************************************************
@@ -8041,12 +8035,12 @@ void DisplayPutC(char c) {
     // handle the standard control chars
     switch(c) {
         case '\b':  CurrentX -= gui_font_width;
-            //if (CurrentX < 0) CurrentX = 0;
-            if(CurrentX < 0){  //Go to end of previous line
+            if (CurrentX < 0) CurrentX = 0;
+/*            if(CurrentX < 0){  //Go to end of previous line
               	CurrentY -= gui_font_height ;                  //Go up one line
               	if (CurrentY < 0) CurrentY = 0;
               	CurrentX = (Option.Width-1) * gui_font_width;  //go to last character
-            }           
+            }   */        
             return;
         case '\r':  CurrentX = 0;
                     return;

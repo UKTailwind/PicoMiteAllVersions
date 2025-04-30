@@ -599,7 +599,11 @@ int parseintegerarray(unsigned char *tp, int64_t **a1int, int argno, int dimensi
 	if((g_vartbl[g_VarIndex].type & T_CONST) && ConstantNotAllowed) error("Cannot change a constant");
 	if(dims==NULL)dims=g_vartbl[g_VarIndex].dims;
 	if(g_vartbl[g_VarIndex].type & T_INT) {
+#ifdef rp2350
+		memcpy(dims,g_vartbl[g_VarIndex].dims, MAXDIM * sizeof(int));
+#else
 		memcpy(dims,g_vartbl[g_VarIndex].dims, MAXDIM * sizeof(short));
+#endif
 		*a1int = (int64_t *)ptr1;
 		if((uint32_t)ptr1!=(uint32_t)g_vartbl[g_VarIndex].val.s)error("Syntax");
 	} else error("Argument % must be an integer array",argno);
@@ -613,6 +617,36 @@ int parseintegerarray(unsigned char *tp, int64_t **a1int, int argno, int dimensi
 	return card;
 }
 #ifdef rp2350
+int parsestringarray(unsigned char *tp, unsigned char **a1str, int argno, int dimensions, int *dims, bool ConstantNotAllowed, unsigned char *length){
+#else
+int parsestringarray(unsigned char *tp, unsigned char **a1str, int argno, int dimensions, short *dims, bool ConstantNotAllowed, unsigned char *length){
+#endif
+	void *ptr1 = NULL;
+	int i,j;
+	ptr1 = findvar(tp, V_FIND | V_EMPTY_OK | V_NOFIND_ERR);
+	if((g_vartbl[g_VarIndex].type & T_CONST) && ConstantNotAllowed) error("Cannot change a constant");
+	if(dims==NULL)dims=g_vartbl[g_VarIndex].dims;
+	if(g_vartbl[g_VarIndex].type & T_STR) {
+#ifdef rp2350
+		memcpy(dims,g_vartbl[g_VarIndex].dims, MAXDIM * sizeof(int));
+#else
+		memcpy(dims,g_vartbl[g_VarIndex].dims, MAXDIM * sizeof(short));
+#endif
+		*length=g_vartbl[g_VarIndex].size;
+		*a1str = (unsigned char *)ptr1;
+		if((uint32_t)ptr1!=(uint32_t)g_vartbl[g_VarIndex].val.s)error("Syntax");
+	} else error("Argument % must be a string array",argno);
+	int card=1;
+	if(dimensions==1 && (dims[0]<=0 || dims[1]>0))error("Argument % must be a 1D string array",argno);
+	if(dimensions==2 && (dims[0]<=0 || dims[1]<=0 || dims[2]>0))error("Argument % must be a 2D string array",argno);
+	for(i=0;i<MAXDIM;i++){
+		j=(dims[i] - g_OptionBase + 1);
+		if(j)card *= j;
+	}
+	return card;
+}
+
+#ifdef rp2350
 int parsenumberarray(unsigned char *tp, MMFLOAT **a1float, int64_t **a1int, int argno, int dimensions, int *dims, bool ConstantNotAllowed){
 #else
 int parsenumberarray(unsigned char *tp, MMFLOAT **a1float, int64_t **a1int, int argno, short dimensions, short *dims, bool ConstantNotAllowed){
@@ -623,7 +657,11 @@ int parsenumberarray(unsigned char *tp, MMFLOAT **a1float, int64_t **a1int, int 
 	if((g_vartbl[g_VarIndex].type & T_CONST) && ConstantNotAllowed) error("Cannot change a constant");
 	if(dims==NULL)dims=g_vartbl[g_VarIndex].dims;
 	if(g_vartbl[g_VarIndex].type & (T_INT | T_NBR)) {
-		memcpy(dims,g_vartbl[g_VarIndex].dims,  MAXDIM * sizeof(short));
+#ifdef rp2350
+		memcpy(dims,g_vartbl[g_VarIndex].dims, MAXDIM * sizeof(int));
+#else
+		memcpy(dims,g_vartbl[g_VarIndex].dims, MAXDIM * sizeof(short));
+#endif
 		if(g_vartbl[g_VarIndex].type & T_NBR) *a1float = (MMFLOAT *)ptr1;
 		else *a1int=(int64_t *)ptr1;
 		if((uint32_t)ptr1!=(uint32_t)g_vartbl[g_VarIndex].val.s)error("Syntax");
@@ -648,7 +686,11 @@ int parsefloatrarray(unsigned char *tp, MMFLOAT **a1float, int argno, int dimens
 	if((g_vartbl[g_VarIndex].type & T_CONST) && ConstantNotAllowed) error("Cannot change a constant");
 	if(dims==NULL)dims=g_vartbl[g_VarIndex].dims;
 	if(g_vartbl[g_VarIndex].type & T_NBR) {
-		memcpy(dims,g_vartbl[g_VarIndex].dims,  MAXDIM * sizeof(short));
+#ifdef rp2350
+		memcpy(dims,g_vartbl[g_VarIndex].dims, MAXDIM * sizeof(int));
+#else
+		memcpy(dims,g_vartbl[g_VarIndex].dims, MAXDIM * sizeof(short));
+#endif
 		*a1float = (MMFLOAT *)ptr1;
 		if((uint32_t)ptr1!=(uint32_t)g_vartbl[g_VarIndex].val.s)error("Syntax");
 	} else error("Argument % must be a floating point array",argno);
@@ -968,20 +1010,7 @@ void cmd_math(void){
 
 		tp = checkstring(cmdline, (unsigned char *)"SET");
 		if(tp) {
-			int i,card1=1;
-			MMFLOAT *a1float=NULL;
-			int64_t *a1int=NULL;
-			getargs(&tp, 3,(unsigned char *)",");
-			if(!(argc == 3)) error("Argument count");
-			card1=parsenumberarray(argv[2],&a1float,&a1int,2,0, dims, true);
-		    evaluate(argv[0], &f, &i64, &s, &t, false);
-		    if(t & T_STR) error("Syntax");
-
-			if(a1float!=NULL){
-				for(i=0; i< card1;i++)*a1float++ = ((t & T_INT) ? (MMFLOAT)i64 : f);
-			} else {
-				for(i=0; i< card1;i++)*a1int++ = ((t & T_INT) ? i64 : FloatToInt64(f));
-			}
+			array_set(tp);
 			return;
 		}
 
@@ -1045,46 +1074,7 @@ void cmd_math(void){
 
 		tp = checkstring(cmdline, (unsigned char *)"SLICE");
 		if(tp) {
-			int i, j, start, increment, dim[MAXDIM], pos[MAXDIM],off[MAXDIM], dimcount=0, target=-1, toarray=0;
-			int64_t *a1int=NULL,*a2int=NULL;
-			MMFLOAT *afloat=NULL;
-			getargs(&tp, 13,(unsigned char *)",");
-			if(argc<7)error("Argument count");
-			parsenumberarray(argv[0],&afloat,&a1int,1,0,dims, false);
-			if(!a1int)a1int=(int64_t *)afloat;
-			if(dims[1]<=0)error("Argument 1 must be a 2D or more numerical array");
-			for(i=0;i<MAXDIM;i++){
-				if(dims[i]-g_OptionBase>0){
-					dimcount++;
-					dim[i]=dims[i]-g_OptionBase;
-				} else dim[i]=0;
-			}
-			if(((argc-1)/2-1)!=dimcount)error("Argument count");
-			for(i=0; i<dimcount;i++ ){
-				if(*argv[i*2 +2]) pos[i]=getint(argv[i*2 +2],g_OptionBase,dim[i]+g_OptionBase)-g_OptionBase;
-				else {
-					if(target!=-1)error("Only one index can be omitted");
-					target=i;
-					pos[i]=1;
-				}
-			}
-			toarray=parsenumberarray(argv[i*2 +2],&afloat,&a2int,i+1,1,dims, true)-1;
-			if(!a2int)a2int=(int64_t *)afloat;
-			if(dim[target]!=toarray)error("Size mismatch between slice and target array");
-			i=dimcount-1;
-			while(i>=0){
-				off[i]=1;
-				for(j=0; j<i; j++)off[i]*=(dim[j]+1);
-				i--;
-			}
-			start=1;
-			for(i=0;i<dimcount;i++){
-				start+= (pos[i]*off[i]);
-			}
-			start--;
-			increment=off[target];
-			start-=increment;
-			for(i=0;i<=dim[target];i++)*a2int++ = a1int[start+i*increment];
+			array_slice(tp);
 			return;
 		}
 		tp = checkstring(cmdline, (unsigned char *)"SENSORFUSION");
@@ -1728,38 +1718,7 @@ void cmd_math(void){
 		}
 		tp = checkstring(cmdline, (unsigned char *)"ADD");
 		if(tp) {
-			int i,card1=1, card2=1;
-			MMFLOAT *a1float=NULL,*a2float=NULL, scale;
-			int64_t *a1int=NULL, *a2int=NULL;
-			getargs(&tp, 5,(unsigned char *)",");
-			if(!(argc == 5)) error("Argument count");
-			card1=parsenumberarray(argv[0], &a1float, &a1int, 1, 0,dims, false);
-		    evaluate(argv[2], &f, &i64, &s, &t, false);
-		    if(t & T_STR) error("Syntax");
-		    scale=getnumber(argv[2]);
-			card2=parsenumberarray(argv[4], &a2float, &a2int, 3, 0,dims, true);
-			if(card1 != card2)error("Array size mismatch");
-			if(scale!=0.0){
-				if(a2float!=NULL && a1float!=NULL){
-					for(i=0; i< card1;i++)*a2float++ = ((t & T_INT) ? (MMFLOAT)i64 : f) + (*a1float++);
-				} else if(a2float!=NULL && a1float==NULL){
-					for(i=0; i< card1;i++)(*a2float++) = ((t & T_INT) ? (MMFLOAT)i64 : f) + ((MMFLOAT)*a1int++);
-				} else if(a2float==NULL && a1float!=NULL){
-					for(i=0; i< card1;i++)(*a2int++) = FloatToInt64(((t & T_INT) ? i64 : FloatToInt64(f)) + (*a1float++));
-				} else {
-					for(i=0; i< card1;i++)(*a2int++) = ((t & T_INT) ? i64 : FloatToInt64(f)) + (*a1int++);
-				}
-			} else {
-				if(a2float!=NULL && a1float!=NULL){
-					for(i=0; i< card1;i++)*a2float++ = *a1float++;
-				} else if(a2float!=NULL && a1float==NULL){
-					for(i=0; i< card1;i++)(*a2float++) = ((MMFLOAT)*a1int++);
-				} else if(a2float==NULL && a1float!=NULL){
-					for(i=0; i< card1;i++)(*a2int++) = FloatToInt64(*a1float++);
-				} else {
-					for(i=0; i< card1;i++)*a2int++ = *a1int++;
-				}
-			}
+			array_add(tp);
 			return;
 		}
 		tp = checkstring(cmdline, (unsigned char *)"POWER");
@@ -1893,47 +1852,7 @@ void cmd_math(void){
 		}
 		tp = checkstring(cmdline, (unsigned char *)"INSERT");
 		if(tp) {
-			int i, j, start, increment, dim[MAXDIM], pos[MAXDIM],off[MAXDIM], dimcount=0, target=-1;
-			int64_t *a1int=NULL,*a2int=NULL;
-			MMFLOAT *afloat=NULL;
-			getargs(&tp, 13,(unsigned char *)",");
-			if(argc<7)error("Argument count");
-			parsenumberarray(argv[0],&afloat,&a1int,1,0,dims, false);
-			if(!a1int)a1int=(int64_t *)afloat;
-			if(dims[1]<=0)error("Argument 1 must be a 2D or more numerical array");
-			for(i=0;i<MAXDIM;i++){
-				if(dims[i]-g_OptionBase>0){
-					dimcount++;
-					dim[i]=dims[i]-g_OptionBase;
-				} else dim[i]=0;
-			}
-			if(((argc-1)/2-1)!=dimcount)error("Argument count");
-			for(i=0; i<dimcount;i++ ){
-				if(*argv[i*2 +2]) pos[i]=getint(argv[i*2 +2],g_OptionBase,dim[i]+g_OptionBase)-g_OptionBase;
-				else {
-					if(target!=-1)error("Only one index can be omitted");
-					target=i;
-					pos[i]=1;
-				}
-			}
-			parsenumberarray(argv[i*2 +2],&afloat,&a2int,i+1,1,dims,true);
-			if(!a2int)a2int=(int64_t *)afloat;
-			if(target==-1)return;
-			if(dim[target]+g_OptionBase!=dims[0])error("Size mismatch between insert and target array");
-			i=dimcount-1;
-			while(i>=0){
-				off[i]=1;
-				for(j=0; j<i; j++)off[i]*=(dim[j]+1);
-				i--;
-			}
-			start=1;
-			for(i=0;i<dimcount;i++){
-				start+= (pos[i]*off[i]);
-			}
-			start--;
-			increment=off[target];
-			start-=increment;
-			for(i=0;i<=dim[target];i++) a1int[start+i*increment]=*a2int++;
+			array_insert(tp);
 			return;
 		}
 		tp = checkstring(cmdline, (unsigned char *)"FFT");

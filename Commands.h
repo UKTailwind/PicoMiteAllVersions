@@ -98,6 +98,9 @@ extern struct sa_data datastore[MAXRESTORE];
 extern int restorepointer;
 extern unsigned short *frame, *outframe;
 extern bool framecursor;
-
+extern void array_slice(unsigned char *tp);
+extern void array_insert(unsigned char *tp);
+extern void array_add(unsigned char *tp);
+extern void array_set(unsigned char *tp);
 #endif
 /*  @endcond */

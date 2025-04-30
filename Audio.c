@@ -62,6 +62,9 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #define MP3_BUFFER_SIZE WAV_BUFFER_SIZE
 #ifdef rp2350
 #include "dr_mp3.h"
+#define MOD_BUFFER_SIZE WAV_BUFFER_SIZE
+#else 
+#define MOD_BUFFER_SIZE WAV_BUFFER_SIZE/2
 #endif
 #include "hardware/pio.h"
 #include "hardware/pio_instructions.h"
@@ -638,7 +641,7 @@ drwav_bool32 onSeek(void  *userdata,  int offset,  drwav_seek_origin origin){
 	}
     return 1;
 }
-drwav_bool32 onTell(void  *userdata,  drmp3_int64* pCursor){
+drwav_bool32 onTell(void  *userdata,  drwav_int64* pCursor){
 	if(filesource[WAV_fnbr]==FATFSFILE){
 		*pCursor=(*(FileTable[WAV_fnbr].fptr)).fptr;
 	} else {
@@ -1771,8 +1774,8 @@ void MIPS16 cmd_play(void) {
 		if(!(modbuff))error("Mod playback not enabled");
 #endif
         if(!InitSDCard()) return;
-        sbuff1 = GetMemory(WAV_BUFFER_SIZE);
-        sbuff2 = GetMemory(WAV_BUFFER_SIZE);
+        sbuff1 = GetMemory(MOD_BUFFER_SIZE);
+        sbuff2 = GetMemory(MOD_BUFFER_SIZE);
         ubuff1 = (uint16_t *)sbuff1;
         ubuff2 = (uint16_t *)sbuff2;
         g_buff1 = (int16_t *)sbuff1;
@@ -1855,10 +1858,10 @@ void MIPS16 cmd_play(void) {
 			playvs1053(P_MOD);
 			return;
 		} else {
-	        hxcmod_fillbuffer( mcontext, (msample*)sbuff1, WAV_BUFFER_SIZE/8, NULL, noloop );
+	        hxcmod_fillbuffer( mcontext, (msample*)sbuff1, MOD_BUFFER_SIZE/8, NULL, noloop );
 		}
-        wav_filesize=WAV_BUFFER_SIZE/4;
-        bcount[1]=WAV_BUFFER_SIZE/4;
+        wav_filesize=MOD_BUFFER_SIZE/4;
+        bcount[1]=MOD_BUFFER_SIZE/4;
         bcount[2]=0;
 		if(Option.audio_i2s_bclk)i2sconvert(g_buff1, (int16_t *)sbuff1, bcount[1]);
 		else iconvert((uint16_t *)ubuff1, (int16_t *)sbuff1, bcount[1]);
@@ -2012,15 +2015,15 @@ void checkWAVinput(void){
 #endif
 			} else if(CurrentlyPlaying == P_MOD){
 				if(swingbuf==2){
-					if(hxcmod_fillbuffer( mcontext, (msample*)sbuff1, WAV_BUFFER_SIZE/8,NULL, noloop ))playreadcomplete = 1;
-					wav_filesize=WAV_BUFFER_SIZE/4;
-					bcount[1]=WAV_BUFFER_SIZE/4;
+					if(hxcmod_fillbuffer( mcontext, (msample*)sbuff1, MOD_BUFFER_SIZE/4,NULL, noloop ))playreadcomplete = 1;
+					wav_filesize=MOD_BUFFER_SIZE/2;
+					bcount[1]=MOD_BUFFER_SIZE/2;
 					if(Option.audio_i2s_bclk)i2sconvert(g_buff1, (int16_t *)sbuff1, bcount[1]);
 					else iconvert((uint16_t *)ubuff1, (int16_t *)sbuff1, bcount[1]);
 				} else {
-					if(hxcmod_fillbuffer( mcontext, (msample*)sbuff2, WAV_BUFFER_SIZE/8,NULL, noloop ))playreadcomplete = 1;
-					wav_filesize=WAV_BUFFER_SIZE/4;
-					bcount[2]=WAV_BUFFER_SIZE/4;
+					if(hxcmod_fillbuffer( mcontext, (msample*)sbuff2, MOD_BUFFER_SIZE/4,NULL, noloop ))playreadcomplete = 1;
+					wav_filesize=MOD_BUFFER_SIZE/2;
+					bcount[2]=MOD_BUFFER_SIZE/2;
 					if(Option.audio_i2s_bclk)i2sconvert(g_buff2, (int16_t *)sbuff2, bcount[2]);
 					else iconvert((uint16_t *)ubuff2, (int16_t *)sbuff2, bcount[2]);
 				}
