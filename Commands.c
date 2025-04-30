@@ -1029,6 +1029,10 @@ void MIPS16 cmd_new(void) {
     flash_range_erase(realflashpointer, MAX_PROG_SIZE);
     FlashWriteByte(0); FlashWriteByte(0); FlashWriteByte(0);    // terminate the program in flash
     FlashWriteClose();
+#ifdef PICOMITEVGA
+	int mode = DISPLAY_TYPE-SCREENMODE1+1;
+	setmode(mode);
+#endif
     memset(inpbuf,0,STRINGSIZE);
 	longjmp(mark, 1);							                    // jump back to the input prompt
 }

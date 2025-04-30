@@ -6870,10 +6870,7 @@ void cmd_map(void){
     }
 }
 #endif
-
-void cmd_mode(void){
-    int mode =getint(cmdline,1,MAXMODES);
-//    if(mode+SCREENMODE1-1==DISPLAY_TYPE)return;
+void setmode(int mode){
     closeframebuffer('A');
     memset((void *)FRAMEBUFFER,0,framebuffersize);
     if(mode==5){
@@ -6940,6 +6937,13 @@ void cmd_mode(void){
 #ifdef USBKEYBOARD
 	clearrepeat();
 #endif	
+}
+
+
+void cmd_mode(void){
+    int mode =getint(cmdline,1,MAXMODES);
+//    if(mode+SCREENMODE1-1==DISPLAY_TYPE)return;
+    setmode(mode);
 }
 #endif
 /* 
