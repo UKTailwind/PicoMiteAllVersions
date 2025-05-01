@@ -8048,7 +8048,17 @@ void DisplayPutC(char c) {
             return;
         case '\r':  CurrentX = 0;
                     return;
-        case '\n':  CurrentY += gui_font_height;
+                    case '\n':  
+                    if(CurrentY + 2* gui_font_height >= VRes) {
+                        if(Option.NoScroll && Option.DISPLAY_CONSOLE){ClearScreen(gui_bcolour);CurrentX=0;CurrentY=0;}
+                        else {                    
+                         ScrollLCD( gui_font_height);
+                        }
+                    } else {
+                       CurrentY += gui_font_height;
+                    }
+                    return;                    
+ /*        case '\n':  CurrentY += gui_font_height;
                     if(CurrentY + gui_font_height >= (VRes/gui_font_height)*gui_font_height) {
                         if(Option.NoScroll && Option.DISPLAY_CONSOLE){ClearScreen(gui_bcolour);CurrentX=0;CurrentY=0;}
                         else {
@@ -8056,13 +8066,14 @@ void DisplayPutC(char c) {
                             CurrentY -= (CurrentY + gui_font_height - VRes);
                         }
                     }
-                    return;
+                    return;*/
         case '\t':  do {
                         DisplayPutC(' ');
                     } while((CurrentX/gui_font_width) % Option.Tab);
                     return;
     }
     GUIPrintChar(gui_font, gui_fcolour, gui_bcolour, c, ORIENT_NORMAL);            // print it
+    routinechecks();
 }
 void ShowCursor(int show) {
   static int visible = false;
