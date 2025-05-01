@@ -8040,11 +8040,11 @@ void DisplayPutC(char c) {
     switch(c) {
         case '\b':  CurrentX -= gui_font_width;
             if (CurrentX < 0) CurrentX = 0;
-/*            if(CurrentX < 0){  //Go to end of previous line
+            if(CurrentX < 0){  //Go to end of previous line
               	CurrentY -= gui_font_height ;                  //Go up one line
               	if (CurrentY < 0) CurrentY = 0;
               	CurrentX = (Option.Width-1) * gui_font_width;  //go to last character
-            }   */        
+            }           
             return;
         case '\r':  CurrentX = 0;
                     return;
