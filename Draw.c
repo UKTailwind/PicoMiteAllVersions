@@ -8049,7 +8049,7 @@ void DisplayPutC(char c) {
         case '\r':  CurrentX = 0;
                     return;
                     case '\n':  
-                    if(CurrentY + 2* gui_font_height >= VRes) {
+                    if(CurrentY + 2* gui_font_height > VRes) {
                         if(Option.NoScroll && Option.DISPLAY_CONSOLE){ClearScreen(gui_bcolour);CurrentX=0;CurrentY=0;}
                         else {                    
                          ScrollLCD( gui_font_height);
