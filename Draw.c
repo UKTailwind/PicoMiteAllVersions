@@ -6891,18 +6891,18 @@ void setmode(int mode, bool clear){
 #ifndef HDMI
         tilefcols=(uint16_t *)((uint8_t*)FRAMEBUFFER+(MODE1SIZE*3));
         tilebcols=(uint16_t *)((uint8_t*)FRAMEBUFFER+(MODE1SIZE*3)+(MODE1SIZE>>1));
-        for(int x=0;x<X_TILE;x++){
-            for(int y=0;y<Y_TILE;y++){
-                tilefcols[y*X_TILE+x]=Option.VGAFC;
-                tilebcols[y*X_TILE+x]=Option.VGABC;
-           }
-        }
 #endif
 #endif
         DISPLAY_TYPE=SCREENMODE1;
         ScreenSize=MODE1SIZE;
     }
 //    uSec(10000);
+    ResetDisplay();
+    if(clear){
+        memset((void *)WriteBuf, 0, ScreenSize);
+        CurrentX = CurrentY =0;
+        ClearScreen(Option.DefaultBC);
+    }
 #ifdef HDMI
     if(FullColour || MediumRes){
 #endif
@@ -6927,20 +6927,48 @@ void setmode(int mode, bool clear){
         }
     }
 #endif
+if(DISPLAY_TYPE==SCREENMODE1){
+    ytileheight=gui_font_height;
+    Y_TILE=VRes/ytileheight;
+    if(VRes % ytileheight)Y_TILE++;
 #ifdef PICOMITEVGA
-        if(gui_font_height>=8 && (gui_font_width % 8)==0){
-            ytileheight=gui_font_height;
-            Y_TILE=(VRes+ytileheight-1)/ytileheight;
+    if(DISPLAY_TYPE==SCREENMODE1 && WriteBuf==DisplayBuf){
+#ifdef HDMI
+        memset((void *)WriteBuf,0,ScreenSize);
+        if(FullColour){
+            uint16_t bcolour = RGB555(gui_bcolour);
+            uint16_t fcolour = RGB555(gui_fcolour);
+            for(int x=0;x<X_TILE;x++){
+                for(int y=0;y<Y_TILE;y++){
+                    tilefcols[y*X_TILE+x]=fcolour;
+                    tilebcols[y*X_TILE+x]=bcolour;
+                } 
+            }
+        } else {
+           uint8_t bcolour = RGB332(gui_bcolour);
+           uint8_t fcolour = RGB332(gui_fcolour);
+            for(int x=0;x<X_TILE;x++){
+                for(int y=0;y<Y_TILE;y++){
+                    tilefcols_w[y*X_TILE+x]=fcolour;
+                    tilebcols_w[y*X_TILE+x]=bcolour;
+                } 
+            }
+        }
+        CurrentX=CurrentY=0;
+#else
+        int bcolour = RGB121(gui_bcolour);
+        int fcolour = RGB121(gui_fcolour);
+        bcolour= (bcolour<<12) | (bcolour<<8) | (bcolour<<4) | bcolour;
+        fcolour= (fcolour<<12) | (fcolour<<8) | (fcolour<<4) | fcolour;
+        for(int x=0;x<X_TILE;x++){
+            for(int y=0;y<Y_TILE;y++){
+                tilefcols[y*X_TILE+x]=fcolour;
+                tilebcols[y*X_TILE+x]=bcolour;
+            } 
         }
 #endif
-#ifdef HDMI
-        settiles();
+    }
 #endif
-ResetDisplay();
-if(clear){
-    memset((void *)WriteBuf, 0, ScreenSize);
-    CurrentX = CurrentY =0;
-    ClearScreen(Option.DefaultBC);
 }
 
 #ifdef USBKEYBOARD
@@ -6951,8 +6979,7 @@ if(clear){
 
 void cmd_mode(void){
     int mode =getint(cmdline,1,MAXMODES);
-//    if(mode+SCREENMODE1-1==DISPLAY_TYPE)return;
-    setmode(mode,true);
+    setmode(mode, true);
 }
 #endif
 /* 
