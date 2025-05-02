@@ -1376,6 +1376,10 @@ if(Option.SerialConsole)while(ConsoleTxBufHead!=ConsoleTxBufTail)routinechecks()
 	if(g_myrand)FreeMemory((void *)g_myrand);
 	g_myrand=NULL;
 	OptionConsole=3;
+#ifdef PICOMITEVGA
+	int mode = DISPLAY_TYPE-SCREENMODE1+1;
+	setmode(mode);
+#endif
 	SSPrintString("\033[?25h"); //in case application has turned the cursor off
 	SSPrintString("\033[97;40m");
 #ifdef PICOMITEWEB
