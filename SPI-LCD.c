@@ -1344,7 +1344,7 @@ void DrawBitmapSPI(int x1, int y1, int width, int height, int scale, int fc, int
 
     // revert to non enhanced SPI mode
     if(p != NULL) FreeMemory((unsigned char *)p);
-
+ 
 }
 void DrawBitmapSPISCR(int x1, int y1, int width, int height, int scale, int fc, int bc, unsigned char *bitmap){
     int i, j, k, m, y, yt, n;

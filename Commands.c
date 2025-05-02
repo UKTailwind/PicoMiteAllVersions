@@ -649,7 +649,7 @@ void MIPS16 ListProgram(unsigned char *p, int all) {
             if(!(ListCnt==CurrentY/(FontTable[gui_font >> 4][1] * (gui_font & 0b1111)) + 2 && b[0]=='\'' && b[1]=='#')){
 				pp = b;
 				while(*pp) {
-					if(MMCharPos >= Option.Width) ListNewLine(&ListCnt, all);
+					if(MMCharPos > Option.Width) ListNewLine(&ListCnt, all);
 					MMputchar(*pp++,0);
 				}
 				fflush(stdout);

@@ -4015,17 +4015,17 @@ void MIPS16 cmd_option(void) {
         return;
   }
 #endif
-    tp = checkstring(cmdline, (unsigned char *)"DISPLAY");
     if(tp) {
         getargs(&tp, 3, (unsigned char *)",");
-        if(argc!=3)error("Syntax");
-        if(Option.DISPLAY_CONSOLE) error("Cannot change LCD console");
-        int Height = getint(argv[0], 5, 100);
-        int Width = getint(argv[2], 37, 240);
-        Option.Width=Width;
-        Option.Height=Height;
-        SaveOptions();
-        setterminal(Option.Height,Option.Width);
+        if(Option.DISPLAY_CONSOLE && argc>0 ) error("Cannot change LCD console");
+        if(argc >= 1) Option.Height = getint(argv[0], 5, 100);
+        if(argc == 3) Option.Width = getint(argv[2], 37, 240);
+        if (Option.DISPLAY_CONSOLE) {
+           setterminal((Option.Height > SCREENHEIGHT)?Option.Height:SCREENHEIGHT,(Option.Width > SCREENWIDTH)?Option.Width:SCREENWIDTH);                                                    // or height is > 24
+        }else{
+           setterminal(Option.Height,Option.Width);
+        }
+        if(argc >= 1 )SaveOptions();  //Only save if necessary
         return;
     }
 #ifdef GUICONTROLS

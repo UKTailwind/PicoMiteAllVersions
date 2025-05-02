@@ -8058,15 +8058,6 @@ void DisplayPutC(char c) {
                        CurrentY += gui_font_height;
                     }
                     return;                    
- /*        case '\n':  CurrentY += gui_font_height;
-                    if(CurrentY + gui_font_height >= (VRes/gui_font_height)*gui_font_height) {
-                        if(Option.NoScroll && Option.DISPLAY_CONSOLE){ClearScreen(gui_bcolour);CurrentX=0;CurrentY=0;}
-                        else {
-                            ScrollLCD(CurrentY + gui_font_height - VRes);
-                            CurrentY -= (CurrentY + gui_font_height - VRes);
-                        }
-                    }
-                    return;*/
         case '\t':  do {
                         DisplayPutC(' ');
                     } while((CurrentX/gui_font_width) % Option.Tab);
