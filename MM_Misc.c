@@ -4015,6 +4015,7 @@ void MIPS16 cmd_option(void) {
         return;
   }
 #endif
+    tp = checkstring(cmdline, (unsigned char *)"DISPLAY");
     if(tp) {
         getargs(&tp, 3, (unsigned char *)",");
         if(Option.DISPLAY_CONSOLE && argc>0 ) error("Cannot change LCD console");
