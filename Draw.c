@@ -6870,9 +6870,9 @@ void cmd_map(void){
     }
 }
 #endif
-void setmode(int mode){
+void setmode(int mode, bool clear){
     closeframebuffer('A');
-    memset((void *)FRAMEBUFFER,0,framebuffersize);
+    if(clear)memset((void *)FRAMEBUFFER,0,framebuffersize);
     if(mode==5){
         DISPLAY_TYPE=SCREENMODE5; 
         ScreenSize=MODE5SIZE;
@@ -6901,15 +6901,8 @@ void setmode(int mode){
 #endif
         DISPLAY_TYPE=SCREENMODE1;
         ScreenSize=MODE1SIZE;
-#ifdef HDMI
-        settiles();
-#endif
     }
 //    uSec(10000);
-    ResetDisplay();
-    memset((void *)WriteBuf, 0, ScreenSize);
-    CurrentX = CurrentY =0;
-    ClearScreen(Option.DefaultBC);
 #ifdef HDMI
     if(FullColour || MediumRes){
 #endif
@@ -6934,6 +6927,22 @@ void setmode(int mode){
         }
     }
 #endif
+#ifdef PICOMITEVGA
+        if(gui_font_height>=8 && (gui_font_width % 8)==0){
+            ytileheight=gui_font_height;
+            Y_TILE=(VRes+ytileheight-1)/ytileheight;
+        }
+#endif
+#ifdef HDMI
+        settiles();
+#endif
+ResetDisplay();
+if(clear){
+    memset((void *)WriteBuf, 0, ScreenSize);
+    CurrentX = CurrentY =0;
+    ClearScreen(Option.DefaultBC);
+}
+
 #ifdef USBKEYBOARD
 	clearrepeat();
 #endif	
@@ -6943,7 +6952,7 @@ void setmode(int mode){
 void cmd_mode(void){
     int mode =getint(cmdline,1,MAXMODES);
 //    if(mode+SCREENMODE1-1==DISPLAY_TYPE)return;
-    setmode(mode);
+    setmode(mode,true);
 }
 #endif
 /* 

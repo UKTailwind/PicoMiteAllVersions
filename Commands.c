@@ -1031,7 +1031,7 @@ void MIPS16 cmd_new(void) {
     FlashWriteClose();
 #ifdef PICOMITEVGA
 	int mode = DISPLAY_TYPE-SCREENMODE1+1;
-	setmode(mode);
+	setmode(mode, true);
 #endif
     memset(inpbuf,0,STRINGSIZE);
 	longjmp(mark, 1);							                    // jump back to the input prompt
@@ -1378,7 +1378,7 @@ if(Option.SerialConsole)while(ConsoleTxBufHead!=ConsoleTxBufTail)routinechecks()
 	OptionConsole=3;
 #ifdef PICOMITEVGA
 	int mode = DISPLAY_TYPE-SCREENMODE1+1;
-	setmode(mode);
+	setmode(mode,false);
 #endif
 	SSPrintString("\033[?25h"); //in case application has turned the cursor off
 	SSPrintString("\033[97;40m");

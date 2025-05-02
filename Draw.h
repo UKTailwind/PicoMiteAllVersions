@@ -163,7 +163,7 @@ extern char CMM1;
 extern int ScreenSize;
 extern char LCDAttrib;
 extern uint32_t remap[];
-extern void setmode(int mode);
+extern void setmode(int mode, bool clear);
 typedef struct SVD {
 	FLOAT3D x;
 	FLOAT3D y;
