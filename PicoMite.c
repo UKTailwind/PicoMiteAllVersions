@@ -841,7 +841,7 @@ void MIPS16 EditInputLine(void) {
  
                                 // Lets put the cursor at the beginning of where the command is displayed.
                                 // backspace to the beginning of line
-#define USEBACKSPACE
+//#define USEBACKSPACE
 #ifdef USEBACKSPACE                                
                                 while(j)  {
                                   if (j==l4 || j==l3 ||j==l2 ){DisplayPutC('\b');SSPrintString("\e[1A");SSPrintString(goend);}else{ MMputchar('\b',0);}
@@ -3785,19 +3785,21 @@ void settiles(void){
     if(FullColour){
         tilefcols=(uint16_t *)((uint32_t)FRAMEBUFFER+(MODE1SIZE*3));
         tilebcols=(uint16_t *)((uint32_t)FRAMEBUFFER+(MODE1SIZE*3)+(MODE1SIZE>>1));
-        ytileheight=12;
-        X_TILE=MODE_H_ACTIVE_PIXELS/8;Y_TILE=MODE_V_ACTIVE_LINES/ytileheight;
-        for(int x=0;x<X_TILE;x++){
+        ytileheight=gui_font_height;
+        Y_TILE=VRes/ytileheight;
+        X_TILE=HRes/8;
+        if(VRes % ytileheight)Y_TILE++;
+            for(int x=0;x<X_TILE;x++){
             for(int y=0;y<Y_TILE;y++){
-                tilefcols[y*X_TILE+x]=RGB555(Option.DefaultFC);
-                tilebcols[y*X_TILE+x]=RGB555(Option.DefaultBC);
+                tilefcols[y*X_TILE+x]=RGB555(gui_fcolour);
+                tilebcols[y*X_TILE+x]=RGB555(gui_bcolour);
             }
         }
     } else {
         tilefcols_w=(uint8_t *)DisplayBuf+MODE1SIZE;
         tilebcols_w=tilefcols_w+(MODE_H_ACTIVE_PIXELS/8)*(MODE_V_ACTIVE_LINES/8); //minimum tilesize is 8x8
-        memset(tilefcols_w,RGB332(Option.DefaultFC),(MODE_H_ACTIVE_PIXELS/8)*(MODE_V_ACTIVE_LINES/8)*sizeof(uint8_t));
-        memset(tilebcols_w,RGB332(Option.DefaultBC),(MODE_H_ACTIVE_PIXELS/8)*(MODE_V_ACTIVE_LINES/8)*sizeof(uint8_t));
+        memset(tilefcols_w,RGB332(gui_fcolour),(MODE_H_ACTIVE_PIXELS/8)*(MODE_V_ACTIVE_LINES/8)*sizeof(uint8_t));
+        memset(tilebcols_w,RGB332(gui_bcolour),(MODE_H_ACTIVE_PIXELS/8)*(MODE_V_ACTIVE_LINES/8)*sizeof(uint8_t));
         ytileheight=(MediumRes? 12:24);
         X_TILE=MODE_H_ACTIVE_PIXELS/8;Y_TILE=MODE_V_ACTIVE_LINES/ytileheight;
     }
@@ -4312,6 +4314,8 @@ if(Option.CPU_Speed==FreqSVGA){ //adjust the size of the heap
     ConsoleRxBufTail = 0;
     ConsoleTxBufHead = 0;
     ConsoleTxBufTail = 0;
+    PromptFC=gui_fcolour=Option.DefaultFC;
+    PromptBC=gui_bcolour=Option.DefaultBC;
     InitHeap(true);              										// initilise memory allocation
     uSecFunc(1000);
     disable_interrupts_pico();
@@ -4354,7 +4358,7 @@ if(Option.CPU_Speed==FreqSVGA){ //adjust the size of the heap
         multicore_launch_core1_with_stack(HDMICore,core1stack,512);
         core1stack[0]=0x12345678;
         uSec(1000);
-    #else
+        #else
     #ifdef rp2350
     piomap[QVGA_PIO_NUM]=(uint64_t)((uint64_t)1<<(uint64_t)PinDef[Option.VGA_BLUE].GPno);
     piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.VGA_BLUE].GPno+1));
@@ -4377,7 +4381,8 @@ if(Option.CPU_Speed==FreqSVGA){ //adjust the size of the heap
         memset((void *)WriteBuf, 0, 38400);
     #endif
     ResetDisplay();
-#else
+    ClearScreen(Option.DefaultBC);
+    #else
     #ifdef PICOMITE
         bus_ctrl_hw->priority=0x100;
         multicore_launch_core1_with_stack(UpdateCore,core1stack,2048);

@@ -2524,7 +2524,7 @@ void cmd_frame(void){
 			if(argc<3)error("Syntax");
 			int x=getint(argv[0],0,framex-1);
 			int y=getint(argv[2],0,framey-1);
-			if(DISPLAY_TYPE==SCREENMODE1)tilefcols[y*X_TILE+x]=Option.VGAFC;
+			if(DISPLAY_TYPE==SCREENMODE1)tilefcols[y*X_TILE+x]=RGB121pack(gui_fcolour);
 			SCursor(x,y);
 		}
 	} else if((p=checkstring(cmdline,(unsigned char *)"BOX"))){
@@ -2540,7 +2540,7 @@ void cmd_frame(void){
 		if(argc==11){
 			if(checkstring(argv[10],(unsigned char *)"DOUBLE"))dual=true;
 		}
-		fc=((fc & 0x800000)>> 20) | ((fc & 0xC000)>>13) | ((fc & 0x80)>>7);
+		fc=RGB121(fc);
 		framewritechar(x,y,dual ? c_d_topleft : c_topleft,fc,0);
 		framewritechar(x+w,y,dual ? c_d_topright : c_topright,fc,0);
 		framewritechar(x+w,y+h,dual ? c_d_bottomright : c_bottomright,fc,0);
@@ -2569,7 +2569,7 @@ void cmd_frame(void){
 		if(argc==15){
 			if(checkstring(argv[14],(unsigned char *)"DOUBLE"))dual=true;
 		}
-		fc=((fc & 0x800000)>> 20) | ((fc & 0xC000)>>13) | ((fc & 0x80)>>7);
+		fc=RGB121(fc);
 		framewritechar(x,y,dual ? c_d_topleft : c_topleft,fc,0);
 		framewritechar(x+w,y,dual ? c_d_tdown : c_tdown,fc,0);
 		framewritechar(x+w+w2,y,dual ? c_d_topright : c_topright,fc,0);
@@ -2614,7 +2614,7 @@ void cmd_frame(void){
 		if(argc==13){
 			if(checkstring(argv[12],(unsigned char *)"DOUBLE"))dual=true;
 		}
-		fc=((fc & 0x800000)>> 20) | ((fc & 0xC000)>>13) | ((fc & 0x80)>>7);
+		fc=RGB121(fc);
 		framewritechar(x,y,dual ? c_d_topleft : c_d_topleft,fc,0);
 		framewritechar(x+w,y,dual ? c_d_topright : c_d_topright,fc,0);
 		framewritechar(x+w,y+h,dual ? c_d_tright : c_d_tright,fc,0);
@@ -2649,7 +2649,7 @@ void cmd_frame(void){
 		if(argc==13){
 			if(checkstring(argv[12],(unsigned char *)"DOUBLE"))dual=true;
 		}
-		fc=((fc & 0x800000)>> 20) | ((fc & 0xC000)>>13) | ((fc & 0x80)>>7);
+		fc=RGB121(fc);
 		framewritechar(x,y,dual ? c_d_topleft : c_topleft,fc,0);
 		framewritechar(x+w,y,dual ? c_d_tdown : c_tdown,fc,0);
 		framewritechar(x+w,y+h,dual ? c_d_tup : c_tup,fc,0);
@@ -2687,7 +2687,7 @@ void cmd_frame(void){
 		if(argc>=9 && *argv[8])xend=getint(argv[8],1,xmax);
 		if(argc==11)yend=getint(argv[10],1,ymax);
 		SCursor(xstart,ystart);
-		if(DISPLAY_TYPE==SCREENMODE1)tilefcols[ystart*X_TILE+xstart]=Option.VGAFC;
+		if(DISPLAY_TYPE==SCREENMODE1)tilefcols[ystart*X_TILE+xstart]=RGB;
 		if(abs(xs)>=0){
 			for(int y=ystart;y<=yend;y++){
 				uint16_t *line=&frame[y*framex];
@@ -2774,7 +2774,7 @@ void cmd_frame(void){
 		if(argc>=7 && *argv[6])fc=getint(argv[6],0,WHITE);
 		if(argc==9)attributes=getint(argv[8],0,15);
 		int l=strlen((char *)p);
-		fc=((fc & 0x800000)>> 20) | ((fc & 0xC000)>>13) | ((fc & 0x80)>>7);
+		fc=RGB121(fc);
 		while(l--){
 			if(x==framex){y++;x=0;}
 			if(y==framey)return;

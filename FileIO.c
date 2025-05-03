@@ -4897,7 +4897,7 @@ void ResetOptions(bool startup)
 #ifdef PICOMITEVGA
     Option.DISPLAY_CONSOLE = 1;
     Option.DISPLAY_TYPE = SCREENMODE1;
-    Option.VGAFC = 0xFFFF;
+//    Option.VGAFC = 0xFFFF;
     Option.X_TILE=80;
     Option.Y_TILE=40;
     Option.CPU_Speed = Freq252P;

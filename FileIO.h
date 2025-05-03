@@ -96,7 +96,7 @@ struct option_s {
     short DefaultBrightness;         // default backlight brightness //40
     unsigned char KEYBOARD_CLOCK;
     unsigned char KEYBOARD_DATA;
-    uint16_t VGAFC, VGABC;      // the default colours 36=56
+    uint16_t D1, D2;      // the default colours 36=56
 //
     // display related
     unsigned char DefaultFont;

@@ -1832,6 +1832,9 @@ void PO2Str(char *s1, const char *s2) {
 void PO3Str(char *s1, const char *s2, const char *s3) {
     PO(s1); MMPrintString((char *)s2); MMPrintString(", ");MMPrintString((char *)s3); MMPrintString("\r\n");
 }
+void PO2StrInt(char *s1, const char *s2, int s3) {
+    PO(s1); MMPrintString((char *)s2); MMPrintString(" @ ");PInt(s3);MMPrintString("KHz\r\n");
+}
 
 
 void PO2Int(char *s1, int n) {
@@ -1890,8 +1893,6 @@ void MIPS16 printoptions(void){
         }
         PRet();
     }
-//    if(Option.Autorun>0 && Option.Autorun<=MAXFLASHSLOTS) PO2Int("AUTORUN", Option.Autorun);
-//    if(Option.Autorun==MAXFLASHSLOTS+1)PO2Str("AUTORUN", "ON");
     if(Option.Baudrate != CONSOLE_BAUDRATE) PO2Int("BAUDRATE", Option.Baudrate);
     if(Option.FlashSize !=2048*1024) PO2Int("FLASH SIZE", Option.FlashSize);
     if(MAX_PROG_SIZE == Option.LIBRARY_FLASH_SIZE) PO2IntH("LIBRARY_FLASH_SIZE ", Option.LIBRARY_FLASH_SIZE);
@@ -1901,6 +1902,42 @@ void MIPS16 printoptions(void){
     if(Option.PWM == true) PO2Str("POWER PWM", "ON");
     if(Option.Listcase != CONFIG_TITLE) PO2Str("CASE", CaseList[(int)Option.Listcase]);
     if(Option.Tab != 2) PO2Int("TAB", Option.Tab);
+    if(Option.DefaultFC !=WHITE ||Option.DefaultBC !=BLACK){
+        PO("DEFAULT COLOURS");
+            if(Option.DefaultFC==WHITE)MMPrintString("WHITE, ");
+            else if(Option.DefaultFC==YELLOW)MMPrintString("YELLOW,");
+            else if(Option.DefaultFC==LILAC)MMPrintString("LILAC,");
+            else if(Option.DefaultFC==BROWN)MMPrintString("BROWN,");
+            else if(Option.DefaultFC==FUCHSIA)MMPrintString("FUCHSIA,");
+            else if(Option.DefaultFC==RUST)MMPrintString("RUST, ");
+            else if(Option.DefaultFC==MAGENTA)MMPrintString("MAGENTA,");
+            else if(Option.DefaultFC==RED)MMPrintString("RED,");
+            else if(Option.DefaultFC==CYAN)MMPrintString("CYAN,");
+            else if(Option.DefaultFC==GREEN)MMPrintString("GREEN,");
+            else if(Option.DefaultFC==CERULEAN)MMPrintString("CERULEAN,");
+            else if(Option.DefaultFC==MIDGREEN)MMPrintString("MIDGREEN,");
+            else if(Option.DefaultFC==COBALT)MMPrintString("COBALT,");
+            else if(Option.DefaultFC==MYRTLE)MMPrintString("MYRTLE,");
+            else if(Option.DefaultFC==BLUE)MMPrintString("BLUE,");
+            else if(Option.DefaultFC==BLACK)MMPrintString("BLACK,");
+            if(Option.DefaultBC==WHITE)MMPrintString(" WHITE");
+            else if(Option.DefaultBC==YELLOW)MMPrintString(" YELLOW");
+            else if(Option.DefaultBC==LILAC)MMPrintString(" LILAC");
+            else if(Option.DefaultBC==BROWN)MMPrintString(" BROWN");
+            else if(Option.DefaultBC==FUCHSIA)MMPrintString(" FUCHSIA");
+            else if(Option.DefaultBC==RUST)MMPrintString(" RUST");
+            else if(Option.DefaultBC==MAGENTA)MMPrintString(" MAGENTA");
+            else if(Option.DefaultBC==RED)MMPrintString(" RED");
+            else if(Option.DefaultBC==CYAN)MMPrintString(" CYAN");
+            else if(Option.DefaultBC==GREEN)MMPrintString(" GREEN");
+            else if(Option.DefaultBC==CERULEAN)MMPrintString(" CERULEAN");
+            else if(Option.DefaultBC==MIDGREEN)MMPrintString(" MIDGREEN");
+            else if(Option.DefaultBC==COBALT)MMPrintString(" COBALT");
+            else if(Option.DefaultBC==MYRTLE)MMPrintString(" MYRTLE");
+            else if(Option.DefaultBC==BLUE)MMPrintString(" BLUE");
+            else if(Option.DefaultBC==BLACK)MMPrintString(" BLACK");
+        PRet();
+    }
 #ifdef USBKEYBOARD
     if(!(Option.USBKeyboard == NO_KEYBOARD)){
         PO("KEYBOARD"); MMPrintString((char *)KBrdList[(int)Option.USBKeyboard]); 
@@ -1936,62 +1973,18 @@ void MIPS16 printoptions(void){
 #endif
     if(Option.AllPins)PO2Str("PICO", "OFF");
 #ifdef PICOMITEVGA
-    PO2Int("CPUSPEED (KHz)", Option.CPU_Speed);
-    if(Option.CPU_Speed==Freq720P)PO2Str("RESOLUTION", "1280x720");
-    if(Option.CPU_Speed==FreqXGA)PO2Str("RESOLUTION", "1024x768");
-    if(Option.CPU_Speed==FreqSVGA)PO2Str("RESOLUTION", "800x600");
-    if(Option.CPU_Speed==Freq848)PO2Str("RESOLUTION", "848x480");
-    if(Option.CPU_Speed==Freq400)PO2Str("RESOLUTION", "720x400");
-    if(Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P || Option.CPU_Speed==Freq378P )PO2Str("RESOLUTION", "640x480");
-    /*#ifndef HDMI
-     if(Option.CPU_Speed== Freq848)PO2Str("WIDESCREEN", "848");
-    if(Option.CPU_Speed== Freq400)PO2Str("WIDESCREEN", "720");
-#endif*/
+    if(Option.CPU_Speed==Freq720P)PO2StrInt("RESOLUTION", "1280x720",Option.CPU_Speed);
+    if(Option.CPU_Speed==FreqXGA)PO2StrInt("RESOLUTION", "1024x768",Option.CPU_Speed);
+    if(Option.CPU_Speed==FreqSVGA)PO2StrInt("RESOLUTION", "800x600",Option.CPU_Speed);
+    if(Option.CPU_Speed==Freq848)PO2StrInt("RESOLUTION", "848x480",Option.CPU_Speed);
+    if(Option.CPU_Speed==Freq400)PO2StrInt("RESOLUTION", "720x400",Option.CPU_Speed);
+    if(Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P || Option.CPU_Speed==Freq378P )PO2StrInt("RESOLUTION", "640x480",Option.CPU_Speed);
     if(Option.DISPLAY_TYPE!=SCREENMODE1)PO2Int("DEFAULT MODE", Option.DISPLAY_TYPE-SCREENMODE1+1);
     if(Option.Height != 40 || Option.Width != 80) PO3Int("DISPLAY", Option.Height, Option.Width);
-    if(Option.X_TILE==40)PO2Str("TILE SIZE", "LARGE");
-#ifndef HDMI
-    if(Option.VGAFC !=0xFFFF || Option.VGABC !=0){
-        PO("DEFAULT COLOURS");
-            if(Option.VGAFC==0xFFFF)MMPrintString("WHITE, ");
-            else if(Option.VGAFC==0xEEEE)MMPrintString("YELLOW,");
-            else if(Option.VGAFC==0xDDDD)MMPrintString("LILAC,");
-            else if(Option.VGAFC==0xCCCC)MMPrintString("BROWN,");
-            else if(Option.VGAFC==0xBBBB)MMPrintString("FUSCHIA,");
-            else if(Option.VGAFC==0xAAAA)MMPrintString("RUST, ");
-            else if(Option.VGAFC==0x9999)MMPrintString("MAGENTA,");
-            else if(Option.VGAFC==0x8888)MMPrintString("RED,");
-            else if(Option.VGAFC==0x7777)MMPrintString("CYAN,");
-            else if(Option.VGAFC==0x6666)MMPrintString("GREEN,");
-            else if(Option.VGAFC==0x5555)MMPrintString("CERULEAN,");
-            else if(Option.VGAFC==0x4444)MMPrintString("MIDGREEN,");
-            else if(Option.VGAFC==0x3333)MMPrintString("COBALT,");
-            else if(Option.VGAFC==0x2222)MMPrintString("MYRTLE,");
-            else if(Option.VGAFC==0x1111)MMPrintString("BLUE,");
-            else if(Option.VGAFC==0x0000)MMPrintString("BLACK,");
-            if(Option.VGABC==0xFFFF)MMPrintString(" WHITE");
-            else if(Option.VGABC==0xEEEE)MMPrintString(" YELLOW");
-            else if(Option.VGABC==0xDDDD)MMPrintString(" LILAC");
-            else if(Option.VGABC==0xCCCC)MMPrintString(" BROWN");
-            else if(Option.VGABC==0xBBBB)MMPrintString(" FUSCHIA");
-            else if(Option.VGABC==0xAAAA)MMPrintString(" RUST");
-            else if(Option.VGABC==0x9999)MMPrintString(" MAGENTA");
-            else if(Option.VGABC==0x8888)MMPrintString(" RED");
-            else if(Option.VGABC==0x7777)MMPrintString(" CYAN");
-            else if(Option.VGABC==0x6666)MMPrintString(" GREEN");
-            else if(Option.VGABC==0x5555)MMPrintString(" CERULEAN");
-            else if(Option.VGABC==0x4444)MMPrintString(" MIDGREEN");
-            else if(Option.VGABC==0x3333)MMPrintString(" COBALT");
-            else if(Option.VGABC==0x2222)MMPrintString(" MYRTLE");
-            else if(Option.VGABC==0x1111)MMPrintString(" BLUE");
-            else if(Option.VGABC==0x0000)MMPrintString(" BLACK");
-        PRet();
-    }
-#else
-if(Option.HDMIclock!=2 || Option.HDMId0!=0 || Option.HDMId1!=6 ||Option.HDMId2!=4){
+#ifdef HDMI
+    if(Option.HDMIclock!=2 || Option.HDMId0!=0 || Option.HDMId1!=6 ||Option.HDMId2!=4){
     PO("HDMI PINS ");PInt(Option.HDMIclock);PIntComma(Option.HDMId0);PIntComma(Option.HDMId1);PIntComma(Option.HDMId2);PRet();
 }
-
 #endif
 #else
     PO2Int("CPUSPEED (KHz)", Option.CPU_Speed);
@@ -3477,7 +3470,57 @@ void MIPS16 cmd_option(void) {
         return;
     }
 #endif
-    tp = checkstring(cmdline, (unsigned char *)"HEARTBEAT");
+tp = checkstring(cmdline, (unsigned char *)"DEFAULT COLOURS");
+if(tp==NULL)tp = checkstring(cmdline, (unsigned char *)"DEFAULT COLORS");
+if(tp){
+    int DefaultFC=WHITE;
+    int DefaultBC=BLACK;
+    getargs(&tp,3, (unsigned char *)",");
+    if(checkstring(argv[0], (unsigned char *)"WHITE"))        { DefaultFC=WHITE;}
+    else if(checkstring(argv[0], (unsigned char *)"YELLOW"))  { DefaultFC=YELLOW;}
+    else if(checkstring(argv[0], (unsigned char *)"LILAC"))   { DefaultFC=LILAC;}
+    else if(checkstring(argv[0], (unsigned char *)"BROWN"))   { DefaultFC=BROWN;}
+    else if(checkstring(argv[0], (unsigned char *)"FUCHSIA")) { DefaultFC=FUCHSIA;}
+    else if(checkstring(argv[0], (unsigned char *)"RUST"))    { DefaultFC=RUST;}
+    else if(checkstring(argv[0], (unsigned char *)"MAGENTA")) { DefaultFC=MAGENTA;}
+    else if(checkstring(argv[0], (unsigned char *)"RED"))     { DefaultFC=RED;}
+    else if(checkstring(argv[0], (unsigned char *)"CYAN"))    { DefaultFC=CYAN;}
+    else if(checkstring(argv[0], (unsigned char *)"GREEN"))   { DefaultFC=GREEN;}
+    else if(checkstring(argv[0], (unsigned char *)"CERULEAN")){ DefaultFC=CERULEAN;}
+    else if(checkstring(argv[0], (unsigned char *)"MIDGREEN")){ DefaultFC=MIDGREEN;}
+    else if(checkstring(argv[0], (unsigned char *)"COBALT"))  { DefaultFC=COBALT;}
+    else if(checkstring(argv[0], (unsigned char *)"MYRTLE"))  { DefaultFC=MYRTLE;}
+    else if(checkstring(argv[0], (unsigned char *)"BLUE"))    { DefaultFC=BLUE;}
+    else if(checkstring(argv[0], (unsigned char *)"BLACK"))   { DefaultFC=BLACK;}
+    else error("Invalid colour: $", argv[0]); 
+    if(argc==3){
+        if(checkstring(argv[2], (unsigned char *)"WHITE"))        { DefaultBC=WHITE;}
+        else if(checkstring(argv[2], (unsigned char *)"YELLOW"))  { DefaultBC=YELLOW;}
+        else if(checkstring(argv[2], (unsigned char *)"LILAC"))   { DefaultBC=LILAC;}
+        else if(checkstring(argv[2], (unsigned char *)"BROWN"))   { DefaultBC=BROWN;}
+        else if(checkstring(argv[2], (unsigned char *)"FUCHSIA")) { DefaultBC=FUCHSIA;}
+        else if(checkstring(argv[2], (unsigned char *)"RUST"))    { DefaultBC=RUST;}
+        else if(checkstring(argv[2], (unsigned char *)"MAGENTA")) { DefaultBC=MAGENTA;}
+        else if(checkstring(argv[2], (unsigned char *)"RED"))     { DefaultBC=RED;}
+        else if(checkstring(argv[2], (unsigned char *)"CYAN"))    { DefaultBC=CYAN;}
+        else if(checkstring(argv[2], (unsigned char *)"GREEN"))   { DefaultBC=GREEN;}
+        else if(checkstring(argv[2], (unsigned char *)"CERULEAN")){ DefaultBC=CERULEAN;}
+        else if(checkstring(argv[2], (unsigned char *)"MIDGREEN")){ DefaultBC=MIDGREEN;}
+        else if(checkstring(argv[2], (unsigned char *)"COBALT"))  { DefaultBC=COBALT;}
+        else if(checkstring(argv[2], (unsigned char *)"MYRTLE"))  { DefaultBC=MYRTLE;}
+        else if(checkstring(argv[2], (unsigned char *)"BLUE"))    { DefaultBC=BLUE;}
+        else if(checkstring(argv[2], (unsigned char *)"BLACK"))   { DefaultBC=BLACK;}
+        else error("Invalid colour: $", argv[2]); 
+    }      
+    if(DefaultBC==DefaultFC)error("Foreground and Background colours are the same");
+    Option.DefaultBC=DefaultBC;
+    Option.DefaultFC=DefaultFC;
+    SaveOptions();
+    ResetDisplay();
+    if(Option.DISPLAY_TYPE!=SCREENMODE1)ClearScreen(gui_bcolour);
+    return;
+}
+tp = checkstring(cmdline, (unsigned char *)"HEARTBEAT");
     if(tp) {
         if(checkstring(tp, (unsigned char *)"OFF") || checkstring(tp, (unsigned char *)"DISABLE"))      Option.NoHeartbeat = 1; 
         else {
@@ -3589,21 +3632,24 @@ void MIPS16 cmd_option(void) {
         int fcolour=(FullColour ? RGB555(Option.DefaultFC) : RGB332(Option.DefaultFC));
         int bcolour=(FullColour ? RGB555(Option.DefaultBC) : RGB332(Option.DefaultBC));
 #else
-        int  fcolour = RGB121(Option.DefaultFC);
-        fcolour= (fcolour<<12) | (fcolour<<8) | (fcolour<<4) | fcolour;
-        int bcolour = RGB121(Option.DefaultBC);
-        bcolour= (bcolour<<12) | (bcolour<<8) | (bcolour<<4) | bcolour;
+        int  fcolour = RGB121pack(Option.DefaultFC);
+        int bcolour = RGB121pack(Option.DefaultBC);
 #endif
-#ifndef HDMI
         for(int xp=0;xp<X_TILE;xp++){
             for(int yp=0;yp<Y_TILE;yp++){
-                tilefcols[yp*X_TILE+xp]=(uint16_t)fcolour;
-                tilebcols[yp*Y_TILE+xp]=(uint16_t)bcolour;
+#ifdef HDMI
+                if(FullColour){
+#endif
+                    if(fcolour!=0xFFFFFFFF) tilefcols[yp*X_TILE+xp]=(uint16_t)fcolour;
+                    if(bcolour!=0xFFFFFFFF) tilebcols[yp*X_TILE+xp]=(uint16_t)bcolour;
+#ifdef HDMI
+                } else {
+                    if(fcolour!=0xFFFFFFFF) tilefcols_w[yp*X_TILE+xp]=(uint8_t)fcolour;
+                    if(bcolour!=0xFFFFFFFF) tilebcols_w[yp*X_TILE+xp]=(uint8_t)bcolour;
+                }
+#endif
             }
         }
-#endif
-        Option.VGAFC=fcolour;
-        Option.VGABC=bcolour;
 #endif
         Option.DISPLAY_CONSOLE = true; 
         if(!CurrentLinePtr) {
@@ -3800,41 +3846,7 @@ void MIPS16 cmd_option(void) {
         SoftReset();
         return;
     }
-/*     tp = checkstring(cmdline, (unsigned char *)"CPUSPEED");
-    if(tp) {
-   	    if(CurrentLinePtr) error("Invalid in a program");
-        if(Option.CPU_Speed==Freq848 || Option.CPU_Speed==Freq400) error("Not available in widescreen");
-        int CPU_Speed=getint(tp, MIN_CPU,MAX_CPU);
-        if(!(CPU_Speed==Freq252P || CPU_Speed==Freq378P || CPU_Speed==Freq480P || CPU_Speed==FreqSVGA))error("CPU speed 252000, 315000, 360000 or 378000 only");
-        Option.CPU_Speed=CPU_Speed;
-        Option.X_TILE=(Option.CPU_Speed==Freq848 ? 106 : Option.CPU_Speed==Freq400 ? 90 : Option.CPU_Speed==FreqSVGA ? 100: 80);
-        Option.Y_TILE=Option.CPU_Speed==Freq400 ? 33 : Option.CPU_Speed==FreqSVGA ? 50: 40;
-        SaveOptions();
-        _excep_code = RESET_COMMAND;
-        SoftReset();
-        return;
-    }
-    tp = checkstring(cmdline, (unsigned char *)"WIDESCREEN");
-    if(tp) {
-   	    if(CurrentLinePtr) error("Invalid in a program");
-        if(checkstring(tp, (unsigned char *)"OFF")){
-            Option.CPU_Speed=Freq252P;
-#ifdef rp2350
-        } else if(checkstring(tp, (unsigned char *)"848")){
-            Option.CPU_Speed=Freq848;
-
-#endif
-        } else if(checkstring(tp, (unsigned char *)"720")){
-            Option.CPU_Speed=Freq400;
-        } else error("Syntax");
-        Option.X_TILE=(Option.CPU_Speed==Freq848 ? 106 : Option.CPU_Speed==Freq400 ? 90 : 80);
-        Option.Y_TILE=(Option.CPU_Speed==Freq400 ? 33 : 40);
-        SaveOptions();
-        _excep_code = RESET_COMMAND;
-        SoftReset();
-        return;
-    }*/
-    
+   
 #endif
 
     tp = checkstring(cmdline, (unsigned char *)"DEFAULT MODE");
@@ -3877,66 +3889,6 @@ void MIPS16 cmd_option(void) {
         CurrentX = CurrentY =0;
         if(Option.DISPLAY_TYPE!=SCREENMODE1)ClearScreen(Option.DefaultBC);
         SetFont(Option.DefaultFont);
-        return;
-    }
-    tp = checkstring(cmdline, (unsigned char *)"DEFAULT COLOURS");
-    if(tp==NULL)tp = checkstring(cmdline, (unsigned char *)"DEFAULT COLORS");
-    if(tp){
-        uint16_t forcol=0xFFFF;
-        uint16_t backcol=0x0000;
-        int DefaultFC=WHITE;
-        int DefaultBC=BLACK;
-        getargs(&tp,3, (unsigned char *)",");
-        if(checkstring(argv[0], (unsigned char *)"WHITE"))        { forcol=0xFFFF; DefaultFC=WHITE;}
-        else if(checkstring(argv[0], (unsigned char *)"YELLOW"))  { forcol=0xEEEE; DefaultFC=YELLOW;}
-        else if(checkstring(argv[0], (unsigned char *)"LILAC"))   { forcol=0xDDDD; DefaultFC=LILAC;}
-        else if(checkstring(argv[0], (unsigned char *)"BROWN"))   { forcol=0xCCCC; DefaultFC=BROWN;}
-        else if(checkstring(argv[0], (unsigned char *)"FUCHSIA")) { forcol=0xBBBB; DefaultFC=FUCHSIA;}
-        else if(checkstring(argv[0], (unsigned char *)"RUST"))    { forcol=0xAAAA; DefaultFC=RUST;}
-        else if(checkstring(argv[0], (unsigned char *)"MAGENTA")) { forcol=0x9999; DefaultFC=MAGENTA;}
-        else if(checkstring(argv[0], (unsigned char *)"RED"))     { forcol=0x8888; DefaultFC=RED;}
-        else if(checkstring(argv[0], (unsigned char *)"CYAN"))    { forcol=0x7777; DefaultFC=CYAN;}
-        else if(checkstring(argv[0], (unsigned char *)"GREEN"))   { forcol=0x6666; DefaultFC=GREEN;}
-        else if(checkstring(argv[0], (unsigned char *)"CERULEAN")){ forcol=0x5555; DefaultFC=CERULEAN;}
-        else if(checkstring(argv[0], (unsigned char *)"MIDGREEN")){ forcol=0x4444; DefaultFC=MIDGREEN;}
-        else if(checkstring(argv[0], (unsigned char *)"COBALT"))  { forcol=0x3333; DefaultFC=COBALT;}
-        else if(checkstring(argv[0], (unsigned char *)"MYRTLE"))  { forcol=0x2222; DefaultFC=MYRTLE;}
-        else if(checkstring(argv[0], (unsigned char *)"BLUE"))    { forcol=0x1111; DefaultFC=BLUE;}
-        else if(checkstring(argv[0], (unsigned char *)"BLACK"))   { forcol=0x0000; DefaultFC=BLACK;}
-        else error("Invalid colour: $", argv[0]); 
-        if(argc==3){
-            if(checkstring(argv[2], (unsigned char *)"WHITE"))        { backcol=0xFFFF; DefaultBC=WHITE;}
-            else if(checkstring(argv[2], (unsigned char *)"YELLOW"))  { backcol=0xEEEE; DefaultBC=YELLOW;}
-            else if(checkstring(argv[2], (unsigned char *)"LILAC"))   { backcol=0xDDDD; DefaultBC=LILAC;}
-            else if(checkstring(argv[2], (unsigned char *)"BROWN"))   { backcol=0xCCCC; DefaultBC=BROWN;}
-            else if(checkstring(argv[2], (unsigned char *)"FUCHSIA")) { backcol=0xBBBB; DefaultBC=FUCHSIA;}
-            else if(checkstring(argv[2], (unsigned char *)"RUST"))    { backcol=0xAAAA; DefaultBC=RUST;}
-            else if(checkstring(argv[2], (unsigned char *)"MAGENTA")) { backcol=0x9999; DefaultBC=MAGENTA;}
-            else if(checkstring(argv[2], (unsigned char *)"RED"))     { backcol=0x8888; DefaultBC=RED;}
-            else if(checkstring(argv[2], (unsigned char *)"CYAN"))    { backcol=0x7777; DefaultBC=CYAN;}
-            else if(checkstring(argv[2], (unsigned char *)"GREEN"))   { backcol=0x6666; DefaultBC=GREEN;}
-            else if(checkstring(argv[2], (unsigned char *)"CERULEAN")){ backcol=0x5555; DefaultBC=CERULEAN;}
-            else if(checkstring(argv[2], (unsigned char *)"MIDGREEN")){ backcol=0x4444; DefaultBC=MIDGREEN;}
-            else if(checkstring(argv[2], (unsigned char *)"COBALT"))  { backcol=0x3333; DefaultBC=COBALT;}
-            else if(checkstring(argv[2], (unsigned char *)"MYRTLE"))  { backcol=0x2222; DefaultBC=MYRTLE;}
-            else if(checkstring(argv[2], (unsigned char *)"BLUE"))    { backcol=0x1111; DefaultBC=BLUE;}
-            else if(checkstring(argv[2], (unsigned char *)"BLACK"))   { backcol=0x0000; DefaultBC=BLACK;}
-            else error("Invalid colour: $", argv[2]); 
-        }      
-        if(backcol==forcol)error("Foreground and Background colours are the same");
-        Option.VGABC=backcol;
-        Option.VGAFC=forcol;
-        for(int x=0;x<X_TILE;x++){
-            for(int y=0;y<Y_TILE;y++){
-                tilefcols[y*X_TILE+x]=Option.VGAFC;
-                tilebcols[y*X_TILE+x]=Option.VGABC;
-            }
-        }
-        Option.DefaultBC=DefaultBC;
-        Option.DefaultFC=DefaultFC;
-        SaveOptions();
-        ResetDisplay();
-        if(Option.DISPLAY_TYPE!=SCREENMODE1)ClearScreen(gui_bcolour);
         return;
     }
 #else

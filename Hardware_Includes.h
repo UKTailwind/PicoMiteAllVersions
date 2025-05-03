@@ -102,6 +102,7 @@ extern unsigned char SPIatRisk;
 extern uint8_t RGB121(uint32_t c);
 extern uint8_t RGB332(uint32_t c);
 extern uint16_t RGB555(uint32_t c);
+extern uint16_t RGB121pack(uint32_t c);
 #ifndef rp2350
 extern datetime_t rtc_t;
 #else

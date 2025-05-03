@@ -29,7 +29,7 @@ list all
 
 
 
-#define VERSION         "6.00.02RC19"			    // define the version number
+#define VERSION         "6.00.02RC20"			    // define the version number
 #define YEAR			"2011-2025"			    // and the year
 #define YEAR2          "2016-2025"
 #ifdef rp2350

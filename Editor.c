@@ -118,14 +118,14 @@ void DisplayPutClever(char c){
 #ifdef HDMI
     else {
         if(FullColour){
-            for(int i=0; i< gui_font_width / 8; i++)tilebcols[CurrentY/gui_font_height*X_TILE+CurrentX/8+i]=Option.VGABC;
+            for(int i=0; i< gui_font_width / 8; i++)tilebcols[CurrentY/gui_font_height*X_TILE+CurrentX/8+i]=RGB555(Option.DefaultBC);
         }
         else {
-            for(int i=0; i< gui_font_width / 8; i++)tilebcols_w[CurrentY/gui_font_height*X_TILE+CurrentX/8+i]=Option.VGABC;
+            for(int i=0; i< gui_font_width / 8; i++)tilebcols_w[CurrentY/gui_font_height*X_TILE+CurrentX/8+i]=RGB332(Option.DefaultBC);
         }
     }
 #else
-    else for(int i=0; i< gui_font_width / 8; i++)tilebcols[CurrentY/gui_font_height*X_TILE+CurrentX/8+i]=Option.VGABC;
+    else for(int i=0; i< gui_font_width / 8; i++)tilebcols[CurrentY/gui_font_height*X_TILE+CurrentX/8+i]=RGB121pack(Option.DefaultBC);
 #endif
     CurrentX += gui_font_width;
     } else DisplayPutC(c);
@@ -185,8 +185,38 @@ static char (*SSputchar)(char buff, int flush)=SerialConsolePutC;
             case DISPLAY_CLS:       ClearScreen(gui_bcolour);
                                     break;
 #ifdef PICOMITEVGA
+            case CLEAR_TO_EOS:      MX470Display(CLEAR_TO_EOL);
+                                    DrawRectangle(0, CurrentY + gui_font_height, HRes-1, VRes-1, DISPLAY_TYPE==SCREENMODE1 ? 0 : gui_bcolour);
+#ifdef HDMI
+                                    if(FullColour){
+                                        if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==gui_font_height){
+                                            for(int y=(CurrentY + gui_font_height)/ytileheight;y<Y_TILE;y++)
+                                            for(int x=0;x<X_TILE;x++){
+                                                tilefcols[y*X_TILE+x]=RGB555(gui_fcolour);
+                                                tilebcols[y*X_TILE+x]=RGB555(gui_bcolour);
+                                            }
+                                        }
+                                    } else {
+                                        if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==gui_font_height){
+                                            for(int y=(CurrentY + gui_font_height)/ytileheight;y<Y_TILE;y++)
+                                            for(int x=0;x<X_TILE;x++){
+                                                tilefcols_w[CurrentY/ytileheight*X_TILE+x]=RGB332(gui_fcolour);
+                                                tilebcols_w[CurrentY/ytileheight*X_TILE+x]=RGB332(gui_bcolour);
+                                            }
+                                        }
+                                    }
+#else
+                                    if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==gui_font_height){
+                                        for(int y=(CurrentY + gui_font_height)/ytileheight;y<Y_TILE;y++)
+                                        for(int x=0;x<X_TILE;x++){
+                                            tilefcols[CurrentY/ytileheight*X_TILE+x]=RGB121pack(gui_fcolour);
+                                            tilebcols[CurrentY/ytileheight*X_TILE+x]=RGB121pack(gui_bcolour);
+                                        }
+                                    }
+
+#endif
             case REVERSE_VIDEO:     
-            if((DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==gui_font_height)){
+                                    if((DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==gui_font_height)){
                                     r_on^=1;
                                     } else {
                                         t = gui_fcolour;
@@ -214,8 +244,8 @@ static char (*SSputchar)(char buff, int flush)=SerialConsolePutC;
 #else
                                         if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==gui_font_height){
                                             for(int x=CurrentX/8;x<X_TILE;x++){
-                                                tilefcols[CurrentY/ytileheight*X_TILE+x]=Option.VGAFC;
-                                                tilebcols[CurrentY/ytileheight*X_TILE+x]=Option.VGABC;
+                                                tilefcols[CurrentY/ytileheight*X_TILE+x]=RGB121pack(gui_fcolour);
+                                                tilebcols[CurrentY/ytileheight*X_TILE+x]=RGB121pack(gui_bcolour);
                                             }
                                         }
 
@@ -229,10 +259,10 @@ static char (*SSputchar)(char buff, int flush)=SerialConsolePutC;
                                     break;
             case CLEAR_TO_EOL:      DrawBox(CurrentX, CurrentY, HRes-1, CurrentY + gui_font_height-1, 0, 0, gui_bcolour);
                                     break;
-#endif
             case CLEAR_TO_EOS:      DrawBox(CurrentX, CurrentY, HRes-1, CurrentY + gui_font_height-1, 0, 0, gui_bcolour);
                                     DrawRectangle(0, CurrentY + gui_font_height, HRes-1, VRes-1, gui_bcolour);
                                     break;
+#endif
             case SCROLL_DOWN:
                                     break;
             case DRAW_LINE:         DrawBox(0, gui_font_height * (Option.Height - 2), HRes - 1, VRes - 1, 0, 0, (DISPLAY_TYPE==SCREENMODE1 ? 0 :gui_bcolour));
@@ -562,8 +592,8 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
                         for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilebcols_w[lasty1*X_TILE+i]=RGB332(WHITE);
                     }
 #else
-                    for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilefcols[lasty1*X_TILE+i]=(RGB121(RED)<<12) | (RGB121(RED)<<8) | (RGB121(RED)<<4) | RGB121(RED);
-                    for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilebcols[lasty1*X_TILE+i]=(RGB121(WHITE)<<12) | (RGB121(WHITE)<<8) | (RGB121(WHITE)<<4) | RGB121(WHITE);
+                    for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilefcols[lasty1*X_TILE+i]=RGB121pack(RED);
+                    for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilebcols[lasty1*X_TILE+i]=RGB121pack(WHITE);
 #endif
                     }
                 if((nunstruct[2].L && leftpushed==false && rightpushed==false && middlepushed==false) ||
@@ -1202,8 +1232,8 @@ void MarkMode(unsigned char *cb, unsigned char *buf) {
                     for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilebcols_w[lasty1*X_TILE+i]=RGB332(WHITE);
                 }
 #else
-                    for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilefcols[lasty1*X_TILE+i]=(RGB121(RED)<<12) | (RGB121(RED)<<8) | (RGB121(RED)<<4) | RGB121(RED);
-                    for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilebcols[lasty1*X_TILE+i]=(RGB121(WHITE)<<12) | (RGB121(WHITE)<<8) | (RGB121(WHITE)<<4) | RGB121(WHITE);
+                    for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilefcols[lasty1*X_TILE+i]=RGB121pack(RED);
+                    for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilebcols[lasty1*X_TILE+i]=RGB121pack(WHITE);
 #endif
                 }
             if((nunstruct[2].L && leftpushed==false && rightpushed==false && middlepushed==false) ||
