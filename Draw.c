@@ -525,7 +525,7 @@ void ClearScreen(int c) {
             } 
         }
 #endif
-    }
+    } else DrawRectangle(0, 0, HRes - 1, VRes - 1, c);
 #else
     DrawRectangle(0, 0, HRes - 1, VRes - 1, c);
 #endif
