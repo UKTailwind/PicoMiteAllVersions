@@ -641,14 +641,14 @@ drwav_bool32 onSeek(void  *userdata,  int offset,  drwav_seek_origin origin){
 	}
     return 1;
 }
-drwav_bool32 onTell(void  *userdata,  drwav_int64* pCursor){
+/*drwav_bool32 onTell(void  *userdata,  drwav_int64* pCursor){
 	if(filesource[WAV_fnbr]==FATFSFILE){
 		*pCursor=(*(FileTable[WAV_fnbr].fptr)).fptr;
 	} else {
 		*pCursor=lfs_file_tell(&lfs,FileTable[WAV_fnbr].lfsptr);
 	}
     return 1;
-}
+}*/
 
 void CloseAudio(int all){
 #ifdef rp2350
@@ -852,7 +852,7 @@ void mp3callback(char *p, int position){
     	CloseAudio(0);
     }
 	mymp3=GetMemory(sizeof(drmp3));
-    if(drmp3_init(mymp3, (drmp3_read_proc)onRead, (drmp3_seek_proc)onSeek, (drmp3_tell_proc)onTell,  NULL, NULL, &allocationCallbacks)==DRMP3_FALSE)error("Mp3 init");
+    if(drmp3_init(mymp3, (drmp3_read_proc)onRead, (drmp3_seek_proc)onSeek, NULL, &allocationCallbacks)==DRMP3_FALSE)error("Mp3 init");
     FreeMemorySafe((void *)&sbuff1);
     FreeMemorySafe((void *)&sbuff2);
 //	PInt(mymp3->channels);MMPrintString(" Channels\r\n");

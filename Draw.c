@@ -8065,7 +8065,7 @@ void DisplayPutC(char c) {
     // handle the standard control chars
     switch(c) {
         case '\b':  CurrentX -= gui_font_width;
-            if (CurrentX < 0) CurrentX = 0;
+//            if (CurrentX < 0) CurrentX = 0;
             if(CurrentX < 0){  //Go to end of previous line
               	CurrentY -= gui_font_height ;                  //Go up one line
               	if (CurrentY < 0) CurrentY = 0;
@@ -8099,7 +8099,7 @@ void ShowCursor(int show) {
   newstate = ((CursorTimer <= CURSOR_ON) && show);                  // what should be the state of the cursor?
   if(visible == newstate) return;                                   // we can skip the rest if the cursor is already in the correct state
   visible = newstate;                                               // draw the cursor BELOW the font
-  DrawLine(CurrentX, CurrentY + gui_font_height-(gui_font_height<12? 1:2), CurrentX + gui_font_width-1, CurrentY + gui_font_height-(gui_font_height<12? 1:2), (gui_font_height<=12 ? 1 : 2), visible ? gui_fcolour : (DISPLAY_TYPE==SCREENMODE1 ? 0 :gui_bcolour));
+  DrawLine(CurrentX, CurrentY + gui_font_height-(gui_font_height<=12? 1:2), CurrentX + gui_font_width-1, CurrentY + gui_font_height-(gui_font_height<=12? 1:2), (gui_font_height<=12 ? 1 : 2), visible ? gui_fcolour : (DISPLAY_TYPE==SCREENMODE1 ? 0 :gui_bcolour));
 }
 #ifndef PICOMITEWEB
 #define ABS(X) ((X)>0 ? (X) : (-(X)))

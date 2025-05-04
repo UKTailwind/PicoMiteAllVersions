@@ -841,7 +841,7 @@ void MIPS16 EditInputLine(void) {
  
                                 // Lets put the cursor at the beginning of where the command is displayed.
                                 // backspace to the beginning of line
-//#define USEBACKSPACE
+#define USEBACKSPACE
 #ifdef USEBACKSPACE                                
                                 while(j)  {
                                   if (j==l4 || j==l3 ||j==l2 ){DisplayPutC('\b');SSPrintString("\e[1A");SSPrintString(goend);}else{ MMputchar('\b',0);}
