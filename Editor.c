@@ -213,8 +213,9 @@ static char (*SSputchar)(char buff, int flush)=SerialConsolePutC;
                                             tilebcols[CurrentY/ytileheight*X_TILE+x]=RGB121pack(gui_bcolour);
                                         }
                                     }
-
+                                    
 #endif
+                                    break;
             case REVERSE_VIDEO:     
                                     if((DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==gui_font_height)){
                                     r_on^=1;
@@ -402,6 +403,7 @@ void edit(unsigned char *cmdline, bool cmdfile) {
     multilinecomment = false;
     EdBuff = GetTempMemory(EDIT_BUFFER_SIZE);
     edit_buff_size=EDIT_BUFFER_SIZE;
+    char buff[STRINGSIZE];
     *EdBuff = 0;
 
     VHeight = Option.Height - 2;
@@ -429,7 +431,11 @@ void edit(unsigned char *cmdline, bool cmdfile) {
                     }
                 }
                 nbrlines++;
-                fromp = llist(p, fromp);                                // otherwise expand the line
+                if(Option.continuation){
+                    fromp = llist((unsigned char *)buff, fromp);                                // otherwise expand the line
+                    format_string(&buff[0],Option.Width);
+                    strcat((char *)p,buff);
+                } else fromp = llist(p, fromp);
                 if(!(nbrlines==1 && p[0]=='\'' && p[1]=='#')){
                     p += strlen((char *)p);
                     *p++ = '\n'; *p = 0;
@@ -455,10 +461,20 @@ void edit(unsigned char *cmdline, bool cmdfile) {
             else fsize = lfs_file_size(&lfs,FileTable[fnbr1].lfsptr);
             if(fsize > edit_buff_size - 10) error("Out of memory");
             p=EdBuff;
+            char *q=(char *)EdBuff;
             do
             { // while waiting for the end of file
                 c = FileGetChar(fnbr1);
-                if(c=='\n')nbrlines++;
+                if(c=='\n'){
+                    nbrlines++;
+                    if(Option.continuation){
+                        strcpy(buff,q);
+                        format_string(&buff[0],Option.Width);
+                        strcpy(q,buff);
+                        p=(unsigned char *)q+strlen(q);
+                        q=(char *)p;
+                    }
+                }
                 if(c=='\r')continue;
                 *p++=c;
             } while (!FileEOF(fnbr1));
@@ -1026,6 +1042,15 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
                                 fnbr1=FindFreeFileNbr();
                                 BasicFileOpen(fname, fnbr1, FA_WRITE | FA_CREATE_ALWAYS);
                                 p=EdBuff;
+                                if(Option.continuation){
+                                    unsigned char *q=p;
+                                    while(*p){
+                                        if(*p==Option.continuation && p[1]=='\n')p+=2; //step over the continuation characters
+                                        else *q++=*p++;
+                                    }
+                                    *q=0;
+                                    p=EdBuff;
+                                }
                                 do
                                 { // while waiting for the end of file
                                     c = *p++;

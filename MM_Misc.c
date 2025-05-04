@@ -1899,6 +1899,7 @@ void MIPS16 printoptions(void){
     if(Option.Invert == true) PO2Str("CONSOLE", "INVERT");
     if(Option.Invert == 2) PO2Str("CONSOLE", "AUTO");
     if(Option.ColourCode == true) PO2Str("COLOURCODE", "ON");
+    if(Option.continuation == true) PO2Str("CONTINUATION LINES", "ON");
     if(Option.PWM == true) PO2Str("POWER PWM", "ON");
     if(Option.Listcase != CONFIG_TITLE) PO2Str("CASE", CaseList[(int)Option.Listcase]);
     if(Option.Tab != 2) PO2Int("TAB", Option.Tab);
@@ -4059,6 +4060,14 @@ tp = checkstring(cmdline, (unsigned char *)"HEARTBEAT");
     if(tp) {
         if(checkstring(tp, (unsigned char *)"ENABLE"))       { Option.RTC = true; SaveOptions(); RtcGetTime(0); return; }
         if(checkstring(tp, (unsigned char *)"DISABLE"))      { Option.RTC = false; SaveOptions(); return;  }
+    }
+    tp = checkstring(cmdline, (unsigned char *)"CONTINUATION LINES");
+    if(tp) {
+        if(checkstring(tp, (unsigned char *)"ENABLE"))       { Option.continuation = '_'; SaveOptions(); return; }
+        else if(checkstring(tp, (unsigned char *)"DISABLE"))      { Option.continuation = false; SaveOptions(); return;  }
+        else if(checkstring(tp, (unsigned char *)"ON"))      { Option.continuation = '_'; SaveOptions(); return;  }
+        else if(checkstring(tp, (unsigned char *)"OFF"))      { Option.continuation = false; SaveOptions(); return;  }
+        else Option.continuation=getint(tp,0,255);
     }
 
     tp = checkstring(cmdline, (unsigned char *)"MODBUFF");

@@ -646,11 +646,23 @@ void MIPS16 ListProgram(unsigned char *p, int all) {
 	while(!(*p == 0 || *p == 0xff)) {                               // normally a LIST ends at the break so this is a safety precaution
         if(*p == T_NEWLINE) {
 			p = llist((unsigned char *)b, p);                                        // otherwise expand the line
-            if(!(ListCnt==CurrentY/(FontTable[gui_font >> 4][1] * (gui_font & 0b1111)) + 2 && b[0]=='\'' && b[1]=='#')){
+            if(!(b[0]=='\'' && b[1]=='#')){
 				pp = b;
-				while(*pp) {
-					if(MMCharPos > Option.Width) ListNewLine(&ListCnt, all);
-					MMputchar(*pp++,0);
+				if(Option.continuation){
+					format_string(pp,Option.Width);
+					while(*pp) {
+						if(*pp=='\n'){
+							ListNewLine(&ListCnt, all);
+							pp++;
+							continue;
+						}
+						MMputchar(*pp++,0);
+					}
+				} else {
+					while(*pp) {
+						if(MMCharPos > Option.Width) ListNewLine(&ListCnt, all);
+						MMputchar(*pp++,0);
+					}
 				}
 				fflush(stdout);
 				ListNewLine(&ListCnt, all);
@@ -3429,6 +3441,45 @@ void replaceAlpha(char *str, const char *replacements[MMEND]){
 
     buffer[bufferIndex] = '\0'; // Null-terminate the buffer
     strcpy(str,  buffer); // Copy the buffer back into the original string
+}
+void format_string(char *c, int n) {
+	n--;
+    int len = strlen(c);
+	if(*c==0)return;
+    char *result = GetMemory(len * 2); // Allocate enough space for the modified string
+    int pos = 0, start = 0;
+
+    while (start < len) {
+        int split_pos = start + n - 1;
+
+        if (split_pos >= len) { // If remaining text fits in one line
+            strcpy(result + pos, c + start);
+            pos += strlen(c + start);
+            break;
+        }
+
+        while (split_pos > start && !(c[split_pos] == ' ' || c[split_pos] == ',')) {
+            split_pos--; // Try to find a space to break at
+        }
+
+        if (split_pos == start) {
+            split_pos = start + n - 1; // No space found, force a split
+        }
+
+        strncpy(result + pos, c + start, split_pos - start + 1);
+        pos += (split_pos - start + 1);
+
+        start = split_pos + 1;
+
+        if (start < len) { // Only add underscore if not the last substring
+            result[pos++] = Option.continuation;
+            result[pos++] = '\n';
+        }
+    }
+
+    result[pos] = '\0';
+	strcpy(c,result);
+	FreeMemory((void *)result);
 }
 // list a line into a buffer (b) given a pointer to the beginning of the line (p).
 // the returned string is a C style string (terminated with a zero)
