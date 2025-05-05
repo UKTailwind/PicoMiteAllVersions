@@ -1899,7 +1899,7 @@ void MIPS16 printoptions(void){
     if(Option.Invert == true) PO2Str("CONSOLE", "INVERT");
     if(Option.Invert == 2) PO2Str("CONSOLE", "AUTO");
     if(Option.ColourCode == true) PO2Str("COLOURCODE", "ON");
-    if(Option.continuation == true) PO2Str("CONTINUATION LINES", "ON");
+    if(Option.continuation) PO2Str("CONTINUATION LINES", "ON");
     if(Option.PWM == true) PO2Str("POWER PWM", "ON");
     if(Option.Listcase != CONFIG_TITLE) PO2Str("CASE", CaseList[(int)Option.Listcase]);
     if(Option.Tab != 2) PO2Int("TAB", Option.Tab);
@@ -3051,8 +3051,8 @@ void MIPS16 cmd_option(void) {
 #ifndef PICOMITEVGA
 	tp = checkstring(cmdline, (unsigned char *)"LCD320");
 	if(tp) {
-        if(!( SSD16TYPE || Option.DISPLAY_TYPE==IPS_4_16 || SPI480))error("Only available on SSD1963, 480x320 SPI displays and IPS_4_16 displays");
-        if(!(Option.DISPLAY_ORIENTATION==LANDSCAPE || Option.DISPLAY_ORIENTATION==RLANDSCAPE))error("Only available in landscape mode");
+        if(!( SSD16TYPE || Option.DISPLAY_TYPE==IPS_4_16 || SPI480 || Option.DISPLAY_TYPE==ILI9488P)) error("Only available on SSD1963, 480x320 SPI displays and IPS_4_16 displays");
+        if(!(Option.DISPLAY_ORIENTATION==LANDSCAPE || Option.DISPLAY_ORIENTATION==RLANDSCAPE || Option.DISPLAY_TYPE==ILI9488P))error("Only available in landscape mode");
         if(( SSD16TYPE || Option.DISPLAY_TYPE==IPS_4_16)){
             if(checkstring(tp, (unsigned char *)"OFF"))	{ 
                 clear320();
@@ -3070,13 +3070,21 @@ void MIPS16 cmd_option(void) {
                 buff320=GetMemory(320*6);
                 return; 
             } else error("Syntax");
+        } else if(Option.DISPLAY_TYPE==ILI9488P){
+            if(checkstring(tp, (unsigned char *)"OFF"))	{ 
+                VRes=320;
+                return;
+            }
+            else if(checkstring(tp, (unsigned char *)"ON"))	{ 
+                HRes=320;
+                return; 
+            } 
         } else if(SPI480){
             if(checkstring(tp, (unsigned char *)"OFF"))	{ 
                 clear320();
                 return;
             }
             else if(checkstring(tp, (unsigned char *)"ON"))	{ 
-                HRes=320;
                 VRes=240;
                 return; 
             } else error("Syntax");

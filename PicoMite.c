@@ -495,8 +495,10 @@ void __not_in_flash_func(routinechecks)(void){
 //            SSPrintString(alive);
 //        }
     if(clocktimer==0 && Option.RTC){
-        RtcGetTime(0);
-        clocktimer=(1000*60*60);
+        if(classicread==0 && nunchuckread==0){
+            RtcGetTime(0);
+            clocktimer=(1000*60*60);
+        }
     }
 #ifndef USBKEYBOARD
     if(Option.KeyboardConfig==CONFIG_I2C && KeyCheck==0){
@@ -511,26 +513,32 @@ void __not_in_flash_func(routinechecks)(void){
     }
 #endif
     if(classic1 && ClassicTimer>=10){
-        if(classicread==false){
+        if(classicread==0){
 			WiiSend(sizeof(readcontroller),(char *)readcontroller);
-            classicread=true;
-        } else {
-            classicread=false;
-            classic1=2;
+            if(!mmI2Cvalue)classicread=1;
+        } else if(classicread==1){
 			WiiReceive(6, (char *)nunbuff);
+            if(!mmI2Cvalue)classicread=2;
+            else classicread=0;
+        } else {
             classicproc();
+            classicread=0;
+            classic1=2;
         }
         ClassicTimer=0; 
     }
     if(nunchuck1 && NunchuckTimer>=10){ 
         if(nunchuckread==false){
 			WiiSend(sizeof(readcontroller),(char *)readcontroller);
-            nunchuckread=true;
-        } else {
-            nunchuckread=false;
-            nunchuck1=2;
+            if(!mmI2Cvalue)nunchuckread=1;
+        } else if(nunchuckread==1){
 			WiiReceive(6, (char *)nunbuff);
+            if(!mmI2Cvalue)nunchuckread=2;
+            else nunchuckread=0;
+        } else {
             nunproc();
+            nunchuckread=0;
+            nunchuck1=2;
         }
         NunchuckTimer=0;
     }
@@ -4161,8 +4169,8 @@ int MIPS16 main(){
 //    volatile uint32_t *qmi_m1_timing=(uint32_t *)0x400d0020;
 #endif
     if(Option.CPU_Speed<=200000)vreg_set_voltage(VREG_VOLTAGE_1_15);
-    else if(Option.CPU_Speed>200000 && Option.CPU_Speed<=300000 )vreg_set_voltage(VREG_VOLTAGE_1_25);  // Std default @ boot is 1_10
-    else if(Option.CPU_Speed>300000  && Option.CPU_Speed<=320000 )vreg_set_voltage(VREG_VOLTAGE_1_30);  // Std default @ boot is 1_10
+//    else if(Option.CPU_Speed>200000 && Option.CPU_Speed<=300000 )vreg_set_voltage(VREG_VOLTAGE_1_25);  // Std default @ boot is 1_10
+    else if(Option.CPU_Speed>200000  && Option.CPU_Speed<=320000 )vreg_set_voltage(VREG_VOLTAGE_1_30);  // Std default @ boot is 1_10
 #ifdef rp2350
     else if(Option.CPU_Speed>320000  && Option.CPU_Speed<=360000 )vreg_set_voltage(VREG_VOLTAGE_1_40);  // Std default @ boot is 1_10
     else vreg_set_voltage(VREG_VOLTAGE_1_60);  // Std default @ boot is 1_10

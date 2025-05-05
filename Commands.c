@@ -3016,7 +3016,6 @@ void cmd_call(void){
 	i = FindSubFun(p, false);                   // it could be a defined command
 	strcat((char *)p," ");
 	strcat((char *)p,(char *)q);
-//	MMPrintString(p);PRet();
 	if(i >= 0) {                                // >= 0 means it is a user defined command
 		DefinedSubFun(false, p, i, NULL, NULL, NULL, NULL);
 	}
@@ -3442,10 +3441,11 @@ void replaceAlpha(char *str, const char *replacements[MMEND]){
     buffer[bufferIndex] = '\0'; // Null-terminate the buffer
     strcpy(str,  buffer); // Copy the buffer back into the original string
 }
-void format_string(char *c, int n) {
+int format_string(char *c, int n) {
+	int count=0;
 	n--;
     int len = strlen(c);
-	if(*c==0)return;
+	if(*c==0)return 0;
     char *result = GetMemory(len * 2); // Allocate enough space for the modified string
     int pos = 0, start = 0;
 
@@ -3474,12 +3474,14 @@ void format_string(char *c, int n) {
         if (start < len) { // Only add underscore if not the last substring
             result[pos++] = Option.continuation;
             result[pos++] = '\n';
+			count++;
         }
     }
 
     result[pos] = '\0';
 	strcpy(c,result);
 	FreeMemory((void *)result);
+	return count;
 }
 // list a line into a buffer (b) given a pointer to the beginning of the line (p).
 // the returned string is a C style string (terminated with a zero)

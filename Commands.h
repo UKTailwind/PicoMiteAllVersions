@@ -102,7 +102,7 @@ extern void array_slice(unsigned char *tp);
 extern void array_insert(unsigned char *tp);
 extern void array_add(unsigned char *tp);
 extern void array_set(unsigned char *tp);
-extern void format_string(char *c, int n);
+extern int format_string(char *c, int n);
 
 #endif
 /*  @endcond */

@@ -145,7 +145,7 @@ extern volatile struct s_nunstruct nunstruct[6];
 extern void WiiReceive(int nbr, char *p);
 extern void WiiSend(int nbr, char *p);
 extern int mmI2Cvalue;
-extern bool classicread, nunchuckread;
+extern unsigned char classicread, nunchuckread;
 #define REG_GAIN                    0x00         // Gain lower 8 bits (rest in vref 
     #define REG_BLUE                    0x01         // blue gain 
     #define REG_RED                     0x02         // red gain 

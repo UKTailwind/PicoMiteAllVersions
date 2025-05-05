@@ -134,7 +134,7 @@ char * nunInterruptc[6] = {
 bool nunfoundc[6] = {
   false
 };
-bool classicread = 0, nunchuckread = 0;
+unsigned char classicread = 0, nunchuckread = 0;
 /*******************************************************************************************
 							  I2C related commands in MMBasic
                               ===============================

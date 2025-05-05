@@ -221,7 +221,7 @@ void MIPS16 __not_in_flash_func(on_pwm_wrap)(void) {
 	static int repeatcount=1;
     // play a tone
 #ifndef PICOMITEWEB
-//	__dsb();
+	__dsb();
 #endif
     pwm_clear_irq(AUDIO_SLICE);
 	if(Option.audio_i2s_bclk){
@@ -1500,7 +1500,7 @@ void InitReservedIO(void) {
 			I2C_enabled=1;
 			I2C0SDApin=Option.SYSTEM_I2C_SDA;
 			I2C0SCLpin=Option.SYSTEM_I2C_SCL;
-			I2C_Timeout=500;
+			I2C_Timeout=2;
 		} else {
 			I2C1locked=1;
 			i2c_init(i2c1,(Option.SYSTEM_I2C_SLOW ? 100000:400000));
@@ -1509,7 +1509,7 @@ void InitReservedIO(void) {
 			I2C2_enabled=1;	
 			I2C1SDApin=Option.SYSTEM_I2C_SDA;
 			I2C1SCLpin=Option.SYSTEM_I2C_SCL;
-			I2C2_Timeout=500;
+			I2C2_Timeout=2;
 		}
 		if(Option.RTC)RtcGetTime(1);
 #ifndef USBKEYBOARD

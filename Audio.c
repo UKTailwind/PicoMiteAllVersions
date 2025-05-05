@@ -64,7 +64,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "dr_mp3.h"
 #define MOD_BUFFER_SIZE WAV_BUFFER_SIZE
 #else 
-#define MOD_BUFFER_SIZE WAV_BUFFER_SIZE/2
+#define MOD_BUFFER_SIZE (WAV_BUFFER_SIZE/4)*3
 #endif
 #include "hardware/pio.h"
 #include "hardware/pio_instructions.h"
@@ -130,7 +130,7 @@ uint16_t *ubuff1, *ubuff2;
 int16_t *g_buff1, *g_buff2;
 char *modbuff=NULL;
 modcontext *mcontext=NULL;
-int modfilesamplerate=16000;
+int modfilesamplerate=22050;
 char *pbuffp;
 void audio_checks(void);
 uint16_t *playbuff;
@@ -1765,7 +1765,7 @@ void MIPS16 cmd_play(void) {
         getargs(&tp, 3,(unsigned char *)",");                                  // this MUST be the first executable line in the function
         char *p;
         int i __attribute((unused))=0,fsize;
-        modfilesamplerate=16000;
+        modfilesamplerate=22050;
 		if(CurrentlyPlaying==P_WAVOPEN)CloseAudio(1);
         if(CurrentlyPlaying != P_NOTHING) error("Sound output in use");
 #ifdef rp2350
@@ -1871,8 +1871,8 @@ void MIPS16 cmd_play(void) {
         nextbuf=2;
         ppos=0;
         playreadcomplete=0;
-        setrate(48000);
-		audiorepeat=3;
+        setrate(44100);
+		audiorepeat=2;
     	pwm_set_irq0_enabled(AUDIO_SLICE, true);
 		pwm_set_enabled(AUDIO_SLICE, true); 
 		Timer1=500;
