@@ -2443,7 +2443,9 @@ int FileLoadCMM2Program(char *fname, bool message) {
     }
     *p = 0;                                                         // terminate the string in RAM
     FileClose(fnbr);
+    unsigned char continuation=Option.continuation;
     SaveProgramToFlash((unsigned char *)buf, false);
+    Option.continuation= continuation;   
     FreeMemorySafe((void **)&buf);
     FreeMemorySafe((void **)&dlist);
     return true;

@@ -3443,7 +3443,7 @@ void replaceAlpha(char *str, const char *replacements[MMEND]){
 }
 int format_string(char *c, int n) {
 	int count=0;
-	n--;
+	n-=2;
     int len = strlen(c);
 	if(*c==0)return 0;
     char *result = GetMemory(len * 2); // Allocate enough space for the modified string
@@ -3472,6 +3472,7 @@ int format_string(char *c, int n) {
         start = split_pos + 1;
 
         if (start < len) { // Only add underscore if not the last substring
+            result[pos++] = ' ';
             result[pos++] = Option.continuation;
             result[pos++] = '\n';
 			count++;

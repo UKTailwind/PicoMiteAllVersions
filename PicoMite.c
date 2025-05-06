@@ -4705,9 +4705,9 @@ contloop:
         *p = 0;                                                     // terminate the string in inpbuf
 
         if(*inpbuf == 0 && (*pm == 0 || (!isprint((uint8_t)*pm) && pm[1] == 0))) break; // don't save a trailing newline
-        if(inpbuf[strlen((char *)inpbuf)-1]==Option.continuation && Option.continuation){
+        if(inpbuf[strlen((char *)inpbuf)-1]==Option.continuation && inpbuf[strlen((char *)inpbuf)-2]==' ' && Option.continuation){
             continuation=true;
-            inpbuf[strlen((char *)inpbuf)-1]=0; //strip the continuation character
+            inpbuf[strlen((char *)inpbuf)-2]=0; //strip the continuation character
             goto contloop;
         }
         tokenise(false);                                            // turn into executable code

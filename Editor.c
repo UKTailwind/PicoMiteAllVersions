@@ -515,20 +515,21 @@ void cmd_edit(void){
 void cmd_editfile(void){
      edit(cmdline, FALSE);
 }
-int find_longest_line_length(const char *text) {
+int find_longest_line_length(const char *text ,int *linein) {
     int current_length = 0;
     int max_length = 0;
-    
     const char *ptr = text;
-    
+    int line=0;
     while (*ptr) {
         if (*ptr == '\n') {
-            if (ptr > text && *(ptr - 1) == '_') {
+            line++;
+            if (ptr > text && *(ptr - 1) == '_' && *(ptr - 2)==' ' && Option.continuation) {
                 // Line continuation, do not reset length
             } else {
                 // If this line exceeds the max, update
                 if (current_length > max_length) {
                     max_length = current_length;
+                    *linein=line;
                 }
                 current_length = 0; // Reset for a new line
             }
@@ -998,13 +999,16 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
               case F1:             // Save and exit
               case CTRLKEY('W'):   // Save, exit and run
               case F2:             // Save, exit and run
-                            if(Option.continuation){
-                                int i=find_longest_line_length((char *)EdBuff);
+//                            if(Option.continuation){
+                                int line=0;
+                                int i=find_longest_line_length((char *)EdBuff, &line);
                                 if(i>255){
-                                    editDisplayMsg((unsigned char *)" LINE TOO LONG");
+                                    char buff[20]={};
+                                    sprintf(buff," LINE %d TOO LONG",line);
+                                    editDisplayMsg((unsigned char *)buff);
                                     break;
                                 }
-                            }
+//                            }
                             c=buf[0];
                             PrintString("\033[?1000l");                         // Tera Term turn off mouse click report in vt200 mode
                             PrintString("\0338\033[2J\033[H");                  // vt100 clear screen and home cursor

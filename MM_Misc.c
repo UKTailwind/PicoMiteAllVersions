@@ -4075,7 +4075,7 @@ tp = checkstring(cmdline, (unsigned char *)"HEARTBEAT");
         else if(checkstring(tp, (unsigned char *)"DISABLE"))      { Option.continuation = false; SaveOptions(); return;  }
         else if(checkstring(tp, (unsigned char *)"ON"))      { Option.continuation = '_'; SaveOptions(); return;  }
         else if(checkstring(tp, (unsigned char *)"OFF"))      { Option.continuation = false; SaveOptions(); return;  }
-        else Option.continuation=getint(tp,0,255);
+        else error("Syntax");
     }
 
     tp = checkstring(cmdline, (unsigned char *)"MODBUFF");
