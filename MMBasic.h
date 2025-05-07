@@ -259,7 +259,7 @@ void erasearray(unsigned char *n);
 void  ClearVars(int level, bool all);
 void  ClearStack(void);
 void  ClearRuntime(bool all);
-void  ClearProgram(void);
+void  ClearProgram(bool psram);
 void *DoExpression(unsigned char *p, int *t);
 unsigned char *GetNextCommand(unsigned char *p, unsigned char **CLine, unsigned char *EOFMsg) ;
 int CheckEmpty(char *p);

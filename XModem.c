@@ -65,7 +65,7 @@ void MIPS16 cmd_xmodem(void) {
         // no file name, so this is a transfer to/from program memory
         if(CurrentLinePtr) error("Invalid in a program");
         if(Option.DISPLAY_TYPE>=VIRTUAL && WriteBuf)FreeMemorySafe((void **)&WriteBuf);
-        if(rcv)ClearProgram();                                             // we need all the RAM
+        if(rcv)ClearProgram(true);                                             // we need all the RAM
         else {
             closeframebuffer('A');
             CloseAudio(1);

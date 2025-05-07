@@ -4982,7 +4982,7 @@ void restorepanel(void){
             DrawPixel = DrawPixelNormal;
         	DrawBLITBuffer = DrawBufferSPISCR;
             ScrollLCD = ScrollLCDSPISCR;
-            if(Option.DISPLAY_TYPE == ILI9341 || Option.DISPLAY_TYPE == ILI9488  || Option.DISPLAY_TYPE == ILI9488P || Option.DISPLAY_TYPE == ST7789B){
+            if(Option.DISPLAY_TYPE == ILI9341 || Option.DISPLAY_TYPE == ST7796S || Option.DISPLAY_TYPE == ILI9488  || Option.DISPLAY_TYPE == ILI9488P || Option.DISPLAY_TYPE == ST7789B){
                 ReadBuffer = ReadBufferSPISCR;
 				ReadBLITBuffer = ReadBufferSPISCR;
             }
@@ -4992,7 +4992,7 @@ void restorepanel(void){
             DrawBuffer = DrawBufferSPI;
             DrawPixel = DrawPixelNormal;
         	DrawBLITBuffer = DrawBufferSPI;
-            if(Option.DISPLAY_TYPE == ILI9341 || Option.DISPLAY_TYPE == ILI9488  || Option.DISPLAY_TYPE == ILI9488P || Option.DISPLAY_TYPE == ST7789B){
+            if(Option.DISPLAY_TYPE == ILI9341 || Option.DISPLAY_TYPE == ST7796S || Option.DISPLAY_TYPE == ILI9488  || Option.DISPLAY_TYPE == ILI9488P || Option.DISPLAY_TYPE == ST7789B){
 				ReadBLITBuffer = ReadBufferSPI;
                 ReadBuffer = ReadBufferSPI;
                 ScrollLCD = ScrollLCDSPI;
@@ -5294,7 +5294,7 @@ void blitmerge (int x0, int y0, int w, int h, uint8_t colour){
 #ifdef PICOMITE
     mutex_enter_blocking(&frameBufferMutex);			// lock the frame buffer
 #endif
-    if(Option.DISPLAY_TYPE==ILI9341 || Option.DISPLAY_TYPE==ST7789B || Option.DISPLAY_TYPE==ILI9488 || Option.DISPLAY_TYPE == ILI9488P ){
+    if(Option.DISPLAY_TYPE==ILI9341 || Option.DISPLAY_TYPE == ST7796S || Option.DISPLAY_TYPE==ST7789B || Option.DISPLAY_TYPE==ILI9488 || Option.DISPLAY_TYPE == ILI9488P ){
         while(GetLineILI9341()!=0){}
     }
     for(int y=y0;y<y0+h;y++){
@@ -5331,7 +5331,7 @@ void merge(uint8_t colour){
 #ifdef PICOMITE
     mutex_enter_blocking(&frameBufferMutex);			// lock the frame buffer
 #endif
-    if(Option.DISPLAY_TYPE==ILI9341 || Option.DISPLAY_TYPE==ST7789B || Option.DISPLAY_TYPE==ILI9488 || Option.DISPLAY_TYPE == ILI9488P ){
+    if(Option.DISPLAY_TYPE==ILI9341 || Option.DISPLAY_TYPE == ST7796S || Option.DISPLAY_TYPE==ST7789B || Option.DISPLAY_TYPE==ILI9488 || Option.DISPLAY_TYPE == ILI9488P ){
         while(GetLineILI9341()!=0){}
     }
     for(int y=0;y<VRes;y++){
@@ -5459,7 +5459,7 @@ void cmd_framebuffer(void){
             LayerBuf=GetMemory(HRes*VRes/2);
         } else error("Layer already exists");
     } else if((p=checkstring(cmdline, (unsigned char *)"WAIT"))) {
-        if(Option.DISPLAY_TYPE==ILI9341 || Option.DISPLAY_TYPE==ST7789B || Option.DISPLAY_TYPE==ILI9488 || Option.DISPLAY_TYPE == ILI9488P ){
+        if(Option.DISPLAY_TYPE==ILI9341 || Option.DISPLAY_TYPE == ST7796S || Option.DISPLAY_TYPE==ST7789B || Option.DISPLAY_TYPE==ILI9488 || Option.DISPLAY_TYPE == ILI9488P ){
             while(GetLineILI9341()!=0){}
         }
     } else if((p=checkstring(cmdline, (unsigned char *)"CLOSE"))) {
@@ -5795,7 +5795,7 @@ void cmd_blit(void) {
             blitbuff[bnbr].blitbuffptr = NULL;
         } else error("Buffer not in use");
         // get the number
-     } else {
+    } else {
         getargs(&cmdline, 11, (unsigned char *)",");
         if((void *)ReadBuffer == (void *)DisplayNotSet) error("Invalid on this display");
         if(argc != 11) error("Syntax");
@@ -6191,7 +6191,8 @@ void cmd_blit(void) {
 	        }
 	        if(x1 < x2) {
 	            int start_x1, start_x2;
-	            max_x = 1;
+	            max_x = LargestContiguousHeap()/(SSD16TYPE  || Option.DISPLAY_TYPE==IPS_4_16 ? 2 : 3);
+                if(max_x>x2-x1+1)max_x=x2-x1+1;
 	            buff = GetMemory(max_x * h * (SSD16TYPE  || Option.DISPLAY_TYPE==IPS_4_16 ? 2 : 3));
 	            start_x1 = x1 + w - max_x;
 	            start_x2 = x2 + w - max_x;

@@ -4534,7 +4534,7 @@ if(Option.CPU_Speed==FreqSVGA){ //adjust the size of the heap
     } else {
         if(*ProgMemory == 0x01 ) ClearVars(0,true);
         else {
-            ClearProgram();
+            ClearProgram(true);
         }
     #ifdef PICOMITEWEB
     if (cyw43_arch_init()==0) {
@@ -4667,6 +4667,9 @@ void MIPS16 SaveProgramToFlash(unsigned char *pm, int msg) {
     multi=false;
     uint32_t storedupdates[MAXCFUNCTION], updatecount=0, realflashsave;
     initFonts();
+#ifdef rp2350
+    __dsb();
+#endif
 #ifdef USBKEYBOARD
 	clearrepeat();
 #endif	

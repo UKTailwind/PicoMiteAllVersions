@@ -188,7 +188,7 @@ void   MIPS16 InitBasic(void) {
     CommandTableSize =  (sizeof(commandtbl)/sizeof(struct s_tokentbl));
     TokenTableSize =  (sizeof(tokentbl)/sizeof(struct s_tokentbl));
 
-    ClearProgram();
+    ClearProgram(true);
 
     // load the commonly used tokens
     // by looking them up once here performance is improved considerably
@@ -438,7 +438,7 @@ int   MIPS16 PrepareProgramExt(unsigned char *p, int i, unsigned char **CFunPtr,
                 enable_interrupts_pico();
                 MMPrintString("Error: Too many subroutines and functions - erasing program\r\n");
                 uSec(100000);
-                ClearProgram();
+                ClearProgram(true);
                 cmdline=NULL;
                 do_end(false);
                 longjmp(mark, 1);												// jump back to the input prompt
@@ -3257,10 +3257,10 @@ void MIPS16 ClearRuntime(bool all) {
 
 // clear everything including program memory (includes ClearStack() and ClearRuntime(true))
 // this is used before loading a program
-void MIPS16 ClearProgram(void) {
+void MIPS16 ClearProgram(bool psram) {
 //    InitHeap(true);
     initFonts();
-    m_alloc(M_PROG);                                           // init the variables for program memory
+    m_alloc(psram ? M_PROG : M_LIMITED);                                           // init the variables for program memory
     if(Option.DISPLAY_TYPE>=VIRTUAL && WriteBuf)FreeMemorySafe((void **)&WriteBuf);
     ClearRuntime(true);
 //    ProgMemory[0] = ProgMemory[1] = ProgMemory[3] = ProgMemory[4] = 0;

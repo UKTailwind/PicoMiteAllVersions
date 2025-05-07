@@ -403,7 +403,7 @@ void edit(unsigned char *cmdline, bool cmdfile) {
     multilinecomment = false;
     EdBuff = GetTempMemory(EDIT_BUFFER_SIZE);
     edit_buff_size=EDIT_BUFFER_SIZE;
-    char buff[STRINGSIZE];
+    char buff[STRINGSIZE*2]={0};
     *EdBuff = 0;
 
     VHeight = Option.Height - 2;
@@ -433,12 +433,19 @@ void edit(unsigned char *cmdline, bool cmdfile) {
                 nbrlines++;
                 if(Option.continuation){
                     fromp = llist((unsigned char *)buff, fromp);                                // otherwise expand the line
-                    nbrlines+=format_string(&buff[0],Option.Width);
-                    strcat((char *)p,buff);
-                } else fromp = llist(p, fromp);
-                if(!(nbrlines==1 && p[0]=='\'' && p[1]=='#')){
-                    p += strlen((char *)p);
-                    *p++ = '\n'; *p = 0;
+                    if(!(nbrlines==1 && buff[0]=='\'' && buff[1]=='#'))
+                    {
+                        nbrlines+=format_string(&buff[0],Option.Width);
+                        strcat((char *)p,buff);
+                        p += strlen((char *)buff);
+                        *p++ = '\n'; *p = 0;
+                    } else nbrlines=0;
+                } else {
+                    fromp = llist(p, fromp);
+                    if(!(nbrlines==1 && p[0]=='\'' && p[1]=='#')){
+                        p += strlen((char *)p);
+                        *p++ = '\n'; *p = 0;
+                    } else nbrlines=0;
                 }
             }
             // finally, is it the end of the program?
@@ -1975,7 +1982,7 @@ void editDisplayMsg(unsigned char *msg) {
 // save the program in the editing buffer into the program memory
 void SaveToProgMemory(void) {
     SaveProgramToFlash(EdBuff, true);
-    ClearProgram();
+    ClearProgram(true);
     StartEditPoint = (unsigned char *)(edy + cury);                            // record out position in case the editor is invoked again
     StartEditChar = edx + curx;
     // bugfix for when the edit point is a space

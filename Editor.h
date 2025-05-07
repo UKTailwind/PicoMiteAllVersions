@@ -38,6 +38,7 @@ extern int StartEditChar;
 extern unsigned char *EdBuff;                      // the buffer used for editing the text
 extern int EdBuffSize;                    // size of the buffer in characters
 extern int editactive;
+extern int find_longest_line_length(const char *text ,int *linein);
 // the values returned by the standard control keys
 #define TAB       0x9
 #define BKSP      0x8

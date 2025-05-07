@@ -1034,7 +1034,7 @@ void  MIPS16 cmd_continue(void) {
 void MIPS16 cmd_new(void) {
 	closeframebuffer('A');
 	checkend(cmdline);
-	ClearProgram();
+	ClearProgram(true);
 	FlashLoad=0;
 	uSec(250000);
     FlashWriteInit(PROGRAM_FLASH);

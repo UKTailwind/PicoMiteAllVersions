@@ -2308,7 +2308,7 @@ int FileLoadCMM2Program(char *fname, bool message) {
     LineCount=0;
     int importlines=0, data;
     if (!InitSDCard()) return false;
-    ClearProgram(); // clear any leftovers from the previous program
+    ClearProgram(true); // clear any leftovers from the previous program
     fnbr = FindFreeFileNbr();
     p = (char *)getFstring((unsigned char *)fname);
     if (strchr((char *)p, '.') == NULL) strcat((char *)p, ".bas");
@@ -2458,7 +2458,7 @@ int FileLoadProgram(unsigned char *fname, bool chain)
     char *p, *buf;
     int c,oldfont=gui_font;
     if (!InitSDCard()) return false;
-//    ClearProgram(); // clear any leftovers from the previous program
+//    ClearProgram(true); // clear any leftovers from the previous program
     initFonts();
     m_alloc(chain? M_LIMITED :M_PROG);                                           // init the variables for program memory
     if(Option.DISPLAY_TYPE>=VIRTUAL && WriteBuf)FreeMemorySafe((void **)&WriteBuf);
@@ -4420,7 +4420,35 @@ void CrunchData(unsigned char **p, int c)
     *((*p)++) = lastch = c;
 }
 /*  @endcond */
+int check_line_length(const char *text ,int *linein) {
+    int current_length = 0;
+    int max_length = 0;
+    const char *ptr = text;
+    int line=0;
+    while (*ptr) {
+        if (*ptr == '\r') {
+            line++;
+            // If this line exceeds the max, update
+            if (current_length > max_length) {
+                max_length = current_length;
+                *linein=line;
+            }
+            current_length = 0; // Reset for a new line
+        } else {
+            // Increase length for this segment of the line
+            current_length++;
+        }
+        
+        ptr++;
+    }
 
+    // Final check in case the last line was the longest
+    if (current_length > max_length) {
+        max_length = current_length;
+    }
+
+    return max_length;
+}
 void cmd_autosave(void)
 {
     unsigned char *buf, *p;
@@ -4460,7 +4488,7 @@ void cmd_autosave(void)
         else
             error("Syntax");
     }
-    ClearProgram(); // clear any leftovers from the previous program
+    ClearProgram(false); // clear any leftovers from the previous program
     p = buf = GetTempMemory(EDIT_BUFFER_SIZE);
     CrunchData(&p, 0); // initialise the crunch data subroutine
 readin:;
@@ -4501,6 +4529,7 @@ readin:;
     }
     fflush(stdout);
 
+
     *p = 0; // terminate the string in RAM
     while (getConsole() != -1)
         ; // clear any rubbish in the input
@@ -4522,6 +4551,115 @@ readin:;
         ExecuteProgram(tknbuf); // execute the line straight away
     }
 }
+/*
+void cmd_autosave(void)
+{
+    unsigned char *buf, *p;
+    int c, prevc = 0, crunch = false;
+    int count = 0;
+    uint64_t timeout;
+    if (CurrentLinePtr)error("Invalid in a program");
+    if(!checkstring(cmdline,(unsigned char *)"APPEND")){
+        FlashLoad=0;
+        uSec(250000);
+        FlashWriteInit(PROGRAM_FLASH);
+        flash_range_erase(realflashpointer, MAX_PROG_SIZE);
+        FlashWriteByte(0); FlashWriteByte(0); FlashWriteByte(0);    // terminate the program in flash
+        FlashWriteClose();
+        if (*cmdline)
+        {
+            if (toupper(*cmdline) == 'C')
+                crunch = true;
+            else
+                error("Syntax");
+        }
+        CrunchData(&p, 0); // initialise the crunch data subroutine
+        }
+        ClearVars(0,true);
+        CloseAudio(1);
+        CloseAllFiles();
+        ClearExternalIO();                                              // this MUST come before InitHeap(true)
+#ifdef PICOMITEWEB
+        if(TCPstate){
+            for(int i=0;i<MaxPcb;i++)FreeMemory(TCPstate->buffer_recv[i]);
+        }
+#endif
+        p = buf = GetTempMemory(EDIT_BUFFER_SIZE-2048);
+        char * fromp  = (char *)ProgMemory;
+        if(*fromp){
+            p = buf;
+            while(*fromp != 0xff) {
+                if(*fromp == T_NEWLINE) {
+                    fromp = (char *)llist((unsigned char *)p, (unsigned char *)fromp);                                // otherwise expand the line
+                    p += strlen((char *)p);
+                    *p++ = '\n'; *p = 0;
+                }
+                // finally, is it the end of the program?
+                if(fromp[0] == 0 || fromp[0] == 0xff) break;
+            }
+        }
+    while ((c = MMInkey()) != 0x1a && c != F1 && c != F2)
+    { // while waiting for the end of text char
+        if (c == -1 && count && time_us_64() - timeout > 100000)
+        {
+            fflush(stdout);
+            count = 0;
+        }
+        if (p == buf && c == '\n')
+            continue; // throw away an initial line feed which can follow the command
+        if ((p - buf) >= EDIT_BUFFER_SIZE-2048)
+            error("Not enough memory");
+        if (isprint(c) || c == '\r' || c == '\n' || c == TAB)
+        {
+            if (c == TAB)
+                c = ' ';
+            if (crunch)
+                CrunchData(&p, c); // insert into RAM after throwing away comments. etc
+            else
+                *p++ = c; // insert the input into RAM
+            {
+                if (!(c == '\n' && prevc == '\r'))
+                {
+                    MMputchar(c, 0);
+                    count++;
+                    timeout = time_us_64();
+                } // and echo it
+                if (c == '\r')
+                {
+                    MMputchar('\n', 1);
+                    count = 0;
+                }
+            }
+            prevc = c;
+        }
+    }
+    fflush(stdout);
+
+    *p = 0; // terminate the string in RAM
+    while (getConsole() != -1)
+        ; // clear any rubbish in the input
+          //    ClearSavedVars();                                               // clear any saved variables
+    int j,i=0;
+        j=check_line_length((char *)buf,&i);
+        if(j>255)error("line % is % characters long, maximum is 255",i,j);
+        SaveProgramToFlash(buf, true);
+        ClearSavedVars(); // clear any saved variables
+        ClearTempMemory(); 
+#ifdef PICOMITEWEB
+            if(TCPstate){
+                for(int i=0;i<MaxPcb;i++)TCPstate->buffer_recv[i]=GetMemory(TCP_READ_BUFFER_SIZE);
+            }
+#endif
+        if (c == F2)
+        {
+            ClearVars(0,true);
+            strcpy((char *)inpbuf, "RUN\r\n");
+            multi=false;
+            tokenise(true);         // turn into executable code
+            ExecuteProgram(tknbuf); // execute the line straight away
+        }
+//    }
+}*/
 /* 
  * @cond
  * The following section will be excluded from the documentation.
@@ -5314,6 +5452,7 @@ void ClearSavedVars(void)
     disable_interrupts_pico();
     flash_range_erase(FLASH_TARGET_OFFSET + FLASH_ERASE_SIZE, SAVEDVARS_FLASH_SIZE);
     enable_interrupts_pico();
+    uSec(10000);
 }
 void SaveOptions(void)
 {

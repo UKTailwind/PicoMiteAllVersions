@@ -869,15 +869,22 @@ void __not_in_flash_func(TestStackOverflow)(void) {
 
 void MIPS64 __not_in_flash_func(FreeMemory)(unsigned char *addr) {
     if(addr == NULL) return;
-#ifdef rp2350
-#ifndef PICOMITEWEB
+#if defined(rp2350) && !defined(PICOMITEWEB)
     int bits;
-    if(addr>(unsigned char *)PSRAMbase && addr<(unsigned char *)(PSRAMbase+PSRAMsize)){
-        do {
-            bits = SBitsGet(addr);
-            SBitsSet(addr, 0);
-            addr += PAGESIZE;
-        } while(bits != (PUSED | PLAST));
+    if(PSRAMsize){
+        if(addr>(unsigned char *)PSRAMbase && addr<(unsigned char *)(PSRAMbase+PSRAMsize)){
+            do {
+                bits = SBitsGet(addr);
+                SBitsSet(addr, 0);
+                addr += PAGESIZE;
+            } while(bits != (PUSED | PLAST));
+        } else {
+            do {
+                bits = MBitsGet(addr);
+                MBitsSet(addr, 0);
+                addr += PAGESIZE;
+            } while(bits != (PUSED | PLAST));
+        }
     } else {
         do {
             bits = MBitsGet(addr);
@@ -892,15 +899,7 @@ void MIPS64 __not_in_flash_func(FreeMemory)(unsigned char *addr) {
         MBitsSet(addr, 0);
         addr += PAGESIZE;
     } while(bits != (PUSED | PLAST));
-    #endif
-#else
-    int bits;
-    do {
-        bits = MBitsGet(addr);
-        MBitsSet(addr, 0);
-        addr += PAGESIZE;
-    } while(bits != (PUSED | PLAST));
-    #endif
+#endif
 }
 
 
@@ -1014,11 +1013,6 @@ void MIPS64 __not_in_flash_func(*GetSystemMemory)(int size) { //get memory from 
             }
         } else n = 0;                                               // not enough space here so reset our count
     }
-#ifdef rp2350
-#ifndef PICOMITEWEB
-        if(PSRAMsize)return GetPSMemory(size);
-#endif
-#endif
     TempStringClearStart = 0;
     ClearTempMemory();                                               // hopefully this will give us enough to print the prompt
     error("Not enough Heap memory");

@@ -3592,7 +3592,7 @@ tp = checkstring(cmdline, (unsigned char *)"HEARTBEAT");
     if(tp) {
    	    if(CurrentLinePtr) error("Invalid in a program");
         Option.NoScroll = 0;
-        if(!(Option.DISPLAY_TYPE==ST7789B || Option.DISPLAY_TYPE==ILI9488  || Option.DISPLAY_TYPE == ILI9488P || Option.DISPLAY_TYPE==ILI9341 || Option.DISPLAY_TYPE>=VGADISPLAY))Option.NoScroll=1;
+        if(!(Option.DISPLAY_TYPE==ST7789B || Option.DISPLAY_TYPE==ILI9488  || Option.DISPLAY_TYPE == ST7796S || Option.DISPLAY_TYPE == ILI9488P || Option.DISPLAY_TYPE==ILI9341 || Option.DISPLAY_TYPE>=VGADISPLAY))Option.NoScroll=1;
         if(!(Option.DISPLAY_ORIENTATION == DISPLAY_LANDSCAPE) && Option.DISPLAY_TYPE==SSDTYPE) error("Landscape only");
         skipspace(tp);
         Option.DefaultFC = WHITE;
