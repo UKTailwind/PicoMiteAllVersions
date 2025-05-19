@@ -329,13 +329,15 @@ extern void __not_in_flash_func(spi_finish)(spi_inst_t *spi);
 #define VIRTUAL_M       54
 #define VS1053slow      55
 #define VS1053fast      56
+#define NEXTGEN1        57
+#define NEXTGEN          NEXTGEN1
 #define TFT_NOP 0x00
 #define TFT_SWRST 0x01
 #define SSDTYPE (Option.DISPLAY_TYPE>=SSDPANEL && Option.DISPLAY_TYPE<VIRTUAL_C && !(Option.DISPLAY_TYPE==ILI9341_16 || Option.DISPLAY_TYPE==ILI9341_8 || Option.DISPLAY_TYPE==IPS_4_16 || Option.DISPLAY_TYPE==ILI9486_16))
 #define SSD16TYPE (Option.DISPLAY_TYPE>SSD_PANEL_8 && Option.DISPLAY_TYPE<VIRTUAL_C && !(Option.DISPLAY_TYPE==ILI9341_16 || Option.DISPLAY_TYPE==IPS_4_16 || Option.DISPLAY_TYPE==ILI9486_16))
-#define SPIREAD (Option.DISPLAY_TYPE == ILI9341 || Option.DISPLAY_TYPE == ILI9488P || Option.DISPLAY_TYPE == ILI9488 || Option.DISPLAY_TYPE == ST7789B)
+#define SPIREAD (Option.DISPLAY_TYPE == ILI9341 || Option.DISPLAY_TYPE == ILI9488P || Option.DISPLAY_TYPE == ILI9488 || Option.DISPLAY_TYPE == ST7796S || Option.DISPLAY_TYPE == ST7789B)
 #define FASTSCROLL (SSDTYPE || Option.DISPLAY_TYPE==SCREENMODE1 ||  Option.DISPLAY_TYPE == SCREENMODE2 || Option.DISPLAY_TYPE == VIRTUAL_C || Option.DISPLAY_ORIENTATION == VIRTUAL_M)
-#define SPI480 (Option.DISPLAY_TYPE==ILI9488 || Option.DISPLAY_TYPE==ILI9488W || Option.DISPLAY_TYPE==ILI9481 || Option.DISPLAY_TYPE==ILI9481IPS) 
+#define SPI480 (Option.DISPLAY_TYPE==ILI9488 || Option.DISPLAY_TYPE==ST7796S || Option.DISPLAY_TYPE==ILI9488W || Option.DISPLAY_TYPE==ILI9481 || Option.DISPLAY_TYPE==ILI9481IPS) 
 #define TFT_SLPIN 0x10
 #define TFT_SLPOUT 0x11
 
@@ -475,5 +477,6 @@ extern void BitBangReadSPI(BYTE *buff, int cnt);
 extern void ScrollLCDSPI(int lines);
 extern void SetCS(void);
 extern int GetLineILI9341(void);
+extern void SPI111init(void);
 #endif
 /*  @endcond */

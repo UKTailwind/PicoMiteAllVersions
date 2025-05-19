@@ -115,8 +115,6 @@ void __not_in_flash_func(spi_finish)(spi_inst_t *spi){
 int LCD_CS_PIN=0;
 int LCD_CD_PIN=0;
 int LCD_Reset_PIN=0;
-static bool ST7796Swritestate=true;
-#define ST7796Schangetowrite  1600
 unsigned char LCDBuffer[1440]={0};
 
 void DefineRegionSPI(int xstart, int ystart, int xend, int yend, int rw);
@@ -153,6 +151,7 @@ void MIPS16 ConfigDisplaySPI(unsigned char *p) {
 	char code,CD,RESET,CS=0;
 	uint8_t BACKLIGHT=0;
 	int DISPLAY_TYPE=0;
+	int orientation=1;
     getargs(&p, 13, (unsigned char *)",");
     if(checkstring(argv[0], (unsigned char *)"ILI9163")) {
         DISPLAY_TYPE = ILI9163;
@@ -195,15 +194,18 @@ void MIPS16 ConfigDisplaySPI(unsigned char *p) {
 	} else return;
 	if(!Option.SYSTEM_CLK)error("System SPI not configured");
     if(!(argc == 7 || argc == 9 || argc==11 || argc==13)) error("Argument count");
-    if(checkstring(argv[2], (unsigned char *)"L") || checkstring(argv[2], (unsigned char *)"LANDSCAPE"))
-        Option.DISPLAY_ORIENTATION = LANDSCAPE;
-    else if(checkstring(argv[2], (unsigned char *)"P") || checkstring(argv[2], (unsigned char *)"PORTRAIT"))
-        Option.DISPLAY_ORIENTATION = PORTRAIT;
-    else if(checkstring(argv[2], (unsigned char *)"RL") || checkstring(argv[2], (unsigned char *)"RLANDSCAPE"))
-        Option.DISPLAY_ORIENTATION = RLANDSCAPE;
-    else if(checkstring(argv[2], (unsigned char *)"RP") || checkstring(argv[2], (unsigned char *)"RPORTRAIT"))
-        Option.DISPLAY_ORIENTATION = RPORTRAIT;
-    else error("Orientation");
+	if(*argv[2]){
+		if(checkstring(argv[2], (unsigned char *)"L") || checkstring(argv[2], (unsigned char *)"LANDSCAPE"))
+			orientation = LANDSCAPE;
+		else if(checkstring(argv[2], (unsigned char *)"P") || checkstring(argv[2], (unsigned char *)"PORTRAIT"))
+			orientation = PORTRAIT;
+		else if(checkstring(argv[2], (unsigned char *)"RL") || checkstring(argv[2], (unsigned char *)"RLANDSCAPE"))
+			orientation = RLANDSCAPE;
+		else if(checkstring(argv[2], (unsigned char *)"RP") || checkstring(argv[2], (unsigned char *)"RPORTRAIT"))
+			orientation = RPORTRAIT;
+		else error("Orientation");
+	}
+	Option.DISPLAY_ORIENTATION=orientation;
     if(DISPLAY_TYPE==ST7789 || DISPLAY_TYPE == ST7789A|| DISPLAY_TYPE == ST7789A)Option.DISPLAY_ORIENTATION=(Option.DISPLAY_ORIENTATION+2) % 4;
 	if(!(code=codecheck(argv[4])))argv[4]+=2;
 	CD = getinteger(argv[4]);
@@ -320,7 +322,7 @@ void MIPS16 InitDisplaySPI(int InitOnly) {
 		spi_write_command(0x29); //Display on
 		uSec(150000);
 		break;
-	case ILI9488:
+		case ILI9488:
 		case ILI9488P:
 		case ILI9488W:
 			ResetController();
@@ -1137,10 +1139,6 @@ void spisendfast(unsigned char *n, int i){
 void DrawRectangleSPI(int x1, int y1, int x2, int y2, int c){
     // convert the colours to 565 format
 	unsigned char col[3];
-	if(Option.DISPLAY_TYPE==ST7796S && !ST7796Swritestate){
-		uSec(ST7796Schangetowrite);
-		ST7796Swritestate=true;
-	}
 	if(x1==x2 && y1==y2){
 		if(x1 < 0) return;
 	    if(x1 >= HRes) return;
@@ -1261,10 +1259,6 @@ void DrawRectangleSPISCR(int x1, int y1, int x2, int y2, int c){
 // convert the colours to 565 format
 	int t;
 	// make sure the coordinates are kept within the display area
-	if(Option.DISPLAY_TYPE==ST7796S && !ST7796Swritestate){
-		uSec(ST7796Schangetowrite);
-		ST7796Swritestate=true;
-	}
 	if(x2 <= x1) { t = x1; x1 = x2; x2 = t; }
 	if(y2 <= y1) { t = y1; y1 = y2; y2 = t; }
 	if(x1 < 0) x1 = 0;
@@ -1303,11 +1297,7 @@ void DrawBitmapSPI(int x1, int y1, int width, int height, int scale, int fc, int
     } c;
     if(bc == -1 && (void *)ReadBuffer == (void *)DisplayNotSet) bc = 0x0;
     if(x1>=HRes || y1>=VRes || x1+width*scale<0 || y1+height*scale<0)return;
-	if(Option.DISPLAY_TYPE==ST7796S && !ST7796Swritestate){
-		uSec(ST7796Schangetowrite);
-		ST7796Swritestate=true;
-	}
-    // adjust when part of the bitmap is outside the displayable coordinates
+   // adjust when part of the bitmap is outside the displayable coordinates
     vertCoord = y1; if(y1 < 0) y1 = 0;                                 // the y coord is above the top of the screen
     XStart = x1; if(XStart < 0) XStart = 0;                            // the x coord is to the left of the left marginn
     XEnd = x1 + (width * scale) - 1; if(XEnd >= HRes) XEnd = HRes - 1; // the width of the bitmap will extend beyond the right margin
@@ -1317,8 +1307,6 @@ void DrawBitmapSPI(int x1, int y1, int width, int height, int scale, int fc, int
         j = width * height * scale * scale * 3;
         p = GetMemory(j);                                              //allocate some temporary memory
         ReadBuffer(XStart, y1, XEnd, YEnd, (unsigned char *)p);
-		uSec(ST7796Schangetowrite);
-		ST7796Swritestate=true;
     }
     // convert the colours to 565 format
 	if(Option.DISPLAY_TYPE==ILI9488  || Option.DISPLAY_TYPE == ILI9488P || Option.DISPLAY_TYPE==ILI9481IPS ){
@@ -1420,10 +1408,6 @@ void DrawBitmapSPISCR(int x1, int y1, int width, int height, int scale, int fc, 
 	}
     if(bc == -1 && (void *)ReadBuffer == (void *)DisplayNotSet) bc = 0x0;
     if(x1>=HRes || y1>=VRes || x1+width*scale<0 || y1+height*scale<0)return;
-	if(Option.DISPLAY_TYPE==ST7796S && !ST7796Swritestate){
-		uSec(ST7796Schangetowrite);
-		ST7796Swritestate=true;
-	}
     // adjust when part of the bitmap is outside the displayable coordinates
     vertCoord = y1; if(y1 < 0) y1 = 0;                                 // the y coord is above the top of the screen
     XStart = x1; if(XStart < 0) XStart = 0;                            // the x coord is to the left of the left marginn
@@ -1432,8 +1416,6 @@ void DrawBitmapSPISCR(int x1, int y1, int width, int height, int scale, int fc, 
         j = width * height * scale * scale * 3;
         p = GetMemory(j);                                              //allocate some temporary memory
         ReadBuffer(XStart, y1, XEnd, (y1 + (height * scale) - 1) , (unsigned char *)p);
-		uSec(ST7796Schangetowrite);
-		ST7796Swritestate=true;
     }
 	yt = y = (y1 + ScrollStart) % VRes;
 	YEnd=(y + (height * scale) - 1)  % VRes;
@@ -1491,9 +1473,6 @@ const unsigned char map32[256];
 void ReadBufferSPI(int x1, int y1, int x2, int y2, unsigned char* p) {
     int r, N, t;
     unsigned char h,l;
-	if(Option.DISPLAY_TYPE==ST7796S && ST7796Swritestate){
-		ST7796Swritestate=false;
-	}
 //	SInt(x1);SIntComma(y1);SIntComma(x2);SIntComma(y2);SRet();
     // make sure the coordinates are kept within the display area
     if(x2 <= x1) { t = x1; x1 = x2; x2 = t; }
@@ -1547,9 +1526,6 @@ void ReadBufferSPISCR(int x1, int y1, int x2, int y2, unsigned char* p) {
     unsigned char h,l;
 //	PInt(x1);PIntComma(y1);PIntComma(x2);PIntComma(y2);PRet();
     // make sure the coordinates are kept within the display area
-	if(Option.DISPLAY_TYPE==ST7796S && ST7796Swritestate){
-		ST7796Swritestate=false;
-	}
     if(x2 <= x1) { t = x1; x1 = x2; x2 = t; }
     if(y2 <= y1) { t = y1; y1 = y2; y2 = t; }
     if(x1 < 0) x1 = 0;
@@ -1633,10 +1609,6 @@ void DrawBufferSPI(int x1, int y1, int x2, int y2, unsigned char* p) {
     } c;
 	unsigned char q[3];
 	int i,t;
-	if(Option.DISPLAY_TYPE==ST7796S && !ST7796Swritestate){
-		uSec(ST7796Schangetowrite);
-		ST7796Swritestate=true;
-	}
     if(x2 <= x1) { t = x1; x1 = x2; x2 = t; }
     if(y2 <= y1) { t = y1; y1 = y2; y2 = t; }
     if(x1 < 0) x1 = 0;
@@ -1679,10 +1651,6 @@ void DrawBufferSPISCR(int x1, int y1, int x2, int y2, unsigned char* p) {
     } c;
 	unsigned char q[3];
 	int i,t;
-	if(Option.DISPLAY_TYPE==ST7796S && !ST7796Swritestate){
-		uSec(ST7796Schangetowrite);
-		ST7796Swritestate=true;
-	}
     if(x2 <= x1) { t = x1; x1 = x2; x2 = t; }
     if(y2 <= y1) { t = y1; y1 = y2; y2 = t; }
     if(x1 < 0) x1 = 0;
@@ -2053,6 +2021,7 @@ void ST7920SetXY(int x, int y){
 void Display_Refresh(void){
 	if(!(Option.DISPLAY_TYPE<=I2C_PANEL || Option.DISPLAY_TYPE>=BufferedPanel)) return;
 	unsigned char* p=(void *)((unsigned int)LCDBuffer);
+	if(low_x==2000 && high_x==-1 && low_y==2000 && high_y==-1)return; //Nothing to do
 	if(low_x<0)low_x=0;
 	if(low_y<0)low_y=0;
 	if(high_x>DisplayHRes)high_x=DisplayHRes-1;
@@ -2064,18 +2033,15 @@ void Display_Refresh(void){
 			SetCS();
 			gpio_put(LCD_CD_PIN,GPIO_PIN_SET);
 			xmit_byte_multi(p+(y*DisplayHRes)+low_x,high_x-low_x+1);
-//			HAL_SPI_Transmit(&hspi3,p+(y*DisplayHRes)+low_x,high_x-low_x+1,500);
 			ClearCS(Option.LCD_CS);
 		}
-	}
-	if(Option.DISPLAY_TYPE<=I2C_PANEL){
+	} else if(Option.DISPLAY_TYPE<=I2C_PANEL){
 		int y;
 		for(y=low_y/8;y<(high_y & 0xf8)/8+1;y++){
 			SSD1306I2CSetXY(Option.I2Coffset+low_x,y);
 			I2C_Send_Data(p+(y*DisplayHRes)+low_x,high_x-low_x+1);
 		}
-	}
-	if(Option.DISPLAY_TYPE==SSD1306SPI){
+	} else if(Option.DISPLAY_TYPE==SSD1306SPI){
 		int y;
 		for(y=low_y/8;y<(high_y & 0xf8)/8+1;y++){
 			SSD1306SPISetXY(Option.I2Coffset+low_x,y);
@@ -2085,8 +2051,7 @@ void Display_Refresh(void){
 //			HAL_SPI_Transmit(&hspi3,p+(y*DisplayHRes)+low_x,high_x-low_x+1,500);
 			ClearCS(Option.LCD_CS);
 		}
-	}
-	if(Option.DISPLAY_TYPE==ST7920){
+	} else if(Option.DISPLAY_TYPE==ST7920){
 		int y,i;
 		unsigned char x_array[33];
 		unsigned char *q;
@@ -2104,7 +2069,7 @@ void Display_Refresh(void){
 			ClearCS(Option.LCD_CD);
 		}
 	}
-    low_y=2000; high_y=0; low_x=2000; high_x=0;
+    low_y=2000; high_y=-1; low_x=2000; high_x=-1;
 
 }
 #endif

@@ -1251,9 +1251,19 @@ retest_an_if:
 						// and it is just a number, so get it and find the line
 						nextstmt = findline(getinteger(argv[4]), true);
 					else {
-						// there is a statement after the ELSE clause  so just point to it (the byte after the ELSE token)
+/*						// there is a statement after the ELSE clause  so just point to it (the byte after the ELSE token)
 						for(p = cmdline; *p && *p != ss[1]; p++);	// search for the token
 						nextstmt = p + 1;							// and point to the byte after
+*/
+		                // IF <condition> THEN <statement1> ELSE <statement2>
+						// Find and read the THEN function token.
+						for(p = cmdline; *p && *p != ss[0]; p++){}
+						// Skip the command that <statement1> must start with.
+						skipspace(p);
+						p += sizeof(CommandToken);
+						// Find and read the ELSE function token.
+						for(p = cmdline; *p && *p != ss[1]; p++);
+		                nextstmt = p+1;  // The statement after the ELSE token.
 					}
 				} else {
 					// no ELSE on a single line IF statement, so just continue with the next statement
@@ -3638,7 +3648,7 @@ void execute(char* mycmd) {
 	}
 	else {
 		unsigned char* p = inpbuf;
-		char* q;
+//		char* q;
 //		char fn[STRINGSIZE] = { 0 };
         unsigned short tkn=GetCommandValue((unsigned char *)"RUN");
         tknbuf[0] = (tkn & 0x7f ) + C_BASETOKEN;
@@ -3646,10 +3656,10 @@ void execute(char* mycmd) {
 		p[0] = (tkn & 0x7f ) + C_BASETOKEN;
 		p[1] = (tkn >> 7) + C_BASETOKEN; //tokens can be 14-bit
 		memmove(&p[2], &p[4], strlen((char *)p) - 4);
-		if ((q = strchr((char *)p, ':'))) {
+/*		if ((q = strchr((char *)p, ':'))) {
 			q--;
 			*q = '0';
-		}
+		}*/
 		p[strlen((char*)p) - 2] = 0;
 //		MMPrintString(fn); PRet();
 //		CloseAudio(1);

@@ -105,8 +105,6 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #define PIN_RESTART         9997                                // reset caused by entering 0 at the PIN prompt
 #define RESTART_NOAUTORUN   9996                                // reset required after changing the LCD or touch config
 #define PinRead(a)  gpio_get(PinDef[a].GPno)
-#define LCDMaxV 480
-#define LCDMaxH 800
 #define VMaxV 480
 #define VMaxH 640
 extern int GetJustification(char *p, int *jh, int *jv, int *jo);

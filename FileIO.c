@@ -5210,7 +5210,6 @@ void FlashWriteAlign(void)
     }
     FlashWriteWord(0xFFFFFFFF);
 }
-
 void FlashWriteClose(void)
 {
     while (mi8p != 0)

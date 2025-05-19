@@ -62,6 +62,7 @@ extern volatile unsigned int PauseTimer;
 extern volatile unsigned int IntPauseTimer;
 extern volatile unsigned int Timer1, Timer2, Timer3, Timer4, Timer5;		                       //1000Hz decrement timer
 extern volatile unsigned int diskchecktimer;
+extern volatile unsigned int clocktimer;
 extern volatile int ds18b20Timer;
 extern volatile int CursorTimer;
 extern volatile unsigned int I2CTimer;
@@ -297,8 +298,10 @@ extern struct tagMTRand *g_myrand;
 #define putch _putch
 #endif
 #endif
+#define nunaddr 0xA4 / 2
 #define CURSOR_OFF        350              // cursor off time in mS
 #define CURSOR_ON     650                  // cursor on time in mS
+#define RoundUptoInt(a)     (((a) + (32 - 1)) & (~(32 - 1)))// round up to the nearest whole integer
 
 #define dp(...) {unsigned char s[140];sprintf((char *)s,  __VA_ARGS__); MMPrintString((char *)s); MMPrintString((char *)"\r\n");}
 

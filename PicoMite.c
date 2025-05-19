@@ -497,7 +497,6 @@ void __not_in_flash_func(routinechecks)(void){
     if(clocktimer==0 && Option.RTC){
         if(classicread==0 && nunchuckread==0){
             RtcGetTime(0);
-            clocktimer=(1000*60*60);
         }
     }
 #ifndef USBKEYBOARD
@@ -4095,16 +4094,6 @@ int MIPS16 main(){
     LoadOptions();
 #ifdef rp2350
     if(rom_get_last_boot_type()==BOOT_TYPE_FLASH_UPDATE)restart_reason=0xFFFFFFFC;
-//    if(Option.PSRAM_CS_PIN){
-//        gpio_init(47);
-//        gpio_set_dir(47, GPIO_OUT);
-//        gpio_put(47,GPIO_PIN_SET);
-//}
-//    if(!rp2350a){
-//        gpio_init(47);
-//        gpio_set_dir(47, GPIO_OUT);
-//        gpio_put(47,GPIO_PIN_SET);
-//    }
 #else
     if(restart_reason==0x10001 || restart_reason==0x101)restart_reason=0xFFFFFFFC;
 #endif

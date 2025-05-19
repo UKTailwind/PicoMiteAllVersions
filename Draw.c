@@ -46,7 +46,6 @@ extern mutex_t	frameBufferMutex;
 #define LONG long
 #define max(x, y) (((x) > (y)) ? (x) : (y))
 #define min(x, y) (((x) < (y)) ? (x) : (y))
-#define RoundUptoInt(a)     (((a) + (32 - 1)) & (~(32 - 1)))// round up to the nearest whole integer
 void DrawFilledCircle(int x, int y, int radius, int r, int fill, int ints_per_line, uint32_t *br, MMFLOAT aspect, MMFLOAT aspect2);
 void hline(int x0, int x1, int y, int f, int ints_per_line, uint32_t *br);
 void SaveTriangle(int bnbr, char *buff);
@@ -118,7 +117,7 @@ typedef struct _BMPDECODER
 short gui_font;
 int gui_fcolour;
 int gui_bcolour;
-short low_y=LCDMaxV, high_y=0, low_x=LCDMaxH, high_x=0;
+short low_y=2000, high_y=-1, low_x=2000, high_x=-1;
 int PrintPixelMode=0;
 
 short CurrentX=0, CurrentY=0;                                             // the current default position for the next char to be written
@@ -5024,7 +5023,7 @@ void restorepanel(void){
     WriteBuf=NULL;
 }
 void setframebuffer(void){
-    if(!((Option.DISPLAY_TYPE>I2C_PANEL && Option.DISPLAY_TYPE < BufferedPanel) || (Option.DISPLAY_TYPE>=SSDPANEL && Option.DISPLAY_TYPE<VIRTUAL)))return;
+    if(!((Option.DISPLAY_TYPE>I2C_PANEL && Option.DISPLAY_TYPE < BufferedPanel) || (Option.DISPLAY_TYPE>=SSDPANEL && Option.DISPLAY_TYPE<VIRTUAL) || Option.DISPLAY_TYPE>=NEXTGEN))return;
     DrawRectangle=DrawRectangle16;
     DrawBitmap= DrawBitmap16;
     ScrollLCD=ScrollLCD16;
@@ -5353,9 +5352,9 @@ void merge(uint8_t colour){
         copyframetoscreen(LineBuf,0,HRes-1,y,y,0);
     }
 #ifdef PICOMITE
-    mutex_exit(&frameBufferMutex);
-    mergedone=true;
-    __dmb();
+        mutex_exit(&frameBufferMutex);
+        mergedone=true;
+        __dmb();
 #endif
 }
 /*  @endcond */
@@ -7023,7 +7022,7 @@ void cmd_refresh(void){
 
 void DrawPixel16(int x, int y, int c){
     if(x<0 || y<0 || x>=HRes || y>=VRes)return;
-    if(Option.DISPLAY_TYPE>=VIRTUAL && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
+    if((Option.DISPLAY_TYPE>=VIRTUAL &&  Option.DISPLAY_TYPE<NEXTGEN) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
     unsigned char colour = RGB121(c);
 	uint8_t *p=(uint8_t *)(((uint32_t) WriteBuf)+(y*(HRes>>1))+(x>>1));
     if(x & 1){
@@ -7039,7 +7038,7 @@ void DrawRectangle16(int x1, int y1, int x2, int y2, int c){
 //    unsigned char mask;
     unsigned char colour = RGB121(c);;
     unsigned char bcolour=(colour<<4) | colour;
-    if(Option.DISPLAY_TYPE>=VIRTUAL && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
+    if((Option.DISPLAY_TYPE>=VIRTUAL &&  Option.DISPLAY_TYPE<NEXTGEN) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
     if(x1 < 0) x1 = 0;
     if(x1 >= HRes) x1 = HRes - 1;
     if(x2 < 0) x2 = 0;
@@ -7077,7 +7076,7 @@ void DrawBitmap16(int x1, int y1, int width, int height, int scale, int fc, int 
     if(x1>=HRes || y1>=VRes || x1+width*scale<0 || y1+height*scale<0)return;
     unsigned char fcolour = RGB121(fc);
     unsigned char bcolour = RGB121(bc);
-    if(Option.DISPLAY_TYPE>=VIRTUAL && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
+    if((Option.DISPLAY_TYPE>=VIRTUAL &&  Option.DISPLAY_TYPE<NEXTGEN) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
     for(i = 0; i < height; i++) {                                   // step thru the font scan line by line
         for(j = 0; j < scale; j++) {                                // repeat lines to scale the font
             for(k = 0; k < width; k++) {                            // step through each bit in a scan line
@@ -7139,7 +7138,7 @@ void DrawBuffer16(int x1, int y1, int x2, int y2, unsigned char *p){
     } c;
     unsigned char fcolour;
     uint8_t *pp;
-    if(Option.DISPLAY_TYPE>=VIRTUAL && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
+    if((Option.DISPLAY_TYPE>=VIRTUAL &&  Option.DISPLAY_TYPE<NEXTGEN) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
     // make sure the coordinates are kept within the display area
     if(x2 <= x1) { t = x1; x1 = x2; x2 = t; }
     if(y2 <= y1) { t = y1; y1 = y2; y2 = t; }
@@ -7175,7 +7174,7 @@ void DrawBuffer16Fast(int x1, int y1, int x2, int y2, int blank, unsigned char *
     // make sure the coordinates are kept within the display area
     if(x2 <= x1) { t = x1; x1 = x2; x2 = t; }
     if(y2 <= y1) { t = y1; y1 = y2; y2 = t; }
-    if(Option.DISPLAY_TYPE>=VIRTUAL && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
+    if((Option.DISPLAY_TYPE>=VIRTUAL &&  Option.DISPLAY_TYPE<NEXTGEN) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
 	for(y=y1;y<=y2;y++){
     	for(x=x1;x<=x2;x++){
             if(x>=0 && x<HRes && y>=0 && y<VRes){
@@ -7210,7 +7209,7 @@ void DrawBuffer16Fast(int x1, int y1, int x2, int y2, int blank, unsigned char *
 void ReadBuffer16(int x1, int y1, int x2, int y2, unsigned char *c){
     int x,y,t;
     uint8_t *pp;
-    if(Option.DISPLAY_TYPE>=VIRTUAL && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
+    if((Option.DISPLAY_TYPE>=VIRTUAL &&  Option.DISPLAY_TYPE<NEXTGEN) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
     if(x2 <= x1) { t = x1; x1 = x2; x2 = t; }
     if(y2 <= y1) { t = y1; y1 = y2; y2 = t; }
     int xx1=x1, yy1=y1, xx2=x2, yy2=y2;
@@ -7254,7 +7253,7 @@ void ReadBuffer16Fast(int x1, int y1, int x2, int y2, unsigned char *c){
     uint8_t *pp;
     if(x2 <= x1) { t = x1; x1 = x2; x2 = t; }
     if(y2 <= y1) { t = y1; y1 = y2; y2 = t; }
-    if(Option.DISPLAY_TYPE>=VIRTUAL && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
+    if((Option.DISPLAY_TYPE>=VIRTUAL && Option.DISPLAY_TYPE<NEXTGEN) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
 	for(y=y1;y<=y2;y++){
     	for(x=x1;x<=x2;x++){
 			if(x>=0 && x<HRes && y>=0 && y<VRes){
@@ -7283,7 +7282,7 @@ void Display_Refresh(void){
 #endif
 void DrawPixel2(int x, int y, int c){
     if(x<0 || y<0 || x>=HRes || y>=VRes)return;
-    if(Option.DISPLAY_TYPE>=VIRTUAL && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
+    if((Option.DISPLAY_TYPE>=VIRTUAL &&  Option.DISPLAY_TYPE<NEXTGEN) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
 	uint8_t *p=(uint8_t *)(((uint32_t) WriteBuf)+(y*(HRes>>3))+(x>>3));
 	uint8_t bit = 1<<(x % 8);
 	if(c)*p |=bit;
@@ -7293,7 +7292,7 @@ void DrawRectangle2(int x1, int y1, int x2, int y2, int c){
     int x,y,x1p, x2p, t;
     unsigned char mask;
     volatile unsigned char *p;
-    if(Option.DISPLAY_TYPE>=VIRTUAL && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
+    if((Option.DISPLAY_TYPE>=VIRTUAL &&  Option.DISPLAY_TYPE<NEXTGEN) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
     if(x1 < 0) x1 = 0;
     if(x1 >= HRes) x1 = HRes - 1;
     if(x2 < 0) x2 = 0;
@@ -7361,7 +7360,7 @@ void DrawBitmap2(int x1, int y1, int width, int height, int scale, int fc, int b
     unsigned char mask;
     if(x1>=HRes || y1>=VRes || x1+width*scale<0 || y1+height*scale<0)return;
     int tilematch=0;
-    if(Option.DISPLAY_TYPE>=VIRTUAL && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
+    if((Option.DISPLAY_TYPE>=VIRTUAL &&  Option.DISPLAY_TYPE<NEXTGEN) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
 #ifdef PICOMITEVGA
     int xa= 8;
     int ya=ytileheight;
@@ -7560,7 +7559,7 @@ void DrawBuffer2(int x1, int y1, int x2, int y2, unsigned char *p){
     char rgbbytes[4];
     unsigned int rgb;
     } c;
-    if(Option.DISPLAY_TYPE>=VIRTUAL && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
+    if((Option.DISPLAY_TYPE>=VIRTUAL &&  Option.DISPLAY_TYPE<NEXTGEN) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
     // make sure the coordinates are kept within the display area
     if(x2 <= x1) { t = x1; x1 = x2; x2 = t; }
     if(y2 <= y1) { t = y1; y1 = y2; y2 = t; }
@@ -7597,7 +7596,7 @@ void DrawBuffer2Fast(int x1, int y1, int x2, int y2, int blank, unsigned char *p
     // make sure the coordinates are kept within the display area
     if(x2 <= x1) { t = x1; x1 = x2; x2 = t; }
     if(y2 <= y1) { t = y1; y1 = y2; y2 = t; }
-    if(Option.DISPLAY_TYPE>=VIRTUAL && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
+    if((Option.DISPLAY_TYPE>=VIRTUAL &&  Option.DISPLAY_TYPE<NEXTGEN) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
 	for(y=y1;y<=y2;y++){
     	for(x=x1;x<=x2;x++){
             if(x>=0 && x<HRes && y>=0 && y<VRes){
@@ -7629,7 +7628,7 @@ void ReadBuffer2(int x1, int y1, int x2, int y2, unsigned char *c){
     int x,y,t,loc;
 //    uint8_t *pp;
     unsigned char mask;
-    if(Option.DISPLAY_TYPE>=VIRTUAL && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
+    if((Option.DISPLAY_TYPE>=VIRTUAL &&  Option.DISPLAY_TYPE<NEXTGEN) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
     if(x2 <= x1) { t = x1; x1 = x2; x2 = t; }
     if(y2 <= y1) { t = y1; y1 = y2; y2 = t; }
     int xx1=x1, yy1=y1, xx2=x2, yy2=y2;
@@ -7670,7 +7669,7 @@ void ReadBuffer2Fast(int x1, int y1, int x2, int y2, unsigned char *c){
     int x,y,t,loc,toggle=0;;
 //    uint8_t *pp;
     unsigned char mask;
-    if(Option.DISPLAY_TYPE>=VIRTUAL && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
+    if((Option.DISPLAY_TYPE>=VIRTUAL &&  Option.DISPLAY_TYPE<NEXTGEN) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
     if(x2 <= x1) { t = x1; x1 = x2; x2 = t; }
     if(y2 <= y1) { t = y1; y1 = y2; y2 = t; }
 	for(y=y1;y<=y2;y++){
@@ -7713,7 +7712,7 @@ void MIPS16 ConfigDisplayVirtual(unsigned char *p) {
     Option.DISPLAY_ORIENTATION = LANDSCAPE;
 }
 void MIPS16 InitDisplayVirtual(void){
-    if(Option.DISPLAY_TYPE==0 || Option.DISPLAY_TYPE < VIRTUAL) return;
+    if(Option.DISPLAY_TYPE==0 || Option.DISPLAY_TYPE < VIRTUAL || Option.DISPLAY_TYPE >= NEXTGEN) return;
     DisplayHRes = HRes = display_details[Option.DISPLAY_TYPE].horizontal;
     DisplayVRes = VRes = display_details[Option.DISPLAY_TYPE].vertical;
 	if(Option.DISPLAY_TYPE==VIRTUAL_M){

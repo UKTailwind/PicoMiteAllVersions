@@ -55,20 +55,25 @@ extern const uint8_t *flash_progmemory;
         unsigned char __attribute__ ((aligned (4096))) AllMemory[HEAP_MEMORY_SIZE+256+320*240*2];
         unsigned char *FRAMEBUFFER=AllMemory+HEAP_MEMORY_SIZE+256;
         uint32_t framebuffersize=320*240*2;
-        #else
-        unsigned char __attribute__ ((aligned (256))) AllMemory[HEAP_MEMORY_SIZE+256];
-    #endif
-    unsigned char *MMHeap=AllMemory;
+        unsigned char *MMHeap=AllMemory;
     #else
+        unsigned char __attribute__ ((aligned (256))) AllMemory[HEAP_MEMORY_SIZE+256];
+        unsigned char *MMHeap=AllMemory;
+        uint32_t framebuffersize=0;
+        unsigned char *FRAMEBUFFER=NULL;
+    #endif
+#else
     #ifdef PICOMITEVGA
         unsigned char __attribute__ ((aligned (4096))) Heap[HEAP_MEMORY_SIZE+256];
         unsigned char __attribute__ ((aligned (256))) video[640*480/8];
         unsigned char *FRAMEBUFFER=video;
         uint32_t framebuffersize=640*480/8;
         unsigned char *MMHeap=Heap;
-        #else
+    #else
         unsigned char __attribute__ ((aligned (256))) AllMemory[HEAP_MEMORY_SIZE+256];
         unsigned char *MMHeap=AllMemory;
+        uint32_t framebuffersize=0;
+        unsigned char *FRAMEBUFFER=NULL;
     #endif
 #endif
 

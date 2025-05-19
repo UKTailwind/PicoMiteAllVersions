@@ -1581,7 +1581,6 @@ void cmd_port(void) {
         	if(!code)pin=codemap(pincode);
         	else pin=pincode;
             if(IsInvalidPin(pin) || !(ExtCurrentConfig[pin] == EXT_DIG_OUT )) error("Invalid output pin");
-            gpio_set_input_enabled(PinDef[pin].GPno, true);
             mask |=(1<<PinDef[pin].GPno);
             if(value & 1)setmask |= (1<<PinDef[pin].GPno);
             value >>= 1;
@@ -1589,23 +1588,9 @@ void cmd_port(void) {
             pincode++;
         }
     } 
-    readmask=gpio_get_all64();
+    readmask=gpio_get_out_level_all64();
     readmask &=mask;
-    gpio_xor_mask64(setmask ^ readmask);
-#ifdef rp2350
-    #ifdef PICOMITEWEB
-        int n=NBRPINS;
-    #else
-        int n=rp2350a ? 44: NBRPINS;
-    #endif
-#else
-    int n=NBRPINS;
-#endif
-
-    for(int i=0;i<n;i++){
-        if(mask & 1)gpio_set_input_enabled(PinDef[i].GPno, false);
-        mask>>=1;
-    }
+    gpio_xor_mask(setmask ^ readmask);
 }
 
 
@@ -1660,6 +1645,7 @@ void fun_port(void) {
 	getargs(&ep, NBRPINS * 4, (unsigned char *)",");
 	if((argc & 0b11) != 0b11) error("Invalid syntax");
     uint64_t pinstate=gpio_get_all64();
+    uint64_t outpinstate=gpio_get_out_level_all64();
     for(i = argc - 3; i >= 0; i -= 4) {
     	code=0;
     	if(!(code=codecheck(argv[i])))argv[i]+=2;
@@ -1673,7 +1659,8 @@ void fun_port(void) {
         	else pin=pincode;
             if(IsInvalidPin(pin) || !(ExtCurrentConfig[pin] == EXT_DIG_IN || ExtCurrentConfig[pin] == EXT_DIG_OUT || ExtCurrentConfig[pin] == EXT_INT_HI || ExtCurrentConfig[pin] == EXT_INT_LO || ExtCurrentConfig[pin] == EXT_INT_BOTH)) error("Invalid input pin");
             value <<= 1;
-            value |= (pinstate & (1<<PinDef[pin].GPno)? 1:0);
+            if(ExtCurrentConfig[pin] == EXT_DIG_OUT)value |= (outpinstate & (1<<PinDef[pin].GPno)? 1:0);
+            else value |= (pinstate & (1<<PinDef[pin].GPno)? 1:0);
             nbr--;
             pincode--;
         }

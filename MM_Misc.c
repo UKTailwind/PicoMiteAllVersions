@@ -2046,7 +2046,7 @@ void MIPS16 printoptions(void){
 		}
         PRet();
     }
-    if(Option.DISPLAY_TYPE >= VIRTUAL){
+    if(Option.DISPLAY_TYPE >= VIRTUAL && Option.DISPLAY_TYPE<NEXTGEN){
         PO("LCDPANEL"); MMPrintString((char *)display_details[Option.DISPLAY_TYPE].name); PRet();
     } 
     #ifdef GUICONTROLS
@@ -3051,8 +3051,7 @@ void MIPS16 cmd_option(void) {
 #ifndef PICOMITEVGA
 	tp = checkstring(cmdline, (unsigned char *)"LCD320");
 	if(tp) {
-        if(!( SSD16TYPE || Option.DISPLAY_TYPE==IPS_4_16 || SPI480 || Option.DISPLAY_TYPE==ILI9488P)) error("Only available on SSD1963, 480x320 SPI displays and IPS_4_16 displays");
-        if(!(Option.DISPLAY_ORIENTATION==LANDSCAPE || Option.DISPLAY_ORIENTATION==RLANDSCAPE || Option.DISPLAY_TYPE==ILI9488P))error("Only available in landscape mode");
+        if(!( SSD16TYPE  && (Option.DISPLAY_ORIENTATION==LANDSCAPE || Option.DISPLAY_ORIENTATION==RLANDSCAPE))) error("Only available on 16-bit SSD1963 and IPS_4_16 displays in Landscape");
         if(( SSD16TYPE || Option.DISPLAY_TYPE==IPS_4_16)){
             if(checkstring(tp, (unsigned char *)"OFF"))	{ 
                 clear320();
@@ -3068,24 +3067,6 @@ void MIPS16 cmd_option(void) {
                 HRes=320;
                 VRes=240;
                 buff320=GetMemory(320*6);
-                return; 
-            } else error("Syntax");
-        } else if(Option.DISPLAY_TYPE==ILI9488P){
-            if(checkstring(tp, (unsigned char *)"OFF"))	{ 
-                VRes=320;
-                return;
-            }
-            else if(checkstring(tp, (unsigned char *)"ON"))	{ 
-                HRes=320;
-                return; 
-            } 
-        } else if(SPI480){
-            if(checkstring(tp, (unsigned char *)"OFF"))	{ 
-                clear320();
-                return;
-            }
-            else if(checkstring(tp, (unsigned char *)"ON"))	{ 
-                VRes=240;
                 return; 
             } else error("Syntax");
         } else error("Invalid display type");

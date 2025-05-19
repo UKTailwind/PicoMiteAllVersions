@@ -40,7 +40,6 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 
 #include "hardware/irq.h"
 
-#define nunaddr 0xA4 / 2;
 #define PinRead(a) gpio_get(PinDef[a].GPno)
 extern void DrawBufferMEM(int x1, int y1, int x2, int y2, unsigned char * p);
 extern void ReadBufferMEM(int x1, int y1, int x2, int y2, unsigned char * buff);
@@ -518,6 +517,7 @@ void CheckI2CKeyboard(int noerror, int read) {
 void RtcGetTime(int noerror) {
   char * buff = GetTempMemory(STRINGSIZE); // Received data is stored here
   int DS1307;
+  clocktimer=(1000*60*60);
   if (I2C0locked) {
     I2C_Sendlen = 1; // send one byte
     I2C_Rcvlen = 0;
@@ -595,9 +595,24 @@ void MIPS16 cmd_rtc(void) {
   unsigned char * p;
   void * ptr = NULL;
   if (!(I2C0locked || I2C1locked)) error("SYSTEM I2C not configured");
-  if (checkstring(cmdline, (unsigned char * )
-      "GETTIME")) {
-    RtcGetTime(0);
+  if (checkstring(cmdline, (unsigned char * )"GETTIME")) {
+    int repeat=5;
+    noRTC=0;
+    while(1){
+      while(!(classicread==0 && nunchuckread==0)){routinechecks();}
+      RtcGetTime(1);
+      if(noRTC==0)break;
+      repeat--;
+      if(!repeat)break;
+    }
+    if(noRTC){
+      if (CurrentLinePtr) error("RTC not responding");
+      if (Option.RTC) {
+        MMPrintString("RTC not responding");
+        MMPrintString("\r\n");
+      }
+    }
+  
     return;
   }
   if ((p = checkstring(cmdline, (unsigned char * )
@@ -1350,6 +1365,7 @@ void GeneralReceive(unsigned int addr, int nbr, char * p) {
   if (I2C0locked) {
     I2C_Rcvbuf_Float = NULL;
     I2C_Rcvbuf_Int = NULL;
+    I2C_Rcvbuf_String = NULL;
     I2C_Sendlen = 0; // send one byte
     I2C_Rcvlen = nbr;
     I2C_Addr = addr; // address of the device
@@ -1357,6 +1373,7 @@ void GeneralReceive(unsigned int addr, int nbr, char * p) {
   } else {
     I2C2_Rcvbuf_Float = NULL;
     I2C2_Rcvbuf_Int = NULL;
+    I2C2_Rcvbuf_String = NULL;
     I2C2_Sendlen = 0; // send one byte
     I2C2_Rcvlen = nbr;
     I2C2_Addr = addr; // address of the device
