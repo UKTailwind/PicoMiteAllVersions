@@ -1259,10 +1259,11 @@ retest_an_if:
 						// Find and read the THEN function token.
 						for(p = cmdline; *p && *p != ss[0]; p++){}
 						// Skip the command that <statement1> must start with.
+						p++;
 						skipspace(p);
 						p += sizeof(CommandToken);
 						// Find and read the ELSE function token.
-						for(p = cmdline; *p && *p != ss[1]; p++);
+						for(; *p && *p != ss[1]; p++);
 		                nextstmt = p+1;  // The statement after the ELSE token.
 					}
 				} else {
