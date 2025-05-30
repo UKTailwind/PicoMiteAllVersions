@@ -578,12 +578,9 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
   int ytileheightsave;
   ytileheightsave=ytileheight;
   OptionY_TILESave=Y_TILE;
-  if(!Option.ColourCode)ytileheight=16;
-  else {
-        ytileheight=gui_font_height;
-        Y_TILE=VRes/ytileheight;
-        if(VRes % ytileheight)Y_TILE++;
-  }
+  ytileheight=gui_font_height;
+  Y_TILE=VRes/ytileheight;
+  if(VRes % ytileheight)Y_TILE++;
 #else 
   char RefreshSave=Option.Refresh;
   Option.Refresh=0;
@@ -1133,8 +1130,9 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
 #ifdef USBKEYBOARD
 	                        clearrepeat();
 #endif	                        
-                            return;
-
+                            do_end(true);
+                            longjmp(mark, 1);												// jump back to the input prompt
+ 
               // Search
               case CTRLKEY('R'):
               case F3:    GetInputString((unsigned char *)"Find (Use SHIFT-F3 to repeat): ");

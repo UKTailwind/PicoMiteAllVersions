@@ -5034,6 +5034,7 @@ void ResetOptions(bool startup)
     Option.DefaultBrightness = 100;
     Option.Baudrate = CONSOLE_BAUDRATE;
     Option.PROG_FLASH_SIZE=MAX_PROG_SIZE;
+    Option.ColourCode=0x01;
 #ifdef PICOMITEVGA
     Option.DISPLAY_CONSOLE = 1;
     Option.DISPLAY_TYPE = SCREENMODE1;
