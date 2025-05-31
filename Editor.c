@@ -1130,8 +1130,7 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
 #ifdef USBKEYBOARD
 	                        clearrepeat();
 #endif	                        
-                            do_end(true);
-                            longjmp(mark, 1);												// jump back to the input prompt
+                            return;
  
               // Search
               case CTRLKEY('R'):

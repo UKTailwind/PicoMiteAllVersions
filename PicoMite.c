@@ -4617,7 +4617,7 @@ autorun:
         i=0;
         WatchdogSet=savewatchdog;
         CommandToken tkn=commandtbl_decode(tknbuf);
-        if(tkn==GetCommandValue((unsigned char *)"RUN"))i=1;
+        if(tkn==GetCommandValue((unsigned char *)"RUN") || tkn==GetCommandValue((unsigned char *)"EDIT") || tkn==GetCommandValue((unsigned char *)"AUTOSAVE"))i=1;
         if (setjmp(jmprun) != 0) {
             PrepareProgram(false);
             CurrentLinePtr = 0;
