@@ -1619,7 +1619,7 @@ void MIPS16 do_chain(unsigned char *cmdline){
 	SaveContext();
 	ClearVars(0,false);
 	InitHeap(false);
-	if (*filename && !FileLoadProgram(buf, true)) return;
+	if (*buf && !FileLoadProgram(buf, true)) return;
     ClearRuntime(false);
     PrepareProgram(true);
 	RestoreContext(false);
@@ -2119,7 +2119,8 @@ void MIPS16 __not_in_flash_func(cmd_do)(void) {
 	unsigned char *p, *tp, *evalp;
     if(cmdtoken==cmdWHILE)error("Unknown command");
 	// if it is a DO loop find the WHILE token and (if found) get a pointer to its expression
-	while(*cmdline && *cmdline != tokenWHILE) cmdline++;
+	while(*cmdline && *cmdline != tokenWHILE && *cmdline != tokenUNTIL) cmdline++;
+	if(*cmdline == tokenUNTIL)error("Syntax");
 	if(*cmdline == tokenWHILE) {
 			evalp = ++cmdline;
 		}

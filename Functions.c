@@ -508,8 +508,8 @@ typedef enum {
 	MMCMDLINE,
 #ifdef PICOMITEWEB
 	MMMESSAGE,
-    MMTOPIC,
     MMADDRESS,
+    MMTOPIC,
 #endif
     MMFLAG,  
     MMDISPLAY,
@@ -575,14 +575,14 @@ typedef enum {
 			Mstrcpy(sret,messagebuff);
 			targ=T_STR;
 			break;
-		case MMTOPIC:
-			sret = GetTempMemory(STRINGSIZE);                                        // this will last for the life of the command
-			Mstrcpy(sret,topicbuff);
-			targ=T_STR;
-			break;
 		case MMADDRESS:
 			sret = GetTempMemory(STRINGSIZE);                                        // this will last for the life of the command
 			Mstrcpy(sret,addressbuff);
+			targ=T_STR;
+			break;
+		case MMTOPIC:
+			sret = GetTempMemory(STRINGSIZE);                                        // this will last for the life of the command
+			Mstrcpy(sret,topicbuff);
 			targ=T_STR;
 			break;
 #endif

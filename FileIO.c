@@ -476,8 +476,10 @@ void MIPS16 cmd_psram(void)
                         pp--;
                         if ((unsigned char)*pp == T_NEWLINE)
                         {
+                            char *p=(char *)pp;
                             MMPrintString(": \"");
-                            llist((unsigned char *)buff, (unsigned char *)pp);
+                            buff[0]='\'';buff[1]='#';
+                            while(buff[0]=='\'' && buff[1]=='#')p=(char *)llist((unsigned char *)buff, (unsigned char *)p);
                             MMPrintString(buff);
                             MMPrintString("\"\r\n");
                         }
@@ -495,32 +497,6 @@ void MIPS16 cmd_psram(void)
             }
         }
     }
-    else if ((p = checkstring(cmdline, (unsigned char *)"DISK LOAD")))
-    {
-        int fsize,overwrite=0;
-        getargs(&p,5,(unsigned char *)",");
-        if(!(argc==3 || argc==5))error("Syntax");
-        int i = getint(argv[0], 1, MAXRAMSLOTS);
-        if(argc==5){
-            if(checkstring(argv[4],(unsigned char *)"O") || checkstring(argv[4],(unsigned char *)"OVERWRITE"))overwrite=1;
-            else error("Syntax");
-        }
-        uint32_t *c = (uint32_t *)(PSRAMblock + ((i - 1) * MAX_PROG_SIZE));
-        if (*c != 0x0 && overwrite==0) error("Already programmed");
-        int fnbr = FindFreeFileNbr();
-        if (!InitSDCard())  return;
-        char *pp = (char *)getFstring(argv[2]);
-        if (!BasicFileOpen((char *)pp, fnbr, FA_READ)) return;
-		if(filesource[fnbr]!=FLASHFILE)  fsize = f_size(FileTable[fnbr].fptr);
-		else fsize = lfs_file_size(&lfs,FileTable[fnbr].lfsptr);
-        if(fsize>MAX_PROG_SIZE)error("File size % cannot exceed %",fsize,MAX_PROG_SIZE);
-        uint8_t *q=(uint8_t *)c;
-        memset(q,0,MAX_PROG_SIZE);
-        for(int k = 0; k < fsize; k++){        // write to the flash byte by byte
-           *q++=FileGetChar(fnbr);
-        }
-        FileClose(fnbr);
-    }
     else if ((p = checkstring(cmdline, (unsigned char *)"FILE LOAD")))
     {
         int overwrite=0;
@@ -533,6 +509,7 @@ void MIPS16 cmd_psram(void)
         }
         uint8_t *c = (uint8_t *)(PSRAMblock + ((i - 1) * MAX_PROG_SIZE));
         if (*c != 0x0 && overwrite==0) error("Already programmed");
+        memset(c,0xFF,MAX_PROG_SIZE);
 		ClearTempMemory();
         SaveContext();
         MemLoadProgram(argv[2],c);
@@ -717,8 +694,10 @@ void MIPS16 cmd_flash(void)
                         pp--;
                         if ((unsigned char)*pp == T_NEWLINE)
                         {
+                            char *p=(char *)pp;
                             MMPrintString(": \"");
-                            llist((unsigned char *)buff, (unsigned char *)pp);
+                            buff[0]='\'';buff[1]='#';
+                            while(buff[0]=='\'' && buff[1]=='#')p=(char *)llist((unsigned char *)buff, (unsigned char *)p);
                             MMPrintString(buff);
                             MMPrintString("\"\r\n");
                         }
