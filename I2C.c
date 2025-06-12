@@ -288,11 +288,17 @@ void cmd_i2c(void) {
       "CLOSE")) != NULL)
     i2cDisable(p);
   else if ((p = checkstring(cmdline, (unsigned char * )
-      "WRITE")) != NULL)
-    i2cSend(p);
+      "WRITE")) != NULL){
+        if(I2C0SDApin==Option.SYSTEM_I2C_SDA) I2C_Timeout=1000;
+        i2cSend(p);
+        if(I2C0SDApin==Option.SYSTEM_I2C_SDA) I2C_Timeout=SystemI2CTimeout;
+      }
   else if ((p = checkstring(cmdline, (unsigned char * )
-      "READ")) != NULL)
-    i2cReceive(p);
+      "READ")) != NULL){
+        if(I2C0SDApin==Option.SYSTEM_I2C_SDA) I2C_Timeout=1000;
+        i2cReceive(p);
+        if(I2C0SDApin==Option.SYSTEM_I2C_SDA) I2C_Timeout=SystemI2CTimeout;
+      }
   else if ((p = checkstring(cmdline, (unsigned char * )
       "CHECK")) != NULL)
     i2cCheck(p);
@@ -322,11 +328,17 @@ void cmd_i2c2(void) {
       "CLOSE")) != NULL)
     i2c2Disable(p);
   else if ((p = checkstring(cmdline, (unsigned char * )
-      "WRITE")) != NULL)
-    i2c2Send(p);
+      "WRITE")) != NULL){
+        if(I2C1SDApin==Option.SYSTEM_I2C_SDA) I2C2_Timeout=1000;
+        i2c2Send(p);
+        if(I2C1SDApin==Option.SYSTEM_I2C_SDA) I2C2_Timeout=SystemI2CTimeout;
+      }
   else if ((p = checkstring(cmdline, (unsigned char * )
-      "READ")) != NULL)
-    i2c2Receive(p);
+      "READ")) != NULL){
+        if(I2C1SDApin==Option.SYSTEM_I2C_SDA) I2C2_Timeout=1000;
+        i2c2Receive(p);
+        if(I2C1SDApin==Option.SYSTEM_I2C_SDA) I2C2_Timeout=SystemI2CTimeout;
+      }
   else if ((p = checkstring(cmdline, (unsigned char * )
       "CHECK")) != NULL)
     i2c2Check(p);
@@ -991,8 +1003,10 @@ void i2cCheck(unsigned char * p) {
   addr = getinteger(argv[0]);
   if (addr < 0 || addr > 0x7F) error("Invalid I2C address");
   //	int ret=i2c_read_blocking(i2c0, addr, &rxdata, 1, false);
-  int ret = i2c_read_timeout_us(i2c0, addr, & rxdata, 1, false, 100);
-  mmI2Cvalue = ret < 0 ? 1 : 0;
+  int i2cret = i2c_read_timeout_us(i2c0, addr, & rxdata, 1, false, 1000);
+  mmI2Cvalue = 0;
+  if (i2cret == PICO_ERROR_GENERIC) mmI2Cvalue = 1;
+  if (i2cret == PICO_ERROR_TIMEOUT) mmI2Cvalue = 2;
 }
 void i2c2Check(unsigned char * p) {
   int addr;
@@ -1003,8 +1017,10 @@ void i2c2Check(unsigned char * p) {
   addr = getinteger(argv[0]);
   if (addr < 0 || addr > 0x7F) error("Invalid I2C address");
   //	int ret=i2c_read_blocking(i2c1, addr, &rxdata, 1, false);
-  int ret = i2c_read_timeout_us(i2c1, addr, & rxdata, 1, false, 100);
-  mmI2Cvalue = ret < 0 ? 1 : 0;
+  int i2cret = i2c_read_timeout_us(i2c1, addr, & rxdata, 1, false, 1000);
+  mmI2Cvalue = 0;
+  if (i2cret == PICO_ERROR_GENERIC) mmI2Cvalue = 1;
+  if (i2cret == PICO_ERROR_TIMEOUT) mmI2Cvalue = 2;
 }
 // receive data from an I2C slave - master mode
 void i2cReceive(unsigned char * p) {

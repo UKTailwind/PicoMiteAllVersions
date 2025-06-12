@@ -46,46 +46,47 @@ const struct Displays display_details[]={
 		{14,"ST7789_320", 50000000, 320, 240, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
 		{15,"ILI9488W", LCD_SPI_SPEED, 480, 320, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
 		{16,"ST7796S", 50000000, 480, 320, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
-		{17,"ST7735S_W", LCD_SPI_SPEED, 128, 128, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
-		{18,"GC9A01", LCD_SPI_SPEED, 240, 240, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
-		{19,"ILI9481IPS", 12000000, 480, 320, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
-		{20,"N5110", NOKIA_SPI_SPEED, 84, 48, 1, 1, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
-		{21,"SSD1306SPI", LCD_SPI_SPEED, 128, 64, 1, 1, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
-		{22,"ST7920", ST7920_SPI_SPEED, 128, 64, 1, 1, SPI_POLARITY_HIGH, SPI_PHASE_2EDGE},
-		{23,"", TOUCH_SPI_SPEED, 0, 0, 0, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
-		{24,"SPIReadSpeed", 12000000, 480, 320, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
-		{25,"ST7789RSpeed", 6000000, 320, 240, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
-		{26,"", SLOW_TOUCH_SPEED, 0, 0, 0, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
-		{27,"User", 0, 0, 0, 0, 0, 0 ,0},
-		{28,"Dummy", 0, 0, 0, 0, 0, 0 ,0},
+		{17,"ST7796SP",50000000, 320, 320, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
+		{18,"ST7735S_W", LCD_SPI_SPEED, 128, 128, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
+		{19,"GC9A01", LCD_SPI_SPEED, 240, 240, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
+		{20,"ILI9481IPS", 12000000, 480, 320, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
+		{21,"N5110", NOKIA_SPI_SPEED, 84, 48, 1, 1, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
+		{22,"SSD1306SPI", LCD_SPI_SPEED, 128, 64, 1, 1, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
+		{23,"ST7920", ST7920_SPI_SPEED, 128, 64, 1, 1, SPI_POLARITY_HIGH, SPI_PHASE_2EDGE},
+		{24,"", TOUCH_SPI_SPEED, 0, 0, 0, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
+		{25,"SPIReadSpeed", 12000000, 480, 320, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
+		{26,"ST7789RSpeed", 6000000, 320, 240, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
+		{27,"", SLOW_TOUCH_SPEED, 0, 0, 0, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
+		{28,"User", 0, 0, 0, 0, 0, 0 ,0},
 		{29,"Dummy", 0, 0, 0, 0, 0, 0 ,0},
 		{30,"Dummy", 0, 0, 0, 0, 0, 0 ,0},
 		{31,"Dummy", 0, 0, 0, 0, 0, 0 ,0},
 		{32,"Dummy", 0, 0, 0, 0, 0, 0 ,0},
 		{33,"Dummy", 0, 0, 0, 0, 0, 0 ,0},
 		{34,"Dummy", 0, 0, 0, 0, 0, 0 ,0},
-		{35,"SSD1963_4", 0, 0, 0, 0, 0, 0 ,0},
-		{36,"SSD1963_5", 0, 0, 0, 0, 0, 0 ,0},
-		{37,"SSD1963_5A", 0, 0, 0, 0, 0, 0 ,0},
-		{38,"SSD1963_7", 0, 0, 0, 0, 0, 0 ,0},
-		{39,"SSD1963_7A", 0, 0, 0, 0, 0, 0 ,0},
-		{40,"SSD1963_8", 0, 0, 0, 0, 0, 0 ,0},
-		{41,"ILI9341_8", 0, 0, 0, 0, 0, 0 ,0},
-		{42,"SSD1963_4_16", 0, 0, 0, 0, 0, 0 ,0},
-		{43,"SSD1963_5_16", 0, 0, 0, 0, 0, 0 ,0},
-		{44,"SSD1963_5A_16" , 0, 0, 0, 0, 0, 0 ,0},
-		{45,"SSD1963_7_16", 0, 0, 0, 0, 0, 0 ,0},
-		{46,"SSD1963_7A_16", 0, 0, 0, 0, 0, 0 ,0},
-		{47,"SSD1963_8_16", 0, 0, 0, 0, 0, 0 ,0},
-		{48,"ILI9341_16", 0, 0, 0, 0, 0, 0 ,0},
-		{49,"IPS_4_16", 0, 0, 0, 0, 0, 0 ,0},
-		{50,"SSD1963_5E_16", 0, 0, 0, 0, 0, 0 ,0},
-		{51,"SSD1963_7E_16", 0, 0, 0, 0, 0, 0 ,0},
-		{52,"ILI9486_16", 0, 0, 0, 0, 0, 0 ,0},
-		{53,"VIRTUAL_C", 0, 320, 240, 0, 0, 0, 0},
-		{54,"VIRTUAL_M", 0, 640, 480, 0, 0, 0, 0},
-		{55,"VS1053slow", 200000, 0, 0, 0, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
-		{56,"VS1053fast", 4000000, 0, 0, 0, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
+		{35,"Dummy", 0, 0, 0, 0, 0, 0 ,0},
+		{36,"SSD1963_4", 0, 0, 0, 0, 0, 0 ,0},
+		{37,"SSD1963_5", 0, 0, 0, 0, 0, 0 ,0},
+		{38,"SSD1963_5A", 0, 0, 0, 0, 0, 0 ,0},
+		{39,"SSD1963_7", 0, 0, 0, 0, 0, 0 ,0},
+		{40,"SSD1963_7A", 0, 0, 0, 0, 0, 0 ,0},
+		{41,"SSD1963_8", 0, 0, 0, 0, 0, 0 ,0},
+		{42,"ILI9341_8", 0, 0, 0, 0, 0, 0 ,0},
+		{43,"SSD1963_4_16", 0, 0, 0, 0, 0, 0 ,0},
+		{44,"SSD1963_5_16", 0, 0, 0, 0, 0, 0 ,0},
+		{45,"SSD1963_5A_16" , 0, 0, 0, 0, 0, 0 ,0},
+		{46,"SSD1963_7_16", 0, 0, 0, 0, 0, 0 ,0},
+		{47,"SSD1963_7A_16", 0, 0, 0, 0, 0, 0 ,0},
+		{48,"SSD1963_8_16", 0, 0, 0, 0, 0, 0 ,0},
+		{49,"ILI9341_16", 0, 0, 0, 0, 0, 0 ,0},
+		{50,"IPS_4_16", 0, 0, 0, 0, 0, 0 ,0},
+		{51,"SSD1963_5E_16", 0, 0, 0, 0, 0, 0 ,0},
+		{52,"SSD1963_7E_16", 0, 0, 0, 0, 0, 0 ,0},
+		{53,"ILI9486_16", 0, 0, 0, 0, 0, 0 ,0},
+		{54,"VIRTUAL_C", 0, 320, 240, 0, 0, 0, 0},
+		{55,"VIRTUAL_M", 0, 640, 480, 0, 0, 0, 0},
+		{56,"VS1053slow", 200000, 0, 0, 0, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
+		{57,"VS1053fast", 4000000, 0, 0, 0, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
 
 };
 void __not_in_flash_func(spi_write_fast)(spi_inst_t *spi, const uint8_t *src, size_t len) {
@@ -179,6 +180,8 @@ void MIPS16 ConfigDisplaySPI(unsigned char *p) {
         DISPLAY_TYPE = ILI9488W;
     } else if(checkstring(argv[0], (unsigned char *)"ST7796S")) {
         DISPLAY_TYPE = ST7796S;
+    } else if(checkstring(argv[0], (unsigned char *)"ST7796SP")) {
+        DISPLAY_TYPE = ST7796SP;
     } else if(checkstring(argv[0], (unsigned char *)"ILI9341")) {
         DISPLAY_TYPE = ILI9341;
     } else if(checkstring(argv[0], (unsigned char *)"ST7735S_W")) {
@@ -268,7 +271,7 @@ void MIPS16 InitDisplaySPI(int InitOnly) {
 				DrawPixel = DrawPixelNormal;
 				ScrollLCD = ScrollLCDSPISCR;
         		DrawBLITBuffer = DrawBufferSPISCR;
-				if(Option.DISPLAY_TYPE == ILI9341 || Option.DISPLAY_TYPE == ST7796S || Option.DISPLAY_TYPE == ILI9488  || Option.DISPLAY_TYPE == ILI9488P || Option.DISPLAY_TYPE == ST7789B){
+				if(Option.DISPLAY_TYPE == ILI9341 || Option.DISPLAY_TYPE == ST7796SP || Option.DISPLAY_TYPE == ST7796S || Option.DISPLAY_TYPE == ILI9488  || Option.DISPLAY_TYPE == ILI9488P || Option.DISPLAY_TYPE == ST7789B){
 					ReadBuffer = ReadBufferSPISCR;
 					ReadBLITBuffer = ReadBufferSPISCR;
 				}
@@ -278,7 +281,7 @@ void MIPS16 InitDisplaySPI(int InitOnly) {
 				DrawBuffer = DrawBufferSPI;
         		DrawBLITBuffer = DrawBufferSPI;
 				DrawPixel = DrawPixelNormal;
-				if(Option.DISPLAY_TYPE == ILI9341 || Option.DISPLAY_TYPE == ST7796S || Option.DISPLAY_TYPE == ILI9488  || Option.DISPLAY_TYPE == ILI9488P || Option.DISPLAY_TYPE == ST7789B){
+				if(Option.DISPLAY_TYPE == ILI9341 || Option.DISPLAY_TYPE == ST7796SP || Option.DISPLAY_TYPE == ST7796S || Option.DISPLAY_TYPE == ILI9488  || Option.DISPLAY_TYPE == ILI9488P || Option.DISPLAY_TYPE == ST7789B){
 					ReadBLITBuffer = ReadBufferSPI;
 					ReadBuffer = ReadBufferSPI;
 					ScrollLCD = ScrollLCDSPI;
@@ -298,6 +301,7 @@ void MIPS16 InitDisplaySPI(int InitOnly) {
     // the initialisation sequences and the SPI driver code was written by Peter Mather (matherp on The Back Shed forum)
     switch(Option.DISPLAY_TYPE) {
 		case ST7796S:
+		case ST7796SP:
 		ResetController();
 		spi_write_cd(0xC5, 1, 0x1C);             //VCOM  Control 1 [1C]
 		spi_write_cd(0x3A, 1, 0x55);              //565
@@ -305,6 +309,8 @@ void MIPS16 InitDisplaySPI(int InitOnly) {
 		uSec(150000);
 		//0xB1, 2, 0xB0, 0x11,        //Frame Rate Control [A0 10]
 		spi_write_cd(0xB4, 1, 0x01);              //Inversion Control [01]
+		if(Option.BGR)spi_write_command(0x21); 
+		else spi_write_command(0x20); 
 		spi_write_cd(0xB6, 3, 0x80, 0x02, 0x3B);  // Display Function Control [80 02 3B] .kbv SS=1, NL=480
 		spi_write_cd(0xB7, 1, 0xC6);             //Entry Mode      [06]
 	//    0xF7, 4, 0xA9, 0x51, 0x2C, 0x82,    //Adjustment Control 3 [A9 51 2C 82]
@@ -316,6 +322,11 @@ void MIPS16 InitDisplaySPI(int InitOnly) {
 			case PORTRAIT:      spi_write_cd(ILI9341_MEMCONTROL,1,ILI9341_Portrait); break;
 			case RLANDSCAPE:    spi_write_cd(ILI9341_MEMCONTROL,1,ILI9341_Landscape180); break;
 			case RPORTRAIT:     spi_write_cd(ILI9341_MEMCONTROL,1,ILI9341_Portrait180); break;
+		}
+		if(Option.DISPLAY_TYPE==ST7796SP){
+			spi_write_cd(0x33,6,0x00,0x00,0x01,0x40,0x00,0xA0);
+		} else {
+			spi_write_cd(0x33,6,0x00,0x00,0x01,0xE0,0x00,0x00);
 		}
 		spi_write_command(0x11);
 		uSec(150000);
@@ -1485,7 +1496,7 @@ void ReadBufferSPI(int x1, int y1, int x2, int y2, unsigned char* p) {
     if(y1 >= VRes) y1 = VRes - 1;
     if(y2 < 0) y2 = 0;
     if(y2 >= VRes) y2 = VRes - 1;
-    N=(x2- x1+1) * (y2- y1+1) * (Option.DISPLAY_TYPE==ST7796S ? 2 : 3);
+    N=(x2- x1+1) * (y2- y1+1) * ((Option.DISPLAY_TYPE==ST7796S  || Option.DISPLAY_TYPE == ST7796SP)? 2 : 3);
     if(Option.DISPLAY_TYPE==ILI9341 || Option.DISPLAY_TYPE==ST7789B )spi_write_cd(ILI9341_PIXELFORMAT,1,0x66); //change to RGB666 for read
     DefineRegionSPI(x1, y1, x2, y2, 0);
 	SPISpeedSet( (Option.DISPLAY_TYPE==ILI9488  || Option.DISPLAY_TYPE == ILI9488P || Option.DISPLAY_TYPE==ST7789B || Option.DISPLAY_TYPE==ILI9481IPS) ? ST7789RSpeed : SPIReadSpeed); //need to slow SPI for read on this display
@@ -1498,7 +1509,7 @@ void ReadBufferSPI(int x1, int y1, int x2, int y2, unsigned char* p) {
     // revert to non enhanced SPI mode
     if(Option.DISPLAY_TYPE==ILI9341 || Option.DISPLAY_TYPE==ST7789B )spi_write_cd(ILI9341_PIXELFORMAT,1,0x55); //change back to rdb565
     r=0;
-	if(Option.DISPLAY_TYPE==ST7796S){
+	if(Option.DISPLAY_TYPE==ST7796S || Option.DISPLAY_TYPE == ST7796SP){
 		int n=(x2- x1+1) * (y2- y1+1)*3;
 		while(N){
 			h=p[N-2];
@@ -1541,7 +1552,7 @@ void ReadBufferSPISCR(int x1, int y1, int x2, int y2, unsigned char* p) {
 	y1 = (y1 + ScrollStart) % VRes;
 	y2 = y1 + t;  
     if(y2 >= VRes) {
-		N=(x2- x1+1) * (y2- VRes) * (Option.DISPLAY_TYPE==ST7796S ? 2 : 3);
+		N=(x2- x1+1) * (y2- VRes) * ((Option.DISPLAY_TYPE==ST7796S  || Option.DISPLAY_TYPE == ST7796SP) ? 2 : 3);
 		DefineRegionSPI(x1, y1, x2, VRes - 1,0);
 		SPISpeedSet( (Option.DISPLAY_TYPE==ILI9488  || Option.DISPLAY_TYPE == ILI9488P || Option.DISPLAY_TYPE==ST7789B || Option.DISPLAY_TYPE==ILI9481IPS) ? ST7789RSpeed : SPIReadSpeed); //need to slow SPI for read on this display
 		rcvr_byte_multi((uint8_t *)p, 1);
@@ -1551,7 +1562,7 @@ void ReadBufferSPISCR(int x1, int y1, int x2, int y2, unsigned char* p) {
 		ClearCS(Option.LCD_CS);                  //set CS high
 		SPISpeedSet(Option.DISPLAY_TYPE);
 		p+=N;
-		N=(x2- x1+1) * (y2 - VRes) * (Option.DISPLAY_TYPE==ST7796S ? 2 : 3);
+		N=(x2- x1+1) * (y2 - VRes) * ((Option.DISPLAY_TYPE==ST7796S  || Option.DISPLAY_TYPE == ST7796SP) ? 2 : 3);
 		DefineRegionSPI(x1, 0, x2, y2 - VRes,0);
 		SPISpeedSet( (Option.DISPLAY_TYPE==ILI9488  || Option.DISPLAY_TYPE == ILI9488P || Option.DISPLAY_TYPE==ST7789B || Option.DISPLAY_TYPE==ILI9481IPS) ? ST7789RSpeed : SPIReadSpeed); //need to slow SPI for read on this display
 		rcvr_byte_multi((uint8_t *)p, 1);
@@ -1562,7 +1573,7 @@ void ReadBufferSPISCR(int x1, int y1, int x2, int y2, unsigned char* p) {
 		SPISpeedSet(Option.DISPLAY_TYPE);
 		N=(x2- x1+1) * (y2- y1+1) * 3;
 	} else {
-		N=(x2- x1+1) * (y2- y1+1) * (Option.DISPLAY_TYPE==ST7796S ? 2 : 3);
+		N=(x2- x1+1) * (y2- y1+1) * ((Option.DISPLAY_TYPE==ST7796S  || Option.DISPLAY_TYPE == ST7796SP) ? 2 : 3);
 		DefineRegionSPI(x1, y1, x2, y2, 0);
 		SPISpeedSet( (Option.DISPLAY_TYPE==ILI9488  || Option.DISPLAY_TYPE == ILI9488P || Option.DISPLAY_TYPE==ST7789B || Option.DISPLAY_TYPE==ILI9481IPS) ? ST7789RSpeed : SPIReadSpeed); //need to slow SPI for read on this display
 		rcvr_byte_multi((uint8_t *)p, 1);
@@ -1575,7 +1586,7 @@ void ReadBufferSPISCR(int x1, int y1, int x2, int y2, unsigned char* p) {
 	}
 	if(Option.DISPLAY_TYPE==ILI9341 || Option.DISPLAY_TYPE==ST7789B )spi_write_cd(ILI9341_PIXELFORMAT,1,0x55); //change back to rdb565
 	r=0;
-	if(Option.DISPLAY_TYPE==ST7796S){
+	if(Option.DISPLAY_TYPE==ST7796S || Option.DISPLAY_TYPE == ST7796SP){
 		N=(x2- x1+1) * (y2- y1+1)*2;
 		int n=(x2- x1+1) * (y2- y1+1)*3;
 		while(N){

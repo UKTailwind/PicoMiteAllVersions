@@ -557,33 +557,34 @@ void MIPS16 DefinedSubFun(int isfun, unsigned char *cmd, int index, MMFLOAT *fa,
 #else
 void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, int index, MMFLOAT *fa, long long int  *i64a, unsigned char **sa, int *typ) {
 #endif
-	unsigned char *p, *s, *tp, *ttp, tcmdtoken;
-	unsigned char *CallersLinePtr, *SubLinePtr = NULL;
+
+    unsigned char *p, *s, *tp, *ttp, tcmdtoken;
+    unsigned char *CallersLinePtr, *SubLinePtr = NULL;
     unsigned char *argbuf1; unsigned char **argv1; int argc1;
     unsigned char *argbuf2; unsigned char **argv2; int argc2;
     unsigned char fun_name[MAXVARLEN + 1];
     unsigned char *argbyref;
-	int i;
+    int i;
     int ArgType, FunType;
     int *argtype;
     union u_argval {
-        MMFLOAT f;                                                    // the value if it is a float
-        long long int  i;                                            // the value if it is an integer
-        MMFLOAT *fa;                                                  // pointer to the allocated memory if it is an array of floats
-        long long int  *ia;                                          // pointer to the allocated memory if it is an array of integers
-        unsigned char *s;                                                    // pointer to the allocated memory if it is a string
+        MMFLOAT f;                                             // the value if it is a float
+        long long int  i;                                      // the value if it is an integer
+        MMFLOAT *fa;                                           // pointer to the allocated memory if it is an array of floats
+        long long int  *ia;                                    // pointer to the allocated memory if it is an array of integers
+        unsigned char *s;                                      // pointer to the allocated memory if it is a string
     } *argval;
     int *argVarIndex;
 
     CallersLinePtr = CurrentLinePtr;
-    SubLinePtr = subfun[index];                                     // used for error reporting
-    p =  SubLinePtr + sizeof(CommandToken);                                            // point to the sub or function definition
+    SubLinePtr = subfun[index];                                // used for error reporting
+    p =  SubLinePtr + sizeof(CommandToken);                    // point to the sub or function definition
     skipspace(p);
     ttp = p;
-    
+   
     // copy the sub/fun name from the definition into temp storage and terminate
     // p is left pointing to the end of the name (ie, start of the argument list in the definition)
-    CurrentLinePtr = SubLinePtr;                                    // report errors at the definition
+    CurrentLinePtr = SubLinePtr;                               // report errors at the definition
     tp = fun_name;
     *tp++ = *p++; while(isnamechar(*p)) *tp++ = *p++;
     if(*p == '$' || *p == '%' || *p == '!') {
@@ -593,7 +594,7 @@ void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, in
         *tp++ = *p++;
     }
     *tp = 0;
-    
+   
     if(isfun && *p != '(' /*&& (*SubLinePtr != cmdCFUN)*/) error("Function definition");
 
     // find the end of the caller's identifier, tp is left pointing to the start of the caller's argument list
@@ -620,7 +621,6 @@ void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, in
         FunType |= (V_FIND | V_DIM_VAR | V_LOCAL | V_EMPTY_OK);
     }
 
-
     // from now on
     // tp  = the caller's argument list
     // p   = the argument list for the definition
@@ -634,11 +634,11 @@ void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, in
         return;
     }
    // from now on we have a user defined sub or function (not a C routine)
-    
+   
     if(gosubindex >= MAXGOSUB) error("Too many nested SUB/FUN");
     errorstack[gosubindex] = CallersLinePtr;
-	gosubstack[gosubindex++] = isfun ? NULL : nextstmt;             // NULL signifies that this is returned to by ending ExecuteProgram()
-    #define buffneeded MAX_ARG_COUNT*(sizeof(union u_argval)+ 2*sizeof(int)+3*sizeof(unsigned char *)+sizeof(unsigned char))+ 2*STRINGSIZE 
+    gosubstack[gosubindex++] = isfun ? NULL : nextstmt;             // NULL signifies that this is returned to by ending ExecuteProgram()
+    #define buffneeded MAX_ARG_COUNT*(sizeof(union u_argval)+ 2*sizeof(int)+3*sizeof(unsigned char *)+sizeof(unsigned char))+ 2*STRINGSIZE
     // allocate memory for processing the arguments
     argval=GetSystemMemory(buffneeded);
     argtype=(void *)argval+MAX_ARG_COUNT * sizeof(union u_argval);
@@ -664,12 +664,12 @@ void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, in
     CurrentLinePtr = CallersLinePtr;                                // report errors at the caller
     if(argc1 > argc2 || (argc1 && (argc1 & 1) == 0)) error("Argument list");
 
-	// step through the arguments supplied by the caller and get the value supplied
+    // step through the arguments supplied by the caller and get the value supplied
     // these can be:
     //    - missing (ie, caller did not supply that parameter)
     //    - a variable, in which case we need to get a pointer to that variable's data and save its index so later we can get its type
     //    - an expression, in which case we evaluate the expression and get its value and type
-    for(i = 0; i < argc2; i += 2) {                                 // count through the arguments in the definition of the sub/fun       
+    for(i = 0; i < argc2; i += 2) {                                 // count through the arguments in the definition of the sub/fun      
         if(i < argc1 && *argv1[i]) {
             // check if the argument is a valid variable
             if(i < argc1 && isnamestart(*argv1[i]) && *skipvar(argv1[i], false) == 0) {
@@ -690,19 +690,26 @@ void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, in
             // check for BYVAL or BYREF in sub/fun definition
             argbyref[i]=0;
             skipspace(argv2[i]);
-			if(toupper(*argv2[i]) == 'B' && toupper(*(argv2[i]+1)) == 'Y') {
-				if((checkstring(argv2[i] + 2, (unsigned char *)"VAL")) != NULL) {        // if BYVAL
-					argtype[i] = 0;	                                    // remove any pointer flag in the caller
-					argv2[i] += 5;										// skip to the variable start
-				} else {
-					if((checkstring(argv2[i] + 2, (unsigned char *)"REF")) != NULL) {    // if BYREF
-						if((argtype[i] & T_PTR) == 0) error("Variable required for BYREF");
-						argv2[i] += 5;									// skip to the variable start
-					}
-                    argbyref[i]=1;
-                }
-				skipspace(argv2[i]);
-			}
+            if(toupper(*argv2[i]) == 'B' && toupper(*(argv2[i]+1)) == 'Y') {
+                if((checkstring(argv2[i] + 2, (unsigned char *)"VAL")) != NULL) {        // if BYVAL
+                    //Only if not an array remove any pointer flag in the caller
+                    if(g_vartbl[argVarIndex[i]].dims[0] == 0){
+                         argtype[i] = 0;
+                    }else{
+                         error("Array as BYVAL not allowed $",argv1[i]);
+                    }
+                    argv2[i] += 5;                                      // skip to the variable start
+                    argbyref[i]=2;
+                } else {
+                    if((checkstring(argv2[i] + 2, (unsigned char *)"REF")) != NULL) {    // if BYREF
+                        //if((argtype[i] & T_PTR) == 0) error("Variable required for BYREF $", argv1[i]);
+                        argv2[i] += 5;                                  // skip to the variable start
+                        argbyref[i]=1;
+                        if((argtype[i] & T_PTR) == 0)error("Variable required for BYREF $", argv1[i]);
+                    }
+               }
+                skipspace(argv2[i]);
+            }
 
             // if argument is present and is not a pointer to a variable then evaluate it as an expression
             if(argtype[i] == 0) {
@@ -724,6 +731,16 @@ void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, in
     g_LocalIndex++;
     for(i = 0; i < argc2; i += 2) {                                 // count through the arguments in the definition of the sub/fun
         ArgType = T_NOTYPE;
+        //skip BYVAL/BYREF keywords
+        if(toupper(*argv2[i]) == 'B' && toupper(*(argv2[i]+1)) == 'Y') {
+            if((checkstring(argv2[i] + 2,(unsigned char *) "VAL")) != NULL) {
+                argv2[i] += 5;
+            }else if((checkstring(argv2[i] + 2, (unsigned char *)"REF")) != NULL) {    // if BYREF
+                argv2[i] += 5;                                  // skip to the variable start
+            }
+        }
+
+       // if (argbyref[i] )argv2[i] += 5;
         tp = skipvar(argv2[i], false);                              // point to after the variable
         skipspace(tp);
         if(*tp == tokenAS) {                                        // are we using Microsoft syntax (eg, AS INTEGER)?
@@ -734,11 +751,12 @@ void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, in
         ArgType |= (V_FIND | V_DIM_VAR | V_LOCAL | V_EMPTY_OK);
         tp = findvar(argv2[i], ArgType);                            // declare the local variable
         if(g_vartbl[g_VarIndex].dims[0] > 0) error("Argument list");    // if it is an array it must be an empty array
-        
+       
         CurrentLinePtr = CallersLinePtr;                            // report errors at the caller
 
         // if the definition called for an array, special processing and checking will be required
         if(g_vartbl[g_VarIndex].dims[0] == -1) {
+            //if( (argbyref[i]==2)) error("Array must be passed as BYREF $",argv1[i]);
             int j;
             if(g_vartbl[argVarIndex[i]].dims[0] == 0) error("Expected an array");
             if(TypeMask(g_vartbl[g_VarIndex].type) != TypeMask(argtype[i])) error("Incompatible type: $", argv1[i]);
@@ -749,8 +767,8 @@ void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, in
 
         // if this is a pointer check and the type is NOT the same as that requested in the sub/fun definition
         if((argtype[i] & T_PTR) && TypeMask(g_vartbl[g_VarIndex].type) != TypeMask(argtype[i])) {
-                if(argbyref[i]){ error("BYREF requires same types: $", argv1[i]);}
-                if((TypeMask(g_vartbl[g_VarIndex].type) & T_STR) || (TypeMask(argtype[i]) & T_STR))
+            if(argbyref[i]==1){ error("BYREF requires same types: $", argv1[i]);}
+            if((TypeMask(g_vartbl[g_VarIndex].type) & T_STR) || (TypeMask(argtype[i]) & T_STR))
                 error("Incompatible type: $", argv1[i]);
             // make this into an ordinary argument
             if(g_vartbl[argVarIndex[i]].type & T_PTR) {
@@ -760,7 +778,7 @@ void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, in
             }
             argtype[i] &= ~T_PTR;                                   // and remove the pointer flag
         }
-        
+       
         // if this is a pointer (note: at this point the caller type and the required type must be the same)
         if(argtype[i] & T_PTR) {
             // the argument supplied was a variable so we must setup the local variable as a pointer
@@ -842,9 +860,9 @@ void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, in
     else
         *sa = tp;                                                   // for a string we just need to return the local memory
     *typ = FunType;                                                 // save the function type for the caller
-	ClearVars(g_LocalIndex--, true);                                        // delete any local variables
+    ClearVars(g_LocalIndex--, true);                                        // delete any local variables
     g_TempMemoryIsChanged = true;                                     // signal that temporary memory should be checked
-	gosubindex--;
+    gosubindex--;
 }
 
 char  MIPS16 *strcasechr(const char *p, int ch)

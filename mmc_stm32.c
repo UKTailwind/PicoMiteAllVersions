@@ -1500,7 +1500,7 @@ void InitReservedIO(void) {
 			I2C_enabled=1;
 			I2C0SDApin=Option.SYSTEM_I2C_SDA;
 			I2C0SCLpin=Option.SYSTEM_I2C_SCL;
-			I2C_Timeout=2;
+			I2C_Timeout=SystemI2CTimeout;
 		} else {
 			I2C1locked=1;
 			i2c_init(i2c1,(Option.SYSTEM_I2C_SLOW ? 100000:400000));
@@ -1509,7 +1509,7 @@ void InitReservedIO(void) {
 			I2C2_enabled=1;	
 			I2C1SDApin=Option.SYSTEM_I2C_SDA;
 			I2C1SCLpin=Option.SYSTEM_I2C_SCL;
-			I2C2_Timeout=2;
+			I2C2_Timeout=SystemI2CTimeout;
 		}
 		if(Option.RTC)RtcGetTime(1);
 #ifndef USBKEYBOARD

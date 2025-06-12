@@ -3281,16 +3281,16 @@ void MIPS32 __not_in_flash_func(HDMIloop3)(void){
                 case SCREENMODE2: //400 X 300 x 4bit-colour mapped to 256 or 424 X 240 x 4bit-colour mapped to 256
                     {
                         uint16_t *p=(uint16_t *)HDMIlines[line_to_load];
-                        uint8_t l,d,s;
+                        uint8_t l,d;
                         int pp= (Line_dup)*vgaloop4;
                         for(int i=0; i<vgaloop4 ; i++){
-                            l=LayerBuf[pp+i];d=DisplayBuf[pp+i];s=SecondLayer[pp+i];
+                            l=LayerBuf[pp+i];d=DisplayBuf[pp+i];
                             if((l&0xf)!=transparent){
                                 *p++=map16d[l&0xf];
                             } else {
                                 *p++=map16d[d&0xf];
                             }
-                            d>>=4;l>>=4;s>>=4;
+                            d>>=4;l>>=4;
                             if((l&0xf)!=transparent){
                                 *p++=map16d[l&0xf];
                             } else {
