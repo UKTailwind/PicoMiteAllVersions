@@ -5023,10 +5023,10 @@ void ResetOptions(bool startup)
     Option.CPU_Speed = Freq252P;
     #ifdef USBKEYBOARD
         #ifdef HDMI
-            Option.HDMIclock=2;
-            Option.HDMId0=0;
-            Option.HDMId1=6;
-            Option.HDMId2=4;
+            Option.HDMIclock=1;
+            Option.HDMId0=3;
+            Option.HDMId1=5;
+            Option.HDMId2=7;
         #endif
         Option.USBKeyboard = CONFIG_US;
         Option.RepeatStart=600;
@@ -5044,8 +5044,8 @@ void ResetOptions(bool startup)
             Option.HDMId1=5;
             Option.HDMId2=7;
         #else
-            Option.VGA_HSYNC=21;
-            Option.VGA_BLUE=24;
+            Option.VGA_HSYNC=16;
+            Option.VGA_BLUE=10;
         #endif
         Option.KEYBOARD_CLOCK=KEYBOARDCLOCK;
         Option.KEYBOARD_DATA=KEYBOARDDATA;
@@ -5074,14 +5074,14 @@ void ResetOptions(bool startup)
     //M2
     Option.modbuff = 1;
     Option.modbuffsize =256;
-    Option.MOUSE_CLOCK = 1;
-    Option.MOUSE_DATA =2;
-    Option.SD_CLK_PIN = 9;
-    Option.SD_MOSI_PIN = 10;
+    //Option.MOUSE_CLOCK = 1;
+    //Option.MOUSE_DATA =2;
+    Option.SD_CLK_PIN = 4;
+    Option.SD_MOSI_PIN = 5;
     Option.SD_MISO_PIN = 6;
     Option.SD_CS = 7;
-    Option.AUDIO_L = 14;
-    Option.AUDIO_R = 15;
+    Option.AUDIO_L = 31;
+    Option.AUDIO_R = 32;
     Option.AUDIO_SLICE = 5;
     //Option.AUDIO_SLICE = 99;
     Option.SDspeed = 12;
@@ -5090,10 +5090,10 @@ void ResetOptions(bool startup)
     Option.DefaultFC = WHITE;
     Option.DefaultBC = BLACK;
     Option.LCDVOP = 0xB1;
-    Option.INT1pin = 26;
-    Option.INT2pin = 27;
-    Option.INT3pin = 31;
-    Option.INT4pin = 32;
+    Option.INT1pin = 19;
+    Option.INT2pin = 20;
+    Option.INT3pin = 21;
+    Option.INT4pin = 22;
 #ifndef PICOMITEVGA
     Option.TOUCH_XSCALE=1.0f;
     Option.TOUCH_YSCALE=1.0f;
@@ -5101,8 +5101,8 @@ void ResetOptions(bool startup)
     Option.DefaultBrightness = 100;
     Option.numlock = 1;
     Option.repeat = 0b101100;
-    Option.VGA_HSYNC=21;
-    Option.VGA_BLUE=24;
+    Option.VGA_HSYNC=16;
+    Option.VGA_BLUE=10;
     uint8_t txbuf[4] = {0x9f};
     uint8_t rxbuf[4] = {0};
     Option.heartbeatpin = 43;

@@ -146,9 +146,9 @@ int QVGA_HACT;	// V active scanlines (= 2*HEIGHT)
         bool USBenabled=false;
     #else
         #ifdef HDMI
-            #define MES_SIGNON  "\rPicoMiteHDMI MMBasic " CHIP " Edition V"VERSION "\r\n"
+            #define MES_SIGNON  "\rPicoMiteHDMI MMBasic " CHIP " M2 Edition V"VERSION "\r\n"
         #else
-            #define MES_SIGNON  "\rPicoMiteVGA MMBasic " CHIP " Edition V"VERSION "\r\n"
+            #define MES_SIGNON  "\rPicoMiteVGA MMBasic " CHIP " M1 Edition V"VERSION "\r\n"
         #endif
 #endif
 
@@ -4113,8 +4113,8 @@ int MIPS16 main(){
     }
 #ifndef HDMI
     if(Option.VGA_HSYNC==0){
-        Option.VGA_HSYNC=21;
-        Option.VGA_BLUE=24;
+        Option.VGA_HSYNC=16;
+        Option.VGA_BLUE=10;
         SaveOptions();
     }
 #else
@@ -4360,7 +4360,7 @@ if(Option.CPU_Speed==FreqSVGA){ //adjust the size of the heap
     piomap[QVGA_PIO_NUM]=(uint64_t)((uint64_t)1<<(uint64_t)PinDef[Option.VGA_BLUE].GPno);
     piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.VGA_BLUE].GPno+1));
     piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.VGA_BLUE].GPno+2));
-    piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.VGA_BLUE].GPno+3));
+    piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.VGA_BLUE].GPno+4));
     piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)PinDef[Option.VGA_HSYNC].GPno);
     piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.VGA_HSYNC].GPno+1));
     if(Option.audio_i2s_bclk){

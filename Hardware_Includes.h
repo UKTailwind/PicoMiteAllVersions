@@ -364,8 +364,8 @@ extern struct tagMTRand *g_myrand;
 #define PIN_RESTART         9997                                    // reset caused by entering 0 at the PIN prompt
 #define RESTART_NOAUTORUN   9996                                    // reset required after changing the LCD or touch config
 #define RESTART_DOAUTORUN   9995                                    // reset required by OPTION SET (ie, re runs the program)
-#define KEYBOARDCLOCK 11
-#define KEYBOARDDATA 12
+#define KEYBOARDCLOCK 1
+#define KEYBOARDDATA 2
 #define ALARM_NUM 0
 #define ALARM_IRQ TIMER_IRQ_0
 

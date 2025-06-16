@@ -1821,7 +1821,7 @@ char *pinsearch(int pin){
 	else if(pin==PINMAP[PinDef[Option.VGA_HSYNC].GPno+1])strcpy(buff,"VGA VSYNC");
 	else if(pin==PINMAP[PinDef[Option.VGA_BLUE].GPno+1])strcpy(buff,"VGA GREEN L");
 	else if(pin==PINMAP[PinDef[Option.VGA_BLUE].GPno+2])strcpy(buff,"VGA GREEN H");
-	else if(pin==PINMAP[PinDef[Option.VGA_BLUE].GPno+3])strcpy(buff,"VGA RED");
+	else if(pin==PINMAP[PinDef[Option.VGA_BLUE].GPno+4])strcpy(buff,"VGA RED");
 #endif
 #endif
 #ifdef rp2350

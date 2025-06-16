@@ -162,7 +162,7 @@ void VGArecovery(int pin){
         ExtCurrentConfig[Option.VGA_HSYNC]=EXT_BOOT_RESERVED;
         ExtCurrentConfig[PINMAP[PinDef[Option.VGA_BLUE].GPno+1]]=EXT_BOOT_RESERVED;
         ExtCurrentConfig[PINMAP[PinDef[Option.VGA_BLUE].GPno+2]]=EXT_BOOT_RESERVED;
-        ExtCurrentConfig[PINMAP[PinDef[Option.VGA_BLUE].GPno+3]]=EXT_BOOT_RESERVED;
+        ExtCurrentConfig[PINMAP[PinDef[Option.VGA_BLUE].GPno+4]]=EXT_BOOT_RESERVED;
         ExtCurrentConfig[PINMAP[PinDef[Option.VGA_HSYNC].GPno+1]]=EXT_BOOT_RESERVED;
 
         if(pin)error("Pin %/| is in use",pin,pin);
@@ -170,7 +170,7 @@ void VGArecovery(int pin){
         piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)PinDef[Option.VGA_BLUE].GPno);
         piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.VGA_BLUE].GPno+1));
         piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.VGA_BLUE].GPno+2));
-        piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.VGA_BLUE].GPno+3));
+        piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.VGA_BLUE].GPno+4)); // TODO: free?
         piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)PinDef[Option.VGA_HSYNC].GPno);
         piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.VGA_HSYNC].GPno+1));
         if(Option.audio_i2s_bclk){
