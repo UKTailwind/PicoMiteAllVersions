@@ -5039,10 +5039,10 @@ void ResetOptions(bool startup)
         Option.ColourCode=1;
     #else
         #ifdef HDMI
-            Option.HDMIclock=2;
-            Option.HDMId0=0;
-            Option.HDMId1=6;
-            Option.HDMId2=4;
+            Option.HDMIclock=1;
+            Option.HDMId0=3;
+            Option.HDMId1=5;
+            Option.HDMId2=7;
         #else
             Option.VGA_HSYNC=21;
             Option.VGA_BLUE=24;
@@ -5071,17 +5071,29 @@ void ResetOptions(bool startup)
 #ifdef PICOMITEWEB
     Option.ServerResponceTime=5000;
 #endif
-    Option.AUDIO_SLICE = 99;
+    //M2
+    Option.modbuff = 1;
+    Option.modbuffsize =256;
+    Option.MOUSE_CLOCK = 1;
+    Option.MOUSE_DATA =2;
+    Option.SD_CLK_PIN = 9;
+    Option.SD_MOSI_PIN = 10;
+    Option.SD_MISO_PIN = 6;
+    Option.SD_CS = 7;
+    Option.AUDIO_L = 14;
+    Option.AUDIO_R = 15;
+    Option.AUDIO_SLICE = 5;
+    //Option.AUDIO_SLICE = 99;
     Option.SDspeed = 12;
     Option.DISPLAY_ORIENTATION = DISPLAY_LANDSCAPE;
     Option.DefaultFont = 0x01;
     Option.DefaultFC = WHITE;
     Option.DefaultBC = BLACK;
     Option.LCDVOP = 0xB1;
-    Option.INT1pin = 9;
-    Option.INT2pin = 10;
-    Option.INT3pin = 11;
-    Option.INT4pin = 12;
+    Option.INT1pin = 26;
+    Option.INT2pin = 27;
+    Option.INT3pin = 31;
+    Option.INT4pin = 32;
 #ifndef PICOMITEVGA
     Option.TOUCH_XSCALE=1.0f;
     Option.TOUCH_YSCALE=1.0f;
