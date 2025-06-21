@@ -4142,7 +4142,7 @@ int MIPS16 main(){
 #ifdef HDMI
         Option.CPU_Speed=Freq480P;              // init the options if this is the very first startup
 #else
-        Option.CPU_Speed=Freq252P;              // init the options if this is the very first startup
+        Option.CPU_Speed=Freq378P; ///  Freq252P;              // init the options if this is the very first startup
 #endif
 #else
         Option.CPU_Speed=200000;              // init the options if this is the very first startup
