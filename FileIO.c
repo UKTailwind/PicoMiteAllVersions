@@ -65,7 +65,7 @@ extern const uint8_t *flash_libgmemory;
 extern void routinechecks(void);
 extern bool mergedread;
 extern int TraceOn;
-struct option_s __attribute__ ((aligned (256))) Option;
+struct option_s __attribute__ ((aligned (256))) Option = { 0 };
 int dirflags;
 int GPSfnbr = 0;
 int lfs_FileFnbr=0;
@@ -5045,7 +5045,7 @@ void ResetOptions(bool startup)
             Option.HDMId2=7;
         #else
             Option.VGA_HSYNC=16;
-            Option.VGA_BLUE=10;
+            Option.VGA_BLUE =9;
         #endif
         Option.KEYBOARD_CLOCK=KEYBOARDCLOCK;
         Option.KEYBOARD_DATA=KEYBOARDDATA;
@@ -5071,6 +5071,7 @@ void ResetOptions(bool startup)
 #ifdef PICOMITEWEB
     Option.ServerResponceTime=5000;
 #endif
+///Option.PSRAM_CS_PIN = 62; // GP47
     //M2
     Option.modbuff = 1;
     Option.modbuffsize =256;
@@ -5101,8 +5102,6 @@ void ResetOptions(bool startup)
     Option.DefaultBrightness = 100;
     Option.numlock = 1;
     Option.repeat = 0b101100;
-    Option.VGA_HSYNC=16;
-    Option.VGA_BLUE=10;
     uint8_t txbuf[4] = {0x9f};
     uint8_t rxbuf[4] = {0};
     Option.heartbeatpin = 43;

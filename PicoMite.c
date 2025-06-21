@@ -2350,6 +2350,12 @@ void QVgaDmaInit()
 	irq_set_priority(DMA_IRQ_0, 0);
 }
 
+// TODO:
+void graphics_init();
+void graphics_set_buffer(uint8_t* buffer, const uint16_t width, const uint16_t height);
+void graphics_set_bgcolor(const uint32_t color888);
+void graphics_set_flashmode(const bool flash_line, const bool flash_frame);
+
 // initialize QVGA (can change system clock)
 void QVgaInit()
 {
@@ -2357,13 +2363,18 @@ void QVgaInit()
     Y_TILE=Option.Y_TILE;
     ytileheight=(X_TILE==80 || X_TILE==90 || X_TILE==106 || X_TILE==100)? 12 : 16;
 	// initialize PIO
-	QVgaPioInit();
+//	QVgaPioInit();
+    I2SOff = pio_add_program(QVGA_PIO, &i2s_program);
+    graphics_init();
+    graphics_set_buffer(NULL, 320, 480); /// TODO:
+    graphics_set_bgcolor(0x000000);
+    graphics_set_flashmode(false, false);
 
 	// initialize scanline buffers
-	QVgaBufInit();
+//	QVgaBufInit();
 
 	// initialize DMA
-	QVgaDmaInit();
+//	QVgaDmaInit();
 
 	// initialize parameters
 	QVgaScanLine = 0; // currently processed scanline
@@ -4114,7 +4125,7 @@ int MIPS16 main(){
 #ifndef HDMI
     if(Option.VGA_HSYNC==0){
         Option.VGA_HSYNC=16;
-        Option.VGA_BLUE=10;
+        Option.VGA_BLUE = 9;
         SaveOptions();
     }
 #else
@@ -4360,7 +4371,9 @@ if(Option.CPU_Speed==FreqSVGA){ //adjust the size of the heap
     piomap[QVGA_PIO_NUM]=(uint64_t)((uint64_t)1<<(uint64_t)PinDef[Option.VGA_BLUE].GPno);
     piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.VGA_BLUE].GPno+1));
     piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.VGA_BLUE].GPno+2));
+    piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.VGA_BLUE].GPno+3));
     piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.VGA_BLUE].GPno+4));
+    piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.VGA_BLUE].GPno+5));
     piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)PinDef[Option.VGA_HSYNC].GPno);
     piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.VGA_HSYNC].GPno+1));
     if(Option.audio_i2s_bclk){
