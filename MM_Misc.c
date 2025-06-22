@@ -4463,6 +4463,8 @@ tp = checkstring(cmdline, (unsigned char *)"HEARTBEAT");
         return;
     }
 #endif
+    // unsupported for this build
+    #if 0
 	tp = checkstring(cmdline, (unsigned char *)"SDCARD");
     int pin1, pin2, pin3, pin4;
     if(CurrentLinePtr) error("Invalid in a program");
@@ -4546,7 +4548,8 @@ tp = checkstring(cmdline, (unsigned char *)"HEARTBEAT");
         SoftReset();
         return;
     }
-	tp = checkstring(cmdline, (unsigned char *)"DISK SAVE");
+	#endif
+    tp = checkstring(cmdline, (unsigned char *)"DISK SAVE");
     if(tp){
         getargs(&tp,1,(unsigned char *)",");
         if(!(argc==1))error("Syntax");

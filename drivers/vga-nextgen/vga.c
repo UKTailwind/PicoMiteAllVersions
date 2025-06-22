@@ -476,6 +476,8 @@ void graphics_init() {
 
     channel_config_set_dreq(&c0, dreq);
     channel_config_set_chain_to(&c0, dma_chan_ctrl); // chain to other channel
+	channel_config_set_irq_quiet(&c0, true);
+	c0.ctrl |= DMA_CH0_CTRL_TRIG_HIGH_PRIORITY_BITS;
 
     dma_channel_configure(
         dma_chan,
@@ -503,8 +505,10 @@ void graphics_init() {
     );
 
     graphics_set_mode();
-    irq_set_exclusive_handler(VGA_DMA_IRQ, dma_handler_VGA);
+    irq_set_exclusive_handler(DMA_IRQ_0, dma_handler_VGA);
+// set highest IRQ priority
+	irq_set_priority(DMA_IRQ_0, 0);
     dma_channel_set_irq0_enabled(dma_chan_ctrl, true);
-    irq_set_enabled(VGA_DMA_IRQ, true);
-    dma_start_channel_mask(1u << dma_chan);
+  //  irq_set_enabled(DMA_IRQ_0, true);
+   // dma_start_channel_mask(1u << dma_chan);
 }

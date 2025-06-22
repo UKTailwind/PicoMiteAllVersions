@@ -57,8 +57,6 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "hardware/structs/qmi.h"
 #endif
 extern const uint8_t *flash_target_contents;
-extern const uint8_t *flash_option_contents;
-extern const uint8_t *SavedVarsFlash;
 extern const uint8_t *flash_progmemory;
 //LIBRARY
 extern const uint8_t *flash_libgmemory;
@@ -282,6 +280,7 @@ union uFileTable FileTable[MAXOPENFILES + 1];
 volatile BYTE SDCardStat = STA_NOINIT | STA_NODISK;
 int OptionFileErrorAbort = true;
 volatile uint32_t irqs;
+static bool irqs_disabled = false;
 #ifdef rp2350
 static void save_psram_settings(void) {
     // We're about to invalidate the XIP cache, clean it first to commit any dirty writes to PSRAM
@@ -309,10 +308,13 @@ void disable_interrupts_pico(void)
 #ifdef rp2350
     save_psram_settings();
 #endif
-    irqs=save_and_disable_interrupts();
+    irqs = save_and_disable_interrupts();
+    irqs_disabled = true;
 }
 void enable_interrupts_pico(void)
 {
+    if (!irqs_disabled) return;
+    irqs_disabled = false;
 #ifdef rp2350
     restore_psram_settings();
 #endif
@@ -3308,7 +3310,7 @@ int InitSDCard(void)
     {
         FatFSFileSystem=0;
         ErrorThrow(i,FATFSFILE);
-        return false;
+        return 0;
     }
     return 2;
 }
@@ -3336,14 +3338,9 @@ void getfullfilename(char *fname, char *q){
         strcpy(q,"0:/");
     }
     fullpath(q);
-//       	MMPrintString("Was: ");MMPrintString(fname);PRet();
-//      	MMPrintString("Path: ");MMPrintString(filepath[FatFSFileSystem]);PRet();
-//       	MMPrintString("File: ");MMPrintString(pp);PRet();
     strcpy(q,fullpathname[FatFSFileSystem]);
     if(fullpathname[FatFSFileSystem][strlen(fullpathname[FatFSFileSystem])-1]!='/')strcat(q,"/");
     strcat(q,pp);
-//       	MMPrintString("Full: ");MMPrintString(q);PRet();
-
 }
 // this performs the basic duties of opening a file, all file opens in MMBasic should use this
 // it will open the file, set the FileTable[] entry and populate the file descriptor
@@ -4974,10 +4971,12 @@ void CheckSDCard(void)
 }
 void LoadOptions(void)
 {
-    int i = sizeof(struct option_s);
-    unsigned char *pp = (unsigned char *)flash_option_contents;
-    unsigned char *qq = (unsigned char *)&Option;
-    while (i--) *qq++ = *pp++;
+    ResetOptionsNoSave();
+    FIL f;
+    f_open(&f, "/tmp/picoMite.opts", FA_READ);
+    UINT br;
+    f_read(&f, &Option, sizeof(struct option_s), &br);
+    f_close(&f);
     RGB121map[0] = BLACK;
     RGB121map[1] = BLUE;
     RGB121map[2] =  MYRTLE;
@@ -4996,15 +4995,9 @@ void LoadOptions(void)
     RGB121map[15] = WHITE;
 }
 
-void ResetOptions(bool startup)
-{
-    if(!startup){
-        disable_sd();
-        disable_audio();
-        disable_systemi2c();
-        disable_systemspi();
-    }
+void ResetOptionsNoSave(void) {
     memset((void *)&Option, 0, sizeof(struct option_s));
+    Option.FlashSize = 4096 * 1024;
     Option.Magic = MagicKey;
     Option.Height = SCREENHEIGHT;
     Option.Width = SCREENWIDTH;
@@ -5071,7 +5064,8 @@ void ResetOptions(bool startup)
 #ifdef PICOMITEWEB
     Option.ServerResponceTime=5000;
 #endif
-///Option.PSRAM_CS_PIN = 62; // GP47
+//Option.PSRAM_CS_PIN = 62; // GP47
+//Option.PSRAM_CS_PIN = 25; // GP19
     //M2
     Option.modbuff = 1;
     Option.modbuffsize =256;
@@ -5102,8 +5096,6 @@ void ResetOptions(bool startup)
     Option.DefaultBrightness = 100;
     Option.numlock = 1;
     Option.repeat = 0b101100;
-    uint8_t txbuf[4] = {0x9f};
-    uint8_t rxbuf[4] = {0};
     Option.heartbeatpin = 43;
 #ifdef rp2350
     if(!rp2350a){
@@ -5111,10 +5103,17 @@ void ResetOptions(bool startup)
         Option.AllPins=1;
     }
 #endif
-    disable_interrupts_pico();
-    flash_do_cmd(txbuf, rxbuf, 4);
-    Option.FlashSize= 1 << rxbuf[3];
-    enable_interrupts_pico();
+}
+
+void ResetOptions(bool startup)
+{
+    if(!startup){
+    ///    disable_sd();
+        disable_audio();
+        disable_systemi2c();
+        disable_systemspi();
+    }
+    ResetOptionsNoSave();
     SaveOptions();
     uSec(250000);
 }
@@ -5143,8 +5142,6 @@ void FlashWriteInit(int region)
     mi8p = 0;
     if (region == PROGRAM_FLASH)
         realflashpointer = (uint32_t)PROGSTART;
-    else if (region == SAVED_VARS_FLASH)
-        realflashpointer = (uint32_t)(FLASH_TARGET_OFFSET + FLASH_ERASE_SIZE);
     else if (region == LIBRARY_FLASH)
         realflashpointer = (uint32_t)(PROGSTART - MAX_PROG_SIZE);  //i.e the last slot  
     else 
@@ -5218,8 +5215,8 @@ void FlashWriteClose(void)
 ********************************************************************************************************************/
 void MIPS16 cmd_var(void)
 {
-    unsigned char *p, *buf, *bufp, *varp, *vdata, lastc;
-    int i, j, nbr = 1, nbr2 = 1, array, type, SaveDefaultType;
+    unsigned char *p, *vdata;
+    int i, j, nbr = 1, SaveDefaultType;
     int VarList[MAX_ARG_COUNT];
     unsigned char *VarDataList[MAX_ARG_COUNT];
     if ((p = checkstring(cmdline, (unsigned char *)"CLEAR")))
@@ -5228,40 +5225,60 @@ void MIPS16 cmd_var(void)
         ClearSavedVars();
         return;
     }
+
     if ((p = checkstring(cmdline, (unsigned char *)"RESTORE")))
     {
         char b[MAXVARLEN + 3];
         checkend(p);
-        //        SavedVarsFlash = (char*)FLASH_SAVED_VAR_ADDR;      // point to where the variables were saved
-        if (*SavedVarsFlash == 0xFF)
-            return;                             // zero in this location means that nothing has ever been saved
-        SaveDefaultType = DefaultType;          // save the default type
-        bufp = (unsigned char *)SavedVarsFlash; // point to where the variables were saved
-        while (*bufp != 0xff)
-        {                   // 0xff is the end of the variable list
-            type = *bufp++; // get the variable type
+        FIL f;
+        FRESULT res = f_open(&f, "/tmp/picoMite.vars", FA_READ);
+        if (res != FR_OK)
+            return; // нет файла — нечего восстанавливать
+
+        UINT br;
+        unsigned char type, array;
+        unsigned char tmp;
+        unsigned char *vdata;
+        int j, nbr, nbr2;
+        DefaultType = SaveDefaultType = DefaultType;
+
+        while (!f_eof(&f)) {
+            // Читаем тип
+            if (f_read(&f, &type, 1, &br) != FR_OK || br != 1 || type == 0xFF || type == 0x00)
+                break;
+
             array = type & 0x80;
-            type &= 0x7f;                 // set array to true if it is an array
-            DefaultType = TypeMask(type); // and set the default type to this
-            if (array)
-            {
-                strcpy(b, (const char *)bufp);
+            type &= 0x7f;
+            DefaultType = TypeMask(type);
+
+            // Читаем имя
+            char name[MAXVARLEN + 1];
+            int ni = 0;
+            while (ni < MAXVARLEN && f_read(&f, &tmp, 1, &br) == FR_OK && br == 1 && tmp != 0)
+                name[ni++] = tmp;
+            name[ni] = '\0';
+
+            if (array) {
+                strcpy(b, name);
                 strcat(b, "()");
-                vdata = findvar((unsigned char *)b, type | V_EMPTY_OK | V_NOFIND_ERR); // find an array
+                vdata = findvar((unsigned char *)b, type | V_EMPTY_OK | V_NOFIND_ERR);
+            } else {
+                vdata = findvar((unsigned char *)name, type | V_FIND);
             }
-            else
-                vdata = findvar(bufp, type | V_FIND); // find or create a non arrayed variable
+
             if (TypeMask(g_vartbl[g_VarIndex].type) != TypeMask(type))
-                error("$ type conflict", bufp);
+                error("$ type conflict", (unsigned char *)name);
             if (g_vartbl[g_VarIndex].type & T_CONST)
-                error("$ is a constant", bufp);
-            bufp += strlen((char *)bufp) + 1; // step over the name and the terminating zero byte
-            if (array)
-            { // an array has the data size in the next two bytes
-                nbr = *bufp++;
-                nbr |= (*bufp++) << 8;
-                nbr |= (*bufp++) << 16;
-                nbr |= (*bufp++) << 24;
+                error("$ is a constant", (unsigned char *)name);
+
+            if (array) {
+                // читаем длину массива
+                unsigned char pbuf[4];
+                f_read(&f, pbuf, 4, &br);
+                if (br != 4) break;
+                nbr = pbuf[0] | (pbuf[1] << 8) | (pbuf[2] << 16) | (pbuf[3] << 24);
+
+                // проверка размера
                 nbr2 = 1;
                 for (j = 0; g_vartbl[g_VarIndex].dims[j] != 0 && j < MAXDIM; j++)
                     nbr2 *= (g_vartbl[g_VarIndex].dims[j] + 1 - g_OptionBase);
@@ -5273,19 +5290,26 @@ void MIPS16 cmd_var(void)
                     nbr2 *= sizeof(long long int);
                 if (nbr2 != nbr)
                     error("Array size");
-            }
-            else
-            {
-                if (type & T_STR)
-                    nbr = *bufp + 1;
+            } else {
+                if (type & T_STR) {
+                    f_read(&f, &nbr, 1, &br);
+                    if (br != 1) break;
+                    nbr += 1;
+                }
                 if (type & T_NBR)
                     nbr = sizeof(MMFLOAT);
                 if (type & T_INT)
                     nbr = sizeof(long long int);
             }
-            while (nbr--)
-                *vdata++ = *bufp++; // copy the data
+
+            // читаем данные
+            while (nbr--) {
+                if (f_read(&f, &tmp, 1, &br) != FR_OK || br != 1) break;
+                *vdata++ = tmp;
+            }
         }
+
+        f_close(&f);
         DefaultType = SaveDefaultType;
         return;
     }
@@ -5296,9 +5320,24 @@ void MIPS16 cmd_var(void)
         if (argc && (argc & 0x01) == 0)
             error("Invalid syntax");
 
+        // Если не указали, какие переменные сохранять, сохраняем все
+        if (argc == 0) {
+            int vi = 0;
+            for (int i = 0; i < MAXVARS; i++) {
+                if (g_vartbl[i].name[0] == 0) continue;
+                if (g_vartbl[i].type & (T_CONST | T_PTR)) continue;
+                if (g_vartbl[i].level != 0) continue;
+                if (vi >= (MAX_ARG_COUNT / 2))
+                    error("Too many variables to save");
+                VarList[vi] = i;
+                VarDataList[vi] = g_vartbl[i].val.s;
+                vi++;
+            }
+            argc = vi * 2;
+        }
         // befor we start, run through the arguments checking for errors
         // before we start, run through the arguments checking for errors
-        for (i = 0; i < argc; i += 2)
+        else for (i = 0; i < argc; i += 2)
         {
             checkend(skipvar(argv[i], false));
             VarDataList[i / 2] = findvar(argv[i], V_NOFIND_ERR | V_EMPTY_OK);
@@ -5317,117 +5356,186 @@ void MIPS16 cmd_var(void)
                     error("Invalid variable");
             }
         }
-        // load the current variable save table into RAM
-        // while doing this skip any variables that are in the argument list for this save
-        bufp = buf = GetTempMemory(SAVEDVARS_FLASH_SIZE); // build the saved variable table in RAM
-                                                          //        SavedVarsFlash = (char*)FLASH_SAVED_VAR_ADDR;      // point to where the variables were saved
-        varp = (unsigned char *)SavedVarsFlash;           // point to where the variables were saved
-        while (*varp != 0 && *varp != 0xff)
-        {                   // 0xff is the end of the variable list, SavedVarsFlash[4] = 0 means that the flash has never been written to
-            type = *varp++; // get the variable type
-            array = type & 0x80;
-            type &= 0x7f; // set array to true if it is an array
-            vdata = varp; // save a pointer to the name
-            while (*varp)
-                varp++; // skip the name
-            varp++;     // and the terminating zero byte
-            if (array)
-            { // an array has the data size in the next two bytes
-                nbr = (varp[0] | (varp[1] << 8) | (varp[2] << 16) | (varp[3] << 24)) + 4;
-            }
-            else
-            {
-                if (type & T_STR)
-                    nbr = *varp + 1;
-                if (type & T_NBR)
-                    nbr = sizeof(MMFLOAT);
-                if (type & T_INT)
-                    nbr = sizeof(long long int);
-            }
-            for (i = 0; i < argc; i += 2)
-            {                                      // scan the argument list
-                p = &argv[i][strlen((char *)argv[i]) - 1]; // pointer to the last char
-                lastc = *p;                        // get the last char
-                if (lastc <= '%')
-                    *p = 0; // remove the type suffix for the compare
-                if (strncasecmp((char *)vdata, (char *)argv[i], MAXVARLEN) == 0)
-                { // does the entry have the same name?
-                    while (nbr--)
-                        varp++; // found matching variable, skip over the entry in flash (ie, do not copy to RAM)
-                    i = 9999;   // force the termination of the for loop
-                }
-                *p = lastc; // restore the type suffix
-            }
-            // finished scanning the argument list, did we find a matching variable?
-            // if not, copy this entry to RAM
-            if (i < 9999)
-            {
-                *bufp++ = type | array;
-                while (*vdata)
-                    *bufp++ = *vdata++; // copy the name
-                *bufp++ = *vdata++;     // and the terminating zero byte
-                while (nbr--)
-                    *bufp++ = *varp++; // copy the data
-            }
+        UINT br;
+        unsigned char type, array, tmp;
+        char *bufp, *buf;
+        bufp = buf = GetTempMemory(SAVEDVARS_FLASH_SIZE);  // RAM-блок, куда копируем нужные переменные
+        // Открываем файл переменных
+        FIL f;
+        FRESULT res = f_open(&f, "/tmp/picoMite.vars", FA_READ);
+        if (res != FR_OK) {
+            goto no_file;
         }
 
+        while (!f_eof(&f)) {
+            FSIZE_t entry_start = f_tell(&f);  // запоминаем начало
+
+            // Читаем тип
+            if (f_read(&f, &type, 1, &br) != FR_OK || br == 0) break;
+            array = type & 0x80;
+            type &= 0x7f;
+
+            // Читаем имя переменной в `namebuf`
+            char namebuf[MAXVARLEN + 1];
+            int ni = 0;
+            while (ni < MAXVARLEN) {
+                if (f_read(&f, &tmp, 1, &br) != FR_OK || br == 0) goto done;
+                if (tmp == 0) break;
+                namebuf[ni++] = tmp;
+            }
+            namebuf[ni] = 0;
+
+            // Проверяем, есть ли это имя среди аргументов вызова
+            int skip = 0;
+            if (argc > 0) {
+                for (int i = 0; i < argc; i += 2) {
+                    char *p = (char *)argv[i];
+                    int len = strlen(p);
+                    char lastc = p[len - 1];
+                    if (lastc <= '%') p[len - 1] = 0;
+                    if (strncasecmp(namebuf, p, MAXVARLEN) == 0) {
+                        skip = 1;
+                    }
+                    p[len - 1] = lastc;
+                    if (skip) break;
+                }
+            }
+
+            // Пропускаем/сохраняем в зависимости от результата
+            if (skip) {
+                // пропускаем оставшиеся данные
+                if (array) {
+                    unsigned char lenbuf[4];
+                    f_read(&f, lenbuf, 4, &br);
+                    FSIZE_t len = lenbuf[0] | (lenbuf[1] << 8) | (lenbuf[2] << 16) | (lenbuf[3] << 24);
+                    f_lseek(&f, f_tell(&f) + len);
+                } else {
+                    if (type & T_STR) {
+                        f_read(&f, &tmp, 1, &br);
+                        f_lseek(&f, f_tell(&f) + tmp);
+                    } else if (type & T_NBR) {
+                        f_lseek(&f, f_tell(&f) + sizeof(MMFLOAT));
+                    } else if (type & T_INT) {
+                        f_lseek(&f, f_tell(&f) + sizeof(long long int));
+                    }
+                }
+            } else {
+                // переместимся обратно и скопируем всю запись целиком
+                FSIZE_t entry_end;
+                if (array) {
+                    unsigned char lenbuf[4];
+                    f_read(&f, lenbuf, 4, &br);
+                    FSIZE_t len = lenbuf[0] | (lenbuf[1] << 8) | (lenbuf[2] << 16) | (lenbuf[3] << 24);
+                    entry_end = f_tell(&f) + len;
+                } else {
+                    if (type & T_STR) {
+                        f_read(&f, &tmp, 1, &br);
+                        entry_end = f_tell(&f) + tmp;
+                    } else if (type & T_NBR) {
+                        entry_end = f_tell(&f) + sizeof(MMFLOAT);
+                    } else if (type & T_INT) {
+                        entry_end = f_tell(&f) + sizeof(long long int);
+                    } else {
+                        entry_end = f_tell(&f);  // ничего не добавляется
+                    }
+                }
+
+                FSIZE_t saved_len = entry_end - entry_start;
+                f_lseek(&f, entry_start);
+                while (saved_len--) {
+                    f_read(&f, &tmp, 1, &br);
+                    *bufp++ = tmp;
+                }
+            }
+        }
+done:
+        f_close(&f);
         // initialise for writing to the flash
         ClearSavedVars();
-        FlashWriteInit(SAVED_VARS_FLASH);
-        // now write the variables in RAM recovered from the var save list
-        while (buf < bufp)
-        {
-            FlashWriteByte(*buf++);
+no_file:
+        // Создаём (или перезаписываем) файл переменных
+        res = f_open(&f, "/tmp/picoMite.vars", FA_WRITE | FA_CREATE_ALWAYS);
+        if (res != FR_OK) {
+            error("Cannot open variable file for writing");
         }
-        // now save the variables listed in this invocation of VAR SAVE
-        for (i = 0; i < argc; i += 2)
-        {
-            g_VarIndex = VarList[i / 2];                   // previously saved index to the variable
-            vdata = VarDataList[i / 2];                  // pointer to the variable's data
-            type = TypeMask(g_vartbl[g_VarIndex].type);      // get the variable's type
-            type |= (g_vartbl[g_VarIndex].type & T_IMPLIED); // set the implied flag
-            array = (g_vartbl[g_VarIndex].dims[0] != 0);
 
-            nbr = 1; // number of elements to save
-            if (array)
-            { // if this is an array calculate the number of elements
+        // Сначала записываем буфер с предыдущими переменными
+        for (char *ptr = buf; ptr < bufp; ptr++) {
+            UINT bw;
+            f_write(&f, ptr, 1, &bw);
+            if (bw != 1) {
+                f_close(&f);
+                error("Write error");
+            }
+        }
+        // Затем сохраняем переменные, указанные в этом вызове VAR SAVE
+        for (int i = 0; i < argc; i += 2) {
+            g_VarIndex = VarList[i / 2];  // ранее сохраненный индекс переменной
+            vdata = VarDataList[i / 2];   // указатель на данные переменной
+            type = TypeMask(g_vartbl[g_VarIndex].type);
+            type |= (g_vartbl[g_VarIndex].type & T_IMPLIED);
+            array = (g_vartbl[g_VarIndex].dims[0] != 0);
+            nbr = 1;
+            if (array) {
                 for (j = 0; g_vartbl[g_VarIndex].dims[j] != 0 && j < MAXDIM; j++)
                     nbr *= (g_vartbl[g_VarIndex].dims[j] + 1 - g_OptionBase);
-                type |= 0x80; // an array has the top bit set
+                type |= 0x80;
             }
-
-            if (type & T_STR)
-            {
+            if (type & T_STR) {
                 if (array)
                     nbr *= (g_vartbl[g_VarIndex].size + 1);
                 else
-                    nbr = *vdata + 1; // for a simple string variable just save the string
+                    nbr = *vdata + 1;
             }
             if (type & T_NBR)
                 nbr *= sizeof(MMFLOAT);
             if (type & T_INT)
                 nbr *= sizeof(long long int);
-            if ((uint32_t)realflashpointer + XIP_BASE - (uint32_t)SavedVarsFlash + 36 + nbr > SAVEDVARS_FLASH_SIZE)
-            {
-                FlashWriteClose();
-                error("Not enough memory");
+
+            p = g_vartbl[g_VarIndex].name;
+            size_t entry_size = 1 /*type*/ + strlen((char*)p) + 1 /*zero*/ + (array ? 4 : 0) + nbr;
+            if (f_tell(&f) + entry_size > SAVEDVARS_FLASH_SIZE) {
+                f_close(&f);
+                error("Too many variables to save");
             }
-            FlashWriteByte(type); // save its type
-            for (j = 0, p = g_vartbl[g_VarIndex].name; *p && j < MAXVARLEN; p++, j++)
-                FlashWriteByte(*p); // save the name
-            FlashWriteByte(0);      // terminate the name
-            if (array)
-            { // if it is an array save the number of data bytes
-                FlashWriteByte(nbr);
-                FlashWriteByte(nbr >> 8);
-                FlashWriteByte(nbr >> 16);
-                FlashWriteByte(nbr >> 24);
+            // Пишем тип
+            UINT bw;
+            f_write(&f, &type, 1, &bw);
+            if (bw != 1) goto write_error;
+
+            // Пишем имя переменной
+            for (j = 0; *p && j < MAXVARLEN; j++, p++) {
+                f_write(&f, p, 1, &bw);
+                if (bw != 1) goto write_error;
             }
-            while (nbr--)
-                FlashWriteByte(*vdata++); // write the data
+            tmp = 0;
+            f_write(&f, &tmp, 1, &bw); // завершающий ноль имени
+            if (bw != 1) goto write_error;
+
+            // Если массив — пишем размер
+            if (array) {
+                uint8_t lenbuf[4] = {
+                    (uint8_t)(nbr & 0xFF),
+                    (uint8_t)((nbr >> 8) & 0xFF),
+                    (uint8_t)((nbr >> 16) & 0xFF),
+                    (uint8_t)((nbr >> 24) & 0xFF)
+                };
+                f_write(&f, lenbuf, 4, &bw);
+                if (bw != 4) goto write_error;
+            }
+
+            // Пишем данные переменной
+            while (nbr--) {
+                f_write(&f, vdata, 1, &bw);
+                if (bw != 1) goto write_error;
+                vdata++;
+            }
         }
-        FlashWriteClose();
+        f_close(&f);
         return;
+write_error:
+        f_close(&f);
+        error("Write error");
     }
     error("Unknown command");
 }
@@ -5438,21 +5546,20 @@ void MIPS16 cmd_var(void)
 
 void ClearSavedVars(void)
 {
-    uSec(250000);
-    disable_interrupts_pico();
-    flash_range_erase(FLASH_TARGET_OFFSET + FLASH_ERASE_SIZE, SAVEDVARS_FLASH_SIZE);
-    enable_interrupts_pico();
-    uSec(10000);
+    f_unlink("/tmp/picoMite.vars");
 }
 void SaveOptions(void)
 {
-    uSec(100000);
-    disable_interrupts_pico();
-    flash_range_erase(FLASH_TARGET_OFFSET, FLASH_ERASE_SIZE);
-    enable_interrupts_pico();
-    uSec(10000);
-    disable_interrupts_pico();
-    flash_range_program(FLASH_TARGET_OFFSET, (const uint8_t *)&Option, sizeof(struct option_s));
-    enable_interrupts_pico();
+    FIL f;
+    f_open(&f, "/tmp/picoMite.opts", FA_WRITE | FA_CREATE_ALWAYS);
+    unsigned char *qq = (unsigned char *)&Option;
+    UINT wr;
+    f_write(&f, qq, sizeof(struct option_s), &wr);
+    f_close(&f);
 }
 /*  @endcond */
+void mount_tmp(void) {
+    if ( f_mount(&FatFs, "", 1) == FR_OK) {
+        f_mkdir("/tmp");
+    }
+}

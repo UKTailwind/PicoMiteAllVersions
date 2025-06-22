@@ -1401,6 +1401,50 @@ void dobacklight(void){
 		setpwm(pin, &BacklightChannel, &BacklightSlice, Option.DISPLAY_TYPE==ILI9488W ? 1000.0 : 50000.0, Option.DefaultBrightness);
 	}
 }
+void InitSDCARD(void) {
+	if(Option.SD_CS || Option.CombinedCS){
+		if(!Option.CombinedCS){
+			ExtCfg(Option.SD_CS, EXT_BOOT_RESERVED, 0);
+			SD_CS_PIN=PinDef[Option.SD_CS].GPno;
+			gpio_init(SD_CS_PIN);
+			gpio_set_drive_strength(SD_CS_PIN,GPIO_DRIVE_STRENGTH_8MA);
+			gpio_put(SD_CS_PIN,GPIO_PIN_SET);
+			gpio_set_dir(SD_CS_PIN, GPIO_OUT);
+			gpio_set_slew_rate(SD_CS_PIN, GPIO_SLEW_RATE_SLOW);
+		}
+		CurrentSPISpeed=NONE_SPI_SPEED;
+		if(Option.SD_CLK_PIN){
+			SD_CLK_PIN=PinDef[Option.SD_CLK_PIN].GPno;
+			SD_MOSI_PIN=PinDef[Option.SD_MOSI_PIN].GPno;
+			SD_MISO_PIN=PinDef[Option.SD_MISO_PIN].GPno;
+			ExtCfg(Option.SD_CLK_PIN, EXT_BOOT_RESERVED, 0);
+			ExtCfg(Option.SD_MOSI_PIN, EXT_BOOT_RESERVED, 0);
+			ExtCfg(Option.SD_MISO_PIN, EXT_BOOT_RESERVED, 0);
+			gpio_init(SD_CLK_PIN);
+			gpio_set_drive_strength(SD_CLK_PIN,GPIO_DRIVE_STRENGTH_8MA);
+			gpio_put(SD_CLK_PIN,GPIO_PIN_RESET);
+			gpio_set_dir(SD_CLK_PIN, GPIO_OUT);
+			gpio_set_slew_rate(SD_CLK_PIN, GPIO_SLEW_RATE_FAST);
+			gpio_init(SD_MOSI_PIN);
+			gpio_set_drive_strength(SD_MOSI_PIN,GPIO_DRIVE_STRENGTH_8MA);
+			gpio_put(SD_MOSI_PIN,GPIO_PIN_RESET);
+			gpio_set_dir(SD_MOSI_PIN, GPIO_OUT);
+			gpio_set_slew_rate(SD_MOSI_PIN, GPIO_SLEW_RATE_FAST);
+			gpio_init(SD_MISO_PIN);
+			gpio_set_pulls(SD_MISO_PIN,true,false);
+			gpio_set_dir(SD_MISO_PIN, GPIO_IN);
+			gpio_set_input_hysteresis_enabled(SD_MISO_PIN,true);
+			xchg_byte= BitBangSwapSPI;
+			xmit_byte_multi=BitBangSendSPI;
+			rcvr_byte_multi=BitBangReadSPI;
+		} else {
+			SD_CLK_PIN=SPI_CLK_PIN;
+			SD_MOSI_PIN=SPI_MOSI_PIN;
+			SD_MISO_PIN=SPI_MISO_PIN;
+		}
+		mount_tmp();
+	}
+}
 void InitReservedIO(void) {
 #ifdef rp2350
 	if(Option.PSRAM_CS_PIN){
@@ -1554,47 +1598,6 @@ void InitReservedIO(void) {
 		xchg_byte= BitBangSwapSPI;
 		xmit_byte_multi=BitBangSendSPI;
 		rcvr_byte_multi=BitBangReadSPI;
-	}
-	if(Option.SD_CS || Option.CombinedCS){
-		if(!Option.CombinedCS){
-			ExtCfg(Option.SD_CS, EXT_BOOT_RESERVED, 0);
-			SD_CS_PIN=PinDef[Option.SD_CS].GPno;
-			gpio_init(SD_CS_PIN);
-			gpio_set_drive_strength(SD_CS_PIN,GPIO_DRIVE_STRENGTH_8MA);
-			gpio_put(SD_CS_PIN,GPIO_PIN_SET);
-			gpio_set_dir(SD_CS_PIN, GPIO_OUT);
-			gpio_set_slew_rate(SD_CS_PIN, GPIO_SLEW_RATE_SLOW);
-		}
-		CurrentSPISpeed=NONE_SPI_SPEED;
-		if(Option.SD_CLK_PIN){
-			SD_CLK_PIN=PinDef[Option.SD_CLK_PIN].GPno;
-			SD_MOSI_PIN=PinDef[Option.SD_MOSI_PIN].GPno;
-			SD_MISO_PIN=PinDef[Option.SD_MISO_PIN].GPno;
-			ExtCfg(Option.SD_CLK_PIN, EXT_BOOT_RESERVED, 0);
-			ExtCfg(Option.SD_MOSI_PIN, EXT_BOOT_RESERVED, 0);
-			ExtCfg(Option.SD_MISO_PIN, EXT_BOOT_RESERVED, 0);
-			gpio_init(SD_CLK_PIN);
-			gpio_set_drive_strength(SD_CLK_PIN,GPIO_DRIVE_STRENGTH_8MA);
-			gpio_put(SD_CLK_PIN,GPIO_PIN_RESET);
-			gpio_set_dir(SD_CLK_PIN, GPIO_OUT);
-			gpio_set_slew_rate(SD_CLK_PIN, GPIO_SLEW_RATE_FAST);
-			gpio_init(SD_MOSI_PIN);
-			gpio_set_drive_strength(SD_MOSI_PIN,GPIO_DRIVE_STRENGTH_8MA);
-			gpio_put(SD_MOSI_PIN,GPIO_PIN_RESET);
-			gpio_set_dir(SD_MOSI_PIN, GPIO_OUT);
-			gpio_set_slew_rate(SD_MOSI_PIN, GPIO_SLEW_RATE_FAST);
-			gpio_init(SD_MISO_PIN);
-			gpio_set_pulls(SD_MISO_PIN,true,false);
-			gpio_set_dir(SD_MISO_PIN, GPIO_IN);
-			gpio_set_input_hysteresis_enabled(SD_MISO_PIN,true);
-			xchg_byte= BitBangSwapSPI;
-			xmit_byte_multi=BitBangSendSPI;
-			rcvr_byte_multi=BitBangReadSPI;
-		} else {
-			SD_CLK_PIN=SPI_CLK_PIN;
-			SD_MOSI_PIN=SPI_MOSI_PIN;
-			SD_MISO_PIN=SPI_MISO_PIN;
-		}
 	}
 	if(Option.AUDIO_L || Option.AUDIO_CLK_PIN){ //enable the audio system
 		if(Option.AUDIO_L){ // Normal PWM audio

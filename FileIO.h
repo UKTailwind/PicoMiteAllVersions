@@ -51,6 +51,7 @@ void FilePutStr(int count, char *c, int fnbr);
 char FilePutChar(char c, int fnbr);
 void CheckSDCard(void);
 void LoadOptions(void);
+void ResetOptionsNoSave(void);
 void CrunchData(unsigned char **p, int c);
 int FileEOF(int fnbr);
 void ClearSavedVars(void);
@@ -256,7 +257,6 @@ extern int lfs_FileFnbr;
 extern struct lfs_config pico_lfs_cfg;
 #define SAVED_OPTIONS_FLASH 5
 #define LIBRARY_FLASH 6
-#define SAVED_VARS_FLASH 7
 #define PROGRAM_FLASH 8
 typedef union uFileTable
 {

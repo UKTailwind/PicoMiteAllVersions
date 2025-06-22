@@ -148,7 +148,7 @@ int QVGA_HACT;	// V active scanlines (= 2*HEIGHT)
         #ifdef HDMI
             #define MES_SIGNON  "\rPicoMiteHDMI MMBasic " CHIP " M2 Edition V"VERSION "\r\n"
         #else
-            #define MES_SIGNON  "\rPicoMiteVGA MMBasic " CHIP " M1 Edition V"VERSION "\r\n"
+            #define MES_SIGNON  "\rPicoMiteVGA MMBasic " CHIP " m1p2 Edition V"VERSION "\r\n"
         #endif
 #endif
 
@@ -231,8 +231,6 @@ unsigned char PulsePin[NBR_PULSE_SLOTS];
 unsigned char PulseDirection[NBR_PULSE_SLOTS];
 int PulseCnt[NBR_PULSE_SLOTS];
 int PulseActive;
-const uint8_t *flash_option_contents = (const uint8_t *) (XIP_BASE + FLASH_TARGET_OFFSET);
-const uint8_t *SavedVarsFlash = (const uint8_t *) (XIP_BASE + FLASH_TARGET_OFFSET +  FLASH_ERASE_SIZE);
 const uint8_t *flash_target_contents = (const uint8_t *) (XIP_BASE + FLASH_TARGET_OFFSET + FLASH_ERASE_SIZE + SAVEDVARS_FLASH_SIZE);
 const uint8_t *flash_progmemory = (const uint8_t *) (XIP_BASE + PROGSTART);
 const uint8_t *flash_libmemory = (const uint8_t *) (XIP_BASE + PROGSTART - MAX_PROG_SIZE);
@@ -2378,9 +2376,9 @@ void QVgaInit()
 
 	// initialize parameters
 	QVgaScanLine = 0; // currently processed scanline
-	QVgaBufInx = 0; // at first, control buffer 1 will be sent out
-	QVgaFrame = 0; // current frame
-	ScanLineCBNext = &ScanLineCB[CB_MAX]; // send control buffer 2 next
+//	QVgaBufInx = 0; // at first, control buffer 1 will be sent out
+//	QVgaFrame = 0; // current frame
+//	ScanLineCBNext = &ScanLineCB[CB_MAX]; // send control buffer 2 next
 
 	// enable DMA IRQ
 	irq_set_enabled(DMA_IRQ_0, true);
@@ -4090,9 +4088,8 @@ void WebConnect(void){
 
 int MIPS16 main(){
     static int ErrorInPrompt;
-    int i=0;
-    char savewatchdog=false;
-        i=watchdog_caused_reboot();
+    char savewatchdog = false;
+    int i = watchdog_caused_reboot();
 #ifdef rp2350
     restart_reason=powman_hw->chip_reset | i;
     rp2350a=(*((io_ro_32*)(SYSINFO_BASE + SYSINFO_PACKAGE_SEL_OFFSET)) & 1);
@@ -4102,13 +4099,15 @@ int MIPS16 main(){
     if(_excep_code == SOFT_RESET || _excep_code == SCREWUP_TIMEOUT )restart_reason=0xFFFFFFFF;
     if((_excep_code == WATCHDOG_TIMEOUT) & i) restart_reason=0xFFFFFFFE;
     if((_excep_code == POSSIBLE_WATCHDOG) & i)restart_reason=0xFFFFFFFD;
-    LoadOptions();
+    ResetOptionsNoSave();
 #ifdef rp2350
     if(rom_get_last_boot_type()==BOOT_TYPE_FLASH_UPDATE)restart_reason=0xFFFFFFFC;
 #else
     if(restart_reason==0x10001 || restart_reason==0x101)restart_reason=0xFFFFFFFC;
 #endif
-    uint32_t excep=_excep_code;
+    uint32_t excep = _excep_code;
+    InitSDCARD();
+    LoadOptions();
     if(  Option.Baudrate == 0 ||
         !(Option.Tab==2 || Option.Tab==3 || Option.Tab==4 ||Option.Tab==8) ||
         !(Option.Autorun>=0 && Option.Autorun<=MAXFLASHSLOTS+1) ||
@@ -4209,7 +4208,7 @@ int MIPS16 main(){
     sleep_ms(2);
 #endif
     PWM_FREQ=44100;
-    pico_get_unique_board_id_string (id_out,12);
+    pico_get_unique_board_id_string (id_out, 12);
 #ifdef rp2350
 #ifndef PICOMITEWEB
     if(Option.PSRAM_CS_PIN){
@@ -4310,7 +4309,6 @@ if(Option.CPU_Speed==FreqSVGA){ //adjust the size of the heap
 #ifndef USBKEYBOARD
     stdio_set_translate_crlf(&stdio_usb, false);
 #endif
-    LoadOptions();
 	stdio_init_all();
     adc_init();
     adc_set_temp_sensor_enabled(true);
@@ -4392,7 +4390,7 @@ if(Option.CPU_Speed==FreqSVGA){ //adjust the size of the heap
     #endif
     ResetDisplay();
     ClearScreen(Option.DefaultBC);
-    #else
+#else
     #ifdef PICOMITE
         bus_ctrl_hw->priority=0x100;
         multicore_launch_core1_with_stack(UpdateCore,core1stack,2048);
@@ -4466,7 +4464,7 @@ if(Option.CPU_Speed==FreqSVGA){ //adjust the size of the heap
         WatchdogSet = true;                                 // remember if it was a watchdog timeout
         MMPrintString("\rFirmware updated\r\n");
     }
-    savewatchdog=WatchdogSet;
+    savewatchdog = WatchdogSet;
     if(noRTC){
         noRTC=0;
         Option.RTC=0;
@@ -4508,7 +4506,6 @@ if(Option.CPU_Speed==FreqSVGA){ //adjust the size of the heap
     start_i2s(QVGA_PIO_NUM,1);
 #endif
 
-   
 	if(setjmp(mark) != 0) {
      // we got here via a long jump which means an error or CTRL-C or the program wants to exit to the command prompt
         FlashLoad = 0;
@@ -4847,7 +4844,7 @@ contloop:
     realflashpointer = realflashsave ;
     updatecount=0;
     p = (unsigned char *)flash_progmemory;                                              // start scanning program memory
-     while(*p != 0xff) {
+    while(*p != 0xff) {
      	nbr++;
          if(*p == 0) p++;                                            // if it is at the end of an element skip the zero marker
          if(*p == 0) break;                                          // end of the program
@@ -4954,8 +4951,8 @@ contloop:
          }
          while(*p) p++;                                              // look for the zero marking the start of the next element
      }
-     FlashWriteWord(0xffffffff);                                // make sure that the end of the CFunctions is terminated with an erased word
-     FlashWriteClose();                                              // this will flush the buffer and step the flash write pointer to the next word boundary
+    FlashWriteWord(0xffffffff);                                // make sure that the end of the CFunctions is terminated with an erased word
+    FlashWriteClose();                                              // this will flush the buffer and step the flash write pointer to the next word boundary
     if(msg) {                                                       // if requested by the caller, print an informative message
         if(MMCharPos > 1) MMPrintString("\r\n");                    // message should be on a new line
         MMPrintString("Saved ");
@@ -4968,6 +4965,7 @@ contloop:
 #ifdef USBKEYBOARD
 	clearrepeat();
 #endif
+/// TODO: ensure
     enable_interrupts_pico();
     return;
 

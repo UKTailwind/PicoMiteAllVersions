@@ -43,7 +43,6 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #define ASMMAX 6400 // maximum number of bytes that can be copied or set by assembler routines
 #define MAXCPY 3200 // tuned maximum number of bytes to copy using ZCOPY
 
-extern const uint8_t *SavedVarsFlash;
 extern const uint8_t *flash_progmemory;
 // memory management parameters
 
@@ -552,30 +551,48 @@ void MIPS16 cmd_memory(void) {
     GeneralSize = (i + 512)/1024; GeneralPercent = (i * 100)/CurrentRAM;
 
     // count the space used by saved variables (in flash)
-    p = (unsigned char *)SavedVarsFlash;
+
+    // Попытка открыть файл с сохранёнными переменными
+    FIL f;
+    FRESULT res = f_open(&f, "/tmp/picoMite.vars", FA_READ);
+    if (res != FR_OK) {
+        SavedVarCnt = 0;
+        SavedVarSizeK = 0;
+        SavedVarPercent = 0;
+        goto func;
+    }
     SavedVarCnt = 0;
-    while(!(*p == 0 || *p == 0xff)) {
-        unsigned char type, array;
+    UINT br;
+    while(!f_eof(&f)) {
+        unsigned char type, array, tmp;
         SavedVarCnt++;
-        type = *p++;
+        if ( f_read(&f, &type, 1, &br) != FR_OK ) break;
         array = type & 0x80;  type &= 0x7f;                         // set array to true if it is an array
-        p += strlen((char *)p) + 1;
-        if(array)
-            p += (p[0] | p[1] << 8 | p[2] << 16| p[3] << 24) + 4;
+        while ( f_read(&f, &tmp, 1, &br) == FR_OK && tmp != 0 );
+        if(array) {
+            uint8_t len_bytes[4];
+            f_read(&f, len_bytes, 4, &br);
+            FSIZE_t sz = len_bytes[0] | (len_bytes[1] << 8) | (len_bytes[2] << 16) | (len_bytes[3] << 24);
+            f_lseek(&f, f_tell(&f) + sz);
+        }
         else {
             if(type &  T_NBR)
-                p += sizeof(MMFLOAT);
+                f_lseek(&f, f_tell(&f) + sizeof(MMFLOAT));
             else if(type &  T_INT)
-                p += sizeof(long long int);
-            else
-                p += *p + 1;
+                f_lseek(&f, f_tell(&f) + sizeof(long long int));
+            else {
+                unsigned char p0;
+                f_read(&f, &p0, 1, &br);
+                f_lseek(&f, f_tell(&f) + p0);
+            }
         }
     }
-    SavedVarSize = p - (SavedVarsFlash);
+    SavedVarSize = f_tell(&f);
     SavedVarSizeK = (SavedVarSize + 512) / 1024;
     SavedVarPercent = (SavedVarSize * 100) / (/*MAX_PROG_SIZE +*/ SAVEDVARS_FLASH_SIZE);
     if(SavedVarCnt && SavedVarSizeK == 0) SavedVarPercent = SavedVarSizeK = 1;        // adjust if it is zero and we have some variables
-
+    f_close(&f);
+func:
     // count the space used by CFunctions, CSubs and fonts
     CFunctSize = CFunctNbr = FontSize = FontNbr = 0;
     pint = (unsigned int *)CFunctionFlash;

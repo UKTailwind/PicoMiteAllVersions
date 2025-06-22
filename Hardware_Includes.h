@@ -199,6 +199,8 @@ extern void MMPrintString(char* s);
 extern void SSPrintString(char* s);
 extern void myprintf(char *s);
 extern int getConsole(void);
+extern void mount_tmp(void);
+extern void InitSDCARD(void);
 extern void InitReservedIO(void);
 extern char SerialConsolePutC(char c, int flush);
 extern void CallExecuteProgram(char *p);
