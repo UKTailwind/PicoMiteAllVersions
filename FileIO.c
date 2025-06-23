@@ -5215,8 +5215,8 @@ void FlashWriteClose(void)
 ********************************************************************************************************************/
 void MIPS16 cmd_var(void)
 {
-    unsigned char *p, *vdata;
-    int i, j, nbr = 1, SaveDefaultType;
+    unsigned char *p;
+    int SaveDefaultType;
     int VarList[MAX_ARG_COUNT];
     unsigned char *VarDataList[MAX_ARG_COUNT];
     if ((p = checkstring(cmdline, (unsigned char *)"CLEAR")))
@@ -5226,20 +5226,97 @@ void MIPS16 cmd_var(void)
         return;
     }
 
-    if ((p = checkstring(cmdline, (unsigned char *)"RESTORE")))
-    {
+    if ((p = checkstring(cmdline, (unsigned char *)"LIST"))) {
+        checkend(p); // Проверяем, что нет лишних аргументов
+
+        char linebuf[MAXSTRLEN + 16];
+        char strbuf[MAXSTRLEN + 1];  // буфер под строку
+        for (int i = 0; i < MAXVARS; i++) {
+            if (g_vartbl[i].name[0] == 0) continue;
+            if (g_vartbl[i].type & (T_CONST | T_PTR)) continue;
+            if (g_vartbl[i].level != 0) continue;
+
+            unsigned char type = TypeMask(g_vartbl[i].type);
+            bool is_array = g_vartbl[i].dims[0] != 0;
+
+            const char *typesuffix = (type == T_STR) ? "$" :
+                                    (type == T_INT) ? "%" : "";
+
+            // Печатаем имя переменной
+            snprintf(linebuf, sizeof(linebuf), "%s%s%s = ",
+                    g_vartbl[i].name, typesuffix, is_array ? "()" : "");
+            MMPrintString(linebuf);
+
+            if (is_array) {
+                MMPrintString("{");
+
+                int elements = 1;
+                for (int d = 0; d < MAXDIM && g_vartbl[i].dims[d]; d++)
+                    elements *= (g_vartbl[i].dims[d] + 1 - g_OptionBase);
+
+                if (type == T_STR) {
+                    int width = g_vartbl[i].size + 1;
+                    unsigned char *base = g_vartbl[i].val.s;
+                    for (int j = 0; j < elements; j++) {
+                        unsigned char *s = &base[j * width];
+                        int len = s[0];
+                        if (len > g_vartbl[i].size) len = g_vartbl[i].size;
+                        memcpy(strbuf, s + 1, len);
+                        strbuf[len] = 0;
+                        snprintf(linebuf, sizeof(linebuf), "\"%s\"%s", strbuf, (j < elements - 1) ? "," : "");
+                        MMPrintString(linebuf);
+                    }
+                } else if (type == T_NBR) {
+                    MMFLOAT *fa = g_vartbl[i].val.fa;
+                    for (int j = 0; j < elements; j++) {
+                        snprintf(linebuf, sizeof(linebuf), "%g%s", fa[j], (j < elements - 1) ? "," : "");
+                        MMPrintString(linebuf);
+                    }
+                } else if (type == T_INT) {
+                    long long int *ia = g_vartbl[i].val.ia;
+                    for (int j = 0; j < elements; j++) {
+                        snprintf(linebuf, sizeof(linebuf), "%lld%s", ia[j], (j < elements - 1) ? "," : "");
+                        MMPrintString(linebuf);
+                    }
+                } else {
+                    MMPrintString("?");
+                }
+
+                MMPrintString("}\r\n");
+            } else {
+                if (type == T_STR) {
+                    unsigned char *s = g_vartbl[i].val.s;
+                    int len = s[0];
+                    if (len > g_vartbl[i].size) len = g_vartbl[i].size;
+                    memcpy(strbuf, s + 1, len);
+                    strbuf[len] = 0;
+                    snprintf(linebuf, sizeof(linebuf), "\"%s\"\r\n", strbuf);
+                    MMPrintString(linebuf);
+                } else if (type == T_NBR) {
+                    snprintf(linebuf, sizeof(linebuf), "%g\r\n", g_vartbl[i].val.f);
+                    MMPrintString(linebuf);
+                } else if (type == T_INT) {
+                    snprintf(linebuf, sizeof(linebuf), "%lld\r\n", g_vartbl[i].val.i);
+                    MMPrintString(linebuf);
+                } else {
+                    MMPrintString("(unknown type)\r\n");
+                }
+            }
+        }
+        return;
+    }
+    if ((p = checkstring(cmdline, (unsigned char *)"RESTORE"))) {
         char b[MAXVARLEN + 3];
         checkend(p);
+
         FIL f;
         FRESULT res = f_open(&f, "/tmp/picoMite.vars", FA_READ);
-        if (res != FR_OK)
-            return; // нет файла — нечего восстанавливать
+        if (res != FR_OK) return;  // нет файла — нечего восстанавливать
 
         UINT br;
-        unsigned char type, array;
-        unsigned char tmp;
+        unsigned char type, array, tmp;
         unsigned char *vdata;
-        int j, nbr, nbr2;
+        int j, nbr, expected;
         DefaultType = SaveDefaultType = DefaultType;
 
         while (!f_eof(&f)) {
@@ -5248,8 +5325,8 @@ void MIPS16 cmd_var(void)
                 break;
 
             array = type & 0x80;
-            type &= 0x7f;
-            DefaultType = TypeMask(type);
+            type &= 0x7F;
+            DefaultType = TypeMask(type);  // применим тип по умолчанию для findvar
 
             // Читаем имя
             char name[MAXVARLEN + 1];
@@ -5258,6 +5335,95 @@ void MIPS16 cmd_var(void)
                 name[ni++] = tmp;
             name[ni] = '\0';
 
+            // Получаем указатель на переменную
+            if (array) {
+                strcpy(b, name);
+                strcat(b, "()");
+                vdata = findvar((unsigned char *)b, type | V_EMPTY_OK | V_NOFIND_ERR);
+            } else {
+                vdata = findvar((unsigned char *)name, type | V_FIND);
+            }
+
+            // Проверки на корректность
+            if (TypeMask(g_vartbl[g_VarIndex].type) != TypeMask(type))
+                error("$ type conflict", (unsigned char *)name);
+            if (g_vartbl[g_VarIndex].type & T_CONST)
+                error("$ is a constant", (unsigned char *)name);
+
+            // Определим, сколько байт надо читать
+            if (array) {
+                // читаем размер массива в байтах
+                unsigned char pbuf[4];
+                if (f_read(&f, pbuf, 4, &br) != FR_OK || br != 4) break;
+                nbr = pbuf[0] | (pbuf[1] << 8) | (pbuf[2] << 16) | (pbuf[3] << 24);
+
+                // сверим с ожидаемым
+                expected = 1;
+                for (j = 0; g_vartbl[g_VarIndex].dims[j] != 0 && j < MAXDIM; j++)
+                    expected *= (g_vartbl[g_VarIndex].dims[j] + 1 - g_OptionBase);
+                if (type & T_STR)
+                    expected *= g_vartbl[g_VarIndex].size + 1;
+                if (type & T_NBR)
+                    expected *= sizeof(MMFLOAT);
+                if (type & T_INT)
+                    expected *= sizeof(long long int);
+                if (expected != nbr)
+                    error("Array size mismatch");
+            } else {
+                if (type & T_STR) {
+                    // сначала читаем длину строки
+                    if (f_read(&f, &tmp, 1, &br) != FR_OK || br != 1) break;
+                    vdata[0] = tmp;
+                    nbr = tmp + 1;  // включая длину
+                    vdata++;        // сместим указатель, чтобы писать в s[1]
+                } else if (type & T_NBR) {
+                    nbr = sizeof(MMFLOAT);
+                } else if (type & T_INT) {
+                    nbr = sizeof(long long int);
+                } else {
+                    continue; // неизвестный тип — пропускаем
+                }
+            }
+
+            // Чтение данных
+            if (f_read(&f, vdata, nbr, &br) != FR_OK || br != nbr)
+                error("Data reading error");
+        }
+
+        f_close(&f);
+        DefaultType = SaveDefaultType;
+        return;
+    }
+    if ((p = checkstring(cmdline, (unsigned char *)"RV"))) { // RESTORE VERBOSE
+        char b[MAXVARLEN + 3], linebuf[MAXSTRLEN + 32];
+        checkend(p);
+
+        FIL f;
+        FRESULT res = f_open(&f, "/tmp/picoMite.vars", FA_READ);
+        if (res != FR_OK) return;  // Файл отсутствует — ничего не делать
+
+        UINT br;
+        unsigned char type, array, tmp;
+        unsigned char *vdata;
+        int j, nbr, expected;
+        DefaultType = SaveDefaultType = DefaultType;
+
+        while (!f_eof(&f)) {
+            if (f_read(&f, &type, 1, &br) != FR_OK || br != 1 || type == 0xFF || type == 0x00)
+                break;
+
+            array = type & 0x80;
+            type &= 0x7F;
+            DefaultType = TypeMask(type);
+
+            // Чтение имени переменной
+            char name[MAXVARLEN + 1];
+            int ni = 0;
+            while (ni < MAXVARLEN && f_read(&f, &tmp, 1, &br) == FR_OK && br == 1 && tmp != 0)
+                name[ni++] = tmp;
+            name[ni] = '\0';
+
+            // Получаем переменную
             if (array) {
                 strcpy(b, name);
                 strcat(b, "()");
@@ -5271,41 +5437,118 @@ void MIPS16 cmd_var(void)
             if (g_vartbl[g_VarIndex].type & T_CONST)
                 error("$ is a constant", (unsigned char *)name);
 
+            // Определяем объём данных
             if (array) {
-                // читаем длину массива
                 unsigned char pbuf[4];
-                f_read(&f, pbuf, 4, &br);
-                if (br != 4) break;
+                if (f_read(&f, pbuf, 4, &br) != FR_OK || br != 4) break;
                 nbr = pbuf[0] | (pbuf[1] << 8) | (pbuf[2] << 16) | (pbuf[3] << 24);
 
-                // проверка размера
-                nbr2 = 1;
+                expected = 1;
                 for (j = 0; g_vartbl[g_VarIndex].dims[j] != 0 && j < MAXDIM; j++)
-                    nbr2 *= (g_vartbl[g_VarIndex].dims[j] + 1 - g_OptionBase);
+                    expected *= (g_vartbl[g_VarIndex].dims[j] + 1 - g_OptionBase);
                 if (type & T_STR)
-                    nbr2 *= g_vartbl[g_VarIndex].size + 1;
+                    expected *= g_vartbl[g_VarIndex].size + 1;
                 if (type & T_NBR)
-                    nbr2 *= sizeof(MMFLOAT);
+                    expected *= sizeof(MMFLOAT);
                 if (type & T_INT)
-                    nbr2 *= sizeof(long long int);
-                if (nbr2 != nbr)
-                    error("Array size");
+                    expected *= sizeof(long long int);
+                if (expected != nbr)
+                    error("Array size mismatch");
             } else {
                 if (type & T_STR) {
-                    f_read(&f, &nbr, 1, &br);
-                    if (br != 1) break;
-                    nbr += 1;
-                }
-                if (type & T_NBR)
+                    if (f_read(&f, &tmp, 1, &br) != FR_OK || br != 1) break;
+                    // Записываем длину строки в vdata[0]
+                    vdata[0] = tmp;
+                    nbr = tmp;
+                    // Далее считываем символы в vdata + 1
+                    if (f_read(&f, vdata + 1, nbr, &br) != FR_OK || br != nbr)
+                        error("Data reading error");
+                    nbr += 1;  // включая байт длины
+                } else if (type & T_NBR) {
                     nbr = sizeof(MMFLOAT);
-                if (type & T_INT)
+                    if (f_read(&f, vdata, nbr, &br) != FR_OK || br != nbr)
+                        error("Data reading error");
+                } else if (type & T_INT) {
                     nbr = sizeof(long long int);
+                    if (f_read(&f, vdata, nbr, &br) != FR_OK || br != nbr)
+                        error("Data reading error");
+                } else {
+                    continue;
+                }
             }
 
-            // читаем данные
-            while (nbr--) {
-                if (f_read(&f, &tmp, 1, &br) != FR_OK || br != 1) break;
-                *vdata++ = tmp;
+            // Для массива или скаляра устанавливаем valptr для вывода
+            unsigned char *valptr;
+            if (array) {
+                valptr = g_vartbl[g_VarIndex].val.s; // для массива всегда val.s, fa или ia не меняются
+                if (type == T_NBR)
+                    valptr = (unsigned char *)g_vartbl[g_VarIndex].val.fa;
+                else if (type == T_INT)
+                    valptr = (unsigned char *)g_vartbl[g_VarIndex].val.ia;
+            } else {
+                valptr = vdata;
+            }
+
+            // Формируем суффикс типа
+            const char *suffix = (type == T_STR) ? "$" : (type == T_INT ? "%" : "");
+
+            // Выводим имя переменной
+            snprintf(linebuf, sizeof(linebuf), "%s%s%s = ", name, suffix, array ? "()" : "");
+            MMPrintString(linebuf);
+
+            if (array) {
+                MMPrintString("{");
+                int count = 1;
+                for (j = 0; j < MAXDIM && g_vartbl[g_VarIndex].dims[j]; j++)
+                    count *= (g_vartbl[g_VarIndex].dims[j] + 1 - g_OptionBase);
+
+                if (type == T_STR) {
+                    int width = g_vartbl[g_VarIndex].size + 1;
+                    for (j = 0; j < count; j++) {
+                        unsigned char len = valptr[j * width];
+                        if (len > g_vartbl[g_VarIndex].size) len = g_vartbl[g_VarIndex].size;
+                        char tmpstr[MAXSTRLEN + 1];
+                        if (len > MAXSTRLEN) len = MAXSTRLEN;
+                        memcpy(tmpstr, &valptr[j * width + 1], len);
+                        tmpstr[len] = '\0';
+
+                        snprintf(linebuf, sizeof(linebuf), "\"%s\"%s", tmpstr, (j < count - 1) ? "," : "");
+                        MMPrintString(linebuf);
+                    }
+                } else if (type == T_NBR) {
+                    MMFLOAT *fa = (MMFLOAT *)valptr;
+                    for (j = 0; j < count; j++) {
+                        snprintf(linebuf, sizeof(linebuf), "%g%s", fa[j], (j < count - 1) ? "," : "");
+                        MMPrintString(linebuf);
+                    }
+                } else if (type == T_INT) {
+                    long long int *ia = (long long int *)valptr;
+                    for (j = 0; j < count; j++) {
+                        snprintf(linebuf, sizeof(linebuf), "%lld%s", ia[j], (j < count - 1) ? "," : "");
+                        MMPrintString(linebuf);
+                    }
+                }
+                MMPrintString("}\r\n");
+            } else {
+                if (type == T_STR) {
+                    unsigned char len = valptr[0];
+                    if (len > g_vartbl[g_VarIndex].size) len = g_vartbl[g_VarIndex].size;
+                    char tmpstr[MAXSTRLEN + 1];
+                    if (len > MAXSTRLEN) len = MAXSTRLEN;
+                    memcpy(tmpstr, &valptr[1], len);
+                    tmpstr[len] = '\0';
+
+                    snprintf(linebuf, sizeof(linebuf), "\"%s\"\r\n", tmpstr);
+                    MMPrintString(linebuf);
+                } else if (type == T_NBR) {
+                    MMFLOAT val = *((MMFLOAT *)valptr);
+                    snprintf(linebuf, sizeof(linebuf), "%g\r\n", val);
+                    MMPrintString(linebuf);
+                } else if (type == T_INT) {
+                    long long int val = *((long long int *)valptr);
+                    snprintf(linebuf, sizeof(linebuf), "%lld\r\n", val);
+                    MMPrintString(linebuf);
+                }
             }
         }
 
@@ -5313,153 +5556,175 @@ void MIPS16 cmd_var(void)
         DefaultType = SaveDefaultType;
         return;
     }
+    if ((p = checkstring(cmdline, (unsigned char *)"SAVE"))) {
+        getargs(&p, (MAX_ARG_COUNT * 2) - 1, (unsigned char *)","); 
+        if (argc && (argc & 0x01) == 0) error("Invalid syntax");
 
-    if ((p = checkstring(cmdline, (unsigned char *)"SAVE")))
-    {
-        getargs(&p, (MAX_ARG_COUNT * 2) - 1, (unsigned char *)","); // getargs macro must be the first executable stmt in a block
-        if (argc && (argc & 0x01) == 0)
-            error("Invalid syntax");
-
-        // Если не указали, какие переменные сохранять, сохраняем все
         if (argc == 0) {
-            int vi = 0;
             for (int i = 0; i < MAXVARS; i++) {
                 if (g_vartbl[i].name[0] == 0) continue;
                 if (g_vartbl[i].type & (T_CONST | T_PTR)) continue;
                 if (g_vartbl[i].level != 0) continue;
-                if (vi >= (MAX_ARG_COUNT / 2))
-                    error("Too many variables to save");
-                VarList[vi] = i;
-                VarDataList[vi] = g_vartbl[i].val.s;
-                vi++;
-            }
-            argc = vi * 2;
-        }
-        // befor we start, run through the arguments checking for errors
-        // before we start, run through the arguments checking for errors
-        else for (i = 0; i < argc; i += 2)
-        {
-            checkend(skipvar(argv[i], false));
-            VarDataList[i / 2] = findvar(argv[i], V_NOFIND_ERR | V_EMPTY_OK);
-            VarList[i / 2] = g_VarIndex;
-            if ((g_vartbl[g_VarIndex].type & (T_CONST | T_PTR)) || g_vartbl[g_VarIndex].level != 0)
-                error("Invalid variable");
-            p = &argv[i][strlen((char *)argv[i]) - 1]; // pointer to the last char
-            if (*p == ')')
-            { // strip off any empty brackets which indicate an array
-                p--;
-                if (*p == ' ')
-                    p--;
-                if (*p == '(')
-                    *p = 0;
+
+                // Добавляем в список
+                argv[argc++] = (unsigned char *)g_vartbl[i].name;
+                VarList[argc / 2] = i;
+                if (g_vartbl[i].type & T_STR)
+                    VarDataList[argc / 2] = g_vartbl[i].val.s;
+                else if (g_vartbl[i].type & T_NBR)
+                    VarDataList[argc / 2] = (unsigned char *)&g_vartbl[i].val.f;
+                else if (g_vartbl[i].type & T_INT)
+                    VarDataList[argc / 2] = (unsigned char *)&g_vartbl[i].val.i;
                 else
+                    VarDataList[argc / 2] = g_vartbl[i].val.s;
+                argc++; // увеличиваем на 2, т.к. формат — "имя,разделитель"
+                if (argc >= MAX_ARG_COUNT) {
+                    MMPrintString("Too many variables to save\r\n");
+                    break;
+                }
+            }
+        } else {
+            // Проверяем переменные, указанные в аргументах
+            for (int i = 0; i < argc; i += 2) {
+                checkend(skipvar(argv[i], false));
+                VarDataList[i / 2] = findvar(argv[i], V_NOFIND_ERR | V_EMPTY_OK);
+                VarList[i / 2] = g_VarIndex;
+                if ((g_vartbl[g_VarIndex].type & (T_CONST | T_PTR)) || g_vartbl[g_VarIndex].level != 0)
                     error("Invalid variable");
+
+                // Убираем суффиксы массива "()" из имени для точного совпадения при фильтрации
+                char *p_end = (char *)&argv[i][strlen((char *)argv[i]) - 1];
+                if (*p_end == ')') {
+                    p_end--;
+                    if (*p_end == ' ') p_end--;
+                    if (*p_end == '(') *p_end = 0;
+                    else error("Invalid variable");
+                }
             }
         }
-        UINT br;
-        unsigned char type, array, tmp;
-        char *bufp, *buf;
-        bufp = buf = GetTempMemory(SAVEDVARS_FLASH_SIZE);  // RAM-блок, куда копируем нужные переменные
-        // Открываем файл переменных
+
+        // Получаем временный буфер для хранения уже сохранённых переменных
+        char *bufp;
+        char *buf = bufp = GetTempMemory(SAVEDVARS_FLASH_SIZE);
+        if (!buf) error("Not enough memory");
+
         FIL f;
+        UINT br;
         FRESULT res = f_open(&f, "/tmp/picoMite.vars", FA_READ);
-        if (res != FR_OK) {
-            goto no_file;
-        }
+        if (res == FR_OK) {
+            // Читаем существующий файл и копируем переменные, НЕ входящие в список текущих для сохранения
+            while (!f_eof(&f)) {
+                FSIZE_t entry_start = f_tell(&f);
 
-        while (!f_eof(&f)) {
-            FSIZE_t entry_start = f_tell(&f);  // запоминаем начало
+                unsigned char type;
+                if (f_read(&f, &type, 1, &br) != FR_OK || br == 0) break;
 
-            // Читаем тип
-            if (f_read(&f, &type, 1, &br) != FR_OK || br == 0) break;
-            array = type & 0x80;
-            type &= 0x7f;
+                unsigned char tmp, array = type & 0x80;
+                unsigned char base_type = type & 0x7F;
 
-            // Читаем имя переменной в `namebuf`
-            char namebuf[MAXVARLEN + 1];
-            int ni = 0;
-            while (ni < MAXVARLEN) {
-                if (f_read(&f, &tmp, 1, &br) != FR_OK || br == 0) goto done;
-                if (tmp == 0) break;
-                namebuf[ni++] = tmp;
-            }
-            namebuf[ni] = 0;
+                char namebuf[MAXVARLEN + 1];
+                int ni = 0;
+                while (ni < MAXVARLEN) {
+                    if (f_read(&f, &tmp, 1, &br) != FR_OK || br == 0) goto done;
+                    if (tmp == 0) break;
+                    namebuf[ni++] = tmp;
+                }
+                namebuf[ni] = 0;
 
-            // Проверяем, есть ли это имя среди аргументов вызова
-            int skip = 0;
-            if (argc > 0) {
+                // Проверяем, содержится ли переменная в списке для сохранения
+                bool skip = false;
                 for (int i = 0; i < argc; i += 2) {
-                    char *p = (char *)argv[i];
-                    int len = strlen(p);
-                    char lastc = p[len - 1];
-                    if (lastc <= '%') p[len - 1] = 0;
-                    if (strncasecmp(namebuf, p, MAXVARLEN) == 0) {
-                        skip = 1;
+                    char *argname = (char *)argv[i];
+                    size_t arglen = strlen(argname);
+                    // Если в аргументе есть суффикс %, $, () — отрезаем для сравнения
+                    while (arglen > 0 && (argname[arglen - 1] == '%' || argname[arglen - 1] == '$' || argname[arglen - 1] == ')'))
+                        arglen--;
+                    if (strncasecmp(namebuf, argname, arglen) == 0 && namebuf[arglen] == '\0') {
+                        skip = true;
+                        break;
                     }
-                    p[len - 1] = lastc;
-                    if (skip) break;
                 }
-            }
 
-            // Пропускаем/сохраняем в зависимости от результата
-            if (skip) {
-                // пропускаем оставшиеся данные
-                if (array) {
-                    unsigned char lenbuf[4];
-                    f_read(&f, lenbuf, 4, &br);
-                    FSIZE_t len = lenbuf[0] | (lenbuf[1] << 8) | (lenbuf[2] << 16) | (lenbuf[3] << 24);
-                    f_lseek(&f, f_tell(&f) + len);
-                } else {
-                    if (type & T_STR) {
-                        f_read(&f, &tmp, 1, &br);
-                        f_lseek(&f, f_tell(&f) + tmp);
-                    } else if (type & T_NBR) {
-                        f_lseek(&f, f_tell(&f) + sizeof(MMFLOAT));
-                    } else if (type & T_INT) {
-                        f_lseek(&f, f_tell(&f) + sizeof(long long int));
-                    }
-                }
-            } else {
-                // переместимся обратно и скопируем всю запись целиком
-                FSIZE_t entry_end;
-                if (array) {
-                    unsigned char lenbuf[4];
-                    f_read(&f, lenbuf, 4, &br);
-                    FSIZE_t len = lenbuf[0] | (lenbuf[1] << 8) | (lenbuf[2] << 16) | (lenbuf[3] << 24);
-                    entry_end = f_tell(&f) + len;
-                } else {
-                    if (type & T_STR) {
-                        f_read(&f, &tmp, 1, &br);
-                        entry_end = f_tell(&f) + tmp;
-                    } else if (type & T_NBR) {
-                        entry_end = f_tell(&f) + sizeof(MMFLOAT);
-                    } else if (type & T_INT) {
-                        entry_end = f_tell(&f) + sizeof(long long int);
+                if (skip) {
+                    // Пропускаем запись целиком
+                    if (array) {
+                        unsigned char lenbuf[4];
+                        if (f_read(&f, lenbuf, 4, &br) != FR_OK || br != 4) goto done;
+                        FSIZE_t len = lenbuf[0] | (lenbuf[1] << 8) | (lenbuf[2] << 16) | (lenbuf[3] << 24);
+                        f_lseek(&f, f_tell(&f) + len);
                     } else {
-                        entry_end = f_tell(&f);  // ничего не добавляется
+                        if (base_type == T_STR) {
+                            if (f_read(&f, &tmp, 1, &br) != FR_OK || br != 1) goto done;
+                            f_lseek(&f, f_tell(&f) + tmp);
+                        } else if (base_type == T_NBR) {
+                            f_lseek(&f, f_tell(&f) + sizeof(MMFLOAT));
+                        } else if (base_type == T_INT) {
+                            f_lseek(&f, f_tell(&f) + sizeof(long long int));
+                        }
+                    }
+                } else {
+                    // Копируем всю запись в буфер
+                    FSIZE_t entry_end;
+                    if (array) {
+                        unsigned char lenbuf[4];
+                        if (f_read(&f, lenbuf, 4, &br) != FR_OK || br != 4) goto done;
+                        FSIZE_t len = lenbuf[0] | (lenbuf[1] << 8) | (lenbuf[2] << 16) | (lenbuf[3] << 24);
+                        entry_end = f_tell(&f) + len;
+                        // Сохраняем тип, имя, ноль, длину массива
+                        f_lseek(&f, entry_start);
+                        FSIZE_t to_copy = entry_end - entry_start;
+                        while (to_copy--) {
+                            if (f_read(&f, &tmp, 1, &br) != FR_OK || br == 0) goto done;
+                            if ((bufp - buf) >= SAVEDVARS_FLASH_SIZE) error("Too many variables to save");
+                            *bufp++ = tmp;
+                        }
+                    } else {
+                        if (base_type == T_STR) {
+                            if (f_read(&f, &tmp, 1, &br) != FR_OK || br != 1) goto done;
+                            entry_end = f_tell(&f) + tmp;
+                            f_lseek(&f, entry_start);
+                            FSIZE_t to_copy = (entry_end - entry_start);
+                            while (to_copy--) {
+                                if (f_read(&f, &tmp, 1, &br) != FR_OK || br == 0) goto done;
+                                if ((bufp - buf) >= SAVEDVARS_FLASH_SIZE) error("Too many variables to save");
+                                *bufp++ = tmp;
+                            }
+                        } else if (base_type == T_NBR) {
+                            entry_end = f_tell(&f) + sizeof(MMFLOAT);
+                            f_lseek(&f, entry_start);
+                            FSIZE_t to_copy = (entry_end - entry_start);
+                            while (to_copy--) {
+                                if (f_read(&f, &tmp, 1, &br) != FR_OK || br == 0) goto done;
+                                if ((bufp - buf) >= SAVEDVARS_FLASH_SIZE) error("Too many variables to save");
+                                *bufp++ = tmp;
+                            }
+                        } else if (base_type == T_INT) {
+                            entry_end = f_tell(&f) + sizeof(long long int);
+                            f_lseek(&f, entry_start);
+                            FSIZE_t to_copy = (entry_end - entry_start);
+                            while (to_copy--) {
+                                if (f_read(&f, &tmp, 1, &br) != FR_OK || br == 0) goto done;
+                                if ((bufp - buf) >= SAVEDVARS_FLASH_SIZE) error("Too many variables to save");
+                                *bufp++ = tmp;
+                            }
+                        } else {
+                            // Неизвестный тип — пропускаем
+                            continue;
+                        }
                     }
                 }
-
-                FSIZE_t saved_len = entry_end - entry_start;
-                f_lseek(&f, entry_start);
-                while (saved_len--) {
-                    f_read(&f, &tmp, 1, &br);
-                    *bufp++ = tmp;
-                }
             }
-        }
-done:
-        f_close(&f);
-        // initialise for writing to the flash
-        ClearSavedVars();
-no_file:
-        // Создаём (или перезаписываем) файл переменных
-        res = f_open(&f, "/tmp/picoMite.vars", FA_WRITE | FA_CREATE_ALWAYS);
-        if (res != FR_OK) {
-            error("Cannot open variable file for writing");
+        done:
+            f_close(&f);
+        } else if (res != FR_NO_FILE) {
+            error("Error opening variable file");
         }
 
-        // Сначала записываем буфер с предыдущими переменными
+        // Теперь открываем файл для записи (перезаписываем)
+        res = f_open(&f, "/tmp/picoMite.vars", FA_WRITE | FA_CREATE_ALWAYS);
+        if (res != FR_OK) error("Cannot open variable file for writing");
+
+        // Записываем буфер с уже сохранёнными переменными
         for (char *ptr = buf; ptr < bufp; ptr++) {
             UINT bw;
             f_write(&f, ptr, 1, &bw);
@@ -5468,16 +5733,17 @@ no_file:
                 error("Write error");
             }
         }
-        // Затем сохраняем переменные, указанные в этом вызове VAR SAVE
+
+        // Теперь сохраняем переменные, переданные в аргументах (или все)
         for (int i = 0; i < argc; i += 2) {
-            g_VarIndex = VarList[i / 2];  // ранее сохраненный индекс переменной
-            vdata = VarDataList[i / 2];   // указатель на данные переменной
-            type = TypeMask(g_vartbl[g_VarIndex].type);
+            g_VarIndex = VarList[i / 2];
+            unsigned char *vdata = VarDataList[i / 2];
+            unsigned char type = TypeMask(g_vartbl[g_VarIndex].type);
             type |= (g_vartbl[g_VarIndex].type & T_IMPLIED);
-            array = (g_vartbl[g_VarIndex].dims[0] != 0);
-            nbr = 1;
+            unsigned char array = (g_vartbl[g_VarIndex].dims[0] != 0);
+            int nbr = 1;
             if (array) {
-                for (j = 0; g_vartbl[g_VarIndex].dims[j] != 0 && j < MAXDIM; j++)
+                for (int j = 0; j < MAXDIM && g_vartbl[g_VarIndex].dims[j] != 0; j++)
                     nbr *= (g_vartbl[g_VarIndex].dims[j] + 1 - g_OptionBase);
                 type |= 0x80;
             }
@@ -5485,34 +5751,33 @@ no_file:
                 if (array)
                     nbr *= (g_vartbl[g_VarIndex].size + 1);
                 else
-                    nbr = *vdata + 1;
+                    nbr = *vdata + 1;  // для скаляра длина + байт длины
             }
-            if (type & T_NBR)
-                nbr *= sizeof(MMFLOAT);
-            if (type & T_INT)
-                nbr *= sizeof(long long int);
+            if (type & T_NBR) nbr *= sizeof(MMFLOAT);
+            if (type & T_INT) nbr *= sizeof(long long int);
 
-            p = g_vartbl[g_VarIndex].name;
-            size_t entry_size = 1 /*type*/ + strlen((char*)p) + 1 /*zero*/ + (array ? 4 : 0) + nbr;
+            const char *p = (char*)g_vartbl[g_VarIndex].name;
+            size_t entry_size = 1 /*type*/ + strlen(p) + 1 /*zero*/ + (array ? 4 : 0) + nbr;
             if (f_tell(&f) + entry_size > SAVEDVARS_FLASH_SIZE) {
                 f_close(&f);
                 error("Too many variables to save");
             }
+
             // Пишем тип
             UINT bw;
             f_write(&f, &type, 1, &bw);
             if (bw != 1) goto write_error;
 
-            // Пишем имя переменной
-            for (j = 0; *p && j < MAXVARLEN; j++, p++) {
-                f_write(&f, p, 1, &bw);
+            // Пишем имя
+            for (int j = 0; p[j] && j < MAXVARLEN; j++) {
+                f_write(&f, &p[j], 1, &bw);
                 if (bw != 1) goto write_error;
             }
-            tmp = 0;
-            f_write(&f, &tmp, 1, &bw); // завершающий ноль имени
+            uint8_t tmp = 0;
+            f_write(&f, &tmp, 1, &bw);
             if (bw != 1) goto write_error;
 
-            // Если массив — пишем размер
+            // Для массива пишем длину
             if (array) {
                 uint8_t lenbuf[4] = {
                     (uint8_t)(nbr & 0xFF),
@@ -5525,18 +5790,20 @@ no_file:
             }
 
             // Пишем данные переменной
-            while (nbr--) {
-                f_write(&f, vdata, 1, &bw);
+            for (int k = 0; k < nbr; k++) {
+                f_write(&f, &vdata[k], 1, &bw);
                 if (bw != 1) goto write_error;
-                vdata++;
             }
         }
+
         f_close(&f);
         return;
-write_error:
+
+    write_error:
         f_close(&f);
         error("Write error");
     }
+
     error("Unknown command");
 }
 /* 
