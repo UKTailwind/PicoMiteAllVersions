@@ -14,6 +14,7 @@ endif()
 # ====================================================================================
 cmake_minimum_required(VERSION 3.13)
 # Valid builds are PICO, PICOUSB, VGA, VGAUSB, HDMI(rp2350 only), HDMIUSB(rp2350 only), WEB
+set(PICO_BOARD pico2 CACHE STRING "Board type")
 
 set(COMPILE VGARP2350)
 

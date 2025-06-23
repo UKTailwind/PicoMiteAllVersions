@@ -352,7 +352,7 @@ struct option_s {
    unsigned char NoScroll;
    unsigned char CombinedCS;
    unsigned char USBKeyboard;
-   unsigned char VGA_HSYNC;
+   unsigned char VGA_HSYNC_unused;
    unsigned char VGA_BLUE;
    unsigned char AUDIO_MISO_PIN;
    unsigned char AUDIO_DCS_PIN;

@@ -159,13 +159,13 @@ uint8_t *buff320=NULL;
 #ifndef HDMI
 void VGArecovery(int pin){
         ExtCurrentConfig[Option.VGA_BLUE]=EXT_BOOT_RESERVED;
-        ExtCurrentConfig[Option.VGA_HSYNC]=EXT_BOOT_RESERVED;
         ExtCurrentConfig[PINMAP[PinDef[Option.VGA_BLUE].GPno+1]]=EXT_BOOT_RESERVED;
         ExtCurrentConfig[PINMAP[PinDef[Option.VGA_BLUE].GPno+2]]=EXT_BOOT_RESERVED;
         ExtCurrentConfig[PINMAP[PinDef[Option.VGA_BLUE].GPno+3]]=EXT_BOOT_RESERVED;
         ExtCurrentConfig[PINMAP[PinDef[Option.VGA_BLUE].GPno+4]]=EXT_BOOT_RESERVED;
         ExtCurrentConfig[PINMAP[PinDef[Option.VGA_BLUE].GPno+5]]=EXT_BOOT_RESERVED;
-        ExtCurrentConfig[PINMAP[PinDef[Option.VGA_HSYNC].GPno+1]]=EXT_BOOT_RESERVED;
+        ExtCurrentConfig[PINMAP[PinDef[Option.VGA_BLUE].GPno+6]]=EXT_BOOT_RESERVED;
+        ExtCurrentConfig[PINMAP[PinDef[Option.VGA_BLUE].GPno+7]]=EXT_BOOT_RESERVED;
 
         if(pin)error("Pin %/| is in use",pin,pin);
 #ifdef rp2350
@@ -175,8 +175,8 @@ void VGArecovery(int pin){
         piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.VGA_BLUE].GPno+3));
         piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.VGA_BLUE].GPno+4));
         piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.VGA_BLUE].GPno+5));
-        piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)PinDef[Option.VGA_HSYNC].GPno);
-        piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.VGA_HSYNC].GPno+1));
+        piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.VGA_BLUE].GPno+6));
+        piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.VGA_BLUE].GPno+7));
         if(Option.audio_i2s_bclk){
             piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)PinDef[Option.audio_i2s_data].GPno);
             piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)PinDef[Option.audio_i2s_bclk].GPno);
@@ -2132,10 +2132,10 @@ void MIPS16 printoptions(void){
         MMPrintString("\r\n");
     }
 #ifndef HDMI
-    if(Option.VGA_BLUE!=24 || Option.VGA_HSYNC!=21 ){
-        PO("VGA PINS"); MMPrintString((char *)PinDef[Option.VGA_HSYNC].pinname);
-        MMputchar(',',1);;MMPrintString((char *)PinDef[Option.VGA_BLUE].pinname);PRet();
-    }
+    PO("VGA PINS");
+    MMPrintString((char *)PinDef[Option.VGA_BLUE].pinname);
+    MMPrintString("-GP13"); // TODO: detect as +8
+    PRet();
 #endif
 #endif
     if(Option.CombinedCS)PO2Str("SDCARD", "COMBINED CS");
@@ -2423,12 +2423,7 @@ void MIPS16 configure(unsigned char *p){
 #ifdef USBKEYBOARD
             MMPrintString("CMM1.5\r\n");
 #else
-            MMPrintString("PICOMITEVGA V1.1\r\n");
-            MMPrintString("PICOMITEVGA V1.0\r\n");
-            MMPrintString("VGA Design 1\r\n");
-            MMPrintString("VGA Design 2\r\n");
-            MMPrintString("SWEETIEPI\r\n");
-            MMPrintString("VGA Basic\r\n");
+            MMPrintString("Unsupported feature\r\n");
 #endif
 #else
 #ifdef USBKEYBOARD
@@ -2459,6 +2454,7 @@ void MIPS16 configure(unsigned char *p){
 #endif
             return;
         }       
+#if 0
 #ifdef PICOMITEVGA
 #ifndef HDMI
 #ifdef USBKEYBOARD
@@ -2500,7 +2496,6 @@ void MIPS16 configure(unsigned char *p){
             Option.SYSTEM_CLK=PINMAP[10];
             Option.SYSTEM_MOSI=PINMAP[11];
             Option.SYSTEM_MISO=PINMAP[12];
-            Option.VGA_HSYNC=PINMAP[16];
             Option.VGA_BLUE=PINMAP[18];
             Option.AUDIO_CS_PIN=PINMAP[24];
             Option.AUDIO_CLK_PIN=PINMAP[22];
@@ -2526,7 +2521,6 @@ void MIPS16 configure(unsigned char *p){
             Option.SYSTEM_CLK=PINMAP[10];
             Option.SYSTEM_MOSI=PINMAP[11];
             Option.SYSTEM_MISO=PINMAP[12];
-            Option.VGA_HSYNC=PINMAP[16];
             Option.VGA_BLUE=PINMAP[18];
             Option.AUDIO_L=PINMAP[22];
             Option.AUDIO_R=PINMAP[23];
@@ -2547,7 +2541,6 @@ void MIPS16 configure(unsigned char *p){
             Option.SYSTEM_MOSI=PINMAP[11];
             Option.SYSTEM_MISO=PINMAP[12];
             Option.SD_CS=PINMAP[13];
-            Option.VGA_HSYNC=PINMAP[16];
             Option.VGA_BLUE=PINMAP[18];
             strcpy((char *)Option.platform,"VGA Design 1");
             SaveOptions();
@@ -2566,7 +2559,6 @@ void MIPS16 configure(unsigned char *p){
             Option.SYSTEM_MOSI=PINMAP[11];
             Option.SYSTEM_MISO=PINMAP[12];
             Option.SD_CS=PINMAP[13];
-            Option.VGA_HSYNC=PINMAP[16];
             Option.VGA_BLUE=PINMAP[18];
             Option.AUDIO_L=PINMAP[6];
             Option.AUDIO_R=PINMAP[7];
@@ -2595,7 +2587,6 @@ OPTION VGA PINS GP14, GP10*/
             Option.SD_CLK_PIN=PINMAP[3];
             Option.SD_MOSI_PIN=PINMAP[4];
             Option.SD_MISO_PIN=PINMAP[2];
-            Option.VGA_HSYNC=PINMAP[14];
             Option.VGA_BLUE=PINMAP[10];
             Option.AUDIO_CS_PIN=PINMAP[5];
             Option.AUDIO_CLK_PIN=PINMAP[6];
@@ -2624,7 +2615,6 @@ option system i2c GP26, GP27*/
             Option.SD_CLK_PIN=PINMAP[13];
             Option.SD_MOSI_PIN=PINMAP[15];
             Option.SD_MISO_PIN=PINMAP[12];
-            Option.VGA_HSYNC=PINMAP[16];
             Option.VGA_BLUE=PINMAP[18];
             Option.AUDIO_L=PINMAP[6];
             Option.AUDIO_R=PINMAP[7];
@@ -2637,6 +2627,7 @@ option system i2c GP26, GP27*/
             _excep_code = RESET_COMMAND;
             SoftReset();
         }
+#endif
 #endif
 #else
 #ifdef USBKEYBOARD
@@ -2777,7 +2768,6 @@ OPTION PLATFORM HDMIUSB
             _excep_code = RESET_COMMAND;
             SoftReset();
         }
-#endif
 #endif
 #endif
 #if defined(PICOMITE) || defined(PICOMITEWEB)
@@ -3006,6 +2996,7 @@ OPTION MODBUFF ENABLE 192 */
             _excep_code = RESET_COMMAND;
             SoftReset();
         }
+#endif
 #endif
 #endif
         error("Invalid board for this firmware");
@@ -3789,36 +3780,26 @@ tp = checkstring(cmdline, (unsigned char *)"HEARTBEAT");
     return;
 }
 #ifndef HDMI
-    tp = checkstring(cmdline, (unsigned char *)"VGA PINS");
+    tp = checkstring(cmdline, (unsigned char *)"VGA PIN");
     if(tp) {
-        int pin1,pin2,testpin;
-        getargs(&tp,3,(unsigned char *)",");
+        int pin1,testpin;
+        getargs(&tp,1,(unsigned char *)",");
    	    if(CurrentLinePtr) error("Invalid in a program");
         char code;
         if(!(code=codecheck(argv[0])))argv[0]+=2;
         pin1 = getinteger(argv[0]);
         if(!code)pin1=codemap(pin1);
-        if(!(code=codecheck(argv[2])))argv[2]+=2;
-        pin2 = getinteger(argv[2]);
-        if(!code)pin2=codemap(pin2);
         // now de-allocate the existing VGA pins temporarily 
         ExtCurrentConfig[Option.VGA_BLUE]=EXT_NOT_CONFIG;
-        ExtCurrentConfig[Option.VGA_HSYNC]=EXT_NOT_CONFIG;
         ExtCurrentConfig[PINMAP[PinDef[Option.VGA_BLUE].GPno+1]]=EXT_NOT_CONFIG;
         ExtCurrentConfig[PINMAP[PinDef[Option.VGA_BLUE].GPno+2]]=EXT_NOT_CONFIG;
         ExtCurrentConfig[PINMAP[PinDef[Option.VGA_BLUE].GPno+3]]=EXT_NOT_CONFIG;
         ExtCurrentConfig[PINMAP[PinDef[Option.VGA_BLUE].GPno+4]]=EXT_NOT_CONFIG;
         ExtCurrentConfig[PINMAP[PinDef[Option.VGA_BLUE].GPno+5]]=EXT_NOT_CONFIG;
-        ExtCurrentConfig[PINMAP[PinDef[Option.VGA_HSYNC].GPno+1]]=EXT_NOT_CONFIG;
+        ExtCurrentConfig[PINMAP[PinDef[Option.VGA_BLUE].GPno+6]]=EXT_NOT_CONFIG;
+        ExtCurrentConfig[PINMAP[PinDef[Option.VGA_BLUE].GPno+7]]=EXT_NOT_CONFIG;
         if(ExtCurrentConfig[pin1] != EXT_NOT_CONFIG)VGArecovery(pin1);
-        if(ExtCurrentConfig[pin2] != EXT_NOT_CONFIG)VGArecovery(pin2);
         testpin=PINMAP[PinDef[pin1].GPno+1];
-        if(ExtCurrentConfig[testpin] != EXT_NOT_CONFIG)VGArecovery(testpin);
-        testpin=PINMAP[PinDef[pin2].GPno+1];
-        if(ExtCurrentConfig[testpin] != EXT_NOT_CONFIG)VGArecovery(testpin);
-        testpin=PINMAP[PinDef[pin2].GPno+2];
-        if(ExtCurrentConfig[testpin] != EXT_NOT_CONFIG)VGArecovery(testpin);
-        testpin=PINMAP[PinDef[pin2].GPno+3];
         if(ExtCurrentConfig[testpin] != EXT_NOT_CONFIG)VGArecovery(testpin);
 #ifdef rp2350
         uint64_t map=0;
@@ -3827,22 +3808,22 @@ tp = checkstring(cmdline, (unsigned char *)"HEARTBEAT");
             map|=(uint64_t)((uint64_t)1<<(uint64_t)PinDef[Option.audio_i2s_bclk].GPno);
             map|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.audio_i2s_bclk].GPno+1));
         }
-        map|=(uint64_t)((uint64_t)1<<(uint64_t)PinDef[pin2].GPno);
-        map|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[pin2].GPno+1));
-        map|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[pin2].GPno+2));
-        map|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[pin2].GPno+3));
         map|=(uint64_t)((uint64_t)1<<(uint64_t)PinDef[pin1].GPno);
         map|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[pin1].GPno+1));
+        map|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[pin1].GPno+2));
+        map|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[pin1].GPno+3));
+        map|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[pin1].GPno+4));
+        map|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[pin1].GPno+5));
+        map|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[pin1].GPno+6));
+        map|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[pin1].GPno+7));
         if((map & (uint64_t)0xFFFF) && (map & (uint64_t)0xFFFF00000000))error("Attempt to define incompatible PIO pins");
 #endif
-        Option.VGA_HSYNC=pin1;
-        Option.VGA_BLUE=pin2;
+        Option.VGA_BLUE=pin1;
         SaveOptions();
         _excep_code = RESET_COMMAND;
         SoftReset();
         return;
-    }
-   
+    }   
 #endif
 
     tp = checkstring(cmdline, (unsigned char *)"DEFAULT MODE");

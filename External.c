@@ -3810,7 +3810,6 @@ if(rp2350a){
 }
 
 
-
 void __not_in_flash_func(TM_EXTI_Handler_1)(void) {
 	if(ExtCurrentConfig[Option.INT1pin] == EXT_PER_IN) {
         if(--INT1Timer <= 0) {

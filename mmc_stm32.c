@@ -1819,14 +1819,14 @@ char *pinsearch(int pin){
 	else if(pin==PINMAP[PinDef[Option.audio_i2s_bclk].GPno+1])strcpy(buff,"I2S LRCK");
 #ifdef PICOMITEVGA
 #ifndef HDMI
-	else if(pin==Option.VGA_HSYNC)strcpy(buff,"VGA HSYNC");
-	else if(pin==PINMAP[PinDef[Option.VGA_HSYNC].GPno+1])strcpy(buff,"VGA VSYNC");
 	else if(pin==Option.VGA_BLUE) strcpy(buff,"VGA BLUE L");
 	else if(pin==PINMAP[PinDef[Option.VGA_BLUE].GPno+1])strcpy(buff,"VGA BLUE H");
 	else if(pin==PINMAP[PinDef[Option.VGA_BLUE].GPno+2])strcpy(buff,"VGA GREEN L");
 	else if(pin==PINMAP[PinDef[Option.VGA_BLUE].GPno+3])strcpy(buff,"VGA GREEN H");
 	else if(pin==PINMAP[PinDef[Option.VGA_BLUE].GPno+4])strcpy(buff,"VGA RED L");
 	else if(pin==PINMAP[PinDef[Option.VGA_BLUE].GPno+5])strcpy(buff,"VGA RED H");
+	else if(pin==PINMAP[PinDef[Option.VGA_BLUE].GPno+6])strcpy(buff,"VGA HSYNC");
+	else if(pin==PINMAP[PinDef[Option.VGA_BLUE].GPno+7])strcpy(buff,"VGA VSYNC");
 #endif
 #endif
 #ifdef rp2350
