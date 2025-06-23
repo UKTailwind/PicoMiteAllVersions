@@ -5013,7 +5013,7 @@ void ResetOptionsNoSave(void) {
 //    Option.VGAFC = 0xFFFF;
     Option.X_TILE=80;
     Option.Y_TILE=40;
-    Option.CPU_Speed = Freq252P;
+    Option.CPU_Speed = Freq378P; /// Freq252P;
     #ifdef USBKEYBOARD
         #ifdef HDMI
             Option.HDMIclock=1;
