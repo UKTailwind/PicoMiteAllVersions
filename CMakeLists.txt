@@ -59,8 +59,8 @@ add_executable(PicoMite
 	mmc_stm32.c
 	Draw.c
 	Editor.cpp
-	XModem.c
-	MM_Misc.c
+	XModem.cpp
+	MM_Misc.cpp
 	External.c
 	MATHS.c
 	Onewire.c
