@@ -22,6 +22,7 @@ LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON A
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
 
 ************************************************************************************************************************/
+#include "PicoMite.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -146,9 +147,9 @@ int QVGA_HACT;	// V active scanlines (= 2*HEIGHT)
         bool USBenabled=false;
     #else
         #ifdef HDMI
-            #define MES_SIGNON  "\rPicoMiteHDMI MMBasic " CHIP " M2 Edition V"VERSION "\r\n"
+            #define MES_SIGNON  "\rPicoMiteHDMI MMBasic " CHIP " M2 Edition V" VERSION "\r\n"
         #else
-            #define MES_SIGNON  "\rPicoMiteVGA MMBasic " CHIP " m1p2 Edition V"VERSION "\r\n"
+            #define MES_SIGNON  "\rPicoMiteVGA MMBasic " CHIP " m1p2 Edition V" VERSION "\r\n"
         #endif
 #endif
 
@@ -205,7 +206,7 @@ volatile unsigned int MouseTimer = 0;
 #endif
 volatile unsigned int AHRSTimer = 0;
 volatile unsigned int InkeyTimer = 0;
-volatile long long int mSecTimer = 0;                               // this is used to count mSec
+volatile uint64_t mSecTimer = 0;                               // this is used to count mSec
 volatile unsigned int WDTimer = 0;
 volatile unsigned int diskchecktimer = DISKCHECKRATE;
 volatile unsigned int clocktimer=60*60*1000;
@@ -289,6 +290,7 @@ void PIOExecute(int pion, int sm, uint32_t ins){
 int IDiv(int a, int b){return a/b;}
 int   FCmp(MMFLOAT a,MMFLOAT b){if(a>b) return 1;else if(a<b)return -1; else return 0;}
 MMFLOAT LoadFloat(unsigned long long c){union ftype{ unsigned long long a; MMFLOAT b;}f;f.a=c;return f.b; }
+extern "C"
 const void * const CallTable[] __attribute__((section(".text")))  = {	(void *)uSecFunc,	//0x00
 																		(void *)putConsole,	//0x04
 																		(void *)getConsole,	//0x08
@@ -325,7 +327,7 @@ const void * const CallTable[] __attribute__((section(".text")))  = {	(void *)uS
 																		(void *)IntToFloat, //0x84
 																		(void *)FloatToInt64,	//0x88
 																		(void *)&Option,	//0x8c
-																		(void *)sin,	//0x90
+																		(void *)(double (*)(double))sin,	//0x90
 																		(void *)DrawCircle,	//0x94
 																		(void *)DrawTriangle,	//0x98
 																		(void *)uSecTimer,	//0x9c
@@ -441,10 +443,10 @@ static inline CommandToken commandtbl_decode(const unsigned char *p){
 char banner[64];
 void __not_in_flash_func(routinechecks)(void){
     static int when=0;
-    if(abs((time_us_64()-mSecTimer*1000))> 5000){
+    if((time_us_64() - mSecTimer * 1000) > 5000){
         cancel_repeating_timer(&timer);
         add_repeating_timer_us(-1000, timer_callback, NULL, &timer);
-        mSecTimer=time_us_64()/1000;
+        mSecTimer = time_us_64() / 1000;
     }
     if (CurrentlyPlaying == P_WAV || CurrentlyPlaying == P_FLAC || CurrentlyPlaying==P_MP3 || CurrentlyPlaying==P_MIDI ){
 #ifdef PICOMITE
@@ -466,7 +468,7 @@ void __not_in_flash_func(routinechecks)(void){
     }
 #else
 	 static int c, read=0;
-     if(tud_cdc_connected() && (Option.SerialConsole==0 || Option.SerialConsole>4) && Option.Telnet!=-1){
+     if(tud_cdc_connected() && (Option.SerialConsole==0 || Option.SerialConsole>4) && Option.Telnet != (unsigned int)-1){
         while(( c=tud_cdc_read_char())!=-1){
             ConsoleRxBuf[ConsoleRxBufHead] = c;
             if(BreakKey && ConsoleRxBuf[ConsoleRxBufHead] == BreakKey) {// if the user wants to stop the progran
@@ -631,40 +633,40 @@ int __not_in_flash_func(MMInkey)(void) {
     static unsigned int c4 = -1;
 //	static int crseen = 0;
 
-    if(c1 != -1) {                                                  // check if there are discarded chars from a previous sequence
+    if(c1 != (unsigned int)-1) {                                                  // check if there are discarded chars from a previous sequence
         c = c1; c1 = c2; c2 = c3; c3 = c4; c4 = -1;                 // shuffle the queue down
         return c;                                                   // and return the head of the queue
     }
 
     c = getConsole();                                               // do discarded chars so get the char
 #ifndef USBKEYBOARD
-    if(c==-1)CheckKeyboard();
+    if(c == (unsigned int)-1)CheckKeyboard();
 #endif
     if(!(c==0x1b))return c;
     InkeyTimer = 0;                                             // start the timer
-    while((c = getConsole()) == -1 && InkeyTimer < 30);         // get the second char with a delay of 30mS to allow the next char to arrive
+    while((c = getConsole()) == (unsigned int)-1 && InkeyTimer < 30);         // get the second char with a delay of 30mS to allow the next char to arrive
     if(c == 'O'){   //support for many linux terminal emulators
-        while((c = getConsole()) == -1 && InkeyTimer < 50);        // delay some more to allow the final chars to arrive, even at 1200 baud
+        while((c = getConsole()) == (unsigned int)-1 && InkeyTimer < 50);        // delay some more to allow the final chars to arrive, even at 1200 baud
         if(c == 'P') return F1;
         if(c == 'Q') return F2;
         if(c == 'R') return F3;
         if(c == 'S') return F4;
         if(c == 'T') return F5;
         if(c == '2'){
-            while((tc = getConsole()) == -1 && InkeyTimer < 70);        // delay some more to allow the final chars to arrive, even at 1200 baud
+            while((tc = getConsole()) == (unsigned int)-1 && InkeyTimer < 70);        // delay some more to allow the final chars to arrive, even at 1200 baud
             if(tc == 'R') return F3 + 0x20;
             c1 = 'O'; c2 = c; c3 = tc; return 0x1b;                 // not a valid 4 char code
         }
         c1 = 'O'; c2 = c; return 0x1b;                 // not a valid 4 char code
     }
     if(c != '[') { c1 = c; return 0x1b; }                       // must be a square bracket
-    while((c = getConsole()) == -1 && InkeyTimer < 50);         // get the third char with delay
+    while((c = getConsole()) == (unsigned int)-1 && InkeyTimer < 50);         // get the third char with delay
     if(c == 'A') return UP;                                     // the arrow keys are three chars
     if(c == 'B') return DOWN;
     if(c == 'C') return RIGHT;
     if(c == 'D') return LEFT;
     if(c < '1' && c > '6') { c1 = '['; c2 = c; return 0x1b; }   // the 3rd char must be in this range
-    while((tc = getConsole()) == -1 && InkeyTimer < 70);        // delay some more to allow the final chars to arrive, even at 1200 baud
+    while((tc = getConsole()) == (unsigned int)-1 && InkeyTimer < 70);        // delay some more to allow the final chars to arrive, even at 1200 baud
     if(tc == '~') {                                             // all 4 char codes must be terminated with ~
         if(c == '1') return HOME;
         if(c == '2') return INSERT;
@@ -674,7 +676,7 @@ int __not_in_flash_func(MMInkey)(void) {
         if(c == '6') return PDOWN;
         c1 = '['; c2 = c; c3 = tc; return 0x1b;                 // not a valid 4 char code
     }
-    while((ttc = getConsole()) == -1 && InkeyTimer < 90);       // get the 5th char with delay
+    while((ttc = getConsole()) == (unsigned int)-1 && InkeyTimer < 90);       // get the 5th char with delay
     if(ttc == '~') {                                            // must be a ~
         if(c == '1') {
             if(tc >='1' && tc <= '5') return F1 + (tc - '1');   // F1 to F5
@@ -710,12 +712,12 @@ void MMgetline(int filenbr, char *p) {
         // if this is the console, check for a programmed function key and insert the text
         if(filenbr == 0) {
             tp = NULL;
-            if(c == F2)  tp = "RUN";
-            if(c == F3)  tp = "LIST";
-            if(c == F4)  tp = "EDIT";
-            if(c == F10) tp = "AUTOSAVE";
-            if(c == F11) tp = "XMODEM RECEIVE";
-            if(c == F12) tp = "XMODEM SEND";
+            if(c == F2)  tp = (char *)"RUN";
+            if(c == F3)  tp = (char *)"LIST";
+            if(c == F4)  tp = (char *)"EDIT";
+            if(c == F10) tp = (char *)"AUTOSAVE";
+            if(c == F11) tp = (char *)"XMODEM RECEIVE";
+            if(c == F12) tp = (char *)"XMODEM SEND";
             if(c == F1) tp = (char *)Option.F1key;
             if(c == F5) tp = (char *)Option.F5key;
             if(c == F6) tp = (char *)Option.F6key;
@@ -724,7 +726,7 @@ void MMgetline(int filenbr, char *p) {
             if(c == F9) tp = (char *)Option.F9key;
             if(tp) {
                 strcpy(p, tp);
-                if(EchoOption) { MMPrintString(tp); MMPrintString("\r\n"); }
+                if(EchoOption) { MMPrintString(tp); MMPrintString((char *)"\r\n"); }
                 return;
             }
         }
@@ -771,12 +773,12 @@ void MMgetline(int filenbr, char *p) {
 // the buffer is a sequence of strings separated by a zero byte.
 // using the up arrow usere can call up the last few commands executed.
 void MIPS16 InsertLastcmd(unsigned char *s) {
-int i, slen;
+    int i;
     if(strcmp((const char *)lastcmd, (const char *)s) == 0) return;                             // don't duplicate
-    slen = strlen((const char *)s);
+    size_t slen = strlen((const char *)s);
     if(slen < 1 || slen > sizeof(lastcmd) - 1) return;
     slen++;
-    for(i = sizeof(lastcmd) - 1; i >=  slen ; i--)
+    for(i = sizeof(lastcmd) - 1; i >= (int)slen ; i--)
         lastcmd[i] = lastcmd[i - slen];                             // shift the contents of the buffer up
     strcpy((char *)lastcmd, (char *)s);                                             // and insert the new string in the beginning
     for(i = sizeof(lastcmd) - 1; lastcmd[i]; i--) lastcmd[i] = 0;             // zero the end of the buffer
@@ -1439,7 +1441,7 @@ int MMgetchar(void) {
 	return c;
 }
 // print a string to the console interfaces
-void MMPrintString(char* s) {
+void MMPrintString(const char* s) {
     while(*s) {
         if(s[1])MMputchar(*s,0);
         else MMputchar(*s,1);
@@ -4504,7 +4506,7 @@ if(Option.CPU_Speed==FreqSVGA){ //adjust the size of the heap
 #else
     start_i2s(QVGA_PIO_NUM,1);
 #endif
-
+    char *p=(char *)inpbuf;
 	if(setjmp(mark) != 0) {
      // we got here via a long jump which means an error or CTRL-C or the program wants to exit to the command prompt
         FlashLoad = 0;
@@ -4519,7 +4521,7 @@ if(Option.CPU_Speed==FreqSVGA){ //adjust the size of the heap
 		optionangle=1.0;
         useoptionangle=false;
         savewatchdog = WatchdogSet = false;
-		char *ptr = findvar((unsigned char *)"MM.ENDLINE$", V_NOFIND_NULL);
+		char *ptr = (char *)findvar((unsigned char *)"MM.ENDLINE$", V_NOFIND_NULL);
         if(ptr && *ptr){
             CurrentLinePtr=0;
             memcpy(inpbuf,ptr,*ptr+1);
@@ -4609,7 +4611,7 @@ if(Option.CPU_Speed==FreqSVGA){ //adjust the size of the heap
         EditInputLine();
         //InsertLastcmd(inpbuf);                                  // save in case we want to edit it later
         if(!*inpbuf) continue;                                      // ignore an empty line
-        char *p=(char *)inpbuf;
+        p=(char *)inpbuf;
         skipspace(p);
 //        executelocal(p);
         if(strlen(p)==2 && p[1]==':'){
@@ -4664,6 +4666,7 @@ void MIPS16 SaveProgramToFlash(unsigned char *pm, int msg) {
     bool continuation=false;
     multi=false;
     uint32_t storedupdates[MAXCFUNCTION], updatecount=0, realflashsave;
+    int firsthex=1;
     initFonts();
 #ifdef rp2350
     __dsb();
@@ -4730,7 +4733,7 @@ contloop:
      //   Unsigned Int - The Offset (in words) to the main() function (ie, the entry point to the CFunction/CSub).  Omitted in a font.
      //   word1..wordN - The CFunction/CSub/Font code
      // The next CFunction/CSub/Font starts immediately following the last word of the previous CFunction/CSub/Font
-    int firsthex=1;
+    firsthex=1;
     realflashsave= realflashpointer;
     p = (unsigned char *)flash_progmemory;                                              // start scanning program memory
     while(*p != 0xff) {
@@ -4979,5 +4982,20 @@ contloop:
 #ifdef __cplusplus
 }
 #endif
+
+unsigned char CombinedPtr::operator*() {
+    if (p.f >= XIP_BASE) { // in Flash or in RAM
+        return *p.c;
+    }
+    // in file on SD card (less than 256 MB of space on file is supported)
+    size_t offset = p.f % CombinedPtrBufSize;
+    if (p.f / CombinedPtrBufSize == buff_base_offset / CombinedPtrBufSize) { // we are in buffer
+        return buff[offset];
+    }
+    buff_base_offset = p.f & ~(FSIZE_t)(CombinedPtrBufSize - 1);
+    SDBlock(buff_base_offset, buff, CombinedPtrBufSize);
+    return buff[offset];
+}
+
 
 /// \end:uart_advanced[]

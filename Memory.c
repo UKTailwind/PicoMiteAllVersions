@@ -889,12 +889,12 @@ void __not_in_flash_func(TestStackOverflow)(void) {
 
 
 
-void MIPS64 __not_in_flash_func(FreeMemory)(unsigned char *addr) {
+void MIPS64 __not_in_flash_func(FreeMemory)(void *addr) {
     if(addr == NULL) return;
 #if defined(rp2350) && !defined(PICOMITEWEB)
     int bits;
     if(PSRAMsize){
-        if(addr>(unsigned char *)PSRAMbase && addr<(unsigned char *)(PSRAMbase+PSRAMsize)){
+        if((unsigned char *)addr > (unsigned char *)PSRAMbase && (unsigned char *)addr < (unsigned char *)(PSRAMbase+PSRAMsize)){
             do {
                 bits = SBitsGet(addr);
                 SBitsSet(addr, 0);

@@ -57,7 +57,7 @@ extern int OptionErrorSkip;
 extern int ExitMMBasicFlag;
 extern unsigned char *InterruptReturn;
 extern unsigned int _excep_peek;
-extern volatile long long int mSecTimer;
+extern volatile uint64_t mSecTimer;
 extern volatile unsigned int PauseTimer;
 extern volatile unsigned int IntPauseTimer;
 extern volatile unsigned int Timer1, Timer2, Timer3, Timer4, Timer5;		                       //1000Hz decrement timer
@@ -195,7 +195,7 @@ extern void PIntHC(unsigned long long int n) ;
 extern void PFlt(MMFLOAT flt);
 extern void PFltComma(MMFLOAT n) ;
 extern void putConsole(int c, int flush);
-extern void MMPrintString(char* s);
+extern void MMPrintString(const char* s);
 extern void SSPrintString(char* s);
 extern void myprintf(char *s);
 extern int getConsole(void);

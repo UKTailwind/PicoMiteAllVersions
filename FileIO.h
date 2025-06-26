@@ -44,7 +44,7 @@ void MMfclose(int fnbr);
 int FindFreeFileNbr(void);
 void CloseAllFiles(void);
 void MMgetline(int filenbr, char *p);
-void MMPrintString(char *s);
+void MMPrintString(const char *s);
 void CheckAbort(void);
 char FileGetChar(int fnbr);
 void FilePutStr(int count, char *c, int fnbr);
@@ -270,6 +270,7 @@ enum {
     FATFSFILE
 };
 extern union uFileTable FileTable[MAXOPENFILES + 1];
+extern UINT SDBlock(FSIZE_t p, void* buf, size_t sz);
 
 #ifdef __cplusplus
 }

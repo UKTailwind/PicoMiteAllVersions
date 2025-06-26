@@ -43,7 +43,7 @@ pico_sdk_init()
 add_subdirectory(drivers/vga-nextgen)
 
 add_executable(PicoMite
-	PicoMite.c
+	PicoMite.cpp
 	Memory.c
 	regex.c 
 	MMBasic.c
@@ -51,7 +51,8 @@ add_executable(PicoMite
 	Custom.c
 	Functions.c
 	Commands.c
-	FileIO.c
+	FileIO.cpp
+	FileIOC.c
 	ff.c
 	ffsystem.c
 	ffunicode.c
@@ -174,7 +175,11 @@ target_compile_options(PicoMite PRIVATE -DNDEBUG
 										-DPICO_CORE1_STACK_SIZE=0x00
 										-DPICO_MALLOC_PANIC
 										-O2
-										-Wall)
+										-Wall
+										-Wno-write-strings
+										-Wno-sign-compare
+										$<$<COMPILE_LANGUAGE:CXX>:-Wno-register>
+										)
 # all RP2350 variants
 if (COMPILE STREQUAL "HDMI" OR COMPILE STREQUAL "WEBRP2350" OR COMPILE STREQUAL "HDMIUSB" OR COMPILE STREQUAL "PICORP2350" OR COMPILE STREQUAL "PICOUSBRP2350" OR COMPILE STREQUAL "VGARP2350" OR COMPILE STREQUAL "VGAUSBRP2350")
 target_compile_options(PicoMite PRIVATE -Drp2350

@@ -246,7 +246,7 @@ extern unsigned short cmdIF, cmdENDIF, cmdEND_IF, cmdELSEIF, cmdELSE_IF, cmdELSE
 extern unsigned short cmdSUB, cmdFUN, cmdCSUB, cmdIRET, cmdComment, cmdEndComment;
 
 extern unsigned char *GetIntAddress(unsigned char *p);
-extern void MMPrintString(char *s);
+extern void MMPrintString(const char *s);
 
 // void error(unsigned char *msg) ;
 void  error(char *msg, ...);
