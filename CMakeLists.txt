@@ -50,7 +50,7 @@ add_executable(PicoMite
 	Operators.c
 	Custom.c
 	Functions.c
-	Commands.c
+	Commands.cpp
 	FileIO.cpp
 	FileIOC.c
 	ff.c
@@ -58,7 +58,7 @@ add_executable(PicoMite
 	ffunicode.c
 	mmc_stm32.c
 	Draw.c
-	Editor.c
+	Editor.cpp
 	XModem.c
 	MM_Misc.c
 	External.c
@@ -71,7 +71,7 @@ add_executable(PicoMite
 	BmpDecoder.c
 	GPS.c
 	Audio.c
-	CFunction.c
+	CFunction.cpp
     picojpeg.c 
     lfs.c
     lfs_util.c
