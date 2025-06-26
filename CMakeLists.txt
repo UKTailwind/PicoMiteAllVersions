@@ -44,9 +44,9 @@ add_subdirectory(drivers/vga-nextgen)
 
 add_executable(PicoMite
 	PicoMite.cpp
-	Memory.c
+	Memory.cpp
 	regex.c 
-	MMBasic.c
+	MMBasic.cpp
 	Operators.c
 	Custom.c
 	Functions.c
