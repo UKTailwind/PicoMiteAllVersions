@@ -31,6 +31,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * @cond
  * The following section will be excluded from the documentation.
  */
+#include "MMBasic.h"
 
 extern "C" {
 
@@ -69,7 +70,7 @@ extern "C" {
 #define VT100_C_ERROR           "\033[31m"      // Red                  Red
 
 // these two are the only global variables, the default place for the cursor when the editor opens
-unsigned char *StartEditPoint = NULL;
+CombinedPtr StartEditPoint;
 int StartEditChar = 0;
 static bool markmode=false;
 extern void routinechecks(void);
@@ -329,8 +330,9 @@ int oldmode;
 #define MAXCLIP 1024
 // edit command:
 //  EDIT              Will run the full screen editor on the current program memory, if run after an error will place the cursor on the error line
-void edit(unsigned char *cmdline, bool cmdfile) {
-    unsigned char *fromp, *p=NULL;
+void edit(CombinedPtr cmdline, bool cmdfile) {
+    CombinedPtr fromp;
+    unsigned char *p=NULL;
     int y, x, edit_buff_size ;
     optioncolourcodesave=Option.ColourCode;
     char name[STRINGSIZE], *filename=NULL;
@@ -522,7 +524,7 @@ void cmd_edit(void){
     edit(cmdline, true);
 }
 void cmd_editfile(void){
-     edit(cmdline, FALSE);
+    edit(cmdline, false);
 }
 int find_longest_line_length(const char *text ,int *linein) {
     int current_length = 0;

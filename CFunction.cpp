@@ -4,6 +4,7 @@
  *  Created on: 3 Jul 2020
  *      Author: peter
  */
+#include "MMBasic.h"
 
 extern "C" {
 #include "MMBasic_Includes.h"
@@ -41,7 +42,7 @@ unsigned int *FindCFunction(unsigned int *p, unsigned char *CmdPtr, unsigned cha
     return p;
 }
 
-long long int MIPS16 CallCFunction(unsigned char *CmdPtr, unsigned char *ArgList, unsigned char *DefP, unsigned char *CallersLinePtr) {
+long long int MIPS16 CallCFunction(CombinedPtr CmdPtr, CombinedPtr ArgList, CombinedPtr DefP, CombinedPtr CallersLinePtr) {
     void *arg[10] = { NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL };
     int typ[10] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
     long long int ret, i64[10];

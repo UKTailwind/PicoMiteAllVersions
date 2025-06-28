@@ -32,8 +32,9 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * @cond
  * The following section will be excluded from the documentation.
  */
+#include "MMBasic.h"
 
- extern "C" {
+extern "C" {
 
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
@@ -98,8 +99,8 @@ int g_doindex;                                // counts the number of nested DO/
 
 
 // stack to keep track of GOSUBs, SUBs and FUNCTIONs
-unsigned char *gosubstack[MAXGOSUB];
-unsigned char *errorstack[MAXGOSUB];
+CombinedPtr gosubstack[MAXGOSUB];
+CombinedPtr errorstack[MAXGOSUB];
 int gosubindex;
 
 unsigned char g_DimUsed = false;						// used to catch OPTION BASE after DIM has been used
@@ -134,7 +135,7 @@ void MIPS16 cmd_inc(void){
 void MIPS16 __not_in_flash_func(cmd_inc)(void){
 #endif
 #endif
-	unsigned char *p, *q;
+	unsigned char *p;
     int vtype;
 	getargs(&cmdline,3,(unsigned char *)",");
 	if(argc==1){
@@ -152,7 +153,7 @@ void MIPS16 __not_in_flash_func(cmd_inc)(void){
         vtype = TypeMask(g_vartbl[g_VarIndex].type);
         if(vtype & T_STR){
 			int size=g_vartbl[g_VarIndex].size;
-        	q=getstring(argv[2]);
+        	CombinedPtr q = getstring(argv[2]);
     		if(*p + *q > size) error("String too long");
 			Mstrcat(p, q);
         } else if(vtype & T_NBR){
@@ -164,8 +165,7 @@ void MIPS16 __not_in_flash_func(cmd_inc)(void){
 }
 // the PRINT command
 void cmd_print(void) {
-	unsigned char *s, *p;
-    unsigned char *ss;
+	CombinedPtr p, s, ss;
 	MMFLOAT f;
     long long int  i64;
 	int i, t, fnbr;
@@ -189,7 +189,7 @@ void cmd_print(void) {
             p = argv[2];
 			t = T_NOTYPE;
 			p = evaluate(p, &f, &i64, &s, &t, true);			// get the value and type of the argument
-            ss=(unsigned char *)s;
+            ss = s;
             if(!(t & T_STR)) error("Only a single string parameter allowed");
             int i,xsum=0;
             if(ss[1]!='$' || ss[ss[0]]!='*')error("GPS command must start with dollar and end with star");
@@ -241,7 +241,7 @@ void cmd_print(void) {
                     IntToStr((char *)inpbuf + ((i64 >= 0) ? 1:0), i64, 10); // if positive output a space instead of the sign
 					MMfputs((unsigned char *)CtoM(inpbuf), fnbr);					// convert to a MMBasic string and output
 				} else if(t & T_STR) {
-					MMfputs((unsigned char *)s, fnbr);								// print if a string (s is a MMBasic string)
+					MMfputs(s.raw(), fnbr);								// print if a string (s is a MMBasic string)
 				} else error("Attempt to print reserved word");	
 			}
 			docrlf = true;
@@ -254,10 +254,10 @@ void cmd_print(void) {
 void cmd_arrayset(void){
 	array_set(cmdline);
 }
-void array_set(unsigned char *tp){
+void array_set(CombinedPtr tp){
     MMFLOAT f;
     long long int i64;
-    unsigned char *s;
+    CombinedPtr s;
 	#ifdef rp2350
 	int dims[MAXDIM]={0};
 	#else
@@ -297,10 +297,10 @@ void cmd_add(void){
 	array_add(cmdline);
 }
 
-void array_add(unsigned char *tp){
+void array_add(CombinedPtr tp){
     MMFLOAT f;
     long long int i64;
-    unsigned char *s;
+    CombinedPtr s;
 	#ifdef rp2350
 	int dims[MAXDIM]={0};
 	#else
@@ -367,7 +367,7 @@ void array_add(unsigned char *tp){
 void cmd_insert(void){
 	array_insert(cmdline);
 }
-void array_insert(unsigned char *tp){
+void array_insert(CombinedPtr tp){
 	int i, j, t, start, increment, dim[MAXDIM], pos[MAXDIM],off[MAXDIM], dimcount=0, target=-1;
 	int64_t *a1int=NULL,*a2int=NULL;
 	MMFLOAT *afloat=NULL;
@@ -442,7 +442,7 @@ void array_insert(unsigned char *tp){
 void cmd_slice(void){
 	array_slice(cmdline);
 }
-void array_slice(unsigned char *tp){
+void array_slice(CombinedPtr tp){
 	int i, j, t, start, increment, dim[MAXDIM], pos[MAXDIM],off[MAXDIM], dimcount=0, target=-1, toarray=0;
 	int64_t *a1int=NULL,*a2int=NULL;
 	MMFLOAT *afloat=NULL;
@@ -640,7 +640,7 @@ void MIPS16 ListNewLine(int *ListCnt, int all) {
 }
 
 
-void MIPS16 ListProgram(unsigned char *p, int all) {
+void MIPS16 ListProgram(CombinedPtr p, int all) {
 	char b[STRINGSIZE];
 	char *pp;
     int ListCnt = CurrentY/(FontTable[gui_font >> 4][1] * (gui_font & 0b1111)) + 2;
@@ -1661,7 +1661,7 @@ void cmd_select(void) {
     type = TypeMask(type);
     if(type & T_NBR) f = *(MMFLOAT *)v;
     if(type & T_INT) i64 = *(long long int  *)v;
-    if(type & T_STR) Mstrcpy((unsigned char *)s, (unsigned char *)v);
+    if(type & T_STR) Mstrcpy((unsigned char *)s, *(CombinedPtr*)v);
 
     // now search through the program looking for a matching CASE statement
     // i tracks the nesting level of any nested SELECT CASE commands
@@ -3023,8 +3023,8 @@ search_again:
 
 void cmd_call(void){
 	int i;
-	unsigned char *p=getCstring(cmdline); //get the command we want to call
-    unsigned char *q = skipexpression(cmdline);
+	unsigned char *p = getCstring(cmdline); //get the command we want to call
+    CombinedPtr q = skipexpression(cmdline);
 	if(*q==',')q++;
 	i = FindSubFun(p, false);                   // it could be a defined command
 	strcat((char *)p," ");
@@ -3214,8 +3214,8 @@ void cmd_on(void) {
  */
 // utility routine used by DoDim() below and other places in the interpreter
 // checks if the type has been explicitly specified as in DIM FLOAT A, B, ... etc
-unsigned char *CheckIfTypeSpecified(unsigned char *p, int *type, int AllowDefaultType) {
-    unsigned char *tp;
+CombinedPtr CheckIfTypeSpecified(CombinedPtr p, int *type, int AllowDefaultType) {
+    CombinedPtr tp;
 
     if((tp = checkstring(p, (unsigned char *)"INTEGER")) != NULL)
         *type = T_INT | T_IMPLIED;
@@ -3400,11 +3400,11 @@ void  cmd_const(void) {
             if(type & T_NBR) g_vartbl[g_VarIndex].val.f = *(MMFLOAT *)v;           // and set its value
             if(type & T_INT) g_vartbl[g_VarIndex].val.i = *(long long int  *)v;
             if(type & T_STR) {
-				if((unsigned char)*(unsigned char *)v<(MAXDIM-1)*sizeof(g_vartbl[g_VarIndex].dims[1])){
+				if((unsigned char)*(*(CombinedPtr*)v) < (MAXDIM - 1) * sizeof(g_vartbl[g_VarIndex].dims[1])) {
 					FreeMemorySafe((void **)&g_vartbl[g_VarIndex].val.s);
 					g_vartbl[g_VarIndex].val.s=(uint8_t*)&g_vartbl[g_VarIndex].dims[1];
 				}
-				Mstrcpy((unsigned char *)g_vartbl[g_VarIndex].val.s, (unsigned char *)v);
+				Mstrcpy((unsigned char *)g_vartbl[g_VarIndex].val.s, *(CombinedPtr*)v);
 			}
         }
     }
@@ -3500,7 +3500,7 @@ int format_string(char *c, int n) {
 // list a line into a buffer (b) given a pointer to the beginning of the line (p).
 // the returned string is a C style string (terminated with a zero)
 // this is used by cmd_list(), cmd_edit() and cmd_xmodem()
-unsigned char  *llist(unsigned char *b, unsigned char *p) {
+CombinedPtr llist(unsigned char *b, CombinedPtr p) {
 	int i, firstnonwhite = true;
     unsigned char *b_start = b;
 

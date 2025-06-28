@@ -31,6 +31,8 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * @cond
  * The following section will be excluded from the documentation.
  */
+#include "PicoMite.h"
+#include "MMBasic.h"
 
 extern "C" {
 
@@ -132,8 +134,7 @@ volatile union u_flash
 volatile int mi8p = 0;
 volatile uint32_t realflashpointer;
 int FlashLoad = 0;
-unsigned char *CFunctionFlash = NULL;
-unsigned char *CFunctionLibrary = NULL;
+CombinedPtr CFunctionFlash, CFunctionLibrary;
 #define SDbufferSize 512
 static char *SDbuffer[MAXOPENFILES + 1] = {NULL};
 int buffpointer[MAXOPENFILES + 1] = {0};
@@ -425,7 +426,7 @@ extern unsigned int psmap[7*1024*1024/ PAGESIZE / PAGESPERWORD];
 void MIPS16 cmd_psram(void)
 {
     if(!PSRAMsize)error("PSRAM not enabled");
-    unsigned char *p;
+    CombinedPtr p;
     if ((p = checkstring(cmdline, (unsigned char *)"ERASE ALL")))
     {
         memset((void *)PSRAMblock, 0, PSRAMblocksize);
@@ -441,13 +442,13 @@ void MIPS16 cmd_psram(void)
         int i = getint(p, 1, MAXRAMSLOTS);
         uint8_t *j = (uint8_t *)PSRAMblock + ((i - 1) * MAX_PROG_SIZE);
         memset(j,0,MAX_PROG_SIZE);
-        uint8_t *q = ProgMemory;
+        CombinedPtr q = ProgMemory;
         memcpy(j,q,MAX_PROG_SIZE);
     }
     else if ((p = checkstring(cmdline, (unsigned char *)"LIST")))
     {
         int j, i, k;
-        int *pp;
+        CombinedPtrI pp;
         getargs(&p, 3, (unsigned char *)",");
         if (argc)
         {
@@ -480,12 +481,12 @@ void MIPS16 cmd_psram(void)
                         PInt(i);
                         MMPrintString(" in use");
                         pp--;
-                        if ((unsigned char)*pp == T_NEWLINE)
+                        if (*pp == T_NEWLINE)
                         {
-                            char *p=(char *)pp;
+                            CombinedPtr p = pp;
                             MMPrintString(": \"");
                             buff[0]='\'';buff[1]='#';
-                            while(buff[0]=='\'' && buff[1]=='#')p=(char *)llist((unsigned char *)buff, (unsigned char *)p);
+                            while(buff[0]=='\'' && buff[1]=='#') p = llist((unsigned char *)buff, p);
                             MMPrintString(buff);
                             MMPrintString("\"\r\n");
                         }
@@ -527,8 +528,8 @@ void MIPS16 cmd_psram(void)
         uint8_t *c = (uint8_t *)(PSRAMblock + ((i - 1) * MAX_PROG_SIZE));
         if (*c != 0x0)
             error("Already programmed");
-        uint8_t *q = ProgMemory;
-        memcpy(c,q,MAX_PROG_SIZE);
+        CombinedPtr q = ProgMemory;
+        memcpy(c, q, MAX_PROG_SIZE);
     }
     else if ((p = checkstring(cmdline, (unsigned char *)"LOAD")))
     {
@@ -578,7 +579,7 @@ void MIPS16 cmd_psram(void)
         else ProgMemory = (unsigned char *)(flash_target_contents + MAXFLASHSLOTS * MAX_PROG_SIZE);
         FlashLoad = i;
         PrepareProgram(true);
-        nextstmt = (unsigned char *)ProgMemory;
+        nextstmt = ProgMemory;
     }
     else if ((p = checkstring(cmdline, (unsigned char *)"RUN")))
     {
@@ -591,7 +592,7 @@ void MIPS16 cmd_psram(void)
         // Create a global constant MM.CMDLINE$ containing the empty string.
 //        (void) findvar((unsigned char *)"MM.CMDLINE$", V_FIND | V_DIM_VAR | T_CONST);
         if(Option.LIBRARY_FLASH_SIZE == MAX_PROG_SIZE) ExecuteProgram(LibMemory);  // run anything that might be in the library
-        nextstmt = (unsigned char *)ProgMemory;
+        nextstmt = ProgMemory;
     }
     else
         error("Syntax");
@@ -599,13 +600,13 @@ void MIPS16 cmd_psram(void)
 #endif
 void MIPS16 cmd_flash(void)
 {
-    unsigned char *p;
+    CombinedPtr p;
     if ((p = checkstring(cmdline, (unsigned char *)"ERASE ALL")))
     {
         if (CurrentLinePtr)
             error("Invalid in program");
 //        uint32_t j = FLASH_TARGET_OFFSET + FLASH_ERASE_SIZE + SAVEDVARS_FLASH_SIZE;
-        int k=MAXFLASHSLOTS;
+        int k = MAXFLASHSLOTS;
         if(Option.LIBRARY_FLASH_SIZE==MAX_PROG_SIZE )
            k--;
         uSec(250000);
@@ -649,7 +650,7 @@ void MIPS16 cmd_flash(void)
                 error("Erase error");
             }
         disable_interrupts_pico();
-        uint8_t *q = ProgMemory;
+        CombinedPtr q = ProgMemory;
         uint8_t *writebuff = (uint8_t *)GetTempMemory(4096);
         for (int k = 0; k < MAX_PROG_SIZE; k += 4096)
         {
@@ -662,7 +663,7 @@ void MIPS16 cmd_flash(void)
     else if ((p = checkstring(cmdline, (unsigned char *)"LIST")))
     {
         int j, i, k;
-        int *pp;
+        CombinedPtrI pp;
         getargs(&p, 3, (unsigned char *)",");
         if (argc)
         {
@@ -700,10 +701,10 @@ void MIPS16 cmd_flash(void)
                         pp--;
                         if ((unsigned char)*pp == T_NEWLINE)
                         {
-                            char *p=(char *)pp;
+                            CombinedPtr p = pp;
                             MMPrintString(": \"");
                             buff[0]='\'';buff[1]='#';
-                            while(buff[0]=='\'' && buff[1]=='#')p=(char *)llist((unsigned char *)buff, (unsigned char *)p);
+                            while(buff[0]=='\'' && buff[1]=='#') p = llist((unsigned char *)buff, p);
                             MMPrintString(buff);
                             MMPrintString("\"\r\n");
                         }
@@ -816,7 +817,7 @@ void MIPS16 cmd_flash(void)
                 error("Erase error");
             }
         disable_interrupts_pico();
-        uint8_t *q = (uint8_t *)ProgMemory;
+        CombinedPtr q = ProgMemory;
         uint8_t *writebuff = (uint8_t *)GetTempMemory(4096);
         for (int k = 0; k < MAX_PROG_SIZE; k += 4096)
         {
@@ -876,7 +877,7 @@ void MIPS16 cmd_flash(void)
         else ProgMemory = (unsigned char *)(flash_target_contents + MAXFLASHSLOTS * MAX_PROG_SIZE);
         FlashLoad = i;
         PrepareProgram(true);
-        nextstmt = (unsigned char *)ProgMemory;
+        nextstmt = ProgMemory;
     }
     else if ((p = checkstring(cmdline, (unsigned char *)"RUN")))
     {
@@ -890,7 +891,7 @@ void MIPS16 cmd_flash(void)
         // Create a global constant MM.CMDLINE$ containing the empty string.
 //        (void) findvar((unsigned char *)"MM.CMDLINE$", V_FIND | V_DIM_VAR | T_CONST);
         if(Option.LIBRARY_FLASH_SIZE == MAX_PROG_SIZE) ExecuteProgram(LibMemory);  // run anything that might be in the library
-        nextstmt = (unsigned char *)ProgMemory;
+        nextstmt = ProgMemory;
     }
     else
         error("Syntax");
@@ -930,19 +931,19 @@ char *GetCWD(void)
     }
 }
 /*  @endcond */
-void cmd_LoadImage(unsigned char *p)
+void cmd_LoadImage(CombinedPtr _p)
 {
     int fnbr;
     int xOrigin, yOrigin;
 
     // get the command line arguments
-    getargs(&p, 5, (unsigned char *)","); // this MUST be the first executable line in the function
+    getargs(&_p, 5, (unsigned char *)","); // this MUST be the first executable line in the function
     if (argc == 0)
         error("Argument count");
     if (!InitSDCard())
         return;
 
-    p = getFstring(argv[0]); // get the file name
+    uint8_t* p = getFstring(argv[0]); // get the file name
 
     xOrigin = yOrigin = 0;
     if (argc >= 3)
@@ -951,8 +952,8 @@ void cmd_LoadImage(unsigned char *p)
         yOrigin = getinteger(argv[4]); // get the y origin (optional) argument
 
     // open the file
-    if (strchr((char *)p, '.') == NULL)
-        strcat((char *)p, ".bmp");
+    if (strchr((char*)p, '.') == NULL)
+        strcat((char*)p, ".bmp");
     fnbr = FindFreeFileNbr();
     if (!BasicFileOpen((char *)p, fnbr, FA_READ))
         return;
@@ -991,7 +992,7 @@ unsigned char pjpeg_need_bytes_callback(unsigned char *pBuf, unsigned char buf_s
 }
 /*  @endcond */
 
-void cmd_LoadJPGImage(unsigned char *p)
+void cmd_LoadJPGImage(CombinedPtr _p)
 {
     pjpeg_image_info_t image_info;
     int mcu_x = 0;
@@ -1013,13 +1014,13 @@ void cmd_LoadJPGImage(unsigned char *p)
     int xOrigin, yOrigin;
 
     // get the command line arguments
-    getargs(&p, 5, (unsigned char *)","); // this MUST be the first executable line in the function
+    getargs(&_p, 5, (unsigned char *)","); // this MUST be the first executable line in the function
     if (argc == 0)
         error("Argument count");
     if (!InitSDCard())
         return;
 
-    p = getFstring(argv[0]); // get the file name
+    uint8_t* p = getFstring(argv[0]); // get the file name
 
     xOrigin = yOrigin = 0;
     if (argc >= 3)
@@ -1668,7 +1669,8 @@ extern uint64_t __uninitialized_ram(_persistent);
 void MIPS16 cmd_save(void)
 {
     int fnbr;
-    unsigned char *pp, *flinebuf, *outbuf, *p; // get the file name and change to the directory
+    unsigned char *pp, *flinebuf, *outbuf; // get the file name and change to the directory
+    CombinedPtr p;
     int maxH = VRes;
     int maxW = HRes;
     if (!InitSDCard()) return;
@@ -2057,10 +2059,10 @@ void MIPS16 cmd_save(void)
     else
     {
         unsigned char b[STRINGSIZE];
-        p = getFstring(cmdline); // get the file name and change to the directory
-        if (strchr((char *)p, '.') == NULL)
-            strcat((char *)p, ".bas");
-        if (!BasicFileOpen((char *)p, fnbr, FA_WRITE | FA_CREATE_ALWAYS))
+        char * _p = (char *)getFstring(cmdline); // get the file name and change to the directory
+        if (strchr(_p, '.') == NULL)
+            strcat(_p, ".bas");
+        if (!BasicFileOpen(_p, fnbr, FA_WRITE | FA_CREATE_ALWAYS))
             return;
         p = ProgMemory;
         int lineno=0;
@@ -2241,7 +2243,8 @@ void importfile(char *pp, char *tp, char **p, uint32_t buf, int convertdebug, bo
 			}
 		}
 		if(sbuff[0]=='#'){
-			unsigned char *tp=checkstring((unsigned char *)&sbuff[1], (unsigned char *)"DEFINE");
+			CombinedPtr tp((unsigned char *)&sbuff[1]);
+            tp = checkstring(tp, (unsigned char *)"DEFINE");
 			if(tp){
 				getargs(&tp,3,(unsigned char *)",");
 				if(nDefines>=MAXDEFINES){
@@ -2371,7 +2374,8 @@ int FileLoadCMM2Program(char *fname, bool message) {
 		}
 		slen=len;
 		if(sbuff[0]=='#'){
-			unsigned char *tp=checkstring((unsigned char *)&sbuff[1], (unsigned char *)"DEFINE");
+			CombinedPtr tp((unsigned char *)&sbuff[1]);
+            tp = checkstring(tp, (unsigned char *)"DEFINE");
 			if(tp){
 				getargs(&tp,3,(unsigned char *)",");
 				if(nDefines>=MAXDEFINES){
@@ -2541,7 +2545,7 @@ void MIPS16 SaveProgramToRAM(unsigned char *pm, int msg, uint8_t *ram) {
 #ifdef USBKEYBOARD
 	clearrepeat();
 #endif	
-    memcpy(buf, tknbuf, STRINGSIZE);                                // save the token buffer because we are going to use it
+    memcpy((void*)buf, (void*)tknbuf, STRINGSIZE);                                // save the token buffer because we are going to use it
     memset(ram,0xFF,MAX_PROG_SIZE);
     realmempointer=(volatile uint32_t)ram;
     nbr = 0;
@@ -2805,7 +2809,7 @@ void MIPS16 SaveProgramToRAM(unsigned char *pm, int msg, uint8_t *ram) {
         MMPrintString((char *)tknbuf);
         MMPrintString(" bytes\r\n");
     }
-    memcpy(tknbuf, buf, STRINGSIZE);                                // restore the token buffer in case there are other commands in it
+    memcpy((void*)tknbuf, (void*)buf, STRINGSIZE);                                // restore the token buffer in case there are other commands in it
 //    initConsole();
 #ifdef USBKEYBOARD
 	clearrepeat();
@@ -2872,7 +2876,7 @@ int MemLoadProgram(unsigned char *fname, unsigned char *ram)
     return true;
 }
 
-void MIPS16 loadCMM2(unsigned char *p, bool autorun, bool message)
+void MIPS16 loadCMM2(CombinedPtr p, bool autorun, bool message)
 {
     getargs(&p, 1, (unsigned char *)",");
     if (!(argc & 1) || argc == 0)
@@ -2916,7 +2920,7 @@ void MIPS16 cmd_loadCMM2(void){
 
 #endif
 #ifdef rp2350
-void LoadPNG(unsigned char *p) {
+void LoadPNG(CombinedPtr p) {
 //	int fnbr;
 	int xOrigin, yOrigin,w,h, transparent=0, cutoff=20;
     int maxW=HRes;
@@ -3009,7 +3013,7 @@ void MIPS16 cmd_load(void)
 {
     int oldfont=PromptFont;
     int autorun = false;
-    unsigned char *p;
+    CombinedPtr p;
 
     p = checkstring(cmdline, (unsigned char *)"CONTEXT");
     if (p)
@@ -3558,7 +3562,7 @@ void MIPS16 cmd_copy(void)
     ss[0] = tokenTO;
     ss[1] = 0;
     int waste;
-    unsigned char *tp = checkstring(cmdline, (unsigned char *)"B2A");
+    CombinedPtr tp = checkstring(cmdline, (unsigned char *)"B2A");
     if(tp){
         getargs(&tp, 3, (unsigned char *)ss);
         if (argc != 3) error("Syntax");
@@ -3594,8 +3598,8 @@ void MIPS16 cmd_copy(void)
         B2B(fromfile,tofile);
         return;
     }
-    
-    getargs(&p, 3, (unsigned char *)ss);
+    CombinedPtr _p(p);
+    getargs(&_p, 3, (unsigned char *)ss);
     if (argc != 3) error("Syntax");
     fromfile = getFstring(argv[0]);
     tofile = getFstring(argv[2]);
@@ -3898,7 +3902,7 @@ void MIPS16 cmd_files(void)
     int waste=0, t=FatFSFileSystem+1;
     unsigned char cmdbuffer[STRINGSIZE]={0};
     unsigned char *cmdbuf=cmdbuffer;
-    strcpy((char *)cmdbuf,(char *)cmdline);
+    strcpy((char *)cmdbuf, cmdline);
     if(*cmdbuf){
         t = drivecheck((char *)getFstring(cmdline),&waste);
         cmdbuf+=waste;
@@ -3927,7 +3931,8 @@ void MIPS16 cmd_files(void)
     fcnt = 0;
     if (*cmdbuf)
     {
-        getargs(&cmdbuf, 3, (unsigned char *)",");
+        CombinedPtr cp(cmdbuf);
+        getargs(&cp, 3, (unsigned char *)",");
         if (!(argc == 1 || argc == 3))
             error("Syntax");
         p = (char *)getFstring(argv[0]);
@@ -4437,7 +4442,7 @@ void cmd_autosave(void)
     int count = 0;
     uint64_t timeout;
     if (CurrentLinePtr)error("Invalid in a program");
-    char *tp=(char *)checkstring(cmdline,(unsigned char *)"APPEND");
+    CombinedPtr tp = checkstring(cmdline,(unsigned char *)"APPEND");
     if(tp){
         ClearVars(0,true);
         CloseAudio(1);
@@ -4449,11 +4454,11 @@ void cmd_autosave(void)
         }
 #endif
         p = buf = (uint8_t*)GetTempMemory(EDIT_BUFFER_SIZE);
-        char * fromp  = (char *)ProgMemory;
+        CombinedPtr fromp = ProgMemory;
         p = buf;
         while(*fromp != 0xff) {
             if(*fromp == T_NEWLINE) {
-                fromp = (char *)llist((unsigned char *)p, (unsigned char *)fromp);                                // otherwise expand the line
+                fromp = llist((unsigned char *)p, fromp);                                // otherwise expand the line
                 p += strlen((char *)p);
                 *p++ = '\n'; *p = 0;
             }
@@ -5219,7 +5224,7 @@ void FlashWriteClose(void)
 ********************************************************************************************************************/
 void MIPS16 cmd_var(void)
 {
-    unsigned char *p;
+    CombinedPtr p;
     int SaveDefaultType;
     int VarList[MAX_ARG_COUNT];
     unsigned char *VarDataList[MAX_ARG_COUNT];
@@ -5834,11 +5839,25 @@ void mount_tmp(void) {
         f_mkdir("/tmp");
     }
 }
-FIL f; // /tmp/picoMite.prog
+FIL f = { 0 }; // "/tmp/picoMite.prog"
+static void ensure_prog_file_open(void) {
+    if (f.obj.fs) return; // already open
+    if (f_open(&f, "/tmp/picoMite.prog", FA_READ | FA_WRITE) != FR_OK) {
+        f_open(&f, "/tmp/picoMite.prog", FA_READ | FA_WRITE | FA_CREATE_ALWAYS);
+    }
+}
 UINT SDBlock(FSIZE_t p, void* buf, size_t sz) {
     UINT res = 0;
+    ensure_prog_file_open();
     f_lseek(&f, p);
     f_read(&f, buf, sz, &res);
+    return res;
+}
+UINT SDWriteBlock(FSIZE_t p, const void* buf, size_t sz) {
+    UINT res = 0;
+    ensure_prog_file_open();
+    f_lseek(&f, p);
+    f_write(&f, buf, sz, &res);
     return res;
 }
 

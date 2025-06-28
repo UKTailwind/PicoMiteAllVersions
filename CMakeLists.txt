@@ -47,9 +47,10 @@ add_executable(PicoMite
 	Memory.cpp
 	regex.c 
 	MMBasic.cpp
-	Operators.c
-	Custom.c
-	Functions.c
+	MMBasicC.c
+	Operators.cpp
+	Custom.cpp
+	Functions.cpp
 	Commands.cpp
 	FileIO.cpp
 	FileIOC.c
@@ -57,12 +58,13 @@ add_executable(PicoMite
 	ffsystem.c
 	ffunicode.c
 	mmc_stm32.c
-	Draw.c
+	Draw.cpp
 	Editor.cpp
 	XModem.cpp
 	MM_Misc.cpp
-	External.c
-	MATHS.c
+	External.cpp
+	MATHS.cpp
+	MATHSC.c
 	Onewire.c
 	I2C.c
 	SPI.c

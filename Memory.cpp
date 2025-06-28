@@ -31,6 +31,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * @cond
  * The following section will be excluded from the documentation.
  */
+#include "MMBasic.h"
 
 extern "C" {
 
@@ -157,7 +158,7 @@ short g_StrTmpIndex = 0;                                                // index
 ************************************************************************************************************************/
 /*  @endcond */
 void MIPS16 cmd_memory(void) {
-	unsigned char *p,*tp;
+    CombinedPtr p, tp;
     tp = checkstring(cmdline, (unsigned char *)"PACK");
     if(tp){
         getargs(&tp,7,(unsigned char *)",");
@@ -423,7 +424,7 @@ void MIPS16 cmd_memory(void) {
     }
     tp = checkstring(cmdline, (unsigned char *)"SET");
     if(tp){
-    	unsigned char *p;
+    	CombinedPtr p;
     	if((p = checkstring(tp, (unsigned char *)"BYTE"))) {
         	getargs(&p,5,(unsigned char *)","); //assume byte
         	if(argc!=5)error("Syntax");

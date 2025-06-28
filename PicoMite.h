@@ -1,7 +1,14 @@
+#ifndef __PICOMITE_H
+#define __PICOMITE_H
+
+#ifdef __cplusplus
+
 #include <cstddef>
 #include "ff.h"
 
 #define CombinedPtrBufSize 32
+
+class CombinedPtrI;
 
 class CombinedPtr {
     union {
@@ -9,14 +16,21 @@ class CombinedPtr {
         FSIZE_t f;
     } p;
     static_assert(sizeof(unsigned char*) == sizeof(FSIZE_t), "Incompatible pointer and FSIZE_t sizes");
-    FSIZE_t buff_base_offset = (FSIZE_t)-1;
-    unsigned char buff[CombinedPtrBufSize]; // small buffer to read sd-card not a lot times
+    static FSIZE_t buff_base_offset;
+    static unsigned char buff[CombinedPtrBufSize]; // small buffer to read sd-card not a lot times
 public:
     // Конструкторы
     CombinedPtr() : p{nullptr} {}
-    CombinedPtr(unsigned char* ptr) : p{ptr} {}
+    /*explicit*/ CombinedPtr(unsigned char* ptr) : p{ptr} {}
     CombinedPtr(FSIZE_t off) { p.f = off; }
     CombinedPtr(const CombinedPtr& other) : p{other.p.c} {}
+    CombinedPtr(std::nullptr_t) : p{nullptr} {}
+
+    // TODO: assert for case not in RAM ?
+    unsigned char* raw() { return p.c; }
+
+    // Оператор приведения
+    explicit operator FSIZE_t() const { return p.f; }
 
     // Присваивание
     CombinedPtr& operator=(unsigned char* ptr) { p.c = ptr; return *this; }
@@ -27,7 +41,7 @@ public:
     //unsigned char* operator->() const { return p.c; }
 
     // Индексация
-    unsigned char& operator[](std::ptrdiff_t i) const { return p.c[i]; }
+    unsigned char operator[](std::ptrdiff_t i);
 
     // Инкремент / декремент
     CombinedPtr& operator++() { ++p.c; return *this; }        // префикс ++
@@ -51,10 +65,83 @@ public:
     bool operator<=(const CombinedPtr& other) const { return p.c <= other.p.c; }
     bool operator>(const CombinedPtr& other) const { return p.c > other.p.c; }
     bool operator>=(const CombinedPtr& other) const { return p.c >= other.p.c; }
-
-    // Получить "сырой" указатель
-    unsigned char* get() const { return p.c; }
-
+    bool operator!=(std::nullptr_t) const {
+        return p.c != nullptr;
+    }
+    bool operator==(std::nullptr_t) const {
+        return p.c == nullptr;
+    }
     // Явное преобразование в bool (проверка на nullptr)
     explicit operator bool() const { return p.c != nullptr; }
+
+    // CFunction (if it exists) starts on the next word address after the program
+    CombinedPtr aligh() { return CombinedPtr((unsigned char *)((p.f + 0b11) & ~0b11)); }
+    CombinedPtr& write_byte(uint8_t v);
+    double as_double();
+    long long as_i64a();
+
+    friend class CombinedPtrI;
+    CombinedPtr(const CombinedPtrI& other);
+    CombinedPtr& operator=(const CombinedPtrI& other);
 };
+
+class CombinedPtrI {
+    CombinedPtr p;
+public:
+    // Конструкторы
+    CombinedPtrI() : p(nullptr) {}
+    CombinedPtrI(int* ptr) : p((uint8_t*)ptr) {}
+    CombinedPtrI(unsigned int* ptr) : p((uint8_t*)ptr) {}
+    CombinedPtrI(const CombinedPtr& other) : p(other) {}
+    CombinedPtrI(std::nullptr_t) : p(nullptr) {}
+
+    // Оператор приведения
+    explicit operator FSIZE_t() const { return p.p.f; }
+        
+    // Присваивание
+    CombinedPtrI& operator=(const CombinedPtr& other) { p = other; return *this; }
+
+    // Разыменование
+    unsigned int operator*();
+    //unsigned int* operator->() const;
+
+    // Индексация
+    unsigned int operator[](std::ptrdiff_t i);
+
+    // Инкремент / декремент
+    CombinedPtrI& operator++() { p.p.c += 4; return *this; }        // префикс ++
+    CombinedPtrI operator++(int) { CombinedPtr tmp(p); p.p.c += 4; return tmp; }  // постфикс ++
+
+    CombinedPtrI& operator--() { p.p.c -= 4; return *this; }        // префикс --
+    CombinedPtrI operator--(int) { CombinedPtrI tmp(p); p.p.c -= 4; return tmp; }  // постфикс --
+
+    // Арифметика указателей
+    CombinedPtrI operator+(std::ptrdiff_t i) const { return CombinedPtrI(p + (i << 2)); }
+    CombinedPtrI operator-(std::ptrdiff_t i) const { return CombinedPtrI(p - (i << 2)); }
+    std::ptrdiff_t operator-(const CombinedPtrI& other) const { return p - other.p; }
+
+    CombinedPtrI& operator+=(std::ptrdiff_t i) { p += i << 2; return *this; }
+    CombinedPtrI& operator-=(std::ptrdiff_t i) { p -= i << 2; return *this; }
+
+    // Операторы сравнения
+    bool operator==(const CombinedPtrI& other) const { return p == other.p; }
+    bool operator!=(const CombinedPtrI& other) const { return p != other.p; }
+    bool operator<(const CombinedPtrI& other) const { return p < other.p; }
+    bool operator<=(const CombinedPtrI& other) const { return p <= other.p; }
+    bool operator>(const CombinedPtrI& other) const { return p > other.p; }
+    bool operator>=(const CombinedPtrI& other) const { return p >= other.p; }
+
+    // Явное преобразование в bool (проверка на nullptr)
+    explicit operator bool() const { return p.p.c != nullptr; }
+
+    friend class CombinedPtr;
+};
+
+size_t strlen(CombinedPtr src);
+CombinedPtr strchr(CombinedPtr src, int ch);
+char *strcpy(char *dest, CombinedPtr src);
+void strcat(char* dest, CombinedPtr src);
+void *memcpy (uint8_t *dst, CombinedPtr src, size_t sz);
+
+#endif // __cplusplus
+#endif // __PICOMITE_H

@@ -23,6 +23,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 
 ************************************************************************************************************************/
 #include <complex.h>
+#include "MMBasic.h"
 
 extern "C" {
 
@@ -5848,12 +5849,12 @@ Tick Interrupts (1 to 4 in that order)
 // will return true if interrupt detected or false if not
 int checkdetailinterrupts(void) {
     int i, v;
-    char *intaddr;
+    CombinedPtr intaddr;
     static char rti[2];
     for(int i=1;i<=MAXPID;i++){
         if(PIDchannels[i].interrupt!=NULL && time_us_64()>PIDchannels[i].timenext && PIDchannels[i].active){
             PIDchannels[i].timenext=time_us_64()+(PIDchannels[i].PIDparams->T * 1000000);
-            intaddr=(char *)PIDchannels[i].interrupt;
+            intaddr = PIDchannels[i].interrupt;
             goto GotAnInterrupt;
         }
     }
@@ -6121,7 +6122,7 @@ int __not_in_flash_func(check_interrupt)(void) {
 // get the address for a MMBasic interrupt
 // this will handle a line number, a label or a subroutine
 // all areas of MMBasic that can generate an interrupt use this function
-unsigned char *GetIntAddress(unsigned char *p) {
+CombinedPtr GetIntAddress(CombinedPtr p) {
     int i;
     if(isnamestart((uint8_t)*p)) {                                           // if it starts with a valid name char
         i = FindSubFun(p, 0);                                       // try to find a matching subroutine

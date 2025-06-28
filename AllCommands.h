@@ -6,12 +6,15 @@
  the C language function associated with commands, functions or operators should be
  declared here
 **********************************************************************************/
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #if !defined(INCLUDE_COMMAND_TABLE) && !defined(INCLUDE_TOKEN_TABLE)
 // format:
 //      void cmd_???(void)
 //      void fun_???(void)
 //      void op_???(void)
-
 void cmd_clear(void);
 void cmd_continue(void);
 void cmd_delete(void);
@@ -708,6 +711,7 @@ void fun_map(void);
 { (unsigned char *)"Bit(",	T_FUN | T_INT,		0, fun_bit,	},
 { (unsigned char *)"",   0,                  0, cmd_null,    }                   // this dummy entry is always at the end
 #endif
+#ifdef __cplusplus
+}
+#endif
 /*  @endcond */
-
-

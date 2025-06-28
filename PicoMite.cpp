@@ -23,6 +23,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 
 ************************************************************************************************************************/
 #include "PicoMite.h"
+#include "MMBasic.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -1017,12 +1018,11 @@ void MIPS16 EditInputLine(void) {
             	         SSPrintString("\e[2J\e[H");
             	         fflush(stdout);
                          if(Option.DISPLAY_CONSOLE){ClearScreen(gui_bcolour);CurrentX=0;CurrentY=0;}
-                         if(FindSubFun((unsigned char *)"MM.PROMPT", 0) >= 0) {
-                            ExecuteProgram((unsigned char *)"MM.PROMPT\0");
+                         if(FindSubFun(CombinedPtr((uint8_t*)"MM.PROMPT"), 0) >= 0) {
+                            ExecuteProgram(CombinedPtr((uint8_t*)"MM.PROMPT\0"));
                          } else{
                              MMPrintString("> ");                                    // print the prompt
                          }                           
-            	         //MMPrintString("> ");
             	         fflush(stdout);
                     }    
                     break;
@@ -1080,9 +1080,9 @@ void MIPS16 EditInputLine(void) {
                             //if(Option.NoScroll && Option.DISPLAY_CONSOLE && (CurrentY + 2*gui_font_height >= VRes)){
                             if(Option.NoScroll && Option.DISPLAY_CONSOLE && (CurrentY + (2 + strlen((const char *)inpbuf)/Option.Width)*gui_font_height >= VRes)){    
                                       ClearScreen(gui_bcolour);CurrentX=0;CurrentY=0;
-                                      if(FindSubFun((unsigned char *)"MM.PROMPT", 0) >= 0) {
+                                      if(FindSubFun(CombinedPtr((unsigned char *)"MM.PROMPT"), 0) >= 0) {
                                          SSPrintString("\r");
-                                         ExecuteProgram((unsigned char *)"MM.PROMPT\0");
+                                         ExecuteProgram(CombinedPtr((unsigned char *)"MM.PROMPT\0"));
                                       } else{
                                          SSPrintString("\r");
                                          MMPrintString("> ");                           // print the prompt
@@ -4480,7 +4480,7 @@ if(Option.CPU_Speed==FreqSVGA){ //adjust the size of the heap
     }
     updatebootcount();
     *tknbuf = 0;
-     ContinuePoint = nextstmt;                               // in case the user wants to use the continue command
+    ContinuePoint = nextstmt;                               // in case the user wants to use the continue command
 #ifdef USBKEYBOARD
 	clearrepeat();
      for(int i=0;i<4;i++){
@@ -4546,8 +4546,8 @@ if(Option.CPU_Speed==FreqSVGA){ //adjust the size of the heap
     SPIatRisk=((Option.DISPLAY_TYPE>I2C_PANEL && Option.DISPLAY_TYPE<BufferedPanel) && Option.SD_CLK_PIN==0);
 #endif
         PrepareProgram(true);
-        if(FindSubFun((unsigned char *)"MM.STARTUP", 0) >= 0) {
-            ExecuteProgram((unsigned char *)"MM.STARTUP\0");
+        if(FindSubFun(CombinedPtr((unsigned char *)"MM.STARTUP"), 0) >= 0) {
+            ExecuteProgram(CombinedPtr((unsigned char *)"MM.STARTUP\0"));
             memset(inpbuf,0,STRINGSIZE);
         }
         if(Option.Autorun && _excep_code != RESTART_DOAUTORUN) {
@@ -4599,9 +4599,9 @@ if(Option.CPU_Speed==FreqSVGA){ //adjust the size of the heap
         }
         if(_excep_code!=POSSIBLE_WATCHDOG)_excep_code = 0;
         PrepareProgram(false);
-        if(!ErrorInPrompt && FindSubFun((unsigned char *)"MM.PROMPT", 0) >= 0) {
+        if(!ErrorInPrompt && FindSubFun(CombinedPtr((unsigned char *)"MM.PROMPT"), 0) >= 0) {
             ErrorInPrompt = true;
-            ExecuteProgram((unsigned char *)"MM.PROMPT\0");
+            ExecuteProgram(CombinedPtr((unsigned char *)"MM.PROMPT\0"));
             MMPromptPos=MMCharPos-1;    //Save length of prompt
         } else{
             MMPrintString("> ");                                    // print the prompt
@@ -4633,7 +4633,7 @@ autorun:
             PrepareProgram(false);
             CurrentLinePtr = 0;
         }
-        ExecuteProgram(tknbuf);                                     // execute the line straight away
+        ExecuteProgram(CombinedPtr(tknbuf));                                     // execute the line straight away
         if(i){
             cmdline=NULL;
             do_end(false);
@@ -4660,7 +4660,8 @@ void stripcomment(char *p){
 
 // takes a pointer to RAM containing a program (in clear text) and writes it to memory in tokenised format
 void MIPS16 SaveProgramToFlash(unsigned char *pm, int msg) {
-    unsigned char *p, fontnbr, prevchar = 0, buf[STRINGSIZE];
+    unsigned char fontnbr, prevchar = 0, buf[STRINGSIZE];
+    CombinedPtr p;
     unsigned short endtoken, tkn;
     int nbr, i, j, n, SaveSizeAddr;
     bool continuation=false;
@@ -4674,7 +4675,7 @@ void MIPS16 SaveProgramToFlash(unsigned char *pm, int msg) {
 #ifdef USBKEYBOARD
 	clearrepeat();
 #endif	
-    memcpy(buf, tknbuf, STRINGSIZE);                                // save the token buffer because we are going to use it
+    memcpy((void*)buf, (void*)tknbuf, STRINGSIZE);                                // save the token buffer because we are going to use it
     FlashWriteInit(PROGRAM_FLASH);
     flash_range_erase(realflashpointer, MAX_PROG_SIZE);
     j=MAX_PROG_SIZE/4;
@@ -4694,19 +4695,19 @@ contloop:
         else p = inpbuf;
         while(!(*pm == 0 || *pm == '\r' || (*pm == '\n' && prevchar != '\r'))) {
             if(*pm == TAB) {
-                do {*p++ = ' ';
-                    if((p - inpbuf) >= MAXSTRLEN) goto exiterror;
-                } while((p - inpbuf) % 2);
+                do {p.write_byte(' ')++;
+                    if((p.raw() - inpbuf) >= MAXSTRLEN) goto exiterror;
+                } while((p.raw() - inpbuf) % 2);
             } else {
                 if(isprint((uint8_t)*pm)) {
-                    *p++ = *pm;
-                    if((p - inpbuf) >= MAXSTRLEN) goto exiterror;
+                    p.write_byte(*pm)++;
+                    if((p.raw() - inpbuf) >= MAXSTRLEN) goto exiterror;
                 }
             }
             prevchar = *pm++;
         }
         if(*pm) prevchar = *pm++;                                   // step over the end of line char but not the terminating zero
-        *p = 0;                                                     // terminate the string in inpbuf
+        p.write_byte(0);                                                     // terminate the string in inpbuf
 
         if(*inpbuf == 0 && (*pm == 0 || (!isprint((uint8_t)*pm) && pm[1] == 0))) break; // don't save a trailing newline
         if(inpbuf[strlen((char *)inpbuf)-1]==Option.continuation && inpbuf[strlen((char *)inpbuf)-2]==' ' && Option.continuation){
@@ -4888,7 +4889,7 @@ contloop:
              p--;
          } else {
              endtoken = GetCommandValue((unsigned char *)"End CSub");
-             FlashWriteWord((unsigned int)(p-flash_progmemory));               // if a CFunction/CSub save a relative pointer to the declaration
+             FlashWriteWord((unsigned int)(p.raw() - flash_progmemory));               // if a CFunction/CSub save a relative pointer to the declaration
              fontnbr = 0;
              p++;
          }
@@ -4962,7 +4963,7 @@ contloop:
         MMPrintString((char *)tknbuf);
         MMPrintString(" bytes\r\n");
     }
-    memcpy(tknbuf, buf, STRINGSIZE);                                // restore the token buffer in case there are other commands in it
+    memcpy((void*)tknbuf, (void*)buf, STRINGSIZE);                                // restore the token buffer in case there are other commands in it
 //    initConsole();
 #ifdef USBKEYBOARD
 	clearrepeat();
@@ -4983,6 +4984,8 @@ contloop:
 }
 #endif
 
+FSIZE_t CombinedPtr::buff_base_offset = (FSIZE_t)-1;
+
 unsigned char CombinedPtr::operator*() {
     if (p.f >= XIP_BASE) { // in Flash or in RAM
         return *p.c;
@@ -4997,5 +5000,103 @@ unsigned char CombinedPtr::operator*() {
     return buff[offset];
 }
 
+unsigned char CombinedPtr::operator[](std::ptrdiff_t i) {
+    FSIZE_t pi = p.f + i;
+    if (pi >= XIP_BASE) { // in Flash or in RAM
+        return p.c[i];
+    }
+    // in file on SD card (less than 256 MB of space on file is supported)
+    size_t offset = pi % CombinedPtrBufSize;
+    if (pi / CombinedPtrBufSize == buff_base_offset / CombinedPtrBufSize) { // we are in buffer
+        return buff[offset];
+    }
+    buff_base_offset = pi & ~(FSIZE_t)(CombinedPtrBufSize - 1);
+    SDBlock(buff_base_offset, buff, CombinedPtrBufSize);
+    return buff[offset];
+}
+double CombinedPtr::as_double() {
+    if (p.f >= XIP_BASE)
+        return *(double *)p.c;
+    double res;
+    for (int i = 0; i < 8; ++i)
+        ((uint8_t*)&res)[i] = (*this)[i];  // считываем байты с учётом кеша и SD
+    return res;
+}
+
+long long CombinedPtr::as_i64a() {
+    if (p.f >= XIP_BASE)
+        return *(long long *)p.c;
+    long long res;
+    for (int i = 0; i < 8; ++i)
+        ((uint8_t*)&res)[i] = (*this)[i];  // считываем байты с учётом кеша и SD
+    return res;
+}
+
+CombinedPtr& CombinedPtr::write_byte(uint8_t v) {
+    if (p.f >= XIP_BASE) {
+        *p.c = v;
+        return *this;
+    }
+
+    // in file on SD card
+    size_t offset = p.f % CombinedPtrBufSize;
+    FSIZE_t block_base = p.f & ~(FSIZE_t)(CombinedPtrBufSize - 1);
+
+    if (block_base != buff_base_offset) {
+        // Если мы вышли за границу текущего буфера — сначала сохранить старый, если нужно
+        // (можно добавить dirty-флаг при необходимости)
+        if (buff_base_offset != (FSIZE_t)-1) {
+            SDWriteBlock(buff_base_offset, buff, CombinedPtrBufSize);
+        }
+        // Загрузить новый блок перед записью
+        SDBlock(block_base, buff, CombinedPtrBufSize);
+        buff_base_offset = block_base;
+    }
+
+    buff[offset] = v;
+    // При желании: можно отметить буфер "dirty" и записать позже
+    SDWriteBlock(buff_base_offset, buff, CombinedPtrBufSize);
+
+    return *this;
+}
+
+CombinedPtr::CombinedPtr(const CombinedPtrI& other) {
+    p.c = other.p.p.c;
+}
+
+CombinedPtr& CombinedPtr::operator=(const CombinedPtrI& other) {
+    p.c = other.p.p.c;
+    return *this;
+}
+
+unsigned int CombinedPtrI::operator*() {
+    if (p.p.f >= XIP_BASE) { // in Flash or in RAM
+        return *(unsigned int*)p.p.c;
+    }
+    // in file on SD card (less than 256 MB of space on file is supported)
+    return (unsigned int)p[0] | ((unsigned int)p[1] << 8) | ((unsigned int)p[2] << 16) | ((unsigned int)p[3] << 24);
+}
+
+unsigned int CombinedPtrI::operator[](std::ptrdiff_t i) {
+    if (p.p.f >= XIP_BASE) { // in Flash or in RAM
+        return *(reinterpret_cast<unsigned int*>(p.p.c) + i);
+    }
+
+    CombinedPtr base = p + (i << 2);
+    return ((unsigned int)base[0]) |
+           ((unsigned int)base[1] << 8) |
+           ((unsigned int)base[2] << 16) |
+           ((unsigned int)base[3] << 24);
+}
+
+// print a string to the console interfaces
+void MMPrintStringPP(CombinedPtr s) {
+    while(*s) {
+        if(s[1])MMputchar(*s,0);
+        else MMputchar(*s,1);
+        s++;
+    }
+    fflush(stdout);
+}
 
 /// \end:uart_advanced[]

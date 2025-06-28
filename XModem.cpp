@@ -31,6 +31,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * @cond
  * The following section will be excluded from the documentation.
  */
+#include "MMBasic.h"
 
 extern "C" {
 
@@ -45,7 +46,8 @@ bool rcvnoint;
 /*  @endcond */
 
 void MIPS16 cmd_xmodem(void) {
-    char *buf, BreakKeySave, *p, *fromp;
+    char *buf, BreakKeySave, *p;
+    CombinedPtr fromp;
     int rcv = 0, fnbr, crunch = false;
     char *fname;
     ClearExternalIO();
@@ -81,11 +83,11 @@ void MIPS16 cmd_xmodem(void) {
         } else {
             int nbrlines = 0;
             // we must copy program memory into RAM expanding tokens as we go
-            fromp  = (char *)ProgMemory;
+            fromp  = ProgMemory;
             p = buf;                                                // the RAM buffer
             while(1) {
                 if(*fromp == T_NEWLINE) {
-                    fromp = (char *)llist((unsigned char *)p, (unsigned char *)fromp);                        // expand the line into the buffer
+                    fromp = llist((unsigned char *)p, fromp);                        // expand the line into the buffer
                     nbrlines++;
                     if(!(nbrlines==1 && p[0]=='\'' && p[1]=='#')){
                         p += strlen(p);

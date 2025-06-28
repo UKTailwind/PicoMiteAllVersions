@@ -29,6 +29,12 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #define __FILEIO_H
 
 #ifdef __cplusplus
+#include "PicoMite.h"
+extern CombinedPtr CFunctionFlash, CFunctionLibrary;
+void MMPrintStringPP(CombinedPtr s);
+#endif
+
+#ifdef __cplusplus
 extern "C" {
 #endif
 #include "ff.h"
@@ -235,7 +241,6 @@ struct option_s {
     unsigned char extensions[96]; //128=896 == 7 XMODEM blocks
     // To enable older CFunctions to run any new options *MUST* be added at the end of the list
 } __attribute__((packed));
-extern unsigned char *CFunctionFlash, *CFunctionLibrary;
 extern struct option_s Option;
 extern int FlashLoad;
 extern void ResetOptions(bool startup);
@@ -271,6 +276,7 @@ enum {
 };
 extern union uFileTable FileTable[MAXOPENFILES + 1];
 extern UINT SDBlock(FSIZE_t p, void* buf, size_t sz);
+extern UINT SDWriteBlock(FSIZE_t p, const void* buf, size_t sz);
 
 #ifdef __cplusplus
 }

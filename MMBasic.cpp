@@ -26,13 +26,25 @@ LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON A
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
 
 ************************************************************************************************************************/
+#include "configuration.h"
+#include "PicoMite.h"
+#include "MMBasic.h"
 
-extern "C" {
+CombinedPtr subfun[MAXSUBFUN];                                      // table used to locate all subroutines and functions
+CombinedPtr LibMemory;                                           //This is where the library is stored. At the last flash slot (4)
+CombinedPtr ProgMemory;                                                      // program memory, this is where the program is stored
+CombinedPtr NextDataLine;                                                 // used to track the next line to read in DATA & READ stmts
+CombinedPtr ep;                                                     // pointer to the argument to the function terminated with a zero byte.
+CombinedPtr cmdline;                                                      // Command line terminated with a zero unsigned char and trimmed of spaces
+CombinedPtr nextstmt;                                                     // Pointer to the next statement to be executed.
+CombinedPtr CurrentLinePtr, SaveCurrentLinePtr;                           // Pointer to the current line (used in error reporting)
+CombinedPtr ContinuePoint;                                                // Where to continue from if using the continue statement
+                                                                     // it is NOT trimmed of spaces
+///extern "C" {
 
 #include <stdio.h>
 #include <limits.h>
 #include <stdarg.h>
-#include "MMBasic.h"
 #include "pico/stdlib.h"
 #include "Functions.h"
 #include "Commands.h"
@@ -44,44 +56,14 @@ extern "C" {
 #include "pico/multicore.h"
 #endif
 
-// this is the command table that defines the various tokens for commands in the source code
-// most of them are listed in the .h files so you should not add your own here but instead add
-// them to the appropiate .h file
-#define INCLUDE_COMMAND_TABLE
-const struct s_tokentbl commandtbl[] = {
-    #include "Functions.h"
-    #include "Commands.h"
-    #include "Operators.h"
-    #include "Custom.h"
-    #include "Hardware_Includes.h"
-};
-#undef INCLUDE_COMMAND_TABLE
-
-
-
-// this is the token table that defines the other tokens in the source code
-// most of them are listed in the .h files so you should not add your own here
-// but instead add them to the appropiate .h file
-#define INCLUDE_TOKEN_TABLE
-const struct s_tokentbl tokentbl[] = {
-    #include "Functions.h"
-    #include "Commands.h"
-    #include "Operators.h"
-    #include "Custom.h"
-    #include "Hardware_Includes.h"
-};
-#undef INCLUDE_TOKEN_TABLE
-
-
-static inline CommandToken commandtbl_decode(const unsigned char *p){
+static inline CommandToken commandtbl_decode(CombinedPtr& p){
     return ((CommandToken)(p[0] & 0x7f)) | ((CommandToken)(p[1] & 0x7f)<<7);
 }
 // these are initialised at startup
 int CommandTableSize, TokenTableSize;
 #ifdef rp2350
 struct s_funtbl funtbl[MAXSUBFUN];
-//void hashlabels(int errabort);
-void hashlabels(unsigned char *p,int ErrAbort);
+static void hashlabels(CombinedPtr p, int ErrAbort);
 #endif
 struct s_vartbl __attribute__ ((aligned (64))) g_vartbl[MAXVARS]={0};                                            // this table stores all variables
 int g_varcnt=0;                                                         // number of variables
@@ -94,7 +76,6 @@ bool OptionNoCheck=false;
 unsigned char DefaultType;                                                   // the default type if a variable is not specifically typed
 int emptyarray=0;
 int TempStringClearStart;                                           // used to prevent clearing of space in an expression that called a FUNCTION
-unsigned char *subfun[MAXSUBFUN];                                            // table used to locate all subroutines and functions
 char CurrentSubFunName[MAXVARLEN + 1];                              // the name of the current sub or fun
 char CurrentInterruptName[MAXVARLEN + 1];                           // the name of the current interrupt function
 jmp_buf jmprun;
@@ -107,15 +88,12 @@ unsigned char PromptString[MAXPROMPTLEN];                                    // 
 int ProgramChanged;                                                 // true if the program in memory has been changed and not saved
 struct s_hash g_hashlist[MAXVARS/2]={0};
 int g_hashlistpointer=0;
-unsigned char *LibMemory;                                           //This is where the library is stored. At the last flash slot (4)
 int multi=false;
-unsigned char *ProgMemory;                                                      // program memory, this is where the program is stored
+static int  PrepareProgramExt(CombinedPtr, int, CombinedPtr*, int);
 int PSize;                                                          // the size of the program stored in ProgMemory[]
 
 int NextData;                                                       // used to track the next item to read in DATA & READ stmts
-unsigned char *NextDataLine;                                                 // used to track the next line to read in DATA & READ stmts
 int g_OptionBase;                                                     // track the state of OPTION BASE
-int  PrepareProgramExt(unsigned char *, int, unsigned char **, int);
 extern uint32_t core1stack[];;
 
 #if defined(MMFAMILY)
@@ -146,34 +124,28 @@ char digit[256]={
 int targ;                                                           // the type of the returned value
 MMFLOAT farg1, farg2, fret;                                           // the two float arguments and returned value
 long long int  iarg1, iarg2, iret;                                   // the two integer arguments and returned value
-unsigned char *sarg1, *sarg2, *sret;                                         // the two string arguments and returned value
+CombinedPtr sarg1, sarg2, sret;                                         // the two string arguments and returned value
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
 // Global information used by functions
 // functions use targ, fret and sret as defined for operators (above)
-unsigned char *ep;                                                           // pointer to the argument to the function terminated with a zero byte.
-                                                                    // it is NOT trimmed of spaces
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
 // Global information used by commands
 //
 int cmdtoken;                                                       // Token number of the command
-unsigned char *cmdline;                                                      // Command line terminated with a zero unsigned char and trimmed of spaces
-unsigned char *nextstmt;                                                     // Pointer to the next statement to be executed.
-unsigned char *CurrentLinePtr, *SaveCurrentLinePtr;                                               // Pointer to the current line (used in error reporting)
-unsigned char *ContinuePoint;                                                // Where to continue from if using the continue statement
 
 extern int TraceOn;
-extern unsigned char *TraceBuff[TRACE_BUFF_SIZE];
+extern CombinedPtr TraceBuff[TRACE_BUFF_SIZE];
 extern int TraceBuffIndex;                                          // used for listing the contents of the trace buffer
-extern long long int CallCFunction(unsigned char *CmdPtr, unsigned char *ArgList, unsigned char *DefP, unsigned char *CallersLinePtr);
+extern long long int MIPS16 CallCFunction(CombinedPtr CmdPtr, CombinedPtr ArgList, CombinedPtr DefP, CombinedPtr CallersLinePtr);
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
 // Functions only used within MMBasic.c
 //
 //void getexpr(unsigned char *);
 //void checktype(int *, int);
-unsigned char __not_in_flash_func(*getvalue)(unsigned char *p, MMFLOAT *fa, long long int  *ia, unsigned char **sa, int *oo, int *ta);
+static CombinedPtr getvalue(CombinedPtr p, MMFLOAT *fa, long long int  *ia, CombinedPtr *sa, int *oo, int *ta);
 unsigned char tokenTHEN, tokenELSE, tokenGOTO, tokenEQUAL, tokenTO, tokenSTEP, tokenWHILE, tokenUNTIL, tokenGOSUB, tokenAS, tokenFOR;
 unsigned short cmdIF, cmdENDIF, cmdEND_IF, cmdELSEIF, cmdELSE_IF, cmdELSE, cmdSELECT_CASE, cmdFOR, cmdNEXT, cmdWHILE, cmdENDSUB, cmdENDFUNCTION, cmdLOCAL, cmdSTATIC, cmdCASE, cmdDO, cmdLOOP, cmdCASE_ELSE, cmdEND_SELECT;
 unsigned short cmdSUB, cmdFUN, cmdCFUN, cmdCSUB, cmdIRET, cmdComment, cmdEndComment;
@@ -183,57 +155,6 @@ unsigned short cmdSUB, cmdFUN, cmdCFUN, cmdCSUB, cmdIRET, cmdComment, cmdEndComm
  Includes the routines to initialise MMBasic, start running the interpreter, and to run a program in memory
 *********************************************************************************************************************************************/
 
-
-// Initialise MMBasic
-void   MIPS16 InitBasic(void) {
-    DefaultType = T_NBR;
-    CommandTableSize =  (sizeof(commandtbl)/sizeof(struct s_tokentbl));
-    TokenTableSize =  (sizeof(tokentbl)/sizeof(struct s_tokentbl));
-
-    ClearProgram(true);
-
-    // load the commonly used tokens
-    // by looking them up once here performance is improved considerably
-    tokenTHEN  = GetTokenValue( (unsigned char *)"Then");
-    tokenELSE  = GetTokenValue( (unsigned char *)"Else");
-    tokenGOTO  = GetTokenValue( (unsigned char *)"GoTo");
-    tokenEQUAL = GetTokenValue( (unsigned char *)"=");
-    tokenTO    = GetTokenValue( (unsigned char *)"To");
-    tokenSTEP  = GetTokenValue( (unsigned char *)"Step");
-    tokenWHILE = GetTokenValue( (unsigned char *)"While");
-    tokenUNTIL = GetTokenValue( (unsigned char *)"Until");
-    tokenGOSUB = GetTokenValue( (unsigned char *)"GoSub");
-    tokenAS    = GetTokenValue( (unsigned char *)"As");
-    tokenFOR   = GetTokenValue( (unsigned char *)"For");
-    cmdLOOP  = GetCommandValue( (unsigned char *)"Loop");
-    cmdIF      = GetCommandValue( (unsigned char *)"If");
-    cmdENDIF   = GetCommandValue( (unsigned char *)"EndIf");
-    cmdEND_IF  = GetCommandValue( (unsigned char *)"End If");
-    cmdELSEIF  = GetCommandValue( (unsigned char *)"ElseIf");
-    cmdELSE_IF = GetCommandValue( (unsigned char *)"Else If");
-    cmdELSE    = GetCommandValue( (unsigned char *)"Else");
-    cmdSELECT_CASE = GetCommandValue( (unsigned char *)"Select Case");
-    cmdCASE        = GetCommandValue( (unsigned char *)"Case");
-    cmdCASE_ELSE   = GetCommandValue( (unsigned char *)"Case Else");
-    cmdEND_SELECT  = GetCommandValue( (unsigned char *)"End Select");
-	cmdSUB = GetCommandValue( (unsigned char *)"Sub");
-	cmdFUN = GetCommandValue( (unsigned char *)"Function");
-    cmdLOCAL = GetCommandValue( (unsigned char *)"Local");
-    cmdSTATIC = GetCommandValue( (unsigned char *)"Static");
-    cmdENDSUB= GetCommandValue( (unsigned char *)"End Sub");
-    cmdENDFUNCTION = GetCommandValue( (unsigned char *)"End Function");
-    cmdDO=  GetCommandValue( (unsigned char *)"Do");
-    cmdFOR=  GetCommandValue( (unsigned char *)"For");
-    cmdNEXT= GetCommandValue( (unsigned char *)"Next");
-	cmdIRET = GetCommandValue( (unsigned char *)"IReturn");
-    cmdCSUB = GetCommandValue( (unsigned char *)"CSub");
-    cmdComment = GetCommandValue( (unsigned char *)"/*");
-    cmdEndComment = GetCommandValue( (unsigned char *)"*/");
-//  SInt(CommandTableSize);
-//  SIntComma(TokenTableSize);
-//  SSPrintString("\r\n");
-
-}
 
 int CheckEmpty(char *p){
         int emptyarray=0;
@@ -250,11 +171,10 @@ int CheckEmpty(char *p){
         return emptyarray;
 }
 
-
 // run a program
 // this will continuously execute a program until the end (marked by TWO zero chars)
 // the argument p must point to the first line to be executed
-void MIPS16 __not_in_flash_func(ExecuteProgram)(unsigned char *p) {
+void MIPS16 __not_in_flash_func(ExecuteProgram)(CombinedPtr p) {
     int i, SaveLocalIndex = 0;
     jmp_buf SaveErrNext;
     memcpy(SaveErrNext, ErrNext, sizeof(jmp_buf));                  // we call ExecuteProgram() recursively so we need to store/restore old jump buffer between calls
@@ -291,7 +211,7 @@ void MIPS16 __not_in_flash_func(ExecuteProgram)(unsigned char *p) {
                 SaveLocalIndex = g_LocalIndex;                        // save this if we need to cleanup after an error
                 if(setjmp(ErrNext) == 0) {                          // return to the else leg of this if error and OPTION ERROR SKIP/IGNORE is in effect
                     if(p[0]>= C_BASETOKEN && p[1]>=C_BASETOKEN){
-                        cmdtoken=commandtbl_decode(p);
+                        cmdtoken = commandtbl_decode(p);
                         targ = T_CMD;
                         commandtbl[cmdtoken].fptr(); // execute the command
                     } else {
@@ -340,7 +260,8 @@ void   MIPS16 PrepareProgram(int ErrAbort) {
     uint32_t hash=FNV_offset_basis;
     char printvar[MAXVARLEN+1];
 #endif
-    unsigned char *p1, *p2;
+    CombinedPtr p1;
+    unsigned char *p2;
     for(i = FONT_BUILTIN_NBR; i < FONT_TABLE_SIZE-1; i++)
         FontTable[i] = NULL;                                        // clear the font table
 
@@ -349,7 +270,7 @@ void   MIPS16 PrepareProgram(int ErrAbort) {
     CFunctionFlash = CFunctionLibrary = NULL;
     if(Option.LIBRARY_FLASH_SIZE == MAX_PROG_SIZE)
          NbrFuncts = PrepareProgramExt(LibMemory , 0, &CFunctionLibrary, ErrAbort);
-    PrepareProgramExt(ProgMemory, NbrFuncts,&CFunctionFlash, ErrAbort);
+    PrepareProgramExt(ProgMemory, NbrFuncts, &CFunctionFlash, ErrAbort);
     
     // check the sub/fun table for duplicates
 #ifdef rp2350
@@ -359,14 +280,14 @@ void   MIPS16 PrepareProgram(int ErrAbort) {
     	// This allows for a fast check of a variable name being the same as a function name
     	// It also allows a hash look up for function name matching
     	p1 = subfun[i];
-        p1+=sizeof(CommandToken);
+        p1 += sizeof(CommandToken);
         skipspace(p1);
         p2 = (unsigned char *)printvar; namelen = 0;
-        hash=FNV_offset_basis;
+        hash = FNV_offset_basis;
     	do {
-            u=mytoupper(*p1);
+            u = mytoupper(*p1);
     		hash ^= u;
-    		hash*=FNV_prime;
+    		hash *= FNV_prime;
     		*p2++ = u;
             p1++;
     		if(++namelen > MAXVARLEN){
@@ -383,12 +304,10 @@ void   MIPS16 PrepareProgram(int ErrAbort) {
 		funtbl[hash].index=i;
 		memcpy(funtbl[hash].name,printvar,(namelen == MAXVARLEN ? namelen :namelen+1));
     }
-        if(Option.LIBRARY_FLASH_SIZE == MAX_PROG_SIZE){
-            hashlabels(LibMemory,ErrAbort);
-           // if(!ErrAbort) return;
-        }   
-          hashlabels(ProgMemory,ErrAbort);
-          //if(!ErrAbort) return;
+    if(Option.LIBRARY_FLASH_SIZE == MAX_PROG_SIZE){
+        hashlabels(LibMemory, ErrAbort);
+    }   
+    hashlabels(ProgMemory, ErrAbort);
 
 #endif
     if(!ErrAbort) return;
@@ -396,10 +315,10 @@ void   MIPS16 PrepareProgram(int ErrAbort) {
     for(i = 0; i < MAXSUBFUN && subfun[i] != NULL; i++) {
         for(j = i + 1; j < MAXSUBFUN && subfun[j] != NULL; j++) {
             CurrentLinePtr = p1 = subfun[i];
-            p1+=sizeof(CommandToken);
+            p1 += sizeof(CommandToken);
             skipspace(p1);
-            p2 = subfun[j];
-            p2+=sizeof(CommandToken);
+            CombinedPtr p2 = subfun[j];
+            p2 += sizeof(CommandToken);
             skipspace(p2);
             while(1) {
                 if(!isnamechar(*p1) && !isnamechar(*p2)) {
@@ -411,17 +330,12 @@ void   MIPS16 PrepareProgram(int ErrAbort) {
             }
         }
     }
-//    for(i=0;i<MAXSUBFUN;i++){
-//    	if(funtbl[i].name[0]!=0){
-//    		MMPrintString(funtbl[i].name);PIntHC(funtbl[i].index);PIntComma(i);PRet();
-//    	}
-//    }
 }
 
 
 // This scans one area (main program or the library area) for user defined subroutines and functions.
 // It is only used by PrepareProgram() above.
-int   MIPS16 PrepareProgramExt(unsigned char *p, int i, unsigned char **CFunPtr, int ErrAbort) {
+int   MIPS16 PrepareProgramExt(CombinedPtr p, int i, CombinedPtr *CFunPtr, int ErrAbort) {
     unsigned int *cfp;
     while(*p != 0xff) {
         p = GetNextCommand(p, &CurrentLinePtr, NULL);
@@ -458,7 +372,7 @@ int   MIPS16 PrepareProgramExt(unsigned char *p, int i, unsigned char **CFunPtr,
     }
     while(*p == 0) p++;                                             // the end of the program can have multiple zeros
     p++;                                                            // step over the terminating 0xff
-    *CFunPtr = (unsigned char *)(((unsigned int)p + 0b11) & ~0b11); // CFunction flash (if it exists) starts on the next word address after the program in flash
+    *CFunPtr = p.aligh(); // CFunction flash (if it exists) starts on the next word address after the program in flash
     if(i < MAXSUBFUN) subfun[i] = NULL;
     CurrentLinePtr = NULL;
     // now, step through the CFunction area looking for fonts to add to the font table
@@ -477,7 +391,7 @@ int   MIPS16 PrepareProgramExt(unsigned char *p, int i, unsigned char **CFunPtr,
 // returns with the index of the sub/function in the table or -1 if not found
 // if type = 0 then look for a sub otherwise a function
 #ifdef rp2350
-int __not_in_flash_func(FindSubFun)(unsigned char *p, int type) {
+int __not_in_flash_func(FindSubFun)(CombinedPtr p, int type) {
     unsigned char *s;
     unsigned char name[MAXVARLEN + 1];
     int j, u, namelen;
@@ -552,18 +466,18 @@ int __not_in_flash_func(FindSubFun)(unsigned char *p, int type) {
 //   fa, i64a, sa and typ are pointers to where the return value is to be stored (used by functions only)
 #if defined(PICOMITEWEB) || defined(PICOMITEVGA)
 #ifdef rp2350
-void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, int index, MMFLOAT *fa, long long int  *i64a, unsigned char **sa, int *typ) {
+void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, CombinedPtr cmd, int index, MMFLOAT *fa, long long int  *i64a, CombinedPtr *sa, int *typ) {
 #else
-void MIPS16 DefinedSubFun(int isfun, unsigned char *cmd, int index, MMFLOAT *fa, long long int  *i64a, unsigned char **sa, int *typ) {
+void MIPS16 DefinedSubFun(int isfun, CombinedPtr cmd, int index, MMFLOAT *fa, long long int  *i64a, CombinedPtr *sa, int *typ) {
 #endif
 #else
-void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, int index, MMFLOAT *fa, long long int  *i64a, unsigned char **sa, int *typ) {
+void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, CombinedPtr cmd, int index, MMFLOAT *fa, long long int  *i64a, CombinedPtr *sa, int *typ) {
 #endif
 
-    unsigned char *p, *s, *tp, *ttp, tcmdtoken;
-    unsigned char *CallersLinePtr, *SubLinePtr = NULL;
-    unsigned char *argbuf1; unsigned char **argv1; int argc1;
-    unsigned char *argbuf2; unsigned char **argv2; int argc2;
+    unsigned char tcmdtoken;
+    CombinedPtr s, c, p, tp, ttp, CallersLinePtr, SubLinePtr;
+    unsigned char *argbuf1; CombinedPtr *argv1; int argc1;
+    unsigned char *argbuf2; CombinedPtr *argv2; int argc2;
     unsigned char fun_name[MAXVARLEN + 1];
     unsigned char *argbyref;
     int i;
@@ -588,14 +502,15 @@ void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, in
     // p is left pointing to the end of the name (ie, start of the argument list in the definition)
     CurrentLinePtr = SubLinePtr;                               // report errors at the definition
     tp = fun_name;
-    *tp++ = *p++; while(isnamechar(*p)) *tp++ = *p++;
+    tp.write_byte(*p++)++;
+    while(isnamechar(*p)) tp.write_byte(*p++)++;
     if(*p == '$' || *p == '%' || *p == '!') {
         if(!isfun) {
             error("Type specification is invalid: @", (int)(*p));
         }
-        *tp++ = *p++;
+        tp.write_byte(*p++)++;
     }
-    *tp = 0;
+    tp.write_byte(0);
    
     if(isfun && *p != '(' /*&& (*SubLinePtr != cmdCFUN)*/) error("Function definition");
 
@@ -639,27 +554,27 @@ void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, in
    
     if(gosubindex >= MAXGOSUB) error("Too many nested SUB/FUN");
     errorstack[gosubindex] = CallersLinePtr;
-    gosubstack[gosubindex++] = isfun ? NULL : nextstmt;             // NULL signifies that this is returned to by ending ExecuteProgram()
+    gosubstack[gosubindex++] = isfun ? CombinedPtr() : nextstmt;             // NULL signifies that this is returned to by ending ExecuteProgram()
     #define buffneeded MAX_ARG_COUNT*(sizeof(union u_argval)+ 2*sizeof(int)+3*sizeof(unsigned char *)+sizeof(unsigned char))+ 2*STRINGSIZE
     // allocate memory for processing the arguments
     argval = (union u_argval*)GetSystemMemory(buffneeded);
     argtype = (int*)((uint8_t*)argval + MAX_ARG_COUNT * sizeof(union u_argval));
     argVarIndex = (int*)((uint8_t*)argtype+MAX_ARG_COUNT * sizeof(int));
     argbuf1 = (uint8_t *)argVarIndex+MAX_ARG_COUNT * sizeof(int);
-    argv1 = (uint8_t**)argbuf1 + STRINGSIZE;
+    argv1 = (CombinedPtr*)argbuf1 + STRINGSIZE;
     argbuf2 = (uint8_t*)argv1 + MAX_ARG_COUNT * sizeof(unsigned char *);
-    argv2 = (uint8_t**)argbuf2 + STRINGSIZE;
+    argv2 = (CombinedPtr*)argbuf2 + STRINGSIZE;
     argbyref = (uint8_t*)argv2 + MAX_ARG_COUNT * sizeof(unsigned char *);
 
     // now split up the arguments in the caller
     CurrentLinePtr = CallersLinePtr;                                // report errors at the caller
     argc1 = 0;
-    if(*tp) makeargs(&tp, MAX_ARG_COUNT, argbuf1, argv1, &argc1, (*tp == '(') ? (unsigned char *)"(," : (unsigned char *)",");
+    if(*tp) makeargs2(&tp, MAX_ARG_COUNT, argbuf1, argv1, &argc1, (*tp == '(') ? (unsigned char *)"(," : (unsigned char *)",");
 
     // split up the arguments in the definition
     CurrentLinePtr = SubLinePtr;                                    // any errors must be at the definition
     argc2 = 0;
-    if(*p) makeargs(&p, MAX_ARG_COUNT, argbuf2, argv2, &argc2, (*p == '(') ? (unsigned char *)"(," : (unsigned char *)",");
+    if(*p) makeargs2(&p, MAX_ARG_COUNT, argbuf2, argv2, &argc2, (*p == '(') ? (unsigned char *)"(," : (unsigned char *)",");
 
     // error checking
     if(argc2 && (argc2 & 1) == 0) error("Argument list");
@@ -676,7 +591,7 @@ void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, in
             // check if the argument is a valid variable
             if(i < argc1 && isnamestart(*argv1[i]) && *skipvar(argv1[i], false) == 0) {
                 // yes, it is a variable (or perhaps a user defined function which looks the same)?
-                if(!(FindSubFun(argv1[i], 1) >= 0 && strchr((char *)argv1[i], '(') != NULL)) {
+                if(!(FindSubFun(argv1[i], 1) >= 0 && strchr(argv1[i], '(').raw() != NULL)) {
                     // yes, this is a valid variable.  set argvalue to point to the variable's data and argtype to its type
                     argval[i].s = (uint8_t*)findvar(argv1[i], V_FIND | V_EMPTY_OK);        // get a pointer to the variable's data
                     argtype[i] = g_vartbl[g_VarIndex].type;                          // and the variable's type
@@ -716,7 +631,8 @@ void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, in
             // if argument is present and is not a pointer to a variable then evaluate it as an expression
             if(argtype[i] == 0) {
                 long long int  ia;
-                evaluate(argv1[i], &argval[i].f, &ia, &s, &argtype[i], false);   // get the value and type of the argument
+                CombinedPtr p(argv1[i]);
+                evaluate(p, &argval[i].f, &ia, &s, &argtype[i], false);   // get the value and type of the argument
                 if(argtype[i] & T_INT)
                     argval[i].i = ia;
                 else if(argtype[i] & T_STR) {
@@ -746,7 +662,7 @@ void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, in
         tp = skipvar(argv2[i], false);                              // point to after the variable
         skipspace(tp);
         if(*tp == tokenAS) {                                        // are we using Microsoft syntax (eg, AS INTEGER)?
-            *tp++ = 0;                                              // terminate the string and step over the AS token
+            tp.write_byte(0)++;                                              // terminate the string and step over the AS token
             tp = CheckIfTypeSpecified(tp, &ArgType, true);          // and get the type
             if(!(ArgType & T_IMPLIED)) error("Variable type");
         }
@@ -838,7 +754,7 @@ void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, in
         FreeMemorySafe((void **)&g_vartbl[g_VarIndex].val.s);                         // free the memory if it is a string
         g_vartbl[g_VarIndex].type |= T_PTR;
         g_LocalIndex--;                                               // allocate the memory at the previous level
-        g_vartbl[g_VarIndex].val.s = tp = (uint8_t*)GetTempMemory(STRINGSIZE);    // and use our own memory
+        tp = g_vartbl[g_VarIndex].val.s = (uint8_t*)GetTempMemory(STRINGSIZE);    // and use our own memory
         g_LocalIndex++;
     }
     skipelement(p);                                                 // point to the body of the function
@@ -856,9 +772,9 @@ void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, in
 
     // return the value of the function's variable to the caller
     if(FunType & T_NBR)
-        *fa = *(MMFLOAT *)tp;
+        *fa = tp.as_double();
     else if(FunType & T_INT)
-        *i64a = *(long long int  *)tp;
+        *i64a = tp.as_i64a();
     else
         *sa = tp;                                                   // for a string we just need to return the local memory
     *typ = FunType;                                                 // save the function type for the caller
@@ -1002,7 +918,7 @@ void  MIPS16 STR_REPLACE(char *target, const char *needle, const char *replaceme
 // if the arg console is true then do not add a line number
 
 void  MIPS16 tokenise(int console) {
-    unsigned char *p, *op, *tp;
+    CombinedPtr p, tp, op;
     int i=0;
     int firstnonwhite;
     int labelvalid;
@@ -1010,20 +926,24 @@ void  MIPS16 tokenise(int console) {
     // first, make sure that only printable characters are in the line
     p = inpbuf;
     while(*p) {
-        *p = *p & 0x7f;
-        if(*p < ' ' || *p == 0x7f)  *p = ' ';
+        p.write_byte(*p & 0x7f);
+        if(*p < ' ' || *p == 0x7f) p.write_byte(' ');
         p++;
     }
     tp = inpbuf;
     skipspace(tp);
     if(toupper(tp[0])=='H' && toupper(tp[1])=='E' && toupper(tp[2])=='L' && toupper(tp[3])=='P' && tp[4]==' '){
-        unsigned char *q=&tp[5];
+        CombinedPtr q = tp + 5;
         skipspace(q);
-        if(*q!='"'){
-            int end=strlen((char *)q);
-            memmove(&q[1],q,strlen((char *)q));
-            *q='"';
-            q[end+1]=0;
+        if(*q != '"'){
+            int end = strlen(q);
+            for(int i = 0; i < end; ++i) {
+
+            }
+            for (int i = end - 1; i >= 0; --i) (q + i + 1).write_byte(q[i]);
+            q.write_byte('"');
+            q += end+1;
+            q.write_byte(0);
         }
     }
     if(toupper(tp[0])=='R' && toupper(tp[1])=='E' && toupper(tp[2])=='M' && tp[3]==' ')i=1;
@@ -1044,18 +964,26 @@ void  MIPS16 tokenise(int console) {
     // setup the input and output buffers
     p = inpbuf;
     op = tknbuf;
-    if(!console) *op++ = T_NEWLINE;
+    if(!console) op.write_byte(T_NEWLINE)++;
 
     // get the line number if it exists
     tp = p;
     skipspace(tp);
     for(i = 0; i < 8; i++) if(!isxdigit(tp[i])) break;              // test if this is eight hex digits
     if(IsDigitinline(*tp) && i < 8) {                                     // if it a digit and not an 8 digit hex number (ie, it is CFUNCTION data) then try for a line number
-        i = strtol((char *)tp, (char **)&tp, 10);
+        size_t i = 0;
+        { // TODO: fn?
+        CombinedPtr r = tp;
+        char buf[32]; // максимум цифр + знак
+        while (i < sizeof(buf) - 1 && isgraph(*r)) buf[i++] = *r++;
+        buf[i] = '\0';
+        char *endptr;
+        i = strtol(buf, &endptr, 10);
+        }
         if(!console && i > 0 && i <= MAXLINENBR) {
-            *op++ = T_LINENBR;
-            *op++ = (i>>8);
-            *op++ = (i & 0xff);
+            op.write_byte(T_LINENBR)++;
+            op.write_byte(i >> 8)++;
+            op.write_byte(i & 0xff)++;
         }
         p = tp;
     }
@@ -1066,13 +994,14 @@ void  MIPS16 tokenise(int console) {
     tp=p;
     skipspace(tp);
     if(*tp=='.'){
-        if(!strncasecmp((char *)tp,".SIDE SET ",10) ||
-            !strncasecmp((char *)tp,".END PROGRAM",12) ||
-            !strncasecmp((char *)tp,".WRAP",4) ||
-            !strncasecmp((char *)tp,".LINE ",5) ||
-            !strncasecmp((char *)tp,".PROGRAM ",9) ||
-            !strncasecmp((char *)tp,".LABEL ",6)
-        ) *tp='_';
+        char r[13]; for(int i = 0; i < 13; ++i) r[i] = tp[i];
+        if(!strncasecmp(r,".SIDE SET ",10) ||
+            !strncasecmp(r,".END PROGRAM",12) ||
+            !strncasecmp(r,".WRAP",4) ||
+            !strncasecmp(r,".LINE ",5) ||
+            !strncasecmp(r,".PROGRAM ",9) ||
+            !strncasecmp(r,".LABEL ",6)
+        ) *r = '_';
     }
 
     while(*p) {
@@ -1081,7 +1010,7 @@ void  MIPS16 tokenise(int console) {
         }
         // just copy a space
         if(*p == ' ') {
-            *op++ = *p++;
+            op.write_byte(*p++)++;
             continue;
         }
 
@@ -1089,9 +1018,9 @@ void  MIPS16 tokenise(int console) {
         // this will also accept a string without the closing quote and it will add the quote in
         if(*p == '"') {
             do {
-                *op++ = *p++;
+                op.write_byte(*p++)++;
             } while(*p != '"' && *p);
-            *op++ = '"';
+            op.write_byte('"')++;
             if(*p == '"') p++;
             continue;
         }
@@ -1099,18 +1028,18 @@ void  MIPS16 tokenise(int console) {
         // copy anything after a comment (')
         if(*p == '\'' || multi==true) {
             do {
-                *op++=*p++;
+                op.write_byte(*p++)++;
             } while(*p);
             continue;
         }
 
         // check for multiline separator (colon) and replace with a zero char
         if(*p == ':') {
-            *op++ = 0;
+            op.write_byte(0)++;
             p++;
             while(*p == ':') {                                      // insert a space between consecutive colons
-                *op++ = ' ';
-                *op++ = 0;
+                op.write_byte(' ')++;
+                op.write_byte(0)++;
                 p++;
             }
             firstnonwhite = true;
@@ -1121,12 +1050,12 @@ void  MIPS16 tokenise(int console) {
         if(IsDigitinline(*p) || *p == '.') {                              // valid chars at the start of a number
             while(IsDigitinline(*p) || *p == '.' || *p == 'E' || *p == 'e')
                 if (*p == 'E' || *p == 'e') {   // check for '+' or '-' as part of the exponent
-                    *op++ = *p++;                                   // copy the number
+                    op.write_byte(*p++)++;                                   // copy the number
                     if (*p == '+' || *p == '-') {                   // BUGFIX by Gerard Sexton
-                        *op++ = *p++;                               // copy the '+' or '-'
+                        op.write_byte(*p++)++;                               // copy the '+' or '-'
                     }
                 } else {
-                    *op++ = *p++;                                   // copy the number
+                    op.write_byte(*p++)++;                                   // copy the number
                 }
             firstnonwhite = false;
             continue;
@@ -1135,7 +1064,7 @@ void  MIPS16 tokenise(int console) {
         // not whitespace or string or comment or number - see if we can find a label or a token identifier
          if(firstnonwhite) {                                         // first entry on the line must be a command
             // these variables are only used in the search for a command code
-            unsigned char *tp2, *match_p = NULL;
+            CombinedPtr tp2, match_p;
             int match_i = -1, match_l = 0;
             // first test if it is a print shortcut char (?) - this needs special treatment
             if(*p == '?') {
@@ -1144,7 +1073,8 @@ void  MIPS16 tokenise(int console) {
                 match_p = p;
             } else if((tp2 = checkstring(p, (unsigned char *)"BITBANG")) != NULL) {
                     match_i = GetCommandValue((unsigned char *)"Device");
-                    match_p = p = tp2;
+                    p = tp2;
+                    match_p = p;
             } else {
                 // now try for a command in the command table
                 // this works by scanning the entire table looking for the match with the longest command name
@@ -1176,13 +1106,12 @@ void  MIPS16 tokenise(int console) {
 
             if(match_i > -1) {
                 // we have found a command
-//                *op++ = match_i + C_BASETOKEN;                      // insert the token found
-                *op++ = (match_i & 0x7f ) + C_BASETOKEN;
-                *op++ = (match_i >> 7) + C_BASETOKEN; //tokens can be 14-bit
+                op.write_byte((match_i & 0x7f ) + C_BASETOKEN)++;
+                op.write_byte((match_i >> 7) + C_BASETOKEN)++; //tokens can be 14-bit
                 p = match_p;                                        // step over the command in the source
                 if(isalpha(*(p-1)) && *p == ' ') p++;               // if the command is followed by a space skip over it
                 if(match_i == GetCommandValue((unsigned char *)"Rem")) // check if it is a REM command
-                    while(*p) *op++ = *p++;                         // and in that case just copy everything
+                    while(*p) op.write_byte(*p++)++;                         // and in that case just copy everything
                 firstnonwhite = false;
                 labelvalid = false;                                 // we do not want any labels after this
                 if(match_i == GetCommandValue((unsigned char *)"/*")){
@@ -1208,16 +1137,16 @@ void  MIPS16 tokenise(int console) {
                     if(!isnamechar(*tp)) break;                     // search for the first invalid char
                 if(*tp == ':') {                                    // Yes !!  It is a label
                     labelvalid = false;                             // we do not want any more labels
-                    *op++ = T_LABEL;                                // insert the token
-                    *op++ = tp - p;                                 // insert the length of the label
-                    for(i = tp - p; i > 0; i--) *op++ = *p++;       // copy the label
+                    op.write_byte(T_LABEL)++;                                // insert the token
+                    op.write_byte(tp - p)++;                                 // insert the length of the label
+                    for(i = tp - p; i > 0; i--) op.write_byte(*p++)++;       // copy the label
                     p++;                                            // step over the terminating colon
                     continue;
                 }
             }
         } else {
             // check to see if it is a function or keyword
-            unsigned char *tp2 = NULL;
+            CombinedPtr tp2;
             for(i = 0 ; i < TokenTableSize - 1; i++) {
                 tp2 = p;
                 tp = tokentbl[i].name;
@@ -1231,7 +1160,7 @@ void  MIPS16 tokenise(int console) {
             if(i != TokenTableSize - 1) {
                 // we have a  match
                 i += C_BASETOKEN;
-                *op++ = i;                                          // insert the token found
+                op.write_byte(i)++;                                          // insert the token found
                 p = tp2;                                            // and step over it in the source text
                         if(i == tokenTHEN || i == tokenELSE)
                             firstnonwhite = true;                   // a command is valid after a THEN or ELSE
@@ -1249,11 +1178,11 @@ void  MIPS16 tokenise(int console) {
                 skipspace(tp);
                 if(*tp == '=') {  
                     unsigned short tkn = GetCommandValue((unsigned char *)"Let");                                   // is it an implied let?
-                    *op++ = (tkn & 0x7f ) + C_BASETOKEN;
-                    *op++ = (tkn >> 7) + C_BASETOKEN; //tokens can be 14-bit
+                    op.write_byte((tkn & 0x7f ) + C_BASETOKEN)++;
+                    op.write_byte((tkn >> 7) + C_BASETOKEN)++; //tokens can be 14-bit
                 }
             }
-            while(isnamechar(*p)) *op++ = *p++;                     // copy the variable name
+            while(isnamechar(*p)) op.write_byte(*p++)++;                     // copy the variable name
             firstnonwhite = false;
             labelvalid = false;                                     // we do not want any labels after this
             continue;
@@ -1271,15 +1200,14 @@ void  MIPS16 tokenise(int console) {
         }
 
         // something else, so just copy the one character
-        *op++ = *p++;
-       labelvalid = false;                                          // we do not want any labels after this
-       firstnonwhite = false;
-
+        op.write_byte(*p++)++;
+        labelvalid = false;                                          // we do not want any labels after this
+        firstnonwhite = false;
     }
     // end of loop, trim any trailing blanks (but not part of a line number)
-    while(*(op - 1) == ' ' && op > tknbuf + 3) *--op = 0;
+    while(*(op - 1) == ' ' && op > tknbuf + 3) --op.write_byte(0);
     // make sure that it is terminated properly
-    *op++ = 0;  *op++ = 0;  *op++ = 0;                              // terminate with  zero chars
+    op.write_byte(0)++;  op.write_byte(0)++;  op.write_byte(0);                              // terminate with  zero chars
 }
 
 
@@ -1300,15 +1228,15 @@ void  MIPS16 tokenise(int console) {
 //         if *t = T_NOTYPE it will not throw an error and will return the type found in *t
 // it returns with a void pointer to a float, integer or string depending on the value returned in *t
 // this will check that the expression is terminated correctly and throw an error if not
-void __not_in_flash_func(*DoExpression)(unsigned char *p, int *t) {
+void __not_in_flash_func(*DoExpression)(CombinedPtr p, int *t) {
     static MMFLOAT f;
     static long long int  i64;
-    static unsigned char *s;
+    static CombinedPtr s;
 
     evaluate(p, &f, &i64, &s, t, false);
     if(*t & T_INT) return &i64;
     if(*t & T_NBR) return &f;
-    if(*t & T_STR) return s;
+    if(*t & T_STR) return &s;
 
     error("Internal fault 1(sorry)");
     return NULL;                                                    // to keep the compiler happy
@@ -1322,10 +1250,10 @@ void __not_in_flash_func(*DoExpression)(unsigned char *p, int *t) {
 //  if *t = T_STR or T_NBR or T_INT will throw an error if the result is not the correct type
 //  if *t = T_NOTYPE it will not throw an error and will return the type found in *t
 // this will check that the expression is terminated correctly and throw an error if not.  flags & E_NOERROR will suppress that check
-unsigned char MIPS16 __not_in_flash_func(*evaluate)(unsigned char *p, MMFLOAT *fa, long long int  *ia, unsigned char **sa, int *ta, int flags) {
+CombinedPtr MIPS16 __not_in_flash_func(evaluate)(CombinedPtr p, MMFLOAT *fa, long long int  *ia, CombinedPtr *sa, int *ta, int flags) {
     int o;
     int t = *ta;
-    unsigned char *s;
+    CombinedPtr s;
     p = getvalue(p, fa, ia, &s, &o, &t);                            // get the left hand side of the expression, the operator is returned in o
     while(o != E_END) p = doexpr(p, fa, ia, &s, &o, &t);            // get the right hand side of the expression and evaluate the operator in o
 
@@ -1352,7 +1280,7 @@ MMFLOAT __not_in_flash_func(getnumber)(unsigned char *p) {
     int t = T_NBR;
     MMFLOAT f;
     long long int  i64;
-    unsigned char *s;
+    CombinedPtr s;
     evaluate(p, &f, &i64, &s, &t, false);
     if(t & T_INT) return (MMFLOAT)i64;
     return f;
@@ -1360,12 +1288,11 @@ MMFLOAT __not_in_flash_func(getnumber)(unsigned char *p) {
 
 
 // evaluate an expression and return a 64 bit integer
-long long int  __not_in_flash_func(getinteger)(unsigned char *p) {
+long long int  __not_in_flash_func(getinteger)(CombinedPtr p) {
     int t = T_INT;
     MMFLOAT f;
     long long int  i64;
-    unsigned char *s;
-
+    CombinedPtr s;
     evaluate(p, &f, &i64, &s, &t, false);
     if(t & T_NBR) return FloatToInt64(f);
     return i64;
@@ -1376,12 +1303,12 @@ long long int  __not_in_flash_func(getinteger)(unsigned char *p) {
 // evaluate an expression and return an integer
 // this will throw an error is the integer is outside a specified range
 // this will correctly round the number if it is a fraction of an integer
-long long int __not_in_flash_func(getint)(unsigned char *p, long long int min, long long int max) {
+long long int __not_in_flash_func(getint)(CombinedPtr p, long long int min, long long int max) {
     long long int  i;
     int t = T_INT;
     MMFLOAT f;
     long long int i64;
-    unsigned char *s;
+    CombinedPtr s;
     evaluate(p, &f, &i64, &s, &t, false);
     if(t & T_NBR) i= FloatToInt64(f);
     else i=i64;
@@ -1392,12 +1319,11 @@ long long int __not_in_flash_func(getint)(unsigned char *p, long long int min, l
 
 
 // evaluate an expression to get a string
-unsigned char __not_in_flash_func(*getstring)(unsigned char *p) {
+CombinedPtr __not_in_flash_func(getstring)(CombinedPtr p) {
     int t = T_STR;
     MMFLOAT f;
     long long int  i64;
-    unsigned char *s;
-
+    CombinedPtr s;
     evaluate(p, &f, &i64, &s, &t, false);
     return s;
 }
@@ -1406,14 +1332,14 @@ unsigned char __not_in_flash_func(*getstring)(unsigned char *p) {
 
 // evaluate an expression to get a string using the C style for a string
 // as against the MMBasic style returned by getstring()
-unsigned char __not_in_flash_func(*getCstring)(unsigned char *p) {
+unsigned char __not_in_flash_func(*getCstring)(CombinedPtr p) {
     unsigned char *tp;
     tp = (uint8_t*)GetTempMemory(STRINGSIZE);                                        // this will last for the life of the command
     Mstrcpy(tp, getstring(p));                                      // get the string and save in a temp place
     MtoC(tp);                                                       // convert to a C style string
     return tp;
 }
-unsigned char *getFstring(unsigned char *p) {
+unsigned char *getFstring(CombinedPtr p) {
     unsigned char *tp;
     tp = (uint8_t*)GetTempMemory(STRINGSIZE);                                        // this will last for the life of the command
     Mstrcpy(tp, getstring(p));                                      // get the string and save in a temp place
@@ -1430,12 +1356,12 @@ unsigned char *getFstring(unsigned char *p) {
 
 
 // recursively evaluate an expression observing the rules of operator precedence
-unsigned char MIPS16 __not_in_flash_func(*doexpr)(unsigned char *p, MMFLOAT *fa, long long int  *ia, unsigned char **sa, int *oo, int *ta) {
+CombinedPtr MIPS16 __not_in_flash_func(doexpr)(CombinedPtr p, MMFLOAT *fa, long long int  *ia, CombinedPtr *sa, int *oo, int *ta) {
     MMFLOAT fa1, fa2;
     long long int  ia1, ia2;
     int o1, o2;
     int t1, t2;
-    unsigned char *sa1, *sa2;
+    CombinedPtr sa1, sa2;
 
     TestStackOverflow();                                            // throw an error if we have overflowed the PIC32's stack
 
@@ -1486,12 +1412,12 @@ unsigned char MIPS16 __not_in_flash_func(*doexpr)(unsigned char *p, MMFLOAT *fa,
 
 // get a value, either from a constant, function or variable
 // also returns the next operator to the right of the value or E_END if no operator
-unsigned char MIPS16 __not_in_flash_func(*getvalue)(unsigned char *p, MMFLOAT *fa, long long int  *ia, unsigned char **sa, int *oo, int *ta) {
+static CombinedPtr getvalue(CombinedPtr p, MMFLOAT *fa, long long int  *ia, CombinedPtr *sa, int *oo, int *ta) {
     MMFLOAT f = 0;
     long long int  i64 = 0;
-    unsigned char *s = NULL;
     int t = T_NOTYPE;
-    unsigned char *tp, *p1, *p2;
+    unsigned char *p1, *p2;
+    CombinedPtr tp, s;
     int i;
 
     TestStackOverflow();                                            // throw an error if we have overflowed the PIC32's stack
@@ -1573,9 +1499,10 @@ unsigned char MIPS16 __not_in_flash_func(*getvalue)(unsigned char *p, MMFLOAT *f
             // if it is a function with arguments we need to locate the closing bracket and copy the argument to
             // a temporary variable so that functions like getarg() will work.
             if(tokentype(*p) & T_FUN) {
-                p1 = p + 1;
+                CombinedPtr p1 = p + 1;
                 p = getclosebracket(p);                             // find the closing bracket
-                p2 = ep = (uint8_t*)GetTempMemory(STRINGSIZE);                           // this will last for the life of the command
+                p2 = (uint8_t*)GetTempMemory(STRINGSIZE);                           // this will last for the life of the command
+                ep = p2;
                 while(p1 != p) *p2++ = *p1++;
             }
             p++;                                                        // point to after the function (without argument) or after the closing bracket
@@ -1595,14 +1522,15 @@ unsigned char MIPS16 __not_in_flash_func(*getvalue)(unsigned char *p, MMFLOAT *f
         i = -1;
         if(*tp == '(') i = FindSubFun(p, 1);                        // if terminated with a bracket it could be a function
         if(i >= 0) {                                                // >= 0 means it is a user defined function
-            unsigned char *SaveCurrentLinePtr = CurrentLinePtr;              // in case the code in DefinedSubFun messes with this
+            CombinedPtr SaveCurrentLinePtr = CurrentLinePtr;              // in case the code in DefinedSubFun messes with this
             DefinedSubFun(true, p, i, &f, &i64, &s, &t);
             CurrentLinePtr = SaveCurrentLinePtr;
         } else {
-            s = (unsigned char *)findvar(p, V_FIND);                         // if it is a string then the string pointer is automatically set
+            void *tt = findvar(p, V_FIND);                         // if it is a string then the string pointer is automatically set
             t = TypeMask(g_vartbl[g_VarIndex].type);
-            if(t & T_NBR) f = (*(MMFLOAT *)s);
-            if(t & T_INT) i64 = (*(long long int  *)s);
+            if(t & T_NBR) f = (*(MMFLOAT *)tt);
+            if(t & T_INT) i64 = (*(long long int  *)tt);
+            if(t & T_STR) s = *(CombinedPtr*)tt;
         }
         p = skipvar(p, false);
     }
@@ -1682,8 +1610,9 @@ unsigned char MIPS16 __not_in_flash_func(*getvalue)(unsigned char *p, MMFLOAT *f
 		// if it is a string constant, return a pointer to that.  Note: tokenise() guarantees that strings end with a quote
 		else if(*p == '"') {
 			p++;                                                        // step over the quote
-			p1 = s = (uint8_t*)GetTempMemory(STRINGSIZE);                                // this will last for the life of the command
-			tp = (unsigned char *)strchr((char *)p, '"');
+			p1 = (uint8_t*)GetTempMemory(STRINGSIZE);                                // this will last for the life of the command
+            s = p1;
+			tp = strchr(p, '"');
                 int toggle=0;
                 while(p != tp){
                     if(*p=='\\' && tp>p+1 && OptionEscape)toggle^=1;
@@ -1760,7 +1689,8 @@ unsigned char MIPS16 __not_in_flash_func(*getvalue)(unsigned char *p, MMFLOAT *f
                     } else *p1++ = *p++;
                 } 
 			p++;
-			CtoM(s);                                                    // convert to a MMBasic string
+            // N.B. only raw RAM based strings are supported there
+			CtoM(s.raw());                                                    // convert to a MMBasic string
 			t = T_STR;
     }
     else
@@ -1781,15 +1711,10 @@ unsigned char MIPS16 __not_in_flash_func(*getvalue)(unsigned char *p, MMFLOAT *f
     return p;
 }
 
-
-
-
-
 // search through program memory looking for a line number. Stops when it has a matching or larger number
 // returns a pointer to the T_NEWLINE token or a pointer to the two zero characters representing the end of the program
-unsigned char MIPS16 *findline(int nbr, int mustfind) {
-    unsigned char *p;
-    unsigned char *next;
+CombinedPtr MIPS16 findline(int nbr, int mustfind) {
+    CombinedPtr p, next;
     int i,j=0;
     p = ProgMemory;
     next=LibMemory;
@@ -1844,19 +1769,19 @@ unsigned char MIPS16 *findline(int nbr, int mustfind) {
     return p;
 }
 #ifdef rp2350
-void hashlabels(unsigned char *p,int ErrAbort){   
-    //unsigned char *p = (unsigned char *)ProgMemory;
+void hashlabels(CombinedPtr p, int ErrAbort){   
+    //unsigned char *p = ProgMemory;
     int j, u, namelen;
     uint32_t originalhash,hash=FNV_offset_basis;
    // char *lastp = (char *)ProgMemory + 1;
-    char *lastp = (char *)p + 1;
+    CombinedPtr lastp = p + 1;
     // now do the search
     while(1) {
         if(p[0] == 0 && p[1] == 0)                                  // end of the program
             break;
 
         if(p[0] == T_NEWLINE) {
-            lastp = (char *)p;                                              // save in case this is the right line
+            lastp = p;                                              // save in case this is the right line
             p++;                                                    // and step over the line number
             continue;
         }
@@ -2018,7 +1943,7 @@ unsigned char MIPS16 *findlabel(unsigned char *labelptr) {
 
 // returns true if 'line' is a valid line in the program
 int IsValidLine(int nbr) {
-    unsigned char *p;
+    CombinedPtr p;
     p = findline(nbr, false);
     if(*p == T_NEWLINE) p++;
     if(*p == T_LINENBR) {
@@ -2030,11 +1955,9 @@ int IsValidLine(int nbr) {
 
 // count the number of lines up to and including the line pointed to by the argument
 // used for error reporting in programs that do not use line numbers
-int MIPS16 CountLines(unsigned char *target) {
-    unsigned char *p;
+int MIPS16 CountLines(CombinedPtr target) {
     int cnt;
-
-    p = ProgMemory;
+    CombinedPtr p = ProgMemory;
     if(ProgMemory[0]==1 && ProgMemory[1]==39 && ProgMemory[2]==35)cnt=-1;
     else cnt = 0;
 
@@ -2096,18 +2019,18 @@ routines for storing and manipulating variables
 //      for T_STR a block of memory of MAXSTRLEN size (or size determined by the LENGTH keyword) will be malloc'ed and the pointer stored in the variable slot.
 #ifdef PICOMITEWEB
 #ifdef rp2350
-void MIPS16 __not_in_flash_func(*findvar)(unsigned char *p, int action) {
+void MIPS16 __not_in_flash_func(*findvar)(CombinedPtr p, int action) {
 #else
-void MIPS16 *findvar(unsigned char *p, int action) {
+void MIPS16 *findvar(CombinedPtr p, int action) {
 #endif
 #else
-void MIPS16 __not_in_flash_func(*findvar)(unsigned char *p, int action) {
+void MIPS16 __not_in_flash_func(*findvar)(CombinedPtr p, int action) {
 #endif
     unsigned char name[MAXVARLEN + 1];
     int i=0, j, size, ifree, globalifree, localifree, nbr, vtype, vindex, namelen, tmp;
-    unsigned char *s, *x, u, suffix=0;
+    unsigned char *x, u, suffix=0;
+    CombinedPtr s;
     void *mptr;
-//    int hashIndex=0;
     int GlobalhashIndex, OriginalGlobalHash;
     int LocalhashIndex, OriginalLocalHash;
     uint32_t hash=FNV_offset_basis;
@@ -2116,12 +2039,7 @@ void MIPS16 __not_in_flash_func(*findvar)(unsigned char *p, int action) {
 #endif
 	char  *tp, *ip;
     int dim[MAXDIM]={0}, dnbr;
-//	if(__get_MSP() < (uint32_t)&stackcheck-0x5000){
-//		error("Expression is too complex at depth %",g_LocalIndex);
-//	}
     vtype = dnbr = emptyarray = 0;
-    // first zero the array used for holding the dimension values
-//    for(i = 0; i < MAXDIM; i++) dim[i] = 0;
     ifree = -1;
 
     // check the first char for a legal variable name
@@ -2134,7 +2052,7 @@ void MIPS16 __not_in_flash_func(*findvar)(unsigned char *p, int action) {
 		u=mytoupper(*p++);
 		hash ^= u;
 		hash*=FNV_prime;
-		*s++ = u;
+		s.write_byte(u)++;
 		if(++namelen > MAXVARLEN) error("Variable name too long");
 	} while(isnamechar(*p));
 #ifdef rp2350
@@ -2142,7 +2060,7 @@ void MIPS16 __not_in_flash_func(*findvar)(unsigned char *p, int action) {
 #endif
 	hash %= MAXVARHASH; //scale 0-255
     
-	if(namelen!=MAXVARLEN)*s=0;
+	if(namelen!=MAXVARLEN) s.write_byte(0);
     // check the terminating char and set the type
     if(*p == '$') {
         if((action & T_IMPLIED) && !(action & T_STR)) error("Conflicting variable type");
@@ -2166,7 +2084,7 @@ void MIPS16 __not_in_flash_func(*findvar)(unsigned char *p, int action) {
 
     // check if this is an array
     if(*p == '(') {
-        char *pp = (char *)p + 1;
+        CombinedPtr pp = p + 1;
         skipspace(pp);
         if(action & V_EMPTY_OK && *pp == ')')  {                     // if this is an empty array.  eg  ()
         	emptyarray=1;
@@ -2183,9 +2101,9 @@ void MIPS16 __not_in_flash_func(*findvar)(unsigned char *p, int action) {
             for(i = 0; i < argc; i += 2) {
                 MMFLOAT f;
                 long long int in;
-                char *s;
+                CombinedPtr s;
                 int targ = T_NOTYPE;
-                evaluate(argv[i], &f, &in, (unsigned char **)&s, &targ, false);       // get the value and type of the argument
+                evaluate(argv[i], &f, &in, &s, &targ, false);       // get the value and type of the argument
                 if(targ == T_STR) dnbr = MAXDIM;                    // force an error to be thrown later (with the correct message)
                 if(targ == T_NBR) in = FloatToInt32(f);
                 dim[i/2] = in;
@@ -2565,10 +2483,19 @@ void MIPS16 __not_in_flash_func(*findvar)(unsigned char *p, int action) {
 //   pointer to an integer that will contain (after the function has returned) the number of arguments found
 //   pointer to a string that contains the characters to be used in spliting up the line.  If the first unsigned char of that
 //       string is an opening bracket '(' this function will expect the arg list to be enclosed in brackets.
-void MIPS16 __not_in_flash_func(makeargs)(unsigned char **p, int maxargs, unsigned char *argbuf, unsigned char *argv[], int *argc, unsigned char *delim) {
+extern "C" void makeargs(uint8_t **p, int maxargs, uint8_t *argbuf, uint8_t *argv[], int *argc, uint8_t *delim) {
+    CombinedPtr p2 = *p;
+    CombinedPtr argv2[maxargs];
+    makeargs2(&p2, maxargs, argbuf, argv2, argc, delim);
+    for (int i = 0; i < maxargs; ++i) {
+        argv[i] = argv2[i].raw();
+    }
+    *p = p2.raw();
+}
+void MIPS16 __not_in_flash_func(makeargs2)(CombinedPtr *p, int maxargs, unsigned char *argbuf, CombinedPtr argv[], int *argc, unsigned char *delim) {
     unsigned char *op;
     int inarg, expect_cmd, expect_bracket, then_tkn, else_tkn;
-    unsigned char *tp;
+    CombinedPtr tp;
 
     TestStackOverflow();                                            // throw an error if we have overflowed the PIC32's stack
 
@@ -2850,17 +2777,18 @@ void MIPS16 error(char *msg, ...) {
     if(MMCharPos > 1) MMPrintString("\r\n");
     int line_num = -2;
     if(CurrentLinePtr) {
-        tp = p = (char *)ProgMemory;
+        CombinedPtr tp, p;
+        tp = p = ProgMemory;
         if (Option.LIBRARY_FLASH_SIZE==MAX_PROG_SIZE && CurrentLinePtr < LibMemory+MAX_PROG_SIZE)
-           tp = p = (char *)LibMemory;
+           tp = p = LibMemory;
         //if(*CurrentLinePtr != T_NEWLINE && CurrentLinePtr < ProgMemory + MAX_PROG_SIZE) {
         if(*CurrentLinePtr != T_NEWLINE && ((CurrentLinePtr < ProgMemory + MAX_PROG_SIZE) || (Option.LIBRARY_FLASH_SIZE==MAX_PROG_SIZE && CurrentLinePtr < LibMemory+MAX_PROG_SIZE))) {    
             // normally CurrentLinePtr points to a T_NEWLINE token but in this case it does not
             // so we have to search for the start of the line and set CurrentLinePtr to that
           while(*p != 0xff) {
               while(*p) p++;                                        // look for the zero marking the start of an element
-              if(p >= (char *)CurrentLinePtr || p[1] == 0) {                // the previous line was the one that we wanted
-                  CurrentLinePtr = (unsigned char *)tp;
+              if(p >= CurrentLinePtr || p[1] == 0) {                // the previous line was the one that we wanted
+                  CurrentLinePtr = tp;
                   break;
                 }
               if(p[1] == T_NEWLINE) {
@@ -2875,7 +2803,7 @@ void MIPS16 error(char *msg, ...) {
        // we now have CurrentLinePtr pointing to the start of the line
 //        dump(CurrentLinePtr, 80);
         llist(tknbuf, CurrentLinePtr);
-        p = (char *) tknbuf;
+        p = tknbuf;
         skipspace(p);
         if(CurrentLinePtr >= ProgMemory && CurrentLinePtr < ProgMemory + MAX_PROG_SIZE){
             line_num = CountLines(CurrentLinePtr);
@@ -3363,8 +3291,8 @@ int GetTokenValue (unsigned char *n) {
 
 
 // skip to the end of a variable
-unsigned char MIPS16 __not_in_flash_func(*skipvar)(unsigned char *p, int noerror) {
-    unsigned char *pp, *tp;
+CombinedPtr MIPS16 __not_in_flash_func(skipvar)(CombinedPtr p, int noerror) {
+    CombinedPtr tp, pp;
     int i;
     int inquote = false;
 
@@ -3417,7 +3345,7 @@ unsigned char MIPS16 __not_in_flash_func(*skipvar)(unsigned char *p, int noerror
 
 
 // skip to the end of an expression (terminates on null, comma, comment or unpaired ')'
-unsigned char __not_in_flash_func(*skipexpression)(unsigned char *p) {
+CombinedPtr __not_in_flash_func(skipexpression)(CombinedPtr p) {
     int i, inquote;
 
     for(i = inquote = 0; *p; p++) {
@@ -3438,7 +3366,7 @@ unsigned char __not_in_flash_func(*skipexpression)(unsigned char *p) {
 // CLine is a pointer to a char pointer which in turn points to the start of the current line for error reporting (if NULL it will be ignored)
 // EOFMsg is the error message to use if the end of the program is reached
 // returns a pointer to the next command
-unsigned char __not_in_flash_func(*GetNextCommand)(unsigned char *p, unsigned char **CLine, unsigned char *EOFMsg) {
+CombinedPtr __not_in_flash_func(GetNextCommand)(CombinedPtr p, CombinedPtr *CLine, unsigned char *EOFMsg) {
     do {
         if(*p != T_NEWLINE) {                                       // if we are not already at the start of a line
             while(*p) p++;                                          // look for the zero marking the start of an element
@@ -3467,7 +3395,7 @@ unsigned char __not_in_flash_func(*GetNextCommand)(unsigned char *p, unsigned ch
 // scans text looking for the matching closing bracket
 // it will handle nested strings, brackets and functions
 // it expects to be called pointing at the opening bracket or a function token
-unsigned char __not_in_flash_func(*getclosebracket)(unsigned char *p) {
+CombinedPtr __not_in_flash_func(getclosebracket)(CombinedPtr p) {
     int i = 0;
     int inquote = false;
 
@@ -3486,7 +3414,7 @@ unsigned char __not_in_flash_func(*getclosebracket)(unsigned char *p) {
 
 // check that there is no excess text following an element
 // will skip spaces and abort if a zero char is not found
-void __not_in_flash_func(checkend)(unsigned char *p) {
+void __not_in_flash_func(checkend)(CombinedPtr p) {
     skipspace(p);
     if(*p == '\'') return;
     if(*p)
@@ -3494,25 +3422,9 @@ void __not_in_flash_func(checkend)(unsigned char *p) {
 }
 
 
-// check if the next text in an element (a basic statement) corresponds to an alpha string
-// leading whitespace is skipped and the string must be terminated with a valid terminating
-// character. Returns a pointer to the end of the string if found or NULL is not
-unsigned char __not_in_flash_func(*checkstring)(unsigned char *p, unsigned char *tkn) {
-    skipspace(p);                                           // skip leading spaces
-    while(*tkn && (mytoupper(*tkn) == mytoupper(*p))) { tkn++; p++; }   // compare the strings
-//    if(*tkn == 0 && (*p == (unsigned char)' ' || *p == (unsigned char)',' || *p == (unsigned char)'\'' || *p == 0 || *p == (unsigned char)'('  || *p == (unsigned char)'=')) {
-    if(*tkn == 0 && !isnamechar(*p)){
-        skipspace(p);
-        return p;                                                   // if successful return a pointer to the next non space character after the matched string
-    }
-    return NULL;                                                    // or NULL if not
-}
-
 /********************************************************************************************************************************************
 A couple of I/O routines that do not belong anywhere else
 *********************************************************************************************************************************************/
-
-
 
 
 
@@ -3555,12 +3467,12 @@ unsigned char __not_in_flash_func(*CtoM)(unsigned char *p) {
 
 // copy a MMBasic string to a new location
 #ifdef rp2350
-void __not_in_flash_func(Mstrcpy)(unsigned char *dest, unsigned char *src) {
+void __not_in_flash_func(Mstrcpy)(unsigned char *dest, CombinedPtr src) {
  #else
 #ifdef PICOMITEVGA
-void Mstrcpy(unsigned char *dest, unsigned char *src) {
+void Mstrcpy(unsigned char *dest, CombinedPtr src) {
  #else
-void __not_in_flash_func(Mstrcpy)(unsigned char *dest, unsigned char *src) {
+void __not_in_flash_func(Mstrcpy)(unsigned char *dest, CombinedPtr src) {
 #endif
 #endif
    int i;
@@ -3571,7 +3483,7 @@ void __not_in_flash_func(Mstrcpy)(unsigned char *dest, unsigned char *src) {
 
 
 // concatenate two MMBasic strings
-void Mstrcat(unsigned char *dest, unsigned char *src) {
+void Mstrcat(unsigned char *dest, CombinedPtr src) {
     int i;
     i = *src;
     *dest += i;
@@ -3583,9 +3495,9 @@ void Mstrcat(unsigned char *dest, unsigned char *src) {
 
 // compare two MMBasic style strings
 // returns 1 if s1 > s2  or  0 if s1 = s2  or  -1 if s1 < s2
-int Mstrcmp(unsigned char *s1, unsigned char *s2) {
+int Mstrcmp(CombinedPtr s1, CombinedPtr  s2) {
     register int i;
-    register unsigned char *p1, *p2;
+    CombinedPtr p1, p2;
 
     // get the smaller length
     i = *s1 < *s2 ? *s1 : *s2;
@@ -3737,5 +3649,30 @@ int __not_in_flash_func(mem_equal)(unsigned char *s1, unsigned char *s2, int i) 
     return 1;
 }
 
+///}
+
+// check if the next text in an element (a basic statement) corresponds to an alpha string
+// leading whitespace is skipped and the string must be terminated with a valid terminating
+// character. Returns a pointer to the end of the string if found or NULL is not
+uint8_t* checkstring(uint8_t* p, unsigned char *tkn) {
+    skipspace(p);                                           // skip leading spaces
+    while(*tkn && (mytoupper(*tkn) == mytoupper(*p))) { tkn++; p++; }   // compare the strings
+    if(*tkn == 0 && !isnamechar(*p)){
+        skipspace(p);
+        return p;                                                   // if successful return a pointer to the next non space character after the matched string
+    }
+    return NULL;                                                    // or NULL if not
 }
+
+// C++ version
+CombinedPtr checkstring(CombinedPtr p, unsigned char *tkn) {
+    skipspace(p);                                           // skip leading spaces
+    while(*tkn && (mytoupper(*tkn) == mytoupper(*p))) { tkn++; p++; }   // compare the strings
+    if(*tkn == 0 && !isnamechar(*p)){
+        skipspace(p);
+        return p;                                                   // if successful return a pointer to the next non space character after the matched string
+    }
+    return CombinedPtr();                                           // or NULL if not
+}
+
 /*  @endcond */

@@ -48,7 +48,6 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 
     extern unsigned char *InterruptReturn;
     extern int check_interrupt(void);
-    extern unsigned char *GetIntAddress(unsigned char *p);
     extern void CrunchData(unsigned char **p, int c);
 	extern uint32_t getFreeHeap(void);
     // struct for the interrupt configuration

@@ -30,23 +30,27 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 
 #if !defined(INCLUDE_COMMAND_TABLE) && !defined(INCLUDE_TOKEN_TABLE)
 
+#ifdef __cplusplus
+#include "PicoMite.h"
+#ifdef rp2350
+extern int parsenumberarray(CombinedPtr tp, MMFLOAT **a1float, int64_t **a1int, int argno, int dimensions, int *dims, bool ConstantNotAllowed);
+extern int parsefloatrarray(CombinedPtr tp, MMFLOAT **a1float, int argno, int dimensions, int *dims, bool ConstantNotAllowed);
+extern int parseintegerarray(CombinedPtr tp, int64_t **a1int, int argno, int dimensions, int *dims, bool ConstantNotAllowed);
+extern int parsestringarray(CombinedPtr tp, unsigned char **a1str, int argno, int dimensions, int *dims, bool ConstantNotAllowed, unsigned char *length);
+#else
+extern int parsenumberarray(CombinedPtr tp, MMFLOAT **a1float, int64_t **a1int, int argno, short dimensions, short *dims, bool ConstantNotAllowed);
+extern int parsefloatrarray(CombinedPtr tp, MMFLOAT **a1float, int argno, int dimensions, short *dims, bool ConstantNotAllowed);
+extern int parseintegerarray(CombinedPtr tp, int64_t **a1int, int argno, int dimensions, short *dims, bool ConstantNotAllowed);
+extern int parsestringarray(CombinedPtr tp, unsigned char **a1str, int argno, int dimensions, short *dims, bool ConstantNotAllowed, unsigned char *length);
+#endif
+extern int parseany(CombinedPtr tp, MMFLOAT **a1float, int64_t **a1int, unsigned char ** a1str, int *length, bool stringarray);
+extern void cmd_SensorFusion(CombinedPtr passcmdline);
 
+extern "C" {
+#endif
 // General definitions used by other modules
 extern void Q_Mult(MMFLOAT *q1, MMFLOAT *q2, MMFLOAT *n);
 extern void Q_Invert(MMFLOAT *q, MMFLOAT *n);
-extern void cmd_SensorFusion(char *passcmdline);
-#ifdef rp2350
-extern int parsenumberarray(unsigned char *tp, MMFLOAT **a1float, int64_t **a1int, int argno, int dimensions, int *dims, bool ConstantNotAllowed);
-extern int parsefloatrarray(unsigned char *tp, MMFLOAT **a1float, int argno, int dimensions, int *dims, bool ConstantNotAllowed);
-extern int parseintegerarray(unsigned char *tp, int64_t **a1int, int argno, int dimensions, int *dims, bool ConstantNotAllowed);
-extern int parsestringarray(unsigned char *tp, unsigned char **a1str, int argno, int dimensions, int *dims, bool ConstantNotAllowed, unsigned char *length);
-#else
-extern int parsenumberarray(unsigned char *tp, MMFLOAT **a1float, int64_t **a1int, int argno, short dimensions, short *dims, bool ConstantNotAllowed);
-extern int parsefloatrarray(unsigned char *tp, MMFLOAT **a1float, int argno, int dimensions, short *dims, bool ConstantNotAllowed);
-extern int parseintegerarray(unsigned char *tp, int64_t **a1int, int argno, int dimensions, short *dims, bool ConstantNotAllowed);
-extern int parsestringarray(unsigned char *tp, unsigned char **a1str, int argno, int dimensions, short *dims, bool ConstantNotAllowed, unsigned char *length);
-#endif
-extern int parseany(unsigned char *tp, MMFLOAT **a1float, int64_t **a1int, unsigned char ** a1str, int *length, bool stringarray);
 void MahonyQuaternionUpdate(MMFLOAT ax, MMFLOAT ay, MMFLOAT az, MMFLOAT gx, MMFLOAT gy, MMFLOAT gz, MMFLOAT mx, MMFLOAT my, MMFLOAT mz, MMFLOAT Ki, MMFLOAT Kp, MMFLOAT deltat, MMFLOAT *yaw, MMFLOAT *pitch, MMFLOAT *roll);
 void MadgwickQuaternionUpdate(MMFLOAT ax, MMFLOAT ay, MMFLOAT az, MMFLOAT gx, MMFLOAT gy, MMFLOAT gz, MMFLOAT mx, MMFLOAT my, MMFLOAT mz, MMFLOAT beta, MMFLOAT deltat, MMFLOAT *pitch, MMFLOAT *yaw, MMFLOAT *roll);
 extern volatile unsigned int AHRSTimer;
@@ -145,6 +149,13 @@ extern s_PIDchan PIDchannels[MAXPID+1];
 
 MMFLOAT PIDController_Update(PIDController *pid, MMFLOAT setpoint, MMFLOAT measurement);
 
-
+typedef struct cplx {
+	double real;
+	double img;
+} cplx;
+extern bool Fft_transformRadix2(cplx* vec, size_t n, bool inverse);
+#ifdef __cplusplus
+}
+#endif
 #endif
 /*  @endcond */

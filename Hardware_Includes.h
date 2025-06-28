@@ -51,7 +51,9 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 extern int MMerrno;
 //extern int ListCnt;
 extern int MMCharPos;
-extern unsigned char *StartEditPoint;
+#ifdef __cplusplus
+extern CombinedPtr StartEditPoint;
+#endif
 extern int StartEditChar;
 extern int OptionErrorSkip;
 extern int ExitMMBasicFlag;
