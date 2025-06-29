@@ -67,11 +67,11 @@ add_executable(PicoMite
 	MATHSC.c
 	Onewire.cpp
 	I2C.cpp
-	SPI.c
-	Serial.c
+	SPI.cpp
+	Serial.cpp
 	SPI-LCD.c
 	BmpDecoder.c
-	GPS.c
+	GPS.cpp
 	Audio.cpp
 	CFunction.cpp
     picojpeg.c 
@@ -117,8 +117,8 @@ if (COMPILE STREQUAL "VGAUSB" OR COMPILE STREQUAL "PICOUSBRP2350" OR COMPILE STR
 	)
 else()
 	target_sources(PicoMite PRIVATE 
-	Keyboard.c 
-	mouse.c
+	Keyboard.cpp
+	mouse.cpp
 	)
 endif()
 

@@ -208,7 +208,6 @@ extern void InitSDCARD(void);
 extern void InitReservedIO(void);
 extern char SerialConsolePutC(char c, int flush);
 extern void CallExecuteProgram(char *p);
-extern long long int *GetReceiveDataBuffer(unsigned char *p, unsigned int *nbr);
 extern int ticks_per_second;
 extern volatile unsigned int GPSTimer;
 extern uint16_t AUDIO_L_PIN, AUDIO_R_PIN, AUDIO_SLICE;

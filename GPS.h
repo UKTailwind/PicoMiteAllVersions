@@ -34,13 +34,17 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 // General definitions used by other modules        
 #ifndef MINMEA_H
 #define MINMEA_H
- 
-        
+
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <errno.h>
 #include <time.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+        
 //#include <math.h>
 #define YEAR0           1900                    /* the first year */
 #define EPOCH_YR        1970            /* EPOCH = Jan 1 1970 00:00:00 */
@@ -265,7 +269,9 @@ int minmea_gettime(struct timespec *ts, const struct minmea_date *date, const st
  * Rescale a fixed-point value to a different scale. Rounds towards zero.
  */
 
-
+#ifdef __cplusplus
+}
+#endif
 
 
 #endif /* MINMEA_H */

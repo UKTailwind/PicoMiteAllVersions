@@ -1539,9 +1539,9 @@ void RestoreContext(bool keep){
 		p+=sizeof(g_forindex);
 		memcpy(&g_doindex, p, sizeof(g_doindex));
 		p+=sizeof(g_doindex);
-		memcpy(g_forstack, p, sizeof(struct s_forstack)*MAXFORLOOPS);
+		memcpy((void*)g_forstack, p, sizeof(struct s_forstack)*MAXFORLOOPS);
 		p+=sizeof(struct s_forstack)*MAXFORLOOPS;
-		memcpy(g_dostack, p, sizeof(struct s_dostack)*MAXDOLOOPS);
+		memcpy((void*)g_dostack, p, sizeof(struct s_dostack)*MAXDOLOOPS);
 		p+=sizeof(struct s_dostack)*MAXDOLOOPS;
 		memcpy(g_vartbl, p, sizeof(struct s_vartbl)*MAXVARS);
 		p+=sizeof(struct s_vartbl)*MAXVARS;

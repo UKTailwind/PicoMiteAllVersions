@@ -29,8 +29,6 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #ifndef __MMBASIC_H
 #define __MMBASIC_H
 
-#include "PicoMite.h"
-
 #include <stdlib.h>
 #include <setjmp.h>
 #include <string.h>
@@ -46,6 +44,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "configuration.h"                          // memory configuration defines for the particular hardware this is running on
 
 #ifdef __cplusplus
+#include "PicoMite.h"
 extern "C" {
 int CheckEmpty(CombinedPtr p);
 void MMfputs(CombinedPtr p, int filenbr);
@@ -138,7 +137,6 @@ struct s_funtbl {
 	uint32_t index;
 };
 
-extern struct s_funtbl funtbl[MAXSUBFUN];
 typedef struct s_vartbl {                               // structure of the variable table
 	unsigned char name[MAXVARLEN];                       // variable's name
 	unsigned char type;                                  // its type (T_NUM, T_INT or T_STR)
@@ -322,14 +320,9 @@ extern unsigned char *ModuleTable[MAXMODULES];           // list of pointers to 
 extern int NbrModules;                          // the number of library modules currently loaded
 #endif
 
-#if defined(__PIC32MX__)
-inline int str_equal(const unsigned char *s1, const unsigned char *s2);
-#else
 void IntToStrPad(char *p, long long int nbr, signed char padch, int maxch, int radix);
 void IntToStr(char *strr, long long int nbr, unsigned int base);
 void FloatToStr(char *p, MMFLOAT f, int m, int n, unsigned char ch);
-int str_equal(const unsigned char *s1, const unsigned char *s2);
-#endif
 int mem_equal(unsigned char *s1, unsigned char *s2, int i);
 extern int emptyarray;
 typedef uint16_t CommandToken;
@@ -341,6 +334,13 @@ CombinedPtr checkstring(CombinedPtr p, unsigned char *tkn);
 uint8_t* checkstring(uint8_t* p, unsigned char *tkn);
 #else
 void makeargs(uint8_t **tp, int maxargs, uint8_t *argbuf, uint8_t *argv[], int *argc, uint8_t *delim);
+
+#if defined(__PIC32MX__)
+inline int str_equal(const unsigned char *s1, const unsigned char *s2);
+#else
+int str_equal(const unsigned char *s1, const unsigned char *s2);
+#endif
+
 #endif
 
 

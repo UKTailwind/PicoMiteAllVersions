@@ -257,7 +257,7 @@ bool Fft_transformRadix2(cplx vec[], size_t n, bool inverse) {
 	// Trigonometric tables
 	if (SIZE_MAX / sizeof(double complex) < n / 2)
 		return false;
-	double complex *exptable = GetMemory((n / 2) * sizeof(double complex));
+	double complex *exptable = (double complex *)GetMemory((n / 2) * sizeof(double complex));
 	if (exptable == NULL)
 		return false;
 	for (size_t i = 0; i < n / 2; i++)

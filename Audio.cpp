@@ -33,8 +33,6 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  */
 #include <cstring>
 
-extern "C" {
-
 #include <stdio.h>
 #include <stdbool.h>                                // Pascal
 #include <stdint.h>                                 // Pascal
@@ -44,6 +42,9 @@ extern "C" {
 #include "hardware/flash.h"
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
+
+extern "C" {
+
 #define DRWAV_COPY_MEMORY(dst, src, sz) memcpy((dst), (src), (sz))
 #define DR_WAV_IMPLEMENTATION
 #define DR_WAV_NO_SIMD

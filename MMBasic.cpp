@@ -30,18 +30,6 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "PicoMite.h"
 #include "MMBasic.h"
 
-CombinedPtr subfun[MAXSUBFUN];                                      // table used to locate all subroutines and functions
-CombinedPtr LibMemory;                                           //This is where the library is stored. At the last flash slot (4)
-CombinedPtr ProgMemory;                                                      // program memory, this is where the program is stored
-CombinedPtr NextDataLine;                                                 // used to track the next line to read in DATA & READ stmts
-CombinedPtr ep;                                                     // pointer to the argument to the function terminated with a zero byte.
-CombinedPtr cmdline;                                                      // Command line terminated with a zero unsigned char and trimmed of spaces
-CombinedPtr nextstmt;                                                     // Pointer to the next statement to be executed.
-CombinedPtr CurrentLinePtr, SaveCurrentLinePtr;                           // Pointer to the current line (used in error reporting)
-CombinedPtr ContinuePoint;                                                // Where to continue from if using the continue statement
-                                                                     // it is NOT trimmed of spaces
-///extern "C" {
-
 #include <stdio.h>
 #include <limits.h>
 #include <stdarg.h>
@@ -56,6 +44,17 @@ CombinedPtr ContinuePoint;                                                // Whe
 #include "pico/multicore.h"
 #endif
 
+extern "C" {
+CombinedPtr subfun[MAXSUBFUN];                                      // table used to locate all subroutines and functions
+CombinedPtr LibMemory;                                           //This is where the library is stored. At the last flash slot (4)
+CombinedPtr ProgMemory;                                                      // program memory, this is where the program is stored
+CombinedPtr NextDataLine;                                                 // used to track the next line to read in DATA & READ stmts
+CombinedPtr ep;                                                     // pointer to the argument to the function terminated with a zero byte.
+CombinedPtr cmdline;                                                      // Command line terminated with a zero unsigned char and trimmed of spaces
+CombinedPtr nextstmt;                                                     // Pointer to the next statement to be executed.
+CombinedPtr CurrentLinePtr, SaveCurrentLinePtr;                           // Pointer to the current line (used in error reporting)
+CombinedPtr ContinuePoint;                                                // Where to continue from if using the continue statement
+                                                                    // it is NOT trimmed of spaces
 static inline CommandToken commandtbl_decode(CombinedPtr& p){
     return ((CommandToken)(p[0] & 0x7f)) | ((CommandToken)(p[1] & 0x7f)<<7);
 }
@@ -1276,7 +1275,7 @@ CombinedPtr MIPS16 __not_in_flash_func(evaluate)(CombinedPtr p, MMFLOAT *fa, lon
 
 
 // evaluate an expression to get a number
-MMFLOAT __not_in_flash_func(getnumber)(unsigned char *p) {
+MMFLOAT __not_in_flash_func(getnumber)(CombinedPtr p) {
     int t = T_NBR;
     MMFLOAT f;
     long long int  i64;
@@ -2483,7 +2482,7 @@ void MIPS16 __not_in_flash_func(*findvar)(CombinedPtr p, int action) {
 //   pointer to an integer that will contain (after the function has returned) the number of arguments found
 //   pointer to a string that contains the characters to be used in spliting up the line.  If the first unsigned char of that
 //       string is an opening bracket '(' this function will expect the arg list to be enclosed in brackets.
-extern "C" void makeargs(uint8_t **p, int maxargs, uint8_t *argbuf, uint8_t *argv[], int *argc, uint8_t *delim) {
+void makeargs(uint8_t **p, int maxargs, uint8_t *argbuf, uint8_t *argv[], int *argc, uint8_t *delim) {
     CombinedPtr p2 = *p;
     CombinedPtr argv2[maxargs];
     makeargs2(&p2, maxargs, argbuf, argv2, argc, delim);
@@ -2492,115 +2491,6 @@ extern "C" void makeargs(uint8_t **p, int maxargs, uint8_t *argbuf, uint8_t *arg
     }
     *p = p2.raw();
 }
-void MIPS16 __not_in_flash_func(makeargs2)(CombinedPtr *p, int maxargs, unsigned char *argbuf, CombinedPtr argv[], int *argc, unsigned char *delim) {
-    unsigned char *op;
-    int inarg, expect_cmd, expect_bracket, then_tkn, else_tkn;
-    CombinedPtr tp;
-
-    TestStackOverflow();                                            // throw an error if we have overflowed the PIC32's stack
-
-    tp = *p;
-    op = argbuf;
-    *argc = 0;
-    inarg = false;
-    expect_cmd = false;
-    expect_bracket = false;
-    then_tkn = tokenTHEN;
-    else_tkn = tokenELSE;
-
-    // skip leading spaces
-    while(*tp == ' ') tp++;
-
-    // check if we are processing a list enclosed in brackets and if so
-    //  - skip the opening bracket
-    //  - flag that a closing bracket should be found
-    if(*delim == '(') {
-        if(*tp != '(')
-            error("Syntax");
-        expect_bracket = true;
-        delim++;
-        tp++;
-    }
-
-    // the main processing loop
-    while(*tp) {
-
-        if(expect_bracket == true && *tp == ')') break;
-
-        // comment char causes the rest of the line to be skipped
-        if(*tp == '\'') {
-            break;
-        }
-
-        // the special characters that cause the line to be split up are in the string delim
-        // any other chars form part of the one argument
-        if(strchr((char *)delim, (char)*tp) != NULL && !expect_cmd) {
-            if(*tp == then_tkn || *tp == else_tkn) expect_cmd = true;
-            if(inarg) {                                             // if we have been processing an argument
-                while(op > argbuf && *(op - 1) == ' ') op--;        // trim trailing spaces
-                *op++ = 0;                                          // terminate it
-            } else if(*argc) {                                      // otherwise we have two delimiters in a row (except for the first argument)
-                argv[(*argc)++] = op;                               // create a null argument to go between the two delimiters
-                *op++ = 0;                                          // and terminate it
-            }
-
-            inarg = false;
-            if(*argc >= maxargs) error("Syntax");
-            argv[(*argc)++] = op;                                   // save the pointer for this delimiter
-            *op++ = *tp++;                                          // copy the token or char (always one)
-            *op++ = 0;                                              // terminate it
-            continue;
-        }
-
-        // check if we have a THEN or ELSE token and if so flag that a command should be next
-        if(*tp == then_tkn || *tp == else_tkn) expect_cmd = true;
-
-
-        // remove all spaces (outside of quoted text and bracketed text)
-        if(!inarg && *tp == ' ') {
-            tp++;
-            continue;
-        }
-
-        // not a special char so we must start a new argument
-        if(!inarg) {
-            if(*argc >= maxargs) error("Syntax");
-            argv[(*argc)++] = op;                                   // save the pointer for this arg
-            inarg = true;
-        }
-
-        // if an opening bracket '(' copy everything until we hit the matching closing bracket
-        // this includes special characters such as , and ; and keeps track of any nested brackets
-        if(*tp == '(' || ((tokentype(*tp) & T_FUN) && !expect_cmd)) {
-            int x;
-            x = (getclosebracket(tp) - tp) + 1;
-            memcpy(op, tp, x);
-            op += x; tp += x;
-            continue;
-        }
-
-        // if quote mark (") copy everything until the closing quote
-        // this includes special characters such as , and ;
-        // the tokenise() function will have ensured that the closing quote is always there
-        if(*tp == '"') {
-            do {
-                *op++ = *tp++;
-                if(*tp == 0) error("Syntax");
-            } while(*tp != '"');
-            *op++ = *tp++;
-            continue;
-        }
-
-        // anything else is just copied into the argument
-        *op++ = *tp++;
-        if(expect_cmd)*op++ = *tp++; //copy rest of command token
-        expect_cmd = false;
-    }
-    if(expect_bracket && *tp != ')') error("Syntax");
-    while(op - 1 > argbuf && *(op-1) == ' ') --op;                  // trim any trailing spaces on the last argument
-    *op = 0;                                                        // terminate the last argument
-}
-
 
 static void MIPS16 display_string(const char *s, bool fill) {
     // Indent each line by one space.
@@ -3649,7 +3539,7 @@ int __not_in_flash_func(mem_equal)(unsigned char *s1, unsigned char *s2, int i) 
     return 1;
 }
 
-///}
+}
 
 // check if the next text in an element (a basic statement) corresponds to an alpha string
 // leading whitespace is skipped and the string must be terminated with a valid terminating
@@ -3673,6 +3563,115 @@ CombinedPtr checkstring(CombinedPtr p, unsigned char *tkn) {
         return p;                                                   // if successful return a pointer to the next non space character after the matched string
     }
     return CombinedPtr();                                           // or NULL if not
+}
+
+void MIPS16 __not_in_flash_func(makeargs2)(CombinedPtr *p, int maxargs, unsigned char *argbuf, CombinedPtr argv[], int *argc, unsigned char *delim) {
+    unsigned char *op;
+    int inarg, expect_cmd, expect_bracket, then_tkn, else_tkn;
+    CombinedPtr tp;
+
+    TestStackOverflow();                                            // throw an error if we have overflowed the PIC32's stack
+
+    tp = *p;
+    op = argbuf;
+    *argc = 0;
+    inarg = false;
+    expect_cmd = false;
+    expect_bracket = false;
+    then_tkn = tokenTHEN;
+    else_tkn = tokenELSE;
+
+    // skip leading spaces
+    while(*tp == ' ') tp++;
+
+    // check if we are processing a list enclosed in brackets and if so
+    //  - skip the opening bracket
+    //  - flag that a closing bracket should be found
+    if(*delim == '(') {
+        if(*tp != '(')
+            error("Syntax");
+        expect_bracket = true;
+        delim++;
+        tp++;
+    }
+
+    // the main processing loop
+    while(*tp) {
+
+        if(expect_bracket == true && *tp == ')') break;
+
+        // comment char causes the rest of the line to be skipped
+        if(*tp == '\'') {
+            break;
+        }
+
+        // the special characters that cause the line to be split up are in the string delim
+        // any other chars form part of the one argument
+        if(strchr((char *)delim, (char)*tp) != NULL && !expect_cmd) {
+            if(*tp == then_tkn || *tp == else_tkn) expect_cmd = true;
+            if(inarg) {                                             // if we have been processing an argument
+                while(op > argbuf && *(op - 1) == ' ') op--;        // trim trailing spaces
+                *op++ = 0;                                          // terminate it
+            } else if(*argc) {                                      // otherwise we have two delimiters in a row (except for the first argument)
+                argv[(*argc)++] = op;                               // create a null argument to go between the two delimiters
+                *op++ = 0;                                          // and terminate it
+            }
+
+            inarg = false;
+            if(*argc >= maxargs) error("Syntax");
+            argv[(*argc)++] = op;                                   // save the pointer for this delimiter
+            *op++ = *tp++;                                          // copy the token or char (always one)
+            *op++ = 0;                                              // terminate it
+            continue;
+        }
+
+        // check if we have a THEN or ELSE token and if so flag that a command should be next
+        if(*tp == then_tkn || *tp == else_tkn) expect_cmd = true;
+
+
+        // remove all spaces (outside of quoted text and bracketed text)
+        if(!inarg && *tp == ' ') {
+            tp++;
+            continue;
+        }
+
+        // not a special char so we must start a new argument
+        if(!inarg) {
+            if(*argc >= maxargs) error("Syntax");
+            argv[(*argc)++] = op;                                   // save the pointer for this arg
+            inarg = true;
+        }
+
+        // if an opening bracket '(' copy everything until we hit the matching closing bracket
+        // this includes special characters such as , and ; and keeps track of any nested brackets
+        if(*tp == '(' || ((tokentype(*tp) & T_FUN) && !expect_cmd)) {
+            int x;
+            x = (getclosebracket(tp) - tp) + 1;
+            memcpy(op, tp, x);
+            op += x; tp += x;
+            continue;
+        }
+
+        // if quote mark (") copy everything until the closing quote
+        // this includes special characters such as , and ;
+        // the tokenise() function will have ensured that the closing quote is always there
+        if(*tp == '"') {
+            do {
+                *op++ = *tp++;
+                if(*tp == 0) error("Syntax");
+            } while(*tp != '"');
+            *op++ = *tp++;
+            continue;
+        }
+
+        // anything else is just copied into the argument
+        *op++ = *tp++;
+        if(expect_cmd)*op++ = *tp++; //copy rest of command token
+        expect_cmd = false;
+    }
+    if(expect_bracket && *tp != ')') error("Syntax");
+    while(op - 1 > argbuf && *(op-1) == ' ') --op;                  // trim any trailing spaces on the last argument
+    *op = 0;                                                        // terminate the last argument
 }
 
 /*  @endcond */

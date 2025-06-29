@@ -6025,11 +6025,11 @@ int checkdetailinterrupts(void) {
 
     // interrupt routines for the serial ports
     if(com1_interrupt != nullptr && SerialRxStatus(1) >= com1_ilevel) {// do we need to interrupt?
-        intaddr = CombinedPtr(com1_interrupt);                                   // set the next stmt to the interrupt location
+        intaddr = com1_interrupt;                                   // set the next stmt to the interrupt location
         goto GotAnInterrupt;
     }
     if(com2_interrupt != nullptr && SerialRxStatus(2) >= com2_ilevel) {// do we need to interrupt?
-        intaddr = CombinedPtr(com2_interrupt);                                   // set the next stmt to the interrupt location
+        intaddr = com2_interrupt;                                   // set the next stmt to the interrupt location
         goto GotAnInterrupt;
     }
     if(IrGotMsg && IrInterrupt.raw() != nullptr) {
