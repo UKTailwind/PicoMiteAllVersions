@@ -3169,26 +3169,15 @@ int GetCommandValue( unsigned char *n) {
 }
 
 
-
 // find the value of a token given its name
 int GetTokenValue (unsigned char *n) {
+    /**
     FIL f;
     f_open(&f, "/tmp/tt", FA_CREATE_ALWAYS | FA_WRITE | FA_OPEN_APPEND);
     UINT wr;
     f_write(&f, n, strlen(n), &wr);
     f_write(&f, ".", 1, &wr);
     f_close(&f);
-    for(int i = 0; i < TokenTableSize - 1; i++) {
-        f_open(&f, "/tmp/tt", FA_WRITE | FA_OPEN_APPEND);
-        f_write(&f, tokentbl[i].name, strlen(tokentbl[i].name), &wr);
-        f_write(&f, ".", 1, &wr);
-        f_close(&f);
-
-//        if(str_equal(n, tokentbl[i].name)) {
-        if(strcmp((char*)n, (char*)tokentbl[i].name) == 0) {
-            return i + C_BASETOKEN;
-        }
-    }
     gpio_init(PICO_DEFAULT_LED_PIN);
     gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
     for (int i = 0; i < 6; i++) {
@@ -3197,11 +3186,13 @@ int GetTokenValue (unsigned char *n) {
         sleep_ms(23);
         gpio_put(PICO_DEFAULT_LED_PIN, false);
     }
-    f_open(&f, "/tmp/tt", FA_WRITE | FA_OPEN_APPEND);
-    f_write(&f, n, strlen(n), &wr);
-    f_write(&f, "\n", 1, &wr);
-    f_close(&f);
-
+    */
+    for(int i = 0; i < TokenTableSize - 1; i++) {
+        if(str_equal(n, tokentbl[i].name)) {
+//        if(strcmp((char*)n, (char*)tokentbl[i].name) == 0) {
+            return i + C_BASETOKEN;
+        }
+    }
     error("Internal fault 4(sorry)");
     return 0;
 }
@@ -3435,7 +3426,7 @@ int Mstrcmp(CombinedPtr s1, CombinedPtr  s2) {
     return 0;
 }
 
-
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // these library functions went missing in the PIC32 C compiler ver 1.12 and later
@@ -3496,6 +3487,7 @@ static unsigned char charmap[] = {
     0xf8, 0xf9, 0xfa, 0xfb, 0xfc, 0xfd, 0xfe, 0xff,
 };
 
+extern "C" {
 
 /*
  *----------------------------------------------------------------------
@@ -3515,18 +3507,28 @@ static unsigned char charmap[] = {
  *----------------------------------------------------------------------
  */
 
+int mystrncasecmp(
+    CombinedPtr s1, CombinedPtr s2,
+    size_t  length)      /* Maximum number of characters to compare
+                         * (stop earlier if the end of either string
+                         * is reached). */
+{
+    register unsigned char u1, u2;
 
-int mystrncasecmp(CombinedPtr s1, CombinedPtr s2, size_t length) {
     for (; length != 0; length--, s1++, s2++) {
-        unsigned char u1 = *s1;
-        unsigned char u2 = *s2;
-        if (charmap[u1] != charmap[u2])
+        u1 = (unsigned char) *s1;
+        u2 = (unsigned char) *s2;
+        if (charmap[u1] != charmap[u2]) {
             return charmap[u1] - charmap[u2];
-        if (u1 == '\0')
+        }
+        if (u1 == '\0') {
             return 0;
+        }
     }
     return 0;
 }
+
+
 
 // Compare two strings, ignoring case differences.
 // Returns true if the strings are equal (ignoring case) otherwise returns false.
@@ -3534,27 +3536,53 @@ int mystrncasecmp(CombinedPtr s1, CombinedPtr s2, size_t length) {
 inline
 #endif
 int __not_in_flash_func(str_equal)(const unsigned char *s1, const unsigned char *s2) {
-    if (!s1 || !s2) return 0;
-
-    for (; ; s1++, s2++) {
-        if (*s1 == '\0' && *s2 == '\0') return 1;
-        if (*s1 == '\0' || *s2 == '\0') return 0;
-        if (charmap[*s1] != charmap[*s2]) return 0;
+    unsigned char u1, u2;
+    u1 = charmap[*(unsigned char *)s1];
+    u2 = charmap[*(unsigned char *)s2];
+    if(u1 != u2) return 0;
+    for ( ; ; ) {
+        if(*s2 == '\0') {
+            return *s1 == '\0';
+        }
+        s1++; s2++;
+        u1 = charmap[*(unsigned char *)s1];
+        u2 = charmap[*(unsigned char *)s2];
+        if(u1 != u2) {
+            return 0;
+        }
     }
+    return 0;
 }
-
+bool str_equal2(CombinedPtr s1, const unsigned char* s2) {
+    unsigned char u1, u2;
+    u1 = charmap[*s1];
+    u2 = charmap[*(unsigned char *)s2];
+    if(u1 != u2) return 0;
+    for ( ; ; ) {
+        if(*s2 == '\0') {
+            return *s1 == '\0';
+        }
+        s1++; s2++;
+        u1 = charmap[*s1];
+        u2 = charmap[*(unsigned char *)s2];
+        if(u1 != u2) {
+            return 0;
+        }
+    }
+    return 0;
+}
 
 // Compare two areas of memory, ignoring case differences.
 // Returns true if they are equal (ignoring case) otherwise returns false.
 int __not_in_flash_func(mem_equal)(unsigned char *s1, unsigned char *s2, int i) {
-    if (i <= 0) return 1;  // безопасно: 0 байт — значит равны
-    if (charmap[*s1] != charmap[*s2]) return 0;
+    if(charmap[*(unsigned char *)s1] != charmap[*(unsigned char *)s2]) return 0;
     while (--i) {
-        if (charmap[*++s1] != charmap[*++s2]) return 0;
+        if(charmap[*(unsigned char *)++s1] != charmap[*(unsigned char *)++s2])
+            return 0;
     }
     return 1;
 }
-
+/*  @endcond */
 }
 
 // check if the next text in an element (a basic statement) corresponds to an alpha string

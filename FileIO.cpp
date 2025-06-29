@@ -4654,13 +4654,13 @@ static void FileOpen(char *fname, CombinedPtr fmode, CombinedPtr ffnbr)
 {
     int fnbr;
     BYTE mode = 0;
-    if (str_equal(fmode, (const unsigned char *)"OUTPUT"))
+    if (str_equal2(fmode, (const unsigned char *)"OUTPUT"))
         mode = FA_WRITE | FA_CREATE_ALWAYS;
-    else if (str_equal(fmode, (const unsigned char *)"APPEND"))
+    else if (str_equal2(fmode, (const unsigned char *)"APPEND"))
         mode = FA_WRITE | FA_OPEN_APPEND;
-    else if (str_equal(fmode, (const unsigned char *)"INPUT"))
+    else if (str_equal2(fmode, (const unsigned char *)"INPUT"))
         mode = FA_READ;
-    else if (str_equal(fmode, (const unsigned char *)"RANDOM"))
+    else if (str_equal2(fmode, (const unsigned char *)"RANDOM"))
         mode = FA_WRITE | FA_OPEN_APPEND | FA_READ;
     else
         error("File access mode");

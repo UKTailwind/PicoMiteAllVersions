@@ -58,6 +58,7 @@ char *strcpy(char *dest, CombinedPtr src) {
     while ((*dest++ = *src++) != '\0');
     return orig;
 }
+
 char *strncpy(char *dest, CombinedPtr src, size_t sz) {
     char *orig = dest;
     size_t i = 0;

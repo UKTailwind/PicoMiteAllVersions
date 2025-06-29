@@ -178,14 +178,8 @@ CombinedPtr strchr(CombinedPtr src, int ch);
 void strcat(CombinedPtr dest, const char* src);
 char *strcpy(char *dest, CombinedPtr src);
 char *strncpy(char *dest, CombinedPtr src, size_t sz);
-inline static bool str_equal(CombinedPtr a, const unsigned char* b) {
-    uint8_t len = *a;
-    for (int i = 0; i < len; ++i) {
-        if (b[i] == '\0' || (a + 1 + i).operator*() != b[i])
-            return false;
-    }
-    return b[len] == '\0'; // строка b не должна быть длиннее a
-}
+extern "C" bool str_equal2(CombinedPtr a, const unsigned char* b);
+extern "C" int str_equal(const unsigned char* a, const unsigned char* b);
 void strcat(char* dest, CombinedPtr src);
 void *memcpy (uint8_t *dst, CombinedPtr src, size_t sz);
 int strcasecmp(CombinedPtr s1, const char *s2);

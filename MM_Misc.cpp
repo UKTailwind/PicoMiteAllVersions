@@ -2349,7 +2349,7 @@ void disable_audio(void){
 #ifndef PICOMITEVGA
 void MIPS16 ConfigDisplayUser(unsigned char *tp){
     getargs(&tp, 13, (unsigned char *)",");
-    if(str_equal(argv[0], (unsigned char *)"USER")) {
+    if(str_equal2(argv[0], (unsigned char *)"USER")) {
         if(Option.DISPLAY_TYPE) error("Display already configured");
         if(argc != 5) error("Argument count");
         HRes = DisplayHRes = getint(argv[2], 1, 10000);

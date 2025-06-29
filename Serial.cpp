@@ -236,20 +236,20 @@ void MIPS16 SerialOpen(CombinedPtr spec) {
 	parity = UART_PARITY_NONE;
 	s2 = 1;
     for(i = 0; i < 5; i++) {
-    	if(str_equal(argv[argc - 1], (unsigned char *)"EVEN")) {
+    	if(str_equal2(argv[argc - 1], (unsigned char *)"EVEN")) {
     		if(parity)error("Syntax");
     		else {parity = UART_PARITY_EVEN; argc -= 2; }	// set even parity
     	}
-    	if(str_equal(argv[argc - 1], (unsigned char *)"ODD")) {
+    	if(str_equal2(argv[argc - 1], (unsigned char *)"ODD")) {
     		if(parity)error("Syntax");
     		else {parity = UART_PARITY_ODD; argc -= 2; }	// set even parity
     	}
-    	if(str_equal(argv[argc - 1], (unsigned char *)"INV")) { inv = 1; argc -= 2; };	// invert the serial port
-    	if(str_equal(argv[argc - 1], (unsigned char *)"DE")) error("DE not Supported");	// get the two stop bit option
-	   	if(str_equal(argv[argc - 1], (unsigned char *)"OC")) error("OC not Supported");	// get the two stop bit option
-    	if(str_equal(argv[argc - 1], (unsigned char *)"9BIT")) error("9BIT not Supported");	// get the two stop bit option
-     	if(str_equal(argv[argc - 1], (unsigned char *)"S2")) { s2 = 2; argc -= 2; }	// get the two stop bit option
-    	if(str_equal(argv[argc - 1], (unsigned char *)"7BIT")) { b7 = 7; argc -= 2; }	// set the 7 bit byte option
+    	if(str_equal2(argv[argc - 1], (unsigned char *)"INV")) { inv = 1; argc -= 2; };	// invert the serial port
+    	if(str_equal2(argv[argc - 1], (unsigned char *)"DE")) error("DE not Supported");	// get the two stop bit option
+	   	if(str_equal2(argv[argc - 1], (unsigned char *)"OC")) error("OC not Supported");	// get the two stop bit option
+    	if(str_equal2(argv[argc - 1], (unsigned char *)"9BIT")) error("9BIT not Supported");	// get the two stop bit option
+     	if(str_equal2(argv[argc - 1], (unsigned char *)"S2")) { s2 = 2; argc -= 2; }	// get the two stop bit option
+    	if(str_equal2(argv[argc - 1], (unsigned char *)"7BIT")) { b7 = 7; argc -= 2; }	// set the 7 bit byte option
     }
 	if(argc < 1 || argc > 9) error("COM specification");
 
