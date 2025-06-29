@@ -4984,6 +4984,7 @@ contloop:
 }
 #endif
 
+uint8_t CombinedPtr::buff[CombinedPtrBufSize];
 FSIZE_t CombinedPtr::buff_base_offset = (FSIZE_t)-1;
 
 unsigned char CombinedPtr::operator*() {
@@ -5058,71 +5059,6 @@ CombinedPtr& CombinedPtr::write_byte(uint8_t v) {
     SDWriteBlock(buff_base_offset, buff, CombinedPtrBufSize);
 
     return *this;
-}
-
-template<typename T>
-CombinedPtr::CombinedPtr(const CombinedPtrT<T>& other) {
-    p = other.p;
-}
-
-template<typename T>
-CombinedPtr& CombinedPtr::operator=(const CombinedPtrT<T>& other) {
-    p = other.p;
-    return *this;
-}
-/*
-CombinedPtr::CombinedPtr(const CombinedPtrI& other) {
-    p.c = other.p.p.c;
-}
-
-CombinedPtr& CombinedPtr::operator=(const CombinedPtrI& other) {
-    p.c = other.p.p.c;
-    return *this;
-}
-unsigned int CombinedPtrI::operator*() {
-    if (p.p.f >= XIP_BASE) { // in Flash or in RAM
-        return *(unsigned int*)p.p.c;
-    }
-    // in file on SD card (less than 256 MB of space on file is supported)
-    return (unsigned int)p[0] | ((unsigned int)p[1] << 8) | ((unsigned int)p[2] << 16) | ((unsigned int)p[3] << 24);
-}
-
-unsigned int CombinedPtrI::operator[](std::ptrdiff_t i) {
-    if (p.p.f >= XIP_BASE) { // in Flash or in RAM
-        return *(reinterpret_cast<unsigned int*>(p.p.c) + i);
-    }
-
-    CombinedPtr base = p + (i << 2);
-    return ((unsigned int)base[0]) |
-           ((unsigned int)base[1] << 8) |
-           ((unsigned int)base[2] << 16) |
-           ((unsigned int)base[3] << 24);
-}
-*/
-template<typename T>
-T CombinedPtrT<T>::operator*() {
-    if (p.raw() >= (unsigned char*)XIP_BASE) {
-        return *reinterpret_cast<T*>(p.raw());
-    }
-
-    // SD-карта: читаем побайтово
-    T val = 0;
-    for (size_t i = 0; i < sizeof(T); ++i)
-        reinterpret_cast<uint8_t*>(&val)[i] = *(p + i);
-    return val;
-}
-
-template<typename T>
-T CombinedPtrT<T>::operator[](std::ptrdiff_t i) {
-    CombinedPtr base = p + i * sizeof(T);
-    if (base.raw() >= (unsigned char*)XIP_BASE) {
-        return *reinterpret_cast<T*>(base.raw());
-    }
-
-    T val = 0;
-    for (size_t j = 0; j < sizeof(T); ++j)
-        reinterpret_cast<uint8_t*>(&val)[j] = base[j];
-    return val;
 }
 
 // print a string to the console interfaces

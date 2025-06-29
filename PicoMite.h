@@ -8,7 +8,6 @@
 
 #define CombinedPtrBufSize 32
 
-//class CombinedPtrI;
 template<typename T> class CombinedPtrT;
 
 class CombinedPtr {
@@ -94,64 +93,11 @@ public:
     template<typename T> CombinedPtr(const CombinedPtrT<T>& other);
     template<typename T> CombinedPtr& operator=(const CombinedPtrT<T>& other);
 };
-/*
-class CombinedPtrI {
-    CombinedPtr p;
-public:
-    // Конструкторы
-    CombinedPtrI() : p(nullptr) {}
-    CombinedPtrI(int* ptr) : p((uint8_t*)ptr) {}
-    CombinedPtrI(unsigned int* ptr) : p((uint8_t*)ptr) {}
-    CombinedPtrI(const CombinedPtr& other) : p(other) {}
-    CombinedPtrI(std::nullptr_t) : p(nullptr) {}
 
-    // TODO: assert for case not in RAM ?
-    unsigned int* raw() { return (unsigned int*)p.p.c; }
+#ifndef XIP_BASE
+#define XIP_BASE 0x10000000
+#endif
 
-    // Оператор приведения
-    explicit operator FSIZE_t() const { return p.p.f; }
-        
-    // Присваивание
-    CombinedPtrI& operator=(const CombinedPtr& other) { p = other; return *this; }
-    CombinedPtrI& operator=(int* other) { p.p.c = (uint8_t*)other ; return *this; }
-    CombinedPtrI& operator=(unsigned int* other) { p.p.c = (uint8_t*)other ; return *this; }
-
-    // Разыменование
-    unsigned int operator*();
-    //unsigned int* operator->() const;
-
-    // Индексация
-    unsigned int operator[](std::ptrdiff_t i);
-
-    // Инкремент / декремент
-    CombinedPtrI& operator++() { p.p.c += 4; return *this; }        // префикс ++
-    CombinedPtrI operator++(int) { CombinedPtr tmp(p); p.p.c += 4; return tmp; }  // постфикс ++
-
-    CombinedPtrI& operator--() { p.p.c -= 4; return *this; }        // префикс --
-    CombinedPtrI operator--(int) { CombinedPtrI tmp(p); p.p.c -= 4; return tmp; }  // постфикс --
-
-    // Арифметика указателей
-    CombinedPtrI operator+(std::ptrdiff_t i) const { return CombinedPtrI(p + (i << 2)); }
-    CombinedPtrI operator-(std::ptrdiff_t i) const { return CombinedPtrI(p - (i << 2)); }
-    std::ptrdiff_t operator-(const CombinedPtrI& other) const { return p - other.p; }
-
-    CombinedPtrI& operator+=(std::ptrdiff_t i) { p += i << 2; return *this; }
-    CombinedPtrI& operator-=(std::ptrdiff_t i) { p -= i << 2; return *this; }
-
-    // Операторы сравнения
-    bool operator==(const CombinedPtrI& other) const { return p == other.p; }
-    bool operator!=(const CombinedPtrI& other) const { return p != other.p; }
-    bool operator<(const CombinedPtrI& other) const { return p < other.p; }
-    bool operator<=(const CombinedPtrI& other) const { return p <= other.p; }
-    bool operator>(const CombinedPtrI& other) const { return p > other.p; }
-    bool operator>=(const CombinedPtrI& other) const { return p >= other.p; }
-
-    // Явное преобразование в bool (проверка на nullptr)
-    explicit operator bool() const { return p.p.c != nullptr; }
-
-    friend class CombinedPtr;
-};
-*/
 template<typename T>
 class CombinedPtrT {
     CombinedPtr p;
@@ -166,8 +112,26 @@ public:
     CombinedPtrT& operator=(const CombinedPtr& other) { p = other; return *this; }
     CombinedPtrT& operator=(T* other) { p = reinterpret_cast<uint8_t*>(other); return *this; }
 
-    T operator*();
-    T operator[](std::ptrdiff_t i);
+    inline T operator*() {
+        if (p.raw() >= (unsigned char*)XIP_BASE) {
+            return *reinterpret_cast<T*>(p.raw());
+        }
+        // SD-карта: читаем побайтово
+        T val = 0;
+        for (size_t i = 0; i < sizeof(T); ++i)
+            reinterpret_cast<uint8_t*>(&val)[i] = *(p + i);
+        return val;
+    }
+    inline T operator[](std::ptrdiff_t i) {
+        CombinedPtr base = p + i * sizeof(T);
+        if (base.raw() >= (unsigned char*)XIP_BASE) {
+            return *reinterpret_cast<T*>(base.raw());
+        }
+        T val = 0;
+        for (size_t j = 0; j < sizeof(T); ++j)
+            reinterpret_cast<uint8_t*>(&val)[j] = base[j];
+        return val;
+    }
 
     CombinedPtrT& operator++() { p += sizeof(T); return *this; }
     CombinedPtrT operator++(int) { CombinedPtrT tmp(*this); p += sizeof(T); return tmp; }
@@ -193,6 +157,17 @@ public:
 
     friend class CombinedPtr;
 };
+
+template<typename T>
+CombinedPtr::CombinedPtr(const CombinedPtrT<T>& other) {
+    this->p.c = other.p.p.c;
+}
+
+template<typename T>
+CombinedPtr& CombinedPtr::operator=(const CombinedPtrT<T>& other) {
+    this->p.c = other.p.p.c;
+    return *this;
+}
 
 using CombinedPtrI = CombinedPtrT<int>;
 using CombinedPtrLL = CombinedPtrT<long long>;

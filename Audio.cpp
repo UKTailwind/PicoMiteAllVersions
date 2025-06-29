@@ -160,7 +160,7 @@ a_flist *alist= nullptr;
 uint8_t trackplaying=0, trackstoplay=0;
 unsigned short *noisetable= nullptr;
 unsigned short *usertable= nullptr;
-const unsigned short whitenoise[2]={0};
+static const unsigned short whitenoise[2]={0};
 int noloop=0;
 int8_t XDCS=-1,XCS=-1,DREQ=-1,XRST=-1;
 uint8_t midienabled=0;

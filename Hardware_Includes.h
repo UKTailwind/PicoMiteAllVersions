@@ -47,16 +47,18 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "configuration.h"
 #include "FileIO.h"
 #include "ff.h"
-// global variables used in MMBasic but must be maintained outside of the interpreter
-extern int MMerrno;
-//extern int ListCnt;
-extern int MMCharPos;
+
 #ifdef __cplusplus
   #include "PicoMite.h"
 	extern "C" {
 	extern CombinedPtr StartEditPoint;
 	extern CombinedPtr InterruptReturn;
 #endif
+
+// global variables used in MMBasic but must be maintained outside of the interpreter
+extern int MMerrno;
+//extern int ListCnt;
+extern int MMCharPos;
 extern int StartEditChar;
 extern int OptionErrorSkip;
 extern int ExitMMBasicFlag;

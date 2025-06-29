@@ -191,7 +191,7 @@ bool dmarunning=false;
 bool ADCDualBuffering=false;
 uint32_t ADCmax=0;
 int ADCopen=0;
-CombinedPtr ADCInterrupt;
+extern CombinedPtr ADCInterrupt;
 volatile MMFLOAT * volatile a1float= nullptr, * volatile a2float= nullptr, * volatile a3float= nullptr, * volatile a4float= nullptr;
 volatile int ADCpos=0;
 float frequency;

@@ -106,7 +106,7 @@ uint8_t SPI0locked=0;
 uint8_t SPI1locked=0;
 int BacklightSlice=-1;
 int BacklightChannel=-1;
-extern const unsigned short whitenoise[2];
+static const unsigned short whitenoise[2]={0};
 uint16_t AUDIO_SPI;
 volatile uint16_t VSbuffer=0;
 void __not_in_flash_func(DefaultAudio)(uint16_t left, uint16_t right){

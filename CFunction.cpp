@@ -4,11 +4,10 @@
  *  Created on: 3 Jul 2020
  *      Author: peter
  */
-#include "MMBasic.h"
-
-extern "C" {
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
+
+extern "C" {
 //Vector to CFunction static RAM
 
 //Vector to CFunction routine called every mSec
