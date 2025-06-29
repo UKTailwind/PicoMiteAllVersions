@@ -32,6 +32,8 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "PicoMite.h"
 extern CombinedPtr CFunctionFlash, CFunctionLibrary;
 void MMPrintStringPP(CombinedPtr s);
+int FileLoadProgram(CombinedPtr fname, bool chain);
+int FileLoadCMM2Program(CombinedPtr  fname, bool message);
 #endif
 
 #ifdef __cplusplus
@@ -42,6 +44,7 @@ extern "C" {
 #include "upng.h"
 #endif
 // File related I/O
+void FilePutStr(int count, char* c, int fnbr);
 unsigned char MMfputc(unsigned char c, int fnbr);
 int MMfgetc(int filenbr);
 void MMfopen(unsigned char *fname, unsigned char *mode, int fnbr);
@@ -53,7 +56,6 @@ void MMgetline(int filenbr, char *p);
 void MMPrintString(const char *s);
 void CheckAbort(void);
 char FileGetChar(int fnbr);
-void FilePutStr(int count, char *c, int fnbr);
 char FilePutChar(char c, int fnbr);
 void CheckSDCard(void);
 void LoadOptions(void);
@@ -61,8 +63,6 @@ void ResetOptionsNoSave(void);
 void CrunchData(unsigned char **p, int c);
 int FileEOF(int fnbr);
 void ClearSavedVars(void);
-int FileLoadProgram(unsigned char *fname, bool chain);
-int FileLoadCMM2Program(char *fname, bool message);
 void SaveOptions(void);
 void ResetAllFlash(void);
 void disable_interrupts_pico(void);

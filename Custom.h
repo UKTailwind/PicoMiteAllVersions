@@ -50,8 +50,15 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 //      void fun_???(void)
 //      void op_???(void)
 extern uint8_t pioTXlast[4][3];
-extern char *pioRXinterrupts[4][3];
-extern char *pioTXinterrupts[4][3];
+
+#ifdef __cplusplus
+#include "PicoMite.h"
+extern CombinedPtr pioRXinterrupts[4][3];
+extern CombinedPtr pioTXinterrupts[4][3];
+extern CombinedPtr DMAinterruptRX;
+extern CombinedPtr DMAinterruptTX;
+#endif
+
 #ifdef PICOMITEWEB
 	extern void GetNTPTime(void);
 	extern void checkTCPOptions(void);
@@ -118,8 +125,6 @@ extern char *pioTXinterrupts[4][3];
     extern volatile bool UDPreceive;
 #endif
 extern int piointerrupt;
-extern char *DMAinterruptRX;
-extern char *DMAinterruptTX;
 extern uint32_t dma_rx_chan;
 extern uint32_t dma_tx_chan;
 extern uint32_t dma_rx_chan2;

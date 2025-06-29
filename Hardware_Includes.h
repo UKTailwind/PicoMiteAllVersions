@@ -52,12 +52,14 @@ extern int MMerrno;
 //extern int ListCnt;
 extern int MMCharPos;
 #ifdef __cplusplus
-extern CombinedPtr StartEditPoint;
+  #include "PicoMite.h"
+	extern "C" {
+	extern CombinedPtr StartEditPoint;
+	extern CombinedPtr InterruptReturn;
 #endif
 extern int StartEditChar;
 extern int OptionErrorSkip;
 extern int ExitMMBasicFlag;
-extern unsigned char *InterruptReturn;
 extern unsigned int _excep_peek;
 extern volatile uint64_t mSecTimer;
 extern volatile unsigned int PauseTimer;
@@ -401,4 +403,9 @@ extern struct tagMTRand *g_myrand;
 #include "GPS.h"
 #include "Audio.h"
 #include "PS2Keyboard.h"
+
+#ifdef __cplusplus
+}
+#endif
+
 /*  @endcond */

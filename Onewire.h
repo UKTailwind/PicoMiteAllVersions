@@ -26,8 +26,16 @@ option) any later version.
 #if !defined(INCLUDE_COMMAND_TABLE) && !defined(INCLUDE_TOKEN_TABLE)
 #ifndef ONEWIRE_HEADER
 #define ONEWIRE_HEADER
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 extern long long int *ds18b20Timers;
 extern int mmOWvalue;  
+#ifdef __cplusplus
+}
+#endif
+
 #endif
 #endif
 /*  @endcond */

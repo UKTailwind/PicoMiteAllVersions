@@ -170,11 +170,11 @@ void MIPS16 cmd_memory(void) {
         int sourcesize,destinationsize;
         void *top=NULL;
         uint64_t *from=NULL;
-        if(CheckEmpty((char *)argv[0])){
+        if(CheckEmpty(argv[0])){
             sourcesize=parseintegerarray(argv[0],(int64_t **)&from, 1,1,NULL,false);
             if(sourcesize<n)error("Source array too small");
         } else from=(uint64_t *)GetPokeAddr(argv[0]);
-        if(CheckEmpty((char *)argv[2])){
+        if(CheckEmpty(argv[2])){
             destinationsize=parseintegerarray(argv[2],(int64_t **)&top, 2,1,NULL,true);
             if(destinationsize*64/size<n)error("Destination array too small");
         } else top=(void *)GetPokeAddr(argv[2]);
@@ -227,7 +227,7 @@ void MIPS16 cmd_memory(void) {
 	    if(*argv[0] == '#') argv[0]++;
 		int fnbr = getint(argv[0],1,MAXOPENFILES);	// get the number
         int n=getinteger(argv[2]);
-        if(CheckEmpty((char *)argv[4])){
+        if(CheckEmpty(argv[4])){
             sourcesize=parseintegerarray(argv[4],&aint,3,1,NULL,false);
             if(sourcesize*8<n)error("Source array too small");
             fromp=(char *)aint;
@@ -251,7 +251,7 @@ void MIPS16 cmd_memory(void) {
 	    if(*argv[0] == '#') argv[0]++;
 		int fnbr = getint(argv[0],1,MAXOPENFILES);	// get the number
         int n=getinteger(argv[2]);
-        if(CheckEmpty((char *)argv[4])){
+        if(CheckEmpty(argv[4])){
             sourcesize=parseintegerarray(argv[4],&aint,3,1,NULL,false);
             if(sourcesize*8<n)error("Source array too small");
             fromp=(char *)aint;
@@ -277,13 +277,13 @@ void MIPS16 cmd_memory(void) {
         int sourcesize,destinationsize;
         uint64_t *to=NULL;
         void *fromp=NULL;
-        if(CheckEmpty((char *)argv[0])){
+        if(CheckEmpty(argv[0])){
             sourcesize=parseintegerarray(argv[0],(int64_t **)&fromp, 1,1,NULL,false);
             if(sourcesize*64/size<n)error("Source array too small");
         } else {
             fromp=(void*)GetPokeAddr(argv[0]);
         }
-        if(CheckEmpty((char *)argv[2])){
+        if(CheckEmpty(argv[2])){
             destinationsize=parseintegerarray(argv[2],(int64_t **)&to, 2,1,NULL,true);
             if(n>destinationsize)error("Destination array too small");
         } else to=(uint64_t *)GetPokeAddr(argv[2]);
@@ -518,7 +518,8 @@ void MIPS16 cmd_memory(void) {
     int i, j, var, nbr, vsize, VarCnt;
     int ProgramSize, ProgramPercent, VarSize, VarPercent, GeneralSize, GeneralPercent, SavedVarSize, SavedVarSizeK, SavedVarPercent, SavedVarCnt;
     int CFunctSize, CFunctSizeK, CFunctNbr, CFunctPercent, FontSize, FontSizeK, FontNbr, FontPercent, LibrarySizeK, LibraryPercent,LibraryMaxK;
-    unsigned int CurrentRAM, *pint;
+    unsigned int CurrentRAM;
+    CombinedPtrI pint;
 
     CurrentRAM = heap_memory_size + MAXVARS * sizeof(struct s_vartbl);
 #ifdef rp2350
@@ -596,9 +597,8 @@ void MIPS16 cmd_memory(void) {
 func:
     // count the space used by CFunctions, CSubs and fonts
     CFunctSize = CFunctNbr = FontSize = FontNbr = 0;
-    pint = (unsigned int *)CFunctionFlash;
+    pint = CFunctionFlash;
     while(*pint != 0xffffffff) {
-        //if(*pint < FONT_TABLE_SIZE) {
         if(*pint >> 31 ){    
             pint++;
             FontNbr++;
@@ -686,14 +686,14 @@ func:
                p++;i++;
            }
            p++; i++;    //get 0xFF that ends the program and count it
-           while((unsigned int)p & 0b11) { //count to the next word boundary
+           while(p & 0b11) { //count to the next word boundary
            	p++;i++;
            }
                
            //Now add the binary used for CSUB and Fonts
            if(CFunctionLibrary != NULL) {
              j=0;
-             pint = (unsigned int *)CFunctionLibrary;
+             pint = CFunctionLibrary;
              while(*pint != 0xffffffff) {
               pint++;                                      //step over the address or Font No.
               j += *pint + 8;                              //Read the size
@@ -827,12 +827,12 @@ void m_alloc(int type) {
 // Get a temporary buffer of any size
 // The space only lasts for the length of the command.
 // A pointer to the space is saved in an array so that it can be returned at the end of the command
-void __not_in_flash_func(*GetTempMemory)(int NbrBytes) {
+char __not_in_flash_func(*GetTempMemory)(int NbrBytes) {
     if(g_StrTmpIndex >= MAXTEMPSTRINGS) error("Not enough memory");
     g_StrTmpLocalIndex[g_StrTmpIndex] = g_LocalIndex;
     g_StrTmp[g_StrTmpIndex] = (char*)GetSystemMemory(NbrBytes);
     g_TempMemoryIsChanged = true;
-    return (void *)g_StrTmp[g_StrTmpIndex++];
+    return (char *)g_StrTmp[g_StrTmpIndex++];
 }
 
 
@@ -994,7 +994,7 @@ static inline __attribute__ ((always_inline)) void MBitsSet(unsigned char *addr,
 }
 #ifdef rp2350
 #ifndef PICOMITEWEB
-void __not_in_flash_func(*GetPSMemory)(int size) {
+char __not_in_flash_func(*GetPSMemory)(int size) {
     unsigned int j, n;
     unsigned char *addr;
     j = n = (size + PAGESIZE - 1)/PAGESIZE;                         // nbr of pages rounded up
@@ -1006,7 +1006,7 @@ void __not_in_flash_func(*GetPSMemory)(int size) {
                 while(j--) SBitsSet(addr + (j * PAGESIZE), PUSED);  // set the other pages to show that they are used
                 memset(addr, 0, size);                              // zero the memory
  //               dp("alloc = %p (%d)", addr, size);
-                return (void *)addr;
+                return (char *)addr;
             }
         } else
             n = j;                                                  // not enough space here so reset our count
@@ -1042,7 +1042,7 @@ void MIPS64 __not_in_flash_func(*GetSystemMemory)(int size) { //get memory from 
     error("Not enough Heap memory");
     return NULL;                                                    // keep the compiler happy
 }
-void MIPS64 __not_in_flash_func(*GetMemory)(int size) {
+char MIPS64 __not_in_flash_func(*GetMemory)(int size) {
     unsigned int j, n, k;
     unsigned char *addr;
     j = n = k= (size + PAGESIZE - 1)/PAGESIZE;                         // nbr of pages rounded up
@@ -1053,20 +1053,20 @@ void MIPS64 __not_in_flash_func(*GetMemory)(int size) {
                 MBitsSet(addr + (j * PAGESIZE), PUSED | PLAST);     // show that this is used and the last in the chain of pages
                 while(j--) MBitsSet(addr + (j * PAGESIZE), PUSED);  // set the other pages to show that they are used
                 memset(addr, 0, size);                              // zero the memory
-                return (void *)addr;
+                return (char *)addr;
             }
         } else n = j;                                               // not enough space here so reset our count
     }
     // out of memory
 #ifdef rp2350
 #ifndef PICOMITEWEB
-    if(PSRAMsize)return GetPSMemory(size);
+    if(PSRAMsize) return GetPSMemory(size);
 #endif
 #endif
     TempStringClearStart = 0;
     ClearTempMemory();                                               // hopefully this will give us enough to print the prompt
     error("Not enough Heap memory");
-    return NULL;                                                    // keep the compiler happy
+    return nullptr;                                                    // keep the compiler happy
 }    
 
 void *GetAlignedMemory(int size) {

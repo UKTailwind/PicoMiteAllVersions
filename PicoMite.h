@@ -8,7 +8,8 @@
 
 #define CombinedPtrBufSize 32
 
-class CombinedPtrI;
+//class CombinedPtrI;
+template<typename T> class CombinedPtrT;
 
 class CombinedPtr {
     union {
@@ -22,18 +23,23 @@ public:
     // Конструкторы
     CombinedPtr() : p{nullptr} {}
     /*explicit*/ CombinedPtr(unsigned char* ptr) : p{ptr} {}
+    CombinedPtr(char* ptr) : p{(unsigned char*)ptr} {}
+    CombinedPtr(void* ptr) : p{(unsigned char*)ptr} {}
     CombinedPtr(FSIZE_t off) { p.f = off; }
     CombinedPtr(const CombinedPtr& other) : p{other.p.c} {}
     CombinedPtr(std::nullptr_t) : p{nullptr} {}
 
     // TODO: assert for case not in RAM ?
-    unsigned char* raw() { return p.c; }
+    unsigned char* raw() const { return p.c; }
 
     // Оператор приведения
     explicit operator FSIZE_t() const { return p.f; }
 
     // Присваивание
+    CombinedPtr& operator=(std::nullptr_t) { p.c = 0; return *this; }
     CombinedPtr& operator=(unsigned char* ptr) { p.c = ptr; return *this; }
+    CombinedPtr& operator=(char* ptr) { p.c = (unsigned char*)ptr; return *this; }
+    CombinedPtr& operator=(void* ptr) { p.c = (unsigned char*)ptr; return *this; }
     CombinedPtr& operator=(const CombinedPtr& other) { p.c = other.p.c; return *this; }
 
     // Разыменование
@@ -71,6 +77,9 @@ public:
     bool operator==(std::nullptr_t) const {
         return p.c == nullptr;
     }
+
+    unsigned int operator&(unsigned int x) { return p.f & x; }
+
     // Явное преобразование в bool (проверка на nullptr)
     explicit operator bool() const { return p.c != nullptr; }
 
@@ -80,11 +89,12 @@ public:
     double as_double();
     long long as_i64a();
 
-    friend class CombinedPtrI;
-    CombinedPtr(const CombinedPtrI& other);
-    CombinedPtr& operator=(const CombinedPtrI& other);
+   // friend class CombinedPtrI;
+    template<typename T> friend class CombinedPtrT;
+    template<typename T> CombinedPtr(const CombinedPtrT<T>& other);
+    template<typename T> CombinedPtr& operator=(const CombinedPtrT<T>& other);
 };
-
+/*
 class CombinedPtrI {
     CombinedPtr p;
 public:
@@ -95,11 +105,16 @@ public:
     CombinedPtrI(const CombinedPtr& other) : p(other) {}
     CombinedPtrI(std::nullptr_t) : p(nullptr) {}
 
+    // TODO: assert for case not in RAM ?
+    unsigned int* raw() { return (unsigned int*)p.p.c; }
+
     // Оператор приведения
     explicit operator FSIZE_t() const { return p.p.f; }
         
     // Присваивание
     CombinedPtrI& operator=(const CombinedPtr& other) { p = other; return *this; }
+    CombinedPtrI& operator=(int* other) { p.p.c = (uint8_t*)other ; return *this; }
+    CombinedPtrI& operator=(unsigned int* other) { p.p.c = (uint8_t*)other ; return *this; }
 
     // Разыменование
     unsigned int operator*();
@@ -136,12 +151,70 @@ public:
 
     friend class CombinedPtr;
 };
+*/
+template<typename T>
+class CombinedPtrT {
+    CombinedPtr p;
+public:
+    CombinedPtrT() : p(nullptr) {}
+    CombinedPtrT(T* ptr) : p(reinterpret_cast<uint8_t*>(ptr)) {}
+    CombinedPtrT(const CombinedPtr& other) : p(other) {}
+    CombinedPtrT(std::nullptr_t) : p(nullptr) {}
+
+    T* raw() { return reinterpret_cast<T*>(p.raw()); }
+
+    CombinedPtrT& operator=(const CombinedPtr& other) { p = other; return *this; }
+    CombinedPtrT& operator=(T* other) { p = reinterpret_cast<uint8_t*>(other); return *this; }
+
+    T operator*();
+    T operator[](std::ptrdiff_t i);
+
+    CombinedPtrT& operator++() { p += sizeof(T); return *this; }
+    CombinedPtrT operator++(int) { CombinedPtrT tmp(*this); p += sizeof(T); return tmp; }
+
+    CombinedPtrT& operator--() { p -= sizeof(T); return *this; }
+    CombinedPtrT operator--(int) { CombinedPtrT tmp(*this); p -= sizeof(T); return tmp; }
+
+    CombinedPtrT operator+(std::ptrdiff_t i) const { return CombinedPtrT(p + i * sizeof(T)); }
+    CombinedPtrT operator-(std::ptrdiff_t i) const { return CombinedPtrT(p - i * sizeof(T)); }
+    std::ptrdiff_t operator-(const CombinedPtrT& other) const { return (p - other.p) / sizeof(T); }
+
+    CombinedPtrT& operator+=(std::ptrdiff_t i) { p += i * sizeof(T); return *this; }
+    CombinedPtrT& operator-=(std::ptrdiff_t i) { p -= i * sizeof(T); return *this; }
+
+    bool operator==(const CombinedPtrT& other) const { return p == other.p; }
+    bool operator!=(const CombinedPtrT& other) const { return p != other.p; }
+    bool operator<(const CombinedPtrT& other) const { return p < other.p; }
+    bool operator<=(const CombinedPtrT& other) const { return p <= other.p; }
+    bool operator>(const CombinedPtrT& other) const { return p > other.p; }
+    bool operator>=(const CombinedPtrT& other) const { return p >= other.p; }
+
+    explicit operator bool() const { return p.raw() != nullptr; }
+
+    friend class CombinedPtr;
+};
+
+using CombinedPtrI = CombinedPtrT<int>;
+using CombinedPtrLL = CombinedPtrT<long long>;
+using CombinedPtrD = CombinedPtrT<double>;
 
 size_t strlen(CombinedPtr src);
 CombinedPtr strchr(CombinedPtr src, int ch);
+void strcat(CombinedPtr dest, const char* src);
 char *strcpy(char *dest, CombinedPtr src);
+char *strncpy(char *dest, CombinedPtr src, size_t sz);
+inline static bool str_equal(CombinedPtr a, const unsigned char* b) {
+    uint8_t len = *a;
+    for (int i = 0; i < len; ++i) {
+        if (b[i] == '\0' || (a + 1 + i).operator*() != b[i])
+            return false;
+    }
+    return b[len] == '\0'; // строка b не должна быть длиннее a
+}
 void strcat(char* dest, CombinedPtr src);
 void *memcpy (uint8_t *dst, CombinedPtr src, size_t sz);
+int strcasecmp(CombinedPtr s1, const char *s2);
+int strncasecmp(CombinedPtr s1, const char *s2, size_t sz);
 
 #endif // __cplusplus
 #endif // __PICOMITE_H

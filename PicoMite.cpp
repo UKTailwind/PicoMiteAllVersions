@@ -4523,8 +4523,8 @@ if(Option.CPU_Speed==FreqSVGA){ //adjust the size of the heap
         savewatchdog = WatchdogSet = false;
 		char *ptr = (char *)findvar((unsigned char *)"MM.ENDLINE$", V_NOFIND_NULL);
         if(ptr && *ptr){
-            CurrentLinePtr=0;
-            memcpy(inpbuf,ptr,*ptr+1);
+            CurrentLinePtr = nullptr;
+            memcpy((void*)inpbuf, ptr, *ptr+1);
             *ptr=0;
             MtoC(inpbuf);
             *ptr=0;
@@ -4577,7 +4577,7 @@ if(Option.CPU_Speed==FreqSVGA){ //adjust the size of the heap
         EchoOption = true;
         g_LocalIndex = 0;                                             // this should not be needed but it ensures that all space will be cleared
         ClearTempMemory();                                          // clear temp string space (might have been used by the prompt)
-        CurrentLinePtr = NULL;                                      // do not use the line number in error reporting
+        CurrentLinePtr = nullptr;                                      // do not use the line number in error reporting
         if(MMCharPos > 1) MMPrintString("\r\n");                    // prompt should be on a new line
         while(Option.PIN && !IgnorePIN) {
             _excep_code = PIN_RESTART;
@@ -4631,11 +4631,11 @@ autorun:
         if(tkn==GetCommandValue((unsigned char *)"RUN") || tkn==GetCommandValue((unsigned char *)"EDIT") || tkn==GetCommandValue((unsigned char *)"AUTOSAVE"))i=1;
         if (setjmp(jmprun) != 0) {
             PrepareProgram(false);
-            CurrentLinePtr = 0;
+            CurrentLinePtr = nullptr;
         }
         ExecuteProgram(CombinedPtr(tknbuf));                                     // execute the line straight away
         if(i){
-            cmdline=NULL;
+            cmdline = nullptr;
             do_end(false);
             longjmp(mark, 1);												// jump back to the input prompt
         }
@@ -5060,6 +5060,17 @@ CombinedPtr& CombinedPtr::write_byte(uint8_t v) {
     return *this;
 }
 
+template<typename T>
+CombinedPtr::CombinedPtr(const CombinedPtrT<T>& other) {
+    p = other.p;
+}
+
+template<typename T>
+CombinedPtr& CombinedPtr::operator=(const CombinedPtrT<T>& other) {
+    p = other.p;
+    return *this;
+}
+/*
 CombinedPtr::CombinedPtr(const CombinedPtrI& other) {
     p.c = other.p.p.c;
 }
@@ -5068,7 +5079,6 @@ CombinedPtr& CombinedPtr::operator=(const CombinedPtrI& other) {
     p.c = other.p.p.c;
     return *this;
 }
-
 unsigned int CombinedPtrI::operator*() {
     if (p.p.f >= XIP_BASE) { // in Flash or in RAM
         return *(unsigned int*)p.p.c;
@@ -5087,6 +5097,32 @@ unsigned int CombinedPtrI::operator[](std::ptrdiff_t i) {
            ((unsigned int)base[1] << 8) |
            ((unsigned int)base[2] << 16) |
            ((unsigned int)base[3] << 24);
+}
+*/
+template<typename T>
+T CombinedPtrT<T>::operator*() {
+    if (p.raw() >= (unsigned char*)XIP_BASE) {
+        return *reinterpret_cast<T*>(p.raw());
+    }
+
+    // SD-карта: читаем побайтово
+    T val = 0;
+    for (size_t i = 0; i < sizeof(T); ++i)
+        reinterpret_cast<uint8_t*>(&val)[i] = *(p + i);
+    return val;
+}
+
+template<typename T>
+T CombinedPtrT<T>::operator[](std::ptrdiff_t i) {
+    CombinedPtr base = p + i * sizeof(T);
+    if (base.raw() >= (unsigned char*)XIP_BASE) {
+        return *reinterpret_cast<T*>(base.raw());
+    }
+
+    T val = 0;
+    for (size_t j = 0; j < sizeof(T); ++j)
+        reinterpret_cast<uint8_t*>(&val)[j] = base[j];
+    return val;
 }
 
 // print a string to the console interfaces

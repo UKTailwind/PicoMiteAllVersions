@@ -42,11 +42,22 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
     #ifndef MISC_HEADER
     #define MISC_HEADER
 
+#ifdef __cplusplus
+#include "PicoMite.h"
+extern "C" {
+	extern CombinedPtr InterruptReturn;
+	extern CombinedPtr TickInt[NBRSETTICKS];
+	extern CombinedPtr CSubInterrupt;
+	extern CombinedPtr OnKeyGOSUB;
+	extern CombinedPtr OnPS2GOSUB;
+	extern unsigned int GetPeekAddr(CombinedPtr p);
+	extern unsigned int GetPokeAddr(CombinedPtr p);
+#endif
+
    	extern void OtherOptions(void);
 	extern int InterruptUsed;
 	extern int OptionErrorCheck;
 
-    extern unsigned char *InterruptReturn;
     extern int check_interrupt(void);
     extern void CrunchData(unsigned char **p, int c);
 	extern uint32_t getFreeHeap(void);
@@ -65,22 +76,16 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 
     extern int TickPeriod[NBRSETTICKS];
     extern volatile int TickTimer[NBRSETTICKS];
-    extern unsigned char *TickInt[NBRSETTICKS];
-	extern volatile unsigned char TickActive[NBRSETTICKS];
+    extern volatile unsigned char TickActive[NBRSETTICKS];
 	extern unsigned int CurrentCpuSpeed;
 	extern unsigned int PeripheralBusSpeed;
-	extern unsigned char *OnKeyGOSUB;
-	extern unsigned char *OnPS2GOSUB;
 	extern unsigned char EchoOption;
-	extern unsigned int GetPeekAddr(unsigned char *p);
-	extern unsigned int GetPokeAddr(unsigned char *p);
 	extern void disable_sd(void);
 	extern void disable_systemspi(void);
 	extern void disable_systemi2c(void);
 	extern void disable_audio(void);
 	extern char *MQTTInterrupt;
 	extern volatile bool MQTTComplete;
-	extern char *CSubInterrupt;
 	extern volatile bool CSubComplete;
 	extern uint32_t __get_MSP(void);
 	extern int ExistsFile(char *p);
@@ -95,6 +100,9 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 	extern time_t get_epoch(int year, int month,int day, int hour,int minute, int second);
 	extern uint_fast64_t gettimefromepoch(int *year, int *month, int *day, int *hour, int *minute, int *second);
 	extern uint64_t __uninitialized_ram(_persistent);
+#ifdef __cplusplus
+}
+#endif
 
 #endif
 #endif

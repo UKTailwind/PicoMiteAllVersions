@@ -1,4 +1,10 @@
+#include "configuration.h"
 #include "MMBasic.h"
+#include "Functions.h"
+#include "Commands.h"
+#include "Operators.h"
+#include "Custom.h"
+#include "Hardware_Includes.h"
 // this is the command table that defines the various tokens for commands in the source code
 // most of them are listed in the .h files so you should not add your own here but instead add
 // them to the appropiate .h file

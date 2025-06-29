@@ -242,10 +242,13 @@ extern struct blitbuffer blitbuff[MAXBLITBUF+1];
 extern void closeall3d(void);
 extern void closeframebuffer(char layer);
 extern void closeallsprites(void);
-extern char* COLLISIONInterrupt;
+#ifdef __cplusplus
+#include "PicoMite.h"
+extern CombinedPtr COLLISIONInterrupt;
+extern void ConfigDisplayVirtual(CombinedPtr p);
+#endif
 extern bool CollisionFound;
 extern void InitDisplayVirtual(void);
-extern void ConfigDisplayVirtual(unsigned char *p);
 extern void merge(uint8_t colour);
 extern void blitmerge (int x0, int y0, int w, int h, uint8_t colour);
 extern bool mergerunning;

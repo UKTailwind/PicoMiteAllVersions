@@ -58,6 +58,61 @@ char *strcpy(char *dest, CombinedPtr src) {
     while ((*dest++ = *src++) != '\0');
     return orig;
 }
+char *strncpy(char *dest, CombinedPtr src, size_t sz) {
+    char *orig = dest;
+    size_t i = 0;
+
+    while (i < sz && (*src != '\0')) {
+        *dest++ = *src++;
+        i++;
+    }
+
+    // Обнулить остаток, если src короче sz
+    while (i < sz) {
+        *dest++ = '\0';
+        i++;
+    }
+
+    return orig;
+}
+extern "C" int tolower(int c);
+int strcasecmp(CombinedPtr s1, const char *s2) {
+    unsigned char c1, c2;
+
+    while (*s1 && *s2) {
+        c1 = (unsigned char)*s1++;
+        c2 = (unsigned char)*s2++;
+
+        c1 = tolower(c1);
+        c2 = tolower(c2);
+
+        if (c1 != c2)
+            return c1 - c2;
+    }
+    // Обрабатываем возможную разницу длины
+    c1 = tolower((unsigned char)*s1);
+    c2 = tolower((unsigned char)*s2);
+    return c1 - c2;
+}
+int strncasecmp(CombinedPtr s1, const char *s2, size_t sz) {
+    unsigned char c1, c2;
+	size_t i = 0;
+    while (i < sz && *s1 && *s2) {
+        c1 = (unsigned char)*s1++;
+        c2 = (unsigned char)*s2++;
+
+        c1 = tolower(c1);
+        c2 = tolower(c2);
+
+        if (c1 != c2)
+            return c1 - c2;
+		++i;
+    }
+    // Обрабатываем возможную разницу длины
+    c1 = tolower((unsigned char)*s1);
+    c2 = tolower((unsigned char)*s2);
+    return c1 - c2;
+}
 size_t strlen(CombinedPtr src) {
 	size_t res = 0;
 	while (*src++) ++res;
@@ -70,6 +125,13 @@ CombinedPtr strchr(CombinedPtr src, int ch) {
         ++src;
     }
     return nullptr;
+}
+void strcat(CombinedPtr dest, const char* src) {
+    uint8_t len = *dest; // длина строки
+    while (*src) {
+        (dest + ++len).write_byte(*src++);
+    }
+    dest.write_byte(len); // записать новую длину в dest[0]
 }
 extern "C" {
 

@@ -6,11 +6,13 @@
  the C language function associated with commands, functions or operators should be
  declared here
 **********************************************************************************/
+
+#if !defined(INCLUDE_COMMAND_TABLE) && !defined(INCLUDE_TOKEN_TABLE)
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#if !defined(INCLUDE_COMMAND_TABLE) && !defined(INCLUDE_TOKEN_TABLE)
 // format:
 //      void cmd_???(void)
 //      void fun_???(void)
@@ -343,6 +345,11 @@ void fun_flag(void);
 #endif
 void fun_dev(void);
 void fun_map(void);
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif
 
 /* ********************************************************************************
@@ -710,8 +717,5 @@ void fun_map(void);
 #endif
 { (unsigned char *)"Bit(",	T_FUN | T_INT,		0, fun_bit,	},
 { (unsigned char *)"",   0,                  0, cmd_null,    }                   // this dummy entry is always at the end
-#endif
-#ifdef __cplusplus
-}
 #endif
 /*  @endcond */

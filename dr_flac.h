@@ -1351,7 +1351,7 @@ DRFLAC_API drflac_bool32 drflac_next_cuesheet_track(drflac_cuesheet_track_iterat
     #endif
 #endif
 
-#ifdef __linux__
+#if 0 //__linux__
     #ifndef _BSD_SOURCE
         #define _BSD_SOURCE
     #endif

@@ -135,7 +135,7 @@ void *IrDev, *IrCmd;
 volatile char IrVarType;
 volatile char IrState, IrGotMsg;
 int IrBits, IrCount;
-unsigned char *IrInterrupt;
+CombinedPtr IrInterrupt;
 int last_adc=99;
 volatile int CallBackEnabled=0;
 uint8_t IRpin=99;
@@ -191,17 +191,17 @@ bool dmarunning=false;
 bool ADCDualBuffering=false;
 uint32_t ADCmax=0;
 int ADCopen=0;
-char *ADCInterrupt;
-volatile MMFLOAT * volatile a1float=NULL, * volatile a2float=NULL, * volatile a3float=NULL, * volatile a4float=NULL;
+CombinedPtr ADCInterrupt;
+volatile MMFLOAT * volatile a1float= nullptr, * volatile a2float= nullptr, * volatile a3float= nullptr, * volatile a4float= nullptr;
 volatile int ADCpos=0;
 float frequency;
 uint32_t ADC_dma_chan=ADC_DMA;
 uint32_t ADC_dma_chan2=ADC_DMA2;
-short *ADCbuffer=NULL;
+short *ADCbuffer= nullptr;
 void PWMoff(int slice);
-volatile uint8_t *adcint=NULL; 
-uint8_t *adcint1=NULL; 
-uint8_t *adcint2=NULL; 
+volatile uint8_t *adcint= nullptr; 
+uint8_t *adcint1= nullptr; 
+uint8_t *adcint2= nullptr; 
 MMFLOAT ADCscale[4], ADCbottom[4];
 extern void mouse0close(void);
 //Vector to CFunction routine called every command (ie, from the BASIC interrupt checker)
@@ -239,7 +239,7 @@ int codemap(int pin){
 	return (int)PINMAP[pin];
 }
 #endif
-int codecheck(unsigned char *line){
+int codecheck(CombinedPtr line){
 	if((line[0]=='G' || line[0]=='g') && (line[1]=='P' || line[1]=='p')){
 		line+=2;
 		if(isnamestart(*line) || *line=='.') return 1;
@@ -1393,7 +1393,7 @@ process:
         for(i = 0; i < NBRINTERRUPTS; i++) if(inttbl[i].pin == 0) break;
         if(i >= NBRINTERRUPTS) error("Too many interrupts");
         inttbl[i].pin = pin;
-		inttbl[i].intp = (char *)GetIntAddress(argv[4]);					// get the interrupt routine's location
+		inttbl[i].intp = (char*)GetIntAddress(argv[4]).raw();					// get the interrupt routine's location
 		inttbl[i].last = ExtInp(pin);								// save the current pin value for the first test
         switch(value) {                                             // and set trigger polarity
             case EXT_INT_HI:    inttbl[i].lohi = T_LOHI; break;
@@ -1564,7 +1564,7 @@ void cmd_port(void) {
 	getargs(&cmdline, NBRPINS * 4, (unsigned char *)",");
 
 	if((argc & 0b11) != 0b11) error("Invalid syntax");
-    if(!strchr((char *)cmdline,')'))error ("Syntax");
+    if(!strchr(cmdline,')').raw()) error ("Syntax");
     // step over the equals sign and get the value for the assignment
 	while(*cmdline && tokenfunction(*cmdline) != op_equal) cmdline++;
 	if(!*cmdline) error("Invalid syntax");
@@ -1761,13 +1761,13 @@ IR routines
 *****************************************************************************************************************************/
 
 void cmd_ir(void) {
-    unsigned char *p;
+    CombinedPtr p;
     int i, pin, dev, cmd;
     if(checkstring(cmdline, (unsigned char *)"CLOSE")) {
         if(IrState == IR_CLOSED) error("Not Open");
         if(CallBackEnabled==1) gpio_set_irq_enabled_with_callback(PinDef[IRpin].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false, &gpio_callback);
         else gpio_set_irq_enabled(PinDef[IRpin].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
-        IrInterrupt = NULL;
+        IrInterrupt = nullptr;
         CallBackEnabled &= (~1);
         ExtCfg(IRpin, EXT_NOT_CONFIG, 0);
     } else if((p = checkstring(cmdline, (unsigned char *)"SEND"))) {
@@ -2156,7 +2156,7 @@ void MIPS16 cmd_backlight(void){
 }
 #endif
 void MIPS16 cmd_Servo(void){
-    unsigned char *tp;
+    CombinedPtr tp;
     int div=1, high1=0, high2=0;
     MMFLOAT duty1=-1.0, duty2=-1.0;
     getargs(&cmdline,5,(unsigned char *)",");
@@ -2220,7 +2220,7 @@ void MIPS16 cmd_Servo(void){
     set_PWM(slice,duty1,duty2,high1,high2, 0);
 }
 void MIPS16 cmd_pwm(void){
-    unsigned char *tp;
+    CombinedPtr tp;
     if((tp=checkstring(cmdline, (unsigned char *)"SYNC"))) {
         MMFLOAT count0=-1.0,count1=-1.0,count2=-1.0,count3=-1.0,count4=-1.0,count5=-1.0,count6=-1.0,count7=-1.0;
 #ifdef rp2350
@@ -2447,7 +2447,7 @@ void MIPS16 cmd_pwm(void){
  */
 static char keypad_pins[8];
 MMFLOAT *KeypadVar;
-unsigned char *KeypadInterrupt = NULL;
+CombinedPtr KeypadInterrupt;
 void KeypadClose(void);
 /*  @endcond */
 
@@ -2459,7 +2459,7 @@ void cmd_keypad(void) {
     else {
         getargs(&cmdline, 19, (unsigned char *)",");
         if(argc%2 == 0 || argc < 17) error("Invalid syntax");
-        if(KeypadInterrupt != NULL) error("Already open");
+        if(KeypadInterrupt != nullptr) error("Already open");
         KeypadVar = (double*)findvar(argv[0], V_FIND);
         if(g_vartbl[g_VarIndex].type & T_CONST) error("Cannot change a constant");
         if(!(g_vartbl[g_VarIndex].type & T_NBR)) error("Floating point variable required");
@@ -2490,13 +2490,13 @@ void cmd_keypad(void) {
 
 void KeypadClose(void) {
     int i;
-    if(KeypadInterrupt == NULL) return;
+    if(KeypadInterrupt == nullptr) return;
     for(i = 0; i < 8; i++) {
         if(keypad_pins[i]) {
             ExtCfg(keypad_pins[i], EXT_NOT_CONFIG, 0);				// all set to unconfigured
         }
     }
-    KeypadInterrupt = NULL;
+    KeypadInterrupt = nullptr;
 }
 
 
@@ -2547,7 +2547,7 @@ static char lcd_pins[6];
 
 void cmd_lcd(void)
  {
-    unsigned char *p;
+    CombinedPtr p;
     int i, j, code;
 
     if((p = checkstring(cmdline, (unsigned char *)"INIT"))) {
@@ -2695,9 +2695,9 @@ void cmd_DHT22(void) {
     if(!(argc == 5 || argc == 7)) error("Incorrect number of arguments");
 
     // get the two variables
-	temp = findvar(argv[2], V_FIND);
+	temp = (double*)findvar(argv[2], V_FIND);
 	if(!(g_vartbl[g_VarIndex].type & T_NBR)) error("Invalid variable");
-	humid = findvar(argv[4], V_FIND);
+	humid = (double*)findvar(argv[4], V_FIND);
 	if(!(g_vartbl[g_VarIndex].type & T_NBR)) error("Invalid variable");
 
     // get the pin number and set it up
@@ -2741,7 +2741,7 @@ normal_exit:
  * @cond
  * The following section will be excluded from the documentation.
  */
-void __not_in_flash_func(WS2812e)(int gppin, int T1H, int T1L, int T0H, int T0L, int nbr, char *p){
+void __not_in_flash_func(WS2812e)(int gppin, int T1H, int T1L, int T0H, int T0L, int nbr, CombinedPtr p){
     for(int i=0;i<nbr;i++){
         for(int j=0;j<8;j++){
             if(*p & 1){
@@ -2755,16 +2755,16 @@ void __not_in_flash_func(WS2812e)(int gppin, int T1H, int T1L, int T0H, int T0L,
                 gpio_put(gppin,false);
                 shortpause(T0L);
             }
-            *p>>=1;
+            p.write_byte(*p >> 1);
         }
         p++;
     }
 }
 /*  @endcond */
 void fun_dev(void){
-    unsigned char *tp=NULL;
+    CombinedPtr tp;
     tp = checkstring(ep, (unsigned char *)"WII");
-    if(tp==NULL)tp = checkstring(ep, (unsigned char *)"CLASSIC");
+    if(tp== nullptr)tp = checkstring(ep, (unsigned char *)"CLASSIC");
     if(tp){
        //	int ax; //classic left x
         //	int ay; //classic left y
@@ -2787,7 +2787,7 @@ void fun_dev(void){
         else iret=0;
         targ=T_INT;
     } else if((tp=checkstring(ep,(unsigned char *)"NUNCHUCK"))){
-        unsigned char *p;
+        CombinedPtr p;
         getargs(&tp,1,(unsigned char *)",");
         p=argv[0];
         if(toupper(*p)=='A'){
@@ -2909,10 +2909,10 @@ void fun_dev(void){
 }
 
 void cmd_WS2812(void){
-        int64_t *dest=NULL;
+        int64_t *dest= nullptr;
         uint32_t pin, red , green, blue, white, colour;
         int T0H=0,T0L=0,T1H=0,T1L=0,TRST=0;
-        unsigned char *p;
+        CombinedPtr p;
         int i, j, bit, nbr=0, colours=3;
         int ticks_per_millisecond=ticks_per_second/1000; 
     	getargs(&cmdline, 7, (unsigned char *)",");
@@ -2953,30 +2953,32 @@ void cmd_WS2812(void){
         int gppin=PinDef[pin].GPno;
         if(!(ExtCurrentConfig[pin] == EXT_DIG_OUT || ExtCurrentConfig[pin] == EXT_NOT_CONFIG)) error("Pin %/| is not off or an output",pin,pin);
         if(ExtCurrentConfig[pin] == EXT_NOT_CONFIG)ExtCfg(pin, EXT_DIG_OUT, 0);
-		p=GetTempMemory((nbr+1)*colours);
+		p = (uint8_t*)GetTempMemory((nbr+1)*colours);
 		uint64_t endreset=time_us_64()+TRST;
     	for(i=0;i<nbr;i++){
     		green=(dest[i]>>8) & 0xFF;
     		red=(dest[i]>>16) & 0xFF;
     		blue=dest[i] & 0xFF;
             if(colours==4)white=(dest[i]>>24) & 0xFF;
-			p[0]=0;p[1]=0;p[2]=0;
-            if(colours==4){p[3]=0;}
-    		for(j=0;j<8;j++){
-    			bit=1<<j;
-    			if( green &  (1<<(7-j)) )p[0] |= bit;
-    			if(red   & (1<<(7-j)))p[1] |= bit;
-    			if(blue  & (1<<(7-j)))p[2] |= bit;
-                if(colours==4){
-    			    if(white  & (1<<(7-j)))p[3] |= bit;
+			p.write_byte(0);
+            (p+1).write_byte(0);
+            (p+2).write_byte(0);
+            if(colours==4) (p+3).write_byte(0);
+    		for(j = 0; j < 8; ++j){
+    			bit = 1 << j;
+    			if(green & (1<<(7-j))) p.write_byte(p[0] | bit);
+    			if(red   & (1<<(7-j))) (p+1).write_byte(p[1] | bit);
+    			if(blue  & (1<<(7-j))) (p+2).write_byte(p[2] | bit);
+                if(colours == 4){
+    			    if(white & (1<<(7-j))) (p+3).write_byte(p[3] | bit);
                 }
     		}
-    		p+=colours;
+    		p += colours;
     	}
-    	p-=(nbr*colours);
+    	p -= (nbr * colours);
         while(time_us_64()<endreset){}
         disable_interrupts_pico();
-        WS2812e(gppin, T1H, T1L, T0H, T0L, nbr*colours, (char *)p);
+        WS2812e(gppin, T1H, T1L, T0H, T0L, nbr * colours, p);
         enable_interrupts_pico();
 }
 /* 
@@ -2989,7 +2991,7 @@ void __not_in_flash_func(bitstream)(int gppin, unsigned int *data, int num){
         shortpause(data[i])
     }
 }
-void __not_in_flash_func(serialtx)(int gppin, unsigned char *string, int bittime){
+void __not_in_flash_func(serialtx)(int gppin, CombinedPtr string, int bittime){
     int mask;
     int count = 0;
     while(count++ < string[0]) {
@@ -3016,7 +3018,7 @@ unsigned short FloatToUint32(MMFLOAT x) {
         error("Number range");
     return (x >= 0 ? (unsigned int)(x + 0.5) : (unsigned int)(x - 0.5)) ;
 }
-int __not_in_flash_func(serialrx)(int gppin, unsigned char *string, int timeout, int bittime, int half, int maxchars, char *termchars){
+int __not_in_flash_func(serialrx)(int gppin, unsigned char *string, int timeout, int bittime, int half, int maxchars, CombinedPtr termchars){
     int i,c,count=0;
     while(1){
         while(gpio_get_all64() & gppin) {                              // wait for the start bit
@@ -3047,7 +3049,7 @@ int __not_in_flash_func(serialrx)(int gppin, unsigned char *string, int timeout,
 }
 /*  @endcond */
 void cmd_device(void){
-	unsigned char *tp;
+	CombinedPtr tp;
 	tp = checkstring(cmdline, (unsigned char *)"WS2812");
 	if(tp) {
         cmdline=tp;
@@ -3075,7 +3077,7 @@ void cmd_device(void){
 	}
 #endif
     tp = checkstring(cmdline, (unsigned char *)"WII CLASSIC");
-    if(tp==NULL)tp = checkstring(cmdline, (unsigned char *)"WII");
+    if(tp== nullptr)tp = checkstring(cmdline, (unsigned char *)"WII");
 	if(tp) {
         cmdline=tp;
 		cmd_Classic();
@@ -3110,7 +3112,7 @@ void cmd_device(void){
 	tp = checkstring(cmdline, (unsigned char *)"SERIALRX");
 	if(tp) {
         int maxchars=255;
-        char *termchars=NULL;
+        CombinedPtr termchars;
 		getargs(&tp, 13,(unsigned char *)",");
 		if(argc < 9) error("Argument count");
         unsigned char code;
@@ -3122,21 +3124,21 @@ void cmd_device(void){
         if(ExtCurrentConfig[pin] == EXT_NOT_CONFIG)ExtCfg(pin, EXT_DIG_IN, CNPUSET);
         int gppin=(1<<PinDef[pin].GPno);
         int baudrate=getint(argv[2],110,230400);
-        unsigned char *string=NULL;
-        string = findvar(argv[4], V_FIND);
+        unsigned char *string= nullptr;
+        string = (unsigned char *)findvar(argv[4], V_FIND);
 	    if(!(g_vartbl[g_VarIndex].type & T_STR)) error("Invalid variable");
         int timeout=getint(argv[6],1,100000)*1000;
         void *status=findvar(argv[8], V_FIND);
         int type=g_vartbl[g_VarIndex].type;
 	    if(!(type & (T_NBR | T_INT))) error("Invalid variable");
         if(argc>9 && *argv[10])maxchars=getint(argv[10],1,255);
-        if(argc==13)termchars=(char *)getstring(argv[12]);
+        if(argc==13) termchars = getstring(argv[12]);
         writeusclock(0);
         int bittime=16777215 + 12  - (ticks_per_second/baudrate) ;
         int half = 16777215 + 12  - (ticks_per_second/(baudrate<<1)) ;
         if(!(gpio_get_all64() & gppin))error("Framing error");
         disable_interrupts_pico();
-        int istat=serialrx(gppin, string, timeout, bittime, half, maxchars, termchars);
+        int istat = serialrx(gppin, string, timeout, bittime, half, maxchars, termchars);
         enable_interrupts_pico();
         if(type & T_INT)*(int64_t *)status=(int64_t)istat;
         else *(MMFLOAT *)status=(MMFLOAT)istat;
@@ -3155,13 +3157,13 @@ void cmd_device(void){
         if(IsInvalidPin(pin)) error("Invalid pin");
         int gppin=(1<<PinDef[pin].GPno);
         int baudrate=getint(argv[2],110,230400);
-        unsigned char *string=getstring(argv[4]);
+        CombinedPtr string = getstring(argv[4]);
         if(!(ExtCurrentConfig[pin] == EXT_DIG_OUT || ExtCurrentConfig[pin] == EXT_NOT_CONFIG)) error("Pin %/| is not off or an output",pin,pin);
         if(ExtCurrentConfig[pin] == EXT_NOT_CONFIG)ExtCfg(pin, EXT_DIG_OUT, 0);
         gpio_set_mask64(gppin);                                    // send the start bit
         int bittime=16777215 + 12  - (ticks_per_second/baudrate) ;
         disable_interrupts_pico();
-        serialtx(gppin,string, bittime);
+        serialtx(gppin, string, bittime);
         enable_interrupts_pico();
 		return;
 	}
@@ -3170,8 +3172,8 @@ void cmd_device(void){
 		int i,num,size;
 		uint32_t pin;
         int ticks_per_millisecond=ticks_per_second/1000;
-		MMFLOAT *a1float=NULL;
-		int64_t *a1int=NULL;
+		MMFLOAT *a1float= nullptr;
+		int64_t *a1int= nullptr;
 		unsigned int *data;
 		getargs(&tp, 5,(unsigned char *)",");
 		if(!(argc == 5)) error("Argument count");
@@ -3186,8 +3188,8 @@ void cmd_device(void){
         if(ExtCurrentConfig[pin] == EXT_NOT_CONFIG)ExtCfg(pin, EXT_DIG_OUT, 0);
         size=parsenumberarray(argv[4],&a1float, &a1int, 3, 1, NULL, false);
         if(size < num)error("Array too small");
-        data=GetTempMemory(num * sizeof(unsigned int));
-        if(a1float!=NULL){
+        data = (unsigned int*)GetTempMemory(num * sizeof(unsigned int));
+        if(a1float!= nullptr){
             for(i=0; i< num;i++)data[i]= FloatToUint32(*a1float++);
         } else {
             for(i=0; i< num;i++){
@@ -3221,7 +3223,7 @@ void __not_in_flash_func(ADCint)()
 /*  @endcond */
 
 void cmd_adc(void){
-	unsigned char *tp;
+	CombinedPtr tp;
 	tp = checkstring(cmdline, (unsigned char *)"OPEN");
 	if(tp) {
         getargs(&tp,5,(unsigned char *)",");
@@ -3314,8 +3316,8 @@ if(rp2350a){
 #endif
         if(argc==5){
         	InterruptUsed = true;
-        	ADCInterrupt = (char *)GetIntAddress(argv[4]);							// get the interrupt location
-    	} else ADCInterrupt = NULL;
+        	ADCInterrupt = GetIntAddress(argv[4]);							// get the interrupt location
+    	} else ADCInterrupt = nullptr;
         ADCopen=nbr;
 		return;
 	}
@@ -3326,8 +3328,8 @@ if(rp2350a){
         if(!(argc == 3))error("Argument count");
         ADCmax=0;
         ADCpos=0;
-        adcint1=adcint2=NULL;
-        int64_t *adcval=NULL;
+        adcint1=adcint2= nullptr;
+        int64_t *adcval= nullptr;
 #ifdef rp2350
         int dims[MAXDIM]={0};
 #else
@@ -3335,7 +3337,7 @@ if(rp2350a){
 #endif
         int card1=parseintegerarray(argv[0], &adcval, 1, 1, dims, true);
         adcint1=(uint8_t *)adcval;
-        adcval=NULL;
+        adcval= nullptr;
         ADCmax=parseintegerarray(argv[2], &adcval, 2, 1, dims, true);
         adcint2=(uint8_t *)adcval;
         if(card1!=ADCmax)error("Array size mismatch %,%",card1, ADCmax);
@@ -3408,7 +3410,7 @@ if(rp2350a){
         getargs(&tp, 23, (unsigned char *)",");
 		if(!ADCopen)error("ADC not open");
         if(!(argc >= 1))error("Argument count");
-        a1float=NULL; a2float=NULL; a3float=NULL; a4float=NULL;
+        a1float= nullptr; a2float= nullptr; a3float= nullptr; a4float= nullptr;
         ADCmax=0;
         ADCpos=0;
         int card;
@@ -3535,7 +3537,7 @@ if(rp2350a){
         if(ADCopen>=4)ExtCfg(44, EXT_NOT_CONFIG, 0);
 #endif
         ADCopen=0;
-        adcint=adcint1=adcint2=NULL;
+        adcint=adcint1=adcint2= nullptr;
         ADCDualBuffering=false;
         dmarunning=false;
         last_adc=99;
@@ -3566,7 +3568,7 @@ void MIPS16 ClearExternalIO(void) {
         cameraclose();
     #endif
     InterruptUsed = false;
-	InterruptReturn = NULL;
+	InterruptReturn = nullptr;
     irq_set_enabled(DMA_IRQ_1, false);
 #ifdef rp2350
     irq_set_enabled(PWM_IRQ_WRAP_1, false);
@@ -3599,8 +3601,8 @@ void MIPS16 ClearExternalIO(void) {
     }
     CallBackEnabled &= (~32);
     for(i=0;i<MAXBLITBUF;i++){
-    	spritebuff[i].spritebuffptr = NULL;
-    	blitbuff[i].blitbuffptr = NULL;
+    	spritebuff[i].spritebuffptr = nullptr;
+    	blitbuff[i].blitbuffptr = nullptr;
     }
     CallBackEnabled=0;
     KeypadClose();
@@ -3620,12 +3622,12 @@ void MIPS16 ClearExternalIO(void) {
     SPI2Close();
     if(IRpin!=99){
         gpio_set_irq_enabled_with_callback(PinDef[IRpin].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false, &gpio_callback);
-        IrInterrupt = NULL;
+        IrInterrupt = nullptr;
         ExtCfg(IRpin, EXT_NOT_CONFIG, 0);
     }
     ResetDisplay();
     IrState = IR_CLOSED;
-    IrInterrupt = NULL;
+    IrInterrupt = nullptr;
     IrGotMsg = false;
     memset(&PIDchannels,0,sizeof(s_PIDchan)*(MAXPID+1));
 #ifdef rp2350
@@ -3665,9 +3667,9 @@ void MIPS16 ClearExternalIO(void) {
     }
     #endif
     FreeMemorySafe((void **)&ds18b20Timers);
-    KeypadInterrupt = NULL;
+    KeypadInterrupt = nullptr;
 
-    for(i = 0; i < NBRSETTICKS; i++) TickInt[i] = NULL;
+    for(i = 0; i < NBRSETTICKS; i++) TickInt[i] = nullptr;
     for(i = 0; i < NBRSETTICKS; i++) TickActive[i] = 0;
 	for(i = 0; i < NBR_PULSE_SLOTS; i++) PulseCnt[i] = 0;             // disable any pending pulse commands
     PulseActive = false;
@@ -3746,44 +3748,44 @@ if(rp2350a){
     ADCopen=0;
     adc_set_round_robin(0);
     SetADCFreq(500000);
-    KeyInterrupt=NULL;
-    OnKeyGOSUB=NULL;
+    KeyInterrupt= nullptr;
+    OnKeyGOSUB= nullptr;
 #ifndef USBKEYBOARD
-    OnPS2GOSUB=NULL;
+    OnPS2GOSUB= nullptr;
     PS2code=0;
     PS2int=false;
     if(!Option.MOUSE_CLOCK)mouse0close();
 #endif 
-    for (int i=0; i<6;i++)nunInterruptc[i]=NULL;
+    for (int i=0; i<6;i++)nunInterruptc[i]= nullptr;
     if((classic1 || nunchuck1) && (classicread || nunchuckread))WiiReceive(6, (char *)nunbuff);
     classic1=0;
     nunchuck1=0;
     classicread=false;
     nunchuckread=false;
 #ifdef PICOMITEWEB
-    MQTTInterrupt=NULL;
+    MQTTInterrupt= nullptr;
     MQTTComplete=0;
     closeMQTT();
 #endif
 #ifndef PICOMITEWEB
 #ifdef PICOMITEVGA
     CollisionFound = false;
-    COLLISIONInterrupt=NULL;
+    COLLISIONInterrupt= nullptr;
 #endif
 #endif
 #ifdef GUICONTROLS
     gui_int_down = false;
     gui_int_up = false;
-    GuiIntDownVector=NULL;
-    GuiIntUpVector=NULL;
+    GuiIntDownVector= nullptr;
+    GuiIntUpVector= nullptr;
 #endif
     dmarunning=false;
     ADCDualBuffering=false;
-    ADCInterrupt=NULL;
-    CSubInterrupt=NULL;
+    ADCInterrupt= nullptr;
+    CSubInterrupt= nullptr;
     CSubComplete=0;
     keyselect=0;
-    g_myrand=NULL;
+    g_myrand= nullptr;
     CMM1=0;
     dirOK=2;
     nextline[0]=0;nextline[1]=0;nextline[2]=0;nextline[3]=99;
@@ -3791,9 +3793,9 @@ if(rp2350a){
     memset(pioRXinterrupts,0,sizeof(pioRXinterrupts));
     memset(pioTXinterrupts,0,sizeof(pioTXinterrupts));
     piointerrupt=0;
-    DMAinterruptRX=NULL;
-    DMAinterruptTX=NULL;
-    WAVInterrupt=NULL;
+    DMAinterruptRX= nullptr;
+    DMAinterruptTX= nullptr;
+    WAVInterrupt= nullptr;
     dma_hw->abort = ((1u << dma_rx_chan2) | (1u << dma_rx_chan));
     if(dma_channel_is_busy(dma_rx_chan))dma_channel_abort(dma_rx_chan);
     if(dma_channel_is_busy(dma_rx_chan2))dma_channel_abort(dma_rx_chan2);
@@ -3809,7 +3811,7 @@ if(rp2350a){
     if(dma_channel_is_busy(ADC_dma_chan2))dma_channel_abort(ADC_dma_chan2);
 //    dma_channel_cleanup(ADC_dma_chan);
 //    dma_channel_cleanup(ADC_dma_chan2);
-    adcint=adcint1=adcint2=NULL;
+    adcint=adcint1=adcint2= nullptr;
 }
 
 

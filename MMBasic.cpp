@@ -156,9 +156,9 @@ unsigned short cmdSUB, cmdFUN, cmdCFUN, cmdCSUB, cmdIRET, cmdComment, cmdEndComm
 *********************************************************************************************************************************************/
 
 
-int CheckEmpty(char *p){
+int CheckEmpty(CombinedPtr p){
         int emptyarray=0;
-        char *pp = strchr((char *)p, '(');
+        CombinedPtr pp = strchr(p, '(');
         if(pp){
             pp++;
             skipspace(pp);
@@ -267,7 +267,7 @@ void   MIPS16 PrepareProgram(int ErrAbort) {
 
     
     NbrFuncts = 0;
-    CFunctionFlash = CFunctionLibrary = NULL;
+    CFunctionFlash = CFunctionLibrary = nullptr;
     if(Option.LIBRARY_FLASH_SIZE == MAX_PROG_SIZE)
          NbrFuncts = PrepareProgramExt(LibMemory , 0, &CFunctionLibrary, ErrAbort);
     PrepareProgramExt(ProgMemory, NbrFuncts, &CFunctionFlash, ErrAbort);
@@ -355,7 +355,7 @@ int   MIPS16 PrepareProgramExt(CombinedPtr p, int i, CombinedPtr *CFunPtr, int E
                 MMPrintString("Error: Too many subroutines and functions - erasing program\r\n");
                 uSec(100000);
                 ClearProgram(true);
-                cmdline=NULL;
+                cmdline=nullptr;
                 do_end(false);
                 longjmp(mark, 1);												// jump back to the input prompt
             }
@@ -373,8 +373,8 @@ int   MIPS16 PrepareProgramExt(CombinedPtr p, int i, CombinedPtr *CFunPtr, int E
     while(*p == 0) p++;                                             // the end of the program can have multiple zeros
     p++;                                                            // step over the terminating 0xff
     *CFunPtr = p.aligh(); // CFunction flash (if it exists) starts on the next word address after the program in flash
-    if(i < MAXSUBFUN) subfun[i] = NULL;
-    CurrentLinePtr = NULL;
+    if(i < MAXSUBFUN) subfun[i] = nullptr;
+    CurrentLinePtr = nullptr;
     // now, step through the CFunction area looking for fonts to add to the font table
     //Bit 7 on the last address byte is used to identify a font.
     cfp = *(unsigned int **)CFunPtr;
@@ -1827,7 +1827,7 @@ void hashlabels(CombinedPtr p, int ErrAbort){
 // search through program memory looking for a label.
 // returns a pointer to the T_NEWLINE token or throws an error if not found
 // non cached version
-unsigned char *findlabel(unsigned char *labelptr) {
+CombinedPtr findlabel(CombinedPtr labelptr) {
 //    char *p, *lastp = (char *)ProgMemory + 1;
 	unsigned char  *tp, *ip;
     int i;
@@ -1835,7 +1835,7 @@ unsigned char *findlabel(unsigned char *labelptr) {
     char label[MAXVARLEN + 1];
 
     // first, just exit we have a NULL argument
-    if(labelptr == NULL) return NULL;
+    if(labelptr == NULL) return nullptr;
 
     // convert the label to the token format and load into label[]
     // this assumes that the first character has already been verified as a valid label character
@@ -1870,11 +1870,11 @@ unsigned char *findlabel(unsigned char *labelptr) {
 		hash %= MAXSUBFUN;
 	}
 	if(funtbl[hash].name[0]==0)error("Cannot find label");
-	return 0;
+	return nullptr;
 
 }
 #else
-unsigned char MIPS16 *findlabel(unsigned char *labelptr) {
+CombinedPtr MIPS16 findlabel(CombinedPtr labelptr) {
     char *p, *lastp = (char *)ProgMemory + 1;
     char *next;
     int i,j=0;
@@ -2841,7 +2841,7 @@ void MIPS16 error(char *msg, ...) {
     }
     
     #endif
-    cmdline=NULL;
+    cmdline = nullptr;
 	do_end(false);
 	longjmp(mark, 1);												// jump back to the input prompt
 }
@@ -3121,7 +3121,7 @@ void  MIPS16 ClearStack(void) {
     gosubindex = 0;
     g_LocalIndex = 0;
     g_TempMemoryIsChanged = true;                                     // signal that temporary memory should be checked
-    InterruptReturn = NULL;
+    InterruptReturn = nullptr;
 }
 
 
@@ -3154,7 +3154,7 @@ void MIPS16 ClearRuntime(bool all) {
     OptionConsole=3;
     DefaultType = T_NBR;
     ds18b20Timers = NULL;                                           // InitHeap(true) will recover the memory allocated to this array
-    findlabel(NULL);                                                // clear the label cache
+    findlabel(nullptr);                                                // clear the label cache
     OptionErrorSkip = 0;
 	optionangle=1.0;
     useoptionangle=false;
@@ -3186,12 +3186,12 @@ void MIPS16 ClearRuntime(bool all) {
     m_alloc(all? M_VAR : M_LIMITED);
     ClearVars(0,true);
     memset(cmdlinebuff,0,sizeof(cmdlinebuff));
-    memset(datastore, 0, sizeof(struct sa_data) * MAXRESTORE);
+    memset((void*)datastore, 0, sizeof(struct sa_data) * MAXRESTORE);
     restorepointer = 0;
     g_flag=0;
     g_varcnt = 0;
-    CurrentLinePtr = ContinuePoint = NULL;
-    for(i = 0;  i < MAXSUBFUN; i++)  subfun[i] = NULL;
+    CurrentLinePtr = ContinuePoint = nullptr;
+    for(i = 0;  i < MAXSUBFUN; i++)  subfun[i] = nullptr;
 #ifdef GUICONTROLS
     for(i = 1; i < Option.MaxCtrls; i++) {
         memset(&Ctrl[i],0,sizeof(struct s_ctrl));
@@ -3213,7 +3213,7 @@ void MIPS16 ClearProgram(bool psram) {
     ClearRuntime(true);
 //    ProgMemory[0] = ProgMemory[1] = ProgMemory[3] = ProgMemory[4] = 0;
     PSize = 0;
-    StartEditPoint = NULL;
+    StartEditPoint = nullptr;
     StartEditChar= 0;
     ProgramChanged = false;
     TraceOn = false;
@@ -3599,8 +3599,8 @@ static unsigned char charmap[] = {
 
 
 int mystrncasecmp(
-    const unsigned char *s1,         /* First string. */
-    const unsigned char *s2,         /* Second string. */
+    CombinedPtr s1,         /* First string. */
+    CombinedPtr s2,         /* Second string. */
     size_t  length)      /* Maximum number of characters to compare
                          * (stop earlier if the end of either string
                          * is reached). */

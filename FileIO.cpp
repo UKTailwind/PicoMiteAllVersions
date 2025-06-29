@@ -79,7 +79,7 @@ static uint32_t m1_rfmt;
 static uint32_t m1_timing;
 static uint32_t m0_rfmt;
 static uint32_t m0_timing;
-int MemLoadProgram(unsigned char *fname, unsigned char *ram);
+static int MemLoadProgram(CombinedPtr fname, unsigned char *ram);
 #endif
 
 // 8*8*4 bytes * 3 = 768
@@ -1318,8 +1318,8 @@ void fun_dir(void)
     }
 
     sret = (uint8_t *)GetTempMemory(STRINGSIZE); // this will last for the life of the command
-    strcpy((char *)sret, fnod.fname);
-    CtoM(sret); // convert to a MMBasic style string
+    strcpy((char*)sret.raw(), fnod.fname);
+    CtoM(sret.raw()); // convert to a MMBasic style string
     FatFSFileSystem=FatFSFileSystemSave;
     targ = T_STR;
 }
@@ -2285,9 +2285,9 @@ void importfile(char *pp, char *tp, char **p, uint32_t buf, int convertdebug, bo
 }
 
 // load a file into program memory
-int FileLoadCMM2Program(char *fname, bool message) {
+int FileLoadCMM2Program(CombinedPtr fname, bool message) {
     int fnbr;
-    char *p,*op, *ip, *buf, *sbuff, buff[STRINGSIZE];
+    char *op, *ip, *buf, *sbuff, buff[STRINGSIZE];
     char pp[FF_MAX_LFN] = {0};
     int c;
     int convertdebug=1;
@@ -2298,8 +2298,8 @@ int FileLoadCMM2Program(char *fname, bool message) {
     if (!InitSDCard()) return false;
     ClearProgram(true); // clear any leftovers from the previous program
     fnbr = FindFreeFileNbr();
-    p = (char *)getFstring((unsigned char *)fname);
-    if (strchr((char *)p, '.') == NULL) strcat((char *)p, ".bas");
+    char* p = (char*)getFstring(fname);
+    if (strchr(p, '.') == NULL) strcat(p, ".bas");
     char q[FF_MAX_LFN]={0};
     FatFSFileSystemSave=FatFSFileSystem;
     getfullfilename(p,q);
@@ -2441,7 +2441,7 @@ int FileLoadCMM2Program(char *fname, bool message) {
 }
 #endif
 // load a file into program memory
-int FileLoadProgram(unsigned char *fname, bool chain)
+int FileLoadProgram(CombinedPtr fname, bool chain)
 {
     int fnbr;
     char *p, *buf;
@@ -2454,7 +2454,7 @@ int FileLoadProgram(unsigned char *fname, bool chain)
     ClearRuntime(chain? false : true);
 //    ProgMemory[0] = ProgMemory[1] = ProgMemory[3] = ProgMemory[4] = 0;
     PSize = 0;
-    StartEditPoint = NULL;
+    StartEditPoint = nullptr;
     StartEditChar= 0;
     ProgramChanged = false;
     TraceOn = false;
@@ -2822,7 +2822,7 @@ void MIPS16 SaveProgramToRAM(unsigned char *pm, int msg, uint8_t *ram) {
         MemWriteClose();
         error("Not enough memory");
 }
-int MemLoadProgram(unsigned char *fname, unsigned char *ram)
+static int MemLoadProgram(CombinedPtr fname, unsigned char *ram)
 {
     int fnbr;
     char *p, *buf;
@@ -2833,7 +2833,7 @@ int MemLoadProgram(unsigned char *fname, unsigned char *ram)
     if(Option.DISPLAY_TYPE>=VIRTUAL && WriteBuf)FreeMemorySafe((void **)&WriteBuf);
     ClearRuntime(false);
     PSize = 0;
-    StartEditPoint = NULL;
+    StartEditPoint = nullptr;
     StartEditChar= 0;
     ProgramChanged = false;
     TraceOn = false;
@@ -2884,7 +2884,7 @@ void MIPS16 loadCMM2(CombinedPtr p, bool autorun, bool message)
     if (CurrentLinePtr != NULL && !autorun)
         error("Invalid in a program");
 
-    if (!FileLoadCMM2Program((char *)argv[0], message))
+    if (!FileLoadCMM2Program(argv[0], message))
         return;
     FlashLoad = 0;
     if (autorun)
@@ -3283,13 +3283,15 @@ void FilePutStr(int count, char *c, int fnbr)
 
 // output a string to a file
 // the string must be a MMBasic string
-void MMfputs(unsigned char *p, int filenbr)
+void MMfputs(CombinedPtr p, int filenbr)
 {
     int i;
     i = *p++;
     if (FileTable[filenbr].com > MAXCOMPORTS)
     {
-        FilePutStr(i, (char *)p, filenbr);
+        uint8_t* c = (uint8_t*)GetTempMemory(i);
+        memcpy(c, p, i);
+        FilePutStr(i, (char*)c, filenbr);
     }
     else
     {
@@ -3610,7 +3612,6 @@ void MIPS16 cmd_copy(void)
     if(strchr((char *)fromfile,'*') || strchr((char *)fromfile,'?')){ //wildcard in the source so bulk copy
         unsigned char *in = (uint8_t*)GetTempMemory(STRINGSIZE);
         unsigned char *out = (uint8_t*)GetTempMemory(STRINGSIZE);
-//         MMPrintString("Bulk copying\r\n");
         int localsave=FatFSFileSystem;
         if(!(ExistsDir((char *)tofile, todir, &tofilesystem))){
             FatFSFileSystem=localsave;
@@ -3619,12 +3620,10 @@ void MIPS16 cmd_copy(void)
         int waste=0, t=FatFSFileSystem+1;
         t = drivecheck((char *)getFstring(argv[0]),&waste);
         argv[0]+=waste;
-        *argv[0]='"';
+        argv[0].write_byte('"');
         FatFSFileSystem=t-1;
         int i;
-//        uint32_t currentdate;
         char *p;
-//        char ts[FF_MAX_LFN] = {0};
         char pp[FF_MAX_LFN] = {0};
         char q[FF_MAX_LFN] = {0};
         DIR djd;
@@ -4651,24 +4650,24 @@ void cmd_autosave(void)
  * The following section will be excluded from the documentation.
  */
 
-void FileOpen(char *fname, char *fmode, char *ffnbr)
+static void FileOpen(char *fname, CombinedPtr fmode, CombinedPtr ffnbr)
 {
     int fnbr;
     BYTE mode = 0;
-    if (str_equal((const unsigned char *)fmode, (const unsigned char *)"OUTPUT"))
+    if (str_equal(fmode, (const unsigned char *)"OUTPUT"))
         mode = FA_WRITE | FA_CREATE_ALWAYS;
-    else if (str_equal((const unsigned char *)fmode, (const unsigned char *)"APPEND"))
+    else if (str_equal(fmode, (const unsigned char *)"APPEND"))
         mode = FA_WRITE | FA_OPEN_APPEND;
-    else if (str_equal((const unsigned char *)fmode, (const unsigned char *)"INPUT"))
+    else if (str_equal(fmode, (const unsigned char *)"INPUT"))
         mode = FA_READ;
-    else if (str_equal((const unsigned char *)fmode, (const unsigned char *)"RANDOM"))
+    else if (str_equal(fmode, (const unsigned char *)"RANDOM"))
         mode = FA_WRITE | FA_OPEN_APPEND | FA_READ;
     else
         error("File access mode");
 
     if (*ffnbr == '#')
         ffnbr++;
-    fnbr = getinteger((unsigned char *)ffnbr);
+    fnbr = getinteger(ffnbr);
     BasicFileOpen(fname, fnbr, mode);
 }
 /*  @endcond */
@@ -4692,7 +4691,7 @@ void cmd_open(void)
         // check that it is a serial port that we are opening
         if (argc == 5 && !(mem_equal((unsigned char *)fname, (unsigned char *)"COM1:", 5) || mem_equal((unsigned char *)fname, (unsigned char *)"COM2:", 5)))
         {
-            FileOpen(fname, (char *)argv[2], (char *)argv[4]);
+            FileOpen(fname, argv[2], argv[4]);
             diskchecktimer = DISKCHECKRATE;
             return;
         }
@@ -4755,7 +4754,7 @@ void fun_inputstr(void)
     if (fnbr == 0)
     { // accessing the console
         for (i = 1; i <= nbr && kbhitConsole(); i++)
-            sret[i] = getConsole(); // get the char from the console input buffer and save in our returned string
+            (sret + i).write_byte(getConsole()); // get the char from the console input buffer and save in our returned string
     }
     else
     {
@@ -4767,14 +4766,14 @@ void fun_inputstr(void)
         if (FileTable[fnbr].com > MAXCOMPORTS)
         {
             for (i = 1; i <= nbr && !MMfeof(fnbr); i++)
-                sret[i] = FileGetChar(fnbr); // get the char from the SD card and save in our returned string
-            *sret = i - 1;                   // update the length of the string
+                (sret+i).write_byte(FileGetChar(fnbr)); // get the char from the SD card and save in our returned string
+            sret.write_byte(i - 1);                   // update the length of the string
             return;                          // all done so skip the rest
         }
         for (i = 1; i <= nbr && SerialRxStatus(FileTable[fnbr].com); i++)
-            sret[i] = SerialGetchar(FileTable[fnbr].com); // get the char from the serial input buffer and save in our returned string
+            (sret+i).write_byte(SerialGetchar(FileTable[fnbr].com)); // get the char from the serial input buffer and save in our returned string
     }
-    *sret = i - 1;
+    sret.write_byte(i - 1);
 }
 
 void fun_eof(void)
@@ -5602,11 +5601,11 @@ void MIPS16 cmd_var(void)
                     error("Invalid variable");
 
                 // Убираем суффиксы массива "()" из имени для точного совпадения при фильтрации
-                char *p_end = (char *)&argv[i][strlen((char *)argv[i]) - 1];
+                CombinedPtr p_end = (argv[i] + strlen(argv[i])) - 1;
                 if (*p_end == ')') {
                     p_end--;
                     if (*p_end == ' ') p_end--;
-                    if (*p_end == '(') *p_end = 0;
+                    if (*p_end == '(') p_end.write_byte(0);
                     else error("Invalid variable");
                 }
             }
@@ -5643,12 +5642,12 @@ void MIPS16 cmd_var(void)
                 // Проверяем, содержится ли переменная в списке для сохранения
                 bool skip = false;
                 for (int i = 0; i < argc; i += 2) {
-                    char *argname = (char *)argv[i];
+                    CombinedPtr argname = argv[i];
                     size_t arglen = strlen(argname);
                     // Если в аргументе есть суффикс %, $, () — отрезаем для сравнения
                     while (arglen > 0 && (argname[arglen - 1] == '%' || argname[arglen - 1] == '$' || argname[arglen - 1] == ')'))
                         arglen--;
-                    if (strncasecmp(namebuf, argname, arglen) == 0 && namebuf[arglen] == '\0') {
+                    if (strncasecmp(argname, namebuf, arglen) == 0 && namebuf[arglen] == '\0') {
                         skip = true;
                         break;
                     }

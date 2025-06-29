@@ -293,7 +293,7 @@ static char (*SSputchar)(char buff, int flush)=SerialConsolePutC;
  THE EDIT COMMAND
 ********************************************************************************************************************************************/
 
-unsigned char *EdBuff=NULL;                     // the buffer used for editing the text
+unsigned char *EdBuff= nullptr;                     // the buffer used for editing the text
 int nbrlines;                     // size of the text held in the buffer (in lines)
 int VWidth, VHeight;              // editing screen width and height in characters
 int edx, edy;                     // column and row at the top left hand corner of the editing screen (in characters)
@@ -332,10 +332,10 @@ int oldmode;
 //  EDIT              Will run the full screen editor on the current program memory, if run after an error will place the cursor on the error line
 void edit(CombinedPtr cmdline, bool cmdfile) {
     CombinedPtr fromp;
-    unsigned char *p=NULL;
+    unsigned char *p= nullptr;
     int y, x, edit_buff_size ;
     optioncolourcodesave=Option.ColourCode;
-    char name[STRINGSIZE], *filename=NULL;
+    char name[STRINGSIZE], *filename= nullptr;
     getargs(&cmdline,1,(unsigned char *)",");
     if(argc){
         strcpy(name,(char *)getFstring(argv[0]));
@@ -415,7 +415,7 @@ void edit(CombinedPtr cmdline, bool cmdfile) {
     edx = edy = curx = cury = y = x = tempx = 0;
     txtp = EdBuff;
     *tknbuf = 0;
-    if(filename==NULL){
+    if(filename== nullptr){
         fromp  = ProgMemory;
         p = EdBuff;
         nbrlines = 0;
@@ -1072,7 +1072,7 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
 #else
             Option.Refresh=RefreshSave;
 #endif                          
-                            if(c != ESC && TextChanged && fname==NULL) SaveToProgMemory();
+                            if(c != ESC && TextChanged && fname== nullptr) SaveToProgMemory();
                             if(c != ESC && TextChanged && fname) {
                                 int fnbr1;
                                 if(ExistsFile(fname)){
@@ -1115,7 +1115,7 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
                                 return;
                             }
                             if(c == ESC || c == CTRLKEY('Q') || c == F1 || fname) {
-                                cmdline=NULL;
+                                cmdline= nullptr;
                                 do_end(false);
                                 longjmp(mark, 1);												// jump back to the input prompt
                             }

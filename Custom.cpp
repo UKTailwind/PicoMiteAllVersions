@@ -101,11 +101,11 @@ they may be changed and you would then need to re insert your changes in a new r
 
 #include "hardware/pio.h"
 #include "hardware/pio_instructions.h"
-char *pioRXinterrupts[4][3]={0};
-char *pioTXinterrupts[4][3]={0};
+CombinedPtr pioRXinterrupts[4][3];
+CombinedPtr pioTXinterrupts[4][3];
 uint8_t pioTXlast[4][3]={0};
-char *DMAinterruptRX=NULL;
-char *DMAinterruptTX=NULL;
+CombinedPtr DMAinterruptRX;
+CombinedPtr DMAinterruptTX;
 uint32_t dma_rx_chan = PIO_RX_DMA;
 uint32_t dma_tx_chan = PIO_TX_DMA;
 uint32_t dma_rx_chan2 = PIO_RX_DMA2;
@@ -373,7 +373,7 @@ void start_i2s(int pior, int sm){
         else if(pior==1)PIO1=false;
         else PIO0=false;
 }
-int getGPpin(unsigned char *pinarg, int pio, int base){
+static int getGPpin(CombinedPtr pinarg, int pio, int base){
 	char code;
         int pin;
 	if(!(code=codecheck(pinarg)))pinarg+=2;
@@ -479,7 +479,7 @@ void MIPS16 cmd_pio(void){
         a1int=(uint32_t *)aint;
         if(argc>=9 && *argv[8]){
                 if(nbr==0)error("Interrupt incopmpatible with continuous running");
-                DMAinterruptRX=(char *)GetIntAddress(argv[8]);
+                DMAinterruptRX=GetIntAddress(argv[8]);
                 InterruptUsed=true;
         }
         int dmasize=DMA_SIZE_32;
@@ -574,7 +574,7 @@ void MIPS16 cmd_pio(void){
         a1int=(uint32_t *)aint;
         if(argc>=9 && *argv[8]){
                 if(nbr==0)error("Interrupt incopmpatible with continuous running");
-                DMAinterruptTX=(char *)GetIntAddress(argv[8]);
+                DMAinterruptTX=GetIntAddress(argv[8]);
                 InterruptUsed=true;
         }
         int dmasize=DMA_SIZE_32;
@@ -650,12 +650,12 @@ void MIPS16 cmd_pio(void){
 #endif
         int sm=getint(argv[2],0,3);
         if(*argv[4]){
-                if(checkstring(argv[4],(unsigned char *)"0"))pioRXinterrupts[sm][pior]=NULL;
-                else pioRXinterrupts[sm][pior]=(char *)GetIntAddress(argv[4]);
+                if(checkstring(argv[4],(unsigned char *)"0"))pioRXinterrupts[sm][pior]=nullptr;
+                else pioRXinterrupts[sm][pior]=GetIntAddress(argv[4]);
         }
         if(argc==7){
-                if(checkstring(argv[6],(unsigned char *)"0"))pioTXinterrupts[sm][pior]=NULL;
-                else pioTXinterrupts[sm][pior]=(char *)GetIntAddress(argv[6]);
+                if(checkstring(argv[6],(unsigned char *)"0"))pioTXinterrupts[sm][pior]=nullptr;
+                else pioTXinterrupts[sm][pior]=GetIntAddress(argv[6]);
         }
         piointerrupt=0;
         for(int i=0;i<4;i++){

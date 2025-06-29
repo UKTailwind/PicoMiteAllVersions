@@ -426,7 +426,7 @@ void cmd_mouse(void){
       if(!mouse0)error("Not open");
       if(!(argc==3))error("Syntax");
       n=getint(argv[0],2,2);
-      nunInterruptc[n] = (char *)GetIntAddress(argv[2]);					// get the interrupt location
+      nunInterruptc[n] = GetIntAddress(argv[2]);					// get the interrupt location
       InterruptUsed = true;
       return;
 	} else if((tp = checkstring(cmdline, (unsigned char *)"SET"))){

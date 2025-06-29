@@ -65,14 +65,14 @@ add_executable(PicoMite
 	External.cpp
 	MATHS.cpp
 	MATHSC.c
-	Onewire.c
-	I2C.c
+	Onewire.cpp
+	I2C.cpp
 	SPI.c
 	Serial.c
 	SPI-LCD.c
 	BmpDecoder.c
 	GPS.c
-	Audio.c
+	Audio.cpp
 	CFunction.cpp
     picojpeg.c 
     lfs.c
@@ -180,6 +180,8 @@ target_compile_options(PicoMite PRIVATE -DNDEBUG
 										-Wall
 										-Wno-write-strings
 										-Wno-sign-compare
+										-Wno-pointer-arith
+										-Wno-narrowing
 										$<$<COMPILE_LANGUAGE:CXX>:-Wno-register>
 										)
 # all RP2350 variants

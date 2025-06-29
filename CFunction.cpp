@@ -33,11 +33,10 @@ unsigned int CFuncAudio = (unsigned int)NULL;
 
 
 // used by CallCFunction() below to find a CFunction or CSub in program flash or the library
-unsigned int *FindCFunction(unsigned int *p, unsigned char *CmdPtr, unsigned char *offset) {
+static CombinedPtrI FindCFunction(CombinedPtrI p, CombinedPtr CmdPtr, CombinedPtr offset) {
     while(*p != 0xffffffff) {
-        //if(*p++ == (unsigned int)(CmdPtr-ProgMemory)) return p;
-        if(*p++ == (unsigned int)(CmdPtr-offset)) return p;
-        p += (*p + 4) / sizeof(unsigned int);
+        if(*p++ == (int)(CmdPtr - offset)) return p;
+        p += (*p + 4) / sizeof(int);
     }
     return p;
 }
@@ -47,26 +46,26 @@ long long int MIPS16 CallCFunction(CombinedPtr CmdPtr, CombinedPtr ArgList, Comb
     int typ[10] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
     long long int ret, i64[10];
     MMFLOAT ff[10];
-    unsigned char *pp;
+    CombinedPtr pp;
     int i,type;
     uint32_t ii;
-    unsigned int *p = (unsigned int *)CallTable;
+    CombinedPtrI p = (int *)CallTable;
     MMFLOAT ftmp;
 //    if((uint32_t)p > 0x10000000)error("Internal error");
     // find the C code in flash
     if(*ArgList == '(') ArgList++;                                  // and step over it
-    p = FindCFunction((unsigned int *)CFunctionFlash, CmdPtr,ProgMemory);      // search through the program flash looking for a match to the function being called
-    if(*p == 0xffffffff && CFunctionLibrary != NULL)
-         p = FindCFunction((unsigned int *)CFunctionLibrary, CmdPtr,LibMemory);// if unsuccessful search the library area
+    p = FindCFunction(CFunctionFlash, CmdPtr, ProgMemory);      // search through the program flash looking for a match to the function being called
+    if(*p == 0xffffffff && CFunctionLibrary != nullptr)
+         p = FindCFunction(CFunctionLibrary, CmdPtr, LibMemory);// if unsuccessful search the library area
     if(*p == 0xffffffff) error("Internal fault 5(sorry)");
 
     // next, get the argument types (if specified)
     {  // first copy the type list to a buffer and trim the following closing bracket (if there)
         char buf[MAXSTRLEN];
-        unsigned char *p = (unsigned char *)buf;
+        CombinedPtr p = (unsigned char *)buf;
         if(*DefP == '(') DefP++;
-        while(*DefP && *DefP != ')' && *DefP != '\'') *p++ = *DefP++;
-        *p = 0;
+        while(*DefP && *DefP != ')' && *DefP != '\'') p.write_byte(*DefP++)++;
+        p.write_byte(0);
         p = (unsigned char *)buf;
         skipspace(p);
         CheckIfTypeSpecified(p, &i, true);
@@ -86,7 +85,7 @@ long long int MIPS16 CallCFunction(CombinedPtr CmdPtr, CombinedPtr ArgList, Comb
         getargs(&ArgList, 19, (unsigned char *)",");                                 // expand the command line of the caller
         for(i = 0; i < argc; i += 2) {
             // if this is a straight variable we want to pass a pointer to its value in RAM
-            if(isnamestart((uint8_t)*argv[i]) && (*skipvar(argv[i], false) == 0 || *skipvar(argv[i], false) == ')') && !(FindSubFun(argv[i], 1) >= 0 && strchr((const char *)argv[i], '(') != NULL)) {
+            if(isnamestart((uint8_t)*argv[i]) && (*skipvar(argv[i], false) == 0 || *skipvar(argv[i], false) == ')') && !(FindSubFun(argv[i], 1) >= 0 && strchr(argv[i], '(') != nullptr)) {
                 arg[i/2] = findvar(argv[i], V_FIND | V_EMPTY_OK /* | V_NOFIND_ERR */ );   // if the argument
                 if(typ[i/2] != 0 && !(TypeMask(g_vartbl[g_VarIndex].type) & typ[i/2])) error("Incompatible type");
             } else {
@@ -122,10 +121,11 @@ long long int MIPS16 CallCFunction(CombinedPtr CmdPtr, CombinedPtr ArgList, Comb
     }
     p++;      // step over the size word
 
-    // run the function in flash
+    // run the function in flash /// TODO: RAM/SD?
     ii = *p++;
-    p = (unsigned int *)((unsigned int) p | 0x1);
-    ret = ((long long int (*)(void *, void *, void *, void *, void *, void *, void *, void *, void *, void *)) (p + ii)) (arg[0], arg[1], arg[2], arg[3], arg[4], arg[5], arg[6], arg[7], arg[8], arg[9]);              // run the CFunction
+    p = (unsigned int *)((unsigned int) p.raw() | 0x1);
+    ret = ((long long int (*)(void *, void *, void *, void *, void *, void *, void *, void *, void *, void *))
+            (p.raw() + ii)) (arg[0], arg[1], arg[2], arg[3], arg[4], arg[5], arg[6], arg[7], arg[8], arg[9]);              // run the CFunction
 
     return ret;
 }
@@ -138,7 +138,7 @@ void CallCFuncmSec(void){
 
 // save the interpreter state if re entering it
 void CallExecuteProgram(char *p) {
-    unsigned char *nextstmtSaved = nextstmt;
+    CombinedPtr nextstmtSaved = nextstmt;
     g_LocalIndex++;
     ExecuteProgram((unsigned char *)p);
     nextstmt = nextstmtSaved;

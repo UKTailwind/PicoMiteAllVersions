@@ -31,10 +31,6 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 
 #include "PicoMite.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <stdlib.h>
 #include <setjmp.h>
 #include <string.h>
@@ -48,6 +44,48 @@ extern "C" {
 #endif
 
 #include "configuration.h"                          // memory configuration defines for the particular hardware this is running on
+
+#ifdef __cplusplus
+extern "C" {
+int CheckEmpty(CombinedPtr p);
+void MMfputs(CombinedPtr p, int filenbr);
+int  mystrncasecmp (CombinedPtr s1, CombinedPtr s2, size_t n);
+CombinedPtr doexpr(CombinedPtr p, MMFLOAT *fa, long long int  *ia, CombinedPtr *sa, int *oo, int *t);
+extern CombinedPtr NextDataLine;                      // used to track the next line to read in DATA & READ stmts
+extern CombinedPtr subfun[];                          // Table of subroutines and functions built when the program starts running
+CombinedPtr GetNextCommand(CombinedPtr p, CombinedPtr *CLine, unsigned char *EOFMsg) ;
+void DefinedSubFun(int iscmd, CombinedPtr cmd, int index, MMFLOAT *fa, long long int  *i64, CombinedPtr *sa, int *t);
+MMFLOAT getnumber(CombinedPtr p);
+CombinedPtr evaluate(CombinedPtr p, MMFLOAT *fa, long long int  *ia, CombinedPtr *sa, int *ta, int noerror);
+long long int  getinteger(CombinedPtr p);
+CombinedPtr getstring(CombinedPtr p);
+long long int getint(CombinedPtr p, long long int min, long long int max);
+extern CombinedPtr ContinuePoint;                     // Where to continue from if using the continue statement
+extern CombinedPtr cmdline;                           // Command line terminated with a zero unsigned char and trimmed of spaces
+extern CombinedPtr nextstmt;                          // Pointer to the next statement to be executed.
+void ExecuteProgram(CombinedPtr p);
+unsigned char *getCstring(CombinedPtr p);
+extern CombinedPtr CurrentLinePtr, SaveCurrentLinePtr;                    // pointer to the current line being executed
+extern CombinedPtr ProgMemory;                           // program memory
+extern CombinedPtr LibMemory;                           // library memory
+extern CombinedPtr ep;                                // Pointer to the argument to a function
+CombinedPtr skipexpression(CombinedPtr p);
+unsigned char *getFstring(CombinedPtr p);
+void checkend(CombinedPtr p);
+int  CountLines(CombinedPtr target);
+int FindSubFun(CombinedPtr p, int type);
+CombinedPtr skipvar(CombinedPtr p, int noerror);
+CombinedPtr getclosebracket(CombinedPtr p);
+void Mstrcpy(unsigned char *dest, CombinedPtr src);
+void *DoExpression(CombinedPtr p, int *t);
+extern CombinedPtr sarg1, sarg2, sret;              // Global string pointers used by operators
+void Mstrcat(unsigned char *dest, CombinedPtr src);
+void *findvar(CombinedPtr, int);
+int Mstrcmp(CombinedPtr s1, CombinedPtr s2);
+CombinedPtr findline(int, int);
+CombinedPtr findlabel(CombinedPtr labelptr);
+CombinedPtr GetIntAddress(CombinedPtr p);
+#endif
 
 // Types used to define an item of data.  Often they are ORed together.
 // Used in tokens, variables and arguments to functions
@@ -254,11 +292,9 @@ void  ClearVars(int level, bool all);
 void  ClearStack(void);
 void  ClearRuntime(bool all);
 void  ClearProgram(bool psram);
-int CheckEmpty(char *p);
 void  tokenise(int console);
 
 void AddProgramLine(int append);
-unsigned char *findlabel(unsigned char *labelptr);
 int FunctionType(unsigned char *p);
 void makeupper(unsigned char *p);
 char *fstrstr (const char *s1, const char *s2);
@@ -271,7 +307,6 @@ int IsValidLine(int line);
 void InsertLastcmd(unsigned char *s);
 extern jmp_buf ErrNext;   
 void PrepareProgram(int ErrAbort);
-void MMfputs(unsigned char *p, int filenbr);
 extern int TempStringClearStart;                                           // used to prevent clearing of space in an expression that called a FUNCTION
 extern int PSize;                               // size of the program in program memory
 extern unsigned char PromptString[MAXPROMPTLEN];                                    // the prompt for input, an empty string means use the default
@@ -295,50 +330,15 @@ void IntToStr(char *strr, long long int nbr, unsigned int base);
 void FloatToStr(char *p, MMFLOAT f, int m, int n, unsigned char ch);
 int str_equal(const unsigned char *s1, const unsigned char *s2);
 #endif
-int  mystrncasecmp (const unsigned char *s1, const unsigned char *s2, size_t n);
 int mem_equal(unsigned char *s1, unsigned char *s2, int i);
 extern int emptyarray;
 typedef uint16_t CommandToken;
 
 #ifdef __cplusplus
 }
-CombinedPtr doexpr(CombinedPtr p, MMFLOAT *fa, long long int  *ia, CombinedPtr *sa, int *oo, int *t);
-extern CombinedPtr NextDataLine;                      // used to track the next line to read in DATA & READ stmts
-extern CombinedPtr subfun[];                          // Table of subroutines and functions built when the program starts running
-CombinedPtr GetNextCommand(CombinedPtr p, CombinedPtr *CLine, unsigned char *EOFMsg) ;
-void DefinedSubFun(int iscmd, CombinedPtr cmd, int index, MMFLOAT *fa, long long int  *i64, CombinedPtr *sa, int *t);
-MMFLOAT getnumber(CombinedPtr p);
-CombinedPtr evaluate(CombinedPtr p, MMFLOAT *fa, long long int  *ia, CombinedPtr *sa, int *ta, int noerror);
-long long int  getinteger(CombinedPtr p);
-CombinedPtr getstring(CombinedPtr p);
-long long int getint(CombinedPtr p, long long int min, long long int max);
-extern CombinedPtr ContinuePoint;                     // Where to continue from if using the continue statement
-extern CombinedPtr cmdline;                           // Command line terminated with a zero unsigned char and trimmed of spaces
-extern CombinedPtr nextstmt;                          // Pointer to the next statement to be executed.
 void makeargs2(CombinedPtr *tp, int maxargs, unsigned char *argbuf, CombinedPtr argv[], int *argc, unsigned char *delim);
-void ExecuteProgram(CombinedPtr p);
-unsigned char *getCstring(CombinedPtr p);
-extern CombinedPtr CurrentLinePtr, SaveCurrentLinePtr;                    // pointer to the current line being executed
-extern CombinedPtr ProgMemory;                           // program memory
-extern CombinedPtr LibMemory;                           // library memory
-extern CombinedPtr ep;                                // Pointer to the argument to a function
 CombinedPtr checkstring(CombinedPtr p, unsigned char *tkn);
 uint8_t* checkstring(uint8_t* p, unsigned char *tkn);
-CombinedPtr skipexpression(CombinedPtr p);
-unsigned char *getFstring(CombinedPtr p);
-void checkend(CombinedPtr p);
-int  CountLines(CombinedPtr target);
-int FindSubFun(CombinedPtr p, int type);
-CombinedPtr skipvar(CombinedPtr p, int noerror);
-CombinedPtr getclosebracket(CombinedPtr p);
-void Mstrcpy(unsigned char *dest, CombinedPtr src);
-void *DoExpression(CombinedPtr p, int *t);
-extern CombinedPtr sarg1, sarg2, sret;              // Global string pointers used by operators
-void Mstrcat(unsigned char *dest, CombinedPtr src);
-void *findvar(CombinedPtr, int);
-int Mstrcmp(CombinedPtr s1, CombinedPtr s2);
-CombinedPtr findline(int, int);
-extern CombinedPtr GetIntAddress(CombinedPtr p);
 #else
 void makeargs(uint8_t **tp, int maxargs, uint8_t *argbuf, uint8_t *argv[], int *argc, uint8_t *delim);
 #endif
