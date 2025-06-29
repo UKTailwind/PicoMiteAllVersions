@@ -4276,29 +4276,28 @@ int MIPS16 main(){
     else if(Option.CPU_Speed == 378000)QVGA_CLKDIV= 3;
     else QVGA_CLKDIV= 1;
 #ifdef rp2350
-if(Option.CPU_Speed==Freq848){ //adjust the size of the heap
-    framebuffersize=424*240*2;
-    heap_memory_size=HEAP_MEMORY_SIZE-framebuffersize+320*240*2;
-    FRAMEBUFFER=AllMemory+heap_memory_size+256;
-    MODE1SIZE=MODE1SIZE_8;
-    MODE2SIZE=MODE2SIZE_8;
-    MODE2SIZE=MODE2SIZE_8;
-    MODE2SIZE=MODE2SIZE_8;
-    MODE2SIZE=MODE2SIZE_8;
-    HRes=848;
-}
-if(Option.CPU_Speed==FreqSVGA){ //adjust the size of the heap
-    framebuffersize=400*300*2;
-    heap_memory_size=HEAP_MEMORY_SIZE-framebuffersize+320*240*2;
-    FRAMEBUFFER=AllMemory+heap_memory_size+256;
-    MODE1SIZE=MODE1SIZE_V;
-    MODE2SIZE=MODE2SIZE_V;
-    MODE3SIZE=MODE3SIZE_V;
-    MODE5SIZE=MODE5SIZE_V;
-    HRes=800;
-    VRes=600;
-}
-
+    if(Option.CPU_Speed==Freq848){ //adjust the size of the heap
+        framebuffersize=424*240*2;
+        heap_memory_size=HEAP_MEMORY_SIZE-framebuffersize+320*240*2;
+        FRAMEBUFFER=AllMemory+heap_memory_size+256;
+        MODE1SIZE=MODE1SIZE_8;
+        MODE2SIZE=MODE2SIZE_8;
+        MODE2SIZE=MODE2SIZE_8;
+        MODE2SIZE=MODE2SIZE_8;
+        MODE2SIZE=MODE2SIZE_8;
+        HRes=848;
+    }
+    if(Option.CPU_Speed==FreqSVGA){ //adjust the size of the heap
+        framebuffersize=400*300*2;
+        heap_memory_size=HEAP_MEMORY_SIZE-framebuffersize+320*240*2;
+        FRAMEBUFFER=AllMemory+heap_memory_size+256;
+        MODE1SIZE=MODE1SIZE_V;
+        MODE2SIZE=MODE2SIZE_V;
+        MODE3SIZE=MODE3SIZE_V;
+        MODE5SIZE=MODE5SIZE_V;
+        HRes=800;
+        VRes=600;
+    }
 #endif
 #endif
 #endif
@@ -4398,7 +4397,7 @@ if(Option.CPU_Speed==FreqSVGA){ //adjust the size of the heap
         core1stack[0]=0x12345678;
     #endif
 #endif
-        strcpy((char *)banner,MES_SIGNON); 
+    strcpy((char *)banner,MES_SIGNON); 
 #ifdef rp2350
     #ifdef PICOMITEVGA
         #ifdef HDMI
@@ -4566,12 +4565,12 @@ if(Option.CPU_Speed==FreqSVGA){ //adjust the size of the heap
         }
     }
     while(1) {
-    if(Option.DISPLAY_CONSOLE) {
-        SetFont(PromptFont);
-        gui_fcolour = PromptFC;
-        gui_bcolour = PromptBC;
-        if(CurrentX != 0) MMPrintString("\r\n");                    // prompt should be on a new line
-    }
+        if(Option.DISPLAY_CONSOLE) {
+            SetFont(PromptFont);
+            gui_fcolour = PromptFC;
+            gui_bcolour = PromptBC;
+            if(CurrentX != 0) MMPrintString("\r\n");                    // prompt should be on a new line
+        }
         MMAbort = false;
         BreakKey = BREAK_KEY;
         EchoOption = true;

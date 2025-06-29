@@ -271,8 +271,6 @@ struct s_tokentbl {                             // structure of the token table
     unsigned char precedence;                            // precedence used by operators only.  operators with equal precedence are processed left to right.
     void (*fptr)(void);                         // pointer to the function that will interpret that token
 };
-extern const struct s_tokentbl tokentbl[];
-extern const struct s_tokentbl commandtbl[];
 
 extern unsigned char tokenTHEN, tokenELSE, tokenGOTO, tokenEQUAL, tokenTO, tokenSTEP, tokenWHILE, tokenUNTIL, tokenGOSUB, tokenAS, tokenFOR;
 extern unsigned short cmdIF, cmdENDIF, cmdEND_IF, cmdELSEIF, cmdELSE_IF, cmdELSE, cmdSELECT_CASE, cmdFOR, cmdNEXT, cmdWHILE, cmdENDSUB, cmdENDFUNCTION, cmdLOCAL, cmdSTATIC, cmdCASE, cmdDO, cmdLOOP, cmdCASE_ELSE, cmdEND_SELECT;
@@ -332,6 +330,8 @@ typedef uint16_t CommandToken;
 void makeargs2(CombinedPtr *tp, int maxargs, unsigned char *argbuf, CombinedPtr argv[], int *argc, unsigned char *delim);
 CombinedPtr checkstring(CombinedPtr p, unsigned char *tkn);
 uint8_t* checkstring(uint8_t* p, unsigned char *tkn);
+extern "C" const struct s_tokentbl tokentbl[];
+extern "C" const struct s_tokentbl commandtbl[];
 #else
 void makeargs(uint8_t **tp, int maxargs, uint8_t *argbuf, uint8_t *argv[], int *argc, uint8_t *delim);
 
@@ -342,7 +342,6 @@ int str_equal(const unsigned char *s1, const unsigned char *s2);
 #endif
 
 #endif
-
 
 #endif /* __MMBASIC_H */
 /*  @endcond */

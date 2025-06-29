@@ -9,12 +9,13 @@
 // most of them are listed in the .h files so you should not add your own here but instead add
 // them to the appropiate .h file
 #define INCLUDE_COMMAND_TABLE
-const struct s_tokentbl commandtbl[] = {
-    #include "Functions.h"
-    #include "Commands.h"
-    #include "Operators.h"
-    #include "Custom.h"
-    #include "Hardware_Includes.h"
+__attribute__((used)) const struct s_tokentbl commandtbl[] = {
+//    #include "Functions.h"
+//    #include "Commands.h"
+//    #include "Operators.h"
+//    #include "Custom.h"
+//    #include "Hardware_Includes.h"
+    #include "AllCommands.h"
 };
 #undef INCLUDE_COMMAND_TABLE
 
@@ -22,12 +23,13 @@ const struct s_tokentbl commandtbl[] = {
 // most of them are listed in the .h files so you should not add your own here
 // but instead add them to the appropiate .h file
 #define INCLUDE_TOKEN_TABLE
-const struct s_tokentbl tokentbl[] = {
-    #include "Functions.h"
-    #include "Commands.h"
-    #include "Operators.h"
-    #include "Custom.h"
-    #include "Hardware_Includes.h"
+__attribute__((used)) const struct s_tokentbl tokentbl[] = {
+//    #include "Functions.h"
+//    #include "Commands.h"
+//    #include "Operators.h"
+//    #include "Custom.h"
+//    #include "Hardware_Includes.h"
+    #include "AllCommands.h"
 };
 #undef INCLUDE_TOKEN_TABLE
 
@@ -79,5 +81,4 @@ void   MIPS16 InitBasic(void) {
 //  SInt(CommandTableSize);
 //  SIntComma(TokenTableSize);
 //  SSPrintString("\r\n");
-
 }

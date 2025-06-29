@@ -3044,13 +3044,12 @@ void MIPS16 ClearRuntime(bool all) {
     OptionConsole=3;
     DefaultType = T_NBR;
     ds18b20Timers = NULL;                                           // InitHeap(true) will recover the memory allocated to this array
-    findlabel(nullptr);                                                // clear the label cache
     OptionErrorSkip = 0;
-	optionangle=1.0;
-    useoptionangle=false;
-    optionfulltime=false;
-    optionfastaudio=0;
-    optionlogging=false;
+	optionangle     = 1.0;
+    useoptionangle  = false;
+    optionfulltime  = false;
+    optionfastaudio = 0;
+    optionlogging   = false;
 /*frame
     frame=NULL;
     outframe=NULL;
@@ -3077,6 +3076,7 @@ void MIPS16 ClearRuntime(bool all) {
     ClearVars(0,true);
     memset(cmdlinebuff,0,sizeof(cmdlinebuff));
     memset((void*)datastore, 0, sizeof(struct sa_data) * MAXRESTORE);
+    findlabel(nullptr);                                                // clear the label cache
     restorepointer = 0;
     g_flag=0;
     g_varcnt = 0;
@@ -3099,12 +3099,14 @@ void MIPS16 ClearProgram(bool psram) {
 //    InitHeap(true);
     initFonts();
     m_alloc(psram ? M_PROG : M_LIMITED);                                           // init the variables for program memory
-    if(Option.DISPLAY_TYPE>=VIRTUAL && WriteBuf)FreeMemorySafe((void **)&WriteBuf);
+    if(Option.DISPLAY_TYPE>=VIRTUAL && WriteBuf) {
+        FreeMemorySafe((void **)&WriteBuf);
+    }
     ClearRuntime(true);
 //    ProgMemory[0] = ProgMemory[1] = ProgMemory[3] = ProgMemory[4] = 0;
     PSize = 0;
     StartEditPoint = nullptr;
-    StartEditChar= 0;
+    StartEditChar  = 0;
     ProgramChanged = false;
     TraceOn = false;
 }
@@ -3170,10 +3172,36 @@ int GetCommandValue( unsigned char *n) {
 
 // find the value of a token given its name
 int GetTokenValue (unsigned char *n) {
-    int i;
-    for(i = 0; i < TokenTableSize - 1; i++)
-        if(str_equal(n, tokentbl[i].name))
+    FIL f;
+    f_open(&f, "/tmp/tt", FA_CREATE_ALWAYS | FA_WRITE | FA_OPEN_APPEND);
+    UINT wr;
+    f_write(&f, n, strlen(n), &wr);
+    f_write(&f, ".", 1, &wr);
+    f_close(&f);
+    for(int i = 0; i < TokenTableSize - 1; i++) {
+        f_open(&f, "/tmp/tt", FA_WRITE | FA_OPEN_APPEND);
+        f_write(&f, tokentbl[i].name, strlen(tokentbl[i].name), &wr);
+        f_write(&f, ".", 1, &wr);
+        f_close(&f);
+
+//        if(str_equal(n, tokentbl[i].name)) {
+        if(strcmp((char*)n, (char*)tokentbl[i].name) == 0) {
             return i + C_BASETOKEN;
+        }
+    }
+    gpio_init(PICO_DEFAULT_LED_PIN);
+    gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
+    for (int i = 0; i < 6; i++) {
+        sleep_ms(23);
+        gpio_put(PICO_DEFAULT_LED_PIN, true);
+        sleep_ms(23);
+        gpio_put(PICO_DEFAULT_LED_PIN, false);
+    }
+    f_open(&f, "/tmp/tt", FA_WRITE | FA_OPEN_APPEND);
+    f_write(&f, n, strlen(n), &wr);
+    f_write(&f, "\n", 1, &wr);
+    f_close(&f);
+
     error("Internal fault 4(sorry)");
     return 0;
 }
@@ -3488,29 +3516,17 @@ static unsigned char charmap[] = {
  */
 
 
-int mystrncasecmp(
-    CombinedPtr s1,         /* First string. */
-    CombinedPtr s2,         /* Second string. */
-    size_t  length)      /* Maximum number of characters to compare
-                         * (stop earlier if the end of either string
-                         * is reached). */
-{
-    register unsigned char u1, u2;
-
+int mystrncasecmp(CombinedPtr s1, CombinedPtr s2, size_t length) {
     for (; length != 0; length--, s1++, s2++) {
-        u1 = (unsigned char) *s1;
-        u2 = (unsigned char) *s2;
-        if (charmap[u1] != charmap[u2]) {
+        unsigned char u1 = *s1;
+        unsigned char u2 = *s2;
+        if (charmap[u1] != charmap[u2])
             return charmap[u1] - charmap[u2];
-        }
-        if (u1 == '\0') {
+        if (u1 == '\0')
             return 0;
-        }
     }
     return 0;
 }
-
-
 
 // Compare two strings, ignoring case differences.
 // Returns true if the strings are equal (ignoring case) otherwise returns false.
@@ -3518,23 +3534,23 @@ int mystrncasecmp(
 inline
 #endif
 int __not_in_flash_func(str_equal)(const unsigned char *s1, const unsigned char *s2) {
-    if(charmap[*(unsigned char *)s1] != charmap[*(unsigned char *)s2]) return 0;
-    for ( ; ; ) {
-        if(*s2 == '\0') return 1;
-        s1++; s2++;
-        if(charmap[*(unsigned char *)s1] != charmap[*(unsigned char *)s2]) return 0;
+    if (!s1 || !s2) return 0;
+
+    for (; ; s1++, s2++) {
+        if (*s1 == '\0' && *s2 == '\0') return 1;
+        if (*s1 == '\0' || *s2 == '\0') return 0;
+        if (charmap[*s1] != charmap[*s2]) return 0;
     }
-    return 0;
 }
 
 
 // Compare two areas of memory, ignoring case differences.
 // Returns true if they are equal (ignoring case) otherwise returns false.
 int __not_in_flash_func(mem_equal)(unsigned char *s1, unsigned char *s2, int i) {
-    if(charmap[*(unsigned char *)s1] != charmap[*(unsigned char *)s2]) return 0;
+    if (i <= 0) return 1;  // безопасно: 0 байт — значит равны
+    if (charmap[*s1] != charmap[*s2]) return 0;
     while (--i) {
-        if(charmap[*(unsigned char *)++s1] != charmap[*(unsigned char *)++s2])
-            return 0;
+        if (charmap[*++s1] != charmap[*++s2]) return 0;
     }
     return 1;
 }

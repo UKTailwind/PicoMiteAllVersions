@@ -74,7 +74,6 @@ extern int FreeSpaceOnHeap(void);
 extern int LargestContiguousHeap(void);
 extern unsigned char *DOS_ProgMemory;
 extern void *ReAllocMemory(void *addr, size_t msize);
-extern void FreeMemorySafe(void **addr);
 extern void *GetAlignedMemory(int size);
 extern void FreeMemorySafe(void **addr);
 extern int MemSize(void *addr);
