@@ -167,7 +167,7 @@ void Init_ds18b20(int pin, int precision) {
     ExtCfg(pin, EXT_NOT_CONFIG, 0);                                 // set pin to unconfigured
     gpio_init(PinDef[pin].GPno); 
     ow_reset(pin);
-	disable_interrupts_pico();
+	/** disable_interrupts_pico(); */
     ow_writeByte(pin, 0xcc);                                        // command skip the ROM
     ow_writeByte(pin, 0x4E);                                        // write to the scratchpad
     ow_writeByte(pin, 0x00);                                        // dummy data to TH
@@ -176,7 +176,7 @@ void Init_ds18b20(int pin, int precision) {
     ow_reset(pin);
     ow_writeByte(pin, 0xcc);                                        // skip the ROM
     ow_writeByte(pin, 0x44);                                        // command start the conversion
-	enable_interrupts_pico();
+	/** enable_interrupts_pico(); */
     PinSetBit(pin, LATSET);
 	gpio_set_dir(PinDef[pin].GPno, GPIO_OUT);
 	gpio_put(PinDef[pin].GPno,GPIO_PIN_SET);
@@ -228,12 +228,12 @@ void fun_ds18b20(void) {
 		fret = 1000.0;
 	} else {
         ow_reset(pin);
-		disable_interrupts_pico();
+		/** disable_interrupts_pico(); */
         ow_writeByte(pin, 0xcc);                                    // skip the ROM (again)
         ow_writeByte(pin, 0xBE);                                    // command read data
         b1  = ow_readByte(pin);
         b2  = ow_readByte(pin);
-		enable_interrupts_pico();
+		/** enable_interrupts_pico(); */
         ow_reset(pin);
         if(b1 == 255 && b2 == 255){
             fret = 1000.0;
@@ -276,7 +276,7 @@ static void owReset(CombinedPtr p) {
 	ExtCurrentConfig[pin] = EXT_NOT_CONFIG;
 }
 void owWriteCore(int pin, int * buf, int len, int flag){
-	disable_interrupts_pico();
+	/** disable_interrupts_pico(); */
 	for (int i = 0; i < len; i++) {
 		if (flag & 0x04) {
 			if (buf[i]) {
@@ -296,7 +296,7 @@ void owWriteCore(int pin, int * buf, int len, int flag){
 			ow_writeByte(pin, buf[i]);
 		}
 	}
-	enable_interrupts_pico();
+	/** enable_interrupts_pico(); */
 }
 
 
@@ -345,7 +345,7 @@ static void owWrite(CombinedPtr p) {
 }
 
 void owReadCore(int pin, int * buf, int len, int flag){
-    disable_interrupts_pico();
+    /** disable_interrupts_pico(); */
     PinSetBit(pin, TRISCLR);          // set as output *** added this line
     for (int i = 0; i < len; i++) {
         if (flag & 0x04) {
@@ -354,7 +354,7 @@ void owReadCore(int pin, int * buf, int len, int flag){
             buf[i] = ow_readByte(pin);
         }
     }
-    enable_interrupts_pico();
+    /** enable_interrupts_pico(); */
 }
 
 // read one wire data

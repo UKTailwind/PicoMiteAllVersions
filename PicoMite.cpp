@@ -233,9 +233,9 @@ unsigned char PulsePin[NBR_PULSE_SLOTS];
 unsigned char PulseDirection[NBR_PULSE_SLOTS];
 int PulseCnt[NBR_PULSE_SLOTS];
 int PulseActive;
-const uint8_t *flash_target_contents = (const uint8_t *) (XIP_BASE + FLASH_TARGET_OFFSET + FLASH_ERASE_SIZE + SAVEDVARS_FLASH_SIZE);
-const uint8_t *flash_progmemory = (const uint8_t *) (XIP_BASE + PROGSTART);
-const uint8_t *flash_libmemory = (const uint8_t *) (XIP_BASE + PROGSTART - MAX_PROG_SIZE);
+const FSIZE_t sd_target_contents = 0;
+const FSIZE_t sd_progmemory = PROGSTART;
+const FSIZE_t sd_libmemory = PROGSTART - MAX_PROG_SIZE;
 int ticks_per_second; 
 int InterruptUsed;
 int calibrate=0;
@@ -1820,14 +1820,14 @@ void PFltComma(MMFLOAT n) {
 void sigbus(void){
     MMPrintString("Error: Invalid address - resetting\r\n");
 	uSec(250000);
-	disable_interrupts_pico();
-//	flash_range_erase(PROGSTART, MAX_PROG_SIZE);
+	/** disable_interrupts_pico(); */
+//	sd_range_erase(PROGSTART, MAX_PROG_SIZE);
     LoadOptions();
     if(Option.NoReset==0){
         Option.Autorun=0;
         SaveOptions();
     }
-	enable_interrupts_pico();
+	/** enable_interrupts_pico(); */
     memset(inpbuf,0,STRINGSIZE);
     SoftReset();
 }
@@ -4135,7 +4135,7 @@ int MIPS16 main(){
     }
 #endif
     m_alloc(M_PROG);                                           // init the variables for program memory
-    LibMemory = (uint8_t *)flash_libmemory;
+    LibMemory = sd_libmemory;
     uSec(100);
     if(_excep_code == RESET_CLOCKSPEED) {
 #ifdef PICOMITEVGA
@@ -4324,8 +4324,8 @@ int MIPS16 main(){
     PromptBC=gui_bcolour=Option.DefaultBC;
     InitHeap(true);              										// initilise memory allocation
     uSecFunc(1000);
-    disable_interrupts_pico();
-    enable_interrupts_pico();
+    /** disable_interrupts_pico(); */
+    /** enable_interrupts_pico(); */
     mSecTimer=time_us_64()/1000;
     DISPLAY_TYPE = Option.DISPLAY_TYPE;
     // negative timeout means exact delay (rather than delay between callbacks)
@@ -4433,7 +4433,7 @@ int MIPS16 main(){
             }
         } else {
             if(Option.Autorun!=MAXFLASHSLOTS+1){
-                ProgMemory=(unsigned char *)(flash_target_contents+(Option.Autorun-1)*MAX_PROG_SIZE);
+                ProgMemory=(unsigned char *)(sd_target_contents+(Option.Autorun-1)*MAX_PROG_SIZE);
             }
             if(*ProgMemory != 0x01 ) {
                 MMPrintString((char *)banner);
@@ -4514,7 +4514,7 @@ int MIPS16 main(){
 	    clearrepeat();
 #endif	    
         ScrewUpTimer = 0;
-        ProgMemory=(uint8_t *)flash_progmemory;
+        ProgMemory=sd_progmemory;
         ContinuePoint = nextstmt;                               // in case the user wants to use the continue command
 		*tknbuf = 0;											// we do not want to run whatever is in the token buffer
 		optionangle=1.0;
@@ -4676,11 +4676,11 @@ void MIPS16 SaveProgramToFlash(unsigned char *pm, int msg) {
 #endif	
     memcpy((void*)buf, (void*)tknbuf, STRINGSIZE);                                // save the token buffer because we are going to use it
     FlashWriteInit(PROGRAM_FLASH);
-    flash_range_erase(realflashpointer, MAX_PROG_SIZE);
+    sd_range_erase(realflashpointer, MAX_PROG_SIZE);
     j=MAX_PROG_SIZE/4;
-    int *pp=(int *)(flash_progmemory);
-        while(j--)if(*pp++ != 0xFFFFFFFF){
-            enable_interrupts_pico();
+    CombinedPtrI pp = CombinedPtr(sd_progmemory);
+        while(j--) if(*pp++ != 0xFFFFFFFF) {
+            /** enable_interrupts_pico(); */
             error("Flash erase problem");
         }
     nbr = 0;
@@ -4735,7 +4735,7 @@ contloop:
      // The next CFunction/CSub/Font starts immediately following the last word of the previous CFunction/CSub/Font
     firsthex=1;
     realflashsave= realflashpointer;
-    p = (unsigned char *)flash_progmemory;                                              // start scanning program memory
+    p = sd_progmemory;                                              // start scanning program memory
     while(*p != 0xff) {
     	nbr++;
         if(*p == 0) p++;                                            // if it is at the end of an element skip the zero marker
@@ -4762,7 +4762,7 @@ contloop:
              fontnbr = getint(p, 1, FONT_TABLE_SIZE);
                                                  // font 6 has some special characters, some of which depend on font 1
              if(fontnbr == 1 || fontnbr == 6 || fontnbr == 7) {
-                enable_interrupts_pico();
+                /** enable_interrupts_pico(); */
                 error("Cannot redefine fonts 1, 6 or 7");
              }
              realflashpointer+=4;
@@ -4781,7 +4781,7 @@ contloop:
              skipspace(p);
              if(!fontnbr) { //process CSub 
                  if(!isnamestart((uint8_t)*p)){
-                    enable_interrupts_pico();
+                    /** enable_interrupts_pico(); */
                     error("Function name");
                  }  
                  do { p++; } while(isnamechar((uint8_t)*p));
@@ -4802,7 +4802,7 @@ contloop:
                      n = 0;
                      for(i = 0; i < 8; i++) {
                          if(!isxdigit((uint8_t)*p)) {
-                            enable_interrupts_pico();
+                            /** enable_interrupts_pico(); */
                             error("Invalid hex word");
                          }
                          if((int)((char *)realflashpointer - (uint32_t)PROGSTART) >= MAX_PROG_SIZE - 5) goto exiterror;
@@ -4818,7 +4818,7 @@ contloop:
                      if(firsthex){
                     	 firsthex=0;
                     	 if(((n>>16) & 0xff) < 0x20){
-                            enable_interrupts_pico();
+                            /** enable_interrupts_pico(); */
                             error("Can't define non-printing characters");
                          }
                      }
@@ -4827,7 +4827,7 @@ contloop:
                  while(*p) p++;                                      // make sure that we move to the end of the line
                  p++;                                                // step to the start of the next line
                  if(*p == 0) {
-                     enable_interrupts_pico();
+                     /** enable_interrupts_pico(); */
                      error("Missing END declaration");
                  }
                  if(*p == T_NEWLINE) {
@@ -4845,7 +4845,7 @@ contloop:
      }
     realflashpointer = realflashsave ;
     updatecount=0;
-    p = (unsigned char *)flash_progmemory;                                              // start scanning program memory
+    p = sd_progmemory;                                              // start scanning program memory
     while(*p != 0xff) {
      	nbr++;
          if(*p == 0) p++;                                            // if it is at the end of an element skip the zero marker
@@ -4872,7 +4872,7 @@ contloop:
              fontnbr = getint(p, 1, FONT_TABLE_SIZE);
                                                  // font 6 has some special characters, some of which depend on font 1
              if(fontnbr == 1 || fontnbr == 6 || fontnbr == 7) {
-                 enable_interrupts_pico();
+                 /** enable_interrupts_pico(); */
                  error("Cannot redefine fonts 1, 6, or 7");
              }
 
@@ -4888,7 +4888,7 @@ contloop:
              p--;
          } else {
              endtoken = GetCommandValue((unsigned char *)"End CSub");
-             FlashWriteWord((unsigned int)(p.raw() - flash_progmemory));               // if a CFunction/CSub save a relative pointer to the declaration
+             FlashWriteWord((unsigned int)(p.raw() - sd_progmemory));               // if a CFunction/CSub save a relative pointer to the declaration
              fontnbr = 0;
              p++;
          }
@@ -4898,7 +4898,7 @@ contloop:
              skipspace(p);
              if(!fontnbr) {
                  if(!isnamestart((uint8_t)*p))  {
-                     enable_interrupts_pico();
+                     /** enable_interrupts_pico(); */
                      error("Function name");
                  }
                  do { p++; } while(isnamechar(*p));
@@ -4919,7 +4919,7 @@ contloop:
                      n = 0;
                      for(i = 0; i < 8; i++) {
                          if(!isxdigit(*p)) {
-                            enable_interrupts_pico();
+                            /** enable_interrupts_pico(); */
                             error("Invalid hex word");
                          }
                          if((int)((char *)realflashpointer - (uint32_t)PROGSTART) >= MAX_PROG_SIZE - 5) goto exiterror;
@@ -4938,7 +4938,7 @@ contloop:
                  while(*p) p++;                                      // make sure that we move to the end of the line
                  p++;                                                // step to the start of the next line
                  if(*p == 0) {
-                    enable_interrupts_pico();
+                    /** enable_interrupts_pico(); */
                     error("Missing END declaration");
                  }
                  if(*p == T_NEWLINE) {
@@ -4968,7 +4968,7 @@ contloop:
 	clearrepeat();
 #endif
 /// TODO: ensure
-    enable_interrupts_pico();
+    /** enable_interrupts_pico(); */
     return;
 
     // we only get here in an error situation while writing the program to flash

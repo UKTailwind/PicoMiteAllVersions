@@ -21,9 +21,13 @@ class CombinedPtr {
 public:
     // Конструкторы
     CombinedPtr() : p{nullptr} {}
-    /*explicit*/ CombinedPtr(unsigned char* ptr) : p{ptr} {}
+    /*explicit*/
+    CombinedPtr(unsigned char* ptr) : p{ptr} {}
+    CombinedPtr(const unsigned char* ptr) : p{(unsigned char*)ptr} {}
     CombinedPtr(char* ptr) : p{(unsigned char*)ptr} {}
+    CombinedPtr(const char* ptr) : p{(unsigned char*)ptr} {}
     CombinedPtr(void* ptr) : p{(unsigned char*)ptr} {}
+    CombinedPtr(const void* ptr) : p{(unsigned char*)ptr} {}
     CombinedPtr(FSIZE_t off) { p.f = off; }
     CombinedPtr(const CombinedPtr& other) : p{other.p.c} {}
     CombinedPtr(std::nullptr_t) : p{nullptr} {}
@@ -93,6 +97,9 @@ public:
     template<typename T> CombinedPtr(const CombinedPtrT<T>& other);
     template<typename T> CombinedPtr& operator=(const CombinedPtrT<T>& other);
 };
+
+void sd_range_erase(FSIZE_t offset, FSIZE_t size);
+void sd_range_program(FSIZE_t offset, CombinedPtr p, FSIZE_t size);
 
 #ifndef XIP_BASE
 #define XIP_BASE 0x10000000

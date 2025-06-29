@@ -343,14 +343,14 @@ int   MIPS16 PrepareProgramExt(CombinedPtr p, int i, CombinedPtr *CFunPtr, int E
         if(tkn == cmdSUB || tkn == cmdFUN /*|| tkn == cmdCFUN*/ || tkn == cmdCSUB) {         // found a SUB, FUN, CFUNCTION or CSUB token
             if(i >= MAXSUBFUN) {
                 FlashWriteInit(PROGRAM_FLASH);
-                flash_range_erase(realflashpointer, MAX_PROG_SIZE);
+                sd_range_erase(realflashpointer, MAX_PROG_SIZE);
                 int j=MAX_PROG_SIZE/4;
-                int *pp=(int *)(flash_progmemory);
+                CombinedPtrI pp = CombinedPtr(sd_progmemory);
                     while(j--)if(*pp++ != 0xFFFFFFFF){
-                        enable_interrupts_pico();
+                        /** enable_interrupts_pico(); */
                         error("Flash erase problem");
                     }
-                enable_interrupts_pico();
+                /** enable_interrupts_pico(); */
                 MMPrintString("Error: Too many subroutines and functions - erasing program\r\n");
                 uSec(100000);
                 ClearProgram(true);

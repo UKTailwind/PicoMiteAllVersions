@@ -190,7 +190,7 @@ void VGArecovery(int pin){
     }
 #endif
 #endif
-extern const uint8_t *flash_target_contents;
+extern const FSIZE_t sd_target_contents;
 int TickPeriod[NBRSETTICKS]={0};
 volatile int TickTimer[NBRSETTICKS]={0};
 CombinedPtr TickInt[NBRSETTICKS];
@@ -1471,7 +1471,7 @@ void MIPS16 cmd_library(void) {
         InQuote = InCFun = j = 0;
         CmdExpected = true;
         if(Option.LIBRARY_FLASH_SIZE != MAX_PROG_SIZE){
-            uint32_t *c = (uint32_t *)(flash_progmemory - MAX_PROG_SIZE);
+            CombinedPtrI c = CombinedPtr(sd_progmemory - MAX_PROG_SIZE);
             if (*c != 0xFFFFFFFF)
                 error("Flash Slot % already in use",MAXFLASHSLOTS);
         }
@@ -1643,12 +1643,12 @@ void MIPS16 cmd_library(void) {
         //now write the library from ram to the library flash area
         // initialise for writing to the flash
         FlashWriteInit(LIBRARY_FLASH);
-        flash_range_erase(realflashpointer, MAX_PROG_SIZE);
+        sd_range_erase(realflashpointer, MAX_PROG_SIZE);
         i=MAX_PROG_SIZE/4;
        
-        int *ppp=(int *)(flash_progmemory - MAX_PROG_SIZE);
+        int *ppp=(sd_progmemory - MAX_PROG_SIZE);
         while(i--)if(*ppp++ != 0xFFFFFFFF){
-            enable_interrupts_pico();
+            /** enable_interrupts_pico(); */
             error("Flash erase problem");
         }
    
@@ -1684,15 +1684,15 @@ void MIPS16 cmd_library(void) {
         if(Option.LIBRARY_FLASH_SIZE != MAX_PROG_SIZE) return;
         
         FlashWriteInit(LIBRARY_FLASH);
-        flash_range_erase(realflashpointer, MAX_PROG_SIZE);
+        sd_range_erase(realflashpointer, MAX_PROG_SIZE);
         i=MAX_PROG_SIZE/4;
        
-        int *ppp=(int *)(flash_progmemory - MAX_PROG_SIZE);
+        int *ppp=(sd_progmemory - MAX_PROG_SIZE);
         while(i--)if(*ppp++ != 0xFFFFFFFF){
-            enable_interrupts_pico();
+            /** enable_interrupts_pico(); */
             error("Flash erase problem");
         }
-        enable_interrupts_pico();
+        /** enable_interrupts_pico(); */
 
         Option.LIBRARY_FLASH_SIZE= 0;
         SaveOptions();
@@ -1776,11 +1776,11 @@ void MIPS16 cmd_library(void) {
 		else fsize = lfs_file_size(&lfs,FileTable[fnbr].lfsptr);
         if(fsize>MAX_PROG_SIZE)error("File size % should be % or less",fsize,MAX_PROG_SIZE);
         FlashWriteInit(LIBRARY_FLASH);
-        flash_range_erase(realflashpointer, MAX_PROG_SIZE);
+        sd_range_erase(realflashpointer, MAX_PROG_SIZE);
         int i=MAX_PROG_SIZE/4;
-        int *ppp=(int *)(flash_progmemory - MAX_PROG_SIZE);
+        int *ppp=(sd_progmemory - MAX_PROG_SIZE);
         while(i--)if(*ppp++ != 0xFFFFFFFF){
-            enable_interrupts_pico();
+            /** enable_interrupts_pico(); */
             error("Flash erase problem");
         }
         for(int k = 0; k < fsize; k++){        // write to the flash byte by byte
@@ -4572,13 +4572,13 @@ tp = checkstring(cmdline, (unsigned char *)"HEARTBEAT");
         Option.Magic=MagicKey; //This isn't ideal but it improves the chances of a older config working in a new build
         FileClose(fnbr);
         uSec(100000);
-        disable_interrupts_pico();
-        flash_range_erase(FLASH_TARGET_OFFSET, FLASH_ERASE_SIZE);
-        enable_interrupts_pico();
+        /** disable_interrupts_pico(); */
+        sd_range_erase(FLASH_TARGET_OFFSET, FLASH_ERASE_SIZE);
+        /** enable_interrupts_pico(); */
         uSec(10000);
-        disable_interrupts_pico();
-        flash_range_program(FLASH_TARGET_OFFSET, (const uint8_t *)&Option, 768);
-        enable_interrupts_pico();
+        /** disable_interrupts_pico(); */
+        sd_range_program(FLASH_TARGET_OFFSET, (const uint8_t *)&Option, 768);
+        /** enable_interrupts_pico(); */
         _excep_code = RESET_COMMAND;
         SoftReset();
     }
@@ -4588,9 +4588,9 @@ tp = checkstring(cmdline, (unsigned char *)"HEARTBEAT");
         if(Option.LIBRARY_FLASH_SIZE==MAX_PROG_SIZE) {
           uint32_t j = FLASH_TARGET_OFFSET + FLASH_ERASE_SIZE + SAVEDVARS_FLASH_SIZE + ((MAXFLASHSLOTS - 1) * MAX_PROG_SIZE);
           uSec(250000);
-          disable_interrupts_pico();
-          flash_range_erase(j, MAX_PROG_SIZE);
-          enable_interrupts_pico();
+          /** disable_interrupts_pico(); */
+          sd_range_erase(j, MAX_PROG_SIZE);
+          /** enable_interrupts_pico(); */
         }
         configure(tp);
         return;
@@ -4865,7 +4865,7 @@ void MIPS16 fun_info(void){
             targ=T_INT;
             return;
         } else if((tp=checkstring(ep, (unsigned char *)"FLASH ADDRESS"))){
-            iret=(int64_t)(unsigned int)(flash_target_contents + (getint(tp,1,MAXFLASHSLOTS) - 1) * MAX_PROG_SIZE);
+            iret=(int64_t)(unsigned int)(sd_target_contents + (getint(tp,1,MAXFLASHSLOTS) - 1) * MAX_PROG_SIZE);
             targ=T_INT;
             return;
         } else if((tp=checkstring(ep, (unsigned char *)"FILESIZE"))){
@@ -5122,9 +5122,9 @@ void MIPS16 fun_info(void){
 		} else if(checkstring(tp, (unsigned char *)"FLASH SIZE")){
             uint8_t txbuf[4] = {0x9f};
             uint8_t rxbuf[4] = {0};
-            disable_interrupts_pico();
+            /** disable_interrupts_pico(); */
             flash_do_cmd(txbuf, rxbuf, 4);
-            enable_interrupts_pico();
+            /** enable_interrupts_pico(); */
             iret= 1 << rxbuf[3];
 			targ=T_INT;
 			return;

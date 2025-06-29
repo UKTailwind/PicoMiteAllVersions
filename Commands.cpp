@@ -1038,7 +1038,7 @@ void MIPS16 cmd_new(void) {
 	FlashLoad=0;
 	uSec(250000);
     FlashWriteInit(PROGRAM_FLASH);
-    flash_range_erase(realflashpointer, MAX_PROG_SIZE);
+    sd_range_erase(realflashpointer, MAX_PROG_SIZE);
     FlashWriteByte(0); FlashWriteByte(0); FlashWriteByte(0);    // terminate the program in flash
     FlashWriteClose();
 #ifdef PICOMITEVGA

@@ -44,7 +44,7 @@ extern "C" {
 #define ASMMAX 6400 // maximum number of bytes that can be copied or set by assembler routines
 #define MAXCPY 3200 // tuned maximum number of bytes to copy using ZCOPY
 
-extern const uint8_t *flash_progmemory;
+extern const FSIZE_t sd_progmemory;
 // memory management parameters
 
 // allocate static memory for programs, variables and the heap
@@ -797,12 +797,12 @@ void m_alloc(int type) {
         case M_PROG:
 #ifdef rp2350
 #ifndef PICOMITEWEB
-                        if(PSRAMsize)memset((uint8_t *)PSRAMbase,0,PSRAMsize);
+                        if(PSRAMsize) memset((uint8_t *)PSRAMbase,0,PSRAMsize);
 #endif
 #endif
         case M_LIMITED:    // this is called initially in InitBasic() to set the base pointer for program memory
                         // everytime the program size is adjusted up or down this must be called to check for memory overflow
-                        ProgMemory = (uint8_t *)flash_progmemory;
+                        ProgMemory = sd_progmemory;
                         memset(MMHeap,0,heap_memory_size);
 #ifdef GUICONTROLS
                         if(Option.MaxCtrls) Ctrl=(struct s_ctrl *)CTRLS;

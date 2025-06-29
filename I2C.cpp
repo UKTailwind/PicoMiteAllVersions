@@ -2319,9 +2319,9 @@ void MIPS16 cmd_camera(void) {
     char * buff = GetTempMemory(160 * 120 * 2);
     char * k = buff;
     c.rgb = 0;
-    disable_interrupts_pico();
+    /** disable_interrupts_pico(); */
     capture(buff);
-    enable_interrupts_pico();
+    /** enable_interrupts_pico(); */
     char * linebuff = nullptr;
     if (scale) linebuff = GetTempMemory(160 * 3);
     for (int y = ys; y < 120 * scale + ys; y += scale) {
@@ -2371,9 +2371,9 @@ void MIPS16 cmd_camera(void) {
     }
     char * buff = GetTempMemory(160 * 120 * 2);
     c.rgb = 0;
-    disable_interrupts_pico();
+    /** disable_interrupts_pico(); */
     capture(buff);
-    enable_interrupts_pico();
+    /** enable_interrupts_pico(); */
     char * linebuff = GetTempMemory(160 * 3 * scale);
     char * k = buff;
     for (int y = ys; y < 120 * scale + ys; y += scale) {

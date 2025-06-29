@@ -360,8 +360,8 @@ extern "C" {
 #define PIO_RX_DMA2 9
 #define PIO_TX_DMA2 6
 #define ADC_CLK_SPEED   (Option.CPU_Speed*500)
-#define PROGSTART (FLASH_TARGET_OFFSET + FLASH_ERASE_SIZE + SAVEDVARS_FLASH_SIZE + ((MAXFLASHSLOTS) * MAX_PROG_SIZE))
-#define TOP_OF_SYSTEM_FLASH  (FLASH_TARGET_OFFSET + FLASH_ERASE_SIZE + SAVEDVARS_FLASH_SIZE + ((MAXFLASHSLOTS+1) * MAX_PROG_SIZE))
+#define PROGSTART (((MAXFLASHSLOTS) * MAX_PROG_SIZE))
+#define TOP_OF_SYSTEM_FLASH  (((MAXFLASHSLOTS+1) * MAX_PROG_SIZE))
 #define RoundUpK4(a)     (((a) + (4096 - 1)) & (~(4096 - 1)))// round up to the nearest page size      [position 131:9]	
 typedef enum {
     MMHRES,
