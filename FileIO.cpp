@@ -5838,18 +5838,23 @@ void mount_tmp(void) {
         f_mkdir("/tmp");
     }
 }
-FIL f = { 0 }; // "/tmp/picoMite.prog"
+static FIL f = { 0 }; // "/tmp/picoMite.prog"
 static void ensure_prog_file_open(void) {
     if (f.obj.fs) return; // already open
     if (f_open(&f, "/tmp/picoMite.prog", FA_READ | FA_WRITE) != FR_OK) {
-        f_open(&f, "/tmp/picoMite.prog", FA_READ | FA_WRITE | FA_CREATE_ALWAYS);
+        if (f_open(&f, "/tmp/picoMite.prog", FA_READ | FA_WRITE | FA_CREATE_ALWAYS) == FR_OK) {
+            SDErraseBlock(0, 16 << 20);
+        }
     }
 }
 UINT SDBlock(FSIZE_t p, void* buf, size_t sz) {
     UINT res = 0;
     ensure_prog_file_open();
-    f_lseek(&f, p);
-    f_read(&f, buf, sz, &res);
+    if (f_lseek(&f, p) != FR_OK) goto err;
+    if (f_read(&f, buf, sz, &res) != FR_OK) goto err;
+    return res;
+err:
+    memset(buf, 0xFF, sz);
     return res;
 }
 UINT SDWriteBlock(FSIZE_t p, const void* buf, size_t sz) {
@@ -5857,6 +5862,7 @@ UINT SDWriteBlock(FSIZE_t p, const void* buf, size_t sz) {
     ensure_prog_file_open();
     f_lseek(&f, p);
     f_write(&f, buf, sz, &res);
+    f_sync(&f);
     return res;
 }
 UINT SDWriteBlockPP(FSIZE_t offset, CombinedPtr p, size_t sz) {
@@ -5867,6 +5873,7 @@ UINT SDWriteBlockPP(FSIZE_t offset, CombinedPtr p, size_t sz) {
         uint8_t b = *p++;
         f_write(&f, &b, 1, &res);
     }
+    f_sync(&f);
     return sz;
 }
 UINT SDErraseBlock(FSIZE_t offset, size_t sz) {
@@ -5877,6 +5884,7 @@ UINT SDErraseBlock(FSIZE_t offset, size_t sz) {
         uint32_t b = 0xFFFFFFFF;
         f_write(&f, &b, 4, &res);
     }
+    f_sync(&f);
     return sz;
 }
 

@@ -45,7 +45,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 
 extern "C" {
 
-#define DRWAV_COPY_MEMORY(dst, src, sz) memcpy((dst), (src), (sz))
+#define DRWAV_COPY_MEMORY(dst, src, sz) memcpy((void*)(dst), (src), (sz))
 #define DR_WAV_IMPLEMENTATION
 #define DR_WAV_NO_SIMD
 #define DR_WAV_NO_STDIO

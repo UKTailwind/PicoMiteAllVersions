@@ -4994,6 +4994,17 @@ unsigned char CombinedPtr::operator*() {
     }
     // in file on SD card (less than 256 MB of space on file is supported)
     size_t offset = p.f % CombinedPtrBufSize;
+    /**
+    {
+    static FIL f;
+    if(f_open(&f, "/tmp/tt", FA_WRITE | FA_OPEN_APPEND) != FR_OK) f_open(&f, "/tmp/tt", FA_CREATE_ALWAYS | FA_WRITE | FA_OPEN_APPEND);
+    UINT wr;
+    static char n[32];
+    snprintf(n, 32, "%02X:%04X\n", (uint32_t)offset, (uint32_t)p.f);
+    f_write(&f, n, strlen(n), &wr);
+    f_close(&f);
+    }
+*/
     if (p.f / CombinedPtrBufSize == buff_base_offset / CombinedPtrBufSize) { // we are in buffer
         return buff[offset];
     }

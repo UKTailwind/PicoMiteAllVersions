@@ -374,16 +374,32 @@ int   MIPS16 PrepareProgramExt(CombinedPtr p, int i, CombinedPtr *CFunPtr, int E
     if(*CFunPtr != nullptr && CFunPtr->raw() >= (uint8_t*)0x11000000) { // PSRAM or SRAM
         FreeMemory((void*)CFunPtr->raw());
     }
+
+        gpio_init(PICO_DEFAULT_LED_PIN);
+        gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
+
     CombinedPtr p_aligned = p.align();
     if (p_aligned.raw() < (uint8_t*)XIP_BASE) {
         // --- SD карта: копируем CFunction/Font в RAM ---
         CombinedPtrI cfp = p_aligned;
         size_t total_bytes = 0;
-        while (*cfp != 0xffffffff) {
+        while (*cfp != 0xffffffff && total_bytes < MAX_PROG_SIZE) {
             cfp++; // skip header
             unsigned int len = *cfp;
             total_bytes += (len + 4); // data + header
             cfp += (len + 4) / sizeof(unsigned int);
+        }
+{
+        for (int i = 0; i < 6; i++) {
+            sleep_ms(23);
+            gpio_put(PICO_DEFAULT_LED_PIN, true);
+            sleep_ms(23);
+            gpio_put(PICO_DEFAULT_LED_PIN, false);
+        }
+}
+        if (!total_bytes || total_bytes >= MAX_PROG_SIZE) {
+            *CFunPtr = nullptr;
+            return i;
         }
         total_bytes += 4; // final 0xffffffff
 
@@ -407,17 +423,6 @@ int   MIPS16 PrepareProgramExt(CombinedPtr p, int i, CombinedPtr *CFunPtr, int E
         cfp++;
         cfp += (*cfp + 4) / sizeof(unsigned int);
     }
-{
-        gpio_init(PICO_DEFAULT_LED_PIN);
-        gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
-        for (int i = 0; i < 6; i++) {
-            sleep_ms(23);
-            gpio_put(PICO_DEFAULT_LED_PIN, true);
-            sleep_ms(23);
-            gpio_put(PICO_DEFAULT_LED_PIN, false);
-        }
-
-}
     return i;
 }
 
@@ -3206,14 +3211,6 @@ int GetCommandValue( unsigned char *n) {
 
 // find the value of a token given its name
 int GetTokenValue (unsigned char *n) {
-    /**
-    FIL f;
-    f_open(&f, "/tmp/tt", FA_CREATE_ALWAYS | FA_WRITE | FA_OPEN_APPEND);
-    UINT wr;
-    f_write(&f, n, strlen(n), &wr);
-    f_write(&f, ".", 1, &wr);
-    f_close(&f);
-    */
     for(int i = 0; i < TokenTableSize - 1; i++) {
         if(str_equal(n, tokentbl[i].name)) {
 //        if(strcmp((char*)n, (char*)tokentbl[i].name) == 0) {
