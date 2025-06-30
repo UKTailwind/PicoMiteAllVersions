@@ -190,7 +190,7 @@ void VGArecovery(int pin){
     }
 #endif
 #endif
-extern const FSIZE_t sd_target_contents;
+const FSIZE_t sd_target_contents = 0;
 int TickPeriod[NBRSETTICKS]={0};
 volatile int TickTimer[NBRSETTICKS]={0};
 CombinedPtr TickInt[NBRSETTICKS];
@@ -1646,7 +1646,7 @@ void MIPS16 cmd_library(void) {
         sd_range_erase(realflashpointer, MAX_PROG_SIZE);
         i=MAX_PROG_SIZE/4;
        
-        int *ppp=(sd_progmemory - MAX_PROG_SIZE);
+        CombinedPtrI ppp= CombinedPtr(sd_progmemory - MAX_PROG_SIZE);
         while(i--)if(*ppp++ != 0xFFFFFFFF){
             /** enable_interrupts_pico(); */
             error("Flash erase problem");
@@ -1687,7 +1687,7 @@ void MIPS16 cmd_library(void) {
         sd_range_erase(realflashpointer, MAX_PROG_SIZE);
         i=MAX_PROG_SIZE/4;
        
-        int *ppp=(sd_progmemory - MAX_PROG_SIZE);
+        CombinedPtrI ppp= CombinedPtr(sd_progmemory - MAX_PROG_SIZE);
         while(i--)if(*ppp++ != 0xFFFFFFFF){
             /** enable_interrupts_pico(); */
             error("Flash erase problem");
@@ -1778,7 +1778,7 @@ void MIPS16 cmd_library(void) {
         FlashWriteInit(LIBRARY_FLASH);
         sd_range_erase(realflashpointer, MAX_PROG_SIZE);
         int i=MAX_PROG_SIZE/4;
-        int *ppp=(sd_progmemory - MAX_PROG_SIZE);
+        CombinedPtrI ppp= CombinedPtr(sd_progmemory - MAX_PROG_SIZE);
         while(i--)if(*ppp++ != 0xFFFFFFFF){
             /** enable_interrupts_pico(); */
             error("Flash erase problem");

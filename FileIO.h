@@ -34,6 +34,7 @@ extern CombinedPtr CFunctionFlash, CFunctionLibrary;
 void MMPrintStringPP(CombinedPtr s);
 int FileLoadProgram(CombinedPtr fname, bool chain);
 int FileLoadCMM2Program(CombinedPtr  fname, bool message);
+extern UINT SDWriteBlockPP(FSIZE_t offset, CombinedPtr p, size_t sz);
 #endif
 
 #ifdef __cplusplus
@@ -277,6 +278,7 @@ enum {
 extern union uFileTable FileTable[MAXOPENFILES + 1];
 extern UINT SDBlock(FSIZE_t p, void* buf, size_t sz);
 extern UINT SDWriteBlock(FSIZE_t p, const void* buf, size_t sz);
+extern UINT SDErraseBlock(FSIZE_t offset, size_t sz);
 
 #ifdef __cplusplus
 }

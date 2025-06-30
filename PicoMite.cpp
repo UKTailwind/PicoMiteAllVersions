@@ -4433,7 +4433,7 @@ int MIPS16 main(){
             }
         } else {
             if(Option.Autorun!=MAXFLASHSLOTS+1){
-                ProgMemory=(unsigned char *)(sd_target_contents+(Option.Autorun-1)*MAX_PROG_SIZE);
+                ProgMemory = (sd_target_contents+(Option.Autorun-1)*MAX_PROG_SIZE);
             }
             if(*ProgMemory != 0x01 ) {
                 MMPrintString((char *)banner);
@@ -5014,6 +5014,16 @@ unsigned char CombinedPtr::operator[](std::ptrdiff_t i) {
     SDBlock(buff_base_offset, buff, CombinedPtrBufSize);
     return buff[offset];
 }
+
+void sd_range_erase(FSIZE_t offset, FSIZE_t size) {
+    CombinedPtr::flush();
+    SDErraseBlock(offset, size);
+}
+void sd_range_program(FSIZE_t offset, CombinedPtr p, FSIZE_t size) {
+    CombinedPtr::flush();
+    SDWriteBlockPP(offset, p, size);
+}
+
 double CombinedPtr::as_double() {
     if (p.f >= XIP_BASE)
         return *(double *)p.c;
@@ -5037,27 +5047,28 @@ CombinedPtr& CombinedPtr::write_byte(uint8_t v) {
         *p.c = v;
         return *this;
     }
-
     // in file on SD card
     size_t offset = p.f % CombinedPtrBufSize;
     FSIZE_t block_base = p.f & ~(FSIZE_t)(CombinedPtrBufSize - 1);
 
     if (block_base != buff_base_offset) {
-        // Если мы вышли за границу текущего буфера — сначала сохранить старый, если нужно
-        // (можно добавить dirty-флаг при необходимости)
-        if (buff_base_offset != (FSIZE_t)-1) {
+        if (buff_dirty && buff_base_offset != (FSIZE_t)-1) {
             SDWriteBlock(buff_base_offset, buff, CombinedPtrBufSize);
+            buff_dirty = false;
         }
-        // Загрузить новый блок перед записью
         SDBlock(block_base, buff, CombinedPtrBufSize);
         buff_base_offset = block_base;
     }
-
     buff[offset] = v;
-    // При желании: можно отметить буфер "dirty" и записать позже
-    SDWriteBlock(buff_base_offset, buff, CombinedPtrBufSize);
-
+    buff_dirty = true; // Помечаем буфер как изменённый
     return *this;
+}
+bool CombinedPtr::buff_dirty = false;
+void CombinedPtr::flush() {
+    if (buff_dirty && buff_base_offset != (FSIZE_t)-1) {
+        SDWriteBlock(buff_base_offset, buff, CombinedPtrBufSize);
+        buff_dirty = false;
+    }
 }
 
 // print a string to the console interfaces

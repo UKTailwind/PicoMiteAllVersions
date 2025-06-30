@@ -62,10 +62,9 @@ extern "C" {
 #include "hardware/structs/qmi.h"
 #endif
 
-extern const FSIZE_t sd_target_contents;
+const FSIZE_t sd_target_contents = 0;
 extern const FSIZE_t sd_progmemory;
 //LIBRARY
-extern const uint8_t *flash_libgmemory;
 extern void routinechecks(void);
 extern bool mergedread;
 extern int TraceOn;
@@ -5860,5 +5859,26 @@ UINT SDWriteBlock(FSIZE_t p, const void* buf, size_t sz) {
     f_write(&f, buf, sz, &res);
     return res;
 }
+UINT SDWriteBlockPP(FSIZE_t offset, CombinedPtr p, size_t sz) {
+    UINT res = 0;
+    ensure_prog_file_open();
+    f_lseek(&f, offset);
+    for (size_t i = 0; i < sz; ++i) {
+        uint8_t b = *p++;
+        f_write(&f, &b, 1, &res);
+    }
+    return sz;
+}
+UINT SDErraseBlock(FSIZE_t offset, size_t sz) {
+    UINT res = 0;
+    ensure_prog_file_open();
+    f_lseek(&f, offset);
+    for (size_t i = 0; i < sz; i += 4) {
+        uint32_t b = 0xFFFFFFFF;
+        f_write(&f, &b, 4, &res);
+    }
+    return sz;
+}
+
 
 }

@@ -18,7 +18,10 @@ class CombinedPtr {
     static_assert(sizeof(unsigned char*) == sizeof(FSIZE_t), "Incompatible pointer and FSIZE_t sizes");
     static FSIZE_t buff_base_offset;
     static unsigned char buff[CombinedPtrBufSize]; // small buffer to read sd-card not a lot times
+    static bool buff_dirty; // флаг, что буфер изменён
 public:
+    static void flush();
+
     // Конструкторы
     CombinedPtr() : p{nullptr} {}
     /*explicit*/
