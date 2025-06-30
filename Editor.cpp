@@ -332,17 +332,17 @@ int oldmode;
 //  EDIT              Will run the full screen editor on the current program memory, if run after an error will place the cursor on the error line
 void edit(CombinedPtr cmdline, bool cmdfile) {
     CombinedPtr fromp;
-    unsigned char *p= nullptr;
+    unsigned char *p = nullptr;
     int y, x, edit_buff_size ;
-    optioncolourcodesave=Option.ColourCode;
-    char name[STRINGSIZE], *filename= nullptr;
+    optioncolourcodesave = Option.ColourCode;
+    char name[STRINGSIZE], *filename = nullptr;
     getargs(&cmdline,1,(unsigned char *)",");
     if(argc){
-        strcpy(name,(char *)getFstring(argv[0]));
-        filename=name;
+        strcpy(name, (char *) getFstring(argv[0]));
+        filename = name;
     }
     if(CurrentLinePtr && cmdfile) error("Invalid in a program");
-    if(argc==0 && !cmdfile)error("Syntax");
+    if(argc==0 && !cmdfile) error("Syntax");
     if(!cmdfile){
         SaveContext();
         ClearVars(0,FALSE);

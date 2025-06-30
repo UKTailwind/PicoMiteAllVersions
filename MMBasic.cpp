@@ -265,6 +265,12 @@ void   MIPS16 PrepareProgram(int ErrAbort) {
         FontTable[i] = nullptr;                                        // clear the font table
 
     NbrFuncts = 0;
+    if(CFunctionFlash != nullptr && CFunctionFlash.raw() >= (uint8_t*)0x11000000) { // PSRAM or SRAM
+        FreeMemory((void*)CFunctionFlash.raw());
+    }
+    if(CFunctionLibrary != nullptr && CFunctionLibrary.raw() >= (uint8_t*)0x11000000) { // PSRAM or SRAM
+        FreeMemory((void*)CFunctionLibrary.raw());
+    }
     CFunctionFlash = CFunctionLibrary = nullptr;
     if(Option.LIBRARY_FLASH_SIZE == MAX_PROG_SIZE) {
         NbrFuncts = PrepareProgramExt(LibMemory , 0, &CFunctionLibrary, ErrAbort);
@@ -331,6 +337,7 @@ void   MIPS16 PrepareProgram(int ErrAbort) {
     }
 }
 
+__attribute__((section(".rodata"))) static const uint32_t rom = 0xffffffff;
 
 // This scans one area (main program or the library area) for user defined subroutines and functions.
 // It is only used by PrepareProgram() above.
@@ -373,8 +380,8 @@ int   MIPS16 PrepareProgramExt(CombinedPtr p, int i, CombinedPtr *CFunPtr, int E
     p++;                                                            // step over the terminating 0xff
     if(*CFunPtr != nullptr && CFunPtr->raw() >= (uint8_t*)0x11000000) { // PSRAM or SRAM
         FreeMemory((void*)CFunPtr->raw());
+        *CFunPtr = nullptr;
     }
-
 
     CombinedPtr p_aligned = p.align();
     if (p_aligned.raw() < (uint8_t*)XIP_BASE) {
@@ -398,12 +405,14 @@ int   MIPS16 PrepareProgramExt(CombinedPtr p, int i, CombinedPtr *CFunPtr, int E
         }
 */
         if (!total_bytes || total_bytes >= MAX_PROG_SIZE) {
-            *CFunPtr = nullptr;
+            *CFunPtr = CombinedPtr(&rom);
+            if(i < MAXSUBFUN) subfun[i] = nullptr;
+            CurrentLinePtr = nullptr;
             return i;
         }
         total_bytes += 4; // final 0xffffffff
 
-        uint8_t *ram_copy = (uint8_t *)GetMemory(total_bytes); // или malloc
+        uint8_t *ram_copy = (uint8_t *)GetMemory(total_bytes);
         for (size_t i = 0; i < total_bytes; ++i)
             ram_copy[i] = p_aligned[i];
 
