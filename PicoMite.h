@@ -6,7 +6,7 @@
 #include <cstddef>
 #include "ff.h"
 
-#define CombinedPtrBufSize 32
+#define CombinedPtrBufSize 512
 
 template<typename T> class CombinedPtrT;
 

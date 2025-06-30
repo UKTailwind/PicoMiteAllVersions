@@ -132,7 +132,6 @@ char CMM1=0;
 // note that HRes == 0 is an indication that a display is not configured
 short HRes = 0, VRes = 0;
 short lastx,lasty;
-const int CMM1map[16]={BLACK,BLUE,GREEN,CYAN,RED,MAGENTA,YELLOW,WHITE,MYRTLE,COBALT,MIDGREEN,CERULEAN,RUST,FUCHSIA,BROWN,LILAC};
 int RGB121map[16];
 uint32_t remap[256];
 // pointers to the drawing primitives
@@ -477,13 +476,14 @@ static void getcoord(CombinedPtr p, int *x, int *y) {
 		*y = getinteger(argv[2]);
 	}
 }
+const static int CMM1map[16]={BLACK,BLUE,GREEN,CYAN,RED,MAGENTA,YELLOW,WHITE,MYRTLE,COBALT,MIDGREEN,CERULEAN,RUST,FUCHSIA,BROWN,LILAC};
 
 static int getColour(CombinedPtr c, int minus){
 	int colour;
 	if(CMM1){
-		colour = getint(c,(minus ? -1: 0),15);
-		if(colour>=0)colour=CMM1map[colour];
-	} else colour=getint(c,(minus ? -1: 0),0xFFFFFFF);
+		colour = getint(c, (minus ? -1 : 0), 15);
+		if(colour >= 0 && colour < sizeof(CMM1map) / sizeof(CMM1map[0])) colour = CMM1map[colour];
+	} else colour = getint(c, (minus ? -1: 0),0xFFFFFFF);
 	return colour;
 
 }

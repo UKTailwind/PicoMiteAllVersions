@@ -1818,7 +1818,8 @@ void PFltComma(MMFLOAT n) {
     MMPrintString(", "); PFlt(n);
 }
 void sigbus(void){
-    MMPrintString("Error: Invalid address - resetting\r\n");
+    error("^ Invalid address\r\n");
+    MMPrintString("resetting...\r\n");
 	uSec(250000);
 	/** disable_interrupts_pico(); */
 //	sd_range_erase(PROGSTART, MAX_PROG_SIZE);
