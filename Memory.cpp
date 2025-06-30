@@ -60,7 +60,7 @@ extern const FSIZE_t sd_progmemory;
         unsigned char __attribute__ ((aligned (256))) AllMemory[HEAP_MEMORY_SIZE+256];
         unsigned char *MMHeap=AllMemory;
         uint32_t framebuffersize=0;
-        unsigned char *FRAMEBUFFER=NULL;
+        unsigned char *FRAMEBUFFER= nullptr;
     #endif
 #else
     #ifdef PICOMITEVGA
@@ -73,7 +73,7 @@ extern const FSIZE_t sd_progmemory;
         unsigned char __attribute__ ((aligned (256))) AllMemory[HEAP_MEMORY_SIZE+256];
         unsigned char *MMHeap=AllMemory;
         uint32_t framebuffersize=0;
-        unsigned char *FRAMEBUFFER=NULL;
+        unsigned char *FRAMEBUFFER= nullptr;
     #endif
 #endif
 
@@ -119,18 +119,18 @@ unsigned char *SecondFrame=video;
 #endif
 #endif
 #ifdef PICOMITE
-    unsigned char *WriteBuf=NULL;
-    unsigned char *LayerBuf=NULL;
-    unsigned char *FrameBuf=NULL;
+    unsigned char *WriteBuf= nullptr;
+    unsigned char *LayerBuf= nullptr;
+    unsigned char *FrameBuf= nullptr;
 #endif
 #ifdef GUICONTROLS
     struct s_ctrl CTRLS[MAXCONTROLS];
-    struct s_ctrl *Ctrl=NULL;
+    struct s_ctrl *Ctrl= nullptr;
 #endif
 #ifdef PICOMITEWEB
-    unsigned char *WriteBuf=NULL;
-    unsigned char *LayerBuf=NULL;
-    unsigned char *FrameBuf=NULL;
+    unsigned char *WriteBuf= nullptr;
+    unsigned char *LayerBuf= nullptr;
+    unsigned char *FrameBuf= nullptr;
 #endif
 
 unsigned int mmap[HEAP_MEMORY_SIZE/ PAGESIZE / PAGESPERWORD]={0};
@@ -168,8 +168,8 @@ void MIPS16 cmd_memory(void) {
         int size=getint(argv[6],1,32);
         if(!(size==1 || size==4 || size==8 || size==16 || size==32))error((char *)"Invalid size");
         int sourcesize,destinationsize;
-        void *top=NULL;
-        uint64_t *from=NULL;
+        void *top= nullptr;
+        uint64_t *from= nullptr;
         if(CheckEmpty(argv[0])){
             sourcesize=parseintegerarray(argv[0],(int64_t **)&from, 1,1,NULL,false);
             if(sourcesize<n)error("Source array too small");
@@ -219,7 +219,7 @@ void MIPS16 cmd_memory(void) {
     }
     tp = checkstring(cmdline, (unsigned char *)"PRINT");
     if(tp){
-        char *fromp=NULL;
+        char *fromp= nullptr;
         int sourcesize;
         int64_t *aint;
         getargs(&tp,5,(unsigned char *)",");
@@ -243,7 +243,7 @@ void MIPS16 cmd_memory(void) {
     }
     tp = checkstring(cmdline, (unsigned char *)"INPUT");
     if(tp){
-        char *fromp=NULL;
+        char *fromp= nullptr;
         int sourcesize;
         int64_t *aint;
         getargs(&tp,5,(unsigned char *)",");
@@ -275,8 +275,8 @@ void MIPS16 cmd_memory(void) {
         int size=getint(argv[6],1,32);
         if(!(size==1 || size==4 || size==8 || size==16 || size==32))error((char *)"Invalid size");
         int sourcesize,destinationsize;
-        uint64_t *to=NULL;
-        void *fromp=NULL;
+        uint64_t *to= nullptr;
+        void *fromp= nullptr;
         if(CheckEmpty(argv[0])){
             sourcesize=parseintegerarray(argv[0],(int64_t **)&fromp, 1,1,NULL,false);
             if(sourcesize*64/size<n)error("Source array too small");
@@ -529,7 +529,7 @@ void MIPS16 cmd_memory(void) {
     for(i = VarCnt = vsize = var = 0; var < MAXVARS; var++) {
         if(g_vartbl[var].type == T_NOTYPE) continue;
         VarCnt++;  vsize += sizeof(struct s_vartbl);
-        if(g_vartbl[var].val.s == NULL) continue;
+        if(g_vartbl[var].val.s == nullptr) continue;
         if(g_vartbl[var].type & T_PTR) continue;
         nbr = g_vartbl[var].dims[0] + 1 - g_OptionBase;
         if(g_vartbl[var].dims[0]) {
@@ -691,7 +691,7 @@ func:
            }
                
            //Now add the binary used for CSUB and Fonts
-           if(CFunctionLibrary != NULL) {
+           if(CFunctionLibrary != nullptr) {
              j=0;
              pint = CFunctionLibrary;
              while(*pint != 0xffffffff) {
@@ -851,7 +851,7 @@ void __not_in_flash_func(ClearTempMemory)(void) {
         if(g_StrTmpLocalIndex[g_StrTmpIndex - 1] >= g_LocalIndex) {
             g_StrTmpIndex--;
             FreeMemory((void *)g_StrTmp[g_StrTmpIndex]);
-            g_StrTmp[g_StrTmpIndex] = NULL;
+            g_StrTmp[g_StrTmpIndex] = nullptr;
             g_TempMemoryIsChanged = false;
         } else
             break;
@@ -865,7 +865,7 @@ void MIPS16 ClearSpecificTempMemory(void *addr) {
     for(i = 0; i < g_StrTmpIndex; i++) {
         if(g_StrTmp[i] == addr) {
             FreeMemory(addr);
-            g_StrTmp[i] = NULL;
+            g_StrTmp[i] = nullptr;
             g_StrTmpIndex--;
             while(i < g_StrTmpIndex) {
                 g_StrTmp[i] = g_StrTmp[i + 1];
@@ -891,7 +891,7 @@ void __not_in_flash_func(TestStackOverflow)(void) {
 
 
 void MIPS64 __not_in_flash_func(FreeMemory)(void *_addr) {
-    if(_addr == NULL) return;
+    if(_addr == nullptr) return;
 #if defined(rp2350) && !defined(PICOMITEWEB)
     unsigned char * addr = (unsigned char *)_addr;
     int bits;
@@ -935,16 +935,16 @@ void InitHeap(bool all) {
 #ifdef rp2350
     if(all)memset(psmap,0,sizeof(psmap));
 #endif
-    for(i = 0; i < MAXTEMPSTRINGS; i++) g_StrTmp[i] = NULL;
+    for(i = 0; i < MAXTEMPSTRINGS; i++) g_StrTmp[i] = nullptr;
 #ifdef PICOMITEVGA
     WriteBuf=(unsigned char *)FRAMEBUFFER;
     DisplayBuf=(unsigned char *)FRAMEBUFFER;
     LayerBuf=(unsigned char *)FRAMEBUFFER;
     FrameBuf=(unsigned char *)FRAMEBUFFER;
 #else
-    FrameBuf=NULL;
-    WriteBuf=NULL;
-    LayerBuf=NULL;
+    FrameBuf= nullptr;
+    WriteBuf= nullptr;
+    LayerBuf= nullptr;
 #endif
 }
 
@@ -1182,20 +1182,20 @@ void *ReAllocMemory(void *addr, size_t msize){
 	int size=MemSize(addr);
 	if(msize<=size)return addr;
 	void *newaddr=GetMemory(msize);
-	if(addr!=NULL && size!=0){
+	if(addr!= nullptr && size!=0){
 		memcpy(newaddr,addr,MemSize(addr));
 		FreeMemory(addr);
-        addr=NULL;
+        addr= nullptr;
 
 	}
 	return newaddr;
 }
 void __not_in_flash_func(FreeMemorySafe)(void **addr){
-	if(*addr!=NULL){
-        if(*addr >= (void *)MMHeap && *addr < (void *)(MMHeap + heap_memory_size)) {FreeMemory(*addr);*addr=NULL;}
+	if(*addr!= nullptr){
+        if(*addr >= (void *)MMHeap && *addr < (void *)(MMHeap + heap_memory_size)) {FreeMemory(*addr);*addr= nullptr;}
 #ifdef rp2350
 #ifndef PICOMITEWEB
-        if(*addr >= (void *)PSRAMbase && *addr < (void *)(PSRAMbase + PSRAMsize)) {FreeMemory(*addr);*addr=NULL;}
+        if(*addr >= (void *)PSRAMbase && *addr < (void *)(PSRAMbase + PSRAMsize)) {FreeMemory(*addr);*addr= nullptr;}
 #endif
 #endif
 	}

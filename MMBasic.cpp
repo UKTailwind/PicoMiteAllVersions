@@ -262,7 +262,7 @@ void   MIPS16 PrepareProgram(int ErrAbort) {
     CombinedPtr p1;
     unsigned char *p2;
     for(i = FONT_BUILTIN_NBR; i < FONT_TABLE_SIZE-1; i++)
-        FontTable[i] = NULL;                                        // clear the font table
+        FontTable[i] = nullptr;                                        // clear the font table
 
     NbrFuncts = 0;
     CFunctionFlash = CFunctionLibrary = nullptr;
@@ -274,7 +274,7 @@ void   MIPS16 PrepareProgram(int ErrAbort) {
     // check the sub/fun table for duplicates
 #ifdef rp2350
     memset(funtbl,0,sizeof(struct s_funtbl)*MAXSUBFUN);
-    for(i = 0; i < MAXSUBFUN && subfun[i] != NULL; i++) {
+    for(i = 0; i < MAXSUBFUN && subfun[i] != nullptr; i++) {
     	// First we will hash the function name and add it to the function table
     	// This allows for a fast check of a variable name being the same as a function name
     	// It also allows a hash look up for function name matching
@@ -311,8 +311,8 @@ void   MIPS16 PrepareProgram(int ErrAbort) {
 #endif
     if(!ErrAbort) return;
 
-    for(i = 0; i < MAXSUBFUN && subfun[i] != NULL; i++) {
-        for(j = i + 1; j < MAXSUBFUN && subfun[j] != NULL; j++) {
+    for(i = 0; i < MAXSUBFUN && subfun[i] != nullptr; i++) {
+        for(j = i + 1; j < MAXSUBFUN && subfun[j] != nullptr; j++) {
             CurrentLinePtr = p1 = subfun[i];
             p1 += sizeof(CommandToken);
             skipspace(p1);
@@ -375,8 +375,6 @@ int   MIPS16 PrepareProgramExt(CombinedPtr p, int i, CombinedPtr *CFunPtr, int E
         FreeMemory((void*)CFunPtr->raw());
     }
 
-        gpio_init(PICO_DEFAULT_LED_PIN);
-        gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
 
     CombinedPtr p_aligned = p.align();
     if (p_aligned.raw() < (uint8_t*)XIP_BASE) {
@@ -389,14 +387,16 @@ int   MIPS16 PrepareProgramExt(CombinedPtr p, int i, CombinedPtr *CFunPtr, int E
             total_bytes += (len + 4); // data + header
             cfp += (len + 4) / sizeof(unsigned int);
         }
-{
+/** 
+        gpio_init(PICO_DEFAULT_LED_PIN);
+        gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
         for (int i = 0; i < 6; i++) {
             sleep_ms(23);
             gpio_put(PICO_DEFAULT_LED_PIN, true);
             sleep_ms(23);
             gpio_put(PICO_DEFAULT_LED_PIN, false);
         }
-}
+*/
         if (!total_bytes || total_bytes >= MAX_PROG_SIZE) {
             *CFunPtr = nullptr;
             return i;
@@ -477,7 +477,7 @@ int __not_in_flash_func(FindSubFun)(unsigned char *p, int type) {
     unsigned char *p1, *p2;
     int i;
 
-    for(i = 0;  i < MAXSUBFUN && subfun[i] != NULL; i++) {
+    for(i = 0;  i < MAXSUBFUN && subfun[i] != nullptr; i++) {
         p2 = subfun[i];                                             // point to the command token
         CommandToken tkn=commandtbl_decode(p2);
         if(type == 0) {                                             // if it is a sub and we want a fun or vice versa skip this one
@@ -630,7 +630,7 @@ void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, CombinedPtr cmd, int i
             // check if the argument is a valid variable
             if(i < argc1 && isnamestart(*argv1[i]) && *skipvar(argv1[i], false) == 0) {
                 // yes, it is a variable (or perhaps a user defined function which looks the same)?
-                if(!(FindSubFun(argv1[i], 1) >= 0 && strchr(argv1[i], '(').raw() != NULL)) {
+                if(!(FindSubFun(argv1[i], 1) >= 0 && strchr(argv1[i], '(').raw() != nullptr)) {
                     // yes, this is a valid variable.  set argvalue to point to the variable's data and argtype to its type
                     argval[i].s = (uint8_t*)findvar(argv1[i], V_FIND | V_EMPTY_OK);        // get a pointer to the variable's data
                     argtype[i] = g_vartbl[g_VarIndex].type;                          // and the variable's type
@@ -647,7 +647,7 @@ void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, CombinedPtr cmd, int i
             argbyref[i]=0;
             skipspace(argv2[i]);
             if(toupper(*argv2[i]) == 'B' && toupper(*(argv2[i]+1)) == 'Y') {
-                if((checkstring(argv2[i] + 2, (unsigned char *)"VAL")) != NULL) {        // if BYVAL
+                if((checkstring(argv2[i] + 2, (unsigned char *)"VAL")) != nullptr) {        // if BYVAL
                     //Only if not an array remove any pointer flag in the caller
                     if(g_vartbl[argVarIndex[i]].dims[0] == 0){
                          argtype[i] = 0;
@@ -657,7 +657,7 @@ void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, CombinedPtr cmd, int i
                     argv2[i] += 5;                                      // skip to the variable start
                     argbyref[i]=2;
                 } else {
-                    if((checkstring(argv2[i] + 2, (unsigned char *)"REF")) != NULL) {    // if BYREF
+                    if((checkstring(argv2[i] + 2, (unsigned char *)"REF")) != nullptr) {    // if BYREF
                         //if((argtype[i] & T_PTR) == 0) error("Variable required for BYREF $", argv1[i]);
                         argv2[i] += 5;                                  // skip to the variable start
                         argbyref[i]=1;
@@ -690,9 +690,9 @@ void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, CombinedPtr cmd, int i
         ArgType = T_NOTYPE;
         //skip BYVAL/BYREF keywords
         if(toupper(*argv2[i]) == 'B' && toupper(*(argv2[i]+1)) == 'Y') {
-            if((checkstring(argv2[i] + 2,(unsigned char *) "VAL")) != NULL) {
+            if((checkstring(argv2[i] + 2,(unsigned char *) "VAL")) != nullptr) {
                 argv2[i] += 5;
-            }else if((checkstring(argv2[i] + 2, (unsigned char *)"REF")) != NULL) {    // if BYREF
+            }else if((checkstring(argv2[i] + 2, (unsigned char *)"REF")) != nullptr) {    // if BYREF
                 argv2[i] += 5;                                  // skip to the variable start
             }
         }
@@ -717,7 +717,7 @@ void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, CombinedPtr cmd, int i
             int j;
             if(g_vartbl[argVarIndex[i]].dims[0] == 0) error("Expected an array");
             if(TypeMask(g_vartbl[g_VarIndex].type) != TypeMask(argtype[i])) error("Incompatible type: $", argv1[i]);
-            g_vartbl[g_VarIndex].val.s = NULL;
+            g_vartbl[g_VarIndex].val.s = nullptr;
             for(j = 0; j < MAXDIM; j++)                             // copy the dimensions of the supplied variable into our local variable
                 g_vartbl[g_VarIndex].dims[j] = g_vartbl[argVarIndex[i]].dims[j];
         }
@@ -739,7 +739,7 @@ void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, CombinedPtr cmd, int i
         // if this is a pointer (note: at this point the caller type and the required type must be the same)
         if(argtype[i] & T_PTR) {
             // the argument supplied was a variable so we must setup the local variable as a pointer
-            if((g_vartbl[g_VarIndex].type & T_STR) && g_vartbl[g_VarIndex].val.s != NULL) {
+            if((g_vartbl[g_VarIndex].type & T_STR) && g_vartbl[g_VarIndex].val.s != nullptr) {
                 FreeMemorySafe((void **)&g_vartbl[g_VarIndex].val.s);                            // free up the local variable's memory if it is a pointer to a string
                 }
             g_vartbl[g_VarIndex].val.s = argval[i].s;                              // point to the data of the variable supplied as an argument
@@ -861,7 +861,7 @@ void  MIPS16 str_replace(char *target, const char *needle, const char *replaceme
         const char *p = fstrstr(tmp, needle);
 
         // walked past last occurrence of needle; copy remaining part
-        if (p == NULL) {
+        if (p == nullptr) {
             strcpy(insert_point, tmp);
             break;
         }
@@ -1110,7 +1110,7 @@ void  MIPS16 tokenise(int console) {
                 match_i = GetCommandValue((unsigned char *)"Print");
                 if(*++p == ' ') p++;                                // eat a trailing space
                 match_p = p;
-            } else if((tp2 = checkstring(p, (unsigned char *)"BITBANG")) != NULL) {
+            } else if((tp2 = checkstring(p, (unsigned char *)"BITBANG")) != nullptr) {
                     match_i = GetCommandValue((unsigned char *)"Device");
                     p = tp2;
                     match_p = p;
@@ -1874,7 +1874,7 @@ CombinedPtr findlabel(CombinedPtr labelptr) {
     char label[MAXVARLEN + 1];
 
     // first, just exit we have a NULL argument
-    if(labelptr == NULL) return nullptr;
+    if(labelptr == nullptr) return nullptr;
 
     // convert the label to the token format and load into label[]
     // this assumes that the first character has already been verified as a valid label character
@@ -1920,7 +1920,7 @@ CombinedPtr MIPS16 findlabel(CombinedPtr labelptr) {
     char label[MAXVARLEN + 1];
 
     // first, just exit we have a NULL argument
-    if(labelptr == NULL) return NULL;
+    if(labelptr == nullptr) return NULL;
 
     // convert the label to the token format and load into label[]
     // this assumes that the first character has already been verified as a valid label character
@@ -2369,7 +2369,7 @@ void MIPS16 __not_in_flash_func(*findvar)(CombinedPtr p, int action) {
     }
 #else
     if(!(action & V_FUNCT)) {                                       // don't do this if we are defining the local variable for a function name
-        for(i = 0;  i < MAXSUBFUN && subfun[i] != NULL; i++) {
+        for(i = 0;  i < MAXSUBFUN && subfun[i] != nullptr; i++) {
             x = subfun[i];                                          // point to the command token
             x++; skipspace(x);                                      // point to the identifier
             s = name;                                               // point to the new variable
@@ -2400,7 +2400,7 @@ void MIPS16 __not_in_flash_func(*findvar)(CombinedPtr p, int action) {
                 } while(i);
             }
             skipspace(p);
-            if((s = checkstring(p, (unsigned char *)"LENGTH")) != NULL)
+            if((s = checkstring(p, (unsigned char *)"LENGTH")) != nullptr)
                 size = getint(s, 1, MAXSTRLEN) ;
             else
                 if(!(*p == ',' || *p == 0 || tokenfunction(*p) == op_equal || tokenfunction(*p) == op_invalid)) error("Unexpected text: $", p);
@@ -2468,7 +2468,7 @@ void MIPS16 __not_in_flash_func(*findvar)(CombinedPtr p, int action) {
     // First, set the important characteristics of the variable to indicate that the
     // variable is not allocated.  Thus, if GetMemory() fails with "not enough memory",
     // the variable will remain not allocated
-    g_vartbl[ifree].val.s = NULL;
+    g_vartbl[ifree].val.s = nullptr;
     g_vartbl[ifree].type = T_BLOCKED;
     i = *g_vartbl[ifree].name;   *g_vartbl[ifree].name = 0;
 	j = g_vartbl[ifree].dims[0]; g_vartbl[ifree].dims[0] = 0;
@@ -3079,11 +3079,11 @@ void MIPS16 ClearRuntime(bool all) {
 #ifdef USBKEYBOARD
 	clearrepeat();
 #endif	
-    OptionExplicit = false;
-    OptionEscape = false;
-    OptionConsole=3;
-    DefaultType = T_NBR;
-    ds18b20Timers = NULL;                                           // InitHeap(true) will recover the memory allocated to this array
+    OptionExplicit  = false;
+    OptionEscape    = false;
+    OptionConsole   = 3;
+    DefaultType     = T_NBR;
+    ds18b20Timers   = nullptr;                                           // InitHeap(true) will recover the memory allocated to this array
     OptionErrorSkip = 0;
 	optionangle     = 1.0;
     useoptionangle  = false;
@@ -3091,8 +3091,8 @@ void MIPS16 ClearRuntime(bool all) {
     optionfastaudio = 0;
     optionlogging   = false;
 /*frame
-    frame=NULL;
-    outframe=NULL;
+    frame= nullptr;
+    outframe= nullptr;
 */
 #ifndef PICOMITEVGA
     if(ScrollLCD==ScrollLCDSPISCR){
@@ -3126,7 +3126,7 @@ void MIPS16 ClearRuntime(bool all) {
     for(i = 1; i < Option.MaxCtrls; i++) {
         memset(&Ctrl[i],0,sizeof(struct s_ctrl));
         Ctrl[i].state = Ctrl[i].type = 0;
-        Ctrl[i].s = NULL;
+        Ctrl[i].s = nullptr;
     }
 #endif
 }
@@ -3306,7 +3306,7 @@ CombinedPtr __not_in_flash_func(GetNextCommand)(CombinedPtr p, CombinedPtr *CLin
             p++;                                                    // step over the zero
         }
         if(*p == 0) {
-            if(EOFMsg == NULL) return p;
+            if(EOFMsg == nullptr) return p;
             error((char *)EOFMsg);
         }
         if(*p == T_NEWLINE) {
@@ -3675,7 +3675,7 @@ void MIPS16 __not_in_flash_func(makeargs2)(CombinedPtr *p, int maxargs, unsigned
 
         // the special characters that cause the line to be split up are in the string delim
         // any other chars form part of the one argument
-        if(strchr((char *)delim, (char)*tp) != NULL && !expect_cmd) {
+        if(strchr((char *)delim, (char)*tp) != nullptr && !expect_cmd) {
             if(*tp == then_tkn || *tp == else_tkn) expect_cmd = true;
             if(inarg) {                                             // if we have been processing an argument
                 while(op > argbuf && *(op - 1) == ' ') op--;        // trim trailing spaces
