@@ -90,7 +90,7 @@ public:
     explicit operator bool() const { return p.c != nullptr; }
 
     // CFunction (if it exists) starts on the next word address after the program
-    CombinedPtr aligh() { return CombinedPtr((unsigned char *)((p.f + 0b11) & ~0b11)); }
+    CombinedPtr align() { return CombinedPtr((unsigned char *)((p.f + 0b11) & ~0b11)); }
     CombinedPtr& write_byte(uint8_t v);
     double as_double();
     long long as_i64a();

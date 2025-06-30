@@ -4505,16 +4505,16 @@ int MIPS16 main(){
 #else
     start_i2s(QVGA_PIO_NUM,1);
 #endif
-    char *p=(char *)inpbuf;
+    char *p = (char *)inpbuf;
 	if(setjmp(mark) != 0) {
-     // we got here via a long jump which means an error or CTRL-C or the program wants to exit to the command prompt
+        // we got here via a long jump which means an error or CTRL-C or the program wants to exit to the command prompt
         FlashLoad = 0;
 //        LoadOptions();
 #ifdef USBKEYBOARD
 	    clearrepeat();
 #endif	    
         ScrewUpTimer = 0;
-        ProgMemory=sd_progmemory;
+        ProgMemory = sd_progmemory;
         ContinuePoint = nextstmt;                               // in case the user wants to use the continue command
 		*tknbuf = 0;											// we do not want to run whatever is in the token buffer
 		optionangle=1.0;
@@ -4531,16 +4531,18 @@ int MIPS16 main(){
             goto autorun;
         }
     } else {
-        if(*ProgMemory == 0x01 ) ClearVars(0,true);
+        if ( *ProgMemory == 0x01 ) {
+            ClearVars(0,true);
+        }
         else {
             ClearProgram(true);
         }
-    #ifdef PICOMITEWEB
-    if (cyw43_arch_init()==0) {
-        startupcomplete=1;
-        WebConnect();
-    }
-    #endif
+        #ifdef PICOMITEWEB
+        if (cyw43_arch_init()==0) {
+            startupcomplete=1;
+            WebConnect();
+        }
+        #endif
 #ifdef PICOMITE
     SPIatRisk=((Option.DISPLAY_TYPE>I2C_PANEL && Option.DISPLAY_TYPE<BufferedPanel) && Option.SD_CLK_PIN==0);
 #endif

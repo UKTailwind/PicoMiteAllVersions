@@ -264,11 +264,11 @@ void   MIPS16 PrepareProgram(int ErrAbort) {
     for(i = FONT_BUILTIN_NBR; i < FONT_TABLE_SIZE-1; i++)
         FontTable[i] = NULL;                                        // clear the font table
 
-    
     NbrFuncts = 0;
     CFunctionFlash = CFunctionLibrary = nullptr;
-    if(Option.LIBRARY_FLASH_SIZE == MAX_PROG_SIZE)
-         NbrFuncts = PrepareProgramExt(LibMemory , 0, &CFunctionLibrary, ErrAbort);
+    if(Option.LIBRARY_FLASH_SIZE == MAX_PROG_SIZE) {
+        NbrFuncts = PrepareProgramExt(LibMemory , 0, &CFunctionLibrary, ErrAbort);
+    }
     PrepareProgramExt(ProgMemory, NbrFuncts, &CFunctionFlash, ErrAbort);
     
     // check the sub/fun table for duplicates
@@ -335,7 +335,6 @@ void   MIPS16 PrepareProgram(int ErrAbort) {
 // This scans one area (main program or the library area) for user defined subroutines and functions.
 // It is only used by PrepareProgram() above.
 int   MIPS16 PrepareProgramExt(CombinedPtr p, int i, CombinedPtr *CFunPtr, int ErrAbort) {
-    unsigned int *cfp;
     while(*p != 0xff) {
         p = GetNextCommand(p, &CurrentLinePtr, NULL);
         if(*p == 0) break;                                          // end of the program or module
@@ -369,20 +368,56 @@ int   MIPS16 PrepareProgramExt(CombinedPtr p, int i, CombinedPtr *CFunPtr, int E
         }
         while(*p) p++;                                              // look for the zero marking the start of the next element
     }
+
     while(*p == 0) p++;                                             // the end of the program can have multiple zeros
     p++;                                                            // step over the terminating 0xff
-    *CFunPtr = p.aligh(); // CFunction flash (if it exists) starts on the next word address after the program in flash
+    if(*CFunPtr != nullptr && CFunPtr->raw() >= (uint8_t*)0x11000000) { // PSRAM or SRAM
+        FreeMemory((void*)CFunPtr->raw());
+    }
+    CombinedPtr p_aligned = p.align();
+    if (p_aligned.raw() < (uint8_t*)XIP_BASE) {
+        // --- SD карта: копируем CFunction/Font в RAM ---
+        CombinedPtrI cfp = p_aligned;
+        size_t total_bytes = 0;
+        while (*cfp != 0xffffffff) {
+            cfp++; // skip header
+            unsigned int len = *cfp;
+            total_bytes += (len + 4); // data + header
+            cfp += (len + 4) / sizeof(unsigned int);
+        }
+        total_bytes += 4; // final 0xffffffff
+
+        uint8_t *ram_copy = (uint8_t *)GetMemory(total_bytes); // или malloc
+        for (size_t i = 0; i < total_bytes; ++i)
+            ram_copy[i] = p_aligned[i];
+
+        *CFunPtr = CombinedPtr(ram_copy);
+    } else {
+        // --- во Flash: можно использовать напрямую ---
+        *CFunPtr = p_aligned;
+    }
     if(i < MAXSUBFUN) subfun[i] = nullptr;
     CurrentLinePtr = nullptr;
     // now, step through the CFunction area looking for fonts to add to the font table
     //Bit 7 on the last address byte is used to identify a font.
-    cfp = *(unsigned int **)CFunPtr;
+    CombinedPtrI cfp = *CFunPtr;
     while(*cfp != 0xffffffff) {
-        if(*cfp & 0x80000000)
-            FontTable[*cfp & (FONT_TABLE_SIZE-1)] = (unsigned char *)(cfp + 2);
+        if(*cfp & 0x80000000) // Если установлен бит 31 (0x80000000), это шрифт:
+            FontTable[*cfp & (FONT_TABLE_SIZE-1)] = (uint8_t *)(cfp + 2).raw();
         cfp++;
         cfp += (*cfp + 4) / sizeof(unsigned int);
     }
+{
+        gpio_init(PICO_DEFAULT_LED_PIN);
+        gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
+        for (int i = 0; i < 6; i++) {
+            sleep_ms(23);
+            gpio_put(PICO_DEFAULT_LED_PIN, true);
+            sleep_ms(23);
+            gpio_put(PICO_DEFAULT_LED_PIN, false);
+        }
+
+}
     return i;
 }
 
@@ -3178,14 +3213,6 @@ int GetTokenValue (unsigned char *n) {
     f_write(&f, n, strlen(n), &wr);
     f_write(&f, ".", 1, &wr);
     f_close(&f);
-    gpio_init(PICO_DEFAULT_LED_PIN);
-    gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
-    for (int i = 0; i < 6; i++) {
-        sleep_ms(23);
-        gpio_put(PICO_DEFAULT_LED_PIN, true);
-        sleep_ms(23);
-        gpio_put(PICO_DEFAULT_LED_PIN, false);
-    }
     */
     for(int i = 0; i < TokenTableSize - 1; i++) {
         if(str_equal(n, tokentbl[i].name)) {
