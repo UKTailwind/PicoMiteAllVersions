@@ -1120,15 +1120,15 @@ void  MIPS16 tokenise(int console) {
                 if(*++p == ' ') p++;                                // eat a trailing space
                 match_p = p;
             } else if((tp2 = checkstring(p, (unsigned char *)"BITBANG")) != nullptr) {
-                    match_i = GetCommandValue((unsigned char *)"Device");
-                    p = tp2;
-                    match_p = p;
+                match_i = GetCommandValue((unsigned char *)"Device");
+                p = tp2;
+                match_p = p;
             } else {
                 // now try for a command in the command table
                 // this works by scanning the entire table looking for the match with the longest command name
                 // this is needed because we need to differentiate between END and END SUB for example.
                 // without looking for the longest match we might think that we have a match when we found just END.
-            for(i = 0 ; i < CommandTableSize - 1; i++) {
+                for(i = 0 ; i < CommandTableSize - 1; i++) {
                     tp2 = p;
                     tp = commandtbl[i].name;
                     while(mytoupper(*tp2) == mytoupper(*tp) && *tp != 0) {

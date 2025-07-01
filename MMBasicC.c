@@ -10,12 +10,12 @@
 // them to the appropiate .h file
 #define INCLUDE_COMMAND_TABLE
 __attribute__((used)) const struct s_tokentbl commandtbl[] = {
-//    #include "Functions.h"
-//    #include "Commands.h"
-//    #include "Operators.h"
-//    #include "Custom.h"
-//    #include "Hardware_Includes.h"
-    #include "AllCommands.h"
+    #include "Functions.h"
+    #include "Commands.h"
+    #include "Operators.h"
+    #include "Custom.h"
+    #include "Hardware_Includes.h"
+//    #include "AllCommands.h"
 };
 #undef INCLUDE_COMMAND_TABLE
 
@@ -24,12 +24,12 @@ __attribute__((used)) const struct s_tokentbl commandtbl[] = {
 // but instead add them to the appropiate .h file
 #define INCLUDE_TOKEN_TABLE
 __attribute__((used)) const struct s_tokentbl tokentbl[] = {
-//    #include "Functions.h"
-//    #include "Commands.h"
-//    #include "Operators.h"
-//    #include "Custom.h"
-//    #include "Hardware_Includes.h"
-    #include "AllCommands.h"
+    #include "Functions.h"
+    #include "Commands.h"
+    #include "Operators.h"
+    #include "Custom.h"
+    #include "Hardware_Includes.h"
+//    #include "AllCommands.h"
 };
 #undef INCLUDE_TOKEN_TABLE
 

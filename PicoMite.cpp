@@ -5065,24 +5065,26 @@ long long CombinedPtr::as_i64a() {
 }
 
 CombinedPtr& CombinedPtr::write_byte(uint8_t v) {
-    if (p.f >= XIP_BASE) {
+    if (is_ram()) {
         *p.c = v;
         return *this;
     }
-    // in file on SD card
-    size_t offset = p.f % CombinedPtrBufSize;
-    FSIZE_t block_base = p.f & ~(FSIZE_t)(CombinedPtrBufSize - 1);
+    if (on_sd()) { // in file on SD card
+        size_t offset = p.f % CombinedPtrBufSize;
+        FSIZE_t block_base = p.f & ~(FSIZE_t)(CombinedPtrBufSize - 1);
 
-    if (block_base != buff_base_offset) {
-        if (buff_dirty && buff_base_offset != (FSIZE_t)-1) {
-            SDWriteBlock(buff_base_offset, buff, CombinedPtrBufSize);
-            buff_dirty = false;
+        if (block_base != buff_base_offset) {
+            if (buff_dirty && buff_base_offset != (FSIZE_t)-1) {
+                SDWriteBlock(buff_base_offset, buff, CombinedPtrBufSize);
+                buff_dirty = false;
+            }
+            SDBlock(block_base, buff, CombinedPtrBufSize);
+            buff_base_offset = block_base;
         }
-        SDBlock(block_base, buff, CombinedPtrBufSize);
-        buff_base_offset = block_base;
+        buff[offset] = v;
+        buff_dirty = true; // Помечаем буфер как изменённый
     }
-    buff[offset] = v;
-    buff_dirty = true; // Помечаем буфер как изменённый
+    error("!!! >> write_byte: %->[%]", v, p.f);
     return *this;
 }
 bool CombinedPtr::buff_dirty = false;
