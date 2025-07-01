@@ -8,6 +8,10 @@
 
 #define CombinedPtrBufSize 512
 
+#ifndef XIP_BASE
+#define XIP_BASE 0x10000000
+#endif
+
 template<typename T> class CombinedPtrT;
 
 class CombinedPtr {
@@ -36,7 +40,10 @@ public:
     CombinedPtr(std::nullptr_t) : p{nullptr} {}
 
     // TODO: assert for case not in RAM ?
-    unsigned char* raw() const { return p.c; }
+    unsigned char* raw(int _case = 0) const;
+    unsigned char* ram() const { return p.c; };
+    bool is_ram() const { return p.f >= 0x11000000; };
+    bool on_sd() const { return p.f < XIP_BASE; };
 
     // Оператор приведения
     explicit operator FSIZE_t() const { return p.f; }
@@ -104,10 +111,6 @@ public:
 void sd_range_erase(FSIZE_t offset, FSIZE_t size);
 void sd_range_program(FSIZE_t offset, CombinedPtr p, FSIZE_t size);
 
-#ifndef XIP_BASE
-#define XIP_BASE 0x10000000
-#endif
-
 template<typename T>
 class CombinedPtrT {
     CombinedPtr p;
@@ -117,14 +120,14 @@ public:
     CombinedPtrT(const CombinedPtr& other) : p(other) {}
     CombinedPtrT(std::nullptr_t) : p(nullptr) {}
 
-    T* raw() { return reinterpret_cast<T*>(p.raw()); }
+    T* raw(int _case) { return reinterpret_cast<T*>(p.raw(_case)); }
 
     CombinedPtrT& operator=(const CombinedPtr& other) { p = other; return *this; }
     CombinedPtrT& operator=(T* other) { p = reinterpret_cast<uint8_t*>(other); return *this; }
 
     inline T operator*() {
-        if (p.raw() >= (unsigned char*)XIP_BASE) {
-            return *reinterpret_cast<T*>(p.raw());
+        if (!p.on_sd()) {
+            return *reinterpret_cast<T*>(p.raw(300));
         }
         // SD-карта: читаем побайтово
         T val = 0;
@@ -134,8 +137,8 @@ public:
     }
     inline T operator[](std::ptrdiff_t i) {
         CombinedPtr base = p + i * sizeof(T);
-        if (base.raw() >= (unsigned char*)XIP_BASE) {
-            return *reinterpret_cast<T*>(base.raw());
+        if (!p.on_sd()) {
+            return *reinterpret_cast<T*>(base.raw(301));
         }
         T val = 0;
         for (size_t j = 0; j < sizeof(T); ++j)
@@ -163,7 +166,7 @@ public:
     bool operator>(const CombinedPtrT& other) const { return p > other.p; }
     bool operator>=(const CombinedPtrT& other) const { return p >= other.p; }
 
-    explicit operator bool() const { return p.raw() != nullptr; }
+    explicit operator bool() const { return p.p.c != nullptr; }
 
     friend class CombinedPtr;
 };

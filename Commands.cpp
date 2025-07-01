@@ -241,8 +241,10 @@ void cmd_print(void) {
                     IntToStr((char *)inpbuf + ((i64 >= 0) ? 1:0), i64, 10); // if positive output a space instead of the sign
 					MMfputs(CtoM(inpbuf), fnbr);					// convert to a MMBasic string and output
 				} else if(t & T_STR) {
-					MMfputs(s.raw(), fnbr);								// print if a string (s is a MMBasic string)
-				} else error("Attempt to print reserved word");	
+					MMfputs(s, fnbr);								// print if a string (s is a MMBasic string)
+				} else {
+					error("Attempt to print reserved word");
+				}
 			}
 			docrlf = true;
 		}

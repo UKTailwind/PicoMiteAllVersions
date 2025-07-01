@@ -265,11 +265,11 @@ void   MIPS16 PrepareProgram(int ErrAbort) {
         FontTable[i] = nullptr;                                        // clear the font table
 
     NbrFuncts = 0;
-    if(CFunctionFlash != nullptr && CFunctionFlash.raw() >= (uint8_t*)0x11000000) { // PSRAM or SRAM
-        FreeMemory((void*)CFunctionFlash.raw());
+    if(CFunctionFlash != nullptr && CFunctionFlash.is_ram()) { // PSRAM or SRAM
+        FreeMemory((void*)CFunctionFlash.ram());
     }
-    if(CFunctionLibrary != nullptr && CFunctionLibrary.raw() >= (uint8_t*)0x11000000) { // PSRAM or SRAM
-        FreeMemory((void*)CFunctionLibrary.raw());
+    if(CFunctionLibrary != nullptr && CFunctionLibrary.is_ram()) { // PSRAM or SRAM
+        FreeMemory((void*)CFunctionLibrary.ram());
     }
     CFunctionFlash = CFunctionLibrary = nullptr;
     if(Option.LIBRARY_FLASH_SIZE == MAX_PROG_SIZE) {
@@ -378,13 +378,13 @@ int   MIPS16 PrepareProgramExt(CombinedPtr p, int i, CombinedPtr *CFunPtr, int E
 
     while(*p == 0) p++;                                             // the end of the program can have multiple zeros
     p++;                                                            // step over the terminating 0xff
-    if(*CFunPtr != nullptr && CFunPtr->raw() >= (uint8_t*)0x11000000) { // PSRAM or SRAM
-        FreeMemory((void*)CFunPtr->raw());
+    if(*CFunPtr != nullptr && CFunPtr->is_ram()) { // PSRAM or SRAM
+        FreeMemory((void*)CFunPtr->ram());
         *CFunPtr = nullptr;
     }
 
     CombinedPtr p_aligned = p.align();
-    if (p_aligned.raw() < (uint8_t*)XIP_BASE) {
+    if (p_aligned.on_sd()) {
         // --- SD карта: копируем CFunction/Font в RAM ---
         CombinedPtrI cfp = p_aligned;
         size_t total_bytes = 0;
@@ -418,7 +418,7 @@ int   MIPS16 PrepareProgramExt(CombinedPtr p, int i, CombinedPtr *CFunPtr, int E
 
         *CFunPtr = CombinedPtr(ram_copy);
     } else {
-        // --- во Flash: можно использовать напрямую ---
+        // --- во Flash/RAM: можно использовать напрямую ---
         *CFunPtr = p_aligned;
     }
     if(i < MAXSUBFUN) subfun[i] = nullptr;
@@ -428,7 +428,7 @@ int   MIPS16 PrepareProgramExt(CombinedPtr p, int i, CombinedPtr *CFunPtr, int E
     CombinedPtrI cfp = *CFunPtr;
     while(*cfp != 0xffffffff) {
         if(*cfp & 0x80000000) // Если установлен бит 31 (0x80000000), это шрифт:
-            FontTable[*cfp & (FONT_TABLE_SIZE-1)] = (uint8_t *)(cfp + 2).raw();
+            FontTable[*cfp & (FONT_TABLE_SIZE-1)] = (uint8_t *)(cfp + 2).raw(202);
         cfp++;
         cfp += (*cfp + 4) / sizeof(unsigned int);
     }

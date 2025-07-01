@@ -122,9 +122,9 @@ long long int MIPS16 CallCFunction(CombinedPtr CmdPtr, CombinedPtr ArgList, Comb
 
     // run the function in flash /// TODO: RAM/SD?
     ii = *p++;
-    p = (unsigned int *)((unsigned int) p.raw() | 0x1);
+    p = (unsigned int *)((unsigned int) p.raw(200) | 0x1);
     ret = ((long long int (*)(void *, void *, void *, void *, void *, void *, void *, void *, void *, void *))
-            (p.raw() + ii)) (arg[0], arg[1], arg[2], arg[3], arg[4], arg[5], arg[6], arg[7], arg[8], arg[9]);              // run the CFunction
+            (p.raw(201) + ii)) (arg[0], arg[1], arg[2], arg[3], arg[4], arg[5], arg[6], arg[7], arg[8], arg[9]);              // run the CFunction
 
     return ret;
 }

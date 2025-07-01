@@ -5637,7 +5637,7 @@ static unsigned int GetCFunAddr(CombinedPtrI ip, int i, CombinedPtr offset) {
         if(*ip++ == (unsigned int)(subfun[i]-offset)) {                      // if we have a match
             ip++;                                                   // step over the size word
             i = *ip++;                                              // get the offset
-            return (unsigned int)(ip + i).raw();                          // return the entry point
+            return (unsigned int)(ip + i).raw(203);                          // return the entry point
         }
         ip += (*ip + 4) / sizeof(unsigned int);
     }
