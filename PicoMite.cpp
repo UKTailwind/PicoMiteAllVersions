@@ -1819,8 +1819,8 @@ void PFltComma(MMFLOAT n) {
 }
 void sigbus(void){
     error("^ Invalid address\r\n");
-    MMPrintString("resetting...\r\n");
-	uSec(250000);
+    MMPrintString("Invalid address - resetting...\r\n");
+	uSec(500000);
 	/** disable_interrupts_pico(); */
 //	sd_range_erase(PROGSTART, MAX_PROG_SIZE);
     LoadOptions();
@@ -4137,7 +4137,7 @@ int MIPS16 main(){
 #endif
     m_alloc(M_PROG);                                           // init the variables for program memory
     LibMemory = sd_libmemory;
-    uSec(100);
+ ///   uSec(100);
     if(_excep_code == RESET_CLOCKSPEED) {
 #ifdef PICOMITEVGA
 #ifdef HDMI
@@ -4324,7 +4324,7 @@ int MIPS16 main(){
     PromptFC=gui_fcolour=Option.DefaultFC;
     PromptBC=gui_bcolour=Option.DefaultBC;
     InitHeap(true);              										// initilise memory allocation
-    uSecFunc(1000);
+///    uSecFunc(1000);
     /** disable_interrupts_pico(); */
     /** enable_interrupts_pico(); */
     mSecTimer=time_us_64()/1000;

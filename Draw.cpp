@@ -482,8 +482,12 @@ static int getColour(CombinedPtr c, int minus){
 	int colour;
 	if(CMM1){
 		colour = getint(c, (minus ? -1 : 0), 15);
-		if(colour >= 0 && colour < sizeof(CMM1map) / sizeof(CMM1map[0])) colour = CMM1map[colour];
-	} else colour = getint(c, (minus ? -1: 0),0xFFFFFFF);
+		if(colour >= 0 && colour < sizeof(CMM1map) / sizeof(CMM1map[0])) {
+            colour = CMM1map[colour];
+        }
+	} else {
+        colour = getint(c, (minus ? -1: 0), 0xFFFFFFF);
+    }
 	return colour;
 
 }
@@ -6309,7 +6313,7 @@ void cmd_colourmap(void){
     if(nf!=n)error("Array size mismatch %, %",n,nf);
     for(int i=0;i<n;i++){
         int in=(cptr == nullptr ? (int)cfptr[i] : cptr[i]);
-        if(in>=16)error("Input range error on element %",i);
+        if(in>=16) error("Input range error on element %", i);
         if(fptr == nullptr)ffptr[i]=map[in];
         else fptr[i]=map[in];
     }

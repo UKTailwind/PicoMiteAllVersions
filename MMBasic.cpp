@@ -1355,10 +1355,10 @@ long long int __not_in_flash_func(getint)(CombinedPtr p, long long int min, long
     long long int  i;
     int t = T_INT;
     MMFLOAT f;
-    long long int i64;
+    long long int i64 = 0;
     CombinedPtr s;
     evaluate(p, &f, &i64, &s, &t, false);
-    if(t & T_NBR) i= FloatToInt64(f);
+    if(t & T_NBR) i = FloatToInt64(f);
     else i=i64;
     if(i < min || i > max) error("~ is invalid (valid is ~ to ~)", i, min, max);
     return i;
@@ -1451,12 +1451,11 @@ CombinedPtr MIPS16 __not_in_flash_func(doexpr)(CombinedPtr p, MMFLOAT *fa, long 
             return p;
         }
         // the next operator has a higher precedence, recursive call to evaluate it
-        else
+        else {
             p = doexpr(p, &fa2, &ia2, &sa2, &o2, &t2);
+        }
     }
 }
-
-
 
 // get a value, either from a constant, function or variable
 // also returns the next operator to the right of the value or E_END if no operator
@@ -1471,10 +1470,10 @@ static CombinedPtr getvalue(CombinedPtr p, MMFLOAT *fa, long long int  *ia, Comb
     TestStackOverflow();                                            // throw an error if we have overflowed the PIC32's stack
 
     skipspace(p);
-    if(*p>=C_BASETOKEN){ //don't waste time if not a built-in function
-    // special processing for the NOT operator
-    // just get the next value and invert its logical value
-        if(*p<=131){
+    if(*p >= C_BASETOKEN){ //don't waste time if not a built-in function
+        // special processing for the NOT operator
+        // just get the next value and invert its logical value
+        if(*p <= 131){
             // special processing for the unary operators
             if(tokenfunction(*p) == op_not) {
                 int ro;
@@ -1561,106 +1560,104 @@ static CombinedPtr getvalue(CombinedPtr p, MMFLOAT *fa, long long int  *ia, Comb
             f = fret; i64 = iret; s = sret;                             // save the result
         }
     } else {
-    // if it is a variable or a defined function, find it and get its value
-    	if(isnamestart(*p)) {
-        // first check if it is terminated with a bracket
-        tp = p + 1;
-        while(isnamechar(*tp)) tp++;                                // search for the end of the identifier
-        if(*tp == '$' || *tp == '%' || *tp == '!') tp++;
-        i = -1;
-        if(*tp == '(') i = FindSubFun(p, 1);                        // if terminated with a bracket it could be a function
-        if(i >= 0) {                                                // >= 0 means it is a user defined function
-            CombinedPtr SaveCurrentLinePtr = CurrentLinePtr;              // in case the code in DefinedSubFun messes with this
-            DefinedSubFun(true, p, i, &f, &i64, &s, &t);
-            CurrentLinePtr = SaveCurrentLinePtr;
-        } else {
-            void *tt = findvar(p, V_FIND);                         // if it is a string then the string pointer is automatically set
-            t = TypeMask(g_vartbl[g_VarIndex].type);
-            if(t & T_NBR) f = (*(MMFLOAT *)tt);
-            if(t & T_INT) i64 = (*(long long int  *)tt);
-            if(t & T_STR) s = *(CombinedPtr*)tt;
+        // if it is a variable or a defined function, find it and get its value
+        if(isnamestart(*p)) {
+            // first check if it is terminated with a bracket
+            tp = p + 1;
+            while(isnamechar(*tp)) tp++;                                // search for the end of the identifier
+            if(*tp == '$' || *tp == '%' || *tp == '!') tp++;
+            i = -1;
+            if(*tp == '(') i = FindSubFun(p, 1);                        // if terminated with a bracket it could be a function
+            if(i >= 0) {                                                // >= 0 means it is a user defined function
+                CombinedPtr SaveCurrentLinePtr = CurrentLinePtr;              // in case the code in DefinedSubFun messes with this
+                DefinedSubFun(true, p, i, &f, &i64, &s, &t);
+                CurrentLinePtr = SaveCurrentLinePtr;
+            } else {
+                void *tt = findvar(p, V_FIND);                         // if it is a string then the string pointer is automatically set
+                t = TypeMask(g_vartbl[g_VarIndex].type);
+                if(t & T_NBR) f = (*(MMFLOAT *)tt);
+                if(t & T_INT) i64 = (*(long long int  *)tt);
+                if(t & T_STR) s = *(CombinedPtr*)tt;
+            }
+            p = skipvar(p, false);
         }
-        p = skipvar(p, false);
-    }
-   // is it an ordinary numeric constant?  get its value if yes
-    // a leading + or - might have been converted to a token so we need to check for them also
-    else if(IsDigitinline(*p) || *p == '.') {
-			char ts[31], *tsp;
-			int isi64 = true;
-			tsp = ts;
-			int isf=true;
-			long long int scale=0;
-			// copy the first digit of the string to a temporary place
-			if(*p == '.') {
-				isi64 = false;
-				scale=1;
-			} else if(IsDigitinline(*p)){
-				i64=(*p - '0');
-			}
-			*tsp++ = *p++;
+        // is it an ordinary numeric constant?  get its value if yes
+        // a leading + or - might have been converted to a token so we need to check for them also
+        else if(IsDigitinline(*p) || *p == '.') {
+            char ts[31], *tsp;
+            int isi64 = true;
+            tsp = ts;
+            int isf=true;
+            long long int scale=0;
+            // copy the first digit of the string to a temporary place
+            if(*p == '.') {
+                isi64 = false;
+                scale = 1;
+            } else if(IsDigitinline(*p)){
+                i64 = (*p - '0');
+            }
+            *tsp++ = *p++;
 
-			// now concatenate the remaining digits
-			while((digit[(uint8_t)*p]) && (tsp - ts) < 30) {
-				if(*p >= '0' && *p <= '9'){
-					i64 = i64 * 10 + (*p - '0');
-					if(scale)scale*=10;
-				} else {
-					if((*p) == '.'){
-						isi64 = false;
-						scale =1;
-					} else {
-						if(mytoupper(*p) == 'E' || *p == '-' || *p == '+' ){
-							isi64 = false;
-							isf=false;
-						}
-					}
-				}
-				*tsp++ = *p++;                                          // copy the string to a temporary place
-			}
-			*tsp = 0;                                                   // terminate it
-			if(isi64) {
-				t = T_INT;
-			} else if(isf && (tsp - ts) < 18) {
-				f=(MMFLOAT)i64/(MMFLOAT)scale;
-				t = T_NBR;
-			} else {
-				f = (MMFLOAT)strtod(ts, &tsp);                          // and convert to a MMFLOAT
-				t = T_NBR;
-			}
-    }
-
-
-   // if it is a numeric constant starting with the & character then get its base and convert to an integer
-    else if(*p == '&') {
-        p++; i64 = 0;
-        switch(mytoupper(*p++)) {
-            case 'H':   while(isxdigit(*p)) {
-                            i64 = (i64 << 4) | ((mytoupper(*p) >= 'A') ? mytoupper(*p) - 'A' + 10 : *p - '0');
-                            p++;
-                        } break;
-            case 'O':   while(*p >= '0' && *p <= '7') {
-                            i64 = (i64 << 3) | (*p++ - '0');
-                        } break;
-            case 'B':   while(*p == '0' || *p == '1') {
-                            i64 = (i64 << 1) | (*p++ - '0');
-                        } break;
-            default:    error("Type prefix");
+            // now concatenate the remaining digits
+            while((digit[(uint8_t)*p]) && (tsp - ts) < 30) {
+                if(*p >= '0' && *p <= '9'){
+                    i64 = i64 * 10 + (*p - '0');
+                    if(scale)scale*=10;
+                } else {
+                    if((*p) == '.'){
+                        isi64 = false;
+                        scale =1;
+                    } else {
+                        if(mytoupper(*p) == 'E' || *p == '-' || *p == '+' ){
+                            isi64 = false;
+                            isf=false;
+                        }
+                    }
+                }
+                *tsp++ = *p++;                                          // copy the string to a temporary place
+            }
+            *tsp = 0;                                                   // terminate it
+            if(isi64) {
+                t = T_INT;
+            } else if(isf && (tsp - ts) < 18) {
+                f=(MMFLOAT)i64/(MMFLOAT)scale;
+                t = T_NBR;
+            } else {
+                f = (MMFLOAT)strtod(ts, &tsp);                          // and convert to a MMFLOAT
+                t = T_NBR;
+            }
         }
-        t = T_INT;
-    }
-		// if opening bracket then first evaluate the contents of the bracket
-    	else if(*p == '(') {
-			p++;                                                        // step over the bracket
-			p = evaluate(p, &f, &i64, &s, &t, true);                    // recursively get the contents
-			if(*p != ')') error("No closing bracket");
-			++p;                                                        // step over the closing bracket
-		}
-		// if it is a string constant, return a pointer to that.  Note: tokenise() guarantees that strings end with a quote
-		else if(*p == '"') {
-			p++;                                                        // step over the quote
-			p1 = (uint8_t*)GetTempMemory(STRINGSIZE);                                // this will last for the life of the command
+        // if it is a numeric constant starting with the & character then get its base and convert to an integer
+        else if(*p == '&') {
+            p++; i64 = 0;
+            switch(mytoupper(*p++)) {
+                case 'H':   while(isxdigit(*p)) {
+                                i64 = (i64 << 4) | ((mytoupper(*p) >= 'A') ? mytoupper(*p) - 'A' + 10 : *p - '0');
+                                p++;
+                            } break;
+                case 'O':   while(*p >= '0' && *p <= '7') {
+                                i64 = (i64 << 3) | (*p++ - '0');
+                            } break;
+                case 'B':   while(*p == '0' || *p == '1') {
+                                i64 = (i64 << 1) | (*p++ - '0');
+                            } break;
+                default:    error("Type prefix");
+            }
+            t = T_INT;
+        }
+        // if opening bracket then first evaluate the contents of the bracket
+        else if(*p == '(') {
+            p++;                                                        // step over the bracket
+            p = evaluate(p, &f, &i64, &s, &t, true);                    // recursively get the contents
+            if(*p != ')') error("No closing bracket");
+            ++p;                                                        // step over the closing bracket
+        }
+        // if it is a string constant, return a pointer to that.  Note: tokenise() guarantees that strings end with a quote
+        else if(*p == '"') {
+            p++;                                                        // step over the quote
+            p1 = (uint8_t*)GetTempMemory(STRINGSIZE);                                // this will last for the life of the command
             s = p1;
-			tp = strchr(p, '"');
+            tp = strchr(p, '"');
                 int toggle=0;
                 while(p != tp){
                     if(*p=='\\' && tp>p+1 && OptionEscape)toggle^=1;
@@ -1736,10 +1733,10 @@ static CombinedPtr getvalue(CombinedPtr p, MMFLOAT *fa, long long int  *ia, Comb
                         toggle=0;
                     } else *p1++ = *p++;
                 } 
-			p++;
+            p++;
             // N.B. only raw RAM based strings are supported there
-			CtoM(s.raw());                                                    // convert to a MMBasic string
-			t = T_STR;
+            CtoM(s.raw());                                                    // convert to a MMBasic string
+            t = T_STR;
     }
     else
         error("Syntax");

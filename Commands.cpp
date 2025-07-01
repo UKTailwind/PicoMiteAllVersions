@@ -1873,7 +1873,7 @@ void MIPS16 cmd_trace(void) {
         if(i < 0) i += TRACE_BUFF_SIZE;
         while(i != TraceBuffIndex) {
 			if(TraceBuff[i] >= ProgMemory && TraceBuff[i] <= ProgMemory+MAX_PROG_SIZE){
-           		 inpbuf[0] = '[';
+           		inpbuf[0] = '[';
             	IntToStr((char *)inpbuf + 1, CountLines(TraceBuff[i]), 10);
             	strcat((char *)inpbuf, "]");
 			}else if(TraceBuff[i]){
