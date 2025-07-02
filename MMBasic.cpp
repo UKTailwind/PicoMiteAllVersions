@@ -383,11 +383,11 @@ int   MIPS16 PrepareProgramExt(CombinedPtr p, int i, CombinedPtr *CFunPtr, int E
         *CFunPtr = nullptr;
     }
 
+    int total_bytes = 0;
     CombinedPtr p_aligned = p.align();
     if (p_aligned.on_sd()) {
         // --- SD карта: копируем CFunction/Font в RAM ---
         CombinedPtrI cfp = p_aligned;
-        size_t total_bytes = 0;
         while (*cfp != 0xffffffff && total_bytes < MAX_PROG_SIZE) {
             cfp++; // skip header
             unsigned int len = *cfp;
@@ -420,16 +420,18 @@ int   MIPS16 PrepareProgramExt(CombinedPtr p, int i, CombinedPtr *CFunPtr, int E
     } else {
         // --- во Flash/RAM: можно использовать напрямую ---
         *CFunPtr = p_aligned;
+        total_bytes = MAX_PROG_SIZE;
     }
     if(i < MAXSUBFUN) subfun[i] = nullptr;
     CurrentLinePtr = nullptr;
     // now, step through the CFunction area looking for fonts to add to the font table
     //Bit 7 on the last address byte is used to identify a font.
     CombinedPtrI cfp = *CFunPtr;
-    while(*cfp != 0xffffffff) {
-        if(*cfp & 0x80000000) // Если установлен бит 31 (0x80000000), это шрифт:
+    while(*cfp != 0xffffffff && total_bytes > 0) {
+        if(*cfp & 0x80000000) { // Если установлен бит 31 (0x80000000), это шрифт:
             FontTable[*cfp & (FONT_TABLE_SIZE-1)] = (uint8_t *)(cfp + 2).raw(202);
-        cfp++;
+        }
+        cfp++; total_bytes -= 4;
         cfp += (*cfp + 4) / sizeof(unsigned int);
     }
     return i;
