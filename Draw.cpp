@@ -420,7 +420,7 @@ static void  getargaddress (CombinedPtr p, CombinedPtrLL *ip, CombinedPtrD *fp, 
         *n=1;
         return;
     }
-    ptr = findvar((unsigned char *)pp, V_FIND | V_EMPTY_OK | V_NOFIND_NULL);
+    ptr = findvar((unsigned char *)pp, V_FIND | V_EMPTY_OK | V_NOFIND_NULL, 30);
     if(ptr && g_vartbl[g_VarIndex].type & (T_NBR | T_INT)) {
         if(g_vartbl[g_VarIndex].dims[0] <= 0){ //simple variable
             *n=1;

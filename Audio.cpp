@@ -1513,12 +1513,12 @@ void MIPS16 cmd_play(void) {
 		int64_t *aint;
 		streamsize=parseintegerarray(argv[0], &aint, 1, 1, NULL, true) * 8;
 		streambuffer=(char *)aint;
-		ptr1 = findvar(argv[2], V_FIND | V_EMPTY_OK | V_NOFIND_ERR);
+		ptr1 = findvar(argv[2], V_FIND | V_EMPTY_OK | V_NOFIND_ERR, 1);
 		if(g_vartbl[g_VarIndex].type & T_INT) {
 				if(g_vartbl[g_VarIndex].dims[0] != 0) error("Argument 2 must be an integer");
 				streamreadpointer = (int *)ptr1;
 		} else error("Argument 2 must be an integer");
-		ptr1 = findvar(argv[4], V_FIND | V_EMPTY_OK | V_NOFIND_ERR);
+		ptr1 = findvar(argv[4], V_FIND | V_EMPTY_OK | V_NOFIND_ERR, 2);
 		if(g_vartbl[g_VarIndex].type & T_INT) {
 				if(g_vartbl[g_VarIndex].dims[0] != 0) error("Argument 3 must be an integer");
 				streamwritepointer = (int *)ptr1;

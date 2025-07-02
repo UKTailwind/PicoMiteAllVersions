@@ -79,7 +79,7 @@ void Mstrcpy(unsigned char *dest, CombinedPtr src);
 void *DoExpression(CombinedPtr p, int *t);
 extern CombinedPtr sarg1, sarg2, sret;              // Global string pointers used by operators
 void Mstrcat(unsigned char *dest, CombinedPtr src);
-void *findvar(CombinedPtr, int);
+void *findvar(CombinedPtr, int, int at = 0);
 int Mstrcmp(CombinedPtr s1, CombinedPtr s2);
 CombinedPtr findline(int, int);
 CombinedPtr findlabel(CombinedPtr labelptr);

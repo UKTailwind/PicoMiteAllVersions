@@ -5347,9 +5347,9 @@ void MIPS16 cmd_var(void)
             if (array) {
                 strcpy(b, name);
                 strcat(b, "()");
-                vdata = (uint8_t*)findvar((unsigned char *)b, type | V_EMPTY_OK | V_NOFIND_ERR);
+                vdata = (uint8_t*)findvar((unsigned char *)b, type | V_EMPTY_OK | V_NOFIND_ERR,38);
             } else {
-                vdata = (uint8_t*)findvar((unsigned char *)name, type | V_FIND);
+                vdata = (uint8_t*)findvar((unsigned char *)name, type | V_FIND,39);
             }
 
             // Проверки на корректность
@@ -5435,9 +5435,9 @@ void MIPS16 cmd_var(void)
             if (array) {
                 strcpy(b, name);
                 strcat(b, "()");
-                vdata = (uint8_t*)findvar((unsigned char *)b, type | V_EMPTY_OK | V_NOFIND_ERR);
+                vdata = (uint8_t*)findvar((unsigned char *)b, type | V_EMPTY_OK | V_NOFIND_ERR,40);
             } else {
-                vdata = (uint8_t*)findvar((unsigned char *)name, type | V_FIND);
+                vdata = (uint8_t*)findvar((unsigned char *)name, type | V_FIND,41);
             }
 
             if (TypeMask(g_vartbl[g_VarIndex].type) != TypeMask(type))
@@ -5595,7 +5595,7 @@ void MIPS16 cmd_var(void)
             // Проверяем переменные, указанные в аргументах
             for (int i = 0; i < argc; i += 2) {
                 checkend(skipvar(argv[i], false));
-                VarDataList[i / 2] = (uint8_t*)findvar(argv[i], V_NOFIND_ERR | V_EMPTY_OK);
+                VarDataList[i / 2] = (uint8_t*)findvar(argv[i], V_NOFIND_ERR | V_EMPTY_OK,42);
                 VarList[i / 2] = g_VarIndex;
                 if ((g_vartbl[g_VarIndex].type & (T_CONST | T_PTR)) || g_vartbl[g_VarIndex].level != 0)
                     error("Invalid variable");

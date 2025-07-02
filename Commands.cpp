@@ -139,7 +139,7 @@ void MIPS16 __not_in_flash_func(cmd_inc)(void){
     int vtype;
 	getargs(&cmdline,3,(unsigned char *)",");
 	if(argc==1){
-		p = (uint8_t*)findvar(argv[0], V_FIND);
+		p = (uint8_t*)findvar(argv[0], V_FIND, 4);
 		if(g_vartbl[g_VarIndex].type & T_CONST) error("Cannot change a constant");
         vtype = TypeMask(g_vartbl[g_VarIndex].type);
         if(vtype & T_STR) error("Invalid variable");                // sanity check
@@ -148,7 +148,7 @@ void MIPS16 __not_in_flash_func(cmd_inc)(void){
 		else if(vtype & T_INT)*(long long int *)p = *(long long int *)p + 1;
 		else error("Syntax");
 	} else {
-		p = (uint8_t*)findvar(argv[0], V_FIND);
+		p = (uint8_t*)findvar(argv[0], V_FIND, 5);
 		if(g_vartbl[g_VarIndex].type & T_CONST) error("Cannot change a constant");
         vtype = TypeMask(g_vartbl[g_VarIndex].type);
         if(vtype & T_STR){
@@ -272,7 +272,7 @@ void array_set(CombinedPtr tp){
 	unsigned char *a1str= nullptr;
 	getargs(&tp, 3,(unsigned char *)",");
 	if(!(argc == 3)) error("Argument count");
-	findvar(argv[2], V_FIND | V_EMPTY_OK | V_NOFIND_ERR);
+	findvar(argv[2], V_FIND | V_EMPTY_OK | V_NOFIND_ERR, 6);
 	t=g_vartbl[g_VarIndex].type;
 	evaluate(argv[0], &f, &i64, &s, &t, false);
 	if(t & T_STR){
@@ -314,7 +314,7 @@ void array_add(CombinedPtr tp){
 	unsigned char *a1str= nullptr, *a2str= nullptr;
 	getargs(&tp, 5,(unsigned char *)",");
 	if(!(argc == 5)) error("Argument count");
-	findvar(argv[0], V_FIND | V_EMPTY_OK | V_NOFIND_ERR);
+	findvar(argv[0], V_FIND | V_EMPTY_OK | V_NOFIND_ERR, 7);
 	t=g_vartbl[g_VarIndex].type;
 	if(t & T_STR){
 		unsigned char size=0,size2=0;
@@ -382,7 +382,7 @@ void array_insert(CombinedPtr tp){
 #endif
 	getargs(&tp, 15,(unsigned char *)",");
 	if(argc<7)error("Argument count");
-	findvar(argv[0], V_FIND | V_EMPTY_OK | V_NOFIND_ERR);
+	findvar(argv[0], V_FIND | V_EMPTY_OK | V_NOFIND_ERR, 8);
 	t=g_vartbl[g_VarIndex].type;
 	if(t & T_STR){
 		parsestringarray(argv[0],&a1str,1,0,dims, false,&size);
@@ -457,7 +457,7 @@ void array_slice(CombinedPtr tp){
 #endif
 	getargs(&tp, 15,(unsigned char *)",");
 	if(argc<7)error("Argument count");
-	findvar(argv[0], V_FIND | V_EMPTY_OK | V_NOFIND_ERR);
+	findvar(argv[0], V_FIND | V_EMPTY_OK | V_NOFIND_ERR, 9);
 	t=g_vartbl[g_VarIndex].type;
 	if(t & T_STR){
 		parsestringarray(argv[0],&a1str,1,0,dims, false, &size);
@@ -536,7 +536,7 @@ void  MIPS16 __not_in_flash_func(cmd_let)(void) {
 	if(p1 != p2) error("Syntax");
 
 	// create the variable and get the length if it is a string
-	p2 = (uint8_t*)findvar(cmdline, V_FIND);
+	p2 = (uint8_t*)findvar(cmdline, V_FIND, 10);
     size = g_vartbl[g_VarIndex].size;
     if(g_vartbl[g_VarIndex].type & T_CONST) error("Cannot change a constant");
 
@@ -1348,8 +1348,8 @@ if(Option.SerialConsole)while(ConsoleTxBufHead!=ConsoleTxBufTail)routinechecks()
 			} else {
 				unsigned char *cmd_args = (unsigned char *)"";
 				cmd_args = getCstring(argv[0]);
-				void *ptr = findvar((unsigned char *)"MM.ENDLINE$", T_STR| V_NOFIND_NULL);  
-				if(ptr == nullptr) ptr = findvar((unsigned char *)"MM.ENDLINE$", V_FIND |V_DIM_VAR);
+				void *ptr = findvar((unsigned char *)"MM.ENDLINE$", T_STR| V_NOFIND_NULL, 11);
+				if(ptr == nullptr) ptr = findvar((unsigned char *)"MM.ENDLINE$", V_FIND |V_DIM_VAR, 12);
 				strcpy((char*)ptr, (char *)cmd_args ); // *** THW 16/4/23
 				CtoM((uint8_t*)ptr);
 			}
@@ -1841,7 +1841,7 @@ void cmd_input(void) {
 			}
 		}
 		*sp = 0;													// terminate the string
-		tp = (uint8_t*)findvar(argv[i], V_FIND);								// get the variable and save its new value
+		tp = (uint8_t*)findvar(argv[i], V_FIND, 13);								// get the variable and save its new value
         if(g_vartbl[g_VarIndex].type & T_CONST) error("Cannot change a constant");
 		if(g_vartbl[g_VarIndex].type & T_STR) {
     		if(strlen((char *)s) > g_vartbl[g_VarIndex].size) error("String too long");
@@ -1922,7 +1922,7 @@ void MIPS16 __not_in_flash_func(cmd_for)(void) {
 		if(*vname && *vname == ' ') vname++;
 		while(*vname && vname[strlen(vname) - 1] == ' ') (vname + strlen(vname) - 1).write_byte(0);
 		vlen = strlen(vname);
-		vptr = findvar(argv[0], V_FIND);					        // create the variable
+		vptr = findvar(argv[0], V_FIND, 14);					        // create the variable
         if(g_vartbl[g_VarIndex].type & T_CONST) error("Cannot change a constant");
         vtype = TypeMask(g_vartbl[g_VarIndex].type);
 		if(vtype & T_STR) error("Invalid variable");                // sanity check
@@ -2033,7 +2033,7 @@ void MIPS16 __not_in_flash_func(cmd_next)(void) {
 		if(i & 0x01) {
 			if(*argv[i] != ',') error("Syntax");
 		} else
-			vtbl[vcnt++] = findvar(argv[i], V_FIND | V_NOFIND_ERR); // find the variable and error if not found
+			vtbl[vcnt++] = findvar(argv[i], V_FIND | V_NOFIND_ERR, 15); // find the variable and error if not found
 	}
 
 	loopback:
@@ -2365,7 +2365,7 @@ void cmd_gosub(void) {
 void cmd_mid(void){
 	CombinedPtr p;
 	getargs(&cmdline,5,(unsigned char *)",");
-	findvar(argv[0], V_NOFIND_ERR);
+	findvar(argv[0], V_NOFIND_ERR, 16);
     if(g_vartbl[g_VarIndex].type & T_CONST) error("Cannot change a constant");
 	if(!(g_vartbl[g_VarIndex].type & T_STR)) error("Not a string");
 	int size=g_vartbl[g_VarIndex].size;
@@ -2417,7 +2417,7 @@ void cmd_mid(void){
 }
 void cmd_byte(void){
 	getargs(&cmdline,3,(unsigned char *)",");
-	findvar(argv[0], V_NOFIND_ERR);
+	findvar(argv[0], V_NOFIND_ERR, 17);
     if(g_vartbl[g_VarIndex].type & T_CONST) error("Cannot change a constant");
 	if(!(g_vartbl[g_VarIndex].type & T_STR)) error("Not a string");
 	CombinedPtr sourcestring=getstring(argv[0]);
@@ -2431,7 +2431,7 @@ void cmd_byte(void){
 }
 void cmd_bit(void){
 	getargs(&cmdline,3,(unsigned char *)",");
-	uint64_t *source=(uint64_t *)findvar(argv[0], V_NOFIND_ERR);
+	uint64_t *source=(uint64_t *)findvar(argv[0], V_NOFIND_ERR, 18);
     if(g_vartbl[g_VarIndex].type & T_CONST) error("Cannot change a constant");
 	if(!(g_vartbl[g_VarIndex].type & T_INT)) error("Not an integer");
 	uint64_t bit=(uint64_t)1<<(uint64_t)getint(argv[2],0,63);
@@ -2862,7 +2862,7 @@ void MIPS16 cmd_read(void) {
         if(i & 0x01) {
             if(*argv[i] != ',') error("Syntax");
         } else {
-			findvar(argv[i], V_FIND | V_EMPTY_OK);
+			findvar(argv[i], V_FIND | V_EMPTY_OK, 19);
 			if(g_vartbl[g_VarIndex].type & T_CONST) error("Cannot change a constant");
 			card=1;
 			if(emptyarray){ //empty array
@@ -2879,7 +2879,7 @@ void MIPS16 cmd_read(void) {
     int *vsize=(int*)GetTempMemory(num_to_read * sizeof (int));
     // step through the arguments and save the pointer and type
     for(vcnt = i = 0; i < argc; i+=2) {
-		ptr = (uint8_t*)findvar(argv[i], V_FIND | V_EMPTY_OK);
+		ptr = (uint8_t*)findvar(argv[i], V_FIND | V_EMPTY_OK, 20);
 		vtbl[vcnt] = (char*)ptr;
 		card=1;
 		if(emptyarray){ //empty array
@@ -3075,7 +3075,7 @@ void MIPS16 cmd_restore(void) {
 			NextDataLine = findline(getinteger(cmdline), true); // try for a line number
 			NextData = 0;
 		} else {
-			void *ptr=findvar(cmdline,V_NOFIND_NULL);
+			void *ptr=findvar(cmdline,V_NOFIND_NULL,21);
 			if(ptr){
 				if(g_vartbl[g_VarIndex].type & T_NBR) {
 					if(g_vartbl[g_VarIndex].dims[0] > 0) { // Not an array
@@ -3123,7 +3123,7 @@ void cmd_lineinput(void) {
 	}
 
 	if(argc - i != 1) error("Syntax");
-	vp = (uint8_t*)findvar(argv[i], V_FIND);
+	vp = (uint8_t*)findvar(argv[i], V_FIND, 22);
     if(g_vartbl[g_VarIndex].type & T_CONST) error("Cannot change a constant");
 	if(!(g_vartbl[g_VarIndex].type & T_STR)) error("Invalid variable");
 	MMgetline(fnbr, (char *)inpbuf);									    // get the input line
@@ -3334,11 +3334,11 @@ void MIPS16 cmd_dim(void) {
             } else
             	strcpy((char *)VarName, argv[i]);
 
-            v = findvar(VarName, type | V_NOFIND_NULL);             // check if the variable exists
+            v = findvar(VarName, type | V_NOFIND_NULL, 23);             // check if the variable exists
             typeSave = type;
             VIndexSave = g_VarIndex;
 			if(v == nullptr) {											// if not found
-                v = findvar(VarName, type | V_FIND | V_DIM_VAR);    // create the variable
+                v = findvar(VarName, type | V_FIND | V_DIM_VAR, 24);    // create the variable
                 type = TypeMask(g_vartbl[g_VarIndex].type);
                 VIndexSave = g_VarIndex;
                 chPosit.write_byte(chSave);                                  // restore the char previously removed
@@ -3377,9 +3377,9 @@ void MIPS16 cmd_dim(void) {
 
 			 // if it is a STATIC var create a local var pointing to the global var
              if(StaticVar) {
-                tv = findvar(argv[i], typeSave | V_LOCAL | V_NOFIND_NULL);    						// check if the local variable exists
+                tv = findvar(argv[i], typeSave | V_LOCAL | V_NOFIND_NULL, 25);    						// check if the local variable exists
                 if(tv != nullptr) error("$ already declared", argv[i]);
-                tv = findvar(argv[i], typeSave | V_LOCAL | V_FIND | V_DIM_VAR);         			// create the variable
+                tv = findvar(argv[i], typeSave | V_LOCAL | V_FIND | V_DIM_VAR, 26);         			// create the variable
                 if(g_vartbl[VIndexSave].dims[0] > 0 || (g_vartbl[VIndexSave].type & T_STR)) {
                     FreeMemory(tv);                                                                 // we don't need the memory allocated to the local
                     g_vartbl[g_VarIndex].val.s = g_vartbl[VIndexSave].val.s;                              // point to the memory of the global variable
@@ -3411,7 +3411,7 @@ void  cmd_const(void) {
         type = TypeMask(type);
         type |= V_FIND | V_DIM_VAR | T_CONST | T_IMPLIED;
         if(g_LocalIndex != 0) type |= V_LOCAL;                        // local if defined in a sub/fun
-        findvar(argv[i], type);                                     // create the variable
+        findvar(argv[i], type, 27);                                     // create the variable
         if(g_vartbl[g_VarIndex].dims[0] != 0) error("Invalid constant");
         if(TypeMask(g_vartbl[g_VarIndex].type) != TypeMask(type)) error("Invalid constant");
         else {

@@ -609,10 +609,10 @@ void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, CombinedPtr cmd, int i
     argtype = (int*)((uint8_t*)argval + MAX_ARG_COUNT * sizeof(union u_argval));
     argVarIndex = (int*)((uint8_t*)argtype+MAX_ARG_COUNT * sizeof(int));
     argbuf1 = (uint8_t *)argVarIndex+MAX_ARG_COUNT * sizeof(int);
-    argv1 = (CombinedPtr*)argbuf1 + STRINGSIZE;
-    argbuf2 = (uint8_t*)argv1 + MAX_ARG_COUNT * sizeof(unsigned char *);
-    argv2 = (CombinedPtr*)argbuf2 + STRINGSIZE;
-    argbyref = (uint8_t*)argv2 + MAX_ARG_COUNT * sizeof(unsigned char *);
+    argv1 = (CombinedPtr*)(argbuf1 + STRINGSIZE);
+    argbuf2 = ((uint8_t*)argv1) + MAX_ARG_COUNT * sizeof(CombinedPtr);
+    argv2 = (CombinedPtr*)(argbuf2 + STRINGSIZE);
+    argbyref = ((uint8_t*)argv2) + MAX_ARG_COUNT * sizeof(CombinedPtr);
 
     // now split up the arguments in the caller
     CurrentLinePtr = CallersLinePtr;                                // report errors at the caller
@@ -641,7 +641,7 @@ void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, CombinedPtr cmd, int i
                 // yes, it is a variable (or perhaps a user defined function which looks the same)?
                 if(!(FindSubFun(argv1[i], 1) >= 0 && strchr(argv1[i], '(').raw() != nullptr)) {
                     // yes, this is a valid variable.  set argvalue to point to the variable's data and argtype to its type
-                    argval[i].s = (uint8_t*)findvar(argv1[i], V_FIND | V_EMPTY_OK);        // get a pointer to the variable's data
+                    argval[i].s = (uint8_t*)findvar(argv1[i], V_FIND | V_EMPTY_OK, 62);        // get a pointer to the variable's data
                     argtype[i] = g_vartbl[g_VarIndex].type;                          // and the variable's type
                     argVarIndex[i] = g_VarIndex;
                     if(argtype[i] & T_CONST) {
@@ -715,7 +715,10 @@ void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, CombinedPtr cmd, int i
             if(!(ArgType & T_IMPLIED)) error("Variable type");
         }
         ArgType |= (V_FIND | V_DIM_VAR | V_LOCAL | V_EMPTY_OK);
-        tp = (uint8_t*)findvar(argv2[i], ArgType);                            // declare the local variable
+        if (!argv2[i].ram()) {
+            error("FN: $", fun_name);
+        }
+        tp = (uint8_t*)findvar(argv2[i], ArgType, 63);                            // declare the local variable
         if(g_vartbl[g_VarIndex].dims[0] > 0) error("Argument list");    // if it is an array it must be an empty array
        
         CurrentLinePtr = CallersLinePtr;                            // report errors at the caller
@@ -796,7 +799,7 @@ void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, CombinedPtr cmd, int i
     //   - When that returns we need to restore the global variables
     //   - Get the variable's value and save that in the return value globals (fret or sret)
     //   - Return to the expression parser
-    tp = (uint8_t*)findvar(fun_name, FunType | V_FUNCT);                      // declare the local variable
+    tp = (uint8_t*)findvar(fun_name, FunType | V_FUNCT, 64);                      // declare the local variable
     FunType = g_vartbl[g_VarIndex].type;
     if(FunType & T_STR) {
         FreeMemorySafe((void **)&g_vartbl[g_VarIndex].val.s);                         // free the memory if it is a string
@@ -1573,7 +1576,7 @@ static CombinedPtr getvalue(CombinedPtr p, MMFLOAT *fa, long long int  *ia, Comb
                 DefinedSubFun(true, p, i, &f, &i64, &s, &t);
                 CurrentLinePtr = SaveCurrentLinePtr;
             } else {
-                void *tt = findvar(p, V_FIND);                         // if it is a string then the string pointer is automatically set
+                void *tt = findvar(p, V_FIND, 65);                         // if it is a string then the string pointer is automatically set
                 t = TypeMask(g_vartbl[g_VarIndex].type);
                 if(t & T_NBR) f = (*(MMFLOAT *)tt);
                 if(t & T_INT) i64 = (*(long long int  *)tt);
@@ -2072,7 +2075,7 @@ void MIPS16 __not_in_flash_func(*findvar)(CombinedPtr p, int action) {
 void MIPS16 *findvar(CombinedPtr p, int action) {
 #endif
 #else
-void MIPS16 __not_in_flash_func(*findvar)(CombinedPtr p, int action) {
+void MIPS16 __not_in_flash_func(*findvar)(CombinedPtr p, int action, int at) {
 #endif
     unsigned char name[MAXVARLEN + 1];
     int i=0, j, size, ifree, globalifree, localifree, nbr, vtype, vindex, namelen, tmp;
@@ -2090,9 +2093,14 @@ void MIPS16 __not_in_flash_func(*findvar)(CombinedPtr p, int action) {
     vtype = dnbr = emptyarray = 0;
     ifree = -1;
 
+    if(!p) {
+        error("Variable name is NULL [%]", at);
+    }
     // check the first char for a legal variable name
     skipspace(p);
-    if(!isnamestart(*p)) error("Variable name");
+    if(!isnamestart(*p)) {
+        error("Variable name at % [%]", (int)p.ram(), at);
+    }
 
     // copy the variable name into name
     s = name; namelen = 0;
@@ -3691,12 +3699,18 @@ void MIPS16 __not_in_flash_func(makeargs2)(CombinedPtr *p, int maxargs, unsigned
                 *op++ = 0;                                          // terminate it
             } else if(*argc) {                                      // otherwise we have two delimiters in a row (except for the first argument)
                 argv[(*argc)++] = op;                               // create a null argument to go between the two delimiters
+        if (!argv[(*argc - 1)]) {
+            error("ARGC: % (ARGV[i] == null) 1", (*argc - 1));
+        }
                 *op++ = 0;                                          // and terminate it
             }
 
             inarg = false;
             if(*argc >= maxargs) error("Syntax");
             argv[(*argc)++] = op;                                   // save the pointer for this delimiter
+        if (!argv[(*argc - 1)]) {
+            error("ARGC: % (ARGV[i] == null) 2", (*argc - 1));
+        }
             *op++ = *tp++;                                          // copy the token or char (always one)
             *op++ = 0;                                              // terminate it
             continue;
@@ -3716,6 +3730,9 @@ void MIPS16 __not_in_flash_func(makeargs2)(CombinedPtr *p, int maxargs, unsigned
         if(!inarg) {
             if(*argc >= maxargs) error("Syntax");
             argv[(*argc)++] = op;                                   // save the pointer for this arg
+        if (!argv[(*argc - 1)]) {
+            error("ARGC: % (ARGV[i] == null) 3", (*argc - 1));
+        }
             inarg = true;
         }
 
@@ -3749,6 +3766,11 @@ void MIPS16 __not_in_flash_func(makeargs2)(CombinedPtr *p, int maxargs, unsigned
     if(expect_bracket && *tp != ')') error("Syntax");
     while(op - 1 > argbuf && *(op-1) == ' ') --op;                  // trim any trailing spaces on the last argument
     *op = 0;                                                        // terminate the last argument
+    for(int i = 0; i < *argc; ++i) {
+        if (!argv[i]) {
+            error("ARGC: % (ARGV[i] == null)", i);
+        }
+    }
 }
 
 /*  @endcond */

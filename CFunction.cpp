@@ -85,7 +85,7 @@ long long int MIPS16 CallCFunction(CombinedPtr CmdPtr, CombinedPtr ArgList, Comb
         for(i = 0; i < argc; i += 2) {
             // if this is a straight variable we want to pass a pointer to its value in RAM
             if(isnamestart((uint8_t)*argv[i]) && (*skipvar(argv[i], false) == 0 || *skipvar(argv[i], false) == ')') && !(FindSubFun(argv[i], 1) >= 0 && strchr(argv[i], '(') != nullptr)) {
-                arg[i/2] = findvar(argv[i], V_FIND | V_EMPTY_OK /* | V_NOFIND_ERR */ );   // if the argument
+                arg[i/2] = findvar(argv[i], V_FIND | V_EMPTY_OK /* | V_NOFIND_ERR */ , 3);   // if the argument
                 if(typ[i/2] != 0 && !(TypeMask(g_vartbl[g_VarIndex].type) & typ[i/2])) error("Incompatible type");
             } else {
                 // else it must be an expression of some sort

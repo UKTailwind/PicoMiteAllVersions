@@ -1797,11 +1797,11 @@ void cmd_ir(void) {
         if(IrState != IR_CLOSED) error("Already open");
         if(argc%2 == 0 || argc == 0) error("Invalid syntax");
         IrVarType = 0;
-        IrDev = findvar(argv[0], V_FIND);
+        IrDev = findvar(argv[0], V_FIND, 31);
         if(g_vartbl[g_VarIndex].type & T_CONST) error("Cannot change a constant");
         if(g_vartbl[g_VarIndex].type & T_STR)  error("Invalid variable");
         if(g_vartbl[g_VarIndex].type & T_NBR) IrVarType |= 0b01;
-        IrCmd = findvar(argv[2], V_FIND);
+        IrCmd = findvar(argv[2], V_FIND, 32);
         if(g_vartbl[g_VarIndex].type & T_CONST) error("Cannot change a constant");
         if(g_vartbl[g_VarIndex].type & T_STR)  error("Invalid variable");
         if(g_vartbl[g_VarIndex].type & T_NBR) IrVarType |= 0b10;
@@ -2460,7 +2460,7 @@ void cmd_keypad(void) {
         getargs(&cmdline, 19, (unsigned char *)",");
         if(argc%2 == 0 || argc < 17) error("Invalid syntax");
         if(KeypadInterrupt != nullptr) error("Already open");
-        KeypadVar = (double*)findvar(argv[0], V_FIND);
+        KeypadVar = (double*)findvar(argv[0], V_FIND, 33);
         if(g_vartbl[g_VarIndex].type & T_CONST) error("Cannot change a constant");
         if(!(g_vartbl[g_VarIndex].type & T_NBR)) error("Floating point variable required");
         InterruptUsed = true;
@@ -2695,9 +2695,9 @@ void cmd_DHT22(void) {
     if(!(argc == 5 || argc == 7)) error("Incorrect number of arguments");
 
     // get the two variables
-	temp = (double*)findvar(argv[2], V_FIND);
+	temp = (double*)findvar(argv[2], V_FIND, 34);
 	if(!(g_vartbl[g_VarIndex].type & T_NBR)) error("Invalid variable");
-	humid = (double*)findvar(argv[4], V_FIND);
+	humid = (double*)findvar(argv[4], V_FIND, 35);
 	if(!(g_vartbl[g_VarIndex].type & T_NBR)) error("Invalid variable");
 
     // get the pin number and set it up
@@ -3125,10 +3125,10 @@ void cmd_device(void){
         int gppin=(1<<PinDef[pin].GPno);
         int baudrate=getint(argv[2],110,230400);
         unsigned char *string= nullptr;
-        string = (unsigned char *)findvar(argv[4], V_FIND);
+        string = (unsigned char *)findvar(argv[4], V_FIND, 36);
 	    if(!(g_vartbl[g_VarIndex].type & T_STR)) error("Invalid variable");
         int timeout=getint(argv[6],1,100000)*1000;
-        void *status=findvar(argv[8], V_FIND);
+        void *status=findvar(argv[8], V_FIND, 37);
         int type=g_vartbl[g_VarIndex].type;
 	    if(!(type & (T_NBR | T_INT))) error("Invalid variable");
         if(argc>9 && *argv[10])maxchars=getint(argv[10],1,255);

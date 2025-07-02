@@ -687,7 +687,7 @@ void MIPS16 cmd_pio(void){
 #endif
         int sm=getint(argv[2],0,3);
         nbr = getinteger(argv[4]);
-        dd = (long long*)findvar(argv[6], V_FIND | V_EMPTY_OK | V_NOFIND_ERR);
+        dd = (long long*)findvar(argv[6], V_FIND | V_EMPTY_OK | V_NOFIND_ERR, 28);
         if(((g_vartbl[g_VarIndex].type & T_INT) && g_vartbl[g_VarIndex].dims[0] > 0 && g_vartbl[g_VarIndex].dims[1] == 0))
         {		// integer array
             if( (((long long int *)dd - g_vartbl[g_VarIndex].val.ia) + nbr) > (g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase) )
@@ -1323,7 +1323,7 @@ void MIPS16 cmd_pio(void){
         if(argc<3)error("Syntax");
         int size=getinteger(argv[2]);
         if(!(size==256 || size==512 || size==1024 || size== 2048 || size==4096 || size==8192 || size==16384 || size==32768))error("Not power of 2");
-        findvar(argv[0], V_FIND | V_NOFIND_ERR);
+        findvar(argv[0], V_FIND | V_NOFIND_ERR, 29);
         if ((g_vartbl[g_VarIndex].type & T_INT) && g_vartbl[g_VarIndex].dims[0] == 0 && g_vartbl[g_VarIndex].level==0){
                 g_vartbl[g_VarIndex].val.s =(unsigned char *)GetAlignedMemory(size);
                 g_vartbl[g_VarIndex].size=255;

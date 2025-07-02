@@ -285,7 +285,7 @@ void fun_bound(void){
 	int which=1;
 	getargs(&ep, 3,(unsigned char *)",");
 	if(argc==3)which=getint(argv[2],0,MAXDIM);
-    findvar(argv[0], V_FIND | V_EMPTY_OK | V_NOFIND_ERR);
+    findvar(argv[0], V_FIND | V_EMPTY_OK | V_NOFIND_ERR,43);
 	if(which==0)iret=g_OptionBase;
 	else iret=g_vartbl[g_VarIndex].dims[which-1];
 	if(iret==-1)iret=0;
@@ -563,7 +563,7 @@ void fun_bit(void){
 	uint64_t *s;
 	uint64_t spos;
 	getargs(&ep, 3, (unsigned char *)",");
-	s=(uint64_t *)findvar(argv[0], V_NOFIND_ERR);
+	s=(uint64_t *)findvar(argv[0], V_NOFIND_ERR,44);
 	if(!(g_vartbl[g_VarIndex].type & T_INT)) error("Not an integer");
 	spos = getint(argv[2], 0,63);						    // the mid position
 	iret = ((int64_t)(*s&(1ll<<spos))>>spos) & 1ll;
@@ -582,7 +582,7 @@ void fun_byte(void){
 	unsigned char *s;
 	int spos;
 	getargs(&ep, 3, (unsigned char *)",");
-	s=(unsigned char *)findvar(argv[0], V_NOFIND_ERR);
+	s=(unsigned char *)findvar(argv[0], V_NOFIND_ERR,45);
 	if(!(g_vartbl[g_VarIndex].type & T_STR)) error("Not a string");
 	spos = getint(argv[2], 1, g_vartbl[g_VarIndex].size);						    // the mid position
 	iret = s[spos];							// this will last for the life of the command
@@ -874,7 +874,7 @@ void fun_instr(void) {
 		strcpy(s,(char *)getCstring(argv[0+n]));
 		strcpy(p,(char *)getCstring(argv[2+n]));
 		if(argc==5+n){
-			temp = (MMFLOAT*)findvar(argv[4+n], V_FIND);
+			temp = (MMFLOAT*)findvar(argv[4+n], V_FIND,46);
 			if(!(g_vartbl[g_VarIndex].type & T_NBR)) error("Invalid variable");
 		}
 		reti = regcomp(&regex, p, 0);

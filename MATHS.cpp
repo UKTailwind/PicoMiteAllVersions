@@ -598,7 +598,7 @@ int parseintegerarray(CombinedPtr tp, int64_t **a1int, int argno, int dimensions
 #endif
 	void *ptr1 = NULL;
 	int i,j;
-	ptr1 = findvar(tp, V_FIND | V_EMPTY_OK | V_NOFIND_ERR);
+	ptr1 = findvar(tp, V_FIND | V_EMPTY_OK | V_NOFIND_ERR, 47);
 	if((g_vartbl[g_VarIndex].type & T_CONST) && ConstantNotAllowed) error("Cannot change a constant");
 	if(dims==NULL)dims=g_vartbl[g_VarIndex].dims;
 	if(g_vartbl[g_VarIndex].type & T_INT) {
@@ -626,7 +626,7 @@ int parsestringarray(CombinedPtr tp, unsigned char **a1str, int argno, int dimen
 #endif
 	void *ptr1 = NULL;
 	int i,j;
-	ptr1 = findvar(tp, V_FIND | V_EMPTY_OK | V_NOFIND_ERR);
+	ptr1 = findvar(tp, V_FIND | V_EMPTY_OK | V_NOFIND_ERR, 48);
 	if((g_vartbl[g_VarIndex].type & T_CONST) && ConstantNotAllowed) error("Cannot change a constant");
 	if(dims==NULL)dims=g_vartbl[g_VarIndex].dims;
 	if(g_vartbl[g_VarIndex].type & T_STR) {
@@ -656,7 +656,7 @@ int parsenumberarray(CombinedPtr tp, MMFLOAT **a1float, int64_t **a1int, int arg
 #endif
 	void *ptr1 = NULL;
 	int i,j;
-	ptr1 = findvar(tp, V_FIND | V_EMPTY_OK | V_NOFIND_ERR);
+	ptr1 = findvar(tp, V_FIND | V_EMPTY_OK | V_NOFIND_ERR, 49);
 	if((g_vartbl[g_VarIndex].type & T_CONST) && ConstantNotAllowed) error("Cannot change a constant");
 	if(dims==NULL)dims=g_vartbl[g_VarIndex].dims;
 	if(g_vartbl[g_VarIndex].type & (T_INT | T_NBR)) {
@@ -685,7 +685,7 @@ int parsefloatrarray(CombinedPtr tp, MMFLOAT **a1float, int argno, int dimension
 #endif
 	void *ptr1 = NULL;
 	int i,j;
-	ptr1 = findvar(tp, V_FIND | V_EMPTY_OK | V_NOFIND_ERR);
+	ptr1 = findvar(tp, V_FIND | V_EMPTY_OK | V_NOFIND_ERR, 50);
 	if((g_vartbl[g_VarIndex].type & T_CONST) && ConstantNotAllowed) error("Cannot change a constant");
 	if(dims==NULL)dims=g_vartbl[g_VarIndex].dims;
 	if(g_vartbl[g_VarIndex].type & T_NBR) {
@@ -718,7 +718,7 @@ int parsearrays(CombinedPtr tp, MMFLOAT **a1float, MMFLOAT **a2float,MMFLOAT **a
 	return card1;
 }
 int parseany(CombinedPtr tp, MMFLOAT **a1float, int64_t **a1int, unsigned char ** a1str, int *length, bool stringarray){
-	void *ptr1 = findvar(tp, V_FIND | V_EMPTY_OK | V_NOFIND_ERR);
+	void *ptr1 = findvar(tp, V_FIND | V_EMPTY_OK | V_NOFIND_ERR, 51);
 	int arraylength;
 	if(g_vartbl[g_VarIndex].type & T_NBR) {
 		if(g_vartbl[g_VarIndex].dims[1] != 0) error("Invalid variable");
@@ -1780,11 +1780,11 @@ void cmd_math(void){
 				}
 			}
 			if(argc==11){
-				void *ptr1 = findvar(argv[8], V_FIND);
+				void *ptr1 = findvar(argv[8], V_FIND, 52);
 				if(!(g_vartbl[g_VarIndex].type & (T_NBR | T_INT))) error("Invalid variable");
 				if(g_vartbl[g_VarIndex].type==T_INT)*(long long int *)ptr1=(long long int)inmin;
 				else *(MMFLOAT *)ptr1=inmin;
-				void *ptr2 = findvar(argv[10], V_FIND);
+				void *ptr2 = findvar(argv[10], V_FIND,53);
 				if(!(g_vartbl[g_VarIndex].type & (T_NBR | T_INT))) error("Invalid variable");
 				if(g_vartbl[g_VarIndex].type==T_INT)*(long long int *)ptr2=(long long int)inmax;
 				else *(MMFLOAT *)ptr2=inmax;
@@ -2450,7 +2450,7 @@ void fun_math(void){
 				if(dims[1] > 0) {		// Not an array
 					error("Argument 1 must be a 1D numerical array");
 				}
-				temp = (long long*)findvar(argv[2], V_FIND);
+				temp = (long long*)findvar(argv[2], V_FIND, 54);
 				if(!(g_vartbl[g_VarIndex].type & T_INT)) error("Invalid variable");
 			}
 
@@ -2492,7 +2492,7 @@ void fun_math(void){
 				if(dims[1] > 0) {		// Not an array
 					error("Argument 1 must be a 1D numerical array");
 				}
-				temp = (long long int *)findvar(argv[2], V_FIND);
+				temp = (long long int *)findvar(argv[2], V_FIND,55);
 				if(!(g_vartbl[g_VarIndex].type & T_INT)) error("Invalid variable");
 			}
 			if(a1float!=NULL){
@@ -2711,11 +2711,11 @@ void cmd_SensorFusion(CombinedPtr passcmdline) {
         mx=getnumber(argv[12]);
         my=getnumber(argv[14]);
         mz=getnumber(argv[16]);
-        pitch = (double*)findvar(argv[18], V_FIND);
+        pitch = (double*)findvar(argv[18], V_FIND,56);
         if(!(g_vartbl[g_VarIndex].type & T_NBR)) error("Invalid variable");
-        roll = (double*)findvar(argv[20], V_FIND);
+        roll = (double*)findvar(argv[20], V_FIND,57);
         if(!(g_vartbl[g_VarIndex].type & T_NBR)) error("Invalid variable");
-        yaw = (double*)findvar(argv[22], V_FIND);
+        yaw = (double*)findvar(argv[22], V_FIND,58);
         if(!(g_vartbl[g_VarIndex].type & T_NBR)) error("Invalid variable");
         beta = 0.5;
         if(argc == 25) beta=getnumber(argv[24]);
@@ -2741,11 +2741,11 @@ void cmd_SensorFusion(CombinedPtr passcmdline) {
         mx=getnumber(argv[12]);
         my=getnumber(argv[14]);
         mz=getnumber(argv[16]);
-        pitch = (double*)findvar(argv[18], V_FIND);
+        pitch = (double*)findvar(argv[18], V_FIND, 59);
         if(!(g_vartbl[g_VarIndex].type & T_NBR)) error("Invalid variable");
-        roll = (double*)findvar(argv[20], V_FIND);
+        roll = (double*)findvar(argv[20], V_FIND,60);
         if(!(g_vartbl[g_VarIndex].type & T_NBR)) error("Invalid variable");
-        yaw = (double*)findvar(argv[22], V_FIND);
+        yaw = (double*)findvar(argv[22], V_FIND,61);
         if(!(g_vartbl[g_VarIndex].type & T_NBR)) error("Invalid variable");
         Kp=10.0 ; Ki=0.0;
         if(argc >= 25)Kp=getnumber(argv[24]);
