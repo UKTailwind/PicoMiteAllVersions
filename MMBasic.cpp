@@ -429,10 +429,16 @@ int   MIPS16 PrepareProgramExt(CombinedPtr p, int i, CombinedPtr *CFunPtr, int E
     CombinedPtrI cfp = *CFunPtr;
     while(*cfp != 0xffffffff && total_bytes > 0) {
         if(*cfp & 0x80000000) { // Если установлен бит 31 (0x80000000), это шрифт:
-            FontTable[*cfp & (FONT_TABLE_SIZE-1)] = (uint8_t *)(cfp + 2).raw(202);
+            size_t i = *cfp & (FONT_TABLE_SIZE-1);
+            if (FontTable[i] >= (uint8_t*)0x11000000) { // RAM to cleanup before reassign
+                FreeMemory(FontTable[i]);
+            }
+            FontTable[i] = (uint8_t *)(cfp + 2).raw(202);
         }
         cfp++; total_bytes -= 4;
-        cfp += (*cfp + 4) / sizeof(unsigned int);
+        size_t sz = (*cfp + 4);
+        cfp += sz / sizeof(unsigned int);
+        total_bytes -= sz;
     }
     return i;
 }
