@@ -1540,7 +1540,7 @@ static CombinedPtr getvalue(CombinedPtr p, MMFLOAT *fa, long long int  *ia, Comb
             }
         } 
         if(tokentype(*p) & (T_FUN | T_FNA)) {
-    // if a function execute it and save the result
+            // if a function execute it and save the result
             int tmp;
             tp = p;
             // if it is a function with arguments we need to locate the closing bracket and copy the argument to
@@ -1577,9 +1577,12 @@ static CombinedPtr getvalue(CombinedPtr p, MMFLOAT *fa, long long int  *ia, Comb
                 t = TypeMask(g_vartbl[g_VarIndex].type);
                 if(t & T_NBR) f = (*(MMFLOAT *)tt);
                 if(t & T_INT) i64 = (*(long long int  *)tt);
-                if(t & T_STR) s = *(CombinedPtr*)tt;
+                if(t & T_STR) s = (uint8_t*)tt;
             }
             p = skipvar(p, false);
+    if (s.ram() > (uint8_t*)0x21000000) {
+    	error("s2: %", s.ram());
+    }
         }
         // is it an ordinary numeric constant?  get its value if yes
         // a leading + or - might have been converted to a token so we need to check for them also
@@ -1658,85 +1661,85 @@ static CombinedPtr getvalue(CombinedPtr p, MMFLOAT *fa, long long int  *ia, Comb
             p1 = (uint8_t*)GetTempMemory(STRINGSIZE);                                // this will last for the life of the command
             s = p1;
             tp = strchr(p, '"');
-                int toggle=0;
-                while(p != tp){
-                    if(*p=='\\' && tp>p+1 && OptionEscape)toggle^=1;
-                    if(toggle){
-                        if(*p=='\\' && isdigit(p[1]) && isdigit(p[2]) && isdigit(p[3])){
-                            p++;
-                            i=(*p++)-48;
-                            i*=10;
-                            i+=(*p++)-48;
-                            i*=10;
-                            i+=(*p++)-48;
-                            if(i==0)error("Null character \\000 in escape sequence - use CHR$(0)","$");
-                            *p1++=i;
-                        } else {
-                            p++;
-                            switch(*p){
-                                case '\\':
-                                    *p1++='\\';
+            int toggle=0;
+            while(p != tp){
+                if(*p=='\\' && tp>p+1 && OptionEscape)toggle^=1;
+                if(toggle){
+                    if(*p=='\\' && isdigit(p[1]) && isdigit(p[2]) && isdigit(p[3])){
+                        p++;
+                        i=(*p++)-48;
+                        i*=10;
+                        i+=(*p++)-48;
+                        i*=10;
+                        i+=(*p++)-48;
+                        if(i==0)error("Null character \\000 in escape sequence - use CHR$(0)","$");
+                        *p1++=i;
+                    } else {
+                        p++;
+                        switch(*p){
+                            case '\\':
+                                *p1++='\\';
+                                p++;
+                                break;
+                            case 'a':
+                                *p1++='\a';
+                                p++;
+                                break;
+                            case 'b':
+                                *p1++='\b';
+                                p++;
+                                break;
+                            case 'e':
+                                *p1++='\e';
+                                p++;
+                                break;
+                            case 'f':
+                                *p1++='\f';
+                                p++;
+                                break;
+                            case 'n':
+                                *p1++='\n';
+                                p++;
+                                break;
+                            case 'q':
+                                *p1++='\"';
+                                p++;
+                                break;
+                            case 'r':
+                                *p1++='\r';
+                                p++;
+                                break;
+                            case 't':
+                                *p1++='\t';
+                                p++;
+                                break;
+                            case 'v':
+                                *p1++='\v';
+                                p++;
+                                break;
+                            case '&':
+                                p++;
+                                if(isxdigit(*p) && isxdigit(p[1])){
+                                    i=0;
+                                    i = (i << 4) | ((mytoupper(*p) >= 'A') ? mytoupper(*p) - 'A' + 10 : *p - '0');
                                     p++;
-                                    break;
-                                case 'a':
-                                    *p1++='\a';
+                                    i = (i << 4) | ((mytoupper(*p) >= 'A') ? mytoupper(*p) - 'A' + 10 : *p - '0');
                                     p++;
-                                    break;
-                                case 'b':
-                                    *p1++='\b';
-                                    p++;
-                                    break;
-                                case 'e':
-                                    *p1++='\e';
-                                    p++;
-                                    break;
-                                case 'f':
-                                    *p1++='\f';
-                                    p++;
-                                    break;
-                                case 'n':
-                                    *p1++='\n';
-                                    p++;
-                                    break;
-                                case 'q':
-                                    *p1++='\"';
-                                    p++;
-                                    break;
-                                case 'r':
-                                    *p1++='\r';
-                                    p++;
-                                    break;
-                                case 't':
-                                    *p1++='\t';
-                                    p++;
-                                    break;
-                                case 'v':
-                                    *p1++='\v';
-                                    p++;
-                                    break;
-                                case '&':
-                                    p++;
-                                    if(isxdigit(*p) && isxdigit(p[1])){
-                                        i=0;
-                                        i = (i << 4) | ((mytoupper(*p) >= 'A') ? mytoupper(*p) - 'A' + 10 : *p - '0');
-                                        p++;
-                                        i = (i << 4) | ((mytoupper(*p) >= 'A') ? mytoupper(*p) - 'A' + 10 : *p - '0');
-                                        p++;
-                                        if(i==0)error("Null character \\&00 in escape sequence - use CHR$(0)","$");
-                                        *p1++=i;
-                                    } else *p1++='x';
-                                    break;
-                                default:
-                                    *p1++=*p++;
-                            }
+                                    if(i==0)error("Null character \\&00 in escape sequence - use CHR$(0)","$");
+                                    *p1++=i;
+                                } else *p1++='x';
+                                break;
+                            default:
+                                *p1++=*p++;
                         }
-                        toggle=0;
-                    } else *p1++ = *p++;
-                } 
-            p++;
-            // N.B. only raw RAM based strings are supported there
-            CtoM(s.raw());                                                    // convert to a MMBasic string
-            t = T_STR;
+                    }
+                    toggle=0;
+                } else *p1++ = *p++;
+            } 
+        p++;
+        // N.B. only raw RAM based strings are supported there
+        CtoM(s.raw());                                                    // convert to a MMBasic string
+        t = T_STR;
     }
     else
         error("Syntax");

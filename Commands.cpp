@@ -1349,7 +1349,7 @@ if(Option.SerialConsole)while(ConsoleTxBufHead!=ConsoleTxBufTail)routinechecks()
 				unsigned char *cmd_args = (unsigned char *)"";
 				cmd_args = getCstring(argv[0]);
 				void *ptr = findvar((unsigned char *)"MM.ENDLINE$", T_STR| V_NOFIND_NULL);  
-				if(ptr== nullptr)ptr = findvar((unsigned char *)"MM.ENDLINE$", V_FIND |V_DIM_VAR);
+				if(ptr == nullptr) ptr = findvar((unsigned char *)"MM.ENDLINE$", V_FIND |V_DIM_VAR);
 				strcpy((char*)ptr, (char *)cmd_args ); // *** THW 16/4/23
 				CtoM((uint8_t*)ptr);
 			}
