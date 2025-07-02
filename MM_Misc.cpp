@@ -4776,9 +4776,9 @@ void MIPS16 fun_info(void){
         else if(restart_reason & 0x40000)strcpy((char *)sret.raw(), "Reset Switch");
         else if(restart_reason & 0x280000)strcpy((char *)sret.raw(), "Debug");
 #else
-        else if(restart_reason==0x100)strcpy((char *)sret, "Power On");
-        else if(restart_reason==0x10000)strcpy((char *)sret, "Reset Switch");
-        else if(restart_reason==0x100000)strcpy((char *)sret, "Debug");
+        else if(restart_reason==0x100)strcpy((char *)sret.raw(), "Power On");
+        else if(restart_reason==0x10000)strcpy((char *)sret.raw(), "Reset Switch");
+        else if(restart_reason==0x100000)strcpy((char *)sret.raw(), "Debug");
 #endif
         else sprintf((char *)sret.raw(), "Unknown code %X",(unsigned int)restart_reason);
         CtoM(sret.raw());

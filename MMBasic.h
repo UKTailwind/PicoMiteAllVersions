@@ -327,6 +327,7 @@ typedef uint16_t CommandToken;
 
 #ifdef __cplusplus
 }
+int mem_equal2(CombinedPtr s1, unsigned char *s2, int i);
 void makeargs2(CombinedPtr *tp, int maxargs, unsigned char *argbuf, CombinedPtr argv[], int *argc, unsigned char *delim);
 CombinedPtr checkstring(CombinedPtr p, unsigned char *tkn);
 uint8_t* checkstring(uint8_t* p, unsigned char *tkn);

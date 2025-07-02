@@ -892,8 +892,8 @@ void __not_in_flash_func(TestStackOverflow)(void) {
 
 void MIPS64 __not_in_flash_func(FreeMemory)(void *_addr) {
     if(_addr == nullptr) return;
-#if defined(rp2350) && !defined(PICOMITEWEB)
     unsigned char * addr = (unsigned char *)_addr;
+#if defined(rp2350) && !defined(PICOMITEWEB)
     int bits;
     if(PSRAMsize){
         if(addr > (unsigned char *)PSRAMbase && addr < (unsigned char *)(PSRAMbase+PSRAMsize)){

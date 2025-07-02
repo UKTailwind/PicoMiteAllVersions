@@ -258,9 +258,9 @@ void   MIPS16 PrepareProgram(int ErrAbort) {
     int u, namelen;
     uint32_t hash=FNV_offset_basis;
     char printvar[MAXVARLEN+1];
+    unsigned char *p2;
 #endif
     CombinedPtr p1;
-    unsigned char *p2;
     for(i = FONT_BUILTIN_NBR; i < FONT_TABLE_SIZE-1; i++)
         FontTable[i] = nullptr;                                        // clear the font table
 
@@ -482,8 +482,8 @@ int __not_in_flash_func(FindSubFun)(CombinedPtr p, int type) {
     return -1;
 }
 #else
-int __not_in_flash_func(FindSubFun)(unsigned char *p, int type) {
-    unsigned char *p1, *p2;
+int __not_in_flash_func(FindSubFun)(CombinedPtr p, int type) {
+    CombinedPtr p1, p2;
     int i;
 
     for(i = 0;  i < MAXSUBFUN && subfun[i] != nullptr; i++) {
@@ -1926,13 +1926,13 @@ CombinedPtr findlabel(CombinedPtr labelptr) {
 }
 #else
 CombinedPtr MIPS16 findlabel(CombinedPtr labelptr) {
-    char *p, *lastp = (char *)ProgMemory + 1;
-    char *next;
+    CombinedPtr p, lastp = ProgMemory + 1;
+    CombinedPtr next;
     int i,j=0;
     char label[MAXVARLEN + 1];
 
     // first, just exit we have a NULL argument
-    if(labelptr == nullptr) return NULL;
+    if(labelptr == nullptr) return nullptr;
 
     // convert the label to the token format and load into label[]
     // this assumes that the first character has already been verified as a valid label character
@@ -1944,12 +1944,12 @@ CombinedPtr MIPS16 findlabel(CombinedPtr labelptr) {
     }
     label[0] = i - 1;                                               // the length byte
    
-    p = (char *)ProgMemory;
-    next=(char *)LibMemory;
+    p = ProgMemory;
+    next = LibMemory;
     if (Option.LIBRARY_FLASH_SIZE==MAX_PROG_SIZE){
        if (CurrentLinePtr >= LibMemory && CurrentLinePtr <= LibMemory + MAX_PROG_SIZE){
-          p=(char *)LibMemory;
-          next=(char *)ProgMemory;
+          p = LibMemory;
+          next = ProgMemory;
        }
     }
 
@@ -1981,8 +1981,8 @@ CombinedPtr MIPS16 findlabel(CombinedPtr labelptr) {
 
         if(p[0] == T_LABEL) {
             p++;                                                    // point to the length of the label
-            if(mem_equal((unsigned char *)p, (unsigned char *)label, label[0] + 1))                   // compare the strings including the length byte
-                return (unsigned char *)lastp;                                       // and if successful return pointing to the beginning of the line
+            if(mem_equal2(p, (unsigned char *)label, label[0] + 1))                   // compare the strings including the length byte
+                return lastp;                                       // and if successful return pointing to the beginning of the line
             p += p[0] + 1;                                          // still looking! skip over the label
             continue;
         }
@@ -2387,7 +2387,7 @@ void MIPS16 __not_in_flash_func(*findvar)(CombinedPtr p, int action, int at) {
 #else
     if(!(action & V_FUNCT)) {                                       // don't do this if we are defining the local variable for a function name
         for(i = 0;  i < MAXSUBFUN && subfun[i] != nullptr; i++) {
-            x = subfun[i];                                          // point to the command token
+            CombinedPtr x = subfun[i];                                          // point to the command token
             x++; skipspace(x);                                      // point to the identifier
             s = name;                                               // point to the new variable
             if(*s != toupper(*x)) continue;                         // quick first test
@@ -3626,6 +3626,14 @@ int __not_in_flash_func(mem_equal)(unsigned char *s1, unsigned char *s2, int i) 
 /*  @endcond */
 }
 
+int mem_equal2(CombinedPtr s1, unsigned char *s2, int i) {
+    if(charmap[*s1] != charmap[*(unsigned char *)s2]) return 0;
+    while (--i) {
+        if(charmap[*++s1] != charmap[*(unsigned char *)++s2])
+            return 0;
+    }
+    return 1;
+}
 // check if the next text in an element (a basic statement) corresponds to an alpha string
 // leading whitespace is skipped and the string must be terminated with a valid terminating
 // character. Returns a pointer to the end of the string if found or NULL is not
