@@ -4891,7 +4891,7 @@ contloop:
              p--;
          } else {
              endtoken = GetCommandValue((unsigned char *)"End CSub");
-             FlashWriteWord((unsigned int)(p.raw() - sd_progmemory));               // if a CFunction/CSub save a relative pointer to the declaration
+             FlashWriteWord((unsigned int)(p.ram() - sd_progmemory));               // if a CFunction/CSub save a relative pointer to the declaration
              fontnbr = 0;
              p++;
          }

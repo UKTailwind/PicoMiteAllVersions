@@ -2898,7 +2898,7 @@ char getnextuncompressednibble(char **s, int reset){
     }
 
 }
-static inline char getnextnibble(char **fc, int reset){
+static inline char getnextnibble(CombinedPtr* fc, int reset){
     static uint8_t available;
     static char out;
     if(reset){
@@ -2912,7 +2912,7 @@ static inline char getnextnibble(char **fc, int reset){
     if(!reset)available--;
     return out;
 }
-void docompressed(char *fc,int x1, int y1, int w, int h, int8_t blank){
+static void docompressed(CombinedPtr fc,int x1, int y1, int w, int h, int8_t blank){
 #ifndef PICOMITEVGA
     if(!WriteBuf){ //direct to screen
         if(blank==-1){
@@ -3057,15 +3057,15 @@ void cmd_blitmemory(void){
     int x1, y1, w, h;
     int8_t blank=-1;
     getargs(&cmdline, 7, (unsigned char*)",");
-    if(argc<5)error("Syntax");
-    char *from=(char *)GetPeekAddr(argv[0]);
+    if(argc < 5) error("Syntax");
+    CombinedPtr from = (char *)GetPeekAddr(argv[0]);
     x1 = (int)getinteger(argv[2]);
     y1 = (int)getinteger(argv[4]);
-    uint16_t *size=(uint16_t *)from;
-    w=(size[0] & 0x7FFF);
-    h=(size[1] & 0x7FFF);
-    from+=4;
-    if(argc==7)blank=getint(argv[6],-1,15);
+    CombinedPtrI size = from;
+    w = (size[0] & 0x7FFF);
+    h = (size[1] & 0x7FFF);
+    from += 4;
+    if(argc == 7) blank = getint(argv[6],-1,15);
     if(size[0] & 0x8000 || size[1] &  0x8000) {
         docompressed(from, x1, y1, w, h, blank);
     } else {
@@ -3220,15 +3220,15 @@ int blitother(void){
         int8_t blank=-1;
         getargs(&p, 7, (unsigned char*)",");
         if(argc<5)error("Syntax");
-        char *fc=(char *)GetPeekAddr(argv[0]);
+        CombinedPtr fc=(char *)GetPeekAddr(argv[0]);
         x1 = (int)getinteger(argv[2]);
         y1 = (int)getinteger(argv[4]);
-        uint16_t *size=(uint16_t *)fc;
-        w=size[0];
-        h=size[1];
-        if(w>HRes || h>VRes)error("Invalid dimensions, w=%, h=%",w,h);
-        fc+=4;
-        if(argc==7)blank=getint(argv[6],-1,15);
+        CombinedPtrI size = fc;
+        w = (size[0] & 0x7FFF);
+        h = (size[1] & 0x7FFF);
+        if(w > HRes || h > VRes) error("Invalid dimensions, w=%, h=%", w, h);
+        fc += 4;
+        if(argc == 7) blank = getint(argv[6], -1, 15);
         docompressed(fc, x1, y1, w, h, blank);
         return 1;
     }  else if ((p = checkstring(cmdline, (unsigned char*)"FRAMEBUFFER"))) {
