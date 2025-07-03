@@ -362,6 +362,7 @@ extern "C" {
 #define ADC_CLK_SPEED   (Option.CPU_Speed*500)
 #define PROGSTART (((MAXFLASHSLOTS) * MAX_PROG_SIZE))
 #define TOP_OF_SYSTEM_FLASH  (((MAXFLASHSLOTS+1) * MAX_PROG_SIZE))
+// TODO: remove such alignment (required for FLASH only)
 #define RoundUpK4(a)     (((a) + (4096 - 1)) & (~(4096 - 1)))// round up to the nearest page size      [position 131:9]	
 typedef enum {
     MMHRES,

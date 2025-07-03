@@ -4071,7 +4071,7 @@ tp = checkstring(cmdline, (unsigned char *)"HEARTBEAT");
                 Option.modbuff = true; 
                 SaveOptions(); 
                 ResetFlashStorage(1); 
-                modbuff=(char *)(XIP_BASE + RoundUpK4(TOP_OF_SYSTEM_FLASH));
+                modbuff = (RoundUpK4(TOP_OF_SYSTEM_FLASH));
                 _excep_code = RESET_COMMAND;
                 SoftReset();
                 }
@@ -4090,7 +4090,7 @@ tp = checkstring(cmdline, (unsigned char *)"HEARTBEAT");
                 Option.modbuffsize=0;
                 SaveOptions(); 
                 ResetFlashStorage(1); 
-                modbuff= nullptr;
+                modbuff = nullptr;
                 _excep_code = RESET_COMMAND;
                 SoftReset();
             }
@@ -5014,7 +5014,7 @@ void MIPS16 fun_info(void){
         return;
     }	
     else if((tp=checkstring(ep,(unsigned char *)"MODBUFF ADDRESS"))){
-        iret=(int64_t)((uint32_t)(char *)(XIP_BASE + RoundUpK4(TOP_OF_SYSTEM_FLASH)));
+        iret=(int64_t)((uint32_t)(char *)(RoundUpK4(TOP_OF_SYSTEM_FLASH)));
         targ=T_INT;
         return;
     }

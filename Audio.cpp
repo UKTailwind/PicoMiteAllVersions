@@ -42,6 +42,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "hardware/flash.h"
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
+#include "hxcmod.h"
 
 extern "C" {
 
@@ -74,7 +75,6 @@ extern "C" {
 #include "hardware/pio.h"
 #include "hardware/pio_instructions.h"
 #include "dr_flac.h"
-#include "hxcmod.h"
 #include "VS1053.h"
 extern BYTE MDD_SDSPI_CardDetectState(void);
 #define MAXALBUM 20
@@ -133,7 +133,7 @@ volatile int swingbuf = 0,nextbuf = 0, playreadcomplete = 1;
 char *sbuff1= nullptr, *sbuff2= nullptr;
 uint16_t *ubuff1, *ubuff2;
 int16_t *g_buff1, *g_buff2;
-char *modbuff= nullptr;
+CombinedPtr modbuff;
 modcontext *mcontext= nullptr;
 int modfilesamplerate=22050;
 char *pbuffp;
@@ -661,7 +661,7 @@ void CloseAudio(int all){
 #ifdef rp2350
 	if(!PSRAMsize)
 #endif
-	modbuff =  (Option.modbuff ?  (char *)(XIP_BASE + RoundUpK4(TOP_OF_SYSTEM_FLASH)) : NULL);
+	modbuff = (Option.modbuff ? (char *)(RoundUpK4(TOP_OF_SYSTEM_FLASH)) : nullptr);
 	int was_playing=CurrentlyPlaying;
 	if(!Option.audio_i2s_bclk){
 		bcount[1] = bcount[2] = wav_filesize = 0;
@@ -691,7 +691,9 @@ void CloseAudio(int all){
 		drmp3_uninit(mymp3);
 		FreeMemorySafe((void **)&mymp3);
 	}
-	if(PSRAMsize && was_playing == P_MOD)FreeMemorySafe((void **)&modbuff);
+	if (modbuff && PSRAMsize && was_playing == P_MOD) {
+		FreeMemory(modbuff.ram());
+	}
 #endif
     int i;
     for(i=0;i<MAXSOUNDS;i++){
@@ -1773,10 +1775,10 @@ void MIPS16 cmd_play(void) {
         char *p;
         int i __attribute((unused))=0,fsize;
         modfilesamplerate=22050;
-		if(CurrentlyPlaying==P_WAVOPEN)CloseAudio(1);
+		if(CurrentlyPlaying == P_WAVOPEN) CloseAudio(1);
         if(CurrentlyPlaying != P_NOTHING) error("Sound output in use");
 #ifdef rp2350
-		if(!(modbuff || PSRAMsize))error("Mod playback not enabled");
+		if(!modbuff && !PSRAMsize) error("Mod playback not enabled");
 #else
 		if(!(modbuff))error("Mod playback not enabled");
 #endif
@@ -1814,8 +1816,8 @@ void MIPS16 cmd_play(void) {
 #ifdef rp2350
 		if(!PSRAMsize){
 #endif
-			if(RoundUpK4(fsize)>1024*Option.modbuffsize)error("File too large for modbuffer");
-			char *check=modbuff;
+			if(RoundUpK4(fsize) > 1024 * Option.modbuffsize) error("File too large for modbuffer");
+			CombinedPtr check = modbuff;
 			while(!FileEOF(WAV_fnbr)) { 
 				if(*check++ != FileGetChar(WAV_fnbr)){
 					alreadythere=0;
@@ -1824,11 +1826,11 @@ void MIPS16 cmd_play(void) {
 			}
 #ifdef rp2350
 		} else {
-			modbuff=GetMemory(RoundUpK4(fsize));
+			modbuff = GetMemory(RoundUpK4(fsize));
 			positionfile(WAV_fnbr,0);
-			char *r=modbuff;
+			uint8_t *r = modbuff.ram();
 			while(!FileEOF(WAV_fnbr)) { 
-				*r++=FileGetChar(WAV_fnbr);
+				*r++ = FileGetChar(WAV_fnbr);
 			}
 		}
 #endif
@@ -1837,7 +1839,7 @@ void MIPS16 cmd_play(void) {
 			positionfile(WAV_fnbr,0);
 			uint32_t j = RoundUpK4(TOP_OF_SYSTEM_FLASH);
 			/** disable_interrupts_pico(); */
-			sd_range_erase(j, RoundUpK4(fsize));
+			// sd_range_erase(j, RoundUpK4(fsize));
 			/** enable_interrupts_pico(); */
 			while(!FileEOF(WAV_fnbr)) { 
 				memset(r,0,256) ;
@@ -1849,7 +1851,7 @@ void MIPS16 cmd_play(void) {
 				sd_range_program(j, (uint8_t *)r, 256);
 				/** enable_interrupts_pico(); */
 				routinechecks();
-				j+=256;
+				j += 256;
 			}
 			FileClose(WAV_fnbr);
 		}
@@ -1857,7 +1859,7 @@ void MIPS16 cmd_play(void) {
 		mcontext = (modcontext*)GetMemory(sizeof(modcontext));
         hxcmod_init( mcontext );
         hxcmod_setcfg(mcontext, modfilesamplerate,1,1 );
-		hxcmod_load( mcontext, (void*)modbuff, fsize );
+		hxcmod_load( mcontext, modbuff, fsize );
 		if(!mcontext->mod_loaded) error("File $ [%] load failed", p, fsize);
 		if(!CurrentLinePtr){
 			MMPrintString("Playing ");MMPrintString((char *)mcontext->song.title);PRet();

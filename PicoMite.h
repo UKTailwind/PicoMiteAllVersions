@@ -130,7 +130,7 @@ public:
             return *reinterpret_cast<T*>(p.raw(300));
         }
         // SD-карта: читаем побайтово
-        T val = 0;
+        T val;
         for (size_t i = 0; i < sizeof(T); ++i)
             reinterpret_cast<uint8_t*>(&val)[i] = *(p + i);
         return val;

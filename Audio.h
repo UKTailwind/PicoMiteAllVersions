@@ -52,7 +52,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #ifdef __cplusplus
 #include "PicoMite.h"
 extern "C" {
-extern CombinedPtr WAVInterrupt;
+extern CombinedPtr WAVInterrupt, modbuff;
 #endif
 
 typedef enum {P_PAUSE_TONE, P_PAUSE_FLAC, P_PAUSE_MP3, P_PAUSE_SOUND, P_PAUSE_MOD, P_PAUSE_WAV, P_STOP, 
@@ -63,7 +63,7 @@ extern volatile e_CurrentlyPlaying CurrentlyPlaying;
 extern bool WAVcomplete;
 extern int WAV_fnbr;
 extern int PWM_FREQ;
-extern char *sbuff1, *sbuff2,  *modbuff;
+extern char *sbuff1, *sbuff2;
 extern int16_t *g_buff1, *g_buff2; 
 extern volatile uint32_t bcount[3];
 extern volatile int wav_filesize;                                    // head and tail of the ring buffer for com1

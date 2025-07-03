@@ -3021,7 +3021,7 @@ static void docompressed(CombinedPtr fc,int x1, int y1, int w, int h, int8_t bla
             to=(char *)WriteBuf+y*(HRes>>1)+(x1>>1); //get the byte that will start the output
             if(x1 & 1)otoggle=1; // if x1 is odd then we will start on the high nibble
             else otoggle=0;
-        for(int x=x1;x<x1+w;x++){
+            for(int x=x1;x<x1+w;x++){
                 if(itoggle==0){
                     c=getnextnibble(&fc,0);
                     itoggle=1;

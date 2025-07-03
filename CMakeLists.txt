@@ -78,7 +78,7 @@ add_executable(PicoMite
     picojpeg.c 
     lfs.c
     lfs_util.c
-	hxcmod.c
+	hxcmod.cpp
     VS1053.c
 	aes.c
 )
