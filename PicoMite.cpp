@@ -150,7 +150,7 @@ int QVGA_HACT;	// V active scanlines (= 2*HEIGHT)
         #ifdef HDMI
             #define MES_SIGNON  "\rPicoMiteHDMI MMBasic " CHIP " M2 Edition V" VERSION "\r\n"
         #else
-            #define MES_SIGNON  "\rPicoMiteVGA MMBasic " CHIP " m1p2 SD-edition V" VERSION "\r\n"
+            #define MES_SIGNON  "\rPicoMiteVGA MMBasic " CHIP " m1p2 SD Edition V" VERSION " Murmulator port by Mike_V73\r\n"
         #endif
 #endif
 

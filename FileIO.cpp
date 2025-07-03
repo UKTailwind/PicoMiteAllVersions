@@ -643,7 +643,7 @@ void MIPS16 cmd_flash(void)
         /** enable_interrupts_pico(); */
         j = (MAX_PROG_SIZE >> 2);
         uSec(250000);
-        int *pp = (int *)(sd_target_contents + (i - 1) * MAX_PROG_SIZE);
+        CombinedPtrI pp = CombinedPtr(sd_target_contents + (i - 1) * MAX_PROG_SIZE);
         while (j--)
             if (*pp++ != 0xFFFFFFFF)
             {
@@ -690,7 +690,7 @@ void MIPS16 cmd_flash(void)
             {
                 k = 0;
                 j = MAX_PROG_SIZE >> 2;
-                pp = (int *)(sd_target_contents + (i - 1) * MAX_PROG_SIZE);
+                pp = CombinedPtr(sd_target_contents + (i - 1) * MAX_PROG_SIZE);
                 while (j--)
                     if (*pp++ != 0xFFFFFFFF)
                     {
@@ -770,20 +770,19 @@ void MIPS16 cmd_flash(void)
             else error("Syntax");
         }
         if(Option.LIBRARY_FLASH_SIZE==MAX_PROG_SIZE && i==MAXFLASHSLOTS) error("Library is using Slot % ",MAXFLASHSLOTS);
-        uint32_t *c = (uint32_t *)(sd_target_contents + (i - 1) * MAX_PROG_SIZE);
-        if (*c != 0xFFFFFFFF && overwrite==0) error("Already programmed");
+        CombinedPtrI c = CombinedPtr(sd_target_contents + (i - 1) * MAX_PROG_SIZE);
+        if (*c != 0xFFFFFFFF && overwrite == 0) error("Already programmed");
         int fnbr = FindFreeFileNbr();
-        if (!InitSDCard())  return;
+        if (!InitSDCard()) return;
         char *pp = (char *)getFstring(argv[2]);
         if (!BasicFileOpen((char *)pp, fnbr, FA_READ)) return;
-		if(filesource[fnbr]!=FLASHFILE)  fsize = f_size(FileTable[fnbr].fptr);
-		else fsize = lfs_file_size(&lfs,FileTable[fnbr].lfsptr);
-        if(fsize>MAX_PROG_SIZE)error("File size % cannot exceed %",fsize,MAX_PROG_SIZE);
+		if(filesource[fnbr]!=FLASHFILE) fsize = f_size(FileTable[fnbr].fptr);
+		else fsize = lfs_file_size(&lfs, FileTable[fnbr].lfsptr);
+        if(fsize>MAX_PROG_SIZE) error("File size % cannot exceed %", fsize, MAX_PROG_SIZE);
         FlashWriteInit(i);
         sd_range_erase(realflashpointer, MAX_PROG_SIZE);
         int j=MAX_PROG_SIZE/4;
-        int *ppp=(int *)(sd_target_contents + (i - 1) * MAX_PROG_SIZE);
-        while(j--)if(*ppp++ != 0xFFFFFFFF){
+        while(j--) if(*c++ != 0xFFFFFFFF) {
             /** enable_interrupts_pico(); */
             error("Flash erase problem");
         }
@@ -799,7 +798,7 @@ void MIPS16 cmd_flash(void)
             error("Invalid in program");
         int i = getint(p, 1, MAXFLASHSLOTS);
         if(Option.LIBRARY_FLASH_SIZE==MAX_PROG_SIZE && i==MAXFLASHSLOTS) error("Library is using Slot % ",MAXFLASHSLOTS);
-        uint32_t *c = (uint32_t *)(sd_target_contents + (i - 1) * MAX_PROG_SIZE);
+        CombinedPtrI c = CombinedPtr(sd_target_contents + (i - 1) * MAX_PROG_SIZE);
         if (*c != 0xFFFFFFFF)
             error("Already programmed");
         ;
@@ -810,7 +809,7 @@ void MIPS16 cmd_flash(void)
         /** enable_interrupts_pico(); */
         j = (MAX_PROG_SIZE >> 2);
         uSec(250000);
-        int *pp = (int *)(sd_target_contents + (i - 1) * MAX_PROG_SIZE);
+        CombinedPtrI pp = CombinedPtr(sd_target_contents + (i - 1) * MAX_PROG_SIZE);
         while (j--)
             if (*pp++ != 0xFFFFFFFF)
             {
@@ -845,7 +844,7 @@ void MIPS16 cmd_flash(void)
                 error("Erase error");
             }
         /** disable_interrupts_pico(); */
-        uint8_t *q = (uint8_t *)(sd_target_contents + (i - 1) * MAX_PROG_SIZE);
+        CombinedPtr q = CombinedPtr(sd_target_contents + (i - 1) * MAX_PROG_SIZE);
         uint8_t *writebuff = (uint8_t *)GetTempMemory(4096);
         if (*q == 0xFF)
         {
@@ -5006,7 +5005,7 @@ void LoadOptions(void)
 
 void ResetOptionsNoSave(void) {
     memset((void *)&Option, 0, sizeof(struct option_s));
-    Option.FlashSize = 4096 * 1024;
+    Option.FlashSize = 16 << 20;
     Option.Magic = MagicKey;
     Option.Height = SCREENHEIGHT;
     Option.Width = SCREENWIDTH;
@@ -5843,7 +5842,9 @@ static void ensure_prog_file_open(void) {
     if (f.obj.fs) return; // already open
     if (f_open(&f, "/tmp/picoMite.prog", FA_READ | FA_WRITE) != FR_OK) {
         if (f_open(&f, "/tmp/picoMite.prog", FA_READ | FA_WRITE | FA_CREATE_ALWAYS) == FR_OK) {
+            MMPrintString("Prepare B:/tmp/picoMite.prog...\r\n");
             SDErraseBlock(0, 16 << 20);
+            MMPrintString("Done\r\n");
         }
     }
 }

@@ -1788,7 +1788,7 @@ void MIPS16 cmd_play(void) {
         g_buff1 = (int16_t *)sbuff1;
         g_buff2 = (int16_t *)sbuff2;
         p = (char *)getFstring(argv[0]);                                    // get the file name
-        WAVInterrupt = nullptr;
+		WAVInterrupt = nullptr;
         WAVcomplete = 0;
         // open the file
         if(strchr((char *)p, '.') == nullptr) strcat((char *)p, ".MOD");
@@ -1806,7 +1806,8 @@ void MIPS16 cmd_play(void) {
             InterruptUsed = true;
 			noloop=1;
         } else noloop=0;
-        i=0;
+
+		i=0;
 		if(filesource[WAV_fnbr]!=FLASHFILE)  fsize = f_size(FileTable[WAV_fnbr].fptr);
 		else fsize = lfs_file_size(&lfs,FileTable[WAV_fnbr].lfsptr);
 		int alreadythere=1;
@@ -1857,7 +1858,7 @@ void MIPS16 cmd_play(void) {
         hxcmod_init( mcontext );
         hxcmod_setcfg(mcontext, modfilesamplerate,1,1 );
 		hxcmod_load( mcontext, (void*)modbuff, fsize );
-		if(!mcontext->mod_loaded)error("Load failed");
+		if(!mcontext->mod_loaded) error("File $ [%] load failed", p, fsize);
 		if(!CurrentLinePtr){
 			MMPrintString("Playing ");MMPrintString((char *)mcontext->song.title);PRet();
 		}

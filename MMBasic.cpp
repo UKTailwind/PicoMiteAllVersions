@@ -265,10 +265,10 @@ void   MIPS16 PrepareProgram(int ErrAbort) {
         FontTable[i] = nullptr;                                        // clear the font table
 
     NbrFuncts = 0;
-    if(CFunctionFlash != nullptr && CFunctionFlash.is_ram()) { // PSRAM or SRAM
+    if(CFunctionFlash.is_ram()) { // PSRAM or SRAM
         FreeMemory((void*)CFunctionFlash.ram());
     }
-    if(CFunctionLibrary != nullptr && CFunctionLibrary.is_ram()) { // PSRAM or SRAM
+    if(CFunctionLibrary.is_ram()) { // PSRAM or SRAM
         FreeMemory((void*)CFunctionLibrary.ram());
     }
     CFunctionFlash = CFunctionLibrary = nullptr;
@@ -315,7 +315,9 @@ void   MIPS16 PrepareProgram(int ErrAbort) {
     hashlabels(ProgMemory, ErrAbort);
 
 #endif
-    if(!ErrAbort) return;
+    if(!ErrAbort) {
+        return;
+    }
 
     for(i = 0; i < MAXSUBFUN && subfun[i] != nullptr; i++) {
         for(j = i + 1; j < MAXSUBFUN && subfun[j] != nullptr; j++) {
