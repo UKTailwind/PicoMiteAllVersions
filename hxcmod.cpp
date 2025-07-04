@@ -222,7 +222,7 @@ static void doFunk(channel * cptr)
 
 				// Note : Directly modify the sample in the mod buffer...
 				// The current Invert Loop effect implementation can't be played from ROM.
-				(cptr->sampdata + (cptr->samppos >> 10)).write_byte(-1 - cptr->sampdata[cptr->samppos >> 10]);
+				(cptr->sampdata + (cptr->samppos >> 10)).write_byte(-1 - (mchar)cptr->sampdata[cptr->samppos >> 10]);
 			}
 		}
 	}
@@ -1502,14 +1502,14 @@ int hxcmod_fillbuffer( modcontext * modctx, msample * outbuffer, unsigned long n
 							r += ( cptr->sampdata[k] *  cptr->volume );
 						}
 #else
-						if( cptr->sampdata!=0 && ( ((j&3)==1) || ((j&3)==2) ) )
+						if( cptr->sampdata !=0 && ( ((j & 3) == 1) || ((j & 3) == 2) ) )
 						{
-							r += ( cptr->sampdata[k] *  cptr->volume );
+							r += ( (mchar)cptr->sampdata[k] *  cptr->volume );
 						}
 
-						if( cptr->sampdata!=0 && ( ((j&3)==0) || ((j&3)==3) ) )
+						if( cptr->sampdata != 0 && ( ((j & 3) == 0) || ((j & 3) == 3) ) )
 						{
-							l += ( cptr->sampdata[k] *  cptr->volume );
+							l += ( (mchar)cptr->sampdata[k] *  cptr->volume );
 						}
 #endif
 
