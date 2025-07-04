@@ -441,7 +441,7 @@ const char DaysInMonth[] = { 0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 }
 static inline CommandToken commandtbl_decode(const unsigned char *p){
     return ((CommandToken)(p[0] & 0x7f)) | ((CommandToken)(p[1] & 0x7f)<<7);
 }
-char banner[64];
+char banner[84];
 void __not_in_flash_func(routinechecks)(void){
     static int when=0;
     if((time_us_64() - mSecTimer * 1000) > 5000){
@@ -4680,12 +4680,12 @@ void MIPS16 SaveProgramToFlash(unsigned char *pm, int msg) {
     memcpy((void*)buf, (void*)tknbuf, STRINGSIZE);                                // save the token buffer because we are going to use it
     FlashWriteInit(PROGRAM_FLASH);
     sd_range_erase(realflashpointer, MAX_PROG_SIZE);
-    j=MAX_PROG_SIZE/4;
+    j = MAX_PROG_SIZE/4;
     CombinedPtrI pp = CombinedPtr(sd_progmemory);
-        while(j--) if(*pp++ != 0xFFFFFFFF) {
-            /** enable_interrupts_pico(); */
-            error("Flash erase problem");
-        }
+    while(j--) if(*pp++ != 0xFFFFFFFF) {
+        /** enable_interrupts_pico(); */
+        error("Flash erase problem");
+    }
     nbr = 0;
     // this is used to count the number of bytes written to flash
     while(*pm) {
@@ -5001,19 +5001,11 @@ unsigned char CombinedPtr::operator*() {
     if (p.f >= XIP_BASE) { // in Flash or in RAM
         return *p.c;
     }
+    if (in_psram()) {
+        return read8psram(p.f);
+    }
     // in file on SD card (less than 256 MB of space on file is supported)
     size_t offset = p.f % CombinedPtrBufSize;
-    /**
-    {
-    static FIL f;
-    if(f_open(&f, "/tmp/tt", FA_WRITE | FA_OPEN_APPEND) != FR_OK) f_open(&f, "/tmp/tt", FA_CREATE_ALWAYS | FA_WRITE | FA_OPEN_APPEND);
-    UINT wr;
-    static char n[32];
-    snprintf(n, 32, "%02X:%04X\n", (uint32_t)offset, (uint32_t)p.f);
-    f_write(&f, n, strlen(n), &wr);
-    f_close(&f);
-    }
-*/
     if (p.f / CombinedPtrBufSize == buff_base_offset / CombinedPtrBufSize) { // we are in buffer
         return buff[offset];
     }
@@ -5026,6 +5018,9 @@ unsigned char CombinedPtr::operator[](std::ptrdiff_t i) {
     FSIZE_t pi = p.f + i;
     if (pi >= XIP_BASE) { // in Flash or in RAM
         return p.c[i];
+    }
+    if (in_psram()) {
+        return read8psram(p.f + i);
     }
     // in file on SD card (less than 256 MB of space on file is supported)
     size_t offset = pi % CombinedPtrBufSize;

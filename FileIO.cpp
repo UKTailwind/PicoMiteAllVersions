@@ -5840,19 +5840,39 @@ void mount_tmp(void) {
 static FIL f = { 0 }; // "/tmp/picoMite.prog"
 static void ensure_prog_file_open(void) {
     if (f.obj.fs) return; // already open
+    init_psram();
     if (f_open(&f, "/tmp/picoMite.prog", FA_READ | FA_WRITE) != FR_OK) {
         if (f_open(&f, "/tmp/picoMite.prog", FA_READ | FA_WRITE | FA_CREATE_ALWAYS) == FR_OK) {
             MMPrintString("Prepare B:/tmp/picoMite.prog...\r\n");
             SDErraseBlock(0, 16 << 20);
             MMPrintString("Done\r\n");
+        } else {
+            MMPrintString("Error: cannot open /tmp/picoMite.prog\r\n");
+            return;
         }
+    }
+    if (psram_size()) {
+        uint32_t v; UINT br;
+        MMPrintString("Prepare Murmulator PSRAM...\r\n");
+        for (int i = 0; i < psram_size(); i += 4) {
+            if (f_read(&f, &v, 4, &br) != FR_OK || br != 4) break;
+            write32psram(i, v);
+        }
+        MMPrintString("Done\r\n");
     }
 }
 UINT SDBlock(FSIZE_t p, void* buf, size_t sz) {
     UINT res = 0;
     ensure_prog_file_open();
-    if (f_lseek(&f, p) != FR_OK) goto err;
-    if (f_read(&f, buf, sz, &res) != FR_OK) goto err;
+    FSIZE_t maxi = p + sz;
+    if (maxi > psram_size()) maxi = psram_size();
+    size_t i = 0;
+    uint8_t* b = (uint8_t*)buf;
+    for (; i < sz && p + i < maxi; ++i) {
+        *b++ = read8psram(p + i);
+    }
+    if (f_lseek(&f, p + i) != FR_OK) goto err;
+    if (f_read(&f, b, sz - i, &res) != FR_OK) goto err;
     return res;
 err:
     memset(buf, 0xFF, sz);
@@ -5861,6 +5881,14 @@ err:
 UINT SDWriteBlock(FSIZE_t p, const void* buf, size_t sz) {
     UINT res = 0;
     ensure_prog_file_open();
+    FSIZE_t maxi = p + sz;
+    if (maxi > psram_size()) maxi = psram_size();
+    uint8_t* b = (uint8_t*)buf;
+    size_t i = 0;
+    for (; i < sz && p + i < maxi; ++i) {
+        uint8_t v = *b++;
+        write8psram(p + i, v);
+    }
     f_lseek(&f, p);
     f_write(&f, buf, sz, &res);
     f_sync(&f);
@@ -5869,10 +5897,16 @@ UINT SDWriteBlock(FSIZE_t p, const void* buf, size_t sz) {
 UINT SDWriteBlockPP(FSIZE_t offset, CombinedPtr p, size_t sz) {
     UINT res = 0;
     ensure_prog_file_open();
+    FSIZE_t maxi = offset + sz;
+    if (maxi > psram_size()) maxi = psram_size();
+    CombinedPtrT<uint32_t> p32 = p;
     f_lseek(&f, offset);
-    for (size_t i = 0; i < sz; ++i) {
-        uint8_t b = *p++;
-        f_write(&f, &b, 1, &res);
+    for (size_t i = 0; i < sz; i += 4) {
+        uint32_t v = *p32++;
+        if (offset + i < maxi) {
+            write32psram(offset + i, v);
+        }
+        if (f_write(&f, &v, 4, &res) != FR_OK || res != 4) return i;
     }
     f_sync(&f);
     return sz;
@@ -5880,9 +5914,14 @@ UINT SDWriteBlockPP(FSIZE_t offset, CombinedPtr p, size_t sz) {
 UINT SDErraseBlock(FSIZE_t offset, size_t sz) {
     UINT res = 0;
     ensure_prog_file_open();
+    FSIZE_t maxi = offset + sz;
+    if (maxi > psram_size()) maxi = psram_size();
     f_lseek(&f, offset);
+    uint32_t b = 0xFFFFFFFF;
     for (size_t i = 0; i < sz; i += 4) {
-        uint32_t b = 0xFFFFFFFF;
+        if (offset + i < maxi) {
+            write32psram(offset + i, b);
+        }
         f_write(&f, &b, 4, &res);
     }
     f_sync(&f);

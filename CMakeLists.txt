@@ -42,6 +42,7 @@ set(CMAKE_CXX_STANDARD 17)
 pico_sdk_init()
 
 add_subdirectory(drivers/vga-nextgen)
+add_subdirectory(drivers/psram)
 
 add_executable(PicoMite
 	PicoMite.cpp
@@ -238,6 +239,7 @@ endif()
 
 target_link_libraries(PicoMite
     vga-nextgen
+	psram
 	pico_stdlib
 	hardware_flash
 	hardware_irq

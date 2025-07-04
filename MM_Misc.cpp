@@ -1900,7 +1900,9 @@ void MIPS16 printoptions(void){
         PRet();
     }
     if(Option.Baudrate != CONSOLE_BAUDRATE) PO2Int("BAUDRATE", Option.Baudrate);
-    if(Option.FlashSize !=2048*1024) PO2Int("FLASH SIZE", Option.FlashSize);
+    //if(Option.FlashSize !=2048*1024)
+    PO2Int("SWAP (FALSH) SIZE", Option.FlashSize);
+    if(psram_size()) PO2Int("PSRAM (GP18-21) SIZE", psram_size());
     if(MAX_PROG_SIZE == Option.LIBRARY_FLASH_SIZE) PO2IntH("LIBRARY_FLASH_SIZE ", Option.LIBRARY_FLASH_SIZE);
     if(Option.Invert == true) PO2Str("CONSOLE", "INVERT");
     if(Option.Invert == 2) PO2Str("CONSOLE", "AUTO");

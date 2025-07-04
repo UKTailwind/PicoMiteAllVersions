@@ -1242,7 +1242,7 @@ int hxcmod_load(modcontext * modctx, CombinedPtr mod_data, int mod_data_size)
 				modctx->sampledata[i] = nullptr;
 
 			// Samples loading
-			for (i = 0, sptr = modctx->song.samples; i <31; i++, sptr++)
+			for (i = 0, sptr = modctx->song.samples; i < 31; i++, sptr++)
 			{
 				if (sptr->length == 0) continue;
 

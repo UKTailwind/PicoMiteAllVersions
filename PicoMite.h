@@ -5,6 +5,7 @@
 
 #include <cstddef>
 #include "ff.h"
+#include "psram_spi.h"
 
 #define CombinedPtrBufSize 512
 
@@ -43,6 +44,7 @@ public:
     unsigned char* raw(int _case = 0) const;
     unsigned char* ram() const { return p.c; };
     bool is_ram() const { return p.f >= 0x11000000; };
+    bool in_psram() const { return p.f < psram_size(); } // Murmulator style PSRAM
     bool on_sd() const { return p.f < XIP_BASE; };
 
     // Оператор приведения
