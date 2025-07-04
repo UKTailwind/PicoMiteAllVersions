@@ -5153,27 +5153,14 @@ void FlashWriteInit(int region)
         realflashpointer = (uint32_t)(PROGSTART - MAX_PROG_SIZE);  //i.e the last slot  
     else 
         realflashpointer = (uint32_t)PROGSTART - MAX_PROG_SIZE*(MAXFLASHSLOTS-region+1);
-    /** disable_interrupts_pico(); */
-}
-void FlashWriteBlock(void)
-{
-    int i;
-    uint32_t address = realflashpointer - 256;
-    //    if(address % 32)error("Memory write address");
-    sd_range_program((const uint32_t)address, (const uint8_t *)&MemWord.i64[0], 256);
-    for (i = 0; i < 64; i++)
-        MemWord.i32[i] = 0xFFFFFFFF;
 }
 void FlashWriteByte(unsigned char b)
 {
-    realflashpointer++;
+    CombinedPtr c = realflashpointer++;
     MemWord.i8[mi8p] = b;
     mi8p++;
     mi8p %= 256;
-    if (mi8p == 0)
-    {
-        FlashWriteBlock();
-    }
+    c.write_byte(b);
 }
 void FlashWriteWord(unsigned int i)
 {
@@ -5184,7 +5171,7 @@ void FlashWriteWord(unsigned int i)
 }
 // Set the pointer to a specific address
 void FlashSetAddress(int address) {
-	 realflashpointer=(uint32_t)PROGSTART+address;
+	realflashpointer = (uint32_t)PROGSTART + address;
 }
 
 void FlashWriteAlignWord(void)
@@ -5195,7 +5182,6 @@ void FlashWriteAlignWord(void)
     }
     FlashWriteWord(0xFFFFFFFF);
 }
-
 
 void FlashWriteAlign(void)
 {

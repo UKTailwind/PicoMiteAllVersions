@@ -277,6 +277,9 @@ if(COMPILE STREQUAL "WEB" OR COMPILE STREQUAL "WEBRP2350" )
 	pico_cyw43_arch_lwip_poll
 	)
 endif()
+
 if (m1p2)
     pico_set_linker_script(${PROJECT_NAME} "${CMAKE_SOURCE_DIR}/memmap.ld")
 endif ()
+
+target_link_options(${PROJECT_NAME} PRIVATE -Xlinker --print-memory-usage --data-sections)

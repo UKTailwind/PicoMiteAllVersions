@@ -2881,7 +2881,8 @@ void cmd_triangle(void) {                                           // thanks to
  * @cond
  * The following section will be excluded from the documentation.
  */
-char getnextuncompressednibble(char **s, int reset){
+#ifndef PICOMITEVGA
+static char getnextuncompressednibble(char **s, int reset){
     static int toggle=0;
     if(reset){
         toggle=reset-1;
@@ -2898,6 +2899,7 @@ char getnextuncompressednibble(char **s, int reset){
     }
 
 }
+#endif
 static inline char getnextnibble(CombinedPtr* fc, int reset){
     static uint8_t available;
     static char out;
@@ -2912,7 +2914,7 @@ static inline char getnextnibble(CombinedPtr* fc, int reset){
     if(!reset)available--;
     return out;
 }
-static void docompressed(CombinedPtr fc,int x1, int y1, int w, int h, int8_t blank){
+static void docompressed(CombinedPtr fc, int x1, int y1, int w, int h, int8_t blank){
 #ifndef PICOMITEVGA
     if(!WriteBuf){ //direct to screen
         if(blank==-1){
@@ -3224,8 +3226,8 @@ int blitother(void){
         x1 = (int)getinteger(argv[2]);
         y1 = (int)getinteger(argv[4]);
         CombinedPtrI size = fc;
-        w = (size[0] & 0x7FFF);
-        h = (size[1] & 0x7FFF);
+        w = size[0];
+        h = size[1];
         if(w > HRes || h > VRes) error("Invalid dimensions, w=%, h=%", w, h);
         fc += 4;
         if(argc == 7) blank = getint(argv[6], -1, 15);

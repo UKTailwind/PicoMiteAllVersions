@@ -245,7 +245,6 @@ struct option_s {
 extern struct option_s Option;
 extern int FlashLoad;
 extern void ResetOptions(bool startup);
-extern void FlashWriteBlock(void);
 extern void FlashWriteWord(unsigned int i);
 extern void FlashWriteByte(unsigned char b);
 extern void FlashWriteAlign(void);

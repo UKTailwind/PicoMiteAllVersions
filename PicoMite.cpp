@@ -5063,6 +5063,10 @@ long long CombinedPtr::as_i64a() {
 }
 
 CombinedPtr& CombinedPtr::write_byte(uint8_t v) {
+    if (is_rom()) {
+        error("Attempt to write_byte % to ROM [%]", v, p.f);
+        return *this;
+    }
     if (is_ram()) {
         *p.c = v;
         return *this;
@@ -5082,7 +5086,6 @@ CombinedPtr& CombinedPtr::write_byte(uint8_t v) {
         buff[offset] = v;
         buff_dirty = true; // Помечаем буфер как изменённый
     }
-    error("!!! >> write_byte: %->[%]", v, p.f);
     return *this;
 }
 bool CombinedPtr::buff_dirty = false;

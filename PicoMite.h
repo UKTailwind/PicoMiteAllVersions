@@ -44,6 +44,7 @@ public:
     // TODO: assert for case not in RAM ?
     unsigned char* raw(int _case = 0) const;
     unsigned char* ram() const { return p.c; };
+    bool is_rom() const { return p.f >= XIP_BASE && p.f < 0x11000000; };
     bool is_ram() const { return p.f >= 0x11000000; };
     bool in_psram() const { return p.f < psram_size(); } // Murmulator style PSRAM
     bool on_sd() const { return p.f < XIP_BASE; };
@@ -123,6 +124,7 @@ public:
     CombinedPtrT(const CombinedPtr& other) : p(other) {}
     CombinedPtrT(std::nullptr_t) : p(nullptr) {}
 
+    T* ram() { return reinterpret_cast<T*>(p.ram()); }
     T* raw(int _case) { return reinterpret_cast<T*>(p.raw(_case)); }
 
     CombinedPtrT& operator=(const CombinedPtr& other) { p = other; return *this; }
