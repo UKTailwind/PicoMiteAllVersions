@@ -4680,11 +4680,13 @@ void MIPS16 SaveProgramToFlash(unsigned char *pm, int msg) {
     memcpy((void*)buf, (void*)tknbuf, STRINGSIZE);                                // save the token buffer because we are going to use it
     FlashWriteInit(PROGRAM_FLASH);
     sd_range_erase(realflashpointer, MAX_PROG_SIZE);
-    j = MAX_PROG_SIZE/4;
+    j = MAX_PROG_SIZE / 4;
     CombinedPtrI pp = CombinedPtr(sd_progmemory);
-    while(j--) if(*pp++ != 0xFFFFFFFF) {
-        /** enable_interrupts_pico(); */
-        error("Flash erase problem");
+    while(j--) {
+        uint32_t t = *pp++;
+        if (t != 0xFFFFFFFF) {
+            error("Flash erase problem = % [%]", t, MAX_PROG_SIZE - (j*4) - 4);
+        }
     }
     nbr = 0;
     // this is used to count the number of bytes written to flash
@@ -5001,13 +5003,13 @@ unsigned char CombinedPtr::operator*() {
     if (p.f >= XIP_BASE) { // in Flash or in RAM
         return *p.c;
     }
-    if (in_psram()) {
-        return read8psram(p.f);
-    }
     // in file on SD card (less than 256 MB of space on file is supported)
     size_t offset = p.f % CombinedPtrBufSize;
     if (p.f / CombinedPtrBufSize == buff_base_offset / CombinedPtrBufSize) { // we are in buffer
         return buff[offset];
+    }
+    if (in_psram()) {
+        return read8psram(p.f);
     }
     buff_base_offset = p.f & ~(FSIZE_t)(CombinedPtrBufSize - 1);
     SDBlock(buff_base_offset, buff, CombinedPtrBufSize);
@@ -5019,13 +5021,13 @@ unsigned char CombinedPtr::operator[](std::ptrdiff_t i) {
     if (pi >= XIP_BASE) { // in Flash or in RAM
         return p.c[i];
     }
-    if (in_psram()) {
-        return read8psram(p.f + i);
-    }
     // in file on SD card (less than 256 MB of space on file is supported)
     size_t offset = pi % CombinedPtrBufSize;
     if (pi / CombinedPtrBufSize == buff_base_offset / CombinedPtrBufSize) { // we are in buffer
         return buff[offset];
+    }
+    if (in_psram()) {
+        return read8psram(p.f + i);
     }
     buff_base_offset = pi & ~(FSIZE_t)(CombinedPtrBufSize - 1);
     SDBlock(buff_base_offset, buff, CombinedPtrBufSize);
@@ -5034,6 +5036,7 @@ unsigned char CombinedPtr::operator[](std::ptrdiff_t i) {
 
 void sd_range_erase(FSIZE_t offset, FSIZE_t size) {
     CombinedPtr::flush();
+    CombinedPtr::init();
     SDErraseBlock(offset, size);
 }
 void sd_range_program(FSIZE_t offset, CombinedPtr p, FSIZE_t size) {

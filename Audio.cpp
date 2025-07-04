@@ -1817,7 +1817,6 @@ void MIPS16 cmd_play(void) {
 		if(!PSRAMsize){
 #endif
 			if(RoundUpK4(fsize) > 1024 * Option.modbuffsize) error("File too large for modbuffer");
-			modbuff = XIP_BASE + (1024u << 20);
 			CombinedPtr check = modbuff;
 			while(!FileEOF(WAV_fnbr)) { 
 				if(*check++ != FileGetChar(WAV_fnbr)){

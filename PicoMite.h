@@ -26,6 +26,7 @@ class CombinedPtr {
     static bool buff_dirty; // флаг, что буфер изменён
 public:
     static void flush();
+    static void init() { buff_base_offset = -1; }
 
     // Конструкторы
     CombinedPtr() : p{nullptr} {}

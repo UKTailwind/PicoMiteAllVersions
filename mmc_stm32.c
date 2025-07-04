@@ -1827,6 +1827,11 @@ char *pinsearch(int pin){
 	else if(pin==PINMAP[PinDef[Option.VGA_BLUE].GPno+5])strcpy(buff,"VGA RED H");
 	else if(pin==PINMAP[PinDef[Option.VGA_BLUE].GPno+6])strcpy(buff,"VGA HSYNC");
 	else if(pin==PINMAP[PinDef[Option.VGA_BLUE].GPno+7])strcpy(buff,"VGA VSYNC");
+	// TODO: specific check
+	else if(pin==24)strcpy(buff,"M PSRAM CS");
+	else if(pin==PINMAP[PinDef[24].GPno+1])strcpy(buff,"M PSRAM SCK");
+	else if(pin==PINMAP[PinDef[24].GPno+2])strcpy(buff,"M PSRAM MOSI");
+	else if(pin==PINMAP[PinDef[24].GPno+3])strcpy(buff,"M PSRAM MISO");
 #endif
 #endif
 #ifdef rp2350

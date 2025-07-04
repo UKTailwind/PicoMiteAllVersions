@@ -161,7 +161,14 @@ uint8_t *buff320= nullptr;
 #endif
 #ifdef PICOMITEVGA
 #ifndef HDMI
-void VGArecovery(int pin){
+void VGArecovery(int pin) {
+        // TODO: separate place
+        // PSRAM_PIN_CS 18
+        ExtCurrentConfig[24]=EXT_BOOT_RESERVED;
+        ExtCurrentConfig[PINMAP[PinDef[24].GPno+1]]=EXT_BOOT_RESERVED;
+        ExtCurrentConfig[PINMAP[PinDef[24].GPno+2]]=EXT_BOOT_RESERVED;
+        ExtCurrentConfig[PINMAP[PinDef[24].GPno+3]]=EXT_BOOT_RESERVED;
+
         ExtCurrentConfig[Option.VGA_BLUE]=EXT_BOOT_RESERVED;
         ExtCurrentConfig[PINMAP[PinDef[Option.VGA_BLUE].GPno+1]]=EXT_BOOT_RESERVED;
         ExtCurrentConfig[PINMAP[PinDef[Option.VGA_BLUE].GPno+2]]=EXT_BOOT_RESERVED;
@@ -3792,6 +3799,12 @@ tp = checkstring(cmdline, (unsigned char *)"HEARTBEAT");
         if(!(code=codecheck(argv[0])))argv[0]+=2;
         pin1 = getinteger(argv[0]);
         if(!code)pin1=codemap(pin1);
+        // TODO: separate place
+        // PSRAM_PIN_CS 18
+        ExtCurrentConfig[24]=EXT_BOOT_RESERVED;
+        ExtCurrentConfig[PINMAP[PinDef[24].GPno+1]]=EXT_BOOT_RESERVED;
+        ExtCurrentConfig[PINMAP[PinDef[24].GPno+2]]=EXT_BOOT_RESERVED;
+        ExtCurrentConfig[PINMAP[PinDef[24].GPno+3]]=EXT_BOOT_RESERVED;
         // now de-allocate the existing VGA pins temporarily 
         ExtCurrentConfig[Option.VGA_BLUE]=EXT_NOT_CONFIG;
         ExtCurrentConfig[PINMAP[PinDef[Option.VGA_BLUE].GPno+1]]=EXT_NOT_CONFIG;
