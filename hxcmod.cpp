@@ -1551,13 +1551,13 @@ int hxcmod_fillbuffer( modcontext * modctx, msample * outbuffer, unsigned long n
 #ifdef HXCMOD_MONO_OUTPUT
                             if( seffectptr->sampdata!=0 )
                             {
-                                r += ( seffectptr->sampdata[k] *  seffectptr->volume );
+                                r += ( (mchar)seffectptr->sampdata[k] *  seffectptr->volume );
                             }
 #else
                             if( seffectptr->sampdata!=0)
                             {
-                                r += ( seffectptr->sampdata[k] *  seffectptr->volume );
-                                l += ( seffectptr->sampdata[k] *  seffectptr->volume );
+                                r += ( (mchar)seffectptr->sampdata[k] *  seffectptr->volume );
+                                l += ( (mchar)seffectptr->sampdata[k] *  seffectptr->volume );
                             }
 #endif
                         }
