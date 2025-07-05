@@ -17,7 +17,7 @@ cmake_minimum_required(VERSION 3.13)
 set(PICO_BOARD pico2 CACHE STRING "Board type")
 
 set(COMPILE VGARP2350)
-#set(m1p2 ON)
+set(m1p2 ON)
 
 if (COMPILE STREQUAL "HDMI" OR COMPILE STREQUAL "WEBRP2350" OR COMPILE STREQUAL "HDMIUSB"  OR COMPILE STREQUAL "VGARP2350"  OR COMPILE STREQUAL "VGAUSBRP2350"  OR COMPILE STREQUAL "PICORP2350"  OR COMPILE STREQUAL "PICOUSBRP2350" )
 	set(PICO_PLATFORM rp2350)
@@ -232,8 +232,7 @@ target_compile_options(PicoMite PRIVATE -DUSBKEYBOARD
 endif()
 #special case WEB RP2350 gets the GUI controls
 if(COMPILE STREQUAL "WEBRP2350")
-	target_compile_options(PicoMite PRIVATE -DGUICONTROLS
-											)
+	target_compile_options(PicoMite PRIVATE -DGUICONTROLS)
 endif()
 
 
@@ -254,32 +253,27 @@ target_link_libraries(PicoMite
 
 if(COMPILE STREQUAL "VGAUSB" OR COMPILE STREQUAL "PICOUSB" OR COMPILE STREQUAL "HDMIUSB" OR COMPILE STREQUAL "PICOUSBRP2350" OR COMPILE STREQUAL "VGAUSBRP2350")
 	target_link_libraries(PicoMite
-	tinyusb_host 
-	tinyusb_board
-	pico_multicore
+		tinyusb_host 
+		tinyusb_board
+		pico_multicore
 	)
 endif()
 
 if(COMPILE STREQUAL "VGA" OR COMPILE STREQUAL "PICO" OR COMPILE STREQUAL "HDMI" OR COMPILE STREQUAL "VGARP2350" OR COMPILE STREQUAL "PICORP2350")
-	target_link_libraries(PicoMite
-	pico_multicore
-	)
+	target_link_libraries(PicoMite	pico_multicore)
 endif()
 
 if(COMPILE STREQUAL "VGARP2350" OR COMPILE STREQUAL "WEBRP2350" OR COMPILE STREQUAL "PICORP2350" OR COMPILE STREQUAL "HDMI" OR COMPILE STREQUAL "HDMIUSB" OR COMPILE STREQUAL "VGAUSBRP2350" OR COMPILE STREQUAL "PICOUSBRP2350")
-	target_link_libraries(PicoMite
-	pico_rand
-	)
+	target_link_libraries(PicoMite pico_rand)
 endif()
 
 if(COMPILE STREQUAL "WEB" OR COMPILE STREQUAL "WEBRP2350" )
-	target_link_libraries(PicoMite
-	pico_cyw43_arch_lwip_poll
-	)
+	target_link_libraries(PicoMite	pico_cyw43_arch_lwip_poll)
 endif()
 
 if (m1p2)
     pico_set_linker_script(${PROJECT_NAME} "${CMAKE_SOURCE_DIR}/memmap.ld")
+	target_compile_options(PicoMite PRIVATE -DM1P2)
 endif ()
 
 target_link_options(${PROJECT_NAME} PRIVATE -Xlinker --print-memory-usage --data-sections)
