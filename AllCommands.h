@@ -54,6 +54,7 @@ void cmd_read(void);
 void cmd_restore(void);
 void cmd_return(void);
 void cmd_run(void);
+void cmd_fm(void);
 #ifdef M1P2
 void cmd_m1p2(void);
 #endif
@@ -406,6 +407,7 @@ void fun_map(void);
 	{ (unsigned char *)"Restore",            T_CMD,				0, cmd_restore	},
 	{ (unsigned char *)"Return",		T_CMD,				0, cmd_return,	},
 	{ (unsigned char *)"Run",		T_CMD,				0, cmd_run	},
+	{ (unsigned char *)"Fm",		T_CMD,				0, cmd_fm	},
 #ifdef M1P2
 	{ (unsigned char *)"m1p2",		T_CMD,				0, cmd_m1p2	},
 #endif

@@ -1920,7 +1920,7 @@ void MIPS16 printoptions(void){
     if(Option.PWM == true) PO2Str("POWER PWM", "ON");
     if(Option.Listcase != CONFIG_TITLE) PO2Str("CASE", CaseList[(int)Option.Listcase]);
     if(Option.Tab != 2) PO2Int("TAB", Option.Tab);
-    if(Option.DefaultFC !=WHITE ||Option.DefaultBC !=BLACK){
+    if(Option.DefaultFC !=WHITE || Option.DefaultBC !=BLACK){
         PO("DEFAULT COLOURS");
             if(Option.DefaultFC==WHITE)MMPrintString("WHITE, ");
             else if(Option.DefaultFC==YELLOW)MMPrintString("YELLOW,");

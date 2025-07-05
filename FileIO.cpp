@@ -801,13 +801,13 @@ void MIPS16 cmd_flash(void)
         int fnbr = FindFreeFileNbr();
         if (!InitSDCard()) return;
         char *pp = (char *)getFstring(argv[2]);
-        if (!BasicFileOpen((char *)pp, fnbr, FA_READ)) return;
+        if (!BasicFileOpen(pp, fnbr, FA_READ)) return;
 		if(filesource[fnbr]!=FLASHFILE) fsize = f_size(FileTable[fnbr].fptr);
 		else fsize = lfs_file_size(&lfs, FileTable[fnbr].lfsptr);
         if(fsize>MAX_PROG_SIZE) error("File size % cannot exceed %", fsize, MAX_PROG_SIZE);
         FlashWriteInit(i);
         sd_range_erase(realflashpointer, MAX_PROG_SIZE);
-        int j=MAX_PROG_SIZE/4;
+        int j = MAX_PROG_SIZE / 4;
         while(j--) if(*c++ != 0xFFFFFFFF) {
             /** enable_interrupts_pico(); */
             error("Flash erase problem");
@@ -856,7 +856,8 @@ void MIPS16 cmd_flash(void)
     {
         if (CurrentLinePtr)
             error("Invalid in program");
-        int j = (Option.PROG_FLASH_SIZE >> 2), i = getint(p, 1, MAXFLASHSLOTS);
+        int j = (Option.PROG_FLASH_SIZE >> 2);
+        int i = getint(p, 1, MAXFLASHSLOTS);
         if(Option.LIBRARY_FLASH_SIZE==MAX_PROG_SIZE && i==MAXFLASHSLOTS) error("Library is using Slot % ",MAXFLASHSLOTS);
         /** disable_interrupts_pico(); */
         sd_range_erase(PROGSTART, MAX_PROG_SIZE);
@@ -5224,6 +5225,7 @@ void FlashWriteClose(void)
     {
         FlashWriteByte(0xff);
     }
+    CombinedPtr::flush();
     /** enable_interrupts_pico(); */
 }
 /*  @endcond */

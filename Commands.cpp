@@ -674,27 +674,29 @@ void MIPS16 ListProgram(CombinedPtr p, int all) {
 	}
 }
 
-void MIPS16 do_run(CombinedPtr cmdline, bool CMM2mode) {
+static void MIPS16 do_run(CombinedPtr cmdline, bool CMM2mode, unsigned char* fm) {
     // RUN [ filename$ ] [, cmd_args$ ]
-    unsigned char *filename = (unsigned char *)"", *cmd_args = (unsigned char *)"";
-	CombinedPtr cmdbuf=(uint8_t*)GetMemory(256);
-	memcpy(cmdbuf.raw(),cmdline,STRINGSIZE);
-    getargs(&cmdbuf, 3, (unsigned char *)",");
-	switch (argc) {
-        case 0:
-            break;
-        case 1:
-            filename = getCstring(argv[0]);
-            break;
-        case 2:
-            cmd_args = getCstring(argv[1]);
-            break;
-        default:
-            filename = getCstring(argv[0]);
-            if(*argv[2])cmd_args = getCstring(argv[2]);
-            break;
-    }
-
+    unsigned char *filename = fm ? fm : (unsigned char *)"";
+	unsigned char *cmd_args = (unsigned char *)"";
+	if (!fm) {
+		CombinedPtr cmdbuf=(uint8_t*)GetMemory(256);
+		memcpy(cmdbuf.raw(),cmdline,STRINGSIZE);
+		getargs(&cmdbuf, 3, (unsigned char *)",");
+		switch (argc) {
+			case 0:
+				break;
+			case 1:
+				filename = getCstring(argv[0]);
+				break;
+			case 2:
+				cmd_args = getCstring(argv[1]);
+				break;
+			default:
+				filename = getCstring(argv[0]);
+				if(*argv[2])cmd_args = getCstring(argv[2]);
+				break;
+		}
+	}
     // The memory allocated by getCstring() is not preserved across
     // a call to FileLoadProgram() so we need to cache 'filename' and
     // 'cmd_args' on the stack.
@@ -1088,12 +1090,16 @@ void __not_in_flash_func(cmd_m1p2)(void) {
 }
 #endif
 
+void MIPS16 cmd_fm(void) {
+	do_run(cmdline, false, (uint8_t*)"a:/fm.bas");
+}
+
 void MIPS16 cmd_run(void){
-	do_run(cmdline,false);
+	do_run(cmdline, false, nullptr);
 }
 
 void MIPS16 cmd_RunCMM2(void){
-	do_run(cmdline,true);
+	do_run(cmdline, true, nullptr);
 }
 
 void  MIPS16 cmd_continue(void) {

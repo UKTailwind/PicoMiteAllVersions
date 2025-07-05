@@ -2901,18 +2901,19 @@ static char getnextuncompressednibble(char **s, int reset){
 
 }
 #endif
-static inline char getnextnibble(CombinedPtr* fc, int reset){
-    static uint8_t available;
-    static char out;
+static inline uint8_t getnextnibble(CombinedPtr* fc, int reset){
+    static uint8_t available = 0;
+    static uint8_t out = 0;
     if(reset){
-        available=0;
+        available = 0;
     }
-    if(available==0){
-        available=**fc & 0xF; //number of identical pixels
-        out=(**fc)>>4;
+    if(available == 0) {
+        uint8_t v = **fc;
+        available = v & 0xF; //number of identical pixels
+        out = v >> 4;
         (*fc)++;    
     } 
-    if(!reset)available--;
+    if(!reset) available--;
     return out;
 }
 static void docompressed(CombinedPtr fc, int x1, int y1, int w, int h, int8_t blank){
@@ -3003,53 +3004,54 @@ static void docompressed(CombinedPtr fc, int x1, int y1, int w, int h, int8_t bl
         }
     } else 
 #endif
-    if(x1 %2 == 0 && w % 2 == 0 && blank==-1){
-        char c, *to;
-        c=getnextnibble(&fc,1); //reset the decoder
-        for(int y=y1;y<y1+h;y++){
-            to=(char *)WriteBuf+y*(HRes>>1)+(x1>>1);
-            for(int x=x1;x<x1+w;x+=2){
-                c=getnextnibble(&fc,0);
-                c|=(getnextnibble(&fc,0)<<4);
-                if(y<0 || y>=VRes)continue;
-                if(x>=0 && x<HRes)*to=c;
+    uint8_t c, *to;
+    int HRes2 = HRes >> 1;
+    if((x1 & 1) == 0 && (w & 1) == 0 && blank == -1){
+        c = getnextnibble(&fc, 1); //reset the decoder
+        for(int y = y1; y < y1 + h; ++y) {
+            to = WriteBuf + y * HRes2 + (x1 >> 1);
+            for(int x = x1; x < x1 + w; x += 2){
+                c = getnextnibble(&fc, 0);
+                c |= (getnextnibble(&fc, 0) << 4);
+                if (y < 0 || y >= VRes) continue;
+                if (x >= 0 && x < HRes) *to = c;
                 to++;
             }               
         }
     } else { 
-        int otoggle=0,itoggle=0; //input will always start on a byte boundary
-        char c,*to;
-        c=getnextnibble(&fc,1); //reset the decoder
-        for(int y=y1;y<y1+h;y++){ //loop though all of the output lines
-            to=(char *)WriteBuf+y*(HRes>>1)+(x1>>1); //get the byte that will start the output
-            if(x1 & 1)otoggle=1; // if x1 is odd then we will start on the high nibble
-            else otoggle=0;
-            for(int x=x1;x<x1+w;x++){
-                if(itoggle==0){
-                    c=getnextnibble(&fc,0);
-                    itoggle=1;
+        int otoggle = 0;
+        int itoggle = 0; //input will always start on a byte boundary
+        c = getnextnibble(&fc, 1); //reset the decoder
+        for(int y = y1; y < y1 + h; ++y) { //loop though all of the output lines
+            to = WriteBuf+y * HRes2 + (x1 >> 1); //get the byte that will start the output
+            if (x1 & 1) otoggle=1; // if x1 is odd then we will start on the high nibble
+            else otoggle = 0;
+            for(int x = x1; x < x1 + w; ++x) {
+                if (itoggle == 0){
+                    c = getnextnibble(&fc, 0);
+                    itoggle = 1;
                 } else {
-                    c=getnextnibble(&fc,0);
-                    itoggle=0;
+                    c = getnextnibble(&fc, 0);
+                    itoggle = 0;
                 }
-                if(y<0 || y>=VRes)continue;
-                if(otoggle==0){
-                    if(x>=0 && x<HRes){
-                        if(c!=blank){
+                if (y < 0 || y >= VRes) continue;
+                if (otoggle == 0) {
+                    if(x >= 0 && x < HRes){
+                        if(c != blank){
                             *to &= 0xF0;
                             *to |=c;
                         }
                     }
                 } else {
                     if(x>=0 && x<HRes){
-                        if(c!=blank){
-                            *to &=0x0f;
+                        if(c != blank){
+                            *to &= 0x0f;
                             *to |= (c<<4);
                         }
                     }
                     to++;
                 }
-                otoggle^=1;
+                otoggle ^= 1;
             }
         }
     }
