@@ -732,7 +732,7 @@ static __inline__ __attribute__((always_inline)) drmp3_int32 drmp3_clip_int16_ar
 #define DRMP3_ASSERT(expression) assert(expression)
 #endif
 #ifndef DRMP3_COPY_MEMORY
-#define DRMP3_COPY_MEMORY(dst, src, sz) memcpy((dst), (src), (sz))
+#define DRMP3_COPY_MEMORY(dst, src, sz) memcpy((void*)(dst), (src), (sz))
 #endif
 #ifndef DRMP3_MOVE_MEMORY
 #define DRMP3_MOVE_MEMORY(dst, src, sz) memmove((dst), (src), (sz))

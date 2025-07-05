@@ -33,7 +33,9 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 void EditInputLine(void);
 
 // General definitions used by other modules
-extern unsigned char *StartEditPoint;
+#ifdef __cplusplus
+extern CombinedPtr StartEditPoint;
+#endif
 extern int StartEditChar;
 extern unsigned char *EdBuff;                      // the buffer used for editing the text
 extern int EdBuffSize;                    // size of the buffer in characters

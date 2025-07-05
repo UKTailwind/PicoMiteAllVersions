@@ -1,0 +1,57 @@
+; SPI, customized as the PSRAM chips like to implement it:
+; - Data is always written first, then optionally read
+; Depending on PCB layout, introduce fudge factor:
+; - Reads in high speed mode need an extra clock cycle to synchronize
+; - Reads are done on the falling edge of SCK when > 83MHz
+
+.program spi_psram_fudge
+.side_set 2                        ; sideset bit 1 is SCK, bit 0 is CS
+begin:
+    out x, 8            side 0b01  ; x = number of bits to output. CS deasserted
+    out y, 8            side 0b01  ; y = number of bits to input
+    jmp x--, writeloop  side 0b01  ; Pre-decement x by 1 so loop has correct number of iterations
+writeloop:
+    out pins, 1         side 0b00  ; Write value on pin, lower clock. CS asserted
+    jmp x--, writeloop  side 0b10  ; Raise clock: this is when PSRAM reads the value. Loop if we have more to write
+    jmp !y, begin       side 0b00  ; If this is a write-only operation, jump back to beginning
+    nop                 side 0b10  ; Fudge factor of extra clock cycle; the PSRAM needs 1 extra for output to start appearing
+    jmp readloop_mid    side 0b00  ; Jump to middle of readloop to decrement y and get right clock phase
+readloop:
+    in pins, 1          side 0b00  ; Read value on pin, lower clock. Datasheet says to read on falling edge > 83MHz
+readloop_mid:
+    jmp y--, readloop   side 0b10  ; Raise clock. Loop if we have more to read
+
+.program spi_psram
+.side_set 2                        ; sideset bit 1 is SCK, bit 0 is CS
+begin:
+    out x, 8            side 0b01  ; x = number of bits to output. CS deasserted
+    out y, 8            side 0b01  ; y = number of bits to input
+    jmp x--, writeloop  side 0b01  ; Pre-decement x by 1 so loop has correct number of iterations
+writeloop:
+    out pins, 1         side 0b00  ; Write value on pin, lower clock. CS asserted
+    jmp x--, writeloop  side 0b10  ; Raise clock: this is when PSRAM reads the value. Loop if we have more to write
+    jmp !y, begin       side 0b00  ; If this is a write-only operation, jump back to beginning
+    jmp readloop_mid    side 0b10  ; Jump to middle of readloop to decrement y and get right clock phase
+readloop:
+    in pins, 1          side 0b10  ; Read value on pin, raise clock.
+readloop_mid:
+    jmp y--, readloop   side 0b00  ; Lower clock. Loop if we have more to read
+
+
+.program qspi_psram
+.side_set 2
+begin:
+    out x, 8            side 0b01  ; x = number of nibbles to output. CS deasserted
+    out y, 8            side 0b01  ; y = number of nibbles to input
+    jmp x--, writeloop  side 0b01  ; Pre-decement x by 1 so loop has correct number of iterations
+writeloop:
+    out pins, 4         side 0b00  ; Write value on pins, lower clock. CS asserted
+    jmp x--, writeloop  side 0b10  ; Raise clock: this is when PSRAM reads the value. Loop if we have more to write
+    jmp !y, begin       side 0b00  ; If this is a write-only operation, jump back to beginning
+    set pindirs 0       side 0b10  ; Fudge factor of extra clock cycle; the PSRAM needs 1 extra for output to start appearing
+    nop    side 0b00  ; Jump to middle of readloop to decrement y and get right clock phase
+readloop:
+    in pins, 4          side 0b10  ; Read value on s, lower clock. Datasheet says to read on falling edge > 83MHz
+readloop_mid:
+    jmp y--, readloop   side 0b00  ; Raise clock. Loop if we have more to read
+    set pindirs 0xF     side 0b01

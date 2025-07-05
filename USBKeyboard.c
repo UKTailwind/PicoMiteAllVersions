@@ -2117,7 +2117,7 @@ void cmd_gamepad(void){
 		getargs(&tp,5,(unsigned char *)",");
 		if(!(argc==3 || argc==5))error("Syntax");
 		n=getint(argv[0],1,4);
-		nunInterruptc[n] = (char *)GetIntAddress(argv[2]);					// get the interrupt location
+		nunInterruptc[n] = GetIntAddress(argv[2]);					// get the interrupt location
 		InterruptUsed = true;
 		nunstruct[n].x1=0b1111111111111111;
 		if(argc==5)nunstruct[n].x1=getint(argv[4],0,0b1111111111111111);
@@ -2193,7 +2193,7 @@ void cmd_mouse(void){
 		getargs(&tp,3,(unsigned char *)",");
 		if(!(argc==3))error("Syntax");
 		n=getint(argv[0],1,4);
-		nunInterruptc[n] = (char *)GetIntAddress(argv[2]);					// get the interrupt location
+		nunInterruptc[n] = GetIntAddress(argv[2]);					// get the interrupt location
 		InterruptUsed = true;
 		return;
 	} else if((tp = checkstring(cmdline, (unsigned char *)"SET"))){

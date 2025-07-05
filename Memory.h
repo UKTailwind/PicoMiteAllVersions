@@ -50,27 +50,30 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #ifndef MEMORY_HEADER
 #define MEMORY_HEADER
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 extern unsigned char *strtmp[];                                       // used to track temporary string space on the heap
 extern int TempMemoryTop;                                           // this is the last index used for allocating temp memory
 extern bool g_TempMemoryIsChanged;						                // used to prevent unnecessary scanning of strtmp[]
 typedef enum _M_Req {M_PROG, M_VAR, M_LIMITED} M_Req;
 
 extern void m_alloc(int type);
-extern void *GetMemory(int  msize);
+extern char *GetMemory(int  msize);
 extern void *GetSystemMemory(int  msize);
-extern void *GetTempMemory(int NbrBytes);
+extern char *GetTempMemory(int NbrBytes);
 extern void *GetTempStrMemory(void);
 extern void ClearTempMemory(void);
 extern void ClearSpecificTempMemory(void *addr);
 extern void TestStackOverflow(void);
-extern void FreeMemory(unsigned char *addr);
+extern void FreeMemory(void*);
 extern void InitHeap(bool all);
 extern unsigned char *HeapBottom(void);
 extern int FreeSpaceOnHeap(void);
 extern int LargestContiguousHeap(void);
 extern unsigned char *DOS_ProgMemory;
 extern void *ReAllocMemory(void *addr, size_t msize);
-extern void FreeMemorySafe(void **addr);
 extern void *GetAlignedMemory(int size);
 extern void FreeMemorySafe(void **addr);
 extern int MemSize(void *addr);
@@ -106,6 +109,11 @@ struct s_ctrl {
 };
 
 extern struct s_ctrl *Ctrl;             // list of the controls
+
+#ifdef __cplusplus
+}
+#endif
+
 #define PAGESIZE        256                                         // the allocation granuality
 #define PAGEBITS        2                                           // nbr of status bits per page of allocated memory, must be a power of 2
 

@@ -57,6 +57,7 @@ typedef unsigned long   mulong;
 //
 // MOD file structures
 //
+#include "PicoMite.h"
 
 #pragma pack(1)
 
@@ -92,25 +93,25 @@ typedef struct {
 // HxCMod Internal structures
 //
 typedef struct {
-	mchar * sampdata;
+	CombinedPtr sampdata;
 	mulong  length;
 	mulong  reppnt;
 	mulong  replen;
 	muint   sampnum;
 
-	mchar * nxt_sampdata;
+	CombinedPtr nxt_sampdata;
 	mulong  nxt_length;
 	mulong  nxt_reppnt;
 	mulong  nxt_replen;
 	muint   update_nxt_repeat;
 
-	mchar * dly_sampdata;
+	CombinedPtr dly_sampdata;
 	mulong  dly_length;
 	mulong  dly_reppnt;
 	mulong  dly_replen;
 	muint   note_delay;
 
-	mchar * lst_sampdata;
+	CombinedPtr lst_sampdata;
 	mulong  lst_length;
 	mulong  lst_reppnt;
 	mulong  lst_replen;
@@ -153,7 +154,7 @@ typedef struct {
 
 typedef struct {
 	int active;
-	mchar * sampdata;
+	CombinedPtr sampdata;
 	mulong  length;
 	muint   sampnum;
 	mulong  samppos;
@@ -163,8 +164,8 @@ typedef struct {
 
 typedef struct {
 	module  song;
-	mchar * sampledata[31];
-	note *  patterndata[128];
+	CombinedPtr sampledata[31];
+	CombinedPtrT<note> patterndata[128];
 
 	mulong  playrate;
 	muint   tablepos;
@@ -274,7 +275,7 @@ typedef struct tracker_buffer_state_
 
 int  hxcmod_init( modcontext * modctx );
 int  hxcmod_setcfg( modcontext * modctx, int samplerate, int stereo_separation, int filter);
-int  hxcmod_load( modcontext * modctx, void * mod_data, int mod_data_size );
+int  hxcmod_load( modcontext * modctx, CombinedPtr mod_data, int mod_data_size );
 void hxcmod_playsoundeffect( modcontext * modctx, unsigned short sampnum, unsigned short seffectnum, unsigned char volume, unsigned int period );
 extern int hxcmod_effectplaying( modcontext * modctx, unsigned short seffectnum);
 int hxcmod_fillbuffer( modcontext * modctx, msample * outbuffer, unsigned long nbsample, tracker_buffer_state * trkbuf, int noloop );

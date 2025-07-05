@@ -47,17 +47,23 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "configuration.h"
 #include "FileIO.h"
 #include "ff.h"
+
+#ifdef __cplusplus
+  #include "PicoMite.h"
+	extern "C" {
+	extern CombinedPtr StartEditPoint;
+	extern CombinedPtr InterruptReturn;
+#endif
+
 // global variables used in MMBasic but must be maintained outside of the interpreter
 extern int MMerrno;
 //extern int ListCnt;
 extern int MMCharPos;
-extern unsigned char *StartEditPoint;
 extern int StartEditChar;
 extern int OptionErrorSkip;
 extern int ExitMMBasicFlag;
-extern unsigned char *InterruptReturn;
 extern unsigned int _excep_peek;
-extern volatile long long int mSecTimer;
+extern volatile uint64_t mSecTimer;
 extern volatile unsigned int PauseTimer;
 extern volatile unsigned int IntPauseTimer;
 extern volatile unsigned int Timer1, Timer2, Timer3, Timer4, Timer5;		                       //1000Hz decrement timer
@@ -195,20 +201,21 @@ extern void PIntHC(unsigned long long int n) ;
 extern void PFlt(MMFLOAT flt);
 extern void PFltComma(MMFLOAT n) ;
 extern void putConsole(int c, int flush);
-extern void MMPrintString(char* s);
+extern void MMPrintString(const char* s);
 extern void SSPrintString(char* s);
 extern void myprintf(char *s);
 extern int getConsole(void);
+extern void mount_tmp(void);
+extern void InitSDCARD(void);
 extern void InitReservedIO(void);
 extern char SerialConsolePutC(char c, int flush);
 extern void CallExecuteProgram(char *p);
-extern long long int *GetReceiveDataBuffer(unsigned char *p, unsigned int *nbr);
 extern int ticks_per_second;
 extern volatile unsigned int GPSTimer;
 extern uint16_t AUDIO_L_PIN, AUDIO_R_PIN, AUDIO_SLICE;
 extern uint16_t AUDIO_WRAP;
 extern int PromptFont, PromptFC, PromptBC;                             // the font and colours selected at the prompt
-extern const uint8_t *flash_progmemory;
+extern const FSIZE_t sd_progmemory;
 extern lfs_t lfs;
 extern lfs_dir_t lfs_dir;
 extern struct lfs_info lfs_info;
@@ -364,8 +371,8 @@ extern struct tagMTRand *g_myrand;
 #define PIN_RESTART         9997                                    // reset caused by entering 0 at the PIN prompt
 #define RESTART_NOAUTORUN   9996                                    // reset required after changing the LCD or touch config
 #define RESTART_DOAUTORUN   9995                                    // reset required by OPTION SET (ie, re runs the program)
-#define KEYBOARDCLOCK 11
-#define KEYBOARDDATA 12
+#define KEYBOARDCLOCK 1
+#define KEYBOARDDATA 2
 #define ALARM_NUM 0
 #define ALARM_IRQ TIMER_IRQ_0
 
@@ -397,4 +404,9 @@ extern struct tagMTRand *g_myrand;
 #include "GPS.h"
 #include "Audio.h"
 #include "PS2Keyboard.h"
+
+#ifdef __cplusplus
+}
+#endif
+
 /*  @endcond */

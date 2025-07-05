@@ -21,6 +21,13 @@
 *  v2.0.1  struct option_s updated to match v6.00.01 Release
 *
 ******************************************************************************************/
+#ifndef PICOCFUNC_H
+#define PICOCFUNC_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /*** Uncomment one of these three  ***/
 #define PICOMITE
 //#define PICOMITEVGA
@@ -53,7 +60,7 @@
 #define Vector_ExtInp             (*(unsigned int *)(BaseAddress+0x14))       // int ExtInp(int pin)
 #define Vector_PinSetBit          (*(unsigned int *)(BaseAddress+0x18))       // void PinSetBit(int pin, unsigned int offset)
 #define Vector_PinRead            (*(unsigned int *)(BaseAddress+0x1C))       // int PinRead(int pin)
-#define Vector_MMPrintString      (*(unsigned int *)(BaseAddress+0x20))       // void MMPrintString(char* s)
+#define Vector_MMPrintString      (*(unsigned int *)(BaseAddress+0x20))       // void MMPrintString(const char* s)
 #define Vector_IntToStr           (*(unsigned int *)(BaseAddress+0x24))       // void IntToStr(char *strr, long long int nbr, unsigned int base)
 #define Vector_CheckAbort         (*(unsigned int *)(BaseAddress+0x28))       // void CheckAbort(void)
 #define Vector_GetMemory          (*(unsigned int *)(BaseAddress+0x2C))       // void *GetMemory(size_t msize);
@@ -352,7 +359,7 @@ struct option_s {
    unsigned char NoScroll;
    unsigned char CombinedCS;
    unsigned char USBKeyboard;
-   unsigned char VGA_HSYNC;
+   unsigned char VGA_HSYNC_unused;
    unsigned char VGA_BLUE;
    unsigned char AUDIO_MISO_PIN;
    unsigned char AUDIO_DCS_PIN;
@@ -481,3 +488,10 @@ short RepeatRate;
 #define EXT_BOOT_RESERVED       0x400                 // this pin is reserved at bootup and cannot be used
 #define NOP()  __asm volatile ("nop")
 #define USERLCDPANEL            25
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif // PICOCFUNC_H
+/*  @endcond */

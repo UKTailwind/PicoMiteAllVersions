@@ -1351,7 +1351,7 @@ DRFLAC_API drflac_bool32 drflac_next_cuesheet_track(drflac_cuesheet_track_iterat
     #endif
 #endif
 
-#ifdef __linux__
+#if 0 //__linux__
     #ifndef _BSD_SOURCE
         #define _BSD_SOURCE
     #endif
@@ -1621,7 +1621,7 @@ static DRFLAC_INLINE drflac_bool32 drflac_has_sse41(void)
 #define DRFLAC_FREE(p)                      free((p))
 #endif
 #ifndef DRFLAC_COPY_MEMORY
-#define DRFLAC_COPY_MEMORY(dst, src, sz)    memcpy((dst), (src), (sz))
+#define DRFLAC_COPY_MEMORY(dst, src, sz)    memcpy((void*)(dst), (src), (sz))
 #endif
 #ifndef DRFLAC_ZERO_MEMORY
 #define DRFLAC_ZERO_MEMORY(p, sz)           memset((p), 0, (sz))

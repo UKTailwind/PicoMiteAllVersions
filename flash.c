@@ -125,7 +125,7 @@ static void __no_inline_not_in_flash_func(flash_rp2350_restore_qmi_cs1)(const fl
 //-----------------------------------------------------------------------------
 // Actual flash programming shims (work whether or not PICO_NO_FLASH==1)
 
-void __no_inline_not_in_flash_func(flash_range_erase)(uint32_t flash_offs, size_t count) {
+void __no_inline_not_in_flash_func(sd_range_erase)(uint32_t flash_offs, size_t count) {
 #ifdef PICO_FLASH_SIZE_BYTES
     hard_assert(flash_offs + count <= PICO_FLASH_SIZE_BYTES);
 #endif
@@ -133,9 +133,9 @@ void __no_inline_not_in_flash_func(flash_range_erase)(uint32_t flash_offs, size_
     invalid_params_if(HARDWARE_FLASH, count & (FLASH_SECTOR_SIZE - 1));
     rom_connect_internal_flash_fn connect_internal_flash_func = (rom_connect_internal_flash_fn)rom_func_lookup_inline(ROM_FUNC_CONNECT_INTERNAL_FLASH);
     rom_flash_exit_xip_fn flash_exit_xip_func = (rom_flash_exit_xip_fn)rom_func_lookup_inline(ROM_FUNC_FLASH_EXIT_XIP);
-    rom_flash_range_erase_fn flash_range_erase_func = (rom_flash_range_erase_fn)rom_func_lookup_inline(ROM_FUNC_FLASH_RANGE_ERASE);
+    rom_sd_range_erase_fn sd_range_erase_func = (rom_sd_range_erase_fn)rom_func_lookup_inline(ROM_FUNC_FLASH_RANGE_ERASE);
     rom_flash_flush_cache_fn flash_flush_cache_func = (rom_flash_flush_cache_fn)rom_func_lookup_inline(ROM_FUNC_FLASH_FLUSH_CACHE);
-    assert(connect_internal_flash_func && flash_exit_xip_func && flash_range_erase_func && flash_flush_cache_func);
+    assert(connect_internal_flash_func && flash_exit_xip_func && sd_range_erase_func && flash_flush_cache_func);
     flash_init_boot2_copyout();
     // Commit any pending writes to external RAM, to avoid losing them in the subsequent flush:
     xip_cache_clean_all();
@@ -149,7 +149,7 @@ void __no_inline_not_in_flash_func(flash_range_erase)(uint32_t flash_offs, size_
 
     connect_internal_flash_func();
     flash_exit_xip_func();
-    flash_range_erase_func(flash_offs, count, FLASH_BLOCK_SIZE, FLASH_BLOCK_ERASE_CMD);
+    sd_range_erase_func(flash_offs, count, FLASH_BLOCK_SIZE, FLASH_BLOCK_ERASE_CMD);
     flash_flush_cache_func(); // Note this is needed to remove CSn IO force as well as cache flushing
     flash_enable_xip_via_boot2();
 #if PICO_RP2350
@@ -162,7 +162,7 @@ void __no_inline_not_in_flash_func(flash_flush_cache)(void) {
     flash_flush_cache_func();
 }
 
-void __no_inline_not_in_flash_func(flash_range_program)(uint32_t flash_offs, const uint8_t *data, size_t count) {
+void __no_inline_not_in_flash_func(sd_range_program)(uint32_t flash_offs, const uint8_t *data, size_t count) {
 #ifdef PICO_FLASH_SIZE_BYTES
     hard_assert(flash_offs + count <= PICO_FLASH_SIZE_BYTES);
 #endif
@@ -170,9 +170,9 @@ void __no_inline_not_in_flash_func(flash_range_program)(uint32_t flash_offs, con
     invalid_params_if(HARDWARE_FLASH, count & (FLASH_PAGE_SIZE - 1));
     rom_connect_internal_flash_fn connect_internal_flash_func = (rom_connect_internal_flash_fn)rom_func_lookup_inline(ROM_FUNC_CONNECT_INTERNAL_FLASH);
     rom_flash_exit_xip_fn flash_exit_xip_func = (rom_flash_exit_xip_fn)rom_func_lookup_inline(ROM_FUNC_FLASH_EXIT_XIP);
-    rom_flash_range_program_fn flash_range_program_func = (rom_flash_range_program_fn)rom_func_lookup_inline(ROM_FUNC_FLASH_RANGE_PROGRAM);
+    rom_sd_range_program_fn sd_range_program_func = (rom_sd_range_program_fn)rom_func_lookup_inline(ROM_FUNC_FLASH_RANGE_PROGRAM);
     rom_flash_flush_cache_fn flash_flush_cache_func = (rom_flash_flush_cache_fn)rom_func_lookup_inline(ROM_FUNC_FLASH_FLUSH_CACHE);
-    assert(connect_internal_flash_func && flash_exit_xip_func && flash_range_program_func && flash_flush_cache_func);
+    assert(connect_internal_flash_func && flash_exit_xip_func && sd_range_program_func && flash_flush_cache_func);
     flash_init_boot2_copyout();
     xip_cache_clean_all();
 #if PICO_RP2350
@@ -184,7 +184,7 @@ void __no_inline_not_in_flash_func(flash_range_program)(uint32_t flash_offs, con
 
     connect_internal_flash_func();
     flash_exit_xip_func();
-    flash_range_program_func(flash_offs, data, count);
+    sd_range_program_func(flash_offs, data, count);
     flash_flush_cache_func(); // Note this is needed to remove CSn IO force as well as cache flushing
     flash_enable_xip_via_boot2();
 #if PICO_RP2350
