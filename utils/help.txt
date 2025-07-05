@@ -1,0 +1,1671 @@
+~MM.STARTUP
+MM.STARTUP
+~MM.PROMPT
+MM.PROMPT
+~MM.END
+MM.END
+~MM.DEVICE$ 
+MM.DEVICE$ 
+~MM.ADDRESS$ 
+MM.ADDRESS$ 
+~MM.CMDLINE$ 
+MM.CMDLINE$ 
+~MM.ERRNO  
+MM.ERRNO  
+~MM.ERRMSG$  
+MM.ERRMSG$  
+~MM.INFO() MM.INFO$()
+MM.INFO() MM.INFO$()
+~MM.INFO$(AUTORUN)
+MM.INFO$(AUTORUN)
+~MM.INFO(ADC) 
+MM.INFO(ADC) 
+~MM.INFO(ADC DMA) 
+MM.INFO(ADC DMA) 
+~MM.INFO(BOOT COUNT)
+MM.INFO(BOOT COUNT)
+~MM.INFO$(CPUSPEED)
+MM.INFO$(CPUSPEED)
+~MM.INFO$(LCDPANEL)
+MM.INFO$(LCDPANEL)
+~MM.INFO(LCD320)
+MM.INFO(LCD320)
+~MM.INFO$(SDCARD) 
+MM.INFO$(SDCARD) 
+~MM.INFO$(CURRENT)
+MM.INFO$(CURRENT)
+~MM.INFO$(PATH) 
+MM.INFO$(PATH) 
+~MM.INFO(DISK SIZE) 
+MM.INFO(DISK SIZE) 
+~MM.INFO$(DRIVE) 
+MM.INFO$(DRIVE) 
+~MM.INFO(EXISTS FILE fname$) 
+MM.INFO(EXISTS FILE fname$) 
+~MM.INFO(EXISTS DIR dirname$) 
+MM.INFO(EXISTS DIR dirname$) 
+~MM.INFO$(FREE SPACE) 
+MM.INFO$(FREE SPACE) 
+~MM.INFO$(FILESIZE file$) 
+MM.INFO$(FILESIZE file$) 
+~MM.INFO$(MODIFIED file$) 
+MM.INFO$(MODIFIED file$) 
+~MM.INFO(FCOLOUR) 
+MM.INFO(FCOLOUR) 
+~MM.INFO(BCOLOUR) 
+MM.INFO(BCOLOUR) 
+~MM.INFO(FONT) 
+MM.INFO(FONT) 
+~MM.INFO(FONT ADDRESS n) 
+MM.INFO(FONT ADDRESS n) 
+~MM.INFO(FONT POINTER n) 
+MM.INFO(FONT POINTER n) 
+~MM.INFO(FONTHEIGHT) 
+MM.INFO(FONTHEIGHT) 
+~MM.INFO(FONTWIDTH)
+MM.INFO(FONTWIDTH)
+~MM.INFO$(FLASH) 
+MM.INFO$(FLASH) 
+~MM.INFO(FLASH ADDRESS n) 
+MM.INFO(FLASH ADDRESS n) 
+~MM.INFO(HEAP) 
+MM.INFO(HEAP) 
+~MM.INFO(HPOS) 
+MM.INFO(HPOS) 
+~MM.INFO(VPOS) 
+MM.INFO(VPOS) 
+~MM.INFO(ID) 
+MM.INFO(ID) 
+~MM.INFO$(IP ADDRESS) 
+MM.INFO$(IP ADDRESS) 
+~MM.INFO(OPTION option)  
+MM.INFO(OPTION option)  
+~MM.INFO$(PIN pinno) 
+MM.INFO$(PIN pinno) 
+~MM.INFO$(PINNO GPnn) 
+MM.INFO$(PINNO GPnn) 
+~MM.INFO(PERSISTENT)
+MM.INFO(PERSISTENT)
+~MM.INFO(PIO RX DMA) 
+MM.INFO(PIO RX DMA) 
+~MM.INFO(PIO TX DMA) 
+MM.INFO(PIO TX DMA) 
+~MM.INFO$(PLATFORM) 
+MM.INFO$(PLATFORM) 
+~MM.INFO(PS2) 
+MM.INFO(PS2) 
+~MM.INFO$(SOUND)
+MM.INFO$(SOUND)
+~MM.INFO(STACK)
+MM.INFO(STACK)
+~MM.INFO$(SYSTEM I2C) 
+MM.INFO$(SYSTEM I2C) 
+~MM.INFO(SYSTEM HEAP) 
+MM.INFO(SYSTEM HEAP) 
+~MM.INFO(TILE HEIGHT) 
+MM.INFO(TILE HEIGHT) 
+~MM.INFO(TRACK) 
+MM.INFO(TRACK) 
+~MM.INFO$(TOUCH) 
+MM.INFO$(TOUCH) 
+~MM.INFO(USB n) 
+MM.INFO(USB n) 
+0=not in use, 
+1=keyboard, 
+2=mouse, 
+128=ps4, 
+129=ps3, 
+130=SNES/Generic
+~MM.INFO(VARCNT) 
+MM.INFO(VARCNT) 
+~MM.INFO$(LINE) 
+MM.INFO$(LINE) 
+~MM.INFO(UPTIME) 
+MM.INFO(UPTIME) 
+~MM.INFO(VERSION) 
+MM.INFO(VERSION) 
+~MM.INFO(WRITEBUFF) 
+MM.INFO(WRITEBUFF) 
+~MM.INFO(TCP PORT) 
+MM.INFO(TCP PORT) 
+~MM.INFO(UDP PORT) 
+MM.INFO(UDP PORT) 
+~MM.INFO(TCPIP STATUS) 
+MM.INFO(TCPIP STATUS) 
+~MM.INFO(WIFI STATUS) 
+MM.INFO(WIFI STATUS) 
+0 WiFi is down  
+1 Connected to WiFi  
+2 Connected to WiFi, but no IP address (TCPIP STATUS only) 
+3 Connected to WiFi with an IP address (TCPIP STATUS only) 
+-1 Connection failed  
+-2 No matching SSID found (could be out of range, or down) 
+-3 Authentication failure
+~MM.HRES 
+MM.HRES 
+~MM.VRES 
+MM.VRES 
+~MM.MESSAGE$ 
+MM.MESSAGE$ 
+~MM.ONEWIRE 
+MM.ONEWIRE 
+0 = Device not found, 
+1 = Device found.
+~MM.I2C 
+MM.I2C 
+0 = The command completed without error. 
+1 = Received a NACK response 
+2 = Command timed out
+~MM.WATCHDOG 
+MM.WATCHDOG 
+~Options
+Options
+~OPTION ANGLE RADIANS | DEGREES 
+OPTION ANGLE RADIANS | DEGREES 
+~OPTION AUDIO PWMnApin, PWMnBpin  or OPTION AUDIO DISABLE 
+OPTION AUDIO PWMnApin, PWMnBpin  or OPTION AUDIO DISABLE 
+~OPTION AUDIO 
+OPTION AUDIO 
+~OPTION AUDIO SPI Cspin,  CLKpin, MOSIpin  or OPTION AUDIO DISABLE 
+OPTION AUDIO SPI Cspin,  CLKpin, MOSIpin  or OPTION AUDIO DISABLE 
+~OPTION AUDIO VS1053 CLKpin, MOSIpin, MISOpin, XCSpin, XDCSpin, DREQpin, XRSTpin or OPTION AUDIO DISABLE
+OPTION AUDIO VS1053 CLKpin, MOSIpin, MISOpin, XCSpin, XDCSpin, DREQpin, XRSTpin or OPTION AUDIO DISABLE
+~OPTION AUDIO I2S BCLKpin, DATApin
+OPTION AUDIO I2S BCLKpin, DATApin
+~OPTION AUTORUN OFF
+OPTION AUTORUN OFF
+~OPTION AUTORUN ON [,NORESET] or OPTION AUTORUN n [,NORESET] or OPTION AUTORUN OFF
+OPTION AUTORUN ON [,NORESET] or OPTION AUTORUN n [,NORESET] or OPTION AUTORUN OFF
+~OPTION BASE 0 | 1 
+OPTION BASE 0 | 1 
+~OPTION BAUDRATE nn 
+OPTION BAUDRATE nn 
+~OPTION BREAK nn 
+OPTION BREAK nn 
+~OPTION CASE LOWER | UPPER | TITLE 
+OPTION CASE LOWER | UPPER | TITLE 
+~OPTION COLOURCODE OFF
+OPTION COLOURCODE OFF
+~OPTION COLOURCODE ON or OPTION COLOURCODE OFF 
+OPTION COLOURCODE ON or OPTION COLOURCODE OFF 
+~OPTION CONSOLE output
+OPTION CONSOLE output
+~OPTION CPUSPEED 
+OPTION CPUSPEED 
+~OPTION COUNT pin1, pin2, pin3, pin4
+OPTION COUNT pin1, pin2, pin3, pin4
+~OPTION DEFAULT FLOAT | INTEGER | STRING | NONE 
+OPTION DEFAULT FLOAT | INTEGER | STRING | NONE 
+~OPTION DEFAULT COLOURS foreground [,background]
+OPTION DEFAULT COLOURS foreground [,background]
+~OPTION DEFAULT MODE n 
+OPTION DEFAULT MODE n 
+~OPTION DISK SAVE fname$ | OPTION DISK LOAD fname$ 
+OPTION DISK SAVE fname$ | OPTION DISK LOAD fname$ 
+~OPTION DISPLAY lines [,chars]
+OPTION DISPLAY lines [,chars]
+~OPTION ESCAPE
+OPTION ESCAPE
+~OPTION EXPLICIT 
+OPTION EXPLICIT 
+~OPTION FAST AUDIO ON|OFFF
+OPTION FAST AUDIO ON|OFFF
+~OPTION FNKey string$
+OPTION FNKey string$
+~OPTION HDMI PINS  clockpositivepin, d0positivepin, d1positivepin, d2positivepin 
+OPTION HDMI PINS  clockpositivepin, d0positivepin, d1positivepin, d2positivepin 
+~OPTION HEARTBEAT ON/OFF 
+OPTION HEARTBEAT ON/OFF 
+~OPTION KEYBOARD nn [,capslock] [,numlock] [,repeatstart] [,repeatrate] or OPTION KEYBOARD DISABLE
+OPTION KEYBOARD nn [,capslock] [,numlock] [,repeatstart] [,repeatrate] or OPTION KEYBOARD DISABLE
+~OPTION KEYBOARD I2C
+OPTION KEYBOARD I2C
+~OPTION KEYBOARD PINS clockpin, datapin
+OPTION KEYBOARD PINS clockpin, datapin
+~OPTION KEYBOARD REPEAT repeatstart , repeatrate 
+OPTION KEYBOARD REPEAT repeatstart , repeatrate 
+~OPTION LCDPANEL /* 
+OPTION LCDPANEL /* 
+~OPTION LCDPANEL VIRTUAL_C  or OPTION LCDPANEL VIRTUAL_M
+OPTION LCDPANEL VIRTUAL_C  or OPTION LCDPANEL VIRTUAL_M
+~OPTION LCDPANEL options or OPTION LCDPANEL DISABLE
+OPTION LCDPANEL options or OPTION LCDPANEL DISABLE
+~OPTION LCDPANEL CONSOLE [font [, fc [, bc [,blight]]] [,NOSCROLL] or OPTION LCDPANEL NOCONSOLE
+OPTION LCDPANEL CONSOLE [font [, fc [, bc [,blight]]] [,NOSCROLL] or OPTION LCDPANEL NOCONSOLE
+~OPTION LCDPANEL USER hres, vres
+OPTION LCDPANEL USER hres, vres
+~OPTION LCDPANEL CONSOLE [font [, fc [,bc]] or OPTION LCDPANEL NOCONSOLE /* 
+OPTION LCDPANEL CONSOLE [font [, fc [,bc]] or OPTION LCDPANEL NOCONSOLE /* 
+~OPTION LCD320 ON/OFF 
+OPTION LCD320 ON/OFF 
+~OPTION LEGACY ON or OPTION LEGACY OFF  
+OPTION LEGACY ON or OPTION LEGACY OFF  
+~OPTION LIST 
+OPTION LIST 
+~OPTION MILLISECONDS ON|OFF
+OPTION MILLISECONDS ON|OFF
+~OPTION MODBUFF ENABLE/DISABLE [sizeinK]
+OPTION MODBUFF ENABLE/DISABLE [sizeinK]
+~OPTION MOUSE CLKpin, DATApin 
+OPTION MOUSE CLKpin, DATApin 
+~OPTION MOUSE DISABLE 
+OPTION MOUSE DISABLE 
+~OPTION PICO ON/OFF
+OPTION PICO ON/OFF
+~OPTION PIN nbr 
+OPTION PIN nbr 
+~OPTION PLATFORM name$
+OPTION PLATFORM name$
+~OPTION POWER PFM | PWM
+OPTION POWER PFM | PWM
+~OPTION PSRAM PIN n  or OPTION PSRAM DISABLE
+OPTION PSRAM PIN n  or OPTION PSRAM DISABLE
+~OPTION RESET  
+OPTION RESET  
+~OPTION RESET cfg or OPTION RESET LIST
+OPTION RESET cfg or OPTION RESET LIST
+~OPTION RESOLUTION nn [,cpuspeedinKhz] 
+OPTION RESOLUTION nn [,cpuspeedinKhz] 
+'nn' is: 640x480 or 640 // 1280x720 or 1280 // 1024x768 or 1024 // 800x600 or 800
+~OPTION RTC AUTO ENABLE | DISABLE 
+OPTION RTC AUTO ENABLE | DISABLE 
+~OPTION SDCARD Cspin [,CLKpin, MOSIpin, MISOpin] or OPTION SDCARD DISABLE
+OPTION SDCARD Cspin [,CLKpin, MOSIpin, MISOpin] or OPTION SDCARD DISABLE
+~OPTION SDCARD COMBINED CS
+OPTION SDCARD COMBINED CS
+~OPTION SERIAL CONSOLE uartapin, uartbpin
+OPTION SERIAL CONSOLE uartapin, uartbpin
+~OPTION SERIAL CONSOLE DISABLE 
+OPTION SERIAL CONSOLE DISABLE 
+~OPTION SYSTEM I2C sdapin, sclpin [,SLOW/FAST]
+OPTION SYSTEM I2C sdapin, sclpin [,SLOW/FAST]
+~OPTION SYSTEM SPI CLKpin, MOSIpin, MISOpin or OPTION SYSTEM SPI DISABLE
+OPTION SYSTEM SPI CLKpin, MOSIpin, MISOpin or OPTION SYSTEM SPI DISABLE
+~OPTION TAB 2 | 3 | 4 | 8 
+OPTION TAB 2 | 3 | 4 | 8 
+~OPTION TCP SERVER PORT n  
+OPTION TCP SERVER PORT n  
+~OPTION TELNET CONSOLE OFF|ONLY|ON 
+OPTION TELNET CONSOLE OFF|ONLY|ON 
+ON = Console output sent to USB and Telnet 
+ONLY= Console output sent to Telnet only 
+OFF = Console output sent to USB only 
+~OPTION TFTP OFF|ON 
+OPTION TFTP OFF|ON 
+~OPTION TOUCH FT6336 IRQpin, RESETpin [,BEEPpin] [,sensitivity]
+OPTION TOUCH FT6336 IRQpin, RESETpin [,BEEPpin] [,sensitivity]
+~OPTION TOUCH T_CS pin, T_IRQ pin [, Beep] or OPTION TOUCH DISABLE 
+OPTION TOUCH T_CS pin, T_IRQ pin [, Beep] or OPTION TOUCH DISABLE 
+~OPTION VCC voltage 
+OPTION VCC voltage 
+~OPTION UDP SERVER PORT n 
+OPTION UDP SERVER PORT n 
+~OPTION VGA PINS HSYNCpin, BLUEpin 
+OPTION VGA PINS HSYNCpin, BLUEpin 
+~OPTION WEB MESSAGES ON/OFF 
+OPTION WEB MESSAGES ON/OFF 
+~OPTION WIFI ssid$, passwd$, [name$] [,ipaddress$, mask$, gateway$] 
+OPTION WIFI ssid$, passwd$, [name$] [,ipaddress$, mask$, gateway$] 
+~About MBASIC commands
+About MBASIC commands
+~A:  B:      Shortcut
+A:  B:      Shortcut
+~ADC
+ADC
+~ADC OPEN freq, n_channels [,interrupt] 
+ADC OPEN freq, n_channels [,interrupt] 
+~ADC FREQUENCY freq 
+ADC FREQUENCY freq 
+~ADC CLOSE 
+ADC CLOSE 
+~ADC START array1!() [,array2!()] [,array3!()] [,array4!()] [,Chan4arr!()] [,C1min] [,C1max] [,C2min] [,C2max] [,C3min] [,C3max] [,C4min] [,C4max] 
+ADC START array1!() [,array2!()] [,array3!()] [,array4!()] [,Chan4arr!()] [,C1min] [,C1max] [,C2min] [,C2max] [,C3min] [,C3max] [,C4min] [,C4max] 
+~ADC RUN array1%(),array2%)
+ADC RUN array1%(),array2%)
+~ARC x, y, r1, [r2], a1, a2 [, c] 
+ARC x, y, r1, [r2], a1, a2 [, c] 
+~AUTOSAVE or AUTOSAVE CRUNCH or AUTOSAVE APPEND 
+AUTOSAVE or AUTOSAVE CRUNCH or AUTOSAVE APPEND 
+~BACKLIGHT n [,DEFAULT] 
+BACKLIGHT n [,DEFAULT] 
+~BLIT READ [#]b, x, y, w, h 
+BLIT READ [#]b, x, y, w, h 
+~BLIT WRITE [#]b, x, y [,mode] %, x, y [,col] 
+BLIT WRITE [#]b, x, y [,mode] %, x, y [,col] 
+'mode' parameter
+&B001 = mirrored left to right ; 
+&B010 = mirrored top to bottom ; 
+&B100 = don't copy transparent pixels
+~BLIT LOAD[BMP] [#]b, fname$ [,x] [,y] [,w] [,h]
+BLIT LOAD[BMP] [#]b, fname$ [,x] [,y] [,w] [,h]
+~BLIT CLOSE [#]b 
+BLIT CLOSE [#]b 
+~BLIT MERGE colour, x, y, w, h 
+BLIT MERGE colour, x, y, w, h 
+~BLIT FRAMEBUFFER from, to, xin, yin, xout, yout, width, height [,colour]
+BLIT FRAMEBUFFER from, to, xin, yin, xout, yout, width, height [,colour]
+~BLIT MEMORY address, x, y [,col]
+BLIT MEMORY address, x, y [,col]
+~BLIT COMPRESSED address%, x, y [,col]
+BLIT COMPRESSED address%, x, y [,col]
+~BLIT x1, y1, x2, y2, w, h
+BLIT x1, y1, x2, y2, w, h
+~BOX x, y, w, h [, lw] [,c] [,fill] 
+BOX x, y, w, h [, lw] [,c] [,fill] 
+~CALL usersubname$ [,usersubparameters,....] 
+CALL usersubname$ [,usersubparameters,....] 
+~CAMERA 
+CAMERA 
+~CAMERA OPEN XLKpin, PLKpin, HSpin, VSCpin, RETpin, D0pin
+CAMERA OPEN XLKpin, PLKpin, HSpin, VSCpin, RETpin, D0pin
+~CAMERA CAPTURE [scale, [x , y]]
+CAMERA CAPTURE [scale, [x , y]]
+~CAMERA CLOSE
+CAMERA CLOSE
+~CAMERA CHANGE image%(),change! [,scale [,x ,y]]
+CAMERA CHANGE image%(),change! [,scale [,x ,y]]
+~CAMERA TEST tnum
+CAMERA TEST tnum
+tnum=2 generates colourbars and 
+tnum=0 sets back to the visual input. 
+~CAMERA REGISTER reg%, data%
+CAMERA REGISTER reg%, data%
+~CAT S$, N$ 
+CAT S$, N$ 
+~CHAIN fname$ [,cmdline$] 
+CHAIN fname$ [,cmdline$] 
+~CHDIR dir$ 
+CHDIR dir$ 
+~CIRCLE x, y, r [,lw] [, a] [, c] [, fill] 
+CIRCLE x, y, r [,lw] [, a] [, c] [, fill] 
+~CLEAR 
+CLEAR 
+~CLOSE [#]fnbr [,[#]fnbr] ... 
+CLOSE [#]fnbr [,[#]fnbr] ... 
+~CLS [colour] 
+CLS [colour] 
+~CMM2 LOAD or CMM2 RUN
+CMM2 LOAD or CMM2 RUN
+~COLOUR fore [, back] or COLOR fore [, back] 
+COLOUR fore [, back] or COLOR fore [, back] 
+~COLOUR MAP inarray%(),outarray%() [,colourmap%()]
+COLOUR MAP inarray%(),outarray%() [,colourmap%()]
+~CONFIGURE cfg  
+CONFIGURE cfg  
+~CONFIGURE LIST 
+CONFIGURE LIST 
+~CONST id = expression [, id = expression] ... etc  
+CONST id = expression [, id = expression] ... etc  
+~CONTINUE 
+CONTINUE 
+~CONTINUE DO or CONTINUE FOR 
+CONTINUE DO or CONTINUE FOR 
+~COPY fname1$ TO fname2$ Copy a file from 'fname1$' to 'fname2$' 
+COPY fname1$ TO fname2$ Copy a file from 'fname1$' to 'fname2$' 
+~COPY fname$ TO dirname$
+COPY fname$ TO dirname$
+~CPU RESTART 
+CPU RESTART 
+~CPU SLEEP n 
+CPU SLEEP n 
+~CSUB name [type [, type] ...] /hex [[ hex[...] / END CSUB 
+CSUB name [type [, type] ...] /hex [[ hex[...] / END CSUB 
+~DATA constant[,constant]... 
+DATA constant[,constant]... 
+~DATE$ = "DD-MM-YY[YY]" or DATE$ = "DD/MM/YY[YY]" or DATE$ ="YYYY-MM-DD" or DATE$="YYYY/MM/DD" 
+DATE$ = "DD-MM-YY[YY]" or DATE$ = "DD/MM/YY[YY]" or DATE$ ="YYYY-MM-DD" or DATE$="YYYY/MM/DD" 
+~DEFINEFONT #Nbr /hex [[ hex[...] /END DEFINEFONT 
+DEFINEFONT #Nbr /hex [[ hex[...] /END DEFINEFONT 
+~DEVICE BITSTREAM pinno, n_transitions, array%()
+DEVICE BITSTREAM pinno, n_transitions, array%()
+~DEVICE CAMERA 
+DEVICE CAMERA 
+~DEVICE GAMEPAD 
+DEVICE GAMEPAD 
+~DEVICE HUMID 
+DEVICE HUMID 
+~DEVICE KEYPAD 
+DEVICE KEYPAD 
+~DEVICE MOUSE 
+DEVICE MOUSE 
+~DEVICE LCD 
+DEVICE LCD 
+~DEVICE SERIALTX pinno,baudrate,ostring$
+DEVICE SERIALTX pinno,baudrate,ostring$
+~DEVICE SERIALRX pinno, baudrate, istring$, timeout_in_ms, status% [,nbr] [,terminators$]
+DEVICE SERIALRX pinno, baudrate, istring$, timeout_in_ms, status% [,nbr] [,terminators$]
+~DEVICE WII 
+DEVICE WII 
+~DEVICE WS2812 
+DEVICE WS2812 
+~DIM [type] decl [,decl]...  
+DIM [type] decl [,decl]...  
+~DO <statements> LOOP 
+DO <statements> LOOP 
+~DO WHILE expression <statements> LOOP 
+DO WHILE expression <statements> LOOP 
+~DO <statements> LOOP UNTIL expression 
+DO <statements> LOOP UNTIL expression 
+~DRAW3D 
+DRAW3D 
+~DRAW3D CREATE
+DRAW3D CREATE
+~DRAW3D ROTATE q(), n [,n1 [,n2...]}
+DRAW3D ROTATE q(), n [,n1 [,n2...]}
+~DRAW3D RESET n [,n1 [,n2...]}
+DRAW3D RESET n [,n1 [,n2...]}
+~DRAW3D CAMERA n, z_viewplane[,x_camera [,y_camera] [,PAN_X] [,PAN_Y]
+DRAW3D CAMERA n, z_viewplane[,x_camera [,y_camera] [,PAN_X] [,PAN_Y]
+~DRAW3D SHOW n, x, y, z [,nocull] or DRAW3D WRITE n, x, y, z [,nocull]
+DRAW3D SHOW n, x, y, z [,nocull] or DRAW3D WRITE n, x, y, z [,nocull]
+~DRAW3D HIDE n [,n1 [,n2...]]
+DRAW3D HIDE n [,n1 [,n2...]]
+~DRAW3D HIDE ALL
+DRAW3D HIDE ALL
+~DRAW3D CLOSE n [,n1 [,n2...]]
+DRAW3D CLOSE n [,n1 [,n2...]]
+~DRAW3D CLOSE ALL
+DRAW3D CLOSE ALL
+~DRAW3D DIAGNOSE objectno, x, y, z
+DRAW3D DIAGNOSE objectno, x, y, z
+~3D EXAMPLE - display a 3D object on the screen using the DRAW3D SHOW and DRAW3D WRITE commands.
+3D EXAMPLE - display a 3D object on the screen using the DRAW3D SHOW and DRAW3D WRITE commands.
+~3D EXAMPLE - Concave shape fixed in 3D space but with moving camera
+3D EXAMPLE - Concave shape fixed in 3D space but with moving camera
+~3D EXAMPLE - Wall from a high view with panned viewport
+3D EXAMPLE - Wall from a high view with panned viewport
+~3D EXAMPLE - Football with missing face and internal view
+3D EXAMPLE - Football with missing face and internal view
+~DRIVE drive$
+DRIVE drive$
+~EDIT or  EDIT fname$ or EDIT FILE fname$ 
+EDIT or  EDIT fname$ or EDIT FILE fname$ 
+~EDIT FILE 
+EDIT FILE 
+~ELSE 
+ELSE 
+~ELSEIF expression THEN or ELSE IF expression THEN 
+ELSEIF expression THEN or ELSE IF expression THEN 
+~END 
+END 
+~END CSUB 
+END CSUB 
+~END FUNCTION 
+END FUNCTION 
+~ENDIF or END IF 
+ENDIF or END IF 
+~END SUB 
+END SUB 
+~ERASE variable [,variable]... 
+ERASE variable [,variable]... 
+~ERROR [error_msg$] 
+ERROR [error_msg$] 
+~EXECUTE command$ 
+EXECUTE command$ 
+~EXIT DO 
+EXIT DO 
+~EXIT FOR 
+EXIT FOR 
+~EXIT FUNCTION  
+EXIT FUNCTION  
+~EXIT SUB 
+EXIT SUB 
+~FILES [fspec$] [,sort] 
+FILES [fspec$] [,sort] 
+~FILES [fspec$] [,sort] 
+FILES [fspec$] [,sort] 
+~FLASH 
+FLASH 
+~FLASH LIST 
+FLASH LIST 
+~FLASH LIST n [,all] 
+FLASH LIST n [,all] 
+~FLASH ERASE n 
+FLASH ERASE n 
+~FLASH ERASE ALL 
+FLASH ERASE ALL 
+~FLASH SAVE n 
+FLASH SAVE n 
+~FLASH LOAD n 
+FLASH LOAD n 
+~FLASH RUN n 
+FLASH RUN n 
+~FLASH CHAIN n 
+FLASH CHAIN n 
+~FLASH OVERWRITE n 
+FLASH OVERWRITE n 
+~FLASH DISK LOAD n, fname$ [,O[VERWRITE]]
+FLASH DISK LOAD n, fname$ [,O[VERWRITE]]
+~FLUSH [#]fnbr 
+FLUSH [#]fnbr 
+~FONT [#]font-number, scaling 
+FONT [#]font-number, scaling 
+~FOR counter = start TO finish [STEP increment] 
+FOR counter = start TO finish [STEP increment] 
+~FRAMEBUFFER NOT HDMI AND VGA VERSIONS
+FRAMEBUFFER NOT HDMI AND VGA VERSIONS
+~FRAMEBUFFER CREATE NOT HDMI AND VGA VERSIONS
+FRAMEBUFFER CREATE NOT HDMI AND VGA VERSIONS
+~FRAMEBUFFER LAYER NOT HDMI AND VGA VERSIONS
+FRAMEBUFFER LAYER NOT HDMI AND VGA VERSIONS
+~FRAMEBUFFER WRITE where/where$ NOT HDMI AND VGA VERSIONS
+FRAMEBUFFER WRITE where/where$ NOT HDMI AND VGA VERSIONS
+~FRAMEBUFFER CLOSE [which] NOT HDMI AND VGA VERSIONS
+FRAMEBUFFER CLOSE [which] NOT HDMI AND VGA VERSIONS
+~FRAMEBUFFER COPY from, to [,b] NOT HDMI AND VGA VERSIONS
+FRAMEBUFFER COPY from, to [,b] NOT HDMI AND VGA VERSIONS
+~FRAMEBUFFER WAIT NOT HDMI AND VGA VERSIONS
+FRAMEBUFFER WAIT NOT HDMI AND VGA VERSIONS
+~FRAMEBUFFER MERGE [colour] [,mode] [,updaterate] NOT HDMI AND VGA VERSIONS
+FRAMEBUFFER MERGE [colour] [,mode] [,updaterate] NOT HDMI AND VGA VERSIONS
+~FRAMEBUFFER SYN NOT HDMI AND VGA VERSIONS
+FRAMEBUFFER SYN NOT HDMI AND VGA VERSIONS
+~FRAMEBUFFER  HDMI AND VGA VERSIONS ONLY
+FRAMEBUFFER  HDMI AND VGA VERSIONS ONLY
+~FRAMEBUFFER CREATE HDMI AND VGA VERSIONS ONLY
+FRAMEBUFFER CREATE HDMI AND VGA VERSIONS ONLY
+~FRAMEBUFFER CREATE 2  HDMI AND VGA VERSIONS ONLY
+FRAMEBUFFER CREATE 2  HDMI AND VGA VERSIONS ONLY
+~FRAMEBUFFER LAYER [colour] HDMI AND VGA VERSIONS ONLY
+FRAMEBUFFER LAYER [colour] HDMI AND VGA VERSIONS ONLY
+~FRAMEBUFFER LAYER TOP [colour] HDMI AND VGA VERSIONS ONLY
+FRAMEBUFFER LAYER TOP [colour] HDMI AND VGA VERSIONS ONLY
+~FRAMEBUFFER WRITE where/where$ HDMI AND VGA VERSIONS ONLY
+FRAMEBUFFER WRITE where/where$ HDMI AND VGA VERSIONS ONLY
+~FRAMEBUFFER CLOSE [which] HDMI AND VGA VERSIONS ONLY
+FRAMEBUFFER CLOSE [which] HDMI AND VGA VERSIONS ONLY
+~FRAMEBUFFER COPY from, to [,b] HDMI AND VGA VERSIONS ONLY
+FRAMEBUFFER COPY from, to [,b] HDMI AND VGA VERSIONS ONLY
+~FRAMEBUFFER WAIT HDMI AND VGA VERSIONS ONLY
+FRAMEBUFFER WAIT HDMI AND VGA VERSIONS ONLY
+~FUNCTION xxx (arg1 [,arg2, ...]) [AS <type>} <statements> xxx = <return value> END FUNCTION 
+FUNCTION xxx (arg1 [,arg2, ...]) [AS <type>} <statements> xxx = <return value> END FUNCTION 
+~GAMEPAD COLOUR channel, colour
+GAMEPAD COLOUR channel, colour
+~GAMEPAD HAPTIC channel left, right
+GAMEPAD HAPTIC channel left, right
+~GAMEPAD INTERRUPT ENABLE channel, int [,mask]
+GAMEPAD INTERRUPT ENABLE channel, int [,mask]
+~GAMEPAD CONFIGURE vid, pid, i0, c0, i1, c1, i2, c2, i3, c3, i4, c4, i5, c5, i6, c6, i7, c7, i8, c8, i9, c9, i10, c10, i11, c11, i12, c12, i13, c13, i14, c14, i15, c15
+GAMEPAD CONFIGURE vid, pid, i0, c0, i1, c1, i2, c2, i3, c3, i4, c4, i5, c5, i6, c6, i7, c7, i8, c8, i9, c9, i10, c10, i11, c11, i12, c12, i13, c13, i14, c14, i15, c15
+~GAMEPAD INTERRUPT DISABLE channel
+GAMEPAD INTERRUPT DISABLE channel
+~GAMEPAD MONITOR
+GAMEPAD MONITOR
+~GOTO target 
+GOTO target 
+~GUI BITMAP x, y, bits [, width] [, height] [, scale] [, c] [, bc] 
+GUI BITMAP x, y, bits [, width] [, height] [, scale] [, c] [, bc] 
+~GUI CALIBRATE or  GUI CALIBRATE a,b,c,d,d 
+GUI CALIBRATE or  GUI CALIBRATE a,b,c,d,d 
+~GUI RESET LCDPANEL 
+GUI RESET LCDPANEL 
+~GUI TEST LCDPANEL Or GUI TEST TOUCH 
+GUI TEST LCDPANEL Or GUI TEST TOUCH 
+~HUMID pin, tvar, hvar [,DHT11]
+HUMID pin, tvar, hvar [,DHT11]
+~I2C Communications Appendix B
+I2C Communications Appendix B
+~I2C OPEN speed, timeout 
+I2C OPEN speed, timeout 
+~I2C WRITE addr, option, sendlen, senddata [,sendata ....] 
+I2C WRITE addr, option, sendlen, senddata [,sendata ....] 
+~I2C READ addr, option, rcvlen, rcvbuf 
+I2C READ addr, option, rcvlen, rcvbuf 
+~I2C CHECK addr
+I2C CHECK addr
+~I2C CLOSE 
+I2C CLOSE 
+~I2C SLAVE 
+I2C SLAVE 
+~I2C2 
+I2C2 
+~IF expr THEN stmt [: stmt] or IF expr THEN stmt ELSE stmt 
+IF expr THEN stmt [: stmt] or IF expr THEN stmt ELSE stmt 
+~INPUT ["prompt$"] var1 [,var2[, var3 [, etc]]]
+INPUT ["prompt$"] var1 [,var2[, var3 [, etc]]]
+~INPUT #nbr, list of variables 
+INPUT #nbr, list of variables 
+~INTERRUPT [myint] 
+INTERRUPT [myint] 
+~IR dev, key , int or IR CLOSE 
+IR dev, key , int or IR CLOSE 
+~IR SEND pin, dev, key 
+IR SEND pin, dev, key 
+~KEYPAD var, int, r1, r2, r3, r4, c1, c2, c3 [, c4] or KEYPAD CLOSE 
+KEYPAD var, int, r1, r2, r3, r4, c1, c2, c3 [, c4] or KEYPAD CLOSE 
+~KILL file$ [,all] 
+KILL file$ [,all] 
+~LCD INIT d4, d5, d6, d7, rs, en   or  LCD line, pos, text$  or  LCD CLEAR   or  LCD CLOSE
+LCD INIT d4, d5, d6, d7, rs, en   or  LCD line, pos, text$  or  LCD CLEAR   or  LCD CLOSE
+~LCD CMD d1 [, d2 [, etc]] or LCD DATA d1 [, d2 [, etc]]
+LCD CMD d1 [, d2 [, etc]] or LCD DATA d1 [, d2 [, etc]]
+~LET variable = expression 
+LET variable = expression 
+~LIBRARY SAVE  or LIBRARY DELETE or LIBRARY LIST or LIBRARY LIST ALL or LIBRARY DISK SAVE fname$ or LIBRARY DISK LOAD fname$
+LIBRARY SAVE  or LIBRARY DELETE or LIBRARY LIST or LIBRARY LIST ALL or LIBRARY DISK SAVE fname$ or LIBRARY DISK LOAD fname$
+~LINE x1, y1, x2, y2 [, LW [, C]] 
+LINE x1, y1, x2, y2 [, LW [, C]] 
+~LINE AA x1, y1, x2, y2 [, LW [, C]] 
+LINE AA x1, y1, x2, y2 [, LW [, C]] 
+~LINE GRAPH x(), y(), colour
+LINE GRAPH x(), y(), colour
+~LINE INPUT [prompt$,] string-variable$ 
+LINE INPUT [prompt$,] string-variable$ 
+~LINE INPUT #nbr, string-variable$  
+LINE INPUT #nbr, string-variable$  
+~LINE PLOT ydata() [,nbr][,xstart] [,xinc] [,ystart] [,yinc][,colour]
+LINE PLOT ydata() [,nbr][,xstart] [,xinc] [,ystart] [,yinc][,colour]
+~LIST [fname$] or LIST ALL [fname$] 
+LIST [fname$] or LIST ALL [fname$] 
+~LIST COMMANDS or LIST FUNCTIONS 
+LIST COMMANDS or LIST FUNCTIONS 
+~LIST PINS
+LIST PINS
+~LIST SYSTEM I2C
+LIST SYSTEM I2C
+~LOAD file$ [,R] 
+LOAD file$ [,R] 
+~LOAD IMAGE file$ [, x] [, y] 
+LOAD IMAGE file$ [, x] [, y] 
+~LOAD JPG file$ [, x] [, y] 
+LOAD JPG file$ [, x] [, y] 
+~LOAD PNG fname$ [, x] [, y][,transparent] [,alphacut]
+LOAD PNG fname$ [, x] [, y][,transparent] [,alphacut]
+~LOCAL variable [, variables] 
+LOCAL variable [, variables] 
+~LONGSTRING AES128 ENCRYPT/DECRYPT CBC/ECB/CTR key$/key[!/%](), in%(), out%() [,iv$/iv[!/%]()]
+LONGSTRING AES128 ENCRYPT/DECRYPT CBC/ECB/CTR key$/key[!/%](), in%(), out%() [,iv$/iv[!/%]()]
+~LONGSTRING APPEND array%(), string$ 
+LONGSTRING APPEND array%(), string$ 
+~LONGSTRING BASE64 ENCODE/DECODE in%(), out%()
+LONGSTRING BASE64 ENCODE/DECODE in%(), out%()
+~LONGSTRING CLEAR array%() 
+LONGSTRING CLEAR array%() 
+~LONGSTRING COPY dest%(), src%() 
+LONGSTRING COPY dest%(), src%() 
+~LONGSTRING CONCAT dest%(), src%() 
+LONGSTRING CONCAT dest%(), src%() 
+~LONGSTRING LCASE array%() 
+LONGSTRING LCASE array%() 
+~LONGSTRING LEFT dest%(), src%(), nbr 
+LONGSTRING LEFT dest%(), src%(), nbr 
+~LONGSTRING LOAD array%(), nbr, string$ 
+LONGSTRING LOAD array%(), nbr, string$ 
+~LONGSTRING MID dest%(), src%(), start, nbr 
+LONGSTRING MID dest%(), src%(), start, nbr 
+~LONGSTRING PRINT [#n,] src%() 
+LONGSTRING PRINT [#n,] src%() 
+~LONGSTRING REPLACE array%() , string$, start 
+LONGSTRING REPLACE array%() , string$, start 
+~LONGSTRING RESIZE addr%(), nbr 
+LONGSTRING RESIZE addr%(), nbr 
+~LONGSTRING RIGHT dest%(), src%(), nbr 
+LONGSTRING RIGHT dest%(), src%(), nbr 
+~LONGSTRING SETBYTE addr%(), nbr, data 
+LONGSTRING SETBYTE addr%(), nbr, data 
+~LONGSTRING TRIM array%(), nbr 
+LONGSTRING TRIM array%(), nbr 
+~LONGSTRING UCASE array%() 
+LONGSTRING UCASE array%() 
+~LOOP [UNTIL expression] 
+LOOP [UNTIL expression] 
+~MAP( n ) = rgb%   <- HDMI VERSION ONLY
+MAP( n ) = rgb%   <- HDMI VERSION ONLY
+~MAP MAXIMITE   <- HDMI VERSION ONLY
+MAP MAXIMITE   <- HDMI VERSION ONLY
+~MAP GREYSCALE   <- HDMI VERSION ONLY
+MAP GREYSCALE   <- HDMI VERSION ONLY
+~MAP SET    <- HDMI VERSION ONLY
+MAP SET    <- HDMI VERSION ONLY
+~MAP RESET    <- HDMI VERSION ONLY
+MAP RESET    <- HDMI VERSION ONLY
+~MAP( n ) = rgb%    <- VGA VERSION ONLY
+MAP( n ) = rgb%    <- VGA VERSION ONLY
+~MAP MAXIMITE    <- VGA VERSION ONLY
+MAP MAXIMITE    <- VGA VERSION ONLY
+~MAP SET    <- VGA VERSION ONLY
+MAP SET    <- VGA VERSION ONLY
+~MAP RESET    <- VGA VERSION ONLY
+MAP RESET    <- VGA VERSION ONLY
+~MATH RANDOMIZE [n]
+MATH RANDOMIZE [n]
+~MATH SET nbr, array() 
+MATH SET nbr, array() 
+~MATH SCALE in(), scale ,out() 
+MATH SCALE in(), scale ,out() 
+~MATH ADD in(), num ,out() 
+MATH ADD in(), num ,out() 
+~MATH INTERPOLATE in1(), in2(), ratio, out() 
+MATH INTERPOLATE in1(), in2(), ratio, out() 
+~MATH WINDOW in(), minout, maxout, out() [,minin, maxin]
+MATH WINDOW in(), minout, maxout, out() [,minin, maxin]
+~MATH SLICE sourcearray(), [d1] [,d2] [,d3] [,d4] [,d5] , destinationarray() 
+MATH SLICE sourcearray(), [d1] [,d2] [,d3] [,d4] [,d5] , destinationarray() 
+~MATH INSERT targetarray(), [d1] [,d2] [,d3] [,d4] [,d5] , sourcearray() 
+MATH INSERT targetarray(), [d1] [,d2] [,d3] [,d4] [,d5] , sourcearray() 
+~MATH POWER inarray(), power, outarray()
+MATH POWER inarray(), power, outarray()
+~MATH M_INVERSE array!(), inversearray!() 
+MATH M_INVERSE array!(), inversearray!() 
+~MATH M_PRINT array() 
+MATH M_PRINT array() 
+~MATH M_TRANSPOSE in(), out() 
+MATH M_TRANSPOSE in(), out() 
+~MATH M_MULT in1(), in2(), out() 
+MATH M_MULT in1(), in2(), out() 
+~MATH V_PRINT array() 
+MATH V_PRINT array() 
+~MATH V_NORMALISE inV(), outV() 
+MATH V_NORMALISE inV(), outV() 
+~MATH V_MULT matrix(), inV(), outV() 
+MATH V_MULT matrix(), inV(), outV() 
+~MATH V_CROSS inV1(), inV2(), outV() 
+MATH V_CROSS inV1(), inV2(), outV() 
+~MATH V_ROTATE x, y, a, xin(), yin(), xout(), yout()
+MATH V_ROTATE x, y, a, xin(), yin(), xout(), yout()
+~MATH Q_INVERT inQ(), outQ() 
+MATH Q_INVERT inQ(), outQ() 
+~MATH Q_VECTOR x, y, z, outVQ() 
+MATH Q_VECTOR x, y, z, outVQ() 
+~MATH Q_CREATE theta, x, y, z, outRQ() 
+MATH Q_CREATE theta, x, y, z, outRQ() 
+~MATH Q_EULER yaw, pitch, roll, outRQ() 
+MATH Q_EULER yaw, pitch, roll, outRQ() 
+~MATH Q_MULT inQ1,inQ2,outQ 
+MATH Q_MULT inQ1,inQ2,outQ 
+~MATH Q_ROTATE , RQ(), inVQ(), outVQ() 
+MATH Q_ROTATE , RQ(), inVQ(), outVQ() 
+~MATH C
+MATH C
+MATH C_ADD array1%(), array2%(), array3%()
+MATH C_SUB array1%(), array2%(), array3%()
+MATH C_MULT array1%(), array2%(), array3%()
+MATH C_DIV array1%(), array2%(), array3%()
+MATH C_ADD array1!(), array2!(), array3!()
+MATH C_SUB array1!(), array2!(), array3!()
+MATH C_MULT array1!(), array2!(), array3!()
+MATH C_DIV array1!(), array2!(), array3!()
+~MATH FFT signalarray!(), FFTarray!() 
+MATH FFT signalarray!(), FFTarray!() 
+~MATH FFT INVERSE FFTarray!(), signalarray!() 
+MATH FFT INVERSE FFTarray!(), signalarray!() 
+~MATH FFT MAGNITUDE signalarray!(),magnitudearray!() 
+MATH FFT MAGNITUDE signalarray!(),magnitudearray!() 
+~MATH FFT PHASE signalarray!(), phasearray!() 
+MATH FFT PHASE signalarray!(), phasearray!() 
+~MATH SENSORFUSION type ax, ay, az, gx, gy, gz, mx, my, mz, pitch, roll, yaw [,p1] [,p2]
+MATH SENSORFUSION type ax, ay, az, gx, gy, gz, mx, my, mz, pitch, roll, yaw [,p1] [,p2]
+~MATH PID INIT channel, pid_params!(), callback
+MATH PID INIT channel, pid_params!(), callback
+~MATH PID START channel 
+MATH PID START channel 
+~MATH PID STOP channel 
+MATH PID STOP channel 
+~MATH AES128 ENCRYPT/DECRYPT CBC/ECB/CTR key$/key(), in$/in(), out$/out() [,iv$/iv()]
+MATH AES128 ENCRYPT/DECRYPT CBC/ECB/CTR key$/key(), in$/in(), out$/out() [,iv$/iv()]
+~MEMORY SET 
+MEMORY SET 
+MEMORY SET address, byte, numberofbytes
+MEMORY SET BYTE address, byte, numberofbytes
+MEMORY SET SHORT address, short, numberofshorts
+MEMORY SET WORD address, word, numberofwords
+MEMORY SET INTEGER address, integervalue ,numberofintegers [,increment]
+MEMORY SET FLOAT address, floatingvalue ,numberofloats [,increment]
+BYTE = One byte per memory address. 
+SHORT = Two bytes per memory address. 
+WORD = Four bytes per memory address. 
+FLOAT = Eight bytes per memory address.
+~MEMORY COPY sourceaddress, destinationaddres, numberofbytes
+MEMORY COPY sourceaddress, destinationaddres, numberofbytes
+~MEMORY COPY INTEGER (or FLOAT) sourceaddress, destinationaddress, numberofintegers [,sourceincrement] [,destinationincrement] 
+MEMORY COPY INTEGER (or FLOAT) sourceaddress, destinationaddress, numberofintegers [,sourceincrement] [,destinationincrement] 
+~MEMORY PRINT #]fnbr , nbr, address%/array() MEMORY INPUT [#]fnbr , nbr, address%/array()
+MEMORY PRINT #]fnbr , nbr, address%/array() MEMORY INPUT [#]fnbr , nbr, address%/array()
+~MEMORY PACK (or UNPACK ) source%()/sourceaddress%, dest%()/destaddress%, number, size 
+MEMORY PACK (or UNPACK ) source%()/sourceaddress%, dest%()/destaddress%, number, size 
+~MKDIR dir$ 
+MKDIR dir$ 
+~MID$( str$, start [, num]) = str2$ 
+MID$( str$, start [, num]) = str2$ 
+~MODE 1 or MODE 2 Or MODE 3 (RP2350 only) 
+MODE 1 or MODE 2 Or MODE 3 (RP2350 only) 
+~MODE n 
+MODE n 
+~OPTION RESOLUTION
+OPTION RESOLUTION
+~MOUSE  
+MOUSE  
+~MOUSE INTERRUPT ENABLE channel, int
+MOUSE INTERRUPT ENABLE channel, int
+~MOUSE INTERRUPT DISABLE channel
+MOUSE INTERRUPT DISABLE channel
+~MOUSE SET channel, y- coord, y-coord [, wheel-count]
+MOUSE SET channel, y- coord, y-coord [, wheel-count]
+~MOUSE OPEN channel, CLKpin, DATApin 
+MOUSE OPEN channel, CLKpin, DATApin 
+~MOUSE CLOSE channel
+MOUSE CLOSE channel
+~NEW 
+NEW 
+~NEXT [counter-variable] [,counter-variable], etc 
+NEXT [counter-variable] [,counter-variable], etc 
+~ON ERROR ABORT or ON ERROR IGNORE or ON ERROR SKIP [nn] or ON ERROR CLEAR
+ON ERROR ABORT or ON ERROR IGNORE or ON ERROR SKIP [nn] or ON ERROR CLEAR
+~ON ERROR ABORT 
+ON ERROR ABORT 
+~ON ERROR IGNORE 
+ON ERROR IGNORE 
+~ON ERROR SKIP 
+ON ERROR SKIP 
+~ON ERROR CLEAR. 
+ON ERROR CLEAR. 
+~ON KEY target or ON KEY ASCIIcode, target 
+ON KEY target or ON KEY ASCIIcode, target 
+~ON PS2 target
+ON PS2 target
+~ONEWIRE RESET pin or ONEWIRE WRITE pin, flag, length, data [, data...] or  ONEWIRE READ pin, flag, length, data [, data...] 
+ONEWIRE RESET pin or ONEWIRE WRITE pin, flag, length, data [, data...] or  ONEWIRE READ pin, flag, length, data [, data...] 
+'flag' options: 
+1 -Send reset before command 
+2 -Send reset after command 
+4 -Only send/recv a bit instead of a byte of data 
+8 -Invoke a strong pullup after the command (the pin will be set high and open drain disabled) 
+~OPEN fname$ FOR mode AS [#]fnbr 
+OPEN fname$ FOR mode AS [#]fnbr 
+'mode' is INPUT, OUTPUT, APPEND or RANDOM. 
+INPUT open the file for reading, throw an error if the file does not exist. 
+OUTPUT open the file for writing, overwrite any existing file with the same name. 
+APPEND open the file for writing , will not overwrite an existing file. Writes will be appended to the end of the file. 
+RANDOM open the file for both read and write. Allow random access using the SEEK command. 
+~OPEN comspec$ AS [#]fnbr 
+OPEN comspec$ AS [#]fnbr 
+~OPEN comspec$ AS GPS [,timezone_offset] [,monitor] 
+OPEN comspec$ AS GPS [,timezone_offset] [,monitor] 
+~PAUSE delay 
+PAUSE delay 
+~PIN( pin ) = value 
+PIN( pin ) = value 
+~PIO machine
+PIO machine
+~PIO assemble pio,linedata$
+PIO assemble pio,linedata$
+~PIO DMA RX pio, sm, nbr, data%() [,completioninterrupt] [,transfersize] [,loopbackcount] or PIO DMA TX pio, sm, nbr, data%() [,completioninterrupt] [,transfersize] [,loopbackcount]
+PIO DMA RX pio, sm, nbr, data%() [,completioninterrupt] [,transfersize] [,loopbackcount] or PIO DMA TX pio, sm, nbr, data%() [,completioninterrupt] [,transfersize] [,loopbackcount]
+~PIO DMA RX OFF or PIO DMA TX OFF
+PIO DMA RX OFF or PIO DMA TX OFF
+~PIO INTERRUPT pio, sm [,RXinterrupt] [,TXinterrupt]
+PIO INTERRUPT pio, sm [,RXinterrupt] [,TXinterrupt]
+~PIO INIT MACHINE pio%, statemachine%, clockspeed [,pinctrl] [,execctrl] [,shiftctrl] [,startinstruction]
+PIO INIT MACHINE pio%, statemachine%, clockspeed [,pinctrl] [,execctrl] [,shiftctrl] [,startinstruction]
+~PIO INIT MACHINE pio%,statemachine%, clockspeed[,pinctrl] [,execctrl] [,shiftctrl][,startinstruction] [,sideout [,setout] [,outout]
+PIO INIT MACHINE pio%,statemachine%, clockspeed[,pinctrl] [,execctrl] [,shiftctrl][,startinstruction] [,sideout [,setout] [,outout]
+~PIO EXECUTE pio, state_machine, instruction%
+PIO EXECUTE pio, state_machine, instruction%
+~PIO WRITE pio, state_machine, count, data0 [,data1..] 
+PIO WRITE pio, state_machine, count, data0 [,data1..] 
+~PIO WRITEFIFO a,b,v,d
+PIO WRITEFIFO a,b,v,d
+~PIO READ pio, state_machine, count, data%[()]
+PIO READ pio, state_machine, count, data%[()]
+~PIO START pio, statemachine 
+PIO START pio, statemachine 
+~PIO STOP pio, statemachine  
+PIO STOP pio, statemachine  
+~PIO CLEAR pio 
+PIO CLEAR pio 
+~PIO PROGRAM LINE pio, line, instruction 
+PIO PROGRAM LINE pio, line, instruction 
+~PIXEL x, y [,c] 
+PIXEL x, y [,c] 
+~PLAY TONE left [, right [, dur] [,interrupt]]] 
+PLAY TONE left [, right [, dur] [,interrupt]]] 
+~PLAY FLAC file$ [, interrupt]
+PLAY FLAC file$ [, interrupt]
+~PLAY WAV file$ [, interrupt] 
+PLAY WAV file$ [, interrupt] 
+~PLAY MP3 file$ [, interrupt]
+PLAY MP3 file$ [, interrupt]
+~PLAY MODFILE file$ [,interrupt]
+PLAY MODFILE file$ [,interrupt]
+~PLAY MODSAMPLE Samplenum, channel [,volume]
+PLAY MODSAMPLE Samplenum, channel [,volume]
+~PLAY LOAD SOUND array%()
+PLAY LOAD SOUND array%()
+~PLAY SOUND soundno, channelno, type [,frequency] [,volume] 
+PLAY SOUND soundno, channelno, type [,frequency] [,volume] 
+~PLAY PAUSE 
+PLAY PAUSE 
+~PLAY RESUME 
+PLAY RESUME 
+~PLAY STOP 
+PLAY STOP 
+~PLAY VOLUME left, right 
+PLAY VOLUME left, right 
+~PLAY NEXT 
+PLAY NEXT 
+~PLAY PREVIOUS 
+PLAY PREVIOUS 
+~PLAY MP3 file$ [, interrupt] (VS1053 specific)
+PLAY MP3 file$ [, interrupt] (VS1053 specific)
+~PLAY HALT (VS1053 specific)
+PLAY HALT (VS1053 specific)
+~PLAY CONTINUE track$ (VS1053 specific)
+PLAY CONTINUE track$ (VS1053 specific)
+~PLAY MIDIFILE file$ [,interrupt] (VS1053 specific)
+PLAY MIDIFILE file$ [,interrupt] (VS1053 specific)
+~PLAY MIDI (VS1053 specific)
+PLAY MIDI (VS1053 specific)
+~PLAY MIDI CMD cmd%,data1%, data2% (VS1053 specific)
+PLAY MIDI CMD cmd%,data1%, data2% (VS1053 specific)
+~PLAY MIDI TEST n (VS1053 specific)
+PLAY MIDI TEST n (VS1053 specific)
+~PLAY NOTE ON channel%, note%, velocity% (VS1053 specific)
+PLAY NOTE ON channel%, note%, velocity% (VS1053 specific)
+~PLAY NOTE OFF channel%, note% [,velocity%] (VS1053 specific)
+PLAY NOTE OFF channel%, note% [,velocity%] (VS1053 specific)
+~PLAY STREAM buffer%(),readpointer%, writepointer%  (VS1053 specific)
+PLAY STREAM buffer%(),readpointer%, writepointer%  (VS1053 specific)
+~POKE BYTE addr%, byte or POKE SHORT addr%, short% or POKE WORD addr%, word% or POKE INTEGER addr%, int% or POKE FLOAT addr%, float!  or POKE VAR var, offset, byte or POKE VARTBL, offset, byte
+POKE BYTE addr%, byte or POKE SHORT addr%, short% or POKE WORD addr%, word% or POKE INTEGER addr%, int% or POKE FLOAT addr%, float!  or POKE VAR var, offset, byte or POKE VARTBL, offset, byte
+POKE BYTE will set the byte (i.e. 8 bits) at the memory location 'addr%' to 'byte'. 'addr%' should be an integer.
+POKE SHORT will set the short integer (i.e. 16 bits) at the memory location 'addr%' to 'word%'. 'addr%' and short%' should be integers.
+POKE WORD will set the word (i.e. 32 bits) at the memory location 'addr%' to 'word%'. 'addr%' and 'word%' should be integers.
+POKE INTEGER will set the MMBasic integer (i.e. 64 bits) at the memory location 'addr%' to int%'. 'addr%' and int%' should be integers.
+POKE FLOAT will set the word (i.e. 32 bits) at the memory location 'addr%' to 'float!'. 'addr%' should be an integer and 'float!' a floating point number.
+POKE VAR will set a byte in the memory address of 'var'. 'offset' is the +/-offset from the address of the variable. An array is specified as var().
+POKE VARTBL will set a byte in MMBasic's variable table. 'offset' is the +/-offset from the start of the variable table. 
+~POKE DISPLAY command [,data1] [,data2] [,datan]
+POKE DISPLAY command [,data1] [,data2] [,datan]
+~POKE DISPLAY HRES n or POKE DISPLAY VRES n
+POKE DISPLAY HRES n or POKE DISPLAY VRES n
+~POLYGON n, xarray%(), yarray%() [, bordercolour] [, fillcolour] or POLYGON n(), xarray%(), yarray%() [, bordercolour()] [, fillcolour()] or POLYGON n(), xarray%(), yarray%() [, bordercolour] [, fillcolour]
+POLYGON n, xarray%(), yarray%() [, bordercolour] [, fillcolour] or POLYGON n(), xarray%(), yarray%() [, bordercolour()] [, fillcolour()] or POLYGON n(), xarray%(), yarray%() [, bordercolour] [, fillcolour]
+~PORT(start, nbr [,start, nbr]...) = value 
+PORT(start, nbr [,start, nbr]...) = value 
+~PRINT expression [[,; ]expression] ... etc 
+PRINT expression [[,; ]expression] ... etc 
+~PRINT #nbr, expression [[,; ]expression] ... etc
+PRINT #nbr, expression [[,; ]expression] ... etc
+~PRINT #GPS, expression [[,; ]expression] ... etc [[,; ]expression] ... etc 
+PRINT #GPS, expression [[,; ]expression] ... etc [[,; ]expression] ... etc 
+~PRINT @(x [, y]) expression Or PRINT @(x, [y], m) expression 
+PRINT @(x [, y]) expression Or PRINT @(x, [y], m) expression 
+m = 1 The background will not be drawn (ie, transparent) 
+m = 2 The video will be inverted (black letters, white background) 
+m = 5 Current pixels will be inverted (transparent background) 
+~PULSE pin, width 
+PULSE pin, width 
+~PWM channel, frequency,[dutyA][,dutyB][,phase][,defer]
+PWM channel, frequency,[dutyA][,dutyB][,phase][,defer]
+~PWM SYNC s0 [,s1][,s2][,s3][,s4][,s5][,s6][,s7]
+PWM SYNC s0 [,s1][,s2][,s3][,s4][,s5][,s6][,s7]
+~PWM channel, OFF  
+PWM channel, OFF  
+~RAM
+RAM
+~RANDOMIZE nbr 
+RANDOMIZE nbr 
+~RBOX x, y, w, h [, r] [,c] [,fill] 
+RBOX x, y, w, h [, r] [,c] [,fill] 
+~READ variable[, variable]... 
+READ variable[, variable]... 
+~READ SAVE or READ RESTORE 
+READ SAVE or READ RESTORE 
+~REFRESH
+REFRESH
+~REM string 
+REM string 
+~RENAME old$ AS new$ 
+RENAME old$ AS new$ 
+~RESTORE [line] 
+RESTORE [line] 
+~RMDIR dir$ 
+RMDIR dir$ 
+~RTC GETTIME  
+RTC GETTIME  
+~RTC SETTIME year, month,day, hour, minute, second 
+RTC SETTIME year, month,day, hour, minute, second 
+~RTC SETREG reg, value or RTC GETREG reg, var 
+RTC SETREG reg, value or RTC GETREG reg, var 
+~RUN or RUN [file$] [, cmdline$]
+RUN or RUN [file$] [, cmdline$]
+~SAVE file$ 
+SAVE file$ 
+~SAVE CONTEXT [CLEAR] or LOAD CONTEXT [KEEP]
+SAVE CONTEXT [CLEAR] or LOAD CONTEXT [KEEP]
+~SAVE PERSISTENT n%
+SAVE PERSISTENT n%
+~SAVE IMAGE file$ [,x, y, w, h]  or  SAVE COMPRESSED IMAGE file$ [,x, y, w, h] 
+SAVE IMAGE file$ [,x, y, w, h]  or  SAVE COMPRESSED IMAGE file$ [,x, y, w, h] 
+~SEEK [#]fnbr, pos 
+SEEK [#]fnbr, pos 
+~SELECT CASE value CASE testexp <statements> CASE ELSE <statements> END SELECT 
+SELECT CASE value CASE testexp <statements> CASE ELSE <statements> END SELECT 
+~SERVO channel [positionA] [,positionB]
+SERVO channel [positionA] [,positionB]
+~SETPIN pin, cfg, target [,option] 
+SETPIN pin, cfg, target [,option] 
+~SETPIN pin, cfg, target [, option]
+SETPIN pin, cfg, target [, option]
+~SETPIN GP25, DOUT | HEARTBEAT
+SETPIN GP25, DOUT | HEARTBEAT
+~SETPIN p1[, p2 [, p3]], device 
+SETPIN p1[, p2 [, p3]], device 
+~SETPIN rx, tx, COM1 
+SETPIN rx, tx, COM1 
+~SETPIN rx, tx, COM2 
+SETPIN rx, tx, COM2 
+~SETPIN rx, tx, clk, SPI 
+SETPIN rx, tx, clk, SPI 
+~SETPIN rx, tx, clk, SPI2 
+SETPIN rx, tx, clk, SPI2 
+~SETPIN sda, scl, I2C 
+SETPIN sda, scl, I2C 
+~SETPIN sda, scl, I2C2 
+SETPIN sda, scl, I2C2 
+~SETPIN pin, PWMnx 
+SETPIN pin, PWMnx 
+~SETPIN pin, IR  
+SETPIN pin, IR  
+~SETPIN pin, PIOn  
+SETPIN pin, PIOn  
+~SETPIN GP1, FFIN [,gate]
+SETPIN GP1, FFIN [,gate]
+~SETTICK period, target [, nbr] 
+SETTICK period, target [, nbr] 
+~SETTICK PAUSE, target [, nbr]  or  SETTICK RESUME, target [, nbr] 
+SETTICK PAUSE, target [, nbr]  or  SETTICK RESUME, target [, nbr] 
+~SORT array() [,indexarray()] [,flags] [,startposition] [,elementstosort]  
+SORT array() [,indexarray()] [,flags] [,startposition] [,elementstosort]  
+'flag' parameter values are:
+bit0: 0 (default if omitted) normal sort - 1 reverse sort
+bit1: 0 (default) case dependent - 1 sort is case independent (strings only).
+bit2: 0 (default) normal sort - 1 empty strings go to the end of the array
+~SPI OPEN speed, mode, bits or SPI READ nbr, array() or SPI WRITE nbr, data1, data2,data3, ... etc or SPI WRITE nbr, string$ or SPI WRITE nbr, array() or SPI CLOSE
+SPI OPEN speed, mode, bits or SPI READ nbr, array() or SPI WRITE nbr, data1, data2,data3, ... etc or SPI WRITE nbr, string$ or SPI WRITE nbr, array() or SPI CLOSE
+~SPRITE CLOSE [#]n  (VGA AND HDMI VERSIONS ONLY)
+SPRITE CLOSE [#]n  (VGA AND HDMI VERSIONS ONLY)
+~SPRITE CLOSE ALL (VGA AND HDMI VERSIONS ONLY)
+SPRITE CLOSE ALL (VGA AND HDMI VERSIONS ONLY)
+~SPRITE COPY [#]n, [#]m, nbr (VGA AND HDMI VERSIONS ONLY)
+SPRITE COPY [#]n, [#]m, nbr (VGA AND HDMI VERSIONS ONLY)
+~SPRITE HIDE [#]n  (VGA AND HDMI VERSIONS ONLY)
+SPRITE HIDE [#]n  (VGA AND HDMI VERSIONS ONLY)
+~SPRITE HIDE ALL (VGA AND HDMI VERSIONS ONLY)
+SPRITE HIDE ALL (VGA AND HDMI VERSIONS ONLY)
+~SPRITE RESTORE  (VGA AND HDMI VERSIONS ONLY)
+SPRITE RESTORE  (VGA AND HDMI VERSIONS ONLY)
+~SPRITE HIDE SAFE [#]n (VGA AND HDMI VERSIONS ONLY)
+SPRITE HIDE SAFE [#]n (VGA AND HDMI VERSIONS ONLY)
+~SPRITE INTERRUPT sub  (VGA AND HDMI VERSIONS ONLY)
+SPRITE INTERRUPT sub  (VGA AND HDMI VERSIONS ONLY)
+~SPRITE READ [#]b, x, y, w, h (VGA AND HDMI VERSIONS ONLY)
+SPRITE READ [#]b, x, y, w, h (VGA AND HDMI VERSIONS ONLY)
+~SPRITE WRITE [#]b, x, y (VGA AND HDMI VERSIONS ONLY)
+SPRITE WRITE [#]b, x, y (VGA AND HDMI VERSIONS ONLY)
+'mode' parameter defaults to 4. It is the bitwise AND of the following values: 
+&B001 = mirrored left to right
+&B010 = mirrored top to bottom
+&B100 = don't copy transparent pixels
+~SPRITE LOAD fname$ [,start_sprite_number] [,mode] (VGA AND HDMI VERSIONS ONLY)
+SPRITE LOAD fname$ [,start_sprite_number] [,mode] (VGA AND HDMI VERSIONS ONLY)
+~SPRITE LOADARRAY [#]n, w, h, array%() (VGA AND HDMI VERSIONS ONLY)
+SPRITE LOADARRAY [#]n, w, h, array%() (VGA AND HDMI VERSIONS ONLY)
+~SPRITE LOADBMP [#]b, fname$ [,x] [,y] [,w] [,h] (VGA AND HDMI VERSIONS ONLY)
+SPRITE LOADBMP [#]b, fname$ [,x] [,y] [,w] [,h] (VGA AND HDMI VERSIONS ONLY)
+~SPRITE LOADPNG [#]b, fname$ [,transparent] [,alphacut] (VGA AND HDMI VERSIONS ONLY)
+SPRITE LOADPNG [#]b, fname$ [,transparent] [,alphacut] (VGA AND HDMI VERSIONS ONLY)
+~SPRITE MOVE (VGA AND HDMI VERSIONS ONLY)
+SPRITE MOVE (VGA AND HDMI VERSIONS ONLY)
+~SPRITE NEXT [#]n, x, y (VGA AND HDMI VERSIONS ONLY)
+SPRITE NEXT [#]n, x, y (VGA AND HDMI VERSIONS ONLY)
+~SPRITE SCROLL x, y [,col] (VGA AND HDMI VERSIONS ONLY)
+SPRITE SCROLL x, y [,col] (VGA AND HDMI VERSIONS ONLY)
+~SPRITE SET TRANSPARENT n (VGA AND HDMI VERSIONS ONLY)
+SPRITE SET TRANSPARENT n (VGA AND HDMI VERSIONS ONLY)
+~SPRITE SHOW [#]n, x,y, layer [,options] (VGA AND HDMI VERSIONS ONLY)
+SPRITE SHOW [#]n, x,y, layer [,options] (VGA AND HDMI VERSIONS ONLY)
+'options' can be set as follows:
+bit 0 set - mirrored left to right
+bit 1 set - mirrored top to bottom
+bit 2 set - black pixels not treated as transparent default is 0
+~SPRITE SHOW SAFE [#]n, x,y, layer [,orientation] [,ontop] (VGA AND HDMI VERSIONS ONLY)
+SPRITE SHOW SAFE [#]n, x,y, layer [,orientation] [,ontop] (VGA AND HDMI VERSIONS ONLY)
+~SPRITE SWAP [#]n1, [#]n2 [,orientation] (VGA AND HDMI VERSIONS ONLY)
+SPRITE SWAP [#]n1, [#]n2 [,orientation] (VGA AND HDMI VERSIONS ONLY)
+~STATIC variable [, variables] 
+STATIC variable [, variables] 
+~SUB xxx (arg1 [,arg2, ...]) <statements> END SUB 
+SUB xxx (arg1 [,arg2, ...]) <statements> END SUB 
+~SYNC time% [,period] or SYNC
+SYNC time% [,period] or SYNC
+~TEMPR START pin [, precision] 
+TEMPR START pin [, precision] 
+~TEXT x, y, string$ [,alignment$] [, font] [, scale] [, c] [, bc] 
+TEXT x, y, string$ [,alignment$] [, font] [, scale] [, c] [, bc] 
+~TILE x, y [,foreground] [,background] [,nbr_tiles_wide]  [,nbr_tiles_high] 
+TILE x, y [,foreground] [,background] [,nbr_tiles_wide]  [,nbr_tiles_high] 
+~TILE HEIGHT n 
+TILE HEIGHT n 
+~TIME$ = "HH:MM:SS" or TIME$ = "HH:MM" or TIME$ = "HH" 
+TIME$ = "HH:MM:SS" or TIME$ = "HH:MM" or TIME$ = "HH" 
+~TIMER = msec 
+TIMER = msec 
+~TRACE ON TRACE ON/OFF or  TRACE OFF or TRACE LIST nn 
+TRACE ON TRACE ON/OFF or  TRACE OFF or TRACE LIST nn 
+~TRIANGLE X1, Y1, X2, Y2, X3, Y3 [, C [, FILL]] 
+TRIANGLE X1, Y1, X2, Y2, X3, Y3 [, C [, FILL]] 
+~UPDATE FIRMWARE 
+UPDATE FIRMWARE 
+~VAR SAVE var [, var]... or VAR RESTORE or VAR RV or VAR CLEAR
+VAR SAVE var [, var]... or VAR RESTORE or VAR RV or VAR CLEAR
+~WATCHDOG timeout or WATCHDOG OFF or WATCHDOG HW timeout or WATCHDOG HW OFF  
+WATCHDOG timeout or WATCHDOG OFF or WATCHDOG HW timeout or WATCHDOG HW OFF  
+~WII [CLASSIC] OPEN [,interrupt]
+WII [CLASSIC] OPEN [,interrupt]
+~WII [CLASSIC] CLOSE
+WII [CLASSIC] CLOSE
+~WII NUNCHUCK OPEN [,interrupt]
+WII NUNCHUCK OPEN [,interrupt]
+~WII NUNCHUCK CLOSE
+WII NUNCHUCK CLOSE
+~WEB  WEBMITE ONLY
+WEB  WEBMITE ONLY
+~WEB CONNECT [ssid$, passwd$, [name$] [,ipaddress$, mask$, gateway$]]
+WEB CONNECT [ssid$, passwd$, [name$] [,ipaddress$, mask$, gateway$]]
+~WEB MQTT CONNECT addr$, port, user$, passwd$ [, interrupt]
+WEB MQTT CONNECT addr$, port, user$, passwd$ [, interrupt]
+~WEB MQTT PUBLISH topic$, msg$, [,qos] [,retain] 
+WEB MQTT PUBLISH topic$, msg$, [,qos] [,retain] 
+~WEB MQTT SUBSCRIBE topic$ [,qos]
+WEB MQTT SUBSCRIBE topic$ [,qos]
+~WEB MQTT UNSUBSCRIBE topic$
+WEB MQTT UNSUBSCRIBE topic$
+~WEB MQTT CLOSE
+WEB MQTT CLOSE
+~WEB NTP [timeoffset [,NTPserver$]] [,timeout]]]
+WEB NTP [timeoffset [,NTPserver$]] [,timeout]]]
+~WEB OPEN TCP CLIENT address$, port
+WEB OPEN TCP CLIENT address$, port
+~WEB OPEN TCP STREAM address$, port
+WEB OPEN TCP STREAM address$, port
+~WEB SCAN [array%()]
+WEB SCAN [array%()]
+~WEB TCP CLIENT REQUEST request$, buff%() [,timeout]
+WEB TCP CLIENT REQUEST request$, buff%() [,timeout]
+~WEB TCP CLIENT STREAM command$, buffer%(), readpointer%, writepointer%
+WEB TCP CLIENT STREAM command$, buffer%(), readpointer%, writepointer%
+~WEB CLOSE TCP CLIENT
+WEB CLOSE TCP CLIENT
+~WEB TCP INTERRUPT InterruptSub
+WEB TCP INTERRUPT InterruptSub
+~WEB TCP READ cb%, buff%()
+WEB TCP READ cb%, buff%()
+~WEB TCP SEND cb%, data%() or WEB TCP CLOSE cb%
+WEB TCP SEND cb%, data%() or WEB TCP CLOSE cb%
+~WEB TRANSMIT CODE cb%, nnn%
+WEB TRANSMIT CODE cb%, nnn%
+~WEB TRANSMIT FILE cb%, filename$, content-type$
+WEB TRANSMIT FILE cb%, filename$, content-type$
+~WEB TRANSMIT PAGE cb%, filename$ [,buffersize]
+WEB TRANSMIT PAGE cb%, filename$ [,buffersize]
+~WEB UDP INTERRUPT intname
+WEB UDP INTERRUPT intname
+~WEB UDP SEND addr$, port, data$
+WEB UDP SEND addr$, port, data$
+~WS2812 type, pin, nbr, value%[()]
+WS2812 type, pin, nbr, value%[()]
+'type' is character specifying the type of chip:
+O = original WS2812
+B = WS2812B
+S = SK6812
+W =SK6812W (RGBW)
+~XMODEM SEND or XMODEM SEND file$ or XMODEM RECEIVE or XMODEM RECEIVE file$ or XMODEM CRUNCH
+XMODEM SEND or XMODEM SEND file$ or XMODEM RECEIVE or XMODEM RECEIVE file$ or XMODEM CRUNCH
+~MMBASIC Functions 
+MMBASIC Functions 
+~ABS( number ) 
+ABS( number ) 
+~ACOS( number ) 
+ACOS( number ) 
+~ASC( string$ ) 
+ASC( string$ ) 
+~ASIN( number ) 
+ASIN( number ) 
+~ATN( number ) 
+ATN( number ) 
+~ATAN2( y, x ) 
+ATAN2( y, x ) 
+~BIN$( number [, chars]) 
+BIN$( number [, chars]) 
+~BIN2STR$(type, value [,BIG]) 
+BIN2STR$(type, value [,BIG]) 
+'value'. 'type' can be: 
+INT64 signed 64-bit integer converted to an 8 byte string 
+UINT64 unsigned 64-bit integer converted to an 8 byte string 
+INT32 signed 32-bit integer converted to a 4 byte string 
+UINT32 unsigned 32-bit integer converted to a 4 byte string 
+INT16 signed 16-bit integer converted to a 2 byte string 
+UINT16 unsigned 16-bit integer converted to a 2 byte string 
+INT8 signed 8-bit integer converted to a 1 byte string 
+UINT8 unsigned 8-bit integer converted to a 1 byte string 
+SINGLE single precision floating point number converted to a 4 byte string 
+DOUBLE double precision floating point number converted to a 8 byte string 
+~BOUND(array() [,dimension] 
+BOUND(array() [,dimension] 
+~CALL(userfunname$, [,userfunparameters,....]) 
+CALL(userfunname$, [,userfunparameters,....]) 
+~CHOICE(condition, ExpressionIfTrue, ExpressionIfFalse) 
+CHOICE(condition, ExpressionIfTrue, ExpressionIfFalse) 
+~CHR$( number ) 
+CHR$( number ) 
+~CINT( number ) 
+CINT( number ) 
+~COS( number ) 
+COS( number ) 
+~CWD$ 
+CWD$ 
+~DATE$ 
+DATE$ 
+~DATETIME$(n) 
+DATETIME$(n) 
+~DAY$(date$) 
+DAY$(date$) 
+~DEG( radians ) 
+DEG( radians ) 
+~DEVICE(GAMEPAD channel, funct)
+DEVICE(GAMEPAD channel, funct)
+'funct' is a 1 or 2 letter code indicating the information to return as follows:
+LX the position of the analog left joystick x axis
+LY the position of the analog left joystick y axis
+RX the position of the analog right joystick x axis
+RY the position of the analog right joystick y axis
+GX the reading from the X axis gyro (where supported)
+GY the reading from the Y axis gyro (where supported)
+GZ the reading from the Z axis gyro (where supported)
+AX the reading from the X axis accelerometer (where supported)
+AY the reading from the Y axis accelerometer (where supported)
+AZ the reading from the Z axis accelerometer (where supported)
+L the position of the analog left button
+R the position of the analog right button
+B a bitmap of the state of all the buttons. A bit will be set to 1 if the button is pressed.
+T the ID code of the controller 
+
+The button bitmap is as follows:
+BIT 0 Button R/R1  	    
+BIT 1 Button start/options
+BIT 2 Button home
+BIT 3 Button select/share
+BIT 4 Button L/L1
+BIT 5 Button down cursor
+BIT 6 Button right cursor
+BIT 7 Button up cursor
+BIT 8 Button left cursor
+BIT 9 Right shoulder button 2/R2
+BIT 10 Button x/triangle
+BIT 11 Button a/circle
+BIT 12 Button y/square
+BIT 13 Button b/cross
+BIT 14 Left should button 2/L2
+BIT 15 Touchpad
+~DEVICE(MOUSE channel, funct)
+DEVICE(MOUSE channel, funct)
+'funct' is a 1 letter code indicating the information to return as follows:
+X the X coordinate (0 to MM.HRES-1)
+Y the Y coordinate (0 to MM.VRES-1)
+L the state of the left mouse button
+R the state of the right mouse button
+M the state of the middle mouse button (wheel click)
+D 1 if there has been a double click of the left mouse button
+~DEVICE(WII [CLASSIC] funct)
+DEVICE(WII [CLASSIC] funct)
+'funct' is a 1 or 2 letter code indicating the information to return as follows:
+LX the position of the analog left joystick x axis
+LY the position of the analog left joystick y axis
+RX the position of the analog right joystick x axis
+RY the position of the analog right joystick y axis
+L the position of the analog left button
+R the position of the analog right button
+B a bitmap of the state of all the buttons. A bit will be set to 1 if the button is pressed.
+T the ID code of the controller - should be hex &HA4200101
+
+The button bitmap is as follows:
+BIT 0 Button R
+BIT 1 Button start
+BIT 2 Button home
+BIT 3 Button select
+BIT 4 Button L
+BIT 5 Button down cursor
+BIT 6 Button right cursor
+BIT 7 Button up cursor
+BIT 8 Button left cursor
+BIT 9 Button ZR
+BIT 10 Button x
+BIT 11 Button a
+BIT 12 Button y
+BIT 13 Button b
+BIT 14 Button ZL
+~DEVICE(WII NUNCHUCK funct)
+DEVICE(WII NUNCHUCK funct)
+'funct' is a 1 or 2 letter code indicating the information to return as follows: 
+AX the x axis acceleration
+AY the y axis acceleration
+AZ the z axis acceleration
+JX the position of the joystick x axis
+JY the position of joystick y axis
+C the state of the C button
+Z the state of the Z button
+T the ID code of the controller - should be hex &HA4200000
+~DIR$( fspec, type ) or DIR$( fspec )  or DIR$( )
+DIR$( fspec, type ) or DIR$( fspec )  or DIR$( )
+'fspec' "*.*" will return all entries, "*.TXT" will return text files etc.  
+'type' is the type of entry to return and can be one of: 
+VOL Search for the volume label only 
+DIR Search for directories only 
+FILE Search for files only (the default if 'type' is not specified) 
+~DISTANCE( trigger, echo ) or DISTANCE( trig-echo ) 
+DISTANCE( trigger, echo ) or DISTANCE( trig-echo ) 
+~EOF( [#]fnbr ) 
+EOF( [#]fnbr ) 
+~EPOCH(DATETIME$) 
+EPOCH(DATETIME$) 
+~EVAL( string$ ) 
+EVAL( string$ ) 
+~EXP( number ) 
+EXP( number ) 
+~FIELD$( string1, nbr, string2 [, string3] ) 
+FIELD$( string1, nbr, string2 [, string3] ) 
+~FIX( number ) 
+FIX( number ) 
+~FORMAT$( nbr [, fmt$] ) 
+FORMAT$( nbr [, fmt$] ) 
+The format specification starts with a % character and ends with a letter. Anything outside of this construct is copied to the output as is. 
+The structure of a format specification is: 
+% [flags] [width] [.precision] type Where 'flags' can be: 
+-Left justify the value within a given field width 
+0 Use 0 for the pad character instead of space 
++ Forces the + sign to be shown for positive numbers space Causes a positive value to display a space for the sign. 
+
+Negative values still show the - sign 'width' is the minimum number of characters to output, less than this the number will be padded, more than this the width will be expanded. 
+'precision' specifies the number of fraction digits to generate with an e, or f type or the maximum number of significant digits to generate with a g type. 
+If specified, the precision must be preceded by a dot (.). 
+
+'type' can be one of: 
+g Automatically format the number for the best presentation. 
+f Format the number with the decimal point and following digits 
+e Format the number in exponential format 
+
+If uppercase G or F is used the exponential output will use an uppercase E. 
+If the format specification is not specified "%g" is assumed. 
+~GETSCANLINE 
+GETSCANLINE 
+~GPS()
+GPS()
+~GPS(ALTITUDE) 
+GPS(ALTITUDE) 
+~GPS(DATE) 
+GPS(DATE) 
+~GPS(DOP) 
+GPS(DOP) 
+~GPS(FIX) 
+GPS(FIX) 
+~GPS(GEOID) 
+GPS(GEOID) 
+~GPS(LATITUDE) 
+GPS(LATITUDE) 
+~GPS(LONGITUDE) 
+GPS(LONGITUDE) 
+~GPS(SATELLITES) 
+GPS(SATELLITES) 
+~GPS(SPEED) 
+GPS(SPEED) 
+~GPS(TIME) 
+GPS(TIME) 
+~GPS(TRACK) 
+GPS(TRACK) 
+~GPS(VALID)  
+GPS(VALID)  
+~HEX$( number [, chars]) 
+HEX$( number [, chars]) 
+~INKEY$ 
+INKEY$ 
+~INPUT$(nbr, [#]fnbr) 
+INPUT$(nbr, [#]fnbr) 
+~INSTR( [start-position,] string-searched$, string- pattern$ [,size] )  
+INSTR( [start-position,] string-searched$, string- pattern$ [,size] )  
+~INT( number ) 
+INT( number ) 
+~JSON$(array%(), string$)
+JSON$(array%(), string$)
+~KEYDOWN(n)
+KEYDOWN(n)
+KEYDOWN(0) will return the number of keys being pressed 
+KEYDOWN(1)- KEYDOWN(6) will return value of key pressed. 
+KEYDOWN(7) will give any modifier keys that are pressed. These keys do not add to the count in keydown(0)
+The return value is a bitmask as follows: lAlt - 1, lCtrl - 2, lGui - 4, lShift - 8, rAlt - 16, rCtrl - 32, rGui - 64, rShift - 128
+KEYDOWN(8) will give the current status of the lock keys. These keys do not add to the count in keydown(0)
+The return value is a bitmask as follows: CapsLock - 1, NumLock - 2, ScrollLock - 4 
+~LCASE$( string$ ) 
+LCASE$( string$ ) 
+~LCOMPARE(array1%(), array2%()) 
+LCOMPARE(array1%(), array2%()) 
+~LEFT$( string$, nbr ) 
+LEFT$( string$, nbr ) 
+~LEN( string$ ) 
+LEN( string$ ) 
+~LGETBYTE(array%(), n) 
+LGETBYTE(array%(), n) 
+~LGETSTR$(array%(), start, length) 
+LGETSTR$(array%(), start, length) 
+~LINSTR(array%(), search$ [,start] [,size])) 
+LINSTR(array%(), search$ [,start] [,size])) 
+~LLEN(array%()) 
+LLEN(array%()) 
+~LOC( [#]fnbr ) 
+LOC( [#]fnbr ) 
+~LOF( [#]fnbr ) 
+LOF( [#]fnbr ) 
+~LOG( number ) 
+LOG( number ) 
+~MAP( n )
+MAP( n )
+~MATH(ATAN3 x,y) 
+MATH(ATAN3 x,y) 
+~MATH(COSH a) 
+MATH(COSH a) 
+~MATH(LOG10 a) 
+MATH(LOG10 a) 
+~MATH(SINH a) 
+MATH(SINH a) 
+~MATH(TANH a) 
+MATH(TANH a) 
+~MATH(CRCn data [,length] [,polynome] [,startmask] [,endmask] [,reverseIn] [,reverseOut]
+MATH(CRCn data [,length] [,polynome] [,startmask] [,endmask] [,reverseIn] [,reverseOut]
+~MATH(RAND)
+MATH(RAND)
+~MATH(CHI a()) 
+MATH(CHI a()) 
+~MATH(CHI_p a()) 
+MATH(CHI_p a()) 
+~MATH(CROSSING array() [,level] [,direction]
+MATH(CROSSING array() [,level] [,direction]
+~MATH(CORREL a(), a()) 
+MATH(CORREL a(), a()) 
+~MATH(MAX a() [,index%]) 
+MATH(MAX a() [,index%]) 
+~MATH(MEAN a()) 
+MATH(MEAN a()) 
+~MATH(MEDIAN a()) 
+MATH(MEDIAN a()) 
+~MATH(MIN a(), [index%]) 
+MATH(MIN a(), [index%]) 
+~MATH(SD a()) 
+MATH(SD a()) 
+~MATH(SUM a()) 
+MATH(SUM a()) 
+~MATH(MAGNITUDE v()) 
+MATH(MAGNITUDE v()) 
+~MATH(DOTPRODUCT v1(), v2()) 
+MATH(DOTPRODUCT v1(), v2()) 
+~MATH(M_DETERMINANT array!()) 
+MATH(M_DETERMINANT array!()) 
+~MATH(PID channel, setpoint!, measurement))
+MATH(PID channel, setpoint!, measurement))
+~MATH(BASE64 ENCODE/DECODE in$/in(), out$/out())
+MATH(BASE64 ENCODE/DECODE in$/in(), out$/out())
+~MAX( arg1 [, arg2 [, ...]] )  or MIN( arg1 [, arg2 [, ...]] ) 
+MAX( arg1 [, arg2 [, ...]] )  or MIN( arg1 [, arg2 [, ...]] ) 
+~MID$( string$, start ) or MID$( string$, start, nbr ) 
+MID$( string$, start ) or MID$( string$, start, nbr ) 
+~OCT$( number [, chars]) 
+OCT$( number [, chars]) 
+~PEEK(BYTE addr%) or PEEK(SHORT addr%) or PEEK(WORD addr%) or PEEK(INTEGER addr%) or PEEK(FLOAT addr%) or PEEK(VARADDR var) or PEEK(CFUNADDR cfun) or PEEK(VAR var, +/-offset) or PEEK( VARTBL, +/-offset) or PEEK( PROGMEM, +/-offset)
+PEEK(BYTE addr%) or PEEK(SHORT addr%) or PEEK(WORD addr%) or PEEK(INTEGER addr%) or PEEK(FLOAT addr%) or PEEK(VARADDR var) or PEEK(CFUNADDR cfun) or PEEK(VAR var, +/-offset) or PEEK( VARTBL, +/-offset) or PEEK( PROGMEM, +/-offset)
+BYTE will return the byte (8-bits) located at 'addr%' 
+SHORT will return the short integer (16-bits) located at 'addr%' 
+WORD will return the word (32-bits) located at 'addr%' 
+INTEGER will return the integer (64-bits) located at 'addr%' 
+FLOAT will return the floating point number (32-bits) located at 'addr%' 
+VARADDR will return the address (32-bits) of the variable 'var' in memory. An array is specified as var(). 
+CFUNADDR will return the address (32-bits) of the CFunction 'cfun' in memory. 
+VAR, will return a byte in the memory allocated to 'var'. An array is specified as var(). 
+VARTBL, will return a byte in the memory allocated to the variable table maintained by MMBasic. 
+~PEEK(BP, n%) PEEK with increment to the next byte
+PEEK(BP, n%) PEEK with increment to the next byte
+~PEEK(SP,n%) PEEK with increment to the next short
+PEEK(SP,n%) PEEK with increment to the next short
+~PEEK(WP,n%)PEEK with increment to the next word
+PEEK(WP,n%)PEEK with increment to the next word
+~PI 
+PI 
+~PIN( pin ) 
+PIN( pin ) 
+~PIN( BOOTSEL ) 
+PIN( BOOTSEL ) 
+~PIN( TEMP ) 
+PIN( TEMP ) 
+~PIO(DMA RX POINTER) or PIO(DMA TX POINTER) 
+PIO(DMA RX POINTER) or PIO(DMA TX POINTER) 
+~PIO (SHIFTCTRL push_threshold [,pull_threshold] [,autopush] [,autopull] [,in_shiftdir] [,out_shiftdir] [,fjoin_rx] [,fjoin_tx])
+PIO (SHIFTCTRL push_threshold [,pull_threshold] [,autopush] [,autopull] [,in_shiftdir] [,out_shiftdir] [,fjoin_rx] [,fjoin_tx])
+~PIO (PINCTRL no_side_set_pins [,no_set_pins] [,no_out_pins] [,IN base] [,side_set_base] [,set_base][, out_base])
+PIO (PINCTRL no_side_set_pins [,no_set_pins] [,no_out_pins] [,IN base] [,side_set_base] [,set_base][, out_base])
+~PIO (EXECCTRL jmp_pin ,wrap_target, wrap [,side_pindir] [,side_en])
+PIO (EXECCTRL jmp_pin ,wrap_target, wrap [,side_pindir] [,side_en])
+~PIO(READFIFO a, b, c)
+PIO(READFIFO a, b, c)
+~PIO(NEXT LINE [channel])
+PIO(NEXT LINE [channel])
+~PIO (FDEBUG pio) 
+PIO (FDEBUG pio) 
+~PIO (FSTAT pio) 
+PIO (FSTAT pio) 
+~PIO (FLEVEL pio) 
+PIO (FLEVEL pio) 
+~PIO(FLEVEL pio ,sm, DIR) dir can be RX or TX. 
+PIO(FLEVEL pio ,sm, DIR) dir can be RX or TX. 
+~PIO(.WRAP) 
+PIO(.WRAP) 
+~PIO(.WRAP TARGET) 
+PIO(.WRAP TARGET) 
+~PIXEL( x, y)
+PIXEL( x, y)
+~PORT(start, nbr [,start, nbr]...) 
+PORT(start, nbr [,start, nbr]...) 
+~PULSIN( pin, polarity ) or PULSIN( pin, polarity, t1 ) or PULSIN( pin, polarity, t1, t2 ) 
+PULSIN( pin, polarity ) or PULSIN( pin, polarity, t1 ) or PULSIN( pin, polarity, t1, t2 ) 
+~RAD( degrees ) 
+RAD( degrees ) 
+~RGB(red, green, blue) or  RGB(shortcut) 
+RGB(red, green, blue) or  RGB(shortcut) 
+~RIGHT$( string$, number-ofchars ) 
+RIGHT$( string$, number-ofchars ) 
+~RND( number ) or RND 
+RND( number ) or RND 
+~SGN( number )  
+SGN( number )  
+~SIN( number ) 
+SIN( number ) 
+~SPACE$( number ) 
+SPACE$( number ) 
+~SPI ( data ) or SPI2 ( data )  
+SPI ( data ) or SPI2 ( data )  
+~SPRITE()   <- VGA AND HDMI VERSIONS ONLY
+SPRITE()   <- VGA AND HDMI VERSIONS ONLY
+~SPRITE(C, [#]n )   <-  VGA AND HDMI VERSIONS ONLY
+SPRITE(C, [#]n )   <-  VGA AND HDMI VERSIONS ONLY
+~SPRITE(C, [#]n, m)   <- VGA AND HDMI VERSIONS ONLY
+SPRITE(C, [#]n, m)   <- VGA AND HDMI VERSIONS ONLY
+If the collision was with the edge of the screen then the return value will be:
+&HF1 collision with left of screen
+&HF2 collision with top of screen
+&HF4 collision with right of screen
+&HF8 collision with bottom of screen
+~SPRITE(D ,[#]s1, [#]s2)   <- VGA AND HDMI VERSIONS ONLY
+SPRITE(D ,[#]s1, [#]s2)   <- VGA AND HDMI VERSIONS ONLY
+~SPRITE(E, [#]n   <- VGA AND HDMI VERSIONS ONLY
+SPRITE(E, [#]n   <- VGA AND HDMI VERSIONS ONLY
+~SPRITE(H,[#]n)   <- VGA AND HDMI VERSIONS ONLY
+SPRITE(H,[#]n)   <- VGA AND HDMI VERSIONS ONLY
+~SPRITE(L, [#]n)   <- VGA AND HDMI VERSIONS ONLY
+SPRITE(L, [#]n)   <- VGA AND HDMI VERSIONS ONLY
+~SPRITE(N)   <- VGA AND HDMI VERSIONS ONLY
+SPRITE(N)   <- VGA AND HDMI VERSIONS ONLY
+~SPRITE(N,n)   <- VGA AND HDMI VERSIONS ONLY
+SPRITE(N,n)   <- VGA AND HDMI VERSIONS ONLY
+~SPRITE(S)   <- VGA AND HDMI VERSIONS ONLY
+SPRITE(S)   <- VGA AND HDMI VERSIONS ONLY
+~SPRITE(V,spriteno1,spriteno 2)   <- VGA AND HDMI VERSIONS ONLY
+SPRITE(V,spriteno1,spriteno 2)   <- VGA AND HDMI VERSIONS ONLY
+~SPRITE(T, [#]n)   <- VGA AND HDMI VERSIONS ONLY
+SPRITE(T, [#]n)   <- VGA AND HDMI VERSIONS ONLY
+~SPRITE(V,[#]so1, [#]s2)   <- VGA AND HDMI VERSIONS ONLY
+SPRITE(V,[#]so1, [#]s2)   <- VGA AND HDMI VERSIONS ONLY
+~SPRITE(W, [#]n)   <- VGA AND HDMI VERSIONS ONLY
+SPRITE(W, [#]n)   <- VGA AND HDMI VERSIONS ONLY
+~SPRITE(X, [#]n)   <- VGA AND HDMI VERSIONS ONLY
+SPRITE(X, [#]n)   <- VGA AND HDMI VERSIONS ONLY
+~SPRITE(Y, [#]n)   <- VGA AND HDMI VERSIONS ONLY
+SPRITE(Y, [#]n)   <- VGA AND HDMI VERSIONS ONLY
+~SQR( number )   <- VGA AND HDMI VERSIONS ONLY
+SQR( number )   <- VGA AND HDMI VERSIONS ONLY
+~STR$( number ) or STR$( number, m ) or STR$( number, m, n ) or STR$( number, m, n, c$ ) 
+STR$( number ) or STR$( number, m ) or STR$( number, m, n ) or STR$( number, m, n, c$ ) 
+If 'm' is specified sufficient spaces will be added to the start of the number 
+If 'm' is zero or the number has more than 'm' significant digits no padding spaces will be added. 
+If 'm' is negative, positive numbers will be prefixed with the plus symbol and negative numbers with the negative symbol. 
+If 'm' is positive then only the negative symbol will be used. 'n' is the number of digits required to follow the decimal place. 
+If it is zero the string will be returned without the decimal point. 
+If it is negative the output will always use the exponential format with 'n' digits resolution. 
+If 'n' is not specified the number of decimal places and output format will vary automatically according to the number.
+'c$' is a string and if specified the first character of this string will be used as the padding character instead of a space (see the 'm' argument). 
+~STR2BIN(type, string$ [,BIG]) 
+STR2BIN(type, string$ [,BIG]) 
+Returns a number equal to the binary representation in 'string$'. 'type' can be: 
+INT64 converts 8 byte string representing a signed 64-bit integer to an integer 
+UINT64 converts 8 byte string representing an unsigned 64-bit integer to an integer 
+INT32 converts 4 byte string representing a signed 32-bit integer to an integer 
+UINT32 converts 4 byte string representing an unsigned 32-bit integer to an integer 
+INT16 converts 2 byte string representing a signed 16-bit integer to an integer 
+UINT16 converts 2 byte string representing an unsigned 16-bit integer to an integer 
+INT8 converts 1 byte string representing a signed 8-bit integer to an integer 
+UINT8 converts 1 byte string representing an unsigned 8-bit integer to an integer 
+SINGLE converts 4 byte string representing single precision float to a float 
+DOUBLE converts 8 byte string representing single precision float to a float 
+~STRING$( nbr, ascii ) or STRING$( nbr, string$ ) 
+STRING$( nbr, ascii ) or STRING$( nbr, string$ ) 
+~TAN( number ) 
+TAN( number ) 
+~TEMPR( pin ) 
+TEMPR( pin ) 
+~TIME$ 
+TIME$ 
+~TIMER 
+TIMER 
+~TOUCH(X) or TOUCH(Y)
+TOUCH(X) or TOUCH(Y)
+~UCASE$( string$ ) 
+UCASE$( string$ ) 
+~VAL( string$ ) 
+VAL( string$ ) 

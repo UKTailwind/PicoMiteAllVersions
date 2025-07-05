@@ -1644,6 +1644,7 @@ void MIPS16 do_chain(CombinedPtr cmdline){
 }
 void cmd_chain(void){
 	do_chain(cmdline);
+    CombinedPtr::flush();
 }
 
 void cmd_select(void) {
@@ -1855,6 +1856,7 @@ void cmd_input(void) {
 			*((MMFLOAT *)tp) = (MMFLOAT)atof((char *)s);
 		if(*p == ',') p++;
 	}
+    CombinedPtr::flush();
 }
 
 
@@ -1921,6 +1923,7 @@ void MIPS16 __not_in_flash_func(cmd_for)(void) {
 		vname = argv[0];
 		if(*vname && *vname == ' ') vname++;
 		while(*vname && vname[strlen(vname) - 1] == ' ') (vname + strlen(vname) - 1).write_byte(0);
+        CombinedPtr::flush();
 		vlen = strlen(vname);
 		vptr = findvar(argv[0], V_FIND, 14);					        // create the variable
         if(g_vartbl[g_VarIndex].type & T_CONST) error("Cannot change a constant");
@@ -2414,6 +2417,7 @@ void cmd_mid(void){
 		for (int i = 0; i < value[0]; ++i)
 			(sourcestring + start + i).write_byte((value + 1 + i).operator*());
 	}
+    CombinedPtr::flush();
 }
 void cmd_byte(void){
 	getargs(&cmdline,3,(unsigned char *)",");
@@ -2428,6 +2432,7 @@ void cmd_byte(void){
 	if(!*cmdline) error("Syntax");
 	int value = getint(cmdline,0,255);
 	(sourcestring + start).write_byte(value);
+    CombinedPtr::flush();
 }
 void cmd_bit(void){
 	getargs(&cmdline,3,(unsigned char *)",");
@@ -3391,6 +3396,7 @@ void MIPS16 cmd_dim(void) {
 			}
         }
     }
+    CombinedPtr::flush();
 }
 
 void  cmd_const(void) {

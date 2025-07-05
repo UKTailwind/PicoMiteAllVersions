@@ -346,24 +346,50 @@ void ErrorThrow(int e, int type)
         error(MMErrMsg);
     return;
 }
+#define PROG_FILE "/tmp/picoMite.prog"
+static FIL f = { 0 };
+static void ensure_prog_file_open(void);
+
+#include "utils\FM151.bas.h"
+#include "utils\help.txt.h"
+
 void ResetFlashStorage(int umount){
-    int boot_count=0;
-    if(umount)lfs_unmount(&lfs); 
-    FSerror=lfs_format(&lfs, &pico_lfs_cfg);ErrorCheck(0);
-    FSerror=lfs_mount(&lfs, &pico_lfs_cfg);	ErrorCheck(0);
+    int boot_count = 0;
+    CombinedPtr::init();
+    if(umount) lfs_unmount(&lfs); 
+    FSerror = lfs_format(&lfs, &pico_lfs_cfg); ErrorCheck(0);
+    FSerror = lfs_mount(&lfs, &pico_lfs_cfg);  ErrorCheck(0);
     int fnbr = FindFreeFileNbr();
-    BasicFileOpen("bootcount",fnbr,FA_WRITE | FA_OPEN_APPEND | FA_READ);
-    FSerror=lfs_file_read(&lfs, FileTable[fnbr].lfsptr, &boot_count, sizeof(boot_count));
+    BasicFileOpen("bootcount", fnbr, FA_WRITE | FA_OPEN_APPEND | FA_READ);
+    FSerror = lfs_file_read(&lfs, FileTable[fnbr].lfsptr, &boot_count, sizeof(boot_count));
     if(FSerror>0)FSerror=0;
     ErrorCheck(fnbr);
     boot_count+=1;
-    FSerror=lfs_file_rewind(&lfs, FileTable[fnbr].lfsptr);
+    FSerror = lfs_file_rewind(&lfs, FileTable[fnbr].lfsptr);
     ErrorCheck(fnbr);
-    FSerror=lfs_file_write(&lfs, FileTable[fnbr].lfsptr, &boot_count, sizeof(boot_count));
-    if(FSerror>0)FSerror=0;
+    FSerror = lfs_file_write(&lfs, FileTable[fnbr].lfsptr, &boot_count, sizeof(boot_count));
+    if(FSerror > 0) FSerror = 0;
     ErrorCheck(fnbr);
     FileClose(fnbr);
- }
+
+    fnbr = FindFreeFileNbr();
+    BasicFileOpen("fm.bas", fnbr, FA_WRITE | FA_OPEN_APPEND | FA_READ);
+    FSerror = lfs_file_rewind(&lfs, FileTable[fnbr].lfsptr);
+    ErrorCheck(fnbr);
+    FSerror = lfs_file_write(&lfs, FileTable[fnbr].lfsptr, &FM151_bas, sizeof(FM151_bas));
+    if(FSerror > 0) FSerror = 0;
+    ErrorCheck(fnbr);
+    FileClose(fnbr);
+
+    fnbr = FindFreeFileNbr();
+    BasicFileOpen("help.txt", fnbr, FA_WRITE | FA_OPEN_APPEND | FA_READ);
+    FSerror = lfs_file_rewind(&lfs, FileTable[fnbr].lfsptr);
+    ErrorCheck(fnbr);
+    FSerror = lfs_file_write(&lfs, FileTable[fnbr].lfsptr, &help_txt, sizeof(help_txt));
+    if(FSerror > 0) FSerror = 0;
+    ErrorCheck(fnbr);
+    FileClose(fnbr);
+}
 
 int __not_in_flash_func(fs_flash_read)(const struct lfs_config *cfg, lfs_block_t block,
         lfs_off_t off, void *buffer, lfs_size_t size)
@@ -3746,8 +3772,9 @@ void MIPS16 cmd_copy(void)
         B2A(fromfile,tofile);
         return;
     }
-    FatFSFileSystem=FatFSFileSystemSave;
-} 
+    FatFSFileSystem = FatFSFileSystemSave;
+    CombinedPtr::flush();
+}
 /* 
  * @cond
  * The following section will be excluded from the documentation.
@@ -5823,13 +5850,12 @@ void mount_tmp(void) {
         f_mkdir("/tmp");
     }
 }
-static FIL f = { 0 }; // "/tmp/picoMite.prog"
 static void ensure_prog_file_open(void) {
     if (f.obj.fs) return; // already open
     init_psram();
-    if (f_open(&f, "/tmp/picoMite.prog", FA_READ | FA_WRITE) != FR_OK) {
-        if (f_open(&f, "/tmp/picoMite.prog", FA_READ | FA_WRITE | FA_CREATE_ALWAYS) == FR_OK) {
-            MMPrintString("Prepare B:/tmp/picoMite.prog...\r\n");
+    if (f_open(&f, PROG_FILE, FA_READ | FA_WRITE) != FR_OK) {
+        if (f_open(&f, PROG_FILE, FA_READ | FA_WRITE | FA_CREATE_ALWAYS) == FR_OK) {
+            MMPrintString("Prepare B:" PROG_FILE "...\r\n");
             SDErraseBlock(0, 16 << 20); // TODO: use Options
             MMPrintString("Done\r\n");
         } else {
@@ -5838,7 +5864,11 @@ static void ensure_prog_file_open(void) {
         }
     } else if (psram_size()) {
         MMPrintString("Prepare Murmulator PSRAM...\r\n");
-        SDErraseBlock(0, psram_size());
+        UINT br; uint32_t v;
+        for(int i = 0; i < psram_size(); i += 4) {
+            f_read(&f, &v, 4, &br);
+            write32psram(i, v);
+        }
         MMPrintString("Done\r\n");
     }
 }
@@ -5862,7 +5892,7 @@ err:
     memset(buf, 0xFF, sz);
     return res + read;
 }
-static const uint8_t* PSRAMBWritelock(FSIZE_t p, const uint8_t* b, size_t sz) {
+static const uint8_t* PSRAMWriteBlock(FSIZE_t p, const uint8_t* b, size_t sz) {
     for (uint32_t i = p; i < sz + p && i < psram_size(); ++i) {
         write8psram(i, *b++);
     }
@@ -5871,14 +5901,11 @@ static const uint8_t* PSRAMBWritelock(FSIZE_t p, const uint8_t* b, size_t sz) {
 UINT SDWriteBlock(FSIZE_t p, const void* buf, size_t sz) {
     UINT res = 0;
     ensure_prog_file_open();
-    const  uint8_t* b = PSRAMBWritelock(p, (const uint8_t*)buf, sz);
-    size_t write = b - (const uint8_t*)buf;
-    p += write;
-    sz -= write;
+    PSRAMWriteBlock(p, (const uint8_t*)buf, sz);
     f_lseek(&f, p);
     f_write(&f, buf, sz, &res);
     f_sync(&f);
-    return res + write;
+    return res;
 }
 static CombinedPtr PSRAMWriteBlockPP(FSIZE_t p, CombinedPtr b, size_t sz) {
     for (uint32_t i = p; i < sz + p && i < psram_size(); ++i) {
@@ -5889,10 +5916,7 @@ static CombinedPtr PSRAMWriteBlockPP(FSIZE_t p, CombinedPtr b, size_t sz) {
 UINT SDWriteBlockPP(FSIZE_t offset, CombinedPtr p, size_t sz) {
     UINT res = 0;
     ensure_prog_file_open();
-    CombinedPtr b = PSRAMWriteBlockPP(offset, p, sz);
-    size_t write = b - p;
-    offset += write;
-    sz -= write;
+    PSRAMWriteBlockPP(offset, p, sz);
     CombinedPtrT<uint32_t> p32 = p;
     f_lseek(&f, offset);
     for (size_t i = 0; i < sz; i += 4) {
@@ -5900,31 +5924,26 @@ UINT SDWriteBlockPP(FSIZE_t offset, CombinedPtr p, size_t sz) {
         if (f_write(&f, &v, 4, &res) != FR_OK || res != 4) return i;
     }
     f_sync(&f);
-    return sz + write;
+    return sz;
 }
 static FSIZE_t PSRAMErraseBlock(FSIZE_t p, size_t sz) {
     uint32_t i = p;
     for (; i < sz + p && i < psram_size(); i += 4) {
         write32psram(i, 0xFFFFFFFF);
-        // uint32_t v = read32psram(i);
-        // if (v != 0xFFFFFFFF) error("PSRAMErraseBlock issue % [%]", i, v);
     }
     return i;
 }
 UINT SDErraseBlock(FSIZE_t offset, size_t sz) {
     UINT res = 0;
     ensure_prog_file_open();
-    FSIZE_t o2 = PSRAMErraseBlock(offset, sz);
-    size_t write = o2 - offset;
-    offset += write;
-    sz -= write;
+    PSRAMErraseBlock(offset, sz);
     f_lseek(&f, offset);
     uint32_t b = 0xFFFFFFFF;
     for (size_t i = 0; i < sz; i += 4) {
         f_write(&f, &b, 4, &res);
     }
     f_sync(&f);
-    return sz + write;
+    return sz;
 }
 
 

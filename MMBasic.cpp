@@ -399,11 +399,11 @@ int   MIPS16 PrepareProgramExt(CombinedPtr p, int i, CombinedPtr *CFunPtr, int E
     if (p_aligned.on_sd()) {
         // --- SD карта: копируем CFunction/Font в RAM ---
         CombinedPtrI cfp = p_aligned;
-        while (*cfp != 0xffffffff && total_bytes < MAX_PROG_SIZE) {
+        while (total_bytes < MAX_PROG_SIZE && *cfp != 0xffffffff) {
             cfp++; // skip header
             unsigned int len = *cfp;
             total_bytes += (len + 4); // data + header
-            cfp += (len + 4) / sizeof(unsigned int);
+            cfp += (len + 4) / sizeof(int);
         }
         if (!total_bytes || total_bytes >= MAX_PROG_SIZE) {
             *CFunPtr = CombinedPtr(&rom);
@@ -412,8 +412,10 @@ int   MIPS16 PrepareProgramExt(CombinedPtr p, int i, CombinedPtr *CFunPtr, int E
             return i;
         }
         total_bytes += 4; // final 0xffffffff
-
-        uint8_t *ram_copy = (uint8_t *)GetMemory(total_bytes);
+        static uint8_t* allocated_there = nullptr;
+        if (allocated_there) FreeMemory(allocated_there);
+        allocated_there = (uint8_t*)GetMemory(total_bytes);
+        uint8_t *ram_copy = (uint8_t*)(((uint32_t)allocated_there + 0b11) & ~0b11);
         for (size_t i = 0; i < total_bytes; ++i)
             ram_copy[i] = p_aligned[i];
 
@@ -431,9 +433,6 @@ int   MIPS16 PrepareProgramExt(CombinedPtr p, int i, CombinedPtr *CFunPtr, int E
     while(*cfp != 0xffffffff && total_bytes > 0) {
         if(*cfp & 0x80000000) { // Если установлен бит 31 (0x80000000), это шрифт:
             size_t i = *cfp & (FONT_TABLE_SIZE-1);
-            if (FontTable[i] >= (uint8_t*)0x11000000) { // RAM to cleanup before reassign
-                FreeMemory(FontTable[i]);
-            }
             FontTable[i] = (uint8_t *)(cfp + 2).raw(202);
         }
         cfp++; total_bytes -= 4;

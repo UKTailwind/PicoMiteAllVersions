@@ -2759,6 +2759,7 @@ void __not_in_flash_func(WS2812e)(int gppin, int T1H, int T1L, int T0H, int T0L,
         }
         p++;
     }
+    CombinedPtr::flush();
 }
 /*  @endcond */
 void fun_dev(void){
@@ -2980,6 +2981,7 @@ void cmd_WS2812(void){
         /** disable_interrupts_pico(); */
         WS2812e(gppin, T1H, T1L, T0H, T0L, nbr * colours, p);
         /** enable_interrupts_pico(); */
+        CombinedPtr::flush();
 }
 /* 
  * @cond

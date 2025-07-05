@@ -475,6 +475,7 @@ static void getcoord(CombinedPtr p, int *x, int *y) {
 		*x = getinteger(argv[0]);
 		*y = getinteger(argv[2]);
 	}
+    CombinedPtr::flush();
 }
 const static int CMM1map[16]={BLACK,BLUE,GREEN,CYAN,RED,MAGENTA,YELLOW,WHITE,MYRTLE,COBALT,MIDGREEN,CERULEAN,RUST,FUCHSIA,BROWN,LILAC};
 

@@ -145,7 +145,7 @@ public:
         if (!p.on_sd()) {
             return *reinterpret_cast<T*>(base.raw(301));
         }
-        T val = 0;
+        T val;
         for (size_t j = 0; j < sizeof(T); ++j)
             reinterpret_cast<uint8_t*>(&val)[j] = base[j];
         return val;

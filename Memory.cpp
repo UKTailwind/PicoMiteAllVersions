@@ -856,6 +856,7 @@ void __not_in_flash_func(ClearTempMemory)(void) {
         } else
             break;
     }
+    CombinedPtr::flush();
 }
 
 

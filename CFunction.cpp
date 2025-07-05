@@ -76,6 +76,7 @@ long long int MIPS16 CallCFunction(CombinedPtr CmdPtr, CombinedPtr ArgList, Comb
                 typ[i/2] &= ~T_IMPLIED;
             }
         }
+        CombinedPtr::flush();
     }
 
     // we have found the CFunction or CSub and the types on its command line
