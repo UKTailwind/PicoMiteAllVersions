@@ -5873,9 +5873,12 @@ static void ensure_prog_file_open(void) {
     }
 }
 static uint8_t* PSRAMBlock(FSIZE_t p, uint8_t* b, size_t sz) {
+    gpio_put(PICO_DEFAULT_LED_PIN, true);
     for (uint32_t i = p; i < sz + p && i < psram_size(); ++i) {
         *b++ = read8psram(i);
+        gpio_put(PICO_DEFAULT_LED_PIN, !(i % 512));
     }
+    gpio_put(PICO_DEFAULT_LED_PIN, false);
     return b;
 }
 UINT SDBlock(FSIZE_t p, void* buf, size_t sz) {
@@ -5885,8 +5888,10 @@ UINT SDBlock(FSIZE_t p, void* buf, size_t sz) {
     size_t read = b - (uint8_t*)buf;
     p += read;
     sz -= read;
+    gpio_put(PICO_DEFAULT_LED_PIN, true);
     if (f_lseek(&f, p) != FR_OK) goto err;
     if (f_read(&f, b, sz, &res) != FR_OK) goto err;
+    gpio_put(PICO_DEFAULT_LED_PIN, false);
     return res + read;
 err:
     memset(buf, 0xFF, sz);
@@ -5902,9 +5907,11 @@ UINT SDWriteBlock(FSIZE_t p, const void* buf, size_t sz) {
     UINT res = 0;
     ensure_prog_file_open();
     PSRAMWriteBlock(p, (const uint8_t*)buf, sz);
+    gpio_put(PICO_DEFAULT_LED_PIN, true);
     f_lseek(&f, p);
     f_write(&f, buf, sz, &res);
     f_sync(&f);
+    gpio_put(PICO_DEFAULT_LED_PIN, false);
     return res;
 }
 static CombinedPtr PSRAMWriteBlockPP(FSIZE_t p, CombinedPtr b, size_t sz) {
@@ -5918,12 +5925,18 @@ UINT SDWriteBlockPP(FSIZE_t offset, CombinedPtr p, size_t sz) {
     ensure_prog_file_open();
     PSRAMWriteBlockPP(offset, p, sz);
     CombinedPtrT<uint32_t> p32 = p;
+    gpio_put(PICO_DEFAULT_LED_PIN, true);
     f_lseek(&f, offset);
     for (size_t i = 0; i < sz; i += 4) {
         uint32_t v = *p32++;
-        if (f_write(&f, &v, 4, &res) != FR_OK || res != 4) return i;
+        gpio_put(PICO_DEFAULT_LED_PIN, !(i % 512));
+        if (f_write(&f, &v, 4, &res) != FR_OK || res != 4) {
+            gpio_put(PICO_DEFAULT_LED_PIN, false);
+            return i;
+        }
     }
     f_sync(&f);
+    gpio_put(PICO_DEFAULT_LED_PIN, false);
     return sz;
 }
 static FSIZE_t PSRAMErraseBlock(FSIZE_t p, size_t sz) {
@@ -5937,12 +5950,15 @@ UINT SDErraseBlock(FSIZE_t offset, size_t sz) {
     UINT res = 0;
     ensure_prog_file_open();
     PSRAMErraseBlock(offset, sz);
+    gpio_put(PICO_DEFAULT_LED_PIN, true);
     f_lseek(&f, offset);
     uint32_t b = 0xFFFFFFFF;
     for (size_t i = 0; i < sz; i += 4) {
+        gpio_put(PICO_DEFAULT_LED_PIN, !(i % 512));
         f_write(&f, &b, 4, &res);
     }
     f_sync(&f);
+    gpio_put(PICO_DEFAULT_LED_PIN, false);
     return sz;
 }
 

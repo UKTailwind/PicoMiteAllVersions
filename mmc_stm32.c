@@ -1832,6 +1832,8 @@ char *pinsearch(int pin){
 	else if(pin==PINMAP[PinDef[24].GPno+1])strcpy(buff,"M PSRAM SCK");
 	else if(pin==PINMAP[PinDef[24].GPno+2])strcpy(buff,"M PSRAM MOSI");
 	else if(pin==PINMAP[PinDef[24].GPno+3])strcpy(buff,"M PSRAM MISO");
+	// PICO_DEFAULT_LED_PIN GP25
+	else if(pin==43)strcpy(buff,"LED");
 #endif
 #endif
 #ifdef rp2350

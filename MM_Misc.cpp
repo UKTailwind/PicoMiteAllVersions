@@ -168,6 +168,8 @@ void VGArecovery(int pin) {
         ExtCurrentConfig[PINMAP[PinDef[24].GPno+1]]=EXT_BOOT_RESERVED;
         ExtCurrentConfig[PINMAP[PinDef[24].GPno+2]]=EXT_BOOT_RESERVED;
         ExtCurrentConfig[PINMAP[PinDef[24].GPno+3]]=EXT_BOOT_RESERVED;
+        // PICO_DEFAULT_LED_PIN GP25
+        ExtCurrentConfig[43]=EXT_BOOT_RESERVED;
 
         ExtCurrentConfig[Option.VGA_BLUE]=EXT_BOOT_RESERVED;
         ExtCurrentConfig[PINMAP[PinDef[Option.VGA_BLUE].GPno+1]]=EXT_BOOT_RESERVED;
@@ -3805,6 +3807,8 @@ tp = checkstring(cmdline, (unsigned char *)"HEARTBEAT");
         ExtCurrentConfig[PINMAP[PinDef[24].GPno+1]]=EXT_BOOT_RESERVED;
         ExtCurrentConfig[PINMAP[PinDef[24].GPno+2]]=EXT_BOOT_RESERVED;
         ExtCurrentConfig[PINMAP[PinDef[24].GPno+3]]=EXT_BOOT_RESERVED;
+        // PICO_DEFAULT_LED_PIN GP25
+        ExtCurrentConfig[43]=EXT_BOOT_RESERVED;
         // now de-allocate the existing VGA pins temporarily 
         ExtCurrentConfig[Option.VGA_BLUE]=EXT_NOT_CONFIG;
         ExtCurrentConfig[PINMAP[PinDef[Option.VGA_BLUE].GPno+1]]=EXT_NOT_CONFIG;

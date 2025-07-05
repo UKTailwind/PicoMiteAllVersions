@@ -385,8 +385,6 @@ int   MIPS16 PrepareProgramExt(CombinedPtr p, int i, CombinedPtr *CFunPtr, int E
         *CFunPtr = nullptr;
     }
     /** TODO:
-        gpio_init(PICO_DEFAULT_LED_PIN);
-        gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
         for (int i = 0; i < 6; i++) {
             sleep_ms(23);
             gpio_put(PICO_DEFAULT_LED_PIN, true);

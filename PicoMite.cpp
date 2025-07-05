@@ -4495,6 +4495,9 @@ int MIPS16 main(){
     USBenabled=true;
 #else
     initMouse0(0);
+    // PICO_DEFAULT_LED_PIN GP25
+    gpio_init(PICO_DEFAULT_LED_PIN);
+    gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
 #endif
 #ifdef rp2350
     if(PSRAMsize){MMPrintString("Total of ");PInt(PSRAMsize/(1024*1024));MMPrintString(" Mbytes PSRAM available\r\n");}
