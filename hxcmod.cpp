@@ -1137,7 +1137,7 @@ int hxcmod_load(modcontext * modctx, CombinedPtr mod_data, int mod_data_size)
 #ifdef FULL_STATE
 			memclear(&(modctx->effects_event_counts),0,sizeof(modctx->effects_event_counts));
 #endif
-			memcopy2((uint8_t*)&(modctx->song.title), modmemory, 1084);
+			memcopy2((uint8_t*)&modctx->song, modmemory, 1084);
 
 			i = 0;
 			modctx->number_of_channels = 0;

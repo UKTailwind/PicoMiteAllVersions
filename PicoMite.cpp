@@ -5003,26 +5003,9 @@ unsigned char* CombinedPtr::raw(int _case) const {
 }
 
 unsigned char CombinedPtr::operator*() {
-    if (p.f >= XIP_BASE) { // in Flash or in RAM
-        return *p.c;
-    }
-    // in file on SD card (less than 256 MB of space on file is supported)
-    size_t offset = p.f % CombinedPtrBufSize;
-    if (p.f / CombinedPtrBufSize == buff_base_offset / CombinedPtrBufSize) { // we are in buffer
-        return buff[offset];
-    }
-    if (in_psram()) {
-        return read8psram(p.f);
-    }
-    buff_base_offset = p.f & ~(FSIZE_t)(CombinedPtrBufSize - 1);
-    SDBlock(buff_base_offset, buff, CombinedPtrBufSize);
-    return buff[offset];
-}
-
-unsigned char CombinedPtr::operator[](std::ptrdiff_t i) {
-    FSIZE_t pi = p.f + i;
+    FSIZE_t pi = p.f;
     if (pi >= XIP_BASE) { // in Flash or in RAM
-        return p.c[i];
+        return *p.c;
     }
     // in file on SD card (less than 256 MB of space on file is supported)
     size_t offset = pi % CombinedPtrBufSize;
@@ -5030,11 +5013,15 @@ unsigned char CombinedPtr::operator[](std::ptrdiff_t i) {
         return buff[offset];
     }
     if (in_psram()) {
-        return read8psram(p.f + i);
+        return read8psram(pi);
     }
     buff_base_offset = pi & ~(FSIZE_t)(CombinedPtrBufSize - 1);
     SDBlock(buff_base_offset, buff, CombinedPtrBufSize);
     return buff[offset];
+}
+
+unsigned char CombinedPtr::operator[](std::ptrdiff_t i) {
+    return *(*this + i);
 }
 
 void sd_range_erase(FSIZE_t offset, FSIZE_t size) {

@@ -692,7 +692,8 @@ void CloseAudio(int all){
 		FreeMemorySafe((void **)&mymp3);
 	}
 	if (modbuff && PSRAMsize && was_playing == P_MOD) {
-		FreeMemory(modbuff.ram());
+		FreeMemory(modbuff.raw(500));
+		modbuff = (Option.modbuff ? (char *)(RoundUpK4(TOP_OF_SYSTEM_FLASH)) : nullptr);
 	}
 #endif
     int i;
@@ -1772,11 +1773,12 @@ void MIPS16 cmd_play(void) {
 	}
     if((tp = checkstring(cmdline, (unsigned char *)"MODFILE"))) {
         getargs(&tp, 3,(unsigned char *)",");                                  // this MUST be the first executable line in the function
-        char *p;
-        int i __attribute((unused))=0,fsize;
-        modfilesamplerate=22050;
+        int i __attribute((unused))=0;
+		int fsize = 0;
+        modfilesamplerate = 22050;
 		if(CurrentlyPlaying == P_WAVOPEN) CloseAudio(1);
         if(CurrentlyPlaying != P_NOTHING) error("Sound output in use");
+		modbuff = (Option.modbuff ? (char *)(RoundUpK4(TOP_OF_SYSTEM_FLASH)) : nullptr);
 #ifdef rp2350
 		if(!modbuff && !PSRAMsize) error("Mod playback not enabled");
 #else
@@ -1789,17 +1791,17 @@ void MIPS16 cmd_play(void) {
         ubuff2 = (uint16_t *)sbuff2;
         g_buff1 = (int16_t *)sbuff1;
         g_buff2 = (int16_t *)sbuff2;
-        p = (char *)getFstring(argv[0]);                                    // get the file name
+        char *p = (char *)getFstring(argv[0]);                                    // get the file name
 		WAVInterrupt = nullptr;
         WAVcomplete = 0;
         // open the file
-        if(strchr((char *)p, '.') == nullptr) strcat((char *)p, ".MOD");
-		char q[FF_MAX_LFN]={0};
-		getfullfilename(p,q);
-		memmove(&q[2],q,strlen(q));
-		q[1]=':';
-		q[0]=FatFSFileSystem ? 'B' : 'A';
-		strcpy(WAVfilename,q);
+        if(strchr(p, '.') == nullptr) strcat(p, ".MOD");
+		char q[FF_MAX_LFN] = { 0 };
+		getfullfilename(p, q);
+		memmove(&q[2], q, strlen(q));
+		q[1] = ':';
+		q[0] = FatFSFileSystem ? 'B' : 'A';
+		strcpy(WAVfilename, q);
         WAV_fnbr = FindFreeFileNbr();
         if(!BasicFileOpen(p, WAV_fnbr, FA_READ)) return;
 		if(argc==3){
@@ -1812,9 +1814,9 @@ void MIPS16 cmd_play(void) {
 		i=0;
 		if(filesource[WAV_fnbr]!=FLASHFILE)  fsize = f_size(FileTable[WAV_fnbr].fptr);
 		else fsize = lfs_file_size(&lfs,FileTable[WAV_fnbr].lfsptr);
-		int alreadythere=1;
+		int alreadythere = 1;
 #ifdef rp2350
-		if(!PSRAMsize){
+		if(!PSRAMsize) {
 #endif
 			if(RoundUpK4(fsize) > 1024 * Option.modbuffsize) error("File too large for modbuffer");
 			CombinedPtr check = modbuff;
@@ -1826,15 +1828,15 @@ void MIPS16 cmd_play(void) {
 			}
 #ifdef rp2350
 		} else {
-			modbuff = GetMemory(RoundUpK4(fsize));
-			positionfile(WAV_fnbr,0);
-			uint8_t *r = modbuff.ram();
+			uint8_t *r = (uint8_t*)GetMemory(RoundUpK4(fsize));
+			positionfile(WAV_fnbr, 0);
+			modbuff = r;
 			while(!FileEOF(WAV_fnbr)) { 
 				*r++ = FileGetChar(WAV_fnbr);
 			}
 		}
 #endif
-		if(!alreadythere){
+		if(!alreadythere) {
 			uint8_t *r = (uint8_t*)GetTempMemory(256);
 			positionfile(WAV_fnbr,0);
 			uint32_t j = RoundUpK4(TOP_OF_SYSTEM_FLASH);
@@ -1843,8 +1845,8 @@ void MIPS16 cmd_play(void) {
 			/** enable_interrupts_pico(); */
 			while(!FileEOF(WAV_fnbr)) { 
 				memset(r,0,256) ;
-				for(i=0;i<256;i++) {
-					if(FileEOF(WAV_fnbr))break;
+				for (i = 0; i < 256; ++i) {
+					if (FileEOF(WAV_fnbr)) break;
 					r[i] = FileGetChar(WAV_fnbr);
 				}  
 				/** disable_interrupts_pico(); */
@@ -1856,9 +1858,10 @@ void MIPS16 cmd_play(void) {
 			FileClose(WAV_fnbr);
 		}
         FileClose(WAV_fnbr);
+		CombinedPtr::flush();
 		mcontext = (modcontext*)GetMemory(sizeof(modcontext));
         hxcmod_init( mcontext );
-        hxcmod_setcfg(mcontext, modfilesamplerate,1,1 );
+        hxcmod_setcfg(mcontext, modfilesamplerate, 1, 1);
 		hxcmod_load( mcontext, modbuff, fsize );
 		if(!mcontext->mod_loaded) error("File $ [%] load failed", p, fsize);
 		if(!CurrentLinePtr){
