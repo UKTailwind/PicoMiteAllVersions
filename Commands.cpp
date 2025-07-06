@@ -1009,80 +1009,24 @@ void cmd_help(void){
 }
 
 #ifdef M1P2
-struct UF2_Block_t {
-    // 32 byte header
-    uint32_t magicStart0;
-    uint32_t magicStart1;
-    uint32_t flags;
-    uint32_t targetAddr;
-    uint32_t payloadSize;
-    uint32_t blockNo;
-    uint32_t numBlocks;
-    uint32_t fileSize; // or familyID;
-    uint8_t data[476];
-    uint32_t magicEnd;
-} UF2_Block_t;
-
-inline static uint32_t __not_in_flash_func(read_flash_block)(FIL * f, uint8_t * buffer, uint32_t expected_flash_target_offset) {
-    UINT bytes_read = 0;
-    struct UF2_Block_t uf2_block{};
-    uint32_t data_sector_index = 0;
-    for(; data_sector_index < FLASH_SECTOR_SIZE; data_sector_index += 256) {
-        f_read(f, &uf2_block, sizeof(uf2_block), &bytes_read);
-        if (!bytes_read) break;
-        if (uf2_block.targetAddr == XIP_BASE + 0xFFFF00) { // ignore such block
-            f_read(f, &uf2_block, sizeof(uf2_block), &bytes_read);
-            if (!bytes_read) break;
-        }
-        if (expected_flash_target_offset != uf2_block.targetAddr - XIP_BASE) {
-            f_lseek(f, f_tell(f) - sizeof(uf2_block)); // we will reread this block, it doesnt belong to this continues block
-            expected_flash_target_offset = uf2_block.targetAddr - XIP_BASE;
-            break;
-        }
-        memcpy((void*)buffer + data_sector_index, uf2_block.data, 256);
-        expected_flash_target_offset += 256;
-        gpio_put(PICO_DEFAULT_LED_PIN, (expected_flash_target_offset >> 13) & 1);
-    }
-    return expected_flash_target_offset;
-}
-
-#define FIRMWARE_OFFSET 64
-
 void __not_in_flash_func(cmd_m1p2)(void) {
-	CombinedPtr cmdbuf = (uint8_t*)GetMemory(256);
+	CombinedPtr cmdbuf = (uint8_t*)GetTempMemory(256);
 	memcpy(cmdbuf.raw(),cmdline,STRINGSIZE);
     getargs(&cmdbuf, 3, (unsigned char *)",");
     const TCHAR* pathname = (const TCHAR*)getCstring(argv[0]);
 	if (pathname[1] == ':' && (pathname[0] == 'B' || pathname[0] == 'b')) {
 		pathname += 2;
 	}
-	FIL file;
-    if (FR_OK == f_open(&file, pathname, FA_READ)) {
-        uint32_t flash_target_offset = FIRMWARE_OFFSET << 10;
-        multicore_lockout_start_blocking();
-        uint32_t ints = save_and_disable_interrupts();
-        while(true) {
-            uint8_t buffer[FLASH_SECTOR_SIZE];
-            uint32_t next_flash_target_offset = read_flash_block(&file, buffer, flash_target_offset);
-            if (next_flash_target_offset == flash_target_offset) {
-                break;
-            }
-            if (next_flash_target_offset < (FIRMWARE_OFFSET << 10)) {
-                restore_interrupts(ints);
-                multicore_lockout_end_blocking();
-                gpio_put(PICO_DEFAULT_LED_PIN, false);
-                error("Unexpected target offset...");
-				// TODO: recover
-                return;
-            }
-            flash_range_erase(flash_target_offset, FLASH_SECTOR_SIZE);
-            flash_range_program(flash_target_offset, buffer, FLASH_SECTOR_SIZE);
-            flash_target_offset = next_flash_target_offset;
-        }
-        restore_interrupts(ints);
-        multicore_lockout_end_blocking();
-        gpio_put(PICO_DEFAULT_LED_PIN, false);
-        f_close(&file);
+	FIL* file = (FIL*)GetTempMemory(sizeof(FIL));
+    if (FR_OK == f_open(file, pathname, FA_READ)) {
+		f_close(file);
+		char* y = (char*)0x20000000 + (512 << 10) - 4;
+		*y++ = 0xFF; *y++ = 0x0F; *y++ = 0xF0; *y++ = 0x17; // Magic
+		f_unlink("/.firmware");
+		f_open(file, "/.firmware", FA_WRITE | FA_CREATE_ALWAYS);
+		UINT wb;
+		f_write(file, pathname, strlen(pathname), &wb);
+		f_close(file);
         watchdog_enable(100, true);
     } else {
         error("Unable to open file: $", pathname);
