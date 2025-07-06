@@ -136,19 +136,14 @@ public:
         }
         // SD-карта: читаем побайтово
         T val;
+        uint8_t* pv = reinterpret_cast<uint8_t*>(&val);
+        CombinedPtr ps = p;
         for (size_t i = 0; i < sizeof(T); ++i)
-            reinterpret_cast<uint8_t*>(&val)[i] = *(p + i);
+            *pv++ = *ps++;
         return val;
     }
     inline T operator[](std::ptrdiff_t i) {
-        CombinedPtr base = p + i * sizeof(T);
-        if (!p.on_sd()) {
-            return *reinterpret_cast<T*>(base.raw(301));
-        }
-        T val;
-        for (size_t j = 0; j < sizeof(T); ++j)
-            reinterpret_cast<uint8_t*>(&val)[j] = base[j];
-        return val;
+        return *(*this + i);
     }
 
     CombinedPtrT& operator++() { p += sizeof(T); return *this; }

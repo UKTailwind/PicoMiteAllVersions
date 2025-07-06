@@ -3006,10 +3006,11 @@ static void docompressed(CombinedPtr fc, int x1, int y1, int w, int h, int8_t bl
 #endif
     uint8_t c, *to;
     int HRes2 = HRes >> 1;
+    uint8_t* WriteBuf_x = WriteBuf +  (x1 >> 1);
     if((x1 & 1) == 0 && (w & 1) == 0 && blank == -1){
         c = getnextnibble(&fc, 1); //reset the decoder
         for(int y = y1; y < y1 + h; ++y) {
-            to = WriteBuf + y * HRes2 + (x1 >> 1);
+            to = WriteBuf_x + y * HRes2;
             for(int x = x1; x < x1 + w; x += 2){
                 c = getnextnibble(&fc, 0);
                 c |= (getnextnibble(&fc, 0) << 4);
@@ -3023,7 +3024,7 @@ static void docompressed(CombinedPtr fc, int x1, int y1, int w, int h, int8_t bl
         int itoggle = 0; //input will always start on a byte boundary
         c = getnextnibble(&fc, 1); //reset the decoder
         for(int y = y1; y < y1 + h; ++y) { //loop though all of the output lines
-            to = WriteBuf+y * HRes2 + (x1 >> 1); //get the byte that will start the output
+            to = WriteBuf_x + y * HRes2; //get the byte that will start the output
             if (x1 & 1) otoggle=1; // if x1 is odd then we will start on the high nibble
             else otoggle = 0;
             for(int x = x1; x < x1 + w; ++x) {
@@ -3043,7 +3044,7 @@ static void docompressed(CombinedPtr fc, int x1, int y1, int w, int h, int8_t bl
                         }
                     }
                 } else {
-                    if(x>=0 && x<HRes){
+                    if(x >= 0 && x < HRes){
                         if(c != blank){
                             *to &= 0x0f;
                             *to |= (c<<4);
@@ -3066,12 +3067,12 @@ void cmd_blitmemory(void){
     CombinedPtr from = (char *)GetPeekAddr(argv[0]);
     x1 = (int)getinteger(argv[2]);
     y1 = (int)getinteger(argv[4]);
-    CombinedPtrI size = from;
+    CombinedPtrT<uint16_t> size = from;
     w = (size[0] & 0x7FFF);
     h = (size[1] & 0x7FFF);
     from += 4;
     if(argc == 7) blank = getint(argv[6],-1,15);
-    if(size[0] < 0 || size[1] < 0) {
+    if((size[0] & 0x8000) || (size[1] & 0x8000)) {
         docompressed(from, x1, y1, w, h, blank);
     } else {
 #ifndef PICOMITEVGA
