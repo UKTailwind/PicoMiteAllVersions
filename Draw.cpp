@@ -3071,7 +3071,7 @@ void cmd_blitmemory(void){
     h = (size[1] & 0x7FFF);
     from += 4;
     if(argc == 7) blank = getint(argv[6],-1,15);
-    if(size[0] & 0x8000 || size[1] &  0x8000) {
+    if(size[0] < 0 || size[1] < 0) {
         docompressed(from, x1, y1, w, h, blank);
     } else {
 #ifndef PICOMITEVGA
@@ -3163,51 +3163,53 @@ void cmd_blitmemory(void){
             }
         } else 
 #endif
-        if(x1 %2 == 0 && w % 2 == 0 && blank==-1){
-            char c, *to;
-            for(int y=y1;y<y1+h;y++){
-                to=(char *)WriteBuf+y*(HRes>>1)+(x1>>1);
-                for(int x=x1;x<x1+w;x+=2){
-                    c=*from++;
-                    if(y<0 || y>=VRes)continue;
-                    if(x>=0 && x<HRes)*to=c;
+        uint8_t c, *to;
+        int HRes2 = HRes >> 1;
+        uint8_t* WriteBuf_x = WriteBuf + (x1 >> 1);
+        if((x1 & 1) == 0 && (w & 1) == 0 && blank == -1) {
+            for(int y = y1; y < y1 + h; ++y){
+                to = WriteBuf_x + y * HRes2;
+                for(int x = x1; x < x1 + w; x += 2) {
+                    c = *from++;
+                    if (y < 0 || y >= VRes) continue;
+                    if (x >= 0 && x < HRes) *to = c;
                     to++;
                 }               
             }
         } else { 
-            int otoggle=0,itoggle=0; //input will always start on a byte boundary
-            char c,*to;
-            for(int y=y1;y<y1+h;y++){ //loop though all of the output lines
-                to=(char *)WriteBuf+y*(HRes>>1)+(x1>>1); //get the byte that will start the output
-                if(x1 & 1)otoggle=1; // if x1 is odd then we will start on the high nibble
-                else otoggle=0;
-                for(int x=x1;x<x1+w;x++){
-                    if(itoggle==0){
-                        c=*from & 0x0f;
-                        itoggle=1;
+            int otoggle = 0;
+            int itoggle = 0; //input will always start on a byte boundary
+            for(int y = y1; y < y1 + h; ++y) { //loop though all of the output lines
+                to = WriteBuf_x + y * HRes2; //get the byte that will start the output
+                if (x1 & 1) otoggle=1; // if x1 is odd then we will start on the high nibble
+                else otoggle = 0;
+                for (int x = x1; x < x1 + w; ++x) {
+                    if (itoggle == 0){
+                        c = *from & 0x0f;
+                        itoggle = 1;
                     } else {
-                        c= *from >>4;
+                        c = *from >> 4;
                         from++;
-                        itoggle=0;
+                        itoggle = 0;
                     }
-                    if(y<0 || y>=VRes)continue;
-                    if(otoggle==0){
-                        if(x>=0 && x<HRes){
-                            if(c!=blank){
+                    if (y < 0 || y >= VRes)continue;
+                    if (otoggle == 0){
+                        if (x >= 0 && x < HRes) {
+                            if(c != blank){
                                 *to &= 0xF0;
-                                *to |=c;
+                                *to |= c;
                             }
                         }
                     } else {
-                        if(x>=0 && x<HRes){
-                            if(c!=blank){
+                        if (x >=0 && x < HRes) {
+                            if (c != blank){
                                 *to &=0x0f;
                                 *to |= (c<<4);
                             }
                         }
                         to++;
                     }
-                    otoggle^=1;
+                    otoggle ^= 1;
                 }
             }
         }

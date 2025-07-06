@@ -536,7 +536,7 @@ void fun_map(void);
 /*frame
 	{ (unsigned char *)"Frame",		T_CMD | T_FUN,				0, cmd_frame	},
 */
-	#ifdef PICOMITEVGA
+#ifdef PICOMITEVGA
   	{ (unsigned char *)"TILE",            T_CMD,                     0, cmd_tile   },
   	{ (unsigned char *)"MODE",            T_CMD,                     0, cmd_mode   },
   	{ (unsigned char *)"Map(",            T_CMD | T_FUN  ,           0, cmd_map   },
