@@ -44,11 +44,18 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #define	COM_DEFAULT_BUF_SIZE	    1024
 #define TX_BUFFER_SIZE              256
 
+#ifdef __cplusplus
+extern "C" {
+#include "PicoMite.h"
+	void SerialOpen(CombinedPtr spec);
+	extern CombinedPtr com1_interrupt;							// pointer to the interrupt routine
+	extern CombinedPtr com2_interrupt, com2_TX_interrupt;		// pointer to the interrupt routine
+#endif
+
 // global variables
 	extern int com1;														// true if COM1 is enabled
 	extern int com1_buf_size;													// size of the buffer used to receive chars
 	extern int com1_baud;													// determines the baud rate
-	extern char *com1_interrupt;												// pointer to the interrupt routine
 	extern int com1_TX_complete;
 	extern int com1_ilevel;													// number nbr of chars in the buffer for an interrupt
 	extern unsigned char *com1Rx_buf;											// pointer to the buffer for received characters
@@ -67,7 +74,6 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 	extern int com2;														// true if COM2 is enabled
 	extern int com2_buf_size;													// size of the buffer used to receive chars
 	extern int com2_baud;													// determines the baud rate
-	extern char *com2_interrupt, *com2_TX_interrupt;												// pointer to the interrupt routine
 	extern int com2_TX_complete;
 	extern int com2_ilevel;													// number nbr of chars in the buffer for an interrupt
 	extern unsigned char *com2Rx_buf;											// pointer to the buffer for received characters
@@ -78,7 +84,6 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 	extern void on_uart_irq0();
 	extern void on_uart_irq1();
 // global functions
-void SerialOpen(unsigned char *spec);
 void SerialClose(int comnbr);
 unsigned char SerialPutchar(int comnbr, unsigned char c);
 int SerialRxStatus(int comnbr);
@@ -92,6 +97,10 @@ extern void stop_com1e(void);
 extern void start_com2(void);
 extern void stop_com2(void);
 extern void MX_USART1_UART_Init1(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
 #endif

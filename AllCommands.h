@@ -6,12 +6,17 @@
  the C language function associated with commands, functions or operators should be
  declared here
 **********************************************************************************/
+
 #if !defined(INCLUDE_COMMAND_TABLE) && !defined(INCLUDE_TOKEN_TABLE)
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // format:
 //      void cmd_???(void)
 //      void fun_???(void)
 //      void op_???(void)
-
 void cmd_clear(void);
 void cmd_continue(void);
 void cmd_delete(void);
@@ -49,6 +54,10 @@ void cmd_read(void);
 void cmd_restore(void);
 void cmd_return(void);
 void cmd_run(void);
+void cmd_fm(void);
+#ifdef M1P2
+void cmd_m1p2(void);
+#endif
 void cmd_save(void);
 void cmd_troff(void);
 void cmd_tron(void);
@@ -340,6 +349,11 @@ void fun_flag(void);
 #endif
 void fun_dev(void);
 void fun_map(void);
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif
 
 /* ********************************************************************************
@@ -393,6 +407,10 @@ void fun_map(void);
 	{ (unsigned char *)"Restore",            T_CMD,				0, cmd_restore	},
 	{ (unsigned char *)"Return",		T_CMD,				0, cmd_return,	},
 	{ (unsigned char *)"Run",		T_CMD,				0, cmd_run	},
+	{ (unsigned char *)"Fm",		T_CMD,				0, cmd_fm	},
+#ifdef M1P2
+	{ (unsigned char *)"m1p2",		T_CMD,				0, cmd_m1p2	},
+#endif
 	{ (unsigned char *)"Save",		T_CMD,				0, cmd_save		},
     { (unsigned char *)"Static",		T_CMD,				0, cmd_dim		},
 	{ (unsigned char *)"Sub",		T_CMD,				0, cmd_subfun   },
@@ -518,7 +536,7 @@ void fun_map(void);
 /*frame
 	{ (unsigned char *)"Frame",		T_CMD | T_FUN,				0, cmd_frame	},
 */
-	#ifdef PICOMITEVGA
+#ifdef PICOMITEVGA
   	{ (unsigned char *)"TILE",            T_CMD,                     0, cmd_tile   },
   	{ (unsigned char *)"MODE",            T_CMD,                     0, cmd_mode   },
   	{ (unsigned char *)"Map(",            T_CMD | T_FUN  ,           0, cmd_map   },
@@ -702,12 +720,10 @@ void fun_map(void);
 	{ (unsigned char *)"Json$(",		T_FUN | T_STR,          0, fun_json		},
 #endif
 #ifdef GUICONTROLS
-	  { (unsigned char *)"MsgBox(",        T_FUN | T_INT,              0, fun_msgbox     },
-	  { (unsigned char *)"CtrlVal(",       T_FUN | T_NBR | T_STR,      0, fun_ctrlval    },
+	{ (unsigned char *)"MsgBox(",        T_FUN | T_INT,              0, fun_msgbox     },
+	{ (unsigned char *)"CtrlVal(",       T_FUN | T_NBR | T_STR,      0, fun_ctrlval    },
 #endif
-{ (unsigned char *)"Bit(",	T_FUN | T_INT,		0, fun_bit,	},
-{ (unsigned char *)"",   0,                  0, cmd_null,    }                   // this dummy entry is always at the end
+    { (unsigned char *)"Bit(",	T_FUN | T_INT,		0, fun_bit,	},
+    { (unsigned char *)"",   0,                  0, cmd_null,    }                   // this dummy entry is always at the end
 #endif
 /*  @endcond */
-
-

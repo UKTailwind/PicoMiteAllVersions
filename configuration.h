@@ -35,11 +35,11 @@ extern "C" {
     #ifdef rp2350
         #define MAXSUBFUN           512                     // each entry takes up 4 bytes
         #define MAXVARS             768                     // 8 + MAXVARLEN + MAXDIM * 2  (ie, 56 bytes) - these do not incl array members
-#ifdef USBKEYBOARD
-    #define HEAP_MEMORY_SIZE (184*1024) 
-#else
-        #define HEAP_MEMORY_SIZE (184*1024) 
-#endif
+        #ifdef USBKEYBOARD
+            #define HEAP_MEMORY_SIZE (184*1024) 
+        #else
+            #define HEAP_MEMORY_SIZE (184*1024) 
+        #endif
         #define FLASH_TARGET_OFFSET (864 * 1024) 
         #ifdef HDMI
             #define MAXMODES 5
@@ -360,8 +360,9 @@ extern "C" {
 #define PIO_RX_DMA2 9
 #define PIO_TX_DMA2 6
 #define ADC_CLK_SPEED   (Option.CPU_Speed*500)
-#define PROGSTART (FLASH_TARGET_OFFSET + FLASH_ERASE_SIZE + SAVEDVARS_FLASH_SIZE + ((MAXFLASHSLOTS) * MAX_PROG_SIZE))
-#define TOP_OF_SYSTEM_FLASH  (FLASH_TARGET_OFFSET + FLASH_ERASE_SIZE + SAVEDVARS_FLASH_SIZE + ((MAXFLASHSLOTS+1) * MAX_PROG_SIZE))
+#define PROGSTART (((MAXFLASHSLOTS) * MAX_PROG_SIZE))
+#define TOP_OF_SYSTEM_FLASH  (((MAXFLASHSLOTS+1) * MAX_PROG_SIZE))
+// TODO: remove such alignment (required for FLASH only)
 #define RoundUpK4(a)     (((a) + (4096 - 1)) & (~(4096 - 1)))// round up to the nearest page size      [position 131:9]	
 typedef enum {
     MMHRES,

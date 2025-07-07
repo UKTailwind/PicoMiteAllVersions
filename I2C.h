@@ -66,6 +66,16 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #define I2C_Status_Slave_Receive_Full           0x00200000
 #define SSD1306_I2C_Addr 0x3c
 #define SystemI2CTimeout 5
+
+#ifdef __cplusplus
+#include "PicoMite.h"
+extern "C" {
+extern CombinedPtr I2C_Slave_Send_IntLine;                                // pointer to the slave send interrupt line number
+extern CombinedPtr I2C_Slave_Receive_IntLine;                             // pointer to the slave receive interrupt line number
+extern CombinedPtr I2C2_Slave_Send_IntLine;                                // pointer to the slave send interrupt line number
+extern CombinedPtr I2C2_Slave_Receive_IntLine;                             // pointer to the slave receive interrupt line number
+extern CombinedPtr nunInterruptc[];
+#endif
 // Global variables provided by I2C.c
 extern unsigned int I2C_Timer;                                      // master timeout counter
 extern char *I2C_IntLine;                                           // pointer to the master interrupt line number
@@ -81,10 +91,6 @@ extern unsigned int I2C2_Timeout;									// master timeout value
 extern volatile unsigned int I2C_Status;                            // status flags
 extern volatile unsigned int I2C2_Status;                            // status flags
 extern bool  noRTC, noI2C;
-extern char *I2C_Slave_Send_IntLine;                                // pointer to the slave send interrupt line number
-extern char *I2C_Slave_Receive_IntLine;                             // pointer to the slave receive interrupt line number
-extern char *I2C2_Slave_Send_IntLine;                                // pointer to the slave send interrupt line number
-extern char *I2C2_Slave_Receive_IntLine;                             // pointer to the slave receive interrupt line number
 extern void I2C_Send_Command(char command);
 extern void CheckI2CKeyboard(int noerror, int read);
 extern void cmd_camera(void);
@@ -130,7 +136,6 @@ typedef struct s_nunstruct {
 		int16_t gyro[3], accs[3];
 } a_nunstruct;
 extern volatile uint8_t classic1, nunchuck1;
-extern char *nunInterruptc[];
 extern bool nunfoundc[];
 extern void classicproc(void);
 extern void nunproc(void);
@@ -146,6 +151,12 @@ extern void WiiReceive(int nbr, char *p);
 extern void WiiSend(int nbr, char *p);
 extern int mmI2Cvalue;
 extern unsigned char classicread, nunchuckread;
+
+#ifdef __cplusplus
+}
+#endif
+
+
 #define REG_GAIN                    0x00         // Gain lower 8 bits (rest in vref 
     #define REG_BLUE                    0x01         // blue gain 
     #define REG_RED                     0x02         // red gain 

@@ -29,6 +29,15 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #define __FILEIO_H
 
 #ifdef __cplusplus
+#include "PicoMite.h"
+extern CombinedPtr CFunctionFlash, CFunctionLibrary;
+void MMPrintStringPP(CombinedPtr s);
+int FileLoadProgram(CombinedPtr fname, bool chain);
+int FileLoadCMM2Program(CombinedPtr  fname, bool message);
+extern UINT SDWriteBlockPP(FSIZE_t offset, CombinedPtr p, size_t sz);
+#endif
+
+#ifdef __cplusplus
 extern "C" {
 #endif
 #include "ff.h"
@@ -36,6 +45,7 @@ extern "C" {
 #include "upng.h"
 #endif
 // File related I/O
+void FilePutStr(int count, char* c, int fnbr);
 unsigned char MMfputc(unsigned char c, int fnbr);
 int MMfgetc(int filenbr);
 void MMfopen(unsigned char *fname, unsigned char *mode, int fnbr);
@@ -44,18 +54,16 @@ void MMfclose(int fnbr);
 int FindFreeFileNbr(void);
 void CloseAllFiles(void);
 void MMgetline(int filenbr, char *p);
-void MMPrintString(char *s);
+void MMPrintString(const char *s);
 void CheckAbort(void);
 char FileGetChar(int fnbr);
-void FilePutStr(int count, char *c, int fnbr);
 char FilePutChar(char c, int fnbr);
 void CheckSDCard(void);
 void LoadOptions(void);
+void ResetOptionsNoSave(void);
 void CrunchData(unsigned char **p, int c);
 int FileEOF(int fnbr);
 void ClearSavedVars(void);
-int FileLoadProgram(unsigned char *fname, bool chain);
-int FileLoadCMM2Program(char *fname, bool message);
 void SaveOptions(void);
 void ResetAllFlash(void);
 void disable_interrupts_pico(void);
@@ -205,7 +213,7 @@ struct option_s {
     unsigned char NoScroll;
     unsigned char CombinedCS;
     unsigned char USBKeyboard;
-    unsigned char VGA_HSYNC;
+    unsigned char VGA_HSYNC_not_in_use_for_m1p2;
     unsigned char VGA_BLUE; //7=236
     unsigned char AUDIO_MISO_PIN;
     unsigned char AUDIO_DCS_PIN;
@@ -234,11 +242,9 @@ struct option_s {
     unsigned char extensions[96]; //128=896 == 7 XMODEM blocks
     // To enable older CFunctions to run any new options *MUST* be added at the end of the list
 } __attribute__((packed));
-extern unsigned char *CFunctionFlash, *CFunctionLibrary;
 extern struct option_s Option;
 extern int FlashLoad;
 extern void ResetOptions(bool startup);
-extern void FlashWriteBlock(void);
 extern void FlashWriteWord(unsigned int i);
 extern void FlashWriteByte(unsigned char b);
 extern void FlashWriteAlign(void);
@@ -256,7 +262,6 @@ extern int lfs_FileFnbr;
 extern struct lfs_config pico_lfs_cfg;
 #define SAVED_OPTIONS_FLASH 5
 #define LIBRARY_FLASH 6
-#define SAVED_VARS_FLASH 7
 #define PROGRAM_FLASH 8
 typedef union uFileTable
 {
@@ -270,6 +275,9 @@ enum {
     FATFSFILE
 };
 extern union uFileTable FileTable[MAXOPENFILES + 1];
+extern UINT SDBlock(FSIZE_t p, void* buf, size_t sz);
+extern UINT SDWriteBlock(FSIZE_t p, const void* buf, size_t sz);
+extern UINT SDErraseBlock(FSIZE_t offset, size_t sz);
 
 #ifdef __cplusplus
 }

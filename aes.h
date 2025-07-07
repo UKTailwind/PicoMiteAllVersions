@@ -41,6 +41,10 @@
     #define AES_keyExpSize 176
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 struct AES_ctx
 {
   uint8_t RoundKey[AES_keyExpSize];
@@ -87,5 +91,8 @@ void AES_CTR_xcrypt_buffer(struct AES_ctx* ctx, uint8_t* buf, size_t length);
 
 #endif // #if defined(CTR) && (CTR == 1)
 
+#ifdef __cplusplus
+}
+#endif
 
 #endif // _AES_H_

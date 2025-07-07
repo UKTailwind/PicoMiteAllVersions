@@ -29,10 +29,6 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #ifndef __MMBASIC_H
 #define __MMBASIC_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <stdlib.h>
 #include <setjmp.h>
 #include <string.h>
@@ -46,6 +42,49 @@ extern "C" {
 #endif
 
 #include "configuration.h"                          // memory configuration defines for the particular hardware this is running on
+
+#ifdef __cplusplus
+#include "PicoMite.h"
+extern "C" {
+int CheckEmpty(CombinedPtr p);
+void MMfputs(CombinedPtr p, int filenbr);
+int  mystrncasecmp (CombinedPtr s1, CombinedPtr s2, size_t n);
+CombinedPtr doexpr(CombinedPtr p, MMFLOAT *fa, long long int  *ia, CombinedPtr *sa, int *oo, int *t);
+extern CombinedPtr NextDataLine;                      // used to track the next line to read in DATA & READ stmts
+extern CombinedPtr subfun[];                          // Table of subroutines and functions built when the program starts running
+CombinedPtr GetNextCommand(CombinedPtr p, CombinedPtr *CLine, unsigned char *EOFMsg) ;
+void DefinedSubFun(int iscmd, CombinedPtr cmd, int index, MMFLOAT *fa, long long int  *i64, CombinedPtr *sa, int *t);
+MMFLOAT getnumber(CombinedPtr p);
+CombinedPtr evaluate(CombinedPtr p, MMFLOAT *fa, long long int  *ia, CombinedPtr *sa, int *ta, int noerror);
+long long int  getinteger(CombinedPtr p);
+CombinedPtr getstring(CombinedPtr p);
+long long int getint(CombinedPtr p, long long int min, long long int max);
+extern CombinedPtr ContinuePoint;                     // Where to continue from if using the continue statement
+extern CombinedPtr cmdline;                           // Command line terminated with a zero unsigned char and trimmed of spaces
+extern CombinedPtr nextstmt;                          // Pointer to the next statement to be executed.
+void ExecuteProgram(CombinedPtr p);
+unsigned char *getCstring(CombinedPtr p);
+extern CombinedPtr CurrentLinePtr, SaveCurrentLinePtr;                    // pointer to the current line being executed
+extern CombinedPtr ProgMemory;                           // program memory
+extern CombinedPtr LibMemory;                           // library memory
+extern CombinedPtr ep;                                // Pointer to the argument to a function
+CombinedPtr skipexpression(CombinedPtr p);
+unsigned char *getFstring(CombinedPtr p);
+void checkend(CombinedPtr p);
+int  CountLines(CombinedPtr target);
+int FindSubFun(CombinedPtr p, int type);
+CombinedPtr skipvar(CombinedPtr p, int noerror);
+CombinedPtr getclosebracket(CombinedPtr p);
+void Mstrcpy(unsigned char *dest, CombinedPtr src);
+void *DoExpression(CombinedPtr p, int *t);
+extern CombinedPtr sarg1, sarg2, sret;              // Global string pointers used by operators
+void Mstrcat(unsigned char *dest, CombinedPtr src);
+void *findvar(CombinedPtr, int, int at = 0);
+int Mstrcmp(CombinedPtr s1, CombinedPtr s2);
+CombinedPtr findline(int, int);
+CombinedPtr findlabel(CombinedPtr labelptr);
+CombinedPtr GetIntAddress(CombinedPtr p);
+#endif
 
 // Types used to define an item of data.  Often they are ORed together.
 // Used in tokens, variables and arguments to functions
@@ -98,7 +137,6 @@ struct s_funtbl {
 	uint32_t index;
 };
 
-extern struct s_funtbl funtbl[MAXSUBFUN];
 typedef struct s_vartbl {                               // structure of the variable table
 	unsigned char name[MAXVARLEN];                       // variable's name
 	unsigned char type;                                  // its type (T_NUM, T_INT or T_STR)
@@ -193,8 +231,11 @@ extern unsigned char DefaultType;                        // the default type if 
 // x = pointer to the basic text to be split up (unsigned char *)
 // y = maximum number of args (will throw an error if exceeded) (int)
 // s = a string of characters to be used in detecting where to split the text (unsigned char *)
+#ifdef __cplusplus
+#define getargs(x, y, s) unsigned char argbuf[STRINGSIZE + STRINGSIZE/2]; CombinedPtr argv[y]; int argc; makeargs2(x, y, argbuf, argv, &argc, s)
+#else
 #define getargs(x, y, s) unsigned char argbuf[STRINGSIZE + STRINGSIZE/2]; unsigned char *argv[y]; int argc; makeargs(x, y, argbuf, argv, &argc, s)
-
+#endif
 extern int CommandTableSize, TokenTableSize;
 
 extern volatile int MMAbort;
@@ -204,9 +245,6 @@ extern jmp_buf jmprun;
 extern int ProgMemSize;
 
 extern int NextData;                            // used to track the next item to read in DATA & READ stmts
-extern unsigned char *NextDataLine;                      // used to track the next line to read in DATA & READ stmts
-extern unsigned char *CurrentLinePtr,*SaveCurrentLinePtr;                    // pointer to the current line being executed
-extern unsigned char *ContinuePoint;                     // Where to continue from if using the continue statement
 extern int ProgramChanged;                                                 // true if the program in memory has been changed and not saved
 
 extern unsigned char inpbuf[];                           // used to store user keystrokes until we have a line
@@ -215,20 +253,15 @@ extern unsigned char lastcmd[];                          // used to store the co
 
 extern MMFLOAT farg1, farg2, fret;                // Global floating point variables used by operators
 extern long long int  iarg1, iarg2, iret;        // Global integer variables used by operators
-extern unsigned char *sarg1, *sarg2, *sret;              // Global string pointers used by operators
 extern int targ;                                // Global type of argument (string or float) returned by an operator
 
 extern int cmdtoken;                            // Token number of the command
-extern unsigned char *cmdline;                           // Command line terminated with a zero unsigned char and trimmed of spaces
-extern unsigned char *nextstmt;                          // Pointer to the next statement to be executed.
-extern unsigned char *ep;                                // Pointer to the argument to a function
 
 extern int OptionErrorSkip;                    // value of OPTION ERROR
 extern int MMerrno;
 
 extern char MMErrMsg[MAXERRMSG];                // array holding the error msg
 
-extern unsigned char *subfun[];                          // Table of subroutines and functions built when the program starts running
 extern char CurrentSubFunName[MAXVARLEN + 1];   // the name of the current sub or fun
 extern char CurrentInterruptName[MAXVARLEN + 1];// the name of the current interrupt function
 
@@ -238,74 +271,40 @@ struct s_tokentbl {                             // structure of the token table
     unsigned char precedence;                            // precedence used by operators only.  operators with equal precedence are processed left to right.
     void (*fptr)(void);                         // pointer to the function that will interpret that token
 };
-extern const struct s_tokentbl tokentbl[];
-extern const struct s_tokentbl commandtbl[];
 
 extern unsigned char tokenTHEN, tokenELSE, tokenGOTO, tokenEQUAL, tokenTO, tokenSTEP, tokenWHILE, tokenUNTIL, tokenGOSUB, tokenAS, tokenFOR;
 extern unsigned short cmdIF, cmdENDIF, cmdEND_IF, cmdELSEIF, cmdELSE_IF, cmdELSE, cmdSELECT_CASE, cmdFOR, cmdNEXT, cmdWHILE, cmdENDSUB, cmdENDFUNCTION, cmdLOCAL, cmdSTATIC, cmdCASE, cmdDO, cmdLOOP, cmdCASE_ELSE, cmdEND_SELECT;
 extern unsigned short cmdSUB, cmdFUN, cmdCSUB, cmdIRET, cmdComment, cmdEndComment;
 
-extern unsigned char *GetIntAddress(unsigned char *p);
-extern void MMPrintString(char *s);
+extern void MMPrintString(const char *s);
 
 // void error(unsigned char *msg) ;
 void  error(char *msg, ...);
 void  InitBasic(void);
 int FloatToInt32(MMFLOAT);
 long long int  FloatToInt64(MMFLOAT x);
-void makeargs(unsigned char **tp, int maxargs, unsigned char *argbuf, unsigned char *argv[], int *argc, unsigned char *delim);
-void *findvar(unsigned char *, int);
 void erasearray(unsigned char *n);
 void  ClearVars(int level, bool all);
 void  ClearStack(void);
 void  ClearRuntime(bool all);
 void  ClearProgram(bool psram);
-void *DoExpression(unsigned char *p, int *t);
-unsigned char *GetNextCommand(unsigned char *p, unsigned char **CLine, unsigned char *EOFMsg) ;
-int CheckEmpty(char *p);
-unsigned char *evaluate(unsigned char *p, MMFLOAT *fa, long long int  *ia, unsigned char **sa, int *ta, int noerror);
-unsigned char *doexpr(unsigned char *p, MMFLOAT *fa, long long int  *ia, unsigned char **sa, int *oo, int *t);
-void DefinedSubFun(int iscmd, unsigned char *cmd, int index, MMFLOAT *fa, long long int  *i64, unsigned char **sa, int *t);
-MMFLOAT getnumber(unsigned char *p);
-long long int  getinteger(unsigned char *p);
-long long int getint(unsigned char *p, long long int min, long long int max);
-unsigned char *getstring(unsigned char *p);
 void  tokenise(int console);
-void ExecuteProgram(unsigned char *);
+
 void AddProgramLine(int append);
-unsigned char *findline(int, int);
-unsigned char *findlabel(unsigned char *labelptr);
-unsigned char *skipvar(unsigned char *p, int noerror);
-unsigned char *skipexpression(unsigned char *p);
 int FunctionType(unsigned char *p);
-unsigned char *getclosebracket(unsigned char *p);
 void makeupper(unsigned char *p);
-void checkend(unsigned char *p);
 char *fstrstr (const char *s1, const char *s2);
 int GetCommandValue(unsigned char *n);
 int GetTokenValue(unsigned char *n);
-unsigned char *checkstring(unsigned char *p, unsigned char *tkn);
 int GetLineLength(unsigned char *p);
 unsigned char *MtoC(unsigned char *p);
 unsigned char *CtoM(unsigned char *p);
-void Mstrcpy(unsigned char *dest, unsigned char *src);
-void Mstrcat(unsigned char *dest, unsigned char *src);
-int Mstrcmp(unsigned char *s1, unsigned char *s2);
-unsigned char *getCstring(unsigned char *p);
-unsigned char *getFstring(unsigned char *p);
 int IsValidLine(int line);
 void InsertLastcmd(unsigned char *s);
-int  CountLines(unsigned char *target);
 extern jmp_buf ErrNext;   
-int FindSubFun(unsigned char *p, int type);
 void PrepareProgram(int ErrAbort);
-void MMfputs(unsigned char *p, int filenbr);
 extern int TempStringClearStart;                                           // used to prevent clearing of space in an expression that called a FUNCTION
-extern unsigned char *LibMemory;                           // library memory
-extern unsigned char *ProgMemory;                           // program memory
 extern int PSize;                               // size of the program in program memory
-extern unsigned char *cmdline;                           // Command line terminated with a zero unsigned char and trimmed of spaces
-extern unsigned char *nextstmt;                          // Pointer to the next statement to be executed.
 extern unsigned char PromptString[MAXPROMPTLEN];                                    // the prompt for input, an empty string means use the default
 extern int multi;
 extern void str_replace(char *target, const char *needle, const char *replacement, uint8_t ignore);
@@ -319,21 +318,31 @@ extern unsigned char *ModuleTable[MAXMODULES];           // list of pointers to 
 extern int NbrModules;                          // the number of library modules currently loaded
 #endif
 
-#if defined(__PIC32MX__)
-inline int str_equal(const unsigned char *s1, const unsigned char *s2);
-#else
 void IntToStrPad(char *p, long long int nbr, signed char padch, int maxch, int radix);
 void IntToStr(char *strr, long long int nbr, unsigned int base);
 void FloatToStr(char *p, MMFLOAT f, int m, int n, unsigned char ch);
-int str_equal(const unsigned char *s1, const unsigned char *s2);
-#endif
-int  mystrncasecmp (const unsigned char *s1, const unsigned char *s2, size_t n);
 int mem_equal(unsigned char *s1, unsigned char *s2, int i);
 extern int emptyarray;
 typedef uint16_t CommandToken;
 
 #ifdef __cplusplus
 }
+int mem_equal2(CombinedPtr s1, unsigned char *s2, int i);
+void makeargs2(CombinedPtr *tp, int maxargs, unsigned char *argbuf, CombinedPtr argv[], int *argc, unsigned char *delim);
+CombinedPtr checkstring(CombinedPtr p, unsigned char *tkn);
+uint8_t* checkstring(uint8_t* p, unsigned char *tkn);
+extern "C" const struct s_tokentbl tokentbl[];
+extern "C" const struct s_tokentbl commandtbl[];
+#else
+void makeargs(uint8_t **tp, int maxargs, uint8_t *argbuf, uint8_t *argv[], int *argc, uint8_t *delim);
+
+#if defined(__PIC32MX__)
+inline int str_equal(const unsigned char *s1, const unsigned char *s2);
+#else
+int str_equal(const unsigned char *s1, const unsigned char *s2);
 #endif
+
+#endif
+
 #endif /* __MMBASIC_H */
 /*  @endcond */

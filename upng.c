@@ -1175,7 +1175,7 @@ upng_t* upng_new_from_file(char *filename)
 	/* get filesize */
 	if(filesource[fnbr]!=FLASHFILE)  size = fullsize = f_size(FileTable[fnbr].fptr);
 	else size = fullsize = lfs_file_size(&lfs,FileTable[fnbr].lfsptr);
-    buffer = buff = GetMemory(size);
+    buffer = buff = (uint8_t*)GetMemory(size);
 
 	/* read contents of the file into the vector */
 	if (buffer == NULL) {

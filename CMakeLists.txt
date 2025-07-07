@@ -1,7 +1,23 @@
+# == DO NOT EDIT THE FOLLOWING LINES for the Raspberry Pi Pico VS Code Extension to work ==
+if(WIN32)
+    set(USERHOME $ENV{USERPROFILE})
+else()
+    set(USERHOME $ENV{HOME})
+endif()
+set(sdkVersion 2.1.1)
+set(toolchainVersion 14_2_Rel1)
+set(picotoolVersion 2.1.1)
+set(picoVscode ${USERHOME}/.pico-sdk/cmake/pico-vscode.cmake)
+if (EXISTS ${picoVscode})
+    include(${picoVscode})
+endif()
+# ====================================================================================
 cmake_minimum_required(VERSION 3.13)
 # Valid builds are PICO, PICOUSB, VGA, VGAUSB, HDMI(rp2350 only), HDMIUSB(rp2350 only), WEB
+set(PICO_BOARD pico2 CACHE STRING "Board type")
 
-set(COMPILE VGA)
+set(COMPILE VGARP2350)
+set(m1p2 ON)
 
 if (COMPILE STREQUAL "HDMI" OR COMPILE STREQUAL "WEBRP2350" OR COMPILE STREQUAL "HDMIUSB"  OR COMPILE STREQUAL "VGARP2350"  OR COMPILE STREQUAL "VGAUSBRP2350"  OR COMPILE STREQUAL "PICORP2350"  OR COMPILE STREQUAL "PICOUSBRP2350" )
 	set(PICO_PLATFORM rp2350)
@@ -24,39 +40,46 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 #set(PICO_NO_COPRO_DIS 1)
 pico_sdk_init()
+
+add_subdirectory(drivers/vga-nextgen)
+add_subdirectory(drivers/psram)
+
 add_executable(PicoMite
-	PicoMite.c
-	Memory.c
+	PicoMite.cpp
+	Memory.cpp
 	regex.c 
-	MMBasic.c
-	Operators.c
-	Custom.c
-	Functions.c
-	Commands.c
-	FileIO.c
+	MMBasic.cpp
+	MMBasicC.c
+	Operators.cpp
+	Custom.cpp
+	Functions.cpp
+	Commands.cpp
+	FileIO.cpp
+	FileIOC.c
 	ff.c
 	ffsystem.c
 	ffunicode.c
 	mmc_stm32.c
-	Draw.c
-	Editor.c
-	XModem.c
-	MM_Misc.c
-	External.c
-	MATHS.c
-	Onewire.c
-	I2C.c
-	SPI.c
-	Serial.c
+	Draw.cpp
+	Editor.cpp
+	XModem.cpp
+	MM_Misc.cpp
+	External.cpp
+	MATHS.cpp
+	MATHSC.c
+	Onewire.cpp
+	I2C.cpp
+	SPI.cpp
+	Serial.cpp
 	SPI-LCD.c
 	BmpDecoder.c
-	GPS.c
-	Audio.c
-	CFunction.c
+	GPS.cpp
+	Audio.cpp
+	CFunction.cpp
     picojpeg.c 
     lfs.c
     lfs_util.c
-	hxcmod.c
+	hxcmod.cpp
     VS1053.c
 	aes.c
 )
@@ -96,8 +119,8 @@ if (COMPILE STREQUAL "VGAUSB" OR COMPILE STREQUAL "PICOUSBRP2350" OR COMPILE STR
 	)
 else()
 	target_sources(PicoMite PRIVATE 
-	Keyboard.c 
-	mouse.c
+	Keyboard.cpp
+	mouse.cpp
 	)
 endif()
 
@@ -156,7 +179,13 @@ target_compile_options(PicoMite PRIVATE -DNDEBUG
 										-DPICO_CORE1_STACK_SIZE=0x00
 										-DPICO_MALLOC_PANIC
 										-O2
-										-Wall)
+										-Wall
+										-Wno-write-strings
+										-Wno-sign-compare
+										-Wno-pointer-arith
+										-Wno-narrowing
+										$<$<COMPILE_LANGUAGE:CXX>:-Wno-register>
+										)
 # all RP2350 variants
 if (COMPILE STREQUAL "HDMI" OR COMPILE STREQUAL "WEBRP2350" OR COMPILE STREQUAL "HDMIUSB" OR COMPILE STREQUAL "PICORP2350" OR COMPILE STREQUAL "PICOUSBRP2350" OR COMPILE STREQUAL "VGARP2350" OR COMPILE STREQUAL "VGAUSBRP2350")
 target_compile_options(PicoMite PRIVATE -Drp2350
@@ -203,12 +232,13 @@ target_compile_options(PicoMite PRIVATE -DUSBKEYBOARD
 endif()
 #special case WEB RP2350 gets the GUI controls
 if(COMPILE STREQUAL "WEBRP2350")
-	target_compile_options(PicoMite PRIVATE -DGUICONTROLS
-											)
+	target_compile_options(PicoMite PRIVATE -DGUICONTROLS)
 endif()
 
 
 target_link_libraries(PicoMite
+    vga-nextgen
+	psram
 	pico_stdlib
 	hardware_flash
 	hardware_irq
@@ -223,26 +253,27 @@ target_link_libraries(PicoMite
 
 if(COMPILE STREQUAL "VGAUSB" OR COMPILE STREQUAL "PICOUSB" OR COMPILE STREQUAL "HDMIUSB" OR COMPILE STREQUAL "PICOUSBRP2350" OR COMPILE STREQUAL "VGAUSBRP2350")
 	target_link_libraries(PicoMite
-	tinyusb_host 
-	tinyusb_board
-	pico_multicore
+		tinyusb_host 
+		tinyusb_board
+		pico_multicore
 	)
 endif()
 
 if(COMPILE STREQUAL "VGA" OR COMPILE STREQUAL "PICO" OR COMPILE STREQUAL "HDMI" OR COMPILE STREQUAL "VGARP2350" OR COMPILE STREQUAL "PICORP2350")
-	target_link_libraries(PicoMite
-	pico_multicore
-	)
+	target_link_libraries(PicoMite	pico_multicore)
 endif()
 
 if(COMPILE STREQUAL "VGARP2350" OR COMPILE STREQUAL "WEBRP2350" OR COMPILE STREQUAL "PICORP2350" OR COMPILE STREQUAL "HDMI" OR COMPILE STREQUAL "HDMIUSB" OR COMPILE STREQUAL "VGAUSBRP2350" OR COMPILE STREQUAL "PICOUSBRP2350")
-	target_link_libraries(PicoMite
-	pico_rand
-	)
+	target_link_libraries(PicoMite pico_rand)
 endif()
 
 if(COMPILE STREQUAL "WEB" OR COMPILE STREQUAL "WEBRP2350" )
-	target_link_libraries(PicoMite
-	pico_cyw43_arch_lwip_poll
-	)
+	target_link_libraries(PicoMite	pico_cyw43_arch_lwip_poll)
 endif()
+
+if (m1p2)
+    pico_set_linker_script(${PROJECT_NAME} "${CMAKE_SOURCE_DIR}/memmap.ld")
+	target_compile_options(PicoMite PRIVATE -DM1P2)
+endif ()
+
+target_link_options(${PROJECT_NAME} PRIVATE -Xlinker --print-memory-usage --data-sections)

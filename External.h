@@ -47,8 +47,16 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 
 #define NBR_PULSE_SLOTS     5                       // number of concurrent pulse commands, each entry is 8 bytes
 
+#ifdef __cplusplus
+  #include "PicoMite.h"
+extern "C" {
+  extern int codecheck(CombinedPtr line);
+  extern CombinedPtr IrInterrupt;
+  extern CombinedPtr KeypadInterrupt;
+  extern CombinedPtr ADCInterrupt;
+  extern CombinedPtr InterruptReturn;
+#endif
 
-extern unsigned char *InterruptReturn;
 extern int check_interrupt(void);
 extern void ClearExternalIO(void);
 
@@ -258,9 +266,7 @@ typedef enum
 extern void *IrDev, *IrCmd;
 extern volatile char IrVarType, IrState, IrGotMsg;
 extern int IrBits, IrCount;
-extern unsigned char *IrInterrupt;
 extern int codemap(int pin);
-extern int codecheck(unsigned char *line);
 extern uint8_t PWM0Apin;
 extern uint8_t PWM1Apin;
 extern uint8_t PWM2Apin;
@@ -302,7 +308,6 @@ extern volatile MMFLOAT * volatile a1float, * volatile a2float, * volatile a3flo
 extern uint32_t ADCmax;
 extern bool dmarunning;
 extern bool ADCDualBuffering;
-extern char *ADCInterrupt;
 extern uint32_t ADC_dma_chan;
 extern uint32_t ADC_dma_chan2;
 extern short *ADCbuffer;
@@ -314,7 +319,6 @@ void IrReset(void);
 void IRSendSignal(int pin, int half_cycles);
 void TM_EXTI_Handler_5(char *buf, uint32_t events);
 // numpad declares
-extern unsigned char *KeypadInterrupt;
 int KeypadCheck(void);
 extern MMFLOAT ADCscale[4], ADCbottom[4];
 
@@ -328,6 +332,9 @@ extern MMFLOAT ADCscale[4], ADCbottom[4];
 #define NEC_WAIT_BIT_END            8
 #define elapsed             readusclock()
 
+#ifdef __cplusplus
+}
+#endif
 
 #endif
 #endif

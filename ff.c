@@ -23,7 +23,7 @@
 #include "diskio.h"		/* Declarations of device I/O functions */
 #include "string.h"
 #include "configuration.h"
-extern void MMPrintString(char *s);
+extern void MMPrintString(const char *s);
 extern void error(char *msg, ...);
 extern const int enableexFAT;
 /*--------------------------------------------------------------------------

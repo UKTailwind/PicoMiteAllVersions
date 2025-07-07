@@ -232,7 +232,7 @@ static inline void *lfs_malloc(size_t size) {
 // Deallocate memory, only used if buffers are not provided to littlefs
 static inline void lfs_free(void *p) {
 #ifndef LFS_NO_MALLOC
-    FreeMemory(p);
+    FreeMemory((uint8_t*)p);
 #else
     (void)p;
 #endif
