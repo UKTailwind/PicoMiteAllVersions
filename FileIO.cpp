@@ -436,7 +436,7 @@ void MIPS16 cmd_disk(void){
     if(strcmp(b, "A:/FORMAT")==0)  { 
         FatFSFileSystem = FatFSFileSystemSave = 0;
         ResetFlashStorage(1);
-        return; 
+        return;
     }
     if(strcmp(b, "A:")==0)  { FatFSFileSystem = FatFSFileSystemSave = 0;  return; }
     if(strcmp(b, "B:")==0)    {
@@ -5859,6 +5859,8 @@ static void ensure_prog_file_open(void) {
         if (f_open(&f, PROG_FILE, FA_READ | FA_WRITE | FA_CREATE_ALWAYS) == FR_OK) {
             MMPrintString("Prepare B:" PROG_FILE "...\r\n");
             SDErraseBlock(0, 16 << 20); // TODO: use Options
+            FatFSFileSystem = FatFSFileSystemSave = 0;
+            ResetFlashStorage(1);
             MMPrintString("Done\r\n");
         } else {
             MMPrintString("Error: cannot open /tmp/picoMite.prog\r\n");

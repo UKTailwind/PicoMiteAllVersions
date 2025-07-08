@@ -82,7 +82,7 @@ extern "C" {
         #endif
         #define MAXMODES 2
         #define HEAP_MEMORY_SIZE (96*1024) 
-        #define MAX_CPU     378000 
+        #define MAX_CPU     460000 
         #define MIN_CPU     252000
         #define MAXSUBFUN           256                     // each entry takes up 4 bytes
     #endif
