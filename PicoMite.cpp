@@ -5000,7 +5000,7 @@ uint8_t CombinedPtr::buff[CombinedPtrBufSize];
 FSIZE_t CombinedPtr::buff_base_offset = (FSIZE_t)-1;
 
 unsigned char* CombinedPtr::raw(int _case) const {
-    if (!p.f || p.f >= 0x11000000) { // in RAM
+    if (p.c) {
         return p.c;
     }
     error("!!! >> case: % [%]", _case, p.f);
