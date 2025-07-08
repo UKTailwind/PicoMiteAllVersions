@@ -83,8 +83,10 @@ uint32_t heap_memory_size=HEAP_MEMORY_SIZE;
 uint16_t *tilefcols;//=(uint16_t *)((uint32_t)FRAMEBUFFER+(MODE1SIZE_S*3));
 uint16_t *tilebcols;//=(uint16_t *)((uint32_t)FRAMEBUFFER+(MODE1SIZE_S*3)+(MODE1SIZE_S>>1));
 #else
-uint16_t __attribute__ ((aligned (256))) tilefcols[80*40];
-uint16_t __attribute__ ((aligned (256))) tilebcols[80*40];
+uint16_t __attribute__ ((aligned (256))) _tilefcols[80*40];
+uint16_t __attribute__ ((aligned (256))) _tilebcols[80*40];
+uint16_t* tilefcols = (uint16_t*)_tilefcols;
+uint16_t* tilebcols = (uint16_t*)_tilebcols;
 #endif
 #ifdef HDMI
 uint8_t *tilefcols_w; 

@@ -5073,10 +5073,10 @@ void ResetOptionsNoSave(void) {
             Option.HDMId1=5;
             Option.HDMId2=7;
         #else
-            Option.VGA_BLUE =9;
+            Option.VGA_BLUE = 9;
         #endif
-        Option.KEYBOARD_CLOCK=KEYBOARDCLOCK;
-        Option.KEYBOARD_DATA=KEYBOARDDATA;
+        Option.KEYBOARD_CLOCK = KEYBOARDCLOCK;
+        Option.KEYBOARD_DATA  = KEYBOARDDATA;
         Option.KeyboardConfig = CONFIG_US;
     #endif
 #else

@@ -74,14 +74,14 @@ extern "C" {
             #define MagicKey 0x4776A715
             #define HEAPTOP 0x2003F000
             #define MAXVARS             480                     // 8 + MAXVARLEN + MAXDIM * 2  (ie, 56 bytes) - these do not incl array members
-    #else
+        #else
             #define FLASH_TARGET_OFFSET (864 * 1024) 
             #define MagicKey 0xA2349A2F
             #define HEAPTOP 0x2003f000
             #define MAXVARS             480                     // 8 + MAXVARLEN + MAXDIM * 2  (ie, 56 bytes) - these do not incl array members
-    #endif
+        #endif
         #define MAXMODES 2
-        #define HEAP_MEMORY_SIZE (100*1024) 
+        #define HEAP_MEMORY_SIZE (96*1024) 
         #define MAX_CPU     378000 
         #define MIN_CPU     252000
         #define MAXSUBFUN           256                     // each entry takes up 4 bytes

@@ -150,7 +150,11 @@ int QVGA_HACT;	// V active scanlines (= 2*HEIGHT)
         #ifdef HDMI
             #define MES_SIGNON  "\rPicoMiteHDMI MMBasic " CHIP " M2 Edition V" VERSION "\r\n"
         #else
-            #define MES_SIGNON  "\rPicoMiteVGA MMBasic " CHIP " m1p2 SD Edition V" VERSION " Murmulator port by Mike_V73\r\n"
+            #ifdef rp2350
+                #define MES_SIGNON  "\rPicoMiteVGA MMBasic " CHIP " m1p2 SD Edition V" VERSION " Murmulator port by Mike_V73\r\n"
+            #else
+                #define MES_SIGNON  "\rPicoMiteVGA MMBasic " CHIP " m1p1 SD Edition V" VERSION " Murmulator port by Mike_V73\r\n"
+            #endif
         #endif
 #endif
 
@@ -4099,14 +4103,14 @@ int MIPS16 main(){
 #else
     restart_reason=vreg_and_chip_reset_hw->chip_reset | i;
 #endif
-    if(_excep_code == SOFT_RESET || _excep_code == SCREWUP_TIMEOUT )restart_reason=0xFFFFFFFF;
-    if((_excep_code == WATCHDOG_TIMEOUT) & i) restart_reason=0xFFFFFFFE;
-    if((_excep_code == POSSIBLE_WATCHDOG) & i)restart_reason=0xFFFFFFFD;
+    if(_excep_code == SOFT_RESET || _excep_code == SCREWUP_TIMEOUT ) restart_reason = 0xFFFFFFFF;
+    if((_excep_code == WATCHDOG_TIMEOUT) & i)  restart_reason = 0xFFFFFFFE;
+    if((_excep_code == POSSIBLE_WATCHDOG) & i) restart_reason = 0xFFFFFFFD;
     ResetOptionsNoSave();
 #ifdef rp2350
     if(rom_get_last_boot_type()==BOOT_TYPE_FLASH_UPDATE)restart_reason=0xFFFFFFFC;
 #else
-    if(restart_reason==0x10001 || restart_reason==0x101)restart_reason=0xFFFFFFFC;
+    if(restart_reason==0x10001 || restart_reason==0x101) restart_reason = 0xFFFFFFFC;
 #endif
     uint32_t excep = _excep_code;
     InitSDCARD();
@@ -4118,14 +4122,14 @@ int MIPS16 main(){
         Option.PROG_FLASH_SIZE!=MAX_PROG_SIZE ||
         (Option.heartbeatpin==0 && Option.NoHeartbeat==0) ||
         !(Option.Magic==MagicKey)
-        ){
+    ) {
         ResetAllFlash();              // init the options if this is the very first startup
         _excep_code=0;
         watchdog_enable(1, 1);
         while(1);
     }
 #ifndef HDMI
-    if(Option.VGA_BLUE == 0){
+    if(Option.VGA_BLUE == 0) {
         Option.VGA_BLUE = 9;
         SaveOptions();
     }
@@ -4171,12 +4175,13 @@ int MIPS16 main(){
 #endif
     if(Option.CPU_Speed<=200000)vreg_set_voltage(VREG_VOLTAGE_1_15);
 //    else if(Option.CPU_Speed>200000 && Option.CPU_Speed<=300000 )vreg_set_voltage(VREG_VOLTAGE_1_25);  // Std default @ boot is 1_10
-    else if(Option.CPU_Speed>200000  && Option.CPU_Speed<=320000 )vreg_set_voltage(VREG_VOLTAGE_1_30);  // Std default @ boot is 1_10
+    else if(Option.CPU_Speed>200000  && Option.CPU_Speed<=320000 ) vreg_set_voltage(VREG_VOLTAGE_1_30);  // Std default @ boot is 1_10
 #ifdef rp2350
     else if(Option.CPU_Speed>320000  && Option.CPU_Speed<=360000 )vreg_set_voltage(VREG_VOLTAGE_1_40);  // Std default @ boot is 1_10
     else vreg_set_voltage(VREG_VOLTAGE_1_60);  // Std default @ boot is 1_10
 #else
-    else vreg_set_voltage(VREG_VOLTAGE_1_30); 
+    else ///vreg_set_voltage(VREG_VOLTAGE_1_30);
+        hw_set_bits(&vreg_and_chip_reset_hw->vreg, VREG_AND_CHIP_RESET_VREG_VSEL_BITS);
 #endif
     sleep_ms(10);
 #ifdef rp2350
@@ -4209,7 +4214,7 @@ int MIPS16 main(){
 
     sleep_ms(2);
 #endif
-    PWM_FREQ=44100;
+    PWM_FREQ = 44100;
     pico_get_unique_board_id_string (id_out, 12);
 #ifdef rp2350
 #ifndef PICOMITEWEB
@@ -4223,9 +4228,9 @@ int MIPS16 main(){
     }
 #endif
 #endif
-    if(clock_get_hz(clk_usb)!=48000000){
+    if(clock_get_hz(clk_usb) != 48000000){
         ResetAllFlash();              // init the options if this is the very first startup
-        _excep_code=INVALID_CLOCKSPEED;
+        _excep_code = INVALID_CLOCKSPEED;
         watchdog_enable(1, 1);
         while(1);
     }
@@ -4244,7 +4249,7 @@ int MIPS16 main(){
 	mutex_init( &frameBufferMutex );						// create a mutex to lock frame buffer
 #endif
 #ifndef rp2350
-    if(Option.CPU_Speed<=200000)modclock(2);
+    if(Option.CPU_Speed <= 200000) modclock(2);
 #else
 #ifdef HDMI
     if(FullColour || MediumRes){
@@ -4274,7 +4279,7 @@ int MIPS16 main(){
 #ifdef PICOMITEVGA
 #ifndef HDMI
     if(Option.CPU_Speed == Freq252P || Option.CPU_Speed == Freq480P  || Option.CPU_Speed == Freq848  || Option.CPU_Speed == Freq400   || Option.CPU_Speed == FreqSVGA )QVGA_CLKDIV= 2;
-    else if(Option.CPU_Speed == 378000)QVGA_CLKDIV= 3;
+    else if(Option.CPU_Speed == 378000) QVGA_CLKDIV= 3;
     else QVGA_CLKDIV= 1;
 #ifdef rp2350
     if(Option.CPU_Speed==Freq848){ //adjust the size of the heap
@@ -4313,7 +4318,7 @@ int MIPS16 main(){
 	stdio_init_all();
     adc_init();
     adc_set_temp_sensor_enabled(true);
-    mSecTimer=time_us_64()/1000;
+    mSecTimer = time_us_64() / 1000;
     add_repeating_timer_us(-1000, timer_callback, NULL, &timer);
     InitReservedIO();
     ClearExternalIO();
@@ -4333,10 +4338,10 @@ int MIPS16 main(){
 	OptionErrorSkip = false;
 #ifndef USBKEYBOARD
     if(!(Option.SerialConsole==1 || Option.SerialConsole==2) || Option.Telnet==-1) {
-        uint64_t t=time_us_64();
-        while(1){
-            if(tud_cdc_connected())break;
-            if(time_us_64()-t>5000000)break;
+        uint64_t t = time_us_64();
+        while(1) {
+            if (tud_cdc_connected()) break;
+            if (time_us_64() - t > 5000000) break;
         }
     }
     initKeyboard();
@@ -4351,12 +4356,12 @@ int MIPS16 main(){
     if(Option.BackLightLevel)setBacklight(Option.BackLightLevel, 0);
 #endif
     ErrorInPrompt = false;
-    exception_set_exclusive_handler(HARDFAULT_EXCEPTION,sigbus);
-    exception_set_exclusive_handler(SVCALL_EXCEPTION,sigbus);
-    exception_set_exclusive_handler(PENDSV_EXCEPTION,sigbus);
-    exception_set_exclusive_handler(NMI_EXCEPTION ,sigbus);
-    exception_set_exclusive_handler(SYSTICK_EXCEPTION,sigbus);
-    while((i=getConsole())!=-1){}
+    exception_set_exclusive_handler(HARDFAULT_EXCEPTION, sigbus);
+    exception_set_exclusive_handler(SVCALL_EXCEPTION, sigbus);
+    exception_set_exclusive_handler(PENDSV_EXCEPTION, sigbus);
+    exception_set_exclusive_handler(NMI_EXCEPTION, sigbus);
+    exception_set_exclusive_handler(SYSTICK_EXCEPTION, sigbus);
+    while((i = getConsole()) != -1) { }
     
 #ifdef PICOMITEVGA
 //        bus_ctrl_hw->priority = BUSCTRL_BUS_PRIORITY_DMA_W_BITS | BUSCTRL_BUS_PRIORITY_DMA_R_BITS;
@@ -4366,27 +4371,27 @@ int MIPS16 main(){
         core1stack[0]=0x12345678;
         uSec(1000);
         #else
-    #ifdef rp2350
-    piomap[QVGA_PIO_NUM]=(uint64_t)((uint64_t)1<<(uint64_t)PinDef[Option.VGA_BLUE].GPno);
-    piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.VGA_BLUE].GPno+1));
-    piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.VGA_BLUE].GPno+2));
-    piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.VGA_BLUE].GPno+3));
-    piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.VGA_BLUE].GPno+4));
-    piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.VGA_BLUE].GPno+5));
-    piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.VGA_BLUE].GPno+6));
-    piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.VGA_BLUE].GPno+7));
-    if(Option.audio_i2s_bclk){
-        piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)PinDef[Option.audio_i2s_data].GPno);
-        piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)PinDef[Option.audio_i2s_bclk].GPno);
-        piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.audio_i2s_bclk].GPno+1));
-    }
-    #endif        
-        X_TILE=Option.X_TILE;
-        Y_TILE=Option.Y_TILE;
-        ytileheight=(X_TILE==80 || X_TILE==106)? 12 : 16;
+        #ifdef rp2350
+            piomap[QVGA_PIO_NUM]=(uint64_t)((uint64_t)1<<(uint64_t)PinDef[Option.VGA_BLUE].GPno);
+            piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.VGA_BLUE].GPno+1));
+            piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.VGA_BLUE].GPno+2));
+            piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.VGA_BLUE].GPno+3));
+            piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.VGA_BLUE].GPno+4));
+            piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.VGA_BLUE].GPno+5));
+            piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.VGA_BLUE].GPno+6));
+            piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.VGA_BLUE].GPno+7));
+            if(Option.audio_i2s_bclk){
+                piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)PinDef[Option.audio_i2s_data].GPno);
+                piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)PinDef[Option.audio_i2s_bclk].GPno);
+                piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.audio_i2s_bclk].GPno+1));
+            }
+        #endif        
+        X_TILE = Option.X_TILE;
+        Y_TILE = Option.Y_TILE;
+        ytileheight = (X_TILE == 80 || X_TILE == 106) ? 12 : 16;
         bus_ctrl_hw->priority=0x100;
-        multicore_launch_core1_with_stack(QVgaCore,core1stack,512);
-        core1stack[0]=0x12345678;
+        multicore_launch_core1_with_stack(QVgaCore, core1stack, 512);
+        core1stack[0] = 0x12345678;
         memset((void *)WriteBuf, 0, 38400);
     #endif
     ResetDisplay();

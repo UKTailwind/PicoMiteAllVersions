@@ -14,10 +14,11 @@ endif()
 # ====================================================================================
 cmake_minimum_required(VERSION 3.13)
 # Valid builds are PICO, PICOUSB, VGA, VGAUSB, HDMI(rp2350 only), HDMIUSB(rp2350 only), WEB
-set(PICO_BOARD pico2 CACHE STRING "Board type")
+set(PICO_BOARD pico CACHE STRING "Board type")
 
-set(COMPILE VGARP2350)
-set(m1p2 ON)
+#set(COMPILE VGARP2350)
+#set(m1p2 ON)
+set(COMPILE VGA)
 
 if (COMPILE STREQUAL "HDMI" OR COMPILE STREQUAL "WEBRP2350" OR COMPILE STREQUAL "HDMIUSB"  OR COMPILE STREQUAL "VGARP2350"  OR COMPILE STREQUAL "VGAUSBRP2350"  OR COMPILE STREQUAL "PICORP2350"  OR COMPILE STREQUAL "PICOUSBRP2350" )
 	set(PICO_PLATFORM rp2350)
@@ -271,9 +272,11 @@ if(COMPILE STREQUAL "WEB" OR COMPILE STREQUAL "WEBRP2350" )
 	target_link_libraries(PicoMite	pico_cyw43_arch_lwip_poll)
 endif()
 
-if (m1p2)
-    pico_set_linker_script(${PROJECT_NAME} "${CMAKE_SOURCE_DIR}/memmap.ld")
-	target_compile_options(PicoMite PRIVATE -DM1P2)
-endif ()
+if (COMPILE STREQUAL "HDMI" OR COMPILE STREQUAL "WEBRP2350" OR COMPILE STREQUAL "HDMIUSB"  OR COMPILE STREQUAL "VGARP2350"  OR COMPILE STREQUAL "VGAUSBRP2350"  OR COMPILE STREQUAL "PICORP2350"  OR COMPILE STREQUAL "PICOUSBRP2350" )
+	if (m1p2)
+    	pico_set_linker_script(${PROJECT_NAME} "${CMAKE_SOURCE_DIR}/memmap.ld")
+		target_compile_options(PicoMite PRIVATE -DM1P2)
+	endif ()
+endif()
 
 target_link_options(${PROJECT_NAME} PRIVATE -Xlinker --print-memory-usage --data-sections)

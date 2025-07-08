@@ -133,13 +133,8 @@ extern uint32_t map16pairs[16];
 extern const uint32_t MAP256DEF[256];
 extern volatile int32_t v_scanline;
 #else
-#ifdef rp2350
 extern uint16_t *tilefcols;
 extern uint16_t *tilebcols;
-#else
-extern uint16_t tilefcols[];
-extern uint16_t tilebcols[];
-#endif
 #endif
 extern void __not_in_flash_func(QVgaCore)(void);
 extern uint32_t core1stack[];
@@ -238,13 +233,8 @@ extern void clear320(void);
 	#ifndef HDMI
 		extern uint16_t __attribute__ ((aligned (256))) M_Foreground[16];
 		extern uint16_t __attribute__ ((aligned (256))) M_Background[16];
-		#ifdef rp2350
-			extern uint16_t *tilefcols;
-			extern uint16_t *tilebcols;
-		#else
-			extern uint16_t __attribute__ ((aligned (256))) tilefcols[80*40];
-			extern uint16_t __attribute__ ((aligned (256))) tilebcols[80*40];
-		#endif
+		extern uint16_t *tilefcols;
+		extern uint16_t *tilebcols;
 		extern void VGArecovery(int pin);
 	#else
 	extern int MODE_H_SYNC_POLARITY, MODE_V_TOTAL_LINES, MODE_ACTIVE_LINES, MODE_ACTIVE_PIXELS;

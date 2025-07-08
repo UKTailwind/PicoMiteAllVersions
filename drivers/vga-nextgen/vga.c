@@ -142,6 +142,10 @@ void __time_critical_func() dma_handler_VGA() {
         dma_channel_set_read_addr(dma_chan_ctrl, output_buffer, false);
         return;
     };
+    if (!DisplayBuf || !LayerBuf || !tilefcols || !tilebcols) {
+        dma_channel_set_read_addr(dma_chan_ctrl, output_buffer, false);
+        return;
+    }
 
     //зона прорисовки изображения
     uint16_t* output_buffer_16bit = (uint16_t *)(*output_buffer);
@@ -162,158 +166,158 @@ void __time_critical_func() dma_handler_VGA() {
     int width = MIN((visible_line_size - ((graphics_buffer_shift_x > 0) ? (graphics_buffer_shift_x) : 0)), max_width);
     if (width < 0) return; // TODO: detect a case
 
-                    static uint16_t map4_2_8[16] = {
-                        0b11000000,
-                        0b11000011,
-                        0b11000100,
-                        0b11000111,
-                        0b11001000,
-                        0b11001011,
-                        0b11001100,
-                        0b11001111,
-                        0b11110000,
-                        0b11110011,
-                        0b11110100,
-                        0b11110111,
-                        0b11111000,
-                        0b11111011,
-                        0b11111100,
-                        0b11111111
-                    };
+    static uint16_t map4_2_8[16] = {
+        0b11000000,
+        0b11000011,
+        0b11000100,
+        0b11000111,
+        0b11001000,
+        0b11001011,
+        0b11001100,
+        0b11001111,
+        0b11110000,
+        0b11110011,
+        0b11110100,
+        0b11110111,
+        0b11111000,
+        0b11111011,
+        0b11111100,
+        0b11111111
+    };
 
-            if(DISPLAY_TYPE==SCREENMODE1){
-                uint16_t *q = output_buffer_16bit;
-                volatile unsigned char *p  = &DisplayBuf[screen_line * vgaloop8];
-                volatile unsigned char *pp = &LayerBuf[screen_line * vgaloop8];
-                if (tc == ytileheight){
-                    tile++;
-                    tc=0;
-                }
-                tc++;
-                register int pos= tile * X_TILE;
-                for(register int i = 0; i < vgaloop16; ++i) {
-                    register int d = *p++ | *pp++;
-                    register int low  = d & 0xF;
-                    register int high = d >> 4;
-                    register uint32_t u16 = (M_Foreground[low] & tilefcols[pos]) | (M_Background[low] & tilebcols[pos]); // 4x4bit
-                    *q++ = map4_2_8[u16 & 0xF] | (map4_2_8[(u16 >> 4) & 0xF] << 8);
-                    *q++ = map4_2_8[(u16 >> 8) & 0xF] | (map4_2_8[(u16 >> 12) & 0xF] << 8);
-                    u16 = (M_Foreground[high]& tilefcols[pos]) | (M_Background[high] & tilebcols[pos]) ;
-                    *q++ = map4_2_8[u16 & 0xF] | (map4_2_8[(u16 >> 4) & 0xF] << 8);
-                    *q++ = map4_2_8[(u16 >> 8) & 0xF] | (map4_2_8[(u16 >> 12) & 0xF] << 8);
-                    pos++;
-                    d = *p++ | *pp++;
-                    low = d & 0xF;
-                    high = d++ >>4;
-                    u16 = (M_Foreground[low] & tilefcols[pos]) | (M_Background[low] & tilebcols[pos]) ;
-                    *q++ = map4_2_8[u16 & 0xF] | (map4_2_8[(u16 >> 4) & 0xF] << 8);
-                    *q++ = map4_2_8[(u16 >> 8) & 0xF] | (map4_2_8[(u16 >> 12) & 0xF] << 8);
-                    u16 = (M_Foreground[high]& tilefcols[pos]) | (M_Background[high] & tilebcols[pos]) ;
-                    *q++ = map4_2_8[u16 & 0xF] | (map4_2_8[(u16 >> 4) & 0xF] << 8);
-                    *q++ = map4_2_8[(u16 >> 8) & 0xF] | (map4_2_8[(u16 >> 12) & 0xF] << 8);
-                    pos++;
-                }
+    if (DISPLAY_TYPE == SCREENMODE1) {
+        uint16_t *q = output_buffer_16bit;
+        volatile unsigned char *p  = &DisplayBuf[screen_line * vgaloop8];
+        volatile unsigned char *pp = &LayerBuf[screen_line * vgaloop8];
+        if (tc == ytileheight){
+            tile++;
+            tc=0;
+        }
+        tc++;
+        register int pos= tile * X_TILE;
+        for(register int i = 0; i < vgaloop16; ++i) {
+            register int d = *p++ | *pp++;
+            register int low  = d & 0xF;
+            register int high = d >> 4;
+            register uint32_t u16 = (M_Foreground[low] & tilefcols[pos]) | (M_Background[low] & tilebcols[pos]); // 4x4bit
+            *q++ = map4_2_8[u16 & 0xF] | (map4_2_8[(u16 >> 4) & 0xF] << 8);
+            *q++ = map4_2_8[(u16 >> 8) & 0xF] | (map4_2_8[(u16 >> 12) & 0xF] << 8);
+            u16 = (M_Foreground[high]& tilefcols[pos]) | (M_Background[high] & tilebcols[pos]) ;
+            *q++ = map4_2_8[u16 & 0xF] | (map4_2_8[(u16 >> 4) & 0xF] << 8);
+            *q++ = map4_2_8[(u16 >> 8) & 0xF] | (map4_2_8[(u16 >> 12) & 0xF] << 8);
+            pos++;
+            d = *p++ | *pp++;
+            low = d & 0xF;
+            high = d++ >>4;
+            u16 = (M_Foreground[low] & tilefcols[pos]) | (M_Background[low] & tilebcols[pos]) ;
+            *q++ = map4_2_8[u16 & 0xF] | (map4_2_8[(u16 >> 4) & 0xF] << 8);
+            *q++ = map4_2_8[(u16 >> 8) & 0xF] | (map4_2_8[(u16 >> 12) & 0xF] << 8);
+            u16 = (M_Foreground[high]& tilefcols[pos]) | (M_Background[high] & tilebcols[pos]) ;
+            *q++ = map4_2_8[u16 & 0xF] | (map4_2_8[(u16 >> 4) & 0xF] << 8);
+            *q++ = map4_2_8[(u16 >> 8) & 0xF] | (map4_2_8[(u16 >> 12) & 0xF] << 8);
+            pos++;
+        }
 #ifdef rp2350
-            } else if(DISPLAY_TYPE==SCREENMODE3){
-                uint8_t transparent16=(uint8_t)transparent;
-                register unsigned char *p=&DisplayBuf[screen_line * vgaloop2];
-                register unsigned char *q=&LayerBuf[screen_line * vgaloop2];
-                register int low, high, low2, high2;
-                register uint8_t *r = (uint8_t *)output_buffer_16bit;
-                for(register int i = 0; i < vgaloop2; ++i){
-                    low= map16[p[i] & 0xF];
-                    high=map16[(p[i] & 0xF0)>>4];
-                    low2= map16[q[i] & 0xF];
-                    high2=map16[(q[i] & 0xF0)>>4];
-                    if ( low2 != transparent16) low = low2;
-                    if ( high2!= transparent16) high = high2;
-                    *r++ = map4_2_8[low];
-                    *r++ = map4_2_8[high];
-                }
+    } else if(DISPLAY_TYPE==SCREENMODE3){
+        uint8_t transparent16=(uint8_t)transparent;
+        register unsigned char *p=&DisplayBuf[screen_line * vgaloop2];
+        register unsigned char *q=&LayerBuf[screen_line * vgaloop2];
+        register int low, high, low2, high2;
+        register uint8_t *r = (uint8_t *)output_buffer_16bit;
+        for(register int i = 0; i < vgaloop2; ++i){
+            low= map16[p[i] & 0xF];
+            high=map16[(p[i] & 0xF0)>>4];
+            low2= map16[q[i] & 0xF];
+            high2=map16[(q[i] & 0xF0)>>4];
+            if ( low2 != transparent16) low = low2;
+            if ( high2!= transparent16) high = high2;
+            *r++ = map4_2_8[low];
+            *r++ = map4_2_8[high];
+        }
 #endif
-            } else { //mode 2
-                int line = screen_line >> 1;
-                register unsigned char *dd=&DisplayBuf[line * vgaloop4];
-                register unsigned char *ll=&LayerBuf[line * vgaloop4];
-                uint8_t transparent16=(uint8_t)transparent;
+    } else { //mode 2
+        int line = screen_line >> 1;
+        register unsigned char *dd=&DisplayBuf[line * vgaloop4];
+        register unsigned char *ll=&LayerBuf[line * vgaloop4];
+        uint8_t transparent16=(uint8_t)transparent;
 #ifdef rp2350
-                uint8_t s;
-                uint8_t transparent16s=(uint8_t)transparents;
+        uint8_t s;
+        uint8_t transparent16s=(uint8_t)transparents;
 #endif
 #ifdef rp2350
-                register unsigned char *ss=&SecondLayer[line * vgaloop4];
-                if(ss==dd){
-                    ss=ll;
-                    transparent16s=transparent16;
-                }
-                register int low3, high3;
+        register unsigned char *ss=&SecondLayer[line * vgaloop4];
+        if(ss==dd){
+            ss=ll;
+            transparent16s=transparent16;
+        }
+        register int low3, high3;
 #endif
-                register int low, high, low2, high2;
-                register uint8_t *r = (uint8_t*)output_buffer_16bit;
-                register uint8_t l,d;
-                for(int i=0;i<vgaloop4;i+=2){
-                    d=*dd++;
-                    l=*ll++;
-                    low= map16[d & 0xF];
-                    d>>=4;
-                    high=map16[d];
-                    low2= map16[l & 0xF];
-                    l>>=4;
-                    high2=map16[l];
+        register int low, high, low2, high2;
+        register uint8_t *r = (uint8_t*)output_buffer_16bit;
+        register uint8_t l,d;
+        for(int i=0;i<vgaloop4;i+=2){
+            d=*dd++;
+            l=*ll++;
+            low= map16[d & 0xF];
+            d>>=4;
+            high=map16[d];
+            low2= map16[l & 0xF];
+            l>>=4;
+            high2=map16[l];
 #ifdef rp2350
-                    s=*ss++;
-                    low3= map16[s & 0xF];
-                    s>>=4;
-                    high3=map16[s];
+            s=*ss++;
+            low3= map16[s & 0xF];
+            s>>=4;
+            high3=map16[s];
 #endif
-                    if(low2!=transparent16)low=low2;
-                    if(high2!=transparent16)high=high2;
+            if(low2!=transparent16)low=low2;
+            if(high2!=transparent16)high=high2;
 #ifdef rp2350
-                    if(low3!=transparent16s)low=low3;
-                    if(high3!=transparent16s)high=high3;
+            if(low3!=transparent16s)low=low3;
+            if(high3!=transparent16s)high=high3;
 #endif
-                    low = map4_2_8[low];
-                    *r++ = low;
-                    *r++ = low;
-                    high = map4_2_8[high];
-                    *r++ = high;
-                    *r++ = high;
+            low = map4_2_8[low];
+            *r++ = low;
+            *r++ = low;
+            high = map4_2_8[high];
+            *r++ = high;
+            *r++ = high;
 
-                    d=*dd++;
-                    l=*ll++;
-                    low= map16[d & 0xF];
-                    d>>=4;
-                    high=map16[d];
-                    low2= map16[l & 0xF];
-                    l>>=4;
-                    high2=map16[l];
+            d=*dd++;
+            l=*ll++;
+            low= map16[d & 0xF];
+            d>>=4;
+            high=map16[d];
+            low2= map16[l & 0xF];
+            l>>=4;
+            high2=map16[l];
 #ifdef rp2350
-                    s=*ss++;
-                    low3= map16[s & 0xF];
-                    s>>=4;
-                    high3=map16[s];
+            s=*ss++;
+            low3= map16[s & 0xF];
+            s>>=4;
+            high3=map16[s];
 #endif
-                    if(low2!=transparent16)low=low2;
-                    if(high2!=transparent16)high=high2;
+            if(low2!=transparent16)low=low2;
+            if(high2!=transparent16)high=high2;
 #ifdef rp2350
-                    if(low3!=transparent16s)low=low3;
-                    if(high3!=transparent16s)high=high3;
+            if(low3!=transparent16s)low=low3;
+            if(high3!=transparent16s)high=high3;
 #endif
-                    low = map4_2_8[low];
-                    *r++ = low;
-                    *r++ = low;
-                    high = map4_2_8[high];
-                    *r++ = high;
-                    *r++ = high;
-                }
-            }
+            low = map4_2_8[low];
+            *r++ = low;
+            *r++ = low;
+            high = map4_2_8[high];
+            *r++ = high;
+            *r++ = high;
+        }
+    }
 
 /**
-            for  (int x = 0; x < width; ++x) {
-                register uint8_t cx = input_buffer_8bit[x ^ 2] & 0b00111111;
-                uint16_t c = (cx >> 4) | (cx & 0b1100) | ((cx & 0b11) << 4); // swap R and B
-                *output_buffer_16bit++ = ((c << 8 | c) & 0x3f3f) | palette16_mask;
-            }
+    for  (int x = 0; x < width; ++x) {
+        register uint8_t cx = input_buffer_8bit[x ^ 2] & 0b00111111;
+        uint16_t c = (cx >> 4) | (cx & 0b1100) | ((cx & 0b11) << 4); // swap R and B
+        *output_buffer_16bit++ = ((c << 8 | c) & 0x3f3f) | palette16_mask;
+    }
 */
     dma_channel_set_read_addr(dma_chan_ctrl, output_buffer, false);
 }
