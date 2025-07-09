@@ -175,6 +175,7 @@ int CheckEmpty(CombinedPtr p){
 // the argument p must point to the first line to be executed
 void MIPS16 __not_in_flash_func(ExecuteProgram)(CombinedPtr p) {
     int i, SaveLocalIndex = 0;
+    CombinedPtr p_cmd = p;
     jmp_buf SaveErrNext;
     memcpy(SaveErrNext, ErrNext, sizeof(jmp_buf));                  // we call ExecuteProgram() recursively so we need to store/restore old jump buffer between calls
     skipspace(p);                                                   // just in case, skip any whitespace
@@ -220,8 +221,14 @@ void MIPS16 __not_in_flash_func(ExecuteProgram)(CombinedPtr p) {
                         if(i >= 0) {                                // >= 0 means it is a user defined command
                             DefinedSubFun(false, p, i, NULL, NULL, NULL, NULL);
                         }
-                        else
-                            error("Unknown command");
+                        else {
+                            char* cstr = GetTempMemory(256);
+                            for(int i = 0; i < 256; ++i) {
+                                cstr[i] = *p_cmd++;
+                                if (!cstr[i]) break;
+                            }
+                            error("Unknown command: $", cstr);
+                        }
                     }
                 } else {
                     g_LocalIndex = SaveLocalIndex;                    // restore so that we can clean up any memory leaks
