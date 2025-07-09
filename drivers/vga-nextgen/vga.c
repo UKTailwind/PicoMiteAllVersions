@@ -166,7 +166,7 @@ void __time_critical_func() dma_handler_VGA() {
     int width = MIN((visible_line_size - ((graphics_buffer_shift_x > 0) ? (graphics_buffer_shift_x) : 0)), max_width);
     if (width < 0) return; // TODO: detect a case
 
-    static uint16_t map4_2_8[16] = {
+    uint16_t map4_2_8[16] = {
         0b11000000,
         0b11000011,
         0b11000100,
@@ -184,37 +184,61 @@ void __time_critical_func() dma_handler_VGA() {
         0b11111100,
         0b11111111
     };
+    uint16_t map4_2_8_h[16] = {
+        0b1100000000000000,
+        0b1100001100000000,
+        0b1100010000000000,
+        0b1100011100000000,
+        0b1100100000000000,
+        0b1100101100000000,
+        0b1100110000000000,
+        0b1100111100000000,
+        0b1111000000000000,
+        0b1111001100000000,
+        0b1111010000000000,
+        0b1111011100000000,
+        0b1111100000000000,
+        0b1111101100000000,
+        0b1111110000000000,
+        0b1111111100000000
+    };
 
     if (DISPLAY_TYPE == SCREENMODE1) {
         uint16_t *q = output_buffer_16bit;
-        volatile unsigned char *p  = &DisplayBuf[screen_line * vgaloop8];
-        volatile unsigned char *pp = &LayerBuf[screen_line * vgaloop8];
+        size_t idx = screen_line * vgaloop8;
+        uint8_t *p  = DisplayBuf + idx;
+        uint8_t *pp = LayerBuf + idx;
         if (tc == ytileheight){
             tile++;
-            tc=0;
+            tc = 0;
         }
         tc++;
-        register int pos= tile * X_TILE;
-        for(register int i = 0; i < vgaloop16; ++i) {
-            register int d = *p++ | *pp++;
-            register int low  = d & 0xF;
-            register int high = d >> 4;
-            register uint32_t u16 = (M_Foreground[low] & tilefcols[pos]) | (M_Background[low] & tilebcols[pos]); // 4x4bit
-            *q++ = map4_2_8[u16 & 0xF] | (map4_2_8[(u16 >> 4) & 0xF] << 8);
-            *q++ = map4_2_8[(u16 >> 8) & 0xF] | (map4_2_8[(u16 >> 12) & 0xF] << 8);
-            u16 = (M_Foreground[high]& tilefcols[pos]) | (M_Background[high] & tilebcols[pos]) ;
-            *q++ = map4_2_8[u16 & 0xF] | (map4_2_8[(u16 >> 4) & 0xF] << 8);
-            *q++ = map4_2_8[(u16 >> 8) & 0xF] | (map4_2_8[(u16 >> 12) & 0xF] << 8);
+        register uint32_t pos = tile * X_TILE;
+        register uint8_t oxF = 0xF;
+        for(register uint32_t i = 0; i < vgaloop16; ++i) {
+            register uint8_t d = *p++ | *pp++;
+            register uint8_t low  = d & oxF;
+            register uint8_t high = d >> 4;
+            register uint32_t tilefcols_pos = tilefcols[pos];
+            register uint32_t tilebcols_pos = tilebcols[pos];
+            register uint32_t u16 = (M_Foreground[low] & tilefcols_pos) | (M_Background[low] & tilebcols_pos); // 4x4bit
+            *q++ = map4_2_8[u16 & oxF] | map4_2_8_h[(u16 >> 4) & oxF];
+            *q++ = map4_2_8[(u16 >> 8) & oxF] | map4_2_8_h[u16 >> 12];
+            u16 = (M_Foreground[high] & tilefcols_pos) | (M_Background[high] & tilebcols_pos) ;
+            *q++ = map4_2_8[u16 & oxF] | map4_2_8_h[(u16 >> 4) & oxF];
+            *q++ = map4_2_8[(u16 >> 8) & oxF] | map4_2_8_h[u16 >> 12];
             pos++;
+            tilefcols_pos = tilefcols[pos];
+            tilebcols_pos = tilebcols[pos];
             d = *p++ | *pp++;
-            low = d & 0xF;
-            high = d++ >>4;
-            u16 = (M_Foreground[low] & tilefcols[pos]) | (M_Background[low] & tilebcols[pos]) ;
-            *q++ = map4_2_8[u16 & 0xF] | (map4_2_8[(u16 >> 4) & 0xF] << 8);
-            *q++ = map4_2_8[(u16 >> 8) & 0xF] | (map4_2_8[(u16 >> 12) & 0xF] << 8);
-            u16 = (M_Foreground[high]& tilefcols[pos]) | (M_Background[high] & tilebcols[pos]) ;
-            *q++ = map4_2_8[u16 & 0xF] | (map4_2_8[(u16 >> 4) & 0xF] << 8);
-            *q++ = map4_2_8[(u16 >> 8) & 0xF] | (map4_2_8[(u16 >> 12) & 0xF] << 8);
+            low = d & oxF;
+            high = d >> 4;
+            u16 = (M_Foreground[low] & tilefcols_pos) | (M_Background[low] & tilebcols_pos) ;
+            *q++ = map4_2_8[u16 & oxF] | map4_2_8_h[(u16 >> 4) & oxF];
+            *q++ = map4_2_8[(u16 >> 8) & oxF] | map4_2_8_h[u16 >> 12];
+            u16 = (M_Foreground[high] & tilefcols_pos) | (M_Background[high] & tilebcols_pos) ;
+            *q++ = map4_2_8[u16 & oxF] | map4_2_8_h[(u16 >> 4) & oxF];
+            *q++ = map4_2_8[(u16 >> 8) & oxF] | map4_2_8_h[u16 >> 12];
             pos++;
         }
 #ifdef rp2350
