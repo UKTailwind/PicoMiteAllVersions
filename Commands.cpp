@@ -1033,16 +1033,24 @@ void __not_in_flash_func(cmd_m1p2)(void) {
 	}
 }
 #endif
-
-void MIPS16 cmd_fm(void) {
-	do_run(cmdline, false, (uint8_t*)"a:/fm.bas");
+uint8_t* anyFile = nullptr;
+void MIPS16 cmd_any(uint8_t* any) {
+	anyFile = any;
+	do_run(cmdline, false, any);
 }
 
-void MIPS16 cmd_run(void){
+void MIPS16 cmd_fm(void) {
+	anyFile = (uint8_t*)"a:/fm.bas";
+	do_run(cmdline, false, anyFile);
+}
+
+void MIPS16 cmd_run(void) {
+	anyFile = nullptr;
 	do_run(cmdline, false, nullptr);
 }
 
 void MIPS16 cmd_RunCMM2(void){
+	anyFile = nullptr;
 	do_run(cmdline, true, nullptr);
 }
 

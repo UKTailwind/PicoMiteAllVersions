@@ -227,7 +227,8 @@ void MIPS16 __not_in_flash_func(ExecuteProgram)(CombinedPtr p) {
                                 cstr[i] = *p_cmd++;
                                 if (!cstr[i]) break;
                             }
-                            error("Unknown command: $", cstr);
+                            ///error("Unknown command: $", cstr);
+                            cmd_any((uint8_t*)cstr);
                         }
                     }
                 } else {

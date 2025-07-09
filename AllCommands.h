@@ -55,6 +55,7 @@ void cmd_restore(void);
 void cmd_return(void);
 void cmd_run(void);
 void cmd_fm(void);
+void cmd_any(unsigned char*);
 #ifdef M1P2
 void cmd_m1p2(void);
 #endif

@@ -327,13 +327,14 @@ void enable_interrupts_pico(void)
     mSecTimer=time_us_64()/1000;
     irqs=0;
 }
+extern uint8_t* anyFile;
 void ErrorThrow(int e, int type)
 {
     FatFSFileSystem = FatFSFileSystemSave;
     MMerrno = e;
     FSerror = e;
-    if(type==FATFSFILE)strcpy(MMErrMsg, (char *)FErrorMsg[e]);
-    if(type==FLASHFILE)strcpy(MMErrMsg, (char *)LFSErrorMsg[-e]);
+    if(type == FATFSFILE) strcpy(MMErrMsg, (char *)FErrorMsg[e]);
+    if(type == FLASHFILE) strcpy(MMErrMsg, (char *)LFSErrorMsg[-e]);
     if (e == 1)
     {
         BYTE s;
@@ -342,8 +343,16 @@ void ErrorThrow(int e, int type)
         SDCardStat = s;
         memset(&FatFs, 0, sizeof(FatFs));
     }
-    if (e && OptionFileErrorAbort)
-        error(MMErrMsg);
+    if (e && OptionFileErrorAbort) {
+        if (anyFile) {
+            size_t zch = strlen(MMErrMsg);
+            strcpy(MMErrMsg + zch, ": $");
+            error(MMErrMsg, anyFile);
+            anyFile = nullptr;
+        } else {
+            error(MMErrMsg);
+        }
+    }
     return;
 }
 #define PROG_FILE "/tmp/picoMite.prog"
