@@ -120,6 +120,8 @@ extern uint32_t core1stack[];;
 unsigned char FunKey[NBRPROGKEYS][MAXKEYLEN + 1];                            // data storage for the programmable function keys
 #endif
 
+uint32_t DefinedSubFunMem;         // Records memory allocated to DefinedSubFun in case of an error
+int DefinedSubFunLocalIndex;       // Records LocalIndex at start of DefinedSubFun in case of an error
 char digit[256]={
 		0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, //0
 		0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, //0x10
@@ -576,6 +578,12 @@ void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, in
     } *argval;
     int *argVarIndex;
 
+    // Errors generated after gosubindex is incremented need to restore the original value
+    // Any variables created if LocalIndex was incremented also need to be cleared
+    // Memory allocated to *argval needs to be recovered.
+    // This allows unit tests to recover cleanly from skipped errors.i.e. ON ERROR SKIP
+    DefinedSubFunLocalIndex=g_LocalIndex;  //save the LocalIndex
+ 
     CallersLinePtr = CurrentLinePtr;
     SubLinePtr = subfun[index];                                // used for error reporting
     p =  SubLinePtr + sizeof(CommandToken);                    // point to the sub or function definition
@@ -634,13 +642,14 @@ void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, in
         return;
     }
    // from now on we have a user defined sub or function (not a C routine)
-   
+ 
     if(gosubindex >= MAXGOSUB) error("Too many nested SUB/FUN");
     errorstack[gosubindex] = CallersLinePtr;
     gosubstack[gosubindex++] = isfun ? NULL : nextstmt;             // NULL signifies that this is returned to by ending ExecuteProgram()
     #define buffneeded MAX_ARG_COUNT*(sizeof(union u_argval)+ 2*sizeof(int)+3*sizeof(unsigned char *)+sizeof(unsigned char))+ 2*STRINGSIZE
     // allocate memory for processing the arguments
     argval=GetSystemMemory(buffneeded);
+    DefinedSubFunMem=(uint32_t)argval;      //save pointer to memory for cleanup on error
     argtype=(void *)argval+MAX_ARG_COUNT * sizeof(union u_argval);
     argVarIndex = (void *)argtype+MAX_ARG_COUNT * sizeof(int);
     argbuf1 = (void *)argVarIndex+MAX_ARG_COUNT * sizeof(int);
@@ -693,22 +702,28 @@ void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, in
             if(toupper(*argv2[i]) == 'B' && toupper(*(argv2[i]+1)) == 'Y') {
                 if((checkstring(argv2[i] + 2, (unsigned char *)"VAL")) != NULL) {        // if BYVAL
                     //Only if not an array remove any pointer flag in the caller
-                    if(g_vartbl[argVarIndex[i]].dims[0] == 0){
-                         argtype[i] = 0;
-                    }else{
-                         error("Array as BYVAL not allowed $",argv1[i]);
+                    argtype[i] = 0;
+         
+                    // Trap an array but not an array element
+                    if(g_vartbl[argVarIndex[i]].dims[0] > 0){
+                        /* See if we have an array or an array element */
+                        tp=argv1[i];
+                        do { tp++;} while(*tp != '(');  // We should find a '(' because it must be an array or and array element to get here
+                        tp++;
+                        skipspace(tp);
+                        if(*tp == ')') error("Array as BYVAL not allowed $",argv1[i]);
                     }
                     argv2[i] += 5;                                      // skip to the variable start
-                    argbyref[i]=2;
+                   
                 } else {
                     if((checkstring(argv2[i] + 2, (unsigned char *)"REF")) != NULL) {    // if BYREF
-                        //if((argtype[i] & T_PTR) == 0) error("Variable required for BYREF $", argv1[i]);
+                        if((argtype[i] & T_PTR) == 0) error("Variable required for BYREF $", argv1[i]);
+ 
                         argv2[i] += 5;                                  // skip to the variable start
                         argbyref[i]=1;
-                        if((argtype[i] & T_PTR) == 0)error("Variable required for BYREF $", argv1[i]);
                     }
                }
-                skipspace(argv2[i]);
+             
             }
 
             // if argument is present and is not a pointer to a variable then evaluate it as an expression
@@ -740,26 +755,24 @@ void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, in
             }
         }
 
-       // if (argbyref[i] )argv2[i] += 5;
         tp = skipvar(argv2[i], false);                              // point to after the variable
         skipspace(tp);
         if(*tp == tokenAS) {                                        // are we using Microsoft syntax (eg, AS INTEGER)?
             *tp++ = 0;                                              // terminate the string and step over the AS token
             tp = CheckIfTypeSpecified(tp, &ArgType, true);          // and get the type
-            if(!(ArgType & T_IMPLIED)) error("Variable type");
+            if(!(ArgType & T_IMPLIED))  error("Variable type");
         }
         ArgType |= (V_FIND | V_DIM_VAR | V_LOCAL | V_EMPTY_OK);
         tp = findvar(argv2[i], ArgType);                            // declare the local variable
-        if(g_vartbl[g_VarIndex].dims[0] > 0) error("Argument list");    // if it is an array it must be an empty array
+        if(g_vartbl[g_VarIndex].dims[0] > 0)  error("Argument list");    // if it is an array it must be an empty array
        
         CurrentLinePtr = CallersLinePtr;                            // report errors at the caller
 
         // if the definition called for an array, special processing and checking will be required
         if(g_vartbl[g_VarIndex].dims[0] == -1) {
-            //if( (argbyref[i]==2)) error("Array must be passed as BYREF $",argv1[i]);
             int j;
-            if(g_vartbl[argVarIndex[i]].dims[0] == 0) error("Expected an array");
-            if(TypeMask(g_vartbl[g_VarIndex].type) != TypeMask(argtype[i])) error("Incompatible type: $", argv1[i]);
+            if(g_vartbl[argVarIndex[i]].dims[0] == 0)  error("Expected an array");
+            if(TypeMask(g_vartbl[g_VarIndex].type) != TypeMask(argtype[i]))  error("Incompatible type: $", argv1[i]);
             g_vartbl[g_VarIndex].val.s = NULL;
             for(j = 0; j < MAXDIM; j++)                             // copy the dimensions of the supplied variable into our local variable
                 g_vartbl[g_VarIndex].dims[j] = g_vartbl[argVarIndex[i]].dims[j];
@@ -767,9 +780,9 @@ void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, in
 
         // if this is a pointer check and the type is NOT the same as that requested in the sub/fun definition
         if((argtype[i] & T_PTR) && TypeMask(g_vartbl[g_VarIndex].type) != TypeMask(argtype[i])) {
-            if(argbyref[i]==1){ error("BYREF requires same types: $", argv1[i]);}
+            if(argbyref[i]) error("BYREF requires same types: $", argv1[i]);
             if((TypeMask(g_vartbl[g_VarIndex].type) & T_STR) || (TypeMask(argtype[i]) & T_STR))
-                error("Incompatible type: $", argv1[i]);
+                 error("Incompatible type: $", argv1[i]);
             // make this into an ordinary argument
             if(g_vartbl[argVarIndex[i]].type & T_PTR) {
                 argval[i].i = *g_vartbl[argVarIndex[i]].val.ia;       // get the value if the supplied argument is a pointer
@@ -783,7 +796,7 @@ void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, in
         if(argtype[i] & T_PTR) {
             // the argument supplied was a variable so we must setup the local variable as a pointer
             if((g_vartbl[g_VarIndex].type & T_STR) && g_vartbl[g_VarIndex].val.s != NULL) {
-                FreeMemorySafe((void **)&g_vartbl[g_VarIndex].val.s);                            // free up the local variable's memory if it is a pointer to a string
+                FreeMemorySafe((void **)&g_vartbl[g_VarIndex].val.s);              // free up the local variable's memory if it is a pointer to a string
                 }
             g_vartbl[g_VarIndex].val.s = argval[i].s;                              // point to the data of the variable supplied as an argument
             g_vartbl[g_VarIndex].type |= T_PTR;                                    // set the type to a pointer
@@ -803,17 +816,13 @@ void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, in
             else if((g_vartbl[g_VarIndex].type & T_INT) && (argtype[i] & T_NBR))   // need an integer but was supplied with a float
                 g_vartbl[g_VarIndex].val.i = FloatToInt64(argval[i].f);
             else
-                error("Incompatible type: $", argv1[i]);
+               error("Incompatible type: $", argv1[i]);
         }
     }
 
-    // temp memory used in setting up the arguments can be deleted now
-/*    FreeMemory((unsigned char *)argval);
-    FreeMemory((unsigned char *)argtype); FreeMemory((unsigned char *)argVarIndex);
-    FreeMemory(argbuf1); FreeMemory((unsigned char *)argv1);
-    FreeMemory(argbuf2); FreeMemory((unsigned char *)argv2);
-    FreeMemory((unsigned char *)argbyref);*/
+    // memory used in setting up the arguments can be deleted now
     FreeMemory((void*)argval);
+    DefinedSubFunMem=0;                                             //we got here so we wont need to cleanup any memory
     strcpy((char *)CurrentSubFunName, (char *)fun_name);
     // if it is a defined command we simply point to the first statement in our command and allow ExecuteProgram() to carry on as before
     // exit from the sub is via cmd_return which will decrement g_LocalIndex
@@ -2754,6 +2763,7 @@ void MIPS16 LCD_error(int line_num, const char *line_txt, const char* error_msg)
     Option.DISPLAY_CONSOLE = old_console;
     gui_fcolour = old_fcolour;
     gui_bcolour = old_bcolour;
+    Display_Refresh();
 }
 // throw an error
 // displays the error message and aborts the program
@@ -2801,6 +2811,13 @@ void MIPS16 error(char *msg, ...) {
         lfs_file_write(&lfs, &lfs_file, crlf, sizeof(crlf));
         lfs_file_close(&lfs, &lfs_file);	
     }
+    // Clean up after an error in DefinedSubFun
+    if(DefinedSubFunMem){
+        if(g_LocalIndex != DefinedSubFunLocalIndex) ClearVars(g_LocalIndex,true);
+        gosubindex--;
+        FreeMemory((void*)DefinedSubFunMem);
+        DefinedSubFunMem=0;
+    }  
     if(OptionErrorSkip) longjmp(ErrNext, 1);                       // if OPTION ERROR SKIP/IGNORE is in force
 #ifdef PICOMITE
             multicore_fifo_push_blocking(0xFF);

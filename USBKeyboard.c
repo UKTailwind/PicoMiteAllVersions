@@ -1824,9 +1824,8 @@ void tuh_hid_report_received_cb(uint8_t dev_addr, uint8_t instance, uint8_t cons
 //--------------------------------------------------------------------+
 // Keyboard
 //--------------------------------------------------------------------+
-uint8_t APP_MapKeyToUsage(uint8_t *report, int keyno, int modifier)
+uint8_t APP_MapKeyToUsage(uint8_t keyCode, int modifier)
 {
-    uint8_t keyCode=report[keyno];
     if(keyCode == USB_HID_KEYBOARD_KEYPAD_KEYBOARD_CAPS_LOCK
                     || keyCode == USB_HID_KEYBOARD_KEYPAD_KEYBOARD_SCROLL_LOCK
                     || keyCode == USB_HID_KEYBOARD_KEYPAD_KEYPAD_NUM_LOCK_AND_CLEAR) return 0;
@@ -1903,13 +1902,18 @@ uint8_t APP_MapKeyToUsage(uint8_t *report, int keyno, int modifier)
 }
 void USR_KEYBRD_ProcessData(uint8_t data)
 {
-  int sendCRLF=2;
+	static uint8_t lastdata;
+	static uint64_t lasttime;
+	if(data==lastdata && time_us_64()-lasttime<25000)return;
+	lasttime=time_us_64();
+	lastdata=data;
+  	int sendCRLF=2;
 	if(data==0)return;
 	if (BreakKey && data == BreakKey)
 	{                                      // if the user wants to stop the progran
-	MMAbort = true;                      // set the flag for the interpreter to see
-	ConsoleRxBufHead = ConsoleRxBufTail; // empty the buffer
-											// break;
+		MMAbort = true;                      // set the flag for the interpreter to see
+		ConsoleRxBufHead = ConsoleRxBufTail; // empty the buffer
+												// break;
 	}
 	if(data=='\n'){
 		if(sendCRLF==3)USR_KEYBRD_ProcessData('\r');
@@ -1920,80 +1924,100 @@ void USR_KEYBRD_ProcessData(uint8_t data)
 		return;
 	}
 	ConsoleRxBuf[ConsoleRxBufHead]  = data;   // store the byte in the ring buffer
-	if(BreakKey && ConsoleRxBuf[ConsoleRxBufHead] == BreakKey) {// if the user wants to stop the progran
+/*	if(BreakKey && ConsoleRxBuf[ConsoleRxBufHead] == BreakKey) {// if the user wants to stop the progran
 		MMAbort = true;                                         // set the flag for the interpreter to see
 		ConsoleRxBufHead = ConsoleRxBufTail;                    // empty the buffer
 		return;
-	}
+	}*/
+
 	ConsoleRxBufHead = (ConsoleRxBufHead + 1) % CONSOLE_RX_BUF_SIZE;     // advance the head of the queue
 	if(ConsoleRxBufHead == ConsoleRxBufTail) {                           // if the buffer has overflowed
 		ConsoleRxBufTail = (ConsoleRxBufTail + 1) % CONSOLE_RX_BUF_SIZE; // throw away the oldest char
 	}
 }
+static void process_key(int key, uint8_t n, int modifier){
+	keytimer=0;
+	if(key==0x39){ //Caps lock
+		if(caps_lock){
+			HID[n].sendlights&=~(uint8_t)2;
+			caps_lock=0;
+			tuh_hid_set_report(HID[n].Device_address, HID[n].Device_instance, 0, HID_REPORT_TYPE_OUTPUT, (void *)&HID[n].sendlights,1);
+		} else {
+			HID[n].sendlights|=0x02;
+			caps_lock=1;
+			tuh_hid_set_report(HID[n].Device_address, HID[n].Device_instance, 0, HID_REPORT_TYPE_OUTPUT, (void *)&HID[n].sendlights,1);
+		}
+	} else if(key==0x53){ //Num lock
+		if(num_lock){
+			HID[n].sendlights&=~(uint8_t)1;
+			num_lock=0;
+			tuh_hid_set_report(HID[n].Device_address, HID[n].Device_instance, 0, HID_REPORT_TYPE_OUTPUT, (void *)&HID[n].sendlights,1);
+		} else {
+			HID[n].sendlights|=0x01;
+			num_lock=1;
+			tuh_hid_set_report(HID[n].Device_address, HID[n].Device_instance, 0, HID_REPORT_TYPE_OUTPUT, (void *)&HID[n].sendlights,1);
+		}
+	} else if(key==0x47){ //Scroll lock
+		if(scroll_lock){
+			HID[n].sendlights&=~(uint8_t)4;
+			scroll_lock=0;
+			tuh_hid_set_report(HID[n].Device_address, HID[n].Device_instance, 0, HID_REPORT_TYPE_OUTPUT, (void *)&HID[n].sendlights,1);
+		} else {
+			HID[n].sendlights|=0x04;
+			scroll_lock=1;
+			tuh_hid_set_report(HID[n].Device_address, HID[n].Device_instance, 0, HID_REPORT_TYPE_OUTPUT, (void *)&HID[n].sendlights,1);
+		}
+	} else { //normal key
+		uint8_t c = APP_MapKeyToUsage(key, modifier);
+		if (c != 0)
+		{
+			USR_KEYBRD_ProcessData(c);
+			repeattime=Option.RepeatStart;
+		}
+	}
 
+}
+bool notbefore(int i, uint8_t *current_keys, uint8_t*prev_keys){
+	uint8_t test=current_keys[i];
+	for(int j=0;j<6;j++){if(prev_keys[j]==test)return false;}
+	return true;
+}
 static void process_kbd_report(hid_keyboard_report_t const *report, uint8_t n)
 {
-  static uint8_t prev_keys[6] = {0}; // previous report to check key released
-  int total=0;
-  static int lasttotal=0;
-  uint8_t current_keys[6]={0};
-  int modifier=report->modifier;
-  for(int i=0;i<6;i++){
-    if(report->keycode[i])total++;
-  }
-  if(total==0)lasttotal=0;
-  for(int i=0;i<total;i++)current_keys[i]=report->keycode[total-i-1];
-  //------------- example code ignore control (non-printable) key affects -------------//
-		if(((keytimer>Option.RepeatStart || current_keys[0]!=prev_keys[0]) && total>=lasttotal)){
-			keytimer=0;
-        // not existed in previous report means the current key is pressed
-//        bool const is_shift = report->modifier & (KEYBOARD_MODIFIER_LEFTSHIFT | KEYBOARD_MODIFIER_RIGHTSHIFT);
-			if(current_keys[0]==0x39){
-				if(caps_lock){
-					HID[n].sendlights&=~(uint8_t)2;
-					caps_lock=0;
-          tuh_hid_set_report(HID[n].Device_address, HID[n].Device_instance, 0, HID_REPORT_TYPE_OUTPUT, (void *)&HID[n].sendlights,1);
-				} else {
-					HID[n].sendlights|=0x02;
-					caps_lock=1;
-          tuh_hid_set_report(HID[n].Device_address, HID[n].Device_instance, 0, HID_REPORT_TYPE_OUTPUT, (void *)&HID[n].sendlights,1);
-				}
-			} else if(current_keys[0]==0x53){
-				if(num_lock){
-					HID[n].sendlights&=~(uint8_t)1;
-					num_lock=0;
-          tuh_hid_set_report(HID[n].Device_address, HID[n].Device_instance, 0, HID_REPORT_TYPE_OUTPUT, (void *)&HID[n].sendlights,1);
-				} else {
-					HID[n].sendlights|=0x01;
-					num_lock=1;
-          tuh_hid_set_report(HID[n].Device_address, HID[n].Device_instance, 0, HID_REPORT_TYPE_OUTPUT, (void *)&HID[n].sendlights,1);
-				}
-			} else if(current_keys[0]==0x47){
-				if(scroll_lock){
-					HID[n].sendlights&=~(uint8_t)4;
-					scroll_lock=0;
-          tuh_hid_set_report(HID[n].Device_address, HID[n].Device_instance, 0, HID_REPORT_TYPE_OUTPUT, (void *)&HID[n].sendlights,1);
-				} else {
-					HID[n].sendlights|=0x04;
-					scroll_lock=1;
-          tuh_hid_set_report(HID[n].Device_address, HID[n].Device_instance, 0, HID_REPORT_TYPE_OUTPUT, (void *)&HID[n].sendlights,1);
-				}
-			} else {
-				uint8_t c = APP_MapKeyToUsage(current_keys,0, modifier);
-				if (c != 0)
-				{
-					USR_KEYBRD_ProcessData(c);
-		      repeattime=Option.RepeatStart;
-				}
-      }
-      memcpy(prev_keys ,current_keys, sizeof(prev_keys));
-    } 
-    lasttotal=total;
-    for(int i=0;i<6;i++){
-        uint8_t c = APP_MapKeyToUsage(current_keys, i, modifier);
-        if (c != 0)	KeyDown[i]=c;
-        else KeyDown[i]=0;
-    }
+	static uint8_t prev_keys[6] = {0}; // previous report to check key released
+	static bool lasterror=false;
+	int total=0;
+//	static int lasttotal=0;
+	uint8_t current_keys[6]={0};
+	int modifier=report->modifier;
+	for(int i=0;i<6;i++){
+		if(report->keycode[i])total++;
+		if(report->keycode[i]>0 && report->keycode[i]<4){lasterror=true;return;}
+		lasterror=false;
+	}
+  	for(int i=0;i<total;i++)current_keys[i]=report->keycode[total-i-1]; //Get local copy of keys pressed
+	// now work out if any new keys are pressed
+	if(total){ //Anything to do
+	    if(lasterror && total==2){
+			uint8_t t=current_keys[0];
+			current_keys[0]=current_keys[1];
+			current_keys[1]=t;
+		}
+		for(int k=total-1;k>=0;k--){ //loop through all the pressed keys in reverse order
+			if(notbefore(k,current_keys,prev_keys))process_key(current_keys[k], n, modifier);
+		}
+		if(current_keys[0]!=prev_keys[0])keytimer=0;
+//		if(((keytimer>Option.RepeatStart || current_keys[0]!=prev_keys[0]) && total>=lasttotal)){
+//			process_key(current_keys[0], n, modifier);
+//		} 
+	} else keytimer-0;
+	memcpy(prev_keys ,current_keys, sizeof(prev_keys));
+	for(int i=0;i<6;i++){
+		uint8_t c = APP_MapKeyToUsage(current_keys[i], modifier);
+		if (c != 0)	KeyDown[i]=c;
+		else KeyDown[i]=0;
+	}
+//    lasttotal=total;
     KeyDown[6]=(modifier & KEYBOARD_MODIFIER_LEFTALT ? 1: 0) |
         (modifier & KEYBOARD_MODIFIER_LEFTCTRL ? 2: 0) |
         (modifier & KEYBOARD_MODIFIER_LEFTGUI ? 4: 0) |

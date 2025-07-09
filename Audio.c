@@ -1337,16 +1337,18 @@ void MIPS16 cmd_play(void) {
     }
     if((tp = checkstring(cmdline, (unsigned char *)"WAV"))) {
         char *p;
+		int FatFSFileSystemSave=FatFSFileSystem;
         int i __attribute((unused))=0;
         getargs(&tp, 3,(unsigned char *)",");                                  // this MUST be the first executable line in the function
         if(!(argc == 1 || argc == 3)) error("Argument count");
 		if(CurrentlyPlaying==P_WAVOPEN)CloseAudio(1);
         if(CurrentlyPlaying != P_NOTHING) error("Sound output in use for $",PlayingStr[CurrentlyPlaying]);
 
-        if(!InitSDCard()) return;
         p = (char *)getFstring(argv[0]);                                    // get the file name
 		char q[FF_MAX_LFN]={0};
 		getfullfilename(p,q);
+        if(!InitSDCard()) return;
+		if(!FatFSFileSystem && toupper(p[0])=='B' && p[1]==':')FatFSFileSystem=1;
         WAVInterrupt = NULL;
         WAVcomplete = 0;
         if(argc == 3) {
@@ -1391,6 +1393,7 @@ void MIPS16 cmd_play(void) {
 				wavcallback(alist[trackplaying].fn);
 				return;
     	    }
+			FatFSFileSystem=FatFSFileSystemSave;
 		}
         // open the file
         trackstoplay=0;
@@ -1405,16 +1408,18 @@ void MIPS16 cmd_play(void) {
     }
 	if((tp = checkstring(cmdline, (unsigned char *)"FLAC"))) {
         char *p;
+		int FatFSFileSystemSave=FatFSFileSystem;
         int i __attribute((unused))=0;
         getargs(&tp, 3,(unsigned char *)",");                                  // this MUST be the first executable line in the function
         if(!(argc == 1 || argc == 3)) error("Argument count");
 		if(CurrentlyPlaying==P_WAVOPEN)CloseAudio(1);
         if(CurrentlyPlaying != P_NOTHING) error("Sound output in use for $",PlayingStr[CurrentlyPlaying]);
 
-        if(!InitSDCard()) return;
         p = (char *)getFstring(argv[0]);                                    // get the file name
 		char q[FF_MAX_LFN]={0};
 		getfullfilename(p,q);
+        if(!InitSDCard()) return;
+		if(!FatFSFileSystem && toupper(p[0])=='B' && p[1]==':')FatFSFileSystem=1;
         WAVInterrupt = NULL;
         WAVcomplete = 0;
         if(argc == 3) {
@@ -1459,6 +1464,7 @@ void MIPS16 cmd_play(void) {
 				flaccallback(alist[trackplaying].fn);
 				return;
     	    }
+			FatFSFileSystem=FatFSFileSystemSave;
 		}
         // open the file
         trackstoplay=0;
@@ -1690,6 +1696,7 @@ void MIPS16 cmd_play(void) {
 	}
 	if((tp = checkstring(cmdline, (unsigned char *)"MP3"))) {
         char *p;
+		int FatFSFileSystemSave=FatFSFileSystem;
         int i __attribute((unused))=0;
         getargs(&tp, 3,(unsigned char *)",");                                  // this MUST be the first executable line in the function
         if(!(argc == 1 || argc == 3)) error("Argument count");
@@ -1701,10 +1708,11 @@ void MIPS16 cmd_play(void) {
 		if(CurrentlyPlaying==P_WAVOPEN)CloseAudio(1);
         if(CurrentlyPlaying != P_NOTHING) error("Sound output in use for $",PlayingStr[CurrentlyPlaying]);
 
-        if(!InitSDCard()) return;
-        p = (char *)getFstring(argv[0]);                                    // get the file name
+         p = (char *)getFstring(argv[0]);                                    // get the file name
 		char q[FF_MAX_LFN]={0};
 		getfullfilename(p,q);
+        if(!InitSDCard()) return;
+		if(!FatFSFileSystem && toupper(p[0])=='B' && p[1]==':')FatFSFileSystem=1;
         WAVInterrupt = NULL;
         WAVcomplete = 0;
         if(argc == 3) {
@@ -1749,6 +1757,7 @@ void MIPS16 cmd_play(void) {
 				mp3callback(alist[trackplaying].fn,0);
 				return;
     	    }
+			FatFSFileSystem=FatFSFileSystemSave;
 		}
         // open the file
         trackstoplay=0;

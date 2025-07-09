@@ -277,6 +277,16 @@ extern uint8_t PWM4Bpin;
 extern uint8_t PWM5Bpin;
 extern uint8_t PWM6Bpin;
 extern uint8_t PWM7Bpin;
+#ifdef rp2350
+extern uint8_t PWM8Apin;
+extern uint8_t PWM8Bpin;
+extern uint8_t PWM9Apin;
+extern uint8_t PWM9Bpin;
+extern uint8_t PWM10Apin;
+extern uint8_t PWM10Bpin;
+extern uint8_t PWM11Apin;
+extern uint8_t PWM11Bpin;
+#endif
 extern uint8_t UART1RXpin;
 extern uint8_t UART1TXpin;
 extern uint8_t UART0TXpin;

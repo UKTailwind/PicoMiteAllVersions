@@ -176,8 +176,8 @@ int __not_in_flash_func(getsound)(int i,int mode){
 	int j=0,phase;
 	if(mode % 2){
 		phase=(int)sound_PhaseAC_right[i];
-		if(sound_mode_left[i][0]==97){j = 2000; mode+=6;}
-		else if(sound_mode_left[i][0]==99){j = (phase > 2047 ? 3900 : 100); mode+=4;}
+		if(sound_mode_right[i][0]==97){j = 2000; mode+=6;}
+		else if(sound_mode_right[i][0]==99){j = (phase > 2047 ? 3900 : 100); mode+=4;}
 		else if(mode==1 && sound_mode_right[i][0]==98){
 			mode+=4;
 			j=phase*3800/4096+100;
@@ -1286,6 +1286,16 @@ int getslice(int pin){
 	else if(PinDef[pin].mode & PWM6B){PWM6Bpin=pin;slice=6;}
 	else if(PinDef[pin].mode & PWM7A){PWM7Apin=pin;slice=7;}
 	else if(PinDef[pin].mode & PWM7B){PWM7Bpin=pin;slice=7;}
+#ifdef rp2350
+	else if(PinDef[pin].mode & PWM8A){PWM8Apin=pin;slice=8;}
+	else if(PinDef[pin].mode & PWM8B){PWM8Bpin=pin;slice=8;}
+	else if(PinDef[pin].mode & PWM9A){PWM9Apin=pin;slice=9;}
+	else if(PinDef[pin].mode & PWM9B){PWM9Bpin=pin;slice=9;}
+	else if(PinDef[pin].mode & PWM10A){PWM10Apin=pin;slice=10;}
+	else if(PinDef[pin].mode & PWM10B){PWM10Bpin=pin;slice=10;}
+	else if(PinDef[pin].mode & PWM11A){PWM11Apin=pin;slice=11;}
+	else if(PinDef[pin].mode & PWM11B){PWM11Bpin=pin;slice=11;}
+#endif
 	return slice;
 }
 void setpwm(int pin, int *PWMChannel, int *PWMSlice, MMFLOAT frequency, MMFLOAT duty){
@@ -1368,6 +1378,43 @@ void setpwm(int pin, int *PWMChannel, int *PWMSlice, MMFLOAT frequency, MMFLOAT 
 		pwm_set_chan_level(slice, PWM_CHAN_B, high);
 		*PWMChannel=PWM_CHAN_B;
 	}
+	#ifdef rp2350
+	if(!rp2350a){
+		if(slice==8 && PWM8Apin!=99){
+			pwm_set_chan_level(slice, PWM_CHAN_A, high);
+			*PWMChannel=PWM_CHAN_A;
+		}
+		if(slice==8 && PWM8Bpin!=99){
+			pwm_set_chan_level(slice, PWM_CHAN_B, high);
+			*PWMChannel=PWM_CHAN_B;
+		}
+		if(slice==8 && PWM9Apin!=99){
+			pwm_set_chan_level(slice, PWM_CHAN_A, high);
+			*PWMChannel=PWM_CHAN_A;
+		}
+		if(slice==9 && PWM9Bpin!=99){
+			pwm_set_chan_level(slice, PWM_CHAN_B, high);
+			*PWMChannel=PWM_CHAN_B;
+		}
+		if(slice==10 && PWM10Apin!=99){
+			pwm_set_chan_level(slice, PWM_CHAN_A, high);
+			*PWMChannel=PWM_CHAN_A;
+		}
+		if(slice==10 && PWM10Bpin!=99){
+			pwm_set_chan_level(slice, PWM_CHAN_B, high);
+			*PWMChannel=PWM_CHAN_B;
+		}
+		if(slice==11 && PWM11Apin!=99){
+			pwm_set_chan_level(slice, PWM_CHAN_A, high);
+			*PWMChannel=PWM_CHAN_A;
+		}
+		if(slice==11 && PWM11Bpin!=99){
+			pwm_set_chan_level(slice, PWM_CHAN_B, high);
+			*PWMChannel=PWM_CHAN_B;
+		}
+	}
+	#endif
+	
 	if(slice==0){
 		pwm_set_enabled(slice, true);
 	}
@@ -1392,6 +1439,22 @@ void setpwm(int pin, int *PWMChannel, int *PWMSlice, MMFLOAT frequency, MMFLOAT 
 	if(slice==7){
 		pwm_set_enabled(slice, true);
 	}
+#ifdef rp2350
+	if(!rp2350a){
+		if(slice==8){
+			pwm_set_enabled(slice, true);
+		}
+		if(slice==9){
+			pwm_set_enabled(slice, true);
+		}
+		if(slice==10){
+			pwm_set_enabled(slice, true);
+		}
+		if(slice==11){
+			pwm_set_enabled(slice, true);
+		}
+	}
+#endif
 
 }
 void dobacklight(void){

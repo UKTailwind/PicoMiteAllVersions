@@ -1069,7 +1069,7 @@ void MIPS16 cmd_erase(void) {
             if(!(len == 0 && (*x == 0 || strlen(p) == MAXVARLEN))) continue;
     		// found the variable
 			if(((g_vartbl[j].type & T_STR) || g_vartbl[j].dims[0] != 0) && !(g_vartbl[j].type & T_PTR)) {
-				FreeMemory(g_vartbl[j].val.s);                        // free any memory (if allocated)
+				FreeMemorySafe((void **)&g_vartbl[j].val.s);                        // free any memory (if allocated)
 				g_vartbl[j].val.s=NULL;
 			}
 			k=j+1;
