@@ -721,6 +721,7 @@ void MIPS16 do_run(unsigned char *cmdline, bool CMM2mode) {
 //    memcpy(cmdlinebuff, pcmd_args, *pcmd_args + 1); // *** THW 16/4/23
 	Mstrcpy(cmdlinebuff, pcmd_args);
     IgnorePIN = false;
+	uint8_t *dummy __attribute((unused))=GetMemory(STRINGSIZE);
 	if(Option.LIBRARY_FLASH_SIZE == MAX_PROG_SIZE) ExecuteProgram(LibMemory );       // run anything that might be in the library
     if(*ProgMemory != T_NEWLINE) return;                             // no program to run
 #ifdef PICOMITEWEB
@@ -1502,11 +1503,7 @@ void SaveContext(void){
 		lfs_file_write(&lfs, &lfs_file, g_dostack, sizeof(struct s_dostack)*MAXDOLOOPS);
 		lfs_file_write(&lfs, &lfs_file, g_vartbl, sizeof(struct s_vartbl)*MAXVARS);
 		lfs_file_write(&lfs, &lfs_file, g_hashlist, sizeof(struct s_hash)*MAXVARS/2);
-		unsigned char *p=MMHeap;
-		for(int i=0;i<  (heap_memory_size+1024)/1024;i++){
-			lfs_file_write(&lfs, &lfs_file, p, 1024);
-			p+=1024;
-		}
+		lfs_file_write(&lfs, &lfs_file, MMHeap, heap_memory_size+256);
 		lfs_file_write(&lfs, &lfs_file, mmap, sizeof(mmap));
 		lfs_file_close(&lfs, &lfs_file);
 #if defined(rp2350) && !defined(PICOMITEWEB)
@@ -1580,11 +1577,7 @@ void RestoreContext(bool keep){
 		lfs_file_read(&lfs, &lfs_file, g_dostack, sizeof(struct s_dostack)*MAXDOLOOPS);
 		lfs_file_read(&lfs, &lfs_file, g_vartbl, sizeof(struct s_vartbl)*MAXVARS);
 		lfs_file_read(&lfs, &lfs_file, g_hashlist, sizeof(struct s_hash)*MAXVARS/2);
-		unsigned char *p=MMHeap;
-		for(int i=0;i<  (heap_memory_size+1024)/1024;i++){
-			lfs_file_read(&lfs, &lfs_file, p, 1024);
-			p+=1024;
-		}
+		lfs_file_read(&lfs, &lfs_file, MMHeap, heap_memory_size+256);
 		lfs_file_read(&lfs, &lfs_file, mmap, sizeof(mmap));
 		lfs_file_close(&lfs, &lfs_file);
 		if(!keep)lfs_remove(&lfs, "/.vars");
