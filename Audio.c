@@ -1188,7 +1188,7 @@ void MIPS16 cmd_play(void) {
 				duration = duration * (float)PWM_FREQ; // number of interrupts for the requested waveform
 	// This should now be an exact multiple of the number per waveform
 				PlayDuration=(((uint64_t)(duration/hw))*hw);
-			}
+			} else if(PlayDuration != 0xffffffffffffffff)PlayDuration=duration * (float)PWM_FREQ;
 			pwm_set_irq0_enabled(AUDIO_SLICE, false);
 			PhaseM_left =  f_left  / (float)PWM_FREQ * 4096.0;
 			PhaseM_right = f_right  / (float)PWM_FREQ * 4096.0;

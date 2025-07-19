@@ -721,7 +721,7 @@ void MIPS16 do_run(unsigned char *cmdline, bool CMM2mode) {
 //    memcpy(cmdlinebuff, pcmd_args, *pcmd_args + 1); // *** THW 16/4/23
 	Mstrcpy(cmdlinebuff, pcmd_args);
     IgnorePIN = false;
-	uint8_t *dummy __attribute((unused))=GetMemory(STRINGSIZE);
+//	uint8_t *dummy __attribute((unused))=GetMemory(STRINGSIZE);
 	if(Option.LIBRARY_FLASH_SIZE == MAX_PROG_SIZE) ExecuteProgram(LibMemory );       // run anything that might be in the library
     if(*ProgMemory != T_NEWLINE) return;                             // no program to run
 #ifdef PICOMITEWEB
@@ -1474,18 +1474,18 @@ void SaveContext(void){
 	} else {
 #endif
 		lfs_file_t lfs_file;
-		if(ExistsFile("A:/.vars")){
-			lfs_remove(&lfs, "/.vars");
-		}
+        struct lfs_info lfsinfo={0};
+        FSerror = lfs_stat(&lfs, "/.vars", &lfsinfo);
+        if(lfsinfo.type==LFS_TYPE_REG)lfs_remove(&lfs, "/.vars");
 		int sizeneeded= sizeof(g_StrTmpIndex)+ sizeof(g_TempMemoryIsChanged)+sizeof(g_StrTmp)+sizeof(g_StrTmpLocalIndex)+sizeof(g_Localvarcnt)+
 		sizeof(g_LocalIndex)+sizeof(g_OptionBase)+sizeof(g_DimUsed)+sizeof(g_varcnt)+sizeof(g_Globalvarcnt)+
 		sizeof(g_hashlistpointer)+sizeof(g_forindex)+sizeof(g_doindex)+sizeof(struct s_forstack)*MAXFORLOOPS+sizeof(struct s_dostack)*MAXDOLOOPS+
 		sizeof(struct s_vartbl)*MAXVARS+sizeof(struct s_hash)*MAXVARS/2+heap_memory_size+256+sizeof(mmap);
 		if(sizeneeded>=Option.FlashSize-(Option.modbuff ? 1024*Option.modbuffsize : 0)-RoundUpK4(TOP_OF_SYSTEM_FLASH)-lfs_fs_size(&lfs)*4096)error("Not enough free space on A: drive: % needed",sizeneeded);
 		lfs_file_open(&lfs, &lfs_file, ".vars", LFS_O_RDWR | LFS_O_CREAT);;
-		int dt=get_fattime();
+//		int dt=get_fattime();
 		ClearTempMemory();
-		lfs_setattr(&lfs, ".vars", 'A', &dt,   4);
+//		lfs_setattr(&lfs, ".vars", 'A', &dt,   4);
 		lfs_file_write(&lfs, &lfs_file, &g_StrTmpIndex, sizeof(g_StrTmpIndex));
 		lfs_file_write(&lfs, &lfs_file, &g_TempMemoryIsChanged, sizeof(g_TempMemoryIsChanged));
 		lfs_file_write(&lfs, &lfs_file, (void *)g_StrTmp, sizeof(g_StrTmp));
@@ -1558,7 +1558,9 @@ void RestoreContext(bool keep){
 	} else {
 #endif
 		lfs_file_t lfs_file;
-		if(!ExistsFile("A:/.vars"))error("Internal error");
+        struct lfs_info lfsinfo={0};
+        FSerror = lfs_stat(&lfs, "/.vars", &lfsinfo);
+        if(lfsinfo.type!=LFS_TYPE_REG)error("Internal error");
 		lfs_file_open(&lfs, &lfs_file, "/.vars", LFS_O_RDONLY);
 		lfs_file_read(&lfs, &lfs_file, &g_StrTmpIndex, sizeof(g_StrTmpIndex));
 		lfs_file_read(&lfs, &lfs_file, &g_TempMemoryIsChanged, sizeof(g_TempMemoryIsChanged));
