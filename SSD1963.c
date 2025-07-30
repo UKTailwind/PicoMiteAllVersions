@@ -34,7 +34,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
-int ScrollStart;
+volatile int ScrollStart;
 int Has100Pins = 0;
 
 // parameters for the SSD1963 display panel (refer to the glass data sheet)
@@ -46,7 +46,7 @@ unsigned int RDpin, RDport;
 int SSD1963PixelInterface, SSD1963PixelFormat;
 #define DELAY 0x80  //Bit7 of the count indicates a delay is also added.
 #define REPEAT 0x40  //Bit6 of the count indicates same data is repeated instead of reading next byte.
-int SSD1963rgb,SSD1963data=0;
+int SSD1963rgb=0,SSD1963data=0;
 void WriteCmdDataIPS_4_16(int cmd,int n,int data);
 unsigned int ReadData(void);
 void ReadBLITBufferSSD1963(int x1, int y1, int x2, int y2, unsigned char* p);
@@ -550,7 +550,7 @@ void MIPS16 InitDisplaySSD(void) {
 	SSD1963rgb=0b0;
 	LCDAttrib=0;
     SSD1963data=PinDef[Option.SSD_DATA].GPno;
-    if(Option.DISPLAY_TYPE<SSDPANEL || Option.DISPLAY_ORIENTATION>=VIRTUAL)return;
+    if(Option.DISPLAY_TYPE<SSDPANEL || Option.DISPLAY_TYPE>=VIRTUAL)return;
 
     // the parameters for the display panel are set here (refer to the data sheet for the glass)
     switch(Option.DISPLAY_TYPE) {
