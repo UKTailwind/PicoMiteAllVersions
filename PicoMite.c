@@ -44,9 +44,13 @@ extern "C" {
 #include "hardware/structs/pads_qspi.h"
 #include "pico/unique_id.h"
 #include "hardware/pwm.h"
+#include "configuration.h"
+#define PSRAMCSPIN PinDef[Option.PSRAM_CS_PIN].GPno
+
 extern void start_i2s(int pio, int sm);
 #ifdef rp2350
 #include "hardware/structs/qmi.h"
+#include "psram.h"
 #endif
 #ifdef PICOMITEVGA
 extern void start_vga_i2s(void);
@@ -436,7 +440,6 @@ const struct s_PinDef PinDef[]={
 };
 char alive[]="\033[?25h";
 const char DaysInMonth[] = { 0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
-
 static inline CommandToken commandtbl_decode(const unsigned char *p){
     return ((CommandToken)(p[0] & 0x7f)) | ((CommandToken)(p[1] & 0x7f)<<7);
 }
@@ -484,6 +487,16 @@ void __not_in_flash_func(routinechecks)(void){
             }
         }
     }
+#endif
+#if defined(PICOMITE) && defined(rp2350)
+	if(Option.DISPLAY_TYPE>=NEXTGEN && !(low_x==silly_low && high_x==silly_high && low_y==silly_low && high_y==silly_high)){// Buffered LCD displays
+        if(Option.Refresh){
+            multicore_fifo_push_blocking(6);
+            multicore_fifo_push_blocking((uint32_t)low_x | (high_x<<16));
+            multicore_fifo_push_blocking((uint32_t)low_y | (high_y<<16));
+            low_x=silly_low; high_y=silly_high; low_y=silly_low; high_x=silly_high;
+        }
+	}  
 #endif
 	if(GPSchannel)processgps();
     if(diskchecktimer == 0)CheckSDCard();
@@ -1497,6 +1510,9 @@ bool MIPS16 __not_in_flash_func(timer_callback)(repeating_timer_t *rt)
         last=now;
         INT5Timer = INT5InitTimer; 
     }
+#if defined(PICOMITE) && defined(rp2350)
+    if(Option.LOCAL_KEYBOARD && mSecTimer % LOCALKEYSCANRATE==0)cmd_keyscan();
+#endif
 #endif
         AHRSTimer++;
         InkeyTimer++;                                                     // used to delay on an escape character
@@ -2493,6 +2509,26 @@ extern uint16_t HDMIlines[2][800];
 #define MODE_V_V_SYNC_WIDTH    2
 #define MODE_V_V_BACK_PORCH    22
 
+#define MODE_H_X_SYNC_POLARITY 1
+#define MODE_H_X_FRONT_PORCH   24
+#define MODE_H_X_SYNC_WIDTH    136
+#define MODE_H_X_BACK_PORCH    160
+
+#define MODE_V_X_SYNC_POLARITY 0
+#define MODE_V_X_FRONT_PORCH   1
+#define MODE_V_X_SYNC_WIDTH    4
+#define MODE_V_X_BACK_PORCH    23
+
+#define MODE_H_Y_SYNC_POLARITY 0
+#define MODE_H_Y_FRONT_PORCH   32
+#define MODE_H_Y_SYNC_WIDTH    80
+#define MODE_H_Y_BACK_PORCH    112
+
+#define MODE_V_Y_SYNC_POLARITY 1
+#define MODE_V_Y_FRONT_PORCH   3
+#define MODE_V_Y_SYNC_WIDTH    10
+#define MODE_V_Y_BACK_PORCH    7
+
 #define MODE_H_S_TOTAL_PIXELS ( \
     MODE_H_S_FRONT_PORCH + MODE_H_S_SYNC_WIDTH + \
     MODE_H_S_BACK_PORCH  + MODE_H_S_ACTIVE_PIXELS \
@@ -2548,6 +2584,22 @@ extern uint16_t HDMIlines[2][800];
 #define MODE_V_4_TOTAL_LINES  ( \
     MODE_V_4_FRONT_PORCH + MODE_V_4_SYNC_WIDTH + \
     MODE_V_4_BACK_PORCH  + MODE_V_4_ACTIVE_LINES \
+)
+#define MODE_H_X_TOTAL_PIXELS ( \
+    MODE_H_X_FRONT_PORCH + MODE_H_X_SYNC_WIDTH + \
+    MODE_H_X_BACK_PORCH  + MODE_H_X_ACTIVE_PIXELS \
+)
+#define MODE_V_X_TOTAL_LINES  ( \
+    MODE_V_X_FRONT_PORCH + MODE_V_X_SYNC_WIDTH + \
+    MODE_V_X_BACK_PORCH  + MODE_V_X_ACTIVE_LINES \
+)
+#define MODE_H_Y_TOTAL_PIXELS ( \
+    MODE_H_Y_FRONT_PORCH + MODE_H_Y_SYNC_WIDTH + \
+    MODE_H_Y_BACK_PORCH  + MODE_H_Y_ACTIVE_PIXELS \
+)
+#define MODE_V_Y_TOTAL_LINES  ( \
+    MODE_V_Y_FRONT_PORCH + MODE_V_Y_SYNC_WIDTH + \
+    MODE_V_Y_BACK_PORCH  + MODE_V_Y_ACTIVE_LINES \
 )
 
 volatile int mode = 1;
@@ -2644,26 +2696,27 @@ void MIPS64 __not_in_flash_func(dma_irq_handler0)() {
 // ----------------------------------------------------------------------------
 // Main program
 
-/*void MIPS32 __not_in_flash_func(HDMIloop1)(void){
+
+void MIPS32 __not_in_flash_func(HDMIloopX)(void){
     int last_line=2,load_line, line_to_load, Line_dup, Line_quad;
     while(1){
         if(v_scanline!=last_line){
             last_line=v_scanline;
-            load_line=v_scanline - (MODE_V_TOTAL_LINES - MODE_V_ACTIVE_LINES);
+            load_line=v_scanline - (MODE_V_X_TOTAL_LINES - MODE_V_X_ACTIVE_LINES);
             Line_dup=load_line>>1;
             Line_quad=load_line>>2;
             line_to_load = last_line & 1;
-            if(load_line>=0 && load_line<MODE_V_ACTIVE_LINES){
+            if(load_line>=0 && load_line<MODE_V_X_ACTIVE_LINES){
                 __dmb();
                 switch(DISPLAY_TYPE){
-                case SCREENMODE1: //1280x720x2 colour with tiles
+                case SCREENMODE1: //1024x768x2 colour with tiles
                     {
                         uint8_t *p=(uint8_t *)HDMIlines[line_to_load];
                         uint8_t *fcol_w=tilefcols_w+load_line/ytileheight*X_TILE, *bcol_w=tilebcols_w+load_line/ytileheight*X_TILE; //get the relevant tile
-                        uint32_t *pp=(uint32_t *)&DisplayBuf[load_line*vgaloop8];
-                        uint32_t *qq=(uint32_t *)&LayerBuf[load_line*vgaloop8];
+                        uint32_t *pp=(uint32_t *)&DisplayBuf[load_line*MODE_H_X_ACTIVE_PIXELS/8];
+                        uint32_t *qq=(uint32_t *)&LayerBuf[load_line*MODE_H_X_ACTIVE_PIXELS/8];
                         uint32_t d=*pp | *qq;
-                        for(int i=0; i<vgaloop32 ; i++){
+                        for(int i=0; i<MODE_H_X_ACTIVE_PIXELS/32 ; i++){
                             *p++ = (d&0x1) ? *fcol_w : *bcol_w;
                             d>>=1;
                             *p++ = (d&0x1) ? *fcol_w : *bcol_w;
@@ -2735,16 +2788,16 @@ void MIPS64 __not_in_flash_func(dma_irq_handler0)() {
                             *p++ = (d&0x1) ? *fcol_w : *bcol_w;
                             fcol_w++;
                             bcol_w++;
-                            d=*(++pp) | *(++qq);
+                            d=*(++pp) | *(++qq) ;
                         }
                     }
                     break;
-                case SCREENMODE2: //320 x 180 x 4bit-colour mapped to 256
+                case SCREENMODE2: //256 x 192 x 4bit-colour mapped to 256
                     {
                         uint32_t *p=(uint32_t *)HDMIlines[line_to_load];
                         uint8_t l,d,s;
-                        int pp= (Line_quad)*vgaloop8;
-                        for(int i=0; i<vgaloop8 ; i++){
+                        int pp= (Line_quad)*MODE_H_X_ACTIVE_PIXELS/8;
+                        for(int i=0; i<MODE_H_X_ACTIVE_PIXELS/8 ; i++){
                             l=LayerBuf[pp+i];d=DisplayBuf[pp+i];s=SecondLayer[pp+i];
                             if((s&0xf)!=transparents){
                                 *p++=map16q[s&0xf];
@@ -2768,51 +2821,13 @@ void MIPS64 __not_in_flash_func(dma_irq_handler0)() {
                         }
                     }
                     break;
-            case SCREENMODE3: //640 x 360 x 4bit-colour mapped to 256
+            case SCREENMODE3: //512 x 384 x 4bit-colour mapped to 256
                     {
-                        int pp= (Line_dup)*vgaloop4;
+                        int pp= (Line_dup)*MODE_H_X_ACTIVE_PIXELS/4;
                         uint16_t *p=(uint16_t *)HDMIlines[line_to_load];
                         uint8_t l,d;
-                        register uint8_t *dd=&DisplayBuf[pp];
-                        register uint8_t *ll=&LayerBuf[pp];
-                        for(int i=0; i<vgaloop16 ; i++){
-                            l=*ll++;d=*dd++;
-                            if((l&0xf)!=transparent){
-                                *p++=map16d[l&0xf];
-                            } else {
-                                *p++=map16d[d&0xf];
-                            }
-                            d>>=4;l>>=4;
-                            if((l&0xf)!=transparent){
-                                *p++=map16d[l&0xf];
-                            } else {
-                                *p++=map16d[d&0xf];
-                            }
-                            l=*ll++;d=*dd++;
-                            if((l&0xf)!=transparent){
-                                *p++=map16d[l&0xf];
-                            } else {
-                                *p++=map16d[d&0xf];
-                            }
-                            d>>=4;l>>=4;
-                            if((l&0xf)!=transparent){
-                                *p++=map16d[l&0xf];
-                            } else {
-                                *p++=map16d[d&0xf];
-                            }
-                            l=*ll++;d=*dd++;
-                            if((l&0xf)!=transparent){
-                                *p++=map16d[l&0xf];
-                            } else {
-                                *p++=map16d[d&0xf];
-                            }
-                            d>>=4;l>>=4;
-                            if((l&0xf)!=transparent){
-                                *p++=map16d[l&0xf];
-                            } else {
-                                *p++=map16d[d&0xf];
-                            }
-                            l=*ll++;d=*dd++;
+                        for(int i=0; i<MODE_H_X_ACTIVE_PIXELS/4 ; i++){
+                            l=LayerBuf[pp+i];d=DisplayBuf[pp+i];
                             if((l&0xf)!=transparent){
                                 *p++=map16d[l&0xf];
                             } else {
@@ -2827,12 +2842,12 @@ void MIPS64 __not_in_flash_func(dma_irq_handler0)() {
                         }
                     }
                     break;
-                case SCREENMODE5: //320 x 180 x 8bit-colour 
+                case SCREENMODE5: //256 x 192 x 8bit-colour 
                     {
                         uint8_t *p=(uint8_t *)HDMIlines[line_to_load];
                         uint8_t l,d,s;
-                        int pp= (Line_quad)*vgaloop4;
-                        for(int i=0; i<vgaloop4 ; i++){
+                        int pp= (Line_quad)*MODE_H_X_ACTIVE_PIXELS/4;
+                        for(int i=0; i<MODE_H_X_ACTIVE_PIXELS/4 ; i++){
                             l=LayerBuf[pp+i];d=DisplayBuf[pp+i];s=SecondLayer[pp+i];
                             if(s!=transparents){
                                 *p++=s;
@@ -2860,7 +2875,7 @@ void MIPS64 __not_in_flash_func(dma_irq_handler0)() {
             }
         }
     }
-}*/
+}
 void MIPS32 __not_in_flash_func(HDMIloop1)(void){
     int last_line=2,load_line, line_to_load, Line_dup, Line_quad;
     while(1){
@@ -3230,7 +3245,7 @@ void MIPS32 __not_in_flash_func(HDMIloop3)(void){
             if(load_line>=0 && load_line<MODE_V_ACTIVE_LINES){
                 __dmb();
                 switch(DISPLAY_TYPE){
-                case SCREENMODE1: //800x600x2 or 848x480x2 colour with tiles
+                case SCREENMODE1: //800x600x2 or 848/800x480x2 colour with tiles
                     {
                         uint8_t *p=(uint8_t *)HDMIlines[line_to_load];
                         uint8_t *fcol_w=tilefcols_w+load_line/ytileheight*X_TILE, *bcol_w=tilebcols_w+load_line/ytileheight*X_TILE; //get the relevant tile
@@ -3278,7 +3293,7 @@ void MIPS32 __not_in_flash_func(HDMIloop3)(void){
                         }
                     }
                     break;
-                case SCREENMODE2: //400 X 300 x 4bit-colour mapped to 256 or 424 X 240 x 4bit-colour mapped to 256
+                case SCREENMODE2: //400 X 300 x 4bit-colour mapped to 256 or 424/400 X 240 x 4bit-colour mapped to 256
                     {
                         uint16_t *p=(uint16_t *)HDMIlines[line_to_load];
                         uint8_t l,d;
@@ -3299,7 +3314,7 @@ void MIPS32 __not_in_flash_func(HDMIloop3)(void){
                         }
                     }
                     break;
-                case SCREENMODE3: //800 x 600 x 4bit-colour mapped to 256 or 848 x 480 x 4bit-colour mapped to 256
+                case SCREENMODE3: //800 x 600 x 4bit-colour mapped to 256 or 848/800 x 480 x 4bit-colour mapped to 256
                     {
                         int pp= load_line*vgaloop2;
                         uint8_t *p=(uint8_t *)HDMIlines[line_to_load];
@@ -3320,7 +3335,7 @@ void MIPS32 __not_in_flash_func(HDMIloop3)(void){
                         }
                     }
                     break;
-                case SCREENMODE5: //400 x 300 x 8bit-colour or 424 x 240 x 8bit-colour 
+                case SCREENMODE5: //400 x 300 x 8bit-colour or 424/400 x 240 x 8bit-colour 
                     {
                         uint8_t *p=(uint8_t *)HDMIlines[line_to_load];
                         uint8_t l,d;
@@ -3595,6 +3610,45 @@ void HDMICore(void){
         MODE4SIZE=MODE3SIZE_4;
         MODE5SIZE=MODE5SIZE_4;
         PIXELS_PER_WORD=2;
+    } else if(Option.CPU_Speed==FreqX){
+        MODE_H_SYNC_POLARITY=MODE_H_X_SYNC_POLARITY;
+        MODE_ACTIVE_LINES=MODE_V_X_ACTIVE_LINES;
+        MODE_ACTIVE_PIXELS=MODE_H_X_ACTIVE_PIXELS;
+        MODE_V_TOTAL_LINES=MODE_V_X_TOTAL_LINES;
+        MODE_H_ACTIVE_PIXELS=MODE_H_X_ACTIVE_PIXELS;
+        MODE_H_FRONT_PORCH=MODE_H_X_FRONT_PORCH;
+        MODE_H_SYNC_WIDTH=MODE_H_X_SYNC_WIDTH;
+        MODE_H_BACK_PORCH=MODE_H_X_BACK_PORCH;
+        MODE_V_SYNC_POLARITY=MODE_V_X_SYNC_POLARITY;
+        MODE_V_ACTIVE_LINES=MODE_V_X_ACTIVE_LINES;
+        MODE_V_FRONT_PORCH=MODE_V_X_FRONT_PORCH;
+        MODE_V_SYNC_WIDTH=MODE_V_X_SYNC_WIDTH;
+        MODE_V_BACK_PORCH=MODE_V_X_BACK_PORCH;
+        MODE1SIZE=MODE1SIZE_X;
+        MODE2SIZE=MODE2SIZE_X;
+        MODE3SIZE=MODE3SIZE_X;
+        MODE4SIZE=0L;
+        MODE5SIZE=MODE5SIZE_X;
+        PIXELS_PER_WORD=4;
+    } else if(Option.CPU_Speed==FreqY){
+        MODE_H_SYNC_POLARITY=MODE_H_Y_SYNC_POLARITY;
+        MODE_ACTIVE_LINES=MODE_V_Y_ACTIVE_LINES;
+        MODE_ACTIVE_PIXELS=MODE_H_Y_ACTIVE_PIXELS;
+        MODE_V_TOTAL_LINES=MODE_V_Y_TOTAL_LINES;
+        MODE_H_ACTIVE_PIXELS=MODE_H_Y_ACTIVE_PIXELS;
+        MODE_H_FRONT_PORCH=MODE_H_Y_FRONT_PORCH;
+        MODE_H_SYNC_WIDTH=MODE_H_Y_SYNC_WIDTH;
+        MODE_H_BACK_PORCH=MODE_H_Y_BACK_PORCH;
+        MODE_V_SYNC_POLARITY=MODE_V_Y_SYNC_POLARITY;
+        MODE_V_ACTIVE_LINES=MODE_V_Y_ACTIVE_LINES;
+        MODE_V_FRONT_PORCH=MODE_V_Y_FRONT_PORCH;
+        MODE_V_SYNC_WIDTH=MODE_V_Y_SYNC_WIDTH;
+        MODE_V_BACK_PORCH=MODE_V_Y_BACK_PORCH;
+        MODE1SIZE=MODE1SIZE_Y;
+        MODE2SIZE=MODE2SIZE_Y;
+        MODE3SIZE=MODE3SIZE_Y;
+        MODE5SIZE=MODE5SIZE_Y;
+        PIXELS_PER_WORD=4;
     }  else {
         MODE_H_SYNC_POLARITY=MODE_H_S_SYNC_POLARITY;
         MODE_ACTIVE_LINES=MODE_V_S_ACTIVE_LINES;
@@ -3785,6 +3839,7 @@ void HDMICore(void){
     if(Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq378P  || Option.CPU_Speed==Freq252P || Option.CPU_Speed==Freq400)HDMIloop0();
     else if(Option.CPU_Speed==Freq720P)HDMIloop1();
     else if(Option.CPU_Speed==FreqXGA)HDMIloop2();
+    else if(Option.CPU_Speed==FreqX)HDMIloopX();
     else HDMIloop3();
 }
 void settiles(void){
@@ -3818,11 +3873,11 @@ void settiles(void){
 #include "pico/multicore.h"
 void __not_in_flash_func(UpdateCore)()
 {
-    systick_hw->csr = 0x5;
-    systick_hw->rvr = 0x00FFFFFF;
-    while(multicore_fifo_rvalid()) {
-        multicore_fifo_pop_blocking();
-    }
+//    systick_hw->csr = 0x5;
+//    systick_hw->rvr = 0x00FFFFFF;
+//    while(multicore_fifo_rvalid()) {
+//        multicore_fifo_pop_blocking();
+//    }
 
 	while (true)
 	{
@@ -3884,6 +3939,23 @@ void __not_in_flash_func(UpdateCore)()
                     }
                     blitmerge(x1,y1,w,h,colour);
                 }
+#if defined(PICOMITE) && defined(rp2350)
+			} else if(command==6){
+                int x_low=(int)multicore_fifo_pop_blocking();
+                int y_low=(int)multicore_fifo_pop_blocking();
+                int x_high=x_low>>16;
+                x_low &=0xFFFF;
+                int y_high=y_low>>16;
+                y_low &=0xFFFF;
+                mutex_enter_blocking(&frameBufferMutex);			// lock the frame buffer
+                copybuffertoscreen((uint8_t *)ScreenBuffer,x_low,y_low,x_high,y_high);
+                mutex_exit(&frameBufferMutex);
+			} else if(command==7){
+                int t=(int)multicore_fifo_pop_blocking();
+                spi_write_command(CMD_SET_SCROLL_START);
+                spi_write_data(t >> 8);
+                spi_write_data(t);
+#endif
             } else if(command==1){ 
                 uint8_t *s=(uint8_t *)multicore_fifo_pop_blocking();
                 mutex_enter_blocking(&frameBufferMutex);			// lock the frame buffer
@@ -4118,7 +4190,7 @@ int MIPS16 main(){
         SaveOptions();
     }
 #else
-    if(!(Option.CPU_Speed==Freq720P || Option.CPU_Speed==Freq378P || Option.CPU_Speed==Freq252P || Option.CPU_Speed==Freq848  || Option.CPU_Speed==Freq400 || Option.CPU_Speed==FreqSVGA || Option.CPU_Speed==Freq480P|| Option.CPU_Speed==FreqXGA )){
+    if(!(Option.CPU_Speed==Freq720P || Option.CPU_Speed==Freq378P || Option.CPU_Speed==Freq252P || Option.CPU_Speed==Freq848  || Option.CPU_Speed==Freq400 || Option.CPU_Speed==FreqSVGA || Option.CPU_Speed==Freq480P|| Option.CPU_Speed==FreqXGA || Option.CPU_Speed==FreqX  || Option.CPU_Speed==FreqY)){
         Option.CPU_Speed=Freq480P;
         SaveOptions();
     }
@@ -4153,12 +4225,7 @@ int MIPS16 main(){
     }
 #endif
     vreg_disable_voltage_limit ();
-#ifdef rp2350
-//    volatile uint32_t *qmi_m0_timing=(uint32_t *)0x400d000c;
-//    volatile uint32_t *qmi_m1_timing=(uint32_t *)0x400d0020;
-#endif
     if(Option.CPU_Speed<=200000)vreg_set_voltage(VREG_VOLTAGE_1_15);
-//    else if(Option.CPU_Speed>200000 && Option.CPU_Speed<=300000 )vreg_set_voltage(VREG_VOLTAGE_1_25);  // Std default @ boot is 1_10
     else if(Option.CPU_Speed>200000  && Option.CPU_Speed<=320000 )vreg_set_voltage(VREG_VOLTAGE_1_30);  // Std default @ boot is 1_10
 #ifdef rp2350
     else if(Option.CPU_Speed>320000  && Option.CPU_Speed<=360000 )vreg_set_voltage(VREG_VOLTAGE_1_40);  // Std default @ boot is 1_10
@@ -4168,33 +4235,22 @@ int MIPS16 main(){
 #endif
     sleep_ms(10);
 #ifdef rp2350
-#define QMI_COOLDOWN 30    // 0xc0000000 [31:30] COOLDOWN     (0x1) Chip select cooldown period
-#define QMI_PAGEBREAK 28        // 0x30000000 [29:28] PAGEBREAK    (0x0) When page break is enabled, chip select will...
-#define QMI_SELECT_SETUP 25        // 0x02000000 [25]    SELECT_SETUP (0) Add up to one additional system clock cycle of setup...
-#define QMI_SELECT_HOLD 23        // 0x01800000 [24:23] SELECT_HOLD  (0x0) Add up to three additional system clock cycles of active...
-#define QMI_MAX_SELECT 17        // 0x007e0000 [22:17] MAX_SELECT   (0x00) Enforce a maximum assertion duration for this window's...
-#define QMI_MIN_DESELECT 12        // 0x0001f000 [16:12] MIN_DESELECT (0x00) After this window's chip select is deasserted, it...
-#define QMI_RXDELAY 8          // 0x00000700 [10:8]  RXDELAY      (0x0) Delay the read data sample timing, in units of one half...
-#define QMI_CLKDIV 0           // 0x000000ff [7:0]   CLKDIV       (0x04) Clock divisor
     pads_qspi_hw->io[0]=0x67;
     pads_qspi_hw->io[1]=0x67;
     pads_qspi_hw->io[2]=0x67;
     pads_qspi_hw->io[3]=0x6B;
     pads_qspi_hw->io[4]=0x6B;
     pads_qspi_hw->io[5]=0x6B;
-    qmi_hw->m[1].timing = (1<<QMI_COOLDOWN) | (2<<QMI_PAGEBREAK) | (3<<QMI_SELECT_HOLD) | (18<<QMI_MAX_SELECT) | (4<<QMI_MIN_DESELECT) | (6<<QMI_RXDELAY) | (5<<QMI_CLKDIV);
-    if(Option.CPU_Speed<=324000)qmi_hw->m[1].timing = (1<<QMI_COOLDOWN) | (2<<QMI_PAGEBREAK) | (3<<QMI_SELECT_HOLD) | (18<<QMI_MAX_SELECT) | (4<<QMI_MIN_DESELECT) | (4<<QMI_RXDELAY) | (4<<QMI_CLKDIV);
     if(Option.CPU_Speed<=288000)qmi_hw->m[0].timing = 0x40006202;
-    if(Option.CPU_Speed<=150000)qmi_hw->m[1].timing = 0x60006102;
     sleep_ms(2);
 #endif
+#if defined(HDMI) && defined(rp2350)
+    set_sys_clock_khz(Option.CPU_Speed==FreqX ? 252000 : Option.CPU_Speed, false);
+#else
     set_sys_clock_khz(Option.CPU_Speed, false);
+#endif
 #ifdef rp2350
-    qmi_hw->m[1].timing = (1<<QMI_COOLDOWN) | (2<<QMI_PAGEBREAK) | (3<<QMI_SELECT_HOLD) | (18<<QMI_MAX_SELECT) | (4<<QMI_MIN_DESELECT) | (6<<QMI_RXDELAY) | (5<<QMI_CLKDIV);
-    if(Option.CPU_Speed<=324000)qmi_hw->m[1].timing = (1<<QMI_COOLDOWN) | (2<<QMI_PAGEBREAK) | (3<<QMI_SELECT_HOLD) | (18<<QMI_MAX_SELECT) | (4<<QMI_MIN_DESELECT) | (4<<QMI_RXDELAY) | (4<<QMI_CLKDIV);
     if(Option.CPU_Speed<=288000)qmi_hw->m[0].timing = 0x40006202;
-    if(Option.CPU_Speed<=150000)qmi_hw->m[1].timing = 0x60006102;
-
     sleep_ms(2);
 #endif
     PWM_FREQ=44100;
@@ -4202,12 +4258,11 @@ int MIPS16 main(){
 #ifdef rp2350
 #ifndef PICOMITEWEB
     if(Option.PSRAM_CS_PIN){
-        gpio_set_function(PinDef[Option.PSRAM_CS_PIN].GPno, GPIO_FUNC_XIP_CS1); // CS for PSRAM
-        xip_ctrl_hw->ctrl|=XIP_CTRL_WRITABLE_M1_BITS;
-        if(!(PSRAMsize=testPSRAM())){
+        psram_setup();
+        if(!(PSRAMsize=psram_size())){
             Option.PSRAM_CS_PIN=0;
             SaveOptions();
-        }
+        } else PSRAMsize-=2*1024*1024;
     }
 #endif
 #endif
@@ -4234,6 +4289,13 @@ int MIPS16 main(){
 #ifndef rp2350
     if(Option.CPU_Speed<=200000)modclock(2);
 #else
+#if defined(PICOMITE) && defined(rp2350)
+    if(Option.DISPLAY_TYPE>=NEXTGEN){ //adjust the size of the heap
+        framebuffersize=display_details[Option.DISPLAY_TYPE].horizontal*display_details[Option.DISPLAY_TYPE].vertical;
+        heap_memory_size=HEAP_MEMORY_SIZE-framebuffersize;
+        FRAMEBUFFER=AllMemory+heap_memory_size+256;
+    }
+#endif
 #ifdef HDMI
     if(FullColour || MediumRes){
         clock_configure(
@@ -4251,6 +4313,11 @@ int MIPS16 main(){
     }
     if(Option.CPU_Speed==Freq848){ //adjust the size of the heap
         framebuffersize=424*240*2;
+        heap_memory_size=HEAP_MEMORY_SIZE-framebuffersize+320*240*2;
+        FRAMEBUFFER=AllMemory+heap_memory_size+256;
+    }
+    if(Option.CPU_Speed==FreqY){ //adjust the size of the heap
+        framebuffersize=400*240*2;
         heap_memory_size=HEAP_MEMORY_SIZE-framebuffersize+320*240*2;
         FRAMEBUFFER=AllMemory+heap_memory_size+256;
     }

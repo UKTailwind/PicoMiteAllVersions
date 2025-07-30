@@ -35,6 +35,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
 #include "hardware/spi.h"
+#include "Memory.h"
 #ifndef PICOMITEWEB
 #include "pico/multicore.h"
 extern mutex_t	frameBufferMutex;
@@ -84,6 +85,7 @@ typedef struct _BMPDECODER
 #endif
 #endif
     #include "smallfont.h"
+    #include "font-8x10.h"
 
     unsigned char *FontTable[FONT_TABLE_SIZE] = {   (unsigned char *)font1,
                                                     (unsigned char *)Misc_12x20_LE,
@@ -101,7 +103,7 @@ typedef struct _BMPDECODER
                                                     (unsigned char *)ArialNumFontPlus,
 													(unsigned char *)F_6x8_LE,
 													(unsigned char *)TinyFont,
-                                                    NULL,
+                                                    (unsigned char *)font8x10,
                                                     NULL,
                                                     NULL,
                                                     NULL,
@@ -117,7 +119,7 @@ typedef struct _BMPDECODER
 short gui_font;
 int gui_fcolour;
 int gui_bcolour;
-short low_y=2000, high_y=-1, low_x=2000, high_x=-1;
+volatile short low_x=silly_low, high_y=silly_high, low_y=silly_low, high_x=silly_high;
 int PrintPixelMode=0;
 
 short CurrentX=0, CurrentY=0;                                             // the current default position for the next char to be written
@@ -131,7 +133,6 @@ short HRes = 0, VRes = 0;
 short lastx,lasty;
 const int CMM1map[16]={BLACK,BLUE,GREEN,CYAN,RED,MAGENTA,YELLOW,WHITE,MYRTLE,COBALT,MIDGREEN,CERULEAN,RUST,FUCHSIA,BROWN,LILAC};
 int RGB121map[16];
-uint32_t remap[256];
 // pointers to the drawing primitives
 #ifndef PICOMITEWEB
 struct D3D* struct3d[MAX3D + 1] = { NULL };
@@ -149,6 +150,7 @@ int sprite_which_collided = -1;
 static bool hideall = 0;
 uint8_t sprite_transparent=0;
 #ifdef PICOMITEVGA
+uint32_t remap[256];
 short gui_font_width, gui_font_height;
 int last_bcolour, last_fcolour;
 volatile int CursorTimer=0;               // used to time the flashing cursor
@@ -208,7 +210,7 @@ void MIPS16 initFonts(void){
 	FontTable[5] = (unsigned char *)ArialNumFontPlus;
 	FontTable[6] = (unsigned char *)F_6x8_LE;
 	FontTable[7] = (unsigned char *)TinyFont;
-	FontTable[8] = NULL;
+	FontTable[8] = (unsigned char *)font8x10;
 	FontTable[9] = NULL;
 	FontTable[10] = NULL;
 	FontTable[11] = NULL;
@@ -217,6 +219,12 @@ void MIPS16 initFonts(void){
 	FontTable[14] = NULL;
 	FontTable[15] = NULL;
 }
+#if defined(PICOMITE) && defined(rp2350)
+uint16_t __not_in_flash_func(RGB565)(uint32_t c){
+    return ((c >> 16) & 0b11111000) | ((c >> 13) & 0b00000111) | ((c << 3) & 0b1110000000000000) |  ((c << 5) & 0b0001111100000000);
+}
+#endif
+
 uint16_t __not_in_flash_func(RGB555)(uint32_t c){
     return ((c & 0xf8)>>3) | ((c& 0xf800)>>6) | ((c & 0xf80000)>>9);
 }
@@ -370,7 +378,8 @@ void MIPS16 cmd_guiMX170(void) {
 #endif
     if((p = checkstring(cmdline, (unsigned char *)"TEST"))) {
         if((checkstring(p, (unsigned char *)"LCDPANEL"))) {
-            int t;
+            int t,count=0;
+            uint64_t start=time_us_64();
             t = ((HRes > VRes) ? HRes : VRes) / 7;
             while(getConsole() < '\r') {
                 routinechecks();
@@ -378,6 +387,7 @@ void MIPS16 cmd_guiMX170(void) {
                 {if(startupcomplete)ProcessWeb(1);}
         #endif
                 DrawCircle(rand() % HRes, rand() % VRes, (rand() % t) + t/5, 1, 1, rgb((rand() % 8)*256/8, (rand() % 8)*256/8, (rand() % 8)*256/8), 1);
+                count++;
                 #ifdef PICOMITEVGA
                 #ifdef HDMI
                 while(v_scanline!=0){} 
@@ -387,6 +397,7 @@ void MIPS16 cmd_guiMX170(void) {
                 #endif
             }
             ClearScreen(gui_bcolour);
+            PFlt(((MMFLOAT)count)/(((MMFLOAT)(time_us_64()-start))/1000000.0));MMPrintString(" Circles per Second");
             return;
         }
 #ifndef PICOMITEVGA
@@ -492,6 +503,15 @@ void DrawPixelNormal(int x, int y, int c) {
 }
 #endif
 void ClearScreen(int c) {
+#if defined(PICOMITE) && defined(rp2350)
+#ifndef PICOMITEVGA
+    if(ScrollLCD==ScrollLCDMEM332){
+		multicore_fifo_push_blocking(7);
+		multicore_fifo_push_blocking((uint32_t)0);
+        ScrollStart=0;
+    }
+#endif
+#endif
 #ifdef PICOMITEVGA
     if(DISPLAY_TYPE==SCREENMODE1 && WriteBuf==DisplayBuf){
         DrawRectangle(0, 0, HRes - 1, VRes - 1, 0);
@@ -802,7 +822,7 @@ void MIPS16 DrawRBox(int x1, int y1, int x2, int y2, int radius, int c, int fill
     DrawRectangle(x1 + radius - 1, y2,  x2 - radius + 1, y2, c);    // botom side
     DrawRectangle(x1, y1 + radius, x1, y2 - radius, c);             // left side
     DrawRectangle(x2, y1 + radius, x2, y2 - radius, c);             // right side
-        if(Option.Refresh)Display_Refresh();
+    if(Option.Refresh)Display_Refresh();
 
 }
 
@@ -927,8 +947,7 @@ void DrawCircle(int x, int y, int radius, int w, int c, int fill, MMFLOAT aspect
 		   }
 	   }
    }
-
-    if(Option.Refresh)Display_Refresh();
+   if(Option.Refresh)Display_Refresh();
 }
 
 
@@ -4979,20 +4998,20 @@ void restorepanel(void){
             DrawBitmap = DrawBitmapSPISCR;
             DrawBuffer = DrawBufferSPISCR;
             DrawPixel = DrawPixelNormal;
-        	DrawBLITBuffer = DrawBufferSPISCR;
             ScrollLCD = ScrollLCDSPISCR;
+            DrawBLITBuffer = DrawBufferSPISCR;
             if(Option.DISPLAY_TYPE == ILI9341 || Option.DISPLAY_TYPE == ST7796SP || Option.DISPLAY_TYPE == ST7796S || Option.DISPLAY_TYPE == ILI9488  || Option.DISPLAY_TYPE == ILI9488P || Option.DISPLAY_TYPE == ST7789B){
                 ReadBuffer = ReadBufferSPISCR;
-				ReadBLITBuffer = ReadBufferSPISCR;
+                ReadBLITBuffer = ReadBufferSPISCR;
             }
         } else {
             DrawRectangle = DrawRectangleSPI;
             DrawBitmap = DrawBitmapSPI;
             DrawBuffer = DrawBufferSPI;
+            DrawBLITBuffer = DrawBufferSPI;
             DrawPixel = DrawPixelNormal;
-        	DrawBLITBuffer = DrawBufferSPI;
             if(Option.DISPLAY_TYPE == ILI9341 || Option.DISPLAY_TYPE == ST7796SP || Option.DISPLAY_TYPE == ST7796S || Option.DISPLAY_TYPE == ILI9488  || Option.DISPLAY_TYPE == ILI9488P || Option.DISPLAY_TYPE == ST7789B){
-				ReadBLITBuffer = ReadBufferSPI;
+                ReadBLITBuffer = ReadBufferSPI;
                 ReadBuffer = ReadBufferSPI;
                 ScrollLCD = ScrollLCDSPI;
             }
@@ -5019,11 +5038,26 @@ void restorepanel(void){
         DrawPixel = DrawPixelNormal;
         if(!(Option.DISPLAY_TYPE == ILI9341_8 || Option.DISPLAY_TYPE == ILI9341_16 || Option.DISPLAY_TYPE == IPS_4_16 ))ScrollLCD = ScrollSSD1963;
         else ScrollLCD=ScrollLCDSPI;
+#if defined(PICOMITE) && defined(rp2350)
+    } else if(Option.DISPLAY_TYPE>=NEXTGEN){
+        DrawRectangle = DrawRectangleMEM332;
+        DrawBitmap = DrawBitmapMEM332;
+        DrawBuffer = DrawBufferMEM332;
+        ReadBuffer = ReadBufferMEM332;
+        DrawBLITBuffer = DrawBlitBufferMEM332;
+        ReadBLITBuffer = ReadBlitBufferMEM332;
+        ScrollLCD = ScrollLCDMEM332;
+        DrawPixel = DrawPixelNormal;
+#endif
     }
     WriteBuf=NULL;
 }
 void setframebuffer(void){
+#if defined(PICOMITE) && defined(rp2350)
     if(!((Option.DISPLAY_TYPE>I2C_PANEL && Option.DISPLAY_TYPE < BufferedPanel) || (Option.DISPLAY_TYPE>=SSDPANEL && Option.DISPLAY_TYPE<VIRTUAL) || Option.DISPLAY_TYPE>=NEXTGEN))return;
+#else
+    if(!((Option.DISPLAY_TYPE>I2C_PANEL && Option.DISPLAY_TYPE < BufferedPanel) || (Option.DISPLAY_TYPE>=SSDPANEL && Option.DISPLAY_TYPE<VIRTUAL)))return;
+#endif
     DrawRectangle=DrawRectangle16;
     DrawBitmap= DrawBitmap16;
     ScrollLCD=ScrollLCD16;
@@ -5048,11 +5082,12 @@ void closeframebuffer(char layer){
 #endif
     if(FrameBuf)FreeMemory(FrameBuf);
     if(LayerBuf)FreeMemory(LayerBuf);
+    if(FrameBuf || LayerBuf)restorepanel();
     FrameBuf=NULL;
     WriteBuf=NULL;
-    restorepanel();
 }
 void copyframetoscreen(uint8_t *s,int xstart, int xend, int ystart, int yend, int odd){
+    low_x=xstart;low_y=ystart;high_x=xend;high_y=yend;
     unsigned char col[3]={0};
     int c;
     if(Option.DISPLAY_TYPE>I2C_PANEL && Option.DISPLAY_TYPE<BufferedPanel)DefineRegionSPI(xstart,ystart,xend,yend, 1);
@@ -5071,6 +5106,10 @@ void copyframetoscreen(uint8_t *s,int xstart, int xend, int ystart, int yend, in
         } else {
             SetAreaIPS_4_16(xstart,ystart,xend,yend, 1);                               // setup the area to be filled
         }
+#if defined(PICOMITE) && defined(rp2350)
+    } else if(Option.DISPLAY_TYPE>=NEXTGEN) {
+        //nothing to do
+#endif
     } else {
         if(screen320){
             if(Option.DISPLAY_TYPE!=SSD1963_4_16)SetAreaSSD1963(xstart+80,ystart*2,xend*2-xstart+81,yend*2+1);                                // setup the area to be filled
@@ -5095,9 +5134,18 @@ void copyframetoscreen(uint8_t *s,int xstart, int xend, int ystart, int yend, in
                 col[2]=(RGB121map[i]>>16);
                 col[1]=(RGB121map[i]>>8) & 0xFF;
                 col[0]=(RGB121map[i] & 0xFF);
+#if defined(PICOMITE) && defined(rp2350)
+            } else if(Option.DISPLAY_TYPE>SSD_PANEL_8 && Option.DISPLAY_TYPE< NEXTGEN){
+#else
             } else if(Option.DISPLAY_TYPE>SSD_PANEL_8){
+#endif
                 map[i]=((RGB121map[i]>>8) & 0xf800) | ((RGB121map[i]>>5) & 0x07e0) | ((RGB121map[i]>>3) & 0x001f);
                 continue;
+#if defined(PICOMITE) && defined(rp2350)
+            } else if(Option.DISPLAY_TYPE>=NEXTGEN){
+                map[i]=RGB332(RGB121map[i]);
+                continue;
+#endif
             } else {
                 col[0]= ((RGB121map[i] >> 16) & 0b11111000) | ((RGB121map[i] >> 13) & 0b00000111);
                 col[1] = ((RGB121map[i] >>  5) & 0b11100000) | ((RGB121map[i] >>  3) & 0b00011111);
@@ -5111,7 +5159,11 @@ void copyframetoscreen(uint8_t *s,int xstart, int xend, int ystart, int yend, in
     }
     i=(xend-xstart+1)*(yend-ystart+1);
     if(Option.DISPLAY_TYPE>I2C_PANEL && Option.DISPLAY_TYPE<BufferedPanel ){
+#if defined(PICOMITE) && defined(rp2350)
+        if(PinDef[Option.LCD_CLK].mode & SPI0SCK){
+#else
         if(PinDef[Option.SYSTEM_CLK].mode & SPI0SCK){
+#endif
             if(odd){
                 c=map[(*s & 0xF0)>>4];
                 spi_write_fast(spi0,(uint8_t *)&c,cnt);
@@ -5146,9 +5198,31 @@ void copyframetoscreen(uint8_t *s,int xstart, int xend, int ystart, int yend, in
                 i-=2;
             }
         }
+#if defined(PICOMITE) && defined(rp2350)
+        if(PinDef[Option.LCD_CLK].mode & SPI0SCK)spi_finish(spi0);
+#else
         if(PinDef[Option.SYSTEM_CLK].mode & SPI0SCK)spi_finish(spi0);
+#endif
         else spi_finish(spi1);
         ClearCS(Option.LCD_CS);                  //set CS high
+#if defined(PICOMITE) && defined(rp2350)
+    } else if(Option.DISPLAY_TYPE>=NEXTGEN){
+        unsigned char *screen=(unsigned char *)(ScreenBuffer);
+        for(int y=ystart;y<=yend;y++){
+            unsigned char *p=screen+(y+ScrollStart<VRes? y+ScrollStart : y+ScrollStart-VRes)*HRes;
+            for(int x=xstart;x<=xend;x++){
+                if(odd){
+                    c=map[(*s & 0xF0)>>4];
+                    s++;
+                    odd^=1;
+                } else {
+                    c=map[*s & 0xF];
+                    odd^=1;
+                }
+                p[x]=c;
+            }
+        }
+#endif
     } else {
         if(screen320  && Option.DISPLAY_TYPE!=SSD1963_4_16){
             unsigned char *q = buff320;
@@ -5355,6 +5429,7 @@ void merge(uint8_t colour){
         mutex_exit(&frameBufferMutex);
         mergedone=true;
         __dmb();
+        low_x=0;low_y=0;high_x=HRes-1;high_y=VRes-1;
 #endif
 }
 /*  @endcond */
@@ -5427,7 +5502,11 @@ void cmd_framebuffer(void){
             else error("Syntax");
         }
         if(background==1){
+#if defined(rp2350)
+            if(!(((Option.DISPLAY_TYPE>I2C_PANEL && Option.DISPLAY_TYPE<BufferedPanel ) || Option .DISPLAY_TYPE>=NEXTGEN || (Option.DISPLAY_TYPE>=SSDPANEL && Option.DISPLAY_TYPE<VIRTUAL))))error("Not available on this display");
+#else
             if(!(((Option.DISPLAY_TYPE>I2C_PANEL && Option.DISPLAY_TYPE<BufferedPanel ) || (Option.DISPLAY_TYPE>=SSDPANEL && Option.DISPLAY_TYPE<VIRTUAL))))error("Not available on this display");
+#endif
             if(diskchecktimer<200 && SPIatRisk)diskchecktimer = 200;
             multicore_fifo_push_blocking(2);
             multicore_fifo_push_blocking((uint32_t)colour);
@@ -5541,7 +5620,11 @@ void cmd_framebuffer(void){
                 } else { //copying to the real display
 #ifdef PICOMITE
                     if(background){
+#ifdef rp2350
+                        if(!(((Option.DISPLAY_TYPE>I2C_PANEL && Option.DISPLAY_TYPE<BufferedPanel ) || Option.DISPLAY_TYPE>=NEXTGEN || (Option.DISPLAY_TYPE>=SSDPANEL && Option.DISPLAY_TYPE<VIRTUAL))))error("Not available on this display");
+#else
                         if(!(((Option.DISPLAY_TYPE>I2C_PANEL && Option.DISPLAY_TYPE<BufferedPanel ) || (Option.DISPLAY_TYPE>=SSDPANEL && Option.DISPLAY_TYPE<VIRTUAL))))error("Not available on this display");
+#endif
                         if(diskchecktimer<100 && SPIatRisk) diskchecktimer=100;
                         multicore_fifo_push_blocking(1);
                         multicore_fifo_push_blocking((uint32_t)s);
@@ -5804,6 +5887,7 @@ void cmd_blit(void) {
         y2 = getinteger(argv[6]);
         w = getinteger(argv[8]);
         h = getinteger(argv[10]);
+//        PInt(x1);PIntComma(y1);PIntComma(x2);PIntComma(y2);PIntComma(w);PIntComma(h);PRet();
         if(w < 1 || h < 1) return;
         if(x1 < 0) { x2 -= x1; w += x1; x1 = 0; }
         if(x2 < 0) { x1 -= x2; w += x2; x2 = 0; }
@@ -6175,7 +6259,11 @@ void cmd_blit(void) {
         } else {
 	        if(x1 >= x2) {
 	            max_x = 1;
+#if defined(PICOMITE) && defined(rp2350)
+	            buff = GetMemory(max_x * h * (SSD16TYPE  || Option.DISPLAY_TYPE==IPS_4_16 ? 2 : (Option.DISPLAY_TYPE>=NEXTGEN ? 1 : 3)));
+#else
 	            buff = GetMemory(max_x * h * (SSD16TYPE  || Option.DISPLAY_TYPE==IPS_4_16 ? 2 : 3));
+#endif
 	            while(w > max_x){
 	                ReadBLITBuffer(x1, y1, x1 + max_x - 1, y1 + h - 1, buff);
 	                DrawBLITBuffer(x2, y2, x2 + max_x - 1, y2 + h - 1, buff);
@@ -6186,13 +6274,17 @@ void cmd_blit(void) {
 	            ReadBLITBuffer(x1, y1, x1 + w - 1, y1 + h - 1, buff);
 	            DrawBLITBuffer(x2, y2, x2 + w - 1, y2 + h - 1, buff);
 	            FreeMemory(buff);
+	            if(Option.Refresh)Display_Refresh();
 	            return;
 	        }
 	        if(x1 < x2) {
 	            int start_x1, start_x2;
-	            max_x = LargestContiguousHeap()/(SSD16TYPE  || Option.DISPLAY_TYPE==IPS_4_16 ? 2 : 3);
-                if(max_x>x2-x1+1)max_x=x2-x1+1;
+	            max_x = 1;
+#if defined(PICOMITE) && defined(rp2350)
+	            buff = GetMemory(max_x * h * (SSD16TYPE  || Option.DISPLAY_TYPE==IPS_4_16 ? 2 : (Option.DISPLAY_TYPE>=NEXTGEN ? 1 : 3)));
+#else
 	            buff = GetMemory(max_x * h * (SSD16TYPE  || Option.DISPLAY_TYPE==IPS_4_16 ? 2 : 3));
+#endif
 	            start_x1 = x1 + w - max_x;
 	            start_x2 = x2 + w - max_x;
 	            while(w > max_x){
@@ -6939,6 +7031,10 @@ void setmode(int mode, bool clear){
         }
     }
 #endif
+if(mode==Option.DISPLAY_TYPE-SCREENMODE1+1){
+    SetFont(Option.DefaultFont);
+    PromptFont=Option.DefaultFont;
+}
 if(DISPLAY_TYPE==SCREENMODE1){
     ytileheight=gui_font_height;
     Y_TILE=VRes/ytileheight;
@@ -7012,8 +7108,21 @@ void fun_mmcharheight(void) {
 ****************************************************************************************************/
 void cmd_refresh(void){
     if(Option.DISPLAY_TYPE == 0) error("Display not configured");
-    low_y=0; high_y=DisplayVRes-1; low_x=0; high_x=DisplayHRes-1;
-	Display_Refresh();
+#if defined(PICOMITE) && defined(rp2350)
+    if(Option.DISPLAY_TYPE>=NEXTGEN){
+        if(!Option.Refresh){
+            multicore_fifo_push_blocking(6);
+            multicore_fifo_push_blocking((uint32_t)low_x | (high_x<<16));
+            multicore_fifo_push_blocking((uint32_t)low_y | (high_y<<16));
+            low_x=silly_low; high_y=silly_high; low_y=silly_low; high_x=silly_high;
+        }
+    } else {
+#endif
+        low_y=0; high_y=DisplayVRes-1; low_x=0; high_x=DisplayHRes-1;
+        Display_Refresh();
+#if defined(PICOMITE) && defined(rp2350)
+    }
+#endif
 }
 /* 
  * @cond
@@ -7022,7 +7131,11 @@ void cmd_refresh(void){
 
 void DrawPixel16(int x, int y, int c){
     if(x<0 || y<0 || x>=HRes || y>=VRes)return;
+#if defined(PICOMITE) && defined(rp2350)
     if((Option.DISPLAY_TYPE>=VIRTUAL &&  Option.DISPLAY_TYPE<NEXTGEN) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
+#else
+    if((Option.DISPLAY_TYPE>=VIRTUAL) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
+#endif
     unsigned char colour = RGB121(c);
 	uint8_t *p=(uint8_t *)(((uint32_t) WriteBuf)+(y*(HRes>>1))+(x>>1));
     if(x & 1){
@@ -7038,7 +7151,11 @@ void DrawRectangle16(int x1, int y1, int x2, int y2, int c){
 //    unsigned char mask;
     unsigned char colour = RGB121(c);;
     unsigned char bcolour=(colour<<4) | colour;
+#if defined(PICOMITE) && defined(rp2350)
     if((Option.DISPLAY_TYPE>=VIRTUAL &&  Option.DISPLAY_TYPE<NEXTGEN) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
+#else
+    if((Option.DISPLAY_TYPE>=VIRTUAL ) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
+#endif
     if(x1 < 0) x1 = 0;
     if(x1 >= HRes) x1 = HRes - 1;
     if(x2 < 0) x2 = 0;
@@ -7076,7 +7193,11 @@ void DrawBitmap16(int x1, int y1, int width, int height, int scale, int fc, int 
     if(x1>=HRes || y1>=VRes || x1+width*scale<0 || y1+height*scale<0)return;
     unsigned char fcolour = RGB121(fc);
     unsigned char bcolour = RGB121(bc);
+#if defined(PICOMITE) && defined(rp2350)
     if((Option.DISPLAY_TYPE>=VIRTUAL &&  Option.DISPLAY_TYPE<NEXTGEN) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
+#else
+    if((Option.DISPLAY_TYPE>=VIRTUAL) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
+#endif
     for(i = 0; i < height; i++) {                                   // step thru the font scan line by line
         for(j = 0; j < scale; j++) {                                // repeat lines to scale the font
             for(k = 0; k < width; k++) {                            // step through each bit in a scan line
@@ -7138,7 +7259,11 @@ void DrawBuffer16(int x1, int y1, int x2, int y2, unsigned char *p){
     } c;
     unsigned char fcolour;
     uint8_t *pp;
+#if defined(PICOMITE) && defined(rp2350)
     if((Option.DISPLAY_TYPE>=VIRTUAL &&  Option.DISPLAY_TYPE<NEXTGEN) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
+#else
+    if((Option.DISPLAY_TYPE>=VIRTUAL) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
+#endif
     // make sure the coordinates are kept within the display area
     if(x2 <= x1) { t = x1; x1 = x2; x2 = t; }
     if(y2 <= y1) { t = y1; y1 = y2; y2 = t; }
@@ -7174,7 +7299,11 @@ void DrawBuffer16Fast(int x1, int y1, int x2, int y2, int blank, unsigned char *
     // make sure the coordinates are kept within the display area
     if(x2 <= x1) { t = x1; x1 = x2; x2 = t; }
     if(y2 <= y1) { t = y1; y1 = y2; y2 = t; }
+#if defined(PICOMITE) && defined(rp2350)
     if((Option.DISPLAY_TYPE>=VIRTUAL &&  Option.DISPLAY_TYPE<NEXTGEN) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
+#else
+    if((Option.DISPLAY_TYPE>=VIRTUAL) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
+#endif
 	for(y=y1;y<=y2;y++){
     	for(x=x1;x<=x2;x++){
             if(x>=0 && x<HRes && y>=0 && y<VRes){
@@ -7209,7 +7338,11 @@ void DrawBuffer16Fast(int x1, int y1, int x2, int y2, int blank, unsigned char *
 void ReadBuffer16(int x1, int y1, int x2, int y2, unsigned char *c){
     int x,y,t;
     uint8_t *pp;
+#if defined(PICOMITE) && defined(rp2350)
     if((Option.DISPLAY_TYPE>=VIRTUAL &&  Option.DISPLAY_TYPE<NEXTGEN) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
+#else
+    if((Option.DISPLAY_TYPE>=VIRTUAL) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
+#endif
     if(x2 <= x1) { t = x1; x1 = x2; x2 = t; }
     if(y2 <= y1) { t = y1; y1 = y2; y2 = t; }
     int xx1=x1, yy1=y1, xx2=x2, yy2=y2;
@@ -7253,7 +7386,11 @@ void ReadBuffer16Fast(int x1, int y1, int x2, int y2, unsigned char *c){
     uint8_t *pp;
     if(x2 <= x1) { t = x1; x1 = x2; x2 = t; }
     if(y2 <= y1) { t = y1; y1 = y2; y2 = t; }
+#if defined(PICOMITE) && defined(rp2350)
     if((Option.DISPLAY_TYPE>=VIRTUAL && Option.DISPLAY_TYPE<NEXTGEN) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
+#else
+    if((Option.DISPLAY_TYPE>=VIRTUAL) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
+#endif
 	for(y=y1;y<=y2;y++){
     	for(x=x1;x<=x2;x++){
 			if(x>=0 && x<HRes && y>=0 && y<VRes){
@@ -7282,7 +7419,11 @@ void Display_Refresh(void){
 #endif
 void DrawPixel2(int x, int y, int c){
     if(x<0 || y<0 || x>=HRes || y>=VRes)return;
+#if defined(PICOMITE) && defined(rp2350)
     if((Option.DISPLAY_TYPE>=VIRTUAL &&  Option.DISPLAY_TYPE<NEXTGEN) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
+#else
+    if((Option.DISPLAY_TYPE>=VIRTUAL) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
+#endif
 	uint8_t *p=(uint8_t *)(((uint32_t) WriteBuf)+(y*(HRes>>3))+(x>>3));
 	uint8_t bit = 1<<(x % 8);
 	if(c)*p |=bit;
@@ -7292,7 +7433,11 @@ void DrawRectangle2(int x1, int y1, int x2, int y2, int c){
     int x,y,x1p, x2p, t;
     unsigned char mask;
     volatile unsigned char *p;
+#if defined(PICOMITE) && defined(rp2350)
     if((Option.DISPLAY_TYPE>=VIRTUAL &&  Option.DISPLAY_TYPE<NEXTGEN) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
+#else
+    if((Option.DISPLAY_TYPE>=VIRTUAL) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
+#endif
     if(x1 < 0) x1 = 0;
     if(x1 >= HRes) x1 = HRes - 1;
     if(x2 < 0) x2 = 0;
@@ -7360,7 +7505,11 @@ void DrawBitmap2(int x1, int y1, int width, int height, int scale, int fc, int b
     unsigned char mask;
     if(x1>=HRes || y1>=VRes || x1+width*scale<0 || y1+height*scale<0)return;
     int tilematch=0;
+#if defined(PICOMITE) && defined(rp2350)
     if((Option.DISPLAY_TYPE>=VIRTUAL &&  Option.DISPLAY_TYPE<NEXTGEN) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
+#else
+    if((Option.DISPLAY_TYPE>=VIRTUAL) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
+#endif
 #ifdef PICOMITEVGA
     int xa= 8;
     int ya=ytileheight;
@@ -7559,7 +7708,11 @@ void DrawBuffer2(int x1, int y1, int x2, int y2, unsigned char *p){
     char rgbbytes[4];
     unsigned int rgb;
     } c;
+#if defined(PICOMITE) && defined(rp2350)
     if((Option.DISPLAY_TYPE>=VIRTUAL &&  Option.DISPLAY_TYPE<NEXTGEN) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
+#else
+    if((Option.DISPLAY_TYPE>=VIRTUAL) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
+#endif
     // make sure the coordinates are kept within the display area
     if(x2 <= x1) { t = x1; x1 = x2; x2 = t; }
     if(y2 <= y1) { t = y1; y1 = y2; y2 = t; }
@@ -7596,7 +7749,11 @@ void DrawBuffer2Fast(int x1, int y1, int x2, int y2, int blank, unsigned char *p
     // make sure the coordinates are kept within the display area
     if(x2 <= x1) { t = x1; x1 = x2; x2 = t; }
     if(y2 <= y1) { t = y1; y1 = y2; y2 = t; }
+#if defined(PICOMITE) && defined(rp2350)
     if((Option.DISPLAY_TYPE>=VIRTUAL &&  Option.DISPLAY_TYPE<NEXTGEN) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
+#else
+    if((Option.DISPLAY_TYPE>=VIRTUAL) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
+#endif
 	for(y=y1;y<=y2;y++){
     	for(x=x1;x<=x2;x++){
             if(x>=0 && x<HRes && y>=0 && y<VRes){
@@ -7628,7 +7785,11 @@ void ReadBuffer2(int x1, int y1, int x2, int y2, unsigned char *c){
     int x,y,t,loc;
 //    uint8_t *pp;
     unsigned char mask;
+#if defined(PICOMITE) && defined(rp2350)
     if((Option.DISPLAY_TYPE>=VIRTUAL &&  Option.DISPLAY_TYPE<NEXTGEN) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
+#else
+    if((Option.DISPLAY_TYPE>=VIRTUAL) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
+#endif
     if(x2 <= x1) { t = x1; x1 = x2; x2 = t; }
     if(y2 <= y1) { t = y1; y1 = y2; y2 = t; }
     int xx1=x1, yy1=y1, xx2=x2, yy2=y2;
@@ -7669,7 +7830,11 @@ void ReadBuffer2Fast(int x1, int y1, int x2, int y2, unsigned char *c){
     int x,y,t,loc,toggle=0;;
 //    uint8_t *pp;
     unsigned char mask;
+#if defined(PICOMITE) && defined(rp2350)
     if((Option.DISPLAY_TYPE>=VIRTUAL &&  Option.DISPLAY_TYPE<NEXTGEN) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
+#else
+    if((Option.DISPLAY_TYPE>=VIRTUAL) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
+#endif
     if(x2 <= x1) { t = x1; x1 = x2; x2 = t; }
     if(y2 <= y1) { t = y1; y1 = y2; y2 = t; }
 	for(y=y1;y<=y2;y++){
@@ -7712,7 +7877,11 @@ void MIPS16 ConfigDisplayVirtual(unsigned char *p) {
     Option.DISPLAY_ORIENTATION = LANDSCAPE;
 }
 void MIPS16 InitDisplayVirtual(void){
+#if defined(PICOMITE) && defined(rp2350)
     if(Option.DISPLAY_TYPE==0 || Option.DISPLAY_TYPE < VIRTUAL || Option.DISPLAY_TYPE >= NEXTGEN) return;
+#else
+    if(Option.DISPLAY_TYPE==0 || Option.DISPLAY_TYPE < VIRTUAL) return;
+#endif
     DisplayHRes = HRes = display_details[Option.DISPLAY_TYPE].horizontal;
     DisplayVRes = VRes = display_details[Option.DISPLAY_TYPE].vertical;
 	if(Option.DISPLAY_TYPE==VIRTUAL_M){
@@ -7877,7 +8046,7 @@ void MIPS16 ResetDisplay(void) {
 #ifdef rp2350
     if(Option.CPU_Speed==Freq848)HRes=((DISPLAY_TYPE == SCREENMODE1 ||  DISPLAY_TYPE == SCREENMODE3) ? 848: 424);
     else if(Option.CPU_Speed==Freq400)HRes=((DISPLAY_TYPE == SCREENMODE1 ||  DISPLAY_TYPE == SCREENMODE3) ? 720: 360);
-    else if(Option.CPU_Speed==FreqSVGA)HRes=((DISPLAY_TYPE == SCREENMODE1 ||  DISPLAY_TYPE == SCREENMODE3) ? 800: 400);
+    else if(Option.CPU_Speed==FreqSVGA || Option.CPU_Speed==FreqY )HRes=((DISPLAY_TYPE == SCREENMODE1 ||  DISPLAY_TYPE == SCREENMODE3) ? 800: 400);
     else HRes=((DISPLAY_TYPE == SCREENMODE1 ||  DISPLAY_TYPE == SCREENMODE3) ? 640: 320);
 #else
     if(Option.CPU_Speed==Freq400)HRes=((DISPLAY_TYPE == SCREENMODE1 ||  DISPLAY_TYPE == SCREENMODE3) ? 720: 360);
@@ -7898,6 +8067,9 @@ void MIPS16 ResetDisplay(void) {
         } else if(Option.CPU_Speed==FreqSVGA){
             HRes=((DISPLAY_TYPE == SCREENMODE1 ||  DISPLAY_TYPE == SCREENMODE3) ? 800: 400);
             VRes=((DISPLAY_TYPE == SCREENMODE1 ||  DISPLAY_TYPE == SCREENMODE3) ? 600: 300);
+        } else if(Option.CPU_Speed==FreqX){
+            HRes=(DISPLAY_TYPE == SCREENMODE1 ? 1024 : ((DISPLAY_TYPE==SCREENMODE2 || DISPLAY_TYPE==SCREENMODE5) ? 256 : 512));
+            VRes=(DISPLAY_TYPE == SCREENMODE1 ? 600 :  ((DISPLAY_TYPE==SCREENMODE2 || DISPLAY_TYPE==SCREENMODE5) ? 150 : 300));
         } 
 #endif
         

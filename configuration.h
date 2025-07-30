@@ -51,7 +51,7 @@ extern "C" {
                 #define HEAPTOP 0x2007D000
             #endif
             #define MAX_CPU     Freq378P 
-            #define MIN_CPU     Freq252P
+            #define MIN_CPU     FreqX
         #else
             #define MAXMODES 3
             #ifdef USBKEYBOARD
@@ -124,6 +124,18 @@ extern "C" {
     #define MODE2SIZE_V  (MODE_H_V_ACTIVE_PIXELS/2) * (MODE_V_V_ACTIVE_LINES/2)/2
     #define MODE3SIZE_V  (MODE_H_V_ACTIVE_PIXELS) * (MODE_V_V_ACTIVE_LINES)/2
     #define MODE5SIZE_V  (MODE_H_V_ACTIVE_PIXELS/2) * (MODE_V_V_ACTIVE_LINES/2)
+    #define MODE_H_X_ACTIVE_PIXELS 1024
+    #define MODE_V_X_ACTIVE_LINES 600
+    #define MODE1SIZE_X  MODE_H_X_ACTIVE_PIXELS * MODE_V_X_ACTIVE_LINES /8
+    #define MODE2SIZE_X  (MODE_H_X_ACTIVE_PIXELS/4) * (MODE_V_X_ACTIVE_LINES/4)/2
+    #define MODE3SIZE_X  (MODE_H_X_ACTIVE_PIXELS/2) * (MODE_V_X_ACTIVE_LINES/2)/2
+    #define MODE5SIZE_X  (MODE_H_X_ACTIVE_PIXELS/4) * (MODE_V_X_ACTIVE_LINES/4)
+    #define MODE_H_Y_ACTIVE_PIXELS 800
+    #define MODE_V_Y_ACTIVE_LINES 480
+    #define MODE1SIZE_Y  MODE_H_Y_ACTIVE_PIXELS * MODE_V_Y_ACTIVE_LINES /8
+    #define MODE2SIZE_Y  (MODE_H_Y_ACTIVE_PIXELS/2) * (MODE_V_Y_ACTIVE_LINES/2)/2
+    #define MODE3SIZE_Y  (MODE_H_Y_ACTIVE_PIXELS) * (MODE_V_Y_ACTIVE_LINES)/2
+    #define MODE5SIZE_Y  (MODE_H_Y_ACTIVE_PIXELS/2) * (MODE_V_Y_ACTIVE_LINES/2)
     #define Freq720P 372000
     #define Freq480P 315000
     #define Freq252P 252000
@@ -132,8 +144,10 @@ extern "C" {
     #define FreqSVGA 360000
     #define Freq848  336000
     #define Freq400  283200
+    #define FreqY    333000
+    #define FreqX    250000
     #define FullColour (Option.CPU_Speed ==Freq252P || Option.CPU_Speed==Freq378P || Option.CPU_Speed ==Freq480P || Option.CPU_Speed ==Freq400)
-    #define MediumRes (Option.CPU_Speed==FreqSVGA || Option.CPU_Speed==Freq848)
+    #define MediumRes (Option.CPU_Speed==FreqSVGA || Option.CPU_Speed==Freq848 || Option.CPU_Speed==FreqY)
 #endif
 
 #ifdef PICOMITEWEB
@@ -160,16 +174,16 @@ extern "C" {
 #ifdef PICOMITE
     #define MIN_CPU     48000
     #ifdef rp2350
-        #define HEAP_MEMORY_SIZE (288*1024) 
+        #define HEAP_MEMORY_SIZE (300*1024) 
         #define MAXVARS             768                     // 8 + MAXVARLEN + MAXDIM * 4  (ie, 64 bytes) - these do not incl array members
-        #define FLASH_TARGET_OFFSET (832 * 1024) 
-        #define MAX_CPU     (rp2350a ? 396000 : 378000)
+        #define FLASH_TARGET_OFFSET (880 * 1024) 
+        #define MAX_CPU     396000
         #define MAXSUBFUN           512                     // each entry takes up 4 bytes
         #ifdef USBKEYBOARD
             #define MagicKey 0xD27F4F27
             #define HEAPTOP 0x20078000
         #else
-            #define MagicKey 0x18207ED7
+            #define MagicKey 0x182084D7
             #define HEAPTOP 0x20078000
         #endif
     #else
@@ -333,6 +347,8 @@ extern "C" {
 #define MAXLAYER   4
 #define MAXCONTROLS 200
 #define MAXDEFINES  16
+#define silly_low 2000
+#define silly_high -1
 //#define DO_NOT_RESET (1 << 5)
 //#define HEARTBEAT    (1 << 6)
 #define HEARTBEATpin  Option.heartbeatpin
@@ -341,6 +357,7 @@ extern "C" {
 #define QVGA_PIO_NUM 0	
 #ifdef rp2350
 #define QVGA_PIO (QVGA_PIO_NUM==0 ? pio0: (QVGA_PIO_NUM==1 ? pio1: pio2))
+#define ScreenBuffer FRAMEBUFFER
 #else
 #define QVGA_PIO (QVGA_PIO_NUM==0 ?  pio0: pio1)
 #endif
@@ -359,6 +376,7 @@ extern "C" {
 #define PIO_TX_DMA 4
 #define PIO_RX_DMA2 9
 #define PIO_TX_DMA2 6
+#define LOCALKEYSCANRATE 10
 #define ADC_CLK_SPEED   (Option.CPU_Speed*500)
 #define PROGSTART (FLASH_TARGET_OFFSET + FLASH_ERASE_SIZE + SAVEDVARS_FLASH_SIZE + ((MAXFLASHSLOTS) * MAX_PROG_SIZE))
 #define TOP_OF_SYSTEM_FLASH  (FLASH_TARGET_OFFSET + FLASH_ERASE_SIZE + SAVEDVARS_FLASH_SIZE + ((MAXFLASHSLOTS+1) * MAX_PROG_SIZE))
@@ -391,6 +409,9 @@ typedef enum {
     MMWIDTH,
     MMHEIGHT,
     MMPERSISTENT,
+#ifndef PICOMITEWEB
+    MMSUPPLY,
+#endif
     MMEND
 } Operation;
 extern const char* overlaid_functions[];

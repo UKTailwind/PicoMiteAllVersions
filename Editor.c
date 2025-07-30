@@ -134,6 +134,7 @@ void DisplayPutClever(char c){
 
 void DisplayPutS(char *s) {
     while(*s) DisplayPutC(*s++);
+    
 }
 
 static inline void printnothing(char * dummy){
@@ -149,15 +150,20 @@ static char (*SSputchar)(char buff, int flush)=SerialConsolePutC;
 #ifdef PICOMITEVGA
     #define MX470PutC(c)        DisplayPutClever(c)
 #else
-    #define MX470PutC(c)        DisplayPutC(c)
+    #define MX470PutC(c)        DisplayPutC(c);
 #endif
 // Only SSD1963 displays support H/W scrolling so for other displays it is much quicker to redraw the screen than scroll it
 // However, we don't want to redraw the serial console so we dummy out the serial writes whiole re-drawing the physical screen
 #ifdef PICOMITEVGA
     #define MX470Scroll(n) ScrollLCD(n);
 #else
+#if defined(PICOMITE) && defined(rp2350)
+    #define MX470Scroll(n)      if(Option.DISPLAY_CONSOLE){if(!((SPIREAD && ScrollLCD != ScrollLCDSPISCR && ScrollLCD != ScrollLCDMEM332)  || Option.NoScroll))ScrollLCD(n);\
+    else {PrintString=printnothing;SSputchar=nothingchar;printScreen();PrintString=SSPrintString;SSputchar=SerialConsolePutC;}}
+#else
     #define MX470Scroll(n)      if(Option.DISPLAY_CONSOLE){if(!((SPIREAD && ScrollLCD != ScrollLCDSPISCR)  || Option.NoScroll))ScrollLCD(n);\
     else {PrintString=printnothing;SSputchar=nothingchar;printScreen();PrintString=SSPrintString;SSputchar=SerialConsolePutC;}}
+#endif
 #endif
 
 //    #define dx(...) {char s[140];sprintf(s,  __VA_ARGS__); SerUSBPutS(s); SerUSBPutS("\r\n");}
@@ -375,7 +381,11 @@ void edit(unsigned char *cmdline, bool cmdfile) {
         gui_bcolour = BLACK;
     }
     if(Option.DISPLAY_CONSOLE == true && HRes/gui_font_width <32) error("Font is too large");
+#if defined(PICOMITE) && defined(rp2350)
     if(Option.DISPLAY_TYPE>=VIRTUAL  && Option.DISPLAY_TYPE<NEXTGEN && WriteBuf)FreeMemorySafe((void **)&WriteBuf);
+#else
+    if(Option.DISPLAY_TYPE>=VIRTUAL && WriteBuf)FreeMemorySafe((void **)&WriteBuf);
+#endif
     if(cmdfile){
         ClearVars(0,true);
         ClearRuntime(true);
@@ -395,8 +405,13 @@ void edit(unsigned char *cmdline, bool cmdfile) {
             SetFont(2<<4 | 1);
             PromptFont=2<<4 | 1;
         }
+        if(DISPLAY_TYPE==Option.DISPLAY_TYPE){
+            SetFont(Option.DefaultFont) ;
+            PromptFont=Option.DefaultFont;
+        }
 #endif
     }
+
 #ifdef PICOMITEWEB
     cleanserver();
 #endif
@@ -583,6 +598,9 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
   if(VRes % ytileheight)Y_TILE++;
 #else 
   char RefreshSave=Option.Refresh;
+#if defined(PICOMITE) && defined(rp2350)
+    if(!(Option.DISPLAY_TYPE>=NEXTGEN))
+#endif
   Option.Refresh=0;
 #endif
     printScreen();                                                  // draw the screen

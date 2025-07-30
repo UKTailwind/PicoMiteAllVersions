@@ -49,7 +49,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #ifdef rp2350
 #include "pico/rand.h"
 #endif
-#ifdef USBKEYBOARD
+#if defined(USBKEYBOARD)
 extern int caps_lock;
 extern int num_lock;
 extern int scroll_lock;
@@ -1876,6 +1876,14 @@ void MIPS16 printoptions(void){
         MMPrintString((char *)PinDef[Option.SYSTEM_MOSI].pinname);MMputchar(',',1);;
         MMPrintString((char *)PinDef[Option.SYSTEM_MISO].pinname);MMPrintString("\r\n");
     }
+#if defined(PICOMITE) && defined(rp2350)
+    if(Option.LCD_CLK && !(Option.SYSTEM_CLK==Option.LCD_CLK)){
+        PO("LCD SPI");
+        MMPrintString((char *)PinDef[Option.LCD_CLK].pinname);MMputchar(',',1);;
+        MMPrintString((char *)PinDef[Option.LCD_MOSI].pinname);MMputchar(',',1);;
+        MMPrintString((char *)PinDef[Option.LCD_MISO].pinname);MMPrintString("\r\n");
+    }
+#endif
 #endif
     if(Option.SYSTEM_I2C_SDA){
         PO("SYSTEM I2C");
@@ -1949,6 +1957,9 @@ void MIPS16 printoptions(void){
         PRet();
     } 
 #else
+#if defined(PICOMITE) && defined(rp2350)
+    if(Option.LOCAL_KEYBOARD)PO3Int("KEYBOARD REPEAT",Option.RepeatStart,Option.RepeatRate);
+#endif
     if(!(Option.KeyboardConfig == NO_KEYBOARD ||Option.KeyboardConfig == CONFIG_I2C)){
         PO("KEYBOARD"); MMPrintString((char *)KBrdList[(int)Option.KeyboardConfig]); 
         if(Option.capslock || Option.numlock!=1 || Option.repeat!=0b00101100){
@@ -1969,6 +1980,10 @@ void MIPS16 printoptions(void){
     if(Option.KeyboardConfig == CONFIG_I2C)PO2Str("KEYBOARD", "I2C");
 #ifdef rp2350
     if(Option.NoHeartbeat && rp2350a)PO2Str("HEARTBEAT", "OFF");
+#if defined(PICOMITE)
+    if(Option.LOCAL_KEYBOARD)PO2Str("KEYBOARD", "LOCAL");
+    if(Option.LOCAL_KEYBOARD)PO2Int("KEYBOARD BACKLIGHT", Option.KeyboardBrightness);
+#endif
 #else
     if(Option.NoHeartbeat )PO2Str("HEARTBEAT", "OFF");
 #endif
@@ -1979,6 +1994,8 @@ void MIPS16 printoptions(void){
     if(Option.CPU_Speed==FreqSVGA)PO2StrInt("RESOLUTION", "800x600",Option.CPU_Speed);
     if(Option.CPU_Speed==Freq848)PO2StrInt("RESOLUTION", "848x480",Option.CPU_Speed);
     if(Option.CPU_Speed==Freq400)PO2StrInt("RESOLUTION", "720x400",Option.CPU_Speed);
+    if(Option.CPU_Speed==FreqX)PO2StrInt("RESOLUTION", "1024x600",Option.CPU_Speed);
+    if(Option.CPU_Speed==FreqY)PO2StrInt("RESOLUTION", "800x480",Option.CPU_Speed);
     if(Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P || Option.CPU_Speed==Freq378P )PO2StrInt("RESOLUTION", "640x480",Option.CPU_Speed);
     if(Option.DISPLAY_TYPE!=SCREENMODE1)PO2Int("DEFAULT MODE", Option.DISPLAY_TYPE-SCREENMODE1+1);
     if(Option.Height != 40 || Option.Width != 80) PO3Int("DISPLAY", Option.Height, Option.Width);
@@ -2004,7 +2021,11 @@ void MIPS16 printoptions(void){
     }
     if(Option.Height != 24 || Option.Width != 80) PO3Int("DISPLAY", Option.Height, Option.Width);
     if(Option.DISPLAY_TYPE == DISP_USER) PO3Int("LCDPANEL USER", HRes, VRes);
+#if defined(PICOMITE) && defined(rp2350)
+    if(Option.DISPLAY_TYPE > I2C_PANEL && (Option.DISPLAY_TYPE < DISP_USER || Option.DISPLAY_TYPE>=NEXTGEN)) {
+#else
     if(Option.DISPLAY_TYPE > I2C_PANEL && Option.DISPLAY_TYPE < DISP_USER) {
+#endif
         i=Option.DISPLAY_ORIENTATION;
         if(Option.DISPLAY_TYPE==ST7789 || Option.DISPLAY_TYPE == ST7789A)i=(i+2) % 4;
         PO("LCDPANEL"); MMPrintString((char *)display_details[Option.DISPLAY_TYPE].name); MMPrintString(", "); MMPrintString((char *)OrientList[(int)i - 1]);
@@ -2013,10 +2034,18 @@ void MIPS16 printoptions(void){
         if(Option.DISPLAY_TYPE!=ST7920){
             MMputchar(',',1);;MMPrintString((char *)PinDef[Option.LCD_CS].pinname);
         }
+#if defined(PICOMITE) && defined(rp2350)
+        if(!(Option.DISPLAY_TYPE<=I2C_PANEL || (Option.DISPLAY_TYPE>=BufferedPanel && Option.DISPLAY_TYPE<NEXTGEN)) && Option.DISPLAY_BL){
+#else
         if(!(Option.DISPLAY_TYPE<=I2C_PANEL || Option.DISPLAY_TYPE>=BufferedPanel ) && Option.DISPLAY_BL){
+#endif
             MMputchar(',',1);MMPrintString((char *)PinDef[Option.DISPLAY_BL].pinname);
         }  else if(Option.BGR)MMputchar(',',1);
+#if defined(PICOMITE) && defined(rp2350)
+        if(!(Option.DISPLAY_TYPE<=I2C_PANEL || (Option.DISPLAY_TYPE>=BufferedPanel && Option.DISPLAY_TYPE<NEXTGEN)) && Option.BGR){
+#else
         if(!(Option.DISPLAY_TYPE<=I2C_PANEL || Option.DISPLAY_TYPE>=BufferedPanel ) && Option.BGR){
+#endif
             MMputchar(',',1);MMPrintString((char *)"INVERT");
         }
         if(Option.DISPLAY_TYPE==SSD1306SPI && Option.I2Coffset)PIntComma(Option.I2Coffset);
@@ -2046,9 +2075,14 @@ void MIPS16 printoptions(void){
 		}
         PRet();
     }
+#if defined(PICOMITE) && defined(rp2350)
     if(Option.DISPLAY_TYPE >= VIRTUAL && Option.DISPLAY_TYPE<NEXTGEN){
+#else
+    if(Option.DISPLAY_TYPE >= VIRTUAL){
+#endif
         PO("LCDPANEL"); MMPrintString((char *)display_details[Option.DISPLAY_TYPE].name); PRet();
     } 
+    if(Option.BackLightLevel!=100)PO2Int("LCD BACKLIGHT", Option.BackLightLevel);
     #ifdef GUICONTROLS
     if(Option.MaxCtrls)PO2Int("GUI CONTROLS", Option.MaxCtrls-1);
     #endif
@@ -2250,10 +2284,30 @@ void MIPS16 disable_systemspi(void){
     if(!IsInvalidPin(Option.SYSTEM_MOSI))ExtCfg(Option.SYSTEM_MOSI, EXT_NOT_CONFIG, 0);
     if(!IsInvalidPin(Option.SYSTEM_MISO))ExtCfg(Option.SYSTEM_MISO, EXT_NOT_CONFIG, 0);
     if(!IsInvalidPin(Option.SYSTEM_CLK))ExtCfg(Option.SYSTEM_CLK, EXT_NOT_CONFIG, 0);
+#if defined(PICOMITE) && defined(rp2350)
+    if(Option.LCD_CLK==Option.SYSTEM_CLK){
+        Option.LCD_MOSI=0;
+        Option.LCD_MISO=0;
+        Option.LCD_CLK=0;
+    }
+#endif
     Option.SYSTEM_MOSI=0;
     Option.SYSTEM_MISO=0;
     Option.SYSTEM_CLK=0;
 }
+#if defined(PICOMITE) && defined(rp2350)
+void MIPS16 disable_lcdspi(void){
+    if(!IsInvalidPin(Option.LCD_MOSI))ExtCurrentConfig[Option.LCD_MOSI] = EXT_DIG_IN ;   
+    if(!IsInvalidPin(Option.LCD_MISO))ExtCurrentConfig[Option.LCD_MISO] = EXT_DIG_IN ;   
+    if(!IsInvalidPin(Option.LCD_CLK))ExtCurrentConfig[Option.LCD_CLK] = EXT_DIG_IN ;   
+    if(!IsInvalidPin(Option.LCD_MOSI))ExtCfg(Option.LCD_MOSI, EXT_NOT_CONFIG, 0);
+    if(!IsInvalidPin(Option.LCD_MISO))ExtCfg(Option.LCD_MISO, EXT_NOT_CONFIG, 0);
+    if(!IsInvalidPin(Option.LCD_CLK))ExtCfg(Option.LCD_CLK, EXT_NOT_CONFIG, 0);
+    Option.LCD_MOSI=Option.SYSTEM_MOSI ? Option.SYSTEM_MOSI : 0;
+    Option.LCD_MISO=Option.SYSTEM_MISO ? Option.SYSTEM_MISO : 0;
+    Option.LCD_CLK=Option.SYSTEM_CLK ? Option.SYSTEM_CLK : 0;
+}
+#endif
 void MIPS16 disable_systemi2c(void){
     if(!IsInvalidPin(Option.SYSTEM_I2C_SCL))ExtCurrentConfig[Option.SYSTEM_I2C_SCL] = EXT_DIG_IN ;   
     if(!IsInvalidPin(Option.SYSTEM_I2C_SDA))ExtCurrentConfig[Option.SYSTEM_I2C_SDA] = EXT_DIG_IN ;   
@@ -2439,6 +2493,9 @@ void MIPS16 configure(unsigned char *p){
 #endif
 #endif
 #if defined(PICOMITE) || defined(PICOMITEWEB)
+#if defined(rp2350)
+            MMPrintString("Palm Pico");
+#endif
 #ifndef USBKEYBOARD
             MMPrintString("Game*Mite\r\n");
             MMPrintString("Pico-ResTouch-LCD-3.5\r\n");
@@ -2777,15 +2834,50 @@ OPTION PLATFORM HDMIUSB
 #endif
 #endif
 #if defined(PICOMITE) || defined(PICOMITEWEB)
+#if defined(PICOMITE) && defined(rp2350)
+       if(checkstring(p,(unsigned char *) "PALM PICO"))  {
+            ResetOptions(false);
+            Option.CPU_Speed=360000;
+            Option.ColourCode = 1;
+            Option.SYSTEM_CLK=PINMAP[6];
+            Option.SYSTEM_MOSI=PINMAP[7];
+            Option.SYSTEM_MISO=PINMAP[4];
+            Option.LCD_CLK=PINMAP[10];
+            Option.LCD_MOSI=PINMAP[11];
+            Option.LCD_MISO=PINMAP[12];
+            Option.AllPins = 1; 
+            Option.SYSTEM_I2C_SDA=PINMAP[20];
+            Option.SYSTEM_I2C_SCL=PINMAP[21];
+            Option.RTC = true;
+            Option.SerialTX=PINMAP[8];
+            Option.SerialRX=PINMAP[9];
+            Option.SerialConsole=2;
+            Option.DISPLAY_ORIENTATION=2;
+            Option.DISPLAY_TYPE=ST7796SPBUFF;
+            Option.LCD_CD=PINMAP[1];
+            Option.LCD_Reset=PINMAP[2];
+            Option.LCD_CS=PINMAP[3];
+            Option.DISPLAY_BL=PINMAP[18];
+            Option.BGR=1;
+            Option.SD_CS=PINMAP[5];
+            Option.audio_i2s_bclk=PINMAP[13];
+            Option.audio_i2s_data=PINMAP[15];
+            Option.AUDIO_SLICE=11;
+            Option.PSRAM_CS_PIN=PINMAP[0];
+            Option.LOCAL_KEYBOARD=1;
+            Option.NoHeartbeat=0;
+            Option.heartbeatpin=PINMAP[25];
+            Option.KeyboardBrightness=10;
+            Option.BackLightLevel=60;
+            Option.DISPLAY_CONSOLE = 1;
+            strcpy((char *)Option.platform,"PALM PICO");
+            SaveOptions();
+            printoptions();uSec(100000);
+            _excep_code = RESET_COMMAND;
+            SoftReset();
+       }
+#endif
 #ifndef USBKEYBOARD
-/*OPTION PLATFORM "Game*Mite"
-OPTION SYSTEM SPI GP6,GP3,GP4
-OPTION CPUSPEED 252000
-OPTION LCDPANEL ILI9341,RLANDSCAPE,GP2,GP1,GP0
-OPTION TOUCH GP5,GP7
-OPTION SDCARD GP22
-OPTION AUDIO GP20,GP21
-OPTION MODBUFF ENABLE 192 */
        if(checkstring(p,(unsigned char *) "GAMEMITE"))  {
             ResetOptions(false);
             Option.CPU_Speed=252000;
@@ -3193,6 +3285,16 @@ void MIPS16 cmd_option(void) {
         return;
     }
 #endif
+#if defined(PICOMITE) && defined(rp2350)
+    tp = checkstring(cmdline, (unsigned char *)"KEYBOARD BACKLIGHT");
+    if(tp) {
+        if(!Option.LOCAL_KEYBOARD)error("Invalid option");
+        Option.KeyboardBrightness=getint(tp,0,100);
+		setpwm(PINMAP[43], &KeyboardlightChannel, &KeyboardlightSlice, 50000.0, Option.KeyboardBrightness);
+        SaveOptions();
+        return;
+    }
+#endif
     tp = checkstring(cmdline, (unsigned char *)"PSRAM PIN");
     if(tp) {
 		if(checkstring(tp, (unsigned char *)"DISABLE")){
@@ -3230,6 +3332,17 @@ void MIPS16 cmd_option(void) {
 	}
 
 #else
+#if defined(PICOMITE) && defined(rp2350)
+    tp = checkstring(cmdline, (unsigned char *)"KEYBOARD REPEAT");
+	if(tp) {
+		getargs(&tp,3,(unsigned char *)",");
+        if(!Option.LOCAL_KEYBOARD)error("Syntax");
+		Option.RepeatStart=getint(argv[0],100,2000);
+		Option.RepeatRate=getint(argv[2],25,2000);
+		SaveOptions();
+		return;
+	}
+#endif
     tp = checkstring(cmdline, (unsigned char *)"PS2 PINS");
     if(tp==NULL)tp = checkstring(cmdline, (unsigned char *)"KEYBOARD PINS");
 	if(tp) {
@@ -3755,6 +3868,16 @@ tp = checkstring(cmdline, (unsigned char *)"HEARTBEAT");
             Option.DISPLAY_TYPE=SCREENMODE1;
             Option.DefaultFont=(2<<4) | 1 ;
         }
+        else if(checkstring(argv[0], (unsigned char *)"1024x600")){
+            Option.CPU_Speed = FreqX; 
+            Option.DISPLAY_TYPE=SCREENMODE1;
+            Option.DefaultFont=1 ;
+        }
+        else if(checkstring(argv[0], (unsigned char *)"800x480")){
+            Option.CPU_Speed = FreqY; 
+            Option.DISPLAY_TYPE=SCREENMODE1;
+            Option.DefaultFont=1 ;
+        }
 #endif      
 #ifdef rp2350
         else if(checkstring(argv[0], (unsigned char *)"800") || checkstring(argv[0], (unsigned char *)"800x600")){
@@ -3905,6 +4028,7 @@ tp = checkstring(cmdline, (unsigned char *)"HEARTBEAT");
 			return;
 		}
 		if(checkstring(tp, (unsigned char *)"OFF"))		{ Option.Refresh = 0; return; }
+        error("Syntax");
 	}
     
     tp = checkstring(cmdline, (unsigned char *)"LCDPANEL");
@@ -4446,16 +4570,69 @@ tp = checkstring(cmdline, (unsigned char *)"HEARTBEAT");
         if(ExtCurrentConfig[pin3] != EXT_NOT_CONFIG)  error("Pin %/| is in use",pin3,pin3);
 		if(!(PinDef[pin1].mode & SPI0SCK && PinDef[pin2].mode & SPI0TX  && PinDef[pin3].mode & SPI0RX  ) &&
         !(PinDef[pin1].mode & SPI1SCK && PinDef[pin2].mode & SPI1TX  && PinDef[pin3].mode & SPI1RX  ))error("Not valid SPI pins");
-        if(PinDef[pin1].mode & SPI0SCK && SPI0locked)error("SPI channel already configured for audio");
-        if(PinDef[pin1].mode & SPI1SCK && SPI1locked)error("SPI channel already configured for audio");
+        if(PinDef[pin1].mode & SPI0SCK && SPI0locked)error("SPI channel already configured");
+        if(PinDef[pin1].mode & SPI1SCK && SPI1locked)error("SPI channel already configured");
         Option.SYSTEM_CLK=pin1;
         Option.SYSTEM_MOSI=pin2;
         Option.SYSTEM_MISO=pin3;
+#if defined(PICOMITE) && defined(rp2350)
+        if(!Option.LCD_CLK){
+            Option.LCD_CLK=Option.SYSTEM_CLK;
+            Option.LCD_MOSI=Option.SYSTEM_MOSI;
+            Option.LCD_MISO=Option.SYSTEM_MISO;
+        }
+#endif
         SaveOptions();
         _excep_code = RESET_COMMAND;
         SoftReset();
         return;
     }
+#if defined(PICOMITE) && defined(rp2350)
+    tp = checkstring(cmdline, (unsigned char *)"LCD SPI");
+    if(tp) {
+        int pin1,pin2,pin3;
+        if(checkstring(tp, (unsigned char *)"DISABLE")){
+   	    if(CurrentLinePtr) error("Invalid in a program");
+         if(Option.LCD_CS )error("In use");
+            disable_lcdspi();
+            SaveOptions();
+            _excep_code = RESET_COMMAND;
+            SoftReset();
+            return;                                // this will restart the processor ? only works when not in debug
+        }
+    	getargs(&tp,5,(unsigned char *)",");
+   	    if(CurrentLinePtr) error("Invalid in a program");
+         if(argc!=5)error("Syntax");
+        if(Option.LCD_CLK && !(Option.LCD_CLK==Option.SYSTEM_CLK))error("LCD SPI already configured");
+        unsigned char code;
+        if(!(code=codecheck(argv[0])))argv[0]+=2;
+        pin1 = getinteger(argv[0]);
+        if(!code)pin1=codemap(pin1);
+        if(IsInvalidPin(pin1)) error("Invalid pin");
+        if(ExtCurrentConfig[pin1] != EXT_NOT_CONFIG)  error("Pin %/| is in use",pin1,pin1);
+        if(!(code=codecheck(argv[2])))argv[2]+=2;
+        pin2 = getinteger(argv[2]);
+        if(!code)pin2=codemap(pin2);
+        if(IsInvalidPin(pin2)) error("Invalid pin");
+        if(ExtCurrentConfig[pin2] != EXT_NOT_CONFIG)  error("Pin %/| is in use",pin2,pin2);
+        if(!(code=codecheck(argv[4])))argv[4]+=2;
+        pin3 = getinteger(argv[4]);
+        if(!code)pin3=codemap(pin3);
+        if(IsInvalidPin(pin3)) error("Invalid pin");
+        if(ExtCurrentConfig[pin3] != EXT_NOT_CONFIG)  error("Pin %/| is in use",pin3,pin3);
+		if(!(PinDef[pin1].mode & SPI0SCK && PinDef[pin2].mode & SPI0TX  && PinDef[pin3].mode & SPI0RX  ) &&
+        !(PinDef[pin1].mode & SPI1SCK && PinDef[pin2].mode & SPI1TX  && PinDef[pin3].mode & SPI1RX  ))error("Not valid SPI pins");
+        if(PinDef[pin1].mode & SPI0SCK && SPI0locked)error("SPI channel already configured");
+        if(PinDef[pin1].mode & SPI1SCK && SPI1locked)error("SPI channel already configured");
+        Option.LCD_CLK=pin1;
+        Option.LCD_MOSI=pin2;
+        Option.LCD_MISO=pin3;
+        SaveOptions();
+        _excep_code = RESET_COMMAND;
+        SoftReset();
+        return;
+    }
+#endif
 #endif
 	tp = checkstring(cmdline, (unsigned char *)"SDCARD");
     int pin1, pin2, pin3, pin4;
@@ -4775,7 +4952,7 @@ void MIPS16 fun_info(void){
         iret=boot_count;
         targ=T_INT;
     } else if(checkstring(ep, (unsigned char *)"BOOT")){
-        if(restart_reason==     0xFFFFFFFF)strcpy((char *)sret, "Restart");
+        if(restart_reason==0xFFFFFFFF)strcpy((char *)sret, "Restart");
         else if(restart_reason==0xFFFFFFFE)strcpy((char *)sret, "S/W Watchdog");
         else if(restart_reason==0xFFFFFFFD)strcpy((char *)sret, "H/W Watchdog");
         else if(restart_reason==0xFFFFFFFC)strcpy((char *)sret, "Firmware update");
@@ -5098,6 +5275,12 @@ void MIPS16 fun_info(void){
 			iret=BreakKey;
 			targ=T_INT;
 			return;
+		} else if(checkstring(tp, (unsigned char *)"AUTOREFRESH")){
+			if(Option.Refresh)strcpy((char *)sret,"ON");
+			else strcpy((char *)sret,"OFF");
+            CtoM(sret);
+            targ=T_STR;
+            return;
 		} else if(checkstring(tp, (unsigned char *)"ANGLE")){
 			if(optionangle==1.0)strcpy((char *)sret,"RADIANS");
 			else strcpy((char *)sret,"DEGREES");
@@ -5385,6 +5568,16 @@ void MIPS16 fun_info(void){
             CtoM(sret);
             targ=T_STR;
             return;
+#if defined(PICOMITE) && defined(rp2350)
+        } else if(checkstring(ep, (unsigned char *)"SCROLL")){
+            iret = ScrollStart;
+            targ=T_INT;
+            return;
+        } else if(checkstring(ep, (unsigned char *)"SCREENBUFF")){
+            iret = (int64_t)(uint32_t)ScreenBuffer;
+            targ=T_INT;
+            return;
+#endif
         } else error("Syntax");
     }
 #ifndef PICOMITEVGA

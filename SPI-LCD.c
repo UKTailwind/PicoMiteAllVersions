@@ -27,6 +27,9 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
 #include "hardware/dma.h"
+#if defined(PICOMITE) && defined(rp2350)
+#include "pico/multicore.h"
+#endif
 int CurrentSPIDevice=NONE_SPI_DEVICE;
 const struct Displays display_details[]={
 		{0,"", SDCARD_SPI_SPEED, 0, 0, 0, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
@@ -87,15 +90,22 @@ const struct Displays display_details[]={
 		{55,"VIRTUAL_M", 0, 640, 480, 0, 0, 0, 0},
 		{56,"VS1053slow", 200000, 0, 0, 0, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
 		{57,"VS1053fast", 4000000, 0, 0, 0, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
-
+#if defined(PICOMITE) && defined(rp2350)
+		{58,"ST7796SPBUFF",90000000, 320, 320, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
+		{59,"ILI9341BUFF",50000000, 320, 240, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
+		{60,"ST7796SBUFF", 90000000, 480, 320, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
+		{61,"ILI9488BUFF", 45000000, 480, 320, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
+		{62,"ILI9488PBUFF", 45000000, 320, 320, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
+		{63,"ILI9488WBUFF", 45000000, 480, 320, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
+		{64,"ST7789_320BUFF", 50000000, 320, 240, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
+#endif
 };
 void __not_in_flash_func(spi_write_fast)(spi_inst_t *spi, const uint8_t *src, size_t len) {
     // Write to TX FIFO whilst ignoring RX, then clean up afterward. When RX
     // is full, PL022 inhibits RX pushes, and sets a sticky flag on
     // push-on-full, but continues shifting. Safe if SSPIMSC_RORIM is not set.
     for (size_t i = 0; i < len; ++i) {
-        while (!spi_is_writable(spi))
-            tight_loop_contents();
+        while (!spi_is_writable(spi)) tight_loop_contents();
         spi_get_hw(spi)->dr = (uint32_t)src[i];
     }
 }
@@ -126,8 +136,13 @@ extern void I2C_Send_Data(unsigned char* data, int n);
 void I2C_Send_Command(char command);
 extern int mmI2Cvalue;												// value of MM.I2C
 void waitwhilebusy(void);
+#if defined(PICOMITE) && defined(rp2350)
+#define SPIsend(a) {uint8_t b=a;lcd_xmit_byte_multi(&b,1);}
+#define SPIqueue(a) {(Option.DISPLAY_TYPE==ILI9488  || Option.DISPLAY_TYPE == ILI9488P || Option.DISPLAY_TYPE==ILI9481IPS) ? lcd_xmit_byte_multi(a,3) : lcd_xmit_byte_multi(a,2) ;}
+#else
 #define SPIsend(a) {uint8_t b=a;xmit_byte_multi(&b,1);}
 #define SPIqueue(a) {(Option.DISPLAY_TYPE==ILI9488  || Option.DISPLAY_TYPE == ILI9488P || Option.DISPLAY_TYPE==ILI9481IPS) ? xmit_byte_multi(a,3) : xmit_byte_multi(a,2) ;}
+#endif
 #define SPIsend2(a) {SPIsend(0);SPIsend(a);}
 int PackHorizontal=0;
 int fullrefreshcount=0;
@@ -194,8 +209,28 @@ void MIPS16 ConfigDisplaySPI(unsigned char *p) {
         DISPLAY_TYPE = SSD1306SPI;
     } else if(checkstring(argv[0], (unsigned char *)"ST7920")) {
         DISPLAY_TYPE = ST7920;
+#if defined(PICOMITE) && defined(rp2350)
+    } else if(checkstring(argv[0], (unsigned char *)"ST7796SPBUFF")) {
+        DISPLAY_TYPE = ST7796SPBUFF;
+    } else if(checkstring(argv[0], (unsigned char *)"ST7796SBUFF")) {
+        DISPLAY_TYPE = ST7796SBUFF;
+    } else if(checkstring(argv[0], (unsigned char *)"ILI9341BUFF")) {
+        DISPLAY_TYPE = ILI9341BUFF;
+    } else if(checkstring(argv[0], (unsigned char *)"ILI9488BUFF")) {
+        DISPLAY_TYPE = ILI9488BUFF;
+    } else if(checkstring(argv[0], (unsigned char *)"ILI9488PBUFF")) {
+        DISPLAY_TYPE = ILI9488PBUFF;
+    } else if(checkstring(argv[0], (unsigned char *)"ILI9488WBUFF")) {
+        DISPLAY_TYPE = ILI9488WBUFF;
+    } else if(checkstring(argv[0], (unsigned char *)"ST7789_320BUFF")) {
+        DISPLAY_TYPE = ST7789C;
+#endif
 	} else return;
+#if defined(PICOMITE) && defined(rp2350)
+	if(!(Option.SYSTEM_CLK || Option.LCD_CLK))error("SPI not configured");
+#else
 	if(!Option.SYSTEM_CLK)error("System SPI not configured");
+#endif
     if(!(argc == 7 || argc == 9 || argc==11 || argc==13)) error("Argument count");
 	if(*argv[2]){
 		if(checkstring(argv[2], (unsigned char *)"L") || checkstring(argv[2], (unsigned char *)"LANDSCAPE"))
@@ -208,6 +243,9 @@ void MIPS16 ConfigDisplaySPI(unsigned char *p) {
 			orientation = RPORTRAIT;
 		else error("Orientation");
 	}
+#if defined(PICOMITE) && defined(rp2350)
+	if(DISPLAY_TYPE>=NEXTGEN && Option.LCD_CLK==Option.SYSTEM_CLK)error("Buffered drivers need a dedicated SPI channel");
+#endif
 	Option.DISPLAY_ORIENTATION=orientation;
     if(DISPLAY_TYPE==ST7789 || DISPLAY_TYPE == ST7789A|| DISPLAY_TYPE == ST7789A)Option.DISPLAY_ORIENTATION=(Option.DISPLAY_ORIENTATION+2) % 4;
 	if(!(code=codecheck(argv[4])))argv[4]+=2;
@@ -254,14 +292,37 @@ void MIPS16 ConfigDisplaySPI(unsigned char *p) {
 // initialise the display controller
 // this is used in the initial boot sequence of the Micromite
 void MIPS16 InitDisplaySPI(int InitOnly) {
+#if defined(PICOMITE) && defined(rp2350)
+    if(Option.DISPLAY_TYPE==0 || (Option.DISPLAY_TYPE >= DISP_USER && Option.DISPLAY_TYPE<NEXTGEN)  || Option.DISPLAY_TYPE <= I2C_PANEL) return;
+#else
     if(Option.DISPLAY_TYPE==0 || Option.DISPLAY_TYPE >= DISP_USER || Option.DISPLAY_TYPE <= I2C_PANEL) return;
+#endif
     DisplayHRes = display_details[Option.DISPLAY_TYPE].horizontal;
     DisplayVRes = display_details[Option.DISPLAY_TYPE].vertical;
-
     if(!InitOnly) {
 //        SPI2on();
         // open the SPI port and reserve the I/O pins
-
+#if defined(PICOMITE) && defined(rp2350)
+		if(Option.SYSTEM_CLK!=Option.LCD_CLK){ //configure the LCD SPI pins
+			gpio_set_function(LCD_CLK_PIN, GPIO_FUNC_SPI);
+			gpio_set_function(LCD_MOSI_PIN, GPIO_FUNC_SPI);
+			gpio_set_function(LCD_MISO_PIN, GPIO_FUNC_SPI);
+			gpio_set_drive_strength(LCD_MOSI_PIN,GPIO_DRIVE_STRENGTH_8MA);
+			gpio_set_drive_strength(LCD_CLK_PIN,GPIO_DRIVE_STRENGTH_8MA);
+			gpio_set_input_hysteresis_enabled(LCD_MISO_PIN,true);
+			if(PinDef[Option.LCD_CLK].mode & SPI0SCK){
+				spi_init(spi0, display_details[Option.DISPLAY_TYPE].speed);
+				spi_set_format(spi0, 8, display_details[Option.DISPLAY_TYPE].CPOL,display_details[Option.DISPLAY_TYPE].CPHASE, SPI_MSB_FIRST);
+				lcd_xmit_byte_multi=HW0SendSPI;
+				lcd_rcvr_byte_multi=HW0ReadSPI;
+			} else {
+				spi_init(spi1, display_details[Option.DISPLAY_TYPE].speed);
+				spi_set_format(spi1, 8, display_details[Option.DISPLAY_TYPE].CPOL,display_details[Option.DISPLAY_TYPE].CPHASE, SPI_MSB_FIRST);
+				lcd_xmit_byte_multi=HW1SendSPI;
+				lcd_rcvr_byte_multi=HW1ReadSPI;
+			}
+		}
+#endif
         // setup the pointers to the drawing primitives
         if(Option.DISPLAY_TYPE>I2C_PANEL && Option.DISPLAY_TYPE < BufferedPanel){
 			if(Option.DISPLAY_ORIENTATION==PORTRAIT){
@@ -287,6 +348,16 @@ void MIPS16 InitDisplaySPI(int InitOnly) {
 					ScrollLCD = ScrollLCDSPI;
 				}
 			}
+#if defined(PICOMITE) && defined(rp2350)
+		} else if(Option.DISPLAY_TYPE>=NEXTGEN){
+            DrawRectangle = DrawRectangleMEM332;
+            DrawBitmap = DrawBitmapMEM332;
+        	DrawBuffer = DrawBufferMEM332;
+			ReadBuffer = ReadBufferMEM332;
+        	DrawBLITBuffer = DrawBlitBufferMEM332;
+			ReadBLITBuffer = ReadBlitBufferMEM332;
+			ScrollLCD = ScrollLCDMEM332;
+#endif
 		} else {
             DrawRectangle = DrawRectangleMEM;
             DrawBitmap = DrawBitmapMEM;
@@ -302,6 +373,10 @@ void MIPS16 InitDisplaySPI(int InitOnly) {
     switch(Option.DISPLAY_TYPE) {
 		case ST7796S:
 		case ST7796SP:
+#if defined(PICOMITE) && defined(rp2350)
+		case ST7796SPBUFF:
+		case ST7796SBUFF:
+#endif
 		ResetController();
 		spi_write_cd(0xC5, 1, 0x1C);             //VCOM  Control 1 [1C]
 		spi_write_cd(0x3A, 1, 0x55);              //565
@@ -323,7 +398,11 @@ void MIPS16 InitDisplaySPI(int InitOnly) {
 			case RLANDSCAPE:    spi_write_cd(ILI9341_MEMCONTROL,1,ILI9341_Landscape180); break;
 			case RPORTRAIT:     spi_write_cd(ILI9341_MEMCONTROL,1,ILI9341_Portrait180); break;
 		}
+#if defined(PICOMITE) && defined(rp2350)
+		if(Option.DISPLAY_TYPE==ST7796SP || Option.DISPLAY_TYPE==ST7796SPBUFF){
+#else
 		if(Option.DISPLAY_TYPE==ST7796SP){
+#endif
 			spi_write_cd(0x33,6,0x00,0x00,0x01,0x40,0x00,0xA0);
 		} else {
 			spi_write_cd(0x33,6,0x00,0x00,0x01,0xE0,0x00,0x00);
@@ -336,8 +415,16 @@ void MIPS16 InitDisplaySPI(int InitOnly) {
 		case ILI9488:
 		case ILI9488P:
 		case ILI9488W:
+#if defined(PICOMITE) && defined(rp2350)
+		case ILI9488PBUFF:
+		case ILI9488BUFF:
+		case ILI9488WBUFF:
+			ResetController();
+			if(Option.DISPLAY_TYPE==ILI9488 || Option.DISPLAY_TYPE==ILI9488P || Option.DISPLAY_TYPE==ILI9488PBUFF || Option.DISPLAY_TYPE==ILI9488BUFF){
+#else
 			ResetController();
 			if(Option.DISPLAY_TYPE==ILI9488 || Option.DISPLAY_TYPE==ILI9488P){
+#endif
 				spi_write_command(0xE0); // Positive Gamma Control
 				spi_write_data(0x00);
 				spi_write_data(0x03);
@@ -415,7 +502,11 @@ void MIPS16 InitDisplaySPI(int InitOnly) {
 
 				spi_write_command(TFT_SLPOUT); //Exit Sleep
 				uSec(120000);
+#if defined(PICOMITE) && defined(rp2350)
+				if(Option.DISPLAY_TYPE==ILI9488P || Option.DISPLAY_TYPE==ILI9488PBUFF){
+#else
 				if(Option.DISPLAY_TYPE==ILI9488P){
+#endif
 					spi_write_command(0x33);
 					spi_write_data(0x00);
 					spi_write_data(0x00);
@@ -659,6 +750,9 @@ void MIPS16 InitDisplaySPI(int InitOnly) {
         	spi_write_command(SSD1331_CMD_DISPLAYON);	//--turn on oled panel
     		break;
     case ILI9341:
+#if defined(PICOMITE) && defined(rp2350)
+	case ILI9341BUFF:
+#endif
             ResetController();
             spi_write_command(ILI9341_SOFTRESET);                           //software reset
             uSec(20000);
@@ -820,6 +914,9 @@ void MIPS16 InitDisplaySPI(int InitOnly) {
         case ST7789:
 		case ST7789A:
 		case ST7789B:
+#if defined(PICOMITE) && defined(rp2350)
+		case ST7789C:
+#endif
             ResetController();
             spi_write_command(ST77XX_SWRESET);    uSec(150000);
             spi_write_command(ST77XX_SLPOUT);    uSec(500000);
@@ -930,7 +1027,11 @@ void SetCS(void) {
 void spi_write_data(unsigned char data){
     gpio_put(LCD_CD_PIN,GPIO_PIN_SET);
     SetCS();
+#if defined(PICOMITE) && defined(rp2350)
+    if(Option.DISPLAY_TYPE == ILI9481 || Option.DISPLAY_TYPE == ILI9488W || Option.DISPLAY_TYPE == ILI9488WBUFF)	{SPIsend2(data);}
+#else
     if(Option.DISPLAY_TYPE == ILI9481 || Option.DISPLAY_TYPE == ILI9488W)	{SPIsend2(data);}
+#endif
     else {SPIsend(data);}
      ClearCS(Option.LCD_CS);
 }
@@ -939,7 +1040,11 @@ void spi_write_data(unsigned char data){
 void spi_write_command(unsigned char data){
     gpio_put(LCD_CD_PIN,GPIO_PIN_RESET);
     SetCS();
+#if defined(PICOMITE) && defined(rp2350)
+    if(Option.DISPLAY_TYPE == ILI9481 || Option.DISPLAY_TYPE == ILI9488W || Option.DISPLAY_TYPE == ILI9488WBUFF)	{SPIsend2(data);}
+#else
     if(Option.DISPLAY_TYPE == ILI9481 || Option.DISPLAY_TYPE == ILI9488W)	{SPIsend2(data);}
+#endif
     else {SPIsend(data);}
     ClearCS(Option.LCD_CS);
 }
@@ -949,7 +1054,11 @@ void ST7920command(unsigned char data){
 	a[1]=data & 0xF0;
 	a[2]=((data & 0x0F)<<4) & 0xF0;
     SetCS();
+#if defined(PICOMITE) && defined(rp2350)
+	lcd_xmit_byte_multi(a,3);
+#else
 	xmit_byte_multi(a,3);
+#endif
 	ClearCS(Option.LCD_CD);
 }
 
@@ -983,7 +1092,11 @@ void MIPS16 ResetController(void){
 
 void DefineRegionSPI(int xstart, int ystart, int xend, int yend, int rw) {
 	unsigned char coord[4];
+#if defined(PICOMITE) && defined(rp2350)
+    if(Option.DISPLAY_TYPE == ILI9481 || Option.DISPLAY_TYPE == ILI9488W || Option.DISPLAY_TYPE == ILI9488WBUFF){
+#else
     if(Option.DISPLAY_TYPE == ILI9481 || Option.DISPLAY_TYPE == ILI9488W){
+#endif
 		SetCS();
     	gpio_put(LCD_CD_PIN,GPIO_PIN_RESET);
     	SPIsend2(ILI9341_COLADDRSET);
@@ -1113,7 +1226,11 @@ void DefineRegionSPI(int xstart, int ystart, int xend, int yend, int rw) {
 		coord[1]=xstart;
 		coord[2]=xend >> 8;
 		coord[3]=xend;
+#if defined(PICOMITE) && defined(rp2350)
+		lcd_xmit_byte_multi(coord,4);//		HAL_SPI_Transmit(&hspi3,coord,4,500);
+#else
 		xmit_byte_multi(coord,4);//		HAL_SPI_Transmit(&hspi3,coord,4,500);
+#endif
     	gpio_put(LCD_CD_PIN,GPIO_PIN_RESET);
 		SPIsend(ILI9341_PAGEADDRSET);
     	gpio_put(LCD_CD_PIN,GPIO_PIN_SET);
@@ -1121,7 +1238,11 @@ void DefineRegionSPI(int xstart, int ystart, int xend, int yend, int rw) {
 		coord[1]=ystart;
 		coord[2]=yend >> 8;
 		coord[3]=yend;
+#if defined(PICOMITE) && defined(rp2350)
+		lcd_xmit_byte_multi(coord,4);//		HAL_SPI_Transmit(&hspi3,coord,4,500);
+#else
 		xmit_byte_multi(coord,4);//		HAL_SPI_Transmit(&hspi3,coord,4,500);
+#endif
     	gpio_put(LCD_CD_PIN,GPIO_PIN_RESET);
 		if(rw) {
 			SPIsend(ILI9341_MEMORYWRITE);
@@ -1141,7 +1262,11 @@ void DefineRegionSPI(int xstart, int ystart, int xend, int yend, int rw) {
  ****************************************************************************************************
 ****************************************************************************************************/
 void spisendfast(unsigned char *n, int i){
+#if defined(PICOMITE) && defined(rp2350)
+		lcd_xmit_byte_multi(n,i);//		HAL_SPI_Transmit(&hspi3,coord,4,500);
+#else
 		xmit_byte_multi(n,i);//		HAL_SPI_Transmit(&hspi3,coord,4,500);
+#endif
 }
 // Draw a filled rectangle
 // this is the basic drawing promitive used by most drawing routines
@@ -1193,7 +1318,11 @@ void DrawRectangleSPI(int x1, int y1, int x2, int y2, int c){
 			col[2]=(c & 0xFC);
 			for(t=0;t<i;t+=3){p[t]=col[0];p[t+1]=col[1];p[t+2]=col[2];}
 			for(y=y1;y<=y2;y++){
+#if defined(PICOMITE) && defined(rp2350)
+				if(PinDef[Option.LCD_CLK].mode & SPI0SCK)spi_write_fast(spi0,p,i);
+#else
 				if(PinDef[Option.SYSTEM_CLK].mode & SPI0SCK)spi_write_fast(spi0,p,i);
+#endif
 				else spi_write_fast(spi1,p,i);
 			}
 		} else {
@@ -1207,7 +1336,11 @@ void DrawRectangleSPI(int x1, int y1, int x2, int y2, int c){
 				col[1]=~col[1];
 			}
 			for(t=0;t<i;t+=2){p[t]=col[0];p[t+1]=col[1];}
+#if defined(PICOMITE) && defined(rp2350)
+			if(PinDef[Option.LCD_CLK].mode & SPI0SCK){
+#else
 			if(PinDef[Option.SYSTEM_CLK].mode & SPI0SCK){
+#endif
 				for(t=y1;t<=y2;t++){
 					spi_write_fast(spi0,p,i);
 				} 
@@ -1218,7 +1351,11 @@ void DrawRectangleSPI(int x1, int y1, int x2, int y2, int c){
 			}
 		}
 	}
+#if defined(PICOMITE) && defined(rp2350)
+	if(PinDef[Option.LCD_CLK].mode & SPI0SCK)spi_finish(spi0);
+#else
 	if(PinDef[Option.SYSTEM_CLK].mode & SPI0SCK)spi_finish(spi0);
+#endif
 	else spi_finish(spi1);
 	ClearCS(Option.LCD_CS);                                       //set CS high
 }
@@ -1236,7 +1373,11 @@ void PhysicalDrawRectSPI(int x1, int y1, int x2, int y2, int c){
 		col[2]=(c & 0xFC);
 		for(t=0;t<i;t+=3){p[t]=col[0];p[t+1]=col[1];p[t+2]=col[2];}
 		for(y=y1;y<=y2;y++){
+#if defined(PICOMITE) && defined(rp2350)
+			if(PinDef[Option.LCD_CLK].mode & SPI0SCK)spi_write_fast(spi0,p,i);
+#else
 			if(PinDef[Option.SYSTEM_CLK].mode & SPI0SCK)spi_write_fast(spi0,p,i);
+#endif
 			else spi_write_fast(spi1,p,i);
 		}
 	} else {
@@ -1250,7 +1391,11 @@ void PhysicalDrawRectSPI(int x1, int y1, int x2, int y2, int c){
 			col[1]=~col[1];
 		}
 		for(t=0;t<i;t+=2){p[t]=col[0];p[t+1]=col[1];}
+#if defined(PICOMITE) && defined(rp2350)
+		if(PinDef[Option.LCD_CLK].mode & SPI0SCK){
+#else
 		if(PinDef[Option.SYSTEM_CLK].mode & SPI0SCK){
+#endif
 			for(t=y1;t<=y2;t++){
 				spi_write_fast(spi0,p,i);
 			} 
@@ -1261,7 +1406,11 @@ void PhysicalDrawRectSPI(int x1, int y1, int x2, int y2, int c){
 		}
 	}
 
+#if defined(PICOMITE) && defined(rp2350)
+	if(PinDef[Option.LCD_CLK].mode & SPI0SCK)spi_finish(spi0);
+#else
 	if(PinDef[Option.SYSTEM_CLK].mode & SPI0SCK)spi_finish(spi0);
+#endif
 	else spi_finish(spi1);
 	ClearCS(Option.LCD_CS);                                       //set CS high
 
@@ -1500,9 +1649,15 @@ void ReadBufferSPI(int x1, int y1, int x2, int y2, unsigned char* p) {
     if(Option.DISPLAY_TYPE==ILI9341 || Option.DISPLAY_TYPE==ST7789B )spi_write_cd(ILI9341_PIXELFORMAT,1,0x66); //change to RGB666 for read
     DefineRegionSPI(x1, y1, x2, y2, 0);
 	SPISpeedSet( (Option.DISPLAY_TYPE==ILI9488  || Option.DISPLAY_TYPE == ILI9488P || Option.DISPLAY_TYPE==ST7789B || Option.DISPLAY_TYPE==ILI9481IPS) ? ST7789RSpeed : SPIReadSpeed); //need to slow SPI for read on this display
+#if defined(PICOMITE) && defined(rp2350)
+	lcd_rcvr_byte_multi((uint8_t *)p, 1);
+    r=0;
+	lcd_rcvr_byte_multi((uint8_t *)p,N);
+#else
 	rcvr_byte_multi((uint8_t *)p, 1);
     r=0;
 	rcvr_byte_multi((uint8_t *)p,N);
+#endif
 	gpio_put(LCD_CD_PIN,GPIO_PIN_RESET);
     ClearCS(Option.LCD_CS);                  //set CS high
 	SPISpeedSet(Option.DISPLAY_TYPE);
@@ -1555,9 +1710,15 @@ void ReadBufferSPISCR(int x1, int y1, int x2, int y2, unsigned char* p) {
 		N=(x2- x1+1) * (y2- VRes) * ((Option.DISPLAY_TYPE==ST7796S  || Option.DISPLAY_TYPE == ST7796SP) ? 2 : 3);
 		DefineRegionSPI(x1, y1, x2, VRes - 1,0);
 		SPISpeedSet( (Option.DISPLAY_TYPE==ILI9488  || Option.DISPLAY_TYPE == ILI9488P || Option.DISPLAY_TYPE==ST7789B || Option.DISPLAY_TYPE==ILI9481IPS) ? ST7789RSpeed : SPIReadSpeed); //need to slow SPI for read on this display
+#if defined(PICOMITE) && defined(rp2350)
+		lcd_rcvr_byte_multi((uint8_t *)p, 1);
+		r=0;
+		lcd_rcvr_byte_multi((uint8_t *)p,N);
+#else
 		rcvr_byte_multi((uint8_t *)p, 1);
 		r=0;
 		rcvr_byte_multi((uint8_t *)p,N);
+#endif
 		gpio_put(LCD_CD_PIN,GPIO_PIN_RESET);
 		ClearCS(Option.LCD_CS);                  //set CS high
 		SPISpeedSet(Option.DISPLAY_TYPE);
@@ -1565,9 +1726,15 @@ void ReadBufferSPISCR(int x1, int y1, int x2, int y2, unsigned char* p) {
 		N=(x2- x1+1) * (y2 - VRes) * ((Option.DISPLAY_TYPE==ST7796S  || Option.DISPLAY_TYPE == ST7796SP) ? 2 : 3);
 		DefineRegionSPI(x1, 0, x2, y2 - VRes,0);
 		SPISpeedSet( (Option.DISPLAY_TYPE==ILI9488  || Option.DISPLAY_TYPE == ILI9488P || Option.DISPLAY_TYPE==ST7789B || Option.DISPLAY_TYPE==ILI9481IPS) ? ST7789RSpeed : SPIReadSpeed); //need to slow SPI for read on this display
+#if defined(PICOMITE) && defined(rp2350)
+		lcd_rcvr_byte_multi((uint8_t *)p, 1);
+		r=0;
+		lcd_rcvr_byte_multi((uint8_t *)p,N);
+#else
 		rcvr_byte_multi((uint8_t *)p, 1);
 		r=0;
 		rcvr_byte_multi((uint8_t *)p,N);
+#endif
 		gpio_put(LCD_CD_PIN,GPIO_PIN_RESET);
 		ClearCS(Option.LCD_CS);                  //set CS high
 		SPISpeedSet(Option.DISPLAY_TYPE);
@@ -1576,9 +1743,15 @@ void ReadBufferSPISCR(int x1, int y1, int x2, int y2, unsigned char* p) {
 		N=(x2- x1+1) * (y2- y1+1) * ((Option.DISPLAY_TYPE==ST7796S  || Option.DISPLAY_TYPE == ST7796SP) ? 2 : 3);
 		DefineRegionSPI(x1, y1, x2, y2, 0);
 		SPISpeedSet( (Option.DISPLAY_TYPE==ILI9488  || Option.DISPLAY_TYPE == ILI9488P || Option.DISPLAY_TYPE==ST7789B || Option.DISPLAY_TYPE==ILI9481IPS) ? ST7789RSpeed : SPIReadSpeed); //need to slow SPI for read on this display
+#if defined(PICOMITE) && defined(rp2350)
+		lcd_rcvr_byte_multi((uint8_t *)p, 1);
+		r=0;
+		lcd_rcvr_byte_multi((uint8_t *)p,N);
+#else
 		rcvr_byte_multi((uint8_t *)p, 1);
 		r=0;
 		rcvr_byte_multi((uint8_t *)p,N);
+#endif
 		gpio_put(LCD_CD_PIN,GPIO_PIN_RESET);
 		ClearCS(Option.LCD_CS);                  //set CS high
 		SPISpeedSet(Option.DISPLAY_TYPE);
@@ -1761,9 +1934,9 @@ void ScrollLCDSPISCR(int lines){
 //        DrawRectangle(0, 0, HRes - 1, linesave - 1, gui_bcolour); // erase the line introduced at the top
     }
     spi_write_command(CMD_SET_SCROLL_START);
-    spi_write_data(t >> 8);
-    spi_write_data(t);
-    ScrollStart = t;
+	spi_write_data(t >> 8);
+	spi_write_data(t);
+	ScrollStart = t;
 }
 void ScrollLCDSPI(int lines){
     if(lines==0)return;
@@ -1784,7 +1957,77 @@ void ScrollLCDSPI(int lines){
     }
     FreeMemory(buff);
 }
+#if defined(PICOMITE) && defined(rp2350)
+void ScrollLCDMEM332(int lines){
+    if(lines==0)return;
+	if(Option.DISPLAY_ORIENTATION==PORTRAIT){
+		int t = ScrollStart;
+		if(lines >= 0) {
+			DrawRectangle(0, 0, HRes - 1, lines - 1, gui_bcolour); // erase the line to be scrolled off
+			multicore_fifo_push_blocking(6);
+			multicore_fifo_push_blocking((uint32_t)low_x | (high_x<<16));
+			multicore_fifo_push_blocking((uint32_t)low_y | (high_y<<16));
+			low_x=silly_low; high_y=silly_high; low_y=silly_low; high_x=silly_high;
+			while(lines--) {
+				if(++t >= VRes) t = 0;
+			}
+		} else {
+			while(lines++) {
+				if(--t < 0) t = VRes - 1;
+			}
+		}
+		multicore_fifo_push_blocking(7);
+		multicore_fifo_push_blocking(t);
+        DrawRectangle(0, VRes-lines, HRes - 1, VRes - 1, gui_bcolour); // erase the lines to be scrolled off
+		ScrollStart = t;
+	} else {
+		unsigned char *screen=(unsigned char *)(ScreenBuffer);
+		if(lines >= 0) {
+			DrawRectangle(0, 0, HRes - 1, lines - 1, gui_bcolour); // erase the line to be scrolled off
+			unsigned char *p=screen+lines*HRes;
+			memmove(screen,p,(VRes-lines)*HRes);
+        	DrawRectangle(0, VRes-lines, HRes - 1, VRes - 1, gui_bcolour); // erase the lines to be scrolled off
+		} else {
+			lines=-lines;
+			unsigned char *p=screen+lines*HRes;
+			memmove(p,screen,(VRes-lines)*HRes);
+        	DrawRectangle(0, 0, HRes - 1, lines - 1, gui_bcolour); // erase the lines introduced at the top
+		}
+	}
+}
 
+void DrawBufferMEM332(int x1, int y1, int x2, int y2, unsigned char* p) {
+    int x,y; 
+    union colourmap
+    {
+    char rgbbytes[4];
+    unsigned int rgb;
+    } c;
+    for(y=y1;y<=y2;y++){
+    	for(x=x1;x<=x2;x++){
+			c.rgbbytes[0]=*p++; //this order swaps the bytes to match the .BMP file
+			c.rgbbytes[1]=*p++;
+			c.rgbbytes[2]=*p++;
+			c.rgbbytes[3]=0;
+			DrawPixel(x,y,c.rgb);
+		}
+	}
+}
+
+void DrawBlitBufferMEM332(int x1, int y1, int x2, int y2, unsigned char* p) {
+	unsigned char *screen=(unsigned char *)(ScreenBuffer);
+    for(int y=y1;y<=y2;y++){
+		unsigned char *buff=screen+(y+ScrollStart<VRes? y+ScrollStart : y+ScrollStart-VRes)*HRes;
+		for(int x=x1;x<=x2;x++){
+			buff[x]=*p++;
+		}
+	}
+    if(y1<low_y)low_y=y1;
+    if(y2>high_y)high_y=y2;
+    if(x1<low_x)low_x=x1;
+    if(x2>high_x)high_x=x2;
+}
+#endif
 void DrawBufferMEM(int x1, int y1, int x2, int y2, unsigned char* p) {
     int x,y; 
     union colourmap
@@ -1805,6 +2048,63 @@ void DrawBufferMEM(int x1, int y1, int x2, int y2, unsigned char* p) {
 		}
 	}
 }
+#if defined(PICOMITE) && defined(rp2350)
+void ReadBufferMEM332(int x1, int y1, int x2, int y2, unsigned char* buff) {
+	unsigned char *screen=(unsigned char *)(ScreenBuffer);
+    int x,y,t;
+    if(x1 < 0) x1 = 0;
+    if(x1 >= HRes) x1 = HRes - 1;
+    if(x2 < 0) x2 = 0;
+    if(x2 >= HRes) x2 = HRes - 1;
+    if(y1 < 0) y1 = 0;
+    if(y1 >= VRes) y1 = VRes - 1;
+    if(y2 < 0) y2 = 0;
+    if(y2 >= VRes) y2 = VRes - 1;
+    if(x2 <= x1) { t = x1; x1 = x2; x2 = t; }
+    if(y2 <= y1) { t = y1; y1 = y2; y2 = t; }
+    if(x2 <= x1) { t = x1; x1 = x2; x2 = t; }
+    if(y2 <= y1) { t = y1; y1 = y2; y2 = t; }
+    if(y1<low_y)low_y=y1;
+    if(y2>high_y)high_y=y2;
+    if(x1<low_x)low_x=x1;
+    if(x2>high_x)high_x=x2;
+    for(y=y1;y<=y2;y++){
+		unsigned char *p=screen+(y+ScrollStart<VRes? y+ScrollStart : y+ScrollStart-VRes)*HRes;
+    	for(x=x1;x<=x2;x++){
+			*buff++=((p[x] & 3)<<6);
+			*buff++=((p[x] & 0b11100)<<3);
+			*buff++=(p[x] & 0b11100000);
+       	}
+    }
+}
+
+void ReadBlitBufferMEM332(int x1, int y1, int x2, int y2, unsigned char* buff) {
+	unsigned char *screen=(unsigned char *)(ScreenBuffer);
+	int t;
+    if(x1 < 0) x1 = 0;
+    if(x1 >= HRes) x1 = HRes - 1;
+    if(x2 < 0) x2 = 0;
+    if(x2 >= HRes) x2 = HRes - 1;
+    if(y1 < 0) y1 = 0;
+    if(y1 >= VRes) y1 = VRes - 1;
+    if(y2 < 0) y2 = 0;
+    if(y2 >= VRes) y2 = VRes - 1;
+    if(x2 <= x1) { t = x1; x1 = x2; x2 = t; }
+    if(y2 <= y1) { t = y1; y1 = y2; y2 = t; }
+    if(x2 <= x1) { t = x1; x1 = x2; x2 = t; }
+    if(y2 <= y1) { t = y1; y1 = y2; y2 = t; }
+    if(y1<low_y)low_y=y1;
+    if(y2>high_y)high_y=y2;
+    if(x1<low_x)low_x=x1;
+    if(x2>high_x)high_x=x2;
+    for(int y=y1;y<=y2;y++){
+		unsigned char *p=screen+(y+ScrollStart<VRes? y+ScrollStart : y+ScrollStart-VRes)*HRes;
+	    for(int x=x1;x<=x2;x++){
+			*buff++=p[x];
+		}
+	}
+}
+#endif
 void ReadBufferMEM(int x1, int y1, int x2, int y2, unsigned char* buff) {
     unsigned char* p=(void *)((unsigned int)LCDBuffer);
     int x,y,loc,t;
@@ -1869,7 +2169,6 @@ void ReadBufferMEM(int x1, int y1, int x2, int y2, unsigned char* buff) {
        	}
     }
 }
-
 void DrawRectangleMEM(int x1, int y1, int x2, int y2, int c){
     unsigned char* p=(void *)((unsigned int)LCDBuffer);
     int x,y,loc,t;
@@ -1933,6 +2232,63 @@ void DrawRectangleMEM(int x1, int y1, int x2, int y2, int c){
 void DrawPixelMEM(int x1,int y1, int c){
 	DrawRectangleMEM(x1,y1,x1,y1,c);
 }
+#if defined(PICOMITE) && defined(rp2350)
+void DrawRectangleMEM332(int x1, int y1, int x2, int y2, int c){
+	int t;
+	unsigned char *screen=(unsigned char *)(ScreenBuffer);
+	unsigned char colour=RGB332(c);
+	if(x2 <= x1) { t = x1; x1 = x2; x2 = t; }
+	if(y2 <= y1) { t = y1; y1 = y2; y2 = t; }
+	if(x1 < 0) x1 = 0;
+	if(x1 >= HRes) x1 = HRes - 1;
+	if(x2 < 0) x2 = 0;
+	if(x2 >= HRes) x2 = HRes - 1;
+	if(y1 < 0) y1 = 0;
+	if(y1 >= VRes) y1 = VRes - 1;
+	if(y2 < 0) y2 = 0;
+	if(y2 >= VRes) y2 = VRes - 1;
+    if(y1<low_y)low_y=y1;
+    if(y2>high_y)high_y=y2;
+    if(x1<low_x)low_x=x1;
+    if(x2>high_x)high_x=x2;
+    for(int y=y1;y<=y2;y++){
+		unsigned char *p=screen+(y+ScrollStart<VRes? y+ScrollStart : y+ScrollStart-VRes)*HRes;
+		p+=x1;
+		memset(p,colour,x2-x1+1);
+    }
+}
+void DrawBitmapMEM332(int x1, int y1, int width, int height, int scale, int fc, int bc, unsigned char *bitmap){
+    int i, j, k, m, x, y;
+	unsigned char f=RGB332(fc);
+	unsigned char b=RGB332(bc);
+	unsigned char *screen=(unsigned char *)(ScreenBuffer);
+    if(x1>=HRes || y1>=VRes || x1+width*scale<0 || y1+height*scale<0)return;
+    for(i = 0; i < height; i++) {                                   // step thru the font scan line by line
+        for(j = 0; j < scale; j++) {                                // repeat lines to scale the font
+            for(k = 0; k < width; k++) {                            // step through each bit in a scan line
+                for(m = 0; m < scale; m++) {                        // repeat pixels to scale in the x axis
+                    x=x1 + k * scale + m ;
+                    y=y1 + i * scale + j ;
+                    if(y<low_y)low_y=y;
+                    if(y>high_y)high_y=y;
+                    if(x<low_x)low_x=x;
+                    if(x>high_x)high_x=x;
+					unsigned char *p=screen+(y+ScrollStart<VRes? y+ScrollStart : y+ScrollStart-VRes)*HRes+x;
+                    if(x >= 0 && x < HRes && y >= 0 && y < VRes) {  // if the coordinates are valid
+                        if((bitmap[((i * width) + k)/8] >> (((height * width) - ((i * width) + k) - 1) %8)) & 1) {
+							*p=f;
+                        } else {
+                            if(bc>=0){
+                                *p=b;
+                            } 
+                        }
+                   }
+                }
+            }
+        }
+    }
+}
+#endif
 void DrawBitmapMEM(int x1, int y1, int width, int height, int scale, int fc, int bc, unsigned char *bitmap){
     int i, j, k, m, x, y,t, loc;
     unsigned char omask, amask;
@@ -2023,16 +2379,112 @@ void ST7920SetXY(int x, int y){
 	a[3]=0x80;
 	a[4]=xx<<4;
     SetCS();
+#if defined(PICOMITE) && defined(rp2350)
+	lcd_xmit_byte_multi(a,5);
+#else
 	xmit_byte_multi(a,5);
-//	HAL_SPI_Transmit(&hspi3,a,5,500);
+#endif
 	uSec(50);
 	ClearCS(Option.LCD_CD);
 }
+#if defined(PICOMITE) && defined(rp2350)
+extern uint16_t __not_in_flash_func(RGB565)(uint32_t c);
+static uint32_t RGB332_LUT[256]={0};
+static uint8_t tlen=2;
+void init_RGB332_to_RGB565_LUT(void) {
+    for (int i = 0; i < 256; i++) {
+        uint8_t r = (i >> 5) & 0x07;   // 3-bit red
+        uint8_t g = (i >> 2) & 0x07;   // 3-bit green
+        uint8_t b = i & 0x03;          // 2-bit blue
 
+        // Stretch components via perceptual LUTs
+        static const uint8_t RED_LUT[8]   = { 0, 4, 8, 12, 16, 20, 26, 31 };
+        static const uint8_t GREEN_LUT[8] = { 0, 9, 18, 27, 36, 45, 54, 63 };
+        static const uint8_t BLUE_LUT[4]  = { 0, 10, 21, 31 };
+
+        uint8_t r5 = RED_LUT[r];
+        uint8_t g6 = GREEN_LUT[g];
+        uint8_t b5 = BLUE_LUT[b];
+
+        // Your bit order mapping:
+        RGB332_LUT[i] = RGB565(r5<<19 | g6<<10 | b5<<3);
+    }
+}
+
+void init_RGB332_to_RGB888_LUT() {
+    for (int i = 0; i < 256; ++i) {
+        uint8_t r = (i >> 5) & 0x07; // 3 bits
+        uint8_t g = (i >> 2) & 0x07; // 3 bits
+        uint8_t b = i & 0x03;        // 2 bits
+
+        uint8_t r8 = (r << 5) | (r << 2) | (r >> 1);  // scale to 8 bits
+        uint8_t g8 = (g << 5) | (g << 2) | (g >> 1);  // scale to 8 bits
+        uint8_t b8 = (b << 6) | (b << 4) | (b << 2) | b; // scale to 8 bits
+
+        RGB332_LUT[i] = (b8 << 16) | (g8 << 8) | r8;
+    }
+	tlen=3;
+}
+void copybuffertoscreen(unsigned char *s,int low_x,int low_y,int high_x,int high_y){
+	if(RGB332_LUT[255]==0){
+		if(Option.DISPLAY_TYPE==ILI9488BUFF  || Option.DISPLAY_TYPE == ILI9488PBUFF)init_RGB332_to_RGB888_LUT();
+		else init_RGB332_to_RGB565_LUT();
+	}
+    int t = high_y - low_y;                                                    // get the distance between the top and bottom
+    low_y = (low_y + ScrollStart) % VRes;
+    high_y = low_y + t;                                                    // and set y2 to the same
+    if(high_y >= VRes) {                                                // if the box splits over the frame buffer boundary
+		DefineRegionSPI(low_x, low_y, high_x, VRes-1, 1);
+		if(PinDef[Option.LCD_CLK].mode & SPI0SCK){
+			for(int y=low_y;y<VRes;y++){
+				unsigned char *p=(unsigned char *)(ScreenBuffer) + (y * HRes + low_x);
+				for(int x=low_x;x<=high_x;x++)spi_write_fast(spi0,(unsigned char *)&RGB332_LUT[*p++],tlen);
+			}
+		} else {
+			for(int y=low_y;y<VRes;y++){
+				unsigned char *p=(unsigned char *)(ScreenBuffer) + (y * HRes + low_x);
+				for(int x=low_x;x<=high_x;x++)spi_write_fast(spi1,(unsigned char *)&RGB332_LUT[*p++],tlen);
+			}
+		}
+		DefineRegionSPI(low_x, 0, high_x, high_y-VRes, 1);
+		if(PinDef[Option.LCD_CLK].mode & SPI0SCK){
+			for(int y=0;y<=high_y-VRes;y++){
+				unsigned char *p=(unsigned char *)(ScreenBuffer) + (y * HRes + low_x);
+				for(int x=low_x;x<=high_x;x++)spi_write_fast(spi0,(unsigned char *)&RGB332_LUT[*p++],tlen);
+			}
+		} else {
+			for(int y=0;y<=high_y-VRes;y++){
+				unsigned char *p=(unsigned char *)(ScreenBuffer) + (y * HRes + low_x);
+				for(int x=low_x;x<=high_x;x++)spi_write_fast(spi1,(unsigned char *)&RGB332_LUT[*p++],tlen);
+			}
+		}
+    } else {
+		DefineRegionSPI(low_x, low_y, high_x, high_y, 1);
+		if(PinDef[Option.LCD_CLK].mode & SPI0SCK){
+			for(int y=low_y;y<=high_y;y++){
+				unsigned char *p=(unsigned char *)(ScreenBuffer) + (y * HRes + low_x);
+				for(int x=low_x;x<=high_x;x++)spi_write_fast(spi0,(unsigned char *)&RGB332_LUT[*p++],tlen);
+			}
+		} else {
+			for(int y=low_y;y<=high_y;y++){
+				unsigned char *p=(unsigned char *)(ScreenBuffer) + (y * HRes + low_x);
+				for(int x=low_x;x<=high_x;x++)spi_write_fast(spi1,(unsigned char *)&RGB332_LUT[*p++],tlen);
+			}
+		}
+	}
+	if(PinDef[Option.LCD_CLK].mode & SPI0SCK)spi_finish(spi0);
+	else spi_finish(spi1);
+	ClearCS(Option.LCD_CS); 
+}
+#endif
 void Display_Refresh(void){
+#if defined(PICOMITE) && defined(rp2350)
+	if(Option.DISPLAY_TYPE>=NEXTGEN  || Option.DISPLAY_TYPE==0 || !(Option.DISPLAY_TYPE<=I2C_PANEL || Option.DISPLAY_TYPE>=BufferedPanel)) return;
+#else
 	if(!(Option.DISPLAY_TYPE<=I2C_PANEL || Option.DISPLAY_TYPE>=BufferedPanel)) return;
+#endif
 	unsigned char* p=(void *)((unsigned int)LCDBuffer);
-	if(low_x==2000 && high_x==-1 && low_y==2000 && high_y==-1)return; //Nothing to do
+	if(low_x==silly_low && high_x==silly_high && low_y==silly_low && high_y==silly_high)return; //Nothing to do
 	if(low_x<0)low_x=0;
 	if(low_y<0)low_y=0;
 	if(high_x>DisplayHRes)high_x=DisplayHRes-1;
@@ -2043,7 +2495,11 @@ void Display_Refresh(void){
 			N5110SetXY(low_x, y);
 			SetCS();
 			gpio_put(LCD_CD_PIN,GPIO_PIN_SET);
+#if defined(PICOMITE) && defined(rp2350)
+			lcd_xmit_byte_multi(p+(y*DisplayHRes)+low_x,high_x-low_x+1);
+#else
 			xmit_byte_multi(p+(y*DisplayHRes)+low_x,high_x-low_x+1);
+#endif
 			ClearCS(Option.LCD_CS);
 		}
 	} else if(Option.DISPLAY_TYPE<=I2C_PANEL){
@@ -2058,8 +2514,11 @@ void Display_Refresh(void){
 			SSD1306SPISetXY(Option.I2Coffset+low_x,y);
 			SetCS();
 			gpio_put(LCD_CD_PIN,GPIO_PIN_SET);
+#if defined(PICOMITE) && defined(rp2350)
+			lcd_xmit_byte_multi(p+(y*DisplayHRes)+low_x,high_x-low_x+1);
+#else
 			xmit_byte_multi(p+(y*DisplayHRes)+low_x,high_x-low_x+1);
-//			HAL_SPI_Transmit(&hspi3,p+(y*DisplayHRes)+low_x,high_x-low_x+1,500);
+#endif
 			ClearCS(Option.LCD_CS);
 		}
 	} else if(Option.DISPLAY_TYPE==ST7920){
@@ -2075,12 +2534,15 @@ void Display_Refresh(void){
 			}
 			ST7920SetXY(0,y);
 			SetCS();
+#if defined(PICOMITE) && defined(rp2350)
+			lcd_xmit_byte_multi(x_array,33);
+#else
 			xmit_byte_multi(x_array,33);
-//			HAL_SPI_Transmit(&hspi3,x_array,33,500);
+#endif
 			ClearCS(Option.LCD_CD);
 		}
 	}
-    low_y=2000; high_y=-1; low_x=2000; high_x=-1;
+    low_x=silly_low; high_y=silly_high; low_y=silly_low; high_x=silly_high;
 
 }
 #endif
@@ -2100,6 +2562,9 @@ extern uint16_t SPI_CLK_PIN;
 // config the SPI port for output
 // it will not touch the port if it has already been opened
 void SPISpeedSet(int device){
+#if defined(PICOMITE) && defined(rp2350)
+	if(Option.LCD_CLK && Option.LCD_CLK!=Option.SYSTEM_CLK && device>I2C_PANEL && device!=TOUCH && device!=SLOWTOUCH) return; //Everything is configured so nothing to do
+#endif
     if(CurrentSPIDevice != device){
 		if(device==SDSLOW || (device==SDFAST && SPI_CLK_PIN!= SD_CLK_PIN)) {
 //			MMPrintString("Slow Bitbang\r\n");
@@ -2114,6 +2579,12 @@ void SPISpeedSet(int device){
 				xchg_byte= HW0SwapSPI;
 				xmit_byte_multi=HW0SendSPI;
 				rcvr_byte_multi=HW0ReadSPI;
+#if defined(PICOMITE) && defined(rp2350)
+				if(!Option.LCD_CLK || Option.LCD_CLK==Option.SYSTEM_CLK){
+					lcd_xmit_byte_multi=HW0SendSPI;
+					lcd_rcvr_byte_multi=HW0ReadSPI;
+				}
+#endif
 				SET_SPI_CLK=HW0Clk;
                 gpio_set_input_enabled(PinDef[Option.SYSTEM_CLK].GPno,false);
                 gpio_set_input_enabled(PinDef[Option.SYSTEM_MOSI].GPno,false);
@@ -2123,6 +2594,12 @@ void SPISpeedSet(int device){
 				xchg_byte= HW1SwapSPI;
 				xmit_byte_multi=HW1SendSPI;
 				rcvr_byte_multi=HW1ReadSPI;
+#if defined(PICOMITE) && defined(rp2350)
+				if(!Option.LCD_CLK || Option.LCD_CLK==Option.SYSTEM_CLK){
+					lcd_xmit_byte_multi=HW1SendSPI;
+					lcd_rcvr_byte_multi=HW1ReadSPI;
+				}
+#endif
 				SET_SPI_CLK=HW1Clk;
 			} else {
 //				MMPrintString("Fast Bitbang\r\n");
