@@ -1227,7 +1227,7 @@ void MIPS16 cmd_play(void) {
         } else if(checkstring(argv[2],(unsigned char *)"B")!=NULL){
         	right=1;
         	left=1;
-       } else {
+        } else {
 			p=(char *)getCstring(argv[2]);
 			if(strcasecmp(p,"B")==0){
 				right=1;

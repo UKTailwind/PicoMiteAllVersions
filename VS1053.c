@@ -259,11 +259,7 @@ void VS1053(uint8_t _cs_pin, uint8_t _dcs_pin, uint8_t _dreq_pin, uint8_t _reset
         LOG("\r\n");
     LOG("Reset VS1053...\r\n");
     LOG("End reset VS1053...\r\n");
-//   gpio_put(cs_pin,GPIO_PIN_SET); // Back to normal again
-//    gpio_put(dcs_pin,GPIO_PIN_SET);
-//    uSec(500000);
     // Init SPI in slow mode ( 0.2 MHz )
-//	SET_SPI_CLK(display_details[device].speed, display_details[device].CPOL, display_details[device].CPHASE);
     spi_init((AUDIO_SPI==1 ? spi0 : spi1), 8000);
 	spi_set_format((AUDIO_SPI==1 ? spi0 : spi1), 8, 0,0, SPI_MSB_FIRST);
     // printDetails("Right after reset/startup");

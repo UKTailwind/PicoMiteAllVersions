@@ -113,7 +113,10 @@ const char *PinFunction[] = {
 #ifdef rp2350
         "PIO1",
         "PIO2",
-        "FFIN"
+        "FFIN",
+#ifdef PICONITE
+        "KEYBOARD"
+#endif
 #else
         "PIO1"
 #endif
@@ -184,6 +187,9 @@ uint8_t slice0=0,slice1=0,slice2=0,slice3=0,slice4=0,slice5=0,slice6=0,slice7=0;
 uint8_t slice8=0,slice9=0,slice10=0,slice11=0;
 bool fast_timer_active=false;
 volatile uint64_t INT5Count, INT5Value, INT5InitTimer, INT5Timer;
+#ifdef PICOMITE
+int LocalKeyDown[7];
+#endif
 #endif
 bool dmarunning=false;
 bool ADCDualBuffering=false;
@@ -1339,7 +1345,10 @@ process:
                             break;
 #ifdef rp2350
         case EXT_FAST_TIMER:    if(pin!=FAST_TIMER_PIN)error("Use pin2/GP1 for fast counter");
-                            if(BacklightSlice==0)error("Channel in use for backlight");
+                            if(BacklightSlice==0)error("Channel in use for LCD backlight");
+#ifdef PICOMITE
+                            if(KeyboardlightSlice==0)error("Channel in use for keyboard backlight");
+#endif
                             if(Option.AUDIO_SLICE==0)error("Channel in use for Audio");
                             if(CameraSlice==0)error("Channel in use for Camera");
                             if(argc == 5)
@@ -2103,7 +2112,11 @@ void PWMoff(int slice){
 }
 #ifndef PICOMITEVGA
 void setBacklight(int level, int setfrequency){
+#if defined(PICOMITE) && defined(rp2350)
+    if(((Option.DISPLAY_TYPE>I2C_PANEL && Option.DISPLAY_TYPE<BufferedPanel ) || Option .DISPLAY_TYPE>=NEXTGEN || (Option.DISPLAY_TYPE>=SSDPANEL && Option.DISPLAY_TYPE<VIRTUAL)) && Option.DISPLAY_BL){
+#else
     if(((Option.DISPLAY_TYPE>I2C_PANEL && Option.DISPLAY_TYPE<BufferedPanel ) || (Option.DISPLAY_TYPE>=SSDPANEL && Option.DISPLAY_TYPE<VIRTUAL)) && Option.DISPLAY_BL){
+#endif
         MMFLOAT frequency=setfrequency ? (MMFLOAT)setfrequency : (Option.DISPLAY_TYPE==ILI9488W ? 1000.0 : 50000.0);
         int wrap=(Option.CPU_Speed*1000)/frequency;
         int high=(int)((MMFLOAT)Option.CPU_Speed/frequency*level*10.0);
@@ -2135,8 +2148,12 @@ void setBacklight(int level, int setfrequency){
 void MIPS16 cmd_backlight(void){
     getargs(&cmdline,3,(unsigned char *)",");
     int level=getint(argv[0],0,100);
-    int frequency=0;
+    int frequency=50000;
+#if defined(PICOMITE) && defined(rp2350)
+    if(((Option.DISPLAY_TYPE>I2C_PANEL && Option.DISPLAY_TYPE<BufferedPanel ) || (Option.DISPLAY_TYPE>=SSDPANEL && Option.DISPLAY_TYPE<VIRTUAL) || Option .DISPLAY_TYPE>=NEXTGEN) && Option.DISPLAY_BL){
+#else
     if(((Option.DISPLAY_TYPE>I2C_PANEL && Option.DISPLAY_TYPE<BufferedPanel ) || (Option.DISPLAY_TYPE>=SSDPANEL && Option.DISPLAY_TYPE<VIRTUAL)) && Option.DISPLAY_BL){
+#endif
     } else if(Option.DISPLAY_TYPE<=I2C_PANEL){
     } else if(Option.DISPLAY_TYPE>=SSDPANEL && Option.DISPLAY_TYPE<VIRTUAL){
     } else if(Option.DISPLAY_TYPE==SSD1306SPI){
@@ -2257,98 +2274,194 @@ void MIPS16 cmd_pwm(void){
 #endif
         
         int enabled=0;
-        if(slice0 || Option.AUDIO_SLICE ==0 || BacklightSlice==0 || CameraSlice==0){
+        if(slice0 || Option.AUDIO_SLICE ==0 || BacklightSlice==0 || CameraSlice==0
+#if defined(PICOMITE) && defined(rp2350)
+            || KeyboardlightSlice==0
+#endif
+        ){
             enabled |=1;
-            if(!(Option.AUDIO_SLICE ==0 || BacklightSlice==0 || CameraSlice==0 || count0<0.0)){
+            if(!(Option.AUDIO_SLICE ==0 || BacklightSlice==0 || CameraSlice==0 || count0<0.0
+#if defined(PICOMITE) && defined(rp2350)
+            || KeyboardlightSlice==0
+#endif
+        )){
                 pwm_set_enabled(0,false);
                 count0=(MMFLOAT)pwm_hw->slice[0].top * (100.0-count0) / 100.0;
                 pwm_set_counter(0,(int)count0);
             }
         }
-        if(slice1 || Option.AUDIO_SLICE ==1 || BacklightSlice==1 || CameraSlice==1){
+        if(slice1 || Option.AUDIO_SLICE ==1 || BacklightSlice==1 || CameraSlice==1
+#if defined(PICOMITE) && defined(rp2350)
+            || KeyboardlightSlice==1
+#endif
+        ){
             enabled |=2;
-            if(!(Option.AUDIO_SLICE ==1 || BacklightSlice==1 || CameraSlice==1 || count1<0.0)){
+            if(!(Option.AUDIO_SLICE ==1 || BacklightSlice==1 || CameraSlice==1 || count1<0.0
+#if defined(PICOMITE) && defined(rp2350)
+            || KeyboardlightSlice==1
+#endif
+        )){
                 pwm_set_enabled(1,false);
                 count1=(MMFLOAT)pwm_hw->slice[1].top * (100.0-count1) / 100.0;
                 pwm_set_counter(1,count1);
             }
         }
-        if(slice2 || Option.AUDIO_SLICE ==2 || BacklightSlice==2 || CameraSlice==2){
+        if(slice2 || Option.AUDIO_SLICE ==2 || BacklightSlice==2 || CameraSlice==2
+#if defined(PICOMITE) && defined(rp2350)
+            || KeyboardlightSlice==2
+#endif
+        ){
             enabled |=4;
-            if(!(Option.AUDIO_SLICE ==2 || BacklightSlice==2 || CameraSlice==2 || count2<0.0)){
+            if(!(Option.AUDIO_SLICE ==2 || BacklightSlice==2 || CameraSlice==2 || count2<0.0
+#if defined(PICOMITE) && defined(rp2350)
+            || KeyboardlightSlice==2
+#endif
+        )){
                 pwm_set_enabled(2,false);
                 count2=(MMFLOAT)pwm_hw->slice[2].top * (100.0-count2) / 100.0;
                 pwm_set_counter(2,count2);
             }
         }
-        if(slice3 || Option.AUDIO_SLICE ==3 || BacklightSlice==3 || CameraSlice==3){
+        if(slice3 || Option.AUDIO_SLICE ==3 || BacklightSlice==3 || CameraSlice==3
+#if defined(PICOMITE) && defined(rp2350)
+            || KeyboardlightSlice==3
+#endif
+        ){
             enabled |=8;
-            if(!(Option.AUDIO_SLICE ==3 || BacklightSlice==3 || CameraSlice==3 || count3<0.0)){
+            if(!(Option.AUDIO_SLICE ==3 || BacklightSlice==3 || CameraSlice==3 || count3<0.0
+#if defined(PICOMITE) && defined(rp2350)
+            || KeyboardlightSlice==3
+#endif
+        )){
                 pwm_set_enabled(3,false);
                 count3=(MMFLOAT)pwm_hw->slice[3].top * (100.0-count3) / 100.0;
                 pwm_set_counter(3,count3);
             }
         }
-        if(slice4 || Option.AUDIO_SLICE ==4 || BacklightSlice==4 || CameraSlice==4){
+        if(slice4 || Option.AUDIO_SLICE ==4 || BacklightSlice==4 || CameraSlice==4
+#if defined(PICOMITE) && defined(rp2350)
+            || KeyboardlightSlice==4
+#endif
+        ){
             enabled |=16;
-            if(!(Option.AUDIO_SLICE ==4 || BacklightSlice==4 || CameraSlice==4 || count4<0.0)){
+            if(!(Option.AUDIO_SLICE ==4 || BacklightSlice==4 || CameraSlice==4 || count4<0.0
+#if defined(PICOMITE) && defined(rp2350)
+            || KeyboardlightSlice==4
+#endif
+        )){
                 pwm_set_enabled(4,false);
                 count4=(MMFLOAT)pwm_hw->slice[4].top * (100.0-count4) / 100.0;
                 pwm_set_counter(4,count4);
             }
         }
-        if(slice5 || Option.AUDIO_SLICE ==5 || BacklightSlice==5 || CameraSlice==5){
+        if(slice5 || Option.AUDIO_SLICE ==5 || BacklightSlice==5 || CameraSlice==5
+#if defined(PICOMITE) && defined(rp2350)
+            || KeyboardlightSlice==5
+#endif
+        ){
             enabled |=32;
-            if(!(Option.AUDIO_SLICE ==5 || BacklightSlice==5 || CameraSlice==5 || count5<0.0)){
+            if(!(Option.AUDIO_SLICE ==5 || BacklightSlice==5 || CameraSlice==5 || count5<0.0
+#if defined(PICOMITE) && defined(rp2350)
+            || KeyboardlightSlice==5
+#endif
+        )){
                 pwm_set_enabled(5,false);
                 count5=(MMFLOAT)pwm_hw->slice[5].top * (100.0-count5) / 100.0;
                 pwm_set_counter(5,count5);
             }
         }
-        if(slice6 || Option.AUDIO_SLICE ==6 || BacklightSlice==6 || CameraSlice==6){
+        if(slice6 || Option.AUDIO_SLICE ==6 || BacklightSlice==6 || CameraSlice==6
+#if defined(PICOMITE) && defined(rp2350)
+            || KeyboardlightSlice==6
+#endif
+        ){
             enabled |=64;
-            if(!(Option.AUDIO_SLICE ==6 || BacklightSlice==6 || CameraSlice==6 || count6<0.0)){
+            if(!(Option.AUDIO_SLICE ==6 || BacklightSlice==6 || CameraSlice==6 || count6<0.0
+#if defined(PICOMITE) && defined(rp2350)
+            || KeyboardlightSlice==6
+#endif
+        )){
                 pwm_set_enabled(6,false);
                 count6=(MMFLOAT)pwm_hw->slice[6].top * (100.0-count6) / 100.0;
                 pwm_set_counter(6,count6);
             }
         }
-        if(slice7 || Option.AUDIO_SLICE ==7 || BacklightSlice==7 || CameraSlice==7){
+        if(slice7 || Option.AUDIO_SLICE ==7 || BacklightSlice==7 || CameraSlice==7
+#if defined(PICOMITE) && defined(rp2350)
+            || KeyboardlightSlice==7
+#endif
+        ){
             enabled |=128;
-            if(!(Option.AUDIO_SLICE ==7 || BacklightSlice==7 || CameraSlice==7 || count7<0.0)){
+            if(!(Option.AUDIO_SLICE ==7 || BacklightSlice==7 || CameraSlice==7 || count7<0.0
+#if defined(PICOMITE) && defined(rp2350)
+            || KeyboardlightSlice==7
+#endif
+            )){
                 pwm_set_enabled(7,false);
                 count7=(MMFLOAT)pwm_hw->slice[7].top * (100.0-count7) / 100.0;
                 pwm_set_counter(7,count7);
             }
         }
 #ifdef rp2350
+#ifdef PICOMITE
+        if(slice8 || Option.AUDIO_SLICE ==8 || BacklightSlice==8 || CameraSlice==8 || KeyboardlightSlice==8){
+#else
         if(slice8 || Option.AUDIO_SLICE ==8 || BacklightSlice==8 || CameraSlice==8){
+#endif
             enabled |=256;
+#ifdef PICOMITE
+            if(!(Option.AUDIO_SLICE ==8 || BacklightSlice==8 || CameraSlice==8 || KeyboardlightSlice==8 || count8<0.0)){
+#else
             if(!(Option.AUDIO_SLICE ==8 || BacklightSlice==8 || CameraSlice==8 || count8<0.0)){
+#endif
                 pwm_set_enabled(8,false);
                 count8=(MMFLOAT)pwm_hw->slice[8].top * (100.0-count8) / 100.0;
                 pwm_set_counter(8,count8);
             }
         }
+#ifdef PICOMITE
+        if(slice9 || Option.AUDIO_SLICE ==9 || BacklightSlice==9 || CameraSlice==9 || KeyboardlightSlice==9){
+#else
         if(slice9 || Option.AUDIO_SLICE ==9 || BacklightSlice==9 || CameraSlice==9){
+#endif
             enabled |=512;
+#ifdef PICOMITE
+            if(!(Option.AUDIO_SLICE ==9 || BacklightSlice==9 || CameraSlice==9 || KeyboardlightSlice==9 || count9<0.0)){
+#else
             if(!(Option.AUDIO_SLICE ==9 || BacklightSlice==9 || CameraSlice==9 || count9<0.0)){
+#endif
                 pwm_set_enabled(9,false);
                 count9=(MMFLOAT)pwm_hw->slice[9].top * (100.0-count9) / 100.0;
                 pwm_set_counter(9,count9);
             }
         }
+#ifdef PICOMITE
+        if(slice10 || Option.AUDIO_SLICE ==10 || BacklightSlice==10 || CameraSlice==10 || KeyboardlightSlice==10){
+#else
         if(slice10 || Option.AUDIO_SLICE ==10 || BacklightSlice==10 || CameraSlice==10){
+#endif
             enabled |=1024;
+#ifdef PICOMITE
+            if(!(Option.AUDIO_SLICE ==10 || BacklightSlice==10 || CameraSlice==10 || KeyboardlightSlice==10 || count10<0.0)){
+#else
             if(!(Option.AUDIO_SLICE ==10 || BacklightSlice==10 || CameraSlice==10 || count10<0.0)){
+#endif
                 pwm_set_enabled(10,false);
                 count10=(MMFLOAT)pwm_hw->slice[10].top * (100.0-count10) / 100.0;
                 pwm_set_counter(10,count10);
             }
         }
+#ifdef PICOMITE
+        if(slice11 || Option.AUDIO_SLICE ==11 || BacklightSlice==11 || CameraSlice==11 || KeyboardlightSlice==11){
+#else
         if(slice11 || Option.AUDIO_SLICE ==11 || BacklightSlice==11 || CameraSlice==11){
+#endif
             enabled |=2048;
+#ifdef PICOMITE
+            if(!(Option.AUDIO_SLICE ==11 || BacklightSlice==11 || CameraSlice==11  || KeyboardlightSlice==11 || count11<0.0)){
+#else
             if(!(Option.AUDIO_SLICE ==11 || BacklightSlice==11 || CameraSlice==11 || count11<0.0)){
+#endif
                 pwm_set_enabled(11,false);
                 count11=(MMFLOAT)pwm_hw->slice[11].top * (100.0-count11) / 100.0;
                 pwm_set_counter(11,count11);
@@ -2442,8 +2555,19 @@ void MIPS16 cmd_pwm(void){
  * @cond
  * The following section will be excluded from the documentation.
  */
-static char keypad_pins[8];
+#ifdef rp2350
+static unsigned char keypad_pins[64]={0};
+int keypadcols=0;
+int keypadrows=0;
+MMFLOAT *PadLookup=NULL;
 MMFLOAT *KeypadVar;
+const MMFLOAT PadLookupDefault[16] = { 1.0, 2.0, 3.0, 20.0, 4.0, 5.0, 6.0, 21.0, 7.0, 8.0, 9.0, 22.0, 10.0, 0.0, 11.0, 23.0 };
+#else
+static char keypad_pins[8]={0};
+MMFLOAT *KeypadVar;
+#define keypadcols 4
+#define keypadrows 4
+#endif
 unsigned char *KeypadInterrupt = NULL;
 void KeypadClose(void);
 /*  @endcond */
@@ -2455,28 +2579,79 @@ void cmd_keypad(void) {
         KeypadClose();
     else {
         getargs(&cmdline, 19, (unsigned char *)",");
-        if(argc%2 == 0 || argc < 17) error("Invalid syntax");
-        if(KeypadInterrupt != NULL) error("Already open");
-        KeypadVar = findvar(argv[0], V_FIND);
-        if(g_vartbl[g_VarIndex].type & T_CONST) error("Cannot change a constant");
-        if(!(g_vartbl[g_VarIndex].type & T_NBR)) error("Floating point variable required");
-        InterruptUsed = true;
-        KeypadInterrupt = GetIntAddress(argv[2]);					// get the interrupt location
-        for(i = 0; i < 8; i++) {
-            if(i == 7 && argc < 19) {
-                keypad_pins[i] = 0;
-                break;
+#ifdef rp2350
+        if(argc==13){ // new format map%(c,r),variable,interrupt, startcolpin, nocols, startrowpin, norows
+            MMFLOAT *a1float=NULL;
+            #ifdef rp2350
+            int dims[MAXDIM]={0};
+            #else
+            short dims[MAXDIM]={0};
+            #endif
+            KeypadInterrupt = GetIntAddress(argv[4]);					// get the interrupt location
+            keypadrows=getint(argv[8],1,31);
+            keypadcols=getint(argv[12],1,31);
+			parsefloatrarray(argv[0], &a1float, 1, 2, dims, false);
+			if(dims[0] - g_OptionBase + 1 !=keypadrows){keypadcols=keypadrows=0;error("Array row count mismatch");}
+			if(dims[1] - g_OptionBase + 1 !=keypadcols){keypadcols=keypadrows=0;error("Array column count mismatch");}
+            KeypadVar = findvar(argv[2], V_FIND);
+            if(g_vartbl[g_VarIndex].type & T_CONST){keypadcols=keypadrows=0;error("Cannot change a constant");}
+            if(!(g_vartbl[g_VarIndex].type & T_NBR)){keypadcols=keypadrows=0;error("Integer variable required");}
+            code=0;
+            if(!(code=codecheck(argv[6])))argv[6]+=2;
+            j = getinteger(argv[6]);
+            if(!code)j=codemap(j);
+            int k=PinDef[j].GPno;
+            for(i=0;i<keypadrows;i++){
+                j=PINMAP[k+i];
+                if(ExtCurrentConfig[j] >= EXT_COM_RESERVED)  error("Pin %/| is in use",j,j);
+                ExtCfg(j, EXT_DIG_IN, ODCSET);
+                ExtCfg(j, EXT_COM_RESERVED, 0);
+                keypad_pins[i] = j;
             }
-        	code=0;
-        	if(!(code=codecheck(argv[(i + 2) * 2])))argv[(i + 2) * 2]+=2;
-        	j = getinteger(argv[(i + 2) * 2]);
-        	if(!code)j=codemap(j);
-            if(ExtCurrentConfig[j] >= EXT_COM_RESERVED)  error("Pin %/| is in use",j,j);
-//            if(i < 4) {
-            ExtCfg(j, EXT_DIG_IN, ODCSET);
-            ExtCfg(j, EXT_COM_RESERVED, 0);
-            keypad_pins[i] = j;
+            code=0;
+            if(!(code=codecheck(argv[10])))argv[10]+=2;
+            j = getinteger(argv[10]);
+            if(!code)j=codemap(j);
+            k=PinDef[j].GPno;
+            for(i=0;i<keypadcols;i++){
+                j=PINMAP[k+i];
+                if(ExtCurrentConfig[j] >= EXT_COM_RESERVED)  error("Pin %/| is in use",j,j);
+                ExtCfg(j, EXT_DIG_IN, ODCSET);
+                ExtCfg(j, EXT_COM_RESERVED, 0);
+                keypad_pins[i+keypadrows] = j;
+            }
+            PadLookup=a1float;
+            InterruptUsed = true;
+        } else {
+            PadLookup=(MMFLOAT *)PadLookupDefault;
+            keypadcols=4;
+            keypadrows=4;
+#endif
+            if(argc%2 == 0 || argc < 17) error("Invalid syntax");
+            if(KeypadInterrupt != NULL) error("Already open");
+            KeypadVar = findvar(argv[0], V_FIND);
+            if(g_vartbl[g_VarIndex].type & T_CONST) error("Cannot change a constant");
+            if(!(g_vartbl[g_VarIndex].type & T_NBR)) error("Floating point variable required");
+            InterruptUsed = true;
+            KeypadInterrupt = GetIntAddress(argv[2]);					// get the interrupt location
+            for(i = 0; i < 8; i++) {
+                if(i == 7 && argc < 19) {
+                    keypad_pins[i] = 0;
+                    break;
+                }
+                code=0;
+                if(!(code=codecheck(argv[(i + 2) * 2])))argv[(i + 2) * 2]+=2;
+                j = getinteger(argv[(i + 2) * 2]);
+                if(!code)j=codemap(j);
+                if(ExtCurrentConfig[j] >= EXT_COM_RESERVED)  error("Pin %/| is in use",j,j);
+    //            if(i < 4) {
+                ExtCfg(j, EXT_DIG_IN, ODCSET);
+                ExtCfg(j, EXT_COM_RESERVED, 0);
+                keypad_pins[i] = j;
+            }
+#ifdef rp2350
         }
+#endif
     }
 }
 
@@ -2488,7 +2663,14 @@ void cmd_keypad(void) {
 void KeypadClose(void) {
     int i;
     if(KeypadInterrupt == NULL) return;
+#ifdef rp2350
+    keypadcols=0;
+    keypadrows=0;
+//    PadLookup=NULL;
+    for(i = 0; i < 64; i++) {
+#else
     for(i = 0; i < 8; i++) {
+#endif
         if(keypad_pins[i]) {
             ExtCfg(keypad_pins[i], EXT_NOT_CONFIG, 0);				// all set to unconfigured
         }
@@ -2499,37 +2681,182 @@ void KeypadClose(void) {
 
 int KeypadCheck(void) {
     static unsigned char count = 0, keydown = false;
-    int i, j;
+    int rows, cols;
+#ifndef rp2350
     const char PadLookup[16] = { 1, 2, 3, 20, 4, 5, 6, 21, 7, 8, 9, 22, 10, 0, 11, 23 };
-
+#endif
     if(count++ % 64) return false;                                  // only check every 64 loops through the interrupt processor
 
-    for(j = 4; j < 8; j++) {                                        // j controls the pull down pins
-        if(keypad_pins[j]) {                                        // we might just have 3 pull down pins
-            PinSetBit(keypad_pins[j], ODCCLR);                      // pull it low
-            for(i = 0; i < 4; i++) {                                // i is the row sense inputs
-                if(PinRead((unsigned char)keypad_pins[i]) == 0) {                  // if it is low we have found a keypress
+    for(cols = keypadrows; cols < keypadrows+keypadcols; cols++) {   
+       if(keypad_pins[cols]) {                                        // we might just have 3 pull down pins
+            PinSetBit(keypad_pins[cols], ODCCLR);                      // pull it low
+            for(rows = 0; rows < keypadrows; rows++) {   
+                if(PinRead((unsigned char)keypad_pins[rows]) == 0) {                  // if it is low we have found a keypress
                     if(keydown) goto exitcheck;                     // we have already reported this, so just exit
                     uSec(40 * 1000);                                // wait 40mS and check again
-                    if(PinRead((unsigned char)keypad_pins[i]) != 0) goto exitcheck;// must be contact bounce if it is now high
-                    *KeypadVar = PadLookup[(i << 2) | (j - 4)];     // lookup the key value and set the variable
-                    PinSetBit(keypad_pins[j], ODCSET);
+                    if(PinRead((unsigned char)keypad_pins[rows]) != 0) goto exitcheck;// must be contact bounce if it is now high
+                    *KeypadVar = PadLookup[(rows*keypadcols)+(cols-keypadrows)];     // lookup the key value and set the variable
+                    PinSetBit(keypad_pins[cols], ODCSET);
                     keydown = true;                                 // record that we know that the key is down
                     return true;                                    // and tell the interrupt processor that we are good to go
                 }
             }
-            PinSetBit(keypad_pins[j], ODCSET);                      // wasn't this pin, clear the pulldown
+            PinSetBit(keypad_pins[cols], ODCSET);                      // wasn't this pin, clear the pulldown
         }
     }
     keydown = false;                                                // no key down, record the fact
     return false;
 
 exitcheck:
-    PinSetBit(keypad_pins[j], ODCSET);
+    PinSetBit(keypad_pins[cols], ODCSET);
     return false;
 }
+#if defined(PICOMITE) && defined(rp2350)
+const unsigned char localkeymap[13][6]={
+{1,2,3,4,5,6},
+{7,8,9,10,11,12},
+{13,14,15,16,17,18},
+{19,20,21,22,23,24},
+{25,26,27,28,29,30},
+{31,32,33,34,35,36},
+{37,38,39,40,41,42},
+{43,44,45,46,47,48},
+{49,50,51,52,53,54},
+{55,56,57,58,59,60},
+{61,62,63,64,65,66},
+{67,68,69,70,71,72},
+{73,74,75,76,77,78}
+};
+const unsigned char asciimapl[79]={
+    255,
+    255,27,11,255,255,255,
+    255,255,255,255,255,255,
+    255,49,113,97,122,255,
+    145,50,119,115,120,255,
+    146,51,101,100,99,255,
+    147,52,114,102,118,45,
+    148,53,116,103,98,61,
+    149,54,121,104,110,255,
+    150,55,117,106,109,32,
+    151,56,105,107,47,255,
+    152,57,111,108,128,129,
+    8,48,112,59,13,130,
+    255,96,92,39,255,131
+};
+const unsigned char asciimapu[79]={
+    255,
+    255,27,11,255,255,255,
+    255,255,255,255,255,255,
+    255,33,81,65,90,255,
+    177,64,87,83,88,255,
+    178,35,69,68,67,255,
+    179,36,82,70,86,95,
+    180,37,84,71,66,43,
+    181,94,89,72,78,255,
+    182,38,85,74,77,32,
+    183,42,73,75,63,255,
+    184,40,79,76,136,137,
+    127,41,80,58,13,134,
+    255,126,124,34,255,135
+};
+const unsigned char asciimapfl[79]={
+    255,
+    255,27,11,255,255,255,
+    255,255,255,255,255,255,
+    255,49,113,97,122,255,
+    145,50,119,115,120,255,
+    146,51,101,100,99,255,
+    147,52,114,102,118,45,
+    148,53,116,103,98,61,
+    149,54,121,104,110,255,
+    150,55,117,106,44,32,
+    151,153,105,60,46,255,
+    152,154,132,62,136,137,
+    8,155,91,123,13,134,
+    255,156,93,125,255,135
+};
+const unsigned char asciimapfu[79]={
+    255,
+    255,27,11,255,255,255,
+    255,255,255,255,255,255,
+    255,33,81,65,90,255,
+    177,64,87,83,88,255,
+    178,35,69,68,67,255,
+    179,36,82,70,86,95,
+    180,37,84,71,66,43,
+    181,94,89,72,78,255,
+    182,38,85,74,44,32,
+    183,185,73,60,46,255,
+    184,186,132,62,136,137,
+    127,187,91,123,13,134,
+    255,188,93,125,255,135
+};
+bool checkpressedtime(int count){
+    if(!count)return false;
+    if(count==1)return true;
+    if(count==Option.RepeatStart/LOCALKEYSCANRATE)return true;
+    if(count >= (Option.RepeatStart+Option.RepeatRate)/LOCALKEYSCANRATE && 
+    (count-Option.RepeatStart/LOCALKEYSCANRATE) % (Option.RepeatRate/LOCALKEYSCANRATE)==0)return true;
+    return false;
+}
+void cmd_keyscan(void){
+    static bool shift=false, function=false, s_lock=false, ctrl=false, alt=false, light=true;
+    int key=0;
+    static unsigned short pressed[79]={0};
+    for(int cols = 24; cols < 37; cols++) {   
+            if(cols==25)continue;
+            PinSetBit(PINMAP[cols], ODCCLR);                      // pull it low
+            for(int rows = 37; rows < 43; rows++) {   
+                int index=localkeymap[cols-24][rows-37];
+                if(PinRead((unsigned char)PINMAP[rows]) == 0) {                  // if it is low we have found a keypress
+                    pressed[index]++;
+                } else pressed[index]=0;
+            }
+            PinSetBit(PINMAP[cols], ODCSET);                      // wasn't this pin, clear the pulldown
+    }
+    function=pressed[18] ? true : false;
+    shift=pressed[5] ? true : false;
+    alt=pressed[30] ? true : false;
+    ctrl=pressed[24] ? true : false;
+    if(pressed[4]==1){
+        gpio_xor_mask64((uint64_t)1<<44);
+        s_lock^=1;
 
+    }
+    if(pressed[13]==1){
+        light^=1;
+        setpwm(PINMAP[43], &KeyboardlightChannel, &KeyboardlightSlice, 50000.0, light ? Option.KeyboardBrightness: 0);
+    }
+    LocalKeyDown[6]=(alt ? 1: 0) |
+    (ctrl ? 2: 0) |
+    (function ? 4: 0) |
+    (shift ? 8: 0);
 
+    for(int i=1;i<79;i++){
+        if(checkpressedtime(pressed[i])){
+            if(function)key=(s_lock ^ shift) ? asciimapfu[i]: asciimapfl[i];
+            else key=(s_lock ^ shift) ? asciimapu[i]: asciimapl[i];
+            if(ctrl && (key>='a' && key<='z'))key-=('a'-1);
+            if(ctrl && key>='A' && key<='Z')key-=('A'-1);
+            if (key == BreakKey) { // if the user wants to stop the progran
+                MMAbort = true; // set the flag for the interpreter to see
+                ConsoleRxBufHead = ConsoleRxBufTail; // empty the buffer
+                // break;
+            } else {
+                ConsoleRxBuf[ConsoleRxBufHead] = key; // store the byte in the ring buffer
+                if (ConsoleRxBuf[ConsoleRxBufHead] == keyselect && KeyInterrupt != NULL) {
+                    Keycomplete = true;
+                } else {
+                    ConsoleRxBufHead = (ConsoleRxBufHead + 1) % CONSOLE_RX_BUF_SIZE; // advance the head of the queue
+                    if (ConsoleRxBufHead == ConsoleRxBufTail) { // if the buffer has overflowed
+                        ConsoleRxBufTail = (ConsoleRxBufTail + 1) % CONSOLE_RX_BUF_SIZE; // throw away the oldest char
+                }
+                }
+            }
+        }
+    }
+}
+#endif
 
 
 /****************************************************************************************************************************
@@ -3670,7 +3997,11 @@ void MIPS16 ClearExternalIO(void) {
     PulseActive = false;
 #ifdef rp2350
     slice0=0;slice1=0;slice2=0;slice3=0;slice4=0;slice5=0;slice6=0;slice7=0;slice8=0;slice9=0;slice10=0;slice11=0;
+#ifdef PICOMITE
+    for(i=0; i<=(rp2350a ? 7:11);i++)if(!(i==Option.AUDIO_SLICE || i==BacklightSlice || i==KeyboardlightSlice))PWMoff(i);
+#else
     for(i=0; i<=(rp2350a ? 7:11);i++)if(!(i==Option.AUDIO_SLICE || i==BacklightSlice))PWMoff(i);
+#endif
 #else
     slice0=0;slice1=0;slice2=0;slice3=0;slice4=0;slice5=0;slice6=0;slice7=0;
     for(i=0; i<=7;i++)if(!(i==Option.AUDIO_SLICE || i==BacklightSlice))PWMoff(i);

@@ -642,7 +642,7 @@ void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, in
         return;
     }
    // from now on we have a user defined sub or function (not a C routine)
- 
+   
     if(gosubindex >= MAXGOSUB) error("Too many nested SUB/FUN");
     errorstack[gosubindex] = CallersLinePtr;
     gosubstack[gosubindex++] = isfun ? NULL : nextstmt;             // NULL signifies that this is returned to by ending ExecuteProgram()
@@ -760,19 +760,19 @@ void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, in
         if(*tp == tokenAS) {                                        // are we using Microsoft syntax (eg, AS INTEGER)?
             *tp++ = 0;                                              // terminate the string and step over the AS token
             tp = CheckIfTypeSpecified(tp, &ArgType, true);          // and get the type
-            if(!(ArgType & T_IMPLIED))  error("Variable type");
+            if(!(ArgType & T_IMPLIED)) error("Variable type");
         }
         ArgType |= (V_FIND | V_DIM_VAR | V_LOCAL | V_EMPTY_OK);
         tp = findvar(argv2[i], ArgType);                            // declare the local variable
-        if(g_vartbl[g_VarIndex].dims[0] > 0)  error("Argument list");    // if it is an array it must be an empty array
+        if(g_vartbl[g_VarIndex].dims[0] > 0) error("Argument list");    // if it is an array it must be an empty array
        
         CurrentLinePtr = CallersLinePtr;                            // report errors at the caller
 
         // if the definition called for an array, special processing and checking will be required
         if(g_vartbl[g_VarIndex].dims[0] == -1) {
             int j;
-            if(g_vartbl[argVarIndex[i]].dims[0] == 0)  error("Expected an array");
-            if(TypeMask(g_vartbl[g_VarIndex].type) != TypeMask(argtype[i]))  error("Incompatible type: $", argv1[i]);
+            if(g_vartbl[argVarIndex[i]].dims[0] == 0) error("Expected an array");
+            if(TypeMask(g_vartbl[g_VarIndex].type) != TypeMask(argtype[i])) error("Incompatible type: $", argv1[i]);
             g_vartbl[g_VarIndex].val.s = NULL;
             for(j = 0; j < MAXDIM; j++)                             // copy the dimensions of the supplied variable into our local variable
                 g_vartbl[g_VarIndex].dims[j] = g_vartbl[argVarIndex[i]].dims[j];
@@ -782,7 +782,7 @@ void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, in
         if((argtype[i] & T_PTR) && TypeMask(g_vartbl[g_VarIndex].type) != TypeMask(argtype[i])) {
             if(argbyref[i]) error("BYREF requires same types: $", argv1[i]);
             if((TypeMask(g_vartbl[g_VarIndex].type) & T_STR) || (TypeMask(argtype[i]) & T_STR))
-                 error("Incompatible type: $", argv1[i]);
+                error("Incompatible type: $", argv1[i]);
             // make this into an ordinary argument
             if(g_vartbl[argVarIndex[i]].type & T_PTR) {
                 argval[i].i = *g_vartbl[argVarIndex[i]].val.ia;       // get the value if the supplied argument is a pointer
@@ -796,7 +796,7 @@ void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, in
         if(argtype[i] & T_PTR) {
             // the argument supplied was a variable so we must setup the local variable as a pointer
             if((g_vartbl[g_VarIndex].type & T_STR) && g_vartbl[g_VarIndex].val.s != NULL) {
-                FreeMemorySafe((void **)&g_vartbl[g_VarIndex].val.s);              // free up the local variable's memory if it is a pointer to a string
+                FreeMemorySafe((void **)&g_vartbl[g_VarIndex].val.s);                            // free up the local variable's memory if it is a pointer to a string
                 }
             g_vartbl[g_VarIndex].val.s = argval[i].s;                              // point to the data of the variable supplied as an argument
             g_vartbl[g_VarIndex].type |= T_PTR;                                    // set the type to a pointer
@@ -816,7 +816,7 @@ void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, in
             else if((g_vartbl[g_VarIndex].type & T_INT) && (argtype[i] & T_NBR))   // need an integer but was supplied with a float
                 g_vartbl[g_VarIndex].val.i = FloatToInt64(argval[i].f);
             else
-               error("Incompatible type: $", argv1[i]);
+                error("Incompatible type: $", argv1[i]);
         }
     }
 
@@ -2860,6 +2860,10 @@ void MIPS16 error(char *msg, ...) {
             }
 #endif
         }
+        if(DISPLAY_TYPE==Option.DISPLAY_TYPE){
+            SetFont(Option.DefaultFont) ;
+            PromptFont=Option.DefaultFont;
+        }
         if(CurrentX != 0) MMPrintString("\r\n");                   // error message should be on a new line
     }
     if(MMCharPos > 1) MMPrintString("\r\n");
@@ -3248,6 +3252,9 @@ void MIPS16 ClearRuntime(bool all) {
     optionfulltime=false;
     optionfastaudio=0;
     optionlogging=false;
+#if defined(PICOMITE) && defined(rp2350)
+	if(Option.DISPLAY_TYPE>=NEXTGEN)Option.Refresh=1;
+#endif
 /*frame
     frame=NULL;
     outframe=NULL;
@@ -3265,6 +3272,12 @@ void MIPS16 ClearRuntime(bool all) {
         WriteData(0);
         WriteData(0);
     }
+#if defined(PICOMITE) && defined(rp2350)
+    if(ScrollLCD==ScrollLCDMEM332){
+		multicore_fifo_push_blocking(7);
+		multicore_fifo_push_blocking((uint32_t)0);
+    }
+#endif
     if(SSD16TYPE || Option.DISPLAY_TYPE==IPS_4_16 || SPI480)clear320();
 #endif
     MMerrno = 0;                                                    // clear the error flags

@@ -50,6 +50,14 @@ extern void DrawRectangleSPI(int x1, int y1, int x2, int y2, int c);
 extern void DrawBufferSPI(int x1, int y1, int x2, int y2, unsigned char* p);
 extern void DrawBitmapSPI(int x1, int y1, int width, int height, int scale, int fc, int bc, unsigned char *bitmap);
 extern void ReadBufferSPI(int x1, int y1, int x2, int y2, unsigned char* p) ;
+#if defined(PICOMITE) && defined(rp2350)
+extern void DrawRectangleMEM332(int x1, int y1, int x2, int y2, int c);
+extern void DrawBitmapMEM332(int x1, int y1, int width, int height, int scale, int fc, int bc, unsigned char *bitmap);
+extern void DrawBufferMEM332(int x1, int y1, int x2, int y2, unsigned char* p) ;
+extern void ReadBufferMEM332(int x1, int y1, int x2, int y2, unsigned char* buff);
+extern void DrawBlitBufferMEM332(int x1, int y1, int x2, int y2, unsigned char* p) ;
+extern void ReadBlitBufferMEM332(int x1, int y1, int x2, int y2, unsigned char* buff);
+#endif
 extern void DrawRectangleSPISCR(int x1, int y1, int x2, int y2, int c);
 extern void DrawBufferSPISCR(int x1, int y1, int x2, int y2, unsigned char* p);
 extern void DrawBitmapSPISCR(int x1, int y1, int width, int height, int scale, int fc, int bc, unsigned char *bitmap);
@@ -330,13 +338,25 @@ extern void __not_in_flash_func(spi_finish)(spi_inst_t *spi);
 #define VIRTUAL_M       55
 #define VS1053slow      56
 #define VS1053fast      57
-#define NEXTGEN1        58
-#define NEXTGEN          NEXTGEN1
+#if defined(PICOMITE) && defined(rp2350)
+#define ST7796SPBUFF    58
+#define NEXTGEN          ST7796SPBUFF
+#define ILI9341BUFF     59
+#define ST7796SBUFF     60
+#define ILI9488BUFF     61
+#define ILI9488PBUFF    62
+#define ILI9488WBUFF    63
+#define ST7789C         64
+#endif
 #define TFT_NOP 0x00
 #define TFT_SWRST 0x01
 #define SSDTYPE (Option.DISPLAY_TYPE>=SSDPANEL && Option.DISPLAY_TYPE<VIRTUAL_C && !(Option.DISPLAY_TYPE==ILI9341_16 || Option.DISPLAY_TYPE==ILI9341_8 || Option.DISPLAY_TYPE==IPS_4_16 || Option.DISPLAY_TYPE==ILI9486_16))
 #define SSD16TYPE (Option.DISPLAY_TYPE>SSD_PANEL_8 && Option.DISPLAY_TYPE<VIRTUAL_C && !(Option.DISPLAY_TYPE==ILI9341_16 || Option.DISPLAY_TYPE==IPS_4_16 || Option.DISPLAY_TYPE==ILI9486_16))
+#if defined(PICOMITE) && defined(rp2350)
+#define SPIREAD (Option.DISPLAY_TYPE == ILI9341 || Option.DISPLAY_TYPE == ILI9488P || Option.DISPLAY_TYPE == ILI9488 || Option.DISPLAY_TYPE == ST7796SP  || Option.DISPLAY_TYPE == ST7796S || Option.DISPLAY_TYPE == ST7789B|| Option.DISPLAY_TYPE>=NEXTGEN)
+#else
 #define SPIREAD (Option.DISPLAY_TYPE == ILI9341 || Option.DISPLAY_TYPE == ILI9488P || Option.DISPLAY_TYPE == ILI9488 || Option.DISPLAY_TYPE == ST7796SP  || Option.DISPLAY_TYPE == ST7796S || Option.DISPLAY_TYPE == ST7789B)
+#endif
 #define FASTSCROLL (SSDTYPE || Option.DISPLAY_TYPE==SCREENMODE1 ||  Option.DISPLAY_TYPE == SCREENMODE2 || Option.DISPLAY_TYPE == VIRTUAL_C || Option.DISPLAY_ORIENTATION == VIRTUAL_M)
 #define SPI480 (Option.DISPLAY_TYPE==ILI9488 || Option.DISPLAY_TYPE==ST7796S || Option.DISPLAY_TYPE==ILI9488W || Option.DISPLAY_TYPE==ILI9481 || Option.DISPLAY_TYPE==ILI9481IPS) 
 #define TFT_SLPIN 0x10
@@ -443,7 +463,11 @@ extern void Display_Refresh(void);
 extern void waitwhilebusy(void);
 struct Displays {
     unsigned char ref;
+#if defined(PICOMITE) && defined(rp2350)
+	char name [16];
+#else
 	char name [13];
+#endif
     int speed;
     int horizontal;
     int vertical;
@@ -459,6 +483,8 @@ extern int LCD_Reset_PIN;
 extern int LCD_E_INKbusy;
 extern void (*xmit_byte_multi)(const BYTE *buff, int cnt);
 extern void (*rcvr_byte_multi)(BYTE *buff, int cnt);
+extern void (*lcd_xmit_byte_multi)(const BYTE *buff, int cnt);
+extern void (*lcd_rcvr_byte_multi)(BYTE *buff, int cnt);
 extern int (*SET_SPI_CLK)(int speed, int polarity, int edge);
 extern void SPISpeedSet(int device);
 extern BYTE (*xchg_byte)(BYTE data_out);
@@ -476,6 +502,9 @@ extern void __not_in_flash_func(HW0ReadSPI)(BYTE *buff, int cnt);
 extern void __not_in_flash_func(HW1ReadSPI)(BYTE *buff, int cnt);
 extern void BitBangReadSPI(BYTE *buff, int cnt);
 extern void ScrollLCDSPI(int lines);
+#if defined(PICOMITE) && defined(rp2350)
+extern void ScrollLCDMEM332(int lines);
+#endif
 extern void SetCS(void);
 extern int GetLineILI9341(void);
 extern void SPI111init(void);

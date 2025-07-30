@@ -171,6 +171,7 @@ New, more portable, method of manipulating an I/O pin
 #define EXT_PIO1_OUT      56
 #define EXT_PIO2_OUT      57
 #define EXT_FAST_TIMER    58
+#define EXT_KEYBOARD      59
 #else
 #define EXT_PIO0_OUT      47
 #define EXT_PIO1_OUT      48
@@ -209,6 +210,9 @@ extern void WriteCount5(unsigned long timeset);
 extern void SoftReset(void);
 extern volatile uint64_t IRoffset;
 extern int BacklightSlice,BacklightChannel;
+#if defined(PICOMITE) && defined(rp2350)
+extern int KeyboardlightSlice,KeyboardlightChannel;
+#endif
 extern void SetADCFreq(float frequency);
 extern void setBacklight(int level, int frequency);
 #ifdef rp2350
@@ -311,6 +315,7 @@ extern int ADCopen;
 extern volatile MMFLOAT * volatile a1float, * volatile a2float, * volatile a3float, * volatile a4float;
 extern uint32_t ADCmax;
 extern bool dmarunning;
+extern int last_adc;
 extern bool ADCDualBuffering;
 extern char *ADCInterrupt;
 extern uint32_t ADC_dma_chan;

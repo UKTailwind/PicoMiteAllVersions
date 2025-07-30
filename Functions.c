@@ -38,6 +38,8 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "Hardware_Includes.h"
 #include <float.h>
 #include "xregex.h"
+#include "hardware/adc.h"
+
 #ifdef rp2350
 #include "pico/rand.h"
 #endif
@@ -70,6 +72,9 @@ const char* overlaid_functions[]={
 	"MM.WIDTH",
 	"MM.HEIGHT",
 	"MM.PERSISTENT",
+#ifndef PICOMITEWEB
+	"MM.SUPPLY",
+#endif
 	"MM.END"
 };
 #ifndef rp2350
@@ -601,6 +606,23 @@ typedef enum {
 		case  MMPERSISTENT:
 			iret=_persistent;
 			break;
+#ifndef PICOMITEWEB
+			case  MMSUPPLY:
+			if(ExtCurrentConfig[44]== EXT_ANA_IN || Option.LOCAL_KEYBOARD){
+		        adc_init();
+#ifdef rp2350
+		        adc_select_input((rp2350a ? 3 : 7));
+#else
+		        adc_select_input(3);
+#endif
+		        last_adc=99;
+		        MMFLOAT t=(MMFLOAT)adc_read()/4095.0*VCC;
+				if(Option.LOCAL_KEYBOARD)fret=t*2.0;
+				else fret=t*3.0;
+			} else fret=-1.0;
+			targ=T_NBR;
+			break;
+#endif
 		default:
 			iret=-1;
 	}

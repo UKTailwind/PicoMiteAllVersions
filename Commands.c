@@ -749,6 +749,8 @@ void MIPS16 cmd_list(void) {
         	ListProgram(ProgMemory, true);
         	checkend(p);
         }
+	} else if((p = checkstring(cmdline, (unsigned char *)"OPTIONS"))) {
+		printoptions();
 	} else if((p = checkstring(cmdline, (unsigned char *)"VARIABLES"))) {
 		int count=0;
 		int64_t *dest=NULL;
@@ -1411,6 +1413,9 @@ if(Option.SerialConsole)while(ConsoleTxBufHead!=ConsoleTxBufTail)routinechecks()
 #endif
 #ifndef USBKEYBOARD
     if(mouse0==false && Option.MOUSE_CLOCK)initMouse0(0);  //see if there is a mouse to initialise 
+#endif
+#if defined(PICOMITE) && defined(rp2350)
+	if(Option.DISPLAY_TYPE>=NEXTGEN)Option.Refresh=1;
 #endif
 }
 void cmd_end(void) {

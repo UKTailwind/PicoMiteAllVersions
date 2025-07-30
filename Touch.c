@@ -153,64 +153,7 @@ void MIPS16 InitTouch(void) {
 	    WriteRegister8(FT6X36_ADDR, FT6X36_REG_THRESHHOLD, Option.THRESHOLD_CAP);
         WriteRegister8(FT6X36_ADDR, FT6X36_REG_TOUCHRATE_ACTIVE, 0x01);
         TOUCH_GETIRQTRIS = 1;
-/*    } else if(Option.TOUCH_CAP==2){
-        if(!Option.TOUCH_IRQ || !Option.SYSTEM_I2C_SCL) return; //shouldn't be needed
-        MMPrintString("Initialising GT911\r\n");
-        uint8_t read_data;
-        PinSetBit(CAP_RESET, LATCLR);
-        uSec(1000);
-        PinSetBit(CAP_RESET, LATSET);
-        uSec(500000);
-        gt911_addr=GT911_ADDR;
-        int ret=i2c_read_blocking(I2C0locked? i2c0 : i2c1, gt911_addr, &read_data, 1, false);
-        if(ret<0){
-            gt911_addr=GT911_ADDR2;
-            ret=i2c_read_blocking(I2C0locked? i2c0 : i2c1, gt911_addr, &read_data, 1, false); 
-        }
-        if(ret<0){
-            MMPrintString("GT911 controller not found\r\n");
-            return;
-        }
-        if(gt911_dev_mode_w(GT911_DEV_MODE_FACTORY) != GT911_OK){
-            MMPrintString("e0\r\n");
-        }
-        else if (gt911_dev_mode_r(&read_data) != GT911_OK){
-            MMPrintString("e1\r\n");
-        } else {
-            PInt(read_data);PRet();
-            uSec(300000);
-            if (read_data != GT911_DEV_MODE_FACTORY)
-            {
-            // Return error to caller 
-            MMPrintString("e3\r\n");
-            }
-            else {
-                read_data = 0x04U;
-                Write8Register16(gt911_addr, GT911_TD_STAT_REG, read_data);
-                if(mmI2Cvalue!=GT911_OK){
-                    MMPrintString("e4\r\n");
-                }
-                else {
-                    uint8_t end_calibration = 0U;
-                    uSec(300000);
-                    for (int nbr_attempt = 0; ((nbr_attempt < 100U) && (end_calibration == 0U)) ; nbr_attempt++)
-                    {
-                    if (gt911_dev_mode_r(&read_data) != GT911_OK)
-                    {
-                        MMPrintString("e5\r\n");
-                        break;
-                    }
-                    if (read_data == GT911_DEV_MODE_WORKING)
-                    {
-                        // Auto Switch to GT911_DEV_MODE_WORKING : means calibration have ended 
-                        end_calibration = 1U; // exit for loop 
-                    }
 
-                    uSec(300000);
-                    }
-                }
-            }
-        }*/
     } else {
         if(!Option.TOUCH_CS) return;
         GetTouchValue(CMD_PENIRQ_ON);                                   // send the controller the command to turn on PenIRQ
@@ -398,9 +341,10 @@ int __not_in_flash_func(GetTouchValue)(int cmd) {
     unsigned int lb, hb;
 	if(!SSDTYPE)SPISpeedSet(TOUCH);
     else SPISpeedSet(SLOWTOUCH);
+	gpio_init(TOUCH_CS_PIN);
+    gpio_set_dir(TOUCH_CS_PIN, GPIO_OUT);
     if(Option.CombinedCS){
         gpio_put(TOUCH_CS_PIN,GPIO_PIN_SET);
-        gpio_set_dir(TOUCH_CS_PIN, GPIO_OUT);
     } else gpio_put(TOUCH_CS_PIN,GPIO_PIN_RESET);  // set CS low
     TDelay();
     val=xchg_byte(cmd);    //    SpiChnPutC(TOUCH_SPI_CHANNEL, cmd);

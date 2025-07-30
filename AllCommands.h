@@ -194,6 +194,7 @@ void cmd_slice(void);
 void cmd_insert(void);
 void cmd_add(void);
 void cmd_arrayset(void);
+void cmd_keyscan(void);
 #ifdef PICOMITEWEB
     void cmd_web(void);
 #endif

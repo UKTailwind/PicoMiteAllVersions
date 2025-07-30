@@ -92,7 +92,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 
     extern short DisplayHRes, DisplayVRes;        // resolution of the display
     extern short HRes, VRes;                      // the programming charteristics of the display
-    extern short low_y, high_y, low_x, high_x;
+    extern volatile short low_y, high_y, low_x, high_x;
 
 #define LANDSCAPE       1
 #define PORTRAIT        2
@@ -138,8 +138,9 @@ void ReadBuffer16Fast(int x1, int y1, int x2, int y2, unsigned char *c);
 void DrawPixelNormal(int x, int y, int c) ;
 void ReadBuffer2(int x1, int y1, int x2, int y2, unsigned char *c);
 void copyframetoscreen(uint8_t *s,int xstart, int xend, int ystart, int yend, int odd);
+void copybuffertoscreen(unsigned char *s,int low_x,int low_y,int high_x,int high_y);
 void restorepanel(void);
-#define FONT_BUILTIN_NBR     8
+#define FONT_BUILTIN_NBR     9
 #define FONT_TABLE_SIZE      16
 extern void (*DrawPixel)(int x1, int y1, int c);
 extern void (*ReadBufferFast)(int x1, int y1, int x2, int y2, unsigned char *c);

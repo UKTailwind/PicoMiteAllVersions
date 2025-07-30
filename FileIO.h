@@ -97,8 +97,9 @@ struct option_s {
     unsigned char KEYBOARD_CLOCK;
     unsigned char KEYBOARD_DATA;
     unsigned char continuation;
-    unsigned char D1;  // dummy
-    uint16_t  D2;      // dummy
+    unsigned char LOCAL_KEYBOARD;  // dummy
+    unsigned char KeyboardBrightness;
+    uint8_t  D2;      // dummy
 //
     // display related
     unsigned char DefaultFont;
@@ -106,7 +107,13 @@ struct option_s {
     unsigned char RTC_Clock;
     unsigned char RTC_Data; //4=60
 //
-    #ifdef PICOMITE
+    #if defined(PICOMITE) && defined(rp2350)
+        unsigned char LCD_CLK;
+        unsigned char LCD_MOSI;
+        unsigned char LCD_MISO;
+        char dummy;                // maximum number of controls allowed //64
+    #endif
+    #if defined(PICOMITE) && !defined(rp2350)
         char dummy[4];                // maximum number of controls allowed //64
     #endif
     #ifdef PICOMITEWEB
@@ -138,7 +145,8 @@ struct option_s {
     char dummy[12];
 #endif
 #ifdef GUICONTROLS
-    int MaxCtrls;
+    uint8_t MaxCtrls;
+    unsigned char spare3[3];
 #else
     uint8_t HDMIclock;
     uint8_t HDMId0;
