@@ -2390,6 +2390,7 @@ void ST7920SetXY(int x, int y){
 #if defined(PICOMITE) && defined(rp2350)
 extern uint16_t __not_in_flash_func(RGB565)(uint32_t c);
 static uint32_t RGB332_LUT[256]={0};
+static uint32_t remap_LUT[256]={0};
 static uint8_t tlen=2;
 void init_RGB332_to_RGB565_LUT(void) {
     for (int i = 0; i < 256; i++) {
@@ -2407,11 +2408,11 @@ void init_RGB332_to_RGB565_LUT(void) {
         uint8_t b5 = BLUE_LUT[b];
 
         // Your bit order mapping:
-        RGB332_LUT[i] = RGB565(r5<<19 | g6<<10 | b5<<3);
+        RGB332_LUT[i] = remap_LUT[i]= RGB565(r5<<19 | g6<<10 | b5<<3);
     }
 }
 
-void init_RGB332_to_RGB888_LUT() {
+void init_RGB332_to_RGB888_LUT(void) {
     for (int i = 0; i < 256; ++i) {
         uint8_t r = (i >> 5) & 0x07; // 3 bits
         uint8_t g = (i >> 2) & 0x07; // 3 bits
@@ -2421,9 +2422,57 @@ void init_RGB332_to_RGB888_LUT() {
         uint8_t g8 = (g << 5) | (g << 2) | (g >> 1);  // scale to 8 bits
         uint8_t b8 = (b << 6) | (b << 4) | (b << 2) | b; // scale to 8 bits
 
-        RGB332_LUT[i] = (b8 << 16) | (g8 << 8) | r8;
+        RGB332_LUT[i] = remap_LUT[i]= (b8 << 16) | (g8 << 8) | r8;
     }
 	tlen=3;
+}
+void fun_map(void){
+    if(!(DISPLAY_TYPE>=NEXTGEN))error("Invalid for this display");
+	int cl=getint(ep,0,255);
+    switch(DISPLAY_TYPE){
+        case SCREENMODE1:
+        case SCREENMODE4:
+            error("Invalid for Mode");
+        break;
+        case SCREENMODE2:
+        case SCREENMODE3:
+            if(cl>15)error("Mode has 16 colours - 0 to 15");
+            targ=T_INT;
+            iret=((cl & 0b1000)<<20) | ((cl & 0b110)<<13) | ((cl & 0b1)<<7);
+            break;
+        case SCREENMODE5:
+            targ=T_INT;
+            iret=((cl & 0b11100000)<<16) | ((cl & 0b00011100)<<11) | ((cl & 0b11)<<6);
+            break;
+    }
+}
+void cmd_map(void){
+	unsigned char *p;
+//    if(Option.CPU_Speed==126000)error("CPUSPEED >= 252000 for colour mapping");
+    if(!(DISPLAY_TYPE>=NEXTGEN))error("Invalid for this display");
+    if((p=checkstring(cmdline, (unsigned char *)"RESET"))) {
+		if(Option.DISPLAY_TYPE==ILI9488BUFF  || Option.DISPLAY_TYPE == ILI9488PBUFF)init_RGB332_to_RGB888_LUT();
+		else init_RGB332_to_RGB565_LUT();
+    } else if((p=checkstring(cmdline, (unsigned char *)"SET"))) {
+         for(int i=0;i<256;i++)RGB332_LUT[i]=remap_LUT[i];
+		 low_x=0;low_y=0;high_x=HRes-1;high_y=VRes-1;
+    } else {
+        union colourmap {
+			char rgbbytes[4];
+			unsigned int rgb;
+		} c;
+	int cl = getinteger(cmdline);
+		while(*cmdline && tokenfunction(*cmdline) != op_equal) cmdline++;
+		if(!*cmdline) error("Invalid syntax");
+		++cmdline;
+		if(!*cmdline) error("Invalid syntax");
+		c.rgb=getColour((char *)cmdline,0);
+		if(Option.DISPLAY_TYPE==ILI9488BUFF  || Option.DISPLAY_TYPE == ILI9488PBUFF){
+			remap_LUT[cl]=(c.rgbbytes[0] << 16) | (c.rgbbytes[1] << 8) | c.rgbbytes[2];
+		} else {
+			remap_LUT[cl]=RGB565(c.rgb);
+		}
+    }
 }
 void copybuffertoscreen(unsigned char *s,int low_x,int low_y,int high_x,int high_y){
 	if(RGB332_LUT[255]==0){

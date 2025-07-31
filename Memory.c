@@ -52,7 +52,7 @@ extern const uint8_t *flash_progmemory;
 //unsigned char __attribute__ ((aligned (256))) AllMemory[ALL_MEMORY_SIZE];
 #ifdef rp2350
     #ifdef PICOMITEVGA
-        unsigned char __attribute__ ((aligned (4096))) AllMemory[HEAP_MEMORY_SIZE+256+320*240*2];
+        unsigned char __attribute__ ((aligned (256))) AllMemory[HEAP_MEMORY_SIZE+256+320*240*2];
         unsigned char *FRAMEBUFFER=AllMemory+HEAP_MEMORY_SIZE+256;
         uint32_t framebuffersize=320*240*2;
         unsigned char *MMHeap=AllMemory;
@@ -64,8 +64,8 @@ extern const uint8_t *flash_progmemory;
     #endif
 #else
     #ifdef PICOMITEVGA
-        unsigned char __attribute__ ((aligned (4096))) Heap[HEAP_MEMORY_SIZE+256];
         unsigned char __attribute__ ((aligned (256))) video[640*480/8];
+        unsigned char __attribute__ ((aligned (4096))) Heap[HEAP_MEMORY_SIZE+256];
         unsigned char *FRAMEBUFFER=video;
         uint32_t framebuffersize=640*480/8;
         unsigned char *MMHeap=Heap;
@@ -124,7 +124,7 @@ unsigned char *SecondFrame=video;
     unsigned char *FrameBuf=NULL;
 #endif
 #ifdef GUICONTROLS
-    struct s_ctrl CTRLS[MAXCONTROLS];
+//    struct s_ctrl CTRLS[MAXCONTROLS];
     struct s_ctrl *Ctrl=NULL;
 #endif
 #ifdef PICOMITEWEB
@@ -786,9 +786,6 @@ void m_alloc(int type) {
                         // everytime the program size is adjusted up or down this must be called to check for memory overflow
                         ProgMemory = (uint8_t *)flash_progmemory;
                         memset(MMHeap,0,heap_memory_size);
-#ifdef GUICONTROLS
-                        if(Option.MaxCtrls) Ctrl=(struct s_ctrl *)CTRLS;
-#endif
                         break;
                         
         case M_VAR:     // this must be called to initialises the variable memory pointer

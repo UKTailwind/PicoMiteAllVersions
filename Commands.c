@@ -127,7 +127,7 @@ void __not_in_flash_func(cmd_null)(void) {
 #ifdef rp2350
 void MIPS16 __not_in_flash_func(cmd_inc)(void){
 #else
-#ifdef PICOMITEVGA
+#if defined(PICOMITEVGA) || (defined(PICOMITEWEB) && !defined(rp2350))
 void MIPS16 cmd_inc(void){
 #else
 void MIPS16 __not_in_flash_func(cmd_inc)(void){

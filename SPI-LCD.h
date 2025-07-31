@@ -504,6 +504,8 @@ extern void BitBangReadSPI(BYTE *buff, int cnt);
 extern void ScrollLCDSPI(int lines);
 #if defined(PICOMITE) && defined(rp2350)
 extern void ScrollLCDMEM332(int lines);
+extern void init_RGB332_to_RGB565_LUT(void);
+extern void init_RGB332_to_RGB888_LUT(void);
 #endif
 extern void SetCS(void);
 extern int GetLineILI9341(void);

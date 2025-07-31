@@ -150,12 +150,18 @@ int sprite_which_collided = -1;
 static bool hideall = 0;
 uint8_t sprite_transparent=0;
 #ifdef PICOMITEVGA
-uint32_t remap[256];
-short gui_font_width, gui_font_height;
+#ifndef HDMI
+uint8_t remap[256];
+#else
+uint32_t remap555[256];
+uint32_t remap332[256];
+uint16_t remap256[256];
+#endif
+
+ short gui_font_width, gui_font_height;
 int last_bcolour, last_fcolour;
 volatile int CursorTimer=0;               // used to time the flashing cursor
 extern volatile int QVgaScanLine;
-extern uint16_t map16[16];
 bool mergedread=0;
 int ScreenSize=0;
 #else
@@ -6898,60 +6904,41 @@ void cmd_tile(void){
 }
 void cmd_map(void){
 	unsigned char *p;
-    static bool first=true;
     if(!(DISPLAY_TYPE==SCREENMODE2 || DISPLAY_TYPE==SCREENMODE3  || DISPLAY_TYPE==SCREENMODE5 ))error("Invalid for this screen mode");
     if((p=checkstring(cmdline, (unsigned char *)"RESET"))) {
-        while(v_scanline!=0){}
-        if(DISPLAY_TYPE==SCREENMODE5)for(int i=0;i<256;i++)map256[i]=remap[i]=RGB555(MAP256DEF[i]);
-        else if(FullColour)for(int i=0;i<16;i++){
-            map16[i]=remap[i]=RGB555(MAP16DEF[i]);
-            map16pairs[i]=map16[i] | (map16[i]<<16);
-        }
-        else if(DISPLAY_TYPE==SCREENMODE3)for(int i=0;i<16;i++) map16d[i]=remap[i]=RGB332(MAP16DEF[i]) | (RGB332(MAP16DEF[i])<<8);
-        else if(DISPLAY_TYPE==SCREENMODE2)for(int i=0;i<16;i++) map16q[i]=remap[i]=RGB332(MAP16DEF[i]) | (RGB332(MAP16DEF[i])<<8) | (RGB332(MAP16DEF[i])<<16) | (RGB332(MAP16DEF[i])<<24);
-        first=false;
+    mapreset();
     } else if((checkstring(cmdline, (unsigned char *)"GRAYSCALE") || checkstring(cmdline, (unsigned char *)"GREYSCALE")) && (FullColour)) {
         while(v_scanline!=0){}
-        if(DISPLAY_TYPE==SCREENMODE5) {
-            for(int i=1;i<=32;i++){
-                int j=i*8-(8-i/4+1);
-                if(j<0)j=0;
-                map256[i-1]=remap[i-1]=RGB555(j*65536 + j*256 + j);
-                map256[i+32-1]=remap[i+32-1]=RGB555(j);
-                map256[i+64-1]=remap[i+64-1]=RGB555(j*256 );
-                map256[i+96-1]=remap[i+96-1]=RGB555(j*256 + j);
-                map256[i+128-1]=remap[i+128-1]=RGB555(j*65536);
-                map256[i+160-1]=remap[i+160-1]=RGB555(j*65536 + j);
-                map256[i+192-1]=remap[i+192-1]=RGB555(j*65536 + j*256);
-                map256[i+224-1]=remap[i+224-1]=RGB555(j*65536 + j*256 + j);
-            }
-        } else {
-            for(int i=1;i<=16;i++){
-                int j=i*16-(16-i+1);
-                map16[i-1]=remap[i-1]= RGB555(j*65536+j*256+j);
-                map16pairs[i-1]=map16[i-1] | (map16[i-1]<<16);
-            }
+        for(int i=1;i<=32;i++){
+            int j=i*8-(8-i/4+1);
+            if(j<0)j=0;
+            map256[i-1]=remap256[i-1]=RGB555(j*65536 + j*256 + j);
+            map256[i+32-1]=remap256[i+32-1]=RGB555(j);
+            map256[i+64-1]=remap256[i+64-1]=RGB555(j*256 );
+            map256[i+96-1]=remap256[i+96-1]=RGB555(j*256 + j);
+            map256[i+128-1]=remap256[i+128-1]=RGB555(j*65536);
+            map256[i+160-1]=remap256[i+160-1]=RGB555(j*65536 + j);
+            map256[i+192-1]=remap256[i+192-1]=RGB555(j*65536 + j*256);
+            map256[i+224-1]=remap256[i+224-1]=RGB555(j*65536 + j*256 + j);
         }
-        first=false;
+        for(int i=1;i<=16;i++){
+            int j=i*16-(16-i+1);
+            map16quads[i-1]=remap332[i-1]= RGB332(j*65536+j*256+j);
+            map16pairs[i-1]=remap555[i-1]= (RGB555(j*65536+j*256+j) | (RGB555(j*65536+j*256+j)<<16));
+        }
     } else if((p=checkstring(cmdline, (unsigned char *)"MAXIMITE"))) {
         while(v_scanline!=0){}
-        if(DISPLAY_TYPE==SCREENMODE5)for(int i=0;i<16;i++)map256[i]=remap[i]=RGB555(CMM1map[i]);
-        else for(int i=0;i<16;i++){
-            map16[i]=remap[i]=RGB555(CMM1map[i]);
-            map16pairs[i]=map16[i] | (map16[i]<<16);
-#ifdef HDMI
-            if(DISPLAY_TYPE==SCREENMODE3 && (FullColour))map16d[i]=remap[i]=RGB332(CMM1map[i]) | (RGB332(CMM1map[i])<<8);
-            if(DISPLAY_TYPE==SCREENMODE2 && (FullColour))map16q[i]=remap[i]=RGB332(CMM1map[i]) | (RGB332(CMM1map[i])<<8)| (RGB332(CMM1map[i])<<16)| (RGB332(CMM1map[i])<<24);
-#endif
+        for(int i=0;i<16;i++)map256[i]=remap256[i]=RGB555(CMM1map[i]);
+        for(int i=0;i<16;i++){
+            map16quads[i]=remap332[i]=RGB332(CMM1map[i]) | (RGB332(CMM1map[i])<<8)| (RGB332(CMM1map[i])<<16)| (RGB332(CMM1map[i])<<24);
+            map16pairs[i]=remap555[i]=RGB555(CMM1map[i]) | (RGB555(CMM1map[i])<<8);
         }
-        first=false;
     } else if((p=checkstring(cmdline, (unsigned char *)"SET"))) {
         while(v_scanline!=0){}
-        if(DISPLAY_TYPE==SCREENMODE5) for(int i=0;i<256;i++)map256[i]=remap[i];
-        else for(int i=0;i<16;i++){
-            if(FullColour){map16[i]=remap[i];map16pairs[i]=map16[i] | (map16[i]<<16);}
-            else if(DISPLAY_TYPE==SCREENMODE3)map16d[i]=remap[i];
-            else if(DISPLAY_TYPE==SCREENMODE2)map16q[i]=remap[i];
+        for(int i=0;i<256;i++)map256[i]=remap256[i];
+        for(int i=0;i<16;i++){
+            map16pairs[i]=remap555[i];
+            map16quads[i]=remap332[i];
         }
     } else {
     	int cl = getint(cmdline,0,255);
@@ -6961,16 +6948,9 @@ void cmd_map(void){
 		++cmdline;
 		if(!*cmdline) error("Invalid syntax");
 		int col=getColour((char *)cmdline,0);
-        if(first){
-            if(DISPLAY_TYPE==SCREENMODE5)for(int i=0;i<256;i++)remap[i]=RGB555(MAP256DEF[i]);
-            else if(FullColour)for(int i=0;i<16;i++)remap[i]=RGB555(MAP16DEF[i]);
-            else if(DISPLAY_TYPE==SCREENMODE3)for(int i=0;i<16;i++)remap[i]=RGB332(MAP16DEF[i]) | (RGB332(MAP16DEF[i])<<8);
-            else if(DISPLAY_TYPE==SCREENMODE2)for(int i=0;i<16;i++)remap[i]=RGB332(MAP16DEF[i]) | (RGB332(MAP16DEF[i])<<8) | (RGB332(MAP16DEF[i])<<16) | (RGB332(MAP16DEF[i])<<24);
-            first=false;
-        }
-		if(FullColour)remap[cl]=RGB555(col);
-        else if(DISPLAY_TYPE==SCREENMODE3)remap[cl]=RGB332(col) | (RGB332(col)<<8);
-        else if(DISPLAY_TYPE==SCREENMODE2)remap[cl]=RGB332(col) | (RGB332(col)<<8) | (RGB332(col)<<16) | (RGB332(col)<<24);
+        remap256[cl]=RGB555(col);
+		remap555[cl]=RGB555(col) | (RGB555(col)<<16);
+        remap332[cl]=RGB332(col) | (RGB332(col)<<8) | (RGB332(col)<<16) | (RGB332(col)<<24);
     }
 }
 #endif
@@ -6995,6 +6975,8 @@ void setmode(int mode, bool clear){
 #ifndef HDMI
         tilefcols=(uint16_t *)((uint8_t*)FRAMEBUFFER+(MODE1SIZE*3));
         tilebcols=(uint16_t *)((uint8_t*)FRAMEBUFFER+(MODE1SIZE*3)+(MODE1SIZE>>1));
+#else
+        mapreset();
 #endif
 #endif
         DISPLAY_TYPE=SCREENMODE1;

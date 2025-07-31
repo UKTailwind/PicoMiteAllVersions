@@ -565,6 +565,10 @@ void fun_map(void);
 { (unsigned char *)"Array Insert",	T_CMD,		0, cmd_insert	},
 { (unsigned char *)"Array Add",	T_CMD,		0, cmd_add	},
 { (unsigned char *)"Array Set",	T_CMD,		0, cmd_arrayset	},
+#if defined(rp2350) && defined(PICOMITE)
+  	{ (unsigned char *)"Map(",            T_CMD | T_FUN  ,           0, cmd_map   },
+	{ (unsigned char *)"Map",            T_CMD,           0, cmd_map   },
+#endif
 { (unsigned char *)"",   0,                  0, cmd_null,    }                   // this dummy entry is always at the end
 #endif
 /* ********************************************************************************
@@ -707,6 +711,9 @@ void fun_map(void);
 	  { (unsigned char *)"CtrlVal(",       T_FUN | T_NBR | T_STR,      0, fun_ctrlval    },
 #endif
 { (unsigned char *)"Bit(",	T_FUN | T_INT,		0, fun_bit,	},
+#if defined(rp2350) && defined(PICOMITE)
+	{ (unsigned char*)"Map(",	    T_FUN | T_INT,		0, fun_map, },
+#endif
 { (unsigned char *)"",   0,                  0, cmd_null,    }                   // this dummy entry is always at the end
 #endif
 /*  @endcond */

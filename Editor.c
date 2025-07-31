@@ -365,7 +365,7 @@ void edit(unsigned char *cmdline, bool cmdfile) {
 #ifdef PICOMITEVGA
 #ifdef rp2350
     #ifdef HDMI
-        if(DISPLAY_TYPE==SCREENMODE3)for(int i=0;i<16;i++)map16[i]=remap[i]=RGB555(MAP16DEF[i]);
+        mapreset();
     #else
         if(DISPLAY_TYPE==SCREENMODE3)for(int i=0;i<16;i++)map16[i]=remap[i]=i;
     #endif
@@ -1056,14 +1056,8 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
                             }
 #ifdef HDMI
         while(v_scanline!=0){}
-        if(DISPLAY_TYPE==SCREENMODE5)for(int i=0;i<256;i++)map256[i]=remap[i]=RGB555(MAP256DEF[i]);
-        else if(FullColour)for(int i=0;i<16;i++){
-            map16[i]=remap[i]=RGB555(MAP16DEF[i]);
-            map16pairs[i]=map16[i] | (map16[i]<<16);
-        }
-        else if(DISPLAY_TYPE==SCREENMODE3)for(int i=0;i<16;i++) {map16s[i]=RGB332(MAP16DEF[i]); map16d[i]=remap[i]=RGB332(MAP16DEF[i]) | (RGB332(MAP16DEF[i])<<8);}
-        else if(DISPLAY_TYPE==SCREENMODE2)for(int i=0;i<16;i++) map16q[i]=remap[i]=RGB332(MAP16DEF[i]) | (RGB332(MAP16DEF[i])<<8) | (RGB332(MAP16DEF[i])<<16) | (RGB332(MAP16DEF[i])<<24);
-            if(DISPLAY_TYPE==SCREENMODE1)  {
+        mapreset();
+        if(DISPLAY_TYPE==SCREENMODE1)  {
                 if(FullColour){
                     tilefcols=(uint16_t *)((uint32_t)FRAMEBUFFER+(MODE1SIZE*3));
                     tilebcols=(uint16_t *)((uint32_t)FRAMEBUFFER+(MODE1SIZE*3)+(MODE1SIZE>>1));

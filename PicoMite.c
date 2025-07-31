@@ -110,30 +110,29 @@ extern void start_vga_i2s(void);
     #include "lwip/udp.h"
 #endif
 #ifdef PICOMITEVGA
-    uint16_t map16[16]={0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};
-    uint32_t map16pairs[16];
     volatile uint8_t transparent=0;
     volatile uint8_t transparents=0;
     volatile int RGBtransparent=0;
     int MODE1SIZE, MODE2SIZE, MODE3SIZE, MODE4SIZE, MODE5SIZE;
 #ifdef HDMI
-    uint16_t map16d[16];
-    uint32_t map16q[16];
-    uint8_t  map16s[16];
-#endif
+    uint32_t map16quads[16];
+    uint32_t map16pairs[16];
     // 126 MHz timings
-int QVGA_TOTAL;// total clock ticks (= QVGA_HSYNC + QVGA_BP + WIDTH*QVGA_CPP[1600] + QVGA_FP)
-int QVGA_HSYNC;	// horizontal sync clock ticks
-int QVGA_BP	;	// back porch clock ticks
-int QVGA_FP;	// front porch clock ticks
+#else
+    uint8_t map16[16]={0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};
+    int QVGA_TOTAL;// total clock ticks (= QVGA_HSYNC + QVGA_BP + WIDTH*QVGA_CPP[1600] + QVGA_FP)
+    int QVGA_HSYNC;	// horizontal sync clock ticks
+    int QVGA_BP	;	// back porch clock ticks
+    int QVGA_FP;	// front porch clock ticks
 
-// QVGA vertical timings
-int QVGA_VACT;	// V active scanlines (= 2*HEIGHT)
-int QVGA_VFRONT;	// V front porch
-int QVGA_VSYNC;	// length of V sync (number of scanlines)
-int QVGA_VBACK;	// V back porch
-int QVGA_VTOT;	// total scanlines (= QVGA_VSYNC + QVGA_VBACK + QVGA_VACT + QVGA_VFRONT)
-int QVGA_HACT;	// V active scanlines (= 2*HEIGHT)
+    // QVGA vertical timings
+    int QVGA_VACT;	// V active scanlines (= 2*HEIGHT)
+    int QVGA_VFRONT;	// V front porch
+    int QVGA_VSYNC;	// length of V sync (number of scanlines)
+    int QVGA_VBACK;	// V back porch
+    int QVGA_VTOT;	// total scanlines (= QVGA_VSYNC + QVGA_VBACK + QVGA_VACT + QVGA_VFRONT)
+    int QVGA_HACT;	// V active scanlines (= 2*HEIGHT)
+#endif
 
     #ifndef HDMI
     #include "Include.h"
@@ -2800,22 +2799,22 @@ void MIPS32 __not_in_flash_func(HDMIloopX)(void){
                         for(int i=0; i<MODE_H_X_ACTIVE_PIXELS/8 ; i++){
                             l=LayerBuf[pp+i];d=DisplayBuf[pp+i];s=SecondLayer[pp+i];
                             if((s&0xf)!=transparents){
-                                *p++=map16q[s&0xf];
+                                *p++=map16quads[s&0xf];
                             } else {
                                 if((l&0xf)!=transparent){
-                                    *p++=map16q[l&0xf];
+                                    *p++=map16quads[l&0xf];
                                 } else {
-                                    *p++=map16q[d&0xf];
+                                    *p++=map16quads[d&0xf];
                                 }
                             }
                             d>>=4;l>>=4;s>>=4;
                             if((s&0xf)!=transparents){
-                                *p++=map16q[s&0xf];
+                                *p++=map16quads[s&0xf];
                             } else {
                                 if((l&0xf)!=transparent){
-                                    *p++=map16q[l&0xf];
+                                    *p++=map16quads[l&0xf];
                                 } else {
-                                    *p++=map16q[d&0xf];
+                                    *p++=map16quads[d&0xf];
                                 }
                             }
                         }
@@ -2829,15 +2828,15 @@ void MIPS32 __not_in_flash_func(HDMIloopX)(void){
                         for(int i=0; i<MODE_H_X_ACTIVE_PIXELS/4 ; i++){
                             l=LayerBuf[pp+i];d=DisplayBuf[pp+i];
                             if((l&0xf)!=transparent){
-                                *p++=map16d[l&0xf];
+                                *p++=map16quads[l&0xf];
                             } else {
-                                *p++=map16d[d&0xf];
+                                *p++=map16quads[d&0xf];
                             }
                             d>>=4;l>>=4;
                             if((l&0xf)!=transparent){
-                                *p++=map16d[l&0xf];
+                                *p++=map16quads[l&0xf];
                             } else {
-                                *p++=map16d[d&0xf];
+                                *p++=map16quads[d&0xf];
                             }
                         }
                     }
@@ -2979,22 +2978,22 @@ void MIPS32 __not_in_flash_func(HDMIloop1)(void){
                         for(int i=0; i<MODE_H_W_ACTIVE_PIXELS/8 ; i++){
                             l=LayerBuf[pp+i];d=DisplayBuf[pp+i];s=SecondLayer[pp+i];
                             if((s&0xf)!=transparents){
-                                *p++=map16q[s&0xf];
+                                *p++=map16quads[s&0xf];
                             } else {
                                 if((l&0xf)!=transparent){
-                                    *p++=map16q[l&0xf];
+                                    *p++=map16quads[l&0xf];
                                 } else {
-                                    *p++=map16q[d&0xf];
+                                    *p++=map16quads[d&0xf];
                                 }
                             }
                             d>>=4;l>>=4;s>>=4;
                             if((s&0xf)!=transparents){
-                                *p++=map16q[s&0xf];
+                                *p++=map16quads[s&0xf];
                             } else {
                                 if((l&0xf)!=transparent){
-                                    *p++=map16q[l&0xf];
+                                    *p++=map16quads[l&0xf];
                                 } else {
-                                    *p++=map16q[d&0xf];
+                                    *p++=map16quads[d&0xf];
                                 }
                             }
                         }
@@ -3008,15 +3007,15 @@ void MIPS32 __not_in_flash_func(HDMIloop1)(void){
                         for(int i=0; i<MODE_H_W_ACTIVE_PIXELS/4 ; i++){
                             l=LayerBuf[pp+i];d=DisplayBuf[pp+i];
                             if((l&0xf)!=transparent){
-                                *p++=map16d[l&0xf];
+                                *p++=map16quads[l&0xf];
                             } else {
-                                *p++=map16d[d&0xf];
+                                *p++=map16quads[d&0xf];
                             }
                             d>>=4;l>>=4;
                             if((l&0xf)!=transparent){
-                                *p++=map16d[l&0xf];
+                                *p++=map16quads[l&0xf];
                             } else {
-                                *p++=map16d[d&0xf];
+                                *p++=map16quads[d&0xf];
                             }
                         }
                     }
@@ -3158,22 +3157,22 @@ void MIPS32 __not_in_flash_func(HDMIloop2)(void){
                         for(int i=0; i<MODE_H_L_ACTIVE_PIXELS/8 ; i++){
                             l=LayerBuf[pp+i];d=DisplayBuf[pp+i];s=SecondLayer[pp+i];
                             if((s&0xf)!=transparents){
-                                *p++=map16q[s&0xf];
+                                *p++=map16quads[s&0xf];
                             } else {
                                 if((l&0xf)!=transparent){
-                                    *p++=map16q[l&0xf];
+                                    *p++=map16quads[l&0xf];
                                 } else {
-                                    *p++=map16q[d&0xf];
+                                    *p++=map16quads[d&0xf];
                                 }
                             }
                             d>>=4;l>>=4;s>>=4;
                             if((s&0xf)!=transparents){
-                                *p++=map16q[s&0xf];
+                                *p++=map16quads[s&0xf];
                             } else {
                                 if((l&0xf)!=transparent){
-                                    *p++=map16q[l&0xf];
+                                    *p++=map16quads[l&0xf];
                                 } else {
-                                    *p++=map16q[d&0xf];
+                                    *p++=map16quads[d&0xf];
                                 }
                             }
                         }
@@ -3187,15 +3186,15 @@ void MIPS32 __not_in_flash_func(HDMIloop2)(void){
                         for(int i=0; i<MODE_H_L_ACTIVE_PIXELS/4 ; i++){
                             l=LayerBuf[pp+i];d=DisplayBuf[pp+i];
                             if((l&0xf)!=transparent){
-                                *p++=map16d[l&0xf];
+                                *p++=map16quads[l&0xf];
                             } else {
-                                *p++=map16d[d&0xf];
+                                *p++=map16quads[d&0xf];
                             }
                             d>>=4;l>>=4;
                             if((l&0xf)!=transparent){
-                                *p++=map16d[l&0xf];
+                                *p++=map16quads[l&0xf];
                             } else {
-                                *p++=map16d[d&0xf];
+                                *p++=map16quads[d&0xf];
                             }
                         }
                     }
@@ -3301,15 +3300,15 @@ void MIPS32 __not_in_flash_func(HDMIloop3)(void){
                         for(int i=0; i<vgaloop4 ; i++){
                             l=LayerBuf[pp+i];d=DisplayBuf[pp+i];
                             if((l&0xf)!=transparent){
-                                *p++=map16d[l&0xf];
+                                *p++=map16quads[l&0xf];
                             } else {
-                                *p++=map16d[d&0xf];
+                                *p++=map16quads[d&0xf];
                             }
                             d>>=4;l>>=4;
                             if((l&0xf)!=transparent){
-                                *p++=map16d[l&0xf];
+                                *p++=map16quads[l&0xf];
                             } else {
-                                *p++=map16d[d&0xf];
+                                *p++=map16quads[d&0xf];
                             }
                         }
                     }
@@ -3322,15 +3321,15 @@ void MIPS32 __not_in_flash_func(HDMIloop3)(void){
                         for(int i=0; i<vgaloop2 ; i++){
                             l=LayerBuf[pp+i];d=DisplayBuf[pp+i];
                             if((l&0xf)!=transparent){
-                                *p++=map16s[l&0xf];
+                                *p++=map16quads[l&0xf];
                             } else {
-                                *p++=map16s[d&0xf];
+                                *p++=map16quads[d&0xf];
                             }
                             d>>=4;l>>=4;
                             if((l&0xf)!=transparent){
-                                *p++=map16s[l&0xf];
+                                *p++=map16quads[l&0xf];
                             } else {
-                                *p++=map16s[d&0xf];
+                                *p++=map16quads[d&0xf];
                             }
                         }
                     }
@@ -3443,15 +3442,15 @@ void MIPS32 __not_in_flash_func(HDMIloop0)(void){
                         d=DisplayBuf[pp+i];
                         l=LayerBuf[pp+i];
                         if((l&0xf)!=transparent16){
-                            *p++=map16[l&0xf];
+                            *p++=map16pairs[l&0xf];
                         } else {
-                            *p++=map16[d&0xf];
+                            *p++=map16pairs[d&0xf];
                         }
                         d>>=4;l>>=4;
                         if((l&0xf)!=transparent16){
-                            *p++=map16[l&0xf];
+                            *p++=map16pairs[l&0xf];
                         } else {
-                            *p++=map16[d&0xf];
+                            *p++=map16pairs[d&0xf];
                         }
                     }
                     break;
@@ -3503,15 +3502,15 @@ void MIPS32 __not_in_flash_func(HDMIloop0)(void){
         }
     }
 }
-void HDMICore(void){
-    for(int i=0;i<256;i++)map256[i]=RGB555(MAP256DEF[i]);
+void mapreset(void){
+    for(int i=0;i<256;i++)map256[i]=remap256[i]=RGB555(MAP256DEF[i]);
     for(int i=0;i<16;i++){
-        map16[i]=RGB555(MAP16DEF[i]);
-        map16pairs[i]=map16[i] | (map16[i]<<16);
-        map16d[i]=(RGB332(MAP16DEF[i])<<8) | RGB332(MAP16DEF[i]);
-        map16q[i]=(RGB332(MAP16DEF[i])<<24) | (RGB332(MAP16DEF[i])<<16) | (RGB332(MAP16DEF[i])<<8) | RGB332(MAP16DEF[i]);
-        map16s[i]=RGB332(MAP16DEF[i]);
+        map16pairs[i]=remap555[i]=(RGB555(MAP16DEF[i]) | (RGB555(MAP16DEF[i])<<16));
+        map16quads[i]=remap332[i]=((RGB332(MAP16DEF[i])<<24) | (RGB332(MAP16DEF[i])<<16) | (RGB332(MAP16DEF[i])<<8) | RGB332(MAP16DEF[i]));
     }
+}
+void HDMICore(void){
+    mapreset();
     if(Option.CPU_Speed==FreqXGA){
         MODE_H_SYNC_POLARITY=MODE_H_L_SYNC_POLARITY;
         MODE_ACTIVE_LINES=MODE_V_L_ACTIVE_LINES;
@@ -4286,14 +4285,22 @@ int MIPS16 main(){
 #ifdef PICOMITE
 	mutex_init( &frameBufferMutex );						// create a mutex to lock frame buffer
 #endif
+#ifdef GUICONTROLS
+     if(Option.MaxCtrls) {
+        int size=Option.MaxCtrls*sizeof(struct s_ctrl);
+        heap_memory_size-= size;
+        Ctrl=(struct s_ctrl *)AllMemory+heap_memory_size+256;
+     }
+#endif
+
 #ifndef rp2350
     if(Option.CPU_Speed<=200000)modclock(2);
 #else
 #if defined(PICOMITE) && defined(rp2350)
     if(Option.DISPLAY_TYPE>=NEXTGEN){ //adjust the size of the heap
         framebuffersize=display_details[Option.DISPLAY_TYPE].horizontal*display_details[Option.DISPLAY_TYPE].vertical;
-        heap_memory_size=HEAP_MEMORY_SIZE-framebuffersize;
-        FRAMEBUFFER=AllMemory+heap_memory_size+256;
+        heap_memory_size-=framebuffersize;
+        FRAMEBUFFER=AllMemory+heap_memory_size+256+Option.MaxCtrls*sizeof(struct s_ctrl);
     }
 #endif
 #ifdef HDMI

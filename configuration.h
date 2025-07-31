@@ -147,7 +147,7 @@ extern "C" {
     #define FreqY    333000
     #define FreqX    250000
     #define FullColour (Option.CPU_Speed ==Freq252P || Option.CPU_Speed==Freq378P || Option.CPU_Speed ==Freq480P || Option.CPU_Speed ==Freq400)
-    #define MediumRes (Option.CPU_Speed==FreqSVGA || Option.CPU_Speed==Freq848 || Option.CPU_Speed==FreqY)
+    #define MediumRes (Option.CPU_Speed==FreqSVGA || Option.CPU_Speed==Freq848 || Option.CPU_Speed==FreqY || Option.CPU_Speed==FreqX)
 #endif
 
 #ifdef PICOMITEWEB

@@ -119,14 +119,12 @@ extern uint8_t *tilefcols_w;
 extern uint8_t *tilebcols_w;
 extern void settiles(void);
 extern uint16_t map256[256];
-extern uint16_t map16[16];
-extern uint16_t map16d[16];
-extern uint8_t map16s[16];
-extern uint32_t map16q[16];
+extern uint32_t map16quads[16];
 extern uint32_t map16pairs[16];
 extern const uint32_t MAP256DEF[256];
 extern volatile int32_t v_scanline;
 #else
+extern uint8_t map16[16];
 #ifdef rp2350
 extern uint16_t *tilefcols;
 extern uint16_t *tilebcols;
@@ -230,8 +228,8 @@ extern void clear320(void);
 	extern volatile uint8_t transparent;
 	extern volatile uint8_t transparents;
 	extern volatile int RGBtransparent;
-	extern uint16_t map16[16];
 	#ifndef HDMI
+		extern uint8_t remap[];
 		extern uint16_t __attribute__ ((aligned (256))) M_Foreground[16];
 		extern uint16_t __attribute__ ((aligned (256))) M_Background[16];
 		#ifdef rp2350
@@ -243,9 +241,13 @@ extern void clear320(void);
 		#endif
 		extern void VGArecovery(int pin);
 	#else
-	extern int MODE_H_SYNC_POLARITY, MODE_V_TOTAL_LINES, MODE_ACTIVE_LINES, MODE_ACTIVE_PIXELS;
-	extern int MODE_H_ACTIVE_PIXELS, MODE_H_FRONT_PORCH, MODE_H_SYNC_WIDTH, MODE_H_BACK_PORCH;
-	extern int MODE_V_SYNC_POLARITY ,MODE_V_ACTIVE_LINES ,MODE_V_FRONT_PORCH, MODE_V_SYNC_WIDTH, MODE_V_BACK_PORCH;
+		extern uint32_t remap555[];
+		extern uint32_t remap332[];
+		extern uint16_t remap256[];
+		extern void mapreset(void);
+		extern int MODE_H_SYNC_POLARITY, MODE_V_TOTAL_LINES, MODE_ACTIVE_LINES, MODE_ACTIVE_PIXELS;
+		extern int MODE_H_ACTIVE_PIXELS, MODE_H_FRONT_PORCH, MODE_H_SYNC_WIDTH, MODE_H_BACK_PORCH;
+		extern int MODE_V_SYNC_POLARITY ,MODE_V_ACTIVE_LINES ,MODE_V_FRONT_PORCH, MODE_V_SYNC_WIDTH, MODE_V_BACK_PORCH;
 	#endif
 	extern int MODE1SIZE;
 	extern int MODE2SIZE;

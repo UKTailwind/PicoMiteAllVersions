@@ -173,7 +173,7 @@ extern long long int CallCFunction(unsigned char *CmdPtr, unsigned char *ArgList
 //
 //void getexpr(unsigned char *);
 //void checktype(int *, int);
-unsigned char __not_in_flash_func(*getvalue)(unsigned char *p, MMFLOAT *fa, long long int  *ia, unsigned char **sa, int *oo, int *ta);
+unsigned char *getvalue(unsigned char *p, MMFLOAT *fa, long long int  *ia, unsigned char **sa, int *oo, int *ta);
 unsigned char tokenTHEN, tokenELSE, tokenGOTO, tokenEQUAL, tokenTO, tokenSTEP, tokenWHILE, tokenUNTIL, tokenGOSUB, tokenAS, tokenFOR;
 unsigned short cmdIF, cmdENDIF, cmdEND_IF, cmdELSEIF, cmdELSE_IF, cmdELSE, cmdSELECT_CASE, cmdFOR, cmdNEXT, cmdWHILE, cmdENDSUB, cmdENDFUNCTION, cmdLOCAL, cmdSTATIC, cmdCASE, cmdDO, cmdLOOP, cmdCASE_ELSE, cmdEND_SELECT;
 unsigned short cmdSUB, cmdFUN, cmdCFUN, cmdCSUB, cmdIRET, cmdComment, cmdEndComment;
@@ -1493,7 +1493,11 @@ unsigned char MIPS16 __not_in_flash_func(*doexpr)(unsigned char *p, MMFLOAT *fa,
 
 // get a value, either from a constant, function or variable
 // also returns the next operator to the right of the value or E_END if no operator
+#if defined(PICOMITEWEB) && !defined(rp2350)
+unsigned char MIPS16 *getvalue(unsigned char *p, MMFLOAT *fa, long long int  *ia, unsigned char **sa, int *oo, int *ta) {
+#else
 unsigned char MIPS16 __not_in_flash_func(*getvalue)(unsigned char *p, MMFLOAT *fa, long long int  *ia, unsigned char **sa, int *oo, int *ta) {
+#endif
     MMFLOAT f = 0;
     long long int  i64 = 0;
     unsigned char *s = NULL;
@@ -1787,7 +1791,7 @@ unsigned char MIPS16 __not_in_flash_func(*getvalue)(unsigned char *p, MMFLOAT *f
 
     return p;
 }
-
+ 
 
 
 
@@ -3253,7 +3257,11 @@ void MIPS16 ClearRuntime(bool all) {
     optionfastaudio=0;
     optionlogging=false;
 #if defined(PICOMITE) && defined(rp2350)
-	if(Option.DISPLAY_TYPE>=NEXTGEN)Option.Refresh=1;
+	if(Option.DISPLAY_TYPE>=NEXTGEN){
+        Option.Refresh=1;
+		if(Option.DISPLAY_TYPE==ILI9488BUFF  || Option.DISPLAY_TYPE == ILI9488PBUFF)init_RGB332_to_RGB888_LUT();
+		else init_RGB332_to_RGB565_LUT();
+    }
 #endif
 /*frame
     frame=NULL;

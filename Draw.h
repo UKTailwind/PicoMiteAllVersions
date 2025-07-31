@@ -161,7 +161,7 @@ extern int PrintPixelMode;
 extern char CMM1;
 extern int ScreenSize;
 extern char LCDAttrib;
-extern uint32_t remap[];
+extern int getColour(char *c, int minus);
 extern void setmode(int mode, bool clear);
 typedef struct SVD {
 	FLOAT3D x;
