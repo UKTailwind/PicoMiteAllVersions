@@ -24,6 +24,7 @@
 
 #include "hardware/platform_defs.h"
 #include "hardware/regs/addressmap.h"
+#include "configuration.h"
 
 #define PSRAM_BASE         _u(0x11000000)
 #define PSRAM_NOCACHE_BASE _u(0x15000000)

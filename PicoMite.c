@@ -45,7 +45,6 @@ extern "C" {
 #include "pico/unique_id.h"
 #include "hardware/pwm.h"
 #include "configuration.h"
-#define PSRAMCSPIN PinDef[Option.PSRAM_CS_PIN].GPno
 
 extern void start_i2s(int pio, int sm);
 #ifdef rp2350
@@ -94,6 +93,7 @@ extern void start_vga_i2s(void);
     #include "hardware/regs/powman.h"
     bool rp2350a=true;
     uint32_t PSRAMsize=0;
+    uint8_t PSRAMpin;
 #endif
 #include "hardware/structs/bus_ctrl.h"
 #include <pico/bootrom.h>
@@ -4257,6 +4257,7 @@ int MIPS16 main(){
 #ifdef rp2350
 #ifndef PICOMITEWEB
     if(Option.PSRAM_CS_PIN){
+        PSRAMpin=PinDef[Option.PSRAM_CS_PIN].GPno;
         psram_setup();
         if(!(PSRAMsize=psram_size())){
             Option.PSRAM_CS_PIN=0;

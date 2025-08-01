@@ -229,6 +229,8 @@ extern "C" {
 #define MAXOPENFILES        10                      // maximum number of open files
 #ifdef rp2350
 #define MAXDIM              5                       // maximum nbr of dimensions to an array
+#define PSRAMCSPIN PSRAMpin
+extern uint8_t PSRAMpin;
 #else
 #define MAXDIM              6                       // maximum nbr of dimensions to an array
 #endif
