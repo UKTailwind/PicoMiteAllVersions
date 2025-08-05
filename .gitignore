@@ -1,0 +1,31 @@
+# object files
+*.o
+*.obj
+*.elf
+
+# linker output
+*.map
+
+# pico sdk build artifacts
+build/
+*.uf2
+*.dis
+*.bin
+*.hex
+
+# debug information files
+*.dwo
+
+# ide and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# os-generated files
+.DS_Store
+Thumbs.db
+
+# patch files
+*.patch
