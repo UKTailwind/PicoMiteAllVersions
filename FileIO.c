@@ -5010,7 +5010,7 @@ void ResetOptions(bool startup)
     Option.Width = SCREENWIDTH;
     Option.Tab = 2;
     Option.DefaultFont = 0x01;
-    Option.DefaultBrightness = 100;
+    Option.BackLightLevel = 100;
     Option.Baudrate = CONSOLE_BAUDRATE;
     Option.PROG_FLASH_SIZE=MAX_PROG_SIZE;
     Option.ColourCode=0x01;
@@ -5086,7 +5086,6 @@ void ResetOptions(bool startup)
     Option.TOUCH_XSCALE=1.0f;
     Option.TOUCH_YSCALE=1.0f;
 #endif
-    Option.DefaultBrightness = 100;
     Option.numlock = 1;
     Option.repeat = 0b101100;
     Option.VGA_HSYNC=21;

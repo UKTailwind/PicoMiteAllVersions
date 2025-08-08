@@ -80,6 +80,9 @@ extern void ErrorCheck(int fnbr);
 extern const int mapping[101];
 extern PIO pioi2s;
 extern uint8_t i2ssm;
+static int arraypos=0;
+static int arraysize=0;
+short *leftarray=NULL,*rightarray=NULL;
 
 /********************************************************************************************************************************************
 commands and functions
@@ -107,9 +110,9 @@ commands and functions
  ********************************************************************************************************************************************/
 
 // define the PWM output frequency for making a tone
-const char* const PlayingStr[] = {"PAUSED TONE", "PAUSED FLAC", "PAUSED MP3",  "PAUSED SOUND", "PAUSED MOD", "PAUSED WAV", "OFF", 
+const char* const PlayingStr[] = {"PAUSED TONE", "PAUSED FLAC", "PAUSED MP3",  "PAUSED SOUND", "PAUSED MOD", "PAUSED ARRAY", "PAUSED WAV", "OFF", 
     "OFF", "TONE", "SOUND", "WAV", "FLAC", "MP3", 
-    "MIDI", "", "MOD", "STREAM","" 
+    "MIDI", "", "MOD", "STREAM", "ARRAY", "" 
 }  ;                              
 volatile unsigned char PWM_count = 0;
 volatile float PhaseM_left, PhaseM_right;
@@ -613,7 +616,7 @@ void MIPS64 __not_in_flash_func(i2sconvert)(int16_t *fbuff, int16_t *sbuff, int 
 	int i;
 	for(i=0;i<(count);i+=2){
 		sbuff[i]=(int16_t)((int)(fbuff[i])*mapping[vol_left]/2000);
-		sbuff[i+1]=(int32_t)((int)(fbuff[i+1])*mapping[vol_right]/2000);
+		sbuff[i+1]=(int16_t)((int)(fbuff[i+1])*mapping[vol_right]/2000);
 	}
 }
 
@@ -641,14 +644,6 @@ drwav_bool32 onSeek(void  *userdata,  int offset,  drwav_seek_origin origin){
 	}
     return 1;
 }
-/*drwav_bool32 onTell(void  *userdata,  drwav_int64* pCursor){
-	if(filesource[WAV_fnbr]==FATFSFILE){
-		*pCursor=(*(FileTable[WAV_fnbr].fptr)).fptr;
-	} else {
-		*pCursor=lfs_file_tell(&lfs,FileTable[WAV_fnbr].lfsptr);
-	}
-    return 1;
-}*/
 
 void CloseAudio(int all){
 #ifdef rp2350
@@ -1025,6 +1020,18 @@ void setnoise(void){
     return;
 
 }
+unsigned int readarray(char *sbuff){
+	short *buff=(short *)sbuff;
+	int count=arraysize-arraypos;
+	if(count>WAV_BUFFER_SIZE/(sizeof(short)*2))count = WAV_BUFFER_SIZE/((sizeof(short))*2);
+	for(int i=arraypos;i< arraypos+count;i++){
+		*buff++=leftarray[i];
+		*buff++=rightarray[i];
+	}
+	arraypos+=count;
+	if(count<WAV_BUFFER_SIZE/(sizeof(short)*2))playreadcomplete = 1;
+	return count*2;
+};
 /*  @endcond */
 // The MMBasic command:  PLAY
 void MIPS16 cmd_play(void) {
@@ -1122,6 +1129,7 @@ void MIPS16 cmd_play(void) {
         else if(CurrentlyPlaying == P_FLAC)  CurrentlyPlaying = P_PAUSE_FLAC;
         else if(CurrentlyPlaying == P_MP3)  CurrentlyPlaying = P_PAUSE_MP3;
         else if(CurrentlyPlaying == P_MOD)  CurrentlyPlaying = P_PAUSE_MOD;
+        else if(CurrentlyPlaying == P_ARRAY)  CurrentlyPlaying = P_PAUSE_ARRAY;
         else
             error("Nothing playing");
         return;
@@ -1133,6 +1141,7 @@ void MIPS16 cmd_play(void) {
         else if(CurrentlyPlaying == P_PAUSE_FLAC) CurrentlyPlaying = P_FLAC;
         else if(CurrentlyPlaying == P_PAUSE_MP3)  CurrentlyPlaying = P_MP3;
         else if(CurrentlyPlaying == P_PAUSE_MOD)  CurrentlyPlaying = P_MOD;
+        else if(CurrentlyPlaying == P_PAUSE_ARRAY)  CurrentlyPlaying = P_ARRAY;
         else
             error("Nothing to resume");  
         return;
@@ -1207,6 +1216,58 @@ void MIPS16 cmd_play(void) {
 			return;
 		}
     }
+    if((tp = checkstring(cmdline, (unsigned char *)"ARRAY"))) {//PLAY ARRAY left%(), right%(), frequency, startpos, endpos, interrupt
+		float freq;
+        getargs(&tp, 11,(unsigned char *)",");                                       // this MUST be the first executable line in the function
+        if(!(argc == 11 || argc == 9 || argc == 7 || argc == 5)) error("Argument count");
+		arraysize=parseintegerarray(argv[0],(int64_t**)&leftarray,1,1,NULL,false);
+		if(parseintegerarray(argv[2],(int64_t**)&rightarray,2,1,NULL,false)!=arraysize)error("Array size mismatch");
+		arraysize*=4;
+		freq=getnumber(argv[4]);
+		if(freq<10.0 || freq> 48000.0)error("Invalid frequency 10.0 - 48000.0");
+		arraypos=0;
+		if(argc>=7 && *argv[6]){
+			arraypos=getint(argv[6],0,arraysize-1);
+		}
+		if(argc>=9 && *argv[8]){
+			arraysize=getint(argv[8],arraypos,arraysize);
+		}
+		if(argc == 11) {
+			if(!CurrentLinePtr)error("No program running");
+			WAVInterrupt = (char *)GetIntAddress(argv[10]);					// get the interrupt location
+			WAVcomplete=false;
+			InterruptUsed = true;
+		}
+		audiorepeat=1;
+		float actualrate=freq;
+		while(actualrate<32000){
+			actualrate +=freq;
+			audiorepeat++;
+		}
+		setrate(actualrate);
+		FreeMemorySafe((void **)&sbuff1);
+		FreeMemorySafe((void **)&sbuff2);
+		sbuff1 = GetMemory(WAV_BUFFER_SIZE);
+		sbuff2 = GetMemory(WAV_BUFFER_SIZE);
+		ubuff1 = (uint16_t *)sbuff1;
+		ubuff2 = (uint16_t *)sbuff2;
+		mono=0;
+		g_buff1 = (int16_t *)sbuff1;
+		g_buff2 = (int16_t *)sbuff2;
+		bcount[2]=0;
+		playreadcomplete=0;
+		bcount[1]=(volatile unsigned int)readarray(sbuff1);
+		if(Option.audio_i2s_bclk) i2sconvert((drwav_int16*)sbuff1,(drwav_int16*)sbuff1,bcount[1]);
+		else iconvert(ubuff1, (int16_t *)sbuff1, bcount[1]);
+		wav_filesize=bcount[1];
+		CurrentlyPlaying = P_ARRAY;
+		swingbuf=1;
+		nextbuf=2;
+		ppos=0;
+		pwm_set_irq0_enabled(AUDIO_SLICE, true);
+		pwm_set_enabled(AUDIO_SLICE, true); 
+		return;
+	}
     if((tp = checkstring(cmdline, (unsigned char *)"SOUND"))) {//PLAY SOUND channel, type, position, frequency, volume
         float f_in, PhaseM;
         int channel, left=0, right=0, lset=0, rset=0, local_sound_v_left=0,local_sound_v_right=0;
@@ -2051,6 +2112,19 @@ void checkWAVinput(void){
 				}
 				nextbuf=swingbuf;
 				diskchecktimer=DISKCHECKRATE;
+			} else if(CurrentlyPlaying == P_ARRAY){
+				if(swingbuf==2){
+					bcount[1]=(volatile unsigned int)readarray(sbuff1);
+					if(Option.audio_i2s_bclk) i2sconvert((drwav_int16*)sbuff1,(drwav_int16*)sbuff1,bcount[1]);
+					else iconvert(ubuff1, (int16_t *)sbuff1, bcount[1]);
+					wav_filesize=bcount[1];
+				} else {
+					bcount[2]=(volatile unsigned int)readarray(sbuff2);
+					if(Option.audio_i2s_bclk) i2sconvert((drwav_int16*)sbuff2,(drwav_int16*)sbuff2,bcount[2]);
+					else iconvert(ubuff2, (int16_t *)sbuff2, bcount[2]);
+					wav_filesize=bcount[2];
+				}
+				nextbuf=swingbuf;
 			} 
 		}
 	}
@@ -2095,9 +2169,8 @@ void audio_checks(void){
     			pwm_set_irq0_enabled(AUDIO_SLICE, false);
 				CurrentlyPlaying = P_NOTHING;
 			} else StopAudio();
-            FileClose(WAV_fnbr);
+            if(CurrentlyPlaying != P_ARRAY)FileClose(WAV_fnbr);
             WAVcomplete = true;
-//            playreadcomplete = 0;
          }
     }
 }

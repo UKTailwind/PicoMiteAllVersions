@@ -459,7 +459,7 @@ void __not_in_flash_func(routinechecks)(void){
         if(SPIatRisk)mutex_exit(&frameBufferMutex);
 #endif
     }
-    if(CurrentlyPlaying == P_MOD) checkWAVinput();
+    if(CurrentlyPlaying == P_MOD || CurrentlyPlaying==P_ARRAY ) checkWAVinput();
     if(++when & 7 && CurrentLinePtr) return;
 #ifdef USBKEYBOARD
     if(USBenabled){
@@ -4305,7 +4305,7 @@ int MIPS16 main(){
     }
 #endif
 #ifdef HDMI
-    if(FullColour || MediumRes){
+    if((FullColour || MediumRes) && !(Option.CPU_Speed==FreqX)){
         clock_configure(
             clk_hstx,
             0,                                                // No glitchless mux

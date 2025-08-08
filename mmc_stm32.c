@@ -265,7 +265,7 @@ void MIPS16 __not_in_flash_func(on_pwm_wrap)(void) {
 				}
 			}
 			return;
-		} else if(CurrentlyPlaying == P_WAV  || CurrentlyPlaying == P_FLAC  || CurrentlyPlaying == P_MOD  || CurrentlyPlaying == P_MP3) {
+		} else if(CurrentlyPlaying == P_WAV  || CurrentlyPlaying == P_FLAC  || CurrentlyPlaying == P_MOD  || CurrentlyPlaying == P_MP3  || CurrentlyPlaying == P_ARRAY) {
 			while((pioi2s->flevel & (0xf<<(i2ssm*8))) < (0x6<<(i2ssm*8))){
 				if(--repeatcount){
 					pio_sm_put(pioi2s, i2ssm, left);
@@ -376,7 +376,7 @@ void MIPS16 __not_in_flash_func(on_pwm_wrap)(void) {
 			VSbuffer=VS1053free();
 			if(VSbuffer>1023-(CurrentlyPlaying == P_STREAM ? sendstream :sendcount))return;
 		}
-    	if(CurrentlyPlaying == P_FLAC || CurrentlyPlaying == P_WAV ||CurrentlyPlaying == P_MP3 || CurrentlyPlaying == P_MIDI || CurrentlyPlaying==P_MOD) {
+    	if(CurrentlyPlaying == P_FLAC || CurrentlyPlaying == P_WAV ||CurrentlyPlaying == P_MP3 || CurrentlyPlaying == P_MIDI || CurrentlyPlaying==P_ARRAY || CurrentlyPlaying==P_MOD) {
 			if(bcount[1]==0 && bcount[2]==0 && playreadcomplete==1){
 //				pwm_set_irq_enabled(AUDIO_SLICE, false);
 				return;
@@ -500,7 +500,7 @@ void MIPS16 __not_in_flash_func(on_pwm_wrap)(void) {
 					if(PhaseAC_right>=4096.0)PhaseAC_right-=4096.0;
 				}
 			}
-		} else if(CurrentlyPlaying == P_WAV  || CurrentlyPlaying == P_FLAC  || CurrentlyPlaying == P_MOD  || CurrentlyPlaying == P_MP3) {
+		} else if(CurrentlyPlaying == P_WAV  || CurrentlyPlaying == P_FLAC  || CurrentlyPlaying == P_MOD   || CurrentlyPlaying==P_ARRAY || CurrentlyPlaying == P_MP3) {
 			if(--repeatcount)return;
 			repeatcount=audiorepeat;
 			if(bcount[1]==0 && bcount[2]==0 && playreadcomplete==1){
@@ -1473,7 +1473,7 @@ void dobacklight(void){
 	if(Option.DISPLAY_BL){
 		ExtCfg(Option.DISPLAY_BL, EXT_BOOT_RESERVED, 0);
 		int pin=Option.DISPLAY_BL;
-		setpwm(pin, &BacklightChannel, &BacklightSlice, Option.DISPLAY_TYPE==ILI9488W ? 1000.0 : 50000.0, Option.DefaultBrightness);
+		setpwm(pin, &BacklightChannel, &BacklightSlice, Option.DISPLAY_TYPE==ILI9488W ? 1000.0 : 50000.0, Option.BackLightLevel);
 	}
 }
 void InitReservedIO(void) {

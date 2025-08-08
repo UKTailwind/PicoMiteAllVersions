@@ -48,9 +48,9 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 
 #ifndef AUDIO_HEADER
 #define AUDIO_HEADER
-typedef enum {P_PAUSE_TONE, P_PAUSE_FLAC, P_PAUSE_MP3, P_PAUSE_SOUND, P_PAUSE_MOD, P_PAUSE_WAV, P_STOP, 
+typedef enum {P_PAUSE_TONE, P_PAUSE_FLAC, P_PAUSE_MP3, P_PAUSE_SOUND, P_PAUSE_MOD, P_PAUSE_ARRAY,P_PAUSE_WAV, P_STOP, 
     P_NOTHING, P_TONE, P_SOUND, P_WAV, P_FLAC, P_MP3, 
-    P_MIDI, P_SYNC, P_MOD, P_STREAM, P_WAVOPEN} e_CurrentlyPlaying;
+    P_MIDI, P_SYNC, P_MOD, P_STREAM, P_ARRAY, P_WAVOPEN} e_CurrentlyPlaying;
 extern const char* const PlayingStr[];
 extern volatile e_CurrentlyPlaying CurrentlyPlaying; 
 extern char *WAVInterrupt;

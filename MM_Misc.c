@@ -2009,13 +2009,13 @@ void MIPS16 printoptions(void){
     if(Option.DISPLAY_CONSOLE == true) {
         PO("LCDPANEL CONSOLE");
         if(Option.DefaultFont != (Option.DISPLAY_TYPE==SCREENMODE2? (6<<4) | 1 : 0x01 ))PInt((Option.DefaultFont>>4) +1);
-        else if(!(Option.DefaultFC==WHITE && Option.DefaultBC==BLACK && Option.DefaultBrightness == 100 && Option.NoScroll==0))MMputchar(',',1);
+        else if(!(Option.DefaultFC==WHITE && Option.DefaultBC==BLACK && Option.BackLightLevel == 100 && Option.NoScroll==0))MMputchar(',',1);
         if(Option.DefaultFC!=WHITE)PIntHC(Option.DefaultFC);
-        else if(!(Option.DefaultBC==BLACK && Option.DefaultBrightness == 100 && Option.NoScroll==0))MMputchar(',',1);
+        else if(!(Option.DefaultBC==BLACK && Option.BackLightLevel == 100 && Option.NoScroll==0))MMputchar(',',1);
         if(Option.DefaultBC!=BLACK)PIntHC(Option.DefaultBC);
-        else if(!(Option.DefaultBrightness == 100 && Option.NoScroll==0))MMputchar(',',1);
-        if(Option.DefaultBrightness != 100)PIntComma(Option.DefaultBrightness);
-        else if(!(Option.DefaultBrightness == 100 && Option.NoScroll==0))MMputchar(',',1);
+        else if(!(Option.BackLightLevel == 100 && Option.NoScroll==0))MMputchar(',',1);
+        if(Option.BackLightLevel != 100)PIntComma(Option.BackLightLevel);
+        else if(!(Option.BackLightLevel == 100 && Option.NoScroll==0))MMputchar(',',1);
         if(Option.NoScroll!=0)MMPrintString(",NOSCROLL");
         PRet();
     }
@@ -2882,9 +2882,15 @@ OPTION PLATFORM HDMIUSB
             ResetOptions(false);
             Option.CPU_Speed=252000;
             Option.ColourCode = 1;
+#if defined(rp2350) && defined(PICOMITE)
+            Option.LCD_CLK=Option.SYSTEM_CLK=PINMAP[6];
+            Option.LCD_MOSI=Option.SYSTEM_MOSI=PINMAP[3];
+            Option.LCD_MISO=Option.SYSTEM_MISO=PINMAP[4];
+#else
             Option.SYSTEM_CLK=PINMAP[6];
             Option.SYSTEM_MOSI=PINMAP[3];
             Option.SYSTEM_MISO=PINMAP[4];
+#endif
             Option.AUDIO_L=PINMAP[20];
             Option.AUDIO_R=PINMAP[21];
             Option.modbuffsize=192;
@@ -2913,9 +2919,15 @@ OPTION PLATFORM HDMIUSB
             ResetOptions(false);
             Option.CPU_Speed=252000;
             Option.ColourCode = 1;
+#if defined(rp2350) && defined(PICOMITE)
+            Option.LCD_CLK=Option.SYSTEM_CLK=PINMAP[10];
+            Option.LCD_MOSI=Option.SYSTEM_MOSI=PINMAP[11];
+            Option.LCD_MISO=Option.SYSTEM_MISO=PINMAP[12];
+#else
             Option.SYSTEM_CLK=PINMAP[10];
             Option.SYSTEM_MOSI=PINMAP[11];
             Option.SYSTEM_MISO=PINMAP[12];
+#endif
             Option.modbuffsize=192;
             Option.DISPLAY_TYPE=ILI9488W;
             Option.LCD_CD=PINMAP[8];
@@ -2942,9 +2954,15 @@ OPTION PLATFORM HDMIUSB
             ResetOptions(false);
             Option.CPU_Speed=252000;
             Option.ColourCode = 1;
+#if defined(rp2350) && defined(PICOMITE)
+            Option.LCD_CLK=Option.SYSTEM_CLK=PINMAP[18];
+            Option.LCD_MOSI=Option.SYSTEM_MOSI=PINMAP[19];
+            Option.LCD_MISO=Option.SYSTEM_MISO=PINMAP[16];
+#else
             Option.SYSTEM_CLK=PINMAP[18];
             Option.SYSTEM_MOSI=PINMAP[19];
             Option.SYSTEM_MISO=PINMAP[16];
+#endif
             Option.DISPLAY_TYPE=ILI9341;
             Option.LCD_CD=PINMAP[20];
             Option.LCD_Reset=PINMAP[21];
@@ -2968,9 +2986,15 @@ OPTION PLATFORM HDMIUSB
             ResetOptions(false);
             Option.CPU_Speed=252000;
             Option.ColourCode = 1;
+#if defined(rp2350) && defined(PICOMITE)
+            Option.LCD_CLK=Option.SYSTEM_CLK=PINMAP[10];
+            Option.LCD_MOSI=Option.SYSTEM_MOSI=PINMAP[11];
+            Option.LCD_MISO=Option.SYSTEM_MISO=PINMAP[12];
+#else
             Option.SYSTEM_CLK=PINMAP[10];
             Option.SYSTEM_MOSI=PINMAP[11];
             Option.SYSTEM_MISO=PINMAP[12];
+#endif
             Option.modbuffsize=192;
             Option.DISPLAY_TYPE=ST7789B;
             Option.LCD_CD=PINMAP[8];
@@ -3000,9 +3024,15 @@ OPTION PLATFORM HDMIUSB
             Option.AllPins = 1; 
             Option.ColourCode = 1;
             Option.NoHeartbeat = 1;
+#if defined(rp2350) && defined(PICOMITE)
+            Option.LCD_CLK=Option.SYSTEM_CLK=PINMAP[10];
+            Option.LCD_MOSI=Option.SYSTEM_MOSI=PINMAP[11];
+            Option.LCD_MISO=Option.SYSTEM_MISO=PINMAP[28];
+#else
             Option.SYSTEM_CLK=PINMAP[10];
             Option.SYSTEM_MOSI=PINMAP[11];
             Option.SYSTEM_MISO=PINMAP[28];
+#endif
             Option.DISPLAY_TYPE=GC9A01;
             Option.LCD_CD=PINMAP[8];
             Option.LCD_Reset=PINMAP[12];
@@ -3022,9 +3052,15 @@ OPTION PLATFORM HDMIUSB
             Option.CPU_Speed=252000;
             Option.ColourCode = 1;
             Option.NoHeartbeat = 1;
+#if defined(rp2350) && defined(PICOMITE)
+            Option.LCD_CLK=Option.SYSTEM_CLK=PINMAP[10];
+            Option.LCD_MOSI=Option.SYSTEM_MOSI=PINMAP[11];
+            Option.LCD_MISO=Option.SYSTEM_MISO=PINMAP[28];
+#else
             Option.SYSTEM_CLK=PINMAP[10];
             Option.SYSTEM_MOSI=PINMAP[11];
             Option.SYSTEM_MISO=PINMAP[28];
+#endif
             Option.DISPLAY_TYPE=ST7735S;
             Option.LCD_CD=PINMAP[8];
             Option.LCD_Reset=PINMAP[12];
@@ -3043,9 +3079,15 @@ OPTION PLATFORM HDMIUSB
             Option.ColourCode = 1;
             Option.NoHeartbeat = 1;
             Option.AllPins = 1; 
+#if defined(rp2350) && defined(PICOMITE)
+            Option.LCD_CLK=Option.SYSTEM_CLK=PINMAP[10];
+            Option.LCD_MOSI=Option.SYSTEM_MOSI=PINMAP[11];
+            Option.LCD_MISO=Option.SYSTEM_MISO=PINMAP[24];
+#else
             Option.SYSTEM_CLK=PINMAP[10];
             Option.SYSTEM_MOSI=PINMAP[11];
             Option.SYSTEM_MISO=PINMAP[24];
+#endif
             Option.DISPLAY_TYPE=ST7789A;
             Option.LCD_CD=PINMAP[8];
             Option.LCD_Reset=PINMAP[12];
@@ -3673,7 +3715,7 @@ tp = checkstring(cmdline, (unsigned char *)"HEARTBEAT");
         Option.DefaultFC = WHITE;
         Option.DefaultBC = BLACK;
         SetFont((Option.DefaultFont = (Option.DISPLAY_TYPE==SCREENMODE2? (6<<4) | 1 : 0x01 )));
-        Option.DefaultBrightness = 100;
+        Option.BackLightLevel = 100;
         Option.NoScroll=0;
         Option.Height = SCREENHEIGHT;
         Option.Width = SCREENWIDTH;
@@ -3692,7 +3734,7 @@ tp = checkstring(cmdline, (unsigned char *)"HEARTBEAT");
         Option.DefaultFC = WHITE;
         Option.DefaultBC = BLACK;
         int font;
-        Option.DefaultBrightness = 100;
+        Option.BackLightLevel = 100;
         if(!(*tp == 0 || *tp == '\'')) {
             getargs(&tp, 9, (unsigned char *)",");                              // this is a macro and must be the first executable stmt in a block
             if(argc > 0) {
@@ -3706,7 +3748,7 @@ tp = checkstring(cmdline, (unsigned char *)"HEARTBEAT");
             if(Option.DefaultFC == Option.DefaultBC) error("Same colours");
             if(argc > 6 && *argv[6]) {
                 if(!Option.DISPLAY_BL)error("Backlight not available on this display");
-                Option.DefaultBrightness = getint(argv[6], 0, 100);
+                Option.BackLightLevel = getint(argv[6], 0, 100);
             }
             if(argc==9){
                 if(checkstring(argv[8],(unsigned char *)"NOSCROLL")){
@@ -3716,7 +3758,7 @@ tp = checkstring(cmdline, (unsigned char *)"HEARTBEAT");
             }
         }
         if(Option.DISPLAY_BL){
-			MMFLOAT frequency=1000.0,duty=Option.DefaultBrightness;
+			MMFLOAT frequency=1000.0,duty=Option.BackLightLevel;
             int wrap=(Option.CPU_Speed*1000)/frequency;
             int high=(int)((MMFLOAT)Option.CPU_Speed/frequency*duty*10.0);
             int div=1;

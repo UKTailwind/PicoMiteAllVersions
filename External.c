@@ -3444,7 +3444,7 @@ void cmd_device(void){
         if(IsInvalidPin(pin)) error("Invalid pin");
         if(!(ExtCurrentConfig[pin] == EXT_DIG_IN || ExtCurrentConfig[pin] == EXT_NOT_CONFIG)) error("Pin %/| is not off or an input",pin,pin);
         if(ExtCurrentConfig[pin] == EXT_NOT_CONFIG)ExtCfg(pin, EXT_DIG_IN, CNPUSET);
-        int gppin=(1<<PinDef[pin].GPno);
+        int gppin=PinDef[pin].GPno;
         int baudrate=getint(argv[2],110,230400);
         unsigned char *string=NULL;
         string = findvar(argv[4], V_FIND);

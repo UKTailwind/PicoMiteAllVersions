@@ -6907,7 +6907,7 @@ void cmd_map(void){
     if(!(DISPLAY_TYPE==SCREENMODE2 || DISPLAY_TYPE==SCREENMODE3  || DISPLAY_TYPE==SCREENMODE5 ))error("Invalid for this screen mode");
     if((p=checkstring(cmdline, (unsigned char *)"RESET"))) {
     mapreset();
-    } else if((checkstring(cmdline, (unsigned char *)"GRAYSCALE") || checkstring(cmdline, (unsigned char *)"GREYSCALE")) && (FullColour)) {
+    } else if(checkstring(cmdline, (unsigned char *)"GRAYSCALE") || checkstring(cmdline, (unsigned char *)"GREYSCALE")) {
         while(v_scanline!=0){}
         for(int i=1;i<=32;i++){
             int j=i*8-(8-i/4+1);
@@ -6923,7 +6923,7 @@ void cmd_map(void){
         }
         for(int i=1;i<=16;i++){
             int j=i*16-(16-i+1);
-            map16quads[i-1]=remap332[i-1]= RGB332(j*65536+j*256+j);
+            map16quads[i-1]=remap332[i-1]= RGB332(j*65536+j*256+j) | (RGB332(j*65536+j*256+j)<<8) | (RGB332(j*65536+j*256+j)<<16) | (RGB332(j*65536+j*256+j)<<24);
             map16pairs[i-1]=remap555[i-1]= (RGB555(j*65536+j*256+j) | (RGB555(j*65536+j*256+j)<<16));
         }
     } else if((p=checkstring(cmdline, (unsigned char *)"MAXIMITE"))) {
@@ -6957,6 +6957,11 @@ void cmd_map(void){
 void setmode(int mode, bool clear){
     closeframebuffer('A');
     if(clear)memset((void *)FRAMEBUFFER,0,framebuffersize);
+#ifdef HDMI
+    while(v_scanline!=0){}
+#else
+    while(QVgaScanLine!=0){}
+#endif
     if(mode==5){
         DISPLAY_TYPE=SCREENMODE5; 
         ScreenSize=MODE5SIZE;

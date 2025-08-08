@@ -1150,7 +1150,7 @@ void MIPS16 InitSSD1963(void) {
     ScrollStart = 0;
 
     ClearScreen(Option.DefaultBC);
-    SetBacklightSSD1963(Option.DefaultBrightness);
+    SetBacklightSSD1963(Option.BackLightLevel);
     WriteComand(CMD_ON_DISPLAY);                                     // Turn on display; show the image on display
 
 }
