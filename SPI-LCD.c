@@ -2679,9 +2679,14 @@ int GetLineILI9341(void){
 	SPIsend(ILI9341_GETSCANLINE);
     gpio_put(LCD_CD_PIN,GPIO_PIN_SET);
 	uSec(3);
+#if defined(PICOMITE) && defined(rp2350)
+	lcd_rcvr_byte_multi((uint8_t *)&q, 1);
+	lcd_rcvr_byte_multi((uint8_t *)&q, 1);
+#else
 	xchg_byte(0);
 	q=xchg_byte(0);
 	xchg_byte(0);
+#endif
 	ClearCS(Option.LCD_CS);
 	SPISpeedSet(Option.DISPLAY_TYPE);
 	return (int)(q);

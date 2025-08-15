@@ -965,12 +965,6 @@ BYTE __not_in_flash_func(send_cmd)(
 		command[3]=(arg >> 8);		// Argument[15..8]
 		command[4]=(arg);			// Argument[7..0]
 		command[5]=(CRC7(command, 5)<<1) | 1;
-/*		xchg_byte(command[0]);			// Start + Command index 
-		xchg_byte(command[1]);	// Argument[31..24] 
-		xchg_byte(command[2]);	// Argument[23..16] 
-		xchg_byte(command[3]);		// Argument[15..8] 
-		xchg_byte(command[4]);			// Argument[7..0] 
-		xchg_byte(command[5]);*/
 		xmit_byte_multi(command,6);
 	/* Receive command response */
 	if (cmd == CMD12) xchg_byte(0xFF);	/* Skip a stuff byte on stop to read */
@@ -1004,26 +998,6 @@ DSTATUS disk_status (
 	return SDCardStat;
 }
 
-/*int CMD0send(void){
-    char response,trys=100, responsetrys=10;
-    do {
-    	deselect();
-		gpio_put(SD_CS_PIN,GPIO_PIN_RESET);
-		asm("NOP");asm("NOP");asm("NOP");
-        trys--;
-        xchg_byte(0x40);
-        xchg_byte(0x0);
-        xchg_byte(0x0);
-        xchg_byte(0x0);
-        xchg_byte(0x0);
-        xchg_byte(0x95);
-        do{
-            response=xchg_byte(0xFF);
-            responsetrys--;
-        } while((responsetrys !=0) && (response !=1));
-    } while((trys !=0) && (response !=1));
-    return response;
-}*/
 
 /*-----------------------------------------------------------------------*/
 /* Initialize Disk Drive                                                 */

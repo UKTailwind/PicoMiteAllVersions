@@ -1021,6 +1021,11 @@ void MIPS64 __not_in_flash_func(*GetSystemMemory)(int size) { //get memory from 
     return NULL;                                                    // keep the compiler happy
 }
 void MIPS64 __not_in_flash_func(*GetMemory)(int size) {
+#ifdef rp2350
+#ifndef PICOMITEWEB
+    if(PSRAMsize && size> heap_memory_size/2)return GetPSMemory(size);
+#endif
+#endif
     unsigned int j, n, k;
     unsigned char *addr;
     j = n = k= (size + PAGESIZE - 1)/PAGESIZE;                         // nbr of pages rounded up
