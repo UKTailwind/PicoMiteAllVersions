@@ -5489,7 +5489,7 @@ void cmd_framebuffer(void){
 #ifdef PICOMITE
     } else if((p=checkstring(cmdline, (unsigned char *)"SYNC"))) { //merge the layer onto the physical display
         mergedone=false;
-        while(mergedone==false && mergerunning){CheckAbort();}
+        while(mergedone==false){CheckAbort();}
 #endif
     } else if((p=checkstring(cmdline, (unsigned char *)"MERGE"))) { //merge the layer onto the physical display
         if(!LayerBuf)error("Layer not created");

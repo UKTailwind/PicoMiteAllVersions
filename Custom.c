@@ -238,13 +238,13 @@ int getirqnum(char *p){
         return data;
 }
 void pio_init(int pior, int sm, uint32_t pinctrl, uint32_t execctrl, uint32_t shiftctrl, int start, float clock, bool sideout, bool setout, bool outout){
-        pio_sm_config mypio=pio_get_default_sm_config();
+        pio_sm_config cfg=pio_get_default_sm_config();
 #ifdef rp2350
         PIO pio = (pior==0 ? pio0: (pior==1 ? pio1: pio2));
 #else
         PIO pio = (pior==0 ? pio0: pio1);
 #endif
-        clock=(float)Option.CPU_Speed*1000.0/clock;
+        sm_config_set_clkdiv(&cfg, (Option.CPU_Speed*1000.0f)/clock);
         int sidebase=(pinctrl & 0b111110000000000)>>10;
         int setbase=(pinctrl &       0b1111100000)>>5;
         int outbase=(pinctrl &            0b11111);
@@ -253,10 +253,9 @@ void pio_init(int pior, int sm, uint32_t pinctrl, uint32_t execctrl, uint32_t sh
         int outcount=(pinctrl & 0x3F00000)>>20;
 //        int inbase=(pinctrl & 0xF8000)>>15;
         int opt=(execctrl>>30) & 1;
-        mypio.clkdiv = (uint32_t) (clock * (1 << 16));
-        mypio.execctrl=execctrl;
-        mypio.shiftctrl=shiftctrl;
-        mypio.pinctrl=pinctrl;
+        cfg.execctrl=execctrl;
+        cfg.shiftctrl=shiftctrl;
+        cfg.pinctrl=pinctrl;
         #ifdef rp2350
         #ifdef PICOMITEWEB
                 for(int i = 1; i < (NBRPINS) ; i++) {
@@ -270,12 +269,14 @@ void pio_init(int pior, int sm, uint32_t pinctrl, uint32_t execctrl, uint32_t sh
                         gpio_set_input_enabled(PinDef[i].GPno, true);
                 }
         }
+#ifdef rp2350
+        cfg.pinhi=0xFFF07C1F;
+#endif
+        pio_sm_set_config(pio, sm, &cfg);
+        pio_sm_init(pio, sm, start, &cfg);
         if(sidecount && sideout)pio_sm_set_consecutive_pindirs(pio, sm, sidebase, sidecount-opt, true);
         if(outcount && outout)pio_sm_set_consecutive_pindirs(pio, sm, outbase, outcount, true);
         if(setcount && setout)pio_sm_set_consecutive_pindirs(pio, sm, setbase, setcount, true);
-        pio_sm_set_config(pio, sm, &mypio);
-        pio_sm_init(pio, sm, start, &mypio);
-        pio_sm_clear_fifos(pio,sm);
 }
 int checkblock(char *p){
         int data=0;
@@ -1402,7 +1403,7 @@ void MIPS16 cmd_pio(void){
         int sm=getint(argv[2],0,3);
         float clock=getnumber(argv[4]);
         if(clock<CLKMIN || clock> CLKMAX)error("Clock must be in range % to %",CLKMIN,CLKMAX);
-        int pinctrl=0, execctrl=0,shiftctrl=0;
+        int pinctrl=0, execctrl=0x1F000,shiftctrl=0xC0000;
         if(argc>5 && *argv[6])pinctrl = getint(argv[6],0,0xFFFFFFFF);
         if(argc>7 && *argv[8])execctrl= getint(argv[8],0,0xFFFFFFFF);
         if(argc>9 && *argv[10])shiftctrl= getint(argv[10],0,0xFFFFFFFF);
