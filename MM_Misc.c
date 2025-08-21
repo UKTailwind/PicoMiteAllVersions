@@ -5309,6 +5309,7 @@ void MIPS16 fun_info(void){
             if(Option.AUDIO_L)strcpy((char *)sret,"PWM");
             else if(Option.AUDIO_MISO_PIN)strcpy((char *)sret,"VS1053");
             else if(Option.AUDIO_CLK_PIN)strcpy((char *)sret,"SPI");
+			else if(Option.audio_i2s_bclk)strcpy((char *)sret,"I2S");
             else strcpy((char *)sret,"NONE");
             CtoM(sret);
             targ=T_STR;

@@ -175,7 +175,7 @@ extern void start_vga_i2s(void);
         #include "pico/multicore.h"
         mutex_t	frameBufferMutex;					// mutex to lock frame buffer
     #else
-        #define MES_SIGNON  "\rPicoMite MMBasic " CHIP " Edition V"VERSION "\r\n"
+        #define MES_SIGNON  "\rPicoMite MMBasic " CHIP " V"VERSION "\r\n"
         #include "pico/multicore.h"
         mutex_t	frameBufferMutex;					// mutex to lock frame buffer
         #endif
@@ -4286,13 +4286,7 @@ int MIPS16 main(){
 #ifdef PICOMITE
 	mutex_init( &frameBufferMutex );						// create a mutex to lock frame buffer
 #endif
-#ifdef GUICONTROLS
-     if(Option.MaxCtrls) {
-        int size=Option.MaxCtrls*sizeof(struct s_ctrl);
-        heap_memory_size-= size;
-        Ctrl=(struct s_ctrl *)AllMemory+heap_memory_size+256;
-     }
-#endif
+
 
 #ifndef rp2350
     if(Option.CPU_Speed<=200000)modclock(2);
@@ -4301,7 +4295,7 @@ int MIPS16 main(){
     if(Option.DISPLAY_TYPE>=NEXTGEN){ //adjust the size of the heap
         framebuffersize=display_details[Option.DISPLAY_TYPE].horizontal*display_details[Option.DISPLAY_TYPE].vertical;
         heap_memory_size-=framebuffersize;
-        FRAMEBUFFER=AllMemory+heap_memory_size+256+Option.MaxCtrls*sizeof(struct s_ctrl);
+        FRAMEBUFFER=AllMemory+heap_memory_size+256;
     }
 #endif
 #ifdef HDMI

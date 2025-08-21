@@ -1458,17 +1458,13 @@ void InitReservedIO(void) {
 #if defined(PICOMITE)
 	if(Option.LOCAL_KEYBOARD){
 		ExtCfg(PINMAP[47],EXT_ANA_IN,0);
-		ExtCfg(PINMAP[44],EXT_DIG_OUT,0);
-//		ExtCfg(PINMAP[45],EXT_DIG_OUT,0);
-//		ExtCfg(PINMAP[46],EXT_DIG_OUT,0);
-		setpwm(PINMAP[43], &KeyboardlightChannel, &KeyboardlightSlice, 50000.0, Option.KeyboardBrightness);
-
-		for(int i=24;i<48;i++){
-			if(i==25)continue;
-			if(i<43){
-				ExtCfg(PINMAP[i], EXT_DIG_IN, ODCSET);
-			}
-			if(!(i==45 || i==46))ExtCfg(PINMAP[i], EXT_BOOT_RESERVED, 0);
+		ExtCfg(PINMAP[47], EXT_BOOT_RESERVED, 0);
+		ExtCfg(PINMAP[24],EXT_DIG_OUT,0);
+		ExtCfg(PINMAP[24], EXT_BOOT_RESERVED, 0);
+//		setpwm(PINMAP[41], &KeyboardlightChannel, &KeyboardlightSlice, 50000.0, Option.KeyboardBrightness);
+		for(int i=26;i<41;i++){
+			ExtCfg(PINMAP[i], EXT_DIG_IN, ODCSET);
+			ExtCfg(PINMAP[i], EXT_BOOT_RESERVED, 0);
 		}
 	}
 #endif
