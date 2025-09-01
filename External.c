@@ -2733,8 +2733,8 @@ const unsigned char asciimapl[51]={
     '5','t','g','b',',',
     '6','y','h','n','.',
     '7','u','j','m',';',
-    '8','i','k',0x80,0x81,
-    '9','o','l','=',0x82,
+    '8','i','k','=',0x82,
+    '9','o','l',0x80,0x81,
     '0','p',8,13,0x83
 };
 const unsigned char asciimapu[51]={
@@ -2746,8 +2746,8 @@ const unsigned char asciimapu[51]={
     '%','T','G','B','<',
     '^','Y','H','N','>',
     '&','U','J','M',':',
-    '*','I','K',0x80,0x81,
-    '(','O','L','+',0x82,
+    '*','I','K','+',0x82,
+    '(','O','L',0x80,0x81,
     ')','P',8,13,0x83
 };
 const unsigned char asciimapfl[51]={
@@ -2757,10 +2757,10 @@ const unsigned char asciimapfl[51]={
     0x93,'`','d','c',255,
     0x94,'|','f','v',' ',
     0x95,'{','g','b','\\',
-    0x96,'}','h','n','_',
+    0x96,'}','h','n','?',
     0x97,'[','j','m','\'',
-    0x98,']','k',0x88,0x89,
-    0x99,0x9B,'-','/',0x86,
+    0x98,']','_','/',0x86,
+    0x99,0x9B,'-',0x88,0x89,
     0x9A,0x9C,127,27,0x87
 };
 const unsigned char asciimapfu[51]={
@@ -2770,10 +2770,10 @@ const unsigned char asciimapfu[51]={
     0xB3,'`','d','c',255,
     0xB4,'|','f','v',' ',
     0xB5,'{','g','b','\\',
-    0xB6,'}','h','n','_',
+    0xB6,'}','h','n','?',
     0xB7,'[','j','m','\'',
-    0xB8,']','k',0x88,0x89,
-    0xB9,0xBB,'-','/',0x86,
+    0xB8,']','_','/',0x86,
+    0xB9,0xBB,'-',0x88,0x89,
     0xBA,0xBC,127,27,0x87
 };
 bool checkpressedtime(int count){
@@ -2825,14 +2825,16 @@ void cmd_keyscan(void){
                 ConsoleRxBufHead = ConsoleRxBufTail; // empty the buffer
                 // break;
             } else {
-                ConsoleRxBuf[ConsoleRxBufHead] = key; // store the byte in the ring buffer
-                if (ConsoleRxBuf[ConsoleRxBufHead] == keyselect && KeyInterrupt != NULL) {
-                    Keycomplete = true;
-                } else {
-                    ConsoleRxBufHead = (ConsoleRxBufHead + 1) % CONSOLE_RX_BUF_SIZE; // advance the head of the queue
-                    if (ConsoleRxBufHead == ConsoleRxBufTail) { // if the buffer has overflowed
-                        ConsoleRxBufTail = (ConsoleRxBufTail + 1) % CONSOLE_RX_BUF_SIZE; // throw away the oldest char
-                }
+                if(!(key==255)){
+                    ConsoleRxBuf[ConsoleRxBufHead] = key; // store the byte in the ring buffer
+                    if (ConsoleRxBuf[ConsoleRxBufHead] == keyselect && KeyInterrupt != NULL) {
+                        Keycomplete = true;
+                    } else {
+                        ConsoleRxBufHead = (ConsoleRxBufHead + 1) % CONSOLE_RX_BUF_SIZE; // advance the head of the queue
+                        if (ConsoleRxBufHead == ConsoleRxBufTail) { // if the buffer has overflowed
+                            ConsoleRxBufTail = (ConsoleRxBufTail + 1) % CONSOLE_RX_BUF_SIZE; // throw away the oldest char
+                        }
+                    }
                 }
             }
         }

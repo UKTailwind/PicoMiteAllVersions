@@ -3959,6 +3959,7 @@ void __not_in_flash_func(UpdateCore)()
                 uint8_t *s=(uint8_t *)multicore_fifo_pop_blocking();
                 mutex_enter_blocking(&frameBufferMutex);			// lock the frame buffer
                 copyframetoscreen(s,0,HRes-1,0,VRes-1,0);
+                mergedone=true;
                 mutex_exit(&frameBufferMutex);
             }
         } 

@@ -5488,8 +5488,9 @@ void cmd_framebuffer(void){
 #ifndef PICOMITEVGA
 #ifdef PICOMITE
     } else if((p=checkstring(cmdline, (unsigned char *)"SYNC"))) { //merge the layer onto the physical display
+        uint64_t time=time_us_64()+100000;
         mergedone=false;
-        while(mergedone==false){CheckAbort();}
+        while(mergedone==false && time_us_64()<time){CheckAbort();}
 #endif
     } else if((p=checkstring(cmdline, (unsigned char *)"MERGE"))) { //merge the layer onto the physical display
         if(!LayerBuf)error("Layer not created");

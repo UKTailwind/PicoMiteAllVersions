@@ -102,7 +102,11 @@
 
 
 #define FF_USE_LFN		1
+#if defined(rp2350) && !defined(PICOMITEWEB)
+#define FF_MAX_LFN		127
+#else
 #define FF_MAX_LFN		63
+#endif
 /* The FF_USE_LFN switches the support for LFN (long file name).
 /
 /   0: Disable LFN. FF_MAX_LFN has no effect.

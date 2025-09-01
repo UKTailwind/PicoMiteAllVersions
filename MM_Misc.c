@@ -2870,6 +2870,7 @@ OPTION PLATFORM HDMIUSB
             Option.KeyboardBrightness=10;
             Option.BackLightLevel=60;
             Option.DISPLAY_CONSOLE = 1;
+            Option.continuation = '_';
             strcpy((char *)Option.platform,"PALM PICO");
             SaveOptions();
             printoptions();uSec(100000);
@@ -5072,6 +5073,12 @@ void MIPS16 fun_info(void){
         } else if((tp=checkstring(ep, (unsigned char *)"EXISTS FILE"))){
             char *p = (char *)getFstring(tp);
             iret=ExistsFile(p);
+            if(iret==0){
+                char dir[FF_MAX_LFN]={0};
+                int filesystem;
+                iret=ExistsDir(p,dir,&filesystem);
+                if(iret)iret=-1;
+            }
             targ=T_INT;
             return;
         } else if(checkstring(ep, (unsigned char *)"ERRMSG")){

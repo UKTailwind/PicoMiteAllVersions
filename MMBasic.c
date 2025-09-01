@@ -1431,6 +1431,7 @@ unsigned char *getFstring(unsigned char *p) {
         tp[0]++;
     }
     MtoC(tp);
+    if(strlen((char *)tp)>FF_MAX_LFN)error("Filename > % characters",FF_MAX_LFN);
     return tp;
 }
 

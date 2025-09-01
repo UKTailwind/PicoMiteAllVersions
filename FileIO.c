@@ -3319,7 +3319,7 @@ void getfullfilename(char *fname, char *q){
         fname+=waste;
     }
     FatFSFileSystem=t-1;
-    char pp[FF_MAX_LFN] = {0};
+    char pp[STRINGSIZE] = {0};
     char *p=fname;
     int i;
     i=strlen(p)-1;
@@ -3342,6 +3342,7 @@ void getfullfilename(char *fname, char *q){
     strcpy(q,fullpathname[FatFSFileSystem]);
     if(fullpathname[FatFSFileSystem][strlen(fullpathname[FatFSFileSystem])-1]!='/')strcat(q,"/");
     strcat(q,pp);
+    if(strlen(pp)>FF_MAX_LFN)error("Filename > % characters",FF_MAX_LFN);
 //       	MMPrintString("Full: ");MMPrintString(q);PRet();
 
 }
@@ -3850,10 +3851,13 @@ void fullpath(char *q)
             strcat(rp, "/"); // make sure the previous pathname ends in slash, will only be the case at root
         strcat(rp, p);       // append the new pathname
     }
+    if(strlen(rp)>FF_MAX_LFN)error("Pathname > % characters",FF_MAX_LFN);
+
     strcpy(fullpathname[FatFSFileSystem], rp);           // set the new pathname
     resolve_path(fullpathname[FatFSFileSystem], rp, rp); // resolve to single absolute path
     if (strcmp(rp, "A:") == 0 || strcmp(rp, "0:") == 0 || strcmp(rp, "B:") == 0)
         strcat(rp, "/");      // if root append the slash
+    if(strlen(rp)>FF_MAX_LFN)error("Pathname > % characters",FF_MAX_LFN);
     strcpy(fullpathname[FatFSFileSystem], rp); // store this back to the filepath variable
     memmove(fullpathname[FatFSFileSystem], &fullpathname[FatFSFileSystem][2], strlen(fullpathname[FatFSFileSystem]));
 //    MMPrintString("Now: ");MMPrintString(fullpathname[FatFSFileSystem]);PRet();
