@@ -1,4 +1,4 @@
-/* 
+/*
  * @cond
  * The following section will be excluded from the documentation.
  */
@@ -17,7 +17,7 @@ option) any later version.
 ************************************************************************************************************************/
 
 // These two together take up about 4K of flash and no one seems to use them !!
-//#define INCLUDE_CRC
+// #define INCLUDE_CRC
 #define INCLUDE_1WIRE_SEARCH
 
 /* ********************************************************************************
@@ -27,7 +27,7 @@ option) any later version.
 #ifndef ONEWIRE_HEADER
 #define ONEWIRE_HEADER
 extern long long int *ds18b20Timers;
-extern int mmOWvalue;  
+extern int mmOWvalue;
 #endif
 #endif
 /*  @endcond */

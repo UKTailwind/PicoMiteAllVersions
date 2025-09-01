@@ -5,7 +5,7 @@
 // X_8x13_LE.c
 // Font type    : Full (95 characters)
 // Font size    : 8x13 pixels
-// Memory usage : 1239 bytes
+// Memory usage : 1239 bytes 
 
 const unsigned char X_8x13_LE[1239] = {
 0x08,0x0D,0x20,0x5F,

@@ -26,37 +26,35 @@
 #include "hardware/regs/addressmap.h"
 #include "configuration.h"
 
-#define PSRAM_BASE         _u(0x11000000)
+#define PSRAM_BASE _u(0x11000000)
 #define PSRAM_NOCACHE_BASE _u(0x15000000)
 
-#define PSRAM_WINDOW_SIZE  (16 << 20)
+#define PSRAM_WINDOW_SIZE (16 << 20)
 
 #ifndef PSRAMCSPIN
- #ifdef PIMORONI_PGA2350_PSRAM_CS_PIN
- #define PSRAMCSPIN PIMORONI_PGA2350_PSRAM_CS_PIN
- #elifdef PIMORONI_PICO_PLUS2_PSRAM_CS_PIN
- #define PSRAMCSPIN PIMORONI_PICO_PLUS2_PSRAM_CS_PIN
- #elifdef PIMORONI_PICO_PLUS2_W_PSRAM_CS_PIN
- #define PSRAMCSPIN PIMORONI_PICO_PLUS2_W_PSRAM_CS_PIN
- #elifdef WEACT_STUDIO_RP2350B_PSRAM_CS_PIN
- #define PSRAMCSPIN WEACT_STUDIO_RP2350B_PSRAM_CS_PIN
- #elifdef ADAFRUIT_FEATHER_RP2350
- #define PSRAMCSPIN 8
- #endif
+#ifdef PIMORONI_PGA2350_PSRAM_CS_PIN
+#define PSRAMCSPIN PIMORONI_PGA2350_PSRAM_CS_PIN
+#elifdef PIMORONI_PICO_PLUS2_PSRAM_CS_PIN
+#define PSRAMCSPIN PIMORONI_PICO_PLUS2_PSRAM_CS_PIN
+#elifdef PIMORONI_PICO_PLUS2_W_PSRAM_CS_PIN
+#define PSRAMCSPIN PIMORONI_PICO_PLUS2_W_PSRAM_CS_PIN
+#elifdef WEACT_STUDIO_RP2350B_PSRAM_CS_PIN
+#define PSRAMCSPIN WEACT_STUDIO_RP2350B_PSRAM_CS_PIN
+#elifdef ADAFRUIT_FEATHER_RP2350
+#define PSRAMCSPIN 8
+#endif
 #endif
 
-typedef struct psram_id_t {
-	uint8_t mfid;   /* Manufacturer ID */
-	uint8_t kgd;    /* Known Good Die */
-	uint8_t eid[6]; /* EID */
+typedef struct psram_id_t
+{
+   uint8_t mfid;   /* Manufacturer ID */
+   uint8_t kgd;    /* Known Good Die */
+   uint8_t eid[6]; /* EID */
 } psram_id_t;
-
 
 void psram_setup();
 size_t psram_size();
-const psram_id_t* psram_get_id();
-const char* psram_get_manufacturer(uint8_t mfid);
-
+const psram_id_t *psram_get_id();
+const char *psram_get_manufacturer(uint8_t mfid);
 
 #endif /* FANPICO_PSRAM_H */
-

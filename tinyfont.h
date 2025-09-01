@@ -6,7 +6,7 @@
  * tinyfont.h
  *
  *  Created on: 20 Feb 2019
- *      Author: Peter
+ *      Author: Peter 
  */
 
 #ifndef TINYFONT_H_

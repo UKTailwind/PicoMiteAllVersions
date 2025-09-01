@@ -1,3 +1,27 @@
+/***********************************************************************************************************************
+PicoMite MMBasic
+
+keyboard.c
+
+<COPYRIGHT HOLDERS>  Geoff Graham, Peter Mather
+Copyright (c) 2021, <COPYRIGHT HOLDERS> All rights reserved.
+Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
+1.	Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
+2.	Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer
+  in the documentation and/or other materials provided with the distribution.
+3.	The name MMBasic be used when referring to the interpreter in any documentation and promotional material and the original copyright message be displayed
+  on the console at startup (additional copyright messages may be added).
+4.	All advertising materials mentioning features or use of this software must display the following acknowledgement: This product includes software developed
+  by the <copyright holder>.
+5.	Neither the name of the <copyright holder> nor the names of its contributors may be used to endorse or promote products derived from this software
+  without specific prior written permission.
+THIS SOFTWARE IS PROVIDED BY <COPYRIGHT HOLDERS> AS IS AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL <COPYRIGHT HOLDERS> BE LIABLE FOR ANY DIRECT,
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+************************************************************************************************************************/
 /*
  * Keyboard.c
  *
@@ -54,20 +78,20 @@ int justset = 0;
 
 volatile int KeyDownRegister;
 volatile int KeyDownCode;
-volatile int PS2code=0;
-volatile bool PS2int=false;
+volatile int PS2code = 0;
+volatile bool PS2int = false;
 // key codes that must be tracked for up/down state
 #define CTRL 0x14 // left and right generate the same code
 #define L_SHFT 0x12
 #define R_SHFT 0x59
 #define CAPS 0x58
 #define NUML 0x77
-  static char LShift = 0;
-  static char RShift = 0;
-  static char PS2Ctrl = 0;
-  static char AltGrDown = 0;
-  static char KeyUpCode = false;
-  static char KeyE0 = false;
+static char LShift = 0;
+static char RShift = 0;
+static char PS2Ctrl = 0;
+static char AltGrDown = 0;
+static char KeyUpCode = false;
+static char KeyE0 = false;
 
 // this is a map of the keycode characters and the character to be returned for the keycode
 const char keyCodes[8][128] =
@@ -284,7 +308,7 @@ const char keySCodes[8][128] =
             0, ALT, L_SHFT, 0, CTRL, 'Q', '!', 0,    // 16-23    10-07
             0, 0, 'Y', 'S', 'A', 'W', '\"', 0,       // 24-31    18-1F
             0, 'C', 'X', 'D', 'E', '$', 0, 0,        // 32-39    20-27
-            0, '\'', 'V', 'F', 'T', 'R', '%', 0,      // 40-47    28-2F
+            0, '\'', 'V', 'F', 'T', 'R', '%', 0,     // 40-47    28-2F
             0, 'N', 'B', 'H', 'G', 'Z', '&', 0,      // 48-55    30-37
             0, 0, 'M', 'J', 'U', '/', '(', 0,        // 56-63    38-3F
             0, ';', 'K', 'I', 'O', '=', ')', 0,      // 64-71    40-47
@@ -453,19 +477,20 @@ void initKeyboard(void)
 {
   //	GPIO_InitTypeDef GPIO_InitDef;
 
-    if (Option.KeyboardConfig ==  NO_KEYBOARD || Option.KeyboardConfig==CONFIG_I2C) return;
-    KBDIntEnable(0); // disable interrupt in case called from within CNInterrupt()
+  if (Option.KeyboardConfig == NO_KEYBOARD || Option.KeyboardConfig == CONFIG_I2C)
+    return;
+  KBDIntEnable(0); // disable interrupt in case called from within CNInterrupt()
 
-    // enable pullups on the clock and data lines.
-    //	sendCommand(0xFF);
-    //	HAL_Delay(100);
-    // setup Change Notification interrupt
-    KBDIntEnable(1); // enable interrupt
-    PS2State = PS2START;
-    CapsLock = Option.capslock;
-    NumLock = Option.numlock;
-    uSec(100000);
-    setLEDs(CapsLock, NumLock, 0);
+  // enable pullups on the clock and data lines.
+  //	sendCommand(0xFF);
+  //	HAL_Delay(100);
+  // setup Change Notification interrupt
+  KBDIntEnable(1); // enable interrupt
+  PS2State = PS2START;
+  CapsLock = Option.capslock;
+  NumLock = Option.numlock;
+  uSec(100000);
+  setLEDs(CapsLock, NumLock, 0);
 }
 
 /***************************************************************************************************
@@ -476,14 +501,15 @@ bool sendCommand(int cmd, int clock, int data)
   int i, j;
 
   // calculate the parity and add to the command as the 9th bit
-  for (j = i = 0; i < 8; i++) j += ((cmd >> i) & 1);
+  for (j = i = 0; i < 8; i++)
+    j += ((cmd >> i) & 1);
   cmd = (cmd & 0xff) | (((j + 1) & 1) << 8);
   InkeyTimer = 0;
-/*  while (!PinRead(clock)) //wait for clock high
-    if (InkeyTimer >= 500)
-    {         // wait for the keyboard to pull the clock low
-      return false; // wait for the keyboard to pull the clock low
-    }*/
+  /*  while (!PinRead(clock)) //wait for clock high
+      if (InkeyTimer >= 500)
+      {         // wait for the keyboard to pull the clock low
+        return false; // wait for the keyboard to pull the clock low
+      }*/
   PinSetBit(clock, TRISCLR);
   PinSetBit(clock, LATCLR);
   uSec(250);
@@ -494,7 +520,7 @@ bool sendCommand(int cmd, int clock, int data)
   uSec(2);
   while (PinRead(clock))
     if (InkeyTimer >= 500)
-    {         // wait for the keyboard to pull the clock low
+    {               // wait for the keyboard to pull the clock low
       return false; // wait for the keyboard to pull the clock low
     }
 
@@ -511,12 +537,12 @@ bool sendCommand(int cmd, int clock, int data)
     }
     while (!PinRead(clock))
       if (InkeyTimer >= 500)
-      {         // wait for the keyboard to pull the clock low
+      {               // wait for the keyboard to pull the clock low
         return false; // wait for the keyboard to pull the clock low
       }
     while (PinRead(clock))
       if (InkeyTimer >= 500)
-      {         // wait for the keyboard to pull the clock low
+      {               // wait for the keyboard to pull the clock low
         return false; // wait for the keyboard to pull the clock low
       }
     cmd >>= 1;
@@ -527,17 +553,17 @@ bool sendCommand(int cmd, int clock, int data)
 
   while (PinRead(data))
     if (InkeyTimer >= 500)
-    {         // wait for the keyboard to pull the clock low
+    {               // wait for the keyboard to pull the clock low
       return false; // wait for the keyboard to pull the clock low
-    }         // wait for the keyboard to pull data low (ACK)
+    } // wait for the keyboard to pull data low (ACK)
   while (PinRead(clock))
     if (InkeyTimer >= 500)
-    {         // wait for the keyboard to pull the clock low
+    {               // wait for the keyboard to pull the clock low
       return false; // wait for the keyboard to pull the clock low
-    }         // wait for the clock to go low
+    } // wait for the clock to go low
   while (!(PinRead(clock)) || !(PinRead(data)))
     if (InkeyTimer >= 500)
-    {         // wait for the keyboard to pull the clock low
+    {               // wait for the keyboard to pull the clock low
       return false; // wait for the keyboard to pull the clock low
     }
   return true;
@@ -567,446 +593,451 @@ void __not_in_flash_func(CheckKeyboard)(void)
     setLEDs(CapsLock, NumLock, 0);
   }
 }
-void processcode(unsigned char Code){
+void processcode(unsigned char Code)
+{
   unsigned char c = 0;
   //	unsigned int dly;
-        if(!(Code==0xe0 || Code==0xf0 || (Code==0x12 && KeyE0) || (Code==0x12 && KeyUpCode)) && Code){
-          PS2int=true;
-          PS2code=Code;
-        }
+  if (!(Code == 0xe0 || Code == 0xf0 || (Code == 0x12 && KeyE0) || (Code == 0x12 && KeyUpCode)) && Code)
+  {
+    PS2int = true;
+    PS2code = Code;
+  }
 
-        if(KeyUpCode)PS2code|=0xf000;
-        if(KeyE0)PS2code|=0xe000;
-        if(KeyE0 && KeyUpCode)PS2code|=0xe0f000;
-        if (Code == 0xaa)
-        { // self test code (a keyboard must have just been plugged in)
-          CapsLock = 0;
-          NumLock = 1;
-        }                      // so initialise it
-        else if (Code == 0xf0) // a key has been released
-          KeyUpCode = true;
-        else if (Code == 0xe0) // extended keycode prefix
-          KeyE0 = true;
+  if (KeyUpCode)
+    PS2code |= 0xf000;
+  if (KeyE0)
+    PS2code |= 0xe000;
+  if (KeyE0 && KeyUpCode)
+    PS2code |= 0xe0f000;
+  if (Code == 0xaa)
+  { // self test code (a keyboard must have just been plugged in)
+    CapsLock = 0;
+    NumLock = 1;
+  } // so initialise it
+  else if (Code == 0xf0) // a key has been released
+    KeyUpCode = true;
+  else if (Code == 0xe0) // extended keycode prefix
+    KeyE0 = true;
+  else
+  {
+    // Process a scan code from the keyboard into an ASCII character.
+    // It then inserts the char into the keyboard queue.
+
+    // for the US keyboard and the right Alt key we need to make it the same as the left Alt key
+    if (Option.KeyboardConfig == CONFIG_US && KeyE0 && Code == 0x11)
+      KeyE0 = false;
+
+    // if a key has been released we are only interested in resetting state keys
+    if (KeyUpCode)
+    {
+      if (Code == L_SHFT)
+        LShift = 0; // left shift button is released
+      else if (Code == R_SHFT)
+        RShift = 0; // right shift button is released
+      else if (Code == CTRL)
+        PS2Ctrl = 0; // left control button is released
+      else if (KeyE0 && Code == 0x11)
+        AltGrDown = 0; // release the AltGr key on non US keyboards
+      else if (Code == KeyDownCode)
+        KeyDownRegister = 0; // normal char so record that it is no longer depressed
+      goto SkipOut;
+    }
+
+    // we are only here if the key has been pressed (NOT released)
+    if (Code == L_SHFT)
+    {
+      LShift = 1;
+      goto SkipOut;
+    } // left shift button is pressed
+    if (Code == R_SHFT)
+    {
+      RShift = 1;
+      goto SkipOut;
+    } // right shift button is pressed
+    if (Code == CTRL)
+    {
+      PS2Ctrl = 1;
+      goto SkipOut;
+    } // left control button is pressed
+    if (Code == CAPS)
+    {
+      CapsLock = !CapsLock;
+      setleds = 1;
+      //                            setLEDs(CapsLock, NumLock, 3);
+      goto SkipOut;
+    }
+    if (Code == NUML)
+    { // caps or num lock pressed
+      NumLock = !NumLock;
+      setleds = 1;
+      //                            setLEDs(CapsLock, NumLock, 7);
+      goto SkipOut;
+    }
+    if (KeyE0 && Code == 0x11)
+    {
+      AltGrDown = 1;
+      goto SkipOut;
+    } // AltGr key pressed on non US Keyboard
+
+    // now get the character into c.  Why, oh why, are scan codes so random?
+    if (!KeyE0 && Code == 0x83)
+      c = 0x97; // a special case, function key F7
+    else if (KeyE0 && Code == 0x4A)
+      c = '/'; // another special case, this time the keypad forward slash
+    else if (KeyE0 && Code == 0x5A)
+      c = NUM_ENT; // yet another special case, this time the keypad enter key
+    else if ((KeyE0 || !NumLock) && Code >= 104 && Code < 0x80 && !AltGrDown)
+    {             // a keycode from the numeric keypad
+      LShift = 0; // when num lock LED is on codes are preceeded by left shift
+      if (Option.KeyboardConfig == CONFIG_ES)
+        c = keyE0Codes_ES[Code - 104];
+      else
+        c = keyE0Codes[Code - 104];
+      if (PS2Ctrl)
+      { // special for PB
+        if (c == UP)
+          c = PUP; // CTRL-UP to page up
+        if (c == DOWN)
+          c = PDOWN; // CTRL-DOWN to page down
+        if (c == LEFT)
+          c = HOME; // CTRL-LEFT to home
+        if (c == RIGHT)
+          c = END; // CTRL-RIGHT to end
+      }
+    }
+    else if ((Code >= 0x15 && Code < 0x62) && AltGrDown != 0) // a keycode preceeded by Alt-Gr
+      switch (Option.KeyboardConfig)
+      {               // an international keycode pressed with
+      case CONFIG_US: // the AltGr key
+        break;        // no code for US keyboard
+      case CONFIG_FR: // French Keyboard
+        switch (Code)
+        {
+        case 0x45:
+          c = 0x40; // @
+          AltGrDown = 0;
+          break;
+        case 0x25:
+          c = 0x7b; // {
+          AltGrDown = 0;
+          break;
+        case 0x2e:
+          c = 0x5b; // [
+          AltGrDown = 0;
+          break;
+        case 0x55:
+          c = 0x7d; // }
+          AltGrDown = 0;
+          break;
+        case 0x4e:
+          c = 0x5d; // ]
+          AltGrDown = 0;
+          break;
+        case 0x3e:
+          c = 0x5c; // '\'
+          AltGrDown = 0;
+          break;
+        case 0x1e:
+          c = 0x7e; // ~
+          AltGrDown = 0;
+          break;
+        case 0x36:
+          c = 0x7c; // |
+          AltGrDown = 0;
+          break;
+        case 0x26:
+          c = 0x23; // #
+          AltGrDown = 0;
+          break;
+        default:
+          c = 0; // invalid code
+          AltGrDown = 0;
+          break;
+        }
+        break;
+      case CONFIG_GR: // German Keyboard
+        switch (Code)
+        {
+        case 0x15:
+          c = 0x40; // @
+          AltGrDown = 0;
+          break;
+        case 0x3d:
+          c = 0x7b; // {
+          AltGrDown = 0;
+          break;
+        case 0x3e:
+          c = 0x5b; // [
+          AltGrDown = 0;
+          break;
+        case 0x45:
+          c = 0x7d; // }
+          AltGrDown = 0;
+          break;
+        case 0x46:
+          c = 0x5d; // ]
+          AltGrDown = 0;
+          break;
+        case 0x4e:
+          c = 0x5c; // '\'
+          AltGrDown = 0;
+          break;
+        case 0x5b:
+          c = 0x7e; // ~
+          AltGrDown = 0;
+          break;
+        case 0x61:
+          c = 0x7c; // |
+          AltGrDown = 0;
+          break;
+        default:
+          c = 0; // invalid code
+          AltGrDown = 0;
+          break;
+        }
+        break;
+      case CONFIG_IT: // Italian Keyboard
+        switch (Code)
+        {
+        case 0x4C:
+          c = 0x40; // @
+          AltGrDown = 0;
+          break;
+        case 0x54:
+          c = 0x5b; // [
+          AltGrDown = 0;
+          break;
+        case 0x5b:
+          c = 0x5d; // ]
+          AltGrDown = 0;
+          break;
+        case 0x52:
+          c = 0x23; // #
+          AltGrDown = 0;
+          break;
+        default:
+          c = 0; // invalid code
+          AltGrDown = 0;
+          break;
+        }
+        break;
+      case CONFIG_BE: // Belgian Keyboard
+        switch (Code)
+        {
+        case 0x1e:
+          c = 0x40; // @
+          AltGrDown = 0;
+          break;
+        case 0x46:
+          c = 0x7b; // {
+          AltGrDown = 0;
+          break;
+        case 0x54:
+          c = 0x5b; // [
+          AltGrDown = 0;
+          break;
+        case 0x45:
+          c = 0x7d; // }
+          AltGrDown = 0;
+          break;
+        case 0x5b:
+          c = 0x5d; // ]
+          AltGrDown = 0;
+          break;
+        case 0x1a:
+          c = 0x5c; // '\'
+          AltGrDown = 0;
+          break;
+        case 0x4a:
+          c = 0x7e; // ~
+          AltGrDown = 0;
+          break;
+        case 0x16:
+          c = 0x7c; // |
+          AltGrDown = 0;
+          break;
+        case 0x26:
+          c = 0x23; // #
+          AltGrDown = 0;
+          break;
+        default:
+          c = 0; // invalid code
+          AltGrDown = 0;
+          break;
+        }
+        break;
+      case CONFIG_ES: // Spanish Keyboard
+        switch (Code)
+        {
+        case 0x1E:
+          c = 0x40; // @
+          AltGrDown = 0;
+          break;
+        case 0x54:
+          c = 0x5b; // [
+          AltGrDown = 0;
+          break;
+        case 0x5b:
+          c = 0x5d; // ]
+          AltGrDown = 0;
+          break;
+        case 0x26:
+          c = 0x23; // #
+          AltGrDown = 0;
+          break;
+        case 0x52:
+          c = 0x7b; // {
+          AltGrDown = 0;
+          break;
+        case 0x5d:
+          c = 0x7d; // }
+          AltGrDown = 0;
+          break;
+        case 0x16:
+          c = 0x7c; // |
+          AltGrDown = 0;
+          break;
+        case 0x0e:
+          c = 0x5c; // '\'
+          AltGrDown = 0;
+          break;
+        case 0x25:
+          c = 0x7e; // ~
+          AltGrDown = 0;
+          break;
+        default:
+          c = 0; // invalid code
+          AltGrDown = 0;
+          break;
+        }
+        break;
+      case CONFIG_BR: // Brazilian Keyboard (TO DO)
+        switch (Code)
+        {
+        case 0x1D:
+          c = '?'; // ?
+          AltGrDown = 0;
+          break;
+        case 0x14:
+          c = '/'; // /
+          AltGrDown = 0;
+          break;
+        default:
+          c = 0; // invalid code
+          AltGrDown = 0;
+          break;
+        }
+        break;
+      }
+    else
+    {
+      switch (Option.KeyboardConfig)
+      {
+      case CONFIG_US:
+        if (LShift || RShift)
+          c = keySCodes[0][Code % 128]; // a keycode preceeded by a shift
+        else
+          c = keyCodes[0][Code % 128]; // just a keycode
+        break;
+      case CONFIG_FR:
+        if (LShift || RShift)
+          c = keySCodes[1][Code % 128]; // a keycode preceeded by a shift
+        else
+          c = keyCodes[1][Code % 128]; // just a keycode
+        break;
+      case CONFIG_GR:
+        if (LShift || RShift)
+          c = keySCodes[2][Code % 128]; // a keycode preceeded by a shift
+        else
+          c = keyCodes[2][Code % 128]; // just a keycode
+        break;
+      case CONFIG_IT:
+        if (LShift || RShift)
+          c = keySCodes[3][Code % 128]; // a keycode preceeded by a shift
+        else
+          c = keyCodes[3][Code % 128]; // just a keycode
+        break;
+      case CONFIG_BE:
+        if (LShift || RShift)
+          c = keySCodes[4][Code % 128]; // a keycode preceeded by a shift
+        else
+          c = keyCodes[4][Code % 128]; // just a keycode
+        break;
+      case CONFIG_UK:
+        if (LShift || RShift)
+          c = keySCodes[5][Code % 128]; // a keycode preceeded by a shift
+        else
+          c = keyCodes[5][Code % 128]; // just a keycode
+        break;
+      case CONFIG_ES:
+        if (LShift || RShift)
+          c = keySCodes[6][Code % 128]; // a keycode preceeded by a shift
+        else
+          c = keyCodes[6][Code % 128]; // just a keycode
+        break;
+      case CONFIG_BR:
+        if (LShift || RShift)
+          c = keySCodes[7][Code % 128]; // a keycode preceeded by a shift
+        else
+          c = keyCodes[7][Code % 128]; // just a keycode
+        break;
+      }
+    }
+
+    if (!c)
+      goto SkipOut;
+
+    if (c <= 0x7F)
+    { // a normal character
+      if (CapsLock && c >= 'a' && c <= 'z')
+        c -= 32; // adj for caps lock
+      if (PS2Ctrl)
+        c &= 0x1F; // adj for control
+    }
+    else
+    { // must be a function key or similar
+      if (LShift || RShift)
+        c |= 0b00100000;
+      // NOTE: Special for PB, CTRL-UP to page up, CTRL-DOWN to page down, CTRL-LEFT to home, CTRL-RIGHT to end
+      if (PS2Ctrl && !(c == PUP || c == PDOWN || c == HOME || c == END))
+        c |= 0b01000000;
+    }
+
+    if (BreakKey && c == BreakKey)
+    {                                      // if the user wants to stop the progran
+      MMAbort = true;                      // set the flag for the interpreter to see
+      ConsoleRxBufHead = ConsoleRxBufTail; // empty the buffer
+                                           // break;
+    }
+    else
+    {
+      if (!(justset && c == '3'))
+      {
+        Timer3 = 0;
+        ConsoleRxBuf[ConsoleRxBufHead] = c; // store the byte in the ring buffer
+        if (ConsoleRxBuf[ConsoleRxBufHead] == keyselect && KeyInterrupt != NULL)
+        {
+          Keycomplete = true;
+        }
         else
         {
-          // Process a scan code from the keyboard into an ASCII character.
-          // It then inserts the char into the keyboard queue.
-
-          // for the US keyboard and the right Alt key we need to make it the same as the left Alt key
-          if (Option.KeyboardConfig == CONFIG_US && KeyE0 && Code == 0x11)
-            KeyE0 = false;
-
-          // if a key has been released we are only interested in resetting state keys
-          if (KeyUpCode)
-          {
-            if (Code == L_SHFT)
-              LShift = 0; // left shift button is released
-            else if (Code == R_SHFT)
-              RShift = 0; // right shift button is released
-            else if (Code == CTRL)
-              PS2Ctrl = 0; // left control button is released
-            else if (KeyE0 && Code == 0x11)
-              AltGrDown = 0; // release the AltGr key on non US keyboards
-            else if (Code == KeyDownCode)
-              KeyDownRegister = 0; // normal char so record that it is no longer depressed
-            goto SkipOut;
+          ConsoleRxBufHead = (ConsoleRxBufHead + 1) % CONSOLE_RX_BUF_SIZE; // advance the head of the queue
+          if (ConsoleRxBufHead == ConsoleRxBufTail)
+          {                                                                  // if the buffer has overflowed
+            ConsoleRxBufTail = (ConsoleRxBufTail + 1) % CONSOLE_RX_BUF_SIZE; // throw away the oldest char
           }
-
-          // we are only here if the key has been pressed (NOT released)
-          if (Code == L_SHFT)
-          {
-            LShift = 1;
-            goto SkipOut;
-          } // left shift button is pressed
-          if (Code == R_SHFT)
-          {
-            RShift = 1;
-            goto SkipOut;
-          } // right shift button is pressed
-          if (Code == CTRL)
-          {
-            PS2Ctrl = 1;
-            goto SkipOut;
-          } // left control button is pressed
-          if (Code == CAPS)
-          {
-            CapsLock = !CapsLock;
-            setleds = 1;
-            //                            setLEDs(CapsLock, NumLock, 3);
-            goto SkipOut;
-          }
-          if (Code == NUML)
-          { // caps or num lock pressed
-            NumLock = !NumLock;
-            setleds = 1;
-            //                            setLEDs(CapsLock, NumLock, 7);
-            goto SkipOut;
-          }
-          if (KeyE0 && Code == 0x11)
-          {
-            AltGrDown = 1;
-            goto SkipOut;
-          } // AltGr key pressed on non US Keyboard
-
-          // now get the character into c.  Why, oh why, are scan codes so random?
-          if (!KeyE0 && Code == 0x83)
-            c = 0x97; // a special case, function key F7
-          else if (KeyE0 && Code == 0x4A)
-            c = '/'; // another special case, this time the keypad forward slash
-          else if (KeyE0 && Code == 0x5A)
-            c = NUM_ENT; // yet another special case, this time the keypad enter key
-          else if ((KeyE0 || !NumLock) && Code >= 104 && Code < 0x80 && !AltGrDown)
-          {             // a keycode from the numeric keypad
-            LShift = 0; // when num lock LED is on codes are preceeded by left shift
-            if (Option.KeyboardConfig == CONFIG_ES)
-              c = keyE0Codes_ES[Code - 104];
-            else
-              c = keyE0Codes[Code - 104];
-            if (PS2Ctrl)
-            { // special for PB
-              if (c == UP)
-                c = PUP; // CTRL-UP to page up
-              if (c == DOWN)
-                c = PDOWN; // CTRL-DOWN to page down
-              if (c == LEFT)
-                c = HOME; // CTRL-LEFT to home
-              if (c == RIGHT)
-                c = END; // CTRL-RIGHT to end
-            }
-          }
-          else if ((Code >= 0x15 && Code < 0x62) && AltGrDown != 0) // a keycode preceeded by Alt-Gr
-            switch (Option.KeyboardConfig)
-            {               // an international keycode pressed with
-            case CONFIG_US: // the AltGr key
-              break;        // no code for US keyboard
-            case CONFIG_FR: // French Keyboard
-              switch (Code)
-              {
-              case 0x45:
-                c = 0x40; // @
-                AltGrDown = 0;
-                break;
-              case 0x25:
-                c = 0x7b; // {
-                AltGrDown = 0;
-                break;
-              case 0x2e:
-                c = 0x5b; // [
-                AltGrDown = 0;
-                break;
-              case 0x55:
-                c = 0x7d; // }
-                AltGrDown = 0;
-                break;
-              case 0x4e:
-                c = 0x5d; // ]
-                AltGrDown = 0;
-                break;
-              case 0x3e:
-                c = 0x5c; // '\'
-                AltGrDown = 0;
-                break;
-              case 0x1e:
-                c = 0x7e; // ~
-                AltGrDown = 0;
-                break;
-              case 0x36:
-                c = 0x7c; // |
-                AltGrDown = 0;
-                break;
-              case 0x26:
-                c = 0x23; // #
-                AltGrDown = 0;
-                break;
-              default:
-                c = 0; // invalid code
-                AltGrDown = 0;
-                break;
-              }
-              break;
-            case CONFIG_GR: // German Keyboard
-              switch (Code)
-              {
-              case 0x15:
-                c = 0x40; // @
-                AltGrDown = 0;
-                break;
-              case 0x3d:
-                c = 0x7b; // {
-                AltGrDown = 0;
-                break;
-              case 0x3e:
-                c = 0x5b; // [
-                AltGrDown = 0;
-                break;
-              case 0x45:
-                c = 0x7d; // }
-                AltGrDown = 0;
-                break;
-              case 0x46:
-                c = 0x5d; // ]
-                AltGrDown = 0;
-                break;
-              case 0x4e:
-                c = 0x5c; // '\'
-                AltGrDown = 0;
-                break;
-              case 0x5b:
-                c = 0x7e; // ~
-                AltGrDown = 0;
-                break;
-              case 0x61:
-                c = 0x7c; // |
-                AltGrDown = 0;
-                break;
-              default:
-                c = 0; // invalid code
-                AltGrDown = 0;
-                break;
-              }
-              break;
-            case CONFIG_IT: // Italian Keyboard
-              switch (Code)
-              {
-              case 0x4C:
-                c = 0x40; // @
-                AltGrDown = 0;
-                break;
-              case 0x54:
-                c = 0x5b; // [
-                AltGrDown = 0;
-                break;
-              case 0x5b:
-                c = 0x5d; // ]
-                AltGrDown = 0;
-                break;
-              case 0x52:
-                c = 0x23; // #
-                AltGrDown = 0;
-                break;
-              default:
-                c = 0; // invalid code
-                AltGrDown = 0;
-                break;
-              }
-              break;
-            case CONFIG_BE: // Belgian Keyboard
-              switch (Code)
-              {
-              case 0x1e:
-                c = 0x40; // @
-                AltGrDown = 0;
-                break;
-              case 0x46:
-                c = 0x7b; // {
-                AltGrDown = 0;
-                break;
-              case 0x54:
-                c = 0x5b; // [
-                AltGrDown = 0;
-                break;
-              case 0x45:
-                c = 0x7d; // }
-                AltGrDown = 0;
-                break;
-              case 0x5b:
-                c = 0x5d; // ]
-                AltGrDown = 0;
-                break;
-              case 0x1a:
-                c = 0x5c; // '\'
-                AltGrDown = 0;
-                break;
-              case 0x4a:
-                c = 0x7e; // ~
-                AltGrDown = 0;
-                break;
-              case 0x16:
-                c = 0x7c; // |
-                AltGrDown = 0;
-                break;
-              case 0x26:
-                c = 0x23; // #
-                AltGrDown = 0;
-                break;
-              default:
-                c = 0; // invalid code
-                AltGrDown = 0;
-                break;
-              }
-              break;
-            case CONFIG_ES: // Spanish Keyboard
-              switch (Code)
-              {
-              case 0x1E:
-                c = 0x40; // @
-                AltGrDown = 0;
-                break;
-              case 0x54:
-                c = 0x5b; // [
-                AltGrDown = 0;
-                break;
-              case 0x5b:
-                c = 0x5d; // ]
-                AltGrDown = 0;
-                break;
-              case 0x26:
-                c = 0x23; // #
-                AltGrDown = 0;
-                break;
-              case 0x52:
-                c = 0x7b; // {
-                AltGrDown = 0;
-                break;
-              case 0x5d:
-                c = 0x7d; // }
-                AltGrDown = 0;
-                break;
-              case 0x16:
-                c = 0x7c; // |
-                AltGrDown = 0;
-                break;
-              case 0x0e:
-                c = 0x5c; // '\'
-                AltGrDown = 0;
-                break;
-              case 0x25:
-                c = 0x7e; // ~
-                AltGrDown = 0;
-                break;
-              default:
-                c = 0; // invalid code
-                AltGrDown = 0;
-                break;
-              }
-              break;
-            case CONFIG_BR: // Brazilian Keyboard (TO DO)
-              switch (Code)
-              {
-              case 0x1D:
-                c = '?'; // ?
-                AltGrDown = 0;
-                break;
-              case 0x14:
-                c = '/'; // /
-                AltGrDown = 0;
-                break;
-              default:
-                c = 0; // invalid code
-                AltGrDown = 0;
-                break;
-              }
-              break;
-            }
-          else
-          {
-            switch (Option.KeyboardConfig)
-            {
-            case CONFIG_US:
-              if (LShift || RShift)
-                c = keySCodes[0][Code % 128]; // a keycode preceeded by a shift
-              else
-                c = keyCodes[0][Code % 128]; // just a keycode
-              break;
-            case CONFIG_FR:
-              if (LShift || RShift)
-                c = keySCodes[1][Code % 128]; // a keycode preceeded by a shift
-              else
-                c = keyCodes[1][Code % 128]; // just a keycode
-              break;
-            case CONFIG_GR:
-              if (LShift || RShift)
-                c = keySCodes[2][Code % 128]; // a keycode preceeded by a shift
-              else
-                c = keyCodes[2][Code % 128]; // just a keycode
-              break;
-            case CONFIG_IT:
-              if (LShift || RShift)
-                c = keySCodes[3][Code % 128]; // a keycode preceeded by a shift
-              else
-                c = keyCodes[3][Code % 128]; // just a keycode
-              break;
-            case CONFIG_BE:
-              if (LShift || RShift)
-                c = keySCodes[4][Code % 128]; // a keycode preceeded by a shift
-              else
-                c = keyCodes[4][Code % 128]; // just a keycode
-              break;
-            case CONFIG_UK:
-              if (LShift || RShift)
-                c = keySCodes[5][Code % 128]; // a keycode preceeded by a shift
-              else
-                c = keyCodes[5][Code % 128]; // just a keycode
-              break;
-            case CONFIG_ES:
-              if (LShift || RShift)
-                c = keySCodes[6][Code % 128]; // a keycode preceeded by a shift
-              else
-                c = keyCodes[6][Code % 128]; // just a keycode
-              break;
-            case CONFIG_BR:
-              if (LShift || RShift)
-                c = keySCodes[7][Code % 128]; // a keycode preceeded by a shift
-              else
-                c = keyCodes[7][Code % 128]; // just a keycode
-              break;
-            }
-          }
-
-          if (!c)
-            goto SkipOut;
-
-          if (c <= 0x7F)
-          { // a normal character
-            if (CapsLock && c >= 'a' && c <= 'z')
-              c -= 32; // adj for caps lock
-            if (PS2Ctrl)
-              c &= 0x1F; // adj for control
-          }
-          else
-          { // must be a function key or similar
-            if (LShift || RShift)
-              c |= 0b00100000;
-            // NOTE: Special for PB, CTRL-UP to page up, CTRL-DOWN to page down, CTRL-LEFT to home, CTRL-RIGHT to end
-            if (PS2Ctrl && !(c == PUP || c == PDOWN || c == HOME || c == END))
-              c |= 0b01000000;
-          }
-
-          if (BreakKey && c == BreakKey)
-          {                                      // if the user wants to stop the progran
-            MMAbort = true;                      // set the flag for the interpreter to see
-            ConsoleRxBufHead = ConsoleRxBufTail; // empty the buffer
-                                                 // break;
-          }
-          else
-          {
-            if (!(justset && c == '3'))
-            {
-              Timer3=0;
-              ConsoleRxBuf[ConsoleRxBufHead] = c; // store the byte in the ring buffer
-              if (ConsoleRxBuf[ConsoleRxBufHead] == keyselect && KeyInterrupt != NULL)
-              {
-                Keycomplete = true;
-              }
-              else
-              {
-                ConsoleRxBufHead = (ConsoleRxBufHead + 1) % CONSOLE_RX_BUF_SIZE; // advance the head of the queue
-                if (ConsoleRxBufHead == ConsoleRxBufTail)
-                {                                                                  // if the buffer has overflowed
-                  ConsoleRxBufTail = (ConsoleRxBufTail + 1) % CONSOLE_RX_BUF_SIZE; // throw away the oldest char
-                }
-              }
-            }
-            else
-              justset = 0;
-          }
-
-        SkipOut:
-          // end lump of self contained code
-          //////////////////////////////////////////////////////////////////////////////////////////////////////////
-          KeyUpCode = false;
-          KeyE0 = false;
         }
+      }
+      else
+        justset = 0;
+    }
+
+  SkipOut:
+    // end lump of self contained code
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////
+    KeyUpCode = false;
+    KeyE0 = false;
+  }
 }
 /***************************************************************************************************
 change notification interrupt service routine
@@ -1014,12 +1045,13 @@ change notification interrupt service routine
 void __not_in_flash_func(CNInterrupt)(uint64_t dd)
 {
   static unsigned char Code = 0;
-  int d = dd & (1<<PinDef[Option.KEYBOARD_DATA].GPno);
+  int d = dd & (1 << PinDef[Option.KEYBOARD_DATA].GPno);
 
   // Make sure it was a falling edge
-  if (!(dd & (1<<PinDef[Option.KEYBOARD_CLOCK].GPno)))
+  if (!(dd & (1 << PinDef[Option.KEYBOARD_CLOCK].GPno)))
   {
-    if(!Timer3)PS2State=PS2START;
+    if (!Timer3)
+      PS2State = PS2START;
     switch (PS2State)
     {
     default:
@@ -1040,7 +1072,7 @@ void __not_in_flash_func(CNInterrupt)(uint64_t dd)
         KParity = 0; // init parity check
         Code = 0;
         PS2State = PS2BIT;
-        Timer3=5;
+        Timer3 = 5;
       }
       break;
 
@@ -1058,21 +1090,21 @@ void __not_in_flash_func(CNInterrupt)(uint64_t dd)
         KParity ^= 0x80;  // PS2DAT == 1
       if (KParity & 0x80) // parity odd, continue
         PS2State = PS2STOP;
-      else {
+      else
+      {
         PS2State = PS2ERROR;
-        putConsole('q',1);
+        putConsole('q', 1);
       }
       break;
 
     case PS2STOP:
       if (d)
       { // PS2DAT == 1
-      processcode(Code);
-      Code = 0;
+        processcode(Code);
+        Code = 0;
       }
       PS2State = PS2START;
       break;
     }
   }
 }
-
