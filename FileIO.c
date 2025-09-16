@@ -3615,7 +3615,7 @@ char __not_in_flash_func(FilePutChar)(char c, int fnbr)
 }
 int FileEOF(int fnbr)
 {
-    int i;
+    int i=1;
     if (filesource[fnbr] == FATFSFILE)
     {
         if (!InitSDCard())
@@ -3883,6 +3883,7 @@ int BasicFileOpen(char *fname, int fnbr, int mode)
         lastfptr[fnbr] = -1;
         bw[fnbr] = -1;
         fmode[fnbr] = mode;
+        if(mode==FA_READ)positionfile(fnbr,0); //prime the read buffer
     }
     else
     {

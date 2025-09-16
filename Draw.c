@@ -597,9 +597,15 @@ void ClearScreen(int c)
 #ifndef PICOMITEVGA
     if (ScrollLCD == ScrollLCDMEM332)
     {
-        multicore_fifo_push_blocking(7);
-        multicore_fifo_push_blocking((uint32_t)0);
-        ScrollStart = 0;
+        if (Option.DISPLAY_TYPE >= SSD1963_5_12BUFF)
+        {
+        }
+        else
+        {
+            multicore_fifo_push_blocking(7);
+            multicore_fifo_push_blocking((uint32_t)0);
+            ScrollStart = 0;
+        }
     }
 #endif
 #endif

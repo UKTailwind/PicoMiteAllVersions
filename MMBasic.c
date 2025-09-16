@@ -4009,8 +4009,14 @@ void MIPS16 ClearRuntime(bool all)
 #if defined(PICOMITE) && defined(rp2350)
     if (ScrollLCD == ScrollLCDMEM332)
     {
-        multicore_fifo_push_blocking(7);
-        multicore_fifo_push_blocking((uint32_t)0);
+        if (Option.DISPLAY_TYPE >= SSD1963_5_12BUFF)
+        {
+        }
+        else
+        {
+            multicore_fifo_push_blocking(7);
+            multicore_fifo_push_blocking((uint32_t)0);
+        }
     }
 #endif
     if (SSD16TYPE || Option.DISPLAY_TYPE == IPS_4_16 || SPI480)

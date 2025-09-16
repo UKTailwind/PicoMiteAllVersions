@@ -1429,7 +1429,7 @@ void cmd_math(void)
 			{
 				while (card--)
 				{
-					*a3int++ = *a1int++ & *a2int++;
+					*a3int++ = *a1int++ ^ *a2int++;
 				}
 			}
 			return;
@@ -1451,7 +1451,7 @@ void cmd_math(void)
 			{
 				while (card--)
 				{
-					*a3int++ = *a1int++ & *a2int++;
+					*a3int++ = *a1int++ | *a2int++;
 				}
 			}
 			return;

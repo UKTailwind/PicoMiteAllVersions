@@ -2623,7 +2623,7 @@ void MIPS16 printoptions(void)
     if (Option.DISPLAY_TYPE == DISP_USER)
         PO3Int("LCDPANEL USER", HRes, VRes);
 #if defined(PICOMITE) && defined(rp2350)
-    if (Option.DISPLAY_TYPE > I2C_PANEL && (Option.DISPLAY_TYPE < DISP_USER || Option.DISPLAY_TYPE >= NEXTGEN))
+    if (Option.DISPLAY_TYPE > I2C_PANEL && (Option.DISPLAY_TYPE < DISP_USER || (Option.DISPLAY_TYPE >= NEXTGEN && Option.DISPLAY_TYPE < SSD1963_5_12BUFF)))
     {
 #else
     if (Option.DISPLAY_TYPE > I2C_PANEL && Option.DISPLAY_TYPE < DISP_USER)
@@ -2684,7 +2684,11 @@ void MIPS16 printoptions(void)
             PIntComma(Option.I2Coffset);
         MMPrintString("\r\n");
     }
-    if (Option.DISPLAY_TYPE >= SSDPANEL && Option.DISPLAY_TYPE < VIRTUAL)
+#if defined(PICOMITE) && defined(rp2350)
+    if ((Option.DISPLAY_TYPE >= SSDPANEL && Option.DISPLAY_TYPE < VIRTUAL) || Option.DISPLAY_TYPE >= SSD1963_5_12BUFF)
+#else
+    if ((Option.DISPLAY_TYPE >= SSDPANEL && Option.DISPLAY_TYPE < VIRTUAL))
+#endif
     {
         PO("LCDPANEL");
         MMPrintString((char *)display_details[Option.DISPLAY_TYPE].name);
@@ -2695,14 +2699,26 @@ void MIPS16 printoptions(void)
             MMputchar(',', 1);
             MMPrintString((char *)PinDef[Option.DISPLAY_BL].pinname);
         }
+#if defined(PICOMITE) && defined(rp2350)
+        else if (Option.SSD_DC != (Option.DISPLAY_TYPE > SSD_PANEL_8 && Option.DISPLAY_TYPE < SSD1963_5_12BUFF ? 16 : 13) || Option.SSD_RESET != (Option.DISPLAY_TYPE > SSD_PANEL_8 && Option.DISPLAY_TYPE < SSD1963_5_12BUFF ? 19 : 16) || (Option.SSD_DATA != 1))
+#else
         else if (Option.SSD_DC != (Option.DISPLAY_TYPE > SSD_PANEL_8 ? 16 : 13) || Option.SSD_RESET != (Option.DISPLAY_TYPE > SSD_PANEL_8 ? 19 : 16) || (Option.SSD_DATA != 1))
+#endif
             MMputchar(',', 1);
+#if defined(PICOMITE) && defined(rp2350)
+        if (Option.SSD_DC != (Option.DISPLAY_TYPE > SSD_PANEL_8 && Option.DISPLAY_TYPE < SSD1963_5_12BUFF ? 16 : 13))
+#else
         if (Option.SSD_DC != (Option.DISPLAY_TYPE > SSD_PANEL_8 ? 16 : 13))
+#endif
         {
             MMputchar(',', 1);
             MMPrintString((char *)PinDef[PINMAP[Option.SSD_DC]].pinname);
         }
+#if defined(PICOMITE) && defined(rp2350)
+        else if (Option.SSD_RESET != (Option.DISPLAY_TYPE > SSD_PANEL_8 && Option.DISPLAY_TYPE < SSD1963_5_12BUFF ? 19 : 16) || (Option.SSD_DATA != 1))
+#else
         else if (Option.SSD_RESET != (Option.DISPLAY_TYPE > SSD_PANEL_8 ? 19 : 16) || (Option.SSD_DATA != 1))
+#endif
             MMputchar(',', 1);
         if (Option.SSD_RESET == -1)
         {

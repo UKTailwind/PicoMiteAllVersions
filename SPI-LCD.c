@@ -98,6 +98,7 @@ const struct Displays display_details[] = {
 	{62, "ILI9488PBUFF", 45000000, 320, 320, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
 	{63, "ILI9488WBUFF", 45000000, 480, 320, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
 	{64, "ST7789_320BUFF", 50000000, 320, 240, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
+	{65, "SSD1963_5_12BUFF", 0, 400, 240, 0, 0, 0, 0},
 #endif
 };
 void __not_in_flash_func(spi_write_fast)(spi_inst_t *spi, const uint8_t *src, size_t len)
@@ -2587,10 +2588,16 @@ void ScrollLCDMEM332(int lines)
 					t = VRes - 1;
 			}
 		}
-		multicore_fifo_push_blocking(7);
-		multicore_fifo_push_blocking(t);
-		DrawRectangle(0, VRes - lines, HRes - 1, VRes - 1, gui_bcolour); // erase the lines to be scrolled off
-		ScrollStart = t;
+		if (Option.DISPLAY_TYPE >= SSD1963_5_12BUFF)
+		{
+		}
+		else
+		{
+			multicore_fifo_push_blocking(7);
+			multicore_fifo_push_blocking(t);
+			DrawRectangle(0, VRes - lines, HRes - 1, VRes - 1, gui_bcolour); // erase the lines to be scrolled off
+			ScrollStart = t;
+		}
 	}
 	else
 	{
@@ -3324,7 +3331,7 @@ void cmd_map(void)
 		error("Invalid for this display");
 	if ((p = checkstring(cmdline, (unsigned char *)"RESET")))
 	{
-		if (Option.DISPLAY_TYPE == ILI9488BUFF || Option.DISPLAY_TYPE == ILI9488PBUFF)
+		if (Option.DISPLAY_TYPE == ILI9488BUFF || Option.DISPLAY_TYPE == ILI9488PBUFF || Option.DISPLAY_TYPE == SSD1963_5_12BUFF)
 			init_RGB332_to_RGB888_LUT();
 		else
 			init_RGB332_to_RGB565_LUT();
@@ -3354,7 +3361,7 @@ void cmd_map(void)
 		if (!*cmdline)
 			error("Invalid syntax");
 		c.rgb = getColour((char *)cmdline, 0);
-		if (Option.DISPLAY_TYPE == ILI9488BUFF || Option.DISPLAY_TYPE == ILI9488PBUFF)
+		if (Option.DISPLAY_TYPE == ILI9488BUFF || Option.DISPLAY_TYPE == ILI9488PBUFF || Option.DISPLAY_TYPE == SSD1963_5_12BUFF)
 		{
 			remap_LUT[cl] = (c.rgbbytes[0] << 16) | (c.rgbbytes[1] << 8) | c.rgbbytes[2];
 		}
@@ -3368,7 +3375,7 @@ void copybuffertoscreen(unsigned char *s, int low_x, int low_y, int high_x, int 
 {
 	if (RGB332_LUT[255] == 0)
 	{
-		if (Option.DISPLAY_TYPE == ILI9488BUFF || Option.DISPLAY_TYPE == ILI9488PBUFF)
+		if (Option.DISPLAY_TYPE == ILI9488BUFF || Option.DISPLAY_TYPE == ILI9488PBUFF || Option.DISPLAY_TYPE == SSD1963_5_12BUFF)
 			init_RGB332_to_RGB888_LUT();
 		else
 			init_RGB332_to_RGB565_LUT();
@@ -3376,74 +3383,80 @@ void copybuffertoscreen(unsigned char *s, int low_x, int low_y, int high_x, int 
 	int t = high_y - low_y; // get the distance between the top and bottom
 	low_y = (low_y + ScrollStart) % VRes;
 	high_y = low_y + t; // and set y2 to the same
-	if (high_y >= VRes)
-	{ // if the box splits over the frame buffer boundary
-		DefineRegionSPI(low_x, low_y, high_x, VRes - 1, 1);
-		if (PinDef[Option.LCD_CLK].mode & SPI0SCK)
-		{
-			for (int y = low_y; y < VRes; y++)
-			{
-				unsigned char *p = (unsigned char *)(ScreenBuffer) + (y * HRes + low_x);
-				for (int x = low_x; x <= high_x; x++)
-					spi_write_fast(spi0, (unsigned char *)&RGB332_LUT[*p++], tlen);
-			}
-		}
-		else
-		{
-			for (int y = low_y; y < VRes; y++)
-			{
-				unsigned char *p = (unsigned char *)(ScreenBuffer) + (y * HRes + low_x);
-				for (int x = low_x; x <= high_x; x++)
-					spi_write_fast(spi1, (unsigned char *)&RGB332_LUT[*p++], tlen);
-			}
-		}
-		DefineRegionSPI(low_x, 0, high_x, high_y - VRes, 1);
-		if (PinDef[Option.LCD_CLK].mode & SPI0SCK)
-		{
-			for (int y = 0; y <= high_y - VRes; y++)
-			{
-				unsigned char *p = (unsigned char *)(ScreenBuffer) + (y * HRes + low_x);
-				for (int x = low_x; x <= high_x; x++)
-					spi_write_fast(spi0, (unsigned char *)&RGB332_LUT[*p++], tlen);
-			}
-		}
-		else
-		{
-			for (int y = 0; y <= high_y - VRes; y++)
-			{
-				unsigned char *p = (unsigned char *)(ScreenBuffer) + (y * HRes + low_x);
-				for (int x = low_x; x <= high_x; x++)
-					spi_write_fast(spi1, (unsigned char *)&RGB332_LUT[*p++], tlen);
-			}
-		}
+	if (Option.DISPLAY_TYPE >= SSD1963_5_12BUFF)
+	{
 	}
 	else
 	{
-		DefineRegionSPI(low_x, low_y, high_x, high_y, 1);
-		if (PinDef[Option.LCD_CLK].mode & SPI0SCK)
-		{
-			for (int y = low_y; y <= high_y; y++)
+		if (high_y >= VRes)
+		{ // if the box splits over the frame buffer boundary
+			DefineRegionSPI(low_x, low_y, high_x, VRes - 1, 1);
+			if (PinDef[Option.LCD_CLK].mode & SPI0SCK)
 			{
-				unsigned char *p = (unsigned char *)(ScreenBuffer) + (y * HRes + low_x);
-				for (int x = low_x; x <= high_x; x++)
-					spi_write_fast(spi0, (unsigned char *)&RGB332_LUT[*p++], tlen);
+				for (int y = low_y; y < VRes; y++)
+				{
+					unsigned char *p = (unsigned char *)(ScreenBuffer) + (y * HRes + low_x);
+					for (int x = low_x; x <= high_x; x++)
+						spi_write_fast(spi0, (unsigned char *)&RGB332_LUT[*p++], tlen);
+				}
+			}
+			else
+			{
+				for (int y = low_y; y < VRes; y++)
+				{
+					unsigned char *p = (unsigned char *)(ScreenBuffer) + (y * HRes + low_x);
+					for (int x = low_x; x <= high_x; x++)
+						spi_write_fast(spi1, (unsigned char *)&RGB332_LUT[*p++], tlen);
+				}
+			}
+			DefineRegionSPI(low_x, 0, high_x, high_y - VRes, 1);
+			if (PinDef[Option.LCD_CLK].mode & SPI0SCK)
+			{
+				for (int y = 0; y <= high_y - VRes; y++)
+				{
+					unsigned char *p = (unsigned char *)(ScreenBuffer) + (y * HRes + low_x);
+					for (int x = low_x; x <= high_x; x++)
+						spi_write_fast(spi0, (unsigned char *)&RGB332_LUT[*p++], tlen);
+				}
+			}
+			else
+			{
+				for (int y = 0; y <= high_y - VRes; y++)
+				{
+					unsigned char *p = (unsigned char *)(ScreenBuffer) + (y * HRes + low_x);
+					for (int x = low_x; x <= high_x; x++)
+						spi_write_fast(spi1, (unsigned char *)&RGB332_LUT[*p++], tlen);
+				}
 			}
 		}
 		else
 		{
-			for (int y = low_y; y <= high_y; y++)
+			DefineRegionSPI(low_x, low_y, high_x, high_y, 1);
+			if (PinDef[Option.LCD_CLK].mode & SPI0SCK)
 			{
-				unsigned char *p = (unsigned char *)(ScreenBuffer) + (y * HRes + low_x);
-				for (int x = low_x; x <= high_x; x++)
-					spi_write_fast(spi1, (unsigned char *)&RGB332_LUT[*p++], tlen);
+				for (int y = low_y; y <= high_y; y++)
+				{
+					unsigned char *p = (unsigned char *)(ScreenBuffer) + (y * HRes + low_x);
+					for (int x = low_x; x <= high_x; x++)
+						spi_write_fast(spi0, (unsigned char *)&RGB332_LUT[*p++], tlen);
+				}
+			}
+			else
+			{
+				for (int y = low_y; y <= high_y; y++)
+				{
+					unsigned char *p = (unsigned char *)(ScreenBuffer) + (y * HRes + low_x);
+					for (int x = low_x; x <= high_x; x++)
+						spi_write_fast(spi1, (unsigned char *)&RGB332_LUT[*p++], tlen);
+				}
 			}
 		}
+		if (PinDef[Option.LCD_CLK].mode & SPI0SCK)
+			spi_finish(spi0);
+		else
+			spi_finish(spi1);
+		ClearCS(Option.LCD_CS);
 	}
-	if (PinDef[Option.LCD_CLK].mode & SPI0SCK)
-		spi_finish(spi0);
-	else
-		spi_finish(spi1);
-	ClearCS(Option.LCD_CS);
 }
 #endif
 void Display_Refresh(void)

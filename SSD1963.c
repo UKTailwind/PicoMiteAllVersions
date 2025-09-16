@@ -101,6 +101,12 @@ void MIPS16 ConfigDisplaySSD(unsigned char *p)
     { // this is the 5" glass
         Option.DISPLAY_TYPE = SSD1963_5_16;
     }
+#if defined(PICOMITE) && defined(rp2350)
+    else if (checkstring(argv[0], (unsigned char *)"SSD1963_5_12BUFF"))
+    { // this is the 5" glass
+        Option.DISPLAY_TYPE = SSD1963_5_12BUFF;
+    }
+#endif
     else if (checkstring(argv[0], (unsigned char *)"SSD1963_5A_16"))
     { // this is the 5" glass alternative version
         Option.DISPLAY_TYPE = SSD1963_5A_16;
@@ -184,10 +190,15 @@ void MIPS16 ConfigDisplaySSD(unsigned char *p)
         CheckPin(SSD1963_DAT10, OptionErrorCheck);
         CheckPin(SSD1963_DAT11, OptionErrorCheck);
         CheckPin(SSD1963_DAT12, OptionErrorCheck);
-        CheckPin(SSD1963_DAT13, OptionErrorCheck);
-        CheckPin(SSD1963_DAT14, OptionErrorCheck);
-        CheckPin(SSD1963_DAT15, OptionErrorCheck);
-        CheckPin(SSD1963_DAT16, OptionErrorCheck);
+#if defined(PICOMITE) && defined(rp2350)
+        if (Option.DISPLAY_TYPE != SSD1963_5_12BUFF)
+#endif
+        {
+            CheckPin(SSD1963_DAT13, OptionErrorCheck);
+            CheckPin(SSD1963_DAT14, OptionErrorCheck);
+            CheckPin(SSD1963_DAT15, OptionErrorCheck);
+            CheckPin(SSD1963_DAT16, OptionErrorCheck);
+        }
     }
 
     if (argc > 3 && *argv[4])
@@ -234,7 +245,11 @@ void MIPS16 ConfigDisplaySSD(unsigned char *p)
     }
     else
     {
+#if defined(PICOMITE) && defined(rp2350)
+        if (Option.DISPLAY_TYPE > SSD_PANEL_8 && Option.DISPLAY_TYPE < SSD1963_5_12BUFF)
+#else
         if (Option.DISPLAY_TYPE > SSD_PANEL_8)
+#endif
         {
             Option.SSD_DC = 16;
             Option.SSD_WR = 17;
@@ -604,7 +619,7 @@ static const uint8_t
 void MIPS16 InitILI9341(void)
 {
 
-    if (Option.SSD_RESET)
+    if (Option.SSD_RESET > 0)
     {
         PinSetBit(SSD1963_RESET_PIN, LATCLR); // reset the SSD1963
         uSec(10000);
@@ -651,7 +666,7 @@ void MIPS16 InitILI9341(void)
 
 void MIPS16 InitIPS_4_16(void)
 {
-    if (Option.SSD_RESET)
+    if (Option.SSD_RESET > 0)
     {
         PinSetBit(SSD1963_RESET_PIN, LATCLR); // reset the SSD1963
         uSec(10000);
@@ -714,7 +729,11 @@ void MIPS16 InitDisplaySSD(void)
     SSD1963rgb = 0b0;
     LCDAttrib = 0;
     SSD1963data = PinDef[Option.SSD_DATA].GPno;
-    if (Option.DISPLAY_TYPE < SSDPANEL || Option.DISPLAY_TYPE >= VIRTUAL)
+#if defined(PICOMITE) && defined(rp2350)
+    if ((Option.DISPLAY_TYPE < SSDPANEL || Option.DISPLAY_TYPE >= VIRTUAL) && Option.DISPLAY_TYPE < SSD1963_5_12BUFF)
+#else
+    if ((Option.DISPLAY_TYPE < SSDPANEL || Option.DISPLAY_TYPE >= VIRTUAL))
+#endif
         return;
 
     // the parameters for the display panel are set here (refer to the data sheet for the glass)
@@ -776,6 +795,28 @@ void MIPS16 InitDisplaySSD(void)
         SSD1963Mode1 = 0x24; // 24-bit for 5" panel, data latch in falling edge for LSHIFT
         SSD1963Mode2 = 0;    // Hsync+Vsync mode
         break;
+#if defined(PICOMITE) && defined(rp2350)
+        if ((Option.DISPLAY_TYPE < SSDPANEL || Option.DISPLAY_TYPE >= VIRTUAL) && Option.DISPLAY_TYPE < SSD1963_5_12BUFF)
+        case SSD1963_5_12BUFF:
+            DisplayHRes = 400; // this is a 5" glass alternative version
+        DisplayVRes = 240;
+        SSD1963HorizPulseWidth = 128;
+        SSD1963HorizBackPorch = 88;
+        SSD1963HorizFrontPorch = 40;
+        SSD1963VertPulseWidth = 2;
+        SSD1963VertBackPorch = 25;
+        SSD1963VertFrontPorch = 18;
+        // Set LSHIFT freq, i.e. the DCLK with PLL freq 120MHz set previously
+        // Typical DCLK is 33MHz.  30MHz = 120MHz*(LCDC_FPR+1)/2^20.  LCDC_FPR = 262143 (0x3FFFF)
+        SSD1963PClock1 = 0x04;
+        SSD1963PClock2 = 0x93;
+        SSD1963PClock3 = 0xe0;
+        SSD1963Mode1 = 0x24; // 24-bit for 5" panel, data latch in falling edge for LSHIFT
+        SSD1963Mode2 = 0;    // Hsync+Vsync mode
+        break;
+#else
+        if ((Option.DISPLAY_TYPE < SSDPANEL || Option.DISPLAY_TYPE >= VIRTUAL))
+#endif
     case SSD1963_7ER_16:
         SSD1963rgb = 0b1000;
     case SSD1963_7_16:
@@ -858,7 +899,15 @@ void MIPS16 InitDisplaySSD(void)
         VRes = DisplayHRes;
         HRes = DisplayVRes;
     }
-    if (Option.DISPLAY_TYPE > SSD_PANEL_8)
+#if defined(PICOMITE) && defined(rp2350)
+    if (Option.DISPLAY_TYPE >= SSD1963_5_12BUFF)
+    {
+        SSD1963PixelInterface = 1;       // PIXEL data interface - 12-bit RGB888
+        SSD1963PixelFormat = 0b01110000; // PIXEL data interface 24-bit
+    }
+    else
+#endif
+        if (Option.DISPLAY_TYPE > SSD_PANEL_8)
     {
         SSD1963PixelInterface = 3;       // PIXEL data interface - 16-bit RGB565
         SSD1963PixelFormat = 0b01010000; // PIXEL data interface RGB565
@@ -868,25 +917,39 @@ void MIPS16 InitDisplaySSD(void)
         SSD1963PixelInterface = 0;       // PIXEL data interface - 8-bit
         SSD1963PixelFormat = 0b01110000; // PIXEL data interface 24-bit
     }
-
-    // setup the pointers to the drawing primitives
-    DrawRectangle = DrawRectangleSSD1963;
-    DrawBitmap = DrawBitmapSSD1963;
-    if (!(Option.DISPLAY_TYPE == ILI9341_8 || Option.DISPLAY_TYPE == ILI9341_16 || Option.DISPLAY_TYPE == IPS_4_16))
-        ScrollLCD = ScrollSSD1963;
-    else
-        ScrollLCD = ScrollLCDSPI;
-    DrawBuffer = DrawBufferSSD1963;
-    ReadBuffer = ReadBufferSSD1963;
-    if (SSD16TYPE || Option.DISPLAY_TYPE == IPS_4_16)
+#if defined(PICOMITE) && defined(rp2350)
+    if (Option.DISPLAY_TYPE >= SSD1963_5_12BUFF)
     {
-        DrawBLITBuffer = DrawBLITBufferSSD1963;
-        ReadBLITBuffer = ReadBLITBufferSSD1963;
+        DrawRectangle = DrawRectangleMEM332;
+        DrawBitmap = DrawBitmapMEM332;
+        DrawBuffer = DrawBufferMEM332;
+        ReadBuffer = ReadBufferMEM332;
+        DrawBLITBuffer = DrawBlitBufferMEM332;
+        ReadBLITBuffer = ReadBlitBufferMEM332;
+        ScrollLCD = ScrollLCDMEM332;
     }
     else
+#endif
     {
-        DrawBLITBuffer = DrawBufferSSD1963;
-        ReadBLITBuffer = ReadBufferSSD1963;
+        // setup the pointers to the drawing primitives
+        DrawRectangle = DrawRectangleSSD1963;
+        DrawBitmap = DrawBitmapSSD1963;
+        if (!(Option.DISPLAY_TYPE == ILI9341_8 || Option.DISPLAY_TYPE == ILI9341_16 || Option.DISPLAY_TYPE == IPS_4_16))
+            ScrollLCD = ScrollSSD1963;
+        else
+            ScrollLCD = ScrollLCDSPI;
+        DrawBuffer = DrawBufferSSD1963;
+        ReadBuffer = ReadBufferSSD1963;
+        if (SSD16TYPE || Option.DISPLAY_TYPE == IPS_4_16)
+        {
+            DrawBLITBuffer = DrawBLITBufferSSD1963;
+            ReadBLITBuffer = ReadBLITBufferSSD1963;
+        }
+        else
+        {
+            DrawBLITBuffer = DrawBufferSSD1963;
+            ReadBLITBuffer = ReadBufferSSD1963;
+        }
     }
     DrawPixel = DrawPixelNormal;
     if (Option.DISPLAY_TYPE == ILI9341_8)
@@ -1151,7 +1214,7 @@ void SetTearingCfg(int state, int mode)
  ***********************************************************************************************************************************/
 void MIPS16 InitILI9341_8(void)
 {
-    if (Option.SSD_RESET)
+    if (Option.SSD_RESET > 0)
     {
         PinSetBit(SSD1963_RESET_PIN, LATCLR); // reset the SSD1963
         uSec(10000);
@@ -1283,7 +1346,7 @@ void MIPS16 InitILI9341_8(void)
 void MIPS16 InitSSD1963(void)
 {
 
-    if (Option.SSD_RESET)
+    if (Option.SSD_RESET > 0)
     {
         PinSetBit(SSD1963_RESET_PIN, LATCLR); // reset the SSD1963
         uSec(10000);
