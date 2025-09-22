@@ -791,6 +791,8 @@ void MIPS16 ListFile(char *pp, int all)
 			if (buff[i] == TAB)
 				buff[i] = ' ';
 		ListCnt = printWrappedText(buff, Option.Width, ListCnt, all);
+		routinechecks();
+		CheckAbort();
 	}
 	FileClose(fnbr);
 }
@@ -859,6 +861,8 @@ void MIPS16 ListProgram(unsigned char *p, int all)
 				}
 				fflush(stdout);
 				ListNewLine(&ListCnt, all);
+				routinechecks();
+				CheckAbort();
 				if (p[0] == 0 && p[1] == 0)
 					break; // end of the listing ?
 			}

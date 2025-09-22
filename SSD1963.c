@@ -106,6 +106,14 @@ void MIPS16 ConfigDisplaySSD(unsigned char *p)
     { // this is the 5" glass
         Option.DISPLAY_TYPE = SSD1963_5_12BUFF;
     }
+    else if (checkstring(argv[0], (unsigned char *)"SSD1963_5_16BUFF"))
+    { // this is the 5" glass
+        Option.DISPLAY_TYPE = SSD1963_5_16BUFF;
+    }
+    else if (checkstring(argv[0], (unsigned char *)"SSD1963_5_BUFF"))
+    { // this is the 5" glass
+        Option.DISPLAY_TYPE = SSD1963_5_BUFF;
+    }
 #endif
     else if (checkstring(argv[0], (unsigned char *)"SSD1963_5A_16"))
     { // this is the 5" glass alternative version
@@ -184,7 +192,11 @@ void MIPS16 ConfigDisplaySSD(unsigned char *p)
     CheckPin(SSD1963_DAT6, OptionErrorCheck);
     CheckPin(SSD1963_DAT7, OptionErrorCheck);
     CheckPin(SSD1963_DAT8, OptionErrorCheck);
+#if defined(PICOMITE) && defined(rp2350)
+    if (Option.DISPLAY_TYPE > SSD_PANEL_8 && Option.DISPLAY_TYPE!=SSD1963_5_BUFF)
+#else
     if (Option.DISPLAY_TYPE > SSD_PANEL_8)
+#endif
     {
         CheckPin(SSD1963_DAT9, OptionErrorCheck);
         CheckPin(SSD1963_DAT10, OptionErrorCheck);
@@ -229,13 +241,6 @@ void MIPS16 ConfigDisplaySSD(unsigned char *p)
             pin = codemap(pin);
         if (IsInvalidPin(pin))
             error("Invalid pin");
-#ifdef rp2350
-        if (Option.DISPLAY_TYPE > SSD_PANEL_8 && PinDef[pin].GPno != 16 && rp2350a)
-            error("Must be GP16 for 16-bit displays on the RP2350A");
-#else
-        if (Option.DISPLAY_TYPE > SSD_PANEL_8 && PinDef[pin].GPno != 16)
-            error("Must be GP16 for 16-bit displays");
-#endif
         if (ExtCurrentConfig[pin] != EXT_NOT_CONFIG)
             error("Pin %/| is in use", pin, pin);
         Option.SSD_DC = PinDef[pin].GPno;
@@ -246,7 +251,7 @@ void MIPS16 ConfigDisplaySSD(unsigned char *p)
     else
     {
 #if defined(PICOMITE) && defined(rp2350)
-        if (Option.DISPLAY_TYPE > SSD_PANEL_8 && Option.DISPLAY_TYPE < SSD1963_5_12BUFF)
+        if ((Option.DISPLAY_TYPE > SSD_PANEL_8 && Option.DISPLAY_TYPE < NEXTGEN) || Option.DISPLAY_TYPE==SSD1963_5_16BUFF)
 #else
         if (Option.DISPLAY_TYPE > SSD_PANEL_8)
 #endif
@@ -796,9 +801,11 @@ void MIPS16 InitDisplaySSD(void)
         SSD1963Mode2 = 0;    // Hsync+Vsync mode
         break;
 #if defined(PICOMITE) && defined(rp2350)
-        if ((Option.DISPLAY_TYPE < SSDPANEL || Option.DISPLAY_TYPE >= VIRTUAL) && Option.DISPLAY_TYPE < SSD1963_5_12BUFF)
-        case SSD1963_5_12BUFF:
-            DisplayHRes = 400; // this is a 5" glass alternative version
+    case SSD1963_5_12BUFF:
+    case SSD1963_5_16BUFF:
+    case SSD1963_5_BUFF:
+        SSD1963rgb = 0b1000;
+        DisplayHRes = 400; // this is a 5" glass alternative version
         DisplayVRes = 240;
         SSD1963HorizPulseWidth = 128;
         SSD1963HorizBackPorch = 88;
@@ -808,14 +815,12 @@ void MIPS16 InitDisplaySSD(void)
         SSD1963VertFrontPorch = 18;
         // Set LSHIFT freq, i.e. the DCLK with PLL freq 120MHz set previously
         // Typical DCLK is 33MHz.  30MHz = 120MHz*(LCDC_FPR+1)/2^20.  LCDC_FPR = 262143 (0x3FFFF)
-        SSD1963PClock1 = 0x04;
-        SSD1963PClock2 = 0x93;
-        SSD1963PClock3 = 0xe0;
+        SSD1963PClock1 = 0x03;
+        SSD1963PClock2 = 0xff;
+        SSD1963PClock3 = 0xff;
         SSD1963Mode1 = 0x24; // 24-bit for 5" panel, data latch in falling edge for LSHIFT
         SSD1963Mode2 = 0;    // Hsync+Vsync mode
         break;
-#else
-        if ((Option.DISPLAY_TYPE < SSDPANEL || Option.DISPLAY_TYPE >= VIRTUAL))
 #endif
     case SSD1963_7ER_16:
         SSD1963rgb = 0b1000;
@@ -900,10 +905,26 @@ void MIPS16 InitDisplaySSD(void)
         HRes = DisplayVRes;
     }
 #if defined(PICOMITE) && defined(rp2350)
-    if (Option.DISPLAY_TYPE >= SSD1963_5_12BUFF)
+    if (Option.DISPLAY_TYPE == SSD1963_5_12BUFF)
     {
         SSD1963PixelInterface = 1;       // PIXEL data interface - 12-bit RGB888
         SSD1963PixelFormat = 0b01110000; // PIXEL data interface 24-bit
+        DisplayHRes*=2;
+        DisplayVRes*=2;
+    }
+    else if (Option.DISPLAY_TYPE == SSD1963_5_16BUFF)
+    {
+        SSD1963PixelInterface = 3;       // PIXEL data interface - 16-bit RGB565
+        SSD1963PixelFormat = 0b01010000; // PIXEL data interface RGB565
+        DisplayHRes*=2;
+        DisplayVRes*=2;
+    }
+    else if (Option.DISPLAY_TYPE == SSD1963_5_BUFF)
+    {
+        SSD1963PixelInterface = 0;       // PIXEL data interface - 8-bit
+        SSD1963PixelFormat = 0b01110000; // PIXEL data interface 24-bit
+        DisplayHRes*=2;
+        DisplayVRes*=2;
     }
     else
 #endif
@@ -996,31 +1017,44 @@ void WriteData(int data)
 // For the 100 pin chip write RGB colour over an 8 bit bus
 void WriteColor(unsigned int c)
 {
+#if defined(PICOMITE) && defined(rp2350)
+    if ((Option.DISPLAY_TYPE > SSD_PANEL_8 && Option.DISPLAY_TYPE<NEXTGEN) || Option.DISPLAY_TYPE==SSD1963_5_16BUFF)
+#else
     if (Option.DISPLAY_TYPE > SSD_PANEL_8)
+#endif
     {
         gpio_put_masked64((0xFFFF << SSD1963data), (c << SSD1963data));
         gpio_put(SSD1963_WR_GPPIN, 0);
         nop;
         gpio_put(SSD1963_WR_GPPIN, 1);
     }
-    else
+#if defined(PICOMITE) && defined(rp2350)
+    else if (Option.DISPLAY_TYPE == SSD1963_5_12BUFF)
     {
-        gpio_put_masked64((0xFF << SSD1963data), (((c >> 16) & 0xFF) << SSD1963data));
+        gpio_put_masked64((0xFFF << SSD1963data), (((c >> 12) & 0xFFF) << SSD1963data));
+        gpio_put(SSD1963_WR_GPPIN, 0);
+        nop;
+        gpio_put(SSD1963_WR_GPPIN, 1);
+        gpio_put_masked64((0xFFF << SSD1963data), ((c & 0xFFF) << SSD1963data));
         nop;
         gpio_put(SSD1963_WR_GPPIN, 0);
         nop;
+        gpio_put(SSD1963_WR_GPPIN, 1);
+    }
+#endif
+    else
+    {
+        gpio_put_masked64((0xFF << SSD1963data), (((c >> 16) & 0xFF) << SSD1963data));
+        gpio_put(SSD1963_WR_GPPIN, 0);
         nop;
         gpio_put(SSD1963_WR_GPPIN, 1);
         gpio_put_masked64((0xFF << SSD1963data), (((c >> 8) & 0xFF) << SSD1963data));
         nop;
         gpio_put(SSD1963_WR_GPPIN, 0);
         nop;
-        nop;
         gpio_put(SSD1963_WR_GPPIN, 1);
-        nop;
         gpio_put_masked64((0xFF << SSD1963data), ((c & 0xFF) << SSD1963data));
         gpio_put(SSD1963_WR_GPPIN, 0);
-        nop;
         nop;
         gpio_put(SSD1963_WR_GPPIN, 1);
     }
@@ -1423,9 +1457,9 @@ void MIPS16 InitSSD1963(void)
 
     // Set pixel data interface
     WriteComand(CMD_SET_DATA_INTERFACE);
-    WriteData(SSD1963PixelInterface); // 8-bit colour format
+    WriteData(SSD1963PixelInterface); // data format
     WriteComand(CMD_SET_PIXEL_FORMAT);
-    WriteData(SSD1963PixelFormat); // 8-bit colour format
+    WriteData(SSD1963PixelFormat); // colour format
 
     // initialise the GPIOs
     WriteComand(CMD_SET_GPIO_CONF); // Set all GPIOs to output, controlled by host
@@ -2805,7 +2839,6 @@ void ScrollSSD1963(int lines)
                     t = 0;
             }
         }
-        DrawRectangleSSD1963(0, 0, HRes - 1, lines - 1, gui_bcolour); // erase the line introduced at the top
     }
 
     WriteComand(CMD_SET_SCROLL_START);

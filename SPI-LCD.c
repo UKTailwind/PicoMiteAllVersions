@@ -99,6 +99,8 @@ const struct Displays display_details[] = {
 	{63, "ILI9488WBUFF", 45000000, 480, 320, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
 	{64, "ST7789_320BUFF", 50000000, 320, 240, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
 	{65, "SSD1963_5_12BUFF", 0, 400, 240, 0, 0, 0, 0},
+	{66, "SSD1963_5_16BUFF", 0, 400, 240, 0, 0, 0, 0},
+	{67, "SSD1963_5_BUFF", 0, 400, 240, 0, 0, 0, 0},
 #endif
 };
 void __not_in_flash_func(spi_write_fast)(spi_inst_t *spi, const uint8_t *src, size_t len)
@@ -2561,19 +2563,13 @@ void ScrollLCDMEM332(int lines)
 {
 	if (lines == 0)
 		return;
-	if (Option.DISPLAY_ORIENTATION == PORTRAIT)
+	if ((Option.DISPLAY_ORIENTATION == PORTRAIT && Option.DISPLAY_TYPE<SSD1963_5_12BUFF) || (Option.DISPLAY_ORIENTATION == LANDSCAPE && Option.DISPLAY_TYPE>=SSD1963_5_12BUFF))
 	{
+		ShowCursor(false);
 		int t = ScrollStart;
+		int l=lines;
 		if (lines >= 0)
 		{
-			DrawRectangle(0, 0, HRes - 1, lines - 1, gui_bcolour); // erase the line to be scrolled off
-			multicore_fifo_push_blocking(6);
-			multicore_fifo_push_blocking((uint32_t)low_x | (high_x << 16));
-			multicore_fifo_push_blocking((uint32_t)low_y | (high_y << 16));
-			low_x = silly_low;
-			high_y = silly_high;
-			low_y = silly_low;
-			high_x = silly_high;
 			while (lines--)
 			{
 				if (++t >= VRes)
@@ -2590,14 +2586,17 @@ void ScrollLCDMEM332(int lines)
 		}
 		if (Option.DISPLAY_TYPE >= SSD1963_5_12BUFF)
 		{
+			multicore_fifo_push_blocking(8);
+			multicore_fifo_push_blocking(t*2);
 		}
 		else
 		{
 			multicore_fifo_push_blocking(7);
 			multicore_fifo_push_blocking(t);
-			DrawRectangle(0, VRes - lines, HRes - 1, VRes - 1, gui_bcolour); // erase the lines to be scrolled off
-			ScrollStart = t;
 		}
+		ScrollStart = t;
+		if(l>0)DrawRectangle(0, VRes - l, HRes - 1, VRes - 1, gui_bcolour); 
+		else DrawRectangle(0, 0, HRes - 1, l - 1, gui_bcolour);
 	}
 	else
 	{
@@ -3269,19 +3268,24 @@ void init_RGB332_to_RGB565_LUT(void)
 		uint8_t g = (i >> 2) & 0x07; // 3-bit green
 		uint8_t b = i & 0x03;		 // 2-bit blue
 
+
 		// Stretch components via perceptual LUTs
 		static const uint8_t RED_LUT[8] = {0, 4, 8, 12, 16, 20, 26, 31};
 		static const uint8_t GREEN_LUT[8] = {0, 9, 18, 27, 36, 45, 54, 63};
 		static const uint8_t BLUE_LUT[4] = {0, 10, 21, 31};
 
+
 		uint8_t r5 = RED_LUT[r];
 		uint8_t g6 = GREEN_LUT[g];
 		uint8_t b5 = BLUE_LUT[b];
 
+
 		// Your bit order mapping:
-		RGB332_LUT[i] = remap_LUT[i] = RGB565(r5 << 19 | g6 << 10 | b5 << 3);
+		if(Option .DISPLAY_TYPE!=SSD1963_5_16BUFF)RGB332_LUT[i] = remap_LUT[i] = RGB565(r5 << 19 | g6 << 10 | b5 << 3);
+		else RGB332_LUT[i] = remap_LUT[i] = (r5 << 11 | g6 << 5 | b5 );
 	}
 }
+
 
 void init_RGB332_to_RGB888_LUT(void)
 {
@@ -3291,14 +3295,50 @@ void init_RGB332_to_RGB888_LUT(void)
 		uint8_t g = (i >> 2) & 0x07; // 3 bits
 		uint8_t b = i & 0x03;		 // 2 bits
 
+
 		uint8_t r8 = (r << 5) | (r << 2) | (r >> 1);	 // scale to 8 bits
 		uint8_t g8 = (g << 5) | (g << 2) | (g >> 1);	 // scale to 8 bits
 		uint8_t b8 = (b << 6) | (b << 4) | (b << 2) | b; // scale to 8 bits
+
 
 		RGB332_LUT[i] = remap_LUT[i] = (b8 << 16) | (g8 << 8) | r8;
 	}
 	tlen = 3;
 }
+// Expand 3-bit to 8-bit using perceptual scaling
+static inline uint8_t scale3to8(uint8_t val) {
+    // Map 0–7 to perceptually spaced 0–255
+    static const uint8_t lut[8] = {0, 36, 73, 109, 146, 182, 219, 255};
+    return lut[val & 0x07];
+}
+
+// Expand 2-bit to 8-bit using perceptual scaling
+static inline uint8_t scale2to8(uint8_t val) {
+    // Map 0–3 to perceptually spaced 0–255
+    static const uint8_t lut[4] = {0, 85, 170, 255};
+    return lut[val & 0x03];
+}
+
+// Convert RGB332 to RGB888
+void rgb332_to_rgb888(uint8_t rgb332, uint8_t *r, uint8_t *g, uint8_t *b) {
+    *r = scale3to8((rgb332 >> 5) & 0x07); // Red: bits 7–5
+    *g = scale3to8((rgb332 >> 2) & 0x07); // Green: bits 4–2
+    *b = scale2to8(rgb332 & 0x03);        // Blue: bits 1–0
+}
+
+void init_RGB332_to_RGB888_LUT_SSD(void)
+{
+	for (int i = 0; i < 256; ++i)
+	{
+		uint8_t r ;
+		uint8_t g ;
+		uint8_t b ;
+		rgb332_to_rgb888(i,&r,&g,&b);
+		RGB332_LUT[i] = remap_LUT[i] = (r << 16) | (g << 8) | b;
+	}
+	tlen = 3;
+}
+
 void fun_map(void)
 {
 	if (!(DISPLAY_TYPE >= NEXTGEN))
@@ -3375,8 +3415,10 @@ void copybuffertoscreen(unsigned char *s, int low_x, int low_y, int high_x, int 
 {
 	if (RGB332_LUT[255] == 0)
 	{
-		if (Option.DISPLAY_TYPE == ILI9488BUFF || Option.DISPLAY_TYPE == ILI9488PBUFF || Option.DISPLAY_TYPE == SSD1963_5_12BUFF)
+		if (Option.DISPLAY_TYPE == ILI9488BUFF || Option.DISPLAY_TYPE == ILI9488PBUFF)
 			init_RGB332_to_RGB888_LUT();
+		else if(Option.DISPLAY_TYPE == SSD1963_5_12BUFF || Option.DISPLAY_TYPE == SSD1963_5_BUFF)
+			init_RGB332_to_RGB888_LUT_SSD();
 		else
 			init_RGB332_to_RGB565_LUT();
 	}
@@ -3385,6 +3427,67 @@ void copybuffertoscreen(unsigned char *s, int low_x, int low_y, int high_x, int 
 	high_y = low_y + t; // and set y2 to the same
 	if (Option.DISPLAY_TYPE >= SSD1963_5_12BUFF)
 	{
+		if (high_y >= VRes)
+		{ // if the box splits over the frame buffer boundary
+			SetAreaSSD1963(low_x*2, low_y*2, high_x*2+1, (VRes - 1)*2+1); // if the box splits over the frame buffer boundary
+			WriteComand(CMD_WR_MEMSTART);
+			for (int y = low_y; y < VRes; y++)
+			{
+				unsigned char *p = (unsigned char *)(ScreenBuffer) + (y * HRes + low_x);
+				for (int x = low_x; x <= high_x; x++)
+				{
+               		WriteColor(RGB332_LUT[*p]);
+               		WriteColor(RGB332_LUT[*p++]); 
+				}
+				// duplicate the lines
+				p = (unsigned char *)(ScreenBuffer) + (y * HRes + low_x);
+				for (int x = low_x; x <= high_x; x++)
+				{
+               		WriteColor(RGB332_LUT[*p]);
+               		WriteColor(RGB332_LUT[*p++]);
+				}
+			}
+			
+			SetAreaSSD1963(low_x*2, 0, high_x*2+1, (high_y - VRes)*2+1); // if the box splits over the frame buffer boundary
+			WriteComand(CMD_WR_MEMSTART);
+			for (int y = 0; y <= high_y - VRes; y++)
+			{
+				unsigned char *p = (unsigned char *)(ScreenBuffer) + (y * HRes + low_x);
+				for (int x = low_x; x <= high_x; x++)
+				{
+               		WriteColor(RGB332_LUT[*p]);
+               		WriteColor(RGB332_LUT[*p++]); 
+				}
+				// duplicate the lines
+				p = (unsigned char *)(ScreenBuffer) + (y * HRes + low_x);
+				for (int x = low_x; x <= high_x; x++)
+				{
+               		WriteColor(RGB332_LUT[*p]);
+               		WriteColor(RGB332_LUT[*p++]);
+				}
+			}
+		}
+		else
+		{
+			SetAreaSSD1963(low_x*2, low_y*2, high_x*2+1, high_y*2+1); // if the box splits over the frame buffer boundary
+			WriteComand(CMD_WR_MEMSTART);
+			for (int y = low_y; y <= high_y; y++)
+			{
+				unsigned char *p = (unsigned char *)(ScreenBuffer) + (y * HRes + low_x);
+				for (int x = low_x; x <= high_x; x++)
+				{
+               		WriteColor(RGB332_LUT[*p]);
+               		WriteColor(RGB332_LUT[*p++]); 
+				}
+				// duplicate the lines
+				p = (unsigned char *)(ScreenBuffer) + (y * HRes + low_x);
+				for (int x = low_x; x <= high_x; x++)
+				{
+               		WriteColor(RGB332_LUT[*p]);
+               		WriteColor(RGB332_LUT[*p++]);
+				}
+			}
+		}
 	}
 	else
 	{

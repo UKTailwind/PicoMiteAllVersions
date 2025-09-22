@@ -1915,7 +1915,7 @@ void MIPS16 cmd_pio(void)
                         sideout = getint(argv[14], 0, 1);
                 if (argc > 15 && *argv[16])
                         setout = getint(argv[16], 0, 1);
-                if (argc > 171 && *argv[18])
+                if (argc > 17 && *argv[18])
                         outout = getint(argv[18], 0, 1);
                 pio_init(pior, sm, pinctrl, execctrl, shiftctrl, start, clock, sideout, setout, outout);
                 return;
@@ -2007,7 +2007,7 @@ void MIPS16 cmd_pio(void)
                 if (argc > 19 && *argv[20])
                         outbase = getGPpin(argv[20], pior, base);
                 if (argc > 21 && *argv[22])
-                        outno = getint(argv[22], 0, 5);
+                        outno = getint(argv[22], 0, 31);
                 if (argc > 23 && *argv[24])
                         outout = getint(argv[24], 0, 1);
                 if (argc > 25 && *argv[26])

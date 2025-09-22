@@ -1887,7 +1887,11 @@ void InitReservedIO(void)
 	VGArecovery(0);
 #endif
 #else
-	if (Option.DISPLAY_TYPE >= SSDPANEL && Option.DISPLAY_TYPE < VIRTUAL)
+#if defined(PICOMITE) && defined(rp2350)
+	if ((Option.DISPLAY_TYPE >= SSDPANEL && Option.DISPLAY_TYPE < VIRTUAL) || Option.DISPLAY_TYPE>=SSD1963_5_12BUFF)
+#else
+	if ((Option.DISPLAY_TYPE >= SSDPANEL && Option.DISPLAY_TYPE < VIRTUAL))
+#endif
 	{
 		ExtCfg(SSD1963_DC_PIN, EXT_BOOT_RESERVED, 0);
 		gpio_init(SSD1963_DC_GPPIN);
@@ -1948,7 +1952,11 @@ void InitReservedIO(void)
 		gpio_put(SSD1963_GPDAT8, GPIO_PIN_SET);
 		gpio_set_dir(SSD1963_GPDAT8, GPIO_OUT);
 		gpio_set_input_enabled(SSD1963_GPDAT8, true);
+#if defined(PICOMITE) && defined(rp2350)
+		if (Option.DISPLAY_TYPE > SSD_PANEL_8 && Option.DISPLAY_TYPE != SSD1963_5_BUFF)
+#else
 		if (Option.DISPLAY_TYPE > SSD_PANEL_8)
+#endif
 		{
 			ExtCfg(SSD1963_DAT9, EXT_BOOT_RESERVED, 0);
 			gpio_init(SSD1963_GPDAT9);
@@ -1970,26 +1978,31 @@ void InitReservedIO(void)
 			gpio_put(SSD1963_GPDAT12, GPIO_PIN_SET);
 			gpio_set_dir(SSD1963_GPDAT12, GPIO_OUT);
 			gpio_set_input_enabled(SSD1963_GPDAT12, true);
-			ExtCfg(SSD1963_DAT13, EXT_BOOT_RESERVED, 0);
-			gpio_init(SSD1963_GPDAT13);
-			gpio_put(SSD1963_GPDAT13, GPIO_PIN_SET);
-			gpio_set_dir(SSD1963_GPDAT13, GPIO_OUT);
-			gpio_set_input_enabled(SSD1963_GPDAT13, true);
-			ExtCfg(SSD1963_DAT14, EXT_BOOT_RESERVED, 0);
-			gpio_init(SSD1963_GPDAT14);
-			gpio_put(SSD1963_GPDAT14, GPIO_PIN_SET);
-			gpio_set_dir(SSD1963_GPDAT14, GPIO_OUT);
-			gpio_set_input_enabled(SSD1963_GPDAT14, true);
-			ExtCfg(SSD1963_DAT15, EXT_BOOT_RESERVED, 0);
-			gpio_init(SSD1963_GPDAT15);
-			gpio_put(SSD1963_GPDAT15, GPIO_PIN_SET);
-			gpio_set_dir(SSD1963_GPDAT15, GPIO_OUT);
-			gpio_set_input_enabled(SSD1963_GPDAT15, true);
-			ExtCfg(SSD1963_DAT16, EXT_BOOT_RESERVED, 0);
-			gpio_init(SSD1963_GPDAT16);
-			gpio_put(SSD1963_GPDAT16, GPIO_PIN_SET);
-			gpio_set_dir(SSD1963_GPDAT16, GPIO_OUT);
-			gpio_set_input_enabled(SSD1963_GPDAT16, true);
+#if defined(PICOMITE) && defined(rp2350)
+			if (Option.DISPLAY_TYPE != SSD1963_5_12BUFF)
+#endif
+			{
+				ExtCfg(SSD1963_DAT13, EXT_BOOT_RESERVED, 0);
+				gpio_init(SSD1963_GPDAT13);
+				gpio_put(SSD1963_GPDAT13, GPIO_PIN_SET);
+				gpio_set_dir(SSD1963_GPDAT13, GPIO_OUT);
+				gpio_set_input_enabled(SSD1963_GPDAT13, true);
+				ExtCfg(SSD1963_DAT14, EXT_BOOT_RESERVED, 0);
+				gpio_init(SSD1963_GPDAT14);
+				gpio_put(SSD1963_GPDAT14, GPIO_PIN_SET);
+				gpio_set_dir(SSD1963_GPDAT14, GPIO_OUT);
+				gpio_set_input_enabled(SSD1963_GPDAT14, true);
+				ExtCfg(SSD1963_DAT15, EXT_BOOT_RESERVED, 0);
+				gpio_init(SSD1963_GPDAT15);
+				gpio_put(SSD1963_GPDAT15, GPIO_PIN_SET);
+				gpio_set_dir(SSD1963_GPDAT15, GPIO_OUT);
+				gpio_set_input_enabled(SSD1963_GPDAT15, true);
+				ExtCfg(SSD1963_DAT16, EXT_BOOT_RESERVED, 0);
+				gpio_init(SSD1963_GPDAT16);
+				gpio_put(SSD1963_GPDAT16, GPIO_PIN_SET);
+				gpio_set_dir(SSD1963_GPDAT16, GPIO_OUT);
+				gpio_set_input_enabled(SSD1963_GPDAT16, true);
+			}
 		}
 		dobacklight();
 	}

@@ -344,6 +344,8 @@ extern void __not_in_flash_func(spi_finish)(spi_inst_t *spi);
 #define ILI9488WBUFF 63
 #define ST7789C 64
 #define SSD1963_5_12BUFF 65
+#define SSD1963_5_16BUFF 66
+#define SSD1963_5_BUFF 67
 #endif
 #define TFT_NOP 0x00
 #define TFT_SWRST 0x01
@@ -504,6 +506,7 @@ extern void ScrollLCDSPI(int lines);
 extern void ScrollLCDMEM332(int lines);
 extern void init_RGB332_to_RGB565_LUT(void);
 extern void init_RGB332_to_RGB888_LUT(void);
+extern void init_RGB332_to_RGB888_LUT_SSD(void);
 #endif
 extern void SetCS(void);
 extern int GetLineILI9341(void);

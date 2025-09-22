@@ -3883,7 +3883,13 @@ int BasicFileOpen(char *fname, int fnbr, int mode)
         lastfptr[fnbr] = -1;
         bw[fnbr] = -1;
         fmode[fnbr] = mode;
-        if(mode==FA_READ)positionfile(fnbr,0); //prime the read buffer
+        int fsize = f_size(FileTable[fnbr].fptr);
+        if(fsize==0 && mode==FA_READ) //set the filepointers so that EOF is returned iommediately
+        {
+            bw[fnbr]=1;
+            buffpointer[fnbr] = 1;
+        }
+
     }
     else
     {
@@ -3929,7 +3935,7 @@ int BasicFileOpen(char *fname, int fnbr, int mode)
     }
 }
 
-#define MAXFILES 1000
+#define MAXFILES 800
 typedef struct ss_flist
 {
     char fn[FF_MAX_LFN];

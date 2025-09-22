@@ -805,7 +805,7 @@ int __not_in_flash_func(MMInkey)(void)
             return RIGHT;
         if (c == 'D')
             return LEFT;
-        if (c < '1' && c > '6')
+        if (c < '1' || c > '6')
         {
             c1 = '[';
             c2 = c;
@@ -4855,6 +4855,13 @@ void __not_in_flash_func(UpdateCore)()
                 spi_write_command(CMD_SET_SCROLL_START);
                 spi_write_data(t >> 8);
                 spi_write_data(t);
+            }
+            else if (command == 8)
+            {
+                int t = (int)multicore_fifo_pop_blocking();
+                WriteComand(CMD_SET_SCROLL_START);
+                WriteData(t >> 8);
+                WriteData(t);
 #endif
             }
             else if (command == 1)
