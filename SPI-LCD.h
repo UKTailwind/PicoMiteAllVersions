@@ -343,9 +343,18 @@ extern void __not_in_flash_func(spi_finish)(spi_inst_t *spi);
 #define ILI9488PBUFF 62
 #define ILI9488WBUFF 63
 #define ST7789C 64
-#define SSD1963_5_12BUFF 65
-#define SSD1963_5_16BUFF 66
-#define SSD1963_5_BUFF 67
+#define SSD1963_5_12BUFF 68
+#define SSD1963_5_12BUFF0 69
+#define SSD1963_7_12BUFF 70
+#define SSD1963_7_12BUFF0 71
+#define SSD1963_5_16BUFF 72
+#define SSD1963_5_16BUFF0 73
+#define SSD1963_7_16BUFF 74
+#define SSD1963_7_16BUFF0 75
+#define SSD1963_5_BUFF 76
+#define SSD1963_5_BUFF0 77
+#define SSD1963_7_BUFF 78
+#define SSD1963_7_BUFF0 79
 #endif
 #define TFT_NOP 0x00
 #define TFT_SWRST 0x01

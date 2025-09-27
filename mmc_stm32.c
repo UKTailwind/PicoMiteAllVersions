@@ -1888,7 +1888,7 @@ void InitReservedIO(void)
 #endif
 #else
 #if defined(PICOMITE) && defined(rp2350)
-	if ((Option.DISPLAY_TYPE >= SSDPANEL && Option.DISPLAY_TYPE < VIRTUAL) || Option.DISPLAY_TYPE>=SSD1963_5_12BUFF)
+	if ((Option.DISPLAY_TYPE >= SSDPANEL && Option.DISPLAY_TYPE < VIRTUAL) || Option.DISPLAY_TYPE >= SSD1963_5_12BUFF)
 #else
 	if ((Option.DISPLAY_TYPE >= SSDPANEL && Option.DISPLAY_TYPE < VIRTUAL))
 #endif
@@ -1953,7 +1953,7 @@ void InitReservedIO(void)
 		gpio_set_dir(SSD1963_GPDAT8, GPIO_OUT);
 		gpio_set_input_enabled(SSD1963_GPDAT8, true);
 #if defined(PICOMITE) && defined(rp2350)
-		if (Option.DISPLAY_TYPE > SSD_PANEL_8 && Option.DISPLAY_TYPE != SSD1963_5_BUFF)
+		if (Option.DISPLAY_TYPE > SSD_PANEL_8 && (Option.DISPLAY_TYPE & 0xFC) != SSD1963_5_BUFF)
 #else
 		if (Option.DISPLAY_TYPE > SSD_PANEL_8)
 #endif
@@ -1979,7 +1979,7 @@ void InitReservedIO(void)
 			gpio_set_dir(SSD1963_GPDAT12, GPIO_OUT);
 			gpio_set_input_enabled(SSD1963_GPDAT12, true);
 #if defined(PICOMITE) && defined(rp2350)
-			if (Option.DISPLAY_TYPE != SSD1963_5_12BUFF)
+			if (Option.DISPLAY_TYPE != (SSD1963_5_12BUFF & 0xFC))
 #endif
 			{
 				ExtCfg(SSD1963_DAT13, EXT_BOOT_RESERVED, 0);
@@ -2425,12 +2425,21 @@ char *pinsearch(int pin)
 		strcpy(buff, "LCD Reset");
 	else if (pin == Option.DISPLAY_BL)
 		strcpy(buff, "LCD BACKLIGHT");
-	else if (pin == PINMAP[Option.SSD_DC] && Option.DISPLAY_TYPE >= SSDPANEL && Option.DISPLAY_TYPE < VIRTUAL_C)
+#if defined(PICOMITE) && defined(rp2350)
+	else if (pin == PINMAP[Option.SSD_DC] && ((Option.DISPLAY_TYPE > SSD_PANEL_8 && Option.DISPLAY_TYPE < VIRTUAL_C) || (Option.DISPLAY_TYPE >= SSD1963_5_12BUFF)))
 		strcpy(buff, "SSD DC");
-	else if (pin == PINMAP[Option.SSD_WR] && Option.DISPLAY_TYPE >= SSDPANEL && Option.DISPLAY_TYPE < VIRTUAL_C)
+	else if (pin == PINMAP[Option.SSD_WR] && ((Option.DISPLAY_TYPE > SSD_PANEL_8 && Option.DISPLAY_TYPE < VIRTUAL_C) || (Option.DISPLAY_TYPE >= SSD1963_5_12BUFF)))
 		strcpy(buff, "SSD WR");
-	else if (pin == PINMAP[Option.SSD_RD] && Option.DISPLAY_TYPE >= SSDPANEL && Option.DISPLAY_TYPE < VIRTUAL_C)
+	else if (pin == PINMAP[Option.SSD_RD] && ((Option.DISPLAY_TYPE > SSD_PANEL_8 && Option.DISPLAY_TYPE < VIRTUAL_C) || (Option.DISPLAY_TYPE >= SSD1963_5_12BUFF)))
 		strcpy(buff, "SSD RD");
+#else
+	else if (pin == PINMAP[Option.SSD_DC] && ((Option.DISPLAY_TYPE > SSD_PANEL_8 && Option.DISPLAY_TYPE < VIRTUAL_C)))
+		strcpy(buff, "SSD DC");
+	else if (pin == PINMAP[Option.SSD_WR] && ((Option.DISPLAY_TYPE > SSD_PANEL_8 && Option.DISPLAY_TYPE < VIRTUAL_C)))
+		strcpy(buff, "SSD WR");
+	else if (pin == PINMAP[Option.SSD_RD] && ((Option.DISPLAY_TYPE > SSD_PANEL_8 && Option.DISPLAY_TYPE < VIRTUAL_C)))
+		strcpy(buff, "SSD RD");
+#endif
 	else if (pin == PINMAP[Option.SSD_RESET])
 		strcpy(buff, "SSD RESET");
 	else if (pin == PINMAP[ssd] && Option.SSD_DC)
@@ -2449,22 +2458,41 @@ char *pinsearch(int pin)
 		strcpy(buff, "SSD D6");
 	else if (pin == PINMAP[ssd + 7] && Option.SSD_DC)
 		strcpy(buff, "SSD D7");
-	else if (pin == PINMAP[ssd + 8] && Option.SSD_DC && Option.DISPLAY_TYPE > SSD_PANEL_8 && Option.DISPLAY_TYPE < VIRTUAL_C)
+#if defined(PICOMITE) && defined(rp2350)
+	else if (pin == PINMAP[ssd + 8] && Option.SSD_DC && ((Option.DISPLAY_TYPE > SSD_PANEL_8 && Option.DISPLAY_TYPE < VIRTUAL_C) || (Option.DISPLAY_TYPE >= SSD1963_5_12BUFF && Option.DISPLAY_TYPE < SSD1963_5_BUFF)))
 		strcpy(buff, "SSD D8");
-	else if (pin == PINMAP[ssd + 9] && Option.SSD_DC && Option.DISPLAY_TYPE > SSD_PANEL_8 && Option.DISPLAY_TYPE < VIRTUAL_C)
+	else if (pin == PINMAP[ssd + 9] && Option.SSD_DC && ((Option.DISPLAY_TYPE > SSD_PANEL_8 && Option.DISPLAY_TYPE < VIRTUAL_C) || (Option.DISPLAY_TYPE >= SSD1963_5_12BUFF && Option.DISPLAY_TYPE < SSD1963_5_BUFF)))
 		strcpy(buff, "SSD D9");
-	else if (pin == PINMAP[ssd + 10] && Option.SSD_DC && Option.DISPLAY_TYPE > SSD_PANEL_8 && Option.DISPLAY_TYPE < VIRTUAL_C)
+	else if (pin == PINMAP[ssd + 10] && Option.SSD_DC && ((Option.DISPLAY_TYPE > SSD_PANEL_8 && Option.DISPLAY_TYPE < VIRTUAL_C) || (Option.DISPLAY_TYPE >= SSD1963_5_12BUFF && Option.DISPLAY_TYPE < SSD1963_5_BUFF)))
 		strcpy(buff, "SSD D10");
-	else if (pin == PINMAP[ssd + 11] && Option.SSD_DC && Option.DISPLAY_TYPE > SSD_PANEL_8 && Option.DISPLAY_TYPE < VIRTUAL_C)
+	else if (pin == PINMAP[ssd + 11] && Option.SSD_DC && ((Option.DISPLAY_TYPE > SSD_PANEL_8 && Option.DISPLAY_TYPE < VIRTUAL_C) || (Option.DISPLAY_TYPE >= SSD1963_5_12BUFF && Option.DISPLAY_TYPE < SSD1963_5_BUFF)))
 		strcpy(buff, "SSD D11");
-	else if (pin == PINMAP[ssd + 12] && Option.SSD_DC && Option.DISPLAY_TYPE > SSD_PANEL_8 && Option.DISPLAY_TYPE < VIRTUAL_C)
+	else if (pin == PINMAP[ssd + 12] && Option.SSD_DC && ((Option.DISPLAY_TYPE > SSD_PANEL_8 && Option.DISPLAY_TYPE < VIRTUAL_C) || ((Option.DISPLAY_TYPE & 0xFC) == SSD1963_5_16BUFF)))
 		strcpy(buff, "SSD D12");
-	else if (pin == PINMAP[ssd + 13] && Option.SSD_DC && Option.DISPLAY_TYPE > SSD_PANEL_8 && Option.DISPLAY_TYPE < VIRTUAL_C)
+	else if (pin == PINMAP[ssd + 13] && Option.SSD_DC && ((Option.DISPLAY_TYPE > SSD_PANEL_8 && Option.DISPLAY_TYPE < VIRTUAL_C) || ((Option.DISPLAY_TYPE & 0xFC) == SSD1963_5_16BUFF)))
 		strcpy(buff, "SSD D13");
-	else if (pin == PINMAP[ssd + 14] && Option.SSD_DC && Option.DISPLAY_TYPE > SSD_PANEL_8 && Option.DISPLAY_TYPE < VIRTUAL_C)
+	else if (pin == PINMAP[ssd + 14] && Option.SSD_DC && ((Option.DISPLAY_TYPE > SSD_PANEL_8 && Option.DISPLAY_TYPE < VIRTUAL_C) || ((Option.DISPLAY_TYPE & 0xFC) == SSD1963_5_16BUFF)))
 		strcpy(buff, "SSD D14");
-	else if (pin == PINMAP[ssd + 15] && Option.SSD_DC && Option.DISPLAY_TYPE > SSD_PANEL_8 && Option.DISPLAY_TYPE < VIRTUAL_C)
+	else if (pin == PINMAP[ssd + 15] && Option.SSD_DC && ((Option.DISPLAY_TYPE > SSD_PANEL_8 && Option.DISPLAY_TYPE < VIRTUAL_C) || ((Option.DISPLAY_TYPE & 0xFC) == SSD1963_5_16BUFF)))
 		strcpy(buff, "SSD D15");
+#else
+	else if (pin == PINMAP[ssd + 8] && Option.SSD_DC && ((Option.DISPLAY_TYPE > SSD_PANEL_8 && Option.DISPLAY_TYPE < VIRTUAL_C)))
+		strcpy(buff, "SSD D8");
+	else if (pin == PINMAP[ssd + 9] && Option.SSD_DC && ((Option.DISPLAY_TYPE > SSD_PANEL_8 && Option.DISPLAY_TYPE < VIRTUAL_C)))
+		strcpy(buff, "SSD D9");
+	else if (pin == PINMAP[ssd + 10] && Option.SSD_DC && ((Option.DISPLAY_TYPE > SSD_PANEL_8 && Option.DISPLAY_TYPE < VIRTUAL_C)))
+		strcpy(buff, "SSD D10");
+	else if (pin == PINMAP[ssd + 11] && Option.SSD_DC && ((Option.DISPLAY_TYPE > SSD_PANEL_8 && Option.DISPLAY_TYPE < VIRTUAL_C)))
+		strcpy(buff, "SSD D11");
+	else if (pin == PINMAP[ssd + 12] && Option.SSD_DC && ((Option.DISPLAY_TYPE > SSD_PANEL_8 && Option.DISPLAY_TYPE < VIRTUAL_C)))
+		strcpy(buff, "SSD D12");
+	else if (pin == PINMAP[ssd + 13] && Option.SSD_DC && ((Option.DISPLAY_TYPE > SSD_PANEL_8 && Option.DISPLAY_TYPE < VIRTUAL_C)))
+		strcpy(buff, "SSD D13");
+	else if (pin == PINMAP[ssd + 14] && Option.SSD_DC && ((Option.DISPLAY_TYPE > SSD_PANEL_8 && Option.DISPLAY_TYPE < VIRTUAL_C)))
+		strcpy(buff, "SSD D14");
+	else if (pin == PINMAP[ssd + 15] && Option.SSD_DC && ((Option.DISPLAY_TYPE > SSD_PANEL_8 && Option.DISPLAY_TYPE < VIRTUAL_C)))
+		strcpy(buff, "SSD D15");
+#endif
 	else
 #endif
 		if (pin == Option.KEYBOARD_CLOCK)

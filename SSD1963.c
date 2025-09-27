@@ -114,14 +114,22 @@ void MIPS16 ConfigDisplaySSD(unsigned char *p)
     { // this is the 5" glass
         Option.DISPLAY_TYPE = SSD1963_5_BUFF;
     }
+    else if (checkstring(argv[0], (unsigned char *)"SSD1963_7_12BUFF"))
+    { // this is the 5" glass
+        Option.DISPLAY_TYPE = SSD1963_7_12BUFF;
+    }
+    else if (checkstring(argv[0], (unsigned char *)"SSD1963_7_16BUFF"))
+    { // this is the 5" glass
+        Option.DISPLAY_TYPE = SSD1963_7_16BUFF;
+    }
+    else if (checkstring(argv[0], (unsigned char *)"SSD1963_7_BUFF"))
+    { // this is the 5" glass
+        Option.DISPLAY_TYPE = SSD1963_7_BUFF;
+    }
 #endif
     else if (checkstring(argv[0], (unsigned char *)"SSD1963_5A_16"))
     { // this is the 5" glass alternative version
         Option.DISPLAY_TYPE = SSD1963_5A_16;
-    }
-    else if (checkstring(argv[0], (unsigned char *)"SSD1963_5ER_16"))
-    { // this is the 5" EastRising RGB is BGR
-        Option.DISPLAY_TYPE = SSD1963_5ER_16;
     }
     else if (checkstring(argv[0], (unsigned char *)"SSD1963_7_16"))
     { // there appears to be two versions of the 7" glass in circulation, this is type 1
@@ -130,10 +138,6 @@ void MIPS16 ConfigDisplaySSD(unsigned char *p)
     else if (checkstring(argv[0], (unsigned char *)"SSD1963_7A_16"))
     { // this is type 2 of the 7" glass (high luminosity version)
         Option.DISPLAY_TYPE = SSD1963_7A_16;
-    }
-    else if (checkstring(argv[0], (unsigned char *)"SSD1963_7ER_16"))
-    { // this is the 7" EastRising RGB is BGR
-        Option.DISPLAY_TYPE = SSD1963_7ER_16;
     }
     else if (checkstring(argv[0], (unsigned char *)"SSD1963_8_16"))
     { // this is the 8" and 9" glass (EastRising)
@@ -154,7 +158,7 @@ void MIPS16 ConfigDisplaySSD(unsigned char *p)
     else
         return;
 #ifdef rp2350
-    if (!(argc == 3 || argc == 5 || argc == 7 || argc == 9 || (argc == 11 && !rp2350a)))
+    if (!(argc == 3 || argc == 5 || argc == 7 || argc == 9 || argc == 11 || (argc == 13 && !rp2350a)))
         error("Argument count");
 #else
     if (!(argc == 3 || argc == 5 || argc == 7 || argc == 9))
@@ -172,18 +176,40 @@ void MIPS16 ConfigDisplaySSD(unsigned char *p)
     else
         error("Orientation");
     Option.SSD_DATA = 1;
-    if (argc == 11)
+    if (argc == 13)
     { // only valid on rp2350b
         char code;
-        if (!(code = codecheck(argv[10])))
-            argv[10] += 2;
-        int pin = getinteger(argv[10]);
+        if (!(code = codecheck(argv[12])))
+            argv[12] += 2;
+        int pin = getinteger(argv[12]);
         if (!code)
             pin = codemap(pin);
         if (IsInvalidPin(pin))
             error("Invalid pin");
         Option.SSD_DATA = pin;
     }
+    if (argc >= 11 && *argv[10])
+    {
+        if (checkstring(argv[10], (unsigned char *)"INVERT"))
+            Option.BGR = 1;
+    }
+    else
+        Option.BGR = 0;
+
+#if defined(PICOMITE) && defined(rp2350)
+    if (Option.SSD_DATA == 1 && Option.DISPLAY_TYPE == SSD1963_5_12BUFF)
+        Option.DISPLAY_TYPE = SSD1963_5_12BUFF0;
+    if (Option.SSD_DATA == 1 && Option.DISPLAY_TYPE == SSD1963_5_16BUFF)
+        Option.DISPLAY_TYPE = SSD1963_5_16BUFF0;
+    if (Option.SSD_DATA == 1 && Option.DISPLAY_TYPE == SSD1963_5_BUFF)
+        Option.DISPLAY_TYPE = SSD1963_5_BUFF0;
+    if (Option.SSD_DATA == 1 && Option.DISPLAY_TYPE == SSD1963_7_12BUFF)
+        Option.DISPLAY_TYPE = SSD1963_7_12BUFF0;
+    if (Option.SSD_DATA == 1 && Option.DISPLAY_TYPE == SSD1963_7_16BUFF)
+        Option.DISPLAY_TYPE = SSD1963_7_16BUFF0;
+    if (Option.SSD_DATA == 1 && Option.DISPLAY_TYPE == SSD1963_7_BUFF)
+        Option.DISPLAY_TYPE = SSD1963_7_BUFF0;
+#endif
     CheckPin(SSD1963_DAT1, OptionErrorCheck);
     CheckPin(SSD1963_DAT2, OptionErrorCheck);
     CheckPin(SSD1963_DAT3, OptionErrorCheck);
@@ -193,7 +219,7 @@ void MIPS16 ConfigDisplaySSD(unsigned char *p)
     CheckPin(SSD1963_DAT7, OptionErrorCheck);
     CheckPin(SSD1963_DAT8, OptionErrorCheck);
 #if defined(PICOMITE) && defined(rp2350)
-    if (Option.DISPLAY_TYPE > SSD_PANEL_8 && Option.DISPLAY_TYPE!=SSD1963_5_BUFF)
+    if (Option.DISPLAY_TYPE > SSD_PANEL_8 && (Option.DISPLAY_TYPE & 0xFC) != SSD1963_5_BUFF)
 #else
     if (Option.DISPLAY_TYPE > SSD_PANEL_8)
 #endif
@@ -203,7 +229,7 @@ void MIPS16 ConfigDisplaySSD(unsigned char *p)
         CheckPin(SSD1963_DAT11, OptionErrorCheck);
         CheckPin(SSD1963_DAT12, OptionErrorCheck);
 #if defined(PICOMITE) && defined(rp2350)
-        if (Option.DISPLAY_TYPE != SSD1963_5_12BUFF)
+        if ((Option.DISPLAY_TYPE & 0xFC) != SSD1963_5_12BUFF)
 #endif
         {
             CheckPin(SSD1963_DAT13, OptionErrorCheck);
@@ -251,7 +277,7 @@ void MIPS16 ConfigDisplaySSD(unsigned char *p)
     else
     {
 #if defined(PICOMITE) && defined(rp2350)
-        if ((Option.DISPLAY_TYPE > SSD_PANEL_8 && Option.DISPLAY_TYPE < NEXTGEN) || Option.DISPLAY_TYPE==SSD1963_5_16BUFF)
+        if ((Option.DISPLAY_TYPE > SSD_PANEL_8 && Option.DISPLAY_TYPE < NEXTGEN) || Option.DISPLAY_TYPE == SSD1963_5_16BUFF)
 #else
         if (Option.DISPLAY_TYPE > SSD_PANEL_8)
 #endif
@@ -734,6 +760,8 @@ void MIPS16 InitDisplaySSD(void)
     SSD1963rgb = 0b0;
     LCDAttrib = 0;
     SSD1963data = PinDef[Option.SSD_DATA].GPno;
+    if (Option.BGR)
+        SSD1963rgb = 0b1000;
 #if defined(PICOMITE) && defined(rp2350)
     if ((Option.DISPLAY_TYPE < SSDPANEL || Option.DISPLAY_TYPE >= VIRTUAL) && Option.DISPLAY_TYPE < SSD1963_5_12BUFF)
 #else
@@ -762,12 +790,29 @@ void MIPS16 InitDisplaySSD(void)
         SSD1963Mode1 = 0x20; // 24-bit for 4.3" panel, data latch in rising edge for LSHIFT
         SSD1963Mode2 = 0;    // Hsync+Vsync mode
         break;
-    case SSD1963_5ER_16:
-        SSD1963rgb = 0b1000;
     case SSD1963_5_16:
     case SSD1963_5:
+#if defined(PICOMITE) && defined(rp2350)
+    case SSD1963_5_12BUFF:
+    case SSD1963_5_16BUFF:
+    case SSD1963_5_BUFF:
+    case SSD1963_5_12BUFF0:
+    case SSD1963_5_16BUFF0:
+    case SSD1963_5_BUFF0:
+        if (Option.DISPLAY_TYPE >= SSD1963_5_12BUFF)
+        {
+            DisplayHRes = 400; // this is the 5" glass
+            DisplayVRes = 240;
+        }
+        else
+        {
+            DisplayHRes = 800; // this is the 5" glass
+            DisplayVRes = 480;
+        }
+#else
         DisplayHRes = 800; // this is the 5" glass
         DisplayVRes = 480;
+#endif
         SSD1963HorizPulseWidth = 128;
         SSD1963HorizBackPorch = 88;
         SSD1963HorizFrontPorch = 40;
@@ -800,34 +845,29 @@ void MIPS16 InitDisplaySSD(void)
         SSD1963Mode1 = 0x24; // 24-bit for 5" panel, data latch in falling edge for LSHIFT
         SSD1963Mode2 = 0;    // Hsync+Vsync mode
         break;
-#if defined(PICOMITE) && defined(rp2350)
-    case SSD1963_5_12BUFF:
-    case SSD1963_5_16BUFF:
-    case SSD1963_5_BUFF:
-        SSD1963rgb = 0b1000;
-        DisplayHRes = 400; // this is a 5" glass alternative version
-        DisplayVRes = 240;
-        SSD1963HorizPulseWidth = 128;
-        SSD1963HorizBackPorch = 88;
-        SSD1963HorizFrontPorch = 40;
-        SSD1963VertPulseWidth = 2;
-        SSD1963VertBackPorch = 25;
-        SSD1963VertFrontPorch = 18;
-        // Set LSHIFT freq, i.e. the DCLK with PLL freq 120MHz set previously
-        // Typical DCLK is 33MHz.  30MHz = 120MHz*(LCDC_FPR+1)/2^20.  LCDC_FPR = 262143 (0x3FFFF)
-        SSD1963PClock1 = 0x03;
-        SSD1963PClock2 = 0xff;
-        SSD1963PClock3 = 0xff;
-        SSD1963Mode1 = 0x24; // 24-bit for 5" panel, data latch in falling edge for LSHIFT
-        SSD1963Mode2 = 0;    // Hsync+Vsync mode
-        break;
-#endif
-    case SSD1963_7ER_16:
-        SSD1963rgb = 0b1000;
     case SSD1963_7_16:
     case SSD1963_7:
-        DisplayHRes = 800; // this is the 7" glass
+#if defined(PICOMITE) && defined(rp2350)
+    case SSD1963_7_12BUFF:
+    case SSD1963_7_16BUFF:
+    case SSD1963_7_BUFF:
+    case SSD1963_7_12BUFF0:
+    case SSD1963_7_16BUFF0:
+    case SSD1963_7_BUFF0:
+        if (Option.DISPLAY_TYPE >= SSD1963_7_12BUFF)
+        {
+            DisplayHRes = 400; // this is the 7" glass
+            DisplayVRes = 240;
+        }
+        else
+        {
+            DisplayHRes = 800; // this is the 7" glass
+            DisplayVRes = 480;
+        }
+#else
+        DisplayHRes = 800; // this is the 5" glass
         DisplayVRes = 480;
+#endif
         SSD1963HorizPulseWidth = 1;
         SSD1963HorizBackPorch = 210;
         SSD1963HorizFrontPorch = 45;
@@ -905,26 +945,26 @@ void MIPS16 InitDisplaySSD(void)
         HRes = DisplayVRes;
     }
 #if defined(PICOMITE) && defined(rp2350)
-    if (Option.DISPLAY_TYPE == SSD1963_5_12BUFF)
+    if ((Option.DISPLAY_TYPE & 0xFC) == SSD1963_5_12BUFF)
     {
         SSD1963PixelInterface = 1;       // PIXEL data interface - 12-bit RGB888
         SSD1963PixelFormat = 0b01110000; // PIXEL data interface 24-bit
-        DisplayHRes*=2;
-        DisplayVRes*=2;
+        DisplayHRes *= 2;
+        DisplayVRes *= 2;
     }
-    else if (Option.DISPLAY_TYPE == SSD1963_5_16BUFF)
+    else if ((Option.DISPLAY_TYPE & 0xFC) == SSD1963_5_16BUFF)
     {
         SSD1963PixelInterface = 3;       // PIXEL data interface - 16-bit RGB565
         SSD1963PixelFormat = 0b01010000; // PIXEL data interface RGB565
-        DisplayHRes*=2;
-        DisplayVRes*=2;
+        DisplayHRes *= 2;
+        DisplayVRes *= 2;
     }
-    else if (Option.DISPLAY_TYPE == SSD1963_5_BUFF)
+    else if ((Option.DISPLAY_TYPE & 0xFC) == SSD1963_5_BUFF)
     {
         SSD1963PixelInterface = 0;       // PIXEL data interface - 8-bit
         SSD1963PixelFormat = 0b01110000; // PIXEL data interface 24-bit
-        DisplayHRes*=2;
-        DisplayVRes*=2;
+        DisplayHRes *= 2;
+        DisplayVRes *= 2;
     }
     else
 #endif
@@ -1013,35 +1053,108 @@ void WriteData(int data)
     nop;
     gpio_put(SSD1963_WR_GPPIN, 1);
 }
-
+#if defined(PICOMITE) && defined(rp2350)
+void __not_in_flash_func(WriteColorFast)(unsigned int c)
+{
+    if (Option.DISPLAY_TYPE == SSD1963_5_12BUFF0 || Option.DISPLAY_TYPE == SSD1963_7_12BUFF0)
+    {
+        uint64_t mask = (0xFFF);
+        gpio_put_masked64(mask, ((c >> 12)));
+        gpioc_bit_out_put(SSD1963_WR_GPPIN, 0);
+        nop;
+        gpioc_bit_out_put(SSD1963_WR_GPPIN, 1);
+        gpio_put_masked64(mask, (c));
+        gpioc_bit_out_put(SSD1963_WR_GPPIN, 0);
+        nop;
+        gpioc_bit_out_put(SSD1963_WR_GPPIN, 1);
+        gpio_put_masked64(mask, ((c >> 12)));
+        gpioc_bit_out_put(SSD1963_WR_GPPIN, 0);
+        nop;
+        gpioc_bit_out_put(SSD1963_WR_GPPIN, 1);
+        gpio_put_masked64(mask, (c));
+        gpioc_bit_out_put(SSD1963_WR_GPPIN, 0);
+        nop;
+        gpioc_bit_out_put(SSD1963_WR_GPPIN, 1);
+        return;
+    }
+    else if (Option.DISPLAY_TYPE == SSD1963_5_16BUFF0 || Option.DISPLAY_TYPE == SSD1963_7_16BUFF0)
+    {
+        gpio_put_masked64((0xFFFF), c);
+        gpioc_bit_out_put(SSD1963_WR_GPPIN, 0);
+        nop;
+        gpioc_bit_out_put(SSD1963_WR_GPPIN, 1);
+        nop;
+        gpioc_bit_out_put(SSD1963_WR_GPPIN, 0);
+        nop;
+        gpioc_bit_out_put(SSD1963_WR_GPPIN, 1);
+        return;
+    }
+    else if (Option.DISPLAY_TYPE == SSD1963_5_BUFF0 || Option.DISPLAY_TYPE == SSD1963_7_BUFF0)
+    {
+        gpio_put_masked64(0xFF, (c >> 16));
+        gpioc_bit_out_put(SSD1963_WR_GPPIN, 0);
+        nop;
+        gpioc_bit_out_put(SSD1963_WR_GPPIN, 1);
+        gpio_put_masked64(0xFF, (c >> 8));
+        gpioc_bit_out_put(SSD1963_WR_GPPIN, 0);
+        nop;
+        gpioc_bit_out_put(SSD1963_WR_GPPIN, 1);
+        gpio_put_masked64(0xFF, c);
+        gpioc_bit_out_put(SSD1963_WR_GPPIN, 0);
+        nop;
+        gpioc_bit_out_put(SSD1963_WR_GPPIN, 1);
+        gpio_put_masked64(0xFF, (c >> 16));
+        gpioc_bit_out_put(SSD1963_WR_GPPIN, 0);
+        nop;
+        gpioc_bit_out_put(SSD1963_WR_GPPIN, 1);
+        gpio_put_masked64(0xFF, (c >> 8));
+        gpioc_bit_out_put(SSD1963_WR_GPPIN, 0);
+        nop;
+        gpioc_bit_out_put(SSD1963_WR_GPPIN, 1);
+        gpio_put_masked64(0xFF, c);
+        gpioc_bit_out_put(SSD1963_WR_GPPIN, 0);
+        nop;
+        gpioc_bit_out_put(SSD1963_WR_GPPIN, 1);
+        return;
+    }
+}
+#endif
 // For the 100 pin chip write RGB colour over an 8 bit bus
+#if defined(PICOMITE) && defined(rp2350)
+void __not_in_flash_func(WriteColor)(unsigned int c)
+{
+
+    if (Option.DISPLAY_TYPE == SSD1963_5_12BUFF || Option.DISPLAY_TYPE == SSD1963_7_12BUFF)
+    {
+        uint64_t mask = (0xFFF << SSD1963data);
+        gpio_put_masked64(mask, ((c >> 12) << SSD1963data));
+        gpioc_bit_out_put(SSD1963_WR_GPPIN, 0);
+        nop;
+        gpioc_bit_out_put(SSD1963_WR_GPPIN, 1);
+        gpio_put_masked64(mask, (c << SSD1963data));
+        gpioc_bit_out_put(SSD1963_WR_GPPIN, 0);
+        nop;
+        gpioc_bit_out_put(SSD1963_WR_GPPIN, 1);
+        return;
+    }
+    else if ((Option.DISPLAY_TYPE > SSD_PANEL_8 && Option.DISPLAY_TYPE < VIRTUAL) || Option.DISPLAY_TYPE == SSD1963_5_16BUFF || Option.DISPLAY_TYPE == SSD1963_7_16BUFF)
+#else
 void WriteColor(unsigned int c)
 {
-#if defined(PICOMITE) && defined(rp2350)
-    if ((Option.DISPLAY_TYPE > SSD_PANEL_8 && Option.DISPLAY_TYPE<NEXTGEN) || Option.DISPLAY_TYPE==SSD1963_5_16BUFF)
-#else
     if (Option.DISPLAY_TYPE > SSD_PANEL_8)
 #endif
     {
         gpio_put_masked64((0xFFFF << SSD1963data), (c << SSD1963data));
-        gpio_put(SSD1963_WR_GPPIN, 0);
-        nop;
-        gpio_put(SSD1963_WR_GPPIN, 1);
-    }
 #if defined(PICOMITE) && defined(rp2350)
-    else if (Option.DISPLAY_TYPE == SSD1963_5_12BUFF)
-    {
-        gpio_put_masked64((0xFFF << SSD1963data), (((c >> 12) & 0xFFF) << SSD1963data));
+        gpioc_bit_out_put(SSD1963_WR_GPPIN, 0);
+        nop;
+        gpioc_bit_out_put(SSD1963_WR_GPPIN, 1);
+#else
         gpio_put(SSD1963_WR_GPPIN, 0);
         nop;
         gpio_put(SSD1963_WR_GPPIN, 1);
-        gpio_put_masked64((0xFFF << SSD1963data), ((c & 0xFFF) << SSD1963data));
-        nop;
-        gpio_put(SSD1963_WR_GPPIN, 0);
-        nop;
-        gpio_put(SSD1963_WR_GPPIN, 1);
-    }
 #endif
+    }
     else
     {
         gpio_put_masked64((0xFF << SSD1963data), (((c >> 16) & 0xFF) << SSD1963data));

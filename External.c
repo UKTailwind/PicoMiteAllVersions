@@ -5108,8 +5108,7 @@ void cmd_adc(void)
             top = getnumber(argv[22]);
             ADCscale[3] = (top - ADCbottom[3]) / 4095.0;
         }
-        ADCmax++;
-        ADCbuffer = GetMemory(ADCmax * ADCopen * 2);
+        ADCbuffer = GetMemory((ADCmax)*ADCopen * 2);
         adc_init();
         adc_set_round_robin(ADCopen == 1 ? 1 : ADCopen == 2 ? 3
                                            : ADCopen == 3   ? 7

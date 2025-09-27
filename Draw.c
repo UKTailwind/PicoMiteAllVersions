@@ -599,8 +599,6 @@ void ClearScreen(int c)
     {
         if (Option.DISPLAY_TYPE >= SSD1963_5_12BUFF)
         {
-            multicore_fifo_push_blocking(8);
-            multicore_fifo_push_blocking((uint32_t)0);
             ScrollStart = 0;
         }
         else
@@ -11531,19 +11529,19 @@ void ShowCursor(int show)
     if (visible == newstate)
         return;         // we can skip the rest if the cursor is already in the correct state
     visible = newstate; // draw the cursor BELOW the font
-    int y1=CurrentY + gui_font_height - (gui_font_height <= 12 ? 1 : 2);
-    int y2=y1+(gui_font_height <= 12 ? 0 : 1);
-    int x1=CurrentX;
-    int x2=CurrentX + gui_font_width - 1;
+    int y1 = CurrentY + gui_font_height - (gui_font_height <= 12 ? 1 : 2);
+    int y2 = y1 + (gui_font_height <= 12 ? 0 : 1);
+    int x1 = CurrentX;
+    int x2 = CurrentX + gui_font_width - 1;
     DrawLine(x1, y1, x2, y1, (gui_font_height <= 12 ? 1 : 2), visible ? gui_fcolour : (DISPLAY_TYPE == SCREENMODE1 ? 0 : gui_bcolour));
-	if (y1 < low_y)
-		low_y = y1;
-	if (y2 > high_y)
-		high_y = y2;
-	if (x1 < low_x)
-		low_x = x1;
-	if (x2 > high_x)
-		high_x = x2;
+    if (y1 < low_y)
+        low_y = y1;
+    if (y2 > high_y)
+        high_y = y2;
+    if (x1 < low_x)
+        low_x = x1;
+    if (x2 > high_x)
+        high_x = x2;
     routinechecks();
 }
 #ifndef PICOMITEWEB

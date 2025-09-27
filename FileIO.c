@@ -3615,7 +3615,7 @@ char __not_in_flash_func(FilePutChar)(char c, int fnbr)
 }
 int FileEOF(int fnbr)
 {
-    int i=1;
+    int i = 1;
     if (filesource[fnbr] == FATFSFILE)
     {
         if (!InitSDCard())
@@ -3884,12 +3884,11 @@ int BasicFileOpen(char *fname, int fnbr, int mode)
         bw[fnbr] = -1;
         fmode[fnbr] = mode;
         int fsize = f_size(FileTable[fnbr].fptr);
-        if(fsize==0 && mode==FA_READ) //set the filepointers so that EOF is returned iommediately
+        if (fsize == 0 && mode == FA_READ) // set the filepointers so that EOF is returned iommediately
         {
-            bw[fnbr]=1;
+            bw[fnbr] = 1;
             buffpointer[fnbr] = 1;
         }
-
     }
     else
     {

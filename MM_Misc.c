@@ -2725,6 +2725,13 @@ void MIPS16 printoptions(void)
             MMputchar(',', 1);
             MMPrintString("NORESET");
         }
+        else if ((Option.SSD_DATA != 1 || Option.BGR))
+            MMputchar(',', 1);
+        if (Option.BGR)
+        {
+            MMputchar(',', 1);
+            MMPrintString("INVERT");
+        }
         else if ((Option.SSD_DATA != 1))
             MMputchar(',', 1);
         if (Option.SSD_DATA != 1)
@@ -3223,7 +3230,7 @@ void disable_audio(void)
 #ifndef PICOMITEVGA
 void MIPS16 ConfigDisplayUser(unsigned char *tp)
 {
-    getargs(&tp, 13, (unsigned char *)",");
+    getargs(&tp, 15, (unsigned char *)",");
     if (str_equal(argv[0], (unsigned char *)"USER"))
     {
         if (Option.DISPLAY_TYPE)

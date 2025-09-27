@@ -3981,12 +3981,12 @@ void MIPS16 ClearRuntime(bool all)
     if (Option.DISPLAY_TYPE >= NEXTGEN)
     {
         Option.Refresh = 1;
-		if (Option.DISPLAY_TYPE == ILI9488BUFF || Option.DISPLAY_TYPE == ILI9488PBUFF)
-			init_RGB332_to_RGB888_LUT();
-		else if(Option.DISPLAY_TYPE == SSD1963_5_12BUFF || Option.DISPLAY_TYPE == SSD1963_5_BUFF)
-			init_RGB332_to_RGB888_LUT_SSD();
-		else
-			init_RGB332_to_RGB565_LUT();
+        if (Option.DISPLAY_TYPE == ILI9488BUFF || Option.DISPLAY_TYPE == ILI9488PBUFF)
+            init_RGB332_to_RGB888_LUT();
+        else if ((Option.DISPLAY_TYPE & 0xFC) == SSD1963_5_12BUFF || (Option.DISPLAY_TYPE & 0xFC) == SSD1963_5_BUFF)
+            init_RGB332_to_RGB888_LUT_SSD();
+        else
+            init_RGB332_to_RGB565_LUT();
     }
 #endif
 /*frame
@@ -4014,8 +4014,6 @@ void MIPS16 ClearRuntime(bool all)
         ScrollStart = 0;
         if (Option.DISPLAY_TYPE >= SSD1963_5_12BUFF)
         {
-            multicore_fifo_push_blocking(8);
-            multicore_fifo_push_blocking((uint32_t)0);
         }
         else
         {
