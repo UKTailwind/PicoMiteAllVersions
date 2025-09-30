@@ -3349,24 +3349,8 @@ void fun_map(void)
 	if (!(DISPLAY_TYPE >= NEXTGEN))
 		error("Invalid for this display");
 	int cl = getint(ep, 0, 255);
-	switch (DISPLAY_TYPE)
-	{
-	case SCREENMODE1:
-	case SCREENMODE4:
-		error("Invalid for Mode");
-		break;
-	case SCREENMODE2:
-	case SCREENMODE3:
-		if (cl > 15)
-			error("Mode has 16 colours - 0 to 15");
-		targ = T_INT;
-		iret = ((cl & 0b1000) << 20) | ((cl & 0b110) << 13) | ((cl & 0b1) << 7);
-		break;
-	case SCREENMODE5:
-		targ = T_INT;
-		iret = ((cl & 0b11100000) << 16) | ((cl & 0b00011100) << 11) | ((cl & 0b11) << 6);
-		break;
-	}
+	targ = T_INT;
+	iret = ((cl & 0b11100000) << 16) | ((cl & 0b00011100) << 11) | ((cl & 0b11) << 6);
 }
 void cmd_map(void)
 {
@@ -3379,7 +3363,10 @@ void cmd_map(void)
 		if (Option.DISPLAY_TYPE == ILI9488BUFF || Option.DISPLAY_TYPE == ILI9488PBUFF || (Option.DISPLAY_TYPE & 0xFC) == SSD1963_5_12BUFF || (Option.DISPLAY_TYPE & 0xFC) == SSD1963_5_BUFF)
 			init_RGB332_to_RGB888_LUT();
 		else
+		{
+			MMPrintString("Here\r\n");
 			init_RGB332_to_RGB565_LUT();
+		}
 	}
 	else if ((p = checkstring(cmdline, (unsigned char *)"SET")))
 	{

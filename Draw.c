@@ -11710,7 +11710,7 @@ void normalise(s_vector *v)
     v->y /= n;
     v->z /= n;
 }
-void display3d(int n, FLOAT3D x, FLOAT3D y, FLOAT3D z, int clear, int nonormals)
+void display3d(int n, FLOAT3D x, FLOAT3D y, FLOAT3D z, int clear, int nonormals, int depthmode)
 {
     s_vector ray, lighting = {0};
     s_vector p1, p2, p3, U, V;
@@ -11764,16 +11764,41 @@ void display3d(int n, FLOAT3D x, FLOAT3D y, FLOAT3D z, int clear, int nonormals)
         lighting.z = p1.z - struct3d[n]->light.z;
         normalise(&lighting);
         struct3d[n]->dots[f] = ray.x * struct3d[n]->normals[f].x + ray.y * struct3d[n]->normals[f].y + ray.z * struct3d[n]->normals[f].z;
-        tmp = struct3d[n]->r_centroids[f].m;
-        struct3d[n]->depth[f] = sqrt3d(
-            (struct3d[n]->r_centroids[f].z * tmp + z - camera[struct3d[n]->camera].z) *
-                (struct3d[n]->r_centroids[f].z * tmp + z - camera[struct3d[n]->camera].z) +
-            (struct3d[n]->r_centroids[f].y * tmp + y - camera[struct3d[n]->camera].y) *
-                (struct3d[n]->r_centroids[f].y * tmp + y - camera[struct3d[n]->camera].y) +
-            (struct3d[n]->r_centroids[f].x * tmp + x - camera[struct3d[n]->camera].x) *
-                (struct3d[n]->r_centroids[f].x * tmp + x - camera[struct3d[n]->camera].x));
-        struct3d[n]->depthindex[f] = f;
-        struct3d[n]->distance += struct3d[n]->depth[f];
+        if (depthmode == 0)
+        {
+            tmp = struct3d[n]->r_centroids[f].m;
+            struct3d[n]->depth[f] = sqrt3d(
+                (struct3d[n]->r_centroids[f].z * tmp + z - camera[struct3d[n]->camera].z) *
+                    (struct3d[n]->r_centroids[f].z * tmp + z - camera[struct3d[n]->camera].z) +
+                (struct3d[n]->r_centroids[f].y * tmp + y - camera[struct3d[n]->camera].y) *
+                    (struct3d[n]->r_centroids[f].y * tmp + y - camera[struct3d[n]->camera].y) +
+                (struct3d[n]->r_centroids[f].x * tmp + x - camera[struct3d[n]->camera].x) *
+                    (struct3d[n]->r_centroids[f].x * tmp + x - camera[struct3d[n]->camera].x));
+            struct3d[n]->depthindex[f] = f;
+            struct3d[n]->distance += struct3d[n]->depth[f];
+        }
+        else
+        {
+            FLOAT3D max_depth = -32767.0;
+            for (v = 0; v < struct3d[n]->facecount[f]; v++)
+            {
+                tmp = struct3d[n]->r_vertices[struct3d[n]->face_x_vert[vp + v]].m;
+                FLOAT3D vertex_depth = sqrt3d(
+                    (struct3d[n]->r_vertices[struct3d[n]->face_x_vert[vp + v]].z * tmp + z - camera[struct3d[n]->camera].z) *
+                        (struct3d[n]->r_vertices[struct3d[n]->face_x_vert[vp + v]].z * tmp + z - camera[struct3d[n]->camera].z) +
+                    (struct3d[n]->r_vertices[struct3d[n]->face_x_vert[vp + v]].y * tmp + y - camera[struct3d[n]->camera].y) *
+                        (struct3d[n]->r_vertices[struct3d[n]->face_x_vert[vp + v]].y * tmp + y - camera[struct3d[n]->camera].y) +
+                    (struct3d[n]->r_vertices[struct3d[n]->face_x_vert[vp + v]].x * tmp + x - camera[struct3d[n]->camera].x) *
+                        (struct3d[n]->r_vertices[struct3d[n]->face_x_vert[vp + v]].x * tmp + x - camera[struct3d[n]->camera].x));
+                if (vertex_depth > max_depth)
+                {
+                    max_depth = vertex_depth;
+                }
+            }
+            struct3d[n]->depth[f] = max_depth;
+            struct3d[n]->depthindex[f] = f;
+            struct3d[n]->distance += struct3d[n]->depth[f];
+        }
     }
     struct3d[n]->distance /= f;
     // sort the distances from the faces to the camera
@@ -11854,6 +11879,7 @@ void display3d(int n, FLOAT3D x, FLOAT3D y, FLOAT3D z, int clear, int nonormals)
     struct3d[n]->current.y = y;
     struct3d[n]->current.z = z;
     struct3d[n]->nonormals = nonormals;
+    struct3d[n]->depthmode = depthmode;
     if (struct3d[n]->vmax > 4)
     { // needed for polygon fill
         FreeMemory((unsigned char *)main_fill_polyX);
@@ -12007,6 +12033,8 @@ void MIPS16 cmd_3D(void)
         struct3d[n]->light.y = 0;
         struct3d[n]->light.z = 0;
         struct3d[n]->ambient = 0;
+        struct3d[n]->depthmode = 0;
+        struct3d[n]->nonormals = 0;
         // load up things that have one entry per vertex
         struct3d[n]->q_vertices = GetMemory(struct3d[n]->nv * sizeof(struct t_quaternion));
         struct3d[n]->r_vertices = GetMemory(struct3d[n]->nv * sizeof(struct t_quaternion));
@@ -12164,7 +12192,7 @@ void MIPS16 cmd_3D(void)
     }
     else if ((p = checkstring(cmdline, (unsigned char *)"SHOW")))
     {
-        getargs(&p, 9, (unsigned char *)",");
+        getargs(&p, 11, (unsigned char *)",");
         if (argc < 7)
             error("Argument count");
         int n = getint(argv[0], 1, MAX3D);
@@ -12172,13 +12200,16 @@ void MIPS16 cmd_3D(void)
         int y = getint(argv[4], -32766, 32766);
         int z = getinteger(argv[6]);
         int nonormals = 0;
-        if (argc == 9)
+        int depthmode = 0;
+        if (argc >= 9 && *argv[8])
             nonormals = getint(argv[8], 0, 1);
+        if (argc == 11)
+            depthmode = getint(argv[10], 0, 1);
         if (struct3d[n] == NULL)
             error("Object % does not exist", n);
         if (camera[struct3d[n]->camera].viewplane == -32767)
             error("Camera position not defined");
-        display3d(n, x, y, z, 1, nonormals);
+        display3d(n, x, y, z, 1, nonormals, depthmode);
         return;
     }
     else if ((p = checkstring(cmdline, (unsigned char *)"SET FLAGS")))
@@ -12305,13 +12336,13 @@ void MIPS16 cmd_3D(void)
                 error("Object % does not exist", n);
             if (struct3d[n]->xmin != 32767)
                 error("Object % is not hidden", n);
-            display3d(n, struct3d[n]->current.x, struct3d[n]->current.y, struct3d[n]->current.z, 1, struct3d[n]->nonormals);
+            display3d(n, struct3d[n]->current.x, struct3d[n]->current.y, struct3d[n]->current.z, 1, struct3d[n]->nonormals, struct3d[n]->depthmode);
         }
         return;
     }
     else if ((p = checkstring(cmdline, (unsigned char *)"WRITE")))
     {
-        getargs(&p, 9, (unsigned char *)",");
+        getargs(&p, 11, (unsigned char *)",");
         if (argc < 7)
             error("Argument count");
         int n = getint(argv[0], 1, MAX3D);
@@ -12319,13 +12350,16 @@ void MIPS16 cmd_3D(void)
         int y = getint(argv[4], -32766, 32766);
         int z = getinteger(argv[6]);
         int nonormals = 0;
-        if (argc == 9)
+        int depthmode = 0;
+        if (argc >= 9 && *argv[8])
             nonormals = getint(argv[8], 0, 1);
+        if (argc == 11)
+            depthmode = getint(argv[10], 0, 1);
         if (struct3d[n] == NULL)
             error("Object % does not exist", n);
         if (camera[struct3d[n]->camera].viewplane == -32767)
             error("Camera position not defined");
-        display3d(n, x, y, z, 0, nonormals);
+        display3d(n, x, y, z, 0, nonormals, depthmode);
         return;
     }
     else if ((p = checkstring(cmdline, (unsigned char *)"CLOSE ALL")))
