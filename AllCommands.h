@@ -360,6 +360,7 @@ void fun_tilde(void);
 void fun_byte(void);
 void fun_bit(void);
 void fun_flag(void);
+void fun_trim(void);
 #ifdef PICOMITEWEB
 void fun_json(void);
 #endif
@@ -740,6 +741,7 @@ void fun_map(void);
 #if defined(rp2350) && defined(PICOMITE)
 	{(unsigned char *)"Map(", T_FUN | T_INT, 0, fun_map},
 #endif
+	{(unsigned char *)"Trim$(", T_FUN | T_STR, 0, fun_trim},
 {
 	(unsigned char *)"", 0, 0, cmd_null,
 } // this dummy entry is always at the end

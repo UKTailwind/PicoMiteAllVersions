@@ -755,7 +755,96 @@ void fun_atan2(void)
 	fret = useoptionangle ? z * optionangle : z;
 	targ = T_NBR;
 }
+// Helper function to check if a character is in the mask
+int is_in_mask(char c, const char *mask)
+{
+	while (*mask)
+	{
+		if (*mask == c)
+		{
+			return 1;
+		}
+		mask++;
+	}
+	return 0;
+}
 
+char *trim(char *source, char *mask, char where)
+{
+	char *result = GetTempMemory(STRINGSIZE);
+
+	if (!source || !mask || !result)
+	{
+		if (result)
+			result[0] = '\0';
+		return result;
+	}
+
+	int len = strlen(source);
+	int start = 0;
+	int end = len - 1;
+
+	// Trim from the left
+	if (where == 'L' || where == 'B')
+	{
+		while (start <= end && is_in_mask(source[start], mask))
+		{
+			start++;
+		}
+	}
+
+	// Trim from the right
+	if (where == 'R' || where == 'B')
+	{
+		while (end >= start && is_in_mask(source[end], mask))
+		{
+			end--;
+		}
+	}
+
+	// Copy the trimmed string to result
+	int result_len = end - start + 1;
+	if (result_len > 0 && result_len < STRINGSIZE)
+	{
+		strncpy(result, source + start, result_len);
+		result[result_len] = '\0';
+	}
+	else
+	{
+		result[0] = '\0';
+	}
+
+	return result;
+}
+void fun_trim(void)
+{
+	char defaultmask[2] = " ";
+	char *mask = NULL;
+	char where = 'L';
+	getargs(&ep, 5, (unsigned char *)",");
+	char *instring = (char *)getCstring(argv[0]);
+	if (argc >= 3 && *argv[2])
+		mask = (char *)getCstring(argv[2]);
+	else
+		mask = defaultmask;
+	if (argc == 5)
+	{
+		if (checkstring(argv[4], (unsigned char *)"L"))
+			where = 'L';
+		else if (checkstring(argv[4], (unsigned char *)"R"))
+			where = 'R';
+		else if (checkstring(argv[4], (unsigned char *)"B"))
+			where = 'B';
+		else
+		{
+			where = (char)*getCstring(argv[4]);
+			if (!(where == 'L' || where == 'R' || where == 'B'))
+				error("Syntax");
+		}
+	}
+	targ = T_STR;
+	sret = CtoM((unsigned char *)trim(instring, mask, where));
+}
 // convert a number into a one character string
 // s$ = CHR$(nbr)
 void fun_chr(void)
