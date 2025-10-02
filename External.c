@@ -2904,29 +2904,50 @@ void setBacklight(int level, int setfrequency)
 void MIPS16 cmd_backlight(void)
 {
     getargs(&cmdline, 3, (unsigned char *)",");
+
     int level = getint(argv[0], 0, 100);
     int frequency = 50000;
+
+    // Validate that backlight is supported for current display type
+    bool backlight_supported = false;
+
 #if defined(PICOMITE) && defined(rp2350)
-    if (((Option.DISPLAY_TYPE > I2C_PANEL && Option.DISPLAY_TYPE < BufferedPanel) || (Option.DISPLAY_TYPE >= SSDPANEL && Option.DISPLAY_TYPE < VIRTUAL) || Option.DISPLAY_TYPE >= NEXTGEN) && Option.DISPLAY_BL)
+    if (((Option.DISPLAY_TYPE > I2C_PANEL && Option.DISPLAY_TYPE < BufferedPanel) ||
+         (Option.DISPLAY_TYPE >= SSDPANEL && Option.DISPLAY_TYPE < VIRTUAL) ||
+         Option.DISPLAY_TYPE >= NEXTGEN) &&
+        Option.DISPLAY_BL)
     {
+        backlight_supported = true;
     }
-    else if ((Option.DISPLAY_TYPE >= SSDPANEL && Option.DISPLAY_TYPE < VIRTUAL) || Option.DISPLAY_TYPE > SSD1963_5_12BUFF)
-#else
-    if (((Option.DISPLAY_TYPE > I2C_PANEL && Option.DISPLAY_TYPE < BufferedPanel) || (Option.DISPLAY_TYPE >= SSDPANEL && Option.DISPLAY_TYPE < VIRTUAL)) && Option.DISPLAY_BL)
+    else if ((Option.DISPLAY_TYPE >= SSDPANEL && Option.DISPLAY_TYPE < VIRTUAL) ||
+             Option.DISPLAY_TYPE > SSD1963_5_12BUFF)
     {
+        backlight_supported = true;
+    }
+#else
+    if (((Option.DISPLAY_TYPE > I2C_PANEL && Option.DISPLAY_TYPE < BufferedPanel) ||
+         (Option.DISPLAY_TYPE >= SSDPANEL && Option.DISPLAY_TYPE < VIRTUAL)) &&
+        Option.DISPLAY_BL)
+    {
+        backlight_supported = true;
     }
     else if (Option.DISPLAY_TYPE >= SSDPANEL && Option.DISPLAY_TYPE < VIRTUAL)
+    {
+        backlight_supported = true;
+    }
 #endif
+    else if (Option.DISPLAY_TYPE <= I2C_PANEL ||
+             Option.DISPLAY_TYPE == SSD1306SPI)
     {
+        backlight_supported = true;
     }
-    else if (Option.DISPLAY_TYPE <= I2C_PANEL)
+
+    if (!backlight_supported)
     {
-    }
-    else if (Option.DISPLAY_TYPE == SSD1306SPI)
-    {
-    }
-    else
         error("Backlight not set up");
+    }
+
+    // Handle optional third argument (DEFAULT flag or custom frequency)
     if (argc == 3)
     {
         if (checkstring(argv[2], (unsigned char *)"DEFAULT"))
@@ -2939,9 +2960,12 @@ void MIPS16 cmd_backlight(void)
             frequency = getint(argv[2], 100, 100000);
         }
     }
+
     setBacklight(level, frequency);
 }
+
 #endif
+
 void MIPS16 cmd_Servo(void)
 {
     unsigned char *tp;
