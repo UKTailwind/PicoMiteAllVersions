@@ -2909,19 +2909,17 @@ void MIPS16 cmd_backlight(void)
 #if defined(PICOMITE) && defined(rp2350)
     if (((Option.DISPLAY_TYPE > I2C_PANEL && Option.DISPLAY_TYPE < BufferedPanel) || (Option.DISPLAY_TYPE >= SSDPANEL && Option.DISPLAY_TYPE < VIRTUAL) || Option.DISPLAY_TYPE >= NEXTGEN) && Option.DISPLAY_BL)
     {
+    }
+    else if ((Option.DISPLAY_TYPE >= SSDPANEL && Option.DISPLAY_TYPE < VIRTUAL) || Option.DISPLAY_TYPE > SSD1963_5_12BUFF)
 #else
     if (((Option.DISPLAY_TYPE > I2C_PANEL && Option.DISPLAY_TYPE < BufferedPanel) || (Option.DISPLAY_TYPE >= SSDPANEL && Option.DISPLAY_TYPE < VIRTUAL)) && Option.DISPLAY_BL)
     {
-#endif
     }
-    else if (Option.DISPLAY_TYPE <= I2C_PANEL)
-    {
-    }
-#if defined(PICOMITE) && defined(rp2350)
-    else if ((Option.DISPLAY_TYPE >= SSDPANEL && Option.DISPLAY_TYPE < VIRTUAL) || Option.DISPLAY_TYPE > SSD1963_5_12BUFF)
-#else
     else if (Option.DISPLAY_TYPE >= SSDPANEL && Option.DISPLAY_TYPE < VIRTUAL)
 #endif
+    {
+    }
+    else if (Option.DISPLAY_TYPE <= I2C_PANEL)
     {
     }
     else if (Option.DISPLAY_TYPE == SSD1306SPI)
