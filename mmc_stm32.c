@@ -1869,10 +1869,8 @@ void InitReservedIO(void)
 #if defined(PICOMITE)
 	if (Option.LOCAL_KEYBOARD)
 	{
-		ExtCfg(PINMAP[47], EXT_ANA_IN, 0);
-		ExtCfg(PINMAP[47], EXT_BOOT_RESERVED, 0);
-		ExtCfg(PINMAP[24], EXT_DIG_OUT, 0);
-		ExtCfg(PINMAP[24], EXT_BOOT_RESERVED, 0);
+		ExtCfg(PINMAP[SHIFTLCKLED], EXT_DIG_OUT, 0);
+		ExtCfg(PINMAP[SHIFTLCKLED], EXT_BOOT_RESERVED, 0);
 		//		setpwm(PINMAP[41], &KeyboardlightChannel, &KeyboardlightSlice, 50000.0, Option.KeyboardBrightness);
 		for (int i = 26; i < 41; i++)
 		{
@@ -1979,7 +1977,7 @@ void InitReservedIO(void)
 			gpio_set_dir(SSD1963_GPDAT12, GPIO_OUT);
 			gpio_set_input_enabled(SSD1963_GPDAT12, true);
 #if defined(PICOMITE) && defined(rp2350)
-			if (Option.DISPLAY_TYPE != (SSD1963_5_12BUFF & 0xFC))
+			if ((Option.DISPLAY_TYPE & 0xFC) != SSD1963_5_12BUFF)
 #endif
 			{
 				ExtCfg(SSD1963_DAT13, EXT_BOOT_RESERVED, 0);
@@ -2581,52 +2579,38 @@ char *pinsearch(int pin)
 	else if (pin == Option.PSRAM_CS_PIN)
 		strcpy(buff, "PSRAM CS");
 #if defined(PICOMITE)
-	else if (pin == PINMAP[24] && Option.LOCAL_KEYBOARD)
-		strcpy(buff, "KEYBOARD C1");
 	else if (pin == PINMAP[26] && Option.LOCAL_KEYBOARD)
-		strcpy(buff, "KEYBOARD C2");
-	else if (pin == PINMAP[27] && Option.LOCAL_KEYBOARD)
-		strcpy(buff, "KEYBOARD C3");
-	else if (pin == PINMAP[28] && Option.LOCAL_KEYBOARD)
-		strcpy(buff, "KEYBOARD C4");
-	else if (pin == PINMAP[29] && Option.LOCAL_KEYBOARD)
-		strcpy(buff, "KEYBOARD C5");
-	else if (pin == PINMAP[30] && Option.LOCAL_KEYBOARD)
-		strcpy(buff, "KEYBOARD C6");
-	else if (pin == PINMAP[31] && Option.LOCAL_KEYBOARD)
-		strcpy(buff, "KEYBOARD C7");
-	else if (pin == PINMAP[32] && Option.LOCAL_KEYBOARD)
-		strcpy(buff, "KEYBOARD C8");
-	else if (pin == PINMAP[33] && Option.LOCAL_KEYBOARD)
-		strcpy(buff, "KEYBOARD C9");
-	else if (pin == PINMAP[34] && Option.LOCAL_KEYBOARD)
-		strcpy(buff, "KEYBOARD C10");
-	else if (pin == PINMAP[35] && Option.LOCAL_KEYBOARD)
-		strcpy(buff, "KEYBOARD C11");
-	else if (pin == PINMAP[36] && Option.LOCAL_KEYBOARD)
-		strcpy(buff, "KEYBOARD C12");
-	else if (pin == PINMAP[37] && Option.LOCAL_KEYBOARD)
 		strcpy(buff, "KEYBOARD R1");
-	else if (pin == PINMAP[38] && Option.LOCAL_KEYBOARD)
+	else if (pin == PINMAP[27] && Option.LOCAL_KEYBOARD)
 		strcpy(buff, "KEYBOARD R2");
-	else if (pin == PINMAP[39] && Option.LOCAL_KEYBOARD)
+	else if (pin == PINMAP[28] && Option.LOCAL_KEYBOARD)
 		strcpy(buff, "KEYBOARD R3");
-	else if (pin == PINMAP[40] && Option.LOCAL_KEYBOARD)
+	else if (pin == PINMAP[29] && Option.LOCAL_KEYBOARD)
 		strcpy(buff, "KEYBOARD R4");
-	else if (pin == PINMAP[41] && Option.LOCAL_KEYBOARD)
+	else if (pin == PINMAP[30] && Option.LOCAL_KEYBOARD)
 		strcpy(buff, "KEYBOARD R5");
-	else if (pin == PINMAP[42] && Option.LOCAL_KEYBOARD)
-		strcpy(buff, "KEYBOARD R6");
-	else if (pin == PINMAP[43] && Option.LOCAL_KEYBOARD)
-		strcpy(buff, "KEYBOARD BACKLIGHT");
-	else if (pin == PINMAP[44] && Option.LOCAL_KEYBOARD)
-		strcpy(buff, "KEYBOARD LED3");
+	else if (pin == PINMAP[31] && Option.LOCAL_KEYBOARD)
+		strcpy(buff, "KEYBOARD C1");
+	else if (pin == PINMAP[32] && Option.LOCAL_KEYBOARD)
+		strcpy(buff, "KEYBOARD C2");
+	else if (pin == PINMAP[33] && Option.LOCAL_KEYBOARD)
+		strcpy(buff, "KEYBOARD C3");
+	else if (pin == PINMAP[34] && Option.LOCAL_KEYBOARD)
+		strcpy(buff, "KEYBOARD C4");
+	else if (pin == PINMAP[35] && Option.LOCAL_KEYBOARD)
+		strcpy(buff, "KEYBOARD C5");
+	else if (pin == PINMAP[36] && Option.LOCAL_KEYBOARD)
+		strcpy(buff, "KEYBOARD C6");
+	else if (pin == PINMAP[37] && Option.LOCAL_KEYBOARD)
+		strcpy(buff, "KEYBOARD C7");
+	else if (pin == PINMAP[38] && Option.LOCAL_KEYBOARD)
+		strcpy(buff, "KEYBOARD C8");
+	else if (pin == PINMAP[39] && Option.LOCAL_KEYBOARD)
+		strcpy(buff, "KEYBOARD C9");
+	else if (pin == PINMAP[40] && Option.LOCAL_KEYBOARD)
+		strcpy(buff, "KEYBOARD C10");
 	else if (pin == PINMAP[45] && Option.LOCAL_KEYBOARD)
-		strcpy(buff, "KEYBOARD LED1");
-	else if (pin == PINMAP[46] && Option.LOCAL_KEYBOARD)
-		strcpy(buff, "KEYBOARD LED2");
-	else if (pin == PINMAP[47] && Option.LOCAL_KEYBOARD)
-		strcpy(buff, "BATTERY VOLTAGE");
+		strcpy(buff, "KEYBOARD LED");
 #endif
 #endif
 	else

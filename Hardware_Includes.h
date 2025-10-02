@@ -63,6 +63,7 @@ extern volatile unsigned int diskchecktimer;
 extern volatile unsigned int clocktimer;
 extern volatile int ds18b20Timer;
 extern volatile int CursorTimer;
+extern uint32_t restart_reason;
 extern volatile unsigned int I2CTimer;
 #ifndef USBKEYBOARD
 extern volatile unsigned int MouseTimer;

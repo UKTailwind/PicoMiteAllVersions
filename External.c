@@ -2917,7 +2917,7 @@ void MIPS16 cmd_backlight(void)
     else if (Option.DISPLAY_TYPE <= I2C_PANEL)
     {
     }
-    else if (Option.DISPLAY_TYPE >= SSDPANEL && Option.DISPLAY_TYPE < VIRTUAL)
+    else if ((Option.DISPLAY_TYPE >= SSDPANEL && Option.DISPLAY_TYPE < VIRTUAL) || Option.DISPLAY_TYPE > SSD1963_5_12BUFF)
     {
     }
     else if (Option.DISPLAY_TYPE == SSD1306SPI)
@@ -3782,7 +3782,7 @@ void cmd_keyscan(void)
     ctrl = pressed[10] ? true : false;
     if (function && pressed[5] == 1)
     {
-        gpio_xor_mask64((uint64_t)1 << 24);
+        gpio_xor_mask64((uint64_t)1 << SHIFTLCKLED);
         s_lock ^= 1;
     }
     //    if(pressed[13]==1){

@@ -53,6 +53,8 @@ const char *overlaid_functions[] = {
 	"MM.FONTWIDTH",
 #ifndef USBKEYBOARD
 	"MM.PS2",
+#else
+	"MM.USB",
 #endif
 	"MM.HPOS",
 	"MM.VPOS",
@@ -591,20 +593,25 @@ void fun_byte(void)
 	iret = s[spos];										  // this will last for the life of the command
 	targ = T_INT;
 }
+extern int USBcode;
+
 void fun_tilde(void)
 {
 	targ = T_INT;
 	/*
-	typedef enum {
+	typedef enum
+	{
 		MMHRES,
 		MMVRES,
 		MMVER,
 		MMI2C,
 		MMFONTHEIGHT,
 		MMFONTWIDTH,
-	#ifndef USBKEYBOARD
+#ifndef USBKEYBOARD
 		MMPS2,
-	#endif
+#else
+		MMUSB,
+#endif
 		MMHPOS,
 		MMVPOS,
 		MMONEWIRE,
@@ -613,19 +620,22 @@ void fun_tilde(void)
 		MMWATCHDOG,
 		MMDEVICE,
 		MMCMDLINE,
-	#ifdef PICOMITEWEB
+#ifdef PICOMITEWEB
 		MMMESSAGE,
 		MMADDRESS,
 		MMTOPIC,
-	#endif
+#endif
 		MMFLAG,
 		MMDISPLAY,
 		MMWIDTH,
 		MMHEIGHT,
 		MMPERSISTENT,
+#ifndef PICOMITEWEB
+		MMSUPPLY,
+#endif
 		MMEND
-	} Operation;
-	*/
+	}
+*/
 	switch (*ep - 'A')
 	{
 	case MMHRES:
@@ -649,6 +659,10 @@ void fun_tilde(void)
 #ifndef USBKEYBOARD
 	case MMPS2:
 		iret = (int64_t)(uint32_t)PS2code;
+		break;
+#else
+	case MMUSB:
+		iret = (int64_t)USBcode;
 		break;
 #endif
 	case MMHPOS:

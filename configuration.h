@@ -177,7 +177,7 @@ extern "C"
 #ifdef rp2350
 #define HEAP_MEMORY_SIZE (300 * 1024)
 #define MAXVARS 768 // 8 + MAXVARLEN + MAXDIM * 4  (ie, 64 bytes) - these do not incl array members
-#define FLASH_TARGET_OFFSET (880 * 1024)
+#define FLASH_TARGET_OFFSET (912 * 1024)
 #define MAX_CPU 396000
 #define MAXSUBFUN 512 // each entry takes up 4 bytes
 #ifdef USBKEYBOARD
@@ -393,6 +393,8 @@ extern "C"
         MMFONTWIDTH,
 #ifndef USBKEYBOARD
         MMPS2,
+#else
+    MMUSB,
 #endif
         MMHPOS,
         MMVPOS,

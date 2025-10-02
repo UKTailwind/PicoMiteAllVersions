@@ -62,7 +62,6 @@ extern int last_adc;
 extern char banner[];
 extern char *pinsearch(int pin);
 extern uint8_t getrnd(void);
-extern uint32_t restart_reason;
 extern unsigned int b64d_size(unsigned int in_size);
 extern unsigned int b64e_size(unsigned int in_size);
 extern unsigned int b64_encode(const unsigned char *in, unsigned int in_len, unsigned char *out);
@@ -2552,8 +2551,6 @@ void MIPS16 printoptions(void)
 #if defined(PICOMITE)
     if (Option.LOCAL_KEYBOARD)
         PO2Str("KEYBOARD", "LOCAL");
-    if (Option.LOCAL_KEYBOARD)
-        PO2Int("KEYBOARD BACKLIGHT", Option.KeyboardBrightness);
 #endif
 #else
     if (Option.NoHeartbeat)
@@ -3725,42 +3722,44 @@ void MIPS16 configure(unsigned char *p)
             ResetOptions(false);
             Option.CPU_Speed = 360000;
             Option.ColourCode = 1;
-            Option.SYSTEM_CLK = PINMAP[6];
-            Option.SYSTEM_MOSI = PINMAP[7];
-            Option.SYSTEM_MISO = PINMAP[4];
-            Option.LCD_CLK = PINMAP[10];
-            Option.LCD_MOSI = PINMAP[11];
-            Option.LCD_MISO = PINMAP[12];
+            Option.LCD_CLK = Option.SYSTEM_CLK = PINMAP[42];
+            Option.LCD_MOSI = Option.SYSTEM_MOSI = PINMAP[43];
+            Option.LCD_MISO = Option.SYSTEM_MISO = PINMAP[44];
             Option.AllPins = 1;
             Option.SYSTEM_I2C_SDA = PINMAP[20];
             Option.SYSTEM_I2C_SCL = PINMAP[21];
             Option.RTC = true;
-            Option.SerialTX = PINMAP[8];
-            Option.SerialRX = PINMAP[9];
-            Option.SerialConsole = 2;
-            Option.DISPLAY_ORIENTATION = 2;
-            Option.DISPLAY_TYPE = ST7796SPBUFF;
-            Option.LCD_CD = PINMAP[1];
-            Option.LCD_Reset = PINMAP[2];
-            Option.LCD_CS = PINMAP[3];
-            Option.DISPLAY_BL = PINMAP[18];
+            Option.DISPLAY_ORIENTATION = LANDSCAPE;
+            Option.DISPLAY_TYPE = SSD1963_5_12BUFF0;
+            Option.BackLightLevel = 100;
+            Option.SSD_RESET = -1;
+            Option.SSD_DATA = 1;
+            Option.SSD_DC = 16;
+            Option.SSD_WR = 17;
+            Option.SSD_RD = 18;
+            Option.TOUCH_CS = PINMAP[19];
+            Option.TOUCH_IRQ = PINMAP[46];
             Option.BGR = 1;
-            Option.SD_CS = PINMAP[5];
-            Option.audio_i2s_bclk = PINMAP[13];
-            Option.audio_i2s_data = PINMAP[15];
+            Option.SD_CS = PINMAP[41];
+            Option.audio_i2s_bclk = PINMAP[22];
+            Option.audio_i2s_data = PINMAP[24];
             Option.AUDIO_SLICE = 11;
-            Option.PSRAM_CS_PIN = PINMAP[0];
+            Option.PSRAM_CS_PIN = PINMAP[47];
             Option.LOCAL_KEYBOARD = 1;
             Option.NoHeartbeat = 0;
             Option.heartbeatpin = PINMAP[25];
-            Option.KeyboardBrightness = 10;
-            Option.BackLightLevel = 60;
             Option.DISPLAY_CONSOLE = 1;
             Option.continuation = '_';
+            Option.LCD_CD = Option.LCD_Reset = Option.LCD_CS = 0;
+            Option.TOUCH_SWAPXY = 1;
+            Option.TOUCH_XZERO = 163;
+            Option.TOUCH_YZERO = 293;
+            Option.TOUCH_XSCALE = 0.1058;
+            Option.TOUCH_YSCALE = 0.0650;
             strcpy((char *)Option.platform, "PALM PICO");
             SaveOptions();
             printoptions();
-            uSec(100000);
+            uSec(1000000);
             _excep_code = RESET_COMMAND;
             SoftReset();
         }
@@ -4345,15 +4344,27 @@ void MIPS16 cmd_option(void)
     }
 #endif
 #if defined(PICOMITE) && defined(rp2350)
-    tp = checkstring(cmdline, (unsigned char *)"KEYBOARD BACKLIGHT");
+    tp = checkstring(cmdline, (unsigned char *)"LOCAL KEYBOARD");
     if (tp)
     {
-        if (!Option.LOCAL_KEYBOARD)
-            error("Invalid option");
-        Option.KeyboardBrightness = getint(tp, 0, 100);
-        setpwm(PINMAP[43], &KeyboardlightChannel, &KeyboardlightSlice, 50000.0, Option.KeyboardBrightness);
-        SaveOptions();
-        return;
+        if (Option.KEYBOARD_CLOCK)
+            error("Keyboard must be disabled to set up local keyboard");
+        if (checkstring(tp, (unsigned char *)"OFF"))
+        {
+            Option.LOCAL_KEYBOARD = 0;
+            SaveOptions();
+            _excep_code = RESET_COMMAND;
+            SoftReset();
+            return;
+        }
+        else if (checkstring(tp, (unsigned char *)"ON"))
+        {
+            Option.LOCAL_KEYBOARD = 1;
+            SaveOptions();
+            _excep_code = RESET_COMMAND;
+            SoftReset();
+            return;
+        }
     }
 #endif
     tp = checkstring(cmdline, (unsigned char *)"PSRAM PIN");

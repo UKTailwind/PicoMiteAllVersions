@@ -1618,6 +1618,8 @@ void MIPS16 InitSSD1963(void)
 
     ClearScreen(Option.DefaultBC);
     SetBacklightSSD1963(Option.BackLightLevel);
+    if (!(restart_reason & 0xFFFFFFF0 || restart_reason & 0x30000))
+        uSec(500000);            // Give time for power to stabilise
     WriteComand(CMD_ON_DISPLAY); // Turn on display; show the image on display
 }
 void SetAreaIPS_4_16(int xstart, int ystart, int xend, int yend, int rw)

@@ -624,6 +624,12 @@ int __not_in_flash_func(FindSubFun)(unsigned char *p, int type)
     return -1;
 }
 #endif
+// Helper macros for common operations
+#define IS_BYVAL(p) (toupper(*(p)) == 'B' && toupper(*((p) + 1)) == 'Y' && \
+                     checkstring((p) + 2, (unsigned char *)"VAL") != NULL)
+#define IS_BYREF(p) (toupper(*(p)) == 'B' && toupper(*((p) + 1)) == 'Y' && \
+                     checkstring((p) + 2, (unsigned char *)"REF") != NULL)
+#define SKIP_BYVAL_BYREF(p) ((p) + 5)
 
 // This function is responsible for executing a defined subroutine or function.
 // As these two are similar they are processed in the one lump of code.
@@ -642,71 +648,63 @@ void MIPS16 DefinedSubFun(int isfun, unsigned char *cmd, int index, MMFLOAT *fa,
 {
 #endif
 #else
+
 void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, int index, MMFLOAT *fa, long long int *i64a, unsigned char **sa, int *typ)
 {
 #endif
-
     unsigned char *p, *s, *tp, *ttp, tcmdtoken;
-    unsigned char *CallersLinePtr, *SubLinePtr = NULL;
-    unsigned char *argbuf1;
-    unsigned char **argv1;
-    int argc1;
-    unsigned char *argbuf2;
-    unsigned char **argv2;
-    int argc2;
+    unsigned char *CallersLinePtr, *SubLinePtr;
+    unsigned char *argbuf1, *argbuf2;
+    unsigned char **argv1, **argv2;
+    int argc1, argc2;
     unsigned char fun_name[MAXVARLEN + 1];
     unsigned char *argbyref;
-    int i;
-    int ArgType, FunType;
-    int *argtype;
+    int i, ArgType, FunType;
+    int *argtype, *argVarIndex;
     union u_argval
     {
-        MMFLOAT f;         // the value if it is a float
-        long long int i;   // the value if it is an integer
-        MMFLOAT *fa;       // pointer to the allocated memory if it is an array of floats
-        long long int *ia; // pointer to the allocated memory if it is an array of integers
-        unsigned char *s;  // pointer to the allocated memory if it is a string
+        MMFLOAT f;
+        long long int i;
+        MMFLOAT *fa;
+        long long int *ia;
+        unsigned char *s;
     } *argval;
-    int *argVarIndex;
 
-    // Errors generated after gosubindex is incremented need to restore the original value
-    // Any variables created if LocalIndex was incremented also need to be cleared
-    // Memory allocated to *argval needs to be recovered.
-    // This allows unit tests to recover cleanly from skipped errors.i.e. ON ERROR SKIP
-    DefinedSubFunLocalIndex = g_LocalIndex; // save the LocalIndex
-
+    DefinedSubFunLocalIndex = g_LocalIndex;
     CallersLinePtr = CurrentLinePtr;
-    SubLinePtr = subfun[index];            // used for error reporting
-    p = SubLinePtr + sizeof(CommandToken); // point to the sub or function definition
+    SubLinePtr = subfun[index];
+    p = SubLinePtr + sizeof(CommandToken);
     skipspace(p);
     ttp = p;
 
-    // copy the sub/fun name from the definition into temp storage and terminate
-    // p is left pointing to the end of the name (ie, start of the argument list in the definition)
-    CurrentLinePtr = SubLinePtr; // report errors at the definition
+    // Copy sub/fun name - optimized with pointer arithmetic
+    CurrentLinePtr = SubLinePtr;
     tp = fun_name;
     *tp++ = *p++;
     while (isnamechar(*p))
         *tp++ = *p++;
-    if (*p == '$' || *p == '%' || *p == '!')
+
+    unsigned char suffix = *p;
+    if (suffix == '$' || suffix == '%' || suffix == '!')
     {
         if (!isfun)
-        {
-            error("Type specification is invalid: @", (int)(*p));
-        }
-        *tp++ = *p++;
+            error("Type specification is invalid: @", (int)suffix);
+        *tp++ = suffix;
+        p++;
     }
     *tp = 0;
 
-    if (isfun && *p != '(' /*&& (*SubLinePtr != cmdCFUN)*/)
+    if (isfun && *p != '(')
         error("Function definition");
 
-    // find the end of the caller's identifier, tp is left pointing to the start of the caller's argument list
-    CurrentLinePtr = CallersLinePtr; // report errors at the caller
+    // Find end of caller's identifier
+    CurrentLinePtr = CallersLinePtr;
     tp = cmd + 1;
     while (isnamechar(*tp))
         tp++;
-    if (*tp == '$' || *tp == '%' || *tp == '!')
+
+    suffix = *tp;
+    if (suffix == '$' || suffix == '%' || suffix == '!')
     {
         if (!isfun)
             error("Type specification");
@@ -715,150 +713,147 @@ void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, in
     if (mytoupper(*(p - 1)) != mytoupper(*(tp - 1)))
         error("Inconsistent type suffix");
 
-    // if this is a function we check to find if the function's type has been specified with AS <type> and save it
-    CurrentLinePtr = SubLinePtr; // report errors at the definition
+    // Check function type specification
+    CurrentLinePtr = SubLinePtr;
     FunType = T_NOTYPE;
     if (isfun)
     {
-        ttp = skipvar(ttp, false); // point to after the function name and bracketed arguments
+        ttp = skipvar(ttp, false);
         skipspace(ttp);
         if (*ttp == tokenAS)
-        {                                                    // are we using Microsoft syntax (eg, AS INTEGER)?
-            ttp++;                                           // step over the AS token
-            ttp = CheckIfTypeSpecified(ttp, &FunType, true); // get the type
+        {
+            ttp++;
+            ttp = CheckIfTypeSpecified(ttp, &FunType, true);
             if (!(FunType & T_IMPLIED))
                 error("Variable type");
         }
         FunType |= (V_FIND | V_DIM_VAR | V_LOCAL | V_EMPTY_OK);
     }
 
-    // from now on
-    // tp  = the caller's argument list
-    // p   = the argument list for the definition
     skipspace(tp);
     skipspace(p);
 
-    // similar if this is a CSUB
+    // Handle CSUB - early return
     CommandToken tkn = commandtbl_decode(SubLinePtr);
     if (tkn == cmdCSUB)
     {
-        CallCFunction(SubLinePtr, tp, p, CallersLinePtr); // run the CSUB
-        g_TempMemoryIsChanged = true;                     // signal that temporary memory should be checked
+        CallCFunction(SubLinePtr, tp, p, CallersLinePtr);
+        g_TempMemoryIsChanged = true;
         return;
     }
-    // from now on we have a user defined sub or function (not a C routine)
 
     if (gosubindex >= MAXGOSUB)
         error("Too many nested SUB/FUN");
     errorstack[gosubindex] = CallersLinePtr;
-    gosubstack[gosubindex++] = isfun ? NULL : nextstmt; // NULL signifies that this is returned to by ending ExecuteProgram()
-#define buffneeded MAX_ARG_COUNT * (sizeof(union u_argval) + 2 * sizeof(int) + 3 * sizeof(unsigned char *) + sizeof(unsigned char)) + 2 * STRINGSIZE
-    // allocate memory for processing the arguments
-    argval = GetSystemMemory(buffneeded);
-    DefinedSubFunMem = (uint32_t)argval; // save pointer to memory for cleanup on error
-    argtype = (void *)argval + MAX_ARG_COUNT * sizeof(union u_argval);
-    argVarIndex = (void *)argtype + MAX_ARG_COUNT * sizeof(int);
-    argbuf1 = (void *)argVarIndex + MAX_ARG_COUNT * sizeof(int);
-    argv1 = (void *)argbuf1 + STRINGSIZE;
-    argbuf2 = (void *)argv1 + MAX_ARG_COUNT * sizeof(unsigned char *);
-    argv2 = (void *)argbuf2 + STRINGSIZE;
-    argbyref = (void *)argv2 + MAX_ARG_COUNT * sizeof(unsigned char *);
+    gosubstack[gosubindex++] = isfun ? NULL : nextstmt;
 
-    // now split up the arguments in the caller
-    CurrentLinePtr = CallersLinePtr; // report errors at the caller
+// Allocate memory for argument processing - single allocation
+#define buffneeded (MAX_ARG_COUNT * (sizeof(union u_argval) + 2 * sizeof(int) +             \
+                                     3 * sizeof(unsigned char *) + sizeof(unsigned char)) + \
+                    2 * STRINGSIZE)
+    argval = GetSystemMemory(buffneeded);
+    DefinedSubFunMem = (uint32_t)argval;
+
+    // Setup pointers into allocated buffer
+    argtype = (int *)((char *)argval + MAX_ARG_COUNT * sizeof(union u_argval));
+    argVarIndex = (int *)((char *)argtype + MAX_ARG_COUNT * sizeof(int));
+    argbuf1 = (unsigned char *)((char *)argVarIndex + MAX_ARG_COUNT * sizeof(int));
+    argv1 = (unsigned char **)((char *)argbuf1 + STRINGSIZE);
+    argbuf2 = (unsigned char *)((char *)argv1 + MAX_ARG_COUNT * sizeof(unsigned char *));
+    argv2 = (unsigned char **)((char *)argbuf2 + STRINGSIZE);
+    argbyref = (unsigned char *)((char *)argv2 + MAX_ARG_COUNT * sizeof(unsigned char *));
+
+    // Split up arguments in caller
+    CurrentLinePtr = CallersLinePtr;
     argc1 = 0;
     if (*tp)
-        makeargs(&tp, MAX_ARG_COUNT, argbuf1, argv1, &argc1, (*tp == '(') ? (unsigned char *)"(," : (unsigned char *)",");
+        makeargs(&tp, MAX_ARG_COUNT, argbuf1, argv1, &argc1,
+                 (*tp == '(') ? (unsigned char *)"(," : (unsigned char *)",");
 
-    // split up the arguments in the definition
-    CurrentLinePtr = SubLinePtr; // any errors must be at the definition
+    // Split up arguments in definition
+    CurrentLinePtr = SubLinePtr;
     argc2 = 0;
     if (*p)
-        makeargs(&p, MAX_ARG_COUNT, argbuf2, argv2, &argc2, (*p == '(') ? (unsigned char *)"(," : (unsigned char *)",");
+        makeargs(&p, MAX_ARG_COUNT, argbuf2, argv2, &argc2,
+                 (*p == '(') ? (unsigned char *)"(," : (unsigned char *)",");
 
-    // error checking
+    // Error checking
     if (argc2 && (argc2 & 1) == 0)
         error("Argument list");
-    CurrentLinePtr = CallersLinePtr; // report errors at the caller
+    CurrentLinePtr = CallersLinePtr;
     if (argc1 > argc2 || (argc1 && (argc1 & 1) == 0))
         error("Argument list");
 
-    // step through the arguments supplied by the caller and get the value supplied
-    // these can be:
-    //    - missing (ie, caller did not supply that parameter)
-    //    - a variable, in which case we need to get a pointer to that variable's data and save its index so later we can get its type
-    //    - an expression, in which case we evaluate the expression and get its value and type
+    // Process caller's arguments
     for (i = 0; i < argc2; i += 2)
-    { // count through the arguments in the definition of the sub/fun
+    {
+        argtype[i] = 0; // Initialize
+        argbyref[i] = 0;
+
         if (i < argc1 && *argv1[i])
         {
-            // check if the argument is a valid variable
-            if (i < argc1 && isnamestart(*argv1[i]) && *skipvar(argv1[i], false) == 0)
+            // Check if argument is a variable
+            unsigned char *arg = argv1[i];
+            if (isnamestart(*arg))
             {
-                // yes, it is a variable (or perhaps a user defined function which looks the same)?
-                if (!(FindSubFun(argv1[i], 1) >= 0 && strchr((char *)argv1[i], '(') != NULL))
+                unsigned char *end = skipvar(arg, false);
+                if (*end == 0)
                 {
-                    // yes, this is a valid variable.  set argvalue to point to the variable's data and argtype to its type
-                    argval[i].s = findvar(argv1[i], V_FIND | V_EMPTY_OK); // get a pointer to the variable's data
-                    argtype[i] = g_vartbl[g_VarIndex].type;               // and the variable's type
-                    argVarIndex[i] = g_VarIndex;
-                    if (argtype[i] & T_CONST)
+                    // Check it's not a user-defined function
+                    if (!(FindSubFun(arg, 1) >= 0 && strchr((char *)arg, '(') != NULL))
                     {
-                        argtype[i] = 0; // we don't want to point to a constant
-                    }
-                    else
-                    {
-                        argtype[i] |= T_PTR; // flag this as a pointer
+                        argval[i].s = findvar(arg, V_FIND | V_EMPTY_OK);
+                        int vtype = g_vartbl[g_VarIndex].type;
+                        argtype[i] = vtype;
+                        argVarIndex[i] = g_VarIndex;
+
+                        if (vtype & T_CONST)
+                            argtype[i] = 0;
+                        else
+                            argtype[i] |= T_PTR;
                     }
                 }
             }
 
-            // check for BYVAL or BYREF in sub/fun definition
-            argbyref[i] = 0;
-            skipspace(argv2[i]);
-            if (toupper(*argv2[i]) == 'B' && toupper(*(argv2[i] + 1)) == 'Y')
-            {
-                if ((checkstring(argv2[i] + 2, (unsigned char *)"VAL")) != NULL)
-                { // if BYVAL
-                    // Only if not an array remove any pointer flag in the caller
-                    argtype[i] = 0;
+            // Check for BYVAL/BYREF in definition
+            unsigned char *defarg = argv2[i];
+            skipspace(defarg);
 
-                    // Trap an array but not an array element
-                    if (g_vartbl[argVarIndex[i]].dims[0] > 0)
-                    {
-                        /* See if we have an array or an array element */
-                        tp = argv1[i];
-                        do
-                        {
-                            tp++;
-                        } while (*tp != '('); // We should find a '(' because it must be an array or and array element to get here
+            if (IS_BYVAL(defarg))
+            {
+                argtype[i] = 0; // Remove pointer flag
+
+                // Check for array (but not array element)
+                if (g_vartbl[argVarIndex[i]].dims[0] > 0)
+                {
+                    tp = arg;
+                    while (*tp != '(')
                         tp++;
-                        skipspace(tp);
-                        if (*tp == ')')
-                            error("Array as BYVAL not allowed $", argv1[i]);
-                    }
-                    argv2[i] += 5; // skip to the variable start
+                    tp++;
+                    skipspace(tp);
+                    if (*tp == ')')
+                        error("Array as BYVAL not allowed $", arg);
                 }
-                else
-                {
-                    if ((checkstring(argv2[i] + 2, (unsigned char *)"REF")) != NULL)
-                    { // if BYREF
-                        if ((argtype[i] & T_PTR) == 0)
-                            error("Variable required for BYREF $", argv1[i]);
-
-                        argv2[i] += 5; // skip to the variable start
-                        argbyref[i] = 1;
-                    }
-                }
+                argv2[i] = SKIP_BYVAL_BYREF(defarg);
+            }
+            else if (IS_BYREF(defarg))
+            {
+                if ((argtype[i] & T_PTR) == 0)
+                    error("Variable required for BYREF $", arg);
+                argv2[i] = SKIP_BYVAL_BYREF(defarg);
+                argbyref[i] = 1;
             }
 
-            // if argument is present and is not a pointer to a variable then evaluate it as an expression
+            // Evaluate non-pointer arguments
             if (argtype[i] == 0)
             {
                 long long int ia;
-                evaluate(argv1[i], &argval[i].f, &ia, &s, &argtype[i], false); // get the value and type of the argument
+                evaluate(arg, &argval[i].f, &ia, &s, &argtype[i], false);
+
                 if (argtype[i] & T_INT)
+                {
                     argval[i].i = ia;
+                }
                 else if (argtype[i] & T_STR)
                 {
                     argval[i].s = GetMemory(STRINGSIZE);
@@ -868,164 +863,173 @@ void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, in
         }
     }
 
-    // now we step through the parameters in the definition of the sub/fun
-    // for each one we create the local variable and compare its type to that supplied in the callers list
-    CurrentLinePtr = SubLinePtr; // any errors must be at the definition
+    // Create local variables for parameters
+    CurrentLinePtr = SubLinePtr;
     g_LocalIndex++;
+
     for (i = 0; i < argc2; i += 2)
-    { // count through the arguments in the definition of the sub/fun
+    {
         ArgType = T_NOTYPE;
-        // skip BYVAL/BYREF keywords
-        if (toupper(*argv2[i]) == 'B' && toupper(*(argv2[i] + 1)) == 'Y')
+        unsigned char *defarg = argv2[i];
+
+        // Skip BYVAL/BYREF keywords
+        if (IS_BYVAL(defarg))
         {
-            if ((checkstring(argv2[i] + 2, (unsigned char *)"VAL")) != NULL)
-            {
-                argv2[i] += 5;
-            }
-            else if ((checkstring(argv2[i] + 2, (unsigned char *)"REF")) != NULL)
-            {                  // if BYREF
-                argv2[i] += 5; // skip to the variable start
-            }
+            argv2[i] = defarg = SKIP_BYVAL_BYREF(defarg);
+        }
+        else if (IS_BYREF(defarg))
+        {
+            argv2[i] = defarg = SKIP_BYVAL_BYREF(defarg);
         }
 
-        tp = skipvar(argv2[i], false); // point to after the variable
+        tp = skipvar(defarg, false);
         skipspace(tp);
         if (*tp == tokenAS)
-        {                                                  // are we using Microsoft syntax (eg, AS INTEGER)?
-            *tp++ = 0;                                     // terminate the string and step over the AS token
-            tp = CheckIfTypeSpecified(tp, &ArgType, true); // and get the type
+        {
+            *tp++ = 0;
+            tp = CheckIfTypeSpecified(tp, &ArgType, true);
             if (!(ArgType & T_IMPLIED))
                 error("Variable type");
         }
+
         ArgType |= (V_FIND | V_DIM_VAR | V_LOCAL | V_EMPTY_OK);
-        tp = findvar(argv2[i], ArgType); // declare the local variable
+        tp = findvar(defarg, ArgType);
+
         if (g_vartbl[g_VarIndex].dims[0] > 0)
-            error("Argument list"); // if it is an array it must be an empty array
+            error("Argument list");
 
-        CurrentLinePtr = CallersLinePtr; // report errors at the caller
+        CurrentLinePtr = CallersLinePtr;
 
-        // if the definition called for an array, special processing and checking will be required
+        // Handle array parameters
         if (g_vartbl[g_VarIndex].dims[0] == -1)
         {
-            int j;
             if (g_vartbl[argVarIndex[i]].dims[0] == 0)
                 error("Expected an array");
             if (TypeMask(g_vartbl[g_VarIndex].type) != TypeMask(argtype[i]))
                 error("Incompatible type: $", argv1[i]);
+
             g_vartbl[g_VarIndex].val.s = NULL;
-            for (j = 0; j < MAXDIM; j++) // copy the dimensions of the supplied variable into our local variable
-                g_vartbl[g_VarIndex].dims[j] = g_vartbl[argVarIndex[i]].dims[j];
+            // Copy dimensions
+            memcpy(g_vartbl[g_VarIndex].dims, g_vartbl[argVarIndex[i]].dims,
+                   MAXDIM * sizeof(int));
         }
 
-        // if this is a pointer check and the type is NOT the same as that requested in the sub/fun definition
-        if ((argtype[i] & T_PTR) && TypeMask(g_vartbl[g_VarIndex].type) != TypeMask(argtype[i]))
+        int localType = g_vartbl[g_VarIndex].type;
+        int localTypeMask = TypeMask(localType);
+        int argTypeMask = TypeMask(argtype[i]);
+
+        // Handle type mismatches for pointers
+        if ((argtype[i] & T_PTR) && localTypeMask != argTypeMask)
         {
             if (argbyref[i])
                 error("BYREF requires same types: $", argv1[i]);
-            if ((TypeMask(g_vartbl[g_VarIndex].type) & T_STR) || (TypeMask(argtype[i]) & T_STR))
+            if ((localTypeMask & T_STR) || (argTypeMask & T_STR))
                 error("Incompatible type: $", argv1[i]);
-            // make this into an ordinary argument
+
+            // Convert to ordinary argument
             if (g_vartbl[argVarIndex[i]].type & T_PTR)
-            {
-                argval[i].i = *g_vartbl[argVarIndex[i]].val.ia; // get the value if the supplied argument is a pointer
-            }
+                argval[i].i = *g_vartbl[argVarIndex[i]].val.ia;
             else
-            {
-                argval[i].i = *(long long int *)argval[i].s; // get the value if the supplied argument is an ordinary variable
-            }
-            argtype[i] &= ~T_PTR; // and remove the pointer flag
+                argval[i].i = *(long long int *)argval[i].s;
+
+            argtype[i] &= ~T_PTR;
         }
 
-        // if this is a pointer (note: at this point the caller type and the required type must be the same)
+        // Setup pointer or copy value
         if (argtype[i] & T_PTR)
         {
-            // the argument supplied was a variable so we must setup the local variable as a pointer
-            if ((g_vartbl[g_VarIndex].type & T_STR) && g_vartbl[g_VarIndex].val.s != NULL)
-            {
-                FreeMemorySafe((void **)&g_vartbl[g_VarIndex].val.s); // free up the local variable's memory if it is a pointer to a string
-            }
-            g_vartbl[g_VarIndex].val.s = argval[i].s;                  // point to the data of the variable supplied as an argument
-            g_vartbl[g_VarIndex].type |= T_PTR;                        // set the type to a pointer
-            g_vartbl[g_VarIndex].size = g_vartbl[argVarIndex[i]].size; // just in case it is a string copy the size
-            // this is not a pointer
+            if ((localType & T_STR) && g_vartbl[g_VarIndex].val.s != NULL)
+                FreeMemorySafe((void **)&g_vartbl[g_VarIndex].val.s);
+
+            g_vartbl[g_VarIndex].val.s = argval[i].s;
+            g_vartbl[g_VarIndex].type |= T_PTR;
+            g_vartbl[g_VarIndex].size = g_vartbl[argVarIndex[i]].size;
         }
         else if (argtype[i] != 0)
-        { // in getting the memory argtype[] is initialised to zero
-            // the parameter was an expression or a just straight variables with different types (therefore not a pointer))
-            if ((g_vartbl[g_VarIndex].type & T_STR) && (argtype[i] & T_STR))
-            { // both are a string
+        {
+            // Type-specific value copying
+            if ((localType & T_STR) && (argtype[i] & T_STR))
+            {
                 Mstrcpy(g_vartbl[g_VarIndex].val.s, argval[i].s);
                 FreeMemorySafe((void **)&argval[i].s);
             }
-            else if ((g_vartbl[g_VarIndex].type & T_NBR) && (argtype[i] & T_NBR)) // both are a float
+            else if ((localType & T_NBR) && (argtype[i] & T_NBR))
+            {
                 g_vartbl[g_VarIndex].val.f = argval[i].f;
-            else if ((g_vartbl[g_VarIndex].type & T_NBR) && (argtype[i] & T_INT)) // need a float but supplied an integer
+            }
+            else if ((localType & T_NBR) && (argtype[i] & T_INT))
+            {
                 g_vartbl[g_VarIndex].val.f = argval[i].i;
-            else if ((g_vartbl[g_VarIndex].type & T_INT) && (argtype[i] & T_INT)) // both are integers
+            }
+            else if ((localType & T_INT) && (argtype[i] & T_INT))
+            {
                 g_vartbl[g_VarIndex].val.i = argval[i].i;
-            else if ((g_vartbl[g_VarIndex].type & T_INT) && (argtype[i] & T_NBR)) // need an integer but was supplied with a float
+            }
+            else if ((localType & T_INT) && (argtype[i] & T_NBR))
+            {
                 g_vartbl[g_VarIndex].val.i = FloatToInt64(argval[i].f);
+            }
             else
+            {
                 error("Incompatible type: $", argv1[i]);
+            }
         }
     }
 
-    // memory used in setting up the arguments can be deleted now
+    // Cleanup argument memory
     FreeMemory((void *)argval);
-    DefinedSubFunMem = 0; // we got here so we wont need to cleanup any memory
+    DefinedSubFunMem = 0;
     strcpy((char *)CurrentSubFunName, (char *)fun_name);
-    // if it is a defined command we simply point to the first statement in our command and allow ExecuteProgram() to carry on as before
-    // exit from the sub is via cmd_return which will decrement g_LocalIndex
+
+    // Handle subroutine (simple case)
     if (!isfun)
     {
         skipelement(p);
-        nextstmt = p; // point to the body of the subroutine
+        nextstmt = p;
         return;
     }
 
-    // if it is a defined function we have a lot more work to do.  We must:
-    //   - Create a local variable for the function's name
-    //   - Save the globals being used by the current command that caused the function to be called
-    //   - Invoke another instance of ExecuteProgram() to execute the body of the function
-    //   - When that returns we need to restore the global variables
-    //   - Get the variable's value and save that in the return value globals (fret or sret)
-    //   - Return to the expression parser
-    tp = findvar(fun_name, FunType | V_FUNCT); // declare the local variable
+    // Handle function (complex case)
+    tp = findvar(fun_name, FunType | V_FUNCT);
     FunType = g_vartbl[g_VarIndex].type;
+
     if (FunType & T_STR)
     {
-        FreeMemorySafe((void **)&g_vartbl[g_VarIndex].val.s); // free the memory if it is a string
+        FreeMemorySafe((void **)&g_vartbl[g_VarIndex].val.s);
         g_vartbl[g_VarIndex].type |= T_PTR;
-        g_LocalIndex--;                                              // allocate the memory at the previous level
-        g_vartbl[g_VarIndex].val.s = tp = GetTempMemory(STRINGSIZE); // and use our own memory
+        g_LocalIndex--;
+        g_vartbl[g_VarIndex].val.s = tp = GetTempMemory(STRINGSIZE);
         g_LocalIndex++;
     }
-    skipelement(p); // point to the body of the function
 
-    ttp = nextstmt; // save the globals used by commands
+    skipelement(p);
+
+    // Save command state
+    ttp = nextstmt;
     tcmdtoken = cmdtoken;
     s = cmdline;
 
-    ExecuteProgram(p);               // execute the function's code
-    CurrentLinePtr = CallersLinePtr; // report errors at the caller
+    ExecuteProgram(p);
+    CurrentLinePtr = CallersLinePtr;
 
-    cmdline = s; // restore the globals
+    // Restore command state
+    cmdline = s;
     cmdtoken = tcmdtoken;
     nextstmt = ttp;
 
-    // return the value of the function's variable to the caller
+    // Return function value
     if (FunType & T_NBR)
         *fa = *(MMFLOAT *)tp;
     else if (FunType & T_INT)
         *i64a = *(long long int *)tp;
     else
-        *sa = tp;                    // for a string we just need to return the local memory
-    *typ = FunType;                  // save the function type for the caller
-    ClearVars(g_LocalIndex--, true); // delete any local variables
-    g_TempMemoryIsChanged = true;    // signal that temporary memory should be checked
+        *sa = tp;
+
+    *typ = FunType;
+    ClearVars(g_LocalIndex--, true);
+    g_TempMemoryIsChanged = true;
     gosubindex--;
 }
-
 char MIPS16 *strcasechr(const char *p, int ch)
 {
     char c;
@@ -1783,6 +1787,16 @@ unsigned char MIPS16 __not_in_flash_func (*doexpr)(unsigned char *p, MMFLOAT *fa
             p = doexpr(p, &fa2, &ia2, &sa2, &o2, &t2);
     }
 }
+// Inline macro to save results - eliminates repeated code
+#define SAVE_RESULTS() \
+    do                 \
+    {                  \
+        *fa = f;       \
+        *ia = i64;     \
+        *sa = s;       \
+        *ta = t;       \
+        *oo = ro;      \
+    } while (0)
 
 // get a value, either from a constant, function or variable
 // also returns the next operator to the right of the value or E_END if no operator
@@ -1798,142 +1812,115 @@ unsigned char MIPS16 __not_in_flash_func (*getvalue)(unsigned char *p, MMFLOAT *
     unsigned char *s = NULL;
     int t = T_NOTYPE;
     unsigned char *tp, *p1, *p2;
-    int i;
+    int i, ro;
+    unsigned char c;
 
-    TestStackOverflow(); // throw an error if we have overflowed the PIC32's stack
+    TestStackOverflow();
 
     skipspace(p);
-    if (*p >= C_BASETOKEN)
-    { // don't waste time if not a built-in function
-        // special processing for the NOT operator
-        // just get the next value and invert its logical value
-        if (*p <= 131)
+    c = *p;
+
+    if (c >= C_BASETOKEN)
+    {
+        // Unified unary operator handling
+        if (c <= 131)
         {
-            // special processing for the unary operators
-            if (tokenfunction(*p) == op_not)
+            void (*op_type)(void) = tokenfunction(c);
+
+            if (op_type == op_not || op_type == op_inv ||
+                op_type == op_subtract || op_type == op_add)
             {
-                int ro;
                 p++;
                 t = T_NOTYPE;
-                p = getvalue(p, &f, &i64, &s, &ro, &t); // get the next value
-                if (t & T_NBR)
-                    f = (MMFLOAT)((f != 0) ? 0 : 1); // invert the value returned
-                else if (t & T_INT)
-                    i64 = ((i64 != 0) ? 0 : 1);
-                else
-                    error("Expected a number");
+                p = getvalue(p, &f, &i64, &s, &ro, &t);
+
+                // Handle each operator
+                if (op_type == op_not)
+                {
+                    if (t & T_NBR)
+                        f = (f != 0) ? 0 : 1;
+                    else if (t & T_INT)
+                        i64 = (i64 != 0) ? 0 : 1;
+                    else
+                        error("Expected a number");
+                }
+                else if (op_type == op_inv)
+                {
+                    if (t & T_NBR)
+                        i64 = FloatToInt64(f);
+                    else if (!(t & T_INT))
+                        error("Expected a number");
+                    i64 = ~i64;
+                    t = T_INT;
+                }
+                else if (op_type == op_subtract)
+                {
+                    if (t & T_NBR)
+                        f = -f;
+                    else if (t & T_INT)
+                        i64 = -i64;
+                    else
+                        error("Expected a number");
+                }
+                // op_add: no modification needed
+
                 skipspace(p);
-                *fa = f; // save what we have
-                *ia = i64;
-                *sa = s;
-                *ta = t;
-                *oo = ro;
-                return p; // return straight away as we already have the next operator
-            }
-            else if (tokenfunction(*p) == op_inv)
-            {
-                int ro;
-                p++;
-                t = T_NOTYPE;
-                p = getvalue(p, &f, &i64, &s, &ro, &t); // get the next value
-                if (t & T_NBR)
-                    i64 = FloatToInt64(f);
-                else if (!(t & T_INT))
-                    error("Expected a number");
-                i64 = ~i64;
-                t = T_INT;
-                skipspace(p);
-                *fa = f; // save what we have
-                *ia = i64;
-                *sa = s;
-                *ta = t;
-                *oo = ro;
-                return p; // return straight away as we already have the next operator
-            }
-            else if (tokenfunction(*p) == op_subtract)
-            {
-                int ro;
-                p++;
-                t = T_NOTYPE;
-                p = getvalue(p, &f, &i64, &s, &ro, &t); // get the next value
-                if (t & T_NBR)
-                    f = -f; // negate the MMFLOAT returned
-                else if (t & T_INT)
-                    i64 = -i64; // negate the integer returned
-                else
-                    error("Expected a number");
-                skipspace(p);
-                *fa = f; // save what we have
-                *ia = i64;
-                *sa = s;
-                *ta = t;
-                *oo = ro;
-                return p; // return straight away as we already have the next operator
-            }
-            else if (tokenfunction(*p) == op_add)
-            {
-                int ro;
-                p++;
-                t = T_NOTYPE;
-                p = getvalue(p, &f, &i64, &s, &ro, &t); // get the next value
-                skipspace(p);
-                *fa = f; // save what we have
-                *ia = i64;
-                *sa = s;
-                *ta = t;
-                *oo = ro;
-                return p; // return straight away as we already have the next operator
+                SAVE_RESULTS();
+                return p;
             }
         }
-        if (tokentype(*p) & (T_FUN | T_FNA))
+
+        // Function handling
+        if (tokentype(c) & (T_FUN | T_FNA))
         {
-            // if a function execute it and save the result
             int tmp;
             tp = p;
-            // if it is a function with arguments we need to locate the closing bracket and copy the argument to
-            // a temporary variable so that functions like getarg() will work.
-            if (tokentype(*p) & T_FUN)
+
+            if (tokentype(c) & T_FUN)
             {
                 p1 = p + 1;
-                p = getclosebracket(p);              // find the closing bracket
-                p2 = ep = GetTempMemory(STRINGSIZE); // this will last for the life of the command
-                while (p1 != p)
-                    *p2++ = *p1++;
+                p = getclosebracket(p);
+                p2 = ep = GetTempMemory(STRINGSIZE);
+                // Use memcpy for bulk copy
+                i = p - p1;
+                memcpy(p2, p1, i);
             }
-            p++;                                   // point to after the function (without argument) or after the closing bracket
-            tmp = targ = TypeMask(tokentype(*tp)); // set the type of the function (which might need to know this)
-            tokenfunction (*tp)();                 // execute the function
+            p++;
+            tmp = targ = TypeMask(tokentype(*tp));
+            tokenfunction (*tp)();
             if ((tmp & targ) == 0)
-                error("Internal fault 2(sorry)"); // as a safety check the function must return a type the same as set in the header
-            t = targ;                             // save the type of the function
+                error("Internal fault 2(sorry)");
+            t = targ;
             f = fret;
             i64 = iret;
-            s = sret; // save the result
+            s = sret;
         }
     }
     else
     {
-        // if it is a variable or a defined function, find it and get its value
-        if (isnamestart(*p))
+        // Variable or defined function
+        if (isnamestart(c))
         {
-            // first check if it is terminated with a bracket
             tp = p + 1;
             while (isnamechar(*tp))
-                tp++; // search for the end of the identifier
-            if (*tp == '$' || *tp == '%' || *tp == '!')
                 tp++;
+            c = *tp;
+            if (c == '$' || c == '%' || c == '!')
+                tp++;
+
             i = -1;
             if (*tp == '(')
-                i = FindSubFun(p, 1); // if terminated with a bracket it could be a function
+                i = FindSubFun(p, 1);
+
             if (i >= 0)
-            {                                                       // >= 0 means it is a user defined function
-                unsigned char *SaveCurrentLinePtr = CurrentLinePtr; // in case the code in DefinedSubFun messes with this
+            {
+                unsigned char *SaveCurrentLinePtr = CurrentLinePtr;
                 DefinedSubFun(true, p, i, &f, &i64, &s, &t);
                 CurrentLinePtr = SaveCurrentLinePtr;
             }
             else
             {
-                s = (unsigned char *)findvar(p, V_FIND); // if it is a string then the string pointer is automatically set
+                s = (unsigned char *)findvar(p, V_FIND);
                 t = TypeMask(g_vartbl[g_VarIndex].type);
                 if (t & T_NBR)
                     f = (*(MMFLOAT *)s);
@@ -1942,55 +1929,55 @@ unsigned char MIPS16 __not_in_flash_func (*getvalue)(unsigned char *p, MMFLOAT *
             }
             p = skipvar(p, false);
         }
-        // is it an ordinary numeric constant?  get its value if yes
-        // a leading + or - might have been converted to a token so we need to check for them also
-        else if (IsDigitinline(*p) || *p == '.')
+        // Numeric constant
+        else if (IsDigitinline(c) || c == '.')
         {
-            char ts[31], *tsp;
-            int isi64 = true;
-            tsp = ts;
-            int isf = true;
+            char ts[31], *tsp = ts;
+            int isi64 = true, isf = true;
             long long int scale = 0;
-            // copy the first digit of the string to a temporary place
-            if (*p == '.')
+
+            // First character
+            if (c == '.')
             {
                 isi64 = false;
                 scale = 1;
             }
-            else if (IsDigitinline(*p))
+            else
             {
-                i64 = (*p - '0');
+                i64 = (c - '0');
             }
-            *tsp++ = *p++;
+            *tsp++ = c;
+            p++;
 
-            // now concatenate the remaining digits
-            while ((digit[(uint8_t)*p]) && (tsp - ts) < 30)
+            // Optimized digit parsing
+            while (digit[(uint8_t)*p] && (tsp - ts) < 30)
             {
-                if (*p >= '0' && *p <= '9')
+                c = *p;
+                if (c >= '0' && c <= '9')
                 {
-                    i64 = i64 * 10 + (*p - '0');
+                    i64 = i64 * 10 + (c - '0');
                     if (scale)
                         scale *= 10;
                 }
+                else if (c == '.')
+                {
+                    isi64 = false;
+                    scale = 1;
+                }
                 else
                 {
-                    if ((*p) == '.')
+                    unsigned char uc = mytoupper(c);
+                    if (uc == 'E' || c == '-' || c == '+')
                     {
                         isi64 = false;
-                        scale = 1;
-                    }
-                    else
-                    {
-                        if (mytoupper(*p) == 'E' || *p == '-' || *p == '+')
-                        {
-                            isi64 = false;
-                            isf = false;
-                        }
+                        isf = false;
                     }
                 }
-                *tsp++ = *p++; // copy the string to a temporary place
+                *tsp++ = c;
+                p++;
             }
-            *tsp = 0; // terminate it
+            *tsp = 0;
+
             if (isi64)
             {
                 t = T_INT;
@@ -2002,168 +1989,155 @@ unsigned char MIPS16 __not_in_flash_func (*getvalue)(unsigned char *p, MMFLOAT *
             }
             else
             {
-                f = (MMFLOAT)strtod(ts, &tsp); // and convert to a MMFLOAT
+                f = (MMFLOAT)strtod(ts, &tsp);
                 t = T_NBR;
             }
         }
-
-        // if it is a numeric constant starting with the & character then get its base and convert to an integer
-        else if (*p == '&')
+        // Based integer constants (&H, &O, &B)
+        else if (c == '&')
         {
             p++;
             i64 = 0;
-            switch (mytoupper(*p++))
+            c = mytoupper(*p++);
+
+            if (c == 'H')
             {
-            case 'H':
                 while (isxdigit(*p))
                 {
-                    i64 = (i64 << 4) | ((mytoupper(*p) >= 'A') ? mytoupper(*p) - 'A' + 10 : *p - '0');
-                    p++;
+                    c = *p++;
+                    i64 = (i64 << 4) | ((c >= 'A' && c <= 'F') ? c - 'A' + 10 : (c >= 'a' && c <= 'f') ? c - 'a' + 10
+                                                                                                       : c - '0');
                 }
-                break;
-            case 'O':
+            }
+            else if (c == 'O')
+            {
                 while (*p >= '0' && *p <= '7')
-                {
                     i64 = (i64 << 3) | (*p++ - '0');
-                }
-                break;
-            case 'B':
+            }
+            else if (c == 'B')
+            {
                 while (*p == '0' || *p == '1')
-                {
                     i64 = (i64 << 1) | (*p++ - '0');
-                }
-                break;
-            default:
+            }
+            else
+            {
                 error("Type prefix");
             }
             t = T_INT;
         }
-        // if opening bracket then first evaluate the contents of the bracket
-        else if (*p == '(')
+        // Bracketed expression
+        else if (c == '(')
         {
-            p++;                                     // step over the bracket
-            p = evaluate(p, &f, &i64, &s, &t, true); // recursively get the contents
+            p++;
+            p = evaluate(p, &f, &i64, &s, &t, true);
             if (*p != ')')
                 error("No closing bracket");
-            ++p; // step over the closing bracket
+            p++;
         }
-        // if it is a string constant, return a pointer to that.  Note: tokenise() guarantees that strings end with a quote
-        else if (*p == '"')
+        // String constant with escape sequences
+        else if (c == '"')
         {
-            p++;                                // step over the quote
-            p1 = s = GetTempMemory(STRINGSIZE); // this will last for the life of the command
+            p++;
+            p1 = s = GetTempMemory(STRINGSIZE);
             tp = (unsigned char *)strchr((char *)p, '"');
-            int toggle = 0;
-            while (p != tp)
+
+            if (OptionEscape)
             {
-                if (*p == '\\' && tp > p + 1 && OptionEscape)
-                    toggle ^= 1;
-                if (toggle)
+                int toggle = 0;
+                while (p != tp)
                 {
-                    if (*p == '\\' && isdigit(p[1]) && isdigit(p[2]) && isdigit(p[3]))
+                    c = *p;
+                    if (c == '\\' && tp > p + 1)
+                        toggle ^= 1;
+
+                    if (toggle)
                     {
                         p++;
-                        i = (*p++) - 48;
-                        i *= 10;
-                        i += (*p++) - 48;
-                        i *= 10;
-                        i += (*p++) - 48;
-                        if (i == 0)
-                            error("Null character \\000 in escape sequence - use CHR$(0)", "$");
-                        *p1++ = i;
+                        c = *p;
+
+                        // Octal escape \ddd
+                        if (c >= '0' && c <= '9' && isdigit(p[1]) && isdigit(p[2]))
+                        {
+                            i = (c - 48) * 100 + (p[1] - 48) * 10 + (p[2] - 48);
+                            p += 3;
+                            if (i == 0)
+                                error("Null character \\000 in escape sequence - use CHR$(0)", "$");
+                            *p1++ = i;
+                        }
+                        // Hex escape \&hh
+                        else if (c == '&' && isxdigit(p[1]) && isxdigit(p[2]))
+                        {
+                            p++;
+                            c = *p++;
+                            i = ((c >= 'A' && c <= 'F') ? c - 'A' + 10 : (c >= 'a' && c <= 'f') ? c - 'a' + 10
+                                                                                                : c - '0')
+                                << 4;
+                            c = *p++;
+                            i |= (c >= 'A' && c <= 'F') ? c - 'A' + 10 : (c >= 'a' && c <= 'f') ? c - 'a' + 10
+                                                                                                : c - '0';
+                            if (i == 0)
+                                error("Null character \\&00 in escape sequence - use CHR$(0)", "$");
+                            *p1++ = i;
+                        }
+                        // Single character escapes
+                        else
+                        {
+                            static const char escape_chars[] = "\\abefnqrtv";
+                            static const char escape_values[] = {
+                                '\\', '\a', '\b', '\e', '\f', '\n', '"', '\r', '\t', '\v'};
+                            const char *found = strchr(escape_chars, c);
+                            if (found)
+                                *p1++ = escape_values[found - escape_chars];
+                            else
+                                *p1++ = c;
+                            p++;
+                        }
+                        toggle = 0;
                     }
                     else
                     {
-                        p++;
-                        switch (*p)
-                        {
-                        case '\\':
-                            *p1++ = '\\';
-                            p++;
-                            break;
-                        case 'a':
-                            *p1++ = '\a';
-                            p++;
-                            break;
-                        case 'b':
-                            *p1++ = '\b';
-                            p++;
-                            break;
-                        case 'e':
-                            *p1++ = '\e';
-                            p++;
-                            break;
-                        case 'f':
-                            *p1++ = '\f';
-                            p++;
-                            break;
-                        case 'n':
-                            *p1++ = '\n';
-                            p++;
-                            break;
-                        case 'q':
-                            *p1++ = '\"';
-                            p++;
-                            break;
-                        case 'r':
-                            *p1++ = '\r';
-                            p++;
-                            break;
-                        case 't':
-                            *p1++ = '\t';
-                            p++;
-                            break;
-                        case 'v':
-                            *p1++ = '\v';
-                            p++;
-                            break;
-                        case '&':
-                            p++;
-                            if (isxdigit(*p) && isxdigit(p[1]))
-                            {
-                                i = 0;
-                                i = (i << 4) | ((mytoupper(*p) >= 'A') ? mytoupper(*p) - 'A' + 10 : *p - '0');
-                                p++;
-                                i = (i << 4) | ((mytoupper(*p) >= 'A') ? mytoupper(*p) - 'A' + 10 : *p - '0');
-                                p++;
-                                if (i == 0)
-                                    error("Null character \\&00 in escape sequence - use CHR$(0)", "$");
-                                *p1++ = i;
-                            }
-                            else
-                                *p1++ = 'x';
-                            break;
-                        default:
-                            *p1++ = *p++;
-                        }
+                        *p1++ = *p++;
                     }
-                    toggle = 0;
                 }
-                else
-                    *p1++ = *p++;
+            }
+            else
+            {
+                // Fast path when no escape processing needed
+                i = tp - p;
+                memcpy(p1, p, i);
+                p1 += i;
+                p = tp;
             }
             p++;
-            CtoM(s); // convert to a MMBasic string
+            CtoM(s);
             t = T_STR;
         }
         else
+        {
             error("Syntax");
+        }
     }
+
     skipspace(p);
-    *fa = f; // save what we have
+    *fa = f;
     *ia = i64;
     *sa = s;
     *ta = t;
 
-    // get the next operator, if there is not an operator set the operator to end of expression (E_END)
-    if (tokentype(*p) & T_OPER)
-        *oo = *p++ - C_BASETOKEN;
+    // Get next operator
+    c = *p;
+    if (tokentype(c) & T_OPER)
+    {
+        *oo = c - C_BASETOKEN;
+        p++;
+    }
     else
+    {
         *oo = E_END;
+    }
 
     return p;
 }
-
 // search through program memory looking for a line number. Stops when it has a matching or larger number
 // returns a pointer to the T_NEWLINE token or a pointer to the two zero characters representing the end of the program
 unsigned char MIPS16 *findline(int nbr, int mustfind)
@@ -3165,14 +3139,17 @@ void MIPS16 __not_in_flash_func (*findvar)(unsigned char *p, int action)
 //       string is an opening bracket '(' this function will expect the arg list to be enclosed in brackets.
 void MIPS16 __not_in_flash_func(makeargs)(unsigned char **p, int maxargs, unsigned char *argbuf, unsigned char *argv[], int *argc, unsigned char *delim)
 {
-    unsigned char *op;
-    int inarg, expect_cmd, expect_bracket, then_tkn, else_tkn;
+    unsigned char *op, *last_nonspace;
+    int inarg, expect_cmd, expect_bracket;
     unsigned char *tp;
+    unsigned char then_tkn, else_tkn;
+    unsigned char c;
 
-    TestStackOverflow(); // throw an error if we have overflowed the PIC32's stack
+    TestStackOverflow();
 
     tp = *p;
     op = argbuf;
+    last_nonspace = argbuf;
     *argc = 0;
     inarg = false;
     expect_cmd = false;
@@ -3180,13 +3157,11 @@ void MIPS16 __not_in_flash_func(makeargs)(unsigned char **p, int maxargs, unsign
     then_tkn = tokenTHEN;
     else_tkn = tokenELSE;
 
-    // skip leading spaces
+    // Skip leading spaces
     while (*tp == ' ')
         tp++;
 
-    // check if we are processing a list enclosed in brackets and if so
-    //  - skip the opening bracket
-    //  - flag that a closing bracket should be found
+    // Check for bracket-enclosed list
     if (*delim == '(')
     {
         if (*tp != '(')
@@ -3196,82 +3171,81 @@ void MIPS16 __not_in_flash_func(makeargs)(unsigned char **p, int maxargs, unsign
         tp++;
     }
 
-    // the main processing loop
-    while (*tp)
+    // Main processing loop
+    while ((c = *tp))
     {
-
-        if (expect_bracket == true && *tp == ')')
+        if (expect_bracket && c == ')')
             break;
 
-        // comment char causes the rest of the line to be skipped
-        if (*tp == '\'')
-        {
+        // Comment terminates line
+        if (c == '\'')
             break;
-        }
 
-        // the special characters that cause the line to be split up are in the string delim
-        // any other chars form part of the one argument
-        if (strchr((char *)delim, (char)*tp) != NULL && !expect_cmd)
+        // Check for delimiter characters
+        if (!expect_cmd && strchr((char *)delim, (char)c) != NULL)
         {
-            if (*tp == then_tkn || *tp == else_tkn)
+            if (c == then_tkn || c == else_tkn)
                 expect_cmd = true;
+
             if (inarg)
-            { // if we have been processing an argument
-                while (op > argbuf && *(op - 1) == ' ')
-                    op--;  // trim trailing spaces
-                *op++ = 0; // terminate it
+            {
+                // Trim trailing spaces using cached position
+                op = last_nonspace + 1;
+                *op++ = 0;
             }
             else if (*argc)
-            {                         // otherwise we have two delimiters in a row (except for the first argument)
-                argv[(*argc)++] = op; // create a null argument to go between the two delimiters
-                *op++ = 0;            // and terminate it
+            {
+                // Empty argument between delimiters
+                argv[(*argc)++] = op;
+                *op++ = 0;
             }
 
             inarg = false;
             if (*argc >= maxargs)
                 error("Syntax");
-            argv[(*argc)++] = op; // save the pointer for this delimiter
-            *op++ = *tp++;        // copy the token or char (always one)
-            *op++ = 0;            // terminate it
+
+            argv[(*argc)++] = op;
+            *op++ = c;
+            *op++ = 0;
+            tp++;
+            last_nonspace = op - 1;
             continue;
         }
 
-        // check if we have a THEN or ELSE token and if so flag that a command should be next
-        if (*tp == then_tkn || *tp == else_tkn)
+        // Flag command expected after THEN/ELSE
+        if (c == then_tkn || c == else_tkn)
             expect_cmd = true;
 
-        // remove all spaces (outside of quoted text and bracketed text)
-        if (!inarg && *tp == ' ')
+        // Skip spaces outside quotes/brackets
+        if (!inarg && c == ' ')
         {
             tp++;
             continue;
         }
 
-        // not a special char so we must start a new argument
+        // Start new argument
         if (!inarg)
         {
             if (*argc >= maxargs)
                 error("Syntax");
-            argv[(*argc)++] = op; // save the pointer for this arg
+            argv[(*argc)++] = op;
             inarg = true;
+            last_nonspace = op;
         }
 
-        // if an opening bracket '(' copy everything until we hit the matching closing bracket
-        // this includes special characters such as , and ; and keeps track of any nested brackets
-        if (*tp == '(' || ((tokentype(*tp) & T_FUN) && !expect_cmd))
+        // Handle brackets and functions
+        if (c == '(' || ((tokentype(c) & T_FUN) && !expect_cmd))
         {
-            int x;
-            x = (getclosebracket(tp) - tp) + 1;
-            memcpy(op, tp, x);
-            op += x;
-            tp += x;
+            int len = (getclosebracket(tp) - tp) + 1;
+            memcpy(op, tp, len);
+            op += len;
+            tp += len;
+            last_nonspace = op - 1;
             continue;
         }
 
-        // if quote mark (") copy everything until the closing quote
-        // this includes special characters such as , and ;
-        // the tokenise() function will have ensured that the closing quote is always there
-        if (*tp == '"')
+        // Handle quoted strings
+        if (c == '"')
         {
             do
             {
@@ -3280,22 +3254,31 @@ void MIPS16 __not_in_flash_func(makeargs)(unsigned char **p, int maxargs, unsign
                     error("Syntax");
             } while (*tp != '"');
             *op++ = *tp++;
+            last_nonspace = op - 1;
             continue;
         }
 
-        // anything else is just copied into the argument
-        *op++ = *tp++;
+        // Copy regular character
+        *op++ = c;
+        if (c != ' ')
+            last_nonspace = op - 1;
+        tp++;
+
         if (expect_cmd)
-            *op++ = *tp++; // copy rest of command token
-        expect_cmd = false;
+        {
+            *op++ = *tp++;
+            last_nonspace = op - 1;
+            expect_cmd = false;
+        }
     }
+
     if (expect_bracket && *tp != ')')
         error("Syntax");
-    while (op - 1 > argbuf && *(op - 1) == ' ')
-        --op; // trim any trailing spaces on the last argument
-    *op = 0;  // terminate the last argument
-}
 
+    // Trim final trailing spaces
+    op = last_nonspace + 1;
+    *op = 0;
+}
 static void MIPS16 display_string(const char *s, bool fill)
 {
     // Indent each line by one space.

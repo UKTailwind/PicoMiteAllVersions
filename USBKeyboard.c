@@ -51,6 +51,7 @@ extern volatile int ConsoleRxBufHead;
 extern volatile int ConsoleRxBufTail;
 extern volatile int keytimer;
 int justset = 0;
+int USBcode = -1;
 // extern char ConsoleRxBuf[];
 uint32_t repeattime;
 void USR_KEYBRD_ProcessData(uint8_t data);
@@ -2229,7 +2230,11 @@ static void process_kbd_report(hid_keyboard_report_t const *report, uint8_t n)
 				process_key(current_keys[k], n, modifier);
 		}
 		if (current_keys[0] != prev_keys[0])
+		{
 			keytimer = 0;
+			if (current_keys[0])
+				USBcode = current_keys[0];
+		}
 		//		if(((keytimer>Option.RepeatStart || current_keys[0]!=prev_keys[0]) && total>=lasttotal)){
 		//			process_key(current_keys[0], n, modifier);
 		//		}
