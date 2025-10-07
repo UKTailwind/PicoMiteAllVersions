@@ -74,7 +74,7 @@ void MIPS16 ConfigTouch(unsigned char *p)
         if (!TOUCH_CAP)
             TOUCH_CAP = 2;
     }
-    getargs(&p, 7, (unsigned char *)",");
+    getcsargs(&p, 7);
     if (!(Option.SYSTEM_CLK || TOUCH_CAP))
         error("System SPI not configured");
     if (!TOUCH_CAP)

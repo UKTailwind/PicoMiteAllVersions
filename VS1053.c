@@ -74,20 +74,20 @@ const uint16_t ADDR_REG_GPIO_VAL_R = 0xc018;
 const uint16_t ADDR_REG_GPIO_ODATA_RW = 0xc019;
 const uint16_t ADDR_REG_I2S_CONFIG_RW = 0xc040;
 #define xmit_multi(a, b) spi_write_blocking((AUDIO_SPI == 1 ? spi0 : spi1), a, b);
-static BYTE __not_in_flash_func(xchg)(BYTE data_out)
+static inline BYTE __not_in_flash_func(xchg)(BYTE data_out)
 {
     BYTE data_in = 0;
     spi_write_read_blocking((AUDIO_SPI == 1 ? spi0 : spi1), &data_out, &data_in, 1);
     return data_in;
 }
 
-uint8_t stdmax(int a, int b)
+static inline uint8_t stdmax(int a, int b)
 {
     if (a > b)
         return a;
     return b;
 }
-int stdmap(int v)
+static inline int stdmap(int v)
 {
     v = (v * 80) / 100;
     if (v == 0)
@@ -95,36 +95,36 @@ int stdmap(int v)
     else
         return 100 - v;
 }
-void await_data_request()
+static inline void await_data_request()
 {
     while (!(gpio_get(dreq_pin)))
     {
     }
 }
 
-void control_mode_on()
+static inline void control_mode_on()
 {
     gpio_put(dcs_pin, GPIO_PIN_SET);
     gpio_put(cs_pin, GPIO_PIN_RESET);
 }
 
-void control_mode_off()
+static inline void control_mode_off()
 {
     gpio_put(cs_pin, GPIO_PIN_SET);
 }
 
-void __not_in_flash_func(data_mode_on())
+static inline void __not_in_flash_func(data_mode_on())
 {
     gpio_put(cs_pin, GPIO_PIN_SET);
     gpio_put(dcs_pin, GPIO_PIN_RESET);
 }
 
-void __not_in_flash_func(data_mode_off())
+static inline void __not_in_flash_func(data_mode_off())
 {
     gpio_put(dcs_pin, GPIO_PIN_SET);
 }
 
-bool data_request()
+static inline bool data_request()
 {
     return (gpio_get(dreq_pin) == 1);
 }

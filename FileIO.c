@@ -412,7 +412,7 @@ void MIPS16 cmd_disk(void)
     char *p = (char *)getCstring(cmdline);
     char *b = GetTempMemory(STRINGSIZE);
     for (int i = 0; i < strlen(p); i++)
-        b[i] = toupper(p[i]);
+        b[i] = mytoupper(p[i]);
     if (strcmp(b, "A:/FORMAT") == 0)
     {
         FatFSFileSystem = FatFSFileSystemSave = 0;
@@ -463,7 +463,7 @@ void MIPS16 cmd_psram(void)
     {
         int j, i, k;
         int *pp;
-        getargs(&p, 3, (unsigned char *)",");
+        getcsargs(&p, 3);
         if (argc)
         {
             int i = getint(argv[0], 1, MAXRAMSLOTS);
@@ -528,7 +528,7 @@ void MIPS16 cmd_psram(void)
     else if ((p = checkstring(cmdline, (unsigned char *)"FILE LOAD")))
     {
         int overwrite = 0;
-        getargs(&p, 5, (unsigned char *)",");
+        getcsargs(&p, 5);
         if (!(argc == 3 || argc == 5))
             error("Syntax");
         int i = getint(argv[0], 1, MAXRAMSLOTS);
@@ -697,7 +697,7 @@ void MIPS16 cmd_flash(void)
     {
         int j, i, k;
         int *pp;
-        getargs(&p, 3, (unsigned char *)",");
+        getcsargs(&p, 3);
         if (argc)
         {
             int i = getint(argv[0], 1, MAXFLASHSLOTS);
@@ -772,7 +772,7 @@ void MIPS16 cmd_flash(void)
     else if ((p = checkstring(cmdline, (unsigned char *)"MODBUFF LOAD")))
     {
         int fsize;
-        getargs(&p, 1, (unsigned char *)",");
+        getcsargs(&p, 1);
         if (!(argc == 1))
             error("Syntax");
         int fnbr = FindFreeFileNbr();
@@ -813,7 +813,7 @@ void MIPS16 cmd_flash(void)
     else if ((p = checkstring(cmdline, (unsigned char *)"DISK LOAD")))
     {
         int fsize, overwrite = 0;
-        getargs(&p, 5, (unsigned char *)",");
+        getcsargs(&p, 5);
         if (!(argc == 3 || argc == 5))
             error("Syntax");
         int i = getint(argv[0], 1, MAXFLASHSLOTS);
@@ -1014,7 +1014,7 @@ void cmd_LoadImage(unsigned char *p)
     int xOrigin, yOrigin;
 
     // get the command line arguments
-    getargs(&p, 5, (unsigned char *)","); // this MUST be the first executable line in the function
+    getcsargs(&p, 5); // this MUST be the first executable line in the function
     if (argc == 0)
         error("Argument count");
     if (!InitSDCard())
@@ -1093,7 +1093,7 @@ void cmd_LoadJPGImage(unsigned char *p)
     int xOrigin, yOrigin;
 
     // get the command line arguments
-    getargs(&p, 5, (unsigned char *)","); // this MUST be the first executable line in the function
+    getcsargs(&p, 5); // this MUST be the first executable line in the function
     if (argc == 0)
         error("Argument count");
     if (!InitSDCard())
@@ -1283,7 +1283,7 @@ void fun_dir(void)
     static lfs_dir_t lfs_dir_dir;
     struct lfs_info lfs_info_dir;
     unsigned char *p;
-    getargs(&ep, 3, (unsigned char *)",");
+    getcsargs(&ep, 3);
     if (argc != 0)
         dirflags = -1;
     if (!(argc <= 3))
@@ -1560,7 +1560,7 @@ void fun_cwd(void)
 void MIPS16 cmd_kill(void)
 {
     char q[FF_MAX_LFN] = {0};
-    getargs(&cmdline, 3, (unsigned char *)",");
+    getcsargs(&cmdline, 3);
     char *tp = (char *)getFstring(argv[0]);
     if (strchr(tp, '*') || strchr(tp, '?'))
     {
@@ -1626,7 +1626,7 @@ void MIPS16 cmd_kill(void)
             MMPrintString("\r\nAre you sure ? (Y/N) ");
             while (1)
             {
-                i = toupper(MMInkey());
+                i = mytoupper(MMInkey());
                 if (i == 'Y' || i == 'N')
                     putConsole(i, 1);
                 if (i == 'Y')
@@ -1661,7 +1661,7 @@ void MIPS16 cmd_kill(void)
                         MMPrintString(" ? (Y/N) ");
                         while (1)
                         {
-                            i = toupper(MMInkey());
+                            i = mytoupper(MMInkey());
                             if (i == 'Y' || i == 'N')
                             {
                                 putConsole(i, 1);
@@ -1711,7 +1711,7 @@ void MIPS16 cmd_kill(void)
                         MMPrintString(" ? (Y/N) ");
                         while (1)
                         {
-                            i = toupper(MMInkey());
+                            i = mytoupper(MMInkey());
                             if (i == 'Y' || i == 'N')
                             {
                                 putConsole(i, 1);
@@ -1799,7 +1799,7 @@ void positionfile(int fnbr, int idx)
 void cmd_seek(void)
 {
     int fnbr, idx;
-    getargs(&cmdline, 5, (unsigned char *)",");
+    getcsargs(&cmdline, 5);
     if (argc != 3)
         error("Syntax");
     if (*argv[0] == '#')
@@ -1825,7 +1825,7 @@ void MIPS16 cmd_name(void)
     ss[1] = 0;
     char qold[FF_MAX_LFN] = {0};
     char qnew[FF_MAX_LFN] = {0};
-    getargs(&cmdline, 3, (unsigned char *)ss); // getargs macro must be the first executable stmt in a block
+    getargs(&cmdline, 3, (unsigned char *)ss); // macro must be the first executable stmt in a block
     if (argc != 3)
         error("Syntax");
     old = (char *)getFstring(argv[0]); // get the old name
@@ -1907,7 +1907,7 @@ void MIPS16 cmd_save(void)
             255, 255, 255, 0};
 
         //        unsigned char bmppad[3] = {0, 0, 0};
-        getargs(&p, 9, (unsigned char *)",");
+        getcsargs(&p, 9);
         if (!InitSDCard())
             return;
         if ((void *)ReadBuffer == (void *)DisplayNotSet)
@@ -2084,7 +2084,7 @@ void MIPS16 cmd_save(void)
                 255, 255, 255, 0};
 
             unsigned char bmppad[3] = {0, 0, 0};
-            getargs(&p, 9, (unsigned char *)",");
+            getcsargs(&p, 9);
             if (!InitSDCard())
                 return;
             if ((void *)ReadBuffer == (void *)DisplayNotSet)
@@ -2209,7 +2209,7 @@ void MIPS16 cmd_save(void)
         unsigned char bmpfileheader[14] = {'B', 'M', 0, 0, 0, 0, 0, 0, 0, 0, 54, 0, 0, 0};
         unsigned char bmpinfoheader[40] = {40, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 24, 0};
         unsigned char bmppad[3] = {0, 0, 0};
-        getargs(&p, 9, (unsigned char *)",");
+        getcsargs(&p, 9);
         if (!InitSDCard())
             return;
         if ((void *)ReadBuffer == (void *)DisplayNotSet)
@@ -2356,13 +2356,13 @@ int massage(char *buff)
         char *p = dlist[i].from;
         while (*p)
         {
-            *p = toupper(*p);
+            *p = mytoupper(*p);
             p++;
         }
         p = dlist[i].to;
         while (*p)
         {
-            *p = toupper(*p);
+            *p = mytoupper(*p);
             p++;
         }
         STR_REPLACE(buff, dlist[i].from, dlist[i].to, 0);
@@ -2497,13 +2497,13 @@ void importfile(char *pp, char *tp, char **p, uint32_t buf, int convertdebug, bo
                 *op++ = *ip++;
         }
         slen = len;
-        if (!(toupper(sbuff[0]) == 'R' && toupper(sbuff[1]) == 'U' && toupper(sbuff[2]) == 'N' && (strlen(sbuff) == 3 || sbuff[3] == ' ')))
+        if (!(mytoupper(sbuff[0]) == 'R' && mytoupper(sbuff[1]) == 'U' && mytoupper(sbuff[2]) == 'N' && (strlen(sbuff) == 3 || sbuff[3] == ' ')))
         {
             toggle = 0;
             for (c = 0; c < slen; c++)
             {
                 if (!(toggle || data))
-                    sbuff[c] = toupper(sbuff[c]);
+                    sbuff[c] = mytoupper(sbuff[c]);
                 if (sbuff[c] == 34)
                 {
                     if (toggle == 0)
@@ -2534,7 +2534,7 @@ void importfile(char *pp, char *tp, char **p, uint32_t buf, int convertdebug, bo
             unsigned char *tp = checkstring((unsigned char *)&sbuff[1], (unsigned char *)"DEFINE");
             if (tp)
             {
-                getargs(&tp, 3, (unsigned char *)",");
+                getcsargs(&tp, 3);
                 if (nDefines >= MAXDEFINES)
                 {
                     FreeMemorySafe((void *)&buf);
@@ -2699,7 +2699,7 @@ int FileLoadCMM2Program(char *fname, bool message)
             unsigned char *tp = checkstring((unsigned char *)&sbuff[1], (unsigned char *)"DEFINE");
             if (tp)
             {
-                getargs(&tp, 3, (unsigned char *)",");
+                getcsargs(&tp, 3);
                 if (nDefines >= MAXDEFINES)
                 {
                     FreeMemorySafe((void *)&buf);
@@ -2729,13 +2729,13 @@ int FileLoadCMM2Program(char *fname, bool message)
         }
         else
         {
-            if (!(toupper(sbuff[0]) == 'R' && toupper(sbuff[1]) == 'U' && toupper(sbuff[2]) == 'N' && (strlen(sbuff) == 3 || sbuff[3] == ' ')))
+            if (!(mytoupper(sbuff[0]) == 'R' && mytoupper(sbuff[1]) == 'U' && mytoupper(sbuff[2]) == 'N' && (strlen(sbuff) == 3 || sbuff[3] == ' ')))
             {
                 toggle = 0;
                 for (c = 0; c < slen; c++)
                 {
                     if (!(toggle || data))
-                        sbuff[c] = toupper(sbuff[c]);
+                        sbuff[c] = mytoupper(sbuff[c]);
                     if (sbuff[c] == 34)
                     {
                         if (toggle == 0)
@@ -3061,7 +3061,7 @@ void MIPS16 SaveProgramToRAM(unsigned char *pm, int msg, uint8_t *ram)
                         if (*p <= '9')
                             n |= (*p - '0');
                         else
-                            n |= (toupper(*p) - 'A' + 10);
+                            n |= (mytoupper(*p) - 'A' + 10);
                         p++;
                     }
                     realmempointer += 4;
@@ -3204,7 +3204,7 @@ void MIPS16 SaveProgramToRAM(unsigned char *pm, int msg, uint8_t *ram)
                         if (*p <= '9')
                             n |= (*p - '0');
                         else
-                            n |= (toupper(*p) - 'A' + 10);
+                            n |= (mytoupper(*p) - 'A' + 10);
                         p++;
                     }
 
@@ -3320,7 +3320,7 @@ int MemLoadProgram(unsigned char *fname, unsigned char *ram)
 
 void MIPS16 loadCMM2(unsigned char *p, bool autorun, bool message)
 {
-    getargs(&p, 1, (unsigned char *)",");
+    getcsargs(&p, 1);
     if (!(argc & 1) || argc == 0)
         error("Syntax");
     if (CurrentLinePtr != NULL && !autorun)
@@ -3348,10 +3348,10 @@ void MIPS16 loadCMM2(unsigned char *p, bool autorun, bool message)
 void MIPS16 cmd_loadCMM2(void)
 {
     bool autorun = false;
-    getargs(&cmdline, 3, (unsigned char *)",");
+    getcsargs(&cmdline, 3);
     if (argc == 3)
     {
-        if (toupper(*argv[2]) == 'R')
+        if (mytoupper(*argv[2]) == 'R')
             autorun = true;
         else
             error("Syntax");
@@ -3372,7 +3372,7 @@ void LoadPNG(unsigned char *p)
     int maxH = VRes;
     upng_t *upng;
     // get the command line arguments
-    getargs(&p, 9, (unsigned char *)","); // this MUST be the first executable line in the function
+    getcsargs(&p, 9); // this MUST be the first executable line in the function
     if (argc == 0)
         error("Argument count");
     if (!InitSDCard())
@@ -3510,13 +3510,13 @@ void MIPS16 cmd_load(void)
         return;
     }
 #endif
-    getargs(&cmdline, 3, (unsigned char *)",");
+    getcsargs(&cmdline, 3);
     CloseAudio(1);
     if (!(argc & 1) || argc == 0)
         error("Syntax");
     if (argc == 3)
     {
-        if (toupper(*argv[2]) == 'R')
+        if (mytoupper(*argv[2]) == 'R')
             autorun = true;
         else
             error("Syntax");
@@ -4537,7 +4537,7 @@ void MIPS16 cmd_files(void)
     fcnt = 0;
     if (*cmdbuf)
     {
-        getargs(&cmdbuf, 3, (unsigned char *)",");
+        getcsargs(&cmdbuf, 3);
         if (!(argc == 1 || argc == 3))
             error("Syntax");
         p = (char *)getFstring(argv[0]);
@@ -5122,7 +5122,7 @@ void cmd_autosave(void)
     }
     if (*cmdline)
     {
-        if (toupper(*cmdline) == 'C')
+        if (mytoupper(*cmdline) == 'C')
             crunch = true;
         else
             error("Syntax");
@@ -5208,7 +5208,7 @@ void cmd_autosave(void)
         FlashWriteClose();
         if (*cmdline)
         {
-            if (toupper(*cmdline) == 'C')
+            if (mytoupper(*cmdline) == 'C')
                 crunch = true;
             else
                 error("Syntax");
@@ -5338,7 +5338,7 @@ void cmd_open(void)
     ss[2] = ',';
     ss[3] = 0;
     {                                              // start a new block
-        getargs(&cmdline, 7, (unsigned char *)ss); // getargs macro must be the first executable stmt in a block
+        getargs(&cmdline, 7, (unsigned char *)ss); // macro must be the first executable stmt in a block
         if (!(argc == 3 || argc == 5 || argc == 7))
             error("Syntax");
         fname = (char *)getFstring(argv[0]);
@@ -5398,7 +5398,7 @@ void cmd_open(void)
 void fun_inputstr(void)
 {
     int i, nbr, fnbr;
-    getargs(&ep, 3, (unsigned char *)",");
+    getcsargs(&ep, 3);
     if (argc != 3)
         error("Syntax");
     sret = GetTempMemory(STRINGSIZE); // this will last for the life of the command
@@ -5434,7 +5434,7 @@ void fun_inputstr(void)
 void fun_eof(void)
 {
     int fnbr;
-    getargs(&ep, 1, (unsigned char *)",");
+    getcsargs(&ep, 1);
     if (argc == 0)
         error("Syntax");
     if (*argv[0] == '#')
@@ -5447,7 +5447,7 @@ void fun_eof(void)
 void cmd_flush(void)
 {
     int fnbr;
-    getargs(&cmdline, 1, (unsigned char *)",");
+    getcsargs(&cmdline, 1);
     if (*argv[0] == '#')
         argv[0]++;
     fnbr = getinteger(argv[0]);
@@ -5479,7 +5479,7 @@ void cmd_flush(void)
 void fun_loc(void)
 {
     int fnbr;
-    getargs(&ep, 1, (unsigned char *)",");
+    getcsargs(&ep, 1);
     if (argc == 0)
         error("Syntax");
     if (*argv[0] == '#')
@@ -5521,7 +5521,7 @@ void fun_loc(void)
 void fun_lof(void)
 {
     int fnbr;
-    getargs(&ep, 1, (unsigned char *)",");
+    getcsargs(&ep, 1);
     if (argc == 0)
         error("Syntax");
     if (*argv[0] == '#')
@@ -5557,7 +5557,7 @@ void fun_lof(void)
 void cmd_close(void)
 {
     int i, fnbr;
-    getargs(&cmdline, (MAX_ARG_COUNT * 2) - 1, (unsigned char *)","); // getargs macro must be the first executable stmt in a block
+    getcsargs(&cmdline, (MAX_ARG_COUNT * 2) - 1); // macro must be the first executable stmt in a block
     if ((argc & 0x01) == 0)
         error("Syntax");
     for (i = 0; i < argc; i += 2)
@@ -5956,7 +5956,7 @@ void MIPS16 cmd_var(void)
 
     if ((p = checkstring(cmdline, (unsigned char *)"SAVE")))
     {
-        getargs(&p, (MAX_ARG_COUNT * 2) - 1, (unsigned char *)","); // getargs macro must be the first executable stmt in a block
+        getcsargs(&p, (MAX_ARG_COUNT * 2) - 1); // macro must be the first executable stmt in a block
         if (argc && (argc & 0x01) == 0)
             error("Invalid syntax");
 

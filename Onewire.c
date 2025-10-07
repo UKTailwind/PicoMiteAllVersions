@@ -180,7 +180,7 @@ void Init_ds18b20(int pin, int precision)
 void cmd_ds18b20(void)
 {
 	int pin, precision;
-	getargs(&cmdline, 5, (unsigned char *)",");
+	getcsargs(&cmdline, 5);
 	if (argc < 1)
 		error("Argument count");
 	char code;
@@ -205,7 +205,7 @@ void cmd_ds18b20(void)
 void fun_ds18b20(void)
 {
 	int pin, b1, b2;
-	getargs(&ep, 3, (unsigned char *)",");
+	getcsargs(&ep, 3);
 	if (!(argc == 1 || argc == 3))
 		error("Syntax");
 	char code;
@@ -324,7 +324,7 @@ void owWrite(unsigned char *p)
 	int pin, flag, len, i, buf[255];
 	unsigned char *cp;
 
-	getargs(&p, MAX_ARG_COUNT * 2, (unsigned char *)",");
+	getcsargs(&p, MAX_ARG_COUNT * 2);
 	if (!(argc & 0x01) || (argc < 7))
 		error("Argument count");
 	char code;
@@ -395,7 +395,7 @@ void owRead(unsigned char *p)
 	int pin, flag, len, i, buf[255];
 	void *ptr = NULL;
 
-	getargs(&p, MAX_ARG_COUNT * 2, (unsigned char *)",");
+	getcsargs(&p, MAX_ARG_COUNT * 2);
 	if (!(argc & 0x01) || (argc < 7))
 		error("Argument count");
 	char code;
@@ -471,7 +471,7 @@ void fun_owSearch(void)
 	} buf, inp;
 	unsigned char filter = 0;
 
-	getargs(&ep, MAX_ARG_COUNT * 2, (unsigned char *)",");
+	getcsargs(&ep, MAX_ARG_COUNT * 2);
 	if (!(argc & 0x01) || (argc < 3))
 		error("Argument count");
 	char code;
@@ -558,7 +558,7 @@ void fun_owCRC8(void)
 	int len, i, x;
 	unsigned char buf[255], uc = 0;
 
-	getargs(&ep, MAX_ARG_COUNT * 2, ","); // this is a macro and must be the first executable stmt in a block
+	getcsargs(&ep, MAX_ARG_COUNT * 2); // this is a macro and must be the first executable stmt in a block
 	if (!(argc & 0x01) || (argc < 3))
 		error("Argument count");
 	len = getinteger(argv[0]);
@@ -587,7 +587,7 @@ void fun_owCRC16(void)
 	int len, i, x;
 	unsigned short buf[255], us = 0;
 
-	getargs(&ep, MAX_ARG_COUNT * 2, ","); // this is a macro and must be the first executable stmt in a block
+	getcsargs(&ep, MAX_ARG_COUNT * 2); // this is a macro and must be the first executable stmt in a block
 	if (!(argc & 0x01) || (argc < 3))
 		error("Argument count");
 	len = getinteger(argv[0]);

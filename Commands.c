@@ -120,21 +120,16 @@ void __not_in_flash_func(cmd_null)(void)
  * @param a the integer, float or string to be changed
  * @param b OPTIONAL for integers and floats - defaults to 1. Otherwise the amount to increment the number or the string to concatenate
  */
-#ifdef rp2350
-void MIPS16 __not_in_flash_func(cmd_inc)(void)
-{
-#else
-#if defined(PICOMITEVGA) || (defined(PICOMITEWEB) && !defined(rp2350))
+#if LOWRAM
 void MIPS16 cmd_inc(void)
 {
 #else
 void MIPS16 __not_in_flash_func(cmd_inc)(void)
 {
 #endif
-#endif
 	unsigned char *p, *q;
 	int vtype;
-	getargs(&cmdline, 3, (unsigned char *)",");
+	getcsargs(&cmdline, 3);
 	if (argc == 1)
 	{
 		p = findvar(argv[0], V_FIND);
@@ -317,7 +312,7 @@ void array_set(unsigned char *tp)
 	MMFLOAT *a1float = NULL;
 	int64_t *a1int = NULL;
 	unsigned char *a1str = NULL;
-	getargs(&tp, 3, (unsigned char *)",");
+	getcsargs(&tp, 3);
 	if (!(argc == 3))
 		error("Argument count");
 	findvar(argv[2], V_FIND | V_EMPTY_OK | V_NOFIND_ERR);
@@ -373,7 +368,7 @@ void array_add(unsigned char *tp)
 	MMFLOAT *a1float = NULL, *a2float = NULL, scale;
 	int64_t *a1int = NULL, *a2int = NULL;
 	unsigned char *a1str = NULL, *a2str = NULL;
-	getargs(&tp, 5, (unsigned char *)",");
+	getcsargs(&tp, 5);
 	if (!(argc == 5))
 		error("Argument count");
 	findvar(argv[0], V_FIND | V_EMPTY_OK | V_NOFIND_ERR);
@@ -478,7 +473,7 @@ void array_insert(unsigned char *tp)
 #else
 	short dims[MAXDIM] = {0};
 #endif
-	getargs(&tp, 15, (unsigned char *)",");
+	getcsargs(&tp, 15);
 	if (argc < 7)
 		error("Argument count");
 	findvar(argv[0], V_FIND | V_EMPTY_OK | V_NOFIND_ERR);
@@ -584,7 +579,7 @@ void array_slice(unsigned char *tp)
 #else
 	short dims[MAXDIM] = {0};
 #endif
-	getargs(&tp, 15, (unsigned char *)",");
+	getcsargs(&tp, 15);
 	if (argc < 7)
 		error("Argument count");
 	findvar(argv[0], V_FIND | V_EMPTY_OK | V_NOFIND_ERR);
@@ -876,7 +871,7 @@ void MIPS16 do_run(unsigned char *cmdline, bool CMM2mode)
 	unsigned char *filename = (unsigned char *)"", *cmd_args = (unsigned char *)"";
 	unsigned char *cmdbuf = GetMemory(256);
 	memcpy(cmdbuf, cmdline, STRINGSIZE);
-	getargs(&cmdbuf, 3, (unsigned char *)",");
+	getcsargs(&cmdbuf, 3);
 	switch (argc)
 	{
 	case 0:
@@ -961,7 +956,7 @@ void MIPS16 cmd_list(void)
 				CurrentX = 0;
 				CurrentY = 0;
 			}
-			getargs(&p, 1, (unsigned char *)",");
+			getcsargs(&p, 1);
 			char *buff = GetTempMemory(STRINGSIZE);
 			strcpy(buff, (char *)getCstring(argv[0]));
 			if (strchr(buff, '.') == NULL)
@@ -990,7 +985,7 @@ void MIPS16 cmd_list(void)
 		int64_t *dest = NULL;
 		char *buff = NULL;
 		int j = 0;
-		getargs(&p, 1, (unsigned char *)",");
+		getcsargs(&p, 1);
 		if (argc)
 		{
 			j = (parseintegerarray(argv[0], &dest, 1, 1, NULL, true) - 1) * 8;
@@ -1214,7 +1209,7 @@ void MIPS16 cmd_list(void)
 	{
 		if (!(*cmdline == 0 || *cmdline == '\''))
 		{
-			getargs(&cmdline, 1, (unsigned char *)",");
+			getcsargs(&cmdline, 1);
 			if (Option.DISPLAY_CONSOLE && (SPIREAD || Option.NoScroll))
 			{
 				ClearScreen(gui_bcolour);
@@ -1298,7 +1293,7 @@ int printWrappedText(const char *text, int screenWidth, int listcnt, int all)
 
 void cmd_help(void)
 {
-	getargs(&cmdline, 1, (unsigned char *)",");
+	getcsargs(&cmdline, 1);
 	if (!ExistsFile("A:/help.txt"))
 		error("A:/help.txt not found");
 	if (!argc)
@@ -1437,7 +1432,7 @@ void MIPS16 cmd_erase(void)
 	int i, j, k, len;
 	char p[MAXVARLEN + 1], *s, *x;
 
-	getargs(&cmdline, (MAX_ARG_COUNT * 2) - 1, (unsigned char *)","); // getargs macro must be the first executable stmt in a block
+	getcsargs(&cmdline, (MAX_ARG_COUNT * 2) - 1); // macro must be the first executable stmt in a block
 	if ((argc & 0x01) == 0)
 		error("Argument count");
 	for (i = 0; i < argc; i += 2)
@@ -1506,27 +1501,12 @@ void cmd_goto(void)
 	CurrentLinePtr = nextstmt;
 }
 
-#ifdef PICOMITEWEB
-#ifdef rp2350
-void MIPS16 __not_in_flash_func(cmd_if)(void)
-{
-#else
-void cmd_if(void)
-{
-#endif
-#else
-#ifndef rp2350
-#ifdef PICOMITEVGA
+#if LOWRAM
 void cmd_if(void)
 {
 #else
 void MIPS16 __not_in_flash_func(cmd_if)(void)
 {
-#endif
-#else
-void MIPS16 __not_in_flash_func(cmd_if)(void)
-{
-#endif
 #endif
 	int r, i, testgoto, testelseif;
 	unsigned char ss[3]; // this will be used to split up the argument line
@@ -1719,27 +1699,12 @@ retest_an_if:
 }
 }
 
-#ifdef PICOMITEWEB
-#ifdef rp2350
-void MIPS16 __not_in_flash_func(cmd_else)(void)
-{
-#else
-void cmd_else(void)
-{
-#endif
-#else
-#ifndef rp2350
-#ifdef PICOMITEVGA
+#if LOWRAM
 void cmd_else(void)
 {
 #else
-void MIPS16 __not_in_flash_func(cmd_else)(void)
+void MIPS32 __not_in_flash_func(cmd_else)(void)
 {
-#endif
-#else
-void MIPS16 __not_in_flash_func(cmd_else)(void)
-{
-#endif
 #endif
 	int i;
 	unsigned char *p, *tp;
@@ -1777,7 +1742,6 @@ void MIPS16 __not_in_flash_func(cmd_else)(void)
 	skipelement(p);
 	nextstmt = p;
 }
-
 void do_end(bool ecmd)
 {
 #ifdef PICOMITE
@@ -1794,7 +1758,7 @@ void do_end(bool ecmd)
 	fflush(stdout);
 	if (ecmd)
 	{
-		getargs(&cmdline, 1, (unsigned char *)",");
+		getcsargs(&cmdline, 1);
 		if (argc == 1)
 		{
 			if (FindSubFun((unsigned char *)"MM.END", 0) >= 0 && checkstring(argv[0], (unsigned char *)"NOEND") == NULL)
@@ -1889,7 +1853,7 @@ void do_end(bool ecmd)
 	if (mouse0 == false && Option.MOUSE_CLOCK)
 		initMouse0(0); // see if there is a mouse to initialise
 #endif
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
 	if (Option.DISPLAY_TYPE >= NEXTGEN)
 		Option.Refresh = 1;
 #endif
@@ -2088,7 +2052,7 @@ void MIPS16 do_chain(unsigned char *cmdline)
 	unsigned char *filename = (unsigned char *)"", *cmd_args = (unsigned char *)"";
 	unsigned char *cmdbuf = GetMemory(256);
 	memcpy(cmdbuf, cmdline, STRINGSIZE);
-	getargs(&cmdbuf, 3, (unsigned char *)",");
+	getcsargs(&cmdbuf, 3);
 	switch (argc)
 	{
 	case 0:
@@ -2467,20 +2431,57 @@ void MIPS16 cmd_trace(void)
 	else
 		error("Unknown command");
 }
+/*
+ *----------------------------------------------------------------------
+ *
+ * mystrncasecmp --
+ *
+ *  Compares two strings, ignoring case differences.
+ *
+ * Results:
+ *  Compares up to length chars of s1 and s2, returning -1, 0, or 1 if s1
+ *  is lexicographically less than, equal to, or greater than s2 over
+ *  those characters.
+ *
+ * Side effects:
+ *  None.
+ *
+ *----------------------------------------------------------------------
+ */
+static inline int mystrncasecmp(
+	const unsigned char *s1, /* First string. */
+	const unsigned char *s2, /* Second string. */
+	size_t length)			 /* Maximum number of characters to compare
+							  * (stop earlier if the end of either string
+							  * is reached). */
+{
+	register unsigned char u1, u2;
+
+	for (; length != 0; length--, s1++, s2++)
+	{
+		u1 = (unsigned char)*s1;
+		u2 = (unsigned char)*s2;
+		if (mytoupper(u1) != mytoupper(u2))
+		{
+			return mytoupper(u1) - mytoupper(u2);
+		}
+		if (u1 == '\0')
+		{
+			return 0;
+		}
+	}
+	return 0;
+}
 
 // FOR command
-#ifndef PICOMITE
-#ifdef rp2350
-void MIPS16 __not_in_flash_func(cmd_for)(void)
-{
-#else
+#if LOWRAM
 void cmd_for(void)
 {
-#endif
 #else
-void MIPS16 __not_in_flash_func(cmd_for)(void)
+void MIPS32 __not_in_flash_func(cmd_for)(void)
 {
 #endif
+
 	int i, t, vlen, test;
 	unsigned char ss[4]; // this will be used to split up the argument line
 	unsigned char *p, *tp, *xp;
@@ -2618,14 +2619,9 @@ void MIPS16 __not_in_flash_func(cmd_for)(void)
 	}
 }
 
-#ifndef PICOMITE
-#ifdef rp2350
-void MIPS16 __not_in_flash_func(cmd_next)(void)
-{
-#else
+#if LOWRAM
 void cmd_next(void)
 {
-#endif
 #else
 void MIPS16 __not_in_flash_func(cmd_next)(void)
 {
@@ -2723,14 +2719,9 @@ breakout:
 	}
 }
 
-#ifndef PICOMITE
-#ifdef rp2350
-void MIPS16 __not_in_flash_func(cmd_do)(void)
-{
-#else
+#if WEBRP2350
 void cmd_do(void)
 {
-#endif
 #else
 void MIPS16 __not_in_flash_func(cmd_do)(void)
 {
@@ -2820,14 +2811,9 @@ void MIPS16 __not_in_flash_func(cmd_do)(void)
 	}
 }
 
-#ifdef PICOMITEWEB
-#ifdef rp2350
-void MIPS16 __not_in_flash_func(cmd_loop)(void)
-{
-#else
+#if WEBRP2350
 void cmd_loop(void)
 {
-#endif
 #else
 void MIPS16 __not_in_flash_func(cmd_loop)(void)
 {
@@ -2938,7 +2924,7 @@ void cmd_error(void)
 void cmd_randomize(void)
 {
 	int i;
-	getargs(&cmdline, 1, (unsigned char *)",");
+	getcsargs(&cmdline, 1);
 	if (argc == 1)
 		i = getinteger(argv[0]);
 	else
@@ -3031,7 +3017,7 @@ void cmd_gosub(void)
 void cmd_mid(void)
 {
 	unsigned char *p;
-	getargs(&cmdline, 5, (unsigned char *)",");
+	getcsargs(&cmdline, 5);
 	findvar(argv[0], V_NOFIND_ERR);
 	if (g_vartbl[g_VarIndex].type & T_CONST)
 		error("Cannot change a constant");
@@ -3070,7 +3056,7 @@ void cmd_mid(void)
 }
 void cmd_byte(void)
 {
-	getargs(&cmdline, 3, (unsigned char *)",");
+	getcsargs(&cmdline, 3);
 	findvar(argv[0], V_NOFIND_ERR);
 	if (g_vartbl[g_VarIndex].type & T_CONST)
 		error("Cannot change a constant");
@@ -3090,7 +3076,7 @@ void cmd_byte(void)
 }
 void cmd_bit(void)
 {
-	getargs(&cmdline, 3, (unsigned char *)",");
+	getcsargs(&cmdline, 3);
 	uint64_t *source = (uint64_t *)findvar(argv[0], V_NOFIND_ERR);
 	if (g_vartbl[g_VarIndex].type & T_CONST)
 		error("Cannot change a constant");
@@ -3121,7 +3107,7 @@ void cmd_flags(void)
 
 void cmd_flag(void)
 {
-	getargs(&cmdline, 1, (unsigned char *)",");
+	getcsargs(&cmdline, 1);
 	uint64_t bit = (uint64_t)1 << (uint64_t)getint(argv[0], 0, 63);
 	while (*cmdline && tokenfunction(*cmdline) != op_equal)
 		cmdline++;
@@ -3241,7 +3227,7 @@ void cmd_frame(void){
 			framecursor=false;
 			SSPrintString("\033[?25l");
 		} else {
-			getargs(&p,3,(unsigned char *)",");
+			getcsargs(&p,3);
 			if(argc<3)error("Syntax");
 			int x=getint(argv[0],0,framex-1);
 			int y=getint(argv[2],0,framey-1);
@@ -3251,7 +3237,7 @@ void cmd_frame(void){
 	} else if((p=checkstring(cmdline,(unsigned char *)"BOX"))){
 		int fc=gui_fcolour;
 		bool dual=false;
-		getargs(&p,11,(unsigned char *)",");
+		getcsargs(&p,11);
 		if(argc<7)error("Syntax");
 		int x=getint(argv[0],0,framex-1);
 		int y=getint(argv[2],0,framey-1);
@@ -3278,7 +3264,7 @@ void cmd_frame(void){
 	} else if((p=checkstring(cmdline,(unsigned char *)"QBOX"))){
 		int fc=gui_fcolour;
 		bool dual=false;
-		getargs(&p,15,(unsigned char *)",");
+		getcsargs(&p,15);
 		if(argc<9)error("Syntax");
 		int x=getint(argv[0],0,framex-1);
 		int y=getint(argv[2],0,framey-1);
@@ -3324,7 +3310,7 @@ void cmd_frame(void){
 	} else if((p=checkstring(cmdline,(unsigned char *)"VBOX"))){
 		int fc=gui_fcolour;
 		bool dual=false;
-		getargs(&p,13,(unsigned char *)",");
+		getcsargs(&p,13);
 		if(argc<9)error("Syntax");
 		int x=getint(argv[0],0,framex-1);
 		int y=getint(argv[2],0,framey-1);
@@ -3359,7 +3345,7 @@ void cmd_frame(void){
 	} else if((p=checkstring(cmdline,(unsigned char *)"HBOX"))){
 		int fc=gui_fcolour;
 		bool dual=false;
-		getargs(&p,13,(unsigned char *)",");
+		getcsargs(&p,13);
 		if(argc<9)error("Syntax");
 		int x=getint(argv[0],0,framex-1);
 		int y=getint(argv[2],0,framey-1);
@@ -3399,7 +3385,7 @@ void cmd_frame(void){
 		FreeMemorySafe((void **)&outframe);
 	} else if((p=checkstring(cmdline,(unsigned char *)"SCROLL"))){
 		int xstart=0,ystart=0,xend=framex-1,yend=framey-1, xmax=framex-1, ymax=framey-1;
-		getargs(&p,11,(unsigned char *)",");
+		getcsargs(&p,11);
 //		if(argc<7)error("Syntax");
 		int xs=getint(argv[0],-(xmax),xmax);
 		int ys=getint(argv[2],-(ymax),ymax);
@@ -3487,7 +3473,7 @@ void cmd_frame(void){
 		SColour(gui_fcolour,1);
 	} else {
 		int attributes=0, fc=gui_fcolour;
-		getargs(&cmdline,9,(unsigned char *)",");
+		getcsargs(&cmdline,9);
 		if(argc<5)error("Syntax");
 		int x=getint(argv[0],0,framex-1);
 		int y=getint(argv[2],0,framey-1);
@@ -3536,7 +3522,7 @@ void MIPS16 cmd_read(void)
 		NextData = datastore[restorepointer].SaveNextData;
 		return;
 	}
-	getargs(&cmdline, (MAX_ARG_COUNT * 2) - 1, (unsigned char *)","); // getargs macro must be the first executable stmt in a block
+	getcsargs(&cmdline, (MAX_ARG_COUNT * 2) - 1); // macro must be the first executable stmt in a block
 	if (argc == 0)
 		error("Syntax");
 	// first count the elements and do the syntax checking
@@ -3640,8 +3626,8 @@ search_again:
 	}
 
 	// we have a DATA statement, first split the line into arguments
-	{ // new block, the getargs macro must be the first executable stmt in a block
-		getargs(&p, (MAX_ARG_COUNT * 2) - 1, (unsigned char *)",");
+	{ // new block, the macro must be the first executable stmt in a block
+		getcsargs(&p, (MAX_ARG_COUNT * 2) - 1);
 		if ((argc & 1) == 0)
 		{
 			CurrentLinePtr = lineptr;
@@ -3906,7 +3892,7 @@ void cmd_on(void)
 	p = checkstring(cmdline, (unsigned char *)"PS2");
 	if (p)
 	{
-		getargs(&p, 1, (unsigned char *)",");
+		getcsargs(&p, 1);
 		if (*argv[0] == '0' && !isdigit(*(argv[0] + 1)))
 		{
 			OnPS2GOSUB = NULL; // the program wants to turn the interrupt off
@@ -3921,7 +3907,7 @@ void cmd_on(void)
 	p = checkstring(cmdline, (unsigned char *)"KEY");
 	if (p)
 	{
-		getargs(&p, 3, (unsigned char *)",");
+		getcsargs(&p, 3);
 		if (argc == 1)
 		{
 			if (*argv[0] == '0' && !isdigit(*(argv[0] + 1)))
@@ -3967,13 +3953,6 @@ void cmd_on(void)
 		}
 		MMerrno = 0; // clear the error flags
 		*MMErrMsg = 0;
-		if (checkstring(p, (unsigned char *)"CLEAR"))
-			return;
-		if (checkstring(p, (unsigned char *)"IGNORE"))
-		{
-			OptionErrorSkip = -1;
-			return;
-		}
 		if ((p = checkstring(p, (unsigned char *)"SKIP")))
 		{
 			if (*p == 0 || *p == (unsigned char)'\'')
@@ -3982,6 +3961,19 @@ void cmd_on(void)
 				OptionErrorSkip = getint(p, 1, 10000) + 1;
 			return;
 		}
+		else if (checkstring(p, (unsigned char *)"CLEAR"))
+			return;
+		else if (checkstring(p, (unsigned char *)"IGNORE"))
+		{
+			OptionErrorSkip = -1;
+			return;
+		}
+		else if (checkstring(p, (unsigned char *)"RESTART"))
+		{
+			OptionErrorSkip = 999999;
+			return;
+		}
+
 		error("Syntax");
 	}
 
@@ -3992,7 +3984,7 @@ void cmd_on(void)
 	ss[2] = ',';
 	ss[3] = 0;
 	{													// start a new block
-		getargs(&cmdline, (MAX_ARG_COUNT * 2) - 1, ss); // getargs macro must be the first executable stmt in a block
+		getargs(&cmdline, (MAX_ARG_COUNT * 2) - 1, ss); // macro must be the first executable stmt in a block
 		if (argc < 3 || !(*argv[1] == ss[0] || *argv[1] == ss[1]))
 			error("Syntax");
 		if (argc % 2 == 0)
@@ -4094,8 +4086,8 @@ void MIPS16 cmd_dim(void)
 		cmdline++;									// this means that we can use DIM AS INTEGER a, b, etc
 	p = CheckIfTypeSpecified(cmdline, &type, true); // check for DIM FLOAT A, B, ...
 	ImpliedType = type;
-	{ // getargs macro must be the first executable stmt in a block
-		getargs(&p, (MAX_ARG_COUNT * 2) - 1, (unsigned char *)",");
+	{ //  macro must be the first executable stmt in a block
+		getcsargs(&p, (MAX_ARG_COUNT * 2) - 1);
 		if ((argc & 0x01) == 0)
 			error("Syntax");
 
@@ -4233,7 +4225,7 @@ void cmd_const(void)
 	void *v;
 	int i, type;
 
-	getargs(&cmdline, (MAX_ARG_COUNT * 2) - 1, (unsigned char *)","); // getargs macro must be the first executable stmt in a block
+	getcsargs(&cmdline, (MAX_ARG_COUNT * 2) - 1); //  macro must be the first executable stmt in a block
 	if ((argc & 0x01) == 0)
 		error("Syntax");
 
@@ -4534,7 +4526,7 @@ void execute(char *mycmd)
 	// we have to fool the tokeniser into thinking that it is processing a program line entered at the console
 	skipspace(mycmd);
 	strcpy((char *)inpbuf, (const char *)getCstring((unsigned char *)mycmd)); // then copy the argument
-	if (!(toupper(inpbuf[0]) == 'R' && toupper(inpbuf[1]) == 'U' && toupper(inpbuf[2]) == 'N'))
+	if (!(mytoupper(inpbuf[0]) == 'R' && mytoupper(inpbuf[1]) == 'U' && mytoupper(inpbuf[2]) == 'N'))
 	{ // convert the string to upper case
 		while (inpbuf[i])
 		{
@@ -4549,7 +4541,7 @@ void execute(char *mycmd)
 			{
 				if (inpbuf[i] == ':')
 					error((char *)"Only single statements allowed");
-				inpbuf[i] = toupper(inpbuf[i]);
+				inpbuf[i] = mytoupper(inpbuf[i]);
 			}
 			i++;
 		}

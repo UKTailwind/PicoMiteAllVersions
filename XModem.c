@@ -48,11 +48,11 @@ void MIPS16 cmd_xmodem(void)
     int rcv = 0, fnbr, crunch = false;
     char *fname;
     ClearExternalIO();
-    if (toupper(*cmdline) == 'R')
+    if (mytoupper(*cmdline) == 'R')
         rcv = true;
-    else if (toupper(*cmdline) == 'S')
+    else if (mytoupper(*cmdline) == 'S')
         rcv = false;
-    else if (toupper(*cmdline) == 'C')
+    else if (mytoupper(*cmdline) == 'C')
         crunch = rcv = true;
     else
         error("Syntax");

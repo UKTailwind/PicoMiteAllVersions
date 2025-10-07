@@ -1323,7 +1323,7 @@ void MIPS16 cmd_play(void)
 	}
 	if ((tp = checkstring(cmdline, (unsigned char *)"VOLUME")))
 	{
-		getargs(&tp, 3, (unsigned char *)",");
+		getcsargs(&tp, 3);
 		if (argc < 1)
 			error("Argument count");
 		if (*argv[0])
@@ -1349,7 +1349,7 @@ void MIPS16 cmd_play(void)
 		uint64_t PlayDuration = 0xffffffffffffffff; // default is to play forever
 													//        uint64_t  x;
 		{											// get the command line arguments
-			getargs(&tp, 7, (unsigned char *)",");
+			getcsargs(&tp, 7);
 			if (!(argc == 3 || argc == 5 || argc == 7))
 				error("Argument count");
 			//			if(Option.AUDIO_MISO_PIN)error("Not available with VS1053 audio");
@@ -1413,7 +1413,7 @@ void MIPS16 cmd_play(void)
 	if ((tp = checkstring(cmdline, (unsigned char *)"ARRAY")))
 	{ // PLAY ARRAY left%(), right%(), frequency, startpos, endpos, interrupt
 		float freq;
-		getargs(&tp, 11, (unsigned char *)","); // this MUST be the first executable line in the function
+		getcsargs(&tp, 11); // this MUST be the first executable line in the function
 		if (!(argc == 11 || argc == 9 || argc == 7 || argc == 5))
 			error("Argument count");
 		arraysize = parseintegerarray(argv[0], (int64_t **)&leftarray, 1, 1, NULL, false);
@@ -1480,7 +1480,7 @@ void MIPS16 cmd_play(void)
 		char *p;
 		uint16_t *lastleft = NULL, *lastright = NULL, *local_sound_mode_left = (uint16_t *)nulltable, *local_sound_mode_right = (uint16_t *)nulltable;
 		// get the command line arguments
-		getargs(&tp, 9, (unsigned char *)","); // this MUST be the first executable line in the function
+		getcsargs(&tp, 9); // this MUST be the first executable line in the function
 		if (!(argc == 9 || argc == 7 || argc == 5))
 			error("Argument count");
 		if (checkstring(argv[4], (unsigned char *)"O") == NULL && argc == 5)
@@ -1748,7 +1748,7 @@ void MIPS16 cmd_play(void)
 		char *p;
 		int FatFSFileSystemSave = FatFSFileSystem;
 		int i __attribute((unused)) = 0;
-		getargs(&tp, 3, (unsigned char *)","); // this MUST be the first executable line in the function
+		getcsargs(&tp, 3); // this MUST be the first executable line in the function
 		if (!(argc == 1 || argc == 3))
 			error("Argument count");
 		if (CurrentlyPlaying == P_WAVOPEN)
@@ -1761,7 +1761,7 @@ void MIPS16 cmd_play(void)
 		getfullfilename(p, q);
 		if (!InitSDCard())
 			return;
-		if (!FatFSFileSystem && toupper(p[0]) == 'B' && p[1] == ':')
+		if (!FatFSFileSystem && mytoupper(p[0]) == 'B' && p[1] == ':')
 			FatFSFileSystem = 1;
 		WAVInterrupt = NULL;
 		WAVcomplete = 0;
@@ -1835,7 +1835,7 @@ void MIPS16 cmd_play(void)
 		char *p;
 		int FatFSFileSystemSave = FatFSFileSystem;
 		int i __attribute((unused)) = 0;
-		getargs(&tp, 3, (unsigned char *)","); // this MUST be the first executable line in the function
+		getcsargs(&tp, 3); // this MUST be the first executable line in the function
 		if (!(argc == 1 || argc == 3))
 			error("Argument count");
 		if (CurrentlyPlaying == P_WAVOPEN)
@@ -1848,7 +1848,7 @@ void MIPS16 cmd_play(void)
 		getfullfilename(p, q);
 		if (!InitSDCard())
 			return;
-		if (!FatFSFileSystem && toupper(p[0]) == 'B' && p[1] == ':')
+		if (!FatFSFileSystem && mytoupper(p[0]) == 'B' && p[1] == ':')
 			FatFSFileSystem = 1;
 		WAVInterrupt = NULL;
 		WAVcomplete = 0;
@@ -1926,7 +1926,7 @@ void MIPS16 cmd_play(void)
 		unsigned char *xp;
 		if ((xp = checkstring(tp, (unsigned char *)"ON")))
 		{
-			getargs(&xp, 5, (unsigned char *)",");
+			getcsargs(&xp, 5);
 			if (!(argc == 5))
 				error("Syntax");
 			uint8_t channel = getint(argv[0], 0, 15);
@@ -1936,7 +1936,7 @@ void MIPS16 cmd_play(void)
 		}
 		else if ((xp = checkstring(tp, (unsigned char *)"OFF")))
 		{
-			getargs(&xp, 5, (unsigned char *)",");
+			getcsargs(&xp, 5);
 			if (!(argc == 5 || argc == 3))
 				error("Syntax");
 			uint8_t channel = getint(argv[0], 0, 15);
@@ -1952,7 +1952,7 @@ void MIPS16 cmd_play(void)
 	}
 	if ((tp = checkstring(cmdline, (unsigned char *)"STREAM")))
 	{
-		getargs(&tp, 5, (unsigned char *)",");
+		getcsargs(&tp, 5);
 		if (!(argc == 5))
 			error("Syntax");
 		if (!Option.AUDIO_MISO_PIN)
@@ -2008,7 +2008,7 @@ void MIPS16 cmd_play(void)
 		unsigned char *xp;
 		if ((xp = checkstring(tp, (unsigned char *)"CMD")))
 		{
-			getargs(&xp, 5, (unsigned char *)",");
+			getcsargs(&xp, 5);
 			if (!midienabled)
 				error("Midi output not enabled");
 			if (!(argc == 5 || argc == 3))
@@ -2023,7 +2023,7 @@ void MIPS16 cmd_play(void)
 		}
 		if ((xp = checkstring(tp, (unsigned char *)"TEST")))
 		{
-			getargs(&xp, 1, (unsigned char *)",");
+			getcsargs(&xp, 1);
 			if (!midienabled)
 				error("Midi output not enabled");
 			miditest(getint(argv[0], 1, 3));
@@ -2053,7 +2053,7 @@ void MIPS16 cmd_play(void)
 	{
 		char *p;
 		int i __attribute((unused)) = 0;
-		getargs(&tp, 3, (unsigned char *)","); // this MUST be the first executable line in the function
+		getcsargs(&tp, 3); // this MUST be the first executable line in the function
 		if (!(argc == 1 || argc == 3))
 			error("Argument count");
 		if (!Option.AUDIO_MISO_PIN)
@@ -2204,7 +2204,7 @@ void MIPS16 cmd_play(void)
 		char *p;
 		int FatFSFileSystemSave = FatFSFileSystem;
 		int i __attribute((unused)) = 0;
-		getargs(&tp, 3, (unsigned char *)","); // this MUST be the first executable line in the function
+		getcsargs(&tp, 3); // this MUST be the first executable line in the function
 		if (!(argc == 1 || argc == 3))
 			error("Argument count");
 #ifndef rp2350
@@ -2224,7 +2224,7 @@ void MIPS16 cmd_play(void)
 		getfullfilename(p, q);
 		if (!InitSDCard())
 			return;
-		if (!FatFSFileSystem && toupper(p[0]) == 'B' && p[1] == ':')
+		if (!FatFSFileSystem && mytoupper(p[0]) == 'B' && p[1] == ':')
 			FatFSFileSystem = 1;
 		WAVInterrupt = NULL;
 		WAVcomplete = 0;
@@ -2295,7 +2295,7 @@ void MIPS16 cmd_play(void)
 	}
 	if ((tp = checkstring(cmdline, (unsigned char *)"MODFILE")))
 	{
-		getargs(&tp, 3, (unsigned char *)","); // this MUST be the first executable line in the function
+		getcsargs(&tp, 3); // this MUST be the first executable line in the function
 		char *p;
 		int i __attribute((unused)) = 0, fsize;
 		modfilesamplerate = 22050;
@@ -2456,7 +2456,7 @@ void MIPS16 cmd_play(void)
 		unsigned short sampnum, seffectnum;
 		unsigned char volume;
 		unsigned int samprate, period;
-		getargs(&tp, 5, (unsigned char *)","); // this MUST be the first executable line in the function
+		getcsargs(&tp, 5); // this MUST be the first executable line in the function
 		if (!(argc == 5 || argc == 3))
 			error("Argument count");
 

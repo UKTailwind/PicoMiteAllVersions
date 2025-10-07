@@ -196,7 +196,7 @@ int cmd_mqtt(void)
   unsigned char *tp = checkstring(cmdline, (unsigned char *)"MQTT CONNECT");
   if (tp)
   {
-    getargs(&tp, 9, (unsigned char *)",");
+    getcsargs(&tp, 9);
     char *IP = GetTempMemory(STRINGSIZE);
     char *ID = GetTempMemory(STRINGSIZE);
     if (mqtt_client)
@@ -249,7 +249,7 @@ int cmd_mqtt(void)
   tp = checkstring(cmdline, (unsigned char *)"MQTT PUBLISH");
   if (tp)
   {
-    getargs(&tp, 7, (unsigned char *)",");
+    getcsargs(&tp, 7);
     int qos = 1;
     int retain = 1;
     if (argc < 3)
@@ -266,7 +266,7 @@ int cmd_mqtt(void)
   tp = checkstring(cmdline, (unsigned char *)"MQTT SUBSCRIBE");
   if (tp)
   {
-    getargs(&tp, 3, (unsigned char *)",");
+    getcsargs(&tp, 3);
     if (!(argc >= 1))
       error("Syntax");
     strcpy(mqtt_subs.topic, (char *)getCstring(argv[0]));

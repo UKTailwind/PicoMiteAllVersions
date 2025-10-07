@@ -225,7 +225,7 @@ void MIPS16 initFonts(void)
     FontTable[14] = NULL;
     FontTable[15] = NULL;
 }
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
 uint16_t __not_in_flash_func(RGB565)(uint32_t c)
 {
     return ((c >> 16) & 0b11111000) | ((c >> 13) & 0b00000111) | ((c << 3) & 0b1110000000000000) | ((c << 5) & 0b0001111100000000);
@@ -238,7 +238,7 @@ uint16_t __not_in_flash_func(RGB555)(uint32_t c)
 }
 uint8_t __not_in_flash_func(RGB332)(uint32_t c)
 {
-    return ((c & 0b111000000000000000000000) >> 16) | ((c & 0b1110000000000000) >> 11) | ((c & 0b11000000) >> 6);
+    return (c >> 16 & 0xE0) | (c >> 11 & 0x1C) | (c >> 6 & 0x03);
 }
 uint8_t __not_in_flash_func(RGB121)(uint32_t c)
 {
@@ -264,7 +264,7 @@ void MIPS16 cmd_guiMX170(void)
         MMFLOAT f;
         long long int i64;
 
-        getargs(&p, 15, (unsigned char *)",");
+        getcsargs(&p, 15);
         if (!(argc & 1) || argc < 5)
             error("Argument count");
 
@@ -352,7 +352,7 @@ void MIPS16 cmd_guiMX170(void)
 
         if (*p && *p != '\'')
         { // if the calibration is provided on the command line
-            getargs(&p, 9, (unsigned char *)",");
+            getcsargs(&p, 9);
             if (argc != 9)
                 error("Argument count");
             Option.TOUCH_SWAPXY = getinteger(argv[0]);
@@ -564,7 +564,7 @@ void getcoord(char *p, int *x, int *y)
     ttp = (unsigned char *)b + 1;
     // kludge (todo: fix this)
     {
-        getargs(&ttp, 3, (unsigned char *)","); // this is a macro and must be the first executable stmt in a block
+        getcsargs(&ttp, 3); // this is a macro and must be the first executable stmt in a block
         if (argc != 3)
             error("Invalid Syntax");
         *x = getinteger(argv[0]);
@@ -593,7 +593,7 @@ void DrawPixelNormal(int x, int y, int c)
 #endif
 void ClearScreen(int c)
 {
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
 #ifndef PICOMITEVGA
     if (ScrollLCD == ScrollLCDMEM332)
     {
@@ -1051,37 +1051,63 @@ Draw a circle on the video output
     fill - the colour to use for the fill or -1 if no fill
     aspect - the ration of the x and y axis (a MMFLOAT).  1.0 gives a prefect circle
 ***********************************************************************************************/
+#ifdef rp2350
+void __not_in_flash_func(DrawCircle)(int x, int y, int radius, int w, int c, int fill, MMFLOAT aspect)
+{
+#else
 void DrawCircle(int x, int y, int radius, int w, int c, int fill, MMFLOAT aspect)
 {
+#endif
     int a, b, P;
     int A, B;
     int asp;
     MMFLOAT aspect2;
+
     if (w > 1)
     {
         if (fill >= 0)
-        { // thick border with filled centre
+        {
+            // Thick border with filled centre
             DrawCircle(x, y, radius, 0, c, c, aspect);
             aspect2 = ((aspect * (MMFLOAT)radius) - (MMFLOAT)w) / ((MMFLOAT)(radius - w));
             DrawCircle(x, y, radius - w, 0, fill, fill, aspect2);
         }
         else
-        { // thick border with empty centre
-            int r1 = radius - w, r2 = radius, xs = -1, xi = 0, i, j, k, m, ll = radius;
-            if (aspect > 1.0)
+        {
+            // OPTIMIZED: Thick border with empty centre
+            int r1 = radius - w;
+            int r2 = radius;
+            int ll = radius;
+
+            if (aspect > 1.0f)
                 ll = (int)((MMFLOAT)radius * aspect);
-            int ints_per_line = RoundUptoInt((ll * 2) + 1) / 32;
-            uint32_t *br = (uint32_t *)GetTempMemory(((ints_per_line + 1) * ((r2 * 2) + 1)) * 4);
+
+            int ints_per_line = RoundUptoInt((ll << 1) + 1) / 32;
+            uint32_t *br = (uint32_t *)GetTempMemory(((ints_per_line + 1) * ((r2 << 1) + 1)) << 2);
+
             DrawFilledCircle(x, y, r2, r2, 1, ints_per_line, br, aspect, aspect);
             aspect2 = ((aspect * (MMFLOAT)r2) - (MMFLOAT)w) / ((MMFLOAT)r1);
             DrawFilledCircle(x, y, r1, r2, 0, ints_per_line, br, aspect, aspect2);
-            x = (int)((MMFLOAT)x + (MMFLOAT)r2 * (1.0 - aspect));
-            for (j = 0; j < r2 * 2 + 1; j++)
+
+            int x_offset = (int)((MMFLOAT)x + (MMFLOAT)r2 * (1.0f - aspect));
+            int y_offset = y - r2;
+            int x_base = x_offset - r2;
+
+            // OPTIMIZED: Scan and draw
+            int xs = -1;
+            int xi = 0;
+
+            for (int j = 0; j < (r2 << 1) + 1; j++)
             {
-                for (i = 0; i < ints_per_line; i++)
+                int row_offset = j * ints_per_line;
+                int y_coord = y_offset + j;
+
+                for (int i = 0; i < ints_per_line; i++)
                 {
-                    k = br[i + j * ints_per_line];
-                    for (m = 0; m < 32; m++)
+                    uint32_t k = br[i + row_offset];
+                    int x_start = x_base + (i << 5);
+
+                    for (int m = 0; m < 32; m++)
                     {
                         if (xs == -1 && (k & 0x80000000))
                         {
@@ -1090,69 +1116,87 @@ void DrawCircle(int x, int y, int radius, int w, int c, int fill, MMFLOAT aspect
                         }
                         if (xs != -1 && !(k & 0x80000000))
                         {
-                            DrawRectangle(x - r2 + xs + xi * 32, y - r2 + j, x - r2 + m + i * 32, y - r2 + j, c);
+                            DrawRectangle(x_base + xs + (xi << 5), y_coord,
+                                          x_start + m, y_coord, c);
                             xs = -1;
                         }
                         k <<= 1;
                     }
                 }
+
                 if (xs != -1)
                 {
-                    DrawRectangle(x - r2 + xs + xi * 32, y - r2 + j, x - r2 + m + i * 32, y - r2 + j, c);
+                    DrawRectangle(x_base + xs + (xi << 5), y_coord,
+                                  x_base + 32 + (ints_per_line << 5), y_coord, c);
                     xs = -1;
                 }
             }
         }
     }
     else
-    { // single thickness outline
-        int w1 = w, r1 = radius;
+    {
+        // OPTIMIZED: Single thickness outline
+        int w1 = w;
+        int r1 = radius;
+
         if (fill >= 0)
         {
+            asp = (int)(aspect * 1024.0f);
+
             while (w >= 0 && radius > 0)
             {
                 a = 0;
                 b = radius;
                 P = 1 - radius;
-                asp = aspect * (MMFLOAT)(1 << 10);
 
                 do
                 {
                     A = (a * asp) >> 10;
                     B = (b * asp) >> 10;
-                    if (fill >= 0 && w >= 0)
-                    {
-                        DrawRectangle(x - A, y + b, x + A, y + b, fill);
-                        DrawRectangle(x - A, y - b, x + A, y - b, fill);
-                        DrawRectangle(x - B, y + a, x + B, y + a, fill);
-                        DrawRectangle(x - B, y - a, x + B, y - a, fill);
-                    }
-                    if (P < 0)
-                        P += 3 + 2 * a++;
-                    else
-                        P += 5 + 2 * (a++ - b--);
 
+                    DrawRectangle(x - A, y + b, x + A, y + b, fill);
+                    DrawRectangle(x - A, y - b, x + A, y - b, fill);
+                    DrawRectangle(x - B, y + a, x + B, y + a, fill);
+                    DrawRectangle(x - B, y - a, x + B, y - a, fill);
+
+                    if (P < 0)
+                    {
+                        P += 3 + (a << 1);
+                        a++;
+                    }
+                    else
+                    {
+                        P += 5 + ((a - b) << 1);
+                        a++;
+                        b--;
+                    }
                 } while (a <= b);
+
                 w--;
                 radius--;
             }
         }
+
         if (c != fill)
         {
             w = w1;
             radius = r1;
+            asp = (int)(aspect * 1024.0f);
+
             while (w >= 0 && radius > 0)
             {
                 a = 0;
                 b = radius;
                 P = 1 - radius;
-                asp = aspect * (MMFLOAT)(1 << 10);
+
                 do
                 {
                     A = (a * asp) >> 10;
                     B = (b * asp) >> 10;
+
                     if (w)
                     {
+                        // OPTIMIZED: Unrolled pixel drawing
                         DrawPixel(A + x, b + y, c);
                         DrawPixel(B + x, a + y, c);
                         DrawPixel(x - A, b + y, c);
@@ -1162,17 +1206,26 @@ void DrawCircle(int x, int y, int radius, int w, int c, int fill, MMFLOAT aspect
                         DrawPixel(x - A, y - b, c);
                         DrawPixel(x - B, y - a, c);
                     }
-                    if (P < 0)
-                        P += 3 + 2 * a++;
-                    else
-                        P += 5 + 2 * (a++ - b--);
 
+                    if (P < 0)
+                    {
+                        P += 3 + (a << 1);
+                        a++;
+                    }
+                    else
+                    {
+                        P += 5 + ((a - b) << 1);
+                        a++;
+                        b--;
+                    }
                 } while (a <= b);
+
                 w--;
                 radius--;
             }
         }
     }
+
     if (Option.Refresh)
         Display_Refresh();
 }
@@ -1245,83 +1298,86 @@ void ClearTriangle(int x0, int y0, int x1, int y1, int x2, int y2, int ints_per_
         y = y + 1;
     }
 }
-#define ABS(X) ((X) > 0 ? (X) : (-(X)))
+#define ABS(X) ((X) < 0 ? -(X) : (X))
+#define CLAMP(v, min, max) ((v) < (min) ? (min) : ((v) >= (max) ? (max) - 1 : (v)))
+#define SWAP(a, b)      \
+    do                  \
+    {                   \
+        int _tmp = (a); \
+        (a) = (b);      \
+        (b) = _tmp;     \
+    } while (0)
 
-void CalcLine(int x1, int y1, int x2, int y2, short *xmin, short *xmax)
+// Internal optimized version with offset support
+static void CalcLineInternal(int x1, int y1, int x2, int y2, short *xmin, short *xmax, int yoffset)
 {
-
+    // Handle horizontal line
     if (y1 == y2)
     {
-        if (y1 < 0)
-            y1 = 0;
-        if (y1 >= VRes)
-            y1 = VRes - 1;
-        if (y2 < 0)
-            y2 = 0;
-        if (y2 >= VRes)
-            y2 = VRes - 1;
-        if (x1 < xmin[y1])
-            xmin[y1] = x1;
-        if (x2 < xmin[y1])
-            xmin[y1] = x2;
-        if (x1 > xmax[y1])
-            xmax[y1] = x1;
-        if (x2 > xmax[y1])
-            xmax[y1] = x2;
+        if (y1 < 0 || y1 >= VRes)
+            return;
+
+        int idx = y1 - yoffset;
+        int minx = (x1 < x2) ? x1 : x2;
+        int maxx = (x1 > x2) ? x1 : x2;
+
+        if (minx < xmin[idx])
+            xmin[idx] = minx;
+        if (maxx > xmax[idx])
+            xmax[idx] = maxx;
         return;
     }
+
+    // Handle vertical line
     if (x1 == x2)
     {
         if (y2 < y1)
-            swap(y2, y1);
-        if (y1 < 0)
-            y1 = 0;
-        if (y1 >= VRes)
-            y1 = VRes - 1;
-        if (y2 < 0)
-            y2 = 0;
-        if (y2 >= VRes)
-            y2 = VRes - 1;
-        for (int y = y1; y <= y2; y++)
+            SWAP(y2, y1);
+
+        int ystart = CLAMP(y1, 0, VRes);
+        int yend = CLAMP(y2, 0, VRes);
+
+        for (int y = ystart; y <= yend; y++)
         {
-            if (x1 < xmin[y])
-                xmin[y] = x1;
-            if (x1 > xmax[y])
-                xmax[y] = x1;
+            int idx = y - yoffset;
+            if (x1 < xmin[idx])
+                xmin[idx] = x1;
+            if (x1 > xmax[idx])
+                xmax[idx] = x1;
         }
         return;
     }
-    // uses a variant of Bresenham's line algorithm:
-    //   https://en.wikipedia.org/wiki/Talk:Bresenham%27s_line_algorithm
+
+    // Bresenham's line algorithm
     if (y1 > y2)
     {
-        swap(y1, y2);
-        swap(x1, x2);
+        SWAP(y1, y2);
+        SWAP(x1, x2);
     }
-    if (y1 < 0)
-        y1 = 0;
-    if (y1 >= VRes)
-        y1 = VRes - 1;
-    if (y2 < 0)
-        y2 = 0;
-    if (y2 >= VRes)
-        y2 = VRes - 1;
-    int absX = ABS(x1 - x2); // absolute value of coordinate distances
+
+    int absX = ABS(x1 - x2);
     int absY = ABS(y1 - y2);
-    int offX = x2 < x1 ? 1 : -1; // line-drawing direction offsets
+    int offX = x2 < x1 ? 1 : -1;
     int offY = y2 < y1 ? 1 : -1;
-    int x = x2; // incremental location
+
+    int x = x2;
     int y = y2;
     int err;
-    if (x < xmin[y])
-        xmin[y] = x;
-    if (x > xmax[y])
-        xmax[y] = x;
+
+    // Update initial point if in bounds
+    if (y >= 0 && y < VRes)
+    {
+        int idx = y - yoffset;
+        if (x < xmin[idx])
+            xmin[idx] = x;
+        if (x > xmax[idx])
+            xmax[idx] = x;
+    }
+
     if (absX > absY)
     {
-
-        // line is more horizontal; increment along x-axis
-        err = absX / 2;
+        // Line is more horizontal
+        err = absX >> 1;
         while (x != x1)
         {
             err = err - absY;
@@ -1331,17 +1387,21 @@ void CalcLine(int x1, int y1, int x2, int y2, short *xmin, short *xmax)
                 err += absX;
             }
             x += offX;
-            if (x < xmin[y])
-                xmin[y] = x;
-            if (x > xmax[y])
-                xmax[y] = x;
+
+            if (y >= 0 && y < VRes)
+            {
+                int idx = y - yoffset;
+                if (x < xmin[idx])
+                    xmin[idx] = x;
+                if (x > xmax[idx])
+                    xmax[idx] = x;
+            }
         }
     }
     else
     {
-
-        // line is more vertical; increment along y-axis
-        err = absY / 2;
+        // Line is more vertical
+        err = absY >> 1;
         while (y != y1)
         {
             err = err - absX;
@@ -1351,90 +1411,118 @@ void CalcLine(int x1, int y1, int x2, int y2, short *xmin, short *xmax)
                 err += absY;
             }
             y += offY;
-            if (x < xmin[y])
-                xmin[y] = x;
-            if (x > xmax[y])
-                xmax[y] = x;
+
+            if (y >= 0 && y < VRes)
+            {
+                int idx = y - yoffset;
+                if (x < xmin[idx])
+                    xmin[idx] = x;
+                if (x > xmax[idx])
+                    xmax[idx] = x;
+            }
         }
     }
 }
 
+// Original CalcLine - maintains backward compatibility
+void CalcLine(int x1, int y1, int x2, int y2, short *xmin, short *xmax)
+{
+    CalcLineInternal(x1, y1, x2, y2, xmin, xmax, 0);
+}
+
 void DrawTriangle(int x0, int y0, int x1, int y1, int x2, int y2, int c, int f)
 {
+    // Check for degenerate triangle (collinear points)
     if (x0 * (y1 - y2) + x1 * (y2 - y0) + x2 * (y0 - y1) == 0)
-    { // points are co-linear i.e zero area
+    {
+        // Sort points by y coordinate
+        if (y0 > y2)
+        {
+            SWAP(y0, y2);
+            SWAP(x0, x2);
+        }
         if (y0 > y1)
         {
-            swap(y0, y1);
-            swap(x0, x1);
+            SWAP(y0, y1);
+            SWAP(x0, x1);
         }
         if (y1 > y2)
         {
-            swap(y2, y1);
-            swap(x2, x1);
+            SWAP(y1, y2);
+            SWAP(x1, x2);
         }
-        if (y0 > y1)
-        {
-            swap(y0, y1);
-            swap(x0, x1);
-        }
-        DrawLine(x0, y0, x2, y2, 1, c);
-    }
-    else
-    {
-        if (f == -1)
-        {
-            // draw only the outline
-            DrawLine(x0, y0, x1, y1, 1, c);
-            DrawLine(x1, y1, x2, y2, 1, c);
-            DrawLine(x2, y2, x0, y0, 1, c);
-        }
-        else
-        {
-            if (y0 > y1)
-            {
-                swap(y0, y1);
-                swap(x0, x1);
-            }
-            if (y1 > y2)
-            {
-                swap(y2, y1);
-                swap(x2, x1);
-            }
-            if (y0 > y1)
-            {
-                swap(y0, y1);
-                swap(x0, x1);
-            }
-            short *xmin = (short *)GetMemory(VRes * sizeof(short));
-            short *xmax = (short *)GetMemory(VRes * sizeof(short));
 
-            int y;
-            for (y = y0; y <= y2; y++)
-            {
-                if (y >= 0 && y < VRes)
-                {
-                    xmin[y] = 32767;
-                    xmax[y] = -1;
-                }
-            }
-            CalcLine(x0, y0, x1, y1, xmin, xmax);
-            CalcLine(x1, y1, x2, y2, xmin, xmax);
-            CalcLine(x2, y2, x0, y0, xmin, xmax);
-            for (y = y0; y <= y2; y++)
-            {
-                if (y >= 0 && y < VRes)
-                    DrawRectangle(xmin[y], y, xmax[y], y, f);
-            }
-            //            if(c!=f){
-            DrawLine(x0, y0, x1, y1, 1, c);
-            DrawLine(x1, y1, x2, y2, 1, c);
-            DrawLine(x2, y2, x0, y0, 1, c);
-            //            }
-            FreeMemory((unsigned char *)xmin);
-            FreeMemory((unsigned char *)xmax);
-        }
+        DrawLine(x0, y0, x2, y2, 1, c);
+        return;
     }
+
+    // Draw outline only
+    if (f == -1)
+    {
+        DrawLine(x0, y0, x1, y1, 1, c);
+        DrawLine(x1, y1, x2, y2, 1, c);
+        DrawLine(x2, y2, x0, y0, 1, c);
+        return;
+    }
+
+    // Sort vertices by y coordinate (sorting network)
+    if (y0 > y2)
+    {
+        SWAP(y0, y2);
+        SWAP(x0, x2);
+    }
+    if (y0 > y1)
+    {
+        SWAP(y0, y1);
+        SWAP(x0, x1);
+    }
+    if (y1 > y2)
+    {
+        SWAP(y1, y2);
+        SWAP(x1, x2);
+    }
+
+    // Calculate actual y range needed
+    int ymin = (y0 < 0) ? 0 : y0;
+    int ymax = (y2 >= VRes) ? VRes - 1 : y2;
+
+    // Early exit if completely off-screen
+    if (ymin >= VRes || ymax < 0)
+        return;
+
+    int range = ymax - ymin + 1;
+
+    // Allocate only needed range
+    short *xmin = (short *)GetMemory(range * sizeof(short));
+    short *xmax = (short *)GetMemory(range * sizeof(short));
+
+    // Initialize arrays
+    for (int i = 0; i < range; i++)
+    {
+        xmin[i] = 32767;
+        xmax[i] = -32768;
+    }
+
+    // Calculate scanline extents
+    CalcLineInternal(x0, y0, x1, y1, xmin, xmax, ymin);
+    CalcLineInternal(x1, y1, x2, y2, xmin, xmax, ymin);
+    CalcLineInternal(x2, y2, x0, y0, xmin, xmax, ymin);
+
+    // Fill scanlines
+    for (int y = ymin; y <= ymax; y++)
+    {
+        int idx = y - ymin;
+        if (xmax[idx] >= xmin[idx]) // Valid span
+            DrawRectangle(xmin[idx], y, xmax[idx], y, f);
+    }
+
+    // Draw outline
+    DrawLine(x0, y0, x1, y1, 1, c);
+    DrawLine(x1, y1, x2, y2, 1, c);
+    DrawLine(x2, y2, x0, y0, 1, c);
+
+    FreeMemory((unsigned char *)xmin);
+    FreeMemory((unsigned char *)xmax);
 }
 void RestoreTriangle(int bnbr, char *buff)
 {
@@ -1643,7 +1731,7 @@ int SizeTriangle(int x0, int y0, int x1, int y1, int x2, int y2)
 
 void cmd_RestoreTriangle(unsigned char *p)
 {
-    getargs(&p, 1, (unsigned char *)",");
+    getcsargs(&p, 1);
     if (*argv[0] == '#')
         argv[0]++;
     int bnbr = getint(argv[0], 1, MAXBLITBUF) - 1; // get the buffer number
@@ -1659,7 +1747,7 @@ void cmd_RestoreTriangle(unsigned char *p)
 void cmd_ReadTriangle(unsigned char *p)
 {
     int bnbr, x1, x2, x3, y1, y2, y3, size;
-    getargs(&p, 13, (unsigned char *)",");
+    getcsargs(&p, 13);
     if (argc != 13)
         error((char *)"Syntax");
     if (*argv[0] == '#')
@@ -1956,7 +2044,7 @@ void GUIPrintString(int x, int y, int fnt, int jh, int jv, int jo, int fc, int b
 // the values are returned via pointers
 int GetJustification(char *p, int *jh, int *jv, int *jo)
 {
-    switch (toupper(*p++))
+    switch (mytoupper(*p++))
     {
     case 'L':
         *jh = JUSTIFY_LEFT;
@@ -1973,7 +2061,7 @@ int GetJustification(char *p, int *jh, int *jv, int *jo)
         p--;
     }
     skipspace(p);
-    switch (toupper(*p++))
+    switch (mytoupper(*p++))
     {
     case 'T':
         *jv = JUSTIFY_TOP;
@@ -1990,7 +2078,7 @@ int GetJustification(char *p, int *jh, int *jv, int *jo)
         p--;
     }
     skipspace(p);
-    switch (toupper(*p++))
+    switch (mytoupper(*p++))
     {
     case 'N':
         *jo = ORIENT_NORMAL;
@@ -2022,7 +2110,7 @@ void cmd_text(void)
     char *s;
     int jh = 0, jv = 0, jo = 0;
 
-    getargs(&cmdline, 17, (unsigned char *)","); // this is a macro and must be the first executable stmt
+    getcsargs(&cmdline, 17); // this is a macro and must be the first executable stmt
     if (Option.DISPLAY_TYPE == 0)
         error("Display not configured");
     if (!(argc & 1) || argc < 5)
@@ -2086,7 +2174,7 @@ void cmd_pixel(void)
         int x1, y1, c = 0, n = 0, i, nc = 0;
         long long int *x1ptr, *y1ptr, *cptr;
         MMFLOAT *x1fptr, *y1fptr, *cfptr;
-        getargs(&cmdline, 5, (unsigned char *)",");
+        getcsargs(&cmdline, 5);
         if (!(argc == 3 || argc == 5))
             error("Argument count");
         getargaddress(argv[0], &x1ptr, &x1fptr, &n);
@@ -2151,12 +2239,12 @@ void cmd_circle(void)
     {
         int x, y, radius, colour, fill;
         float aspect;
-        getargs(&cmdline, 9, (unsigned char *)",");
+        getcsargs(&cmdline, 9);
         if (argc % 2 == 0 || argc < 3)
             error("Invalid syntax");
         if (*argv[0] != '(')
             error("Expected opening bracket");
-        if (toupper(*argv[argc - 1]) == 'F')
+        if (mytoupper(*argv[argc - 1]) == 'F')
         {
             argc -= 2;
             fill = true;
@@ -2189,7 +2277,7 @@ void cmd_circle(void)
         MMFLOAT a;
         long long int *xptr, *yptr, *rptr, *fptr, *wptr, *cptr, *aptr;
         MMFLOAT *xfptr, *yfptr, *rfptr, *ffptr, *wfptr, *cfptr, *afptr;
-        getargs(&cmdline, 13, (unsigned char *)",");
+        getcsargs(&cmdline, 13);
         if (!(argc & 1) || argc < 5)
             error("Argument count");
         getargaddress(argv[0], &xptr, &xfptr, &n);
@@ -2481,7 +2569,7 @@ void cmd_line(void)
     if (CMM1)
     {
         int x1, y1, x2, y2, colour, box, fill;
-        getargs(&cmdline, 5, (unsigned char *)",");
+        getcsargs(&cmdline, 5);
 
         // check if it is actually a LINE INPUT command
         if (argc < 1)
@@ -2534,7 +2622,7 @@ void cmd_line(void)
             MMFLOAT *y1fptr;
             int xs = 0, xinc = 1;
             int ys = 0, yinc = 1;
-            getargs(&p, 13, (unsigned char *)",");
+            getcsargs(&p, 13);
             getargaddress(argv[0], &y1ptr, &y1fptr, &n);
             if (n == 1)
                 error("Argument 1 is not an array");
@@ -2595,7 +2683,7 @@ void cmd_line(void)
         else if ((p = checkstring(cmdline, (unsigned char *)"AA")))
         {
             MMFLOAT x1, y1, x2, y2;
-            getargs(&p, 11, (unsigned char *)",");
+            getcsargs(&p, 11);
             c = gui_fcolour;
             ;
             w = 1; // setup the defaults
@@ -2619,7 +2707,7 @@ void cmd_line(void)
         {
             long long int *x1ptr, *y1ptr, *x2ptr, *y2ptr, *wptr, *cptr;
             MMFLOAT *x1fptr, *y1fptr, *x2fptr, *y2fptr, *wfptr, *cfptr;
-            getargs(&cmdline, 11, (unsigned char *)",");
+            getcsargs(&cmdline, 11);
             if (!(argc & 1) || argc < 3)
                 error("Argument count");
             getargaddress(argv[0], &x1ptr, &x1fptr, &n);
@@ -2729,7 +2817,7 @@ void cmd_box(void)
     int x1, y1, w = 0, c = 0, f = 0, n = 0, i, nc = 0, nw = 0, nf = 0, hmod, wmod, nwidth = 0, nheight = 0, width = 0, height = 0;
     long long int *x1ptr, *y1ptr, *wiptr, *hptr, *wptr, *cptr, *fptr;
     MMFLOAT *x1fptr, *y1fptr, *wifptr, *hfptr, *wfptr, *cfptr, *ffptr;
-    getargs(&cmdline, 13, (unsigned char *)",");
+    getcsargs(&cmdline, 13);
     if (Option.DISPLAY_TYPE == 0)
         error("Display not configured");
     if (!(argc & 1) || argc < 7)
@@ -2995,7 +3083,7 @@ void MIPS16 cmd_arc(void)
     int x, y, r1, r2, c, i, j, k, xs = -1, xi = 0, m;
     int rad1, rad2, rad3, rstart, quadr;
     int x0, y0, x1, y1, x2, y2, xr, yr;
-    getargs(&cmdline, 13, (unsigned char *)",");
+    getcsargs(&cmdline, 13);
     if (!(argc == 11 || argc == 13))
         error("Argument count");
     if (Option.DISPLAY_TYPE == 0)
@@ -3135,77 +3223,122 @@ static void fill_begin_fill()
 
 static void fill_end_fill(int count, int ystart, int yend)
 {
-    // based on public-domain fill algorithm in C by Darel Rex Finley, 2007
-    //   from http://alienryderflex.com/polygon_fill/
+    // Use stack for typical polygon sizes
+    TFLOAT nodeX_stack[256];
+    TFLOAT *nodeX = (count <= 256) ? nodeX_stack : GetMemory(count * sizeof(TFLOAT));
 
-    TFLOAT *nodeX = GetMemory(count * sizeof(TFLOAT)); // x-coords of polygon intercepts
-    int nodes;                                         // size of nodeX
-    int y, i, j;                                       // current pixel and loop indices
-    TFLOAT temp;                                       // temporary variable for sorting
-    int f = (main_fill.fill_color.red << 16) | (main_fill.fill_color.green << 8) | main_fill.fill_color.blue;
-    int c = (main_fill.pen_color.red << 16) | (main_fill.pen_color.green << 8) | main_fill.pen_color.blue;
-    int xstart, xend;
-    //  loop through the rows of the image
+    const int f = (main_fill.fill_color.red << 16) |
+                  (main_fill.fill_color.green << 8) |
+                  main_fill.fill_color.blue;
+    const int c = (main_fill.pen_color.red << 16) |
+                  (main_fill.pen_color.green << 8) |
+                  main_fill.pen_color.blue;
 
-    for (y = ystart; y < yend; y++)
+    const int vertex_count = main_fill_poly_vertex_count;
+
+    // Pre-compute edge data to avoid redundant calculations
+    typedef struct
     {
+        TFLOAT x0, y0, x1, y1;
+        TFLOAT dx, dy;
+        int valid;
+    } Edge;
 
-        //  build a list of polygon intercepts on the current line
-        nodes = 0;
-        j = main_fill_poly_vertex_count - 1;
-        for (i = 0; i < main_fill_poly_vertex_count; i++)
+    Edge edges[256]; // Adjust size as needed
+    Edge *pEdges = (vertex_count <= 256) ? edges : GetMemory(vertex_count * sizeof(Edge));
+
+    // Pre-process edges
+    for (int i = 0; i < vertex_count; i++)
+    {
+        int j = (i + 1) % vertex_count;
+        pEdges[i].x0 = main_fill_polyX[i];
+        pEdges[i].y0 = main_fill_polyY[i];
+        pEdges[i].x1 = main_fill_polyX[j];
+        pEdges[i].y1 = main_fill_polyY[j];
+        pEdges[i].dy = pEdges[i].y1 - pEdges[i].y0;
+        pEdges[i].dx = pEdges[i].x1 - pEdges[i].x0;
+
+        // Pre-check if edge is horizontal (can skip during scanline processing)
+        pEdges[i].valid = (pEdges[i].dy != 0);
+    }
+
+    // Scanline loop
+    for (int y = ystart; y < yend; y++)
+    {
+        int nodes = 0;
+        const TFLOAT yf = (TFLOAT)y;
+
+        // Find intercepts - optimized with pre-computed edge data
+        for (int i = 0; i < vertex_count; i++)
         {
-            if ((main_fill_polyY[i] < (TFLOAT)y &&
-                 main_fill_polyY[j] >= (TFLOAT)y) ||
-                (main_fill_polyY[j] < (TFLOAT)y &&
-                 main_fill_polyY[i] >= (TFLOAT)y))
-            {
+            if (!pEdges[i].valid)
+                continue;
 
-                // intercept found; record it
-                nodeX[nodes++] = (main_fill_polyX[i] +
-                                  ((TFLOAT)y - main_fill_polyY[i]) /
-                                      (main_fill_polyY[j] - main_fill_polyY[i]) *
-                                      (main_fill_polyX[j] - main_fill_polyX[i]));
+            const Edge *e = &pEdges[i];
+
+            // Edge crossing check
+            if ((e->y0 < yf && e->y1 >= yf) || (e->y1 < yf && e->y0 >= yf))
+            {
+                // Fast intercept calculation
+                nodeX[nodes++] = e->x0 + (yf - e->y0) * e->dx / e->dy;
             }
-            j = i;
         }
 
-        //  sort the nodes via simple insertion sort
-        for (i = 1; i < nodes; i++)
+        // Optimized sort
+        if (nodes == 2)
         {
-            temp = nodeX[i];
-            for (j = i; j > 0 && temp < nodeX[j - 1]; j--)
+            // Special case: just swap if needed
+            if (nodeX[0] > nodeX[1])
             {
-                nodeX[j] = nodeX[j - 1];
+                TFLOAT temp = nodeX[0];
+                nodeX[0] = nodeX[1];
+                nodeX[1] = temp;
             }
-            nodeX[j] = temp;
+        }
+        else if (nodes > 2)
+        {
+            // Insertion sort for small n
+            for (int i = 1; i < nodes; i++)
+            {
+                TFLOAT temp = nodeX[i];
+                int j = i;
+                while (j > 0 && nodeX[j - 1] > temp)
+                {
+                    nodeX[j] = nodeX[j - 1];
+                    j--;
+                }
+                nodeX[j] = temp;
+            }
         }
 
-        //  fill the pixels between node pairs
-        for (i = 0; i < nodes; i += 2)
+        // Fill spans
+        for (int i = 0; i < nodes - 1; i += 2)
         {
-            xstart = (int)floorf(nodeX[i]) + 1;
-            xend = (int)ceilf(nodeX[i + 1]) - 1;
-            DrawLine(xstart, y, xend, y, 1, f);
+            int xstart = (int)(nodeX[i] + 1.0f);
+            int xend = (int)nodeX[i + 1];
+
+            if (xstart <= xend)
+            {
+                DrawLine(xstart, y, xend, y, 1, f);
+            }
         }
     }
 
     main_fill.filled = false;
 
-    // redraw polygon (filling is imperfect and can occasionally occlude sides)
-    for (i = 0; i < main_fill_poly_vertex_count; i++)
+    // Redraw outline
+    for (int i = 0; i < vertex_count; i++)
     {
-        int x0 = (int)roundf(main_fill_polyX[i]);
-        int y0 = (int)roundf(main_fill_polyY[i]);
-        int x1 = (int)roundf(main_fill_polyX[(i + 1) %
-                                             main_fill_poly_vertex_count]);
-        int y1 = (int)roundf(main_fill_polyY[(i + 1) %
-                                             main_fill_poly_vertex_count]);
-        DrawLine(x0, y0, x1, y1, 1, c);
+        //        int next = (i + 1) % vertex_count;
+        DrawLine((int)(pEdges[i].x0 + 0.5f), (int)(pEdges[i].y0 + 0.5f),
+                 (int)(pEdges[i].x1 + 0.5f), (int)(pEdges[i].y1 + 0.5f), 1, c);
     }
-    FreeMemory((void *)nodeX);
-}
 
+    if (vertex_count > 256)
+        FreeMemory((void *)pEdges);
+    if (count > 256)
+        FreeMemory((void *)nodeX);
+}
 void polygon(unsigned char *p, int close)
 {
     int xcount = 0;
@@ -3213,7 +3346,7 @@ void polygon(unsigned char *p, int close)
     MMFLOAT *polycountf = NULL, *cfptr = NULL, *ffptr = NULL, *xfptr = NULL, *yfptr = NULL, xfptr2 = 0, yfptr2 = 0;
     int i, f = 0, c, xtot = 0, ymax = 0, ymin = 1000000;
     int n = 0, nx = 0, ny = 0, nc = 0, nf = 0;
-    getargs(&p, 9, (unsigned char *)",");
+    getcsargs(&p, 9);
     if (Option.DISPLAY_TYPE == 0)
         error("Display not configured");
     getargaddress(argv[0], &polycount, &polycountf, &n);
@@ -3491,7 +3624,7 @@ void MIPS16 cmd_rbox(void)
     int x1, y1, wi, h, w = 0, c = 0, f = 0, r = 0, n = 0, i, nc = 0, nw = 0, nf = 0, hmod, wmod;
     long long int *x1ptr, *y1ptr, *wiptr, *hptr, *wptr, *cptr, *fptr;
     MMFLOAT *x1fptr, *y1fptr, *wifptr, *hfptr, *wfptr, *cfptr, *ffptr;
-    getargs(&cmdline, 13, (unsigned char *)",");
+    getcsargs(&cmdline, 13);
     if (Option.DISPLAY_TYPE == 0)
         error("Display not configured");
     if (!(argc & 1) || argc < 7)
@@ -3604,7 +3737,7 @@ void MIPS16 cmd_rbox(void)
 void MIPS16 fun_at(void)
 {
     char buf[27];
-    getargs(&ep, 5, (unsigned char *)",");
+    getcsargs(&ep, 5);
     if (commandfunction(cmdtoken) != cmd_print)
         error("Invalid function");
     //	if((argc == 3 || argc == 5)) error("Incorrect number of arguments");
@@ -3644,7 +3777,7 @@ void fun_pixel(void)
         error("Invalid on this display");
     int p;
     int x, y;
-    getargs(&ep, 3, (unsigned char *)",");
+    getcsargs(&ep, 3);
     if (argc != 3)
         error("Argument count");
     x = getinteger(argv[0]);
@@ -3674,7 +3807,7 @@ void cmd_triangle(void)
     int x1, y1, x2, y2, x3, y3, c = 0, f = 0, n = 0, i, nc = 0, nf = 0;
     long long int *x3ptr, *y3ptr, *x1ptr, *y1ptr, *x2ptr, *y2ptr, *fptr, *cptr;
     MMFLOAT *x3fptr, *y3fptr, *x1fptr, *y1fptr, *x2fptr, *y2fptr, *ffptr, *cfptr;
-    getargs(&cmdline, 15, (unsigned char *)",");
+    getcsargs(&cmdline, 15);
     if (Option.DISPLAY_TYPE == 0)
         error("Display not configured");
     if (!(argc & 1) || argc < 11)
@@ -4018,7 +4151,7 @@ void cmd_blitmemory(void)
 {
     int x1, y1, w, h;
     int8_t blank = -1;
-    getargs(&cmdline, 7, (unsigned char *)",");
+    getcsargs(&cmdline, 7);
     if (argc < 5)
         error("Syntax");
     char *from = (char *)GetPeekAddr(argv[0]);
@@ -4242,7 +4375,7 @@ int blitother(void)
     if ((p = checkstring(cmdline, (unsigned char *)"COMPRESSED")))
     {
         int8_t blank = -1;
-        getargs(&p, 7, (unsigned char *)",");
+        getcsargs(&p, 7);
         if (argc < 5)
             error("Syntax");
         char *fc = (char *)GetPeekAddr(argv[0]);
@@ -4264,7 +4397,7 @@ int blitother(void)
         int8_t blank = -1;
         int otoggle = 0, itoggle = 0; // input will always start on a byte boundary
         volatile unsigned char *s = NULL, *d = NULL;
-        getargs(&p, 17, (unsigned char *)",");
+        getcsargs(&p, 17);
         if (argc < 15)
             error("Syntax");
         if (checkstring(argv[0], (unsigned char *)"L"))
@@ -4620,7 +4753,7 @@ void cmd_cls(void)
 
 void fun_rgb(void)
 {
-    getargs(&ep, 5, (unsigned char *)",");
+    getcsargs(&ep, 5);
     if (argc == 5)
         iret = rgb(getint(argv[0], 0, 255), getint(argv[2], 0, 255), getint(argv[4], 0, 255));
     else if (argc == 1)
@@ -5290,7 +5423,7 @@ void MIPS16 loadsprite(unsigned char *p)
     char *q, *fname;
     unsigned char buff[256], *z;
     uint32_t data;
-    getargs(&p, 5, (unsigned char *)",");
+    getcsargs(&p, 5);
     int mode = 0;
     fnbr = FindFreeFileNbr();
     if (!InitSDCard())
@@ -5461,7 +5594,7 @@ void MIPS16 loadarray(unsigned char *p)
     char *q;
     //    uint16_t* qq;
     //    uint32_t* qqq;
-    getargs(&p, 7, (unsigned char *)",");
+    getcsargs(&p, 7);
     if (*argv[0] == '#')
         argv[0]++;
     bnbr = (int)getint(argv[0], 1, MAXBLITBUF);
@@ -5657,7 +5790,7 @@ void cmd_sprite(void)
     if ((p = checkstring(cmdline, (unsigned char *)"SHOW SAFE")))
     {
         int layer, mode = 1;
-        getargs(&p, 11, (unsigned char *)",");
+        getcsargs(&p, 11);
         if (!(argc == 7 || argc == 9 || argc == 11))
             error((char *)"Syntax");
         if (hideall)
@@ -5728,7 +5861,7 @@ void cmd_sprite(void)
     else if ((p = checkstring(cmdline, (unsigned char *)"SHOW")))
     {
         int layer, mode = 1;
-        getargs(&p, 9, (unsigned char *)",");
+        getcsargs(&p, 9);
         if (!(argc == 7 || argc == 9))
             error((char *)"Syntax");
         if (hideall)
@@ -5824,7 +5957,7 @@ void cmd_sprite(void)
     }
     else if ((p = checkstring(cmdline, (unsigned char *)"HIDE SAFE")))
     {
-        getargs(&p, 1, (unsigned char *)",");
+        getcsargs(&p, 1);
         if (sprites_in_use != LIFOpointer + zeroLIFOpointer || sprites_in_use != sumlayer())
             error((char *)"sprite internal error");
         if (argc != 1)
@@ -5851,7 +5984,7 @@ void cmd_sprite(void)
     }
     else if ((p = checkstring(cmdline, (unsigned char *)"HIDE")))
     {
-        getargs(&p, 1, (unsigned char *)",");
+        getcsargs(&p, 1);
         if (argc != 1)
             error((char *)"Syntax");
         if (*argv[0] == '#')
@@ -5891,7 +6024,7 @@ void cmd_sprite(void)
         int rbnbr = 0, mode = 2;
         int64_t master;
         signed char mymaster;
-        getargs(&p, 5, (unsigned char *)",");
+        getcsargs(&p, 5);
         if (argc < 3)
             error((char *)"Syntax");
         if (hideall)
@@ -5951,7 +6084,7 @@ void cmd_sprite(void)
     }
     else if ((p = checkstring(cmdline, (unsigned char *)"READ")))
     {
-        getargs(&p, 11, (unsigned char *)",");
+        getcsargs(&p, 11);
         if (!(argc == 9))
             error((char *)"Syntax");
         if (*argv[0] == '#')
@@ -5994,7 +6127,7 @@ void cmd_sprite(void)
     else if ((p = checkstring(cmdline, (unsigned char *)"COPY")))
     {
         int cpy, nbr, c1, n1;
-        getargs(&p, 5, (unsigned char *)",");
+        getcsargs(&p, 5);
         if (argc != 5)
             error((char *)"Syntax");
         if (*argv[0] == '#')
@@ -6052,7 +6185,7 @@ void cmd_sprite(void)
     }
     else if ((p = checkstring(cmdline, (unsigned char *)"INTERRUPT")))
     {
-        getargs(&p, 1, (unsigned char *)",");
+        getcsargs(&p, 1);
         COLLISIONInterrupt = (char *)GetIntAddress(argv[0]); // get the interrupt location
         InterruptUsed = true;
         return;
@@ -6068,7 +6201,7 @@ void cmd_sprite(void)
     }
     else if ((p = checkstring(cmdline, (unsigned char *)"CLOSE")))
     {
-        getargs(&p, 1, (unsigned char *)",");
+        getcsargs(&p, 1);
         if (hideall)
             error((char *)"Sprites are hidden");
         if (*argv[0] == '#')
@@ -6114,7 +6247,7 @@ void cmd_sprite(void)
     }
     else if ((p = checkstring(cmdline, (unsigned char *)"NEXT")))
     {
-        getargs(&p, 5, (unsigned char *)",");
+        getcsargs(&p, 5);
         if (!(argc == 5))
             error((char *)"Syntax");
         if (*argv[0] == '#')
@@ -6127,7 +6260,7 @@ void cmd_sprite(void)
     else if ((p = checkstring(cmdline, (unsigned char *)"WRITE")))
     {
         int mode = 4;
-        getargs(&p, 7, (unsigned char *)",");
+        getcsargs(&p, 7);
         if (!(argc == 5 || argc == 7))
             error((char *)"Syntax");
         if (*argv[0] == '#')
@@ -6161,7 +6294,7 @@ void cmd_sprite(void)
         int w, h;
         upng_t *upng;
         // get the command line arguments
-        getargs(&p, 11, (unsigned char *)","); // this MUST be the first executable line in the function
+        getcsargs(&p, 11); // this MUST be the first executable line in the function
         if (*argv[0] == '#')
             argv[0]++;                         // check if the first arg is prefixed with a #
         bnbr = getint(argv[0], 1, MAXBLITBUF); // get the buffer number
@@ -6272,7 +6405,7 @@ void cmd_sprite(void)
         int xOrigin, yOrigin, xlen, ylen;
         BMPDECODER BmpDec;
         // get the command line arguments
-        getargs(&p, 11, (unsigned char *)","); // this MUST be the first executable line in the function
+        getcsargs(&p, 11); // this MUST be the first executable line in the function
         if (*argv[0] == '#')
             argv[0]++;                         // check if the first arg is prefixed with a #
         bnbr = getint(argv[0], 1, MAXBLITBUF); // get the buffer number
@@ -6408,7 +6541,7 @@ void cmd_sprite(void)
     {
         int i, n, m = 0, blank = -2, x, y;
         char *current = NULL;
-        getargs(&p, 5, (unsigned char *)",");
+        getcsargs(&p, 5);
         if (hideall)
             error((char *)"Sprites are hidden");
         x = (int)getint(argv[0], -maxW / 2 - 1, maxW);
@@ -6519,7 +6652,7 @@ void cmd_sprite(void)
 void fun_sprite(void)
 {
     int bnbr = 0, w = -1, h = -1, t = 0, x = 10000, y = 10000, l = 0, n, c = 0;
-    getargs(&ep, 5, (unsigned char *)",");
+    getcsargs(&ep, 5);
     if (checkstring(argv[0], (unsigned char *)"W"))
         t = 1;
     else if (checkstring(argv[0], (unsigned char *)"H"))
@@ -6789,7 +6922,7 @@ void restorepanel(void)
             ScrollLCD = ScrollSSD1963;
         else
             ScrollLCD = ScrollLCDSPI;
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
     }
     else if (Option.DISPLAY_TYPE >= NEXTGEN)
     {
@@ -6800,14 +6933,14 @@ void restorepanel(void)
         DrawBLITBuffer = DrawBlitBufferMEM332;
         ReadBLITBuffer = ReadBlitBufferMEM332;
         ScrollLCD = ScrollLCDMEM332;
-        DrawPixel = DrawPixelNormal;
+        DrawPixel = DrawPixelMEM332;
 #endif
     }
     WriteBuf = NULL;
 }
 void setframebuffer(void)
 {
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
     if (!((Option.DISPLAY_TYPE > I2C_PANEL && Option.DISPLAY_TYPE < BufferedPanel) || (Option.DISPLAY_TYPE >= SSDPANEL && Option.DISPLAY_TYPE < VIRTUAL) || Option.DISPLAY_TYPE >= NEXTGEN))
         return;
 #else
@@ -6883,7 +7016,7 @@ void copyframetoscreen(uint8_t *s, int xstart, int xend, int ystart, int yend, i
         {
             SetAreaIPS_4_16(xstart, ystart, xend, yend, 1); // setup the area to be filled
         }
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
     }
     else if (Option.DISPLAY_TYPE >= NEXTGEN)
     {
@@ -6926,7 +7059,7 @@ void copyframetoscreen(uint8_t *s, int xstart, int xend, int ystart, int yend, i
                 col[2] = (RGB121map[i] >> 16);
                 col[1] = (RGB121map[i] >> 8) & 0xFF;
                 col[0] = (RGB121map[i] & 0xFF);
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
             }
             else if (Option.DISPLAY_TYPE > SSD_PANEL_8 && Option.DISPLAY_TYPE < NEXTGEN)
             {
@@ -6937,7 +7070,7 @@ void copyframetoscreen(uint8_t *s, int xstart, int xend, int ystart, int yend, i
 #endif
                 map[i] = ((RGB121map[i] >> 8) & 0xf800) | ((RGB121map[i] >> 5) & 0x07e0) | ((RGB121map[i] >> 3) & 0x001f);
                 continue;
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
             }
             else if (Option.DISPLAY_TYPE >= NEXTGEN)
             {
@@ -6961,7 +7094,7 @@ void copyframetoscreen(uint8_t *s, int xstart, int xend, int ystart, int yend, i
     i = (xend - xstart + 1) * (yend - ystart + 1);
     if (Option.DISPLAY_TYPE > I2C_PANEL && Option.DISPLAY_TYPE < BufferedPanel)
     {
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
         if (PinDef[Option.LCD_CLK].mode & SPI0SCK)
         {
 #else
@@ -7010,7 +7143,7 @@ void copyframetoscreen(uint8_t *s, int xstart, int xend, int ystart, int yend, i
                 i -= 2;
             }
         }
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
         if (PinDef[Option.LCD_CLK].mode & SPI0SCK)
             spi_finish(spi0);
 #else
@@ -7020,7 +7153,7 @@ void copyframetoscreen(uint8_t *s, int xstart, int xend, int ystart, int yend, i
         else
             spi_finish(spi1);
         ClearCS(Option.LCD_CS); // set CS high
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
     }
     else if (Option.DISPLAY_TYPE >= NEXTGEN)
     {
@@ -7281,98 +7414,82 @@ void copyframetoscreen(uint8_t *s, int xstart, int xend, int ystart, int yend, i
         }
     }
 }
-void blitmerge(int x0, int y0, int w, int h, uint8_t colour)
+// Batch size for scanline accumulation (tune based on available RAM)
+#define MERGE_BATCH_LINES 8
+
+// Core merge logic - optimized with reduced branching
+static inline void merge_scanline(uint8_t *dst, const uint8_t *src, int width, uint8_t colour)
 {
-    if (LayerBuf == NULL || FrameBuf == NULL)
-        return;
-    uint8_t *ss, *s = LayerBuf;
-    uint8_t *d = FrameBuf;
-    uint8_t LineBuf[HRes / 2];
     uint8_t highcolour = colour << 4;
-#ifdef PICOMITE
-    mutex_enter_blocking(&frameBufferMutex); // lock the frame buffer
-#endif
-    if (Option.DISPLAY_TYPE == ILI9341 || Option.DISPLAY_TYPE == ST7796SP || Option.DISPLAY_TYPE == ST7796S || Option.DISPLAY_TYPE == ST7789B || Option.DISPLAY_TYPE == ILI9488 || Option.DISPLAY_TYPE == ILI9488P)
+
+    for (int x = 0; x < width; x++)
     {
-        while (GetLineILI9341() != 0)
-        {
-        }
+        uint8_t src_pixel = src[x];
+        uint8_t top = src_pixel & 0xF0;
+        uint8_t bottom = src_pixel & 0x0F;
+
+        // Skip if both pixels are transparent
+        if (top == highcolour && bottom == colour)
+            continue;
+
+        // Branchless merge: use source pixel if not transparent, else keep destination
+        uint8_t new_top = (top != highcolour) ? top : (dst[x] & 0xF0);
+        uint8_t new_bottom = (bottom != colour) ? bottom : (dst[x] & 0x0F);
+        dst[x] = new_top | new_bottom;
     }
-    for (int y = y0; y < y0 + h; y++)
-    {
-        if (y > VRes - 1)
-            break;
-        memcpy(LineBuf, d + y * HRes / 2, HRes / 2);
-        ss = s + y * HRes / 2;
-        for (int x = 0; x < HRes / 2; x++)
-        {
-            uint8_t top = *ss & 0xF0;
-            uint8_t bottom = *ss++ & 0x0f;
-            if (top == highcolour && bottom == colour)
-                continue;
-            if (top != highcolour && bottom != colour)
-                LineBuf[x] = (top | bottom);
-            else if (top != highcolour)
-            {
-                LineBuf[x] &= 0x0F;
-                LineBuf[x] |= top;
-            }
-            else
-            {
-                LineBuf[x] &= 0xF0;
-                LineBuf[x] |= bottom;
-            }
-        }
-        copyframetoscreen(&LineBuf[x0 / 2], x0, x0 + w - 1, y, y, 0);
-    }
-#ifdef PICOMITE
-    mutex_exit(&frameBufferMutex);
-    mergedone = true;
-    __dmb();
-#endif
 }
+
 void merge(uint8_t colour)
 {
     if (LayerBuf == NULL || FrameBuf == NULL)
         return;
-    uint8_t *ss, *s = LayerBuf;
+
+    uint8_t *s = LayerBuf;
     uint8_t *d = FrameBuf;
-    uint8_t LineBuf[HRes / 2];
-    uint8_t highcolour = colour << 4;
+    int bytes_per_line = HRes / 2;
+
+    // Allocate batch buffer for multiple scanlines
+    uint8_t BatchBuf[MERGE_BATCH_LINES * (HRes / 2)];
+
 #ifdef PICOMITE
-    mutex_enter_blocking(&frameBufferMutex); // lock the frame buffer
+    mutex_enter_blocking(&frameBufferMutex);
 #endif
-    if (Option.DISPLAY_TYPE == ILI9341 || Option.DISPLAY_TYPE == ST7796SP || Option.DISPLAY_TYPE == ST7796S || Option.DISPLAY_TYPE == ST7789B || Option.DISPLAY_TYPE == ILI9488 || Option.DISPLAY_TYPE == ILI9488P)
+
+    if (Option.DISPLAY_TYPE == ILI9341 || Option.DISPLAY_TYPE == ST7796SP ||
+        Option.DISPLAY_TYPE == ST7796S || Option.DISPLAY_TYPE == ST7789B ||
+        Option.DISPLAY_TYPE == ILI9488 || Option.DISPLAY_TYPE == ILI9488P)
     {
         while (GetLineILI9341() != 0)
         {
         }
     }
-    for (int y = 0; y < VRes; y++)
+
+    // Process in batches
+    for (int y = 0; y < VRes; y += MERGE_BATCH_LINES)
     {
-        memcpy(LineBuf, d + y * HRes / 2, HRes / 2);
-        ss = s + y * HRes / 2;
-        for (int x = 0; x < HRes / 2; x++)
+        int batch_size = (y + MERGE_BATCH_LINES > VRes) ? (VRes - y) : MERGE_BATCH_LINES;
+
+        // Process batch of scanlines
+        for (int i = 0; i < batch_size; i++)
         {
-            uint8_t top = *ss & 0xF0;
-            uint8_t bottom = *ss++ & 0x0f;
-            if (top == highcolour && bottom == colour)
-                continue;
-            if (top != highcolour && bottom != colour)
-                LineBuf[x] = (top | bottom);
-            else if (top != highcolour)
-            {
-                LineBuf[x] &= 0x0F;
-                LineBuf[x] |= top;
-            }
-            else
-            {
-                LineBuf[x] &= 0xF0;
-                LineBuf[x] |= bottom;
-            }
+            int curr_y = y + i;
+            uint8_t *dst_line = BatchBuf + i * bytes_per_line;
+            uint8_t *src_line = s + curr_y * bytes_per_line;
+            uint8_t *frame_line = d + curr_y * bytes_per_line;
+
+            // Copy framebuffer line to batch buffer
+            memcpy(dst_line, frame_line, bytes_per_line);
+
+            // Merge layer into batch buffer
+            merge_scanline(dst_line, src_line, bytes_per_line, colour);
         }
-        copyframetoscreen(LineBuf, 0, HRes - 1, y, y, 0);
+
+        // Send entire batch to screen in one call
+        int y_start = y;
+        int y_end = y + batch_size - 1;
+        copyframetoscreen(BatchBuf, 0, HRes - 1, y_start, y_end, 0);
     }
+
 #ifdef PICOMITE
     mutex_exit(&frameBufferMutex);
     mergedone = true;
@@ -7381,6 +7498,68 @@ void merge(uint8_t colour)
     low_y = 0;
     high_x = HRes - 1;
     high_y = VRes - 1;
+#endif
+}
+
+void blitmerge(int x0, int y0, int w, int h, uint8_t colour)
+{
+    if (LayerBuf == NULL || FrameBuf == NULL)
+        return;
+
+    uint8_t *s = LayerBuf;
+    uint8_t *d = FrameBuf;
+    int bytes_per_line = HRes / 2;
+    int x0_bytes = x0 / 2;
+    int w_bytes = w / 2;
+
+    // Allocate batch buffer for multiple scanlines
+    uint8_t BatchBuf[MERGE_BATCH_LINES * (HRes / 2)];
+
+#ifdef PICOMITE
+    mutex_enter_blocking(&frameBufferMutex);
+#endif
+
+    if (Option.DISPLAY_TYPE == ILI9341 || Option.DISPLAY_TYPE == ST7796SP ||
+        Option.DISPLAY_TYPE == ST7796S || Option.DISPLAY_TYPE == ST7789B ||
+        Option.DISPLAY_TYPE == ILI9488 || Option.DISPLAY_TYPE == ILI9488P)
+    {
+        while (GetLineILI9341() != 0)
+        {
+        }
+    }
+
+    int y_end = (y0 + h > VRes) ? VRes : (y0 + h);
+
+    // Process in batches
+    for (int y = y0; y < y_end; y += MERGE_BATCH_LINES)
+    {
+        int batch_size = (y + MERGE_BATCH_LINES > y_end) ? (y_end - y) : MERGE_BATCH_LINES;
+
+        // Process batch of scanlines
+        for (int i = 0; i < batch_size; i++)
+        {
+            int curr_y = y + i;
+            uint8_t *dst_line = BatchBuf + i * bytes_per_line;
+            uint8_t *src_line = s + curr_y * bytes_per_line;
+            uint8_t *frame_line = d + curr_y * bytes_per_line;
+
+            // Copy entire framebuffer line to batch buffer
+            memcpy(dst_line, frame_line, bytes_per_line);
+
+            // Merge only the specified region
+            merge_scanline(dst_line + x0_bytes, src_line + x0_bytes, w_bytes, colour);
+        }
+
+        // Send entire batch to screen in one call
+        int y_start = y;
+        int y_batch_end = y + batch_size - 1;
+        copyframetoscreen(&BatchBuf[x0_bytes], x0, x0 + w - 1, y_start, y_batch_end, 0);
+    }
+
+#ifdef PICOMITE
+    mutex_exit(&frameBufferMutex);
+    mergedone = true;
+    __dmb();
 #endif
 }
 /*  @endcond */
@@ -7424,7 +7603,7 @@ void cmd_framebuffer(void)
             return;
         }
         {
-            getargs(&p, 1, (unsigned char *)",");
+            getcsargs(&p, 1);
             if (argc != 1)
                 error("Syntax");
             char *q = (char *)getCstring(argv[0]);
@@ -7473,7 +7652,7 @@ void cmd_framebuffer(void)
         if (!FrameBuf)
             error("Framebuffer not created");
         uint8_t colour = 0;
-        getargs(&p, 5, (unsigned char *)",");
+        getcsargs(&p, 5);
         if (argc >= 1 && *argv[0])
         {
             colour = getint(argv[0], 0, 15);
@@ -7605,7 +7784,7 @@ void cmd_framebuffer(void)
 #ifdef PICOMITE
         int complex = 0, background = 0;
         unsigned char *buff = WriteBuf;
-        getargs(&p, 5, (unsigned char *)",");
+        getcsargs(&p, 5);
         if (!(argc == 3 || argc == 5))
             error("Syntax");
         if (argc == 5)
@@ -7618,7 +7797,7 @@ void cmd_framebuffer(void)
 #else
         int complex = 0;
         unsigned char *buff = WriteBuf;
-        getargs(&p, 3, (unsigned char *)",");
+        getcsargs(&p, 3);
         if (!(argc == 3))
             error("Syntax");
 #endif
@@ -7722,7 +7901,7 @@ void cmd_blit(void)
         int xOrigin, yOrigin, xlen, ylen;
         BMPDECODER BmpDec;
         // get the command line arguments
-        getargs(&p, 11, (unsigned char *)","); // this MUST be the first executable line in the function
+        getcsargs(&p, 11); // this MUST be the first executable line in the function
         if (*argv[0] == '#')
             argv[0]++;                             // check if the first arg is prefixed with a #
         bnbr = getint(argv[0], 1, MAXBLITBUF) - 1; // get the buffer number
@@ -7778,7 +7957,7 @@ void cmd_blit(void)
         if (!FrameBuf)
             error("Framebuffer not created");
         uint8_t colour = 0;
-        getargs(&p, 13, (unsigned char *)",");
+        getcsargs(&p, 13);
         if (argc >= 1 && *argv[0])
         {
             colour = getint(argv[0], 0, 15);
@@ -7852,7 +8031,7 @@ void cmd_blit(void)
 #endif
     if ((p = checkstring(cmdline, (unsigned char *)"READ")))
     {
-        getargs(&p, 9, (unsigned char *)",");
+        getcsargs(&p, 9);
         if ((void *)ReadBuffer == (void *)DisplayNotSet)
             error("Invalid on this display");
         if (argc != 9)
@@ -7897,7 +8076,7 @@ void cmd_blit(void)
     else if ((p = checkstring(cmdline, (unsigned char *)"WRITE")))
     {
         int mode = 0;
-        getargs(&p, 7, (unsigned char *)",");
+        getcsargs(&p, 7);
         if (!(argc == 5 || argc == 7))
             error((char *)"Syntax");
         if (*argv[0] == '#')
@@ -8033,7 +8212,7 @@ void cmd_blit(void)
     }
     else if ((p = checkstring(cmdline, (unsigned char *)"CLOSE")))
     {
-        getargs(&p, 1, (unsigned char *)",");
+        getcsargs(&p, 1);
         if (*argv[0] == '#')
             argv[0]++;                             // check if the first arg is prefixed with a #
         bnbr = getint(argv[0], 1, MAXBLITBUF) - 1; // get the buffer number
@@ -8048,7 +8227,7 @@ void cmd_blit(void)
     }
     else
     {
-        getargs(&cmdline, 11, (unsigned char *)",");
+        getcsargs(&cmdline, 11);
         if ((void *)ReadBuffer == (void *)DisplayNotSet)
             error("Invalid on this display");
         if (argc != 11)
@@ -8570,7 +8749,7 @@ void cmd_blit(void)
             if (x1 >= x2)
             {
                 max_x = 1;
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
                 buff = GetMemory(max_x * h * (SSD16TYPE || Option.DISPLAY_TYPE == IPS_4_16 ? 2 : (Option.DISPLAY_TYPE >= NEXTGEN ? 1 : 3)));
 #else
                 buff = GetMemory(max_x * h * (SSD16TYPE || Option.DISPLAY_TYPE == IPS_4_16 ? 2 : 3));
@@ -8594,7 +8773,7 @@ void cmd_blit(void)
             {
                 int start_x1, start_x2;
                 max_x = 1;
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
                 buff = GetMemory(max_x * h * (SSD16TYPE || Option.DISPLAY_TYPE == IPS_4_16 ? 2 : (Option.DISPLAY_TYPE >= NEXTGEN ? 1 : 3)));
 #else
                 buff = GetMemory(max_x * h * (SSD16TYPE || Option.DISPLAY_TYPE == IPS_4_16 ? 2 : 3));
@@ -8623,7 +8802,7 @@ void cmd_blit(void)
 
 void MIPS16 cmd_font(void)
 {
-    getargs(&cmdline, 3, (unsigned char *)",");
+    getcsargs(&cmdline, 3);
     if (argc < 1)
         error("Argument count");
     if (*argv[0] == '#')
@@ -8674,7 +8853,7 @@ void cmd_colourmap(void)
     MMFLOAT *cfptr = NULL, *ffptr = NULL;
     int nf, n, i;
     int map[16];
-    getargs(&cmdline, 5, (unsigned char *)",");
+    getcsargs(&cmdline, 5);
     memcpy((void *)map, (void *)RGB121map, 16 * sizeof(int));
     if (!(argc == 3 || argc == 5))
         error("Argument count");
@@ -8721,7 +8900,7 @@ void cmd_colourmap(void)
 #endif
 void cmd_colour(void)
 {
-    getargs(&cmdline, 3, (unsigned char *)",");
+    getcsargs(&cmdline, 3);
     if (argc < 1)
         error("Argument count");
     gui_fcolour = getColour((char *)argv[0], 0);
@@ -8845,7 +9024,7 @@ void cmd_tile(void)
     }
     else
     {
-        getargs(&cmdline, 11, (unsigned char *)",");
+        getcsargs(&cmdline, 11);
         if (!(DISPLAY_TYPE == SCREENMODE1))
             return;
         if (argc < 5)
@@ -9514,7 +9693,7 @@ void cmd_tile(void)
     }
     else
     {
-        getargs(&cmdline, 11, (unsigned char *)",");
+        getcsargs(&cmdline, 11);
         if (!(DISPLAY_TYPE == SCREENMODE1))
             return;
         if (argc < 5)
@@ -9817,7 +9996,7 @@ void cmd_refresh(void)
 {
     if (Option.DISPLAY_TYPE == 0)
         error("Display not configured");
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
     if (Option.DISPLAY_TYPE >= NEXTGEN)
     {
         if (!Option.Refresh)
@@ -9839,7 +10018,7 @@ void cmd_refresh(void)
         low_x = 0;
         high_x = DisplayHRes - 1;
         Display_Refresh();
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
     }
 #endif
 }
@@ -9852,7 +10031,7 @@ void DrawPixel16(int x, int y, int c)
 {
     if (x < 0 || y < 0 || x >= HRes || y >= VRes)
         return;
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
     if ((Option.DISPLAY_TYPE >= VIRTUAL && Option.DISPLAY_TYPE < NEXTGEN) && WriteBuf == NULL)
         WriteBuf = GetMemory(VMaxH * VMaxV / 8);
 #else
@@ -9879,7 +10058,7 @@ void DrawRectangle16(int x1, int y1, int x2, int y2, int c)
     unsigned char colour = RGB121(c);
     ;
     unsigned char bcolour = (colour << 4) | colour;
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
     if ((Option.DISPLAY_TYPE >= VIRTUAL && Option.DISPLAY_TYPE < NEXTGEN) && WriteBuf == NULL)
         WriteBuf = GetMemory(VMaxH * VMaxV / 8);
 #else
@@ -9947,7 +10126,7 @@ void DrawBitmap16(int x1, int y1, int width, int height, int scale, int fc, int 
         return;
     unsigned char fcolour = RGB121(fc);
     unsigned char bcolour = RGB121(bc);
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
     if ((Option.DISPLAY_TYPE >= VIRTUAL && Option.DISPLAY_TYPE < NEXTGEN) && WriteBuf == NULL)
         WriteBuf = GetMemory(VMaxH * VMaxV / 8);
 #else
@@ -10039,7 +10218,7 @@ void DrawBuffer16(int x1, int y1, int x2, int y2, unsigned char *p)
     } c;
     unsigned char fcolour;
     uint8_t *pp;
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
     if ((Option.DISPLAY_TYPE >= VIRTUAL && Option.DISPLAY_TYPE < NEXTGEN) && WriteBuf == NULL)
         WriteBuf = GetMemory(VMaxH * VMaxV / 8);
 #else
@@ -10115,7 +10294,7 @@ void DrawBuffer16Fast(int x1, int y1, int x2, int y2, int blank, unsigned char *
         y1 = y2;
         y2 = t;
     }
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
     if ((Option.DISPLAY_TYPE >= VIRTUAL && Option.DISPLAY_TYPE < NEXTGEN) && WriteBuf == NULL)
         WriteBuf = GetMemory(VMaxH * VMaxV / 8);
 #else
@@ -10174,7 +10353,7 @@ void ReadBuffer16(int x1, int y1, int x2, int y2, unsigned char *c)
 {
     int x, y, t;
     uint8_t *pp;
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
     if ((Option.DISPLAY_TYPE >= VIRTUAL && Option.DISPLAY_TYPE < NEXTGEN) && WriteBuf == NULL)
         WriteBuf = GetMemory(VMaxH * VMaxV / 8);
 #else
@@ -10261,7 +10440,7 @@ void ReadBuffer16Fast(int x1, int y1, int x2, int y2, unsigned char *c)
         y1 = y2;
         y2 = t;
     }
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
     if ((Option.DISPLAY_TYPE >= VIRTUAL && Option.DISPLAY_TYPE < NEXTGEN) && WriteBuf == NULL)
         WriteBuf = GetMemory(VMaxH * VMaxV / 8);
 #else
@@ -10313,7 +10492,7 @@ void DrawPixel2(int x, int y, int c)
 {
     if (x < 0 || y < 0 || x >= HRes || y >= VRes)
         return;
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
     if ((Option.DISPLAY_TYPE >= VIRTUAL && Option.DISPLAY_TYPE < NEXTGEN) && WriteBuf == NULL)
         WriteBuf = GetMemory(VMaxH * VMaxV / 8);
 #else
@@ -10332,7 +10511,7 @@ void DrawRectangle2(int x1, int y1, int x2, int y2, int c)
     int x, y, x1p, x2p, t;
     unsigned char mask;
     volatile unsigned char *p;
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
     if ((Option.DISPLAY_TYPE >= VIRTUAL && Option.DISPLAY_TYPE < NEXTGEN) && WriteBuf == NULL)
         WriteBuf = GetMemory(VMaxH * VMaxV / 8);
 #else
@@ -10458,7 +10637,7 @@ void DrawBitmap2(int x1, int y1, int width, int height, int scale, int fc, int b
     if (x1 >= HRes || y1 >= VRes || x1 + width * scale < 0 || y1 + height * scale < 0)
         return;
     int tilematch = 0;
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
     if ((Option.DISPLAY_TYPE >= VIRTUAL && Option.DISPLAY_TYPE < NEXTGEN) && WriteBuf == NULL)
         WriteBuf = GetMemory(VMaxH * VMaxV / 8);
 #else
@@ -10742,7 +10921,7 @@ void DrawBuffer2(int x1, int y1, int x2, int y2, unsigned char *p)
         char rgbbytes[4];
         unsigned int rgb;
     } c;
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
     if ((Option.DISPLAY_TYPE >= VIRTUAL && Option.DISPLAY_TYPE < NEXTGEN) && WriteBuf == NULL)
         WriteBuf = GetMemory(VMaxH * VMaxV / 8);
 #else
@@ -10822,7 +11001,7 @@ void DrawBuffer2Fast(int x1, int y1, int x2, int y2, int blank, unsigned char *p
         y1 = y2;
         y2 = t;
     }
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
     if ((Option.DISPLAY_TYPE >= VIRTUAL && Option.DISPLAY_TYPE < NEXTGEN) && WriteBuf == NULL)
         WriteBuf = GetMemory(VMaxH * VMaxV / 8);
 #else
@@ -10876,7 +11055,7 @@ void ReadBuffer2(int x1, int y1, int x2, int y2, unsigned char *c)
     int x, y, t, loc;
     //    uint8_t *pp;
     unsigned char mask;
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
     if ((Option.DISPLAY_TYPE >= VIRTUAL && Option.DISPLAY_TYPE < NEXTGEN) && WriteBuf == NULL)
         WriteBuf = GetMemory(VMaxH * VMaxV / 8);
 #else
@@ -10948,7 +11127,7 @@ void ReadBuffer2Fast(int x1, int y1, int x2, int y2, unsigned char *c)
     ;
     //    uint8_t *pp;
     unsigned char mask;
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
     if ((Option.DISPLAY_TYPE >= VIRTUAL && Option.DISPLAY_TYPE < NEXTGEN) && WriteBuf == NULL)
         WriteBuf = GetMemory(VMaxH * VMaxV / 8);
 #else
@@ -11013,7 +11192,7 @@ void ReadBuffer2Fast(int x1, int y1, int x2, int y2, unsigned char *c)
 
 void MIPS16 ConfigDisplayVirtual(unsigned char *p)
 {
-    getargs(&p, 13, (unsigned char *)",");
+    getcsargs(&p, 13);
     if (checkstring(argv[0], (unsigned char *)"VIRTUAL_M"))
     {
         DISPLAY_TYPE = VIRTUAL_M;
@@ -11029,7 +11208,7 @@ void MIPS16 ConfigDisplayVirtual(unsigned char *p)
 }
 void MIPS16 InitDisplayVirtual(void)
 {
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
     if (Option.DISPLAY_TYPE == 0 || Option.DISPLAY_TYPE < VIRTUAL || Option.DISPLAY_TYPE >= NEXTGEN)
         return;
 #else
@@ -11374,82 +11553,132 @@ void MIPS16 ResetDisplay(void)
 #endif
 #endif
 }
-void hline(int x0, int x1, int y, int f, int ints_per_line, uint32_t *br)
-{ // draw a horizontal line
-    uint32_t w1, xx1, w0, xx0, x, xn, i;
-    const uint32_t a[] = {0xFFFFFFFF, 0x7FFFFFFF, 0x3FFFFFFF, 0x1FFFFFFF, 0xFFFFFFF, 0x7FFFFFF, 0x3FFFFFF, 0x1FFFFFF,
-                          0xFFFFFF, 0x7FFFFF, 0x3FFFFF, 0x1FFFFF, 0xFFFFF, 0x7FFFF, 0x3FFFF, 0x1FFFF,
-                          0xFFFF, 0x7FFF, 0x3FFF, 0x1FFF, 0xFFF, 0x7FF, 0x3FF, 0x1FF,
-                          0xFF, 0x7F, 0x3F, 0x1F, 0x0F, 0x07, 0x03, 0x01};
-    const uint32_t b[] = {0x80000000, 0xC0000000, 0xe0000000, 0xf0000000, 0xf8000000, 0xfc000000, 0xfe000000, 0xff000000,
-                          0xff800000, 0xffC00000, 0xffe00000, 0xfff00000, 0xfff80000, 0xfffc0000, 0xfffe0000, 0xffff0000,
-                          0xffff8000, 0xffffC000, 0xffffe000, 0xfffff000, 0xfffff800, 0xfffffc00, 0xfffffe00, 0xffffff00,
-                          0xffffff80, 0xffffffC0, 0xffffffe0, 0xfffffff0, 0xfffffff8, 0xfffffffc, 0xfffffffe, 0xffffffff};
-    w0 = y * (ints_per_line);
-    xx0 = 0;
-    w1 = y * (ints_per_line) + x1 / 32;
-    xx1 = (x1 & 0x1F);
-    w0 = y * (ints_per_line) + x0 / 32;
-    xx0 = (x0 & 0x1F);
-    w1 = y * (ints_per_line) + x1 / 32;
-    xx1 = (x1 & 0x1F);
-    if (w1 == w0)
-    { // special case both inside same word
-        x = (a[xx0] & b[xx1]);
-        xn = ~x;
+// OPTIMIZED: Move lookup tables to file scope in RAM for fast access
+__not_in_flash("data") static const uint32_t hline_mask_a[32] = {
+    0xFFFFFFFF, 0x7FFFFFFF, 0x3FFFFFFF, 0x1FFFFFFF, 0xFFFFFFF, 0x7FFFFFF, 0x3FFFFFF, 0x1FFFFFF,
+    0xFFFFFF, 0x7FFFFF, 0x3FFFFF, 0x1FFFFF, 0xFFFFF, 0x7FFFF, 0x3FFFF, 0x1FFFF,
+    0xFFFF, 0x7FFF, 0x3FFF, 0x1FFF, 0xFFF, 0x7FF, 0x3FF, 0x1FF,
+    0xFF, 0x7F, 0x3F, 0x1F, 0x0F, 0x07, 0x03, 0x01};
+
+__not_in_flash("data") static const uint32_t hline_mask_b[32] = {
+    0x80000000, 0xC0000000, 0xe0000000, 0xf0000000, 0xf8000000, 0xfc000000, 0xfe000000, 0xff000000,
+    0xff800000, 0xffC00000, 0xffe00000, 0xfff00000, 0xfff80000, 0xfffc0000, 0xfffe0000, 0xffff0000,
+    0xffff8000, 0xffffC000, 0xffffe000, 0xfffff000, 0xfffff800, 0xfffffc00, 0xfffffe00, 0xffffff00,
+    0xffffff80, 0xffffffC0, 0xffffffe0, 0xfffffff0, 0xfffffff8, 0xfffffffc, 0xfffffffe, 0xffffffff};
+
+#ifdef rp2350
+void __not_in_flash_func(hline)(int x0, int x1, int y, int f, int ints_per_line, uint32_t *restrict br)
+{
+#else
+void hline(int x0, int x1, int y, int f, int ints_per_line, uint32_t *restrict br)
+{
+#endif
+    // OPTIMIZED: Calculate once, no redundant operations
+    uint32_t base_offset = y * ints_per_line;
+    uint32_t w0 = base_offset + (x0 >> 5); // Divide by 32
+    uint32_t w1 = base_offset + (x1 >> 5);
+    uint32_t xx0 = x0 & 0x1F; // Modulo 32
+    uint32_t xx1 = x1 & 0x1F;
+
+    if (likely(w1 == w0))
+    {
+        // OPTIMIZED: Special case - both endpoints in same word
+        uint32_t mask = hline_mask_a[xx0] & hline_mask_b[xx1];
+
         if (f)
-            br[w0] |= x;
+            br[w0] |= mask;
         else
-            br[w0] &= xn; // turn on the pixel
+            br[w0] &= ~mask;
     }
     else
     {
-        if (w1 - w0 > 1)
-        { // first deal with full words
-            for (i = w0 + 1; i < w1; i++)
+        // OPTIMIZED: Multiple words
+        uint32_t word_count = w1 - w0;
+
+        if (likely(word_count > 1))
+        {
+            // Fill full words in between
+            uint32_t fill_val = f ? 0xFFFFFFFF : 0;
+            uint32_t *p = &br[w0 + 1];
+            uint32_t count = word_count - 1;
+
+            // Unroll by 4 for better performance
+            while (count >= 4)
             {
-                // draw the pixel
-                br[i] = 0;
-                if (f)
-                    br[i] = 0xFFFFFFFF; // turn on the pixels
+                p[0] = fill_val;
+                p[1] = fill_val;
+                p[2] = fill_val;
+                p[3] = fill_val;
+                p += 4;
+                count -= 4;
             }
+
+            // Handle remainder
+            while (count--)
+                *p++ = fill_val;
         }
-        x = ~a[xx0];
-        br[w0] &= x;
-        x = ~x;
+
+        // Handle partial words at edges
+        uint32_t mask0 = hline_mask_a[xx0];
+        uint32_t mask1 = hline_mask_b[xx1];
+
         if (f)
-            br[w0] |= x; // turn on the pixel
-        x = ~b[xx1];
-        br[w1] &= x;
-        x = ~x;
-        if (f)
-            br[w1] |= x; // turn on the pixel
+        {
+            br[w0] = (br[w0] & ~mask0) | mask0;
+            br[w1] = (br[w1] & ~mask1) | mask1;
+        }
+        else
+        {
+            br[w0] &= ~mask0;
+            br[w1] &= ~mask1;
+        }
     }
 }
 
-void DrawFilledCircle(int x, int y, int radius, int r, int fill, int ints_per_line, uint32_t *br, MMFLOAT aspect, MMFLOAT aspect2)
+void DrawFilledCircle(int x, int y, int radius, int r, int fill,
+                      int ints_per_line, uint32_t *restrict br,
+                      MMFLOAT aspect, MMFLOAT aspect2)
 {
-    int a, b, P;
-    int A, B, asp;
-    x = (int)((MMFLOAT)r * aspect) + radius;
-    y = r + radius;
-    a = 0;
-    b = radius;
-    P = 1 - radius;
-    asp = aspect2 * (MMFLOAT)(1 << 10);
+    // OPTIMIZED: Pre-calculate constants
+    int center_x = (int)((MMFLOAT)r * aspect) + radius;
+    int center_y = r + radius;
+    int x_base = center_x - radius;
+
+    int asp = (int)(aspect2 * 1024.0f); // Use 1024 for shift
+
+    int a = 0;
+    int b = radius;
+    int P = 1 - radius;
+
     do
     {
-        A = (a * asp) >> 10;
-        B = (b * asp) >> 10;
-        hline(x - A - radius, x + A - radius, y + b - radius, fill, ints_per_line, br);
-        hline(x - A - radius, x + A - radius, y - b - radius, fill, ints_per_line, br);
-        hline(x - B - radius, x + B - radius, y + a - radius, fill, ints_per_line, br);
-        hline(x - B - radius, x + B - radius, y - a - radius, fill, ints_per_line, br);
-        if (P < 0)
-            P += 3 + 2 * a++;
-        else
-            P += 5 + 2 * (a++ - b--);
+        // OPTIMIZED: Calculate scaled values
+        int A = (a * asp) >> 10;
+        int B = (b * asp) >> 10;
 
+        int x_minus_A = x_base - A;
+        int x_plus_A = x_base + (A << 1);
+        int x_minus_B = x_base - B;
+        int x_plus_B = x_base + (B << 1);
+
+        // Draw horizontal lines
+        hline(x_minus_A, x_plus_A, center_y + b, fill, ints_per_line, br);
+        hline(x_minus_A, x_plus_A, center_y - b, fill, ints_per_line, br);
+        hline(x_minus_B, x_plus_B, center_y + a, fill, ints_per_line, br);
+        hline(x_minus_B, x_plus_B, center_y - a, fill, ints_per_line, br);
+
+        // OPTIMIZED: Bresenham decision
+        if (P < 0)
+        {
+            P += 3 + (a << 1);
+            a++;
+        }
+        else
+        {
+            P += 5 + ((a - b) << 1);
+            a++;
+            b--;
+        }
     } while (a <= b);
 }
 /******************************************************************************************
@@ -11545,7 +11774,6 @@ void ShowCursor(int show)
     routinechecks();
 }
 #ifndef PICOMITEWEB
-#define ABS(X) ((X) > 0 ? (X) : (-(X)))
 
 void DrawPolygon(int n, short *xcoord, short *ycoord, int face)
 {
@@ -11973,7 +12201,7 @@ void MIPS16 cmd_3D(void)
         MMFLOAT *vertex;
         TFLOAT tmp;
         long long int *faces, *facecount, *facecountindex, *colours, *linecolour = NULL, *fillcolour = NULL;
-        getargs(&p, 19, (unsigned char *)",");
+        getcsargs(&p, 19);
         if (argc < 17)
             error("Argument count");
         int c, colourcount = 0, vp, v, f, fc = 0, n = getint(argv[0], 1, MAX3D);
@@ -12161,7 +12389,7 @@ void MIPS16 cmd_3D(void)
     }
     else if ((p = checkstring(cmdline, (unsigned char *)"DIAGNOSE")))
     {
-        getargs(&p, 9, (unsigned char *)",");
+        getcsargs(&p, 9);
         if (argc < 7)
             error("Argument count");
         int n = getint(argv[0], 1, MAX3D);
@@ -12180,7 +12408,7 @@ void MIPS16 cmd_3D(void)
     }
     else if ((p = checkstring(cmdline, (unsigned char *)"LIGHT")))
     {
-        getargs(&p, 9, (unsigned char *)",");
+        getcsargs(&p, 9);
         if (argc != 9)
             error("Argument count");
         int n = getint(argv[0], 1, MAX3D);
@@ -12192,7 +12420,7 @@ void MIPS16 cmd_3D(void)
     }
     else if ((p = checkstring(cmdline, (unsigned char *)"SHOW")))
     {
-        getargs(&p, 11, (unsigned char *)",");
+        getcsargs(&p, 11);
         if (argc < 7)
             error("Argument count");
         int n = getint(argv[0], 1, MAX3D);
@@ -12215,7 +12443,7 @@ void MIPS16 cmd_3D(void)
     else if ((p = checkstring(cmdline, (unsigned char *)"SET FLAGS")))
     {
         int i, face, nbr;
-        getargs(&p, ((MAX_ARG_COUNT - 1) * 2) - 1, (unsigned char *)",");
+        getcsargs(&p, ((MAX_ARG_COUNT - 1) * 2) - 1);
         if ((argc & 0b11) != 0b11)
             error("Invalid syntax");
         int n = getint(argv[0], 1, MAX3D);
@@ -12240,7 +12468,7 @@ void MIPS16 cmd_3D(void)
         int i, n, v, f;
         s_quaternion q1;
         MMFLOAT *q = NULL;
-        getargs(&p, (MAX_ARG_COUNT * 2) - 1, (unsigned char *)","); // getargs macro must be the first executable stmt in a block
+        getcsargs(&p, (MAX_ARG_COUNT * 2) - 1); // macro must be the first executable stmt in a block
         if ((argc & 0x01 || argc < 3) == 0)
             error("Argument count");
         if (parsefloatrarray(argv[0], &q, 1, 1, NULL, true) != 5)
@@ -12285,7 +12513,7 @@ void MIPS16 cmd_3D(void)
     {
         int i, n;
         int v, f;
-        getargs(&p, (MAX_ARG_COUNT * 2) - 1, (unsigned char *)","); // getargs macro must be the first executable stmt in a block
+        getcsargs(&p, (MAX_ARG_COUNT * 2) - 1); // macro must be the first executable stmt in a block
         if ((argc & 0x01 || argc < 3) == 0)
             error("Argument count");
         for (i = 0; i < argc; i += 2)
@@ -12305,7 +12533,7 @@ void MIPS16 cmd_3D(void)
     else if ((p = checkstring(cmdline, (unsigned char *)"HIDE")))
     {
         int i, n;
-        getargs(&p, (MAX_ARG_COUNT * 2) - 1, (unsigned char *)","); // getargs macro must be the first executable stmt in a block
+        getcsargs(&p, (MAX_ARG_COUNT * 2) - 1); // macro must be the first executable stmt in a block
         if ((argc & 0x01 || argc < 3) == 0)
             error("Argument count");
         for (i = 0; i < argc; i += 2)
@@ -12326,7 +12554,7 @@ void MIPS16 cmd_3D(void)
     else if ((p = checkstring(cmdline, (unsigned char *)"RESTORE")))
     {
         int i, n;
-        getargs(&p, (MAX_ARG_COUNT * 2) - 1, (unsigned char *)","); // getargs macro must be the first executable stmt in a block
+        getcsargs(&p, (MAX_ARG_COUNT * 2) - 1); // macro must be the first executable stmt in a block
         if ((argc & 0x01 || argc < 3) == 0)
             error("Argument count");
         for (i = 0; i < argc; i += 2)
@@ -12342,7 +12570,7 @@ void MIPS16 cmd_3D(void)
     }
     else if ((p = checkstring(cmdline, (unsigned char *)"WRITE")))
     {
-        getargs(&p, 11, (unsigned char *)",");
+        getcsargs(&p, 11);
         if (argc < 7)
             error("Argument count");
         int n = getint(argv[0], 1, MAX3D);
@@ -12370,7 +12598,7 @@ void MIPS16 cmd_3D(void)
     else if ((p = checkstring(cmdline, (unsigned char *)"CLOSE")))
     {
         int i, n;
-        getargs(&p, (MAX_ARG_COUNT * 2) - 1, (unsigned char *)","); // getargs macro must be the first executable stmt in a block
+        getcsargs(&p, (MAX_ARG_COUNT * 2) - 1); // macro must be the first executable stmt in a block
         if ((argc & 0x01 || argc < 3) == 0)
             error("Argument count");
         for (i = 0; i < argc; i += 2)
@@ -12386,7 +12614,7 @@ void MIPS16 cmd_3D(void)
     }
     else if ((p = checkstring(cmdline, (unsigned char *)"CAMERA")))
     {
-        getargs(&p, 11, (unsigned char *)",");
+        getcsargs(&p, 11);
         if (argc < 3)
             error("Argument count");
         int n = getint(argv[0], 1, MAXCAM);
@@ -12420,7 +12648,7 @@ void MIPS16 fun_3D(void)
     unsigned char *p;
     if ((p = checkstring(ep, (unsigned char *)"XMIN")))
     {
-        getargs(&p, 1, (unsigned char *)",");
+        getcsargs(&p, 1);
         int n = getint(argv[0], 1, MAX3D);
         if (struct3d[n] == NULL)
             error("Object does not exist");
@@ -12428,7 +12656,7 @@ void MIPS16 fun_3D(void)
     }
     else if ((p = checkstring(ep, (unsigned char *)"XMAX")))
     {
-        getargs(&p, 1, (unsigned char *)",");
+        getcsargs(&p, 1);
         int n = getint(argv[0], 1, MAX3D);
         if (struct3d[n] == NULL)
             error("Object does not exist");
@@ -12436,7 +12664,7 @@ void MIPS16 fun_3D(void)
     }
     else if ((p = checkstring(ep, (unsigned char *)"YMIN")))
     {
-        getargs(&p, 1, (unsigned char *)",");
+        getcsargs(&p, 1);
         int n = getint(argv[0], 1, MAX3D);
         if (struct3d[n] == NULL)
             error("Object does not exist");
@@ -12444,7 +12672,7 @@ void MIPS16 fun_3D(void)
     }
     else if ((p = checkstring(ep, (unsigned char *)"YMAX")))
     {
-        getargs(&p, 1, (unsigned char *)",");
+        getcsargs(&p, 1);
         int n = getint(argv[0], 1, MAX3D);
         if (struct3d[n] == NULL)
             error("Object does not exist");
@@ -12452,7 +12680,7 @@ void MIPS16 fun_3D(void)
     }
     else if ((p = checkstring(ep, (unsigned char *)"X")))
     {
-        getargs(&p, 1, (unsigned char *)",");
+        getcsargs(&p, 1);
         int n = getint(argv[0], 1, MAX3D);
         if (struct3d[n] == NULL)
             error("Object does not exist");
@@ -12460,7 +12688,7 @@ void MIPS16 fun_3D(void)
     }
     else if ((p = checkstring(ep, (unsigned char *)"Y")))
     {
-        getargs(&p, 1, (unsigned char *)",");
+        getcsargs(&p, 1);
         int n = getint(argv[0], 1, MAX3D);
         if (struct3d[n] == NULL)
             error("Object does not exist");
@@ -12468,7 +12696,7 @@ void MIPS16 fun_3D(void)
     }
     else if ((p = checkstring(ep, (unsigned char *)"DISTANCE")))
     {
-        getargs(&p, 1, (unsigned char *)",");
+        getcsargs(&p, 1);
         int n = getint(argv[0], 1, MAX3D);
         if (struct3d[n] == NULL)
             error("Object does not exist");
@@ -12476,7 +12704,7 @@ void MIPS16 fun_3D(void)
     }
     else if ((p = checkstring(ep, (unsigned char *)"Z")))
     {
-        getargs(&p, 1, (unsigned char *)",");
+        getcsargs(&p, 1);
         int n = getint(argv[0], 1, MAX3D);
         if (struct3d[n] == NULL)
             error("Object does not exist");
@@ -12655,7 +12883,7 @@ void cmd_framebuffer(void)
         int colour = 0;
         if (SecondFrame == DisplayBuf)
         {
-            getargs(&p, 1, (unsigned char *)",");
+            getcsargs(&p, 1);
             switch (DISPLAY_TYPE)
             {
             case SCREENMODE2:
@@ -12724,7 +12952,7 @@ void cmd_framebuffer(void)
         int colour = 0;
         if (SecondLayer == DisplayBuf)
         {
-            getargs(&p, 1, (unsigned char *)",");
+            getcsargs(&p, 1);
             switch (DISPLAY_TYPE)
             {
             case SCREENMODE2:
@@ -12778,7 +13006,7 @@ void cmd_framebuffer(void)
         int colour = 0;
         if (LayerBuf == DisplayBuf)
         {
-            getargs(&p, 1, (unsigned char *)",");
+            getcsargs(&p, 1);
             switch (DISPLAY_TYPE)
             {
             case SCREENMODE2:
@@ -12896,7 +13124,7 @@ void cmd_framebuffer(void)
         }
         else
         {
-            getargs(&p, 1, (unsigned char *)",");
+            getcsargs(&p, 1);
             char *q = (char *)getCstring(argv[0]);
             if (strcasecmp(q, "N") == 0)
                 WriteBuf = DisplayBuf;
@@ -12942,7 +13170,7 @@ void cmd_framebuffer(void)
     }
     else if ((p = checkstring(cmdline, (unsigned char *)"COPY")))
     {
-        getargs(&p, 5, (unsigned char *)",");
+        getcsargs(&p, 5);
         if (!(argc == 3 || argc == 5))
             error("Syntax");
         volatile uint8_t *s = NULL, *d = NULL;

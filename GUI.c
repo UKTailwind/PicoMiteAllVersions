@@ -190,7 +190,7 @@ int GetCtrlParams(int type, unsigned char *p)
     struct s_GaugeS *GaugeS; // in case we are dealing with a GAUGE control
     if (!Option.MaxCtrls)
         error("No memory allocated for GUI controls");
-    getargs(&p, 40, (unsigned char *)",");
+    getcsargs(&p, 40);
     if ((argc & 1) != 1)
         error("Argument count");
     if (*argv[0] == '#')
@@ -623,7 +623,7 @@ void cmd_gui(void)
     if ((p = checkstring(cmdline, (unsigned char *)"DELETE")))
     {
         int i, r;
-        getargs(&p, MAX_ARG_COUNT, (unsigned char *)",");
+        getcsargs(&p, MAX_ARG_COUNT);
         if (!(argc & 1))
             error("Argument count");
         if (!Option.MaxCtrls)
@@ -661,7 +661,7 @@ void cmd_gui(void)
     if ((p = checkstring(cmdline, (unsigned char *)"DISABLE")))
     {
         int i, r;
-        getargs(&p, MAX_ARG_COUNT, (unsigned char *)",");
+        getcsargs(&p, MAX_ARG_COUNT);
         if (!(argc & 1))
             error("Argument count");
         if (!Option.MaxCtrls)
@@ -686,7 +686,7 @@ void cmd_gui(void)
     if ((p = checkstring(cmdline, (unsigned char *)"HIDE")))
     {
         int i, r;
-        getargs(&p, MAX_ARG_COUNT, (unsigned char *)",");
+        getcsargs(&p, MAX_ARG_COUNT);
         if (!Option.MaxCtrls)
             error("No memory allocated for GUI controls");
         if (!(argc & 1))
@@ -711,7 +711,7 @@ void cmd_gui(void)
     if ((p = checkstring(cmdline, (unsigned char *)"ENABLE")))
     {
         int i, r;
-        getargs(&p, MAX_ARG_COUNT, (unsigned char *)",");
+        getcsargs(&p, MAX_ARG_COUNT);
         if (!(argc & 1))
             error("Argument count");
         if (!Option.MaxCtrls)
@@ -742,7 +742,7 @@ void cmd_gui(void)
     if ((p = checkstring(cmdline, (unsigned char *)"SHOW")))
     {
         int i, r;
-        getargs(&p, MAX_ARG_COUNT, (unsigned char *)",");
+        getcsargs(&p, MAX_ARG_COUNT);
         if (!(argc & 1))
             error("Argument count");
         if (!Option.MaxCtrls)
@@ -773,7 +773,7 @@ void cmd_gui(void)
     if ((p = checkstring(cmdline, (unsigned char *)"RESTORE")))
     {
         int i, r;
-        getargs(&p, MAX_ARG_COUNT, (unsigned char *)",");
+        getcsargs(&p, MAX_ARG_COUNT);
         if (!Option.MaxCtrls)
             error("No memory allocated for GUI controls");
         if (!(argc & 1))
@@ -804,7 +804,7 @@ void cmd_gui(void)
     if ((p = checkstring(cmdline, (unsigned char *)"REDRAW")))
     {
         int i, r;
-        getargs(&p, MAX_ARG_COUNT, (unsigned char *)",");
+        getcsargs(&p, MAX_ARG_COUNT);
         if (!(argc & 1))
             error("Argument count");
         if (!Option.MaxCtrls)
@@ -836,7 +836,7 @@ void cmd_gui(void)
     if ((p = checkstring(cmdline, (unsigned char *)"FCOLOUR")) || (p = checkstring(cmdline, (unsigned char *)"BCOLOUR")))
     {
         int i, r, c;
-        getargs(&p, MAX_ARG_COUNT, (unsigned char *)",");
+        getcsargs(&p, MAX_ARG_COUNT);
         if (!Option.MaxCtrls)
             error("No memory allocated for GUI controls");
         if (!(argc & 1) || argc < 3)
@@ -866,7 +866,7 @@ void cmd_gui(void)
 
     if ((p = checkstring(cmdline, (unsigned char *)"INTERRUPT")))
     {
-        getargs(&p, 3, (unsigned char *)",");
+        getcsargs(&p, 3);
         if (Option.TOUCH_CS == 0)
             error("Touch option not set");
         if (!Option.TOUCH_XZERO && !Option.TOUCH_YZERO)
@@ -902,7 +902,7 @@ void cmd_GUIpage(unsigned char *p)
 {
     int i, r, OldPages;
 
-    getargs(&p, MAX_ARG_COUNT, (unsigned char *)",");
+    getcsargs(&p, MAX_ARG_COUNT);
     if (!(argc & 1))
         error("Argument count");
     if (!Option.MaxCtrls)
@@ -2684,7 +2684,7 @@ void fun_msgbox(void)
     long long int timeout;
     if (!Option.MaxCtrls)
         error("No memory allocated for GUI controls");
-    getargs(&ep, 9, (unsigned char *)",");
+    getcsargs(&ep, 9);
     if (argc < 3)
         error("Argument count");
     msg = GetMemory(MAX_CAPTION_LINES * MAXSTRLEN);

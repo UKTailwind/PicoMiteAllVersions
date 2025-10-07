@@ -104,7 +104,7 @@ void cmd_udp(unsigned char *p)
     tp = checkstring(p, (unsigned char *)"INTERRUPT");
     if (tp)
     {
-        getargs(&tp, 1, (unsigned char *)",");
+        getcsargs(&tp, 1);
         if (argc != 1)
             error("Syntax");
         UDPinterrupt = (char *)GetIntAddress(argv[0]);
@@ -115,7 +115,7 @@ void cmd_udp(unsigned char *p)
     tp = checkstring(p, (unsigned char *)"SEND");
     if (tp)
     {
-        getargs(&tp, 5, (unsigned char *)",");
+        getcsargs(&tp, 5);
         if (argc != 5)
             error("Syntax");
         UDP_T *state = &UDPstate;

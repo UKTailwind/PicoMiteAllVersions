@@ -61,7 +61,7 @@ extern void ConfigDisplaySSD(unsigned char *p);
 extern void SetAreaSSD1963(int x1, int y1, int x2, int y2);
 extern void SetAreaILI9341(int xstart, int ystart, int xend, int yend, int rw);
 extern void WriteColor(unsigned int c);
-extern void WriteColorFast(unsigned int c);
+extern void (*WriteColorFast)(unsigned int c);
 extern void WriteComand(int cmd);
 extern void WriteData(int data);
 extern int display_backlight, SSD1963data;

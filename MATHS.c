@@ -799,7 +799,7 @@ int parsefloatrarray(unsigned char *tp, MMFLOAT **a1float, int argno, int dimens
 int parsearrays(unsigned char *tp, MMFLOAT **a1float, MMFLOAT **a2float, MMFLOAT **a3float, int64_t **a1int, int64_t **a2int, int64_t **a3int)
 {
 	int card1, card2, card3;
-	getargs(&tp, 5, (unsigned char *)",");
+	getcsargs(&tp, 5);
 	if (!(argc == 5))
 		error("Argument count");
 	card1 = parsenumberarray(argv[0], a1float, a1int, 1, 0, NULL, false);
@@ -886,7 +886,7 @@ unsigned char *parseAES(uint8_t *p, int ivadd, uint8_t *keyx, uint8_t *ivx, int6
 	unsigned char *a1str = NULL, *a2str = NULL, *a3str = NULL, *a4str = NULL;
 	MMFLOAT *a1float = NULL, *a2float = NULL, *a3float = NULL, *a4float = NULL;
 	int card1, card3;
-	getargs(&p, 7, (unsigned char *)",");
+	getcsargs(&p, 7);
 	if (ivx == NULL)
 	{
 		if (argc != 5)
@@ -1015,7 +1015,7 @@ unsigned char *parseB64(uint8_t *p, int64_t **outint, unsigned char **outstr, MM
 	int64_t *a1int = NULL, *a3int = NULL;
 	unsigned char *a1str = NULL, *a3str = NULL;
 	MMFLOAT *a1float = NULL, *a3float = NULL;
-	getargs(&p, 3, (unsigned char *)",");
+	getcsargs(&p, 3);
 	if (argc != 3)
 		error("Syntax");
 	*outstr = NULL;
@@ -1219,7 +1219,7 @@ void cmd_math(void)
 #endif
 
 	skipspace(cmdline);
-	if (toupper(*cmdline) == 'S')
+	if (mytoupper(*cmdline) == 'S')
 	{
 
 		tp = checkstring(cmdline, (unsigned char *)"SET");
@@ -1235,7 +1235,7 @@ void cmd_math(void)
 			int i, card1 = 1, card2 = 1;
 			MMFLOAT *a1float = NULL, *a2float = NULL, scale;
 			int64_t *a1int = NULL, *a2int = NULL;
-			getargs(&tp, 5, (unsigned char *)",");
+			getcsargs(&tp, 5);
 			if (!(argc == 5))
 				error("Argument count");
 			card1 = parsenumberarray(argv[0], &a1float, &a1int, 1, 0, dims, false);
@@ -1299,7 +1299,7 @@ void cmd_math(void)
 		{
 			int i, card1 = 1, card2 = 1;
 			int64_t *a1int = NULL, *a2int = NULL;
-			getargs(&tp, 7, (unsigned char *)",");
+			getcsargs(&tp, 7);
 			if (!(argc == 5 || argc == 7))
 				error("Argument count");
 			card1 = parseintegerarray(argv[0], &a1int, 1, 0, dims, false);
@@ -1340,7 +1340,7 @@ void cmd_math(void)
 			return;
 		}
 	}
-	else if (toupper(*cmdline) == 'C')
+	else if (mytoupper(*cmdline) == 'C')
 	{
 		unsigned char *tp1 = NULL;
 		tp = checkstring(cmdline, (unsigned char *)"C_ADD");
@@ -1501,14 +1501,14 @@ void cmd_math(void)
 			return;
 		}
 	}
-	else if (toupper(*cmdline) == 'V')
+	else if (mytoupper(*cmdline) == 'V')
 	{
 		tp = checkstring(cmdline, (unsigned char *)"V_MULT");
 		if (tp)
 		{
 			int i, j, numcols = 0, numrows = 0;
 			MMFLOAT *a1float = NULL, *a2float = NULL, *a2sfloat = NULL, *a3float = NULL;
-			getargs(&tp, 5, (unsigned char *)",");
+			getcsargs(&tp, 5);
 			if (!(argc == 5))
 				error("Argument count");
 			parsefloatrarray(argv[0], &a1float, 1, 2, dims, false);
@@ -1542,7 +1542,7 @@ void cmd_math(void)
 		if (tp)
 		{
 			// xorigin!, yorigin!,angle!,xin!(), yin!(),xout(1), yout!()
-			getargs(&tp, 13, (unsigned char *)",");
+			getcsargs(&tp, 13);
 			if (!(argc == 13))
 				error("Argument count");
 			MMFLOAT xorigin = getnumber(argv[0]);
@@ -1587,7 +1587,7 @@ void cmd_math(void)
 		{
 			int j, numrows = 0, card2;
 			MMFLOAT *a1float = NULL, *a1sfloat = NULL, *a2float = NULL, mag = 0.0;
-			getargs(&tp, 3, (unsigned char *)",");
+			getcsargs(&tp, 3);
 			if (!(argc == 3))
 				error("Argument count");
 			numrows = parsefloatrarray(argv[0], &a1float, 1, 1, dims, false);
@@ -1614,7 +1614,7 @@ void cmd_math(void)
 			int j, numcols = 0;
 			MMFLOAT *a1float = NULL, *a2float = NULL, *a3float = NULL;
 			MMFLOAT a[3], b[3];
-			getargs(&tp, 5, (unsigned char *)",");
+			getcsargs(&tp, 5);
 			if (!(argc == 5))
 				error("Argument count");
 			numcols = parsefloatrarray(argv[0], &a1float, 1, 1, dims, false);
@@ -1642,7 +1642,7 @@ void cmd_math(void)
 			int j, numcols = 0;
 			MMFLOAT *a1float = NULL;
 			int64_t *a1int = NULL;
-			getargs(&tp, 3, (unsigned char *)",");
+			getcsargs(&tp, 3);
 			if (!(argc == 1 || argc == 3))
 				error("Argument count");
 			numcols = parsenumberarray(argv[0], &a1float, &a1int, 1, 1, dims, false);
@@ -1680,14 +1680,14 @@ void cmd_math(void)
 			return;
 		}
 	}
-	else if (toupper(*cmdline) == 'M')
+	else if (mytoupper(*cmdline) == 'M')
 	{
 		tp = checkstring(cmdline, (unsigned char *)"M_INVERSE");
 		if (tp)
 		{
 			int i, j, n, numcols = 0, numrows = 0;
 			MMFLOAT *a1float = NULL, *a2float = NULL, det;
-			getargs(&tp, 3, (unsigned char *)",");
+			getcsargs(&tp, 3);
 			if (!(argc == 3))
 				error("Argument count");
 			parsefloatrarray(argv[0], &a1float, 1, 2, dims, false);
@@ -1734,7 +1734,7 @@ void cmd_math(void)
 		{
 			int i, j, numcols1 = 0, numrows1 = 0, numcols2 = 0, numrows2 = 0;
 			MMFLOAT *a1float = NULL, *a2float = NULL;
-			getargs(&tp, 3, (unsigned char *)",");
+			getcsargs(&tp, 3);
 			if (!(argc == 3))
 				error("Argument count");
 			parsefloatrarray(argv[0], &a1float, 1, 2, dims, false);
@@ -1782,7 +1782,7 @@ void cmd_math(void)
 		{
 			int i, j, k, numcols1 = 0, numrows1 = 0, numcols2 = 0, numrows2 = 0, numcols3 = 0, numrows3 = 0;
 			MMFLOAT *a1float = NULL, *a2float = NULL, *a3float = NULL;
-			getargs(&tp, 5, (unsigned char *)",");
+			getcsargs(&tp, 5);
 			if (!(argc == 5))
 				error("Argument count");
 			parsefloatrarray(argv[0], &a1float, 1, 2, dims, false);
@@ -1843,7 +1843,7 @@ void cmd_math(void)
 			MMFLOAT *a1float = NULL;
 			int64_t *a1int = NULL;
 			// need three arrays with same cardinality, second array must be 2 dimensional
-			getargs(&tp, 1, (unsigned char *)",");
+			getcsargs(&tp, 1);
 			if (!(argc == 1))
 				error("Argument count");
 			parsenumberarray(argv[0], &a1float, &a1int, 1, 2, dims, false);
@@ -1893,7 +1893,7 @@ void cmd_math(void)
 			return;
 		}
 	}
-	else if (toupper(*cmdline) == 'Q')
+	else if (mytoupper(*cmdline) == 'Q')
 	{
 
 		tp = checkstring(cmdline, (unsigned char *)"Q_INVERT");
@@ -1901,7 +1901,7 @@ void cmd_math(void)
 		{
 			int card;
 			MMFLOAT *q = NULL, *n = NULL;
-			getargs(&tp, 3, (unsigned char *)",");
+			getcsargs(&tp, 3);
 			if (!(argc == 3))
 				error("Argument count");
 			card = parsefloatrarray(argv[0], &q, 1, 1, dims, false);
@@ -1920,7 +1920,7 @@ void cmd_math(void)
 			int card;
 			MMFLOAT *q = NULL;
 			MMFLOAT mag = 0.0;
-			getargs(&tp, 7, (unsigned char *)",");
+			getcsargs(&tp, 7);
 			if (!(argc == 7))
 				error("Argument count");
 			MMFLOAT x = getnumber(argv[0]);
@@ -1943,7 +1943,7 @@ void cmd_math(void)
 		{
 			int card;
 			MMFLOAT *q = NULL;
-			getargs(&tp, 7, (unsigned char *)",");
+			getcsargs(&tp, 7);
 			if (!(argc == 7))
 				error("Argument count");
 			MMFLOAT yaw = -getnumber(argv[0]) / optionangle;
@@ -1972,7 +1972,7 @@ void cmd_math(void)
 			int card;
 			MMFLOAT *q = NULL;
 			MMFLOAT mag = 0.0;
-			getargs(&tp, 9, (unsigned char *)",");
+			getcsargs(&tp, 9);
 			if (!(argc == 9))
 				error("Argument count");
 			MMFLOAT theta = getnumber(argv[0]);
@@ -2001,7 +2001,7 @@ void cmd_math(void)
 		{
 			MMFLOAT *q1 = NULL, *q2 = NULL, *n = NULL;
 			int card;
-			getargs(&tp, 5, (unsigned char *)",");
+			getcsargs(&tp, 5);
 			if (!(argc == 5))
 				error("Argument count");
 			card = parsefloatrarray(argv[0], &q1, 1, 1, dims, false);
@@ -2023,7 +2023,7 @@ void cmd_math(void)
 			int card;
 			MMFLOAT *q1 = NULL, *v1 = NULL, *n = NULL;
 			MMFLOAT temp[5], qtemp[5];
-			getargs(&tp, 5, (unsigned char *)",");
+			getcsargs(&tp, 5);
 			if (!(argc == 5))
 				error("Argument count");
 			card = parsefloatrarray(argv[0], &q1, 1, 1, dims, false);
@@ -2145,7 +2145,7 @@ void cmd_math(void)
 			}
 			else if ((pi = checkstring(tp, (unsigned char *)"INIT")))
 			{
-				getargs(&pi, 5, (unsigned char *)",");
+				getcsargs(&pi, 5);
 				if (argc != 5)
 					error("Syntax");
 				MMFLOAT *q1 = NULL;
@@ -2174,7 +2174,7 @@ void cmd_math(void)
 			int i, card1 = 1, card2 = 1;
 			MMFLOAT *a1float = NULL, *a2float = NULL, scale;
 			int64_t *a1int = NULL, *a2int = NULL;
-			getargs(&tp, 5, (unsigned char *)",");
+			getcsargs(&tp, 5);
 			if (!(argc == 5))
 				error("Argument count");
 			card1 = parsenumberarray(argv[0], &a1float, &a1int, 1, 0, dims, false);
@@ -2240,7 +2240,7 @@ void cmd_math(void)
 			int i, card1 = 1, card2 = 1;
 			MMFLOAT *a1float = NULL, *a2float = NULL, outmin, outmax, inmin = 1.5e+308, inmax = -1.5e308;
 			int64_t *a1int = NULL, *a2int = NULL;
-			getargs(&tp, 11, (unsigned char *)",");
+			getcsargs(&tp, 11);
 			if (!(argc == 7 || argc == 11))
 				error("Argument count");
 			card1 = parsenumberarray(argv[0], &a1float, &a1int, 1, 0, dims, false);
@@ -2310,7 +2310,7 @@ void cmd_math(void)
 		if (tp)
 		{
 			int i;
-			getargs(&tp, 1, (unsigned char *)",");
+			getcsargs(&tp, 1);
 			if (argc == 1)
 				i = getinteger(argv[0]);
 			else
@@ -2328,7 +2328,7 @@ void cmd_math(void)
 			int i, card1, card2, card3;
 			MMFLOAT *a1float = NULL, *a2float = NULL, *a3float = NULL, scale, tmp1, tmp2, tmp3;
 			int64_t *a1int = NULL, *a2int = NULL, *a3int = NULL;
-			getargs(&tp, 7, (unsigned char *)",");
+			getcsargs(&tp, 7);
 			if (!(argc == 7))
 				error("Argument count");
 			card1 = parsenumberarray(argv[0], &a1float, &a1int, 1, 0, dims, false);
@@ -2423,12 +2423,12 @@ void fun_math(void)
 	short dims[MAXDIM] = {0};
 #endif
 	skipspace(ep);
-	if (toupper(*ep) == 'P')
+	if (mytoupper(*ep) == 'P')
 	{
 		tp = checkstring(ep, (unsigned char *)"PID");
 		if (tp)
 		{
-			getargs(&tp, 5, (unsigned char *)",");
+			getcsargs(&tp, 5);
 			if (argc != 5)
 				error("Syntax");
 			int channel = getint(argv[0], 1, MAXPID);
@@ -2443,13 +2443,13 @@ void fun_math(void)
 			return;
 		}
 	}
-	if (toupper(*ep) == 'A')
+	if (mytoupper(*ep) == 'A')
 	{
 		tp = checkstring(ep, (unsigned char *)"ATAN3");
 		if (tp)
 		{
 			MMFLOAT y, x, z;
-			getargs(&tp, 3, (unsigned char *)",");
+			getcsargs(&tp, 3);
 			if (argc != 3)
 				error("Syntax");
 			y = getnumber(argv[0]);
@@ -2463,7 +2463,7 @@ void fun_math(void)
 			return;
 		}
 	}
-	else if (toupper(*ep) == 'C')
+	else if (mytoupper(*ep) == 'C')
 	{
 		if (ep[1] == '_')
 		{
@@ -2503,31 +2503,31 @@ void fun_math(void)
 			}
 			else if ((tp = checkstring(&ep[2], (unsigned char *)"ADD")))
 			{
-				getargs(&tp, 3, (unsigned char *)",");
+				getcsargs(&tp, 3);
 				fcplx x = getComplex(argv[0]) + getComplex(argv[2]);
 				retComplex(x);
 			}
 			else if ((tp = checkstring(&ep[2], (unsigned char *)"MUL")))
 			{
-				getargs(&tp, 3, (unsigned char *)",");
+				getcsargs(&tp, 3);
 				fcplx x = getComplex(argv[0]) * getComplex(argv[2]);
 				retComplex(x);
 			}
 			else if ((tp = checkstring(&ep[2], (unsigned char *)"SUB")))
 			{
-				getargs(&tp, 3, (unsigned char *)",");
+				getcsargs(&tp, 3);
 				fcplx x = getComplex(argv[0]) - getComplex(argv[2]);
 				retComplex(x);
 			}
 			else if ((tp = checkstring(&ep[2], (unsigned char *)"DIV")))
 			{
-				getargs(&tp, 3, (unsigned char *)",");
+				getcsargs(&tp, 3);
 				fcplx x = getComplex(argv[0]) / getComplex(argv[2]);
 				retComplex(x);
 			}
 			else if ((tp = checkstring(&ep[2], (unsigned char *)"POW")))
 			{
-				getargs(&tp, 3, (unsigned char *)",");
+				getcsargs(&tp, 3);
 				fcplx x = cpowf(getComplex(argv[0]), getComplex(argv[2]));
 				retComplex(x);
 			}
@@ -2623,13 +2623,13 @@ void fun_math(void)
 			}
 			else if ((tp = checkstring(&ep[2], (unsigned char *)"CPLX")))
 			{
-				getargs(&tp, 3, (unsigned char *)",");
+				getcsargs(&tp, 3);
 				fcplx x = (float)(getnumber(argv[0])) + (float)(getnumber(argv[2])) * I;
 				retComplex(x);
 			}
 			else if ((tp = checkstring(&ep[2], (unsigned char *)"POLAR")))
 			{
-				getargs(&tp, 3, (unsigned char *)",");
+				getcsargs(&tp, 3);
 				MMFLOAT r = getnumber(argv[0]);
 				MMFLOAT theta = getnumber(argv[2]) / optionangle;
 				MMFLOAT stheta = sin(theta) * r;
@@ -2647,7 +2647,7 @@ void fun_math(void)
 			int i;
 			MMFLOAT *a1float = NULL;
 			int64_t *a1int = NULL;
-			getargs(&tp, 13, (unsigned char *)",");
+			getcsargs(&tp, 13);
 			if (argc < 1)
 				error("Syntax");
 			uint8_t polynome = CRC8_DEFAULT_POLYNOME;
@@ -2700,7 +2700,7 @@ void fun_math(void)
 			int i;
 			MMFLOAT *a1float = NULL;
 			int64_t *a1int = NULL;
-			getargs(&tp, 13, (unsigned char *)",");
+			getcsargs(&tp, 13);
 			if (argc < 1)
 				error("Syntax");
 			uint16_t polynome = CRC12_DEFAULT_POLYNOME;
@@ -2753,7 +2753,7 @@ void fun_math(void)
 			int i;
 			MMFLOAT *a1float = NULL;
 			int64_t *a1int = NULL;
-			getargs(&tp, 13, (unsigned char *)",");
+			getcsargs(&tp, 13);
 			if (argc < 1)
 				error("Syntax");
 			uint16_t polynome = CRC16_DEFAULT_POLYNOME;
@@ -2806,7 +2806,7 @@ void fun_math(void)
 			int i;
 			MMFLOAT *a1float = NULL;
 			int64_t *a1int = NULL;
-			getargs(&tp, 13, (unsigned char *)",");
+			getcsargs(&tp, 13);
 			if (argc < 1)
 				error("Syntax");
 			uint32_t polynome = CRC32_DEFAULT_POLYNOME;
@@ -2856,7 +2856,7 @@ void fun_math(void)
 		tp = checkstring(ep, (unsigned char *)"COSH");
 		if (tp)
 		{
-			getargs(&tp, 1, (unsigned char *)",");
+			getcsargs(&tp, 1);
 			if (!(argc == 1))
 				error("Argument count");
 			fret = cosh(getnumber(argv[0]));
@@ -2872,7 +2872,7 @@ void fun_math(void)
 			MMFLOAT crossing = 0.0;
 			int direction = 1;
 			int found = -1;
-			getargs(&tp, 5, (unsigned char *)",");
+			getcsargs(&tp, 5);
 			if (argc < 1)
 				error("Syntax");
 			if (argc >= 3 && *argv[2])
@@ -2967,7 +2967,7 @@ void fun_math(void)
 			MMFLOAT *a3float = NULL, *a4float = NULL;
 			MMFLOAT axb = 0, a2 = 0, b2 = 0;
 			int64_t *a1int = NULL, *a2int = NULL;
-			getargs(&tp, 3, (unsigned char *)",");
+			getcsargs(&tp, 3);
 			if (!(argc == 3))
 				error("Argument count");
 			card1 = parsenumberarray(argv[0], &a1float, &a1int, 1, 0, dims, false);
@@ -3030,7 +3030,7 @@ void fun_math(void)
 			MMFLOAT total = 0.0;
 			int64_t *a1int = NULL;
 			{
-				getargs(&tp, 1, (unsigned char *)",");
+				getcsargs(&tp, 1);
 				if (!(argc == 1))
 					error("Argument count");
 				parsenumberarray(argv[0], &a1float, &a1int, 1, 2, dims, false);
@@ -3108,7 +3108,7 @@ void fun_math(void)
 			}
 		}
 	}
-	else if (toupper(*ep) == 'D')
+	else if (mytoupper(*ep) == 'D')
 	{
 
 		tp = checkstring(ep, (unsigned char *)"DOTPRODUCT");
@@ -3118,7 +3118,7 @@ void fun_math(void)
 			int card1, card2;
 			MMFLOAT *a1float = NULL, *a2float = NULL;
 			// need two arrays with same cardinality
-			getargs(&tp, 3, (unsigned char *)",");
+			getcsargs(&tp, 3);
 			if (!(argc == 3))
 				error("Argument count");
 			card1 = parsefloatrarray(argv[0], &a1float, 1, 1, dims, false);
@@ -3134,12 +3134,12 @@ void fun_math(void)
 			return;
 		}
 	}
-	else if (toupper(*ep) == 'L')
+	else if (mytoupper(*ep) == 'L')
 	{
 		tp = checkstring(ep, (unsigned char *)"LOG10");
 		if (tp)
 		{
-			getargs(&tp, 1, (unsigned char *)",");
+			getcsargs(&tp, 1);
 			if (!(argc == 1))
 				error("Argument count");
 			MMFLOAT f = getnumber(argv[0]);
@@ -3152,14 +3152,14 @@ void fun_math(void)
 			return;
 		}
 	}
-	else if (toupper(*ep) == 'M')
+	else if (mytoupper(*ep) == 'M')
 	{
 		tp = checkstring(ep, (unsigned char *)"M_DETERMINANT");
 		if (tp)
 		{
 			int i, j, n, numcols = 0, numrows = 0;
 			MMFLOAT *a1float = NULL;
-			getargs(&tp, 1, (unsigned char *)",");
+			getcsargs(&tp, 1);
 			if (!(argc == 1))
 				error("Argument count");
 			parsefloatrarray(argv[0], &a1float, 1, 2, dims, false);
@@ -3190,7 +3190,7 @@ void fun_math(void)
 			MMFLOAT *a1float = NULL, max = -3.0e+38;
 			int64_t *a1int = NULL;
 			long long int *temp = NULL;
-			getargs(&tp, 3, (unsigned char *)",");
+			getcsargs(&tp, 3);
 			//			if(!(argc == 1)) error("Argument count");
 			card1 = parsenumberarray(argv[0], &a1float, &a1int, 1, 0, dims, false);
 			if (argc == 3)
@@ -3245,7 +3245,7 @@ void fun_math(void)
 			MMFLOAT *a1float = NULL, min = 3.0e+38;
 			int64_t *a1int = NULL;
 			long long int *temp = NULL;
-			getargs(&tp, 3, (unsigned char *)",");
+			getcsargs(&tp, 3);
 			//			if(!(argc == 1)) error("Argument count");
 			card1 = parsenumberarray(argv[0], &a1float, &a1int, 1, 0, dims, false);
 			if (argc == 3)
@@ -3299,7 +3299,7 @@ void fun_math(void)
 			int numcols = 0;
 			MMFLOAT *a1float = NULL;
 			MMFLOAT mag = 0.0;
-			getargs(&tp, 1, (unsigned char *)",");
+			getcsargs(&tp, 1);
 			if (!(argc == 1))
 				error("Argument count");
 			numcols = parsefloatrarray(argv[0], &a1float, 1, 0, dims, false);
@@ -3319,7 +3319,7 @@ void fun_math(void)
 			int i, card1 = 1;
 			MMFLOAT *a1float = NULL, mean = 0;
 			int64_t *a1int = NULL;
-			getargs(&tp, 1, (unsigned char *)",");
+			getcsargs(&tp, 1);
 			if (!(argc == 1))
 				error("Argument count");
 			card1 = parsenumberarray(argv[0], &a1float, &a1int, 1, 0, dims, false);
@@ -3344,7 +3344,7 @@ void fun_math(void)
 			int i, card1, card2 = 1;
 			MMFLOAT *a1float = NULL, *a2float = NULL;
 			int64_t *a2int = NULL;
-			getargs(&tp, 1, (unsigned char *)",");
+			getcsargs(&tp, 1);
 			if (!(argc == 1))
 				error("Argument count");
 			card2 = parsenumberarray(argv[0], &a2float, &a2int, 1, 0, dims, false);
@@ -3370,13 +3370,13 @@ void fun_math(void)
 			return;
 		}
 	}
-	else if (toupper(*ep) == 'S')
+	else if (mytoupper(*ep) == 'S')
 	{
 
 		tp = checkstring(ep, (unsigned char *)"SINH");
 		if (tp)
 		{
-			getargs(&tp, 1, (unsigned char *)",");
+			getcsargs(&tp, 1);
 			if (!(argc == 1))
 				error("Argument count");
 			fret = sinh(getnumber(argv[0]));
@@ -3390,7 +3390,7 @@ void fun_math(void)
 			int i, card1 = 1;
 			MMFLOAT *a2float = NULL, *a1float = NULL, mean = 0, var = 0, deviation;
 			int64_t *a2int = NULL, *a1int = NULL;
-			getargs(&tp, 1, (unsigned char *)",");
+			getcsargs(&tp, 1);
 			if (!(argc == 1))
 				error("Argument count");
 			card1 = parsenumberarray(argv[0], &a1float, &a1int, 1, 0, dims, false);
@@ -3434,7 +3434,7 @@ void fun_math(void)
 			int i, card1 = 1;
 			MMFLOAT *a1float = NULL, sum = 0;
 			int64_t *a1int = NULL;
-			getargs(&tp, 1, (unsigned char *)",");
+			getcsargs(&tp, 1);
 			if (!(argc == 1))
 				error("Argument count");
 			card1 = parsenumberarray(argv[0], &a1float, &a1int, 1, 0, dims, false);
@@ -3453,13 +3453,13 @@ void fun_math(void)
 			return;
 		}
 	}
-	else if (toupper(*ep) == 'T')
+	else if (mytoupper(*ep) == 'T')
 	{
 
 		tp = checkstring(ep, (unsigned char *)"TANH");
 		if (tp)
 		{
-			getargs(&tp, 1, (unsigned char *)",");
+			getcsargs(&tp, 1);
 			if (!(argc == 1))
 				error("Argument count");
 			fret = tanh(getnumber(argv[0]));
@@ -3467,7 +3467,7 @@ void fun_math(void)
 			return;
 		}
 	}
-	else if (toupper(*ep) == 'R')
+	else if (mytoupper(*ep) == 'R')
 	{
 		tp = checkstring(ep, (unsigned char *)"RAND");
 		if (tp)
@@ -3608,7 +3608,7 @@ void cmd_FFT(unsigned char *pp)
 	tp = checkstring(pp, (unsigned char *)"MAGNITUDE");
 	if (tp)
 	{
-		getargs(&tp, 3, (unsigned char *)",");
+		getcsargs(&tp, 3);
 		card1 = parsefloatrarray(argv[0], &a3float, 1, 1, dims, false);
 		card2 = parsefloatrarray(argv[2], &a4float, 2, 1, dims, true);
 		if (card1 != card2)
@@ -3636,7 +3636,7 @@ void cmd_FFT(unsigned char *pp)
 	tp = checkstring(pp, (unsigned char *)"PHASE");
 	if (tp)
 	{
-		getargs(&tp, 3, (unsigned char *)",");
+		getcsargs(&tp, 3);
 		card1 = parsefloatrarray(argv[0], &a3float, 1, 1, dims, false);
 		card2 = parsefloatrarray(argv[2], &a4float, 2, 1, dims, true);
 		if (card1 != card2)
@@ -3664,7 +3664,7 @@ void cmd_FFT(unsigned char *pp)
 	tp = checkstring(pp, (unsigned char *)"INVERSE");
 	if (tp)
 	{
-		getargs(&tp, 3, (unsigned char *)",");
+		getcsargs(&tp, 3);
 		card1 = parsefloatrarray(argv[0], &a4float, 1, 2, dims, false);
 		int size = dims[1] - g_OptionBase + 1;
 		a1cplx = (cplx *)a4float;
@@ -3690,7 +3690,7 @@ void cmd_FFT(unsigned char *pp)
 			a3float[i] = creal(a2cplx[i]);
 		return;
 	}
-	getargs(&pp, 3, (unsigned char *)",");
+	getcsargs(&pp, 3);
 	card1 = parsefloatrarray(argv[0], &a3float, 1, 1, dims, false);
 	card2 = parsefloatrarray(argv[2], &a4float, 2, 2, dims, true);
 	a2cplx = (cplx *)a4float;
@@ -3716,7 +3716,7 @@ void cmd_SensorFusion(char *passcmdline)
 	unsigned char *p;
 	if ((p = checkstring((unsigned char *)passcmdline, (unsigned char *)"MADGWICK")) != NULL)
 	{
-		getargs(&p, 25, (unsigned char *)",");
+		getcsargs(&p, 25);
 		if (argc < 23)
 			error("Incorrect number of parameters");
 		MMFLOAT t;
@@ -3761,7 +3761,7 @@ void cmd_SensorFusion(char *passcmdline)
 	}
 	if ((p = checkstring((unsigned char *)passcmdline, (unsigned char *)"MAHONY")) != NULL)
 	{
-		getargs(&p, 27, (unsigned char *)",");
+		getcsargs(&p, 27);
 		if (argc < 23)
 			error("Incorrect number of parameters");
 		MMFLOAT t;

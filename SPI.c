@@ -111,9 +111,9 @@ void cmd_spi(void)
     if (ExtCurrentConfig[SPI0TXpin] >= EXT_COM_RESERVED)
         error("Already open");
 
-    { // start a new block for getargs()
+    { // start a new block for getcsargs()
         int mode;
-        getargs(&p, 5, (unsigned char *)",");
+        getcsargs(&p, 5);
         if (argc < 3)
             error("Incorrect argument count");
         mode = getinteger(argv[2]);
@@ -240,9 +240,9 @@ void cmd_spi2(void)
     if (ExtCurrentConfig[SPI1TXpin] >= EXT_COM_RESERVED)
         error("Already open");
 
-    { // start a new block for getargs()
+    { // start a new block for getcsargs()
         int mode;
-        getargs(&p, 5, (unsigned char *)",");
+        getcsargs(&p, 5);
         if (argc < 3)
             error("Incorrect argument count");
         mode = getinteger(argv[2]);
@@ -303,7 +303,7 @@ unsigned int *GetSendDataList(unsigned char *p, unsigned int *nbr)
     int i;
     void *ptr;
 
-    getargs(&p, MAX_ARG_COUNT, (unsigned char *)",");
+    getcsargs(&p, MAX_ARG_COUNT);
     if (!(argc & 1))
         error("Invalid syntax");
     *nbr = getint(argv[0], 0, 9999999);
@@ -383,7 +383,7 @@ long long int *GetReceiveDataBuffer(unsigned char *p, unsigned int *nbr)
 {
     void *ptr;
 
-    getargs(&p, 3, (unsigned char *)",");
+    getcsargs(&p, 3);
     if (argc != 3)
         error("Invalid syntax");
     *nbr = getinteger(argv[0]);

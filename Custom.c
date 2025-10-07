@@ -191,7 +191,7 @@ int calcsideanddelay(char *p, int sidepins, int maxdelaybits)
                         char *ppp = ss;
                         if (*ss == '&')
                         {
-                                if (!(toupper(ss[1]) == 'B' || toupper(ss[1]) == 'H' || toupper(ss[1]) == 'O'))
+                                if (!(mytoupper(ss[1]) == 'B' || mytoupper(ss[1]) == 'H' || mytoupper(ss[1]) == 'O'))
                                         error("Syntax");
                                 ppp += 2;
                         }
@@ -450,7 +450,7 @@ void MIPS16 cmd_pio(void)
         if (tp)
         {
                 int i;
-                getargs(&tp, (MAX_ARG_COUNT * 2) - 1, (unsigned char *)",");
+                getcsargs(&tp, (MAX_ARG_COUNT * 2) - 1);
                 if ((argc & 0x01) == 0)
                         error("Syntax");
                 if (argc < 5)
@@ -478,7 +478,7 @@ void MIPS16 cmd_pio(void)
         if (tp)
         {
                 int i = 6;
-                getargs(&tp, (MAX_ARG_COUNT * 2) - 1, (unsigned char *)",");
+                getcsargs(&tp, (MAX_ARG_COUNT * 2) - 1);
                 if ((argc & 0x01) == 0)
                         error("Syntax");
                 if (argc < 5)
@@ -507,7 +507,7 @@ void MIPS16 cmd_pio(void)
         tp = checkstring(cmdline, (unsigned char *)"DMA RX");
         if (tp)
         {
-                getargs(&tp, 13, (unsigned char *)",");
+                getcsargs(&tp, 13);
                 if (checkstring(argv[0], (unsigned char *)"OFF"))
                 {
                         dma_hw->abort = ((1u << dma_rx_chan2) | (1u << dma_rx_chan));
@@ -637,7 +637,7 @@ void MIPS16 cmd_pio(void)
         tp = checkstring(cmdline, (unsigned char *)"DMA TX");
         if (tp)
         {
-                getargs(&tp, 13, (unsigned char *)",");
+                getcsargs(&tp, 13);
                 if (checkstring(argv[0], (unsigned char *)"OFF"))
                 {
                         dma_hw->abort = ((1u << dma_tx_chan2) | (1u << dma_tx_chan));
@@ -769,7 +769,7 @@ void MIPS16 cmd_pio(void)
         tp = checkstring(cmdline, (unsigned char *)"INTERRUPT");
         if (tp)
         {
-                getargs(&tp, 7, (unsigned char *)",");
+                getcsargs(&tp, 7);
                 if ((argc & 0x01) == 0)
                         error("Syntax");
                 if (argc < 5)
@@ -818,7 +818,7 @@ void MIPS16 cmd_pio(void)
                 //        unsigned char *p;
                 unsigned int nbr;
                 long long int *dd;
-                getargs(&tp, (MAX_ARG_COUNT * 2) - 1, (unsigned char *)",");
+                getcsargs(&tp, (MAX_ARG_COUNT * 2) - 1);
                 if ((argc & 0x01) == 0)
                         error("Syntax");
                 if (argc < 5)
@@ -864,7 +864,7 @@ void MIPS16 cmd_pio(void)
         tp = checkstring(cmdline, (unsigned char *)"WRITEFIFO");
         if (tp)
         {
-                getargs(&tp, 7, (unsigned char *)",");
+                getcsargs(&tp, 7);
                 int pior = getint(argv[0], 0, PIOMAX - 1);
                 if (PIO0 == false && pior == 0)
                         error("PIO 0 not available");
@@ -883,7 +883,7 @@ void MIPS16 cmd_pio(void)
         tp = checkstring(cmdline, (unsigned char *)"PROGRAM LINE");
         if (tp)
         {
-                getargs(&tp, 5, (unsigned char *)",");
+                getcsargs(&tp, 5);
                 if (argc != 5)
                         error("Syntax");
                 int pior = getint(argv[0], 0, PIOMAX - 1);
@@ -907,7 +907,7 @@ void MIPS16 cmd_pio(void)
         if (tp)
         {
                 static int wrap_target_set = 0, wrap_set = 0;
-                getargs(&tp, 3, (unsigned char *)",");
+                getcsargs(&tp, 3);
                 if (!argc)
                         error("Syntax");
                 int pior = getint(argv[0], 0, PIOMAX - 1);
@@ -1055,7 +1055,7 @@ void MIPS16 cmd_pio(void)
                                                 char *ppp = ss;
                                                 if (*ss == '&')
                                                 {
-                                                        if (!(toupper(ss[1]) == 'B' || toupper(ss[1]) == 'H' || toupper(ss[1]) == 'O'))
+                                                        if (!(mytoupper(ss[1]) == 'B' || mytoupper(ss[1]) == 'H' || mytoupper(ss[1]) == 'O'))
                                                                 error("Syntax");
                                                         ppp += 2;
                                                 }
@@ -1153,7 +1153,7 @@ void MIPS16 cmd_pio(void)
                                                 char *ppp = ss;
                                                 if (*ss == '&')
                                                 {
-                                                        if (!(toupper(ss[1]) == 'B' || toupper(ss[1]) == 'H' || toupper(ss[1]) == 'O'))
+                                                        if (!(mytoupper(ss[1]) == 'B' || mytoupper(ss[1]) == 'H' || mytoupper(ss[1]) == 'O'))
                                                                 error("Syntax");
                                                         ppp += 2;
                                                 }
@@ -1227,7 +1227,7 @@ void MIPS16 cmd_pio(void)
                                                 char *ppp = ss;
                                                 if (*ss == '&')
                                                 {
-                                                        if (!(toupper(ss[1]) == 'B' || toupper(ss[1]) == 'H' || toupper(ss[1]) == 'O'))
+                                                        if (!(mytoupper(ss[1]) == 'B' || mytoupper(ss[1]) == 'H' || mytoupper(ss[1]) == 'O'))
                                                                 error("Syntax");
                                                         ppp += 2;
                                                 }
@@ -1310,7 +1310,7 @@ void MIPS16 cmd_pio(void)
                                                 char *ppp = ss;
                                                 if (*ss == '&')
                                                 {
-                                                        if (!(toupper(ss[1]) == 'B' || toupper(ss[1]) == 'H' || toupper(ss[1]) == 'O'))
+                                                        if (!(mytoupper(ss[1]) == 'B' || mytoupper(ss[1]) == 'H' || mytoupper(ss[1]) == 'O'))
                                                                 error("Syntax");
                                                         ppp += 2;
                                                 }
@@ -1605,7 +1605,7 @@ void MIPS16 cmd_pio(void)
                                                 char *ppp = ss;
                                                 if (*ss == '&')
                                                 {
-                                                        if (!(toupper(ss[1]) == 'B' || toupper(ss[1]) == 'H' || toupper(ss[1]) == 'O'))
+                                                        if (!(mytoupper(ss[1]) == 'B' || mytoupper(ss[1]) == 'H' || mytoupper(ss[1]) == 'O'))
                                                                 error("Syntax");
                                                         ppp += 2;
                                                 }
@@ -1758,7 +1758,7 @@ void MIPS16 cmd_pio(void)
         tp = checkstring(cmdline, (unsigned char *)"CLEAR");
         if (tp)
         {
-                getargs(&tp, 1, (unsigned char *)",");
+                getcsargs(&tp, 1);
                 int pior = getint(argv[0], 0, PIOMAX - 1);
                 if (PIO0 == false && pior == 0)
                         error("PIO 0 not available");
@@ -1785,7 +1785,7 @@ void MIPS16 cmd_pio(void)
         tp = checkstring(cmdline, (unsigned char *)"MAKE RING BUFFER");
         if (tp)
         {
-                getargs(&tp, 3, (unsigned char *)",");
+                getcsargs(&tp, 3);
                 if (argc < 3)
                         error("Syntax");
                 int size = getinteger(argv[2]);
@@ -1806,7 +1806,7 @@ void MIPS16 cmd_pio(void)
         if (tp)
         {
                 struct pio_program program;
-                getargs(&tp, 3, (unsigned char *)",");
+                getcsargs(&tp, 3);
                 if (argc != 3)
                         error("Syntax");
                 //        void *prt1;
@@ -1838,7 +1838,7 @@ void MIPS16 cmd_pio(void)
         tp = checkstring(cmdline, (unsigned char *)"START");
         if (tp)
         {
-                getargs(&tp, 3, (unsigned char *)",");
+                getcsargs(&tp, 3);
                 if (argc != 3)
                         error("Syntax");
                 int pior = getint(argv[0], 0, PIOMAX - 1);
@@ -1862,7 +1862,7 @@ void MIPS16 cmd_pio(void)
         tp = checkstring(cmdline, (unsigned char *)"STOP");
         if (tp)
         {
-                getargs(&tp, 3, (unsigned char *)",");
+                getcsargs(&tp, 3);
                 if (argc != 3)
                         error("Syntax");
                 int pior = getint(argv[0], 0, PIOMAX - 1);
@@ -1886,7 +1886,7 @@ void MIPS16 cmd_pio(void)
         {
                 int start = 0;
                 bool setout = false, sideout = false, outout = false;
-                getargs(&tp, 19, (unsigned char *)",");
+                getcsargs(&tp, 19);
                 if (argc < 5)
                         error("Syntax");
                 int pior = getint(argv[0], 0, PIOMAX - 1);
@@ -1924,7 +1924,7 @@ void MIPS16 cmd_pio(void)
         tp = checkstring(cmdline, (unsigned char *)"SET BASE");
         if (tp)
         {
-                getargs(&tp, 3, (unsigned char *)",");
+                getcsargs(&tp, 3);
                 if (argc < 3)
                         error("Syntax");
                 int pior = getint(argv[0], 0, PIOMAX - 1);
@@ -1962,9 +1962,9 @@ void MIPS16 cmd_pio(void)
                 int pushthreshold = 0, pullthreshold = 0, autopush = 0, autopull = 0, inshiftdir = 1, outshiftdir = 1, joinrxfifo = 0, jointxfifo = 0;
 #ifdef rp2350
                 int joinrxfifoget = 0, joinrxfifoput = 0;
-                getargs(&tp, 57, (unsigned char *)",");
+                getcsargs(&tp, 57);
 #else
-                getargs(&tp, 53, (unsigned char *)",");
+                getcsargs(&tp, 53);
 #endif
                 int pior = getint(argv[0], 0, PIOMAX - 1);
                 if (PIO0 == false && pior == 0)
@@ -2115,7 +2115,7 @@ void fun_pio(void)
         if (tp)
         {
                 int64_t myret = 0;
-                getargs(&tp, 13, (unsigned char *)",");
+                getcsargs(&tp, 13);
                 if (argc < 3)
                         error("Syntax");
                 myret = (getint(argv[0], 0, 5) << 29); // no of side set pins
@@ -2125,40 +2125,40 @@ void fun_pio(void)
                         myret |= (getint(argv[4], 0, 31) << 20); // no of OUT pins
                 if (argc > 5 && *argv[6])
                 {
-                        if (!(toupper((char)*argv[6]) == 'G'))
+                        if (!(mytoupper((char)*argv[6]) == 'G'))
                                 error("Syntax");
                         argv[6]++;
-                        if (!(toupper((char)*argv[6]) == 'P'))
+                        if (!(mytoupper((char)*argv[6]) == 'P'))
                                 error("Syntax");
                         argv[6]++;
                         myret |= (getint(argv[6], 0, 31) << 15); // IN base
                 }
                 if (argc > 7 && *argv[8])
                 {
-                        if (!(toupper((char)*argv[8]) == 'G'))
+                        if (!(mytoupper((char)*argv[8]) == 'G'))
                                 error("Syntax");
                         argv[8]++;
-                        if (!(toupper((char)*argv[8]) == 'P'))
+                        if (!(mytoupper((char)*argv[8]) == 'P'))
                                 error("Syntax");
                         argv[8]++;
                         myret |= (getint(argv[8], 0, 31) << 10); // SIDE SET base
                 }
                 if (argc > 9 && *argv[10])
                 {
-                        if (!(toupper((char)*argv[10]) == 'G'))
+                        if (!(mytoupper((char)*argv[10]) == 'G'))
                                 error("Syntax");
                         argv[10]++;
-                        if (!(toupper((char)*argv[10]) == 'P'))
+                        if (!(mytoupper((char)*argv[10]) == 'P'))
                                 error("Syntax");
                         argv[10]++;
                         myret |= (getint(argv[10], 0, 31) << 5); // SET base
                 }
                 if (argc == 13)
                 {
-                        if (!(toupper((char)*argv[12]) == 'G'))
+                        if (!(mytoupper((char)*argv[12]) == 'G'))
                                 error("Syntax");
                         argv[12]++;
-                        if (!(toupper((char)*argv[12]) == 'P'))
+                        if (!(mytoupper((char)*argv[12]) == 'P'))
                                 error("Syntax");
                         argv[12]++;
                         myret |= getint(argv[12], 0, 31); // OUT base
@@ -2171,13 +2171,13 @@ void fun_pio(void)
         if (tp)
         {
                 int64_t myret = 0;
-                getargs(&tp, 9, (unsigned char *)",");
+                getcsargs(&tp, 9);
                 if (!(argc == 5 || argc == 7 || argc == 9))
                         error("Syntax");
-                if (!(toupper((char)*argv[0]) == 'G'))
+                if (!(mytoupper((char)*argv[0]) == 'G'))
                         error("Syntax");
                 argv[0]++;
-                if (!(toupper((char)*argv[0]) == 'P'))
+                if (!(mytoupper((char)*argv[0]) == 'P'))
                         error("Syntax");
                 argv[0]++;
                 myret = (getint(argv[0], 0, 31) << 24); // jmp pin
@@ -2208,9 +2208,9 @@ void fun_pio(void)
         if (tp)
         {
 #ifdef rp2350
-                getargs(&tp, 19, (unsigned char *)",");
+                getcsargs(&tp, 19);
 #else
-                getargs(&tp, 15, (unsigned char *)",");
+                getcsargs(&tp, 15);
 #endif
                 if (argc < 1)
                         error("Syntax");
@@ -2242,7 +2242,7 @@ void fun_pio(void)
         tp = checkstring(ep, (unsigned char *)"FSTAT");
         if (tp)
         {
-                getargs(&tp, 1, (unsigned char *)",");
+                getcsargs(&tp, 1);
                 int pior = getint(argv[0], 0, PIOMAX - 1);
                 if (PIO0 == false && pior == 0)
                         error("PIO 0 not available");
@@ -2263,7 +2263,7 @@ void fun_pio(void)
         tp = checkstring(ep, (unsigned char *)"READFIFO");
         if (tp)
         {
-                getargs(&tp, 5, (unsigned char *)",");
+                getcsargs(&tp, 5);
                 int pior = getint(argv[0], 0, PIOMAX - 1);
                 if (PIO0 == false && pior == 0)
                         error("PIO 0 not available");
@@ -2282,7 +2282,7 @@ void fun_pio(void)
         tp = checkstring(ep, (unsigned char *)"FDEBUG");
         if (tp)
         {
-                getargs(&tp, 1, (unsigned char *)",");
+                getcsargs(&tp, 1);
                 int pior = getint(argv[0], 0, PIOMAX - 1);
                 if (PIO0 == false && pior == 0)
                         error("PIO 0 not available");
@@ -2302,7 +2302,7 @@ void fun_pio(void)
         tp = checkstring(ep, (unsigned char *)"NEXT LINE");
         if (tp)
         {
-                getargs(&tp, 1, (unsigned char *)",");
+                getcsargs(&tp, 1);
                 int pior = nextline[3];
                 if (argc)
                         pior = getint(argv[0], 0, PIOMAX - 1);
@@ -2323,7 +2323,7 @@ void fun_pio(void)
         tp = checkstring(ep, (unsigned char *)"FLEVEL");
         if (tp)
         {
-                getargs(&tp, 5, (unsigned char *)",");
+                getcsargs(&tp, 5);
                 int pior = getint(argv[0], 0, PIOMAX - 1);
                 if (PIO0 == false && pior == 0)
                         error("PIO 0 not available");
@@ -2656,7 +2656,7 @@ void fun_json(void)
         MMFLOAT tempd;
         int i, j, k, mode, index;
         char field[32], num[6];
-        getargs(&ep, 3, (unsigned char *)",");
+        getcsargs(&ep, 3);
         char *a = GetTempMemory(STRINGSIZE);
         ptr1 = findvar(argv[0], V_FIND | V_EMPTY_OK);
         if (g_vartbl[g_VarIndex].type & T_INT)

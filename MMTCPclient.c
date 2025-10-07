@@ -216,7 +216,7 @@ int cmd_tcpclient(void)
     if (tp)
     {
         int timeout = 5000;
-        getargs(&tp, 5, (unsigned char *)",");
+        getcsargs(&tp, 5);
         if (argc < 3)
             error("Syntax");
         ip4_addr_t remote_addr;
@@ -270,7 +270,7 @@ int cmd_tcpclient(void)
     if (tp)
     {
         int timeout = 5000;
-        getargs(&tp, 5, (unsigned char *)",");
+        getcsargs(&tp, 5);
         if (argc < 3)
             error("Syntax");
         ip4_addr_t remote_addr;
@@ -331,7 +331,7 @@ int cmd_tcpclient(void)
         uint8_t *q = NULL;
         int size = 0, timeout = 5000;
         TCP_CLIENT_T *state = TCP_CLIENT;
-        getargs(&tp, 5, (unsigned char *)",");
+        getcsargs(&tp, 5);
         if (!state)
             error("No connection");
         if (!state->connected)
@@ -369,7 +369,7 @@ int cmd_tcpclient(void)
         uint8_t *q = NULL;
         int size = 0;
         TCP_CLIENT_T *state = TCP_CLIENT;
-        getargs(&tp, 7, (unsigned char *)",");
+        getcsargs(&tp, 7);
         if (!state)
             error("No connection");
         if (!state->connected)

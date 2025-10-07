@@ -155,7 +155,7 @@ void MIPS16 cmd_memory(void)
     tp = checkstring(cmdline, (unsigned char *)"PACK");
     if (tp)
     {
-        getargs(&tp, 7, (unsigned char *)",");
+        getcsargs(&tp, 7);
         if (argc != 7)
             error("Syntax");
         int i, n = getinteger(argv[4]);
@@ -250,7 +250,7 @@ void MIPS16 cmd_memory(void)
         char *fromp = NULL;
         int sourcesize;
         int64_t *aint;
-        getargs(&tp, 5, (unsigned char *)",");
+        getcsargs(&tp, 5);
         if (!(argc == 5))
             error("Syntax");
         if (*argv[0] == '#')
@@ -282,7 +282,7 @@ void MIPS16 cmd_memory(void)
         char *fromp = NULL;
         int sourcesize;
         int64_t *aint;
-        getargs(&tp, 5, (unsigned char *)",");
+        getcsargs(&tp, 5);
         if (!(argc == 5))
             error("Syntax");
         if (*argv[0] == '#')
@@ -314,7 +314,7 @@ void MIPS16 cmd_memory(void)
     tp = checkstring(cmdline, (unsigned char *)"UNPACK");
     if (tp)
     {
-        getargs(&tp, 7, (unsigned char *)",");
+        getcsargs(&tp, 7);
         if (argc != 7)
             error("Syntax");
         int i, n = getinteger(argv[4]);
@@ -409,7 +409,7 @@ void MIPS16 cmd_memory(void)
         if ((p = checkstring(tp, (unsigned char *)"INTEGER")))
         {
             int stepin = 1, stepout = 1;
-            getargs(&p, 9, (unsigned char *)",");
+            getcsargs(&p, 9);
             if (argc < 5)
                 error("Syntax");
             int n = getinteger(argv[4]);
@@ -455,7 +455,7 @@ void MIPS16 cmd_memory(void)
         if ((p = checkstring(tp, (unsigned char *)"FLOAT")))
         {
             int stepin = 1, stepout = 1;
-            getargs(&p, 9, (unsigned char *)","); // assume byte
+            getcsargs(&p, 9); // assume byte
             if (argc < 5)
                 error("Syntax");
             int n = getinteger(argv[4]);
@@ -500,7 +500,7 @@ void MIPS16 cmd_memory(void)
             }
             return;
         }
-        getargs(&tp, 9, (unsigned char *)","); // assume byte
+        getcsargs(&tp, 9); // assume byte
         if (argc < 5)
             error("Syntax");
         int stepin = 1, stepout = 1;
@@ -546,7 +546,7 @@ void MIPS16 cmd_memory(void)
         unsigned char *p;
         if ((p = checkstring(tp, (unsigned char *)"BYTE")))
         {
-            getargs(&p, 5, (unsigned char *)","); // assume byte
+            getcsargs(&p, 5); // assume byte
             if (argc != 5)
                 error("Syntax");
             char *to = (char *)GetPokeAddr(argv[0]);
@@ -559,7 +559,7 @@ void MIPS16 cmd_memory(void)
         }
         if ((p = checkstring(tp, (unsigned char *)"SHORT")))
         {
-            getargs(&p, 5, (unsigned char *)","); // assume byte
+            getcsargs(&p, 5); // assume byte
             if (argc != 5)
                 error("Syntax");
             short *to = (short *)GetPokeAddr(argv[0]);
@@ -579,7 +579,7 @@ void MIPS16 cmd_memory(void)
         }
         if ((p = checkstring(tp, (unsigned char *)"WORD")))
         {
-            getargs(&p, 5, (unsigned char *)","); // assume byte
+            getcsargs(&p, 5); // assume byte
             if (argc != 5)
                 error("Syntax");
             unsigned int *to = (unsigned int *)GetPokeAddr(argv[0]);
@@ -600,7 +600,7 @@ void MIPS16 cmd_memory(void)
         if ((p = checkstring(tp, (unsigned char *)"INTEGER")))
         {
             int stepin = 1;
-            getargs(&p, 7, (unsigned char *)",");
+            getcsargs(&p, 7);
             if (argc < 5)
                 error("Syntax");
             uint64_t *to = (uint64_t *)GetPokeAddr(argv[0]);
@@ -629,7 +629,7 @@ void MIPS16 cmd_memory(void)
         if ((p = checkstring(tp, (unsigned char *)"FLOAT")))
         {
             int stepin = 1;
-            getargs(&p, 7, (unsigned char *)","); // assume byte
+            getcsargs(&p, 7); // assume byte
             if (argc < 5)
                 error("Syntax");
             MMFLOAT *to = (MMFLOAT *)GetPokeAddr(argv[0]);
@@ -655,7 +655,7 @@ void MIPS16 cmd_memory(void)
             }
             return;
         }
-        getargs(&tp, 5, (unsigned char *)","); // assume byte
+        getcsargs(&tp, 5); // assume byte
         if (argc != 5)
             error("Syntax");
         char *to = (char *)GetPokeAddr(argv[0]);
@@ -1196,20 +1196,18 @@ void __not_in_flash_func(SBitsSet)(unsigned char *addr, int bits)
 
 static inline __attribute__((always_inline)) unsigned int MBitsGet(unsigned char *addr)
 {
-    unsigned int i, *p;
-    addr -= (unsigned int)&MMHeap[0];
-    p = &mmap[((unsigned int)addr / PAGESIZE) / PAGESPERWORD];               // point to the word in the memory map
-    i = ((((unsigned int)addr / PAGESIZE)) & (PAGESPERWORD - 1)) * PAGEBITS; // get the position of the bits in the word
-    return (*p >> i) & ((1 << PAGEBITS) - 1);
+    unsigned int page_idx = ((unsigned int)addr - (unsigned int)&MMHeap[0]) >> 8; // divide by 256 using shift
+    unsigned int *p = &mmap[page_idx >> 4];                                       // divide by 16 using shift
+    unsigned int bit_pos = (page_idx & 15) << 1;                                  // (mod 16) * 2, combined operation
+    return (*p >> bit_pos) & 3;                                                   // extract 2 bits
 }
 
 static inline __attribute__((always_inline)) void MBitsSet(unsigned char *addr, int bits)
 {
-    unsigned int i, *p;
-    addr -= (unsigned int)&MMHeap[0];
-    p = &mmap[((unsigned int)addr / PAGESIZE) / PAGESPERWORD];               // point to the word in the memory map
-    i = ((((unsigned int)addr / PAGESIZE)) & (PAGESPERWORD - 1)) * PAGEBITS; // get the position of the bits in the word
-    *p = (bits << i) | (*p & (~(((1 << PAGEBITS) - 1) << i)));
+    unsigned int page_idx = ((unsigned int)addr - (unsigned int)&MMHeap[0]) >> 8; // divide by 256 using shift
+    unsigned int *p = &mmap[page_idx >> 4];                                       // divide by 16 using shift
+    unsigned int bit_pos = (page_idx & 15) << 1;                                  // (mod 16) * 2, combined operation
+    *p = (*p & ~(3u << bit_pos)) | ((unsigned int)bits << bit_pos);
 }
 #ifdef rp2350
 #ifndef PICOMITEWEB

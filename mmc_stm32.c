@@ -65,7 +65,7 @@ int SPISpeed = 0xFF;
 // #define SPI_CLK_PIN Option.SYSTEM_CLK
 // define SPI_MISO_PIN Option.SYSTEM_MISO
 uint16_t SPI_CLK_PIN, SPI_MOSI_PIN, SPI_MISO_PIN;
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
 uint16_t LCD_CLK_PIN, LCD_MOSI_PIN, LCD_MISO_PIN;
 #endif
 uint16_t SD_CLK_PIN, SD_MOSI_PIN, SD_MISO_PIN, SD_CS_PIN;
@@ -89,7 +89,7 @@ BYTE (*xchg_byte)(BYTE data_out) = NULL;
 void (*xmit_byte_multi)(const BYTE *buff, int cnt) = NULL;
 void (*rcvr_byte_multi)(BYTE *buff, int cnt) = NULL;
 int (*SET_SPI_CLK)(int speed, int polarity, int edge) = NULL;
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
 void (*lcd_xmit_byte_multi)(const BYTE *buff, int cnt) = NULL;
 void (*lcd_rcvr_byte_multi)(BYTE *buff, int cnt) = NULL;
 int (*LCD_SET_SPI_CLK)(int speed, int polarity, int edge) = NULL;
@@ -112,7 +112,7 @@ uint8_t SPI0locked = 0;
 uint8_t SPI1locked = 0;
 int BacklightSlice = -1;
 int BacklightChannel = -1;
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
 int KeyboardlightSlice = -1;
 int KeyboardlightChannel = -1;
 #endif
@@ -1885,7 +1885,7 @@ void InitReservedIO(void)
 	VGArecovery(0);
 #endif
 #else
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
 	if ((Option.DISPLAY_TYPE >= SSDPANEL && Option.DISPLAY_TYPE < VIRTUAL) || Option.DISPLAY_TYPE >= SSD1963_5_12BUFF)
 #else
 	if ((Option.DISPLAY_TYPE >= SSDPANEL && Option.DISPLAY_TYPE < VIRTUAL))
@@ -1950,7 +1950,7 @@ void InitReservedIO(void)
 		gpio_put(SSD1963_GPDAT8, GPIO_PIN_SET);
 		gpio_set_dir(SSD1963_GPDAT8, GPIO_OUT);
 		gpio_set_input_enabled(SSD1963_GPDAT8, true);
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
 		if (Option.DISPLAY_TYPE > SSD_PANEL_8 && (Option.DISPLAY_TYPE & 0xFC) != SSD1963_5_BUFF)
 #else
 		if (Option.DISPLAY_TYPE > SSD_PANEL_8)
@@ -1976,7 +1976,7 @@ void InitReservedIO(void)
 			gpio_put(SSD1963_GPDAT12, GPIO_PIN_SET);
 			gpio_set_dir(SSD1963_GPDAT12, GPIO_OUT);
 			gpio_set_input_enabled(SSD1963_GPDAT12, true);
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
 			if ((Option.DISPLAY_TYPE & 0xFC) != SSD1963_5_12BUFF)
 #endif
 			{
@@ -2100,7 +2100,7 @@ void InitReservedIO(void)
 		}
 #endif
 	}
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
 	if (Option.LCD_CLK && !(Option.LCD_CLK == Option.SYSTEM_CLK))
 	{
 		LCD_CLK_PIN = PinDef[Option.LCD_CLK].GPno;
@@ -2423,7 +2423,7 @@ char *pinsearch(int pin)
 		strcpy(buff, "LCD Reset");
 	else if (pin == Option.DISPLAY_BL)
 		strcpy(buff, "LCD BACKLIGHT");
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
 	else if (pin == PINMAP[Option.SSD_DC] && ((Option.DISPLAY_TYPE > SSD_PANEL_8 && Option.DISPLAY_TYPE < VIRTUAL_C) || (Option.DISPLAY_TYPE >= SSD1963_5_12BUFF)))
 		strcpy(buff, "SSD DC");
 	else if (pin == PINMAP[Option.SSD_WR] && ((Option.DISPLAY_TYPE > SSD_PANEL_8 && Option.DISPLAY_TYPE < VIRTUAL_C) || (Option.DISPLAY_TYPE >= SSD1963_5_12BUFF)))
@@ -2456,7 +2456,7 @@ char *pinsearch(int pin)
 		strcpy(buff, "SSD D6");
 	else if (pin == PINMAP[ssd + 7] && Option.SSD_DC)
 		strcpy(buff, "SSD D7");
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
 	else if (pin == PINMAP[ssd + 8] && Option.SSD_DC && ((Option.DISPLAY_TYPE > SSD_PANEL_8 && Option.DISPLAY_TYPE < VIRTUAL_C) || (Option.DISPLAY_TYPE >= SSD1963_5_12BUFF && Option.DISPLAY_TYPE < SSD1963_5_BUFF)))
 		strcpy(buff, "SSD D8");
 	else if (pin == PINMAP[ssd + 9] && Option.SSD_DC && ((Option.DISPLAY_TYPE > SSD_PANEL_8 && Option.DISPLAY_TYPE < VIRTUAL_C) || (Option.DISPLAY_TYPE >= SSD1963_5_12BUFF && Option.DISPLAY_TYPE < SSD1963_5_BUFF)))
@@ -2545,7 +2545,7 @@ char *pinsearch(int pin)
 		strcpy(buff, "SPI SYSTEM MOSI");
 	else if (pin == Option.SYSTEM_MISO)
 		strcpy(buff, "SPI SYSTEM MISO");
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
 	else if (pin == Option.LCD_CLK && Option.LCD_CLK != Option.SYSTEM_CLK)
 		strcpy(buff, "SPI LCD CLK");
 	else if (pin == Option.LCD_MOSI && Option.LCD_CLK != Option.SYSTEM_CLK)

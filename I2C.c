@@ -179,7 +179,7 @@ void I2C_Send_Data(unsigned char *data, int n)
 void ConfigDisplayI2C(unsigned char *p)
 {
   unsigned char DISPLAY_TYPE = 0;
-  getargs(&p, 5, (unsigned char *)",");
+  getcsargs(&p, 5);
   if (!(argc == 3 || argc == 5))
     error("Argument count");
   if (checkstring(argv[0], (unsigned char *)"SSD1306I2C"))
@@ -408,7 +408,7 @@ void __not_in_flash_func(i2c1_irq_handler)(void)
 void i2cSlave(unsigned char *p)
 {
   int addr;
-  getargs(&p, 5, (unsigned char *)",");
+  getcsargs(&p, 5);
   if (argc != 5)
     error("Argument count");
   if (I2C_Status & I2C_Status_Slave)
@@ -435,7 +435,7 @@ void i2cSlave(unsigned char *p)
 void i2c2Slave(unsigned char *p)
 {
   int addr;
-  getargs(&p, 5, (unsigned char *)",");
+  getcsargs(&p, 5);
   if (argc != 5)
     error("Argument count");
   if (I2C2_Status & I2C_Status_Slave)
@@ -714,7 +714,7 @@ void MIPS16 cmd_rtc(void)
   if ((p = checkstring(cmdline, (unsigned char *)"SETTIME")) != NULL)
   {
     int Fulldate = 0;
-    getargs(&p, 11, (unsigned char *)",");
+    getcsargs(&p, 11);
     if (I2C0locked)
     {
       if (argc == 1)
@@ -821,7 +821,7 @@ void MIPS16 cmd_rtc(void)
   }
   else if ((p = checkstring(cmdline, (unsigned char *)"GETREG")) != NULL)
   {
-    getargs(&p, 3, (unsigned char *)",");
+    getcsargs(&p, 3);
     if (argc != 3)
       error("Argument count");
     if (I2C0locked)
@@ -872,7 +872,7 @@ void MIPS16 cmd_rtc(void)
   }
   else if ((p = checkstring(cmdline, (unsigned char *)"SETREG")) != NULL)
   {
-    getargs(&p, 3, (unsigned char *)",");
+    getcsargs(&p, 3);
     if (argc != 3)
       error("Argument count");
     if (I2C0locked)
@@ -907,7 +907,7 @@ void MIPS16 cmd_rtc(void)
 void i2cEnable(unsigned char *p)
 {
   int speed, timeout;
-  getargs(&p, 3, (unsigned char *)",");
+  getcsargs(&p, 3);
   if (argc != 3)
     error("Invalid syntax");
   speed = getinteger(argv[0]);
@@ -925,7 +925,7 @@ void i2cEnable(unsigned char *p)
 void i2c2Enable(unsigned char *p)
 {
   int speed, timeout;
-  getargs(&p, 3, (unsigned char *)",");
+  getcsargs(&p, 3);
   if (argc != 3)
     error("Invalid syntax");
   speed = getinteger(argv[0]);
@@ -965,7 +965,7 @@ void i2cSend(unsigned char *p)
   void *ptr = NULL;
   unsigned char *cptr = NULL;
 
-  getargs(&p, 99, (unsigned char *)",");
+  getcsargs(&p, MAX_ARG_COUNT);
   if (!(argc & 0x01) || (argc < 7))
     error("Invalid syntax");
   if (!I2C_enabled)
@@ -1047,7 +1047,7 @@ void i2cSendSlave(unsigned char *p, int channel)
   int sendlen, i;
   void *ptr = NULL;
   unsigned char *cptr = NULL;
-  getargs(&p, 99, (unsigned char *)",");
+  getcsargs(&p, MAX_ARG_COUNT);
   if (!(argc >= 3))
     error("Invalid syntax");
   if (!((I2C_Status & I2C_Status_Slave && channel == 0) || (I2C2_Status & I2C_Status_Slave && channel == 1)))
@@ -1131,7 +1131,7 @@ void i2c2Send(unsigned char *p)
   void *ptr = NULL;
   unsigned char *cptr = NULL;
 
-  getargs(&p, 99, (unsigned char *)",");
+  getcsargs(&p, MAX_ARG_COUNT);
   if (!(argc & 0x01) || (argc < 7))
     error("Invalid syntax");
   if (!I2C2_enabled)
@@ -1212,7 +1212,7 @@ void i2cCheck(unsigned char *p)
 {
   int addr;
   uint8_t rxdata;
-  getargs(&p, 1, (unsigned char *)",");
+  getcsargs(&p, 1);
   if (!I2C_enabled)
     error("I2C not open");
   addr = getinteger(argv[0]);
@@ -1230,7 +1230,7 @@ void i2c2Check(unsigned char *p)
 {
   int addr;
   uint8_t rxdata;
-  getargs(&p, 1, (unsigned char *)",");
+  getcsargs(&p, 1);
   if (!I2C2_enabled)
     error("I2C not open");
   addr = getinteger(argv[0]);
@@ -1249,7 +1249,7 @@ void i2cReceive(unsigned char *p)
 {
   int addr, i2c_options, rcvlen;
   void *ptr = NULL;
-  getargs(&p, 7, (unsigned char *)",");
+  getcsargs(&p, 7);
   if (argc != 7)
     error("Invalid syntax");
   if (!I2C_enabled)
@@ -1337,7 +1337,7 @@ void i2cReceiveSlave(unsigned char *p, int channel)
   I2C2_Rcvbuf_Float = NULL;
   I2C2_Rcvbuf_Int = NULL;
   I2C2_Rcvbuf_String = NULL;
-  getargs(&p, 5, (unsigned char *)",");
+  getcsargs(&p, 5);
   if (argc != 5)
     error("Invalid syntax");
   if (!((I2C_Status & I2C_Status_Slave && channel == 0) || (I2C2_Status & I2C_Status_Slave && channel == 1)))
@@ -1463,7 +1463,7 @@ void i2c2Receive(unsigned char *p)
 {
   int addr, i2c2_options, rcvlen;
   void *ptr = NULL;
-  getargs(&p, 7, (unsigned char *)",");
+  getcsargs(&p, 7);
   if (argc != 7)
     error("Invalid syntax");
   if (!I2C2_enabled)
@@ -1845,7 +1845,7 @@ void MIPS16 cmd_Nunchuck(void)
   uint32_t id = 0;
   if ((tp = checkstring(cmdline, (unsigned char *)"OPEN")))
   {
-    getargs(&tp, 1, (unsigned char *)",");
+    getcsargs(&tp, 1);
     if (!(I2C0locked || I2C1locked))
       error("SYSTEM I2C not configured");
     if (classic1 || nunchuck1)
@@ -1914,7 +1914,7 @@ void MIPS16 cmd_Classic(void)
   uint32_t id = 0;
   if ((tp = checkstring(cmdline, (unsigned char *)"OPEN")))
   {
-    getargs(&tp, 3, (unsigned char *)",");
+    getcsargs(&tp, 3);
     if (!(I2C0locked || I2C1locked))
       error("SYSTEM I2C not configured");
     if (classic1 || nunchuck1)
@@ -2386,7 +2386,7 @@ void MIPS16 cmd_camera(void)
   if ((tp = checkstring(cmdline, (unsigned char *)"OPEN")))
   {
     int pin1, pin2, pin3, pin4, pin5, pin6;
-    getargs(&tp, 11, (unsigned char *)",");
+    getcsargs(&tp, 11);
     if (argc != 11)
       error("Syntax");
     if (!(Option.DISPLAY_TYPE > I2C_PANEL && Option.DISPLAY_TYPE < BufferedPanel))
@@ -2759,12 +2759,12 @@ void MIPS16 cmd_camera(void)
   }
   else if ((tp = checkstring(cmdline, (unsigned char *)"TEST")))
   {
-    getargs(&tp, 1, (unsigned char *)",");
+    getcsargs(&tp, 1);
     OV7670_test_pattern(getint(argv[0], 0, 3));
   }
   else if ((tp = checkstring(cmdline, (unsigned char *)"REGISTER")))
   {
-    getargs(&tp, 3, (unsigned char *)",");
+    getcsargs(&tp, 3);
     if (!XCLK)
       error("Camera not open");
     int a = getint(argv[0], 0, 255);
@@ -2786,7 +2786,7 @@ void MIPS16 cmd_camera(void)
     int totaldifference = 0, difference;
     if (!XCLK)
       error("Camera not open");
-    getargs(&tp, 9, (unsigned char *)",");
+    getcsargs(&tp, 9);
     if (!(argc == 3 || argc == 5 || argc == 9))
       error("Syntax");
     int xs = 0, ys = 0;
@@ -2867,7 +2867,7 @@ void MIPS16 cmd_camera(void)
   }
   else if ((tp = checkstring(cmdline, (unsigned char *)"CAPTURE")))
   {
-    getargs(&tp, 5, (unsigned char *)",");
+    getcsargs(&tp, 5);
     int xs = 0, ys = 0;
     if (!XCLK)
       error("Camera not open");

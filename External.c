@@ -298,17 +298,13 @@ void SoftReset(void)
     while (1)
         ;
 }
-#ifdef rp2350
-void __not_in_flash_func(PinSetBit)(int pin, unsigned int offset)
-{
-#else
-#if defined(PICOMITEVGA) || defined(PICOMITEWEB)
+
+#if LOWRAM
 void PinSetBit(int pin, unsigned int offset)
 {
 #else
 void __not_in_flash_func(PinSetBit)(int pin, unsigned int offset)
 {
-#endif
 #endif
     switch (offset)
     {
@@ -389,22 +385,12 @@ int IsInvalidPin(int pin)
         return true;
     return false;
 }
-#ifdef PICOMITEWEB
-void ExtSet(int pin, int val)
-{
-#else
-#ifndef rp2350
-#ifdef PICOMITEVGA
+#if LOWRAM
 void ExtSet(int pin, int val)
 {
 #else
 void __not_in_flash_func(ExtSet)(int pin, int val)
 {
-#endif
-#else
-void __not_in_flash_func(ExtSet)(int pin, int val)
-{
-#endif
 #endif
 
     if (ExtCurrentConfig[pin] == EXT_NOT_CONFIG || ExtCurrentConfig[pin] == EXT_DIG_OUT /* || ExtCurrentConfig[pin] == EXT_OC_OUT*/)
@@ -446,7 +432,7 @@ void __not_in_flash_func(cmd_sync)(void)
 #endif
     uint64_t i;
     static uint64_t synctime = 0, endtime = 0;
-    getargs(&cmdline, 3, (unsigned char *)",");
+    getcsargs(&cmdline, 3);
     if (synctime && argc == 0)
     {
         while (time_us_64() < endtime)
@@ -1332,14 +1318,9 @@ void MIPS16 ExtCfg(int pin, int cfg, int option)
     uSec(2);
 }
 extern int adc_clk_div;
-#ifndef rp2350
-#ifdef PICOMITEVGA
+#if LOWRAM
 int64_t ExtInp(int pin)
 {
-#else
-int64_t __not_in_flash_func(ExtInp)(int pin)
-{
-#endif
 #else
 int64_t __not_in_flash_func(ExtInp)(int pin)
 {
@@ -1402,7 +1383,7 @@ int64_t __not_in_flash_func(ExtInp)(int pin)
 void MIPS16 cmd_setpin(void)
 {
     int i, pin, pin2 = 0, pin3 = 0, value = -1, value2 = 0, value3 = 0, option = 0;
-    getargs(&cmdline, 7, (unsigned char *)",");
+    getcsargs(&cmdline, 7);
     if (argc % 2 == 0 || argc < 3)
         error("Argument count");
     char code;
@@ -2105,7 +2086,7 @@ void cmd_port(void)
 {
     int pin, nbr, value, code, pincode;
     int i;
-    getargs(&cmdline, NBRPINS * 4, (unsigned char *)",");
+    getcsargs(&cmdline, NBRPINS * 4);
 
     if ((argc & 0b11) != 0b11)
         error("Invalid syntax");
@@ -2157,7 +2138,7 @@ void fun_distance(void)
 {
     int trig, echo, techo;
 
-    getargs(&ep, 3, (unsigned char *)",");
+    getcsargs(&ep, 3);
     if ((argc & 1) != 1)
         error("Invalid syntax");
     char code;
@@ -2223,7 +2204,7 @@ void fun_port(void)
 {
     int pin, nbr, i, value = 0, code, pincode;
 
-    getargs(&ep, NBRPINS * 4, (unsigned char *)",");
+    getcsargs(&ep, NBRPINS * 4);
     if ((argc & 0b11) != 0b11)
         error("Invalid syntax");
     uint64_t pinstate = gpio_get_all64();
@@ -2266,7 +2247,7 @@ void cmd_pulse(void)
     int pin, i, x, y;
     MMFLOAT f;
 
-    getargs(&cmdline, 3, (unsigned char *)",");
+    getcsargs(&cmdline, 3);
     if (argc != 3)
         error("Invalid syntax");
     char code;
@@ -2326,7 +2307,7 @@ void fun_pulsin(void)
     int pin, polarity;
     unsigned int t1, t2;
 
-    getargs(&ep, 7, (unsigned char *)",");
+    getcsargs(&ep, 7);
     if ((argc & 1) != 1 || argc < 3)
         error("Invalid syntax");
     char code;
@@ -2400,7 +2381,7 @@ void cmd_ir(void)
     }
     else if ((p = checkstring(cmdline, (unsigned char *)"SEND")))
     {
-        getargs(&p, 5, (unsigned char *)",");
+        getcsargs(&p, 5);
         char code;
         if (!(code = codecheck(argv[0])))
             argv[0] += 2;
@@ -2428,7 +2409,7 @@ void cmd_ir(void)
     }
     else
     {
-        getargs(&cmdline, 5, (unsigned char *)",");
+        getcsargs(&cmdline, 5);
         if (IRpin == 99)
             error("Pin not configured for IR");
         if (IrState != IR_CLOSED)
@@ -2857,7 +2838,7 @@ void PWMoff(int slice)
 #ifndef PICOMITEVGA
 void setBacklight(int level, int setfrequency)
 {
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
     if (((Option.DISPLAY_TYPE > I2C_PANEL && Option.DISPLAY_TYPE < BufferedPanel) || Option.DISPLAY_TYPE >= NEXTGEN || (Option.DISPLAY_TYPE >= SSDPANEL && Option.DISPLAY_TYPE < VIRTUAL)) && Option.DISPLAY_BL)
     {
 #else
@@ -2888,7 +2869,11 @@ void setBacklight(int level, int setfrequency)
         I2C_Send_Command(0x81); // SETCONTRAST
         I2C_Send_Command((uint8_t)level);
     }
+#if PICOMITERP2350
+    else if ((Option.DISPLAY_TYPE >= SSDPANEL && Option.DISPLAY_TYPE < VIRTUAL) || Option.DISPLAY_TYPE > SSD1963_5_12BUFF)
+#else
     else if (Option.DISPLAY_TYPE >= SSDPANEL && Option.DISPLAY_TYPE < VIRTUAL)
+#endif
     {
         SetBacklightSSD1963(level);
     }
@@ -2903,7 +2888,7 @@ void setBacklight(int level, int setfrequency)
 /*  @endcond */
 void MIPS16 cmd_backlight(void)
 {
-    getargs(&cmdline, 3, (unsigned char *)",");
+    getcsargs(&cmdline, 3);
 
     int level = getint(argv[0], 0, 100);
     int frequency = 50000;
@@ -2911,7 +2896,7 @@ void MIPS16 cmd_backlight(void)
     // Validate that backlight is supported for current display type
     bool backlight_supported = false;
 
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
     if (((Option.DISPLAY_TYPE > I2C_PANEL && Option.DISPLAY_TYPE < BufferedPanel) ||
          (Option.DISPLAY_TYPE >= SSDPANEL && Option.DISPLAY_TYPE < VIRTUAL) ||
          Option.DISPLAY_TYPE >= NEXTGEN) &&
@@ -2971,7 +2956,7 @@ void MIPS16 cmd_Servo(void)
     unsigned char *tp;
     int div = 1, high1 = 0, high2 = 0;
     MMFLOAT duty1 = -1.0, duty2 = -1.0;
-    getargs(&cmdline, 5, (unsigned char *)",");
+    getcsargs(&cmdline, 5);
     if (!(argc >= 3))
         error("Syntax");
     int CPU_Speed = Option.CPU_Speed;
@@ -3069,9 +3054,9 @@ void MIPS16 cmd_pwm(void)
         MMFLOAT count0 = -1.0, count1 = -1.0, count2 = -1.0, count3 = -1.0, count4 = -1.0, count5 = -1.0, count6 = -1.0, count7 = -1.0;
 #ifdef rp2350
         MMFLOAT count8 = -1.0, count9 = -1.0, count10 = -1.0, count11 = -1.0;
-        getargs(&tp, 23, (unsigned char *)",");
+        getcsargs(&tp, 23);
 #else
-        getargs(&tp, 15, (unsigned char *)",");
+        getcsargs(&tp, 15);
 #endif
         if (argc >= 1)
         {
@@ -3157,14 +3142,14 @@ void MIPS16 cmd_pwm(void)
 
         int enabled = 0;
         if (slice0 || Option.AUDIO_SLICE == 0 || BacklightSlice == 0 || CameraSlice == 0
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
             || KeyboardlightSlice == 0
 #endif
         )
         {
             enabled |= 1;
             if (!(Option.AUDIO_SLICE == 0 || BacklightSlice == 0 || CameraSlice == 0 || count0 < 0.0
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
                   || KeyboardlightSlice == 0
 #endif
                   ))
@@ -3175,14 +3160,14 @@ void MIPS16 cmd_pwm(void)
             }
         }
         if (slice1 || Option.AUDIO_SLICE == 1 || BacklightSlice == 1 || CameraSlice == 1
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
             || KeyboardlightSlice == 1
 #endif
         )
         {
             enabled |= 2;
             if (!(Option.AUDIO_SLICE == 1 || BacklightSlice == 1 || CameraSlice == 1 || count1 < 0.0
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
                   || KeyboardlightSlice == 1
 #endif
                   ))
@@ -3193,14 +3178,14 @@ void MIPS16 cmd_pwm(void)
             }
         }
         if (slice2 || Option.AUDIO_SLICE == 2 || BacklightSlice == 2 || CameraSlice == 2
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
             || KeyboardlightSlice == 2
 #endif
         )
         {
             enabled |= 4;
             if (!(Option.AUDIO_SLICE == 2 || BacklightSlice == 2 || CameraSlice == 2 || count2 < 0.0
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
                   || KeyboardlightSlice == 2
 #endif
                   ))
@@ -3211,14 +3196,14 @@ void MIPS16 cmd_pwm(void)
             }
         }
         if (slice3 || Option.AUDIO_SLICE == 3 || BacklightSlice == 3 || CameraSlice == 3
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
             || KeyboardlightSlice == 3
 #endif
         )
         {
             enabled |= 8;
             if (!(Option.AUDIO_SLICE == 3 || BacklightSlice == 3 || CameraSlice == 3 || count3 < 0.0
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
                   || KeyboardlightSlice == 3
 #endif
                   ))
@@ -3229,14 +3214,14 @@ void MIPS16 cmd_pwm(void)
             }
         }
         if (slice4 || Option.AUDIO_SLICE == 4 || BacklightSlice == 4 || CameraSlice == 4
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
             || KeyboardlightSlice == 4
 #endif
         )
         {
             enabled |= 16;
             if (!(Option.AUDIO_SLICE == 4 || BacklightSlice == 4 || CameraSlice == 4 || count4 < 0.0
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
                   || KeyboardlightSlice == 4
 #endif
                   ))
@@ -3247,14 +3232,14 @@ void MIPS16 cmd_pwm(void)
             }
         }
         if (slice5 || Option.AUDIO_SLICE == 5 || BacklightSlice == 5 || CameraSlice == 5
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
             || KeyboardlightSlice == 5
 #endif
         )
         {
             enabled |= 32;
             if (!(Option.AUDIO_SLICE == 5 || BacklightSlice == 5 || CameraSlice == 5 || count5 < 0.0
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
                   || KeyboardlightSlice == 5
 #endif
                   ))
@@ -3265,14 +3250,14 @@ void MIPS16 cmd_pwm(void)
             }
         }
         if (slice6 || Option.AUDIO_SLICE == 6 || BacklightSlice == 6 || CameraSlice == 6
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
             || KeyboardlightSlice == 6
 #endif
         )
         {
             enabled |= 64;
             if (!(Option.AUDIO_SLICE == 6 || BacklightSlice == 6 || CameraSlice == 6 || count6 < 0.0
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
                   || KeyboardlightSlice == 6
 #endif
                   ))
@@ -3283,14 +3268,14 @@ void MIPS16 cmd_pwm(void)
             }
         }
         if (slice7 || Option.AUDIO_SLICE == 7 || BacklightSlice == 7 || CameraSlice == 7
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
             || KeyboardlightSlice == 7
 #endif
         )
         {
             enabled |= 128;
             if (!(Option.AUDIO_SLICE == 7 || BacklightSlice == 7 || CameraSlice == 7 || count7 < 0.0
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
                   || KeyboardlightSlice == 7
 #endif
                   ))
@@ -3388,7 +3373,7 @@ void MIPS16 cmd_pwm(void)
     int div = 1, high1 = 0, high2 = 0;
     int phase1 = 0, phase2 = 0;
     MMFLOAT duty1 = -1.0, duty2 = -1.0;
-    getargs(&cmdline, 11, (unsigned char *)",");
+    getcsargs(&cmdline, 11);
     if (!(argc >= 3))
         error("Syntax");
     int CPU_Speed = Option.CPU_Speed;
@@ -3529,7 +3514,7 @@ void cmd_keypad(void)
         KeypadClose();
     else
     {
-        getargs(&cmdline, 19, (unsigned char *)",");
+        getcsargs(&cmdline, 19);
 #ifdef rp2350
         if (argc == 13)
         { // new format map%(c,r),variable,interrupt, startcolpin, nocols, startrowpin, norows
@@ -3710,7 +3695,7 @@ exitcheck:
     PinSetBit(keypad_pins[cols], ODCSET);
     return false;
 }
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
 const unsigned char localkeymap[10][5] = {
     {1, 2, 3, 4, 5},
     {6, 7, 8, 9, 10},
@@ -3878,7 +3863,7 @@ void cmd_lcd(void)
 
     if ((p = checkstring(cmdline, (unsigned char *)"INIT")))
     {
-        getargs(&p, 11, (unsigned char *)",");
+        getcsargs(&p, 11);
         if (argc != 11)
             error("Invalid syntax");
         if (*lcd_pins)
@@ -3924,11 +3909,11 @@ void cmd_lcd(void)
     }
     else if ((p = checkstring(cmdline, (unsigned char *)"CMD")) || (p = checkstring(cmdline, (unsigned char *)"DATA")))
     { // send a command or data
-        getargs(&p, MAX_ARG_COUNT * 2, (unsigned char *)",");
+        getcsargs(&p, MAX_ARG_COUNT * 2);
         for (i = 0; i < argc; i += 2)
         {
             j = getint(argv[i], 0, 255);
-            LCD_Byte(j, toupper(*cmdline) == 'D', 0);
+            LCD_Byte(j, mytoupper(*cmdline) == 'D', 0);
         }
     }
     else
@@ -3936,7 +3921,7 @@ void cmd_lcd(void)
         const char linestart[4] = {0, 64, 20, 84};
         int center, pos;
 
-        getargs(&cmdline, 5, (unsigned char *)",");
+        getcsargs(&cmdline, 5);
         if (argc != 5)
             error("Invalid syntax");
         i = getint(argv[0], 1, 4);
@@ -4056,7 +4041,7 @@ void cmd_DHT22(void)
     int dht11 = 0;
     MMFLOAT *temp, *humid;
 
-    getargs(&cmdline, 7, (unsigned char *)",");
+    getcsargs(&cmdline, 7);
     if (!(argc == 5 || argc == 7))
         error("Incorrect number of arguments");
 
@@ -4162,7 +4147,7 @@ void fun_dev(void)
         //	int L;  //classic left analog
         //	int R;  //classic right analog
         //	unsigned short x0; //classic buttons
-        getargs(&tp, 1, (unsigned char *)",");
+        getcsargs(&tp, 1);
         if (!classic1)
             error("Not open");
         if (checkstring(argv[0], (unsigned char *)"LX"))
@@ -4188,18 +4173,18 @@ void fun_dev(void)
     else if ((tp = checkstring(ep, (unsigned char *)"NUNCHUCK")))
     {
         unsigned char *p;
-        getargs(&tp, 1, (unsigned char *)",");
+        getcsargs(&tp, 1);
         p = argv[0];
-        if (toupper(*p) == 'A')
+        if (mytoupper(*p) == 'A')
         {
             p++;
             if (p[1] == 0)
             {
-                if (toupper(*p) == 'X')
+                if (mytoupper(*p) == 'X')
                     iret = nunstruct[5].ax;
-                else if (toupper(*p) == 'Y')
+                else if (mytoupper(*p) == 'Y')
                     iret = nunstruct[5].ay;
-                else if (toupper(*p) == 'Z')
+                else if (mytoupper(*p) == 'Z')
                     iret = nunstruct[5].az;
                 else
                     error("Syntax");
@@ -4208,22 +4193,22 @@ void fun_dev(void)
             {
                 if (p[1] == '0')
                 {
-                    if (toupper(*p) == 'X')
+                    if (mytoupper(*p) == 'X')
                         iret = nunstruct[5].x0;
-                    else if (toupper(*p) == 'Y')
+                    else if (mytoupper(*p) == 'Y')
                         iret = nunstruct[5].y0;
-                    else if (toupper(*p) == 'Z')
+                    else if (mytoupper(*p) == 'Z')
                         iret = nunstruct[5].z0;
                     else
                         error("Syntax");
                 }
                 else if (p[1] == '1')
                 {
-                    if (toupper(*p) == 'X')
+                    if (mytoupper(*p) == 'X')
                         iret = nunstruct[5].x1;
-                    else if (toupper(*p) == 'Y')
+                    else if (mytoupper(*p) == 'Y')
                         iret = nunstruct[5].y1;
-                    else if (toupper(*p) == 'Z')
+                    else if (mytoupper(*p) == 'Z')
                         iret = nunstruct[5].z1;
                     else
                         error("Syntax");
@@ -4232,48 +4217,48 @@ void fun_dev(void)
                     error("Syntax");
             }
         }
-        else if (toupper(*p) == 'J')
+        else if (mytoupper(*p) == 'J')
         {
             p++;
             if (p[1] == 0)
             {
-                if (toupper(*p) == 'X')
+                if (mytoupper(*p) == 'X')
                     iret = nunstruct[5].x;
-                else if (toupper(*p) == 'Y')
+                else if (mytoupper(*p) == 'Y')
                     iret = nunstruct[5].y;
             }
             else
             {
-                if (toupper(*p) == 'X')
+                if (mytoupper(*p) == 'X')
                 {
                     p++;
-                    if (toupper(*p) == 'L')
+                    if (mytoupper(*p) == 'L')
                     {
                         iret = nunstruct[5].calib[9];
                     }
-                    else if (toupper(*p) == 'C')
+                    else if (mytoupper(*p) == 'C')
                     {
                         iret = nunstruct[5].calib[10];
                     }
-                    else if (toupper(*p) == 'R')
+                    else if (mytoupper(*p) == 'R')
                     {
                         iret = nunstruct[5].calib[8];
                     }
                     else
                         error("Syntax");
                 }
-                else if (toupper(*p) == 'Y')
+                else if (mytoupper(*p) == 'Y')
                 {
                     p++;
-                    if (toupper(*p) == 'T')
+                    if (mytoupper(*p) == 'T')
                     {
                         iret = nunstruct[5].calib[11];
                     }
-                    else if (toupper(*p) == 'C')
+                    else if (mytoupper(*p) == 'C')
                     {
                         iret = nunstruct[5].calib[13];
                     }
-                    else if (toupper(*p) == 'B')
+                    else if (mytoupper(*p) == 'B')
                     {
                         iret = nunstruct[5].calib[12];
                     }
@@ -4286,11 +4271,11 @@ void fun_dev(void)
         }
         else
         {
-            if (toupper(*p) == 'Z')
+            if (mytoupper(*p) == 'Z')
                 iret = nunstruct[5].Z;
-            else if (toupper(*p) == 'C')
+            else if (mytoupper(*p) == 'C')
                 iret = nunstruct[5].C;
-            else if (toupper(*p) == 'T')
+            else if (mytoupper(*p) == 'T')
                 iret = nunstruct[5].type;
             else
                 error("Syntax");
@@ -4307,7 +4292,7 @@ void fun_dev(void)
         //	int L;  //classic left analog
         //	int R;  //classic right analog
         //	unsigned short x0; //classic buttons
-        getargs(&tp, 3, (unsigned char *)",");
+        getcsargs(&tp, 3);
         int n = getint(argv[0], 1, 4);
         if (checkstring(argv[2], (unsigned char *)"LX"))
             iret = nunstruct[n].ax;
@@ -4365,7 +4350,7 @@ void fun_dev(void)
                 500mSec before it times out or until it is read.
                 T This returns 3 if a PS2 mouse has a scroll wheel or 0 if not.*/
 
-        getargs(&tp, 3, (unsigned char *)",");
+        getcsargs(&tp, 3);
         int n = getint(argv[0], 1, 4);
         if (checkstring(argv[2], (unsigned char *)"X"))
             iret = nunstruct[n].ax;
@@ -4402,11 +4387,11 @@ void cmd_WS2812(void)
     unsigned char *p;
     int i, j, bit, nbr = 0, colours = 3;
     int ticks_per_millisecond = ticks_per_second / 1000;
-    getargs(&cmdline, 7, (unsigned char *)",");
+    getcsargs(&cmdline, 7);
     if (argc != 7)
         error("Argument count");
     p = argv[0];
-    if (toupper(*p) == 'O')
+    if (mytoupper(*p) == 'O')
     {
         T0H = 16777215 + setuptime - ((7 * ticks_per_millisecond) / 20000);
         T1H = 16777215 + setuptime - ((14 * ticks_per_millisecond) / 20000);
@@ -4414,7 +4399,7 @@ void cmd_WS2812(void)
         T1L = 16777215 + setuptime - ((9.5 * ticks_per_millisecond) / 20000);
         TRST = 50;
     }
-    else if (toupper(*p) == 'B')
+    else if (mytoupper(*p) == 'B')
     {
         T0H = 16777215 + setuptime - ((8 * ticks_per_millisecond) / 20000);
         T1H = 16777215 + setuptime - ((16 * ticks_per_millisecond) / 20000);
@@ -4422,9 +4407,9 @@ void cmd_WS2812(void)
         T1L = 16777215 + setuptime - ((6.5 * ticks_per_millisecond) / 20000);
         TRST = 280;
     }
-    else if (toupper(*p) == 'S' || toupper(*p) == 'W')
+    else if (mytoupper(*p) == 'S' || mytoupper(*p) == 'W')
     {
-        if (toupper(*p) == 'W')
+        if (mytoupper(*p) == 'W')
             colours = 4;
         T0H = 16777215 + setuptime - ((6 * ticks_per_millisecond) / 20000);
         T0L = 16777215 + setuptime - ((15 * ticks_per_millisecond) / 20000);
@@ -4674,7 +4659,7 @@ void cmd_device(void)
     {
         int maxchars = 255;
         char *termchars = NULL;
-        getargs(&tp, 13, (unsigned char *)",");
+        getcsargs(&tp, 13);
         if (argc < 9)
             error("Argument count");
         unsigned char code;
@@ -4722,7 +4707,7 @@ void cmd_device(void)
     if (tp)
     {
         //        int mask;
-        getargs(&tp, 5, (unsigned char *)",");
+        getcsargs(&tp, 5);
         if (!(argc == 5))
             error("Argument count");
         unsigned char code;
@@ -4757,7 +4742,7 @@ void cmd_device(void)
         MMFLOAT *a1float = NULL;
         int64_t *a1int = NULL;
         unsigned int *data;
-        getargs(&tp, 5, (unsigned char *)",");
+        getcsargs(&tp, 5);
         if (!(argc == 5))
             error("Argument count");
         num = getint(argv[2], 1, 10000);
@@ -4826,7 +4811,7 @@ void cmd_adc(void)
     tp = checkstring(cmdline, (unsigned char *)"OPEN");
     if (tp)
     {
-        getargs(&tp, 5, (unsigned char *)",");
+        getcsargs(&tp, 5);
         if (ADCopen)
             error("Already open");
         if (!(argc == 3 || argc == 5))
@@ -4974,7 +4959,7 @@ void cmd_adc(void)
     tp = checkstring(cmdline, (unsigned char *)"RUN");
     if (tp)
     {
-        getargs(&tp, 3, (unsigned char *)",");
+        getcsargs(&tp, 3);
         if (!ADCopen)
             error("ADC not open");
         if (!(argc == 3))
@@ -5055,7 +5040,7 @@ void cmd_adc(void)
     tp = checkstring(cmdline, (unsigned char *)"FREQUENCY");
     if (tp)
     {
-        getargs(&tp, 1, (unsigned char *)",");
+        getcsargs(&tp, 1);
         if (!ADCopen)
             error("Not open");
         float localfrequency = (float)getnumber(argv[0]) * ADCopen;
@@ -5067,7 +5052,7 @@ void cmd_adc(void)
     tp = checkstring(cmdline, (unsigned char *)"START");
     if (tp)
     {
-        getargs(&tp, 23, (unsigned char *)",");
+        getcsargs(&tp, 23);
         if (!ADCopen)
             error("ADC not open");
         if (!(argc >= 1))

@@ -46,13 +46,14 @@ extern void DrawRectangleSPI(int x1, int y1, int x2, int y2, int c);
 extern void DrawBufferSPI(int x1, int y1, int x2, int y2, unsigned char *p);
 extern void DrawBitmapSPI(int x1, int y1, int width, int height, int scale, int fc, int bc, unsigned char *bitmap);
 extern void ReadBufferSPI(int x1, int y1, int x2, int y2, unsigned char *p);
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
 extern void DrawRectangleMEM332(int x1, int y1, int x2, int y2, int c);
 extern void DrawBitmapMEM332(int x1, int y1, int width, int height, int scale, int fc, int bc, unsigned char *bitmap);
 extern void DrawBufferMEM332(int x1, int y1, int x2, int y2, unsigned char *p);
 extern void ReadBufferMEM332(int x1, int y1, int x2, int y2, unsigned char *buff);
 extern void DrawBlitBufferMEM332(int x1, int y1, int x2, int y2, unsigned char *p);
 extern void ReadBlitBufferMEM332(int x1, int y1, int x2, int y2, unsigned char *buff);
+extern void DrawPixelMEM332(int x, int y, int c);
 #endif
 extern void DrawRectangleSPISCR(int x1, int y1, int x2, int y2, int c);
 extern void DrawBufferSPISCR(int x1, int y1, int x2, int y2, unsigned char *p);
@@ -334,7 +335,7 @@ extern void __not_in_flash_func(spi_finish)(spi_inst_t *spi);
 #define VIRTUAL_M 55
 #define VS1053slow 56
 #define VS1053fast 57
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
 #define ST7796SPBUFF 58
 #define NEXTGEN ST7796SPBUFF
 #define ILI9341BUFF 59
@@ -360,7 +361,7 @@ extern void __not_in_flash_func(spi_finish)(spi_inst_t *spi);
 #define TFT_SWRST 0x01
 #define SSDTYPE (Option.DISPLAY_TYPE >= SSDPANEL && Option.DISPLAY_TYPE < VIRTUAL_C && !(Option.DISPLAY_TYPE == ILI9341_16 || Option.DISPLAY_TYPE == ILI9341_8 || Option.DISPLAY_TYPE == IPS_4_16 || Option.DISPLAY_TYPE == ILI9486_16))
 #define SSD16TYPE (Option.DISPLAY_TYPE > SSD_PANEL_8 && Option.DISPLAY_TYPE < VIRTUAL_C && !(Option.DISPLAY_TYPE == ILI9341_16 || Option.DISPLAY_TYPE == IPS_4_16 || Option.DISPLAY_TYPE == ILI9486_16))
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
 #define SPIREAD (Option.DISPLAY_TYPE == ILI9341 || Option.DISPLAY_TYPE == ILI9488P || Option.DISPLAY_TYPE == ILI9488 || Option.DISPLAY_TYPE == ST7796SP || Option.DISPLAY_TYPE == ST7796S || Option.DISPLAY_TYPE == ST7789B || Option.DISPLAY_TYPE >= NEXTGEN)
 #else
 #define SPIREAD (Option.DISPLAY_TYPE == ILI9341 || Option.DISPLAY_TYPE == ILI9488P || Option.DISPLAY_TYPE == ILI9488 || Option.DISPLAY_TYPE == ST7796SP || Option.DISPLAY_TYPE == ST7796S || Option.DISPLAY_TYPE == ST7789B)
@@ -472,7 +473,7 @@ extern void waitwhilebusy(void);
 struct Displays
 {
     unsigned char ref;
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
     char name[16];
 #else
     char name[13];
@@ -511,7 +512,7 @@ extern void __not_in_flash_func(HW0ReadSPI)(BYTE *buff, int cnt);
 extern void __not_in_flash_func(HW1ReadSPI)(BYTE *buff, int cnt);
 extern void BitBangReadSPI(BYTE *buff, int cnt);
 extern void ScrollLCDSPI(int lines);
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
 extern void ScrollLCDMEM332(int lines);
 extern void init_RGB332_to_RGB565_LUT(void);
 extern void init_RGB332_to_RGB888_LUT(void);

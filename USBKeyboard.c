@@ -615,7 +615,7 @@ const int DEkeyValue[202] = {
 	121, 89,	//    USB_HID_KEYBOARD_KEYPAD_KEYBOARD_Z                                       = 0x1D,
 	49, 33,		//    USB_HID_KEYBOARD_KEYPAD_KEYBOARD_1_AND_EXCLAMATION_POINT                 = 0x1E,
 	50, 34,		//    USB_HID_KEYBOARD_KEYPAD_KEYBOARD_2_AND_AT                                = 0x1F,
-	51, 0,		//    USB_HID_KEYBOARD_KEYPAD_KEYBOARD_3_AND_HASH                              = 0x20,      DE: §=245
+	51, 200,	//    USB_HID_KEYBOARD_KEYPAD_KEYBOARD_3_AND_HASH                              = 0x20,      DE: §=245
 	52, 36,		//    USB_HID_KEYBOARD_KEYPAD_KEYBOARD_4_AND_DOLLAR                            = 0x21,
 	53, 37,		//    USB_HID_KEYBOARD_KEYPAD_KEYBOARD_5_AND_PERCENT                           = 0x22,
 	54, 38,		//    USB_HID_KEYBOARD_KEYPAD_KEYBOARD_6_AND_CARROT                            = 0x23,
@@ -628,15 +628,15 @@ const int DEkeyValue[202] = {
 	8, 8,		//    USB_HID_KEYBOARD_KEYPAD_KEYBOARD_DELETE                                  = 0x2A,
 	9, 0x9f,	//    USB_HID_KEYBOARD_KEYPAD_KEYBOARD_TAB                                     = 0x2B,
 	32, 32,		//    USB_HID_KEYBOARD_KEYPAD_KEYBOARD_SPACEBAR                                = 0x2C,
-	0, 63,		//    USB_HID_KEYBOARD_KEYPAD_KEYBOARD_MINUS_AND_UNDERSCORE                    = 0x2D,        DE: ß=225
-	0, 96,		//    USB_HID_KEYBOARD_KEYPAD_KEYBOARD_EQUAL_AND_PLUS                          = 0x2E,   DE: ´=239
-	0, 0,		//    USB_HID_KEYBOARD_KEYPAD_KEYBOARD_OPEN_BRACKET_AND_OPEN_CURLY_BRACE       = 0x2F,         DE: ü=129,Ü=154
+	201, 63,	//    USB_HID_KEYBOARD_KEYPAD_KEYBOARD_MINUS_AND_UNDERSCORE                    = 0x2D,        DE: ß=225
+	202, 96,	//    USB_HID_KEYBOARD_KEYPAD_KEYBOARD_EQUAL_AND_PLUS                          = 0x2E,   DE: ´=239
+	203, 204,	//    USB_HID_KEYBOARD_KEYPAD_KEYBOARD_OPEN_BRACKET_AND_OPEN_CURLY_BRACE       = 0x2F,         DE: ü=129,Ü=154
 	43, 42,		//    USB_HID_KEYBOARD_KEYPAD_KEYBOARD_CLOSE_BRACKET_AND_CLOSE_CURLY_BRACE     = 0x30,
 	35, 39,		//    USB_HID_KEYBOARD_KEYPAD_KEYBOARD_BACK_SLASH_AND_PIPE                     = 0x31,
 	35, 39,		//    USB_HID_KEYBOARD_KEYPAD_KEYBOARD_NON_US_HASH_AND_TILDE                   = 0x32,
-	0, 0,		//    USB_HID_KEYBOARD_KEYPAD_KEYBOARD_SEMICOLON_AND_COLON                     = 0x33,   DE: ö=228,Ö=229
-	0, 0,		//    USB_HID_KEYBOARD_KEYPAD_KEYBOARD_APOSTROPHE_AND_QUOTE                    = 0x34,   DE: ä=132,Ä=142
-	94, 0,		//    USB_HID_KEYBOARD_KEYPAD_KEYBOARD_GRAVE_ACCENT_AND_TILDE                  = 0x35,   DE: °=167
+	205, 206,	//    USB_HID_KEYBOARD_KEYPAD_KEYBOARD_SEMICOLON_AND_COLON                     = 0x33,   DE: ö=228,Ö=229
+	207, 208,	//    USB_HID_KEYBOARD_KEYPAD_KEYBOARD_APOSTROPHE_AND_QUOTE                    = 0x34,   DE: ä=132,Ä=142
+	94, 209,	//    USB_HID_KEYBOARD_KEYPAD_KEYBOARD_GRAVE_ACCENT_AND_TILDE                  = 0x35,   DE: °=167
 	44, 59,		//    USB_HID_KEYBOARD_KEYPAD_KEYBOARD_COMMA_AND_LESS_THAN                     = 0x36,
 	46, 58,		//    USB_HID_KEYBOARD_KEYPAD_KEYBOARD_PERIOD_AND_GREATER_THAN                 = 0x37,
 	45, 95,		//    USB_HID_KEYBOARD_KEYPAD_KEYBOARD_FORWARD_SLASH_AND_QUESTION_MARK         = 0x38,
@@ -2388,7 +2388,7 @@ void cmd_gamepad(void)
 	int n;
 	if ((tp = checkstring(cmdline, (unsigned char *)"INTERRUPT ENABLE")))
 	{
-		getargs(&tp, 5, (unsigned char *)",");
+		getcsargs(&tp, 5);
 		if (!(argc == 3 || argc == 5))
 			error("Syntax");
 		n = getint(argv[0], 1, 4);
@@ -2410,7 +2410,7 @@ void cmd_gamepad(void)
 	}
 	else if ((tp = checkstring(cmdline, (unsigned char *)"CONFIGURE")))
 	{
-		getargs(&tp, 67, (unsigned char *)",");
+		getcsargs(&tp, 67);
 		if (!(argc == 67))
 			error("Syntax");
 		MyGamepad.vid = getint(argv[0], 0, 0xFFFF);
@@ -2450,7 +2450,7 @@ void cmd_gamepad(void)
 	}
 	else if ((tp = checkstring(cmdline, (unsigned char *)"HAPTIC")))
 	{
-		getargs(&tp, 5, (unsigned char *)",");
+		getcsargs(&tp, 5);
 		if (!(argc == 5))
 			error("Syntax");
 		n = getint(argv[0], 1, 4) - 1;
@@ -2461,7 +2461,7 @@ void cmd_gamepad(void)
 	}
 	else if ((tp = checkstring(cmdline, (unsigned char *)"COLOUR")))
 	{
-		getargs(&tp, 3, (unsigned char *)",");
+		getcsargs(&tp, 3);
 		if (!(argc == 3))
 			error("Syntax");
 		n = getint(argv[0], 1, 4) - 1;
@@ -2474,7 +2474,7 @@ void cmd_gamepad(void)
 	}
 	else if ((tp = checkstring(cmdline, (unsigned char *)"INTERRUPT DISABLE")))
 	{
-		getargs(&tp, 1, (unsigned char *)",");
+		getcsargs(&tp, 1);
 		n = getint(argv[0], 1, 4);
 		nunInterruptc[n] = NULL;
 	}
@@ -2487,7 +2487,7 @@ void cmd_mouse(void)
 	int n;
 	if ((tp = checkstring(cmdline, (unsigned char *)"INTERRUPT ENABLE")))
 	{
-		getargs(&tp, 3, (unsigned char *)",");
+		getcsargs(&tp, 3);
 		if (!(argc == 3))
 			error("Syntax");
 		n = getint(argv[0], 1, 4);
@@ -2497,7 +2497,7 @@ void cmd_mouse(void)
 	}
 	else if ((tp = checkstring(cmdline, (unsigned char *)"SET")))
 	{
-		getargs(&tp, 7, (unsigned char *)",");
+		getcsargs(&tp, 7);
 		if (!(argc == 7 || argc == 5))
 			error("Syntax");
 		n = getint(argv[0], 2, 2);
@@ -2508,7 +2508,7 @@ void cmd_mouse(void)
 	}
 	else if ((tp = checkstring(cmdline, (unsigned char *)"INTERRUPT DISABLE")))
 	{
-		getargs(&tp, 1, (unsigned char *)",");
+		getcsargs(&tp, 1);
 		n = getint(argv[0], 1, 4);
 		nunInterruptc[n] = NULL;
 	}

@@ -188,7 +188,7 @@ static char (*SSputchar)(char buff, int flush) = SerialConsolePutC;
 #ifdef PICOMITEVGA
 #define MX470Scroll(n) ScrollLCD(n);
 #else
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
 #define MX470Scroll(n)                                                                                       \
     if (Option.DISPLAY_CONSOLE)                                                                              \
     {                                                                                                        \
@@ -439,7 +439,7 @@ void edit(unsigned char *cmdline, bool cmdfile)
     int y, x, edit_buff_size;
     optioncolourcodesave = Option.ColourCode;
     char name[STRINGSIZE], *filename = NULL;
-    getargs(&cmdline, 1, (unsigned char *)",");
+    getcsargs(&cmdline, 1);
     if (argc)
     {
         strcpy(name, (char *)getFstring(argv[0]));
@@ -492,7 +492,7 @@ void edit(unsigned char *cmdline, bool cmdfile)
     }
     if (Option.DISPLAY_CONSOLE == true && HRes / gui_font_width < 32)
         error("Font is too large");
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
     if (Option.DISPLAY_TYPE >= VIRTUAL && Option.DISPLAY_TYPE < NEXTGEN && WriteBuf)
         FreeMemorySafe((void **)&WriteBuf);
 #else
@@ -770,7 +770,7 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
         Y_TILE++;
 #else
     char RefreshSave = Option.Refresh;
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
     if (!(Option.DISPLAY_TYPE >= NEXTGEN))
 #endif
         Option.Refresh = 0;
@@ -1352,7 +1352,7 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
                 if (TextChanged)
                 {
                     GetInputString((unsigned char *)"Exit and discard all changes (Y/N): ");
-                    if (toupper(*inpbuf) != 'Y')
+                    if (mytoupper(*inpbuf) != 'Y')
                         break;
                 }
                 // fall through to the normal exit
@@ -2110,7 +2110,7 @@ char *findLine(int ln, int *inmulti)
 
 int EditCompStr(char *p, char *tkn)
 {
-    while (*tkn && (toupper(*tkn) == toupper(*p)))
+    while (*tkn && (mytoupper(*tkn) == mytoupper(*p)))
     {
         if (*tkn == '(' && *p == '(')
             return true;
@@ -2119,7 +2119,7 @@ int EditCompStr(char *p, char *tkn)
         tkn++;
         p++;
     }
-    if (*tkn == 0 && !isnamechar(*p))
+    if (*tkn == 0 && !isnamechar((unsigned char)*p))
         return true; // return the string if successful
 
     return false; // or NULL if not

@@ -466,170 +466,192 @@ uint8_t PSRAMpin;
         return ((CommandToken)(p[0] & 0x7f)) | ((CommandToken)(p[1] & 0x7f) << 7);
     }
     char banner[64];
+// Helper macro for mutex-protected operations
+#ifdef PICOMITE
+#define WITH_FRAMEBUFFER_LOCK(condition, code)       \
+    do                                               \
+    {                                                \
+        if (condition)                               \
+            mutex_enter_blocking(&frameBufferMutex); \
+        code;                                        \
+        if (condition)                               \
+            mutex_exit(&frameBufferMutex);           \
+    } while (0)
+#else
+#define WITH_FRAMEBUFFER_LOCK(condition, code) code
+#endif
+
+    // Wii controller state machine processing
+    typedef enum
+    {
+        WII_STATE_IDLE = 0,
+        WII_STATE_SEND = 1,
+        WII_STATE_RECEIVE = 2
+    } WiiState;
+
+    static inline void process_wii_controller(volatile uint8_t *device_flag,
+                                              volatile unsigned int *timer,
+                                              int *readstate,
+                                              void (*proc_func)(void),
+                                              int threshold)
+    {
+        if (!(*device_flag) || *timer < threshold)
+            return;
+
+        switch (*readstate)
+        {
+        case WII_STATE_IDLE:
+            WiiSend(sizeof(readcontroller), (char *)readcontroller);
+            if (!mmI2Cvalue)
+                *readstate = WII_STATE_SEND;
+            break;
+
+        case WII_STATE_SEND:
+            WiiReceive(6, (char *)nunbuff);
+            *readstate = mmI2Cvalue ? WII_STATE_IDLE : WII_STATE_RECEIVE;
+            break;
+
+        case WII_STATE_RECEIVE:
+            proc_func();
+            *readstate = WII_STATE_IDLE;
+            *device_flag = 2;
+            break;
+        }
+        *timer = 0;
+    }
+
     void __not_in_flash_func(routinechecks)(void)
     {
         static int when = 0;
+        static int classicread = 0, nunchuckread = 0;
+#ifndef USBKEYBOARD
+        static int keyread = 0;
+#endif
+
+        // === Timer synchronization ===
         if (abs((time_us_64() - mSecTimer * 1000)) > 5000)
         {
             cancel_repeating_timer(&timer);
             add_repeating_timer_us(-1000, timer_callback, NULL, &timer);
             mSecTimer = time_us_64() / 1000;
         }
-        if (CurrentlyPlaying == P_WAV || CurrentlyPlaying == P_FLAC || CurrentlyPlaying == P_MP3 || CurrentlyPlaying == P_MIDI)
+
+        // === Audio playback processing ===
+        if (CurrentlyPlaying == P_WAV || CurrentlyPlaying == P_FLAC ||
+            CurrentlyPlaying == P_MP3 || CurrentlyPlaying == P_MIDI)
         {
-#ifdef PICOMITE
-            if (SPIatRisk)
-                mutex_enter_blocking(&frameBufferMutex); // lock the frame buffer
-#endif
-            checkWAVinput();
-#ifdef PICOMITE
-            if (SPIatRisk)
-                mutex_exit(&frameBufferMutex);
-#endif
+            WITH_FRAMEBUFFER_LOCK(SPIatRisk, checkWAVinput());
         }
-        if (CurrentlyPlaying == P_MOD || CurrentlyPlaying == P_ARRAY)
-            checkWAVinput();
-        if (++when & 7 && CurrentLinePtr)
-            return;
-#ifdef USBKEYBOARD
-        if (USBenabled)
+        else if (CurrentlyPlaying == P_MOD || CurrentlyPlaying == P_ARRAY)
         {
-            if (mSecTimer > 2000)
-            {
-                tuh_task();
-                hid_app_task();
-            }
+            checkWAVinput();
+        }
+
+        // === Early exit for frequent calls ===
+        if ((++when & 0x07) && CurrentLinePtr)
+            return;
+
+        // === USB task processing ===
+#ifdef USBKEYBOARD
+        if (USBenabled && mSecTimer > 2000)
+        {
+            tuh_task();
+            hid_app_task();
         }
 #else
-    static int c, read = 0;
-    if (tud_cdc_connected() && (Option.SerialConsole == 0 || Option.SerialConsole > 4) && Option.Telnet != -1)
+    // === Console CDC processing ===
+    if (tud_cdc_connected() &&
+        (Option.SerialConsole == 0 || Option.SerialConsole > 4) &&
+        Option.Telnet != -1)
     {
+
+        int c;
         while ((c = tud_cdc_read_char()) != -1)
         {
             ConsoleRxBuf[ConsoleRxBufHead] = c;
-            if (BreakKey && ConsoleRxBuf[ConsoleRxBufHead] == BreakKey)
-            {                                        // if the user wants to stop the progran
-                MMAbort = true;                      // set the flag for the interpreter to see
-                ConsoleRxBufHead = ConsoleRxBufTail; // empty the buffer
+
+            if (BreakKey && c == BreakKey)
+            {
+                // User interrupt
+                MMAbort = true;
+                ConsoleRxBufHead = ConsoleRxBufTail;
             }
-            else if (ConsoleRxBuf[ConsoleRxBufHead] == keyselect && KeyInterrupt != NULL)
+            else if (c == keyselect && KeyInterrupt != NULL)
             {
                 Keycomplete = true;
             }
             else
             {
-                ConsoleRxBufHead = (ConsoleRxBufHead + 1) % CONSOLE_RX_BUF_SIZE; // advance the head of the queue
+                // Normal character - add to buffer
+                ConsoleRxBufHead = (ConsoleRxBufHead + 1) % CONSOLE_RX_BUF_SIZE;
+
+                // Handle buffer overflow
                 if (ConsoleRxBufHead == ConsoleRxBufTail)
-                {                                                                    // if the buffer has overflowed
-                    ConsoleRxBufTail = (ConsoleRxBufTail + 1) % CONSOLE_RX_BUF_SIZE; // throw away the oldest char
+                {
+                    ConsoleRxBufTail = (ConsoleRxBufTail + 1) % CONSOLE_RX_BUF_SIZE;
                 }
             }
         }
     }
 #endif
-#if defined(PICOMITE) && defined(rp2350)
-        if (Option.DISPLAY_TYPE >= NEXTGEN && !(low_x == silly_low && high_x == silly_high && low_y == silly_low && high_y == silly_high))
-        { // Buffered LCD displays
+
+        // === Display buffer refresh (RP2350) ===
+#if PICOMITERP2350
+        if (Option.DISPLAY_TYPE >= NEXTGEN &&
+            !(low_x == silly_low && high_x == silly_high &&
+              low_y == silly_low && high_y == silly_high))
+        {
+
             if (Option.Refresh)
             {
                 multicore_fifo_push_blocking(6);
                 multicore_fifo_push_blocking((uint32_t)low_x | (high_x << 16));
                 multicore_fifo_push_blocking((uint32_t)low_y | (high_y << 16));
-                low_x = silly_low;
-                high_y = silly_high;
-                low_y = silly_low;
-                high_x = silly_high;
+
+                low_x = low_y = silly_low;
+                high_x = high_y = silly_high;
             }
         }
 #endif
+
+        // === GPS processing ===
         if (GPSchannel)
             processgps();
+
+        // === SD card check ===
         if (diskchecktimer == 0)
             CheckSDCard();
+
+        // === Touch processing ===
 #ifdef GUICONTROLS
         if (Ctrl && TOUCH_GETIRQTRIS && !calibrate)
             ProcessTouch();
 #endif
 
-        //        if(tud_cdc_connected() && KeyCheck==0){
-        //            SSPrintString(alive);
-        //        }
-        if (clocktimer == 0 && Option.RTC)
+        // === RTC update ===
+        if (clocktimer == 0 && Option.RTC && !classicread && !nunchuckread)
         {
-            if (classicread == 0 && nunchuckread == 0)
-            {
-                RtcGetTime(0);
-            }
+            RtcGetTime(0);
         }
+
+        // === I2C keyboard check ===
 #ifndef USBKEYBOARD
         if (Option.KeyboardConfig == CONFIG_I2C && KeyCheck == 0)
         {
-            if (read == 0)
-            {
-                CheckI2CKeyboard(0, 0);
-                read = 1;
-            }
-            else
-            {
-                CheckI2CKeyboard(0, 1);
-                read = 0;
-            }
+            CheckI2CKeyboard(0, keyread);
+            keyread = !keyread;
             KeyCheck = KEYCHECKTIME;
         }
 #endif
-        if (classic1 && ClassicTimer >= 10)
-        {
-            if (classicread == 0)
-            {
-                WiiSend(sizeof(readcontroller), (char *)readcontroller);
-                if (!mmI2Cvalue)
-                    classicread = 1;
-            }
-            else if (classicread == 1)
-            {
-                WiiReceive(6, (char *)nunbuff);
-                if (!mmI2Cvalue)
-                    classicread = 2;
-                else
-                    classicread = 0;
-            }
-            else
-            {
-                classicproc();
-                classicread = 0;
-                classic1 = 2;
-            }
-            ClassicTimer = 0;
-        }
-        if (nunchuck1 && NunchuckTimer >= 10)
-        {
-            if (nunchuckread == false)
-            {
-                WiiSend(sizeof(readcontroller), (char *)readcontroller);
-                if (!mmI2Cvalue)
-                    nunchuckread = 1;
-            }
-            else if (nunchuckread == 1)
-            {
-                WiiReceive(6, (char *)nunbuff);
-                if (!mmI2Cvalue)
-                    nunchuckread = 2;
-                else
-                    nunchuckread = 0;
-            }
-            else
-            {
-                nunproc();
-                nunchuckread = 0;
-                nunchuck1 = 2;
-            }
-            NunchuckTimer = 0;
-        }
-        /*frame
-            if(frame && CurrentLinePtr)ShowCursor(framecursor);
-        */
-    }
 
+        // === Wii Classic Controller ===
+        process_wii_controller(&classic1, &ClassicTimer, &classicread,
+                               classicproc, 10);
+
+        // === Wii Nunchuck ===
+        process_wii_controller(&nunchuck1, &NunchuckTimer, &nunchuckread,
+                               nunproc, 10);
+    }
     int __not_in_flash_func(getConsole)(void)
     {
         int c = -1;
@@ -725,7 +747,7 @@ uint8_t PSRAMpin;
 // check if there is a keystroke waiting in the buffer and, if so, return with the char
 // returns -1 if no char waiting
 // the main work is to check for vt100 escape code sequences and map to Maximite codes
-#if (defined(PICOMITEVGA) || defined(PICOMITEWEB)) && !defined(rp2350)
+#if LOWRAM
     int MMInkey(void)
     {
 #else
@@ -976,63 +998,64 @@ int __not_in_flash_func(MMInkey)(void)
         }
         *p = 0;
     }
-    // insert a string into the start of the lastcmd buffer.
-    // the buffer is a sequence of strings separated by a zero byte.
-    // using the up arrow usere can call up the last few commands executed.
+    // Insert a string into the lastcmd buffer
     void MIPS16 InsertLastcmd(unsigned char *s)
     {
         int i, slen;
+
         if (strcmp((const char *)lastcmd, (const char *)s) == 0)
-            return; // don't duplicate
+            return;
+
         slen = strlen((const char *)s);
         if (slen < 1 || slen > sizeof(lastcmd) - 1)
             return;
+
         slen++;
         for (i = sizeof(lastcmd) - 1; i >= slen; i--)
-            lastcmd[i] = lastcmd[i - slen]; // shift the contents of the buffer up
-        strcpy((char *)lastcmd, (char *)s); // and insert the new string in the beginning
+            lastcmd[i] = lastcmd[i - slen];
+
+        strcpy((char *)lastcmd, (char *)s);
+
         for (i = sizeof(lastcmd) - 1; lastcmd[i]; i--)
-            lastcmd[i] = 0; // zero the end of the buffer
+            lastcmd[i] = 0;
     }
 
     void MIPS16 EditInputLine(void)
     {
-        char *p = NULL;
+        char *p;
         char buf[MAXKEYLEN + 3];
         char goend[10];
-        int lastcmd_idx, lastcmd_edit;
-        int insert, /*startline,*/ maxchars;
-        int CharIndex, BufEdited;
-        int c, i, j;
-        int l4, l3, l2;
-        maxchars = 255;
+        int lastcmd_idx = 0, lastcmd_edit = 0;
+        int CharIndex, BufEdited = false;
+        int insert = false;
+        int c, i, j, len;
+        int l2, l3, l4;
+
+        // Calculate line wrap positions
         if (Option.DISPLAY_CONSOLE && Option.Width <= SCREENWIDTH)
-        { // We will always assume the Vt100 is 80 colums if LCD is the console <=80.
+        {
             l2 = SCREENWIDTH + 1 - MMPromptPos;
             l3 = 2 * SCREENWIDTH + 2 - MMPromptPos;
             l4 = 3 * SCREENWIDTH + 3 - MMPromptPos;
         }
         else
-        { // otherwise assume the VT100 matches Option.Width
+        {
             l2 = Option.Width + 1 - MMPromptPos;
             l3 = 2 * Option.Width + 2 - MMPromptPos;
             l4 = 3 * Option.Width + 3 - MMPromptPos;
         }
-        // Build "\e[80C" equivalent string for the line length
-        // strcpy(goend,"\e[");IntToStr(linelen,l2+MMPromptPos, 10);strcat(goend,linelen); strcat(goend, "C");
+
         strcpy(goend, "\e[");
         IntToStr(&goend[strlen(goend)], l2 + MMPromptPos, 10);
         strcat(goend, "C");
 
-        MMPrintString((char *)inpbuf);            // display the contents of the input buffer (if any)
-        CharIndex = strlen((const char *)inpbuf); // get the current cursor position in the line
-        insert = false;
-        //    Cursor = C_STANDARD;
-        lastcmd_edit = lastcmd_idx = 0;
-        BufEdited = false; //(CharIndex != 0);
+        MMPrintString((char *)inpbuf);
+        CharIndex = strlen((const char *)inpbuf);
+
         while (1)
         {
             c = MMgetchar();
+
             if (c == TAB)
             {
                 strcpy(buf, "        ");
@@ -1057,15 +1080,14 @@ int __not_in_flash_func(MMInkey)(void)
                 buf[0] = c;
                 buf[1] = 0;
             }
+
             do
             {
                 switch (buf[0])
                 {
                 case '\r':
-                case '\n': // if(autoOn && atoi(inpbuf) > 0) autoNext = atoi(inpbuf) + autoIncr;
-                    // if(autoOn && !BufEdited) *inpbuf = 0;
+                case '\n':
                     goto saveline;
-                    break;
 
                 case '\b':
                     if (CharIndex > 0)
@@ -1073,13 +1095,11 @@ int __not_in_flash_func(MMInkey)(void)
                         BufEdited = true;
                         i = CharIndex - 1;
                         j = CharIndex;
-                        for (p = (char *)inpbuf + i; *p; p++)
-                            *p = *(p + 1); // remove the char from inpbuf
 
-                        // Lets put the cursor at the beginning of where the command is displayed.
-                        // backspace to the beginning of line
-#define USEBACKSPACE
-#ifdef USEBACKSPACE
+                        for (p = (char *)inpbuf + i; *p; p++)
+                            *p = *(p + 1);
+
+                        // Backspace to beginning
                         while (j)
                         {
                             if (j == l4 || j == l3 || j == l2)
@@ -1096,35 +1116,19 @@ int __not_in_flash_func(MMInkey)(void)
                         }
                         fflush(stdout);
                         MX470Display(CLEAR_TO_EOS);
-                        SSPrintString("\033[0J"); // Clear to End Of Screen
-#else
-                    CurrentX = 0;
-                    CurrentY = CurrentY - ((CharIndex + 1) / Option.Width * gui_font_height);
-                    if (CharIndex > l4 - 1)
-                        SSPrintString("\e[3A");
-                    else if (CharIndex > l3 - 1)
-                        SSPrintString("\e[2A");
-                    else if (CharIndex > l2 - 1)
-                        SSPrintString("\e[1A");
-                    SSPrintString("\r");
-                    // CurrentX=0;SerUSBPutS("\r");
-                    MX470Display(CLEAR_TO_EOS);
-                    SSPrintString("\033[0J");
-                    MMPrintString("> ");
-                    fflush(stdout);
+                        SSPrintString("\033[0J");
 
-#endif
-
+                        // Redisplay buffer
                         j = 0;
-                        while (j < strlen((const char *)inpbuf))
+                        len = strlen((const char *)inpbuf);
+                        while (j < len)
                         {
                             MMputchar(inpbuf[j], 0);
-                            if ((j == l4 - 1 || j == l3 - 1 || j == l2 - 1) && j == strlen((const char *)inpbuf) - 1)
+                            if ((j == l4 - 1 || j == l3 - 1 || j == l2 - 1) && j == len - 1)
                             {
-                                SSPrintString(" ");
-                                SSPrintString("\b");
+                                SSPrintString(" \b");
                             }
-                            if ((j == l4 - 1 || j == l3 - 1 || j == l2 - 1) && j < strlen((const char *)inpbuf) - 1)
+                            if ((j == l4 - 1 || j == l3 - 1 || j == l2 - 1) && j < len - 1)
                             {
                                 SerialConsolePutC(inpbuf[j + 1], 0);
                                 SSPrintString("\b");
@@ -1133,8 +1137,8 @@ int __not_in_flash_func(MMInkey)(void)
                         }
                         fflush(stdout);
 
-                        // return the cursor to the right position
-                        for (j = strlen((const char *)inpbuf); j > i; j--)
+                        // Return cursor to position
+                        for (j = len; j > i; j--)
                         {
                             if (j == l4 || j == l3 || j == l2)
                             {
@@ -1156,14 +1160,10 @@ int __not_in_flash_func(MMInkey)(void)
 
                 case CTRLKEY('S'):
                 case LEFT:
-
                     BufEdited = true;
-                    insert = false; // left at first char will turn OVR on
+                    insert = false;
                     if (CharIndex > 0)
                     {
-                        // if(CharIndex == strlen((const char *)inpbuf)) {
-                        // insert = true;
-                        // }
                         if (CharIndex == l4 || CharIndex == l3 || CharIndex == l2)
                         {
                             DisplayPutC('\b');
@@ -1174,45 +1174,42 @@ int __not_in_flash_func(MMInkey)(void)
                         {
                             MMputchar('\b', 1);
                         }
-                        insert = true; // Any left turns on INS
+                        insert = true;
                         CharIndex--;
                     }
                     break;
 
                 case CTRLKEY('D'):
                 case RIGHT:
-
-                    if (CharIndex < strlen((const char *)inpbuf))
+                    len = strlen((const char *)inpbuf);
+                    if (CharIndex < len)
                     {
                         BufEdited = true;
                         MMputchar(inpbuf[CharIndex], 1);
-                        if ((CharIndex == l4 - 1 || CharIndex == l3 - 1 || CharIndex == l2 - 1) && CharIndex == strlen((const char *)inpbuf) - 1)
+                        if ((CharIndex == l4 - 1 || CharIndex == l3 - 1 || CharIndex == l2 - 1) && CharIndex == len - 1)
                         {
-                            SSPrintString(" ");
-                            SSPrintString("\b");
+                            SSPrintString(" \b");
                         }
-                        if ((CharIndex == l4 - 1 || CharIndex == l3 - 1 || CharIndex == l2 - 1) && CharIndex < strlen((const char *)inpbuf) - 1)
+                        if ((CharIndex == l4 - 1 || CharIndex == l3 - 1 || CharIndex == l2 - 1) && CharIndex < len - 1)
                         {
                             SerialConsolePutC(inpbuf[CharIndex + 1], 0);
                             SSPrintString("\b");
                         }
                         CharIndex++;
                     }
-                    //                      insert=false; //right always switches to OVER
                     break;
+
                 case CTRLKEY(']'):
                 case DEL:
-
-                    if (CharIndex < strlen((const char *)inpbuf))
+                    len = strlen((const char *)inpbuf);
+                    if (CharIndex < len)
                     {
                         BufEdited = true;
                         i = CharIndex;
 
                         for (p = (char *)inpbuf + i; *p; p++)
-                            *p = *(p + 1); // remove the char from inpbuf
-                        j = strlen((const char *)inpbuf);
-                        // Lets put the cursor at the beginning of where the command is displayed.
-                        // backspace to the beginning of line
+                            *p = *(p + 1);
+
                         j = CharIndex;
                         while (j)
                         {
@@ -1230,17 +1227,18 @@ int __not_in_flash_func(MMInkey)(void)
                         }
                         fflush(stdout);
                         MX470Display(CLEAR_TO_EOS);
-                        SSPrintString("\033[0J"); // Clear to End Of Screen
+                        SSPrintString("\033[0J");
+
                         j = 0;
-                        while (j < strlen((const char *)inpbuf))
+                        len = strlen((const char *)inpbuf);
+                        while (j < len)
                         {
                             MMputchar(inpbuf[j], 0);
-                            if ((j == l4 - 1 || j == l3 - 1 || j == l2 - 1) && j == strlen((const char *)inpbuf) - 1)
+                            if ((j == l4 - 1 || j == l3 - 1 || j == l2 - 1) && j == len - 1)
                             {
-                                SSPrintString(" ");
-                                SSPrintString("\b");
+                                SSPrintString(" \b");
                             }
-                            if ((j == l4 - 1 || j == l3 - 1 || j == l2 - 1) && j < strlen((const char *)inpbuf) - 1)
+                            if ((j == l4 - 1 || j == l3 - 1 || j == l2 - 1) && j < len - 1)
                             {
                                 SerialConsolePutC(inpbuf[j + 1], 0);
                                 SSPrintString("\b");
@@ -1248,8 +1246,8 @@ int __not_in_flash_func(MMInkey)(void)
                             j++;
                         }
                         fflush(stdout);
-                        // return the cursor to the right position
-                        for (j = strlen((const char *)inpbuf); j > i; j--)
+
+                        for (j = len; j > i; j--)
                         {
                             if (j == l4 || j == l3 || j == l2)
                             {
@@ -1269,7 +1267,6 @@ int __not_in_flash_func(MMInkey)(void)
                 case CTRLKEY('N'):
                 case INSERT:
                     insert = !insert;
-                    //                            Cursor = C_STANDARD + insert;
                     break;
 
                 case CTRLKEY('U'):
@@ -1278,11 +1275,8 @@ int __not_in_flash_func(MMInkey)(void)
                     if (CharIndex > 0)
                     {
                         if (CharIndex == strlen((const char *)inpbuf))
-                        {
                             insert = true;
-                            //                                    Cursor = C_INSERT;
-                        }
-                        // backspace to the beginning of line
+
                         while (CharIndex)
                         {
                             if (CharIndex == l4 || CharIndex == l3 || CharIndex == l2)
@@ -1300,34 +1294,23 @@ int __not_in_flash_func(MMInkey)(void)
                         fflush(stdout);
                     }
                     else
-                    { // HOME @ home turns off edit mode
-                        BufEdited = false;
-                        insert = false; // home at first char will turn OVR on
+                    {
+                        BufEdited = insert = false;
                     }
                     break;
 
                 case CTRLKEY('K'):
                 case END:
                     BufEdited = true;
-                    while (CharIndex < strlen((const char *)inpbuf))
+                    len = strlen((const char *)inpbuf);
+                    while (CharIndex < len)
                     {
                         MMputchar(inpbuf[CharIndex++], 0);
                     }
                     fflush(stdout);
                     break;
 
-                    /*            if(c == F2)  tp = "RUN";
-                                if(c == F3)  tp = "LIST";
-                                if(c == F4)  tp = "EDIT";
-                                if(c == F10) tp = "AUTOSAVE";
-                                if(c == F11) tp = "XMODEM RECEIVE";
-                                if(c == F12) tp = "XMODEM SEND";
-                                if(c == F5) tp = Option.F5key;
-                                if(c == F6) tp = Option.F6key;
-                                if(c == F7) tp = Option.F7key;
-                                if(c == F8) tp = Option.F8key;
-                                if(c == F9) tp = Option.F9key;
-                    */
+                // Function keys - consolidated
                 case 0x91:
                     if (*Option.F1key)
                         strcpy(&buf[1], (char *)Option.F1key);
@@ -1340,34 +1323,6 @@ int __not_in_flash_func(MMInkey)(void)
                     break;
                 case 0x94:
                     strcpy(&buf[1], "EDIT\r\n");
-                    break;
-                case 0x95:
-                    if (*Option.F5key)
-                    {
-                        strcpy(&buf[1], (char *)Option.F5key);
-                    }
-                    else
-                    {
-                        /*** F5 will clear the VT100  ***/
-                        SSPrintString("\e[2J\e[H");
-                        fflush(stdout);
-                        if (Option.DISPLAY_CONSOLE)
-                        {
-                            ClearScreen(gui_bcolour);
-                            CurrentX = 0;
-                            CurrentY = 0;
-                        }
-                        if (FindSubFun((unsigned char *)"MM.PROMPT", 0) >= 0)
-                        {
-                            ExecuteProgram((unsigned char *)"MM.PROMPT\0");
-                        }
-                        else
-                        {
-                            MMPrintString("> "); // print the prompt
-                        }
-                        // MMPrintString("> ");
-                        fflush(stdout);
-                    }
                     break;
                 case 0x96:
                     if (*Option.F6key)
@@ -1394,50 +1349,79 @@ int __not_in_flash_func(MMInkey)(void)
                 case 0x9c:
                     strcpy(&buf[1], "XMODEM SEND\r\n");
                     break;
-                case CTRLKEY('E'):
-                case UP:
-                    if (!(BufEdited /*|| autoOn || CurrentLineNbr */))
-                    {
 
-                        if (lastcmd_edit)
+                case 0x95:
+                    if (*Option.F5key)
+                    {
+                        strcpy(&buf[1], (char *)Option.F5key);
+                    }
+                    else
+                    {
+                        SSPrintString("\e[2J\e[H");
+                        fflush(stdout);
+                        if (Option.DISPLAY_CONSOLE)
                         {
-                            i = lastcmd_idx + strlen((const char *)&lastcmd[lastcmd_idx]) + 1; // find the next command
-                            if (lastcmd[i] != 0 && i < sizeof(lastcmd) - 1)
-                                lastcmd_idx = i; // and point to it for the next time around
+                            ClearScreen(gui_bcolour);
+                            CurrentX = CurrentY = 0;
+                        }
+                        if (FindSubFun((unsigned char *)"MM.PROMPT", 0) >= 0)
+                        {
+                            ExecuteProgram((unsigned char *)"MM.PROMPT\0");
                         }
                         else
+                        {
+                            MMPrintString("> ");
+                        }
+                        fflush(stdout);
+                    }
+                    break;
+
+                case CTRLKEY('E'):
+                case UP:
+                    if (!BufEdited)
+                    {
+                        if (lastcmd_edit)
+                        {
+                            i = lastcmd_idx + strlen((const char *)&lastcmd[lastcmd_idx]) + 1;
+                            if (lastcmd[i] != 0 && i < sizeof(lastcmd) - 1)
+                                lastcmd_idx = i;
+                        }
+                        else
+                        {
                             lastcmd_edit = true;
-                        strcpy((char *)inpbuf, (const char *)&lastcmd[lastcmd_idx]); // get the command into the buffer for editing
+                        }
+                        strcpy((char *)inpbuf, (const char *)&lastcmd[lastcmd_idx]);
                         goto insert_lastcmd;
                     }
                     break;
 
                 case CTRLKEY('X'):
                 case DOWN:
-                    if (!(BufEdited /*|| autoOn || CurrentLineNbr */))
+                    if (!BufEdited)
                     {
                         if (lastcmd_idx == 0)
+                        {
                             *inpbuf = lastcmd_edit = 0;
+                        }
                         else
                         {
                             for (i = lastcmd_idx - 2; i > 0 && lastcmd[i - 1] != 0; i--)
-                                ;                                              // find the start of the previous command
-                            lastcmd_idx = i;                                   // and point to it for the next time around
-                            strcpy((char *)inpbuf, (const char *)&lastcmd[i]); // get the command into the buffer for editing
+                                ;
+                            lastcmd_idx = i;
+                            strcpy((char *)inpbuf, (const char *)&lastcmd[i]);
                         }
-                        goto insert_lastcmd; // gotos are bad, I know, I know
+                        goto insert_lastcmd;
                     }
                     break;
 
                 insert_lastcmd:
+                    len = strlen((const char *)inpbuf);
 
-                    // If NoScroll and its near the bottom then clear screen and write command at top
-                    // if(Option.NoScroll && Option.DISPLAY_CONSOLE && (CurrentY + 2*gui_font_height >= VRes)){
-                    if (Option.NoScroll && Option.DISPLAY_CONSOLE && (CurrentY + (2 + strlen((const char *)inpbuf) / Option.Width) * gui_font_height >= VRes))
+                    if (Option.NoScroll && Option.DISPLAY_CONSOLE &&
+                        (CurrentY + (2 + len / Option.Width) * gui_font_height >= VRes))
                     {
                         ClearScreen(gui_bcolour);
-                        CurrentX = 0;
-                        CurrentY = 0;
+                        CurrentX = CurrentY = 0;
                         if (FindSubFun((unsigned char *)"MM.PROMPT", 0) >= 0)
                         {
                             SSPrintString("\r");
@@ -1446,14 +1430,12 @@ int __not_in_flash_func(MMInkey)(void)
                         else
                         {
                             SSPrintString("\r");
-                            MMPrintString("> "); // print the prompt
+                            MMPrintString("> ");
                         }
                     }
                     else
                     {
-                        // Lets put the cursor at the beginning of where the command is displayed.
-                        // backspace to the beginning of line
-                        j = CharIndex; //????????????????????????????????
+                        j = CharIndex;
                         while (j)
                         {
                             if (j == l4 || j == l3 || j == l2)
@@ -1470,38 +1452,36 @@ int __not_in_flash_func(MMInkey)(void)
                         }
                         fflush(stdout);
                         MX470Display(CLEAR_TO_EOS);
-                        SSPrintString("\033[0J"); // Clear to End Of Screen
+                        SSPrintString("\033[0J");
                     }
 
-                    CharIndex = strlen((const char *)inpbuf);
-                    MMPrintString((char *)inpbuf); // display the line
+                    CharIndex = len;
+                    MMPrintString((char *)inpbuf);
                     if (CharIndex == l4 || CharIndex == l3 || CharIndex == l2)
                     {
-                        SSPrintString(" ");
-                        SSPrintString("\b");
+                        SSPrintString(" \b");
                     }
                     fflush(stdout);
-                    CharIndex = strlen((const char *)inpbuf); // get the current cursor position in the line
                     break;
 
                 default:
                     if (buf[0] >= ' ' && buf[0] < 0x7f)
                     {
-                        // BufEdited = true;
-
                         i = CharIndex;
                         j = strlen((const char *)inpbuf);
+
                         if (insert)
                         {
-                            if (strlen((const char *)inpbuf) >= maxchars - 1)
-                                break; // sorry, line full
-                            for (p = (char *)inpbuf + strlen((const char *)inpbuf); j >= CharIndex; p--, j--)
+                            if (j >= 254)
+                                break;
+                            for (p = (char *)inpbuf + j; j >= CharIndex; p--, j--)
                                 *(p + 1) = *p;
-                            inpbuf[CharIndex] = buf[0];                // insert the char
-                            MMPrintString((char *)&inpbuf[CharIndex]); // display new part of the line
+                            inpbuf[CharIndex] = buf[0];
+                            MMPrintString((char *)&inpbuf[CharIndex]);
                             CharIndex++;
-                            // return the cursor to the right position
-                            for (j = strlen((const char *)inpbuf); j > CharIndex; j--)
+
+                            len = strlen((const char *)inpbuf);
+                            for (j = len; j > CharIndex; j--)
                             {
                                 if (j == l4 || j == l3 || j == l2)
                                 {
@@ -1518,63 +1498,50 @@ int __not_in_flash_func(MMInkey)(void)
                         }
                         else
                         {
-                            if (strlen((const char *)inpbuf) >= maxchars - 1)
-                                break;                                    // sorry, line full  just ignore
-                            inpbuf[strlen((const char *)inpbuf) + 1] = 0; // incase we are adding to the end of the string
-                            inpbuf[CharIndex++] = buf[0];                 // overwrite the char
+                            if (j >= 254)
+                                break;
+                            inpbuf[j + (CharIndex == j ? 1 : 0)] = 0;
+                            inpbuf[CharIndex++] = buf[0];
                             MMputchar(buf[0], 0);
                             if (j == l4 - 1 || j == l3 - 1 || j == l2 - 1)
                             {
-                                SSPrintString(" ");
-                                SSPrintString("\b");
+                                SSPrintString(" \b");
                             }
                             fflush(stdout);
                         }
+
 #ifndef PICOMITEVGA
-                        i = CharIndex;
-                        j = strlen((const char *)inpbuf);
-                        // If its going to scroll then clear screen
-                        if (Option.NoScroll && Option.DISPLAY_CONSOLE)
+                        if (Option.NoScroll && Option.DISPLAY_CONSOLE &&
+                            CurrentY + 2 * gui_font_height >= VRes)
                         {
-                            if (CurrentY + 2 * gui_font_height >= VRes)
-                            {
-                                ClearScreen(gui_bcolour); /*CurrentX=0*/
-                                ;
-                                CurrentY = 0;
-                                CurrentX = (MMPromptPos - 2) * gui_font_width;
-                                // if(FindSubFun((unsigned char *)"MM.PROMPT", 0) >= 0) {
-                                //    ExecuteProgram((unsigned char *)"MM.PROMPT\0");
-                                // } else{
-                                // SSPrintString("\r");
-                                // MMPrintString("> ");                           // print the prompt
-                                DisplayPutC('>');
-                                DisplayPutC(' ');
-                                //}
-                                DisplayPutS((char *)inpbuf); // display the line
-                            }
+                            ClearScreen(gui_bcolour);
+                            CurrentY = 0;
+                            CurrentX = (MMPromptPos - 2) * gui_font_width;
+                            DisplayPutC('>');
+                            DisplayPutC(' ');
+                            DisplayPutS((char *)inpbuf);
                         }
 #endif
                     }
                     break;
                 }
+
                 for (i = 0; i < MAXKEYLEN + 1; i++)
-                    buf[i] = buf[i + 1]; // shuffle down the buffer to get the next char
+                    buf[i] = buf[i + 1];
+
             } while (*buf);
+
             if (CharIndex == strlen((const char *)inpbuf))
             {
                 insert = false;
-                //        Cursor = C_STANDARD;
             }
         }
 
     saveline:
-        //    Cursor = C_STANDARD;
-
-        if (strlen((const char *)inpbuf) < maxchars)
+        if (strlen((const char *)inpbuf) < 255)
             InsertLastcmd(inpbuf);
         MMPrintString("\r\n");
     }
-
 #ifdef OLDSTUFF
     void MIPS16 EditInputLine(void)
     {
@@ -1979,270 +1946,269 @@ int __not_in_flash_func(MMInkey)(void)
     }
 
     volatile int onoff = 0;
+// Helper macros to reduce code duplication
+#define DECREMENT_IF_ACTIVE(timer) \
+    if (timer)                     \
+    timer--
+
+#define UPDATE_FREQ_INPUT(pin, timer, init_timer, count, value) \
+    if (ExtCurrentConfig[pin] == EXT_FREQ_IN && --timer <= 0)   \
+    {                                                           \
+        value = count;                                          \
+        count = 0;                                              \
+        timer = init_timer;                                     \
+    }
+
+#define UPDATE_PER_INPUT(pin, count)         \
+    if (ExtCurrentConfig[pin] == EXT_PER_IN) \
+    count++
+
+    // Optimized atomic 64-bit counter read
+    static inline uint64_t read_counter_atomic(void)
+    {
+        uint32_t hi, lo;
+        do
+        {
+            hi = INT5Count;
+            lo = pwm_get_counter(0);
+        } while (hi != INT5Count);
+        return ((uint64_t)hi * 50000) + lo;
+    }
+
     bool MIPS16 __not_in_flash_func(timer_callback)(repeating_timer_t *rt)
     {
-        mSecTimer++; // used by the TIMER function
-        if (processtick)
-        {
-            static int IrTimeout, IrTick, NextIrTick;
-            int ElapsedMicroSec, IrDevTmp, IrCmdTmp;
+        mSecTimer++;
+
+        if (!processtick)
+            return 1;
+
+        // === RP2350 Fast Timer Processing ===
 #ifdef rp2350
-            if (ExtCurrentConfig[FAST_TIMER_PIN] == EXT_FAST_TIMER && --INT5Timer <= 0)
-            {
-                static uint64_t now, last = 0;
-                uint32_t hi = INT5Count;
-                uint32_t lo;
-                do
-                {
-                    // Read the lower 32 bits
-                    lo = pwm_get_counter(0);
-                    // Now read the upper 32 bits again and
-                    // check that it hasn't incremented. If it has loop around
-                    // and read the lower 32 bits again to get an accurate value
-                    uint32_t next_hi = INT5Count;
-                    if (hi == next_hi)
-                        break;
-                    hi = next_hi;
-                } while (true);
-                now = ((uint64_t)hi * 50000) + lo;
-                INT5Value = now - last;
-                last = now;
-                INT5Timer = INT5InitTimer;
-            }
-#if defined(PICOMITE) && defined(rp2350)
-            if (Option.LOCAL_KEYBOARD && mSecTimer % LOCALKEYSCANRATE == 0)
-                cmd_keyscan();
+        if (ExtCurrentConfig[FAST_TIMER_PIN] == EXT_FAST_TIMER && --INT5Timer <= 0)
+        {
+            static uint64_t last = 0;
+            uint64_t now = read_counter_atomic();
+            INT5Value = now - last;
+            last = now;
+            INT5Timer = INT5InitTimer;
+        }
+
+#if PICOMITERP2350
+        if (Option.LOCAL_KEYBOARD && mSecTimer % LOCALKEYSCANRATE == 0)
+            cmd_keyscan();
 #endif
 #endif
-            AHRSTimer++;
-            InkeyTimer++;    // used to delay on an escape character
-            PauseTimer++;    // used by the PAUSE command
-            IntPauseTimer++; // used by the PAUSE command inside an interrupt
-            ds18b20Timer++;
-            GPSTimer++;
-            I2CTimer++;
+
+        // === Increment-only timers ===
+        AHRSTimer++;
+        InkeyTimer++;
+        PauseTimer++;
+        IntPauseTimer++;
+        ds18b20Timer++;
+        GPSTimer++;
+        I2CTimer++;
+        ClassicTimer++;
+        NunchuckTimer++;
+
 #ifdef USBKEYBOARD
-            keytimer++;
-            for (int i = 0; i < 4; i++)
+        keytimer++;
+        for (int i = 0; i < 4; i++)
+        {
+            if (HID[i].Device_type)
             {
-                if (HID[i].Device_type)
-                {
-                    HID[i].report_timer++;
-                }
-            }
-#else
-        nunstruct[2].type++;
-        MouseTimer++;
-#endif
-            if (clocktimer)
-                clocktimer--;
-            if (Timer5)
-                Timer5--;
-            if (Timer4)
-                Timer4--;
-            if (Timer3)
-                Timer3--;
-            if (Timer2)
-                Timer2--;
-            if (Timer1)
-                Timer1--;
-            if (KeyCheck)
-                KeyCheck--;
-            ClassicTimer++;
-            NunchuckTimer++;
-            if (diskchecktimer && (Option.SD_CS || Option.CombinedCS))
-                diskchecktimer--;
-            if (++CursorTimer > CURSOR_OFF + CURSOR_ON)
-                CursorTimer = 0; // used to control cursor blink rate
-            if (CFuncmSec)
-                CallCFuncmSec(); // the 1mS tick for CFunctions (see CFunction.c)
-            if (InterruptUsed)
-            {
-                int i;
-                for (i = 0; i < NBRSETTICKS; i++)
-                    if (TickActive[i])
-                        TickTimer[i]++; // used in the interrupt tick
-            }
-            if (WDTimer)
-            {
-                if (--WDTimer == 0)
-                {
-                    _excep_code = WATCHDOG_TIMEOUT;
-                    watchdog_enable(1, 1);
-                    while (1)
-                        ;
-                }
-            }
-            if (ScrewUpTimer)
-            {
-                if (--ScrewUpTimer == 0)
-                {
-                    _excep_code = SCREWUP_TIMEOUT;
-                    watchdog_enable(1, 1);
-                    while (1)
-                        ;
-                }
-            }
-            if (PulseActive)
-            {
-                int i;
-                for (PulseActive = i = 0; i < NBR_PULSE_SLOTS; i++)
-                {
-                    if (PulseCnt[i] > 0)
-                    {                         // if the pulse timer is running
-                        PulseCnt[i]--;        // and decrement our count
-                        if (PulseCnt[i] == 0) // if this is the last count reset the pulse
-                            PinSetBit(PulsePin[i], LATINV);
-                        else
-                            PulseActive = true; // there is at least one pulse still active
-                    }
-                }
-            }
-            ElapsedMicroSec = readIRclock();
-            if (IrState > IR_WAIT_START && ElapsedMicroSec > 15000)
-                IrReset();
-            IrCmdTmp = -1;
-
-            // check for any Sony IR receive activity
-            if (IrState == SONY_WAIT_BIT_START && ElapsedMicroSec > 2800 && (IrCount == 12 || IrCount == 15 || IrCount == 20))
-            {
-                IrDevTmp = ((IrBits >> 7) & 0b11111);
-                IrCmdTmp = (IrBits & 0b1111111) | ((IrBits >> 5) & ~0b1111111);
-            }
-
-            // check for any NEC IR receive activity
-            if (IrState == NEC_WAIT_BIT_END && IrCount == 32)
-            {
-                // check if it is a NON extended address and adjust if it is
-                if ((IrBits >> 24) == ~((IrBits >> 16) & 0xff))
-                    IrBits = (IrBits & 0x0000ffff) | ((IrBits >> 8) & 0x00ff0000);
-                IrDevTmp = ((IrBits >> 16) & 0xffff);
-                IrCmdTmp = ((IrBits >> 8) & 0xff);
-            }
-#ifdef GUICONTROLS
-            // check on the touch panel, is the pen down?
-
-            TouchTimer++;
-            if (CheckGuiFlag)
-                CheckGuiTimeouts(); // are blinking LEDs in use?  If so count down their timers
-
-            if (TOUCH_GETIRQTRIS)
-            { // is touch enabled and the PEN IRQ pin an input?
-                if (TOUCH_DOWN)
-                { // is the pen down
-                    if (!TouchState)
-                    {                                  // yes, it is.  If we have not reported this before
-                        TouchState = TouchDown = true; // set the flags
-                                                       //                TouchUp = false;
-                    }
-                }
-                else
-                {
-                    if (TouchState)
-                    {                                        // the pen is not down.  If we have not reported this before
-                        TouchState /* = TouchDown*/ = false; // set the flags
-                        TouchUp = true;
-                    }
-                }
-            }
-
-            if (ClickTimer)
-            {
-                ClickTimer--;
-                if (Option.TOUCH_Click)
-                    PinSetBit(Option.TOUCH_Click, ClickTimer ? LATSET : LATCLR);
-            }
-#endif
-            // now process the IR message, this includes handling auto repeat while the key is held down
-            // IrTick counts how many mS since the key was first pressed
-            // NextIrTick is used to time the auto repeat
-            // IrTimeout is used to detect when the key is released
-            // IrGotMsg is a signal to the interrupt handler that an interrupt is required
-            if (IrCmdTmp != -1)
-            {
-                if (IrTick > IrTimeout)
-                {
-                    // this is a new keypress
-                    IrTick = 0;
-                    NextIrTick = 650;
-                }
-                if (IrTick == 0 || IrTick > NextIrTick)
-                {
-                    if (IrVarType & 0b01)
-                        *(MMFLOAT *)IrDev = IrDevTmp;
-                    else
-                        *(long long int *)IrDev = IrDevTmp;
-                    if (IrVarType & 0b10)
-                        *(MMFLOAT *)IrCmd = IrCmdTmp;
-                    else
-                        *(long long int *)IrCmd = IrCmdTmp;
-                    IrGotMsg = true;
-                    NextIrTick += 250;
-                }
-                IrTimeout = IrTick + 150;
-                IrReset();
-            }
-            IrTick++;
-            if (ExtCurrentConfig[Option.INT1pin] == EXT_PER_IN)
-                INT1Count++;
-            if (ExtCurrentConfig[Option.INT2pin] == EXT_PER_IN)
-                INT2Count++;
-            if (ExtCurrentConfig[Option.INT3pin] == EXT_PER_IN)
-                INT3Count++;
-            if (ExtCurrentConfig[Option.INT4pin] == EXT_PER_IN)
-                INT4Count++;
-            if (ExtCurrentConfig[Option.INT1pin] == EXT_FREQ_IN && --INT1Timer <= 0)
-            {
-                INT1Value = INT1Count;
-                INT1Count = 0;
-                INT1Timer = INT1InitTimer;
-            }
-            if (ExtCurrentConfig[Option.INT2pin] == EXT_FREQ_IN && --INT2Timer <= 0)
-            {
-                INT2Value = INT2Count;
-                INT2Count = 0;
-                INT2Timer = INT2InitTimer;
-            }
-            if (ExtCurrentConfig[Option.INT3pin] == EXT_FREQ_IN && --INT3Timer <= 0)
-            {
-                INT3Value = INT3Count;
-                INT3Count = 0;
-                INT3Timer = INT3InitTimer;
-            }
-            if (ExtCurrentConfig[Option.INT4pin] == EXT_FREQ_IN && --INT4Timer <= 0)
-            {
-                INT4Value = INT4Count;
-                INT4Count = 0;
-                INT4Timer = INT4InitTimer;
-            }
-
-            ////////////////////////////////// this code runs once a second /////////////////////////////////
-            if (++SecondsTimer >= 1000)
-            {
-                SecondsTimer -= 1000;
-#ifndef PICOMITEWEB
-                if (ExtCurrentConfig[PinDef[HEARTBEATpin].pin] == EXT_HEARTBEAT)
-                    gpio_xor_mask64(1 << PinDef[HEARTBEATpin].GPno);
-#endif
-                // keep track of the time and date
-                /*        if(++second >= 60) {
-                            second = 0 ;
-                            if(++minute >= 60) {
-                                minute = 0;
-                                if(++hour >= 24) {
-                                    hour = 0;
-                                    if(++day > DaysInMonth[month] + ((month == 2 && (year % 4) == 0)?1:0)) {
-                                        day = 1;
-                                        if(++month > 12) {
-                                            month = 1;
-                                            year++;
-                                        }
-                                    }
-                                }
-                            }
-                        }*/
+                HID[i].report_timer++;
             }
         }
+#else
+    nunstruct[2].type++;
+    MouseTimer++;
+#endif
+
+        // === Decrement-only timers ===
+        DECREMENT_IF_ACTIVE(clocktimer);
+        DECREMENT_IF_ACTIVE(Timer5);
+        DECREMENT_IF_ACTIVE(Timer4);
+        DECREMENT_IF_ACTIVE(Timer3);
+        DECREMENT_IF_ACTIVE(Timer2);
+        DECREMENT_IF_ACTIVE(Timer1);
+        DECREMENT_IF_ACTIVE(KeyCheck);
+
+        if (diskchecktimer && (Option.SD_CS || Option.CombinedCS))
+            diskchecktimer--;
+
+        // === Cursor blink control ===
+        if (++CursorTimer > CURSOR_OFF + CURSOR_ON)
+            CursorTimer = 0;
+
+        // === CFunction callback ===
+        if (CFuncmSec)
+            CallCFuncmSec();
+
+        // === Interrupt tick timers ===
+        if (InterruptUsed)
+        {
+            for (int i = 0; i < NBRSETTICKS; i++)
+            {
+                if (TickActive[i])
+                    TickTimer[i]++;
+            }
+        }
+
+        // === Watchdog timer ===
+        if (WDTimer && --WDTimer == 0)
+        {
+            _excep_code = WATCHDOG_TIMEOUT;
+            watchdog_enable(1, 1);
+            while (1)
+                ;
+        }
+
+        // === Screw-up timer ===
+        if (ScrewUpTimer && --ScrewUpTimer == 0)
+        {
+            _excep_code = SCREWUP_TIMEOUT;
+            watchdog_enable(1, 1);
+            while (1)
+                ;
+        }
+
+        // === Pulse management ===
+        if (PulseActive)
+        {
+            PulseActive = false;
+            for (int i = 0; i < NBR_PULSE_SLOTS; i++)
+            {
+                if (PulseCnt[i] > 0)
+                {
+                    if (--PulseCnt[i] == 0)
+                    {
+                        PinSetBit(PulsePin[i], LATINV);
+                    }
+                    else
+                    {
+                        PulseActive = true;
+                    }
+                }
+            }
+        }
+
+        // === IR Processing ===
+        int ElapsedMicroSec = readIRclock();
+
+        if (IrState > IR_WAIT_START && ElapsedMicroSec > 15000)
+        {
+            IrReset();
+        }
+
+        int IrDevTmp = -1, IrCmdTmp = -1;
+
+        // Sony IR protocol
+        if (IrState == SONY_WAIT_BIT_START && ElapsedMicroSec > 2800 &&
+            (IrCount == 12 || IrCount == 15 || IrCount == 20))
+        {
+            IrDevTmp = (IrBits >> 7) & 0x1F;
+            IrCmdTmp = (IrBits & 0x7F) | ((IrBits >> 5) & ~0x7F);
+        }
+
+        // NEC IR protocol
+        if (IrState == NEC_WAIT_BIT_END && IrCount == 32)
+        {
+            // Adjust for non-extended address
+            if ((IrBits >> 24) == ~((IrBits >> 16) & 0xFF))
+            {
+                IrBits = (IrBits & 0x0000FFFF) | ((IrBits >> 8) & 0x00FF0000);
+            }
+            IrDevTmp = (IrBits >> 16) & 0xFFFF;
+            IrCmdTmp = (IrBits >> 8) & 0xFF;
+        }
+
+#ifdef GUICONTROLS
+        // === Touch panel processing ===
+        TouchTimer++;
+
+        if (CheckGuiFlag)
+            CheckGuiTimeouts();
+
+        if (TOUCH_GETIRQTRIS)
+        {
+            bool pen_down = TOUCH_DOWN;
+            if (pen_down && !TouchState)
+            {
+                TouchState = TouchDown = true;
+            }
+            else if (!pen_down && TouchState)
+            {
+                TouchState = false;
+                TouchUp = true;
+            }
+        }
+
+        if (ClickTimer)
+        {
+            ClickTimer--;
+            if (Option.TOUCH_Click)
+            {
+                PinSetBit(Option.TOUCH_Click, ClickTimer ? LATSET : LATCLR);
+            }
+        }
+#endif
+
+        // === IR Message Processing (with auto-repeat) ===
+        if (IrCmdTmp != -1)
+        {
+            static int IrTimeout = 0, IrTick = 0, NextIrTick = 0;
+
+            if (IrTick > IrTimeout)
+            {
+                // New keypress
+                IrTick = 0;
+                NextIrTick = 650;
+            }
+
+            if (IrTick == 0 || IrTick > NextIrTick)
+            {
+                // Store values based on variable type
+                if (IrVarType & 0x01)
+                    *(MMFLOAT *)IrDev = IrDevTmp;
+                else
+                    *(long long int *)IrDev = IrDevTmp;
+
+                if (IrVarType & 0x02)
+                    *(MMFLOAT *)IrCmd = IrCmdTmp;
+                else
+                    *(long long int *)IrCmd = IrCmdTmp;
+
+                IrGotMsg = true;
+                NextIrTick += 250;
+            }
+
+            IrTimeout = IrTick + 150;
+            IrReset();
+            IrTick++;
+        }
+
+        // === Period counter updates ===
+        UPDATE_PER_INPUT(Option.INT1pin, INT1Count);
+        UPDATE_PER_INPUT(Option.INT2pin, INT2Count);
+        UPDATE_PER_INPUT(Option.INT3pin, INT3Count);
+        UPDATE_PER_INPUT(Option.INT4pin, INT4Count);
+
+        // === Frequency counter updates ===
+        UPDATE_FREQ_INPUT(Option.INT1pin, INT1Timer, INT1InitTimer, INT1Count, INT1Value);
+        UPDATE_FREQ_INPUT(Option.INT2pin, INT2Timer, INT2InitTimer, INT2Count, INT2Value);
+        UPDATE_FREQ_INPUT(Option.INT3pin, INT3Timer, INT3InitTimer, INT3Count, INT3Value);
+        UPDATE_FREQ_INPUT(Option.INT4pin, INT4Timer, INT4InitTimer, INT4Count, INT4Value);
+
+        // === Second timer (heartbeat) ===
+        if (++SecondsTimer >= 1000)
+        {
+            SecondsTimer -= 1000;
+#ifndef PICOMITEWEB
+            if (ExtCurrentConfig[PinDef[HEARTBEATpin].pin] == EXT_HEARTBEAT)
+                gpio_xor_mask64(1 << PinDef[HEARTBEATpin].GPno);
+#endif
+        }
+
         return 1;
     }
     void __not_in_flash_func(uSec)(int us)
@@ -4835,7 +4801,7 @@ void __not_in_flash_func(UpdateCore)()
                     }
                     blitmerge(x1, y1, w, h, colour);
                 }
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
             }
             else if (command == 6)
             {
@@ -5194,10 +5160,8 @@ uint32_t testPSRAM(void)
         else if (Option.CPU_Speed > 200000 && Option.CPU_Speed <= 320000)
             vreg_set_voltage(VREG_VOLTAGE_1_30); // Std default @ boot is 1_10
 #ifdef rp2350
-        else if (Option.CPU_Speed > 320000 && Option.CPU_Speed <= 360000)
-            vreg_set_voltage(VREG_VOLTAGE_1_40); // Std default @ boot is 1_10
-        else
-            vreg_set_voltage(VREG_VOLTAGE_1_60); // Std default @ boot is 1_10
+        else if (Option.CPU_Speed > 320000)
+            vreg_set_voltage(VREG_VOLTAGE_1_50); // Std default @ boot is 1_10
 #else
     else
         vreg_set_voltage(VREG_VOLTAGE_1_30);
@@ -5269,7 +5233,7 @@ uint32_t testPSRAM(void)
         if (Option.CPU_Speed <= 200000)
             modclock(2);
 #else
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
     if (Option.DISPLAY_TYPE >= NEXTGEN)
     { // adjust the size of the heap
         framebuffersize = display_details[Option.DISPLAY_TYPE].horizontal * display_details[Option.DISPLAY_TYPE].vertical;
@@ -5386,7 +5350,7 @@ uint32_t testPSRAM(void)
             {
                 if (tud_cdc_connected())
                     break;
-                if (time_us_64() - t > 5000000)
+                if (time_us_64() - t > 500000)
                     break;
             }
         }
@@ -5721,9 +5685,9 @@ uint32_t testPSRAM(void)
             //        executelocal(p);
             if (strlen(p) == 2 && p[1] == ':')
             {
-                if (toupper(*p) == 'A')
+                if (mytoupper(*p) == 'A')
                     strcpy(p, "drive \"a:\"");
-                if (toupper(*p) == 'B')
+                if (mytoupper(*p) == 'B')
                     strcpy(p, "drive \"b:\"");
             }
             if (*p == '*' && p[1] != '(')
@@ -5973,7 +5937,7 @@ uint32_t testPSRAM(void)
                             if (*p <= '9')
                                 n |= (*p - '0');
                             else
-                                n |= (toupper(*p) - 'A' + 10);
+                                n |= (mytoupper(*p) - 'A' + 10);
                             p++;
                         }
                         realflashpointer += 4;
@@ -6121,7 +6085,7 @@ uint32_t testPSRAM(void)
                             if (*p <= '9')
                                 n |= (*p - '0');
                             else
-                                n |= (toupper(*p) - 'A' + 10);
+                                n |= (mytoupper(*p) - 'A' + 10);
                             p++;
                         }
 

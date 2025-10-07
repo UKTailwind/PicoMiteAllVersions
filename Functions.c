@@ -186,7 +186,7 @@ static int MInStr(char *srch, char c)
 void fun_bound(void)
 {
 	int which = 1;
-	getargs(&ep, 3, (unsigned char *)",");
+	getcsargs(&ep, 3);
 	if (argc == 3)
 		which = getint(argv[2], 0, MAXDIM);
 	findvar(argv[0], V_FIND | V_EMPTY_OK | V_NOFIND_ERR);
@@ -265,7 +265,7 @@ void fun_field(void)
 {
 	unsigned char *p, *delims = (unsigned char *)"\1,", *quotes = (unsigned char *)"\0";
 	int fnbr, i, j, k;
-	getargs(&ep, 7, (unsigned char *)",");
+	getcsargs(&ep, 7);
 	if (!(argc == 3 || argc == 5 || argc == 7))
 		error("Syntax");
 	p = getstring(argv[0]);				  // the string containing the fields
@@ -311,7 +311,7 @@ void fun_str2bin(void)
 		uint16_t us;
 	} map;
 	int j;
-	getargs(&ep, 5, (unsigned char *)",");
+	getcsargs(&ep, 5);
 	if (!(argc == 3 || argc == 5))
 		error("Syntax");
 	if (argc == 5 && !checkstring(argv[4], (unsigned char *)"BIG"))
@@ -425,7 +425,7 @@ void fun_bin2str(void)
 		uint16_t us;
 	} map;
 	int64_t i64;
-	getargs(&ep, 5, (unsigned char *)",");
+	getcsargs(&ep, 5);
 	if (!(argc == 3 || argc == 5))
 		error("Syntax");
 	if (argc == 5 && !(checkstring(argv[4], (unsigned char *)"BIG")))
@@ -563,7 +563,7 @@ void fun_bit(void)
 {
 	uint64_t *s;
 	uint64_t spos;
-	getargs(&ep, 3, (unsigned char *)",");
+	getcsargs(&ep, 3);
 	s = (uint64_t *)findvar(argv[0], V_NOFIND_ERR);
 	if (!(g_vartbl[g_VarIndex].type & T_INT))
 		error("Not an integer");
@@ -575,7 +575,7 @@ void fun_bit(void)
 void fun_flag(void)
 {
 	uint64_t spos;
-	getargs(&ep, 1, (unsigned char *)",");
+	getcsargs(&ep, 1);
 	spos = getint(argv[0], 0, 63); // the mid position
 	iret = ((int64_t)(g_flag & (1ll << spos)) >> spos) & 1ll;
 	targ = T_INT;
@@ -585,7 +585,7 @@ void fun_byte(void)
 {
 	unsigned char *s;
 	int spos;
-	getargs(&ep, 3, (unsigned char *)",");
+	getcsargs(&ep, 3);
 	s = (unsigned char *)findvar(argv[0], V_NOFIND_ERR);
 	if (!(g_vartbl[g_VarIndex].type & T_STR))
 		error("Not a string");
@@ -760,7 +760,7 @@ void fun_atn(void)
 void fun_atan2(void)
 {
 	MMFLOAT y, x, z;
-	getargs(&ep, 3, (unsigned char *)",");
+	getcsargs(&ep, 3);
 	if (argc != 3)
 		error("Syntax");
 	y = getnumber(argv[0]);
@@ -835,7 +835,7 @@ void fun_trim(void)
 	char defaultmask[2] = " ";
 	char *mask = NULL;
 	char where = 'L';
-	getargs(&ep, 5, (unsigned char *)",");
+	getcsargs(&ep, 5);
 	char *instring = (char *)getCstring(argv[0]);
 	if (argc >= 3 && *argv[2])
 		mask = (char *)getCstring(argv[2]);
@@ -925,7 +925,7 @@ void DoHexOctBin(int base)
 {
 	unsigned long long int i;
 	int j = 1;
-	getargs(&ep, 3, (unsigned char *)",");
+	getcsargs(&ep, 3);
 	i = (unsigned long long int)getinteger(argv[0]); // get the number
 	if (argc == 3)
 		j = getint(argv[2], 0, MAXSTRLEN); // get the optional number of chars to return
@@ -970,7 +970,7 @@ void fun_instr(void)
 	unsigned char *ss;
 	MMFLOAT f;
 	long long int i64;
-	getargs(&ep, 7, (unsigned char *)",");
+	getcsargs(&ep, 7);
 	if (!(argc == 3 || argc == 5 || argc == 7))
 		error("Syntax");
 	t = T_NOTYPE;
@@ -1079,7 +1079,7 @@ void fun_left(void)
 {
 	int i;
 	unsigned char *s;
-	getargs(&ep, 3, (unsigned char *)",");
+	getcsargs(&ep, 3);
 
 	if (argc != 3)
 		error("Argument count");
@@ -1098,7 +1098,7 @@ void fun_right(void)
 {
 	int nbr;
 	unsigned char *s, *p1, *p2;
-	getargs(&ep, 3, (unsigned char *)",");
+	getcsargs(&ep, 3);
 
 	if (argc != 3)
 		error("Argument count");
@@ -1143,7 +1143,7 @@ void fun_mid(void)
 {
 	unsigned char *s, *p1, *p2;
 	int spos, nbr = 0, i;
-	getargs(&ep, 5, (unsigned char *)",");
+	getcsargs(&ep, 5);
 
 	if (argc == 5)
 	{										 // we have MID$(s, n, m)
@@ -1293,12 +1293,12 @@ void fun_val(void)
 	{
 		p++;
 		iret = 0;
-		switch (toupper(*p++))
+		switch (mytoupper(*p++))
 		{
 		case 'H':
 			while (isxdigit(*p))
 			{
-				iret = (iret << 4) | ((toupper(*p) >= 'A') ? toupper(*p) - 'A' + 10 : *p - '0');
+				iret = (iret << 4) | ((mytoupper(*p) >= 'A') ? mytoupper(*p) - 'A' + 10 : *p - '0');
 				p++;
 			}
 			break;
@@ -1392,7 +1392,7 @@ void fun_str(void)
 	int m, n;
 	unsigned char ch, *p;
 
-	getargs(&ep, 7, (unsigned char *)",");
+	getcsargs(&ep, 7);
 	if ((argc & 1) != 1)
 		error("Syntax");
 	t = T_NOTYPE;
@@ -1443,7 +1443,7 @@ void fun_string(void)
 	int i, j, t = T_NOTYPE;
 	void *p;
 
-	getargs(&ep, 3, (unsigned char *)",");
+	getcsargs(&ep, 3);
 	if (argc != 3)
 		error("Syntax");
 
@@ -1480,7 +1480,7 @@ void fun_ucase(void)
 	i = *p++ = *s++;					  // get the length of the string and save in the destination
 	while (i--)
 	{
-		*p = toupper(*s);
+		*p = mytoupper(*s);
 		p++;
 		s++;
 	}
@@ -1637,7 +1637,7 @@ void do_max_min(int cmp)
 {
 	int i;
 	MMFLOAT nbr, f;
-	getargs(&ep, (MAX_ARG_COUNT * 2) - 1, (unsigned char *)",");
+	getcsargs(&ep, (MAX_ARG_COUNT * 2) - 1);
 	if ((argc & 1) != 1)
 		error("Syntax");
 	if (cmp)
@@ -1666,23 +1666,18 @@ void fun_min(void)
 {
 	do_max_min(0);
 }
-#ifdef rp2350
-void __not_in_flash_func(fun_ternary)(void)
-{
-#else
-#ifdef PICOMITEVGA
+#if LOWRAM
 void fun_ternary(void)
 {
 #else
 void __not_in_flash_func(fun_ternary)(void)
 {
 #endif
-#endif
 	MMFLOAT f = 0;
 	long long int i64 = 0;
 	unsigned char *s = NULL;
 	int t = T_NOTYPE;
-	getargs(&ep, 5, (unsigned char *)",");
+	getcsargs(&ep, 5);
 	if (argc != 5)
 		error("Syntax");
 	int which = getnumber(argv[0]);

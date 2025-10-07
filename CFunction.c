@@ -101,7 +101,7 @@ long long int MIPS16 CallCFunction(unsigned char *CmdPtr, unsigned char *ArgList
         if (i != DefaultType)
         {
             // if there is a type list get each entry
-            getargs(&p, 19, (unsigned char *)",");
+            getcsargs(&p, 19);
             for (i = 0; i < argc; i += 2)
             { // get each definition
                 CheckIfTypeSpecified(argv[i], &typ[i / 2], false);
@@ -114,7 +114,7 @@ long long int MIPS16 CallCFunction(unsigned char *CmdPtr, unsigned char *ArgList
     CurrentLinePtr = CallersLinePtr; // report errors at the caller
     if (*ArgList != ')')
     {
-        getargs(&ArgList, 19, (unsigned char *)","); // expand the command line of the caller
+        getcsargs(&ArgList, 19); // expand the command line of the caller
         for (i = 0; i < argc; i += 2)
         {
             // if this is a straight variable we want to pass a pointer to its value in RAM

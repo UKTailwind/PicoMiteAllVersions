@@ -115,7 +115,7 @@ char *UDPinterrupt = NULL;
 volatile bool UDPreceive = false;
 void setwifi(unsigned char *tp)
 {
-    getargs(&tp, 11, (unsigned char *)",");
+    getcsargs(&tp, 11);
     if (!(argc == 3 || argc == 5 || argc == 11))
         error("Syntax");
     if (CurrentLinePtr)
@@ -369,11 +369,11 @@ void stringsort(unsigned char *sarray, int n, int offset, long long *index, int 
             {
                 if (flags & 2)
                 {
-                    if (toupper(*p1) > toupper(*p2))
+                    if (mytoupper(*p1) > mytoupper(*p2))
                     {
                         k = reverse; // earlier in the array is bigger
                     }
-                    if (toupper(*p1) < toupper(*p2))
+                    if (mytoupper(*p1) < mytoupper(*p2))
                     {
                         k = -reverse; // later in the array is bigger
                     }
@@ -479,7 +479,7 @@ void cmd_sort(void)
     int64_t *a3int = NULL, *a4int = NULL;
     unsigned char *a3str = NULL;
     int i, size = 0, truesize, flags = 0, maxsize = 0, startpoint = 0;
-    getargs(&cmdline, 9, (unsigned char *)",");
+    getcsargs(&cmdline, 9);
     size = parseany(argv[0], &a3float, &a3int, &a3str, &maxsize, true) - 1;
     truesize = size;
     if (argc >= 3 && *argv[2])
@@ -737,7 +737,7 @@ void cmd_longString(void)
         uint8_t *q = NULL;
         int nbr;
         int j = 0;
-        getargs(&tp, 5, (unsigned char *)",");
+        getcsargs(&tp, 5);
         if (argc != 5)
             error("Argument count");
         j = (parseintegerarray(argv[0], &dest, 1, 1, NULL, true) - 1) * 8 - 1;
@@ -754,7 +754,7 @@ void cmd_longString(void)
         char *p = NULL;
         char *q = NULL;
         int i, j, nbr;
-        getargs(&tp, 3, (unsigned char *)",");
+        getcsargs(&tp, 3);
         if (argc != 3)
             error("Argument count");
         j = parseintegerarray(argv[0], &dest, 1, 1, NULL, true) - 1;
@@ -776,7 +776,7 @@ void cmd_longString(void)
         uint32_t trim;
         char *p, *q = NULL;
         int i;
-        getargs(&tp, 3, (unsigned char *)",");
+        getcsargs(&tp, 3);
         if (argc != 3)
             error("Argument count");
         parseintegerarray(argv[0], &dest, 1, 1, NULL, true);
@@ -796,7 +796,7 @@ void cmd_longString(void)
         char *p = NULL;
         char *q = NULL;
         int i, nbr;
-        getargs(&tp, 5, (unsigned char *)",");
+        getcsargs(&tp, 5);
         if (argc != 5)
             error("Argument count");
         parseintegerarray(argv[0], &dest, 1, 1, NULL, true);
@@ -816,7 +816,7 @@ void cmd_longString(void)
         char *p;
         char *q = NULL;
         int i, j;
-        getargs(&tp, 5, (unsigned char *)",");
+        getcsargs(&tp, 5);
         if (argc != 5)
             error("Argument count");
         int64_t nbr = getinteger(argv[2]);
@@ -842,7 +842,7 @@ void cmd_longString(void)
         char *p = NULL;
         char *q = NULL;
         int i, j, nbr;
-        getargs(&tp, 5, (unsigned char *)",");
+        getcsargs(&tp, 5);
         if (argc != 5)
             error("Argument count");
         j = parseintegerarray(argv[0], &dest, 1, 1, NULL, true) - 1;
@@ -866,7 +866,7 @@ void cmd_longString(void)
         char *p = NULL;
         char *q = NULL;
         int i, j, nbr;
-        getargs(&tp, 5, (unsigned char *)",");
+        getcsargs(&tp, 5);
         if (argc != 5)
             error("Argument count");
         j = parseintegerarray(argv[0], &dest, 1, 1, NULL, true) - 1;
@@ -894,7 +894,7 @@ void cmd_longString(void)
         char *p = NULL;
         char *q = NULL;
         int i, j, nbr, start;
-        getargs(&tp, 7, (unsigned char *)",");
+        getcsargs(&tp, 7);
         if (argc < 5)
             error("Argument count");
         j = parseintegerarray(argv[0], &dest, 1, 1, NULL, true) - 1;
@@ -923,7 +923,7 @@ void cmd_longString(void)
     if (tp)
     {
         int64_t *dest = NULL;
-        getargs(&tp, 1, (unsigned char *)",");
+        getcsargs(&tp, 1);
         if (argc != 1)
             error("Argument count");
         parseintegerarray(argv[0], &dest, 1, 1, NULL, true);
@@ -935,7 +935,7 @@ void cmd_longString(void)
     {
         int64_t *dest = NULL;
         int j = 0;
-        getargs(&tp, 3, (unsigned char *)",");
+        getcsargs(&tp, 3);
         if (argc != 3)
             error("Argument count");
         j = (parseintegerarray(argv[0], &dest, 1, 1, NULL, true) - 1) * 8;
@@ -948,7 +948,7 @@ void cmd_longString(void)
         int64_t *dest = NULL;
         char *q = NULL;
         int i;
-        getargs(&tp, 1, (unsigned char *)",");
+        getcsargs(&tp, 1);
         if (argc != 1)
             error("Argument count");
         parseintegerarray(argv[0], &dest, 1, 1, NULL, true);
@@ -1003,7 +1003,7 @@ void cmd_longString(void)
         int64_t *dest = NULL;
         char *q = NULL;
         int i;
-        getargs(&tp, 1, (unsigned char *)",");
+        getcsargs(&tp, 1);
         if (argc != 1)
             error("Argument count");
         parseintegerarray(argv[0], &dest, 1, 1, NULL, true);
@@ -1024,7 +1024,7 @@ void cmd_longString(void)
         char *p = NULL;
         char *q = NULL;
         int i = 0, j;
-        getargs(&tp, 3, (unsigned char *)",");
+        getcsargs(&tp, 3);
         if (argc != 3)
             error("Argument count");
         j = parseintegerarray(argv[0], &dest, 1, 1, NULL, true);
@@ -1047,7 +1047,7 @@ void cmd_longString(void)
         char *p = NULL;
         char *q = NULL;
         int i = 0, j, d = 0, s = 0;
-        getargs(&tp, 3, (unsigned char *)",");
+        getcsargs(&tp, 3);
         if (argc != 3)
             error("Argument count");
         j = parseintegerarray(argv[0], &dest, 1, 1, NULL, true) - 1;
@@ -1176,7 +1176,7 @@ void cmd_longString(void)
             unsigned char *qq = NULL;
             unsigned char *q = NULL;
             int j;
-            getargs(&p, 3, (unsigned char *)",");
+            getcsargs(&p, 3);
             if (argc != 3)
                 error("Argument count");
             j = parseintegerarray(argv[2], &dest, 2, 1, NULL, true) - 1;
@@ -1194,7 +1194,7 @@ void cmd_longString(void)
             unsigned char *qq = NULL;
             unsigned char *q = NULL;
             int j;
-            getargs(&p, 3, (unsigned char *)",");
+            getcsargs(&p, 3);
             if (argc != 3)
                 error("Argument count");
             j = parseintegerarray(argv[2], &dest, 2, 1, NULL, true) - 1;
@@ -1217,7 +1217,7 @@ void parselongAES(uint8_t *p, int ivadd, uint8_t *keyx, uint8_t *ivx, int64_t **
     unsigned char *a1str = NULL, *a4str = NULL;
     MMFLOAT *a1float = NULL, *a4float = NULL;
     int card1, card3;
-    getargs(&p, 7, (unsigned char *)",");
+    getcsargs(&p, 7);
     if (ivx == NULL)
     {
         if (argc != 5)
@@ -1309,7 +1309,7 @@ void fun_LGetStr(void)
     char *s = NULL;
     int64_t *src = NULL;
     int start, nbr, j;
-    getargs(&ep, 5, (unsigned char *)",");
+    getcsargs(&ep, 5);
     if (argc != 5)
         error("Argument count");
     j = (parseintegerarray(argv[0], &src, 2, 1, NULL, false) - 1) * 8;
@@ -1335,7 +1335,7 @@ void fun_LGetByte(void)
     uint8_t *s = NULL;
     int64_t *src = NULL;
     int start, j;
-    getargs(&ep, 3, (unsigned char *)",");
+    getcsargs(&ep, 3);
     if (argc != 3)
         error("Argument count");
     j = (parseintegerarray(argv[0], &src, 2, 1, NULL, false) - 1) * 8;
@@ -1351,7 +1351,7 @@ void fun_LInstr(void)
     char srch[STRINGSIZE];
     char *str = NULL;
     int slen, found = 0, i, j, n;
-    getargs(&ep, 7, (unsigned char *)",");
+    getcsargs(&ep, 7);
     if (argc < 3 || argc > 7)
         error("Argument count");
     int64_t start;
@@ -1433,7 +1433,7 @@ void fun_LCompare(void)
     char *p = NULL;
     char *q = NULL;
     int d = 0, s = 0, found = 0;
-    getargs(&ep, 3, (unsigned char *)",");
+    getcsargs(&ep, 3);
     if (argc != 3)
         error("Argument count");
     parseintegerarray(argv[0], &dest, 1, 1, NULL, false);
@@ -1480,7 +1480,7 @@ void fun_LCompare(void)
 void fun_LLen(void)
 {
     int64_t *dest = NULL;
-    getargs(&ep, 1, (unsigned char *)",");
+    getcsargs(&ep, 1);
     if (argc != 1)
         error("Argument count");
     parseintegerarray(argv[0], &dest, 1, 1, NULL, false);
@@ -2120,7 +2120,7 @@ void MIPS16 cmd_library(void)
     }
     if ((tp = checkstring(cmdline, (unsigned char *)"DISK SAVE")))
     {
-        getargs(&tp, 1, (unsigned char *)",");
+        getcsargs(&tp, 1);
         if (!(argc == 1))
             error("Syntax");
         if (CurrentLinePtr)
@@ -2181,7 +2181,7 @@ void MIPS16 cmd_library(void)
     if ((tp = checkstring(cmdline, (unsigned char *)"DISK LOAD")))
     {
         int fsize;
-        getargs(&tp, 1, (unsigned char *)",");
+        getcsargs(&tp, 1);
         if (!(argc == 1))
             error("Syntax");
         if (CurrentLinePtr)
@@ -2232,7 +2232,7 @@ void cmd_settick(void)
     ;
     //    int pause=0;
     char *s = GetTempMemory(STRINGSIZE);
-    getargs(&cmdline, 5, (unsigned char *)",");
+    getcsargs(&cmdline, 5);
     strcpy(s, (char *)argv[0]);
     if (!(argc == 3 || argc == 5))
         error("Argument count");
@@ -2366,7 +2366,7 @@ void MIPS16 printoptions(void)
         MMPrintString((char *)PinDef[Option.SYSTEM_MISO].pinname);
         MMPrintString("\r\n");
     }
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
     if (Option.LCD_CLK && !(Option.SYSTEM_CLK == Option.LCD_CLK))
     {
         PO("LCD SPI");
@@ -2509,7 +2509,7 @@ void MIPS16 printoptions(void)
         PRet();
     }
 #else
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
     if (Option.LOCAL_KEYBOARD)
         PO3Int("KEYBOARD REPEAT", Option.RepeatStart, Option.RepeatRate);
 #endif
@@ -2619,7 +2619,7 @@ void MIPS16 printoptions(void)
         PO3Int("DISPLAY", Option.Height, Option.Width);
     if (Option.DISPLAY_TYPE == DISP_USER)
         PO3Int("LCDPANEL USER", HRes, VRes);
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
     if (Option.DISPLAY_TYPE > I2C_PANEL && (Option.DISPLAY_TYPE < DISP_USER || (Option.DISPLAY_TYPE >= NEXTGEN && Option.DISPLAY_TYPE < SSD1963_5_12BUFF)))
     {
 #else
@@ -2643,7 +2643,7 @@ void MIPS16 printoptions(void)
             ;
             MMPrintString((char *)PinDef[Option.LCD_CS].pinname);
         }
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
         if (!(Option.DISPLAY_TYPE <= I2C_PANEL || (Option.DISPLAY_TYPE >= BufferedPanel && Option.DISPLAY_TYPE < NEXTGEN)) && Option.DISPLAY_BL)
         {
 #else
@@ -2655,7 +2655,7 @@ void MIPS16 printoptions(void)
         }
         else if (Option.BGR)
             MMputchar(',', 1);
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
         if (!(Option.DISPLAY_TYPE <= I2C_PANEL || (Option.DISPLAY_TYPE >= BufferedPanel && Option.DISPLAY_TYPE < NEXTGEN)) && Option.BGR)
         {
 #else
@@ -2681,7 +2681,7 @@ void MIPS16 printoptions(void)
             PIntComma(Option.I2Coffset);
         MMPrintString("\r\n");
     }
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
     if ((Option.DISPLAY_TYPE >= SSDPANEL && Option.DISPLAY_TYPE < VIRTUAL) || Option.DISPLAY_TYPE >= SSD1963_5_12BUFF)
 #else
     if ((Option.DISPLAY_TYPE >= SSDPANEL && Option.DISPLAY_TYPE < VIRTUAL))
@@ -2696,13 +2696,13 @@ void MIPS16 printoptions(void)
             MMputchar(',', 1);
             MMPrintString((char *)PinDef[Option.DISPLAY_BL].pinname);
         }
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
         else if (Option.SSD_DC != (Option.DISPLAY_TYPE > SSD_PANEL_8 && Option.DISPLAY_TYPE < SSD1963_5_12BUFF ? 16 : 13) || Option.SSD_RESET != (Option.DISPLAY_TYPE > SSD_PANEL_8 && Option.DISPLAY_TYPE < SSD1963_5_12BUFF ? 19 : 16) || (Option.SSD_DATA != 1))
 #else
         else if (Option.SSD_DC != (Option.DISPLAY_TYPE > SSD_PANEL_8 ? 16 : 13) || Option.SSD_RESET != (Option.DISPLAY_TYPE > SSD_PANEL_8 ? 19 : 16) || (Option.SSD_DATA != 1))
 #endif
             MMputchar(',', 1);
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
         if (Option.SSD_DC != (Option.DISPLAY_TYPE > SSD_PANEL_8 && Option.DISPLAY_TYPE < SSD1963_5_12BUFF ? 16 : 13))
 #else
         if (Option.SSD_DC != (Option.DISPLAY_TYPE > SSD_PANEL_8 ? 16 : 13))
@@ -2711,7 +2711,7 @@ void MIPS16 printoptions(void)
             MMputchar(',', 1);
             MMPrintString((char *)PinDef[PINMAP[Option.SSD_DC]].pinname);
         }
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
         else if (Option.SSD_RESET != (Option.DISPLAY_TYPE > SSD_PANEL_8 && Option.DISPLAY_TYPE < SSD1963_5_12BUFF ? 19 : 16) || (Option.SSD_DATA != 1))
 #else
         else if (Option.SSD_RESET != (Option.DISPLAY_TYPE > SSD_PANEL_8 ? 19 : 16) || (Option.SSD_DATA != 1))
@@ -2738,7 +2738,7 @@ void MIPS16 printoptions(void)
         }
         PRet();
     }
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
     if (Option.DISPLAY_TYPE >= VIRTUAL && Option.DISPLAY_TYPE < NEXTGEN)
     {
 #else
@@ -3063,7 +3063,7 @@ void MIPS16 disable_systemspi(void)
         ExtCfg(Option.SYSTEM_MISO, EXT_NOT_CONFIG, 0);
     if (!IsInvalidPin(Option.SYSTEM_CLK))
         ExtCfg(Option.SYSTEM_CLK, EXT_NOT_CONFIG, 0);
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
     if (Option.LCD_CLK == Option.SYSTEM_CLK)
     {
         Option.LCD_MOSI = 0;
@@ -3075,7 +3075,7 @@ void MIPS16 disable_systemspi(void)
     Option.SYSTEM_MISO = 0;
     Option.SYSTEM_CLK = 0;
 }
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
 void MIPS16 disable_lcdspi(void)
 {
     if (!IsInvalidPin(Option.LCD_MOSI))
@@ -3227,7 +3227,7 @@ void disable_audio(void)
 #ifndef PICOMITEVGA
 void MIPS16 ConfigDisplayUser(unsigned char *tp)
 {
-    getargs(&tp, 15, (unsigned char *)",");
+    getcsargs(&tp, 15);
     if (str_equal(argv[0], (unsigned char *)"USER"))
     {
         if (Option.DISPLAY_TYPE)
@@ -3716,7 +3716,7 @@ void MIPS16 configure(unsigned char *p)
 #endif
 #endif
 #if defined(PICOMITE) || defined(PICOMITEWEB)
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
         if (checkstring(p, (unsigned char *)"PALM PICO"))
         {
             ResetOptions(false);
@@ -4322,7 +4322,7 @@ void MIPS16 cmd_option(void)
     tp = checkstring(cmdline, (unsigned char *)"HDMI PINS");
     if (tp)
     {
-        getargs(&tp, 7, (unsigned char *)",");
+        getcsargs(&tp, 7);
         if (CurrentLinePtr)
             error("Invalid in a program");
         if (argc != 7)
@@ -4343,7 +4343,7 @@ void MIPS16 cmd_option(void)
         return;
     }
 #endif
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
     tp = checkstring(cmdline, (unsigned char *)"LOCAL KEYBOARD");
     if (tp)
     {
@@ -4380,7 +4380,7 @@ void MIPS16 cmd_option(void)
         }
         int pin1;
         unsigned char code;
-        getargs(&tp, 1, (unsigned char *)",");
+        getcsargs(&tp, 1);
         if (CurrentLinePtr)
             error("Invalid in a program");
         if (!(code = codecheck(argv[0])))
@@ -4405,7 +4405,7 @@ void MIPS16 cmd_option(void)
     tp = checkstring(cmdline, (unsigned char *)"KEYBOARD REPEAT");
     if (tp)
     {
-        getargs(&tp, 3, (unsigned char *)",");
+        getcsargs(&tp, 3);
         Option.RepeatStart = getint(argv[0], 100, 2000);
         Option.RepeatRate = getint(argv[2], 25, 2000);
         SaveOptions();
@@ -4413,11 +4413,11 @@ void MIPS16 cmd_option(void)
     }
 
 #else
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
     tp = checkstring(cmdline, (unsigned char *)"KEYBOARD REPEAT");
     if (tp)
     {
-        getargs(&tp, 3, (unsigned char *)",");
+        getcsargs(&tp, 3);
         if (!Option.LOCAL_KEYBOARD)
             error("Syntax");
         Option.RepeatStart = getint(argv[0], 100, 2000);
@@ -4433,7 +4433,7 @@ void MIPS16 cmd_option(void)
     {
         int pin1, pin2;
         unsigned char code;
-        getargs(&tp, 3, (unsigned char *)",");
+        getcsargs(&tp, 3);
         if (CurrentLinePtr)
             error("Invalid in a program");
         if (Option.KEYBOARD_CLOCK)
@@ -4479,7 +4479,7 @@ void MIPS16 cmd_option(void)
         {
             int pin1, pin2;
             unsigned char code;
-            getargs(&tp, 3, (unsigned char *)",");
+            getcsargs(&tp, 3);
             if (Option.MOUSE_CLOCK)
                 error("Mouse must be disabled to change pins");
             if (argc != 3)
@@ -4532,7 +4532,7 @@ void MIPS16 cmd_option(void)
         else
         {
 #endif
-            getargs(&tp, 9, (unsigned char *)",");
+            getcsargs(&tp, 9);
 #ifndef USBKEYBOARD
             if (!Option.KEYBOARD_CLOCK)
             {
@@ -4655,7 +4655,7 @@ void MIPS16 cmd_option(void)
         else
         {
             int pin, pin2;
-            getargs(&tp, 5, (unsigned char *)",");
+            getcsargs(&tp, 5);
             if (!(argc == 3 || argc == 5))
                 error("Syntax");
             char code;
@@ -4721,7 +4721,7 @@ void MIPS16 cmd_option(void)
     tp = checkstring(cmdline, (unsigned char *)"AUTORUN");
     if (tp)
     {
-        getargs(&tp, 3, (unsigned char *)",");
+        getcsargs(&tp, 3);
         Option.NoReset = 0;
         if (argc == 3)
         {
@@ -4789,7 +4789,7 @@ void MIPS16 cmd_option(void)
     {
         int DefaultFC = WHITE;
         int DefaultBC = BLACK;
-        getargs(&tp, 3, (unsigned char *)",");
+        getcsargs(&tp, 3);
         if (checkstring(argv[0], (unsigned char *)"WHITE"))
         {
             DefaultFC = WHITE;
@@ -4957,7 +4957,7 @@ void MIPS16 cmd_option(void)
                 p = checkstring(tp, (unsigned char *)"ENABLE");
             if (p)
             {
-                getargs(&p, 1, (unsigned char *)",");
+                getcsargs(&p, 1);
                 if (argc)
                 {
                     unsigned char code, pin1;
@@ -5036,7 +5036,7 @@ void MIPS16 cmd_option(void)
         Option.BackLightLevel = 100;
         if (!(*tp == 0 || *tp == '\''))
         {
-            getargs(&tp, 9, (unsigned char *)","); // this is a macro and must be the first executable stmt in a block
+            getcsargs(&tp, 9); // this is a macro and must be the first executable stmt in a block
             if (argc > 0)
             {
                 if (*argv[0] == '#')
@@ -5180,7 +5180,7 @@ void MIPS16 cmd_option(void)
     tp = checkstring(cmdline, (unsigned char *)"TCP SERVER PORT");
     if (tp)
     {
-        getargs(&tp, 3, (unsigned char *)",");
+        getcsargs(&tp, 3);
         if (CurrentLinePtr)
             error("Invalid in a program");
         Option.TCP_PORT = getint(argv[0], 0, 65535);
@@ -5195,7 +5195,7 @@ void MIPS16 cmd_option(void)
     tp = checkstring(cmdline, (unsigned char *)"UDP SERVER PORT");
     if (tp)
     {
-        getargs(&tp, 3, (unsigned char *)",");
+        getcsargs(&tp, 3);
         if (CurrentLinePtr)
             error("Invalid in a program");
         Option.UDP_PORT = getint(argv[0], 0, 65535);
@@ -5252,7 +5252,7 @@ void MIPS16 cmd_option(void)
     tp = checkstring(cmdline, (unsigned char *)"RESOLUTION");
     if (tp)
     {
-        getargs(&tp, 3, (unsigned char *)",");
+        getcsargs(&tp, 3);
         if (CurrentLinePtr)
             error("Invalid in a program");
         if ((checkstring(argv[0], (unsigned char *)"640")) || (checkstring(argv[0], (unsigned char *)"640x480")))
@@ -5341,7 +5341,7 @@ void MIPS16 cmd_option(void)
     if (tp)
     {
         int pin1, pin2, testpin;
-        getargs(&tp, 3, (unsigned char *)",");
+        getcsargs(&tp, 3);
         if (CurrentLinePtr)
             error("Invalid in a program");
         char code;
@@ -5572,7 +5572,7 @@ void MIPS16 cmd_option(void)
     tp = checkstring(cmdline, (unsigned char *)"DISPLAY");
     if (tp)
     {
-        getargs(&tp, 3, (unsigned char *)",");
+        getcsargs(&tp, 3);
         if (Option.DISPLAY_CONSOLE && argc > 0)
             error("Cannot change LCD console");
         if (argc >= 1)
@@ -5595,7 +5595,7 @@ void MIPS16 cmd_option(void)
     tp = checkstring(cmdline, (unsigned char *)"GUI CONTROLS");
     if (tp)
     {
-        getargs(&tp, 1, (unsigned char *)",");
+        getcsargs(&tp, 1);
         if (CurrentLinePtr)
             error("Invalid in a program");
         Option.MaxCtrls = getint(argv[0], 0, MAXCONTROLS - 1);
@@ -5789,7 +5789,7 @@ void MIPS16 cmd_option(void)
         {
             if (!Option.modbuff)
             {
-                getargs(&p, 1, (unsigned char *)",");
+                getcsargs(&p, 1);
                 if (argc)
                 {
                     size = getint(argv[0], 16, (Option.FlashSize - RoundUpK4(TOP_OF_SYSTEM_FLASH)) / 1024 - 132);
@@ -5801,7 +5801,7 @@ void MIPS16 cmd_option(void)
                 {
                 };
                 putConsole(i, 1);
-                if (toupper(i) != 'Y')
+                if (mytoupper(i) != 'Y')
                 {
                     memset(inpbuf, 0, STRINGSIZE);
                     longjmp(mark, 1);
@@ -5829,7 +5829,7 @@ void MIPS16 cmd_option(void)
                 {
                 };
                 putConsole(i, 1);
-                if (toupper(i) != 'Y')
+                if (mytoupper(i) != 'Y')
                 {
                     memset(inpbuf, 0, STRINGSIZE);
                     longjmp(mark, 1);
@@ -5871,7 +5871,7 @@ void MIPS16 cmd_option(void)
         if ((p = checkstring(tp, (unsigned char *)"VS1053")))
         {
             int pin1, pin2, pin3, pin4, pin5, pin6, pin7;
-            getargs(&p, 13, (unsigned char *)",");
+            getcsargs(&p, 13);
             if (argc != 13)
                 error("Syntax");
             if (Option.AUDIO_CLK_PIN || Option.AUDIO_L)
@@ -5974,7 +5974,7 @@ void MIPS16 cmd_option(void)
         if ((p = checkstring(tp, (unsigned char *)"SPI")))
         {
             int pin1, pin2, pin3;
-            getargs(&p, 5, (unsigned char *)",");
+            getcsargs(&p, 5);
             if (argc != 5)
                 error("Syntax");
             if (Option.AUDIO_CLK_PIN || Option.AUDIO_L)
@@ -6034,7 +6034,7 @@ void MIPS16 cmd_option(void)
         if ((p = checkstring(tp, (unsigned char *)"I2S")))
         {
             int pin1, pin2, pin3;
-            getargs(&p, 3, (unsigned char *)",");
+            getcsargs(&p, 3);
             if (argc != 3)
                 error("Syntax");
             if (Option.AUDIO_CLK_PIN || Option.AUDIO_L || Option.audio_i2s_bclk)
@@ -6095,7 +6095,7 @@ void MIPS16 cmd_option(void)
             SoftReset();
             return;
         }
-        getargs(&tp, 3, (unsigned char *)",");
+        getcsargs(&tp, 3);
         if (argc != 3)
             error("Syntax");
         if (Option.AUDIO_CLK_PIN || Option.AUDIO_L)
@@ -6152,7 +6152,7 @@ void MIPS16 cmd_option(void)
             SoftReset();
             return; // this will restart the processor ? only works when not in debug
         }
-        getargs(&tp, 5, (unsigned char *)",");
+        getcsargs(&tp, 5);
         if (CurrentLinePtr)
             error("Invalid in a program");
         if (argc < 3)
@@ -6233,7 +6233,7 @@ void MIPS16 cmd_option(void)
             gpio_set_irq_enabled(PinDef[Option.INT4pin].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
             CallBackEnabled &= (~16);
         }
-        getargs(&tp, 7, (unsigned char *)",");
+        getcsargs(&tp, 7);
         if (argc != 7)
             error("Syntax");
         unsigned char code;
@@ -6299,7 +6299,7 @@ void MIPS16 cmd_option(void)
             SoftReset();
             return; // this will restart the processor ? only works when not in debug
         }
-        getargs(&tp, 5, (unsigned char *)",");
+        getcsargs(&tp, 5);
         if (CurrentLinePtr)
             error("Invalid in a program");
         if (argc != 5)
@@ -6344,7 +6344,7 @@ void MIPS16 cmd_option(void)
         Option.SYSTEM_CLK = pin1;
         Option.SYSTEM_MOSI = pin2;
         Option.SYSTEM_MISO = pin3;
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
         if (!Option.LCD_CLK)
         {
             Option.LCD_CLK = Option.SYSTEM_CLK;
@@ -6357,7 +6357,7 @@ void MIPS16 cmd_option(void)
         SoftReset();
         return;
     }
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
     tp = checkstring(cmdline, (unsigned char *)"LCD SPI");
     if (tp)
     {
@@ -6374,7 +6374,7 @@ void MIPS16 cmd_option(void)
             SoftReset();
             return; // this will restart the processor ? only works when not in debug
         }
-        getargs(&tp, 5, (unsigned char *)",");
+        getcsargs(&tp, 5);
         if (CurrentLinePtr)
             error("Invalid in a program");
         if (argc != 5)
@@ -6456,7 +6456,7 @@ void MIPS16 cmd_option(void)
             return;
         }
 #endif
-        getargs(&tp, 7, (unsigned char *)",");
+        getcsargs(&tp, 7);
 #ifdef PICOMITEVGA
         if (!(argc == 7))
             error("Syntax");
@@ -6545,7 +6545,7 @@ void MIPS16 cmd_option(void)
     tp = checkstring(cmdline, (unsigned char *)"DISK SAVE");
     if (tp)
     {
-        getargs(&tp, 1, (unsigned char *)",");
+        getcsargs(&tp, 1);
         if (!(argc == 1))
             error("Syntax");
         if (CurrentLinePtr)
@@ -6570,7 +6570,7 @@ void MIPS16 cmd_option(void)
     tp = checkstring(cmdline, (unsigned char *)"DISK LOAD");
     if (tp)
     {
-        getargs(&tp, 1, (unsigned char *)",");
+        getcsargs(&tp, 1);
         if (CurrentLinePtr)
             error("Invalid in a program");
         if (!(argc == 1))
@@ -7589,7 +7589,7 @@ void MIPS16 fun_info(void)
         }
         else if ((tp = checkstring(ep, (unsigned char *)"PWM DUTY")))
         {
-            getargs(&tp, 3, (unsigned char *)",");
+            getcsargs(&tp, 3);
             if (argc != 3)
                 error("Syntax");
 #ifdef rp2350
@@ -7766,7 +7766,7 @@ void MIPS16 fun_info(void)
             CtoM(sret);
             targ = T_STR;
             return;
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
         }
         else if (checkstring(ep, (unsigned char *)"SCROLL"))
         {
@@ -7918,7 +7918,7 @@ void cmd_cpu(void)
     {
         //        	int pullup=0;
         MMFLOAT totalseconds;
-        getargs(&p, 3, (unsigned char *)",");
+        getcsargs(&p, 3);
         totalseconds = getnumber(p);
         if (totalseconds <= 0.0)
             error("Invalid period");
@@ -7929,7 +7929,7 @@ void cmd_cpu(void)
 }
 void cmd_csubinterrupt(void)
 {
-    getargs(&cmdline, 1, (unsigned char *)",");
+    getcsargs(&cmdline, 1);
     if (argc != 0)
     {
         if (checkstring(argv[0], (unsigned char *)"0"))
@@ -8013,7 +8013,7 @@ void cmd_poke(void)
         }
         else
         {
-            getargs(&p, (MAX_ARG_COUNT * 2) - 3, (unsigned char *)",");
+            getcsargs(&p, (MAX_ARG_COUNT * 2) - 3);
             if (!argc)
                 return;
             if (Option.DISPLAY_TYPE >= SSDPANEL && Option.DISPLAY_TYPE < VIRTUAL)
@@ -8049,7 +8049,7 @@ void cmd_poke(void)
     }
     else
     {
-        getargs(&cmdline, 5, (unsigned char *)",");
+        getcsargs(&cmdline, 5);
         if ((p = checkstring(argv[0], (unsigned char *)"BYTE")))
         {
             if (argc != 3)
@@ -8170,7 +8170,7 @@ void fun_peek(void)
 {
     unsigned char *p;
     void *pp;
-    getargs(&ep, 3, (unsigned char *)",");
+    getcsargs(&ep, 3);
     if ((p = checkstring(argv[0], (unsigned char *)"INT8")))
     {
         if (argc != 1)
@@ -8259,7 +8259,7 @@ void fun_peek(void)
         if (i == -1)
         {
             skipspace(p);
-            getargs(&p, 1, (unsigned char *)",");
+            getcsargs(&p, 1);
             if (argc != 1)
                 error("Syntax");
             unsigned char *q = getCstring(argv[0]);
@@ -8339,7 +8339,7 @@ void fun_format(void)
 {
     unsigned char *p, *fmt;
     int inspec;
-    getargs(&ep, 3, (unsigned char *)",");
+    getcsargs(&ep, 3);
     if (argc % 2 == 0)
         error("Invalid syntax");
     if (argc == 3)

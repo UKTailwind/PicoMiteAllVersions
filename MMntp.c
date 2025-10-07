@@ -141,7 +141,7 @@ static NTP_T *ntp_init(void)
 
 void cmd_ntp(unsigned char *tp)
 {
-    getargs(&tp, 5, (unsigned char *)",");
+    getcsargs(&tp, 5);
     NTP_T *state = ntp_init();
     int timeout = 5000;
     if (!state)

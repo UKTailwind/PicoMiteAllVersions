@@ -222,7 +222,7 @@ extern uint8_t *buff320;
 extern uint16_t SD_CLK_PIN, SD_MOSI_PIN, SD_MISO_PIN, SD_CS_PIN;
 extern volatile bool mergedone;
 extern void start_i2s(int pio, int sm);
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
 extern uint16_t LCD_CLK_PIN, LCD_MOSI_PIN, LCD_MISO_PIN;
 #endif
 extern bool screen320;
@@ -273,7 +273,7 @@ extern uint8_t Current_USB_devices;
 extern void cmd_mouse(void);
 extern bool USBenabled;
 #endif
-int __not_in_flash_func(MMInkey)(void);
+int MMInkey(void);
 int MMgetchar(void);
 char MMputchar(char c, int flush);
 void SaveProgramToFlash(unsigned char *pm, int msg);

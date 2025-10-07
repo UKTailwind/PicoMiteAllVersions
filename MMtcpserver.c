@@ -486,7 +486,7 @@ void cmd_transmit(unsigned char *cmd)
         tp = checkstring(cmd, (unsigned char *)"CODE");
         if (tp)
         {
-                getargs(&tp, 3, (unsigned char *)",");
+                getcsargs(&tp, 3);
                 if (argc != 3)
                         error("Argument count");
                 TCP_SERVER_T *state = (TCP_SERVER_T *)TCPstate;
@@ -520,7 +520,7 @@ void cmd_transmit(unsigned char *cmd)
                 char p[10] = {0};
                 int FileSize;
                 UINT n_read;
-                getargs(&tp, 5, (unsigned char *)",");
+                getcsargs(&tp, 5);
                 if (argc != 5)
                         error("Argument count");
                 TCP_SERVER_T *state = (TCP_SERVER_T *)TCPstate;
@@ -626,7 +626,7 @@ void cmd_transmit(unsigned char *cmd)
                 int FileSize;
                 int buffersize = 4096;
                 char p[10] = {0};
-                getargs(&tp, 5, (unsigned char *)",");
+                getcsargs(&tp, 5);
                 if (argc < 3)
                         error("Argument count");
                 char *outstr = GetTempMemory(STRINGSIZE);
@@ -789,7 +789,7 @@ int cmd_tcpserver(void)
         tp = checkstring(cmdline, (unsigned char *)"TCP INTERRUPT");
         if (tp)
         {
-                getargs(&tp, 1, (unsigned char *)",");
+                getcsargs(&tp, 1);
                 if (argc != 1)
                         error("Syntax");
                 TCPreceiveInterrupt = (char *)GetIntAddress(argv[0]);
@@ -801,7 +801,7 @@ int cmd_tcpserver(void)
         if (tp)
         {
                 TCP_SERVER_T *state = TCPstate;
-                getargs(&tp, 1, (unsigned char *)",");
+                getcsargs(&tp, 1);
                 if (argc != 1)
                         error("Syntax");
                 int pcb = getint(argv[0], 1, MaxPcb) - 1;
@@ -824,7 +824,7 @@ int cmd_tcpserver(void)
                 uint8_t *q = NULL;
                 int size = 0;
                 TCP_SERVER_T *state = TCPstate;
-                getargs(&tp, 3, (unsigned char *)",");
+                getcsargs(&tp, 3);
                 if (argc != 3)
                         error("Syntax");
                 int pcb = getint(argv[0], 1, MaxPcb) - 1;
@@ -862,7 +862,7 @@ int cmd_tcpserver(void)
                 TCP_SERVER_T *state = (TCP_SERVER_T *)TCPstate;
                 int64_t *dest = NULL;
                 uint8_t *q = NULL;
-                getargs(&tp, 3, (unsigned char *)",");
+                getcsargs(&tp, 3);
                 if (!TCPstate)
                         error("Server not open");
                 if (argc != 3)

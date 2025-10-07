@@ -420,6 +420,13 @@ extern "C"
         MMEND
     } Operation;
     extern const char *overlaid_functions[];
+#ifndef likely
+#define likely(x) __builtin_expect(!!(x), 1)
+#define unlikely(x) __builtin_expect(!!(x), 0)
+#endif
+#define LOWRAM (!defined(rp2350) && (defined(PICOMITEVGA) || defined(PICOMITEWEB)))
+#define PICOMITERP2350 (defined(PICOMITE) && defined(rp2350))
+#define WEBRP2350 (!defined(rp2350) && defined(PICOMITEWEB))
 #ifdef __cplusplus
 }
 #endif

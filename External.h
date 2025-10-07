@@ -207,7 +207,7 @@ extern void WriteCount5(unsigned long timeset);
 extern void SoftReset(void);
 extern volatile uint64_t IRoffset;
 extern int BacklightSlice, BacklightChannel;
-#if defined(PICOMITE) && defined(rp2350)
+#if PICOMITERP2350
 extern int KeyboardlightSlice, KeyboardlightChannel;
 #define SHIFTLCKLED 45
 #endif
