@@ -3775,6 +3775,51 @@ void MIPS16 configure(unsigned char *p)
             _excep_code = RESET_COMMAND;
             SoftReset();
         }
+        if (checkstring(p, (unsigned char *)"PICO PALM"))
+        {
+            ResetOptions(false);
+            Option.CPU_Speed = 360000;
+            Option.ColourCode = 1;
+            Option.SYSTEM_CLK = PINMAP[6];
+            Option.SYSTEM_MOSI = PINMAP[7];
+            Option.SYSTEM_MISO = PINMAP[4];
+            Option.LCD_CLK = PINMAP[10];
+            Option.LCD_MOSI = PINMAP[11];
+            Option.LCD_MISO = PINMAP[12];
+            Option.AllPins = 1;
+            Option.SYSTEM_I2C_SDA = PINMAP[20];
+            Option.SYSTEM_I2C_SCL = PINMAP[21];
+            Option.RTC = true;
+            Option.SerialTX = PINMAP[8];
+            Option.SerialRX = PINMAP[9];
+            Option.SerialConsole = 2;
+            Option.DISPLAY_ORIENTATION = 2;
+            Option.DISPLAY_TYPE = ST7796SPBUFF;
+            Option.LCD_CD = PINMAP[1];
+            Option.LCD_Reset = PINMAP[2];
+            Option.LCD_CS = PINMAP[3];
+            Option.DISPLAY_BL = PINMAP[18];
+            Option.BGR = 1;
+            Option.SD_CS = PINMAP[5];
+            Option.audio_i2s_bclk = PINMAP[13];
+            Option.audio_i2s_data = PINMAP[15];
+            Option.AUDIO_SLICE = 11;
+            Option.PSRAM_CS_PIN = PINMAP[0];
+            Option.LOCAL_KEYBOARD = 1;
+            Option.NoHeartbeat = 0;
+            Option.heartbeatpin = PINMAP[25];
+            Option.KeyboardBrightness = 10;
+            Option.BackLightLevel = 60;
+            Option.DISPLAY_CONSOLE = 1;
+            Option.continuation = '_';
+            strcpy((char *)Option.platform, "PALM PICO");
+            SaveOptions();
+            OptionConsole = 1;
+            printoptions();
+            uSec(100000);
+            _excep_code = RESET_COMMAND;
+            SoftReset();
+        }
 #endif
 #ifndef USBKEYBOARD
         if (checkstring(p, (unsigned char *)"GAMEMITE"))
