@@ -3554,10 +3554,10 @@ void __not_in_flash_func(copybuffertoscreen)(unsigned char *s, int low_x, int lo
 	if (Option.DISPLAY_TYPE >= SSD1963_5_12BUFF)
 	{
 		{
-			SetAreaSSD1963(low_x * 2, low_y * 2, high_x * 2 + 1, high_y * 2 + 1); // if the box splits over the frame buffer boundary
+			SetAreaSSD1963((low_x + screen320) * 2, low_y * 2, (high_x + screen320) * 2 + 1, high_y * 2 + 1); // if the box splits over the frame buffer boundary
 			WriteComand(CMD_WR_MEMSTART);
 			int y_off = low_y * HRes;
-			if (Option.DISPLAY_TYPE & 1)
+			if (Option.SSD_DATA == 1)
 			{
 				const int width = high_x - low_x + 1;
 
@@ -3571,14 +3571,14 @@ void __not_in_flash_func(copybuffertoscreen)(unsigned char *s, int low_x, int lo
 						int x;
 						for (x = 0; x <= width - 4; x += 4)
 						{
-							WriteColorFast(RGB332_LUT[p[x]]);
-							WriteColorFast(RGB332_LUT[p[x + 1]]);
-							WriteColorFast(RGB332_LUT[p[x + 2]]);
-							WriteColorFast(RGB332_LUT[p[x + 3]]);
+							WriteColor(RGB332_LUT[p[x]]);
+							WriteColor(RGB332_LUT[p[x + 1]]);
+							WriteColor(RGB332_LUT[p[x + 2]]);
+							WriteColor(RGB332_LUT[p[x + 3]]);
 						}
 						for (; x < width; x++)
 						{
-							WriteColorFast(RGB332_LUT[p[x]]);
+							WriteColor(RGB332_LUT[p[x]]);
 						}
 					}
 

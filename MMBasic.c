@@ -284,7 +284,7 @@ int CheckEmpty(char *p)
 // run a program
 // this will continuously execute a program until the end (marked by TWO zero chars)
 // the argument p must point to the first line to be executed
-void MIPS16 __not_in_flash_func(ExecuteProgram)(unsigned char *p)
+void __not_in_flash_func(ExecuteProgram)(unsigned char *p)
 {
     int i, SaveLocalIndex = 0;
     jmp_buf SaveErrNext;
@@ -1726,6 +1726,8 @@ unsigned char MIPS16 __not_in_flash_func (*doexpr)(unsigned char *p, MMFLOAT *fa
     int o1, o2;
     int t1, t2;
     unsigned char *sa1, *sa2;
+    struct s_tokentbl *op; // Cache the operator table entry
+    int op_type;
 
     TestStackOverflow(); // throw an error if we have overflowed the PIC32's stack
 
@@ -1734,28 +1736,36 @@ unsigned char MIPS16 __not_in_flash_func (*doexpr)(unsigned char *p, MMFLOAT *fa
     sa1 = *sa;
     t1 = TypeMask(*ta);
     o1 = *oo;
+
     p = getvalue(p, &fa2, &ia2, &sa2, &o2, &t2);
+
     while (1)
     {
         if (o2 == E_END || tokentbl[o1].precedence <= tokentbl[o2].precedence)
         {
+            // Cache the operator table entry to avoid repeated lookups
+            op = (struct s_tokentbl *)&tokentbl[o1];
+            op_type = op->type;
+
             if ((t1 & T_STR) != (t2 & T_STR))
                 error("Incompatible types in expression");
-            targ = tokentbl[o1].type & (T_NBR | T_INT);
+
+            targ = op_type & (T_NBR | T_INT);
+
             if (targ == T_NBR)
             { // if the operator does not work with ints convert the args to floats
                 if (t1 & T_INT)
                 {
                     fa1 = ia1;
                     t1 = T_NBR;
-                } // at this time the only example of this is op_div (/)
+                }
                 if (t2 & T_INT)
                 {
                     fa2 = ia2;
                     t2 = T_NBR;
                 }
             }
-            if (targ == T_INT)
+            else if (targ == T_INT)
             { // if the operator does not work with floats convert the args to ints
                 if (t1 & T_NBR)
                 {
@@ -1768,31 +1778,36 @@ unsigned char MIPS16 __not_in_flash_func (*doexpr)(unsigned char *p, MMFLOAT *fa
                     t2 = T_INT;
                 }
             }
-            if (targ == (T_NBR | T_INT))
-            { // if the operator will work with both floats and ints
-                if (t1 & T_NBR && t2 & T_INT)
+            else // targ == (T_NBR | T_INT)
+            {    // if the operator will work with both floats and ints
+                if ((t1 & T_NBR) && (t2 & T_INT))
                 {
                     fa2 = ia2;
                     t2 = T_NBR;
-                } // if one arg is float convert the other to a float
-                if (t1 & T_INT && t2 & T_NBR)
+                }
+                else if ((t1 & T_INT) && (t2 & T_NBR))
                 {
                     fa1 = ia1;
                     t1 = T_NBR;
                 }
             }
-            if (!(tokentbl[o1].type & T_OPER) || !(tokentbl[o1].type & t1))
+
+            if (!(op_type & T_OPER) || !(op_type & t1))
             {
                 error("Invalid operator");
             }
+
+            // Setup args for operator function
             farg1 = fa1;
-            farg2 = fa2; // setup the float args (incase it is a float)
+            farg2 = fa2;
             sarg1 = sa1;
-            sarg2 = sa2; // ditto string args
+            sarg2 = sa2;
             iarg1 = ia1;
-            iarg2 = ia2;         // ditto integer args
-            targ = t1;           // this is what both args are
-            tokentbl[o1].fptr(); // call the operator function
+            iarg2 = ia2;
+            targ = t1;
+
+            op->fptr(); // call the operator function
+
             *fa = fret;
             *ia = iret;
             *sa = sret;
@@ -3128,88 +3143,88 @@ void MIPS32 __not_in_flash_func (*findvar)(unsigned char *p, int action)
     return mptr;
 }
 #ifdef rp2350
-void MIPS32 __not_in_flash_func(MakeCommaSeparatedArgs)(unsigned char **p, int maxargs, unsigned char *argbuf, unsigned char *argv[], int *argc)
+void __not_in_flash_func(MakeCommaSeparatedArgs)(unsigned char **p, int maxargs, unsigned char *argbuf, unsigned char *argv[], int *argc)
 {
-    unsigned char *op, *tp;
-    unsigned char c;
+    unsigned char *op;
     int inarg;
+    unsigned char *tp;
 
-    TestStackOverflow();
+    TestStackOverflow(); // throw an error if we have overflowed the PIC32's stack
 
     tp = *p;
     op = argbuf;
     *argc = 0;
     inarg = false;
 
-    // Skip leading spaces
+    // skip leading spaces
     while (*tp == ' ')
         tp++;
 
-    // Main processing loop
-    while ((c = *tp))
+    // the main processing loop
+    while (*tp)
     {
-        // Comment terminates line
-        if (c == '\'')
+        // comment char causes the rest of the line to be skipped
+        if (*tp == '\'')
+        {
             break;
+        }
 
-        // Handle comma delimiter
-        if (c == ',')
+        // check for comma delimiter
+        if (*tp == ',')
         {
             if (inarg)
-            {
-                // Trim trailing spaces
+            { // if we have been processing an argument
                 while (op > argbuf && *(op - 1) == ' ')
-                    op--;
-                *op++ = 0;
-                inarg = false;
+                    op--;  // trim trailing spaces
+                *op++ = 0; // terminate it
             }
-            else if (*argc > 0)
-            {
-                // Empty argument - add null string
-                if (*argc >= maxargs)
-                    error("Syntax");
-                argv[(*argc)++] = op; // FIX: Need to store pointer and increment argc
-                *op++ = 0;
+            else if (*argc)
+            {                         // otherwise we have two delimiters in a row (except for the first argument)
+                argv[(*argc)++] = op; // create a null argument to go between the two delimiters
+                *op++ = 0;            // and terminate it
             }
 
-            // Store delimiter as separate argument
+            inarg = false;
             if (*argc >= maxargs)
                 error("Syntax");
-            argv[(*argc)++] = op;
-            *op++ = ',';
-            *op++ = 0;
-            tp++;
+            argv[(*argc)++] = op; // save the pointer for this delimiter
+            *op++ = *tp++;        // copy the comma
+            *op++ = 0;            // terminate it
             continue;
         }
-        // Skip spaces between arguments
-        if (!inarg && c == ' ')
+
+        // remove all spaces (outside of quoted text and bracketed text)
+        if (!inarg && *tp == ' ')
         {
             tp++;
             continue;
         }
 
-        // Start new argument
+        // not a special char so we must start a new argument
         if (!inarg)
         {
             if (*argc >= maxargs)
                 error("Syntax");
-            argv[(*argc)++] = op;
+            argv[(*argc)++] = op; // save the pointer for this arg
             inarg = true;
         }
 
-        // Handle brackets and functions
-        if (c == '(' || (tokentype(c) & T_FUN))
+        // if an opening bracket '(' copy everything until we hit the matching closing bracket
+        // this includes special characters such as , and keeps track of any nested brackets
+        if (*tp == '(' || (tokentype(*tp) & T_FUN))
         {
-            unsigned char *close = getclosebracket(tp);
-            int len = (close - tp) + 1;
-            memcpy(op, tp, len);
-            op += len;
-            tp += len;
+            int x;
+            x = (getclosebracket(tp) - tp) + 1;
+            memcpy(op, tp, x);
+            op += x;
+            tp += x;
             continue;
         }
 
-        // Handle quoted strings
-        if (c == '"')
+        // if quote mark (") copy everything until the closing quote
+        // this includes special characters such as ,
+        // the tokenise() function will have ensured that the closing quote is always there
+        if (*tp == '"')
         {
             do
             {
@@ -3221,20 +3236,12 @@ void MIPS32 __not_in_flash_func(MakeCommaSeparatedArgs)(unsigned char **p, int m
             continue;
         }
 
-        // Copy regular character
-        *op++ = c;
-        tp++;
+        // anything else is just copied into the argument
+        *op++ = *tp++;
     }
-
-    // Trim final trailing spaces if in argument
-    if (inarg)
-    {
-        while (op > argbuf && *(op - 1) == ' ')
-            op--;
-    }
-
-    *op = 0;
-    *p = tp;
+    while (op - 1 > argbuf && *(op - 1) == ' ')
+        --op; // trim any trailing spaces on the last argument
+    *op = 0;  // terminate the last argument
 }
 #endif
 /********************************************************************************************************************************************
@@ -3549,7 +3556,7 @@ void MIPS16 error(char *msg, ...)
         FreeMemory((void *)DefinedSubFunMem);
         DefinedSubFunMem = 0;
     }
-    if (OptionErrorSkip)
+    if (OptionErrorSkip <= 100000)
         longjmp(ErrNext, 1); // if OPTION ERROR SKIP/IGNORE is in force
 #ifdef PICOMITE
     multicore_fifo_push_blocking(0xFF);
@@ -4326,65 +4333,93 @@ unsigned char __not_in_flash_func (*skipexpression)(unsigned char *p)
 // returns a pointer to the next command
 unsigned char __not_in_flash_func (*GetNextCommand)(unsigned char *p, unsigned char **CLine, unsigned char *EOFMsg)
 {
+    unsigned char c;
+
     do
     {
-        if (*p != T_NEWLINE)
+        c = *p;
+
+        if (c != T_NEWLINE)
         { // if we are not already at the start of a line
+            // Scan to end of element - look for the zero
             while (*p)
-                p++; // look for the zero marking the start of an element
-            p++;     // step over the zero
+                p++;
+            p++; // step over the zero
+            c = *p;
         }
-        if (*p == 0)
+
+        if (c == 0)
         {
             if (EOFMsg == NULL)
                 return p;
             error((char *)EOFMsg);
         }
-        if (*p == T_NEWLINE)
+
+        if (c == T_NEWLINE)
         {
             if (CLine)
-                *CLine = p; // and a pointer to the line also for error reporting
+                *CLine = p; // pointer to the line for error reporting
             p++;
+            c = *p;
         }
-        if (*p == T_LINENBR)
+
+        if (c == T_LINENBR)
+        {
             p += 3;
+            c = *p;
+        }
 
         skipspace(p);
-        if (p[0] == T_LABEL)
+        c = *p;
+
+        if (c == T_LABEL)
         {                  // got a label
             p += p[1] + 2; // skip over the label
             skipspace(p);  // and any following spaces
+            c = *p;
         }
-    } while (*p < C_BASETOKEN);
+    } while (c < C_BASETOKEN);
+
     return p;
 }
-
 // scans text looking for the matching closing bracket
 // it will handle nested strings, brackets and functions
 // it expects to be called pointing at the opening bracket or a function token
 unsigned char __not_in_flash_func (*getclosebracket)(unsigned char *p)
 {
     int i = 0;
-    int inquote = false;
 
     do
     {
         if (*p == 0)
             error("Expected closing bracket");
+
+        // Handle quoted strings - skip them entirely
         if (*p == '\"')
-            inquote = !inquote;
-        if (!inquote)
         {
-            if (*p == ')')
-                i--;
-            if (*p == '(' || (tokentype(*p) & T_FUN))
-                i++;
+            p++;
+            while (*p != '\"')
+            {
+                if (*p == 0)
+                    error("Expected closing bracket");
+                p++;
+            }
+            p++;
+            continue;
         }
+
+        // Check for closing bracket
+        if (*p == ')')
+            i--;
+        // Check for opening bracket or function token
+        else if (*p == '(' || (tokentype(*p) & T_FUN))
+            i++;
+
         p++;
     } while (i);
+
     return p - 1;
 }
-
 // check that there is no excess text following an element
 // will skip spaces and abort if a zero char is not found
 void __not_in_flash_func(checkend)(unsigned char *p)

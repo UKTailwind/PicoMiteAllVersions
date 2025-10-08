@@ -265,6 +265,7 @@ extern "C"
     extern int FSerror;
     extern int lfs_FileFnbr;
     extern struct lfs_config pico_lfs_cfg;
+    extern const uint8_t *flash_option_contents;
 #define SAVED_OPTIONS_FLASH 5
 #define LIBRARY_FLASH 6
 #define SAVED_VARS_FLASH 7

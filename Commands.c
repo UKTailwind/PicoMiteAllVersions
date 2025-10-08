@@ -3953,15 +3953,7 @@ void cmd_on(void)
 		}
 		MMerrno = 0; // clear the error flags
 		*MMErrMsg = 0;
-		if ((p = checkstring(p, (unsigned char *)"SKIP")))
-		{
-			if (*p == 0 || *p == (unsigned char)'\'')
-				OptionErrorSkip = 2;
-			else
-				OptionErrorSkip = getint(p, 1, 10000) + 1;
-			return;
-		}
-		else if (checkstring(p, (unsigned char *)"CLEAR"))
+		if (checkstring(p, (unsigned char *)"CLEAR"))
 			return;
 		else if (checkstring(p, (unsigned char *)"IGNORE"))
 		{
@@ -3971,6 +3963,14 @@ void cmd_on(void)
 		else if (checkstring(p, (unsigned char *)"RESTART"))
 		{
 			OptionErrorSkip = 999999;
+			return;
+		}
+		else if ((p = checkstring(p, (unsigned char *)"SKIP")))
+		{
+			if (*p == 0 || *p == (unsigned char)'\'')
+				OptionErrorSkip = 2;
+			else
+				OptionErrorSkip = getint(p, 1, 10000) + 1;
 			return;
 		}
 

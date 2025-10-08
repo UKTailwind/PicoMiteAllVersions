@@ -225,7 +225,7 @@ extern void start_i2s(int pio, int sm);
 #if PICOMITERP2350
 extern uint16_t LCD_CLK_PIN, LCD_MOSI_PIN, LCD_MISO_PIN;
 #endif
-extern bool screen320;
+extern uint8_t screen320;
 extern void clear320(void);
 #ifdef PICOMITEVGA
 extern volatile uint8_t transparent;

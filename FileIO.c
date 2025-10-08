@@ -57,7 +57,6 @@ extern mutex_t frameBufferMutex;
 #include "hardware/structs/qmi.h"
 #endif
 extern const uint8_t *flash_target_contents;
-extern const uint8_t *flash_option_contents;
 extern const uint8_t *SavedVarsFlash;
 extern const uint8_t *flash_progmemory;
 // LIBRARY

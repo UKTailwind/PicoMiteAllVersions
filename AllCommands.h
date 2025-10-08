@@ -226,6 +226,9 @@ void cmd_web(void);
 void cmd_loadCMM2(void);
 void cmd_RunCMM2(void);
 #endif
+#if PICOMITERP2350
+void cmd_mode(void);
+#endif
 void op_invalid(void);
 void op_exp(void);
 void op_mul(void);
@@ -590,9 +593,10 @@ void fun_map(void);
 	{(unsigned char *)"Array Insert", T_CMD, 0, cmd_insert},
 	{(unsigned char *)"Array Add", T_CMD, 0, cmd_add},
 	{(unsigned char *)"Array Set", T_CMD, 0, cmd_arrayset},
-#if defined(rp2350) && defined(PICOMITE)
+#if PICOMITERP2350
 	{(unsigned char *)"Map(", T_CMD | T_FUN, 0, cmd_map},
 	{(unsigned char *)"Map", T_CMD, 0, cmd_map},
+	{(unsigned char *)"Mode", T_CMD, 0, cmd_mode},
 #endif
 {
 	(unsigned char *)"", 0, 0, cmd_null,
@@ -738,7 +742,7 @@ void fun_map(void);
 	{(unsigned char *)"CtrlVal(", T_FUN | T_NBR | T_STR, 0, fun_ctrlval},
 #endif
 	{(unsigned char *)"Bit(", T_FUN | T_INT, 0, fun_bit},
-#if defined(rp2350) && defined(PICOMITE)
+#if PICOMITERP2350
 	{(unsigned char *)"Map(", T_FUN | T_INT, 0, fun_map},
 #endif
 	{(unsigned char *)"Trim$(", T_FUN | T_STR, 0, fun_trim},

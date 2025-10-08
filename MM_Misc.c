@@ -48,6 +48,9 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #ifdef rp2350
 #include "pico/rand.h"
 #endif
+#if PICOMITERP2350
+#include "pico/multicore.h"
+#endif
 #if defined(USBKEYBOARD)
 extern int caps_lock;
 extern int num_lock;
@@ -232,7 +235,7 @@ MMFLOAT optionangle = 1.0;
 bool useoptionangle = false;
 bool optionfastaudio = false;
 bool optionfulltime = false;
-bool screen320 = false;
+uint8_t screen320 = false;
 bool optionlogging = false;
 volatile bool CSubComplete = false;
 uint64_t timeroffset = 0;
@@ -3245,6 +3248,14 @@ void MIPS16 ConfigDisplayUser(unsigned char *tp)
 }
 void MIPS16 clear320(void)
 {
+#if PICOMITERP2350
+    if (Option.DISPLAY_TYPE >= SSD1963_5_12BUFF)
+    {
+        screen320 = 0;
+        HRes = 400;
+        return;
+    }
+#endif
     if (SPI480)
     {
         if (Option.DISPLAY_ORIENTATION & 1)
@@ -3730,7 +3741,7 @@ void MIPS16 configure(unsigned char *p)
             Option.SYSTEM_I2C_SCL = PINMAP[21];
             Option.RTC = true;
             Option.DISPLAY_ORIENTATION = LANDSCAPE;
-            Option.DISPLAY_TYPE = SSD1963_5_12BUFF0;
+            Option.DISPLAY_TYPE = SSD1963_5_BUFF;
             Option.BackLightLevel = 100;
             Option.SSD_RESET = -1;
             Option.SSD_DATA = 1;
@@ -3758,6 +3769,7 @@ void MIPS16 configure(unsigned char *p)
             Option.TOUCH_YSCALE = 0.0650;
             strcpy((char *)Option.platform, "PALM PICO");
             SaveOptions();
+            OptionConsole = 1;
             printoptions();
             uSec(1000000);
             _excep_code = RESET_COMMAND;
@@ -4132,8 +4144,12 @@ void MIPS16 cmd_option(void)
     tp = checkstring(cmdline, (unsigned char *)"LCD320");
     if (tp)
     {
+#if PICOMITERP2350
+        if (!((SSD16TYPE || Option.DISPLAY_TYPE >= SSD1963_5_12BUFF) && (Option.DISPLAY_ORIENTATION == LANDSCAPE || Option.DISPLAY_ORIENTATION == RLANDSCAPE)))
+#else
         if (!(SSD16TYPE && (Option.DISPLAY_ORIENTATION == LANDSCAPE || Option.DISPLAY_ORIENTATION == RLANDSCAPE)))
-            error("Only available on 16-bit SSD1963 and IPS_4_16 displays in Landscape");
+#endif
+            error("Invalid for this display");
         if ((SSD16TYPE || Option.DISPLAY_TYPE == IPS_4_16))
         {
             if (checkstring(tp, (unsigned char *)"OFF"))
@@ -4157,6 +4173,20 @@ void MIPS16 cmd_option(void)
             else
                 error("Syntax");
         }
+#if PICOMITERP2350
+        else if (Option.DISPLAY_TYPE >= SSD1963_5_12BUFF)
+        {
+            ClearScreen(gui_bcolour);
+            multicore_fifo_push_blocking(6);
+            multicore_fifo_push_blocking((uint32_t)low_x | (high_x << 16));
+            multicore_fifo_push_blocking((uint32_t)low_y | (high_y << 16));
+            low_x = low_y = silly_low;
+            high_x = high_y = silly_high;
+            HRes = 320;
+            screen320 = 40;
+            return;
+        }
+#endif
         else
             error("Invalid display type");
     }

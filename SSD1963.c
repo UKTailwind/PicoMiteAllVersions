@@ -52,8 +52,10 @@ unsigned int ReadData(void);
 void ReadBLITBufferSSD1963(int x1, int y1, int x2, int y2, unsigned char *p);
 void DrawBLITBufferSSD1963(int x1, int y1, int x2, int y2, unsigned char *p);
 // #define dx(...) {char s[140];sprintf(s,  __VA_ARGS__); SerUSBPutS(s); SerUSBPutS("\r\n");}
-void (*WriteColorFast)(unsigned int c) = NULL;
-
+void (*WriteColor)(unsigned int c) = NULL;
+void WriteColorD0(unsigned int c);
+void WriteColorFlex(unsigned int c);
+static uint64_t writemask = 0;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 //
 // Functions used by MMBasic to setup the display
@@ -205,18 +207,6 @@ void MIPS16 ConfigDisplaySSD(unsigned char *p)
         Option.BGR = 0;
 
 #if PICOMITERP2350
-    if (Option.SSD_DATA == 1 && Option.DISPLAY_TYPE == SSD1963_5_12BUFF)
-        Option.DISPLAY_TYPE = SSD1963_5_12BUFF0;
-    if (Option.SSD_DATA == 1 && Option.DISPLAY_TYPE == SSD1963_5_16BUFF)
-        Option.DISPLAY_TYPE = SSD1963_5_16BUFF0;
-    if (Option.SSD_DATA == 1 && Option.DISPLAY_TYPE == SSD1963_5_BUFF)
-        Option.DISPLAY_TYPE = SSD1963_5_BUFF0;
-    if (Option.SSD_DATA == 1 && Option.DISPLAY_TYPE == SSD1963_7_12BUFF)
-        Option.DISPLAY_TYPE = SSD1963_7_12BUFF0;
-    if (Option.SSD_DATA == 1 && Option.DISPLAY_TYPE == SSD1963_7_16BUFF)
-        Option.DISPLAY_TYPE = SSD1963_7_16BUFF0;
-    if (Option.SSD_DATA == 1 && Option.DISPLAY_TYPE == SSD1963_7_BUFF)
-        Option.DISPLAY_TYPE = SSD1963_7_BUFF0;
 #endif
     CheckPin(SSD1963_DAT1, OptionErrorCheck);
     CheckPin(SSD1963_DAT2, OptionErrorCheck);
@@ -847,9 +837,6 @@ void MIPS16 InitDisplaySSD(void)
     case SSD1963_5_12BUFF:
     case SSD1963_5_16BUFF:
     case SSD1963_5_BUFF:
-    case SSD1963_5_12BUFF0:
-    case SSD1963_5_16BUFF0:
-    case SSD1963_5_BUFF0:
         if (Option.DISPLAY_TYPE >= SSD1963_5_12BUFF)
         {
             DisplayHRes = 400; // this is the 5" glass
@@ -902,9 +889,6 @@ void MIPS16 InitDisplaySSD(void)
     case SSD1963_7_12BUFF:
     case SSD1963_7_16BUFF:
     case SSD1963_7_BUFF:
-    case SSD1963_7_12BUFF0:
-    case SSD1963_7_16BUFF0:
-    case SSD1963_7_BUFF0:
         if (Option.DISPLAY_TYPE >= SSD1963_7_12BUFF)
         {
             DisplayHRes = 400; // this is the 7" glass
@@ -1030,6 +1014,18 @@ void MIPS16 InitDisplaySSD(void)
         SSD1963PixelFormat = 0b01110000; // PIXEL data interface 24-bit
     }
     DrawPixel = DrawPixelNormal;
+    WriteColor = (Option.SSD_DATA == 1 ? WriteColorD0 : WriteColorFlex);
+    uint64_t bits = 0xFF;
+#if PICOMITERP2350
+    if ((Option.DISPLAY_TYPE > SSD_PANEL_8 && Option.DISPLAY_TYPE < VIRTUAL) || (Option.DISPLAY_TYPE >= SSD1963_5_16BUFF && Option.DISPLAY_TYPE <= SSD1963_8_16BUFF))
+        bits = 0xFFFF;
+    if (Option.DISPLAY_TYPE >= SSD1963_5_12BUFF && Option.DISPLAY_TYPE <= SSD1963_8_12BUFF)
+        bits = 0xFFF;
+#else
+    if (Option.DISPLAY_TYPE > SSD_PANEL_8 && Option.DISPLAY_TYPE < VIRTUAL)
+        bits = 0xFFFF;
+#endif
+    writemask = bits << PinDef[Option.SSD_DATA].GPno;
 #if PICOMITERP2350
     if (Option.DISPLAY_TYPE >= SSD1963_5_12BUFF)
     {
@@ -1041,17 +1037,18 @@ void MIPS16 InitDisplaySSD(void)
         ReadBLITBuffer = ReadBlitBufferMEM332;
         ScrollLCD = ScrollLCDMEM332;
         DrawPixel = DrawPixelMEM332;
-        if (Option.DISPLAY_TYPE == SSD1963_5_12BUFF0 || Option.DISPLAY_TYPE == SSD1963_7_12BUFF0)
+        if ((Option.DISPLAY_TYPE == SSD1963_5_12BUFF || Option.DISPLAY_TYPE == SSD1963_7_12BUFF) && Option.SSD_DATA == 1)
         {
-            WriteColorFast = WriteColor_12bit;
+            WriteColor = WriteColor_12bit;
         }
-        else if (Option.DISPLAY_TYPE == SSD1963_5_16BUFF0 || Option.DISPLAY_TYPE == SSD1963_7_16BUFF0)
+        else if ((Option.DISPLAY_TYPE == SSD1963_5_16BUFF || Option.DISPLAY_TYPE == SSD1963_7_16BUFF))
         {
-            WriteColorFast = WriteColor_16bit;
+            WriteColor = WriteColor_16bit;
         }
-        else
+        else if ((Option.DISPLAY_TYPE == SSD1963_5_BUFF || Option.DISPLAY_TYPE == SSD1963_7_BUFF) && Option.SSD_DATA == 1)
+
         {
-            WriteColorFast = WriteColor_8bit;
+            WriteColor = WriteColor_8bit;
         }
     }
     else
@@ -1101,7 +1098,7 @@ void MIPS16 InitDisplaySSD(void)
 // Write a command byte to the SSD1963
 void WriteComand(int cmd)
 {
-    gpio_put_masked64((Option.DISPLAY_TYPE > SSD_PANEL_8 ? (0xFFFF << SSD1963data) : (0xFF << SSD1963data)), (cmd << SSD1963data));
+    gpio_put_masked64(writemask, (cmd << SSD1963data));
     gpio_put(SSD1963_DC_GPPIN, 0);
     gpio_put(SSD1963_WR_GPPIN, 0);
     nop;
@@ -1112,24 +1109,23 @@ void WriteComand(int cmd)
 // Write an 8 bit data word to the SSD1963
 void WriteData(int data)
 {
-    gpio_put_masked64((Option.DISPLAY_TYPE > SSD_PANEL_8 ? (0xFFFF << SSD1963data) : (0xFF << SSD1963data)), (data << SSD1963data));
+    gpio_put_masked64(writemask, (data << SSD1963data));
     gpio_put(SSD1963_WR_GPPIN, 0);
     nop;
     gpio_put(SSD1963_WR_GPPIN, 1);
 }
 // For the 100 pin chip write RGB colour over an 8 bit bus
 #if PICOMITERP2350
-void __not_in_flash_func(WriteColor)(unsigned int c)
+void __not_in_flash_func(WriteColorFlex)(unsigned int c)
 {
 
     if (Option.DISPLAY_TYPE == SSD1963_5_12BUFF || Option.DISPLAY_TYPE == SSD1963_7_12BUFF)
     {
-        uint64_t mask = (0xFFF << SSD1963data);
-        gpio_put_masked64(mask, ((c >> 12) << SSD1963data));
+        gpio_put_masked64(writemask, ((c >> 12) << SSD1963data));
         gpioc_bit_out_put(SSD1963_WR_GPPIN, 0);
         nop;
         gpioc_bit_out_put(SSD1963_WR_GPPIN, 1);
-        gpio_put_masked64(mask, (c << SSD1963data));
+        gpio_put_masked64(writemask, (c << SSD1963data));
         gpioc_bit_out_put(SSD1963_WR_GPPIN, 0);
         nop;
         gpioc_bit_out_put(SSD1963_WR_GPPIN, 1);
@@ -1137,12 +1133,12 @@ void __not_in_flash_func(WriteColor)(unsigned int c)
     }
     else if ((Option.DISPLAY_TYPE > SSD_PANEL_8 && Option.DISPLAY_TYPE < VIRTUAL) || Option.DISPLAY_TYPE == SSD1963_5_16BUFF || Option.DISPLAY_TYPE == SSD1963_7_16BUFF)
 #else
-void WriteColor(unsigned int c)
+void WriteColorFlex(unsigned int c)
 {
     if (Option.DISPLAY_TYPE > SSD_PANEL_8)
 #endif
     {
-        gpio_put_masked64((0xFFFF << SSD1963data), (c << SSD1963data));
+        gpio_put_masked64(writemask, (c << SSD1963data));
 #if PICOMITERP2350
         gpioc_bit_out_put(SSD1963_WR_GPPIN, 0);
         nop;
@@ -1155,19 +1151,65 @@ void WriteColor(unsigned int c)
     }
     else
     {
-        gpio_put_masked64((0xFF << SSD1963data), (((c >> 16) & 0xFF) << SSD1963data));
+        gpio_put_masked64(writemask, ((c >> 16) << SSD1963data));
         gpio_put(SSD1963_WR_GPPIN, 0);
         nop;
         gpio_put(SSD1963_WR_GPPIN, 1);
-        gpio_put_masked64((0xFF << SSD1963data), (((c >> 8) & 0xFF) << SSD1963data));
+        gpio_put_masked64((0xFF << SSD1963data), ((c >> 8) << SSD1963data));
         nop;
         gpio_put(SSD1963_WR_GPPIN, 0);
         nop;
         gpio_put(SSD1963_WR_GPPIN, 1);
-        gpio_put_masked64((0xFF << SSD1963data), ((c & 0xFF) << SSD1963data));
+        gpio_put_masked64((0xFF << SSD1963data), (c << SSD1963data));
         gpio_put(SSD1963_WR_GPPIN, 0);
         nop;
         gpio_put(SSD1963_WR_GPPIN, 1);
+    }
+}
+void __not_in_flash_func(WriteColorD0)(unsigned int c)
+{
+    if (Option.DISPLAY_TYPE > SSD_PANEL_8)
+    {
+        gpio_put_masked64(0xFFFF, c);
+#if PICOMITERP2350
+        gpioc_bit_out_put(SSD1963_WR_GPPIN, 0);
+        wr_pulse();
+        gpioc_bit_out_put(SSD1963_WR_GPPIN, 1);
+#else
+        gpio_put(SSD1963_WR_GPPIN, 0);
+        nop;
+        gpio_put(SSD1963_WR_GPPIN, 1);
+#endif
+    }
+    else
+    {
+#if PICOMITERP2350
+        gpio_put_masked64(0xFF, c >> 16);
+        gpioc_bit_out_put(SSD1963_WR_GPPIN, 0);
+        wr_pulse();
+        gpioc_bit_out_put(SSD1963_WR_GPPIN, 1);
+        gpio_put_masked64(0xFF, c >> 8);
+        gpioc_bit_out_put(SSD1963_WR_GPPIN, 0);
+        wr_pulse();
+        gpioc_bit_out_put(SSD1963_WR_GPPIN, 1);
+        gpio_put_masked64(0xFF, c);
+        gpioc_bit_out_put(SSD1963_WR_GPPIN, 0);
+        wr_pulse();
+        gpioc_bit_out_put(SSD1963_WR_GPPIN, 1);
+#else
+        gpio_put_masked64(0xFF, c >> 16);
+        gpio_put(SSD1963_WR_GPPIN, 0);
+        nop;
+        gpio_put(SSD1963_WR_GPPIN, 1);
+        gpio_put_masked64(0xFF, c >> 8);
+        gpio_put(SSD1963_WR_GPPIN, 0);
+        nop;
+        gpio_put(SSD1963_WR_GPPIN, 1);
+        gpio_put_masked64(0xFF, c);
+        gpio_put(SSD1963_WR_GPPIN, 0);
+        nop;
+        gpio_put(SSD1963_WR_GPPIN, 1);
+#endif
     }
 }
 
@@ -1176,7 +1218,7 @@ void WriteColor(unsigned int c)
 // Slowly write a command byte to the SSD1963
 static void WriteComandSlow(int cmd)
 {
-    gpio_put_masked64((Option.DISPLAY_TYPE > SSD_PANEL_8 ? (0xFFFF << SSD1963data) : (0xFF << SSD1963data)), (cmd << SSD1963data));
+    gpio_put_masked64(writemask, (cmd << SSD1963data));
     gpio_put(SSD1963_DC_GPPIN, 0);
     gpio_put(SSD1963_WR_GPPIN, 0);
     uSec(5);
@@ -1187,7 +1229,7 @@ static void WriteComandSlow(int cmd)
 // Slowly write an 8 bit data word to the SSD1963
 void WriteDataSlow(int data)
 {
-    gpio_put_masked64((Option.DISPLAY_TYPE > SSD_PANEL_8 ? (0xFFFF << SSD1963data) : (0xFF << SSD1963data)), (data << SSD1963data));
+    gpio_put_masked64(writemask, (data << SSD1963data));
     gpio_put(SSD1963_WR_GPPIN, 0);
     uSec(5);
     gpio_put(SSD1963_WR_GPPIN, 1);
@@ -1204,7 +1246,7 @@ inline __attribute((always_inline)) unsigned int ReadData(void)
     nop;
     nop;
     gpio_put(SSD1963_RD_GPPIN, 1);
-    return (gpio_get_all64() & (Option.DISPLAY_TYPE > SSD_PANEL_8 ? (0xFFFF << SSD1963data) : (0xFF << SSD1963data))) >> SSD1963data;
+    return (gpio_get_all64() & (writemask << SSD1963data)) >> SSD1963data;
 }
 
 unsigned int ReadDataIPS(void)
@@ -1710,13 +1752,27 @@ void PhysicalDrawRect(int x1, int y1, int x2, int y2, int c)
     {
         c = ((c >> 8) & 0xf800) | ((c >> 5) & 0x07e0) | ((c >> 3) & 0x001f);
         i = (x2 - x1 + 1) * (y2 - y1 + 1);
-        while (i--)
+        if (Option.SSD_DATA == 1)
         {
-            gpio_put(SSD1963_WR_GPPIN, 0);
-            gpio_put_masked64(0xFFFF << SSD1963data, c << SSD1963data);
-            // nop;gpio_put(SSD1963_WR_GPPIN,0);
-            nop;
-            gpio_put(SSD1963_WR_GPPIN, 1);
+            while (i--)
+            {
+                gpio_put(SSD1963_WR_GPPIN, 0);
+                gpio_put_masked64(0xFFFF, c);
+                // nop;gpio_put(SSD1963_WR_GPPIN,0);
+                nop;
+                gpio_put(SSD1963_WR_GPPIN, 1);
+            }
+        }
+        else
+        {
+            while (i--)
+            {
+                gpio_put(SSD1963_WR_GPPIN, 0);
+                gpio_put_masked64(0xFFFF << SSD1963data, c << SSD1963data);
+                // nop;gpio_put(SSD1963_WR_GPPIN,0);
+                nop;
+                gpio_put(SSD1963_WR_GPPIN, 1);
+            }
         }
     }
     else
@@ -2966,4 +3022,77 @@ void ScrollSSD1963(int lines)
 
     ScrollStart = t;
 }
+#if PICOMITERP2350
+void cmd_mode(void)
+{
+    if (!(Option.DISPLAY_TYPE == SSD1963_5_16BUFF ||
+          Option.DISPLAY_TYPE == SSD1963_7_16BUFF ||
+          Option.DISPLAY_TYPE == SSD1963_8_16BUFF ||
+          Option.DISPLAY_TYPE == SSD1963_5_BUFF ||
+          Option.DISPLAY_TYPE == SSD1963_7_BUFF ||
+          Option.DISPLAY_TYPE == SSD1963_8_BUFF ||
+          Option.DISPLAY_TYPE == SSD1963_5_16 ||
+          Option.DISPLAY_TYPE == SSD1963_7_16 ||
+          Option.DISPLAY_TYPE == SSD1963_8_16 ||
+          Option.DISPLAY_TYPE == SSD1963_5 ||
+          Option.DISPLAY_TYPE == SSD1963_7 ||
+          Option.DISPLAY_TYPE == SSD1963_8))
+        error("Invalid Display");
+    int i = sizeof(struct option_s);
+    struct option_s __attribute__((aligned(256))) LocalOption;
+    unsigned char *pp = (unsigned char *)flash_option_contents;
+    unsigned char *qq = (unsigned char *)&LocalOption;
+    while (i--)
+        *qq++ = *pp++;
+    if (LocalOption.DISPLAY_TYPE < SSD1963_5_12BUFF)
+        error("Default display type must be buffered");
+    if (checkstring(cmdline, (unsigned char *)"400"))
+    {
+        if (Option.DISPLAY_TYPE >= SSD1963_5_12BUFF)
+            return;
+        Option.Refresh = 0; // stop any more request
+        uSec(100000);       // wait for the fifo to drain
+        if (Option.DISPLAY_TYPE == SSD1963_5_16)
+            Option.DISPLAY_TYPE = SSD1963_5_16BUFF;
+        else if (Option.DISPLAY_TYPE == SSD1963_7_16)
+            Option.DISPLAY_TYPE = SSD1963_7_16BUFF;
+        else if (Option.DISPLAY_TYPE == SSD1963_8_16)
+            Option.DISPLAY_TYPE = SSD1963_8_16BUFF;
+        else if (Option.DISPLAY_TYPE == SSD1963_5)
+            Option.DISPLAY_TYPE = SSD1963_5_BUFF;
+        else if (Option.DISPLAY_TYPE == SSD1963_7)
+            Option.DISPLAY_TYPE = SSD1963_7_BUFF;
+        else if (Option.DISPLAY_TYPE == SSD1963_8)
+            Option.DISPLAY_TYPE = SSD1963_8_BUFF;
+        Option.TOUCH_XZERO = LocalOption.TOUCH_XZERO;
+        Option.TOUCH_YZERO = LocalOption.TOUCH_YZERO;
+        Option.TOUCH_XSCALE = LocalOption.TOUCH_XSCALE;
+        Option.TOUCH_YSCALE = LocalOption.TOUCH_YSCALE;
+    }
+    else if (checkstring(cmdline, (unsigned char *)"800"))
+    {
+        if (Option.DISPLAY_TYPE < VIRTUAL)
+            return;
+        if (Option.DISPLAY_TYPE == SSD1963_5_16BUFF)
+            Option.DISPLAY_TYPE = SSD1963_5_16;
+        else if (Option.DISPLAY_TYPE == SSD1963_7_16BUFF)
+            Option.DISPLAY_TYPE = SSD1963_7_16;
+        else if (Option.DISPLAY_TYPE == SSD1963_8_16BUFF)
+            Option.DISPLAY_TYPE = SSD1963_8_16;
+        else if (Option.DISPLAY_TYPE == SSD1963_5_BUFF)
+            Option.DISPLAY_TYPE = SSD1963_5;
+        else if (Option.DISPLAY_TYPE == SSD1963_7_BUFF)
+            Option.DISPLAY_TYPE = SSD1963_7;
+        else if (Option.DISPLAY_TYPE == SSD1963_8_BUFF)
+            Option.DISPLAY_TYPE = SSD1963_8;
+        Option.TOUCH_XZERO = LocalOption.TOUCH_XZERO;
+        Option.TOUCH_YZERO = LocalOption.TOUCH_YZERO;
+        Option.TOUCH_XSCALE = LocalOption.TOUCH_XSCALE * 2;
+        Option.TOUCH_YSCALE = LocalOption.TOUCH_YSCALE * 2;
+    }
+    //    SaveOptions();
+    InitDisplaySSD();
+    Option.Refresh = 1;
+}
+#endif
 /*  @endcond */
