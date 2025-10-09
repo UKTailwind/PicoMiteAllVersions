@@ -3556,7 +3556,7 @@ void MIPS16 error(char *msg, ...)
         FreeMemory((void *)DefinedSubFunMem);
         DefinedSubFunMem = 0;
     }
-    if (OptionErrorSkip <= 100000)
+    if (OptionErrorSkip && OptionErrorSkip <= 100000)
         longjmp(ErrNext, 1); // if OPTION ERROR SKIP/IGNORE is in force
 #ifdef PICOMITE
     multicore_fifo_push_blocking(0xFF);

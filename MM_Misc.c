@@ -981,14 +981,16 @@ void cmd_longString(void)
                 argv[0]++;              // check if the first arg is a file number
             fnbr = getinteger(argv[0]); // get the number
             parseintegerarray(argv[2], &dest, 2, 1, NULL, true);
-            if (*argv[3] == ';')
-                docrlf = false;
+            if (argc == 4)
+                if (*argv[3] == ';')
+                    docrlf = false;
         }
         else
         {
             parseintegerarray(argv[0], &dest, 1, 1, NULL, true);
-            if (*argv[1] == ';')
-                docrlf = false;
+            if (argc == 2)
+                if (*argv[1] == ';')
+                    docrlf = false;
         }
         q = (char *)&dest[1];
         j = dest[0];
