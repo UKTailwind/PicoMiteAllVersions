@@ -13211,71 +13211,110 @@ void cmd_framebuffer(void)
 #include <stdint.h>
 #include <stdbool.h>
 
-// External functions (assumed to be defined elsewhere)
-static inline uint32_t readcolor(int x, int y)
-{
-    uint32_t p;
-    ReadBuffer(x, y, x, y, (unsigned char *)&p);
-    return p;
-}
 // Define your screen bounds here
 #define SCREEN_WIDTH HRes
 #define SCREEN_HEIGHT VRes
 
-// Stack structure for flood fill
-#ifdef rp2350
-#define STACK_SIZE 2048 // Adjust based on available memory
-#else
-#define STACK_SIZE 2048 // Adjust based on available memory
-#endif
+// Stack structure for flood fill with dynamic block allocation
+#define BLOCK_SIZE_ENTRIES 256
 
-typedef struct
-{
+typedef struct {
     int x;
     int y;
 } Point;
 
-typedef struct
-{
-    Point *data;
-    int ptr;
-    int capacity;
+typedef struct StackBlock {
+    Point data[BLOCK_SIZE_ENTRIES];
+    struct StackBlock *next;
+} StackBlock;
+
+typedef struct {
+    StackBlock *first_block;
+    StackBlock *current_block;
+    int current_ptr;  // Index within current block (0 to BLOCK_SIZE_ENTRIES-1)
+    int total_blocks;
 } FloodStack;
 
-// Stack operations
-static inline bool push(FloodStack *s, int x, int y)
-{
-    if (s->ptr >= s->capacity)
-    {
-        return false; // Stack overflow
+// Stack operations with dynamic block allocation
+static bool init_stack(FloodStack *s) {
+    s->first_block = (StackBlock*)GetMemory(sizeof(StackBlock));
+    if (s->first_block == NULL) {
+        return false;
     }
-    s->data[s->ptr].x = x;
-    s->data[s->ptr].y = y;
-    s->ptr++;
+    s->first_block->next = NULL;
+    s->current_block = s->first_block;
+    s->current_ptr = 0;
+    s->total_blocks = 1;
     return true;
 }
 
-static inline bool pop(FloodStack *s, int *x, int *y)
-{
-    if (s->ptr <= 0)
-    {
-        return false; // Stack empty
+static void free_stack(FloodStack *s) {
+    StackBlock *block = s->first_block;
+    while (block != NULL) {
+        StackBlock *next = block->next;
+        FreeMemory((void *)block);
+        block = next;
     }
-    s->ptr--;
-    *x = s->data[s->ptr].x;
-    *y = s->data[s->ptr].y;
+}
+
+static bool push(FloodStack *s, int x, int y) {
+    // Check if we need a new block
+    if (s->current_ptr >= BLOCK_SIZE_ENTRIES) {
+        // Try to allocate a new block
+        StackBlock *new_block = (StackBlock*)GetMemory(sizeof(StackBlock));
+        if (new_block == NULL) {
+            return false;  // Out of memory
+        }
+        new_block->next = NULL;
+        s->current_block->next = new_block;
+        s->current_block = new_block;
+        s->current_ptr = 0;
+        s->total_blocks++;
+    }
+    
+    // Add to current block
+    s->current_block->data[s->current_ptr].x = x;
+    s->current_block->data[s->current_ptr].y = y;
+    s->current_ptr++;
+    return true;
+}
+
+static bool pop(FloodStack *s, int *x, int *y) {
+    // Check if current block is empty
+    if (s->current_ptr == 0) {
+        // Need to go back to previous block
+        if (s->current_block == s->first_block) {
+            return false;  // Stack is empty
+        }
+        
+        // Find the previous block by traversing from start
+        StackBlock *prev = s->first_block;
+        while (prev->next != s->current_block) {
+            prev = prev->next;
+        }
+        
+        // Free the empty block
+        FreeMemory((void *)s->current_block);
+        s->current_block = prev;
+        s->current_block->next = NULL;
+        s->current_ptr = BLOCK_SIZE_ENTRIES;
+        s->total_blocks--;
+    }
+    
+    // Pop from current block
+    s->current_ptr--;
+    *x = s->current_block->data[s->current_ptr].x;
+    *y = s->current_block->data[s->current_ptr].y;
     return true;
 }
 
 // Read a scanline segment efficiently
-static void read_scanline(int x_start, int x_end, int y, unsigned char *buffer)
-{
+static void read_scanline(int x_start, int x_end, int y, unsigned char *buffer) {
     ReadBuffer(x_start, y, x_end, y, buffer);
 }
 
 // Get color from buffer
-static inline uint32_t get_color_from_buffer(unsigned char *buffer, int index)
-{
+static inline uint32_t get_color_from_buffer(unsigned char *buffer, int index) {
     int idx = index * 3;
     uint32_t r = buffer[idx];
     uint32_t g = buffer[idx + 1];
@@ -13284,199 +13323,165 @@ static inline uint32_t get_color_from_buffer(unsigned char *buffer, int index)
 }
 
 // Scanline flood fill algorithm with block reading
-void floodfill(int x, int y, uint32_t c_new)
-{
+void floodfill(int x, int y, uint32_t c_new) {
+	OptionErrorSkip = 2;
     // Bounds check
-    if (x < 0 || x >= SCREEN_WIDTH || y < 0 || y >= SCREEN_HEIGHT)
-    {
+    if (x < 0 || x >= SCREEN_WIDTH || y < 0 || y >= SCREEN_HEIGHT) {
         return;
     }
-
-    // Allocate stack from heap
+    
+    // Initialize dynamic stack
     FloodStack stack;
-    stack.capacity = STACK_SIZE;
-    stack.ptr = 0;
-    stack.data = (Point *)GetMemory(STACK_SIZE * sizeof(Point));
-
-    if (stack.data == NULL)
-    {
-        return; // Memory allocation failed
+    if (!init_stack(&stack)) {
+        return;  // Memory allocation failed
     }
-
+    
     // Allocate buffer for scanline reads (one full row)
-    unsigned char *line_buffer = (unsigned char *)GetMemory(SCREEN_WIDTH * 3);
-    if (line_buffer == NULL)
-    {
-        FreeMemory((void *)stack.data);
-        return; // Memory allocation failed
+    unsigned char *line_buffer = (unsigned char*)GetMemory(SCREEN_WIDTH * 3);
+    if (line_buffer == NULL) {
+        free_stack(&stack);
+        return;  // Memory allocation failed
     }
-
+    
     // Allocate persistent buffers for checking adjacent lines
-    unsigned char *above_buffer = (unsigned char *)GetMemory(SCREEN_WIDTH * 3);
-    unsigned char *below_buffer = (unsigned char *)GetMemory(SCREEN_WIDTH * 3);
-    if (above_buffer == NULL || below_buffer == NULL)
-    {
-        if (above_buffer)
-            FreeMemory((void *)above_buffer);
-        if (below_buffer)
-            FreeMemory((void *)below_buffer);
+    unsigned char *above_buffer = (unsigned char*)GetMemory(SCREEN_WIDTH * 3);
+    unsigned char *below_buffer = (unsigned char*)GetMemory(SCREEN_WIDTH * 3);
+    if (above_buffer == NULL || below_buffer == NULL) {
+        if (above_buffer) FreeMemory((void *)above_buffer);
+        if (below_buffer) FreeMemory((void *)below_buffer);
         FreeMemory((void *)line_buffer);
-        FreeMemory((void *)stack.data);
-        return; // Memory allocation failed
+        free_stack(&stack);
+        return;  // Memory allocation failed
     }
-
+    
     // Read the initial scanline to get origin color
     read_scanline(0, SCREEN_WIDTH - 1, y, line_buffer);
     uint32_t c_origin = get_color_from_buffer(line_buffer, x);
-
+    
     // If the starting pixel is already the target color, nothing to do
-    if (c_origin == c_new)
-    {
+    if (c_origin == c_new) {
         FreeMemory((void *)below_buffer);
         FreeMemory((void *)above_buffer);
         FreeMemory((void *)line_buffer);
-        FreeMemory((void *)stack.data);
+        free_stack(&stack);
         return;
     }
-
+    
     // Push initial point
-    if (!push(&stack, x, y))
-    {
+    if (!push(&stack, x, y)) {
         FreeMemory((void *)below_buffer);
         FreeMemory((void *)above_buffer);
         FreeMemory((void *)line_buffer);
-        FreeMemory((void *)stack.data);
-        return; // Stack overflow on first push
+        free_stack(&stack);
+        return;  // Stack overflow on first push
     }
-
-    int current_y = -1; // Track which line is currently buffered
-
-    while (pop(&stack, &x, &y))
-    {
+    
+    int current_y = -1;  // Track which line is currently buffered
+    
+    while (pop(&stack, &x, &y)) {
         // Read the scanline if we don't have it buffered
-        if (y != current_y)
-        {
+        if (y != current_y) {
             read_scanline(0, SCREEN_WIDTH - 1, y, line_buffer);
             current_y = y;
         }
-
+        
         // Check if this pixel still needs filling
-        if (get_color_from_buffer(line_buffer, x) != c_origin)
-        {
+        if (get_color_from_buffer(line_buffer, x) != c_origin) {
             continue;
         }
-
+        
         // Find leftmost pixel in this row
         int x1 = x;
-        while (x1 > 0 && get_color_from_buffer(line_buffer, x1 - 1) == c_origin)
-        {
+        while (x1 > 0 && get_color_from_buffer(line_buffer, x1 - 1) == c_origin) {
             x1--;
         }
-
+        
         // Find rightmost pixel in this row
         int x2 = x;
-        while (x2 < SCREEN_WIDTH - 1 && get_color_from_buffer(line_buffer, x2 + 1) == c_origin)
-        {
+        while (x2 < SCREEN_WIDTH - 1 && get_color_from_buffer(line_buffer, x2 + 1) == c_origin) {
             x2++;
         }
-
+        
         // Fill the scanline and update buffer
         int span_width = x2 - x1 + 1;
-        unsigned char *draw_buffer = (unsigned char *)GetMemory(span_width * 3);
-        if (draw_buffer != NULL)
-        {
+        unsigned char *draw_buffer = (unsigned char*)GetMemory(span_width * 3);
+        if (draw_buffer != NULL) {
             // Prepare the buffer with new color
-            for (int i = 0; i < span_width; i++)
-            {
+            for (int i = 0; i < span_width; i++) {
                 draw_buffer[i * 3 + 2] = (c_new >> 16) & 0xFF;
                 draw_buffer[i * 3 + 1] = (c_new >> 8) & 0xFF;
                 draw_buffer[i * 3] = c_new & 0xFF;
             }
-
+            
             // Write the entire span at once
             DrawBuffer(x1, y, x2, y, draw_buffer);
             FreeMemory((void *)draw_buffer);
-
+            
             // Update our local buffer so we don't re-process these pixels
-            for (int i = x1; i <= x2; i++)
-            {
+            for (int i = x1; i <= x2; i++) {
                 int idx = i * 3;
                 line_buffer[idx + 2] = (c_new >> 16) & 0xFF;
                 line_buffer[idx + 1] = (c_new >> 8) & 0xFF;
                 line_buffer[idx] = c_new & 0xFF;
             }
         }
-
+        
         // Check pixels above and below, adding spans to stack
         bool span_above = false;
         bool span_below = false;
-
+        
         // Read line above if needed
-        if (y > 0)
-        {
+        if (y > 0) {
             read_scanline(0, SCREEN_WIDTH - 1, y - 1, above_buffer);
-
-            for (int i = x1; i <= x2; i++)
-            {
+            
+            for (int i = x1; i <= x2; i++) {
                 uint32_t c = get_color_from_buffer(above_buffer, i);
-                if (c == c_origin)
-                {
-                    if (!span_above)
-                    {
-                        if (!push(&stack, i, y - 1))
-                        {
+                if (c == c_origin) {
+                    if (!span_above) {
+                        if (!push(&stack, i, y - 1)) {
                             FreeMemory((void *)below_buffer);
                             FreeMemory((void *)above_buffer);
                             FreeMemory((void *)line_buffer);
-                            FreeMemory((void *)stack.data);
-                            return; // Stack overflow - partial fill
+                            free_stack(&stack);
+                            return;  // Stack overflow - partial fill
                         }
                         span_above = true;
                     }
-                }
-                else
-                {
+                } else {
                     span_above = false;
                 }
             }
         }
-
+        
         // Read line below if needed
-        if (y < SCREEN_HEIGHT - 1)
-        {
+        if (y < SCREEN_HEIGHT - 1) {
             read_scanline(0, SCREEN_WIDTH - 1, y + 1, below_buffer);
-
-            for (int i = x1; i <= x2; i++)
-            {
+            
+            for (int i = x1; i <= x2; i++) {
                 uint32_t c = get_color_from_buffer(below_buffer, i);
-                if (c == c_origin)
-                {
-                    if (!span_below)
-                    {
-                        if (!push(&stack, i, y + 1))
-                        {
+                if (c == c_origin) {
+                    if (!span_below) {
+                        if (!push(&stack, i, y + 1)) {
                             FreeMemory((void *)below_buffer);
                             FreeMemory((void *)above_buffer);
                             FreeMemory((void *)line_buffer);
-                            FreeMemory((void *)stack.data);
-                            return; // Stack overflow - partial fill
+                            free_stack(&stack);
+                            return;  // Stack overflow - partial fill
                         }
                         span_below = true;
                     }
-                }
-                else
-                {
+                } else {
                     span_below = false;
                 }
             }
         }
     }
-
+    
     // Clean up heap memory
     FreeMemory((void *)below_buffer);
     FreeMemory((void *)above_buffer);
     FreeMemory((void *)line_buffer);
-    FreeMemory((void *)stack.data);
+    free_stack(&stack);
 }
 void cmd_fill(void)
 {
