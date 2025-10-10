@@ -13218,6 +13218,7 @@ void cmd_framebuffer(void)
 // Stack structure for flood fill with dynamic block allocation
 #define BLOCK_SIZE_ENTRIES 256
 
+
 typedef struct {
     int x;
     int y;
@@ -13289,16 +13290,18 @@ static bool pop(FloodStack *s, int *x, int *y) {
         
         // Find the previous block by traversing from start
         StackBlock *prev = s->first_block;
-        while (prev->next != s->current_block) {
+        while (prev != NULL && prev->next != s->current_block) {
             prev = prev->next;
         }
         
-        // Free the empty block
-        FreeMemory((void *)s->current_block);
+        // Safety check
+        if (prev == NULL) {
+            return false;  // Corrupted list
+        }
+        
+        // Move to previous block (don't free - we'll free all at the end)
         s->current_block = prev;
-        s->current_block->next = NULL;
         s->current_ptr = BLOCK_SIZE_ENTRIES;
-        s->total_blocks--;
     }
     
     // Pop from current block
@@ -13324,7 +13327,6 @@ static inline uint32_t get_color_from_buffer(unsigned char *buffer, int index) {
 
 // Scanline flood fill algorithm with block reading
 void floodfill(int x, int y, uint32_t c_new) {
-	OptionErrorSkip = 2;
     // Bounds check
     if (x < 0 || x >= SCREEN_WIDTH || y < 0 || y >= SCREEN_HEIGHT) {
         return;
@@ -13408,9 +13410,9 @@ void floodfill(int x, int y, uint32_t c_new) {
         if (draw_buffer != NULL) {
             // Prepare the buffer with new color
             for (int i = 0; i < span_width; i++) {
-                draw_buffer[i * 3 + 2] = (c_new >> 16) & 0xFF;
+                draw_buffer[i * 3] = (c_new >> 16) & 0xFF;
                 draw_buffer[i * 3 + 1] = (c_new >> 8) & 0xFF;
-                draw_buffer[i * 3] = c_new & 0xFF;
+                draw_buffer[i * 3 + 2] = c_new & 0xFF;
             }
             
             // Write the entire span at once
@@ -13420,9 +13422,9 @@ void floodfill(int x, int y, uint32_t c_new) {
             // Update our local buffer so we don't re-process these pixels
             for (int i = x1; i <= x2; i++) {
                 int idx = i * 3;
-                line_buffer[idx + 2] = (c_new >> 16) & 0xFF;
+                line_buffer[idx] = (c_new >> 16) & 0xFF;
                 line_buffer[idx + 1] = (c_new >> 8) & 0xFF;
-                line_buffer[idx] = c_new & 0xFF;
+                line_buffer[idx + 2] = c_new & 0xFF;
             }
         }
         
