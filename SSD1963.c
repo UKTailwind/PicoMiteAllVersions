@@ -3028,6 +3028,7 @@ void cmd_mode(void)
     if (!(Option.DISPLAY_TYPE == SSD1963_5_16BUFF ||
           Option.DISPLAY_TYPE == SSD1963_7_16BUFF ||
           Option.DISPLAY_TYPE == SSD1963_8_16BUFF ||
+          Option.DISPLAY_TYPE == SSD1963_5_12BUFF ||
           Option.DISPLAY_TYPE == SSD1963_5_BUFF ||
           Option.DISPLAY_TYPE == SSD1963_7_BUFF ||
           Option.DISPLAY_TYPE == SSD1963_8_BUFF ||
@@ -3052,18 +3053,7 @@ void cmd_mode(void)
             return;
         Option.Refresh = 0; // stop any more request
         uSec(100000);       // wait for the fifo to drain
-        if (Option.DISPLAY_TYPE == SSD1963_5_16)
-            Option.DISPLAY_TYPE = SSD1963_5_16BUFF;
-        else if (Option.DISPLAY_TYPE == SSD1963_7_16)
-            Option.DISPLAY_TYPE = SSD1963_7_16BUFF;
-        else if (Option.DISPLAY_TYPE == SSD1963_8_16)
-            Option.DISPLAY_TYPE = SSD1963_8_16BUFF;
-        else if (Option.DISPLAY_TYPE == SSD1963_5)
-            Option.DISPLAY_TYPE = SSD1963_5_BUFF;
-        else if (Option.DISPLAY_TYPE == SSD1963_7)
-            Option.DISPLAY_TYPE = SSD1963_7_BUFF;
-        else if (Option.DISPLAY_TYPE == SSD1963_8)
-            Option.DISPLAY_TYPE = SSD1963_8_BUFF;
+        Option.DISPLAY_TYPE = LocalOption.DISPLAY_TYPE;
         Option.TOUCH_XZERO = LocalOption.TOUCH_XZERO;
         Option.TOUCH_YZERO = LocalOption.TOUCH_YZERO;
         Option.TOUCH_XSCALE = LocalOption.TOUCH_XSCALE;
@@ -3083,7 +3073,7 @@ void cmd_mode(void)
             Option.DISPLAY_TYPE = SSD1963_5;
         else if (Option.DISPLAY_TYPE == SSD1963_7_BUFF)
             Option.DISPLAY_TYPE = SSD1963_7;
-        else if (Option.DISPLAY_TYPE == SSD1963_8_BUFF)
+        else if (Option.DISPLAY_TYPE == SSD1963_8_BUFF || Option.DISPLAY_TYPE == SSD1963_5_16BUFF) // no 12 bit mode for 800x480
             Option.DISPLAY_TYPE = SSD1963_8;
         Option.TOUCH_XZERO = LocalOption.TOUCH_XZERO;
         Option.TOUCH_YZERO = LocalOption.TOUCH_YZERO;

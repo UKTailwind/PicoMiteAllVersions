@@ -11635,52 +11635,32 @@ void hline(int x0, int x1, int y, int f, int ints_per_line, uint32_t *restrict b
     }
 }
 
-void DrawFilledCircle(int x, int y, int radius, int r, int fill,
-                      int ints_per_line, uint32_t *restrict br,
-                      MMFLOAT aspect, MMFLOAT aspect2)
+void DrawFilledCircle(int x, int y, int radius, int r, int fill, int ints_per_line, uint32_t *br, MMFLOAT aspect, MMFLOAT aspect2)
 {
-    // OPTIMIZED: Pre-calculate constants
-    int center_x = (int)((MMFLOAT)r * aspect) + radius;
-    int center_y = r + radius;
-    int x_base = center_x - radius;
-
-    int asp = (int)(aspect2 * 1024.0f); // Use 1024 for shift
-
-    int a = 0;
-    int b = radius;
-    int P = 1 - radius;
-
+    int a, b, P;
+    int A, B, asp;
+    x = (int)((MMFLOAT)r * aspect) + radius;
+    y = r + radius;
+    a = 0;
+    b = radius;
+    P = 1 - radius;
+    asp = aspect2 * (MMFLOAT)(1 << 10);
     do
     {
-        // OPTIMIZED: Calculate scaled values
-        int A = (a * asp) >> 10;
-        int B = (b * asp) >> 10;
-
-        int x_minus_A = x_base - A;
-        int x_plus_A = x_base + (A << 1);
-        int x_minus_B = x_base - B;
-        int x_plus_B = x_base + (B << 1);
-
-        // Draw horizontal lines
-        hline(x_minus_A, x_plus_A, center_y + b, fill, ints_per_line, br);
-        hline(x_minus_A, x_plus_A, center_y - b, fill, ints_per_line, br);
-        hline(x_minus_B, x_plus_B, center_y + a, fill, ints_per_line, br);
-        hline(x_minus_B, x_plus_B, center_y - a, fill, ints_per_line, br);
-
-        // OPTIMIZED: Bresenham decision
+        A = (a * asp) >> 10;
+        B = (b * asp) >> 10;
+        hline(x - A - radius, x + A - radius, y + b - radius, fill, ints_per_line, br);
+        hline(x - A - radius, x + A - radius, y - b - radius, fill, ints_per_line, br);
+        hline(x - B - radius, x + B - radius, y + a - radius, fill, ints_per_line, br);
+        hline(x - B - radius, x + B - radius, y - a - radius, fill, ints_per_line, br);
         if (P < 0)
-        {
-            P += 3 + (a << 1);
-            a++;
-        }
+            P += 3 + 2 * a++;
         else
-        {
-            P += 5 + ((a - b) << 1);
-            a++;
-            b--;
-        }
+            P += 5 + 2 * (a++ - b--);
+
     } while (a <= b);
 }
+
 /******************************************************************************************
  Print a char on the LCD display (SSD1963 and in landscape only).  It handles control chars
  such as newline and will wrap at the end of the line and scroll the display if necessary.
@@ -13228,3 +13208,188 @@ void cmd_framebuffer(void)
         error("Syntax");
 }
 #endif
+#include <stdint.h>
+#include <stdbool.h>
+
+// External functions (assumed to be defined elsewhere)
+static inline uint32_t readcolor(int x, int y)
+{
+    uint32_t p;
+    ReadBuffer(x, y, x, y, (unsigned char *)&p);
+    return p;
+}
+// Define your screen bounds here
+#define SCREEN_WIDTH HRes
+#define SCREEN_HEIGHT VRes
+
+// Stack structure for flood fill
+#ifdef rp2350
+#define STACK_SIZE 4096 // Adjust based on available memory
+#else
+#define STACK_SIZE 2048 // Adjust based on available memory
+#endif
+
+typedef struct
+{
+    int x;
+    int y;
+} Point;
+
+typedef struct
+{
+    Point *data;
+    int ptr;
+    int capacity;
+} FloodStack;
+
+// Stack operations
+static inline bool push(FloodStack *s, int x, int y)
+{
+    if (s->ptr >= s->capacity)
+    {
+        return false; // Stack overflow
+    }
+    s->data[s->ptr].x = x;
+    s->data[s->ptr].y = y;
+    s->ptr++;
+    return true;
+}
+
+static inline bool pop(FloodStack *s, int *x, int *y)
+{
+    if (s->ptr <= 0)
+    {
+        return false; // Stack empty
+    }
+    s->ptr--;
+    *x = s->data[s->ptr].x;
+    *y = s->data[s->ptr].y;
+    return true;
+}
+
+// Scanline flood fill algorithm
+void floodfill(int x, int y, uint32_t c_new)
+{
+    uint32_t c_origin = readcolor(x, y);
+
+    // If the starting pixel is already the target color, nothing to do
+    if (c_origin == c_new)
+    {
+        return;
+    }
+
+    // Bounds check
+    if (x < 0 || x >= SCREEN_WIDTH || y < 0 || y >= SCREEN_HEIGHT)
+    {
+        return;
+    }
+
+    // Allocate stack from heap
+    FloodStack stack;
+    stack.capacity = STACK_SIZE;
+    stack.ptr = 0;
+    stack.data = (Point *)GetMemory(STACK_SIZE * sizeof(Point));
+
+    if (stack.data == NULL)
+    {
+        return; // Memory allocation failed
+    }
+
+    // Push initial point
+    if (!push(&stack, x, y))
+    {
+        FreeMemory((void *)stack.data);
+        return; // Stack overflow on first push
+    }
+
+    while (pop(&stack, &x, &y))
+    {
+        // Find leftmost pixel in this row
+        int x1 = x;
+        while (x1 >= 0 && readcolor(x1, y) == c_origin)
+        {
+            x1--;
+        }
+        x1++; // Step back to the last valid pixel
+
+        // Find rightmost pixel in this row
+        int x2 = x;
+        while (x2 < SCREEN_WIDTH && readcolor(x2, y) == c_origin)
+        {
+            x2++;
+        }
+        x2--; // Step back to the last valid pixel
+
+        // Fill the scanline
+        for (int i = x1; i <= x2; i++)
+        {
+            DrawPixel(i, y, c_new);
+        }
+
+        // Check pixels above and below, adding spans to stack
+        bool span_above = false;
+        bool span_below = false;
+
+        for (int i = x1; i <= x2; i++)
+        {
+            // Check above
+            if (y > 0)
+            {
+                uint32_t c = readcolor(i, y - 1);
+                if (c == c_origin)
+                {
+                    if (!span_above)
+                    {
+                        if (!push(&stack, i, y - 1))
+                        {
+                            FreeMemory((void *)stack.data);
+                            return; // Stack overflow - partial fill
+                        }
+                        span_above = true;
+                    }
+                }
+                else
+                {
+                    span_above = false;
+                }
+            }
+
+            // Check below
+            if (y < SCREEN_HEIGHT - 1)
+            {
+                uint32_t c = readcolor(i, y + 1);
+                if (c == c_origin)
+                {
+                    if (!span_below)
+                    {
+                        if (!push(&stack, i, y + 1))
+                        {
+                            FreeMemory((void *)stack.data);
+                            return; // Stack overflow - partial fill
+                        }
+                        span_below = true;
+                    }
+                }
+                else
+                {
+                    span_below = false;
+                }
+            }
+        }
+    }
+
+    // Clean up heap memory
+    FreeMemory((void *)stack.data);
+}
+void cmd_fill(void)
+{
+    getcsargs(&cmdline, 5);
+    if (!(Option.DISPLAY_TYPE))
+        error("No display");
+    if (!(argc == 5))
+        error("Syntax");
+    int x = getint(argv[0], 0, HRes - 1);
+    int y = getint(argv[2], 0, VRes - 1);
+    uint32_t c = (uint32_t)getColour((char *)argv[4], 0);
+    floodfill(x, y, c);
+}

@@ -219,6 +219,7 @@ void cmd_insert(void);
 void cmd_add(void);
 void cmd_arrayset(void);
 void cmd_keyscan(void);
+void cmd_fill(void);
 #ifdef PICOMITEWEB
 void cmd_web(void);
 #endif
@@ -598,6 +599,7 @@ void fun_map(void);
 	{(unsigned char *)"Map", T_CMD, 0, cmd_map},
 	{(unsigned char *)"Mode", T_CMD, 0, cmd_mode},
 #endif
+	{(unsigned char *)"Fill", T_CMD, 0, cmd_fill},
 {
 	(unsigned char *)"", 0, 0, cmd_null,
 } // this dummy entry is always at the end
