@@ -13224,7 +13224,7 @@ static inline uint32_t readcolor(int x, int y)
 
 // Stack structure for flood fill
 #ifdef rp2350
-#define STACK_SIZE 4096 // Adjust based on available memory
+#define STACK_SIZE 2048 // Adjust based on available memory
 #else
 #define STACK_SIZE 2048 // Adjust based on available memory
 #endif
@@ -13388,9 +13388,9 @@ void floodfill(int x, int y, uint32_t c_new)
             // Prepare the buffer with new color
             for (int i = 0; i < span_width; i++)
             {
-                draw_buffer[i * 3] = (c_new >> 16) & 0xFF;
+                draw_buffer[i * 3 + 2] = (c_new >> 16) & 0xFF;
                 draw_buffer[i * 3 + 1] = (c_new >> 8) & 0xFF;
-                draw_buffer[i * 3 + 2] = c_new & 0xFF;
+                draw_buffer[i * 3] = c_new & 0xFF;
             }
 
             // Write the entire span at once
@@ -13401,9 +13401,9 @@ void floodfill(int x, int y, uint32_t c_new)
             for (int i = x1; i <= x2; i++)
             {
                 int idx = i * 3;
-                line_buffer[idx] = (c_new >> 16) & 0xFF;
+                line_buffer[idx + 2] = (c_new >> 16) & 0xFF;
                 line_buffer[idx + 1] = (c_new >> 8) & 0xFF;
-                line_buffer[idx + 2] = c_new & 0xFF;
+                line_buffer[idx] = c_new & 0xFF;
             }
         }
 
