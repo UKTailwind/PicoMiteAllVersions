@@ -46,6 +46,7 @@ extern "C"
 #include "pico/unique_id.h"
 #include "hardware/pwm.h"
 #include "configuration.h"
+#include <malloc.h>
 
 #ifdef rp2350
 #include "hardware/structs/qmi.h"
@@ -91,7 +92,6 @@ extern "C"
 #include <string.h>
 #include "hardware/regs/sysinfo.h"
 #include "hardware/regs/powman.h"
-#include <malloc.h>
 bool rp2350a = true;
 uint32_t PSRAMsize = 0;
 uint8_t PSRAMpin;
