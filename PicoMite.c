@@ -91,6 +91,7 @@ extern "C"
 #include <string.h>
 #include "hardware/regs/sysinfo.h"
 #include "hardware/regs/powman.h"
+#include <malloc.h>
 bool rp2350a = true;
 uint32_t PSRAMsize = 0;
 uint8_t PSRAMpin;
@@ -201,7 +202,7 @@ uint8_t PSRAMpin;
     volatile int ConsoleTxBufHead = 0;
     volatile int ConsoleTxBufTail = 0;
     uint I2SOff;
-
+    uint32_t g_heaptop;
 #ifndef USBKEYBOARD
     extern void initMouse0(int sensitivity);
     volatile unsigned int MouseTimer = 0;
@@ -277,6 +278,7 @@ uint8_t PSRAMpin;
     static int64_t PinReadFunc(int a) { return gpio_get(PinDef[a].GPno); }
     extern void CallCFuncmSec(void);
     extern volatile uint32_t irqs;
+    extern uint32_t __heap_start; // Start of heap (if defined)
 #define CFUNCRAM_SIZE 256
     int CFuncRam[CFUNCRAM_SIZE / sizeof(int)];
     repeating_timer_t timer;
@@ -2203,6 +2205,12 @@ int __not_in_flash_func(MMInkey)(void)
         if (++SecondsTimer >= 1000)
         {
             SecondsTimer -= 1000;
+            // MMBasic doesn't use the heap but USB uses a bit and web functions use a lot
+            // keep an occasional eye on heap usage so that we can check for the stack hitting the heap
+            // used by TestStackOverflow()
+            struct mallinfo m = mallinfo();
+            g_heaptop = __heap_start + m.keepcost;
+
 #ifndef PICOMITEWEB
             if (ExtCurrentConfig[PinDef[HEARTBEATpin].pin] == EXT_HEARTBEAT)
                 gpio_xor_mask64(1 << PinDef[HEARTBEATpin].GPno);
@@ -5070,6 +5078,7 @@ uint32_t testPSRAM(void)
         int i = 0;
         char savewatchdog = false;
         i = watchdog_caused_reboot();
+        g_heaptop = __heap_start;
 #ifdef rp2350
         restart_reason = powman_hw->chip_reset | i;
         rp2350a = (*((io_ro_32 *)(SYSINFO_BASE + SYSINFO_PACKAGE_SEL_OFFSET)) & 1);

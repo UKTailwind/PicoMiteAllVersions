@@ -41,15 +41,13 @@ extern "C"
 #else
 #define HEAP_MEMORY_SIZE (184 * 1024)
 #endif
-#define FLASH_TARGET_OFFSET (864 * 1024)
+#define FLASH_TARGET_OFFSET (880 * 1024)
 #ifdef HDMI
 #define MAXMODES 5
 #ifdef USBKEYBOARD
 #define MagicKey 0x84223124
-#define HEAPTOP 0x2007D000
 #else
 #define MagicKey 0x9687B2A0
-#define HEAPTOP 0x2007D000
 #endif
 #define MAX_CPU Freq378P
 #define MIN_CPU FreqX
@@ -57,10 +55,8 @@ extern "C"
 #define MAXMODES 3
 #ifdef USBKEYBOARD
 #define MagicKey 0x82115904
-#define HEAPTOP 0x2007C000
 #else
 #define MagicKey 0x84005FAF
-#define HEAPTOP 0x2007C000
 #endif
 #ifdef rp2350
 #define MAX_CPU 378000
@@ -71,14 +67,12 @@ extern "C"
 #endif
 #else
 #ifdef USBKEYBOARD
-#define FLASH_TARGET_OFFSET (848 * 1024)
+#define FLASH_TARGET_OFFSET (880 * 1024)
 #define MagicKey 0x4776A715
-#define HEAPTOP 0x2003F000
 #define MAXVARS 480 // 8 + MAXVARLEN + MAXDIM * 2  (ie, 56 bytes) - these do not incl array members
 #else
 #define FLASH_TARGET_OFFSET (864 * 1024)
 #define MagicKey 0xA2349A2F
-#define HEAPTOP 0x2003f000
 #define MAXVARS 480 // 8 + MAXVARLEN + MAXDIM * 2  (ie, 56 bytes) - these do not incl array members
 #endif
 #define MAXMODES 2
@@ -156,16 +150,14 @@ extern "C"
 #define MAXSUBFUN 512 // each entry takes up 4 bytes
 #define MAXVARS 768   // 8 + MAXVARLEN + MAXDIM * 2  (ie, 56 bytes) - these do not incl array members
 #define HEAP_MEMORY_SIZE (208 * 1024)
-#define HEAPTOP 0x2006E000
 #else
 #define MAXSUBFUN 256 // each entry takes up 4 bytes
 #define MAXVARS 480   // 8 + MAXVARLEN + MAXDIM * 2  (ie, 56 bytes) - these do not incl array members
 #define HEAP_MEMORY_SIZE (88 * 1024)
-#define HEAPTOP 0x2003D000
 #endif
 
 #include "lwipopts_examples_common.h"
-#define FLASH_TARGET_OFFSET (1080 * 1024)
+#define FLASH_TARGET_OFFSET (1200 * 1024)
 #define MagicKey 0x53472B1C
 #define MaxPcb 8
 #define MAX_CPU 252000
@@ -182,10 +174,8 @@ extern "C"
 #define MAXSUBFUN 512 // each entry takes up 4 bytes
 #ifdef USBKEYBOARD
 #define MagicKey 0xD27F4F27
-#define HEAPTOP 0x20078000
 #else
 #define MagicKey 0x182084D7
-#define HEAPTOP 0x20078000
 #endif
 #else
 #define HEAP_MEMORY_SIZE (124 * 1024)
@@ -195,10 +185,8 @@ extern "C"
 #define MAXSUBFUN 256 // each entry takes up 4 bytes
 #ifdef USBKEYBOARD
 #define MagicKey 0x6110519E
-#define HEAPTOP 0x2003F000
 #else
 #define MagicKey 0xE0799B93
-#define HEAPTOP 0x2003EC00
 #endif
 #endif
 #endif

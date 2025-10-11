@@ -259,6 +259,12 @@ void MIPS16 InitBasic(void)
     //  SIntComma(TokenTableSize);
     //  SSPrintString("\r\n");
 }
+// test the stack for overflow - this is a NULL function in the DOS version
+static inline void TestStackOverflow(void)
+{
+    if (__get_MSP() < g_heaptop)
+        error("Stack overflow, expression too complex at depth %", g_LocalIndex);
+}
 
 int CheckEmpty(char *p)
 {

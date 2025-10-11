@@ -222,6 +222,7 @@ extern uint8_t *buff320;
 extern uint16_t SD_CLK_PIN, SD_MOSI_PIN, SD_MISO_PIN, SD_CS_PIN;
 extern volatile bool mergedone;
 extern void start_i2s(int pio, int sm);
+extern uint32_t g_heaptop;
 #if PICOMITERP2350
 extern uint16_t LCD_CLK_PIN, LCD_MOSI_PIN, LCD_MISO_PIN;
 #endif

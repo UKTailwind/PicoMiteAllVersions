@@ -66,7 +66,6 @@ extern void *GetTempMemory(int NbrBytes);
 extern void *GetTempStrMemory(void);
 extern void ClearTempMemory(void);
 extern void ClearSpecificTempMemory(void *addr);
-extern void TestStackOverflow(void);
 extern void FreeMemory(unsigned char *addr);
 extern void InitHeap(bool all);
 extern unsigned char *HeapBottom(void);

@@ -1086,18 +1086,6 @@ void MIPS16 ClearSpecificTempMemory(void *addr)
     }
 }
 
-// test the stack for overflow - this is a NULL function in the DOS version
-void __not_in_flash_func(TestStackOverflow)(void)
-{
-    //    static uint32_t x=0xFFFFFFFF;
-    uint32_t y = __get_MSP();
-    //    if(y<x){
-    //        x=y;PIntH(x);PRet();
-    //    }
-    if (y < HEAPTOP)
-        error("Stack overflow, expression too complex at depth %", g_LocalIndex);
-}
-
 void MIPS64 __not_in_flash_func(FreeMemory)(unsigned char *addr)
 {
     if (addr == NULL)
