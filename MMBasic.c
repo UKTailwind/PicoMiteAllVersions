@@ -203,7 +203,7 @@ unsigned char *getvalue(unsigned char *p, MMFLOAT *fa, long long int *ia, unsign
 unsigned char tokenTHEN, tokenELSE, tokenGOTO, tokenEQUAL, tokenTO, tokenSTEP, tokenWHILE, tokenUNTIL, tokenGOSUB, tokenAS, tokenFOR;
 unsigned short cmdIF, cmdENDIF, cmdEND_IF, cmdELSEIF, cmdELSE_IF, cmdELSE, cmdSELECT_CASE, cmdFOR, cmdNEXT, cmdWHILE, cmdENDSUB, cmdENDFUNCTION, cmdLOCAL, cmdSTATIC, cmdCASE, cmdDO, cmdLOOP, cmdCASE_ELSE, cmdEND_SELECT;
 unsigned short cmdSUB, cmdFUN, cmdCFUN, cmdCSUB, cmdIRET, cmdComment, cmdEndComment;
-
+uint32_t heapend;
 /********************************************************************************************************************************************
  Program management
  Includes the routines to initialise MMBasic, start running the interpreter, and to run a program in memory
@@ -255,6 +255,7 @@ void MIPS16 InitBasic(void)
     cmdCSUB = GetCommandValue((unsigned char *)"CSub");
     cmdComment = GetCommandValue((unsigned char *)"/*");
     cmdEndComment = GetCommandValue((unsigned char *)"*/");
+    heapend = (uint32_t)&__heap_start + PICO_HEAP_SIZE;
     //  SInt(CommandTableSize);
     //  SIntComma(TokenTableSize);
     //  SSPrintString("\r\n");
@@ -262,8 +263,10 @@ void MIPS16 InitBasic(void)
 // test the stack for overflow - this is a NULL function in the DOS version
 static inline void TestStackOverflow(void)
 {
-    if (__get_MSP() < g_heaptop)
-        error("Stack overflow, expression too complex at depth %", g_LocalIndex);
+    uint32_t stack;
+    __asm volatile("MRS %0, msp" : "=r"(stack));
+    if (stack < heapend)
+        error("Stack overflow, at depth %, stack \\, heap \\", g_LocalIndex, (int64_t)stack, (int64_t)heapend);
 }
 
 int CheckEmpty(char *p)
@@ -2570,9 +2573,6 @@ void MIPS32 __not_in_flash_func (*findvar)(unsigned char *p, int action)
 #endif
     char *tp, *ip;
     int dim[MAXDIM] = {0}, dnbr;
-    //	if(__get_MSP() < (uint32_t)&stackcheck-0x5000){
-    //		error("Expression is too complex at depth %",g_LocalIndex);
-    //	}
     vtype = dnbr = emptyarray = 0;
     // first zero the array used for holding the dimension values
     //    for(i = 0; i < MAXDIM; i++) dim[i] = 0;
@@ -3532,6 +3532,8 @@ void MIPS16 error(char *msg, ...)
                 IntToStr(tp, va_arg(ap, int), 10);
             else if (*msg == '~') // insert a long long integer
                 IntToStr(tp, va_arg(ap, int64_t), 10);
+            else if (*msg == '\\') // insert a long long integer
+                IntToStr(tp, va_arg(ap, int64_t), 16);
             else if (*msg == '|') // insert an integer
                 strcpy(tp, PinDef[va_arg(ap, int)].pinname);
             else

@@ -7160,6 +7160,12 @@ void MIPS16 fun_info(void)
     }
     else if (*ep == 'h' || *ep == 'H')
     {
+        if (checkstring(ep, (unsigned char *)"HEAPEND"))
+        {
+            iret = heapend;
+            targ = T_INT;
+            return;
+        }
         if (checkstring(ep, (unsigned char *)"HEAP"))
         {
             iret = FreeSpaceOnHeap();
