@@ -6673,6 +6673,8 @@ void MIPS16 cmd_option(void)
             *s++ = FileGetChar(fnbr);
         }
         Option.Magic = MagicKey; // This isn't ideal but it improves the chances of a older config working in a new build
+        if (Option.version != hashversion())
+            MMPrintString("Warning: Version has changed - check options are correct\r\n");
         FileClose(fnbr);
         uSec(100000);
         disable_interrupts_pico();

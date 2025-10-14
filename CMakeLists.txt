@@ -172,7 +172,7 @@ endif()
 # all PicoMite variants - enable the gui
 if (COMPILE STREQUAL "PICO" OR COMPILE STREQUAL "PICOUSB" OR COMPILE STREQUAL "PICORP2350" OR COMPILE STREQUAL "PICOUSBRP2350")
 target_compile_options(PicoMite PRIVATE -DPICOMITE
-										-DPICO_HEAP_SIZE=0x1000 
+										-DPICO_HEAP_SIZE=0x800 
 										-DGUICONTROLS
 										-DPICO_CORE0_STACK_SIZE=0x2000
 										)
@@ -180,7 +180,7 @@ endif()
 # all VGA variants 
 if (COMPILE STREQUAL "VGA" OR COMPILE STREQUAL "VGAUSB" OR COMPILE STREQUAL "VGARP2350" OR COMPILE STREQUAL "VGAUSBRP2350")
 target_compile_options(PicoMite PRIVATE -DPICOMITEVGA
-										-DPICO_HEAP_SIZE=0x1000 
+										-DPICO_HEAP_SIZE=0x800 
 										-DPICO_CORE0_STACK_SIZE=0x2000
 										)
 endif()
@@ -188,7 +188,7 @@ endif()
 if (COMPILE STREQUAL "HDMI" OR COMPILE STREQUAL "HDMIUSB")
 target_compile_options(PicoMite PRIVATE -DPICOMITEVGA
 										-DHDMI
-										-DPICO_HEAP_SIZE=0x1000 
+										-DPICO_HEAP_SIZE=0x800 
 										-DPICO_CORE0_STACK_SIZE=0x2000
 										)
 endif()

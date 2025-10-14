@@ -225,7 +225,7 @@ extern "C"
 #ifdef PICOMITEWEB
 #define CONSOLE_RX_BUF_SIZE TCP_MSS
 #else
-#define CONSOLE_RX_BUF_SIZE 256
+#define CONSOLE_RX_BUF_SIZE 2280
 #endif
 #define CONSOLE_TX_BUF_SIZE 256
 #define MAXOPENFILES 10

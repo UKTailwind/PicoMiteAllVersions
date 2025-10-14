@@ -543,3 +543,373 @@ BYTE BMP_bDecode_memory(int x, int y, int xlen, int ylen, int fnbr, char *p)
         return 0;
 }
 /*  @endcond */
+
+// BMP structures
+typedef struct __attribute__((packed))
+{
+        uint16_t bfType;
+        uint32_t bfSize;
+        uint16_t bfReserved1;
+        uint16_t bfReserved2;
+        uint32_t bfOffBits;
+} BITMAPFILEHEADER;
+
+typedef struct __attribute__((packed))
+{
+        uint32_t biSize;
+        int32_t biWidth;
+        int32_t biHeight;
+        uint16_t biPlanes;
+        uint16_t biBitCount;
+        uint32_t biCompression;
+        uint32_t biSizeImage;
+        int32_t biXPelsPerMeter;
+        int32_t biYPelsPerMeter;
+        uint32_t biClrUsed;
+        uint32_t biClrImportant;
+} BITMAPINFOHEADER;
+
+// Convert RGB121 to RGB888
+void rgb121_to_rgb888_components(uint8_t color, uint8_t *r, uint8_t *g, uint8_t *b)
+{
+        uint8_t r1 = (color >> 3) & 1;
+        uint8_t g2 = (color >> 1) & 3;
+        uint8_t b1 = color & 1;
+
+        *r = r1 * 255;
+        *g = g2 * 85; // 255/3
+        *b = b1 * 255;
+}
+
+// Convert RGB332 to RGB888
+void rgb332_to_rgb888_components(uint8_t color, uint8_t *r, uint8_t *g, uint8_t *b)
+{
+        uint8_t r3 = (color >> 5) & 7;
+        uint8_t g3 = (color >> 2) & 7;
+        uint8_t b2 = color & 3;
+
+        *r = (r3 * 255) / 7;
+        *g = (g3 * 255) / 7;
+        *b = (b2 * 255) / 3;
+}
+
+// Convert RGB888 to RGB121 with dithering
+uint8_t rgb888_to_rgb121_dither(int16_t r, int16_t g, int16_t b)
+{
+        // Clamp values
+        r = (r < 0) ? 0 : (r > 255) ? 255
+                                    : r;
+        g = (g < 0) ? 0 : (g > 255) ? 255
+                                    : g;
+        b = (b < 0) ? 0 : (b > 255) ? 255
+                                    : b;
+
+        // Convert to RGB121 (1 bit R, 2 bits G, 1 bit B)
+        uint8_t r1 = (r >= 128) ? 1 : 0;
+        uint8_t g2 = (g * 3 + 127) / 255;
+        uint8_t b1 = (b >= 128) ? 1 : 0;
+
+        return (r1 << 3) | (g2 << 1) | b1;
+}
+
+// Convert RGB888 to RGB332 with dithering
+uint8_t rgb888_to_rgb332_dither(int16_t r, int16_t g, int16_t b)
+{
+        // Clamp values
+        r = (r < 0) ? 0 : (r > 255) ? 255
+                                    : r;
+        g = (g < 0) ? 0 : (g > 255) ? 255
+                                    : g;
+        b = (b < 0) ? 0 : (b > 255) ? 255
+                                    : b;
+
+        // Convert to RGB332 (3 bits R, 3 bits G, 2 bits B)
+        uint8_t r3 = (r * 7 + 127) / 255;
+        uint8_t g3 = (g * 7 + 127) / 255;
+        uint8_t b2 = (b * 3 + 127) / 255;
+
+        return (r3 << 5) | (g3 << 2) | b2;
+}
+
+int ReadAndDisplayBMP(int fnbr, int display_mode, int img_x_offset, int img_y_offset,
+                      int x_display, int y_display)
+{
+        BITMAPFILEHEADER fileHeader;
+        BITMAPINFOHEADER infoHeader;
+        unsigned int bytes_read;
+        int result;
+
+        // Read file header
+        result = IMG_FREAD(fnbr, &fileHeader, sizeof(BITMAPFILEHEADER), &bytes_read);
+        if (result != 0 || bytes_read != sizeof(BITMAPFILEHEADER))
+        {
+                error("BMP: Failed to read file header");
+                return -1;
+        }
+
+        // Verify BMP signature
+        if (fileHeader.bfType != 0x4D42)
+        { // "BM"
+                error("BMP: Invalid file signature (not a BMP file)");
+                return -2;
+        }
+
+        // Read info header
+        result = IMG_FREAD(fnbr, &infoHeader, sizeof(BITMAPINFOHEADER), &bytes_read);
+        if (result != 0 || bytes_read != sizeof(BITMAPINFOHEADER))
+        {
+                error("BMP: Failed to read info header");
+                return -3;
+        }
+
+        // Verify format - must be 24-bit RGB
+        if (infoHeader.biBitCount != 24)
+        {
+                error("BMP: Must be 24-bit RGB888 format");
+                return -4;
+        }
+
+        // Verify no compression
+        if (infoHeader.biCompression != 0)
+        {
+                error("BMP: Compressed format not supported");
+                return -5;
+        }
+
+        // Verify biPlanes is 1 (standard requirement)
+        if (infoHeader.biPlanes != 1)
+        {
+                error("BMP: Invalid planes value (must be 1)");
+                return -6;
+        }
+
+        int width = infoHeader.biWidth;
+        int height = infoHeader.biHeight;
+        int is_bottom_up = (height > 0);
+        if (height < 0)
+                height = -height;
+
+        // Check size limits
+        if (width > 1920 || height > 1080 || width <= 0 || height <= 0)
+        {
+                error("BMP: Image dimensions invalid or exceed 1920x1080");
+                return -7;
+        }
+
+        // Calculate row size (rows are padded to 4-byte boundary)
+        int row_size = ((width * 3 + 3) / 4) * 4;
+
+        // Allocate buffers for Floyd-Steinberg dithering
+        // We need to store error values for current and next line
+        int16_t *error_buffer_r = (int16_t *)GetMemory(width * 2 * sizeof(int16_t));
+        int16_t *error_buffer_g = (int16_t *)GetMemory(width * 2 * sizeof(int16_t));
+        int16_t *error_buffer_b = (int16_t *)GetMemory(width * 2 * sizeof(int16_t));
+
+        if (!error_buffer_r || !error_buffer_g || !error_buffer_b)
+        {
+                if (error_buffer_r)
+                        FreeMemory((void *)error_buffer_r);
+                if (error_buffer_g)
+                        FreeMemory((void *)error_buffer_g);
+                if (error_buffer_b)
+                        FreeMemory((void *)error_buffer_b);
+                error("BMP: Failed to allocate error buffers");
+                return -8;
+        }
+
+        // Initialize error buffers to zero
+        for (int i = 0; i < width * 2; i++)
+        {
+                error_buffer_r[i] = 0;
+                error_buffer_g[i] = 0;
+                error_buffer_b[i] = 0;
+        }
+
+        int16_t *curr_error_r = error_buffer_r;
+        int16_t *next_error_r = error_buffer_r + width;
+        int16_t *curr_error_g = error_buffer_g;
+        int16_t *next_error_g = error_buffer_g + width;
+        int16_t *curr_error_b = error_buffer_b;
+        int16_t *next_error_b = error_buffer_b + width;
+
+        // Buffer for reading pixel data (5 lines max)
+        int lines_per_buffer = 5;
+        uint8_t *line_buffer = (uint8_t *)GetMemory(row_size * lines_per_buffer);
+        if (!line_buffer)
+        {
+                FreeMemory((void *)error_buffer_r);
+                FreeMemory((void *)error_buffer_g);
+                FreeMemory((void *)error_buffer_b);
+                error("BMP: Failed to allocate line buffer");
+                return -9;
+        }
+
+        // Buffer for output BGR triplets (maximum width for visible portion)
+        int max_visible_width = (HRes < width) ? HRes : width;
+        uint8_t *output_buffer = (uint8_t *)GetMemory(max_visible_width * 3);
+        if (!output_buffer)
+        {
+                FreeMemory((void *)line_buffer);
+                FreeMemory((void *)error_buffer_r);
+                FreeMemory((void *)error_buffer_g);
+                FreeMemory((void *)error_buffer_b);
+                error("BMP: Failed to allocate output buffer");
+                return -10;
+        }
+
+        // Process image line by line
+        for (int y = 0; y < height; y += lines_per_buffer)
+        {
+                int lines_to_read = (y + lines_per_buffer > height) ? (height - y) : lines_per_buffer;
+                int bytes_to_read = row_size * lines_to_read;
+
+                // Read lines
+                result = IMG_FREAD(fnbr, line_buffer, bytes_to_read, &bytes_read);
+                if (result != 0 || bytes_read != bytes_to_read)
+                {
+                        FreeMemory((void *)output_buffer);
+                        FreeMemory((void *)line_buffer);
+                        FreeMemory((void *)error_buffer_r);
+                        FreeMemory((void *)error_buffer_g);
+                        FreeMemory((void *)error_buffer_b);
+                        error("BMP: Failed to read image data");
+                        return -11;
+                }
+
+                // Process each line in the buffer
+                for (int line = 0; line < lines_to_read; line++)
+                {
+                        int current_y = y + line;
+                        int img_y = is_bottom_up ? (height - 1 - current_y) : current_y;
+                        int screen_y = img_y - img_y_offset + y_display;
+
+                        // Skip if line is outside display bounds
+                        if (screen_y < 0 || screen_y >= VRes)
+                        {
+                                continue;
+                        }
+
+                        // Clear next line error buffer
+                        for (int i = 0; i < width; i++)
+                        {
+                                next_error_r[i] = 0;
+                                next_error_g[i] = 0;
+                                next_error_b[i] = 0;
+                        }
+
+                        // Track visible pixels
+                        int visible_pixels = 0;
+                        int first_screen_x = -1;
+
+                        // Process each pixel in the line
+                        for (int x = 0; x < width; x++)
+                        {
+                                int pixel_offset = line * row_size + x * 3;
+                                uint8_t b = line_buffer[pixel_offset];
+                                uint8_t g = line_buffer[pixel_offset + 1];
+                                uint8_t r = line_buffer[pixel_offset + 2];
+
+                                // Apply accumulated error from previous pixels
+                                int16_t old_r = r + curr_error_r[x];
+                                int16_t old_g = g + curr_error_g[x];
+                                int16_t old_b = b + curr_error_b[x];
+
+                                // Convert to display format
+                                uint8_t display_color;
+                                uint8_t new_r, new_g, new_b;
+
+                                if (display_mode == DISPLAY_RGB121)
+                                {
+                                        display_color = rgb888_to_rgb121_dither(old_r, old_g, old_b);
+                                        rgb121_to_rgb888_components(display_color, &new_r, &new_g, &new_b);
+                                }
+                                else
+                                { // DISPLAY_RGB332
+                                        display_color = rgb888_to_rgb332_dither(old_r, old_g, old_b);
+                                        rgb332_to_rgb888_components(display_color, &new_r, &new_g, &new_b);
+                                }
+
+                                // Clamp old values for error calculation
+                                old_r = (old_r < 0) ? 0 : (old_r > 255) ? 255
+                                                                        : old_r;
+                                old_g = (old_g < 0) ? 0 : (old_g > 255) ? 255
+                                                                        : old_g;
+                                old_b = (old_b < 0) ? 0 : (old_b > 255) ? 255
+                                                                        : old_b;
+
+                                // Calculate error
+                                int16_t err_r = old_r - new_r;
+                                int16_t err_g = old_g - new_g;
+                                int16_t err_b = old_b - new_b;
+
+                                // Distribute error using Floyd-Steinberg dithering
+                                if (x + 1 < width)
+                                {
+                                        curr_error_r[x + 1] += (err_r * 7) / 16;
+                                        curr_error_g[x + 1] += (err_g * 7) / 16;
+                                        curr_error_b[x + 1] += (err_b * 7) / 16;
+                                }
+                                if (x > 0)
+                                {
+                                        next_error_r[x - 1] += (err_r * 3) / 16;
+                                        next_error_g[x - 1] += (err_g * 3) / 16;
+                                        next_error_b[x - 1] += (err_b * 3) / 16;
+                                }
+                                next_error_r[x] += (err_r * 5) / 16;
+                                next_error_g[x] += (err_g * 5) / 16;
+                                next_error_b[x] += (err_b * 5) / 16;
+                                if (x + 1 < width)
+                                {
+                                        next_error_r[x + 1] += (err_r * 1) / 16;
+                                        next_error_g[x + 1] += (err_g * 1) / 16;
+                                        next_error_b[x + 1] += (err_b * 1) / 16;
+                                }
+
+                                // Calculate screen position
+                                int screen_x = x - img_x_offset + x_display;
+
+                                // Store pixel if it's visible on screen
+                                if (screen_x >= 0 && screen_x < HRes)
+                                {
+                                        if (first_screen_x == -1)
+                                        {
+                                                first_screen_x = screen_x;
+                                        }
+                                        // Store as BGR triplets
+                                        output_buffer[visible_pixels * 3] = new_b;
+                                        output_buffer[visible_pixels * 3 + 1] = new_g;
+                                        output_buffer[visible_pixels * 3 + 2] = new_r;
+                                        visible_pixels++;
+                                }
+                        }
+
+                        // Draw the line if any pixels are visible
+                        if (visible_pixels > 0)
+                        {
+                                int last_screen_x = first_screen_x + visible_pixels - 1;
+                                DrawBuffer(first_screen_x, screen_y, last_screen_x, screen_y, output_buffer);
+                        }
+
+                        // Swap error buffers
+                        int16_t *temp;
+                        temp = curr_error_r;
+                        curr_error_r = next_error_r;
+                        next_error_r = temp;
+                        temp = curr_error_g;
+                        curr_error_g = next_error_g;
+                        next_error_g = temp;
+                        temp = curr_error_b;
+                        curr_error_b = next_error_b;
+                        next_error_b = temp;
+                }
+        }
+
+        // Cleanup
+        FreeMemory((void *)output_buffer);
+        FreeMemory((void *)line_buffer);
+        FreeMemory((void *)error_buffer_r);
+        FreeMemory((void *)error_buffer_g);
+        FreeMemory((void *)error_buffer_b);
+
+        return 0;
+}

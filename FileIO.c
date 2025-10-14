@@ -1038,6 +1038,43 @@ void cmd_LoadImage(unsigned char *p)
     if (Option.Refresh)
         Display_Refresh();
 }
+void cmd_LoadDitheredImage(unsigned char *p)
+{
+    int fnbr;
+    int xOrigin = 0, yOrigin = 0;
+    int xRead = 0, yRead = 0;
+    int mode = DISPLAY_RGB121;
+    // get the command line arguments
+    getcsargs(&p, 11); // this MUST be the first executable line in the function
+    if (argc == 0)
+        error("Argument count");
+    if (!InitSDCard())
+        return;
+
+    p = getFstring(argv[0]); // get the file name
+
+    xOrigin = yOrigin = 0;
+    if (argc >= 3 && *argv[2])
+        xOrigin = getinteger(argv[2]); // get the x origin (optional) argument
+    if (argc >= 5 && *argv[4])
+        yOrigin = getinteger(argv[4]); // get the y origin (optional) argument
+    if (argc >= 7 && *argv[6])
+        mode = getint(argv[6], DISPLAY_RGB121, DISPLAY_RGB332); // get the y origin (optional) argument
+    if (argc >= 9 && *argv[8])
+        xRead = getint(argv[8], 0, 1919); // get the y origin (optional) argument
+    if (argc == 11)
+        yRead = getint(argv[10], 0, 1079); // get the y origin (optional) argument
+    // open the file
+    if (strchr((char *)p, '.') == NULL)
+        strcat((char *)p, ".bmp");
+    fnbr = FindFreeFileNbr();
+    if (!BasicFileOpen((char *)p, fnbr, FA_READ))
+        return;
+    ReadAndDisplayBMP(fnbr, mode, xRead, yRead, xOrigin, yOrigin);
+    FileClose(fnbr);
+    if (Option.Refresh)
+        Display_Refresh();
+}
 /*
  * @cond
  * The following section will be excluded from the documentation.
@@ -3495,6 +3532,12 @@ void MIPS16 cmd_load(void)
         cmd_LoadImage(p);
         return;
     }
+    p = checkstring(cmdline, (unsigned char *)"DITHERED");
+    if (p)
+    {
+        cmd_LoadDitheredImage(p);
+        return;
+    }
     p = checkstring(cmdline, (unsigned char *)"JPG");
     if (p)
     {
@@ -3612,6 +3655,31 @@ char __not_in_flash_func(FilePutChar)(char c, int fnbr)
         return t;
     }
 }
+void __not_in_flash_func(FilePutdata)(char *c, int fnbr, int n)
+{
+    if (filesource[fnbr] == FLASHFILE)
+    {
+        FSerror = lfs_file_write(&lfs, FileTable[fnbr].lfsptr, c, n);
+        if (FSerror != n)
+            FSerror = -5;
+        if (FSerror > 0)
+            FSerror = 0;
+        ErrorCheck(fnbr);
+        return;
+    }
+    else
+    {
+        unsigned int bw;
+        if (!InitSDCard())
+            return;
+        FSerror = f_write(FileTable[fnbr].fptr, c, n, &bw);
+        lastfptr[fnbr] = -1; // invalidate the read file buffer
+        ErrorCheck(fnbr);
+        diskchecktimer = DISKCHECKRATE;
+        return;
+    }
+}
+
 int FileEOF(int fnbr)
 {
     int i = 1;
@@ -5690,6 +5758,7 @@ void ResetOptions(bool startup)
     Option.ColourCode = 0x01;
     Option.RepeatStart = 600;
     Option.RepeatRate = 150;
+    Option.version = hashversion();
 #ifdef PICOMITEVGA
     Option.DISPLAY_CONSOLE = 1;
     Option.DISPLAY_TYPE = SCREENMODE1;
@@ -6107,8 +6176,22 @@ void ClearSavedVars(void)
     enable_interrupts_pico();
     uSec(10000);
 }
+unsigned short hashversion(void)
+{
+    uint32_t hash = FNV_offset_basis;
+    char build[20];
+    strcpy(build, VERSION);
+    char *p = build;
+    do
+    {
+        hash ^= *p++;
+        hash *= FNV_prime;
+    } while (*p);
+    return (unsigned short)hash;
+}
 void SaveOptions(void)
 {
+    Option.version = hashversion();
     uSec(100000);
     disable_interrupts_pico();
     flash_range_erase(FLASH_TARGET_OFFSET, FLASH_ERASE_SIZE);

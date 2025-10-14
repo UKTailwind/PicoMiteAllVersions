@@ -67,7 +67,10 @@ extern "C"
     extern int OptionFileErrorAbort;
     extern unsigned char filesource[MAXOPENFILES + 1];
     extern int FatFSFileSystemSave;
+    extern unsigned short hashversion(void);
     extern void positionfile(int fnbr, int idx);
+    extern void FilePutdata(char *c, int fnbr, int n);
+
     struct option_s
     {
         int Magic;
@@ -96,7 +99,7 @@ extern "C"
         int CPU_Speed;
         unsigned int Telnet;      // used to store the size of the program flash (also start of the LIBRARY code)
         int DefaultFC, DefaultBC; // the default colours
-        short D3;                 // default backlight brightness //40
+        short version;            // default backlight brightness //40
         unsigned char KEYBOARD_CLOCK;
         unsigned char KEYBOARD_DATA;
         unsigned char continuation;
