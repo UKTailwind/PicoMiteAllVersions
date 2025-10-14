@@ -1038,6 +1038,7 @@ void cmd_LoadImage(unsigned char *p)
     if (Option.Refresh)
         Display_Refresh();
 }
+
 void cmd_LoadDitheredImage(unsigned char *p)
 {
     int fnbr;
@@ -1059,7 +1060,7 @@ void cmd_LoadDitheredImage(unsigned char *p)
     if (argc >= 5 && *argv[4])
         yOrigin = getinteger(argv[4]); // get the y origin (optional) argument
     if (argc >= 7 && *argv[6])
-        mode = getint(argv[6], DISPLAY_RGB121, DISPLAY_RGB332); // get the y origin (optional) argument
+        mode = getint(argv[6], 0,3); // get the y origin (optional) argument
     if (argc >= 9 && *argv[8])
         xRead = getint(argv[8], 0, 1919); // get the y origin (optional) argument
     if (argc == 11)
@@ -1070,7 +1071,7 @@ void cmd_LoadDitheredImage(unsigned char *p)
     fnbr = FindFreeFileNbr();
     if (!BasicFileOpen((char *)p, fnbr, FA_READ))
         return;
-    ReadAndDisplayBMP(fnbr, mode, xRead, yRead, xOrigin, yOrigin);
+    ReadAndDisplayBMP(fnbr, mode & 1, (mode & 2)>>1, xRead, yRead, xOrigin, yOrigin);
     FileClose(fnbr);
     if (Option.Refresh)
         Display_Refresh();

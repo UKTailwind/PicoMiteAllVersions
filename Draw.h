@@ -115,6 +115,9 @@ extern volatile short low_y, high_y, low_x, high_x;
 // Display mode constants
 #define DISPLAY_RGB121 0
 #define DISPLAY_RGB332 1
+// Dithering mode constants
+#define DITHER_FLOYD_STEINBERG 0
+#define DITHER_ATKINSON 1
 
 extern int GetJustification(char *p, int *jh, int *jv, int *jo);
 extern void cmd_guiBasic(void);
@@ -161,8 +164,8 @@ extern void DrawBitmapUser(int x1, int y1, int width, int height, int scale, int
 extern void DisplayPutC(char c);
 extern void GUIPrintString(int x, int y, int fnt, int jh, int jv, int jo, int fc, int bc, char *str);
 extern void DrawTriangle(int x0, int y0, int x1, int y1, int x2, int y2, int c, int fill);
-extern int ReadAndDisplayBMP(int fnbr, int display_mode, int img_x_offset, int img_y_offset,
-                             int x_display, int y_display);
+extern int ReadAndDisplayBMP(int fnbr, int display_mode, int dither_mode, int img_x_offset, 
+                      int img_y_offset, int x_display, int y_display);
 extern void cmd_guiMX170(void);
 extern void initFonts(void);
 extern void ShowCursor(int show);
