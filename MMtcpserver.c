@@ -488,7 +488,7 @@ void cmd_transmit(unsigned char *cmd)
         {
                 getcsargs(&tp, 3);
                 if (argc != 3)
-                        error("Argument count");
+                        StandardError(2);
                 TCP_SERVER_T *state = (TCP_SERVER_T *)TCPstate;
                 char httpheaders[] = "HTTP/1.0 404\r\n\r\n";
                 int pcb = getint(argv[0], 1, MaxPcb) - 1;
@@ -522,7 +522,7 @@ void cmd_transmit(unsigned char *cmd)
                 UINT n_read;
                 getcsargs(&tp, 5);
                 if (argc != 5)
-                        error("Argument count");
+                        StandardError(2);
                 TCP_SERVER_T *state = (TCP_SERVER_T *)TCPstate;
                 int pcb = getint(argv[0], 1, MaxPcb) - 1;
                 fname = (char *)getCstring(argv[2]);
@@ -628,7 +628,7 @@ void cmd_transmit(unsigned char *cmd)
                 char p[10] = {0};
                 getcsargs(&tp, 5);
                 if (argc < 3)
-                        error("Argument count");
+                        StandardError(2);
                 char *outstr = GetTempMemory(STRINGSIZE);
                 char *valbuf = GetTempMemory(STRINGSIZE);
                 strcat(outstr, httpheaders);
@@ -791,7 +791,8 @@ int cmd_tcpserver(void)
         {
                 getcsargs(&tp, 1);
                 if (argc != 1)
-                        error("Syntax");
+                        SyntaxError();
+                ;
                 TCPreceiveInterrupt = (char *)GetIntAddress(argv[0]);
                 InterruptUsed = true;
                 TCPreceived = 0;
@@ -803,7 +804,8 @@ int cmd_tcpserver(void)
                 TCP_SERVER_T *state = TCPstate;
                 getcsargs(&tp, 1);
                 if (argc != 1)
-                        error("Syntax");
+                        SyntaxError();
+                ;
                 int pcb = getint(argv[0], 1, MaxPcb) - 1;
                 tcp_server_close(state, pcb);
                 return 1;
@@ -826,13 +828,14 @@ int cmd_tcpserver(void)
                 TCP_SERVER_T *state = TCPstate;
                 getcsargs(&tp, 3);
                 if (argc != 3)
-                        error("Syntax");
+                        SyntaxError();
+                ;
                 int pcb = getint(argv[0], 1, MaxPcb) - 1;
                 ptr1 = findvar(argv[2], V_FIND | V_EMPTY_OK | V_NOFIND_ERR);
                 if (g_vartbl[g_VarIndex].type & T_INT)
                 {
                         if (g_vartbl[g_VarIndex].dims[1] != 0)
-                                error("Invalid variable");
+                                StandardError(6);
                         if (g_vartbl[g_VarIndex].dims[0] <= 0)
                         { // Not an array
                                 error("Argument 2 must be integer array");
@@ -866,7 +869,7 @@ int cmd_tcpserver(void)
                 if (!TCPstate)
                         error("Server not open");
                 if (argc != 3)
-                        error("Argument count");
+                        StandardError(2);
                 int pcb = getint(argv[0], 1, MaxPcb) - 1;
                 parseintegerarray(argv[2], &dest, 2, 1, NULL, false);
                 q = (uint8_t *)&dest[1];

@@ -117,7 +117,8 @@ void MIPS16 cmd_xmodem(void)
     else if (mytoupper(*cmdline) == 'C')
         crunch = rcv = true;
     else
-        error("Syntax");
+        SyntaxError();
+    ;
     while (isalpha(*cmdline))
         cmdline++; // find the filename (if it is there)
     skipspace(cmdline);
@@ -129,7 +130,7 @@ void MIPS16 cmd_xmodem(void)
     {
         // no file name, so this is a transfer to/from program memory
         if (CurrentLinePtr)
-            error("Invalid in a program");
+            StandardError(10);
         if (Option.DISPLAY_TYPE >= VIRTUAL && WriteBuf)
             FreeMemorySafe((void **)&WriteBuf);
         if (rcv)
@@ -171,7 +172,7 @@ void MIPS16 cmd_xmodem(void)
                     {
                         p += strlen(p);
                         if ((p - buf) > (XMODEMBUFFERSIZE - STRINGSIZE))
-                            error("Not enough memory");
+                            StandardError(29);
                         *p++ = '\n';
                         *p = 0; // terminate that line
                     }

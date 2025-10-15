@@ -192,7 +192,8 @@ int calcsideanddelay(char *p, int sidepins, int maxdelaybits)
                         if (*ss == '&')
                         {
                                 if (!(mytoupper(ss[1]) == 'B' || mytoupper(ss[1]) == 'H' || mytoupper(ss[1]) == 'O'))
-                                        error("Syntax");
+                                        SyntaxError();
+                                ;
                                 ppp += 2;
                         }
                         while (*ppp >= '0' && *ppp <= '9' && *ppp)
@@ -210,7 +211,8 @@ int calcsideanddelay(char *p, int sidepins, int maxdelaybits)
                         *ppp = save;
                 }
                 else
-                        error("Syntax");
+                        SyntaxError();
+                ;
         }
         if ((pp = fstrstr(p, "[")))
         {
@@ -318,19 +320,22 @@ int checkblock(char *p)
         if ((pp = fstrstr(p, "IFFULL")))
         {
                 if (!(pp[6] == ' ' || pp[6] == 0))
-                        error("Syntax");
+                        SyntaxError();
+                ;
                 data = 0b1000000;
         }
         if ((pp = fstrstr(p, "NOBLOCK")))
         {
                 if (!(pp[7] == ' ' || pp[7] == 0))
-                        error("Syntax");
+                        SyntaxError();
+                ;
                 return data;
         }
         if ((pp = fstrstr(p, "BLOCK")))
         {
                 if (!(pp[5] == ' ' || pp[5] == 0))
-                        error("Syntax");
+                        SyntaxError();
+                ;
                 data = 0b100000;
         }
         return data;
@@ -424,7 +429,7 @@ int getGPpin(unsigned char *pinarg, int pio, int base)
         if (!code)
                 pin = codemap(pin);
         if (IsInvalidPin(pin))
-                error("Invalid pin");
+                StandardError(9);
         if ((ExtCurrentConfig[pin] == EXT_PIO0_OUT && pio != 0) ||
             (ExtCurrentConfig[pin] == EXT_PIO1_OUT && pio != 1)
 #ifdef rp2350
@@ -452,17 +457,19 @@ void MIPS16 cmd_pio(void)
                 int i;
                 getcsargs(&tp, (MAX_ARG_COUNT * 2) - 1);
                 if ((argc & 0x01) == 0)
-                        error("Syntax");
+                        SyntaxError();
+                ;
                 if (argc < 5)
-                        error("Syntax");
+                        SyntaxError();
+                ;
                 int pior = getint(argv[0], 0, PIOMAX - 1);
                 if (PIO0 == false && pior == 0)
-                        error("PIO 0 not available");
+                        StandardError(3);
                 if (PIO1 == false && pior == 1)
-                        error("PIO 1 not available");
+                        StandardError(4);
 #ifdef rp2350
                 if (PIO2 == false && pior == 2)
-                        error("PIO 2 not available");
+                        StandardError(5);
                 PIO pio = (pior == 0 ? pio0 : (pior == 1 ? pio1 : pio2));
 #else
                 PIO pio = (pior == 0 ? pio0 : pio1);
@@ -480,17 +487,19 @@ void MIPS16 cmd_pio(void)
                 int i = 6;
                 getcsargs(&tp, (MAX_ARG_COUNT * 2) - 1);
                 if ((argc & 0x01) == 0)
-                        error("Syntax");
+                        SyntaxError();
+                ;
                 if (argc < 5)
-                        error("Syntax");
+                        SyntaxError();
+                ;
                 int pior = getint(argv[0], 0, PIOMAX - 1);
                 if (PIO0 == false && pior == 0)
-                        error("PIO 0 not available");
+                        StandardError(3);
                 if (PIO1 == false && pior == 1)
-                        error("PIO 1 not available");
+                        StandardError(4);
 #ifdef rp2350
                 if (PIO2 == false && pior == 2)
-                        error("PIO 2 not available");
+                        StandardError(5);
                 PIO pio = (pior == 0 ? pio0 : (pior == 1 ? pio1 : pio2));
 #else
                 PIO pio = (pior == 0 ? pio0 : pio1);
@@ -526,15 +535,16 @@ void MIPS16 cmd_pio(void)
                                 dma_channel_abort(dma_rx_chan2);
                 }
                 if (argc < 7)
-                        error("Syntax");
+                        SyntaxError();
+                ;
                 int pior = getint(argv[0], 0, PIOMAX - 1);
                 if (PIO0 == false && pior == 0)
-                        error("PIO 0 not available");
+                        StandardError(3);
                 if (PIO1 == false && pior == 1)
-                        error("PIO 1 not available");
+                        StandardError(4);
 #ifdef rp2350
                 if (PIO2 == false && pior == 2)
-                        error("PIO 2 not available");
+                        StandardError(5);
                 PIO pio = (pior == 0 ? pio0 : (pior == 1 ? pio1 : pio2));
 #else
                 PIO pio = (pior == 0 ? pio0 : pio1);
@@ -590,7 +600,7 @@ void MIPS16 cmd_pio(void)
                                         i++;
                                 i += dmasize;
                                 if ((1 << i) > (toarraysize * 8))
-                                        error("Array size");
+                                        StandardError(17);
                                 if (nbr == 0)
                                 {
                                         nbr = size;
@@ -616,7 +626,7 @@ void MIPS16 cmd_pio(void)
                 else
                 {
                         if ((nbr << dmasize) > (toarraysize * 8))
-                                error("Array size");
+                                StandardError(17);
                         channel_config_set_write_increment(&c, true);
                 }
                 if (s_nbr == 0)
@@ -656,15 +666,16 @@ void MIPS16 cmd_pio(void)
                                 dma_channel_abort(dma_tx_chan2);
                 }
                 if (argc < 7)
-                        error("Syntax");
+                        SyntaxError();
+                ;
                 int pior = getint(argv[0], 0, PIOMAX - 1);
                 if (PIO0 == false && pior == 0)
-                        error("PIO 0 not available");
+                        StandardError(3);
                 if (PIO1 == false && pior == 1)
-                        error("PIO 1 not available");
+                        StandardError(4);
 #ifdef rp2350
                 if (PIO2 == false && pior == 2)
-                        error("PIO 2 not available");
+                        StandardError(5);
                 PIO pio = (pior == 0 ? pio0 : (pior == 1 ? pio1 : pio2));
 #else
                 PIO pio = (pior == 0 ? pio0 : pio1);
@@ -720,7 +731,7 @@ void MIPS16 cmd_pio(void)
                                         i++;
                                 i += dmasize;
                                 if ((1 << i) > (toarraysize * 8))
-                                        error("Array size");
+                                        StandardError(17);
                                 if (nbr == 0)
                                 {
                                         nbr = size;
@@ -747,7 +758,7 @@ void MIPS16 cmd_pio(void)
                 else
                 {
                         if ((nbr << dmasize) > (toarraysize * 8))
-                                error("Array size");
+                                StandardError(17);
                         channel_config_set_read_increment(&c, true);
                 }
                 if (s_nbr == 0)
@@ -771,17 +782,19 @@ void MIPS16 cmd_pio(void)
         {
                 getcsargs(&tp, 7);
                 if ((argc & 0x01) == 0)
-                        error("Syntax");
+                        SyntaxError();
+                ;
                 if (argc < 5)
-                        error("Syntax");
+                        SyntaxError();
+                ;
                 int pior = getint(argv[0], 0, PIOMAX - 1);
                 if (PIO0 == false && pior == 0)
-                        error("PIO 0 not available");
+                        StandardError(3);
                 if (PIO1 == false && pior == 1)
-                        error("PIO 1 not available");
+                        StandardError(4);
 #ifdef rp2350
                 if (PIO2 == false && pior == 2)
-                        error("PIO 2 not available");
+                        StandardError(5);
 #endif
                 int sm = getint(argv[2], 0, 3);
                 if (*argv[4])
@@ -820,17 +833,19 @@ void MIPS16 cmd_pio(void)
                 long long int *dd;
                 getcsargs(&tp, (MAX_ARG_COUNT * 2) - 1);
                 if ((argc & 0x01) == 0)
-                        error("Syntax");
+                        SyntaxError();
+                ;
                 if (argc < 5)
-                        error("Syntax");
+                        SyntaxError();
+                ;
                 int pior = getint(argv[0], 0, PIOMAX - 1);
                 if (PIO0 == false && pior == 0)
-                        error("PIO 0 not available");
+                        StandardError(3);
                 if (PIO1 == false && pior == 1)
-                        error("PIO 1 not available");
+                        StandardError(4);
 #ifdef rp2350
                 if (PIO2 == false && pior == 2)
-                        error("PIO 2 not available");
+                        StandardError(5);
                 PIO pio = (pior == 0 ? pio0 : (pior == 1 ? pio1 : pio2));
 #else
                 PIO pio = (pior == 0 ? pio0 : pio1);
@@ -848,7 +863,7 @@ void MIPS16 cmd_pio(void)
                         // single variable
                 }
                 else
-                        error("Invalid variable");
+                        StandardError(6);
 
                 while (nbr--)
                 {
@@ -867,11 +882,11 @@ void MIPS16 cmd_pio(void)
                 getcsargs(&tp, 7);
                 int pior = getint(argv[0], 0, PIOMAX - 1);
                 if (PIO0 == false && pior == 0)
-                        error("PIO 0 not available");
+                        StandardError(3);
                 if (PIO1 == false && pior == 1)
-                        error("PIO 1 not available");
+                        StandardError(4);
                 if (PIO2 == false && pior == 2)
-                        error("PIO 2 not available");
+                        StandardError(5);
                 PIO pio = (pior == 0 ? pio0 : (pior == 1 ? pio1 : pio2));
                 int sm = getint(argv[2], 0, 3);
                 int fifo = getint(argv[4], 0, 3);
@@ -885,15 +900,16 @@ void MIPS16 cmd_pio(void)
         {
                 getcsargs(&tp, 5);
                 if (argc != 5)
-                        error("Syntax");
+                        SyntaxError();
+                ;
                 int pior = getint(argv[0], 0, PIOMAX - 1);
                 if (PIO0 == false && pior == 0)
-                        error("PIO 0 not available");
+                        StandardError(3);
                 if (PIO1 == false && pior == 1)
-                        error("PIO 1 not available");
+                        StandardError(4);
 #ifdef rp2350
                 if (PIO2 == false && pior == 2)
-                        error("PIO 2 not available");
+                        StandardError(5);
                 PIO pio = (pior == 0 ? pio0 : (pior == 1 ? pio1 : pio2));
 #else
                 PIO pio = (pior == 0 ? pio0 : pio1);
@@ -909,14 +925,15 @@ void MIPS16 cmd_pio(void)
                 static int wrap_target_set = 0, wrap_set = 0;
                 getcsargs(&tp, 3);
                 if (!argc)
-                        error("Syntax");
+                        SyntaxError();
+                ;
                 int pior = getint(argv[0], 0, PIOMAX - 1);
                 if (PIO0 == false && pior == 0)
-                        error("PIO 0 not available");
+                        StandardError(3);
                 if (PIO1 == false && pior == 1)
-                        error("PIO 1 not available");
+                        StandardError(4);
                 if (PIO2 == false && pior == 2)
-                        error("PIO 2 not available");
+                        StandardError(5);
                 pioinuse = pior;
 #ifdef rp2350
                 PIO pio = (pior == 0 ? pio0 : (pior == 1 ? pio1 : pio2));
@@ -998,7 +1015,8 @@ void MIPS16 cmd_pio(void)
                                         if (strncasecmp(ss, "X--", 3) == 0 && (ss[3] == ' ' || ss[3] == ','))
                                         {
                                                 if (dup)
-                                                        error("Syntax");
+                                                        SyntaxError();
+                                                ;
                                                 ins |= 0x40;
                                                 dup = 1;
                                                 ss += 3;
@@ -1006,7 +1024,8 @@ void MIPS16 cmd_pio(void)
                                         if (strncasecmp(ss, "!Y", 2) == 0 && (ss[2] == ' ' || ss[2] == ','))
                                         {
                                                 if (dup)
-                                                        error("Syntax");
+                                                        SyntaxError();
+                                                ;
                                                 ins |= 0x60;
                                                 dup = 1;
                                                 ss += 2;
@@ -1014,7 +1033,8 @@ void MIPS16 cmd_pio(void)
                                         if (strncasecmp(ss, "Y--", 3) == 0 && (ss[3] == ' ' || ss[3] == ','))
                                         {
                                                 if (dup)
-                                                        error("Syntax");
+                                                        SyntaxError();
+                                                ;
                                                 ins |= 0x80;
                                                 dup = 1;
                                                 ss += 3;
@@ -1022,7 +1042,8 @@ void MIPS16 cmd_pio(void)
                                         if (strncasecmp(ss, "X!=Y", 4) == 0 && (ss[4] == ' ' || ss[4] == ','))
                                         {
                                                 if (dup)
-                                                        error("Syntax");
+                                                        SyntaxError();
+                                                ;
                                                 ins |= 0xA0;
                                                 dup = 1;
                                                 ss += 4;
@@ -1030,7 +1051,8 @@ void MIPS16 cmd_pio(void)
                                         if (strncasecmp(ss, "PIN", 3) == 0 && (ss[3] == ' ' || ss[3] == ','))
                                         {
                                                 if (dup)
-                                                        error("Syntax");
+                                                        SyntaxError();
+                                                ;
                                                 ins |= 0xC0;
                                                 dup = 1;
                                                 ss += 3;
@@ -1038,7 +1060,8 @@ void MIPS16 cmd_pio(void)
                                         if (strncasecmp(ss, "!OSRE", 5) == 0 && (ss[5] == ' ' || ss[5] == ','))
                                         {
                                                 if (dup)
-                                                        error("Syntax");
+                                                        SyntaxError();
+                                                ;
                                                 ins |= 0xC0;
                                                 dup = 1;
                                                 ss += 5;
@@ -1056,7 +1079,8 @@ void MIPS16 cmd_pio(void)
                                                 if (*ss == '&')
                                                 {
                                                         if (!(mytoupper(ss[1]) == 'B' || mytoupper(ss[1]) == 'H' || mytoupper(ss[1]) == 'O'))
-                                                                error("Syntax");
+                                                                SyntaxError();
+                                                        ;
                                                         ppp += 2;
                                                 }
                                                 while (*ppp >= '0' && *ppp <= '9' && *ppp)
@@ -1078,7 +1102,8 @@ void MIPS16 cmd_pio(void)
                                         {
                                                 char *ppp = ss;
                                                 if (!isnamestart(*ppp))
-                                                        error("Syntax");
+                                                        SyntaxError();
+                                                ;
                                                 while (isnamechar(*ppp))
                                                 {
                                                         ppp++;
@@ -1101,7 +1126,8 @@ void MIPS16 cmd_pio(void)
                                         checksideanddelay = 1;
                                         skipspace(ss);
                                         if (!(*ss == '1' || *ss == '0'))
-                                                error("Syntax");
+                                                SyntaxError();
+                                        ;
                                         if (*ss == '1')
                                                 ins |= 0x80;
                                         ss++;
@@ -1154,7 +1180,8 @@ void MIPS16 cmd_pio(void)
                                                 if (*ss == '&')
                                                 {
                                                         if (!(mytoupper(ss[1]) == 'B' || mytoupper(ss[1]) == 'H' || mytoupper(ss[1]) == 'O'))
-                                                                error("Syntax");
+                                                                SyntaxError();
+                                                        ;
                                                         ppp += 2;
                                                 }
                                                 while (*ppp >= '0' && *ppp <= '9' && *ppp)
@@ -1168,7 +1195,8 @@ void MIPS16 cmd_pio(void)
                                                 }
                                         }
                                         else
-                                                error("Syntax");
+                                                SyntaxError();
+                                        ;
                                         int bits = getint((unsigned char *)ss, 0, rel == 2 ? 31 : PINCTRL_JMP_PIN ? 3
                                                                                                                   : 7);
                                         if (*ppp == ',')
@@ -1214,10 +1242,12 @@ void MIPS16 cmd_pio(void)
                                                 ins |= 0b11100000;
                                         }
                                         else
-                                                error("Syntax");
+                                                SyntaxError();
+                                        ;
                                         skipspace(ss);
                                         if (*ss != ',')
-                                                error("Syntax");
+                                                SyntaxError();
+                                        ;
                                         ss++;
                                         char save = 0;
                                         skipspace(ss);
@@ -1228,7 +1258,8 @@ void MIPS16 cmd_pio(void)
                                                 if (*ss == '&')
                                                 {
                                                         if (!(mytoupper(ss[1]) == 'B' || mytoupper(ss[1]) == 'H' || mytoupper(ss[1]) == 'O'))
-                                                                error("Syntax");
+                                                                SyntaxError();
+                                                        ;
                                                         ppp += 2;
                                                 }
                                                 while (*ppp >= '0' && *ppp <= '9' && *ppp)
@@ -1242,7 +1273,8 @@ void MIPS16 cmd_pio(void)
                                                 }
                                         }
                                         else
-                                                error("Syntax");
+                                                SyntaxError();
+                                        ;
                                         int bits = getint((unsigned char *)ss, 1, 32);
                                         if (bits == 32)
                                                 bits = 0;
@@ -1297,10 +1329,12 @@ void MIPS16 cmd_pio(void)
                                                 ins |= 0b11100000;
                                         }
                                         else
-                                                error("Syntax");
+                                                SyntaxError();
+                                        ;
                                         skipspace(ss);
                                         if (*ss != ',')
-                                                error("Syntax");
+                                                SyntaxError();
+                                        ;
                                         ss++;
                                         char save = 0;
                                         skipspace(ss);
@@ -1311,7 +1345,8 @@ void MIPS16 cmd_pio(void)
                                                 if (*ss == '&')
                                                 {
                                                         if (!(mytoupper(ss[1]) == 'B' || mytoupper(ss[1]) == 'H' || mytoupper(ss[1]) == 'O'))
-                                                                error("Syntax");
+                                                                SyntaxError();
+                                                        ;
                                                         ppp += 2;
                                                 }
                                                 while (*ppp >= '0' && *ppp <= '9' && *ppp)
@@ -1325,7 +1360,8 @@ void MIPS16 cmd_pio(void)
                                                 }
                                         }
                                         else
-                                                error("Syntax");
+                                                SyntaxError();
+                                        ;
                                         int bits = getint((unsigned char *)ss, 1, 32);
                                         if (bits == 32)
                                                 bits = 0;
@@ -1419,15 +1455,18 @@ void MIPS16 cmd_pio(void)
                                                         ins |= 0b1011;
                                                 }
                                                 else if (!(strncasecmp(ss, "Y]", 2) == 0 && (ss[2] == ' ' || ss[2] == ',')))
-                                                        error("Syntax");
+                                                        SyntaxError();
+                                                ;
                                                 ss += 2;
 #endif
                                         }
                                         else
-                                                error("Syntax");
+                                                SyntaxError();
+                                        ;
                                         skipspace(ss);
                                         if (*ss != ',')
-                                                error("Syntax");
+                                                SyntaxError();
+                                        ;
                                         ss++;
                                         skipspace(ss);
                                         if (*ss == '~' || *ss == '!')
@@ -1445,35 +1484,40 @@ void MIPS16 cmd_pio(void)
                                         {
                                                 ss += 4;
                                                 if (!(ins & 0x2000))
-                                                        error("Syntax");
+                                                        SyntaxError();
+                                                ;
                                         }
                                         else if (strncasecmp(ss, "X", 1) == 0 && (ss[1] == 0 || ss[1] == ' ' || ss[1] == ','))
                                         {
                                                 ss++;
                                                 ins |= 0b001;
                                                 if (!(ins & 0x2000))
-                                                        error("Syntax");
+                                                        SyntaxError();
+                                                ;
                                         }
                                         else if (strncasecmp(ss, "Y", 1) == 0 && (ss[1] == 0 || ss[1] == ' ' || ss[1] == ','))
                                         {
                                                 ss++;
                                                 ins |= 0b010;
                                                 if (!(ins & 0x2000))
-                                                        error("Syntax");
+                                                        SyntaxError();
+                                                ;
                                         }
                                         else if (strncasecmp(ss, "NULL", 4) == 0 && (ss[4] == 0 || ss[4] == ' ' || ss[4] == ','))
                                         {
                                                 ss += 4;
                                                 ins |= 0b011;
                                                 if (!(ins & 0x2000))
-                                                        error("Syntax");
+                                                        SyntaxError();
+                                                ;
                                         }
                                         else if (strncasecmp(ss, "STATUS", 6) == 0 && (ss[6] == 0 || ss[6] == ' ' || ss[6] == ','))
                                         {
                                                 ss += 6;
                                                 ins |= 0b101;
                                                 if (!(ins & 0x2000))
-                                                        error("Syntax");
+                                                        SyntaxError();
+                                                ;
                                         }
                                         else if (strncasecmp(ss, "ISR", 3) == 0 && (ss[3] == 0 || ss[3] == ' ' || ss[3] == ','))
                                         {
@@ -1486,7 +1530,8 @@ void MIPS16 cmd_pio(void)
                                                 ss += 3;
                                                 ins |= 0b111;
                                                 if (!(ins & 0x2000))
-                                                        error("Syntax");
+                                                        SyntaxError();
+                                                ;
 #ifdef rp2350
                                         }
                                         else if (strncasecmp(ss, "RXFIFO", 6) == 0 && (ss[6] == '[') && ins == (0xA000 | 0b11100000))
@@ -1510,12 +1555,14 @@ void MIPS16 cmd_pio(void)
                                                         ins |= 0b1011;
                                                 }
                                                 else if (!(strncasecmp(ss, "Y]", 2) == 0 && (ss[2] == 0 || ss[2] == ' ' || ss[2] == ',')))
-                                                        error("Syntax");
+                                                        SyntaxError();
+                                                ;
                                                 ss += 2;
 #endif
                                         }
                                         else
-                                                error("Syntax");
+                                                SyntaxError();
+                                        ;
                                 }
                                 else if (!strncasecmp(ss, "NOP", 3) && (ss[3] == 0 || ss[3] == ' '))
                                 {
@@ -1592,10 +1639,12 @@ void MIPS16 cmd_pio(void)
                                                 ins |= 0b10000000;
                                         }
                                         else
-                                                error("Syntax");
+                                                SyntaxError();
+                                        ;
                                         skipspace(ss);
                                         if (*ss != ',')
-                                                error("Syntax");
+                                                SyntaxError();
+                                        ;
                                         ss++;
                                         char save = 0;
                                         skipspace(ss);
@@ -1606,7 +1655,8 @@ void MIPS16 cmd_pio(void)
                                                 if (*ss == '&')
                                                 {
                                                         if (!(mytoupper(ss[1]) == 'B' || mytoupper(ss[1]) == 'H' || mytoupper(ss[1]) == 'O'))
-                                                                error("Syntax");
+                                                                SyntaxError();
+                                                        ;
                                                         ppp += 2;
                                                 }
                                                 while (*ppp >= '0' && *ppp <= '9' && *ppp)
@@ -1620,7 +1670,8 @@ void MIPS16 cmd_pio(void)
                                                 }
                                         }
                                         else
-                                                error("Syntax");
+                                                SyntaxError();
+                                        ;
                                         ins |= getint((unsigned char *)ss, 0, 31);
                                         if (*ppp == ',')
                                                 *ppp = save;
@@ -1659,7 +1710,6 @@ void MIPS16 cmd_pio(void)
                                 }
                                 else if (!strncasecmp(ss, ".WRAP", 4))
                                 {
-                                        //                                if(!wrap_target_set)error("Wrap target not set");
                                         if (wrap_set)
                                                 error("Repeat directive");
                                         p_wrap = PIOlinenumber - 1;
@@ -1761,12 +1811,12 @@ void MIPS16 cmd_pio(void)
                 getcsargs(&tp, 1);
                 int pior = getint(argv[0], 0, PIOMAX - 1);
                 if (PIO0 == false && pior == 0)
-                        error("PIO 0 not available");
+                        StandardError(3);
                 if (PIO1 == false && pior == 1)
-                        error("PIO 1 not available");
+                        StandardError(4);
 #ifdef rp2350
                 if (PIO2 == false && pior == 2)
-                        error("PIO 2 not available");
+                        StandardError(5);
                 PIO pio = (pior == 0 ? pio0 : (pior == 1 ? pio1 : pio2));
 #else
                 PIO pio = (pior == 0 ? pio0 : pio1);
@@ -1787,7 +1837,8 @@ void MIPS16 cmd_pio(void)
         {
                 getcsargs(&tp, 3);
                 if (argc < 3)
-                        error("Syntax");
+                        SyntaxError();
+                ;
                 int size = getinteger(argv[2]);
                 if (!(size == 256 || size == 512 || size == 1024 || size == 2048 || size == 4096 || size == 8192 || size == 16384 || size == 32768))
                         error("Not power of 2");
@@ -1799,7 +1850,7 @@ void MIPS16 cmd_pio(void)
                         g_vartbl[g_VarIndex].dims[0] = size / 8 - 1 + g_OptionBase;
                 }
                 else
-                        error("Invalid variable");
+                        StandardError(6);
                 return;
         }
         tp = checkstring(cmdline, (unsigned char *)"PROGRAM");
@@ -1808,26 +1859,27 @@ void MIPS16 cmd_pio(void)
                 struct pio_program program;
                 getcsargs(&tp, 3);
                 if (argc != 3)
-                        error("Syntax");
+                        SyntaxError();
+                ;
                 //        void *prt1;
                 program.length = 32;
                 program.origin = 0;
                 int64_t *a1int = NULL;
                 int pior = getint(argv[0], 0, PIOMAX - 1);
                 if (PIO0 == false && pior == 0)
-                        error("PIO 0 not available");
+                        StandardError(3);
                 if (PIO1 == false && pior == 1)
-                        error("PIO 1 not available");
+                        StandardError(4);
 #ifdef rp2350
                 if (PIO2 == false && pior == 2)
-                        error("PIO 2 not available");
+                        StandardError(5);
                 PIO pio = (pior == 0 ? pio0 : (pior == 1 ? pio1 : pio2));
 #else
                 PIO pio = (pior == 0 ? pio0 : pio1);
 #endif
                 int toarraysize = parseintegerarray(argv[2], &a1int, 2, 1, dims, true);
                 if (toarraysize != 8)
-                        error("Array size");
+                        StandardError(17);
                 program.instructions = (const uint16_t *)a1int;
                 for (int sm = 0; sm < 4; sm++)
                         hw_clear_bits(&pio->ctrl, 1 << (PIO_CTRL_SM_ENABLE_LSB + sm));
@@ -1840,15 +1892,16 @@ void MIPS16 cmd_pio(void)
         {
                 getcsargs(&tp, 3);
                 if (argc != 3)
-                        error("Syntax");
+                        SyntaxError();
+                ;
                 int pior = getint(argv[0], 0, PIOMAX - 1);
                 if (PIO0 == false && pior == 0)
-                        error("PIO 0 not available");
+                        StandardError(3);
                 if (PIO1 == false && pior == 1)
-                        error("PIO 1 not available");
+                        StandardError(4);
 #ifdef rp2350
                 if (PIO2 == false && pior == 2)
-                        error("PIO 2 not available");
+                        StandardError(5);
                 PIO pio = (pior == 0 ? pio0 : (pior == 1 ? pio1 : pio2));
 #else
                 PIO pio = (pior == 0 ? pio0 : pio1);
@@ -1864,15 +1917,16 @@ void MIPS16 cmd_pio(void)
         {
                 getcsargs(&tp, 3);
                 if (argc != 3)
-                        error("Syntax");
+                        SyntaxError();
+                ;
                 int pior = getint(argv[0], 0, PIOMAX - 1);
                 if (PIO0 == false && pior == 0)
-                        error("PIO 0 not available");
+                        StandardError(3);
                 if (PIO1 == false && pior == 1)
-                        error("PIO 1 not available");
+                        StandardError(4);
 #ifdef rp2350
                 if (PIO2 == false && pior == 2)
-                        error("PIO 2 not available");
+                        StandardError(5);
                 PIO pio = (pior == 0 ? pio0 : (pior == 1 ? pio1 : pio2));
 #else
                 PIO pio = (pior == 0 ? pio0 : pio1);
@@ -1888,15 +1942,16 @@ void MIPS16 cmd_pio(void)
                 bool setout = false, sideout = false, outout = false;
                 getcsargs(&tp, 19);
                 if (argc < 5)
-                        error("Syntax");
+                        SyntaxError();
+                ;
                 int pior = getint(argv[0], 0, PIOMAX - 1);
                 if (PIO0 == false && pior == 0)
-                        error("PIO 0 not available");
+                        StandardError(3);
                 if (PIO1 == false && pior == 1)
-                        error("PIO 1 not available");
+                        StandardError(4);
 #ifdef rp2350
                 if (PIO2 == false && pior == 2)
-                        error("PIO 2 not available");
+                        StandardError(5);
 #endif
                 int sm = getint(argv[2], 0, 3);
                 float clock = getnumber(argv[4]);
@@ -1926,15 +1981,16 @@ void MIPS16 cmd_pio(void)
         {
                 getcsargs(&tp, 3);
                 if (argc < 3)
-                        error("Syntax");
+                        SyntaxError();
+                ;
                 int pior = getint(argv[0], 0, PIOMAX - 1);
                 if (PIO0 == false && pior == 0)
-                        error("PIO 0 not available");
+                        StandardError(3);
                 if (PIO1 == false && pior == 1)
-                        error("PIO 1 not available");
+                        StandardError(4);
 #ifdef rp2350
                 if (PIO2 == false && pior == 2)
-                        error("PIO 2 not available");
+                        StandardError(5);
                 PIO pio = (pior == 0 ? pio0 : (pior == 1 ? pio1 : pio2));
 #else
                 PIO pio = (pior == 0 ? pio0 : pio1);
@@ -1968,12 +2024,12 @@ void MIPS16 cmd_pio(void)
 #endif
                 int pior = getint(argv[0], 0, PIOMAX - 1);
                 if (PIO0 == false && pior == 0)
-                        error("PIO 0 not available");
+                        StandardError(3);
                 if (PIO1 == false && pior == 1)
-                        error("PIO 1 not available");
+                        StandardError(4);
 #ifdef rp2350
                 if (PIO2 == false && pior == 2)
-                        error("PIO 2 not available");
+                        StandardError(5);
                 PIO pio = (pior == 0 ? pio0 : (pior == 1 ? pio1 : pio2));
                 base = pio_get_gpio_base(pio);
 #else
@@ -2106,7 +2162,8 @@ void MIPS16 cmd_pio(void)
                         pio_sm_set_consecutive_pindirs(pio, sm, outbase, outno, true);
                 return;
         }
-        error("Syntax");
+        SyntaxError();
+        ;
 }
 void fun_pio(void)
 {
@@ -2117,7 +2174,8 @@ void fun_pio(void)
                 int64_t myret = 0;
                 getcsargs(&tp, 13);
                 if (argc < 3)
-                        error("Syntax");
+                        SyntaxError();
+                ;
                 myret = (getint(argv[0], 0, 5) << 29); // no of side set pins
                 if (argc > 1 && *argv[2])
                         myret |= (getint(argv[2], 0, 5) << 26); // no of set pins
@@ -2126,40 +2184,48 @@ void fun_pio(void)
                 if (argc > 5 && *argv[6])
                 {
                         if (!(mytoupper((char)*argv[6]) == 'G'))
-                                error("Syntax");
+                                SyntaxError();
+                        ;
                         argv[6]++;
                         if (!(mytoupper((char)*argv[6]) == 'P'))
-                                error("Syntax");
+                                SyntaxError();
+                        ;
                         argv[6]++;
                         myret |= (getint(argv[6], 0, 31) << 15); // IN base
                 }
                 if (argc > 7 && *argv[8])
                 {
                         if (!(mytoupper((char)*argv[8]) == 'G'))
-                                error("Syntax");
+                                SyntaxError();
+                        ;
                         argv[8]++;
                         if (!(mytoupper((char)*argv[8]) == 'P'))
-                                error("Syntax");
+                                SyntaxError();
+                        ;
                         argv[8]++;
                         myret |= (getint(argv[8], 0, 31) << 10); // SIDE SET base
                 }
                 if (argc > 9 && *argv[10])
                 {
                         if (!(mytoupper((char)*argv[10]) == 'G'))
-                                error("Syntax");
+                                SyntaxError();
+                        ;
                         argv[10]++;
                         if (!(mytoupper((char)*argv[10]) == 'P'))
-                                error("Syntax");
+                                SyntaxError();
+                        ;
                         argv[10]++;
                         myret |= (getint(argv[10], 0, 31) << 5); // SET base
                 }
                 if (argc == 13)
                 {
                         if (!(mytoupper((char)*argv[12]) == 'G'))
-                                error("Syntax");
+                                SyntaxError();
+                        ;
                         argv[12]++;
                         if (!(mytoupper((char)*argv[12]) == 'P'))
-                                error("Syntax");
+                                SyntaxError();
+                        ;
                         argv[12]++;
                         myret |= getint(argv[12], 0, 31); // OUT base
                 }
@@ -2173,12 +2239,15 @@ void fun_pio(void)
                 int64_t myret = 0;
                 getcsargs(&tp, 9);
                 if (!(argc == 5 || argc == 7 || argc == 9))
-                        error("Syntax");
+                        SyntaxError();
+                ;
                 if (!(mytoupper((char)*argv[0]) == 'G'))
-                        error("Syntax");
+                        SyntaxError();
+                ;
                 argv[0]++;
                 if (!(mytoupper((char)*argv[0]) == 'P'))
-                        error("Syntax");
+                        SyntaxError();
+                ;
                 argv[0]++;
                 myret = (getint(argv[0], 0, 31) << 24); // jmp pin
                 myret |= pio_sm_calc_wrap(getint(argv[2], 0, 31), getint(argv[4], 0, 31));
@@ -2213,7 +2282,8 @@ void fun_pio(void)
                 getcsargs(&tp, 15);
 #endif
                 if (argc < 1)
-                        error("Syntax");
+                        SyntaxError();
+                ;
                 int64_t myret = 0;
                 myret = (getint(argv[0], 0, 31) << 20);  // push threshold
                 myret |= (getint(argv[2], 0, 31) << 25); // pull threshold
@@ -2245,12 +2315,12 @@ void fun_pio(void)
                 getcsargs(&tp, 1);
                 int pior = getint(argv[0], 0, PIOMAX - 1);
                 if (PIO0 == false && pior == 0)
-                        error("PIO 0 not available");
+                        StandardError(3);
                 if (PIO1 == false && pior == 1)
-                        error("PIO 1 not available");
+                        StandardError(4);
 #ifdef rp2350
                 if (PIO2 == false && pior == 2)
-                        error("PIO 2 not available");
+                        StandardError(5);
                 PIO pio = (pior == 0 ? pio0 : (pior == 1 ? pio1 : pio2));
 #else
                 PIO pio = (pior == 0 ? pio0 : pio1);
@@ -2266,11 +2336,11 @@ void fun_pio(void)
                 getcsargs(&tp, 5);
                 int pior = getint(argv[0], 0, PIOMAX - 1);
                 if (PIO0 == false && pior == 0)
-                        error("PIO 0 not available");
+                        StandardError(3);
                 if (PIO1 == false && pior == 1)
-                        error("PIO 1 not available");
+                        StandardError(4);
                 if (PIO2 == false && pior == 2)
-                        error("PIO 2 not available");
+                        StandardError(5);
                 PIO pio = (pior == 0 ? pio0 : (pior == 1 ? pio1 : pio2));
                 int sm = getint(argv[2], 0, 3);
                 int fifo = getint(argv[4], 0, 3);
@@ -2285,12 +2355,12 @@ void fun_pio(void)
                 getcsargs(&tp, 1);
                 int pior = getint(argv[0], 0, PIOMAX - 1);
                 if (PIO0 == false && pior == 0)
-                        error("PIO 0 not available");
+                        StandardError(3);
                 if (PIO1 == false && pior == 1)
-                        error("PIO 1 not available");
+                        StandardError(4);
 #ifdef rp2350
                 if (PIO2 == false && pior == 2)
-                        error("PIO 2 not available");
+                        StandardError(5);
                 PIO pio = (pior == 0 ? pio0 : (pior == 1 ? pio1 : pio2));
 #else
                 PIO pio = (pior == 0 ? pio0 : pio1);
@@ -2309,12 +2379,12 @@ void fun_pio(void)
                 if (pior == 99)
                         error("No current PIO in use");
                 if (PIO0 == false && pior == 0)
-                        error("PIO 0 not available");
+                        StandardError(3);
                 if (PIO1 == false && pior == 1)
-                        error("PIO 1 not available");
+                        StandardError(4);
 #ifdef rp2350
                 if (PIO2 == false && pior == 2)
-                        error("PIO 2 not available");
+                        StandardError(5);
 #endif
                 iret = nextline[pior];
                 targ = T_INT;
@@ -2326,12 +2396,12 @@ void fun_pio(void)
                 getcsargs(&tp, 5);
                 int pior = getint(argv[0], 0, PIOMAX - 1);
                 if (PIO0 == false && pior == 0)
-                        error("PIO 0 not available");
+                        StandardError(3);
                 if (PIO1 == false && pior == 1)
-                        error("PIO 1 not available");
+                        StandardError(4);
 #ifdef rp2350
                 if (PIO2 == false && pior == 2)
-                        error("PIO 2 not available");
+                        StandardError(5);
                 PIO pio = (pior == 0 ? pio0 : (pior == 1 ? pio1 : pio2));
 #else
                 PIO pio = (pior == 0 ? pio0 : pio1);
@@ -2341,14 +2411,16 @@ void fun_pio(void)
                 else
                 {
                         if (argc != 5)
-                                error("Syntax");
+                                SyntaxError();
+                        ;
                         int sm = getint(argv[2], 0, 3) * 8;
                         if (checkstring(argv[4], (unsigned char *)"TX"))
                                 iret = ((pio->flevel) >> sm) & 0xf;
                         else if (checkstring(argv[4], (unsigned char *)"RX"))
                                 iret = ((pio->flevel) >> (sm + 4)) & 0xf;
                         else
-                                error("Syntax");
+                                SyntaxError();
+                        ;
                 }
                 targ = T_INT;
                 return;
@@ -2367,7 +2439,8 @@ void fun_pio(void)
                 targ = T_INT;
                 return;
         }
-        error("Syntax");
+        SyntaxError();
+        ;
 }
 // mode determines functionality
 // bit 0 sets wheter to add a space after the text
@@ -2583,17 +2656,17 @@ void cmd_web(void)
                         if (g_vartbl[g_VarIndex].type & T_INT)
                         {
                                 if (g_vartbl[g_VarIndex].dims[1] != 0)
-                                        error("Invalid variable");
+                                        StandardError(6);
                                 if (g_vartbl[g_VarIndex].dims[0] <= 0)
                                 { // Not an array
-                                        error("Argument 1 must be integer array");
+                                        StandardError(35);
                                 }
                                 scan_size = (g_vartbl[g_VarIndex].dims[0] - g_OptionBase) * 8;
                                 scan_dest = (char *)ptr1;
                                 scan_dest[8] = 0;
                         }
                         else
-                                error("Argument 1 must be integer array");
+                                StandardError(35);
                 }
                 scan_dups = GetMemory(32 * 100 + 1);
                 cyw43_wifi_scan_options_t scan_options = {0};
@@ -2642,7 +2715,8 @@ void cmd_web(void)
         if (cmd_tcpserver())
                 return;
         //        if(cmd_tls())return;
-        error("Syntax");
+        SyntaxError();
+        ;
 }
 
 void fun_json(void)
@@ -2662,16 +2736,16 @@ void fun_json(void)
         if (g_vartbl[g_VarIndex].type & T_INT)
         {
                 if (g_vartbl[g_VarIndex].dims[1] != 0)
-                        error("Invalid variable");
+                        StandardError(6);
                 if (g_vartbl[g_VarIndex].dims[0] <= 0)
                 { // Not an array
-                        error("Argument 1 must be integer array");
+                        StandardError(35);
                 }
                 dest = (long long int *)ptr1;
                 json_string = (char *)&dest[1];
         }
         else
-                error("Argument 1 must be integer array");
+                StandardError(35);
         cJSON_InitHooks(NULL);
         cJSON *parse = cJSON_Parse(json_string);
         if (parse == NULL)

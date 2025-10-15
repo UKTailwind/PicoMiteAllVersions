@@ -107,15 +107,15 @@ void cmd_spi(void)
 
     p = checkstring(cmdline, (unsigned char *)"OPEN");
     if (p == NULL)
-        error("Invalid syntax");
+        SyntaxError();
     if (ExtCurrentConfig[SPI0TXpin] >= EXT_COM_RESERVED)
-        error("Already open");
+        StandardError(31);
 
     { // start a new block for getcsargs()
         int mode;
         getcsargs(&p, 5);
         if (argc < 3)
-            error("Incorrect argument count");
+            StandardError(2);
         mode = getinteger(argv[2]);
         speed = getinteger(argv[0]);
         spibits = 8;
@@ -236,15 +236,15 @@ void cmd_spi2(void)
 
     p = checkstring(cmdline, (unsigned char *)"OPEN");
     if (p == NULL)
-        error("Invalid syntax");
+        SyntaxError();
     if (ExtCurrentConfig[SPI1TXpin] >= EXT_COM_RESERVED)
-        error("Already open");
+        StandardError(31);
 
     { // start a new block for getcsargs()
         int mode;
         getcsargs(&p, 5);
         if (argc < 3)
-            error("Incorrect argument count");
+            StandardError(2);
         mode = getinteger(argv[2]);
         speed = getinteger(argv[0]);
         spi2bits = 8;
@@ -305,7 +305,7 @@ unsigned int *GetSendDataList(unsigned char *p, unsigned int *nbr)
 
     getcsargs(&p, MAX_ARG_COUNT);
     if (!(argc & 1))
-        error("Invalid syntax");
+        SyntaxError();
     *nbr = getint(argv[0], 0, 9999999);
     if (!*nbr)
         return NULL;
@@ -317,15 +317,15 @@ unsigned int *GetSendDataList(unsigned char *p, unsigned int *nbr)
     {
         ptr = findvar(argv[2], V_NOFIND_NULL | V_EMPTY_OK);
         if (ptr == NULL)
-            error("Invalid variable");
+            StandardError(6);
 
         // now check if it is a non array string
         if (g_vartbl[g_VarIndex].type & T_STR)
         {
             if (g_vartbl[g_VarIndex].dims[0] != 0)
-                error("Invalid variable");
+                StandardError(6);
             if (*((char *)ptr) < *nbr)
-                error("Insufficient data");
+                StandardError(28);
             ptr += sizeof(char); // skip the length byte in a MMBasic string
             for (i = 0; i < *nbr; i++)
             {
@@ -337,13 +337,13 @@ unsigned int *GetSendDataList(unsigned char *p, unsigned int *nbr)
 
         // if it is a MMFLOAT or integer do some sanity checks
         if (g_vartbl[g_VarIndex].dims[1] != 0)
-            error("Invalid variable");
+            StandardError(6);
         if (*nbr > 1)
         {
             if (g_vartbl[g_VarIndex].dims[0] == 0)
-                error("Invalid variable");
+                StandardError(6);
             if (*nbr > (g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase))
-                error("Insufficient data");
+                StandardError(28);
         }
 
         // now check if it is a MMFLOAT
@@ -371,7 +371,7 @@ unsigned int *GetSendDataList(unsigned char *p, unsigned int *nbr)
 
     // if we got to here we must have a simple list of expressions to send (phew!)
     if (*nbr != ((argc - 1) >> 1))
-        error("Incorrect argument count");
+        StandardError(2);
     for (i = 0; i < *nbr; i++)
     {
         buf[i] = getinteger(argv[i + i + 2]);
@@ -385,18 +385,18 @@ long long int *GetReceiveDataBuffer(unsigned char *p, unsigned int *nbr)
 
     getcsargs(&p, 3);
     if (argc != 3)
-        error("Invalid syntax");
+        SyntaxError();
     *nbr = getinteger(argv[0]);
     ptr = findvar(argv[2], V_NOFIND_NULL | V_EMPTY_OK);
     if (ptr == NULL)
-        error("Invalid variable");
+        StandardError(6);
     if ((g_vartbl[g_VarIndex].type & T_INT) && g_vartbl[g_VarIndex].dims[0] > 0 && g_vartbl[g_VarIndex].dims[1] == 0)
     { // integer array
         if ((((long long int *)ptr - g_vartbl[g_VarIndex].val.ia) + *nbr) > (g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase))
             error("Insufficient array size");
     }
     else
-        error("Invalid variable");
+        StandardError(6);
     return ptr;
 }
 /*  @endcond */

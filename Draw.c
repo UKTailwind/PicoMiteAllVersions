@@ -249,14 +249,16 @@ uint16_t __not_in_flash_func(RGB121pack)(uint32_t c)
     return (RGB121(c) << 12) | (RGB121(c) << 8) | (RGB121(c) << 4) | RGB121(c);
 }
 /*  @endcond */
-
+void CheckDisplay(void)
+{
+    if (Option.DISPLAY_TYPE == 0)
+        error("Display not configured");
+}
 void MIPS16 cmd_guiMX170(void)
 {
     unsigned char *p;
 
-    if (Option.DISPLAY_TYPE == 0)
-        error("Display not configured");
-    // display a bitmap stored in an integer or string
+    CheckDisplay(); // display a bitmap stored in an integer or string
     if ((p = checkstring(cmdline, (unsigned char *)"BITMAP")))
     {
         int x, y, fc, bc, h, w, scale, t, bytes;
@@ -266,7 +268,7 @@ void MIPS16 cmd_guiMX170(void)
 
         getcsargs(&p, 15);
         if (!(argc & 1) || argc < 5)
-            error("Argument count");
+            StandardError(2);
 
         // set the defaults
         h = 8;
@@ -283,7 +285,7 @@ void MIPS16 cmd_guiMX170(void)
         t = T_NOTYPE;
         evaluate(argv[4], &f, &i64, &s, &t, true);
         if (t & T_NBR)
-            error("Invalid argument");
+            SyntaxError();
         else if (t & T_INT)
             s = (unsigned char *)&i64;
         else if (t & T_STR)
@@ -354,7 +356,7 @@ void MIPS16 cmd_guiMX170(void)
         { // if the calibration is provided on the command line
             getcsargs(&p, 9);
             if (argc != 9)
-                error("Argument count");
+                StandardError(2);
             Option.TOUCH_SWAPXY = getinteger(argv[0]);
             Option.TOUCH_XZERO = getinteger(argv[2]);
             Option.TOUCH_YZERO = getinteger(argv[4]);
@@ -367,7 +369,7 @@ void MIPS16 cmd_guiMX170(void)
         else
         {
             if (CurrentLinePtr)
-                error("Invalid in a program");
+                StandardError(10);
             Option.TOUCH_SWAPXY = 0;
             Option.TOUCH_XZERO = 0;
             Option.TOUCH_YZERO = 0;
@@ -478,7 +480,7 @@ void MIPS16 cmd_guiMX170(void)
         }
 #endif
     }
-    error("Unknown command");
+    StandardError(36);
 }
 /*
  * @cond
@@ -530,7 +532,7 @@ void getargaddress(unsigned char *p, long long int **ip, MMFLOAT **fp, int *n)
             }
         }
         if (g_vartbl[g_VarIndex].dims[1] != 0)
-            error("Invalid variable");
+            StandardError(6);
         if (g_vartbl[g_VarIndex].type & T_NBR)
             *fp = (MMFLOAT *)ptr;
         else
@@ -566,7 +568,7 @@ void getcoord(char *p, int *x, int *y)
     {
         getcsargs(&ttp, 3); // this is a macro and must be the first executable stmt in a block
         if (argc != 3)
-            error("Invalid Syntax");
+            SyntaxError();
         *x = getinteger(argv[0]);
         *y = getinteger(argv[2]);
     }
@@ -1749,7 +1751,7 @@ void cmd_ReadTriangle(unsigned char *p)
     int bnbr, x1, x2, x3, y1, y2, y3, size;
     getcsargs(&p, 13);
     if (argc != 13)
-        error((char *)"Syntax");
+        SyntaxError();
     if (*argv[0] == '#')
         argv[0]++;
     bnbr = getint(argv[0], 1, MAXBLITBUF) - 1; // get the buffer number
@@ -2111,10 +2113,9 @@ void cmd_text(void)
     int jh = 0, jv = 0, jo = 0;
 
     getcsargs(&cmdline, 17); // this is a macro and must be the first executable stmt
-    if (Option.DISPLAY_TYPE == 0)
-        error("Display not configured");
+    CheckDisplay();
     if (!(argc & 1) || argc < 5)
-        error("Argument count");
+        StandardError(2);
     x = getinteger(argv[0]);
     y = getinteger(argv[2]);
     s = (char *)getCstring(argv[4]);
@@ -2150,8 +2151,7 @@ void cmd_text(void)
 
 void cmd_pixel(void)
 {
-    if (Option.DISPLAY_TYPE == 0)
-        error("Display not configured");
+    CheckDisplay();
     if (CMM1)
     {
         int x, y, value;
@@ -2160,10 +2160,10 @@ void cmd_pixel(void)
         while (*cmdline && tokenfunction(*cmdline) != op_equal)
             cmdline++;
         if (!*cmdline)
-            error("Invalid syntax");
+            SyntaxError();
         ++cmdline;
         if (!*cmdline)
-            error("Invalid syntax");
+            SyntaxError();
         value = getColour((char *)cmdline, 0);
         DrawPixel(x, y, value);
         lastx = x;
@@ -2176,7 +2176,7 @@ void cmd_pixel(void)
         MMFLOAT *x1fptr, *y1fptr, *cfptr;
         getcsargs(&cmdline, 5);
         if (!(argc == 3 || argc == 5))
-            error("Argument count");
+            StandardError(2);
         getargaddress(argv[0], &x1ptr, &x1fptr, &n);
         if (n != 1)
             getargaddress(argv[2], &y1ptr, &y1fptr, &n);
@@ -2213,7 +2213,7 @@ void cmd_pixel(void)
                     {
                         c = (cfptr == NULL ? cptr[i] : (int)cfptr[i]);
                         if (c < 0 || c > WHITE)
-                            error("% is invalid (valid is % to %)", (int)c, 0, WHITE);
+                            StandardErrorParam3(26, (int)c, 0, WHITE);
                     }
                 }
             }
@@ -2233,15 +2233,14 @@ void cmd_pixel(void)
 
 void cmd_circle(void)
 {
-    if (Option.DISPLAY_TYPE == 0)
-        error("Display not configured");
+    CheckDisplay();
     if (CMM1)
     {
         int x, y, radius, colour, fill;
         float aspect;
         getcsargs(&cmdline, 9);
         if (argc % 2 == 0 || argc < 3)
-            error("Invalid syntax");
+            SyntaxError();
         if (*argv[0] != '(')
             error("Expected opening bracket");
         if (mytoupper(*argv[argc - 1]) == 'F')
@@ -2256,7 +2255,7 @@ void cmd_circle(void)
         if (radius == 0)
             return; // nothing to draw
         if (radius < 1)
-            error("Invalid argument");
+            SyntaxError();
         if (argc > 3 && *argv[4])
             colour = getColour((char *)argv[4], 0);
         else
@@ -2279,7 +2278,7 @@ void cmd_circle(void)
         MMFLOAT *xfptr, *yfptr, *rfptr, *ffptr, *wfptr, *cfptr, *afptr;
         getcsargs(&cmdline, 13);
         if (!(argc & 1) || argc < 5)
-            error("Argument count");
+            StandardError(2);
         getargaddress(argv[0], &xptr, &xfptr, &n);
         if (n != 1)
         {
@@ -2327,7 +2326,7 @@ void cmd_circle(void)
                     {
                         w = (wfptr == NULL ? wptr[i] : (int)wfptr[i]);
                         if (w < 0 || w > 100)
-                            error("% is invalid (valid is % to %)", (int)w, 0, 100);
+                            StandardErrorParam3(26, (int)w, 0, 100);
                     }
                 }
             }
@@ -2352,7 +2351,7 @@ void cmd_circle(void)
                     {
                         c = (cfptr == NULL ? cptr[i] : (int)cfptr[i]);
                         if (c < 0 || c > WHITE)
-                            error("% is invalid (valid is % to %)", (int)c, 0, WHITE);
+                            StandardErrorParam3(26, (int)c, 0, WHITE);
                     }
                 }
             }
@@ -2369,7 +2368,7 @@ void cmd_circle(void)
                     {
                         f = (ffptr == NULL ? fptr[i] : (int)ffptr[i]);
                         if (f < 0 || f > WHITE)
-                            error("% is invalid (valid is % to %)", (int)f, 0, WHITE);
+                            StandardErrorParam3(26, (int)f, 0, WHITE);
                     }
                 }
             }
@@ -2563,8 +2562,7 @@ void MIPS16 drawAALine(MMFLOAT x0, MMFLOAT y0, MMFLOAT x1, MMFLOAT y1, uint32_t 
 
 void cmd_line(void)
 {
-    if (Option.DISPLAY_TYPE == 0)
-        error("Display not configured");
+    CheckDisplay();
     unsigned char *p;
     if (CMM1)
     {
@@ -2573,7 +2571,7 @@ void cmd_line(void)
 
         // check if it is actually a LINE INPUT command
         if (argc < 1)
-            error("Invalid syntax");
+            SyntaxError();
         x1 = lastx;
         y1 = lasty;
         colour = gui_fcolour;
@@ -2590,7 +2588,7 @@ void cmd_line(void)
             skipspace(p);
         }
         if (tokenfunction(*p) != op_subtract)
-            error("Invalid syntax");
+            SyntaxError();
         p++;
         skipspace(p);
         if (*p != '(')
@@ -2709,12 +2707,12 @@ void cmd_line(void)
             MMFLOAT *x1fptr, *y1fptr, *x2fptr, *y2fptr, *wfptr, *cfptr;
             getcsargs(&cmdline, 11);
             if (!(argc & 1) || argc < 3)
-                error("Argument count");
+                StandardError(2);
             getargaddress(argv[0], &x1ptr, &x1fptr, &n);
             if (n != 1)
             {
                 if (argc < 7)
-                    error("Argument count");
+                    StandardError(2);
                 getargaddress(argv[2], &y1ptr, &y1fptr, &n);
                 getargaddress(argv[4], &x2ptr, &x2fptr, &n);
                 getargaddress(argv[6], &y2ptr, &y2fptr, &n);
@@ -2771,7 +2769,7 @@ void cmd_line(void)
                         {
                             w = (wfptr == NULL ? wptr[i] : (int)wfptr[i]);
                             if (w < -100 || w > 100)
-                                error("% is invalid (valid is % to %)", (int)w, 0, 100);
+                                StandardErrorParam3(26, (int)w, 0, 100);
                         }
                     }
                 }
@@ -2788,7 +2786,7 @@ void cmd_line(void)
                         {
                             c = (cfptr == NULL ? cptr[i] : (int)cfptr[i]);
                             if (c < 0 || c > WHITE)
-                                error("% is invalid (valid is % to %)", (int)c, 0, WHITE);
+                                StandardErrorParam3(26, (int)c, 0, WHITE);
                         }
                     }
                 }
@@ -2818,10 +2816,9 @@ void cmd_box(void)
     long long int *x1ptr, *y1ptr, *wiptr, *hptr, *wptr, *cptr, *fptr;
     MMFLOAT *x1fptr, *y1fptr, *wifptr, *hfptr, *wfptr, *cfptr, *ffptr;
     getcsargs(&cmdline, 13);
-    if (Option.DISPLAY_TYPE == 0)
-        error("Display not configured");
+    CheckDisplay();
     if (!(argc & 1) || argc < 7)
-        error("Argument count");
+        StandardError(2);
     getargaddress(argv[0], &x1ptr, &x1fptr, &n);
     if (n != 1)
     {
@@ -2892,7 +2889,7 @@ void cmd_box(void)
                 {
                     w = (wfptr == NULL ? wptr[i] : (int)wfptr[i]);
                     if (w < 0 || w > 100)
-                        error("% is invalid (valid is % to %)", (int)w, 0, 100);
+                        StandardErrorParam3(26, (int)w, 0, 100);
                 }
             }
         }
@@ -2909,7 +2906,7 @@ void cmd_box(void)
                 {
                     c = (cfptr == NULL ? cptr[i] : (int)cfptr[i]);
                     if (c < 0 || c > WHITE)
-                        error("% is invalid (valid is % to %)", (int)c, 0, WHITE);
+                        StandardErrorParam3(26, (int)c, 0, WHITE);
                 }
             }
         }
@@ -2926,7 +2923,7 @@ void cmd_box(void)
                 {
                     f = (ffptr == NULL ? fptr[i] : (int)ffptr[i]);
                     if (f < -1 || f > WHITE)
-                        error("% is invalid (valid is % to %)", (int)f, -1, WHITE);
+                        StandardErrorParam3(26, (int)f, -1, WHITE);
                 }
             }
         }
@@ -3085,9 +3082,8 @@ void MIPS16 cmd_arc(void)
     int x0, y0, x1, y1, x2, y2, xr, yr;
     getcsargs(&cmdline, 13);
     if (!(argc == 11 || argc == 13))
-        error("Argument count");
-    if (Option.DISPLAY_TYPE == 0)
-        error("Display not configured");
+        StandardError(2);
+    CheckDisplay();
     x = getinteger(argv[0]);
     y = getinteger(argv[2]);
     r1 = getinteger(argv[4]);
@@ -3347,8 +3343,7 @@ void polygon(unsigned char *p, int close)
     int i, f = 0, c, xtot = 0, ymax = 0, ymin = 1000000;
     int n = 0, nx = 0, ny = 0, nc = 0, nf = 0;
     getcsargs(&p, 9);
-    if (Option.DISPLAY_TYPE == 0)
-        error("Display not configured");
+    CheckDisplay();
     getargaddress(argv[0], &polycount, &polycountf, &n);
     if (n == 1)
     {
@@ -3489,7 +3484,7 @@ void polygon(unsigned char *p, int close)
                 {
                     cc[i] = (cfptr == NULL ? cptr[i] : (int)cfptr[i]);
                     if (cc[i] < 0 || cc[i] > 0xFFFFFF)
-                        error("% is invalid (valid is % to %)", (int)cc[i], 0, 0xFFFFFF);
+                        StandardErrorParam3(26, (int)cc[i], 0, 0xFFFFFF);
                 }
             }
         }
@@ -3510,7 +3505,7 @@ void polygon(unsigned char *p, int close)
                 {
                     ff[i] = (ffptr == NULL ? fptr[i] : (int)ffptr[i]);
                     if (ff[i] < 0 || ff[i] > 0xFFFFFF)
-                        error("% is invalid (valid is % to %)", (int)ff[i], 0, 0xFFFFFF);
+                        StandardErrorParam3(26, (int)ff[i], 0, 0xFFFFFF);
                 }
             }
         }
@@ -3625,10 +3620,9 @@ void MIPS16 cmd_rbox(void)
     long long int *x1ptr, *y1ptr, *wiptr, *hptr, *wptr, *cptr, *fptr;
     MMFLOAT *x1fptr, *y1fptr, *wifptr, *hfptr, *wfptr, *cfptr, *ffptr;
     getcsargs(&cmdline, 13);
-    if (Option.DISPLAY_TYPE == 0)
-        error("Display not configured");
+    CheckDisplay();
     if (!(argc & 1) || argc < 7)
-        error("Argument count");
+        StandardError(2);
     getargaddress(argv[0], &x1ptr, &x1fptr, &n);
     if (n != 1)
     {
@@ -3674,7 +3668,7 @@ void MIPS16 cmd_rbox(void)
                 {
                     w = (wfptr == NULL ? wptr[i] : (int)wfptr[i]);
                     if (w < 0 || w > 100)
-                        error("% is invalid (valid is % to %)", (int)w, 0, 100);
+                        StandardErrorParam3(26, (int)w, 0, 100);
                 }
             }
         }
@@ -3691,7 +3685,7 @@ void MIPS16 cmd_rbox(void)
                 {
                     c = (cfptr == NULL ? cptr[i] : (int)cfptr[i]);
                     if (c < 0 || c > WHITE)
-                        error("% is invalid (valid is % to %)", (int)c, 0, WHITE);
+                        StandardErrorParam3(26, (int)c, 0, WHITE);
                 }
             }
         }
@@ -3708,7 +3702,7 @@ void MIPS16 cmd_rbox(void)
                 {
                     f = (ffptr == NULL ? fptr[i] : (int)ffptr[i]);
                     if (f < -1 || f > WHITE)
-                        error("% is invalid (valid is % to %)", (int)f, -1, WHITE);
+                        StandardErrorParam3(26, (int)f, -1, WHITE);
                 }
             }
         }
@@ -3751,7 +3745,7 @@ void MIPS16 fun_at(void)
         if (PrintPixelMode < 0 || PrintPixelMode > 7)
         {
             PrintPixelMode = 0;
-            error("Number out of bounds");
+            StandardError(21);
         }
     }
     else
@@ -3774,12 +3768,12 @@ void MIPS16 fun_at(void)
 void fun_pixel(void)
 {
     if ((void *)ReadBuffer == (void *)DisplayNotSet)
-        error("Invalid on this display");
+        StandardError(11);
     int p;
     int x, y;
     getcsargs(&ep, 3);
     if (argc != 3)
-        error("Argument count");
+        StandardError(2);
     x = getinteger(argv[0]);
     y = getinteger(argv[2]);
     ReadBuffer(x, y, x, y, (unsigned char *)&p);
@@ -3793,14 +3787,14 @@ void cmd_triangle(void)
     if ((p = checkstring(cmdline, (unsigned char *)"SAVE")))
     {
         if ((void *)ReadBuffer == (void *)DisplayNotSet)
-            error("Invalid on this display");
+            StandardError(11);
         cmd_ReadTriangle(p);
         return;
     }
     if ((p = checkstring(cmdline, (unsigned char *)"RESTORE")))
     {
         if ((void *)ReadBuffer == (void *)DisplayNotSet)
-            error("Invalid on this display");
+            StandardError(11);
         cmd_RestoreTriangle(p);
         return;
     }
@@ -3808,10 +3802,9 @@ void cmd_triangle(void)
     long long int *x3ptr, *y3ptr, *x1ptr, *y1ptr, *x2ptr, *y2ptr, *fptr, *cptr;
     MMFLOAT *x3fptr, *y3fptr, *x1fptr, *y1fptr, *x2fptr, *y2fptr, *ffptr, *cfptr;
     getcsargs(&cmdline, 15);
-    if (Option.DISPLAY_TYPE == 0)
-        error("Display not configured");
+    CheckDisplay();
     if (!(argc & 1) || argc < 11)
-        error("Argument count");
+        StandardError(2);
     getargaddress(argv[0], &x1ptr, &x1fptr, &n);
     if (n != 1)
     {
@@ -3866,7 +3859,7 @@ void cmd_triangle(void)
                 {
                     c = (cfptr == NULL ? cptr[i] : (int)cfptr[i]);
                     if (c < 0 || c > WHITE)
-                        error("% is invalid (valid is % to %)", (int)c, 0, WHITE);
+                        StandardErrorParam3(26, (int)c, 0, WHITE);
                 }
             }
         }
@@ -3883,7 +3876,7 @@ void cmd_triangle(void)
                 {
                     f = (ffptr == NULL ? fptr[i] : (int)ffptr[i]);
                     if (f < -1 || f > WHITE)
-                        error("% is invalid (valid is % to %)", (int)f, -1, WHITE);
+                        StandardErrorParam3(26, (int)f, -1, WHITE);
                 }
             }
         }
@@ -4153,7 +4146,8 @@ void cmd_blitmemory(void)
     int8_t blank = -1;
     getcsargs(&cmdline, 7);
     if (argc < 5)
-        error("Syntax");
+        SyntaxError();
+    ;
     char *from = (char *)GetPeekAddr(argv[0]);
     x1 = (int)getinteger(argv[2]);
     y1 = (int)getinteger(argv[4]);
@@ -4377,7 +4371,8 @@ int blitother(void)
         int8_t blank = -1;
         getcsargs(&p, 7);
         if (argc < 5)
-            error("Syntax");
+            SyntaxError();
+        ;
         char *fc = (char *)GetPeekAddr(argv[0]);
         x1 = (int)getinteger(argv[2]);
         y1 = (int)getinteger(argv[4]);
@@ -4399,7 +4394,8 @@ int blitother(void)
         volatile unsigned char *s = NULL, *d = NULL;
         getcsargs(&p, 17);
         if (argc < 15)
-            error("Syntax");
+            SyntaxError();
+        ;
         if (checkstring(argv[0], (unsigned char *)"L"))
             s = LayerBuf;
         else if (checkstring(argv[0], (unsigned char *)"F"))
@@ -4416,7 +4412,8 @@ int blitother(void)
             s = NULL;
 #endif
         else
-            error("Syntax");
+            SyntaxError();
+        ;
         if (checkstring(argv[2], (unsigned char *)"L"))
             d = LayerBuf;
         else if (checkstring(argv[2], (unsigned char *)"F"))
@@ -4433,11 +4430,12 @@ int blitother(void)
             d = NULL;
 #endif
         else
-            error("Syntax");
+            SyntaxError();
+        ;
         if (s == d)
             error("Same framebuffer");
         if (s == NULL && (void *)ReadBuffer == (void *)DisplayNotSet)
-            error("Invalid on this display");
+            StandardError(11);
         x1 = (int)getinteger(argv[4]);
         y1 = (int)getinteger(argv[6]);
         x2 = (int)getinteger(argv[8]);
@@ -4698,8 +4696,8 @@ int blitother(void)
 /*  @endcond */
 void cmd_cls(void)
 {
-    if (Option.DISPLAY_TYPE == 0)
-        error("Display not configured");
+    CheckDisplay();
+
 #ifdef GUICONTROLS
     HideAllControls();
 #endif
@@ -4812,7 +4810,8 @@ void fun_rgb(void)
             error("Invalid colour: $", argv[0]);
     }
     else
-        error("Syntax");
+        SyntaxError();
+    ;
     targ = T_INT;
 }
 /*
@@ -5783,8 +5782,7 @@ void cmd_sprite(void)
     if (WriteBuf == NULL)
         error("Not available on physical display");
 #endif
-    if (Option.DISPLAY_TYPE == 0)
-        error("Display not configured");
+    CheckDisplay();
     if (DISPLAY_TYPE == SCREENMODE4 || DISPLAY_TYPE == SCREENMODE5)
         error("Not available for this display mode");
     if ((p = checkstring(cmdline, (unsigned char *)"SHOW SAFE")))
@@ -5792,14 +5790,14 @@ void cmd_sprite(void)
         int layer, mode = 1;
         getcsargs(&p, 11);
         if (!(argc == 7 || argc == 9 || argc == 11))
-            error((char *)"Syntax");
+            SyntaxError();
         if (hideall)
             error((char *)"Sprites are hidden");
         if (*argv[0] == '#')
             argv[0]++;
         bnbr = (int)getint(argv[0], 1, MAXBLITBUF); // get the number
         if (spritebuff[bnbr].h == 9999)
-            error("Invalid buffer");
+            StandardError(37);
         if (spritebuff[bnbr].spritebuffptr != NULL)
         {
             x1 = (int)getint(argv[2], -spritebuff[bnbr].w + 1, maxW - 1);
@@ -5863,14 +5861,14 @@ void cmd_sprite(void)
         int layer, mode = 1;
         getcsargs(&p, 9);
         if (!(argc == 7 || argc == 9))
-            error((char *)"Syntax");
+            SyntaxError();
         if (hideall)
             error((char *)"Sprites are hidden");
         if (*argv[0] == '#')
             argv[0]++;
         bnbr = (int)getint(argv[0], 1, MAXBLITBUF); // get the number
         if (spritebuff[bnbr].h == 9999)
-            error("Invalid buffer");
+            StandardError(37);
         if (spritebuff[bnbr].spritebuffptr != NULL)
         {
             x1 = (int)getint(argv[2], -spritebuff[bnbr].w + 1, maxW - 1);
@@ -5961,7 +5959,7 @@ void cmd_sprite(void)
         if (sprites_in_use != LIFOpointer + zeroLIFOpointer || sprites_in_use != sumlayer())
             error((char *)"sprite internal error");
         if (argc != 1)
-            error((char *)"Syntax");
+            SyntaxError();
         if (*argv[0] == '#')
             argv[0]++;
         bnbr = (int)getint(argv[0], 1, MAXBLITBUF); // get the number
@@ -5986,7 +5984,7 @@ void cmd_sprite(void)
     {
         getcsargs(&p, 1);
         if (argc != 1)
-            error((char *)"Syntax");
+            SyntaxError();
         if (*argv[0] == '#')
             argv[0]++;
         bnbr = (int)getint(argv[0], 1, MAXBLITBUF); // get the number
@@ -6026,7 +6024,7 @@ void cmd_sprite(void)
         signed char mymaster;
         getcsargs(&p, 5);
         if (argc < 3)
-            error((char *)"Syntax");
+            SyntaxError();
         if (hideall)
             error((char *)"Sprites are hidden");
         if (*argv[0] == '#')
@@ -6086,7 +6084,7 @@ void cmd_sprite(void)
     {
         getcsargs(&p, 11);
         if (!(argc == 9))
-            error((char *)"Syntax");
+            SyntaxError();
         if (*argv[0] == '#')
             argv[0]++;
         bnbr = (int)getint(argv[0], 1, MAXBLITBUF); // get the number
@@ -6129,7 +6127,7 @@ void cmd_sprite(void)
         int cpy, nbr, c1, n1;
         getcsargs(&p, 5);
         if (argc != 5)
-            error((char *)"Syntax");
+            SyntaxError();
         if (*argv[0] == '#')
             argv[0]++;
         bnbr = (int)getint(argv[0], 1, MAXBLITBUF); // get the number
@@ -6249,7 +6247,7 @@ void cmd_sprite(void)
     {
         getcsargs(&p, 5);
         if (!(argc == 5))
-            error((char *)"Syntax");
+            SyntaxError();
         if (*argv[0] == '#')
             argv[0]++;
         bnbr = (int)getint(argv[0], 1, MAXBLITBUF); // get the number
@@ -6262,12 +6260,12 @@ void cmd_sprite(void)
         int mode = 4;
         getcsargs(&p, 7);
         if (!(argc == 5 || argc == 7))
-            error((char *)"Syntax");
+            SyntaxError();
         if (*argv[0] == '#')
             argv[0]++;
         bnbr = (int)getint(argv[0], 1, MAXBLITBUF); // get the number
         if (spritebuff[bnbr].h == 9999)
-            error("Invalid buffer");
+            StandardError(37);
         if (spritebuff[bnbr].spritebuffptr != NULL)
         {
             x1 = (int)getint(argv[2], -spritebuff[bnbr].w + 1, maxW);
@@ -6301,7 +6299,7 @@ void cmd_sprite(void)
         if (spritebuff[bnbr].spritebuffptr)
             error("Buffer % in use", bnbr);
         if (argc == 0)
-            error("Argument count");
+            StandardError(2);
         if (!InitSDCard())
             return;
         unsigned char *q = getFstring(argv[2]); // get the file name
@@ -6412,7 +6410,7 @@ void cmd_sprite(void)
         if (spritebuff[bnbr].spritebuffptr)
             error("Buffer % in use", bnbr);
         if (argc == 0)
-            error("Argument count");
+            StandardError(2);
         if (!InitSDCard())
             return;
         unsigned char *pp = getFstring(argv[2]); // get the file name
@@ -6422,7 +6420,7 @@ void cmd_sprite(void)
         if (argc >= 7 && *argv[6])
             yOrigin = getinteger(argv[6]); // get the y origin (optional) argument
         if (xOrigin < 0 || yOrigin < 0)
-            error("Coordinates");
+            StandardError(34);
         xlen = ylen = -1;
         if (argc >= 9 && *argv[8])
             xlen = getinteger(argv[8]); // get the x length (optional) argument
@@ -6441,7 +6439,7 @@ void cmd_sprite(void)
         if (ylen == -1)
             ylen = BmpDec.lHeight;
         if (xlen + xOrigin > BmpDec.lWidth || ylen + yOrigin > BmpDec.lHeight)
-            error("Coordinates");
+            StandardError(34);
         char *q = GetTempMemory(xlen * ylen * 3);
         spritebuff[bnbr].spritebuffptr = GetMemory((xlen * ylen + 4) >> 1);
         spritebuff[bnbr].blitstoreptr = GetMemory((xlen * ylen + 4) >> 1);
@@ -6647,7 +6645,8 @@ void cmd_sprite(void)
         sprite_transparent = getint((unsigned char *)p, 0, 15);
     }
     else
-        error("Syntax");
+        SyntaxError();
+    ;
 }
 void fun_sprite(void)
 {
@@ -6680,11 +6679,11 @@ void fun_sprite(void)
     else if (checkstring(argv[0], (unsigned char *)"S"))
         t = 13;
     else
-        error((char *)"Syntax");
+        SyntaxError();
     if (t < 12)
     {
         if (argc < 3)
-            error((char *)"Syntax");
+            SyntaxError();
         if (*argv[2] == '#')
             argv[2]++;
         bnbr = (int)getint(argv[2], 0, MAXBLITBUF);
@@ -6771,7 +6770,7 @@ void fun_sprite(void)
         int x1 = 0, y1 = 0, h1 = 0, w1 = 0;
         MMFLOAT vector;
         if (argc < 5)
-            error((char *)"Syntax");
+            SyntaxError();
         if (*argv[4] == '#')
             argv[4]++;
         rbnbr = (int)getint(argv[4], 1, MAXBLITBUF);
@@ -6809,7 +6808,7 @@ void fun_sprite(void)
         int rbnbr = 0;
         int x1 = 0, y1 = 0, h1 = 0, w1 = 0;
         if (argc < 5)
-            error((char *)"Syntax");
+            SyntaxError();
         if (*argv[4] == '#')
             argv[4]++;
         rbnbr = (int)getint(argv[4], 1, MAXBLITBUF);
@@ -7597,7 +7596,7 @@ void cmd_framebuffer(void)
         else if (checkstring(p, (unsigned char *)"F"))
         {
             if (!FrameBuf)
-                error("Frame buffer not created");
+                StandardError(38);
             WriteBuf = FrameBuf;
             setframebuffer();
             return;
@@ -7605,7 +7604,8 @@ void cmd_framebuffer(void)
         {
             getcsargs(&p, 1);
             if (argc != 1)
-                error("Syntax");
+                SyntaxError();
+            ;
             char *q = (char *)getCstring(argv[0]);
             if (strcasecmp(q, "N") == 0)
             {
@@ -7625,12 +7625,13 @@ void cmd_framebuffer(void)
             else if (strcasecmp(q, "F") == 0)
             {
                 if (!FrameBuf)
-                    error("Frame buffer not created");
+                    StandardError(38);
                 WriteBuf = FrameBuf;
                 setframebuffer();
             }
             else
-                error("Syntax");
+                SyntaxError();
+            ;
         }
 #ifndef PICOMITEVGA
 #ifdef PICOMITE
@@ -7668,16 +7669,19 @@ void cmd_framebuffer(void)
             else if (checkstring(argv[2], (unsigned char *)"A"))
                 background = 3;
             else
-                error("Syntax");
+                SyntaxError();
+            ;
         }
         if (background == 1)
         {
 #if defined(rp2350)
             if (!(((Option.DISPLAY_TYPE > I2C_PANEL && Option.DISPLAY_TYPE < BufferedPanel) || Option.DISPLAY_TYPE >= NEXTGEN || (Option.DISPLAY_TYPE >= SSDPANEL && Option.DISPLAY_TYPE < VIRTUAL))))
-                error("Not available on this display");
+                StandardError(1);
+            ;
 #else
             if (!(((Option.DISPLAY_TYPE > I2C_PANEL && Option.DISPLAY_TYPE < BufferedPanel) || (Option.DISPLAY_TYPE >= SSDPANEL && Option.DISPLAY_TYPE < VIRTUAL))))
-                error("Not available on this display");
+                StandardError(1);
+            ;
 #endif
             if (diskchecktimer < 200 && SPIatRisk)
                 diskchecktimer = 200;
@@ -7690,7 +7694,8 @@ void cmd_framebuffer(void)
             if (argc == 5)
                 mergetimer = getint(argv[4], 0, 60 * 10 * 1000);
             if (!(((Option.DISPLAY_TYPE > I2C_PANEL && Option.DISPLAY_TYPE < BufferedPanel) || (Option.DISPLAY_TYPE >= SSDPANEL && Option.DISPLAY_TYPE < VIRTUAL))))
-                error("Not available on this display");
+                StandardError(1);
+            ;
             if (WriteBuf == NULL)
                 WriteBuf = FrameBuf;
             setframebuffer();
@@ -7786,34 +7791,38 @@ void cmd_framebuffer(void)
         unsigned char *buff = WriteBuf;
         getcsargs(&p, 5);
         if (!(argc == 3 || argc == 5))
-            error("Syntax");
+            SyntaxError();
+        ;
         if (argc == 5)
         {
             if (checkstring(argv[4], (unsigned char *)"B"))
                 background = 1;
             else
-                error("Syntax");
+                SyntaxError();
+            ;
         }
 #else
         int complex = 0;
         unsigned char *buff = WriteBuf;
         getcsargs(&p, 3);
         if (!(argc == 3))
-            error("Syntax");
+            SyntaxError();
+        ;
 #endif
         uint8_t *s = NULL, *d = NULL;
         if (checkstring(argv[0], (unsigned char *)"N"))
         {
             complex = 1;
             if ((void *)ReadBuffer == (void *)DisplayNotSet)
-                error("Invalid on this display");
+                StandardError(11);
         }
         else if (checkstring(argv[0], (unsigned char *)"L"))
             s = LayerBuf;
         else if (checkstring(argv[0], (unsigned char *)"F"))
             s = FrameBuf;
         else
-            error("Syntax");
+            SyntaxError();
+        ;
         if (checkstring(argv[2], (unsigned char *)"N"))
         {
             complex = 2;
@@ -7823,7 +7832,8 @@ void cmd_framebuffer(void)
         else if (checkstring(argv[2], (unsigned char *)"F"))
             d = FrameBuf;
         else
-            error("Syntax");
+            SyntaxError();
+        ;
 
         if (d != s)
         {
@@ -7856,10 +7866,12 @@ void cmd_framebuffer(void)
                     {
 #ifdef rp2350
                         if (!(((Option.DISPLAY_TYPE > I2C_PANEL && Option.DISPLAY_TYPE < BufferedPanel) || Option.DISPLAY_TYPE >= NEXTGEN || (Option.DISPLAY_TYPE >= SSDPANEL && Option.DISPLAY_TYPE < VIRTUAL))))
-                            error("Not available on this display");
+                            StandardError(1);
+                        ;
 #else
                         if (!(((Option.DISPLAY_TYPE > I2C_PANEL && Option.DISPLAY_TYPE < BufferedPanel) || (Option.DISPLAY_TYPE >= SSDPANEL && Option.DISPLAY_TYPE < VIRTUAL))))
-                            error("Not available on this display");
+                            StandardError(1);
+                        ;
 #endif
                         if (diskchecktimer < 100 && SPIatRisk)
                             diskchecktimer = 100;
@@ -7879,7 +7891,8 @@ void cmd_framebuffer(void)
         WriteBuf = buff;
     }
     else
-        error("Syntax");
+        SyntaxError();
+    ;
 }
 #endif
 
@@ -7888,8 +7901,7 @@ void cmd_blit(void)
     int x1, y1, x2, y2, w, h, bnbr;
     unsigned char *buff = NULL;
     unsigned char *p;
-    if (Option.DISPLAY_TYPE == 0)
-        error("Display not configured");
+    CheckDisplay();
     if (blitother())
         return;
     p = checkstring(cmdline, (unsigned char *)"LOADBMP");
@@ -7908,7 +7920,7 @@ void cmd_blit(void)
         if (blitbuff[bnbr].blitbuffptr)
             error("Buffer % in use", bnbr);
         if (argc == 0)
-            error("Argument count");
+            StandardError(2);
         if (!InitSDCard())
             return;
         p = getCstring(argv[2]); // get the file name
@@ -7918,7 +7930,7 @@ void cmd_blit(void)
         if (argc >= 7 && *argv[6])
             yOrigin = getinteger(argv[6]); // get the y origin (optional) argument
         if (xOrigin < 0 || yOrigin < 0)
-            error("Coordinates");
+            StandardError(34);
         xlen = ylen = -1;
         if (argc >= 9 && *argv[8])
             xlen = getinteger(argv[8]); // get the x length (optional) argument
@@ -7937,7 +7949,7 @@ void cmd_blit(void)
         if (ylen == -1)
             ylen = BmpDec.lHeight;
         if (xlen + xOrigin > BmpDec.lWidth || ylen + yOrigin > BmpDec.lHeight)
-            error("Coordinates");
+            StandardError(34);
         blitbuff[bnbr].blitbuffptr = GetMemory(xlen * ylen * 3 + 4);
         memset(blitbuff[bnbr].blitbuffptr, 0xFF, xlen * ylen * 3 + 4);
         fnbr = FindFreeFileNbr();
@@ -7977,12 +7989,14 @@ void cmd_blit(void)
             else if (checkstring(argv[10], (unsigned char *)"A"))
                 background = 3;
             else
-                error("Syntax");
+                SyntaxError();
+            ;
         }
         if (background == 1)
         {
             if (!(((Option.DISPLAY_TYPE > I2C_PANEL && Option.DISPLAY_TYPE < BufferedPanel) || (Option.DISPLAY_TYPE >= SSDPANEL && Option.DISPLAY_TYPE < VIRTUAL))))
-                error("Not available on this display");
+                StandardError(1);
+            ;
             if (diskchecktimer < 200 && SPIatRisk)
                 diskchecktimer = 200;
             multicore_fifo_push_blocking(4);
@@ -7998,7 +8012,8 @@ void cmd_blit(void)
             if (argc == 13)
                 mergetimer = getint(argv[12], 0, 60 * 10 * 1000);
             if (!(((Option.DISPLAY_TYPE > I2C_PANEL && Option.DISPLAY_TYPE < BufferedPanel) || (Option.DISPLAY_TYPE >= SSDPANEL && Option.DISPLAY_TYPE < VIRTUAL))))
-                error("Not available on this display");
+                StandardError(1);
+            ;
             if (WriteBuf == NULL)
                 WriteBuf = FrameBuf;
             setframebuffer();
@@ -8033,9 +8048,10 @@ void cmd_blit(void)
     {
         getcsargs(&p, 9);
         if ((void *)ReadBuffer == (void *)DisplayNotSet)
-            error("Invalid on this display");
+            StandardError(11);
         if (argc != 9)
-            error("Syntax");
+            SyntaxError();
+        ;
         if (*argv[0] == '#')
             argv[0]++;                             // check if the first arg is prefixed with a #
         bnbr = getint(argv[0], 1, MAXBLITBUF) - 1; // get the buffer number
@@ -8078,12 +8094,12 @@ void cmd_blit(void)
         int mode = 0;
         getcsargs(&p, 7);
         if (!(argc == 5 || argc == 7))
-            error((char *)"Syntax");
+            SyntaxError();
         if (*argv[0] == '#')
             argv[0]++;
         bnbr = (int)getint(argv[0], 1, MAXBLITBUF) - 1; // get the number
         if (blitbuff[bnbr].h == 9999)
-            error("Invalid buffer");
+            StandardError(37);
         if (blitbuff[bnbr].blitbuffptr != NULL)
         {
             x1 = (int)getint(argv[2], -blitbuff[bnbr].w + 1, HRes);
@@ -8186,7 +8202,7 @@ void cmd_blit(void)
             else
             {
                 if ((void *)ReadBuffer == (void *)DisplayNotSet)
-                    error("Invalid on this display");
+                    StandardError(11);
                 unsigned char *current = GetTempMemory(w * h * 3);
                 if (y1 < 0)
                 {
@@ -8229,9 +8245,10 @@ void cmd_blit(void)
     {
         getcsargs(&cmdline, 11);
         if ((void *)ReadBuffer == (void *)DisplayNotSet)
-            error("Invalid on this display");
+            StandardError(11);
         if (argc != 11)
-            error("Syntax");
+            SyntaxError();
+        ;
         x1 = getinteger(argv[0]);
         y1 = getinteger(argv[2]);
         x2 = getinteger(argv[4]);
@@ -8804,7 +8821,7 @@ void MIPS16 cmd_font(void)
 {
     getcsargs(&cmdline, 3);
     if (argc < 1)
-        error("Argument count");
+        StandardError(2);
     if (*argv[0] == '#')
         ++argv[0];
     if (argc == 3)
@@ -8856,7 +8873,7 @@ void cmd_colourmap(void)
     getcsargs(&cmdline, 5);
     memcpy((void *)map, (void *)RGB121map, 16 * sizeof(int));
     if (!(argc == 3 || argc == 5))
-        error("Argument count");
+        StandardError(2);
     n = parsenumberarray(argv[0], &cfptr, &cptr, 1, 1, NULL, true);
     if (argc == 5)
     { // user defined mapping
@@ -8902,7 +8919,7 @@ void cmd_colour(void)
 {
     getcsargs(&cmdline, 3);
     if (argc < 1)
-        error("Argument count");
+        StandardError(2);
     gui_fcolour = getColour((char *)argv[0], 0);
     if (argc == 3)
         gui_bcolour = getColour((char *)argv[2], 0);
@@ -8943,7 +8960,7 @@ void cmd_map(void)
     unsigned char *p;
     //    if(Option.CPU_Speed==126000)error("CPUSPEED >= 252000 for colour mapping");
     if (!(DISPLAY_TYPE == SCREENMODE2 || DISPLAY_TYPE == SCREENMODE3))
-        error("Invalid for this screen mode");
+        StandardError(40);
     if ((p = checkstring(cmdline, (unsigned char *)"RESET")))
     {
         while (QVgaScanLine != 0)
@@ -8979,10 +8996,10 @@ void cmd_map(void)
         while (*cmdline && tokenfunction(*cmdline) != op_equal)
             cmdline++;
         if (!*cmdline)
-            error("Invalid syntax");
+            SyntaxError();
         ++cmdline;
         if (!*cmdline)
-            error("Invalid syntax");
+            SyntaxError();
         int col = getColour((char *)cmdline, 0);
         if (first)
         {
@@ -9000,7 +9017,7 @@ void cmd_tile(void)
     uint32_t bcolour = 0xFFFFFFFF, fcolour = 0xFFFFFFFF;
     int xlen = 1, ylen = 1;
     if (DISPLAY_TYPE != SCREENMODE1)
-        error("Invalid for this screen mode");
+        StandardError(40);
     if (checkstring(cmdline, (unsigned char *)"RESET"))
     {
         for (int x = 0; x < X_TILE; x++)
@@ -9028,7 +9045,8 @@ void cmd_tile(void)
         if (!(DISPLAY_TYPE == SCREENMODE1))
             return;
         if (argc < 5)
-            error("Syntax");
+            SyntaxError();
+        ;
         int x = getint(argv[0], 0, X_TILE);
         int y = getint(argv[2], 0, Y_TILE);
         int tilebcolour, tilefcolour;
@@ -9653,7 +9671,7 @@ void cmd_tile(void)
     uint32_t bcolour = 0xFFFFFFFF, fcolour = 0xFFFFFFFF;
     int xlen = 1, ylen = 1;
     if (DISPLAY_TYPE != SCREENMODE1)
-        error("Invalid for this screen mode");
+        StandardError(40);
     if (checkstring(cmdline, (unsigned char *)"RESET"))
     {
         fcolour = (FullColour) ? RGB555(Option.DefaultFC) : RGB332(Option.DefaultFC);
@@ -9697,7 +9715,8 @@ void cmd_tile(void)
         if (!(DISPLAY_TYPE == SCREENMODE1))
             return;
         if (argc < 5)
-            error("Syntax");
+            SyntaxError();
+        ;
         int x = getint(argv[0], 0, X_TILE - 1);
         int y = getint(argv[2], 0, Y_TILE - 1);
         int tilebcolour, tilefcolour;
@@ -9749,7 +9768,7 @@ void cmd_map(void)
 {
     unsigned char *p;
     if (!(DISPLAY_TYPE == SCREENMODE2 || DISPLAY_TYPE == SCREENMODE3 || DISPLAY_TYPE == SCREENMODE5))
-        error("Invalid for this screen mode");
+        StandardError(40);
     if ((p = checkstring(cmdline, (unsigned char *)"RESET")))
     {
         mapreset();
@@ -9814,10 +9833,10 @@ void cmd_map(void)
         while (*cmdline && tokenfunction(*cmdline) != op_equal)
             cmdline++;
         if (!*cmdline)
-            error("Invalid syntax");
+            SyntaxError();
         ++cmdline;
         if (!*cmdline)
-            error("Invalid syntax");
+            SyntaxError();
         int col = getColour((char *)cmdline, 0);
         remap256[cl] = RGB555(col);
         remap555[cl] = RGB555(col) | (RGB555(col) << 16);
@@ -9969,16 +9988,14 @@ void cmd_mode(void)
 /*  @endcond */
 void fun_mmcharwidth(void)
 {
-    if (Option.DISPLAY_TYPE == 0)
-        error("Display not configured");
+    CheckDisplay();
     iret = FontTable[gui_font >> 4][0] * (gui_font & 0b1111);
     targ = T_INT;
 }
 
 void fun_mmcharheight(void)
 {
-    if (Option.DISPLAY_TYPE == 0)
-        error("Display not configured");
+    CheckDisplay();
     iret = FontTable[gui_font >> 4][1] * (gui_font & 0b1111);
     targ = T_INT;
 }
@@ -9994,8 +10011,8 @@ void fun_mmcharheight(void)
 ****************************************************************************************************/
 void cmd_refresh(void)
 {
-    if (Option.DISPLAY_TYPE == 0)
-        error("Display not configured");
+    CheckDisplay();
+
 #if PICOMITERP2350
     if (Option.DISPLAY_TYPE >= NEXTGEN)
     {
@@ -12183,7 +12200,7 @@ void MIPS16 cmd_3D(void)
         long long int *faces, *facecount, *facecountindex, *colours, *linecolour = NULL, *fillcolour = NULL;
         getcsargs(&p, 19);
         if (argc < 17)
-            error("Argument count");
+            StandardError(2);
         int c, colourcount = 0, vp, v, f, fc = 0, n = getint(argv[0], 1, MAX3D);
         if (struct3d[n] != NULL)
             error("Object already exists");
@@ -12371,7 +12388,7 @@ void MIPS16 cmd_3D(void)
     {
         getcsargs(&p, 9);
         if (argc < 7)
-            error("Argument count");
+            StandardError(2);
         int n = getint(argv[0], 1, MAX3D);
         int x = getint(argv[2], -32766, 32766);
         int y = getint(argv[4], -32766, 32766);
@@ -12380,7 +12397,7 @@ void MIPS16 cmd_3D(void)
         if (argc == 9)
             sort = getint(argv[8], 0, 1);
         if (struct3d[n] == NULL)
-            error("Object % does not exist", n);
+            StandardErrorParam(7, n);
         if (camera[struct3d[n]->camera].viewplane == -32767)
             error("Camera position not defined");
         diagnose3d(n, x, y, z, sort);
@@ -12390,7 +12407,7 @@ void MIPS16 cmd_3D(void)
     {
         getcsargs(&p, 9);
         if (argc != 9)
-            error("Argument count");
+            StandardError(2);
         int n = getint(argv[0], 1, MAX3D);
         struct3d[n]->light.x = getint(argv[2], -32766, 32766);
         struct3d[n]->light.y = getint(argv[4], -32766, 32766);
@@ -12402,7 +12419,7 @@ void MIPS16 cmd_3D(void)
     {
         getcsargs(&p, 11);
         if (argc < 7)
-            error("Argument count");
+            StandardError(2);
         int n = getint(argv[0], 1, MAX3D);
         int x = getint(argv[2], -32766, 32766);
         int y = getint(argv[4], -32766, 32766);
@@ -12414,7 +12431,7 @@ void MIPS16 cmd_3D(void)
         if (argc == 11)
             depthmode = getint(argv[10], 0, 1);
         if (struct3d[n] == NULL)
-            error("Object % does not exist", n);
+            StandardErrorParam(7, n);
         if (camera[struct3d[n]->camera].viewplane == -32767)
             error("Camera position not defined");
         display3d(n, x, y, z, 1, nonormals, depthmode);
@@ -12425,7 +12442,7 @@ void MIPS16 cmd_3D(void)
         int i, face, nbr;
         getcsargs(&p, ((MAX_ARG_COUNT - 1) * 2) - 1);
         if ((argc & 0b11) != 0b11)
-            error("Invalid syntax");
+            SyntaxError();
         int n = getint(argv[0], 1, MAX3D);
         int flag = getint(argv[2], 0, 255);
         // step over the equals sign and get the value for the assignment
@@ -12435,7 +12452,7 @@ void MIPS16 cmd_3D(void)
             nbr = getinteger(argv[i + 2]);
 
             if (nbr <= 0 || nbr > struct3d[n]->nf - face)
-                error("Invalid argument");
+                SyntaxError();
 
             while (--nbr >= 0)
             {
@@ -12450,9 +12467,9 @@ void MIPS16 cmd_3D(void)
         MMFLOAT *q = NULL;
         getcsargs(&p, (MAX_ARG_COUNT * 2) - 1); // macro must be the first executable stmt in a block
         if ((argc & 0x01 || argc < 3) == 0)
-            error("Argument count");
+            StandardError(2);
         if (parsefloatrarray(argv[0], &q, 1, 1, NULL, true) != 5)
-            error("Argument 1 must be a 5 element floating point array");
+            StandardErrorParam(41, 1);
         q1.w = (FLOAT3D)(*q++);
         q1.x = (FLOAT3D)(*q++);
         q1.y = (FLOAT3D)(*q++);
@@ -12462,7 +12479,7 @@ void MIPS16 cmd_3D(void)
         {
             n = getint(argv[i], 1, MAX3D);
             if (struct3d[n] == NULL)
-                error("Object % does not exist", n);
+                StandardErrorParam(7, n);
             for (v = 0; v < struct3d[n]->nv; v++)
             {
                 q_rotate(&struct3d[n]->q_vertices[v], q1, &struct3d[n]->r_vertices[v]);
@@ -12495,7 +12512,7 @@ void MIPS16 cmd_3D(void)
         int v, f;
         getcsargs(&p, (MAX_ARG_COUNT * 2) - 1); // macro must be the first executable stmt in a block
         if ((argc & 0x01 || argc < 3) == 0)
-            error("Argument count");
+            StandardError(2);
         for (i = 0; i < argc; i += 2)
         {
             n = getint(argv[i], 1, MAX3D);
@@ -12515,12 +12532,12 @@ void MIPS16 cmd_3D(void)
         int i, n;
         getcsargs(&p, (MAX_ARG_COUNT * 2) - 1); // macro must be the first executable stmt in a block
         if ((argc & 0x01 || argc < 3) == 0)
-            error("Argument count");
+            StandardError(2);
         for (i = 0; i < argc; i += 2)
         {
             n = getint(argv[i], 1, MAX3D);
             if (struct3d[n] == NULL)
-                error("Object % does not exist", n);
+                StandardErrorParam(7, n);
             if (struct3d[n]->xmin == 32767)
                 return;
             DrawRectangle(struct3d[n]->xmin, struct3d[n]->ymin, struct3d[n]->xmax, struct3d[n]->ymax, 0);
@@ -12536,12 +12553,12 @@ void MIPS16 cmd_3D(void)
         int i, n;
         getcsargs(&p, (MAX_ARG_COUNT * 2) - 1); // macro must be the first executable stmt in a block
         if ((argc & 0x01 || argc < 3) == 0)
-            error("Argument count");
+            StandardError(2);
         for (i = 0; i < argc; i += 2)
         {
             n = getint(argv[i], 1, MAX3D);
             if (struct3d[n] == NULL)
-                error("Object % does not exist", n);
+                StandardErrorParam(7, n);
             if (struct3d[n]->xmin != 32767)
                 error("Object % is not hidden", n);
             display3d(n, struct3d[n]->current.x, struct3d[n]->current.y, struct3d[n]->current.z, 1, struct3d[n]->nonormals, struct3d[n]->depthmode);
@@ -12552,7 +12569,7 @@ void MIPS16 cmd_3D(void)
     {
         getcsargs(&p, 11);
         if (argc < 7)
-            error("Argument count");
+            StandardError(2);
         int n = getint(argv[0], 1, MAX3D);
         int x = getint(argv[2], -32766, 32766);
         int y = getint(argv[4], -32766, 32766);
@@ -12564,7 +12581,7 @@ void MIPS16 cmd_3D(void)
         if (argc == 11)
             depthmode = getint(argv[10], 0, 1);
         if (struct3d[n] == NULL)
-            error("Object % does not exist", n);
+            StandardErrorParam(7, n);
         if (camera[struct3d[n]->camera].viewplane == -32767)
             error("Camera position not defined");
         display3d(n, x, y, z, 0, nonormals, depthmode);
@@ -12580,12 +12597,12 @@ void MIPS16 cmd_3D(void)
         int i, n;
         getcsargs(&p, (MAX_ARG_COUNT * 2) - 1); // macro must be the first executable stmt in a block
         if ((argc & 0x01 || argc < 3) == 0)
-            error("Argument count");
+            StandardError(2);
         for (i = 0; i < argc; i += 2)
         {
             n = getint(argv[i], 1, MAX3D);
             if (struct3d[n] == NULL)
-                error("Object % does not exist", n);
+                StandardErrorParam(7, n);
             if (struct3d[n]->xmin != 32767)
                 DrawRectangle(struct3d[n]->xmin, struct3d[n]->ymin, struct3d[n]->xmax, struct3d[n]->ymax, 0);
             Free3DMemory(n);
@@ -12596,7 +12613,7 @@ void MIPS16 cmd_3D(void)
     {
         getcsargs(&p, 11);
         if (argc < 3)
-            error("Argument count");
+            StandardError(2);
         int n = getint(argv[0], 1, MAXCAM);
         camera[n].viewplane = getnumber(argv[2]);
         camera[n].x = (FLOAT3D)0;
@@ -12620,7 +12637,8 @@ void MIPS16 cmd_3D(void)
     }
     else
     {
-        error("Syntax");
+        SyntaxError();
+        ;
     }
 }
 void MIPS16 fun_3D(void)
@@ -12631,7 +12649,7 @@ void MIPS16 fun_3D(void)
         getcsargs(&p, 1);
         int n = getint(argv[0], 1, MAX3D);
         if (struct3d[n] == NULL)
-            error("Object does not exist");
+            StandardErrorParam(7, n);
         fret = struct3d[n]->xmin;
     }
     else if ((p = checkstring(ep, (unsigned char *)"XMAX")))
@@ -12639,7 +12657,7 @@ void MIPS16 fun_3D(void)
         getcsargs(&p, 1);
         int n = getint(argv[0], 1, MAX3D);
         if (struct3d[n] == NULL)
-            error("Object does not exist");
+            StandardErrorParam(7, n);
         fret = struct3d[n]->xmax;
     }
     else if ((p = checkstring(ep, (unsigned char *)"YMIN")))
@@ -12647,7 +12665,7 @@ void MIPS16 fun_3D(void)
         getcsargs(&p, 1);
         int n = getint(argv[0], 1, MAX3D);
         if (struct3d[n] == NULL)
-            error("Object does not exist");
+            StandardErrorParam(7, n);
         fret = struct3d[n]->ymin;
     }
     else if ((p = checkstring(ep, (unsigned char *)"YMAX")))
@@ -12655,7 +12673,7 @@ void MIPS16 fun_3D(void)
         getcsargs(&p, 1);
         int n = getint(argv[0], 1, MAX3D);
         if (struct3d[n] == NULL)
-            error("Object does not exist");
+            StandardErrorParam(7, n);
         fret = struct3d[n]->ymax;
     }
     else if ((p = checkstring(ep, (unsigned char *)"X")))
@@ -12663,7 +12681,7 @@ void MIPS16 fun_3D(void)
         getcsargs(&p, 1);
         int n = getint(argv[0], 1, MAX3D);
         if (struct3d[n] == NULL)
-            error("Object does not exist");
+            StandardErrorParam(7, n);
         fret = struct3d[n]->current.x;
     }
     else if ((p = checkstring(ep, (unsigned char *)"Y")))
@@ -12671,7 +12689,7 @@ void MIPS16 fun_3D(void)
         getcsargs(&p, 1);
         int n = getint(argv[0], 1, MAX3D);
         if (struct3d[n] == NULL)
-            error("Object does not exist");
+            StandardErrorParam(7, n);
         fret = struct3d[n]->current.y;
     }
     else if ((p = checkstring(ep, (unsigned char *)"DISTANCE")))
@@ -12679,7 +12697,7 @@ void MIPS16 fun_3D(void)
         getcsargs(&p, 1);
         int n = getint(argv[0], 1, MAX3D);
         if (struct3d[n] == NULL)
-            error("Object does not exist");
+            StandardErrorParam(7, n);
         fret = struct3d[n]->distance;
     }
     else if ((p = checkstring(ep, (unsigned char *)"Z")))
@@ -12687,11 +12705,12 @@ void MIPS16 fun_3D(void)
         getcsargs(&p, 1);
         int n = getint(argv[0], 1, MAX3D);
         if (struct3d[n] == NULL)
-            error("Object does not exist");
+            StandardErrorParam(7, n);
         fret = struct3d[n]->current.z;
     }
     else
-        error("Syntax");
+        SyntaxError();
+    ;
     targ = T_NBR;
 }
 /*
@@ -13099,7 +13118,7 @@ void cmd_framebuffer(void)
         else if (checkstring(p, (unsigned char *)"F"))
         {
             if (FrameBuf == DisplayBuf)
-                error("Frame buffer not created");
+                StandardError(38);
             WriteBuf = FrameBuf;
         }
         else
@@ -13117,7 +13136,7 @@ void cmd_framebuffer(void)
             else if (strcasecmp(q, "F") == 0)
             {
                 if (FrameBuf == DisplayBuf)
-                    error("Frame buffer not created");
+                    StandardError(38);
                 WriteBuf = FrameBuf;
             }
             else if (strcasecmp(q, "2") == 0)
@@ -13133,7 +13152,8 @@ void cmd_framebuffer(void)
                 WriteBuf = SecondLayer;
             }
             else
-                error("Syntax");
+                SyntaxError();
+            ;
         }
     }
     else if ((p = checkstring(cmdline, (unsigned char *)"WAIT")))
@@ -13152,7 +13172,8 @@ void cmd_framebuffer(void)
     {
         getcsargs(&p, 5);
         if (!(argc == 3 || argc == 5))
-            error("Syntax");
+            SyntaxError();
+        ;
         volatile uint8_t *s = NULL, *d = NULL;
         if (checkstring(argv[0], (unsigned char *)"N"))
             s = DisplayBuf;
@@ -13165,7 +13186,8 @@ void cmd_framebuffer(void)
         else if (checkstring(argv[0], (unsigned char *)"T"))
             s = SecondLayer;
         else
-            error("Syntax");
+            SyntaxError();
+        ;
         if (checkstring(argv[2], (unsigned char *)"N"))
             d = DisplayBuf;
         else if (checkstring(argv[2], (unsigned char *)"L"))
@@ -13177,7 +13199,8 @@ void cmd_framebuffer(void)
         else if (checkstring(argv[2], (unsigned char *)"T"))
             d = SecondLayer;
         else
-            error("Syntax");
+            SyntaxError();
+        ;
         if (argc == 5)
         {
             if (checkstring(argv[4], (unsigned char *)"B"))
@@ -13193,7 +13216,8 @@ void cmd_framebuffer(void)
 #endif
             }
             else
-                error("Syntax");
+                SyntaxError();
+            ;
         }
         if (d != s)
             //            #ifdef rp2350
@@ -13205,7 +13229,8 @@ void cmd_framebuffer(void)
             error("Buffer not created");
     }
     else
-        error("Syntax");
+        SyntaxError();
+    ;
 }
 #endif
 #include <stdint.h>
@@ -13612,11 +13637,12 @@ void cmd_fill(void)
 {
     getcsargs(&cmdline, 5);
     if ((void *)ReadBuffer == (void *)DisplayNotSet)
-        error("Invalid on this display");
+        StandardError(11);
     if (!(Option.DISPLAY_TYPE))
         error("No display");
     if (!(argc == 5))
-        error("Syntax");
+        SyntaxError();
+    ;
     int x = getint(argv[0], 0, HRes - 1);
     int y = getint(argv[2], 0, VRes - 1);
     uint32_t c = (uint32_t)getColour((char *)argv[4], 0);

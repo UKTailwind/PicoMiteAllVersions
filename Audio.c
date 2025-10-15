@@ -1168,7 +1168,7 @@ void MIPS16 cmd_play(void)
 		int size = parseintegerarray(tp, &aint, 1, 1, NULL, false);
 		dd = (uint16_t *)aint;
 		if (size != 1024)
-			error("Array size");
+			StandardError(17);
 		usertable = dd;
 		return;
 	}
@@ -1325,7 +1325,7 @@ void MIPS16 cmd_play(void)
 	{
 		getcsargs(&tp, 3);
 		if (argc < 1)
-			error("Argument count");
+			StandardError(2);
 		if (*argv[0])
 			vol_left = getint(argv[0], 0, 100);
 		if (argc == 3)
@@ -1351,7 +1351,7 @@ void MIPS16 cmd_play(void)
 		{											// get the command line arguments
 			getcsargs(&tp, 7);
 			if (!(argc == 3 || argc == 5 || argc == 7))
-				error("Argument count");
+				StandardError(2);
 			//			if(Option.AUDIO_MISO_PIN)error("Not available with VS1053 audio");
 			mono = 0;
 			if (!(CurrentlyPlaying == P_NOTHING || CurrentlyPlaying == P_TONE || CurrentlyPlaying == P_PAUSE_TONE || CurrentlyPlaying == P_STOP || CurrentlyPlaying == P_WAVOPEN))
@@ -1415,10 +1415,10 @@ void MIPS16 cmd_play(void)
 		float freq;
 		getcsargs(&tp, 11); // this MUST be the first executable line in the function
 		if (!(argc == 11 || argc == 9 || argc == 7 || argc == 5))
-			error("Argument count");
+			StandardError(2);
 		arraysize = parseintegerarray(argv[0], (int64_t **)&leftarray, 1, 1, NULL, false);
 		if (parseintegerarray(argv[2], (int64_t **)&rightarray, 2, 1, NULL, false) != arraysize)
-			error("Array size mismatch");
+			StandardError(16);
 		arraysize *= 4;
 		freq = getnumber(argv[4]);
 		if (freq < 10.0 || freq > 48000.0)
@@ -1482,9 +1482,9 @@ void MIPS16 cmd_play(void)
 		// get the command line arguments
 		getcsargs(&tp, 9); // this MUST be the first executable line in the function
 		if (!(argc == 9 || argc == 7 || argc == 5))
-			error("Argument count");
+			StandardError(2);
 		if (checkstring(argv[4], (unsigned char *)"O") == NULL && argc == 5)
-			error("Argument count");
+			StandardError(2);
 		WAV_fnbr = 0;
 		channel = getint(argv[0], 1, MAXSOUNDS) - 1;
 		lastleft = local_sound_mode_left = (uint16_t *)sound_mode_left[channel];
@@ -1750,7 +1750,7 @@ void MIPS16 cmd_play(void)
 		int i __attribute((unused)) = 0;
 		getcsargs(&tp, 3); // this MUST be the first executable line in the function
 		if (!(argc == 1 || argc == 3))
-			error("Argument count");
+			StandardError(2);
 		if (CurrentlyPlaying == P_WAVOPEN)
 			CloseAudio(1);
 		if (CurrentlyPlaying != P_NOTHING)
@@ -1837,7 +1837,7 @@ void MIPS16 cmd_play(void)
 		int i __attribute((unused)) = 0;
 		getcsargs(&tp, 3); // this MUST be the first executable line in the function
 		if (!(argc == 1 || argc == 3))
-			error("Argument count");
+			StandardError(2);
 		if (CurrentlyPlaying == P_WAVOPEN)
 			CloseAudio(1);
 		if (CurrentlyPlaying != P_NOTHING)
@@ -1928,7 +1928,8 @@ void MIPS16 cmd_play(void)
 		{
 			getcsargs(&xp, 5);
 			if (!(argc == 5))
-				error("Syntax");
+				SyntaxError();
+			;
 			uint8_t channel = getint(argv[0], 0, 15);
 			uint8_t note = getint(argv[2], 0, 127);
 			uint8_t velocity = getint(argv[4], 0, 127);
@@ -1938,7 +1939,8 @@ void MIPS16 cmd_play(void)
 		{
 			getcsargs(&xp, 5);
 			if (!(argc == 5 || argc == 3))
-				error("Syntax");
+				SyntaxError();
+			;
 			uint8_t channel = getint(argv[0], 0, 15);
 			uint8_t note = getint(argv[2], 0, 127);
 			uint8_t velocity = 0;
@@ -1947,14 +1949,16 @@ void MIPS16 cmd_play(void)
 			noteOff(channel, note, velocity);
 		}
 		else
-			error("Syntax");
+			SyntaxError();
+		;
 		return;
 	}
 	if ((tp = checkstring(cmdline, (unsigned char *)"STREAM")))
 	{
 		getcsargs(&tp, 5);
 		if (!(argc == 5))
-			error("Syntax");
+			SyntaxError();
+		;
 		if (!Option.AUDIO_MISO_PIN)
 			error("Only available with VS1053 audio");
 		if (CurrentlyPlaying == P_WAVOPEN)
@@ -2012,7 +2016,8 @@ void MIPS16 cmd_play(void)
 			if (!midienabled)
 				error("Midi output not enabled");
 			if (!(argc == 5 || argc == 3))
-				error("Syntax");
+				SyntaxError();
+			;
 			uint8_t cmd = getint(argv[0], 128, 255);
 			uint8_t data1 = getint(argv[2], 0, 127);
 			uint8_t data2 = 0;
@@ -2055,7 +2060,7 @@ void MIPS16 cmd_play(void)
 		int i __attribute((unused)) = 0;
 		getcsargs(&tp, 3); // this MUST be the first executable line in the function
 		if (!(argc == 1 || argc == 3))
-			error("Argument count");
+			StandardError(2);
 		if (!Option.AUDIO_MISO_PIN)
 			error("Only available with VS1053 audio");
 		if (CurrentlyPlaying == P_WAVOPEN)
@@ -2206,7 +2211,7 @@ void MIPS16 cmd_play(void)
 		int i __attribute((unused)) = 0;
 		getcsargs(&tp, 3); // this MUST be the first executable line in the function
 		if (!(argc == 1 || argc == 3))
-			error("Argument count");
+			StandardError(2);
 #ifndef rp2350
 		if (!Option.AUDIO_MISO_PIN)
 			error("Only available with VS1053 audio");
@@ -2458,7 +2463,7 @@ void MIPS16 cmd_play(void)
 		unsigned int samprate, period;
 		getcsargs(&tp, 5); // this MUST be the first executable line in the function
 		if (!(argc == 5 || argc == 3))
-			error("Argument count");
+			StandardError(2);
 
 		if (!(CurrentlyPlaying == P_MOD))
 			error("Samples play over MOD file");
@@ -2481,7 +2486,7 @@ void MIPS16 cmd_play(void)
 		hxcmod_playsoundeffect(mcontext, sampnum, seffectnum, volume, period);
 		return;
 	}
-	error("Unknown command");
+	StandardError(36);
 }
 /*
  * @cond

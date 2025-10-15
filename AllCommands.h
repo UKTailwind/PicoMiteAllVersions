@@ -1,4 +1,8 @@
-/***********************************************************************************************************************
+/*
+ * @cond
+ * The following section will be excluded from the documentation.
+ */
+/* *********************************************************************************************************************
 PicoMite MMBasic
 
 AllCommands.h
@@ -6,15 +10,15 @@ AllCommands.h
 <COPYRIGHT HOLDERS>  Geoff Graham, Peter Mather
 Copyright (c) 2021, <COPYRIGHT HOLDERS> All rights reserved.
 Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
-1.	Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
-2.	Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer
-	in the documentation and/or other materials provided with the distribution.
-3.	The name MMBasic be used when referring to the interpreter in any documentation and promotional material and the original copyright message be displayed
-	on the console at startup (additional copyright messages may be added).
-4.	All advertising materials mentioning features or use of this software must display the following acknowledgement: This product includes software developed
-	by the <copyright holder>.
-5.	Neither the name of the <copyright holder> nor the names of its contributors may be used to endorse or promote products derived from this software
-	without specific prior written permission.
+1. Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
+2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer
+   in the documentation and/or other materials provided with the distribution.
+3. The name MMBasic be used when referring to the interpreter in any documentation and promotional material and the original copyright message be displayed
+   on the console at startup (additional copyright messages may be added).
+4. All advertising materials mentioning features or use of this software must display the following acknowledgement: This product includes software developed
+   by the <copyright holder>.
+5. Neither the name of the <copyright holder> nor the names of its contributors may be used to endorse or promote products derived from this software
+   without specific prior written permission.
 THIS SOFTWARE IS PROVIDED BY <COPYRIGHT HOLDERS> AS IS AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
 OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL <COPYRIGHT HOLDERS> BE LIABLE FOR ANY DIRECT,
 INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
@@ -22,20 +26,15 @@ LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON A
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ************************************************************************************************************************/
-/*
- * @cond
- * The following section will be excluded from the documentation.
- */
-/* ********************************************************************************
- the C language function associated with commands, functions or operators should be
- declared here
-**********************************************************************************/
-#if !defined(INCLUDE_COMMAND_TABLE) && !defined(INCLUDE_TOKEN_TABLE)
-// format:
-//      void cmd_???(void)
-//      void fun_???(void)
-//      void op_???(void)
 
+/* ============================================================================
+ * Function declarations
+ * C language functions associated with commands, functions or operators
+ * Format: void cmd_???(void), void fun_???(void), void op_???(void)
+ * ============================================================================ */
+#if !defined(INCLUDE_COMMAND_TABLE) && !defined(INCLUDE_TOKEN_TABLE)
+
+/* Command functions */
 void cmd_clear(void);
 void cmd_continue(void);
 void cmd_delete(void);
@@ -85,7 +84,6 @@ void cmd_dump(void);
 void cmd_call(void);
 void cmd_execute(void);
 void cmd_mid(void);
-void cmd_null(void);
 void cmd_open(void);
 void cmd_close(void);
 void cmd_files(void);
@@ -134,7 +132,7 @@ void cmd_port(void);
 void cmd_adc(void);
 void cmd_ir(void);
 void cmd_lcd(void);
-void cmd_keypad();
+void cmd_keypad(void);
 void cmd_backlight(void);
 void cmd_device(void);
 void cmd_sync(void);
@@ -148,11 +146,6 @@ void cmd_rtc(void);
 void cmd_math(void);
 void cmd_memory(void);
 void cmd_autosave(void);
-void cmd_option(void);
-void cmd_pause(void);
-void cmd_timer(void);
-void cmd_date(void);
-void cmd_time(void);
 void cmd_ireturn(void);
 void cmd_poke(void);
 void cmd_settick(void);
@@ -162,7 +155,6 @@ void cmd_cfunction(void);
 void cmd_longString(void);
 void cmd_sort(void);
 void cmd_csubinterrupt(void);
-void cmd_library(void);
 void cmd_onewire(void);
 void cmd_ds18b20(void);
 void cmd_spi(void);
@@ -185,7 +177,6 @@ void cmd_Nunchuck(void);
 void cmd_mouse(void);
 void cmd_camera(void);
 void cmd_Servo(void);
-void cmd_chain(void);
 void cmd_psram(void);
 void cmd_wrap(void);
 void cmd_wraptarget(void);
@@ -220,16 +211,23 @@ void cmd_add(void);
 void cmd_arrayset(void);
 void cmd_keyscan(void);
 void cmd_fill(void);
+
 #ifdef PICOMITEWEB
 void cmd_web(void);
 #endif
+
 #ifdef rp2350
 void cmd_loadCMM2(void);
 void cmd_RunCMM2(void);
 #endif
+
 #if PICOMITERP2350
 void cmd_mode(void);
 #endif
+
+void cmd_update(void);
+
+/* Operator functions */
 void op_invalid(void);
 void op_exp(void);
 void op_mul(void);
@@ -251,6 +249,8 @@ void op_not(void);
 void op_shiftleft(void);
 void op_shiftright(void);
 void op_inv(void);
+
+/* Function declarations */
 void fun_pin(void);
 void fun_port(void);
 void fun_distance(void);
@@ -332,11 +332,7 @@ void fun_call(void);
 void fun_GPS(void);
 void fun_mmi2c(void);
 void fun_math(void);
-void fun_timer(void);
-void fun_date(void);
-void fun_time(void);
 void fun_keydown(void);
-void fun_peek(void);
 void fun_restart(void);
 void fun_day(void);
 void fun_info(void);
@@ -348,12 +344,9 @@ void fun_LInstr(void);
 void fun_epoch(void);
 void fun_datetime(void);
 void fun_json(void);
-void cmd_update(void);
 void fun_format(void);
 void fun_mmOW(void);
 void fun_ds18b20(void);
-void fun_pixel(void);
-void fun_getscanline(void);
 void fun_spi(void);
 void fun_spi2(void);
 void fun_msgbox(void);
@@ -365,16 +358,16 @@ void fun_byte(void);
 void fun_bit(void);
 void fun_flag(void);
 void fun_trim(void);
-#ifdef PICOMITEWEB
-void fun_json(void);
-#endif
 void fun_dev(void);
 void fun_map(void);
-#endif
+void fun_touch(void);
 
-/* ********************************************************************************
- All command tokens tokens (eg, PRINT, FOR, etc) should be inserted in this table
-**********************************************************************************/
+#endif /* !defined(INCLUDE_COMMAND_TABLE) && !defined(INCLUDE_TOKEN_TABLE) */
+
+/* ============================================================================
+ * Command table
+ * All command tokens (PRINT, FOR, etc) should be inserted in this table
+ * ============================================================================ */
 #ifdef INCLUDE_COMMAND_TABLE
 
 {(unsigned char *)"Call", T_CMD, 0, cmd_call},
@@ -604,12 +597,15 @@ void fun_map(void);
 	{(unsigned char *)"YModem", T_CMD, 0, cmd_xmodem},
 #endif
 {
-	(unsigned char *)"", 0, 0, cmd_null,
+	(unsigned char *)"", 0, 0, cmd_null
 } // this dummy entry is always at the end
-#endif
-/* ********************************************************************************
- All other tokens (keywords, functions, operators) should be inserted in this table
-**********************************************************************************/
+
+#endif /* INCLUDE_COMMAND_TABLE */
+
+/* ============================================================================
+ * Token table
+ * All other tokens (keywords, functions, operators) should be inserted here
+ * ============================================================================ */
 #ifdef INCLUDE_TOKEN_TABLE
 // These 4 operators mustn't be moved
 {(unsigned char *)"Not", T_OPER | T_NBR | T_INT, 3, op_not},
@@ -752,7 +748,9 @@ void fun_map(void);
 #endif
 	{(unsigned char *)"Trim$(", T_FUN | T_STR, 0, fun_trim},
 {
-	(unsigned char *)"", 0, 0, cmd_null,
+	(unsigned char *)"", 0, 0, cmd_null
 } // this dummy entry is always at the end
-#endif
+
+#endif /* INCLUDE_TOKEN_TABLE */
+
 /*  @endcond */

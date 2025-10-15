@@ -157,7 +157,8 @@ void MIPS16 cmd_memory(void)
     {
         getcsargs(&tp, 7);
         if (argc != 7)
-            error("Syntax");
+            SyntaxError();
+        ;
         int i, n = getinteger(argv[4]);
         if (n <= 0)
             return;
@@ -179,12 +180,12 @@ void MIPS16 cmd_memory(void)
         {
             destinationsize = parseintegerarray(argv[2], (int64_t **)&top, 2, 1, NULL, true);
             if (destinationsize * 64 / size < n)
-                error("Destination array too small");
+                StandardError(23);
         }
         else
             top = (void *)GetPokeAddr(argv[2]);
         if ((uint32_t)from % 8)
-            error("Source address not divisible by 8");
+            error("Address not divisible by 8");
         if (size == 1)
         {
             uint8_t *to = (uint8_t *)top;
@@ -226,7 +227,7 @@ void MIPS16 cmd_memory(void)
         {
             uint16_t *to = (uint16_t *)top;
             if ((uint32_t)to % 2)
-                error("Destination address not divisible by 2");
+                error("Address not divisible by 2");
             while (n--)
             {
                 *to++ = (uint16_t)*from++;
@@ -236,7 +237,7 @@ void MIPS16 cmd_memory(void)
         {
             uint32_t *to = (uint32_t *)top;
             if ((uint32_t)to % 4)
-                error("Destination address not divisible by 4");
+                error("Address not divisible by 4");
             while (n--)
             {
                 *to++ = (uint32_t)*from++;
@@ -252,7 +253,8 @@ void MIPS16 cmd_memory(void)
         int64_t *aint;
         getcsargs(&tp, 5);
         if (!(argc == 5))
-            error("Syntax");
+            SyntaxError();
+        ;
         if (*argv[0] == '#')
             argv[0]++;
         int fnbr = getint(argv[0], 1, MAXOPENFILES); // get the number
@@ -284,7 +286,8 @@ void MIPS16 cmd_memory(void)
         int64_t *aint;
         getcsargs(&tp, 5);
         if (!(argc == 5))
-            error("Syntax");
+            SyntaxError();
+        ;
         if (*argv[0] == '#')
             argv[0]++;
         int fnbr = getint(argv[0], 1, MAXOPENFILES); // get the number
@@ -316,7 +319,8 @@ void MIPS16 cmd_memory(void)
     {
         getcsargs(&tp, 7);
         if (argc != 7)
-            error("Syntax");
+            SyntaxError();
+        ;
         int i, n = getinteger(argv[4]);
         if (n <= 0)
             return;
@@ -340,12 +344,12 @@ void MIPS16 cmd_memory(void)
         {
             destinationsize = parseintegerarray(argv[2], (int64_t **)&to, 2, 1, NULL, true);
             if (n > destinationsize)
-                error("Destination array too small");
+                StandardError(23);
         }
         else
             to = (uint64_t *)GetPokeAddr(argv[2]);
         if ((uint32_t)to % 8)
-            error("Source address not divisible by 8");
+            error("Address not divisible by 8");
         if (size == 1)
         {
             uint8_t *from = (uint8_t *)fromp;
@@ -385,7 +389,7 @@ void MIPS16 cmd_memory(void)
         {
             uint16_t *from = (uint16_t *)fromp;
             if ((uint32_t)from % 2)
-                error("Source address not divisible by 2");
+                error("Address not divisible by 2");
             while (n--)
             {
                 *to++ = (uint64_t)*from++;
@@ -395,7 +399,7 @@ void MIPS16 cmd_memory(void)
         {
             uint32_t *from = (uint32_t *)fromp;
             if ((uint32_t)from % 4)
-                error("Source address not divisible by 4");
+                error("Address not divisible by 4");
             while (n--)
             {
                 *to++ = (uint64_t)*from++;
@@ -411,7 +415,8 @@ void MIPS16 cmd_memory(void)
             int stepin = 1, stepout = 1;
             getcsargs(&p, 9);
             if (argc < 5)
-                error("Syntax");
+                SyntaxError();
+            ;
             int n = getinteger(argv[4]);
             if (n <= 0)
                 return;
@@ -457,7 +462,8 @@ void MIPS16 cmd_memory(void)
             int stepin = 1, stepout = 1;
             getcsargs(&p, 9); // assume byte
             if (argc < 5)
-                error("Syntax");
+                SyntaxError();
+            ;
             int n = getinteger(argv[4]);
             if (n <= 0)
                 return;
@@ -502,7 +508,8 @@ void MIPS16 cmd_memory(void)
         }
         getcsargs(&tp, 9); // assume byte
         if (argc < 5)
-            error("Syntax");
+            SyntaxError();
+        ;
         int stepin = 1, stepout = 1;
         char *from = (char *)GetPeekAddr(argv[0]);
         char *to = (char *)GetPokeAddr(argv[2]);
@@ -548,7 +555,8 @@ void MIPS16 cmd_memory(void)
         {
             getcsargs(&p, 5); // assume byte
             if (argc != 5)
-                error("Syntax");
+                SyntaxError();
+            ;
             char *to = (char *)GetPokeAddr(argv[0]);
             int val = getint(argv[2], 0, 255);
             int n = getinteger(argv[4]);
@@ -561,7 +569,8 @@ void MIPS16 cmd_memory(void)
         {
             getcsargs(&p, 5); // assume byte
             if (argc != 5)
-                error("Syntax");
+                SyntaxError();
+            ;
             short *to = (short *)GetPokeAddr(argv[0]);
             if ((uint32_t)to % 2)
                 error("Address not divisible by 2");
@@ -581,7 +590,8 @@ void MIPS16 cmd_memory(void)
         {
             getcsargs(&p, 5); // assume byte
             if (argc != 5)
-                error("Syntax");
+                SyntaxError();
+            ;
             unsigned int *to = (unsigned int *)GetPokeAddr(argv[0]);
             if ((uint32_t)to % 4)
                 error("Address not divisible by 4");
@@ -602,7 +612,8 @@ void MIPS16 cmd_memory(void)
             int stepin = 1;
             getcsargs(&p, 7);
             if (argc < 5)
-                error("Syntax");
+                SyntaxError();
+            ;
             uint64_t *to = (uint64_t *)GetPokeAddr(argv[0]);
             if ((uint32_t)to % 8)
                 error("Address not divisible by 8");
@@ -631,7 +642,8 @@ void MIPS16 cmd_memory(void)
             int stepin = 1;
             getcsargs(&p, 7); // assume byte
             if (argc < 5)
-                error("Syntax");
+                SyntaxError();
+            ;
             MMFLOAT *to = (MMFLOAT *)GetPokeAddr(argv[0]);
             if ((uint32_t)to % 8)
                 error("Address not divisible by 8");
@@ -657,7 +669,8 @@ void MIPS16 cmd_memory(void)
         }
         getcsargs(&tp, 5); // assume byte
         if (argc != 5)
-            error("Syntax");
+            SyntaxError();
+        ;
         char *to = (char *)GetPokeAddr(argv[0]);
         int val = getint(argv[2], 0, 255);
         int n = getinteger(argv[4]);
@@ -1033,7 +1046,7 @@ void m_alloc(int type)
 void __not_in_flash_func (*GetTempMemory)(int NbrBytes)
 {
     if (g_StrTmpIndex >= MAXTEMPSTRINGS)
-        error("Not enough memory");
+        StandardError(29);
     g_StrTmpLocalIndex[g_StrTmpIndex] = g_LocalIndex;
     g_StrTmp[g_StrTmpIndex] = GetSystemMemory(NbrBytes);
     g_TempMemoryIsChanged = true;
@@ -1307,7 +1320,7 @@ void *GetAlignedMemory(int size)
     while (((uint32_t)addr & (size - 1)) && (!((MBitsGet(addr) & PUSED))) && ((uint32_t)addr < (uint32_t)MMHeap + heap_memory_size))
         addr += PAGESIZE;
     if ((uint32_t)addr == (uint32_t)MMHeap + heap_memory_size)
-        error("Not enough memory");
+        StandardError(29);
     unsigned char *retaddr = addr;
     for (; size > 0; addr += PAGESIZE, size -= PAGESIZE)
     {

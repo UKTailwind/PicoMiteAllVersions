@@ -6144,7 +6144,7 @@ uint32_t testPSRAM(void)
         FlashWriteByte(0);
         FlashWriteByte(0); // terminate the program in flash
         FlashWriteClose();
-        error("Not enough memory");
+        StandardError(29);
     }
 
 #ifdef __cplusplus

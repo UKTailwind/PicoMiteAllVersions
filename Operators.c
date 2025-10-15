@@ -70,7 +70,7 @@ void __not_in_flash_func(op_exp)(void)
     {
         fret = (MMFLOAT)pow(farg1, farg2);
         if (fret == INFINITY)
-            error("Overflow");
+            StandardError(15);
     }
     else
     {
@@ -91,7 +91,7 @@ void __not_in_flash_func(op_mul)(void)
     {
         fret = farg1 * farg2;
         if (fret == INFINITY)
-            error("Overflow");
+            StandardError(15);
     }
     else
         iret = iarg1 * iarg2;
@@ -104,7 +104,7 @@ void __not_in_flash_func(op_div)(void)
         error("Divide by zero");
     fret = farg1 / farg2;
     if (fret == INFINITY)
-        error("Overflow");
+        StandardError(15);
     targ = T_NBR;
 }
 
@@ -121,7 +121,7 @@ void __not_in_flash_func(op_add)(void)
     {
         fret = farg1 + farg2;
         if (fret == INFINITY)
-            error("Overflow");
+            StandardError(15);
     }
     else if (targ & T_INT)
         iret = iarg1 + iarg2;

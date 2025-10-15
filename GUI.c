@@ -189,17 +189,17 @@ int GetCtrlParams(int type, unsigned char *p)
     int r, a;
     struct s_GaugeS *GaugeS; // in case we are dealing with a GAUGE control
     if (!Option.MaxCtrls)
-        error("No memory allocated for GUI controls");
+        StandardError(13);
     getcsargs(&p, 40);
     if ((argc & 1) != 1)
-        error("Argument count");
+        StandardError(2);
     if (*argv[0] == '#')
         argv[0]++;
     r = getint(argv[0], 1, Option.MaxCtrls - 1);
     if (Ctrl[r].type)
         error("GUI reference number #% is in use", r);
     if (argc < 5)
-        error("Argument count");
+        StandardError(2);
     a = 0;
 
     // setup the defaults
@@ -294,7 +294,7 @@ int GetCtrlParams(int type, unsigned char *p)
     // get x1 and y1 - all controls require these
     Ctrl[r].x1 = getint(argv[a += 2], 0, HRes);
     if (argc < a)
-        error("Argument count");
+        StandardError(2);
     Ctrl[r].y1 = getint(argv[a += 2], 0, VRes);
 
     // the fourth argument in GUI CAPTION is the justification
@@ -463,7 +463,7 @@ int GetCtrlParams(int type, unsigned char *p)
     }
 
     if (argc > a + 1)
-        error("Argument count");
+        StandardError(2);
     Ctrl[r].type = type;
     if (type == CTRL_GAUGE || type == CTRL_BARGAUGE)
     {
@@ -486,8 +486,8 @@ void cmd_gui(void)
     int r;
     unsigned char *p;
 
-    if (!Option.DISPLAY_TYPE)
-        error("Display not configured");
+    CheckDisplay();
+    error("Display not configured");
 
     if ((p = checkstring(cmdline, (unsigned char *)"PAGE")))
     {
@@ -537,7 +537,7 @@ void cmd_gui(void)
         if ((checkstring(p, (unsigned char *)"CANCEL")))
         {
             if (!Option.MaxCtrls)
-                error("No memory allocated for GUI controls");
+                StandardError(13);
             if (!InvokingCtrl)
                 return;
             DrawKeyboard(KEY_KEY_CANCEL);
@@ -552,7 +552,7 @@ void cmd_gui(void)
         if ((checkstring(p, (unsigned char *)"CANCEL")))
         {
             if (!Option.MaxCtrls)
-                error("No memory allocated for GUI controls");
+                StandardError(13);
             if (!InvokingCtrl)
                 return;
             DrawKeyboard(KEY_KEY_CANCEL);
@@ -567,7 +567,7 @@ void cmd_gui(void)
         if ((checkstring(p, (unsigned char *)"CANCEL")))
         {
             if (!Option.MaxCtrls)
-                error("No memory allocated for GUI controls");
+                StandardError(13);
             if (!InvokingCtrl)
                 return;
             DrawFmtBox(KEY_KEY_CANCEL);
@@ -625,9 +625,9 @@ void cmd_gui(void)
         int i, r;
         getcsargs(&p, MAX_ARG_COUNT);
         if (!(argc & 1))
-            error("Argument count");
+            StandardError(2);
         if (!Option.MaxCtrls)
-            error("No memory allocated for GUI controls");
+            StandardError(13);
         if (checkstring(argv[0], (unsigned char *)"ALL"))
         {
             for (r = 1; r < Option.MaxCtrls; r++)
@@ -663,9 +663,9 @@ void cmd_gui(void)
         int i, r;
         getcsargs(&p, MAX_ARG_COUNT);
         if (!(argc & 1))
-            error("Argument count");
+            StandardError(2);
         if (!Option.MaxCtrls)
-            error("No memory allocated for GUI controls");
+            StandardError(13);
         if (checkstring(argv[0], (unsigned char *)"ALL"))
         {
             for (r = 1; r < Option.MaxCtrls; r++)
@@ -688,9 +688,9 @@ void cmd_gui(void)
         int i, r;
         getcsargs(&p, MAX_ARG_COUNT);
         if (!Option.MaxCtrls)
-            error("No memory allocated for GUI controls");
+            StandardError(13);
         if (!(argc & 1))
-            error("Argument count");
+            StandardError(2);
         if (checkstring(argv[0], (unsigned char *)"ALL"))
         {
             for (r = 1; r < Option.MaxCtrls; r++)
@@ -713,9 +713,9 @@ void cmd_gui(void)
         int i, r;
         getcsargs(&p, MAX_ARG_COUNT);
         if (!(argc & 1))
-            error("Argument count");
+            StandardError(2);
         if (!Option.MaxCtrls)
-            error("No memory allocated for GUI controls");
+            StandardError(13);
         if (checkstring(argv[0], (unsigned char *)"ALL"))
         {
             for (r = 1; r < Option.MaxCtrls; r++)
@@ -744,9 +744,9 @@ void cmd_gui(void)
         int i, r;
         getcsargs(&p, MAX_ARG_COUNT);
         if (!(argc & 1))
-            error("Argument count");
+            StandardError(2);
         if (!Option.MaxCtrls)
-            error("No memory allocated for GUI controls");
+            StandardError(13);
         if (checkstring(argv[0], (unsigned char *)"ALL"))
         {
             for (r = 1; r < Option.MaxCtrls; r++)
@@ -775,9 +775,9 @@ void cmd_gui(void)
         int i, r;
         getcsargs(&p, MAX_ARG_COUNT);
         if (!Option.MaxCtrls)
-            error("No memory allocated for GUI controls");
+            StandardError(13);
         if (!(argc & 1))
-            error("Argument count");
+            StandardError(2);
         if (checkstring(argv[0], (unsigned char *)"ALL"))
         {
             for (r = 1; r < Option.MaxCtrls; r++)
@@ -806,9 +806,9 @@ void cmd_gui(void)
         int i, r;
         getcsargs(&p, MAX_ARG_COUNT);
         if (!(argc & 1))
-            error("Argument count");
+            StandardError(2);
         if (!Option.MaxCtrls)
-            error("No memory allocated for GUI controls");
+            StandardError(13);
         if (checkstring(argv[0], (unsigned char *)"ALL"))
         {
             ClearScreen(gui_bcolour);
@@ -838,9 +838,9 @@ void cmd_gui(void)
         int i, r, c;
         getcsargs(&p, MAX_ARG_COUNT);
         if (!Option.MaxCtrls)
-            error("No memory allocated for GUI controls");
+            StandardError(13);
         if (!(argc & 1) || argc < 3)
-            error("Argument count");
+            StandardError(2);
         c = getint(argv[0], BLACK, WHITE);
         for (i = 2; i < argc; i += 2)
         {
@@ -889,7 +889,7 @@ void cmd_gui(void)
     if ((p = checkstring(cmdline, (unsigned char *)"SETUP")))
     {
         if (!Option.MaxCtrls)
-            error("No memory allocated for GUI controls");
+            StandardError(13);
         SetupPage = getint(p, 1, MAX_PAGES) - 1;
         return;
     }
@@ -904,9 +904,9 @@ void cmd_GUIpage(unsigned char *p)
 
     getcsargs(&p, MAX_ARG_COUNT);
     if (!(argc & 1))
-        error("Argument count");
+        StandardError(2);
     if (!Option.MaxCtrls)
-        error("No memory allocated for GUI controls");
+        StandardError(13);
     OldPages = CurrentPages;
     CurrentPages = 0;
     for (i = 0; i < argc; i += 2)
@@ -2683,10 +2683,10 @@ void fun_msgbox(void)
     int btnx1[4], btny1, btnx2[4], btny2;
     long long int timeout;
     if (!Option.MaxCtrls)
-        error("No memory allocated for GUI controls");
+        StandardError(13);
     getcsargs(&ep, 9);
     if (argc < 3)
-        error("Argument count");
+        StandardError(2);
     msg = GetMemory(MAX_CAPTION_LINES * MAXSTRLEN);
     btn = GetMemory(4 * MAXSTRLEN);
 
@@ -2785,10 +2785,9 @@ void fun_msgbox(void)
 void fun_ctrlval(void)
 {
     int r;
-    if (!Option.DISPLAY_TYPE)
-        error("Display not configured");
+    CheckDisplay();
     if (!Option.MaxCtrls)
-        error("No memory allocated for GUI controls");
+        StandardError(13);
     if (*ep == '#')
         ep++;
     r = getint(ep, 1, Option.MaxCtrls);
@@ -2843,7 +2842,7 @@ void cmd_ctrlval(void)
     if (HRes == 0)
         error("LCD Panel not configured");
     if (!Option.MaxCtrls)
-        error("No memory allocated for GUI controls");
+        StandardError(13);
     if (*cmdline == '#')
         cmdline++;
     r = getint(cmdline, 1, Option.MaxCtrls);
@@ -2852,11 +2851,13 @@ void cmd_ctrlval(void)
     while (*cmdline && tokenfunction(*cmdline) != op_equal)
         cmdline++; // search for the = symbol
     if (!*cmdline)
-        error("Syntax");
+        SyntaxError();
+    ;
     ++cmdline; // step over the = symbol
     skipspace(cmdline);
     if (!*cmdline || *cmdline == '\'')
-        error("Syntax");
+        SyntaxError();
+    ;
     switch (Ctrl[r].type)
     {
     case CTRL_BUTTON:
@@ -2954,16 +2955,14 @@ void cmd_ctrlval(void)
 
 void fun_mmhpos(void)
 {
-    if (!Option.DISPLAY_TYPE)
-        error("Display not configured");
+    CheckDisplay();
     iret = CurrentX;
     targ = T_INT;
 }
 
 void fun_mmvpos(void)
 {
-    if (!Option.DISPLAY_TYPE)
-        error("Display not configured");
+    CheckDisplay();
     iret = CurrentY;
     targ = T_INT;
 }

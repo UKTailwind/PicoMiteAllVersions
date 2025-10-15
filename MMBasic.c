@@ -351,7 +351,7 @@ void __not_in_flash_func(ExecuteProgram)(unsigned char *p)
                     else
                     {
                         if (!isnamestart(*p) && *p == '~')
-                            error("Unknown command");
+                            StandardError(36);
                         else if (!isnamestart(*p))
                             error("Invalid character: @", (int)(*p));
                         i = FindSubFun(p, false); // it could be a defined command
@@ -360,7 +360,7 @@ void __not_in_flash_func(ExecuteProgram)(unsigned char *p)
                             DefinedSubFun(false, p, i, NULL, NULL, NULL, NULL);
                         }
                         else
-                            error("Unknown command");
+                            StandardError(36);
                     }
                 }
                 else
@@ -1616,11 +1616,11 @@ unsigned char MIPS16 __not_in_flash_func (*evaluate)(unsigned char *p, MMFLOAT *
 
     // check that the types match and convert them if we can
     if ((*ta & (T_NBR | T_INT)) && t & T_STR)
-        error("Expected a number");
+        StandardError(20);
     if (*ta & T_STR && (t & (T_NBR | T_INT)))
         error("Expected a string");
     if (o != E_END)
-        error("Argument count");
+        StandardError(2);
     if ((*ta & T_NBR) && (t & T_INT))
         *fa = *ia;
     if ((*ta & T_INT) && (t & T_NBR))
@@ -1883,14 +1883,14 @@ unsigned char MIPS32 __not_in_flash_func (*getvalue)(unsigned char *p, MMFLOAT *
                     else if (t & T_INT)
                         i64 = (i64 != 0) ? 0 : 1;
                     else
-                        error("Expected a number");
+                        StandardError(20);
                 }
                 else if (op_type == op_inv)
                 {
                     if (t & T_NBR)
                         i64 = FloatToInt64(f);
                     else if (!(t & T_INT))
-                        error("Expected a number");
+                        StandardError(20);
                     i64 = ~i64;
                     t = T_INT;
                 }
@@ -1901,7 +1901,7 @@ unsigned char MIPS32 __not_in_flash_func (*getvalue)(unsigned char *p, MMFLOAT *
                     else if (t & T_INT)
                         i64 = -i64;
                     else
-                        error("Expected a number");
+                        StandardError(20);
                 }
                 // op_add: no modification needed
 
@@ -2155,7 +2155,8 @@ unsigned char MIPS32 __not_in_flash_func (*getvalue)(unsigned char *p, MMFLOAT *
         }
         else
         {
-            error("Syntax");
+            SyntaxError();
+            ;
         }
     }
 
@@ -3192,7 +3193,8 @@ void __not_in_flash_func(MakeCommaSeparatedArgs)(unsigned char **p, int maxargs,
 
             inarg = false;
             if (*argc >= maxargs)
-                error("Syntax");
+                SyntaxError();
+            ;
             argv[(*argc)++] = op; // save the pointer for this delimiter
             *op++ = *tp++;        // copy the comma
             *op++ = 0;            // terminate it
@@ -3210,7 +3212,8 @@ void __not_in_flash_func(MakeCommaSeparatedArgs)(unsigned char **p, int maxargs,
         if (!inarg)
         {
             if (*argc >= maxargs)
-                error("Syntax");
+                SyntaxError();
+            ;
             argv[(*argc)++] = op; // save the pointer for this arg
             inarg = true;
         }
@@ -3236,7 +3239,8 @@ void __not_in_flash_func(MakeCommaSeparatedArgs)(unsigned char **p, int maxargs,
             {
                 *op++ = *tp++;
                 if (*tp == 0)
-                    error("Syntax");
+                    SyntaxError();
+                ;
             } while (*tp != '"');
             *op++ = *tp++;
             continue;
@@ -3297,7 +3301,8 @@ void MIPS16 __not_in_flash_func(makeargs)(unsigned char **p, int maxargs, unsign
     if (*delim == '(')
     {
         if (*tp != '(')
-            error("Syntax");
+            SyntaxError();
+        ;
         expect_bracket = true;
         delim++;
         tp++;
@@ -3336,7 +3341,8 @@ void MIPS16 __not_in_flash_func(makeargs)(unsigned char **p, int maxargs, unsign
 
             inarg = false;
             if (*argc >= maxargs)
-                error("Syntax");
+                SyntaxError();
+            ;
             argv[(*argc)++] = op; // save the pointer for this delimiter
             *op++ = *tp++;        // copy the token or char (always one)
             *op++ = 0;            // terminate it
@@ -3358,7 +3364,8 @@ void MIPS16 __not_in_flash_func(makeargs)(unsigned char **p, int maxargs, unsign
         if (!inarg)
         {
             if (*argc >= maxargs)
-                error("Syntax");
+                SyntaxError();
+            ;
             argv[(*argc)++] = op; // save the pointer for this arg
             inarg = true;
         }
@@ -3384,7 +3391,8 @@ void MIPS16 __not_in_flash_func(makeargs)(unsigned char **p, int maxargs, unsign
             {
                 *op++ = *tp++;
                 if (*tp == 0)
-                    error("Syntax");
+                    SyntaxError();
+                ;
             } while (*tp != '"');
             *op++ = *tp++;
             continue;
@@ -3397,7 +3405,8 @@ void MIPS16 __not_in_flash_func(makeargs)(unsigned char **p, int maxargs, unsign
         expect_cmd = false;
     }
     if (expect_bracket && *tp != ')')
-        error("Syntax");
+        SyntaxError();
+    ;
     while (op - 1 > argbuf && *(op - 1) == ' ')
         --op; // trim any trailing spaces on the last argument
     *op = 0;  // terminate the last argument
@@ -3716,6 +3725,77 @@ void MIPS16 error(char *msg, ...)
     cmdline = NULL;
     do_end(false);
     longjmp(mark, 1); // jump back to the input prompt
+}
+void SyntaxError(void)
+{
+    error("Invalid syntax");
+}
+const char *errorstring[] = {
+    "",                                                    // 0
+    "Not available on this display",                       // 1
+    "Argument count",                                      // 2
+    "PIO 0 not available",                                 // 3
+    "PIO 1 not available",                                 // 4
+    "PIO 2 not available",                                 // 5
+    "Invalid variable",                                    // 6
+    "Object % does not exist",                             // 7
+    "Invalid configuration",                               // 8
+    "Invalid pin",                                         // 9
+    "Invalid in a program",                                // 10
+    "Invalid on this display",                             // 11
+    "Pin not set for PWM",                                 // 12
+    "No memory allocated for GUI controls",                // 13
+    "String length",                                       // 14
+    "Overflow",                                            // 15
+    "Array size mismatch",                                 // 16
+    "Array size",                                          // 17
+    "File number",                                         // 18
+    "File number is not open",                             // 19
+    "Expected a number",                                   // 20
+    "Number out of bounds",                                // 21
+    "Cannot change a constant",                            // 22
+    "Destination array too small",                         // 23
+    "Already Set to pin %",                                // 24
+    "Library is using Slot % ",                            // 25
+    "% is invalid (valid is % to %)",                      // 26
+    "Pin %/| is in use",                                   // 27
+    "Insufficient data",                                   // 28
+    "Not enough memory",                                   // 29
+    "RTC not responding",                                  // 30
+    "Already open",                                        // 31
+    "Insufficient space in array",                         // 32
+    "Maximum % characters",                                // 33
+    "Coordinates",                                         // 34
+    "Argument 1 must be integer array",                    // 35
+    "Unknown command",                                     // 36
+    "Invalid buffer",                                      // 37
+    "Frame buffer not created",                            // 38
+    "Variable > 255",                                      // 39
+    "Invalid for this screen mode",                        // 40
+    "Argument % must be a 5 element floating point array", // 41
+    "Pin $ is not off or an ADC input",                    // 42
+    "Pin %/| is not off or an output",                     // 43
+};
+void StandardError(int n)
+{
+    error((char *)errorstring[n]);
+}
+void StandardErrorParam(int n, int m)
+{
+    error((char *)errorstring[n], m);
+}
+void StandardErrorParam2(int n, int m, int l)
+{
+    error((char *)errorstring[n], m, l);
+}
+void StandardErrorParamS(int n, char *m)
+{
+    error((char *)errorstring[n], m);
+}
+
+void StandardErrorParam3(int n, int m, int l, int h)
+{
+    error((char *)errorstring[n], m, l, h);
 }
 
 /**********************************************************************************************

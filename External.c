@@ -487,14 +487,14 @@ void cmd_pin(void)
     if (!code)
         pin = codemap(pin);
     if (IsInvalidPin(pin))
-        error("Invalid pin");
+        StandardError(9);
     while (*cmdline && tokenfunction(*cmdline) != op_equal)
         cmdline++;
     if (!*cmdline)
-        error("Invalid syntax");
+        SyntaxError();
     ++cmdline;
     if (!*cmdline)
-        error("Invalid syntax");
+        SyntaxError();
     value = getinteger(cmdline);
     ExtSet(pin, value);
 }
@@ -795,11 +795,11 @@ void MIPS16 ExtCfg(int pin, int cfg, int option)
     case EXT_ADCRAW:
     case EXT_ANA_IN:
         if (!(PinDef[pin].mode & ANALOG_IN))
-            error("Invalid configuration");
+            StandardError(8);
         if (pin <= 44 && rp2350a == 0)
-            error("Invalid configuration");
+            StandardError(8);
         if (pin > 44 && rp2350a)
-            error("Invalid configuration");
+            StandardError(8);
         tris = 1;
         ana = 0;
         break;
@@ -807,7 +807,7 @@ void MIPS16 ExtCfg(int pin, int cfg, int option)
     case EXT_ADCRAW:
     case EXT_ANA_IN:
         if (!(PinDef[pin].mode & ANALOG_IN))
-            error("Invalid configuration");
+            StandardError(8);
         tris = 1;
         ana = 0;
         break;
@@ -902,7 +902,7 @@ void MIPS16 ExtCfg(int pin, int cfg, int option)
             gpio_set_input_hysteresis_enabled(PinDef[pin].GPno, true);
             break;
         }
-        error("Invalid configuration"); // not an interrupt enabled pin
+        StandardError(8); // not an interrupt enabled pin
         return;
 
     case EXT_INT_LO:   // same as digital input, so fall through
@@ -910,7 +910,7 @@ void MIPS16 ExtCfg(int pin, int cfg, int option)
     case EXT_INT_BOTH: // same as digital input, so fall through
     case EXT_DIG_IN:
         if (!(PinDef[pin].mode & DIGITAL_IN))
-            error("Invalid configuration");
+            StandardError(8);
         if (option)
             PinSetBit(pin, option);
         tris = 1;
@@ -925,7 +925,7 @@ void MIPS16 ExtCfg(int pin, int cfg, int option)
 #endif
     case EXT_DIG_OUT:
         if (!(PinDef[pin].mode & DIGITAL_OUT))
-            error("Invalid configuration");
+            StandardError(8);
         tris = 0;
         ana = 1;
         gpio_set_drive_strength(PinDef[pin].GPno, GPIO_DRIVE_STRENGTH_8MA);
@@ -933,278 +933,278 @@ void MIPS16 ExtCfg(int pin, int cfg, int option)
 #ifndef PICOMITEWEB
     case EXT_HEARTBEAT:
         if (!(pin = HEARTBEATpin))
-            error("Invalid configuration");
+            StandardError(8);
         tris = 0;
         ana = 1;
         break;
 #endif
     case EXT_UART0TX:
         if (!(PinDef[pin].mode & UART0TX))
-            error("Invalid configuration");
+            StandardError(8);
         if ((UART0TXpin != 99))
-            error("Already Set to pin %", UART0TXpin);
+            StandardErrorParam(24, UART0TXpin);
         UART0TXpin = pin;
         break;
     case EXT_UART0RX:
         if (!(PinDef[pin].mode & UART0RX))
-            error("Invalid configuration");
+            StandardError(8);
         if ((UART0RXpin != 99))
-            error("Already Set to pin %", UART0RXpin);
+            StandardErrorParam(24, UART0RXpin);
         UART0RXpin = pin;
         break;
     case EXT_UART1TX:
         if (!(PinDef[pin].mode & UART1TX))
-            error("Invalid configuration");
+            StandardError(8);
         if ((UART1TXpin != 99))
-            error("Already Set to pin %", UART1TXpin);
+            StandardErrorParam(24, UART1TXpin);
         UART1TXpin = pin;
         break;
     case EXT_UART1RX:
         if (!(PinDef[pin].mode & UART1RX))
-            error("Invalid configuration");
+            StandardError(8);
         if ((UART1RXpin != 99))
-            error("Already Set to pin %", UART1RXpin);
+            StandardErrorParam(24, UART1RXpin);
         UART1RXpin = pin;
         break;
     case EXT_SPI0TX:
         if (!(PinDef[pin].mode & SPI0TX))
-            error("Invalid configuration");
+            StandardError(8);
         if (SPI0locked)
             error("SPI in use for SYSTEM SPI");
         if ((SPI0TXpin != 99 && SPI0TXpin != pin))
-            error("Already Set to pin %", SPI0TXpin);
+            StandardErrorParam(24, SPI0TXpin);
         SPI0TXpin = pin;
         break;
     case EXT_SPI0RX:
         if (!(PinDef[pin].mode & SPI0RX))
-            error("Invalid configuration");
+            StandardError(8);
         if (SPI0locked)
             error("SPI in use for SYSTEM SPI");
         if ((SPI0RXpin != 99 && SPI0RXpin != pin))
-            error("Already Set to pin %", SPI0RXpin);
+            StandardErrorParam(24, SPI0RXpin);
         SPI0RXpin = pin;
         break;
     case EXT_SPI0SCK:
         if (!(PinDef[pin].mode & SPI0SCK))
-            error("Invalid configuration");
+            StandardError(8);
         if (SPI0locked)
             error("SPI in use for SYSTEM SPI");
         if ((SPI0SCKpin != 99 && SPI0SCKpin != pin))
-            error("Already Set to pin %", SPI0SCKpin);
+            StandardErrorParam(24, SPI0SCKpin);
         SPI0SCKpin = pin;
         break;
     case EXT_SPI1TX:
         if (!(PinDef[pin].mode & SPI1TX))
-            error("Invalid configuration");
+            StandardError(8);
         if (SPI1locked)
             error("SPI2 in use for SYSTEM SPI");
         if ((SPI1TXpin != 99 && SPI1TXpin != pin))
-            error("Already Set to pin %", SPI1TXpin);
+            StandardErrorParam(24, SPI1TXpin);
         SPI1TXpin = pin;
         break;
     case EXT_SPI1RX:
         if (!(PinDef[pin].mode & SPI1RX))
-            error("Invalid configuration");
+            StandardError(8);
         if (SPI1locked)
             error("SPI2 in use for SYSTEM SPI");
         if ((SPI1RXpin != 99 && SPI1RXpin != pin))
-            error("Already Set to pin %", SPI1RXpin);
+            StandardErrorParam(24, SPI1RXpin);
         SPI1RXpin = pin;
         break;
     case EXT_SPI1SCK:
         if (!(PinDef[pin].mode & SPI1SCK))
-            error("Invalid configuration");
+            StandardError(8);
         if (SPI1locked)
             error("SPI2 in use for SYSTEM SPI");
         if ((SPI1SCKpin != 99 && SPI1SCKpin != pin))
-            error("Already Set to pin %", SPI1SCKpin);
+            StandardErrorParam(24, SPI1SCKpin);
         SPI1SCKpin = pin;
         break;
     case EXT_IR:
         if ((IRpin != 99))
-            error("Already Set to pin %", IRpin);
+            StandardErrorParam(24, IRpin);
         IRpin = pin;
         break;
     case EXT_PWM0A:
         if (!(PinDef[pin].mode & PWM0A))
-            error("Invalid configuration");
+            StandardError(8);
         if ((PWM0Apin != 99 && PWM0Apin != pin))
-            error("Already Set to pin %", PWM0Apin);
+            StandardErrorParam(24, PWM0Apin);
         PWM0Apin = pin;
         break;
     case EXT_PWM1A:
         if (!(PinDef[pin].mode & PWM1A))
-            error("Invalid configuration");
+            StandardError(8);
         if ((PWM1Apin != 99 && PWM1Apin != pin))
-            error("Already Set to pin %", PWM1Apin);
+            StandardErrorParam(24, PWM1Apin);
         PWM1Apin = pin;
         break;
     case EXT_PWM2A:
         if (!(PinDef[pin].mode & PWM2A))
-            error("Invalid configuration");
+            StandardError(8);
         if ((PWM2Apin != 99 && PWM2Apin != pin))
-            error("Already Set to pin %", PWM2Apin);
+            StandardErrorParam(24, PWM2Apin);
         PWM2Apin = pin;
         gpio_set_drive_strength(PinDef[pin].GPno, GPIO_DRIVE_STRENGTH_8MA);
         gpio_set_slew_rate(PinDef[pin].GPno, GPIO_SLEW_RATE_FAST);
         break;
     case EXT_PWM3A:
         if (!(PinDef[pin].mode & PWM3A))
-            error("Invalid configuration");
+            StandardError(8);
         if ((PWM3Apin != 99 && PWM3Apin != pin))
-            error("Already Set to pin %", PWM3Apin);
+            StandardErrorParam(24, PWM3Apin);
         PWM3Apin = pin;
         break;
     case EXT_PWM4A:
         if (!(PinDef[pin].mode & PWM4A))
-            error("Invalid configuration");
+            StandardError(8);
         if ((PWM4Apin != 99 && PWM4Apin != pin))
-            error("Already Set to pin %", PWM4Apin);
+            StandardErrorParam(24, PWM4Apin);
         PWM4Apin = pin;
         break;
     case EXT_PWM5A:
         if (!(PinDef[pin].mode & PWM5A))
-            error("Invalid configuration");
+            StandardError(8);
         if ((PWM5Apin != 99 && PWM5Apin != pin))
-            error("Already Set to pin %", PWM5Apin);
+            StandardErrorParam(24, PWM5Apin);
         PWM5Apin = pin;
         break;
     case EXT_PWM6A:
         if (!(PinDef[pin].mode & PWM6A))
-            error("Invalid configuration");
+            StandardError(8);
         if ((PWM6Apin != 99 && PWM6Apin != pin))
-            error("Already Set to pin %", PWM6Apin);
+            StandardErrorParam(24, PWM6Apin);
         PWM6Apin = pin;
         break;
     case EXT_PWM7A:
         if (!(PinDef[pin].mode & PWM7A))
-            error("Invalid configuration");
+            StandardError(8);
         if ((PWM7Apin != 99 && PWM7Apin != pin))
-            error("Already Set to pin %", PWM7Apin);
+            StandardErrorParam(24, PWM7Apin);
         PWM7Apin = pin;
         break;
 #ifdef rp2350
     case EXT_PWM8A:
         if (!(PinDef[pin].mode & PWM8A) || rp2350a)
-            error("Invalid configuration");
+            StandardError(8);
         if ((PWM8Apin != 99 && PWM8Apin != pin))
-            error("Already Set to pin %", PWM8Apin);
+            StandardErrorParam(24, PWM8Apin);
         PWM8Apin = pin;
         break;
     case EXT_PWM9A:
         if (!(PinDef[pin].mode & PWM9A) || rp2350a)
-            error("Invalid configuration");
+            StandardError(8);
         if ((PWM9Apin != 99 && PWM9Apin != pin))
-            error("Already Set to pin %", PWM9Apin);
+            StandardErrorParam(24, PWM9Apin);
         PWM9Apin = pin;
         break;
     case EXT_PWM10A:
         if (!(PinDef[pin].mode & PWM10A) || rp2350a)
-            error("Invalid configuration");
+            StandardError(8);
         if ((PWM10Apin != 99 && PWM10Apin != pin))
-            error("Already Set to pin %", PWM10Apin);
+            StandardErrorParam(24, PWM10Apin);
         PWM10Apin = pin;
         break;
     case EXT_PWM11A:
         if (!(PinDef[pin].mode & PWM11A) || rp2350a)
-            error("Invalid configuration");
+            StandardError(8);
         if ((PWM11Apin != 99 && PWM11Apin != pin))
-            error("Already Set to pin %", PWM11Apin);
+            StandardErrorParam(24, PWM11Apin);
         PWM11Apin = pin;
         break;
 #endif
     case EXT_PWM0B:
         if (!(PinDef[pin].mode & PWM0B))
-            error("Invalid configuration");
+            StandardError(8);
         if ((PWM0Bpin != 99 && PWM0Bpin != pin))
-            error("Already Set to pin %", PWM0Bpin);
+            StandardErrorParam(24, PWM0Bpin);
         PWM0Bpin = pin;
         break;
     case EXT_PWM1B:
         if (!(PinDef[pin].mode & PWM1B))
-            error("Invalid configuration");
+            StandardError(8);
         if ((PWM1Bpin != 99 && PWM1Bpin != pin))
-            error("Already Set to pin %", PWM1Bpin);
+            StandardErrorParam(24, PWM1Bpin);
         PWM1Bpin = pin;
         break;
     case EXT_PWM2B:
         if (!(PinDef[pin].mode & PWM2B))
-            error("Invalid configuration");
+            StandardError(8);
         if ((PWM2Bpin != 99 && PWM2Bpin != pin))
-            error("Already Set to pin %", PWM2Bpin);
+            StandardErrorParam(24, PWM2Bpin);
         PWM2Bpin = pin;
         break;
     case EXT_PWM3B:
         if (!(PinDef[pin].mode & PWM3B))
-            error("Invalid configuration");
+            StandardError(8);
         if ((PWM3Bpin != 99 && PWM3Bpin != pin))
-            error("Already Set to pin %", PWM3Bpin);
+            StandardErrorParam(24, PWM3Bpin);
         PWM3Bpin = pin;
         break;
     case EXT_PWM4B:
         if (!(PinDef[pin].mode & PWM4B))
-            error("Invalid configuration");
+            StandardError(8);
         if ((PWM4Bpin != 99 && PWM4Bpin != pin))
-            error("Already Set to pin %", PWM4Bpin);
+            StandardErrorParam(24, PWM4Bpin);
         PWM4Bpin = pin;
         break;
     case EXT_PWM5B:
         if (!(PinDef[pin].mode & PWM5B))
-            error("Invalid configuration");
+            StandardError(8);
         if ((PWM5Bpin != 99 && PWM5Bpin != pin))
-            error("Already Set to pin %", PWM5Bpin);
+            StandardErrorParam(24, PWM5Bpin);
         PWM5Bpin = pin;
         break;
     case EXT_PWM6B:
         if (!(PinDef[pin].mode & PWM6B))
-            error("Invalid configuration");
+            StandardError(8);
         if ((PWM6Bpin != 99 && PWM6Bpin != pin))
-            error("Already Set to pin %", PWM6Bpin);
+            StandardErrorParam(24, PWM6Bpin);
         PWM6Bpin = pin;
         break;
     case EXT_PWM7B:
         if (!(PinDef[pin].mode & PWM7B))
-            error("Invalid configuration");
+            StandardError(8);
         if ((PWM7Bpin != 99 && PWM7Bpin != pin))
-            error("Already Set to pin %", PWM7Bpin);
+            StandardErrorParam(24, PWM7Bpin);
         PWM7Bpin = pin;
         break;
 #ifdef rp2350
 #ifndef PICOMITEWEB
     case EXT_PWM8B:
         if (!(PinDef[pin].mode & PWM8B) || rp2350a)
-            error("Invalid configuration");
+            StandardError(8);
         if ((PWM8Bpin != 99 && PWM8Bpin != pin))
-            error("Blready Set to pin %", PWM8Bpin);
+            StandardErrorParam(24, PWM8Bpin);
         PWM8Bpin = pin;
         break;
     case EXT_PWM9B:
         if (!(PinDef[pin].mode & PWM9B) || rp2350a)
-            error("Invalid configuration");
+            StandardError(8);
         if ((PWM9Bpin != 99 && PWM9Bpin != pin))
-            error("Blready Set to pin %", PWM9Bpin);
+            StandardErrorParam(24, PWM9Bpin);
         PWM9Bpin = pin;
         break;
     case EXT_PWM10B:
         if (!(PinDef[pin].mode & PWM10B) || rp2350a)
-            error("Invalid configuration");
+            StandardError(8);
         if ((PWM10Bpin != 99 && PWM10Bpin != pin))
-            error("Blready Set to pin %", PWM10Bpin);
+            StandardErrorParam(24, PWM10Bpin);
         PWM10Bpin = pin;
         break;
     case EXT_PWM11B:
         if (!(PinDef[pin].mode & PWM11B) || rp2350a)
-            error("Invalid configuration");
+            StandardError(8);
         if ((PWM11Bpin != 99 && PWM11Bpin != pin))
-            error("Blready Set to pin %", PWM11Bpin);
+            StandardErrorParam(24, PWM11Bpin);
         PWM11Bpin = pin;
         break;
 #endif
     case EXT_FAST_TIMER:
         if (!(PinDef[pin].mode & PWM0B))
-            error("Invalid configuration");
+            StandardError(8);
         if ((PWM0Bpin != 99 && PWM0Bpin != pin))
-            error("Already Set to pin %", PWM0Bpin);
+            StandardErrorParam(24, PWM0Bpin);
         PWM0Bpin = pin;
         INT5Count = INT5Value = 0;
         INT5Timer = INT5InitTimer = option; // only used for frequency and period measurement
@@ -1228,42 +1228,42 @@ void MIPS16 ExtCfg(int pin, int cfg, int option)
 #endif
     case EXT_I2C0SDA:
         if (!(PinDef[pin].mode & I2C0SDA))
-            error("Invalid configuration");
+            StandardError(8);
         if (I2C0locked)
             error("I2C in use for SYSTEM I2C");
         if ((I2C0SDApin != 99 && I2C0SDApin != pin))
-            error("Already Set to pin %", I2C0SDApin);
+            StandardErrorParam(24, I2C0SDApin);
         I2C0SDApin = pin;
         break;
     case EXT_I2C0SCL:
         if (!(PinDef[pin].mode & I2C0SCL))
-            error("Invalid configuration");
+            StandardError(8);
         if (I2C0locked)
             error("I2C in use for SYSTEM I2C");
         if ((I2C0SCLpin != 99 && I2C0SCLpin != pin))
-            error("Already Set to pin %", I2C0SCLpin);
+            StandardErrorParam(24, I2C0SCLpin);
         I2C0SCLpin = pin;
         break;
     case EXT_I2C1SDA:
         if (!(PinDef[pin].mode & I2C1SDA))
-            error("Invalid configuration");
+            StandardError(8);
         if (I2C1locked)
             error("I2C2 in use for SYSTEM I2C");
         if ((I2C1SDApin != 99) && I2C1SDApin != pin)
-            error("Already Set to pin %", I2C1SDApin);
+            StandardErrorParam(24, I2C1SDApin);
         I2C1SDApin = pin;
         break;
     case EXT_I2C1SCL:
         if (!(PinDef[pin].mode & I2C1SCL))
-            error("Invalid configuration");
+            StandardError(8);
         if (I2C1locked)
             error("I2C2 in use for SYSTEM I2C");
         if ((I2C1SCLpin != 99 && I2C1SCLpin != pin))
-            error("Already Set to pin %", I2C1SCLpin);
+            StandardErrorParam(24, I2C1SCLpin);
         I2C1SCLpin = pin;
         break;
     default:
-        error("Invalid configuration");
+        StandardError(8);
         return;
     }
     ExtCurrentConfig[pin] = cfg;
@@ -1385,7 +1385,7 @@ void MIPS16 cmd_setpin(void)
     int i, pin, pin2 = 0, pin3 = 0, value = -1, value2 = 0, value3 = 0, option = 0;
     getcsargs(&cmdline, 7);
     if (argc % 2 == 0 || argc < 3)
-        error("Argument count");
+        StandardError(2);
     char code;
     if (!(code = codecheck(argv[0])))
         argv[0] += 2;
@@ -1536,7 +1536,7 @@ void MIPS16 cmd_setpin(void)
             value = EXT_PWM11B;
 #endif
         else
-            error("Invalid configuration");
+            StandardError(8);
     }
     else if (checkstring(argv[2], (unsigned char *)"INT"))
     {
@@ -1549,12 +1549,13 @@ void MIPS16 cmd_setpin(void)
         else if (pin == Option.INT4pin)
             value = EXT_INT4;
         else
-            error("Invalid configuration");
+            StandardError(8);
     }
     if (value != -1)
         goto process;
     if (argc < 5)
-        error("Syntax");
+        SyntaxError();
+    ;
     if (checkstring(argv[4], (unsigned char *)"COM1"))
     {
         if (!(code = codecheck(argv[2])))
@@ -1567,15 +1568,15 @@ void MIPS16 cmd_setpin(void)
         else if (PinDef[pin].mode & UART0RX)
             value = EXT_UART0RX;
         else
-            error("Invalid configuration");
+            StandardError(8);
         if (PinDef[pin2].mode & UART0TX)
             value2 = EXT_UART0TX;
         else if (PinDef[pin2].mode & UART0RX)
             value2 = EXT_UART0RX;
         else
-            error("Invalid configuration");
+            StandardError(8);
         if (value == value2)
-            error("Invalid configuration");
+            StandardError(8);
     }
     else if (checkstring(argv[4], (unsigned char *)"COM2"))
     {
@@ -1589,15 +1590,15 @@ void MIPS16 cmd_setpin(void)
         else if (PinDef[pin].mode & UART1RX)
             value = EXT_UART1RX;
         else
-            error("Invalid configuration");
+            StandardError(8);
         if (PinDef[pin2].mode & UART1TX)
             value2 = EXT_UART1TX;
         else if (PinDef[pin2].mode & UART1RX)
             value2 = EXT_UART1RX;
         else
-            error("Invalid configuration");
+            StandardError(8);
         if (value == value2)
-            error("Invalid configuration");
+            StandardError(8);
     }
     else if (checkstring(argv[4], (unsigned char *)"I2C"))
     {
@@ -1611,15 +1612,15 @@ void MIPS16 cmd_setpin(void)
         else if (PinDef[pin].mode & I2C0SDA)
             value = EXT_I2C0SDA;
         else
-            error("Invalid configuration");
+            StandardError(8);
         if (PinDef[pin2].mode & I2C0SCL)
             value2 = EXT_I2C0SCL;
         else if (PinDef[pin2].mode & I2C0SDA)
             value2 = EXT_I2C0SDA;
         else
-            error("Invalid configuration");
+            StandardError(8);
         if (value == value2)
-            error("Invalid configuration");
+            StandardError(8);
     }
     else if (checkstring(argv[4], (unsigned char *)"I2C2"))
     {
@@ -1633,20 +1634,21 @@ void MIPS16 cmd_setpin(void)
         else if (PinDef[pin].mode & I2C1SDA)
             value = EXT_I2C1SDA;
         else
-            error("Invalid configuration");
+            StandardError(8);
         if (PinDef[pin2].mode & I2C1SCL)
             value2 = EXT_I2C1SCL;
         else if (PinDef[pin2].mode & I2C1SDA)
             value2 = EXT_I2C1SDA;
         else
-            error("Invalid configuration");
+            StandardError(8);
         if (value == value2)
-            error("Invalid configuration");
+            StandardError(8);
     }
     if (value != -1)
         goto process;
     if (argc < 7)
-        error("Syntax");
+        SyntaxError();
+    ;
     if (checkstring(argv[6], (unsigned char *)"SPI"))
     {
         if (!(code = codecheck(argv[2])))
@@ -1666,7 +1668,7 @@ void MIPS16 cmd_setpin(void)
         else if (PinDef[pin].mode & SPI0SCK)
             value = EXT_SPI0SCK;
         else
-            error("Invalid configuration");
+            StandardError(8);
         if (PinDef[pin2].mode & SPI0RX)
             value2 = EXT_SPI0RX;
         else if (PinDef[pin2].mode & SPI0TX)
@@ -1674,7 +1676,7 @@ void MIPS16 cmd_setpin(void)
         else if (PinDef[pin2].mode & SPI0SCK)
             value2 = EXT_SPI0SCK;
         else
-            error("Invalid configuration");
+            StandardError(8);
         if (PinDef[pin3].mode & SPI0RX)
             value3 = EXT_SPI0RX;
         else if (PinDef[pin3].mode & SPI0TX)
@@ -1682,9 +1684,9 @@ void MIPS16 cmd_setpin(void)
         else if (PinDef[pin3].mode & SPI0SCK)
             value3 = EXT_SPI0SCK;
         else
-            error("Invalid configuration");
+            StandardError(8);
         if (value == value2 || value == value3 || value2 == value3)
-            error("Invalid configuration");
+            StandardError(8);
     }
     else if (checkstring(argv[6], (unsigned char *)"SPI2"))
     {
@@ -1705,7 +1707,7 @@ void MIPS16 cmd_setpin(void)
         else if (PinDef[pin].mode & SPI1SCK)
             value = EXT_SPI1SCK;
         else
-            error("Invalid configuration");
+            StandardError(8);
         if (PinDef[pin2].mode & SPI1RX)
             value2 = EXT_SPI1RX;
         else if (PinDef[pin2].mode & SPI1TX)
@@ -1713,7 +1715,7 @@ void MIPS16 cmd_setpin(void)
         else if (PinDef[pin2].mode & SPI1SCK)
             value2 = EXT_SPI1SCK;
         else
-            error("Invalid configuration");
+            StandardError(8);
         if (PinDef[pin3].mode & SPI1RX)
             value3 = EXT_SPI1RX;
         else if (PinDef[pin3].mode & SPI1TX)
@@ -1721,12 +1723,13 @@ void MIPS16 cmd_setpin(void)
         else if (PinDef[pin3].mode & SPI1SCK)
             value3 = EXT_SPI1SCK;
         else
-            error("Invalid configuration");
+            StandardError(8);
         if (value == value2 || value == value3 || value2 == value3)
-            error("Invalid configuration");
+            StandardError(8);
     }
     else
-        error("Syntax");
+        SyntaxError();
+    ;
 //        value = getint(argv[2], 1, 9);
 process:
     // check for any options
@@ -1759,7 +1762,7 @@ process:
                 option = CNPDSET;
             }
             else
-                error("Invalid configuration");
+                StandardError(8);
         }
         else
             option = 0;
@@ -1781,7 +1784,7 @@ process:
                 option = CNPDSET;
             }
             else
-                error("Invalid configuration");
+                StandardError(8);
         }
         else
             option = 0;
@@ -1868,7 +1871,7 @@ process:
     {
         // we need to set up a software interrupt
         if (argc < 5)
-            error("Argument count");
+            StandardError(2);
         for (i = 0; i < NBRINTERRUPTS; i++)
             if (inttbl[i].pin == 0)
                 break;
@@ -1950,7 +1953,7 @@ void fun_pin(void)
     if (!code)
         pin = codemap(pin);
     if (IsInvalidPin(pin))
-        error("Invalid pin");
+        StandardError(9);
     switch (ExtCurrentConfig[pin])
     {
     case EXT_DIG_IN:
@@ -2055,7 +2058,7 @@ int CheckPin(int pin, int action)
     if (!(action & CP_IGNORE_INUSE) && ExtCurrentConfig[pin] >= EXT_DS18B20_RESERVED && ExtCurrentConfig[pin] < EXT_COM_RESERVED)
     {
         if (!(action & CP_NOABORT))
-            error("Pin %/| is in use", pin, pin);
+            StandardErrorParam2(27, pin, pin);
         return false;
     }
 
@@ -2072,7 +2075,7 @@ int CheckPin(int pin, int action)
     if (!(action & CP_IGNORE_RESERVED) && ExtCurrentConfig[pin] >= EXT_DS18B20_RESERVED)
     {
         if (!(action & CP_NOABORT))
-            error("Pin %/| is in use", pin, pin);
+            StandardErrorParam2(27, pin, pin);
         return false;
     }
 
@@ -2089,17 +2092,18 @@ void cmd_port(void)
     getcsargs(&cmdline, NBRPINS * 4);
 
     if ((argc & 0b11) != 0b11)
-        error("Invalid syntax");
+        SyntaxError();
     if (!strchr((char *)cmdline, ')'))
-        error("Syntax");
+        SyntaxError();
+    ;
     // step over the equals sign and get the value for the assignment
     while (*cmdline && tokenfunction(*cmdline) != op_equal)
         cmdline++;
     if (!*cmdline)
-        error("Invalid syntax");
+        SyntaxError();
     ++cmdline;
     if (!*cmdline)
-        error("Invalid syntax");
+        SyntaxError();
     value = getinteger(cmdline);
     uint64_t mask = 0, setmask = 0, readmask;
 
@@ -2111,7 +2115,7 @@ void cmd_port(void)
         pincode = getinteger(argv[i]);
         nbr = getinteger(argv[i + 2]);
         if (nbr < 0 || (pincode == 0 && code != 0) || (pincode < 0))
-            error("Invalid argument");
+            SyntaxError();
 
         while (nbr)
         {
@@ -2140,7 +2144,7 @@ void fun_distance(void)
 
     getcsargs(&ep, 3);
     if ((argc & 1) != 1)
-        error("Invalid syntax");
+        SyntaxError();
     char code;
     if (!(code = codecheck(argv[0])))
         argv[0] += 2;
@@ -2160,7 +2164,7 @@ void fun_distance(void)
     if (IsInvalidPin(trig) || IsInvalidPin(echo))
         error("Invalid pin |", echo);
     if (ExtCurrentConfig[trig] >= EXT_COM_RESERVED || ExtCurrentConfig[echo] >= EXT_COM_RESERVED)
-        error("Pin %/| is in use", trig, trig);
+        StandardErrorParam2(27, trig, trig);
     ExtCfg(echo, EXT_DIG_IN, CNPUSET); // setup the echo input
     PinSetBit(trig, LATCLR);           // trigger output must start low
     ExtCfg(trig, EXT_DIG_OUT, 0);      // setup the trigger output
@@ -2206,7 +2210,7 @@ void fun_port(void)
 
     getcsargs(&ep, NBRPINS * 4);
     if ((argc & 0b11) != 0b11)
-        error("Invalid syntax");
+        SyntaxError();
     uint64_t pinstate = gpio_get_all64();
     uint64_t outpinstate = gpio_get_out_level_all64();
     for (i = argc - 3; i >= 0; i -= 4)
@@ -2217,7 +2221,7 @@ void fun_port(void)
         pincode = getinteger(argv[i]);
         nbr = getinteger(argv[i + 2]);
         if (nbr < 0 || (pincode == 0 && code != 0) || (pincode < 0))
-            error("Invalid argument");
+            SyntaxError();
         pincode += nbr - 1; // we start by reading the most significant bit
 
         while (nbr)
@@ -2249,7 +2253,7 @@ void cmd_pulse(void)
 
     getcsargs(&cmdline, 3);
     if (argc != 3)
-        error("Invalid syntax");
+        SyntaxError();
     char code;
     if (!(code = codecheck(argv[0])))
         argv[0] += 2;
@@ -2261,7 +2265,7 @@ void cmd_pulse(void)
 
     f = getnumber(argv[2]); // get the pulse width
     if (f < 0)
-        error("Number out of bounds");
+        StandardError(21);
     x = f;                                   // get the integer portion (in mSec)
     y = (int)(FSub(f, (MMFLOAT)x) * 1000.0); // get the fractional portion (in uSec)
 
@@ -2309,7 +2313,7 @@ void fun_pulsin(void)
 
     getcsargs(&ep, 7);
     if ((argc & 1) != 1 || argc < 3)
-        error("Invalid syntax");
+        SyntaxError();
     char code;
     if (!(code = codecheck(argv[0])))
         argv[0] += 2;
@@ -2317,7 +2321,7 @@ void fun_pulsin(void)
     if (!code)
         pin = codemap(pin);
     if (IsInvalidPin(pin))
-        error("Invalid pin");
+        StandardError(9);
     if (ExtCurrentConfig[pin] != EXT_DIG_IN)
         error("Pin %/| is not an input", pin, pin);
     polarity = getinteger(argv[2]);
@@ -2389,11 +2393,11 @@ void cmd_ir(void)
         if (!code)
             pin = codemap(pin);
         if (IsInvalidPin(pin))
-            error("Invalid pin");
+            StandardError(9);
         dev = getint(argv[2], 0, 0b11111);
         cmd = getint(argv[4], 0, 0b1111111);
         if (ExtCurrentConfig[pin] >= EXT_COM_RESERVED)
-            error("Pin %/| is in use", pin, pin);
+            StandardErrorParam2(27, pin, pin);
         ExtCfg(pin, EXT_DIG_OUT, 0);
         cmd = (dev << 7) | cmd;
         IRSendSignal(pin, 186);
@@ -2413,22 +2417,22 @@ void cmd_ir(void)
         if (IRpin == 99)
             error("Pin not configured for IR");
         if (IrState != IR_CLOSED)
-            error("Already open");
+            StandardError(31);
         if (argc % 2 == 0 || argc == 0)
-            error("Invalid syntax");
+            SyntaxError();
         IrVarType = 0;
         IrDev = findvar(argv[0], V_FIND);
         if (g_vartbl[g_VarIndex].type & T_CONST)
-            error("Cannot change a constant");
+            StandardError(22);
         if (g_vartbl[g_VarIndex].type & T_STR)
-            error("Invalid variable");
+            StandardError(6);
         if (g_vartbl[g_VarIndex].type & T_NBR)
             IrVarType |= 0b01;
         IrCmd = findvar(argv[2], V_FIND);
         if (g_vartbl[g_VarIndex].type & T_CONST)
-            error("Cannot change a constant");
+            StandardError(22);
         if (g_vartbl[g_VarIndex].type & T_STR)
-            error("Invalid variable");
+            StandardError(6);
         if (g_vartbl[g_VarIndex].type & T_NBR)
             IrVarType |= 0b10;
         InterruptUsed = true;
@@ -2482,58 +2486,58 @@ void IRSendSignal(int pin, int half_cycles)
 void MIPS16 set_PWM(int slice, MMFLOAT duty1, MMFLOAT duty2, int high1, int high2, int delaystart)
 {
     if (slice == 0 && PWM0Apin == 99 && duty1 >= 0.0)
-        error("Pin not set for PWM");
+        StandardError(12);
     if (slice == 0 && PWM0Bpin == 99 && duty2 >= 0.0)
-        error("Pin not set for PWM");
+        StandardError(12);
 #ifdef rp2350
     if (slice == 0 && fast_timer_active)
         error("Channel 0 in use for fast timer");
 #endif
     if (slice == 1 && PWM1Apin == 99 && duty1 >= 0.0)
-        error("Pin not set for PWM");
+        StandardError(12);
     if (slice == 1 && PWM1Bpin == 99 && duty2 >= 0.0)
-        error("Pin not set for PWM");
+        StandardError(12);
     if (slice == 2 && PWM2Apin == 99 && duty1 >= 0.0)
-        error("Pin not set for PWM");
+        StandardError(12);
     if (slice == 2 && PWM2Bpin == 99 && duty2 >= 0.0)
-        error("Pin not set for PWM");
+        StandardError(12);
     if (slice == 3 && PWM3Apin == 99 && duty1 >= 0.0)
-        error("Pin not set for PWM");
+        StandardError(12);
     if (slice == 3 && PWM3Bpin == 99 && duty2 >= 0.0)
-        error("Pin not set for PWM");
+        StandardError(12);
     if (slice == 4 && PWM4Apin == 99 && duty1 >= 0.0)
-        error("Pin not set for PWM");
+        StandardError(12);
     if (slice == 4 && PWM4Bpin == 99 && duty2 >= 0.0)
-        error("Pin not set for PWM");
+        StandardError(12);
     if (slice == 5 && PWM5Apin == 99 && duty1 >= 0.0)
-        error("Pin not set for PWM");
+        StandardError(12);
     if (slice == 5 && PWM5Bpin == 99 && duty2 >= 0.0)
-        error("Pin not set for PWM");
+        StandardError(12);
     if (slice == 6 && PWM6Apin == 99 && duty1 >= 0.0)
-        error("Pin not set for PWM");
+        StandardError(12);
     if (slice == 6 && PWM6Bpin == 99 && duty2 >= 0.0)
-        error("Pin not set for PWM");
+        StandardError(12);
     if (slice == 7 && PWM7Apin == 99 && duty1 >= 0.0)
-        error("Pin not set for PWM");
+        StandardError(12);
     if (slice == 7 && PWM7Bpin == 99 && duty2 >= 0.0)
-        error("Pin not set for PWM");
+        StandardError(12);
 #ifdef rp2350
     if (slice == 8 && PWM8Apin == 99 && duty1 >= 0.0)
-        error("Pin not set for PWM");
+        StandardError(12);
     if (slice == 8 && PWM8Bpin == 99 && duty2 >= 0.0)
-        error("Pin not set for PWM");
+        StandardError(12);
     if (slice == 9 && PWM9Apin == 99 && duty1 >= 0.0)
-        error("Pin not set for PWM");
+        StandardError(12);
     if (slice == 9 && PWM9Bpin == 99 && duty2 >= 0.0)
-        error("Pin not set for PWM");
+        StandardError(12);
     if (slice == 10 && PWM10Apin == 99 && duty1 >= 0.0)
-        error("Pin not set for PWM");
+        StandardError(12);
     if (slice == 10 && PWM10Bpin == 99 && duty2 >= 0.0)
-        error("Pin not set for PWM");
+        StandardError(12);
     if (slice == 11 && PWM11Apin == 99 && duty1 >= 0.0)
-        error("Pin not set for PWM");
+        StandardError(12);
     if (slice == 11 && PWM11Bpin == 99 && duty2 >= 0.0)
-        error("Pin not set for PWM");
+        StandardError(12);
 #endif
     if (slice == 0 && PWM0Apin != 99 && duty1 >= 0.0)
     {
@@ -2958,7 +2962,8 @@ void MIPS16 cmd_Servo(void)
     MMFLOAT duty1 = -1.0, duty2 = -1.0;
     getcsargs(&cmdline, 5);
     if (!(argc >= 3))
-        error("Syntax");
+        SyntaxError();
+    ;
     int CPU_Speed = Option.CPU_Speed;
 #ifdef rp2350
     int slice = getint(argv[0], 0, rp2350a ? 7 : 11);
@@ -3009,14 +3014,16 @@ void MIPS16 cmd_Servo(void)
     {
         duty1 = getnumber(argv[2]);
         if (duty1 > 120.0 || duty1 < -20.0)
-            error("Syntax");
+            SyntaxError();
+        ;
         duty1 = 5.0 + duty1 * 0.05;
     }
     if (argc >= 5 && *argv[4])
     {
         duty2 = getnumber(argv[4]);
         if (duty2 > 120.0 || duty2 < -20.0)
-            error("Syntax");
+            SyntaxError();
+        ;
         duty2 = 5.0 + duty2 * 0.05;
     }
     int wrap = (CPU_Speed * 1000) / frequency;
@@ -3062,81 +3069,94 @@ void MIPS16 cmd_pwm(void)
         {
             count0 = getnumber(argv[0]);
             if ((count0 < 0.0 || count0 > 100.0) && count0 != -1.0)
-                error("Syntax");
+                SyntaxError();
+            ;
         }
         if (argc >= 3 && *argv[2])
         {
             count1 = getnumber(argv[2]);
             if ((count1 < 0.0 || count1 > 100.0) && count1 != -1.0)
-                error("Syntax");
+                SyntaxError();
+            ;
         }
         if (argc >= 5 && *argv[4])
         {
             count2 = getnumber(argv[4]);
             if ((count2 < 0.0 || count2 > 100.0) && count2 != -1.0)
-                error("Syntax");
+                SyntaxError();
+            ;
         }
         if (argc >= 7 && *argv[6])
         {
             count3 = getnumber(argv[6]);
             if ((count3 < 0.0 || count3 > 100.0) && count3 != -1.0)
-                error("Syntax");
+                SyntaxError();
+            ;
         }
         if (argc >= 9 && *argv[8])
         {
             count4 = getnumber(argv[8]);
             if ((count4 < 0.0 || count4 > 100.0) && count4 != -1.0)
-                error("Syntax");
+                SyntaxError();
+            ;
         }
         if (argc >= 11 && *argv[10])
         {
             count5 = getnumber(argv[10]);
             if ((count5 < 0.0 || count5 > 100.0) && count5 != -1.0)
-                error("Syntax");
+                SyntaxError();
+            ;
         }
         if (argc >= 13 && *argv[12])
         {
             count6 = getnumber(argv[12]);
             if ((count6 < 0.0 || count6 > 100.0) && count6 != -1.0)
-                error("Syntax");
+                SyntaxError();
+            ;
         }
 #ifdef rp2350
         if (argc >= 15 && *argv[14])
         {
             count7 = getnumber(argv[14]);
             if ((count7 < 0.0 || count7 > 100.0) && count7 != -1.0)
-                error("Syntax");
+                SyntaxError();
+            ;
         }
         if (argc >= 17 && *argv[16])
         {
             count8 = getnumber(argv[16]);
             if ((count8 < 0.0 || count8 > 100.0) && count8 != -1.0)
-                error("Syntax");
+                SyntaxError();
+            ;
         }
         if (argc >= 19 && *argv[18])
         {
             count9 = getnumber(argv[18]);
             if ((count9 < 0.0 || count9 > 100.0) && count9 != -1.0)
-                error("Syntax");
+                SyntaxError();
+            ;
         }
         if (argc >= 21 && *argv[20])
         {
             count10 = getnumber(argv[20]);
             if ((count10 < 0.0 || count10 > 100.0) && count10 != -1.0)
-                error("Syntax");
+                SyntaxError();
+            ;
         }
         if (argc == 23 && *argv[22])
         {
             count11 = getnumber(argv[22]);
             if ((count11 < 0.0 || count11 > 100.0) && count11 != -1.0)
-                error("Syntax");
+                SyntaxError();
+            ;
         }
 #else
         if (argc == 15 && *argv[14])
         {
             count7 = getnumber(argv[14]);
             if ((count7 < 0.0 || count7 > 100.0) && count7 != -1.0)
-                error("Syntax");
+                SyntaxError();
+            ;
         }
 #endif
 
@@ -3375,7 +3395,8 @@ void MIPS16 cmd_pwm(void)
     MMFLOAT duty1 = -1.0, duty2 = -1.0;
     getcsargs(&cmdline, 11);
     if (!(argc >= 3))
-        error("Syntax");
+        SyntaxError();
+    ;
     int CPU_Speed = Option.CPU_Speed;
 #ifdef rp2350
     int slice = getint(argv[0], 0, rp2350a ? 7 : 11);
@@ -3422,7 +3443,8 @@ void MIPS16 cmd_pwm(void)
         return;
     }
     if (!(argc >= 5))
-        error("Syntax");
+        SyntaxError();
+    ;
     int delaystart = 0;
     int phase = 1;
     if (argc >= 9 && *argv[8])
@@ -3436,7 +3458,8 @@ void MIPS16 cmd_pwm(void)
     {
         duty1 = getnumber(argv[4]);
         if (duty1 > 100.0 || duty1 < -100.0)
-            error("Syntax");
+            SyntaxError();
+        ;
         if (duty1 < 0)
         {
             duty1 = -duty1;
@@ -3447,7 +3470,8 @@ void MIPS16 cmd_pwm(void)
     {
         duty2 = getnumber(argv[6]);
         if (duty2 > 100.0 || duty2 < -100.0)
-            error("Syntax");
+            SyntaxError();
+        ;
         if (duty2 < 0)
         {
             duty2 = -duty2;
@@ -3542,7 +3566,7 @@ void cmd_keypad(void)
             if (g_vartbl[g_VarIndex].type & T_CONST)
             {
                 keypadcols = keypadrows = 0;
-                error("Cannot change a constant");
+                StandardError(22);
             }
             if (!(g_vartbl[g_VarIndex].type & T_NBR))
             {
@@ -3560,7 +3584,7 @@ void cmd_keypad(void)
             {
                 j = PINMAP[k + i];
                 if (ExtCurrentConfig[j] >= EXT_COM_RESERVED)
-                    error("Pin %/| is in use", j, j);
+                    StandardErrorParam2(27, j, j);
                 ExtCfg(j, EXT_DIG_IN, ODCSET);
                 ExtCfg(j, EXT_COM_RESERVED, 0);
                 keypad_pins[i] = j;
@@ -3576,7 +3600,7 @@ void cmd_keypad(void)
             {
                 j = PINMAP[k + i];
                 if (ExtCurrentConfig[j] >= EXT_COM_RESERVED)
-                    error("Pin %/| is in use", j, j);
+                    StandardErrorParam2(27, j, j);
                 ExtCfg(j, EXT_DIG_IN, ODCSET);
                 ExtCfg(j, EXT_COM_RESERVED, 0);
                 keypad_pins[i + keypadrows] = j;
@@ -3591,12 +3615,12 @@ void cmd_keypad(void)
             keypadrows = 4;
 #endif
             if (argc % 2 == 0 || argc < 17)
-                error("Invalid syntax");
+                SyntaxError();
             if (KeypadInterrupt != NULL)
-                error("Already open");
+                StandardError(31);
             KeypadVar = findvar(argv[0], V_FIND);
             if (g_vartbl[g_VarIndex].type & T_CONST)
-                error("Cannot change a constant");
+                StandardError(22);
             if (!(g_vartbl[g_VarIndex].type & T_NBR))
                 error("Floating point variable required");
             InterruptUsed = true;
@@ -3615,7 +3639,7 @@ void cmd_keypad(void)
                 if (!code)
                     j = codemap(j);
                 if (ExtCurrentConfig[j] >= EXT_COM_RESERVED)
-                    error("Pin %/| is in use", j, j);
+                    StandardErrorParam2(27, j, j);
                 //            if(i < 4) {
                 ExtCfg(j, EXT_DIG_IN, ODCSET);
                 ExtCfg(j, EXT_COM_RESERVED, 0);
@@ -3865,9 +3889,9 @@ void cmd_lcd(void)
     {
         getcsargs(&p, 11);
         if (argc != 11)
-            error("Invalid syntax");
+            SyntaxError();
         if (*lcd_pins)
-            error("Already open");
+            StandardError(31);
         for (i = 0; i < 6; i++)
         {
             code = 0;
@@ -3877,7 +3901,7 @@ void cmd_lcd(void)
             if (!code)
                 lcd_pins[i] = codemap(lcd_pins[i]);
             if (ExtCurrentConfig[(int)lcd_pins[i]] >= EXT_COM_RESERVED)
-                error("Pin %/| is in use", lcd_pins[i], lcd_pins[i]);
+                StandardErrorParam2(27, lcd_pins[i], lcd_pins[i]);
             ExtCfg(lcd_pins[i], EXT_DIG_OUT, 0);
             ExtCfg(lcd_pins[i], EXT_COM_RESERVED, 0);
         }
@@ -3923,7 +3947,7 @@ void cmd_lcd(void)
 
         getcsargs(&cmdline, 5);
         if (argc != 5)
-            error("Invalid syntax");
+            SyntaxError();
         i = getint(argv[0], 1, 4);
         pos = 1;
         if (checkstring(argv[2], (unsigned char *)"C8"))
@@ -4048,10 +4072,10 @@ void cmd_DHT22(void)
     // get the two variables
     temp = findvar(argv[2], V_FIND);
     if (!(g_vartbl[g_VarIndex].type & T_NBR))
-        error("Invalid variable");
+        StandardError(6);
     humid = findvar(argv[4], V_FIND);
     if (!(g_vartbl[g_VarIndex].type & T_NBR))
-        error("Invalid variable");
+        StandardError(6);
 
     // get the pin number and set it up
     // get the pin number and set it up
@@ -4064,7 +4088,7 @@ void cmd_DHT22(void)
     if (IsInvalidPin(pin))
         error("Invalid pin ");
     if (ExtCurrentConfig[pin] != EXT_NOT_CONFIG)
-        error("Pin %/| is in use", pin, pin);
+        StandardErrorParam2(27, pin, pin);
     if (argc == 7)
     {
         dht11 = getint(argv[6], 0, 1);
@@ -4187,7 +4211,8 @@ void fun_dev(void)
                 else if (mytoupper(*p) == 'Z')
                     iret = nunstruct[5].az;
                 else
-                    error("Syntax");
+                    SyntaxError();
+                ;
             }
             else
             {
@@ -4200,7 +4225,8 @@ void fun_dev(void)
                     else if (mytoupper(*p) == 'Z')
                         iret = nunstruct[5].z0;
                     else
-                        error("Syntax");
+                        SyntaxError();
+                    ;
                 }
                 else if (p[1] == '1')
                 {
@@ -4211,10 +4237,12 @@ void fun_dev(void)
                     else if (mytoupper(*p) == 'Z')
                         iret = nunstruct[5].z1;
                     else
-                        error("Syntax");
+                        SyntaxError();
+                    ;
                 }
                 else
-                    error("Syntax");
+                    SyntaxError();
+                ;
             }
         }
         else if (mytoupper(*p) == 'J')
@@ -4245,7 +4273,8 @@ void fun_dev(void)
                         iret = nunstruct[5].calib[8];
                     }
                     else
-                        error("Syntax");
+                        SyntaxError();
+                    ;
                 }
                 else if (mytoupper(*p) == 'Y')
                 {
@@ -4263,10 +4292,12 @@ void fun_dev(void)
                         iret = nunstruct[5].calib[12];
                     }
                     else
-                        error("Syntax");
+                        SyntaxError();
+                    ;
                 }
                 else
-                    error("Syntax");
+                    SyntaxError();
+                ;
             }
         }
         else
@@ -4278,7 +4309,8 @@ void fun_dev(void)
             else if (mytoupper(*p) == 'T')
                 iret = nunstruct[5].type;
             else
-                error("Syntax");
+                SyntaxError();
+            ;
         }
         targ = T_INT;
     }
@@ -4372,11 +4404,13 @@ void fun_dev(void)
         else if (checkstring(argv[2], (unsigned char *)"T"))
             iret = nunstruct[n].classic[0];
         else
-            error("Syntax");
+            SyntaxError();
+        ;
         targ = T_INT;
     }
     else
-        error("Syntax");
+        SyntaxError();
+    ;
 }
 
 void cmd_WS2812(void)
@@ -4389,7 +4423,7 @@ void cmd_WS2812(void)
     int ticks_per_millisecond = ticks_per_second / 1000;
     getcsargs(&cmdline, 7);
     if (argc != 7)
-        error("Argument count");
+        StandardError(2);
     p = argv[0];
     if (mytoupper(*p) == 'O')
     {
@@ -4418,7 +4452,8 @@ void cmd_WS2812(void)
         TRST = 80;
     }
     else
-        error("Syntax");
+        SyntaxError();
+    ;
     nbr = getint(argv[4], 1, 256);
     if (nbr > 1)
     {
@@ -4436,10 +4471,10 @@ void cmd_WS2812(void)
     if (!code)
         pin = codemap(pin);
     if (IsInvalidPin(pin))
-        error("Invalid pin");
+        StandardError(9);
     int gppin = PinDef[pin].GPno;
     if (!(ExtCurrentConfig[pin] == EXT_DIG_OUT || ExtCurrentConfig[pin] == EXT_NOT_CONFIG))
-        error("Pin %/| is not off or an output", pin, pin);
+        StandardErrorParam2(43, pin, pin);
     if (ExtCurrentConfig[pin] == EXT_NOT_CONFIG)
         ExtCfg(pin, EXT_DIG_OUT, 0);
     p = GetTempMemory((nbr + 1) * colours);
@@ -4661,7 +4696,7 @@ void cmd_device(void)
         char *termchars = NULL;
         getcsargs(&tp, 13);
         if (argc < 9)
-            error("Argument count");
+            StandardError(2);
         unsigned char code;
         if (!(code = codecheck(argv[0])))
             argv[0] += 2;
@@ -4669,7 +4704,7 @@ void cmd_device(void)
         if (!code)
             pin = codemap(pin);
         if (IsInvalidPin(pin))
-            error("Invalid pin");
+            StandardError(9);
         if (!(ExtCurrentConfig[pin] == EXT_DIG_IN || ExtCurrentConfig[pin] == EXT_NOT_CONFIG))
             error("Pin %/| is not off or an input", pin, pin);
         if (ExtCurrentConfig[pin] == EXT_NOT_CONFIG)
@@ -4679,12 +4714,12 @@ void cmd_device(void)
         unsigned char *string = NULL;
         string = findvar(argv[4], V_FIND);
         if (!(g_vartbl[g_VarIndex].type & T_STR))
-            error("Invalid variable");
+            StandardError(6);
         int timeout = getint(argv[6], 1, 100000) * 1000;
         void *status = findvar(argv[8], V_FIND);
         int type = g_vartbl[g_VarIndex].type;
         if (!(type & (T_NBR | T_INT)))
-            error("Invalid variable");
+            StandardError(6);
         if (argc > 9 && *argv[10])
             maxchars = getint(argv[10], 1, 255);
         if (argc == 13)
@@ -4709,7 +4744,7 @@ void cmd_device(void)
         //        int mask;
         getcsargs(&tp, 5);
         if (!(argc == 5))
-            error("Argument count");
+            StandardError(2);
         unsigned char code;
         //        int count = 0;
         if (!(code = codecheck(argv[0])))
@@ -4718,12 +4753,12 @@ void cmd_device(void)
         if (!code)
             pin = codemap(pin);
         if (IsInvalidPin(pin))
-            error("Invalid pin");
+            StandardError(9);
         int gppin = (1 << PinDef[pin].GPno);
         int baudrate = getint(argv[2], 110, 230400);
         unsigned char *string = getstring(argv[4]);
         if (!(ExtCurrentConfig[pin] == EXT_DIG_OUT || ExtCurrentConfig[pin] == EXT_NOT_CONFIG))
-            error("Pin %/| is not off or an output", pin, pin);
+            StandardErrorParam2(43, pin, pin);
         if (ExtCurrentConfig[pin] == EXT_NOT_CONFIG)
             ExtCfg(pin, EXT_DIG_OUT, 0);
         gpio_set_mask64(gppin); // send the start bit
@@ -4744,7 +4779,7 @@ void cmd_device(void)
         unsigned int *data;
         getcsargs(&tp, 5);
         if (!(argc == 5))
-            error("Argument count");
+            StandardError(2);
         num = getint(argv[2], 1, 10000);
         unsigned char code;
         if (!(code = codecheck(argv[0])))
@@ -4753,10 +4788,10 @@ void cmd_device(void)
         if (!code)
             pin = codemap(pin);
         if (IsInvalidPin(pin))
-            error("Invalid pin");
+            StandardError(9);
         int gppin = (1 << PinDef[pin].GPno);
         if (!(ExtCurrentConfig[pin] == EXT_DIG_OUT || ExtCurrentConfig[pin] == EXT_NOT_CONFIG))
-            error("Pin %/| is not off or an output", pin, pin);
+            StandardErrorParam2(43, pin, pin);
         if (ExtCurrentConfig[pin] == EXT_NOT_CONFIG)
             ExtCfg(pin, EXT_DIG_OUT, 0);
         size = parsenumberarray(argv[4], &a1float, &a1int, 3, 1, NULL, false);
@@ -4787,7 +4822,8 @@ void cmd_device(void)
         enable_interrupts_pico();
         return;
     }
-    error("Syntax");
+    SyntaxError();
+    ;
 }
 /*
  * @cond
@@ -4813,9 +4849,10 @@ void cmd_adc(void)
     {
         getcsargs(&tp, 5);
         if (ADCopen)
-            error("Already open");
+            StandardError(31);
         if (!(argc == 3 || argc == 5))
-            error("Syntax");
+            SyntaxError();
+        ;
 #ifndef PICOMITEWEB
         int nbr = getint(argv[2], 1, 4); // number of ADC channels
 #else
@@ -4827,14 +4864,14 @@ void cmd_adc(void)
 #ifdef rp2350
 #ifdef PICOMITEWEB
         if (!(ExtCurrentConfig[31] == EXT_ANA_IN || ExtCurrentConfig[31] == EXT_NOT_CONFIG))
-            error("Pin GP26 is not off or an ADC input");
+            StandardErrorParamS(42, "GP26");
         if (ExtCurrentConfig[31] == EXT_NOT_CONFIG)
             ExtCfg(31, EXT_ANA_IN, 0);
         ExtCfg(31, EXT_COM_RESERVED, 0);
         if (nbr >= 2)
         {
             if (!(ExtCurrentConfig[32] == EXT_ANA_IN || ExtCurrentConfig[32] == EXT_NOT_CONFIG))
-                error("Pin GP27 is not off or an ADC input");
+                StandardErrorParamS(42, "GP27");
             if (ExtCurrentConfig[32] == EXT_NOT_CONFIG)
                 ExtCfg(32, EXT_ANA_IN, 0);
             ExtCfg(32, EXT_COM_RESERVED, 0);
@@ -4842,7 +4879,7 @@ void cmd_adc(void)
         if (nbr >= 3)
         {
             if (!(ExtCurrentConfig[34] == EXT_ANA_IN || ExtCurrentConfig[34] == EXT_NOT_CONFIG))
-                error("Pin GP28 is not off or an ADC input");
+                StandardErrorParamS(42, "GP28");
             if (ExtCurrentConfig[34] == EXT_NOT_CONFIG)
                 ExtCfg(34, EXT_ANA_IN, 0);
             ExtCfg(34, EXT_COM_RESERVED, 0);
@@ -4851,14 +4888,14 @@ void cmd_adc(void)
         if (rp2350a)
         {
             if (!(ExtCurrentConfig[31] == EXT_ANA_IN || ExtCurrentConfig[31] == EXT_NOT_CONFIG))
-                error("Pin GP26 is not off or an ADC input");
+                StandardErrorParamS(42, "GP26");
             if (ExtCurrentConfig[31] == EXT_NOT_CONFIG)
                 ExtCfg(31, EXT_ANA_IN, 0);
             ExtCfg(31, EXT_COM_RESERVED, 0);
             if (nbr >= 2)
             {
                 if (!(ExtCurrentConfig[32] == EXT_ANA_IN || ExtCurrentConfig[32] == EXT_NOT_CONFIG))
-                    error("Pin GP27 is not off or an ADC input");
+                    StandardErrorParamS(42, "GP27");
                 if (ExtCurrentConfig[32] == EXT_NOT_CONFIG)
                     ExtCfg(32, EXT_ANA_IN, 0);
                 ExtCfg(32, EXT_COM_RESERVED, 0);
@@ -4866,7 +4903,7 @@ void cmd_adc(void)
             if (nbr >= 3)
             {
                 if (!(ExtCurrentConfig[34] == EXT_ANA_IN || ExtCurrentConfig[34] == EXT_NOT_CONFIG))
-                    error("Pin GP28 is not off or an ADC input");
+                    StandardErrorParamS(42, "GP28");
                 if (ExtCurrentConfig[34] == EXT_NOT_CONFIG)
                     ExtCfg(34, EXT_ANA_IN, 0);
                 ExtCfg(34, EXT_COM_RESERVED, 0);
@@ -4874,7 +4911,7 @@ void cmd_adc(void)
             if (nbr >= 4)
             {
                 if (!(ExtCurrentConfig[44] == EXT_ANA_IN || ExtCurrentConfig[44] == EXT_NOT_CONFIG))
-                    error("Pin GP29 is not off or an ADC input");
+                    StandardErrorParamS(42, "GP29");
                 if (ExtCurrentConfig[44] == EXT_NOT_CONFIG)
                     ExtCfg(44, EXT_ANA_IN, 0);
                 ExtCfg(44, EXT_COM_RESERVED, 0);
@@ -4883,14 +4920,14 @@ void cmd_adc(void)
         else
         {
             if (!(ExtCurrentConfig[55] == EXT_ANA_IN || ExtCurrentConfig[55] == EXT_NOT_CONFIG))
-                error("Pin GP40 is not off or an ADC input");
+                StandardErrorParamS(42, "GP40");
             if (ExtCurrentConfig[55] == EXT_NOT_CONFIG)
                 ExtCfg(55, EXT_ANA_IN, 0);
             ExtCfg(55, EXT_COM_RESERVED, 0);
             if (nbr >= 2)
             {
                 if (!(ExtCurrentConfig[56] == EXT_ANA_IN || ExtCurrentConfig[56] == EXT_NOT_CONFIG))
-                    error("Pin GP41 is not off or an ADC input");
+                    StandardErrorParamS(42, "GP41");
                 if (ExtCurrentConfig[56] == EXT_NOT_CONFIG)
                     ExtCfg(56, EXT_ANA_IN, 0);
                 ExtCfg(56, EXT_COM_RESERVED, 0);
@@ -4898,7 +4935,7 @@ void cmd_adc(void)
             if (nbr >= 3)
             {
                 if (!(ExtCurrentConfig[57] == EXT_ANA_IN || ExtCurrentConfig[57] == EXT_NOT_CONFIG))
-                    error("Pin GP42 is not off or an ADC input");
+                    StandardErrorParamS(42, "GP42");
                 if (ExtCurrentConfig[57] == EXT_NOT_CONFIG)
                     ExtCfg(57, EXT_ANA_IN, 0);
                 ExtCfg(57, EXT_COM_RESERVED, 0);
@@ -4906,7 +4943,7 @@ void cmd_adc(void)
             if (nbr >= 4)
             {
                 if (!(ExtCurrentConfig[58] == EXT_ANA_IN || ExtCurrentConfig[58] == EXT_NOT_CONFIG))
-                    error("Pin GP43 is not off or an ADC input");
+                    StandardErrorParamS(42, "GP43");
                 if (ExtCurrentConfig[58] == EXT_NOT_CONFIG)
                     ExtCfg(58, EXT_ANA_IN, 0);
                 ExtCfg(58, EXT_COM_RESERVED, 0);
@@ -4915,14 +4952,14 @@ void cmd_adc(void)
 #endif
 #else
         if (!(ExtCurrentConfig[31] == EXT_ANA_IN || ExtCurrentConfig[31] == EXT_NOT_CONFIG))
-            error("Pin GP26 is not off or an ADC input");
+            StandardErrorParamS(42, "GP26");
         if (ExtCurrentConfig[31] == EXT_NOT_CONFIG)
             ExtCfg(31, EXT_ANA_IN, 0);
         ExtCfg(31, EXT_COM_RESERVED, 0);
         if (nbr >= 2)
         {
             if (!(ExtCurrentConfig[32] == EXT_ANA_IN || ExtCurrentConfig[32] == EXT_NOT_CONFIG))
-                error("Pin GP27 is not off or an ADC input");
+                StandardErrorParamS(42, "GP27");
             if (ExtCurrentConfig[32] == EXT_NOT_CONFIG)
                 ExtCfg(32, EXT_ANA_IN, 0);
             ExtCfg(32, EXT_COM_RESERVED, 0);
@@ -4930,7 +4967,7 @@ void cmd_adc(void)
         if (nbr >= 3)
         {
             if (!(ExtCurrentConfig[34] == EXT_ANA_IN || ExtCurrentConfig[34] == EXT_NOT_CONFIG))
-                error("Pin GP28 is not off or an ADC input");
+                StandardErrorParamS(42, "GP28");
             if (ExtCurrentConfig[34] == EXT_NOT_CONFIG)
                 ExtCfg(34, EXT_ANA_IN, 0);
             ExtCfg(34, EXT_COM_RESERVED, 0);
@@ -4939,7 +4976,7 @@ void cmd_adc(void)
         if (nbr >= 4)
         {
             if (!(ExtCurrentConfig[44] == EXT_ANA_IN || ExtCurrentConfig[44] == EXT_NOT_CONFIG))
-                error("Pin GP29 is not off or an ADC input");
+                StandardErrorParamS(42, "GP29");
             if (ExtCurrentConfig[44] == EXT_NOT_CONFIG)
                 ExtCfg(44, EXT_ANA_IN, 0);
             ExtCfg(44, EXT_COM_RESERVED, 0);
@@ -4963,7 +5000,7 @@ void cmd_adc(void)
         if (!ADCopen)
             error("ADC not open");
         if (!(argc == 3))
-            error("Argument count");
+            StandardError(2);
         ADCmax = 0;
         ADCpos = 0;
         adcint1 = adcint2 = NULL;
@@ -5056,7 +5093,7 @@ void cmd_adc(void)
         if (!ADCopen)
             error("ADC not open");
         if (!(argc >= 1))
-            error("Argument count");
+            StandardError(2);
         a1float = NULL;
         a2float = NULL;
         a3float = NULL;
@@ -5077,7 +5114,7 @@ void cmd_adc(void)
                 error("Second channel not open");
             card = parsefloatrarray(argv[2], (MMFLOAT **)&a2float, 2, 1, NULL, true);
             if (card != ADCmax)
-                error("Array size mismatch");
+                StandardError(16);
         }
         if (argc >= 5 && *argv[4])
         {
@@ -5085,7 +5122,7 @@ void cmd_adc(void)
                 error("Third channel not open");
             card = parsefloatrarray(argv[4], (MMFLOAT **)&a3float, 3, 1, NULL, true);
             if (card != ADCmax)
-                error("Array size mismatch");
+                StandardError(16);
         }
         if (argc >= 7 && *argv[6])
         {
@@ -5093,7 +5130,7 @@ void cmd_adc(void)
                 error("Fourth channel not open");
             card = parsefloatrarray(argv[6], (MMFLOAT **)&a4float, 4, 1, NULL, true);
             if (card != ADCmax)
-                error("Array size mismatch");
+                StandardError(16);
         }
         if (argc >= 11)
         {
@@ -5233,7 +5270,8 @@ void cmd_adc(void)
         adc_init();
         return;
     }
-    error("Syntax");
+    SyntaxError();
+    ;
 }
 void SetADCFreq(float frequency)
 {

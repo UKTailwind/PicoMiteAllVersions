@@ -106,7 +106,8 @@ void cmd_udp(unsigned char *p)
     {
         getcsargs(&tp, 1);
         if (argc != 1)
-            error("Syntax");
+            SyntaxError();
+        ;
         UDPinterrupt = (char *)GetIntAddress(argv[0]);
         InterruptUsed = true;
         UDPreceive = 0;
@@ -117,7 +118,8 @@ void cmd_udp(unsigned char *p)
     {
         getcsargs(&tp, 5);
         if (argc != 5)
-            error("Syntax");
+            SyntaxError();
+        ;
         UDP_T *state = &UDPstate;
         state->complete = 0;
         ip4_addr_t remote_addr;

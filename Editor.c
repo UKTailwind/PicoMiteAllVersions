@@ -35,8 +35,6 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
 
-#define CTRLKEY(a) (a & 0x1f)
-
 #define DISPLAY_CLS 1
 #define REVERSE_VIDEO 3
 #define CLEAR_TO_EOL 4
@@ -446,9 +444,10 @@ void edit(unsigned char *cmdline, bool cmdfile)
         filename = name;
     }
     if (CurrentLinePtr && cmdfile)
-        error("Invalid in a program");
+        StandardError(10);
     if (argc == 0 && !cmdfile)
-        error("Syntax");
+        SyntaxError();
+    ;
     if (!cmdfile)
     {
         SaveContext();
@@ -629,7 +628,7 @@ void edit(unsigned char *cmdline, bool cmdfile)
             else
                 fsize = lfs_file_size(&lfs, FileTable[fnbr1].lfsptr);
             if (fsize > edit_buff_size - 10)
-                error("Out of memory");
+                StandardError(29);
             p = EdBuff;
             char *q = (char *)EdBuff;
             do

@@ -73,7 +73,7 @@ void MIPS16 ConfigDisplaySSD(unsigned char *p)
 {
     getcsargs(&p, 13);
     if ((argc & 1) != 1 || argc < 3)
-        error("Argument count");
+        StandardError(2);
 
     if (checkstring(argv[0], (unsigned char *)"SSD1963_4"))
     { // this is the 4" glass
@@ -169,10 +169,10 @@ void MIPS16 ConfigDisplaySSD(unsigned char *p)
         return;
 #ifdef rp2350
     if (!(argc == 3 || argc == 5 || argc == 7 || argc == 9 || argc == 11 || (argc == 13 && !rp2350a)))
-        error("Argument count");
+        StandardError(2);
 #else
     if (!(argc == 3 || argc == 5 || argc == 7 || argc == 9))
-        error("Argument count");
+        StandardError(2);
 #endif
 
     if (checkstring(argv[2], (unsigned char *)"L") || checkstring(argv[2], (unsigned char *)"LANDSCAPE"))
@@ -195,7 +195,7 @@ void MIPS16 ConfigDisplaySSD(unsigned char *p)
         if (!code)
             pin = codemap(pin);
         if (IsInvalidPin(pin))
-            error("Invalid pin");
+            StandardError(9);
         Option.SSD_DATA = pin;
     }
     if (argc >= 11 && *argv[10])
@@ -246,9 +246,9 @@ void MIPS16 ConfigDisplaySSD(unsigned char *p)
         if (!code)
             pin = codemap(pin);
         if (IsInvalidPin(pin))
-            error("Invalid pin");
+            StandardError(9);
         if (ExtCurrentConfig[pin] != EXT_NOT_CONFIG)
-            error("Pin %/| is in use", pin, pin);
+            StandardErrorParam2(27, pin, pin);
         if ((PinDef[pin].slice & 0x7f) == Option.AUDIO_SLICE)
             error("Channel in use for Audio");
         Option.DISPLAY_BL = pin;
@@ -264,9 +264,9 @@ void MIPS16 ConfigDisplaySSD(unsigned char *p)
         if (!code)
             pin = codemap(pin);
         if (IsInvalidPin(pin))
-            error("Invalid pin");
+            StandardError(9);
         if (ExtCurrentConfig[pin] != EXT_NOT_CONFIG)
-            error("Pin %/| is in use", pin, pin);
+            StandardErrorParam2(27, pin, pin);
         Option.SSD_DC = PinDef[pin].GPno;
         Option.SSD_WR = Option.SSD_DC + 1;
         Option.SSD_RD = Option.SSD_DC + 2;
@@ -1670,8 +1670,7 @@ void MIPS16 InitSSD1963(void)
 }
 void SetAreaIPS_4_16(int xstart, int ystart, int xend, int yend, int rw)
 {
-    if (HRes == 0)
-        error("Display not configured");
+    CheckDisplay();
     WriteCmdDataIPS_4_16(0x2A00, 1, xstart >> 8);
     WriteCmdDataIPS_4_16(0x2A01, 1, xstart & 0xFF);
     WriteCmdDataIPS_4_16(0x2A02, 1, xend >> 8);
@@ -1693,8 +1692,7 @@ void SetAreaIPS_4_16(int xstart, int ystart, int xend, int yend, int rw)
 
 void SetAreaILI9341(int xstart, int ystart, int xend, int yend, int rw)
 {
-    if (HRes == 0)
-        error("Display not configured");
+    CheckDisplay();
     WriteComand(ILI9341_COLADDRSET);
     WriteData(xstart >> 8);
     WriteData(xstart);
@@ -3026,7 +3024,7 @@ void ScrollSSD1963(int lines)
 void cmd_mode(void)
 {
     if (CurrentLinePtr)
-        error("Invalid in a program");
+        StandardError(10);
 
     if (!(Option.DISPLAY_TYPE == SSD1963_5_16BUFF ||
           Option.DISPLAY_TYPE == SSD1963_7_16BUFF ||

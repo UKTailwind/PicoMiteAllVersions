@@ -2,19 +2,23 @@
  * @cond
  * The following section will be excluded from the documentation.
  */
-// ****************************************************************************
-//
-//                                 Main code
-//
-// ****************************************************************************
+/* *********************************************************************************************************************
+ * PicoMite - Main Include Header
+ *
+ * This header contains common definitions, macros, and includes for the PicoMite system
+ **********************************************************************************************************************/
+
 #ifndef _INCLUDE_H
 #define _INCLUDE_H
 
+/* ==============================================================================================================
+ * BASIC TYPE DEFINITIONS
+ * ============================================================================================================== */
 typedef unsigned char Bool;
 #define True 1
 #define False 0
 
-// NULL
+// NULL pointer definition
 #ifndef NULL
 #ifdef __cplusplus
 #define NULL 0
@@ -23,109 +27,124 @@ typedef unsigned char Bool;
 #endif
 #endif
 
-// I/O port prefix
-#define __IO volatile
+/* ==============================================================================================================
+ * COMPILER ATTRIBUTES AND MODIFIERS
+ * ============================================================================================================== */
+#define __IO volatile								 // I/O port prefix
+#define INLINE __attribute__((always_inline)) inline // Force inline
+#define NOINLINE __attribute__((noinline))			 // Prevent inline
+#define WEAK __attribute__((weak))					 // Weak function
+#define ALIGNED __attribute__((aligned(4)))			 // Align to 4-bytes
 
-// request to use inline
-#define INLINE __attribute__((always_inline)) inline
+/* ==============================================================================================================
+ * INLINE ASSEMBLY FUNCTIONS
+ * ============================================================================================================== */
 
-// avoid to use inline
-#define NOINLINE __attribute__((noinline))
-
-// weak function
-#define WEAK __attribute__((weak))
-
-// align array to 4-bytes
-#define ALIGNED __attribute__((aligned(4)))
-
-// default LED pin
-#define LED_PIN 25
-
-// nop instruction
+// No-operation instruction
 INLINE void nop()
 {
 	__asm volatile(" nop\n");
 }
 
-// compiler barrier
+// Compiler barrier
 INLINE void cb()
 {
 	__asm volatile("" ::: "memory");
 }
 
-// ----------------------------------------------------------------------------
-//                               Constants
-// ----------------------------------------------------------------------------
+/* ==============================================================================================================
+ * COMMON CONSTANTS
+ * ============================================================================================================== */
+#define BIT(pos) (1UL << (pos)) // Bit position macro
+#define LED_PIN 25				// Default LED pin
 
-#define BIT(pos) (1UL << (pos))
-
-// ----------------------------------------------------------------------------
-//                                   Includes
-// ----------------------------------------------------------------------------
-
+/* ==============================================================================================================
+ * STANDARD LIBRARY INCLUDES
+ * ============================================================================================================== */
 #include <stdio.h>
+#include <string.h>
+
+/* ==============================================================================================================
+ * PICO SDK INCLUDES
+ * ============================================================================================================== */
+// Core Pico includes
 #include "pico/stdlib.h"
 #include "pico/multicore.h"
-#include <string.h>
+#include "pico/binary_info.h"
+#include "pico/bootrom.h"
+#include "pico/unique_id.h"
+
+// Hardware peripheral includes
+#include "hardware/adc.h"
+#include "hardware/clocks.h"
 #include "hardware/divider.h"
 #include "hardware/dma.h"
-#include "hardware/irq.h"
-
-#include "hardware/gpio.h"
-#include "pico/binary_info.h"
-#include "configuration.h"
-#include "hardware/watchdog.h"
-#include "hardware/clocks.h"
-#include "hardware/flash.h"
-#include "hardware/adc.h"
 #include "hardware/exception.h"
-#include "hardware/structs/systick.h"
-#include "hardware/structs/scb.h"
-#include "hardware/vreg.h"
-#include <pico/bootrom.h>
+#include "hardware/flash.h"
+#include "hardware/gpio.h"
 #include "hardware/irq.h"
 #include "hardware/pio.h"
+#include "hardware/vreg.h"
+#include "hardware/watchdog.h"
+
+// Hardware structures
+#include "hardware/structs/scb.h"
+#include "hardware/structs/systick.h"
+
+/* ==============================================================================================================
+ * USB INCLUDES (conditional)
+ * ============================================================================================================== */
+#ifndef USBKEYBOARD
+#include "class/cdc/cdc_device.h"
+#endif
+
+/* ==============================================================================================================
+ * PROJECT-SPECIFIC INCLUDES
+ * ============================================================================================================== */
+#include "configuration.h"
+
+// PIO program includes (conditional on HDMI)
 #ifndef HDMI
 #include "PicoMiteVGA.pio.h"
 #include "PicoMiteI2S.pio.h"
 #endif
-#ifndef USBKEYBOARD
-#include "pico/unique_id.h"
-#include "class/cdc/cdc_device.h"
-#endif
 
-// ****************************************************************************
-//
-//                                    QVGA configuration
-//
-// ****************************************************************************
-// port pins
-//	GP22... VGA
-//	GP16 ... VGA HSYNC/CSYNC synchronization (inverted: negative SYNC=LOW=0x80, BLACK=HIGH=0x00)
-//	GP17 ... VSYNC
+/* ==============================================================================================================
+ * QVGA DISPLAY CONFIGURATION
+ * ============================================================================================================== */
 
-// QVGA port pins
-#define QVGA_GPIO_FIRST PinDef[Option.VGA_BLUE].GPno		 // first QVGA GPIO
-#define QVGA_GPIO_NUM 4										 // number of QVGA color GPIOs, without HSYNC and VSYNC
-#define QVGA_GPIO_LAST (QVGA_GPIO_FIRST + QVGA_GPIO_NUM - 1) // last QVGA GPIO
-#define QVGA_GPIO_HSYNC PinDef[Option.VGA_HSYNC].GPno		 // QVGA HSYNC/CSYNC GPIO
-#define QVGA_GPIO_VSYNC (QVGA_GPIO_HSYNC + 1)				 // QVGA VSYNC GPIO
+// QVGA GPIO Pin Definitions
+#define QVGA_GPIO_FIRST PinDef[Option.VGA_BLUE].GPno		 // First QVGA GPIO
+#define QVGA_GPIO_NUM 4										 // Number of QVGA color GPIOs
+#define QVGA_GPIO_LAST (QVGA_GPIO_FIRST + QVGA_GPIO_NUM - 1) // Last QVGA GPIO
+#define QVGA_GPIO_HSYNC PinDef[Option.VGA_HSYNC].GPno		 // HSYNC/CSYNC GPIO
+#define QVGA_GPIO_VSYNC (QVGA_GPIO_HSYNC + 1)				 // VSYNC GPIO
 
-// QVGA display resolution
-// #define FRAMESIZE (38400) // display frame size in bytes (=38400)
+/* --------------------------------------------------------------------------------------------------------------
+ * QVGA Horizontal Timing (126 MHz clock)
+ *
+ * Note: HSYNC is inverted - negative SYNC=LOW=0x80, BLACK=HIGH=0x00
+ * -------------------------------------------------------------------------------------------------------------- */
+#define QVGA_TOTAL_F 4000 // Total horizontal clock ticks
+						  // (= QVGA_HSYNC + QVGA_BP + WIDTH*QVGA_CPP[1600] + QVGA_FP)
+#define QVGA_HSYNC_F 480  // Horizontal sync pulse width (clock ticks)
+#define QVGA_BP_F 240	  // Back porch duration (clock ticks)
+#define QVGA_FP_F 80	  // Front porch duration (clock ticks)
 
-// 126 MHz timings
-#define QVGA_TOTAL_F 4000 // total clock ticks (= QVGA_HSYNC + QVGA_BP + WIDTH*QVGA_CPP[1600] + QVGA_FP)
-#define QVGA_HSYNC_F 480  // horizontal sync clock ticks
-#define QVGA_BP_F 240	  // back porch clock ticks
-#define QVGA_FP_F 80	  // front porch clock ticks
+/* --------------------------------------------------------------------------------------------------------------
+ * QVGA Vertical Timing
+ * -------------------------------------------------------------------------------------------------------------- */
+#define QVGA_VTOT_F 525	 // Total scanlines
+						 // (= QVGA_VSYNC + QVGA_VBACK + QVGA_VACT + QVGA_VFRONT)
+#define QVGA_VSYNC_F 2	 // Vertical sync pulse (scanlines)
+#define QVGA_VBACK_F 33	 // Vertical back porch (scanlines)
+#define QVGA_VACT_F 480	 // Active display lines (= 2*HEIGHT)
+#define QVGA_VFRONT_F 10 // Vertical front porch (scanlines)
 
-// QVGA vertical timings
-#define QVGA_VTOT_F 525	 // total scanlines (= QVGA_VSYNC + QVGA_VBACK + QVGA_VACT + QVGA_VFRONT)
-#define QVGA_VSYNC_F 2	 // length of V sync (number of scanlines)
-#define QVGA_VBACK_F 33	 // V back porch
-#define QVGA_VACT_F 480	 // V active scanlines (= 2*HEIGHT)
-#define QVGA_VFRONT_F 10 // V front porch
+/* --------------------------------------------------------------------------------------------------------------
+ * QVGA Display Memory
+ * -------------------------------------------------------------------------------------------------------------- */
+// #define FRAMESIZE        38400   // Display frame size in bytes
 
-#endif // _MAIN_H
-/*  @endcond */
+#endif // _INCLUDE_H
+	   /* @endcond */

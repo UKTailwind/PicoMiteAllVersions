@@ -3,279 +3,101 @@
  * The following section will be excluded from the documentation.
  */
 /* *********************************************************************************************************************
-PicoMite MMBasic
+ * PicoMite MMBasic - SPI-LCD.h
+ *
+ * SPI-based LCD display driver definitions and control
+ *
+ * <COPYRIGHT HOLDERS>  Geoff Graham, Peter Mather
+ * Copyright (c) 2021, <COPYRIGHT HOLDERS> All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ * following conditions are met:
+ * 1. Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *    disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following
+ *    disclaimer in the documentation and/or other materials provided with the distribution.
+ * 3. The name MMBasic be used when referring to the interpreter in any documentation and promotional material and the
+ *    original copyright message be displayed on the console at startup (additional copyright messages may be added).
+ * 4. All advertising materials mentioning features or use of this software must display the following acknowledgement:
+ *    This product includes software developed by the <copyright holder>.
+ * 5. Neither the name of the <copyright holder> nor the names of its contributors may be used to endorse or promote
+ *    products derived from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY <COPYRIGHT HOLDERS> AS IS AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO
+ * EVENT SHALL <COPYRIGHT HOLDERS> BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+ * OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR
+ * TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
-SPI-LCD.h.c
-
-<COPYRIGHT HOLDERS>  Geoff Graham, Peter Mather
-Copyright (c) 2021, <COPYRIGHT HOLDERS> All rights reserved.
-Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
-1.	Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
-2.	Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer
-    in the documentation and/or other materials provided with the distribution.
-3.	The name MMBasic be used when referring to the interpreter in any documentation and promotional material and the original copyright message be displayed
-    on the console at startup (additional copyright messages may be added).
-4.	All advertising materials mentioning features or use of this software must display the following acknowledgement: This product includes software developed
-    by the <copyright holder>.
-5.	Neither the name of the <copyright holder> nor the names of its contributors may be used to endorse or promote products derived from this software
-    without specific prior written permission.
-THIS SOFTWARE IS PROVIDED BY <COPYRIGHT HOLDERS> AS IS AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
-OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL <COPYRIGHT HOLDERS> BE LIABLE FOR ANY DIRECT,
-INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-************************************************************************************************************************/
 #ifndef SPI_LCD_HEADER
 #define SPI_LCD_HEADER
+
 #include "hardware/spi.h"
 
-extern void ConfigDisplaySPI(unsigned char *p);
-extern void InitDisplaySPI(int InitOnly);
-extern void SetAndReserve(int pin, int inp, int init, int type);
-extern void OpenSpiChannel(void);
-extern void DisplayNotSet(void);
-extern void SPISpeedSet(int speed);
-extern void DefineRegionSPI(int xstart, int ystart, int xend, int yend, int rw);
-extern void ClearCS(int pin);
-extern void ResetController(void);
-extern void spi_write_command(unsigned char data);
-extern void spi_write_cd(unsigned char command, int data, ...);
-extern void spi_write_data(unsigned char data);
-extern void DrawRectangleSPI(int x1, int y1, int x2, int y2, int c);
-extern void DrawBufferSPI(int x1, int y1, int x2, int y2, unsigned char *p);
-extern void DrawBitmapSPI(int x1, int y1, int width, int height, int scale, int fc, int bc, unsigned char *bitmap);
-extern void ReadBufferSPI(int x1, int y1, int x2, int y2, unsigned char *p);
-#if PICOMITERP2350
-extern void DrawRectangleMEM332(int x1, int y1, int x2, int y2, int c);
-extern void DrawBitmapMEM332(int x1, int y1, int width, int height, int scale, int fc, int bc, unsigned char *bitmap);
-extern void DrawBufferMEM332(int x1, int y1, int x2, int y2, unsigned char *p);
-extern void ReadBufferMEM332(int x1, int y1, int x2, int y2, unsigned char *buff);
-extern void DrawBlitBufferMEM332(int x1, int y1, int x2, int y2, unsigned char *p);
-extern void ReadBlitBufferMEM332(int x1, int y1, int x2, int y2, unsigned char *buff);
-extern void DrawPixelMEM332(int x, int y, int c);
-#endif
-extern void DrawRectangleSPISCR(int x1, int y1, int x2, int y2, int c);
-extern void DrawBufferSPISCR(int x1, int y1, int x2, int y2, unsigned char *p);
-extern void DrawBitmapSPISCR(int x1, int y1, int width, int height, int scale, int fc, int bc, unsigned char *bitmap);
-extern void ReadBufferSPISCR(int x1, int y1, int x2, int y2, unsigned char *p);
-extern void ScrollLCDSPISCR(int lines);
-extern void set_cs(void);
-extern void __not_in_flash_func(spi_write_fast)(spi_inst_t *spi, const uint8_t *src, size_t len);
-extern void __not_in_flash_func(spi_finish)(spi_inst_t *spi);
-#define SSD1331_COLORORDER_RGB
-#define SSD1331_CMD_DRAWLINE 0x21
-#define SSD1331_CMD_DRAWRECT 0x22
-#define SSD1331_CMD_FILL 0x26
-#define SSD1331_CMD_SETCOLUMN 0x15
-#define SSD1331_CMD_SETROW 0x75
-#define SSD1331_CMD_CONTRASTA 0x81
-#define SSD1331_CMD_CONTRASTB 0x82
-#define SSD1331_CMD_CONTRASTC 0x83
-#define SSD1331_CMD_MASTERCURRENT 0x87
-#define SSD1331_CMD_SETREMAP 0xA0
-#define SSD1331_CMD_STARTLINE 0xA1
-#define SSD1331_CMD_DISPLAYOFFSET 0xA2
-#define SSD1331_CMD_NORMALDISPLAY 0xA4
-#define SSD1331_CMD_DISPLAYALLON 0xA5
-#define SSD1331_CMD_DISPLAYALLOFF 0xA6
-#define SSD1331_CMD_INVERTDISPLAY 0xA7
-#define SSD1331_CMD_SETMULTIPLEX 0xA8
-#define SSD1331_CMD_SETMASTER 0xAD
-#define SSD1331_CMD_DISPLAYDIM 0xAC
-#define SSD1331_CMD_DISPLAYOFF 0xAE
-#define SSD1331_CMD_DISPLAYON 0xAF
-#define SSD1331_CMD_POWERMODE 0xB0
-#define SSD1331_CMD_PRECHARGE 0xB1
-#define SSD1331_CMD_CLOCKDIV 0xB3
-#define SSD1331_CMD_PRECHARGEA 0x8A
-#define SSD1331_CMD_PRECHARGEB 0x8B
-#define SSD1331_CMD_PRECHARGEC 0x8C
-#define SSD1331_CMD_PRECHARGELEVEL 0xBB
-#define SSD1331_CMD_VCOMH 0xBE
+/* ==============================================================================================================
+ * GENERAL CONFIGURATION CONSTANTS
+ * ============================================================================================================== */
+#define LANDSCAPE 1
+#define PORTRAIT 2
+#define RLANDSCAPE 3
+#define RPORTRAIT 4
+#define DISPLAY_LANDSCAPE (Option.DISPLAY_ORIENTATION & 1)
+#define TOUCH_NOT_CALIBRATED -999999
 
-#define ST7735_NOP 0x0
-#define ST7735_SWRESET 0x01
-#define ST7735_RDDID 0x04
-#define ST7735_RDDST 0x09
-#define ST7735_SLPIN 0x10
-#define ST7735_SLPOUT 0x11
-#define ST7735_PTLON 0x12
-#define ST7735_NORON 0x13
-#define ST7735_INVOFF 0x20
-#define ST7735_INVON 0x21
-#define ST7735_DISPOFF 0x28
-#define ST7735_DISPON 0x29
-#define ST7735_CASET 0x2A
-#define ST7735_RASET 0x2B
-#define ST7735_RAMWR 0x2C
-#define ST7735_RAMRD 0x2E
-#define ST7735_PTLAR 0x30
-#define ST7735_MADCTL 0x36
-#define ST7735_COLMOD 0x3A
-#define ST7735_FRMCTR1 0xB1
-#define ST7735_FRMCTR2 0xB2
-#define ST7735_FRMCTR3 0xB3
-#define ST7735_INVCTR 0xB4
-#define ST7735_DISSET5 0xB6
-#define ST7735_PWCTR1 0xC0
-#define ST7735_PWCTR2 0xC1
-#define ST7735_PWCTR3 0xC2
-#define ST7735_PWCTR4 0xC3
-#define ST7735_PWCTR5 0xC4
-#define ST7735_VMCTR1 0xC5
-#define ST7735_RDID1 0xDA
-#define ST7735_RDID2 0xDB
-#define ST7735_RDID3 0xDC
-#define ST7735_RDID4 0xDD
-#define ST7735_PWCTR6 0xFC
-#define ST7735_GMCTRP1 0xE0
-#define ST7735_GMCTRN1 0xE1
-#define ST7735_Portrait 0xC0
-#define ST7735_Portrait180 0
-#define ST7735_Landscape 0xA0
-#define ST7735_Landscape180 0x60
+/* ==============================================================================================================
+ * RESET/RESTART CODES
+ * ============================================================================================================== */
+#define RESET_COMMAND 9999     // Reset caused by the RESET command
+#define WATCHDOG_TIMEOUT 9998  // Reset caused by the watchdog timer
+#define PIN_RESTART 9997       // Reset caused by entering 0 at the PIN prompt
+#define RESTART_NOAUTORUN 9996 // Reset required after changing the LCD or touch config
+#define SCREWUP_TIMEOUT 9994   // Reset caused by the execute timer
+#define SOFT_RESET 9993
+#define POSSIBLE_WATCHDOG 9992
+#define INVALID_CLOCKSPEED 9991
+#define RESET_CLOCKSPEED 9990
 
-#define ILI9341_SOFTRESET 0x01
-#define ILI9341_SLEEPIN 0x10
-#define ILI9341_SLEEPOUT 0x11
-#define ILI9341_NORMALDISP 0x13
-#define ILI9341_INVERTOFF 0x20
-#define ILI9341_INVERTON 0x21
-#define ILI9341_GAMMASET 0x26
-#define ILI9341_DISPLAYOFF 0x28
-#define ILI9341_DISPLAYON 0x29
-#define ILI9341_COLADDRSET 0x2A
-#define ILI9341_PAGEADDRSET 0x2B
-#define ILI9341_MEMORYWRITE 0x2C
-#define ILI9341_RAMRD 0x2E
-#define ILI9341_PIXELFORMAT 0x3A
-#define ILI9341_FRAMECONTROL 0xB1
-#define ILI9341_DISPLAYFUNC 0xB6
-#define ILI9341_ENTRYMODE 0xB7
-#define ILI9341_POWERCONTROL1 0xC0
-#define ILI9341_POWERCONTROL2 0xC1
-#define ILI9341_VCOMCONTROL1 0xC5
-#define ILI9341_VCOMCONTROL2 0xC7
-#define ILI9341_MEMCONTROL 0x36
-#define ILI9341_MADCTL_MY 0x80
-#define ILI9341_MADCTL_MX 0x40
-#define ILI9341_MADCTL_MV 0x20
-#define ILI9341_MADCTL_ML 0x10
-#define ILI9341_MADCTL_RGB 0x00
-#define ILI9341_MADCTL_BGR 0x08
-#define ILI9341_MADCTL_MH 0x04
+/* ==============================================================================================================
+ * SPI SPEED DEFINITIONS
+ * ============================================================================================================== */
+#define FLASH_SPI_SPEED 20000000
+#define LCD_SPI_SPEED 25000000 // Speed of the SPI bus for LCD display controller
+#define TOUCH_SPI_SPEED 300000
+#define SLOW_TOUCH_SPEED 120000
+#define NOKIA_SPI_SPEED 4000000
+#define ST7920_SPI_SPEED 600000
+#define SDCARD_SPI_SPEED 12000000
 
-#define ILI9341_Portrait ILI9341_MADCTL_MX | ILI9341_MADCTL_BGR
-#define ILI9341_Portrait180 ILI9341_MADCTL_MY | ILI9341_MADCTL_BGR
-#define ILI9341_Landscape ILI9341_MADCTL_MV | ILI9341_MADCTL_BGR
-#define ILI9341_Landscape180 ILI9341_MADCTL_MY | ILI9341_MADCTL_MX | ILI9341_MADCTL_MV | ILI9341_MADCTL_BGR
-
-#define ILI9481_MADCTL_FH 0x02
-#define ILI9481_MADCTL_FV 0x01
-
-#define ILI9481_Portrait ILI9481_MADCTL_FH | ILI9341_MADCTL_BGR
-#define ILI9481_Portrait180 ILI9481_MADCTL_FV | ILI9341_MADCTL_BGR
-#define ILI9481_Landscape ILI9341_MADCTL_MV | ILI9341_MADCTL_BGR
-#define ILI9481_Landscape180 ILI9481_MADCTL_FV | ILI9481_MADCTL_FH | ILI9341_MADCTL_MV | ILI9341_MADCTL_BGR
-//
-#define ILI9163_NOP 0x00         // Non operation
-#define ILI9163_SWRESET 0x01     // Soft Reset
-#define ILI9163_SLPIN 0x10       // Sleep ON
-#define ILI9163_SLPOUT 0x11      // Sleep OFF
-#define ILI9163_PTLON 0x12       // Partial Mode ON
-#define ILI9163_NORML 0x13       // Normal Display ON
-#define ILI9163_DINVOF 0x20      // Display Inversion OFF
-#define ILI9163_DINVON 0x21      // Display Inversion ON
-#define ILI9163_GAMMASET 0x26    // Gamma Set (0x01[1],0x02[2],0x04[3],0x08[4])
-#define ILI9163_DISPOFF 0x28     // Display OFF
-#define ILI9163_DISPON 0x29      // Display ON
-#define ILI9163_IDLEON 0x39      // Idle Mode ON
-#define ILI9163_IDLEOF 0x38      // Idle Mode OFF
-#define ILI9163_CLMADRS 0x2A     // Column Address Set
-#define ILI9163_PGEADRS 0x2B     // Page Address Set
-#define ILI9163_RAMWR 0x2C       // Memory Write
-#define ILI9163_RAMRD 0x2E       // Memory Read
-#define ILI9163_CLRSPACE 0x2D    // Color Space : 4K/65K/262K
-#define ILI9163_PARTAREA 0x30    // Partial Area
-#define ILI9163_VSCLLDEF 0x33    // Vertical Scroll Definition
-#define ILI9163_TEFXLON 0x35     // Tearing Effect Line ON
-#define ILI9163_TEFXLOF 0x34     // Tearing Effect Line OFF
-#define ILI9163_MADCTL 0x36      // Memory Access Control
-#define ILI9163_VSSTADRS 0x37    // Vertical Scrolling Start address
-#define ILI9163_PIXFMT 0x3A      // Interface Pixel Format
-#define ILI9341_GETSCANLINE 0x45 // read the current scanline
-#define ILI9163_FRMCTR1 0xB1     // Frame Rate Control (In normal mode/Full colors)
-#define ILI9163_FRMCTR2 0xB2     // Frame Rate Control(In Idle mode/8-colors)
-#define ILI9163_FRMCTR3 0xB3     // Frame Rate Control(In Partial mode/full colors)
-#define ILI9163_DINVCTR 0xB4     // Display Inversion Control
-#define ILI9163_RGBBLK 0xB5      // RGB Interface Blanking Porch setting
-#define ILI9163_DFUNCTR 0xB6     // Display Fuction set 5
-#define ILI9163_SDRVDIR 0xB7     // Source Driver Direction Control
-#define ILI9163_GDRVDIR 0xB8     // Gate Driver Direction Control
-#define ILI9163_PWCTR1 0xC0      // Power_Control1
-#define ILI9163_PWCTR2 0xC1      // Power_Control2
-#define ILI9163_PWCTR3 0xC2      // Power_Control3
-#define ILI9163_PWCTR4 0xC3      // Power_Control4
-#define ILI9163_PWCTR5 0xC4      // Power_Control5
-#define ILI9163_VCOMCTR1 0xC5    // VCOM_Control 1
-#define ILI9163_VCOMCTR2 0xC6    // VCOM_Control 2
-#define ILI9163_VCOMOFFS 0xC7    // VCOM Offset Control
-#define ILI9163_PGAMMAC 0xE0     // Positive Gamma Correction Setting
-#define ILI9163_NGAMMAC 0xE1     // Negative Gamma Correction Setting
-#define ILI9163_GAMRSEL 0xF2     // GAM_R_SEL
-#define ILI9163_Portrait 0b00001000
-#define ILI9163_Portrait180 0b11001000
-#define ILI9163_Landscape 0b01101000
-#define ILI9163_Landscape180 0b10101000
-#define ST77XX_SWRESET 0x01
-#define ST77XX_DISPON 0x29
-#define ST77XX_CASET 0x2A
-#define ST77XX_RASET 0x2B
-#define ST77XX_INVON 0x21
-#define ST77XX_INVOFF 0x20
-#define ST77XX_NORON 0x13
-#define ST77XX_SLPOUT 0x11
-#define ST77XX_COLMOD 0x3A
-
-#define GDEH029A1_PU_DELAY 300
-
-#define GDEH029A1_X_PIXELS 128
-#define GDEH029A1_Y_PIXELS 296
-#define GDEH029A1_WIDTH GDEH029A1_X_PIXELS
-#define GDEH029A1_HEIGHT GDEH029A1_Y_PIXELS
-#define DRIVER_OUTPUT_CONTROL 0x01
-#define BOOSTER_SOFT_START_CONTROL 0x0C
-#define GATE_SCAN_START_POSITION 0x0F
-#define DEEP_SLEEP_MODE 0x10
-#define DATA_ENTRY_MODE_SETTING 0x11
-#define SW_RESET 0x12
-#define TEMPERATURE_SENSOR_CONTROL 0x1A
-#define MASTER_ACTIVATION 0x20
-#define DISPLAY_UPDATE_CONTROL_1 0x21
-#define DISPLAY_UPDATE_CONTROL_2 0x22
-#define WRITE_RAM 0x24
-#define WRITE_VCOM_REGISTER 0x2C
-#define WRITE_LUT_REGISTER 0x32
-#define SET_DUMMY_LINE_PERIOD 0x3A
-#define SET_GATE_TIME 0x3B
-#define BORDER_WAVEFORM_CONTROL 0x3C
-#define SET_RAM_X_ADD_START_END_POS 0x44
-#define SET_RAM_Y_ADD_START_END_POS 0x45
-#define SET_RAM_X_ADDRESS_COUNTER 0x4E
-#define SET_RAM_Y_ADDRESS_COUNTER 0x4F
-#define TERMINATE_FRAME_READ_WRITE 0xFF
+/* ==============================================================================================================
+ * SPI CONFIGURATION
+ * ============================================================================================================== */
 #define SPI_POLARITY_LOW false
 #define SPI_PHASE_1EDGE false
 #define SPI_POLARITY_HIGH true
 #define SPI_PHASE_2EDGE true
-#define ST7920setcommand 0b11111000
-#define ST7920setata 0b11111010
+#define NONE_SPI_DEVICE -1
+
+/* ==============================================================================================================
+ * PIN CONFIGURATION CONSTANTS
+ * ============================================================================================================== */
+#define P_INPUT 1 // For setting the TRIS on I/O bits
+#define P_OUTPUT 0
+#define P_ON 1
+#define P_OFF 0
+#define P_I2C_SCL 0
+#define P_I2C_SDA 1
+
+/* ==============================================================================================================
+ * DISPLAY TYPE IDENTIFIERS
+ * ============================================================================================================== */
 #define SDFAST 0
 #define SDSLOW 1
 #define SSD1306I2C 2
 #define SSD1306I2C32 3
-#define I2C_PANEL SSD1306I2C32 // anything less than or equal to I2C_PANEL is handled by the I2C driver
+#define I2C_PANEL SSD1306I2C32 // Anything <= I2C_PANEL is handled by I2C driver
 #define ILI9163 4
 #define ILI9341 5
 #define ST7735 6
@@ -336,6 +158,7 @@ extern void __not_in_flash_func(spi_finish)(spi_inst_t *spi);
 #define VS1053slow 56
 #define VS1053fast 57
 #define SSD1963_5_12 58
+
 #if PICOMITERP2350
 #define ST7796SPBUFF 61
 #define NEXTGEN ST7796SPBUFF
@@ -358,34 +181,292 @@ extern void __not_in_flash_func(spi_finish)(spi_inst_t *spi);
 #define SSD1963_8_BUFF 78
 #define SSD1963_7_BUFF 79
 #endif
+
+/* ==============================================================================================================
+ * DISPLAY TYPE HELPER MACROS
+ * ============================================================================================================== */
+#define SSDTYPE (Option.DISPLAY_TYPE >= SSDPANEL && Option.DISPLAY_TYPE < VIRTUAL_C &&      \
+                 !(Option.DISPLAY_TYPE == ILI9341_16 || Option.DISPLAY_TYPE == ILI9341_8 || \
+                   Option.DISPLAY_TYPE == IPS_4_16 || Option.DISPLAY_TYPE == ILI9486_16))
+
+#define SSD16TYPE (Option.DISPLAY_TYPE > SSD_PANEL_8 && Option.DISPLAY_TYPE < VIRTUAL_C &&   \
+                   !(Option.DISPLAY_TYPE == ILI9341_16 || Option.DISPLAY_TYPE == IPS_4_16 || \
+                     Option.DISPLAY_TYPE == ILI9486_16))
+
+#if PICOMITERP2350
+#define SPIREAD (Option.DISPLAY_TYPE == ILI9341 || Option.DISPLAY_TYPE == ILI9488P || \
+                 Option.DISPLAY_TYPE == ILI9488 || Option.DISPLAY_TYPE == ST7796SP || \
+                 Option.DISPLAY_TYPE == ST7796S || Option.DISPLAY_TYPE == ST7789B ||  \
+                 Option.DISPLAY_TYPE >= NEXTGEN)
+#else
+#define SPIREAD (Option.DISPLAY_TYPE == ILI9341 || Option.DISPLAY_TYPE == ILI9488P || \
+                 Option.DISPLAY_TYPE == ILI9488 || Option.DISPLAY_TYPE == ST7796SP || \
+                 Option.DISPLAY_TYPE == ST7796S || Option.DISPLAY_TYPE == ST7789B)
+#endif
+
+#define FASTSCROLL (SSDTYPE || Option.DISPLAY_TYPE == SCREENMODE1 ||                          \
+                    Option.DISPLAY_TYPE == SCREENMODE2 || Option.DISPLAY_TYPE == VIRTUAL_C || \
+                    Option.DISPLAY_ORIENTATION == VIRTUAL_M)
+
+#define SPI480 (Option.DISPLAY_TYPE == ILI9488 || Option.DISPLAY_TYPE == ST7796S ||  \
+                Option.DISPLAY_TYPE == ILI9488W || Option.DISPLAY_TYPE == ILI9481 || \
+                Option.DISPLAY_TYPE == ILI9481IPS)
+
+/* ==============================================================================================================
+ * SSD1331 OLED DISPLAY COMMANDS
+ * ============================================================================================================== */
+#define SSD1331_COLORORDER_RGB
+#define SSD1331_CMD_DRAWLINE 0x21
+#define SSD1331_CMD_DRAWRECT 0x22
+#define SSD1331_CMD_FILL 0x26
+#define SSD1331_CMD_SETCOLUMN 0x15
+#define SSD1331_CMD_SETROW 0x75
+#define SSD1331_CMD_CONTRASTA 0x81
+#define SSD1331_CMD_CONTRASTB 0x82
+#define SSD1331_CMD_CONTRASTC 0x83
+#define SSD1331_CMD_MASTERCURRENT 0x87
+#define SSD1331_CMD_SETREMAP 0xA0
+#define SSD1331_CMD_STARTLINE 0xA1
+#define SSD1331_CMD_DISPLAYOFFSET 0xA2
+#define SSD1331_CMD_NORMALDISPLAY 0xA4
+#define SSD1331_CMD_DISPLAYALLON 0xA5
+#define SSD1331_CMD_DISPLAYALLOFF 0xA6
+#define SSD1331_CMD_INVERTDISPLAY 0xA7
+#define SSD1331_CMD_SETMULTIPLEX 0xA8
+#define SSD1331_CMD_SETMASTER 0xAD
+#define SSD1331_CMD_DISPLAYDIM 0xAC
+#define SSD1331_CMD_DISPLAYOFF 0xAE
+#define SSD1331_CMD_DISPLAYON 0xAF
+#define SSD1331_CMD_POWERMODE 0xB0
+#define SSD1331_CMD_PRECHARGE 0xB1
+#define SSD1331_CMD_CLOCKDIV 0xB3
+#define SSD1331_CMD_PRECHARGEA 0x8A
+#define SSD1331_CMD_PRECHARGEB 0x8B
+#define SSD1331_CMD_PRECHARGEC 0x8C
+#define SSD1331_CMD_PRECHARGELEVEL 0xBB
+#define SSD1331_CMD_VCOMH 0xBE
+
+/* ==============================================================================================================
+ * ST7735 TFT DISPLAY COMMANDS
+ * ============================================================================================================== */
+#define ST7735_NOP 0x00
+#define ST7735_SWRESET 0x01
+#define ST7735_RDDID 0x04
+#define ST7735_RDDST 0x09
+#define ST7735_SLPIN 0x10
+#define ST7735_SLPOUT 0x11
+#define ST7735_PTLON 0x12
+#define ST7735_NORON 0x13
+#define ST7735_INVOFF 0x20
+#define ST7735_INVON 0x21
+#define ST7735_DISPOFF 0x28
+#define ST7735_DISPON 0x29
+#define ST7735_CASET 0x2A
+#define ST7735_RASET 0x2B
+#define ST7735_RAMWR 0x2C
+#define ST7735_RAMRD 0x2E
+#define ST7735_PTLAR 0x30
+#define ST7735_MADCTL 0x36
+#define ST7735_COLMOD 0x3A
+#define ST7735_FRMCTR1 0xB1
+#define ST7735_FRMCTR2 0xB2
+#define ST7735_FRMCTR3 0xB3
+#define ST7735_INVCTR 0xB4
+#define ST7735_DISSET5 0xB6
+#define ST7735_PWCTR1 0xC0
+#define ST7735_PWCTR2 0xC1
+#define ST7735_PWCTR3 0xC2
+#define ST7735_PWCTR4 0xC3
+#define ST7735_PWCTR5 0xC4
+#define ST7735_VMCTR1 0xC5
+#define ST7735_RDID1 0xDA
+#define ST7735_RDID2 0xDB
+#define ST7735_RDID3 0xDC
+#define ST7735_RDID4 0xDD
+#define ST7735_PWCTR6 0xFC
+#define ST7735_GMCTRP1 0xE0
+#define ST7735_GMCTRN1 0xE1
+
+// ST7735 Orientation Modes
+#define ST7735_Portrait 0xC0
+#define ST7735_Portrait180 0x00
+#define ST7735_Landscape 0xA0
+#define ST7735_Landscape180 0x60
+
+/* ==============================================================================================================
+ * ILI9341 TFT DISPLAY COMMANDS
+ * ============================================================================================================== */
+#define ILI9341_SOFTRESET 0x01
+#define ILI9341_SLEEPIN 0x10
+#define ILI9341_SLEEPOUT 0x11
+#define ILI9341_NORMALDISP 0x13
+#define ILI9341_INVERTOFF 0x20
+#define ILI9341_INVERTON 0x21
+#define ILI9341_GAMMASET 0x26
+#define ILI9341_DISPLAYOFF 0x28
+#define ILI9341_DISPLAYON 0x29
+#define ILI9341_COLADDRSET 0x2A
+#define ILI9341_PAGEADDRSET 0x2B
+#define ILI9341_MEMORYWRITE 0x2C
+#define ILI9341_RAMRD 0x2E
+#define ILI9341_PIXELFORMAT 0x3A
+#define ILI9341_FRAMECONTROL 0xB1
+#define ILI9341_DISPLAYFUNC 0xB6
+#define ILI9341_ENTRYMODE 0xB7
+#define ILI9341_POWERCONTROL1 0xC0
+#define ILI9341_POWERCONTROL2 0xC1
+#define ILI9341_VCOMCONTROL1 0xC5
+#define ILI9341_VCOMCONTROL2 0xC7
+#define ILI9341_MEMCONTROL 0x36
+#define ILI9341_MADCTL_MY 0x80
+#define ILI9341_MADCTL_MX 0x40
+#define ILI9341_MADCTL_MV 0x20
+#define ILI9341_MADCTL_ML 0x10
+#define ILI9341_MADCTL_RGB 0x00
+#define ILI9341_MADCTL_BGR 0x08
+#define ILI9341_MADCTL_MH 0x04
+
+// ILI9341 Orientation Modes
+#define ILI9341_Portrait (ILI9341_MADCTL_MX | ILI9341_MADCTL_BGR)
+#define ILI9341_Portrait180 (ILI9341_MADCTL_MY | ILI9341_MADCTL_BGR)
+#define ILI9341_Landscape (ILI9341_MADCTL_MV | ILI9341_MADCTL_BGR)
+#define ILI9341_Landscape180 (ILI9341_MADCTL_MY | ILI9341_MADCTL_MX | ILI9341_MADCTL_MV | ILI9341_MADCTL_BGR)
+
+/* ==============================================================================================================
+ * ILI9481 TFT DISPLAY COMMANDS
+ * ============================================================================================================== */
+#define ILI9481_MADCTL_FH 0x02
+#define ILI9481_MADCTL_FV 0x01
+
+// ILI9481 Orientation Modes
+#define ILI9481_Portrait (ILI9481_MADCTL_FH | ILI9341_MADCTL_BGR)
+#define ILI9481_Portrait180 (ILI9481_MADCTL_FV | ILI9341_MADCTL_BGR)
+#define ILI9481_Landscape (ILI9341_MADCTL_MV | ILI9341_MADCTL_BGR)
+#define ILI9481_Landscape180 (ILI9481_MADCTL_FV | ILI9481_MADCTL_FH | ILI9341_MADCTL_MV | ILI9341_MADCTL_BGR)
+
+/* ==============================================================================================================
+ * ILI9163 TFT DISPLAY COMMANDS
+ * ============================================================================================================== */
+#define ILI9163_NOP 0x00
+#define ILI9163_SWRESET 0x01
+#define ILI9163_SLPIN 0x10
+#define ILI9163_SLPOUT 0x11
+#define ILI9163_PTLON 0x12
+#define ILI9163_NORML 0x13
+#define ILI9163_DINVOF 0x20
+#define ILI9163_DINVON 0x21
+#define ILI9163_GAMMASET 0x26
+#define ILI9163_DISPOFF 0x28
+#define ILI9163_DISPON 0x29
+#define ILI9163_IDLEON 0x39
+#define ILI9163_IDLEOF 0x38
+#define ILI9163_CLMADRS 0x2A
+#define ILI9163_PGEADRS 0x2B
+#define ILI9163_RAMWR 0x2C
+#define ILI9163_RAMRD 0x2E
+#define ILI9163_CLRSPACE 0x2D
+#define ILI9163_PARTAREA 0x30
+#define ILI9163_VSCLLDEF 0x33
+#define ILI9163_TEFXLON 0x35
+#define ILI9163_TEFXLOF 0x34
+#define ILI9163_MADCTL 0x36
+#define ILI9163_VSSTADRS 0x37
+#define ILI9163_PIXFMT 0x3A
+#define ILI9341_GETSCANLINE 0x45
+#define ILI9163_FRMCTR1 0xB1
+#define ILI9163_FRMCTR2 0xB2
+#define ILI9163_FRMCTR3 0xB3
+#define ILI9163_DINVCTR 0xB4
+#define ILI9163_RGBBLK 0xB5
+#define ILI9163_DFUNCTR 0xB6
+#define ILI9163_SDRVDIR 0xB7
+#define ILI9163_GDRVDIR 0xB8
+#define ILI9163_PWCTR1 0xC0
+#define ILI9163_PWCTR2 0xC1
+#define ILI9163_PWCTR3 0xC2
+#define ILI9163_PWCTR4 0xC3
+#define ILI9163_PWCTR5 0xC4
+#define ILI9163_VCOMCTR1 0xC5
+#define ILI9163_VCOMCTR2 0xC6
+#define ILI9163_VCOMOFFS 0xC7
+#define ILI9163_PGAMMAC 0xE0
+#define ILI9163_NGAMMAC 0xE1
+#define ILI9163_GAMRSEL 0xF2
+
+// ILI9163 Orientation Modes
+#define ILI9163_Portrait 0b00001000
+#define ILI9163_Portrait180 0b11001000
+#define ILI9163_Landscape 0b01101000
+#define ILI9163_Landscape180 0b10101000
+
+/* ==============================================================================================================
+ * ST77XX GENERIC TFT DISPLAY COMMANDS
+ * ============================================================================================================== */
+#define ST77XX_SWRESET 0x01
+#define ST77XX_DISPON 0x29
+#define ST77XX_CASET 0x2A
+#define ST77XX_RASET 0x2B
+#define ST77XX_INVON 0x21
+#define ST77XX_INVOFF 0x20
+#define ST77XX_NORON 0x13
+#define ST77XX_SLPOUT 0x11
+#define ST77XX_COLMOD 0x3A
+
+/* ==============================================================================================================
+ * E-INK DISPLAY (GDEH029A1) COMMANDS
+ * ============================================================================================================== */
+#define GDEH029A1_PU_DELAY 300
+#define GDEH029A1_X_PIXELS 128
+#define GDEH029A1_Y_PIXELS 296
+#define GDEH029A1_WIDTH GDEH029A1_X_PIXELS
+#define GDEH029A1_HEIGHT GDEH029A1_Y_PIXELS
+
+#define DRIVER_OUTPUT_CONTROL 0x01
+#define BOOSTER_SOFT_START_CONTROL 0x0C
+#define GATE_SCAN_START_POSITION 0x0F
+#define DEEP_SLEEP_MODE 0x10
+#define DATA_ENTRY_MODE_SETTING 0x11
+#define SW_RESET 0x12
+#define TEMPERATURE_SENSOR_CONTROL 0x1A
+#define MASTER_ACTIVATION 0x20
+#define DISPLAY_UPDATE_CONTROL_1 0x21
+#define DISPLAY_UPDATE_CONTROL_2 0x22
+#define WRITE_RAM 0x24
+#define WRITE_VCOM_REGISTER 0x2C
+#define WRITE_LUT_REGISTER 0x32
+#define SET_DUMMY_LINE_PERIOD 0x3A
+#define SET_GATE_TIME 0x3B
+#define BORDER_WAVEFORM_CONTROL 0x3C
+#define SET_RAM_X_ADD_START_END_POS 0x44
+#define SET_RAM_Y_ADD_START_END_POS 0x45
+#define SET_RAM_X_ADDRESS_COUNTER 0x4E
+#define SET_RAM_Y_ADDRESS_COUNTER 0x4F
+#define TERMINATE_FRAME_READ_WRITE 0xFF
+
+/* ==============================================================================================================
+ * ST7920 GRAPHIC LCD COMMANDS
+ * ============================================================================================================== */
+#define ST7920setcommand 0b11111000
+#define ST7920setata 0b11111010
+
+/* ==============================================================================================================
+ * GENERIC TFT COMMANDS
+ * ============================================================================================================== */
 #define TFT_NOP 0x00
 #define TFT_SWRST 0x01
-#define SSDTYPE (Option.DISPLAY_TYPE >= SSDPANEL && Option.DISPLAY_TYPE < VIRTUAL_C && !(Option.DISPLAY_TYPE == ILI9341_16 || Option.DISPLAY_TYPE == ILI9341_8 || Option.DISPLAY_TYPE == IPS_4_16 || Option.DISPLAY_TYPE == ILI9486_16))
-#define SSD16TYPE (Option.DISPLAY_TYPE > SSD_PANEL_8 && Option.DISPLAY_TYPE < VIRTUAL_C && !(Option.DISPLAY_TYPE == ILI9341_16 || Option.DISPLAY_TYPE == IPS_4_16 || Option.DISPLAY_TYPE == ILI9486_16))
-#if PICOMITERP2350
-#define SPIREAD (Option.DISPLAY_TYPE == ILI9341 || Option.DISPLAY_TYPE == ILI9488P || Option.DISPLAY_TYPE == ILI9488 || Option.DISPLAY_TYPE == ST7796SP || Option.DISPLAY_TYPE == ST7796S || Option.DISPLAY_TYPE == ST7789B || Option.DISPLAY_TYPE >= NEXTGEN)
-#else
-#define SPIREAD (Option.DISPLAY_TYPE == ILI9341 || Option.DISPLAY_TYPE == ILI9488P || Option.DISPLAY_TYPE == ILI9488 || Option.DISPLAY_TYPE == ST7796SP || Option.DISPLAY_TYPE == ST7796S || Option.DISPLAY_TYPE == ST7789B)
-#endif
-#define FASTSCROLL (SSDTYPE || Option.DISPLAY_TYPE == SCREENMODE1 || Option.DISPLAY_TYPE == SCREENMODE2 || Option.DISPLAY_TYPE == VIRTUAL_C || Option.DISPLAY_ORIENTATION == VIRTUAL_M)
-#define SPI480 (Option.DISPLAY_TYPE == ILI9488 || Option.DISPLAY_TYPE == ST7796S || Option.DISPLAY_TYPE == ILI9488W || Option.DISPLAY_TYPE == ILI9481 || Option.DISPLAY_TYPE == ILI9481IPS)
 #define TFT_SLPIN 0x10
 #define TFT_SLPOUT 0x11
-
 #define TFT_INVOFF 0x20
 #define TFT_INVON 0x21
-
 #define TFT_DISPOFF 0x28
 #define TFT_DISPON 0x29
-
 #define TFT_CASET 0x2A
 #define TFT_RASET 0x2B
 #define TFT_RAMWR 0x2C
-
 #define TFT_RAMRD 0x2E
-
 #define TFT_MADCTL 0x36
 
+// TFT Memory Access Control Bits
 #define TFT_MAD_MY 0x80
 #define TFT_MAD_MX 0x40
 #define TFT_MAD_MV 0x20
@@ -395,82 +476,49 @@ extern void __not_in_flash_func(spi_finish)(spi_inst_t *spi);
 #define TFT_MAD_MH 0x04
 #define TFT_MAD_SS 0x02
 #define TFT_MAD_GS 0x01
-
 #define TFT_IDXRD 0x00 // ILI9341 only, indexed control register read
+
+/* ==============================================================================================================
+ * GC9A01 ROUND DISPLAY COMMANDS
+ * ============================================================================================================== */
 #define GC9A01_TFTWIDTH 240
 #define GC9A01_TFTHEIGHT 240
-
-#define GC9A01_RST_DELAY 120    ///< delay ms wait for reset finish
-#define GC9A01_SLPIN_DELAY 120  ///< delay ms wait for sleep in finish
-#define GC9A01_SLPOUT_DELAY 120 ///< delay ms wait for sleep out finish
+#define GC9A01_RST_DELAY 120    // Delay (ms) wait for reset finish
+#define GC9A01_SLPIN_DELAY 120  // Delay (ms) wait for sleep in finish
+#define GC9A01_SLPOUT_DELAY 120 // Delay (ms) wait for sleep out finish
 
 #define GC9A01_NOP 0x00
 #define GC9A01_SWRESET 0x01
 #define GC9A01_RDDID 0x04
 #define GC9A01_RDDST 0x09
-
 #define GC9A01_SLPIN 0x10
 #define GC9A01_SLPOUT 0x11
 #define GC9A01_PTLON 0x12
 #define GC9A01_NORON 0x13
-
 #define GC9A01_INVOFF 0x20
 #define GC9A01_INVON 0x21
 #define GC9A01_DISPOFF 0x28
 #define GC9A01_DISPON 0x29
-
 #define GC9A01_CASET 0x2A
 #define GC9A01_RASET 0x2B
 #define GC9A01_RAMWR 0x2C
 #define GC9A01_RAMRD 0x2E
-
 #define GC9A01_PTLAR 0x30
 #define GC9A01_COLMOD 0x3A
 #define GC9A01_MADCTL 0x36
-
 #define GC9A01_MADCTL_MY 0x80
 #define GC9A01_MADCTL_MX 0x40
 #define GC9A01_MADCTL_MV 0x20
 #define GC9A01_MADCTL_ML 0x10
 #define GC9A01_MADCTL_RGB 0x00
-
 #define GC9A01_RDID1 0xDA
 #define GC9A01_RDID2 0xDB
 #define GC9A01_RDID3 0xDC
 #define GC9A01_RDID4 0xDD
 
-#define LANDSCAPE 1
-#define PORTRAIT 2
-#define RLANDSCAPE 3
-#define RPORTRAIT 4
-#define DISPLAY_LANDSCAPE (Option.DISPLAY_ORIENTATION & 1)
-#define TOUCH_NOT_CALIBRATED -999999
-#define RESET_COMMAND 9999     // indicates that the reset was caused by the RESET command
-#define WATCHDOG_TIMEOUT 9998  // reset caused by the watchdog timer
-#define PIN_RESTART 9997       // reset caused by entering 0 at the PIN prompt
-#define RESTART_NOAUTORUN 9996 // reset required after changing the LCD or touch config
-#define SCREWUP_TIMEOUT 9994   // reset caused by the execute timer
-#define SOFT_RESET 9993
-#define POSSIBLE_WATCHDOG 9992
-#define INVALID_CLOCKSPEED 9991
-#define RESET_CLOCKSPEED 9990
-
-#define FLASH_SPI_SPEED 20000000
-#define LCD_SPI_SPEED 25000000 // the speed of the SPI bus when talking to an SPI LCD display controller
-#define TOUCH_SPI_SPEED 300000
-#define SLOW_TOUCH_SPEED 120000
-#define NOKIA_SPI_SPEED 4000000
-#define ST7920_SPI_SPEED 600000
-#define SDCARD_SPI_SPEED 12000000
-#define NONE_SPI_DEVICE -1
-#define P_INPUT 1 // for setting the TRIS on I/O bits
-#define P_OUTPUT 0
-#define P_ON 1
-#define P_OFF 0
-#define P_I2C_SCL 0
-#define P_I2C_SDA 1
-extern void Display_Refresh(void);
-extern void waitwhilebusy(void);
+/* ==============================================================================================================
+ * DISPLAY STRUCTURES
+ * ============================================================================================================== */
 struct Displays
 {
     unsigned char ref;
@@ -487,40 +535,120 @@ struct Displays
     int CPOL;
     int CPHASE;
 };
+
+/* ==============================================================================================================
+ * GLOBAL VARIABLES
+ * ============================================================================================================== */
 extern const struct Displays display_details[];
 extern int LCD_CS_PIN;
 extern int LCD_CD_PIN;
 extern int LCD_Reset_PIN;
 extern int LCD_E_INKbusy;
+extern int SD_SPI_SPEED;
+
+// Function Pointers for SPI Operations
 extern void (*xmit_byte_multi)(const BYTE *buff, int cnt);
 extern void (*rcvr_byte_multi)(BYTE *buff, int cnt);
 extern void (*lcd_xmit_byte_multi)(const BYTE *buff, int cnt);
 extern void (*lcd_rcvr_byte_multi)(BYTE *buff, int cnt);
 extern int (*SET_SPI_CLK)(int speed, int polarity, int edge);
-extern void SPISpeedSet(int device);
 extern BYTE (*xchg_byte)(BYTE data_out);
-extern int SD_SPI_SPEED;
+
+/* ==============================================================================================================
+ * FUNCTION PROTOTYPES - Display Configuration
+ * ============================================================================================================== */
+extern void ConfigDisplaySPI(unsigned char *p);
+extern void InitDisplaySPI(int InitOnly);
+extern void DisplayNotSet(void);
+extern void SPISpeedSet(int speed);
+extern void Display_Refresh(void);
+extern void waitwhilebusy(void);
+
+/* ==============================================================================================================
+ * FUNCTION PROTOTYPES - Pin and SPI Control
+ * ============================================================================================================== */
+extern void SetAndReserve(int pin, int inp, int init, int type);
+extern void OpenSpiChannel(void);
+extern void ClearCS(int pin);
+extern void set_cs(void);
+extern void SetCS(void);
+extern void ResetController(void);
+extern void SPISpeedSet(int device);
+extern void SPI111init(void);
+
+/* ==============================================================================================================
+ * FUNCTION PROTOTYPES - SPI Communication
+ * ============================================================================================================== */
+extern void spi_write_command(unsigned char data);
+extern void spi_write_cd(unsigned char command, int data, ...);
+extern void spi_write_data(unsigned char data);
+extern void __not_in_flash_func(spi_write_fast)(spi_inst_t *spi, const uint8_t *src, size_t len);
+extern void __not_in_flash_func(spi_finish)(spi_inst_t *spi);
+
+/* ==============================================================================================================
+ * FUNCTION PROTOTYPES - Hardware SPI (HW0)
+ * ============================================================================================================== */
 extern int __not_in_flash_func(HW0Clk)(int speed, int polarity, int edge);
-extern int __not_in_flash_func(HW1Clk)(int speed, int polarity, int edge);
-extern int __not_in_flash_func(BitBangSetClk)(int speed, int polarity, int edge);
 extern BYTE __not_in_flash_func(HW0SwapSPI)(BYTE data_out);
-extern BYTE __not_in_flash_func(HW1SwapSPI)(BYTE data_out);
-extern BYTE BitBangSwapSPI(BYTE data_out);
 extern void __not_in_flash_func(HW0SendSPI)(const BYTE *buff, int cnt);
-extern void __not_in_flash_func(HW1SendSPI)(const BYTE *buff, int cnt);
-extern void BitBangSendSPI(const BYTE *buff, int cnt);
 extern void __not_in_flash_func(HW0ReadSPI)(BYTE *buff, int cnt);
+
+/* ==============================================================================================================
+ * FUNCTION PROTOTYPES - Hardware SPI (HW1)
+ * ============================================================================================================== */
+extern int __not_in_flash_func(HW1Clk)(int speed, int polarity, int edge);
+extern BYTE __not_in_flash_func(HW1SwapSPI)(BYTE data_out);
+extern void __not_in_flash_func(HW1SendSPI)(const BYTE *buff, int cnt);
 extern void __not_in_flash_func(HW1ReadSPI)(BYTE *buff, int cnt);
+
+/* ==============================================================================================================
+ * FUNCTION PROTOTYPES - Bit-Bang SPI
+ * ============================================================================================================== */
+extern int __not_in_flash_func(BitBangSetClk)(int speed, int polarity, int edge);
+extern BYTE BitBangSwapSPI(BYTE data_out);
+extern void BitBangSendSPI(const BYTE *buff, int cnt);
 extern void BitBangReadSPI(BYTE *buff, int cnt);
+
+/* ==============================================================================================================
+ * FUNCTION PROTOTYPES - Standard SPI Display Operations
+ * ============================================================================================================== */
+extern void DefineRegionSPI(int xstart, int ystart, int xend, int yend, int rw);
+extern void DrawRectangleSPI(int x1, int y1, int x2, int y2, int c);
+extern void DrawBufferSPI(int x1, int y1, int x2, int y2, unsigned char *p);
+extern void DrawBitmapSPI(int x1, int y1, int width, int height, int scale, int fc, int bc, unsigned char *bitmap);
+extern void ReadBufferSPI(int x1, int y1, int x2, int y2, unsigned char *p);
 extern void ScrollLCDSPI(int lines);
+
+/* ==============================================================================================================
+ * FUNCTION PROTOTYPES - Scrolling Display Operations
+ * ============================================================================================================== */
+extern void DrawRectangleSPISCR(int x1, int y1, int x2, int y2, int c);
+extern void DrawBufferSPISCR(int x1, int y1, int x2, int y2, unsigned char *p);
+extern void DrawBitmapSPISCR(int x1, int y1, int width, int height, int scale, int fc, int bc, unsigned char *bitmap);
+extern void ReadBufferSPISCR(int x1, int y1, int x2, int y2, unsigned char *p);
+extern void ScrollLCDSPISCR(int lines);
+
+/* ==============================================================================================================
+ * FUNCTION PROTOTYPES - RP2350 Specific (MEM332 Format)
+ * ============================================================================================================== */
 #if PICOMITERP2350
+extern void DrawRectangleMEM332(int x1, int y1, int x2, int y2, int c);
+extern void DrawBitmapMEM332(int x1, int y1, int width, int height, int scale, int fc, int bc, unsigned char *bitmap);
+extern void DrawBufferMEM332(int x1, int y1, int x2, int y2, unsigned char *p);
+extern void ReadBufferMEM332(int x1, int y1, int x2, int y2, unsigned char *buff);
+extern void DrawBlitBufferMEM332(int x1, int y1, int x2, int y2, unsigned char *p);
+extern void ReadBlitBufferMEM332(int x1, int y1, int x2, int y2, unsigned char *buff);
+extern void DrawPixelMEM332(int x, int y, int c);
 extern void ScrollLCDMEM332(int lines);
 extern void init_RGB332_to_RGB565_LUT(void);
 extern void init_RGB332_to_RGB888_LUT(void);
 extern void init_RGB332_to_RGB888_LUT_SSD(void);
 #endif
-extern void SetCS(void);
+
+/* ==============================================================================================================
+ * FUNCTION PROTOTYPES - ILI9341 Specific
+ * ============================================================================================================== */
 extern int GetLineILI9341(void);
-extern void SPI111init(void);
-#endif
-/*  @endcond */
+
+#endif // SPI_LCD_HEADER
+       /* @endcond */

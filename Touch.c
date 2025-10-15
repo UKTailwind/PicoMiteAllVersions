@@ -80,10 +80,10 @@ void MIPS16 ConfigTouch(unsigned char *p)
     if (!TOUCH_CAP)
     {
         if (!(argc == 3 || argc == 5))
-            error("Argument count");
+            StandardError(2);
     }
     else if (argc < 3)
-        error("Argument count");
+        StandardError(2);
     unsigned char code;
     if (!(code = codecheck(argv[0])))
         argv[0] += 2;
@@ -91,14 +91,14 @@ void MIPS16 ConfigTouch(unsigned char *p)
     if (!code)
         pin1 = codemap(pin1);
     if (IsInvalidPin(pin1))
-        error("Invalid pin");
+        StandardError(9);
     if (!(code = codecheck(argv[2])))
         argv[2] += 2;
     pin2 = getinteger(argv[2]);
     if (!code)
         pin2 = codemap(pin2);
     if (IsInvalidPin(pin2))
-        error("Invalid pin");
+        StandardError(9);
     if (argc >= 5 && *argv[4])
     {
         if (!(code = codecheck(argv[4])))
@@ -107,7 +107,7 @@ void MIPS16 ConfigTouch(unsigned char *p)
         if (!code)
             pin3 = codemap(pin3);
         if (IsInvalidPin(pin3))
-            error("Invalid pin");
+            StandardError(9);
     }
     if (TOUCH_CAP)
     {
@@ -115,13 +115,13 @@ void MIPS16 ConfigTouch(unsigned char *p)
             threshold = getint(argv[6], 0, 255);
     }
     if (ExtCurrentConfig[pin1] != EXT_NOT_CONFIG)
-        error("Pin %/| is in use", pin1, pin1);
+        StandardErrorParam2(27, pin1, pin1);
     if (pin2)
         if (ExtCurrentConfig[pin2] != EXT_NOT_CONFIG)
-            error("Pin %/| is in use", pin2, pin2);
+            StandardErrorParam2(27, pin2, pin2);
     if (pin3)
         if (ExtCurrentConfig[pin3] != EXT_NOT_CONFIG)
-            error("Pin %/| is in use", pin3, pin3);
+            StandardErrorParam2(27, pin3, pin3);
     Option.TOUCH_CS = (TOUCH_CAP ? pin2 : pin1);
     Option.TOUCH_IRQ = (TOUCH_CAP ? pin1 : pin2);
     Option.TOUCH_Click = pin3;
@@ -498,10 +498,10 @@ void fun_touch(void)
             //            else if(checkstring(ep, (unsigned char *)"GESTURE"))
             //                iret = readRegister8(FT6X36_ADDR, FT6X36_REG_GESTURE_ID);
             else
-                error("Invalid argument");
+                SyntaxError();
         }
         else
-            error("Invalid argument");
+            SyntaxError();
     }
 
     targ = T_INT;

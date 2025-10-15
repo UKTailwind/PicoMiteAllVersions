@@ -218,7 +218,8 @@ int cmd_tcpclient(void)
         int timeout = 5000;
         getcsargs(&tp, 5);
         if (argc < 3)
-            error("Syntax");
+            SyntaxError();
+        ;
         ip4_addr_t remote_addr;
         char *IP = GetTempMemory(STRINGSIZE);
         TCP_CLIENT_T *state = tcp_client_init();
@@ -272,7 +273,8 @@ int cmd_tcpclient(void)
         int timeout = 5000;
         getcsargs(&tp, 5);
         if (argc < 3)
-            error("Syntax");
+            SyntaxError();
+        ;
         ip4_addr_t remote_addr;
         char *IP = GetTempMemory(STRINGSIZE);
         TCP_CLIENT_T *state = tcp_client_init();
@@ -337,7 +339,8 @@ int cmd_tcpclient(void)
         if (!state->connected)
             error("No connection");
         if (argc < 3)
-            error("Syntax");
+            SyntaxError();
+        ;
         char *request = (char *)getstring(argv[0]);
         size = parseintegerarray(argv[2], &dest, 2, 1, NULL, true) * 8;
         dest[0] = 0;
@@ -375,7 +378,8 @@ int cmd_tcpclient(void)
         if (!state->connected)
             error("No connection");
         if (argc != 7)
-            error("Syntax");
+            SyntaxError();
+        ;
         char *request = (char *)getstring(argv[0]);
         size = parseintegerarray(argv[2], &dest, 2, 1, NULL, true) * 8;
         dest[0] = 0;

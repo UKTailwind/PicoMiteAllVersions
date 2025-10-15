@@ -203,7 +203,8 @@ int cmd_mqtt(void)
       error("Already connected");
     int timeout = 5000;
     if (!(argc == 7 || argc == 9))
-      error("Syntax");
+      SyntaxError();
+    ;
     IP = (char *)getCstring(argv[0]);
     int port = getint(argv[2], 1, 65535);
     ip4_addr_t remote_addr;
@@ -253,7 +254,8 @@ int cmd_mqtt(void)
     int qos = 1;
     int retain = 1;
     if (argc < 3)
-      error("Syntax");
+      SyntaxError();
+    ;
     char *topic = (char *)getCstring(argv[0]);
     char *msg = (char *)getCstring(argv[2]);
     if (argc >= 5 && *argv[4])
@@ -268,7 +270,8 @@ int cmd_mqtt(void)
   {
     getcsargs(&tp, 3);
     if (!(argc >= 1))
-      error("Syntax");
+      SyntaxError();
+    ;
     strcpy(mqtt_subs.topic, (char *)getCstring(argv[0]));
     int qos = 0;
     if (argc == 3)

@@ -181,7 +181,7 @@ void ConfigDisplayI2C(unsigned char *p)
   unsigned char DISPLAY_TYPE = 0;
   getcsargs(&p, 5);
   if (!(argc == 3 || argc == 5))
-    error("Argument count");
+    StandardError(2);
   if (checkstring(argv[0], (unsigned char *)"SSD1306I2C"))
   {
     DISPLAY_TYPE = SSD1306I2C;
@@ -327,7 +327,7 @@ void cmd_i2c(void)
   else if ((p = checkstring(cmdline, (unsigned char *)"SLAVE CLOSE")) != NULL)
     i2cDisable(p);
   else
-    error("Unknown command");
+    StandardError(36);
 }
 void cmd_i2c2(void)
 {
@@ -366,7 +366,7 @@ void cmd_i2c2(void)
   else if ((p = checkstring(cmdline, (unsigned char *)"SLAVE CLOSE")) != NULL)
     i2c2Disable(p);
   else
-    error("Unknown command");
+    StandardError(36);
 }
 /*
  * @cond
@@ -410,7 +410,7 @@ void i2cSlave(unsigned char *p)
   int addr;
   getcsargs(&p, 5);
   if (argc != 5)
-    error("Argument count");
+    StandardError(2);
   if (I2C_Status & I2C_Status_Slave)
     error("Slave already open");
   addr = getinteger(argv[0]);
@@ -437,7 +437,7 @@ void i2c2Slave(unsigned char *p)
   int addr;
   getcsargs(&p, 5);
   if (argc != 5)
-    error("Argument count");
+    StandardError(2);
   if (I2C2_Status & I2C_Status_Slave)
     error("Slave already open");
   addr = getinteger(argv[0]);
@@ -646,7 +646,7 @@ error_exit:
     return;
   }
   if (CurrentLinePtr)
-    error("RTC not responding");
+    StandardError(30);
   if (Option.RTC)
   {
     MMPrintString("RTC not responding");
@@ -701,7 +701,7 @@ void MIPS16 cmd_rtc(void)
     if (noRTC)
     {
       if (CurrentLinePtr)
-        error("RTC not responding");
+        StandardError(30);
       if (Option.RTC)
       {
         MMPrintString("RTC not responding");
@@ -739,7 +739,7 @@ void MIPS16 cmd_rtc(void)
       {
         // multiple arguments - data should be in the original yy, mm, dd, etc format
         if (argc != 11)
-          error("Argument count");
+          StandardError(2);
         I2C_Send_Buffer[1] = CvtToBCD(argv[10], 0, 59);  // seconds
         I2C_Send_Buffer[2] = CvtToBCD(argv[8], 0, 59);   // minutes
         I2C_Send_Buffer[3] = CvtToBCD(argv[6], 0, 23);   // hour
@@ -763,7 +763,7 @@ void MIPS16 cmd_rtc(void)
         I2C_Send_Buffer[0] = I2C_Send_Buffer[1] = I2C_Send_Buffer[2] = 0; // set the register pointer to the first register then zero the first two registers
         I2C_Sendlen = 10;                                                 // send 10 bytes
         if (!DoRtcI2C(0x51, NULL))
-          error("RTC not responding");
+          StandardError(30);
       }
     }
     else
@@ -790,7 +790,7 @@ void MIPS16 cmd_rtc(void)
       {
         // multiple arguments - data should be in the original yy, mm, dd, etc format
         if (argc != 11)
-          error("Argument count");
+          StandardError(2);
         I2C_Send_Buffer[1] = CvtToBCD(argv[10], 0, 59);  // seconds
         I2C_Send_Buffer[2] = CvtToBCD(argv[8], 0, 59);   // minutes
         I2C_Send_Buffer[3] = CvtToBCD(argv[6], 0, 23);   // hour
@@ -814,7 +814,7 @@ void MIPS16 cmd_rtc(void)
         I2C_Send_Buffer[0] = I2C_Send_Buffer[1] = I2C_Send_Buffer[2] = 0; // set the register pointer to the first register then zero the first two registers
         I2C2_Sendlen = 10;                                                // send 10 bytes
         if (!DoRtcI2C(0x51, NULL))
-          error("RTC not responding");
+          StandardError(30);
       }
     }
     RtcGetTime(0);
@@ -823,7 +823,7 @@ void MIPS16 cmd_rtc(void)
   {
     getcsargs(&p, 3);
     if (argc != 3)
-      error("Argument count");
+      StandardError(2);
     if (I2C0locked)
     {
       I2C_Sendlen = 1; // send one byte
@@ -838,14 +838,14 @@ void MIPS16 cmd_rtc(void)
     }
     ptr = findvar(argv[2], V_FIND);
     if (g_vartbl[g_VarIndex].type & T_CONST)
-      error("Cannot change a constant");
+      StandardError(22);
     if (g_vartbl[g_VarIndex].type & T_STR)
-      error("Invalid variable");
+      StandardError(6);
 
     if (!(DS1307 = DoRtcI2C(0x68, NULL)))
     {
       if (!DoRtcI2C(0x51, NULL))
-        error("RTC not responding");
+        StandardError(30);
     }
     if (I2C0locked)
     {
@@ -864,7 +864,7 @@ void MIPS16 cmd_rtc(void)
       I2C2_Sendlen = 0;
     }
     if (!DoRtcI2C(DS1307 ? 0x68 : 0x51, (unsigned char *)buff))
-      error("RTC not responding1");
+      StandardError(30);
     if (g_vartbl[g_VarIndex].type & T_NBR)
       *(MMFLOAT *)ptr = buff[0];
     else
@@ -874,7 +874,7 @@ void MIPS16 cmd_rtc(void)
   {
     getcsargs(&p, 3);
     if (argc != 3)
-      error("Argument count");
+      StandardError(2);
     if (I2C0locked)
     {
       I2C_Rcvlen = 0;
@@ -892,11 +892,11 @@ void MIPS16 cmd_rtc(void)
     if (!DoRtcI2C(0x68, NULL))
     {
       if (!DoRtcI2C(0x51, NULL))
-        error("RTC not responding");
+        StandardError(30);
     }
   }
   else
-    error("Unknown command");
+    StandardError(36);
 }
 /*
  * @cond
@@ -909,13 +909,13 @@ void i2cEnable(unsigned char *p)
   int speed, timeout;
   getcsargs(&p, 3);
   if (argc != 3)
-    error("Invalid syntax");
+    SyntaxError();
   speed = getinteger(argv[0]);
   if (!(speed == 100 || speed == 400 || speed == 1000))
     error("Valid speeds 100, 400, 1000");
   timeout = getinteger(argv[2]);
   if (timeout < 0 || (timeout > 0 && timeout < 100))
-    error("Number out of bounds");
+    StandardError(21);
   if (I2C_enabled || I2C_Status & I2C_Status_Slave)
     error("I2C already OPEN");
   I2C_Timeout = timeout;
@@ -927,13 +927,13 @@ void i2c2Enable(unsigned char *p)
   int speed, timeout;
   getcsargs(&p, 3);
   if (argc != 3)
-    error("Invalid syntax");
+    SyntaxError();
   speed = getinteger(argv[0]);
   if (!(speed == 100 || speed == 400 || speed == 1000))
     error("Valid speeds 100, 400, 1000");
   timeout = getinteger(argv[2]);
   if (timeout < 0 || (timeout > 0 && timeout < 100))
-    error("Number out of bounds");
+    StandardError(21);
   if (I2C2_enabled || I2C2_Status & I2C_Status_Slave)
     error("I2C already OPEN");
   I2C2_Timeout = timeout;
@@ -967,13 +967,13 @@ void i2cSend(unsigned char *p)
 
   getcsargs(&p, MAX_ARG_COUNT);
   if (!(argc & 0x01) || (argc < 7))
-    error("Invalid syntax");
+    SyntaxError();
   if (!I2C_enabled)
     error("I2C not open");
   addr = getinteger(argv[0]);
   i2c_options = getinteger(argv[2]);
   if (i2c_options < 0 || i2c_options > 3)
-    error("Number out of bounds");
+    StandardError(21);
   I2C_Status = 0;
   if (i2c_options & 0x01)
     I2C_Status = I2C_Status_BusHold;
@@ -983,7 +983,7 @@ void i2cSend(unsigned char *p)
   if (sendlen == 1 || argc > 7)
   { // numeric expressions for data
     if (sendlen != ((argc - 5) >> 1))
-      error("Incorrect argument count");
+      StandardError(2);
     for (i = 0; i < sendlen; i++)
     {
       I2C_Send_Buffer[i] = getinteger(argv[i + i + 6]);
@@ -993,11 +993,11 @@ void i2cSend(unsigned char *p)
   { // an array of MMFLOAT, integer or a string
     ptr = findvar(argv[6], V_NOFIND_NULL | V_EMPTY_OK);
     if (ptr == NULL)
-      error("Invalid variable");
+      StandardError(6);
     if ((g_vartbl[g_VarIndex].type & T_STR) && g_vartbl[g_VarIndex].dims[0] == 0)
     { // string
       if (sendlen > 255)
-        error("Number out of bounds");
+        StandardError(21);
       cptr = (unsigned char *)ptr;
       cptr++; // skip the length byte in a MMBasic string
       for (i = 0; i < sendlen; i++)
@@ -1009,7 +1009,7 @@ void i2cSend(unsigned char *p)
     { // numeric array
       if ((((MMFLOAT *)ptr - g_vartbl[g_VarIndex].val.fa) + sendlen) > (g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase))
       {
-        error("Insufficient data");
+        StandardError(28);
       }
       else
       {
@@ -1023,7 +1023,7 @@ void i2cSend(unsigned char *p)
     { // integer array
       if ((((long long int *)ptr - g_vartbl[g_VarIndex].val.ia) + sendlen) > (g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase))
       {
-        error("Insufficient data");
+        StandardError(28);
       }
       else
       {
@@ -1034,7 +1034,7 @@ void i2cSend(unsigned char *p)
       }
     }
     else
-      error("Invalid variable");
+      StandardError(6);
   }
   I2C_Sendlen = sendlen;
   I2C_Rcvlen = 0;
@@ -1049,7 +1049,7 @@ void i2cSendSlave(unsigned char *p, int channel)
   unsigned char *cptr = NULL;
   getcsargs(&p, MAX_ARG_COUNT);
   if (!(argc >= 3))
-    error("Invalid syntax");
+    SyntaxError();
   if (!((I2C_Status & I2C_Status_Slave && channel == 0) || (I2C2_Status & I2C_Status_Slave && channel == 1)))
     error("I2C slave not open");
   unsigned char *bbuff;
@@ -1063,12 +1063,12 @@ void i2cSendSlave(unsigned char *p, int channel)
   }
   sendlen = getinteger(argv[0]);
   if (sendlen < 1 || sendlen > 255)
-    error("Number out of bounds");
+    StandardError(21);
 
   if (sendlen == 1 || argc > 3)
   { // numeric expressions for data
     if (sendlen != ((argc - 1) >> 1))
-      error("Incorrect argument count");
+      StandardError(2);
     for (i = 0; i < sendlen; i++)
     {
       bbuff[i] = getinteger(argv[i + i + 2]);
@@ -1078,7 +1078,7 @@ void i2cSendSlave(unsigned char *p, int channel)
   { // an array of MMFLOAT, integer or a string
     ptr = findvar(argv[2], V_NOFIND_NULL | V_EMPTY_OK);
     if (ptr == NULL)
-      error("Invalid variable");
+      StandardError(6);
     if ((g_vartbl[g_VarIndex].type & T_STR) && g_vartbl[g_VarIndex].dims[0] == 0)
     { // string
       cptr = (unsigned char *)ptr;
@@ -1092,7 +1092,7 @@ void i2cSendSlave(unsigned char *p, int channel)
     { // numeric array
       if ((((MMFLOAT *)ptr - g_vartbl[g_VarIndex].val.fa) + sendlen) > (g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase))
       {
-        error("Insufficient data");
+        StandardError(28);
       }
       else
       {
@@ -1106,7 +1106,7 @@ void i2cSendSlave(unsigned char *p, int channel)
     { // integer array
       if ((((long long int *)ptr - g_vartbl[g_VarIndex].val.ia) + sendlen) > (g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase))
       {
-        error("Insufficient data");
+        StandardError(28);
       }
       else
       {
@@ -1117,7 +1117,7 @@ void i2cSendSlave(unsigned char *p, int channel)
       }
     }
     else
-      error("Invalid variable");
+      StandardError(6);
   }
   if (channel == 0)
     i2c_write_raw_blocking(i2c0, bbuff, sendlen);
@@ -1133,13 +1133,13 @@ void i2c2Send(unsigned char *p)
 
   getcsargs(&p, MAX_ARG_COUNT);
   if (!(argc & 0x01) || (argc < 7))
-    error("Invalid syntax");
+    SyntaxError();
   if (!I2C2_enabled)
     error("I2C not open");
   addr = getinteger(argv[0]);
   i2c2_options = getinteger(argv[2]);
   if (i2c2_options < 0 || i2c2_options > 3)
-    error("Number out of bounds");
+    StandardError(21);
   I2C2_Status = 0;
   if (i2c2_options & 0x01)
     I2C2_Status = I2C_Status_BusHold;
@@ -1149,7 +1149,7 @@ void i2c2Send(unsigned char *p)
   if (sendlen == 1 || argc > 7)
   { // numeric expressions for data
     if (sendlen != ((argc - 5) >> 1))
-      error("Incorrect argument count");
+      StandardError(2);
     for (i = 0; i < sendlen; i++)
     {
       I2C_Send_Buffer[i] = getinteger(argv[i + i + 6]);
@@ -1159,11 +1159,11 @@ void i2c2Send(unsigned char *p)
   { // an array of MMFLOAT, integer or a string
     ptr = findvar(argv[6], V_NOFIND_NULL | V_EMPTY_OK);
     if (ptr == NULL)
-      error("Invalid variable");
+      StandardError(6);
     if ((g_vartbl[g_VarIndex].type & T_STR) && g_vartbl[g_VarIndex].dims[0] == 0)
     { // string
       if (sendlen > 255)
-        error("Number out of bounds");
+        StandardError(21);
       cptr = (unsigned char *)ptr;
       cptr++; // skip the length byte in a MMBasic string
       for (i = 0; i < sendlen; i++)
@@ -1175,7 +1175,7 @@ void i2c2Send(unsigned char *p)
     { // numeric array
       if ((((MMFLOAT *)ptr - g_vartbl[g_VarIndex].val.fa) + sendlen) > (g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase))
       {
-        error("Insufficient data");
+        StandardError(28);
       }
       else
       {
@@ -1189,7 +1189,7 @@ void i2c2Send(unsigned char *p)
     { // integer array
       if ((((long long int *)ptr - g_vartbl[g_VarIndex].val.ia) + sendlen) > (g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase))
       {
-        error("Insufficient data");
+        StandardError(28);
       }
       else
       {
@@ -1200,7 +1200,7 @@ void i2c2Send(unsigned char *p)
       }
     }
     else
-      error("Invalid variable");
+      StandardError(6);
   }
   I2C2_Sendlen = sendlen;
   I2C2_Rcvlen = 0;
@@ -1251,7 +1251,7 @@ void i2cReceive(unsigned char *p)
   void *ptr = NULL;
   getcsargs(&p, 7);
   if (argc != 7)
-    error("Invalid syntax");
+    SyntaxError();
   if (!I2C_enabled)
     error("I2C not open");
   addr = getinteger(argv[0]);
@@ -1265,55 +1265,55 @@ void i2cReceive(unsigned char *p)
   I2C_Addr = addr;
   rcvlen = getinteger(argv[4]);
   if (rcvlen < 1)
-    error("Number out of bounds");
+    StandardError(21);
   ptr = findvar(argv[6], V_FIND | V_EMPTY_OK);
   if (g_vartbl[g_VarIndex].type & T_CONST)
-    error("Cannot change a constant");
+    StandardError(22);
   if (ptr == NULL)
-    error("Invalid variable");
+    StandardError(6);
   if (g_vartbl[g_VarIndex].type & T_NBR)
   {
     if (g_vartbl[g_VarIndex].dims[1] != 0)
-      error("Invalid variable");
+      StandardError(6);
     if (g_vartbl[g_VarIndex].dims[0] <= 0)
     { // Not an array
       if (rcvlen != 1)
-        error("Invalid variable");
+        StandardError(6);
     }
     else
     { // An array
       if ((((MMFLOAT *)ptr - g_vartbl[g_VarIndex].val.fa) + rcvlen) > (g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase))
-        error("Insufficient space in array");
+        StandardError(32);
     }
     I2C_Rcvbuf_Float = (MMFLOAT *)ptr;
   }
   else if (g_vartbl[g_VarIndex].type & T_INT)
   {
     if (g_vartbl[g_VarIndex].dims[1] != 0)
-      error("Invalid variable");
+      StandardError(6);
     if (g_vartbl[g_VarIndex].dims[0] <= 0)
     { // Not an array
       if (rcvlen != 1)
-        error("Invalid variable");
+        StandardError(6);
     }
     else
     { // An array
       if ((((long long int *)ptr - g_vartbl[g_VarIndex].val.ia) + rcvlen) > (g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase))
-        error("Insufficient space in array");
+        StandardError(32);
     }
     I2C_Rcvbuf_Int = (long long int *)ptr;
   }
   else if (g_vartbl[g_VarIndex].type & T_STR)
   {
     if (rcvlen < 1 || rcvlen > 255)
-      error("Number out of bounds");
+      StandardError(21);
     if (g_vartbl[g_VarIndex].dims[0] != 0)
-      error("Invalid variable");
+      StandardError(6);
     *(char *)ptr = rcvlen;
     I2C_Rcvbuf_String = (char *)ptr + 1;
   }
   else
-    error("Invalid variable");
+    StandardError(6);
   I2C_Rcvlen = rcvlen;
 
   I2C_Sendlen = 0;
@@ -1339,67 +1339,67 @@ void i2cReceiveSlave(unsigned char *p, int channel)
   I2C2_Rcvbuf_String = NULL;
   getcsargs(&p, 5);
   if (argc != 5)
-    error("Invalid syntax");
+    SyntaxError();
   if (!((I2C_Status & I2C_Status_Slave && channel == 0) || (I2C2_Status & I2C_Status_Slave && channel == 1)))
     error("I2C slave not open");
   rcvlen = getinteger(argv[0]);
   if (rcvlen < 1 || rcvlen > 255)
-    error("Number out of bounds");
+    StandardError(21);
   ptr = findvar(argv[2], V_FIND | V_EMPTY_OK);
   if (g_vartbl[g_VarIndex].type & T_CONST)
-    error("Cannot change a constant");
+    StandardError(22);
   if (ptr == NULL)
-    error("Invalid variable");
+    StandardError(6);
   if (g_vartbl[g_VarIndex].type & T_NBR)
   {
     if (g_vartbl[g_VarIndex].dims[1] != 0)
-      error("Invalid variable");
+      StandardError(6);
     if (g_vartbl[g_VarIndex].dims[0] <= 0)
     { // Not an array
       if (rcvlen != 1)
-        error("Invalid variable");
+        StandardError(6);
     }
     else
     { // An array
       if ((((MMFLOAT *)ptr - g_vartbl[g_VarIndex].val.fa) + rcvlen) > (g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase))
-        error("Insufficient space in array");
+        StandardError(32);
     }
     I2C_Rcvbuf_Float = (MMFLOAT *)ptr;
   }
   else if (g_vartbl[g_VarIndex].type & T_INT)
   {
     if (g_vartbl[g_VarIndex].dims[1] != 0)
-      error("Invalid variable");
+      StandardError(6);
     if (g_vartbl[g_VarIndex].dims[0] <= 0)
     { // Not an array
       if (rcvlen != 1)
-        error("Invalid variable");
+        StandardError(6);
     }
     else
     { // An array
       if ((((long long int *)ptr - g_vartbl[g_VarIndex].val.ia) + rcvlen) > (g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase))
-        error("Insufficient space in array");
+        StandardError(32);
     }
     I2C_Rcvbuf_Int = (long long int *)ptr;
   }
   else if (g_vartbl[g_VarIndex].type & T_STR)
   {
     if (g_vartbl[g_VarIndex].dims[0] != 0)
-      error("Invalid variable");
+      StandardError(6);
     *(char *)ptr = rcvlen;
     I2C_Rcvbuf_String = (char *)ptr + 1;
   }
   else
-    error("Invalid variable");
+    StandardError(6);
   ptr = findvar(argv[4], V_FIND);
   if (g_vartbl[g_VarIndex].type & T_CONST)
-    error("Cannot change a constant");
+    StandardError(22);
   if (g_vartbl[g_VarIndex].type & T_NBR)
     rcvdlenFloat = (MMFLOAT *)ptr;
   else if (g_vartbl[g_VarIndex].type & T_INT)
     rcvdlenInt = (long long int *)ptr;
   else
-    error("Invalid variable");
+    StandardError(6);
 
   unsigned char *bbuff;
   if (channel == 0)
@@ -1465,7 +1465,7 @@ void i2c2Receive(unsigned char *p)
   void *ptr = NULL;
   getcsargs(&p, 7);
   if (argc != 7)
-    error("Invalid syntax");
+    SyntaxError();
   if (!I2C2_enabled)
     error("I2C not open");
   addr = getinteger(argv[0]);
@@ -1479,55 +1479,55 @@ void i2c2Receive(unsigned char *p)
   I2C2_Rcvbuf_String = NULL;
   rcvlen = getinteger(argv[4]);
   if (rcvlen < 1)
-    error("Number out of bounds");
+    StandardError(21);
   ptr = findvar(argv[6], V_FIND | V_EMPTY_OK);
   if (g_vartbl[g_VarIndex].type & T_CONST)
-    error("Cannot change a constant");
+    StandardError(22);
   if (ptr == NULL)
-    error("Invalid variable");
+    StandardError(6);
   if (g_vartbl[g_VarIndex].type & T_NBR)
   {
     if (g_vartbl[g_VarIndex].dims[1] != 0)
-      error("Invalid variable");
+      StandardError(6);
     if (g_vartbl[g_VarIndex].dims[0] <= 0)
     { // Not an array
       if (rcvlen != 1)
-        error("Invalid variable");
+        StandardError(6);
     }
     else
     { // An array
       if ((((MMFLOAT *)ptr - g_vartbl[g_VarIndex].val.fa) + rcvlen) > (g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase))
-        error("Insufficient space in array");
+        StandardError(32);
     }
     I2C2_Rcvbuf_Float = (MMFLOAT *)ptr;
   }
   else if (g_vartbl[g_VarIndex].type & T_INT)
   {
     if (g_vartbl[g_VarIndex].dims[1] != 0)
-      error("Invalid variable");
+      StandardError(6);
     if (g_vartbl[g_VarIndex].dims[0] <= 0)
     { // Not an array
       if (rcvlen != 1)
-        error("Invalid variable");
+        StandardError(6);
     }
     else
     { // An array
       if ((((long long int *)ptr - g_vartbl[g_VarIndex].val.ia) + rcvlen) > (g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase))
-        error("Insufficient space in array");
+        StandardError(32);
     }
     I2C2_Rcvbuf_Int = (long long int *)ptr;
   }
   else if (g_vartbl[g_VarIndex].type & T_STR)
   {
     if (rcvlen < 1 || rcvlen > 255)
-      error("Number out of bounds");
+      StandardError(21);
     if (g_vartbl[g_VarIndex].dims[0] != 0)
-      error("Invalid variable");
+      StandardError(6);
     *(char *)ptr = rcvlen;
     I2C2_Rcvbuf_String = (char *)ptr + 1;
   }
   else
-    error("Invalid variable");
+    StandardError(6);
   I2C2_Rcvlen = rcvlen;
 
   I2C2_Sendlen = 0;
@@ -1849,7 +1849,7 @@ void MIPS16 cmd_Nunchuck(void)
     if (!(I2C0locked || I2C1locked))
       error("SYSTEM I2C not configured");
     if (classic1 || nunchuck1)
-      error("Already open");
+      StandardError(31);
     memset((void *)&nunstruct[5].x, 0, sizeof(nunstruct[5]));
     int retry = 5;
     do
@@ -1905,7 +1905,8 @@ void MIPS16 cmd_Nunchuck(void)
     nunInterruptc[5] = NULL;
   }
   else
-    error("Syntax");
+    SyntaxError();
+  ;
 }
 
 void MIPS16 cmd_Classic(void)
@@ -1918,7 +1919,7 @@ void MIPS16 cmd_Classic(void)
     if (!(I2C0locked || I2C1locked))
       error("SYSTEM I2C not configured");
     if (classic1 || nunchuck1)
-      error("Already open");
+      StandardError(31);
     memset((void *)&nunstruct[0].x, 0, sizeof(nunstruct[0]));
     int retry = 5;
     do
@@ -1975,7 +1976,8 @@ void MIPS16 cmd_Classic(void)
     nunInterruptc[0] = NULL;
   }
   else
-    error("Syntax");
+    SyntaxError();
+  ;
 }
 
 /*
@@ -2388,7 +2390,8 @@ void MIPS16 cmd_camera(void)
     int pin1, pin2, pin3, pin4, pin5, pin6;
     getcsargs(&tp, 11);
     if (argc != 11)
-      error("Syntax");
+      SyntaxError();
+    ;
     if (!(Option.DISPLAY_TYPE > I2C_PANEL && Option.DISPLAY_TYPE < BufferedPanel))
       error("Invalid display type");
     if (!(I2C0locked || I2C1locked))
@@ -2403,9 +2406,9 @@ void MIPS16 cmd_camera(void)
     if (!code)
       pin1 = codemap(pin1);
     if (IsInvalidPin(pin1))
-      error("Invalid pin");
+      StandardError(9);
     if (ExtCurrentConfig[pin1] != EXT_NOT_CONFIG)
-      error("Pin %/| is in use", pin1, pin1);
+      StandardErrorParam2(27, pin1, pin1);
     int slice = getslice(pin1);
     if ((PinDef[Option.DISPLAY_BL].slice & 0x7f) == slice)
       error("Channel in use for backlight");
@@ -2419,9 +2422,9 @@ void MIPS16 cmd_camera(void)
     if (!code)
       pin2 = codemap(pin2);
     if (IsInvalidPin(pin2))
-      error("Invalid pin");
+      StandardError(9);
     if (ExtCurrentConfig[pin2] != EXT_NOT_CONFIG)
-      error("Pin %/| is in use", pin2, pin2);
+      StandardErrorParam2(27, pin2, pin2);
 
     // HREF pin
     if (!(code = codecheck(argv[4])))
@@ -2430,9 +2433,9 @@ void MIPS16 cmd_camera(void)
     if (!code)
       pin3 = codemap(pin3);
     if (IsInvalidPin(pin3))
-      error("Invalid pin");
+      StandardError(9);
     if (ExtCurrentConfig[pin3] != EXT_NOT_CONFIG)
-      error("Pin %/| is in use", pin3, pin3);
+      StandardErrorParam2(27, pin3, pin3);
 
     // VSYNC pin
     if (!(code = codecheck(argv[6])))
@@ -2441,9 +2444,9 @@ void MIPS16 cmd_camera(void)
     if (!code)
       pin4 = codemap(pin4);
     if (IsInvalidPin(pin4))
-      error("Invalid pin");
+      StandardError(9);
     if (ExtCurrentConfig[pin4] != EXT_NOT_CONFIG)
-      error("Pin %/| is in use", pin4, pin4);
+      StandardErrorParam2(27, pin4, pin4);
 
     // RESET pin
     if (!(code = codecheck(argv[8])))
@@ -2452,9 +2455,9 @@ void MIPS16 cmd_camera(void)
     if (!code)
       pin5 = codemap(pin5);
     if (IsInvalidPin(pin5))
-      error("Invalid pin");
+      StandardError(9);
     if (ExtCurrentConfig[pin5] != EXT_NOT_CONFIG)
-      error("Pin %/| is in use", pin5, pin5);
+      StandardErrorParam2(27, pin5, pin5);
 
     // D0-D7 pins
     if (!(code = codecheck(argv[10])))
@@ -2463,14 +2466,14 @@ void MIPS16 cmd_camera(void)
     if (!code)
       pin6 = codemap(pin6);
     if (IsInvalidPin(pin6))
-      error("Invalid pin");
+      StandardError(9);
     int startdata = PinDef[pin6].GPno;
     for (int i = startdata; i < startdata + 8; i++)
     {
       if (IsInvalidPin(PINMAP[i]))
-        error("Invalid pin");
+        StandardError(9);
       if (ExtCurrentConfig[PINMAP[i]] != EXT_NOT_CONFIG)
-        error("Pin %/| is in use", PINMAP[i], PINMAP[i]);
+        StandardErrorParam2(27, PINMAP[i], PINMAP[i]);
     }
     XCLK = pin1;
     PCLK = pin2;
@@ -2788,7 +2791,8 @@ void MIPS16 cmd_camera(void)
       error("Camera not open");
     getcsargs(&tp, 9);
     if (!(argc == 3 || argc == 5 || argc == 9))
-      error("Syntax");
+      SyntaxError();
+    ;
     int xs = 0, ys = 0;
     if (!XCLK)
       error("Camera not open");
@@ -2799,7 +2803,7 @@ void MIPS16 cmd_camera(void)
     // get the two variables
     MMFLOAT *outdiff = findvar(argv[2], V_FIND);
     if (!(g_vartbl[g_VarIndex].type & T_NBR))
-      error("Invalid variable");
+      StandardError(6);
     if (size < 160 * 120 / 8)
       error("Array too small");
     int picout = 0;
@@ -2881,7 +2885,8 @@ void MIPS16 cmd_camera(void)
         ys = getint(argv[4], 0, VRes - 1);
       }
       else if (argc == 3)
-        error("Syntax");
+        SyntaxError();
+      ;
     }
     for (int i = 0; OV7670_rgb[i].reg <= OV7670_REG_LAST; i++)
     {
@@ -2925,6 +2930,7 @@ void MIPS16 cmd_camera(void)
     cameraclose();
   }
   else
-    error("Syntax");
+    SyntaxError();
+  ;
 }
 #endif

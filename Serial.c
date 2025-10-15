@@ -302,7 +302,7 @@ void MIPS16 SerialOpen(unsigned char *spec)
 		if (str_equal(argv[argc - 1], (unsigned char *)"EVEN"))
 		{
 			if (parity)
-				error("Syntax");
+				SyntaxError();
 			else
 			{
 				parity = UART_PARITY_EVEN;
@@ -312,7 +312,7 @@ void MIPS16 SerialOpen(unsigned char *spec)
 		if (str_equal(argv[argc - 1], (unsigned char *)"ODD"))
 		{
 			if (parity)
-				error("Syntax");
+				SyntaxError();
 			else
 			{
 				parity = UART_PARITY_ODD;
@@ -387,7 +387,7 @@ void MIPS16 SerialOpen(unsigned char *spec)
 		///////////////////////////////// this is COM1 ////////////////////////////////////
 
 		if (com1)
-			error("Already open");
+			StandardError(31);
 		if (UART0TXpin == 99 || UART0RXpin == 99)
 			error("Pins not set for COM1");
 
@@ -416,7 +416,7 @@ void MIPS16 SerialOpen(unsigned char *spec)
 		///////////////////////////////// this is COM2 ////////////////////////////////////
 
 		if (com2)
-			error("Already open");
+			StandardError(31);
 		if (UART1TXpin == 99 || UART1RXpin == 99)
 			error("Pins not set for COM2");
 

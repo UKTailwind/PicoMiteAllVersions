@@ -2390,7 +2390,8 @@ void cmd_gamepad(void)
 	{
 		getcsargs(&tp, 5);
 		if (!(argc == 3 || argc == 5))
-			error("Syntax");
+			SyntaxError();
+		;
 		n = getint(argv[0], 1, 4);
 		nunInterruptc[n] = (char *)GetIntAddress(argv[2]); // get the interrupt location
 		InterruptUsed = true;
@@ -2412,7 +2413,8 @@ void cmd_gamepad(void)
 	{
 		getcsargs(&tp, 67);
 		if (!(argc == 67))
-			error("Syntax");
+			SyntaxError();
+		;
 		MyGamepad.vid = getint(argv[0], 0, 0xFFFF);
 		MyGamepad.pid = getint(argv[2], 0, 0xFFFF);
 		MyGamepad.b_R.index = getint(argv[4], 0, 255);
@@ -2452,7 +2454,8 @@ void cmd_gamepad(void)
 	{
 		getcsargs(&tp, 5);
 		if (!(argc == 5))
-			error("Syntax");
+			SyntaxError();
+		;
 		n = getint(argv[0], 1, 4) - 1;
 		if (HID[n].Device_type != PS4)
 			error("PS4 only");
@@ -2463,7 +2466,8 @@ void cmd_gamepad(void)
 	{
 		getcsargs(&tp, 3);
 		if (!(argc == 3))
-			error("Syntax");
+			SyntaxError();
+		;
 		n = getint(argv[0], 1, 4) - 1;
 		if (HID[n].Device_type != PS4)
 			error("PS4 only");
@@ -2479,7 +2483,8 @@ void cmd_gamepad(void)
 		nunInterruptc[n] = NULL;
 	}
 	else
-		error("Syntax");
+		SyntaxError();
+	;
 }
 void cmd_mouse(void)
 {
@@ -2489,7 +2494,8 @@ void cmd_mouse(void)
 	{
 		getcsargs(&tp, 3);
 		if (!(argc == 3))
-			error("Syntax");
+			SyntaxError();
+		;
 		n = getint(argv[0], 1, 4);
 		nunInterruptc[n] = (char *)GetIntAddress(argv[2]); // get the interrupt location
 		InterruptUsed = true;
@@ -2499,7 +2505,8 @@ void cmd_mouse(void)
 	{
 		getcsargs(&tp, 7);
 		if (!(argc == 7 || argc == 5))
-			error("Syntax");
+			SyntaxError();
+		;
 		n = getint(argv[0], 2, 2);
 		nunstruct[n].ax = getint(argv[2], 0, HRes - 1);
 		nunstruct[n].ay = getint(argv[4], 0, VRes - 1);
@@ -2513,5 +2520,6 @@ void cmd_mouse(void)
 		nunInterruptc[n] = NULL;
 	}
 	else
-		error("Syntax");
+		SyntaxError();
+	;
 }

@@ -435,9 +435,10 @@ void cmd_mouse(void)
   if ((tp = checkstring(cmdline, (unsigned char *)"OPEN")))
   {
     getcsargs(&tp, 7);
-    //      if(Option.MOUSE_CLOCK)error("Already open");
+    //      if(Option.MOUSE_CLOCK)StandardError(31);
     if (!(argc == 5))
-      error("Syntax");
+      SyntaxError();
+    ;
     getint(argv[0], 2, 2);
     char code;
     if (!(code = codecheck(argv[2])))
@@ -457,9 +458,9 @@ void cmd_mouse(void)
     if (!(pin1 == Option.MOUSE_CLOCK && pin2 == Option.MOUSE_DATA))
     {
       if (ExtCurrentConfig[pin1] >= EXT_COM_RESERVED)
-        error("Pin %/| is in use", pin1, pin1);
+        StandardErrorParam2(27, pin1, pin1);
       if (ExtCurrentConfig[pin2] >= EXT_COM_RESERVED)
-        error("Pin %/| is in use", pin2, pin2);
+        StandardErrorParam2(27, pin2, pin2);
     }
     if (Option.MOUSE_CLOCK && !(pin1 == Option.MOUSE_CLOCK && pin2 == Option.MOUSE_DATA))
       error("OPTION MOUSE declared with different pins");
@@ -495,7 +496,8 @@ void cmd_mouse(void)
     if (!mouse0)
       error("Not open");
     if (!(argc == 3))
-      error("Syntax");
+      SyntaxError();
+    ;
     n = getint(argv[0], 2, 2);
     nunInterruptc[n] = (char *)GetIntAddress(argv[2]); // get the interrupt location
     InterruptUsed = true;
@@ -507,7 +509,8 @@ void cmd_mouse(void)
     if (!mouse0)
       error("Not open");
     if (!(argc == 7))
-      error("Syntax");
+      SyntaxError();
+    ;
     n = getint(argv[0], 2, 2);
     nunstruct[n].ax = getint(argv[2], -HRes, HRes);
     nunstruct[n].ay = getint(argv[4], -VRes, VRes);
@@ -522,5 +525,6 @@ void cmd_mouse(void)
     nunInterruptc[n] = NULL;
   }
   else
-    error("Syntax");
+    SyntaxError();
+  ;
 }

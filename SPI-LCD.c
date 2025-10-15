@@ -328,7 +328,7 @@ void MIPS16 ConfigDisplaySPI(unsigned char *p)
 		error("System SPI not configured");
 #endif
 	if (!(argc == 7 || argc == 9 || argc == 11 || argc == 13))
-		error("Argument count");
+		StandardError(2);
 	if (*argv[2])
 	{
 		if (checkstring(argv[2], (unsigned char *)"L") || checkstring(argv[2], (unsigned char *)"LANDSCAPE"))
@@ -3521,10 +3521,10 @@ void cmd_map(void)
 		while (*cmdline && tokenfunction(*cmdline) != op_equal)
 			cmdline++;
 		if (!*cmdline)
-			error("Invalid syntax");
+			SyntaxError();
 		++cmdline;
 		if (!*cmdline)
-			error("Invalid syntax");
+			SyntaxError();
 		c.rgb = getColour((char *)cmdline, 0);
 		if (Option.DISPLAY_TYPE == ILI9488BUFF || Option.DISPLAY_TYPE == ILI9488PBUFF || (Option.DISPLAY_TYPE & 0xFC) == SSD1963_5_12BUFF || (Option.DISPLAY_TYPE & 0xFC) == SSD1963_5_BUFF)
 		{

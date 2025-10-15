@@ -267,7 +267,8 @@ void fun_field(void)
 	int fnbr, i, j, k;
 	getcsargs(&ep, 7);
 	if (!(argc == 3 || argc == 5 || argc == 7))
-		error("Syntax");
+		SyntaxError();
+	;
 	p = getstring(argv[0]);				  // the string containing the fields
 	fnbr = getint(argv[2], 1, MAXSTRLEN); // field nbr to return
 	if (argc > 3 && *argv[4])
@@ -313,9 +314,11 @@ void fun_str2bin(void)
 	int j;
 	getcsargs(&ep, 5);
 	if (!(argc == 3 || argc == 5))
-		error("Syntax");
+		SyntaxError();
+	;
 	if (argc == 5 && !checkstring(argv[4], (unsigned char *)"BIG"))
-		error("Syntax");
+		SyntaxError();
+	;
 	char *p;
 	p = (char *)getstring(argv[2]);
 	int len = p[0];
@@ -337,75 +340,76 @@ void fun_str2bin(void)
 	if (checkstring(argv[0], (unsigned char *)"DOUBLE"))
 	{
 		if (len != 8)
-			error("String length");
+			StandardError(14);
 		targ = T_NBR;
 		fret = (MMFLOAT)map.d;
 	}
 	else if (checkstring(argv[0], (unsigned char *)"SINGLE"))
 	{
 		if (len != 4)
-			error("String length");
+			StandardError(14);
 		targ = T_NBR;
 		fret = (MMFLOAT)map.f;
 	}
 	else if (checkstring(argv[0], (unsigned char *)"INT64"))
 	{
 		if (len != 8)
-			error("String length");
+			StandardError(14);
 		targ = T_INT;
 		iret = (int64_t)map.l;
 	}
 	else if (checkstring(argv[0], (unsigned char *)"INT32"))
 	{
 		if (len != 4)
-			error("String length");
+			StandardError(14);
 		targ = T_INT;
 		iret = (int64_t)map.i;
 	}
 	else if (checkstring(argv[0], (unsigned char *)"INT16"))
 	{
 		if (len != 2)
-			error("String length");
+			StandardError(14);
 		targ = T_INT;
 		iret = (int64_t)map.s;
 	}
 	else if (checkstring(argv[0], (unsigned char *)"INT8"))
 	{
 		if (len != 1)
-			error("String length");
+			StandardError(14);
 		targ = T_INT;
 		iret = (int64_t)map.c[0];
 	}
 	else if (checkstring(argv[0], (unsigned char *)"UINT64"))
 	{
 		if (len != 8)
-			error("String length");
+			StandardError(14);
 		targ = T_INT;
 		iret = (int64_t)map.ul;
 	}
 	else if (checkstring(argv[0], (unsigned char *)"UINT32"))
 	{
 		if (len != 4)
-			error("String length");
+			StandardError(14);
 		targ = T_INT;
 		iret = (int64_t)map.ui;
 	}
 	else if (checkstring(argv[0], (unsigned char *)"UINT16"))
 	{
 		if (len != 2)
-			error("String length");
+			StandardError(14);
 		targ = T_INT;
 		iret = (int64_t)map.us;
 	}
 	else if (checkstring(argv[0], (unsigned char *)"UINT8"))
 	{
 		if (len != 1)
-			error("String length");
+			StandardError(14);
 		targ = T_INT;
 		iret = (int64_t)map.uc[0];
 	}
 	else
-		error("Syntax");
+		SyntaxError();
+	;
 }
 
 void fun_bin2str(void)
@@ -427,9 +431,11 @@ void fun_bin2str(void)
 	int64_t i64;
 	getcsargs(&ep, 5);
 	if (!(argc == 3 || argc == 5))
-		error("Syntax");
+		SyntaxError();
+	;
 	if (argc == 5 && !(checkstring(argv[4], (unsigned char *)"BIG")))
-		error("Syntax");
+		SyntaxError();
+	;
 	sret = GetTempMemory(STRINGSIZE); // this will last for the life of the command
 	if (checkstring(argv[0], (unsigned char *)"DOUBLE"))
 	{
@@ -453,21 +459,21 @@ void fun_bin2str(void)
 		{
 			len = 4;
 			if (i64 > 2147483647 || i64 < -2147483648)
-				error("Overflow");
+				StandardError(15);
 			map.i = (int32_t)i64;
 		}
 		else if (checkstring(argv[0], (unsigned char *)"INT16"))
 		{
 			len = 2;
 			if (i64 > 32767 || i64 < -32768)
-				error("Overflow");
+				StandardError(15);
 			map.s = (int16_t)i64;
 		}
 		else if (checkstring(argv[0], (unsigned char *)"INT8"))
 		{
 			len = 1;
 			if (i64 > 127 || i64 < -128)
-				error("Overflow");
+				StandardError(15);
 			map.c[0] = (int8_t)i64;
 		}
 		else if (checkstring(argv[0], (unsigned char *)"UINT64"))
@@ -479,25 +485,26 @@ void fun_bin2str(void)
 		{
 			len = 4;
 			if (i64 > 4294967295 || i64 < 0)
-				error("Overflow");
+				StandardError(15);
 			map.ui = (uint32_t)i64;
 		}
 		else if (checkstring(argv[0], (unsigned char *)"UINT16"))
 		{
 			len = 2;
 			if (i64 > 65535 || i64 < 0)
-				error("Overflow");
+				StandardError(15);
 			map.us = (uint16_t)i64;
 		}
 		else if (checkstring(argv[0], (unsigned char *)"UINT8"))
 		{
 			len = 1;
 			if (i64 > 255 || i64 < 0)
-				error("Overflow");
+				StandardError(15);
 			map.uc[0] = (uint8_t)i64;
 		}
 		else
-			error("Syntax");
+			SyntaxError();
+		;
 	}
 
 	for (j = 0; j < len; j++)
@@ -762,7 +769,8 @@ void fun_atan2(void)
 	MMFLOAT y, x, z;
 	getcsargs(&ep, 3);
 	if (argc != 3)
-		error("Syntax");
+		SyntaxError();
+	;
 	y = getnumber(argv[0]);
 	x = getnumber(argv[2]);
 	z = atan2((float)y, (float)x);
@@ -853,7 +861,8 @@ void fun_trim(void)
 		{
 			where = (char)*getCstring(argv[4]);
 			if (!(where == 'L' || where == 'R' || where == 'B'))
-				error("Syntax");
+				SyntaxError();
+			;
 		}
 	}
 	targ = T_STR;
@@ -972,7 +981,8 @@ void fun_instr(void)
 	long long int i64;
 	getcsargs(&ep, 7);
 	if (!(argc == 3 || argc == 5 || argc == 7))
-		error("Syntax");
+		SyntaxError();
+	;
 	t = T_NOTYPE;
 	evaluate(argv[0], &f, &i64, &ss, &t, false); // get the value and type of the argument
 	if (t & T_NBR)
@@ -990,7 +1000,8 @@ void fun_instr(void)
 		n = 0;
 	}
 	else
-		error("Syntax");
+		SyntaxError();
+	;
 	if (argc < (n == 2 ? 7 : 5))
 	{
 		s1 = getstring(argv[0 + n]);
@@ -1026,7 +1037,7 @@ void fun_instr(void)
 		{
 			temp = findvar(argv[4 + n], V_FIND);
 			if (!(g_vartbl[g_VarIndex].type & T_NBR))
-				error("Invalid variable");
+				StandardError(6);
 		}
 		reti = regcomp(&regex, p, 0);
 		if (reti)
@@ -1082,7 +1093,7 @@ void fun_left(void)
 	getcsargs(&ep, 3);
 
 	if (argc != 3)
-		error("Argument count");
+		StandardError(2);
 	s = GetTempMemory(STRINGSIZE); // this will last for the life of the command
 	Mstrcpy(s, getstring(argv[0]));
 	i = getint(argv[2], 0, MAXSTRLEN);
@@ -1101,7 +1112,7 @@ void fun_right(void)
 	getcsargs(&ep, 3);
 
 	if (argc != 3)
-		error("Argument count");
+		StandardError(2);
 	s = getstring(argv[0]);
 	nbr = getint(argv[2], 0, MAXSTRLEN);
 	if (nbr > *s)
@@ -1154,7 +1165,7 @@ void fun_mid(void)
 		nbr = MAXSTRLEN; // default to all chars
 	}
 	else
-		error("Argument count");
+		StandardError(2);
 
 	s = getstring(argv[0]);				  // the string
 	spos = getint(argv[2], 1, MAXSTRLEN); // the mid position
@@ -1268,7 +1279,7 @@ void fun_tan(void)
 			// Modulus 360 and ensure it's in the range [0, 359]
 			MMFLOAT cosval = sinetab[(integerPart % 360 + 450) % 360];
 			if (cosval == 0.0)
-				error("Overflow");
+				StandardError(15);
 			fret = sinetab[(integerPart % 360 + 360) % 360] / cosval;
 		}
 		else
@@ -1394,11 +1405,12 @@ void fun_str(void)
 
 	getcsargs(&ep, 7);
 	if ((argc & 1) != 1)
-		error("Syntax");
+		SyntaxError();
+	;
 	t = T_NOTYPE;
 	p = evaluate(argv[0], &f, &i64, &s, &t, false); // get the value and type of the argument
 	if (!(t & T_INT || t & T_NBR))
-		error("Expected a number");
+		StandardError(20);
 	m = 0;
 	n = STR_AUTO_PRECISION;
 	ch = ' ';
@@ -1445,7 +1457,8 @@ void fun_string(void)
 
 	getcsargs(&ep, 3);
 	if (argc != 3)
-		error("Syntax");
+		SyntaxError();
+	;
 
 	i = getint(argv[0], 0, MAXSTRLEN);
 	p = DoExpression(argv[2], &t); // get the value and type of the argument
@@ -1585,7 +1598,7 @@ void fun_asin(void)
 {
 	MMFLOAT f = getnumber(ep);
 	if (f < -1.0 || f > 1.0)
-		error("Number out of bounds");
+		StandardError(21);
 	if (f == 1.0)
 	{
 		fret = M_PI_2;
@@ -1609,7 +1622,7 @@ void fun_acos(void)
 {
 	MMFLOAT f = getnumber(ep);
 	if (f < -1.0L || f > 1.0L)
-		error("Number out of bounds");
+		StandardError(21);
 	if (f == 1.0L)
 	{
 		fret = 0.0L;
@@ -1639,7 +1652,8 @@ void do_max_min(int cmp)
 	MMFLOAT nbr, f;
 	getcsargs(&ep, (MAX_ARG_COUNT * 2) - 1);
 	if ((argc & 1) != 1)
-		error("Syntax");
+		SyntaxError();
+	;
 	if (cmp)
 		nbr = -FLT_MAX;
 	else
@@ -1679,7 +1693,8 @@ void __not_in_flash_func(fun_ternary)(void)
 	int t = T_NOTYPE;
 	getcsargs(&ep, 5);
 	if (argc != 5)
-		error("Syntax");
+		SyntaxError();
+	;
 	int which = getnumber(argv[0]);
 	if (which)
 	{
@@ -1709,5 +1724,6 @@ void __not_in_flash_func(fun_ternary)(void)
 		return;
 	}
 	else
-		error("Syntax");
+		SyntaxError();
+	;
 }
