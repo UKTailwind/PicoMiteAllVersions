@@ -140,7 +140,7 @@ long long int MIPS16 CallCFunction(unsigned char *CmdPtr, unsigned char *ArgList
                     arg[i / 2] = &ff[i / 2];
                     break;
                 case T_STR:
-                    arg[i / 2] = GetTempMemory(STRINGSIZE);
+                    arg[i / 2] = GetTempStrMemory();
                     Mstrcpy(arg[i / 2], getstring(argv[i]));
                     break;
                 default: // the type has not been specified (old style CFunction)
@@ -155,7 +155,7 @@ long long int MIPS16 CallCFunction(unsigned char *CmdPtr, unsigned char *ArgList
                         arg[i / 2] = &i64[i / 2];
                     else
                     {
-                        arg[i / 2] = GetTempMemory(STRINGSIZE);
+                        arg[i / 2] = GetTempStrMemory();
                         Mstrcpy(arg[i / 2], pp);
                     }
                     break;

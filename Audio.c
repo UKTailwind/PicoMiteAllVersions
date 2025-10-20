@@ -622,23 +622,7 @@ void MIPS64 __not_in_flash_func(i2sconvert)(int16_t *fbuff, int16_t *sbuff, int 
 size_t onRead(void *userdata, char *pBufferOut, size_t bytesToRead)
 {
 	unsigned int nbr;
-	if (filesource[WAV_fnbr] == FATFSFILE)
-	{
-		FSerror = f_read(FileTable[WAV_fnbr].fptr, pBufferOut, bytesToRead, &nbr);
-		if (FSerror)
-			nbr = 0;
-		if (!MDD_SDSPI_CardDetectState())
-			ErrorCheck(WAV_fnbr);
-	}
-	else
-	{
-		nbr = lfs_file_read(&lfs, FileTable[WAV_fnbr].lfsptr, pBufferOut, bytesToRead);
-		if (nbr < 0)
-			FSerror = nbr;
-		else
-			FSerror = 0;
-		ErrorCheck(WAV_fnbr);
-	}
+	FileGetdata(WAV_fnbr, pBufferOut, bytesToRead, &nbr);
 	return nbr;
 }
 drwav_bool32 onSeek(void *userdata, int offset, drwav_seek_origin origin)
@@ -886,7 +870,7 @@ void mp3callback(char *p, int position)
 		return;
 	if (Option.AUDIO_MISO_PIN)
 	{
-		positionfile(WAV_fnbr, position);
+		positionfile(WAV_fnbr, position, true);
 		playvs1053(P_MP3);
 		return;
 	}
@@ -2145,7 +2129,7 @@ void MIPS16 cmd_play(void)
 		if (CurrentlyPlaying != P_MP3)
 			error("Not playing an MP3");
 		int fnbr = FindFreeFileNbr();
-		char *buff = GetTempMemory(STRINGSIZE);
+		char *buff = GetTempStrMemory();
 		char *p = &WAVfilename[strlen(WAVfilename)];
 		while (*p-- != '/')
 		{
@@ -2168,9 +2152,9 @@ void MIPS16 cmd_play(void)
 		if (i < 0)
 			i = 0;
 		IntToStr(buff, i, 10);
-		FilePutStr(strlen(buff), buff, fnbr);
+		FilePutData(buff, fnbr, strlen(buff));
 		FilePutChar(',', fnbr);
-		FilePutStr(strlen(WAVfilename), WAVfilename, fnbr);
+		FilePutData(WAVfilename, fnbr, strlen(WAVfilename));
 		FileClose(fnbr);
 		CloseAudio(1);
 		return;
@@ -2181,7 +2165,7 @@ void MIPS16 cmd_play(void)
 			error("Only available with VS1053 audio");
 		int fnbr = FindFreeFileNbr();
 		char *p = (char *)getFstring(tp);
-		char *buff = GetTempMemory(STRINGSIZE);
+		char *buff = GetTempStrMemory();
 		if (strchr(p, '/') || strchr(p, ':') || strchr(p, '\\') || strchr(p, '.'))
 			error("Track name");
 		strcpy(buff, "A:/");
@@ -2336,6 +2320,7 @@ void MIPS16 cmd_play(void)
 		q[0] = FatFSFileSystem ? 'B' : 'A';
 		strcpy(WAVfilename, q);
 		WAV_fnbr = FindFreeFileNbr();
+		fsize = FileSize(p);
 		if (!BasicFileOpen(p, WAV_fnbr, FA_READ))
 			return;
 		if (argc == 3)
@@ -2349,10 +2334,6 @@ void MIPS16 cmd_play(void)
 		else
 			noloop = 0;
 		i = 0;
-		if (filesource[WAV_fnbr] != FLASHFILE)
-			fsize = f_size(FileTable[WAV_fnbr].fptr);
-		else
-			fsize = lfs_file_size(&lfs, FileTable[WAV_fnbr].lfsptr);
 		int alreadythere = 1;
 #ifdef rp2350
 		if (!PSRAMsize)
@@ -2374,7 +2355,7 @@ void MIPS16 cmd_play(void)
 		else
 		{
 			modbuff = GetMemory(RoundUpK4(fsize));
-			positionfile(WAV_fnbr, 0);
+			positionfile(WAV_fnbr, 0, false);
 			char *r = modbuff;
 			while (!FileEOF(WAV_fnbr))
 			{
@@ -2384,8 +2365,8 @@ void MIPS16 cmd_play(void)
 #endif
 		if (!alreadythere)
 		{
-			unsigned char *r = GetTempMemory(256);
-			positionfile(WAV_fnbr, 0);
+			unsigned char *r = GetTempMainMemory(256);
+			positionfile(WAV_fnbr, 0, false);
 			uint32_t j = RoundUpK4(TOP_OF_SYSTEM_FLASH);
 			disable_interrupts_pico();
 			flash_range_erase(j, RoundUpK4(fsize));

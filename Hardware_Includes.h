@@ -154,14 +154,16 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #define SD_FAST_SPI_SPEED 1
 #define NONE_SPI_SPEED 4
 
-/* ============================================================================
- * Constants - Reset reasons
- * ============================================================================ */
-#define RESET_COMMAND 9999	   // Reset caused by the RESET command
-#define WATCHDOG_TIMEOUT 9998  // Reset caused by the watchdog timer
-#define PIN_RESTART 9997	   // Reset caused by entering 0 at the PIN prompt
-#define RESTART_NOAUTORUN 9996 // Reset required after changing the LCD or touch config
-#define RESTART_DOAUTORUN 9995 // Reset required by OPTION SET (re-runs the program)
+/* ==============================================================================================================
+ * RESET/RESTART CODES
+ * ============================================================================================================== */
+#define WATCHDOG_TIMEOUT 9998 // Reset caused by the watchdog timer
+#define SCREWUP_TIMEOUT 9995  // Reset caused by the execute timer
+#define SOFT_RESET 9993
+#define POSSIBLE_WATCHDOG 9992
+#define INVALID_CLOCKSPEED 9991
+#define RESET_CLOCKSPEED 9990
+#define RESET_FLASHSTORAGE 9989
 
 /* ============================================================================
  * Constants - Hardware pins

@@ -287,16 +287,17 @@ void __not_in_flash_func(on_pwm_wrap_1)(void)
 
 #endif
 
-void SoftReset(void)
+void SoftReset(int code)
 {
-    _excep_code = SOFT_RESET;
+    _excep_code = code;
 #ifdef USBKEYBOARD
     USBenabled = false;
     uSec(50000); // wait for outstanding requests to complete
 #endif
     watchdog_enable(1, 1);
     while (1)
-        ;
+    {
+    }
 }
 
 #if LOWRAM
@@ -4357,7 +4358,7 @@ void fun_dev(void)
 #ifdef USBKEYBOARD
         else if (checkstring(argv[2], (unsigned char *)"RAW"))
         {
-            sret = GetTempMemory(STRINGSIZE);
+            sret = GetTempStrMemory();
             targ = T_STR;
             Mstrcpy(sret, (unsigned char *)HID[n - 1].report);
             return;
@@ -4477,7 +4478,7 @@ void cmd_WS2812(void)
         StandardErrorParam2(43, pin, pin);
     if (ExtCurrentConfig[pin] == EXT_NOT_CONFIG)
         ExtCfg(pin, EXT_DIG_OUT, 0);
-    p = GetTempMemory((nbr + 1) * colours);
+    p = GetTempMainMemory((nbr + 1) * colours);
     uint64_t endreset = time_us_64() + TRST;
     for (i = 0; i < nbr; i++)
     {
@@ -4797,7 +4798,7 @@ void cmd_device(void)
         size = parsenumberarray(argv[4], &a1float, &a1int, 3, 1, NULL, false);
         if (size < num)
             error("Array too small");
-        data = GetTempMemory(num * sizeof(unsigned int));
+        data = GetTempMainMemory(num * sizeof(unsigned int));
         if (a1float != NULL)
         {
             for (i = 0; i < num; i++)

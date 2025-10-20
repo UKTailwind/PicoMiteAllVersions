@@ -457,7 +457,7 @@ void setBacklight(int level, int frequency);
 /* ============================================================================
  * Function declarations - Utility functions
  * ============================================================================ */
-void SoftReset(void);
+void SoftReset(int code);
 int codemap(int pin);
 int codecheck(unsigned char *line);
 

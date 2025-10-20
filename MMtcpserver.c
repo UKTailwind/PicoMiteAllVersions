@@ -25,6 +25,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
+#include "FileIO.h"
 bool optionsuppressstatus = 0;
 int TCP_PORT;
 // #define //DEBUG_printf printf
@@ -516,9 +517,9 @@ void cmd_transmit(unsigned char *cmd)
                 int32_t fn;
                 char *fname;
                 char *ctype;
-                char *outstr = GetTempMemory(STRINGSIZE);
+                char *outstr = GetTempStrMemory();
                 char p[10] = {0};
-                int FileSize;
+                int Size;
                 UINT n_read;
                 getcsargs(&tp, 5);
                 if (argc != 5)
@@ -535,13 +536,10 @@ void cmd_transmit(unsigned char *cmd)
                 if (ExistsFile(fname))
                 {
                         fn = FindFreeFileNbr();
+                        Size = FileSize(fname);
                         if (!BasicFileOpen(fname, fn, FA_READ))
                                 return;
-                        if (FatFSFileSystem)
-                                FileSize = f_size(FileTable[fn].fptr);
-                        else
-                                FileSize = lfs_file_size(&lfs, FileTable[fn].lfsptr);
-                        IntToStr(p, FileSize, 10);
+                        IntToStr(p, Size, 10);
                         strcat(outstr, p);
                         strcat(outstr, httpend);
                         //                int i=0;
@@ -552,13 +550,10 @@ void cmd_transmit(unsigned char *cmd)
                                 error("Transmit failed");
                         // DEBUG_printf("sending file header to pcb %d\r\n",pcb);
                         tcp_server_send_data(state, state->client_pcb[pcb], pcb);
-                        if (FileSize < TCP_MSS * 4 && FileSize < FreeSpaceOnHeap() / 4)
+                        if (Size < TCP_MSS * 4 && Size < FreeSpaceOnHeap() / 4)
                         {
-                                char *pBuf = GetTempMemory(FileSize);
-                                if (filesource[fn] != FLASHFILE)
-                                        f_read(FileTable[fn].fptr, pBuf, FileSize, &n_read);
-                                else
-                                        n_read = lfs_file_read(&lfs, FileTable[fn].lfsptr, pBuf, FileSize);
+                                char *pBuf = GetTempMainMemory(Size);
+                                FileGetdata(fn, pBuf, Size, &n_read);
                                 state->buffer_sent[pcb] = (unsigned char *)pBuf;
                                 while (n_read > TCP_MSS)
                                 {
@@ -577,16 +572,14 @@ void cmd_transmit(unsigned char *cmd)
                         }
                         else
                         {
-                                char *pBuf = GetTempMemory(TCP_MSS);
+                                char *pBuf = GetTempMainMemory(TCP_MSS);
                                 while (1)
                                 {
                                         if (
-                                            ((filesource[fn] == FLASHFILE) && (lfs_file_tell(&lfs, FileTable[fn].lfsptr) == lfs_file_size(&lfs, FileTable[fn].lfsptr))) || ((filesource[fn] != FLASHFILE) && f_eof(FileTable[fn].fptr)))
+                                            ((filesource[fn] == FLASHFILE) && (lfs_file_tell(&lfs, FileTable[fn].lfsptr) == lfs_file_size(&lfs, FileTable[fn].lfsptr))) ||
+                                            ((filesource[fn] != FLASHFILE) && f_eof(FileTable[fn].fptr)))
                                                 break;
-                                        if (filesource[fn] != FLASHFILE)
-                                                f_read(FileTable[fn].fptr, pBuf, TCP_MSS, &n_read);
-                                        else
-                                                n_read = lfs_file_read(&lfs, FileTable[fn].lfsptr, pBuf, TCP_MSS);
+                                        FileGetdata(fn, pBuf, TCP_MSS, &n_read);
                                         state->to_send[pcb] = n_read;
                                         state->buffer_sent[pcb] = (unsigned char *)pBuf;
                                         state->total_sent[pcb] += n_read;
@@ -623,14 +616,14 @@ void cmd_transmit(unsigned char *cmd)
                 char c;
                 char vartest[MAXVARLEN];
                 int vartestp;
-                int FileSize;
+                int Size;
                 int buffersize = 4096;
                 char p[10] = {0};
                 getcsargs(&tp, 5);
                 if (argc < 3)
                         StandardError(2);
-                char *outstr = GetTempMemory(STRINGSIZE);
-                char *valbuf = GetTempMemory(STRINGSIZE);
+                char *outstr = GetTempStrMemory();
+                char *valbuf = GetTempStrMemory();
                 strcat(outstr, httpheaders);
                 strcat(outstr, httphtml);
                 TCP_SERVER_T *state = (TCP_SERVER_T *)TCPstate;
@@ -643,13 +636,10 @@ void cmd_transmit(unsigned char *cmd)
                 if (ExistsFile(fname))
                 {
                         fn = FindFreeFileNbr();
+                        Size = FileSize(fname);
                         if (!BasicFileOpen(fname, fn, FA_READ))
                                 return;
-                        if (filesource[fn] != FLASHFILE)
-                                FileSize = f_size(FileTable[fn].fptr);
-                        else
-                                FileSize = lfs_file_size(&lfs, FileTable[fn].lfsptr);
-                        char *SocketOut = GetMemory(FileSize + buffersize);
+                        char *SocketOut = GetMemory(Size + buffersize);
                         int SocketOutPointer = 0;
                         while (1)
                         {
@@ -658,7 +648,7 @@ void cmd_transmit(unsigned char *cmd)
                                 c = FileGetChar(fn);
                                 if (c == 26)
                                         continue; // deal with xmodem padding
-                                if (SocketOutPointer > FileSize + 256)
+                                if (SocketOutPointer > Size + 256)
                                         break;
                                 if (c == '{')
                                 { // start of variable definition

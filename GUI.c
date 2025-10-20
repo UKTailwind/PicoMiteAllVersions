@@ -487,7 +487,6 @@ void cmd_gui(void)
     unsigned char *p;
 
     CheckDisplay();
-    error("Display not configured");
 
     if ((p = checkstring(cmdline, (unsigned char *)"PAGE")))
     {
@@ -2809,7 +2808,7 @@ void fun_ctrlval(void)
     }
     else if (Ctrl[r].type == CTRL_TEXTBOX || Ctrl[r].type == CTRL_FMTBOX)
     {
-        sret = GetTempMemory(STRINGSIZE);      // this will last for the life of the command
+        sret = GetTempStrMemory();             // this will last for the life of the command
         if (r == InvokingCtrl)                 // is the keypad for the number box being displayed?
             strcpy((char *)sret, CancelValue); // just return the value saved in case of a cancel
         else
@@ -2821,7 +2820,7 @@ void fun_ctrlval(void)
     }
     else if (Ctrl[r].type == CTRL_DISPLAYBOX || Ctrl[r].type == CTRL_CAPTION)
     {
-        sret = GetTempMemory(STRINGSIZE);        // this will last for the life of the command
+        sret = GetTempStrMemory();               // this will last for the life of the command
         strcpy((char *)sret, (char *)Ctrl[r].s); // copy the string
         CtoM(sret);                              // convert to a MMBasic string
         targ = T_STR;
@@ -2839,8 +2838,7 @@ void cmd_ctrlval(void)
 {
     int r;
     MMFLOAT v;
-    if (HRes == 0)
-        error("LCD Panel not configured");
+    CheckDisplay();
     if (!Option.MaxCtrls)
         StandardError(13);
     if (*cmdline == '#')

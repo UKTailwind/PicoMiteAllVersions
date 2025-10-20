@@ -2956,7 +2956,7 @@ void DrawBitmap320(int x1, int y1, int width, int height, int scale, int fg, int
     ReadBuffer = ReadBufferSSD1963;
     if (x1 < 80)
     {
-        unsigned char *p = GetTempMemory((80 - x1) * height * scale * 2);
+        unsigned char *p = GetTempMainMemory((80 - x1) * height * scale * 2);
         ReadBLITBufferSSD1963(x1, y1, 79, y1 + (height * scale - 1), p);
         DrawBitmapSSD1963(x1, y1, width, height, scale, fg, bg, bitmap);
         DrawBLITBufferSSD1963(x1, y1, 79, y1 + (height * scale - 1), p);

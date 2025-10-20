@@ -124,7 +124,7 @@ void cmd_udp(unsigned char *p)
         state->complete = 0;
         ip4_addr_t remote_addr;
         int timeout = 5000;
-        char *IP = GetTempMemory(STRINGSIZE);
+        char *IP = GetTempStrMemory();
         strcpy(IP, (char *)getCstring(argv[0]));
         if (!isalpha((uint8_t)*IP) && strchr(IP, '.') && strchr(IP, '.') < IP + 4)
         {

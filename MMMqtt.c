@@ -197,8 +197,8 @@ int cmd_mqtt(void)
   if (tp)
   {
     getcsargs(&tp, 9);
-    char *IP = GetTempMemory(STRINGSIZE);
-    char *ID = GetTempMemory(STRINGSIZE);
+    char *IP = GetTempStrMemory();
+    char *ID = GetTempStrMemory();
     if (mqtt_client)
       error("Already connected");
     int timeout = 5000;

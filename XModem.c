@@ -49,7 +49,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #define PACKET_TIMEOUT 3000 // 3 seconds
 #define YMAXRETRANS 25
 #if defined(rp2350) && !defined(USBKEYBOARD)
-#define XMODEMBUFFERSIZE EDIT_BUFFER_SIZE - 8192
+#define XMODEMBUFFERSIZE EDIT_BUFFER_SIZE - 4096
 #else
 #define XMODEMBUFFERSIZE EDIT_BUFFER_SIZE
 #endif
@@ -104,10 +104,14 @@ void MIPS16 cmd_xmodem(void)
     char *buf, BreakKeySave, *p, *fromp;
     int rcv = 0, fnbr, crunch = false;
     char *fname;
-#if defined(rp2350) && !defined(USBKEYBOARD)
     bool xmodem = true;
+#if defined(rp2350) && !defined(USBKEYBOARD)
     if (cmdtoken == GetCommandValue((unsigned char *)"YModem"))
+    {
         xmodem = false;
+        if (Option.CPU_Speed < 200000)
+            error("Minimum CPU speed 200,000KHz for YMODEM");
+    }
 #endif
     ClearExternalIO();
     if (mytoupper(*cmdline) == 'R')
@@ -141,15 +145,15 @@ void MIPS16 cmd_xmodem(void)
             CloseAudio(1);
             ClearVars(0, true);
         }
-        buf = GetTempMemory(XMODEMBUFFERSIZE);
+        buf = GetTempMainMemory(XMODEMBUFFERSIZE);
         if (rcv)
         {
-#if defined(rp2350) && !defined(USBKEYBOARD)
-            if (!xmodem)
-                ymodemReceive(buf, XMODEMBUFFERSIZE, 0, crunch);
-            else
-#endif
+            if (xmodem)
                 xmodemReceive(buf, XMODEMBUFFERSIZE, 0, crunch);
+#if defined(rp2350) && !defined(USBKEYBOARD)
+            else
+                ymodemReceive(buf, XMODEMBUFFERSIZE, 0, crunch);
+#endif
             ClearSavedVars(); // clear any saved variables
             SaveProgramToFlash((unsigned char *)buf, true);
         }
@@ -188,12 +192,12 @@ void MIPS16 cmd_xmodem(void)
             }
             --p;
             *p = 0; // erase the last line terminator
-#if defined(rp2350) && !defined(USBKEYBOARD)
-            if (!xmodem)
-                ymodemTransmit(buf, 0, ymodemname[0] ? ymodemname : NULL, 0); // send it off
-            else
-#endif
+            if (xmodem)
                 xmodemTransmit(buf, 0, 0); // send it off
+#if defined(rp2350) && !defined(USBKEYBOARD)
+            else
+                ymodemTransmit(buf, 0, ymodemname[0] ? ymodemname : NULL, 0); // send it off
+#endif
         }
     }
     else
@@ -216,30 +220,26 @@ void MIPS16 cmd_xmodem(void)
         {
             if (!BasicFileOpen(fname, fnbr, FA_WRITE | FA_CREATE_ALWAYS))
                 return;
-#if defined(rp2350) && !defined(USBKEYBOARD)
-            if (!xmodem)
-                ymodemReceive(NULL, 0, fnbr, false);
-            else
-#endif
+            if (xmodem)
                 xmodemReceive(NULL, 0, fnbr, false);
+#if defined(rp2350) && !defined(USBKEYBOARD)
+            else
+                ymodemReceive(NULL, 0, fnbr, false);
+#endif
             if (rcvnoint)
                 uart_set_irq_enables((Option.SerialConsole & 3) == 1 ? uart0 : uart1, true, false);
         }
         else
         {
+            int fsize = FileSize(fname);
             if (!BasicFileOpen(fname, fnbr, FA_READ))
                 return;
-            int fsize;
-            if (filesource[fnbr] != FLASHFILE)
-                fsize = f_size(FileTable[fnbr].fptr);
-            else
-                fsize = lfs_file_size(&lfs, FileTable[fnbr].lfsptr);
-#if defined(rp2350) && !defined(USBKEYBOARD)
             if (xmodem)
-                ymodemTransmit(NULL, fnbr, fname, fsize);
-            else
-#endif
                 xmodemTransmit(NULL, fnbr, fsize);
+#if defined(rp2350) && !defined(USBKEYBOARD)
+            else
+                ymodemTransmit(NULL, fnbr, fname, fsize);
+#endif
             if (rcvnoint)
                 uart_set_irq_enables((Option.SerialConsole & 3) == 1 ? uart0 : uart1, true, false);
         }
@@ -293,26 +293,15 @@ char _outbyte(char c, int f)
 // for the MX470 we don't want any XModem data echoed to the LCD panel
 // #define _outbyte(c,d) SerialConsolePutC(c,d)
 
-// YMODEM Protocol Implementation
-// Simple, fast, and reliable file transfer protocol
+// YMODEM Protocol Implementation with Flow Control
+// Optimized for systems with slow disk I/O
+//
+// KEY CHANGE: ACK is sent AFTER disk write completes, not before.
+// This prevents sender from transmitting next packet while we're busy writing.
 //
 // IMPORTANT: For CDC/USB connections, ACK characters must be transmitted
 // immediately for proper flow control. The _outbyte() function with f=1
 // parameter should flush both stdio AND the USB layer (tud_cdc_write_flush()).
-// Without this, ACKs may be buffered in USB packets causing timeouts and
-// retransmissions.
-
-// YMODEM Protocol Implementation
-// Simple, fast, and reliable file transfer protocol
-//
-// IMPORTANT: For CDC/USB connections, ACK characters must be transmitted
-// immediately for proper flow control. The _outbyte() function with f=1
-// parameter should flush both stdio AND the USB layer (tud_cdc_write_flush()).
-// Without this, ACKs may be buffered in USB packets causing timeouts and
-// retransmissions.
-//
-// PERFORMANCE: Uses write buffering (8KB) to minimize slow disk write operations.
-// This prevents timeouts during long file transfers.
 
 unsigned short crc16_ccitt(unsigned char *buf, int len)
 {
@@ -325,7 +314,9 @@ unsigned short crc16_ccitt(unsigned char *buf, int len)
     }
     return crc;
 }
+
 #if defined(rp2350) && !defined(USBKEYBOARD)
+
 // Parse file size from YMODEM header
 long parse_file_size(unsigned char *data)
 {
@@ -451,11 +442,13 @@ int receive_packet(unsigned char *buf, int *packet_num, int use_crc)
     return packet_size; // Return packet size on success
 }
 
-// YMODEM receive function
+// YMODEM receive function with aggressive flow control for slow disks
 void ymodemReceive(char *sp, int maxbytes, int fnbr, int crunch)
 {
     unsigned char buf[PACKET_SIZE_1024];
-    unsigned char *write_buffer = GetTempMemory(PACKET_SIZE_1024 * 8); // Buffer 8 packets (8KB) before writing
+    // REDUCED buffer size for more frequent writes = better flow control
+    // Write every 2-4 packets instead of 8 to keep ACK delays shorter
+    unsigned char *write_buffer = GetTempMainMemory(PACKET_SIZE_1024 * 4); // Buffer 4 packets (4KB)
     int write_buffer_used = 0;
     int packet_num;
     int expected_seq = 0;
@@ -465,14 +458,13 @@ void ymodemReceive(char *sp, int maxbytes, int fnbr, int crunch)
     long file_size = 0;
     long bytes_received = 0;
     int receiving_file = 0;
+    int to_disk = (sp == NULL); // Are we writing to disk?
 
     CrunchData((unsigned char **)&sp, 0); // Initialize crunch if needed
 
     // Wait for sender - use NAK instead of 'C' to avoid printing
-    // Most YMODEM senders (including TeraTerm) will use CRC anyway
     for (retry = 0; retry < 10; retry++)
     {
-        // Send NAK (non-printing) instead of 'C'
         _outbyte(NAK, 1);
 
         // Wait to see if sender responds
@@ -504,7 +496,7 @@ void ymodemReceive(char *sp, int maxbytes, int fnbr, int crunch)
 
     // Parse file info from header
     if (buf[0] != 0)
-    { // Not an empty header
+    {
         file_size = parse_file_size(buf);
         receiving_file = 1;
     }
@@ -529,18 +521,19 @@ void ymodemReceive(char *sp, int maxbytes, int fnbr, int crunch)
             result = receive_packet(buf, &packet_num, use_crc);
             if (result == -1)
             {
-                _outbyte(ACK, 1); // ACK the second EOT
+                // Flush any remaining buffered data to file BEFORE ACK
+                if (to_disk && write_buffer_used > 0)
+                {
+                    FilePutData((char *)write_buffer, fnbr, write_buffer_used);
+                    write_buffer_used = 0;
+                }
+
+                _outbyte(ACK, 1); // ACK after flush
 
                 // Terminate data if saving to memory
                 if (sp != NULL && maxbytes > 0)
                 {
                     *sp = 0;
-                }
-                else if (write_buffer_used > 0)
-                {
-                    // Flush any remaining buffered data to file
-                    FilePutdata((char *)write_buffer, fnbr, write_buffer_used);
-                    write_buffer_used = 0;
                 }
 
                 // Send 'C' to see if there are more files
@@ -605,12 +598,13 @@ void ymodemReceive(char *sp, int maxbytes, int fnbr, int crunch)
         }
 
         // Good packet received with correct sequence
-        // ACK IMMEDIATELY to stop sender from timing out
-        _outbyte(ACK, 1);
-        expected_seq = (expected_seq + 1) & 0xFF;
-        retry = 0; // Reset retry counter on success
+        // CRITICAL CHANGE: Process data BEFORE sending ACK
+        // This provides flow control - sender won't send next packet
+        // until we've finished writing to disk
 
-        // NOW process data (this can be slow)
+        retry = 0; // Reset retry counter on success
+        expected_seq = (expected_seq + 1) & 0xFF;
+
         int bytes_to_process = result; // Packet size (128 or 1024)
 
         // If we know the file size, don't process beyond it
@@ -624,7 +618,7 @@ void ymodemReceive(char *sp, int maxbytes, int fnbr, int crunch)
         {
             if (sp != NULL)
             {
-                // Write to memory
+                // Write to memory (fast - no flow control needed)
                 for (int i = 0; i < bytes_to_process; i++)
                 {
                     if (--maxbytes > 0)
@@ -640,28 +634,42 @@ void ymodemReceive(char *sp, int maxbytes, int fnbr, int crunch)
             }
             else
             {
-                // Write to file - buffer data to reduce write operations
-                // Copy to write buffer
+                // Write to file with aggressive flow control
+                // Strategy: Write frequently in smaller chunks to minimize ACK delay
+                // At 150MHz, even small disk writes can cause timeouts if delayed
+
                 memcpy(&write_buffer[write_buffer_used], buf, bytes_to_process);
                 write_buffer_used += bytes_to_process;
 
-                // Flush buffer if full (8KB accumulated)
-                if (write_buffer_used >= PACKET_SIZE_1024 * 8)
+                // VERY AGGRESSIVE: Flush after EVERY 1024-byte packet
+                // This ensures each ACK delay is minimal
+                // Trade-off: More disk writes, but prevents buffer overruns
+                int should_flush = (write_buffer_used >= PACKET_SIZE_1024);
+
+                // Also flush if this is the last data we're expecting
+                if (file_size > 0 && bytes_received + bytes_to_process >= file_size)
                 {
-                    FilePutdata((char *)write_buffer, fnbr, write_buffer_used);
+                    should_flush = 1;
+                }
+
+                if (should_flush && write_buffer_used > 0)
+                {
+                    FilePutData((char *)write_buffer, fnbr, write_buffer_used);
                     write_buffer_used = 0;
+                    // Flow control: ACK sent after this write completes
+                    // At 150MHz, this keeps the delay short enough to prevent overruns
                 }
             }
 
             bytes_received += bytes_to_process;
 
-            // Check if we've received the complete file - flush remaining buffer
-            if (file_size > 0 && bytes_received >= file_size && write_buffer_used > 0 && sp == NULL)
-            {
-                FilePutdata((char *)write_buffer, fnbr, write_buffer_used);
-                write_buffer_used = 0;
-            }
+            // Remove the redundant flush check since we now flush more aggressively above
         }
+
+        // NOW send ACK - after all processing is complete
+        // This is the key to flow control: sender can't send next packet
+        // until we're ready to receive it
+        _outbyte(ACK, 1);
     }
 }
 
@@ -698,7 +706,6 @@ void ymodemTransmit(char *p, int fnbr, char *filename, long file_size)
         else
         {
             // Sending from file - file_size should be provided by caller
-            // If not provided, we'll send without size info (compatible but not ideal)
             file_size = 0;
         }
     }
@@ -963,6 +970,7 @@ void ymodemTransmit(char *p, int fnbr, char *filename, long file_size)
 
     return;
 }
+
 #endif
 // XMODEM Protocol Implementation
 // Simple, efficient file transfer protocol
@@ -1169,7 +1177,7 @@ void xmodemReceive(char *sp, int maxbytes, int fnbr, int crunch)
 
                 if (write_len > 0)
                 {
-                    FilePutdata((char *)prev_buf, fnbr, write_len);
+                    FilePutData((char *)prev_buf, fnbr, write_len);
                 }
             }
 
@@ -1224,7 +1232,7 @@ void xmodemReceive(char *sp, int maxbytes, int fnbr, int crunch)
         if (sp == NULL && have_prev_packet)
         {
             // Write entire packet at once (more efficient than byte-by-byte)
-            FilePutdata((char *)prev_buf, fnbr, XPACKET_SIZE);
+            FilePutData((char *)prev_buf, fnbr, XPACKET_SIZE);
         }
 
         // Save current packet as previous for next iteration

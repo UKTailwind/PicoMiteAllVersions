@@ -147,7 +147,7 @@ void cmd_ntp(unsigned char *tp)
     if (!state)
         error("Can't create NTP structure");
     ip4_addr_t remote_addr;
-    char *IP = GetTempMemory(STRINGSIZE);
+    char *IP = GetTempStrMemory();
     if (argc >= 1)
     {
         MMFLOAT adjust = getnumber(argv[0]);

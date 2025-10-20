@@ -127,7 +127,7 @@
 #define ExtCurrentConfig                ((int *) Vector_ExtCurrentConfig)
 #define HRes                            (*(unsigned int *) Vector_HRes)
 #define VRes                            (*(unsigned int *) Vector_VRes)
-#define SoftReset()                     ((void (*)(void)) Vector_SoftReset) ()
+#define SoftReset(SOFT_RESET)                     ((void (*)(void)) Vector_SoftReset) ()
 #define error(a)                        ((void (*)(char *)) Vector_error) (a)
 #define ProgFlash                       ((int *) Vector_ProgFlash)
 #define g_vartbl                          (*(struct s_vartbl *) Vector_vartbl)

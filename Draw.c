@@ -252,7 +252,7 @@ uint16_t __not_in_flash_func(RGB121pack)(uint32_t c)
 void CheckDisplay(void)
 {
     if (Option.DISPLAY_TYPE == 0)
-        error("Display not configured");
+        DisplayNotSet();
 }
 void MIPS16 cmd_guiMX170(void)
 {
@@ -329,8 +329,7 @@ void MIPS16 cmd_guiMX170(void)
                 busy_wait_ms(mergetimer + 200);
                 if (mergerunning)
                 {
-                    _excep_code = RESET_COMMAND;
-                    SoftReset();
+                    SoftReset(SOFT_RESET);
                 }
             }
 #endif
@@ -1085,7 +1084,7 @@ void DrawCircle(int x, int y, int radius, int w, int c, int fill, MMFLOAT aspect
                 ll = (int)((MMFLOAT)radius * aspect);
 
             int ints_per_line = RoundUptoInt((ll << 1) + 1) / 32;
-            uint32_t *br = (uint32_t *)GetTempMemory(((ints_per_line + 1) * ((r2 << 1) + 1)) << 2);
+            uint32_t *br = (uint32_t *)GetTempMainMemory(((ints_per_line + 1) * ((r2 << 1) + 1)) << 2);
 
             DrawFilledCircle(x, y, r2, r2, 1, ints_per_line, br, aspect, aspect);
             aspect2 = ((aspect * (MMFLOAT)r2) - (MMFLOAT)w) / ((MMFLOAT)r1);
@@ -2670,7 +2669,7 @@ void cmd_line(void)
         }
         else if ((p = checkstring(cmdline, (unsigned char *)"GRAPH")))
         {
-            unsigned char *pp = GetTempMemory(STRINGSIZE);
+            unsigned char *pp = GetTempStrMemory();
             strcpy((char *)pp, (char *)p);
             memmove(&pp[2], pp, strlen((char *)p) + 1);
             pp[0] = '0';
@@ -3116,7 +3115,7 @@ void MIPS16 cmd_arc(void)
     x2 = x;
     y2 = y;
     int ints_per_line = RoundUptoInt((r2 * 2) + 1) / 32;
-    uint32_t *br = (uint32_t *)GetTempMemory(((ints_per_line + 1) * ((r2 * 2) + 1)) * 4);
+    uint32_t *br = (uint32_t *)GetTempMainMemory(((ints_per_line + 1) * ((r2 * 2) + 1)) * 4);
     DrawFilledCircle(x, y, r2, r2, 1, ints_per_line, br, 1.0, 1.0);
     DrawFilledCircle(x, y, r1, r2, 0, ints_per_line, br, 1.0, 1.0);
     while (rstart < rad3)
@@ -3373,8 +3372,8 @@ void polygon(unsigned char *p, int close)
             c = getint(argv[6], 0, WHITE);
         if (argc > 7 && *argv[8])
         {
-            main_fill_polyX = (TFLOAT *)GetTempMemory((xtot + 1) * sizeof(TFLOAT));
-            main_fill_polyY = (TFLOAT *)GetTempMemory((xtot + 1) * sizeof(TFLOAT));
+            main_fill_polyX = (TFLOAT *)GetTempMainMemory((xtot + 1) * sizeof(TFLOAT));
+            main_fill_polyY = (TFLOAT *)GetTempMainMemory((xtot + 1) * sizeof(TFLOAT));
             f = getint(argv[8], 0, WHITE);
             fill_set_fill_color((f >> 16) & 0xFF, (f >> 8) & 0xFF, f & 0xFF);
             fill_set_pen_color((c >> 16) & 0xFF, (c >> 8) & 0xFF, c & 0xFF);
@@ -3448,8 +3447,8 @@ void polygon(unsigned char *p, int close)
     }
     else
     {
-        int *cc = GetTempMemory(n * sizeof(int)); // array for foreground colours
-        int *ff = GetTempMemory(n * sizeof(int)); // array for background colours
+        int *cc = GetTempMainMemory(n * sizeof(int)); // array for foreground colours
+        int *ff = GetTempMainMemory(n * sizeof(int)); // array for background colours
         int xstart, j, xmax = 0;
         for (i = 0; i < n; i++)
         {
@@ -3468,8 +3467,8 @@ void polygon(unsigned char *p, int close)
         getargaddress(argv[4], &yptr, &yfptr, &ny);
         if (ny < xtot)
             error("Y Dimensions %", ny);
-        main_fill_polyX = (TFLOAT *)GetTempMemory(xmax * sizeof(TFLOAT));
-        main_fill_polyY = (TFLOAT *)GetTempMemory(xmax * sizeof(TFLOAT));
+        main_fill_polyX = (TFLOAT *)GetTempMainMemory(xmax * sizeof(TFLOAT));
+        main_fill_polyY = (TFLOAT *)GetTempMainMemory(xmax * sizeof(TFLOAT));
         if (argc > 5 && *argv[6])
         { // foreground colour specified
             getargaddress(argv[6], &cptr, &cfptr, &nc);
@@ -4608,8 +4607,8 @@ int blitother(void)
                 char rgbbytes[4];
                 unsigned int rgb;
             } cb;
-            unsigned char *rbuff = (unsigned char *)GetTempMemory(w * 4);
-            char *from = GetTempMemory((w + 1) / 2);
+            unsigned char *rbuff = (unsigned char *)GetTempMainMemory(w * 4);
+            char *from = GetTempMainMemory((w + 1) / 2);
             for (int y = y1, toy = y2; y < y1 + h; y++, toy++)
             { // loop though all of the output lines
                 ReadBuffer(x1, y, x1 + w - 1, y, rbuff);
@@ -5265,8 +5264,8 @@ void BlitShowBuffer(int bnbr, int x1, int y1, int mode)
         // we now have the old screen image stored together with the coordinates
         if (rotation)
         {
-            unsigned char *d = GetTempMemory(w * h);
-            unsigned char *r = GetTempMemory((w * h + 1) >> 1);
+            unsigned char *d = GetTempMainMemory(w * h);
+            unsigned char *r = GetTempMainMemory((w * h + 1) >> 1);
             expandpixel((unsigned char *)spritebuff[bnbr].spritebuffptr, d, w * h, 0);
             if (rotation & 1)
             { // swap left/write
@@ -5671,8 +5670,8 @@ void ScrollBufferH(int pixels)
     }
     else
     {
-        ss = GetTempMemory(HRes);
-        dd = GetTempMemory(HRes);
+        ss = GetTempMainMemory(HRes);
+        dd = GetTempMainMemory(HRes);
         if (pixels > 0)
         {
             for (y = 0; y < VRes; y++)
@@ -6440,7 +6439,7 @@ void cmd_sprite(void)
             ylen = BmpDec.lHeight;
         if (xlen + xOrigin > BmpDec.lWidth || ylen + yOrigin > BmpDec.lHeight)
             StandardError(34);
-        char *q = GetTempMemory(xlen * ylen * 3);
+        char *q = GetTempMainMemory(xlen * ylen * 3);
         spritebuff[bnbr].spritebuffptr = GetMemory((xlen * ylen + 4) >> 1);
         spritebuff[bnbr].blitstoreptr = GetMemory((xlen * ylen + 4) >> 1);
         memset(q, 0xFF, xlen * ylen * 3);
@@ -6966,8 +6965,7 @@ void closeframebuffer(char layer)
         busy_wait_ms(mergetimer + 200);
         if (mergerunning)
         {
-            _excep_code = RESET_COMMAND;
-            SoftReset();
+            SoftReset(SOFT_RESET);
         }
     }
 #endif
@@ -7711,8 +7709,7 @@ void cmd_framebuffer(void)
                 busy_wait_ms(mergetimer + 200);
                 if (mergerunning)
                 {
-                    _excep_code = RESET_COMMAND;
-                    SoftReset();
+                    SoftReset(SOFT_RESET);
                 }
             }
         }
@@ -7750,8 +7747,7 @@ void cmd_framebuffer(void)
                 busy_wait_ms(mergetimer + 200);
                 if (mergerunning)
                 {
-                    _excep_code = RESET_COMMAND;
-                    SoftReset();
+                    SoftReset(SOFT_RESET);
                 }
             }
 #endif
@@ -7770,8 +7766,7 @@ void cmd_framebuffer(void)
                 busy_wait_ms(mergetimer + 200);
                 if (mergerunning)
                 {
-                    _excep_code = RESET_COMMAND;
-                    SoftReset();
+                    SoftReset(SOFT_RESET);
                 }
             }
 #endif
@@ -7843,7 +7838,7 @@ void cmd_framebuffer(void)
             {
                 if (complex == 1)
                 { // copying from the real display
-                    char *LCDBuffer = GetTempMemory(HRes * 3);
+                    char *LCDBuffer = GetTempMainMemory(HRes * 3);
                     int DisplayMode = 0;
                     if (DrawBufferSPI == DrawBuffer || DrawBufferSSD1963 == DrawBuffer)
                         DisplayMode = 1;
@@ -8033,8 +8028,7 @@ void cmd_blit(void)
                 busy_wait_ms(mergetimer + 200);
                 if (mergerunning)
                 {
-                    _excep_code = RESET_COMMAND;
-                    SoftReset();
+                    SoftReset(SOFT_RESET);
                 }
             }
         }
@@ -8116,7 +8110,7 @@ void cmd_blit(void)
                 buff = (unsigned char *)blitbuff[bnbr].blitbuffptr;
             else
             {
-                buff = GetTempMemory(w * h * 4);
+                buff = GetTempMainMemory(w * h * 4);
                 for (int j = w * h * 4 - 1, i = w * h * 3 - 1; j >= 0; j -= 4)
                 {
                     buff[j] = 0;
@@ -8203,7 +8197,7 @@ void cmd_blit(void)
             {
                 if ((void *)ReadBuffer == (void *)DisplayNotSet)
                     StandardError(11);
-                unsigned char *current = GetTempMemory(w * h * 3);
+                unsigned char *current = GetTempMainMemory(w * h * 3);
                 if (y1 < 0)
                 {
                     buff -= (y1 * 3 * w);
@@ -8328,7 +8322,7 @@ void cmd_blit(void)
             }
             else
             { // nibble move not as easy
-                uint8_t *inbuff = GetTempMemory(HRes / 2);
+                uint8_t *inbuff = GetTempMainMemory(HRes / 2);
                 int intoggle = x1 & 1;
                 int outtoggle = x2 & 1;
                 int n = w / 2;
@@ -8624,7 +8618,7 @@ void cmd_blit(void)
             }
             else
             { // nibble move not as easy
-                uint8_t *inbuff = GetTempMemory(HRes / 2);
+                uint8_t *inbuff = GetTempMainMemory(HRes / 2);
                 int intoggle = x1 & 1;
                 int outtoggle = x2 & 1;
                 int n = w / 2;

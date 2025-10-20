@@ -105,7 +105,7 @@ void cmd_time(void);
 void cmd_flash(void);
 void cmd_var(void);
 void cmd_flush(void);
-void cmd_disk(void);
+void cmd_drive(void);
 void cmd_play(void);
 void cmd_text(void);
 void cmd_pixel(void);
@@ -438,7 +438,7 @@ void fun_touch(void);
 	{(unsigned char *)"Flash", T_CMD, 0, cmd_flash},
 	{(unsigned char *)"VAR", T_CMD, 0, cmd_var},
 	{(unsigned char *)"Flush", T_CMD, 0, cmd_flush},
-	{(unsigned char *)"Drive", T_CMD, 0, cmd_disk},
+	{(unsigned char *)"Drive", T_CMD, 0, cmd_drive},
 	{(unsigned char *)"Play", T_CMD, 0, cmd_play},
 	{(unsigned char *)"PIO", T_CMD, 0, cmd_pio},
 	{(unsigned char *)"New", T_CMD, 0, cmd_new},

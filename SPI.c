@@ -309,7 +309,7 @@ unsigned int *GetSendDataList(unsigned char *p, unsigned int *nbr)
     *nbr = getint(argv[0], 0, 9999999);
     if (!*nbr)
         return NULL;
-    buf = GetTempMemory(*nbr * sizeof(unsigned int));
+    buf = GetTempMainMemory(*nbr * sizeof(unsigned int));
 
     // first check if this is the situation with just two arguments where the second argument could be a string or a simple variable or an array
     // check the correct arg count AND that the second argument looks like a variable AND it is not a function

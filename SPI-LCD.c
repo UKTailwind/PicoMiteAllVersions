@@ -325,7 +325,7 @@ void MIPS16 ConfigDisplaySPI(unsigned char *p)
 		error("SPI not configured");
 #else
 	if (!Option.SYSTEM_CLK)
-		error("System SPI not configured");
+		StandardError(45);
 #endif
 	if (!(argc == 7 || argc == 9 || argc == 11 || argc == 13))
 		StandardError(2);
@@ -1436,8 +1436,7 @@ void DefineRegionSPI(int xstart, int ystart, int xend, int yend, int rw)
 	}
 	else
 	{
-		if (Option.DISPLAY_TYPE == 0)
-			error("Display not configured");
+		CheckDisplay();
 		if (Option.DISPLAY_TYPE == ST7789)
 		{
 			if (Option.DISPLAY_ORIENTATION == 2)

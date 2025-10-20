@@ -48,19 +48,6 @@
 #define TOUCH_NOT_CALIBRATED -999999
 
 /* ==============================================================================================================
- * RESET/RESTART CODES
- * ============================================================================================================== */
-#define RESET_COMMAND 9999     // Reset caused by the RESET command
-#define WATCHDOG_TIMEOUT 9998  // Reset caused by the watchdog timer
-#define PIN_RESTART 9997       // Reset caused by entering 0 at the PIN prompt
-#define RESTART_NOAUTORUN 9996 // Reset required after changing the LCD or touch config
-#define SCREWUP_TIMEOUT 9994   // Reset caused by the execute timer
-#define SOFT_RESET 9993
-#define POSSIBLE_WATCHDOG 9992
-#define INVALID_CLOCKSPEED 9991
-#define RESET_CLOCKSPEED 9990
-
-/* ==============================================================================================================
  * SPI SPEED DEFINITIONS
  * ============================================================================================================== */
 #define FLASH_SPI_SPEED 20000000

@@ -124,12 +124,12 @@ void setwifi(unsigned char *tp)
     ;
     if (CurrentLinePtr)
         StandardError(10);
-    char *ssid = GetTempMemory(STRINGSIZE);
-    char *password = GetTempMemory(STRINGSIZE);
-    char *hostname = GetTempMemory(STRINGSIZE);
-    char *ipaddress = GetTempMemory(STRINGSIZE);
-    char *mask = GetTempMemory(STRINGSIZE);
-    char *gateway = GetTempMemory(STRINGSIZE);
+    char *ssid = GetTempStrMemory();
+    char *password = GetTempStrMemory();
+    char *hostname = GetTempStrMemory();
+    char *ipaddress = GetTempStrMemory();
+    char *mask = GetTempStrMemory();
+    char *gateway = GetTempStrMemory();
     strcpy(ssid, (char *)getCstring(argv[0]));
     strcpy(password, (char *)getCstring(argv[2]));
     if (strlen(ssid) > MAXKEYLEN - 1)
@@ -445,7 +445,7 @@ void stringsort(unsigned char *sarray, int n, int offset, long long *index, int 
             memset(sarray, 0, offset * (n - i));
             if (index != NULL)
             {
-                long long int *newindex = (long long int *)GetTempMemory(n * sizeof(long long int));
+                long long int *newindex = (long long int *)GetTempMainMemory(n * sizeof(long long int));
                 memmove(&newindex[n - i], &index[startpoint], i * sizeof(long long int));
                 memmove(newindex, &index[startpoint + i], (n - i) * sizeof(long long int));
                 memmove(&index[startpoint], newindex, n * sizeof(long long int));
@@ -468,7 +468,7 @@ void stringsort(unsigned char *sarray, int n, int offset, long long *index, int 
             memset(s2, 0, offset * i);
             if (index != NULL)
             {
-                long long int *newindex = (long long int *)GetTempMemory(n * sizeof(long long int));
+                long long int *newindex = (long long int *)GetTempMainMemory(n * sizeof(long long int));
                 memmove(newindex, &index[startpoint + i], (n - i) * sizeof(long long int));
                 memmove(&newindex[n - i], &index[startpoint], i * sizeof(long long int));
                 memmove(&index[startpoint], newindex, n * sizeof(long long int));
@@ -563,7 +563,7 @@ uint64_t gettimefromepoch(int *year, int *month, int *day, int *hour, int *minut
 }
 void fun_datetime(void)
 {
-    sret = GetTempMemory(STRINGSIZE); // this will last for the life of the command
+    sret = GetTempStrMemory(); // this will last for the life of the command
     if (checkstring(ep, (unsigned char *)"NOW"))
     {
         int year, month, day, hour, minute, second;
@@ -1332,7 +1332,7 @@ void fun_LGetStr(void)
         StandardError(21);
     if (start + nbr > src[0])
         nbr = src[0] - start + 1;
-    sret = GetTempMemory(STRINGSIZE); // this will last for the life of the command
+    sret = GetTempStrMemory(); // this will last for the life of the command
     s = (char *)&src[1];
     s += (start - 1);
     p = (char *)sret + 1;
@@ -1616,7 +1616,7 @@ void fun_date(void)
 {
     int year, month, day, hour, minute, second;
     gettimefromepoch(&year, &month, &day, &hour, &minute, &second);
-    sret = GetTempMemory(STRINGSIZE); // this will last for the life of the command
+    sret = GetTempStrMemory(); // this will last for the life of the command
     IntToStrPad((char *)sret, day, '0', 2, 10);
     sret[2] = '-';
     IntToStrPad((char *)sret + 3, month, '0', 2, 10);
@@ -1635,7 +1635,7 @@ void fun_day(void)
     tm = &tma;
     time_t time_of_day;
     int i;
-    sret = GetTempMemory(STRINGSIZE); // this will last for the life of the command
+    sret = GetTempStrMemory(); // this will last for the life of the command
     int d, m, y;
     if (!checkstring(ep, (unsigned char *)"NOW"))
     {
@@ -1768,7 +1768,7 @@ void cmd_time(void)
 void fun_time(void)
 {
     int year, month, day, hour, minute, second;
-    sret = GetTempMemory(STRINGSIZE); // this will last for the life of the command
+    sret = GetTempStrMemory(); // this will last for the life of the command
     uint64_t fulltime = gettimefromepoch(&year, &month, &day, &hour, &minute, &second);
     IntToStrPad((char *)sret, hour, '0', 2, 10);
     sret[2] = ':';
@@ -1830,7 +1830,7 @@ void MIPS16 cmd_library(void)
             return;
         checkend(p);
         ClearRuntime(true);
-        TempPtr = m = MemBuff = GetTempMemory(EDIT_BUFFER_SIZE);
+        TempPtr = m = MemBuff = GetTempMainMemory(EDIT_BUFFER_SIZE);
 
         rem = GetCommandValue((unsigned char *)"Rem");
         InQuote = InCFun = j = 0;
@@ -2212,12 +2212,9 @@ void MIPS16 cmd_library(void)
         char *pp = (char *)getFstring(argv[0]);
         if (strchr((char *)pp, '.') == NULL)
             strcat((char *)pp, ".lib");
+        fsize = FileSize((char *)pp);
         if (!BasicFileOpen((char *)pp, fnbr, FA_READ))
             return;
-        if (filesource[fnbr] != FLASHFILE)
-            fsize = f_size(FileTable[fnbr].fptr);
-        else
-            fsize = lfs_file_size(&lfs, FileTable[fnbr].lfsptr);
         if (fsize > MAX_PROG_SIZE)
             error("File size % should be % or less", fsize, MAX_PROG_SIZE);
         FlashWriteInit(LIBRARY_FLASH);
@@ -2251,7 +2248,7 @@ void cmd_settick(void)
     int irq = 0;
     ;
     //    int pause=0;
-    char *s = GetTempMemory(STRINGSIZE);
+    char *s = GetTempStrMemory();
     getcsargs(&cmdline, 5);
     strcpy(s, (char *)argv[0]);
     if (!(argc == 3 || argc == 5))
@@ -3338,14 +3335,41 @@ void MIPS16 clear320(void)
 // }
 
 #endif
-
+bool testMODBUFF(bool proposed, int proposedsize)
+{
+    if (!(Option.modbuff == proposed && Option.modbuffsize == proposedsize))
+    {
+        MMPrintString("\r\nThis erases everything in flash including the A: drive - are you sure (Y/N) ? ");
+        int i;
+        while ((i = MMInkey()) == -1)
+        {
+        };
+        putConsole(i, 1);
+        if (mytoupper(i) != 'Y')
+        {
+            memset(inpbuf, 0, STRINGSIZE);
+            longjmp(mark, 1);
+        }
+        else
+        {
+            ResetAllFlash();
+            return true;
+        }
+    }
+    return false;
+}
+void doreset(int format)
+{
+    SoftReset(format ? RESET_FLASHSTORAGE : SOFT_RESET);
+}
 void MIPS16 configure(unsigned char *p)
 {
+    bool format = false;
     if (!*p)
     {
+        format = testMODBUFF(false, 0);
         ResetOptions(false);
-        _excep_code = RESET_COMMAND;
-        SoftReset();
+        doreset(format);
     }
     else
     {
@@ -3417,13 +3441,13 @@ void MIPS16 configure(unsigned char *p)
             Option.AUDIO_R = PINMAP[17];
             Option.modbuffsize = 512;
             Option.modbuff = true;
+            format = testMODBUFF(Option.modbuff, Option.modbuffsize);
             Option.AUDIO_SLICE = checkslice(PINMAP[16], PINMAP[17], 0);
             strcpy((char *)Option.platform, "CMM1.5");
             SaveOptions();
             printoptions();
             uSec(100000);
-            _excep_code = RESET_COMMAND;
-            SoftReset();
+            doreset(format);
         }
 #else
         if (checkstring(p, (unsigned char *)"PICOMITEVGA V1.1"))
@@ -3447,12 +3471,12 @@ void MIPS16 configure(unsigned char *p)
             Option.AUDIO_SLICE = checkslice(PINMAP[22], PINMAP[22], 1);
             Option.modbuffsize = 512;
             Option.modbuff = true;
+            format = testMODBUFF(Option.modbuff, Option.modbuffsize);
             strcpy((char *)Option.platform, "PICOMITEVGA V1.1");
             SaveOptions();
             printoptions();
             uSec(100000);
-            _excep_code = RESET_COMMAND;
-            SoftReset();
+            doreset(format);
         }
         if (checkstring(p, (unsigned char *)"PICOMITEVGA V1.0"))
         {
@@ -3473,17 +3497,18 @@ void MIPS16 configure(unsigned char *p)
             Option.AUDIO_R = PINMAP[23];
             Option.modbuffsize = 512;
             Option.modbuff = true;
+            format = testMODBUFF(Option.modbuff, Option.modbuffsize);
             Option.AUDIO_SLICE = checkslice(PINMAP[22], PINMAP[23], 0);
             strcpy((char *)Option.platform, "PICOMITEVGA V1.0");
             SaveOptions();
             printoptions();
             uSec(100000);
-            _excep_code = RESET_COMMAND;
-            SoftReset();
+            doreset(format);
         }
         if (checkstring(p, (unsigned char *)"VGA DESIGN 1"))
         {
             ResetOptions(false);
+            format = testMODBUFF(Option.modbuff, Option.modbuffsize);
             Option.CPU_Speed = 252000;
             Option.ColourCode = 1;
             Option.SYSTEM_CLK = PINMAP[10];
@@ -3496,8 +3521,7 @@ void MIPS16 configure(unsigned char *p)
             SaveOptions();
             printoptions();
             uSec(100000);
-            _excep_code = RESET_COMMAND;
-            SoftReset();
+            doreset(format);
         }
         if (checkstring(p, (unsigned char *)"VGA DESIGN 2"))
         {
@@ -3517,13 +3541,13 @@ void MIPS16 configure(unsigned char *p)
             Option.AUDIO_R = PINMAP[7];
             Option.modbuffsize = 192;
             Option.modbuff = true;
+            format = testMODBUFF(Option.modbuff, Option.modbuffsize);
             Option.AUDIO_SLICE = checkslice(PINMAP[6], PINMAP[7], 0);
             strcpy((char *)Option.platform, "VGA Design 2");
             SaveOptions();
             printoptions();
             uSec(100000);
-            _excep_code = RESET_COMMAND;
-            SoftReset();
+            doreset(format);
         }
         /*OPTION PLATFORM "SWEETIEPI"
         OPTION CPUSPEED 252000
@@ -3550,12 +3574,12 @@ void MIPS16 configure(unsigned char *p)
             Option.AUDIO_SLICE = checkslice(PINMAP[6], PINMAP[6], 1);
             Option.modbuffsize = 192;
             Option.modbuff = true;
+            format = testMODBUFF(Option.modbuff, Option.modbuffsize);
             strcpy((char *)Option.platform, "SWEETIEPI");
             SaveOptions();
             printoptions();
             uSec(100000);
-            _excep_code = RESET_COMMAND;
-            SoftReset();
+            doreset(format);
         }
         /*OPTION PLATFORM VGA BASIC
 
@@ -3579,13 +3603,13 @@ void MIPS16 configure(unsigned char *p)
             Option.AUDIO_R = PINMAP[7];
             Option.modbuffsize = 192;
             Option.modbuff = true;
+            format = testMODBUFF(Option.modbuff, Option.modbuffsize);
             Option.AUDIO_SLICE = checkslice(PINMAP[6], PINMAP[7], 0);
             strcpy((char *)Option.platform, "VGA BASIC");
             SaveOptions();
             printoptions();
             uSec(100000);
-            _excep_code = RESET_COMMAND;
-            SoftReset();
+            doreset(format);
         }
 #endif
 #else
@@ -3620,6 +3644,7 @@ void MIPS16 configure(unsigned char *p)
             Option.AUDIO_R = PINMAP[11];
             Option.modbuffsize = 192;
             Option.modbuff = true;
+            format = testMODBUFF(Option.modbuff, Option.modbuffsize);
             Option.AUDIO_SLICE = checkslice(PINMAP[10], PINMAP[11], 0);
             Option.SYSTEM_I2C_SDA = PINMAP[20];
             Option.SYSTEM_I2C_SCL = PINMAP[21];
@@ -3630,8 +3655,7 @@ void MIPS16 configure(unsigned char *p)
             SaveOptions();
             printoptions();
             uSec(100000);
-            _excep_code = RESET_COMMAND;
-            SoftReset();
+            doreset(format);
         }
         if (checkstring(p, (unsigned char *)"HDMIUSBI2S"))
         {
@@ -3644,6 +3668,7 @@ void MIPS16 configure(unsigned char *p)
             Option.ColourCode = 1;
             Option.modbuffsize = 512;
             Option.modbuff = true;
+            format = testMODBUFF(Option.modbuff, Option.modbuffsize);
             Option.audio_i2s_bclk = PINMAP[10];
             Option.audio_i2s_data = PINMAP[22];
             Option.AUDIO_SLICE = 11;
@@ -3669,8 +3694,7 @@ void MIPS16 configure(unsigned char *p)
             SaveOptions();
             printoptions();
             uSec(100000);
-            _excep_code = RESET_COMMAND;
-            SoftReset();
+            doreset(format);
         }
         if (checkstring(p, (unsigned char *)"OLIMEXUSB"))
         {
@@ -3681,6 +3705,7 @@ void MIPS16 configure(unsigned char *p)
             Option.AUDIO_R = PINMAP[27];
             Option.modbuffsize = 192;
             Option.modbuff = true;
+            format = testMODBUFF(Option.modbuff, Option.modbuffsize);
             Option.AUDIO_SLICE = checkslice(PINMAP[26], PINMAP[27], 0);
             Option.SD_CS = PINMAP[22];
             Option.SD_CLK_PIN = PINMAP[6];
@@ -3696,14 +3721,14 @@ void MIPS16 configure(unsigned char *p)
             SaveOptions();
             printoptions();
             uSec(100000);
-            _excep_code = RESET_COMMAND;
-            SoftReset();
+            doreset(format);
         }
 
 #else
         if (checkstring(p, (unsigned char *)"HDMIBASIC"))
         {
             ResetOptions(false);
+            format = testMODBUFF(Option.modbuff, Option.modbuffsize);
             strcpy((char *)Option.platform, "HDMIbasic");
             Option.ColourCode = 1;
             Option.SD_CS = 7;
@@ -3713,8 +3738,7 @@ void MIPS16 configure(unsigned char *p)
             SaveOptions();
             printoptions();
             uSec(100000);
-            _excep_code = RESET_COMMAND;
-            SoftReset();
+            doreset(format);
         }
         if (checkstring(p, (unsigned char *)"OLIMEX"))
         {
@@ -3725,6 +3749,7 @@ void MIPS16 configure(unsigned char *p)
             Option.AUDIO_R = PINMAP[27];
             Option.modbuffsize = 192;
             Option.modbuff = true;
+            format = testMODBUFF(Option.modbuff, Option.modbuffsize);
             Option.AUDIO_SLICE = checkslice(PINMAP[26], PINMAP[27], 0);
             Option.SD_CS = PINMAP[22];
             Option.SD_CLK_PIN = PINMAP[6];
@@ -3737,8 +3762,7 @@ void MIPS16 configure(unsigned char *p)
             SaveOptions();
             printoptions();
             uSec(100000);
-            _excep_code = RESET_COMMAND;
-            SoftReset();
+            doreset(format);
         }
 #endif
 #endif
@@ -3748,6 +3772,7 @@ void MIPS16 configure(unsigned char *p)
         if (checkstring(p, (unsigned char *)"PALM PICO"))
         {
             ResetOptions(false);
+            format = testMODBUFF(Option.modbuff, Option.modbuffsize);
             Option.CPU_Speed = 360000;
             Option.ColourCode = 1;
             Option.LCD_CLK = Option.SYSTEM_CLK = PINMAP[42];
@@ -3789,12 +3814,12 @@ void MIPS16 configure(unsigned char *p)
             OptionConsole = 1;
             printoptions();
             uSec(1000000);
-            _excep_code = RESET_COMMAND;
-            SoftReset();
+            doreset(format);
         }
         if (checkstring(p, (unsigned char *)"PICO PALM"))
         {
             ResetOptions(false);
+            format = testMODBUFF(Option.modbuff, Option.modbuffsize);
             Option.CPU_Speed = 360000;
             Option.ColourCode = 1;
             Option.SYSTEM_CLK = PINMAP[6];
@@ -3834,8 +3859,7 @@ void MIPS16 configure(unsigned char *p)
             OptionConsole = 1;
             printoptions();
             uSec(100000);
-            _excep_code = RESET_COMMAND;
-            SoftReset();
+            doreset(format);
         }
 #endif
 #ifndef USBKEYBOARD
@@ -3864,6 +3888,7 @@ void MIPS16 configure(unsigned char *p)
             Option.TOUCH_IRQ = PINMAP[7];
             Option.SD_CS = PINMAP[22];
             Option.modbuff = true;
+            format = testMODBUFF(Option.modbuff, Option.modbuffsize);
             Option.DISPLAY_ORIENTATION = 3;
             Option.AUDIO_SLICE = checkslice(PINMAP[20], PINMAP[21], 0);
             Option.TOUCH_SWAPXY = 0;
@@ -3875,8 +3900,7 @@ void MIPS16 configure(unsigned char *p)
             SaveOptions();
             printoptions();
             uSec(100000);
-            _excep_code = RESET_COMMAND;
-            SoftReset();
+            doreset(format);
         }
         if (checkstring(p, (unsigned char *)"PICORESTOUCHLCD3.5"))
         {
@@ -3902,6 +3926,7 @@ void MIPS16 configure(unsigned char *p)
             Option.SD_CS = PINMAP[22];
             Option.DISPLAY_BL = PINMAP[13];
             Option.modbuff = true;
+            format = testMODBUFF(Option.modbuff, Option.modbuffsize);
             Option.DISPLAY_ORIENTATION = 1;
             Option.TOUCH_SWAPXY = 0;
             Option.TOUCH_XZERO = 3963;
@@ -3912,12 +3937,12 @@ void MIPS16 configure(unsigned char *p)
             SaveOptions();
             printoptions();
             uSec(100000);
-            _excep_code = RESET_COMMAND;
-            SoftReset();
+            doreset(format);
         }
         if (checkstring(p, (unsigned char *)"PICO BACKPACK"))
         {
             ResetOptions(false);
+            format = testMODBUFF(Option.modbuff, Option.modbuffsize);
             Option.CPU_Speed = 252000;
             Option.ColourCode = 1;
 #if defined(rp2350) && defined(PICOMITE)
@@ -3946,8 +3971,7 @@ void MIPS16 configure(unsigned char *p)
             SaveOptions();
             printoptions();
             uSec(100000);
-            _excep_code = RESET_COMMAND;
-            SoftReset();
+            doreset(format);
         }
         if (checkstring(p, (unsigned char *)"PICORESTOUCHLCD2.8"))
         {
@@ -3973,6 +3997,7 @@ void MIPS16 configure(unsigned char *p)
             Option.SD_CS = PINMAP[22];
             Option.DISPLAY_BL = PINMAP[13];
             Option.modbuff = true;
+            format = testMODBUFF(Option.modbuff, Option.modbuffsize);
             Option.DISPLAY_ORIENTATION = 1;
             Option.TOUCH_SWAPXY = 0;
             Option.TOUCH_XZERO = 373;
@@ -3983,13 +4008,13 @@ void MIPS16 configure(unsigned char *p)
             SaveOptions();
             printoptions();
             uSec(100000);
-            _excep_code = RESET_COMMAND;
-            SoftReset();
+            doreset(format);
         }
 #ifndef PICOMITEWEB
         if (checkstring(p, (unsigned char *)"RP2040LCD1.28"))
         {
             ResetOptions(false);
+            format = testMODBUFF(Option.modbuff, Option.modbuffsize);
             Option.CPU_Speed = 252000;
             Option.AllPins = 1;
             Option.ColourCode = 1;
@@ -4015,12 +4040,12 @@ void MIPS16 configure(unsigned char *p)
             SaveOptions();
             printoptions();
             uSec(100000);
-            _excep_code = RESET_COMMAND;
-            SoftReset();
+            doreset(format);
         }
         if (checkstring(p, (unsigned char *)"RP2040LCD0.96"))
         {
             ResetOptions(false);
+            format = testMODBUFF(Option.modbuff, Option.modbuffsize);
             Option.CPU_Speed = 252000;
             Option.ColourCode = 1;
             Option.NoHeartbeat = 1;
@@ -4043,12 +4068,12 @@ void MIPS16 configure(unsigned char *p)
             SaveOptions();
             printoptions();
             uSec(100000);
-            _excep_code = RESET_COMMAND;
-            SoftReset();
+            doreset(format);
         }
         if (checkstring(p, (unsigned char *)"RP2040GEEK"))
         {
             ResetOptions(false);
+            format = testMODBUFF(Option.modbuff, Option.modbuffsize);
             Option.CPU_Speed = 252000;
             Option.ColourCode = 1;
             Option.NoHeartbeat = 1;
@@ -4076,8 +4101,7 @@ void MIPS16 configure(unsigned char *p)
             SaveOptions();
             printoptions();
             uSec(100000);
-            _excep_code = RESET_COMMAND;
-            SoftReset();
+            doreset(format);
         }
 #endif
 #else
@@ -4105,13 +4129,13 @@ void MIPS16 configure(unsigned char *p)
             Option.SD_CS = 0;
             Option.modbuffsize = 512;
             Option.modbuff = true;
+            format = testMODBUFF(Option.modbuff, Option.modbuffsize);
             Option.AUDIO_SLICE = checkslice(PINMAP[26], PINMAP[27], 0);
             strcpy((char *)Option.platform, "USB Edition V1.0");
             SaveOptions();
             printoptions();
             uSec(100000);
-            _excep_code = RESET_COMMAND;
-            SoftReset();
+            doreset(format);
         }
 #endif
 #endif
@@ -4433,8 +4457,7 @@ void MIPS16 cmd_option(void)
         Option.HDMId1 = d1;
         Option.HDMId2 = d2;
         SaveOptions();
-        _excep_code = RESET_COMMAND;
-        SoftReset();
+        SoftReset(SOFT_RESET);
         return;
     }
 #endif
@@ -4448,16 +4471,14 @@ void MIPS16 cmd_option(void)
         {
             Option.LOCAL_KEYBOARD = 0;
             SaveOptions();
-            _excep_code = RESET_COMMAND;
-            SoftReset();
+            SoftReset(SOFT_RESET);
             return;
         }
         else if (checkstring(tp, (unsigned char *)"ON"))
         {
             Option.LOCAL_KEYBOARD = 1;
             SaveOptions();
-            _excep_code = RESET_COMMAND;
-            SoftReset();
+            SoftReset(SOFT_RESET);
             return;
         }
     }
@@ -4469,8 +4490,7 @@ void MIPS16 cmd_option(void)
         {
             Option.PSRAM_CS_PIN = 0;
             SaveOptions();
-            _excep_code = RESET_COMMAND;
-            SoftReset();
+            SoftReset(SOFT_RESET);
             return;
         }
         int pin1;
@@ -4491,8 +4511,7 @@ void MIPS16 cmd_option(void)
             error("Invalid pin for PSRAM chip select (GP0,GP8,GP19,GP47)");
         Option.PSRAM_CS_PIN = pin1;
         SaveOptions();
-        _excep_code = RESET_COMMAND;
-        SoftReset();
+        SoftReset(SOFT_RESET);
         return;
     }
 #endif
@@ -4558,8 +4577,7 @@ void MIPS16 cmd_option(void)
         Option.KEYBOARD_CLOCK = pin1;
         Option.KEYBOARD_DATA = pin2;
         SaveOptions();
-        _excep_code = RESET_COMMAND;
-        SoftReset();
+        SoftReset(SOFT_RESET);
         return;
     }
     tp = checkstring(cmdline, (unsigned char *)"MOUSE");
@@ -4604,8 +4622,7 @@ void MIPS16 cmd_option(void)
             Option.MOUSE_DATA = pin2;
         }
         SaveOptions();
-        _excep_code = RESET_COMMAND;
-        SoftReset();
+        SoftReset(SOFT_RESET);
         return;
     }
 
@@ -4624,8 +4641,7 @@ void MIPS16 cmd_option(void)
             Option.KEYBOARD_CLOCK = 0;
             Option.KEYBOARD_DATA = 0;
             SaveOptions();
-            _excep_code = RESET_COMMAND;
-            SoftReset();
+            SoftReset(SOFT_RESET);
         }
         else
         {
@@ -4710,8 +4726,7 @@ void MIPS16 cmd_option(void)
             Option.RepeatRate = getint(argv[8], 25, 2000);
 #endif
             SaveOptions();
-            _excep_code = RESET_COMMAND;
-            SoftReset();
+            SoftReset(SOFT_RESET);
         }
 #ifndef USBKEYBOARD
     }
@@ -4747,8 +4762,7 @@ void MIPS16 cmd_option(void)
             Option.SerialRX = 0;
             Option.SerialConsole = 0;
             SaveOptions();
-            _excep_code = RESET_COMMAND;
-            SoftReset();
+            SoftReset(SOFT_RESET);
             return;
         }
         else
@@ -4791,8 +4805,7 @@ void MIPS16 cmd_option(void)
             if (argc == 5)
                 Option.SerialConsole = (checkstring(argv[4], (unsigned char *)"B") ? 5 : 1);
             SaveOptions();
-            _excep_code = RESET_COMMAND;
-            SoftReset();
+            SoftReset(SOFT_RESET);
             return;
         checkcom2:
             if (PinDef[pin].mode & UART1TX)
@@ -4813,8 +4826,7 @@ void MIPS16 cmd_option(void)
             if (argc == 5)
                 Option.SerialConsole = (checkstring(argv[4], (unsigned char *)"B") ? 6 : 2);
             SaveOptions();
-            _excep_code = RESET_COMMAND;
-            SoftReset();
+            SoftReset(SOFT_RESET);
         }
     }
 
@@ -5076,8 +5088,7 @@ void MIPS16 cmd_option(void)
                     Option.NoHeartbeat = 0;
                     Option.heartbeatpin = pin1;
                     SaveOptions();
-                    _excep_code = RESET_COMMAND;
-                    SoftReset();
+                    SoftReset(SOFT_RESET);
                 }
                 else
                     Option.NoHeartbeat = 0;
@@ -5279,8 +5290,7 @@ void MIPS16 cmd_option(void)
     if (tp)
     {
         setwifi(tp);
-        _excep_code = RESET_COMMAND;
-        SoftReset();
+        SoftReset(SOFT_RESET);
         return;
     }
     tp = checkstring(cmdline, (unsigned char *)"TCP SERVER PORT");
@@ -5294,8 +5304,7 @@ void MIPS16 cmd_option(void)
         if (argc == 3)
             Option.ServerResponceTime = getint(argv[2], 1000, 20000);
         SaveOptions();
-        _excep_code = RESET_COMMAND;
-        SoftReset();
+        SoftReset(SOFT_RESET);
         return;
     }
     tp = checkstring(cmdline, (unsigned char *)"UDP SERVER PORT");
@@ -5309,8 +5318,7 @@ void MIPS16 cmd_option(void)
         if (argc == 3)
             Option.UDPServerResponceTime = getint(argv[2], 1000, 20000);
         SaveOptions();
-        _excep_code = RESET_COMMAND;
-        SoftReset();
+        SoftReset(SOFT_RESET);
         return;
     }
     tp = checkstring(cmdline, (unsigned char *)"TELNET CONSOLE");
@@ -5328,8 +5336,7 @@ void MIPS16 cmd_option(void)
             SyntaxError();
         ;
         SaveOptions();
-        _excep_code = RESET_COMMAND;
-        SoftReset();
+        SoftReset(SOFT_RESET);
         return;
     }
     tp = checkstring(cmdline, (unsigned char *)"TFTP");
@@ -5349,8 +5356,7 @@ void MIPS16 cmd_option(void)
             SyntaxError();
         ;
         SaveOptions();
-        _excep_code = RESET_COMMAND;
-        SoftReset();
+        SoftReset(SOFT_RESET);
         return;
     }
 
@@ -5441,8 +5447,7 @@ void MIPS16 cmd_option(void)
                                                                                          : 40);
 #endif
         SaveOptions();
-        _excep_code = RESET_COMMAND;
-        SoftReset();
+        SoftReset(SOFT_RESET);
         return;
     }
 #ifndef HDMI
@@ -5507,8 +5512,7 @@ void MIPS16 cmd_option(void)
         Option.VGA_HSYNC = pin1;
         Option.VGA_BLUE = pin2;
         SaveOptions();
-        _excep_code = RESET_COMMAND;
-        SoftReset();
+        SoftReset(SOFT_RESET);
         return;
     }
 
@@ -5584,8 +5588,7 @@ void MIPS16 cmd_option(void)
             error("Invalid clock speed");
         Option.CPU_Speed = speed;
         SaveOptions();
-        _excep_code = RESET_COMMAND;
-        SoftReset();
+        SoftReset(SOFT_RESET);
         return;
     }
 
@@ -5652,8 +5655,7 @@ void MIPS16 cmd_option(void)
                 ConfigDisplayI2C(tp);
         }
         SaveOptions();
-        _excep_code = RESET_COMMAND;
-        SoftReset();
+        SoftReset(SOFT_RESET);
         return;
     }
     tp = checkstring(cmdline, (unsigned char *)"TOUCH");
@@ -5674,8 +5676,7 @@ void MIPS16 cmd_option(void)
             ConfigTouch(tp);
         }
         SaveOptions();
-        _excep_code = RESET_COMMAND;
-        SoftReset();
+        SoftReset(SOFT_RESET);
         return;
     }
 #endif
@@ -5712,8 +5713,7 @@ void MIPS16 cmd_option(void)
         if (Option.MaxCtrls)
             Option.MaxCtrls++;
         SaveOptions();
-        _excep_code = RESET_COMMAND;
-        SoftReset();
+        SoftReset(SOFT_RESET);
     }
 #endif
     tp = checkstring(cmdline, (unsigned char *)"CASE");
@@ -5908,13 +5908,14 @@ void MIPS16 cmd_option(void)
                     if (size & 3)
                         error("Must be a multiple of 4");
                 }
-                MMPrintString("\r\nThis will erase everything in flash including the A: drive - are you sure (Y/N) ? ");
+                MMPrintString("\r\nThis erases everything in flash including the A: drive - are you sure (Y/N) ? ");
                 while ((i = MMInkey()) == -1)
                 {
                 };
                 putConsole(i, 1);
                 if (mytoupper(i) != 'Y')
                 {
+                    PRet();
                     memset(inpbuf, 0, STRINGSIZE);
                     longjmp(mark, 1);
                 }
@@ -5926,8 +5927,7 @@ void MIPS16 cmd_option(void)
                 SaveOptions();
                 ResetFlashStorage(1);
                 modbuff = (char *)(XIP_BASE + RoundUpK4(TOP_OF_SYSTEM_FLASH));
-                _excep_code = RESET_COMMAND;
-                SoftReset();
+                SoftReset(SOFT_RESET);
             }
             else
                 error("Already enabled");
@@ -5936,7 +5936,7 @@ void MIPS16 cmd_option(void)
         {
             if (Option.modbuff)
             {
-                MMPrintString("\r\nThis will erase everything in flash including the A: drive - are you sure (Y/N) ? ");
+                MMPrintString("\r\nThis erases everything in flash including the A: drive - are you sure (Y/N) ? ");
                 while ((i = MMInkey()) == -1)
                 {
                 };
@@ -5951,8 +5951,8 @@ void MIPS16 cmd_option(void)
                 SaveOptions();
                 ResetFlashStorage(1);
                 modbuff = NULL;
-                _excep_code = RESET_COMMAND;
-                SoftReset();
+                PRet();
+                SoftReset(SOFT_RESET);
             }
             else
                 error("Not enabled");
@@ -5976,8 +5976,7 @@ void MIPS16 cmd_option(void)
         {
             disable_audio();
             SaveOptions();
-            _excep_code = RESET_COMMAND;
-            SoftReset();
+            SoftReset(SOFT_RESET);
             return; // this will restart the processor ? only works when not in debug
         }
         if ((p = checkstring(tp, (unsigned char *)"VS1053")))
@@ -6080,8 +6079,7 @@ void MIPS16 cmd_option(void)
                 error("Channel in use for backlight");
             Option.AUDIO_SLICE = slice;
             SaveOptions();
-            _excep_code = RESET_COMMAND;
-            SoftReset();
+            SoftReset(SOFT_RESET);
             return;
         }
         if ((p = checkstring(tp, (unsigned char *)"SPI")))
@@ -6141,8 +6139,7 @@ void MIPS16 cmd_option(void)
                 error("Channel in use for backlight");
             Option.AUDIO_SLICE = slice;
             SaveOptions();
-            _excep_code = RESET_COMMAND;
-            SoftReset();
+            SoftReset(SOFT_RESET);
             return;
         }
         if ((p = checkstring(tp, (unsigned char *)"I2S")))
@@ -6206,8 +6203,7 @@ void MIPS16 cmd_option(void)
                 error("Channel in use for backlight");
             Option.AUDIO_SLICE = slice;
             SaveOptions();
-            _excep_code = RESET_COMMAND;
-            SoftReset();
+            SoftReset(SOFT_RESET);
             return;
         }
         getcsargs(&tp, 3);
@@ -6242,8 +6238,7 @@ void MIPS16 cmd_option(void)
         Option.AUDIO_R = pin2;
         Option.AUDIO_SLICE = slice;
         SaveOptions();
-        _excep_code = RESET_COMMAND;
-        SoftReset();
+        SoftReset(SOFT_RESET);
         return;
     }
 
@@ -6264,8 +6259,7 @@ void MIPS16 cmd_option(void)
 #endif
             disable_systemi2c();
             SaveOptions();
-            _excep_code = RESET_COMMAND;
-            SoftReset();
+            SoftReset(SOFT_RESET);
             return; // this will restart the processor ? only works when not in debug
         }
         getcsargs(&tp, 5);
@@ -6315,8 +6309,7 @@ void MIPS16 cmd_option(void)
         Option.SYSTEM_I2C_SDA = pin1;
         Option.SYSTEM_I2C_SCL = pin2;
         SaveOptions();
-        _excep_code = RESET_COMMAND;
-        SoftReset();
+        SoftReset(SOFT_RESET);
         return;
     }
     tp = checkstring(cmdline, (unsigned char *)"COUNT");
@@ -6414,8 +6407,7 @@ void MIPS16 cmd_option(void)
                 error("In use");
             disable_systemspi();
             SaveOptions();
-            _excep_code = RESET_COMMAND;
-            SoftReset();
+            SoftReset(SOFT_RESET);
             return; // this will restart the processor ? only works when not in debug
         }
         getcsargs(&tp, 5);
@@ -6473,8 +6465,7 @@ void MIPS16 cmd_option(void)
         }
 #endif
         SaveOptions();
-        _excep_code = RESET_COMMAND;
-        SoftReset();
+        SoftReset(SOFT_RESET);
         return;
     }
 #if PICOMITERP2350
@@ -6490,8 +6481,7 @@ void MIPS16 cmd_option(void)
                 error("In use");
             disable_lcdspi();
             SaveOptions();
-            _excep_code = RESET_COMMAND;
-            SoftReset();
+            SoftReset(SOFT_RESET);
             return; // this will restart the processor ? only works when not in debug
         }
         getcsargs(&tp, 5);
@@ -6541,8 +6531,7 @@ void MIPS16 cmd_option(void)
         Option.LCD_MOSI = pin2;
         Option.LCD_MISO = pin3;
         SaveOptions();
-        _excep_code = RESET_COMMAND;
-        SoftReset();
+        SoftReset(SOFT_RESET);
         return;
     }
 #endif
@@ -6566,14 +6555,13 @@ void MIPS16 cmd_option(void)
             if (Option.SD_CS || Option.CombinedCS)
                 error("SDcard already configured");
             if (!Option.SYSTEM_CLK)
-                error("System SPI not configured");
+                StandardError(45);
             if (!Option.TOUCH_CS)
                 error("Touch CS pin not configured");
             Option.CombinedCS = 1;
             Option.SD_CS = 0;
             SaveOptions();
-            _excep_code = RESET_COMMAND;
-            SoftReset();
+            SoftReset(SOFT_RESET);
             return;
         }
 #endif
@@ -6590,7 +6578,7 @@ void MIPS16 cmd_option(void)
         if (Option.SD_CS || Option.CombinedCS)
             error("SDcard already configured");
         if (argc == 1 && !Option.SYSTEM_CLK)
-            error("System SPI not configured");
+            StandardError(45);
         unsigned char code;
         if (!(code = codecheck(argv[0])))
             argv[0] += 2;
@@ -6661,8 +6649,7 @@ void MIPS16 cmd_option(void)
 #endif
         }
         SaveOptions();
-        _excep_code = RESET_COMMAND;
-        SoftReset();
+        SoftReset(SOFT_RESET);
         return;
     }
     tp = checkstring(cmdline, (unsigned char *)"DISK SAVE");
@@ -6707,12 +6694,9 @@ void MIPS16 cmd_option(void)
         char *pp = (char *)getFstring(argv[0]);
         if (strchr((char *)pp, '.') == NULL)
             strcat((char *)pp, ".opt");
+        fsize = FileSize((char *)pp);
         if (!BasicFileOpen((char *)pp, fnbr, FA_READ))
             return;
-        if (filesource[fnbr] != FLASHFILE)
-            fsize = f_size(FileTable[fnbr].fptr);
-        else
-            fsize = lfs_file_size(&lfs, FileTable[fnbr].lfsptr);
         if (!(fsize == sizeof(Option) || fsize == sizeof(Option) - 128))
             error("File size incorrect");
         char *s = (char *)&Option.Magic;
@@ -6721,8 +6705,14 @@ void MIPS16 cmd_option(void)
             *s++ = FileGetChar(fnbr);
         }
         Option.Magic = MagicKey; // This isn't ideal but it improves the chances of a older config working in a new build
-        if (Option.version != hashversion())
+        short test = hashversion();
+        if (Option.version != test)
+        {
+            int state = OptionConsole;
+            OptionConsole = 1;
             MMPrintString("Warning: Version has changed - check options are correct\r\n");
+            OptionConsole = state;
+        }
         FileClose(fnbr);
         uSec(100000);
         disable_interrupts_pico();
@@ -6732,8 +6722,7 @@ void MIPS16 cmd_option(void)
         disable_interrupts_pico();
         flash_range_program(FLASH_TARGET_OFFSET, (const uint8_t *)&Option, 768);
         enable_interrupts_pico();
-        _excep_code = RESET_COMMAND;
-        SoftReset();
+        SoftReset(SOFT_RESET);
     }
     tp = checkstring(cmdline, (unsigned char *)"RESET");
     if (tp)
@@ -6756,7 +6745,7 @@ void MIPS16 cmd_option(void)
 
 void fun_device(void)
 {
-    sret = GetTempMemory(STRINGSIZE); // this will last for the life of the command
+    sret = GetTempStrMemory(); // this will last for the life of the command
 #ifdef PICOMITEVGA
 #ifdef USBKEYBOARD
 #ifdef HDMI
@@ -6799,129 +6788,11 @@ uint32_t __get_MSP(void)
     __asm volatile("MRS %0, msp" : "=r"(result));
     return (result);
 }
-int FileSize(char *p)
-{
-    char q[FF_MAX_LFN] = {0};
-    int retval = 0;
-    int waste = 0, t = FatFSFileSystem + 1;
-    int localfilesystemsave = FatFSFileSystem;
-    t = drivecheck(p, &waste);
-    p += waste;
-    getfullfilename(p, q);
-    FatFSFileSystem = t - 1;
-    if (FatFSFileSystem == 0)
-    {
-        struct lfs_info lfsinfo;
-        memset(&lfsinfo, 0, sizeof(DIR));
-        FSerror = lfs_stat(&lfs, q, &lfsinfo);
-        if (lfsinfo.type == LFS_TYPE_REG)
-            retval = lfsinfo.size;
-    }
-    else
-    {
-        DIR djd;
-        FILINFO fnod;
-        memset(&djd, 0, sizeof(DIR));
-        memset(&fnod, 0, sizeof(FILINFO));
-        if (!InitSDCard())
-            return -1;
-        FSerror = f_stat(q, &fnod);
-        if (FSerror != FR_OK)
-            iret = 0;
-        else if (!(fnod.fattrib & AM_DIR))
-            retval = fnod.fsize;
-    }
-    FatFSFileSystem = localfilesystemsave;
-    return retval;
-}
-int ExistsFile(char *p)
-{
-    char q[FF_MAX_LFN] = {0};
-    int retval = 0;
-    int waste = 0, t = FatFSFileSystem + 1;
-    int localfilesystemsave = FatFSFileSystem;
-    t = drivecheck(p, &waste);
-    p += waste;
-    getfullfilename(p, q);
-    FatFSFileSystem = t - 1;
-    if (FatFSFileSystem == 0)
-    {
-        struct lfs_info lfsinfo;
-        memset(&lfsinfo, 0, sizeof(DIR));
-        FSerror = lfs_stat(&lfs, q, &lfsinfo);
-        if (lfsinfo.type == LFS_TYPE_REG)
-            retval = 1;
-    }
-    else
-    {
-        DIR djd;
-        FILINFO fnod;
-        memset(&djd, 0, sizeof(DIR));
-        memset(&fnod, 0, sizeof(FILINFO));
-        if (!InitSDCard())
-            return -1;
-        FSerror = f_stat(q, &fnod);
-        if (FSerror != FR_OK)
-            iret = 0;
-        else if (!(fnod.fattrib & AM_DIR))
-            retval = 1;
-    }
-    FatFSFileSystem = localfilesystemsave;
-    return retval;
-}
-int ExistsDir(char *p, char *q, int *filesystem)
-{
-    int ireturn = 0;
-    ireturn = 0;
-    int localfilesystemsave = FatFSFileSystem;
-    int waste = 0, t = FatFSFileSystem + 1;
-    t = drivecheck(p, &waste);
-    p += waste;
-    getfullfilename(p, q);
-    FatFSFileSystem = t - 1;
-    *filesystem = FatFSFileSystem;
-    if (strcmp(q, "/") == 0 || strcmp(q, "/.") == 0 || strcmp(q, "/..") == 0)
-    {
-        FatFSFileSystem = localfilesystemsave;
-        ireturn = 1;
-        return ireturn;
-    }
-    if (FatFSFileSystem == 0)
-    {
-        struct lfs_info lfsinfo;
-        memset(&lfsinfo, 0, sizeof(DIR));
-        FSerror = lfs_stat(&lfs, q, &lfsinfo);
-        if (lfsinfo.type == LFS_TYPE_DIR)
-            ireturn = 1;
-    }
-    else
-    {
-        DIR djd;
-        FILINFO fnod;
-        memset(&djd, 0, sizeof(DIR));
-        memset(&fnod, 0, sizeof(FILINFO));
-        if (q[strlen(q) - 1] == '/')
-            strcat(q, ".");
-        if (!InitSDCard())
-        {
-            FatFSFileSystem = localfilesystemsave;
-            ireturn = -1;
-            return ireturn;
-        }
-        FSerror = f_stat(q, &fnod);
-        if (FSerror != FR_OK)
-            ireturn = 0;
-        else if ((fnod.fattrib & AM_DIR))
-            ireturn = 1;
-    }
-    FatFSFileSystem = localfilesystemsave;
-    return ireturn;
-}
 
 void MIPS16 fun_info(void)
 {
     unsigned char *tp;
-    sret = GetTempMemory(STRINGSIZE); // this will last for the life of the command
+    sret = GetTempStrMemory(); // this will last for the life of the command
     if (checkstring(ep, (unsigned char *)"AUTORUN"))
     {
         if (Option.Autorun == false)
@@ -7367,7 +7238,7 @@ void MIPS16 fun_info(void)
         //		int i,j;
         DIR djd;
         FILINFO fnod;
-        sret = GetTempMemory(STRINGSIZE); // this will last for the life of the command
+        sret = GetTempStrMemory(); // this will last for the life of the command
         targ = T_STR;
         memset(&djd, 0, sizeof(DIR));
         memset(&fnod, 0, sizeof(FILINFO));
@@ -7583,7 +7454,7 @@ void MIPS16 fun_info(void)
             unsigned char *ss;
             int t = 0;
             char code, *ptr;
-            char *string = GetTempMemory(STRINGSIZE);
+            char *string = GetTempStrMemory();
             skipspace(tp);
 #ifdef PICOMITEWEB
             iret = 0;
@@ -7880,7 +7751,7 @@ void MIPS16 fun_info(void)
                 iret = spi_get_baudrate(spi1);
             }
             else
-                error("System SPI not configured");
+                StandardError(45);
             targ = T_INT;
             return;
         }
@@ -8054,10 +7925,9 @@ void cmd_cpu(void)
     unsigned char *p;
     if ((p = checkstring(cmdline, (unsigned char *)"RESTART")))
     {
-        _excep_code = RESET_COMMAND;
         //        while(ConsoleTxBufTail != ConsoleTxBufHead);
         uSec(10000);
-        SoftReset(); // this will restart the processor ? only works when not in debug
+        SoftReset(SOFT_RESET); // this will restart the processor ? only works when not in debug
     }
     else if ((p = checkstring(cmdline, (unsigned char *)"SLEEP")))
     {
@@ -8525,7 +8395,7 @@ void fun_format(void)
     }
     if (inspec != 2)
         error("Format specification not found");
-    sret = GetTempMemory(STRINGSIZE); // this will last for the life of the command
+    sret = GetTempStrMemory(); // this will last for the life of the command
     sprintf((char *)sret, (char *)fmt, getnumber(argv[0]));
     CtoM(sret);
     targ = T_STR;

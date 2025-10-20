@@ -328,7 +328,7 @@ uint8_t PSRAMpin;
         (void *)IntToStr,           // 0x24
         (void *)CheckAbort,         // 0x28
         (void *)GetMemory,          // 0x2c
-        (void *)GetTempMemory,      // 0x30
+        (void *)GetTempMainMemory,  // 0x30
         (void *)FreeMemory,         // 0x34
         (void *)&DrawRectangle,     // 0x38
         (void *)&DrawBitmap,        // 0x3c
@@ -2057,19 +2057,13 @@ int __not_in_flash_func(MMInkey)(void)
         // === Watchdog timer ===
         if (WDTimer && --WDTimer == 0)
         {
-            _excep_code = WATCHDOG_TIMEOUT;
-            watchdog_enable(1, 1);
-            while (1)
-                ;
+            SoftReset(WATCHDOG_TIMEOUT);
         }
 
         // === Screw-up timer ===
         if (ScrewUpTimer && --ScrewUpTimer == 0)
         {
-            _excep_code = SCREWUP_TIMEOUT;
-            watchdog_enable(1, 1);
-            while (1)
-                ;
+            SoftReset(SCREWUP_TIMEOUT);
         }
 
         // === Pulse management ===
@@ -2347,8 +2341,7 @@ int __not_in_flash_func(MMInkey)(void)
                 busy_wait_ms(mergetimer + 200);
                 if (mergerunning)
                 {
-                    _excep_code = RESET_COMMAND;
-                    SoftReset();
+                    SoftReset(SOFT_RESET);
                 }
             }
 #endif
@@ -2438,7 +2431,7 @@ int __not_in_flash_func(MMInkey)(void)
         }
         enable_interrupts_pico();
         memset(inpbuf, 0, STRINGSIZE);
-        SoftReset();
+        SoftReset(SOFT_RESET);
     }
 
 #ifdef PICOMITEVGA
@@ -4875,18 +4868,23 @@ uint32_t testPSRAM(void)
     lfs_t lfs;
     lfs_dir_t lfs_dir;
     struct lfs_info lfs_info;
-    void MIPS16 updatebootcount(void)
+    void MIPS16 updatebootcount(bool format)
     {
         lfs_file_t lfs_file;
         pico_lfs_cfg.block_count = (Option.FlashSize - RoundUpK4(TOP_OF_SYSTEM_FLASH) - (Option.modbuff ? 1024 * Option.modbuffsize : 0)) / 4096;
         int err, boot_count = 0;
-        err = lfs_mount(&lfs, &pico_lfs_cfg);
+        if (format)
+            err = true;
+        else
+            err = lfs_mount(&lfs, &pico_lfs_cfg);
         // reformat if we can't mount the filesystem
         // this should only happen on the first boot
         if (err)
         {
+            MMPrintString("Formatting the A: drive\r\n");
             err = lfs_format(&lfs, &pico_lfs_cfg);
             err = lfs_mount(&lfs, &pico_lfs_cfg);
+            ResetFlashStorage(1);
         }
 
         err = lfs_file_open(&lfs, &lfs_file, "bootcount", LFS_O_RDWR | LFS_O_CREAT);
@@ -5138,8 +5136,7 @@ uint32_t testPSRAM(void)
         Option.CPU_Speed = 200000; // init the options if this is the very first startup
 #endif
             SaveOptions();
-            _excep_code = INVALID_CLOCKSPEED;
-            watchdog_enable(1, 1);
+            SoftReset(INVALID_CLOCKSPEED);
             while (1)
                 ;
         }
@@ -5213,8 +5210,7 @@ uint32_t testPSRAM(void)
         if (clock_get_hz(clk_usb) != 48000000)
         {
             ResetAllFlash(); // init the options if this is the very first startup
-            _excep_code = INVALID_CLOCKSPEED;
-            watchdog_enable(1, 1);
+            SoftReset(INVALID_CLOCKSPEED);
             while (1)
                 ;
         }
@@ -5447,11 +5443,11 @@ uint32_t testPSRAM(void)
 #endif
 #endif
 #endif
-        if (!(_excep_code == RESTART_NOAUTORUN || _excep_code == INVALID_CLOCKSPEED || _excep_code == SCREWUP_TIMEOUT || _excep_code == WATCHDOG_TIMEOUT || (_excep_code == POSSIBLE_WATCHDOG && watchdog_caused_reboot())))
+        if (!(_excep_code == RESET_FLASHSTORAGE || _excep_code == INVALID_CLOCKSPEED || _excep_code == SCREWUP_TIMEOUT || _excep_code == WATCHDOG_TIMEOUT || (_excep_code == POSSIBLE_WATCHDOG && watchdog_caused_reboot())))
         {
             if (Option.Autorun == 0)
             {
-                if (!(_excep_code == RESET_COMMAND || _excep_code == SOFT_RESET))
+                if (!(_excep_code == SOFT_RESET))
                 {
                     MMPrintString((char *)banner);    // print sign on message
                     MMPrintString((char *)COPYRIGHT); // print sign on message
@@ -5513,7 +5509,7 @@ uint32_t testPSRAM(void)
             SaveOptions();
             MMPrintString("I2C Keyboard not found, OPTION KEYBOARD disabled\r\n");
         }
-        updatebootcount();
+        updatebootcount(_excep_code == RESET_FLASHSTORAGE);
         *tknbuf = 0;
         ContinuePoint = nextstmt; // in case the user wants to use the continue command
 #ifdef USBKEYBOARD
@@ -5604,7 +5600,7 @@ uint32_t testPSRAM(void)
                 ExecuteProgram((unsigned char *)"MM.STARTUP\0");
                 memset(inpbuf, 0, STRINGSIZE);
             }
-            if (Option.Autorun && _excep_code != RESTART_DOAUTORUN)
+            if (Option.Autorun)
             {
                 ClearRuntime(true);
                 PrepareProgram(true);
@@ -5643,20 +5639,19 @@ uint32_t testPSRAM(void)
                 MMPrintString("\r\n"); // prompt should be on a new line
             while (Option.PIN && !IgnorePIN)
             {
-                _excep_code = PIN_RESTART;
                 if (Option.PIN == 99999999) // 99999999 is permanent lockdown
                     MMPrintString("Console locked, press enter to restart: ");
                 else
                     MMPrintString("Enter PIN or 0 to restart: ");
                 MMgetline(0, (char *)inpbuf);
                 if (Option.PIN == 99999999)
-                    SoftReset();
+                    SoftReset(SOFT_RESET);
                 if (*inpbuf != 0)
                 {
                     uSec(3000000);
                     i = atoi((char *)inpbuf);
                     if (i == 0)
-                        SoftReset();
+                        SoftReset(SOFT_RESET);
                     if (i == Option.PIN)
                     {
                         IgnorePIN = true;

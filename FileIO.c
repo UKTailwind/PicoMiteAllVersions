@@ -406,10 +406,128 @@ int __not_in_flash_func(fs_flash_sync)(const struct lfs_config *c)
     return 0;
 }
 /*  @endcond */
-void MIPS16 cmd_disk(void)
+int FileSize(char *p)
+{
+    char q[FF_MAX_LFN] = {0};
+    int retval = 0;
+    int waste = 0, t = FatFSFileSystem + 1;
+    int localfilesystemsave = FatFSFileSystem;
+    t = drivecheck(p, &waste);
+    p += waste;
+    getfullfilename(p, q);
+    FatFSFileSystem = t - 1;
+    if (FatFSFileSystem == 0)
+    {
+        struct lfs_info lfsinfo;
+        memset(&lfsinfo, 0, sizeof(DIR));
+        FSerror = lfs_stat(&lfs, q, &lfsinfo);
+        if (lfsinfo.type == LFS_TYPE_REG)
+            retval = lfsinfo.size;
+    }
+    else
+    {
+        DIR djd;
+        FILINFO fnod;
+        memset(&djd, 0, sizeof(DIR));
+        memset(&fnod, 0, sizeof(FILINFO));
+        if (!InitSDCard())
+            return -1;
+        FSerror = f_stat(q, &fnod);
+        if (FSerror != FR_OK)
+            iret = 0;
+        else if (!(fnod.fattrib & AM_DIR))
+            retval = fnod.fsize;
+    }
+    FatFSFileSystem = localfilesystemsave;
+    return retval;
+}
+int ExistsFile(char *p)
+{
+    char q[FF_MAX_LFN] = {0};
+    int retval = 0;
+    int waste = 0, t = FatFSFileSystem + 1;
+    int localfilesystemsave = FatFSFileSystem;
+    t = drivecheck(p, &waste);
+    p += waste;
+    getfullfilename(p, q);
+    FatFSFileSystem = t - 1;
+    if (FatFSFileSystem == 0)
+    {
+        struct lfs_info lfsinfo;
+        memset(&lfsinfo, 0, sizeof(DIR));
+        FSerror = lfs_stat(&lfs, q, &lfsinfo);
+        if (lfsinfo.type == LFS_TYPE_REG)
+            retval = 1;
+    }
+    else
+    {
+        DIR djd;
+        FILINFO fnod;
+        memset(&djd, 0, sizeof(DIR));
+        memset(&fnod, 0, sizeof(FILINFO));
+        if (!InitSDCard())
+            return -1;
+        FSerror = f_stat(q, &fnod);
+        if (FSerror != FR_OK)
+            iret = 0;
+        else if (!(fnod.fattrib & AM_DIR))
+            retval = 1;
+    }
+    FatFSFileSystem = localfilesystemsave;
+    return retval;
+}
+int ExistsDir(char *p, char *q, int *filesystem)
+{
+    int ireturn = 0;
+    ireturn = 0;
+    int localfilesystemsave = FatFSFileSystem;
+    int waste = 0, t = FatFSFileSystem + 1;
+    t = drivecheck(p, &waste);
+    p += waste;
+    getfullfilename(p, q);
+    FatFSFileSystem = t - 1;
+    *filesystem = FatFSFileSystem;
+    if (strcmp(q, "/") == 0 || strcmp(q, "/.") == 0 || strcmp(q, "/..") == 0)
+    {
+        FatFSFileSystem = localfilesystemsave;
+        ireturn = 1;
+        return ireturn;
+    }
+    if (FatFSFileSystem == 0)
+    {
+        struct lfs_info lfsinfo;
+        memset(&lfsinfo, 0, sizeof(DIR));
+        FSerror = lfs_stat(&lfs, q, &lfsinfo);
+        if (lfsinfo.type == LFS_TYPE_DIR)
+            ireturn = 1;
+    }
+    else
+    {
+        DIR djd;
+        FILINFO fnod;
+        memset(&djd, 0, sizeof(DIR));
+        memset(&fnod, 0, sizeof(FILINFO));
+        if (q[strlen(q) - 1] == '/')
+            strcat(q, ".");
+        if (!InitSDCard())
+        {
+            FatFSFileSystem = localfilesystemsave;
+            ireturn = -1;
+            return ireturn;
+        }
+        FSerror = f_stat(q, &fnod);
+        if (FSerror != FR_OK)
+            ireturn = 0;
+        else if ((fnod.fattrib & AM_DIR))
+            ireturn = 1;
+    }
+    FatFSFileSystem = localfilesystemsave;
+    return ireturn;
+}
+void MIPS16 cmd_drive(void)
 {
     char *p = (char *)getCstring(cmdline);
-    char *b = GetTempMemory(STRINGSIZE);
+    char *b = GetTempStrMemory();
     for (int i = 0; i < strlen(p); i++)
         b[i] = mytoupper(p[i]);
     if (strcmp(b, "A:/FORMAT") == 0)
@@ -577,7 +695,7 @@ void MIPS16 cmd_psram(void)
             }
         disable_interrupts_pico();
         uint8_t *q = (uint8_t *)(PSRAMblock + ((i - 1) * MAX_PROG_SIZE));
-        uint8_t *writebuff = GetTempMemory(4096);
+        uint8_t *writebuff = GetTempMainMemory(4096);
         if (*q == 0xFF)
         {
             enable_interrupts_pico();
@@ -687,7 +805,7 @@ void MIPS16 cmd_flash(void)
             }
         disable_interrupts_pico();
         uint8_t *q = ProgMemory;
-        uint8_t *writebuff = GetTempMemory(4096);
+        uint8_t *writebuff = GetTempMainMemory(4096);
         for (int k = 0; k < MAX_PROG_SIZE; k += 4096)
         {
             for (int j = 0; j < 4096; j++)
@@ -784,15 +902,12 @@ void MIPS16 cmd_flash(void)
         if (!InitSDCard())
             return;
         char *pp = (char *)getFstring(argv[0]);
+        fsize = FileSize((char *)pp);
         if (!BasicFileOpen((char *)pp, fnbr, FA_READ))
             return;
-        if (filesource[fnbr] != FLASHFILE)
-            fsize = f_size(FileTable[fnbr].fptr);
-        else
-            fsize = lfs_file_size(&lfs, FileTable[fnbr].lfsptr);
         if (RoundUpK4(fsize) > 1024 * Option.modbuffsize)
             error("File too large for modbuffer");
-        char *r = GetTempMemory(256);
+        char *r = GetTempMainMemory(256);
         uint32_t j = RoundUpK4(TOP_OF_SYSTEM_FLASH);
         disable_interrupts_pico();
         flash_range_erase(j, RoundUpK4(fsize));
@@ -840,12 +955,9 @@ void MIPS16 cmd_flash(void)
         if (!InitSDCard())
             return;
         char *pp = (char *)getFstring(argv[2]);
+        fsize = FileSize((char *)pp);
         if (!BasicFileOpen((char *)pp, fnbr, FA_READ))
             return;
-        if (filesource[fnbr] != FLASHFILE)
-            fsize = f_size(FileTable[fnbr].fptr);
-        else
-            fsize = lfs_file_size(&lfs, FileTable[fnbr].lfsptr);
         if (fsize > MAX_PROG_SIZE)
             error("File size % cannot exceed %", fsize, MAX_PROG_SIZE);
         FlashWriteInit(i);
@@ -891,7 +1003,7 @@ void MIPS16 cmd_flash(void)
             }
         disable_interrupts_pico();
         uint8_t *q = (uint8_t *)ProgMemory;
-        uint8_t *writebuff = (uint8_t *)GetTempMemory(4096);
+        uint8_t *writebuff = (uint8_t *)GetTempMainMemory(4096);
         for (int k = 0; k < MAX_PROG_SIZE; k += 4096)
         {
             for (int j = 0; j < 4096; j++)
@@ -920,7 +1032,7 @@ void MIPS16 cmd_flash(void)
             }
         disable_interrupts_pico();
         uint8_t *q = (uint8_t *)(flash_target_contents + (i - 1) * MAX_PROG_SIZE);
-        uint8_t *writebuff = GetTempMemory(4096);
+        uint8_t *writebuff = GetTempMainMemory(4096);
         if (*q == 0xFF)
         {
             enable_interrupts_pico();
@@ -998,7 +1110,7 @@ void ErrorCheck(int fnbr)
 char *GetCWD(void)
 {
     char *b;
-    b = GetTempMemory(STRINGSIZE);
+    b = GetTempStrMemory();
     if (FatFSFileSystem)
     {
         if (!InitSDCard())
@@ -1105,10 +1217,7 @@ unsigned char pjpeg_need_bytes_callback(unsigned char *pBuf, unsigned char buf_s
     //    pCallback_data;
 
     n = min(g_nInFileSize - g_nInFileOfs, buf_size);
-    if (filesource[jpgfnbr] != FLASHFILE)
-        f_read(FileTable[jpgfnbr].fptr, pBuf, n, &n_read);
-    else
-        n_read = lfs_file_read(&lfs, FileTable[jpgfnbr].lfsptr, pBuf, n);
+    FileGetdata(jpgfnbr, pBuf, n, &n_read);
     if (n != n_read)
         return PJPG_STREAM_READ_ERROR;
     *pBytes_actually_read = (unsigned char)(n);
@@ -1124,15 +1233,15 @@ void cmd_LoadJPGImage(unsigned char *p)
     int mcu_y = 0;
     uint row_pitch;
     uint8_t status;
-    gCoeffBuf = (int16_t *)GetTempMemory(8 * 8 * sizeof(int16_t));
-    gMCUBufR = (uint8_t *)GetTempMemory(256);
-    gMCUBufG = (uint8_t *)GetTempMemory(256);
-    gMCUBufB = (uint8_t *)GetTempMemory(256);
-    gQuant0 = (int16_t *)GetTempMemory(8 * 8 * sizeof(int16_t));
-    gQuant1 = (int16_t *)GetTempMemory(8 * 8 * sizeof(int16_t));
-    gHuffVal2 = (uint8_t *)GetTempMemory(256);
-    gHuffVal3 = (uint8_t *)GetTempMemory(256);
-    gInBuf = (uint8_t *)GetTempMemory(PJPG_MAX_IN_BUF_SIZE);
+    gCoeffBuf = (int16_t *)GetTempMainMemory(8 * 8 * sizeof(int16_t));
+    gMCUBufR = (uint8_t *)GetTempMainMemory(256);
+    gMCUBufG = (uint8_t *)GetTempMainMemory(256);
+    gMCUBufB = (uint8_t *)GetTempMainMemory(256);
+    gQuant0 = (int16_t *)GetTempMainMemory(8 * 8 * sizeof(int16_t));
+    gQuant1 = (int16_t *)GetTempMainMemory(8 * 8 * sizeof(int16_t));
+    gHuffVal2 = (uint8_t *)GetTempMainMemory(256);
+    gHuffVal3 = (uint8_t *)GetTempMainMemory(256);
+    gInBuf = (uint8_t *)GetTempMainMemory(PJPG_MAX_IN_BUF_SIZE);
     g_nInFileSize = g_nInFileOfs = 0;
 
     //    uint decoded_width, decoded_height;
@@ -1157,13 +1266,9 @@ void cmd_LoadJPGImage(unsigned char *p)
     if (strchr((char *)p, '.') == NULL)
         strcat((char *)p, ".jpg");
     jpgfnbr = FindFreeFileNbr();
+    g_nInFileSize = FileSize((char *)p);
     if (!BasicFileOpen((char *)p, jpgfnbr, FA_READ))
         return;
-
-    if (filesource[jpgfnbr] != FLASHFILE)
-        g_nInFileSize = f_size(FileTable[jpgfnbr].fptr);
-    else
-        g_nInFileSize = lfs_file_size(&lfs, FileTable[jpgfnbr].lfsptr);
     status = pjpeg_decode_init(&image_info, pjpeg_need_bytes_callback, NULL, 0);
 
     if (status)
@@ -1181,7 +1286,7 @@ void cmd_LoadJPGImage(unsigned char *p)
 
     row_pitch = image_info.m_MCUWidth * image_info.m_comps;
 
-    unsigned char *imageblock = GetTempMemory(image_info.m_MCUHeight * image_info.m_MCUWidth * image_info.m_comps);
+    unsigned char *imageblock = GetTempMainMemory(image_info.m_MCUHeight * image_info.m_MCUWidth * image_info.m_comps);
     for (;;)
     {
         uint8_t *pDst_row = imageblock;
@@ -1473,7 +1578,7 @@ void fun_dir(void)
             lfs_dir_close(&lfs, &lfs_dir_dir);
     }
 
-    sret = GetTempMemory(STRINGSIZE); // this will last for the life of the command
+    sret = GetTempStrMemory(); // this will last for the life of the command
     strcpy((char *)sret, fnod.fname);
     CtoM(sret); // convert to a MMBasic style string
     FatFSFileSystem = FatFSFileSystemSave;
@@ -1614,7 +1719,7 @@ void MIPS16 cmd_kill(void)
         //        char *fromfile;
         char fromdir[FF_MAX_LFN] = {0};
         int fromfilesystem;
-        char *in = GetTempMemory(STRINGSIZE);
+        char *in = GetTempStrMemory();
         int localsave = FatFSFileSystem;
         int all = 0;
         int waste = 0, t = FatFSFileSystem + 1;
@@ -1813,7 +1918,7 @@ void MIPS16 cmd_kill(void)
  * The following section will be excluded from the documentation.
  */
 
-void positionfile(int fnbr, int idx)
+void positionfile(int fnbr, int idx, bool noread)
 {
     char *buff;
     if (filesource[fnbr] == FLASHFILE)
@@ -1825,7 +1930,7 @@ void positionfile(int fnbr, int idx)
     }
     else
     {
-        if (fmode[fnbr] & FA_WRITE)
+        if ((fmode[fnbr] & FA_WRITE) || noread)
         {
             FSerror = f_lseek(FileTable[fnbr].fptr, idx);
             ErrorCheck(fnbr);
@@ -1862,7 +1967,7 @@ void cmd_seek(void)
     idx = getint(argv[2], 1, 0x7FFFFFFF) - 1;
     if (idx < 0)
         idx = 0;
-    positionfile(fnbr, idx);
+    positionfile(fnbr, idx, false);
 }
 
 void MIPS16 cmd_name(void)
@@ -1925,7 +2030,6 @@ void MIPS16 cmd_save(void)
     {
         if (!(ReadBuffer == ReadBuffer16 || ReadBuffer == ReadBuffer2))
             error("Invalid for this display");
-        unsigned int nbr;
         int i, x, y, w, h, filesize;
         union colourmap
         {
@@ -2003,30 +2107,12 @@ void MIPS16 cmd_save(void)
         bmpinfoheader[21] = (unsigned char)((h * w / 2) >> 8);
         bmpinfoheader[22] = (unsigned char)((h * w / 2) >> 16);
         bmpinfoheader[23] = (unsigned char)((h * w / 2) >> 24);
-
-        if (filesource[fnbr] == FATFSFILE)
-        {
-            f_write(FileTable[fnbr].fptr, bmpfileheader, 14, &nbr);
-            f_write(FileTable[fnbr].fptr, bmpinfoheader, 40, &nbr);
-            f_write(FileTable[fnbr].fptr, bmpcolourpallette, 64, &nbr);
-        }
-        else
-        {
-            FSerror = lfs_file_write(&lfs, FileTable[fnbr].lfsptr, bmpfileheader, 14);
-            if (FSerror > 0)
-                FSerror = 0;
-            ErrorCheck(fnbr);
-            FSerror = lfs_file_write(&lfs, FileTable[fnbr].lfsptr, bmpinfoheader, 40);
-            if (FSerror > 0)
-                FSerror = 0;
-            FSerror = lfs_file_write(&lfs, FileTable[fnbr].lfsptr, bmpcolourpallette, 64);
-            if (FSerror > 0)
-                FSerror = 0;
-            ErrorCheck(fnbr);
-        }
-        flinebuf = GetTempMemory(maxW * 4);
-        outbuf = GetTempMemory(maxW / 2);
-        char *foutbuf = GetTempMemory(maxW);
+        FilePutData((char *)bmpfileheader, fnbr, 14);
+        FilePutData((char *)bmpinfoheader, fnbr, 40);
+        FilePutData((char *)bmpcolourpallette, fnbr, 64);
+        flinebuf = GetTempMainMemory(maxW * 4);
+        outbuf = GetTempMainMemory(maxW / 2);
+        char *foutbuf = GetTempMainMemory(maxW);
 #ifdef PICOMITEVGA
         mergedread = 1;
 #endif
@@ -2072,38 +2158,22 @@ void MIPS16 cmd_save(void)
             *ppp++ = 0;
             *ppp++ = 0;
             count += 2;
-            if (filesource[fnbr] == FATFSFILE)
-                f_write(FileTable[fnbr].fptr, foutbuf, count, &nbr);
-            else
-            {
-                FSerror = lfs_file_write(&lfs, FileTable[fnbr].lfsptr, foutbuf, count);
-            }
-            if (FSerror > 0)
-                FSerror = 0;
-            ErrorCheck(fnbr);
+            FilePutData((char *)foutbuf, fnbr, count);
         }
 #ifdef PICOMITEVGA
         mergedread = 0;
 #endif
         foutbuf[0] = 0;
         foutbuf[1] = 1;
+        FilePutData((char *)foutbuf, fnbr, 2);
         if (filesource[fnbr] == FATFSFILE)
-            f_write(FileTable[fnbr].fptr, foutbuf, 2, &nbr);
-        else
-        {
-            FSerror = lfs_file_write(&lfs, FileTable[fnbr].lfsptr, foutbuf, 2);
-        }
-        if (FSerror > 0)
-            FSerror = 0;
-        ErrorCheck(fnbr);
-        FileClose(fnbr);
+            FileClose(fnbr);
         return;
     }
     if ((p = checkstring(cmdline, (unsigned char *)"IMAGE")) != NULL)
     {
         if (ReadBuffer == ReadBuffer16 || ReadBuffer == ReadBuffer2)
         {
-            unsigned int nbr;
             int i, x, y, w, h, filesize;
             union colourmap
             {
@@ -2180,28 +2250,11 @@ void MIPS16 cmd_save(void)
             bmpinfoheader[22] = (unsigned char)((h * w / 2) >> 16);
             bmpinfoheader[23] = (unsigned char)((h * w / 2) >> 24);
 
-            if (filesource[fnbr] == FATFSFILE)
-            {
-                f_write(FileTable[fnbr].fptr, bmpfileheader, 14, &nbr);
-                f_write(FileTable[fnbr].fptr, bmpinfoheader, 40, &nbr);
-                f_write(FileTable[fnbr].fptr, bmpcolourpallette, 64, &nbr);
-            }
-            else
-            {
-                FSerror = lfs_file_write(&lfs, FileTable[fnbr].lfsptr, bmpfileheader, 14);
-                if (FSerror > 0)
-                    FSerror = 0;
-                ErrorCheck(fnbr);
-                FSerror = lfs_file_write(&lfs, FileTable[fnbr].lfsptr, bmpinfoheader, 40);
-                if (FSerror > 0)
-                    FSerror = 0;
-                FSerror = lfs_file_write(&lfs, FileTable[fnbr].lfsptr, bmpcolourpallette, 64);
-                if (FSerror > 0)
-                    FSerror = 0;
-                ErrorCheck(fnbr);
-            }
-            flinebuf = GetTempMemory(maxW * 4);
-            outbuf = GetTempMemory(maxW / 2);
+            FilePutData((char *)bmpfileheader, fnbr, 14);
+            FilePutData((char *)bmpinfoheader, fnbr, 40);
+            FilePutData((char *)bmpcolourpallette, fnbr, 64);
+            flinebuf = GetTempMainMemory(maxW * 4);
+            outbuf = GetTempMainMemory(maxW / 2);
 #ifdef PICOMITEVGA
             mergedread = 1;
 #endif
@@ -2226,26 +2279,10 @@ void MIPS16 cmd_save(void)
                         *pp = fcolour << 4;
                     }
                 }
-                if (filesource[fnbr] == FATFSFILE)
-                    f_write(FileTable[fnbr].fptr, outbuf, w / 2, &nbr);
-                else
-                {
-                    FSerror = lfs_file_write(&lfs, FileTable[fnbr].lfsptr, outbuf, w / 2);
-                }
-                if (FSerror > 0)
-                    FSerror = 0;
-                ErrorCheck(fnbr);
+                FilePutData((char *)outbuf, fnbr, w / 2);
                 if ((w / 2) % 4 != 0)
                 {
-                    if (filesource[fnbr] == FATFSFILE)
-                        f_write(FileTable[fnbr].fptr, bmppad, 4 - ((w / 2) % 4), &nbr);
-                    else
-                    {
-                        FSerror = lfs_file_write(&lfs, FileTable[fnbr].lfsptr, bmppad, 4 - ((w / 2) % 4));
-                    }
-                    if (FSerror > 0)
-                        FSerror = 0;
-                    ErrorCheck(fnbr);
+                    FilePutData((char *)bmppad, fnbr, 4 - ((w / 2) % 4));
                 }
             }
 #ifdef PICOMITEVGA
@@ -2255,7 +2292,6 @@ void MIPS16 cmd_save(void)
             return;
         }
 
-        unsigned int nbr;
         int i, x, y, w, h, filesize;
         unsigned char bmpfileheader[14] = {'B', 'M', 0, 0, 0, 0, 0, 0, 0, 0, 54, 0, 0, 0};
         unsigned char bmpinfoheader[40] = {40, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 24, 0};
@@ -2301,46 +2337,16 @@ void MIPS16 cmd_save(void)
         bmpinfoheader[9] = (unsigned char)(h >> 8);
         bmpinfoheader[10] = (unsigned char)(h >> 16);
         bmpinfoheader[11] = (unsigned char)(h >> 24);
-        if (filesource[fnbr] == FATFSFILE)
-        {
-            f_write(FileTable[fnbr].fptr, bmpfileheader, 14, &nbr);
-            f_write(FileTable[fnbr].fptr, bmpinfoheader, 40, &nbr);
-        }
-        else
-        {
-            FSerror = lfs_file_write(&lfs, FileTable[fnbr].lfsptr, bmpfileheader, 14);
-            if (FSerror > 0)
-                FSerror = 0;
-            ErrorCheck(fnbr);
-            FSerror = lfs_file_write(&lfs, FileTable[fnbr].lfsptr, bmpinfoheader, 40);
-            if (FSerror > 0)
-                FSerror = 0;
-            ErrorCheck(fnbr);
-        }
-        flinebuf = GetTempMemory(maxW * 4);
+        FilePutData((char *)bmpfileheader, fnbr, 14);
+        FilePutData((char *)bmpinfoheader, fnbr, 40);
+        flinebuf = GetTempMainMemory(maxW * 4);
         for (i = y + h - 1; i >= y; i--)
         {
             ReadBuffer(x, i, x + w - 1, i, flinebuf);
-            if (filesource[fnbr] == FATFSFILE)
-                f_write(FileTable[fnbr].fptr, flinebuf, w * 3, &nbr);
-            else
-            {
-                FSerror = lfs_file_write(&lfs, FileTable[fnbr].lfsptr, flinebuf, w * 3);
-                if (FSerror > 0)
-                    FSerror = 0;
-                ErrorCheck(fnbr);
-            }
+            FilePutData((char *)flinebuf, fnbr, w * 3);
             if ((w * 3) % 4 != 0)
             {
-                if (filesource[fnbr] == FATFSFILE)
-                    f_write(FileTable[fnbr].fptr, bmppad, 4 - ((w * 3) % 4), &nbr);
-                else
-                {
-                    FSerror = lfs_file_write(&lfs, FileTable[fnbr].lfsptr, bmppad, 4 - ((w * 3) % 4));
-                    if (FSerror > 0)
-                        FSerror = 0;
-                    ErrorCheck(fnbr);
-                }
+                FilePutData((char *)bmppad, fnbr, 4 - ((w * 3) % 4));
             }
         }
         FileClose(fnbr);
@@ -2871,7 +2877,7 @@ int FileLoadProgram(unsigned char *fname, bool chain)
     FatFSFileSystem = FatFSFileSystemSave;
     if (!BasicFileOpen(p, fnbr, FA_READ))
         return false;
-    p = buf = GetTempMemory(EDIT_BUFFER_SIZE - 2048); // get all the memory while leaving space for the couple of buffers defined and the file handle
+    p = buf = GetTempMainMemory(EDIT_BUFFER_SIZE - 2048); // get all the memory while leaving space for the couple of buffers defined and the file handle
     *p++ = '\'';
     *p++ = '#';
     strcpy(p, CurrentFileSystem ? "B:" : "A:");
@@ -3344,7 +3350,7 @@ int MemLoadProgram(unsigned char *fname, unsigned char *ram)
     FatFSFileSystem = FatFSFileSystemSave;
     if (!BasicFileOpen(p, fnbr, FA_READ))
         return false;
-    p = buf = GetTempMemory(EDIT_BUFFER_SIZE - 2048); // get all the memory while leaving space for the couple of buffers defined and the file handle
+    p = buf = GetTempMainMemory(EDIT_BUFFER_SIZE - 2048); // get all the memory while leaving space for the couple of buffers defined and the file handle
     *p++ = '\'';
     *p++ = '#';
     strcpy(p, CurrentFileSystem ? "B:" : "A:");
@@ -3476,7 +3482,7 @@ void LoadPNG(unsigned char *p)
     char d[3];
     if (transparent == -1)
     {
-        unsigned char *buff = GetTempMemory(w * h * 3);
+        unsigned char *buff = GetTempMainMemory(w * h * 3);
         ReadBuffer(xOrigin, yOrigin, xOrigin + w - 1, yOrigin + h - 1, buff);
         for (int i = 0; i < w * h; i++)
         {
@@ -3697,7 +3703,7 @@ char __not_in_flash_func(FilePutChar)(char c, int fnbr)
         return t;
     }
 }
-void __not_in_flash_func(FilePutdata)(char *c, int fnbr, int n)
+void __not_in_flash_func(FilePutData)(char *c, int fnbr, int n)
 {
     if (filesource[fnbr] == FLASHFILE)
     {
@@ -3861,28 +3867,6 @@ void MIPS16 CloseAllFiles(void)
     }
 }
 
-void FilePutStr(int count, char *c, int fnbr)
-{
-    if (filesource[fnbr] == FLASHFILE)
-    {
-        //        int err;
-        FSerror = lfs_file_write(&lfs, FileTable[fnbr].lfsptr, c, count);
-        if (FSerror != count)
-            FSerror = -5;
-        if (FSerror > 0)
-            FSerror = 0;
-        ErrorCheck(fnbr);
-    }
-    else
-    {
-        unsigned int bw;
-        InitSDCard();
-        FSerror = f_write(FileTable[fnbr].fptr, c, count, &bw);
-        ErrorCheck(fnbr);
-        diskchecktimer = DISKCHECKRATE;
-    }
-}
-
 // output a string to a file
 // the string must be a MMBasic string
 void MMfputs(unsigned char *p, int filenbr)
@@ -3891,7 +3875,7 @@ void MMfputs(unsigned char *p, int filenbr)
     i = *p++;
     if (FileTable[filenbr].com > MAXCOMPORTS)
     {
-        FilePutStr(i, (char *)p, filenbr);
+        FilePutData((char *)p, filenbr, i);
     }
     else
     {
@@ -4213,7 +4197,7 @@ int drivecheck(char *p, int *waste)
 
 void MIPS16 cmd_copy(void)
 {
-    unsigned char *p = GetTempMemory(STRINGSIZE);
+    unsigned char *p = GetTempStrMemory();
     memcpy(p, cmdline, STRINGSIZE);
     char ss[2]; // this will be used to split up the argument line
     unsigned char *fromfile, *tofile;
@@ -4281,8 +4265,8 @@ void MIPS16 cmd_copy(void)
     char fromdir[FF_MAX_LFN] = {0};
     if (strchr((char *)fromfile, '*') || strchr((char *)fromfile, '?'))
     { // wildcard in the source so bulk copy
-        unsigned char *in = GetTempMemory(STRINGSIZE);
-        unsigned char *out = GetTempMemory(STRINGSIZE);
+        unsigned char *in = GetTempStrMemory();
+        unsigned char *out = GetTempStrMemory();
         //         MMPrintString("Bulk copying\r\n");
         int localsave = FatFSFileSystem;
         if (!(ExistsDir((char *)tofile, todir, &tofilesystem)))
@@ -5218,7 +5202,7 @@ void cmd_autosave(void)
                 FreeMemory(TCPstate->buffer_recv[i]);
         }
 #endif
-        p = buf = GetTempMemory(EDIT_BUFFER_SIZE);
+        p = buf = GetTempMainMemory(EDIT_BUFFER_SIZE);
         char *fromp = (char *)ProgMemory;
         p = buf;
         while (*fromp != 0xff)
@@ -5245,7 +5229,7 @@ void cmd_autosave(void)
         ;
     }
     ClearProgram(false); // clear any leftovers from the previous program
-    p = buf = GetTempMemory(EDIT_BUFFER_SIZE);
+    p = buf = GetTempMainMemory(EDIT_BUFFER_SIZE);
     CrunchData(&p, 0); // initialise the crunch data subroutine
 readin:;
     while ((c = MMInkey()) != 0x1a && c != F1 && c != F2)
@@ -5341,7 +5325,7 @@ void cmd_autosave(void)
             for(int i=0;i<MaxPcb;i++)FreeMemory(TCPstate->buffer_recv[i]);
         }
 #endif
-        p = buf = GetTempMemory(EDIT_BUFFER_SIZE-2048);
+        p = buf = GetTempMainMemory(EDIT_BUFFER_SIZE-2048);
         char * fromp  = (char *)ProgMemory;
         if(*fromp){
             p = buf;
@@ -5522,7 +5506,7 @@ void fun_inputstr(void)
     if (argc != 3)
         SyntaxError();
     ;
-    sret = GetTempMemory(STRINGSIZE); // this will last for the life of the command
+    sret = GetTempStrMemory(); // this will last for the life of the command
     nbr = getint(argv[0], 1, MAXSTRLEN);
     if (*argv[2] == '#')
         argv[2]++;
@@ -6111,9 +6095,9 @@ void MIPS16 cmd_var(void)
         }
         // load the current variable save table into RAM
         // while doing this skip any variables that are in the argument list for this save
-        bufp = buf = GetTempMemory(SAVEDVARS_FLASH_SIZE); // build the saved variable table in RAM
-                                                          //        SavedVarsFlash = (char*)FLASH_SAVED_VAR_ADDR;      // point to where the variables were saved
-        varp = (unsigned char *)SavedVarsFlash;           // point to where the variables were saved
+        bufp = buf = GetTempMainMemory(SAVEDVARS_FLASH_SIZE); // build the saved variable table in RAM
+                                                              //        SavedVarsFlash = (char*)FLASH_SAVED_VAR_ADDR;      // point to where the variables were saved
+        varp = (unsigned char *)SavedVarsFlash;               // point to where the variables were saved
         while (*varp != 0 && *varp != 0xff)
         {                   // 0xff is the end of the variable list, SavedVarsFlash[4] = 0 means that the flash has never been written to
             type = *varp++; // get the variable type
@@ -6239,7 +6223,7 @@ void ClearSavedVars(void)
 unsigned short hashversion(void)
 {
     uint32_t hash = FNV_offset_basis;
-    char build[20];
+    char build[20] = {0};
     strcpy(build, VERSION);
     char *p = build;
     do

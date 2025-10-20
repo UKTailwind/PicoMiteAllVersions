@@ -2410,7 +2410,7 @@ void InitReservedIO(void)
 
 char *pinsearch(int pin)
 {
-	char *buff = GetTempMemory(STRINGSIZE);
+	char *buff = GetTempStrMemory();
 #ifndef PICOMITEVGA
 	int ssd = PinDef[Option.SSD_DATA].GPno;
 	if (pin == Option.LCD_CD)

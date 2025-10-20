@@ -248,7 +248,7 @@ void fun_call(void)
 		error("Unknown user function");
 	if (targ & T_STR)
 	{
-		sret = GetTempMemory(STRINGSIZE);
+		sret = GetTempStrMemory();
 		Mstrcpy(sret, s); // if it is a string then save it
 	}
 	if (targ & T_INT)
@@ -274,8 +274,8 @@ void fun_field(void)
 	if (argc > 3 && *argv[4])
 		delims = getstring(argv[4]); // delimiters for fields
 	if (argc == 7)
-		quotes = getstring(argv[6]);  // delimiters for quoted text
-	sret = GetTempMemory(STRINGSIZE); // this will last for the life of the command
+		quotes = getstring(argv[6]); // delimiters for quoted text
+	sret = GetTempStrMemory();		 // this will last for the life of the command
 	targ = T_STR;
 	i = 1;
 	while (--fnbr > 0)
@@ -436,7 +436,7 @@ void fun_bin2str(void)
 	if (argc == 5 && !(checkstring(argv[4], (unsigned char *)"BIG")))
 		SyntaxError();
 	;
-	sret = GetTempMemory(STRINGSIZE); // this will last for the life of the command
+	sret = GetTempStrMemory(); // this will last for the life of the command
 	if (checkstring(argv[0], (unsigned char *)"DOUBLE"))
 	{
 		len = 8;
@@ -694,23 +694,23 @@ void fun_tilde(void)
 		fun_device();
 		break;
 	case MMCMDLINE:
-		sret = GetTempMemory(STRINGSIZE); // this will last for the life of the command
+		sret = GetTempStrMemory(); // this will last for the life of the command
 		Mstrcpy(sret, cmdlinebuff);
 		targ = T_STR;
 		break;
 #ifdef PICOMITEWEB
 	case MMMESSAGE:
-		sret = GetTempMemory(STRINGSIZE); // this will last for the life of the command
+		sret = GetTempStrMemory(); // this will last for the life of the command
 		Mstrcpy(sret, messagebuff);
 		targ = T_STR;
 		break;
 	case MMADDRESS:
-		sret = GetTempMemory(STRINGSIZE); // this will last for the life of the command
+		sret = GetTempStrMemory(); // this will last for the life of the command
 		Mstrcpy(sret, addressbuff);
 		targ = T_STR;
 		break;
 	case MMTOPIC:
-		sret = GetTempMemory(STRINGSIZE); // this will last for the life of the command
+		sret = GetTempStrMemory(); // this will last for the life of the command
 		Mstrcpy(sret, topicbuff);
 		targ = T_STR;
 		break;
@@ -793,7 +793,7 @@ int is_in_mask(char c, const char *mask)
 
 char *trim(char *source, char *mask, char where)
 {
-	char *result = GetTempMemory(STRINGSIZE);
+	char *result = GetTempStrMemory();
 
 	if (!source || !mask || !result)
 	{
@@ -875,7 +875,7 @@ void fun_chr(void)
 	int i;
 
 	i = getint(ep, 0, 0xff);
-	sret = GetTempMemory(STRINGSIZE); // this will last for the life of the command
+	sret = GetTempStrMemory(); // this will last for the life of the command
 	sret[0] = 1;
 	sret[1] = i;
 	targ = T_STR;
@@ -940,7 +940,7 @@ void DoHexOctBin(int base)
 		j = getint(argv[2], 0, MAXSTRLEN); // get the optional number of chars to return
 	if (j == 0)
 		j = 1;
-	sret = GetTempMemory(STRINGSIZE); // this will last for the life of the command
+	sret = GetTempStrMemory(); // this will last for the life of the command
 	IntToStrPad((char *)sret, (signed long long int)i, '0', j, base);
 	CtoM(sret);
 	targ = T_STR;
@@ -1030,7 +1030,7 @@ void fun_instr(void)
 		int reti;
 		regmatch_t pmatch;
 		MMFLOAT *temp = NULL;
-		char *s = GetTempMemory(STRINGSIZE), *p = GetTempMemory(STRINGSIZE);
+		char *s = GetTempStrMemory(), *p = GetTempStrMemory();
 		strcpy(s, (char *)getCstring(argv[0 + n]));
 		strcpy(p, (char *)getCstring(argv[2 + n]));
 		if (argc == 5 + n)
@@ -1094,7 +1094,7 @@ void fun_left(void)
 
 	if (argc != 3)
 		StandardError(2);
-	s = GetTempMemory(STRINGSIZE); // this will last for the life of the command
+	s = GetTempStrMemory(); // this will last for the life of the command
 	Mstrcpy(s, getstring(argv[0]));
 	i = getint(argv[2], 0, MAXSTRLEN);
 	if (i < *s)
@@ -1116,8 +1116,8 @@ void fun_right(void)
 	s = getstring(argv[0]);
 	nbr = getint(argv[2], 0, MAXSTRLEN);
 	if (nbr > *s)
-		nbr = *s;					  // get the number of chars to copy
-	sret = GetTempMemory(STRINGSIZE); // this will last for the life of the command
+		nbr = *s;			   // get the number of chars to copy
+	sret = GetTempStrMemory(); // this will last for the life of the command
 	p1 = sret;
 	p2 = s + (*s - nbr) + 1;
 	*p1++ = nbr; // inset the length of the returned string
@@ -1170,7 +1170,7 @@ void fun_mid(void)
 	s = getstring(argv[0]);				  // the string
 	spos = getint(argv[2], 1, MAXSTRLEN); // the mid position
 
-	sret = GetTempMemory(STRINGSIZE); // this will last for the life of the command
+	sret = GetTempStrMemory(); // this will last for the life of the command
 	targ = T_STR;
 	if (spos > *s || nbr == 0) // if the numeric args are not in the string
 		return;				   // return a null string
@@ -1342,10 +1342,10 @@ void fun_eval(void)
 {
 	unsigned char *s, *st, *temp_tknbuf;
 	int t;
-	temp_tknbuf = GetTempMemory(STRINGSIZE);
+	temp_tknbuf = GetTempStrMemory();
 	strcpy((char *)temp_tknbuf, (char *)tknbuf); // first save the current token buffer in case we are in immediate mode
 	// we have to fool the tokeniser into thinking that it is processing a program line entered at the console
-	st = GetTempMemory(STRINGSIZE);
+	st = GetTempStrMemory();
 	strcpy((char *)st, (char *)getstring(ep)); // then copy the argument
 	MtoC(st);								   // and convert to a C string
 	inpbuf[0] = 'r';
@@ -1373,7 +1373,7 @@ void fun_errno(void)
 
 void fun_errmsg(void)
 {
-	sret = GetTempMemory(STRINGSIZE);
+	sret = GetTempStrMemory();
 	strcpy((char *)sret, MMErrMsg);
 	CtoM(sret);
 	targ = T_STR;
@@ -1386,7 +1386,7 @@ void fun_space(void)
 	int i;
 
 	i = getint(ep, 0, MAXSTRLEN);
-	sret = GetTempMemory(STRINGSIZE); // this will last for the life of the command
+	sret = GetTempStrMemory(); // this will last for the life of the command
 	memset(sret + 1, ' ', i);
 	*sret = i;
 	targ = T_STR;
@@ -1426,7 +1426,7 @@ void fun_str(void)
 		ch = ((unsigned char)p[1] & 0x7f);
 	}
 
-	sret = GetTempMemory(STRINGSIZE); // this will last for the life of the command
+	sret = GetTempStrMemory(); // this will last for the life of the command
 	if (t & T_NBR)
 		FloatToStr((char *)sret, f, m, n, ch); // convert the float
 	else
@@ -1475,7 +1475,7 @@ void fun_string(void)
 	if (j < 0 || j > 255)
 		error("Argument value: $", argv[2]);
 
-	sret = GetTempMemory(STRINGSIZE); // this will last for the life of the command
+	sret = GetTempStrMemory(); // this will last for the life of the command
 	memset(sret + 1, j, i);
 	*sret = i;
 	targ = T_STR;
@@ -1489,8 +1489,8 @@ void fun_ucase(void)
 	int i;
 
 	s = getstring(ep);
-	p = sret = GetTempMemory(STRINGSIZE); // this will last for the life of the command
-	i = *p++ = *s++;					  // get the length of the string and save in the destination
+	p = sret = GetTempStrMemory(); // this will last for the life of the command
+	i = *p++ = *s++;			   // get the length of the string and save in the destination
 	while (i--)
 	{
 		*p = mytoupper(*s);
@@ -1508,8 +1508,8 @@ void fun_lcase(void)
 	int i;
 
 	s = getstring(ep);
-	p = sret = GetTempMemory(STRINGSIZE); // this will last for the life of the command
-	i = *p++ = *s++;					  // get the length of the string and save in the destination
+	p = sret = GetTempStrMemory(); // this will last for the life of the command
+	i = *p++ = *s++;			   // get the length of the string and save in the destination
 	while (i--)
 	{
 		*p = tolower(*s);
@@ -1547,7 +1547,7 @@ void fun_tab(void)
 	unsigned char *p;
 
 	i = getint(ep, 1, 255);
-	sret = p = GetTempMemory(STRINGSIZE); // this will last for the life of the command
+	sret = p = GetTempStrMemory(); // this will last for the life of the command
 	if (MMCharPos > i)
 	{
 		i--;
@@ -1568,7 +1568,7 @@ void __not_in_flash_func(fun_inkey)(void)
 {
 	int i;
 
-	sret = GetTempMemory(STRINGSIZE); // this buffer is automatically zeroed so the string is zero size
+	sret = GetTempStrMemory(); // this buffer is automatically zeroed so the string is zero size
 
 	i = MMInkey();
 	if (i != -1)
@@ -1718,7 +1718,7 @@ void __not_in_flash_func(fun_ternary)(void)
 	}
 	else if (t & T_STR)
 	{
-		sret = GetTempMemory(STRINGSIZE);
+		sret = GetTempStrMemory();
 		Mstrcpy(sret, s); // copy the string
 		targ = T_STR;
 		return;

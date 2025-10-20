@@ -69,26 +69,14 @@ int tftp_read(void *handle, void *buf, int bytes)
 {
     int n_read;
     int fnbr = *(int *)handle;
-    if (filesource[fnbr] == FATFSFILE)
-        f_read(FileTable[fnbr].fptr, buf, bytes, (UINT *)&n_read);
-    else
-        n_read = lfs_file_read(&lfs, FileTable[fnbr].lfsptr, buf, bytes);
+    FileGetdata(fnbr, buf, bytes, (UINT *)&n_read);
     return n_read;
 }
 int tftp_write(void *handle, struct pbuf *p)
 {
-    int nbr;
     int fnbr = *(int *)handle;
-    if (filesource[fnbr] == FATFSFILE)
-        f_write(FileTable[fnbr].fptr, p->payload, p->tot_len, (UINT *)&nbr);
-    else
-    {
-        nbr = FSerror = lfs_file_write(&lfs, FileTable[fnbr].lfsptr, p->payload, p->tot_len);
-    }
-    if (FSerror > 0)
-        FSerror = 0;
-    ErrorCheck(tftp_fnbr);
-    return nbr;
+    FilePutData(p->payload, fnbr, p->tot_len);
+    return p->tot_len;
 }
 void tftp_error(void *handle, int err, const char *msg, int size)
 {

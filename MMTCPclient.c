@@ -221,7 +221,7 @@ int cmd_tcpclient(void)
             SyntaxError();
         ;
         ip4_addr_t remote_addr;
-        char *IP = GetTempMemory(STRINGSIZE);
+        char *IP = GetTempStrMemory();
         TCP_CLIENT_T *state = tcp_client_init();
         IP = (char *)getCstring(argv[0]);
         int port = getint(argv[2], 1, 65535);
@@ -276,7 +276,7 @@ int cmd_tcpclient(void)
             SyntaxError();
         ;
         ip4_addr_t remote_addr;
-        char *IP = GetTempMemory(STRINGSIZE);
+        char *IP = GetTempStrMemory();
         TCP_CLIENT_T *state = tcp_client_init();
         IP = (char *)getCstring(argv[0]);
         int port = getint(argv[2], 1, 65535);

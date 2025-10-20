@@ -2452,7 +2452,7 @@ void call_pio(char *instruction, uint8_t mode)
         if ((instructions == NULL || pioinuse == 99) && !(mode & 2))
                 error("Missing Program statement");
         skipspace(cmdline);
-        char *buff = GetTempMemory(STRINGSIZE);
+        char *buff = GetTempStrMemory();
         sprintf(buff, "ASSEMBLE %d, \"", pioinuse);
         strcat(buff, instruction);
         if (mode & 1)
@@ -2725,13 +2725,13 @@ void fun_json(void)
         const cJSON *root = NULL;
         void *ptr1 = NULL;
         char *p;
-        sret = GetTempMemory(STRINGSIZE);
+        sret = GetTempStrMemory();
         int64_t *dest = NULL;
         MMFLOAT tempd;
         int i, j, k, mode, index;
         char field[32], num[6];
         getcsargs(&ep, 3);
-        char *a = GetTempMemory(STRINGSIZE);
+        char *a = GetTempStrMemory();
         ptr1 = findvar(argv[0], V_FIND | V_EMPTY_OK);
         if (g_vartbl[g_VarIndex].type & T_INT)
         {

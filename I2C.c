@@ -207,7 +207,7 @@ void ConfigDisplayI2C(unsigned char *p)
   if (argc == 5)
     Option.I2Coffset = getint(argv[4], 0, 10);
   if (!(I2C0locked || I2C1locked))
-    error("SYSTEM I2C not configured");
+    StandardError(44);
   Option.Refresh = 1;
   Option.DISPLAY_TYPE = DISPLAY_TYPE;
 }
@@ -584,7 +584,7 @@ i2c_error_exit:
 
 void RtcGetTime(int noerror)
 {
-  char *buff = GetTempMemory(STRINGSIZE); // Received data is stored here
+  char *buff = GetTempStrMemory(); // Received data is stored here
   int DS1307;
   clocktimer = (1000 * 60 * 60);
   if (I2C0locked)
@@ -680,7 +680,7 @@ void MIPS16 cmd_rtc(void)
   unsigned char *p;
   void *ptr = NULL;
   if (!(I2C0locked || I2C1locked))
-    error("SYSTEM I2C not configured");
+    StandardError(44);
   if (checkstring(cmdline, (unsigned char *)"GETTIME"))
   {
     int repeat = 5;
@@ -1317,7 +1317,7 @@ void i2cReceive(unsigned char *p)
   I2C_Rcvlen = rcvlen;
 
   I2C_Sendlen = 0;
-  char *buff = GetTempMemory(rcvlen > 255 ? rcvlen + 2 : STRINGSIZE);
+  char *buff = GetTempMainMemory(rcvlen > 255 ? rcvlen + 2 : STRINGSIZE);
   //	PInt((uint32_t)I2C_Rcvbuf_String);
   i2c_masterCommand(1, (unsigned char *)buff);
   //	PIntComma(rcvlen);
@@ -1532,7 +1532,7 @@ void i2c2Receive(unsigned char *p)
 
   I2C2_Sendlen = 0;
 
-  char *buff = GetTempMemory(rcvlen > 255 ? rcvlen + 2 : STRINGSIZE);
+  char *buff = GetTempMainMemory(rcvlen > 255 ? rcvlen + 2 : STRINGSIZE);
   i2c2_masterCommand(1, (unsigned char *)buff);
 }
 
@@ -1847,7 +1847,7 @@ void MIPS16 cmd_Nunchuck(void)
   {
     getcsargs(&tp, 1);
     if (!(I2C0locked || I2C1locked))
-      error("SYSTEM I2C not configured");
+      StandardError(44);
     if (classic1 || nunchuck1)
       StandardError(31);
     memset((void *)&nunstruct[5].x, 0, sizeof(nunstruct[5]));
@@ -1917,7 +1917,7 @@ void MIPS16 cmd_Classic(void)
   {
     getcsargs(&tp, 3);
     if (!(I2C0locked || I2C1locked))
-      error("SYSTEM I2C not configured");
+      StandardError(44);
     if (classic1 || nunchuck1)
       StandardError(31);
     memset((void *)&nunstruct[0].x, 0, sizeof(nunstruct[0]));
@@ -2395,7 +2395,7 @@ void MIPS16 cmd_camera(void)
     if (!(Option.DISPLAY_TYPE > I2C_PANEL && Option.DISPLAY_TYPE < BufferedPanel))
       error("Invalid display type");
     if (!(I2C0locked || I2C1locked))
-      error("SYSTEM I2C not configured");
+      StandardError(44);
     if (XCLK)
       error("Camera already open");
     unsigned char code;
@@ -2821,7 +2821,7 @@ void MIPS16 cmd_camera(void)
     {
       ov7670_set(OV7670_yuv[i].reg, OV7670_yuv[i].value);
     }
-    char *buff = GetTempMemory(160 * 120 * 2);
+    char *buff = GetTempMainMemory(160 * 120 * 2);
     char *k = buff;
     c.rgb = 0;
     disable_interrupts_pico();
@@ -2829,7 +2829,7 @@ void MIPS16 cmd_camera(void)
     enable_interrupts_pico();
     char *linebuff = NULL;
     if (scale)
-      linebuff = GetTempMemory(160 * 3);
+      linebuff = GetTempMainMemory(160 * 3);
     for (int y = ys; y < 120 * scale + ys; y += scale)
     {
       int kk = 0;
@@ -2892,12 +2892,12 @@ void MIPS16 cmd_camera(void)
     {
       ov7670_set(OV7670_rgb[i].reg, OV7670_rgb[i].value);
     }
-    char *buff = GetTempMemory(160 * 120 * 2);
+    char *buff = GetTempMainMemory(160 * 120 * 2);
     c.rgb = 0;
     disable_interrupts_pico();
     capture(buff);
     enable_interrupts_pico();
-    char *linebuff = GetTempMemory(160 * 3 * scale);
+    char *linebuff = GetTempMainMemory(160 * 3 * scale);
     char *k = buff;
     for (int y = ys; y < 120 * scale + ys; y += scale)
     {

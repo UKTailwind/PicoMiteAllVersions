@@ -76,9 +76,9 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * ============================================================================ */
 typedef enum _M_Req
 {
-    M_PROG,
-    M_VAR,
-    M_LIMITED
+   M_PROG,
+   M_VAR,
+   M_LIMITED
 } M_Req;
 
 /* ============================================================================
@@ -86,19 +86,19 @@ typedef enum _M_Req
  * ============================================================================ */
 struct s_ctrl
 {
-    short int x1, y1, x2, y2; // Coordinates of the touch sensitive area
-    int fc, bc;               // Foreground and background colors
-    int fcc;                  // Foreground color for caption (default when control was created)
-    float value;              // Current value
-    float min, max, inc;      // Spinbox min/max and increment (also used by radio buttons, gauge, LEDs)
-    unsigned char *s;         // Caption string
-    unsigned char *fmt;       // Format string for FORMATBOX
-    unsigned char page;       // Display page
-    unsigned char ref;        // Reference number
-    unsigned char type;       // Control type (button, etc)
-    unsigned char state;      // State (disabled, etc)
-    unsigned char font;       // Font in use when control was created (used when redrawing)
-    unsigned char dummy[3];   // Padding
+   short int x1, y1, x2, y2; // Coordinates of the touch sensitive area
+   int fc, bc;               // Foreground and background colors
+   int fcc;                  // Foreground color for caption (default when control was created)
+   float value;              // Current value
+   float min, max, inc;      // Spinbox min/max and increment (also used by radio buttons, gauge, LEDs)
+   unsigned char *s;         // Caption string
+   unsigned char *fmt;       // Format string for FORMATBOX
+   unsigned char page;       // Display page
+   unsigned char ref;        // Reference number
+   unsigned char type;       // Control type (button, etc)
+   unsigned char state;      // State (disabled, etc)
+   unsigned char font;       // Font in use when control was created (used when redrawing)
+   unsigned char dummy[3];   // Padding
 };
 
 /* ============================================================================
@@ -156,7 +156,7 @@ void *GetTempMemory(int NbrBytes);
 void *GetTempStrMemory(void);
 void *GetAlignedMemory(int size);
 void *ReAllocMemory(void *addr, size_t msize);
-
+void *GetTempMainMemory(int NbrBytes);
 /* ============================================================================
  * Function declarations - Memory deallocation
  * ============================================================================ */

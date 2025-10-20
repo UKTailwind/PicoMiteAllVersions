@@ -272,7 +272,7 @@ void MIPS16 cmd_memory(void)
         }
         if (FileTable[fnbr].com > MAXCOMPORTS)
         {
-            FilePutStr(n, fromp, fnbr);
+            FilePutData(fromp, fnbr, n);
         }
         else
             error("File % not open", fnbr);
@@ -1052,11 +1052,29 @@ void __not_in_flash_func (*GetTempMemory)(int NbrBytes)
     g_TempMemoryIsChanged = true;
     return (void *)g_StrTmp[g_StrTmpIndex++];
 }
+void __not_in_flash_func (*GetTempStrMemory)(void)
+{
+    if (g_StrTmpIndex >= MAXTEMPSTRINGS)
+        StandardError(29);
+    g_StrTmpLocalIndex[g_StrTmpIndex] = g_LocalIndex;
+    g_StrTmp[g_StrTmpIndex] = GetSystemMemory(STRINGSIZE);
+    g_TempMemoryIsChanged = true;
+    return (void *)g_StrTmp[g_StrTmpIndex++];
+}
+void __not_in_flash_func (*GetTempMainMemory)(int NbrBytes)
+{
+    if (g_StrTmpIndex >= MAXTEMPSTRINGS)
+        StandardError(29);
+    g_StrTmpLocalIndex[g_StrTmpIndex] = g_LocalIndex;
+    g_StrTmp[g_StrTmpIndex] = GetMemory(NbrBytes);
+    g_TempMemoryIsChanged = true;
+    return (void *)g_StrTmp[g_StrTmpIndex++];
+}
 
 // get a temporary string buffer
 // this is used by many BASIC string functions.  The space only lasts for the length of the command.
 // void *GetTempStrMemory(void) {
-//    return GetTempMemory(STRINGSIZE);
+//    return GetTempStrMemory();
 //}
 
 // clear any temporary string spaces (these last for just the life of a command) and return the memory to the heap

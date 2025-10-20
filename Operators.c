@@ -129,7 +129,7 @@ void __not_in_flash_func(op_add)(void)
     {
         if (*sarg1 + *sarg2 > MAXSTRLEN)
             error("String too long");
-        sret = GetTempMemory(STRINGSIZE); // this will last for the life of the command
+        sret = GetTempStrMemory(); // this will last for the life of the command
         Mstrcpy(sret, sarg1);
         Mstrcat(sret, sarg2);
     }

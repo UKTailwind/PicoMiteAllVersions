@@ -918,7 +918,7 @@ unsigned char *parseAES(uint8_t *p, int ivadd, uint8_t *keyx, uint8_t *ivx, int6
 	if (*card2 % 16)
 		error("input must be multiple of 16 elements long");
 	//	if(card2 >256)error("input must be <= 256 elements long");
-	unsigned char *inx = (unsigned char *)GetTempMemory(*card2 + 16);
+	unsigned char *inx = (unsigned char *)GetTempMainMemory(*card2 + 16);
 	length = 0;
 	card3 = parseany(argv[4], &a3float, &a3int, &a3str, &length, false);
 	if (card3 != *card2 + ivadd && a3str == NULL)
@@ -1035,7 +1035,7 @@ unsigned char *parseB64(uint8_t *p, int64_t **outint, unsigned char **outstr, MM
 	*card1 = parseany(argv[0], &a1float, &a1int, &a1str, &length, false);
 	length = 0;
 	*card2 = parseany(argv[2], &a3float, &a3int, &a3str, &length, false);
-	unsigned char *keyx = (unsigned char *)GetTempMemory(b64e_size(*card1) + 1);
+	unsigned char *keyx = (unsigned char *)GetTempMainMemory(b64e_size(*card1) + 1);
 	if (a1int != NULL)
 	{
 		for (int i = 0; i < *card1; i++)
@@ -1563,14 +1563,14 @@ void cmd_math(void)
 			MMFLOAT *a1float = NULL, *xfout = NULL, *yfout = NULL, cangle = cos(angle), sangle = sin(angle), x, y;
 			int64_t *a1int = NULL, *xiout = NULL, *yiout = NULL;
 			int numpoints = parsenumberarray(argv[6], &a1float, &a1int, 4, 1, dims, false);
-			MMFLOAT *xin = GetTempMemory(numpoints * sizeof(MMFLOAT));
+			MMFLOAT *xin = GetTempMainMemory(numpoints * sizeof(MMFLOAT));
 			for (int i = 0; i < numpoints; i++)
 				xin[i] = (a1float != NULL ? a1float[i] - xorigin : (MMFLOAT)a1int[i] - xorigin);
 			a1float = NULL;
 			a1int = NULL;
 			if (parsenumberarray(argv[8], &a1float, &a1int, 5, 1, dims, false) != numpoints)
 				StandardError(16);
-			MMFLOAT *yin = GetTempMemory(numpoints * sizeof(MMFLOAT));
+			MMFLOAT *yin = GetTempMainMemory(numpoints * sizeof(MMFLOAT));
 			for (int i = 0; i < numpoints; i++)
 				yin[i] = (a1float != NULL ? a1float[i] - yorigin : (MMFLOAT)a1int[i] - yorigin);
 			a1float = NULL;
@@ -2683,7 +2683,7 @@ void fun_math(void)
 			if (argc > 1 && *argv[2])
 				length = getint(argv[2], 1, 65535);
 			length = parseany(argv[0], &a1float, &a1int, &a1str, &length, false);
-			uint8_t *array = GetTempMemory(length);
+			uint8_t *array = GetTempMainMemory(length);
 			if (argc > 3 && *argv[4])
 				polynome = getint(argv[4], 0, 255);
 			if (argc > 5 && *argv[6])
@@ -2737,7 +2737,7 @@ void fun_math(void)
 			if (argc > 1 && *argv[2])
 				length = getint(argv[2], 1, 65535);
 			length = parseany(argv[0], &a1float, &a1int, &a1str, &length, false);
-			uint8_t *array = GetTempMemory(length);
+			uint8_t *array = GetTempMainMemory(length);
 			if (argc > 3 && *argv[4])
 				polynome = getint(argv[4], 0, 4095);
 			if (argc > 5 && *argv[6])
@@ -2791,7 +2791,7 @@ void fun_math(void)
 			if (argc > 1 && *argv[2])
 				length = getint(argv[2], 1, 65535);
 			length = parseany(argv[0], &a1float, &a1int, &a1str, &length, false);
-			uint8_t *array = GetTempMemory(length);
+			uint8_t *array = GetTempMainMemory(length);
 			if (argc > 3 && *argv[4])
 				polynome = getint(argv[4], 0, 65535);
 			if (argc > 5 && *argv[6])
@@ -2845,7 +2845,7 @@ void fun_math(void)
 			if (argc > 1 && *argv[2])
 				length = getint(argv[2], 1, 65535);
 			length = parseany(argv[0], &a1float, &a1int, &a1str, &length, false);
-			uint8_t *array = GetTempMemory(length);
+			uint8_t *array = GetTempMainMemory(length);
 			if (argc > 3 && *argv[4])
 				polynome = getint(argv[4], 0, 0xFFFFFFFF);
 			if (argc > 5 && *argv[6])
@@ -3001,8 +3001,8 @@ void fun_math(void)
 			card2 = parsenumberarray(argv[2], &a2float, &a2int, 2, 0, dims, false);
 			if (card1 != card2)
 				StandardError(16);
-			a3float = GetTempMemory(card1 * sizeof(MMFLOAT));
-			a4float = GetTempMemory(card1 * sizeof(MMFLOAT));
+			a3float = GetTempMainMemory(card1 * sizeof(MMFLOAT));
+			a4float = GetTempMainMemory(card1 * sizeof(MMFLOAT));
 			if (a1float != NULL)
 			{
 				for (i = 0; i < card1; i++)
@@ -3377,7 +3377,7 @@ void fun_math(void)
 			card2 = parsenumberarray(argv[0], &a2float, &a2int, 1, 0, dims, false);
 			card1 = card2;
 			card2 = (card2 - 1) / 2;
-			a1float = GetTempMemory(card1 * sizeof(MMFLOAT));
+			a1float = GetTempMainMemory(card1 * sizeof(MMFLOAT));
 			if (a2float != NULL)
 			{
 				for (i = 0; i < card1; i++)
@@ -3526,7 +3526,7 @@ void fun_math(void)
 					error("Output array too small");
 				if (outstr && b64e_size(card) > 255)
 					error("Output exceeds string size");
-				unsigned char *out = (unsigned char *)GetTempMemory(b64e_size(card + 1));
+				unsigned char *out = (unsigned char *)GetTempMainMemory(b64e_size(card + 1));
 				int size = b64_encode(inx, card, out);
 				returnAES(outint, outflt, outstr, out, NULL, size);
 				iret = size;
@@ -3540,7 +3540,7 @@ void fun_math(void)
 					error("Output array too small");
 				if (outstr && b64d_size(card) > 255)
 					error("Output exceeds string size");
-				unsigned char *out = (unsigned char *)GetTempMemory(b64e_size(card + 1));
+				unsigned char *out = (unsigned char *)GetTempMainMemory(b64e_size(card + 1));
 				int size = b64_decode(inx, card, out);
 				returnAES(outint, outflt, outstr, out, NULL, size);
 				iret = size;
@@ -3649,7 +3649,7 @@ void cmd_FFT(unsigned char *pp)
 		}
 		if (!powerof2)
 			error("array size must be a power of 2");
-		a1cplx = (cplx *)GetTempMemory((card1) * 16);
+		a1cplx = (cplx *)GetTempMainMemory((card1) * 16);
 		a5float = (MMFLOAT *)a1cplx;
 		for (i = 0; i < card1; i++)
 		{
@@ -3677,7 +3677,7 @@ void cmd_FFT(unsigned char *pp)
 		}
 		if (!powerof2)
 			error("array size must be a power of 2");
-		a1cplx = (cplx *)GetTempMemory((card1) * 16);
+		a1cplx = (cplx *)GetTempMainMemory((card1) * 16);
 		a5float = (MMFLOAT *)a1cplx;
 		for (i = 0; i < card1; i++)
 		{
@@ -3707,7 +3707,7 @@ void cmd_FFT(unsigned char *pp)
 		}
 		if (!powerof2)
 			error("array size must be a power of 2");
-		a2cplx = (cplx *)GetTempMemory((card2) * 16);
+		a2cplx = (cplx *)GetTempMainMemory((card2) * 16);
 		memcpy(a2cplx, a1cplx, card2 * 16);
 		for (i = 0; i < card2; i++)
 			a2cplx[i] = conj(a2cplx[i]);

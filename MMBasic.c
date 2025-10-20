@@ -1027,8 +1027,8 @@ void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, in
     {
         FreeMemorySafe((void **)&g_vartbl[g_VarIndex].val.s); // free the memory if it is a string
         g_vartbl[g_VarIndex].type |= T_PTR;
-        g_LocalIndex--;                                              // allocate the memory at the previous level
-        g_vartbl[g_VarIndex].val.s = tp = GetTempMemory(STRINGSIZE); // and use our own memory
+        g_LocalIndex--;                                       // allocate the memory at the previous level
+        g_vartbl[g_VarIndex].val.s = tp = GetTempStrMemory(); // and use our own memory
         g_LocalIndex++;
     }
     skipelement(p); // point to the body of the function
@@ -1702,16 +1702,16 @@ unsigned char __not_in_flash_func (*getstring)(unsigned char *p)
 unsigned char __not_in_flash_func (*getCstring)(unsigned char *p)
 {
     unsigned char *tp;
-    tp = GetTempMemory(STRINGSIZE); // this will last for the life of the command
-    Mstrcpy(tp, getstring(p));      // get the string and save in a temp place
-    MtoC(tp);                       // convert to a C style string
+    tp = GetTempStrMemory();   // this will last for the life of the command
+    Mstrcpy(tp, getstring(p)); // get the string and save in a temp place
+    MtoC(tp);                  // convert to a C style string
     return tp;
 }
 unsigned char *getFstring(unsigned char *p)
 {
     unsigned char *tp;
-    tp = GetTempMemory(STRINGSIZE); // this will last for the life of the command
-    Mstrcpy(tp, getstring(p));      // get the string and save in a temp place
+    tp = GetTempStrMemory();   // this will last for the life of the command
+    Mstrcpy(tp, getstring(p)); // get the string and save in a temp place
     for (int i = 1; i <= *tp; i++)
         if (tp[i] == '\\')
             tp[i] = '/';
@@ -1921,7 +1921,7 @@ unsigned char MIPS32 __not_in_flash_func (*getvalue)(unsigned char *p, MMFLOAT *
             {
                 p1 = p + 1;
                 p = getclosebracket(p);
-                p2 = ep = GetTempMemory(STRINGSIZE);
+                p2 = ep = GetTempStrMemory();
                 // Use memcpy for bulk copy
                 i = p - p1;
                 memcpy(p2, p1, i);
@@ -2079,7 +2079,7 @@ unsigned char MIPS32 __not_in_flash_func (*getvalue)(unsigned char *p, MMFLOAT *
         else if (c == '"')
         {
             p++;
-            p1 = s = GetTempMemory(STRINGSIZE);
+            p1 = s = GetTempStrMemory();
             tp = (unsigned char *)strchr((char *)p, '"');
 
             if (OptionEscape)
@@ -3580,14 +3580,12 @@ void MIPS16 error(char *msg, ...)
     busy_wait_ms(mergetimer + 200);
     if (mergerunning)
     {
-        _excep_code = RESET_COMMAND;
-        SoftReset();
+        SoftReset(SOFT_RESET);
     }
 #endif
     if (OptionErrorSkip > 100000)
     {
-        _excep_code = RESET_COMMAND;
-        SoftReset();
+        SoftReset(SOFT_RESET);
     }
     LoadOptions(); // make sure that the option struct is in a clean state
     OptionConsole = 1;
@@ -3775,6 +3773,8 @@ const char *errorstring[] = {
     "Argument % must be a 5 element floating point array", // 41
     "Pin $ is not off or an ADC input",                    // 42
     "Pin %/| is not off or an output",                     // 43
+    "SYSTEM I2C not configured",                           // 44
+    "System SPI not configured",                           // 45
 };
 void StandardError(int n)
 {

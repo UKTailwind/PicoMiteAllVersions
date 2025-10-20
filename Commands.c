@@ -390,7 +390,7 @@ void array_add(unsigned char *tp)
 		card2 = parsestringarray(argv[4], &a2str, 3, 0, dims, true, &size2);
 		if (card1 != card2)
 			StandardError(16);
-		unsigned char *buff = GetTempMemory(STRINGSIZE); // this will last for the life of the command
+		unsigned char *buff = GetTempStrMemory(); // this will last for the life of the command
 		int copy = size + 1;
 		int copy2 = size2 + 1;
 		for (i = 0; i < card1; i++)
@@ -964,7 +964,7 @@ void MIPS16 cmd_list(void)
 				CurrentY = 0;
 			}
 			getcsargs(&p, 1);
-			char *buff = GetTempMemory(STRINGSIZE);
+			char *buff = GetTempStrMemory();
 			strcpy(buff, (char *)getCstring(argv[0]));
 			if (strchr(buff, '.') == NULL)
 				strcat(buff, ".bas");
@@ -1007,7 +1007,7 @@ void MIPS16 cmd_list(void)
 		}
 		if (!count)
 			return;
-		char **c = GetTempMemory(count * sizeof(*c) + count * (MAXVARLEN + 30));
+		char **c = GetTempMainMemory(count * sizeof(*c) + count * (MAXVARLEN + 30));
 		for (int i = 0, j = 0; i < MAXVARS; i++)
 		{
 			char out[MAXVARLEN + 30];
@@ -1130,7 +1130,7 @@ void MIPS16 cmd_list(void)
 		}
 		m = 0;
 		int x = 0;
-		char **c = GetTempMemory((CommandTableSize + x) * sizeof(*c) + (CommandTableSize + x) * 18);
+		char **c = GetTempMainMemory((CommandTableSize + x) * sizeof(*c) + (CommandTableSize + x) * 18);
 		for (i = 0; i < CommandTableSize + x; i++)
 		{
 			c[m] = (char *)((int)c + sizeof(char *) * (CommandTableSize + x) + m * 18);
@@ -1174,7 +1174,7 @@ void MIPS16 cmd_list(void)
 			CurrentY = 0;
 		}
 		int x = 3 + MMEND;
-		char **c = GetTempMemory((TokenTableSize + x) * sizeof(*c) + (TokenTableSize + x) * 20);
+		char **c = GetTempMainMemory((TokenTableSize + x) * sizeof(*c) + (TokenTableSize + x) * 20);
 		for (i = 0; i < TokenTableSize + x; i++)
 		{
 			c[m] = (char *)((int)c + sizeof(char *) * (TokenTableSize + x) + m * 20);
@@ -1223,7 +1223,7 @@ void MIPS16 cmd_list(void)
 				CurrentX = 0;
 				CurrentY = 0;
 			}
-			char *buff = GetTempMemory(STRINGSIZE);
+			char *buff = GetTempStrMemory();
 			strcpy(buff, (char *)getCstring(argv[0]));
 			if (strchr(buff, '.') == NULL)
 			{
@@ -1310,7 +1310,7 @@ void cmd_help(void)
 	else
 	{
 		int fnbr = FindFreeFileNbr();
-		char *buff = GetTempMemory(STRINGSIZE);
+		char *buff = GetTempStrMemory();
 		BasicFileOpen("A:/help.txt", fnbr, FA_READ);
 		int ListCnt = CurrentY / (FontTable[gui_font >> 4][1] * (gui_font & 0b1111)) + 2;
 		char *p = (char *)getCstring(argv[0]);

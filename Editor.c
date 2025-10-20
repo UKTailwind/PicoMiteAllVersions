@@ -535,7 +535,7 @@ void edit(unsigned char *cmdline, bool cmdfile)
     cleanserver();
 #endif
     multilinecomment = false;
-    EdBuff = GetTempMemory(EDIT_BUFFER_SIZE);
+    EdBuff = GetTempMainMemory(EDIT_BUFFER_SIZE);
     edit_buff_size = EDIT_BUFFER_SIZE;
     char buff[STRINGSIZE * 2] = {0};
     *EdBuff = 0;
@@ -622,11 +622,8 @@ void edit(unsigned char *cmdline, bool cmdfile)
         {
             int fnbr1;
             fnbr1 = FindFreeFileNbr();
+            fsize = FileSize(filename);
             BasicFileOpen(filename, fnbr1, FA_READ);
-            if (filesource[fnbr1] != FLASHFILE)
-                fsize = f_size(FileTable[fnbr1].fptr);
-            else
-                fsize = lfs_file_size(&lfs, FileTable[fnbr1].lfsptr);
             if (fsize > edit_buff_size - 10)
                 StandardError(29);
             p = EdBuff;

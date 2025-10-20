@@ -56,10 +56,10 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * ============================================================================ */
 struct s_inttbl
 {
-	int pin;	// Pin on which the interrupt is set
-	int last;	// Last value of the pin (high or low)
-	char *intp; // Pointer to the interrupt routine
-	int lohi;	// Trigger condition (T_LOHI, T_HILO, T_BOTH)
+   int pin;    // Pin on which the interrupt is set
+   int last;   // Last value of the pin (high or low)
+   char *intp; // Pointer to the interrupt routine
+   int lohi;   // Trigger condition (T_LOHI, T_HILO, T_BOTH)
 };
 
 /* ============================================================================
@@ -149,12 +149,6 @@ void disable_sd(void);
 void disable_systemspi(void);
 void disable_systemi2c(void);
 void disable_audio(void);
-
-/* ============================================================================
- * Function declarations - File system operations
- * ============================================================================ */
-int ExistsFile(char *p);
-int ExistsDir(char *p, char *q, int *filesystem);
 
 /* ============================================================================
  * Function declarations - Time and date utilities
