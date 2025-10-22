@@ -732,11 +732,15 @@ void fun_tilde(void)
 		break;
 #ifndef PICOMITEWEB
 	case MMSUPPLY:
-		if (ExtCurrentConfig[44] == EXT_ANA_IN || Option.LOCAL_KEYBOARD)
+		if (ExtCurrentConfig[44] == EXT_ANA_IN
+#ifdef rp2350
+			|| ExtCurrentConfig[58] == EXT_ANA_IN || ExtCurrentConfig[62] == EXT_ANA_IN
+#endif
+		)
 		{
 			adc_init();
 #ifdef rp2350
-			adc_select_input((rp2350a ? 3 : 7));
+			adc_select_input((ExtCurrentConfig[62] == EXT_ANA_IN ? 7 : 3));
 #else
 			adc_select_input(3);
 #endif

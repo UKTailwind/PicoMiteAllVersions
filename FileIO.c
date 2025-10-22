@@ -56,6 +56,10 @@ extern mutex_t frameBufferMutex;
 #ifdef rp2350
 #include "hardware/structs/qmi.h"
 #endif
+#ifndef USBKEYBOARD
+#include "class/cdc/cdc_device.h"
+#endif
+
 extern const uint8_t *flash_target_contents;
 extern const uint8_t *SavedVarsFlash;
 extern const uint8_t *flash_progmemory;
@@ -384,25 +388,28 @@ int __not_in_flash_func(fs_flash_prog)(const struct lfs_config *cfg, lfs_block_t
     assert(off % cfg->prog_size == 0);
     assert(size % cfg->prog_size == 0);
     assert(block < cfg->block_count);
-
     uint32_t addr = RoundUpK4(TOP_OF_SYSTEM_FLASH) + (Option.modbuff ? 1024 * Option.modbuffsize : 0) + block * 4096 + off;
-    disable_interrupts_pico();
+    uint32_t irqs = save_and_disable_interrupts();
     flash_range_program(addr, buffer, size);
-    enable_interrupts_pico();
+    restore_interrupts(irqs);
+    SecondsTimer += (time_us_64() / 1000 - mSecTimer);
+    mSecTimer = time_us_64() / 1000;
     return 0;
 }
 int __not_in_flash_func(fs_flash_erase)(const struct lfs_config *cfg, lfs_block_t block)
 {
     assert(block < cfg->block_count);
-
     uint32_t block_addr = RoundUpK4(TOP_OF_SYSTEM_FLASH) + (Option.modbuff ? 1024 * Option.modbuffsize : 0) + block * 4096;
-    disable_interrupts_pico();
+    uint32_t irqs = save_and_disable_interrupts();
     flash_range_erase(block_addr, BLOCK_SIZE);
-    enable_interrupts_pico();
+    restore_interrupts(irqs);
+    SecondsTimer += (time_us_64() / 1000 - mSecTimer);
+    mSecTimer = time_us_64() / 1000;
     return 0;
 }
 int __not_in_flash_func(fs_flash_sync)(const struct lfs_config *c)
 {
+    flash_flush_cache();
     return 0;
 }
 /*  @endcond */
@@ -5009,7 +5016,10 @@ void MIPS16 cmd_files(void)
                 ListNewLine(&ListCnt, 1);
             MMputchar(*pp++, 0);
         }
+#ifndef USBKEYBOARD
         fflush(stdout);
+        tud_cdc_write_flush();
+#endif
         ListNewLine(&ListCnt, 1);
         // check if it is more than a screen full
         if (ListCnt >= Option.Height - overlap && i < fcnt)
@@ -5236,7 +5246,10 @@ readin:;
     { // while waiting for the end of text char
         if (c == -1 && count && time_us_64() - timeout > 100000)
         {
+#ifndef USBKEYBOARD
             fflush(stdout);
+            tud_cdc_write_flush();
+#endif
             count = 0;
         }
         if (p == buf && c == '\n')
@@ -5267,7 +5280,10 @@ readin:;
             prevc = c;
         }
     }
+#ifndef USBKEYBOARD
     fflush(stdout);
+    tud_cdc_write_flush();
+#endif
 
     *p = 0; // terminate the string in RAM
     while (getConsole() != -1)
@@ -5343,7 +5359,8 @@ void cmd_autosave(void)
     { // while waiting for the end of text char
         if (c == -1 && count && time_us_64() - timeout > 100000)
         {
-            fflush(stdout);
+            fflush(stdout);         tud_cdc_write_flush();
+#endif
             count = 0;
         }
         if (p == buf && c == '\n')
@@ -5374,7 +5391,8 @@ void cmd_autosave(void)
             prevc = c;
         }
     }
-    fflush(stdout);
+    fflush(stdout);         tud_cdc_write_flush();
+#endif
 
     *p = 0; // terminate the string in RAM
     while (getConsole() != -1)

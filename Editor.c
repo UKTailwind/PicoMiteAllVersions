@@ -34,6 +34,9 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
+#ifndef USBKEYBOARD
+#include "class/cdc/cdc_device.h"
+#endif
 
 #define DISPLAY_CLS 1
 #define REVERSE_VIDEO 3
@@ -2020,7 +2023,10 @@ void MarkMode(unsigned char *cb, unsigned char *buf)
                 SSputchar(*p++, 0);
             }
         }
+#ifndef USBKEYBOARD
         fflush(stdout);
+        tud_cdc_write_flush();
+#endif
         oldmark = mark;
         oldx = x;
         oldy = y;

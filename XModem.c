@@ -43,11 +43,16 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #define NAK 0x15  // Not acknowledge
 #define CAN 0x18  // Cancel
 #define CRC16 'C' // Request CRC-16 mode
+#define PAD 0x1a
 
 #define PACKET_SIZE_128 128
 #define PACKET_SIZE_1024 1024
-#define PACKET_TIMEOUT 3000 // 3 seconds
+#define PACKET_TIMEOUT 3000000 // 3 seconds
 #define YMAXRETRANS 25
+#define X_BUF_SIZE PACKET_SIZE_128 + 6
+#define MAXRETRANS 25
+#define DLY_1S 1000000
+#define X_BLOCK_SIZE 128
 #if defined(rp2350) && !defined(USBKEYBOARD)
 #define XMODEMBUFFERSIZE EDIT_BUFFER_SIZE - 4096
 #else
@@ -95,7 +100,7 @@ void ymodemTransmit(char *p, int fnbr, char *filename, long file_size);
 void ymodemReceive(char *sp, int maxbytes, int fnbr, int crunch);
 #endif
 int FindFreeFileNbr(void);
-bool rcvnoint;
+bool rcvnoint = false;
 
 /*  @endcond */
 
@@ -105,6 +110,7 @@ void MIPS16 cmd_xmodem(void)
     int rcv = 0, fnbr, crunch = false;
     char *fname;
     bool xmodem = true;
+    rcvnoint = false;
 #if defined(rp2350) && !defined(USBKEYBOARD)
     if (cmdtoken == GetCommandValue((unsigned char *)"YModem"))
     {
@@ -209,22 +215,27 @@ void MIPS16 cmd_xmodem(void)
             return;
         fnbr = FindFreeFileNbr();
         fname = (char *)getFstring(cmdline); // get the file name
-        if (Option.SerialConsole)
-        {
-            rcvnoint = true;
-            uart_set_irq_enables((Option.SerialConsole & 3) == 1 ? uart0 : uart1, false, false);
-        }
-        else
-            rcvnoint = false;
         if (rcv)
         {
             if (!BasicFileOpen(fname, fnbr, FA_WRITE | FA_CREATE_ALWAYS))
                 return;
+            if (Option.SerialConsole && filesource[fnbr] != FATFSFILE)
+            {
+                while (ConsoleTxBufTail != ConsoleTxBufHead) // drain any outgoing chracters
+                {
+                }
+                rcvnoint = true;
+                uart_set_irq_enables((Option.SerialConsole & 3) == 1 ? uart0 : uart1, false, false);
+            }
             if (xmodem)
                 xmodemReceive(NULL, 0, fnbr, false);
 #if defined(rp2350) && !defined(USBKEYBOARD)
             else
+            {
+                if (filesource[fnbr] != FATFSFILE)
+                    error("YMODEM receive not available to A: drive");
                 ymodemReceive(NULL, 0, fnbr, false);
+            }
 #endif
             if (rcvnoint)
                 uart_set_irq_enables((Option.SerialConsole & 3) == 1 ? uart0 : uart1, true, false);
@@ -240,8 +251,6 @@ void MIPS16 cmd_xmodem(void)
             else
                 ymodemTransmit(NULL, fnbr, fname, fsize);
 #endif
-            if (rcvnoint)
-                uart_set_irq_enables((Option.SerialConsole & 3) == 1 ? uart0 : uart1, true, false);
         }
         FileClose(fnbr);
     }
@@ -256,12 +265,24 @@ void MIPS16 cmd_xmodem(void)
  * The following section will be excluded from the documentation.
  */
 
+// Replace _inbyte with this version that uses a local FIFO buffer
+// Call with timeout = 0 to just poll and fill FIFO without removing a byte
+// Returns the byte value (0-255) on success, or -1 on timeout/no data
+// When timeout = 0, returns count of bytes in FIFO (0 if empty, -1 unchanged for compatibility)
+// Replace the _inbyte function with this corrected version
+#define FIFOSIZE 1024
 int __not_in_flash_func(_inbyte)(int timeout)
 {
+    static unsigned char local_fifo[FIFOSIZE]; // Match hardware FIFO size
+    static int fifo_count = 0;
+    static int fifo_head = 0;
+
     int c;
-    uint64_t timer = time_us_64() + timeout * 1000;
+
     if (!rcvnoint)
     {
+        // USB CDC mode - no change
+        uint64_t timer = time_us_64() + timeout;
         while (time_us_64() < timer)
         {
             c = getConsole();
@@ -270,23 +291,62 @@ int __not_in_flash_func(_inbyte)(int timeout)
                 return c;
             }
         }
+        return -1;
     }
-    else
+
+    // UART mode - use local FIFO
+    uart_inst_t *uart = (Option.SerialConsole & 3) == 1 ? uart0 : uart1;
+
+    // ALWAYS drain hardware FIFO first (no waiting, just grab what's there)
+    int fifo_tail = (fifo_head + fifo_count) % FIFOSIZE;
+    while (uart_is_readable(uart) && fifo_count < FIFOSIZE)
     {
-        while (time_us_64() < timer && !uart_is_readable((Option.SerialConsole & 3) == 1 ? uart0 : uart1))
-        {
-        }
-        if (time_us_64() < timer)
-            return uart_getc((Option.SerialConsole & 3) == 1 ? uart0 : uart1);
+        local_fifo[fifo_tail] = uart_getc(uart);
+        fifo_tail = (fifo_tail + 1) % FIFOSIZE;
+        fifo_count++;
     }
-    return -1;
+
+    // If timeout is 0, this is a poll request - don't remove byte
+    if (timeout == 0)
+    {
+        return fifo_count > 0 ? fifo_count : -1;
+    }
+
+    // If we have bytes in local FIFO, return one
+    if (fifo_count > 0)
+    {
+        c = local_fifo[fifo_head];
+        fifo_head = (fifo_head + 1) % FIFOSIZE;
+        fifo_count--;
+        return c;
+    }
+
+    // Local FIFO empty - wait for at least 1 byte with timeout
+    uint64_t timer = time_us_64() + timeout;
+    while (time_us_64() < timer && !uart_is_readable(uart))
+    {
+        // Just wait for first byte
+    }
+
+    // Timeout - no data arrived
+    if (!uart_is_readable(uart))
+    {
+        return -1;
+    }
+
+    // Data arrived - drain ALL available bytes from HW FIFO
+    // Since local FIFO was empty, reset pointers for simplicity
+    fifo_head = 0;
+    fifo_count = 0;
+    fifo_tail = 0;
+    return uart_getc(uart);
 }
 char _outbyte(char c, int f)
 {
     if (!rcvnoint)
         SerialConsolePutC(c, f);
     else
-        uart_putc_raw((Option.SerialConsole & 3) == 1 ? uart0 : uart1, c);
+        uart_write_blocking((Option.SerialConsole & 3) == 1 ? uart0 : uart1, (uint8_t *)&c, 1);
     return c;
 }
 
@@ -361,7 +421,7 @@ int receive_packet(unsigned char *buf, int *packet_num, int use_crc)
     if (c == CAN)
     {
         // Check for second CAN
-        if (_inbyte(1000) == CAN)
+        if (_inbyte(1000000) == CAN)
             return -2; // Cancelled
         return 0;      // False alarm
     }
@@ -549,17 +609,24 @@ void ymodemReceive(char *sp, int maxbytes, int fnbr, int crunch)
                 }
                 else if (result > 0 && packet_num == 0)
                 {
-                    // Another file header
+                    // Received header packet - ACK it FIRST
+                    _outbyte(ACK, 1);
+
                     if (buf[0] == 0)
                     {
-                        // Empty header means end of batch
-                        _outbyte(ACK, 1);
+                        // Empty header means end of batch - all done
                         return;
                     }
-                    // Could handle another file here
-                    _outbyte(ACK, 1);
-                    return; // For now, just accept one file
+                    // Non-empty header means another file
+                    return;
                 }
+                else if (result == 0)
+                {
+                    // Timeout waiting - assume complete
+                    return;
+                }
+                // Unexpected case
+                return;
             }
             return;
         }
@@ -713,7 +780,7 @@ void ymodemTransmit(char *p, int fnbr, char *filename, long file_size)
     // Wait for receiver to request start (C or NAK)
     for (retry = 0; retry < 60; retry++)
     {
-        c = _inbyte(1000);
+        c = _inbyte(1000000);
         if (c == CRC16)
         {
             use_crc = 1;
@@ -985,282 +1052,137 @@ void ymodemTransmit(char *p, int fnbr, char *filename, long file_size)
 
 #define XPACKET_SIZE 128
 #define XMAXRETRANS 25
-
-// Receive an XMODEM packet
-// Returns: packet size on success, 0 on error, -1 on EOT, -2 on CAN
-int xmodem_receive_packet(unsigned char *buf, int *packet_num, int use_crc)
+static int check(const unsigned char *buf, int sz)
 {
-    int c;
-    unsigned char seq, seq_comp;
-    unsigned short crc_recv, crc_calc;
-    unsigned char csum_recv, csum_calc;
     int i;
-
-    // Get packet start (SOH)
-    c = _inbyte(PACKET_TIMEOUT);
-    if (c < 0)
-        return 0; // Timeout
-
-    if (c == EOT)
-        return -1; // End of transmission
-    if (c == CAN)
+    unsigned char cks = 0;
+    for (i = 0; i < sz; ++i)
     {
-        // Check for second CAN
-        if (_inbyte(1000) == CAN)
-            return -2; // Cancelled
-        return 0;      // False alarm
+        cks += buf[i];
     }
+    if (cks == buf[sz])
+        return 1;
 
-    if (c != SOH)
-    {
-        return 0; // Invalid start (XMODEM only uses SOH/128-byte blocks)
-    }
-
-    // Get sequence number
-    if ((c = _inbyte(PACKET_TIMEOUT)) < 0)
-        return 0;
-    seq = c;
-
-    // Get complement of sequence number
-    if ((c = _inbyte(PACKET_TIMEOUT)) < 0)
-        return 0;
-    seq_comp = c;
-
-    // Verify sequence numbers are complements
-    if (seq != (unsigned char)(~seq_comp))
-    {
-        return 0; // Sequence error
-    }
-
-    // Read data
-    for (i = 0; i < XPACKET_SIZE; i++)
-    {
-        if ((c = _inbyte(PACKET_TIMEOUT)) < 0)
-            return 0;
-        buf[i] = c;
-    }
-
-    // Read and verify checksum/CRC
-    if (use_crc)
-    {
-        // CRC-16
-        if ((c = _inbyte(PACKET_TIMEOUT)) < 0)
-            return 0;
-        crc_recv = (c << 8);
-        if ((c = _inbyte(PACKET_TIMEOUT)) < 0)
-            return 0;
-        crc_recv |= c;
-
-        crc_calc = crc16_ccitt(buf, XPACKET_SIZE);
-        if (crc_calc != crc_recv)
-        {
-            return 0; // CRC error
-        }
-    }
-    else
-    {
-        // Simple checksum
-        if ((c = _inbyte(PACKET_TIMEOUT)) < 0)
-            return 0;
-        csum_recv = c;
-
-        csum_calc = 0;
-        for (i = 0; i < XPACKET_SIZE; i++)
-        {
-            csum_calc += buf[i];
-        }
-        if (csum_calc != csum_recv)
-        {
-            return 0; // Checksum error
-        }
-    }
-
-    *packet_num = seq;
-    return XPACKET_SIZE; // Return packet size on success
+    return 0;
 }
 
-// XMODEM receive function
-// sp: pointer to memory buffer (NULL if saving to file)
-// maxbytes: size of memory buffer
-// fnbr: file number (if saving to file)
-// crunch: whether to use CrunchData processing
+static void flushinput(void)
+{
+    while (_inbyte(((DLY_1S) * 3) >> 1) >= 0)
+#ifdef PICOMITEWEB
+        ProcessWeb(1)
+#endif
+            ;
+}
 void xmodemReceive(char *sp, int maxbytes, int fnbr, int crunch)
 {
-    unsigned char buf[XPACKET_SIZE];
-    unsigned char prev_buf[XPACKET_SIZE]; // Hold previous packet
-    int packet_num;
-    int expected_seq = 1; // XMODEM starts at packet 1
-    int retry;
-    int result;
-    int use_crc = 0;          // Use checksum mode like original XMODEM
-    int have_prev_packet = 0; // Flag to track if we have a previous packet
+    unsigned char xbuff[X_BUF_SIZE];
+    unsigned char *p;
+    unsigned char trychar = NAK; //'C';
+    unsigned char packetno = 1;
+    int i, c;
+    int retry, retrans = MAXRETRANS;
+    CrunchData((unsigned char **)&sp, 0); // initialise the crunch subroutine
 
-    CrunchData((unsigned char **)&sp, 0); // Initialize crunch if needed
-
-    // Send initial NAK to request start (checksum mode)
-    _outbyte(NAK, 1); // Flush needed - single byte transmission
-
-    // Wait for first packet with retries
-    for (retry = 0; retry < 10; retry++)
-    {
-        // Wait to see if sender responds
-        result = xmodem_receive_packet(buf, &packet_num, use_crc);
-        if (result > 0)
-            break; // Got a packet
-
-        // No response, send NAK again
-        _outbyte(NAK, 1); // Flush needed - single byte transmission
-    }
-
-    if (retry >= 10)
-    {
-        error("Sender did not respond");
-        return;
-    }
-
-    // Check first packet number
-    if (packet_num != 1)
-    {
-        _outbyte(CAN, 0);
-        _outbyte(CAN, 1); // Flush on last byte
-        error("Expected packet 1");
-        return;
-    }
-
-    // Good packet received with correct sequence
-    expected_seq = 2;
-    retry = 0;
-
-    // Save first packet but don't write it yet (in case it's the last packet with padding)
-    memcpy(prev_buf, buf, XPACKET_SIZE);
-    have_prev_packet = 1;
-
-    // Process first packet if going to memory (memory doesn't need padding removal)
-    if (sp != NULL)
-    {
-        for (int i = 0; i < XPACKET_SIZE && maxbytes > 0; i++)
-        {
-            if (--maxbytes > 0)
-            {
-                if (buf[i] == 0x1A)
-                    continue; // Skip padding (SUB/Ctrl-Z)
-                if (crunch)
-                    CrunchData((unsigned char **)&sp, buf[i]);
-                else
-                    *sp++ = buf[i];
-            }
-        }
-    }
-
-    // ACK AFTER processing - ready for next packet
-    _outbyte(ACK, 1); // Flush needed - single byte transmission
-
-    // Main receive loop
+    // first establish communication with the remote
     while (1)
     {
-        result = xmodem_receive_packet(buf, &packet_num, use_crc);
-
-        if (result == -1)
+        for (retry = 0; retry < 32; ++retry)
         {
-            // EOT - end of transmission
-            _outbyte(ACK, 1); // ACK the EOT, flush needed
-
-            // Now write the last packet (prev_buf) with padding removed
-            if (sp == NULL && have_prev_packet)
+            if (trychar)
+                _outbyte(trychar, 1);
+            if ((c = _inbyte((DLY_1S) << 1)) >= 0)
             {
-                // Remove padding bytes (0x1A/SUB) from end
-                int write_len = XPACKET_SIZE;
-                while (write_len > 0 && prev_buf[write_len - 1] == 0x1A)
+                switch (c)
                 {
-                    write_len--;
+                case SOH:
+                    goto start_recv;
+                case EOT:
+                    flushinput();
+                    _outbyte(ACK, 1);
+                    ;
+                    if (sp != NULL)
+                    {
+                        if (maxbytes <= 0)
+                            error("Not enough memory");
+                        *sp++ = 0; // terminate the data
+                    }
+                    return; // no more data
+                case CAN:
+                    flushinput();
+                    _outbyte(ACK, 1);
+                    error("Cancelled by remote");
+                    break;
+                default:
+                    break;
                 }
+            }
+        }
+        flushinput();
+        _outbyte(CAN, 1);
+        _outbyte(CAN, 1);
+        _outbyte(CAN, 1);
+        error("Remote did not respond"); // no sync
 
-                if (write_len > 0)
+    start_recv:
+        trychar = 0;
+        p = xbuff;
+        *p++ = SOH;
+        for (i = 0; i < (X_BLOCK_SIZE + 3); ++i)
+        {
+            if ((c = _inbyte(DLY_1S)) < 0)
+                goto reject;
+            *p++ = c;
+        }
+        if (xbuff[1] == (unsigned char)(~xbuff[2]) && (xbuff[1] == packetno || xbuff[1] == (unsigned char)packetno - 1) && check(&xbuff[3], X_BLOCK_SIZE))
+        {
+            if (xbuff[1] == packetno)
+            {
+                for (i = 0; i < X_BLOCK_SIZE; i++)
                 {
-                    FilePutData((char *)prev_buf, fnbr, write_len);
-                }
-            }
-
-            // Terminate string if saving to memory
-            if (sp != NULL && maxbytes > 0)
-            {
-                *sp = 0;
-            }
-
-            return;
-        }
-        else if (result == -2)
-        {
-            // Cancelled by sender
-            error("Cancelled by remote");
-            return;
-        }
-        else if (result == 0)
-        {
-            // Timeout or error
-            _outbyte(NAK, 1); // Flush needed - single byte transmission
-            if (++retry > XMAXRETRANS)
-            {
-                _outbyte(CAN, 0);
-                _outbyte(CAN, 1); // Flush on last byte
-                error("Too many errors");
-                return;
-            }
-            continue;
-        }
-
-        // Check sequence number
-        if (packet_num != expected_seq)
-        {
-            // If it's the previous packet, sender didn't get our ACK
-            if (packet_num == ((expected_seq - 1) & 0xFF))
-            {
-                _outbyte(ACK, 1); // Re-ACK it, flush needed
-                continue;
-            }
-            // Otherwise, sequence error
-            _outbyte(NAK, 1); // Flush needed - single byte transmission
-            continue;
-        }
-
-        // Good packet received with correct sequence
-        expected_seq = (expected_seq + 1) & 0xFF;
-        retry = 0; // Reset retry counter on success
-
-        // Write the PREVIOUS packet to file BEFORE ACKing
-        // (so interrupts can be disabled during flash write without losing data)
-        if (sp == NULL && have_prev_packet)
-        {
-            // Write entire packet at once (more efficient than byte-by-byte)
-            FilePutData((char *)prev_buf, fnbr, XPACKET_SIZE);
-        }
-
-        // Save current packet as previous for next iteration
-        memcpy(prev_buf, buf, XPACKET_SIZE);
-        have_prev_packet = 1;
-
-        // Process data if going to memory
-        if (sp != NULL)
-        {
-            for (int i = 0; i < XPACKET_SIZE && maxbytes > 0; i++)
-            {
-                if (--maxbytes > 0)
-                {
-                    if (buf[i] == 0x1A)
-                        continue; // Skip padding
-                    if (crunch)
-                        CrunchData((unsigned char **)&sp, buf[i]);
+                    if (sp != NULL)
+                    {
+                        // save the data to the RAM buffer
+                        if (--maxbytes > 0)
+                        {
+                            if (xbuff[i + 3] == PAD)
+                                continue;
+                            //                            if(xbuff[i + 3] == PAD)
+                            //                                *sp++ = 0;                          // replace any EOF's (used to pad out a block) with NUL
+                            //                            else
+                            if (xbuff[i + 3] == 0)
+                                continue;
+                            if (crunch)
+                                CrunchData((unsigned char **)&sp, xbuff[i + 3]);
+                            else
+                                *sp++ = xbuff[i + 3]; // saving to a memory buffer
+                        }
+                    }
                     else
-                        *sp++ = buf[i];
+                    {
+                        // we are saving to a file
+                        FilePutChar(xbuff[i + 3], fnbr);
+                    }
                 }
+                ++packetno;
+                retrans = MAXRETRANS + 1;
             }
+            if (--retrans <= 0)
+            {
+                flushinput();
+                _outbyte(CAN, 1);
+                _outbyte(CAN, 1);
+                _outbyte(CAN, 1);
+                error("Too many errors");
+            }
+            _outbyte(ACK, 1);
+            continue;
         }
-
-        // ACK AFTER all processing/writing complete - now ready for next packet
-        _outbyte(ACK, 1); // Flush needed - single byte transmission
+    reject:
+        flushinput();
+        _outbyte(NAK, 1);
     }
 }
-
 // XMODEM transmit function
 // p: pointer to data in memory (NULL if sending from file)
 // fnbr: file number if sending from file
@@ -1269,11 +1191,10 @@ void xmodemTransmit(char *p, int fnbr, long data_size)
 {
     unsigned char buf[XPACKET_SIZE];
     int packet_num = 1; // XMODEM starts at packet 1
-    int retry;
     int c;
     int use_crc = 0;
     long bytes_sent = 0;
-
+    int retry;
     // Calculate data size if not provided
     if (data_size == 0 && p != NULL)
     {
@@ -1283,7 +1204,7 @@ void xmodemTransmit(char *p, int fnbr, long data_size)
     // Wait for receiver to request start (NAK)
     for (retry = 0; retry < 60; retry++)
     {
-        c = _inbyte(1000);
+        c = _inbyte(1000000);
         if (c == NAK)
         {
             use_crc = 0; // Receiver wants checksum

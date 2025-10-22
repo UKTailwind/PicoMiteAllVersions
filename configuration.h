@@ -46,9 +46,9 @@ extern "C"
 #define MAXVARS 768
 
 #ifdef USBKEYBOARD
-#define HEAP_MEMORY_SIZE (184 * 1024)
+#define HEAP_MEMORY_SIZE (180 * 1024)
 #else
-#define HEAP_MEMORY_SIZE (184 * 1024)
+#define HEAP_MEMORY_SIZE (180 * 1024)
 #endif
 
 #define FLASH_TARGET_OFFSET (880 * 1024)
@@ -285,7 +285,7 @@ extern "C"
 #ifdef rp2350
 #define MAXDIM 5 // Maximum number of dimensions to an array
 #define PSRAMCSPIN PSRAMpin
-    extern uint8_t PSRAMpin;
+        extern uint8_t PSRAMpin;
 #else
 #define MAXDIM 6 // Maximum number of dimensions to an array
 #endif
@@ -368,7 +368,7 @@ extern "C"
 #define EDIT_BUFFER_SIZE (heap_memory_size - 3072 - 3 * HRes)
 
 #ifdef rp2350
-#define FreqDefault 150000
+#define FreqDefault 200000
 #define FAST_TIMER_PIN 2
 #else
 #define FreqDefault 200000
@@ -506,50 +506,50 @@ extern "C"
 #define PICOMITERP2350 (defined(PICOMITE) && defined(rp2350))
 #define WEBRP2350 (!defined(rp2350) && defined(PICOMITEWEB))
 
-    /* ============================================================================
-     * Type definitions - MM operations enum
-     * ============================================================================ */
-    typedef enum
-    {
-        MMHRES,
-        MMVRES,
-        MMVER,
-        MMI2C,
-        MMFONTHEIGHT,
-        MMFONTWIDTH,
+        /* ============================================================================
+         * Type definitions - MM operations enum
+         * ============================================================================ */
+        typedef enum
+        {
+                MMHRES,
+                MMVRES,
+                MMVER,
+                MMI2C,
+                MMFONTHEIGHT,
+                MMFONTWIDTH,
 #ifndef USBKEYBOARD
-        MMPS2,
+                MMPS2,
 #else
-    MMUSB,
+        MMUSB,
 #endif
-        MMHPOS,
-        MMVPOS,
-        MMONEWIRE,
-        MMERRNO,
-        MMERRMSG,
-        MMWATCHDOG,
-        MMDEVICE,
-        MMCMDLINE,
+                MMHPOS,
+                MMVPOS,
+                MMONEWIRE,
+                MMERRNO,
+                MMERRMSG,
+                MMWATCHDOG,
+                MMDEVICE,
+                MMCMDLINE,
 #ifdef PICOMITEWEB
-        MMMESSAGE,
-        MMADDRESS,
-        MMTOPIC,
+                MMMESSAGE,
+                MMADDRESS,
+                MMTOPIC,
 #endif
-        MMFLAG,
-        MMDISPLAY,
-        MMWIDTH,
-        MMHEIGHT,
-        MMPERSISTENT,
+                MMFLAG,
+                MMDISPLAY,
+                MMWIDTH,
+                MMHEIGHT,
+                MMPERSISTENT,
 #ifndef PICOMITEWEB
-        MMSUPPLY,
+                MMSUPPLY,
 #endif
-        MMEND
-    } Operation;
+                MMEND
+        } Operation;
 
-    /* ============================================================================
-     * External variables
-     * ============================================================================ */
-    extern const char *overlaid_functions[];
+        /* ============================================================================
+         * External variables
+         * ============================================================================ */
+        extern const char *overlaid_functions[];
 
 #ifdef __cplusplus
 }

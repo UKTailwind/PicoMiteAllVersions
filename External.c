@@ -5408,6 +5408,13 @@ void MIPS16 ClearExternalIO(void)
     {
         inttbl[i].pin = 0; // disable all interrupts
     }
+#ifdef rp2350
+    if (Option.special == 1)
+    {
+        if (CheckPin(58, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED))
+            ExtCfg(58, EXT_ANA_IN, 0);
+    }
+#endif
 #ifndef PICOMITEWEB
     if (!Option.AllPins)
     {

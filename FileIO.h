@@ -120,7 +120,7 @@ extern "C"
                 unsigned char continuation;
                 unsigned char LOCAL_KEYBOARD;
                 unsigned char KeyboardBrightness;
-                uint8_t D2;
+                uint8_t special; // used for special board configurations
 
                 /* Font and RTC */
                 unsigned char DefaultFont;

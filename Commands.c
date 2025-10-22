@@ -38,6 +38,9 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "hardware/flash.h"
 #include "hardware/dma.h"
 #include "hardware/structs/watchdog.h"
+#ifndef USBKEYBOARD
+#include "class/cdc/cdc_device.h"
+#endif
 #ifdef PICOMITE
 #include "pico/multicore.h"
 #endif
@@ -861,7 +864,10 @@ void MIPS16 ListProgram(unsigned char *p, int all)
 						MMputchar(*pp++, 0);
 					}
 				}
+#ifndef USBKEYBOARD
 				fflush(stdout);
+				tud_cdc_write_flush();
+#endif
 				ListNewLine(&ListCnt, all);
 				routinechecks();
 				CheckAbort();
@@ -1764,7 +1770,10 @@ void do_end(bool ecmd)
 	if (Option.SerialConsole)
 		while (ConsoleTxBufHead != ConsoleTxBufTail)
 			routinechecks();
+#ifndef USBKEYBOARD
 	fflush(stdout);
+	tud_cdc_write_flush();
+#endif
 	if (ecmd)
 	{
 		getcsargs(&cmdline, 1);
@@ -1776,7 +1785,10 @@ void do_end(bool ecmd)
 				if (Option.SerialConsole)
 					while (ConsoleTxBufHead != ConsoleTxBufTail)
 						routinechecks();
+#ifndef USBKEYBOARD
 				fflush(stdout);
+				tud_cdc_write_flush();
+#endif
 				memset(inpbuf, 0, STRINGSIZE);
 			}
 			else
@@ -1796,7 +1808,10 @@ void do_end(bool ecmd)
 			if (Option.SerialConsole)
 				while (ConsoleTxBufHead != ConsoleTxBufTail)
 					routinechecks();
+#ifndef USBKEYBOARD
 			fflush(stdout);
+			tud_cdc_write_flush();
+#endif
 			memset(inpbuf, 0, STRINGSIZE);
 		}
 	}
@@ -3472,7 +3487,8 @@ void cmd_frame(void){
 				}
 			}
 		}
-		fflush(stdout);
+		fflush(stdout);         tud_cdc_write_flush();
+#endif
 		gui_fcolour=savefcol;
 		SCursor(sx,sy);
 		framecursor=ccursor;

@@ -693,10 +693,17 @@ uint8_t PSRAMpin;
             {
                 if (tud_cdc_connected())
                 {
+                    while (!tud_cdc_write_available())
+                    {
+                        tight_loop_contents();
+                    }
                     putc(c, stdout);
                     if (flush)
                     {
+#ifndef USBKEYBOARD
                         fflush(stdout);
+                        tud_cdc_write_flush();
+#endif
                     }
                 }
             }
@@ -1114,7 +1121,10 @@ int __not_in_flash_func(MMInkey)(void)
                             }
                             j--;
                         }
+#ifndef USBKEYBOARD
                         fflush(stdout);
+                        tud_cdc_write_flush();
+#endif
                         MX470Display(CLEAR_TO_EOS);
                         SSPrintString("\033[0J");
 
@@ -1135,7 +1145,10 @@ int __not_in_flash_func(MMInkey)(void)
                             }
                             j++;
                         }
+#ifndef USBKEYBOARD
                         fflush(stdout);
+                        tud_cdc_write_flush();
+#endif
 
                         // Return cursor to position
                         for (j = len; j > i; j--)
@@ -1152,7 +1165,10 @@ int __not_in_flash_func(MMInkey)(void)
                             }
                         }
                         CharIndex--;
+#ifndef USBKEYBOARD
                         fflush(stdout);
+                        tud_cdc_write_flush();
+#endif
                         if (strlen((const char *)inpbuf) == 0)
                             BufEdited = false;
                     }
@@ -1225,7 +1241,10 @@ int __not_in_flash_func(MMInkey)(void)
                             }
                             j--;
                         }
+#ifndef USBKEYBOARD
                         fflush(stdout);
+                        tud_cdc_write_flush();
+#endif
                         MX470Display(CLEAR_TO_EOS);
                         SSPrintString("\033[0J");
 
@@ -1245,7 +1264,10 @@ int __not_in_flash_func(MMInkey)(void)
                             }
                             j++;
                         }
+#ifndef USBKEYBOARD
                         fflush(stdout);
+                        tud_cdc_write_flush();
+#endif
 
                         for (j = len; j > i; j--)
                         {
@@ -1260,7 +1282,10 @@ int __not_in_flash_func(MMInkey)(void)
                                 MMputchar('\b', 0);
                             }
                         }
+#ifndef USBKEYBOARD
                         fflush(stdout);
+                        tud_cdc_write_flush();
+#endif
                     }
                     break;
 
@@ -1291,7 +1316,10 @@ int __not_in_flash_func(MMInkey)(void)
                             }
                             CharIndex--;
                         }
+#ifndef USBKEYBOARD
                         fflush(stdout);
+                        tud_cdc_write_flush();
+#endif
                     }
                     else
                     {
@@ -1307,7 +1335,10 @@ int __not_in_flash_func(MMInkey)(void)
                     {
                         MMputchar(inpbuf[CharIndex++], 0);
                     }
+#ifndef USBKEYBOARD
                     fflush(stdout);
+                    tud_cdc_write_flush();
+#endif
                     break;
 
                 // Function keys - consolidated
@@ -1358,7 +1389,10 @@ int __not_in_flash_func(MMInkey)(void)
                     else
                     {
                         SSPrintString("\e[2J\e[H");
+#ifndef USBKEYBOARD
                         fflush(stdout);
+                        tud_cdc_write_flush();
+#endif
                         if (Option.DISPLAY_CONSOLE)
                         {
                             ClearScreen(gui_bcolour);
@@ -1372,7 +1406,10 @@ int __not_in_flash_func(MMInkey)(void)
                         {
                             MMPrintString("> ");
                         }
+#ifndef USBKEYBOARD
                         fflush(stdout);
+                        tud_cdc_write_flush();
+#endif
                     }
                     break;
 
@@ -1450,7 +1487,10 @@ int __not_in_flash_func(MMInkey)(void)
                             }
                             j--;
                         }
+#ifndef USBKEYBOARD
                         fflush(stdout);
+                        tud_cdc_write_flush();
+#endif
                         MX470Display(CLEAR_TO_EOS);
                         SSPrintString("\033[0J");
                     }
@@ -1461,7 +1501,10 @@ int __not_in_flash_func(MMInkey)(void)
                     {
                         SSPrintString(" \b");
                     }
+#ifndef USBKEYBOARD
                     fflush(stdout);
+                    tud_cdc_write_flush();
+#endif
                     break;
 
                 default:
@@ -1494,7 +1537,10 @@ int __not_in_flash_func(MMInkey)(void)
                                     MMputchar('\b', 0);
                                 }
                             }
+#ifndef USBKEYBOARD
                             fflush(stdout);
+                            tud_cdc_write_flush();
+#endif
                         }
                         else
                         {
@@ -1507,7 +1553,10 @@ int __not_in_flash_func(MMInkey)(void)
                             {
                                 SSPrintString(" \b");
                             }
+#ifndef USBKEYBOARD
                             fflush(stdout);
+                            tud_cdc_write_flush();
+#endif
                         }
 
 #ifndef PICOMITEVGA
@@ -1618,7 +1667,10 @@ int __not_in_flash_func(MMInkey)(void)
                         MMputchar('\b', 0); // display the line and erase the last char
                         for (CharIndex = strlen((const char *)inpbuf); CharIndex > i; CharIndex--)
                             MMputchar('\b', 0);
-                        fflush(stdout); // return the cursor to the righ position
+#ifndef USBKEYBOARD
+                        fflush(stdout);
+                        tud_cdc_write_flush(); // return the cursor to the righ position
+#endif
                     }
                     break;
 
@@ -1663,7 +1715,10 @@ int __not_in_flash_func(MMInkey)(void)
                         MMputchar('\b', 0); // display the line and erase the last char
                         for (CharIndex = strlen((const char *)inpbuf); CharIndex > i; CharIndex--)
                             MMputchar('\b', 0);
-                        fflush(stdout); // return the cursor to the right position
+#ifndef USBKEYBOARD
+                        fflush(stdout);
+                        tud_cdc_write_flush(); // return the cursor to the right position
+#endif
                     }
                     break;
 
@@ -1687,7 +1742,10 @@ int __not_in_flash_func(MMInkey)(void)
                             MMputchar('\b', 0);
                             CharIndex--;
                         }
+#ifndef USBKEYBOARD
                         fflush(stdout);
+                        tud_cdc_write_flush();
+#endif
                     }
                     break;
 
@@ -1697,7 +1755,10 @@ int __not_in_flash_func(MMInkey)(void)
                     {
                         MMputchar(inpbuf[CharIndex++], 0);
                     }
+#ifndef USBKEYBOARD
                     fflush(stdout);
+                    tud_cdc_write_flush();
+#endif
                     break;
 
                     /*            if(c == F2)  tp = "RUN";
@@ -1733,7 +1794,10 @@ int __not_in_flash_func(MMInkey)(void)
                     {
                         /*** F5 will clear the VT100  ***/
                         SSPrintString("\e[2J\e[H");
+#ifndef USBKEYBOARD
                         fflush(stdout);
+                        tud_cdc_write_flush();
+#endif
                         if (Option.DISPLAY_CONSOLE)
                         {
                             ClearScreen(gui_bcolour);
@@ -1741,7 +1805,10 @@ int __not_in_flash_func(MMInkey)(void)
                             CurrentY = 0;
                         }
                         MMPrintString("> ");
+#ifndef USBKEYBOARD
                         fflush(stdout);
+                        tud_cdc_write_flush();
+#endif
                     }
                     break;
                 case 0x96:
@@ -1778,7 +1845,10 @@ int __not_in_flash_func(MMInkey)(void)
                             MMputchar('\b', 0);
                             CharIndex--;
                         }
-                        fflush(stdout); // go to the beginning of line
+#ifndef USBKEYBOARD
+                        fflush(stdout);
+                        tud_cdc_write_flush(); // go to the beginning of line
+#endif
                         if (lastcmd_edit)
                         {
                             i = lastcmd_idx + strlen((const char *)&lastcmd[lastcmd_idx]) + 1; // find the next command
@@ -1801,7 +1871,10 @@ int __not_in_flash_func(MMInkey)(void)
                             MMputchar('\b', 0);
                             CharIndex--;
                         }
-                        fflush(stdout); // go to the beginning of line
+#ifndef USBKEYBOARD
+                        fflush(stdout);
+                        tud_cdc_write_flush(); // go to the beginning of line
+#endif
                         if (lastcmd_idx == 0)
                             *inpbuf = lastcmd_edit = 0;
                         else
@@ -1859,7 +1932,10 @@ int __not_in_flash_func(MMInkey)(void)
                             CharIndex++;
                             for (j = strlen((const char *)inpbuf); j > CharIndex; j--)
                                 MMputchar('\b', 0);
-                            fflush(stdout); // return the cursor to the right position
+#ifndef USBKEYBOARD
+                            fflush(stdout);
+                            tud_cdc_write_flush(); // return the cursor to the right position
+#endif
                         }
                         else
                         {
@@ -1916,7 +1992,10 @@ int __not_in_flash_func(MMInkey)(void)
                 MMputchar(*s, 1);
             s++;
         }
+#ifndef USBKEYBOARD
         fflush(stdout);
+        tud_cdc_write_flush();
+#endif
     }
     void SSPrintString(char *s)
     {
@@ -1925,12 +2004,16 @@ int __not_in_flash_func(MMInkey)(void)
             SerialConsolePutC(*s, 0);
             s++;
         }
+#ifndef USBKEYBOARD
         fflush(stdout);
+        tud_cdc_write_flush();
+#endif
     }
 
     /*void myprintf(char *s){
        fputs(s,stdout);
-         fflush(stdout);
+         fflush(stdout);         tud_cdc_write_flush();
+#endif
     }*/
 
     void __not_in_flash_func(mT4IntEnable)(int status)

@@ -51,6 +51,10 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #if PICOMITERP2350
 #include "pico/multicore.h"
 #endif
+#ifndef USBKEYBOARD
+#include "class/cdc/cdc_device.h"
+#endif
+
 #if defined(USBKEYBOARD)
 extern int caps_lock;
 extern int num_lock;
@@ -2073,7 +2077,10 @@ void MIPS16 cmd_library(void)
         IntToStr((char *)tknbuf, k, 10);
         MMPrintString((char *)tknbuf);
         MMPrintString(" bytes\r\n");
+#ifndef USBKEYBOARD
         fflush(stdout);
+        tud_cdc_write_flush();
+#endif
         uSec(2000);
 
         // Now call the new command that will clear the current program memory then
@@ -2511,6 +2518,10 @@ void MIPS16 printoptions(void)
             MMPrintString(" BLACK");
         PRet();
     }
+#if defined(rp2350) && !defined(PICOMITEWEB)
+    if (Option.special == 1)
+        PO2Str("PICO PLUS 2", "ON");
+#endif
 #ifdef USBKEYBOARD
     if (!(Option.USBKeyboard == NO_KEYBOARD))
     {
@@ -4418,6 +4429,35 @@ void MIPS16 cmd_option(void)
         SaveOptions();
         return;
     }
+#if defined(rp2350) && !defined(PICOMITEWEB)
+    tp = checkstring(cmdline, (unsigned char *)"PICO PLUS 2");
+    if (tp)
+    {
+        if (checkstring(tp, (unsigned char *)"OFF"))
+        {
+            Option.NoHeartbeat = true;
+            Option.special = 0;
+        }
+        else if (checkstring(tp, (unsigned char *)"ON"))
+        {
+            if (ExtCurrentConfig[58] != EXT_NOT_CONFIG)
+                error("Pin | is in use", 58);
+            if (ExtCurrentConfig[43] != EXT_NOT_CONFIG)
+                error("Pin | is in use", PINMAP[25]);
+            Option.NoHeartbeat = false;
+            Option.heartbeatpin = PINMAP[25];
+            Option.special = 1;
+            SaveOptions();
+            SoftReset(SOFT_RESET);
+            return;
+        }
+        else
+            SyntaxError();
+        SaveOptions();
+        SoftReset(SOFT_RESET);
+        return;
+    }
+#endif
     tp = checkstring(cmdline, (unsigned char *)"PLATFORM");
     if (tp)
     {
