@@ -129,7 +129,7 @@ unsigned char *GetIntAddress(unsigned char *p);
  * Function declarations - Memory and system
  * ============================================================================ */
 uint32_t getFreeHeap(void);
-uint32_t __get_MSP(void);
+static inline uint32_t __get_MSP(void);
 
 /* ============================================================================
  * Function declarations - Address operations

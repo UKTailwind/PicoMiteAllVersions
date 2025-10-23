@@ -153,10 +153,15 @@ void m_alloc(int type);
 void *GetMemory(int msize);
 void *GetSystemMemory(int msize);
 void *GetTempMemory(int NbrBytes);
+#if defined(rp2350)
 void *GetTempStrMemory(void);
+void *GetTempMainMemory(int NbrBytes);
+#else
+#define GetTempStrMemory() GetTempMemory(STRINGSIZE)
+#define GetTempMainMemory(a) GetTempMemory(a)
+#endif
 void *GetAlignedMemory(int size);
 void *ReAllocMemory(void *addr, size_t msize);
-void *GetTempMainMemory(int NbrBytes);
 /* ============================================================================
  * Function declarations - Memory deallocation
  * ============================================================================ */
@@ -171,6 +176,13 @@ void ClearSpecificTempMemory(void *addr);
 int FreeSpaceOnHeap(void);
 int LargestContiguousHeap(void);
 int MemSize(void *addr);
+static inline uint32_t __get_MSP(void)
+{
+   uint32_t result;
+
+   __asm volatile("MRS %0, msp" : "=r"(result));
+   return (result);
+}
 
 #endif /* !defined(INCLUDE_COMMAND_TABLE) && !defined(INCLUDE_TOKEN_TABLE) */
 

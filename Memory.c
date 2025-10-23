@@ -1052,6 +1052,7 @@ void __not_in_flash_func (*GetTempMemory)(int NbrBytes)
     g_TempMemoryIsChanged = true;
     return (void *)g_StrTmp[g_StrTmpIndex++];
 }
+#if defined(rp2350)
 void __not_in_flash_func (*GetTempStrMemory)(void)
 {
     if (g_StrTmpIndex >= MAXTEMPSTRINGS)
@@ -1061,6 +1062,7 @@ void __not_in_flash_func (*GetTempStrMemory)(void)
     g_TempMemoryIsChanged = true;
     return (void *)g_StrTmp[g_StrTmpIndex++];
 }
+
 void __not_in_flash_func (*GetTempMainMemory)(int NbrBytes)
 {
     if (g_StrTmpIndex >= MAXTEMPSTRINGS)
@@ -1070,6 +1072,7 @@ void __not_in_flash_func (*GetTempMainMemory)(int NbrBytes)
     g_TempMemoryIsChanged = true;
     return (void *)g_StrTmp[g_StrTmpIndex++];
 }
+#endif
 
 // get a temporary string buffer
 // this is used by many BASIC string functions.  The space only lasts for the length of the command.

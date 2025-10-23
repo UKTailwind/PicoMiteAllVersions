@@ -702,7 +702,7 @@ void MIPS16 cmd_psram(void)
             }
         disable_interrupts_pico();
         uint8_t *q = (uint8_t *)(PSRAMblock + ((i - 1) * MAX_PROG_SIZE));
-        uint8_t *writebuff = GetTempMainMemory(4096);
+        uint8_t *writebuff = GetTempMemory(4096);
         if (*q == 0xFF)
         {
             enable_interrupts_pico();
@@ -812,7 +812,7 @@ void MIPS16 cmd_flash(void)
             }
         disable_interrupts_pico();
         uint8_t *q = ProgMemory;
-        uint8_t *writebuff = GetTempMainMemory(4096);
+        uint8_t *writebuff = GetTempMemory(4096);
         for (int k = 0; k < MAX_PROG_SIZE; k += 4096)
         {
             for (int j = 0; j < 4096; j++)
@@ -1010,7 +1010,7 @@ void MIPS16 cmd_flash(void)
             }
         disable_interrupts_pico();
         uint8_t *q = (uint8_t *)ProgMemory;
-        uint8_t *writebuff = (uint8_t *)GetTempMainMemory(4096);
+        uint8_t *writebuff = (uint8_t *)GetTempMemory(4096);
         for (int k = 0; k < MAX_PROG_SIZE; k += 4096)
         {
             for (int j = 0; j < 4096; j++)
@@ -1039,7 +1039,7 @@ void MIPS16 cmd_flash(void)
             }
         disable_interrupts_pico();
         uint8_t *q = (uint8_t *)(flash_target_contents + (i - 1) * MAX_PROG_SIZE);
-        uint8_t *writebuff = GetTempMainMemory(4096);
+        uint8_t *writebuff = GetTempMemory(4096);
         if (*q == 0xFF)
         {
             enable_interrupts_pico();
@@ -2884,7 +2884,7 @@ int FileLoadProgram(unsigned char *fname, bool chain)
     FatFSFileSystem = FatFSFileSystemSave;
     if (!BasicFileOpen(p, fnbr, FA_READ))
         return false;
-    p = buf = GetTempMainMemory(EDIT_BUFFER_SIZE - 2048); // get all the memory while leaving space for the couple of buffers defined and the file handle
+    p = buf = GetTempMemory(EDIT_BUFFER_SIZE - 2048); // get all the memory while leaving space for the couple of buffers defined and the file handle
     *p++ = '\'';
     *p++ = '#';
     strcpy(p, CurrentFileSystem ? "B:" : "A:");
@@ -3357,7 +3357,7 @@ int MemLoadProgram(unsigned char *fname, unsigned char *ram)
     FatFSFileSystem = FatFSFileSystemSave;
     if (!BasicFileOpen(p, fnbr, FA_READ))
         return false;
-    p = buf = GetTempMainMemory(EDIT_BUFFER_SIZE - 2048); // get all the memory while leaving space for the couple of buffers defined and the file handle
+    p = buf = GetTempMemory(EDIT_BUFFER_SIZE - 2048); // get all the memory while leaving space for the couple of buffers defined and the file handle
     *p++ = '\'';
     *p++ = '#';
     strcpy(p, CurrentFileSystem ? "B:" : "A:");
@@ -3883,6 +3883,12 @@ void MMfputs(unsigned char *p, int filenbr)
     if (FileTable[filenbr].com > MAXCOMPORTS)
     {
         FilePutData((char *)p, filenbr, i);
+    }
+    else if (filenbr == 0)
+    {
+        while ((i--) > 1)
+            MMputchar(*p++, 0);
+        MMputchar(*p++, 1);
     }
     else
     {
@@ -5212,7 +5218,7 @@ void cmd_autosave(void)
                 FreeMemory(TCPstate->buffer_recv[i]);
         }
 #endif
-        p = buf = GetTempMainMemory(EDIT_BUFFER_SIZE);
+        p = buf = GetTempMemory(EDIT_BUFFER_SIZE);
         char *fromp = (char *)ProgMemory;
         p = buf;
         while (*fromp != 0xff)
@@ -5239,7 +5245,7 @@ void cmd_autosave(void)
         ;
     }
     ClearProgram(false); // clear any leftovers from the previous program
-    p = buf = GetTempMainMemory(EDIT_BUFFER_SIZE);
+    p = buf = GetTempMemory(EDIT_BUFFER_SIZE - 8192);
     CrunchData(&p, 0); // initialise the crunch data subroutine
 readin:;
     while ((c = MMInkey()) != 0x1a && c != F1 && c != F2)
@@ -5254,7 +5260,7 @@ readin:;
         }
         if (p == buf && c == '\n')
             continue; // throw away an initial line feed which can follow the command
-        if ((p - buf) >= EDIT_BUFFER_SIZE)
+        if ((p - buf) >= EDIT_BUFFER_SIZE - 8192)
             StandardError(29);
         if (isprint(c) || c == '\r' || c == '\n' || c == TAB)
         {
@@ -5275,6 +5281,10 @@ readin:;
                 {
                     MMputchar('\n', 1);
                     count = 0;
+#ifndef USBKEYBOARD
+                    fflush(stdout);
+                    tud_cdc_write_flush();
+#endif
                 }
             }
             prevc = c;
@@ -5284,7 +5294,6 @@ readin:;
     fflush(stdout);
     tud_cdc_write_flush();
 #endif
-
     *p = 0; // terminate the string in RAM
     while (getConsole() != -1)
         ; // clear any rubbish in the input
@@ -5308,117 +5317,6 @@ readin:;
         ExecuteProgram(tknbuf); // execute the line straight away
     }
 }
-/*
-void cmd_autosave(void)
-{
-    unsigned char *buf, *p;
-    int c, prevc = 0, crunch = false;
-    int count = 0;
-    uint64_t timeout;
-    if (CurrentLinePtr)StandardError(10);
-    if(!checkstring(cmdline,(unsigned char *)"APPEND")){
-        FlashLoad=0;
-        uSec(250000);
-        FlashWriteInit(PROGRAM_FLASH);
-        flash_range_erase(realflashpointer, MAX_PROG_SIZE);
-        FlashWriteByte(0); FlashWriteByte(0); FlashWriteByte(0);    // terminate the program in flash
-        FlashWriteClose();
-        if (*cmdline)
-        {
-            if (mytoupper(*cmdline) == 'C')
-                crunch = true;
-            else
-                SyntaxError();;
-        }
-        CrunchData(&p, 0); // initialise the crunch data subroutine
-        }
-        ClearVars(0,true);
-        CloseAudio(1);
-        CloseAllFiles();
-        ClearExternalIO();                                              // this MUST come before InitHeap(true)
-#ifdef PICOMITEWEB
-        if(TCPstate){
-            for(int i=0;i<MaxPcb;i++)FreeMemory(TCPstate->buffer_recv[i]);
-        }
-#endif
-        p = buf = GetTempMainMemory(EDIT_BUFFER_SIZE-2048);
-        char * fromp  = (char *)ProgMemory;
-        if(*fromp){
-            p = buf;
-            while(*fromp != 0xff) {
-                if(*fromp == T_NEWLINE) {
-                    fromp = (char *)llist((unsigned char *)p, (unsigned char *)fromp);                                // otherwise expand the line
-                    p += strlen((char *)p);
-                    *p++ = '\n'; *p = 0;
-                }
-                // finally, is it the end of the program?
-                if(fromp[0] == 0 || fromp[0] == 0xff) break;
-            }
-        }
-    while ((c = MMInkey()) != 0x1a && c != F1 && c != F2)
-    { // while waiting for the end of text char
-        if (c == -1 && count && time_us_64() - timeout > 100000)
-        {
-            fflush(stdout);         tud_cdc_write_flush();
-#endif
-            count = 0;
-        }
-        if (p == buf && c == '\n')
-            continue; // throw away an initial line feed which can follow the command
-        if ((p - buf) >= EDIT_BUFFER_SIZE-2048)
-            StandardError(29);
-        if (isprint(c) || c == '\r' || c == '\n' || c == TAB)
-        {
-            if (c == TAB)
-                c = ' ';
-            if (crunch)
-                CrunchData(&p, c); // insert into RAM after throwing away comments. etc
-            else
-                *p++ = c; // insert the input into RAM
-            {
-                if (!(c == '\n' && prevc == '\r'))
-                {
-                    MMputchar(c, 0);
-                    count++;
-                    timeout = time_us_64();
-                } // and echo it
-                if (c == '\r')
-                {
-                    MMputchar('\n', 1);
-                    count = 0;
-                }
-            }
-            prevc = c;
-        }
-    }
-    fflush(stdout);         tud_cdc_write_flush();
-#endif
-
-    *p = 0; // terminate the string in RAM
-    while (getConsole() != -1)
-        ; // clear any rubbish in the input
-          //    ClearSavedVars();                                               // clear any saved variables
-    int j,i=0;
-        j=check_line_length((char *)buf,&i);
-        if(j>255)error("line % is % characters long, maximum is 255",i,j);
-        SaveProgramToFlash(buf, true);
-        ClearSavedVars(); // clear any saved variables
-        ClearTempMemory();
-#ifdef PICOMITEWEB
-            if(TCPstate){
-                for(int i=0;i<MaxPcb;i++)TCPstate->buffer_recv[i]=GetMemory(TCP_READ_BUFFER_SIZE);
-            }
-#endif
-        if (c == F2)
-        {
-            ClearVars(0,true);
-            strcpy((char *)inpbuf, "RUN\r\n");
-            multi=false;
-            tokenise(true);         // turn into executable code
-            ExecuteProgram(tknbuf); // execute the line straight away
-        }
-//    }
-}*/
 /*
  * @cond
  * The following section will be excluded from the documentation.
@@ -6113,9 +6011,9 @@ void MIPS16 cmd_var(void)
         }
         // load the current variable save table into RAM
         // while doing this skip any variables that are in the argument list for this save
-        bufp = buf = GetTempMainMemory(SAVEDVARS_FLASH_SIZE); // build the saved variable table in RAM
-                                                              //        SavedVarsFlash = (char*)FLASH_SAVED_VAR_ADDR;      // point to where the variables were saved
-        varp = (unsigned char *)SavedVarsFlash;               // point to where the variables were saved
+        bufp = buf = GetTempMemory(SAVEDVARS_FLASH_SIZE); // build the saved variable table in RAM
+                                                          //        SavedVarsFlash = (char*)FLASH_SAVED_VAR_ADDR;      // point to where the variables were saved
+        varp = (unsigned char *)SavedVarsFlash;           // point to where the variables were saved
         while (*varp != 0 && *varp != 0xff)
         {                   // 0xff is the end of the variable list, SavedVarsFlash[4] = 0 means that the flash has never been written to
             type = *varp++; // get the variable type

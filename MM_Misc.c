@@ -6821,14 +6821,6 @@ void fun_device(void)
     targ = T_STR;
 }
 
-uint32_t __get_MSP(void)
-{
-    uint32_t result;
-
-    __asm volatile("MRS %0, msp" : "=r"(result));
-    return (result);
-}
-
 void MIPS16 fun_info(void)
 {
     unsigned char *tp;

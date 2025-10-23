@@ -59,7 +59,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #define XMODEMBUFFERSIZE EDIT_BUFFER_SIZE
 #endif
 // Calculate CRC-16 (CCITT)
-static unsigned short crc16_ccitt_table[256] = {
+static const unsigned short crc16_ccitt_table[256] = {
     0x0000, 0x1021, 0x2042, 0x3063, 0x4084, 0x50a5, 0x60c6, 0x70e7,
     0x8108, 0x9129, 0xa14a, 0xb16b, 0xc18c, 0xd1ad, 0xe1ce, 0xf1ef,
     0x1231, 0x0210, 0x3273, 0x2252, 0x52b5, 0x4294, 0x72f7, 0x62d6,
@@ -151,7 +151,7 @@ void MIPS16 cmd_xmodem(void)
             CloseAudio(1);
             ClearVars(0, true);
         }
-        buf = GetTempMainMemory(XMODEMBUFFERSIZE);
+        buf = GetTempMemory(XMODEMBUFFERSIZE);
         if (rcv)
         {
             if (xmodem)
@@ -271,7 +271,11 @@ void MIPS16 cmd_xmodem(void)
 // When timeout = 0, returns count of bytes in FIFO (0 if empty, -1 unchanged for compatibility)
 // Replace the _inbyte function with this corrected version
 #define FIFOSIZE 1024
+#if !defined(PICOMITEWEB) && !defined(rp2350)
 int __not_in_flash_func(_inbyte)(int timeout)
+#else
+int _inbyte(int timeout)
+#endif
 {
     static unsigned char local_fifo[FIFOSIZE]; // Match hardware FIFO size
     static int fifo_count = 0;
@@ -508,7 +512,7 @@ void ymodemReceive(char *sp, int maxbytes, int fnbr, int crunch)
     unsigned char buf[PACKET_SIZE_1024];
     // REDUCED buffer size for more frequent writes = better flow control
     // Write every 2-4 packets instead of 8 to keep ACK delays shorter
-    unsigned char *write_buffer = GetTempMainMemory(PACKET_SIZE_1024 * 4); // Buffer 4 packets (4KB)
+    unsigned char *write_buffer = GetTempMemory(PACKET_SIZE_1024 * 4); // Buffer 4 packets (4KB)
     int write_buffer_used = 0;
     int packet_num;
     int expected_seq = 0;

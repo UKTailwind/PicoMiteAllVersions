@@ -538,7 +538,7 @@ void edit(unsigned char *cmdline, bool cmdfile)
     cleanserver();
 #endif
     multilinecomment = false;
-    EdBuff = GetTempMainMemory(EDIT_BUFFER_SIZE);
+    EdBuff = GetTempMemory(EDIT_BUFFER_SIZE);
     edit_buff_size = EDIT_BUFFER_SIZE;
     char buff[STRINGSIZE * 2] = {0};
     *EdBuff = 0;

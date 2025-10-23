@@ -328,7 +328,7 @@ uint8_t PSRAMpin;
         (void *)IntToStr,           // 0x24
         (void *)CheckAbort,         // 0x28
         (void *)GetMemory,          // 0x2c
-        (void *)GetTempMainMemory,  // 0x30
+        (void *)GetTempMemory,      // 0x30
         (void *)FreeMemory,         // 0x34
         (void *)&DrawRectangle,     // 0x38
         (void *)&DrawBitmap,        // 0x3c

@@ -2365,7 +2365,7 @@ void MIPS16 cmd_play(void)
 #endif
 		if (!alreadythere)
 		{
-			unsigned char *r = GetTempMainMemory(256);
+			unsigned char *r = GetTempMemory(256);
 			positionfile(WAV_fnbr, 0, false);
 			uint32_t j = RoundUpK4(TOP_OF_SYSTEM_FLASH);
 			disable_interrupts_pico();
