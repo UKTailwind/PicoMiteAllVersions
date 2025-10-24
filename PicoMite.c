@@ -761,142 +761,131 @@ uint8_t PSRAMpin;
 int __not_in_flash_func(MMInkey)(void)
 {
 #endif
-        unsigned int c = -1;   // default no character
-        unsigned int tc = -1;  // default no character
-        unsigned int ttc = -1; // default no character
-        static unsigned int c1 = -1;
-        static unsigned int c2 = -1;
-        static unsigned int c3 = -1;
-        static unsigned int c4 = -1;
-        //	static int crseen = 0;
+    unsigned int c;
+    unsigned int tc, ttc;
+    static unsigned int c1 = -1;
+    static unsigned int c2 = -1;
+    static unsigned int c3 = -1;
+    static unsigned int c4 = -1;
 
-        if (c1 != -1)
-        { // check if there are discarded chars from a previous sequence
-            c = c1;
-            c1 = c2;
-            c2 = c3;
-            c3 = c4;
-            c4 = -1;  // shuffle the queue down
-            return c; // and return the head of the queue
-        }
+    // Fast path: return queued characters
+    if (c1 != -1) {
+        c = c1;
+        c1 = c2;
+        c2 = c3;
+        c3 = c4;
+        c4 = -1;
+        return c;
+    }
 
-        c = getConsole(); // do discarded chars so get the char
+    c = getConsole();
 #ifndef USBKEYBOARD
-        if (c == -1)
-            CheckKeyboard();
+    if (c == -1)
+        CheckKeyboard();
 #endif
-        if (!(c == 0x1b))
-            return c;
-        InkeyTimer = 0; // start the timer
-        while ((c = getConsole()) == -1 && InkeyTimer < 30)
-            ; // get the second char with a delay of 30mS to allow the next char to arrive
-        if (c == 'O')
-        { // support for many linux terminal emulators
-            while ((c = getConsole()) == -1 && InkeyTimer < 50)
-                ; // delay some more to allow the final chars to arrive, even at 1200 baud
-            if (c == 'P')
-                return F1;
-            if (c == 'Q')
-                return F2;
-            if (c == 'R')
-                return F3;
-            if (c == 'S')
-                return F4;
-            if (c == 'T')
-                return F5;
-            if (c == '2')
-            {
-                while ((tc = getConsole()) == -1 && InkeyTimer < 70)
-                    ; // delay some more to allow the final chars to arrive, even at 1200 baud
-                if (tc == 'R')
-                    return F3 + 0x20;
-                c1 = 'O';
-                c2 = c;
-                c3 = tc;
-                return 0x1b; // not a valid 4 char code
-            }
+    
+    // Fast path: return normal characters immediately
+    if (c != 0x1b)
+        return c;
+
+    // --- Escape sequence handling (rare in normal use) ---
+    
+    InkeyTimer = 0;
+    while ((c = getConsole()) == -1 && InkeyTimer < 30);
+    
+    // Handle ESC-O sequences (Linux terminal emulators)
+    if (c == 'O') {
+        while ((c = getConsole()) == -1 && InkeyTimer < 50);
+        
+        // Use lookup table for single character mapping
+        if (c >= 'P' && c <= 'T') {
+            return F1 + (c - 'P');  // F1-F5
+        }
+        
+        if (c == '2') {
+            while ((tc = getConsole()) == -1 && InkeyTimer < 70);
+            if (tc == 'R')
+                return F3 + 0x20;
             c1 = 'O';
             c2 = c;
-            return 0x1b; // not a valid 4 char code
-        }
-        if (c != '[')
-        {
-            c1 = c;
-            return 0x1b;
-        } // must be a square bracket
-        while ((c = getConsole()) == -1 && InkeyTimer < 50)
-            ; // get the third char with delay
-        if (c == 'A')
-            return UP; // the arrow keys are three chars
-        if (c == 'B')
-            return DOWN;
-        if (c == 'C')
-            return RIGHT;
-        if (c == 'D')
-            return LEFT;
-        if (c < '1' || c > '6')
-        {
-            c1 = '[';
-            c2 = c;
-            return 0x1b;
-        } // the 3rd char must be in this range
-        while ((tc = getConsole()) == -1 && InkeyTimer < 70)
-            ; // delay some more to allow the final chars to arrive, even at 1200 baud
-        if (tc == '~')
-        { // all 4 char codes must be terminated with ~
-            if (c == '1')
-                return HOME;
-            if (c == '2')
-                return INSERT;
-            if (c == '3')
-                return DEL;
-            if (c == '4')
-                return END;
-            if (c == '5')
-                return PUP;
-            if (c == '6')
-                return PDOWN;
-            c1 = '[';
-            c2 = c;
             c3 = tc;
-            return 0x1b; // not a valid 4 char code
+            return 0x1b;
         }
-        while ((ttc = getConsole()) == -1 && InkeyTimer < 90)
-            ; // get the 5th char with delay
-        if (ttc == '~')
-        { // must be a ~
-            if (c == '1')
-            {
-                if (tc >= '1' && tc <= '5')
-                    return F1 + (tc - '1'); // F1 to F5
-                if (tc >= '7' && tc <= '9')
-                    return F6 + (tc - '7'); // F6 to F8
-            }
-            if (c == '2')
-            {
-                if (tc == '0' || tc == '1')
-                    return F9 + (tc - '0'); // F9 and F10
-                if (tc == '3' || tc == '4')
-                    return F11 + (tc - '3'); // F11 and F12
-                if (tc == '5' || tc == '6')
-                    return F3 + 0x20 + tc - '5'; // SHIFT-F3 and F4
-                if (tc == '8' || tc == '9')
-                    return F5 + 0x20 + tc - '8'; // SHIFT-F5 and F6
-            }
-            if (c == '3')
-            {
-                if (tc >= '1' && tc <= '4')
-                    return F7 + 0x20 + (tc - '1'); // SHIFT-F7 to F10
-            }
-            // NB: SHIFT F1, F2, F11, and F12 don't appear to generate anything
+        
+        c1 = 'O';
+        c2 = c;
+        return 0x1b;
+    }
+    
+    // Must be square bracket
+    if (c != '[') {
+        c1 = c;
+        return 0x1b;
+    }
+    
+    while ((c = getConsole()) == -1 && InkeyTimer < 50);
+    
+    // Arrow keys (3 char sequences) - use lookup
+    if (c >= 'A' && c <= 'D') {
+        static const unsigned int arrow_keys[] = {UP, DOWN, RIGHT, LEFT};
+        return arrow_keys[c - 'A'];
+    }
+    
+    if (c < '1' || c > '6') {
+        c1 = '[';
+        c2 = c;
+        return 0x1b;
+    }
+    
+    while ((tc = getConsole()) == -1 && InkeyTimer < 70);
+    
+    // 4 character codes ending with ~
+    if (tc == '~') {
+        if (c >= '1' && c <= '6') {
+            static const unsigned int four_char_keys[] = {
+                HOME, INSERT, DEL, END, PUP, PDOWN
+            };
+            return four_char_keys[c - '1'];
         }
-        // nothing worked so bomb out
         c1 = '[';
         c2 = c;
         c3 = tc;
-        c4 = ttc;
         return 0x1b;
     }
+    
+    // 5 character codes
+    while ((ttc = getConsole()) == -1 && InkeyTimer < 90);
+    
+    if (ttc == '~') {
+        if (c == '1') {
+            if (tc >= '1' && tc <= '5')
+                return F1 + (tc - '1');
+            if (tc >= '7' && tc <= '9')
+                return F6 + (tc - '7');
+        }
+        else if (c == '2') {
+            if (tc >= '0' && tc <= '1')
+                return F9 + (tc - '0');
+            if (tc >= '3' && tc <= '4')
+                return F11 + (tc - '3');
+            if (tc >= '5' && tc <= '6')
+                return F3 + 0x20 + tc - '5';
+            if (tc >= '8' && tc <= '9')
+                return F5 + 0x20 + tc - '8';
+        }
+        else if (c == '3') {
+            if (tc >= '1' && tc <= '4')
+                return F7 + 0x20 + (tc - '1');
+        }
+    }
+    
+    // Nothing worked
+    c1 = '[';
+    c2 = c;
+    c3 = tc;
+    c4 = ttc;
+    return 0x1b;
+}
     // get a line from the keyboard or a serial file handle
     // filenbr == 0 means the console input
     void MMgetline(int filenbr, char *p)

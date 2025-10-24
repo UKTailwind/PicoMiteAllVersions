@@ -3886,9 +3886,10 @@ void MMfputs(unsigned char *p, int filenbr)
     }
     else if (filenbr == 0)
     {
-        while ((i--) > 1)
-            MMputchar(*p++, 0);
-        MMputchar(*p++, 1);
+        while (i--)
+        {
+            MMputchar(*p++, i == 0 ? 1 : 0);
+        }
     }
     else
     {
@@ -5201,6 +5202,7 @@ void cmd_autosave(void)
     unsigned char *buf, *p;
     int c, prevc = 0, crunch = false;
     int count = 0;
+    int noecho = 0;
     uint64_t timeout;
     if (CurrentLinePtr)
         StandardError(10);
@@ -5240,6 +5242,8 @@ void cmd_autosave(void)
     {
         if (mytoupper(*cmdline) == 'C')
             crunch = true;
+        if (mytoupper(*cmdline) == 'N')
+            noecho = true;
         else
             SyntaxError();
         ;
@@ -5248,48 +5252,96 @@ void cmd_autosave(void)
     p = buf = GetTempMemory(EDIT_BUFFER_SIZE - 8192);
     CrunchData(&p, 0); // initialise the crunch data subroutine
 readin:;
+    unsigned char *buf_limit = buf + EDIT_BUFFER_SIZE - 8192;
+    bool skip_initial_lf = (p == buf);
+    bool first = true;
+    uint64_t lastchartime = time_us_64(); // Initialize it!
+
     while ((c = MMInkey()) != 0x1a && c != F1 && c != F2)
-    { // while waiting for the end of text char
-        if (c == -1 && count && time_us_64() - timeout > 100000)
+    {
+        // Check timeout even when no character received
+        if (!first && time_us_64() - lastchartime > 100000)
         {
-#ifndef USBKEYBOARD
-            fflush(stdout);
-            tud_cdc_write_flush();
-#endif
-            count = 0;
+            if (noecho)
+            {
+                MMPrintString("Enter ctrl-Z, F1, or F2 to exit\r\n");
+                noecho = false;
+            }
         }
-        if (p == buf && c == '\n')
-            continue; // throw away an initial line feed which can follow the command
-        if ((p - buf) >= EDIT_BUFFER_SIZE - 8192)
+
+        // Early exit for no input
+        if (c == -1)
+        {
+            if (count && time_us_64() - timeout > 100000)
+            {
+#ifndef USBKEYBOARD
+                if (!noecho)
+                {
+                    fflush(stdout);
+                    tud_cdc_write_flush();
+                }
+#endif
+                count = 0;
+            }
+            continue;
+        }
+
+        // Got a valid character - update timestamp and clear first flag
+        lastchartime = time_us_64();
+        first = false;
+
+        // Handle initial LF
+        if (skip_initial_lf && c == '\n')
+        {
+            skip_initial_lf = false;
+            continue;
+        }
+        skip_initial_lf = false;
+
+        // Buffer overflow check
+        if (p >= buf_limit)
             StandardError(29);
+
+        // Process valid characters
         if (isprint(c) || c == '\r' || c == '\n' || c == TAB)
         {
             if (c == TAB)
                 c = ' ';
+
+            // Store character
             if (crunch)
-                CrunchData(&p, c); // insert into RAM after throwing away comments. etc
+                CrunchData(&p, c);
             else
-                *p++ = c; // insert the input into RAM
+                *p++ = c;
+
+            // Echo logic
+            bool should_echo = !(c == '\n' && prevc == '\r');
+
+            if (should_echo)
             {
-                if (!(c == '\n' && prevc == '\r'))
-                {
+                timeout = time_us_64();
+                if (!noecho)
                     MMputchar(c, 0);
-                    count++;
-                    timeout = time_us_64();
-                } // and echo it
-                if (c == '\r')
+                count++;
+            }
+
+            if (c == '\r')
+            {
+                count = 0;
+                if (!noecho)
                 {
                     MMputchar('\n', 1);
-                    count = 0;
 #ifndef USBKEYBOARD
                     fflush(stdout);
                     tud_cdc_write_flush();
 #endif
                 }
             }
+
             prevc = c;
         }
     }
+
 #ifndef USBKEYBOARD
     fflush(stdout);
     tud_cdc_write_flush();
