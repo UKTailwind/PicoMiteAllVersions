@@ -73,10 +73,15 @@ extern unsigned int b64d_size(unsigned int in_size);
 extern unsigned int b64e_size(unsigned int in_size);
 extern unsigned int b64_encode(const unsigned char *in, unsigned int in_len, unsigned char *out);
 extern unsigned int b64_decode(const unsigned char *in, unsigned int in_len, unsigned char *out);
+uint64_t cdc_update_rate = 1000;
 void parselongAES(uint8_t *p, int ivadd, uint8_t *keyx, uint8_t *ivx, int64_t **inint, int64_t **outint);
 #ifndef PICOMITEVGA
 extern int SSD1963data;
 #endif
+uint64_t get_cdc_interval(void)
+{
+    return cdc_update_rate;
+}
 uint32_t getTotalHeap(void)
 {
     extern char __StackLimit, __bss_end__;
@@ -2078,7 +2083,7 @@ void MIPS16 cmd_library(void)
         MMPrintString((char *)tknbuf);
         MMPrintString(" bytes\r\n");
 #ifndef USBKEYBOARD
-        fflush(stdout);
+        // fflush(stdout);
         tud_cdc_write_flush();
 #endif
         uSec(2000);
@@ -4308,7 +4313,12 @@ void MIPS16 cmd_option(void)
             OptionConsole = 0;
         else
             SyntaxError();
-        ;
+        return;
+    }
+    tp = checkstring(cmdline, (unsigned char *)"CDC POLL RATE");
+    if (tp)
+    {
+        cdc_update_rate = getint(tp, 50, 2000);
         return;
     }
     tp = checkstring(cmdline, (unsigned char *)"DEFAULT");
@@ -4437,6 +4447,7 @@ void MIPS16 cmd_option(void)
         {
             Option.NoHeartbeat = true;
             Option.special = 0;
+            Option.PSRAM_CS_PIN = 0;
         }
         else if (checkstring(tp, (unsigned char *)"ON"))
         {
@@ -4444,8 +4455,11 @@ void MIPS16 cmd_option(void)
                 error("Pin | is in use", 58);
             if (ExtCurrentConfig[43] != EXT_NOT_CONFIG)
                 error("Pin | is in use", PINMAP[25]);
+            if (ExtCurrentConfig[PINMAP[47]] != EXT_NOT_CONFIG)
+                error("Pin | is in use", PINMAP[47]);
             Option.NoHeartbeat = false;
             Option.heartbeatpin = PINMAP[25];
+            Option.PSRAM_CS_PIN = PINMAP[47];
             Option.special = 1;
             SaveOptions();
             SoftReset(SOFT_RESET);

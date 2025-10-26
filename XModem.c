@@ -759,7 +759,6 @@ void ymodemTransmit(char *p, int fnbr, char *filename, long file_size)
     int use_crc = 0;
     long bytes_sent = 0;
     int use_1k = 1; // Use 1024-byte packets
-
     // Validate filename - use default if NULL or empty
     if (filename == NULL || filename[0] == 0)
     {
@@ -1087,7 +1086,6 @@ void xmodemReceive(char *sp, int maxbytes, int fnbr, int crunch)
     int i, c;
     int retry, retrans = MAXRETRANS;
     CrunchData((unsigned char **)&sp, 0); // initialise the crunch subroutine
-
     // first establish communication with the remote
     while (1)
     {

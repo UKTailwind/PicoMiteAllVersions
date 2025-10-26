@@ -5809,6 +5809,7 @@ void MIPS16 __not_in_flash_func(IRHandler)(void)
         break;
     }
 }
+
 void __not_in_flash_func(gpio_callback)(uint gpio, uint32_t events)
 {
 #ifndef USBKEYBOARD

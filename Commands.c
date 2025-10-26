@@ -253,12 +253,30 @@ void cmd_print(void)
 		i = 0;
 	}
 
+	// Get initial buffer for accumulating output
+	unsigned char *outbuf = GetTempMemory(STRINGSIZE);
+	unsigned char *bufptr = outbuf;
+	int bufsize = STRINGSIZE;
+	int used = 0;
+
 	for (; i < argc; i++)
 	{ // step through the arguments
 		if (*argv[i] == ',')
 		{
-			MMfputc('\t', fnbr); // print a tab for a comma
-			docrlf = false;		 // a trailing comma should suppress CR/LF
+			// Check if we need more space for a tab
+			if (used + 1 >= bufsize)
+			{
+				// Need to expand buffer
+				unsigned char *newbuf = GetTempMemory(bufsize + STRINGSIZE);
+				memcpy(newbuf, outbuf, used);
+				ClearSpecificTempMemory(outbuf);
+				outbuf = newbuf;
+				bufptr = outbuf + used;
+				bufsize += STRINGSIZE;
+			}
+			*bufptr++ = '\t';
+			used++;
+			docrlf = false; // a trailing comma should suppress CR/LF
 		}
 		else if (*argv[i] == ';')
 		{
@@ -275,17 +293,64 @@ void cmd_print(void)
 				{
 					*inpbuf = ' ';																				   // preload a space
 					FloatToStr((char *)inpbuf + ((f >= 0) ? 1 : 0), f, 0, STR_AUTO_PRECISION, (unsigned char)' '); // if positive output a space instead of the sign
-					MMfputs((unsigned char *)CtoM(inpbuf), fnbr);												   // convert to a MMBasic string and output
+					int len = strlen((char *)inpbuf);
+
+					// Check if we need more space
+					while (used + len >= bufsize)
+					{
+						unsigned char *newbuf = GetTempMemory(bufsize + STRINGSIZE);
+						memcpy(newbuf, outbuf, used);
+						ClearSpecificTempMemory(outbuf);
+						outbuf = newbuf;
+						bufptr = outbuf + used;
+						bufsize += STRINGSIZE;
+					}
+
+					strcpy((char *)bufptr, (char *)inpbuf);
+					bufptr += len;
+					used += len;
 				}
 				else if (t & T_INT)
 				{
 					*inpbuf = ' ';											  // preload a space
 					IntToStr((char *)inpbuf + ((i64 >= 0) ? 1 : 0), i64, 10); // if positive output a space instead of the sign
-					MMfputs((unsigned char *)CtoM(inpbuf), fnbr);			  // convert to a MMBasic string and output
+					int len = strlen((char *)inpbuf);
+
+					// Check if we need more space
+					while (used + len >= bufsize)
+					{
+						unsigned char *newbuf = GetTempMemory(bufsize + STRINGSIZE);
+						memcpy(newbuf, outbuf, used);
+						ClearSpecificTempMemory(outbuf);
+						outbuf = newbuf;
+						bufptr = outbuf + used;
+						bufsize += STRINGSIZE;
+					}
+
+					strcpy((char *)bufptr, (char *)inpbuf);
+					bufptr += len;
+					used += len;
 				}
 				else if (t & T_STR)
 				{
-					MMfputs((unsigned char *)s, fnbr); // print if a string (s is a MMBasic string)
+					// s is already a MMBasic string, need to extract the C string part
+					unsigned char *cstr = s + 1; // Skip length byte
+					int len = *s;				 // Get length from MMBasic string
+
+					// Check if we need more space
+					while (used + len >= bufsize)
+					{
+						unsigned char *newbuf = GetTempMemory(bufsize + STRINGSIZE);
+						memcpy(newbuf, outbuf, used);
+						ClearSpecificTempMemory(outbuf);
+						outbuf = newbuf;
+						bufptr = outbuf + used;
+						bufsize += STRINGSIZE;
+					}
+
+					memcpy(bufptr, cstr, len);
+					bufptr += len;
+					used += len;
 				}
 				else
 					error("Attempt to print reserved word");
@@ -293,8 +358,48 @@ void cmd_print(void)
 			docrlf = true;
 		}
 	}
+
 	if (docrlf)
-		MMfputs((unsigned char *)"\2\r\n", fnbr); // print the terminating cr/lf unless it has been suppressed
+	{
+		// Check if we need more space for cr/lf
+		if (used + 2 >= bufsize)
+		{
+			unsigned char *newbuf = GetTempMemory(bufsize + STRINGSIZE);
+			memcpy(newbuf, outbuf, used);
+			ClearSpecificTempMemory(outbuf);
+			outbuf = newbuf;
+			bufptr = outbuf + used;
+			bufsize += STRINGSIZE;
+		}
+		*bufptr++ = '\r';
+		*bufptr++ = '\n';
+		used += 2;
+	}
+
+	// Null terminate the C string
+	*bufptr = '\0';
+
+	// Output the buffer
+	if (used <= 255)
+	{
+		// Simple case: fits in a single MMBasic string
+		MMfputs(CtoM(outbuf), fnbr);
+	}
+	else
+	{
+		// Need to output in chunks of maximum 255 bytes
+		int offset = 0;
+		unsigned char *chunk = GetTempMemory(256); // Temporary buffer for each chunk
+		while (offset < used)
+		{
+			int chunklen = (used - offset > 255) ? 255 : (used - offset);
+			memcpy(chunk, outbuf + offset, chunklen);
+			chunk[chunklen] = '\0'; // Null terminate the chunk
+			MMfputs(CtoM(chunk), fnbr);
+			offset += chunklen;
+		}
+	}
+
 	if (PrintPixelMode != 0)
 		SSPrintString("\033[m");
 	PrintPixelMode = 0;
@@ -865,7 +970,7 @@ void MIPS16 ListProgram(unsigned char *p, int all)
 					}
 				}
 #ifndef USBKEYBOARD
-				fflush(stdout);
+				// fflush(stdout);
 				tud_cdc_write_flush();
 #endif
 				ListNewLine(&ListCnt, all);
@@ -1771,7 +1876,7 @@ void do_end(bool ecmd)
 		while (ConsoleTxBufHead != ConsoleTxBufTail)
 			routinechecks();
 #ifndef USBKEYBOARD
-	fflush(stdout);
+	// fflush(stdout);
 	tud_cdc_write_flush();
 #endif
 	if (ecmd)
@@ -1786,7 +1891,7 @@ void do_end(bool ecmd)
 					while (ConsoleTxBufHead != ConsoleTxBufTail)
 						routinechecks();
 #ifndef USBKEYBOARD
-				fflush(stdout);
+				// fflush(stdout);
 				tud_cdc_write_flush();
 #endif
 				memset(inpbuf, 0, STRINGSIZE);
@@ -1809,7 +1914,7 @@ void do_end(bool ecmd)
 				while (ConsoleTxBufHead != ConsoleTxBufTail)
 					routinechecks();
 #ifndef USBKEYBOARD
-			fflush(stdout);
+			// fflush(stdout);
 			tud_cdc_write_flush();
 #endif
 			memset(inpbuf, 0, STRINGSIZE);
@@ -3487,7 +3592,7 @@ void cmd_frame(void){
 				}
 			}
 		}
-		fflush(stdout);         tud_cdc_write_flush();
+		//fflush(stdout);         tud_cdc_write_flush();
 #endif
 		gui_fcolour=savefcol;
 		SCursor(sx,sy);

@@ -388,23 +388,21 @@ int __not_in_flash_func(fs_flash_prog)(const struct lfs_config *cfg, lfs_block_t
     assert(off % cfg->prog_size == 0);
     assert(size % cfg->prog_size == 0);
     assert(block < cfg->block_count);
+
     uint32_t addr = RoundUpK4(TOP_OF_SYSTEM_FLASH) + (Option.modbuff ? 1024 * Option.modbuffsize : 0) + block * 4096 + off;
-    uint32_t irqs = save_and_disable_interrupts();
+    disable_interrupts_pico();
     flash_range_program(addr, buffer, size);
-    restore_interrupts(irqs);
-    SecondsTimer += (time_us_64() / 1000 - mSecTimer);
-    mSecTimer = time_us_64() / 1000;
+    enable_interrupts_pico();
     return 0;
 }
 int __not_in_flash_func(fs_flash_erase)(const struct lfs_config *cfg, lfs_block_t block)
 {
     assert(block < cfg->block_count);
+
     uint32_t block_addr = RoundUpK4(TOP_OF_SYSTEM_FLASH) + (Option.modbuff ? 1024 * Option.modbuffsize : 0) + block * 4096;
-    uint32_t irqs = save_and_disable_interrupts();
+    disable_interrupts_pico();
     flash_range_erase(block_addr, BLOCK_SIZE);
-    restore_interrupts(irqs);
-    SecondsTimer += (time_us_64() / 1000 - mSecTimer);
-    mSecTimer = time_us_64() / 1000;
+    enable_interrupts_pico();
     return 0;
 }
 int __not_in_flash_func(fs_flash_sync)(const struct lfs_config *c)
@@ -4041,10 +4039,10 @@ int BasicFileOpen(char *fname, int fnbr, int mode)
     }
 }
 
-#define MAXFILES 800
+#define MAXFILES 2048
 typedef struct ss_flist
 {
-    char fn[FF_MAX_LFN];
+    char fn[FF_MAX_LFN + 1];
     int fs; // file size
     int fd; // file date
     int ft; // file time
@@ -4640,6 +4638,11 @@ void MIPS16 cmd_files(void)
     char ts[FF_MAX_LFN] = {0};
     char pp[FF_MAX_LFN] = {0};
     char q[FF_MAX_LFN] = {0};
+    int maxfiles = (heap_memory_size - 16384) / sizeof(s_flist);
+#ifdef rp2350
+    if (PSRAMsize)
+        maxfiles = MAXFILES;
+#endif
     static s_flist *flist = NULL;
     char outbuff[STRINGSIZE] = {0};
     DIR djd;
@@ -4715,7 +4718,7 @@ void MIPS16 cmd_files(void)
     else
         FSerror = f_findfirst(&djd, &fnod, fullpathname[FatFSFileSystem], pp);
     ErrorCheck(0);
-    flist = GetMemory(sizeof(s_flist) * MAXFILES);
+    flist = GetMemory(sizeof(s_flist) * maxfiles);
     // add the file to the list, search for the next and keep looping until no more files
     if (FatFSFileSystem)
     {
@@ -4724,11 +4727,11 @@ void MIPS16 cmd_files(void)
 #ifdef PICOMITEWEB
             ProcessWeb(1);
 #endif
-            if (fcnt >= MAXFILES)
+            if (fcnt >= maxfiles)
             {
                 FreeMemorySafe((void **)&flist);
                 f_closedir(&djd);
-                error("Too many files to list");
+                error("Too many files to list, max %", maxfiles);
             }
             if (!(fnod.fattrib & (AM_SYS | AM_HID)))
             {
@@ -5024,7 +5027,7 @@ void MIPS16 cmd_files(void)
             MMputchar(*pp++, 0);
         }
 #ifndef USBKEYBOARD
-        fflush(stdout);
+        // fflush(stdout);
         tud_cdc_write_flush();
 #endif
         ListNewLine(&ListCnt, 1);
@@ -5277,7 +5280,7 @@ readin:;
 #ifndef USBKEYBOARD
                 if (!noecho)
                 {
-                    fflush(stdout);
+                    // fflush(stdout);
                     tud_cdc_write_flush();
                 }
 #endif
@@ -5332,7 +5335,7 @@ readin:;
                 {
                     MMputchar('\n', 1);
 #ifndef USBKEYBOARD
-                    fflush(stdout);
+                    // fflush(stdout);
                     tud_cdc_write_flush();
 #endif
                 }
@@ -5343,7 +5346,7 @@ readin:;
     }
 
 #ifndef USBKEYBOARD
-    fflush(stdout);
+    // fflush(stdout);
     tud_cdc_write_flush();
 #endif
     *p = 0; // terminate the string in RAM

@@ -402,6 +402,14 @@ void initExtIO(void);
 void ExtCfg(int pin, int cfg, int option);
 void ExtSet(int pin, int val);
 int64_t ExtInp(int pin);
+static inline uint64_t gpio_get_out_level_all64(void)
+{
+#if NUM_BANK0_GPIOS <= 32
+  return sio_hw->gpio_out;
+#else
+  return sio_hw->gpio_out | (((uint64_t)sio_hw->gpio_hi_out) << 32u);
+#endif
+}
 
 /* ============================================================================
  * Function declarations - Pin manipulation

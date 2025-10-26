@@ -67,6 +67,8 @@ extern "C"
 #else
 #include "pico/unique_id.h"
 #include "class/cdc/cdc_device.h"
+volatile int CDC_chars_received = 0;
+extern void stdio_usb_set_chars_available_callback(void (*fn)(void *), void *param);
 #endif
 #ifndef rp2350
 #include "hardware/structs/ssi.h"
@@ -519,6 +521,13 @@ uint8_t PSRAMpin;
         }
         *timer = 0;
     }
+    static inline int console_rx_buf_space(void)
+    {
+        if (ConsoleRxBufHead >= ConsoleRxBufTail)
+            return CONSOLE_RX_BUF_SIZE - (ConsoleRxBufHead - ConsoleRxBufTail);
+        else
+            return ConsoleRxBufTail - ConsoleRxBufHead;
+    }
 
     void __not_in_flash_func(routinechecks)(void)
     {
@@ -546,7 +555,40 @@ uint8_t PSRAMpin;
         {
             checkWAVinput();
         }
+#ifndef USBKEYBOARD
+        // === Console CDC processing ===
+        if (CDC_chars_received && console_rx_buf_space() > 1)
+        {
 
+            int c;
+            while ((c = tud_cdc_read_char()) != -1)
+            {
+                ConsoleRxBuf[ConsoleRxBufHead] = c;
+
+                if (BreakKey && c == BreakKey)
+                {
+                    // User interrupt
+                    MMAbort = true;
+                    ConsoleRxBufHead = ConsoleRxBufTail;
+                }
+                else if (c == keyselect && KeyInterrupt != NULL)
+                {
+                    Keycomplete = true;
+                }
+                else
+                {
+                    // Normal character - add to buffer
+                    ConsoleRxBufHead = (ConsoleRxBufHead + 1) % CONSOLE_RX_BUF_SIZE;
+
+                    // Handle potential buffer overflow
+                    if (console_rx_buf_space() <= 1)
+                        break;
+                }
+            }
+            if (CDC_chars_received > 0)
+                CDC_chars_received--;
+        }
+#endif
         // === Early exit for frequent calls ===
         if ((++when & 0x07) && CurrentLinePtr)
             return;
@@ -559,40 +601,6 @@ uint8_t PSRAMpin;
             hid_app_task();
         }
 #else
-    // === Console CDC processing ===
-    if (tud_cdc_connected() &&
-        (Option.SerialConsole == 0 || Option.SerialConsole > 4) &&
-        Option.Telnet != -1)
-    {
-
-        int c;
-        while ((c = tud_cdc_read_char()) != -1)
-        {
-            ConsoleRxBuf[ConsoleRxBufHead] = c;
-
-            if (BreakKey && c == BreakKey)
-            {
-                // User interrupt
-                MMAbort = true;
-                ConsoleRxBufHead = ConsoleRxBufTail;
-            }
-            else if (c == keyselect && KeyInterrupt != NULL)
-            {
-                Keycomplete = true;
-            }
-            else
-            {
-                // Normal character - add to buffer
-                ConsoleRxBufHead = (ConsoleRxBufHead + 1) % CONSOLE_RX_BUF_SIZE;
-
-                // Handle buffer overflow
-                if (ConsoleRxBufHead == ConsoleRxBufTail)
-                {
-                    ConsoleRxBufTail = (ConsoleRxBufTail + 1) % CONSOLE_RX_BUF_SIZE;
-                }
-            }
-        }
-    }
 #endif
 
         // === Display buffer refresh (RP2350) ===
@@ -697,13 +705,12 @@ uint8_t PSRAMpin;
                     {
                         tight_loop_contents();
                     }
-                    putc(c, stdout);
+                    tud_cdc_write_char(c);
+                    //                        putc(c, stdout);
                     if (flush)
                     {
-#ifndef USBKEYBOARD
-                        fflush(stdout);
+                        //                        //fflush(stdout);
                         tud_cdc_write_flush();
-#endif
                     }
                 }
             }
@@ -761,131 +768,149 @@ uint8_t PSRAMpin;
 int __not_in_flash_func(MMInkey)(void)
 {
 #endif
-    unsigned int c;
-    unsigned int tc, ttc;
-    static unsigned int c1 = -1;
-    static unsigned int c2 = -1;
-    static unsigned int c3 = -1;
-    static unsigned int c4 = -1;
+        unsigned int c;
+        unsigned int tc, ttc;
+        static unsigned int c1 = -1;
+        static unsigned int c2 = -1;
+        static unsigned int c3 = -1;
+        static unsigned int c4 = -1;
 
-    // Fast path: return queued characters
-    if (c1 != -1) {
-        c = c1;
-        c1 = c2;
-        c2 = c3;
-        c3 = c4;
-        c4 = -1;
-        return c;
-    }
-
-    c = getConsole();
-#ifndef USBKEYBOARD
-    if (c == -1)
-        CheckKeyboard();
-#endif
-    
-    // Fast path: return normal characters immediately
-    if (c != 0x1b)
-        return c;
-
-    // --- Escape sequence handling (rare in normal use) ---
-    
-    InkeyTimer = 0;
-    while ((c = getConsole()) == -1 && InkeyTimer < 30);
-    
-    // Handle ESC-O sequences (Linux terminal emulators)
-    if (c == 'O') {
-        while ((c = getConsole()) == -1 && InkeyTimer < 50);
-        
-        // Use lookup table for single character mapping
-        if (c >= 'P' && c <= 'T') {
-            return F1 + (c - 'P');  // F1-F5
+        // Fast path: return queued characters
+        if (c1 != -1)
+        {
+            c = c1;
+            c1 = c2;
+            c2 = c3;
+            c3 = c4;
+            c4 = -1;
+            return c;
         }
-        
-        if (c == '2') {
-            while ((tc = getConsole()) == -1 && InkeyTimer < 70);
-            if (tc == 'R')
-                return F3 + 0x20;
+
+        c = getConsole();
+#ifndef USBKEYBOARD
+        if (c == -1)
+            CheckKeyboard();
+#endif
+
+        // Fast path: return normal characters immediately
+        if (c != 0x1b)
+            return c;
+
+        // --- Escape sequence handling (rare in normal use) ---
+
+        InkeyTimer = 0;
+        while ((c = getConsole()) == -1 && InkeyTimer < 30)
+            ;
+
+        // Handle ESC-O sequences (Linux terminal emulators)
+        if (c == 'O')
+        {
+            while ((c = getConsole()) == -1 && InkeyTimer < 50)
+                ;
+
+            // Use lookup table for single character mapping
+            if (c >= 'P' && c <= 'T')
+            {
+                return F1 + (c - 'P'); // F1-F5
+            }
+
+            if (c == '2')
+            {
+                while ((tc = getConsole()) == -1 && InkeyTimer < 70)
+                    ;
+                if (tc == 'R')
+                    return F3 + 0x20;
+                c1 = 'O';
+                c2 = c;
+                c3 = tc;
+                return 0x1b;
+            }
+
             c1 = 'O';
+            c2 = c;
+            return 0x1b;
+        }
+
+        // Must be square bracket
+        if (c != '[')
+        {
+            c1 = c;
+            return 0x1b;
+        }
+
+        while ((c = getConsole()) == -1 && InkeyTimer < 50)
+            ;
+
+        // Arrow keys (3 char sequences) - use lookup
+        if (c >= 'A' && c <= 'D')
+        {
+            static const unsigned int arrow_keys[] = {UP, DOWN, RIGHT, LEFT};
+            return arrow_keys[c - 'A'];
+        }
+
+        if (c < '1' || c > '6')
+        {
+            c1 = '[';
+            c2 = c;
+            return 0x1b;
+        }
+
+        while ((tc = getConsole()) == -1 && InkeyTimer < 70)
+            ;
+
+        // 4 character codes ending with ~
+        if (tc == '~')
+        {
+            if (c >= '1' && c <= '6')
+            {
+                static const unsigned int four_char_keys[] = {
+                    HOME, INSERT, DEL, END, PUP, PDOWN};
+                return four_char_keys[c - '1'];
+            }
+            c1 = '[';
             c2 = c;
             c3 = tc;
             return 0x1b;
         }
-        
-        c1 = 'O';
-        c2 = c;
-        return 0x1b;
-    }
-    
-    // Must be square bracket
-    if (c != '[') {
-        c1 = c;
-        return 0x1b;
-    }
-    
-    while ((c = getConsole()) == -1 && InkeyTimer < 50);
-    
-    // Arrow keys (3 char sequences) - use lookup
-    if (c >= 'A' && c <= 'D') {
-        static const unsigned int arrow_keys[] = {UP, DOWN, RIGHT, LEFT};
-        return arrow_keys[c - 'A'];
-    }
-    
-    if (c < '1' || c > '6') {
-        c1 = '[';
-        c2 = c;
-        return 0x1b;
-    }
-    
-    while ((tc = getConsole()) == -1 && InkeyTimer < 70);
-    
-    // 4 character codes ending with ~
-    if (tc == '~') {
-        if (c >= '1' && c <= '6') {
-            static const unsigned int four_char_keys[] = {
-                HOME, INSERT, DEL, END, PUP, PDOWN
-            };
-            return four_char_keys[c - '1'];
+
+        // 5 character codes
+        while ((ttc = getConsole()) == -1 && InkeyTimer < 90)
+            ;
+
+        if (ttc == '~')
+        {
+            if (c == '1')
+            {
+                if (tc >= '1' && tc <= '5')
+                    return F1 + (tc - '1');
+                if (tc >= '7' && tc <= '9')
+                    return F6 + (tc - '7');
+            }
+            else if (c == '2')
+            {
+                if (tc >= '0' && tc <= '1')
+                    return F9 + (tc - '0');
+                if (tc >= '3' && tc <= '4')
+                    return F11 + (tc - '3');
+                if (tc >= '5' && tc <= '6')
+                    return F3 + 0x20 + tc - '5';
+                if (tc >= '8' && tc <= '9')
+                    return F5 + 0x20 + tc - '8';
+            }
+            else if (c == '3')
+            {
+                if (tc >= '1' && tc <= '4')
+                    return F7 + 0x20 + (tc - '1');
+            }
         }
+
+        // Nothing worked
         c1 = '[';
         c2 = c;
         c3 = tc;
+        c4 = ttc;
         return 0x1b;
     }
-    
-    // 5 character codes
-    while ((ttc = getConsole()) == -1 && InkeyTimer < 90);
-    
-    if (ttc == '~') {
-        if (c == '1') {
-            if (tc >= '1' && tc <= '5')
-                return F1 + (tc - '1');
-            if (tc >= '7' && tc <= '9')
-                return F6 + (tc - '7');
-        }
-        else if (c == '2') {
-            if (tc >= '0' && tc <= '1')
-                return F9 + (tc - '0');
-            if (tc >= '3' && tc <= '4')
-                return F11 + (tc - '3');
-            if (tc >= '5' && tc <= '6')
-                return F3 + 0x20 + tc - '5';
-            if (tc >= '8' && tc <= '9')
-                return F5 + 0x20 + tc - '8';
-        }
-        else if (c == '3') {
-            if (tc >= '1' && tc <= '4')
-                return F7 + 0x20 + (tc - '1');
-        }
-    }
-    
-    // Nothing worked
-    c1 = '[';
-    c2 = c;
-    c3 = tc;
-    c4 = ttc;
-    return 0x1b;
-}
     // get a line from the keyboard or a serial file handle
     // filenbr == 0 means the console input
     void MMgetline(int filenbr, char *p)
@@ -1111,7 +1136,7 @@ int __not_in_flash_func(MMInkey)(void)
                             j--;
                         }
 #ifndef USBKEYBOARD
-                        fflush(stdout);
+                        // fflush(stdout);
                         tud_cdc_write_flush();
 #endif
                         MX470Display(CLEAR_TO_EOS);
@@ -1135,7 +1160,7 @@ int __not_in_flash_func(MMInkey)(void)
                             j++;
                         }
 #ifndef USBKEYBOARD
-                        fflush(stdout);
+                        // fflush(stdout);
                         tud_cdc_write_flush();
 #endif
 
@@ -1155,7 +1180,7 @@ int __not_in_flash_func(MMInkey)(void)
                         }
                         CharIndex--;
 #ifndef USBKEYBOARD
-                        fflush(stdout);
+                        // fflush(stdout);
                         tud_cdc_write_flush();
 #endif
                         if (strlen((const char *)inpbuf) == 0)
@@ -1231,7 +1256,7 @@ int __not_in_flash_func(MMInkey)(void)
                             j--;
                         }
 #ifndef USBKEYBOARD
-                        fflush(stdout);
+                        // fflush(stdout);
                         tud_cdc_write_flush();
 #endif
                         MX470Display(CLEAR_TO_EOS);
@@ -1254,7 +1279,7 @@ int __not_in_flash_func(MMInkey)(void)
                             j++;
                         }
 #ifndef USBKEYBOARD
-                        fflush(stdout);
+                        // fflush(stdout);
                         tud_cdc_write_flush();
 #endif
 
@@ -1272,7 +1297,7 @@ int __not_in_flash_func(MMInkey)(void)
                             }
                         }
 #ifndef USBKEYBOARD
-                        fflush(stdout);
+                        // fflush(stdout);
                         tud_cdc_write_flush();
 #endif
                     }
@@ -1306,7 +1331,7 @@ int __not_in_flash_func(MMInkey)(void)
                             CharIndex--;
                         }
 #ifndef USBKEYBOARD
-                        fflush(stdout);
+                        // fflush(stdout);
                         tud_cdc_write_flush();
 #endif
                     }
@@ -1325,7 +1350,7 @@ int __not_in_flash_func(MMInkey)(void)
                         MMputchar(inpbuf[CharIndex++], 0);
                     }
 #ifndef USBKEYBOARD
-                    fflush(stdout);
+                    // fflush(stdout);
                     tud_cdc_write_flush();
 #endif
                     break;
@@ -1379,7 +1404,7 @@ int __not_in_flash_func(MMInkey)(void)
                     {
                         SSPrintString("\e[2J\e[H");
 #ifndef USBKEYBOARD
-                        fflush(stdout);
+                        // fflush(stdout);
                         tud_cdc_write_flush();
 #endif
                         if (Option.DISPLAY_CONSOLE)
@@ -1396,7 +1421,7 @@ int __not_in_flash_func(MMInkey)(void)
                             MMPrintString("> ");
                         }
 #ifndef USBKEYBOARD
-                        fflush(stdout);
+                        // fflush(stdout);
                         tud_cdc_write_flush();
 #endif
                     }
@@ -1477,7 +1502,7 @@ int __not_in_flash_func(MMInkey)(void)
                             j--;
                         }
 #ifndef USBKEYBOARD
-                        fflush(stdout);
+                        // fflush(stdout);
                         tud_cdc_write_flush();
 #endif
                         MX470Display(CLEAR_TO_EOS);
@@ -1491,7 +1516,7 @@ int __not_in_flash_func(MMInkey)(void)
                         SSPrintString(" \b");
                     }
 #ifndef USBKEYBOARD
-                    fflush(stdout);
+                    // fflush(stdout);
                     tud_cdc_write_flush();
 #endif
                     break;
@@ -1527,7 +1552,7 @@ int __not_in_flash_func(MMInkey)(void)
                                 }
                             }
 #ifndef USBKEYBOARD
-                            fflush(stdout);
+                            // fflush(stdout);
                             tud_cdc_write_flush();
 #endif
                         }
@@ -1543,7 +1568,7 @@ int __not_in_flash_func(MMInkey)(void)
                                 SSPrintString(" \b");
                             }
 #ifndef USBKEYBOARD
-                            fflush(stdout);
+                            // fflush(stdout);
                             tud_cdc_write_flush();
 #endif
                         }
@@ -1657,7 +1682,7 @@ int __not_in_flash_func(MMInkey)(void)
                         for (CharIndex = strlen((const char *)inpbuf); CharIndex > i; CharIndex--)
                             MMputchar('\b', 0);
 #ifndef USBKEYBOARD
-                        fflush(stdout);
+                        // fflush(stdout);
                         tud_cdc_write_flush(); // return the cursor to the righ position
 #endif
                     }
@@ -1705,7 +1730,7 @@ int __not_in_flash_func(MMInkey)(void)
                         for (CharIndex = strlen((const char *)inpbuf); CharIndex > i; CharIndex--)
                             MMputchar('\b', 0);
 #ifndef USBKEYBOARD
-                        fflush(stdout);
+                        // fflush(stdout);
                         tud_cdc_write_flush(); // return the cursor to the right position
 #endif
                     }
@@ -1732,7 +1757,7 @@ int __not_in_flash_func(MMInkey)(void)
                             CharIndex--;
                         }
 #ifndef USBKEYBOARD
-                        fflush(stdout);
+                        // fflush(stdout);
                         tud_cdc_write_flush();
 #endif
                     }
@@ -1745,7 +1770,7 @@ int __not_in_flash_func(MMInkey)(void)
                         MMputchar(inpbuf[CharIndex++], 0);
                     }
 #ifndef USBKEYBOARD
-                    fflush(stdout);
+                    // fflush(stdout);
                     tud_cdc_write_flush();
 #endif
                     break;
@@ -1784,7 +1809,7 @@ int __not_in_flash_func(MMInkey)(void)
                         /*** F5 will clear the VT100  ***/
                         SSPrintString("\e[2J\e[H");
 #ifndef USBKEYBOARD
-                        fflush(stdout);
+                        // fflush(stdout);
                         tud_cdc_write_flush();
 #endif
                         if (Option.DISPLAY_CONSOLE)
@@ -1795,7 +1820,7 @@ int __not_in_flash_func(MMInkey)(void)
                         }
                         MMPrintString("> ");
 #ifndef USBKEYBOARD
-                        fflush(stdout);
+                        // fflush(stdout);
                         tud_cdc_write_flush();
 #endif
                     }
@@ -1835,7 +1860,7 @@ int __not_in_flash_func(MMInkey)(void)
                             CharIndex--;
                         }
 #ifndef USBKEYBOARD
-                        fflush(stdout);
+                        // fflush(stdout);
                         tud_cdc_write_flush(); // go to the beginning of line
 #endif
                         if (lastcmd_edit)
@@ -1861,7 +1886,7 @@ int __not_in_flash_func(MMInkey)(void)
                             CharIndex--;
                         }
 #ifndef USBKEYBOARD
-                        fflush(stdout);
+                        // fflush(stdout);
                         tud_cdc_write_flush(); // go to the beginning of line
 #endif
                         if (lastcmd_idx == 0)
@@ -1922,7 +1947,7 @@ int __not_in_flash_func(MMInkey)(void)
                             for (j = strlen((const char *)inpbuf); j > CharIndex; j--)
                                 MMputchar('\b', 0);
 #ifndef USBKEYBOARD
-                            fflush(stdout);
+                            // fflush(stdout);
                             tud_cdc_write_flush(); // return the cursor to the right position
 #endif
                         }
@@ -1982,7 +2007,7 @@ int __not_in_flash_func(MMInkey)(void)
             s++;
         }
 #ifndef USBKEYBOARD
-        fflush(stdout);
+        // fflush(stdout);
         tud_cdc_write_flush();
 #endif
     }
@@ -1994,16 +2019,10 @@ int __not_in_flash_func(MMInkey)(void)
             s++;
         }
 #ifndef USBKEYBOARD
-        fflush(stdout);
+        // fflush(stdout);
         tud_cdc_write_flush();
 #endif
     }
-
-    /*void myprintf(char *s){
-       fputs(s,stdout);
-         fflush(stdout);         tud_cdc_write_flush();
-#endif
-    }*/
 
     void __not_in_flash_func(mT4IntEnable)(int status)
     {
@@ -5137,7 +5156,12 @@ uint32_t testPSRAM(void)
         cyw43_wifi_pm(&cyw43_state, CYW43_DEFAULT_PM & ~0xf);
     }
 #endif
-
+#ifndef USBKEYBOARD
+    void MIPS32 __not_in_flash_func(usb_chars_available_callback)(void *param)
+    {
+        CDC_chars_received++;
+    }
+#endif
     int MIPS16 main()
     {
         static int ErrorInPrompt;
@@ -5234,7 +5258,7 @@ uint32_t testPSRAM(void)
             vreg_set_voltage(VREG_VOLTAGE_1_30); // Std default @ boot is 1_10
 #ifdef rp2350
         else if (Option.CPU_Speed > 320000)
-            vreg_set_voltage(VREG_VOLTAGE_1_50); // Std default @ boot is 1_10
+            vreg_set_voltage(VREG_VOLTAGE_1_40); // Std default @ boot is 1_10
 #else
     else
         vreg_set_voltage(VREG_VOLTAGE_1_30);
@@ -5257,6 +5281,12 @@ uint32_t testPSRAM(void)
     set_sys_clock_khz(Option.CPU_Speed, false);
 #endif
 #ifdef rp2350
+        pads_qspi_hw->io[0] = 0x67;
+        pads_qspi_hw->io[1] = 0x67;
+        pads_qspi_hw->io[2] = 0x67;
+        pads_qspi_hw->io[3] = 0x6B;
+        pads_qspi_hw->io[4] = 0x6B;
+        pads_qspi_hw->io[5] = 0x6B;
         if (Option.CPU_Speed <= 288000)
             qmi_hw->m[0].timing = 0x40006202;
         sleep_ms(2);
@@ -5425,6 +5455,12 @@ uint32_t testPSRAM(void)
                 if (time_us_64() - t > 500000)
                     break;
             }
+        }
+        if (tud_cdc_connected() &&
+            (Option.SerialConsole == 0 || Option.SerialConsole > 4) &&
+            Option.Telnet != -1)
+        {
+            stdio_usb_set_chars_available_callback(usb_chars_available_callback, NULL);
         }
         initKeyboard();
 #endif
