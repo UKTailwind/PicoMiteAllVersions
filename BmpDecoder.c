@@ -554,44 +554,6 @@ void rgb332_to_rgb888_components(uint8_t color, uint8_t *r, uint8_t *g, uint8_t 
         *b = (b2 * 255) / 3;
 }
 
-// Convert RGB888 to RGB121 with dithering
-uint8_t rgb888_to_rgb121_dither(int16_t r, int16_t g, int16_t b)
-{
-        // Clamp values
-        r = (r < 0) ? 0 : (r > 255) ? 255
-                                    : r;
-        g = (g < 0) ? 0 : (g > 255) ? 255
-                                    : g;
-        b = (b < 0) ? 0 : (b > 255) ? 255
-                                    : b;
-
-        // Convert to RGB121 (1 bit R, 2 bits G, 1 bit B)
-        uint8_t r1 = (r >= 128) ? 1 : 0;
-        uint8_t g2 = (g * 3 + 127) / 255;
-        uint8_t b1 = (b >= 128) ? 1 : 0;
-
-        return (r1 << 3) | (g2 << 1) | b1;
-}
-
-// Convert RGB888 to RGB332 with dithering
-uint8_t rgb888_to_rgb332_dither(int16_t r, int16_t g, int16_t b)
-{
-        // Clamp values
-        r = (r < 0) ? 0 : (r > 255) ? 255
-                                    : r;
-        g = (g < 0) ? 0 : (g > 255) ? 255
-                                    : g;
-        b = (b < 0) ? 0 : (b > 255) ? 255
-                                    : b;
-
-        // Convert to RGB332 (3 bits R, 3 bits G, 2 bits B)
-        uint8_t r3 = (r * 7 + 127) / 255;
-        uint8_t g3 = (g * 7 + 127) / 255;
-        uint8_t b2 = (b * 3 + 127) / 255;
-
-        return (r3 << 5) | (g3 << 2) | b2;
-}
-
 int ReadAndDisplayBMP(int fnbr, int display_mode, int dither_mode, int img_x_offset,
                       int img_y_offset, int x_display, int y_display)
 {

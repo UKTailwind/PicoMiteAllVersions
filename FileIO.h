@@ -433,6 +433,11 @@ extern "C"
          * ============================================================================ */
         void MMPrintString(char *s);
         void CheckAbort(void);
+        // Convert RGB888 to RGB121 with dithering
+        uint8_t rgb888_to_rgb121_dither(int16_t r, int16_t g, int16_t b);
+
+        // Convert RGB888 to RGB332 with dithering
+        uint8_t rgb888_to_rgb332_dither(int16_t r, int16_t g, int16_t b);
 
 #ifdef __cplusplus
 }

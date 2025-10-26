@@ -67,8 +67,6 @@ extern "C"
 #else
 #include "pico/unique_id.h"
 #include "class/cdc/cdc_device.h"
-volatile int CDC_chars_received = 0;
-extern void stdio_usb_set_chars_available_callback(void (*fn)(void *), void *param);
 #endif
 #ifndef rp2350
 #include "hardware/structs/ssi.h"
@@ -557,7 +555,9 @@ uint8_t PSRAMpin;
         }
 #ifndef USBKEYBOARD
         // === Console CDC processing ===
-        if (CDC_chars_received && console_rx_buf_space() > 1)
+        if (tud_cdc_connected() &&
+            (Option.SerialConsole == 0 || Option.SerialConsole > 4) &&
+            Option.Telnet != -1)
         {
 
             int c;
@@ -585,8 +585,6 @@ uint8_t PSRAMpin;
                         break;
                 }
             }
-            if (CDC_chars_received > 0)
-                CDC_chars_received--;
         }
 #endif
         // === Early exit for frequent calls ===
@@ -600,7 +598,6 @@ uint8_t PSRAMpin;
             tuh_task();
             hid_app_task();
         }
-#else
 #endif
 
         // === Display buffer refresh (RP2350) ===
@@ -709,7 +706,7 @@ uint8_t PSRAMpin;
                     //                        putc(c, stdout);
                     if (flush)
                     {
-                        //                        //fflush(stdout);
+                        // fflush(stdout);
                         tud_cdc_write_flush();
                     }
                 }
@@ -5156,12 +5153,7 @@ uint32_t testPSRAM(void)
         cyw43_wifi_pm(&cyw43_state, CYW43_DEFAULT_PM & ~0xf);
     }
 #endif
-#ifndef USBKEYBOARD
-    void MIPS32 __not_in_flash_func(usb_chars_available_callback)(void *param)
-    {
-        CDC_chars_received++;
-    }
-#endif
+
     int MIPS16 main()
     {
         static int ErrorInPrompt;
@@ -5258,7 +5250,7 @@ uint32_t testPSRAM(void)
             vreg_set_voltage(VREG_VOLTAGE_1_30); // Std default @ boot is 1_10
 #ifdef rp2350
         else if (Option.CPU_Speed > 320000)
-            vreg_set_voltage(VREG_VOLTAGE_1_40); // Std default @ boot is 1_10
+            vreg_set_voltage(VREG_VOLTAGE_1_50); // Std default @ boot is 1_10
 #else
     else
         vreg_set_voltage(VREG_VOLTAGE_1_30);
@@ -5455,12 +5447,6 @@ uint32_t testPSRAM(void)
                 if (time_us_64() - t > 500000)
                     break;
             }
-        }
-        if (tud_cdc_connected() &&
-            (Option.SerialConsole == 0 || Option.SerialConsole > 4) &&
-            Option.Telnet != -1)
-        {
-            stdio_usb_set_chars_available_callback(usb_chars_available_callback, NULL);
         }
         initKeyboard();
 #endif

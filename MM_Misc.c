@@ -3369,9 +3369,14 @@ bool testMODBUFF(bool proposed, int proposedsize)
         else
         {
             ResetAllFlash();
+            Option.modbuff = proposed;
+            Option.modbuffsize = proposedsize;
             return true;
         }
     }
+    ResetOptions(true);
+    Option.modbuff = proposed;
+    Option.modbuffsize = proposedsize;
     return false;
 }
 void doreset(int format)
@@ -3384,7 +3389,6 @@ void MIPS16 configure(unsigned char *p)
     if (!*p)
     {
         format = testMODBUFF(false, 0);
-        ResetOptions(false);
         doreset(format);
     }
     else
@@ -3440,7 +3444,7 @@ void MIPS16 configure(unsigned char *p)
 #ifdef USBKEYBOARD
         if (checkstring(p, (unsigned char *)"CMM1.5"))
         {
-            ResetOptions(false);
+            format = testMODBUFF(true, 512);
             Option.CPU_Speed = 252000;
             Option.AllPins = 1;
             Option.ColourCode = 1;
@@ -3457,7 +3461,6 @@ void MIPS16 configure(unsigned char *p)
             Option.AUDIO_R = PINMAP[17];
             Option.modbuffsize = 512;
             Option.modbuff = true;
-            format = testMODBUFF(Option.modbuff, Option.modbuffsize);
             Option.AUDIO_SLICE = checkslice(PINMAP[16], PINMAP[17], 0);
             strcpy((char *)Option.platform, "CMM1.5");
             SaveOptions();
@@ -3468,7 +3471,7 @@ void MIPS16 configure(unsigned char *p)
 #else
         if (checkstring(p, (unsigned char *)"PICOMITEVGA V1.1"))
         {
-            ResetOptions(false);
+            format = testMODBUFF(true, 512);
             Option.CPU_Speed = 252000;
             Option.AllPins = 1;
             Option.ColourCode = 1;
@@ -3485,9 +3488,6 @@ void MIPS16 configure(unsigned char *p)
             Option.AUDIO_CLK_PIN = PINMAP[22];
             Option.AUDIO_MOSI_PIN = PINMAP[23];
             Option.AUDIO_SLICE = checkslice(PINMAP[22], PINMAP[22], 1);
-            Option.modbuffsize = 512;
-            Option.modbuff = true;
-            format = testMODBUFF(Option.modbuff, Option.modbuffsize);
             strcpy((char *)Option.platform, "PICOMITEVGA V1.1");
             SaveOptions();
             printoptions();
@@ -3496,7 +3496,7 @@ void MIPS16 configure(unsigned char *p)
         }
         if (checkstring(p, (unsigned char *)"PICOMITEVGA V1.0"))
         {
-            ResetOptions(false);
+            format = testMODBUFF(true, 512);
             Option.CPU_Speed = 252000;
             Option.AllPins = 1;
             Option.ColourCode = 1;
@@ -3511,9 +3511,6 @@ void MIPS16 configure(unsigned char *p)
             Option.VGA_BLUE = PINMAP[18];
             Option.AUDIO_L = PINMAP[22];
             Option.AUDIO_R = PINMAP[23];
-            Option.modbuffsize = 512;
-            Option.modbuff = true;
-            format = testMODBUFF(Option.modbuff, Option.modbuffsize);
             Option.AUDIO_SLICE = checkslice(PINMAP[22], PINMAP[23], 0);
             strcpy((char *)Option.platform, "PICOMITEVGA V1.0");
             SaveOptions();
@@ -3523,8 +3520,7 @@ void MIPS16 configure(unsigned char *p)
         }
         if (checkstring(p, (unsigned char *)"VGA DESIGN 1"))
         {
-            ResetOptions(false);
-            format = testMODBUFF(Option.modbuff, Option.modbuffsize);
+            format = testMODBUFF(false, 0);
             Option.CPU_Speed = 252000;
             Option.ColourCode = 1;
             Option.SYSTEM_CLK = PINMAP[10];
@@ -3541,7 +3537,7 @@ void MIPS16 configure(unsigned char *p)
         }
         if (checkstring(p, (unsigned char *)"VGA DESIGN 2"))
         {
-            ResetOptions(false);
+            format = testMODBUFF(true, 192);
             Option.CPU_Speed = 252000;
             Option.ColourCode = 1;
             Option.SYSTEM_I2C_SDA = PINMAP[14];
@@ -3555,9 +3551,6 @@ void MIPS16 configure(unsigned char *p)
             Option.VGA_BLUE = PINMAP[18];
             Option.AUDIO_L = PINMAP[6];
             Option.AUDIO_R = PINMAP[7];
-            Option.modbuffsize = 192;
-            Option.modbuff = true;
-            format = testMODBUFF(Option.modbuff, Option.modbuffsize);
             Option.AUDIO_SLICE = checkslice(PINMAP[6], PINMAP[7], 0);
             strcpy((char *)Option.platform, "VGA Design 2");
             SaveOptions();
@@ -3574,6 +3567,7 @@ void MIPS16 configure(unsigned char *p)
         OPTION VGA PINS GP14, GP10*/
         if (checkstring(p, (unsigned char *)"SWEETIEPI"))
         {
+            format = testMODBUFF(true, 192);
             Option.AllPins = 1;
             Option.ColourCode = 1;
             Option.SYSTEM_I2C_SDA = PINMAP[0];
@@ -3588,9 +3582,6 @@ void MIPS16 configure(unsigned char *p)
             Option.AUDIO_CLK_PIN = PINMAP[6];
             Option.AUDIO_MOSI_PIN = PINMAP[7];
             Option.AUDIO_SLICE = checkslice(PINMAP[6], PINMAP[6], 1);
-            Option.modbuffsize = 192;
-            Option.modbuff = true;
-            format = testMODBUFF(Option.modbuff, Option.modbuffsize);
             strcpy((char *)Option.platform, "SWEETIEPI");
             SaveOptions();
             printoptions();
@@ -3606,6 +3597,7 @@ void MIPS16 configure(unsigned char *p)
         option system i2c GP26, GP27*/
         if (checkstring(p, (unsigned char *)"VGA BASIC"))
         {
+            format = testMODBUFF(true, 192);
             Option.ColourCode = 1;
             Option.SYSTEM_I2C_SDA = PINMAP[0];
             Option.SYSTEM_I2C_SCL = PINMAP[1];
@@ -3617,9 +3609,6 @@ void MIPS16 configure(unsigned char *p)
             Option.VGA_BLUE = PINMAP[18];
             Option.AUDIO_L = PINMAP[6];
             Option.AUDIO_R = PINMAP[7];
-            Option.modbuffsize = 192;
-            Option.modbuff = true;
-            format = testMODBUFF(Option.modbuff, Option.modbuffsize);
             Option.AUDIO_SLICE = checkslice(PINMAP[6], PINMAP[7], 0);
             strcpy((char *)Option.platform, "VGA BASIC");
             SaveOptions();
@@ -3645,7 +3634,7 @@ void MIPS16 configure(unsigned char *p)
         */
         if (checkstring(p, (unsigned char *)"HDMIUSB") || checkstring(p, (unsigned char *)"PICO COMPUTER"))
         {
-            ResetOptions(false);
+            format = testMODBUFF(true, 192);
             if (checkstring(p, (unsigned char *)"HDMIUSB"))
                 strcpy((char *)Option.platform, "HDMIUSB");
             else
@@ -3658,9 +3647,6 @@ void MIPS16 configure(unsigned char *p)
             Option.SD_MISO_PIN = PINMAP[28];
             Option.AUDIO_L = PINMAP[10];
             Option.AUDIO_R = PINMAP[11];
-            Option.modbuffsize = 192;
-            Option.modbuff = true;
-            format = testMODBUFF(Option.modbuff, Option.modbuffsize);
             Option.AUDIO_SLICE = checkslice(PINMAP[10], PINMAP[11], 0);
             Option.SYSTEM_I2C_SDA = PINMAP[20];
             Option.SYSTEM_I2C_SCL = PINMAP[21];
@@ -3677,14 +3663,11 @@ void MIPS16 configure(unsigned char *p)
         {
             if (rp2350a)
                 error("RP350B chips only");
-            ResetOptions(false);
+            format = testMODBUFF(true, 512);
             strcpy((char *)Option.platform, "HDMIUSBI2S");
             Option.heartbeatpin = PINMAP[25];
             Option.NoHeartbeat = false;
             Option.ColourCode = 1;
-            Option.modbuffsize = 512;
-            Option.modbuff = true;
-            format = testMODBUFF(Option.modbuff, Option.modbuffsize);
             Option.audio_i2s_bclk = PINMAP[10];
             Option.audio_i2s_data = PINMAP[22];
             Option.AUDIO_SLICE = 11;
@@ -3714,14 +3697,11 @@ void MIPS16 configure(unsigned char *p)
         }
         if (checkstring(p, (unsigned char *)"OLIMEXUSB"))
         {
-            ResetOptions(false);
+            format = testMODBUFF(true, 192);
             strcpy((char *)Option.platform, "OLIMEX USB");
             Option.ColourCode = 1;
             Option.AUDIO_L = PINMAP[26];
             Option.AUDIO_R = PINMAP[27];
-            Option.modbuffsize = 192;
-            Option.modbuff = true;
-            format = testMODBUFF(Option.modbuff, Option.modbuffsize);
             Option.AUDIO_SLICE = checkslice(PINMAP[26], PINMAP[27], 0);
             Option.SD_CS = PINMAP[22];
             Option.SD_CLK_PIN = PINMAP[6];
@@ -3743,8 +3723,7 @@ void MIPS16 configure(unsigned char *p)
 #else
         if (checkstring(p, (unsigned char *)"HDMIBASIC"))
         {
-            ResetOptions(false);
-            format = testMODBUFF(Option.modbuff, Option.modbuffsize);
+            format = testMODBUFF(false, 0);
             strcpy((char *)Option.platform, "HDMIbasic");
             Option.ColourCode = 1;
             Option.SD_CS = 7;
@@ -3758,14 +3737,11 @@ void MIPS16 configure(unsigned char *p)
         }
         if (checkstring(p, (unsigned char *)"OLIMEX"))
         {
-            ResetOptions(false);
+            format = testMODBUFF(true, 192);
             strcpy((char *)Option.platform, "OLIMEX");
             Option.ColourCode = 1;
             Option.AUDIO_L = PINMAP[26];
             Option.AUDIO_R = PINMAP[27];
-            Option.modbuffsize = 192;
-            Option.modbuff = true;
-            format = testMODBUFF(Option.modbuff, Option.modbuffsize);
             Option.AUDIO_SLICE = checkslice(PINMAP[26], PINMAP[27], 0);
             Option.SD_CS = PINMAP[22];
             Option.SD_CLK_PIN = PINMAP[6];
@@ -3787,8 +3763,7 @@ void MIPS16 configure(unsigned char *p)
 #if PICOMITERP2350
         if (checkstring(p, (unsigned char *)"PALM PICO"))
         {
-            ResetOptions(false);
-            format = testMODBUFF(Option.modbuff, Option.modbuffsize);
+            format = testMODBUFF(false, 0);
             Option.CPU_Speed = 360000;
             Option.ColourCode = 1;
             Option.LCD_CLK = Option.SYSTEM_CLK = PINMAP[42];
@@ -3834,8 +3809,7 @@ void MIPS16 configure(unsigned char *p)
         }
         if (checkstring(p, (unsigned char *)"PICO PALM"))
         {
-            ResetOptions(false);
-            format = testMODBUFF(Option.modbuff, Option.modbuffsize);
+            format = testMODBUFF(false, 0);
             Option.CPU_Speed = 360000;
             Option.ColourCode = 1;
             Option.SYSTEM_CLK = PINMAP[6];
@@ -3881,7 +3855,7 @@ void MIPS16 configure(unsigned char *p)
 #ifndef USBKEYBOARD
         if (checkstring(p, (unsigned char *)"GAMEMITE"))
         {
-            ResetOptions(false);
+            format = testMODBUFF(true, 192);
             Option.CPU_Speed = 252000;
             Option.ColourCode = 1;
 #if defined(rp2350) && defined(PICOMITE)
@@ -3895,7 +3869,6 @@ void MIPS16 configure(unsigned char *p)
 #endif
             Option.AUDIO_L = PINMAP[20];
             Option.AUDIO_R = PINMAP[21];
-            Option.modbuffsize = 192;
             Option.DISPLAY_TYPE = ILI9341;
             Option.LCD_CD = PINMAP[2];
             Option.LCD_Reset = PINMAP[1];
@@ -3903,8 +3876,6 @@ void MIPS16 configure(unsigned char *p)
             Option.TOUCH_CS = PINMAP[5];
             Option.TOUCH_IRQ = PINMAP[7];
             Option.SD_CS = PINMAP[22];
-            Option.modbuff = true;
-            format = testMODBUFF(Option.modbuff, Option.modbuffsize);
             Option.DISPLAY_ORIENTATION = 3;
             Option.AUDIO_SLICE = checkslice(PINMAP[20], PINMAP[21], 0);
             Option.TOUCH_SWAPXY = 0;
@@ -3920,7 +3891,7 @@ void MIPS16 configure(unsigned char *p)
         }
         if (checkstring(p, (unsigned char *)"PICORESTOUCHLCD3.5"))
         {
-            ResetOptions(false);
+            format = testMODBUFF(true, 192);
             Option.CPU_Speed = 252000;
             Option.ColourCode = 1;
 #if defined(rp2350) && defined(PICOMITE)
@@ -3932,7 +3903,6 @@ void MIPS16 configure(unsigned char *p)
             Option.SYSTEM_MOSI = PINMAP[11];
             Option.SYSTEM_MISO = PINMAP[12];
 #endif
-            Option.modbuffsize = 192;
             Option.DISPLAY_TYPE = ILI9488W;
             Option.LCD_CD = PINMAP[8];
             Option.LCD_Reset = PINMAP[15];
@@ -3941,7 +3911,6 @@ void MIPS16 configure(unsigned char *p)
             Option.TOUCH_IRQ = PINMAP[17];
             Option.SD_CS = PINMAP[22];
             Option.DISPLAY_BL = PINMAP[13];
-            Option.modbuff = true;
             format = testMODBUFF(Option.modbuff, Option.modbuffsize);
             Option.DISPLAY_ORIENTATION = 1;
             Option.TOUCH_SWAPXY = 0;
@@ -3957,8 +3926,7 @@ void MIPS16 configure(unsigned char *p)
         }
         if (checkstring(p, (unsigned char *)"PICO BACKPACK"))
         {
-            ResetOptions(false);
-            format = testMODBUFF(Option.modbuff, Option.modbuffsize);
+            format = testMODBUFF(false, 0);
             Option.CPU_Speed = 252000;
             Option.ColourCode = 1;
 #if defined(rp2350) && defined(PICOMITE)
@@ -3991,7 +3959,7 @@ void MIPS16 configure(unsigned char *p)
         }
         if (checkstring(p, (unsigned char *)"PICORESTOUCHLCD2.8"))
         {
-            ResetOptions(false);
+            format = testMODBUFF(true, 192);
             Option.CPU_Speed = 252000;
             Option.ColourCode = 1;
 #if defined(rp2350) && defined(PICOMITE)
@@ -4003,7 +3971,6 @@ void MIPS16 configure(unsigned char *p)
             Option.SYSTEM_MOSI = PINMAP[11];
             Option.SYSTEM_MISO = PINMAP[12];
 #endif
-            Option.modbuffsize = 192;
             Option.DISPLAY_TYPE = ST7789B;
             Option.LCD_CD = PINMAP[8];
             Option.LCD_Reset = PINMAP[15];
@@ -4012,8 +3979,6 @@ void MIPS16 configure(unsigned char *p)
             Option.TOUCH_IRQ = PINMAP[17];
             Option.SD_CS = PINMAP[22];
             Option.DISPLAY_BL = PINMAP[13];
-            Option.modbuff = true;
-            format = testMODBUFF(Option.modbuff, Option.modbuffsize);
             Option.DISPLAY_ORIENTATION = 1;
             Option.TOUCH_SWAPXY = 0;
             Option.TOUCH_XZERO = 373;
@@ -4029,8 +3994,7 @@ void MIPS16 configure(unsigned char *p)
 #ifndef PICOMITEWEB
         if (checkstring(p, (unsigned char *)"RP2040LCD1.28"))
         {
-            ResetOptions(false);
-            format = testMODBUFF(Option.modbuff, Option.modbuffsize);
+            format = testMODBUFF(false, 0);
             Option.CPU_Speed = 252000;
             Option.AllPins = 1;
             Option.ColourCode = 1;
@@ -4060,8 +4024,7 @@ void MIPS16 configure(unsigned char *p)
         }
         if (checkstring(p, (unsigned char *)"RP2040LCD0.96"))
         {
-            ResetOptions(false);
-            format = testMODBUFF(Option.modbuff, Option.modbuffsize);
+            format = testMODBUFF(false, 0);
             Option.CPU_Speed = 252000;
             Option.ColourCode = 1;
             Option.NoHeartbeat = 1;
@@ -4088,8 +4051,7 @@ void MIPS16 configure(unsigned char *p)
         }
         if (checkstring(p, (unsigned char *)"RP2040GEEK"))
         {
-            ResetOptions(false);
-            format = testMODBUFF(Option.modbuff, Option.modbuffsize);
+            format = testMODBUFF(false, 0);
             Option.CPU_Speed = 252000;
             Option.ColourCode = 1;
             Option.NoHeartbeat = 1;
@@ -4123,7 +4085,7 @@ void MIPS16 configure(unsigned char *p)
 #else
         if (checkstring(p, (unsigned char *)"USB Edition V1.0"))
         {
-            ResetOptions(false);
+            format = testMODBUFF(true, 512);
             Option.CPU_Speed = 252000;
             Option.ColourCode = 1;
             Option.NoHeartbeat = 1;
@@ -4143,8 +4105,6 @@ void MIPS16 configure(unsigned char *p)
             Option.SerialConsole = 1;
             Option.CombinedCS = 1;
             Option.SD_CS = 0;
-            Option.modbuffsize = 512;
-            Option.modbuff = true;
             format = testMODBUFF(Option.modbuff, Option.modbuffsize);
             Option.AUDIO_SLICE = checkslice(PINMAP[26], PINMAP[27], 0);
             strcpy((char *)Option.platform, "USB Edition V1.0");
