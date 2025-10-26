@@ -1,4 +1,4 @@
-set "fixed_string=V6.01.00RC4"
+set "fixed_string=V6.01.00RC8"
 set "extension=.uf2"
 set "directory=../"
 ren buildRP2040F build
