@@ -46,7 +46,7 @@ void gpio_set_function(uint gpio, gpio_function_t fn) {
     // Zero all fields apart from fsel; we want this IO to do what the peripheral tells it.
     // This doesn't affect e.g. pullup/pulldown, as these are in pad controls.
     io_bank0_hw->io[gpio].ctrl = fn << IO_BANK0_GPIO0_CTRL_FUNCSEL_LSB;
-#if !PICO_RP2040
+#if HAS_PADS_BANK0_ISOLATION
     // Remove pad isolation now that the correct peripheral is in control of the pad
     hw_clear_bits(&pads_bank0_hw->io[gpio], PADS_BANK0_GPIO0_ISO_BITS);
 #endif
@@ -251,11 +251,6 @@ void gpio_set_dormant_irq_enabled(uint gpio, uint32_t events, bool enabled) {
     check_gpio_param(gpio);
     io_bank0_irq_ctrl_hw_t *irq_ctrl_base = &io_bank0_hw->dormant_wake_irq_ctrl;
     _gpio_set_irq_enabled(gpio, events, enabled, irq_ctrl_base);
-}
-
-void gpio_acknowledge_irq(uint gpio, uint32_t events) {
-    check_gpio_param(gpio);
-    io_bank0_hw->intr[gpio / 8] = events << (4 * (gpio % 8));
 }
 
 #define DEBUG_PIN_MASK (((1u << PICO_DEBUG_PIN_COUNT)-1) << PICO_DEBUG_PIN_BASE)
