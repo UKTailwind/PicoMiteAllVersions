@@ -526,15 +526,37 @@ uint8_t PSRAMpin;
         else
             return ConsoleRxBufTail - ConsoleRxBufHead;
     }
-
+    // should be run not more than once a millisecond
     void __not_in_flash_func(routinechecks)(void)
     {
-        static int when = 0;
+        //        static int when = 0;
         static int classicread = 0, nunchuckread = 0;
+        static uint64_t lastrun = 0;
+        uint64_t timenow = time_us_64();
+        if (timenow - lastrun < 500)
+            return;
+        lastrun = timenow;
 #ifndef USBKEYBOARD
         static int keyread = 0;
+        int count;
 #endif
 
+        if (CurrentlyPlaying != P_NOTHING)
+        {
+            // === Audio playback processing ===
+            if (CurrentlyPlaying == P_WAV || CurrentlyPlaying == P_FLAC ||
+                CurrentlyPlaying == P_MP3 || CurrentlyPlaying == P_MIDI)
+            {
+                WITH_FRAMEBUFFER_LOCK(SPIatRisk, checkWAVinput());
+            }
+            else if (CurrentlyPlaying == P_MOD || CurrentlyPlaying == P_ARRAY)
+            {
+                checkWAVinput();
+            }
+        }
+        // === Early exit for frequent calls ===
+        //        if ((++when & 0xF) && CurrentLinePtr)
+        //            return;
         // === Timer synchronization ===
         if (abs((time_us_64() - mSecTimer * 1000)) > 5000)
         {
@@ -543,60 +565,66 @@ uint8_t PSRAMpin;
             mSecTimer = time_us_64() / 1000;
         }
 
-        // === Audio playback processing ===
-        if (CurrentlyPlaying == P_WAV || CurrentlyPlaying == P_FLAC ||
-            CurrentlyPlaying == P_MP3 || CurrentlyPlaying == P_MIDI)
-        {
-            WITH_FRAMEBUFFER_LOCK(SPIatRisk, checkWAVinput());
-        }
-        else if (CurrentlyPlaying == P_MOD || CurrentlyPlaying == P_ARRAY)
-        {
-            checkWAVinput();
-        }
-#ifndef USBKEYBOARD
-        // === Console CDC processing ===
-        if (tud_cdc_connected() &&
-            (Option.SerialConsole == 0 || Option.SerialConsole > 4) &&
-            Option.Telnet != -1)
-        {
-
-            int c;
-            while ((c = tud_cdc_read_char()) != -1)
-            {
-                ConsoleRxBuf[ConsoleRxBufHead] = c;
-
-                if (BreakKey && c == BreakKey)
-                {
-                    // User interrupt
-                    MMAbort = true;
-                    ConsoleRxBufHead = ConsoleRxBufTail;
-                }
-                else if (c == keyselect && KeyInterrupt != NULL)
-                {
-                    Keycomplete = true;
-                }
-                else
-                {
-                    // Normal character - add to buffer
-                    ConsoleRxBufHead = (ConsoleRxBufHead + 1) % CONSOLE_RX_BUF_SIZE;
-
-                    // Handle potential buffer overflow
-                    if (console_rx_buf_space() <= 1)
-                        break;
-                }
-            }
-        }
-#endif
-        // === Early exit for frequent calls ===
-        if ((++when & 0x07) && CurrentLinePtr)
-            return;
-
         // === USB task processing ===
 #ifdef USBKEYBOARD
         if (USBenabled && mSecTimer > 2000)
         {
             tuh_task();
             hid_app_task();
+        }
+#endif
+#ifndef USBKEYBOARD
+        if (tud_cdc_connected() &&
+            (Option.SerialConsole == 0 || Option.SerialConsole > 4) &&
+            Option.Telnet != -1 &&
+            (count = tud_cdc_available()))
+        {
+            uint32_t space = console_rx_buf_space();
+
+            // Ensure we leave at least 1 byte free to distinguish full from empty
+            if (space > 1)
+            {
+                uint8_t tempBuf[CFG_TUD_CDC_RX_BUFSIZE]; // USB CDC buffer size
+                uint32_t to_read = space - 1;            // Maximum we can safely buffer
+
+                // Limit to USB available data
+                if (to_read > count)
+                    to_read = count;
+
+                // Limit to temp buffer size
+                if (to_read > sizeof(tempBuf))
+                    to_read = sizeof(tempBuf);
+
+                // Read from USB with interrupts disabled to prevent race conditions
+                irq_set_enabled(USBCTRL_IRQ, false);
+                uint32_t actual = tud_cdc_read(tempBuf, to_read);
+                irq_set_enabled(USBCTRL_IRQ, true);
+
+                // Process received bytes
+                for (uint32_t i = 0; i < actual; i++)
+                {
+                    int c = tempBuf[i];
+
+                    // Check for break key
+                    if (BreakKey && c == BreakKey)
+                    {
+                        MMAbort = true;
+                        ConsoleRxBufHead = ConsoleRxBufTail; // Flush buffer
+                        break;                               // Exit loop after abort
+                    }
+                    // Check for key interrupt (signal only, don't buffer)
+                    else if (c == keyselect && KeyInterrupt != NULL)
+                    {
+                        Keycomplete = true;
+                    }
+                    // Normal character - store in buffer
+                    else
+                    {
+                        ConsoleRxBuf[ConsoleRxBufHead] = c;
+                        ConsoleRxBufHead = (ConsoleRxBufHead + 1) % CONSOLE_RX_BUF_SIZE;
+                    }
+                }
+            }
         }
 #endif
 
@@ -609,6 +637,11 @@ uint8_t PSRAMpin;
 
             if (Option.Refresh)
             {
+                /*                PInt(low_x);
+                                PIntComma(low_y);
+                                PIntComma(high_x);
+                                PIntComma(high_y);
+                                PRet();*/
                 multicore_fifo_push_blocking(6);
                 multicore_fifo_push_blocking((uint32_t)low_x | (high_x << 16));
                 multicore_fifo_push_blocking((uint32_t)low_y | (high_y << 16));
@@ -696,14 +729,15 @@ uint8_t PSRAMpin;
 #ifndef USBKEYBOARD
             if (Option.SerialConsole == 0 || Option.SerialConsole > 4)
             {
-                if (tud_cdc_connected())
+                if (tud_cdc_connected() && (tud_cdc_get_line_state() & 0x01))
                 {
                     while (!tud_cdc_write_available())
                     {
-                        tight_loop_contents();
+                        busy_wait_us(250);
+                        if (!(tud_cdc_connected() && (tud_cdc_get_line_state() & 0x01)))
+                            break;
                     }
                     tud_cdc_write_char(c);
-                    //                        putc(c, stdout);
                     if (flush)
                     {
                         // fflush(stdout);
@@ -4897,7 +4931,7 @@ void __not_in_flash_func(UpdateCore)()
                 int y_high = y_low >> 16;
                 y_low &= 0xFFFF;
                 mutex_enter_blocking(&frameBufferMutex); // lock the frame buffer
-                copybuffertoscreen((uint8_t *)ScreenBuffer, x_low, y_low, x_high, y_high);
+                copybuffertoscreen(x_low, y_low, x_high, y_high);
                 mutex_exit(&frameBufferMutex);
             }
             else if (command == 7)
@@ -5250,7 +5284,7 @@ uint32_t testPSRAM(void)
             vreg_set_voltage(VREG_VOLTAGE_1_30); // Std default @ boot is 1_10
 #ifdef rp2350
         else if (Option.CPU_Speed > 320000)
-            vreg_set_voltage(VREG_VOLTAGE_1_50); // Std default @ boot is 1_10
+            vreg_set_voltage(VREG_VOLTAGE_1_60); // Std default @ boot is 1_10
 #else
     else
         vreg_set_voltage(VREG_VOLTAGE_1_30);

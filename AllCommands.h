@@ -197,6 +197,8 @@ void cmd_irqset(void);
 void cmd_irqwait(void);
 void cmd_irqclear(void);
 void cmd_irqnowait(void);
+void cmd_irqprev(void);
+void cmd_irqnext(void);
 void cmd_irq(void);
 void cmd_set(void);
 void cmd_byte(void);
@@ -534,6 +536,8 @@ void fun_touch(void);
 	{(unsigned char *)"IRQ WAIT", T_CMD, 0, cmd_irqwait},
 	{(unsigned char *)"IRQ CLEAR", T_CMD, 0, cmd_irqclear},
 	{(unsigned char *)"IRQ NOWAIT", T_CMD, 0, cmd_irqnowait},
+	{(unsigned char *)"IRQ PREV", T_CMD, 0, cmd_irqprev},
+	{(unsigned char *)"IRQ NEXT", T_CMD, 0, cmd_irqnext},
 	{(unsigned char *)"IRQ", T_CMD, 0, cmd_irq},
 	{(unsigned char *)"Set", T_CMD, 0, cmd_set},
 	{(unsigned char *)"Byte(", T_CMD | T_FUN, 0, cmd_byte},

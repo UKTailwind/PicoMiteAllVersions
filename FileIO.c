@@ -1426,8 +1426,9 @@ void cmd_LoadJPGImage(unsigned char *p)
     g_nInFileSize = g_nInFileOfs = 0;
 
     int xOrigin, yOrigin;
+    int xOffset, yOffset;
 
-    getcsargs(&p, 7);
+    getcsargs(&p, 11);
     if (argc == 0)
         StandardError(2);
     if (!InitSDCard())
@@ -1436,11 +1437,13 @@ void cmd_LoadJPGImage(unsigned char *p)
     p = getFstring(argv[0]);
 
     xOrigin = yOrigin = 0;
+    xOffset = yOffset = 0;
+
     if (argc >= 3 && *argv[2])
         xOrigin = getint(argv[2], 0, HRes - 1);
     if (argc >= 5 && *argv[4])
         yOrigin = getint(argv[4], 0, VRes - 1);
-    if (argc == 7)
+    if (argc >= 7 && *argv[6])
         dither_mode = getint(argv[6], -1, 3);
 
     if (strchr((char *)p, '.') == NULL)
@@ -1462,7 +1465,11 @@ void cmd_LoadJPGImage(unsigned char *p)
         error("pjpeg_decode_init() failed with status %", status);
     }
 
-    // Allocate buffer for entire MCU row (all MCUs horizontally)
+    if (argc >= 9 && *argv[8])
+        xOffset = getint(argv[8], 0, image_info.m_width - 1);
+    if (argc == 11)
+        yOffset = getint(argv[10], 0, image_info.m_height - 1);
+
     int mcu_row_width = image_info.m_width * image_info.m_comps;
     int mcu_row_height = image_info.m_MCUHeight;
     unsigned char *mcu_row_buffer = GetTempMainMemory(mcu_row_height * mcu_row_width);
@@ -1490,7 +1497,19 @@ void cmd_LoadJPGImage(unsigned char *p)
     // Process MCU row by MCU row
     for (mcu_y = 0; mcu_y < image_info.m_MCUSPerCol; mcu_y++)
     {
+        // Calculate the actual Y position in the image for this MCU row
+        int image_y = mcu_y * image_info.m_MCUHeight;
+
+        // We can stop decoding if we're past the visible region
+        // but we must decode all previous MCU rows sequentially
+        bool should_display = (image_y + image_info.m_MCUHeight > yOffset) &&
+                              (image_y < yOffset + VRes - yOrigin);
+
+        if (image_y >= yOffset + VRes - yOrigin)
+            break;
+
         // Decode all MCUs in this row into the buffer
+        // (must decode sequentially even if we won't display this row)
         for (mcu_x = 0; mcu_x < image_info.m_MCUSPerRow; mcu_x++)
         {
             status = pjpeg_decode_mcu();
@@ -1544,6 +1563,7 @@ void cmd_LoadJPGImage(unsigned char *p)
         }
 
         // Now dither this entire MCU row, one image row at a time
+        // We MUST process ALL rows to maintain correct error diffusion state
         if (dither_mode >= 0)
         {
             for (int y = 0; y < mcu_row_height; y++)
@@ -1566,18 +1586,48 @@ void cmd_LoadJPGImage(unsigned char *p)
             }
         }
 
-        // Display this MCU row
-        int x = xOrigin;
-        int y = mcu_y * image_info.m_MCUHeight + yOrigin;
-        if (y < VRes && x < HRes)
+        // Display this MCU row line by line
+        // Only display lines that are within the yOffset region
+        if (should_display)
         {
-            int yend = min(VRes - 1, y + image_info.m_MCUHeight - 1);
-            int xend = min(HRes - 1, x + image_info.m_width - 1);
+            // Draw each line individually to prevent overflow
+            for (int line = 0; line < image_info.m_MCUHeight; line++)
+            {
+                int image_line_y = image_y + line;
 
-            if (yend >= yOrigin + image_info.m_height)
-                yend = yOrigin + image_info.m_height - 1;
+                // Check if this line is within the image bounds
+                if (image_line_y >= image_info.m_height)
+                    break;
 
-            DrawBuffer(x, y, xend, yend, mcu_row_buffer);
+                // Skip lines before yOffset
+                if (image_line_y < yOffset)
+                    continue;
+
+                // Calculate screen Y position (relative to yOffset)
+                int screen_y = yOrigin + (image_line_y - yOffset);
+
+                // Check if this line is within vertical display bounds
+                if (screen_y < 0 || screen_y >= VRes)
+                    continue;
+
+                // Calculate horizontal display parameters
+                int screen_x = xOrigin;
+                if (screen_x >= HRes)
+                    continue;
+
+                // Calculate how much of this line to display
+                // We need to skip xOffset pixels from the start of the line
+                int source_start_x = xOffset;
+                int available_width = image_info.m_width - source_start_x;
+                int display_width = min(available_width, HRes - screen_x);
+
+                if (display_width <= 0)
+                    continue;
+
+                // Draw just this line from the buffer, starting at xOffset
+                uint8_t *line_ptr = mcu_row_buffer + (line * mcu_row_width) + (source_start_x * 3);
+                DrawBuffer(screen_x, screen_y, screen_x + display_width - 1, screen_y, line_ptr);
+            }
         }
     }
 
@@ -1588,6 +1638,7 @@ void cmd_LoadJPGImage(unsigned char *p)
     if (Option.Refresh)
         Display_Refresh();
 }
+
 // search for a volume label, directory or file
 // s$ = DIR$(fspec, DIR|FILE|ALL)       will return the first entry
 // s$ = DIR$()                          will return the next

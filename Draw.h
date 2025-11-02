@@ -358,7 +358,7 @@ void ReadBuffer2(int x1, int y1, int x2, int y2, unsigned char *c);
 void ClearScreen(int c);
 void ScrollLCD16(int lines);
 void copyframetoscreen(uint8_t *s, int xstart, int xend, int ystart, int yend, int odd);
-void copybuffertoscreen(unsigned char *s, int low_x, int low_y, int high_x, int high_y);
+void copybuffertoscreen(int low_x, int low_y, int high_x, int high_y);
 void restorepanel(void);
 
 /* ============================================================================

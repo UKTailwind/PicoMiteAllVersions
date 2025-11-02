@@ -2102,7 +2102,7 @@ unsigned char MIPS32 __not_in_flash_func (*getvalue)(unsigned char *p, MMFLOAT *
                             i = (c - 48) * 100 + (p[1] - 48) * 10 + (p[2] - 48);
                             p += 3;
                             if (i == 0)
-                                error("Null character \\000 in escape sequence - use CHR$(0)", "$");
+                                StandardErrorParamS(46, "$");
                             *p1++ = i;
                         }
                         // Hex escape \&hh
@@ -2117,7 +2117,7 @@ unsigned char MIPS32 __not_in_flash_func (*getvalue)(unsigned char *p, MMFLOAT *
                             i |= (c >= 'A' && c <= 'F') ? c - 'A' + 10 : (c >= 'a' && c <= 'f') ? c - 'a' + 10
                                                                                                 : c - '0';
                             if (i == 0)
-                                error("Null character \\&00 in escape sequence - use CHR$(0)", "$");
+                                StandardErrorParamS(46, "$");
                             *p1++ = i;
                         }
                         // Single character escapes
@@ -3729,52 +3729,53 @@ void SyntaxError(void)
     error("Invalid syntax");
 }
 const char *errorstring[] = {
-    "",                                                    // 0
-    "Not available on this display",                       // 1
-    "Argument count",                                      // 2
-    "PIO 0 not available",                                 // 3
-    "PIO 1 not available",                                 // 4
-    "PIO 2 not available",                                 // 5
-    "Invalid variable",                                    // 6
-    "Object % does not exist",                             // 7
-    "Invalid configuration",                               // 8
-    "Invalid pin",                                         // 9
-    "Invalid in a program",                                // 10
-    "Invalid on this display",                             // 11
-    "Pin not set for PWM",                                 // 12
-    "No memory allocated for GUI controls",                // 13
-    "String length",                                       // 14
-    "Overflow",                                            // 15
-    "Array size mismatch",                                 // 16
-    "Array size",                                          // 17
-    "File number",                                         // 18
-    "File number is not open",                             // 19
-    "Expected a number",                                   // 20
-    "Number out of bounds",                                // 21
-    "Cannot change a constant",                            // 22
-    "Destination array too small",                         // 23
-    "Already Set to pin %",                                // 24
-    "Library is using Slot % ",                            // 25
-    "% is invalid (valid is % to %)",                      // 26
-    "Pin %/| is in use",                                   // 27
-    "Insufficient data",                                   // 28
-    "Not enough memory",                                   // 29
-    "RTC not responding",                                  // 30
-    "Already open",                                        // 31
-    "Insufficient space in array",                         // 32
-    "Maximum % characters",                                // 33
-    "Coordinates",                                         // 34
-    "Argument 1 must be integer array",                    // 35
-    "Unknown command",                                     // 36
-    "Invalid buffer",                                      // 37
-    "Frame buffer not created",                            // 38
-    "Variable > 255",                                      // 39
-    "Invalid for this screen mode",                        // 40
-    "Argument % must be a 5 element floating point array", // 41
-    "Pin $ is not off or an ADC input",                    // 42
-    "Pin %/| is not off or an output",                     // 43
-    "SYSTEM I2C not configured",                           // 44
-    "System SPI not configured",                           // 45
+    "",                                                            // 0
+    "Not available on this display",                               // 1
+    "Argument count",                                              // 2
+    "PIO 0 not available",                                         // 3
+    "PIO 1 not available",                                         // 4
+    "PIO 2 not available",                                         // 5
+    "Invalid variable",                                            // 6
+    "Object % does not exist",                                     // 7
+    "Invalid configuration",                                       // 8
+    "Invalid pin",                                                 // 9
+    "Invalid in a program",                                        // 10
+    "Invalid on this display",                                     // 11
+    "Pin not set for PWM",                                         // 12
+    "No memory allocated for GUI controls",                        // 13
+    "String length",                                               // 14
+    "Overflow",                                                    // 15
+    "Array size mismatch",                                         // 16
+    "Array size",                                                  // 17
+    "File number",                                                 // 18
+    "File number is not open",                                     // 19
+    "Expected a number",                                           // 20
+    "Number out of bounds",                                        // 21
+    "Cannot change a constant",                                    // 22
+    "Destination array too small",                                 // 23
+    "Already Set to pin %",                                        // 24
+    "Library is using Slot % ",                                    // 25
+    "% is invalid (valid is % to %)",                              // 26
+    "Pin %/| is in use",                                           // 27
+    "Insufficient data",                                           // 28
+    "Not enough memory",                                           // 29
+    "RTC not responding",                                          // 30
+    "Already open",                                                // 31
+    "Insufficient space in array",                                 // 32
+    "Maximum % characters",                                        // 33
+    "Coordinates",                                                 // 34
+    "Argument 1 must be integer array",                            // 35
+    "Unknown command",                                             // 36
+    "Invalid buffer",                                              // 37
+    "Frame buffer not created",                                    // 38
+    "Variable > 255",                                              // 39
+    "Invalid for this screen mode",                                // 40
+    "Argument % must be a 5 element floating point array",         // 41
+    "Pin $ is not off or an ADC input",                            // 42
+    "Pin %/| is not off or an output",                             // 43
+    "SYSTEM I2C not configured",                                   // 44
+    "System SPI not configured",                                   // 45
+    "Illegal escape sequence, use CHR$(0) for the Null character", // 46
 };
 void StandardError(int n)
 {

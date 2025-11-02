@@ -38,6 +38,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "hardware/dma.h"
 #include "hardware/structs/bus_ctrl.h"
 #include "hardware/structs/dma.h"
+#include "hardware/structs/pio.h"
 #include "hardware/irq.h"
 #include "hardware/pwm.h"
 #ifdef PICOMITEWEB
@@ -1147,6 +1148,24 @@ void MIPS16 cmd_pio(void)
                                                 ss += 3;
                                                 ins |= 0b0100000;
                                         }
+                                        else if (strncasecmp(ss, "IRQ NEXT", 8) == 0 && (ss[8] == ' ' || ss[8] == ','))
+                                        {
+                                                char *pp;
+                                                ss += 8;
+                                                rel = 0;
+                                                ins |= 0b1011000;
+                                                if ((pp = fstrstr(ss, " rel")) && (pp[4] == 0 || pp[4] == ' ' || pp[4] == ';'))
+                                                        rel = 1;
+                                        }
+                                        else if (strncasecmp(ss, "IRQ PREV", 8) == 0 && (ss[8] == ' ' || ss[8] == ','))
+                                        {
+                                                char *pp;
+                                                ss += 8;
+                                                rel = 0;
+                                                ins |= 0b1001000;
+                                                if ((pp = fstrstr(ss, " rel")) && (pp[4] == 0 || pp[4] == ' ' || pp[4] == ';'))
+                                                        rel = 1;
+                                        }
                                         else if (strncasecmp(ss, "IRQ", 3) == 0 && (ss[3] == ' ' || ss[3] == ','))
                                         {
                                                 char *pp;
@@ -1604,6 +1623,22 @@ void MIPS16 cmd_pio(void)
                                         checksideanddelay = 1;
                                         ins |= getirqnum(ss);
                                 }
+                                else if (!strncasecmp(ss, "IRQ NEXT ", 9))
+                                {
+                                        dirOK = 0;
+                                        ss += 8;
+                                        ins = 0xC018;
+                                        checksideanddelay = 1;
+                                        ins |= getirqnum(ss);
+                                }
+                                else if (!strncasecmp(ss, "IRQ PREV ", 9))
+                                {
+                                        dirOK = 0;
+                                        ss += 8;
+                                        ins = 0xC008;
+                                        checksideanddelay = 1;
+                                        ins |= getirqnum(ss);
+                                }
                                 else if (!strncasecmp(ss, "IRQ ", 4))
                                 {
                                         dirOK = 0;
@@ -1885,6 +1920,12 @@ void MIPS16 cmd_pio(void)
                         hw_clear_bits(&pio->ctrl, 1 << (PIO_CTRL_SM_ENABLE_LSB + sm));
                 pio_clear_instruction_memory(pio);
                 pio_add_program(pio, &program);
+                return;
+        }
+        tp = checkstring(cmdline, (unsigned char *)"SYNC");
+        if (tp)
+        {
+                hw_set_bits(&pio1_hw->ctrl, 1 << 26);
                 return;
         }
         tp = checkstring(cmdline, (unsigned char *)"START");
@@ -2558,6 +2599,14 @@ void cmd_irqclear(void)
 void cmd_irqnowait(void)
 {
         call_pio("irq mov", 1);
+}
+void cmd_irqnext(void)
+{
+        call_pio("irq next", 1);
+}
+void cmd_irqprev(void)
+{
+        call_pio("irq prev", 1);
 }
 void cmd_irq(void)
 {
