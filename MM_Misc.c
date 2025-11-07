@@ -3273,6 +3273,7 @@ void MIPS16 ConfigDisplayUser(unsigned char *tp)
         // setup the pointers to the drawing primitives
         DrawRectangle = DrawRectangleUser;
         DrawBitmap = DrawBitmapUser;
+        DrawPixel = DrawPixelNormal;
         return;
     }
 }

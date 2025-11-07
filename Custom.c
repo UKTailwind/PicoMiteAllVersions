@@ -668,7 +668,7 @@ void MIPS16 cmd_pio(void)
                 }
                 if (argc < 7)
                         SyntaxError();
-                ;
+
                 int pior = getint(argv[0], 0, PIOMAX - 1);
                 if (PIO0 == false && pior == 0)
                         StandardError(3);
@@ -685,18 +685,20 @@ void MIPS16 cmd_pio(void)
                 dma_tx_pio = pior;
                 dma_tx_sm = sm;
                 uint32_t nbr = getint(argv[4], 0, 0xFFFFFFFF);
-                uint32_t s_nbr = nbr;
+
                 static uint32_t *a1int = NULL;
                 int64_t *aint = NULL;
                 int toarraysize = parseintegerarray(argv[6], &aint, 4, 1, dims, true);
                 a1int = (uint32_t *)aint;
-                if (argc >= 9 && *argv[8])
+
+                // Get optional size parameter (argc == 13)
+                uint32_t size = 0;
+                if (argc == 13)
                 {
-                        if (nbr == 0)
-                                error("Interrupt incopmpatible with continuous running");
-                        DMAinterruptTX = (char *)GetIntAddress(argv[8]);
-                        InterruptUsed = true;
+                        size = getinteger(argv[12]);
                 }
+
+                // Get optional transfer size (argc >= 11)
                 int dmasize = DMA_SIZE_32;
                 if (argc >= 11 && *argv[10])
                 {
@@ -710,70 +712,161 @@ void MIPS16 cmd_pio(void)
                         else if (dmasize == 32)
                                 dmasize = DMA_SIZE_32;
                 }
+
+                // Validate nbr/size combinations and set operation mode
+                bool ring_mode = false;
+                bool continuous_retrigger = false;
+
+                if (nbr == 0 && size > 0)
+                {
+                        // Ring buffer mode: nbr=0, size specified
+                        // Validate size is power of 2 (required for ring buffer)
+                        if (!(size == 1 || size == 2 || size == 4 || size == 8 || size == 16 ||
+                              size == 32 || size == 64 || size == 128 || size == 256 || size == 512 ||
+                              size == 1024 || size == 2048 || size == 4096 || size == 8192 ||
+                              size == 16384 || size == 32768))
+                                error("Size must be power of 2 for ring buffer mode");
+                        ring_mode = true;
+                        nbr = size; // Transfer size equals ring size
+                }
+                else if (nbr > 0 && size == 0)
+                {
+                        // Single DMA transfer - no special flags needed
+                }
+                else if (nbr > 0 && size > 0)
+                {
+                        if (nbr == size)
+                        {
+                                // Continuous operation with retriggering
+                                continuous_retrigger = true;
+                        }
+                        else
+                        {
+                                error("Incompatible transfer size");
+                        }
+                }
+                else
+                {
+                        // nbr == 0 && size == 0
+                        error("Must specify transfer count or size");
+                }
+
+                // Check for interrupt specification
+                if (argc >= 9 && *argv[8])
+                {
+                        if (ring_mode || continuous_retrigger)
+                                error("Interrupt incompatible with continuous running");
+                        DMAinterruptTX = (char *)GetIntAddress(argv[8]);
+                        InterruptUsed = true;
+                }
+
+                // Validate buffer alignment and size
+                if (continuous_retrigger)
+                {
+                        // Check alignment based on transfer size
+                        uint32_t alignment = (1 << dmasize); // 1, 2, or 4 bytes
+                        if ((uint32_t)a1int & (alignment - 1))
+                                error("Data alignment error");
+
+                        // Validate buffer is large enough
+                        if ((nbr << dmasize) > (toarraysize * 8))
+                                StandardError(17);
+                }
+                else if (ring_mode)
+                {
+                        // Check ring buffer alignment - must align to ring size
+                        uint32_t ring_bytes = size << dmasize;
+                        if ((uint32_t)a1int & (ring_bytes - 1))
+                                error("Data alignment error");
+
+                        // Validate buffer is large enough for ring
+                        if (ring_bytes > (toarraysize * 8))
+                                StandardError(17);
+                }
+                else
+                {
+                        // Single transfer - validate buffer is large enough
+                        if ((nbr << dmasize) > (toarraysize * 8))
+                                StandardError(17);
+                }
+
+                // Configure primary DMA channel
                 dma_channel_config c = dma_channel_get_default_config(dma_tx_chan);
                 channel_config_set_write_increment(&c, false);
+
                 if (dma_tx_pio == 2)
                         channel_config_set_dreq(&c, 16 + sm);
                 else
                         channel_config_set_dreq(&c, pio_get_dreq(pio, sm, true));
 
                 channel_config_set_transfer_data_size(&c, dmasize);
-                if (argc == 13)
+
+                if (ring_mode)
                 {
-                        int size = getinteger(argv[12]);
-                        if (!(size == 1 || size == 2 || size == 4 || size == 8 || size == 16 || size == 32 || size == 64 || size == 128 || size == 256 || size == 512 || size == 1024 || size == 2048 || size == 4096 || size == 8192 || size == 16384 || size == 32768))
-                                error("Not power of 2");
-                        if (size != 1)
-                        {
-                                int i = 0, j = size;
-                                if (((uint32_t)a1int & (j - 1)) && nbr == 0)
-                                        error("Data alignment error");
-                                while (j >>= 1)
-                                        i++;
-                                i += dmasize;
-                                if ((1 << i) > (toarraysize * 8))
-                                        StandardError(17);
-                                if (nbr == 0)
-                                {
-                                        nbr = size;
-                                        dma_channel_config c2 = dma_channel_get_default_config(dma_tx_chan2); // Get configurations for control channel
-                                        channel_config_set_transfer_data_size(&c2, DMA_SIZE_32);              // Set control channel data transfer size to 32 bits
-                                        channel_config_set_read_increment(&c2, false);                        // Set control channel read increment to false
-                                        channel_config_set_write_increment(&c2, false);                       // Set control channel write increment to false
-                                        channel_config_set_dreq(&c2, 0x3F);
-                                        //                                channel_config_set_chain_to(&c2, dma_tx_chan);
-                                        dma_channel_configure(dma_tx_chan2,
-                                                              &c2,
-                                                              &dma_hw->ch[dma_tx_chan].al3_read_addr_trig,
-                                                              &a1int,
-                                                              1,
-                                                              false); // Configure control channel
-                                }
-                                channel_config_set_read_increment(&c, true);
-                                if (s_nbr != 0)
-                                        channel_config_set_ring(&c, false, i);
-                        }
-                        else
-                                channel_config_set_read_increment(&c, false);
+                        // Ring buffer mode: read increment enabled, ring wrapping enabled
+                        channel_config_set_read_increment(&c, true);
+
+                        // Calculate ring size bits
+                        int ring_size_bits = 0;
+                        uint32_t temp_size = size;
+                        while (temp_size >>= 1)
+                                ring_size_bits++;
+                        ring_size_bits += dmasize; // Adjust for transfer size
+
+                        channel_config_set_ring(&c, false, ring_size_bits);
+
+                        // Configure for continuous operation (no chaining)
+                        dma_channel_configure(dma_tx_chan,
+                                              &c,
+                                              &pio->txf[sm],
+                                              a1int,
+                                              nbr,
+                                              true); // Start immediately
+                }
+                else if (continuous_retrigger)
+                {
+                        // Continuous retrigger mode: use control channel
+                        channel_config_set_read_increment(&c, true);
+                        channel_config_set_chain_to(&c, dma_tx_chan2);
+
+                        // Configure control channel for retriggering
+                        dma_channel_config c2 = dma_channel_get_default_config(dma_tx_chan2);
+                        channel_config_set_transfer_data_size(&c2, DMA_SIZE_32);
+                        channel_config_set_read_increment(&c2, false);
+                        channel_config_set_write_increment(&c2, false);
+                        channel_config_set_dreq(&c2, 0x3F); // No pacing
+
+                        dma_channel_configure(dma_tx_chan2,
+                                              &c2,
+                                              &dma_hw->ch[dma_tx_chan].al3_read_addr_trig,
+                                              &a1int,
+                                              1,
+                                              false);
+
+                        // Configure primary channel
+                        dma_channel_configure(dma_tx_chan,
+                                              &c,
+                                              &pio->txf[sm],
+                                              a1int,
+                                              nbr,
+                                              false); // Don't start yet
+
+                        // Start both channels
+                        dma_start_channel_mask((1u << dma_tx_chan) | (1u << dma_tx_chan2));
                 }
                 else
                 {
-                        if ((nbr << dmasize) > (toarraysize * 8))
-                                StandardError(17);
+                        // Single transfer mode: read increment enabled, no chaining
                         channel_config_set_read_increment(&c, true);
-                }
-                if (s_nbr == 0)
-                        channel_config_set_chain_to(&c, dma_tx_chan2); // When this channel completes, it will trigger the channel indicated by chain_to
 
-                dma_channel_configure(dma_tx_chan,
-                                      &c,
-                                      &pio->txf[sm],              // Destination pointer
-                                      a1int,                      // Source pointer
-                                      nbr,                        // Number of transfers
-                                      (s_nbr == 0 ? false : true) // Start immediately
-                );
-                if (s_nbr == 0)
-                        dma_start_channel_mask(1u << dma_tx_chan2);
+                        dma_channel_configure(dma_tx_chan,
+                                              &c,
+                                              &pio->txf[sm],
+                                              a1int,
+                                              nbr,
+                                              true); // Start immediately
+                }
+
                 pio_sm_restart(pio, sm);
                 pio_sm_set_enabled(pio, sm, true);
                 return;
@@ -1925,7 +2018,30 @@ void MIPS16 cmd_pio(void)
         tp = checkstring(cmdline, (unsigned char *)"SYNC");
         if (tp)
         {
-                hw_set_bits(&pio1_hw->ctrl, 1 << 26);
+                getcsargs(&tp, 7);
+                int pior = getint(argv[0], 0, PIOMAX - 1);
+                int prev = 0, next = 0, my = getint(argv[2], 1, 15);
+                uint32_t mask = (my << 8); // define the statemachines to be synched in the current PIO
+                if (argc >= 5 && *argv[4])
+                {
+                        prev = getint(argv[4], 1, 15);
+                        mask |= (1 << 26);
+                        mask |= (prev << 16);
+                }
+                if (argc == 7)
+                {
+                        next = getint(argv[6], 0, 15);
+                        mask |= (1 << 26);
+                        mask |= (next << 20);
+                }
+                if (pior == 0)
+                        hw_set_bits(&pio0_hw->ctrl, mask);
+                else if (pior == 1)
+                        hw_set_bits(&pio0_hw->ctrl, mask);
+#ifdef rp2350
+                else if (pior == 2)
+                        hw_set_bits(&pio2_hw->ctrl, mask);
+#endif
                 return;
         }
         tp = checkstring(cmdline, (unsigned char *)"START");
@@ -2147,6 +2263,11 @@ void MIPS16 cmd_pio(void)
 #endif
 #ifdef rp2350
 #ifdef PICOMITEWEB
+                if (
+                    (jointxfifo && joinrxfifo) ||
+                    (jointxfifo && (joinrxfifoget || joinrxfifoput)) ||
+                    (joinrxfifo && (joinrxfifoget || joinrxfifoput)))
+                        error("Invalid FIFO configuration");
                 for (int i = 1; i < (NBRPINS); i++)
                 {
 #else
@@ -2154,6 +2275,8 @@ void MIPS16 cmd_pio(void)
                 {
 #endif
 #else
+                if (jointxfifo && joinrxfifo)
+                        error("Invalid FIFO configuration");
                 for (int i = 1; i < (NBRPINS); i++)
                 {
 #endif
@@ -2187,10 +2310,12 @@ void MIPS16 cmd_pio(void)
                 sm_config_set_in_shift(&cfg, inshiftdir, autopush, pushthreshold);
                 sm_config_set_out_shift(&cfg, outshiftdir, autopull, pullthreshold);
 #ifdef rp2350
-                if (joinrxfifoget)
-                        cfg.shiftctrl |= (1 << 14);
-                if (joinrxfifoput)
-                        cfg.shiftctrl |= (1 << 15);
+                if (joinrxfifoget && !joinrxfifoput)
+                        sm_config_set_fifo_join(&cfg, PIO_FIFO_JOIN_TXGET);
+                if (!joinrxfifoput && joinrxfifoput)
+                        sm_config_set_fifo_join(&cfg, PIO_FIFO_JOIN_TXPUT);
+                if (joinrxfifoput && joinrxfifoput)
+                        sm_config_set_fifo_join(&cfg, PIO_FIFO_JOIN_PUTGET);
 #endif
                 sm_config_set_clkdiv(&cfg, (Option.CPU_Speed * 1000.0f) / clock);
                 pio_sm_set_config(pio, sm, &cfg);
