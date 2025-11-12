@@ -4249,8 +4249,10 @@ void MIPS16 ClearProgram(bool psram)
     //    InitHeap(true);
     initFonts();
     m_alloc(psram ? M_PROG : M_LIMITED); // init the variables for program memory
-    if (Option.DISPLAY_TYPE >= VIRTUAL && WriteBuf)
+#if PICOMITERP2350
+    if (Option.DISPLAY_TYPE >= VGA222 && WriteBuf)
         FreeMemorySafe((void **)&WriteBuf);
+#endif
     ClearRuntime(true);
     //    ProgMemory[0] = ProgMemory[1] = ProgMemory[3] = ProgMemory[4] = 0;
     PSize = 0;

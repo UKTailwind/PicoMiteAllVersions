@@ -438,6 +438,8 @@ extern "C"
 
         // Convert RGB888 to RGB332 with dithering
         uint8_t rgb888_to_rgb332_dither(int16_t r, int16_t g, int16_t b);
+        // Convert RGB888 to RGB222 with dithering
+        uint8_t rgb888_to_rgb222_dither(int16_t r, int16_t g, int16_t b);
 
 #ifdef __cplusplus
 }

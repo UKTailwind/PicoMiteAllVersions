@@ -1186,7 +1186,9 @@ void cmd_LoadDitheredImage(unsigned char *p)
     if (argc >= 5 && *argv[4])
         yOrigin = getinteger(argv[4]); // get the y origin (optional) argument
     if (argc >= 7 && *argv[6])
-        mode = getint(argv[6], 0, 3); // get the y origin (optional) argument
+        mode = getint(argv[6], 0, 7); // get the y origin (optional) argument
+    if (mode == 3 || mode == 7)
+        error("RGB565 dithering not yet supported");
     if (argc >= 9 && *argv[8])
         xRead = getint(argv[8], 0, 1919); // get the y origin (optional) argument
     if (argc == 11)
@@ -1217,12 +1219,26 @@ static uint g_nInFileSize;
 static uint g_nInFileOfs;
 static int jpgfnbr;
 
-// Dithering modes
+// Dithering modes - bit layout: [method(bit2)][format(bits 1-0)]
+// Bit 2: 0=Floyd-Steinberg, 1=Atkinson
+// Bits 1-0: 00=RGB121, 01=RGB222, 10=RGB332, 11=reserved for RGB565
 #define DITHER_NONE -1
-#define DITHER_FS_RGB121 0
-#define DITHER_FS_RGB332 1
-#define DITHER_ATKINSON_RGB121 2
-#define DITHER_ATKINSON_RGB332 3
+#define DITHER_FS_RGB121 0       // 0b000
+#define DITHER_FS_RGB222 1       // 0b001
+#define DITHER_FS_RGB332 2       // 0b010
+#define DITHER_ATKINSON_RGB121 4 // 0b100
+#define DITHER_ATKINSON_RGB222 5 // 0b101
+#define DITHER_ATKINSON_RGB332 6 // 0b110
+
+// Extract mode components
+#define DITHER_METHOD(mode) ((mode) >> 2)  // 0=Floyd-Steinberg, 1=Atkinson
+#define DITHER_FORMAT(mode) ((mode) & 0x3) // 0=RGB121, 1=RGB222, 2=RGB332, 3=RGB565
+
+// Format identifiers
+#define FORMAT_RGB121 0
+#define FORMAT_RGB222 1
+#define FORMAT_RGB332 2
+#define FORMAT_RGB565 3
 
 // Convert RGB888 to RGB121 with dithering
 uint8_t rgb888_to_rgb121_dither(int16_t r, int16_t g, int16_t b)
@@ -1237,6 +1253,21 @@ uint8_t rgb888_to_rgb121_dither(int16_t r, int16_t g, int16_t b)
     uint8_t g2 = (g * 3 + 127) / 255;
     uint8_t b1 = (b >= 128) ? 1 : 0;
     return (r1 << 3) | (g2 << 1) | b1;
+}
+
+// Convert RGB888 to RGB222 with dithering
+uint8_t rgb888_to_rgb222_dither(int16_t r, int16_t g, int16_t b)
+{
+    r = (r < 0) ? 0 : (r > 255) ? 255
+                                : r;
+    g = (g < 0) ? 0 : (g > 255) ? 255
+                                : g;
+    b = (b < 0) ? 0 : (b > 255) ? 255
+                                : b;
+    uint8_t r2 = (r * 3 + 127) / 255;
+    uint8_t g2 = (g * 3 + 127) / 255;
+    uint8_t b2 = (b * 3 + 127) / 255;
+    return (r2 << 4) | (g2 << 2) | b2;
 }
 
 // Convert RGB888 to RGB332 with dithering
@@ -1265,6 +1296,16 @@ static inline void unpack_rgb121(uint8_t packed, uint8_t *r, uint8_t *g, uint8_t
     *b = b1 ? 255 : 0;
 }
 
+static inline void unpack_rgb222(uint8_t packed, uint8_t *r, uint8_t *g, uint8_t *b)
+{
+    uint8_t r2 = (packed >> 4) & 3;
+    uint8_t g2 = (packed >> 2) & 3;
+    uint8_t b2 = packed & 3;
+    *r = (r2 * 255) / 3;
+    *g = (g2 * 255) / 3;
+    *b = (b2 * 255) / 3;
+}
+
 static inline void unpack_rgb332(uint8_t packed, uint8_t *r, uint8_t *g, uint8_t *b)
 {
     uint8_t r3 = (packed >> 5) & 7;
@@ -1279,8 +1320,10 @@ static inline void unpack_rgb332(uint8_t packed, uint8_t *r, uint8_t *g, uint8_t
 static void dither_image_row(uint8_t *row_buffer, int row_width,
                              int16_t *curr_error, int16_t *next_error, int mode)
 {
-    int is_fs = (mode == DITHER_FS_RGB121 || mode == DITHER_FS_RGB332);
-    int is_rgb121 = (mode == DITHER_FS_RGB121 || mode == DITHER_ATKINSON_RGB121);
+    int method = DITHER_METHOD(mode); // 0=Floyd-Steinberg, 1=Atkinson
+    int format = DITHER_FORMAT(mode); // 0=RGB121, 1=RGB222, 2=RGB332
+
+    int is_fs = (method == 0);
 
     for (int x = 0; x < row_width; x++)
     {
@@ -1291,18 +1334,28 @@ static void dither_image_row(uint8_t *row_buffer, int row_width,
         int16_t old_g = pDst[1] + curr_error[x * 3 + 1];
         int16_t old_b = pDst[0] + curr_error[x * 3 + 2];
 
-        // Quantize
+        // Quantize based on format
         uint8_t packed, new_r, new_g, new_b;
 
-        if (is_rgb121)
+        switch (format)
         {
+        case FORMAT_RGB121:
             packed = rgb888_to_rgb121_dither(old_r, old_g, old_b);
             unpack_rgb121(packed, &new_r, &new_g, &new_b);
-        }
-        else
-        {
+            break;
+        case FORMAT_RGB222:
+            packed = rgb888_to_rgb222_dither(old_r, old_g, old_b);
+            unpack_rgb222(packed, &new_r, &new_g, &new_b);
+            break;
+        case FORMAT_RGB332:
             packed = rgb888_to_rgb332_dither(old_r, old_g, old_b);
             unpack_rgb332(packed, &new_r, &new_g, &new_b);
+            break;
+        default: // FORMAT_RGB565 - not yet implemented
+            new_r = old_r;
+            new_g = old_g;
+            new_b = old_b;
+            break;
         }
 
         // Clamp for error calculation
@@ -1332,6 +1385,7 @@ static void dither_image_row(uint8_t *row_buffer, int row_width,
         // Distribute error
         if (is_fs)
         {
+            // Floyd-Steinberg distribution
             if (x + 1 < row_width)
             {
                 curr_error[(x + 1) * 3 + 0] += (err_r * 7) / 16;
@@ -1359,6 +1413,7 @@ static void dither_image_row(uint8_t *row_buffer, int row_width,
         }
         else
         {
+            // Atkinson distribution
             if (x + 1 < row_width)
             {
                 curr_error[(x + 1) * 3 + 0] += err_r / 8;
@@ -1393,7 +1448,6 @@ static void dither_image_row(uint8_t *row_buffer, int row_width,
         }
     }
 }
-
 unsigned char pjpeg_need_bytes_callback(unsigned char *pBuf, unsigned char buf_size, unsigned char *pBytes_actually_read, void *pCallback_data)
 {
     uint n, n_read;
@@ -1444,7 +1498,9 @@ void cmd_LoadJPGImage(unsigned char *p)
     if (argc >= 5 && *argv[4])
         yOrigin = getint(argv[4], 0, VRes - 1);
     if (argc >= 7 && *argv[6])
-        dither_mode = getint(argv[6], -1, 3);
+        dither_mode = getint(argv[6], -1, 7);
+    if (dither_mode == 3 || dither_mode == 7)
+        error("RGB565 dithering not yet supported");
 
     if (strchr((char *)p, '.') == NULL)
         strcat((char *)p, ".jpg");

@@ -29,6 +29,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "hardware/dma.h"
 #if PICOMITERP2350
 #include "pico/multicore.h"
+#include "hardware/structs/pio.h"
 #endif
 int CurrentSPIDevice = NONE_SPI_DEVICE;
 const struct Displays display_details[] = {
@@ -92,8 +93,8 @@ const struct Displays display_details[] = {
 	{57, "VS1053fast", 4000000, 0, 0, 0, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
 #if PICOMITERP2350
 	{58, "Dummy", 0, 0, 0, 0, 0, 0, 0},
-	{59, "Dummy", 0, 0, 0, 0, 0, 0, 0},
-	{60, "Dummy", 0, 0, 0, 0, 0, 0, 0},
+	{59, "VGA222", 0, 640, 480, 1, 0, 0, 0},
+	{60, "VGA222_320", 0, 320, 240, 2, 0, 0, 0},
 	{61, "ST7796SPBUFF", 60000000, 320, 320, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
 	{62, "ILI9341BUFF", 50000000, 320, 240, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
 	{63, "ST7796SBUFF", 60000000, 480, 320, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
@@ -316,11 +317,48 @@ void MIPS16 ConfigDisplaySPI(unsigned char *p)
 	else if (checkstring(argv[0], (unsigned char *)"ST7789_320BUFF"))
 	{
 		DISPLAY_TYPE = ST7789C;
+	}
+	else if (checkstring(argv[0], (unsigned char *)"VGA222"))
+	{
+		DISPLAY_TYPE = VGA222;
+	}
+	else if (checkstring(argv[0], (unsigned char *)"VGA222_320"))
+	{
+		DISPLAY_TYPE = VGA222X320;
+
 #endif
 	}
 	else
 		return;
 #if PICOMITERP2350
+	if (DISPLAY_TYPE >= VGA222 && Option.DISPLAY_TYPE < NEXTGEN)
+	{
+		int hspin, datapin;
+		Option.DISPLAY_TYPE = DISPLAY_TYPE;
+		Option.DISPLAY_ORIENTATION = LANDSCAPE;
+		if (!(code = codecheck(argv[2])))
+			argv[2] += 2;
+		hspin = getinteger(argv[2]);
+		if (!code)
+			hspin = codemap(hspin);
+		if (!(code = codecheck(argv[4])))
+			argv[4] += 2;
+		datapin = getinteger(argv[4]);
+		if (!code)
+			datapin = codemap(datapin);
+		CheckPin(hspin, CP_IGNORE_INUSE);
+		CheckPin(datapin, CP_IGNORE_INUSE);
+		CheckPin(PINMAP[PinDef[hspin].GPno + 1], CP_IGNORE_INUSE);
+		CheckPin(PINMAP[PinDef[datapin].GPno + 1], CP_IGNORE_INUSE);
+		CheckPin(PINMAP[PinDef[datapin].GPno + 2], CP_IGNORE_INUSE);
+		CheckPin(PINMAP[PinDef[datapin].GPno + 3], CP_IGNORE_INUSE);
+		CheckPin(PINMAP[PinDef[datapin].GPno + 4], CP_IGNORE_INUSE);
+		CheckPin(PINMAP[PinDef[datapin].GPno + 5], CP_IGNORE_INUSE);
+		Option.VGA_HSYNC = hspin;
+		Option.VGA_BLUE = datapin;
+		Option.CPU_Speed = 352000;
+		return;
+	}
 	if (!(Option.SYSTEM_CLK || Option.LCD_CLK))
 		error("SPI not configured");
 #else
@@ -342,6 +380,7 @@ void MIPS16 ConfigDisplaySPI(unsigned char *p)
 		else
 			error("Orientation");
 	}
+
 #if PICOMITERP2350
 	if (DISPLAY_TYPE >= NEXTGEN && Option.LCD_CLK == Option.SYSTEM_CLK)
 		error("Buffered drivers need a dedicated SPI channel");
@@ -413,7 +452,7 @@ void MIPS16 ConfigDisplaySPI(unsigned char *p)
 void MIPS16 InitDisplaySPI(int InitOnly)
 {
 #if PICOMITERP2350
-	if (Option.DISPLAY_TYPE == 0 || (Option.DISPLAY_TYPE >= DISP_USER && Option.DISPLAY_TYPE < NEXTGEN) || Option.DISPLAY_TYPE <= I2C_PANEL)
+	if (Option.DISPLAY_TYPE == 0 || (Option.DISPLAY_TYPE >= DISP_USER && Option.DISPLAY_TYPE < VGA222) || Option.DISPLAY_TYPE <= I2C_PANEL)
 		return;
 #else
 	if (Option.DISPLAY_TYPE == 0 || Option.DISPLAY_TYPE >= DISP_USER || Option.DISPLAY_TYPE <= I2C_PANEL)
@@ -421,6 +460,23 @@ void MIPS16 InitDisplaySPI(int InitOnly)
 #endif
 	DisplayHRes = display_details[Option.DISPLAY_TYPE].horizontal;
 	DisplayVRes = display_details[Option.DISPLAY_TYPE].vertical;
+#if PICOMITERP2350
+	if (Option.DISPLAY_TYPE >= VGA222 && Option.DISPLAY_TYPE < NEXTGEN)
+	{
+		DrawRectangle = DrawRectangle222;
+		DrawBitmap = DrawBitmap222;
+		DrawBuffer = DrawBuffer222;
+		ReadBuffer = ReadBuffer222;
+		DrawBLITBuffer = DrawBuffer222;
+		ReadBLITBuffer = ReadBuffer222;
+		ScrollLCD = ScrollLCD222;
+		DrawPixel = DrawPixel222;
+		HRes = DisplayHRes;
+		VRes = DisplayVRes;
+		return;
+	}
+#endif
+
 	if (!InitOnly)
 	{
 //        SPI2on();
@@ -2622,7 +2678,6 @@ void ScrollLCDMEM332(int lines)
 		}
 	}
 }
-
 void DrawBufferMEM332(int x1, int y1, int x2, int y2, unsigned char *p)
 {
 	int x, y;
@@ -2664,6 +2719,7 @@ void DrawBlitBufferMEM332(int x1, int y1, int x2, int y2, unsigned char *p)
 	if (x2 > high_x)
 		high_x = x2;
 }
+
 #endif
 void DrawBufferMEM(int x1, int y1, int x2, int y2, unsigned char *p)
 {

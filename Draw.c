@@ -6922,7 +6922,18 @@ void restorepanel(void)
             ScrollLCD = ScrollLCDSPI;
 #if PICOMITERP2350
     }
-    else if (Option.DISPLAY_TYPE >= NEXTGEN)
+    else if (Option.DISPLAY_TYPE >= VGA222 && Option.DISPLAY_TYPE < NEXTGEN)
+    {
+        DrawRectangle = DrawRectangle222;
+        DrawBitmap = DrawBitmap222;
+        DrawBuffer = DrawBuffer222;
+        ReadBuffer = ReadBuffer222;
+        DrawBLITBuffer = DrawBuffer222;
+        ReadBLITBuffer = ReadBuffer222;
+        ScrollLCD = ScrollLCD222;
+        DrawPixel = DrawPixel222;
+    }
+    else if (Option.DISPLAY_TYPE > NEXTGEN)
     {
         DrawRectangle = DrawRectangleMEM332;
         DrawBitmap = DrawBitmapMEM332;
@@ -6939,7 +6950,7 @@ void restorepanel(void)
 void setframebuffer(void)
 {
 #if PICOMITERP2350
-    if (!((Option.DISPLAY_TYPE > I2C_PANEL && Option.DISPLAY_TYPE < BufferedPanel) || (Option.DISPLAY_TYPE >= SSDPANEL && Option.DISPLAY_TYPE < VIRTUAL) || Option.DISPLAY_TYPE >= NEXTGEN))
+    if (!((Option.DISPLAY_TYPE > I2C_PANEL && Option.DISPLAY_TYPE < BufferedPanel) || (Option.DISPLAY_TYPE >= SSDPANEL && Option.DISPLAY_TYPE < VIRTUAL) || Option.DISPLAY_TYPE >= VGA222))
         return;
 #else
     if (!((Option.DISPLAY_TYPE > I2C_PANEL && Option.DISPLAY_TYPE < BufferedPanel) || (Option.DISPLAY_TYPE >= SSDPANEL && Option.DISPLAY_TYPE < VIRTUAL)))
@@ -6978,8 +6989,184 @@ void closeframebuffer(char layer)
     FrameBuf = NULL;
     WriteBuf = NULL;
 }
+#include <stdint.h>
+#include <string.h>
+
+#include <stdint.h>
+
+#include <stdint.h>
+
+#include <stdint.h>
+
+// External globals
+extern uint8_t *ScreenBuffer; // RGB222 framebuffer
+extern short HRes, VRes;      // screen resolution
+
+// 4-bit RGB121 → 6-bit RGB222 lookup table
+static uint8_t rgb121_to_rgb222_lut[16];
+static int lut_initialized = 0;
+
+static inline uint32_t pack5(const uint8_t *p)
+{
+    return ((uint32_t)p[0]) |
+           ((uint32_t)p[1] << 6) |
+           ((uint32_t)p[2] << 12) |
+           ((uint32_t)p[3] << 18) |
+           ((uint32_t)p[4] << 24);
+}
+
+// Read-modify-write helper for arbitrary X
+static inline void store_pixel_rmw(uint32_t *dst_line, int x, uint8_t pix6)
+{
+    int word = x / 5;
+    int bit = (x % 5) * 6;
+    uint32_t mask = (uint32_t)0x3F << bit;
+    uint32_t val = ((uint32_t)pix6 << bit);
+    dst_line[word] = (dst_line[word] & ~mask) | (val & mask);
+}
+
+void copy_rgb121_to_rgb222(uint8_t *s, int xstart, int xend, int ystart, int yend, int odd)
+{
+    // Initialize lookup table once
+    if (!lut_initialized)
+    {
+        for (int i = 0; i < 16; ++i)
+        {
+            uint32_t r = ((i >> 3) & 0x1) * 3; // 1-bit → 2-bit
+            uint32_t g = ((i >> 1) & 0x3);     // 2-bit unchanged
+            uint32_t b = ((i >> 0) & 0x1) * 3; // 1-bit → 2-bit
+            rgb121_to_rgb222_lut[i] = (uint8_t)((r << 4) | (g << 2) | b);
+        }
+        lut_initialized = 1;
+    }
+
+    // Clamp bounds
+    if (xstart < 0)
+        xstart = 0;
+    if (ystart < 0)
+        ystart = 0;
+    if (xend >= (int)HRes)
+        xend = HRes - 1;
+    if (yend >= (int)VRes)
+        yend = VRes - 1;
+    if (xstart > xend || ystart > yend)
+        return;
+
+    // --- FAST PATH: full-frame copy, aligned, odd==0 ---
+    if (xstart == 0 && ystart == 0 && xend == HRes - 1 && yend == VRes - 1 && odd == 0)
+    {
+        uint32_t *src = (uint32_t *)s;
+        uint32_t *dst = (uint32_t *)(void *)ScreenBuffer;
+
+        int total_pixels = (int)HRes * (int)VRes;
+        int blocks = total_pixels / 40;
+
+        for (int blk = 0; blk < blocks; blk++)
+        {
+            uint32_t sv[5];
+            for (int i = 0; i < 5; i++)
+                sv[i] = *src++;
+
+            uint8_t p[40];
+            int k = 0;
+            for (int i = 0; i < 5; i++)
+            {
+                uint32_t v = sv[i];
+                for (int n = 0; n < 8; n++, v >>= 4)
+                    p[k++] = rgb121_to_rgb222_lut[v & 0xF];
+            }
+
+            for (int i = 0; i < 8; i++)
+                *dst++ = pack5(&p[i * 5]);
+        }
+
+        // Handle leftovers if total pixels not multiple of 40
+        int leftover = total_pixels % 40;
+        if (leftover)
+        {
+            uint8_t *srcb = s + (blocks * 20); // each 40 pixels = 20 bytes (40 nibbles)
+            int nibstate = 0;
+            for (int i = 0; i < leftover; i++)
+            {
+                uint8_t nib;
+                if (nibstate == 0)
+                {
+                    nib = (*srcb & 0x0F);
+                    nibstate = 1;
+                }
+                else
+                {
+                    nib = (*srcb >> 4);
+                    srcb++;
+                    nibstate = 0;
+                }
+                uint8_t pix6 = rgb121_to_rgb222_lut[nib];
+                int pix_index = (blocks * 40) + i;
+                int y = pix_index / HRes;
+                int x = pix_index % HRes;
+                uint32_t *dst_line = (uint32_t *)(void *)(ScreenBuffer + (y * ((HRes + 4) / 5) * 4));
+                store_pixel_rmw(dst_line, x, pix6);
+            }
+        }
+        return;
+    }
+
+    // --- GENERAL PATH: arbitrary subrectangle and/or odd nibble start ---
+    uint8_t *src = s;
+    int dst_words_per_line = ((int)HRes + 4) / 5;
+
+    for (int y = ystart; y <= yend; ++y)
+    {
+        uint32_t *dst_line = (uint32_t *)(void *)(ScreenBuffer + (y * dst_words_per_line * 4));
+        int x = xstart;
+        while (x <= xend)
+        {
+            uint8_t pix6buf[5];
+            int cnt = 0;
+
+            for (; cnt < 5 && x <= xend; ++cnt, ++x)
+            {
+                uint8_t nib;
+                if (odd == 0)
+                {
+                    nib = (*src) & 0x0F; // low nibble
+                    odd = 1;             // next read high nibble
+                }
+                else
+                {
+                    nib = ((*src) >> 4) & 0x0F; // high nibble
+                    src++;
+                    odd = 0; // next read low nibble
+                }
+                pix6buf[cnt] = rgb121_to_rgb222_lut[nib];
+            }
+
+            if (cnt == 5)
+            {
+                int word_index = (x - 5) / 5;
+                dst_line[word_index] = pack5(pix6buf);
+            }
+            else
+            {
+                int startx = x - cnt;
+                for (int i = 0; i < cnt; ++i)
+                    store_pixel_rmw(dst_line, startx + i, pix6buf[i]);
+            }
+        }
+    }
+}
+
 void copyframetoscreen(uint8_t *s, int xstart, int xend, int ystart, int yend, int odd)
 {
+#ifndef PICOMITEWEB
+#if PICOMITERP2350
+    if (Option.DISPLAY_TYPE >= VGA222 && Option.DISPLAY_TYPE < NEXTGEN)
+    {
+        copy_rgb121_to_rgb222(s, xstart, xend, ystart, yend, odd);
+        return;
+    }
+#endif
+#endif
     low_x = xstart;
     low_y = ystart;
     high_x = xend;
@@ -7015,7 +7202,7 @@ void copyframetoscreen(uint8_t *s, int xstart, int xend, int ystart, int yend, i
         }
 #if PICOMITERP2350
     }
-    else if (Option.DISPLAY_TYPE >= NEXTGEN)
+    else if (Option.DISPLAY_TYPE >= VGA222)
     {
         // nothing to do
 #endif
@@ -7151,6 +7338,9 @@ void copyframetoscreen(uint8_t *s, int xstart, int xend, int ystart, int yend, i
             spi_finish(spi1);
         ClearCS(Option.LCD_CS); // set CS high
 #if PICOMITERP2350
+    }
+    else if (Option.DISPLAY_TYPE >= VGA222 && Option.DISPLAY_TYPE < NEXTGEN)
+    {
     }
     else if (Option.DISPLAY_TYPE >= NEXTGEN)
     {
@@ -7440,7 +7630,6 @@ void merge(uint8_t colour)
 {
     if (LayerBuf == NULL || FrameBuf == NULL)
         return;
-
     uint8_t *s = LayerBuf;
     uint8_t *d = FrameBuf;
     int bytes_per_line = HRes / 2;
@@ -7449,7 +7638,7 @@ void merge(uint8_t colour)
     uint8_t BatchBuf[MERGE_BATCH_LINES * (HRes / 2)];
 
 #ifdef PICOMITE
-    mutex_enter_blocking(&frameBufferMutex);
+//    mutex_enter_blocking(&frameBufferMutex);
 #endif
 
     if (Option.DISPLAY_TYPE == ILI9341 || Option.DISPLAY_TYPE == ST7796SP ||
@@ -7670,13 +7859,17 @@ void cmd_framebuffer(void)
                 SyntaxError();
             ;
         }
+#if defined(rp2350)
+        if (Option.DISPLAY_TYPE >= VGA222 && Option.DISPLAY_TYPE < NEXTGEN)
+            background = 0;
         if (background == 1)
         {
-#if defined(rp2350)
-            if (!(((Option.DISPLAY_TYPE > I2C_PANEL && Option.DISPLAY_TYPE < BufferedPanel) || Option.DISPLAY_TYPE >= NEXTGEN || (Option.DISPLAY_TYPE >= SSDPANEL && Option.DISPLAY_TYPE < VIRTUAL))))
+            if (!(((Option.DISPLAY_TYPE > I2C_PANEL && Option.DISPLAY_TYPE < BufferedPanel) || Option.DISPLAY_TYPE >= VGA222 || (Option.DISPLAY_TYPE >= SSDPANEL && Option.DISPLAY_TYPE < VIRTUAL))))
                 StandardError(1);
             ;
 #else
+        if (background == 1)
+        {
             if (!(((Option.DISPLAY_TYPE > I2C_PANEL && Option.DISPLAY_TYPE < BufferedPanel) || (Option.DISPLAY_TYPE >= SSDPANEL && Option.DISPLAY_TYPE < VIRTUAL))))
                 StandardError(1);
             ;
@@ -10043,7 +10236,7 @@ void DrawPixel16(int x, int y, int c)
     if (x < 0 || y < 0 || x >= HRes || y >= VRes)
         return;
 #if PICOMITERP2350
-    if ((Option.DISPLAY_TYPE >= VIRTUAL && Option.DISPLAY_TYPE < NEXTGEN) && WriteBuf == NULL)
+    if ((Option.DISPLAY_TYPE >= VIRTUAL && Option.DISPLAY_TYPE < VGA222) && WriteBuf == NULL)
         WriteBuf = GetMemory(VMaxH * VMaxV / 8);
 #else
     if ((Option.DISPLAY_TYPE >= VIRTUAL) && WriteBuf == NULL)
@@ -10070,7 +10263,7 @@ void DrawRectangle16(int x1, int y1, int x2, int y2, int c)
     ;
     unsigned char bcolour = (colour << 4) | colour;
 #if PICOMITERP2350
-    if ((Option.DISPLAY_TYPE >= VIRTUAL && Option.DISPLAY_TYPE < NEXTGEN) && WriteBuf == NULL)
+    if ((Option.DISPLAY_TYPE >= VIRTUAL && Option.DISPLAY_TYPE < VGA222) && WriteBuf == NULL)
         WriteBuf = GetMemory(VMaxH * VMaxV / 8);
 #else
     if ((Option.DISPLAY_TYPE >= VIRTUAL) && WriteBuf == NULL)
@@ -10138,7 +10331,7 @@ void DrawBitmap16(int x1, int y1, int width, int height, int scale, int fc, int 
     unsigned char fcolour = RGB121(fc);
     unsigned char bcolour = RGB121(bc);
 #if PICOMITERP2350
-    if ((Option.DISPLAY_TYPE >= VIRTUAL && Option.DISPLAY_TYPE < NEXTGEN) && WriteBuf == NULL)
+    if ((Option.DISPLAY_TYPE >= VIRTUAL && Option.DISPLAY_TYPE < VGA222) && WriteBuf == NULL)
         WriteBuf = GetMemory(VMaxH * VMaxV / 8);
 #else
     if ((Option.DISPLAY_TYPE >= VIRTUAL) && WriteBuf == NULL)
@@ -10230,7 +10423,7 @@ void DrawBuffer16(int x1, int y1, int x2, int y2, unsigned char *p)
     unsigned char fcolour;
     uint8_t *pp;
 #if PICOMITERP2350
-    if ((Option.DISPLAY_TYPE >= VIRTUAL && Option.DISPLAY_TYPE < NEXTGEN) && WriteBuf == NULL)
+    if ((Option.DISPLAY_TYPE >= VIRTUAL && Option.DISPLAY_TYPE < VGA222) && WriteBuf == NULL)
         WriteBuf = GetMemory(VMaxH * VMaxV / 8);
 #else
     if ((Option.DISPLAY_TYPE >= VIRTUAL) && WriteBuf == NULL)
@@ -10306,7 +10499,7 @@ void DrawBuffer16Fast(int x1, int y1, int x2, int y2, int blank, unsigned char *
         y2 = t;
     }
 #if PICOMITERP2350
-    if ((Option.DISPLAY_TYPE >= VIRTUAL && Option.DISPLAY_TYPE < NEXTGEN) && WriteBuf == NULL)
+    if ((Option.DISPLAY_TYPE >= VIRTUAL && Option.DISPLAY_TYPE < VGA222) && WriteBuf == NULL)
         WriteBuf = GetMemory(VMaxH * VMaxV / 8);
 #else
     if ((Option.DISPLAY_TYPE >= VIRTUAL) && WriteBuf == NULL)
@@ -10365,7 +10558,7 @@ void ReadBuffer16(int x1, int y1, int x2, int y2, unsigned char *c)
     int x, y, t;
     uint8_t *pp;
 #if PICOMITERP2350
-    if ((Option.DISPLAY_TYPE >= VIRTUAL && Option.DISPLAY_TYPE < NEXTGEN) && WriteBuf == NULL)
+    if ((Option.DISPLAY_TYPE >= VIRTUAL && Option.DISPLAY_TYPE < VGA222) && WriteBuf == NULL)
         WriteBuf = GetMemory(VMaxH * VMaxV / 8);
 #else
     if ((Option.DISPLAY_TYPE >= VIRTUAL) && WriteBuf == NULL)
@@ -10452,7 +10645,7 @@ void ReadBuffer16Fast(int x1, int y1, int x2, int y2, unsigned char *c)
         y2 = t;
     }
 #if PICOMITERP2350
-    if ((Option.DISPLAY_TYPE >= VIRTUAL && Option.DISPLAY_TYPE < NEXTGEN) && WriteBuf == NULL)
+    if ((Option.DISPLAY_TYPE >= VIRTUAL && Option.DISPLAY_TYPE < VGA222) && WriteBuf == NULL)
         WriteBuf = GetMemory(VMaxH * VMaxV / 8);
 #else
     if ((Option.DISPLAY_TYPE >= VIRTUAL) && WriteBuf == NULL)
@@ -10504,7 +10697,7 @@ void DrawPixel2(int x, int y, int c)
     if (x < 0 || y < 0 || x >= HRes || y >= VRes)
         return;
 #if PICOMITERP2350
-    if ((Option.DISPLAY_TYPE >= VIRTUAL && Option.DISPLAY_TYPE < NEXTGEN) && WriteBuf == NULL)
+    if ((Option.DISPLAY_TYPE >= VIRTUAL && Option.DISPLAY_TYPE < VGA222) && WriteBuf == NULL)
         WriteBuf = GetMemory(VMaxH * VMaxV / 8);
 #else
     if ((Option.DISPLAY_TYPE >= VIRTUAL) && WriteBuf == NULL)
@@ -10523,7 +10716,7 @@ void DrawRectangle2(int x1, int y1, int x2, int y2, int c)
     unsigned char mask;
     volatile unsigned char *p;
 #if PICOMITERP2350
-    if ((Option.DISPLAY_TYPE >= VIRTUAL && Option.DISPLAY_TYPE < NEXTGEN) && WriteBuf == NULL)
+    if ((Option.DISPLAY_TYPE >= VIRTUAL && Option.DISPLAY_TYPE < VGA222) && WriteBuf == NULL)
         WriteBuf = GetMemory(VMaxH * VMaxV / 8);
 #else
     if ((Option.DISPLAY_TYPE >= VIRTUAL) && WriteBuf == NULL)
@@ -10649,7 +10842,7 @@ void DrawBitmap2(int x1, int y1, int width, int height, int scale, int fc, int b
         return;
     int tilematch = 0;
 #if PICOMITERP2350
-    if ((Option.DISPLAY_TYPE >= VIRTUAL && Option.DISPLAY_TYPE < NEXTGEN) && WriteBuf == NULL)
+    if ((Option.DISPLAY_TYPE >= VIRTUAL && Option.DISPLAY_TYPE < VGA222) && WriteBuf == NULL)
         WriteBuf = GetMemory(VMaxH * VMaxV / 8);
 #else
     if ((Option.DISPLAY_TYPE >= VIRTUAL) && WriteBuf == NULL)
@@ -10933,7 +11126,7 @@ void DrawBuffer2(int x1, int y1, int x2, int y2, unsigned char *p)
         unsigned int rgb;
     } c;
 #if PICOMITERP2350
-    if ((Option.DISPLAY_TYPE >= VIRTUAL && Option.DISPLAY_TYPE < NEXTGEN) && WriteBuf == NULL)
+    if ((Option.DISPLAY_TYPE >= VIRTUAL && Option.DISPLAY_TYPE < VGA222) && WriteBuf == NULL)
         WriteBuf = GetMemory(VMaxH * VMaxV / 8);
 #else
     if ((Option.DISPLAY_TYPE >= VIRTUAL) && WriteBuf == NULL)
@@ -11013,7 +11206,7 @@ void DrawBuffer2Fast(int x1, int y1, int x2, int y2, int blank, unsigned char *p
         y2 = t;
     }
 #if PICOMITERP2350
-    if ((Option.DISPLAY_TYPE >= VIRTUAL && Option.DISPLAY_TYPE < NEXTGEN) && WriteBuf == NULL)
+    if ((Option.DISPLAY_TYPE >= VIRTUAL && Option.DISPLAY_TYPE < VGA222) && WriteBuf == NULL)
         WriteBuf = GetMemory(VMaxH * VMaxV / 8);
 #else
     if ((Option.DISPLAY_TYPE >= VIRTUAL) && WriteBuf == NULL)
@@ -11067,7 +11260,7 @@ void ReadBuffer2(int x1, int y1, int x2, int y2, unsigned char *c)
     //    uint8_t *pp;
     unsigned char mask;
 #if PICOMITERP2350
-    if ((Option.DISPLAY_TYPE >= VIRTUAL && Option.DISPLAY_TYPE < NEXTGEN) && WriteBuf == NULL)
+    if ((Option.DISPLAY_TYPE >= VIRTUAL && Option.DISPLAY_TYPE < VGA222) && WriteBuf == NULL)
         WriteBuf = GetMemory(VMaxH * VMaxV / 8);
 #else
     if ((Option.DISPLAY_TYPE >= VIRTUAL) && WriteBuf == NULL)
@@ -11139,7 +11332,7 @@ void ReadBuffer2Fast(int x1, int y1, int x2, int y2, unsigned char *c)
     //    uint8_t *pp;
     unsigned char mask;
 #if PICOMITERP2350
-    if ((Option.DISPLAY_TYPE >= VIRTUAL && Option.DISPLAY_TYPE < NEXTGEN) && WriteBuf == NULL)
+    if ((Option.DISPLAY_TYPE >= VIRTUAL && Option.DISPLAY_TYPE < VGA222) && WriteBuf == NULL)
         WriteBuf = GetMemory(VMaxH * VMaxV / 8);
 #else
     if ((Option.DISPLAY_TYPE >= VIRTUAL) && WriteBuf == NULL)
@@ -11220,7 +11413,7 @@ void MIPS16 ConfigDisplayVirtual(unsigned char *p)
 void MIPS16 InitDisplayVirtual(void)
 {
 #if PICOMITERP2350
-    if (Option.DISPLAY_TYPE == 0 || Option.DISPLAY_TYPE < VIRTUAL || Option.DISPLAY_TYPE >= NEXTGEN)
+    if (Option.DISPLAY_TYPE == 0 || Option.DISPLAY_TYPE < VIRTUAL || Option.DISPLAY_TYPE >= VGA222)
         return;
 #else
     if (Option.DISPLAY_TYPE == 0 || Option.DISPLAY_TYPE < VIRTUAL)
@@ -13642,3 +13835,467 @@ void cmd_fill(void)
     uint32_t c = (uint32_t)getColour((char *)argv[4], 0);
     floodfill(x, y, c);
 }
+#if defined(rp2350) && defined(PICOMITE)
+// RGB222 packing: 5 pixels per 32-bit word (30 bits used, 2 unused)
+// Pixel layout in word: [unused:2][p4:6][p3:6][p2:6][p1:6][p0:6]
+// Pixel format: [R:2][G:2][B:2]
+
+#define RGB222_PIXELS_PER_WORD 5
+#define RGB222_BITS_PER_PIXEL 6
+
+// Global mask and shift tables
+static const uint32_t mask222[5] = {0x3F, 0xFC0, 0x3F000, 0xFC0000, 0x3F000000};
+static const uint32_t invmask222[5] = {0xFFFFFFC0, 0xFFFFF03F, 0xFFFC0FFF, 0xFF03FFFF, 0xC0FFFFFF};
+static const unsigned char pixel_shifts[5] = {0, 6, 12, 18, 24};
+
+// Inline function to convert RGB888 to RGB222
+static inline unsigned char RGB222(int c)
+{
+    return ((c >> 22) & 0x03) << 4 | // Red: bits 23-22 -> bits 5-4
+           ((c >> 14) & 0x03) << 2 | // Green: bits 15-14 -> bits 3-2
+           ((c >> 6) & 0x03);        // Blue: bits 7-6 -> bits 1-0
+}
+
+void DrawPixel222(int x, int y, int c)
+{
+    if (x < 0 || y < 0 || x >= HRes || y >= VRes)
+        return;
+
+    unsigned char colour = RGB222(c);
+    int word_idx = y * (HRes / RGB222_PIXELS_PER_WORD) + (x / RGB222_PIXELS_PER_WORD);
+    int pixel_pos = x % RGB222_PIXELS_PER_WORD;
+    uint32_t *p = (uint32_t *)ScreenBuffer + word_idx;
+
+    *p = (*p & invmask222[pixel_pos]) | ((uint32_t)colour << pixel_shifts[pixel_pos]);
+}
+
+void DrawRectangle222(int x1, int y1, int x2, int y2, int c)
+{
+    int y, t;
+    unsigned char colour = RGB222(c);
+
+    // Clamp coordinates
+    if (x1 < 0)
+        x1 = 0;
+    if (x1 >= HRes)
+        x1 = HRes - 1;
+    if (x2 < 0)
+        x2 = 0;
+    if (x2 >= HRes)
+        x2 = HRes - 1;
+    if (y1 < 0)
+        y1 = 0;
+    if (y1 >= VRes)
+        y1 = VRes - 1;
+    if (y2 < 0)
+        y2 = 0;
+    if (y2 >= VRes)
+        y2 = VRes - 1;
+
+    if (x2 <= x1)
+    {
+        t = x1;
+        x1 = x2;
+        x2 = t;
+    }
+    if (y2 <= y1)
+    {
+        t = y1;
+        y1 = y2;
+        y2 = t;
+    }
+
+    int words_per_line = HRes / RGB222_PIXELS_PER_WORD;
+
+    // Precompute solid word pattern (all 5 pixels same color)
+    uint32_t solid_word = (uint32_t)colour |
+                          ((uint32_t)colour << 6) |
+                          ((uint32_t)colour << 12) |
+                          ((uint32_t)colour << 18) |
+                          ((uint32_t)colour << 24);
+
+    for (y = y1; y <= y2; y++)
+    {
+        int start_word = x1 / RGB222_PIXELS_PER_WORD;
+        int end_word = x2 / RGB222_PIXELS_PER_WORD;
+        int start_pixel = x1 % RGB222_PIXELS_PER_WORD;
+        int end_pixel = x2 % RGB222_PIXELS_PER_WORD;
+
+        uint32_t *p = (uint32_t *)ScreenBuffer + y * words_per_line + start_word;
+
+        if (start_word == end_word)
+        {
+            // All pixels in same word - build composite mask
+            uint32_t composite_mask = 0;
+            for (int px = start_pixel; px <= end_pixel; px++)
+                composite_mask |= mask222[px];
+            *p = (*p & ~composite_mask) | (solid_word & composite_mask);
+        }
+        else
+        {
+            // Handle first partial word
+            if (start_pixel != 0)
+            {
+                uint32_t first_mask = 0;
+                for (int px = start_pixel; px < RGB222_PIXELS_PER_WORD; px++)
+                    first_mask |= mask222[px];
+                *p = (*p & ~first_mask) | (solid_word & first_mask);
+                p++;
+                start_word++;
+            }
+
+            // Fill complete words
+            int full_words = end_word - start_word;
+            for (int i = 0; i < full_words; i++)
+                *p++ = solid_word;
+
+            // Handle last partial word
+            uint32_t last_mask = 0;
+            for (int px = 0; px <= end_pixel; px++)
+                last_mask |= mask222[px];
+            *p = (*p & ~last_mask) | (solid_word & last_mask);
+        }
+    }
+}
+
+void DrawBitmap222(int x1, int y1, int width, int height, int scale, int fc, int bc, unsigned char *bitmap)
+{
+    int i, j, k, m, x, y;
+
+    if (x1 >= HRes || y1 >= VRes || x1 + width * scale < 0 || y1 + height * scale < 0)
+        return;
+
+    unsigned char fcolour = RGB222(fc);
+    unsigned char bcolour = RGB222(bc);
+
+    int words_per_line = HRes / RGB222_PIXELS_PER_WORD;
+
+    // Precompute shifted color values
+    uint32_t fcolour_shifted[5], bcolour_shifted[5];
+    for (int p = 0; p < 5; p++)
+    {
+        fcolour_shifted[p] = (uint32_t)fcolour << pixel_shifts[p];
+        bcolour_shifted[p] = (uint32_t)bcolour << pixel_shifts[p];
+    }
+
+    for (i = 0; i < height; i++)
+    {
+        for (j = 0; j < scale; j++)
+        {
+            for (k = 0; k < width; k++)
+            {
+                int bit_val = (bitmap[((i * width) + k) / 8] >>
+                               (((height * width) - ((i * width) + k) - 1) % 8)) &
+                              1;
+
+                if (bc < 0 && !bit_val)
+                    continue; // Skip background if transparent
+
+                uint32_t *colour_shifted = bit_val ? fcolour_shifted : bcolour_shifted;
+
+                for (m = 0; m < scale; m++)
+                {
+                    x = x1 + k * scale + m;
+                    y = y1 + i * scale + j;
+
+                    if (x >= 0 && x < HRes && y >= 0 && y < VRes)
+                    {
+                        int word_idx = y * words_per_line + (x / RGB222_PIXELS_PER_WORD);
+                        int pixel_pos = x % RGB222_PIXELS_PER_WORD;
+                        uint32_t *p = (uint32_t *)ScreenBuffer + word_idx;
+
+                        *p = (*p & invmask222[pixel_pos]) | colour_shifted[pixel_pos];
+                    }
+                }
+            }
+        }
+    }
+}
+
+void ScrollLCD222(int lines)
+{
+    if (lines == 0)
+        return;
+
+    int words_per_line = HRes / RGB222_PIXELS_PER_WORD;
+    uint32_t *buf = (uint32_t *)ScreenBuffer;
+
+    if (lines >= 0)
+    {
+        // Scroll up
+        int words_to_copy = (VRes - lines) * words_per_line;
+        uint32_t *dst = buf;
+        uint32_t *src = buf + lines * words_per_line;
+
+        // Fast word copy
+        for (int i = 0; i < words_to_copy; i++)
+            *dst++ = *src++;
+
+        DrawRectangle222(0, VRes - lines, HRes - 1, VRes - 1, PromptBC);
+    }
+    else
+    {
+        // Scroll down
+        lines = -lines;
+        int words_to_copy = (VRes - lines) * words_per_line;
+        uint32_t *dst = buf + (VRes - 1) * words_per_line;
+        uint32_t *src = buf + (VRes - 1 - lines) * words_per_line;
+
+        // Fast word copy backwards
+        for (int i = 0; i < words_to_copy; i++)
+            *dst-- = *src--;
+
+        DrawRectangle222(0, 0, HRes - 1, lines - 1, PromptBC);
+    }
+}
+
+void DrawBuffer222(int x1, int y1, int x2, int y2, unsigned char *p)
+{
+    int x, y, t;
+    union colourmap
+    {
+        char rgbbytes[4];
+        unsigned int rgb;
+    } c;
+
+    // Clamp and swap coordinates
+    if (x2 <= x1)
+    {
+        t = x1;
+        x1 = x2;
+        x2 = t;
+    }
+    if (y2 <= y1)
+    {
+        t = y1;
+        y1 = y2;
+        y2 = t;
+    }
+    if (x1 < 0)
+        x1 = 0;
+    if (x1 >= HRes)
+        x1 = HRes - 1;
+    if (x2 < 0)
+        x2 = 0;
+    if (x2 >= HRes)
+        x2 = HRes - 1;
+    if (y1 < 0)
+        y1 = 0;
+    if (y1 >= VRes)
+        y1 = VRes - 1;
+    if (y2 < 0)
+        y2 = 0;
+    if (y2 >= VRes)
+        y2 = VRes - 1;
+
+    int words_per_line = HRes / RGB222_PIXELS_PER_WORD;
+
+    for (y = y1; y <= y2; y++)
+    {
+        int word_idx = y * words_per_line + (x1 / RGB222_PIXELS_PER_WORD);
+        int pixel_pos = x1 % RGB222_PIXELS_PER_WORD;
+        uint32_t *pp = (uint32_t *)ScreenBuffer + word_idx;
+
+        for (x = x1; x <= x2; x++)
+        {
+            c.rgbbytes[0] = *p++;
+            c.rgbbytes[1] = *p++;
+            c.rgbbytes[2] = *p++;
+
+            unsigned char colour = RGB222(c.rgb);
+            *pp = (*pp & invmask222[pixel_pos]) | ((uint32_t)colour << pixel_shifts[pixel_pos]);
+
+            // Move to next pixel position
+            if (++pixel_pos >= RGB222_PIXELS_PER_WORD)
+            {
+                pixel_pos = 0;
+                pp++;
+            }
+        }
+    }
+}
+
+void DrawBuffer222Fast(int x1, int y1, int x2, int y2, int blank, unsigned char *p)
+{
+    int x, y, t;
+
+    if (x2 <= x1)
+    {
+        t = x1;
+        x1 = x2;
+        x2 = t;
+    }
+    if (y2 <= y1)
+    {
+        t = y1;
+        y1 = y2;
+        y2 = t;
+    }
+
+    int words_per_line = HRes / RGB222_PIXELS_PER_WORD;
+    int nibble_toggle = 0;
+
+    for (y = y1; y <= y2; y++)
+    {
+        for (x = x1; x <= x2; x++)
+        {
+            if (x >= 0 && x < HRes && y >= 0 && y < VRes)
+            {
+                unsigned char colour;
+                if (nibble_toggle)
+                {
+                    colour = (*p++ >> 4) & 0x0F;
+                }
+                else
+                {
+                    colour = *p & 0x0F;
+                }
+
+                // Expand 4-bit to 6-bit (RGB222)
+                colour = ((colour & 0x0C) << 2) | // RR from upper 2 bits
+                         ((colour & 0x03) << 2) | // GG from lower 2 bits
+                         (colour & 0x03);         // BB from lower 2 bits
+
+                int word_idx = y * words_per_line + (x / RGB222_PIXELS_PER_WORD);
+                int pixel_pos = x % RGB222_PIXELS_PER_WORD;
+                uint32_t *pp = (uint32_t *)ScreenBuffer + word_idx;
+
+                if (colour != sprite_transparent || blank == -1)
+                {
+                    *pp = (*pp & invmask222[pixel_pos]) | ((uint32_t)colour << pixel_shifts[pixel_pos]);
+                }
+                // else keep old pixel (transparent)
+
+                nibble_toggle = !nibble_toggle;
+            }
+            else
+            {
+                if (nibble_toggle)
+                    p++;
+                nibble_toggle = !nibble_toggle;
+            }
+        }
+    }
+}
+
+void ReadBuffer222(int x1, int y1, int x2, int y2, unsigned char *c)
+{
+    int x, y, t;
+
+    if (x2 <= x1)
+    {
+        t = x1;
+        x1 = x2;
+        x2 = t;
+    }
+    if (y2 <= y1)
+    {
+        t = y1;
+        y1 = y2;
+        y2 = t;
+    }
+
+    int xx1 = (x1 < 0) ? 0 : (x1 >= HRes) ? HRes - 1
+                                          : x1;
+    int xx2 = (x2 < 0) ? 0 : (x2 >= HRes) ? HRes - 1
+                                          : x2;
+    int yy1 = (y1 < 0) ? 0 : (y1 >= VRes) ? VRes - 1
+                                          : y1;
+    int yy2 = (y2 < 0) ? 0 : (y2 >= VRes) ? VRes - 1
+                                          : y2;
+
+    int words_per_line = HRes / RGB222_PIXELS_PER_WORD;
+
+    // Precompute colour expansion table (6-bit RGB222 to 24-bit RGB888)
+    static uint32_t colour_table[64];
+    static int table_initialized = 0;
+    if (!table_initialized)
+    {
+        for (int i = 0; i < 64; i++)
+        {
+            int r = ((i >> 4) & 0x03) * 85; // 0,85,170,255
+            int g = ((i >> 2) & 0x03) * 85;
+            int b = (i & 0x03) * 85;
+            colour_table[i] = (r << 16) | (g << 8) | b;
+        }
+        table_initialized = 1;
+    }
+
+    for (y = yy1; y <= yy2; y++)
+    {
+        int word_idx = y * words_per_line + (xx1 / RGB222_PIXELS_PER_WORD);
+        int pixel_pos = xx1 % RGB222_PIXELS_PER_WORD;
+        uint32_t *pp = (uint32_t *)ScreenBuffer + word_idx;
+        uint32_t word = *pp;
+
+        for (x = xx1; x <= xx2; x++)
+        {
+            unsigned char pixel = (word & mask222[pixel_pos]) >> pixel_shifts[pixel_pos];
+
+            uint32_t rgb = colour_table[pixel];
+            *c++ = rgb & 0xFF;
+            *c++ = (rgb >> 8) & 0xFF;
+            *c++ = (rgb >> 16) & 0xFF;
+
+            // Move to next pixel
+            if (++pixel_pos >= RGB222_PIXELS_PER_WORD)
+            {
+                pixel_pos = 0;
+                pp++;
+                word = *pp;
+            }
+        }
+    }
+}
+
+void ReadBuffer222Fast(int x1, int y1, int x2, int y2, unsigned char *c)
+{
+    int x, y, t;
+    int nibble_toggle = 0;
+
+    if (x2 <= x1)
+    {
+        t = x1;
+        x1 = x2;
+        x2 = t;
+    }
+    if (y2 <= y1)
+    {
+        t = y1;
+        y1 = y2;
+        y2 = t;
+    }
+
+    int words_per_line = HRes / RGB222_PIXELS_PER_WORD;
+
+    for (y = y1; y <= y2; y++)
+    {
+        for (x = x1; x <= x2; x++)
+        {
+            unsigned char pixel_val = 0;
+
+            if (x >= 0 && x < HRes && y >= 0 && y < VRes)
+            {
+                int word_idx = y * words_per_line + (x / RGB222_PIXELS_PER_WORD);
+                int pixel_pos = x % RGB222_PIXELS_PER_WORD;
+                uint32_t *pp = (uint32_t *)ScreenBuffer + word_idx;
+
+                unsigned char pixel6 = (*pp & mask222[pixel_pos]) >> pixel_shifts[pixel_pos];
+
+                // Convert 6-bit to 4-bit (lose 1 bit of color depth)
+                pixel_val = ((pixel6 >> 2) & 0x0C) | (pixel6 & 0x03);
+            }
+
+            if (nibble_toggle)
+            {
+                *c++ |= (pixel_val << 4);
+            }
+            else
+            {
+                *c = pixel_val;
+            }
+            nibble_toggle = !nibble_toggle;
+        }
+    }
+}
+#endif

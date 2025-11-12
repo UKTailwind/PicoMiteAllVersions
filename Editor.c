@@ -495,7 +495,7 @@ void edit(unsigned char *cmdline, bool cmdfile)
     if (Option.DISPLAY_CONSOLE == true && HRes / gui_font_width < 32)
         error("Font is too large");
 #if PICOMITERP2350
-    if (Option.DISPLAY_TYPE >= VIRTUAL && Option.DISPLAY_TYPE < NEXTGEN && WriteBuf)
+    if (Option.DISPLAY_TYPE >= VIRTUAL && Option.DISPLAY_TYPE < VGA222 && WriteBuf)
         FreeMemorySafe((void **)&WriteBuf);
 #else
     if (Option.DISPLAY_TYPE >= VIRTUAL && WriteBuf)

@@ -110,6 +110,12 @@ uint8_t PSRAMpin;
 #include "lwip/pbuf.h"
 #include "lwip/udp.h"
 #endif
+#ifdef PICOMITERP2350
+    const uint8_t kickvga[] = {1, 198, 128, 100, 109, 97, 32, 116, 120, 32, 116, 97, 98, 108,
+                               101, 32, 48, 44, 50, 44, 52, 56, 48, 44, 241, 115, 99, 114, 101, 101, 110, 98, 117, 102,
+                               102, 41, 130, 243, 65, 41, 135, 53, 133, 243, 66, 41, 133, 52, 44, 49, 50, 56, 0, 1, 198,
+                               128, 119, 114, 105, 116, 101, 32, 48, 44, 48, 44, 49, 44, 55, 57, 57, 0, 0};
+#endif
 #ifdef PICOMITEVGA
     volatile uint8_t transparent = 0;
     volatile uint8_t transparents = 0;
@@ -253,6 +259,7 @@ uint8_t PSRAMpin;
     uint32_t restart_reason = 0;
     uint32_t __uninitialized_ram(_excep_code);
     uint64_t __uninitialized_ram(_persistent);
+    extern uint32_t *g_vgalinemap;
     unsigned char lastcmd[STRINGSIZE * 2]; // used to store the last command in case it is needed by the EDIT command
     FATFS fs;                              // Work area (file system object) for logical drive
     bool timer_callback(repeating_timer_t *rt);
@@ -5362,6 +5369,15 @@ uint32_t testPSRAM(void)
             modclock(2);
 #else
 #if PICOMITERP2350
+    if (Option.DISPLAY_TYPE >= VGA222 && Option.DISPLAY_TYPE < NEXTGEN)
+    {
+        int mapsize = display_details[Option.DISPLAY_TYPE].vertical * display_details[Option.DISPLAY_TYPE].bits * sizeof(uint32_t);
+        int framesize = (display_details[Option.DISPLAY_TYPE].horizontal / 5) * sizeof(uint32_t) * display_details[Option.DISPLAY_TYPE].vertical;
+        framebuffersize = mapsize + framesize;
+        heap_memory_size -= framebuffersize;
+        FRAMEBUFFER = (uint8_t *)(AllMemory + heap_memory_size + 256);
+        g_vgalinemap = (uint32_t *)(AllMemory + heap_memory_size + 256 + framesize);
+    }
     if (Option.DISPLAY_TYPE >= NEXTGEN)
     { // adjust the size of the heap
         framebuffersize = display_details[Option.DISPLAY_TYPE].horizontal * display_details[Option.DISPLAY_TYPE].vertical;
@@ -5482,6 +5498,7 @@ uint32_t testPSRAM(void)
                     break;
             }
         }
+        uSec(1000000);
         initKeyboard();
 #endif
         InitBasic();
@@ -5538,9 +5555,21 @@ uint32_t testPSRAM(void)
         ClearScreen(Option.DefaultBC);
 #else
 #ifdef PICOMITE
-    bus_ctrl_hw->priority = 0x100;
-    multicore_launch_core1_with_stack(UpdateCore, core1stack, 2048);
-    core1stack[0] = 0x12345678;
+#ifdef rp2350
+    if (!(Option.DISPLAY_TYPE >= VGA222 && Option.DISPLAY_TYPE < NEXTGEN))
+#endif
+    {
+        bus_ctrl_hw->priority = 0x100;
+        multicore_launch_core1_with_stack(UpdateCore, core1stack, 2048);
+        core1stack[0] = 0x12345678;
+    }
+#ifdef rp2350
+    else
+    {
+        multicore_launch_core1_with_stack(init_vga222, core1stack, 2048);
+        core1stack[0] = 0x12345678;
+    }
+#endif
 #endif
 #endif
         strcpy((char *)banner, MES_SIGNON);
@@ -5728,6 +5757,12 @@ uint32_t testPSRAM(void)
                 ExecuteProgram((unsigned char *)"MM.STARTUP\0");
                 memset(inpbuf, 0, STRINGSIZE);
             }
+            /*#ifdef PICOMITERP2350
+                        if (Option.DISPLAY_TYPE >= VGA222 && Option.DISPLAY_TYPE < NEXTGEN)
+                        {
+                            CallExecuteProgram((char *)kickvga);
+                        }
+            #endif*/
             if (Option.Autorun)
             {
                 ClearRuntime(true);

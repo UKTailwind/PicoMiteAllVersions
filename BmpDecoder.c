@@ -530,6 +530,22 @@ BYTE BMP_bDecode_memory(int x, int y, int xlen, int ylen, int fnbr, char *p)
 }
 /*  @endcond */
 
+// Dithering modes - bit layout: [method(bit2)][format(bits 1-0)]
+// Bit 2: 0=Floyd-Steinberg, 1=Atkinson
+// Bits 1-0: 00=RGB121, 01=RGB222, 10=RGB332, 11=reserved for RGB565
+#define DITHER_METHOD(mode) ((mode) >> 2)  // 0=Floyd-Steinberg, 1=Atkinson
+#define DITHER_FORMAT(mode) ((mode) & 0x3) // 0=RGB121, 1=RGB222, 2=RGB332, 3=RGB565
+
+// Format identifiers
+#define FORMAT_RGB121 0
+#define FORMAT_RGB222 1
+#define FORMAT_RGB332 2
+#define FORMAT_RGB565 3
+
+// Method identifiers
+#define METHOD_FLOYD_STEINBERG 0
+#define METHOD_ATKINSON 1
+
 // Convert RGB121 to RGB888
 void rgb121_to_rgb888_components(uint8_t color, uint8_t *r, uint8_t *g, uint8_t *b)
 {
@@ -542,6 +558,18 @@ void rgb121_to_rgb888_components(uint8_t color, uint8_t *r, uint8_t *g, uint8_t 
         *b = b1 * 255;
 }
 
+// Convert RGB222 to RGB888
+// Convert RGB222 to RGB888
+void rgb222_to_rgb888_components(uint8_t color, uint8_t *r, uint8_t *g, uint8_t *b)
+{
+        uint8_t r2 = (color >> 4) & 3;
+        uint8_t g2 = (color >> 2) & 3;
+        uint8_t b2 = color & 3;
+
+        *r = r2 * 85; // 0->0, 1->85, 2->170, 3->255
+        *g = g2 * 85;
+        *b = b2 * 85;
+}
 // Convert RGB332 to RGB888
 void rgb332_to_rgb888_components(uint8_t color, uint8_t *r, uint8_t *g, uint8_t *b)
 {
@@ -644,9 +672,13 @@ int ReadAndDisplayBMP(int fnbr, int display_mode, int dither_mode, int img_x_off
                 }
         }
 
+        // Extract dithering method and format from mode
+        int dither_method = DITHER_METHOD(dither_mode);
+        int dither_format = DITHER_FORMAT(dither_mode);
+
         // Allocate buffers for dithering error diffusion
         // For Atkinson, we need error values for current and next two lines
-        int error_lines = (dither_mode == DITHER_ATKINSON) ? 3 : 2;
+        int error_lines = (dither_method == METHOD_ATKINSON) ? 3 : 2;
         int16_t *error_buffer_r = (int16_t *)GetMemory(width * error_lines * sizeof(int16_t));
         int16_t *error_buffer_g = (int16_t *)GetMemory(width * error_lines * sizeof(int16_t));
         int16_t *error_buffer_b = (int16_t *)GetMemory(width * error_lines * sizeof(int16_t));
@@ -673,13 +705,13 @@ int ReadAndDisplayBMP(int fnbr, int display_mode, int dither_mode, int img_x_off
 
         int16_t *curr_error_r = error_buffer_r;
         int16_t *next_error_r = error_buffer_r + width;
-        int16_t *next2_error_r = (dither_mode == DITHER_ATKINSON) ? (error_buffer_r + width * 2) : NULL;
+        int16_t *next2_error_r = (dither_method == METHOD_ATKINSON) ? (error_buffer_r + width * 2) : NULL;
         int16_t *curr_error_g = error_buffer_g;
         int16_t *next_error_g = error_buffer_g + width;
-        int16_t *next2_error_g = (dither_mode == DITHER_ATKINSON) ? (error_buffer_g + width * 2) : NULL;
+        int16_t *next2_error_g = (dither_method == METHOD_ATKINSON) ? (error_buffer_g + width * 2) : NULL;
         int16_t *curr_error_b = error_buffer_b;
         int16_t *next_error_b = error_buffer_b + width;
-        int16_t *next2_error_b = (dither_mode == DITHER_ATKINSON) ? (error_buffer_b + width * 2) : NULL;
+        int16_t *next2_error_b = (dither_method == METHOD_ATKINSON) ? (error_buffer_b + width * 2) : NULL;
 
         // Buffer for reading pixel data (5 lines max)
         int lines_per_buffer = 5;
@@ -745,7 +777,7 @@ int ReadAndDisplayBMP(int fnbr, int display_mode, int dither_mode, int img_x_off
                                 next_error_g[i] = 0;
                                 next_error_b[i] = 0;
                         }
-                        if (dither_mode == DITHER_ATKINSON)
+                        if (dither_method == METHOD_ATKINSON)
                         {
                                 for (int i = 0; i < width; i++)
                                 {
@@ -772,19 +804,32 @@ int ReadAndDisplayBMP(int fnbr, int display_mode, int dither_mode, int img_x_off
                                 int16_t old_g = g + curr_error_g[x];
                                 int16_t old_b = b + curr_error_b[x];
 
-                                // Convert to display format
+                                // Convert to display format based on dither_format
                                 uint8_t display_color;
                                 uint8_t new_r, new_g, new_b;
 
-                                if (display_mode == DISPLAY_RGB121)
+                                switch (dither_format)
                                 {
+                                case FORMAT_RGB121:
                                         display_color = rgb888_to_rgb121_dither(old_r, old_g, old_b);
                                         rgb121_to_rgb888_components(display_color, &new_r, &new_g, &new_b);
-                                }
-                                else
-                                { // DISPLAY_RGB332
+                                        break;
+                                case FORMAT_RGB222:
+                                        display_color = rgb888_to_rgb222_dither(old_r, old_g, old_b);
+                                        rgb222_to_rgb888_components(display_color, &new_r, &new_g, &new_b);
+                                        break;
+                                case FORMAT_RGB332:
                                         display_color = rgb888_to_rgb332_dither(old_r, old_g, old_b);
                                         rgb332_to_rgb888_components(display_color, &new_r, &new_g, &new_b);
+                                        break;
+                                default: // FORMAT_RGB565 - not yet implemented
+                                        new_r = (old_r < 0) ? 0 : (old_r > 255) ? 255
+                                                                                : old_r;
+                                        new_g = (old_g < 0) ? 0 : (old_g > 255) ? 255
+                                                                                : old_g;
+                                        new_b = (old_b < 0) ? 0 : (old_b > 255) ? 255
+                                                                                : old_b;
+                                        break;
                                 }
 
                                 // Clamp old values for error calculation
@@ -800,8 +845,8 @@ int ReadAndDisplayBMP(int fnbr, int display_mode, int dither_mode, int img_x_off
                                 int16_t err_g = old_g - new_g;
                                 int16_t err_b = old_b - new_b;
 
-                                // Distribute error based on dithering mode
-                                if (dither_mode == DITHER_FLOYD_STEINBERG)
+                                // Distribute error based on dithering method
+                                if (dither_method == METHOD_FLOYD_STEINBERG)
                                 {
                                         // Floyd-Steinberg dithering
                                         //     X   7/16
@@ -829,7 +874,7 @@ int ReadAndDisplayBMP(int fnbr, int display_mode, int dither_mode, int img_x_off
                                         }
                                 }
                                 else
-                                { // DITHER_ATKINSON
+                                { // METHOD_ATKINSON
                                         // Atkinson dithering (divides error by 8, distributes 6/8)
                                         //     X   1/8 1/8
                                         // 1/8 1/8 1/8
@@ -892,7 +937,7 @@ int ReadAndDisplayBMP(int fnbr, int display_mode, int dither_mode, int img_x_off
                         }
 
                         // Swap error buffers
-                        if (dither_mode == DITHER_FLOYD_STEINBERG)
+                        if (dither_method == METHOD_FLOYD_STEINBERG)
                         {
                                 int16_t *temp;
                                 temp = curr_error_r;
@@ -906,7 +951,7 @@ int ReadAndDisplayBMP(int fnbr, int display_mode, int dither_mode, int img_x_off
                                 next_error_b = temp;
                         }
                         else
-                        { // DITHER_ATKINSON
+                        { // METHOD_ATKINSON
                                 int16_t *temp;
                                 temp = curr_error_r;
                                 curr_error_r = next_error_r;

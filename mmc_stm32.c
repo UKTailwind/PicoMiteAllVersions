@@ -2579,6 +2579,22 @@ char *pinsearch(int pin)
 	else if (pin == Option.PSRAM_CS_PIN)
 		strcpy(buff, "PSRAM CS");
 #if defined(PICOMITE)
+	else if (pin == Option.VGA_BLUE && Option.DISPLAY_TYPE >= VGA222 && Option.DISPLAY_TYPE < NEXTGEN)
+		strcpy(buff, "VGA BLUE L");
+	else if (pin == Option.VGA_HSYNC && Option.DISPLAY_TYPE >= VGA222 && Option.DISPLAY_TYPE < NEXTGEN)
+		strcpy(buff, "VGA HSYNC");
+	else if (pin == PINMAP[PinDef[Option.VGA_HSYNC].GPno + 1] && Option.DISPLAY_TYPE >= VGA222 && Option.DISPLAY_TYPE < NEXTGEN)
+		strcpy(buff, "VGA VSYNC");
+	else if (pin == PINMAP[PinDef[Option.VGA_BLUE].GPno + 1] && Option.DISPLAY_TYPE >= VGA222 && Option.DISPLAY_TYPE < NEXTGEN)
+		strcpy(buff, "VGA BLUE L");
+	else if (pin == PINMAP[PinDef[Option.VGA_BLUE].GPno + 2] && Option.DISPLAY_TYPE >= VGA222 && Option.DISPLAY_TYPE < NEXTGEN)
+		strcpy(buff, "VGA GREEN L");
+	else if (pin == PINMAP[PinDef[Option.VGA_BLUE].GPno + 3] && Option.DISPLAY_TYPE >= VGA222 && Option.DISPLAY_TYPE < NEXTGEN)
+		strcpy(buff, "VGA GREEN H");
+	else if (pin == PINMAP[PinDef[Option.VGA_BLUE].GPno + 4] && Option.DISPLAY_TYPE >= VGA222 && Option.DISPLAY_TYPE < NEXTGEN)
+		strcpy(buff, "VGA RED L");
+	else if (pin == PINMAP[PinDef[Option.VGA_BLUE].GPno + 5] && Option.DISPLAY_TYPE >= VGA222 && Option.DISPLAY_TYPE < NEXTGEN)
+		strcpy(buff, "VGA RED H");
 	else if (pin == PINMAP[26] && Option.LOCAL_KEYBOARD)
 		strcpy(buff, "KEYBOARD R1");
 	else if (pin == PINMAP[27] && Option.LOCAL_KEYBOARD)

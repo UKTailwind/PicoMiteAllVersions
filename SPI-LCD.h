@@ -144,9 +144,10 @@
 #define VIRTUAL_M 55
 #define VS1053slow 56
 #define VS1053fast 57
-#define SSD1963_5_12 58
 
 #if PICOMITERP2350
+#define VGA222 59
+#define VGA222X320 60
 #define ST7796SPBUFF 61
 #define NEXTGEN ST7796SPBUFF
 #define ILI9341BUFF 62

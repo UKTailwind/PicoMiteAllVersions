@@ -104,6 +104,7 @@ uint32_t dma_rx_chan = PIO_RX_DMA;
 uint32_t dma_tx_chan = PIO_TX_DMA;
 uint32_t dma_rx_chan2 = PIO_RX_DMA2;
 uint32_t dma_tx_chan2 = PIO_TX_DMA2;
+uint32_t dma_tx_chan3 = PIO_TX_DMA3;
 int dma_tx_pio;
 int dma_tx_sm;
 int dma_rx_pio;
@@ -149,6 +150,16 @@ volatile bool TCPreceived = false;
 char *TCPreceiveInterrupt = NULL;
 #endif
 #ifdef rp2350
+// ---------------- Globals ----------------
+static const uint32_t *g_Tadd = NULL; // table of source addresses
+static uint32_t g_N = 0;              // number of entries (lines)
+static uint32_t g_M = 0;              // words per transfer
+volatile uint32_t g_index = 0;
+
+static uint g_dma_chan = 0;
+static PIO g_pio = NULL;
+static uint g_sm = 0;
+uint32_t *g_vgalinemap = NULL;
 uint64_t piomap[2] = {0};
 #endif
 #define MAXLABEL 16
@@ -168,6 +179,67 @@ uint8_t i2ssm;
 // #if defined( PICOMITEVGA) && !defined(HDMI)
 #include "PicoMiteI2S.pio.h"
 // #endif
+#ifdef rp2350
+// ------------ DMA IRQ handler ------------
+static void __not_in_flash_func(dma_line_complete_irq)(void)
+{
+        // acknowledge interrupt
+        dma_hw->ints0 = 1u << g_dma_chan;
+
+        // advance line index
+        g_index++;
+        if (g_index >= g_N)
+                g_index = 0;
+
+        // next line address
+        uint32_t src_addr = g_Tadd[g_index];
+
+        // write directly to al3_read_addr_trig to restart DMA safely
+        dma_hw->ch[g_dma_chan].al3_read_addr_trig = src_addr;
+}
+void setup_dma_pio_lines(
+    PIO pio, uint sm,
+    uint dma_chan,
+    const uint32_t *Tadd, uint32_t N,
+    uint32_t M)
+{
+
+        g_pio = pio;
+        g_sm = sm;
+        g_dma_chan = dma_chan;
+        g_Tadd = Tadd;
+        g_N = N;
+        g_M = M;
+        g_index = 0;
+
+        // Configure DMA
+        dma_channel_config c = dma_channel_get_default_config(dma_chan);
+        channel_config_set_transfer_data_size(&c, DMA_SIZE_32);
+        channel_config_set_read_increment(&c, true);
+        channel_config_set_write_increment(&c, false);
+        channel_config_set_dreq(&c, pio_get_dreq(pio, sm, true));
+
+        volatile void *pio_fifo = &pio->txf[sm];
+
+        dma_channel_configure(
+            dma_chan, &c,
+            pio_fifo,
+            (const void *)Tadd[0],
+            M,
+            false);
+
+        dma_channel_set_irq0_enabled(dma_chan, true);
+        irq_set_exclusive_handler(DMA_IRQ_0, dma_line_complete_irq);
+        irq_set_priority(DMA_IRQ_0, 0); // highest priority
+        irq_set_enabled(DMA_IRQ_0, true);
+
+        //        pio_sm_set_enabled(pio, sm, true);
+
+        // start first line
+        dma_hw->ch[dma_chan].al3_read_addr_trig = (uint32_t)Tadd[0];
+}
+
+#endif
 static inline uint32_t pio_sm_calc_wrap(uint wrap_target, uint wrap)
 {
         uint32_t calc = 0;
@@ -264,6 +336,128 @@ int getirqnum(char *p)
                 data |= 0x10;
         }
         return data;
+}
+void startPIO(PIO pio, int sm)
+{
+        pio_sm_clear_fifos(pio, sm);
+        pio_sm_restart(pio, sm);
+        pio_sm_set_enabled(pio, sm, true);
+}
+void syncPIO(int pio, int my, int prev, int next)
+{
+        uint32_t mask = (my << 8); // define the statemachines to be synched in the current PIO
+        if (prev)
+        {
+                mask |= (1 << 26);
+                mask |= (prev << 16);
+        }
+        if (next)
+        {
+                mask |= (1 << 26);
+                mask |= (next << 20);
+        }
+        if (pio == 0)
+                hw_set_bits(&pio0_hw->ctrl, mask);
+        else if (pio == 1)
+                hw_set_bits(&pio0_hw->ctrl, mask);
+#ifdef rp2350
+        else if (pio == 2)
+                hw_set_bits(&pio2_hw->ctrl, mask);
+#endif
+        return;
+}
+void configurePIO(PIO pio, int sm, int clock,
+                  int startaddress, int base,
+                  int sidesetbase, int sidesetno, int sidesetout, int setbase, int setno, int setout,
+                  int outbase, int outno, int outout, int inbase,
+                  int jmppin, int wraptarget, int wrap, int sideenable, int sidepindir,
+                  int pushthreshold, int pullthreshold, int autopush, int autopull, int inshiftdir, int outshiftdir,
+                  int joinrxfifo, int jointxfifo
+#ifdef rp2350
+                  ,
+                  int joinrxfifoget, int joinrxfifoput
+#endif
+)
+{
+
+#ifdef PIODIAG
+        MMPrintString(pio == pio0 ? "pio0" : pio == pio1 ? "pio1"
+                                                         : "pio2");
+        PIntComma(sm);
+        PIntComma(clock);
+        PIntComma(startaddress);
+        PIntComma(base);
+        PIntComma(sidesetbase);
+        PIntComma(sidesetno);
+        PIntComma(sidesetout);
+        PIntComma(setbase);
+        PIntComma(setno);
+        PIntComma(setout);
+        PIntComma(outbase);
+        PIntComma(outno);
+        PIntComma(outout);
+        PIntComma(inbase);
+        PIntComma(jmppin);
+        PIntComma(wraptarget);
+        PIntComma(wrap);
+        PIntComma(sideenable);
+        PIntComma(sidepindir);
+        PIntComma(pushthreshold);
+        PIntComma(pullthreshold);
+        PIntComma(autopush);
+        PIntComma(autopull);
+        PIntComma(inshiftdir);
+        PIntComma(outshiftdir);
+        PIntComma(joinrxfifo);
+        PIntComma(jointxfifo);
+        PIntComma(joinrxfifoget);
+        PIntComma(joinrxfifoput);
+        PRet();
+#endif
+#ifdef rp2350
+        base = pio_get_gpio_base(pio);
+#endif
+        pio_set_gpio_base(pio, base);
+        pio_sm_config cfg = pio_get_default_sm_config();
+        sm_config_set_in_pin_base(&cfg, inbase);
+        if (jointxfifo)
+                sm_config_set_fifo_join(&cfg, PIO_FIFO_JOIN_TX);
+        if (joinrxfifo)
+                sm_config_set_fifo_join(&cfg, PIO_FIFO_JOIN_RX);
+        if (outno)
+                sm_config_set_out_pins(&cfg, outbase, outno);
+        if (sidesetno)
+        {
+                sm_config_set_sideset_pins(&cfg, sidesetbase);
+                sm_config_set_sideset(&cfg, sidesetno + sideenable, sideenable, sidepindir);
+        }
+        if (setno)
+        {
+                sm_config_set_set_pin_base(&cfg, setbase);
+                sm_config_set_set_pin_count(&cfg, setno);
+        }
+        if (jmppin >= 0)
+                sm_config_set_jmp_pin(&cfg, jmppin);
+        sm_config_set_wrap(&cfg, wraptarget, wrap);
+        sm_config_set_in_shift(&cfg, inshiftdir, autopush, pushthreshold);
+        sm_config_set_out_shift(&cfg, outshiftdir, autopull, pullthreshold);
+#ifdef rp2350
+        if (joinrxfifoget && !joinrxfifoput)
+                sm_config_set_fifo_join(&cfg, PIO_FIFO_JOIN_TXGET);
+        if (!joinrxfifoput && joinrxfifoput)
+                sm_config_set_fifo_join(&cfg, PIO_FIFO_JOIN_TXPUT);
+        if (joinrxfifoput && joinrxfifoput)
+                sm_config_set_fifo_join(&cfg, PIO_FIFO_JOIN_PUTGET);
+#endif
+        sm_config_set_clkdiv(&cfg, (Option.CPU_Speed * 1000.0f) / clock);
+        pio_sm_set_config(pio, sm, &cfg);
+        pio_sm_init(pio, sm, startaddress, &cfg);
+        if (sidesetout && sidesetno)
+                pio_sm_set_consecutive_pindirs(pio, sm, sidesetbase, sidesetno, true);
+        if (setout && setno)
+                pio_sm_set_consecutive_pindirs(pio, sm, setbase, setno, true);
+        if (outout && outno)
+                pio_sm_set_consecutive_pindirs(pio, sm, outbase, outno, true);
 }
 void pio_init(int pior, int sm, uint32_t pinctrl, uint32_t execctrl, uint32_t shiftctrl, int start, float clock, bool sideout, bool setout, bool outout)
 {
@@ -645,6 +839,43 @@ void MIPS16 cmd_pio(void)
                 pio_sm_set_enabled(pio, sm, true);
                 return;
         }
+#ifdef rp2350
+        tp = checkstring(cmdline, (unsigned char *)"DMA TX TABLE");
+        if (tp)
+        {
+                getcsargs(&tp, 13);
+                // parameters are:
+                // PIO
+                // state machine number
+                // address table count
+                // buffer address table
+                // transfer size
+                int pior = getint(argv[0], 0, PIOMAX - 1);
+                if (PIO0 == false && pior == 0)
+                        StandardError(3);
+                if (PIO1 == false && pior == 1)
+                        StandardError(4);
+                if (PIO2 == false && pior == 2)
+                        StandardError(5);
+                PIO pio = (pior == 0 ? pio0 : (pior == 1 ? pio1 : pio2));
+                int sm = getint(argv[2], 0, 3);
+                dma_tx_pio = pior;
+                dma_tx_sm = sm;
+                uint32_t nbr = getint(argv[4], 0, 0xFFFFFFFF);
+                static uint32_t *a1int = NULL;
+                //                int64_t *aint = NULL;
+                //                int toarraysize = parseintegerarray(argv[6], &aint, 4, 1, dims, true);
+                //                if ((toarraysize << 1) < nbr)
+                //                        StandardError(17);
+                a1int = (uint32_t *)(uint32_t)getint(argv[6], 0, 0xFFFFFFFF);
+                ;
+                int bsize = getint(argv[8], 0, 0xFFFFFF);
+                setup_dma_pio_lines(pio, sm, dma_tx_chan3,
+                                    a1int, nbr,
+                                    bsize);
+                return;
+        }
+#endif
         tp = checkstring(cmdline, (unsigned char *)"DMA TX");
         if (tp)
         {
@@ -1957,6 +2188,7 @@ void MIPS16 cmd_pio(void)
                         pio->sm[sm].shiftctrl = (3 << 18);
                         pio_sm_clear_fifos(pio, sm);
                 }
+                pio->irq = 255; // clear all irq in the statemachines on the pio
                 pio_clear_instruction_memory(pio);
                 return;
         }
@@ -2021,27 +2253,15 @@ void MIPS16 cmd_pio(void)
                 getcsargs(&tp, 7);
                 int pior = getint(argv[0], 0, PIOMAX - 1);
                 int prev = 0, next = 0, my = getint(argv[2], 1, 15);
-                uint32_t mask = (my << 8); // define the statemachines to be synched in the current PIO
                 if (argc >= 5 && *argv[4])
                 {
                         prev = getint(argv[4], 1, 15);
-                        mask |= (1 << 26);
-                        mask |= (prev << 16);
                 }
                 if (argc == 7)
                 {
                         next = getint(argv[6], 0, 15);
-                        mask |= (1 << 26);
-                        mask |= (next << 20);
                 }
-                if (pior == 0)
-                        hw_set_bits(&pio0_hw->ctrl, mask);
-                else if (pior == 1)
-                        hw_set_bits(&pio0_hw->ctrl, mask);
-#ifdef rp2350
-                else if (pior == 2)
-                        hw_set_bits(&pio2_hw->ctrl, mask);
-#endif
+                syncPIO(pior, my, prev, next);
                 return;
         }
         tp = checkstring(cmdline, (unsigned char *)"START");
@@ -2064,9 +2284,7 @@ void MIPS16 cmd_pio(void)
                 PIO pio = (pior == 0 ? pio0 : pio1);
 #endif
                 int sm = getint(argv[2], 0, 3);
-                pio_sm_clear_fifos(pio, sm);
-                pio_sm_restart(pio, sm);
-                pio_sm_set_enabled(pio, sm, true);
+                startPIO(pio, sm);
                 return;
         }
         tp = checkstring(cmdline, (unsigned char *)"STOP");
@@ -2260,14 +2478,16 @@ void MIPS16 cmd_pio(void)
                         joinrxfifoget = getint(argv[54], 0, 1); // FJOIN_RX_GET
                 if (argc > 55 && *argv[56])
                         joinrxfifoput = getint(argv[56], 0, 1); // FJOIN_RX_PUT
-#endif
-#ifdef rp2350
-#ifdef PICOMITEWEB
                 if (
                     (jointxfifo && joinrxfifo) ||
                     (jointxfifo && (joinrxfifoget || joinrxfifoput)) ||
                     (joinrxfifo && (joinrxfifoget || joinrxfifoput)))
                         error("Invalid FIFO configuration");
+#else
+                for (int i = 1; i < (NBRPINS); i++)
+#endif
+#ifdef rp2350
+#ifdef PICOMITEWEB
                 for (int i = 1; i < (NBRPINS); i++)
                 {
 #else
@@ -2275,9 +2495,6 @@ void MIPS16 cmd_pio(void)
                 {
 #endif
 #else
-                if (jointxfifo && joinrxfifo)
-                        error("Invalid FIFO configuration");
-                for (int i = 1; i < (NBRPINS); i++)
                 {
 #endif
                         if (CheckPin(i, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED))
@@ -2285,47 +2502,18 @@ void MIPS16 cmd_pio(void)
                                 gpio_set_input_enabled(PinDef[i].GPno, true);
                         }
                 }
-                pio_set_gpio_base(pio, base);
-                pio_sm_config cfg = pio_get_default_sm_config();
-                sm_config_set_in_pin_base(&cfg, inbase);
-                if (jointxfifo)
-                        sm_config_set_fifo_join(&cfg, PIO_FIFO_JOIN_TX);
-                if (joinrxfifo)
-                        sm_config_set_fifo_join(&cfg, PIO_FIFO_JOIN_RX);
-                if (outno)
-                        sm_config_set_out_pins(&cfg, outbase, outno);
-                if (sidesetno)
-                {
-                        sm_config_set_sideset_pins(&cfg, sidesetbase);
-                        sm_config_set_sideset(&cfg, sidesetno + sideenable, sideenable, sidepindir);
-                }
-                if (setno)
-                {
-                        sm_config_set_set_pin_base(&cfg, setbase);
-                        sm_config_set_set_pin_count(&cfg, setno);
-                }
-                if (jmppin >= 0)
-                        sm_config_set_jmp_pin(&cfg, jmppin);
-                sm_config_set_wrap(&cfg, wraptarget, wrap);
-                sm_config_set_in_shift(&cfg, inshiftdir, autopush, pushthreshold);
-                sm_config_set_out_shift(&cfg, outshiftdir, autopull, pullthreshold);
+                configurePIO(pio, sm, clock,
+                             startaddress, base,
+                             sidesetbase, sidesetno, sidesetout, setbase, setno, setout,
+                             outbase, outno, outout, inbase,
+                             jmppin, wraptarget, wrap, sideenable, sidepindir,
+                             pushthreshold, pullthreshold, autopush, autopull, inshiftdir, outshiftdir,
+                             joinrxfifo, jointxfifo
 #ifdef rp2350
-                if (joinrxfifoget && !joinrxfifoput)
-                        sm_config_set_fifo_join(&cfg, PIO_FIFO_JOIN_TXGET);
-                if (!joinrxfifoput && joinrxfifoput)
-                        sm_config_set_fifo_join(&cfg, PIO_FIFO_JOIN_TXPUT);
-                if (joinrxfifoput && joinrxfifoput)
-                        sm_config_set_fifo_join(&cfg, PIO_FIFO_JOIN_PUTGET);
+                             ,
+                             joinrxfifoget, joinrxfifoput
 #endif
-                sm_config_set_clkdiv(&cfg, (Option.CPU_Speed * 1000.0f) / clock);
-                pio_sm_set_config(pio, sm, &cfg);
-                pio_sm_init(pio, sm, startaddress, &cfg);
-                if (sidesetout && sidesetno)
-                        pio_sm_set_consecutive_pindirs(pio, sm, sidesetbase, sidesetno, true);
-                if (setout && setno)
-                        pio_sm_set_consecutive_pindirs(pio, sm, setbase, setno, true);
-                if (outout && outno)
-                        pio_sm_set_consecutive_pindirs(pio, sm, outbase, outno, true);
+                );
                 return;
         }
         SyntaxError();
@@ -2749,6 +2937,149 @@ void cmd_label(void)
  * @cond
  * The following section will be excluded from the documentation.
  */
+#if defined(rp2350) && defined(PICOMITE)
+const uint16_t vga0[] = {
+    0x80A0,
+    0xA627,
+    0xA642,
+    0x0642,
+    0xC019,
+    0xC518,
+    //
+    0x80A0,
+    0xA047,
+    0xA022,
+    0x20C1,
+    0xC042,
+    0x20C2,
+    0xC000,
+    0x004B,
+    //
+    0x80A0,
+    0xA047,
+    0xA022,
+    0x2DC0,
+    0x8080,
+    0x6D06,
+    0x6D06,
+    0x6D06,
+    0x6D06,
+    0x6A06,
+    0x6062,
+    0x0052,
+    0xA003,
+};
+const uint16_t vga1[] = {
+    0x90A0,
+    0xB0C7,
+    0x9018,
+    0x90A0,
+    0xB0C7,
+    0x9019,
+    0x90A0,
+    0xA047,
+    0xC007,
+    0x9098,
+    0xB027,
+    0x30C0,
+    0x20C0,
+    0x004C,
+    0x9099,
+    0xB027,
+    0x30C0,
+    0x1050,
+    0xD009,
+    0xB022,
+    0x30C0,
+    0x1054,
+    //
+    0x90A0,
+    0xB047,
+    0x90A0,
+    0xB027,
+    0x30C1,
+    0x005B,
+    0xB022,
+    0x105D,
+    0xD00A};
+
+void init_vga222(void)
+{
+        int maplines = display_details[Option.DISPLAY_TYPE].vertical * display_details[Option.DISPLAY_TYPE].bits;
+        if (display_details[Option.DISPLAY_TYPE].bits == 1)
+                for (int i = 0; i < maplines; i++)
+                {
+                        g_vgalinemap[i] = (uint32_t)FRAMEBUFFER + i * hvisible / pixelsperword * sizeof(uint32_t);
+                }
+        else if (display_details[Option.DISPLAY_TYPE].bits == 2)
+                for (int i = 0; i < maplines; i += 2)
+                {
+                        g_vgalinemap[i] = (uint32_t)FRAMEBUFFER + (i / 2) * hvisible / pixelsperword * sizeof(uint32_t);
+                        g_vgalinemap[i + 1] = g_vgalinemap[i];
+                }
+        pio1->irq = 255; // clear all irq in the statemachines on the pio
+        pio0->irq = 255; // clear all irq in the statemachines on the pio
+        gpio_set_function(PinDef[Option.VGA_HSYNC].GPno, GPIO_FUNC_PIO1);
+        gpio_set_function(PinDef[Option.VGA_HSYNC].GPno + 1, GPIO_FUNC_PIO1);
+        gpio_set_function(PinDef[Option.VGA_BLUE].GPno, GPIO_FUNC_PIO0);
+        gpio_set_function(PinDef[Option.VGA_BLUE].GPno + 1, GPIO_FUNC_PIO0);
+        gpio_set_function(PinDef[Option.VGA_BLUE].GPno + 2, GPIO_FUNC_PIO0);
+        gpio_set_function(PinDef[Option.VGA_BLUE].GPno + 3, GPIO_FUNC_PIO0);
+        gpio_set_function(PinDef[Option.VGA_BLUE].GPno + 4, GPIO_FUNC_PIO0);
+        gpio_set_function(PinDef[Option.VGA_BLUE].GPno + 5, GPIO_FUNC_PIO0);
+        ExtCfg(Option.VGA_HSYNC, EXT_BOOT_RESERVED, 0);
+        ExtCfg(PINMAP[PinDef[Option.VGA_HSYNC].GPno + 1], EXT_BOOT_RESERVED, 0);
+        ExtCfg(Option.VGA_BLUE, EXT_BOOT_RESERVED, 0);
+        ExtCfg(PINMAP[PinDef[Option.VGA_BLUE].GPno + 1], EXT_BOOT_RESERVED, 0);
+        ExtCfg(PINMAP[PinDef[Option.VGA_BLUE].GPno + 2], EXT_BOOT_RESERVED, 0);
+        ExtCfg(PINMAP[PinDef[Option.VGA_BLUE].GPno + 3], EXT_BOOT_RESERVED, 0);
+        ExtCfg(PINMAP[PinDef[Option.VGA_BLUE].GPno + 4], EXT_BOOT_RESERVED, 0);
+        ExtCfg(PINMAP[PinDef[Option.VGA_BLUE].GPno + 5], EXT_BOOT_RESERVED, 0);
+        struct pio_program program;
+        program.length = sizeof(vga0) / sizeof(uint16_t);
+        program.origin = 0;
+        program.instructions = vga0;
+        for (int sm = 0; sm < 4; sm++)
+                hw_clear_bits(&pio0->ctrl, 1 << (PIO_CTRL_SM_ENABLE_LSB + sm));
+        pio_clear_instruction_memory(pio0);
+        pio_add_program(pio0, &program);
+        program.length = sizeof(vga1) / sizeof(uint16_t);
+        program.origin = 0;
+        program.instructions = vga1;
+        for (int sm = 0; sm < 4; sm++)
+                hw_clear_bits(&pio1->ctrl, 1 << (PIO_CTRL_SM_ENABLE_LSB + sm));
+        pio_clear_instruction_memory(pio1);
+        pio_add_program(pio1, &program);
+        PIO0 = false;
+        PIO1 = false;
+        int clock = clock_get_hz(clk_sys);
+        configurePIO(pio0, 0, clock / display_details[Option.DISPLAY_TYPE].bits, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 1, 5, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0);
+        startPIO(pio0, 0);
+        configurePIO(pio0, 1, clock, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 8, 13, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0);
+        startPIO(pio0, 1);
+        configurePIO(pio0, 2, clock / display_details[Option.DISPLAY_TYPE].bits, 14, 0, 0, 0, 0, 0, 0, 0, PinDef[Option.VGA_BLUE].GPno, 6, 1, 0, -1, 16, 26, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0);
+        startPIO(pio0, 2);
+        configurePIO(pio1, 0, clock, 0, 0, PinDef[Option.VGA_HSYNC].GPno + 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, -1, 8, 21, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 1);
+        startPIO(pio1, 0);
+        configurePIO(pio1, 1, clock / display_details[Option.DISPLAY_TYPE].bits, 22, 0, PinDef[Option.VGA_HSYNC].GPno, 1, 1, 0, 0, 0, 0, 0, 0, 0, -1, 25, 30, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0);
+        startPIO(pio1, 1);
+        pio_sm_put_blocking(pio0, 1, vvisible - 1);
+        pio_sm_put_blocking(pio0, 2, hvisible / pixelsperword - 1);
+        pio_sm_put_blocking(pio1, 0, vsync - 1);
+        pio_sm_put_blocking(pio1, 0, vbackporch - 1);
+        pio_sm_put_blocking(pio1, 0, vvisible + vfrontporch - 2);
+        pio_sm_put_blocking(pio1, 1, hbackporchclock - 1);
+        pio_sm_put_blocking(pio1, 1, hsyncclock - 1);
+        syncPIO(0, 15, 0, 15);
+        setup_dma_pio_lines(pio0, 2, dma_tx_chan3,
+                            g_vgalinemap, maplines, hvisible / pixelsperword);
+        pio_sm_put_blocking(pio0, 0, hwholeline - 1);
+        while (1)
+        {
+                tight_loop_contents();
+        }
+}
+#endif
 
 #ifdef PICOMITEWEB
 char *scan_dest = NULL;

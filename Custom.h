@@ -56,6 +56,31 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * Constants
  * ============================================================================ */
 #define TCP_READ_BUFFER_SIZE 2048
+#define hnative 640
+#define cyclesperpixel 14
+#define hsync 96 / display_details[Option.DISPLAY_TYPE].bits
+#define hfrontporch 16 / display_details[Option.DISPLAY_TYPE].bits
+#define hvisible hnative / display_details[Option.DISPLAY_TYPE].bits
+#define hbackporch 48 / display_details[Option.DISPLAY_TYPE].bits
+#define vsync 1
+#define vbackporch 33
+#define vfrontporch 10
+#define vvisible 480
+#define pixelsperword 5 // RGB222
+
+#define wordsperline hvisible\pixelsperword
+#define wordstotransfer wordsperline *vvisible
+#define vlines vsync + vbackporch + vvisible + vfrontporch
+#define hwholeline hsync + hfrontporch + hvisible + hbackporch
+#define hvisibleclock hvisible *cyclesperpixel
+#define hsyncclock hsync *cyclesperpixel
+#define hfrontporchclock hfrontporch *cyclesperpixel
+#define hbackporchclock hbackporch *cyclesperpixel
+
+/* ============================================================================
+ * PICOMITE - Function declarations
+ * ============================================================================ */
+void init_vga222(void);
 
 /* ============================================================================
  * External variables - PIO configuration
@@ -97,47 +122,47 @@ extern int dirOK;
 /* TCP Server structure */
 typedef struct TCP_SERVER_T_
 {
-    struct tcp_pcb *server_pcb;
-    struct tcp_pcb *telnet_pcb;
-    struct tcp_pcb *client_pcb[MaxPcb];
-    volatile int inttrig[MaxPcb];
-    uint8_t *buffer_sent[MaxPcb];
-    uint8_t *buffer_recv[MaxPcb];
-    volatile int sent_len[MaxPcb];
-    volatile int recv_len[MaxPcb];
-    volatile int total_sent[MaxPcb];
-    volatile int to_send[MaxPcb];
-    volatile uint64_t pcbopentime[MaxPcb];
-    volatile int keepalive[MaxPcb];
-    volatile int telnet_pcb_no;
-    volatile int telnet_init_sent;
+   struct tcp_pcb *server_pcb;
+   struct tcp_pcb *telnet_pcb;
+   struct tcp_pcb *client_pcb[MaxPcb];
+   volatile int inttrig[MaxPcb];
+   uint8_t *buffer_sent[MaxPcb];
+   uint8_t *buffer_recv[MaxPcb];
+   volatile int sent_len[MaxPcb];
+   volatile int recv_len[MaxPcb];
+   volatile int total_sent[MaxPcb];
+   volatile int to_send[MaxPcb];
+   volatile uint64_t pcbopentime[MaxPcb];
+   volatile int keepalive[MaxPcb];
+   volatile int telnet_pcb_no;
+   volatile int telnet_init_sent;
 } TCP_SERVER_T;
 
 /* NTP structure */
 typedef struct NTP_T_
 {
-    ip_addr_t ntp_server_address;
-    bool dns_request_sent;
-    struct udp_pcb *ntp_pcb;
-    absolute_time_t ntp_test_time;
-    alarm_id_t ntp_resend_alarm;
-    volatile bool complete;
+   ip_addr_t ntp_server_address;
+   bool dns_request_sent;
+   struct udp_pcb *ntp_pcb;
+   absolute_time_t ntp_test_time;
+   alarm_id_t ntp_resend_alarm;
+   volatile bool complete;
 } NTP_T;
 
 /* TCP Client structure */
 typedef struct TCP_CLIENT_T_
 {
-    volatile struct tcp_pcb *tcp_pcb;
-    ip_addr_t remote_addr;
-    volatile uint8_t *buffer;
-    volatile int buffer_len;
-    volatile bool complete;
-    volatile bool connected;
-    volatile int BUF_SIZE;
-    volatile int TCP_PORT;
-    volatile int *buffer_write;
-    volatile int *buffer_read;
-    volatile char *hostname;
+   volatile struct tcp_pcb *tcp_pcb;
+   ip_addr_t remote_addr;
+   volatile uint8_t *buffer;
+   volatile int buffer_len;
+   volatile bool complete;
+   volatile bool connected;
+   volatile int BUF_SIZE;
+   volatile int TCP_PORT;
+   volatile int *buffer_write;
+   volatile int *buffer_read;
+   volatile char *hostname;
 } TCP_CLIENT_T;
 
 /* ============================================================================

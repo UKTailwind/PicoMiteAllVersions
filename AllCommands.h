@@ -213,6 +213,7 @@ void cmd_add(void);
 void cmd_arrayset(void);
 void cmd_keyscan(void);
 void cmd_fill(void);
+void cmd_turtle(void);
 
 #ifdef PICOMITEWEB
 void cmd_web(void);
@@ -599,6 +600,9 @@ void fun_touch(void);
 	{(unsigned char *)"Fill", T_CMD, 0, cmd_fill},
 #if defined(rp2350) && !defined(USBKEYBOARD)
 	{(unsigned char *)"YModem", T_CMD, 0, cmd_xmodem},
+#endif
+#ifndef PICOMITEWEB
+	{(unsigned char *)"Turtle", T_CMD, 0, cmd_turtle},
 #endif
 {
 	(unsigned char *)"", 0, 0, cmd_null

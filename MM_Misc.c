@@ -2780,6 +2780,10 @@ void MIPS16 printoptions(void)
 #endif
         PO("LCDPANEL");
         MMPrintString((char *)display_details[Option.DISPLAY_TYPE].name);
+        MMputchar(',', 1);
+        MMPrintString((char *)PinDef[Option.VGA_HSYNC].pinname);
+        MMputchar(',', 1);
+        MMPrintString((char *)PinDef[Option.VGA_BLUE].pinname);
         PRet();
     }
     if (Option.BackLightLevel != 100)

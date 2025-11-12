@@ -46,12 +46,12 @@ extern "C"
 #define MAXVARS 768
 
 #ifdef USBKEYBOARD
-#define HEAP_MEMORY_SIZE (176 * 1024)
+#define HEAP_MEMORY_SIZE (180 * 1024)
 #else
-#define HEAP_MEMORY_SIZE (176 * 1024)
+#define HEAP_MEMORY_SIZE (180 * 1024)
 #endif
 
-#define FLASH_TARGET_OFFSET (880 * 1024)
+#define FLASH_TARGET_OFFSET (912 * 1024)
 
 /* HDMI-specific settings */
 #ifdef HDMI
@@ -213,8 +213,8 @@ extern "C"
 #define MIN_CPU 48000
 
 #ifdef rp2350
-#define HEAP_MEMORY_SIZE (308 * 1024)
-#define MAXVARS 768
+#define HEAP_MEMORY_SIZE (332 * 1024)
+#define MAXVARS 640
 #define FLASH_TARGET_OFFSET (912 * 1024)
 #define MAX_CPU 396000
 #define MAXSUBFUN 512
@@ -318,7 +318,7 @@ extern "C"
 #define MAXRESTORE 8            // Maximum restore points
 #define MAXCOLLISIONS 4         // Maximum collision checks
 #define MAXLAYER 4              // Maximum layers
-#define MAXCONTROLS 200         // Maximum GUI controls
+#define MAXCONTROLS 100         // Maximum GUI controls
 #define MAXDEFINES 16           // Maximum defines
 
 /* ============================================================================
@@ -473,7 +473,8 @@ extern "C"
 #define QVGA_DMA_PIO 1 // DMA copy data to PIO (raises IRQ0 on quiet)
 #define ADC_DMA 2
 #define PIO_TX_DMA 4
-#define PIO_TX_DMA2 6
+#define PIO_TX_DMA2 5
+#define PIO_TX_DMA3 6
 #define ADC_DMA2 7
 #define PIO_RX_DMA 8
 #define PIO_RX_DMA2 9
