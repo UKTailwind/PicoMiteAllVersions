@@ -429,7 +429,7 @@ unsigned long ReadCoreTimer(void);
 uint64_t readusclock(void);
 void writeusclock(uint64_t timeset);
 uint64_t readIRclock(void);
-void writeIRclock(uint64_t timeset);
+void writeIRclock(void);
 unsigned long ReadCount5(void);
 void WriteCount5(unsigned long timeset);
 

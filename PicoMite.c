@@ -260,6 +260,7 @@ uint8_t PSRAMpin;
     uint32_t __uninitialized_ram(_excep_code);
     uint64_t __uninitialized_ram(_persistent);
     extern uint32_t *g_vgalinemap;
+    extern uint8_t IRpin;
     unsigned char lastcmd[STRINGSIZE * 2]; // used to store the last command in case it is needed by the EDIT command
     FATFS fs;                              // Work area (file system object) for logical drive
     bool timer_callback(repeating_timer_t *rt);
@@ -2106,6 +2107,8 @@ int __not_in_flash_func(MMInkey)(void)
 
     bool MIPS16 __not_in_flash_func(timer_callback)(repeating_timer_t *rt)
     {
+        static int IrTimeout, IrTick, NextIrTick;
+        int ElapsedMicroSec, IrDevTmp, IrCmdTmp;
         mSecTimer++;
 
         if (!processtick)
@@ -2214,37 +2217,6 @@ int __not_in_flash_func(MMInkey)(void)
                 }
             }
         }
-
-        // === IR Processing ===
-        int ElapsedMicroSec = readIRclock();
-
-        if (IrState > IR_WAIT_START && ElapsedMicroSec > 15000)
-        {
-            IrReset();
-        }
-
-        int IrDevTmp = -1, IrCmdTmp = -1;
-
-        // Sony IR protocol
-        if (IrState == SONY_WAIT_BIT_START && ElapsedMicroSec > 2800 &&
-            (IrCount == 12 || IrCount == 15 || IrCount == 20))
-        {
-            IrDevTmp = (IrBits >> 7) & 0x1F;
-            IrCmdTmp = (IrBits & 0x7F) | ((IrBits >> 5) & ~0x7F);
-        }
-
-        // NEC IR protocol
-        if (IrState == NEC_WAIT_BIT_END && IrCount == 32)
-        {
-            // Adjust for non-extended address
-            if ((IrBits >> 24) == ~((IrBits >> 16) & 0xFF))
-            {
-                IrBits = (IrBits & 0x0000FFFF) | ((IrBits >> 8) & 0x00FF0000);
-            }
-            IrDevTmp = (IrBits >> 16) & 0xFFFF;
-            IrCmdTmp = (IrBits >> 8) & 0xFF;
-        }
-
 #ifdef GUICONTROLS
         // === Touch panel processing ===
         TouchTimer++;
@@ -2275,41 +2247,60 @@ int __not_in_flash_func(MMInkey)(void)
             }
         }
 #endif
-
-        // === IR Message Processing (with auto-repeat) ===
-        if (IrCmdTmp != -1)
+        // now process the IR message, this includes handling auto repeat while the key is held down
+        // IrTick counts how many mS since the key was first pressed
+        // NextIrTick is used to time the auto repeat
+        // IrTimeout is used to detect when the key is released
+        // IrGotMsg is a signal to the interrupt handler that an interrupt is required
+        if (IRpin != 99)
         {
-            static int IrTimeout = 0, IrTick = 0, NextIrTick = 0;
+            ElapsedMicroSec = readIRclock();
+            if (IrState > IR_WAIT_START && ElapsedMicroSec > 15000)
+                IrReset();
+            IrCmdTmp = -1;
 
-            if (IrTick > IrTimeout)
+            // check for any Sony IR receive activity
+            if (IrState == SONY_WAIT_BIT_START && ElapsedMicroSec > 2800 && (IrCount == 12 || IrCount == 15 || IrCount == 20))
             {
-                // New keypress
-                IrTick = 0;
-                NextIrTick = 650;
+                IrDevTmp = ((IrBits >> 7) & 0b11111);
+                IrCmdTmp = (IrBits & 0b1111111) | ((IrBits >> 5) & ~0b1111111);
             }
 
-            if (IrTick == 0 || IrTick > NextIrTick)
+            // check for any NEC IR receive activity
+            if (IrState == NEC_WAIT_BIT_END && IrCount == 32)
             {
-                // Store values based on variable type
-                if (IrVarType & 0x01)
-                    *(MMFLOAT *)IrDev = IrDevTmp;
-                else
-                    *(long long int *)IrDev = IrDevTmp;
-
-                if (IrVarType & 0x02)
-                    *(MMFLOAT *)IrCmd = IrCmdTmp;
-                else
-                    *(long long int *)IrCmd = IrCmdTmp;
-
-                IrGotMsg = true;
-                NextIrTick += 250;
+                // check if it is a NON extended address and adjust if it is
+                if ((IrBits >> 24) == ~((IrBits >> 16) & 0xff))
+                    IrBits = (IrBits & 0x0000ffff) | ((IrBits >> 8) & 0x00ff0000);
+                IrDevTmp = ((IrBits >> 16) & 0xffff);
+                IrCmdTmp = ((IrBits >> 8) & 0xff);
             }
-
-            IrTimeout = IrTick + 150;
-            IrReset();
+            if (IrCmdTmp != -1)
+            {
+                if (IrTick > IrTimeout)
+                {
+                    // this is a new keypress
+                    IrTick = 0;
+                    NextIrTick = 650;
+                }
+                if (IrTick == 0 || IrTick > NextIrTick)
+                {
+                    if (IrVarType & 0b01)
+                        *(MMFLOAT *)IrDev = IrDevTmp;
+                    else
+                        *(long long int *)IrDev = IrDevTmp;
+                    if (IrVarType & 0b10)
+                        *(MMFLOAT *)IrCmd = IrCmdTmp;
+                    else
+                        *(long long int *)IrCmd = IrCmdTmp;
+                    IrGotMsg = true;
+                    NextIrTick += 250;
+                }
+                IrTimeout = IrTick + 150;
+                IrReset();
+            }
             IrTick++;
         }
-
         // === Period counter updates ===
         UPDATE_PER_INPUT(Option.INT1pin, INT1Count);
         UPDATE_PER_INPUT(Option.INT2pin, INT2Count);

@@ -223,9 +223,9 @@ uint64_t readIRclock(void)
 {
     return time_us_64() - IRoffset;
 }
-void writeIRclock(uint64_t timeset)
+void writeIRclock(void)
 {
-    IRoffset = time_us_64() - (uint64_t)timeset;
+    IRoffset = time_us_64();
 }
 #ifdef rp2350
 const uint8_t PINMAP[48] = {1, 2, 4, 5, 6, 7, 9, 10, 11, 12, 14, 15, 16, 17, 19, 20, 21, 22, 24, 25, 26, 27, 29, 41, 42, 43, 31, 32, 34, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62};
@@ -2454,6 +2454,7 @@ void IrInit(void)
         error("Pin %/% is in use", IRpin, IRpin);
     ExtCfg(IRpin, EXT_IR, 0);
     ExtCfg(IRpin, EXT_COM_RESERVED, 0);
+    gpio_set_pulls(PinDef[IRpin].GPno, true, false);
     if (!CallBackEnabled)
     {
         gpio_set_irq_enabled_with_callback(PinDef[IRpin].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, true, &gpio_callback);
@@ -2471,7 +2472,7 @@ void IrReset(void)
 {
     IrState = IR_WAIT_START;
     IrCount = 0;
-    writeIRclock(0);
+    writeIRclock();
 }
 
 // this modulates (at about 38KHz) the IR beam for transmit
@@ -5730,7 +5731,7 @@ void MIPS16 __not_in_flash_func(IRHandler)(void)
     switch (IrState)
     {
     case IR_WAIT_START:
-        writeIRclock(0);             // reset the timer
+        writeIRclock();              // reset the timer
         IrState = IR_WAIT_START_END; // wait for the end of the start bit
         break;
     case IR_WAIT_START_END:
@@ -5743,9 +5744,9 @@ void MIPS16 __not_in_flash_func(IRHandler)(void)
             IrReset(); // the start bit was not valid
             break;
         }
-        IrCount = 0;     // count the bits in the message
-        IrBits = 0;      // reset the bit accumulator
-        writeIRclock(0); // reset the timer
+        IrCount = 0;    // count the bits in the message
+        IrBits = 0;     // reset the bit accumulator
+        writeIRclock(); // reset the timer
         break;
     case SONY_WAIT_BIT_START:
         if (ElapsedMicroSec < 300 || ElapsedMicroSec > 900)
@@ -5753,7 +5754,7 @@ void MIPS16 __not_in_flash_func(IRHandler)(void)
             IrReset();
             break;
         }
-        writeIRclock(0);             // reset the timer
+        writeIRclock();              // reset the timer
         IrState = SONY_WAIT_BIT_END; // wait for the end of this data bit
         break;
     case SONY_WAIT_BIT_END:
@@ -5764,7 +5765,7 @@ void MIPS16 __not_in_flash_func(IRHandler)(void)
         }
         IrBits |= (ElapsedMicroSec > 900) << IrCount; // get the data bit
         IrCount++;                                    // and increment our count
-        writeIRclock(0);                              // reset the timer
+        writeIRclock();                               // reset the timer
         IrState = SONY_WAIT_BIT_START;                // go back and wait for the next data bit
         break;
     case NEC_WAIT_FIRST_BIT_START:
@@ -5782,7 +5783,7 @@ void MIPS16 __not_in_flash_func(IRHandler)(void)
             IrReset(); // the start bit was not valid
             break;
         }
-        writeIRclock(0); // reset the timer
+        writeIRclock(); // reset the timer
         break;
     case NEC_WAIT_BIT_START:
         if (ElapsedMicroSec < 400 || ElapsedMicroSec > 1800)
@@ -5793,7 +5794,7 @@ void MIPS16 __not_in_flash_func(IRHandler)(void)
         IrBits |= (ElapsedMicroSec > 840) << (31 - IrCount); // get the data bit
         LastIrBits = IrBits;
         IrCount++;                  // and increment our count
-        writeIRclock(0);            // reset the timer
+        writeIRclock();             // reset the timer
         IrState = NEC_WAIT_BIT_END; // wait for the end of this data bit
         break;
     case NEC_WAIT_BIT_END:
@@ -5804,7 +5805,7 @@ void MIPS16 __not_in_flash_func(IRHandler)(void)
         }
         if (IrCount == 32)
             break;
-        writeIRclock(0);              // reset the timer
+        writeIRclock();               // reset the timer
         IrState = NEC_WAIT_BIT_START; // go back and wait for the next data bit
         break;
     }
