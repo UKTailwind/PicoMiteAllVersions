@@ -252,7 +252,7 @@ void turtle_forward(TurtleState *t, float distance)
     if (t->pen_down)
         DrawLine((int)old_x, (int)old_y, (int)t->x, (int)t->y, -(t->pen_width), t->pen_color);
 
-    if (t->poly_recording && t->poly_count < 256)
+    if (t->poly_recording && t->poly_count < MAX_POLYGON_POINTS - 1)
     {
         t->poly_points_x[t->poly_count] = (int)t->x;
         t->poly_points_y[t->poly_count] = (int)t->y;
@@ -277,7 +277,7 @@ void turtle_goto(TurtleState *t, float new_x, float new_y)
     }
 
     // Record point for polygon fill
-    if (t->poly_recording && t->poly_count < 256)
+    if (t->poly_recording && t->poly_count < MAX_POLYGON_POINTS - 1)
     {
         t->poly_points_x[t->poly_count] = (int)new_x;
         t->poly_points_y[t->poly_count] = (int)new_y;
@@ -537,6 +537,18 @@ void draw_filled_polygon(TurtleState *t)
 {
     if (t->poly_count < 3)
         return;
+    if (!(t->poly_points_x[0] == t->poly_points_x[t->poly_count]) &&
+        (t->poly_points_y[0] == t->poly_points_y[t->poly_count]))
+    { // close the polygon
+        if (t->poly_count < MAX_POLYGON_POINTS - 1)
+        {
+            t->poly_points_x[t->poly_count] = t->poly_points_x[0];
+            t->poly_points_y[t->poly_count] = t->poly_points_y[0];
+            t->poly_count++;
+        }
+        else
+            error("Polygon can't be closed");
+    }
 
     if (t->fill_pattern == 0)
     {
@@ -758,8 +770,9 @@ void cmd_turtle(void)
     {
         getcsargs(&tp, 1);
         if (argc == 1)
-        turtle.heading += getnumber(tp);
-	    else turtle.heading += 90;
+            turtle.heading += getnumber(tp);
+        else
+            turtle.heading += 90;
         turtle.heading = normalize_heading(turtle.heading);
         draw_turtle_cursor(&turtle);
     }
@@ -767,8 +780,9 @@ void cmd_turtle(void)
     {
         getcsargs(&tp, 1);
         if (argc == 1)
-        turtle.heading -= getnumber(tp);
-	    else turtle.heading -= 90;
+            turtle.heading -= getnumber(tp);
+        else
+            turtle.heading -= 90;
         turtle.heading = normalize_heading(turtle.heading);
         draw_turtle_cursor(&turtle);
     }
@@ -920,7 +934,7 @@ void cmd_turtle(void)
     {
         turtle.fill_pattern = getint(tp, 0, NUM_PATTERNS);
     }
-    else if ((tp = checkstring(cmdline, (unsigned char *)"NOFILL")))
+    else if ((tp = checkstring(cmdline, (unsigned char *)"NOFILL")) || (tp = checkstring(cmdline, (unsigned char *)"NO FILL")))
     {
         turtle.fill_enabled = 0;
     }
