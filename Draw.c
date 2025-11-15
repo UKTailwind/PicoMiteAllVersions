@@ -240,14 +240,6 @@ uint8_t __not_in_flash_func(RGB332)(uint32_t c)
 {
     return (c >> 16 & 0xE0) | (c >> 11 & 0x1C) | (c >> 6 & 0x03);
 }
-uint8_t __not_in_flash_func(RGB121)(uint32_t c)
-{
-    return ((c & 0x800000) >> 20) | ((c & 0xC000) >> 13) | ((c & 0x80) >> 7);
-}
-uint16_t __not_in_flash_func(RGB121pack)(uint32_t c)
-{
-    return (RGB121(c) << 12) | (RGB121(c) << 8) | (RGB121(c) << 4) | RGB121(c);
-}
 /*  @endcond */
 void CheckDisplay(void)
 {
@@ -4386,10 +4378,61 @@ int blitother(void)
         docompressed(fc, x1, y1, w, h, blank);
         return 1;
     }
+    else if ((p = checkstring(cmdline, (unsigned char *)"FLASH")))
+    {
+        unsigned char *d = NULL;
+        unsigned char *s = NULL;
+        int blank = -1;
+        getcsargs(&p, 17);
+        if (!(argc == 15 || argc == 17))
+            SyntaxError();
+        ;
+        int i = getint(argv[0], 1, MAXFLASHSLOTS);
+        s = (unsigned char *)(flash_target_contents + (i - 1) * MAX_PROG_SIZE);
+        uint32_t *x = (uint32_t *)s;
+        HResS = x[0];
+        VResS = x[1];
+		if(HResS<0 || HResS>3840 || VResS<0 || VResS>2160)error("Invalid Image");
+        HResD = HRes;
+        VResD = VRes;
+        s += 8;
+        if (checkstring(argv[2], (unsigned char *)"L"))
+            d = LayerBuf;
+        else if (checkstring(argv[2], (unsigned char *)"F"))
+            d = FrameBuf;
+#ifdef PICOMITEVGA
+        else if (checkstring(argv[2], (unsigned char *)"N"))
+            d = DisplayBuf;
+#ifdef rp2350
+        else if (checkstring(argv[2], (unsigned char *)"T"))
+            d = SecondLayer;
+#endif
+#else
+        else if (checkstring(argv[2], (unsigned char *)"N"))
+            StandardError(1);
+#endif
+        else
+            SyntaxError();
+        x1 = getinteger(argv[4]);
+        y1 = getinteger(argv[6]);
+        x2 = getinteger(argv[8]);
+        y2 = getinteger(argv[10]);
+        w = getinteger(argv[12]);
+        h = getinteger(argv[14]);
+        if (x2 < 0 || y2 < 0 || x2 + w > HResS || y2 + h > VResS)
+            StandardError(21);
+        if (argc == 17)
+            blank = getint(argv[16], -1, 15);
+        blit121(s, d, x1, y1, w, h, x2, y2, blank);
+        return 1;
+    }
     else if ((p = checkstring(cmdline, (unsigned char *)"FRAMEBUFFER")))
     {
         int8_t blank = -1;
+#ifndef PICOMITEVGA
         int otoggle = 0, itoggle = 0; // input will always start on a byte boundary
+        volatile unsigned char c, *to;
+#endif
         volatile unsigned char *s = NULL, *d = NULL;
         getcsargs(&p, 17);
         if (argc < 15)
@@ -4443,77 +4486,14 @@ int blitother(void)
         h = (int)getinteger(argv[14]);
         if (argc == 17)
             blank = getint(argv[16], -1, 15);
-        volatile unsigned char c, *to, *from;
         if (d != NULL && s != NULL)
         {
-            if (x1 == 0 && x2 == 0 && w == HRes && blank == -1)
-            {
-                s += y1 * HRes / 2;
-                d += y2 * HRes / 2;
-                memmove((void *)d, (void *)s, h * HRes / 2);
-            }
-            else
-            {
-                for (int y = y1, toy = y2; y < y1 + h; y++, toy++)
-                {                                           // loop though all of the output lines
-                    from = s + y * (HRes >> 1) + (x1 >> 1); // get the byte that will start the output
-                    to = d + toy * (HRes >> 1) + (x2 >> 1); // get the byte that will start the output
-                    if (x1 & 1)
-                        itoggle = 1; // if x1 is odd then we will start on the high nibble
-                    else
-                        itoggle = 0;
-                    if (x2 & 1)
-                        otoggle = 1; // if x1 is odd then we will start on the high nibble
-                    else
-                        otoggle = 0;
-                    for (int x = x1, tox = x2; x < x1 + w; x++, tox++)
-                    {
-                        if (itoggle == 0)
-                        {
-                            if (tox >= 0 && tox < HRes)
-                                c = *from & 0x0f;
-                            else
-                                c = 0;
-                            itoggle = 1;
-                        }
-                        else
-                        {
-                            if (tox >= 0 && tox < HRes)
-                                c = *from >> 4;
-                            else
-                                c = 0;
-                            from++;
-                            itoggle = 0;
-                        }
-                        if (y < 0 || y >= VRes)
-                            continue;
-                        if (otoggle == 0)
-                        {
-                            if (tox >= 0 && tox < HRes)
-                            {
-                                if (c != blank)
-                                {
-                                    *to &= 0xF0;
-                                    *to |= c;
-                                }
-                            }
-                        }
-                        else
-                        {
-                            if (tox >= 0 && tox < HRes)
-                            {
-                                if (c != blank)
-                                {
-                                    *to &= 0x0f;
-                                    *to |= (c << 4);
-                                }
-                            }
-                            to++;
-                        }
-                        otoggle ^= 1;
-                    }
-                }
-            }
+            // RGB121 blit
+            HResD = HRes;
+            VResD = VRes;
+            HResS = HRes;
+            VResS = VRes;
+            blit121((uint8_t *)s, (uint8_t *)d, x1, y1, w, h, x2, y2, blank);
             return 1;
         }
 #ifndef PICOMITEVGA
@@ -5769,7 +5749,32 @@ void ScrollBufferV(int lines, int blank)
     }
 }
 /*  @endcond */
-
+void packline(uint32_t *data, int width)
+{
+    uint8_t *s = (uint8_t *)data;
+    uint8_t *d = s;
+    for (int i = 0; i < width; i++)
+    {
+        *d++ = *s++;
+        *d++ = *s++;
+        *d++ = *s++;
+        s++;
+    }
+}
+static s_ReadBMP *readstate;
+// External line callback function
+bool loadBMPlinecallback(int *imagewidth, int *imageheight, uint32_t *linedata, int *linenumber)
+{
+    if (*linenumber < readstate->img_y_offset || *linenumber >= readstate->img_y_offset + readstate->height)
+        return true;
+    packline(linedata, *imagewidth);
+    unsigned char *d = readstate->output_buffer;
+    d += (*linenumber - readstate->img_y_offset) * readstate->width * 3;
+    unsigned char *s = (uint8_t *)linedata;
+    s += readstate->img_x_offset * 3;
+    memcpy(d, s, readstate->width * 3);
+    return true;
+}
 void cmd_sprite(void)
 {
     int x1, y1, w, h, bnbr;
@@ -6398,9 +6403,10 @@ void cmd_sprite(void)
 #endif
     else if ((p = checkstring(cmdline, (unsigned char *)"LOADBMP")))
     {
-        int fnbr, toggle = 0;
-        int xOrigin, yOrigin, xlen, ylen;
-        BMPDECODER BmpDec;
+        int toggle = 0;
+        //        int xOrigin, yOrigin, xlen, ylen;
+        s_ReadBMP state;
+        readstate = &state; // store the various variables for use in the callback
         // get the command line arguments
         getcsargs(&p, 11); // this MUST be the first executable line in the function
         if (*argv[0] == '#')
@@ -6413,42 +6419,41 @@ void cmd_sprite(void)
         if (!InitSDCard())
             return;
         unsigned char *pp = getFstring(argv[2]); // get the file name
-        xOrigin = yOrigin = 0;
+        state.img_x_offset = 0;
+        state.img_y_offset = 0;
         if (argc >= 5 && *argv[4])
-            xOrigin = getinteger(argv[4]); // get the x origin (optional) argument
+            state.img_x_offset = getinteger(argv[4]); // get the x origin (optional) argument
         if (argc >= 7 && *argv[6])
-            yOrigin = getinteger(argv[6]); // get the y origin (optional) argument
-        if (xOrigin < 0 || yOrigin < 0)
+            state.img_y_offset = getinteger(argv[6]); // get the y origin (optional) argument
+        if (state.img_x_offset < 0 || state.img_y_offset < 0)
             StandardError(34);
-        xlen = ylen = -1;
+        state.width = state.height = -1;
         if (argc >= 9 && *argv[8])
-            xlen = getinteger(argv[8]); // get the x length (optional) argument
+            state.width = getinteger(argv[8]); // get the x length (optional) argument
         if (argc == 11)
-            ylen = getinteger(argv[10]); // get the y length (optional) argument
+            state.height = getinteger(argv[10]); // get the y length (optional) argument
         // open the file
         if (strchr((char *)pp, '.') == NULL)
             strcat((char *)pp, ".bmp");
-        fnbr = FindFreeFileNbr();
-        if (!BasicFileOpen((char *)pp, fnbr, FA_READ))
+        BMPfnbr = FindFreeFileNbr();
+        if (!BasicFileOpen((char *)pp, BMPfnbr, FA_READ))
             return;
-        BDEC_bReadHeader(&BmpDec, fnbr);
-        FileClose(fnbr);
-        if (xlen == -1)
-            xlen = BmpDec.lWidth;
-        if (ylen == -1)
-            ylen = BmpDec.lHeight;
-        if (xlen + xOrigin > BmpDec.lWidth || ylen + yOrigin > BmpDec.lHeight)
+        decodeBMPheader(&state.image_width, &state.image_height); //        BDEC_bReadHeader(&BmpDec, fnbr);
+        if (state.width == -1)
+            state.width = state.image_width - state.img_x_offset;
+        if (state.height == -1)
+            state.height = state.image_height - state.img_y_offset;
+        if (state.width + state.img_x_offset > state.image_width || state.height + state.img_y_offset > state.image_height)
             StandardError(34);
-        char *q = GetTempMainMemory(xlen * ylen * 3);
-        spritebuff[bnbr].spritebuffptr = GetMemory((xlen * ylen + 4) >> 1);
-        spritebuff[bnbr].blitstoreptr = GetMemory((xlen * ylen + 4) >> 1);
-        memset(q, 0xFF, xlen * ylen * 3);
-        fnbr = FindFreeFileNbr();
-        if (!BasicFileOpen((char *)pp, fnbr, FA_READ))
-            return;
-        BMP_bDecode_memory(xOrigin, yOrigin, xlen, ylen, fnbr, q);
-        spritebuff[bnbr].w = xlen;
-        spritebuff[bnbr].h = ylen;
+        state.output_buffer = GetTempMainMemory(state.width * state.height * 3);
+        spritebuff[bnbr].spritebuffptr = GetMemory((state.width * state.height + 4) >> 1);
+        spritebuff[bnbr].blitstoreptr = GetMemory((state.width * state.height + 4) >> 1);
+        memset(state.output_buffer, 0xFF, state.width * state.height * 3);
+        linecallback = loadBMPlinecallback;
+        decodeBMP(0);
+        FileClose(BMPfnbr);
+        spritebuff[bnbr].w = state.width;
+        spritebuff[bnbr].h = state.height;
         spritebuff[bnbr].master = 0;
         spritebuff[bnbr].mymaster = -1;
         spritebuff[bnbr].x = 10000;
@@ -6460,7 +6465,8 @@ void cmd_sprite(void)
         spritebuff[bnbr].lastcollisions = 0;
         spritebuff[bnbr].edges = 0;
         char *t = spritebuff[bnbr].spritebuffptr;
-        int i = xlen * ylen;
+        int i = state.width * state.height;
+        unsigned char *q = state.output_buffer;
         while (i--)
         {
             if (DISPLAY_TYPE == SCREENMODE1)
@@ -6490,7 +6496,6 @@ void cmd_sprite(void)
             toggle = !toggle;
             q += 3;
         }
-        FileClose(fnbr);
         return;
     }
     else if ((p = checkstring(cmdline, (unsigned char *)"MOVE")))
@@ -8097,11 +8102,12 @@ void cmd_blit(void)
         p = checkstring(cmdline, (unsigned char *)"LOAD");
     if (p)
     {
-        int fnbr;
-        int xOrigin, yOrigin, xlen, ylen;
-        BMPDECODER BmpDec;
         // get the command line arguments
         getcsargs(&p, 11); // this MUST be the first executable line in the function
+        s_ReadBMP state;
+        readstate = &state; // store the various variables for use in the callback
+        state.img_x_offset = 0;
+        state.img_y_offset = 0;
         if (*argv[0] == '#')
             argv[0]++;                             // check if the first arg is prefixed with a #
         bnbr = getint(argv[0], 1, MAXBLITBUF) - 1; // get the buffer number
@@ -8112,41 +8118,39 @@ void cmd_blit(void)
         if (!InitSDCard())
             return;
         p = getCstring(argv[2]); // get the file name
-        xOrigin = yOrigin = 0;
+        state.img_x_offset = state.img_y_offset = 0;
         if (argc >= 5 && *argv[4])
-            xOrigin = getinteger(argv[4]); // get the x origin (optional) argument
+            state.img_x_offset = getinteger(argv[4]); // get the x origin (optional) argument
         if (argc >= 7 && *argv[6])
-            yOrigin = getinteger(argv[6]); // get the y origin (optional) argument
-        if (xOrigin < 0 || yOrigin < 0)
+            state.img_y_offset = getinteger(argv[6]); // get the y origin (optional) argument
+        if (state.img_x_offset < 0 || state.img_y_offset < 0)
             StandardError(34);
-        xlen = ylen = -1;
+        state.width = state.height = -1;
         if (argc >= 9 && *argv[8])
-            xlen = getinteger(argv[8]); // get the x length (optional) argument
+            state.width = getinteger(argv[8]); // get the x length (optional) argument
         if (argc == 11)
-            ylen = getinteger(argv[10]); // get the y length (optional) argument
+            state.height = getinteger(argv[10]); // get the y length (optional) argument
         // open the file
         if (strchr((char *)p, '.') == NULL)
             strcat((char *)p, ".bmp");
-        fnbr = FindFreeFileNbr();
-        if (!BasicFileOpen((char *)p, fnbr, FA_READ))
+        BMPfnbr = FindFreeFileNbr();
+        if (!BasicFileOpen((char *)p, BMPfnbr, FA_READ))
             return;
-        BDEC_bReadHeader(&BmpDec, fnbr);
-        FileClose(fnbr);
-        if (xlen == -1)
-            xlen = BmpDec.lWidth;
-        if (ylen == -1)
-            ylen = BmpDec.lHeight;
-        if (xlen + xOrigin > BmpDec.lWidth || ylen + yOrigin > BmpDec.lHeight)
+        decodeBMPheader(&state.image_width, &state.image_height);
+        if (state.width == -1)
+            state.width = state.image_width - state.img_x_offset;
+        if (state.height == -1)
+            state.height = state.image_height - state.img_y_offset;
+        if (state.width + state.img_x_offset > state.image_width || state.height + state.img_y_offset > state.image_height)
             StandardError(34);
-        blitbuff[bnbr].blitbuffptr = GetMemory(xlen * ylen * 3 + 4);
-        memset(blitbuff[bnbr].blitbuffptr, 0xFF, xlen * ylen * 3 + 4);
-        fnbr = FindFreeFileNbr();
-        if (!BasicFileOpen((char *)p, fnbr, FA_READ))
-            return;
-        BMP_bDecode_memory(xOrigin, yOrigin, xlen, ylen, fnbr, blitbuff[bnbr].blitbuffptr);
-        blitbuff[bnbr].w = xlen;
-        blitbuff[bnbr].h = ylen;
-        FileClose(fnbr);
+        blitbuff[bnbr].blitbuffptr = GetMemory(state.width * state.height * 3 + 4);
+        memset(blitbuff[bnbr].blitbuffptr, 0xFF, state.width * state.height * 3 + 4);
+        state.output_buffer = (uint8_t *)blitbuff[bnbr].blitbuffptr;
+        linecallback = loadBMPlinecallback;
+        decodeBMP(0);
+        blitbuff[bnbr].w = state.width;
+        blitbuff[bnbr].h = state.height;
+        FileClose(BMPfnbr);
         return;
     }
 #ifndef PICOMITEVGA
@@ -8481,176 +8485,12 @@ void cmd_blit(void)
             return;
 #ifdef PICOMITEVGA
         if (DISPLAY_TYPE == SCREENMODE2 || DISPLAY_TYPE == SCREENMODE3)
-        {
-            if ((w & 1) == 0 && (x1 & 1) == 0 && (x2 & 1) == 0)
-            { // Easiest case - byte move in the x direction with w even
-                if (y1 < y2)
-                {
-                    for (int y = h - 1; y >= 0; y--)
-                    {
-                        volatile uint8_t *in = WriteBuf + ((y + y1) * HRes + x1) / 2;
-                        volatile uint8_t *out = WriteBuf + ((y + y2) * HRes + x2) / 2;
-                        memcpy((void *)out, (void *)in, w / 2);
-                    }
-                }
-                else if (y1 > y2)
-                {
-                    for (int y = 0; y < h; y++)
-                    {
-                        volatile uint8_t *in = WriteBuf + ((y + y1) * HRes + x1) / 2;
-                        volatile uint8_t *out = WriteBuf + ((y + y2) * HRes + x2) / 2;
-                        memcpy((void *)out, (void *)in, w / 2);
-                    }
-                }
-                else
-                {
-                    for (int y = 0; y < h; y++)
-                    {
-                        volatile uint8_t *in = WriteBuf + ((y + y1) * HRes + x1) / 2;
-                        volatile uint8_t *out = WriteBuf + ((y + y2) * HRes + x2) / 2;
-                        memmove((void *)out, (void *)in, w / 2);
-                    }
-                }
-                return;
-            }
-            else
-            { // nibble move not as easy
-                uint8_t *inbuff = GetTempMainMemory(HRes / 2);
-                int intoggle = x1 & 1;
-                int outtoggle = x2 & 1;
-                int n = w / 2;
-                if (w & 1)
-                    n++;
-                if (y1 > y2)
-                {
-                    for (int y = 0; y < h; y++)
-                    {
-                        if (!intoggle)
-                            memcpy(inbuff, (void *)WriteBuf + ((y + y1) * HRes + x1) / 2, n);
-                        else
-                        {
-                            int toggle = 1;
-                            volatile uint8_t *in = WriteBuf + ((y + y1) * HRes + x1) / 2;
-                            volatile uint8_t *out = inbuff;
-                            for (int x = 0; x < w; x++)
-                            {
-                                if (toggle)
-                                {
-                                    uint8_t t = *in >> 4;
-                                    *out = t;
-                                    in++;
-                                }
-                                else
-                                {
-                                    uint8_t t = (*in & 0xf) << 4;
-                                    *out |= t;
-                                    out++;
-                                }
-                                toggle ^= 1;
-                            }
-                        }
-                        if (!outtoggle)
-                        {
-                            memcpy((void *)WriteBuf + ((y + y2) * HRes + x2) / 2, inbuff, w / 2);
-                            if (w & 1)
-                            {
-                                volatile uint8_t *lastnibble = WriteBuf + ((y + y2) * HRes + x2 + w) / 2;
-                                *lastnibble &= 0xf0;
-                                *lastnibble |= (inbuff[w / 2] & 0xf);
-                            }
-                        }
-                        else
-                        {
-                            int toggle = 1;
-                            volatile uint8_t *in = inbuff;
-                            volatile uint8_t *out = WriteBuf + ((y + y2) * HRes + x2) / 2;
-                            for (int x = 0; x < w; x++)
-                            {
-                                if (toggle)
-                                {
-                                    uint8_t t = (*in & 0xf) << 4;
-                                    *out &= 0x0f; // clear the top byte of the output
-                                    *out |= t;
-                                    out++;
-                                }
-                                else
-                                {
-                                    uint8_t t = (*in >> 4);
-                                    *out &= 0xf0;
-                                    *out |= t;
-                                    in++;
-                                }
-                                toggle ^= 1;
-                            }
-                        }
-                    }
-                }
-                else
-                {
-                    for (int y = h - 1; y >= 0; y--)
-                    {
-                        if (!intoggle)
-                            memcpy(inbuff, (void *)WriteBuf + ((y + y1) * HRes + x1) / 2, n);
-                        else
-                        {
-                            int toggle = 1;
-                            volatile uint8_t *in = WriteBuf + ((y + y1) * HRes + x1) / 2;
-                            volatile uint8_t *out = inbuff;
-                            for (int x = 0; x < w; x++)
-                            {
-                                if (toggle)
-                                {
-                                    uint8_t t = *in >> 4;
-                                    *out = t;
-                                    in++;
-                                }
-                                else
-                                {
-                                    uint8_t t = (*in & 0xf) << 4;
-                                    *out |= t;
-                                    out++;
-                                }
-                                toggle ^= 1;
-                            }
-                        }
-                        if (!outtoggle)
-                        {
-                            memcpy((void *)WriteBuf + ((y + y2) * HRes + x2) / 2, inbuff, w / 2);
-                            if (w & 1)
-                            {
-                                volatile uint8_t *lastnibble = WriteBuf + ((y + y2) * HRes + x2 + w) / 2;
-                                *lastnibble &= 0xf0;
-                                *lastnibble |= (inbuff[w / 2] & 0xf);
-                            }
-                        }
-                        else
-                        {
-                            int toggle = 1;
-                            volatile uint8_t *in = inbuff;
-                            volatile uint8_t *out = WriteBuf + ((y + y2) * HRes + x2) / 2;
-                            for (int x = 0; x < w; x++)
-                            {
-                                if (toggle)
-                                {
-                                    uint8_t t = (*in & 0xf) << 4;
-                                    *out &= 0x0f; // clear the top byte of the output
-                                    *out |= t;
-                                    out++;
-                                }
-                                else
-                                {
-                                    uint8_t t = (*in >> 4);
-                                    *out &= 0xf0;
-                                    *out |= t;
-                                    in++;
-                                }
-                                toggle ^= 1;
-                            }
-                        }
-                    }
-                }
-                return;
-            }
+        { // RGB121 blit
+            HResD = HRes;
+            VResD = VRes;
+            HResS = HRes;
+            VResS = VRes;
+            blit121_self(WriteBuf, x1, y1, w, h, x2, y2);
         }
         else if (DISPLAY_TYPE && (DISPLAY_TYPE == SCREENMODE4 || DISPLAY_TYPE == SCREENMODE5))
         {
@@ -10230,461 +10070,6 @@ void cmd_refresh(void)
  * @cond
  * The following section will be excluded from the documentation.
  */
-
-void DrawPixel16(int x, int y, int c)
-{
-    if (x < 0 || y < 0 || x >= HRes || y >= VRes)
-        return;
-#if PICOMITERP2350
-    if ((Option.DISPLAY_TYPE >= VIRTUAL && Option.DISPLAY_TYPE < VGA222) && WriteBuf == NULL)
-        WriteBuf = GetMemory(VMaxH * VMaxV / 8);
-#else
-    if ((Option.DISPLAY_TYPE >= VIRTUAL) && WriteBuf == NULL)
-        WriteBuf = GetMemory(VMaxH * VMaxV / 8);
-#endif
-    unsigned char colour = RGB121(c);
-    uint8_t *p = (uint8_t *)(((uint32_t)WriteBuf) + (y * (HRes >> 1)) + (x >> 1));
-    if (x & 1)
-    {
-        *p &= 0x0F;
-        *p |= (colour << 4);
-    }
-    else
-    {
-        *p &= 0xF0;
-        *p |= colour;
-    }
-}
-void DrawRectangle16(int x1, int y1, int x2, int y2, int c)
-{
-    int x, y, x1p, x2p, t;
-    //    unsigned char mask;
-    unsigned char colour = RGB121(c);
-    ;
-    unsigned char bcolour = (colour << 4) | colour;
-#if PICOMITERP2350
-    if ((Option.DISPLAY_TYPE >= VIRTUAL && Option.DISPLAY_TYPE < VGA222) && WriteBuf == NULL)
-        WriteBuf = GetMemory(VMaxH * VMaxV / 8);
-#else
-    if ((Option.DISPLAY_TYPE >= VIRTUAL) && WriteBuf == NULL)
-        WriteBuf = GetMemory(VMaxH * VMaxV / 8);
-#endif
-    if (x1 < 0)
-        x1 = 0;
-    if (x1 >= HRes)
-        x1 = HRes - 1;
-    if (x2 < 0)
-        x2 = 0;
-    if (x2 >= HRes)
-        x2 = HRes - 1;
-    if (y1 < 0)
-        y1 = 0;
-    if (y1 >= VRes)
-        y1 = VRes - 1;
-    if (y2 < 0)
-        y2 = 0;
-    if (y2 >= VRes)
-        y2 = VRes - 1;
-    if (x2 <= x1)
-    {
-        t = x1;
-        x1 = x2;
-        x2 = t;
-    }
-    if (y2 <= y1)
-    {
-        t = y1;
-        y1 = y2;
-        y2 = t;
-    }
-    for (y = y1; y <= y2; y++)
-    {
-        x1p = x1;
-        x2p = x2;
-        uint8_t *p = (uint8_t *)(((uint32_t)WriteBuf) + (y * (HRes >> 1)) + (x1 >> 1));
-        if ((x1 % 2) == 1)
-        {
-            *p &= 0x0F;
-            *p |= (colour << 4);
-            p++;
-            x1p++;
-        }
-        if ((x2 % 2) == 0)
-        {
-            uint8_t *q = (uint8_t *)(((uint32_t)WriteBuf) + (y * (HRes >> 1)) + (x2 >> 1));
-            *q &= 0xF0;
-            *q |= colour;
-            x2p--;
-        }
-        for (x = x1p; x < x2p; x += 2)
-        {
-            *p++ = bcolour;
-        }
-    }
-}
-void DrawBitmap16(int x1, int y1, int width, int height, int scale, int fc, int bc, unsigned char *bitmap)
-{
-    int i, j, k, m, x, y;
-    //    unsigned char mask;
-    if (x1 >= HRes || y1 >= VRes || x1 + width * scale < 0 || y1 + height * scale < 0)
-        return;
-    unsigned char fcolour = RGB121(fc);
-    unsigned char bcolour = RGB121(bc);
-#if PICOMITERP2350
-    if ((Option.DISPLAY_TYPE >= VIRTUAL && Option.DISPLAY_TYPE < VGA222) && WriteBuf == NULL)
-        WriteBuf = GetMemory(VMaxH * VMaxV / 8);
-#else
-    if ((Option.DISPLAY_TYPE >= VIRTUAL) && WriteBuf == NULL)
-        WriteBuf = GetMemory(VMaxH * VMaxV / 8);
-#endif
-    for (i = 0; i < height; i++)
-    { // step thru the font scan line by line
-        for (j = 0; j < scale; j++)
-        { // repeat lines to scale the font
-            for (k = 0; k < width; k++)
-            { // step through each bit in a scan line
-                for (m = 0; m < scale; m++)
-                { // repeat pixels to scale in the x axis
-                    x = x1 + k * scale + m;
-                    y = y1 + i * scale + j;
-                    if (x >= 0 && x < HRes && y >= 0 && y < VRes)
-                    { // if the coordinates are valid
-                        uint8_t *p = (uint8_t *)(((uint32_t)WriteBuf) + (y * (HRes >> 1)) + (x >> 1));
-                        if ((bitmap[((i * width) + k) / 8] >> (((height * width) - ((i * width) + k) - 1) % 8)) & 1)
-                        {
-                            if (x & 1)
-                            {
-                                *p &= 0x0F;
-                                *p |= (fcolour << 4);
-                            }
-                            else
-                            {
-                                *p &= 0xF0;
-                                *p |= fcolour;
-                            }
-                        }
-                        else
-                        {
-                            if (bc >= 0)
-                            {
-                                if (x & 1)
-                                {
-                                    *p &= 0x0F;
-                                    *p |= (bcolour << 4);
-                                }
-                                else
-                                {
-                                    *p &= 0xF0;
-                                    *p |= bcolour;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-void ScrollLCD16(int lines)
-{
-    if (lines == 0)
-        return;
-    if (lines >= 0)
-    {
-        for (int i = 0; i < VRes - lines; i++)
-        {
-            int d = i * (HRes >> 1), s = (i + lines) * (HRes >> 1);
-            for (int c = 0; c < (HRes >> 1); c++)
-                WriteBuf[d + c] = WriteBuf[s + c];
-        }
-        DrawRectangle(0, VRes - lines, HRes - 1, VRes - 1, PromptBC); // erase the lines to be scrolled off
-    }
-    else
-    {
-        lines = -lines;
-        for (int i = VRes - 1; i >= lines; i--)
-        {
-            int d = i * (HRes >> 1), s = (i - lines) * (HRes >> 1);
-            for (int c = 0; c < (HRes >> 1); c++)
-                WriteBuf[d + c] = WriteBuf[s + c];
-        }
-        DrawRectangle(0, 0, HRes - 1, lines - 1, PromptBC); // erase the lines introduced at the top
-    }
-}
-void DrawBuffer16(int x1, int y1, int x2, int y2, unsigned char *p)
-{
-    int x, y, t;
-    union colourmap
-    {
-        char rgbbytes[4];
-        unsigned int rgb;
-    } c;
-    unsigned char fcolour;
-    uint8_t *pp;
-#if PICOMITERP2350
-    if ((Option.DISPLAY_TYPE >= VIRTUAL && Option.DISPLAY_TYPE < VGA222) && WriteBuf == NULL)
-        WriteBuf = GetMemory(VMaxH * VMaxV / 8);
-#else
-    if ((Option.DISPLAY_TYPE >= VIRTUAL) && WriteBuf == NULL)
-        WriteBuf = GetMemory(VMaxH * VMaxV / 8);
-#endif
-    // make sure the coordinates are kept within the display area
-    if (x2 <= x1)
-    {
-        t = x1;
-        x1 = x2;
-        x2 = t;
-    }
-    if (y2 <= y1)
-    {
-        t = y1;
-        y1 = y2;
-        y2 = t;
-    }
-    if (x1 < 0)
-        x1 = 0;
-    if (x1 >= HRes)
-        x1 = HRes - 1;
-    if (x2 < 0)
-        x2 = 0;
-    if (x2 >= HRes)
-        x2 = HRes - 1;
-    if (y1 < 0)
-        y1 = 0;
-    if (y1 >= VRes)
-        y1 = VRes - 1;
-    if (y2 < 0)
-        y2 = 0;
-    if (y2 >= VRes)
-        y2 = VRes - 1;
-    for (y = y1; y <= y2; y++)
-    {
-        for (x = x1; x <= x2; x++)
-        {
-            c.rgbbytes[0] = *p++; // this order swaps the bytes to match the .BMP file
-            c.rgbbytes[1] = *p++;
-            c.rgbbytes[2] = *p++;
-            fcolour = RGB121(c.rgb);
-            pp = (uint8_t *)(((uint32_t)WriteBuf) + (y * (HRes >> 1)) + (x >> 1));
-            if (x & 1)
-            {
-                *pp &= 0x0F;
-                *pp |= (fcolour << 4);
-            }
-            else
-            {
-                *pp &= 0xF0;
-                *pp |= fcolour;
-            }
-        }
-    }
-}
-void DrawBuffer16Fast(int x1, int y1, int x2, int y2, int blank, unsigned char *p)
-{
-    int x, y, t, toggle = 0;
-    unsigned char c, w;
-    uint8_t *pp;
-    // make sure the coordinates are kept within the display area
-    if (x2 <= x1)
-    {
-        t = x1;
-        x1 = x2;
-        x2 = t;
-    }
-    if (y2 <= y1)
-    {
-        t = y1;
-        y1 = y2;
-        y2 = t;
-    }
-#if PICOMITERP2350
-    if ((Option.DISPLAY_TYPE >= VIRTUAL && Option.DISPLAY_TYPE < VGA222) && WriteBuf == NULL)
-        WriteBuf = GetMemory(VMaxH * VMaxV / 8);
-#else
-    if ((Option.DISPLAY_TYPE >= VIRTUAL) && WriteBuf == NULL)
-        WriteBuf = GetMemory(VMaxH * VMaxV / 8);
-#endif
-    for (y = y1; y <= y2; y++)
-    {
-        for (x = x1; x <= x2; x++)
-        {
-            if (x >= 0 && x < HRes && y >= 0 && y < VRes)
-            {
-                pp = (uint8_t *)(WriteBuf + (y * (HRes >> 1)) + (x >> 1));
-                if (x & 1)
-                {
-                    w = *pp & 0xF0;
-                    *pp &= 0x0F;
-                    if (toggle)
-                    {
-                        c = ((*p++) & 0xF0);
-                    }
-                    else
-                    {
-                        c = (*p << 4);
-                    }
-                }
-                else
-                {
-                    w = *pp & 0xF;
-                    *pp &= 0xF0;
-                    if (toggle)
-                    {
-                        c = ((*p++) >> 4);
-                    }
-                    else
-                    {
-                        c = (*p & 0xF);
-                    }
-                }
-                if ((!(c == sprite_transparent || c == sprite_transparent << 4)) || blank == -1)
-                    *pp |= c;
-                else
-                    *pp |= w;
-                toggle = !toggle;
-            }
-            else
-            {
-                if (toggle)
-                    p++;
-                toggle = !toggle;
-            }
-        }
-    }
-}
-void ReadBuffer16(int x1, int y1, int x2, int y2, unsigned char *c)
-{
-    int x, y, t;
-    uint8_t *pp;
-#if PICOMITERP2350
-    if ((Option.DISPLAY_TYPE >= VIRTUAL && Option.DISPLAY_TYPE < VGA222) && WriteBuf == NULL)
-        WriteBuf = GetMemory(VMaxH * VMaxV / 8);
-#else
-    if ((Option.DISPLAY_TYPE >= VIRTUAL) && WriteBuf == NULL)
-        WriteBuf = GetMemory(VMaxH * VMaxV / 8);
-#endif
-    if (x2 <= x1)
-    {
-        t = x1;
-        x1 = x2;
-        x2 = t;
-    }
-    if (y2 <= y1)
-    {
-        t = y1;
-        y1 = y2;
-        y2 = t;
-    }
-    int xx1 = x1, yy1 = y1, xx2 = x2, yy2 = y2;
-    if (x1 < 0)
-        xx1 = 0;
-    if (x1 >= HRes)
-        xx1 = HRes - 1;
-    if (x2 < 0)
-        xx2 = 0;
-    if (x2 >= HRes)
-        xx2 = HRes - 1;
-    if (y1 < 0)
-        yy1 = 0;
-    if (y1 >= VRes)
-        yy1 = VRes - 1;
-    if (y2 < 0)
-        yy2 = 0;
-    if (y2 >= VRes)
-        yy2 = VRes - 1;
-    for (y = yy1; y <= yy2; y++)
-    {
-        for (x = xx1; x <= xx2; x++)
-        {
-            pp = (uint8_t *)(((uint32_t)WriteBuf) + (y * (HRes >> 1)) + (x >> 1));
-#ifdef PICOMITEVGA
-            unsigned int q;
-            uint8_t *qq = pp;
-            if (WriteBuf == DisplayBuf && LayerBuf != DisplayBuf && LayerBuf != NULL)
-                qq = (uint8_t *)(((uint32_t)LayerBuf) + (y * (HRes >> 1)) + (x >> 1));
-#endif
-            if (x & 1)
-            {
-                t = colours[(*pp) >> 4];
-#ifdef PICOMITEVGA
-                q = colours[(*qq) >> 4];
-                if (!(((*qq) >> 4) == transparent) && mergedread)
-                    t = q;
-#endif
-            }
-            else
-            {
-                t = colours[(*pp) & 0x0F];
-#ifdef PICOMITEVGA
-                q = colours[(*qq) & 0x0F];
-                if (!(((*qq) & 0x0F) == transparent) && mergedread)
-                    t = q;
-#endif
-            }
-            *c++ = (t & 0xFF);
-            *c++ = (t >> 8) & 0xFF;
-            *c++ = t >> 16;
-        }
-    }
-}
-void ReadBuffer16Fast(int x1, int y1, int x2, int y2, unsigned char *c)
-{
-    int x, y, t, toggle = 0;
-    uint8_t *pp;
-    if (x2 <= x1)
-    {
-        t = x1;
-        x1 = x2;
-        x2 = t;
-    }
-    if (y2 <= y1)
-    {
-        t = y1;
-        y1 = y2;
-        y2 = t;
-    }
-#if PICOMITERP2350
-    if ((Option.DISPLAY_TYPE >= VIRTUAL && Option.DISPLAY_TYPE < VGA222) && WriteBuf == NULL)
-        WriteBuf = GetMemory(VMaxH * VMaxV / 8);
-#else
-    if ((Option.DISPLAY_TYPE >= VIRTUAL) && WriteBuf == NULL)
-        WriteBuf = GetMemory(VMaxH * VMaxV / 8);
-#endif
-    for (y = y1; y <= y2; y++)
-    {
-        for (x = x1; x <= x2; x++)
-        {
-            if (x >= 0 && x < HRes && y >= 0 && y < VRes)
-            {
-                pp = (uint8_t *)(((uint32_t)WriteBuf) + (y * (HRes >> 1)) + (x >> 1));
-                if (!(x & 1))
-                {
-                    if (toggle)
-                        *c++ |= (((*pp) & 0x0F)) << 4;
-                    else
-                        *c = ((*pp) & 0x0F);
-                }
-                else
-                {
-                    if (toggle)
-                        *c++ |= ((*pp) & 0xF0);
-                    else
-                        *c = ((*pp) >> 4);
-                }
-                toggle = !toggle;
-            }
-            else
-            {
-                if (toggle)
-                    *c++ &= 0xF;
-                else
-                    *c = 0;
-                toggle = !toggle;
-            }
-        }
-    }
-}
 
 #ifdef PICOMITEVGA
 

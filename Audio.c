@@ -622,7 +622,7 @@ void MIPS64 __not_in_flash_func(i2sconvert)(int16_t *fbuff, int16_t *sbuff, int 
 size_t onRead(void *userdata, char *pBufferOut, size_t bytesToRead)
 {
 	unsigned int nbr;
-	FileGetdata(WAV_fnbr, pBufferOut, bytesToRead, &nbr);
+	FileGetData(WAV_fnbr, pBufferOut, bytesToRead, &nbr);
 	return nbr;
 }
 drwav_bool32 onSeek(void *userdata, int offset, drwav_seek_origin origin)

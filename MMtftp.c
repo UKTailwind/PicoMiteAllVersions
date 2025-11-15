@@ -69,7 +69,7 @@ int tftp_read(void *handle, void *buf, int bytes)
 {
     int n_read;
     int fnbr = *(int *)handle;
-    FileGetdata(fnbr, buf, bytes, (UINT *)&n_read);
+    FileGetData(fnbr, buf, bytes, (UINT *)&n_read);
     return n_read;
 }
 int tftp_write(void *handle, struct pbuf *p)

@@ -211,7 +211,17 @@ struct D3D
     uint8_t nonormals;         // Flag for normal calculation
     uint8_t depthmode;         // Depth sorting mode
 };
-
+// Structure to hold dithering state
+typedef struct
+{
+    uint8_t *output_buffer;
+    int img_x_offset;
+    int img_y_offset;
+    int image_height;
+    int image_width;
+    int width;
+    int height;
+} s_ReadBMP;
 /* ============================================================================
  * Type definitions - Camera structure
  * ============================================================================ */
@@ -312,6 +322,7 @@ extern int RGB121map[16];
  * ============================================================================ */
 extern bool mergerunning;
 extern uint32_t mergetimer;
+extern bool mergedread;
 
 /* ============================================================================
  * Function pointer declarations - Core drawing functions
@@ -335,21 +346,11 @@ void DrawRBox(int x1, int y1, int x2, int y2, int radius, int c, int fill);
 void DrawCircle(int x, int y, int radius, int w, int c, int fill, MMFLOAT aspect);
 void DrawTriangle(int x0, int y0, int x1, int y1, int x2, int y2, int c, int fill);
 
-/* ============================================================================
- * Function declarations - Pixel operations (16-bit)
- * ============================================================================ */
-void DrawPixel16(int x, int y, int c);
 void DrawPixelNormal(int x, int y, int c);
-void DrawRectangle16(int x1, int y1, int x2, int y2, int c);
-void DrawBitmap16(int x1, int y1, int width, int height, int scale, int fc, int bc, unsigned char *bitmap);
 
 /* ============================================================================
  * Function declarations - Buffer operations
  * ============================================================================ */
-void DrawBuffer16(int x1, int y1, int x2, int y2, unsigned char *p);
-void DrawBuffer16Fast(int x1, int y1, int x2, int y2, int blank, unsigned char *p);
-void ReadBuffer16(int x1, int y1, int x2, int y2, unsigned char *c);
-void ReadBuffer16Fast(int x1, int y1, int x2, int y2, unsigned char *c);
 void ReadBuffer2(int x1, int y1, int x2, int y2, unsigned char *c);
 /* ============================================================================
  * Function declarations - RGB222 operations
@@ -366,7 +367,6 @@ void ReadBuffer222Fast(int x1, int y1, int x2, int y2, unsigned char *c);
  * Function declarations - Screen operations
  * ============================================================================ */
 void ClearScreen(int c);
-void ScrollLCD16(int lines);
 void copyframetoscreen(uint8_t *s, int xstart, int xend, int ystart, int yend, int odd);
 void copybuffertoscreen(int low_x, int low_y, int high_x, int high_y);
 void restorepanel(void);
@@ -403,7 +403,7 @@ int getColour(char *c, int minus);
 /* ============================================================================
  * Function declarations - Image loading
  * ============================================================================ */
-int ReadAndDisplayBMP(int fnbr, int display_mode, int dither_mode, int img_x_offset,
+int ReadAndDisplayBMP(int fnbr, int dither_mode, int img_x_offset,
                       int img_y_offset, int x_display, int y_display);
 
 /* ============================================================================

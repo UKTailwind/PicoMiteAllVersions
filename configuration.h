@@ -46,9 +46,9 @@ extern "C"
 #define MAXVARS 768
 
 #ifdef USBKEYBOARD
-#define HEAP_MEMORY_SIZE (180 * 1024)
+#define HEAP_MEMORY_SIZE (176 * 1024)
 #else
-#define HEAP_MEMORY_SIZE (180 * 1024)
+#define HEAP_MEMORY_SIZE (176 * 1024)
 #endif
 
 #define FLASH_TARGET_OFFSET (912 * 1024)

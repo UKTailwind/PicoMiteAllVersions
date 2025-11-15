@@ -553,7 +553,7 @@ void cmd_transmit(unsigned char *cmd)
                         if (Size < TCP_MSS * 4 && Size < FreeSpaceOnHeap() / 4)
                         {
                                 char *pBuf = GetTempMainMemory(Size);
-                                FileGetdata(fn, pBuf, Size, &n_read);
+                                FileGetData(fn, pBuf, Size, &n_read);
                                 state->buffer_sent[pcb] = (unsigned char *)pBuf;
                                 while (n_read > TCP_MSS)
                                 {
@@ -579,7 +579,7 @@ void cmd_transmit(unsigned char *cmd)
                                             ((filesource[fn] == FLASHFILE) && (lfs_file_tell(&lfs, FileTable[fn].lfsptr) == lfs_file_size(&lfs, FileTable[fn].lfsptr))) ||
                                             ((filesource[fn] != FLASHFILE) && f_eof(FileTable[fn].fptr)))
                                                 break;
-                                        FileGetdata(fn, pBuf, TCP_MSS, &n_read);
+                                        FileGetData(fn, pBuf, TCP_MSS, &n_read);
                                         state->to_send[pcb] = n_read;
                                         state->buffer_sent[pcb] = (unsigned char *)pBuf;
                                         state->total_sent[pcb] += n_read;

@@ -1344,7 +1344,7 @@ upng_t *upng_new_from_file(char *filename)
 	}
 	while (size > 0)
 	{
-		FileGetdata(fnbr, buffer, 512, &sizeread);
+		FileGetData(fnbr, buffer, 512, &sizeread);
 		size -= sizeread;
 		buffer += sizeread;
 	}

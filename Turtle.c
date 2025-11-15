@@ -91,9 +91,36 @@ const uint8_t fill_patterns[][8] = {
     {0x3C, 0x42, 0x81, 0x81, 0x81, 0x81, 0x42, 0x3C}, // 30: Circle
     {0x7E, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x7E}, // 31: Circle filled
 };
+static TurtleState turtle = {
+    .x = silly_high, .y = silly_high, // Screen center
+    .heading = 0,
+    .pen_down = 1,
+    .pen_color = 0xFFFFFF,
+    .pen_width = 1,
+    .fill_color = 0xFFFFFF,
+    .fill_enabled = 0,
+    .fill_pattern = 0,
+    .visible = 1,
+    .cursor_size = 10,
+    .cursor_color = 0x00FF00,
+    .cursor_x = 0,
+    .cursor_y = 0,
+    .cursor_heading = 0,
+    .cursor_drawn = 0,
+    .has_buffer_support = 0, // Will be set on first call
+    .stack_ptr = 0,
+    .cursor_buffer = NULL,
+    .poly_count = 0,
+    .poly_recording = 0};
+
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
+void turtle_init(void)
+{
+    turtle_reset(&turtle, 0);
+}
+
 static float normalize_heading(float heading)
 {
     // Normalize heading to 0-360 range
@@ -726,37 +753,6 @@ void turtle_reset(TurtleState *t, bool showturtle)
 }
 void cmd_turtle(void)
 {
-    static TurtleState turtle = {
-        .x = silly_high, .y = silly_high, // Screen center
-        .heading = 0,
-        .pen_down = 1,
-        .pen_color = 0xFFFFFF,
-        .pen_width = 1,
-        .fill_color = 0xFFFFFF,
-        .fill_enabled = 0,
-        .fill_pattern = 0,
-        .visible = 1,
-        .cursor_size = 10,
-        .cursor_color = 0x00FF00,
-        .cursor_x = 0,
-        .cursor_y = 0,
-        .cursor_heading = 0,
-        .cursor_drawn = 0,
-        .has_buffer_support = 0, // Will be set on first call
-        .stack_ptr = 0,
-        .cursor_buffer = NULL,
-        .poly_count = 0,
-        .poly_recording = 0};
-    if (turtle.x == silly_high)
-    {
-        FreeMemorySafe((void **)&turtle.cursor_buffer);
-        turtle.x = HRes / 2;
-        turtle.y = VRes / 2;
-        if ((void *)ReadBuffer != (void *)DisplayNotSet)
-            turtle.has_buffer_support = true;
-        else
-            turtle.has_buffer_support = false;
-    }
     unsigned char *tp;
     if ((tp = checkstring(cmdline, (unsigned char *)"FORWARD")) || (tp = checkstring(cmdline, (unsigned char *)"FD")))
     {

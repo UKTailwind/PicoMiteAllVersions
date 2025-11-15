@@ -51,6 +51,7 @@ extern "C"
 #define LIBRARY_FLASH 6
 #define SAVED_VARS_FLASH 7
 #define PROGRAM_FLASH 8
+#define RoundUptoPage(a) ((((uint64_t)a) + (uint64_t)(255)) & (uint64_t)(~(255))) // round up to the nearest page
 
         /* ============================================================================
          * Constants - File types
@@ -75,6 +76,15 @@ extern "C"
         /* ============================================================================
          * Type definitions - Options structure
          * ============================================================================ */
+        typedef struct
+        {
+                int width;
+                int height;
+                int bitsPerPixel;
+                int linesProcessed;
+                bool success;
+                char errorMsg[256];
+        } BMP_Result;
         struct option_s
         {
                 /* Basic settings */
@@ -331,7 +341,8 @@ extern "C"
         extern int FSerror;
         extern int lfs_FileFnbr;
         extern struct lfs_config pico_lfs_cfg;
-
+        extern const uint8_t *flash_target_contents;
+        extern int BMPfnbr;
         /* ============================================================================
          * External variables - Error handling
          * ============================================================================ */
@@ -349,6 +360,9 @@ extern "C"
         int ExistsFile(char *p);
         int ExistsDir(char *p, char *q, int *filesystem);
         int FileSize(char *p);
+        extern bool (*linecallback)(int *imagewidth, int *imageheight, uint32_t *linedata, int *linenumber);
+        extern BMP_Result decodeBMP(bool topdown);
+        void decodeBMPheader(int *width, int *height);
         /* ============================================================================
          * Function declarations - File management
          * ============================================================================ */
@@ -365,7 +379,7 @@ extern "C"
         char FilePutChar(char c, int fnbr);
         //        void FilePutStr(int count, char *c, int fnbr);
         void FilePutData(char *c, int fnbr, int n);
-        int __not_in_flash_func(FileGetdata)(int fnbr, void *buff, int count, unsigned int *read);
+        int __not_in_flash_func(FileGetData)(int fnbr, void *buff, int count, unsigned int *read);
 
         /* ============================================================================
          * Function declarations - File positioning

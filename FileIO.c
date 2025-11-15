@@ -60,13 +60,11 @@ extern mutex_t frameBufferMutex;
 #include "class/cdc/cdc_device.h"
 #endif
 
-extern const uint8_t *flash_target_contents;
 extern const uint8_t *SavedVarsFlash;
 extern const uint8_t *flash_progmemory;
 // LIBRARY
 extern const uint8_t *flash_libgmemory;
 extern void routinechecks(void);
-extern bool mergedread;
 extern int TraceOn;
 struct option_s __attribute__((aligned(256))) Option;
 int dirflags;
@@ -80,7 +78,7 @@ static uint32_t m0_rfmt;
 static uint32_t m0_timing;
 int MemLoadProgram(unsigned char *fname, unsigned char *ram);
 #endif
-
+int BMPfnbr;
 // 8*8*4 bytes * 3 = 768
 int16_t *gCoeffBuf;
 
@@ -148,6 +146,7 @@ char filepath[2][FF_MAX_LFN] = {
 char fullpathname[2][FF_MAX_LFN];
 char fullfilepathname[FF_MAX_LFN];
 extern BYTE BMP_bDecode(int x, int y, int fnbr);
+bool (*linecallback)(int *imagewidth, int *imageheight, uint32_t *linedata, int *linenumber) = NULL;
 #define RoundUp(a) (((a) + (sizeof(int) - 1)) & (~(sizeof(int) - 1))) // round up to the nearest integer size      [position 27:9]
 int resolve_path(char *path, char *result, char *pos);
 void getfullpath(char *p, char *q);
@@ -755,6 +754,107 @@ void MIPS16 cmd_psram(void)
     ;
 }
 #endif
+void flashpackline(uint32_t *data, int width, int linenum)
+{
+    uint8_t *s = (uint8_t *)data;
+    uint8_t *d = s;
+    for (int i = 0; i < width; i += 2)
+    {
+        uint32_t r888 = (*s++);
+        r888 |= (*s++) << 8;
+        r888 |= (*s++) << 16;
+        s++;
+        *d = RGB121(r888);
+        r888 = (*s++);
+        r888 |= (*s++) << 8;
+        r888 |= (*s++) << 16;
+        s++;
+        *d++ |= (RGB121(r888)) << 4;
+    }
+}
+uint32_t flashwritepointer;
+
+// External flash write function
+void writetoflash(uint8_t *buffer, int length)
+{
+    flash_range_program(flashwritepointer, buffer, RoundUptoPage(length));
+    flashwritepointer += length;
+}
+
+// External line callback function
+bool writetoflashcallback(int *imagewidth, int *imageheight, uint32_t *linedata, int *linenumber)
+{
+    static uint8_t *writebuf = NULL;
+    static int bufpointer = 0;
+
+    // Initialize on first line
+    if (*linenumber == 0)
+    {
+        writebuf = GetMemory(1024);
+        bufpointer = 8;
+        uint32_t *p = (uint32_t *)writebuf;
+        p[0] = *imagewidth;
+        p[1] = *imageheight;
+    }
+
+    // Check if image fits in flash
+    if ((*imagewidth) * (*imageheight) / 2 > MAX_PROG_SIZE - 4)
+    {
+        MMPrintString("Error: Image too large for flash region\r\n");
+        if (writebuf)
+        {
+            FreeMemorySafe((void **)&writebuf);
+        }
+        return false;
+    }
+
+    // Convert RGB888 to packed RGB121 (2 pixels per byte)
+    flashpackline(linedata, *imagewidth, *linenumber);
+
+    // Calculate number of valid bytes in linedata after packing
+    int packedBytes = (*imagewidth) / 2;
+    uint8_t *packedData = (uint8_t *)linedata;
+
+    // Copy packed data to write buffer, flushing when full
+    int bytesToCopy = packedBytes;
+    int sourceOffset = 0;
+
+    while (bytesToCopy > 0)
+    {
+        // Calculate space remaining in buffer
+        int spaceAvailable = 1024 - bufpointer;
+
+        // Determine how many bytes to copy in this iteration
+        int copySize = (bytesToCopy < spaceAvailable) ? bytesToCopy : spaceAvailable;
+
+        // Copy data to write buffer
+        memcpy(writebuf + bufpointer, packedData + sourceOffset, copySize);
+        bufpointer += copySize;
+        sourceOffset += copySize;
+        bytesToCopy -= copySize;
+
+        // If buffer is full, write to flash
+        if (bufpointer == 1024)
+        {
+            writetoflash(writebuf, 1024);
+            bufpointer = 0;
+        }
+    }
+
+    // On last line, flush any remaining data and cleanup
+    if (*linenumber == *imageheight - 1)
+    {
+        if (bufpointer > 0)
+        {
+            writetoflash(writebuf, bufpointer);
+        }
+        FreeMemorySafe((void **)&writebuf);
+        bufpointer = 0;
+    }
+
+    return true;
+}
+
 void MIPS16 cmd_flash(void)
 {
     unsigned char *p;
@@ -786,6 +886,68 @@ void MIPS16 cmd_flash(void)
         uSec(250000);
         disable_interrupts_pico();
         flash_range_erase(j, MAX_PROG_SIZE);
+        enable_interrupts_pico();
+    }
+    else if ((p = checkstring(cmdline, (unsigned char *)"LOAD IMAGE")))
+    {
+        getcsargs(&p, 5);
+        bool overwrite = false;
+        if (!(argc == 3 || argc == 5))
+            SyntaxError();
+        ;
+        int i = getint(argv[0], 1, MAXFLASHSLOTS);
+        if (argc == 5)
+        {
+            if (checkstring(argv[4], (unsigned char *)"O") || checkstring(argv[4], (unsigned char *)"OVERWRITE"))
+                overwrite = true;
+            else
+                SyntaxError();
+        }
+        if (Option.LIBRARY_FLASH_SIZE == MAX_PROG_SIZE && i == MAXFLASHSLOTS)
+            StandardErrorParam(25, MAXFLASHSLOTS);
+        uint32_t *c = (uint32_t *)(flash_target_contents + (i - 1) * MAX_PROG_SIZE);
+        if (*c != 0xFFFFFFFF && overwrite == false)
+            error("Already programmed");
+        if (!InitSDCard())
+            return;
+        // open the file
+        char *pp = (char *)getFstring(argv[2]);
+        if (strchr((char *)pp, '.') == NULL)
+            strcat((char *)pp, ".bmp");
+        BMPfnbr = FindFreeFileNbr();
+        if (!BasicFileOpen((char *)pp, BMPfnbr, FA_READ))
+            return;
+        int width, height;
+        decodeBMPheader(&width, &height);
+        if (!CurrentLinePtr)
+        {
+            MMPrintString("Saving ");
+            MMPrintString(pp);
+            MMPrintString(" to flash slot ");
+            PInt(i);
+            PRet();
+            MMPrintString("Image is ");
+            PInt(width);
+            MMPrintString(" by ");
+            PInt(height);
+            MMPrintString(" RGB121 pixels\r\n");
+        }
+        uSec(100000);
+        FlashWriteInit(i);
+        flash_range_erase(realflashpointer, MAX_PROG_SIZE);
+        int j = MAX_PROG_SIZE / 4;
+        int *ppp = (int *)(flash_target_contents + (i - 1) * MAX_PROG_SIZE);
+        while (j--)
+            if (*ppp++ != 0xFFFFFFFF)
+            {
+                enable_interrupts_pico();
+                error("Flash erase problem");
+            }
+        flashwritepointer = FLASH_TARGET_OFFSET + FLASH_ERASE_SIZE + SAVEDVARS_FLASH_SIZE + (i - 1) * MAX_PROG_SIZE;
+        linecallback = writetoflashcallback;
+        decodeBMP(1);
+        FileClose(BMPfnbr);
+        linecallback = NULL;
         enable_interrupts_pico();
     }
     else if ((p = checkstring(cmdline, (unsigned char *)"OVERWRITE")))
@@ -1132,52 +1294,19 @@ char *GetCWD(void)
         return b;
     }
 }
-/*  @endcond */
+
 void cmd_LoadImage(unsigned char *p)
 {
-    int fnbr;
-    int xOrigin, yOrigin;
-
-    // get the command line arguments
-    getcsargs(&p, 5); // this MUST be the first executable line in the function
-    if (argc == 0)
-        StandardError(2);
-    if (!InitSDCard())
-        return;
-
-    p = getFstring(argv[0]); // get the file name
-
-    xOrigin = yOrigin = 0;
-    if (argc >= 3)
-        xOrigin = getinteger(argv[2]); // get the x origin (optional) argument
-    if (argc == 5)
-        yOrigin = getinteger(argv[4]); // get the y origin (optional) argument
-
-    // open the file
-    if (strchr((char *)p, '.') == NULL)
-        strcat((char *)p, ".bmp");
-    fnbr = FindFreeFileNbr();
-    if (!BasicFileOpen((char *)p, fnbr, FA_READ))
-        return;
-    BMP_bDecode(xOrigin, yOrigin, fnbr);
-    FileClose(fnbr);
-    if (Option.Refresh)
-        Display_Refresh();
-}
-
-void cmd_LoadDitheredImage(unsigned char *p)
-{
-    int fnbr;
+    //    int fnbr;
     int xOrigin = 0, yOrigin = 0;
     int xRead = 0, yRead = 0;
-    int mode = DISPLAY_RGB121;
+    int mode = -1;
     // get the command line arguments
     getcsargs(&p, 11); // this MUST be the first executable line in the function
     if (argc == 0)
         StandardError(2);
     if (!InitSDCard())
         return;
-
     p = getFstring(argv[0]); // get the file name
 
     xOrigin = yOrigin = 0;
@@ -1186,7 +1315,7 @@ void cmd_LoadDitheredImage(unsigned char *p)
     if (argc >= 5 && *argv[4])
         yOrigin = getinteger(argv[4]); // get the y origin (optional) argument
     if (argc >= 7 && *argv[6])
-        mode = getint(argv[6], 0, 7); // get the y origin (optional) argument
+        mode = getint(argv[6], -1, 7); // get the y origin (optional) argument
     if (mode == 3 || mode == 7)
         error("RGB565 dithering not yet supported");
     if (argc >= 9 && *argv[8])
@@ -1196,11 +1325,11 @@ void cmd_LoadDitheredImage(unsigned char *p)
     // open the file
     if (strchr((char *)p, '.') == NULL)
         strcat((char *)p, ".bmp");
-    fnbr = FindFreeFileNbr();
-    if (!BasicFileOpen((char *)p, fnbr, FA_READ))
+    BMPfnbr = FindFreeFileNbr();
+    if (!BasicFileOpen((char *)p, BMPfnbr, FA_READ))
         return;
-    ReadAndDisplayBMP(fnbr, mode & 1, (mode & 2) >> 1, xRead, yRead, xOrigin, yOrigin);
-    FileClose(fnbr);
+    ReadAndDisplayBMP(BMPfnbr, mode, xRead, yRead, xOrigin, yOrigin);
+    FileClose(BMPfnbr);
     if (Option.Refresh)
         Display_Refresh();
 }
@@ -1452,7 +1581,7 @@ unsigned char pjpeg_need_bytes_callback(unsigned char *pBuf, unsigned char buf_s
 {
     uint n, n_read;
     n = min(g_nInFileSize - g_nInFileOfs, buf_size);
-    FileGetdata(jpgfnbr, pBuf, n, &n_read);
+    FileGetData(jpgfnbr, pBuf, n, &n_read);
     if (n != n_read)
         return PJPG_STREAM_READ_ERROR;
     *pBytes_actually_read = (unsigned char)(n);
@@ -3834,11 +3963,11 @@ void MIPS16 cmd_load(void)
         cmd_LoadImage(p);
         return;
     }
-    p = checkstring(cmdline, (unsigned char *)"DITHERED");
+    p = checkstring(cmdline, (unsigned char *)"BMP");
     if (p)
     {
         CheckDisplay();
-        cmd_LoadDitheredImage(p);
+        cmd_LoadImage(p);
         return;
     }
     p = checkstring(cmdline, (unsigned char *)"JPG");
@@ -3936,7 +4065,7 @@ char __not_in_flash_func(FileGetChar)(int fnbr)
     }
 }
 // bulk read data. For Fat file system can only be used if FileGetchar has not been called first
-int __not_in_flash_func(FileGetdata)(int fnbr, void *buff, int count, unsigned int *read)
+int __not_in_flash_func(FileGetData)(int fnbr, void *buff, int count, unsigned int *read)
 {
     if (filesource[fnbr] == FATFSFILE)
     {

@@ -64,6 +64,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "configuration.h"
 #include "FileIO.h"
 #include "ff.h"
+#include "RGB121.h"
 
 /* ============================================================================
  * Constants - Display configuration
