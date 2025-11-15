@@ -44,6 +44,9 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #ifdef PICOMITE
 #include "pico/multicore.h"
 #endif
+#ifndef PICOMITEWEB
+#include "turtle.h"
+#endif
 #define overlap (VRes % (FontTable[gui_font >> 4][1] * (gui_font & 0b1111)) ? 0 : 1)
 #include <math.h>
 void flist(int, int, int);
@@ -1052,6 +1055,9 @@ void MIPS16 do_run(unsigned char *cmdline, bool CMM2mode)
 		return; // no program to run
 #ifdef PICOMITEWEB
 	cleanserver();
+#else
+	if (Option.DISPLAY_TYPE)
+		turtle_init();
 #endif
 #ifndef USBKEYBOARD
 	if (mouse0 == false && Option.MOUSE_CLOCK)

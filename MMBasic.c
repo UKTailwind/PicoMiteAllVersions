@@ -40,7 +40,6 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "hardware/flash.h"
 #ifndef PICOMITEWEB
 #include "pico/multicore.h"
-#include "Turtle.h"
 #endif
 
 // this is the command table that defines the various tokens for commands in the source code
@@ -4153,8 +4152,6 @@ void MIPS16 ClearRuntime(bool all)
         }
     }
     optionsuppressstatus = 0;
-#else
-    turtle_init();
 #endif
     CloseAllFiles();
     ClearExternalIO(); // this MUST come before InitHeap(true)

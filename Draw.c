@@ -4392,7 +4392,8 @@ int blitother(void)
         uint32_t *x = (uint32_t *)s;
         HResS = x[0];
         VResS = x[1];
-		if(HResS<0 || HResS>3840 || VResS<0 || VResS>2160)error("Invalid Image");
+        if (HResS < 0 || HResS > 3840 || VResS < 0 || VResS > 2160)
+            error("Invalid Image");
         HResD = HRes;
         VResD = VRes;
         s += 8;
