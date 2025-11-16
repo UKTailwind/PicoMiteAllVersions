@@ -45,7 +45,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "pico/multicore.h"
 #endif
 #ifndef PICOMITEWEB
-#include "turtle.h"
+#include "Turtle.h"
 #endif
 #define overlap (VRes % (FontTable[gui_font >> 4][1] * (gui_font & 0b1111)) ? 0 : 1)
 #include <math.h>
@@ -382,27 +382,29 @@ void cmd_print(void)
 	// Null terminate the C string
 	*bufptr = '\0';
 
-	// Output the buffer
+	// Output the buffer - don't null terminate, use explicit lengths
 	if (used <= 255)
 	{
 		// Simple case: fits in a single MMBasic string
-		MMfputs(CtoM(outbuf), fnbr);
+		unsigned char *mmstr = GetTempMemory(256);
+		mmstr[0] = used;
+		memcpy(mmstr + 1, outbuf, used);
+		MMfputs(mmstr, fnbr);
 	}
 	else
 	{
 		// Need to output in chunks of maximum 255 bytes
 		int offset = 0;
-		unsigned char *chunk = GetTempMemory(256); // Temporary buffer for each chunk
+		unsigned char *mmstr = GetTempMemory(256);
 		while (offset < used)
 		{
 			int chunklen = (used - offset > 255) ? 255 : (used - offset);
-			memcpy(chunk, outbuf + offset, chunklen);
-			chunk[chunklen] = '\0'; // Null terminate the chunk
-			MMfputs(CtoM(chunk), fnbr);
+			mmstr[0] = chunklen;
+			memcpy(mmstr + 1, outbuf + offset, chunklen);
+			MMfputs(mmstr, fnbr);
 			offset += chunklen;
 		}
 	}
-
 	if (PrintPixelMode != 0)
 		SSPrintString("\033[m");
 	PrintPixelMode = 0;

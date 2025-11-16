@@ -227,7 +227,7 @@ extern "C"
 #else
 #define HEAP_MEMORY_SIZE (124 * 1024)
 #define MAXVARS 512
-#define FLASH_TARGET_OFFSET (864 * 1024)
+#define FLASH_TARGET_OFFSET (880 * 1024)
 #define MAX_CPU 420000
 #define MAXSUBFUN 256
 

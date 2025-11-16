@@ -46,11 +46,6 @@ const uint32_t greenturtle[turtlewidth * turtleheight] = {
     0, 0, GREEN, 0, 0, 0, GREEN, 0, 0, 0, 0, GREEN, 0, 0,
     0, 0, GREEN, 0, 0, 0, GREEN, 0, 0, 0, 0, GREEN, 0, 0};
 
-#include "turtle.h"
-#include <string.h>
-#include <stdio.h>
-#include <math.h>
-
 // External drawing functions - you'll need to provide these
 
 // Pattern definitions (8x8 patterns) - Extended set

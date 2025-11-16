@@ -894,18 +894,16 @@ unsigned char *parseAES(uint8_t *p, int ivadd, uint8_t *keyx, uint8_t *ivx, int6
 	unsigned char *a1str = NULL, *a2str = NULL, *a3str = NULL, *a4str = NULL;
 	MMFLOAT *a1float = NULL, *a2float = NULL, *a3float = NULL, *a4float = NULL;
 	int card1, card3;
-	getcsargs(&p, 7);
+	getargs(&p, 7, (unsigned char *)",");
 	if (ivx == NULL)
 	{
 		if (argc != 5)
-			SyntaxError();
-		;
+			error("Syntax");
 	}
 	else
 	{
 		if (argc < 5)
-			SyntaxError();
-		;
+			error("Syntax");
 	}
 	*outstr = NULL;
 	*outint = NULL;
@@ -918,11 +916,11 @@ unsigned char *parseAES(uint8_t *p, int ivadd, uint8_t *keyx, uint8_t *ivx, int6
 	if (*card2 % 16)
 		error("input must be multiple of 16 elements long");
 	//	if(card2 >256)error("input must be <= 256 elements long");
-	unsigned char *inx = (unsigned char *)GetTempMainMemory(*card2 + 16);
+	unsigned char *inx = (unsigned char *)GetTempMemory(*card2 + 16);
 	length = 0;
 	card3 = parseany(argv[4], &a3float, &a3int, &a3str, &length, false);
 	if (card3 != *card2 + ivadd && a3str == NULL)
-		StandardError(16);
+		error("Array size mismatch");
 	if (argc == 7)
 	{
 		length = 0;
@@ -1025,17 +1023,16 @@ unsigned char *parseB64(uint8_t *p, int64_t **outint, unsigned char **outstr, MM
 	int64_t *a1int = NULL, *a3int = NULL;
 	unsigned char *a1str = NULL, *a3str = NULL;
 	MMFLOAT *a1float = NULL, *a3float = NULL;
-	getcsargs(&p, 3);
+	getargs(&p, 3, (unsigned char *)",");
 	if (argc != 3)
-		SyntaxError();
-	;
+		error("Syntax");
 	*outstr = NULL;
 	*outint = NULL;
 	int length = 0;
 	*card1 = parseany(argv[0], &a1float, &a1int, &a1str, &length, false);
 	length = 0;
 	*card2 = parseany(argv[2], &a3float, &a3int, &a3str, &length, false);
-	unsigned char *keyx = (unsigned char *)GetTempMainMemory(b64e_size(*card1) + 1);
+	unsigned char *keyx = (unsigned char *)GetTempMemory(b64e_size(*card1) + 1);
 	if (a1int != NULL)
 	{
 		for (int i = 0; i < *card1; i++)
@@ -2133,8 +2130,47 @@ void cmd_math(void)
 				return;
 			}
 			else
-				SyntaxError();
-			;
+				error("Syntax");
+		}
+		tp = checkstring(cmdline, (unsigned char *)"PID");
+		if (tp)
+		{
+			unsigned char *pi;
+			if ((pi = checkstring(tp, (unsigned char *)"START")))
+			{
+				int channel = getint(pi, 1, MAXPID);
+				if (PIDchannels[channel].interrupt == NULL)
+					error("Channel not initialised");
+				PIDchannels[channel].timenext = time_us_64() + (PIDchannels[channel].PIDparams->T * 1000);
+				PIDchannels[channel].active = true;
+				InterruptUsed = true;
+			}
+			else if ((pi = checkstring(tp, (unsigned char *)"STOP")))
+			{
+				int channel = getint(pi, 1, MAXPID);
+				if (PIDchannels[channel].interrupt == NULL)
+					error("Channel not initialised");
+				PIDchannels[channel].active = false;
+				memset(&PIDchannels[channel], 0, sizeof(s_PIDchan));
+			}
+			else if ((pi = checkstring(tp, (unsigned char *)"INIT")))
+			{
+				getargs(&pi, 5, (unsigned char *)",");
+				if (argc != 5)
+					error("Syntax");
+				MMFLOAT *q1 = NULL;
+				int channel = getint(argv[0], 1, MAXPID);
+				int card = parsefloatrarray(argv[2], &q1, 2, 1, NULL, true);
+				PIDchannels[channel].PIDparams = (PIDController *)q1;
+				if (card != 14)
+					error("Argument 2 must be a 14 element floating point array");
+				if (PIDchannels[channel].PIDparams->T < 0.001)
+					error("Invalid update rate");
+				PIDchannels[channel].interrupt = GetIntAddress(argv[4]);
+			}
+			else
+				error("Syntax");
+			return;
 		}
 		tp = checkstring(cmdline, (unsigned char *)"PID");
 		if (tp)
