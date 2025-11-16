@@ -2172,48 +2172,6 @@ void cmd_math(void)
 				error("Syntax");
 			return;
 		}
-		tp = checkstring(cmdline, (unsigned char *)"PID");
-		if (tp)
-		{
-			unsigned char *pi;
-			if ((pi = checkstring(tp, (unsigned char *)"START")))
-			{
-				int channel = getint(pi, 1, MAXPID);
-				if (PIDchannels[channel].interrupt == NULL)
-					error("Channel not initialised");
-				PIDchannels[channel].timenext = time_us_64() + (PIDchannels[channel].PIDparams->T * 1000);
-				PIDchannels[channel].active = true;
-				InterruptUsed = true;
-			}
-			else if ((pi = checkstring(tp, (unsigned char *)"STOP")))
-			{
-				int channel = getint(pi, 1, MAXPID);
-				if (PIDchannels[channel].interrupt == NULL)
-					error("Channel not initialised");
-				PIDchannels[channel].active = false;
-				memset(&PIDchannels[channel], 0, sizeof(s_PIDchan));
-			}
-			else if ((pi = checkstring(tp, (unsigned char *)"INIT")))
-			{
-				getcsargs(&pi, 5);
-				if (argc != 5)
-					SyntaxError();
-				;
-				MMFLOAT *q1 = NULL;
-				int channel = getint(argv[0], 1, MAXPID);
-				int card = parsefloatrarray(argv[2], &q1, 2, 1, NULL, true);
-				PIDchannels[channel].PIDparams = (PIDController *)q1;
-				if (card != 14)
-					error("Argument 2 must be a 14 element floating point array");
-				if (PIDchannels[channel].PIDparams->T < 0.001)
-					error("Invalid update rate");
-				PIDchannels[channel].interrupt = GetIntAddress(argv[4]);
-			}
-			else
-				SyntaxError();
-			;
-			return;
-		}
 		tp = checkstring(cmdline, (unsigned char *)"ADD");
 		if (tp)
 		{
