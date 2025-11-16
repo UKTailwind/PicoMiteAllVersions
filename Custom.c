@@ -3021,20 +3021,14 @@ void init_vga222(void)
         pio0->irq = 255; // clear all irq in the statemachines on the pio
         gpio_set_function(PinDef[Option.VGA_HSYNC].GPno, GPIO_FUNC_PIO1);
         gpio_set_function(PinDef[Option.VGA_HSYNC].GPno + 1, GPIO_FUNC_PIO1);
-        gpio_set_function(PinDef[Option.VGA_BLUE].GPno, GPIO_FUNC_PIO0);
-        gpio_set_function(PinDef[Option.VGA_BLUE].GPno + 1, GPIO_FUNC_PIO0);
-        gpio_set_function(PinDef[Option.VGA_BLUE].GPno + 2, GPIO_FUNC_PIO0);
-        gpio_set_function(PinDef[Option.VGA_BLUE].GPno + 3, GPIO_FUNC_PIO0);
-        gpio_set_function(PinDef[Option.VGA_BLUE].GPno + 4, GPIO_FUNC_PIO0);
-        gpio_set_function(PinDef[Option.VGA_BLUE].GPno + 5, GPIO_FUNC_PIO0);
         ExtCfg(Option.VGA_HSYNC, EXT_BOOT_RESERVED, 0);
         ExtCfg(PINMAP[PinDef[Option.VGA_HSYNC].GPno + 1], EXT_BOOT_RESERVED, 0);
-        ExtCfg(Option.VGA_BLUE, EXT_BOOT_RESERVED, 0);
-        ExtCfg(PINMAP[PinDef[Option.VGA_BLUE].GPno + 1], EXT_BOOT_RESERVED, 0);
-        ExtCfg(PINMAP[PinDef[Option.VGA_BLUE].GPno + 2], EXT_BOOT_RESERVED, 0);
-        ExtCfg(PINMAP[PinDef[Option.VGA_BLUE].GPno + 3], EXT_BOOT_RESERVED, 0);
-        ExtCfg(PINMAP[PinDef[Option.VGA_BLUE].GPno + 4], EXT_BOOT_RESERVED, 0);
-        ExtCfg(PINMAP[PinDef[Option.VGA_BLUE].GPno + 5], EXT_BOOT_RESERVED, 0);
+        for (int i = 0; i < 6; i++)
+        {
+                gpio_set_function(PinDef[Option.VGA_BLUE].GPno + i, GPIO_FUNC_PIO0);
+                gpio_set_drive_strength(PinDef[Option.VGA_BLUE].GPno + i, GPIO_DRIVE_STRENGTH_8MA);
+                ExtCfg(PINMAP[PinDef[Option.VGA_BLUE].GPno + i], EXT_BOOT_RESERVED, 0);
+        }
         struct pio_program program;
         program.length = sizeof(vga0) / sizeof(uint16_t);
         program.origin = 0;

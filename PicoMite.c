@@ -2942,7 +2942,10 @@ int __not_in_flash_func(MMInkey)(void)
         QVGAOff = pio_add_program(QVGA_PIO, &qvga_program);
         // configure GPIOs for use by PIO
         for (i = QVGA_GPIO_FIRST; i <= QVGA_GPIO_LAST; i++)
+        {
             pio_gpio_init(QVGA_PIO, i);
+            gpio_set_drive_strength(i, GPIO_DRIVE_STRENGTH_8MA);
+        }
         pio_gpio_init(QVGA_PIO, QVGA_GPIO_HSYNC);
         pio_gpio_init(QVGA_PIO, QVGA_GPIO_VSYNC);
 
