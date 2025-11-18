@@ -707,6 +707,8 @@ void MIPS16 ConfigDisplay222(unsigned char *p)
     }
     else
         return;
+    if (argc != 5)
+        SyntaxError();
     int hspin, datapin, code;
     Option.DISPLAY_TYPE = DISPLAY_TYPE;
     Option.DISPLAY_ORIENTATION = LANDSCAPE;

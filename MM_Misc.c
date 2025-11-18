@@ -3278,9 +3278,11 @@ void DrawBufferUser(int x1, int y1, int x2, int y2, unsigned char *c)
 }
 void MIPS16 ConfigDisplayUser(unsigned char *tp)
 {
-    getcsargs(&tp, 5);
-    if (str_equal(argv[0], (unsigned char *)"USER"))
+    getcsargs(&tp, 13);
+    if (checkstring(argv[0], (unsigned char *)"USER"))
     {
+        if (argc != 5)
+            SyntaxError();
         if (Option.DISPLAY_TYPE)
             error("Display already configured");
         if (argc != 5)

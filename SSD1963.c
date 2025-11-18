@@ -752,45 +752,45 @@ void MIPS16 InitIPS_4_16(void)
 #if PICOMITERP2350
 static void __not_in_flash_func(WriteColor_12bit)(unsigned int c)
 {
-    const uint64_t mask = 0xFFF;
-    uint64_t high = c >> 12;
-    uint64_t low = c & 0xFFF;
+    const uint32_t mask = 0xFFF;
+    uint32_t high = c >> 12;
+    uint32_t low = c & 0xFFF;
 
-    gpio_put_masked64(mask, high);
+    gpio_put_masked(mask, high);
     wr_pulse();
-    gpio_put_masked64(mask, low);
+    gpio_put_masked(mask, low);
     wr_pulse();
-    gpio_put_masked64(mask, high);
+    gpio_put_masked(mask, high);
     wr_pulse();
-    gpio_put_masked64(mask, low);
+    gpio_put_masked(mask, low);
     wr_pulse();
 }
 
 static void __not_in_flash_func(WriteColor_16bit)(unsigned int c)
 {
-    gpio_put_masked64((uint64_t)0xFFFF, (uint64_t)c);
+    gpio_put_masked(0xFFFF, c);
     wr_pulse();
     wr_pulse();
 }
 
 static void __not_in_flash_func(WriteColor_8bit)(unsigned int c)
 {
-    const uint64_t mask = 0xFF;
-    uint64_t b0 = c >> 16;
-    uint64_t b1 = (c >> 8) & 0xFF;
-    uint64_t b2 = c & 0xFF;
+    const uint32_t mask = 0xFF;
+    uint32_t b0 = c >> 16;
+    uint32_t b1 = (c >> 8) & 0xFF;
+    uint32_t b2 = c & 0xFF;
 
-    gpio_put_masked64(mask, b0);
+    gpio_put_masked(mask, b0);
     wr_pulse();
-    gpio_put_masked64(mask, b1);
+    gpio_put_masked(mask, b1);
     wr_pulse();
-    gpio_put_masked64(mask, b2);
+    gpio_put_masked(mask, b2);
     wr_pulse();
-    gpio_put_masked64(mask, b0);
+    gpio_put_masked(mask, b0);
     wr_pulse();
-    gpio_put_masked64(mask, b1);
+    gpio_put_masked(mask, b1);
     wr_pulse();
-    gpio_put_masked64(mask, b2);
+    gpio_put_masked(mask, b2);
     wr_pulse();
 }
 #endif
@@ -1105,11 +1105,27 @@ void WriteComand(int cmd)
     gpio_put(SSD1963_WR_GPPIN, 1);
     gpio_put(SSD1963_DC_GPPIN, 1);
 }
+void __not_in_flash_func(WriteComandd0)(int cmd)
+{
+    gpio_put_masked(0xFF, cmd);
+    gpio_put(SSD1963_DC_GPPIN, 0);
+    gpio_put(SSD1963_WR_GPPIN, 0);
+    nop;
+    gpio_put(SSD1963_WR_GPPIN, 1);
+    gpio_put(SSD1963_DC_GPPIN, 1);
+}
 
 // Write an 8 bit data word to the SSD1963
 void WriteData(int data)
 {
     gpio_put_masked64(writemask, ((uint64_t)data << SSD1963data));
+    gpio_put(SSD1963_WR_GPPIN, 0);
+    nop;
+    gpio_put(SSD1963_WR_GPPIN, 1);
+}
+void __not_in_flash_func(WriteDatad0)(int data)
+{
+    gpio_put_masked(0xFF, data);
     gpio_put(SSD1963_WR_GPPIN, 0);
     nop;
     gpio_put(SSD1963_WR_GPPIN, 1);
@@ -1170,7 +1186,7 @@ void __not_in_flash_func(WriteColorD0)(unsigned int c)
 {
     if (Option.DISPLAY_TYPE > SSD_PANEL_8)
     {
-        gpio_put_masked64(0xFFFF, c);
+        gpio_put_masked(0xFFFF, c);
 #if PICOMITERP2350
         gpioc_bit_out_put(SSD1963_WR_GPPIN, 0);
         wr_pulse();
@@ -1306,17 +1322,32 @@ void SetAreaSSD1963(int x1, int y1, int x2, int y2)
     default:
         return;
     }
-
-    WriteComand(CMD_SET_COLUMN);
-    WriteData(start_x >> 8);
-    WriteData(start_x);
-    WriteData(end_x >> 8);
-    WriteData(end_x);
-    WriteComand(CMD_SET_PAGE);
-    WriteData(start_y >> 8);
-    WriteData(start_y);
-    WriteData(end_y >> 8);
-    WriteData(end_y);
+    if (Option.SSD_DATA == 1)
+    {
+        WriteComandd0(CMD_SET_COLUMN);
+        WriteDatad0(start_x >> 8);
+        WriteDatad0(start_x);
+        WriteDatad0(end_x >> 8);
+        WriteDatad0(end_x);
+        WriteComandd0(CMD_SET_PAGE);
+        WriteDatad0(start_y >> 8);
+        WriteDatad0(start_y);
+        WriteDatad0(end_y >> 8);
+        WriteDatad0(end_y);
+    }
+    else
+    {
+        WriteComand(CMD_SET_COLUMN);
+        WriteData(start_x >> 8);
+        WriteData(start_x);
+        WriteData(end_x >> 8);
+        WriteData(end_x);
+        WriteComand(CMD_SET_PAGE);
+        WriteData(start_y >> 8);
+        WriteData(start_y);
+        WriteData(end_y >> 8);
+        WriteData(end_y);
+    }
 }
 
 /*********************************************************************
@@ -1755,7 +1786,7 @@ void PhysicalDrawRect(int x1, int y1, int x2, int y2, int c)
             while (i--)
             {
                 gpio_put(SSD1963_WR_GPPIN, 0);
-                gpio_put_masked64(0xFFFF, c);
+                gpio_put_masked(0xFFFF, c);
                 // nop;gpio_put(SSD1963_WR_GPPIN,0);
                 nop;
                 gpio_put(SSD1963_WR_GPPIN, 1);

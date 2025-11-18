@@ -541,8 +541,11 @@ uint8_t PSRAMpin;
         //        static int when = 0;
         static int classicread = 0, nunchuckread = 0;
         static uint64_t lastrun = 0;
+#if PICOMITERP2350
+        static uint64_t lastscreenwrite = 0;
+#endif
         uint64_t timenow = time_us_64();
-        if (timenow - lastrun < 500)
+        if (timenow - lastrun < 1000)
             return;
         lastrun = timenow;
 #ifndef USBKEYBOARD
@@ -639,24 +642,25 @@ uint8_t PSRAMpin;
 
         // === Display buffer refresh (RP2350) ===
 #if PICOMITERP2350
-        if (Option.DISPLAY_TYPE >= NEXTGEN &&
-            !(low_x == silly_low && high_x == silly_high &&
-              low_y == silly_low && high_y == silly_high))
+        if (timenow - lastscreenwrite > 10000)
         {
 
-            if (Option.Refresh)
-            {
-                /*                PInt(low_x);
-                                PIntComma(low_y);
-                                PIntComma(high_x);
-                                PIntComma(high_y);
-                                PRet();*/
-                multicore_fifo_push_blocking(6);
-                multicore_fifo_push_blocking((uint32_t)low_x | (high_x << 16));
-                multicore_fifo_push_blocking((uint32_t)low_y | (high_y << 16));
+            lastscreenwrite = timenow;
 
-                low_x = low_y = silly_low;
-                high_x = high_y = silly_high;
+            if (Option.DISPLAY_TYPE >= NEXTGEN &&
+                !(low_x == silly_low && high_x == silly_high &&
+                  low_y == silly_low && high_y == silly_high))
+            {
+
+                if (Option.Refresh)
+                {
+                    multicore_fifo_push_blocking(6);
+                    multicore_fifo_push_blocking((uint32_t)low_x | (high_x << 16));
+                    multicore_fifo_push_blocking((uint32_t)low_y | (high_y << 16));
+
+                    low_x = low_y = silly_low;
+                    high_x = high_y = silly_high;
+                }
             }
         }
 #endif
