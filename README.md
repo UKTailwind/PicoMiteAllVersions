@@ -1,5 +1,5 @@
 # PicoMiteRP2350
-This contains files to build MMbasic 6.01.00RC14 to run on both RP2040 and RP2350<br>
+This contains files to build MMbasic 6.01.00RC16 to run on both RP2040 and RP2350<br>
 Compile with GCC 13.3.1 arm-none-eabi<br>
 
 <b style="color:red;"> Build with sdk V2.2.0 but replace gpio.c with the one included here. Note the change in gpio.c is just to set the gpio interrupt to be in ram<br></b>
