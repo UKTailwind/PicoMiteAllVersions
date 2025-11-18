@@ -318,7 +318,7 @@ void Write16bitCommand(int cmd)
     nop;
     nop;
     nop;
-    gpio_put_masked64((0xFFFF << SSD1963data), (cmd << SSD1963data));
+    gpio_put_masked64(((uint64_t)0xFFFF << SSD1963data), ((uint64_t)cmd << SSD1963data));
     nop;
     nop;
     nop;
@@ -347,7 +347,7 @@ void Write16bitCommand(int cmd)
 // Write an 8 bit data word to the SSD1963
 void WriteData16bit(int data)
 {
-    gpio_put_masked64((0xFFFF << SSD1963data), (data << SSD1963data));
+    gpio_put_masked64(((uint64_t)0xFFFF << SSD1963data), ((uint64_t)data << SSD1963data));
     nop;
     nop;
     nop;
@@ -704,10 +704,10 @@ void MIPS16 InitIPS_4_16(void)
     int t = 0;
     // read the id to see if OTM8009A or NT35510
     WriteComand(0xDA00);
-    gpio_set_dir_in_masked64(Option.DISPLAY_TYPE > SSD_PANEL_8 ? (0xFFFF << SSD1963data) : (0xFF << SSD1963data));
+    gpio_set_dir_in_masked64(Option.DISPLAY_TYPE > SSD_PANEL_8 ? ((uint64_t)0xFFFF << SSD1963data) : ((uint64_t)0xFF << SSD1963data));
     t = ReadData(); // dummy read
     t = ReadData(); // dummy read
-    gpio_set_dir_out_masked64(Option.DISPLAY_TYPE > SSD_PANEL_8 ? (0xFFFF << SSD1963data) : (0xFF << SSD1963data));
+    gpio_set_dir_out_masked64(Option.DISPLAY_TYPE > SSD_PANEL_8 ? ((uint64_t)0xFFFF << SSD1963data) : ((uint64_t)0xFF << SSD1963data));
     //    MMPrintString("ID1=");PIntH(t);PRet();
     if ((t & 0x7F) == 0x55)
     { // was ((t & 0x7F) == 0x55) //((t & 0x71) == 0x51)
@@ -753,8 +753,8 @@ void MIPS16 InitIPS_4_16(void)
 static void __not_in_flash_func(WriteColor_12bit)(unsigned int c)
 {
     const uint64_t mask = 0xFFF;
-    uint32_t high = c >> 12;
-    uint32_t low = c & 0xFFF;
+    uint64_t high = c >> 12;
+    uint64_t low = c & 0xFFF;
 
     gpio_put_masked64(mask, high);
     wr_pulse();
@@ -768,7 +768,7 @@ static void __not_in_flash_func(WriteColor_12bit)(unsigned int c)
 
 static void __not_in_flash_func(WriteColor_16bit)(unsigned int c)
 {
-    gpio_put_masked64(0xFFFF, c);
+    gpio_put_masked64((uint64_t)0xFFFF, (uint64_t)c);
     wr_pulse();
     wr_pulse();
 }
@@ -776,9 +776,9 @@ static void __not_in_flash_func(WriteColor_16bit)(unsigned int c)
 static void __not_in_flash_func(WriteColor_8bit)(unsigned int c)
 {
     const uint64_t mask = 0xFF;
-    uint32_t b0 = c >> 16;
-    uint32_t b1 = (c >> 8) & 0xFF;
-    uint32_t b2 = c & 0xFF;
+    uint64_t b0 = c >> 16;
+    uint64_t b1 = (c >> 8) & 0xFF;
+    uint64_t b2 = c & 0xFF;
 
     gpio_put_masked64(mask, b0);
     wr_pulse();
@@ -1098,7 +1098,7 @@ void MIPS16 InitDisplaySSD(void)
 // Write a command byte to the SSD1963
 void WriteComand(int cmd)
 {
-    gpio_put_masked64(writemask, (cmd << SSD1963data));
+    gpio_put_masked64(writemask, ((uint64_t)cmd << SSD1963data));
     gpio_put(SSD1963_DC_GPPIN, 0);
     gpio_put(SSD1963_WR_GPPIN, 0);
     nop;
@@ -1109,7 +1109,7 @@ void WriteComand(int cmd)
 // Write an 8 bit data word to the SSD1963
 void WriteData(int data)
 {
-    gpio_put_masked64(writemask, (data << SSD1963data));
+    gpio_put_masked64(writemask, ((uint64_t)data << SSD1963data));
     gpio_put(SSD1963_WR_GPPIN, 0);
     nop;
     gpio_put(SSD1963_WR_GPPIN, 1);
@@ -1121,11 +1121,11 @@ void __not_in_flash_func(WriteColorFlex)(unsigned int c)
 
     if (Option.DISPLAY_TYPE == SSD1963_5_12BUFF || Option.DISPLAY_TYPE == SSD1963_7_12BUFF)
     {
-        gpio_put_masked64(writemask, ((c >> 12) << SSD1963data));
+        gpio_put_masked64(writemask, ((uint64_t)(c >> 12) << SSD1963data));
         gpioc_bit_out_put(SSD1963_WR_GPPIN, 0);
         nop;
         gpioc_bit_out_put(SSD1963_WR_GPPIN, 1);
-        gpio_put_masked64(writemask, (c << SSD1963data));
+        gpio_put_masked64(writemask, ((uint64_t)c << SSD1963data));
         gpioc_bit_out_put(SSD1963_WR_GPPIN, 0);
         nop;
         gpioc_bit_out_put(SSD1963_WR_GPPIN, 1);
@@ -1138,7 +1138,7 @@ void WriteColorFlex(unsigned int c)
     if (Option.DISPLAY_TYPE > SSD_PANEL_8)
 #endif
     {
-        gpio_put_masked64(writemask, (c << SSD1963data));
+        gpio_put_masked64(writemask, ((uint64_t)c << SSD1963data));
 #if PICOMITERP2350
         gpioc_bit_out_put(SSD1963_WR_GPPIN, 0);
         nop;
@@ -1151,16 +1151,16 @@ void WriteColorFlex(unsigned int c)
     }
     else
     {
-        gpio_put_masked64(writemask, ((c >> 16) << SSD1963data));
+        gpio_put_masked64(writemask, ((uint64_t)(c >> 16) << SSD1963data));
         gpio_put(SSD1963_WR_GPPIN, 0);
         nop;
         gpio_put(SSD1963_WR_GPPIN, 1);
-        gpio_put_masked64((0xFF << SSD1963data), ((c >> 8) << SSD1963data));
+        gpio_put_masked64(((uint64_t)0xFF << SSD1963data), ((uint64_t)(c >> 8) << SSD1963data));
         nop;
         gpio_put(SSD1963_WR_GPPIN, 0);
         nop;
         gpio_put(SSD1963_WR_GPPIN, 1);
-        gpio_put_masked64((0xFF << SSD1963data), (c << SSD1963data));
+        gpio_put_masked64(((uint64_t)0xFF << SSD1963data), ((uint64_t)c << SSD1963data));
         gpio_put(SSD1963_WR_GPPIN, 0);
         nop;
         gpio_put(SSD1963_WR_GPPIN, 1);
@@ -1218,7 +1218,7 @@ void __not_in_flash_func(WriteColorD0)(unsigned int c)
 // Slowly write a command byte to the SSD1963
 static void WriteComandSlow(int cmd)
 {
-    gpio_put_masked64(writemask, (cmd << SSD1963data));
+    gpio_put_masked64(writemask, ((uint64_t)cmd << SSD1963data));
     gpio_put(SSD1963_DC_GPPIN, 0);
     gpio_put(SSD1963_WR_GPPIN, 0);
     uSec(5);
@@ -1229,7 +1229,7 @@ static void WriteComandSlow(int cmd)
 // Slowly write an 8 bit data word to the SSD1963
 void WriteDataSlow(int data)
 {
-    gpio_put_masked64(writemask, (data << SSD1963data));
+    gpio_put_masked64(writemask, ((uint64_t)data << SSD1963data));
     gpio_put(SSD1963_WR_GPPIN, 0);
     uSec(5);
     gpio_put(SSD1963_WR_GPPIN, 1);
@@ -1266,7 +1266,7 @@ unsigned int ReadDataIPS(void)
     nop;
     nop;
     gpio_put(SSD1963_RD_GPPIN, 1);
-    return (gpio_get_all64() & (Option.DISPLAY_TYPE > SSD_PANEL_8 ? (0xFFFF << SSD1963data) : (0xFF << SSD1963data))) >> SSD1963data;
+    return (gpio_get_all64() & (Option.DISPLAY_TYPE > SSD_PANEL_8 ? ((uint64_t)0xFFFF << SSD1963data) : ((uint64_t)0xFF << SSD1963data))) >> SSD1963data;
 }
 
 // Slowly read a byte from the SSD1963
@@ -1276,7 +1276,7 @@ unsigned int ReadDataSlow(void)
     uSec(2);
     gpio_put(SSD1963_RD_GPPIN, 1);
     uSec(2);
-    return (gpio_get_all64() & (Option.DISPLAY_TYPE > SSD_PANEL_8 ? (0xFFFF << SSD1963data) : (0xFF << SSD1963data))) >> SSD1963data;
+    return (gpio_get_all64() & (Option.DISPLAY_TYPE > SSD_PANEL_8 ? ((uint64_t)0xFFFF << SSD1963data) : ((uint64_t)0xFF << SSD1963data))) >> SSD1963data;
 }
 
 /*********************************************************************
@@ -1766,7 +1766,7 @@ void PhysicalDrawRect(int x1, int y1, int x2, int y2, int c)
             while (i--)
             {
                 gpio_put(SSD1963_WR_GPPIN, 0);
-                gpio_put_masked64(0xFFFF << SSD1963data, c << SSD1963data);
+                gpio_put_masked64((uint64_t)0xFFFF << SSD1963data, (uint64_t)c << SSD1963data);
                 // nop;gpio_put(SSD1963_WR_GPPIN,0);
                 nop;
                 gpio_put(SSD1963_WR_GPPIN, 1);
@@ -1995,7 +1995,7 @@ void DrawBufferSSD1963(int x1, int y1, int x2, int y2, unsigned char *p)
                         {
                             if (toggle == 0)
                             {
-                                gpio_put_masked64(0xFFFF << SSD1963data, (((c.rgb >> 8) & 0xf800) | ((c.rgb >> 8) & 0x00fc)) << SSD1963data);
+                                gpio_put_masked64((uint64_t)0xFFFF << SSD1963data, (uint64_t)(((c.rgb >> 8) & 0xf800) | ((c.rgb >> 8) & 0x00fc)) << SSD1963data);
                                 nop;
                                 gpio_put(SSD1963_WR_GPPIN, 0);
                                 nop;
@@ -2005,12 +2005,12 @@ void DrawBufferSSD1963(int x1, int y1, int x2, int y2, unsigned char *p)
                             }
                             else
                             {
-                                gpio_put_masked64(0xFFFF << SSD1963data, ((bl << 8) | ((c.rgb >> 16) & 0x00f8)) << SSD1963data);
+                                gpio_put_masked64((uint64_t)0xFFFF << SSD1963data, (uint64_t)((bl << 8) | ((c.rgb >> 16) & 0x00f8)) << SSD1963data);
                                 nop;
                                 gpio_put(SSD1963_WR_GPPIN, 0);
                                 nop;
                                 gpio_put(SSD1963_WR_GPPIN, 1);
-                                gpio_put_masked64(0xFFFF << SSD1963data, (((c.rgb) & 0xfc00) | ((c.rgb) & 0x00f8)) << SSD1963data);
+                                gpio_put_masked64((uint64_t)0xFFFF << SSD1963data, (uint64_t)(((c.rgb) & 0xfc00) | ((c.rgb) & 0x00f8)) << SSD1963data);
                                 nop;
                                 gpio_put(SSD1963_WR_GPPIN, 0);
                                 nop;
@@ -2031,7 +2031,7 @@ void DrawBufferSSD1963(int x1, int y1, int x2, int y2, unsigned char *p)
         if ((LCDAttrib == 1) && (toggle == 1))
         {
             // extra packet needed
-            gpio_put_masked64(0xFFFF << SSD1963data, ((bl << 8) | ((c.rgb >> 8) & 0x00f8)) << SSD1963data);
+            gpio_put_masked64((uint64_t)0xFFFF << SSD1963data, (uint64_t)((bl << 8) | ((c.rgb >> 8) & 0x00f8)) << SSD1963data);
             nop;
             gpio_put(SSD1963_WR_GPPIN, 0);
             nop;
@@ -2161,7 +2161,7 @@ void DrawBLITBufferSSD1963(int x1, int y1, int x2, int y2, unsigned char *p)
         for (i = (x2 - x1 + 1) * ((VRes - 1) - y1 + 1); i > 0; i--)
         {
             gpio_put(SSD1963_WR_GPPIN, 0);
-            gpio_put_masked64(0xFFFF << SSD1963data, (*pp++) << SSD1963data);
+            gpio_put_masked64((uint64_t)0xFFFF << SSD1963data, (uint64_t)(*pp++) << SSD1963data);
             nop;
             gpio_put(SSD1963_WR_GPPIN, 1);
         }
@@ -2170,7 +2170,7 @@ void DrawBLITBufferSSD1963(int x1, int y1, int x2, int y2, unsigned char *p)
         for (i = (x2 - x1 + 1) * (y2 - VRes + 1); i > 0; i--)
         {
             gpio_put(SSD1963_WR_GPPIN, 0);
-            gpio_put_masked64(0xFFFF << SSD1963data, (*pp++) << SSD1963data);
+            gpio_put_masked64((uint64_t)0xFFFF << SSD1963data, (uint64_t)(*pp++) << SSD1963data);
             nop;
             gpio_put(SSD1963_WR_GPPIN, 1);
         }
@@ -2194,7 +2194,7 @@ void DrawBLITBufferSSD1963(int x1, int y1, int x2, int y2, unsigned char *p)
                 if (x >= 0 && x < HRes && y >= 0 && y < VRes)
                 {
                     gpio_put(SSD1963_WR_GPPIN, 0);
-                    gpio_put_masked64(0xFFFF << SSD1963data, (*pp++) << SSD1963data);
+                    gpio_put_masked64((uint64_t)0xFFFF << SSD1963data, (uint64_t)(*pp++) << SSD1963data);
                     nop;
                     gpio_put(SSD1963_WR_GPPIN, 1);
                 }
@@ -2354,7 +2354,7 @@ void ReadBufferSSD1963(int x1, int y1, int x2, int y2, unsigned char *p)
     {
         SetAreaSSD1963(x1, y1, x2, VRes - 1); // if the box splits over the frame buffer boundary
         WriteComand(CMD_RD_MEMSTART);
-        gpio_set_dir_in_masked64((Option.DISPLAY_TYPE > SSD_PANEL_8 ? (0xFFFF << SSD1963data) : (0xFF << SSD1963data)));
+        gpio_set_dir_in_masked64((Option.DISPLAY_TYPE > SSD_PANEL_8 ? ((uint64_t)0xFFFF << SSD1963data) : ((uint64_t)0xFF << SSD1963data)));
         i = (x2 - x1 + 1) * ((VRes - 1) - y1 + 1);
         uSec(10);
         for (; i > 1; i--)
@@ -2364,11 +2364,11 @@ void ReadBufferSSD1963(int x1, int y1, int x2, int y2, unsigned char *p)
             *p++ = c.rgbbytes[1];
             *p++ = c.rgbbytes[2];
         }
-        gpio_set_dir_out_masked64((Option.DISPLAY_TYPE > SSD_PANEL_8 ? (0xFFFF << SSD1963data) : (0xFF << SSD1963data)));
+        gpio_set_dir_out_masked64((Option.DISPLAY_TYPE > SSD_PANEL_8 ? ((uint64_t)0xFFFF << SSD1963data) : ((uint64_t)0xFF << SSD1963data)));
         uSec(10);
         SetAreaSSD1963(x1, 0, x2, y2 - VRes);
         WriteComand(CMD_RD_MEMSTART);
-        gpio_set_dir_in_masked64((Option.DISPLAY_TYPE > SSD_PANEL_8 ? (0xFFFF << SSD1963data) : (0xFF << SSD1963data)));
+        gpio_set_dir_in_masked64((Option.DISPLAY_TYPE > SSD_PANEL_8 ? ((uint64_t)0xFFFF << SSD1963data) : ((uint64_t)0xFF << SSD1963data)));
         uSec(10);
         for (i = (x2 - x1 + 1) * (y2 - VRes + 1); i > 1; i--)
         { // NB loop counter terminates 1 pixel earlier
@@ -2377,7 +2377,7 @@ void ReadBufferSSD1963(int x1, int y1, int x2, int y2, unsigned char *p)
             *p++ = c.rgbbytes[1];
             *p++ = c.rgbbytes[2];
         }
-        gpio_set_dir_out_masked64((Option.DISPLAY_TYPE > SSD_PANEL_8 ? (0xFFFF << SSD1963data) : (0xFF << SSD1963data)));
+        gpio_set_dir_out_masked64((Option.DISPLAY_TYPE > SSD_PANEL_8 ? ((uint64_t)0xFFFF << SSD1963data) : ((uint64_t)0xFF << SSD1963data)));
         uSec(10);
     }
     else
@@ -2409,7 +2409,7 @@ void ReadBufferSSD1963(int x1, int y1, int x2, int y2, unsigned char *p)
             WriteComand(CMD_RD_MEMSTART);
         }
 
-        gpio_set_dir_in_masked64((Option.DISPLAY_TYPE > SSD_PANEL_8 ? (0xFFFF << SSD1963data) : (0xFF << SSD1963data)));
+        gpio_set_dir_in_masked64((Option.DISPLAY_TYPE > SSD_PANEL_8 ? ((uint64_t)0xFFFF << SSD1963data) : ((uint64_t)0xFF << SSD1963data)));
         uSec(2);
         if (Option.DISPLAY_TYPE == ILI9341_8 || Option.DISPLAY_TYPE == ILI9341_16 || Option.DISPLAY_TYPE == IPS_4_16)
             ReadDataSlow();
@@ -2476,7 +2476,7 @@ void ReadBufferSSD1963(int x1, int y1, int x2, int y2, unsigned char *p)
                 *p++ = c.rgbbytes[2];
             }
         }
-        gpio_set_dir_out_masked64((Option.DISPLAY_TYPE > SSD_PANEL_8 ? (0xFFFF << SSD1963data) : (0xFF << SSD1963data)));
+        gpio_set_dir_out_masked64((Option.DISPLAY_TYPE > SSD_PANEL_8 ? ((uint64_t)0xFFFF << SSD1963data) : ((uint64_t)0xFF << SSD1963data)));
         if (Option.DISPLAY_TYPE == ILI9341_16)
         {
             Write16bitCommand(ILI9341_PIXELFORMAT);
@@ -2596,7 +2596,7 @@ void ReadBLITBufferSSD1963(int x1, int y1, int x2, int y2, unsigned char *p)
     {
         SetAreaSSD1963(x1, y1, x2, VRes - 1); // if the box splits over the frame buffer boundary
         WriteComand(CMD_RD_MEMSTART);
-        gpio_set_dir_in_masked64(0xFFFF << SSD1963data);
+        gpio_set_dir_in_masked64((uint64_t)0xFFFF << SSD1963data);
         i = (x2 - x1 + 1) * ((VRes - 1) - y1 + 1);
         uSec(2);
         for (; i > 1; i--)
@@ -2609,9 +2609,9 @@ void ReadBLITBufferSSD1963(int x1, int y1, int x2, int y2, unsigned char *p)
             nop;
             nop;
             gpio_put(SSD1963_RD_GPPIN, 1);
-            *pp++ = ((gpio_get_all64() & (0xFFFF << SSD1963data)) >> SSD1963data);
+            *pp++ = ((gpio_get_all64() & ((uint64_t)0xFFFF << SSD1963data)) >> SSD1963data);
         }
-        gpio_set_dir_out_masked64(0xFFFF << SSD1963data);
+        gpio_set_dir_out_masked64((uint64_t)0xFFFF << SSD1963data);
         uSec(2);
         SetAreaSSD1963(x1, 0, x2, y2 - VRes);
         WriteComand(CMD_RD_MEMSTART);
@@ -2627,9 +2627,9 @@ void ReadBLITBufferSSD1963(int x1, int y1, int x2, int y2, unsigned char *p)
             nop;
             nop;
             gpio_put(SSD1963_RD_GPPIN, 1);
-            *pp++ = ((gpio_get_all64() & (0xFFFF << SSD1963data)) >> SSD1963data);
+            *pp++ = ((gpio_get_all64() & ((uint64_t)0xFFFF << SSD1963data)) >> SSD1963data);
         }
-        gpio_set_dir_out_masked64(0xFFFF < SSD1963data);
+        gpio_set_dir_out_masked64((uint64_t)0xFFFF < SSD1963data);
         uSec(2);
     }
     else
@@ -2646,7 +2646,7 @@ void ReadBLITBufferSSD1963(int x1, int y1, int x2, int y2, unsigned char *p)
             SetAreaSSD1963(x1, y1, x2, y2); // setup the area to be filled
             WriteComand(CMD_RD_MEMSTART);
         }
-        gpio_set_dir_in_masked64(0xFFFF << SSD1963data);
+        gpio_set_dir_in_masked64((uint64_t)0xFFFF << SSD1963data);
         uSec(2);
         for (i = (x2 - x1 + 1) * (y2 - y1 + 1); i > 0; i--)
         {
@@ -2692,10 +2692,10 @@ void ReadBLITBufferSSD1963(int x1, int y1, int x2, int y2, unsigned char *p)
                 nop;
                 nop;
                 gpio_put(SSD1963_RD_GPPIN, 1);
-                *pp++ = (gpio_get_all64() & (0xFFFF << SSD1963data)) >> SSD1963data;
+                *pp++ = (gpio_get_all64() & ((uint64_t)0xFFFF << SSD1963data)) >> SSD1963data;
             }
         }
-        gpio_set_dir_out_masked64(0xFFFF << SSD1963data);
+        gpio_set_dir_out_masked64((uint64_t)0xFFFF << SSD1963data);
     }
 }
 void ReadBLITBuffer320(int x1, int y1, int x2, int y2, unsigned char *p)
@@ -2775,9 +2775,9 @@ void MIPS16 fun_getscanline(void)
     else
     {
         WriteComand(CMD_GET_SCANLINE);
-        gpio_set_dir_in_masked64(0xFF << SSD1963data);
+        gpio_set_dir_in_masked64((uint64_t)0xFF << SSD1963data);
         iret = (ReadData() << 8) | ReadData(); // get the scan line
-        gpio_set_dir_out_masked64(0xFF << SSD1963data);
+        gpio_set_dir_out_masked64((uint64_t)0xFF << SSD1963data);
         targ = T_INT;
     }
 }

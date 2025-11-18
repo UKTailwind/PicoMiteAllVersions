@@ -164,14 +164,14 @@ typedef struct
     int poly_recording;
 
 } TurtleState;
-void turtle_init(void);
+void turtle_init(bool nowrite);
 // Core movement functions
 void turtle_forward(TurtleState *t, float distance);
 void turtle_goto(TurtleState *t, float new_x, float new_y);
 void turtle_arc(TurtleState *t, float radius, float angle);
 void turtle_bezier(TurtleState *t, float cp1_dist, float cp1_angle, float cp2_dist, float cp2_angle, float end_dist, float end_angle);
 void turtle_wedge(TurtleState *t, float radius, float start_angle, float end_angle);
-void turtle_reset(TurtleState *t, bool showturtle);
+void turtle_reset(TurtleState *t, bool showturtle, bool nowrite);
 // Cursor functions
 void draw_turtle_cursor(TurtleState *t);
 void erase_turtle_cursor(TurtleState *t);

@@ -46,42 +46,36 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "lwip/mem.h"
 #include "lwip/err.h"
 #endif
-
 /* ============================================================================
  * Function declarations and external variables
  * ============================================================================ */
 #if !defined(INCLUDE_COMMAND_TABLE) && !defined(INCLUDE_TOKEN_TABLE)
-
+#include "hardware/pio.h"
+#include "hardware/pio_instructions.h"
 /* ============================================================================
  * Constants
  * ============================================================================ */
 #define TCP_READ_BUFFER_SIZE 2048
-#define hnative 640
-#define cyclesperpixel 14
-#define hsync 96 / display_details[Option.DISPLAY_TYPE].bits
-#define hfrontporch 16 / display_details[Option.DISPLAY_TYPE].bits
-#define hvisible hnative / display_details[Option.DISPLAY_TYPE].bits
-#define hbackporch 48 / display_details[Option.DISPLAY_TYPE].bits
-#define vsync 1
-#define vbackporch 33
-#define vfrontporch 10
-#define vvisible 480
-#define pixelsperword 5 // RGB222
-
-#define wordsperline hvisible\pixelsperword
-#define wordstotransfer wordsperline *vvisible
-#define vlines vsync + vbackporch + vvisible + vfrontporch
-#define hwholeline hsync + hfrontporch + hvisible + hbackporch
-#define hvisibleclock hvisible *cyclesperpixel
-#define hsyncclock hsync *cyclesperpixel
-#define hfrontporchclock hfrontporch *cyclesperpixel
-#define hbackporchclock hbackporch *cyclesperpixel
-
-/* ============================================================================
- * PICOMITE - Function declarations
- * ============================================================================ */
-void init_vga222(void);
-
+void configurePIO(PIO pio, int sm, int clock,
+                  int startaddress, int base,
+                  int sidesetbase, int sidesetno, int sidesetout, int setbase, int setno, int setout,
+                  int outbase, int outno, int outout, int inbase,
+                  int jmppin, int wraptarget, int wrap, int sideenable, int sidepindir,
+                  int pushthreshold, int pullthreshold, int autopush, int autopull, int inshiftdir, int outshiftdir,
+                  int joinrxfifo, int jointxfifo
+#ifdef rp2350
+                  ,
+                  int joinrxfifoget, int joinrxfifoput
+#endif
+);
+void startPIO(PIO pio, int sm);
+void syncPIO(int pio, int my, int prev, int next);
+void setup_dma_pio_lines(
+    PIO pio, uint sm,
+    uint dma_chan,
+    const uint32_t *Tadd, uint32_t N,
+    uint32_t M);
+extern uint32_t dma_tx_chan3;
 /* ============================================================================
  * External variables - PIO configuration
  * ============================================================================ */

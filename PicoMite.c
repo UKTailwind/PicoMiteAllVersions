@@ -111,6 +111,7 @@ uint8_t PSRAMpin;
 #include "lwip/udp.h"
 #endif
 #ifdef PICOMITERP2350
+#include "VGA222.h"
     const uint8_t kickvga[] = {1, 198, 128, 100, 109, 97, 32, 116, 120, 32, 116, 97, 98, 108,
                                101, 32, 48, 44, 50, 44, 52, 56, 48, 44, 241, 115, 99, 114, 101, 101, 110, 98, 117, 102,
                                102, 41, 130, 243, 65, 41, 135, 53, 133, 243, 66, 41, 133, 52, 44, 49, 50, 56, 0, 1, 198,
@@ -2323,7 +2324,7 @@ int __not_in_flash_func(MMInkey)(void)
 
 #ifndef PICOMITEWEB
             if (ExtCurrentConfig[PinDef[HEARTBEATpin].pin] == EXT_HEARTBEAT)
-                gpio_xor_mask64(1 << PinDef[HEARTBEATpin].GPno);
+                gpio_xor_mask64((uint64_t)1 << PinDef[HEARTBEATpin].GPno);
 #endif
         }
 
@@ -5499,6 +5500,9 @@ uint32_t testPSRAM(void)
 #ifndef PICOMITEVGA
         InitDisplaySSD();
         InitDisplaySPI(0);
+#if PICOMITERP2350
+        InitDisplay222();
+#endif
         InitDisplayI2C(0);
         InitDisplayVirtual();
         InitTouch();

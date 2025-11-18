@@ -50,6 +50,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #endif
 #if PICOMITERP2350
 #include "pico/multicore.h"
+#include "VGA222.h"
 #endif
 #ifndef USBKEYBOARD
 #include "class/cdc/cdc_device.h"
@@ -3262,9 +3263,22 @@ void disable_audio(void)
     Option.AUDIO_SLICE = 99;
 }
 #ifndef PICOMITEVGA
+void DrawBufferUser(int x1, int y1, int x2, int y2, unsigned char *c)
+{
+    for (int y = y1; y <= y2 && y < VRes; y++)
+    {
+        for (int x = x1; x <= x2 && x < HRes; x++)
+        {
+            int colour = *c++;
+            colour |= ((*c++) << 8);
+            colour |= ((*c++) << 16);
+            DrawRectangle(x, y, x, y, colour);
+        }
+    }
+}
 void MIPS16 ConfigDisplayUser(unsigned char *tp)
 {
-    getcsargs(&tp, 15);
+    getcsargs(&tp, 5);
     if (str_equal(argv[0], (unsigned char *)"USER"))
     {
         if (Option.DISPLAY_TYPE)
@@ -3278,6 +3292,7 @@ void MIPS16 ConfigDisplayUser(unsigned char *tp)
         DrawRectangle = DrawRectangleUser;
         DrawBitmap = DrawBitmapUser;
         DrawPixel = DrawPixelNormal;
+        DrawBuffer = DrawBufferUser;
         return;
     }
 }
@@ -5666,6 +5681,10 @@ void MIPS16 cmd_option(void)
                 StandardError(10);
             if (!Option.DISPLAY_TYPE)
                 ConfigDisplaySPI(tp);
+#if PICOMITERP2350
+            if (!Option.DISPLAY_TYPE)
+                ConfigDisplay222(tp);
+#endif
             if (!Option.DISPLAY_TYPE)
                 ConfigDisplayVirtual(tp);
             if (!Option.DISPLAY_TYPE)

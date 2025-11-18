@@ -111,9 +111,9 @@ static TurtleState turtle = {
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
-void turtle_init(void)
+void turtle_init(bool nowrite)
 {
-    turtle_reset(&turtle, 0);
+    turtle_reset(&turtle, 0, nowrite);
 }
 
 static float normalize_heading(float heading)
@@ -714,14 +714,16 @@ void DrawRectangleFilled_Pattern(int x, int y, int width, int height, int color,
         }
     }
 }
-void turtle_reset(TurtleState *t, bool showturtle)
+void turtle_reset(TurtleState *t, bool showturtle, bool nowrite)
 {
     if (t->visible && t->cursor_drawn)
     {
         t->visible = 0;
-        erase_turtle_cursor(t);
+        if (!nowrite)
+            erase_turtle_cursor(t);
     }
-    ClearScreen(0);
+    if (!nowrite)
+        ClearScreen(0);
     t->x = HRes / 2;
     t->y = VRes / 2;
     t->heading = 0;
@@ -821,9 +823,9 @@ void cmd_turtle(void)
     {
         getcsargs(&tp, 1);
         if (argc == 1)
-            turtle_reset(&turtle, getint(tp, 0, 1));
+            turtle_reset(&turtle, getint(tp, 0, 1), 0);
         else
-            turtle_reset(&turtle, 0);
+            turtle_reset(&turtle, 0, 0);
     }
     else if ((tp = checkstring(cmdline, (unsigned char *)"ARC")))
     {

@@ -148,26 +148,28 @@
 #if PICOMITERP2350
 #define VGA222 59
 #define VGA222X320 60
-#define ST7796SPBUFF 61
+#define VGA222X720 61
+#define VGA222X400 62
+#define ST7796SPBUFF 81
 #define NEXTGEN ST7796SPBUFF
-#define ILI9341BUFF 62
-#define ST7796SBUFF 63
-#define ILI9488BUFF 64
-#define ILI9488PBUFF 65
-#define ILI9488WBUFF 66
-#define ST7789C 67
-#define SSD1963_5_12BUFF 68
-#define SSD1963_4_12BUFF 69
-#define SSD1963_7_12BUFF 70
-#define SSD1963_8_12BUFF 71
-#define SSD1963_5_16BUFF 72
-#define SSD1963_4_16BUFF 73
-#define SSD1963_7_16BUFF 74
-#define SSD1963_8_16BUFF 75
-#define SSD1963_5_BUFF 76
-#define SSD1963_4_BUFF 77
-#define SSD1963_8_BUFF 78
-#define SSD1963_7_BUFF 79
+#define ILI9341BUFF 82
+#define ST7796SBUFF 83
+#define ILI9488BUFF 84
+#define ILI9488PBUFF 85
+#define ILI9488WBUFF 86
+#define ST7789C 87
+#define SSD1963_5_12BUFF 88
+#define SSD1963_4_12BUFF 89
+#define SSD1963_7_12BUFF 90
+#define SSD1963_8_12BUFF 91
+#define SSD1963_5_16BUFF 92
+#define SSD1963_4_16BUFF 93
+#define SSD1963_7_16BUFF 94
+#define SSD1963_8_16BUFF 95
+#define SSD1963_5_BUFF 96
+#define SSD1963_4_BUFF 97
+#define SSD1963_8_BUFF 98
+#define SSD1963_7_BUFF 99
 #endif
 
 /* ==============================================================================================================

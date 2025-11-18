@@ -89,7 +89,6 @@ they may be changed and you would then need to re insert your changes in a new r
 #include "pico/stdlib.h"
 #include "hardware/irq.h"
 #include "hardware/claim.h"
-#define PIO_NUM(pio) ((pio) == pio0 ? 0 : (pio1 ? 1 : 2))
 #define CLKMIN ((Option.CPU_Speed * 125) >> 13)
 #define CLKMAX (Option.CPU_Speed * 1000)
 
@@ -159,7 +158,6 @@ volatile uint32_t g_index = 0;
 static uint g_dma_chan = 0;
 static PIO g_pio = NULL;
 static uint g_sm = 0;
-uint32_t *g_vgalinemap = NULL;
 uint64_t piomap[2] = {0};
 #endif
 #define MAXLABEL 16
@@ -218,7 +216,7 @@ void setup_dma_pio_lines(
         channel_config_set_read_increment(&c, true);
         channel_config_set_write_increment(&c, false);
         channel_config_set_dreq(&c, pio_get_dreq(pio, sm, true));
-
+		channel_config_set_high_priority(&c, true);
         volatile void *pio_fifo = &pio->txf[sm];
 
         dma_channel_configure(
@@ -2937,143 +2935,6 @@ void cmd_label(void)
  * @cond
  * The following section will be excluded from the documentation.
  */
-#if defined(rp2350) && defined(PICOMITE)
-const uint16_t vga0[] = {
-    0x80A0,
-    0xA627,
-    0xA642,
-    0x0642,
-    0xC019,
-    0xC518,
-    //
-    0x80A0,
-    0xA047,
-    0xA022,
-    0x20C1,
-    0xC042,
-    0x20C2,
-    0xC000,
-    0x004B,
-    //
-    0x80A0,
-    0xA047,
-    0xA022,
-    0x2DC0,
-    0x8080,
-    0x6D06,
-    0x6D06,
-    0x6D06,
-    0x6D06,
-    0x6A06,
-    0x6062,
-    0x0052,
-    0xA003,
-};
-const uint16_t vga1[] = {
-    0x90A0,
-    0xB0C7,
-    0x9018,
-    0x90A0,
-    0xB0C7,
-    0x9019,
-    0x90A0,
-    0xA047,
-    0xC007,
-    0x9098,
-    0xB027,
-    0x30C0,
-    0x20C0,
-    0x004C,
-    0x9099,
-    0xB027,
-    0x30C0,
-    0x1050,
-    0xD009,
-    0xB022,
-    0x30C0,
-    0x1054,
-    //
-    0x90A0,
-    0xB047,
-    0x90A0,
-    0xB027,
-    0x30C1,
-    0x005B,
-    0xB022,
-    0x105D,
-    0xD00A};
-
-void init_vga222(void)
-{
-        int maplines = display_details[Option.DISPLAY_TYPE].vertical * display_details[Option.DISPLAY_TYPE].bits;
-        if (display_details[Option.DISPLAY_TYPE].bits == 1)
-                for (int i = 0; i < maplines; i++)
-                {
-                        g_vgalinemap[i] = (uint32_t)FRAMEBUFFER + i * hvisible / pixelsperword * sizeof(uint32_t);
-                }
-        else if (display_details[Option.DISPLAY_TYPE].bits == 2)
-                for (int i = 0; i < maplines; i += 2)
-                {
-                        g_vgalinemap[i] = (uint32_t)FRAMEBUFFER + (i / 2) * hvisible / pixelsperword * sizeof(uint32_t);
-                        g_vgalinemap[i + 1] = g_vgalinemap[i];
-                }
-        pio1->irq = 255; // clear all irq in the statemachines on the pio
-        pio0->irq = 255; // clear all irq in the statemachines on the pio
-        gpio_set_function(PinDef[Option.VGA_HSYNC].GPno, GPIO_FUNC_PIO1);
-        gpio_set_function(PinDef[Option.VGA_HSYNC].GPno + 1, GPIO_FUNC_PIO1);
-        ExtCfg(Option.VGA_HSYNC, EXT_BOOT_RESERVED, 0);
-        ExtCfg(PINMAP[PinDef[Option.VGA_HSYNC].GPno + 1], EXT_BOOT_RESERVED, 0);
-        for (int i = 0; i < 6; i++)
-        {
-                gpio_set_function(PinDef[Option.VGA_BLUE].GPno + i, GPIO_FUNC_PIO0);
-                gpio_set_drive_strength(PinDef[Option.VGA_BLUE].GPno + i, GPIO_DRIVE_STRENGTH_8MA);
-                ExtCfg(PINMAP[PinDef[Option.VGA_BLUE].GPno + i], EXT_BOOT_RESERVED, 0);
-        }
-        struct pio_program program;
-        program.length = sizeof(vga0) / sizeof(uint16_t);
-        program.origin = 0;
-        program.instructions = vga0;
-        for (int sm = 0; sm < 4; sm++)
-                hw_clear_bits(&pio0->ctrl, 1 << (PIO_CTRL_SM_ENABLE_LSB + sm));
-        pio_clear_instruction_memory(pio0);
-        pio_add_program(pio0, &program);
-        program.length = sizeof(vga1) / sizeof(uint16_t);
-        program.origin = 0;
-        program.instructions = vga1;
-        for (int sm = 0; sm < 4; sm++)
-                hw_clear_bits(&pio1->ctrl, 1 << (PIO_CTRL_SM_ENABLE_LSB + sm));
-        pio_clear_instruction_memory(pio1);
-        pio_add_program(pio1, &program);
-        PIO0 = false;
-        PIO1 = false;
-        int clock = clock_get_hz(clk_sys);
-        configurePIO(pio0, 0, clock / display_details[Option.DISPLAY_TYPE].bits, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 1, 5, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0);
-        startPIO(pio0, 0);
-        configurePIO(pio0, 1, clock, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 8, 13, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0);
-        startPIO(pio0, 1);
-        configurePIO(pio0, 2, clock / display_details[Option.DISPLAY_TYPE].bits, 14, 0, 0, 0, 0, 0, 0, 0, PinDef[Option.VGA_BLUE].GPno, 6, 1, 0, -1, 16, 26, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0);
-        startPIO(pio0, 2);
-        configurePIO(pio1, 0, clock, 0, 0, PinDef[Option.VGA_HSYNC].GPno + 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, -1, 8, 21, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 1);
-        startPIO(pio1, 0);
-        configurePIO(pio1, 1, clock / display_details[Option.DISPLAY_TYPE].bits, 22, 0, PinDef[Option.VGA_HSYNC].GPno, 1, 1, 0, 0, 0, 0, 0, 0, 0, -1, 25, 30, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0);
-        startPIO(pio1, 1);
-        pio_sm_put_blocking(pio0, 1, vvisible - 1);
-        pio_sm_put_blocking(pio0, 2, hvisible / pixelsperword - 1);
-        pio_sm_put_blocking(pio1, 0, vsync - 1);
-        pio_sm_put_blocking(pio1, 0, vbackporch - 1);
-        pio_sm_put_blocking(pio1, 0, vvisible + vfrontporch - 2);
-        pio_sm_put_blocking(pio1, 1, hbackporchclock - 1);
-        pio_sm_put_blocking(pio1, 1, hsyncclock - 1);
-        syncPIO(0, 15, 0, 15);
-        setup_dma_pio_lines(pio0, 2, dma_tx_chan3,
-                            g_vgalinemap, maplines, hvisible / pixelsperword);
-        pio_sm_put_blocking(pio0, 0, hwholeline - 1);
-        while (1)
-        {
-                tight_loop_contents();
-        }
-}
-#endif
 
 #ifdef PICOMITEWEB
 char *scan_dest = NULL;

@@ -1059,7 +1059,7 @@ void MIPS16 do_run(unsigned char *cmdline, bool CMM2mode)
 	cleanserver();
 #else
 	if (Option.DISPLAY_TYPE)
-		turtle_init();
+		turtle_init(1);
 #endif
 #ifndef USBKEYBOARD
 	if (mouse0 == false && Option.MOUSE_CLOCK)

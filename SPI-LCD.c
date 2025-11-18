@@ -95,25 +95,45 @@ const struct Displays display_details[] = {
 	{58, "Dummy", 0, 0, 0, 0, 0, 0, 0},
 	{59, "VGA222", 0, 640, 480, 1, 0, 0, 0},
 	{60, "VGA222_320", 0, 320, 240, 2, 0, 0, 0},
-	{61, "ST7796SPBUFF", 60000000, 320, 320, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
-	{62, "ILI9341BUFF", 50000000, 320, 240, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
-	{63, "ST7796SBUFF", 60000000, 480, 320, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
-	{64, "ILI9488BUFF", 45000000, 480, 320, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
-	{65, "ILI9488PBUFF", 45000000, 320, 320, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
-	{66, "ILI9488WBUFF", 45000000, 480, 320, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
-	{67, "ST7789_320BUFF", 50000000, 320, 240, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
-	{68, "SSD1963_5_12BUFF", 0, 400, 240, 0, 0, 0, 0},
-	{69, "SSD1963_5_12BUFF", 0, 400, 240, 0, 0, 0, 0},
-	{70, "SSD1963_7_12BUFF", 0, 400, 240, 0, 0, 0, 0},
-	{71, "SSD1963_7_12BUFF", 0, 400, 240, 0, 0, 0, 0},
-	{72, "SSD1963_5_16BUFF", 0, 400, 240, 0, 0, 0, 0},
-	{73, "SSD1963_5_16BUFF", 0, 400, 240, 0, 0, 0, 0},
-	{74, "SSD1963_7_16BUFF", 0, 400, 240, 0, 0, 0, 0},
-	{75, "SSD1963_7_16BUFF", 0, 400, 240, 0, 0, 0, 0},
-	{76, "SSD1963_5_BUFF", 0, 400, 240, 0, 0, 0, 0},
-	{77, "SSD1963_5_BUFF", 0, 400, 240, 0, 0, 0, 0},
-	{78, "SSD1963_7_BUFF", 0, 400, 240, 0, 0, 0, 0},
-	{79, "SSD1963_7_BUFF", 0, 400, 240, 0, 0, 0, 0},
+	{61, "VGA222_720", 0, 720, 400, 1, 0, 0, 0},
+	{62, "VGA222_500", 0, 360, 200, 2, 0, 0, 0},
+	{63, "Dummy", 0, 0, 0, 0, 0, 0, 0},
+	{64, "Dummy", 0, 0, 0, 0, 0, 0, 0},
+	{65, "Dummy", 0, 0, 0, 0, 0, 0, 0},
+	{66, "Dummy", 0, 0, 0, 0, 0, 0, 0},
+	{67, "Dummy", 0, 0, 0, 0, 0, 0, 0},
+	{68, "Dummy", 0, 0, 0, 0, 0, 0, 0},
+	{69, "Dummy", 0, 0, 0, 0, 0, 0, 0},
+	{70, "Dummy", 0, 0, 0, 0, 0, 0, 0},
+	{71, "Dummy", 0, 0, 0, 0, 0, 0, 0},
+	{72, "Dummy", 0, 0, 0, 0, 0, 0, 0},
+	{73, "Dummy", 0, 0, 0, 0, 0, 0, 0},
+	{74, "Dummy", 0, 0, 0, 0, 0, 0, 0},
+	{75, "Dummy", 0, 0, 0, 0, 0, 0, 0},
+	{76, "Dummy", 0, 0, 0, 0, 0, 0, 0},
+	{77, "Dummy", 0, 0, 0, 0, 0, 0, 0},
+	{78, "Dummy", 0, 0, 0, 0, 0, 0, 0},
+	{79, "Dummy", 0, 0, 0, 0, 0, 0, 0},
+	{80, "Dummy", 0, 0, 0, 0, 0, 0, 0},
+	{81, "ST7796SPBUFF", 60000000, 320, 320, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
+	{82, "ILI9341BUFF", 50000000, 320, 240, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
+	{83, "ST7796SBUFF", 60000000, 480, 320, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
+	{84, "ILI9488BUFF", 45000000, 480, 320, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
+	{85, "ILI9488PBUFF", 45000000, 320, 320, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
+	{86, "ILI9488WBUFF", 45000000, 480, 320, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
+	{87, "ST7789_320BUFF", 50000000, 320, 240, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
+	{88, "SSD1963_5_12BUFF", 0, 400, 240, 0, 0, 0, 0},
+	{89, "SSD1963_5_12BUFF", 0, 400, 240, 0, 0, 0, 0},
+	{90, "SSD1963_7_12BUFF", 0, 400, 240, 0, 0, 0, 0},
+	{91, "SSD1963_7_12BUFF", 0, 400, 240, 0, 0, 0, 0},
+	{92, "SSD1963_5_16BUFF", 0, 400, 240, 0, 0, 0, 0},
+	{93, "SSD1963_5_16BUFF", 0, 400, 240, 0, 0, 0, 0},
+	{94, "SSD1963_7_16BUFF", 0, 400, 240, 0, 0, 0, 0},
+	{95, "SSD1963_7_16BUFF", 0, 400, 240, 0, 0, 0, 0},
+	{96, "SSD1963_5_BUFF", 0, 400, 240, 0, 0, 0, 0},
+	{97, "SSD1963_5_BUFF", 0, 400, 240, 0, 0, 0, 0},
+	{98, "SSD1963_7_BUFF", 0, 400, 240, 0, 0, 0, 0},
+	{99, "SSD1963_7_BUFF", 0, 400, 240, 0, 0, 0, 0},
 #endif
 };
 void __not_in_flash_func(spi_write_fast)(spi_inst_t *spi, const uint8_t *src, size_t len)
@@ -317,48 +337,11 @@ void MIPS16 ConfigDisplaySPI(unsigned char *p)
 	else if (checkstring(argv[0], (unsigned char *)"ST7789_320BUFF"))
 	{
 		DISPLAY_TYPE = ST7789C;
-	}
-	else if (checkstring(argv[0], (unsigned char *)"VGA222"))
-	{
-		DISPLAY_TYPE = VGA222;
-	}
-	else if (checkstring(argv[0], (unsigned char *)"VGA222_320"))
-	{
-		DISPLAY_TYPE = VGA222X320;
-
 #endif
 	}
 	else
 		return;
 #if PICOMITERP2350
-	if (DISPLAY_TYPE >= VGA222 && Option.DISPLAY_TYPE < NEXTGEN)
-	{
-		int hspin, datapin;
-		Option.DISPLAY_TYPE = DISPLAY_TYPE;
-		Option.DISPLAY_ORIENTATION = LANDSCAPE;
-		if (!(code = codecheck(argv[2])))
-			argv[2] += 2;
-		hspin = getinteger(argv[2]);
-		if (!code)
-			hspin = codemap(hspin);
-		if (!(code = codecheck(argv[4])))
-			argv[4] += 2;
-		datapin = getinteger(argv[4]);
-		if (!code)
-			datapin = codemap(datapin);
-		CheckPin(hspin, CP_IGNORE_INUSE);
-		CheckPin(datapin, CP_IGNORE_INUSE);
-		CheckPin(PINMAP[PinDef[hspin].GPno + 1], CP_IGNORE_INUSE);
-		CheckPin(PINMAP[PinDef[datapin].GPno + 1], CP_IGNORE_INUSE);
-		CheckPin(PINMAP[PinDef[datapin].GPno + 2], CP_IGNORE_INUSE);
-		CheckPin(PINMAP[PinDef[datapin].GPno + 3], CP_IGNORE_INUSE);
-		CheckPin(PINMAP[PinDef[datapin].GPno + 4], CP_IGNORE_INUSE);
-		CheckPin(PINMAP[PinDef[datapin].GPno + 5], CP_IGNORE_INUSE);
-		Option.VGA_HSYNC = hspin;
-		Option.VGA_BLUE = datapin;
-		Option.CPU_Speed = 352000;
-		return;
-	}
 	if (!(Option.SYSTEM_CLK || Option.LCD_CLK))
 		error("SPI not configured");
 #else
@@ -452,7 +435,7 @@ void MIPS16 ConfigDisplaySPI(unsigned char *p)
 void MIPS16 InitDisplaySPI(int InitOnly)
 {
 #if PICOMITERP2350
-	if (Option.DISPLAY_TYPE == 0 || (Option.DISPLAY_TYPE >= DISP_USER && Option.DISPLAY_TYPE < VGA222) || Option.DISPLAY_TYPE <= I2C_PANEL)
+	if (Option.DISPLAY_TYPE == 0 || (Option.DISPLAY_TYPE >= DISP_USER && Option.DISPLAY_TYPE < NEXTGEN) || Option.DISPLAY_TYPE <= I2C_PANEL)
 		return;
 #else
 	if (Option.DISPLAY_TYPE == 0 || Option.DISPLAY_TYPE >= DISP_USER || Option.DISPLAY_TYPE <= I2C_PANEL)
@@ -460,22 +443,6 @@ void MIPS16 InitDisplaySPI(int InitOnly)
 #endif
 	DisplayHRes = display_details[Option.DISPLAY_TYPE].horizontal;
 	DisplayVRes = display_details[Option.DISPLAY_TYPE].vertical;
-#if PICOMITERP2350
-	if (Option.DISPLAY_TYPE >= VGA222 && Option.DISPLAY_TYPE < NEXTGEN)
-	{
-		DrawRectangle = DrawRectangle222;
-		DrawBitmap = DrawBitmap222;
-		DrawBuffer = DrawBuffer222;
-		ReadBuffer = ReadBuffer222;
-		DrawBLITBuffer = DrawBuffer222;
-		ReadBLITBuffer = ReadBuffer222;
-		ScrollLCD = ScrollLCD222;
-		DrawPixel = DrawPixel222;
-		HRes = DisplayHRes;
-		VRes = DisplayVRes;
-		return;
-	}
-#endif
 
 	if (!InitOnly)
 	{

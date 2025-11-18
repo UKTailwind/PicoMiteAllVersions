@@ -353,17 +353,6 @@ void DrawPixelNormal(int x, int y, int c);
  * ============================================================================ */
 void ReadBuffer2(int x1, int y1, int x2, int y2, unsigned char *c);
 /* ============================================================================
- * Function declarations - RGB222 operations
- * ============================================================================ */
-void DrawPixel222(int x, int y, int c);
-void DrawRectangle222(int x1, int y1, int x2, int y2, int c);
-void DrawBitmap222(int x1, int y1, int width, int height, int scale, int fc, int bc, unsigned char *bitmap);
-void ScrollLCD222(int lines);
-void DrawBuffer222(int x1, int y1, int x2, int y2, unsigned char *p);
-void DrawBuffer222Fast(int x1, int y1, int x2, int y2, int blank, unsigned char *p);
-void ReadBuffer222(int x1, int y1, int x2, int y2, unsigned char *c);
-void ReadBuffer222Fast(int x1, int y1, int x2, int y2, unsigned char *c);
-/* ============================================================================
  * Function declarations - Screen operations
  * ============================================================================ */
 void ClearScreen(int c);

@@ -320,7 +320,7 @@ void __not_in_flash_func(PinSetBit)(int pin, unsigned int offset)
         gpio_put(PinDef[pin].GPno, GPIO_PIN_SET);
         return;
     case LATINV:
-        gpio_xor_mask64(1 << PinDef[pin].GPno);
+        gpio_xor_mask64((uint64_t)1 << PinDef[pin].GPno);
         return;
     case TRISSET:
         gpio_set_dir(PinDef[pin].GPno, GPIO_IN);
@@ -2136,7 +2136,7 @@ void cmd_port(void)
     }
     readmask = gpio_get_out_level_all64();
     readmask &= mask;
-    gpio_xor_mask(setmask ^ readmask);
+    gpio_xor_mask64(setmask ^ readmask);
 }
 
 void fun_distance(void)
@@ -4524,7 +4524,7 @@ void cmd_WS2812(void)
  * @cond
  * The following section will be excluded from the documentation.
  */
-void __not_in_flash_func(bitstream)(int gppin, unsigned int *data, int num)
+void __not_in_flash_func(bitstream)(uint64_t gppin, unsigned int *data, int num)
 {
     for (int i = 0; i < num; i++)
     {
@@ -4532,7 +4532,7 @@ void __not_in_flash_func(bitstream)(int gppin, unsigned int *data, int num)
         shortpause(data[i])
     }
 }
-void __not_in_flash_func(serialtx)(int gppin, unsigned char *string, int bittime)
+void __not_in_flash_func(serialtx)(uint64_t gppin, unsigned char *string, int bittime)
 {
     int mask;
     int count = 0;
@@ -4572,48 +4572,109 @@ unsigned short FloatToUint32(MMFLOAT x)
         error("Number range");
     return (x >= 0 ? (unsigned int)(x + 0.5) : (unsigned int)(x - 0.5));
 }
-int __not_in_flash_func(serialrx)(int gppin, unsigned char *string, int timeout, int bittime, int half, int maxchars, char *termchars)
+#include <stdint.h>
+#include <stdbool.h>
+
+static inline bool pin_high(int gppin) { return gpio_get(gppin) ? true : false; }
+
+int __not_in_flash_func(serialrx)(
+    int gppin,
+    unsigned char *buf,
+    int timeout_us, // per-call max time in microseconds
+    int baudrate,
+    int maxchars,
+    const char *termchars // termchars[0] = count, then bytes
+)
 {
-    int i, c, count = 0;
-    while (1)
+    if (!buf || maxchars <= 0 || baudrate <= 0 || ticks_per_second <= 0)
+        return -1;
+
+    // Compute bit time in microseconds with rounding
+    uint32_t bit_us = (uint32_t)((1000000ULL + baudrate / 2) / (uint32_t)baudrate);
+    uint32_t half_us = bit_us >> 1;
+
+    uint32_t call_start = (uint32_t)readusclock();
+    uint32_t deadline = call_start + (uint32_t)timeout_us;
+
+    uint32_t count = 0;
+    buf[0] = 0; // length-prefix at index 0
+
+    for (;;)
     {
-        while (gpio_get_all64() & gppin)
-        { // wait for the start bit
-            if (readusclock() >= timeout)
-                return -1; // return if there is a timeout
+        // 1) Wait for start bit (line goes low)
+        while (pin_high(gppin))
+        {
+            if ((uint32_t)readusclock() >= deadline)
+                return -1;
         }
-        systick_hw->cvr = 0;
-        while (systick_hw->cvr > half)
+
+        // 2) Sample at the middle of the start bit
+        uint32_t t_sample = (uint32_t)readusclock() + half_us;
+        while ((uint32_t)readusclock() < t_sample)
         {
-        };
-        systick_hw->cvr = 0;
-        if (gpio_get_all64() & gppin)
-            continue; // go around again if not low
-        c = 0;
-        for (i = 0; i < 8; i++)
+            if ((uint32_t)readusclock() >= deadline)
+                return -1;
+        }
+        // Confirm still low (valid start)
+        if (pin_high(gppin))
         {
-            while (systick_hw->cvr > bittime)
+            // False start/glitch; resync to idle and try again
+            while (!pin_high(gppin))
             {
-            };
-            systick_hw->cvr = 0;
-            c |= (((gpio_get_all64() & gppin) ? 1 : 0) << i); // and add this bit in
+                if ((uint32_t)readusclock() >= deadline)
+                    return -1;
+            }
+            continue;
         }
-        while (systick_hw->cvr > bittime)
+
+        // 3) Read 8 data bits, LSB first, sampling at each bit center
+        unsigned int c = 0;
+        for (int i = 0; i < 8; i++)
         {
-        };
-        if (!(gpio_get_all64() & gppin))
-            continue; // a framing error if not high
+            t_sample += bit_us;
+            while ((uint32_t)readusclock() < t_sample)
+            {
+                if ((uint32_t)readusclock() >= deadline)
+                    return -1;
+            }
+            c |= (pin_high(gppin) ? 1U : 0U) << i;
+        }
+
+        // 4) Verify stop bit: sample at middle of the stop bit
+        t_sample += bit_us;
+        while ((uint32_t)readusclock() < t_sample)
+        {
+            if ((uint32_t)readusclock() >= deadline)
+                return -1;
+        }
+        if (!pin_high(gppin))
+        {
+            // Framing error: stop bit not high at expected time. Resync.
+            // Optional: return a specific error code.
+            continue;
+        }
+
+        // After successfully decoding c and validating stop bit:
         count++;
-        string[count] = c; // save the character
-        string[0] = count; // and update the numbers of characters in the string
-        if (count >= maxchars)
-            return 2; // do we have our maximun number of characters?
+        buf[count] = (unsigned char)c;
+        buf[0] = (unsigned char)count;
+
+        // If user requested exactly maxchars, stop immediately after writing the Nth char.
+        if ((uint32_t)count == (uint32_t)maxchars)
+        {
+            return 2; // Completed requested number of characters
+        }
+
+        // Optional terminator check only if we haven't yet met the requested count.
         if (termchars)
         {
-            for (i = 0; i < termchars[0]; i++)
-            { // check each terminating character
-                if (c == termchars[i + 1])
-                    return 3; // and exit if this character is one of them
+            int nterm = (unsigned char)termchars[0];
+            for (int i = 0; i < nterm; i++)
+            {
+                if ((unsigned char)c == (unsigned char)termchars[i + 1])
+                {
+                    return 3; // Terminated early by terminator
+                }
             }
         }
     }
@@ -4711,6 +4772,7 @@ void cmd_device(void)
             error("Pin %/| is not off or an input", pin, pin);
         if (ExtCurrentConfig[pin] == EXT_NOT_CONFIG)
             ExtCfg(pin, EXT_DIG_IN, CNPUSET);
+        gpio_set_input_hysteresis_enabled(PinDef[pin].GPno, true);
         int gppin = PinDef[pin].GPno;
         int baudrate = getint(argv[2], 110, 230400);
         unsigned char *string = NULL;
@@ -4727,12 +4789,10 @@ void cmd_device(void)
         if (argc == 13)
             termchars = (char *)getstring(argv[12]);
         writeusclock(0);
-        int bittime = 16777215 + 12 - (ticks_per_second / baudrate);
-        int half = 16777215 + 12 - (ticks_per_second / (baudrate << 1));
-        if (!(gpio_get_all64() & gppin))
+        if (!(gpio_get(gppin)))
             error("Framing error");
         disable_interrupts_pico();
-        int istat = serialrx(gppin, string, timeout, bittime, half, maxchars, termchars);
+        int istat = serialrx(gppin, string, timeout, baudrate, maxchars, termchars);
         enable_interrupts_pico();
         if (type & T_INT)
             *(int64_t *)status = (int64_t)istat;
@@ -4756,7 +4816,7 @@ void cmd_device(void)
             pin = codemap(pin);
         if (IsInvalidPin(pin))
             StandardError(9);
-        int gppin = (1 << PinDef[pin].GPno);
+        uint64_t gppin = ((uint64_t)1 << PinDef[pin].GPno);
         int baudrate = getint(argv[2], 110, 230400);
         unsigned char *string = getstring(argv[4]);
         if (!(ExtCurrentConfig[pin] == EXT_DIG_OUT || ExtCurrentConfig[pin] == EXT_NOT_CONFIG))
@@ -4791,7 +4851,7 @@ void cmd_device(void)
             pin = codemap(pin);
         if (IsInvalidPin(pin))
             StandardError(9);
-        int gppin = (1 << PinDef[pin].GPno);
+        uint64_t gppin = ((uint64_t)1 << PinDef[pin].GPno);
         if (!(ExtCurrentConfig[pin] == EXT_DIG_OUT || ExtCurrentConfig[pin] == EXT_NOT_CONFIG))
             StandardErrorParam2(43, pin, pin);
         if (ExtCurrentConfig[pin] == EXT_NOT_CONFIG)
