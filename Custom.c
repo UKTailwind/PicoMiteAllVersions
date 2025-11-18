@@ -216,7 +216,7 @@ void setup_dma_pio_lines(
         channel_config_set_read_increment(&c, true);
         channel_config_set_write_increment(&c, false);
         channel_config_set_dreq(&c, pio_get_dreq(pio, sm, true));
-		channel_config_set_high_priority(&c, true);
+        channel_config_set_high_priority(&c, true);
         volatile void *pio_fifo = &pio->txf[sm];
 
         dma_channel_configure(
@@ -1032,7 +1032,7 @@ void MIPS16 cmd_pio(void)
 
                 if (ring_mode)
                 {
-                        // Ring buffer mode: read increment enabled, ring wrapping enabled
+                        // Ring buffer mode: read increment enabled, ring wrapping enabled, continuous operation
                         channel_config_set_read_increment(&c, true);
 
                         // Calculate ring size bits
@@ -1043,14 +1043,32 @@ void MIPS16 cmd_pio(void)
                         ring_size_bits += dmasize; // Adjust for transfer size
 
                         channel_config_set_ring(&c, false, ring_size_bits);
+                        channel_config_set_chain_to(&c, dma_tx_chan2); // Chain to control channel for continuous operation
 
-                        // Configure for continuous operation (no chaining)
+                        // Configure control channel for retriggering
+                        dma_channel_config c2 = dma_channel_get_default_config(dma_tx_chan2);
+                        channel_config_set_transfer_data_size(&c2, DMA_SIZE_32);
+                        channel_config_set_read_increment(&c2, false);
+                        channel_config_set_write_increment(&c2, false);
+                        channel_config_set_dreq(&c2, 0x3F); // No pacing
+
+                        dma_channel_configure(dma_tx_chan2,
+                                              &c2,
+                                              &dma_hw->ch[dma_tx_chan].al3_read_addr_trig,
+                                              &a1int,
+                                              1,
+                                              false);
+
+                        // Configure primary channel
                         dma_channel_configure(dma_tx_chan,
                                               &c,
                                               &pio->txf[sm],
                                               a1int,
                                               nbr,
-                                              true); // Start immediately
+                                              false); // Don't start yet
+
+                        // Start control channel to trigger the sequence
+                        dma_start_channel_mask(1u << dma_tx_chan2);
                 }
                 else if (continuous_retrigger)
                 {
