@@ -305,15 +305,8 @@ void blit121_self(uint8_t *framebuffer, int xsource, int ysource,
         return;
     }
 
-    // Need to use line buffer for overlapping regions with different X or unaligned
-
-    // Calculate byte width needed for the source region
-    int src_byte_start = xsource >> 1;
-    int src_byte_end = (xsource + width - 1) >> 1;
-    int buffer_bytes = src_byte_end - src_byte_start + 1;
-
-    // Allocate a line buffer (only need enough for the source width)
-    uint8_t *line_buffer = (uint8_t *)GetMemory(buffer_bytes);
+    // Allocate a line buffer - one byte per pixel for simplicity
+    uint8_t *line_buffer = (uint8_t *)GetMemory(width);
     if (!line_buffer)
     {
         return; // Allocation failed
@@ -328,84 +321,129 @@ void blit121_self(uint8_t *framebuffer, int xsource, int ysource,
             int src_y = ysource + y;
             int dst_y = ydestination + y;
 
-            // Copy just the needed bytes from source row to line buffer
-            memcpy(line_buffer, framebuffer + src_y * stride + src_byte_start, buffer_bytes);
+            // Read source pixels into line buffer (one byte per pixel)
+            for (int x = 0; x < width; x++)
+            {
+                int src_x = xsource + x;
+                int src_byte_idx = src_y * stride + (src_x >> 1);
+                uint8_t src_byte = framebuffer[src_byte_idx];
 
-            // Now copy from line buffer to destination
+                // Extract pixel: even x = low nibble, odd x = high nibble
+                if (src_x & 1)
+                {
+                    line_buffer[x] = (src_byte >> 4) & 0x0F;
+                }
+                else
+                {
+                    line_buffer[x] = src_byte & 0x0F;
+                }
+            }
+
+            // Write from line buffer to destination
             for (int x = 0; x < width; x++)
             {
                 int dst_x = xdestination + x;
-
-                // Get source pixel from line buffer
-                int actual_src_x = xsource + x;
-                int buffer_byte_idx = (actual_src_x >> 1) - src_byte_start;
-                uint8_t src_byte = line_buffer[buffer_byte_idx];
-                uint8_t src_pixel;
-
-                if (actual_src_x & 1)
-                {
-                    src_pixel = src_byte & 0x0F;
-                }
-                else
-                {
-                    src_pixel = (src_byte >> 4) & 0x0F;
-                }
-
-                // Write to destination
                 int dst_byte_idx = dst_y * stride + (dst_x >> 1);
+                uint8_t pixel = line_buffer[x];
 
+                // Write pixel: even x = low nibble, odd x = high nibble
                 if (dst_x & 1)
                 {
-                    framebuffer[dst_byte_idx] = (framebuffer[dst_byte_idx] & 0xF0) | src_pixel;
+                    framebuffer[dst_byte_idx] = (framebuffer[dst_byte_idx] & 0x0F) | (pixel << 4);
                 }
                 else
                 {
-                    framebuffer[dst_byte_idx] = (framebuffer[dst_byte_idx] & 0x0F) | (src_pixel << 4);
+                    framebuffer[dst_byte_idx] = (framebuffer[dst_byte_idx] & 0xF0) | pixel;
+                }
+            }
+        }
+    }
+    else if (ydestination < ysource || xdestination >= xsource)
+    {
+        // Copy from top to bottom and/or left to right
+        for (int y = 0; y < height; y++)
+        {
+            int src_y = ysource + y;
+            int dst_y = ydestination + y;
+
+            // Read source pixels into line buffer (one byte per pixel)
+            for (int x = 0; x < width; x++)
+            {
+                int src_x = xsource + x;
+                int src_byte_idx = src_y * stride + (src_x >> 1);
+                uint8_t src_byte = framebuffer[src_byte_idx];
+
+                // Extract pixel: even x = low nibble, odd x = high nibble
+                if (src_x & 1)
+                {
+                    line_buffer[x] = (src_byte >> 4) & 0x0F;
+                }
+                else
+                {
+                    line_buffer[x] = src_byte & 0x0F;
+                }
+            }
+
+            // Write from line buffer to destination
+            for (int x = 0; x < width; x++)
+            {
+                int dst_x = xdestination + x;
+                int dst_byte_idx = dst_y * stride + (dst_x >> 1);
+                uint8_t pixel = line_buffer[x];
+
+                // Write pixel: even x = low nibble, odd x = high nibble
+                if (dst_x & 1)
+                {
+                    framebuffer[dst_byte_idx] = (framebuffer[dst_byte_idx] & 0x0F) | (pixel << 4);
+                }
+                else
+                {
+                    framebuffer[dst_byte_idx] = (framebuffer[dst_byte_idx] & 0xF0) | pixel;
                 }
             }
         }
     }
     else
     {
-        // Copy from top to bottom (includes same Y position)
+        // Same Y position and destination is to the LEFT: copy right to left
         for (int y = 0; y < height; y++)
         {
             int src_y = ysource + y;
             int dst_y = ydestination + y;
 
-            // Copy just the needed bytes from source row to line buffer
-            memcpy(line_buffer, framebuffer + src_y * stride + src_byte_start, buffer_bytes);
-
-            // Now copy from line buffer to destination
+            // Read source pixels into line buffer (one byte per pixel)
             for (int x = 0; x < width; x++)
             {
-                int dst_x = xdestination + x;
+                int src_x = xsource + x;
+                int src_byte_idx = src_y * stride + (src_x >> 1);
+                uint8_t src_byte = framebuffer[src_byte_idx];
 
-                // Get source pixel from line buffer
-                int actual_src_x = xsource + x;
-                int buffer_byte_idx = (actual_src_x >> 1) - src_byte_start;
-                uint8_t src_byte = line_buffer[buffer_byte_idx];
-                uint8_t src_pixel;
-
-                if (actual_src_x & 1)
+                // Extract pixel: even x = low nibble, odd x = high nibble
+                if (src_x & 1)
                 {
-                    src_pixel = src_byte & 0x0F;
+                    line_buffer[x] = (src_byte >> 4) & 0x0F;
                 }
                 else
                 {
-                    src_pixel = (src_byte >> 4) & 0x0F;
+                    line_buffer[x] = src_byte & 0x0F;
                 }
+            }
 
-                // Write to destination
+            // Write from line buffer to destination (right to left)
+            for (int x = width - 1; x >= 0; x--)
+            {
+                int dst_x = xdestination + x;
                 int dst_byte_idx = dst_y * stride + (dst_x >> 1);
+                uint8_t pixel = line_buffer[x];
 
+                // Write pixel: even x = low nibble, odd x = high nibble
                 if (dst_x & 1)
                 {
-                    framebuffer[dst_byte_idx] = (framebuffer[dst_byte_idx] & 0xF0) | src_pixel;
+                    framebuffer[dst_byte_idx] = (framebuffer[dst_byte_idx] & 0x0F) | (pixel << 4);
                 }
                 else
                 {
-                    framebuffer[dst_byte_idx] = (framebuffer[dst_byte_idx] & 0x0F) | (src_pixel << 4);
+                    framebuffer[dst_byte_idx] = (framebuffer[dst_byte_idx] & 0xF0) | pixel;
                 }
             }
         }
