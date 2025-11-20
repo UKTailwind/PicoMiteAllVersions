@@ -37,7 +37,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
 #include <float.h>
-#include "xregex.h"
+#include "re.h"
 #include "hardware/adc.h"
 
 #ifdef rp2350
@@ -1030,45 +1030,42 @@ void fun_instr(void)
 	}
 	else
 	{
-		regex_t regex;
-		int reti;
-		regmatch_t pmatch;
+		int match_length;
+
+		// int  re_match(const char* pattern, const char* text, int* matchlength);
+
 		MMFLOAT *temp = NULL;
-		char *s = GetTempStrMemory(), *p = GetTempStrMemory();
+		char *s = GetTempMemory(STRINGSIZE), *p = GetTempMemory(STRINGSIZE);
 		strcpy(s, (char *)getCstring(argv[0 + n]));
 		strcpy(p, (char *)getCstring(argv[2 + n]));
 		if (argc == 5 + n)
-		{
+		{ // This is the passed variable to return the match length
 			temp = findvar(argv[4 + n], V_FIND);
 			if (!(g_vartbl[g_VarIndex].type & T_NBR))
-				StandardError(6);
+				error("Invalid variable");
 		}
-		reti = regcomp(&regex, p, 0);
-		if (reti)
-		{
-			regfree(&regex);
-			error("Could not compile regex");
-		}
-		reti = regexec(&regex, &s[start], 1, &pmatch, 0);
 		targ = T_INT;
-		if (!reti)
+
+		// int match_idx = re_matchp(pattern, &s[start], &match_length);
+		int match_idx = re_match(p, &s[start], &match_length);
+		if (match_idx != -1)
 		{
-			iret = pmatch.rm_so + 1 + start;
+			// PInt(match_idx); PInt(match_length);
 			if (temp)
-				*temp = (MMFLOAT)(pmatch.rm_eo - pmatch.rm_so);
+				*temp = (MMFLOAT)(match_length);
+			// iret=match_idx;
+			iret = match_idx + 1 + start;
+			// iret=match_idx+start;
+			if (temp)
+				*temp = (MMFLOAT)(match_length);
 		}
-		else if (reti == REG_NOMATCH)
+		else
 		{
+			// MMPrintString("No Match");
 			iret = 0;
 			if (temp)
 				*temp = 0.0;
 		}
-		else
-		{
-			regfree(&regex);
-			error("Regex execution error");
-		}
-		regfree(&regex);
 	}
 	targ = T_INT;
 }

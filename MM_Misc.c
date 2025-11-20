@@ -42,9 +42,9 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "hardware/pio.h"
 #include "hardware/pio_instructions.h"
 #include <malloc.h>
-#include "xregex.h"
 #include "hardware/structs/pwm.h"
 #include "aes.h"
+#include "re.h"
 #ifdef rp2350
 #include "pico/rand.h"
 #endif
@@ -1413,39 +1413,29 @@ void fun_LInstr(void)
     }
     else
     { // search string is a regular expression
-        regex_t regex;
-        int reti;
-        regmatch_t pmatch;
+      // Alternate regex library as used in Armmite H7
+        int match_length;
         MMFLOAT *temp = NULL;
         MtoC((unsigned char *)srch);
         temp = findvar(argv[6], V_FIND);
         if (!(g_vartbl[g_VarIndex].type & T_NBR))
-            StandardError(6);
-        reti = regcomp(&regex, srch, 0);
-        if (reti)
+            error("Invalid variable");
+
+        int match_idx = re_match(srch, &str[start + 8], &match_length);
+        if (match_idx != -1)
         {
-            regfree(&regex);
-            error("Could not compile regex");
-        }
-        reti = regexec(&regex, &str[start + 8], 1, &pmatch, 0);
-        if (!reti)
-        {
-            iret = pmatch.rm_so + 1 + start;
             if (temp)
-                *temp = (MMFLOAT)(pmatch.rm_eo - pmatch.rm_so);
+                *temp = (MMFLOAT)(match_length);
+            iret = match_idx + 1 + start;
+            if (temp)
+                *temp = (MMFLOAT)(match_length);
         }
-        else if (reti == REG_NOMATCH)
+        else
         {
             iret = 0;
             if (temp)
                 *temp = 0.0;
         }
-        else
-        {
-            regfree(&regex);
-            error("Regex execution error");
-        }
-        regfree(&regex);
     }
     targ = T_INT;
 }
