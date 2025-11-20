@@ -213,7 +213,7 @@ extern "C"
 #define MIN_CPU 48000
 
 #ifdef rp2350
-#define HEAP_MEMORY_SIZE (332 * 1024)
+#define HEAP_MEMORY_SIZE (328 * 1024)
 #define MAXVARS 640
 #define FLASH_TARGET_OFFSET (912 * 1024)
 #define MAX_CPU 396000
