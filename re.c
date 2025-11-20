@@ -649,7 +649,8 @@ int re_compare(re_t pattern1, re_t pattern2)
 void re_string(regex_t *pattern, char *buffer, unsigned *size)
 {
 #if 0
-  const char *const types[] = { "UNUSED", "DOT", "BEGIN", "END", "QUESTIONMARK", "STAR", "PLUS", "CHAR", "CHAR_CLASS", "INV_CHAR_CLASS", "DIGIT", "NOT_DIGIT", "ALPHA", "NOT_ALPHA", "WHITESPACE", "NOT_WHITESPACE", "BRANCH", "GROUP", "GROUPEND", "TIMES", "TIMES_N", "TIMES_M", "TIMES_NM" };
+  const char *const types[] = { "UNUSED", "DOT", "BEGIN", "END", "QUESTIONMARK", "STAR", "PLUS", "CHAR", "CHAR_CLASS", "INV_CHAR_CLASS", "DIGIT", "NOT_DIGIT", "ALPHA", "NOT_ALPHA", "WHITESPACE", "NOT_[...]"
+}
 #endif
   unsigned count = *size;
   unsigned char i = 0;
@@ -1063,6 +1064,36 @@ static inline int ismultimatch(unsigned char type)
   }
 }
 
+/* Helper function to find if there's a BRANCH ahead in the pattern */
+static regex_t *findbranch(regex_t *pattern)
+{
+  regex_t *p = pattern;
+  int depth = 0;
+
+  while (p->type != UNUSED)
+  {
+    if (p->type == GROUP)
+      depth++;
+    else if (p->type == GROUPEND)
+    {
+      if (depth == 0)
+        return NULL; /* Hit end of current group without finding BRANCH */
+      depth--;
+    }
+    else if (p->type == BRANCH && depth == 0)
+      return p; /* Found BRANCH at same nesting level */
+
+    /* Don't look past operators that consume the previous element */
+    if (p->type == STAR || p->type == PLUS || p->type == QUESTIONMARK ||
+        ismultimatch(p->type))
+      return NULL;
+
+    p = getnext(p);
+  }
+
+  return NULL;
+}
+
 /* Iterative matching */
 static int matchpattern(regex_t *pattern, const char *text, int *matchlength, int *num_patterns)
 {
@@ -1160,13 +1191,41 @@ static int matchpattern(regex_t *pattern, const char *text, int *matchlength, in
     {
       return (text[0] == '\0');
     }
+
+    /* Before trying to match, check if there's a BRANCH ahead */
+    /* This handles the case where the left branch fails to match */
+    regex_t *branch = findbranch(next_pattern);
+
     (*matchlength)++;
     (*num_patterns)++;
 
     if (text[0] == '\0')
-      break;
-    if (!matchone(pattern, *(text++)))
-      break;
+    {
+      *matchlength = pre;
+      /* If we have a branch, try the alternate */
+      if (branch)
+      {
+        *matchlength = pre;
+        *num_patterns = 0;
+        return matchpattern(getnext(branch), text - (pre > 0 ? pre : 0), matchlength, num_patterns);
+      }
+      return 0;
+    }
+
+    if (!matchone(pattern, *text))
+    {
+      *matchlength = pre;
+      /* If we have a branch, try the alternate */
+      if (branch)
+      {
+        *matchlength = pre;
+        *num_patterns = 0;
+        return matchpattern(getnext(branch), text, matchlength, num_patterns);
+      }
+      return 0;
+    }
+
+    text++;
     pattern = next_pattern;
   }
 
@@ -1178,7 +1237,7 @@ static int matchpattern(regex_t *pattern, const char *text, int *matchlength, in
 #define N 24
 
 /* Formal verification with cbmc: */
-/* cbmc -DCPROVER --64 --depth 200 --bounds-check --pointer-check --memory-leak-check --div-by-zero-check --signed-overflow-check --unsigned-overflow-check --pointer-overflow-check --conversion-check --undefined-shift-check --enum-range-check --pointer-primitive-check -trace re.c
+/* cbmc -DCPROVER --64 --depth 200 --bounds-check --pointer-check --memory-leak-check --div-by-zero-check --signed-overflow-check --unsigned-overflow-check --pointer-overflow-check --conversion-check [...]
  */
 
 void verify_re_compile()
