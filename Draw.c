@@ -10704,16 +10704,20 @@ void ReadBuffer2(int x1, int y1, int x2, int y2, unsigned char *c)
         {
 #ifdef PICOMITEVGA
             int tile = x / 8 + (y / ytileheight) * X_TILE, back, front;
+#ifdef HDMI
             if (FullColour)
             {
+#endif
                 back = RGB121map[tilebcols[tile] & 0xF];
                 front = RGB121map[tilefcols[tile] & 0xF];
+#ifdef HDMI
             }
             else
             {
                 back = RGB555toRGB888(map256[tilebcols_w[tile] & 0xFF]);
                 front = RGB555toRGB888(map256[tilefcols_w[tile] & 0xF]);
             }
+#endif
 #else
             int front = 0xFFFFFF;
             int back = 0;
