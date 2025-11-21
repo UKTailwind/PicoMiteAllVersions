@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.13)
 # Valid builds are PICO, PICOUSB, VGA, VGAUSB, HDMI(rp2350 only), HDMIUSB(rp2350 only), WEB
 
 
-#set(COMPILE VGA)
+#set(COMPILE HDMIUSB)
 
 if (COMPILE STREQUAL "HDMI" OR COMPILE STREQUAL "WEBRP2350" OR COMPILE STREQUAL "HDMIUSB"  OR COMPILE STREQUAL "VGARP2350"  OR COMPILE STREQUAL "VGAUSBRP2350"  OR COMPILE STREQUAL "PICORP2350"  OR COMPILE STREQUAL "PICOUSBRP2350" )
 	set(PICO_PLATFORM rp2350)
@@ -134,6 +134,7 @@ set_source_files_properties(GPS.c PROPERTIES COMPILE_FLAGS -Os)
 set_source_files_properties(I2C.c PROPERTIES COMPILE_FLAGS -Os)
 set_source_files_properties(lfs.c PROPERTIES COMPILE_FLAGS -Os)
 set_source_files_properties(picojpeg.c PROPERTIES COMPILE_FLAGS -Os)
+set_source_files_properties(re.c PROPERTIES COMPILE_FLAGS -Os)
 set_source_files_properties(regex.c PROPERTIES COMPILE_FLAGS -Os)
 set_source_files_properties(hxcmod.c PROPERTIES COMPILE_FLAGS -Os)
 set_source_files_properties(MATHS.c PROPERTIES COMPILE_FLAGS -Os)

@@ -10641,6 +10641,21 @@ void DrawBuffer2Fast(int x1, int y1, int x2, int y2, int blank, unsigned char *p
         }
     }
 }
+int RGB555toRGB888(int rgb555val)
+{
+    // Extract 5-bit channels
+    int r5 = (rgb555val >> 10) & 0x1F;
+    int g5 = (rgb555val >> 5) & 0x1F;
+    int b5 = rgb555val & 0x1F;
+
+    // Expand to 8-bit channels
+    int r8 = (r5 << 3) | (r5 >> 2);
+    int g8 = (g5 << 3) | (g5 >> 2);
+    int b8 = (b5 << 3) | (b5 >> 2);
+
+    // Pack into 0xRRGGBB
+    return (r8 << 16) | (g8 << 8) | b8;
+}
 
 void ReadBuffer2(int x1, int y1, int x2, int y2, unsigned char *c)
 {
@@ -10688,9 +10703,17 @@ void ReadBuffer2(int x1, int y1, int x2, int y2, unsigned char *c)
         for (x = xx1; x <= xx2; x++)
         {
 #ifdef PICOMITEVGA
-            int tile = x / 8 + (y / ytileheight) * X_TILE;
-            int back = RGB121map[tilebcols[tile] & 0xF];
-            int front = RGB121map[tilefcols[tile] & 0xF];
+            int tile = x / 8 + (y / ytileheight) * X_TILE, back, front;
+            if (FullColour)
+            {
+                back = RGB121map[tilebcols[tile] & 0xF];
+                front = RGB121map[tilefcols[tile] & 0xF];
+            }
+            else
+            {
+                back = RGB555toRGB888(map256[tilebcols_w[tile] & 0xFF]);
+                front = RGB555toRGB888(map256[tilefcols_w[tile] & 0xF]);
+            }
 #else
             int front = 0xFFFFFF;
             int back = 0;

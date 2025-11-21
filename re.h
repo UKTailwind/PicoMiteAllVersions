@@ -23,6 +23,8 @@
  *   '\W'       Non-alphanumeric
  *   '\d'       Digits, [0-9]
  *   '\D'       Non-digits
+ *   '\b'       Word boundary (zero-width assertion)
+ *   '\B'       Not word boundary (zero-width assertion)
  *
  *
  */
