@@ -43,7 +43,11 @@ extern "C"
 /* RP2350 configuration */
 #ifdef rp2350
 #define MAXSUBFUN 512
-#define MAXVARS 768
+#define MAXGLOBALVARS 480 // Configurable split
+#define MAXLOCALVARS 256
+#define MAXVARS MAXGLOBALVARS + MAXLOCALVARS
+#define GLOBALCACHE 16 // Power of 2 for fast modulo
+#define LOCALCACHE 8   // Locals accessed less frequently than globals
 
 #ifdef HDMI
 #define HEAP_MEMORY_SIZE (176 * 1024)
@@ -51,7 +55,7 @@ extern "C"
 #define HEAP_MEMORY_SIZE (184 * 1024)
 #endif
 
-#define FLASH_TARGET_OFFSET (912 * 1024)
+#define FLASH_TARGET_OFFSET (784 * 1024)
 
 /* HDMI-specific settings */
 #ifdef HDMI
@@ -77,15 +81,15 @@ extern "C"
 /* Non-RP2350 configuration */
 #else
 #define MAXSUBFUN 256
-
+#define MAXGLOBALVARS 256 // Configurable split
+#define MAXLOCALVARS 224
+#define MAXVARS MAXGLOBALVARS + MAXLOCALVARS
 #ifdef USBKEYBOARD
-#define FLASH_TARGET_OFFSET (880 * 1024)
+#define FLASH_TARGET_OFFSET (736 * 1024)
 #define MagicKey 0x609509F4
-#define MAXVARS 480
 #else
-#define FLASH_TARGET_OFFSET (864 * 1024)
+#define FLASH_TARGET_OFFSET (736 * 1024)
 #define MagicKey 0xD92E9AF5
-#define MAXVARS 480
 #endif
 
 #define MAXMODES 2
@@ -187,17 +191,21 @@ extern "C"
 
 #ifdef rp2350
 #define MAXSUBFUN 512
-#define MAXVARS 768
+#define MAXGLOBALVARS 512 // Configurable split
+#define MAXLOCALVARS 256
+#define MAXVARS MAXGLOBALVARS + MAXLOCALVARS
 #define HEAP_MEMORY_SIZE (200 * 1024)
 #else
 #define MAXSUBFUN 256
-#define MAXVARS 480
+#define MAXGLOBALVARS 256 // Configurable split
+#define MAXLOCALVARS 224
+#define MAXVARS MAXGLOBALVARS + MAXLOCALVARS
 #define HEAP_MEMORY_SIZE (88 * 1024)
 #endif
 
 #include "lwipopts_examples_common.h"
 
-#define FLASH_TARGET_OFFSET (1200 * 1024)
+#define FLASH_TARGET_OFFSET (1120 * 1024)
 #define MagicKey 0x8DEDD8E6
 #define MaxPcb 8
 #define MAX_CPU 252000
@@ -213,9 +221,11 @@ extern "C"
 #define MIN_CPU 48000
 
 #ifdef rp2350
-#define HEAP_MEMORY_SIZE (328 * 1024)
-#define MAXVARS 640
-#define FLASH_TARGET_OFFSET (912 * 1024)
+#define HEAP_MEMORY_SIZE (320 * 1024)
+#define MAXGLOBALVARS 512 // Configurable split
+#define MAXLOCALVARS 224
+#define MAXVARS MAXGLOBALVARS + MAXLOCALVARS
+#define FLASH_TARGET_OFFSET (864 * 1024)
 #define MAX_CPU 396000
 #define MAXSUBFUN 512
 
@@ -226,8 +236,10 @@ extern "C"
 #endif
 #else
 #define HEAP_MEMORY_SIZE (124 * 1024)
-#define MAXVARS 512
-#define FLASH_TARGET_OFFSET (880 * 1024)
+#define MAXGLOBALVARS 256 // Configurable split
+#define MAXLOCALVARS 224
+#define MAXVARS MAXGLOBALVARS + MAXLOCALVARS
+#define FLASH_TARGET_OFFSET (816 * 1024)
 #define MAX_CPU 420000
 #define MAXSUBFUN 256
 
@@ -257,7 +269,7 @@ extern "C"
 #define FLASH_ERASE_SIZE 4096
 #define MAXFLASHSLOTS 3
 #define MAXRAMSLOTS 5
-#define MAXVARHASH (MAXVARS / 2)
+#define MAXVARHASH MAXLOCALVARS // Hash range for local variables
 
 /* ============================================================================
  * Static memory allocations
@@ -267,7 +279,6 @@ extern "C"
 #define MAXGOSUB 50         // Each entry uses 4 bytes
 #define MAX_MULTILINE_IF 20 // Each entry uses 8 bytes
 #define MAXTEMPSTRINGS 64   // Each entry takes up 4 bytes
-#define MAXSUBHASH MAXSUBFUN
 
 /* ============================================================================
  * Operating characteristics - Strings and variables

@@ -67,7 +67,8 @@ const struct s_tokentbl tokentbl[] = {
 #include "Hardware_Includes.h"
 };
 #undef INCLUDE_TOKEN_TABLE
-
+static int maxlocalvars = MAXLOCALVARS;
+static int maxglobalvars = MAXGLOBALVARS;
 static inline CommandToken commandtbl_decode(const unsigned char *p)
 {
     return ((CommandToken)(p[0] & 0x7f)) | ((CommandToken)(p[1] & 0x7f) << 7);
@@ -445,7 +446,7 @@ void MIPS16 PrepareProgram(int ErrAbort)
         } while (isnamechar(*p1));
         if (namelen != MAXVARLEN)
             *p2 = 0;
-        hash %= MAXSUBHASH; // scale to size of table
+        hash %= MAXSUBFUN; // scale to size of table
         while (funtbl[hash].name[0] != 0)
         {
             hash++;
@@ -594,7 +595,7 @@ int __not_in_flash_func(FindSubFun)(unsigned char *p, int type)
     } while (isnamechar(*p));
     //    PRet();
     *s = 0;
-    hash %= MAXSUBHASH; // scale 0-512
+    hash %= MAXSUBFUN; // scale 0-512
     //	MMPrintString("Searching for function: ");MMPrintString((char *)name);PIntComma(hash);PRet();
     while (funtbl[hash].name[0] != 0)
     {
@@ -2296,7 +2297,7 @@ void hashlabels(unsigned char *p, int ErrAbort)
                 hash *= FNV_prime;
                 namelen++;
             }
-            hash %= MAXSUBHASH; // scale to size of table
+            hash %= MAXSUBFUN; // scale to size of table
             originalhash = hash - 1;
             if (originalhash < 0)
                 originalhash += MAXSUBFUN;
@@ -2353,8 +2354,8 @@ unsigned char *findlabel(unsigned char *labelptr)
         hash ^= label[i];
         hash *= FNV_prime;
     }
-    label[0] = i - 1;   // the length byte
-    hash %= MAXSUBHASH; // scale to size of table
+    label[0] = i - 1;  // the length byte
+    hash %= MAXSUBFUN; // scale to size of table
     if (funtbl[hash].name[0] == 0)
         error("Cannot find label");
     while (funtbl[hash].name[0] != 0)
@@ -2559,34 +2560,35 @@ routines for storing and manipulating variables
 void MIPS16 *findvar(unsigned char *p, int action)
 {
 #else
+/***********************************************************************************************
+ * FUNCTION: findvar() - Find or create a variable
+ *
+ * Changes from original:
+ * - MAXVARS/2 replaced with maxlocalvars for local variable range
+ * - MAXVARS/2 replaced with maxglobalvars for global variable range
+ * - hash % (MAXVARS/2) replaced with hash % maxlocalvars
+ * - Global offset is now maxlocalvars instead of MAXVARS/2
+ ***********************************************************************************************/
 void MIPS32 __not_in_flash_func (*findvar)(unsigned char *p, int action)
 {
 #endif
     unsigned char name[MAXVARLEN + 1];
-    int i = 0, j, size, ifree, globalifree, localifree, nbr, vtype, vindex, namelen, tmp;
-    unsigned char *s, *x, u, suffix = 0;
+    int i = 0, j, size, ifree = -1, globalifree, localifree, nbr, dnbr = 0, vtype = 0, vindex, namelen = 0, tmp;
+    unsigned char *s = name, *x, u, suffix = 0;
     void *mptr;
     int GlobalhashIndex, OriginalGlobalHash;
     int LocalhashIndex, OriginalLocalHash;
     uint32_t hash = FNV_offset_basis;
+    char *tp, *ip;
+    int dim[MAXDIM];
 #ifdef rp2350
     uint32_t funhash;
 #endif
-    char *tp, *ip;
-    int dim[MAXDIM] = {0}, dnbr;
-    vtype = dnbr = emptyarray = 0;
-    // first zero the array used for holding the dimension values
-    //    for(i = 0; i < MAXDIM; i++) dim[i] = 0;
-    ifree = -1;
-
+    emptyarray = 0;
     // check the first char for a legal variable name
     skipspace(p);
     if (!isnamestart(*p))
         error("Variable name");
-
-    // copy the variable name into name
-    s = name;
-    namelen = 0;
     do
     {
         u = mytoupper(*p++);
@@ -2597,9 +2599,16 @@ void MIPS32 __not_in_flash_func (*findvar)(unsigned char *p, int action)
             error("Variable name too long");
     } while (isnamechar(*p));
 #ifdef rp2350
-    funhash = hash % MAXSUBHASH;
+    funhash = hash % MAXSUBFUN;
 #endif
-    hash %= MAXVARHASH; // scale 0-255
+    hash %= maxglobalvars;                 // CHANGED: was MAXVARHASH, now modulo global vars size
+                                           //    }
+    GlobalhashIndex = hash + maxlocalvars; // CHANGED: was hash + MAXVARS/2
+    OriginalGlobalHash = GlobalhashIndex - 1;
+    if (OriginalGlobalHash < maxlocalvars)   // CHANGED: was MAXVARS/2
+        OriginalGlobalHash += maxglobalvars; // CHANGED: was MAXVARS/2
+    globalifree = -1;
+    tmp = -1;
 
     if (namelen != MAXVARLEN)
         *s = 0;
@@ -2655,6 +2664,7 @@ void MIPS32 __not_in_flash_func (*findvar)(unsigned char *p, int action)
             dnbr = argc / 2 + 1;
             if (dnbr > MAXDIM)
                 error("Dimensions");
+            memset(dim, 0, sizeof(dim));
             for (i = 0; i < argc; i += 2)
             {
                 MMFLOAT f;
@@ -2676,19 +2686,13 @@ void MIPS32 __not_in_flash_func (*findvar)(unsigned char *p, int action)
     // we now have the variable name and, if it is an array, the parameters
     // search the table looking for a match
 
-    LocalhashIndex = hash;
-    OriginalLocalHash = LocalhashIndex - 1;
-    if (OriginalLocalHash < 0)
-        OriginalLocalHash += MAXVARS / 2;
-    localifree = -1;
-    GlobalhashIndex = hash + MAXVARS / 2;
-    OriginalGlobalHash = GlobalhashIndex - 1;
-    if (OriginalGlobalHash < MAXVARS / 2)
-        OriginalGlobalHash += MAXVARS / 2;
-    globalifree = -1;
-    tmp = -1;
     if (g_LocalIndex)
     { // search
+        LocalhashIndex = hash % maxlocalvars;
+        OriginalLocalHash = LocalhashIndex - 1;
+        if (OriginalLocalHash < 0)
+            OriginalLocalHash += maxlocalvars; // CHANGED: was MAXVARS/2
+        localifree = -1;
         if (g_vartbl[LocalhashIndex].type == T_NOTYPE)
         {
             localifree = LocalhashIndex;
@@ -2717,9 +2721,12 @@ void MIPS32 __not_in_flash_func (*findvar)(unsigned char *p, int action)
                     }
                 }
                 LocalhashIndex++;
-                LocalhashIndex %= MAXVARS / 2;
+                LocalhashIndex %= maxlocalvars; // CHANGED: was MAXVARS/2
                 if (LocalhashIndex == OriginalLocalHash)
+                {
+                    ClearVars(0, true);
                     error("Too many local variables");
+                }
             }
             if (g_vartbl[LocalhashIndex].name[0] == 0)
             { // not found
@@ -2763,10 +2770,13 @@ void MIPS32 __not_in_flash_func (*findvar)(unsigned char *p, int action)
                         }
                     }
                     GlobalhashIndex++;
-                    if (GlobalhashIndex == MAXVARS)
-                        GlobalhashIndex = MAXVARS / 2;
+                    if (GlobalhashIndex == MAXVARS)     // CHANGED: still MAXVARS (end of table)
+                        GlobalhashIndex = maxlocalvars; // CHANGED: was MAXVARS/2
                     if (GlobalhashIndex == OriginalGlobalHash)
+                    {
+                        ClearVars(0, true);
                         error("Too many global variables");
+                    }
                 }
                 if (g_vartbl[GlobalhashIndex].name[0] == 0)
                 { // not found
@@ -2811,8 +2821,8 @@ void MIPS32 __not_in_flash_func (*findvar)(unsigned char *p, int action)
                     }
                 }
                 GlobalhashIndex++;
-                if (GlobalhashIndex == MAXVARS)
-                    GlobalhashIndex = MAXVARS / 2;
+                if (GlobalhashIndex == MAXVARS)     // CHANGED: still MAXVARS (end of table)
+                    GlobalhashIndex = maxlocalvars; // CHANGED: was MAXVARS/2
             }
             if (g_vartbl[GlobalhashIndex].name[0] == 0)
             { // not found
@@ -2826,8 +2836,7 @@ void MIPS32 __not_in_flash_func (*findvar)(unsigned char *p, int action)
             }
         }
     }
-    //	MMPrintString("search status : ");PInt(g_LocalIndex);PIntComma(localifree);PIntComma(LocalhashIndex);PIntComma(globalifree);PIntComma(GlobalhashIndex);
-    //	MMPrintString((action & V_LOCAL ? " LOCAL" : "      "));MMPrintString((action & V_LOCAL ? " DIM" : "    "));PRet();
+
     // At this point we know if a local variable has been found or if a global variable has been found
     if (action & V_LOCAL)
     {
@@ -2860,8 +2869,6 @@ void MIPS32 __not_in_flash_func (*findvar)(unsigned char *p, int action)
     { // nothing has been found so we are going to create a global unless EXPLICIT is set
         ifree = i = globalifree;
     }
-
-    //    MMPrintString(name);PIntComma(i);MMPrintString((ifree==-1 ? " - found" : " - not there"));PRet();
 
     // if we found an existing and matching variable
     // set the global g_VarIndex indicating the index in the table
@@ -3033,16 +3040,16 @@ void MIPS32 __not_in_flash_func (*findvar)(unsigned char *p, int action)
     // as a result of the previous search ifree is the index to the entry that we should use
 
     // if we are adding to the top, increment the number of vars
-    if (ifree >= MAXVARS / 2)
+    if (ifree >= maxlocalvars) // CHANGED: was MAXVARS/2
     {
         g_Globalvarcnt++;
-        if (g_Globalvarcnt >= MAXVARS / 2)
+        if (g_Globalvarcnt >= maxglobalvars) // CHANGED: was MAXVARS/2
             error("Not enough Global variable memory");
     }
     else
     {
         g_Localvarcnt++;
-        if (g_Localvarcnt >= MAXVARS / 2)
+        if (g_Localvarcnt >= maxlocalvars) // CHANGED: was MAXVARS/2
             error("Not enough Local variable memory");
     }
     g_varcnt = g_Globalvarcnt + g_Localvarcnt;
@@ -3059,7 +3066,7 @@ void MIPS32 __not_in_flash_func (*findvar)(unsigned char *p, int action)
     g_vartbl[ifree].type = vtype | (action & (T_IMPLIED | T_CONST));
     if (suffix)
         g_vartbl[ifree].type |= T_EXPLICIT;
-    if (ifree < MAXVARS / 2)
+    if (ifree < maxlocalvars) // CHANGED: was MAXVARS/2
     {
         g_hashlist[g_hashlistpointer].level = g_LocalIndex;
         g_hashlist[g_hashlistpointer++].hash = ifree;
@@ -3067,10 +3074,9 @@ void MIPS32 __not_in_flash_func (*findvar)(unsigned char *p, int action)
     }
     else
         g_vartbl[ifree].level = 0;
-    //    cleardims(&g_vartbl[ifree].dims[0]);
     for (j = 0; j < MAXDIM; j++)
         g_vartbl[ifree].dims[j] = 0;
-    //    MMPrintString("Creating variable : ");MMPrintString(g_vartbl[ifree].name);MMPrintString(", at depth : ");PInt(g_vartbl[ifree].level);MMPrintString(", Type : ");PInt(vtype);MMPrintString(", hash key : ");PInt(ifree);PRet();
+
     // the easy request is for is a non array numeric variable, so just initialise to
     // zero and return the pointer
     if (dnbr == 0)
@@ -3149,6 +3155,7 @@ void MIPS32 __not_in_flash_func (*findvar)(unsigned char *p, int action)
     g_vartbl[ifree].val.s = mptr;
     return mptr;
 }
+
 #ifdef rp2350
 void __not_in_flash_func(MakeCommaSeparatedArgs)(unsigned char **p, int maxargs, unsigned char *argbuf, unsigned char *argv[], int *argc)
 {
@@ -4017,10 +4024,19 @@ void MIPS16 FloatToStr(char *p, MMFLOAT f, int m, int n, unsigned char ch)
 Various routines to clear memory or the interpreter's state
 **********************************************************************************************/
 
-// clear (or delete) variables
-// if level is not zero it will only delete local variables at that level or greater
-// if level is zero to will delete all variables and reset global settings
-void MIPS16 __not_in_flash_func(ClearVars)(int level, bool all)
+/***********************************************************************************************
+ * FUNCTION: ClearVars() - Clear or delete variables
+ *
+ * Changes from original:
+ * - MAXVARS/2 replaced with maxlocalvars for local variable range checks
+ * - Local variable loop now goes from 0 to maxlocalvars-1
+ * - Global variable section starts at maxlocalvars instead of MAXVARS/2
+ ***********************************************************************************************/
+#ifdef LOWRAM
+void MIPS32 ClearVars(int level, bool all)
+#else
+void MIPS32 __not_in_flash_func(ClearVars)(int level, bool all)
+#endif
 {
     int i, newhashpointer, hashcurrent, hashnext;
 
@@ -4034,13 +4050,20 @@ void MIPS16 __not_in_flash_func(ClearVars)(int level, bool all)
             {
                 hashnext = hashcurrent = g_hashlist[i].hash;
                 hashnext++;
-                hashnext %= MAXVARS / 2;
+                hashnext %= maxlocalvars; // CHANGED: was MAXVARS/2
                 if (((g_vartbl[hashcurrent].type & T_STR) || g_vartbl[hashcurrent].dims[0] != 0) && !(g_vartbl[hashcurrent].type & T_PTR) && ((uint32_t)g_vartbl[hashcurrent].val.s < (uint32_t)MMHeap + heap_memory_size) && ((uint32_t)g_vartbl[hashcurrent].val.s > (uint32_t)MMHeap))
                 {
                     FreeMemorySafe((void **)&g_vartbl[hashcurrent].val.s);
                     // free any memory (if allocated)
                 }
-                //				MMPrintString("Deleting ");MMPrintString(g_vartbl[g_hashlist[i].hash].name);PIntComma(g_hashlist[i].level);PIntComma(g_hashlist[i].hash);PRet();
+#ifdef rp2350
+#ifndef PICOMITEWEB
+                if (((g_vartbl[hashcurrent].type & T_STR) || g_vartbl[hashcurrent].dims[0] != 0) && !(g_vartbl[hashcurrent].type & T_PTR) && ((uint32_t)g_vartbl[hashcurrent].val.s > (uint32_t)PSRAMbase && (uint32_t)g_vartbl[hashcurrent].val.s < (uint32_t)PSRAMbase + PSRAMsize))
+                {
+                    FreeMemorySafe((void **)&g_vartbl[hashcurrent].val.s); // free any memory (if allocated)
+                }
+#endif
+#endif
                 g_hashlist[i].level = -1;
                 newhashpointer = i; // set the new highest index
                 memset(&g_vartbl[hashcurrent], 0, sizeof(struct s_vartbl));
@@ -4056,7 +4079,7 @@ void MIPS16 __not_in_flash_func(ClearVars)(int level, bool all)
     }
     else
     {
-        for (i = 0; i < MAXVARS; i++)
+        for (i = 0; i < MAXVARS; i++) // CHANGED: still scans entire table (locals + globals)
         {
             if (((g_vartbl[i].type & T_STR) || g_vartbl[i].dims[0] != 0) && !(g_vartbl[i].type & T_PTR))
             {
@@ -4114,6 +4137,101 @@ void MIPS16 __not_in_flash_func(ClearVars)(int level, bool all)
     g_OptionBase = 0;
     g_DimUsed = false;
     g_hashlistpointer = 0;
+}
+void MIPS16 cmd_localvars(unsigned char *p)
+{
+    if (g_Globalvarcnt || g_Localvarcnt)
+        error("Variables already declared");
+    int i = getint(p, 32, MAXVARS - 32);
+    maxlocalvars = i;
+    maxglobalvars = MAXVARS - i;
+}
+/***********************************************************************************************
+ * FUNCTION: erase(char *p) - Erase named global variables
+ *
+ * Bug fixes from original:
+ * 1. Use isnameend() instead of isnamechar() to preserve type suffixes
+ * 2. Add memory bounds checking before freeing (heap and PSRAM)
+ * 3. Add PSRAM support for RP2350
+ * 4. Cache strlen() result to avoid redundant calls
+ *
+ * Changes for differential split:
+ * - Search range changed from MAXVARS/2..MAXVARS to maxlocalvars..MAXVARS
+ * - Wrap calculation changed from MAXVARS/2 to maxlocalvars
+ ***********************************************************************************************/
+uint32_t erase(char *p, bool nofree)
+{
+    int j, k, len;
+    char *s, *x;
+    uint32_t addr = 0;
+    len = strlen(p);
+    while (len > 0 && !isnamechar(p[strlen(p) - 1])) // CHANGED: was !isnamechar(p[strlen(p)-1])
+    {
+        p[--len] = 0; // CHANGED: decrement len and use it
+    }
+
+    makeupper((unsigned char *)p);
+    for (j = maxlocalvars; j < MAXVARS; j++) // CHANGED: was MAXVARS/2
+    {
+        s = p;
+        x = (char *)g_vartbl[j].name;
+        len = strlen(p);
+        while (len > 0 && *s == *x)
+        { // compare the variable to the name that we have
+            len--;
+            s++;
+            x++;
+        }
+        if (!(len == 0 && (*x == 0 || strlen(p) == MAXVARLEN)))
+            continue;
+        // found the variable
+
+        // BUG FIX: Add bounds checking before freeing memory
+        if (((g_vartbl[j].type & T_STR) || g_vartbl[j].dims[0] != 0) && !(g_vartbl[j].type & T_PTR))
+        {
+            addr = (uint32_t)g_vartbl[j].val.s; // ADDED: get address once
+
+            if (!nofree)
+            {
+                // Check if in heap
+                if (addr > (uint32_t)MMHeap && addr < (uint32_t)MMHeap + heap_memory_size)
+                {
+                    FreeMemorySafe((void **)&g_vartbl[j].val.s);
+                }
+#ifdef rp2350
+#ifndef PICOMITEWEB
+                // BUG FIX: Add PSRAM support for RP2350
+                else if (addr > (uint32_t)PSRAMbase && addr < (uint32_t)PSRAMbase + PSRAMsize)
+                {
+                    FreeMemorySafe((void **)&g_vartbl[j].val.s);
+                }
+#endif
+#endif
+            }
+            g_vartbl[j].val.s = NULL;
+        }
+
+        k = j + 1;
+        if (k == MAXVARS)
+            k = maxlocalvars; // CHANGED: was MAXVARS/2
+        if (g_vartbl[k].type)
+        {
+            g_vartbl[j].name[0] = '~';
+            g_vartbl[j].type = T_BLOCKED;
+        }
+        else
+        {
+            g_vartbl[j].name[0] = 0;
+            g_vartbl[j].type = T_NOTYPE;
+        }
+        g_vartbl[j].dims[0] = 0;
+        g_vartbl[j].level = 0;
+        g_Globalvarcnt--;
+        break;
+    }
+    if (j == MAXVARS)
+        error("Cannot find $", p);
+    return addr;
 }
 
 // clear all stack pointers (eg, FOR/NEXT stack, DO/LOOP stack, GOSUB stack, etc)
@@ -4221,9 +4339,9 @@ void MIPS16 ClearRuntime(bool all)
 #endif
     MMerrno = 0; // clear the error flags
     *MMErrMsg = 0;
+    ClearVars(0, true);
     InitHeap(true);
     m_alloc(all ? M_VAR : M_LIMITED);
-    ClearVars(0, true);
     memset(cmdlinebuff, 0, sizeof(cmdlinebuff));
     memset(datastore, 0, sizeof(struct sa_data) * MAXRESTORE);
     restorepointer = 0;
@@ -4248,6 +4366,7 @@ void MIPS16 ClearProgram(bool psram)
 {
     //    InitHeap(true);
     initFonts();
+    ClearVars(0, true);
     m_alloc(psram ? M_PROG : M_LIMITED); // init the variables for program memory
 #if PICOMITERP2350
     if (Option.DISPLAY_TYPE >= VGA222 && WriteBuf)

@@ -965,7 +965,7 @@ void flaccallback(char *p)
 	drflac_allocation_callbacks allocationCallbacks;
 	allocationCallbacks.pUserData = NULL;
 	allocationCallbacks.onMalloc = my_malloc;
-	allocationCallbacks.onRealloc = my_realloc;
+	allocationCallbacks.onRealloc = NULL;
 	allocationCallbacks.onFree = my_free;
 	myflac = drflac_open((drflac_read_proc)onRead, (drflac_seek_proc)onSeek, NULL, &allocationCallbacks);
 #ifdef rp2350

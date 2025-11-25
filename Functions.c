@@ -1034,15 +1034,24 @@ void fun_instr(void)
 
 		// int  re_match(const char* pattern, const char* text, int* matchlength);
 
-		MMFLOAT *temp = NULL;
+		void *temp = NULL;
+		int64_t *tempi = NULL;
+		MMFLOAT *tempf = NULL;
 		char *s = GetTempMemory(STRINGSIZE), *p = GetTempMemory(STRINGSIZE);
 		strcpy(s, (char *)getCstring(argv[0 + n]));
+		int tmp = OptionEscape;
+		OptionEscape = 0;
 		strcpy(p, (char *)getCstring(argv[2 + n]));
+		OptionEscape = tmp;
 		if (argc == 5 + n)
 		{ // This is the passed variable to return the match length
 			temp = findvar(argv[4 + n], V_FIND);
-			if (!(g_vartbl[g_VarIndex].type & T_NBR))
+			if (!(g_vartbl[g_VarIndex].type & (T_NBR | T_INT)))
 				error("Invalid variable");
+			if (g_vartbl[g_VarIndex].type & T_INT)
+				tempi = temp;
+			else
+				tempf = temp;
 		}
 		targ = T_INT;
 
@@ -1052,19 +1061,27 @@ void fun_instr(void)
 		{
 			// PInt(match_idx); PInt(match_length);
 			if (temp)
-				*temp = (MMFLOAT)(match_length);
+			{
+				if (tempf)
+					*tempf = (MMFLOAT)(match_length);
+				else
+					*tempi = (int64_t)(match_length);
+			}
 			// iret=match_idx;
 			iret = match_idx + 1 + start;
 			// iret=match_idx+start;
-			if (temp)
-				*temp = (MMFLOAT)(match_length);
 		}
 		else
 		{
 			// MMPrintString("No Match");
 			iret = 0;
 			if (temp)
-				*temp = 0.0;
+			{
+				if (tempf)
+					*tempf = 0.0;
+				else
+					*tempi = 0;
+			}
 		}
 	}
 	targ = T_INT;

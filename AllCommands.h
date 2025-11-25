@@ -214,6 +214,8 @@ void cmd_arrayset(void);
 void cmd_keyscan(void);
 void cmd_fill(void);
 void cmd_turtle(void);
+void cmd_lmid(void);
+void cmd_redim(void);
 
 #ifdef PICOMITEWEB
 void cmd_web(void);
@@ -604,6 +606,8 @@ void fun_touch(void);
 #ifndef PICOMITEWEB
 	{(unsigned char *)"Turtle", T_CMD, 0, cmd_turtle},
 #endif
+	{(unsigned char *)"LMid(", T_CMD | T_FUN, 0, cmd_lmid},
+	{(unsigned char *)"ReDim", T_CMD, 0, cmd_redim},
 {
 	(unsigned char *)"", 0, 0, cmd_null
 } // this dummy entry is always at the end

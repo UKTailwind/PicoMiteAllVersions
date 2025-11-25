@@ -1232,6 +1232,50 @@ void cmd_longString(void)
     }
     error("Invalid option");
 }
+void cmd_lmid(void)
+{
+    unsigned char *p;
+    int num = -1;
+    char *lsStart = NULL;
+    int64_t *dest = NULL;
+    getcsargs(&cmdline, 5);
+    if (!(argc == 5 || argc == 3))
+        StandardError(2);
+    int totalsize = (parseintegerarray(argv[0], &dest, 1, 1, NULL, true) - 1) * 8; // size of the longsting in bytes
+    lsStart = (char *)&dest[1];
+    int currentlength = dest[0];
+    int start = getint(argv[2], 1, currentlength); // pick a starting point in the string
+    if (argc == 5)
+        num = getint(argv[4], 0, currentlength);
+    if (start + (num < 0 ? 0 : num - 1) - 1 > currentlength)
+        error("Selection exceeds length of string");
+    start--; // position 1 is the array position 0
+    while (*cmdline && tokenfunction(*cmdline) != op_equal)
+        cmdline++;
+    if (!*cmdline)
+        SyntaxError();
+    ;
+    ++cmdline;
+    if (!*cmdline)
+        SyntaxError();
+    ;
+    char *value = (char *)getstring(cmdline);
+    if (num == -1)
+        num = value[0];
+    p = (unsigned char *)&value[1];
+    if (num == value[0])
+        memcpy(&lsStart[start], p, num); // simple substitution
+    else
+    {
+        int change = value[0] - num;
+        if (currentlength + change > totalsize)
+            error("String too long");
+        // first move the original after the insertion to it's new position
+        memmove(&lsStart[start + value[0]], &lsStart[start + num], totalsize - (start + num - 1));
+        dest[0] += change;
+        memcpy(&lsStart[start], p, value[0]);
+    }
+}
 void parselongAES(uint8_t *p, int ivadd, uint8_t *keyx, uint8_t *ivx, int64_t **inint, int64_t **outint)
 {
     int64_t *a1int = NULL, *a2int = NULL, *a3int = NULL, *a4int = NULL;
@@ -1384,9 +1428,9 @@ void fun_LInstr(void)
         start = 0;
     j = (parseintegerarray(argv[0], &src, 2, 1, NULL, false) - 1);
     str = (char *)&src[0];
-    Mstrcpy((unsigned char *)srch, (unsigned char *)getstring(argv[2]));
     if (argc < 7)
     {
+        Mstrcpy((unsigned char *)srch, (unsigned char *)getstring(argv[2]));
         slen = *srch;
         iret = 0;
         if (start > src[0] || start < 0 || slen == 0 || src[0] == 0 || slen > src[0] - start)
@@ -1413,28 +1457,42 @@ void fun_LInstr(void)
     }
     else
     { // search string is a regular expression
-      // Alternate regex library as used in Armmite H7
+        // Alternate regex library as used in Armmite H7
+        int tmp = OptionEscape;
+        OptionEscape = 0;
+        Mstrcpy((unsigned char *)srch, (unsigned char *)getstring(argv[2]));
+        OptionEscape = tmp;
         int match_length;
-        MMFLOAT *temp = NULL;
+        void *temp;
+        MMFLOAT *tempf = NULL;
+        int64_t *tempi = NULL;
         MtoC((unsigned char *)srch);
         temp = findvar(argv[6], V_FIND);
-        if (!(g_vartbl[g_VarIndex].type & T_NBR))
+        if (!(g_vartbl[g_VarIndex].type & (T_NBR | T_INT)))
             error("Invalid variable");
-
+        if (g_vartbl[g_VarIndex].type & T_INT)
+            tempi = temp;
+        else
+            tempf = temp;
         int match_idx = re_match(srch, &str[start + 8], &match_length);
         if (match_idx != -1)
         {
-            if (temp)
-                *temp = (MMFLOAT)(match_length);
+            if (tempf)
+                *tempf = (MMFLOAT)(match_length);
+            else
+                *tempi = (int64_t)(match_length);
             iret = match_idx + 1 + start;
-            if (temp)
-                *temp = (MMFLOAT)(match_length);
         }
         else
         {
             iret = 0;
             if (temp)
-                *temp = 0.0;
+            {
+                if (tempf)
+                    *tempf = 0.0;
+                else
+                    *tempi = 0;
+            }
         }
     }
     targ = T_INT;
@@ -4160,6 +4218,12 @@ void MIPS16 cmd_option(void)
         if (g_DimUsed)
             error("Must be before DIM or LOCAL");
         g_OptionBase = getint(tp, 0, 1);
+        return;
+    }
+    tp = checkstring(cmdline, (unsigned char *)"LOCAL VARIABLES");
+    if (tp)
+    {
+        cmd_localvars(tp);
         return;
     }
 
@@ -7247,6 +7311,12 @@ void MIPS16 fun_info(void)
         }
         CtoM(sret);
         targ = T_STR;
+        return;
+    }
+    else if ((tp = checkstring(ep, (unsigned char *)"MAX VARS")))
+    {
+        iret = MAXVARS;
+        targ = T_INT;
         return;
     }
     else if ((tp = checkstring(ep, (unsigned char *)"MODBUFF ADDRESS")))

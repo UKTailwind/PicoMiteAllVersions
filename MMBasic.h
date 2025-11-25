@@ -434,7 +434,8 @@ extern "C"
     void *findvar(unsigned char *, int);
     void erasearray(unsigned char *n);
     int FunctionType(unsigned char *p);
-
+    void cmd_localvars(unsigned char *p);
+    uint32_t erase(char *p, bool nofree);
     /* ============================================================================
      * Function declarations - Tokenization and execution
      * ============================================================================ */

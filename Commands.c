@@ -1553,63 +1553,6 @@ void MIPS16 cmd_new(void)
 	longjmp(mark, 1); // jump back to the input prompt
 }
 
-void MIPS16 cmd_erase(void)
-{
-	int i, j, k, len;
-	char p[MAXVARLEN + 1], *s, *x;
-
-	getcsargs(&cmdline, (MAX_ARG_COUNT * 2) - 1); // macro must be the first executable stmt in a block
-	if ((argc & 0x01) == 0)
-		StandardError(2);
-	for (i = 0; i < argc; i += 2)
-	{
-		strcpy((char *)p, (char *)argv[i]);
-		if (*argv[i] & 0x80)
-			error("You can't erase an in-built function");
-		while (!isnamechar(p[strlen(p) - 1]))
-			p[strlen(p) - 1] = 0;
-		makeupper((unsigned char *)p);
-		for (j = MAXVARS / 2; j < MAXVARS; j++)
-		{
-			s = p;
-			x = (char *)g_vartbl[j].name;
-			len = strlen(p);
-			while (len > 0 && *s == *x)
-			{ // compare the variable to the name that we have
-				len--;
-				s++;
-				x++;
-			}
-			if (!(len == 0 && (*x == 0 || strlen(p) == MAXVARLEN)))
-				continue;
-			// found the variable
-			if (((g_vartbl[j].type & T_STR) || g_vartbl[j].dims[0] != 0) && !(g_vartbl[j].type & T_PTR))
-			{
-				FreeMemorySafe((void **)&g_vartbl[j].val.s); // free any memory (if allocated)
-				g_vartbl[j].val.s = NULL;
-			}
-			k = j + 1;
-			if (k == MAXVARS)
-				k = MAXVARS / 2;
-			if (g_vartbl[k].type)
-			{
-				g_vartbl[j].name[0] = '~';
-				g_vartbl[j].type = T_BLOCKED;
-			}
-			else
-			{
-				g_vartbl[j].name[0] = 0;
-				g_vartbl[j].type = T_NOTYPE;
-			}
-			g_vartbl[j].dims[0] = 0; // and again
-			g_vartbl[j].level = 0;
-			g_Globalvarcnt--;
-			break;
-		}
-		if (j == MAXVARS)
-			error("Cannot find $", p);
-	}
-}
 void MIPS16 cmd_clear(void)
 {
 	checkend(cmdline);
@@ -3147,10 +3090,10 @@ void cmd_mid(void)
 	int size = g_vartbl[g_VarIndex].size;
 	char *sourcestring = (char *)getstring(argv[0]);
 	int start = getint(argv[2], 1, sourcestring[0]);
-	int num = 0;
+	int num = -1;
 	if (argc == 5)
-		num = getint(argv[4], 1, sourcestring[0]);
-	if (start + num - 1 > sourcestring[0])
+		num = getint(argv[4], 0, sourcestring[0]);
+	if (start + (num < 0 ? 0 : num - 1) > sourcestring[0])
 		error("Selection exceeds length of string");
 	while (*cmdline && tokenfunction(*cmdline) != op_equal)
 		cmdline++;
@@ -3162,7 +3105,7 @@ void cmd_mid(void)
 		SyntaxError();
 	;
 	char *value = (char *)getstring(cmdline);
-	if (num == 0)
+	if (num == -1)
 		num = value[0];
 	p = (unsigned char *)&value[1];
 	if (num == value[0])
@@ -3620,6 +3563,168 @@ void cmd_frame(void){
 		}
 	}
 }*/
+#ifdef rp2350
+void parse_and_strip(char *string, int *dims)
+{
+#else
+void parse_and_strip(char *string, short *dims)
+{
+#endif
+	// Initialize dims to zero
+	for (int i = 0; i < MAXDIM; i++)
+	{
+		dims[i] = 0;
+	}
+	char *open = strchr(string, '(');
+	char *close = strchr(string, ')');
+
+	if (open && close && close > open)
+	{
+		// Parse numbers inside parentheses
+		char buffer[256];
+		strncpy(buffer, open + 1, close - open - 1);
+		buffer[close - open - 1] = '\0';
+
+		char *token = strtok(buffer, ",");
+		int idx = 0;
+		while (token && idx < MAXDIM)
+		{
+			dims[idx++] = atoi(token);
+			token = strtok(NULL, ",");
+		}
+
+		// Replace with name()
+		*(open + 1) = '\0';	   // truncate after '('
+		strcpy(open + 1, ")"); // append ')'
+	}
+}
+#ifdef rp2350
+bool array_comp(int in[MAXDIM], int out[MAXDIM])
+
+#else
+bool array_comp(short in[MAXDIM], short out[MAXDIM])
+
+#endif
+{
+	int last_in = -1, last_out = -1;
+
+	// Find last non-zero index in each array
+	for (int i = MAXDIM - 1; i >= 0; i--)
+	{
+		if (last_in == -1 && in[i] != 0)
+			last_in = i;
+		if (last_out == -1 && out[i] != 0)
+			last_out = i;
+	}
+
+	// If positions of last non-zero differ, not allowed
+	if (last_in != last_out)
+		return false;
+
+	// If both arrays are all zeros, they are identical
+	if (last_in == -1)
+		return true;
+
+	// Compare all elements except at the last non-zero index
+	for (int i = 0; i < MAXDIM; i++)
+	{
+		if (i == last_in)
+			continue; // allow difference at the last non-zero
+		if (in[i] != out[i])
+			return false;
+	}
+
+	return true;
+}
+
+void cmd_redim(void)
+{
+#ifdef rp2350
+	int dims[MAXDIM] = {0}, newdims[MAXDIM] = {0};
+#else
+	short dims[MAXDIM] = {0}, newdims[MAXDIM] = {0};
+#endif
+	uint8_t *oldmemory = NULL, *newmemory;
+	int oldsize = 0, newsize = 0;
+	int length = -1;
+	unsigned char *tp;
+	unsigned char old[MAXVARLEN + 1];
+	int preserve = ((tp = checkstring(cmdline, (unsigned char *)"PRESERVE")) ? 1 : 0);
+	if (tp == NULL)
+		tp = cmdline;
+	{
+		getcsargs(&tp, MAX_ARG_COUNT);
+		for (int i = 0; i < argc; i += 2)
+		{ // step through the arguments
+			strncpy((char *)old, (char *)argv[i], MAXVARLEN);
+			parse_and_strip((char *)old, newdims);
+			findvar(old, V_FIND | V_NOFIND_ERR | V_EMPTY_OK);
+			if (g_vartbl[g_VarIndex].type & T_STR)
+				length = g_vartbl[g_VarIndex].size;
+			if (!g_vartbl[g_VarIndex].dims[0])
+				error("$ is not an array ", argv[i]);
+			int type = TypeMask(g_vartbl[g_VarIndex].type);
+			if (g_vartbl[g_VarIndex].dims[0] > 0)
+			{
+				oldmemory = g_vartbl[g_VarIndex].val.s;
+				oldsize = MemSize(oldmemory);
+				for (int i = 0; i < MAXDIM; i++)
+				{
+					dims[i] = g_vartbl[g_VarIndex].dims[i];
+				}
+				if (!array_comp(dims, newdims) && preserve)
+					error("Only the last array index can be changed");
+			}
+			uint32_t addr = erase((char *)old, (preserve ? true : false));
+			if (type & T_STR)
+			{
+				unsigned char *newstring = GetTempStrMemory();
+				strcpy((char *)newstring, (char *)argv[i]);
+				strcat((char *)newstring, " LENGTH ");
+				IntToStr((char *)&newstring[strlen((char *)newstring)], length, 10);
+				findvar(newstring, type | V_FIND | V_DIM_VAR);
+			}
+			else
+				findvar(argv[i], type | V_FIND | V_DIM_VAR);
+			newmemory = g_vartbl[g_VarIndex].val.s;
+			newsize = MemSize(g_vartbl[g_VarIndex].val.s);
+			if (preserve)
+			{
+				if (newsize < oldsize)
+					oldsize = newsize;
+				memcpy(newmemory, oldmemory, oldsize);
+				// Check if in heap
+				if (addr > (uint32_t)MMHeap && addr < (uint32_t)MMHeap + heap_memory_size)
+				{
+					FreeMemorySafe((void **)&addr);
+				}
+#ifdef rp2350
+#ifndef PICOMITEWEB
+				else if (addr > (uint32_t)PSRAMbase && addr < (uint32_t)PSRAMbase + PSRAMsize)
+				{
+					FreeMemorySafe((void **)&addr);
+				}
+#endif
+#endif
+			}
+		}
+	}
+}
+void MIPS16 cmd_erase(void)
+{
+	int i;
+	char p[MAXVARLEN + 1];
+	getcsargs(&cmdline, (MAX_ARG_COUNT * 2) - 1); // macro must be the first executable stmt in a block
+	if ((argc & 0x01) == 0)
+		StandardError(2);
+	for (i = 0; i < argc; i += 2)
+	{
+		strcpy((char *)p, (char *)argv[i]);
+		if (*argv[i] & 0x80)
+			error("You can't erase an in-built function");
+		erase(p, false);
+	}
+}
 
 void cmd_endfun(void)
 {
