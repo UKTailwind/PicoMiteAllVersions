@@ -44,7 +44,10 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #define F7 0x97
 #define F8 0x98
 #define F9 0x99
-
+#define SHIFT_F3 0xB3
+#define SHIFT_F4 0xB4
+#define SHIFT_F5 0xB5
+#define SHIFT_F8 0xB8
 /* ============================================================================
  * Constants - Special control keys
  * ============================================================================ */

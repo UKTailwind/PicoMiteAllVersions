@@ -89,7 +89,7 @@ extern "C"
 #define MagicKey 0x609509F4
 #else
 #define FLASH_TARGET_OFFSET (736 * 1024)
-#define MagicKey 0xD92E9AF5
+#define MagicKey 0xD9277AF5
 #endif
 
 #define MAXMODES 2

@@ -757,6 +757,7 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
     unsigned char *p, *tp, BreakKeySave;
     char currdel = 0, nextdel = 0, lastdel = 0;
     char multi = false;
+    bool foundit = false;
 #ifdef PICOMITEVGA
     int fontinc = gui_font_width / 8; // use to decide where to position mouse cursor
     int OptionY_TILESave;
@@ -952,6 +953,8 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
             buf[0] = c;
             buf[1] = 0;
         }
+        if (!(buf[0] == SHIFT_F5 || buf[0] == SHIFT_F4 || buf[0] == F7 || buf[0] == F8))
+            foundit = false;
         do
         {
             if (buf[0] == BreakKeySave)
@@ -1521,7 +1524,8 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
                 // fall through
 
             case CTRLKEY('G'):
-            case 0xB3: // SHIFT-F3
+            case SHIFT_F3:
+            case F6:
                 p = txtp;
                 if (*p == 0)
                     p = EdBuff - 1;
@@ -1555,6 +1559,7 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
                     edy = 0; // compensate if we are near the start
                 printScreen();
                 PositionCursor(txtp);
+                foundit = true;
                 // SCursor(x, y);
                 break;
 
@@ -1566,7 +1571,33 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
                 PrintFunctKeys(EDIT);
                 PositionCursor(txtp);
                 break;
-
+            case SHIFT_F4:
+            case F7:
+            case CTRLKEY('F'):
+                GetInputString((unsigned char *)"Replace: ");
+                if (*inpbuf == 0 || *inpbuf == ESC)
+                    break;
+                if (!(*inpbuf == 0xb3 || *inpbuf == F3))
+                    strcpy((char *)clipboard, (char *)inpbuf);
+            case CTRLKEY('I'):
+            case SHIFT_F5:
+            case F8:
+                if (!foundit)
+                {
+                    editDisplayMsg((unsigned char *)" NOTHING TO REPLACE ");
+                    break;
+                }
+                if (*clipboard == 0)
+                {
+                    editDisplayMsg((unsigned char *)" CLIPBOARD IS EMPTY ");
+                    break;
+                }
+                for (i = 0; i < strlen((char *)tknbuf); i++)
+                {
+                    buf[i + 1] = DEL;
+                }
+                buf[i + 1] = F5;
+                break;
             case CTRLKEY('Y'):
             case CTRLKEY('V'):
             case F5:
@@ -1580,10 +1611,7 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
                 buf[i + 1] = 0;
                 break;
 
-            // F6 to F12 - Normal function keys
-            case F6:
-            case F7:
-            case F8:
+            // F9 to F12 - Normal function keys
             case F9:
             case F10:
             case F11:
@@ -1905,7 +1933,6 @@ void MarkMode(unsigned char *cb, unsigned char *buf)
             }
             mark = p;
             break;
-
         case CTRLKEY('Y'):
         case CTRLKEY('T'):
         case F5:
