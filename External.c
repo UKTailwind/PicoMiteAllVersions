@@ -4398,6 +4398,8 @@ void fun_dev(void)
             iret = nunstruct[n].C;
         else if (checkstring(argv[2], (unsigned char *)"W"))
             iret = nunstruct[n].az;
+        else if (checkstring(argv[2], (unsigned char *)"B"))
+            iret = nunstruct[n].x0;
         else if (checkstring(argv[2], (unsigned char *)"D"))
         {
             iret = nunstruct[n].Z;

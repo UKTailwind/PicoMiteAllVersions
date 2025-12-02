@@ -366,7 +366,7 @@ void fun_trim(void);
 void fun_dev(void);
 void fun_map(void);
 void fun_touch(void);
-
+void fun_linputstr(void);
 #endif /* !defined(INCLUDE_COMMAND_TABLE) && !defined(INCLUDE_TOKEN_TABLE) */
 
 /* ============================================================================
@@ -759,6 +759,7 @@ void fun_touch(void);
 	{(unsigned char *)"Map(", T_FUN | T_INT, 0, fun_map},
 #endif
 	{(unsigned char *)"Trim$(", T_FUN | T_STR, 0, fun_trim},
+	{(unsigned char *)"LInput(", T_FUN | T_INT, 0, fun_linputstr},
 {
 	(unsigned char *)"", 0, 0, cmd_null
 } // this dummy entry is always at the end

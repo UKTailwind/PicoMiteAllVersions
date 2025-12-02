@@ -591,13 +591,11 @@ void fun_flag(void)
 void fun_byte(void)
 {
 	unsigned char *s;
-	int spos;
 	getcsargs(&ep, 3);
 	s = (unsigned char *)findvar(argv[0], V_NOFIND_ERR);
 	if (!(g_vartbl[g_VarIndex].type & T_STR))
 		error("Not a string");
-	spos = getint(argv[2], 1, g_vartbl[g_VarIndex].size); // the mid position
-	iret = s[spos];										  // this will last for the life of the command
+	iret = s[getint(argv[2], 1, g_vartbl[g_VarIndex].size)]; // the mid position
 	targ = T_INT;
 }
 extern int USBcode;

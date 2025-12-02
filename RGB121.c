@@ -475,13 +475,12 @@ void DrawPixel16(int x, int y, int c)
         *p |= colour;
     }
 }
-void DrawRectangle16(int x1, int y1, int x2, int y2, int c)
+void MIPS32 DrawRectangle16(int x1, int y1, int x2, int y2, int c)
 {
-    int x, y, x1p, x2p, t;
-    //    unsigned char mask;
+    int y, x1p, x2p, width_bytes;
     unsigned char colour = RGB121(c);
-    ;
     unsigned char bcolour = (colour << 4) | colour;
+
 #if PICOMITERP2350
     if ((Option.DISPLAY_TYPE >= VIRTUAL && Option.DISPLAY_TYPE < VGA222) && WriteBuf == NULL)
         WriteBuf = GetMemory(VMaxH * VMaxV / 8);
@@ -489,57 +488,60 @@ void DrawRectangle16(int x1, int y1, int x2, int y2, int c)
     if ((Option.DISPLAY_TYPE >= VIRTUAL) && WriteBuf == NULL)
         WriteBuf = GetMemory(VMaxH * VMaxV / 8);
 #endif
-    if (x1 < 0)
-        x1 = 0;
-    if (x1 >= HRes)
-        x1 = HRes - 1;
-    if (x2 < 0)
-        x2 = 0;
-    if (x2 >= HRes)
-        x2 = HRes - 1;
-    if (y1 < 0)
-        y1 = 0;
-    if (y1 >= VRes)
-        y1 = VRes - 1;
-    if (y2 < 0)
-        y2 = 0;
-    if (y2 >= VRes)
-        y2 = VRes - 1;
-    if (x2 <= x1)
+
+    // Clamp coordinates (branchless where beneficial)
+    x1 = (x1 < 0) ? 0 : (x1 >= HRes) ? HRes - 1
+                                     : x1;
+    x2 = (x2 < 0) ? 0 : (x2 >= HRes) ? HRes - 1
+                                     : x2;
+    y1 = (y1 < 0) ? 0 : (y1 >= VRes) ? VRes - 1
+                                     : y1;
+    y2 = (y2 < 0) ? 0 : (y2 >= VRes) ? VRes - 1
+                                     : y2;
+
+    // Swap if needed
+    if (x2 < x1)
     {
-        t = x1;
+        int t = x1;
         x1 = x2;
         x2 = t;
     }
-    if (y2 <= y1)
+    if (y2 < y1)
     {
-        t = y1;
+        int t = y1;
         y1 = y2;
         y2 = t;
     }
+
+    // Precompute row stride
+    int row_stride = HRes >> 1;
+
     for (y = y1; y <= y2; y++)
     {
         x1p = x1;
         x2p = x2;
-        uint8_t *p = (uint8_t *)(((uint32_t)WriteBuf) + (y * (HRes >> 1)) + (x1 >> 1));
-        if ((x1 % 2) == 1)
+        uint8_t *p = WriteBuf + (y * row_stride) + (x1 >> 1);
+
+        // Handle odd left edge
+        if (x1 & 1)
         {
-            *p &= 0x0F;
-            *p |= (colour << 4);
+            *p = (*p & 0x0F) | (colour << 4);
             p++;
             x1p++;
         }
-        if ((x2 % 2) == 0)
+
+        // Handle even right edge
+        if ((x2 & 1) == 0)
         {
-            uint8_t *q = (uint8_t *)(((uint32_t)WriteBuf) + (y * (HRes >> 1)) + (x2 >> 1));
-            *q &= 0xF0;
-            *q |= colour;
+            uint8_t *q = WriteBuf + (y * row_stride) + (x2 >> 1);
+            *q = (*q & 0xF0) | colour;
             x2p--;
         }
-        for (x = x1p; x < x2p; x += 2)
-        {
-            *p++ = bcolour;
-        }
+
+        // Fill middle section
+        width_bytes = ((x2p - x1p) >> 1) + 1;
+        if (width_bytes > 0)
+            memset(p, bcolour, width_bytes);
     }
 }
 void DrawBitmap16(int x1, int y1, int width, int height, int scale, int fc, int bc, unsigned char *bitmap)

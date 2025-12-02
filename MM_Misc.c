@@ -1396,6 +1396,34 @@ void fun_LGetStr(void)
     *p = 0;
     targ = T_STR;
 }
+void fun_linputstr(void)
+{
+    int j, nbr, fnbr;
+    int64_t *dest = NULL;
+    uint8_t *q = NULL;
+    unsigned int read = 0;
+    getcsargs(&ep, 5);
+    if (argc != 5)
+        SyntaxError();
+    j = (parseintegerarray(argv[0], &dest, 1, 1, NULL, true) - 1) * 8;
+    q = (uint8_t *)&dest[1];
+    nbr = getint(argv[4], g_OptionBase, j - g_OptionBase);
+    if (*argv[2] == '#')
+        argv[2]++;
+    fnbr = getinteger(argv[2]);
+    if (fnbr == 0)
+        SyntaxError();
+    if (fnbr < 1 || fnbr > MAXOPENFILES)
+        StandardError(18);
+    if (FileTable[fnbr].com == 0)
+        StandardError(19);
+    if (FileTable[fnbr].com <= MAXCOMPORTS)
+        error("Input from file only");
+    FileGetData(fnbr, q, nbr, &read);
+    dest[0] = read; // update the length of the string
+    iret = dest[0];
+    targ = T_INT;
+}
 
 void fun_LGetByte(void)
 {

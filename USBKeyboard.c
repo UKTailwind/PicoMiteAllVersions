@@ -1171,10 +1171,208 @@ void process_xbox(uint8_t const *report, uint16_t len, uint8_t n)
   uint8_t report_count;
   tuh_hid_report_info_t report_info[MAX_REPORT];
 } hid_info[CFG_TUH_HID];*/
+/**
+ * Analyze HID report descriptor to determine mouse type
+ *
+ * @param desc_report Pointer to HID report descriptor
+ * @param desc_len Length of descriptor in bytes
+ * @param info Pointer to mouse_info_t structure to fill
+ * @return mouse_report_type_t indicating the mouse type
+ */
+mouse_report_type_t analyze_mouse_descriptor(const uint8_t *desc_report, uint16_t desc_len, mouse_info_t *info)
+{
+	if (!desc_report || !info || desc_len == 0)
+	{
+		return MOUSE_TYPE_UNKNOWN;
+	}
+
+	memset(info, 0, sizeof(mouse_info_t));
+
+	uint8_t report_size = 0;
+	uint8_t report_count = 0;
+	//	uint8_t current_usage = 0;
+	bool found_x = false;
+	bool found_y = false;
+	uint8_t x_bits = 0;
+	uint8_t y_bits = 0;
+	uint8_t button_count = 0;
+	uint8_t bit_position = 0;
+
+	for (uint16_t i = 0; i < desc_len;)
+	{
+		uint8_t bSize = desc_report[i] & 0x03;
+		uint8_t bType = (desc_report[i] >> 2) & 0x03;
+		uint8_t bTag = (desc_report[i] >> 4) & 0x0F;
+
+		i++;
+
+		uint32_t data = 0;
+		for (int j = 0; j < bSize; j++)
+		{
+			if (i + j < desc_len)
+			{
+				data |= (desc_report[i + j] << (j * 8));
+			}
+		}
+		i += bSize;
+
+		// Check for Report ID (Global item, tag 8)
+		if (bType == 1 && bTag == 8)
+		{ // Global Report ID
+			info->uses_report_id = true;
+			info->report_id = data;
+		}
+
+		if (bType == 1)
+		{
+			if (bTag == 7)
+			{
+				report_size = data;
+			}
+			else if (bTag == 9)
+			{
+				report_count = data;
+			}
+		}
+		else if (bType == 2)
+		{
+			if (bTag == 0)
+			{
+				//				current_usage = data;
+
+				if (data == 0x30)
+				{
+					found_x = true;
+				}
+				else if (data == 0x31)
+				{
+					found_y = true;
+				}
+				else if (data == 0x38)
+				{
+					info->has_wheel = true;
+					info->wheel_byte_offset = bit_position / 8;
+				}
+				else if (data == 0x3C)
+				{
+					info->has_pan = true;
+				}
+			}
+			else if (bTag == 2)
+			{
+				if (data >= 0x01 && data <= 0x20)
+				{
+					button_count = data;
+				}
+			}
+		}
+		else if (bType == 0)
+		{
+			if (bTag == 8)
+			{
+				if (found_x && !x_bits)
+				{
+					x_bits = report_size;
+					found_x = false;
+				}
+				if (found_y && !y_bits)
+				{
+					y_bits = report_size;
+					found_y = false;
+				}
+
+				bit_position += (report_size * report_count);
+			}
+		}
+	}
+
+	info->x_bits = x_bits;
+	info->y_bits = y_bits;
+	info->button_count = button_count;
+
+	// If report ID is used, add 1 byte to the report length
+	info->report_length = (bit_position + 7) / 8;
+	if (info->uses_report_id)
+	{
+		info->report_length += 1;
+	}
+
+	if (x_bits == 8 && y_bits == 8)
+	{
+		info->type = MOUSE_TYPE_STANDARD_8BIT;
+		return MOUSE_TYPE_STANDARD_8BIT;
+	}
+	else if (x_bits == 12 && y_bits == 12)
+	{
+		info->type = MOUSE_TYPE_HIGHRES_12BIT;
+		return MOUSE_TYPE_HIGHRES_12BIT;
+	}
+	else if (x_bits == 16 && y_bits == 16)
+	{
+		info->type = MOUSE_TYPE_GAMING_16BIT;
+		return MOUSE_TYPE_GAMING_16BIT;
+	}
+
+	info->type = MOUSE_TYPE_UNKNOWN;
+	return MOUSE_TYPE_UNKNOWN;
+}
+/**
+ * Print mouse info for debugging
+ */
+void print_mouse_info(const mouse_info_t *info)
+{
+	const char *type_names[] = {
+		"Unknown",
+		"Standard 8-bit",
+		"High-res 12-bit",
+		"Gaming 16-bit"};
+
+	if (!CurrentLinePtr)
+	{
+		MMPrintString("Mouse Type: ");
+		MMPrintString((char *)type_names[info->type]);
+		PRet();
+
+		MMPrintString("  X/Y bits: ");
+		PInt(info->x_bits);
+		MMPrintString("/");
+		PInt(info->y_bits);
+		PRet();
+
+		MMPrintString("  Buttons: ");
+		PInt(info->button_count);
+		PRet();
+
+		MMPrintString("  Report length: ");
+		PInt(info->report_length);
+		MMPrintString(" bytes");
+		PRet();
+
+		MMPrintString("  Has wheel: ");
+		MMPrintString(info->has_wheel ? "Yes" : "No");
+		if (info->has_wheel)
+		{
+			MMPrintString(" (byte ");
+			PInt(info->wheel_byte_offset);
+			MMPrintString(")");
+		}
+		PRet();
+
+		MMPrintString("  Has pan: ");
+		MMPrintString(info->has_pan ? "Yes" : "No");
+		PRet();
+	}
+}
+/**
+ * Simple wrapper that just returns the mouse type
+ */
+mouse_report_type_t get_mouse_type(const uint8_t *desc_report, uint16_t desc_len)
+{
+	mouse_info_t info;
+	return analyze_mouse_descriptor(desc_report, desc_len, &info);
+}
 
 static void process_kbd_report(hid_keyboard_report_t const *report, uint8_t n);
-// static void process_mouse_report(hid_mouse_report_t const * report);
-// static void process_generic_report(uint8_t dev_addr, uint8_t instance, uint8_t const* report, uint16_t len);
 int caps_lock = 0;
 int num_lock = 0;
 int scroll_lock = 0;
@@ -1727,14 +1925,30 @@ void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance, uint8_t const *desc_re
 		HID[slot].report_timer = -(10 + (slot + 2) * 500);
 		HID[slot].active = true;
 		HID[slot].report_requested = false;
+		// Switch from boot protocol to report protocol to enable wheel support
+		// Analyze the mouse descriptor
+		mouse_info_t mouse_info;
+		if (desc_len > 0 && desc_report != NULL)
+		{
+			mouse_report_type_t mouse_type = analyze_mouse_descriptor(desc_report, desc_len, &mouse_info);
+
+			// Store the mouse type for later use
+			HID[slot].mouse_type = mouse_type;
+			memcpy((void *)&HID[slot].mouse_info, &mouse_info, sizeof(mouse_info_t));
+
+			// Print info
+			if (!CurrentLinePtr)
+			{
+				print_mouse_info(&mouse_info);
+			}
+		}
+		tuh_hid_set_protocol(dev_addr, instance, HID_PROTOCOL_REPORT);
 		if (!CurrentLinePtr)
 		{
 			MMPrintString("USB Mouse Connected on channel ");
 			PInt(slot + 1);
 			MMPrintString("\r\n> ");
 		}
-		//		tuh_hid_send_report(HID[slot].Device_address, HID[slot].Device_instance,5,mode, sizeof(mode));
-		//		tuh_hid_set_report(HID[slot].Device_address, HID[slot].Device_instance, 0, HID_REPORT_TYPE_INPUT, mode, sizeof(mode));
 		Current_USB_devices++;
 		return;
 	}
@@ -1925,10 +2139,6 @@ void tuh_hid_report_received_cb(uint8_t dev_addr, uint8_t instance, uint8_t cons
 		break;
 
 	case HID_ITF_PROTOCOL_MOUSE:
-		//		MMPrintString("HID receive boot mouse report\r\n");
-		//  PInt(report[0]);
-		//  for (int i=1;i<len;i++)PIntHC(report[i]);
-		//  PRet();
 		process_mouse_report((hid_mouse_report_t const *)report, n + 1);
 		break;
 
@@ -2307,22 +2517,64 @@ void cursor_movement(int8_t x, int8_t y, int8_t wheel)
 
 static void process_mouse_report(hid_mouse_report_t const *report, uint8_t n)
 {
-	/*         if(checkstring(argv[2], (unsigned char *)"X"))iret=nunstruct[n].ax;
-			else if(checkstring(argv[2], (unsigned char *)"Y"))iret=nunstruct[n].ay;
-			else if(checkstring(argv[2], (unsigned char *)"L"))iret=nunstruct[n].L;
-			else if(checkstring(argv[2], (unsigned char *)"R"))iret=nunstruct[n].R;
-			else if(checkstring(argv[2], (unsigned char *)"W"))iret=nunstruct[n].az;
-			else if(checkstring(argv[2], (unsigned char *)"D"))iret=nunstruct[n].Z;*/
-
-	//------------- button state  -------------//
 
 	static uint64_t leftpress = 0;
 	static uint8_t leftstate = 0;
-	if (HID[n - 1].pid == 0x2814 && HID[n - 1].vid == 0x406)
+	// Skip report ID if present
+	if (HID[n - 1].mouse_info.uses_report_id)
 	{
 		uint8_t *p = (uint8_t *)report;
-		p++;
+		p++; // Skip the report ID byte
 		report = (hid_mouse_report_t *)p;
+	}
+	int16_t x_delta, y_delta;
+	int8_t wheel_delta;
+	uint8_t buttons;
+
+	// Use the detected mouse type
+	switch (HID[n - 1].mouse_type)
+	{
+	case MOUSE_TYPE_STANDARD_8BIT:
+		// Standard 4-byte mouse
+		buttons = report->buttons;
+		x_delta = report->x;
+		y_delta = report->y;
+		wheel_delta = report->wheel;
+		break;
+
+	case MOUSE_TYPE_HIGHRES_12BIT:
+		// Your 5-byte mouse with 12-bit X/Y
+		{
+			hid_mouse_report_12bit_t const *r = (hid_mouse_report_12bit_t const *)report;
+			buttons = r->buttons;
+
+			int16_t x_12 = r->data[0] | ((r->data[1] & 0x0F) << 8);
+			if (x_12 & 0x0800)
+				x_12 |= 0xF000;
+			x_delta = x_12;
+
+			int16_t y_12 = ((r->data[1] & 0xF0) >> 4) | (r->data[2] << 4);
+			if (y_12 & 0x0800)
+				y_12 |= 0xF000;
+			y_delta = y_12;
+
+			wheel_delta = r->wheel;
+		}
+		break;
+
+	case MOUSE_TYPE_GAMING_16BIT:
+		// Gaming mouse with 16-bit X/Y
+		{
+			hid_gaming_mouse_report_t const *r = (hid_gaming_mouse_report_t const *)report;
+			buttons = r->buttons & 0xFF;
+			x_delta = (int16_t)(r->data[0] | (r->data[1] << 8)) / 8; // Scale down
+			y_delta = (int16_t)(r->data[2] | (r->data[3] << 8)) / 8; // Scale down
+			wheel_delta = r->wheel;
+		}
+		break;
+
+	default:
+		return; // Unknown type
 	}
 	uint64_t timenow = time_us_64();
 	if (timenow - leftpress > 500000)
@@ -2330,17 +2582,17 @@ static void process_mouse_report(hid_mouse_report_t const *report, uint8_t n)
 		leftstate = 0;
 		nunstruct[n].Z = 0;
 	}
-	if (leftstate == 0 && (report->buttons & MOUSE_BUTTON_LEFT))
+	if (leftstate == 0 && (buttons & MOUSE_BUTTON_LEFT))
 	{
 		leftpress = timenow;
 		leftstate = 1;
 	}
-	if (leftstate == 1 && !(report->buttons & MOUSE_BUTTON_LEFT))
+	if (leftstate == 1 && !(buttons & MOUSE_BUTTON_LEFT))
 	{ //
 		leftpress = timenow;
 		leftstate = 2;
 	}
-	if (leftstate == 2 && (report->buttons & MOUSE_BUTTON_LEFT))
+	if (leftstate == 2 && (buttons & MOUSE_BUTTON_LEFT))
 	{ // second press within 500mSec
 		if (timenow - leftpress > 100000)
 		{
@@ -2354,25 +2606,27 @@ static void process_mouse_report(hid_mouse_report_t const *report, uint8_t n)
 			leftstate = 0;
 		}
 	}
-	nunstruct[n].L = report->buttons & MOUSE_BUTTON_LEFT ? 1 : 0;
-	nunstruct[n].R = report->buttons & MOUSE_BUTTON_RIGHT ? 1 : 0;
-	nunstruct[n].C = report->buttons & MOUSE_BUTTON_MIDDLE ? 1 : 0;
-	nunstruct[n].ax += report->x / 2;
+	nunstruct[n].L = buttons & MOUSE_BUTTON_LEFT ? 1 : 0;
+	nunstruct[n].R = buttons & MOUSE_BUTTON_RIGHT ? 1 : 0;
+	nunstruct[n].C = buttons & MOUSE_BUTTON_MIDDLE ? 1 : 0;
+	nunstruct[n].x0 = buttons;
+	nunstruct[n].ax += x_delta / 2;
 	if (nunstruct[n].ax >= HRes)
 		nunstruct[n].ax = HRes - 1;
 	if (nunstruct[n].ax < 0)
 		nunstruct[n].ax = 0;
-	nunstruct[n].ay += report->y / 2;
+	nunstruct[n].ay += y_delta / 2;
 	if (nunstruct[n].ay >= VRes)
 		nunstruct[n].ay = VRes - 1;
 	if (nunstruct[n].ay < 0)
 		nunstruct[n].ay = 0;
-	nunstruct[n].az += report->wheel;
-	if (nunstruct[n].x0 != (report->buttons & 0b111))
+	nunstruct[n]
+		.az += wheel_delta;
+	if (nunstruct[n].x0 != (buttons & 0b111))
 	{
 		nunfoundc[n] = 1;
 	}
-	nunstruct[n].x0 = report->buttons & 0b111;
+	nunstruct[n].x0 = buttons & 0b111;
 	nunstruct[n].x1 = nunstruct[n].ax / (FontTable[gui_font >> 4][0] * (gui_font & 0b1111));
 	nunstruct[n].y1 = nunstruct[n].ay / (FontTable[gui_font >> 4][1] * (gui_font & 0b1111));
 }

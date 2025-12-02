@@ -214,7 +214,44 @@ struct s_PinDef
 	unsigned char ADCpin;
 	unsigned char slice;
 };
+// Mouse report type enumeration
+typedef enum
+{
+	MOUSE_TYPE_UNKNOWN = 0,
+	MOUSE_TYPE_STANDARD_8BIT = 1, // 4 bytes: buttons, X, Y, wheel
+	MOUSE_TYPE_HIGHRES_12BIT = 2, // 5 bytes: buttons, 12-bit X/Y packed, wheel
+	MOUSE_TYPE_GAMING_16BIT = 3	  // 6+ bytes: buttons, 16-bit X, 16-bit Y, wheel, etc.
+} mouse_report_type_t;
 
+// Structure to hold mouse analysis results
+typedef struct
+{
+	mouse_report_type_t type;
+	uint8_t report_length;
+	uint8_t x_bits;
+	uint8_t y_bits;
+	uint8_t button_count;
+	bool has_wheel;
+	bool has_pan;
+	uint8_t wheel_byte_offset;
+	bool uses_report_id; // <-- Add this
+	uint8_t report_id;	 // <-- Add this
+} mouse_info_t;
+
+typedef struct TU_ATTR_PACKED_12
+{
+	uint8_t buttons; /**< buttons mask for currently pressed buttons in the mouse. */
+	uint8_t data[3];
+	int8_t wheel; /**< Current delta wheel movement on the mouse. */
+	int8_t pan;	  // using AC Pan
+} hid_mouse_report_12bit_t;
+typedef struct TU_ATTR_PACKED_16
+{
+	uint8_t buttons; /**< buttons mask for currently pressed buttons in the mouse. */
+	uint8_t data[4];
+	int8_t wheel; /**< Current delta wheel movement on the mouse. */
+	int8_t pan;	  // using AC Pan
+} hid_gaming_mouse_report_t;
 /* ============================================================================
  * Type definitions - HID device
  * ============================================================================ */
@@ -235,6 +272,8 @@ typedef struct s_HID
 	uint8_t r, g, b;
 	uint8_t sendlights;
 	uint8_t report[65];
+	mouse_report_type_t mouse_type;
+	mouse_info_t mouse_info;
 } a_HID;
 
 /* ============================================================================
