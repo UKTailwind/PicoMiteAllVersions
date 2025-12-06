@@ -270,7 +270,8 @@ extern "C"
                 char mask[16];
                 char gateway[16];
 #else
-        unsigned char x[84]; // 229 bytes
+        float mousespeed;
+        unsigned char x[80]; // 229 bytes
 #endif
 
                 /* Miscellaneous pins and settings */

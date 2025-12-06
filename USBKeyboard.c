@@ -2537,8 +2537,8 @@ static void process_mouse_report(hid_mouse_report_t const *report, uint8_t n)
 	case MOUSE_TYPE_STANDARD_8BIT:
 		// Standard 4-byte mouse
 		buttons = report->buttons;
-		x_delta = report->x;
-		y_delta = report->y;
+		x_delta = (int16_t)((float)report->x / Option.mousespeed);
+		y_delta = (int16_t)((float)report->y / Option.mousespeed);
 		wheel_delta = report->wheel;
 		break;
 
@@ -2551,13 +2551,11 @@ static void process_mouse_report(hid_mouse_report_t const *report, uint8_t n)
 			int16_t x_12 = r->data[0] | ((r->data[1] & 0x0F) << 8);
 			if (x_12 & 0x0800)
 				x_12 |= 0xF000;
-			x_delta = x_12;
-
+			x_delta = (int16_t)((float)x_12 / Option.mousespeed);
 			int16_t y_12 = ((r->data[1] & 0xF0) >> 4) | (r->data[2] << 4);
 			if (y_12 & 0x0800)
 				y_12 |= 0xF000;
-			y_delta = y_12;
-
+			y_delta = (int16_t)((float)y_12 / Option.mousespeed);
 			wheel_delta = r->wheel;
 		}
 		break;
@@ -2567,8 +2565,8 @@ static void process_mouse_report(hid_mouse_report_t const *report, uint8_t n)
 		{
 			hid_gaming_mouse_report_t const *r = (hid_gaming_mouse_report_t const *)report;
 			buttons = r->buttons & 0xFF;
-			x_delta = (int16_t)(r->data[0] | (r->data[1] << 8)) / 8; // Scale down
-			y_delta = (int16_t)(r->data[2] | (r->data[3] << 8)) / 8; // Scale down
+			x_delta = (int16_t)((float)(r->data[0] | (r->data[1] << 8)) / Option.mousespeed); // Scale down
+			y_delta = (int16_t)((float)(r->data[2] | (r->data[3] << 8)) / Option.mousespeed); // Scale down
 			wheel_delta = r->wheel;
 		}
 		break;

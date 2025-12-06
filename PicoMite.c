@@ -5499,6 +5499,11 @@ uint32_t testPSRAM(void)
         }
         uSec(1000000);
         initKeyboard();
+#else
+    if (Option.mousespeed == 0.0f)
+        Option.mousespeed = 1.0f;
+    SaveOptions();
+
 #endif
         InitBasic();
 #ifndef PICOMITEVGA
