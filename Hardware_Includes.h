@@ -313,7 +313,7 @@ extern volatile unsigned int I2CTimer;
 extern volatile unsigned int GPSTimer;
 extern volatile unsigned int WDTimer;
 extern int ticks_per_second;
-
+extern volatile unsigned int bufferupdatetimer;
 #ifndef USBKEYBOARD
 extern volatile unsigned int MouseTimer;
 #endif

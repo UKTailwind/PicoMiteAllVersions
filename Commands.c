@@ -1939,7 +1939,7 @@ void cmd_end(void)
 }
 extern unsigned int mmap[HEAP_MEMORY_SIZE / PAGESIZE / PAGESPERWORD];
 extern unsigned int psmap[7 * 1024 * 1024 / PAGESIZE / PAGESPERWORD];
-extern struct s_hash g_hashlist[MAXVARS / 2];
+extern struct s_hash g_hashlist[MAXLOCALVARS];
 extern int g_hashlistpointer;
 extern short g_StrTmpIndex;
 extern bool g_TempMemoryIsChanged;
@@ -1985,8 +1985,8 @@ void SaveContext(void)
 		p += sizeof(struct s_dostack) * MAXDOLOOPS;
 		memcpy(p, g_vartbl, sizeof(struct s_vartbl) * MAXVARS);
 		p += sizeof(struct s_vartbl) * MAXVARS;
-		memcpy(p, g_hashlist, sizeof(struct s_hash) * MAXVARS / 2);
-		p += sizeof(struct s_hash) * MAXVARS / 2;
+		memcpy(p, g_hashlist, sizeof(struct s_hash) * MAXLOCALVARS);
+		p += sizeof(struct s_hash) * MAXLOCALVARS;
 		memcpy(p, MMHeap, heap_memory_size + 256);
 		p += heap_memory_size + 256;
 		memcpy(p, mmap, sizeof(mmap));
@@ -2002,10 +2002,10 @@ void SaveContext(void)
 		FSerror = lfs_stat(&lfs, "/.vars", &lfsinfo);
 		if (lfsinfo.type == LFS_TYPE_REG)
 			lfs_remove(&lfs, "/.vars");
-		int sizeneeded = sizeof(g_StrTmpIndex) + sizeof(g_TempMemoryIsChanged) + sizeof(g_StrTmp) + sizeof(g_StrTmpLocalIndex) + sizeof(g_Localvarcnt) +
-						 sizeof(g_LocalIndex) + sizeof(g_OptionBase) + sizeof(g_DimUsed) + sizeof(g_varcnt) + sizeof(g_Globalvarcnt) +
+		int sizeneeded = sizeof(g_StrTmpIndex) + sizeof(g_TempMemoryIsChanged) + sizeof(g_StrTmp) + sizeof(g_StrTmpLocalIndex) +
+						 sizeof(g_LocalIndex) + sizeof(g_OptionBase) + sizeof(g_DimUsed) + sizeof(g_varcnt) + sizeof(g_Globalvarcnt) + sizeof(g_Localvarcnt) +
 						 sizeof(g_hashlistpointer) + sizeof(g_forindex) + sizeof(g_doindex) + sizeof(struct s_forstack) * MAXFORLOOPS + sizeof(struct s_dostack) * MAXDOLOOPS +
-						 sizeof(struct s_vartbl) * MAXVARS + sizeof(struct s_hash) * MAXVARS / 2 + heap_memory_size + 256 + sizeof(mmap);
+						 sizeof(struct s_vartbl) * MAXVARS + sizeof(struct s_hash) * MAXLOCALVARS + heap_memory_size + 256 + sizeof(mmap);
 		if (sizeneeded >= Option.FlashSize - (Option.modbuff ? 1024 * Option.modbuffsize : 0) - RoundUpK4(TOP_OF_SYSTEM_FLASH) - lfs_fs_size(&lfs) * 4096)
 			error("Not enough free space on A: drive: % needed", sizeneeded);
 		lfs_file_open(&lfs, &lfs_file, ".vars", LFS_O_RDWR | LFS_O_CREAT);
@@ -2022,14 +2022,14 @@ void SaveContext(void)
 		lfs_file_write(&lfs, &lfs_file, &g_DimUsed, sizeof(g_DimUsed));
 		lfs_file_write(&lfs, &lfs_file, &g_varcnt, sizeof(g_varcnt));
 		lfs_file_write(&lfs, &lfs_file, &g_Globalvarcnt, sizeof(g_Globalvarcnt));
-		lfs_file_write(&lfs, &lfs_file, &g_Localvarcnt, sizeof(g_Globalvarcnt));
+		lfs_file_write(&lfs, &lfs_file, &g_Localvarcnt, sizeof(g_Localvarcnt));
 		lfs_file_write(&lfs, &lfs_file, &g_hashlistpointer, sizeof(g_hashlistpointer));
 		lfs_file_write(&lfs, &lfs_file, &g_forindex, sizeof(g_forindex));
 		lfs_file_write(&lfs, &lfs_file, &g_doindex, sizeof(g_doindex));
 		lfs_file_write(&lfs, &lfs_file, g_forstack, sizeof(struct s_forstack) * MAXFORLOOPS);
 		lfs_file_write(&lfs, &lfs_file, g_dostack, sizeof(struct s_dostack) * MAXDOLOOPS);
 		lfs_file_write(&lfs, &lfs_file, g_vartbl, sizeof(struct s_vartbl) * MAXVARS);
-		lfs_file_write(&lfs, &lfs_file, g_hashlist, sizeof(struct s_hash) * MAXVARS / 2);
+		lfs_file_write(&lfs, &lfs_file, g_hashlist, sizeof(struct s_hash) * MAXLOCALVARS);
 		lfs_file_write(&lfs, &lfs_file, MMHeap, heap_memory_size + 256);
 		lfs_file_write(&lfs, &lfs_file, mmap, sizeof(mmap));
 		lfs_file_close(&lfs, &lfs_file);
@@ -2076,8 +2076,8 @@ void RestoreContext(bool keep)
 		p += sizeof(struct s_dostack) * MAXDOLOOPS;
 		memcpy(g_vartbl, p, sizeof(struct s_vartbl) * MAXVARS);
 		p += sizeof(struct s_vartbl) * MAXVARS;
-		memcpy(g_hashlist, p, sizeof(struct s_hash) * MAXVARS / 2);
-		p += sizeof(struct s_hash) * MAXVARS / 2;
+		memcpy(g_hashlist, p, sizeof(struct s_hash) * MAXLOCALVARS);
+		p += sizeof(struct s_hash) * MAXLOCALVARS;
 		memcpy(MMHeap, p, heap_memory_size + 256);
 		p += heap_memory_size + 256;
 		memcpy(mmap, p, sizeof(mmap));
@@ -2110,7 +2110,7 @@ void RestoreContext(bool keep)
 		lfs_file_read(&lfs, &lfs_file, g_forstack, sizeof(struct s_forstack) * MAXFORLOOPS);
 		lfs_file_read(&lfs, &lfs_file, g_dostack, sizeof(struct s_dostack) * MAXDOLOOPS);
 		lfs_file_read(&lfs, &lfs_file, g_vartbl, sizeof(struct s_vartbl) * MAXVARS);
-		lfs_file_read(&lfs, &lfs_file, g_hashlist, sizeof(struct s_hash) * MAXVARS / 2);
+		lfs_file_read(&lfs, &lfs_file, g_hashlist, sizeof(struct s_hash) * MAXLOCALVARS);
 		lfs_file_read(&lfs, &lfs_file, MMHeap, heap_memory_size + 256);
 		lfs_file_read(&lfs, &lfs_file, mmap, sizeof(mmap));
 		lfs_file_close(&lfs, &lfs_file);

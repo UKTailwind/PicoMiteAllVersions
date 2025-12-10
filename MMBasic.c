@@ -129,7 +129,7 @@ unsigned char tknbuf[STRINGSIZE]; // used to store the tokenised representation 
 // unsigned char lastcmd[STRINGSIZE];                                           // used to store the last command in case it is needed by the EDIT command
 unsigned char PromptString[MAXPROMPTLEN]; // the prompt for input, an empty string means use the default
 int ProgramChanged;                       // true if the program in memory has been changed and not saved
-struct s_hash g_hashlist[MAXVARS / 2] = {0};
+struct s_hash g_hashlist[MAXLOCALVARS] = {0};
 int g_hashlistpointer = 0;
 unsigned char *LibMemory; // This is where the library is stored. At the last flash slot (4)
 int multi = false;
@@ -2601,15 +2601,12 @@ void MIPS32 __not_in_flash_func (*findvar)(unsigned char *p, int action)
 #ifdef rp2350
     funhash = hash % MAXSUBFUN;
 #endif
-    hash %= maxglobalvars;                 // CHANGED: was MAXVARHASH, now modulo global vars size
-                                           //    }
-    GlobalhashIndex = hash + maxlocalvars; // CHANGED: was hash + MAXVARS/2
+    GlobalhashIndex = (hash % maxglobalvars) + maxlocalvars; // CHANGED: was hash + MAXVARS/2
     OriginalGlobalHash = GlobalhashIndex - 1;
     if (OriginalGlobalHash < maxlocalvars)   // CHANGED: was MAXVARS/2
         OriginalGlobalHash += maxglobalvars; // CHANGED: was MAXVARS/2
     globalifree = -1;
     tmp = -1;
-
     if (namelen != MAXVARLEN)
         *s = 0;
     // check the terminating char and set the type

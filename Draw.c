@@ -50,12 +50,12 @@ extern mutex_t frameBufferMutex;
 #define max(x, y) (((x) > (y)) ? (x) : (y))
 #define min(x, y) (((x) < (y)) ? (x) : (y))
 void DrawFilledCircle(int x, int y, int radius, int r, int fill, int ints_per_line, uint32_t *br, MMFLOAT aspect, MMFLOAT aspect2);
-void hline(int x0, int x1, int y, int f, int ints_per_line, uint32_t *br);
 void SaveTriangle(int bnbr, char *buff);
 void RestoreTriangle(int bnbr, char *buff);
 void ReadLine(int x1, int y1, int x2, int y2, char *buff);
 void cmd_RestoreTriangle(unsigned char *p);
 void polygon(unsigned char *p, int close);
+void DrawCircleRingLineByLine(int x, int y, int r1, int r2, int c, MMFLOAT aspect, MMFLOAT aspect2);
 typedef struct _BMPDECODER
 {
     LONG lWidth;
@@ -1069,63 +1069,14 @@ void DrawCircle(int x, int y, int radius, int w, int c, int fill, MMFLOAT aspect
         }
         else
         {
-            // OPTIMIZED: Thick border with empty centre
+            // OPTIMIZED: Thick border with empty centre - LINE BY LINE
             int r1 = radius - w;
             int r2 = radius;
-            int ll = radius;
 
-            if (aspect > 1.0f)
-                ll = (int)((MMFLOAT)radius * aspect);
-
-            int ints_per_line = RoundUptoInt((ll << 1) + 1) / 32;
-            uint32_t *br = (uint32_t *)GetTempMainMemory(((ints_per_line + 1) * ((r2 << 1) + 1)) << 2);
-
-            DrawFilledCircle(x, y, r2, r2, 1, ints_per_line, br, aspect, aspect);
             aspect2 = ((aspect * (MMFLOAT)r2) - (MMFLOAT)w) / ((MMFLOAT)r1);
-            DrawFilledCircle(x, y, r1, r2, 0, ints_per_line, br, aspect, aspect2);
 
-            int x_offset = (int)((MMFLOAT)x + (MMFLOAT)r2 * (1.0f - aspect));
-            int y_offset = y - r2;
-            int x_base = x_offset - r2;
-
-            // OPTIMIZED: Scan and draw
-            int xs = -1;
-            int xi = 0;
-
-            for (int j = 0; j < (r2 << 1) + 1; j++)
-            {
-                int row_offset = j * ints_per_line;
-                int y_coord = y_offset + j;
-
-                for (int i = 0; i < ints_per_line; i++)
-                {
-                    uint32_t k = br[i + row_offset];
-                    int x_start = x_base + (i << 5);
-
-                    for (int m = 0; m < 32; m++)
-                    {
-                        if (xs == -1 && (k & 0x80000000))
-                        {
-                            xs = m;
-                            xi = i;
-                        }
-                        if (xs != -1 && !(k & 0x80000000))
-                        {
-                            DrawRectangle(x_base + xs + (xi << 5), y_coord,
-                                          x_start + m, y_coord, c);
-                            xs = -1;
-                        }
-                        k <<= 1;
-                    }
-                }
-
-                if (xs != -1)
-                {
-                    DrawRectangle(x_base + xs + (xi << 5), y_coord,
-                                  x_base + 32 + (ints_per_line << 5), y_coord, c);
-                    xs = -1;
-                }
-            }
+            // Use new line-by-line algorithm - DRAMATICALLY reduced memory!
+            DrawCircleRingLineByLine(x, y, r1, r2, c, aspect, aspect2);
         }
     }
     else
@@ -1225,74 +1176,6 @@ void DrawCircle(int x, int y, int radius, int w, int c, int fill, MMFLOAT aspect
         Display_Refresh();
 }
 
-void ClearTriangle(int x0, int y0, int x1, int y1, int x2, int y2, int ints_per_line, uint32_t *br)
-{
-    if (x0 * (y1 - y2) + x1 * (y2 - y0) + x2 * (y0 - y1) == 0)
-        return;
-
-    long a, b, y, last;
-    long dx01, dy01, dx02, dy02, dx12, dy12, sa, sb;
-
-    if (y0 > y1)
-    {
-        swap(y0, y1);
-        swap(x0, x1);
-    }
-    if (y1 > y2)
-    {
-        swap(y2, y1);
-        swap(x2, x1);
-    }
-    if (y0 > y1)
-    {
-        swap(y0, y1);
-        swap(x0, x1);
-    }
-
-    dx01 = x1 - x0;
-    dy01 = y1 - y0;
-    dx02 = x2 - x0;
-    dy02 = y2 - y0;
-    dx12 = x2 - x1;
-    dy12 = y2 - y1;
-    sa = 0;
-    sb = 0;
-    if (y1 == y2)
-    {
-        last = y1; // Include y1 scanline
-    }
-    else
-    {
-        last = y1 - 1; // Skip it
-    }
-    for (y = y0; y <= last; y++)
-    {
-        a = x0 + sa / dy01;
-        b = x0 + sb / dy02;
-        sa = sa + dx01;
-        sb = sb + dx02;
-        a = x0 + (x1 - x0) * (y - y0) / (y1 - y0);
-        b = x0 + (x2 - x0) * (y - y0) / (y2 - y0);
-        if (a > b)
-            swap(a, b);
-        hline(a, b, y, 0, ints_per_line, br);
-    }
-    sa = dx12 * (y - y1);
-    sb = dx02 * (y - y0);
-    while (y <= y2)
-    {
-        a = x1 + sa / dy12;
-        b = x0 + sb / dy02;
-        sa = sa + dx12;
-        sb = sb + dx02;
-        a = x1 + (x2 - x1) * (y - y1) / (y2 - y1);
-        b = x0 + (x2 - x0) * (y - y0) / (y2 - y0);
-        if (a > b)
-            swap(a, b);
-        hline(a, b, y, 0, ints_per_line, br);
-        y = y + 1;
-    }
-}
 #define ABS(X) ((X) < 0 ? -(X) : (X))
 #define CLAMP(v, min, max) ((v) < (min) ? (min) : ((v) >= (max) ? (max) - 1 : (v)))
 #define SWAP(a, b)      \
@@ -3060,26 +2943,56 @@ void MIPS16 pointcalc(int angle, int x, int y, int r2, int *x0, int *y0)
 }
 /*  @endcond */
 
-void MIPS16 cmd_arc(void)
+// Fast arc drawing using direct scanline rendering
+// Draws arc segments directly without intermediate bitmap buffer
+
+static inline int normalize_angle(int angle)
 {
-    // Parameters are:
-    // X coordinate of centre of arc
-    // Y coordinate of centre of arc
-    // inner radius of arc
-    // outer radius of arc - omit it 1 pixel wide
-    // start radial of arc in degrees
-    // end radial of arc in degrees
-    // Colour of arc
-    int x, y, r1, r2, c, i, j, k, xs = -1, xi = 0, m;
-    int rad1, rad2, rad3, rstart, quadr;
-    int x0, y0, x1, y1, x2, y2, xr, yr;
+    angle %= 360;
+    return angle < 0 ? angle + 360 : angle;
+}
+
+static inline int point_in_arc_sector(int px, int py, int cx, int cy, int start_deg, int end_deg)
+{
+    // Calculate angle of point relative to center
+    int dx = px - cx;
+    int dy = py - cy;
+
+    if (dx == 0 && dy == 0)
+        return 1;
+
+    // Original uses: 0° = up, 90° = right, 180° = down, 270° = left (clockwise from top)
+    // Standard atan2 gives: 0° = right, 90° = up, 180° = left, 270° = down (counter-clockwise from right)
+    // Convert: angle = 90 - atan2_angle, which is equivalent to atan2(dx, -dy)
+    float angle = atan2f(dx, -dy) * 57.29577951f; // 180/PI
+    if (angle < 0)
+        angle += 360.0f;
+
+    int angle_deg = (int)angle;
+
+    // Handle wrap-around
+    if (end_deg < start_deg)
+        end_deg += 360;
+    if (angle_deg < start_deg)
+        angle_deg += 360;
+
+    return (angle_deg >= start_deg && angle_deg <= end_deg);
+}
+
+void cmd_arc(void)
+{
+    int x, y, r1, r2, c;
+    int rad1, rad2;
+
     getcsargs(&cmdline, 13);
     if (!(argc == 11 || argc == 13))
         StandardError(2);
     CheckDisplay();
+
     x = getinteger(argv[0]);
     y = getinteger(argv[2]);
     r1 = getinteger(argv[4]);
+
     if (*argv[6])
         r2 = getinteger(argv[6]);
     else
@@ -3087,81 +3000,95 @@ void MIPS16 cmd_arc(void)
         r2 = r1;
         r1--;
     }
+
     if (r2 < r1)
         error("Inner radius < outer");
+
     rad1 = getnumber(argv[8]);
     rad2 = getnumber(argv[10]);
-    while (rad1 < 0.0)
-        rad1 += 360.0;
-    while (rad2 < 0.0)
-        rad2 += 360.0;
+
+    // Normalize angles to 0-359
+    rad1 = normalize_angle(rad1);
+    rad2 = normalize_angle(rad2);
+
     if (rad1 == rad2)
         error("Radials");
+
     if (argc == 13)
         c = getint(argv[12], 0, WHITE);
     else
         c = gui_fcolour;
-    while (rad2 < rad1)
+
+    // Ensure rad2 > rad1 for sweep direction
+    if (rad2 < rad1)
         rad2 += 360;
-    rad3 = rad1 + 360;
-    rstart = rad2;
-    int quad1 = (rad1 / 45) % 8;
-    x2 = x;
-    y2 = y;
-    int ints_per_line = RoundUptoInt((r2 * 2) + 1) / 32;
-    uint32_t *br = (uint32_t *)GetTempMainMemory(((ints_per_line + 1) * ((r2 * 2) + 1)) * 4);
-    DrawFilledCircle(x, y, r2, r2, 1, ints_per_line, br, 1.0, 1.0);
-    DrawFilledCircle(x, y, r1, r2, 0, ints_per_line, br, 1.0, 1.0);
-    while (rstart < rad3)
-    {
-        pointcalc(rstart, x, y, r2, &x0, &y0);
-        quadr = (rstart / 45) % 8;
-        if (quadr == quad1 && rad3 - rstart < 45)
-        {
-            pointcalc(rad3, x, y, r2, &x1, &y1);
-            ClearTriangle(x0 - x + r2, y0 - y + r2, x1 - x + r2, y1 - y + r2, x2 - x + r2, y2 - y + r2, ints_per_line, br);
-            rstart = rad3;
-        }
-        else
-        {
-            rstart += 45;
-            rstart -= (rstart % 45);
-            pointcalc(rstart, x, y, r2, &xr, &yr);
-            ClearTriangle(x0 - x + r2, y0 - y + r2, xr - x + r2, yr - y + r2, x2 - x + r2, y2 - y + r2, ints_per_line, br);
-        }
-    }
+
     int save_refresh = Option.Refresh;
     Option.Refresh = 0;
-    for (j = 0; j < r2 * 2 + 1; j++)
+    // Draw arc using scanline method
+    // Iterate through bounding box
+    int min_y = y - r2;
+    int max_y = y + r2;
+    for (int scan_y = min_y; scan_y <= max_y; scan_y++)
     {
-        for (i = 0; i < ints_per_line; i++)
+        int dy = scan_y - y;
+        int dy2 = dy * dy;
+
+        // Calculate x range for outer circle at this y
+        int dx_outer = (int)sqrtf(r2 * r2 - dy2);
+        int dx_inner = (r1 * r1 > dy2) ? (int)sqrtf(r1 * r1 - dy2) : 0;
+
+        // Check left and right segments
+        for (int side = 0; side < 2; side++)
         {
-            k = br[i + j * ints_per_line];
-            for (m = 0; m < 32; m++)
+            int x_start, x_end;
+
+            if (side == 0)
             {
-                if (xs == -1 && (k & 0x80000000))
+                // Left side: from -dx_outer to -dx_inner
+                x_start = x - dx_outer;
+                x_end = x - dx_inner;
+            }
+            else
+            {
+                // Right side: from dx_inner to dx_outer
+                x_start = x + dx_inner;
+                x_end = x + dx_outer;
+            }
+
+            // Find the actual segment within the arc
+            int segment_start = -1;
+            int segment_end = -1;
+
+            for (int scan_x = x_start; scan_x <= x_end; scan_x++)
+            {
+                if (point_in_arc_sector(scan_x, scan_y, x, y, rad1, rad2))
                 {
-                    xs = m;
-                    xi = i;
+                    if (segment_start == -1)
+                        segment_start = scan_x;
+                    segment_end = scan_x;
                 }
-                if (xs != -1 && !(k & 0x80000000))
+                else if (segment_start != -1)
                 {
-                    DrawRectangle(x - r2 + xs + xi * 32, y - r2 + j, x - r2 + m + i * 32, y - r2 + j, c);
-                    xs = -1;
+                    // Draw completed segment
+                    DrawRectangle(segment_start, scan_y, segment_end, scan_y, c);
+                    segment_start = -1;
                 }
-                k <<= 1;
+            }
+
+            // Draw any remaining segment
+            if (segment_start != -1)
+            {
+                DrawRectangle(segment_start, scan_y, segment_end, scan_y, c);
             }
         }
-        if (xs != -1)
-        {
-            DrawRectangle(x - r2 + xs + xi * 32, y - r2 + j, x - r2 + m + i * 32, y - r2 + j, c);
-            xs = -1;
-        }
     }
+
     Option.Refresh = save_refresh;
     if (Option.Refresh)
         Display_Refresh();
 }
+
 /*
  * @cond
  * The following section will be excluded from the documentation.
@@ -10929,6 +10856,29 @@ void fun_getscanline(void)
 //    c - the colour
 void MIPS16 DrawRectangleUser(int x1, int y1, int x2, int y2, int c)
 {
+    // Clamp coordinates (branchless where beneficial)
+    x1 = (x1 < 0) ? 0 : (x1 >= HRes) ? HRes - 1
+                                     : x1;
+    x2 = (x2 < 0) ? 0 : (x2 >= HRes) ? HRes - 1
+                                     : x2;
+    y1 = (y1 < 0) ? 0 : (y1 >= VRes) ? VRes - 1
+                                     : y1;
+    y2 = (y2 < 0) ? 0 : (y2 >= VRes) ? VRes - 1
+                                     : y2;
+
+    // Swap if needed
+    if (x2 < x1)
+    {
+        int t = x1;
+        x1 = x2;
+        x2 = t;
+    }
+    if (y2 < y1)
+    {
+        int t = y1;
+        y1 = y2;
+        y2 = t;
+    }
     char callstr[256];
     unsigned char *nextstmtSaved = nextstmt;
     if (FindSubFun((unsigned char *)"MM.USER_RECTANGLE", 0) >= 0)
@@ -11184,41 +11134,48 @@ __not_in_flash("data") static const uint32_t hline_mask_b[32] = {
     0xff800000, 0xffC00000, 0xffe00000, 0xfff00000, 0xfff80000, 0xfffc0000, 0xfffe0000, 0xffff0000,
     0xffff8000, 0xffffC000, 0xffffe000, 0xfffff000, 0xfffff800, 0xfffffc00, 0xfffffe00, 0xffffff00,
     0xffffff80, 0xffffffC0, 0xffffffe0, 0xfffffff0, 0xfffffff8, 0xfffffffc, 0xfffffffe, 0xffffffff};
+// Helper function to apply hline mask to a single line buffer
+// Helper function to apply hline mask to a single line buffer
+void hline_to_buffer(int x0, int x1, int fill, int ints_per_line, uint32_t *restrict line_buf)
+{
+    if (x1 < x0)
+        return;
+    if (x0 < 0)
+        x0 = 0;
+    if (x1 < 0)
+        return;
 
-#ifdef rp2350
-void __not_in_flash_func(hline)(int x0, int x1, int y, int f, int ints_per_line, uint32_t *restrict br)
-{
-#else
-void hline(int x0, int x1, int y, int f, int ints_per_line, uint32_t *restrict br)
-{
-#endif
-    // OPTIMIZED: Calculate once, no redundant operations
-    uint32_t base_offset = y * ints_per_line;
-    uint32_t w0 = base_offset + (x0 >> 5); // Divide by 32
-    uint32_t w1 = base_offset + (x1 >> 5);
+    int max_x = (ints_per_line << 5) - 1;
+    if (x0 > max_x)
+        return;
+    if (x1 > max_x)
+        x1 = max_x;
+
+    uint32_t w0 = (x0 >> 5); // Divide by 32
+    uint32_t w1 = (x1 >> 5);
     uint32_t xx0 = x0 & 0x1F; // Modulo 32
     uint32_t xx1 = x1 & 0x1F;
 
     if (likely(w1 == w0))
     {
-        // OPTIMIZED: Special case - both endpoints in same word
+        // Special case - both endpoints in same word
         uint32_t mask = hline_mask_a[xx0] & hline_mask_b[xx1];
 
-        if (f)
-            br[w0] |= mask;
+        if (fill)
+            line_buf[w0] |= mask;
         else
-            br[w0] &= ~mask;
+            line_buf[w0] &= ~mask;
     }
     else
     {
-        // OPTIMIZED: Multiple words
+        // Multiple words
         uint32_t word_count = w1 - w0;
 
         if (likely(word_count > 1))
         {
             // Fill full words in between
-            uint32_t fill_val = f ? 0xFFFFFFFF : 0;
-            uint32_t *p = &br[w0 + 1];
+            uint32_t fill_val = fill ? 0xFFFFFFFF : 0;
+            uint32_t *p = &line_buf[w0 + 1];
             uint32_t count = word_count - 1;
 
             // Unroll by 4 for better performance
@@ -11241,43 +11198,149 @@ void hline(int x0, int x1, int y, int f, int ints_per_line, uint32_t *restrict b
         uint32_t mask0 = hline_mask_a[xx0];
         uint32_t mask1 = hline_mask_b[xx1];
 
-        if (f)
+        if (fill)
         {
-            br[w0] = (br[w0] & ~mask0) | mask0;
-            br[w1] = (br[w1] & ~mask1) | mask1;
+            line_buf[w0] |= mask0;
+            line_buf[w1] |= mask1;
         }
         else
         {
-            br[w0] &= ~mask0;
-            br[w1] &= ~mask1;
+            line_buf[w0] &= ~mask0;
+            line_buf[w1] &= ~mask1;
         }
     }
 }
 
-void DrawFilledCircle(int x, int y, int radius, int r, int fill, int ints_per_line, uint32_t *br, MMFLOAT aspect, MMFLOAT aspect2)
+// Draw a horizontal line segment from the line buffer
+void draw_line_from_buffer(uint32_t *line_buf, int ints_per_line, int x_base, int y_coord, int c)
 {
-    int a, b, P;
-    int A, B, asp;
-    x = (int)((MMFLOAT)r * aspect) + radius;
-    y = r + radius;
-    a = 0;
-    b = radius;
-    P = 1 - radius;
-    asp = aspect2 * (MMFLOAT)(1 << 10);
+    int xs = -1;
+    int xi = 0;
+
+    for (int i = 0; i < ints_per_line; i++)
+    {
+        uint32_t k = line_buf[i];
+        int x_start = x_base + (i << 5);
+
+        for (int m = 0; m < 32; m++)
+        {
+            if (xs == -1 && (k & 0x80000000))
+            {
+                xs = m;
+                xi = i;
+            }
+            if (xs != -1 && !(k & 0x80000000))
+            {
+                DrawRectangle(x_base + xs + (xi << 5), y_coord,
+                              x_start + m - 1, y_coord, c);
+                xs = -1;
+            }
+            k <<= 1;
+        }
+    }
+
+    if (xs != -1)
+    {
+        DrawRectangle(x_base + xs + (xi << 5), y_coord,
+                      x_base - 1 + (ints_per_line << 5), y_coord, c);
+    }
+}
+
+// Generate filled circle contributions for a specific scanline
+// center_x is the x-coordinate of the circle center in buffer space
+// center_y is the y-coordinate of the circle center in buffer space
+void generate_circle_scanline(int radius, int center_x, int center_y, int scan_y,
+                              int fill, int ints_per_line, uint32_t *line_buf, int asp)
+{
+    int a = 0;
+    int b = radius;
+    int P = 1 - radius;
+
     do
     {
-        A = (a * asp) >> 10;
-        B = (b * asp) >> 10;
-        hline(x - A - radius, x + A - radius, y + b - radius, fill, ints_per_line, br);
-        hline(x - A - radius, x + A - radius, y - b - radius, fill, ints_per_line, br);
-        hline(x - B - radius, x + B - radius, y + a - radius, fill, ints_per_line, br);
-        hline(x - B - radius, x + B - radius, y - a - radius, fill, ints_per_line, br);
+        int A = (a * asp) >> 10;
+        int B = (b * asp) >> 10;
+
+        // Each Bresenham step generates 4 horizontal lines due to symmetry
+        // Check which ones match our current scanline
+
+        // Lines at y = center_y + b and y = center_y - b
+        if (center_y + b == scan_y)
+        {
+            hline_to_buffer(center_x - A, center_x + A, fill, ints_per_line, line_buf);
+        }
+        if (center_y - b == scan_y)
+        {
+            hline_to_buffer(center_x - A, center_x + A, fill, ints_per_line, line_buf);
+        }
+
+        // Lines at y = center_y + a and y = center_y - a
+        if (center_y + a == scan_y)
+        {
+            hline_to_buffer(center_x - B, center_x + B, fill, ints_per_line, line_buf);
+        }
+        if (center_y - a == scan_y)
+        {
+            hline_to_buffer(center_x - B, center_x + B, fill, ints_per_line, line_buf);
+        }
+
         if (P < 0)
             P += 3 + 2 * a++;
         else
             P += 5 + 2 * (a++ - b--);
 
     } while (a <= b);
+}
+
+// OPTIMIZED: Process circles line-by-line with minimal memory
+void DrawCircleRingLineByLine(int x, int y, int r1, int r2, int c, MMFLOAT aspect, MMFLOAT aspect2)
+{
+    // Calculate the actual width needed for the outer circle
+    int ll = r2;
+    if (aspect > 1.0f)
+        ll = (int)((MMFLOAT)r2 * aspect);
+
+    int ints_per_line = RoundUptoInt((ll << 1) + 1) / 32;
+
+    // Allocate only ONE line buffer
+    uint32_t *line_buf = (uint32_t *)GetTempMainMemory((ints_per_line + 1) << 2);
+
+    // The outer circle center in buffer coordinates
+    // x: stretched by aspect, so center is at (r2 * aspect)
+    // y: not stretched, so center is at r2
+    int center_x_outer = (int)((MMFLOAT)r2 * aspect);
+    int center_y = r2;
+
+    // The inner circle center in buffer coordinates
+    // The inner circle has a different aspect ratio (aspect2)
+    // but it's still centered at the same physical location
+    int center_x_inner = (int)((MMFLOAT)r2 * aspect);
+
+    // Base coordinates for final drawing (top-left of buffer maps to these screen coords)
+    int x_base = x - center_x_outer;
+    int y_base = y - r2;
+
+    int asp_outer = aspect * (MMFLOAT)(1 << 10);
+    int asp_inner = aspect2 * (MMFLOAT)(1 << 10);
+
+    // Process each horizontal line
+    for (int scan_y = 0; scan_y <= (r2 << 1); scan_y++)
+    {
+        int y_coord = y_base + scan_y;
+
+        // Clear line buffer
+        for (int i = 0; i <= ints_per_line; i++)
+            line_buf[i] = 0;
+
+        // Generate outer circle contributions for this scanline
+        generate_circle_scanline(r2, center_x_outer, center_y, scan_y, 1, ints_per_line, line_buf, asp_outer);
+
+        // Generate inner circle contributions (to subtract)
+        generate_circle_scanline(r1, center_x_inner, center_y, scan_y, 0, ints_per_line, line_buf, asp_inner);
+
+        // Draw this line
+        draw_line_from_buffer(line_buf, ints_per_line, x_base, y_coord, c);
+    }
 }
 
 /******************************************************************************************
@@ -12835,8 +12898,6 @@ void cmd_framebuffer(void)
     ;
 }
 #endif
-#include <stdint.h>
-#include <stdbool.h>
 
 // Define your screen bounds here
 #define SCREEN_WIDTH HRes
@@ -12991,8 +13052,22 @@ static inline void set_color_in_buffer(unsigned char *buffer, int index, uint32_
 }
 
 // Scanline flood fill algorithm with block reading
-void floodfill(int x, int y, uint32_t c_new)
+// Supports two modes:
+// 1. Replace mode: if boundary_colour == -1, replace all pixels matching color at (x,y) with internal_colour
+// 2. Boundary mode: if boundary_colour != -1, fill with internal_colour up to boundary_colour
+void floodfill(int x, int y, int internal_colour, int boundary_colour)
 {
+    // Determine which mode we're in
+    bool boundary_mode = (boundary_colour != -1);
+
+    // internal_colour must always be valid (not -1)
+    if (internal_colour == -1)
+    {
+        return; // Invalid: must specify fill color
+    }
+
+    uint32_t c_new = (uint32_t)internal_colour;
+
     // Bounds check
     if (x < 0 || x >= SCREEN_WIDTH || y < 0 || y >= SCREEN_HEIGHT)
     {
@@ -13027,8 +13102,7 @@ void floodfill(int x, int y, uint32_t c_new)
     }
 
     // Allocate a "filled" bitmap to track which pixels we've already processed
-    // This prevents infinite loops without needing to re-read scanlines
-    int bitmap_size = (SCREEN_WIDTH * SCREEN_HEIGHT + 7) / 8; // bits packed into bytes
+    int bitmap_size = (SCREEN_WIDTH * SCREEN_HEIGHT + 7) / 8;
     unsigned char *filled_bitmap = (unsigned char *)GetMemory(bitmap_size);
     if (filled_bitmap == NULL)
     {
@@ -13043,15 +13117,33 @@ void floodfill(int x, int y, uint32_t c_new)
     read_scanline(0, SCREEN_WIDTH - 1, y, line_buffer);
     uint32_t c_origin = get_color_from_buffer(line_buffer, x);
 
-    // If the starting pixel is already the target color, nothing to do
-    if (c_origin == c_new)
+    // Mode-specific validation
+    if (boundary_mode)
     {
-        FreeMemorySafe((void **)&filled_bitmap);
-        FreeMemorySafe((void **)&below_buffer);
-        FreeMemorySafe((void **)&above_buffer);
-        FreeMemorySafe((void **)&line_buffer);
-        free_stack(&stack);
-        return;
+        // In boundary mode, if starting pixel is the boundary color, nothing to do
+        uint32_t c_boundary = (uint32_t)boundary_colour;
+        if (c_origin == c_boundary)
+        {
+            FreeMemorySafe((void **)&filled_bitmap);
+            FreeMemorySafe((void **)&below_buffer);
+            FreeMemorySafe((void **)&above_buffer);
+            FreeMemorySafe((void **)&line_buffer);
+            free_stack(&stack);
+            return;
+        }
+    }
+    else
+    {
+        // In replace mode, if starting pixel is already the target color, nothing to do
+        if (c_origin == c_new)
+        {
+            FreeMemorySafe((void **)&filled_bitmap);
+            FreeMemorySafe((void **)&below_buffer);
+            FreeMemorySafe((void **)&above_buffer);
+            FreeMemorySafe((void **)&line_buffer);
+            free_stack(&stack);
+            return;
+        }
     }
 
     // Push initial point
@@ -13062,7 +13154,7 @@ void floodfill(int x, int y, uint32_t c_new)
         FreeMemorySafe((void **)&above_buffer);
         FreeMemorySafe((void **)&line_buffer);
         free_stack(&stack);
-        return; // Stack overflow on first push
+        return;
     }
 
     int current_y = -1; // Track which line is currently buffered
@@ -13076,12 +13168,6 @@ void floodfill(int x, int y, uint32_t c_new)
             current_y = y;
         }
 
-        // Check if this pixel still needs filling
-        if (get_color_from_buffer(line_buffer, x) != c_origin)
-        {
-            continue;
-        }
-
         // Calculate bitmap position
         int bit_pos = y * SCREEN_WIDTH + x;
         int byte_idx = bit_pos / 8;
@@ -13090,20 +13176,71 @@ void floodfill(int x, int y, uint32_t c_new)
         // Check if we've already processed this pixel
         if (filled_bitmap[byte_idx] & (1 << bit_idx))
         {
-            continue; // Already processed
+            continue;
+        }
+
+        // Check if this pixel should be filled based on mode
+        uint32_t pixel_color = get_color_from_buffer(line_buffer, x);
+        bool should_fill;
+
+        if (boundary_mode)
+        {
+            // Boundary mode: fill if pixel is NOT the boundary color
+            uint32_t c_boundary = (uint32_t)boundary_colour;
+            should_fill = (pixel_color != c_boundary);
+        }
+        else
+        {
+            // Replace mode: only fill if pixel matches origin color
+            should_fill = (pixel_color == c_origin);
+        }
+
+        if (!should_fill)
+        {
+            continue;
         }
 
         // Find leftmost pixel in this row
         int x1 = x;
-        while (x1 > 0 && get_color_from_buffer(line_buffer, x1 - 1) == c_origin)
+        while (x1 > 0)
         {
+            uint32_t left_color = get_color_from_buffer(line_buffer, x1 - 1);
+            bool can_extend;
+
+            if (boundary_mode)
+            {
+                uint32_t c_boundary = (uint32_t)boundary_colour;
+                can_extend = (left_color != c_boundary);
+            }
+            else
+            {
+                can_extend = (left_color == c_origin);
+            }
+
+            if (!can_extend)
+                break;
             x1--;
         }
 
         // Find rightmost pixel in this row
         int x2 = x;
-        while (x2 < SCREEN_WIDTH - 1 && get_color_from_buffer(line_buffer, x2 + 1) == c_origin)
+        while (x2 < SCREEN_WIDTH - 1)
         {
+            uint32_t right_color = get_color_from_buffer(line_buffer, x2 + 1);
+            bool can_extend;
+
+            if (boundary_mode)
+            {
+                uint32_t c_boundary = (uint32_t)boundary_colour;
+                can_extend = (right_color != c_boundary);
+            }
+            else
+            {
+                can_extend = (right_color == c_origin);
+            }
+
+            if (!can_extend)
+                break;
             x2++;
         }
 
@@ -13115,9 +13252,9 @@ void floodfill(int x, int y, uint32_t c_new)
             // Prepare the buffer with new color in B,G,R order
             for (int i = 0; i < span_width; i++)
             {
-                draw_buffer[i * 3] = c_new & 0xFF;             // B
-                draw_buffer[i * 3 + 1] = (c_new >> 8) & 0xFF;  // G
-                draw_buffer[i * 3 + 2] = (c_new >> 16) & 0xFF; // R
+                draw_buffer[i * 3] = c_new & 0xFF;
+                draw_buffer[i * 3 + 1] = (c_new >> 8) & 0xFF;
+                draw_buffer[i * 3 + 2] = (c_new >> 16) & 0xFF;
             }
 
             // Write the entire span at once
@@ -13156,7 +13293,19 @@ void floodfill(int x, int y, uint32_t c_new)
                 if (!(filled_bitmap[b_idx] & (1 << bit)))
                 {
                     uint32_t c = get_color_from_buffer(above_buffer, i);
-                    if (c == c_origin)
+                    bool can_fill;
+
+                    if (boundary_mode)
+                    {
+                        uint32_t c_boundary = (uint32_t)boundary_colour;
+                        can_fill = (c != c_boundary);
+                    }
+                    else
+                    {
+                        can_fill = (c == c_origin);
+                    }
+
+                    if (can_fill)
                     {
                         if (!span_above)
                         {
@@ -13167,7 +13316,7 @@ void floodfill(int x, int y, uint32_t c_new)
                                 FreeMemorySafe((void **)&above_buffer);
                                 FreeMemorySafe((void **)&line_buffer);
                                 free_stack(&stack);
-                                return; // Stack overflow - partial fill
+                                return;
                             }
                             span_above = true;
                         }
@@ -13199,7 +13348,19 @@ void floodfill(int x, int y, uint32_t c_new)
                 if (!(filled_bitmap[b_idx] & (1 << bit)))
                 {
                     uint32_t c = get_color_from_buffer(below_buffer, i);
-                    if (c == c_origin)
+                    bool can_fill;
+
+                    if (boundary_mode)
+                    {
+                        uint32_t c_boundary = (uint32_t)boundary_colour;
+                        can_fill = (c != c_boundary);
+                    }
+                    else
+                    {
+                        can_fill = (c == c_origin);
+                    }
+
+                    if (can_fill)
                     {
                         if (!span_below)
                         {
@@ -13210,7 +13371,7 @@ void floodfill(int x, int y, uint32_t c_new)
                                 FreeMemorySafe((void **)&above_buffer);
                                 FreeMemorySafe((void **)&line_buffer);
                                 free_stack(&stack);
-                                return; // Stack overflow - partial fill
+                                return;
                             }
                             span_below = true;
                         }
@@ -13235,20 +13396,25 @@ void floodfill(int x, int y, uint32_t c_new)
     FreeMemorySafe((void **)&line_buffer);
     free_stack(&stack);
 }
+
 void cmd_fill(void)
 {
-    getcsargs(&cmdline, 5);
+    uint32_t c = -1, b = -1;
+    getcsargs(&cmdline, 7);
     if ((void *)ReadBuffer == (void *)DisplayNotSet)
         StandardError(11);
     if (!(Option.DISPLAY_TYPE))
         error("No display");
-    if (!(argc == 5))
+    if (!(argc == 5 || argc == 7))
         SyntaxError();
-    ;
+
     int x = getint(argv[0], 0, HRes - 1);
     int y = getint(argv[2], 0, VRes - 1);
-    uint32_t c = (uint32_t)getColour((char *)argv[4], 0);
-    floodfill(x, y, c);
+    c = (uint32_t)getColour((char *)argv[4], 0);
+    if (argc == 7)
+        b = (uint32_t)getColour((char *)argv[6], 0);
+    // Call with replace mode (boundary_colour = -1)
+    floodfill(x, y, c, b);
 }
 #if defined(rp2350) && defined(PICOMITE)
 #endif

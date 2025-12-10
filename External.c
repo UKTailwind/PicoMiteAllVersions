@@ -115,7 +115,7 @@ const char *PinFunction[] = {
     "PIO1",
     "PIO2",
     "FFIN",
-#ifdef PICONITE
+#ifdef PICOMITE
     "KEYBOARD"
 #endif
 #else

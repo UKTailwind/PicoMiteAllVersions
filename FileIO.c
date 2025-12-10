@@ -6194,7 +6194,6 @@ void ResetOptions(bool startup)
     Option.capslock = 0;
     Option.numlock = 1;
     Option.ColourCode = 1;
-    Option.mousespeed = 1.0f;
 #else
 #ifdef HDMI
     Option.HDMIclock = 2;

@@ -1927,22 +1927,27 @@ void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance, uint8_t const *desc_re
 		HID[slot].report_requested = false;
 		// Switch from boot protocol to report protocol to enable wheel support
 		// Analyze the mouse descriptor
-		mouse_info_t mouse_info;
-		if (desc_len > 0 && desc_report != NULL)
+		if (Option.mousespeed > 0.0)
 		{
-			mouse_report_type_t mouse_type = analyze_mouse_descriptor(desc_report, desc_len, &mouse_info);
-
-			// Store the mouse type for later use
-			HID[slot].mouse_type = mouse_type;
-			memcpy((void *)&HID[slot].mouse_info, &mouse_info, sizeof(mouse_info_t));
-
-			// Print info
-			if (!CurrentLinePtr)
+			mouse_info_t mouse_info;
+			if (desc_len > 0 && desc_report != NULL)
 			{
-				print_mouse_info(&mouse_info);
+				mouse_report_type_t mouse_type = analyze_mouse_descriptor(desc_report, desc_len, &mouse_info);
+
+				// Store the mouse type for later use
+				HID[slot].mouse_type = mouse_type;
+				memcpy((void *)&HID[slot].mouse_info, &mouse_info, sizeof(mouse_info_t));
+
+				// Print info
+				if (!CurrentLinePtr)
+				{
+					print_mouse_info(&mouse_info);
+				}
 			}
+			tuh_hid_set_protocol(dev_addr, instance, HID_PROTOCOL_REPORT);
 		}
-		tuh_hid_set_protocol(dev_addr, instance, HID_PROTOCOL_REPORT);
+		else
+			HID[slot].mouse_type = MOUSE_TYPE_STANDARD_8BIT;
 		if (!CurrentLinePtr)
 		{
 			MMPrintString("USB Mouse Connected on channel ");
@@ -2537,8 +2542,8 @@ static void process_mouse_report(hid_mouse_report_t const *report, uint8_t n)
 	case MOUSE_TYPE_STANDARD_8BIT:
 		// Standard 4-byte mouse
 		buttons = report->buttons;
-		x_delta = (int16_t)((float)report->x / Option.mousespeed);
-		y_delta = (int16_t)((float)report->y / Option.mousespeed);
+		x_delta = (int16_t)((float)report->x / (Option.mousespeed == 0.0f ? 1.0f : Option.mousespeed));
+		y_delta = (int16_t)((float)report->y / (Option.mousespeed == 0.0f ? 1.0f : Option.mousespeed));
 		wheel_delta = report->wheel;
 		break;
 

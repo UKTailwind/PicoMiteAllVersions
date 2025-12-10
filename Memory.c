@@ -713,7 +713,10 @@ void MIPS16 cmd_memory(void)
                 i += MRoundUp(nbr * (g_vartbl[var].size + 1));
         }
         else if (g_vartbl[var].type & T_STR)
-            i += STRINGSIZE;
+        {
+            if (g_vartbl[var].val.s != (void *)&g_vartbl[var].dims[1])
+                i += STRINGSIZE;
+        }
     }
     VarSize = (vsize + i + 512) / 1024; // this is the memory allocated to variables
     VarPercent = ((vsize + i) * 100) / CurrentRAM;

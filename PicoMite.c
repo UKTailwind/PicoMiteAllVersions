@@ -219,6 +219,7 @@ uint8_t PSRAMpin;
     volatile unsigned int WDTimer = 0;
     volatile unsigned int diskchecktimer = DISKCHECKRATE;
     volatile unsigned int clocktimer = 60 * 60 * 1000;
+    volatile unsigned int bufferupdatetimer = 0;
     volatile unsigned int PauseTimer = 0;
     volatile unsigned int ClassicTimer = 0;
     volatile unsigned int NunchuckTimer = 0;
@@ -381,7 +382,10 @@ uint8_t PSRAMpin;
         (void *)&CFuncInt4,         // 0xbc
         (void *)PIOExecute,
     };
-
+#ifdef rp2350
+    // this is a frig to place the calltable at 0x1000023C as in previous releases
+    const int AallTableloc[2] __attribute__((section(".text"))) = {0, 1};
+#endif
     const struct s_PinDef PinDef[] = {
         {0, 99, "NULL", UNUSED, 99, 99},
         {1, 0, "GP0", DIGITAL_IN | DIGITAL_OUT | SPI0RX | UART0TX | I2C0SDA | PWM0A, 99, 0},  // pin 1
@@ -541,9 +545,6 @@ uint8_t PSRAMpin;
         //        static int when = 0;
         static int classicread = 0, nunchuckread = 0;
         static uint64_t lastrun = 0;
-#if PICOMITERP2350
-        static uint64_t lastscreenwrite = 0;
-#endif
         uint64_t timenow = time_us_64();
         if (timenow - lastrun < 1000)
             return;
@@ -642,10 +643,10 @@ uint8_t PSRAMpin;
 
         // === Display buffer refresh (RP2350) ===
 #if PICOMITERP2350
-        if (timenow - lastscreenwrite > 10000)
+        if (bufferupdatetimer == 0)
         {
 
-            lastscreenwrite = timenow;
+            bufferupdatetimer = 10;
 
             if (Option.DISPLAY_TYPE >= NEXTGEN &&
                 !(low_x == silly_low && high_x == silly_high &&
@@ -654,12 +655,14 @@ uint8_t PSRAMpin;
 
                 if (Option.Refresh)
                 {
-                    multicore_fifo_push_blocking(6);
-                    multicore_fifo_push_blocking((uint32_t)low_x | (high_x << 16));
-                    multicore_fifo_push_blocking((uint32_t)low_y | (high_y << 16));
+                    if (multicore_fifo_push_timeout_us(6, 10))
+                    {
+                        multicore_fifo_push_blocking((uint32_t)low_x | (high_x << 16));
+                        multicore_fifo_push_blocking((uint32_t)low_y | (high_y << 16));
 
-                    low_x = low_y = silly_low;
-                    high_x = high_y = silly_high;
+                        low_x = low_y = silly_low;
+                        high_x = high_y = silly_high;
+                    }
                 }
             }
         }
@@ -2131,6 +2134,7 @@ int __not_in_flash_func(MMInkey)(void)
         }
 
 #if PICOMITERP2350
+        DECREMENT_IF_ACTIVE(bufferupdatetimer);
         if (Option.LOCAL_KEYBOARD && mSecTimer % LOCALKEYSCANRATE == 0)
             cmd_keyscan();
 #endif
@@ -5499,11 +5503,6 @@ uint32_t testPSRAM(void)
         }
         uSec(1000000);
         initKeyboard();
-#else
-    if (Option.mousespeed == 0.0f)
-        Option.mousespeed = 1.0f;
-    SaveOptions();
-
 #endif
         InitBasic();
 #ifndef PICOMITEVGA

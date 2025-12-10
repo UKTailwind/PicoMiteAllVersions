@@ -2605,7 +2605,7 @@ void MIPS16 printoptions(void)
         PO2Str("PICO PLUS 2", "ON");
 #endif
 #ifdef USBKEYBOARD
-    if (Option.mousespeed != 1.0f)
+    if (Option.mousespeed != 0.0f)
     {
         PO("MOUSE SENSITIVITY ");
         PFlt(Option.mousespeed);
@@ -4652,11 +4652,15 @@ void MIPS16 cmd_option(void)
     tp = checkstring(cmdline, (unsigned char *)"MOUSE SENSITIVITY");
     if (tp)
     {
-        float sens = (float)getnumber((unsigned char *)tp);
-        if (sens < 0.001 || sens > 1000.0f)
-            error("Value is invalid (valid is 0.001 to 1000.0)", sens);
+        float sens = (float)getnumber((unsigned char *)tp), was = Option.mousespeed;
+        if (sens < 0.0f || sens > 1000.0f)
+            error("Value is invalid (valid is 0.0 to 1000.0)", sens);
         Option.mousespeed = sens;
         SaveOptions();
+        if ((was == 0.0f && Option.mousespeed != 0.0f) || (was != 0.0f && Option.mousespeed == 0.0f))
+        {
+            SoftReset(SOFT_RESET);
+        }
         return;
     }
 
