@@ -32,6 +32,8 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * The following section will be excluded from the documentation.
  */
 
+#include <stdarg.h>
+#include <math.h>
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
 #include "hardware/spi.h"
@@ -2831,7 +2833,7 @@ void cmd_box(void)
  * The following section will be excluded from the documentation.
  */
 
-void MIPS16 bezier(float x0, float y0, float x1, float y1, float x2, float y2, float x3, float y3, int c)
+/*void MIPS16 bezier(float x0, float y0, float x1, float y1, float x2, float y2, float x3, float y3, int c)
 {
     float tmp, tmp1, tmp2, tmp3, tmp4, tmp5, tmp6, tmp7, tmp8, t = 0.0, xt = x0, yt = y0;
     int i, xti, yti, xtlast = -1, ytlast = -1;
@@ -2859,87 +2861,236 @@ void MIPS16 bezier(float x0, float y0, float x1, float y1, float x2, float y2, f
         t += 0.002;
     }
     DrawBuffered(0, 0, 0, 1);
+}*/
+
+// Fixed-point configuration: 10.22 format (10 bits integer, 22 bits fraction)
+#define FP_SHIFT 24
+#define FP_ONE (1 << FP_SHIFT)
+#define FP_HALF (1 << (FP_SHIFT - 1))
+
+// Convert integer to fixed-point
+#define INT_TO_FP(x) ((int32_t)(x) << FP_SHIFT)
+
+// Convert fixed-point to integer (with rounding)
+#define FP_TO_INT(x) (((x) + FP_HALF) >> FP_SHIFT)
+
+// Fixed-point multiplication
+#define FP_MUL(a, b) (((int64_t)(a) * (int64_t)(b)) >> FP_SHIFT)
+
+// Binomial coefficient calculation (unchanged)
+static int binomial(int n, int k)
+{
+    if (k > n)
+        return 0;
+    if (k == 0 || k == n)
+        return 1;
+    int result = 1;
+    for (int i = 0; i < k; i++)
+    {
+        result *= (n - i);
+        result /= (i + 1);
+    }
+    return result;
 }
 
-void MIPS16 pointcalc(int angle, int x, int y, int r2, int *x0, int *y0)
+// Fast integer square root for bounding box diagonal
+static int isqrt(int n)
 {
-    float c1, s1;
-    int quad;
-    angle %= 360;
-    switch (angle)
+    if (n < 2)
+        return n;
+
+    int x = n;
+    int y = (x + 1) / 2;
+
+    while (y < x)
     {
-    case 0:
-        *x0 = x;
-        *y0 = y - r2;
-        break;
-    case 45:
-        *x0 = x + r2 + 1;
-        *y0 = y - r2;
-        break;
-    case 90:
-        *x0 = x + r2 + 1;
-        *y0 = y;
-        break;
-    case 135:
-        *x0 = x + r2 + 1;
-        *y0 = y + r2;
-        break;
-    case 180:
-        *x0 = x;
-        *y0 = y + r2;
-        break;
-    case 225:
-        *x0 = x - r2;
-        *y0 = y + r2;
-        break;
-    case 270:
-        *x0 = x - r2;
-        *y0 = y;
-        break;
-    case 315:
-        *x0 = x - r2;
-        *y0 = y - r2;
-        break;
-    default:
-        c1 = cos(Rad(angle));
-        s1 = sin(Rad(angle));
-        quad = (angle / 45) % 8;
-        switch (quad)
+        x = y;
+        y = (x + n / x) / 2;
+    }
+
+    return x;
+}
+
+// Function to plot n-point Bezier curve using fixed-point arithmetic
+void PlotBezier(int n, int c, int64_t *x, int64_t *y)
+{
+    int32_t t_fp, one_minus_t_fp;
+    int64_t x_val, y_val;
+    int prev_x, prev_y;
+
+    // Calculate bounding box to estimate curve length
+    int min_x = x[0], max_x = x[0];
+    int min_y = y[0], max_y = y[0];
+    for (int i = 1; i < n; i++)
+    {
+        if (x[i] < min_x)
+            min_x = x[i];
+        if (x[i] > max_x)
+            max_x = x[i];
+        if (y[i] < min_y)
+            min_y = y[i];
+        if (y[i] > max_y)
+            max_y = y[i];
+    }
+
+    // Estimate steps based on bounding box diagonal
+    int bbox_width = max_x - min_x;
+    int bbox_height = max_y - min_y;
+    int bbox_diag = isqrt(bbox_width * bbox_width + bbox_height * bbox_height);
+    int num_steps = bbox_diag * 3;
+
+    // Clamp to reasonable range
+    if (num_steps < 10)
+        num_steps = 10;
+    if (num_steps > 2000)
+        num_steps = 2000;
+
+    // Pre-calculate binomial coefficients
+    int binom_coeffs[16]; // Assuming max 16 control points
+    for (int i = 0; i < n; i++)
+    {
+        binom_coeffs[i] = binomial(n - 1, i);
+    }
+
+    // Calculate and draw first point
+    prev_x = x[0];
+    prev_y = y[0];
+    DrawPixel(prev_x, prev_y, c);
+
+    int line_start_x = prev_x;
+    int line_start_y = prev_y;
+    int line_dx = 0;
+    int line_dy = 0;
+    int line_len = 0;
+
+    // Pre-allocate arrays for power calculations (incremental approach)
+    int32_t t_powers[16];   // t^i in fixed-point
+    int32_t omt_powers[16]; // (1-t)^i in fixed-point
+
+    // Plot the Bezier curve using line segments
+    for (int step = 1; step <= num_steps; step++)
+    {
+        // Calculate t in fixed-point: t = step / num_steps
+        t_fp = ((int64_t)step << FP_SHIFT) / num_steps;
+        one_minus_t_fp = FP_ONE - t_fp;
+
+        // Calculate powers incrementally using previous values
+        // t^0 = 1, t^1 = t, t^2 = t * t^1, etc.
+        t_powers[0] = FP_ONE;
+        omt_powers[0] = FP_ONE;
+
+        for (int i = 1; i < n; i++)
         {
-        case 0:
-            *y0 = y - r2;
-            *x0 = x + s1 * r2 / c1;
-            break;
-        case 1:
-            *x0 = x + r2 + 1;
-            *y0 = y - c1 * r2 / s1;
-            break;
-        case 2:
-            *x0 = x + r2 + 1;
-            *y0 = y - c1 * r2 / s1;
-            break;
-        case 3:
-            *y0 = y + r2;
-            *x0 = x - s1 * r2 / c1;
-            break;
-        case 4:
-            *y0 = y + r2;
-            *x0 = x - s1 * r2 / c1;
-            break;
-        case 5:
-            *x0 = x - r2;
-            *y0 = y + c1 * r2 / s1;
-            break;
-        case 6:
-            *x0 = x - r2;
-            *y0 = y + c1 * r2 / s1;
-            break;
-        case 7:
-            *y0 = y - r2;
-            *x0 = x + s1 * r2 / c1;
-            break;
+            t_powers[i] = FP_MUL(t_powers[i - 1], t_fp);
+            omt_powers[i] = FP_MUL(omt_powers[i - 1], one_minus_t_fp);
+        }
+
+        x_val = 0;
+        y_val = 0;
+
+        // Calculate point using Bezier formula with fixed-point
+        for (int i = 0; i < n; i++)
+        {
+            // basis = binomial(n-1,i) * (1-t)^(n-1-i) * t^i
+            // Note: binomial coefficient is integer, powers are fixed-point
+            int32_t basis_fp = FP_MUL(omt_powers[n - 1 - i], t_powers[i]);
+
+            // Multiply by binomial coefficient (integer)
+            basis_fp = basis_fp * binom_coeffs[i];
+
+            // Accumulate: basis * coordinate
+            x_val += (int64_t)basis_fp * x[i];
+            y_val += (int64_t)basis_fp * y[i];
+        }
+
+        // Convert back to integer coordinates
+        // Need to shift by FP_SHIFT since basis_fp is already in fixed-point
+        int curr_x = (int)((x_val + FP_HALF) >> FP_SHIFT);
+        int curr_y = (int)((y_val + FP_HALF) >> FP_SHIFT);
+
+        // Only process if coordinate changed
+        // Only process if coordinate changed
+        if (curr_x != prev_x || curr_y != prev_y)
+        {
+            int dx = curr_x - prev_x;
+            int dy = curr_y - prev_y;
+            // If jump > 1 pixel, bridge it immediately
+            if (dx > 1 || dx < -1 || dy > 1 || dy < -1)
+            {
+                if (line_len > 1)
+                {
+                    DrawLine(line_start_x, line_start_y, prev_x, prev_y, 1, c);
+                }
+                else if (line_len == 1)
+                {
+                    DrawPixel(prev_x, prev_y, c);
+                }
+                DrawLine(prev_x, prev_y, curr_x, curr_y, 1, c);
+                line_len = 0; // reset run
+            }
+            else
+            {
+
+                // Check if this continues the current straight line
+                if (line_len > 0 && dx == line_dx && dy == line_dy)
+                {
+                    line_len++;
+                }
+                else
+                {
+                    // Direction changed - draw accumulated line if any
+                    if (line_len > 1)
+                    {
+                        DrawLine(line_start_x, line_start_y, prev_x, prev_y, 1, c);
+                    }
+                    else if (line_len == 1)
+                    {
+                        DrawPixel(prev_x, prev_y, c);
+                    }
+
+                    // Start new line segment
+                    line_start_x = prev_x;
+                    line_start_y = prev_y;
+                    line_dx = dx;
+                    line_dy = dy;
+                    line_len = 1;
+                }
+            }
+            prev_x = curr_x;
+            prev_y = curr_y;
         }
     }
+
+    // Draw final accumulated line segment
+    if (line_len > 1)
+    {
+        DrawLine(line_start_x, line_start_y, prev_x, prev_y, 1, c);
+    }
+    else if (line_len == 1)
+    {
+        DrawPixel(prev_x, prev_y, c);
+    }
+}
+
+void cmd_bezier(void)
+{
+    int64_t *x = NULL;
+    int64_t *y = NULL;
+    int countx, county;
+    getcsargs(&cmdline, 7);
+    if (argc < 3)
+        SyntaxError();
+    countx = parseintegerarray(argv[0], &x, 1, 1, NULL, false);
+    county = parseintegerarray(argv[2], &y, 2, 1, NULL, false);
+    if (countx != county)
+        StandardError(16);
+    int n = countx;
+    if (argc >= 5 && *argv[4])
+        n = getint(argv[4], 2, countx);
+    int colour = WHITE;
+    if (argc == 7)
+        colour = getColour((char *)argv[6], 0);
+    PlotBezier(n, colour, x, y);
 }
 /*  @endcond */
 
@@ -3654,7 +3805,7 @@ void MIPS16 fun_at(void)
     getcsargs(&ep, 5);
     if (commandfunction(cmdtoken) != cmd_print)
         error("Invalid function");
-    //	if((argc == 3 || argc == 5)) error("Incorrect number of arguments");
+    //	if((argc == 3 || argc == 5)) StandardError(2);
     //	AutoLineWrap = false;
     CurrentX = getinteger(argv[0]);
     if (argc >= 3 && *argv[2])
@@ -13416,5 +13567,3 @@ void cmd_fill(void)
     // Call with replace mode (boundary_colour = -1)
     floodfill(x, y, c, b);
 }
-#if defined(rp2350) && defined(PICOMITE)
-#endif

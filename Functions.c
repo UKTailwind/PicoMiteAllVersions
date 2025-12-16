@@ -74,6 +74,7 @@ const char *overlaid_functions[] = {
 	"MM.WIDTH",
 	"MM.HEIGHT",
 	"MM.PERSISTENT",
+	"MM.CODE",
 #ifndef PICOMITEWEB
 	"MM.SUPPLY",
 #endif
@@ -599,6 +600,7 @@ void fun_byte(void)
 	targ = T_INT;
 }
 extern int USBcode;
+extern volatile unsigned char stepper_gcode_buffer_space;
 
 void fun_tilde(void)
 {
@@ -728,6 +730,11 @@ void fun_tilde(void)
 	case MMPERSISTENT:
 		iret = _persistent;
 		break;
+#ifdef GCODE
+	case MMCODE:
+		iret = (int64_t)stepper_gcode_buffer_space;
+		break;
+#endif
 #ifndef PICOMITEWEB
 	case MMSUPPLY:
 		if (ExtCurrentConfig[44] == EXT_ANA_IN

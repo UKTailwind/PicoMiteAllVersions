@@ -2553,7 +2553,7 @@ void PrintFunctKeys(int typ)
     if (typ == EDIT)
     {
         if (VWidth >= 78)
-            p = "ESC:Exit F1:Save F2:Run F3/6:Find/r F4:Mark F5:Paste F7/8:Repl/r";
+            p = "ESC:Exit F1:Save F2:Run F3/6:Find/r F4:Mrk F5:Paste F7/8:Repl/r          ";
         else if (VWidth >= 62)
             p = "F1:Save F2:Run F3:Find F4:Mark F5:Paste";
         else
@@ -2593,17 +2593,11 @@ void PrintFunctKeys(int typ)
 void PrintStatus(void)
 {
     int tx;
-    char s[MAXSTRLEN];
+    char s[MAXSTRLEN], temp[32];
 
     tx = edx + curx + 1;
-    sprintf(s, "L:%d C:%d %s", edy + cury + 1, tx, insert ? "INS" : "OVR");
-    //    strcpy(s, "L: ");
-    //    IntToStr(s + strlen(s), edy + cury + 1, 10);
-    //    strcat(s + strlen(s), " C: ");
-    //    IntToStr(s + strlen(s), tx, 10);
-    //    strcat(s, "     ");
-    //    strcpy(s + 15, insert ? "INS" : "OVR");
-
+    sprintf(temp, "L:%d C:%d %s", edy + cury + 1, tx, insert ? "INS" : "OVR");
+    sprintf(s, "%16s", temp);
     MX470Cursor((VWidth - strlen(s)) * gui_font_width, (VRes / gui_font_height) * gui_font_height - gui_font_height);
     MX470PutS(s, GUI_C_STATUS, gui_bcolour); // display the string on the display attached to the MX470
 

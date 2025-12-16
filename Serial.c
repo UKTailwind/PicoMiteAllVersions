@@ -41,7 +41,7 @@ unsigned char *com1Tx_buf;			   // pointer to the buffer for transmitted charact
 volatile int com1Tx_head, com1Tx_tail; // head and tail of the ring buffer for com1
 volatile int com1complete = 1;
 uint16_t Rx1Buffer;
-char com1_mode;				 // keeps track of the settings for com4
+char com1_mode;				 // keeps track of the settings for com1
 unsigned char com1_bit9 = 0; // used to track the 9th bit
 extern uint32_t ticks_per_microsecond;
 
@@ -57,7 +57,7 @@ volatile int com2Rx_head, com2Rx_tail; // head and tail of the ring buffer for c
 unsigned char *com2Tx_buf;			   // pointer to the buffer for transmitted characters
 volatile int com2Tx_head, com2Tx_tail; // head and tail of the ring buffer for com2 Tx
 volatile int com2complete = 1;
-char com2_mode;				 // keeps track of the settings for com4
+char com2_mode;				 // keeps track of the settings for com2
 unsigned char com2_bit9 = 0; // used to track the 9th bit
 // uart interrupt handler
 void on_uart_irq0()

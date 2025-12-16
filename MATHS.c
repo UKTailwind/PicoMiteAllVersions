@@ -1250,8 +1250,9 @@ void cmd_math(void)
 			evaluate(argv[2], &f, &i64, &s, &t, false);
 			if (t & T_STR)
 				SyntaxError();
-			;
 			scale = getnumber(argv[2]);
+			if ((MMFLOAT)i64 != scale)
+				t &= (~T_INT);
 			card2 = parsenumberarray(argv[4], &a2float, &a2int, 3, 0, dims, true);
 			if (card1 != card2)
 				error("Size mismatch");
@@ -1270,12 +1271,12 @@ void cmd_math(void)
 				else if (a2float == NULL && a1float != NULL)
 				{
 					for (i = 0; i < card1; i++)
-						(*a2int++) = FloatToInt64(((t & T_INT) ? i64 : FloatToInt64(f)) * (*a1float++));
+						(*a2int++) = FloatToInt64(((t & T_INT) ? i64 : f) * (*a1float++));
 				}
 				else
 				{
 					for (i = 0; i < card1; i++)
-						(*a2int++) = ((t & T_INT) ? i64 : FloatToInt64(f)) * (*a1int++);
+						(*a2int++) = ((t & T_INT) ? i64 : f) * (*a1int++);
 				}
 			}
 			else

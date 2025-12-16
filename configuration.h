@@ -55,24 +55,24 @@ extern "C"
 #define HEAP_MEMORY_SIZE (184 * 1024)
 #endif
 
-#define FLASH_TARGET_OFFSET (784 * 1024)
+#define FLASH_TARGET_OFFSET (816 * 1024)
 
 /* HDMI-specific settings */
 #ifdef HDMI
 #define MAXMODES 5
 #ifdef USBKEYBOARD
-#define MagicKey 0x94F7FF85
+#define MagicKey 0x94123F85
 #else
-#define MagicKey 0x4F2A4CED
+#define MagicKey 0x41234CED
 #endif
 #define MAX_CPU Freq378P
 #define MIN_CPU FreqX
 #else
 #define MAXMODES 3
 #ifdef USBKEYBOARD
-#define MagicKey 0x722874B3
+#define MagicKey 0x721234B3
 #else
-#define MagicKey 0x0904A487
+#define MagicKey 0x09123487
 #endif
 #define MAX_CPU 378000
 #define MIN_CPU 252000
@@ -84,12 +84,11 @@ extern "C"
 #define MAXGLOBALVARS 256 // Configurable split
 #define MAXLOCALVARS 224
 #define MAXVARS (MAXGLOBALVARS + MAXLOCALVARS)
+#define FLASH_TARGET_OFFSET (736 * 1024)
 #ifdef USBKEYBOARD
-#define FLASH_TARGET_OFFSET (736 * 1024)
-#define MagicKey 0x609509F4
+#define MagicKey 0x601239F4
 #else
-#define FLASH_TARGET_OFFSET (736 * 1024)
-#define MagicKey 0xD9277AF5
+#define MagicKey 0xD9123AF5
 #endif
 
 #define MAXMODES 2
@@ -195,18 +194,19 @@ extern "C"
 #define MAXLOCALVARS 256
 #define MAXVARS (MAXGLOBALVARS + MAXLOCALVARS)
 #define HEAP_MEMORY_SIZE (200 * 1024)
+#define FLASH_TARGET_OFFSET (1136 * 1024)
 #else
 #define MAXSUBFUN 256
 #define MAXGLOBALVARS 256 // Configurable split
 #define MAXLOCALVARS 224
 #define MAXVARS (MAXGLOBALVARS + MAXLOCALVARS)
 #define HEAP_MEMORY_SIZE (88 * 1024)
+#define FLASH_TARGET_OFFSET (1072 * 1024)
 #endif
 
 #include "lwipopts_examples_common.h"
 
-#define FLASH_TARGET_OFFSET (1120 * 1024)
-#define MagicKey 0x8DEDD8E6
+#define MagicKey 0x8123D8E6
 #define MaxPcb 8
 #define MAX_CPU 252000
 #define MIN_CPU 126000
@@ -225,14 +225,14 @@ extern "C"
 #define MAXGLOBALVARS 512 // Configurable split
 #define MAXLOCALVARS 224
 #define MAXVARS (MAXGLOBALVARS + MAXLOCALVARS)
-#define FLASH_TARGET_OFFSET (864 * 1024)
+#define FLASH_TARGET_OFFSET (880 * 1024)
 #define MAX_CPU 396000
 #define MAXSUBFUN 512
 
 #ifdef USBKEYBOARD
-#define MagicKey 0x5C538A65
+#define MagicKey 0x5C123A65
 #else
-#define MagicKey 0x1A3F2EB4
+#define MagicKey 0x1A123EB4
 #endif
 #else
 #define HEAP_MEMORY_SIZE (124 * 1024)
@@ -244,9 +244,9 @@ extern "C"
 #define MAXSUBFUN 256
 
 #ifdef USBKEYBOARD
-#define MagicKey 0x0EEAEDDA
+#define MagicKey 0x0E123DDA
 #else
-#define MagicKey 0xF6841C5B
+#define MagicKey 0xF6123C5B
 #endif
 #endif
 
@@ -556,6 +556,7 @@ extern "C"
                 MMWIDTH,
                 MMHEIGHT,
                 MMPERSISTENT,
+                MMCODE,
 #ifndef PICOMITEWEB
                 MMSUPPLY,
 #endif

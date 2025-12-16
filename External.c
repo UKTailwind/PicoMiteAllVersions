@@ -1202,6 +1202,12 @@ void MIPS16 ExtCfg(int pin, int cfg, int option)
         break;
 #endif
     case EXT_FAST_TIMER:
+        // Check for conflict with stepper system (uses same IRQ)
+#ifdef GCODE
+        extern volatile bool stepper_initialized;
+        if (stepper_initialized)
+            error("FAST TIMER incompatible with STEPPER");
+#endif
         if (!(PinDef[pin].mode & PWM0B))
             StandardError(8);
         if ((PWM0Bpin != 99 && PWM0Bpin != pin))
@@ -4069,7 +4075,7 @@ void cmd_DHT22(void)
 
     getcsargs(&cmdline, 7);
     if (!(argc == 5 || argc == 7))
-        error("Incorrect number of arguments");
+        StandardError(2);
 
     // get the two variables
     temp = findvar(argv[2], V_FIND);

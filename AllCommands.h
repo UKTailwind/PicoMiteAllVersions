@@ -216,6 +216,10 @@ void cmd_fill(void);
 void cmd_turtle(void);
 void cmd_lmid(void);
 void cmd_redim(void);
+void cmd_bezier(void);
+void cmd_star(void);
+void cmd_locate(void);
+void cmd_stepper(void);
 
 #ifdef PICOMITEWEB
 void cmd_web(void);
@@ -608,6 +612,13 @@ void fun_linputstr(void);
 #endif
 	{(unsigned char *)"LMid(", T_CMD | T_FUN, 0, cmd_lmid},
 	{(unsigned char *)"ReDim", T_CMD, 0, cmd_redim},
+	{(unsigned char *)"Bezier", T_CMD, 0, cmd_bezier},
+#ifdef rp2350
+	{(unsigned char *)"Star", T_CMD, 0, cmd_star},
+	{(unsigned char *)"Astro", T_CMD, 0, cmd_star},
+	{(unsigned char *)"Location", T_CMD, 0, cmd_locate},
+//	{(unsigned char *)"Stepper", T_CMD, 0, cmd_stepper},
+#endif
 {
 	(unsigned char *)"", 0, 0, cmd_null
 } // this dummy entry is always at the end

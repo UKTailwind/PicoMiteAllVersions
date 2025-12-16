@@ -656,7 +656,7 @@ void fun_epoch(void)
         h = atoi((char *)argv[6]);
         min = atoi((char *)argv[8]);
         s = atoi((char *)argv[10]);
-        if (h < 0 || h > 23 || min < 0 || m > 59 || s < 0 || s > 59)
+        if (h < 0 || h > 23 || min < 0 || min > 59 || s < 0 || s > 59)
             error("Invalid time");
         //            day = d;
         //            month = m;

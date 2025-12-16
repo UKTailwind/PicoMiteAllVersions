@@ -582,60 +582,324 @@ i2c_error_exit:
 }
 #endif
 
-void RtcGetTime(int noerror)
+// ============== RTC Type Abstraction ==============
+typedef enum
 {
-  char *buff = GetTempStrMemory(); // Received data is stored here
-  int DS1307;
-  clocktimer = (1000 * 60 * 60);
+  RTC_NONE = 0,
+  RTC_DS1307,  // Also DS3231, address 0x68
+  RTC_PCF8563, // Address 0x51
+  RTC_RV3028   // Address 0x52
+} RtcType;
+
+typedef struct
+{
+  RtcType type;
+  uint8_t address;
+  uint8_t reg_start;   // First register to read for time
+  uint8_t reg_seconds; // Offset within read buffer for seconds
+  uint8_t reg_minutes;
+  uint8_t reg_hours;
+  uint8_t reg_day;
+  uint8_t reg_month;
+  uint8_t reg_year;
+  uint8_t read_count; // Number of bytes to read
+} RtcConfig;
+
+static const RtcConfig rtc_configs[] = {
+    // DS1307/DS3231: Start at reg 0, read 7 bytes
+    // Layout: [0]=sec, [1]=min, [2]=hr, [3]=dow, [4]=day, [5]=mon, [6]=yr
+    {RTC_DS1307, 0x68, 0, 0, 1, 2, 4, 5, 6, 7},
+
+    // PCF8563: Start at reg 2, read 7 bytes
+    // Layout: [0]=sec, [1]=min, [2]=hr, [3]=day, [4]=dow, [5]=mon, [6]=yr
+    {RTC_PCF8563, 0x51, 2, 0, 1, 2, 3, 5, 6, 7},
+
+    // RV3028: Start at reg 0, read 7 bytes
+    // Layout: [0]=sec, [1]=min, [2]=hr, [3]=dow, [4]=day, [5]=mon, [6]=yr
+    {RTC_RV3028, 0x52, 0, 0, 1, 2, 4, 5, 6, 7},
+};
+
+static RtcType detected_rtc = RTC_NONE;
+static const RtcConfig *active_rtc = NULL;
+
+// Helper to convert BCD to decimal
+static inline int BcdToDec(uint8_t bcd)
+{
+  return ((bcd >> 4) * 10) + (bcd & 0x0F);
+}
+
+// Helper to convert decimal to BCD
+static inline uint8_t DecToBcd(int dec)
+{
+  return (uint8_t)(((dec / 10) << 4) | (dec % 10));
+}
+
+// Probe for an RTC at the given address
+static int RtcProbe(uint8_t address)
+{
   if (I2C0locked)
   {
-    I2C_Sendlen = 1; // send one byte
+    I2C_Sendlen = 1;
     I2C_Rcvlen = 0;
     I2C_Status = 0;
-    I2C_Send_Buffer[0] = 0; // the first register to read
-    if (!(DS1307 = DoRtcI2C(0x68, NULL)))
-    {
-      I2C_Send_Buffer[0] = 2; // the first register is different for the PCF8563
-      if (!DoRtcI2C(0x51, NULL))
-        goto error_exit;
-    }
-    I2C_Rcvbuf_String = buff; // we want a string of bytes
-    I2C_Rcvbuf_Float = NULL;
-    I2C_Rcvbuf_Int = NULL;
-    I2C_Rcvlen = 7; // get 7 bytes
-    I2C_Sendlen = 0;
-    if (!DoRtcI2C(DS1307 ? 0x68 : 0x51, (unsigned char *)buff))
-      goto error_exit;
+    I2C_Send_Buffer[0] = 0;
   }
   else
   {
-    I2C2_Sendlen = 1; // send one byte
+    I2C2_Sendlen = 1;
     I2C2_Rcvlen = 0;
     I2C2_Status = 0;
-    I2C_Send_Buffer[0] = 0; // the first register to read
-    if (!(DS1307 = DoRtcI2C(0x68, NULL)))
+    I2C_Send_Buffer[0] = 0;
+  }
+  return DoRtcI2C(address, NULL);
+}
+
+// Detect which RTC is connected
+static int RtcDetect(void)
+{
+  for (int i = 0; i < (int)(sizeof(rtc_configs) / sizeof(rtc_configs[0])); i++)
+  {
+    if (RtcProbe(rtc_configs[i].address))
     {
-      I2C_Send_Buffer[0] = 2; // the first register is different for the PCF8563
-      if (!DoRtcI2C(0x51, NULL))
-        goto error_exit;
+      detected_rtc = rtc_configs[i].type;
+      active_rtc = &rtc_configs[i];
+      return 1;
     }
-    I2C2_Rcvbuf_String = buff; // we want a string of bytes
+  }
+  detected_rtc = RTC_NONE;
+  active_rtc = NULL;
+  return 0;
+}
+
+// Read time registers from active RTC into buffer
+static int RtcReadTime(char *buff)
+{
+  if (!active_rtc)
+    return 0;
+
+  // Set register pointer
+  if (I2C0locked)
+  {
+    I2C_Sendlen = 1;
+    I2C_Rcvlen = 0;
+    I2C_Send_Buffer[0] = active_rtc->reg_start;
+  }
+  else
+  {
+    I2C2_Sendlen = 1;
+    I2C2_Rcvlen = 0;
+    I2C_Send_Buffer[0] = active_rtc->reg_start;
+  }
+  if (!DoRtcI2C(active_rtc->address, NULL))
+    return 0;
+
+  // Read time registers
+  if (I2C0locked)
+  {
+    I2C_Rcvbuf_String = buff;
+    I2C_Rcvbuf_Float = NULL;
+    I2C_Rcvbuf_Int = NULL;
+    I2C_Rcvlen = active_rtc->read_count;
+    I2C_Sendlen = 0;
+  }
+  else
+  {
+    I2C2_Rcvbuf_String = buff;
     I2C2_Rcvbuf_Float = NULL;
     I2C2_Rcvbuf_Int = NULL;
-    I2C2_Rcvlen = 7; // get 7 bytes
+    I2C2_Rcvlen = active_rtc->read_count;
     I2C2_Sendlen = 0;
-    if (!DoRtcI2C(DS1307 ? 0x68 : 0x51, (unsigned char *)buff))
-      goto error_exit;
   }
-  //    mT4IntEnable(0);
+  return DoRtcI2C(active_rtc->address, (unsigned char *)buff);
+}
+
+// Decode time from raw buffer using active RTC config
+static void RtcDecodeTime(char *buff, int *year, int *month, int *day,
+                          int *hour, int *minute, int *second)
+{
+  const RtcConfig *cfg = active_rtc;
+  *second = BcdToDec(buff[cfg->reg_seconds] & 0x7F);
+  *minute = BcdToDec(buff[cfg->reg_minutes] & 0x7F);
+  *hour = BcdToDec(buff[cfg->reg_hours] & 0x3F);
+  *day = BcdToDec(buff[cfg->reg_day] & 0x3F);
+  *month = BcdToDec(buff[cfg->reg_month] & 0x1F);
+  *year = BcdToDec(buff[cfg->reg_year]) + 2000;
+}
+
+// Write time to active RTC
+static int RtcWriteTime(int year, int month, int day, int hour, int minute, int second)
+{
+  if (!active_rtc)
+    return 0;
+
+  uint8_t yr = DecToBcd(year % 100);
+  uint8_t mo = DecToBcd(month);
+  uint8_t dy = DecToBcd(day);
+  uint8_t hr = DecToBcd(hour);
+  uint8_t mi = DecToBcd(minute);
+  uint8_t se = DecToBcd(second);
+
+  if (active_rtc->type == RTC_DS1307)
+  {
+    // DS1307/DS3231: write 8 bytes starting at reg 0
+    I2C_Send_Buffer[0] = 0;  // Register pointer
+    I2C_Send_Buffer[1] = se; // Seconds
+    I2C_Send_Buffer[2] = mi; // Minutes
+    I2C_Send_Buffer[3] = hr; // Hours
+    I2C_Send_Buffer[4] = 1;  // Day of week (dummy)
+    I2C_Send_Buffer[5] = dy; // Day
+    I2C_Send_Buffer[6] = mo; // Month
+    I2C_Send_Buffer[7] = yr; // Year
+    if (I2C0locked)
+    {
+      I2C_Sendlen = 8;
+      I2C_Rcvlen = 0;
+    }
+    else
+    {
+      I2C2_Sendlen = 8;
+      I2C2_Rcvlen = 0;
+    }
+  }
+  else if (active_rtc->type == RTC_PCF8563)
+  {
+    // PCF8563: write 9 bytes starting at reg 0
+    I2C_Send_Buffer[0] = 0;  // Register pointer
+    I2C_Send_Buffer[1] = 0;  // Control 1
+    I2C_Send_Buffer[2] = 0;  // Control 2
+    I2C_Send_Buffer[3] = se; // Seconds
+    I2C_Send_Buffer[4] = mi; // Minutes
+    I2C_Send_Buffer[5] = hr; // Hours
+    I2C_Send_Buffer[6] = dy; // Day
+    I2C_Send_Buffer[7] = 1;  // Weekday (dummy)
+    I2C_Send_Buffer[8] = mo; // Month
+    I2C_Send_Buffer[9] = yr; // Year
+    if (I2C0locked)
+    {
+      I2C_Sendlen = 10;
+      I2C_Rcvlen = 0;
+    }
+    else
+    {
+      I2C2_Sendlen = 10;
+      I2C2_Rcvlen = 0;
+    }
+  }
+  else if (active_rtc->type == RTC_RV3028)
+  {
+    // RV3028: write 8 bytes starting at reg 0
+    I2C_Send_Buffer[0] = 0;  // Register pointer
+    I2C_Send_Buffer[1] = se; // Seconds
+    I2C_Send_Buffer[2] = mi; // Minutes
+    I2C_Send_Buffer[3] = hr; // Hours
+    I2C_Send_Buffer[4] = 1;  // Weekday (dummy)
+    I2C_Send_Buffer[5] = dy; // Day
+    I2C_Send_Buffer[6] = mo; // Month
+    I2C_Send_Buffer[7] = yr; // Year
+    if (I2C0locked)
+    {
+      I2C_Sendlen = 8;
+      I2C_Rcvlen = 0;
+    }
+    else
+    {
+      I2C2_Sendlen = 8;
+      I2C2_Rcvlen = 0;
+    }
+  }
+
+  return DoRtcI2C(active_rtc->address, NULL);
+}
+
+// Read a single register from active RTC
+static int RtcReadRegister(uint8_t reg, uint8_t *value)
+{
+  if (!active_rtc)
+    return 0;
+
+  if (I2C0locked)
+  {
+    I2C_Sendlen = 1;
+    I2C_Rcvlen = 0;
+    I2C_Send_Buffer[0] = reg;
+  }
+  else
+  {
+    I2C2_Sendlen = 1;
+    I2C2_Rcvlen = 0;
+    I2C_Send_Buffer[0] = reg;
+  }
+  if (!DoRtcI2C(active_rtc->address, NULL))
+    return 0;
+
+  char buff[1];
+  if (I2C0locked)
+  {
+    I2C_Rcvbuf_String = buff;
+    I2C_Rcvbuf_Float = NULL;
+    I2C_Rcvbuf_Int = NULL;
+    I2C_Rcvlen = 1;
+    I2C_Sendlen = 0;
+  }
+  else
+  {
+    I2C2_Rcvbuf_String = buff;
+    I2C2_Rcvbuf_Float = NULL;
+    I2C2_Rcvbuf_Int = NULL;
+    I2C2_Rcvlen = 1;
+    I2C2_Sendlen = 0;
+  }
+  if (!DoRtcI2C(active_rtc->address, (unsigned char *)buff))
+    return 0;
+  *value = buff[0];
+  return 1;
+}
+
+// Write a single register to active RTC
+static int RtcWriteRegister(uint8_t reg, uint8_t value)
+{
+  if (!active_rtc)
+    return 0;
+
+  I2C_Send_Buffer[0] = reg;
+  I2C_Send_Buffer[1] = value;
+  if (I2C0locked)
+  {
+    I2C_Sendlen = 2;
+    I2C_Rcvlen = 0;
+  }
+  else
+  {
+    I2C2_Sendlen = 2;
+    I2C2_Rcvlen = 0;
+  }
+
+  return DoRtcI2C(active_rtc->address, NULL);
+}
+
+// ============== End RTC Abstraction ==============
+
+void RtcGetTime(int noerror)
+{
+  char *buff = GetTempStrMemory();
+  clocktimer = (1000 * 60 * 60);
+
+  // Detect which RTC is connected
+  if (!RtcDetect())
+  {
+    goto error_exit;
+  }
+
+  // Read time registers
+  if (!RtcReadTime(buff))
+  {
+    goto error_exit;
+  }
+
+  // Decode time using active RTC configuration
   int year, month, day, hour, minute, second;
-  second = ((buff[0] & 0x7f) >> 4) * 10 + (buff[0] & 0x0f);
-  minute = ((buff[1] & 0x7f) >> 4) * 10 + (buff[1] & 0x0f);
-  hour = ((buff[2] & 0x3f) >> 4) * 10 + (buff[2] & 0x0f);
-  day = ((buff[DS1307 ? 4 : 3] & 0x3f) >> 4) * 10 + (buff[DS1307 ? 4 : 3] & 0x0f);
-  month = ((buff[5] & 0x1f) >> 4) * 10 + (buff[5] & 0x0f);
-  year = (buff[6] >> 4) * 10 + (buff[6] & 0x0f) + 2000;
-  //    mT4IntEnable(1);
+  RtcDecodeTime(buff, &year, &month, &day, &hour, &minute, &second);
+
   TimeOffsetToUptime = get_epoch(year, month, day, hour, minute, second) - time_us_64() / 1000000;
   return;
 
@@ -675,12 +939,12 @@ char CvtCharsToBCD(unsigned char *p, int min, int max)
 /*  @endcond */
 void MIPS16 cmd_rtc(void)
 {
-  char buff[7]; // Received data is stored here
-  int DS1307;
   unsigned char *p;
   void *ptr = NULL;
+
   if (!(I2C0locked || I2C1locked))
     StandardError(44);
+
   if (checkstring(cmdline, (unsigned char *)"GETTIME"))
   {
     int repeat = 5;
@@ -708,195 +972,111 @@ void MIPS16 cmd_rtc(void)
         MMPrintString("\r\n");
       }
     }
-
     return;
   }
+
   if ((p = checkstring(cmdline, (unsigned char *)"SETTIME")) != NULL)
   {
     int Fulldate = 0;
+    int year, month, day, hour, minute, second;
+
     getcsargs(&p, 11);
-    if (I2C0locked)
+
+    // Parse the time arguments (same for both I2C buses)
+    if (argc == 1)
     {
-      if (argc == 1)
-      {
-        // single argument - assume the data is in DATETIME2 format used by GUI FORMATBOX
-        p = getCstring(argv[0]);
-        if (!(p[2] == '/' || p[2] == '-') || !(p[11] == ':' || p[13] == ':'))
-          error("Date/time format");
-        if (p[13] == ':')
-          Fulldate = 2;
-        if (p[14 + Fulldate] == ':')
-          I2C_Send_Buffer[1] = CvtCharsToBCD(p + 15 + Fulldate, 0, 59); // seconds
-        else
-          I2C_Send_Buffer[1] = 0;                                     // seconds defaults to zero
-        I2C_Send_Buffer[2] = CvtCharsToBCD(p + 12 + Fulldate, 0, 59); // minutes
-        I2C_Send_Buffer[3] = CvtCharsToBCD(p + 9 + Fulldate, 0, 23);  // hour
-        I2C_Send_Buffer[5] = CvtCharsToBCD(p, 1, 31);                 // day
-        I2C_Send_Buffer[6] = CvtCharsToBCD(p + 3, 1, 12);             // month
-        I2C_Send_Buffer[7] = CvtCharsToBCD(p + 6 + Fulldate, 0, 99);  // year
-      }
+      // single argument - assume the data is in DATETIME2 format: DD/MM/YY HH:MM:SS or DD/MM/YYYY HH:MM:SS
+      p = getCstring(argv[0]);
+      if (!(p[2] == '/' || p[2] == '-') || !(p[11] == ':' || p[13] == ':'))
+        error("Date/time format");
+      if (p[13] == ':')
+        Fulldate = 2;
+
+      // Parse date part
+      day = (p[0] - '0') * 10 + (p[1] - '0');
+      month = (p[3] - '0') * 10 + (p[4] - '0');
+      year = (p[6 + Fulldate] - '0') * 10 + (p[7 + Fulldate] - '0');
+
+      // Parse time part
+      hour = (p[9 + Fulldate] - '0') * 10 + (p[10 + Fulldate] - '0');
+      minute = (p[12 + Fulldate] - '0') * 10 + (p[13 + Fulldate] - '0');
+      if (p[14 + Fulldate] == ':')
+        second = (p[15 + Fulldate] - '0') * 10 + (p[16 + Fulldate] - '0');
       else
-      {
-        // multiple arguments - data should be in the original yy, mm, dd, etc format
-        if (argc != 11)
-          StandardError(2);
-        I2C_Send_Buffer[1] = CvtToBCD(argv[10], 0, 59);  // seconds
-        I2C_Send_Buffer[2] = CvtToBCD(argv[8], 0, 59);   // minutes
-        I2C_Send_Buffer[3] = CvtToBCD(argv[6], 0, 23);   // hour
-        I2C_Send_Buffer[5] = CvtToBCD(argv[4], 1, 31);   // day
-        I2C_Send_Buffer[6] = CvtToBCD(argv[2], 1, 12);   // month
-        I2C_Send_Buffer[7] = CvtToBCD(argv[0], 0, 2099); // year
-      }
-      I2C_Send_Buffer[0] = 0; // turn off the square wave
-      I2C_Send_Buffer[4] = 1;
-      I2C_Rcvlen = 0;
-      I2C_Sendlen = 9; // send 7 bytes
-      if (!DoRtcI2C(0x68, NULL))
-      {
-        I2C_Send_Buffer[9] = I2C_Send_Buffer[7]; // year
-        I2C_Send_Buffer[8] = I2C_Send_Buffer[6]; // month
-        I2C_Send_Buffer[7] = 1;
-        I2C_Send_Buffer[6] = I2C_Send_Buffer[5];                          // day
-        I2C_Send_Buffer[5] = I2C_Send_Buffer[3];                          // hour
-        I2C_Send_Buffer[4] = I2C_Send_Buffer[2];                          // minutes
-        I2C_Send_Buffer[3] = I2C_Send_Buffer[1];                          // seconds
-        I2C_Send_Buffer[0] = I2C_Send_Buffer[1] = I2C_Send_Buffer[2] = 0; // set the register pointer to the first register then zero the first two registers
-        I2C_Sendlen = 10;                                                 // send 10 bytes
-        if (!DoRtcI2C(0x51, NULL))
-          StandardError(30);
-      }
+        second = 0;
     }
     else
     {
-      if (argc == 1)
-      {
-        // single argument - assume the data is in DATETIME2 format used by GUI FORMATBOX
-        p = getCstring(argv[0]);
-        if (!(p[2] == '/' || p[2] == '-') || !(p[11] == ':' || p[13] == ':'))
-          error("Date/time format");
-        if (p[13] == ':')
-          Fulldate = 2;
-        if (p[14 + Fulldate] == ':')
-          I2C_Send_Buffer[1] = CvtCharsToBCD(p + 15 + Fulldate, 0, 59); // seconds
-        else
-          I2C_Send_Buffer[1] = 0;                                     // seconds defaults to zero
-        I2C_Send_Buffer[2] = CvtCharsToBCD(p + 12 + Fulldate, 0, 59); // minutes
-        I2C_Send_Buffer[3] = CvtCharsToBCD(p + 9 + Fulldate, 0, 23);  // hour
-        I2C_Send_Buffer[5] = CvtCharsToBCD(p, 1, 31);                 // day
-        I2C_Send_Buffer[6] = CvtCharsToBCD(p + 3, 1, 12);             // month
-        I2C_Send_Buffer[7] = CvtCharsToBCD(p + 6 + Fulldate, 0, 99);  // year
-      }
-      else
-      {
-        // multiple arguments - data should be in the original yy, mm, dd, etc format
-        if (argc != 11)
-          StandardError(2);
-        I2C_Send_Buffer[1] = CvtToBCD(argv[10], 0, 59);  // seconds
-        I2C_Send_Buffer[2] = CvtToBCD(argv[8], 0, 59);   // minutes
-        I2C_Send_Buffer[3] = CvtToBCD(argv[6], 0, 23);   // hour
-        I2C_Send_Buffer[5] = CvtToBCD(argv[4], 1, 31);   // day
-        I2C_Send_Buffer[6] = CvtToBCD(argv[2], 1, 12);   // month
-        I2C_Send_Buffer[7] = CvtToBCD(argv[0], 0, 2099); // year
-      }
-      I2C_Send_Buffer[0] = 0; // turn off the square wave
-      I2C_Send_Buffer[4] = 1;
-      I2C2_Rcvlen = 0;
-      I2C2_Sendlen = 9; // send 7 bytes
-      if (!DoRtcI2C(0x68, NULL))
-      {
-        I2C_Send_Buffer[9] = I2C_Send_Buffer[7]; // year
-        I2C_Send_Buffer[8] = I2C_Send_Buffer[6]; // month
-        I2C_Send_Buffer[7] = 1;
-        I2C_Send_Buffer[6] = I2C_Send_Buffer[5];                          // day
-        I2C_Send_Buffer[5] = I2C_Send_Buffer[3];                          // hour
-        I2C_Send_Buffer[4] = I2C_Send_Buffer[2];                          // minutes
-        I2C_Send_Buffer[3] = I2C_Send_Buffer[1];                          // seconds
-        I2C_Send_Buffer[0] = I2C_Send_Buffer[1] = I2C_Send_Buffer[2] = 0; // set the register pointer to the first register then zero the first two registers
-        I2C2_Sendlen = 10;                                                // send 10 bytes
-        if (!DoRtcI2C(0x51, NULL))
-          StandardError(30);
-      }
+      // multiple arguments - data should be in the original yy, mm, dd, etc format
+      if (argc != 11)
+        StandardError(2);
+      year = getint(argv[0], 0, 2099) % 100;
+      month = getint(argv[2], 1, 12);
+      day = getint(argv[4], 1, 31);
+      hour = getint(argv[6], 0, 23);
+      minute = getint(argv[8], 0, 59);
+      second = getint(argv[10], 0, 59);
     }
+
+    // Detect RTC and write time
+    if (!RtcDetect())
+      StandardError(30);
+
+    if (!RtcWriteTime(year, month, day, hour, minute, second))
+      StandardError(30);
+
     RtcGetTime(0);
+    return;
   }
-  else if ((p = checkstring(cmdline, (unsigned char *)"GETREG")) != NULL)
+
+  if ((p = checkstring(cmdline, (unsigned char *)"GETREG")) != NULL)
   {
     getcsargs(&p, 3);
     if (argc != 3)
       StandardError(2);
-    if (I2C0locked)
-    {
-      I2C_Sendlen = 1; // send one byte
-      I2C_Rcvlen = 0;
-      *I2C_Send_Buffer = getint(argv[0], 0, 255); // the register to read
-    }
-    else
-    {
-      I2C2_Sendlen = 1; // send one byte
-      I2C2_Rcvlen = 0;
-      *I2C_Send_Buffer = getint(argv[0], 0, 255); // the register to read
-    }
+
     ptr = findvar(argv[2], V_FIND);
     if (g_vartbl[g_VarIndex].type & T_CONST)
       StandardError(22);
     if (g_vartbl[g_VarIndex].type & T_STR)
       StandardError(6);
 
-    if (!(DS1307 = DoRtcI2C(0x68, NULL)))
-    {
-      if (!DoRtcI2C(0x51, NULL))
-        StandardError(30);
-    }
-    if (I2C0locked)
-    {
-      I2C_Rcvbuf_String = buff; // we want a string of bytes
-      I2C_Rcvbuf_Float = NULL;
-      I2C_Rcvbuf_Int = NULL;
-      I2C_Rcvlen = 1; // get 1 byte
-      I2C_Sendlen = 0;
-    }
-    else
-    {
-      I2C2_Rcvbuf_String = buff; // we want a string of bytes
-      I2C2_Rcvbuf_Float = NULL;
-      I2C2_Rcvbuf_Int = NULL;
-      I2C2_Rcvlen = 1; // get 1 byte
-      I2C2_Sendlen = 0;
-    }
-    if (!DoRtcI2C(DS1307 ? 0x68 : 0x51, (unsigned char *)buff))
+    // Detect RTC
+    if (!RtcDetect())
       StandardError(30);
+
+    // Read register
+    uint8_t reg = getint(argv[0], 0, 255);
+    uint8_t value = 0;
+    if (!RtcReadRegister(reg, &value))
+      StandardError(30);
+
     if (g_vartbl[g_VarIndex].type & T_NBR)
-      *(MMFLOAT *)ptr = buff[0];
+      *(MMFLOAT *)ptr = value;
     else
-      *(long long int *)ptr = buff[0];
+      *(long long int *)ptr = value;
+    return;
   }
-  else if ((p = checkstring(cmdline, (unsigned char *)"SETREG")) != NULL)
+
+  if ((p = checkstring(cmdline, (unsigned char *)"SETREG")) != NULL)
   {
     getcsargs(&p, 3);
     if (argc != 3)
       StandardError(2);
-    if (I2C0locked)
-    {
-      I2C_Rcvlen = 0;
-      I2C_Send_Buffer[0] = getint(argv[0], 0, 255); // set the register pointer
-      I2C_Send_Buffer[1] = getint(argv[2], 0, 255); // and the data to be written
-      I2C_Sendlen = 2;                              // send 2 bytes
-    }
-    else
-    {
-      I2C2_Rcvlen = 0;
-      I2C_Send_Buffer[0] = getint(argv[0], 0, 255); // set the register pointer
-      I2C_Send_Buffer[1] = getint(argv[2], 0, 255); // and the data to be written
-      I2C2_Sendlen = 2;                             // send 2 bytes
-    }
-    if (!DoRtcI2C(0x68, NULL))
-    {
-      if (!DoRtcI2C(0x51, NULL))
-        StandardError(30);
-    }
+
+    // Detect RTC
+    if (!RtcDetect())
+      StandardError(30);
+
+    // Write register
+    uint8_t reg = getint(argv[0], 0, 255);
+    uint8_t value = getint(argv[2], 0, 255);
+    if (!RtcWriteRegister(reg, value))
+      StandardError(30);
+    return;
   }
-  else
-    StandardError(36);
+
+  StandardError(36);
 }
 /*
  * @cond
