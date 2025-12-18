@@ -3575,7 +3575,7 @@ void cmd_keypad(void)
             KeypadInterrupt = GetIntAddress(argv[4]); // get the interrupt location
             keypadrows = getint(argv[8], 1, 31);
             keypadcols = getint(argv[12], 1, 31);
-            parsefloatrarray(argv[0], &a1float, 1, 2, dims, false);
+            parsefloatarray(argv[0], &a1float, 1, 2, dims, false);
             if (dims[0] - g_OptionBase + 1 != keypadrows)
             {
                 keypadcols = keypadrows = 0;
@@ -5193,12 +5193,12 @@ void cmd_adc(void)
             ADCscale[i] = VCC / 4095.0;
             ADCbottom[i] = 0;
         }
-        ADCmax = parsefloatrarray(argv[0], (MMFLOAT **)&a1float, 1, 1, NULL, true);
+        ADCmax = parsefloatarray(argv[0], (MMFLOAT **)&a1float, 1, 1, NULL, true);
         if (argc >= 3 && *argv[2])
         {
             if (ADCopen < 2)
                 error("Second channel not open");
-            card = parsefloatrarray(argv[2], (MMFLOAT **)&a2float, 2, 1, NULL, true);
+            card = parsefloatarray(argv[2], (MMFLOAT **)&a2float, 2, 1, NULL, true);
             if (card != ADCmax)
                 StandardError(16);
         }
@@ -5206,7 +5206,7 @@ void cmd_adc(void)
         {
             if (ADCopen < 3)
                 error("Third channel not open");
-            card = parsefloatrarray(argv[4], (MMFLOAT **)&a3float, 3, 1, NULL, true);
+            card = parsefloatarray(argv[4], (MMFLOAT **)&a3float, 3, 1, NULL, true);
             if (card != ADCmax)
                 StandardError(16);
         }
@@ -5214,7 +5214,7 @@ void cmd_adc(void)
         {
             if (ADCopen < 4)
                 error("Fourth channel not open");
-            card = parsefloatrarray(argv[6], (MMFLOAT **)&a4float, 4, 1, NULL, true);
+            card = parsefloatarray(argv[6], (MMFLOAT **)&a4float, 4, 1, NULL, true);
             if (card != ADCmax)
                 StandardError(16);
         }

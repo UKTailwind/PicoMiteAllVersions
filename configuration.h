@@ -84,7 +84,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
             #define MAXGLOBALVARS 256 // Configurable split
             #define MAXLOCALVARS 224
             #define MAXVARS (MAXGLOBALVARS + MAXLOCALVARS)
-            #define FLASH_TARGET_OFFSET (736 * 1024)
+            #define FLASH_TARGET_OFFSET (752 * 1024)
             #ifdef USBKEYBOARD
                 #define MagicKey 0x601239F4
             #else
@@ -201,7 +201,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
             #define MAXLOCALVARS 224
             #define MAXVARS (MAXGLOBALVARS + MAXLOCALVARS)
             #define HEAP_MEMORY_SIZE (88 * 1024)
-            #define FLASH_TARGET_OFFSET (1072 * 1024)
+            #define FLASH_TARGET_OFFSET (1088 * 1024)
         #endif
 
         #include "lwipopts_examples_common.h"

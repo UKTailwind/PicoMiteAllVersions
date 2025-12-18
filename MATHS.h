@@ -170,11 +170,21 @@ void MadgwickQuaternionUpdate(MMFLOAT ax, MMFLOAT ay, MMFLOAT az,
 /* ============================================================================
  * Function declarations - Array parsing (platform-specific)
  * ============================================================================ */
+
+/*
+ * MMBasic maths subcommands (syntax reference)
+ *   MATH SINC x_in(), y_in(), n [, m], window, freq, x_out(), y_out()
+ *     - If m omitted (or m = n): windowed sinc smoothing to n samples
+ *     - If m provided and m != n: windowed sinc interpolation/resampling to m samples
+ *     - window: kernel size (odd; even values rounded up)
+ *     - freq: normalized cutoff (0..0.5)
+ *     - x_out()/y_out(): output arrays (size >= m)
+ */
 #ifdef rp2350
 int parsenumberarray(unsigned char *tp, MMFLOAT **a1float, int64_t **a1int,
 					 int argno, int dimensions, int *dims, bool ConstantNotAllowed);
-int parsefloatrarray(unsigned char *tp, MMFLOAT **a1float,
-					 int argno, int dimensions, int *dims, bool ConstantNotAllowed);
+int parsefloatarray(unsigned char *tp, MMFLOAT **a1float,
+					int argno, int dimensions, int *dims, bool ConstantNotAllowed);
 int parseintegerarray(unsigned char *tp, int64_t **a1int,
 					  int argno, int dimensions, int *dims, bool ConstantNotAllowed);
 int parsestringarray(unsigned char *tp, unsigned char **a1str,
@@ -183,8 +193,8 @@ int parsestringarray(unsigned char *tp, unsigned char **a1str,
 #else
 int parsenumberarray(unsigned char *tp, MMFLOAT **a1float, int64_t **a1int,
 					 int argno, short dimensions, short *dims, bool ConstantNotAllowed);
-int parsefloatrarray(unsigned char *tp, MMFLOAT **a1float,
-					 int argno, int dimensions, short *dims, bool ConstantNotAllowed);
+int parsefloatarray(unsigned char *tp, MMFLOAT **a1float,
+					int argno, int dimensions, short *dims, bool ConstantNotAllowed);
 int parseintegerarray(unsigned char *tp, int64_t **a1int,
 					  int argno, int dimensions, short *dims, bool ConstantNotAllowed);
 int parsestringarray(unsigned char *tp, unsigned char **a1str,

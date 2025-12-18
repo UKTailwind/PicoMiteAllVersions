@@ -760,10 +760,10 @@ int parsenumberarray(unsigned char *tp, MMFLOAT **a1float, int64_t **a1int, int 
 	return card;
 }
 #ifdef rp2350
-int parsefloatrarray(unsigned char *tp, MMFLOAT **a1float, int argno, int dimensions, int *dims, bool ConstantNotAllowed)
+int parsefloatarray(unsigned char *tp, MMFLOAT **a1float, int argno, int dimensions, int *dims, bool ConstantNotAllowed)
 {
 #else
-int parsefloatrarray(unsigned char *tp, MMFLOAT **a1float, int argno, int dimensions, short *dims, bool ConstantNotAllowed)
+int parsefloatarray(unsigned char *tp, MMFLOAT **a1float, int argno, int dimensions, short *dims, bool ConstantNotAllowed)
 {
 #endif
 	void *ptr1 = NULL;
@@ -800,6 +800,168 @@ int parsefloatrarray(unsigned char *tp, MMFLOAT **a1float, int argno, int dimens
 	}
 	return card;
 }
+/**
+ * Apply a windowed sinc filter to smooth coordinate data.
+ *
+ * Parameters:
+ *   x_in        - Input X coordinates
+ *   y_in        - Input Y coordinates
+ *   n           - Number of input points
+ *   x_out       - Pre-allocated output array for smoothed X coordinates (size n)
+ *   y_out       - Pre-allocated output array for smoothed Y coordinates (size n)
+ *   cutoff_freq - Normalized cutoff frequency (0 to 0.5, lower = more smoothing)
+ *   window_size - Size of filter kernel (must be odd)
+ *
+ * Returns: 0 on success, -1 on error
+ */
+int sinc_filter(const MMFLOAT *x_in, const MMFLOAT *y_in, int n,
+				MMFLOAT *x_out, MMFLOAT *y_out,
+				MMFLOAT cutoff_freq, int window_size)
+{
+	int i, j, t;
+	int center, pad_width, padded_len;
+	MMFLOAT sum, kernel_sum;
+	MMFLOAT *kernel, *x_padded, *y_padded;
+
+	if (n <= 0 || window_size <= 0 || !x_out || !y_out)
+		return -1;
+
+	// Ensure window_size is odd
+	if (window_size % 2 == 0)
+	{
+		window_size++;
+	}
+
+	center = window_size / 2;
+	pad_width = window_size / 2;
+	padded_len = n + 2 * pad_width;
+
+	// Allocate kernel
+	kernel = (double *)GetTempMemory(window_size * sizeof(double));
+	if (!kernel)
+		return -1;
+
+	// Create sinc filter kernel with Hamming window
+	kernel_sum = 0.0;
+	for (i = 0; i < window_size; i++)
+	{
+		t = i - center;
+		double hamming = 0.54 - 0.46 * cos(2.0 * M_PI * i / (window_size - 1));
+
+		if (t == 0)
+		{
+			kernel[i] = 2.0 * cutoff_freq * hamming;
+		}
+		else
+		{
+			kernel[i] = (sin(2.0 * M_PI * cutoff_freq * t) / (M_PI * t)) * hamming;
+		}
+		kernel_sum += kernel[i];
+	}
+
+	// Normalize kernel
+	for (i = 0; i < window_size; i++)
+	{
+		kernel[i] /= kernel_sum;
+	}
+
+	// Allocate padded arrays
+	x_padded = (MMFLOAT *)GetTempMemory(padded_len * sizeof(MMFLOAT));
+	y_padded = (MMFLOAT *)GetTempMemory(padded_len * sizeof(MMFLOAT));
+
+	// Pad with edge values
+	for (i = 0; i < pad_width; i++)
+	{
+		x_padded[i] = x_in[0];
+		y_padded[i] = y_in[0];
+		x_padded[padded_len - 1 - i] = x_in[n - 1];
+		y_padded[padded_len - 1 - i] = y_in[n - 1];
+	}
+	for (i = 0; i < n; i++)
+	{
+		x_padded[i + pad_width] = x_in[i];
+		y_padded[i + pad_width] = y_in[i];
+	}
+
+	// Apply convolution
+	for (i = 0; i < n; i++)
+	{
+		sum = 0.0;
+		for (j = 0; j < window_size; j++)
+		{
+			sum += x_padded[i + j] * kernel[j];
+		}
+		x_out[i] = sum;
+
+		sum = 0.0;
+		for (j = 0; j < window_size; j++)
+		{
+			sum += y_padded[i + j] * kernel[j];
+		}
+		y_out[i] = sum;
+	}
+
+	// Clean up
+	return 0;
+}
+
+// Windowed sinc interpolation: resample (x_in,y_in) of length n onto m output points.
+// x_out is populated with evenly spaced coordinates from x_in[0]..x_in[n-1]; y_out holds interpolated values.
+int sinc_filter_interpolate(const MMFLOAT *x_in, const MMFLOAT *y_in, int n, int m,
+							MMFLOAT *x_out, MMFLOAT *y_out,
+							MMFLOAT cutoff_freq, int window_size)
+{
+	if (n <= 1 || m <= 0 || !x_out || !y_out)
+		return -1;
+
+	// Ensure window_size is odd
+	if ((window_size & 1) == 0)
+		window_size++;
+
+	int half = window_size / 2;
+	MMFLOAT x_start = x_in[0];
+	MMFLOAT x_end = x_in[n - 1];
+	MMFLOAT span = x_end - x_start;
+	MMFLOAT step = (m > 1) ? span / (MMFLOAT)(m - 1) : 0.0f;
+	MMFLOAT sample_step = (n > 1) ? (x_in[n - 1] - x_in[0]) / (MMFLOAT)(n - 1) : 1.0f;
+	if (sample_step == 0.0f)
+		sample_step = 1.0f;
+
+	for (int i = 0; i < m; i++)
+	{
+		MMFLOAT x_target = x_start + step * (MMFLOAT)i;
+		x_out[i] = x_target;
+
+		double idx_f = (double)(x_target - x_start) / (double)sample_step;
+		int idx0 = (int)floor(idx_f);
+		double frac = idx_f - (double)idx0;
+		double acc = 0.0, norm = 0.0;
+
+		for (int j = -half; j <= half; j++)
+		{
+			int src = idx0 + j;
+			if (src < 0 || src >= n)
+				continue;
+
+			double t = (double)j - frac;
+			double window = 0.54 - 0.46 * cos(2.0 * M_PI * (double)(j + half) / (double)(window_size - 1));
+			double w;
+			if (t == 0.0)
+				w = (double)(2.0 * cutoff_freq);
+			else
+				w = sin(2.0 * M_PI * cutoff_freq * t) / (M_PI * t);
+			w *= window;
+
+			acc += (double)y_in[src] * w;
+			norm += w;
+		}
+
+		y_out[i] = (norm != 0.0) ? (MMFLOAT)(acc / norm) : 0.0f;
+	}
+
+	return 0;
+}
+
 int parsearrays(unsigned char *tp, MMFLOAT **a1float, MMFLOAT **a2float, MMFLOAT **a3float, int64_t **a1int, int64_t **a2int, int64_t **a3int)
 {
 	int card1, card2, card3;
@@ -1236,6 +1398,57 @@ void cmd_math(void)
 			array_set(tp);
 			return;
 		}
+		tp = checkstring(cmdline, (unsigned char *)"SINC");
+		if (tp)
+		{
+			int n, m, window;
+			MMFLOAT *a1float = NULL, *a2float = NULL, *a3float = NULL, *a4float = NULL, frequency;
+			getcsargs(&tp, 15);
+			if (argc != 13 && argc != 15)
+				StandardError(2);
+
+			n = getint(argv[4], 1, 10000);
+			if (argc == 13)
+			{
+				m = n;
+				window = getint(argv[6], 3, 101);
+				frequency = getnumber(argv[8]);
+			}
+			else
+			{
+				m = getint(argv[6], 1, 20000);
+				window = getint(argv[8], 3, 101);
+				frequency = getnumber(argv[10]);
+			}
+
+			if (frequency <= 0.0 || frequency > 0.5)
+				error("Frequency must be >0 and <=0.5");
+
+			if (parsefloatarray(argv[0], &a1float, 1, 1, NULL, false) < n)
+				StandardError(17);
+			if (parsefloatarray(argv[2], &a2float, 2, 1, NULL, false) < n)
+				StandardError(17);
+			if (argc == 13)
+			{
+				if (parsefloatarray(argv[10], &a3float, 3, 1, NULL, true) < m)
+					StandardError(17);
+				if (parsefloatarray(argv[12], &a4float, 4, 1, NULL, true) < m)
+					StandardError(17);
+			}
+			else
+			{
+				if (parsefloatarray(argv[12], &a3float, 3, 1, NULL, true) < m)
+					StandardError(17);
+				if (parsefloatarray(argv[14], &a4float, 4, 1, NULL, true) < m)
+					StandardError(17);
+			}
+
+			if (m == n)
+				sinc_filter(a1float, a2float, n, a3float, a4float, frequency, window);
+			else
+				sinc_filter_interpolate(a1float, a2float, n, m, a3float, a4float, frequency, window);
+			return;
+		}
 
 		tp = checkstring(cmdline, (unsigned char *)"SCALE");
 		if (tp)
@@ -1521,13 +1734,13 @@ void cmd_math(void)
 			getcsargs(&tp, 5);
 			if (!(argc == 5))
 				StandardError(2);
-			parsefloatrarray(argv[0], &a1float, 1, 2, dims, false);
+			parsefloatarray(argv[0], &a1float, 1, 2, dims, false);
 			numcols = dims[0] - g_OptionBase;
 			numrows = dims[1] - g_OptionBase;
-			parsefloatrarray(argv[2], &a2float, 1, 1, dims, false);
+			parsefloatarray(argv[2], &a2float, 1, 1, dims, false);
 			if ((dims[0] - g_OptionBase) != numcols)
 				StandardError(16);
-			parsefloatrarray(argv[4], &a3float, 1, 1, dims, true);
+			parsefloatarray(argv[4], &a3float, 1, 1, dims, true);
 			if ((dims[0] - g_OptionBase) != numrows)
 				StandardError(16);
 			if (a3float == a1float || a3float == a2float)
@@ -1600,9 +1813,9 @@ void cmd_math(void)
 			getcsargs(&tp, 3);
 			if (!(argc == 3))
 				StandardError(2);
-			numrows = parsefloatrarray(argv[0], &a1float, 1, 1, dims, false);
+			numrows = parsefloatarray(argv[0], &a1float, 1, 1, dims, false);
 			a1sfloat = a1float;
-			card2 = parsefloatrarray(argv[2], &a2float, 2, 1, dims, true);
+			card2 = parsefloatarray(argv[2], &a2float, 2, 1, dims, true);
 			if (numrows != card2)
 				StandardError(16);
 			for (j = 0; j < numrows; j++)
@@ -1627,13 +1840,13 @@ void cmd_math(void)
 			getcsargs(&tp, 5);
 			if (!(argc == 5))
 				StandardError(2);
-			numcols = parsefloatrarray(argv[0], &a1float, 1, 1, dims, false);
+			numcols = parsefloatarray(argv[0], &a1float, 1, 1, dims, false);
 			if (numcols != 3)
 				error("Argument 1 must be a 3 element floating point array");
-			numcols = parsefloatrarray(argv[2], &a2float, 2, 1, dims, false);
+			numcols = parsefloatarray(argv[2], &a2float, 2, 1, dims, false);
 			if (numcols != 3)
 				error("Argument 2 must be a 3 element floating point array");
-			numcols = parsefloatrarray(argv[4], &a3float, 3, 1, dims, true);
+			numcols = parsefloatarray(argv[4], &a3float, 3, 1, dims, true);
 			if (numcols != 3)
 				error("Argument 3 must be a 3 element floating point array");
 			for (j = 0; j < numcols; j++)
@@ -1701,10 +1914,10 @@ void cmd_math(void)
 			getcsargs(&tp, 3);
 			if (!(argc == 3))
 				StandardError(2);
-			parsefloatrarray(argv[0], &a1float, 1, 2, dims, false);
+			parsefloatarray(argv[0], &a1float, 1, 2, dims, false);
 			numcols = dims[0] - g_OptionBase;
 			numrows = dims[1] - g_OptionBase;
-			parsefloatrarray(argv[2], &a2float, 2, 2, dims, true);
+			parsefloatarray(argv[2], &a2float, 2, 2, dims, true);
 			if (dims[0] - g_OptionBase != numcols || dims[1] - g_OptionBase != numrows)
 				StandardError(16);
 			if (numcols != numrows)
@@ -1748,10 +1961,10 @@ void cmd_math(void)
 			getcsargs(&tp, 3);
 			if (!(argc == 3))
 				StandardError(2);
-			parsefloatrarray(argv[0], &a1float, 1, 2, dims, false);
+			parsefloatarray(argv[0], &a1float, 1, 2, dims, false);
 			numcols1 = numrows2 = dims[0] - g_OptionBase;
 			numrows1 = numcols2 = dims[1] - g_OptionBase;
-			parsefloatrarray(argv[2], &a2float, 2, 2, dims, true);
+			parsefloatarray(argv[2], &a2float, 2, 2, dims, true);
 			if (numcols2 != dims[0] - g_OptionBase)
 				StandardError(16);
 			if (numrows2 != dims[1] - g_OptionBase)
@@ -1796,15 +2009,15 @@ void cmd_math(void)
 			getcsargs(&tp, 5);
 			if (!(argc == 5))
 				StandardError(2);
-			parsefloatrarray(argv[0], &a1float, 1, 2, dims, false);
+			parsefloatarray(argv[0], &a1float, 1, 2, dims, false);
 			numcols1 = numrows2 = dims[0] - g_OptionBase + 1;
 			numrows1 = dims[1] - g_OptionBase + 1;
-			parsefloatrarray(argv[2], &a2float, 2, 2, dims, false);
+			parsefloatarray(argv[2], &a2float, 2, 2, dims, false);
 			numcols2 = dims[0] - g_OptionBase + 1;
 			numrows2 = dims[1] - g_OptionBase + 1;
 			if (numrows2 != numcols1)
 				error("Input array size mismatch");
-			parsefloatrarray(argv[4], &a3float, 3, 2, dims, true);
+			parsefloatarray(argv[4], &a3float, 3, 2, dims, true);
 			numcols3 = dims[0] - g_OptionBase + 1;
 			numrows3 = dims[1] - g_OptionBase + 1;
 			if (numcols3 != numcols2 || numrows3 != numrows1)
@@ -1915,10 +2128,10 @@ void cmd_math(void)
 			getcsargs(&tp, 3);
 			if (!(argc == 3))
 				StandardError(2);
-			card = parsefloatrarray(argv[0], &q, 1, 1, dims, false);
+			card = parsefloatarray(argv[0], &q, 1, 1, dims, false);
 			if (card != 5)
 				StandardErrorParam(41, 1);
-			card = parsefloatrarray(argv[2], &n, 2, 1, dims, true);
+			card = parsefloatarray(argv[2], &n, 2, 1, dims, true);
 			if (card != 5)
 				StandardErrorParam(41, 2);
 			Q_Invert(q, n);
@@ -1937,7 +2150,7 @@ void cmd_math(void)
 			MMFLOAT x = getnumber(argv[0]);
 			MMFLOAT y = getnumber(argv[2]);
 			MMFLOAT z = getnumber(argv[4]);
-			card = parsefloatrarray(argv[6], &q, 4, 1, dims, true);
+			card = parsefloatarray(argv[6], &q, 4, 1, dims, true);
 			if (card != 5)
 				StandardErrorParam(41, 4);
 			mag = sqrt(x * x + y * y + z * z); // calculate the magnitude
@@ -1960,7 +2173,7 @@ void cmd_math(void)
 			MMFLOAT yaw = -getnumber(argv[0]) / optionangle;
 			MMFLOAT pitch = getnumber(argv[2]) / optionangle;
 			MMFLOAT roll = getnumber(argv[4]) / optionangle;
-			card = parsefloatrarray(argv[6], &q, 4, 1, dims, true);
+			card = parsefloatarray(argv[6], &q, 4, 1, dims, true);
 			if (card != 5)
 				StandardErrorParam(41, 4);
 			MMFLOAT s1 = sin(pitch / 2);
@@ -1990,7 +2203,7 @@ void cmd_math(void)
 			MMFLOAT x = getnumber(argv[2]);
 			MMFLOAT y = getnumber(argv[4]);
 			MMFLOAT z = getnumber(argv[6]);
-			card = parsefloatrarray(argv[8], &q, 5, 1, dims, true);
+			card = parsefloatarray(argv[8], &q, 5, 1, dims, true);
 			if (card != 5)
 				StandardErrorParam(41, 4);
 			MMFLOAT sineterm = sin(theta / 2.0 / optionangle);
@@ -2015,13 +2228,13 @@ void cmd_math(void)
 			getcsargs(&tp, 5);
 			if (!(argc == 5))
 				StandardError(2);
-			card = parsefloatrarray(argv[0], &q1, 1, 1, dims, false);
+			card = parsefloatarray(argv[0], &q1, 1, 1, dims, false);
 			if (card != 5)
 				StandardErrorParam(41, 1);
-			card = parsefloatrarray(argv[2], &q2, 2, 1, dims, false);
+			card = parsefloatarray(argv[2], &q2, 2, 1, dims, false);
 			if (card != 5)
 				StandardErrorParam(41, 2);
-			card = parsefloatrarray(argv[4], &n, 31, 1, dims, true);
+			card = parsefloatarray(argv[4], &n, 31, 1, dims, true);
 			if (card != 5)
 				StandardErrorParam(41, 3);
 			Q_Mult(q1, q2, n);
@@ -2037,13 +2250,13 @@ void cmd_math(void)
 			getcsargs(&tp, 5);
 			if (!(argc == 5))
 				StandardError(2);
-			card = parsefloatrarray(argv[0], &q1, 1, 1, dims, false);
+			card = parsefloatarray(argv[0], &q1, 1, 1, dims, false);
 			if (card != 5)
 				StandardErrorParam(41, 1);
-			card = parsefloatrarray(argv[2], &v1, 2, 1, dims, false);
+			card = parsefloatarray(argv[2], &v1, 2, 1, dims, false);
 			if (card != 5)
 				StandardErrorParam(41, 2);
-			card = parsefloatrarray(argv[4], &n, 31, 1, dims, true);
+			card = parsefloatarray(argv[4], &n, 31, 1, dims, true);
 			if (card != 5)
 				StandardErrorParam(41, 3);
 			Q_Mult(q1, v1, temp);
@@ -2161,7 +2374,7 @@ void cmd_math(void)
 					error("Syntax");
 				MMFLOAT *q1 = NULL;
 				int channel = getint(argv[0], 1, MAXPID);
-				int card = parsefloatrarray(argv[2], &q1, 2, 1, NULL, true);
+				int card = parsefloatarray(argv[2], &q1, 2, 1, NULL, true);
 				PIDchannels[channel].PIDparams = (PIDController *)q1;
 				if (card != 14)
 					error("Argument 2 must be a 14 element floating point array");
@@ -3143,8 +3356,8 @@ void fun_math(void)
 			getcsargs(&tp, 3);
 			if (!(argc == 3))
 				StandardError(2);
-			card1 = parsefloatrarray(argv[0], &a1float, 1, 1, dims, false);
-			card2 = parsefloatrarray(argv[2], &a2float, 2, 1, dims, false);
+			card1 = parsefloatarray(argv[0], &a1float, 1, 1, dims, false);
+			card2 = parsefloatarray(argv[2], &a2float, 2, 1, dims, false);
 			if (card1 != card2)
 				StandardError(16);
 			fret = 0;
@@ -3184,7 +3397,7 @@ void fun_math(void)
 			getcsargs(&tp, 1);
 			if (!(argc == 1))
 				StandardError(2);
-			parsefloatrarray(argv[0], &a1float, 1, 2, dims, false);
+			parsefloatarray(argv[0], &a1float, 1, 2, dims, false);
 			numcols = dims[0] + 1 - g_OptionBase;
 			numrows = dims[1] + 1 - g_OptionBase;
 			if (numcols != numrows)
@@ -3324,7 +3537,7 @@ void fun_math(void)
 			getcsargs(&tp, 1);
 			if (!(argc == 1))
 				StandardError(2);
-			numcols = parsefloatrarray(argv[0], &a1float, 1, 0, dims, false);
+			numcols = parsefloatarray(argv[0], &a1float, 1, 0, dims, false);
 			for (i = 0; i < numcols; i++)
 			{
 				mag = mag + ((*a1float) * (*a1float));
@@ -3633,8 +3846,8 @@ void cmd_FFT(unsigned char *pp)
 	if (tp)
 	{
 		getcsargs(&tp, 3);
-		card1 = parsefloatrarray(argv[0], &a3float, 1, 1, dims, false);
-		card2 = parsefloatrarray(argv[2], &a4float, 2, 1, dims, true);
+		card1 = parsefloatarray(argv[0], &a3float, 1, 1, dims, false);
+		card2 = parsefloatarray(argv[2], &a4float, 2, 1, dims, true);
 		if (card1 != card2)
 			StandardError(16);
 		for (i = 1; i < 65536; i *= 2)
@@ -3661,8 +3874,8 @@ void cmd_FFT(unsigned char *pp)
 	if (tp)
 	{
 		getcsargs(&tp, 3);
-		card1 = parsefloatrarray(argv[0], &a3float, 1, 1, dims, false);
-		card2 = parsefloatrarray(argv[2], &a4float, 2, 1, dims, true);
+		card1 = parsefloatarray(argv[0], &a3float, 1, 1, dims, false);
+		card2 = parsefloatarray(argv[2], &a4float, 2, 1, dims, true);
 		if (card1 != card2)
 			StandardError(16);
 		for (i = 1; i < 65536; i *= 2)
@@ -3689,10 +3902,10 @@ void cmd_FFT(unsigned char *pp)
 	if (tp)
 	{
 		getcsargs(&tp, 3);
-		card1 = parsefloatrarray(argv[0], &a4float, 1, 2, dims, false);
+		card1 = parsefloatarray(argv[0], &a4float, 1, 2, dims, false);
 		int size = dims[1] - g_OptionBase + 1;
 		a1cplx = (cplx *)a4float;
-		card2 = parsefloatrarray(argv[2], &a3float, 2, 1, dims, true);
+		card2 = parsefloatarray(argv[2], &a3float, 2, 1, dims, true);
 		if (card2 != size)
 			StandardError(16);
 		for (i = 1; i < 65536; i *= 2)
@@ -3715,8 +3928,8 @@ void cmd_FFT(unsigned char *pp)
 		return;
 	}
 	getcsargs(&pp, 3);
-	card1 = parsefloatrarray(argv[0], &a3float, 1, 1, dims, false);
-	card2 = parsefloatrarray(argv[2], &a4float, 2, 2, dims, true);
+	card1 = parsefloatarray(argv[0], &a3float, 1, 1, dims, false);
+	card2 = parsefloatarray(argv[2], &a4float, 2, 2, dims, true);
 	a2cplx = (cplx *)a4float;
 	if ((dims[1] - g_OptionBase + 1) != card1)
 		StandardError(16);

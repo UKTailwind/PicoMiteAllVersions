@@ -12027,7 +12027,7 @@ void MIPS16 cmd_3D(void)
         if (nf < 1)
             error("3D object must have a minimum of 1 face");
         int cam = getint(argv[6], 1, MAXCAM);
-        if (parsefloatrarray(argv[8], &vertex, 5, 2, NULL, false) < nv)
+        if (parsefloatarray(argv[8], &vertex, 5, 2, NULL, false) < nv)
             error("Vertex array too small");
         if (parseintegerarray(argv[10], &facecount, 6, 1, NULL, false) < nf)
             error("Vertex count array too small");
@@ -12284,7 +12284,7 @@ void MIPS16 cmd_3D(void)
         getcsargs(&p, (MAX_ARG_COUNT * 2) - 1); // macro must be the first executable stmt in a block
         if ((argc & 0x01 || argc < 3) == 0)
             StandardError(2);
-        if (parsefloatrarray(argv[0], &q, 1, 1, NULL, true) != 5)
+        if (parsefloatarray(argv[0], &q, 1, 1, NULL, true) != 5)
             StandardErrorParam(41, 1);
         q1.w = (FLOAT3D)(*q++);
         q1.x = (FLOAT3D)(*q++);
