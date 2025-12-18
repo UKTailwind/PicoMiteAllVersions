@@ -617,7 +617,7 @@ void fun_linputstr(void);
 	{(unsigned char *)"Star", T_CMD, 0, cmd_star},
 	{(unsigned char *)"Astro", T_CMD, 0, cmd_star},
 	{(unsigned char *)"Location", T_CMD, 0, cmd_locate},
-//	{(unsigned char *)"Stepper", T_CMD, 0, cmd_stepper},
+	{(unsigned char *)"Stepper", T_CMD, 0, cmd_stepper},
 #endif
 {
 	(unsigned char *)"", 0, 0, cmd_null

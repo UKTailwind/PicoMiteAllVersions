@@ -669,7 +669,7 @@ uint8_t PSRAMpin;
 #endif
 
         // === GPS processing ===
-        if (GPSchannel)
+        if (GPSchannel || PinDef[Option.GPSTX].mode & UART0TX || PinDef[Option.GPSTX].mode & UART1TX)
             processgps();
 
         // === SD card check ===
@@ -5316,7 +5316,7 @@ uint32_t testPSRAM(void)
 #else
     set_sys_clock_khz(Option.CPU_Speed, false);
 #endif
-//NB: set_sys_clock can change the pad configuration so we need to redo it
+// NB: set_sys_clock can change the pad configuration so we need to redo it
 #ifdef rp2350
         pads_qspi_hw->io[0] = 0x67;
         pads_qspi_hw->io[1] = 0x67;

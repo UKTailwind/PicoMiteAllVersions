@@ -600,7 +600,7 @@ void fun_byte(void)
 	targ = T_INT;
 }
 extern int USBcode;
-extern volatile unsigned char stepper_gcode_buffer_space;
+extern volatile unsigned short stepper_gcode_buffer_space;
 
 void fun_tilde(void)
 {
@@ -730,7 +730,7 @@ void fun_tilde(void)
 	case MMPERSISTENT:
 		iret = _persistent;
 		break;
-#ifdef GCODE
+#ifdef rp2350
 	case MMCODE:
 		iret = (int64_t)stepper_gcode_buffer_space;
 		break;

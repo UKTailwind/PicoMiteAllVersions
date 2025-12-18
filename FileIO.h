@@ -265,16 +265,19 @@ extern "C"
 #ifdef PICOMITEWEB
                 uint16_t UDP_PORT;
                 uint16_t UDPServerResponceTime;
-                char hostname[32];
+                char hostname[28];
                 char ipaddress[16];
                 char mask[16];
                 char gateway[16];
 #else
         float mousespeed;
-        unsigned char x[80]; // 229 bytes
+        unsigned char x[76]; // 229 bytes
 #endif
 
                 /* Miscellaneous pins and settings */
+                unsigned short GPSBaud;
+                unsigned char GPSRX;
+                unsigned char GPSTX;
                 unsigned char heartbeatpin;
                 unsigned char PSRAM_CS_PIN;
                 unsigned char BGR;

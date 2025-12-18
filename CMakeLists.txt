@@ -176,6 +176,7 @@ target_compile_options(PicoMite PRIVATE -DNDEBUG
 										-DPICO_FLASH_SIZE_BYTES=16777216
 										-DPICO_CORE1_STACK_SIZE=0x00
 										-DPICO_MALLOC_PANIC
+										-DGCODE
 										-O2
 										-Wall)
 # all RP2350 variants

@@ -1203,7 +1203,7 @@ void MIPS16 ExtCfg(int pin, int cfg, int option)
 #endif
     case EXT_FAST_TIMER:
         // Check for conflict with stepper system (uses same IRQ)
-#ifdef GCODE
+#ifdef rp2350
         extern volatile bool stepper_initialized;
         if (stepper_initialized)
             error("FAST TIMER incompatible with STEPPER");
@@ -2986,6 +2986,11 @@ void MIPS16 cmd_Servo(void)
         error("Channel in use for Audio");
     if (slice == CameraSlice)
         error("Channel in use for Camera");
+#ifdef rp2350
+    extern volatile bool stepper_initialized;
+    if (slice == 10 && stepper_initialized)
+        error("Channel in use for Stepper");
+#endif
     if ((tp = checkstring(argv[2], (unsigned char *)"OFF")))
     {
         PWMoff(slice);
@@ -3166,6 +3171,12 @@ void MIPS16 cmd_pwm(void)
                 SyntaxError();
             ;
         }
+#endif
+
+#ifdef rp2350
+        extern volatile bool stepper_initialized;
+        if (stepper_initialized && (count10 >= 0.0 || slice10))
+            error("Channel 10 in use for Stepper");
 #endif
 
         int enabled = 0;
@@ -3419,6 +3430,11 @@ void MIPS16 cmd_pwm(void)
         error("Channel in use for Audio");
     if (slice == CameraSlice)
         error("Channel in use for Camera");
+#ifdef rp2350
+    extern volatile bool stepper_initialized;
+    if (slice == 10 && stepper_initialized)
+        error("Channel in use for Stepper");
+#endif
     if ((tp = checkstring(argv[2], (unsigned char *)"OFF")))
     {
         PWMoff(slice);

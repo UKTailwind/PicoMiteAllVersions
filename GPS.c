@@ -452,7 +452,7 @@ timegm(const struct tm *tm)
 void fun_GPS(void)
 {
   sret = GetTempStrMemory(); // this will last for the life of the command
-  if (!GPSchannel)
+  if (!(GPSchannel || PinDef[Option.GPSTX].mode & UART0TX || PinDef[Option.GPSTX].mode & UART1RX))
     error("GPS not activated");
   if (checkstring(ep, (unsigned char *)"LATITUDE") != NULL)
   {

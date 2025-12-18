@@ -67,7 +67,7 @@ void on_uart_irq0()
 		char cc = uart_getc(uart0);
 		if (!(Option.SerialConsole & 1))
 		{
-			if (GPSchannel == 1)
+			if (GPSchannel == 1 || PinDef[Option.GPSTX].mode & UART0TX)
 			{
 				*gpsbuf = cc;
 				gpsbuf++;
@@ -156,7 +156,7 @@ void on_uart_irq1()
 		char cc = uart_getc(uart1);
 		if (!(Option.SerialConsole & 2))
 		{
-			if (GPSchannel == 2)
+			if (GPSchannel == 2 || PinDef[Option.GPSTX].mode & UART1TX)
 			{
 				*gpsbuf = cc;
 				gpsbuf++;

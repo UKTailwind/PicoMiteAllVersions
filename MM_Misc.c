@@ -3077,6 +3077,16 @@ void MIPS16 printoptions(void)
         MMPrintString((char *)PinDef[Option.INT4pin].pinname);
         PRet();
     }
+    if (Option.GPSTX)
+    {
+        MMPrintString("OPTION GPS ");
+        MMPrintString((char *)PinDef[Option.GPSTX].pinname);
+        MMputchar(',', 1);
+        MMPrintString((char *)PinDef[Option.GPSRX].pinname);
+        if (Option.GPSBaud !=9600)
+            PIntComma(Option.GPSBaud);
+        PRet();
+    }
 
     if (Option.modbuff)
     {
@@ -4963,6 +4973,86 @@ void MIPS16 cmd_option(void)
             Option.SerialConsole = 2;
             if (argc == 5)
                 Option.SerialConsole = (checkstring(argv[4], (unsigned char *)"B") ? 6 : 2);
+            SaveOptions();
+            SoftReset(SOFT_RESET);
+        }
+    }
+    tp = checkstring(cmdline, (unsigned char *)"GPS");
+    if (tp)
+    {
+        if (CurrentLinePtr)
+            StandardError(10);
+        //        unsigned char *p=NULL;
+        if (checkstring(tp, (unsigned char *)"DISABLE"))
+        {
+            Option.GPSTX = 0;
+            Option.GPSRX = 0;
+            SaveOptions();
+            SoftReset(SOFT_RESET);
+            return;
+        }
+        else
+        {
+            int pin, pin2;
+            getcsargs(&tp, 5);
+            if (!(argc == 3 || argc == 5))
+                SyntaxError();
+            if (argc == 5)
+            {
+                int i = getint(argv[4], Option.CPU_Speed * 1000 / 16 / 65535, 921600);
+                if (i < 100)
+                    StandardError(21);
+                Option.GPSBaud = i;
+            }
+            else
+                Option.GPSBaud = 9600;
+            char code;
+            if (!(code = codecheck(argv[0])))
+                argv[0] += 2;
+            pin = getinteger(argv[0]);
+            if (!code)
+                pin = codemap(pin);
+            if (!(code = codecheck(argv[2])))
+                argv[2] += 2;
+            pin2 = getinteger(argv[2]);
+            if (!code)
+                pin2 = codemap(pin2);
+            if (ExtCurrentConfig[pin] != EXT_NOT_CONFIG)
+                StandardErrorParam2(27, pin, pin);
+            if (ExtCurrentConfig[pin2] != EXT_NOT_CONFIG)
+                StandardErrorParam2(27, pin2, pin2);
+            if (PinDef[pin].mode & UART0TX)
+                Option.GPSTX = pin;
+            else if (PinDef[pin].mode & UART0RX)
+                Option.GPSRX = pin;
+            else
+                goto GPScheckcom2;
+            if (PinDef[pin2].mode & UART0TX)
+                Option.GPSTX = pin2;
+            else if (PinDef[pin2].mode & UART0RX)
+                Option.GPSRX = pin2;
+            else
+                StandardError(8);
+            if (Option.GPSTX == Option.GPSRX)
+                StandardError(8);
+            SaveOptions();
+            SoftReset(SOFT_RESET);
+            return;
+        GPScheckcom2:
+            if (PinDef[pin].mode & UART1TX)
+                Option.GPSTX = pin;
+            else if (PinDef[pin].mode & UART1RX)
+                Option.GPSRX = pin;
+            else
+                StandardError(8);
+            if (PinDef[pin2].mode & UART1TX)
+                Option.GPSTX = pin2;
+            else if (PinDef[pin2].mode & UART1RX)
+                Option.GPSRX = pin2;
+            else
+                StandardError(8);
+            if (Option.GPSTX == Option.GPSRX)
+                StandardError(8);
             SaveOptions();
             SoftReset(SOFT_RESET);
         }

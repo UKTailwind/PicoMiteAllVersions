@@ -32,12 +32,13 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 STEPPER INIT
 Initialise the stepper subsystem.
 This starts the 100kHz timer interrupt, initialises the G-code buffer and
-places the system into TEST mode (no motion) until STEPPER RUN is issued.
+starts DISARMED (no motion execution) until STEPPER RUN is issued.
 
-STEPPER INIT [,arc_tolerance]
+STEPPER INIT [,arc_tolerance] [,buffer_size]
 Initialise the stepper subsystem and optionally set the arc tolerance in mm.
 This controls the maximum linear segment length used to approximate arcs.
 Default is 0.5mm.
+The optional buffer_size sets the number of buffered G-code blocks (default 16).
 
 STEPPER CLOSE
 Shutdown the stepper subsystem and stop the 100kHz timer interrupt.
@@ -45,14 +46,19 @@ Shutdown the stepper subsystem and stop the 100kHz timer interrupt.
 STEPPER ESTOP
 Emergency stop.
 Immediately halts motion, clears the G-code buffer, disables drivers (if
-enable pins are configured) and returns to TEST mode.
+enable pins are configured) and DISARMS motion execution.
+
+STEPPER RECOVER
+Recover from an abnormal state (eg. after a runtime error).
+Stops any executing move, clears the G-code buffer, turns the spindle off,
+and DISARMS motion execution (no automatic resume). Drivers are not automatically disabled.
 
 STEPPER AXIS X|Y|Z, step_pin, dir_pin [,enable_pin] [,dir_invert] [,steps_per_mm] [,max_velocity] [,max_accel]
 Configure an axis.
 Pins may be specified as a physical pin number or GPxx.
 ‘enable_pin’ is optional; if omitted then ENABLE for that axis is unavailable.
 ‘dir_invert’ is 0 or 1.
-‘max_velocity’ is in mm/s.
+‘max_velocity’ is in mm/min (same units as G-code F).
 ‘max_accel’ is in mm/s^2.
 A reasonable default jerk is automatically calculated when axes are configured.
 
@@ -84,7 +90,7 @@ Configure hardware limit switch pins (minimum 3, maximum 6 pins).
 Pins are active-low (triggered when grounded).
 Internal pull-ups are enabled, switches should connect pin to GND.
 Limit switches trigger emergency stop in ISR: motion halts immediately,
-G-code buffer is cleared, and system enters TEST mode.
+G-code buffer is cleared, and the system is DISARMED.
 Use 0 or omit optional parameters to disable max limit switches.
 Example: STEPPER HWLIMITS GP2, GP3, GP4, GP5, GP6, GP7
 Example: STEPPER HWLIMITS 10, 11, 12  ' Only min limits
@@ -126,21 +132,15 @@ Soft limits are checked against hardware position (workspace coords - G92 offset
 STEPPER BUFFER
 Report the current number of buffered blocks and the executed count.
 
-STEPPER POLL
-In TEST mode, returns details of the next buffered block (read-only observation).
-
 STEPPER CLEAR
 Clear the G-code buffer.
-Cannot be used while motion is active (unless in TEST mode).
-
-STEPPER TEST
-Enter TEST mode (no motion). Used for inspecting the queued buffer.
+Cannot be used while motion is active.
 
 STEPPER RUN
-Exit TEST mode and begin executing queued motion.
+Arm motion execution and begin executing queued motion.
 
 STEPPER STATUS
-Report current mode (TEST/RUN), motion state, buffer status, and axis positions.
+Report arming state, motion state, buffer status, and axis positions.
 
 MM.CODE
 Pseudo-variable returning free slots remaining in the stepper G-code buffer.
@@ -149,8 +149,22 @@ Use this to avoid "G-code buffer full" errors, e.g. only issue STEPPER GCODE whe
 
 // Free slots remaining in the G-code circular buffer (0..GCODE_BUFFER_SIZE).
 // Updated by buffer push/pop and safe to read from MMBasic (MM.CODE).
-#ifdef GCODE
-extern volatile uint8_t stepper_gcode_buffer_space;
+#ifdef rp2350
+extern volatile uint16_t stepper_gcode_buffer_space;
+
+// Manual recovery hook to return the stepper subsystem to a known-safe state.
+// Safe to call even if STEPPER INIT has never been run (it will be a no-op).
+void stepper_recover_to_safe_state(void);
+
+// Error abort hook: used on runtime error termination.
+// Does not stop the 100kHz IRQ or lose axis configuration.
+// DISARMS motion execution, disables drivers (if enable pins exist), clears the buffer,
+// turns the spindle off, and marks position as unknown.
+void stepper_abort_to_safe_state_on_error(void);
+
+// Fully shuts down the stepper subsystem (like STEPPER CLOSE).
+// Safe to call even if STEPPER INIT has never been run (it will be a no-op).
+void stepper_close_subsystem(void);
 
 // Structure to hold parameters for a single stepper motor axis
 typedef struct
@@ -162,7 +176,7 @@ typedef struct
 
     // Motion parameters
     float steps_per_mm; // Steps per millimeter (or unit of measurement)
-    float max_velocity; // Maximum velocity in mm/s
+    float max_velocity; // Maximum velocity in mm/s (configured in mm/min)
     float max_accel;    // Maximum acceleration in mm/s²
 
     // Current state
@@ -247,6 +261,13 @@ typedef enum
 #define ISR_FREQ 100000                // 100KHz interrupt frequency (Hz)
 #define STEP_ACCUMULATOR_MAX 100000000 // 100M threshold for step timing
 
+// STEP pulse width in microseconds.
+// Many stepper drivers require a minimum high time (often >= 1us). Keeping this
+// configurable allows tuning for different driver requirements.
+#ifndef STEPPER_STEP_PULSE_US
+#define STEPPER_STEP_PULSE_US 2
+#endif
+
 // Derived constant for velocity calculations
 // Derived from ISR_FREQ and STEP_ACCUMULATOR_MAX.
 //
@@ -283,6 +304,18 @@ typedef enum
 //
 #define RATE_SCALE ((float)STEP_ACCUMULATOR_MAX / (float)ISR_FREQ) // = 1000 (velocity to step_rate)
 
+typedef struct arc_segment_runtime
+{
+    int32_t x_steps;
+    int32_t y_steps;
+    int32_t z_steps;
+    bool x_dir;
+    bool y_dir;
+    bool z_dir;
+    int32_t major_steps;
+    uint8_t major_axis_mask;
+} arc_segment_runtime_t;
+
 typedef struct
 {
     // Current phase
@@ -297,6 +330,10 @@ typedef struct
     volatile bool x_dir;
     volatile bool y_dir;
     volatile bool z_dir;
+
+    // Metadata for boundary management
+    volatile uint8_t major_axis_mask;      // Bitmask of axes whose step counts match the major axis
+    volatile bool allow_accumulator_carry; // True if this block permits step accumulator continuity
 
     // Bresenham algorithm state
     // Major axis is the one with most steps - it drives the timing
@@ -337,6 +374,13 @@ typedef struct
     volatile int32_t accel_steps;  // Total steps in accel phase
     volatile int32_t cruise_steps; // Total steps in cruise phase
     volatile int32_t decel_steps;  // Total steps in decel phase
+
+    // Arc execution state (when running a bundled multi-segment arc)
+    volatile bool arc_active;
+    volatile uint16_t arc_segment_count;
+    volatile uint16_t arc_segment_index;
+    volatile int32_t arc_segment_steps_remaining;
+    volatile arc_segment_runtime_t *arc_segments;
 
 } stepper_move_t;
 
@@ -395,10 +439,12 @@ typedef struct
     bool z_dir;              // Z direction (true = positive)
 
     // Major axis (most steps) determines timing
-    int32_t major_steps;  // Steps for major axis
-    int32_t accel_steps;  // Steps in acceleration phase (major axis)
-    int32_t cruise_steps; // Steps in cruise phase (major axis)
-    int32_t decel_steps;  // Steps in deceleration phase (major axis)
+    int32_t major_steps;          // Steps for major axis
+    int32_t accel_steps;          // Steps in acceleration phase (major axis)
+    int32_t cruise_steps;         // Steps in cruise phase (major axis)
+    int32_t decel_steps;          // Steps in deceleration phase (major axis)
+    uint8_t major_axis_mask;      // Bitmask of axes that share the major step count
+    bool allow_accumulator_carry; // Whether this block allows step accumulator continuity into the next block
 
     // Velocity and acceleration in ISR accumulator "rate units" (NOT mm/s)
     // Rate units: velocity(mm/s) × steps_per_mm × RATE_SCALE
@@ -431,21 +477,76 @@ typedef struct
     float min_accel;            // Effective accel limit along this path (mm/s^2)
 
     // Status flags
-    bool is_planned;   // Motion planning completed
-    bool is_executing; // Currently executing
+    bool is_planned; // Motion planning completed
+
+    // Bundled arc execution payload (only for G02/G03)
+    uint16_t arc_segment_count;
+    arc_segment_runtime_t *arc_segments; // Heap-allocated array owned by planner until ISR takes it
 
 } gcode_block_t;
 
+// Runtime representation stored in the execution buffer (omits parser-only fields)
+typedef struct
+{
+    gcode_motion_type_t type;
+    bool is_planned;
+    bool allow_accumulator_carry;
+    uint8_t major_axis_mask;
+
+    int32_t x_steps_planned;
+    int32_t y_steps_planned;
+    int32_t z_steps_planned;
+    bool x_dir;
+    bool y_dir;
+    bool z_dir;
+
+    int32_t major_steps;
+    int32_t accel_steps;
+    int32_t cruise_steps;
+    int32_t decel_steps;
+
+    int32_t entry_rate;
+    int32_t exit_rate;
+    int32_t cruise_rate;
+    int32_t accel_increment;
+
+    bool use_scurve;
+    int32_t jerk_increment;
+    uint8_t initial_phase;
+    int32_t initial_accel_rate;
+    int32_t scurve_ju_accel_steps;
+    int32_t scurve_ca_steps;
+    int32_t scurve_jd_accel_steps;
+    int32_t scurve_cruise_steps;
+    int32_t scurve_ju_decel_steps;
+    int32_t scurve_cd_steps;
+    int32_t scurve_jd_decel_steps;
+
+    float unit_x;
+    float unit_y;
+    float unit_z;
+    float virtual_steps_per_mm;
+    float min_accel;
+    float distance;
+    float max_velocity;
+
+    uint16_t arc_segment_count;
+    arc_segment_runtime_t *arc_segments;
+
+} stepper_runtime_block_t;
+
 // Circular buffer for G-code blocks
-#define GCODE_BUFFER_SIZE 16
+#define GCODE_BUFFER_DEFAULT_SIZE 32
+#define GCODE_BUFFER_MAX_SIZE 1024
 
 typedef struct
 {
-    gcode_block_t blocks[GCODE_BUFFER_SIZE]; // Ring buffer of G-code blocks
+    stepper_runtime_block_t *blocks; // Ring buffer storage (allocated at INIT)
+    uint16_t size;                   // Number of blocks allocated
 
-    volatile uint8_t head;  // Write position (where new blocks are added)
-    volatile uint8_t tail;  // Read position (currently executing block)
-    volatile uint8_t count; // Number of blocks in buffer
+    volatile uint16_t head;  // Write position (where new blocks are added)
+    volatile uint16_t tail;  // Read position (currently executing block)
+    volatile uint16_t count; // Number of blocks in buffer
 
     // Parser state (modal G-code state)
     gcode_motion_type_t current_motion_mode; // Current motion mode (modal)

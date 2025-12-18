@@ -188,11 +188,37 @@ void cmd_print(void)
 	int i, t, fnbr;
 	int docrlf; // this is used to suppress the cr/lf if needed
 
+#define ADV_CHARPOS(ch)                                        \
+	do                                                         \
+	{                                                          \
+		if ((ch) == '\r' || (ch) == '\n')                      \
+		{                                                      \
+			charpos = 1;                                       \
+		}                                                      \
+		else if ((ch) == '\t')                                 \
+		{                                                      \
+			int nexttab = (((charpos - 1) / 14) + 1) * 14 + 1; \
+			charpos = nexttab;                                 \
+		}                                                      \
+		else                                                   \
+		{                                                      \
+			charpos++;                                         \
+		}                                                      \
+	} while (0)
+
+#define ADV_CHUNK(ptr, len)                         \
+	do                                              \
+	{                                               \
+		for (int adv_i = 0; adv_i < (len); adv_i++) \
+			ADV_CHARPOS((ptr)[adv_i]);              \
+	} while (0)
+
 	getargs(&cmdline, (MAX_ARG_COUNT * 2) - 1, (unsigned char *)";,"); // this is a macro and must be the first executable stmt
 
 	//    s = 0; *s = 56;											    // for testing the exception handler
 
 	docrlf = true;
+	int charpos = MMCharPos; // Track current column for TAB() function
 
 	if (argc > 0 && *argv[0] == '#')
 	{ // check if the first arg is a file number
@@ -279,6 +305,7 @@ void cmd_print(void)
 			}
 			*bufptr++ = '\t';
 			used++;
+			ADV_CHARPOS('\t');
 			docrlf = false; // a trailing comma should suppress CR/LF
 		}
 		else if (*argv[i] == ';')
@@ -291,6 +318,7 @@ void cmd_print(void)
 			while (*p)
 			{
 				t = T_NOTYPE;
+				MMCharPos = charpos;					 // Ensure TAB() sees the current column before evaluation
 				p = evaluate(p, &f, &i64, &s, &t, true); // get the value and type of the argument
 				if (t & T_NBR)
 				{
@@ -312,6 +340,7 @@ void cmd_print(void)
 					strcpy((char *)bufptr, (char *)inpbuf);
 					bufptr += len;
 					used += len;
+					ADV_CHUNK(inpbuf, len);
 				}
 				else if (t & T_INT)
 				{
@@ -333,6 +362,7 @@ void cmd_print(void)
 					strcpy((char *)bufptr, (char *)inpbuf);
 					bufptr += len;
 					used += len;
+					ADV_CHUNK(inpbuf, len);
 				}
 				else if (t & T_STR)
 				{
@@ -354,6 +384,7 @@ void cmd_print(void)
 					memcpy(bufptr, cstr, len);
 					bufptr += len;
 					used += len;
+					ADV_CHUNK(cstr, len);
 				}
 				else
 					error("Attempt to print reserved word");
@@ -377,6 +408,8 @@ void cmd_print(void)
 		*bufptr++ = '\r';
 		*bufptr++ = '\n';
 		used += 2;
+		ADV_CHARPOS('\r');
+		ADV_CHARPOS('\n');
 	}
 
 	// Null terminate the C string
@@ -408,6 +441,10 @@ void cmd_print(void)
 	if (PrintPixelMode != 0)
 		SSPrintString("\033[m");
 	PrintPixelMode = 0;
+	MMCharPos = charpos; // Final column state after buffered output
+
+#undef ADV_CHUNK
+#undef ADV_CHARPOS
 }
 void cmd_arrayset(void)
 {
@@ -1815,6 +1852,16 @@ void MIPS32 __not_in_flash_func(cmd_else)(void)
 }
 void do_end(bool ecmd)
 {
+#ifdef rp2350
+	// On runtime error termination, abort steppers to a safe state.
+	// Keeps the 100kHz IRQ running and preserves axis configuration.
+	// Leaves the system in TEST mode, drivers disabled, spindle off, buffer cleared,
+	// and position unknown (requires G28 or STEPPER POSITION + STEPPER RUN).
+	void stepper_abort_to_safe_state_on_error(void);
+	if (MMerrno != 0)
+		stepper_abort_to_safe_state_on_error();
+#endif
+
 	dma_hw->abort = ((1u << dma_rx_chan2) | (1u << dma_rx_chan));
 	if (dma_channel_is_busy(dma_rx_chan))
 		dma_channel_abort(dma_rx_chan);

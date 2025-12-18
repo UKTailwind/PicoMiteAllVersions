@@ -2373,6 +2373,24 @@ void InitReservedIO(void)
 	}
 #endif
 #endif
+	if (Option.GPSTX)
+	{
+		ExtCfg(Option.GPSTX, EXT_BOOT_RESERVED, 0);
+		ExtCfg(Option.GPSRX, EXT_BOOT_RESERVED, 0);
+		gpsbuf = gpsbuf1;
+		gpscurrent = 0;
+		gpscount = 0;
+		gpio_set_function(PinDef[Option.GPSTX].GPno, GPIO_FUNC_UART);
+		int gp_uart = (PinDef[Option.GPSTX].mode & UART0TX);
+		gpio_set_function(PinDef[Option.GPSRX].GPno, GPIO_FUNC_UART);
+		uart_init(gp_uart ? uart0 : uart1, Option.GPSBaud);
+		uart_set_hw_flow(gp_uart ? uart0 : uart1, false, false);
+		uart_set_format(gp_uart ? uart0 : uart1, 8, 1, UART_PARITY_NONE);
+		uart_set_fifo_enabled(gp_uart ? uart0 : uart1, false);
+		irq_set_exclusive_handler(gp_uart ? UART0_IRQ : UART1_IRQ, gp_uart ? on_uart_irq0 : on_uart_irq1);
+		irq_set_enabled(gp_uart ? UART0_IRQ : UART1_IRQ, true);
+		uart_set_irq_enables(gp_uart ? uart0 : uart1, true, false);
+	}
 	if (Option.SerialConsole)
 	{
 		ExtCfg(Option.SerialTX, EXT_BOOT_RESERVED, 0);
@@ -2505,6 +2523,10 @@ char *pinsearch(int pin)
 		strcpy(buff, "CONSOLE TX");
 	else if (pin == Option.SerialRX)
 		strcpy(buff, "CONSOLE RX");
+	else if (pin == Option.GPSTX)
+		strcpy(buff, "GPS TX");
+	else if (pin == Option.GPSRX)
+		strcpy(buff, "GPS RX");
 	else if (pin == Option.AUDIO_R)
 		strcpy(buff, "AUDIO R");
 	else if (pin == Option.AUDIO_L)
