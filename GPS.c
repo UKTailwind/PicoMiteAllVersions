@@ -1359,14 +1359,19 @@ void cmd_exec_star(int day, int month, int year, int hour, int minute, int secon
     int numStars = sizeof(starCatalog) / sizeof(starCatalog[0]);
     int starIndex = -1;
 
-    // Extract the star name from cmdline (up to first comma or space)
-    char searchName[32];
+    // Extract the star name from cmdline (up to first comma). Allow spaces in names.
+    char searchName[64];
     int i = 0;
     unsigned char *p = cmd;
-    while (*p && *p != ',' && *p != ' ' && i < 31)
+    // skip leading spaces
+    while (*p == ' ') p++;
+    // copy until comma or EOS, preserving spaces inside the name
+    while (*p && *p != ',' && i < (int)(sizeof(searchName) - 1))
     {
-      searchName[i++] = toupper(*p++);
+      searchName[i++] = *p++;
     }
+    // trim trailing spaces
+    while (i > 0 && searchName[i - 1] == ' ') i--;
     searchName[i] = '\0';
 
     // Binary search through sorted catalog
@@ -1395,7 +1400,6 @@ void cmd_exec_star(int day, int month, int year, int hour, int minute, int secon
         getcsargs(&tp, 7);
         if (!(argc == 3 || argc == 7))
           StandardError(2);
-        StandardError(2);
         altitude = findvar(argv[0], V_FIND);
         if (!(g_vartbl[g_VarIndex].type & T_NBR))
           StandardError(6);

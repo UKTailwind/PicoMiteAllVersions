@@ -171,14 +171,28 @@ void MadgwickQuaternionUpdate(MMFLOAT ax, MMFLOAT ay, MMFLOAT az,
  * Function declarations - Array parsing (platform-specific)
  * ============================================================================ */
 
-/*
+/* ============================================================================
  * MMBasic maths subcommands (syntax reference)
- *   MATH SINC x_in(), y_in(), n [, m], window, freq, x_out(), y_out()
- *     - If m omitted (or m = n): windowed sinc smoothing to n samples
- *     - If m provided and m != n: windowed sinc interpolation/resampling to m samples
- *     - window: kernel size (odd; even values rounded up)
- *     - freq: normalized cutoff (0..0.5)
- *     - x_out()/y_out(): output arrays (size >= m)
+ * ============================================================================ */
+
+/*
+ * MATH SINC x_in(), y_in(), n [, m], window, freq, x_out(), y_out()
+ *   Apply a windowed sinc filter to smooth or interpolate coordinate data.
+ *   A sinc filter is an ideal low-pass filter that removes high-frequency noise while preserving
+ *   the signal shape. It is particularly good for resampling (interpolation).
+ *
+ *   Parameters:
+ *     x_in(), y_in() : Input coordinate arrays (float)
+ *     n              : Number of input points
+ *     m              : Number of output points (optional)
+ *                      - If omitted or m=n: Smoothing mode (output size n)
+ *                      - If m!=n: Interpolation/Resampling mode (output size m)
+ *     window         : Filter kernel size (must be odd; even values are incremented).
+ *                      Typical values: 15 to 101. Larger values give a sharper cutoff but are slower.
+ *     freq           : Normalized cutoff frequency (0.0 < freq <= 0.5).
+ *                      0.5 is the Nyquist frequency (no filtering).
+ *                      Typical values: 0.1 (heavy smoothing) to 0.4 (light smoothing).
+ *     x_out(), y_out(): Output coordinate arrays (must be large enough to hold output)
  */
 #ifdef rp2350
 int parsenumberarray(unsigned char *tp, MMFLOAT **a1float, int64_t **a1int,

@@ -3083,7 +3083,7 @@ void MIPS16 printoptions(void)
         MMPrintString((char *)PinDef[Option.GPSTX].pinname);
         MMputchar(',', 1);
         MMPrintString((char *)PinDef[Option.GPSRX].pinname);
-        if (Option.GPSBaud !=9600)
+        if (Option.GPSBaud != 9600)
             PIntComma(Option.GPSBaud);
         PRet();
     }
@@ -4949,6 +4949,8 @@ void MIPS16 cmd_option(void)
                 StandardError(8);
             if (Option.SerialTX == Option.SerialRX)
                 StandardError(8);
+            if (Option.GPSTX && (PinDef[Option.GPSTX].mode & UART0TX))
+                error("UART0 in use for GPS");
             Option.SerialConsole = 1;
             if (argc == 5)
                 Option.SerialConsole = (checkstring(argv[4], (unsigned char *)"B") ? 5 : 1);
@@ -4970,6 +4972,8 @@ void MIPS16 cmd_option(void)
                 StandardError(8);
             if (Option.SerialTX == Option.SerialRX)
                 StandardError(8);
+            if (Option.GPSTX && (PinDef[Option.GPSTX].mode & UART1TX))
+                error("UART1 in use for GPS");
             Option.SerialConsole = 2;
             if (argc == 5)
                 Option.SerialConsole = (checkstring(argv[4], (unsigned char *)"B") ? 6 : 2);
@@ -5035,6 +5039,8 @@ void MIPS16 cmd_option(void)
                 StandardError(8);
             if (Option.GPSTX == Option.GPSRX)
                 StandardError(8);
+            if (Option.SerialConsole && (Option.SerialConsole & 3) == 1)
+                error("UART0 in use for Console");
             SaveOptions();
             SoftReset(SOFT_RESET);
             return;
@@ -5053,6 +5059,8 @@ void MIPS16 cmd_option(void)
                 StandardError(8);
             if (Option.GPSTX == Option.GPSRX)
                 StandardError(8);
+            if (Option.SerialConsole && (Option.SerialConsole & 3) == 2)
+                error("UART1 in use for Console");
             SaveOptions();
             SoftReset(SOFT_RESET);
         }
