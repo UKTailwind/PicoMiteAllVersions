@@ -157,18 +157,18 @@ const Star starCatalog[] = {
     {"Alshain", 296.565000, +6.425000, 0.53600, 0.38500},          // HIP 94779"
     {"Altair", 297.695827, +8.868322, 0.53682, 0.38554},           // HIP 97649"
     {"Aludra", 97.962083, -29.247500, -0.00400, -0.00200},         // HIP 30324"
-    {"Andromeda Galaxy (M31)", 10.684708, 41.269167, 0.0, 0.0},    //"
+    {"Andromeda Galaxy", 10.684708, 41.269167, 0.0, 0.0},    //"
     {"Antares", 247.351915, -26.432002, -0.01016, -0.02321},       // HIP 80763"
     {"Arcturus", 213.915300, +19.182410, -1.09345, -2.00094},      // HIP 69673"
     {"Aspidiske", 122.383333, -47.336667, -0.01200, -0.00600},     // HIP 39953"
     {"Bellatrix", 81.282000, +6.350000, -0.00800, -0.01300},       // HIP 25336"
     {"Betelgeuse", 88.792939, +7.407064, 0.02495, 0.00956},        // HIP 27989"
-    {"Bode's Galaxy (M81)", 148.888750, 69.064444, 0.0, 0.0},      //"
+    {"Bodes Galaxy", 148.888750, 69.064444, 0.0, 0.0},      //"
     {"Canopus", 95.987875, -52.695718, 0.01993, 0.02324},          // HIP 30438"
     {"Capella", 79.172327, +45.997991, 0.07552, -0.42713},         // HIP 24608"
     {"Caph", 2.294167, +59.149444, 0.00300, -0.00200},             // HIP 746"
     {"Castor", 113.650000, +31.888333, -0.19100, -0.04500},        // HIP 36850"
-    {"Cigar Galaxy (M82)", 149.062500, 69.679722, 0.0, 0.0},       //"
+    {"Cigar Galaxy", 149.062500, 69.679722, 0.0, 0.0},       //"
     {"Deneb", 310.357979, +45.280338, 0.00146, 0.00129},           // HIP 102098"
     {"Denebola", 177.264167, +14.572056, -0.49700, -0.11400},      // HIP 57632"
     {"Dubhe", 165.460000, +61.751000, -0.13500, -0.03500},         // HIP 54061"
@@ -210,13 +210,13 @@ const Star starCatalog[] = {
     {"Shedir", 10.127500, +56.537222, 0.00200, -0.00300},          // HIP 3179"
     {"Sirius", 101.287155, -16.716116, -0.54601, -1.22307},        // HIP 32349"
     {"Small Magellanic Cloud", 13.158333, -72.800278, 0.0, 0.0},   //"
-    {"Sombrero Galaxy (M104)", 189.997917, -11.622778, 0.0, 0.0},  //"
+    {"Sombrero Galaxy", 189.997917, -11.622778, 0.0, 0.0},  //"
     {"Spica", 201.298247, -11.161322, -0.04235, -0.03173},         // HIP 65474"
     {"Suhail", 131.175000, -42.654167, -0.01000, -0.00500},        // HIP 42312"
     {"Tarazed", 297.042000, +10.613000, 0.53600, 0.38500},         // HIP 94779"
-    {"Triangulum Galaxy (M33)", 23.462083, 30.659722, 0.0, 0.0},   //"
+    {"Triangulum Galaxy", 23.462083, 30.659722, 0.0, 0.0},   //"
     {"Vega", 279.234734, +38.783688, 0.20094, 0.28623},            // HIP 91262"
-    {"Whirlpool Galaxy (M51)", 202.479167, 47.195278, 0.0, 0.0},   //"
+    {"Whirlpool Galaxy", 202.479167, 47.195278, 0.0, 0.0},   //"
     {"Zubenelgenubi", 229.251667, -16.202500, -0.01000, -0.00500}, // HIP 72622"
     {"Zubeneschamali", 233.671667, -9.382500, -0.01200, -0.00600}, // HIP 73473"
 };
@@ -1354,82 +1354,100 @@ void cmd_exec_star(int day, int month, int year, int hour, int minute, int secon
     return;
   }
 
-  // Check if cmdline matches a star name in the catalog using binary search
+  // Check if cmdline matches a star name in the catalog using binary search + checkstring
   {
     int numStars = sizeof(starCatalog) / sizeof(starCatalog[0]);
     int starIndex = -1;
 
-    // Extract the star name from cmdline (up to first comma). Allow spaces in names.
-    char searchName[64];
-    int i = 0;
+    // Get first character of star name from command (skip leading spaces)
     unsigned char *p = cmd;
-    // skip leading spaces
     while (*p == ' ') p++;
-    // copy until comma or EOS, preserving spaces inside the name
-    while (*p && *p != ',' && i < (int)(sizeof(searchName) - 1))
-    {
-      searchName[i++] = *p++;
-    }
-    // trim trailing spaces
-    while (i > 0 && searchName[i - 1] == ' ') i--;
-    searchName[i] = '\0';
+    if (*p == '\0')
+      goto manual_entry; // No star name provided, fall through to manual entry
+    
+    char firstChar = toupper(*p);
 
-    // Binary search through sorted catalog
+    // Binary search to find any star starting with this letter
     int low = 0;
     int high = numStars - 1;
+    int foundIndex = -1;
+    
     while (low <= high)
     {
       int mid = (low + high) / 2;
-      int cmp = strcasecmp(searchName, starCatalog[mid].name);
-      if (cmp == 0)
+      char catalogFirstChar = toupper(starCatalog[mid].name[0]);
+      
+      if (catalogFirstChar == firstChar)
       {
-        starIndex = mid;
+        foundIndex = mid;
         break;
       }
-      else if (cmp < 0)
-        high = mid - 1;
-      else
+      else if (catalogFirstChar < firstChar)
         low = mid + 1;
+      else
+        high = mid - 1;
+    }
+
+    if (foundIndex < 0)
+      goto manual_entry; // No star starting with this letter
+
+    // Expand backwards to find the first star with this initial letter
+    int startIndex = foundIndex;
+    while (startIndex > 0 && toupper(starCatalog[startIndex - 1].name[0]) == firstChar)
+      startIndex--;
+
+    // Expand forwards to find the last star with this initial letter
+    int endIndex = foundIndex;
+    while (endIndex < numStars - 1 && toupper(starCatalog[endIndex + 1].name[0]) == firstChar)
+      endIndex++;
+
+    // Now check each star in this range using checkstring
+    for (int i = startIndex; i <= endIndex; i++)
+    {
+      tp = checkstring(cmd, (unsigned char *)starCatalog[i].name);
+      if (tp != NULL)
+      {
+        starIndex = i;
+        break;
+      }
     }
 
     if (starIndex >= 0)
     {
-      // Found a star - skip past the name to get arguments
-      tp = p; // p already points past the star name
-      {
-        getcsargs(&tp, 7);
-        if (!(argc == 3 || argc == 7))
-          StandardError(2);
-        altitude = findvar(argv[0], V_FIND);
-        if (!(g_vartbl[g_VarIndex].type & T_NBR))
-          StandardError(6);
-        azimuth = findvar(argv[2], V_FIND);
-        if (!(g_vartbl[g_VarIndex].type & T_NBR))
-          StandardError(6);
+      // Found a star - tp now points after the matched star name
+      getcsargs(&tp, 7);
+      if (!(argc == 3 || argc == 7))
+        StandardError(2);
+      altitude = findvar(argv[0], V_FIND);
+      if (!(g_vartbl[g_VarIndex].type & T_NBR))
+        StandardError(6);
+      azimuth = findvar(argv[2], V_FIND);
+      if (!(g_vartbl[g_VarIndex].type & T_NBR))
+        StandardError(6);
 
-        // Get star data and apply corrections
-        MMFLOAT ra0 = starCatalog[starIndex].ra_deg / 15.0; // Convert degrees to hours
-        MMFLOAT dec0 = starCatalog[starIndex].dec_deg;
-        MMFLOAT pm_ra = starCatalog[starIndex].pm_ra;
-        MMFLOAT pm_dec = starCatalog[starIndex].pm_dec;
-        star = applyProperMotionAndPrecession(ra0, dec0, pm_ra, pm_dec, T);
-        localRA(star, altitude, azimuth, latitude, sidereal);
-        if (argc == 7)
-        {
-          MMFLOAT *bodyRA = findvar(argv[4], V_FIND);
-          if (!(g_vartbl[g_VarIndex].type & T_NBR))
-            StandardError(6);
-          MMFLOAT *bodyDec = findvar(argv[6], V_FIND);
-          if (!(g_vartbl[g_VarIndex].type & T_NBR))
-            StandardError(6);
-          *bodyRA = star.RA;
-          *bodyDec = star.Dec;
-        }
+      // Get star data and apply corrections
+      MMFLOAT ra0 = starCatalog[starIndex].ra_deg / 15.0; // Convert degrees to hours
+      MMFLOAT dec0 = starCatalog[starIndex].dec_deg;
+      MMFLOAT pm_ra = starCatalog[starIndex].pm_ra;
+      MMFLOAT pm_dec = starCatalog[starIndex].pm_dec;
+      star = applyProperMotionAndPrecession(ra0, dec0, pm_ra, pm_dec, T);
+      localRA(star, altitude, azimuth, latitude, sidereal);
+      if (argc == 7)
+      {
+        MMFLOAT *bodyRA = findvar(argv[4], V_FIND);
+        if (!(g_vartbl[g_VarIndex].type & T_NBR))
+          StandardError(6);
+        MMFLOAT *bodyDec = findvar(argv[6], V_FIND);
+        if (!(g_vartbl[g_VarIndex].type & T_NBR))
+          StandardError(6);
+        *bodyRA = star.RA;
+        *bodyDec = star.Dec;
       }
       return;
     }
   }
 
+manual_entry:
   // Fall through to manual RA/Dec entry
   {
     getcsargs(&cmd, 15);
