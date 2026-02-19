@@ -537,6 +537,126 @@ extern uint I2SOff;
 extern void start_vga_i2s(void);
 extern void start_i2s(int pio, int sm);
 
+// ============================================================================
+//  TLV320DAC3100 codec initialization for Adafruit Fruit Jam
+//  Adapted from pico-pc audio_hal.c (CircuitPython TLV320 driver sequence)
+// ============================================================================
+#ifdef ADAFRUIT_FRUIT_JAM
+#include "hardware/i2c.h"
+
+#define TLV320_I2C_ADDR    0x18
+#define TLV320_MCLK_PIN    25     // GP25 = I2S MCLK (15 MHz PWM)
+#define TLV320_RESET_PIN   22     // GP22 = PERIPH_RESET (shared with ESP32-C6)
+#define TLV320_MCLK_FREQ   15000000
+
+static void tlv320_write(uint8_t reg, uint8_t value) {
+        uint8_t data[2] = {reg, value};
+        i2c_write_blocking(i2c0, TLV320_I2C_ADDR, data, 2, false);
+}
+
+static void tlv320_select_page(uint8_t page) {
+        tlv320_write(0x00, page);
+}
+
+// Initialize MCLK, reset codec, configure PLL/clocks/DAC via I2C.
+// Must be called AFTER system I2C is initialized (InitReservedIO)
+// and AFTER system clock is set to final frequency.
+void tlv320_init(void) {
+        // 1. Start 15 MHz PWM clock on MCLK pin (GP25)
+        gpio_set_function(TLV320_MCLK_PIN, GPIO_FUNC_PWM);
+        uint slice = pwm_gpio_to_slice_num(TLV320_MCLK_PIN);
+        uint channel = pwm_gpio_to_channel(TLV320_MCLK_PIN);
+        uint32_t sysclk = clock_get_hz(clk_sys);
+        uint16_t wrap = (sysclk / TLV320_MCLK_FREQ) - 1;
+        pwm_set_wrap(slice, wrap);
+        pwm_set_chan_level(slice, channel, (wrap + 1) / 2);  // 50% duty
+        pwm_set_enabled(slice, true);
+        // Reserve GP25 so BASIC can't reconfigure it
+        ExtCfg(PINMAP[TLV320_MCLK_PIN], EXT_BOOT_RESERVED, 0);
+
+        // 2. Hardware reset: pulse GP22 low for 10ms
+        gpio_init(TLV320_RESET_PIN);
+        gpio_set_dir(TLV320_RESET_PIN, GPIO_OUT);
+        gpio_put(TLV320_RESET_PIN, 0);
+        sleep_ms(10);
+        gpio_put(TLV320_RESET_PIN, 1);
+        sleep_ms(10);
+        ExtCfg(PINMAP[TLV320_RESET_PIN], EXT_BOOT_RESERVED, 0);
+
+        // 3. Software reset
+        tlv320_select_page(0);
+        tlv320_write(0x01, 0x01);
+        sleep_ms(10);
+
+        // 4. Power down DAC and PLL
+        tlv320_write(0x3F, 0x14);     // DAC datapath: both DACs off
+        tlv320_write(0x05, 0x00);     // PLL off
+        sleep_ms(1);
+
+        // 5. PLL values for 15 MHz MCLK -> 44100 Hz sample rate
+        //    P=5, R=1, J=35, D=7504 -> PLL_CLK=107.25 MHz
+        //    NDAC=19, MDAC=1, DOSR=128
+        tlv320_write(0x05, (5 << 4) | 1);              // P=5, R=1, PLL off
+        tlv320_write(0x06, 35);                         // J=35
+        tlv320_write(0x07, (7504 >> 8) & 0xFF);        // D MSB
+        tlv320_write(0x08, 7504 & 0xFF);                // D LSB
+
+        // 6. PLL_CLKIN = MCLK
+        tlv320_write(0x04, 0x00);
+
+        // 7. Power up PLL
+        tlv320_write(0x05, 0x80 | (5 << 4) | 1);       // PLL on, P=5, R=1
+        sleep_ms(10);
+
+        // 8. Route PLL output to CODEC_CLKIN (separate write from PLL power-up)
+        tlv320_write(0x04, 0x03);
+
+        // 9. I2S format, 16-bit, slave mode
+        tlv320_write(0x1B, 0x00);
+
+        // 10. Clock dividers
+        tlv320_write(0x0B, 0x80 | 19);                 // NDAC=19, powered
+        tlv320_write(0x0C, 0x80 | 1);                  // MDAC=1, powered
+        tlv320_write(0x0D, 0);                          // DOSR MSB
+        tlv320_write(0x0E, 128);                        // DOSR LSB = 128
+
+        // 11. Processing block
+        tlv320_write(0x3C, 0x01);
+
+        // 12. Power up DAC (stays muted -- reg 0x40 defaults to 0x0C)
+        tlv320_write(0x3F, 0xD4);     // Both DACs on, normal paths
+}
+
+// Enable output drivers and unmute DAC.
+// Must be called AFTER I2S clocks (BCLK/WS) are running.
+void tlv320_enable_outputs(void) {
+        // Headphone: configure routing, volume, driver
+        tlv320_select_page(1);
+        tlv320_write(0x23, 0x44);     // DAC_L->HPL, DAC_R->HPR via mixer
+        tlv320_write(0x24, 0x88);     // HPL: route enabled, -4 dB
+        tlv320_write(0x25, 0x88);     // HPR: route enabled, -4 dB
+        tlv320_write(0x21, 0x4E);     // Slow power-up ramp for de-pop
+        tlv320_write(0x1F, 0xD4);     // HPL+HPR on, CM=1.65V, SC protect
+        tlv320_write(0x28, 0x34);     // HPL: gain=6dB, unmuted
+        tlv320_write(0x29, 0x34);     // HPR: gain=6dB, unmuted
+
+        // Speaker: configure volume, amp, driver
+        tlv320_write(0x26, 0x80);     // SPK: route enabled, 0 dB
+        tlv320_write(0x20, 0x86);     // Class-D amp on
+        tlv320_write(0x2A, 0x04);     // SPK: gain=6dB, unmuted
+        tlv320_select_page(0);
+
+        // Set DAC volume to -6 dB (0.5 dB steps, two's complement: -6 dB = 0xF4)
+        tlv320_write(0x41, 0xF4);     // Left volume -6 dB
+        tlv320_write(0x42, 0xF4);     // Right volume -6 dB
+
+        // Unmute DAC
+        tlv320_write(0x40, 0x00);
+}
+
+#endif // ADAFRUIT_FRUIT_JAM
+// ============================================================================
+
 void start_i2s(int pior, int sm)
 {
         if (!Option.audio_i2s_bclk)

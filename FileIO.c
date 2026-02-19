@@ -6388,10 +6388,17 @@ void ResetOptions(bool startup)
     Option.CPU_Speed = Freq252P;
 #ifdef USBKEYBOARD
 #ifdef HDMI
+#ifdef ADAFRUIT_FRUIT_JAM
+    Option.HDMIclock = 1;
+    Option.HDMId0 = 3;
+    Option.HDMId1 = 5;
+    Option.HDMId2 = 7;
+#else
     Option.HDMIclock = 2;
     Option.HDMId0 = 0;
     Option.HDMId1 = 6;
     Option.HDMId2 = 4;
+#endif
 #endif
     Option.USBKeyboard = CONFIG_US;
     Option.SerialConsole = 2;
@@ -6402,10 +6409,17 @@ void ResetOptions(bool startup)
     Option.ColourCode = 1;
 #else
 #ifdef HDMI
+#ifdef ADAFRUIT_FRUIT_JAM
+    Option.HDMIclock = 1;
+    Option.HDMId0 = 3;
+    Option.HDMId1 = 5;
+    Option.HDMId2 = 7;
+#else
     Option.HDMIclock = 2;
     Option.HDMId0 = 0;
     Option.HDMId1 = 6;
     Option.HDMId2 = 4;
+#endif
 #else
     Option.VGA_HSYNC = 21;
     Option.VGA_BLUE = 24;

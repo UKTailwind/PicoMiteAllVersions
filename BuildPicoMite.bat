@@ -140,6 +140,24 @@ python ../GetHighestHexAddress.py PicoMite.hex
 cd ..
 timeout /t 20 /nobreak
 ren build buildRP2350L
+::
+:: Fruit Jam HDMIUSB build
+::
+mkdir build
+cd build
+cmake -G "NMake Makefiles" -DCOMPILE=HDMIUSB -DBOARD=adafruit_fruit_jam ..
+nmake
+set "filename=PicoMiteHDMIUSB_FruitJam"
+if exist "%filename%%fixed_string%%extension%" del "%filename%%fixed_string%%extension%"
+copy "PicoMite.uf2" "%directory%%filename%%fixed_string%%extension%"
+echo "%directory%%filename%%fixed_string%%extension%"
+findstr /B ".heap" PicoMite.elf.map
+::
+python ../GetHighestHexAddress.py PicoMite.hex
+::
+cd ..
+timeout /t 20 /nobreak
+ren build buildFruitJam
 
 :: Record end time and calculate elapsed time
 set "end_time=%time%"

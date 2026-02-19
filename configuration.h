@@ -53,7 +53,11 @@ extern "C"
 #define HEAP_MEMORY_SIZE (188 * 1024)
 #endif
 
+#ifdef ADAFRUIT_FRUIT_JAM
+#define FLASH_TARGET_OFFSET (1024 * 1024)
+#else
 #define FLASH_TARGET_OFFSET (896 * 1024)
+#endif
 
 /* HDMI-specific settings */
 #ifdef HDMI

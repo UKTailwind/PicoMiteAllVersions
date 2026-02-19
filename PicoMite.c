@@ -5744,10 +5744,24 @@ uint32_t testPSRAM(void)
             PInt(PSRAMsize / (1024 * 1024));
             MMPrintString(" Mbytes PSRAM available\r\n");
         }
-#if defined(PICOMITEVGA) && !defined(HMDI)
+#ifdef ADAFRUIT_FRUIT_JAM
+        {
+            extern void tlv320_init(void);
+            extern void tlv320_enable_outputs(void);
+            tlv320_init();
+        }
+#endif
+#if defined(PICOMITEVGA) && !defined(HDMI)
         start_i2s(QVGA_PIO_NUM, 1);
 #else
         start_i2s(2, 1);
+#endif
+#ifdef ADAFRUIT_FRUIT_JAM
+        if (Option.audio_i2s_bclk) {
+            extern void tlv320_enable_outputs(void);
+            sleep_ms(50);
+            tlv320_enable_outputs();
+        }
 #endif
 #else
     start_i2s(QVGA_PIO_NUM, 1);

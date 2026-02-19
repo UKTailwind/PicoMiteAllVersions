@@ -3534,6 +3534,7 @@ void MIPS16 configure(unsigned char *p)
             MMPrintString("OLIMEX USB\r\n");
             MMPrintString("PICO COMPUTER\r\n");
             MMPrintString("HDMIUSBI2S\r\n");
+            MMPrintString("FRUIT JAM\r\n");
 #else
             MMPrintString("OLIMEX\r\n");
             MMPrintString("HDMIBasic\r\n");
@@ -3811,6 +3812,43 @@ void MIPS16 configure(unsigned char *p)
             Option.INT2pin = PINMAP[1];
             Option.INT3pin = PINMAP[2];
             Option.INT4pin = PINMAP[3];
+            SaveOptions();
+            printoptions();
+            uSec(100000);
+            doreset(format);
+        }
+        if (checkstring(p, (unsigned char *)"FRUIT JAM"))
+        {
+            if (rp2350a)
+                error("RP2350B chips only");
+            format = testMODBUFF(true, 512);
+            strcpy((char *)Option.platform, "FRUIT JAM");
+            Option.ColourCode = 1;
+            Option.CPU_Speed = Freq480P;
+            // HDMI DVI: CK=GP12/13, D0=GP14/15, D1=GP16/17, D2=GP18/19
+            Option.HDMIclock = 1;
+            Option.HDMId0 = 3;
+            Option.HDMId1 = 5;
+            Option.HDMId2 = 7;
+            // SD Card: GP34(CLK), GP35(MOSI), GP36(MISO), GP39(CS)
+            Option.SD_CS = PINMAP[39];
+            Option.SD_CLK_PIN = PINMAP[34];
+            Option.SD_MOSI_PIN = PINMAP[35];
+            Option.SD_MISO_PIN = PINMAP[36];
+            // I2S Audio: GP26(BCLK), GP24(DIN) - TLV320DAC3100 DAC
+            Option.audio_i2s_bclk = PINMAP[26];
+            Option.audio_i2s_data = PINMAP[24];
+            Option.AUDIO_SLICE = 11;
+            // System I2C: GP20(SDA), GP21(SCL)
+            Option.SYSTEM_I2C_SDA = PINMAP[20];
+            Option.SYSTEM_I2C_SCL = PINMAP[21];
+            // Serial console on UART1: GP8(TX), GP9(RX)
+            Option.SerialTX = PINMAP[8];
+            Option.SerialRX = PINMAP[9];
+            Option.SerialConsole = 2;
+            // Heartbeat LED on GP29
+            Option.heartbeatpin = PINMAP[29];
+            Option.NoHeartbeat = false;
             SaveOptions();
             printoptions();
             uSec(100000);
@@ -6291,7 +6329,7 @@ void MIPS16 cmd_option(void)
 
 //
 #ifdef rp2350
-#if defined(PICOMITEVGA) && !defined(HMDI)
+#if defined(PICOMITEVGA) && !defined(HDMI)
             int pio = QVGA_PIO_NUM;
 #else
             int pio = 2;
