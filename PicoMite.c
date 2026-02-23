@@ -552,7 +552,7 @@ uint8_t PSRAMpin;
             return ConsoleRxBufTail - ConsoleRxBufHead;
     }
     // should be run not more than once a millisecond
-    void __not_in_flash_func(routinechecks)(void)
+    void MIPS32 __not_in_flash_func(routinechecks)(void)
     {
         //        static int when = 0;
         // Note: classicread and nunchuckread are global variables declared in I2C.c
@@ -2135,7 +2135,7 @@ int __not_in_flash_func(MMInkey)(void)
         return ((uint64_t)hi * 50000) + lo;
     }
 
-    bool MIPS16 __not_in_flash_func(timer_callback)(repeating_timer_t *rt)
+    bool MIPS32 __not_in_flash_func(timer_callback)(repeating_timer_t *rt)
     {
         static int IrTimeout, IrTick, NextIrTick;
         int ElapsedMicroSec, IrDevTmp, IrCmdTmp;
@@ -2568,7 +2568,38 @@ int __not_in_flash_func(MMInkey)(void)
         MMPrintString(", ");
         PFlt(n);
     }
-    void sigbus(void)
+    void __attribute__((naked)) sigbus(void)
+    {
+        __asm volatile(
+            "mrs r0, msp\n"
+            "ldr r1, =sigbus_c\n"
+            "bx r1\n");
+    }
+    void __no_inline_not_in_flash_func(sigbus_c)(uint32_t *frame)
+    {
+        char hex[] = "0123456789ABCDEF";
+        uint32_t pc = frame[6];
+        uint32_t lr = frame[5];
+        MMPrintString("PC=");
+        for (int i = 28; i >= 0; i -= 4)
+            putConsole(hex[(pc >> i) & 0xF], 0);
+        MMPrintString(" LR=");
+        for (int i = 28; i >= 0; i -= 4)
+            putConsole(hex[(lr >> i) & 0xF], 0);
+        MMPrintString("\r\n");
+        uSec(250000);
+        disable_interrupts_pico();
+        LoadOptions();
+        if (Option.NoReset == 0)
+        {
+            Option.Autorun = 0;
+            SaveOptions();
+        }
+        enable_interrupts_pico();
+        memset(inpbuf, 0, STRINGSIZE);
+        SoftReset(SOFT_RESET);
+    }
+/*    void sigbus(void)
     {
         MMPrintString("Error: Invalid address - resetting\r\n");
         uSec(250000);
@@ -2584,7 +2615,7 @@ int __not_in_flash_func(MMInkey)(void)
         memset(inpbuf, 0, STRINGSIZE);
         SoftReset(SOFT_RESET);
     }
-
+         */
 #ifdef PICOMITEVGA
     int vgaloop1, vgaloop2, vgaloop4, vgaloop8, vgaloop16, vgaloop32;
 
@@ -5744,7 +5775,7 @@ uint32_t testPSRAM(void)
             PInt(PSRAMsize / (1024 * 1024));
             MMPrintString(" Mbytes PSRAM available\r\n");
         }
-#if defined(PICOMITEVGA) && !defined(HMDI)
+#if defined(PICOMITEVGA) && !defined(HDMI)
         start_i2s(QVGA_PIO_NUM, 1);
 #else
         start_i2s(2, 1);

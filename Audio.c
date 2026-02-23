@@ -85,7 +85,7 @@ static int arraysize = 0;
 short *leftarray = NULL, *rightarray = NULL;
 
 #ifdef rp2350
-// ADSR envelope state for PLAY SAMPLE
+// ADSR envelope state for PLAY SAMPLE (per-channel: 0=left, 1=right)
 typedef enum
 {
 	ADSR_IDLE,
@@ -94,16 +94,16 @@ typedef enum
 	ADSR_SUSTAIN,
 	ADSR_RELEASE
 } e_ADSRPhase;
-static volatile e_ADSRPhase adsr_phase = ADSR_IDLE;
-static volatile int32_t adsr_level = 0;		// current envelope level in 16.16 fixed-point (0 to 2000<<16)
-static volatile int32_t adsr_attack_inc;	// increment per sample during attack phase
-static volatile int32_t adsr_decay_dec;		// decrement per sample during decay phase
-static volatile int32_t adsr_sustain_level; // sustain level in 16.16 fixed-point
-static volatile int32_t adsr_release_dec;	// decrement per sample during release phase
-static volatile int sample_looping = 0;		// flag: 1 = looping waveform for PLAY SAMPLE
-static uint32_t sample_phase = 0;			// 16.16 fixed-point position in waveform cycle
-static uint32_t sample_phase_inc = 0;		// 16.16 fixed-point advance per output sample
-static int sample_cycle_len = 0;			// number of int64 elements per waveform cycle
+static volatile e_ADSRPhase adsr_phase[2] = {ADSR_IDLE, ADSR_IDLE};
+static volatile int32_t adsr_level[2] = {0, 0}; // current envelope level in 16.16 fixed-point (0 to 2000<<16)
+static volatile int32_t adsr_attack_inc[2];		// increment per sample during attack phase
+static volatile int32_t adsr_decay_dec[2];		// decrement per sample during decay phase
+static volatile int32_t adsr_sustain_level[2];	// sustain level in 16.16 fixed-point
+static volatile int32_t adsr_release_dec[2];	// decrement per sample during release phase
+static volatile int sample_looping = 0;			// flag: 1 = looping waveform for PLAY SAMPLE
+static uint32_t sample_phase[2] = {0, 0};		// 16.16 fixed-point position in waveform cycle
+static uint32_t sample_phase_inc[2] = {0, 0};	// 16.16 fixed-point advance per output sample
+static int sample_cycle_len = 0;				// number of int64 elements per waveform cycle
 #endif
 
 /********************************************************************************************************************************************
@@ -1156,39 +1156,37 @@ unsigned int readarray(char *sbuff)
 };
 
 #ifdef rp2350
-// Advance the ADSR envelope by one sample tick (16.16 fixed-point)
-static inline void adsr_tick(void)
+// Advance the ADSR envelope for one channel by one sample tick (16.16 fixed-point)
+// ch: 0=left, 1=right
+static inline void adsr_tick(int ch)
 {
-	switch (adsr_phase)
+	switch (adsr_phase[ch])
 	{
 	case ADSR_ATTACK:
-		adsr_level += adsr_attack_inc;
-		if (adsr_level >= (2000 << 16))
+		adsr_level[ch] += adsr_attack_inc[ch];
+		if (adsr_level[ch] >= (2000 << 16))
 		{
-			adsr_level = (2000 << 16);
-			adsr_phase = ADSR_DECAY;
+			adsr_level[ch] = (2000 << 16);
+			adsr_phase[ch] = ADSR_DECAY;
 		}
 		break;
 	case ADSR_DECAY:
-		adsr_level -= adsr_decay_dec;
-		if (adsr_level <= adsr_sustain_level)
+		adsr_level[ch] -= adsr_decay_dec[ch];
+		if (adsr_level[ch] <= adsr_sustain_level[ch])
 		{
-			adsr_level = adsr_sustain_level;
-			adsr_phase = (adsr_sustain_level > 0) ? ADSR_SUSTAIN : ADSR_IDLE;
-			if (adsr_phase == ADSR_IDLE)
-				playreadcomplete = 1; // sustain=0 means note dies after decay
+			adsr_level[ch] = adsr_sustain_level[ch];
+			adsr_phase[ch] = (adsr_sustain_level[ch] > 0) ? ADSR_SUSTAIN : ADSR_IDLE;
 		}
 		break;
 	case ADSR_SUSTAIN:
 		// hold at sustain level - nothing to do
 		break;
 	case ADSR_RELEASE:
-		adsr_level -= adsr_release_dec;
-		if (adsr_level <= 0)
+		adsr_level[ch] -= adsr_release_dec[ch];
+		if (adsr_level[ch] <= 0)
 		{
-			adsr_level = 0;
-			adsr_phase = ADSR_IDLE;
-			playreadcomplete = 1; // signal end of note
+			adsr_level[ch] = 0;
+			adsr_phase[ch] = ADSR_IDLE;
 		}
 		break;
 	default:
@@ -1196,10 +1194,10 @@ static inline void adsr_tick(void)
 	}
 }
 
-// Fill a buffer with looping sample data, applying the ADSR envelope per-sample.
-// Uses a 16.16 fixed-point phase accumulator to step through the waveform at the
-// correct rate for the desired pitch. Reads the low 16 bits of each int64 element
-// (one sample per integer, not packed shorts).
+// Fill a buffer with looping sample data, applying independent ADSR envelopes
+// and phase accumulators per channel (left=0, right=1).
+// Uses 16.16 fixed-point phase accumulators to step through waveform tables
+// at the correct rate for each channel's desired pitch.
 unsigned int readsamplearray(char *sbuff)
 {
 	short *buff = (short *)sbuff;
@@ -1208,17 +1206,24 @@ unsigned int readsamplearray(char *sbuff)
 	int actual = 0;
 	for (int i = 0; i < maxcount; i++)
 	{
-		int idx = (sample_phase >> 16) % sample_cycle_len;
-		int env = adsr_level >> 16; // extract integer part (0-2000)
+		int idx_l = (sample_phase[0] >> 16) % sample_cycle_len;
+		int idx_r = (sample_phase[1] >> 16) % sample_cycle_len;
+		int env_l = adsr_level[0] >> 16; // extract integer part (0-2000)
+		int env_r = adsr_level[1] >> 16;
 		// Read low 16 bits of each int64 element (idx*4 skips sign-extension shorts)
-		*buff++ = (short)((int)leftarray[idx * 4] * env / 2000);
-		*buff++ = (short)((int)rightarray[idx * 4] * env / 2000);
+		*buff++ = (short)((int)leftarray[idx_l * 4] * env_l / 2000);
+		*buff++ = (short)((int)rightarray[idx_r * 4] * env_r / 2000);
 		actual++;
-		sample_phase += sample_phase_inc;
-		if (sample_phase >= cycle_wrap)
-			sample_phase -= cycle_wrap;
-		adsr_tick();
-		if (adsr_phase == ADSR_IDLE && adsr_level <= 0)
+		sample_phase[0] += sample_phase_inc[0];
+		if (sample_phase[0] >= cycle_wrap)
+			sample_phase[0] -= cycle_wrap;
+		sample_phase[1] += sample_phase_inc[1];
+		if (sample_phase[1] >= cycle_wrap)
+			sample_phase[1] -= cycle_wrap;
+		adsr_tick(0);
+		adsr_tick(1);
+		if (adsr_phase[0] == ADSR_IDLE && adsr_level[0] <= 0 &&
+			adsr_phase[1] == ADSR_IDLE && adsr_level[1] <= 0)
 		{
 			// Zero-fill the rest of the buffer to avoid pops/ticks
 			for (int j = actual; j < maxcount; j++)
@@ -1226,7 +1231,8 @@ unsigned int readsamplearray(char *sbuff)
 				*buff++ = 0;
 				*buff++ = 0;
 			}
-			break; // envelope finished
+			playreadcomplete = 1; // both envelopes finished
+			break;
 		}
 	}
 	return actual * 2;
@@ -1574,10 +1580,10 @@ void MIPS16 cmd_play(void)
 	}
 #ifdef rp2350
 	if ((tp = checkstring(cmdline, (unsigned char *)"SAMPLE")))
-	{ // PLAY SAMPLE left%(), right%(), frequency, attack, decay, sustain, release [,interrupt]
-		float freq;
-		getcsargs(&tp, 15); // this MUST be the first executable line in the function
-		if (!(argc == 13 || argc == 15))
+	{ // PLAY SAMPLE left%(), right%(), freq, A, D, S, R [, freq_R, A_R, D_R, S_R, R_R] [,interrupt]
+		float freq_l, freq_r;
+		getcsargs(&tp, 25); // this MUST be the first executable line in the function
+		if (!(argc == 13 || argc == 15 || argc == 23 || argc == 25))
 			StandardError(2);
 		if (!(CurrentlyPlaying == P_NOTHING || CurrentlyPlaying == P_STOP || CurrentlyPlaying == P_WAVOPEN || CurrentlyPlaying == P_SAMPLE || CurrentlyPlaying == P_PAUSE_SAMPLE))
 			error("Sound output in use for $", PlayingStr[CurrentlyPlaying]);
@@ -1585,18 +1591,43 @@ void MIPS16 cmd_play(void)
 		if (parseintegerarray(argv[2], (int64_t **)&rightarray, 2, 1, NULL, false, NULL) != arraysize)
 			StandardError(16);
 		arraysize *= 4;
-		freq = getnumber(argv[4]);
-		if (freq < 10.0 || freq > 48000.0)
+		// Left channel (or both) parameters
+		freq_l = getnumber(argv[4]);
+		if (freq_l < 10.0 || freq_l > 48000.0)
 			error("Invalid frequency 10.0 - 48000.0");
-		int attack_ms = getint(argv[6], 0, 30000);
-		int decay_ms = getint(argv[8], 0, 30000);
-		int sustain_pct = getint(argv[10], 0, 100);
-		int release_ms = getint(argv[12], 0, 30000);
-		if (argc == 15)
+		int attack_ms_l = getint(argv[6], 0, 30000);
+		int decay_ms_l = getint(argv[8], 0, 30000);
+		int sustain_pct_l = getint(argv[10], 0, 100);
+		int release_ms_l = getint(argv[12], 0, 30000);
+		// Right channel parameters: use separate values if provided, otherwise copy left
+		int has_right = (argc >= 23);
+		float freq_r_val;
+		int attack_ms_r, decay_ms_r, sustain_pct_r, release_ms_r;
+		if (has_right)
+		{
+			freq_r_val = getnumber(argv[14]);
+			if (freq_r_val < 10.0 || freq_r_val > 48000.0)
+				error("Invalid frequency 10.0 - 48000.0");
+			attack_ms_r = getint(argv[16], 0, 30000);
+			decay_ms_r = getint(argv[18], 0, 30000);
+			sustain_pct_r = getint(argv[20], 0, 100);
+			release_ms_r = getint(argv[22], 0, 30000);
+		}
+		else
+		{
+			freq_r_val = freq_l;
+			attack_ms_r = attack_ms_l;
+			decay_ms_r = decay_ms_l;
+			sustain_pct_r = sustain_pct_l;
+			release_ms_r = release_ms_l;
+		}
+		freq_r = freq_r_val;
+		// Interrupt is the last argument if argc is odd (15 or 25)
+		if (argc == 15 || argc == 25)
 		{
 			if (!CurrentLinePtr)
 				error("No program running");
-			WAVInterrupt = (char *)GetIntAddress(argv[14]); // get the interrupt location
+			WAVInterrupt = (char *)GetIntAddress(argv[argc - 1]); // get the interrupt location
 			WAVcomplete = false;
 			InterruptUsed = true;
 		}
@@ -1606,35 +1637,54 @@ void MIPS16 cmd_play(void)
 		// Save the number of int64 elements as the waveform cycle length
 		sample_cycle_len = arraysize / 4;
 		// Use a fixed output sample rate with audiorepeat=1 so each buffer sample
-		// is clocked out once. A phase accumulator in readsamplearray() steps
-		// through the waveform table at the correct rate for the desired pitch.
+		// is clocked out once. Phase accumulators in readsamplearray() step
+		// through each channel's waveform table at the correct rate.
 		audiorepeat = 1;
+		float maxfreq = (freq_l > freq_r) ? freq_l : freq_r;
 		float actualrate = 44100.0f;
-		if (freq > actualrate / 2.0f)
-			actualrate = freq * 2.5f; // ensure Nyquist headroom
-		// Phase increment per output sample (16.16 fixed-point):
-		// To produce freq Hz from a cycle_len-sample table at actualrate output rate,
-		// advance = cycle_len * freq / actualrate elements per output sample.
-		sample_phase_inc = (uint32_t)((float)sample_cycle_len * freq / actualrate * 65536.0f);
-		sample_phase = 0;
-		// Pre-compute ADSR rates (16.16 fixed-point per-sample increments)
-		// adsr_tick() fires once per output sample at actualrate Hz.
-		int32_t sustain_val = mapping[sustain_pct]; // 0-2000
+		if (maxfreq > actualrate / 2.0f)
+			actualrate = maxfreq * 2.5f; // ensure Nyquist headroom
+		// Phase increment per output sample (16.16 fixed-point) per channel
+		sample_phase_inc[0] = (uint32_t)((float)sample_cycle_len * freq_l / actualrate * 65536.0f);
+		sample_phase_inc[1] = (uint32_t)((float)sample_cycle_len * freq_r / actualrate * 65536.0f);
+		sample_phase[0] = 0;
+		sample_phase[1] = 0;
+		// Pre-compute ADSR rates per channel (16.16 fixed-point per-sample increments)
 		int ticks_per_ms = (int)(actualrate / 1000.0f);
 		if (ticks_per_ms < 1)
 			ticks_per_ms = 1;
-		adsr_attack_inc = attack_ms > 0 ? (2000 << 16) / (attack_ms * ticks_per_ms) : (2000 << 16);
-		adsr_decay_dec = decay_ms > 0 ? ((2000 - sustain_val) << 16) / (decay_ms * ticks_per_ms) : ((2000 - sustain_val) << 16);
-		adsr_sustain_level = sustain_val << 16;
-		adsr_release_dec = release_ms > 0 ? (adsr_sustain_level > 0 ? adsr_sustain_level / (release_ms * ticks_per_ms) : (2000 << 16)) : (2000 << 16);
-		if (adsr_attack_inc < 1)
-			adsr_attack_inc = 1;
-		if (adsr_decay_dec < 1 && (2000 - sustain_val) > 0)
-			adsr_decay_dec = 1;
-		if (adsr_release_dec < 1 && sustain_val > 0)
-			adsr_release_dec = 1;
-		adsr_phase = ADSR_ATTACK;
-		adsr_level = 0;
+		// Left channel ADSR
+		{
+			int32_t sustain_val = mapping[sustain_pct_l];
+			adsr_attack_inc[0] = attack_ms_l > 0 ? (2000 << 16) / (attack_ms_l * ticks_per_ms) : (2000 << 16);
+			adsr_decay_dec[0] = decay_ms_l > 0 ? ((2000 - sustain_val) << 16) / (decay_ms_l * ticks_per_ms) : ((2000 - sustain_val) << 16);
+			adsr_sustain_level[0] = sustain_val << 16;
+			adsr_release_dec[0] = release_ms_l > 0 ? (adsr_sustain_level[0] > 0 ? adsr_sustain_level[0] / (release_ms_l * ticks_per_ms) : (2000 << 16)) : (2000 << 16);
+			if (adsr_attack_inc[0] < 1)
+				adsr_attack_inc[0] = 1;
+			if (adsr_decay_dec[0] < 1 && (2000 - sustain_val) > 0)
+				adsr_decay_dec[0] = 1;
+			if (adsr_release_dec[0] < 1 && sustain_val > 0)
+				adsr_release_dec[0] = 1;
+		}
+		// Right channel ADSR
+		{
+			int32_t sustain_val = mapping[sustain_pct_r];
+			adsr_attack_inc[1] = attack_ms_r > 0 ? (2000 << 16) / (attack_ms_r * ticks_per_ms) : (2000 << 16);
+			adsr_decay_dec[1] = decay_ms_r > 0 ? ((2000 - sustain_val) << 16) / (decay_ms_r * ticks_per_ms) : ((2000 - sustain_val) << 16);
+			adsr_sustain_level[1] = sustain_val << 16;
+			adsr_release_dec[1] = release_ms_r > 0 ? (adsr_sustain_level[1] > 0 ? adsr_sustain_level[1] / (release_ms_r * ticks_per_ms) : (2000 << 16)) : (2000 << 16);
+			if (adsr_attack_inc[1] < 1)
+				adsr_attack_inc[1] = 1;
+			if (adsr_decay_dec[1] < 1 && (2000 - sustain_val) > 0)
+				adsr_decay_dec[1] = 1;
+			if (adsr_release_dec[1] < 1 && sustain_val > 0)
+				adsr_release_dec[1] = 1;
+		}
+		adsr_phase[0] = ADSR_ATTACK;
+		adsr_phase[1] = ADSR_ATTACK;
+		adsr_level[0] = 0;
+		adsr_level[1] = 0;
 		sample_looping = 1;
 		setrate((int)actualrate);
 		FreeMemorySafe((void **)&sbuff1);
@@ -1663,10 +1713,11 @@ void MIPS16 cmd_play(void)
 		return;
 	}
 	if (checkstring(cmdline, (unsigned char *)"RELEASE"))
-	{ // PLAY RELEASE - trigger ADSR release phase
+	{ // PLAY RELEASE - trigger ADSR release phase on both channels
 		if (CurrentlyPlaying != P_SAMPLE && CurrentlyPlaying != P_PAUSE_SAMPLE)
 			error("Not playing a sample");
-		adsr_phase = ADSR_RELEASE;
+		adsr_phase[0] = ADSR_RELEASE;
+		adsr_phase[1] = ADSR_RELEASE;
 		return;
 	}
 #endif

@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.13)
 # Valid builds are PICO, PICOUSB, VGA, VGAUSB, HDMI(rp2350 only), HDMIUSB(rp2350 only), WEB
 
 
-#set(COMPILE PICORP2350)
+#set(COMPILE PICOUSB)
 
 if (COMPILE STREQUAL "HDMI" OR COMPILE STREQUAL "WEBRP2350" OR COMPILE STREQUAL "HDMIUSB"  OR COMPILE STREQUAL "VGARP2350"  OR COMPILE STREQUAL "VGAUSBRP2350"  OR COMPILE STREQUAL "PICORP2350"  OR COMPILE STREQUAL "PICOUSBRP2350" )
 	set(PICO_PLATFORM rp2350)
@@ -25,11 +25,6 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 #set(PICO_NO_COPRO_DIS 1)
 pico_sdk_init()
-if (COMPILE STREQUAL "HDMI" OR COMPILE STREQUAL "WEBRP2350" OR COMPILE STREQUAL "HDMIUSB"  OR COMPILE STREQUAL "VGARP2350"  OR COMPILE STREQUAL "VGAUSBRP2350"  OR COMPILE STREQUAL "PICORP2350"  OR COMPILE STREQUAL "PICOUSBRP2350" )
-	add_compile_options(-O2)
-else()
-	add_compile_options(-Os)
-endif()
 add_executable(PicoMite
 	PicoMite.c
 	MMBasic.c
@@ -134,11 +129,11 @@ if(COMPILE STREQUAL "VGARP2350" OR COMPILE STREQUAL "PICORP2350" OR COMPILE STRE
 	Raycaster.c
 	)
 endif()
-set_source_files_properties(mmc_stm32.c PROPERTIES COMPILE_FLAGS -O2)
 set_source_files_properties(ff.c PROPERTIES COMPILE_FLAGS -Os)
 set_source_files_properties(GUI.c PROPERTIES COMPILE_FLAGS -Os)
 set_source_files_properties(BmpDecoder.c PROPERTIES COMPILE_FLAGS -Os)
 set_source_files_properties(Draw.c PROPERTIES COMPILE_FLAGS -Os)
+set_source_files_properties(Turtle.c PROPERTIES COMPILE_FLAGS -Os)
 set_source_files_properties(Raycaster.c PROPERTIES COMPILE_FLAGS -Os)
 set_source_files_properties(GPS.c PROPERTIES COMPILE_FLAGS -Os)
 set_source_files_properties(I2C.c PROPERTIES COMPILE_FLAGS -Os)

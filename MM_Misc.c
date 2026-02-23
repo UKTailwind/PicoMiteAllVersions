@@ -6291,7 +6291,7 @@ void MIPS16 cmd_option(void)
 
 //
 #ifdef rp2350
-#if defined(PICOMITEVGA) && !defined(HMDI)
+#if defined(PICOMITEVGA) && !defined(HDMI)
             int pio = QVGA_PIO_NUM;
 #else
             int pio = 2;
@@ -7616,6 +7616,20 @@ void MIPS16 fun_info(void)
                 iret = ((pwm_hw->slice[channel].cc) >> 16);
             else
                 iret = (pwm_hw->slice[channel].cc & 0xFFFF);
+            targ = T_INT;
+            return;
+        }
+        else if ((tp = checkstring(ep, (unsigned char *)"PWM SLICE")))
+        {
+            int pin = getpinarg(tp);
+            if (IsInvalidPin(pin))
+                StandardError(9);
+            if (PinDef[pin].slice == 99)
+                error("Pin has no PWM capability");
+            int slice = PinDef[pin].slice;
+            if (slice >= 128)
+                slice -= 128;
+            iret = slice;
             targ = T_INT;
             return;
         }

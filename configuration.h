@@ -49,11 +49,11 @@ extern "C"
 
 #ifdef HDMI
 #define HEAP_MEMORY_SIZE (180 * 1024)
+#define FLASH_TARGET_OFFSET (896 * 1024)
 #else
 #define HEAP_MEMORY_SIZE (188 * 1024)
+#define FLASH_TARGET_OFFSET (880 * 1024)
 #endif
-
-#define FLASH_TARGET_OFFSET (896 * 1024)
 
 /* HDMI-specific settings */
 #ifdef HDMI
@@ -225,7 +225,7 @@ extern "C"
 #define MAXLOCALVARS 240
 #define MAXVARS (MAXGLOBALVARS + MAXLOCALVARS)
 #define FLASH_TARGET_OFFSET (976 * 1024)
-#define MAX_CPU 420000
+#define MAX_CPU 396000
 #define MAXSUBFUN 512
 
 #ifdef USBKEYBOARD

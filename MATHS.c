@@ -46,8 +46,8 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 MMFLOAT PI;
 
 /* Stride-aware array access macros for struct member arrays */
-#define STRIDE_FLOAT(ptr, idx, stride) (*(MMFLOAT*)((char*)(ptr) + (idx) * (stride)))
-#define STRIDE_INT(ptr, idx, stride)   (*(long long int*)((char*)(ptr) + (idx) * (stride)))
+#define STRIDE_FLOAT(ptr, idx, stride) (*(MMFLOAT *)((char *)(ptr) + (idx) * (stride)))
+#define STRIDE_INT(ptr, idx, stride) (*(long long int *)((char *)(ptr) + (idx) * (stride)))
 
 /* Forward declaration for stride-aware array parsing */
 int parsearrays_stride(unsigned char *tp, MMFLOAT **a1float, MMFLOAT **a2float, MMFLOAT **a3float, int64_t **a1int, int64_t **a2int, int64_t **a3int, int *s1, int *s2, int *s3);
@@ -648,7 +648,8 @@ int parseintegerarray(unsigned char *tp, int64_t **a1int, int argno, int dimensi
 #endif
 	void *ptr1 = NULL;
 	int i, j;
-	if (stride) *stride = sizeof(int64_t);  // Default stride for normal arrays
+	if (stride)
+		*stride = sizeof(int64_t); // Default stride for normal arrays
 	ptr1 = findvar(tp, V_FIND | V_EMPTY_OK | V_NOFIND_ERR);
 	if ((g_vartbl[g_VarIndex].type & T_CONST) && ConstantNotAllowed)
 		StandardError(22);
@@ -661,17 +662,17 @@ int parseintegerarray(unsigned char *tp, int64_t **a1int, int argno, int dimensi
 		// Caller must handle stride for struct member arrays
 		if (stride == NULL)
 			StandardError(47);
-		
+
 		// Verify member is integer type
 		if (!(g_StructMemberType & T_INT))
 			error("Argument % must be an integer array", argno);
-		
+
 		int struct_type = (int)g_vartbl[g_VarIndex].size;
 		int struct_size = g_structtbl[struct_type]->total_size;
 		*stride = struct_size;
-		
+
 		*a1int = (int64_t *)ptr1;
-		
+
 		// Calculate cardinality from struct array dimensions
 		int card = 1;
 		for (i = 0; i < MAXDIM; i++)
@@ -764,7 +765,8 @@ int parsenumberarray(unsigned char *tp, MMFLOAT **a1float, int64_t **a1int, int 
 #endif
 	void *ptr1 = NULL;
 	int i, j;
-	if (stride) *stride = sizeof(MMFLOAT);  // Default stride for normal arrays
+	if (stride)
+		*stride = sizeof(MMFLOAT); // Default stride for normal arrays
 	ptr1 = findvar(tp, V_FIND | V_EMPTY_OK | V_NOFIND_ERR);
 	if ((g_vartbl[g_VarIndex].type & T_CONST) && ConstantNotAllowed)
 		StandardError(22);
@@ -777,20 +779,20 @@ int parsenumberarray(unsigned char *tp, MMFLOAT **a1float, int64_t **a1int, int 
 		// Caller must handle stride for struct member arrays
 		if (stride == NULL)
 			StandardError(47);
-		
+
 		// Verify member is numeric type
 		if (!(g_StructMemberType & (T_INT | T_NBR)))
 			error("Argument % must be a numerical array", argno);
-		
+
 		int struct_type = (int)g_vartbl[g_VarIndex].size;
 		int struct_size = g_structtbl[struct_type]->total_size;
 		*stride = struct_size;
-		
+
 		if (g_StructMemberType & T_NBR)
 			*a1float = (MMFLOAT *)ptr1;
 		else
 			*a1int = (int64_t *)ptr1;
-		
+
 		// Calculate cardinality from struct array dimensions
 		int card = 1;
 		for (i = 0; i < MAXDIM; i++)
@@ -843,7 +845,8 @@ int parsefloatarray(unsigned char *tp, MMFLOAT **a1float, int argno, int dimensi
 #endif
 	void *ptr1 = NULL;
 	int i, j;
-	if (stride) *stride = sizeof(MMFLOAT);  // Default stride for normal arrays
+	if (stride)
+		*stride = sizeof(MMFLOAT); // Default stride for normal arrays
 	ptr1 = findvar(tp, V_FIND | V_EMPTY_OK | V_NOFIND_ERR);
 	if ((g_vartbl[g_VarIndex].type & T_CONST) && ConstantNotAllowed)
 		StandardError(22);
@@ -856,17 +859,17 @@ int parsefloatarray(unsigned char *tp, MMFLOAT **a1float, int argno, int dimensi
 		// Caller must handle stride for struct member arrays
 		if (stride == NULL)
 			StandardError(47);
-		
+
 		// Verify member is float type
 		if (!(g_StructMemberType & T_NBR))
 			error("Argument % must be a floating point array", argno);
-		
+
 		int struct_type = (int)g_vartbl[g_VarIndex].size;
 		int struct_size = g_structtbl[struct_type]->total_size;
 		*stride = struct_size;
-		
+
 		*a1float = (MMFLOAT *)ptr1;
-		
+
 		// Calculate cardinality from struct array dimensions
 		int card = 1;
 		for (i = 0; i < MAXDIM; i++)
@@ -2620,7 +2623,8 @@ void cmd_math(void)
 				void *ptr1 = findvar(argv[8], V_FIND);
 				scale_vtype = g_vartbl[g_VarIndex].type;
 #ifdef STRUCTENABLED
-				if (g_StructMemberType != 0) scale_vtype = g_StructMemberType;
+				if (g_StructMemberType != 0)
+					scale_vtype = g_StructMemberType;
 #endif
 				if (!(scale_vtype & (T_NBR | T_INT)))
 					StandardError(6);
@@ -2631,7 +2635,8 @@ void cmd_math(void)
 				void *ptr2 = findvar(argv[10], V_FIND);
 				scale_vtype = g_vartbl[g_VarIndex].type;
 #ifdef STRUCTENABLED
-				if (g_StructMemberType != 0) scale_vtype = g_StructMemberType;
+				if (g_StructMemberType != 0)
+					scale_vtype = g_StructMemberType;
 #endif
 				if (!(scale_vtype & (T_NBR | T_INT)))
 					StandardError(6);
@@ -2897,6 +2902,21 @@ void fun_math(void)
 				fcplx x = conjf(getComplex(tp));
 				retComplex(x);
 			}
+			else if ((tp = checkstring(&ep[2], (unsigned char *)"ASINH")))
+			{
+				fcplx x = casinhf(getComplex(tp));
+				retComplex(x);
+			}
+			else if ((tp = checkstring(&ep[2], (unsigned char *)"ACOSH")))
+			{
+				fcplx x = cacoshf(getComplex(tp));
+				retComplex(x);
+			}
+			else if ((tp = checkstring(&ep[2], (unsigned char *)"ATANH")))
+			{
+				fcplx x = catanhf(getComplex(tp));
+				retComplex(x);
+			}
 			else if ((tp = checkstring(&ep[2], (unsigned char *)"ACOS")))
 			{
 				fcplx x = cacosf(getComplex(tp));
@@ -2940,21 +2960,6 @@ void fun_math(void)
 			else if ((tp = checkstring(&ep[2], (unsigned char *)"TANH")))
 			{
 				fcplx x = ctanhf(getComplex(tp));
-				retComplex(x);
-			}
-			else if ((tp = checkstring(&ep[2], (unsigned char *)"ASINH")))
-			{
-				fcplx x = casinhf(getComplex(tp));
-				retComplex(x);
-			}
-			else if ((tp = checkstring(&ep[2], (unsigned char *)"ACOSH")))
-			{
-				fcplx x = cacoshf(getComplex(tp));
-				retComplex(x);
-			}
-			else if ((tp = checkstring(&ep[2], (unsigned char *)"ATANH")))
-			{
-				fcplx x = catanhf(getComplex(tp));
 				retComplex(x);
 			}
 			else if ((tp = checkstring(&ep[2], (unsigned char *)"EXP")))
@@ -3571,7 +3576,8 @@ void fun_math(void)
 				temp = findvar(argv[2], V_FIND);
 				max_vtype = g_vartbl[g_VarIndex].type;
 #ifdef STRUCTENABLED
-				if (g_StructMemberType != 0) max_vtype = g_StructMemberType;
+				if (g_StructMemberType != 0)
+					max_vtype = g_StructMemberType;
 #endif
 				if (!(max_vtype & T_INT))
 					StandardError(6);
@@ -3632,7 +3638,8 @@ void fun_math(void)
 				temp = findvar(argv[2], V_FIND);
 				min_vtype = g_vartbl[g_VarIndex].type;
 #ifdef STRUCTENABLED
-				if (g_StructMemberType != 0) min_vtype = g_StructMemberType;
+				if (g_StructMemberType != 0)
+					min_vtype = g_StructMemberType;
 #endif
 				if (!(min_vtype & T_INT))
 					StandardError(6);

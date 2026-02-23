@@ -464,7 +464,7 @@ int FileSize(char *p)
     if (FatFSFileSystem == 0)
     {
         struct lfs_info lfsinfo;
-        memset(&lfsinfo, 0, sizeof(DIR));
+        memset(&lfsinfo, 0, sizeof(struct lfs_info));
         FSerror = lfs_stat(&lfs, q, &lfsinfo);
         if (lfsinfo.type == LFS_TYPE_REG)
             retval = lfsinfo.size;
@@ -499,7 +499,7 @@ int ExistsFile(char *p)
     if (FatFSFileSystem == 0)
     {
         struct lfs_info lfsinfo;
-        memset(&lfsinfo, 0, sizeof(DIR));
+        memset(&lfsinfo, 0, sizeof(struct lfs_info));
         FSerror = lfs_stat(&lfs, q, &lfsinfo);
         if (lfsinfo.type == LFS_TYPE_REG)
             retval = 1;
@@ -541,7 +541,7 @@ int ExistsDir(char *p, char *q, int *filesystem)
     if (FatFSFileSystem == 0)
     {
         struct lfs_info lfsinfo;
-        memset(&lfsinfo, 0, sizeof(DIR));
+        memset(&lfsinfo, 0, sizeof(struct lfs_info));
         FSerror = lfs_stat(&lfs, q, &lfsinfo);
         if (lfsinfo.type == LFS_TYPE_DIR)
             ireturn = 1;
