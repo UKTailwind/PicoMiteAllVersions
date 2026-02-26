@@ -190,9 +190,17 @@ extern void RtcGetTime(int noerror);
 extern void ConfigDisplayI2C(unsigned char *p);
 extern void InitDisplayI2C(int InitOnly);
 extern void CheckI2CKeyboard(int noerror, int read);
+extern void CheckPicoCalcKeyboard(int noerror, int read);
 extern void cmd_camera(void);
 extern void cmd_Classic(void);
 extern void cameraclose(void);
+extern void CheckLcdBacklight(void);   // *EB*
+extern void CheckKbdBacklight(void);   // *EB*
+extern int read_battery();             // *EB*
+extern int read_biosversion();         // *EB*
+extern int set_kbd_backlight(uint8_t); // *EB*
+extern int set_lcd_backlight(uint8_t); // *EB*
+extern void TestPicoCalc(void);        // *EB*
 
 /* ==============================================================================================================
  * FUNCTION PROTOTYPES - Wii Controllers

@@ -1506,10 +1506,6 @@ void MIPS16 cmd_list(void)
 #endif
 	else if ((p = checkstring(cmdline, (unsigned char *)"PINS")))
 	{
-#if defined(PICOMITEWEB) && defined(rp2350)
-		if (!rp2350a)
-			error("Incompatible board, RP2350A only");
-#endif
 		CallExecuteProgram((char *)pinlist);
 		return;
 	}
@@ -2242,7 +2238,7 @@ extern volatile char g_StrTmpLocalIndex[MAXTEMPSTRINGS]; // used to track the g_
 void SaveContext(void)
 {
 	CloseAudio(1);
-#if defined(rp2350) && !defined(PICOMITEWEB)
+#if defined(rp2350)
 	if (PSRAMsize)
 	{
 		ClearTempMemory();
@@ -2327,14 +2323,14 @@ void SaveContext(void)
 		lfs_file_write(&lfs, &lfs_file, MMHeap, heap_memory_size + 256);
 		lfs_file_write(&lfs, &lfs_file, mmap, sizeof(mmap));
 		lfs_file_close(&lfs, &lfs_file);
-#if defined(rp2350) && !defined(PICOMITEWEB)
+#if defined(rp2350)
 	}
 #endif
 }
 void RestoreContext(bool keep)
 {
 	CloseAudio(1);
-#if defined(rp2350) && !defined(PICOMITEWEB)
+#if defined(rp2350)
 	if (PSRAMsize)
 	{
 		uint8_t *p = (uint8_t *)PSRAMbase + PSRAMsize;
@@ -2410,7 +2406,7 @@ void RestoreContext(bool keep)
 		lfs_file_close(&lfs, &lfs_file);
 		if (!keep)
 			lfs_remove(&lfs, "/.vars");
-#if defined(rp2350) && !defined(PICOMITEWEB)
+#if defined(rp2350)
 	}
 #endif
 }
@@ -4773,18 +4769,7 @@ void MIPS16 cmd_frame(void)
 	{
 		if (!frame)
 			error("Frame does not exist");
-		free_overlays();
-		// Free any vbufs
-		for (int i = 0; i < num_panels; i++)
-		{
-			if (framepanels[i].vbuf)
-				FreeMemorySafe((void **)&framepanels[i].vbuf);
-		}
-		FreeMemorySafe((void **)&frame);
-		FreeMemorySafe((void **)&outframe);
-		FreeMemorySafe((void **)&framepanels);
-		num_panels = 0;
-		max_panels = 0;
+		closeframe();
 	}
 	else if ((p = checkstring(cmdline, (unsigned char *)"WRITE")))
 	{
@@ -5550,12 +5535,10 @@ void cmd_redim(void)
 					FreeMemorySafe((void **)&addr);
 				}
 #ifdef rp2350
-#ifndef PICOMITEWEB
 				else if (addr > (uint32_t)PSRAMbase && addr < (uint32_t)PSRAMbase + PSRAMsize)
 				{
 					FreeMemorySafe((void **)&addr);
 				}
-#endif
 #endif
 			}
 		}

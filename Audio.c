@@ -708,7 +708,7 @@ void CloseAudio(int all)
 		drmp3_uninit(mymp3);
 		FreeMemorySafe((void **)&mymp3);
 	}
-	if (PSRAMsize && was_playing == P_MOD)
+	if (PSRAMsize && (was_playing == P_MOD || was_playing == P_PAUSE_MOD))
 		FreeMemorySafe((void **)&modbuff);
 #endif
 	int i;

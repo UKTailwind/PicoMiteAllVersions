@@ -34,6 +34,15 @@ enum
     LFS_CMP_GT = 2,
 };
 
+static inline uint8_t lfs_tolower_ascii(uint8_t c)
+{
+    if (c >= 'A' && c <= 'Z')
+    {
+        return c + ('a' - 'A');
+    }
+    return c;
+}
+
 /// Caching block device operations ///
 
 static inline void lfs_cache_drop(lfs_t *lfs, lfs_cache_t *rcache)
@@ -1488,14 +1497,32 @@ static int lfs_dir_find_match(void *data,
     lfs_t *lfs = name->lfs;
     const struct lfs_diskoff *disk = buffer;
 
-    // compare with disk
+    // compare with disk (case-insensitive, preserving on-disk case)
     lfs_size_t diff = lfs_min(name->size, lfs_tag_size(tag));
-    int res = lfs_bd_cmp(lfs,
-                         NULL, &lfs->rcache, diff,
-                         disk->block, disk->off, name->name, diff);
-    if (res != LFS_CMP_EQ)
+    const uint8_t *ndata = name->name;
+    for (lfs_off_t i = 0; i < diff;)
     {
-        return res;
+        uint8_t dat[8];
+        lfs_size_t chunk = lfs_min(diff - i, sizeof(dat));
+        int err = lfs_bd_read(lfs,
+                              NULL, &lfs->rcache, diff - i,
+                              disk->block, disk->off + i, dat, chunk);
+        if (err)
+        {
+            return err;
+        }
+
+        for (lfs_size_t j = 0; j < chunk; ++j)
+        {
+            uint8_t dc = lfs_tolower_ascii(dat[j]);
+            uint8_t nc = lfs_tolower_ascii(ndata[i + j]);
+            if (dc != nc)
+            {
+                return (dc < nc) ? LFS_CMP_LT : LFS_CMP_GT;
+            }
+        }
+
+        i += chunk;
     }
 
     // only equal if our size is still the same

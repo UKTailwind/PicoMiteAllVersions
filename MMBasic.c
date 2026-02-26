@@ -5254,7 +5254,6 @@ void MIPS32 __not_in_flash_func(ClearVars)(int level, bool all)
                     // free any memory (if allocated)
                 }
 #ifdef rp2350
-#ifndef PICOMITEWEB
 #ifdef STRUCTENABLED
                 if (((g_vartbl[hashcurrent].type & T_STR) || g_vartbl[hashcurrent].dims[0] != 0 || (g_vartbl[hashcurrent].type & T_STRUCT)) && !(g_vartbl[hashcurrent].type & T_PTR) && ((uint32_t)g_vartbl[hashcurrent].val.s > (uint32_t)PSRAMbase && (uint32_t)g_vartbl[hashcurrent].val.s < (uint32_t)PSRAMbase + PSRAMsize))
 #else
@@ -5263,7 +5262,6 @@ void MIPS32 __not_in_flash_func(ClearVars)(int level, bool all)
                 {
                     FreeMemorySafe((void **)&g_vartbl[hashcurrent].val.s); // free any memory (if allocated)
                 }
-#endif
 #endif
                 g_hashlist[i].level = -1;
                 newhashpointer = i; // set the new highest index
@@ -5295,7 +5293,6 @@ void MIPS32 __not_in_flash_func(ClearVars)(int level, bool all)
                 }
             }
 #ifdef rp2350
-#ifndef PICOMITEWEB
             if (all)
             {
 #ifdef STRUCTENABLED
@@ -5310,7 +5307,6 @@ void MIPS32 __not_in_flash_func(ClearVars)(int level, bool all)
                     }
                 }
             }
-#endif
 #endif
             memset(&g_vartbl[i], 0, sizeof(struct s_vartbl));
         }
@@ -5414,13 +5410,11 @@ uint32_t erase(char *p, bool nofree)
                     FreeMemorySafe((void **)&g_vartbl[j].val.s);
                 }
 #ifdef rp2350
-#ifndef PICOMITEWEB
                 // BUG FIX: Add PSRAM support for RP2350
                 else if (addr > (uint32_t)PSRAMbase && addr < (uint32_t)PSRAMbase + PSRAMsize)
                 {
                     FreeMemorySafe((void **)&g_vartbl[j].val.s);
                 }
-#endif
 #endif
             }
             g_vartbl[j].val.s = NULL;

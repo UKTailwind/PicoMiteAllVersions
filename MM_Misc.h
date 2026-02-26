@@ -161,7 +161,7 @@ uint_fast64_t gettimefromepoch(int *year, int *month, int *day, int *hour, int *
  * ============================================================================ */
 void OtherOptions(void);
 void printoptions(void);
-
+void configure(unsigned char *p, bool noask);
 #endif /* !defined(INCLUDE_COMMAND_TABLE) && !defined(INCLUDE_TOKEN_TABLE) */
 
 #endif /* MISC_HEADER */

@@ -361,7 +361,7 @@ void floatsort(MMFLOAT *farray, int n, long long *index, int flags, int startpoi
     }
 }
 
-void stringsort(unsigned char *sarray, int n, int offset, long long *index, int flags, int startpoint)
+void MIPS16 stringsort(unsigned char *sarray, int n, int offset, long long *index, int flags, int startpoint)
 {
     int ii, i, s = 1, isave;
     int k;
@@ -487,7 +487,7 @@ void stringsort(unsigned char *sarray, int n, int offset, long long *index, int 
     }
 }
 
-void cmd_sort(void)
+void MIPS16 cmd_sort(void)
 {
     MMFLOAT *a3float = NULL;
     int64_t *a3int = NULL, *a4int = NULL;
@@ -742,7 +742,11 @@ void cmd_pause(void)
     }
 }
 
+#ifdef rp2350
 void cmd_longString(void)
+#else
+void MIPS16 cmd_longString(void)
+#endif
 {
     unsigned char *tp;
     tp = checkstring(cmdline, (unsigned char *)"SETBYTE");
@@ -2602,7 +2606,7 @@ void MIPS16 printoptions(void)
             MMPrintString(" BLACK");
         PRet();
     }
-#if defined(rp2350) && !defined(PICOMITEWEB)
+#if defined(rp2350)
     if (Option.special == 1)
         PO2Str("PICO PLUS 2", "ON");
 #endif
@@ -2631,7 +2635,7 @@ void MIPS16 printoptions(void)
     if (Option.LOCAL_KEYBOARD)
         PO3Int("KEYBOARD REPEAT", Option.RepeatStart, Option.RepeatRate);
 #endif
-    if (!(Option.KeyboardConfig == NO_KEYBOARD || Option.KeyboardConfig == CONFIG_I2C))
+    if (!(Option.KeyboardConfig == NO_KEYBOARD || Option.KeyboardConfig >= CONFIG_I2C))
     {
         PO("KEYBOARD");
         MMPrintString((char *)KBrdList[(int)Option.KeyboardConfig]);
@@ -2663,6 +2667,8 @@ void MIPS16 printoptions(void)
 #endif
     if (Option.KeyboardConfig == CONFIG_I2C)
         PO2Str("KEYBOARD", "I2C");
+    if (Option.KeyboardConfig == CONFIG_PICOCALC)
+        PO2Str("KEYBOARD", "PICOCALC");
 #ifdef rp2350
     if (Option.NoHeartbeat && rp2350a)
         PO2Str("HEARTBEAT", "OFF");
@@ -2882,6 +2888,14 @@ void MIPS16 printoptions(void)
     if (Option.MaxCtrls)
         PO2Int("GUI CONTROLS", Option.MaxCtrls - 1);
 #endif
+
+    if (Option.BACKLIGHT_KBD)
+        PO2Int("BACKLIGHT KBD", Option.BACKLIGHT_KBD); // *EB*
+    if (Option.BACKLIGHT_LCD)
+        PO2Int("BACKLIGHT LCD", Option.BACKLIGHT_LCD); // *EB*
+    if (Option.BADPICO)
+        PO2Int("BADPICO", Option.BADPICO); // *EB*
+
 #ifdef PICOMITEWEB
     if (*Option.SSID)
     {
@@ -3286,7 +3300,7 @@ void MIPS16 disable_sd(void)
     Option.SYSTEM_MOSI = 0;
 #endif
 }
-void disable_audio(void)
+void MIPS16 disable_audio(void)
 {
     if (!IsInvalidPin(Option.AUDIO_L))
         ExtCurrentConfig[Option.AUDIO_L] = EXT_DIG_IN;
@@ -3472,9 +3486,9 @@ void MIPS16 clear320(void)
 // }
 
 #endif
-bool testMODBUFF(bool proposed, int proposedsize)
+bool MIPS16 testMODBUFF(bool proposed, int proposedsize, bool noask)
 {
-    if (!(Option.modbuff == proposed && Option.modbuffsize == proposedsize))
+    if (!((Option.modbuff == proposed && Option.modbuffsize == proposedsize) || noask))
     {
         MMPrintString("\r\nThis erases everything in flash including the A: drive - are you sure (Y/N) ? ");
         int i;
@@ -3504,12 +3518,12 @@ void doreset(int format)
 {
     SoftReset(format ? RESET_FLASHSTORAGE : SOFT_RESET);
 }
-void MIPS16 configure(unsigned char *p)
+void MIPS16 configure(unsigned char *p, bool noask)
 {
     bool format = false;
     if (!*p)
     {
-        format = testMODBUFF(false, 0);
+        format = testMODBUFF(false, 0, false);
         doreset(format);
     }
     else
@@ -3549,6 +3563,7 @@ void MIPS16 configure(unsigned char *p)
             MMPrintString("Pico-ResTouch-LCD-3.5\r\n");
             MMPrintString("Pico-ResTouch-LCD-2.8\r\n");
             MMPrintString("PICO BACKPACK\r\n");
+            MMPrintString("PicoCalc\r\n");
 #ifndef PICOMITEWEB
             MMPrintString("RP2040-LCD-1.28\r\n");
             MMPrintString("RP2040LCD-0.96\r\n");
@@ -3565,7 +3580,7 @@ void MIPS16 configure(unsigned char *p)
 #ifdef USBKEYBOARD
         if (checkstring(p, (unsigned char *)"CMM1.5"))
         {
-            format = testMODBUFF(true, 512);
+            format = testMODBUFF(true, 512, false);
             Option.CPU_Speed = 252000;
             Option.AllPins = 1;
             Option.ColourCode = 1;
@@ -3592,7 +3607,7 @@ void MIPS16 configure(unsigned char *p)
 #else
         if (checkstring(p, (unsigned char *)"PICOMITEVGA V1.1"))
         {
-            format = testMODBUFF(true, 512);
+            format = testMODBUFF(true, 512, false);
             Option.CPU_Speed = 252000;
             Option.AllPins = 1;
             Option.ColourCode = 1;
@@ -3617,7 +3632,7 @@ void MIPS16 configure(unsigned char *p)
         }
         if (checkstring(p, (unsigned char *)"PICOMITEVGA V1.0"))
         {
-            format = testMODBUFF(true, 512);
+            format = testMODBUFF(true, 512, false);
             Option.CPU_Speed = 252000;
             Option.AllPins = 1;
             Option.ColourCode = 1;
@@ -3641,7 +3656,7 @@ void MIPS16 configure(unsigned char *p)
         }
         if (checkstring(p, (unsigned char *)"VGA DESIGN 1"))
         {
-            format = testMODBUFF(false, 0);
+            format = testMODBUFF(false, 0, false);
             Option.CPU_Speed = 252000;
             Option.ColourCode = 1;
             Option.SYSTEM_CLK = PINMAP[10];
@@ -3658,7 +3673,7 @@ void MIPS16 configure(unsigned char *p)
         }
         if (checkstring(p, (unsigned char *)"VGA DESIGN 2"))
         {
-            format = testMODBUFF(true, 192);
+            format = testMODBUFF(true, 192, false);
             Option.CPU_Speed = 252000;
             Option.ColourCode = 1;
             Option.SYSTEM_I2C_SDA = PINMAP[14];
@@ -3688,7 +3703,7 @@ void MIPS16 configure(unsigned char *p)
         OPTION VGA PINS GP14, GP10*/
         if (checkstring(p, (unsigned char *)"SWEETIEPI"))
         {
-            format = testMODBUFF(true, 192);
+            format = testMODBUFF(true, 192, false);
             Option.AllPins = 1;
             Option.ColourCode = 1;
             Option.SYSTEM_I2C_SDA = PINMAP[0];
@@ -3718,7 +3733,7 @@ void MIPS16 configure(unsigned char *p)
         option system i2c GP26, GP27*/
         if (checkstring(p, (unsigned char *)"VGA BASIC"))
         {
-            format = testMODBUFF(true, 192);
+            format = testMODBUFF(true, 192, false);
             Option.ColourCode = 1;
             Option.SYSTEM_I2C_SDA = PINMAP[0];
             Option.SYSTEM_I2C_SCL = PINMAP[1];
@@ -3755,7 +3770,7 @@ void MIPS16 configure(unsigned char *p)
         */
         if (checkstring(p, (unsigned char *)"HDMIUSB") || checkstring(p, (unsigned char *)"PICO COMPUTER"))
         {
-            format = testMODBUFF(true, 192);
+            format = testMODBUFF(true, 192, false);
             if (checkstring(p, (unsigned char *)"HDMIUSB"))
                 strcpy((char *)Option.platform, "HDMIUSB");
             else
@@ -3784,7 +3799,7 @@ void MIPS16 configure(unsigned char *p)
         {
             if (rp2350a)
                 error("RP350B chips only");
-            format = testMODBUFF(true, 512);
+            format = testMODBUFF(true, 512, false);
             strcpy((char *)Option.platform, "HDMIUSBI2S");
             Option.heartbeatpin = PINMAP[25];
             Option.NoHeartbeat = false;
@@ -3818,7 +3833,7 @@ void MIPS16 configure(unsigned char *p)
         }
         if (checkstring(p, (unsigned char *)"OLIMEXUSB"))
         {
-            format = testMODBUFF(true, 192);
+            format = testMODBUFF(true, 192, false);
             strcpy((char *)Option.platform, "OLIMEX USB");
             Option.ColourCode = 1;
             Option.AUDIO_L = PINMAP[26];
@@ -3844,7 +3859,7 @@ void MIPS16 configure(unsigned char *p)
 #else
         if (checkstring(p, (unsigned char *)"HDMIBASIC"))
         {
-            format = testMODBUFF(false, 0);
+            format = testMODBUFF(false, 0, false);
             strcpy((char *)Option.platform, "HDMIbasic");
             Option.ColourCode = 1;
             Option.SD_CS = 7;
@@ -3858,7 +3873,7 @@ void MIPS16 configure(unsigned char *p)
         }
         if (checkstring(p, (unsigned char *)"OLIMEX"))
         {
-            format = testMODBUFF(true, 192);
+            format = testMODBUFF(true, 192, false);
             strcpy((char *)Option.platform, "OLIMEX");
             Option.ColourCode = 1;
             Option.AUDIO_L = PINMAP[26];
@@ -3884,7 +3899,7 @@ void MIPS16 configure(unsigned char *p)
 #if PICOMITERP2350
         if (checkstring(p, (unsigned char *)"PALM PICO"))
         {
-            format = testMODBUFF(false, 0);
+            format = testMODBUFF(false, 0, false);
             Option.CPU_Speed = 360000;
             Option.ColourCode = 1;
             Option.LCD_CLK = Option.SYSTEM_CLK = PINMAP[42];
@@ -3930,7 +3945,7 @@ void MIPS16 configure(unsigned char *p)
         }
         if (checkstring(p, (unsigned char *)"PICO PALM"))
         {
-            format = testMODBUFF(false, 0);
+            format = testMODBUFF(false, 0, false);
             Option.CPU_Speed = 360000;
             Option.ColourCode = 1;
             Option.SYSTEM_CLK = PINMAP[6];
@@ -3974,9 +3989,54 @@ void MIPS16 configure(unsigned char *p)
         }
 #endif
 #ifndef USBKEYBOARD
+        if (checkstring(p, (unsigned char *)"PICOCALC"))
+        {
+            format = testMODBUFF(true, 192, noask);
+            Option.CPU_Speed = 252000;
+            Option.ColourCode = 1;
+#if defined(rp2350) && defined(PICOMITE)
+            Option.LCD_CLK = Option.SYSTEM_CLK = 14;
+            Option.LCD_MOSI = Option.SYSTEM_MOSI = 15;
+            Option.LCD_MISO = Option.SYSTEM_MISO = 16;
+#else
+            Option.SYSTEM_CLK = 14;
+            Option.SYSTEM_MOSI = 15;
+            Option.SYSTEM_MISO = 16;
+#endif
+            Option.DISPLAY_TYPE = ST7365P;
+            Option.AUDIO_L = 31;
+            Option.AUDIO_R = 32;
+            Option.LCD_CD = 19;
+            Option.LCD_Reset = 20;
+            Option.LCD_CS = 17;
+            Option.SD_CS = 22;
+            Option.SD_CLK_PIN = 24;
+            Option.SD_MOSI_PIN = 25;
+            Option.SD_MISO_PIN = 21;
+            Option.DISPLAY_ORIENTATION = PORTRAIT;
+            Option.AUDIO_SLICE = checkslice(31, 32, 0);
+            Option.SYSTEM_I2C_SDA = 9;
+            Option.SYSTEM_I2C_SCL = 10;
+            Option.SYSTEM_I2C_SLOW = 1;
+            Option.BackLightLevel = 20; // default 20,sync with i2c keyboard
+            Option.DISPLAY_CONSOLE = 1;
+            Option.DefaultFC = GREEN;
+            Option.KEYBOARD_CLOCK = 0;
+            Option.KEYBOARD_DATA = 0;
+            Option.KeyboardConfig = CONFIG_PICOCALC;
+            Option.ColourCode = 1;
+            Option.BACKLIGHT_KBD = 0;  // Keyboard backlight           // *EB*
+            Option.BACKLIGHT_LCD = 30; // LCD backlight                // *EB*
+            strcpy((char *)Option.platform, "PicoCalc");
+            SaveOptions();
+            if (!noask)
+                printoptions();
+            uSec(100000);
+            doreset(format);
+        }
         if (checkstring(p, (unsigned char *)"GAMEMITE"))
         {
-            format = testMODBUFF(true, 192);
+            format = testMODBUFF(true, 192, false);
             Option.CPU_Speed = 252000;
             Option.ColourCode = 1;
 #if defined(rp2350) && defined(PICOMITE)
@@ -4012,7 +4072,7 @@ void MIPS16 configure(unsigned char *p)
         }
         if (checkstring(p, (unsigned char *)"PICORESTOUCHLCD3.5"))
         {
-            format = testMODBUFF(true, 192);
+            format = testMODBUFF(true, 192, false);
             Option.CPU_Speed = 252000;
             Option.ColourCode = 1;
 #if defined(rp2350) && defined(PICOMITE)
@@ -4046,7 +4106,7 @@ void MIPS16 configure(unsigned char *p)
         }
         if (checkstring(p, (unsigned char *)"PICO BACKPACK"))
         {
-            format = testMODBUFF(false, 0);
+            format = testMODBUFF(false, 0, false);
             Option.CPU_Speed = 252000;
             Option.ColourCode = 1;
 #if defined(rp2350) && defined(PICOMITE)
@@ -4079,7 +4139,7 @@ void MIPS16 configure(unsigned char *p)
         }
         if (checkstring(p, (unsigned char *)"PICORESTOUCHLCD2.8"))
         {
-            format = testMODBUFF(true, 192);
+            format = testMODBUFF(true, 192, false);
             Option.CPU_Speed = 252000;
             Option.ColourCode = 1;
 #if defined(rp2350) && defined(PICOMITE)
@@ -4114,7 +4174,7 @@ void MIPS16 configure(unsigned char *p)
 #ifndef PICOMITEWEB
         if (checkstring(p, (unsigned char *)"RP2040LCD1.28"))
         {
-            format = testMODBUFF(false, 0);
+            format = testMODBUFF(false, 0, false);
             Option.CPU_Speed = 252000;
             Option.AllPins = 1;
             Option.ColourCode = 1;
@@ -4144,7 +4204,7 @@ void MIPS16 configure(unsigned char *p)
         }
         if (checkstring(p, (unsigned char *)"RP2040LCD0.96"))
         {
-            format = testMODBUFF(false, 0);
+            format = testMODBUFF(false, 0, false);
             Option.CPU_Speed = 252000;
             Option.ColourCode = 1;
             Option.NoHeartbeat = 1;
@@ -4171,7 +4231,7 @@ void MIPS16 configure(unsigned char *p)
         }
         if (checkstring(p, (unsigned char *)"RP2040GEEK"))
         {
-            format = testMODBUFF(false, 0);
+            format = testMODBUFF(false, 0, false);
             Option.CPU_Speed = 252000;
             Option.ColourCode = 1;
             Option.NoHeartbeat = 1;
@@ -4205,7 +4265,7 @@ void MIPS16 configure(unsigned char *p)
 #else
         if (checkstring(p, (unsigned char *)"USB Edition V1.0"))
         {
-            format = testMODBUFF(true, 512);
+            format = testMODBUFF(true, 512, false);
             Option.CPU_Speed = 252000;
             Option.ColourCode = 1;
             Option.NoHeartbeat = 1;
@@ -4239,7 +4299,7 @@ void MIPS16 configure(unsigned char *p)
 }
 void cmd_configure(void)
 {
-    configure(cmdline);
+    configure(cmdline, false);
 }
 void MIPS16 cmd_option(void)
 {
@@ -4368,6 +4428,7 @@ void MIPS16 cmd_option(void)
             multicore_fifo_push_blocking(6);
             multicore_fifo_push_blocking((uint32_t)low_x | (high_x << 16));
             multicore_fifo_push_blocking((uint32_t)low_y | (high_y << 16));
+            multicore_fifo_push_blocking((uint32_t)ScrollStart);
             low_x = low_y = silly_low;
             high_x = high_y = silly_high;
             HRes = 320;
@@ -4524,7 +4585,7 @@ void MIPS16 cmd_option(void)
         SaveOptions();
         return;
     }
-#if defined(rp2350) && !defined(PICOMITEWEB)
+#if defined(rp2350)
     tp = checkstring(cmdline, (unsigned char *)"PICO PLUS 2");
     if (tp)
     {
@@ -4536,6 +4597,8 @@ void MIPS16 cmd_option(void)
         }
         else if (checkstring(tp, (unsigned char *)"ON"))
         {
+            if (rp2350a)
+                error("Invalid for RP2350A");
             if (ExtCurrentConfig[58] != EXT_NOT_CONFIG)
                 error("Pin | is in use", 58);
             if (ExtCurrentConfig[43] != EXT_NOT_CONFIG)
@@ -4798,6 +4861,8 @@ void MIPS16 cmd_option(void)
                 Option.KeyboardConfig = CONFIG_BR;
             else if (checkstring(argv[0], (unsigned char *)"I2C"))
                 Option.KeyboardConfig = CONFIG_I2C;
+            else if (checkstring(argv[0], (unsigned char *)"PICOCALC"))
+                Option.KeyboardConfig = CONFIG_PICOCALC;
 #else
         if (checkstring(argv[0], (unsigned char *)"US"))
             Option.USBKeyboard = CONFIG_US;
@@ -4820,7 +4885,7 @@ void MIPS16 cmd_option(void)
 #ifndef USBKEYBOARD
             int rs = 0b00100000;
             int rr = 0b00001100;
-            if (Option.KeyboardConfig != CONFIG_I2C)
+            if (Option.KeyboardConfig < CONFIG_I2C)
             {
                 if (argc >= 3 && *argv[2])
                     Option.capslock = getint(argv[2], 0, 1);
@@ -5239,6 +5304,7 @@ void MIPS16 cmd_option(void)
         ResetDisplay();
         if (Option.DISPLAY_TYPE != SCREENMODE1)
             ClearScreen(gui_bcolour);
+        CurrentX = CurrentY = 0;
         return;
     }
     tp = checkstring(cmdline, (unsigned char *)"HEARTBEAT");
@@ -5457,6 +5523,54 @@ void MIPS16 cmd_option(void)
         SyntaxError();
         ;
     }
+#if PICOCALC // *EB*
+    if (strcmp((char *)Option.platform, "PicoCalc") == 0)
+    {                                                                // *EB*
+        tp = checkstring(cmdline, (unsigned char *)"BACKLIGHT KBD"); // *EB*
+        if (tp)
+        {                                                       // *EB*
+            getargs(&tp, 1, (unsigned char *)",");              // *EB*
+            if (argc > 0)                                       // *EB*
+            {                                                   // *EB*
+                Option.BACKLIGHT_KBD = getint(argv[0], 0, 255); // *EB*
+                set_kbd_backlight(Option.BACKLIGHT_KBD);        // *EB*
+                SaveOptions();                                  // *EB*
+                return;                                         // *EB*
+            } // *EB*
+            else                         // *EB*
+            {                            // *EB*
+                error("Invalid syntax"); // *EB*
+            } // *EB*
+        } // *EB*
+        tp = checkstring(cmdline, (unsigned char *)"BACKLIGHT LCD"); // *EB*
+        if (tp)
+        {                                                       // *EB*
+            getargs(&tp, 1, (unsigned char *)",");              // *EB*
+            if (argc > 0)                                       // *EB*
+            {                                                   // *EB*
+                Option.BACKLIGHT_LCD = getint(argv[0], 0, 255); // *EB*
+                set_lcd_backlight(Option.BACKLIGHT_LCD);        // *EB*
+                SaveOptions();                                  // *EB*
+                return;                                         // *EB*
+            } // *EB*
+            else                         // *EB*
+            {                            // *EB*
+                error("Invalid syntax"); // *EB*
+            } // *EB*
+        } // *EB*
+#if !defined(rp2350)                                           // *EB*
+        tp = checkstring(cmdline, (unsigned char *)"BADPICO"); // *EB*
+        if (tp)
+        {                                           // *EB*
+            getargs(&tp, 1, (unsigned char *)",");  // *EB*
+            Option.BADPICO = getint(argv[0], 0, 1); // *EB*
+            SaveOptions();                          // *EB*
+            return;                                 // *EB*
+        } // *EB*
+#endif
+    } // *EB*
+#endif // *EB*
+
 #ifdef PICOMITEWEB
     tp = checkstring(cmdline, (unsigned char *)"WEB MESSAGES");
     if (tp)
@@ -6362,6 +6476,20 @@ void MIPS16 cmd_option(void)
         getcsargs(&tp, 5);
         if (CurrentLinePtr)
             StandardError(10);
+        if (argc == 1)                                              // *EB*
+        {                                                           // *EB*
+            if (checkstring(argv[0], (unsigned char *)"SLOW"))      // *EB*
+                Option.SYSTEM_I2C_SLOW = 1;                         // *EB*
+            else if (checkstring(argv[0], (unsigned char *)"FAST")) // *EB*
+                Option.SYSTEM_I2C_SLOW = 0;                         // *EB*
+            else                                                    // *EB*
+                SyntaxError();                                      // *EB*
+        } // *EB*
+        SaveOptions();         // *EB*
+        SoftReset(SOFT_RESET); // *EB*
+        return;                // *EB*
+        if (CurrentLinePtr)
+            StandardError(10);
         if (argc < 3)
             SyntaxError();
         ;
@@ -6733,13 +6861,13 @@ void MIPS16 cmd_option(void)
             safe_flash_range_erase(j, MAX_PROG_SIZE);
             enable_interrupts_pico();
         }
-        configure(tp);
+        configure(tp, false);
         return;
     }
     error("Invalid Option");
 }
 
-void fun_device(void)
+void MIPS16 fun_device(void)
 {
     sret = GetTempStrMemory(); // this will last for the life of the command
 #ifdef PICOMITEVGA
@@ -6781,6 +6909,38 @@ void MIPS16 fun_info(void)
 {
     unsigned char *tp;
     sret = GetTempStrMemory(); // this will last for the life of the command
+#if PICOCALC
+    if (strcmp((char *)Option.platform, "PicoCalc") == 0)
+    {
+        if ((tp = checkstring(ep, (unsigned char *)"BATTERY")))
+        {
+            iret = (read_battery() >> 8) & 0x7f;
+            targ = T_INT;
+            return;
+            //@@ implemented MM.INFO(BIOS) to show BIOS version, requires compatible bios
+        }
+        else if ((tp = checkstring(ep, (unsigned char *)"BIOS")))
+        {                            // *EB*
+            static int biosver = -1; // *EB*
+            if (biosver < 0)
+            {                                 // *EB*
+                biosver = read_biosversion(); // *EB*
+                if (biosver < 0)
+                    biosver = 0; // *EB*
+            } // *EB*
+            sprintf((char *)sret, "%d.%d", (biosver >> 12) & 0x0f, (biosver >> 8) & 0x0f); // *EB*
+            CtoM(sret);                                                                    // *EB*
+            targ = T_STR;                                                                  // *EB*
+            return;
+        }
+        else if ((tp = checkstring(ep, (unsigned char *)"CHARGING")))
+        {
+            iret = (read_battery() >> 15);
+            targ = T_INT;
+            return;
+        }
+    }
+#endif
     if (checkstring(ep, (unsigned char *)"AUTORUN"))
     {
         if (Option.Autorun == false)
@@ -7952,7 +8112,7 @@ void fun_restart(void)
     targ = T_INT;
 }
 
-void cmd_cpu(void)
+void MIPS16 cmd_cpu(void)
 {
     unsigned char *p;
     if ((p = checkstring(cmdline, (unsigned char *)"RESTART")))

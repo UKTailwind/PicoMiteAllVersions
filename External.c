@@ -233,7 +233,7 @@ const uint8_t PINMAP[48] = {1, 2, 4, 5, 6, 7, 9, 10, 11, 12, 14, 15, 16, 17, 19,
 int codemap(int pin)
 {
 #ifdef PICOMITEWEB
-    if (pin > 29 || pin < 0 || pin == 23 || pin == 24 || pin == 25 || pin == 29)
+    if (pin > (rp2350a ? 29 : 47) || pin < 0 || pin == 23 || pin == 24 || pin == 25 || pin == 29)
         error("Invalid GPIO");
 #else
     if (pin > (rp2350a ? 29 : 47) || pin < 0)
@@ -426,13 +426,8 @@ void __not_in_flash_func(PinSetBit)(int pin, unsigned int offset)
 int IsInvalidPin(int pin)
 {
 #ifdef rp2350
-#ifdef PICOMITEWEB
-    if (pin < 1 || pin > NBRPINS)
-        return true;
-#else
     if (pin < 1 || pin > (rp2350a ? 44 : NBRPINS))
         return true;
-#endif
 #else
     if (pin < 1 || pin > NBRPINS)
         return true;
@@ -1235,7 +1230,6 @@ void MIPS16 ExtCfg(int pin, int cfg, int option)
         PWM7Bpin = pin;
         break;
 #ifdef rp2350
-#ifndef PICOMITEWEB
     case EXT_PWM8B:
         if (!(PinDef[pin].mode & PWM8B) || rp2350a)
             StandardError(8);
@@ -1264,7 +1258,6 @@ void MIPS16 ExtCfg(int pin, int cfg, int option)
             StandardErrorParam(24, PWM11Bpin);
         PWM11Bpin = pin;
         break;
-#endif
     case EXT_FAST_TIMER:
         // Check for conflict with stepper system (uses same IRQ)
 #ifdef rp2350
@@ -3890,7 +3883,7 @@ void LcdPinSet(int pin, int val);
 static char lcd_pins[6];
 /*  @endcond */
 
-void cmd_lcd(void)
+void MIPS16 cmd_lcd(void)
 {
     unsigned char *p;
     int i, j;
@@ -4086,7 +4079,7 @@ static void I2CLCD_Byte(int data, int rs, int wait_us)
     I2CLCD_Nibble(data & 0x0F, rs, wait_us); // Then low nibble
 }
 
-void cmd_i2clcd(void)
+void MIPS16 cmd_i2clcd(void)
 {
     unsigned char *p;
     int i, j;
@@ -5503,7 +5496,7 @@ void __not_in_flash_func(ADCint)()
 }
 /*  @endcond */
 
-void cmd_adc(void)
+void MIPS16 cmd_adc(void)
 {
     unsigned char *tp;
     tp = checkstring(cmdline, (unsigned char *)"OPEN");
@@ -5515,38 +5508,19 @@ void cmd_adc(void)
         if (!(argc == 3 || argc == 5))
             SyntaxError();
         ;
+#ifdef rp2350
+        int nbr = getint(argv[2], 1, 4); // number of ADC channels
+#else
 #ifndef PICOMITEWEB
         int nbr = getint(argv[2], 1, 4); // number of ADC channels
 #else
         int nbr = getint(argv[2], 1, 3); // number of ADC channels
 #endif
+#endif
         frequency = (float)getnumber(argv[0]) * nbr;
         if (frequency < ADC_CLK_SPEED / 65536.0 / 96.0 || frequency > ADC_CLK_SPEED / 96.0)
             error("Invalid frequency");
 #ifdef rp2350
-#ifdef PICOMITEWEB
-        if (!(ExtCurrentConfig[31] == EXT_ANA_IN || ExtCurrentConfig[31] == EXT_NOT_CONFIG))
-            StandardErrorParamS(42, "GP26");
-        if (ExtCurrentConfig[31] == EXT_NOT_CONFIG)
-            ExtCfg(31, EXT_ANA_IN, 0);
-        ExtCfg(31, EXT_COM_RESERVED, 0);
-        if (nbr >= 2)
-        {
-            if (!(ExtCurrentConfig[32] == EXT_ANA_IN || ExtCurrentConfig[32] == EXT_NOT_CONFIG))
-                StandardErrorParamS(42, "GP27");
-            if (ExtCurrentConfig[32] == EXT_NOT_CONFIG)
-                ExtCfg(32, EXT_ANA_IN, 0);
-            ExtCfg(32, EXT_COM_RESERVED, 0);
-        }
-        if (nbr >= 3)
-        {
-            if (!(ExtCurrentConfig[34] == EXT_ANA_IN || ExtCurrentConfig[34] == EXT_NOT_CONFIG))
-                StandardErrorParamS(42, "GP28");
-            if (ExtCurrentConfig[34] == EXT_NOT_CONFIG)
-                ExtCfg(34, EXT_ANA_IN, 0);
-            ExtCfg(34, EXT_COM_RESERVED, 0);
-        }
-#else
         if (rp2350a)
         {
             if (!(ExtCurrentConfig[31] == EXT_ANA_IN || ExtCurrentConfig[31] == EXT_NOT_CONFIG))
@@ -5611,7 +5585,6 @@ void cmd_adc(void)
                 ExtCfg(58, EXT_COM_RESERVED, 0);
             }
         }
-#endif
 #else
         if (!(ExtCurrentConfig[31] == EXT_ANA_IN || ExtCurrentConfig[31] == EXT_NOT_CONFIG))
             StandardErrorParamS(42, "GP26");
@@ -6041,15 +6014,6 @@ void MIPS16 ClearExternalIO(void)
     IrGotMsg = false;
     memset(&PIDchannels, 0, sizeof(s_PIDchan) * (MAXPID + 1));
 #ifdef rp2350
-#ifdef PICOMITEWEB
-    for (i = 1; i < (NBRPINS); i++)
-    {
-        if (CheckPin(i, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED))
-        {                                 // don't reset invalid or boot reserved pins
-            ExtCfg(i, EXT_NOT_CONFIG, 0); // all set to unconfigured
-        }
-    }
-#else
     for (i = 1; i < (rp2350a ? 44 : NBRPINS); i++)
     {
         if (CheckPin(i, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED))
@@ -6057,7 +6021,6 @@ void MIPS16 ClearExternalIO(void)
             ExtCfg(i, EXT_NOT_CONFIG, 0); // all set to unconfigured
         }
     }
-#endif
 #else
     for (i = 1; i < (NBRPINS); i++)
     {
@@ -6477,7 +6440,7 @@ void __not_in_flash_func(gpio_callback)(uint gpio, uint32_t events)
     static uint64_t data;
     data = gpio_get_all64();
     if (Option.KEYBOARD_CLOCK)
-        if (!(Option.KeyboardConfig == NO_KEYBOARD || Option.KeyboardConfig == CONFIG_I2C) && gpio == PinDef[Option.KEYBOARD_CLOCK].GPno)
+        if (!(Option.KeyboardConfig == NO_KEYBOARD || Option.KeyboardConfig >= CONFIG_I2C) && gpio == PinDef[Option.KEYBOARD_CLOCK].GPno)
             CNInterrupt(data);
     if (MOUSE_CLOCK && gpio == PinDef[MOUSE_CLOCK].GPno)
         MNInterrupt(data);

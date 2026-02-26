@@ -3249,3 +3249,443 @@ void MIPS16 cmd_camera(void)
   ;
 }
 #endif
+#if PICOCALC
+void CheckPicoCalcKeyboard(int noerror, int read)
+{
+  uint16_t buff = 0x0000;
+  int i2cret = 0;
+  static int ctrlheld = 0;
+  I2C2_Sendlen = 1;       // send one byte
+  I2C_Send_Buffer[0] = 9; // the first register to read
+  I2C2_Addr = 0x1f;       // address of the device
+  I2C2_Status = 0;
+  I2C2_Timeout = (Option.SYSTEM_I2C_SLOW ? SystemI2CTimeout * 5 : SystemI2CTimeout);
+
+  i2cret = i2c_write_timeout_us(i2c1, (uint8_t)I2C2_Addr, (uint8_t *)I2C_Send_Buffer, I2C2_Sendlen, false, I2C2_Timeout * 1000);
+
+  if (i2cret != I2C2_Sendlen)
+  {
+    buff = 0x0000;
+    return;
+  }
+
+  sleep_ms(2);
+
+  I2C2_Rcvlen = 2; // get 2 bytes
+  buff = 0x0000;
+
+  i2cret = i2c_read_timeout_us(i2c1, (uint8_t)I2C2_Addr, (uint8_t *)&buff, I2C2_Rcvlen, false, I2C2_Timeout * 1000);
+  if (i2cret != I2C2_Rcvlen)
+  {
+    buff = 0x0000;
+    return;
+  }
+
+  if (buff == 0xA503)
+  {
+    ctrlheld = 0;
+  }
+  else if (buff == 0xA502)
+  {
+    ctrlheld = 1;
+  }
+  else if ((buff & 0xff) == 1)
+  { // pressed
+    int c = buff >> 8;
+    int realc = 0;
+    switch (c)
+    {
+    // Refer to Appendix H in PicoMite User Manual
+    // PicoCalc must be mapped to expected PicoMite keys
+    case 0xd4:
+      realc = DEL;
+      break;
+    case 0xb5:
+      realc = UP;
+      break;
+    case 0xb6:
+      realc = DOWN;
+      break;
+    case 0xb4:
+      realc = LEFT;
+      break;
+    case 0xb7:
+      realc = RIGHT;
+      break;
+    case 0xd1:
+      realc = INSERT;
+      break; // ALT + I
+    case 0xd2:
+      realc = HOME;
+      break; // SHIFT + TAB (collision, see below)
+    case 0xd5:
+      realc = END;
+      break; // SHIFT + DEL (collision, see below)
+    case 0xd6:
+      realc = PUP;
+      break; // SHIFT + UP
+    case 0xd7:
+      realc = PDOWN;
+      break; // SHIFT + DOWN (collision, see below)
+    case 0xa1:
+      realc = ALT;
+      break; // Note: SHIFT + ENTER also sends ALT!
+    case 0x81:
+      realc = F1;
+      break;
+    case 0x82:
+      realc = F2;
+      break;
+    case 0x83:
+      realc = F3;
+      break;
+    case 0x84:
+      realc = F4;
+      break;
+    case 0x85:
+      realc = F5;
+      break;
+    case 0x86:
+      realc = F6;
+      break; // SHIFT + F1
+    case 0x87:
+      realc = F7;
+      break; // SHIFT + F2
+    case 0x88:
+      realc = F8;
+      break; // SHIFT + F3
+    case 0x89:
+      realc = F9;
+      break; // SHIFT + F4
+    case 0x90:
+      realc = F10;
+      break; // SHIFT + F5
+    // F11 not on PicoCalc
+    // F12 not on PicoCalc
+    // PrtScr/SysRq not on PicoCalc
+    case 0xd0:
+      realc = BreakKey;
+      break;
+    // SHIFT_TAB sends Home on PicoCalc
+    // SHIFT_DEL sends End on PicoCalc
+    // DOWNSEL (SHIFT_DOWN_ARROW) sends Page Down (PDOWN) on PicoCalc
+    //   Note: (SHIFT_UP_ARROW) sends Page Up (PUP) on PicoCalc
+    // RIGHTSEL (SHIFT_RIGHT_ARROW) sends nothing on PicoCalc
+    //   Note: (SHIFT_LEFT_ARROW) sends nothing on PicoCalc
+    // Note: PicoCalc cannot send shifted Fn keys!
+    // --- Appendix H ends
+    case 0xb1:
+      realc = ESC;
+      break;
+    case 0x0a:
+      realc = ENTER;
+      break;
+    // --- This will only work when using the custom BIOS at:
+    //     https://github.com/shtirlic/picocalc_southbridge
+    //     Official BIOS (currently 1.4) does not support this key.
+    case 0x91:
+      realc = 0x66;
+      break; // USB_HID_KEYBOARD_KEYPAD_KEYBOARD_POWER
+    // --- Modifier keys must be consumed and ignored!
+    case 0xa2: // Shift (left)
+    case 0xa3: // Shift (right)
+    case 0xa5: // Ctrl
+    case 0xc1: // CapsLK
+      return;
+    default:
+      realc = c;
+      break;
+    }
+    c = realc;
+
+    if (c >= 'a' && c <= 'z' && ctrlheld)
+      c = c - 'a' + 1;
+    if (c == BreakKey)
+    {                                      // if the user wants to stop the progran
+      MMAbort = true;                      // set the flag for the interpreter to see
+      ConsoleRxBufHead = ConsoleRxBufTail; // empty the buffer
+                                           // break;
+    }
+    else
+    {
+      ConsoleRxBuf[ConsoleRxBufHead] = c; // store the byte in the ring buffer
+      if (ConsoleRxBuf[ConsoleRxBufHead] == keyselect && KeyInterrupt != NULL)
+      {
+        Keycomplete = true;
+      }
+      else
+      {
+        ConsoleRxBufHead = (ConsoleRxBufHead + 1) % CONSOLE_RX_BUF_SIZE; // advance the head of the queue
+        if (ConsoleRxBufHead == ConsoleRxBufTail)
+        {                                                                  // if the buffer has overflowed
+          ConsoleRxBufTail = (ConsoleRxBufTail + 1) % CONSOLE_RX_BUF_SIZE; // throw away the oldest char
+        }
+      }
+    }
+  }
+  return;
+}
+void CheckKbdBacklight()
+{
+  int i2cret = 0;
+  char buff[2];
+  I2C2_Sendlen = 2;          // send two bytes^
+  I2C2_Status = 0;           //
+  I2C_Send_Buffer[0] = 0x0a; // the register + write bit
+  I2C2_Addr = 0x1f;          // address of the device
+  I2C2_Timeout = (Option.SYSTEM_I2C_SLOW ? SystemI2CTimeout * 5 : SystemI2CTimeout);
+  ;
+
+  i2cret = i2c_write_timeout_us(i2c1, (uint8_t)I2C2_Addr, (uint8_t *)I2C_Send_Buffer, I2C2_Sendlen, false, I2C2_Timeout * 1000);
+  if (i2cret != I2C2_Sendlen)
+    return;
+
+  sleep_ms(1);
+
+  buff[0] = 0x00;
+
+  i2cret = i2c_read_timeout_us(i2c1, (uint8_t)I2C2_Addr, (uint8_t *)&buff, 2, false, I2C2_Timeout * 1000);
+  if (i2cret == 2 && buff[0] == 0x0a)
+  {
+    if (Option.BACKLIGHT_KBD != buff[1])
+    {
+      Option.BACKLIGHT_KBD = buff[1];
+      SaveOptions();
+    }
+  }
+  return;
+}
+
+int set_kbd_backlight(uint8_t val)
+{
+
+  static uint16_t buff = 0x0000; // *EB*
+  int i2cret = 0;
+  I2C2_Sendlen = 2;          // send two bytes
+  I2C2_Status = 0;           //
+  I2C_Send_Buffer[0] = 0x8A; // the register + write bit
+  I2C_Send_Buffer[1] = val;  // backlight value
+  I2C2_Addr = 0x1f;          // address of the device
+  I2C2_Timeout = (Option.SYSTEM_I2C_SLOW ? SystemI2CTimeout * 5 : SystemI2CTimeout);
+
+  i2cret = i2c_write_timeout_us(i2c1, (uint8_t)I2C2_Addr, (uint8_t *)I2C_Send_Buffer, I2C2_Sendlen, false, I2C2_Timeout * 1000);
+  if (i2cret == PICO_ERROR_GENERIC || i2cret == PICO_ERROR_TIMEOUT)
+  {
+    return -1;
+  }
+
+  sleep_ms(2); // avoid overloading the bios
+
+  I2C2_Rcvlen = 2; // get 2 bytes
+
+  i2cret = i2c_read_timeout_us(i2c1, (uint8_t)I2C2_Addr, (uint8_t *)&buff, I2C2_Rcvlen, false, I2C2_Timeout * 1000);
+  if (i2cret == PICO_ERROR_GENERIC || i2cret == PICO_ERROR_TIMEOUT)
+  {
+    return -1;
+  }
+
+  if (buff != 0)
+  {
+    return buff;
+  }
+  return -1;
+}
+void CheckLcdBacklight()
+{
+
+  int i2cret = 0;
+  char buff[2];
+  I2C2_Sendlen = 1;          // send one byte
+  I2C2_Status = 0;           //
+  I2C_Send_Buffer[0] = 0x05; // the register to read
+  I2C2_Addr = 0x1f;          // address of the device
+  I2C2_Timeout = (Option.SYSTEM_I2C_SLOW ? SystemI2CTimeout * 5 : SystemI2CTimeout);
+
+  i2cret = i2c_write_timeout_us(i2c1, (uint8_t)I2C2_Addr, (uint8_t *)I2C_Send_Buffer, I2C2_Sendlen, false, I2C2_Timeout * 1000);
+  if (i2cret != I2C2_Sendlen)
+    return;
+
+  sleep_ms(1);
+
+  buff[0] = 0x00;
+  i2cret = i2c_read_timeout_us(i2c1, (uint8_t)I2C2_Addr, (uint8_t *)buff, 2, false, I2C2_Timeout * 1000);
+  if (i2cret == 2 && buff[0] == 0x05)
+  {
+    if (Option.BACKLIGHT_LCD != buff[1])
+    {
+      Option.BACKLIGHT_LCD = buff[1];
+      SaveOptions();
+    }
+  }
+  return;
+}
+int set_lcd_backlight(uint8_t val)
+{
+
+  static uint16_t buff = 0x0000; // *EB*
+  int i2cret = 0;
+  I2C2_Sendlen = 2;          // send two bytes
+  I2C2_Status = 0;           //
+  I2C_Send_Buffer[0] = 0x85; // the register + write bit
+  I2C_Send_Buffer[1] = val;  // backlight value
+  I2C2_Addr = 0x1f;          // address of the device
+  I2C2_Timeout = (Option.SYSTEM_I2C_SLOW ? SystemI2CTimeout * 5 : SystemI2CTimeout);
+
+  i2cret = i2c_write_timeout_us(i2c1, (uint8_t)I2C2_Addr, (uint8_t *)I2C_Send_Buffer, I2C2_Sendlen, false, I2C2_Timeout * 1000);
+  if (i2cret == PICO_ERROR_GENERIC || I2C2_Status == PICO_ERROR_TIMEOUT)
+  {
+    // printf("set_lcd_backlight i2c write error\r\n");
+    return -1;
+  }
+
+  sleep_ms(2); // avoid overloading the bios
+
+  I2C2_Rcvlen = 2; // get 2 bytes
+
+  i2cret = i2c_read_timeout_us(i2c1, (uint8_t)I2C2_Addr, (uint8_t *)&buff, I2C2_Rcvlen, false, I2C2_Timeout * 1000);
+  if (i2cret == PICO_ERROR_GENERIC || i2cret == PICO_ERROR_TIMEOUT)
+  {
+    // printf("set_lcd_backlight i2c read error read\r\n");
+    return -1;
+  }
+
+  if (buff != 0)
+  {
+    return buff;
+  }
+  return -1;
+}
+int read_battery()
+{
+
+  static uint16_t buff = 0x0000; // *EB*
+  static uint64_t rqtime;        // *EB*
+  int i2cret = 0;
+  I2C2_Sendlen = 1;          // send one byte
+  I2C2_Status = 0;           //
+  I2C_Send_Buffer[0] = 0x0b; // the register to read
+  I2C2_Addr = 0x1f;          // address of the device
+  I2C2_Timeout = (Option.SYSTEM_I2C_SLOW ? SystemI2CTimeout * 5 : SystemI2CTimeout);
+
+  if (rqtime < time_us_64()) // *EB*
+  {
+    rqtime = time_us_64() + 2000000;
+
+    i2cret = i2c_write_timeout_us(i2c1, (uint8_t)I2C2_Addr, (uint8_t *)I2C_Send_Buffer, I2C2_Sendlen, false, I2C2_Timeout * 1000);
+    if (i2cret == PICO_ERROR_GENERIC || i2cret == PICO_ERROR_TIMEOUT)
+    {
+      // printf("read_battery i2c write error\n");
+      return -1;
+    }
+
+    sleep_ms(2); // avoid overloading the bios
+
+    I2C2_Rcvlen = 2; // get 2 bytes
+    buff = 0x0000;
+
+    i2cret = i2c_read_timeout_us(i2c1, (uint8_t)I2C2_Addr, (uint8_t *)&buff, I2C2_Rcvlen, false, I2C2_Timeout * 1000);
+    if (i2cret == PICO_ERROR_GENERIC || i2cret == PICO_ERROR_TIMEOUT)
+    {
+      // printf("read_battery i2c read error read\n");
+      return -1;
+    }
+  }
+
+  if (buff != 0)
+  {
+    return buff;
+  }
+  return -1;
+}
+int read_biosversion()
+{ // *EB*
+
+  uint16_t buff = 0x0000; // *EB*
+  int i2cret = 0;
+  I2C2_Sendlen = 1;          // send one byte
+  I2C2_Status = 0;           //
+  I2C_Send_Buffer[0] = 0x01; // the register to read
+  I2C2_Addr = 0x1f;          // address of the device
+  I2C2_Timeout = (Option.SYSTEM_I2C_SLOW ? SystemI2CTimeout * 5 : SystemI2CTimeout);
+
+  i2cret = i2c_write_timeout_us(i2c1, (uint8_t)I2C2_Addr, (uint8_t *)I2C_Send_Buffer, I2C2_Sendlen, false, I2C2_Timeout * 1000);
+  if (i2cret == PICO_ERROR_GENERIC || i2cret == PICO_ERROR_TIMEOUT)
+  {
+    // printf("read_biosversion i2c write error\n");
+    return -1;
+  }
+
+  sleep_ms(2); // avoid overloading the bios
+
+  I2C2_Rcvlen = 2; // get 2 bytes
+  buff = 0x0000;   //
+
+  i2cret = i2c_read_timeout_us(i2c1, (uint8_t)I2C2_Addr, (uint8_t *)&buff, I2C2_Rcvlen, false, I2C2_Timeout * 1000);
+  if (i2cret == PICO_ERROR_GENERIC || i2cret == PICO_ERROR_TIMEOUT)
+  {
+    // printf("read_biosversion i2c read error read\n");
+    return -1;
+  }
+
+  if (buff != 0)
+  {
+    return buff;
+  }
+  return -1;
+}
+
+#if PICOCALC // *EB*
+/**
+ * @brief Test if firmware is running on a PicoCalc by attempting I2C battery read
+ *
+ * This function is called during initialization to detect if the firmware is actually
+ * running on a PicoCalc device (vs other PicoMite variants). It temporarily enables I2C,
+ * attempts to read the battery monitor, and updates the platform setting if successful.
+ */
+void MIPS16 TestPicoCalc(void) // *EB*
+{
+  // Only run if platform is not already set to PicoCalc
+  if (strcmp((char *)Option.platform, "PicoCalc") == 0)
+    return;
+
+  // Set the PicoCalc-specific I2C pins (9 for SDA, 10 for SCL)
+  int sda_pin = PinDef[9].GPno;
+  int scl_pin = PinDef[10].GPno;
+
+  // If pins are not configured, cannot test
+  if (sda_pin == 0 || scl_pin == 0)
+    return;
+
+  // Initialize the GPIO pins for I2C
+  gpio_init(sda_pin);
+  gpio_init(scl_pin);
+  gpio_set_function(sda_pin, GPIO_FUNC_I2C);
+  gpio_set_function(scl_pin, GPIO_FUNC_I2C);
+  gpio_pull_up(sda_pin);
+  gpio_pull_up(scl_pin);
+
+  // Initialize I2C1 with standard speed
+  i2c_init(i2c1, 100 * 1000); // 100 kHz
+
+  // Give the I2C bus time to settle
+  sleep_ms(10);
+
+  // Try to read battery to verify I2C is working
+  int battery_result = read_battery();
+
+  // Deinitialize I2C
+  i2c_deinit(i2c1);
+
+  // Return pins to uninitialized state
+  gpio_deinit(sda_pin);
+  gpio_deinit(scl_pin);
+
+  // If battery read succeeded, we're on a PicoCalc
+  if (battery_result > 0)
+  {
+    configure((unsigned char *)"PICOCALC", true);
+  }
+}
+#endif // *EB*
+
+#endif

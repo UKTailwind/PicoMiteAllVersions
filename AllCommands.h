@@ -600,9 +600,7 @@ void fun_frame(void);
 	{(unsigned char *)"CMM2 Load", T_CMD, 0, cmd_loadCMM2},
 	{(unsigned char *)"CMM2 Run", T_CMD, 0, cmd_RunCMM2},
 	{(unsigned char *)"Randomize", T_CMD, 0, cmd_null},
-#ifndef PICOMITEWEB
 	{(unsigned char *)"Ram", T_CMD, 0, cmd_psram},
-#endif
 #else
 	{(unsigned char *)"Randomize", T_CMD, 0, cmd_randomize},
 #endif

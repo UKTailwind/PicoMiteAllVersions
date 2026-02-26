@@ -478,13 +478,8 @@ void pio_init(int pior, int sm, uint32_t pinctrl, uint32_t execctrl, uint32_t sh
         cfg.shiftctrl = shiftctrl;
         cfg.pinctrl = pinctrl;
 #ifdef rp2350
-#ifdef PICOMITEWEB
-        for (int i = 1; i < (NBRPINS); i++)
-        {
-#else
         for (int i = 1; i < (rp2350a ? 44 : NBRPINS); i++)
         {
-#endif
 #else
         for (int i = 1; i < (NBRPINS); i++)
         {
@@ -2497,13 +2492,8 @@ void MIPS16 cmd_pio(void)
                 for (int i = 1; i < (NBRPINS); i++)
 #endif
 #ifdef rp2350
-#ifdef PICOMITEWEB
-                for (int i = 1; i < (NBRPINS); i++)
-                {
-#else
                 for (int i = 1; i < (rp2350a ? 44 : NBRPINS); i++)
                 {
-#endif
 #else
                 {
 #endif

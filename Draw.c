@@ -10724,6 +10724,7 @@ void cmd_refresh(void)
             multicore_fifo_push_blocking(6);
             multicore_fifo_push_blocking((uint32_t)low_x | (high_x << 16));
             multicore_fifo_push_blocking((uint32_t)low_y | (high_y << 16));
+            multicore_fifo_push_blocking((uint32_t)ScrollStart);
             low_x = silly_low;
             high_y = silly_high;
             low_y = silly_low;

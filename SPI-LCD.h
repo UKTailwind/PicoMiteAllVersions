@@ -102,56 +102,58 @@
 #define ST7735S_W 18
 #define GC9A01 19
 #define ILI9481IPS 20
-#define N5110 21
+#define ST7365P 21
+#define N5110 22
 #define BufferedPanel N5110
-#define SSD1306SPI 22
-#define ST7920 23
-#define TOUCH 24
-#define SPIReadSpeed 25
-#define ST7789RSpeed 26
-#define SLOWTOUCH 27
-#define DISP_USER 28
-#define SCREENMODE1 29
+#define SSD1306SPI 23
+#define ST7920 24
+#define TOUCH 25
+#define SPIReadSpeed 26
+#define ST7789RSpeed 27
+#define SLOWTOUCH 28
+#define DISP_USER 29
+#define SCREENMODE1 30
 #define VGADISPLAY SCREENMODE1
-#define SCREENMODE2 30
-#define SCREENMODE3 31
-#define SCREENMODE4 32
-#define SCREENMODE5 33
-#define SCREENMODE6 34
-#define SCREENMODE7 35
-#define SSD1963_4 36
+#define SCREENMODE2 31
+#define SCREENMODE3 32
+#define SCREENMODE4 33
+#define SCREENMODE5 34
+#define SCREENMODE6 35
+#define SCREENMODE7 36
+#define SSD1963_4 37
 #define SSDPANEL SSD1963_4
-#define SSD1963_5 37
-#define SSD1963_5A 38
-#define SSD1963_7 39
-#define SSD1963_7A 40
-#define SSD1963_8 41
-#define ILI9341_8 42
+#define SSD1963_5 38
+#define SSD1963_5A 39
+#define SSD1963_7 40
+#define SSD1963_7A 41
+#define SSD1963_8 42
+#define ILI9341_8 43
 #define SSD_PANEL_8 ILI9341_8
-#define SSD1963_4_16 43
-#define SSD1963_5_16 44
-#define SSD1963_5A_16 45
-#define SSD1963_7_16 46
-#define SSD1963_7A_16 47
-#define SSD1963_8_16 48
-#define ILI9341_16 49
-#define IPS_4_16 50
-#define SSD1963_5ER_16 51
-#define SSD1963_7ER_16 52
-#define ILI9486_16 53
-#define VIRTUAL_C 54
+#define SSD1963_4_16 44
+#define SSD1963_5_16 45
+#define SSD1963_5A_16 46
+#define SSD1963_7_16 47
+#define SSD1963_7A_16 48
+#define SSD1963_8_16 49
+#define ILI9341_16 50
+#define IPS_4_16 51
+#define SSD1963_5ER_16 52
+#define SSD1963_7ER_16 53
+#define ILI9486_16 54
+#define VIRTUAL_C 55
 #define VIRTUAL VIRTUAL_C
-#define VIRTUAL_M 55
-#define VS1053slow 56
-#define VS1053fast 57
+#define VIRTUAL_M 56
+#define VS1053slow 57
+#define VS1053fast 58
 
 #if PICOMITERP2350
 #define VGA222 59
 #define VGA222X320 60
 #define VGA222X720 61
 #define VGA222X400 62
-#define ST7796SPBUFF 81
+#define ST7796SPBUFF 80
 #define NEXTGEN ST7796SPBUFF
+#define ST7365PBUFF 81
 #define ILI9341BUFF 82
 #define ST7796SBUFF 83
 #define ILI9488BUFF 84
@@ -187,11 +189,12 @@
 #define SPIREAD (Option.DISPLAY_TYPE == ILI9341 || Option.DISPLAY_TYPE == ILI9488P || \
                  Option.DISPLAY_TYPE == ILI9488 || Option.DISPLAY_TYPE == ST7796SP || \
                  Option.DISPLAY_TYPE == ST7796S || Option.DISPLAY_TYPE == ST7789B ||  \
-                 Option.DISPLAY_TYPE >= NEXTGEN)
+                 Option.DISPLAY_TYPE == ST7365P || Option.DISPLAY_TYPE >= NEXTGEN)
 #else
 #define SPIREAD (Option.DISPLAY_TYPE == ILI9341 || Option.DISPLAY_TYPE == ILI9488P || \
                  Option.DISPLAY_TYPE == ILI9488 || Option.DISPLAY_TYPE == ST7796SP || \
-                 Option.DISPLAY_TYPE == ST7796S || Option.DISPLAY_TYPE == ST7789B)
+                 Option.DISPLAY_TYPE == ST7796S || Option.DISPLAY_TYPE == ST7789B ||  \
+                 Option.DISPLAY_TYPE == ST7365P)
 #endif
 
 #define FASTSCROLL (SSDTYPE || Option.DISPLAY_TYPE == SCREENMODE1 ||                          \

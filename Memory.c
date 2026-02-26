@@ -1019,10 +1019,8 @@ void m_alloc(int type)
 
     case M_PROG:
 #ifdef rp2350
-#ifndef PICOMITEWEB
         if (PSRAMsize)
             memset((uint8_t *)PSRAMbase, 0, PSRAMsize);
-#endif
 #endif
     case M_LIMITED: // this is called initially in InitBasic() to set the base pointer for program memory
         // everytime the program size is adjusted up or down this must be called to check for memory overflow
@@ -1126,7 +1124,7 @@ void MIPS64 __not_in_flash_func(FreeMemory)(unsigned char *addr)
 {
     if (addr == NULL)
         return;
-#if defined(rp2350) && !defined(PICOMITEWEB)
+#if defined(rp2350)
     int bits;
     if (PSRAMsize)
     {
@@ -1213,7 +1211,6 @@ void InitHeap(bool all)
 ************************************************************************************************************************/
 
 #ifdef rp2350
-#ifndef PICOMITEWEB
 unsigned int __not_in_flash_func(SBitsGet)(unsigned char *addr)
 {
     unsigned int i, *p;
@@ -1232,7 +1229,6 @@ void __not_in_flash_func(SBitsSet)(unsigned char *addr, int bits)
     *p = (bits << i) | (*p & (~(((1 << PAGEBITS) - 1) << i)));
 }
 #endif
-#endif
 
 static inline __attribute__((always_inline)) unsigned int MBitsGet(unsigned char *addr)
 {
@@ -1250,7 +1246,6 @@ static inline __attribute__((always_inline)) void MBitsSet(unsigned char *addr, 
     *p = (*p & ~(3u << bit_pos)) | ((unsigned int)bits << bit_pos);
 }
 #ifdef rp2350
-#ifndef PICOMITEWEB
 void __not_in_flash_func (*GetPSMemory)(int size)
 {
     unsigned int j, n;
@@ -1280,7 +1275,6 @@ void __not_in_flash_func (*GetPSMemory)(int size)
     error("Not enough PSRAM memory");
     return NULL; // keep the compiler happy
 }
-#endif
 #endif
 void MIPS64 __not_in_flash_func (*GetSystemMemory)(int size)
 { // get memory from the bottom up
@@ -1315,10 +1309,8 @@ void MIPS64 __not_in_flash_func (*GetSystemMemory)(int size)
 void MIPS64 __not_in_flash_func (*GetMemory)(int size)
 {
 #ifdef rp2350
-#ifndef PICOMITEWEB
     if (PSRAMsize && size > heap_memory_size / 2)
         return GetPSMemory(size);
-#endif
 #endif
     unsigned int j, n, k;
     unsigned char *addr;
@@ -1342,10 +1334,8 @@ void MIPS64 __not_in_flash_func (*GetMemory)(int size)
     }
     // out of memory
 #ifdef rp2350
-#ifndef PICOMITEWEB
     if (PSRAMsize)
         return GetPSMemory(size);
-#endif
 #endif
     TempStringClearStart = 0;
     ClearTempMemory(); // hopefully this will give us enough to print the prompt
@@ -1384,14 +1374,12 @@ int FreeSpaceOnHeap(void)
         if (!(MBitsGet(addr) & PUSED))
             nbr++;
 #ifdef rp2350
-#ifndef PICOMITEWEB
     if (PSRAMsize)
     {
         for (addr = (unsigned char *)(PSRAMbase + PSRAMsize - PAGESIZE); addr >= (unsigned char *)PSRAMbase; addr -= PAGESIZE)
             if (!(SBitsGet(addr) & PUSED))
                 nbr++;
     }
-#endif
 #endif
     return nbr * PAGESIZE;
 }
@@ -1420,14 +1408,12 @@ unsigned int UsedHeap(void)
         if (MBitsGet(addr) & PUSED)
             nbr++;
 #ifdef rp2350
-#ifndef PICOMITEWEB
     if (PSRAMsize)
     {
         for (addr = (unsigned char *)(PSRAMbase + PSRAMsize - PAGESIZE); addr >= (unsigned char *)PSRAMbase; addr -= PAGESIZE)
             if (SBitsGet(addr) & PUSED)
                 nbr++;
     }
-#endif
 #endif
     return nbr * PAGESIZE;
 }
@@ -1437,7 +1423,6 @@ int MemSize(void *addr)
     int i = 0;
     int bits;
 #ifdef rp2350
-#ifndef PICOMITEWEB
     if (addr > (void *)PSRAMbase && addr < (void *)(PSRAMbase + PSRAMsize))
     {
         if (addr >= (void *)PSRAMbase && addr < (void *)(PSRAMbase + PSRAMsize))
@@ -1451,20 +1436,7 @@ int MemSize(void *addr)
         }
         return i;
     }
-    else
-    {
-        if (addr >= (void *)MMHeap && addr < (void *)(MMHeap + heap_memory_size))
-        {
-            do
-            {
-                bits = MBitsGet(addr);
-                addr += PAGESIZE;
-                i += PAGESIZE;
-            } while (bits != (PUSED | PLAST));
-        }
-        return i;
-    }
-#else
+#endif
     if (addr >= (void *)MMHeap && addr < (void *)(MMHeap + heap_memory_size))
     {
         do
@@ -1475,19 +1447,6 @@ int MemSize(void *addr)
         } while (bits != (PUSED | PLAST));
     }
     return i;
-#endif
-#else
-    if (addr >= (void *)MMHeap && addr < (void *)(MMHeap + heap_memory_size))
-    {
-        do
-        {
-            bits = MBitsGet(addr);
-            addr += PAGESIZE;
-            i += PAGESIZE;
-        } while (bits != (PUSED | PLAST));
-    }
-    return i;
-#endif
 }
 
 void *ReAllocMemory(void *addr, size_t msize)
@@ -1514,13 +1473,11 @@ void __not_in_flash_func(FreeMemorySafe)(void **addr)
             *addr = NULL;
         }
 #ifdef rp2350
-#ifndef PICOMITEWEB
         if (*addr >= (void *)PSRAMbase && *addr < (void *)(PSRAMbase + PSRAMsize))
         {
             FreeMemory(*addr);
             *addr = NULL;
         }
-#endif
 #endif
     }
 }

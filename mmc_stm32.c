@@ -2109,6 +2109,15 @@ void InitReservedIO(void)
 			CheckI2CKeyboard(1, 1);
 			uSec(2000);
 		}
+#if PICOCALC
+		if (Option.KeyboardConfig == CONFIG_PICOCALC)
+		{
+			CheckPicoCalcKeyboard(1, 0);
+			uSec(2000);
+			CheckPicoCalcKeyboard(1, 1);
+			uSec(2000);
+		}
+#endif
 #endif
 	}
 #if PICOMITERP2350
@@ -2417,7 +2426,7 @@ void InitReservedIO(void)
 		uart_set_irq_enables((Option.SerialConsole & 3) == 1 ? uart0 : uart1, true, false);
 	}
 #ifndef USBKEYBOARD
-	if (!(Option.KeyboardConfig == NO_KEYBOARD || Option.KeyboardConfig == CONFIG_I2C))
+	if (!(Option.KeyboardConfig == NO_KEYBOARD || Option.KeyboardConfig >= CONFIG_I2C))
 	{
 		ExtCfg(Option.KEYBOARD_CLOCK, EXT_BOOT_RESERVED, 0);
 		ExtCfg(Option.KEYBOARD_DATA, EXT_BOOT_RESERVED, 0);

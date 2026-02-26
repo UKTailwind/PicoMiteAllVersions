@@ -189,7 +189,9 @@ uint8_t PSRAMpin;
 #endif
     char LCDAttrib = 0;
 #endif
-#define KEYCHECKTIME 16
+#define KEYCHECKTIME 20
+#define LCDBLCHECKTIME 1000 // once per second - staggered   // *EB*
+#define KBDBLCHECKTIME 1000 // once per second - staggered   // *EB*
     int ListCnt;
     int MMCharPos;
     int MMPromptPos;
@@ -228,6 +230,11 @@ uint8_t PSRAMpin;
     volatile unsigned int KeyCheck = 2000;
     volatile int ds18b20Timer = -1;
     volatile unsigned int ScrewUpTimer = 0;
+#if PICOCALC
+    volatile unsigned int LcdBlCheck = 4750; // *EB* Lcd Backlight Check (staggered)
+    volatile unsigned int KbdBlCheck = 5250; // *EB* Kbd Backlight Check (staggered)
+#endif
+
     // volatile int second = 0;                                            // date/time counters
     // volatile int minute = 0;
     // volatile int hour = 0;
@@ -442,14 +449,20 @@ uint8_t PSRAMpin;
         {38, 99, "GND", UNUSED, 99, 99},                                                                   // pin 38
         {39, 99, "VSYS", UNUSED, 99, 99},                                                                  // pin 39
         {40, 99, "VBUS", UNUSED, 99, 99},                                                                  // pin 40
-#ifndef PICOMITEWEB
+#if !defined(PICOMITEWEB) || defined(rp2350)
+#if defined(PICOMITEWEB) && defined(rp2350)
+        {41, 23, "GP23", UNUSED, 99, 99}, // pseudo pin 41 reserved for WEB interface
+        {42, 24, "GP24", UNUSED, 99, 99}, // pseudo pin 42 reserved for WEB interface
+        {43, 25, "GP25", UNUSED, 99, 99}, // pseudo pin 43 reserved for WEB interface
+        {44, 29, "GP29", UNUSED, 99, 99}, // pseudo pin 44 reserved for WEB interface
+#else
         {41, 23, "GP23", DIGITAL_IN | DIGITAL_OUT | SPI0TX | I2C1SCL | PWM3B, 99, 131},             // pseudo pin 41
         {42, 24, "GP24", DIGITAL_IN | DIGITAL_OUT | SPI1RX | UART1TX | I2C0SDA | PWM4A, 99, 4},     // pseudo pin 42
         {43, 25, "GP25", DIGITAL_IN | DIGITAL_OUT | UART1RX | I2C0SCL | PWM4B, 99, 132},            // pseudo pin 43
         {44, 29, "GP29", DIGITAL_IN | DIGITAL_OUT | ANALOG_IN | UART0RX | I2C0SCL | PWM6B, 3, 134}, // pseudo pin 44
 #endif
+#endif
 #ifdef rp2350
-#ifndef PICOMITEWEB
         {45, 30, "GP30", DIGITAL_IN | DIGITAL_OUT | SPI1SCK | I2C1SDA | PWM7A, 99, 7},                       // pseudo pin 45
         {46, 31, "GP31", DIGITAL_IN | DIGITAL_OUT | SPI1TX | I2C1SCL | PWM7B, 99, 135},                      // pseudo pin 46
         {47, 32, "GP32", DIGITAL_IN | DIGITAL_OUT | UART0TX | SPI0RX | I2C0SDA | PWM8A, 99, 8},              // pseudo pin 47
@@ -468,8 +481,6 @@ uint8_t PSRAMpin;
         {60, 45, "GP45", DIGITAL_IN | DIGITAL_OUT | UART0RX | ANALOG_IN | I2C0SCL | PWM10B, 5, 138},         // pseudo pin 60
         {61, 46, "GP46", DIGITAL_IN | DIGITAL_OUT | ANALOG_IN | SPI1SCK | I2C1SDA | PWM11A, 6, 11},          // pseudo pin 61
         {62, 47, "GP47", DIGITAL_IN | DIGITAL_OUT | ANALOG_IN | SPI1TX | I2C1SCL | PWM11B, 7, 139},          // pseudo pin 62
-
-#endif
 #endif
     };
     char alive[] = "\033[?25h";
@@ -675,6 +686,7 @@ uint8_t PSRAMpin;
                     {
                         multicore_fifo_push_blocking((uint32_t)low_x | (high_x << 16));
                         multicore_fifo_push_blocking((uint32_t)low_y | (high_y << 16));
+                        multicore_fifo_push_blocking((uint32_t)ScrollStart);
 
                         low_x = low_y = silly_low;
                         high_x = high_y = silly_high;
@@ -714,6 +726,26 @@ uint8_t PSRAMpin;
             keyread = !keyread;
             KeyCheck = KEYCHECKTIME;
         }
+#endif
+#if PICOCALC // *EB*
+        //@@ Improved keyboard handling                          // *EB*
+        if (Option.KeyboardConfig == CONFIG_PICOCALC && KeyCheck == 0 && !SystemI2CBusHeld()) // *EB*
+        {                                                                                     // *EB*
+            CheckPicoCalcKeyboard(0, keyread);                                                //            CheckPicoCalcKeyboard(1, 0);                                                      // *EB*
+            KeyCheck = KEYCHECKTIME;                                                          // *EB*
+        } // *EB*
+        //@@ LCD backlight sync                                  // *EB*
+        if (Option.KeyboardConfig == CONFIG_PICOCALC && LcdBlCheck == 0 && !SystemI2CBusHeld()) // *EB*
+        {                                                                                       // *EB*
+            CheckLcdBacklight();                                                                // *EB*
+            LcdBlCheck = LCDBLCHECKTIME;                                                        // *EB*
+        } // *EB*
+        //@@ KBD backlight sync                                  // *EB*
+        if (Option.KeyboardConfig == CONFIG_PICOCALC && KbdBlCheck == 0 && !SystemI2CBusHeld()) // *EB*
+        {                                                                                       // *EB*
+            CheckKbdBacklight();                                                                // *EB*
+            KbdBlCheck = KBDBLCHECKTIME;                                                        // *EB*
+        } // *EB*
 #endif
 
         // === Wii Classic Controller ===
@@ -2195,6 +2227,10 @@ int __not_in_flash_func(MMInkey)(void)
         DECREMENT_IF_ACTIVE(Timer2);
         DECREMENT_IF_ACTIVE(Timer1);
         DECREMENT_IF_ACTIVE(KeyCheck);
+#if PICOCALC                             // *EB*
+        DECREMENT_IF_ACTIVE(LcdBlCheck); // *EB*
+        DECREMENT_IF_ACTIVE(KbdBlCheck); // *EB*
+#endif                                   // *EB*
 
         if (diskchecktimer && (Option.SD_CS || Option.CombinedCS))
             diskchecktimer--;
@@ -4989,20 +5025,32 @@ void __not_in_flash_func(UpdateCore)()
             {
                 int x_low = (int)multicore_fifo_pop_blocking();
                 int y_low = (int)multicore_fifo_pop_blocking();
+                int scrollStart = (int)multicore_fifo_pop_blocking();
                 int x_high = x_low >> 16;
                 x_low &= 0xFFFF;
                 int y_high = y_low >> 16;
                 y_low &= 0xFFFF;
                 mutex_enter_blocking(&frameBufferMutex); // lock the frame buffer
-                copybuffertoscreen(x_low, y_low, x_high, y_high);
+                copybuffertoscreen(x_low, y_low, x_high, y_high, scrollStart);
                 mutex_exit(&frameBufferMutex);
             }
             else if (command == 7)
             {
                 int t = (int)multicore_fifo_pop_blocking();
-                spi_write_command(CMD_SET_SCROLL_START);
-                spi_write_data(t >> 8);
-                spi_write_data(t);
+                if (Option.DISPLAY_TYPE >= SSD1963_5_12BUFF)
+                {
+                    // SSD1963 buffered displays use 2x upscaling:
+                    // VRes is half the display resolution, so scale scroll value
+                    WriteComand(CMD_SET_SCROLL_START);
+                    WriteData((t * 2) >> 8);
+                    WriteData((t * 2) & 0xFF);
+                }
+                else
+                {
+                    spi_write_command(CMD_SET_SCROLL_START);
+                    spi_write_data(t >> 8);
+                    spi_write_data(t);
+                }
 #endif
             }
             else if (command == 1)
@@ -5388,7 +5436,6 @@ uint32_t testPSRAM(void)
         PWM_FREQ = 44100;
         pico_get_unique_board_id_string(id_out, 12);
 #ifdef rp2350
-#ifndef PICOMITEWEB
         if (Option.PSRAM_CS_PIN)
         {
             PSRAMpin = PinDef[Option.PSRAM_CS_PIN].GPno;
@@ -5401,7 +5448,6 @@ uint32_t testPSRAM(void)
             else
                 PSRAMsize -= 2 * 1024 * 1024;
         }
-#endif
 #endif
         if (clock_get_hz(clk_usb) != 48000000)
         {
@@ -5550,6 +5596,9 @@ uint32_t testPSRAM(void)
         adc_set_temp_sensor_enabled(true);
         mSecTimer = time_us_64() / 1000;
         add_repeating_timer_us(-1000, timer_callback, NULL, &timer);
+#if PICOCALC
+        TestPicoCalc(); // Test if firmware is running on PicoCalc
+#endif
         InitReservedIO();
         ClearExternalIO();
         ConsoleRxBufHead = 0;
@@ -5594,6 +5643,12 @@ uint32_t testPSRAM(void)
         if (Option.BackLightLevel)
             setBacklight(Option.BackLightLevel, 0);
 #endif
+#if PICOCALC // *EB*
+        if (Option.BACKLIGHT_LCD)
+            set_lcd_backlight(Option.BACKLIGHT_LCD); // *EB*
+        if (Option.BACKLIGHT_KBD)
+            set_kbd_backlight(Option.BACKLIGHT_KBD); // *EB*
+#endif                                               // *EB*
         ErrorInPrompt = false;
         exception_set_exclusive_handler(HARDFAULT_EXCEPTION, sigbus);
         exception_set_exclusive_handler(SVCALL_EXCEPTION, sigbus);

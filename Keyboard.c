@@ -426,18 +426,60 @@ const char keyE0Codes[56] =
     // General Layout on all Keyboard for the Keypad
     {
         // Base 10
-        0, END, 0, LEFT, HOME, 0, 0, 0,             // 104-111
-        INSERT, DEL, DOWN, 0, RIGHT, UP, ESC, NUML, // 112-119
-        F11, '+', PDOWN, '-', '*', PUP, SLOCK, 0,   // 120-127
+        0,
+        END,
+        0,
+        LEFT,
+        HOME,
+        0,
+        0,
+        0, // 104-111
+        INSERT,
+        DEL,
+        DOWN,
+        0,
+        RIGHT,
+        UP,
+        ESC,
+        NUML, // 112-119
+        F11,
+        '+',
+        PDOWN,
+        '-',
+        '*',
+        PUP,
+        SLOCK,
+        0, // 120-127
 };
 
 const char keyE0Codes_ES[56] =
     // Layout for spanish Keyboard for the Keypad
     {
         // Base 10
-        0, END, 0, LEFT, HOME, 0, 0, 0,               // 104-111
-        INSERT, DEL, DOWN, PUP, RIGHT, UP, ESC, NUML, // 112-119
-        F11, 0, PDOWN, 0, 0, 0, SLOCK, 0,             // 120-127
+        0,
+        END,
+        0,
+        LEFT,
+        HOME,
+        0,
+        0,
+        0, // 104-111
+        INSERT,
+        DEL,
+        DOWN,
+        PUP,
+        RIGHT,
+        UP,
+        ESC,
+        NUML, // 112-119
+        F11,
+        0,
+        PDOWN,
+        0,
+        0,
+        0,
+        SLOCK,
+        0, // 120-127
 };
 
 void KBDIntEnable(int status)
@@ -477,7 +519,7 @@ void initKeyboard(void)
 {
   //	GPIO_InitTypeDef GPIO_InitDef;
 
-  if (Option.KeyboardConfig == NO_KEYBOARD || Option.KeyboardConfig == CONFIG_I2C)
+  if (Option.KeyboardConfig == NO_KEYBOARD || Option.KeyboardConfig >= CONFIG_I2C)
     return;
   KBDIntEnable(0); // disable interrupt in case called from within CNInterrupt()
 

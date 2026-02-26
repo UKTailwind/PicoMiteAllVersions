@@ -193,7 +193,7 @@ extern "C"
 #define MAXLOCALVARS 256
 #define MAXVARS (MAXGLOBALVARS + MAXLOCALVARS)
 #define HEAP_MEMORY_SIZE (208 * 1024)
-#define FLASH_TARGET_OFFSET (1216 * 1024)
+#define FLASH_TARGET_OFFSET (1232 * 1024)
 #else
 #define MAXSUBFUN 256
 #define MAXGLOBALVARS 240 // Configurable split
@@ -205,7 +205,7 @@ extern "C"
 
 #include "lwipopts_examples_common.h"
 
-#define MagicKey 0x8721D8E6
+#define MagicKey 0x874628E6
 #define MaxPcb 8
 #define MAX_CPU 252000
 #define MIN_CPU 126000
@@ -231,7 +231,7 @@ extern "C"
 #ifdef USBKEYBOARD
 #define MagicKey 0x5C721A65
 #else
-#define MagicKey 0x1A721EB4
+#define MagicKey 0x1A7426B4
 #endif
 #else
 #define HEAP_MEMORY_SIZE (128 * 1024)
@@ -245,7 +245,7 @@ extern "C"
 #ifdef USBKEYBOARD
 #define MagicKey 0x0E721DDA
 #else
-#define MagicKey 0xF12753C5
+#define MagicKey 0xF16425C5
 #endif
 #endif
 
@@ -355,7 +355,6 @@ extern "C"
  * ============================================================================ */
 #define NBRSETTICKS 4 // Number of SETTICK interrupts available
 
-#ifndef PICOMITEWEB
 #ifdef rp2350
 #define PIOMAX 3
 #define NBRPINS 62
@@ -363,16 +362,13 @@ extern "C"
 #define PSRAMblock (PSRAMbase + PSRAMsize + 0x60000)
 #define PSRAMblocksize 0x1C0000
 #else
+#ifndef PICOMITEWEB
 #define PIOMAX 2
 #define NBRPINS 44
-#endif
-#else
-#ifdef rp2350
-#define PIOMAX 3
 #else
 #define PIOMAX 2
-#endif
 #define NBRPINS 40
+#endif
 #endif
 
 /* ============================================================================
@@ -530,8 +526,8 @@ extern "C"
  * ============================================================================ */
 #define LOWRAM (!defined(rp2350) && (defined(PICOMITEVGA) || defined(PICOMITEWEB)))
 #define PICOMITERP2350 (defined(PICOMITE) && defined(rp2350))
-#define WEBRP2350 (!defined(rp2350) && defined(PICOMITEWEB))
-
+#define WEBRP2350 (defined(rp2350) && defined(PICOMITEWEB))
+#define PICOCALC ((defined(PICOMITE) || defined(PICOMITEWEB)) && !defined(USBKEYBOARD))
         /* ============================================================================
          * Type definitions - MM operations enum
          * ============================================================================ */

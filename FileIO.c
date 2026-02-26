@@ -596,7 +596,7 @@ void MIPS16 cmd_drive(void)
     }
     SyntaxError();
 }
-#if defined(rp2350) && !defined(PICOMITEWEB)
+#if defined(rp2350)
 extern unsigned int mmap[HEAP_MEMORY_SIZE / PAGESIZE / PAGESPERWORD];
 extern unsigned int psmap[7 * 1024 * 1024 / PAGESIZE / PAGESPERWORD];
 void MIPS16 cmd_psram(void)
@@ -1659,7 +1659,7 @@ unsigned char pjpeg_need_bytes_callback(unsigned char *pBuf, unsigned char buf_s
     return 0;
 }
 
-void cmd_LoadJPGImage(unsigned char *p)
+void MIPS16 cmd_LoadJPGImage(unsigned char *p)
 {
     pjpeg_image_info_t image_info;
     int mcu_x = 0;
@@ -4371,8 +4371,10 @@ void MIPS16 CloseAllFiles(void)
     closeall3d();
 #ifdef rp2350
     ray_close();
-    closeframe();
 #endif
+#endif
+#ifdef rp2350
+    closeframe();
 #endif
     closeframebuffer('A');
     for (i = 1; i <= MAXOPENFILES; i++)
