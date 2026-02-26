@@ -322,10 +322,9 @@ extern "C"
 
                 /* Platform identification and extensions */
                 unsigned char platform[32];
-                uint8_t BACKLIGHT_KBD;     // *EB*
-                uint8_t BACKLIGHT_LCD;     // *EB* 
-                uint8_t BADPICO;           // *EB* 
-                uint8_t D4;                // *EB*
+                uint8_t BACKLIGHT_KBD;        // *EB*
+                uint8_t BACKLIGHT_LCD;        // *EB*
+                uint16_t D4;                  // *EB*
                 unsigned char extensions[92]; // 896 bytes == 7 XMODEM blocks
 
                 /* NOTE: To enable older CFunctions to run, any new options MUST be added at the end of the list */

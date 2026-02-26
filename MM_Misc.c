@@ -2893,8 +2893,6 @@ void MIPS16 printoptions(void)
         PO2Int("BACKLIGHT KBD", Option.BACKLIGHT_KBD); // *EB*
     if (Option.BACKLIGHT_LCD)
         PO2Int("BACKLIGHT LCD", Option.BACKLIGHT_LCD); // *EB*
-    if (Option.BADPICO)
-        PO2Int("BADPICO", Option.BADPICO); // *EB*
 
 #ifdef PICOMITEWEB
     if (*Option.SSID)
@@ -5558,16 +5556,6 @@ void MIPS16 cmd_option(void)
                 error("Invalid syntax"); // *EB*
             } // *EB*
         } // *EB*
-#if !defined(rp2350)                                           // *EB*
-        tp = checkstring(cmdline, (unsigned char *)"BADPICO"); // *EB*
-        if (tp)
-        {                                           // *EB*
-            getargs(&tp, 1, (unsigned char *)",");  // *EB*
-            Option.BADPICO = getint(argv[0], 0, 1); // *EB*
-            SaveOptions();                          // *EB*
-            return;                                 // *EB*
-        } // *EB*
-#endif
     } // *EB*
 #endif // *EB*
 

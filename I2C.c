@@ -24,7 +24,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 ************************************************************************************************************************/
 /**
  * @file I2C.c
- * @author Geoff Graham, Peter Mather
+ * @author Geoff Graham, Peter Mather, Ernst Bokkelkamp
  * @brief Source for I2C MMBasic commands
  */
 /**
