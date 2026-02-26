@@ -5820,7 +5820,7 @@ uint32_t testPSRAM(void)
             SaveOptions();
             MMPrintString("I2C Keyboard not found, OPTION KEYBOARD disabled\r\n");
         }
-        updatebootcount(_excep_code == RESET_FLASHSTORAGE);
+        updatebootcount(_excep_code == RESET_FLASHSTORAGE || _excep_code == RESET_PICOCALCINIT);
         *tknbuf = 0;
         ContinuePoint = nextstmt; // in case the user wants to use the continue command
 #ifdef USBKEYBOARD

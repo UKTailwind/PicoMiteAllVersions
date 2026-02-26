@@ -1575,8 +1575,8 @@ void cmd_star(void)
 }
 void cmd_locate(void)
 {
-  getcsargs(&cmdline, 5);
-  if (!(argc == 5))
+  getcsargs(&cmdline, 6);
+  if (!(argc == 5 || argc == 6))
     SyntaxError();
   unsigned char *arg = getCstring(argv[0]);
   MMFLOAT lat = getnumber(argv[2]);
@@ -1617,6 +1617,14 @@ void cmd_locate(void)
     locatelatitude = lat;
     locatelongitude = lon;
     locatevalid = 1;
+    // If a 6th argument is provided, calculate and set the sidereal time
+    if (argc == 6)
+    {
+      MMFLOAT *sidereal = findvar(argv[5], V_FIND);
+      if (!(g_vartbl[g_VarIndex].type & T_NBR))
+        StandardError(6);
+      *sidereal = getSiderealTime(d, m, y, h, min, s, lon);
+    }
   }
 }
 #endif

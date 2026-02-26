@@ -2882,6 +2882,7 @@ void MIPS16 printoptions(void)
 #endif
         PRet();
     }
+    if(strcmp((char *)Option.platform,"PicoCalc"))
     if (Option.BackLightLevel != 100)
         PO2Int("LCD BACKLIGHT", Option.BackLightLevel);
 #ifdef GUICONTROLS
@@ -3514,7 +3515,7 @@ bool MIPS16 testMODBUFF(bool proposed, int proposedsize, bool noask)
 }
 void doreset(int format)
 {
-    SoftReset(format ? RESET_FLASHSTORAGE : SOFT_RESET);
+    SoftReset(format==2 ? RESET_PICOCALCINIT : (format ? RESET_FLASHSTORAGE : SOFT_RESET));
 }
 void MIPS16 configure(unsigned char *p, bool noask)
 {
@@ -4030,7 +4031,7 @@ void MIPS16 configure(unsigned char *p, bool noask)
             if (!noask)
                 printoptions();
             uSec(100000);
-            doreset(format);
+            doreset(noask? 2 :format);
         }
         if (checkstring(p, (unsigned char *)"GAMEMITE"))
         {

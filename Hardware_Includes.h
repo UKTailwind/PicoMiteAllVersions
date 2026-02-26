@@ -165,7 +165,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #define INVALID_CLOCKSPEED 9991
 #define RESET_CLOCKSPEED 9990
 #define RESET_FLASHSTORAGE 9989
-
+#define RESET_PICOCALCINIT 9988
 /* ============================================================================
  * Constants - Hardware pins
  * ============================================================================ */
@@ -457,7 +457,7 @@ extern volatile int RGBtransparent;
 extern int QVGA_CLKDIV;
 
 #ifndef HDMI
-extern uint8_t remap[];
+extern uint32_t remap[];
 extern uint8_t map16[16];
 extern uint16_t __attribute__((aligned(256))) M_Foreground[16];
 extern uint16_t __attribute__((aligned(256))) M_Background[16];
