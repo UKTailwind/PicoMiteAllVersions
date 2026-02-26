@@ -3995,9 +3995,9 @@ void MIPS16 configure(unsigned char *p, bool noask)
             Option.CPU_Speed = 252000;
             Option.ColourCode = 1;
 #if defined(rp2350) && defined(PICOMITE)
-            Option.LCD_CLK = Option.SYSTEM_CLK = 14;
-            Option.LCD_MOSI = Option.SYSTEM_MOSI = 15;
-            Option.LCD_MISO = Option.SYSTEM_MISO = 16;
+            Option.LCD_CLK = 14;
+            Option.LCD_MOSI = 15;
+            Option.LCD_MISO = 16;
 #else
             Option.SYSTEM_CLK = 14;
             Option.SYSTEM_MOSI = 15;
