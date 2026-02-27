@@ -2882,18 +2882,22 @@ void MIPS16 printoptions(void)
 #endif
         PRet();
     }
-    if(strcmp((char *)Option.platform,"PicoCalc"))
-    if (Option.BackLightLevel != 100)
-        PO2Int("LCD BACKLIGHT", Option.BackLightLevel);
 #ifdef GUICONTROLS
     if (Option.MaxCtrls)
         PO2Int("GUI CONTROLS", Option.MaxCtrls - 1);
 #endif
-
-    if (Option.BACKLIGHT_KBD)
-        PO2Int("BACKLIGHT KBD", Option.BACKLIGHT_KBD); // *EB*
-    if (Option.BACKLIGHT_LCD)
-        PO2Int("BACKLIGHT LCD", Option.BACKLIGHT_LCD); // *EB*
+    if (strcmp((char *)Option.platform, "PicoCalc") == 0)
+    {
+        if (Option.BACKLIGHT_KBD)
+            PO2Int("BACKLIGHT KBD", Option.BACKLIGHT_KBD); // *EB*
+        if (Option.BACKLIGHT_LCD)
+            PO2Int("BACKLIGHT LCD", Option.BACKLIGHT_LCD); // *EB*
+    }
+    else
+    {
+        if (Option.BackLightLevel != 100)
+            PO2Int("LCD BACKLIGHT", Option.BackLightLevel);
+    }
 
 #ifdef PICOMITEWEB
     if (*Option.SSID)
@@ -3515,7 +3519,7 @@ bool MIPS16 testMODBUFF(bool proposed, int proposedsize, bool noask)
 }
 void doreset(int format)
 {
-    SoftReset(format==2 ? RESET_PICOCALCINIT : (format ? RESET_FLASHSTORAGE : SOFT_RESET));
+    SoftReset(format == 2 ? RESET_PICOCALCINIT : (format ? RESET_FLASHSTORAGE : SOFT_RESET));
 }
 void MIPS16 configure(unsigned char *p, bool noask)
 {
@@ -4017,7 +4021,6 @@ void MIPS16 configure(unsigned char *p, bool noask)
             Option.SYSTEM_I2C_SDA = 9;
             Option.SYSTEM_I2C_SCL = 10;
             Option.SYSTEM_I2C_SLOW = 1;
-            Option.BackLightLevel = 20; // default 20,sync with i2c keyboard
             Option.DISPLAY_CONSOLE = 1;
             Option.DefaultFC = GREEN;
             Option.KEYBOARD_CLOCK = 0;
@@ -4031,7 +4034,7 @@ void MIPS16 configure(unsigned char *p, bool noask)
             if (!noask)
                 printoptions();
             uSec(100000);
-            doreset(noask? 2 :format);
+            doreset(noask ? 2 : format);
         }
         if (checkstring(p, (unsigned char *)"GAMEMITE"))
         {
@@ -4982,7 +4985,7 @@ void MIPS16 cmd_option(void)
                 error("UART0 in use for GPS");
             Option.SerialConsole = 1;
             if (argc == 5)
-                Option.SerialConsole = (checkstring(argv[4], (unsigned char *)"B") ? 5 : 1);
+                Option.SerialConsole = ((checkstring(argv[4], (unsigned char *)"B") || checkstring(argv[4], (unsigned char *)"BOTH")) ? 5 : 1);
             SaveOptions();
             SoftReset(SOFT_RESET);
             return;

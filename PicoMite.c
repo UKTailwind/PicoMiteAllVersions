@@ -5746,13 +5746,6 @@ uint32_t testPSRAM(void)
                 {
                     MMPrintString((char *)banner);    // print sign on message
                     MMPrintString((char *)COPYRIGHT); // print sign on message
-#if PICOCALC
-                    if (strcmp((char *)Option.platform, "PicoCalc") == 0)
-                    {
-                        MMPrintString("Copyright 2026 Ernst Bokkelkamp\r\n");
-                        MMPrintString("\r\n");
-                    }
-#endif
                     PRet();
                 }
             }
@@ -5766,13 +5759,6 @@ uint32_t testPSRAM(void)
                 {
                     MMPrintString((char *)banner);
                     MMPrintString((char *)COPYRIGHT); // print sign on message
-#if PICOCALC
-                    if (strcmp((char *)Option.platform, "PicoCalc") == 0)
-                    {
-                        MMPrintString("Copyright 2026 Ernst Bokkelkamp\r\n");
-                        MMPrintString("\r\n");
-                    }
-#endif
                     PRet();
                 }
             }

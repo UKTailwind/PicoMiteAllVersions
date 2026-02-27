@@ -86,7 +86,7 @@ extern "C"
 #define FLASH_TARGET_OFFSET (768 * 1024)
 #define MagicKey 0x604569F4
 #else
-#define FLASH_TARGET_OFFSET (768 * 1024)
+#define FLASH_TARGET_OFFSET (752 * 1024)
 #define MagicKey 0xD9765AF5
 #endif
 
