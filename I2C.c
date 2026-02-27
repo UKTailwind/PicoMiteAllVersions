@@ -3644,10 +3644,9 @@ int read_biosversion()
  */
 void MIPS16 TestPicoCalc(void) // *EB*
 {
-  // Only run if platform is not already set to PicoCalc
-  if (strcmp((char *)Option.platform, "PicoCalc") == 0)
+  // Only run if platform is not already set to PicoCalc or something else
+  if (*Option.platform)
     return;
-
   // Set the PicoCalc-specific I2C pins (9 for SDA, 10 for SCL)
   int sda_pin = PinDef[9].GPno;
   int scl_pin = PinDef[10].GPno;

@@ -2073,11 +2073,17 @@ void InitReservedIO(void)
 #endif
 	if (Option.SYSTEM_I2C_SDA)
 	{
+		I2C0locked = 0;
+		I2C1locked = 0;
+		I2C_enabled = 0;
+		I2C2_enabled = 0;
+		I2C0SDApin = I2C0SCLpin = 99;
+		I2C1SDApin = I2C1SCLpin = 99;
 		ExtCfg(Option.SYSTEM_I2C_SCL, EXT_BOOT_RESERVED, 0);
 		ExtCfg(Option.SYSTEM_I2C_SDA, EXT_BOOT_RESERVED, 0);
 		gpio_set_function(PinDef[Option.SYSTEM_I2C_SCL].GPno, GPIO_FUNC_I2C);
 		gpio_set_function(PinDef[Option.SYSTEM_I2C_SDA].GPno, GPIO_FUNC_I2C);
-		if (PinDef[Option.SYSTEM_I2C_SDA].mode & I2C0SDA)
+		if ((PinDef[Option.SYSTEM_I2C_SDA].mode & I2C0SDA) && (PinDef[Option.SYSTEM_I2C_SCL].mode & I2C0SCL))
 		{
 			I2C0locked = 1;
 			i2c_init(i2c0, (Option.SYSTEM_I2C_SLOW ? 100000 : 400000));
@@ -2088,7 +2094,7 @@ void InitReservedIO(void)
 			I2C0SCLpin = Option.SYSTEM_I2C_SCL;
 			I2C_Timeout = (Option.SYSTEM_I2C_SLOW ? SystemI2CTimeout * 5 : SystemI2CTimeout);
 		}
-		else
+		else if ((PinDef[Option.SYSTEM_I2C_SDA].mode & I2C1SDA) && (PinDef[Option.SYSTEM_I2C_SCL].mode & I2C1SCL))
 		{
 			I2C1locked = 1;
 			i2c_init(i2c1, (Option.SYSTEM_I2C_SLOW ? 100000 : 400000));
@@ -2098,6 +2104,11 @@ void InitReservedIO(void)
 			I2C1SDApin = Option.SYSTEM_I2C_SDA;
 			I2C1SCLpin = Option.SYSTEM_I2C_SCL;
 			I2C2_Timeout = (Option.SYSTEM_I2C_SLOW ? SystemI2CTimeout * 5 : SystemI2CTimeout);
+		}
+		else // should never happen
+		{
+			Option.SYSTEM_I2C_SDA = 0;
+			Option.SYSTEM_I2C_SCL = 0;
 		}
 		if (Option.RTC)
 			RtcGetTime(1);

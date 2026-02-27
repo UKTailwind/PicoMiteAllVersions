@@ -6476,10 +6476,10 @@ void MIPS16 cmd_option(void)
                 Option.SYSTEM_I2C_SLOW = 0;                         // *EB*
             else                                                    // *EB*
                 SyntaxError();                                      // *EB*
+            SaveOptions();                                          // *EB*
+            SoftReset(SOFT_RESET);                                  // *EB*
+            return;                                                 // *EB*
         } // *EB*
-        SaveOptions();         // *EB*
-        SoftReset(SOFT_RESET); // *EB*
-        return;                // *EB*
         if (CurrentLinePtr)
             StandardError(10);
         if (argc < 3)
