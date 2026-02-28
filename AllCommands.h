@@ -149,6 +149,7 @@ void cmd_device(void);
 void cmd_sync(void);
 void cmd_setpin(void);
 void cmd_pulse(void);
+void cmd_oneshot(void);
 void cmd_pwm(void);
 void cmd_pin(void);
 void cmd_i2c(void);
@@ -644,6 +645,7 @@ void fun_frame(void);
 	{(unsigned char *)"XModem", T_CMD, 0, cmd_xmodem},
 	{(unsigned char *)"I2CLCD", T_CMD, 0, cmd_i2clcd},
 	{(unsigned char *)"Bitstream", T_CMD, 0, cmd_bitstream},
+	{(unsigned char *)"OneShot", T_CMD, 0, cmd_oneshot},
 
 {
 	(unsigned char *)"", 0, 0, cmd_null

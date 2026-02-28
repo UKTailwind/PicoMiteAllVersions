@@ -48,10 +48,10 @@ extern "C"
 #define MAXVARS (MAXGLOBALVARS + MAXLOCALVARS)
 
 #ifdef HDMI
-#define HEAP_MEMORY_SIZE (180 * 1024)
+#define HEAP_MEMORY_SIZE (184 * 1024)
 #define FLASH_TARGET_OFFSET (896 * 1024)
 #else
-#define HEAP_MEMORY_SIZE (188 * 1024)
+#define HEAP_MEMORY_SIZE (192 * 1024)
 #define FLASH_TARGET_OFFSET (880 * 1024)
 #endif
 
@@ -193,14 +193,14 @@ extern "C"
 #define MAXLOCALVARS 256
 #define MAXVARS (MAXGLOBALVARS + MAXLOCALVARS)
 #define HEAP_MEMORY_SIZE (208 * 1024)
-#define FLASH_TARGET_OFFSET (1232 * 1024)
+#define FLASH_TARGET_OFFSET (1216 * 1024)
 #else
 #define MAXSUBFUN 256
 #define MAXGLOBALVARS 240 // Configurable split
 #define MAXLOCALVARS 240
 #define MAXVARS (MAXGLOBALVARS + MAXLOCALVARS)
 #define HEAP_MEMORY_SIZE (88 * 1024)
-#define FLASH_TARGET_OFFSET (1104 * 1024)
+#define FLASH_TARGET_OFFSET (1088 * 1024)
 #endif
 
 #include "lwipopts_examples_common.h"

@@ -62,7 +62,9 @@ unsigned char *FRAMEBUFFER = NULL;
 #endif
 #else
 #ifdef PICOMITEVGA
-unsigned char __attribute__((aligned(4096))) Heap[HEAP_MEMORY_SIZE + 256] = {0};
+// Keep heap 4KB aligned, but place it in a .bss.* subsection so it remains
+// RAM-only (NOBITS) and does not inflate the flash image size.
+unsigned char __attribute__((section(".bss.zheap"), aligned(4096))) Heap[HEAP_MEMORY_SIZE + 256];
 unsigned char __attribute__((aligned(256))) video[640 * 480 / 8];
 unsigned char *FRAMEBUFFER = video;
 uint32_t framebuffersize = 640 * 480 / 8;

@@ -459,8 +459,8 @@ extern int QVGA_CLKDIV;
 #ifndef HDMI
 extern uint32_t remap[];
 extern uint8_t map16[16];
-extern uint16_t __attribute__((aligned(256))) M_Foreground[16];
-extern uint16_t __attribute__((aligned(256))) M_Background[16];
+extern uint16_t M_Foreground[16];
+extern uint16_t M_Background[16];
 
 #ifdef rp2350
 extern uint16_t *tilefcols;

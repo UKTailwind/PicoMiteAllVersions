@@ -139,6 +139,21 @@ volatile char IrVarType;
 volatile char IrState, IrGotMsg;
 int IrBits, IrCount;
 unsigned char *IrInterrupt;
+#define CALLBACK_ONESHOT 64
+#define ONESHOT_STATE_IDLE 0
+#define ONESHOT_STATE_PREDELAY 1
+#define ONESHOT_STATE_PULSE 2
+
+volatile int oneshot_active = 0;
+volatile int oneshot_state = ONESHOT_STATE_IDLE;
+volatile int oneshot_trigger_pin = 0;
+volatile int oneshot_output_pin = 0;
+volatile int oneshot_trigger_rising = 1;
+volatile int oneshot_prepulse_us = 0;
+volatile int oneshot_pulse_us = 0;
+volatile int oneshot_output_idle_level = 0;
+volatile uint64_t oneshot_ignored_triggers = 0;
+volatile alarm_id_t oneshot_alarm_id = -1;
 int last_adc = 99;
 volatile int CallBackEnabled = 0;
 uint8_t IRpin = 99;
@@ -210,6 +225,94 @@ uint8_t *adcint1 = NULL;
 uint8_t *adcint2 = NULL;
 MMFLOAT ADCscale[4], ADCbottom[4];
 extern void mouse0close(void);
+
+void MIPS16 oneshot_disable(void)
+{
+    alarm_id_t id;
+    int callback_state;
+    int trigger_pin;
+    int output_pin;
+    int idle_level;
+    int was_active;
+
+    mT4IntEnable(0);
+    id = oneshot_alarm_id;
+    oneshot_alarm_id = -1;
+    callback_state = CallBackEnabled;
+    trigger_pin = oneshot_trigger_pin;
+    output_pin = oneshot_output_pin;
+    idle_level = oneshot_output_idle_level;
+    was_active = oneshot_active;
+    oneshot_active = 0;
+    oneshot_state = ONESHOT_STATE_IDLE;
+    oneshot_trigger_pin = 0;
+    oneshot_output_pin = 0;
+    oneshot_trigger_rising = 1;
+    oneshot_prepulse_us = 0;
+    oneshot_pulse_us = 0;
+    oneshot_output_idle_level = 0;
+    oneshot_ignored_triggers = 0;
+    mT4IntEnable(1);
+
+    if (id >= 0)
+        cancel_alarm(id);
+
+    if (trigger_pin > 0)
+        ExtCurrentConfig[trigger_pin] &= (~EXT_COM_RESERVED);
+    if (output_pin > 0)
+        ExtCurrentConfig[output_pin] &= (~EXT_COM_RESERVED);
+
+    if (trigger_pin > 0)
+    {
+        if (callback_state == CALLBACK_ONESHOT)
+            gpio_set_irq_enabled_with_callback(PinDef[trigger_pin].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false, &gpio_callback);
+        else if (callback_state & CALLBACK_ONESHOT)
+            gpio_set_irq_enabled(PinDef[trigger_pin].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
+    }
+    CallBackEnabled &= (~CALLBACK_ONESHOT);
+
+    if (was_active && output_pin > 0 && (ExtCurrentConfig[output_pin] & (~EXT_COM_RESERVED)) == EXT_DIG_OUT)
+    {
+        if ((int)gpio_get_out_level(PinDef[output_pin].GPno) != idle_level)
+            PinSetBit(output_pin, LATINV);
+    }
+}
+
+int64_t __not_in_flash_func(oneshot_alarm_handler)(alarm_id_t id, void *user_data)
+{
+    if (!oneshot_active || id != oneshot_alarm_id)
+        return 0;
+
+    if (oneshot_state == ONESHOT_STATE_PREDELAY)
+    {
+        PinSetBit(oneshot_output_pin, LATINV);
+        if (oneshot_pulse_us <= 0)
+        {
+            PinSetBit(oneshot_output_pin, LATINV);
+            oneshot_state = ONESHOT_STATE_IDLE;
+            oneshot_alarm_id = -1;
+            return 0;
+        }
+        oneshot_state = ONESHOT_STATE_PULSE;
+        oneshot_alarm_id = add_alarm_in_us(oneshot_pulse_us, oneshot_alarm_handler, NULL, true);
+        if (oneshot_alarm_id < 0)
+        {
+            PinSetBit(oneshot_output_pin, LATINV);
+            oneshot_state = ONESHOT_STATE_IDLE;
+            oneshot_alarm_id = -1;
+        }
+        return 0;
+    }
+
+    if (oneshot_state == ONESHOT_STATE_PULSE)
+    {
+        PinSetBit(oneshot_output_pin, LATINV);
+        oneshot_state = ONESHOT_STATE_IDLE;
+        oneshot_alarm_id = -1;
+    }
+    return 0;
+}
+
 // Vector to CFunction routine called every command (ie, from the BASIC interrupt checker)
 
 uint64_t readusclock(void)
@@ -2255,7 +2358,7 @@ void fun_port(void)
     targ = T_INT;
 }
 
-void cmd_pulse(void)
+void MIPS16 cmd_pulse(void)
 {
     int pin, i, x, y;
     MMFLOAT f;
@@ -2308,6 +2411,88 @@ void cmd_pulse(void)
     PulsePin[i] = pin; // save the details
     PulseCnt[i] = x;
     PulseActive = true;
+}
+
+void MIPS16 cmd_oneshot(void)
+{
+    int trigger_pin, output_pin;
+    int trigger_rising = 1;
+    int trigger_pull_option;
+    unsigned int edges;
+    unsigned char *p;
+
+    if ((p = checkstring(cmdline, (unsigned char *)"DISABLE")))
+    {
+        if (*p)
+            SyntaxError();
+        oneshot_disable();
+        return;
+    }
+
+    getcsargs(&cmdline, 9);
+    if (argc != 9)
+        SyntaxError();
+
+    trigger_pin = getpinarg(argv[0]);
+    output_pin = getpinarg(argv[4]);
+    if (trigger_pin == output_pin)
+        error("Pins must be different");
+
+    if (checkstring(argv[2], (unsigned char *)"POSITIVE") || checkstring(argv[2], (unsigned char *)"POS") || checkstring(argv[2], (unsigned char *)"RISING"))
+        trigger_rising = 1;
+    else if (checkstring(argv[2], (unsigned char *)"NEGATIVE") || checkstring(argv[2], (unsigned char *)"NEG") || checkstring(argv[2], (unsigned char *)"FALLING"))
+        trigger_rising = 0;
+    else
+        error("Trigger must be POSITIVE or NEGATIVE");
+
+    trigger_pull_option = trigger_rising ? CNPDSET : CNPUSET;
+
+    if (!(ExtCurrentConfig[trigger_pin] == EXT_NOT_CONFIG || ExtCurrentConfig[trigger_pin] == EXT_DIG_IN || ExtCurrentConfig[trigger_pin] == EXT_INT_HI || ExtCurrentConfig[trigger_pin] == EXT_INT_LO || ExtCurrentConfig[trigger_pin] == EXT_INT_BOTH))
+        error("Trigger pin %/| is in use", trigger_pin, trigger_pin);
+    if (!(ExtCurrentConfig[output_pin] == EXT_NOT_CONFIG || ExtCurrentConfig[output_pin] == EXT_DIG_OUT))
+        error("Output pin %/| must be OFF or DOUT", output_pin, output_pin);
+
+    oneshot_disable();
+
+    if (ExtCurrentConfig[trigger_pin] == EXT_NOT_CONFIG)
+        ExtCfg(trigger_pin, EXT_DIG_IN, trigger_pull_option);
+    else
+        PinSetBit(trigger_pin, trigger_pull_option);
+    gpio_set_input_hysteresis_enabled(PinDef[trigger_pin].GPno, true);
+
+    if (ExtCurrentConfig[output_pin] == EXT_NOT_CONFIG)
+    {
+        ExtCfg(output_pin, EXT_DIG_OUT, 0);
+        PinSetBit(output_pin, LATCLR);
+    }
+
+    ExtCfg(trigger_pin, EXT_COM_RESERVED, 0);
+    ExtCfg(output_pin, EXT_COM_RESERVED, 0);
+
+    mT4IntEnable(0);
+    oneshot_trigger_pin = trigger_pin;
+    oneshot_output_pin = output_pin;
+    oneshot_trigger_rising = trigger_rising;
+    oneshot_prepulse_us = getint(argv[6], 0, 0x7FFFFFFF);
+    oneshot_pulse_us = getint(argv[8], 0, 0x7FFFFFFF);
+    oneshot_output_idle_level = gpio_get_out_level(PinDef[output_pin].GPno) ? 1 : 0;
+    oneshot_ignored_triggers = 0;
+    oneshot_state = ONESHOT_STATE_IDLE;
+    oneshot_alarm_id = -1;
+    oneshot_active = 1;
+    mT4IntEnable(1);
+
+    edges = trigger_rising ? GPIO_IRQ_EDGE_RISE : GPIO_IRQ_EDGE_FALL;
+    if (!CallBackEnabled)
+    {
+        CallBackEnabled = CALLBACK_ONESHOT;
+        gpio_set_irq_enabled_with_callback(PinDef[trigger_pin].GPno, edges, true, &gpio_callback);
+    }
+    else
+    {
+        CallBackEnabled |= CALLBACK_ONESHOT;
+        gpio_set_irq_enabled(PinDef[trigger_pin].GPno, edges, true);
+    }
 }
 
 void fun_pulsin(void)
@@ -2364,7 +2549,7 @@ void fun_pulsin(void)
 IR routines
 *****************************************************************************************************************************/
 
-void cmd_ir(void)
+void MIPS16 cmd_ir(void)
 {
     unsigned char *p;
     int i, pin, dev, cmd;
@@ -2485,360 +2670,162 @@ void IRSendSignal(int pin, int half_cycles)
         uSec(13);
     }
 }
+
+static inline uint8_t *pwmA_pin_ptr(int slice)
+{
+    switch (slice)
+    {
+    case 0:
+        return &PWM0Apin;
+    case 1:
+        return &PWM1Apin;
+    case 2:
+        return &PWM2Apin;
+    case 3:
+        return &PWM3Apin;
+    case 4:
+        return &PWM4Apin;
+    case 5:
+        return &PWM5Apin;
+    case 6:
+        return &PWM6Apin;
+    case 7:
+        return &PWM7Apin;
+#ifdef rp2350
+    case 8:
+        return &PWM8Apin;
+    case 9:
+        return &PWM9Apin;
+    case 10:
+        return &PWM10Apin;
+    case 11:
+        return &PWM11Apin;
+#endif
+    default:
+        return NULL;
+    }
+}
+
+static inline uint8_t *pwmB_pin_ptr(int slice)
+{
+    switch (slice)
+    {
+    case 0:
+        return &PWM0Bpin;
+    case 1:
+        return &PWM1Bpin;
+    case 2:
+        return &PWM2Bpin;
+    case 3:
+        return &PWM3Bpin;
+    case 4:
+        return &PWM4Bpin;
+    case 5:
+        return &PWM5Bpin;
+    case 6:
+        return &PWM6Bpin;
+    case 7:
+        return &PWM7Bpin;
+#ifdef rp2350
+    case 8:
+        return &PWM8Bpin;
+    case 9:
+        return &PWM9Bpin;
+    case 10:
+        return &PWM10Bpin;
+    case 11:
+        return &PWM11Bpin;
+#endif
+    default:
+        return NULL;
+    }
+}
+
+static inline uint8_t *pwm_slice_flag_ptr(int slice)
+{
+    switch (slice)
+    {
+    case 0:
+        return &slice0;
+    case 1:
+        return &slice1;
+    case 2:
+        return &slice2;
+    case 3:
+        return &slice3;
+    case 4:
+        return &slice4;
+    case 5:
+        return &slice5;
+    case 6:
+        return &slice6;
+    case 7:
+        return &slice7;
+#ifdef rp2350
+    case 8:
+        return &slice8;
+    case 9:
+        return &slice9;
+    case 10:
+        return &slice10;
+    case 11:
+        return &slice11;
+#endif
+    default:
+        return NULL;
+    }
+}
+
 void MIPS16 set_PWM(int slice, MMFLOAT duty1, MMFLOAT duty2, int high1, int high2, int delaystart)
 {
-    if (slice == 0 && PWM0Apin == 99 && duty1 >= 0.0)
+    uint8_t *pA = pwmA_pin_ptr(slice);
+    uint8_t *pB = pwmB_pin_ptr(slice);
+    uint8_t *slice_flag = pwm_slice_flag_ptr(slice);
+
+    if (pA == NULL || pB == NULL || slice_flag == NULL)
         StandardError(12);
-    if (slice == 0 && PWM0Bpin == 99 && duty2 >= 0.0)
+
+    if (*pA == 99 && duty1 >= 0.0)
+        StandardError(12);
+    if (*pB == 99 && duty2 >= 0.0)
         StandardError(12);
 #ifdef rp2350
     if (slice == 0 && fast_timer_active)
         error("Channel 0 in use for fast timer");
 #endif
-    if (slice == 1 && PWM1Apin == 99 && duty1 >= 0.0)
-        StandardError(12);
-    if (slice == 1 && PWM1Bpin == 99 && duty2 >= 0.0)
-        StandardError(12);
-    if (slice == 2 && PWM2Apin == 99 && duty1 >= 0.0)
-        StandardError(12);
-    if (slice == 2 && PWM2Bpin == 99 && duty2 >= 0.0)
-        StandardError(12);
-    if (slice == 3 && PWM3Apin == 99 && duty1 >= 0.0)
-        StandardError(12);
-    if (slice == 3 && PWM3Bpin == 99 && duty2 >= 0.0)
-        StandardError(12);
-    if (slice == 4 && PWM4Apin == 99 && duty1 >= 0.0)
-        StandardError(12);
-    if (slice == 4 && PWM4Bpin == 99 && duty2 >= 0.0)
-        StandardError(12);
-    if (slice == 5 && PWM5Apin == 99 && duty1 >= 0.0)
-        StandardError(12);
-    if (slice == 5 && PWM5Bpin == 99 && duty2 >= 0.0)
-        StandardError(12);
-    if (slice == 6 && PWM6Apin == 99 && duty1 >= 0.0)
-        StandardError(12);
-    if (slice == 6 && PWM6Bpin == 99 && duty2 >= 0.0)
-        StandardError(12);
-    if (slice == 7 && PWM7Apin == 99 && duty1 >= 0.0)
-        StandardError(12);
-    if (slice == 7 && PWM7Bpin == 99 && duty2 >= 0.0)
-        StandardError(12);
-#ifdef rp2350
-    if (slice == 8 && PWM8Apin == 99 && duty1 >= 0.0)
-        StandardError(12);
-    if (slice == 8 && PWM8Bpin == 99 && duty2 >= 0.0)
-        StandardError(12);
-    if (slice == 9 && PWM9Apin == 99 && duty1 >= 0.0)
-        StandardError(12);
-    if (slice == 9 && PWM9Bpin == 99 && duty2 >= 0.0)
-        StandardError(12);
-    if (slice == 10 && PWM10Apin == 99 && duty1 >= 0.0)
-        StandardError(12);
-    if (slice == 10 && PWM10Bpin == 99 && duty2 >= 0.0)
-        StandardError(12);
-    if (slice == 11 && PWM11Apin == 99 && duty1 >= 0.0)
-        StandardError(12);
-    if (slice == 11 && PWM11Bpin == 99 && duty2 >= 0.0)
-        StandardError(12);
-#endif
-    if (slice == 0 && PWM0Apin != 99 && duty1 >= 0.0)
+
+    if (*pA != 99 && duty1 >= 0.0)
     {
-        ExtCfg(PWM0Apin, EXT_COM_RESERVED, 0);
+        ExtCfg(*pA, EXT_COM_RESERVED, 0);
         pwm_set_chan_level(slice, PWM_CHAN_A, high1);
     }
-    if (slice == 0 && PWM0Bpin != 99 && duty2 >= 0.0)
+    if (*pB != 99 && duty2 >= 0.0)
     {
-        ExtCfg(PWM0Bpin, EXT_COM_RESERVED, 0);
+        ExtCfg(*pB, EXT_COM_RESERVED, 0);
         pwm_set_chan_level(slice, PWM_CHAN_B, high2);
     }
-    if (slice == 1 && PWM1Apin != 99 && duty1 >= 0.0)
-    {
-        ExtCfg(PWM1Apin, EXT_COM_RESERVED, 0);
-        pwm_set_chan_level(slice, PWM_CHAN_A, high1);
-    }
-    if (slice == 1 && PWM1Bpin != 99 && duty2 >= 0.0)
-    {
-        ExtCfg(PWM1Bpin, EXT_COM_RESERVED, 0);
-        pwm_set_chan_level(slice, PWM_CHAN_B, high2);
-    }
-    if (slice == 2 && PWM2Apin != 99 && duty1 >= 0.0)
-    {
-        ExtCfg(PWM2Apin, EXT_COM_RESERVED, 0);
-        pwm_set_chan_level(slice, PWM_CHAN_A, high1);
-    }
-    if (slice == 2 && PWM2Bpin != 99 && duty2 >= 0.0)
-    {
-        ExtCfg(PWM2Bpin, EXT_COM_RESERVED, 0);
-        pwm_set_chan_level(slice, PWM_CHAN_B, high2);
-    }
-    if (slice == 3 && PWM3Apin != 99 && duty1 >= 0.0)
-    {
-        ExtCfg(PWM3Apin, EXT_COM_RESERVED, 0);
-        pwm_set_chan_level(slice, PWM_CHAN_A, high1);
-    }
-    if (slice == 3 && PWM3Bpin != 99 && duty2 >= 0.0)
-    {
-        ExtCfg(PWM3Bpin, EXT_COM_RESERVED, 0);
-        pwm_set_chan_level(slice, PWM_CHAN_B, high2);
-    }
-    if (slice == 4 && PWM4Apin != 99 && duty1 >= 0.0)
-    {
-        ExtCfg(PWM4Apin, EXT_COM_RESERVED, 0);
-        pwm_set_chan_level(slice, PWM_CHAN_A, high1);
-    }
-    if (slice == 4 && PWM4Bpin != 99 && duty2 >= 0.0)
-    {
-        ExtCfg(PWM4Bpin, EXT_COM_RESERVED, 0);
-        pwm_set_chan_level(slice, PWM_CHAN_B, high2);
-    }
-    if (slice == 5 && PWM5Apin != 99 && duty1 >= 0.0)
-    {
-        ExtCfg(PWM5Apin, EXT_COM_RESERVED, 0);
-        pwm_set_chan_level(slice, PWM_CHAN_A, high1);
-    }
-    if (slice == 5 && PWM5Bpin != 99 && duty2 >= 0.0)
-    {
-        ExtCfg(PWM5Bpin, EXT_COM_RESERVED, 0);
-        pwm_set_chan_level(slice, PWM_CHAN_B, high2);
-    }
-    if (slice == 6 && PWM6Apin != 99 && duty1 >= 0.0)
-    {
-        ExtCfg(PWM6Apin, EXT_COM_RESERVED, 0);
-        pwm_set_chan_level(slice, PWM_CHAN_A, high1);
-    }
-    if (slice == 6 && PWM6Bpin != 99 && duty2 >= 0.0)
-    {
-        ExtCfg(PWM6Bpin, EXT_COM_RESERVED, 0);
-        pwm_set_chan_level(slice, PWM_CHAN_B, high2);
-    }
-    if (slice == 7 && PWM7Apin != 99 && duty1 >= 0.0)
-    {
-        ExtCfg(PWM7Apin, EXT_COM_RESERVED, 0);
-        pwm_set_chan_level(slice, PWM_CHAN_A, high1);
-    }
-    if (slice == 7 && PWM7Bpin != 99 && duty2 >= 0.0)
-    {
-        ExtCfg(PWM7Bpin, EXT_COM_RESERVED, 0);
-        pwm_set_chan_level(slice, PWM_CHAN_B, high2);
-    }
-#ifdef rp2350
-    if (slice == 8 && PWM8Apin != 99 && duty1 >= 0.0)
-    {
-        ExtCfg(PWM8Apin, EXT_COM_RESERVED, 0);
-        pwm_set_chan_level(slice, PWM_CHAN_A, high1);
-    }
-    if (slice == 8 && PWM8Bpin != 99 && duty2 >= 0.0)
-    {
-        ExtCfg(PWM8Bpin, EXT_COM_RESERVED, 0);
-        pwm_set_chan_level(slice, PWM_CHAN_B, high2);
-    }
-    if (slice == 9 && PWM9Apin != 99 && duty1 >= 0.0)
-    {
-        ExtCfg(PWM9Apin, EXT_COM_RESERVED, 0);
-        pwm_set_chan_level(slice, PWM_CHAN_A, high1);
-    }
-    if (slice == 9 && PWM9Bpin != 99 && duty2 >= 0.0)
-    {
-        ExtCfg(PWM9Bpin, EXT_COM_RESERVED, 0);
-        pwm_set_chan_level(slice, PWM_CHAN_B, high2);
-    }
-    if (slice == 10 && PWM10Apin != 99 && duty1 >= 0.0)
-    {
-        ExtCfg(PWM10Apin, EXT_COM_RESERVED, 0);
-        pwm_set_chan_level(slice, PWM_CHAN_A, high1);
-    }
-    if (slice == 10 && PWM10Bpin != 99 && duty2 >= 0.0)
-    {
-        ExtCfg(PWM10Bpin, EXT_COM_RESERVED, 0);
-        pwm_set_chan_level(slice, PWM_CHAN_B, high2);
-    }
-    if (slice == 11 && PWM11Apin != 99 && duty1 >= 0.0)
-    {
-        ExtCfg(PWM11Apin, EXT_COM_RESERVED, 0);
-        pwm_set_chan_level(slice, PWM_CHAN_A, high1);
-    }
-    if (slice == 11 && PWM11Bpin != 99 && duty2 >= 0.0)
-    {
-        ExtCfg(PWM11Bpin, EXT_COM_RESERVED, 0);
-        pwm_set_chan_level(slice, PWM_CHAN_B, high2);
-    }
-#endif
-    if (slice == 0 && slice0 == 0)
+
+    if (*slice_flag == 0)
     {
         if (!delaystart)
             pwm_set_enabled(slice, true);
-        slice0 = 1;
+        *slice_flag = 1;
     }
-    if (slice == 1 && slice1 == 0)
-    {
-        if (!delaystart)
-            pwm_set_enabled(slice, true);
-        slice1 = 1;
-    }
-    if (slice == 2 && slice2 == 0)
-    {
-        if (!delaystart)
-            pwm_set_enabled(slice, true);
-        slice2 = 1;
-    }
-    if (slice == 3 && slice3 == 0)
-    {
-        if (!delaystart)
-            pwm_set_enabled(slice, true);
-        slice3 = 1;
-    }
-    if (slice == 4 && slice4 == 0)
-    {
-        if (!delaystart)
-            pwm_set_enabled(slice, true);
-        slice4 = 1;
-    }
-    if (slice == 5 && slice5 == 0)
-    {
-        if (!delaystart)
-            pwm_set_enabled(slice, true);
-        slice5 = 1;
-    }
-    if (slice == 6 && slice6 == 0)
-    {
-        if (!delaystart)
-            pwm_set_enabled(slice, true);
-        slice6 = 1;
-    }
-    if (slice == 7 && slice7 == 0)
-    {
-        if (!delaystart)
-            pwm_set_enabled(slice, true);
-        slice7 = 1;
-    }
-#ifdef rp2350
-    if (slice == 8 && slice8 == 0)
-    {
-        if (!delaystart)
-            pwm_set_enabled(slice, true);
-        slice8 = 1;
-    }
-    if (slice == 9 && slice9 == 0)
-    {
-        if (!delaystart)
-            pwm_set_enabled(slice, true);
-        slice9 = 1;
-    }
-    if (slice == 10 && slice10 == 0)
-    {
-        if (!delaystart)
-            pwm_set_enabled(slice, true);
-        slice10 = 1;
-    }
-    if (slice == 11 && slice11 == 0)
-    {
-        if (!delaystart)
-            pwm_set_enabled(slice, true);
-        slice11 = 1;
-    }
-#endif
 }
 
-void PWMoff(int slice)
+void MIPS16 PWMoff(int slice)
 {
-    if (slice == 0 && PWM0Apin != 99 && ExtCurrentConfig[PWM0Apin] < EXT_BOOT_RESERVED)
-    {
-        ExtCfg(PWM0Apin, EXT_NOT_CONFIG, 0);
-    }
-    if (slice == 0 && PWM0Bpin != 99 && ExtCurrentConfig[PWM0Bpin] < EXT_BOOT_RESERVED)
-    {
-        ExtCfg(PWM0Bpin, EXT_NOT_CONFIG, 0);
-    }
-    if (slice == 1 && PWM1Apin != 99 && ExtCurrentConfig[PWM1Apin] < EXT_BOOT_RESERVED)
-    {
-        ExtCfg(PWM1Apin, EXT_NOT_CONFIG, 0);
-    }
-    if (slice == 1 && PWM1Bpin != 99 && ExtCurrentConfig[PWM1Bpin] < EXT_BOOT_RESERVED)
-    {
-        ExtCfg(PWM1Bpin, EXT_NOT_CONFIG, 0);
-    }
-    if (slice == 2 && PWM2Apin != 99 && ExtCurrentConfig[PWM2Apin] < EXT_BOOT_RESERVED)
-    {
-        ExtCfg(PWM2Apin, EXT_NOT_CONFIG, 0);
-    }
-    if (slice == 2 && PWM2Bpin != 99 && ExtCurrentConfig[PWM2Bpin] < EXT_BOOT_RESERVED)
-    {
-        ExtCfg(PWM2Bpin, EXT_NOT_CONFIG, 0);
-    }
-    if (slice == 3 && PWM3Apin != 99 && ExtCurrentConfig[PWM3Apin] < EXT_BOOT_RESERVED)
-    {
-        ExtCfg(PWM3Apin, EXT_NOT_CONFIG, 0);
-    }
-    if (slice == 3 && PWM3Bpin != 99 && ExtCurrentConfig[PWM3Bpin] < EXT_BOOT_RESERVED)
-    {
-        ExtCfg(PWM3Bpin, EXT_NOT_CONFIG, 0);
-    }
-    if (slice == 4 && PWM4Apin != 99 && ExtCurrentConfig[PWM4Apin] < EXT_BOOT_RESERVED)
-    {
-        ExtCfg(PWM4Apin, EXT_NOT_CONFIG, 0);
-    }
-    if (slice == 4 && PWM4Bpin != 99 && ExtCurrentConfig[PWM4Bpin] < EXT_BOOT_RESERVED)
-    {
-        ExtCfg(PWM4Bpin, EXT_NOT_CONFIG, 0);
-    }
-    if (slice == 5 && PWM5Apin != 99 && ExtCurrentConfig[PWM5Apin] < EXT_BOOT_RESERVED)
-    {
-        ExtCfg(PWM5Apin, EXT_NOT_CONFIG, 0);
-    }
-    if (slice == 5 && PWM5Bpin != 99 && ExtCurrentConfig[PWM5Bpin] < EXT_BOOT_RESERVED)
-    {
-        ExtCfg(PWM5Bpin, EXT_NOT_CONFIG, 0);
-    }
-    if (slice == 6 && PWM6Apin != 99 && ExtCurrentConfig[PWM6Apin] < EXT_BOOT_RESERVED)
-    {
-        ExtCfg(PWM6Apin, EXT_NOT_CONFIG, 0);
-    }
-    if (slice == 6 && PWM6Bpin != 99 && ExtCurrentConfig[PWM6Bpin] < EXT_BOOT_RESERVED)
-    {
-        ExtCfg(PWM6Bpin, EXT_NOT_CONFIG, 0);
-    }
-    if (slice == 7 && PWM7Apin != 99 && ExtCurrentConfig[PWM7Apin] < EXT_BOOT_RESERVED)
-    {
-        ExtCfg(PWM7Apin, EXT_NOT_CONFIG, 0);
-    }
-    if (slice == 7 && PWM7Bpin != 99 && ExtCurrentConfig[PWM7Bpin] < EXT_BOOT_RESERVED)
-    {
-        ExtCfg(PWM7Bpin, EXT_NOT_CONFIG, 0);
-    }
-#ifdef rp2350
-    if (slice == 8 && PWM8Apin != 99 && ExtCurrentConfig[PWM8Apin] < EXT_BOOT_RESERVED)
-    {
-        ExtCfg(PWM8Apin, EXT_NOT_CONFIG, 0);
-    }
-    if (slice == 8 && PWM8Bpin != 99 && ExtCurrentConfig[PWM8Bpin] < EXT_BOOT_RESERVED)
-    {
-        ExtCfg(PWM8Bpin, EXT_NOT_CONFIG, 0);
-    }
-    if (slice == 9 && PWM9Apin != 99 && ExtCurrentConfig[PWM9Apin] < EXT_BOOT_RESERVED)
-    {
-        ExtCfg(PWM9Apin, EXT_NOT_CONFIG, 0);
-    }
-    if (slice == 9 && PWM9Bpin != 99 && ExtCurrentConfig[PWM9Bpin] < EXT_BOOT_RESERVED)
-    {
-        ExtCfg(PWM9Bpin, EXT_NOT_CONFIG, 0);
-    }
-    if (slice == 10 && PWM10Apin != 99 && ExtCurrentConfig[PWM10Apin] < EXT_BOOT_RESERVED)
-    {
-        ExtCfg(PWM10Apin, EXT_NOT_CONFIG, 0);
-    }
-    if (slice == 10 && PWM10Bpin != 99 && ExtCurrentConfig[PWM10Bpin] < EXT_BOOT_RESERVED)
-    {
-        ExtCfg(PWM10Bpin, EXT_NOT_CONFIG, 0);
-    }
-    if (slice == 11 && PWM11Apin != 99 && ExtCurrentConfig[PWM11Apin] < EXT_BOOT_RESERVED)
-    {
-        ExtCfg(PWM11Apin, EXT_NOT_CONFIG, 0);
-    }
-    if (slice == 11 && PWM11Bpin != 99 && ExtCurrentConfig[PWM11Bpin] < EXT_BOOT_RESERVED)
-    {
-        ExtCfg(PWM11Bpin, EXT_NOT_CONFIG, 0);
-    }
-#endif
+    uint8_t *pA = pwmA_pin_ptr(slice);
+    uint8_t *pB = pwmB_pin_ptr(slice);
+
+    if (pA == NULL || pB == NULL)
+        return;
+
+    if (*pA != 99 && ExtCurrentConfig[*pA] < EXT_BOOT_RESERVED)
+        ExtCfg(*pA, EXT_NOT_CONFIG, 0);
+    if (*pB != 99 && ExtCurrentConfig[*pB] < EXT_BOOT_RESERVED)
+        ExtCfg(*pB, EXT_NOT_CONFIG, 0);
+
     pwm_set_enabled(slice, false);
 }
 #ifndef PICOMITEVGA
@@ -2987,33 +2974,10 @@ void MIPS16 cmd_Servo(void)
 #endif
     if ((tp = checkstring(argv[2], (unsigned char *)"OFF")))
     {
+        uint8_t *slice_flag = pwm_slice_flag_ptr(slice);
         PWMoff(slice);
-        if (slice == 0)
-            slice0 = 0;
-        if (slice == 1)
-            slice1 = 0;
-        if (slice == 2)
-            slice2 = 0;
-        if (slice == 3)
-            slice3 = 0;
-        if (slice == 4)
-            slice4 = 0;
-        if (slice == 5)
-            slice5 = 0;
-        if (slice == 6)
-            slice6 = 0;
-        if (slice == 7)
-            slice7 = 0;
-#ifdef rp2350
-        if (slice == 8)
-            slice8 = 0;
-        if (slice == 9)
-            slice9 = 0;
-        if (slice == 10)
-            slice10 = 0;
-        if (slice == 11)
-            slice11 = 0;
-#endif
+        if (slice_flag != NULL)
+            *slice_flag = 0;
         return;
     }
     MMFLOAT frequency = 50.0;
@@ -3065,341 +3029,67 @@ void MIPS16 cmd_pwm(void)
     unsigned char *tp;
     if ((tp = checkstring(cmdline, (unsigned char *)"SYNC")))
     {
-        MMFLOAT count0 = -1.0, count1 = -1.0, count2 = -1.0, count3 = -1.0, count4 = -1.0, count5 = -1.0, count6 = -1.0, count7 = -1.0;
+        MMFLOAT counts[12];
+        int enabled = 0;
+        int i;
 #ifdef rp2350
-        MMFLOAT count8 = -1.0, count9 = -1.0, count10 = -1.0, count11 = -1.0;
+        int max_slices = 12;
         getcsargs(&tp, 23);
 #else
+        int max_slices = 8;
         getcsargs(&tp, 15);
 #endif
-        if (argc >= 1)
+
+        for (i = 0; i < max_slices; i++)
+            counts[i] = -1.0;
+
+        for (i = 0; i < max_slices; i++)
         {
-            count0 = getnumber(argv[0]);
-            if ((count0 < 0.0 || count0 > 100.0) && count0 != -1.0)
-                SyntaxError();
-            ;
+            int argidx = i * 2;
+            if (argc >= argidx + 1 && (i == 0 || *argv[argidx]))
+            {
+                counts[i] = getnumber(argv[argidx]);
+                if ((counts[i] < 0.0 || counts[i] > 100.0) && counts[i] != -1.0)
+                    SyntaxError();
+            }
         }
-        if (argc >= 3 && *argv[2])
-        {
-            count1 = getnumber(argv[2]);
-            if ((count1 < 0.0 || count1 > 100.0) && count1 != -1.0)
-                SyntaxError();
-            ;
-        }
-        if (argc >= 5 && *argv[4])
-        {
-            count2 = getnumber(argv[4]);
-            if ((count2 < 0.0 || count2 > 100.0) && count2 != -1.0)
-                SyntaxError();
-            ;
-        }
-        if (argc >= 7 && *argv[6])
-        {
-            count3 = getnumber(argv[6]);
-            if ((count3 < 0.0 || count3 > 100.0) && count3 != -1.0)
-                SyntaxError();
-            ;
-        }
-        if (argc >= 9 && *argv[8])
-        {
-            count4 = getnumber(argv[8]);
-            if ((count4 < 0.0 || count4 > 100.0) && count4 != -1.0)
-                SyntaxError();
-            ;
-        }
-        if (argc >= 11 && *argv[10])
-        {
-            count5 = getnumber(argv[10]);
-            if ((count5 < 0.0 || count5 > 100.0) && count5 != -1.0)
-                SyntaxError();
-            ;
-        }
-        if (argc >= 13 && *argv[12])
-        {
-            count6 = getnumber(argv[12]);
-            if ((count6 < 0.0 || count6 > 100.0) && count6 != -1.0)
-                SyntaxError();
-            ;
-        }
-#ifdef rp2350
-        if (argc >= 15 && *argv[14])
-        {
-            count7 = getnumber(argv[14]);
-            if ((count7 < 0.0 || count7 > 100.0) && count7 != -1.0)
-                SyntaxError();
-            ;
-        }
-        if (argc >= 17 && *argv[16])
-        {
-            count8 = getnumber(argv[16]);
-            if ((count8 < 0.0 || count8 > 100.0) && count8 != -1.0)
-                SyntaxError();
-            ;
-        }
-        if (argc >= 19 && *argv[18])
-        {
-            count9 = getnumber(argv[18]);
-            if ((count9 < 0.0 || count9 > 100.0) && count9 != -1.0)
-                SyntaxError();
-            ;
-        }
-        if (argc >= 21 && *argv[20])
-        {
-            count10 = getnumber(argv[20]);
-            if ((count10 < 0.0 || count10 > 100.0) && count10 != -1.0)
-                SyntaxError();
-            ;
-        }
-        if (argc == 23 && *argv[22])
-        {
-            count11 = getnumber(argv[22]);
-            if ((count11 < 0.0 || count11 > 100.0) && count11 != -1.0)
-                SyntaxError();
-            ;
-        }
-#else
-        if (argc == 15 && *argv[14])
-        {
-            count7 = getnumber(argv[14]);
-            if ((count7 < 0.0 || count7 > 100.0) && count7 != -1.0)
-                SyntaxError();
-            ;
-        }
-#endif
 
 #ifdef rp2350
         extern volatile bool stepper_initialized;
-        if (stepper_initialized && (count10 >= 0.0 || slice10))
+        if (stepper_initialized && (counts[10] >= 0.0 || slice10))
             error("Channel 10 in use for Stepper");
 #endif
 
-        int enabled = 0;
-        if (slice0 || Option.AUDIO_SLICE == 0 || BacklightSlice == 0 || CameraSlice == 0
-#if PICOMITERP2350
-            || KeyboardlightSlice == 0
-#endif
-        )
+        for (i = 0; i < max_slices; i++)
         {
-            enabled |= 1;
-            if (!(Option.AUDIO_SLICE == 0 || BacklightSlice == 0 || CameraSlice == 0 || count0 < 0.0
+            uint8_t *slice_flag = pwm_slice_flag_ptr(i);
+            int reserved = false;
+
+            if (slice_flag != NULL && *slice_flag)
+                reserved = true;
+            if (Option.AUDIO_SLICE == i || BacklightSlice == i || CameraSlice == i)
+                reserved = true;
 #if PICOMITERP2350
-                  || KeyboardlightSlice == 0
+            if (KeyboardlightSlice == i)
+                reserved = true;
 #endif
-                  ))
+
+            if (reserved)
             {
-                pwm_set_enabled(0, false);
-                count0 = (MMFLOAT)pwm_hw->slice[0].top * (100.0 - count0) / 100.0;
-                pwm_set_counter(0, (int)count0);
+                enabled |= (1 << i);
+                if (counts[i] >= 0.0 && Option.AUDIO_SLICE != i && BacklightSlice != i && CameraSlice != i
+#if PICOMITERP2350
+                    && KeyboardlightSlice != i
+#endif
+                )
+                {
+                    MMFLOAT count = (MMFLOAT)pwm_hw->slice[i].top * (100.0 - counts[i]) / 100.0;
+                    pwm_set_enabled(i, false);
+                    pwm_set_counter(i, (int)count);
+                }
             }
         }
-        if (slice1 || Option.AUDIO_SLICE == 1 || BacklightSlice == 1 || CameraSlice == 1
-#if PICOMITERP2350
-            || KeyboardlightSlice == 1
-#endif
-        )
-        {
-            enabled |= 2;
-            if (!(Option.AUDIO_SLICE == 1 || BacklightSlice == 1 || CameraSlice == 1 || count1 < 0.0
-#if PICOMITERP2350
-                  || KeyboardlightSlice == 1
-#endif
-                  ))
-            {
-                pwm_set_enabled(1, false);
-                count1 = (MMFLOAT)pwm_hw->slice[1].top * (100.0 - count1) / 100.0;
-                pwm_set_counter(1, count1);
-            }
-        }
-        if (slice2 || Option.AUDIO_SLICE == 2 || BacklightSlice == 2 || CameraSlice == 2
-#if PICOMITERP2350
-            || KeyboardlightSlice == 2
-#endif
-        )
-        {
-            enabled |= 4;
-            if (!(Option.AUDIO_SLICE == 2 || BacklightSlice == 2 || CameraSlice == 2 || count2 < 0.0
-#if PICOMITERP2350
-                  || KeyboardlightSlice == 2
-#endif
-                  ))
-            {
-                pwm_set_enabled(2, false);
-                count2 = (MMFLOAT)pwm_hw->slice[2].top * (100.0 - count2) / 100.0;
-                pwm_set_counter(2, count2);
-            }
-        }
-        if (slice3 || Option.AUDIO_SLICE == 3 || BacklightSlice == 3 || CameraSlice == 3
-#if PICOMITERP2350
-            || KeyboardlightSlice == 3
-#endif
-        )
-        {
-            enabled |= 8;
-            if (!(Option.AUDIO_SLICE == 3 || BacklightSlice == 3 || CameraSlice == 3 || count3 < 0.0
-#if PICOMITERP2350
-                  || KeyboardlightSlice == 3
-#endif
-                  ))
-            {
-                pwm_set_enabled(3, false);
-                count3 = (MMFLOAT)pwm_hw->slice[3].top * (100.0 - count3) / 100.0;
-                pwm_set_counter(3, count3);
-            }
-        }
-        if (slice4 || Option.AUDIO_SLICE == 4 || BacklightSlice == 4 || CameraSlice == 4
-#if PICOMITERP2350
-            || KeyboardlightSlice == 4
-#endif
-        )
-        {
-            enabled |= 16;
-            if (!(Option.AUDIO_SLICE == 4 || BacklightSlice == 4 || CameraSlice == 4 || count4 < 0.0
-#if PICOMITERP2350
-                  || KeyboardlightSlice == 4
-#endif
-                  ))
-            {
-                pwm_set_enabled(4, false);
-                count4 = (MMFLOAT)pwm_hw->slice[4].top * (100.0 - count4) / 100.0;
-                pwm_set_counter(4, count4);
-            }
-        }
-        if (slice5 || Option.AUDIO_SLICE == 5 || BacklightSlice == 5 || CameraSlice == 5
-#if PICOMITERP2350
-            || KeyboardlightSlice == 5
-#endif
-        )
-        {
-            enabled |= 32;
-            if (!(Option.AUDIO_SLICE == 5 || BacklightSlice == 5 || CameraSlice == 5 || count5 < 0.0
-#if PICOMITERP2350
-                  || KeyboardlightSlice == 5
-#endif
-                  ))
-            {
-                pwm_set_enabled(5, false);
-                count5 = (MMFLOAT)pwm_hw->slice[5].top * (100.0 - count5) / 100.0;
-                pwm_set_counter(5, count5);
-            }
-        }
-        if (slice6 || Option.AUDIO_SLICE == 6 || BacklightSlice == 6 || CameraSlice == 6
-#if PICOMITERP2350
-            || KeyboardlightSlice == 6
-#endif
-        )
-        {
-            enabled |= 64;
-            if (!(Option.AUDIO_SLICE == 6 || BacklightSlice == 6 || CameraSlice == 6 || count6 < 0.0
-#if PICOMITERP2350
-                  || KeyboardlightSlice == 6
-#endif
-                  ))
-            {
-                pwm_set_enabled(6, false);
-                count6 = (MMFLOAT)pwm_hw->slice[6].top * (100.0 - count6) / 100.0;
-                pwm_set_counter(6, count6);
-            }
-        }
-        if (slice7 || Option.AUDIO_SLICE == 7 || BacklightSlice == 7 || CameraSlice == 7
-#if PICOMITERP2350
-            || KeyboardlightSlice == 7
-#endif
-        )
-        {
-            enabled |= 128;
-            if (!(Option.AUDIO_SLICE == 7 || BacklightSlice == 7 || CameraSlice == 7 || count7 < 0.0
-#if PICOMITERP2350
-                  || KeyboardlightSlice == 7
-#endif
-                  ))
-            {
-                pwm_set_enabled(7, false);
-                count7 = (MMFLOAT)pwm_hw->slice[7].top * (100.0 - count7) / 100.0;
-                pwm_set_counter(7, count7);
-            }
-        }
-#ifdef rp2350
-#ifdef PICOMITE
-        if (slice8 || Option.AUDIO_SLICE == 8 || BacklightSlice == 8 || CameraSlice == 8 || KeyboardlightSlice == 8)
-        {
-#else
-        if (slice8 || Option.AUDIO_SLICE == 8 || BacklightSlice == 8 || CameraSlice == 8)
-        {
-#endif
-            enabled |= 256;
-#ifdef PICOMITE
-            if (!(Option.AUDIO_SLICE == 8 || BacklightSlice == 8 || CameraSlice == 8 || KeyboardlightSlice == 8 || count8 < 0.0))
-            {
-#else
-            if (!(Option.AUDIO_SLICE == 8 || BacklightSlice == 8 || CameraSlice == 8 || count8 < 0.0))
-            {
-#endif
-                pwm_set_enabled(8, false);
-                count8 = (MMFLOAT)pwm_hw->slice[8].top * (100.0 - count8) / 100.0;
-                pwm_set_counter(8, count8);
-            }
-        }
-#ifdef PICOMITE
-        if (slice9 || Option.AUDIO_SLICE == 9 || BacklightSlice == 9 || CameraSlice == 9 || KeyboardlightSlice == 9)
-        {
-#else
-        if (slice9 || Option.AUDIO_SLICE == 9 || BacklightSlice == 9 || CameraSlice == 9)
-        {
-#endif
-            enabled |= 512;
-#ifdef PICOMITE
-            if (!(Option.AUDIO_SLICE == 9 || BacklightSlice == 9 || CameraSlice == 9 || KeyboardlightSlice == 9 || count9 < 0.0))
-            {
-#else
-            if (!(Option.AUDIO_SLICE == 9 || BacklightSlice == 9 || CameraSlice == 9 || count9 < 0.0))
-            {
-#endif
-                pwm_set_enabled(9, false);
-                count9 = (MMFLOAT)pwm_hw->slice[9].top * (100.0 - count9) / 100.0;
-                pwm_set_counter(9, count9);
-            }
-        }
-#ifdef PICOMITE
-        if (slice10 || Option.AUDIO_SLICE == 10 || BacklightSlice == 10 || CameraSlice == 10 || KeyboardlightSlice == 10)
-        {
-#else
-        if (slice10 || Option.AUDIO_SLICE == 10 || BacklightSlice == 10 || CameraSlice == 10)
-        {
-#endif
-            enabled |= 1024;
-#ifdef PICOMITE
-            if (!(Option.AUDIO_SLICE == 10 || BacklightSlice == 10 || CameraSlice == 10 || KeyboardlightSlice == 10 || count10 < 0.0))
-            {
-#else
-            if (!(Option.AUDIO_SLICE == 10 || BacklightSlice == 10 || CameraSlice == 10 || count10 < 0.0))
-            {
-#endif
-                pwm_set_enabled(10, false);
-                count10 = (MMFLOAT)pwm_hw->slice[10].top * (100.0 - count10) / 100.0;
-                pwm_set_counter(10, count10);
-            }
-        }
-#ifdef PICOMITE
-        if (slice11 || Option.AUDIO_SLICE == 11 || BacklightSlice == 11 || CameraSlice == 11 || KeyboardlightSlice == 11)
-        {
-#else
-        if (slice11 || Option.AUDIO_SLICE == 11 || BacklightSlice == 11 || CameraSlice == 11)
-        {
-#endif
-            enabled |= 2048;
-#ifdef PICOMITE
-            if (!(Option.AUDIO_SLICE == 11 || BacklightSlice == 11 || CameraSlice == 11 || KeyboardlightSlice == 11 || count11 < 0.0))
-            {
-#else
-            if (!(Option.AUDIO_SLICE == 11 || BacklightSlice == 11 || CameraSlice == 11 || count11 < 0.0))
-            {
-#endif
-                pwm_set_enabled(11, false);
-                count11 = (MMFLOAT)pwm_hw->slice[11].top * (100.0 - count11) / 100.0;
-                pwm_set_counter(11, count11);
-            }
-        }
-#endif
+
         pwm_hw->en = enabled;
         return;
     }
@@ -3431,33 +3121,10 @@ void MIPS16 cmd_pwm(void)
 #endif
     if ((tp = checkstring(argv[2], (unsigned char *)"OFF")))
     {
+        uint8_t *slice_flag = pwm_slice_flag_ptr(slice);
         PWMoff(slice);
-        if (slice == 0)
-            slice0 = 0;
-        if (slice == 1)
-            slice1 = 0;
-        if (slice == 2)
-            slice2 = 0;
-        if (slice == 3)
-            slice3 = 0;
-        if (slice == 4)
-            slice4 = 0;
-        if (slice == 5)
-            slice5 = 0;
-        if (slice == 6)
-            slice6 = 0;
-        if (slice == 7)
-            slice7 = 0;
-#ifdef rp2350
-        if (slice == 8)
-            slice8 = 0;
-        if (slice == 9)
-            slice9 = 0;
-        if (slice == 10)
-            slice10 = 0;
-        if (slice == 11)
-            slice11 = 0;
-#endif
+        if (slice_flag != NULL)
+            *slice_flag = 0;
         return;
     }
     if (!(argc >= 5))
@@ -4339,7 +4006,7 @@ error_exit:
 }
 /*  @endcond */
 
-void cmd_DHT22(void)
+void MIPS16 cmd_DHT22(void)
 {
     int pin;
     union colourmap
@@ -5334,7 +5001,7 @@ void cmd_bitstream(void)
     }
 }
 /*  @endcond */
-void cmd_device(void)
+void MIPS16 cmd_device(void)
 {
     unsigned char *tp;
     tp = checkstring(cmdline, (unsigned char *)"WS2812");
@@ -5975,6 +5642,7 @@ void MIPS16 ClearExternalIO(void)
         CallBackEnabled &= (~16);
     }
     CallBackEnabled &= (~32);
+    oneshot_disable();
     for (i = 0; i < MAXBLITBUF; i++)
     {
         if (spritebuff[i] != NULL)
@@ -6455,5 +6123,46 @@ void __not_in_flash_func(gpio_callback)(uint gpio, uint32_t events)
         TM_EXTI_Handler_3();
     if (gpio == PinDef[Option.INT4pin].GPno)
         TM_EXTI_Handler_4();
+    if (oneshot_active && oneshot_trigger_pin > 0 && gpio == PinDef[oneshot_trigger_pin].GPno)
+    {
+        uint32_t expected = oneshot_trigger_rising ? GPIO_IRQ_EDGE_RISE : GPIO_IRQ_EDGE_FALL;
+        if (events & expected)
+        {
+            if (oneshot_state == ONESHOT_STATE_IDLE)
+            {
+                if (oneshot_prepulse_us <= 0)
+                {
+                    PinSetBit(oneshot_output_pin, LATINV);
+                    if (oneshot_pulse_us <= 0)
+                        PinSetBit(oneshot_output_pin, LATINV);
+                    else
+                    {
+                        oneshot_state = ONESHOT_STATE_PULSE;
+                        oneshot_alarm_id = add_alarm_in_us(oneshot_pulse_us, oneshot_alarm_handler, NULL, true);
+                        if (oneshot_alarm_id < 0)
+                        {
+                            PinSetBit(oneshot_output_pin, LATINV);
+                            oneshot_state = ONESHOT_STATE_IDLE;
+                            oneshot_alarm_id = -1;
+                        }
+                    }
+                }
+                else
+                {
+                    oneshot_state = ONESHOT_STATE_PREDELAY;
+                    oneshot_alarm_id = add_alarm_in_us(oneshot_prepulse_us, oneshot_alarm_handler, NULL, true);
+                    if (oneshot_alarm_id < 0)
+                    {
+                        oneshot_state = ONESHOT_STATE_IDLE;
+                        oneshot_alarm_id = -1;
+                    }
+                }
+            }
+            else
+            {
+                oneshot_ignored_triggers++;
+            }
+        }
+    }
 }
 /*  @endcond */
