@@ -73,6 +73,7 @@ void ReadLine(int x1, int y1, int x2, int y2, char *buff);
 void cmd_RestoreTriangle(unsigned char *p);
 void polygon(unsigned char *p, int close);
 void DrawCircleRingLineByLine(int x, int y, int r1, int r2, int c, MMFLOAT aspect, MMFLOAT aspect2);
+
 typedef struct _BMPDECODER
 {
     LONG lWidth;
@@ -4547,17 +4548,13 @@ void cmd_blitmemory(void)
         }
     }
 }
-/*
- * @cond
- * The following section will be excluded from the documentation.
- */
-
 int blitother(void)
 {
     int x1, y1, x2, y2, w, h;
     unsigned char *p;
     if ((p = checkstring(cmdline, (unsigned char *)"COMPRESSED")))
     {
+
         int8_t blank = -1;
         getcsargs(&p, 7);
         if (argc < 5)
@@ -8986,7 +8983,180 @@ void cmd_blit(void)
         return;
     }
 #endif
-    if ((p = checkstring(cmdline, (unsigned char *)"READ")))
+    if ((p = checkstring(cmdline, (unsigned char *)"RESIZE")))
+    {
+        uint8_t *s = NULL, *d = NULL;
+        int src_is_n = 0, dst_is_n = 0;
+        int sx, sy, sw, sh, dx, dy, dw, dh;
+        int start_x, start_y, end_x, end_y;
+
+        getcsargs(&p, 19);
+        if (argc != 19)
+            SyntaxError();
+
+        if (checkstring(argv[0], (unsigned char *)"L"))
+            s = (uint8_t *)LayerBuf;
+        else if (checkstring(argv[0], (unsigned char *)"F"))
+            s = (uint8_t *)FrameBuf;
+#ifdef PICOMITEVGA
+        else if (checkstring(argv[0], (unsigned char *)"2"))
+            s = (uint8_t *)SecondFrame;
+#endif
+#ifdef PICOMITEVGA
+        else if (checkstring(argv[0], (unsigned char *)"N"))
+        {
+            s = (uint8_t *)DisplayBuf;
+            src_is_n = 1;
+        }
+#ifdef rp2350
+        else if (checkstring(argv[0], (unsigned char *)"T"))
+            s = (uint8_t *)SecondLayer;
+#endif
+#else
+        else if (checkstring(argv[0], (unsigned char *)"N"))
+            StandardError(1);
+#endif
+        else
+            SyntaxError();
+
+        if (checkstring(argv[2], (unsigned char *)"L"))
+            d = (uint8_t *)LayerBuf;
+        else if (checkstring(argv[2], (unsigned char *)"F"))
+            d = (uint8_t *)FrameBuf;
+#ifdef PICOMITEVGA
+        else if (checkstring(argv[2], (unsigned char *)"2"))
+            d = (uint8_t *)SecondFrame;
+#endif
+#ifdef PICOMITEVGA
+        else if (checkstring(argv[2], (unsigned char *)"N"))
+        {
+            d = (uint8_t *)DisplayBuf;
+            dst_is_n = 1;
+        }
+#ifdef rp2350
+        else if (checkstring(argv[2], (unsigned char *)"T"))
+            d = (uint8_t *)SecondLayer;
+#endif
+#else
+        else if (checkstring(argv[2], (unsigned char *)"N"))
+            StandardError(1);
+#endif
+        else
+            SyntaxError();
+
+        if ((src_is_n || dst_is_n) && !(DISPLAY_TYPE == SCREENMODE2 || DISPLAY_TYPE == SCREENMODE3))
+            error("N buffer requires RGB121 mode (MODE 2/3)");
+
+        if (s == NULL)
+            error("Source buffer not created");
+        if (d == NULL)
+            error("Destination buffer not created");
+
+        sx = getinteger(argv[4]);
+        sy = getinteger(argv[6]);
+        sw = getinteger(argv[8]);
+        sh = getinteger(argv[10]);
+        dx = getinteger(argv[12]);
+        dy = getinteger(argv[14]);
+        dw = getinteger(argv[16]);
+        dh = getinteger(argv[18]);
+
+        if (sw < 1 || sh < 1 || dw < 1 || dh < 1)
+            return;
+
+        if (sx < 0 || sy < 0 || sx + sw > HRes || sy + sh > VRes)
+            StandardError(21);
+
+        start_x = dx < 0 ? 0 : dx;
+        start_y = dy < 0 ? 0 : dy;
+        end_x = dx + dw;
+        end_y = dy + dh;
+        if (end_x > HRes)
+            end_x = HRes;
+        if (end_y > VRes)
+            end_y = VRes;
+        if (start_x >= end_x || start_y >= end_y)
+            return;
+
+        {
+            int src_stride = (sw + 1) >> 1;
+            int dst_stride = HRes >> 1;
+            uint8_t *src_copy = NULL;
+            int overlap = 0;
+
+            if (s == d)
+            {
+                if (start_x < sx + sw && end_x > sx && start_y < sy + sh && end_y > sy)
+                    overlap = 1;
+            }
+
+            if (overlap)
+            {
+                src_copy = (uint8_t *)GetMemory(src_stride * sh);
+                for (int y = 0; y < sh; y++)
+                {
+                    for (int x = 0; x < sw; x++)
+                    {
+                        uint8_t src_byte = s[(sy + y) * dst_stride + ((sx + x) >> 1)];
+                        uint8_t pix = ((sx + x) & 1) ? ((src_byte >> 4) & 0x0F) : (src_byte & 0x0F);
+                        uint8_t *dstp = &src_copy[y * src_stride + (x >> 1)];
+                        if (x & 1)
+                            *dstp = (*dstp & 0x0F) | (pix << 4);
+                        else
+                            *dstp = (*dstp & 0xF0) | (pix & 0x0F);
+                    }
+                }
+            }
+
+            int64_t y_step = ((int64_t)sh << 16) / dh;
+            int64_t y_fp = (((int64_t)(start_y - dy) * sh) << 16) / dh;
+
+            for (int y = start_y; y < end_y; y++, y_fp += y_step)
+            {
+                int src_y = (int)(y_fp >> 16);
+                if (src_y < 0)
+                    src_y = 0;
+                else if (src_y >= sh)
+                    src_y = sh - 1;
+
+                int64_t x_step = ((int64_t)sw << 16) / dw;
+                int64_t x_fp = (((int64_t)(start_x - dx) * sw) << 16) / dw;
+
+                for (int x = start_x; x < end_x; x++, x_fp += x_step)
+                {
+                    int src_x = (int)(x_fp >> 16);
+                    if (src_x < 0)
+                        src_x = 0;
+                    else if (src_x >= sw)
+                        src_x = sw - 1;
+
+                    uint8_t src_byte;
+                    uint8_t pix;
+                    if (src_copy)
+                    {
+                        src_byte = src_copy[src_y * src_stride + (src_x >> 1)];
+                        pix = (src_x & 1) ? ((src_byte >> 4) & 0x0F) : (src_byte & 0x0F);
+                    }
+                    else
+                    {
+                        int abs_src_x = sx + src_x;
+                        int abs_src_y = sy + src_y;
+                        src_byte = s[abs_src_y * dst_stride + (abs_src_x >> 1)];
+                        pix = (abs_src_x & 1) ? ((src_byte >> 4) & 0x0F) : (src_byte & 0x0F);
+                    }
+                    uint8_t *dstp = &d[y * dst_stride + (x >> 1)];
+                    if (x & 1)
+                        *dstp = (*dstp & 0x0F) | (pix << 4);
+                    else
+                        *dstp = (*dstp & 0xF0) | (pix & 0x0F);
+                }
+            }
+
+            if (src_copy)
+                FreeMemory(src_copy);
+        }
+    }
+    else if ((p = checkstring(cmdline, (unsigned char *)"READ")))
     {
         getcsargs(&p, 9);
         if ((void *)ReadBuffer == (void *)DisplayNotSet)

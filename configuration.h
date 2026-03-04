@@ -200,7 +200,7 @@ extern "C"
 #define MAXLOCALVARS 240
 #define MAXVARS (MAXGLOBALVARS + MAXLOCALVARS)
 #define HEAP_MEMORY_SIZE (88 * 1024)
-#define FLASH_TARGET_OFFSET (1088 * 1024)
+#define FLASH_TARGET_OFFSET (1104 * 1024)
 #endif
 
 #include "lwipopts_examples_common.h"

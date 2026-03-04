@@ -6466,7 +6466,9 @@ void ResetOptions(bool startup)
 #ifdef rp2350
     if (!rp2350a)
     {
+#if !defined(PICOMITEWEB)
         Option.NoHeartbeat = 1;
+#endif
         Option.AllPins = 1;
     }
 #endif
