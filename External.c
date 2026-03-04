@@ -143,6 +143,7 @@ unsigned char *IrInterrupt;
 #define ONESHOT_STATE_IDLE 0
 #define ONESHOT_STATE_PREDELAY 1
 #define ONESHOT_STATE_PULSE 2
+#define ONESHOT_STATE_QUIESCENT 3
 
 volatile int oneshot_active = 0;
 volatile int oneshot_state = ONESHOT_STATE_IDLE;
@@ -151,6 +152,7 @@ volatile int oneshot_output_pin = 0;
 volatile int oneshot_trigger_rising = 1;
 volatile int oneshot_prepulse_us = 0;
 volatile int oneshot_pulse_us = 0;
+volatile int oneshot_quiescent_us = 0;
 volatile int oneshot_output_idle_level = 0;
 volatile uint64_t oneshot_ignored_triggers = 0;
 volatile alarm_id_t oneshot_alarm_id = -1;
@@ -250,6 +252,7 @@ void MIPS16 oneshot_disable(void)
     oneshot_trigger_rising = 1;
     oneshot_prepulse_us = 0;
     oneshot_pulse_us = 0;
+    oneshot_quiescent_us = 0;
     oneshot_output_idle_level = 0;
     oneshot_ignored_triggers = 0;
     mT4IntEnable(1);
@@ -289,8 +292,21 @@ int64_t __not_in_flash_func(oneshot_alarm_handler)(alarm_id_t id, void *user_dat
         if (oneshot_pulse_us <= 0)
         {
             PinSetBit(oneshot_output_pin, LATINV);
-            oneshot_state = ONESHOT_STATE_IDLE;
-            oneshot_alarm_id = -1;
+            if (oneshot_quiescent_us > 0)
+            {
+                oneshot_state = ONESHOT_STATE_QUIESCENT;
+                oneshot_alarm_id = add_alarm_in_us(oneshot_quiescent_us, oneshot_alarm_handler, NULL, true);
+                if (oneshot_alarm_id < 0)
+                {
+                    oneshot_state = ONESHOT_STATE_IDLE;
+                    oneshot_alarm_id = -1;
+                }
+            }
+            else
+            {
+                oneshot_state = ONESHOT_STATE_IDLE;
+                oneshot_alarm_id = -1;
+            }
             return 0;
         }
         oneshot_state = ONESHOT_STATE_PULSE;
@@ -307,6 +323,26 @@ int64_t __not_in_flash_func(oneshot_alarm_handler)(alarm_id_t id, void *user_dat
     if (oneshot_state == ONESHOT_STATE_PULSE)
     {
         PinSetBit(oneshot_output_pin, LATINV);
+        if (oneshot_quiescent_us > 0)
+        {
+            oneshot_state = ONESHOT_STATE_QUIESCENT;
+            oneshot_alarm_id = add_alarm_in_us(oneshot_quiescent_us, oneshot_alarm_handler, NULL, true);
+            if (oneshot_alarm_id < 0)
+            {
+                oneshot_state = ONESHOT_STATE_IDLE;
+                oneshot_alarm_id = -1;
+            }
+        }
+        else
+        {
+            oneshot_state = ONESHOT_STATE_IDLE;
+            oneshot_alarm_id = -1;
+        }
+        return 0;
+    }
+
+    if (oneshot_state == ONESHOT_STATE_QUIESCENT)
+    {
         oneshot_state = ONESHOT_STATE_IDLE;
         oneshot_alarm_id = -1;
     }
@@ -2429,8 +2465,8 @@ void MIPS16 cmd_oneshot(void)
         return;
     }
 
-    getcsargs(&cmdline, 9);
-    if (argc != 9)
+    getcsargs(&cmdline, 11);
+    if (!(argc == 9 || argc == 11))
         SyntaxError();
 
     trigger_pin = getpinarg(argv[0]);
@@ -2438,9 +2474,9 @@ void MIPS16 cmd_oneshot(void)
     if (trigger_pin == output_pin)
         error("Pins must be different");
 
-    if (checkstring(argv[2], (unsigned char *)"POSITIVE") || checkstring(argv[2], (unsigned char *)"POS") || checkstring(argv[2], (unsigned char *)"RISING"))
+    if (checkstring(argv[2], (unsigned char *)"POSITIVE") || checkstring(argv[2], (unsigned char *)"RISING"))
         trigger_rising = 1;
-    else if (checkstring(argv[2], (unsigned char *)"NEGATIVE") || checkstring(argv[2], (unsigned char *)"NEG") || checkstring(argv[2], (unsigned char *)"FALLING"))
+    else if (checkstring(argv[2], (unsigned char *)"NEGATIVE") || checkstring(argv[2], (unsigned char *)"FALLING"))
         trigger_rising = 0;
     else
         error("Trigger must be POSITIVE or NEGATIVE");
@@ -2474,7 +2510,8 @@ void MIPS16 cmd_oneshot(void)
     oneshot_output_pin = output_pin;
     oneshot_trigger_rising = trigger_rising;
     oneshot_prepulse_us = getint(argv[6], 0, 0x7FFFFFFF);
-    oneshot_pulse_us = getint(argv[8], 0, 0x7FFFFFFF);
+    oneshot_pulse_us = getint(argv[8], 1, 0x7FFFFFFF);
+    oneshot_quiescent_us = (argc == 11) ? getint(argv[10], 0, 0x7FFFFFFF) : 0;
     oneshot_output_idle_level = gpio_get_out_level(PinDef[output_pin].GPno) ? 1 : 0;
     oneshot_ignored_triggers = 0;
     oneshot_state = ONESHOT_STATE_IDLE;
@@ -6134,7 +6171,24 @@ void __not_in_flash_func(gpio_callback)(uint gpio, uint32_t events)
                 {
                     PinSetBit(oneshot_output_pin, LATINV);
                     if (oneshot_pulse_us <= 0)
+                    {
                         PinSetBit(oneshot_output_pin, LATINV);
+                        if (oneshot_quiescent_us > 0)
+                        {
+                            oneshot_state = ONESHOT_STATE_QUIESCENT;
+                            oneshot_alarm_id = add_alarm_in_us(oneshot_quiescent_us, oneshot_alarm_handler, NULL, true);
+                            if (oneshot_alarm_id < 0)
+                            {
+                                oneshot_state = ONESHOT_STATE_IDLE;
+                                oneshot_alarm_id = -1;
+                            }
+                        }
+                        else
+                        {
+                            oneshot_state = ONESHOT_STATE_IDLE;
+                            oneshot_alarm_id = -1;
+                        }
+                    }
                     else
                     {
                         oneshot_state = ONESHOT_STATE_PULSE;

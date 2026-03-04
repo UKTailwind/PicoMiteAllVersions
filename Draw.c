@@ -4699,6 +4699,31 @@ int blitother(void)
 #ifndef PICOMITEVGA
         else if (s != NULL)
         { // writing to a physical LCD display
+#if PICOMITERP2350
+            if (Option.DISPLAY_TYPE >= NEXTGEN)
+            {
+                if (w < 1 || h < 1)
+                    return 1;
+                for (int sy = y1, dy = y2; sy < y1 + h; sy++, dy++)
+                {
+                    if (sy < 0 || sy >= VRes)
+                        continue;
+                    uint8_t *src_row = (uint8_t *)s + sy * (HRes >> 1);
+                    for (int sx = x1, dx = x2; sx < x1 + w; sx++, dx++)
+                    {
+                        uint8_t pix;
+                        if (sx < 0 || sx >= HRes)
+                            continue;
+                        pix = src_row[sx >> 1];
+                        pix = (sx & 1) ? ((pix >> 4) & 0x0F) : (pix & 0x0F);
+                        if (blank != -1 && pix == (uint8_t)blank)
+                            continue;
+                        DrawPixelMEM332(dx, dy, RGB121map[pix]);
+                    }
+                }
+                return 1;
+            }
+#endif
             if (x1 == 0 && x2 == 0 && w == HRes && blank == -1)
             {
                 s += y1 * HRes / 2;
@@ -4782,6 +4807,55 @@ int blitother(void)
         }
         else if (d != NULL)
         { // reading from a physical LCD display
+#if PICOMITERP2350
+            if (Option.DISPLAY_TYPE >= NEXTGEN)
+            {
+                union colourmap
+                {
+                    char rgbbytes[4];
+                    unsigned int rgb;
+                } cb;
+                unsigned char *screen = (unsigned char *)(ScreenBuffer);
+                if (w < 1 || h < 1)
+                    return 1;
+                for (int sy = y1, dy = y2; sy < y1 + h; sy++, dy++)
+                {
+                    if (sy < 0 || sy >= VRes)
+                        continue;
+                    int scroll_y = sy + ScrollStart;
+                    if (scroll_y >= VRes)
+                        scroll_y -= VRes;
+                    unsigned char *src_row = screen + scroll_y * HRes;
+                    for (int sx = x1, dx = x2; sx < x1 + w; sx++, dx++)
+                    {
+                        if (sx < 0 || sx >= HRes)
+                            continue;
+                        if (dx < 0 || dx >= HRes || dy < 0 || dy >= VRes)
+                            continue;
+                        uint8_t p332 = src_row[sx];
+                        cb.rgbbytes[0] = ((p332 & 0x03) << 6);
+                        cb.rgbbytes[1] = ((p332 & 0x1C) << 3);
+                        cb.rgbbytes[2] = (p332 & 0xE0);
+                        cb.rgbbytes[3] = 0;
+                        uint8_t fcolour = (uint8_t)RGB121(cb.rgb);
+                        if (blank != -1 && fcolour == (uint8_t)blank)
+                            continue;
+                        volatile unsigned char *to = d + dy * (HRes >> 1) + (dx >> 1);
+                        if (dx & 1)
+                        {
+                            *to &= 0x0F;
+                            *to |= (fcolour << 4);
+                        }
+                        else
+                        {
+                            *to &= 0xF0;
+                            *to |= fcolour;
+                        }
+                    }
+                }
+                return 1;
+            }
+#endif
             union colourmap
             {
                 char rgbbytes[4];
@@ -13391,7 +13465,7 @@ void cmd_framebuffer(void)
                 if (SecondLayer >= (uint8_t *)PSRAMbase && SecondLayer < (uint8_t *)(PSRAMbase + 1024 * 1024 * 16))
                 {
                     FreeMemory((void *)SecondLayer);
-                    error("Second Layer must be in tightly coupled RAM, declare before other variables");
+                    error("Second Layer must be in tightly coupled RAM");
                 }
                 colour = transparents | (transparents << 4);
                 break;
@@ -13404,7 +13478,7 @@ void cmd_framebuffer(void)
                 if (SecondLayer >= (uint8_t *)PSRAMbase && SecondLayer < (uint8_t *)(PSRAMbase + 1024 * 1024 * 16))
                 {
                     FreeMemory((void *)SecondLayer);
-                    error("Second Layer must be in tightly coupled RAM, declare before other variables");
+                    error("Second Layer must be in tightly coupled RAM");
                 }
                 if (argc == 1)
                     transparents = getint(argv[0], 0, 255);
@@ -13471,7 +13545,7 @@ void cmd_framebuffer(void)
             if (LayerBuf > (uint8_t *)PSRAMbase && LayerBuf < (uint8_t *)(PSRAMbase + 1024 * 1024 * 16))
             {
                 FreeMemory((void *)LayerBuf);
-                error("Layer Buffer must be in tightly coupled RAM, declare before other variables");
+                error("Layer Buffer must be in tightly coupled RAM");
             }
 #endif
         }
