@@ -1575,8 +1575,9 @@ void cmd_star(void)
 }
 void cmd_locate(void)
 {
-  getcsargs(&cmdline, 6);
-  if (!(argc == 5 || argc == 6))
+  MMFLOAT *sidereal = NULL;
+  getcsargs(&cmdline, 7);
+  if (!(argc == 5 || argc == 7))
     SyntaxError();
   unsigned char *arg = getCstring(argv[0]);
   MMFLOAT lat = getnumber(argv[2]);
@@ -1585,6 +1586,12 @@ void cmd_locate(void)
   MMFLOAT lon = getnumber(argv[4]);
   if (lon < -180.0 || lon > 180.0)
     error("Invalid longitude");
+  if (argc == 7)
+  {
+    sidereal = findvar(argv[6], V_FIND);
+    if (!(g_vartbl[g_VarIndex].type & T_NBR))
+      StandardError(6);
+  }
   {
     getargs(&arg, 11, (unsigned char *)"-/ :"); // this is a macro and must be the first executable stmt in a block
     if (!(argc == 11))
@@ -1617,14 +1624,9 @@ void cmd_locate(void)
     locatelatitude = lat;
     locatelongitude = lon;
     locatevalid = 1;
-    // If a 6th argument is provided, calculate and set the sidereal time
-    if (argc == 6)
-    {
-      MMFLOAT *sidereal = findvar(argv[5], V_FIND);
-      if (!(g_vartbl[g_VarIndex].type & T_NBR))
-        StandardError(6);
+    // If a 4th argument is provided, calculate and set the sidereal time
+    if (sidereal)
       *sidereal = getSiderealTime(d, m, y, h, min, s, lon);
-    }
   }
 }
 #endif

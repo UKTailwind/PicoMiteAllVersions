@@ -8988,10 +8988,11 @@ void cmd_blit(void)
         uint8_t *s = NULL, *d = NULL;
         int src_is_n = 0, dst_is_n = 0;
         int sx, sy, sw, sh, dx, dy, dw, dh;
+        int transparent = -1;
         int start_x, start_y, end_x, end_y;
 
-        getcsargs(&p, 19);
-        if (argc != 19)
+        getcsargs(&p, 21);
+        if (!(argc == 19 || argc == 21))
             SyntaxError();
 
         if (checkstring(argv[0], (unsigned char *)"L"))
@@ -9060,6 +9061,8 @@ void cmd_blit(void)
         dy = getinteger(argv[14]);
         dw = getinteger(argv[16]);
         dh = getinteger(argv[18]);
+        if (argc == 21)
+            transparent = getint(argv[20], -1, 15);
 
         if (sw < 1 || sh < 1 || dw < 1 || dh < 1)
             return;
@@ -9144,6 +9147,8 @@ void cmd_blit(void)
                         src_byte = s[abs_src_y * dst_stride + (abs_src_x >> 1)];
                         pix = (abs_src_x & 1) ? ((src_byte >> 4) & 0x0F) : (src_byte & 0x0F);
                     }
+                    if (transparent >= 0 && pix == transparent)
+                        continue;
                     uint8_t *dstp = &d[y * dst_stride + (x >> 1)];
                     if (x & 1)
                         *dstp = (*dstp & 0x0F) | (pix << 4);
