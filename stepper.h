@@ -108,7 +108,7 @@ STEPPER RESET
 Reset all axis configurations to defaults.
 Note: This does not stop the 100kHz timer; use STEPPER CLOSE for shutdown.
 
-STEPPER GCODE G0|G1|G2|G3|G28|G61|G64|G90|G91|G92|M03|M05 [,X x] [,Y y] [,Z z] [,F feedrate] [,I i] [,J j] [,K k] [,R r]
+STEPPER GCODE G0|G1|G2|G3|G4|G28|G61|G64|G90|G91|G92|M03|M05 [,X x] [,Y y] [,Z z] [,F feedrate] [,I i] [,J j] [,K k] [,R r] [,P ms]
 Queue a G-code command into the circular buffer.
 G28: Home specified axes (requires min limit switches configured).
      Homes in negative direction at 50% then 5% of max speed.
@@ -118,8 +118,9 @@ G92: Set workspace coordinate offsets (without moving machine).
      G92 X10 means "current position is now X=10 in workspace coordinates".
      Allows setting work coordinate system independent of machine zero.
      Example: STEPPER GCODE G92, X, 0, Y, 0 (set current position as workspace origin)
-M03: Spindle on (requires STEPPER SPINDLE configured). Immediate (not buffered).
-M05: Spindle off (requires STEPPER SPINDLE configured). Immediate (not buffered).
+M03: Spindle on (requires STEPPER SPINDLE configured). Buffered and executed in-order.
+M05: Spindle off (requires STEPPER SPINDLE configured). Buffered and executed in-order.
+G4: Dwell for P milliseconds (buffered and executed in-order).
 G61 selects exact stop mode (no corner blending between moves).
 G64 selects continuous mode (corner blending enabled for consecutive linear/rapid moves).
 G90 selects absolute mode and G91 selects incremental mode (no motion).
@@ -165,6 +166,13 @@ void stepper_abort_to_safe_state_on_error(void);
 // Fully shuts down the stepper subsystem (like STEPPER CLOSE).
 // Safe to call even if STEPPER INIT has never been run (it will be a no-op).
 void stepper_close_subsystem(void);
+
+// Query helpers used by PEEK(STEPPER ...).
+// Returns false if the axis is unavailable/not configured.
+bool stepper_query_position_mm(char axis, float *pos_mm);
+
+// True when stepper execution is armed and currently processing queued work.
+int stepper_query_active(void);
 
 // Structure to hold parameters for a single stepper motor axis
 typedef struct
@@ -390,7 +398,10 @@ typedef enum
     GCODE_RAPID_MOVE = 0,  // G00 - Rapid positioning
     GCODE_LINEAR_MOVE = 1, // G01 - Linear interpolation
     GCODE_CW_ARC = 2,      // G02 - Circular interpolation clockwise
-    GCODE_CCW_ARC = 3      // G03 - Circular interpolation counterclockwise
+    GCODE_CCW_ARC = 3,     // G03 - Circular interpolation counterclockwise
+    GCODE_SPINDLE_ON = 4,  // M03 - Spindle on (buffered control block)
+    GCODE_SPINDLE_OFF = 5, // M05 - Spindle off (buffered control block)
+    GCODE_DWELL = 6        // G04 - Dwell in milliseconds (buffered control block)
 } gcode_motion_type_t;
 
 // Structure for a single G-code motion command
@@ -479,6 +490,9 @@ typedef struct
     // Status flags
     bool is_planned; // Motion planning completed
 
+    // Buffered control timing (used by G4 dwell)
+    uint32_t dwell_ticks; // ISR ticks to wait (0 = no dwell)
+
     // Bundled arc execution payload (only for G02/G03)
     uint16_t arc_segment_count;
     arc_segment_runtime_t *arc_segments; // Heap-allocated array owned by planner until ISR takes it
@@ -529,6 +543,8 @@ typedef struct
     float min_accel;
     float distance;
     float max_velocity;
+
+    uint32_t dwell_ticks;
 
     uint16_t arc_segment_count;
     arc_segment_runtime_t *arc_segments;

@@ -1903,8 +1903,8 @@ void ReadBufferSPI(int x1, int y1, int x2, int y2, unsigned char *p)
 		y2 = 0;
 	if (y2 >= VRes)
 		y2 = VRes - 1;
-	N = (x2 - x1 + 1) * (y2 - y1 + 1) * ((Option.DISPLAY_TYPE == ST7796S || Option.DISPLAY_TYPE == ST7796SP || Option.DISPLAY_TYPE == ST7365P) ? 2 : 3);
-	if (Option.DISPLAY_TYPE == ILI9341 || Option.DISPLAY_TYPE == ST7789B)
+	N = (x2 - x1 + 1) * (y2 - y1 + 1) * ((Option.DISPLAY_TYPE == ST7796S || Option.DISPLAY_TYPE == ST7796SP) ? 2 : 3);
+	if (Option.DISPLAY_TYPE == ILI9341 || Option.DISPLAY_TYPE == ST7789B || Option.DISPLAY_TYPE == ST7365P)
 		spi_write_cd(ILI9341_PIXELFORMAT, 1, 0x66); // change to RGB666 for read
 	DefineRegionSPI(x1, y1, x2, y2, 0);
 	SPISpeedSet((Option.DISPLAY_TYPE == ILI9488 || Option.DISPLAY_TYPE == ILI9488P || Option.DISPLAY_TYPE == ST7789B || Option.DISPLAY_TYPE == ILI9481IPS) ? ST7789RSpeed : SPIReadSpeed); // need to slow SPI for read on this display
@@ -1921,10 +1921,10 @@ void ReadBufferSPI(int x1, int y1, int x2, int y2, unsigned char *p)
 	ClearCS(Option.LCD_CS); // set CS high
 	SPISpeedSet(Option.DISPLAY_TYPE);
 	// revert to non enhanced SPI mode
-	if (Option.DISPLAY_TYPE == ILI9341 || Option.DISPLAY_TYPE == ST7789B)
+	if (Option.DISPLAY_TYPE == ILI9341 || Option.DISPLAY_TYPE == ST7789B || Option.DISPLAY_TYPE == ST7365P)
 		spi_write_cd(ILI9341_PIXELFORMAT, 1, 0x55); // change back to rdb565
 	r = 0;
-	if (Option.DISPLAY_TYPE == ST7796S || Option.DISPLAY_TYPE == ST7796SP || Option.DISPLAY_TYPE == ST7365P)
+	if (Option.DISPLAY_TYPE == ST7796S || Option.DISPLAY_TYPE == ST7796SP)
 	{
 		int n = (x2 - x1 + 1) * (y2 - y1 + 1) * 3;
 		while (N)
@@ -1986,14 +1986,14 @@ void ReadBufferSPISCR(int x1, int y1, int x2, int y2, unsigned char *p)
 		y2 = 0;
 	if (y2 >= VRes)
 		y2 = VRes - 1;
-	if (Option.DISPLAY_TYPE == ILI9341 || Option.DISPLAY_TYPE == ST7789B)
+	if (Option.DISPLAY_TYPE == ILI9341 || Option.DISPLAY_TYPE == ST7789B || Option.DISPLAY_TYPE == ST7365P)
 		spi_write_cd(ILI9341_PIXELFORMAT, 1, 0x66); // change to RDB666 for read
 	t = y2 - y1;									// get the distance between the top and bottom
 	y1 = (y1 + ScrollStart) % VRes;
 	y2 = y1 + t;
 	if (y2 >= VRes)
 	{
-		N = (x2 - x1 + 1) * (y2 - VRes) * ((Option.DISPLAY_TYPE == ST7796S || Option.DISPLAY_TYPE == ST7796SP || Option.DISPLAY_TYPE == ST7365P) ? 2 : 3);
+		N = (x2 - x1 + 1) * (y2 - VRes) * ((Option.DISPLAY_TYPE == ST7796S || Option.DISPLAY_TYPE == ST7796SP) ? 2 : 3);
 		DefineRegionSPI(x1, y1, x2, VRes - 1, 0);
 		SPISpeedSet((Option.DISPLAY_TYPE == ILI9488 || Option.DISPLAY_TYPE == ILI9488P || Option.DISPLAY_TYPE == ST7789B || Option.DISPLAY_TYPE == ILI9481IPS) ? ST7789RSpeed : SPIReadSpeed); // need to slow SPI for read on this display
 #if PICOMITERP2350
@@ -2009,7 +2009,7 @@ void ReadBufferSPISCR(int x1, int y1, int x2, int y2, unsigned char *p)
 		ClearCS(Option.LCD_CS); // set CS high
 		SPISpeedSet(Option.DISPLAY_TYPE);
 		p += N;
-		N = (x2 - x1 + 1) * (y2 - VRes) * ((Option.DISPLAY_TYPE == ST7796S || Option.DISPLAY_TYPE == ST7796SP || Option.DISPLAY_TYPE == ST7365P) ? 2 : 3);
+		N = (x2 - x1 + 1) * (y2 - VRes) * ((Option.DISPLAY_TYPE == ST7796S || Option.DISPLAY_TYPE == ST7796SP) ? 2 : 3);
 		DefineRegionSPI(x1, 0, x2, y2 - VRes, 0);
 		SPISpeedSet((Option.DISPLAY_TYPE == ILI9488 || Option.DISPLAY_TYPE == ILI9488P || Option.DISPLAY_TYPE == ST7789B || Option.DISPLAY_TYPE == ILI9481IPS) ? ST7789RSpeed : SPIReadSpeed); // need to slow SPI for read on this display
 #if PICOMITERP2350
@@ -2028,7 +2028,7 @@ void ReadBufferSPISCR(int x1, int y1, int x2, int y2, unsigned char *p)
 	}
 	else
 	{
-		N = (x2 - x1 + 1) * (y2 - y1 + 1) * ((Option.DISPLAY_TYPE == ST7796S || Option.DISPLAY_TYPE == ST7796SP || Option.DISPLAY_TYPE == ST7365P) ? 2 : 3);
+		N = (x2 - x1 + 1) * (y2 - y1 + 1) * ((Option.DISPLAY_TYPE == ST7796S || Option.DISPLAY_TYPE == ST7796SP) ? 2 : 3);
 		DefineRegionSPI(x1, y1, x2, y2, 0);
 		SPISpeedSet((Option.DISPLAY_TYPE == ILI9488 || Option.DISPLAY_TYPE == ILI9488P || Option.DISPLAY_TYPE == ST7789B || Option.DISPLAY_TYPE == ILI9481IPS) ? ST7789RSpeed : SPIReadSpeed); // need to slow SPI for read on this display
 #if PICOMITERP2350
@@ -2045,10 +2045,10 @@ void ReadBufferSPISCR(int x1, int y1, int x2, int y2, unsigned char *p)
 		SPISpeedSet(Option.DISPLAY_TYPE);
 		// revert to non enhanced SPI mode
 	}
-	if (Option.DISPLAY_TYPE == ILI9341 || Option.DISPLAY_TYPE == ST7789B)
+	if (Option.DISPLAY_TYPE == ILI9341 || Option.DISPLAY_TYPE == ST7789B || Option.DISPLAY_TYPE == ST7365P)
 		spi_write_cd(ILI9341_PIXELFORMAT, 1, 0x55); // change back to rdb565
 	r = 0;
-	if (Option.DISPLAY_TYPE == ST7796S || Option.DISPLAY_TYPE == ST7796SP || Option.DISPLAY_TYPE == ST7365P)
+	if (Option.DISPLAY_TYPE == ST7796S || Option.DISPLAY_TYPE == ST7796SP)
 	{
 		N = (x2 - x1 + 1) * (y2 - y1 + 1) * 2;
 		int n = (x2 - x1 + 1) * (y2 - y1 + 1) * 3;

@@ -42,6 +42,9 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 static bool axis_is_configured(stepper_axis_t *axis);
 static bool position_within_limits(stepper_axis_t *axis, float pos_mm);
 static void cmd_stepper_home_axes(int argc, unsigned char **argv);
+static volatile bool stepper_dwell_active;
+static volatile uint32_t stepper_dwell_until_tick;
+static inline uint32_t stepper_dwell_ms_to_ticks(double ms);
 
 // Cornering (junction) settings
 // Minimal implementation uses a fixed junction deviation. Future work can expose this via STEPPER command.
@@ -72,6 +75,13 @@ static inline void stepper_spindle_set(bool on)
 static inline void stepper_spindle_off(void)
 {
     stepper_spindle_set(false);
+}
+
+static inline void stepper_release_gp_pin(uint8_t gp)
+{
+    if (gp == 0xFF)
+        return;
+    ExtCfg(PINMAP[gp], EXT_NOT_CONFIG, 0);
 }
 
 // MMBasic error() does not return; ensure the spindle is made safe first.
@@ -171,6 +181,7 @@ static inline void stepper_pack_runtime_block(stepper_runtime_block_t *dst, cons
     dst->min_accel = src->min_accel;
     dst->distance = src->distance;
     dst->max_velocity = src->max_velocity;
+    dst->dwell_ticks = src->dwell_ticks;
     dst->arc_segment_count = src->arc_segment_count;
     dst->arc_segments = src->arc_segments;
 }
@@ -214,6 +225,7 @@ static inline void stepper_unpack_runtime_block(gcode_block_t *dst, const steppe
     dst->min_accel = src->min_accel;
     dst->distance = src->distance;
     dst->max_velocity = src->max_velocity;
+    dst->dwell_ticks = src->dwell_ticks;
     dst->arc_segment_count = src->arc_segment_count;
     dst->arc_segments = src->arc_segments;
 }
@@ -816,6 +828,8 @@ void gcode_buffer_init(gcode_buffer_t *buffer)
     planner_reset_position();
 
     stepper_reset_accumulator_carry();
+    stepper_dwell_active = false;
+    stepper_dwell_until_tick = 0;
 
     restore_interrupts(save);
 }
@@ -961,6 +975,22 @@ gcode_block_t create_cw_arc(float x, float y, float i, float j, float feedrate)
 #define STEPPER_START_MIN_STEP_RATE 20000  // ~20 steps/sec
 volatile bool stepper_initialized = false; // Non-static for access from External.c
 static volatile uint32_t stepper_tick_count = 0;
+static volatile bool stepper_dwell_active = false;
+static volatile uint32_t stepper_dwell_until_tick = 0;
+
+static inline uint32_t stepper_dwell_ms_to_ticks(double ms)
+{
+    if (ms <= 0.0)
+        return 0;
+
+    double ticks = (ms * (double)ISR_FREQ) / 1000.0;
+    if (ticks < 1.0)
+        ticks = 1.0;
+    if (ticks > 4294967295.0)
+        ticks = 4294967295.0;
+
+    return (uint32_t)(ticks + 0.999999);
+}
 
 // Motion arming gate: when false, the ISR will not dequeue/execute buffered motion.
 // This replaces the older TEST-mode mechanism.
@@ -1026,6 +1056,54 @@ static void stepper_recompute_axis_step_tick_limits(void)
     stepper_axis_min_step_ticks[0] = stepper_compute_axis_min_step_ticks(&stepper_system.x);
     stepper_axis_min_step_ticks[1] = stepper_compute_axis_min_step_ticks(&stepper_system.y);
     stepper_axis_min_step_ticks[2] = stepper_compute_axis_min_step_ticks(&stepper_system.z);
+}
+
+bool stepper_query_position_mm(char axis, float *pos_mm)
+{
+    if (pos_mm == NULL || !stepper_initialized)
+        return false;
+
+    bool ok = false;
+    uint32_t save = save_and_disable_interrupts();
+    switch (toupper((unsigned char)axis))
+    {
+    case 'X':
+        if (axis_is_configured(&stepper_system.x))
+        {
+            *pos_mm = get_axis_position_mm(&stepper_system.x);
+            ok = true;
+        }
+        break;
+    case 'Y':
+        if (axis_is_configured(&stepper_system.y))
+        {
+            *pos_mm = get_axis_position_mm(&stepper_system.y);
+            ok = true;
+        }
+        break;
+    case 'Z':
+        if (axis_is_configured(&stepper_system.z))
+        {
+            *pos_mm = get_axis_position_mm(&stepper_system.z);
+            ok = true;
+        }
+        break;
+    default:
+        break;
+    }
+    restore_interrupts(save);
+    return ok;
+}
+
+int stepper_query_active(void)
+{
+    uint32_t save = save_and_disable_interrupts();
+    int active = (stepper_initialized && stepper_armed &&
+                  (stepper_system.motion_active || stepper_dwell_active || gcode_buffer.count > 0))
+                     ? 1
+                     : 0;
+    restore_interrupts(save);
+    return active;
 }
 
 // Latched hardware-limit trip (set in ISR, reported in main context)
@@ -1146,6 +1224,8 @@ void stepper_recover_to_safe_state(void)
     current_move.total_steps_remaining = 0;
     current_move.steps_remaining = 0;
     stepper_reset_accumulator_carry();
+    stepper_dwell_active = false;
+    stepper_dwell_until_tick = 0;
     stepper_release_current_arc();
 
     stepper_system.motion_active = false;
@@ -1192,6 +1272,8 @@ void stepper_abort_to_safe_state_on_error(void)
     current_move.total_steps_remaining = 0;
     current_move.steps_remaining = 0;
     stepper_reset_accumulator_carry();
+    stepper_dwell_active = false;
+    stepper_dwell_until_tick = 0;
     stepper_release_current_arc();
 
     stepper_system.motion_active = false;
@@ -1224,6 +1306,24 @@ void stepper_close_subsystem(void)
     if (!stepper_initialized)
         return;
 
+    // Snapshot configured GPIOs before state is reset.
+    uint8_t x_step_pin = stepper_system.x.step_pin;
+    uint8_t x_dir_pin = stepper_system.x.dir_pin;
+    uint8_t x_enable_pin = stepper_system.x.enable_pin;
+    uint8_t y_step_pin = stepper_system.y.step_pin;
+    uint8_t y_dir_pin = stepper_system.y.dir_pin;
+    uint8_t y_enable_pin = stepper_system.y.enable_pin;
+    uint8_t z_step_pin = stepper_system.z.step_pin;
+    uint8_t z_dir_pin = stepper_system.z.dir_pin;
+    uint8_t z_enable_pin = stepper_system.z.enable_pin;
+    uint8_t spindle_pin = stepper_system.spindle_pin;
+    uint8_t x_min_limit_pin = stepper_system.x_min_limit_pin;
+    uint8_t x_max_limit_pin = stepper_system.x_max_limit_pin;
+    uint8_t y_min_limit_pin = stepper_system.y_min_limit_pin;
+    uint8_t y_max_limit_pin = stepper_system.y_max_limit_pin;
+    uint8_t z_min_limit_pin = stepper_system.z_min_limit_pin;
+    uint8_t z_max_limit_pin = stepper_system.z_max_limit_pin;
+
     // Ensure spindle is off on shutdown.
     stepper_spindle_off();
 
@@ -1244,6 +1344,8 @@ void stepper_close_subsystem(void)
     current_move.total_steps_remaining = 0;
     current_move.steps_remaining = 0;
     stepper_reset_accumulator_carry();
+    stepper_dwell_active = false;
+    stepper_dwell_until_tick = 0;
     stepper_release_current_arc();
 
     stepper_armed = false;
@@ -1255,6 +1357,24 @@ void stepper_close_subsystem(void)
     stepper_initialized = false;
 
     restore_interrupts(save);
+
+    // Release GPIO ownership back to generic input/not-configured state.
+    stepper_release_gp_pin(x_step_pin);
+    stepper_release_gp_pin(x_dir_pin);
+    stepper_release_gp_pin(x_enable_pin);
+    stepper_release_gp_pin(y_step_pin);
+    stepper_release_gp_pin(y_dir_pin);
+    stepper_release_gp_pin(y_enable_pin);
+    stepper_release_gp_pin(z_step_pin);
+    stepper_release_gp_pin(z_dir_pin);
+    stepper_release_gp_pin(z_enable_pin);
+    stepper_release_gp_pin(spindle_pin);
+    stepper_release_gp_pin(x_min_limit_pin);
+    stepper_release_gp_pin(x_max_limit_pin);
+    stepper_release_gp_pin(y_min_limit_pin);
+    stepper_release_gp_pin(y_max_limit_pin);
+    stepper_release_gp_pin(z_min_limit_pin);
+    stepper_release_gp_pin(z_max_limit_pin);
 
     // Free G-code buffer memory after IRQ is disabled.
     gcode_buffer_free(&gcode_buffer);
@@ -1430,7 +1550,6 @@ static bool plan_arc_move(float start_x, float start_y, float start_z,
     // At any point on the arc, one axis bears most of the centripetal load.
     // To be safe, limit tangential velocity so the worst-case axis acceleration
     // (which occurs when that axis is aligned with the radius) stays within limits.
-    //
     // Conservative limit: v_max = sqrt(accel * r) ensures centripetal accel alone
     // doesn't exceed axis limits. We use 70% of this to leave room for tangential accel.
     float v_curve_cap = 0.7f * sqrtf(min_accel * r_xy);
@@ -1995,6 +2114,8 @@ void __not_in_flash_func(stepper_timer_isr)(void)
             stepper_system.z_g92_offset = 0.0f;
 
             stepper_reset_accumulator_carry();
+            stepper_dwell_active = false;
+            stepper_dwell_until_tick = 0;
             stepper_release_current_arc();
 
             // Note: main code will now refuse RUN until position is re-established.
@@ -2006,10 +2127,39 @@ void __not_in_flash_func(stepper_timer_isr)(void)
     // If idle, check for new work
     if (current_move.phase == MOVE_PHASE_IDLE)
     {
+        if (stepper_dwell_active)
+        {
+            if ((int32_t)(stepper_tick_count - stepper_dwell_until_tick) < 0)
+                return;
+            stepper_dwell_active = false;
+            stepper_dwell_until_tick = 0;
+        }
+
         // Try to dequeue a new block
         stepper_runtime_block_t *block = gcode_buffer_peek(&gcode_buffer);
         if (block == NULL)
             return;
+
+        if (block->type == GCODE_DWELL)
+        {
+            uint32_t ticks = block->dwell_ticks;
+            gcode_buffer_pop(&gcode_buffer);
+            if (ticks > 0)
+            {
+                stepper_dwell_active = true;
+                stepper_dwell_until_tick = stepper_tick_count + ticks;
+            }
+            return;
+        }
+
+        // Buffered control blocks execute in-order with motion planning.
+        if (block->type == GCODE_SPINDLE_ON || block->type == GCODE_SPINDLE_OFF)
+        {
+            if (stepper_system.spindle_pin != 0xFF)
+                stepper_spindle_set(block->type == GCODE_SPINDLE_ON);
+            gcode_buffer_pop(&gcode_buffer);
+            return;
+        }
 
         // Skip unplanned blocks or blocks with no steps
         if (!block->is_planned || block->major_steps == 0)
@@ -2711,6 +2861,28 @@ static bool position_within_limits(stepper_axis_t *axis, float pos_mm)
     return (pos_steps >= axis->min_limit && pos_steps <= axis->max_limit);
 }
 
+// Helper: true if gp is currently used by any configured motion/limit signal pin.
+static bool stepper_pin_conflicts_with_machine_io(uint8_t gp)
+{
+    if (gp == 0xFF)
+        return false;
+
+    const stepper_axis_t *axes[] = {&stepper_system.x, &stepper_system.y, &stepper_system.z};
+    for (int i = 0; i < 3; i++)
+    {
+        const stepper_axis_t *a = axes[i];
+        if (a->step_pin == gp || a->dir_pin == gp || a->enable_pin == gp)
+            return true;
+    }
+
+    if (stepper_system.x_min_limit_pin == gp || stepper_system.x_max_limit_pin == gp ||
+        stepper_system.y_min_limit_pin == gp || stepper_system.y_max_limit_pin == gp ||
+        stepper_system.z_min_limit_pin == gp || stepper_system.z_max_limit_pin == gp)
+        return true;
+
+    return false;
+}
+
 // Helper function to get axis pointer from axis character
 static stepper_axis_t *get_axis_ptr(char axis_char)
 {
@@ -3312,6 +3484,8 @@ void cmd_stepper(void)
         current_move.total_steps_remaining = 0;
         current_move.steps_remaining = 0;
         stepper_reset_accumulator_carry();
+        stepper_dwell_active = false;
+        stepper_dwell_until_tick = 0;
 
         stepper_system.motion_active = false;
 
@@ -3389,10 +3563,16 @@ void cmd_stepper(void)
         CheckPin(step_pin, CP_IGNORE_INUSE);
         axis->step_pin = PinDef[step_pin].GPno;
 
+        if (stepper_system.spindle_pin != 0xFF && axis->step_pin == stepper_system.spindle_pin)
+            stepper_error("Axis step pin conflicts with spindle pin");
+
         // Get direction pin (required) - accepts physical pin or GPxx format
         int dir_pin = parse_pin(argv[4]);
         CheckPin(dir_pin, CP_IGNORE_INUSE);
         axis->dir_pin = PinDef[dir_pin].GPno;
+
+        if (stepper_system.spindle_pin != 0xFF && axis->dir_pin == stepper_system.spindle_pin)
+            stepper_error("Axis dir pin conflicts with spindle pin");
 
         // Configure step and dir pins as outputs
         gpio_init(axis->step_pin);
@@ -3415,6 +3595,8 @@ void cmd_stepper(void)
             {
                 CheckPin(enable_pin, CP_IGNORE_INUSE);
                 axis->enable_pin = PinDef[enable_pin].GPno;
+                if (stepper_system.spindle_pin != 0xFF && axis->enable_pin == stepper_system.spindle_pin)
+                    stepper_error("Axis enable pin conflicts with spindle pin");
                 gpio_init(axis->enable_pin);
                 gpio_set_dir(axis->enable_pin, GPIO_OUT);
                 gpio_put(axis->enable_pin, 1); // Typically active low, so disable by default
@@ -3640,7 +3822,11 @@ void cmd_stepper(void)
 
         CheckPin(spindle_pin, CP_IGNORE_INUSE);
 
-        stepper_system.spindle_pin = PinDef[spindle_pin].GPno;
+        uint8_t spindle_gp = PinDef[spindle_pin].GPno;
+        if (stepper_pin_conflicts_with_machine_io(spindle_gp))
+            stepper_error("Spindle pin conflicts with axis or limit pin");
+
+        stepper_system.spindle_pin = spindle_gp;
         stepper_system.spindle_invert = (argc == 3) ? (getint(argv[2], 0, 1) != 0) : false;
         stepper_system.spindle_on = false;
 
@@ -3676,6 +3862,14 @@ void cmd_stepper(void)
         stepper_system.y_min_limit_pin = PinDef[y_min_pin].GPno;
         stepper_system.z_min_limit_pin = PinDef[z_min_pin].GPno;
 
+        if (stepper_system.spindle_pin != 0xFF)
+        {
+            if (stepper_system.x_min_limit_pin == stepper_system.spindle_pin ||
+                stepper_system.y_min_limit_pin == stepper_system.spindle_pin ||
+                stepper_system.z_min_limit_pin == stepper_system.spindle_pin)
+                stepper_error("Limit pin conflicts with spindle pin");
+        }
+
         // Configure as inputs with pull-ups (active-low switches)
         gpio_init(stepper_system.x_min_limit_pin);
         gpio_set_dir(stepper_system.x_min_limit_pin, GPIO_IN);
@@ -3709,6 +3903,8 @@ void cmd_stepper(void)
             {
                 CheckPin(x_max_pin, CP_IGNORE_INUSE);
                 stepper_system.x_max_limit_pin = PinDef[x_max_pin].GPno;
+                if (stepper_system.spindle_pin != 0xFF && stepper_system.x_max_limit_pin == stepper_system.spindle_pin)
+                    stepper_error("Limit pin conflicts with spindle pin");
                 gpio_init(stepper_system.x_max_limit_pin);
                 gpio_set_dir(stepper_system.x_max_limit_pin, GPIO_IN);
                 gpio_pull_up(stepper_system.x_max_limit_pin);
@@ -3724,6 +3920,8 @@ void cmd_stepper(void)
             {
                 CheckPin(y_max_pin, CP_IGNORE_INUSE);
                 stepper_system.y_max_limit_pin = PinDef[y_max_pin].GPno;
+                if (stepper_system.spindle_pin != 0xFF && stepper_system.y_max_limit_pin == stepper_system.spindle_pin)
+                    stepper_error("Limit pin conflicts with spindle pin");
                 gpio_init(stepper_system.y_max_limit_pin);
                 gpio_set_dir(stepper_system.y_max_limit_pin, GPIO_IN);
                 gpio_pull_up(stepper_system.y_max_limit_pin);
@@ -3739,6 +3937,8 @@ void cmd_stepper(void)
             {
                 CheckPin(z_max_pin, CP_IGNORE_INUSE);
                 stepper_system.z_max_limit_pin = PinDef[z_max_pin].GPno;
+                if (stepper_system.spindle_pin != 0xFF && stepper_system.z_max_limit_pin == stepper_system.spindle_pin)
+                    stepper_error("Limit pin conflicts with spindle pin");
                 gpio_init(stepper_system.z_max_limit_pin);
                 gpio_set_dir(stepper_system.z_max_limit_pin, GPIO_IN);
                 gpio_pull_up(stepper_system.z_max_limit_pin);
@@ -3934,10 +4134,10 @@ void cmd_stepper(void)
         block.is_planned = false;
 
         // Standalone parser: scan tp directly (standard G-code word format).
-        // Supports: G0/G1/G2/G3, G28, G90/G91, G61/G64, G92, M3/M5 and words X/Y/Z/F/I/J/K/R.
+        // Supports: G0/G1/G2/G3/G4, G28, G90/G91, G61/G64, G92, M3/M5 and words X/Y/Z/F/I/J/K/R/P.
         char *s = (char *)tp;
 
-        int primary_g = -1;           // 0/1/2/3/28/92
+        int primary_g = -1;           // 0/1/2/3/4/28/92
         bool primary_is_home = false; // G28
         bool primary_is_g92 = false;  // G92
         int spindle_m = -1;           // 3/5
@@ -3946,8 +4146,9 @@ void cmd_stepper(void)
         bool word_x_has = false, word_y_has = false, word_z_has = false;
         double word_x_val = 0.0, word_y_val = 0.0, word_z_val = 0.0;
 
-        bool word_f = false, word_i = false, word_j = false, word_k = false, word_r = false;
-        double word_f_val = 0.0, word_i_val = 0.0, word_j_val = 0.0, word_k_val = 0.0, word_r_val = 0.0;
+        bool word_f = false, word_i = false, word_j = false, word_k = false, word_r = false, word_p = false;
+        bool word_p_has = false;
+        double word_f_val = 0.0, word_i_val = 0.0, word_j_val = 0.0, word_k_val = 0.0, word_r_val = 0.0, word_p_val = 0.0;
 
         while (1)
         {
@@ -3993,7 +4194,7 @@ void cmd_stepper(void)
                 }
 
                 // G-code
-                if (code == 0 || code == 1 || code == 2 || code == 3)
+                if (code == 0 || code == 1 || code == 2 || code == 3 || code == 4)
                 {
                     primary_g = (int)code;
                     primary_is_home = false;
@@ -4112,6 +4313,11 @@ void cmd_stepper(void)
                 word_r = true;
                 word_r_val = value;
                 break;
+            case 'P':
+                word_p = true;
+                word_p_has = has_value;
+                word_p_val = value;
+                break;
             default:
                 stepper_error("Unknown parameter");
             }
@@ -4120,16 +4326,47 @@ void cmd_stepper(void)
         // Spindle commands (M3/M5) are handled as standalone commands in GC mode.
         if (spindle_m >= 0)
         {
-            if (primary_g >= 0 || word_x || word_y || word_z || word_f || word_i || word_j || word_k || word_r)
+            if (primary_g >= 0 || word_x || word_y || word_z || word_f || word_i || word_j || word_k || word_r || word_p)
                 stepper_error("M-code must be alone");
             if (stepper_system.spindle_pin == 0xFF)
                 stepper_error("Spindle pin not configured (use STEPPER SPINDLE)");
-            stepper_spindle_set(spindle_m == 3);
+
+            gcode_block_t sblock = {0};
+            sblock.type = (spindle_m == 3) ? GCODE_SPINDLE_ON : GCODE_SPINDLE_OFF;
+            sblock.is_planned = false;
+
+            if (gcode_buffer_is_full(&gcode_buffer))
+                stepper_error("G-code buffer full");
+            if (!gcode_buffer_add(&gcode_buffer, &sblock))
+                stepper_error("Failed to add to buffer");
             return;
         }
 
         if (primary_g < 0)
             stepper_error("Syntax");
+
+        if (primary_g == 4)
+        {
+            if (word_x || word_y || word_z || word_f || word_i || word_j || word_k || word_r)
+                stepper_error("G4 only supports P");
+            if (!word_p || !word_p_has)
+                stepper_error("G4 requires P value");
+            if (word_p_val < 0.0)
+                stepper_error("G4 P must be >= 0");
+
+            block.type = GCODE_DWELL;
+            block.dwell_ticks = stepper_dwell_ms_to_ticks(word_p_val);
+            block.is_planned = false;
+
+            if (gcode_buffer_is_full(&gcode_buffer))
+                stepper_error("G-code buffer full");
+            if (!gcode_buffer_add(&gcode_buffer, &block))
+                stepper_error("Failed to add to buffer");
+            return;
+        }
+
+        if (word_p)
+            stepper_error("P only valid with G4");
 
         // G28 - Home specified axes
         if (primary_is_home)
@@ -4525,7 +4762,7 @@ void cmd_stepper(void)
         return;
     }
 
-    // STEPPER GCODE G0|G1|G2|G3 [, X x] [, Y y] [, Z z] [, F feedrate] [, I i] [, J j] [, R r]
+    // STEPPER GCODE G0|G1|G2|G3|G4 [, X x] [, Y y] [, Z z] [, F feedrate] [, I i] [, J j] [, K k] [, R r] [, P ms]
     // Add a G-code motion command to the circular buffer
     if ((tp = checkstring(cmdline, (unsigned char *)"GCODE")) != NULL)
     {
@@ -4546,9 +4783,9 @@ void cmd_stepper(void)
         int gcode = -1;
         int mcode = -1;
 
-        int cmd_idx = checkparam((char *)argv[0], 18,
+        int cmd_idx = checkparam((char *)argv[0], 20,
                                  "G0", "G00", "G1", "G01", "G2", "G02", "G3", "G03",
-                                 "G28", "G90", "G91", "G61", "G64",
+                                 "G4", "G04", "G28", "G90", "G91", "G61", "G64",
                                  "M3", "M03", "M5", "M05",
                                  "G92");
 
@@ -4571,29 +4808,33 @@ void cmd_stepper(void)
             gcode = 3;
             break;
         case 9:
-            gcode = 28;
-            break;
         case 10:
-            gcode = 90;
+            gcode = 4;
             break;
         case 11:
-            gcode = 91;
+            gcode = 28;
             break;
         case 12:
-            gcode = 61;
+            gcode = 90;
             break;
         case 13:
-            gcode = 64;
+            gcode = 91;
             break;
         case 14:
+            gcode = 61;
+            break;
         case 15:
-            mcode = 3;
+            gcode = 64;
             break;
         case 16:
         case 17:
-            mcode = 5;
+            mcode = 3;
             break;
         case 18:
+        case 19:
+            mcode = 5;
+            break;
+        case 20:
             gcode = 92;
             break;
         default:
@@ -4619,12 +4860,22 @@ void cmd_stepper(void)
             case 3:
                 if (stepper_system.spindle_pin == 0xFF)
                     stepper_error("Spindle pin not configured (use STEPPER SPINDLE)");
-                stepper_spindle_set(true);
+                block.type = GCODE_SPINDLE_ON;
+                block.is_planned = false;
+                if (gcode_buffer_is_full(&gcode_buffer))
+                    stepper_error("G-code buffer full");
+                if (!gcode_buffer_add(&gcode_buffer, &block))
+                    stepper_error("Failed to add to buffer");
                 return;
             case 5:
                 if (stepper_system.spindle_pin == 0xFF)
                     stepper_error("Spindle pin not configured (use STEPPER SPINDLE)");
-                stepper_spindle_set(false);
+                block.type = GCODE_SPINDLE_OFF;
+                block.is_planned = false;
+                if (gcode_buffer_is_full(&gcode_buffer))
+                    stepper_error("G-code buffer full");
+                if (!gcode_buffer_add(&gcode_buffer, &block))
+                    stepper_error("Failed to add to buffer");
                 return;
             default:
                 stepper_error("Unsupported M-code");
@@ -4649,6 +4900,9 @@ void cmd_stepper(void)
             case 3:
                 block.type = GCODE_CCW_ARC;
                 gcode_buffer.current_motion_mode = GCODE_CCW_ARC;
+                break;
+            case 4:
+                block.type = GCODE_DWELL;
                 break;
             case 28:
                 // G28 - Home specified axes (call homing function and return)
@@ -4745,7 +4999,9 @@ void cmd_stepper(void)
         block.k = 0;
         block.r = 0;
 
-        // Parse remaining parameters (X, Y, Z, F, I, J, K, R)
+        bool dwell_p_seen = false;
+
+        // Parse remaining parameters (X, Y, Z, F, I, J, K, R, P)
         // argv indices: 0=G1, 1=empty, 2=param, 3=empty, 4=value, ...
         // Use checkstring first for unquoted literals, fall back to getCstring for variables
         for (int i = 2; i < argc; i += 4)
@@ -4755,10 +5011,12 @@ void cmd_stepper(void)
 
             float value = getnumber(argv[i + 2]);
 
-            int param_idx = checkparam((char *)argv[i], 8, "X", "Y", "Z", "F", "I", "J", "K", "R");
+            int param_idx = checkparam((char *)argv[i], 9, "X", "Y", "Z", "F", "I", "J", "K", "R", "P");
             switch (param_idx)
             {
             case 1:
+                if (block.type == GCODE_DWELL)
+                    stepper_error("G4 only supports P");
                 if (!axis_is_configured(&stepper_system.x))
                     stepper_error("X axis not configured");
                 if (gcode_buffer.absolute_mode)
@@ -4768,6 +5026,8 @@ void cmd_stepper(void)
                 block.has_x = true;
                 break;
             case 2:
+                if (block.type == GCODE_DWELL)
+                    stepper_error("G4 only supports P");
                 if (!axis_is_configured(&stepper_system.y))
                     stepper_error("Y axis not configured");
                 if (gcode_buffer.absolute_mode)
@@ -4777,6 +5037,8 @@ void cmd_stepper(void)
                 block.has_y = true;
                 break;
             case 3:
+                if (block.type == GCODE_DWELL)
+                    stepper_error("G4 only supports P");
                 if (!axis_is_configured(&stepper_system.z))
                     stepper_error("Z axis not configured");
                 if (gcode_buffer.absolute_mode)
@@ -4786,27 +5048,56 @@ void cmd_stepper(void)
                 block.has_z = true;
                 break;
             case 4:
+                if (block.type == GCODE_DWELL)
+                    stepper_error("G4 only supports P");
                 // G-code feedrate is in mm/min, convert to mm/s for internal use
                 block.feedrate = value / 60.0f;
                 gcode_buffer.current_feedrate = block.feedrate;
                 gcode_buffer.feedrate_set = true;
                 break;
             case 5:
+                if (block.type == GCODE_DWELL)
+                    stepper_error("G4 only supports P");
                 block.i = value;
                 break;
             case 6:
+                if (block.type == GCODE_DWELL)
+                    stepper_error("G4 only supports P");
                 block.j = value;
                 break;
             case 7:
+                if (block.type == GCODE_DWELL)
+                    stepper_error("G4 only supports P");
                 block.k = value;
                 break;
             case 8:
+                if (block.type == GCODE_DWELL)
+                    stepper_error("G4 only supports P");
                 block.r = value;
                 block.use_radius = true;
+                break;
+            case 9:
+                if (block.type != GCODE_DWELL)
+                    stepper_error("P only valid with G4");
+                if (value < 0.0f)
+                    stepper_error("G4 P must be >= 0");
+                block.dwell_ticks = stepper_dwell_ms_to_ticks((double)value);
+                dwell_p_seen = true;
                 break;
             default:
                 stepper_error("Unknown parameter");
             }
+        }
+
+        if (block.type == GCODE_DWELL)
+        {
+            if (!dwell_p_seen)
+                stepper_error("G4 requires P value");
+            if (gcode_buffer_is_full(&gcode_buffer))
+                stepper_error("G-code buffer full");
+            if (!gcode_buffer_add(&gcode_buffer, &block))
+                stepper_error("Failed to add to buffer");
+            return;
         }
 
         // Check soft limits for target positions
