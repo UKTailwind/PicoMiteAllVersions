@@ -47,6 +47,9 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "re.h"
 #ifdef rp2350
 #include "pico/rand.h"
+#include "stepper.h"
+extern bool stepper_query_position_mm(char axis, float *pos_mm);
+extern int stepper_query_active(void);
 #endif
 #if PICOMITERP2350
 #include "pico/multicore.h"
@@ -107,10 +110,6 @@ uint32_t getProgramSize(void)
 uint32_t getFreeProgramSpace()
 {
     return PICO_FLASH_SIZE_BYTES - getProgramSize();
-}
-static inline CommandToken commandtbl_decode(const unsigned char *p)
-{
-    return ((CommandToken)(p[0] & 0x7f)) | ((CommandToken)(p[1] & 0x7f) << 7);
 }
 extern int busfault;
 // #include "pico/stdio_usb/reset_interface.h"
@@ -7887,6 +7886,14 @@ void MIPS16 fun_info(void)
             targ = T_STR;
             return;
         }
+#ifdef rp2350
+        else if (checkstring(ep, (unsigned char *)"PSRAM SIZE"))
+        {
+            iret = PSRAMsize;
+            targ = T_INT;
+            return;
+        }
+#endif
         else
             SyntaxError();
         ;
@@ -8525,6 +8532,39 @@ void fun_peek(void)
         targ = T_NBR;
         return;
     }
+
+#ifdef rp2350
+    if ((p = checkstring(argv[0], (unsigned char *)"STEPPER")))
+    {
+        if (argc != 1)
+            SyntaxError();
+
+        if (checkstring(p, (unsigned char *)"ACTIVE"))
+        {
+            iret = stepper_query_active();
+            targ = T_INT;
+            return;
+        }
+
+        float pos_mm = 0.0f;
+        char axis = 0;
+        if (checkstring(p, (unsigned char *)"X"))
+            axis = 'X';
+        else if (checkstring(p, (unsigned char *)"Y"))
+            axis = 'Y';
+        else if (checkstring(p, (unsigned char *)"Z"))
+            axis = 'Z';
+        else
+            error("Expected X, Y, Z, or ACTIVE");
+
+        if (!stepper_query_position_mm(axis, &pos_mm))
+            error("Stepper axis not configured");
+
+        fret = (MMFLOAT)pos_mm;
+        targ = T_NBR;
+        return;
+    }
+#endif
 
     if (argc != 3)
         SyntaxError();

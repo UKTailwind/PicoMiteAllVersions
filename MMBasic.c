@@ -70,10 +70,6 @@ const struct s_tokentbl tokentbl[] = {
 #undef INCLUDE_TOKEN_TABLE
 static int maxlocalvars = MAXLOCALVARS;
 static int maxglobalvars = MAXGLOBALVARS;
-static inline CommandToken commandtbl_decode(const unsigned char *p)
-{
-    return ((CommandToken)(p[0] & 0x7f)) | ((CommandToken)(p[1] & 0x7f) << 7);
-}
 // these are initialised at startup
 int CommandTableSize, TokenTableSize;
 #ifdef rp2350

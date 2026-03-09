@@ -235,6 +235,12 @@ void cmd_stepper(void);
 void cmd_bitstream(void);
 
 #ifdef rp2350
+void cmd_tilemap(void);
+void fun_tilemap(void);
+void tilemap_closeall(void);
+#endif
+
+#ifdef rp2350
 void cmd_ray(void);
 void fun_ray(void);
 void ray_close(void);
@@ -628,6 +634,9 @@ void fun_frame(void);
 	{(unsigned char *)"ReDim", T_CMD, 0, cmd_redim},
 	{(unsigned char *)"Bezier", T_CMD, 0, cmd_bezier},
 #ifdef rp2350
+	{(unsigned char *)"Tilemap", T_CMD, 0, cmd_tilemap},
+#endif
+#ifdef rp2350
 	{(unsigned char *)"Star", T_CMD, 0, cmd_star},
 	{(unsigned char *)"Astro", T_CMD, 0, cmd_star},
 	{(unsigned char *)"Location", T_CMD, 0, cmd_locate},
@@ -807,6 +816,9 @@ void fun_frame(void);
 #ifndef PICOMITEWEB
 	{(unsigned char *)"Ray(", T_FUN | T_INT | T_NBR, 0, fun_ray},
 #endif
+#endif
+#ifdef rp2350
+	{(unsigned char *)"Tilemap(", T_FUN | T_INT, 0, fun_tilemap},
 #endif
 {
 	(unsigned char *)"", 0, 0, cmd_null

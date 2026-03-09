@@ -127,11 +127,6 @@ int MMerrno;		 // the error number
 unsigned char cmdlinebuff[STRINGSIZE];
 const unsigned int CaseOption = 0xffffffff; // used to store the case of the listed output
 
-static inline CommandToken commandtbl_decode(const unsigned char *p)
-{
-	return ((CommandToken)(p[0] & 0x7f)) | ((CommandToken)(p[1] & 0x7f) << 7);
-}
-
 void __not_in_flash_func(cmd_null)(void)
 {
 	// do nothing (this is just a placeholder for commands that have no action)

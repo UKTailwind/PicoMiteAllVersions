@@ -110,5 +110,10 @@ extern void array_add(unsigned char *tp);
 extern void array_set(unsigned char *tp);
 extern int format_string(char *c, int n);
 
+static inline CommandToken commandtbl_decode(const unsigned char *p)
+{
+    return ((CommandToken)(p[0] & 0x7f)) | ((CommandToken)(p[1] & 0x7f) << 7);
+}
+
 #endif
 /*  @endcond */

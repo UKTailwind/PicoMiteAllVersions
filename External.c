@@ -153,6 +153,7 @@ volatile int oneshot_trigger_rising = 1;
 volatile int oneshot_prepulse_us = 0;
 volatile int oneshot_pulse_us = 0;
 volatile int oneshot_quiescent_us = 0;
+volatile int oneshot_retriggerable = 0;
 volatile int oneshot_output_idle_level = 0;
 volatile uint64_t oneshot_ignored_triggers = 0;
 volatile alarm_id_t oneshot_alarm_id = -1;
@@ -253,6 +254,7 @@ void MIPS16 oneshot_disable(void)
     oneshot_prepulse_us = 0;
     oneshot_pulse_us = 0;
     oneshot_quiescent_us = 0;
+    oneshot_retriggerable = 0;
     oneshot_output_idle_level = 0;
     oneshot_ignored_triggers = 0;
     mT4IntEnable(1);
@@ -2453,11 +2455,14 @@ void MIPS16 cmd_oneshot(void)
 {
     int trigger_pin, output_pin;
     int trigger_rising = 1;
+    int retriggerable = 0;
     int trigger_pull_option;
     unsigned int edges;
-    unsigned char *p;
+    unsigned char *p, *params;
 
-    if ((p = checkstring(cmdline, (unsigned char *)"DISABLE")))
+    params = cmdline;
+
+    if ((p = checkstring(params, (unsigned char *)"DISABLE")))
     {
         if (*p)
             SyntaxError();
@@ -2465,7 +2470,13 @@ void MIPS16 cmd_oneshot(void)
         return;
     }
 
-    getcsargs(&cmdline, 11);
+    if ((p = checkstring(params, (unsigned char *)"R")))
+    {
+        retriggerable = 1;
+        params = p;
+    }
+
+    getcsargs(&params, 11);
     if (!(argc == 9 || argc == 11))
         SyntaxError();
 
@@ -2512,6 +2523,7 @@ void MIPS16 cmd_oneshot(void)
     oneshot_prepulse_us = getint(argv[6], 0, 0x7FFFFFFF);
     oneshot_pulse_us = getint(argv[8], 1, 0x7FFFFFFF);
     oneshot_quiescent_us = (argc == 11) ? getint(argv[10], 0, 0x7FFFFFFF) : 0;
+    oneshot_retriggerable = retriggerable;
     oneshot_output_idle_level = gpio_get_out_level(PinDef[output_pin].GPno) ? 1 : 0;
     oneshot_ignored_triggers = 0;
     oneshot_state = ONESHOT_STATE_IDLE;
@@ -6163,10 +6175,20 @@ void __not_in_flash_func(gpio_callback)(uint gpio, uint32_t events)
     if (oneshot_active && oneshot_trigger_pin > 0 && gpio == PinDef[oneshot_trigger_pin].GPno)
     {
         uint32_t expected = oneshot_trigger_rising ? GPIO_IRQ_EDGE_RISE : GPIO_IRQ_EDGE_FALL;
+        alarm_id_t id;
         if (events & expected)
         {
-            if (oneshot_state == ONESHOT_STATE_IDLE)
+            if (oneshot_state == ONESHOT_STATE_IDLE ||
+                (oneshot_retriggerable &&
+                 (oneshot_state == ONESHOT_STATE_PREDELAY || oneshot_state == ONESHOT_STATE_QUIESCENT)))
             {
+                if (oneshot_state != ONESHOT_STATE_IDLE)
+                {
+                    id = oneshot_alarm_id;
+                    oneshot_alarm_id = -1;
+                    if (id >= 0)
+                        cancel_alarm(id);
+                }
                 if (oneshot_prepulse_us <= 0)
                 {
                     PinSetBit(oneshot_output_pin, LATINV);
@@ -6210,6 +6232,21 @@ void __not_in_flash_func(gpio_callback)(uint gpio, uint32_t events)
                         oneshot_state = ONESHOT_STATE_IDLE;
                         oneshot_alarm_id = -1;
                     }
+                }
+            }
+            else if (oneshot_retriggerable && oneshot_state == ONESHOT_STATE_PULSE)
+            {
+                id = oneshot_alarm_id;
+                oneshot_alarm_id = -1;
+                if (id >= 0)
+                    cancel_alarm(id);
+                oneshot_state = ONESHOT_STATE_PULSE;
+                oneshot_alarm_id = add_alarm_in_us(oneshot_pulse_us, oneshot_alarm_handler, NULL, true);
+                if (oneshot_alarm_id < 0)
+                {
+                    PinSetBit(oneshot_output_pin, LATINV);
+                    oneshot_state = ONESHOT_STATE_IDLE;
+                    oneshot_alarm_id = -1;
                 }
             }
             else

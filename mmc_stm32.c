@@ -251,10 +251,63 @@ int __not_in_flash_func(getsound)(int i, int mode)
 #define sendstream 32
 extern PIO pioi2s;
 extern uint8_t i2ssm;
+// Advance the swing buffer and return the next sample pair as int16_t values.
+// Returns: 0 = new sample in *pleft/*pright, 1 = end of stream, -1 = no new sample (use previous)
+static int __no_inline_not_in_flash_func(advance_swing_buffer)(int *pleft, int *pright)
+{
+	if (bcount[1] == 0 && bcount[2] == 0 && playreadcomplete == 1)
+		return 1;
+
+	if (!swingbuf)
+		return -1;
+
+	int result = -1;
+	int16_t *buf = (swingbuf == 1) ? g_buff1 : g_buff2;
+
+	if ((CurrentlyPlaying == P_WAV || CurrentlyPlaying == P_FLAC || CurrentlyPlaying == P_MP3) && mono)
+	{
+		*pleft = *pright = buf[ppos];
+		ppos++;
+		result = 0;
+	}
+	else if (ppos < bcount[swingbuf])
+	{
+		*pleft = buf[ppos];
+		*pright = buf[ppos + 1];
+		ppos += 2;
+		result = 0;
+	}
+
+	if (ppos == bcount[swingbuf])
+	{
+		int psave = ppos;
+		bcount[swingbuf] = 0;
+		ppos = 0;
+		if (swingbuf == 1)
+			swingbuf = 2;
+		else
+			swingbuf = 1;
+		if (bcount[swingbuf] == 0 && !playreadcomplete)
+		{ // nothing ready yet so flip back
+			if (swingbuf == 1)
+			{
+				swingbuf = 2;
+				nextbuf = 1;
+			}
+			else
+			{
+				swingbuf = 1;
+				nextbuf = 2;
+			}
+			bcount[swingbuf] = psave;
+			ppos = 0;
+		}
+	}
+
+	return result;
+}
 void MIPS16 __not_in_flash_func(on_pwm_wrap)(void)
 {
-	static int noisedwellleft[MAXSOUNDS] = {0}, noisedwellright[MAXSOUNDS] = {0};
-	static uint32_t noiseleft[MAXSOUNDS] = {0}, noiseright[MAXSOUNDS] = {0};
 	static int repeatcount = 1;
 	// play a tone
 #ifndef PICOMITEWEB
@@ -266,47 +319,9 @@ void MIPS16 __not_in_flash_func(on_pwm_wrap)(void)
 		if ((pioi2s->flevel & (0xf << (i2ssm * 8))) > (0x6 << (i2ssm * 8)))
 			return;
 		static int32_t left = 0, right = 0;
-		if (CurrentlyPlaying == P_TONE)
-		{
-			if (!SoundPlay)
-			{
-				StopAudio();
-				WAVcomplete = true;
-			}
-			else
-			{
-				while ((pioi2s->flevel & (0xf << (i2ssm * 8))) < (0x6 << (i2ssm * 8)))
-				{
-					SoundPlay--;
-					if (mono)
-					{
-						left = (((((SineTable[(int)PhaseAC_left] - 2000) * mapping[vol_left]))) * 512);
-						PhaseAC_left = PhaseAC_left + PhaseM_left;
-						PhaseAC_right = PhaseAC_left;
-						if (PhaseAC_left >= 4096.0)
-							PhaseAC_left -= 4096.0;
-						right = left;
-					}
-					else
-					{
-						left = (((((SineTable[(int)PhaseAC_left] - 2000) * mapping[vol_left]))) * 512);
-						right = (((((SineTable[(int)PhaseAC_right] - 2000) * mapping[vol_right]))) * 512);
-						PhaseAC_left = PhaseAC_left + PhaseM_left;
-						PhaseAC_right = PhaseAC_right + PhaseM_right;
-						if (PhaseAC_left >= 4096.0)
-							PhaseAC_left -= 4096.0;
-						if (PhaseAC_right >= 4096.0)
-							PhaseAC_right -= 4096.0;
-					}
-					pio_sm_put_blocking(pioi2s, i2ssm, left);
-					pio_sm_put_blocking(pioi2s, i2ssm, right);
-				}
-			}
-			return;
-		}
-		else if (CurrentlyPlaying == P_WAV || CurrentlyPlaying == P_FLAC || CurrentlyPlaying == P_MOD || CurrentlyPlaying == P_MP3 || CurrentlyPlaying == P_ARRAY
+		if (CurrentlyPlaying == P_WAV || CurrentlyPlaying == P_FLAC || CurrentlyPlaying == P_MOD || CurrentlyPlaying == P_MP3 || CurrentlyPlaying == P_TONE || CurrentlyPlaying == P_SOUND || CurrentlyPlaying == P_ARRAY
 #ifdef rp2350
-				 || CurrentlyPlaying == P_SAMPLE
+			|| CurrentlyPlaying == P_SAMPLE
 #endif
 		)
 		{
@@ -320,119 +335,18 @@ void MIPS16 __not_in_flash_func(on_pwm_wrap)(void)
 				else
 				{
 					repeatcount = audiorepeat;
-					if (bcount[1] == 0 && bcount[2] == 0 && playreadcomplete == 1)
-					{
+					int sl, sr;
+					int rc = advance_swing_buffer(&sl, &sr);
+					if (rc == 1)
 						pwm_set_irq_enabled(AUDIO_SLICE, false);
-					}
-					if (swingbuf)
-					{ // buffer is primed
-						if (swingbuf == 1)
-							uplaybuff = g_buff1;
-						else
-							uplaybuff = g_buff2;
-						if ((CurrentlyPlaying == P_WAV || CurrentlyPlaying == P_FLAC || CurrentlyPlaying == P_MP3) && mono)
-						{
-							left = right = (uplaybuff[ppos] << 16);
-							ppos++;
-						}
-						else
-						{
-							if (ppos < bcount[swingbuf])
-							{
-								left = uplaybuff[ppos] << 16;
-								right = uplaybuff[ppos + 1] << 16;
-								ppos += 2;
-							}
-						}
-						pio_sm_put(pioi2s, i2ssm, (uint32_t)(left));
-						pio_sm_put(pioi2s, i2ssm, (uint32_t)(right));
-						if (ppos == bcount[swingbuf])
-						{
-							int psave = ppos;
-							bcount[swingbuf] = 0;
-							ppos = 0;
-							if (swingbuf == 1)
-								swingbuf = 2;
-							else
-								swingbuf = 1;
-							if (bcount[swingbuf] == 0 && !playreadcomplete)
-							{ // nothing ready yet so flip back
-								if (swingbuf == 1)
-								{
-									swingbuf = 2;
-									nextbuf = 1;
-								}
-								else
-								{
-									swingbuf = 1;
-									nextbuf = 2;
-								}
-								bcount[swingbuf] = psave;
-								ppos = 0;
-							}
-						}
-					}
-				}
-			}
-			return;
-		}
-		else if (CurrentlyPlaying == P_SOUND)
-		{
-			while ((pioi2s->flevel & (0xf << (i2ssm * 8))) < (0x6 << (i2ssm * 8)))
-			{
-				int i, j;
-				int leftv = 0, rightv = 0;
-				for (i = 0; i < MAXSOUNDS; i++)
-				{ // first update the 8 sound pointers
-					if (sound_mode_left[i] != nulltable)
+					if (rc == 0)
 					{
-						if (sound_mode_left[i] != whitenoise)
-						{
-							sound_PhaseAC_left[i] = sound_PhaseAC_left[i] + sound_PhaseM_left[i];
-							if (sound_PhaseAC_left[i] >= 4096.0)
-								sound_PhaseAC_left[i] -= 4096.0;
-							leftv += getsound(i, 0);
-						}
-						else
-						{
-							if (noisedwellleft[i] <= 0)
-							{
-								noisedwellleft[i] = sound_PhaseM_left[i];
-								noiseleft[i] = rand() % 3800 + 100;
-							}
-							if (noisedwellleft[i])
-								noisedwellleft[i]--;
-							j = (int)noiseleft[i];
-							j = (j - 2000) * mapping[sound_v_left[i]] / 2000;
-							leftv += j;
-						}
+						left = sl << 16;
+						right = sr << 16;
 					}
-					if (sound_mode_right[i] != nulltable)
-					{
-						if (sound_mode_right[i] != whitenoise)
-						{
-							sound_PhaseAC_right[i] = sound_PhaseAC_right[i] + sound_PhaseM_right[i];
-							if (sound_PhaseAC_right[i] >= 4096.0)
-								sound_PhaseAC_right[i] -= 4096.0;
-							rightv += getsound(i, 1);
-						}
-						else
-						{
-							if (noisedwellright[i] <= 0)
-							{
-								noisedwellright[i] = sound_PhaseM_right[i];
-								noiseright[i] = rand() % 3800 + 100;
-							}
-							if (noisedwellright[i])
-								noisedwellright[i]--;
-							j = (int)noiseright[i];
-							j = (j - 2000) * mapping[sound_v_right[i]] / 2000;
-							rightv += j;
-						}
-					}
+					pio_sm_put(pioi2s, i2ssm, (uint32_t)(left));
+					pio_sm_put(pioi2s, i2ssm, (uint32_t)(right));
 				}
-				pio_sm_put_blocking(pioi2s, i2ssm, leftv * 2000 * 512);
-				pio_sm_put_blocking(pioi2s, i2ssm, rightv * 2000 * 512);
 			}
 			return;
 		}
@@ -457,16 +371,14 @@ void MIPS16 __not_in_flash_func(on_pwm_wrap)(void)
 	}
 	if (Option.AUDIO_MISO_PIN)
 	{
-		int32_t left = 0, right = 0;
 		if (!(gpio_get(PinDef[Option.AUDIO_DREQ_PIN].GPno)))
 			return;
-		if (!(CurrentlyPlaying == P_TONE || CurrentlyPlaying == P_SOUND))
 		{
 			VSbuffer = VS1053free();
 			if (VSbuffer > 1023 - (CurrentlyPlaying == P_STREAM ? sendstream : sendcount))
 				return;
 		}
-		if (CurrentlyPlaying == P_FLAC || CurrentlyPlaying == P_WAV || CurrentlyPlaying == P_MP3 || CurrentlyPlaying == P_MIDI || CurrentlyPlaying == P_ARRAY
+		if (CurrentlyPlaying == P_FLAC || CurrentlyPlaying == P_WAV || CurrentlyPlaying == P_MP3 || CurrentlyPlaying == P_MIDI || CurrentlyPlaying == P_TONE || CurrentlyPlaying == P_SOUND || CurrentlyPlaying == P_ARRAY
 #ifdef rp2350
 			|| CurrentlyPlaying == P_SAMPLE
 #endif
@@ -525,247 +437,30 @@ void MIPS16 __not_in_flash_func(on_pwm_wrap)(void)
 			}
 			*streamreadpointer = rp;
 		}
-		else if (CurrentlyPlaying == P_SOUND)
-		{
-			int i, j;
-			int leftv = 0, rightv = 0, Lcount = 0, Rcount = 0;
-			for (i = 0; i < MAXSOUNDS; i++)
-			{ // first update the 8 sound pointers
-				//					if(sound_mode_left[i]!=nulltable){
-				Lcount++;
-				if (sound_mode_left[i] != whitenoise)
-				{
-					sound_PhaseAC_left[i] = sound_PhaseAC_left[i] + sound_PhaseM_left[i];
-					if (sound_PhaseAC_left[i] >= 4096.0)
-						sound_PhaseAC_left[i] -= 4096.0;
-					leftv += getsound(i, 2);
-				}
-				else
-				{
-					if (noisedwellleft[i] <= 0)
-					{
-						noisedwellleft[i] = sound_PhaseM_left[i];
-						noiseleft[i] = rand() % 3800 + 100;
-					}
-					if (noisedwellleft[i])
-						noisedwellleft[i]--;
-					j = (int)noiseleft[i];
-					leftv += j;
-				}
-				//					}
-				//					if(sound_mode_right[i]!=nulltable){
-				Rcount++;
-				if (sound_mode_right[i] != whitenoise)
-				{
-					sound_PhaseAC_right[i] = sound_PhaseAC_right[i] + sound_PhaseM_right[i];
-					if (sound_PhaseAC_right[i] >= 4096.0)
-						sound_PhaseAC_right[i] -= 4096.0;
-					rightv += getsound(i, 3);
-				}
-				else
-				{
-					if (noisedwellright[i] <= 0)
-					{
-						noisedwellright[i] = sound_PhaseM_right[i];
-						noiseright[i] = rand() % 3800 + 100;
-					}
-					if (noisedwellright[i])
-						noisedwellright[i]--;
-					j = (int)noiseright[i];
-					rightv += j;
-				}
-			}
-			//			}
-			left = ((leftv / Lcount) - 2000) * 16;
-			right = ((rightv / Rcount) - 2000) * 16;
-			sdi_send_buffer((uint8_t *)&left, 2);
-			sdi_send_buffer((uint8_t *)&right, 2);
-		}
-		else if (CurrentlyPlaying == P_TONE)
-		{
-			if (!SoundPlay)
-			{
-				StopAudio();
-				WAVcomplete = true;
-			}
-			else
-			{
-				SoundPlay--;
-				if (mono)
-				{
-					left = ((((int)SineTable[(int)PhaseAC_left]) - 2000) * 16);
-					PhaseAC_left = PhaseAC_left + PhaseM_left;
-					if (PhaseAC_left >= 4096.0)
-						PhaseAC_left -= 4096.0;
-					right = left;
-				}
-				else
-				{
-					left = (((SineTable[(int)PhaseAC_left]) - 2000) * 16);
-					right = (((SineTable[(int)PhaseAC_right]) - 2000) * 16);
-					PhaseAC_left = PhaseAC_left + PhaseM_left;
-					PhaseAC_right = PhaseAC_right + PhaseM_right;
-					if (PhaseAC_left >= 4096.0)
-						PhaseAC_left -= 4096.0;
-					if (PhaseAC_right >= 4096.0)
-						PhaseAC_right -= 4096.0;
-				}
-				sdi_send_buffer((uint8_t *)&left, 2);
-				sdi_send_buffer((uint8_t *)&right, 2);
-			}
-		}
 	}
 	else
 	{
-		if (CurrentlyPlaying == P_TONE)
-		{
-			if (!SoundPlay)
-			{
-				StopAudio();
-				WAVcomplete = true;
-				return;
-			}
-			else
-			{
-				SoundPlay--;
-				if (mono)
-				{
-					left = (((((SineTable[(int)PhaseAC_left] - 2000) * mapping[vol_left]) / 2000) + 2000));
-					PhaseAC_left = PhaseAC_left + PhaseM_left;
-					PhaseAC_right = PhaseAC_left;
-					if (PhaseAC_left >= 4096.0)
-						PhaseAC_left -= 4096.0;
-					right = left;
-				}
-				else
-				{
-					left = (((((SineTable[(int)PhaseAC_left] - 2000) * mapping[vol_left]) / 2000) + 2000));
-					right = (((((SineTable[(int)PhaseAC_right] - 2000) * mapping[vol_right]) / 2000) + 2000));
-					PhaseAC_left = PhaseAC_left + PhaseM_left;
-					PhaseAC_right = PhaseAC_right + PhaseM_right;
-					if (PhaseAC_left >= 4096.0)
-						PhaseAC_left -= 4096.0;
-					if (PhaseAC_right >= 4096.0)
-						PhaseAC_right -= 4096.0;
-				}
-			}
-		}
-		else if (CurrentlyPlaying == P_WAV || CurrentlyPlaying == P_FLAC || CurrentlyPlaying == P_MOD || CurrentlyPlaying == P_ARRAY
+		if (CurrentlyPlaying == P_WAV || CurrentlyPlaying == P_FLAC || CurrentlyPlaying == P_TONE || CurrentlyPlaying == P_SOUND || CurrentlyPlaying == P_MOD || CurrentlyPlaying == P_ARRAY
 #ifdef rp2350
-				 || CurrentlyPlaying == P_SAMPLE
+			|| CurrentlyPlaying == P_SAMPLE
 #endif
-				 || CurrentlyPlaying == P_MP3)
+			|| CurrentlyPlaying == P_MP3)
 		{
 			if (--repeatcount)
 				return;
 			repeatcount = audiorepeat;
-			if (bcount[1] == 0 && bcount[2] == 0 && playreadcomplete == 1)
+			int sl, sr;
+			int rc = advance_swing_buffer(&sl, &sr);
+			if (rc == 1)
 			{
 				pwm_set_irq_enabled(AUDIO_SLICE, false);
 				return;
 			}
-			if (swingbuf)
-			{ // buffer is primed
-				if (swingbuf == 1)
-					playbuff = (uint16_t *)sbuff1;
-				else
-					playbuff = (uint16_t *)sbuff2;
-				if ((CurrentlyPlaying == P_WAV || CurrentlyPlaying == P_FLAC || CurrentlyPlaying == P_MP3) && mono)
-				{
-					left = right = playbuff[ppos];
-					ppos++;
-				}
-				else
-				{
-					if (ppos < bcount[swingbuf])
-					{
-						left = playbuff[ppos];
-						right = playbuff[ppos + 1];
-						ppos += 2;
-					}
-				}
-				if (ppos == bcount[swingbuf])
-				{
-					int psave = ppos;
-					bcount[swingbuf] = 0;
-					ppos = 0;
-					if (swingbuf == 1)
-						swingbuf = 2;
-					else
-						swingbuf = 1;
-					if (bcount[swingbuf] == 0 && !playreadcomplete)
-					{ // nothing ready yet so flip back
-						if (swingbuf == 1)
-						{
-							swingbuf = 2;
-							nextbuf = 1;
-						}
-						else
-						{
-							swingbuf = 1;
-							nextbuf = 2;
-						}
-						bcount[swingbuf] = psave;
-						ppos = 0;
-					}
-				}
+			if (rc == 0)
+			{
+				left = (uint16_t)sl;
+				right = (uint16_t)sr;
 			}
-		}
-		else if (CurrentlyPlaying == P_SOUND)
-		{
-			int i, j;
-			int leftv = 0, rightv = 0;
-			for (i = 0; i < MAXSOUNDS; i++)
-			{ // first update the 8 sound pointers
-				if (sound_mode_left[i] != nulltable)
-				{
-					if (sound_mode_left[i] != whitenoise)
-					{
-						sound_PhaseAC_left[i] = sound_PhaseAC_left[i] + sound_PhaseM_left[i];
-						if (sound_PhaseAC_left[i] >= 4096.0)
-							sound_PhaseAC_left[i] -= 4096.0;
-						leftv += getsound(i, 0);
-					}
-					else
-					{
-						if (noisedwellleft[i] <= 0)
-						{
-							noisedwellleft[i] = sound_PhaseM_left[i];
-							noiseleft[i] = rand() % 3800 + 100;
-						}
-						if (noisedwellleft[i])
-							noisedwellleft[i]--;
-						j = (int)noiseleft[i];
-						j = (j - 2000) * mapping[sound_v_left[i]] / 2000;
-						leftv += j;
-					}
-				}
-				if (sound_mode_right[i] != nulltable)
-				{
-					if (sound_mode_right[i] != whitenoise)
-					{
-						sound_PhaseAC_right[i] = sound_PhaseAC_right[i] + sound_PhaseM_right[i];
-						if (sound_PhaseAC_right[i] >= 4096.0)
-							sound_PhaseAC_right[i] -= 4096.0;
-						rightv += getsound(i, 1);
-					}
-					else
-					{
-						if (noisedwellright[i] <= 0)
-						{
-							noisedwellright[i] = sound_PhaseM_right[i];
-							noiseright[i] = rand() % 3800 + 100;
-						}
-						if (noisedwellright[i])
-							noisedwellright[i]--;
-						j = (int)noiseright[i];
-						j = (j - 2000) * mapping[sound_v_right[i]] / 2000;
-						rightv += j;
-					}
-				}
-			}
-			left = leftv + 2000;
-			right = rightv + 2000;
 		}
 		else if (CurrentlyPlaying <= P_STOP)
 		{

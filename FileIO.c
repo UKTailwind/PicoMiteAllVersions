@@ -4367,6 +4367,9 @@ void MIPS16 CloseAllFiles(void)
     int i;
     closeallsprites();
     closeallstobjects();
+#ifdef rp2350
+    tilemap_closeall();
+#endif
 #ifndef PICOMITEWEB
     closeall3d();
 #ifdef rp2350

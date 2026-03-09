@@ -413,6 +413,15 @@ int GetJustification(char *p, int *jh, int *jv, int *jo);
  * Function declarations - Color operations
  * ============================================================================ */
 int rgb(int r, int g, int b);
+
+/* ============================================================================
+ * Function declarations - Tilemap
+ * ============================================================================ */
+#ifdef rp2350
+void cmd_tilemap(void);
+void fun_tilemap(void);
+void tilemap_closeall(void);
+#endif
 int getColour(char *c, int minus);
 
 /* ============================================================================

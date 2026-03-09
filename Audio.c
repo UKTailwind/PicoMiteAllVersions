@@ -66,6 +66,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #else
 #define MOD_BUFFER_SIZE (WAV_BUFFER_SIZE / 4)
 #endif
+#define TONE_BUFFER_SIZE 4096 // ~23ms at 44100Hz stereo (1024 frames * 2ch * 2 bytes)
 #include "hardware/pio.h"
 #include "hardware/pio_instructions.h"
 #include "dr_flac.h"
@@ -78,6 +79,7 @@ extern const int ErrorMap[21];
 extern char *GetCWD(void);
 extern void ErrorCheck(int fnbr);
 extern const int mapping[101];
+extern int getsound(int i, int mode);
 extern PIO pioi2s;
 extern uint8_t i2ssm;
 static int arraypos = 0;
@@ -157,6 +159,8 @@ modcontext *mcontext = NULL;
 int modfilesamplerate = 22050;
 char *pbuffp;
 void audio_checks(void);
+static int fillToneBuffer(char *buf, int bufsize);
+static int fillSoundBuffer(char *buf, int bufsize);
 uint16_t *playbuff;
 int16_t *uplaybuff;
 volatile int ppos = 0; // playing position for PLAY WAV
@@ -1508,7 +1512,36 @@ void MIPS16 cmd_play(void)
 				PhaseAC_left = 0.0;
 				if (Option.AUDIO_MISO_PIN)
 					playimmediatevs1053(P_TONE);
+				FreeMemorySafe((void **)&sbuff1);
+				FreeMemorySafe((void **)&sbuff2);
+				sbuff1 = GetMemory(TONE_BUFFER_SIZE);
+				sbuff2 = GetMemory(TONE_BUFFER_SIZE);
+				ubuff1 = (uint16_t *)sbuff1;
+				ubuff2 = (uint16_t *)sbuff2;
+				g_buff1 = (int16_t *)sbuff1;
+				g_buff2 = (int16_t *)sbuff2;
 			}
+			// Prime/refill buffer 1 with tone samples
+			bcount[1] = bcount[2] = 0;
+			ppos = 0;
+			swingbuf = 1;
+			nextbuf = 2;
+			playreadcomplete = 0;
+			if (Option.AUDIO_MISO_PIN)
+			{
+				bcount[1] = fillToneBuffer(sbuff1, TONE_BUFFER_SIZE) * 2; // bytes for VS1053
+			}
+			else if (Option.audio_i2s_bclk)
+			{
+				bcount[1] = fillToneBuffer(sbuff1, TONE_BUFFER_SIZE);
+				i2sconvert(g_buff1, (int16_t *)sbuff1, bcount[1]);
+			}
+			else
+			{
+				bcount[1] = fillToneBuffer(sbuff1, TONE_BUFFER_SIZE);
+				iconvert(ubuff1, (int16_t *)sbuff1, bcount[1]);
+			}
+			wav_filesize = bcount[1];
 			CurrentlyPlaying = P_TONE;
 			pwm_set_irq0_enabled(AUDIO_SLICE, true);
 			pwm_set_enabled(AUDIO_SLICE, true);
@@ -1985,10 +2018,29 @@ void MIPS16 cmd_play(void)
 			setrate(PWM_FREQ);
 			if (Option.AUDIO_MISO_PIN)
 				playimmediatevs1053(P_SOUND);
-			pwm_set_irq0_enabled(AUDIO_SLICE, true);
-			pwm_set_enabled(AUDIO_SLICE, true);
+			FreeMemorySafe((void **)&sbuff1);
+			FreeMemorySafe((void **)&sbuff2);
+			sbuff1 = GetMemory(TONE_BUFFER_SIZE);
+			sbuff2 = GetMemory(TONE_BUFFER_SIZE);
+			ubuff1 = (uint16_t *)sbuff1;
+			ubuff2 = (uint16_t *)sbuff2;
+			g_buff1 = (int16_t *)sbuff1;
+			g_buff2 = (int16_t *)sbuff2;
 		}
+		// Prime buffer 1 with sound samples
+		bcount[1] = bcount[2] = 0;
+		ppos = 0;
+		swingbuf = 1;
+		nextbuf = 2;
+		playreadcomplete = 0;
+		if (Option.AUDIO_MISO_PIN)
+			bcount[1] = fillSoundBuffer(sbuff1, TONE_BUFFER_SIZE) * 2; // bytes for VS1053
+		else
+			bcount[1] = fillSoundBuffer(sbuff1, TONE_BUFFER_SIZE);
+		wav_filesize = bcount[1];
 		CurrentlyPlaying = P_SOUND;
+		pwm_set_irq0_enabled(AUDIO_SLICE, true);
+		pwm_set_enabled(AUDIO_SLICE, true);
 		return;
 	}
 	if ((tp = checkstring(cmdline, (unsigned char *)"WAV")))
@@ -2781,6 +2833,234 @@ void StopAudio(void)
 	}
 	SoundPlay = 0;
 }
+// Fill a swing buffer with tone samples as signed 16-bit PCM stereo pairs.
+// Returns the count of int16_t values written (always even, stereo pairs).
+static int fillToneBuffer(char *buf, int bufsize)
+{
+	int16_t *samples = (int16_t *)buf;
+	int max_samples = bufsize / (int)sizeof(int16_t);
+	int n = 0;
+
+	while (n < max_samples && SoundPlay > 0)
+	{
+		SoundPlay--;
+		int16_t l = (int16_t)((SineTable[(int)PhaseAC_left] - 2000) * 16);
+		int16_t r;
+		if (mono)
+		{
+			r = l;
+			PhaseAC_left = PhaseAC_left + PhaseM_left;
+			if (PhaseAC_left >= 4096.0)
+				PhaseAC_left -= 4096.0;
+		}
+		else
+		{
+			r = (int16_t)((SineTable[(int)PhaseAC_right] - 2000) * 16);
+			PhaseAC_left = PhaseAC_left + PhaseM_left;
+			PhaseAC_right = PhaseAC_right + PhaseM_right;
+			if (PhaseAC_left >= 4096.0)
+				PhaseAC_left -= 4096.0;
+			if (PhaseAC_right >= 4096.0)
+				PhaseAC_right -= 4096.0;
+		}
+		samples[n++] = l;
+		samples[n++] = r;
+	}
+
+	if (SoundPlay == 0)
+		playreadcomplete = 1;
+
+	return n;
+}
+// Fill a swing buffer with mixed sound samples.
+// For VS1053 (MISO): produces int16_t pairs using getsound modes 2/3, bcount is in bytes.
+// For I2S: produces int16_t pairs using getsound modes 0/1.
+// For PWM DAC: produces uint16_t pairs using getsound modes 0/1.
+// Returns the count of int16_t (or uint16_t) values written.
+static int fillSoundBuffer(char *buf, int bufsize)
+{
+	static int noisedwellleft[MAXSOUNDS] = {0}, noisedwellright[MAXSOUNDS] = {0};
+	static uint32_t noiseleft[MAXSOUNDS] = {0}, noiseright[MAXSOUNDS] = {0};
+	int max_samples = bufsize / (int)sizeof(int16_t);
+	int n = 0;
+
+	if (Option.AUDIO_MISO_PIN)
+	{
+		int16_t *samples = (int16_t *)buf;
+		while (n < max_samples)
+		{
+			int i, j;
+			int leftv = 0, rightv = 0, Lcount = 0, Rcount = 0;
+			for (i = 0; i < MAXSOUNDS; i++)
+			{
+				Lcount++;
+				if (sound_mode_left[i] != whitenoise)
+				{
+					sound_PhaseAC_left[i] = sound_PhaseAC_left[i] + sound_PhaseM_left[i];
+					if (sound_PhaseAC_left[i] >= 4096.0)
+						sound_PhaseAC_left[i] -= 4096.0;
+					leftv += getsound(i, 2);
+				}
+				else
+				{
+					if (noisedwellleft[i] <= 0)
+					{
+						noisedwellleft[i] = sound_PhaseM_left[i];
+						noiseleft[i] = rand() % 3800 + 100;
+					}
+					if (noisedwellleft[i])
+						noisedwellleft[i]--;
+					j = (int)noiseleft[i];
+					leftv += j;
+				}
+				Rcount++;
+				if (sound_mode_right[i] != whitenoise)
+				{
+					sound_PhaseAC_right[i] = sound_PhaseAC_right[i] + sound_PhaseM_right[i];
+					if (sound_PhaseAC_right[i] >= 4096.0)
+						sound_PhaseAC_right[i] -= 4096.0;
+					rightv += getsound(i, 3);
+				}
+				else
+				{
+					if (noisedwellright[i] <= 0)
+					{
+						noisedwellright[i] = sound_PhaseM_right[i];
+						noiseright[i] = rand() % 3800 + 100;
+					}
+					if (noisedwellright[i])
+						noisedwellright[i]--;
+					j = (int)noiseright[i];
+					rightv += j;
+				}
+			}
+			samples[n++] = (int16_t)(((leftv / Lcount) - 2000) * 16);
+			samples[n++] = (int16_t)(((rightv / Rcount) - 2000) * 16);
+		}
+	}
+	else if (Option.audio_i2s_bclk)
+	{
+		int16_t *samples = (int16_t *)buf;
+		while (n < max_samples)
+		{
+			int i, j;
+			int leftv = 0, rightv = 0;
+			for (i = 0; i < MAXSOUNDS; i++)
+			{
+				if (sound_mode_left[i] != nulltable)
+				{
+					if (sound_mode_left[i] != whitenoise)
+					{
+						sound_PhaseAC_left[i] = sound_PhaseAC_left[i] + sound_PhaseM_left[i];
+						if (sound_PhaseAC_left[i] >= 4096.0)
+							sound_PhaseAC_left[i] -= 4096.0;
+						leftv += getsound(i, 0);
+					}
+					else
+					{
+						if (noisedwellleft[i] <= 0)
+						{
+							noisedwellleft[i] = sound_PhaseM_left[i];
+							noiseleft[i] = rand() % 3800 + 100;
+						}
+						if (noisedwellleft[i])
+							noisedwellleft[i]--;
+						j = (int)noiseleft[i];
+						j = (j - 2000) * mapping[sound_v_left[i]] / 2000;
+						leftv += j;
+					}
+				}
+				if (sound_mode_right[i] != nulltable)
+				{
+					if (sound_mode_right[i] != whitenoise)
+					{
+						sound_PhaseAC_right[i] = sound_PhaseAC_right[i] + sound_PhaseM_right[i];
+						if (sound_PhaseAC_right[i] >= 4096.0)
+							sound_PhaseAC_right[i] -= 4096.0;
+						rightv += getsound(i, 1);
+					}
+					else
+					{
+						if (noisedwellright[i] <= 0)
+						{
+							noisedwellright[i] = sound_PhaseM_right[i];
+							noiseright[i] = rand() % 3800 + 100;
+						}
+						if (noisedwellright[i])
+							noisedwellright[i]--;
+						j = (int)noiseright[i];
+						j = (j - 2000) * mapping[sound_v_right[i]] / 2000;
+						rightv += j;
+					}
+				}
+			}
+			samples[n++] = (int16_t)(leftv * 16);
+			samples[n++] = (int16_t)(rightv * 16);
+		}
+	}
+	else
+	{
+		uint16_t *samples = (uint16_t *)buf;
+		while (n < max_samples)
+		{
+			int i, j;
+			int leftv = 0, rightv = 0;
+			for (i = 0; i < MAXSOUNDS; i++)
+			{
+				if (sound_mode_left[i] != nulltable)
+				{
+					if (sound_mode_left[i] != whitenoise)
+					{
+						sound_PhaseAC_left[i] = sound_PhaseAC_left[i] + sound_PhaseM_left[i];
+						if (sound_PhaseAC_left[i] >= 4096.0)
+							sound_PhaseAC_left[i] -= 4096.0;
+						leftv += getsound(i, 0);
+					}
+					else
+					{
+						if (noisedwellleft[i] <= 0)
+						{
+							noisedwellleft[i] = sound_PhaseM_left[i];
+							noiseleft[i] = rand() % 3800 + 100;
+						}
+						if (noisedwellleft[i])
+							noisedwellleft[i]--;
+						j = (int)noiseleft[i];
+						j = (j - 2000) * mapping[sound_v_left[i]] / 2000;
+						leftv += j;
+					}
+				}
+				if (sound_mode_right[i] != nulltable)
+				{
+					if (sound_mode_right[i] != whitenoise)
+					{
+						sound_PhaseAC_right[i] = sound_PhaseAC_right[i] + sound_PhaseM_right[i];
+						if (sound_PhaseAC_right[i] >= 4096.0)
+							sound_PhaseAC_right[i] -= 4096.0;
+						rightv += getsound(i, 1);
+					}
+					else
+					{
+						if (noisedwellright[i] <= 0)
+						{
+							noisedwellright[i] = sound_PhaseM_right[i];
+							noiseright[i] = rand() % 3800 + 100;
+						}
+						if (noisedwellright[i])
+							noisedwellright[i]--;
+						j = (int)noiseright[i];
+						j = (j - 2000) * mapping[sound_v_right[i]] / 2000;
+						rightv += j;
+					}
+				}
+			}
+			samples[n++] = (uint16_t)(leftv + 2000);
+			samples[n++] = (uint16_t)(rightv + 2000);
+		}
+	}
+
+	return n;
+}
 /******************************************************************************************
  * Maintain the WAV sample buffer
  *******************************************************************************************/
@@ -2823,6 +3103,34 @@ void checkWAVinput(void)
 						playreadcomplete = 1;
 					wav_filesize = WAV_BUFFER_SIZE;
 					bcount[2] = WAV_BUFFER_SIZE;
+				}
+				nextbuf = swingbuf;
+			}
+			else if (CurrentlyPlaying == P_TONE)
+			{
+				if (swingbuf == 2)
+				{
+					bcount[1] = fillToneBuffer(sbuff1, TONE_BUFFER_SIZE) * 2;
+					wav_filesize = bcount[1];
+				}
+				else
+				{
+					bcount[2] = fillToneBuffer(sbuff2, TONE_BUFFER_SIZE) * 2;
+					wav_filesize = bcount[2];
+				}
+				nextbuf = swingbuf;
+			}
+			else if (CurrentlyPlaying == P_SOUND)
+			{
+				if (swingbuf == 2)
+				{
+					bcount[1] = fillSoundBuffer(sbuff1, TONE_BUFFER_SIZE) * 2;
+					wav_filesize = bcount[1];
+				}
+				else
+				{
+					bcount[2] = fillSoundBuffer(sbuff2, TONE_BUFFER_SIZE) * 2;
+					wav_filesize = bcount[2];
 				}
 				nextbuf = swingbuf;
 			}
@@ -2970,6 +3278,42 @@ void checkWAVinput(void)
 				nextbuf = swingbuf;
 			}
 #endif
+			else if (CurrentlyPlaying == P_TONE)
+			{
+				if (swingbuf == 2)
+				{
+					bcount[1] = fillToneBuffer(sbuff1, TONE_BUFFER_SIZE);
+					if (Option.audio_i2s_bclk)
+						i2sconvert(g_buff1, (int16_t *)sbuff1, bcount[1]);
+					else
+						iconvert(ubuff1, (int16_t *)sbuff1, bcount[1]);
+					wav_filesize = bcount[1];
+				}
+				else
+				{
+					bcount[2] = fillToneBuffer(sbuff2, TONE_BUFFER_SIZE);
+					if (Option.audio_i2s_bclk)
+						i2sconvert(g_buff2, (int16_t *)sbuff2, bcount[2]);
+					else
+						iconvert(ubuff2, (int16_t *)sbuff2, bcount[2]);
+					wav_filesize = bcount[2];
+				}
+				nextbuf = swingbuf;
+			}
+			else if (CurrentlyPlaying == P_SOUND)
+			{
+				if (swingbuf == 2)
+				{
+					bcount[1] = fillSoundBuffer(sbuff1, TONE_BUFFER_SIZE);
+					wav_filesize = bcount[1];
+				}
+				else
+				{
+					bcount[2] = fillSoundBuffer(sbuff2, TONE_BUFFER_SIZE);
+					wav_filesize = bcount[2];
+				}
+				nextbuf = swingbuf;
+			}
 		}
 	}
 	if (wav_filesize <= 0 && (CurrentlyPlaying == P_WAV || (CurrentlyPlaying == P_FLAC) || (CurrentlyPlaying == P_MP3) || (CurrentlyPlaying == P_MIDI)))
@@ -3037,7 +3381,7 @@ void audio_checks(void)
 			}
 			else
 				StopAudio();
-			if (wasPlaying != P_ARRAY && wasPlaying != P_SAMPLE)
+			if (wasPlaying != P_ARRAY && wasPlaying != P_SAMPLE && wasPlaying != P_TONE && wasPlaying != P_SOUND)
 				FileClose(WAV_fnbr);
 			WAVcomplete = true;
 		}

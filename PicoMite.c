@@ -485,10 +485,6 @@ uint8_t PSRAMpin;
     };
     char alive[] = "\033[?25h";
     const char DaysInMonth[] = {0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
-    static inline CommandToken commandtbl_decode(const unsigned char *p)
-    {
-        return ((CommandToken)(p[0] & 0x7f)) | ((CommandToken)(p[1] & 0x7f) << 7);
-    }
     char banner[64];
 // Helper macro for mutex-protected operations
 #ifdef PICOMITE
@@ -585,7 +581,8 @@ uint8_t PSRAMpin;
             {
                 WITH_FRAMEBUFFER_LOCK(SPIatRisk, checkWAVinput());
             }
-            else if (CurrentlyPlaying == P_MOD || CurrentlyPlaying == P_ARRAY
+            else if (CurrentlyPlaying == P_MOD || CurrentlyPlaying == P_ARRAY ||
+                     CurrentlyPlaying == P_SOUND || CurrentlyPlaying == P_TONE
 #ifdef rp2350
                      || CurrentlyPlaying == P_SAMPLE
 #endif
@@ -4935,12 +4932,6 @@ int __not_in_flash_func(MMInkey)(void)
 #include "pico/multicore.h"
 void __not_in_flash_func(UpdateCore)()
 {
-    //    systick_hw->csr = 0x5;
-    //    systick_hw->rvr = 0x00FFFFFF;
-    //    while(multicore_fifo_rvalid()) {
-    //        multicore_fifo_pop_blocking();
-    //    }
-
     while (true)
     {
         // data memory barrier
