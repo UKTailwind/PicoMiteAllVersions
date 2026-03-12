@@ -1793,10 +1793,9 @@ void hid_app_task(void)
 			HID[i].report_requested = true;
 			if (!tuh_hid_receive_report(HID[i].Device_address, HID[i].Device_instance))
 			{
-				MMPrintString("Warning USB failure on channel ");
-				PInt(i + 1);
-				MMPrintString("\r\n> ");
-				HID[i].active = false;
+				// Allow retry on next poll cycle instead of permanent deactivation
+				HID[i].report_requested = false;
+				HID[i].report_timer = 0;
 			}
 		}
 		if (HID[i].Device_type == PS4 && timenow - timer > 50000)
@@ -2117,16 +2116,19 @@ void tuh_hid_umount_cb(uint8_t dev_addr, uint8_t instance)
 			break;
 		}
 	}
-	memset((void *)&HID[i], 0, sizeof(struct s_HID));
-	HID[i].report_requested = true;
-	Current_USB_devices--;
+	if (i < 4)
+	{
+		memset((void *)&HID[i], 0, sizeof(struct s_HID));
+		HID[i].report_requested = true;
+		Current_USB_devices--;
+	}
 	//  sprintf(buff,"HID device address = %d, instance = %d is unmounted\r\n", dev_addr, instance);
 }
 // Invoked when received report from device via interrupt endpoint
 void tuh_hid_report_received_cb(uint8_t dev_addr, uint8_t instance, uint8_t const *report, uint16_t len)
 {
 	__dsb();
-	uint8_t n = 255;
+	int n = -1;
 	uint8_t const itf_protocol = tuh_hid_interface_protocol(dev_addr, instance);
 	for (int i = 0; i < 4; i++)
 		if (instance == HID[i].Device_instance && dev_addr == HID[i].Device_address)
@@ -2134,6 +2136,8 @@ void tuh_hid_report_received_cb(uint8_t dev_addr, uint8_t instance, uint8_t cons
 			n = i;
 			break;
 		}
+	if (n < 0)
+		return; // no matching device found, discard report
 	memcpy((void *)&HID[n].report[1], report, (len > 64 ? 64 : len));
 	HID[n].report[0] = (len > 64 ? 64 : len);
 	switch (itf_protocol)
@@ -2455,7 +2459,7 @@ static void process_kbd_report(hid_keyboard_report_t const *report, uint8_t n)
 		//		}
 	}
 	else
-		keytimer - 0;
+		keytimer = 0;
 	memcpy(prev_keys, current_keys, sizeof(prev_keys));
 	for (int i = 0; i < 6; i++)
 	{

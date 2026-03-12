@@ -2206,7 +2206,7 @@ int __not_in_flash_func(MMInkey)(void)
         keytimer++;
         for (int i = 0; i < 4; i++)
         {
-            if (HID[i].Device_type)
+            if (HID[i].Device_type && HID[i].report_timer < 10000)
             {
                 HID[i].report_timer++;
             }

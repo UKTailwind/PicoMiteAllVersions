@@ -6179,7 +6179,7 @@ void ScrollBufferH(int pixels)
         return;
     volatile uint8_t *s, *d, *l, *ss, *dd;
     int y;
-    if (HRes == 320 && !(pixels & 1))
+    if (Option.DISPLAY_TYPE != SCREENMODE1 && !(pixels & 1))
     {
         if (pixels > 0)
         {
@@ -6187,7 +6187,7 @@ void ScrollBufferH(int pixels)
             {
                 s = (((y * HRes) >> 1) + WriteBuf);
                 d = s + (pixels >> 1);
-                memmove((void *)d, (void *)s, 160 - (pixels >> 1));
+                memmove((void *)d, (void *)s, HRes / 2 - (pixels >> 1));
             }
         }
         else
@@ -6198,7 +6198,7 @@ void ScrollBufferH(int pixels)
                 s = (((y * HRes) >> 1) + WriteBuf);
                 d = s;
                 s += (pixels >> 1);
-                memmove((void *)d, (void *)s, 160 - (pixels >> 1));
+                memmove((void *)d, (void *)s, HRes / 2 - (pixels >> 1));
             }
         }
     }
@@ -6210,12 +6210,12 @@ void ScrollBufferH(int pixels)
         {
             for (y = 0; y < VRes; y++)
             {
-                l = (((y * HRes) >> (HRes == 320 ? 1 : 3)) + WriteBuf);
+                l = (((y * HRes) >> (Option.DISPLAY_TYPE != SCREENMODE1 ? 1 : 3)) + WriteBuf);
                 s = ss;
                 d = dd + pixels;
-                expandpixel(l, s, HRes, (HRes == 320 ? 0 : 1));
+                expandpixel(l, s, HRes, (Option.DISPLAY_TYPE != SCREENMODE1 ? 0 : 1));
                 memcpy((void *)d, (void *)s, (HRes - pixels));
-                contractpixel(dd, l, HRes, (HRes == 320 ? 0 : 1));
+                contractpixel(dd, l, HRes, (Option.DISPLAY_TYPE != SCREENMODE1 ? 0 : 1));
             }
         }
         else
@@ -6223,13 +6223,13 @@ void ScrollBufferH(int pixels)
             pixels = -pixels;
             for (y = 0; y < VRes; y++)
             {
-                l = (((y * HRes) >> (HRes == 320 ? 1 : 3)) + WriteBuf);
+                l = (((y * HRes) >> (Option.DISPLAY_TYPE != SCREENMODE1 ? 1 : 3)) + WriteBuf);
                 s = ss;
                 d = dd;
-                expandpixel(l, s, HRes, (HRes == 320 ? 0 : 1));
+                expandpixel(l, s, HRes, (Option.DISPLAY_TYPE != SCREENMODE1 ? 0 : 1));
                 s += pixels;
                 memcpy((void *)d, (void *)s, (HRes - pixels));
-                contractpixel(d, l, HRes, (HRes == 320 ? 0 : 1));
+                contractpixel(d, l, HRes, (Option.DISPLAY_TYPE != SCREENMODE1 ? 0 : 1));
             }
         }
     }
@@ -6239,7 +6239,7 @@ void ScrollBufferV(int lines, int blank)
 {
     uint8_t *s, *d;
     int y, yy;
-    if (HRes == 320)
+    if (Option.DISPLAY_TYPE != SCREENMODE1)
     {
         int n = (HRes >> 1);
         if (lines > 0)
