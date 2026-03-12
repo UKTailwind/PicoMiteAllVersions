@@ -1,5 +1,5 @@
 # PicoMiteRP2350
-This contains files to build MMbasic 6.02.01RC3 to run on both RP2040 and RP2350<br>
+This contains files to build MMbasic 6.02.01RC4 to run on both RP2040 and RP2350<br>
 Compile with GCC 13.3.1 arm-none-eabi<br>
 <br> Note: CmakeLists.txt is changed (since V6.02.01b7) to use a custom load. Building without this version of the CMake file will not work.
 
