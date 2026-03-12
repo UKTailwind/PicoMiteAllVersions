@@ -5479,9 +5479,7 @@ void MIPS16 ClearRuntime(bool all)
     CloseAllFiles();
     ClearExternalIO(); // this MUST come before InitHeap(true)
     ClearStack();
-#ifdef USBKEYBOARD
     clearrepeat();
-#endif
     OptionExplicit = false;
     OptionEscape = false;
     OptionConsole = 3;

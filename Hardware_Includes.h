@@ -668,6 +668,8 @@ void initMouse0(int sensitivity);
 #ifdef USBKEYBOARD
 void clearrepeat(void);
 void cmd_mouse(void);
+#else
+void clearrepeat(void);
 #endif
 
 /* ============================================================================

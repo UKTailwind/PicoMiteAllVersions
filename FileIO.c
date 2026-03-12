@@ -1048,6 +1048,8 @@ void MIPS16 cmd_flash(void)
             if (Option.LIBRARY_FLASH_SIZE == MAX_PROG_SIZE && i == MAXFLASHSLOTS)
                 StandardErrorParam(25, MAXFLASHSLOTS);
             ProgMemory = (unsigned char *)(flash_target_contents + (i - 1) * MAX_PROG_SIZE);
+            if ((unsigned char)*ProgMemory != T_NEWLINE)
+                return;
             if (Option.DISPLAY_CONSOLE && (SPIREAD || Option.NoScroll))
             {
                 ClearScreen(gui_bcolour);
@@ -1887,9 +1889,7 @@ void MIPS16 cmd_LoadJPGImage(unsigned char *p)
     }
 
     FileClose(jpgfnbr);
-#ifdef USBKEYBOARD
     clearrepeat();
-#endif
     if (Option.Refresh)
         Display_Refresh();
 }
@@ -3444,9 +3444,7 @@ void MIPS16 SaveProgramToRAM(unsigned char *pm, int msg, uint8_t *ram)
     multi = false;
     uint32_t storedupdates[MAXCFUNCTION], updatecount = 0, realmemsave;
     initFonts();
-#ifdef USBKEYBOARD
     clearrepeat();
-#endif
     memcpy(buf, tknbuf, STRINGSIZE); // save the token buffer because we are going to use it
     memset(ram, 0xFF, MAX_PROG_SIZE);
     realmempointer = (volatile uint32_t)ram;
@@ -3791,10 +3789,8 @@ void MIPS16 SaveProgramToRAM(unsigned char *pm, int msg, uint8_t *ram)
         MMPrintString(" bytes\r\n");
     }
     memcpy(tknbuf, buf, STRINGSIZE); // restore the token buffer in case there are other commands in it
-//    initConsole();
-#ifdef USBKEYBOARD
+                                     //    initConsole();
     clearrepeat();
-#endif
     return;
 
 // we only get here in an error situation while writing the program to flash
@@ -4019,9 +4015,7 @@ void LoadPNG(unsigned char *p)
         DrawBuffer(xOrigin, yOrigin, xOrigin + w - 1, yOrigin + h - 1, ppp);
     }
     upng_free(upng);
-#ifdef USBKEYBOARD
     clearrepeat();
-#endif
 }
 #endif
 void MIPS16 cmd_load(void)
@@ -4547,9 +4541,7 @@ int BasicFileOpen(char *fname, int fnbr, int mode)
         ErrorCheck(fnbr);
         filesource[fnbr] = FLASHFILE;
     }
-#ifdef USBKEYBOARD
     clearrepeat();
-#endif
     if (FSerror)
     {
         ForceFileClose(fnbr);
@@ -5641,9 +5633,7 @@ void MIPS16 cmd_files(void)
             unsigned char noscroll = Option.NoScroll;
             if ((void *)ReadBuffer != (void *)DisplayNotSet && Option.DISPLAY_CONSOLE)
                 Option.NoScroll = 0;
-#ifdef USBKEYBOARD
             clearrepeat();
-#endif
             MMPrintString("PRESS ANY KEY ...");
             Option.NoScroll = noscroll;
             do

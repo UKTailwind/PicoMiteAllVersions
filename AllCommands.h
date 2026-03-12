@@ -785,9 +785,7 @@ void fun_frame(void);
 	{(unsigned char *)"MM.Info(", T_FUN | T_INT | T_NBR | T_STR, 0, fun_info},
 	{(unsigned char *)"Format$(", T_FUN | T_STR, 0, fun_format},
 	{(unsigned char *)"~(", T_FUN | T_INT | T_NBR | T_STR, 0, fun_tilde},
-#ifdef USBKEYBOARD
 	{(unsigned char *)"KeyDown(", T_FUN | T_INT, 0, fun_keydown},
-#endif
 #ifdef PICOMITEVGA
 	{(unsigned char *)"DRAW3D(", T_FUN | T_INT, 0, fun_3D},
 	{(unsigned char *)"GetScanLine", T_FNA | T_INT, 0, fun_getscanline},

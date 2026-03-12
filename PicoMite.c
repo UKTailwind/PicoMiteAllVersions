@@ -5800,8 +5800,8 @@ uint32_t testPSRAM(void)
         updatebootcount(_excep_code == RESET_FLASHSTORAGE || _excep_code == RESET_PICOCALCINIT);
         *tknbuf = 0;
         ContinuePoint = nextstmt; // in case the user wants to use the continue command
-#ifdef USBKEYBOARD
         clearrepeat();
+#ifdef USBKEYBOARD
         for (int i = 0; i < 4; i++)
         {
             memset((void *)&HID[i], 0, sizeof(struct s_HID));
@@ -5835,10 +5835,8 @@ uint32_t testPSRAM(void)
         {
             // we got here via a long jump which means an error or CTRL-C or the program wants to exit to the command prompt
             FlashLoad = 0;
-//        LoadOptions();
-#ifdef USBKEYBOARD
+            //        LoadOptions();
             clearrepeat();
-#endif
             ScrewUpTimer = 0;
             ProgMemory = (uint8_t *)flash_progmemory;
             ContinuePoint = nextstmt; // in case the user wants to use the continue command
@@ -6054,9 +6052,7 @@ uint32_t testPSRAM(void)
 #ifdef rp2350
         __dsb();
 #endif
-#ifdef USBKEYBOARD
         clearrepeat();
-#endif
         memcpy(buf, tknbuf, STRINGSIZE); // save the token buffer because we are going to use it
         FlashWriteInit(PROGRAM_FLASH);
         safe_flash_range_erase(realflashpointer, MAX_PROG_SIZE);
@@ -6430,10 +6426,8 @@ uint32_t testPSRAM(void)
             MMPrintString(" bytes\r\n");
         }
         memcpy(tknbuf, buf, STRINGSIZE); // restore the token buffer in case there are other commands in it
-//    initConsole();
-#ifdef USBKEYBOARD
+                                         //    initConsole();
         clearrepeat();
-#endif
         enable_interrupts_pico();
         return;
 

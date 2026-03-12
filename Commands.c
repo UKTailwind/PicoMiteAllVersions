@@ -1043,9 +1043,7 @@ void MIPS16 ListNewLine(int *ListCnt, int all)
 	(*ListCnt)++;
 	if (!all && *ListCnt >= Option.Height - overlap)
 	{
-#ifdef USBKEYBOARD
 		clearrepeat();
-#endif
 		MMPrintString("PRESS ANY KEY ...");
 		MMgetchar();
 		MMPrintString("\r                 \r");

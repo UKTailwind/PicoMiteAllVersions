@@ -67,6 +67,9 @@ extern int KeyDown[7];
 #else
 extern char *mouse0Interruptc;
 extern volatile int mouse0foundc;
+extern int PS2KeyDown[7];
+extern volatile char CapsLock;
+extern volatile char NumLock;
 #endif
 int64_t TimeOffsetToUptime = 1704067200;
 extern int last_adc;
@@ -3196,6 +3199,31 @@ void fun_keydown(void)
     targ = T_INT;
 }
 #else
+void fun_keydown(void)
+{
+    int i, n = getint(ep, 0, 8);
+    iret = 0;
+    while (getConsole() != -1)
+        ; // clear anything in the input buffer
+    if (n == 8)
+    {
+        iret = (CapsLock ? 1 : 0) |
+               (NumLock ? 2 : 0);
+    }
+    else if (n)
+    {
+        iret = PS2KeyDown[n - 1];
+    }
+    else
+    {
+        for (i = 0; i < 6; i++)
+        {
+            if (PS2KeyDown[i])
+                iret++;
+        }
+    }
+    targ = T_INT;
+}
 void MIPS16 cmd_update(void)
 {
     uint gpio_mask = 0u;
@@ -7886,10 +7914,16 @@ void MIPS16 fun_info(void)
             targ = T_STR;
             return;
         }
-#ifdef rp2350
         else if (checkstring(ep, (unsigned char *)"PSRAM SIZE"))
+#ifdef rp2350
         {
             iret = PSRAMsize;
+            targ = T_INT;
+            return;
+        }
+#else
+        {
+            iret = 0;
             targ = T_INT;
             return;
         }

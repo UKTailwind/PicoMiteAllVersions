@@ -90,8 +90,13 @@ static char LShift = 0;
 static char RShift = 0;
 static char PS2Ctrl = 0;
 static char AltGrDown = 0;
+static char PS2Alt = 0;
 static char KeyUpCode = false;
 static char KeyE0 = false;
+
+// PS2 KEYDOWN() tracking - up to 6 simultaneous keys + modifier bitmask
+int PS2KeyDown[7] = {0};
+static uint16_t PS2ActiveScancodes[6] = {0};
 
 // this is a map of the keycode characters and the character to be returned for the keycode
 const char keyCodes[8][128] =
@@ -533,6 +538,14 @@ void initKeyboard(void)
   NumLock = Option.numlock;
   uSec(100000);
   setLEDs(CapsLock, NumLock, 0);
+  // Clear any phantom keys from keyboard ACK responses during LED setup
+  {
+    int i;
+    for (i = 0; i < 6; i++)
+      PS2ActiveScancodes[i] = 0;
+    for (i = 0; i < 7; i++)
+      PS2KeyDown[i] = 0;
+  }
 }
 
 /***************************************************************************************************
@@ -628,6 +641,15 @@ void setLEDs(int caps, int num, int scroll)
   justset = 1;
 }
 
+void clearrepeat(void)
+{
+  int i;
+  for (i = 0; i < 6; i++)
+    PS2ActiveScancodes[i] = 0;
+  for (i = 0; i < 7; i++)
+    PS2KeyDown[i] = 0;
+}
+
 void __not_in_flash_func(CheckKeyboard)(void)
 {
   if (setleds)
@@ -680,8 +702,27 @@ void processcode(unsigned char Code)
         PS2Ctrl = 0; // left control button is released
       else if (KeyE0 && Code == 0x11)
         AltGrDown = 0; // release the AltGr key on non US keyboards
-      else if (Code == KeyDownCode)
-        KeyDownRegister = 0; // normal char so record that it is no longer depressed
+      else if (!KeyE0 && Code == 0x11)
+        PS2Alt = 0; // left alt released
+      // Remove released key from PS2 active key tracking and compact the array
+      {
+        uint16_t encoded = (uint16_t)Code | (KeyE0 ? 0x100 : 0);
+        for (int i = 0; i < 6; i++)
+        {
+          if (PS2ActiveScancodes[i] == encoded)
+          {
+            // Shift remaining entries left to fill the gap
+            for (int j = i; j < 5; j++)
+            {
+              PS2ActiveScancodes[j] = PS2ActiveScancodes[j + 1];
+              PS2KeyDown[j] = PS2KeyDown[j + 1];
+            }
+            PS2ActiveScancodes[5] = 0;
+            PS2KeyDown[5] = 0;
+            break;
+          }
+        }
+      }
       goto SkipOut;
     }
 
@@ -720,6 +761,11 @@ void processcode(unsigned char Code)
       AltGrDown = 1;
       goto SkipOut;
     } // AltGr key pressed on non US Keyboard
+    if (!KeyE0 && Code == 0x11)
+    {
+      PS2Alt = 1;
+      goto SkipOut;
+    } // Left Alt key pressed
 
     // now get the character into c.  Why, oh why, are scan codes so random?
     if (!KeyE0 && Code == 0x83)
@@ -1045,6 +1091,34 @@ void processcode(unsigned char Code)
         c |= 0b01000000;
     }
 
+    // Store in PS2 active key tracking (for KEYDOWN function)
+    if (!justset)
+    {
+      uint16_t encoded = (uint16_t)Code | (KeyE0 ? 0x100 : 0);
+      int stored = 0;
+      for (int i = 0; i < 6; i++)
+      {
+        if (PS2ActiveScancodes[i] == encoded)
+        {
+          PS2KeyDown[i] = c; // update character (may change with shift/ctrl)
+          stored = 1;
+          break;
+        }
+      }
+      if (!stored)
+      {
+        for (int i = 0; i < 6; i++)
+        {
+          if (PS2ActiveScancodes[i] == 0)
+          {
+            PS2ActiveScancodes[i] = encoded;
+            PS2KeyDown[i] = c;
+            break;
+          }
+        }
+      }
+    }
+
     if (BreakKey && c == BreakKey)
     {                                      // if the user wants to stop the progran
       MMAbort = true;                      // set the flag for the interpreter to see
@@ -1075,6 +1149,12 @@ void processcode(unsigned char Code)
     }
 
   SkipOut:
+    // Update PS2 modifier bitmask for KEYDOWN function
+    PS2KeyDown[6] = (PS2Alt ? 1 : 0) |     // Left Alt    (bit 0)
+                    (PS2Ctrl ? 2 : 0) |    // Ctrl        (bit 1)
+                    (LShift ? 8 : 0) |     // Left Shift  (bit 3)
+                    (AltGrDown ? 16 : 0) | // Right Alt   (bit 4)
+                    (RShift ? 128 : 0);    // Right Shift (bit 7)
     // end lump of self contained code
     //////////////////////////////////////////////////////////////////////////////////////////////////////////
     KeyUpCode = false;
@@ -1103,8 +1183,16 @@ void __not_in_flash_func(CNInterrupt)(uint64_t dd)
       RShift = 0;
       PS2Ctrl = 0;
       AltGrDown = 0;
+      PS2Alt = 0;
       KeyUpCode = false;
       KeyE0 = false;
+      {
+        int i;
+        for (i = 0; i < 6; i++)
+          PS2ActiveScancodes[i] = 0;
+        for (i = 0; i < 7; i++)
+          PS2KeyDown[i] = 0;
+      }
       // fall through to PS2START
 
     case PS2START:

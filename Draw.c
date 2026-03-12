@@ -4625,7 +4625,7 @@ int blitother(void)
     }
     else if ((p = checkstring(cmdline, (unsigned char *)"FRAMEBUFFER")))
     {
-        int8_t blank = -1;
+        int blank = -1;
 #ifndef PICOMITEVGA
         int otoggle = 0, itoggle = 0; // input will always start on a byte boundary
         volatile unsigned char c, *to;
@@ -4682,9 +4682,144 @@ int blitother(void)
         w = (int)getinteger(argv[12]);
         h = (int)getinteger(argv[14]);
         if (argc == 17)
-            blank = getint(argv[16], -1, 15);
+        {
+#ifdef HDMI
+            if (DISPLAY_TYPE == SCREENMODE4)
+                blank = getint(argv[16], -1, 0x7FFF);
+            else if (DISPLAY_TYPE == SCREENMODE5)
+                blank = getint(argv[16], -1, 0xFF);
+            else
+#endif
+                blank = getint(argv[16], -1, 15);
+        }
         if (d != NULL && s != NULL)
         {
+#ifdef PICOMITEVGA
+            if (DISPLAY_TYPE == SCREENMODE1)
+                error("Not available in mode 1");
+#endif
+#ifdef HDMI
+            if (DISPLAY_TYPE == SCREENMODE4)
+            {
+                // RGB555 blit - 2 bytes per pixel
+                int has_transparency = (blank >= 0);
+                uint16_t tcolor = (uint16_t)blank;
+                int sx_start = 0, sy_start = 0, sx_end = w, sy_end = h;
+                if (x1 < 0)
+                    sx_start = -x1;
+                if (y1 < 0)
+                    sy_start = -y1;
+                if (x1 + w > HRes)
+                    sx_end = HRes - x1;
+                if (y1 + h > VRes)
+                    sy_end = VRes - y1;
+                if (x2 < 0)
+                {
+                    int adj = -x2;
+                    if (adj > sx_start)
+                        sx_start = adj;
+                }
+                if (y2 < 0)
+                {
+                    int adj = -y2;
+                    if (adj > sy_start)
+                        sy_start = adj;
+                }
+                if (x2 + w > HRes)
+                {
+                    int adj = HRes - x2;
+                    if (adj < sx_end)
+                        sx_end = adj;
+                }
+                if (y2 + h > VRes)
+                {
+                    int adj = VRes - y2;
+                    if (adj < sy_end)
+                        sy_end = adj;
+                }
+                if (sx_start >= sx_end || sy_start >= sy_end)
+                    return 1;
+                int num_pixels = sx_end - sx_start;
+                for (int i = sy_start; i < sy_end; i++)
+                {
+                    uint16_t *src_row = (uint16_t *)s + (y1 + i) * HRes + (x1 + sx_start);
+                    uint16_t *dst_row = (uint16_t *)d + (y2 + i) * HRes + (x2 + sx_start);
+                    if (!has_transparency)
+                    {
+                        memcpy(dst_row, src_row, num_pixels * sizeof(uint16_t));
+                    }
+                    else
+                    {
+                        for (int j = 0; j < num_pixels; j++)
+                        {
+                            if (src_row[j] != tcolor)
+                                dst_row[j] = src_row[j];
+                        }
+                    }
+                }
+                return 1;
+            }
+            else if (DISPLAY_TYPE == SCREENMODE5)
+            {
+                // RGB332 blit - 1 byte per pixel
+                int has_transparency = (blank >= 0);
+                uint8_t tcolor = (uint8_t)blank;
+                int sx_start = 0, sy_start = 0, sx_end = w, sy_end = h;
+                if (x1 < 0)
+                    sx_start = -x1;
+                if (y1 < 0)
+                    sy_start = -y1;
+                if (x1 + w > HRes)
+                    sx_end = HRes - x1;
+                if (y1 + h > VRes)
+                    sy_end = VRes - y1;
+                if (x2 < 0)
+                {
+                    int adj = -x2;
+                    if (adj > sx_start)
+                        sx_start = adj;
+                }
+                if (y2 < 0)
+                {
+                    int adj = -y2;
+                    if (adj > sy_start)
+                        sy_start = adj;
+                }
+                if (x2 + w > HRes)
+                {
+                    int adj = HRes - x2;
+                    if (adj < sx_end)
+                        sx_end = adj;
+                }
+                if (y2 + h > VRes)
+                {
+                    int adj = VRes - y2;
+                    if (adj < sy_end)
+                        sy_end = adj;
+                }
+                if (sx_start >= sx_end || sy_start >= sy_end)
+                    return 1;
+                int num_pixels = sx_end - sx_start;
+                for (int i = sy_start; i < sy_end; i++)
+                {
+                    uint8_t *src_row = (uint8_t *)s + (y1 + i) * HRes + (x1 + sx_start);
+                    uint8_t *dst_row = (uint8_t *)d + (y2 + i) * HRes + (x2 + sx_start);
+                    if (!has_transparency)
+                    {
+                        memcpy(dst_row, src_row, num_pixels);
+                    }
+                    else
+                    {
+                        for (int j = 0; j < num_pixels; j++)
+                        {
+                            if (src_row[j] != tcolor)
+                                dst_row[j] = src_row[j];
+                        }
+                    }
+                }
+                return 1;
+            }
+#endif
             // RGB121 blit
             HResD = HRes;
             VResD = VRes;
@@ -10931,9 +11066,7 @@ void setmode(int mode, bool clear)
 #endif
     }
 
-#ifdef USBKEYBOARD
     clearrepeat();
-#endif
 }
 
 void cmd_mode(void)
