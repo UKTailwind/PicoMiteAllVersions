@@ -90,7 +90,7 @@ extern "C"
 #endif
 
 #define MAXMODES 2
-#define HEAP_MEMORY_SIZE (108 * 1024)
+#define HEAP_MEMORY_SIZE (104 * 1024)
 #define MAX_CPU 378000
 #define MIN_CPU 252000
 #endif
@@ -233,11 +233,11 @@ extern "C"
 #define MagicKey 0x1B8226B4
 #endif
 #else
-#define HEAP_MEMORY_SIZE (128 * 1024)
+#define HEAP_MEMORY_SIZE (136 * 1024)
 #define MAXGLOBALVARS 256 // Configurable split
 #define MAXLOCALVARS 240
 #define MAXVARS (MAXGLOBALVARS + MAXLOCALVARS)
-#define FLASH_TARGET_OFFSET (832 * 1024)
+#define FLASH_TARGET_OFFSET (848 * 1024)
 #define MAX_CPU 420000
 #define MAXSUBFUN 256
 
@@ -262,7 +262,11 @@ extern "C"
 /* ============================================================================
  * Memory configuration
  * ============================================================================ */
+#if defined(PICOMITE) && !defined(rp2350)
+#define MAX_PROG_SIZE (120 * 1024) // Maximum program size in bytes (adjust as needed     )
+#else
 #define MAX_PROG_SIZE HEAP_MEMORY_SIZE
+#endif
 #define SAVEDVARS_FLASH_SIZE 16384
 #define FLASH_ERASE_SIZE 4096
 #define MAXFLASHSLOTS 3

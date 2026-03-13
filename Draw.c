@@ -14541,7 +14541,6 @@ void floodfill(int x, int y, int internal_colour, int boundary_colour)
     free_stack(&stack);
 }
 
-#ifdef rp2350
 /* ============================================================================
  * TILEMAP subsystem
  *
@@ -15396,7 +15395,6 @@ void MIPS16 fun_tilemap(void)
         SyntaxError();
     }
 }
-#endif /* rp2350 */
 
 void cmd_fill(void)
 {
