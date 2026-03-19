@@ -112,6 +112,7 @@ extern uint8_t trackplaying, trackstoplay;
  * External variables - Volume control
  * ============================================================================ */
 extern volatile int vol_left, vol_right;
+extern volatile int vol_target_left, vol_target_right;
 
 /* ============================================================================
  * External variables - Buffers
@@ -133,6 +134,8 @@ extern void (*AudioOutput)(uint16_t left, uint16_t right);
  * ============================================================================ */
 extern volatile int sound_v_left[MAXSOUNDS];
 extern volatile int sound_v_right[MAXSOUNDS];
+extern volatile int sound_v_target_left[MAXSOUNDS];
+extern volatile int sound_v_target_right[MAXSOUNDS];
 extern volatile float sound_PhaseAC_left[MAXSOUNDS];
 extern volatile float sound_PhaseAC_right[MAXSOUNDS];
 extern volatile float sound_PhaseM_left[MAXSOUNDS];

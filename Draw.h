@@ -392,7 +392,7 @@ void restorepanel(void);
 void ResetDisplay(void);
 void DisplayPutC(char c);
 void ShowCursor(int show);
-void CheckDisplay(void);
+// void CheckDisplay(void);
 void setmode(int mode, bool clear);
 
 /* ============================================================================
@@ -461,6 +461,13 @@ void blitmerge(int x0, int y0, int w, int h, uint8_t colour);
 /* ============================================================================
  * Function declarations - User-defined drawing (non-VGA)
  * ============================================================================ */
+extern void DisplayNotSet(void);
+static inline void CheckDisplay(void)
+{
+    if (Option.DISPLAY_TYPE == 0)
+        DisplayNotSet();
+}
+
 #ifndef PICOMITEVGA
 void DrawRectangleUser(int x1, int y1, int x2, int y2, int c);
 void DrawBitmapUser(int x1, int y1, int width, int height, int scale, int fc, int bc, unsigned char *bitmap);

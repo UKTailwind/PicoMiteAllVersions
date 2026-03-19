@@ -445,6 +445,7 @@ extern int MOUSE_CLOCK, MOUSE_DATA;
 extern bool rp2350a;
 extern uint32_t PSRAMsize;
 extern const uint32_t MAP16DEF[16];
+extern void stepper_poll_events(void);
 #endif
 
 /* ============================================================================

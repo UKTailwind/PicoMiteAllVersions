@@ -2224,10 +2224,10 @@ extern unsigned int mmap[HEAP_MEMORY_SIZE / PAGESIZE / PAGESPERWORD];
 extern unsigned int psmap[7 * 1024 * 1024 / PAGESIZE / PAGESPERWORD];
 extern struct s_hash g_hashlist[MAXLOCALVARS];
 extern int g_hashlistpointer;
-extern short g_StrTmpIndex;
+extern int g_StrTmpIndex;
 extern bool g_TempMemoryIsChanged;
-extern volatile char *g_StrTmp[MAXTEMPSTRINGS];			 // used to track temporary string space on the heap
-extern volatile char g_StrTmpLocalIndex[MAXTEMPSTRINGS]; // used to track the g_LocalIndex for each temporary string space on the heap
+extern char *g_StrTmp[MAXTEMPSTRINGS];			// used to track temporary string space on the heap
+extern char g_StrTmpLocalIndex[MAXTEMPSTRINGS]; // used to track the g_LocalIndex for each temporary string space on the heap
 void SaveContext(void)
 {
 	CloseAudio(1);
@@ -7645,13 +7645,17 @@ const char *ParseStructMember(unsigned char *p, struct s_structdef *sd)
 		{
 			// Parse dimension value manually (can't use getint during preprocess)
 			int dim = 0;
+			int have_digits = 0;
 			while (*p >= '0' && *p <= '9')
 			{
 				dim = dim * 10 + (*p - '0');
+				have_digits = 1;
 				p++;
 			}
-			if (dim < 1)
-				dim = 1;
+			if (!have_digits)
+				return "Dimensions";
+			if (dim <= g_OptionBase)
+				return "Dimensions";
 			dims[ndims++] = dim;
 			array_elements *= (dim + 1 - g_OptionBase); // Account for OPTION BASE
 

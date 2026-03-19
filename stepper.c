@@ -42,6 +42,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 static bool axis_is_configured(stepper_axis_t *axis);
 static bool position_within_limits(stepper_axis_t *axis, float pos_mm);
 static void cmd_stepper_home_axes(int argc, unsigned char **argv);
+static int parse_pin(unsigned char *arg);
 static volatile bool stepper_dwell_active;
 static volatile uint32_t stepper_dwell_until_tick;
 static inline uint32_t stepper_dwell_ms_to_ticks(double ms);
@@ -49,6 +50,13 @@ static inline uint32_t stepper_dwell_ms_to_ticks(double ms);
 // Cornering (junction) settings
 // Minimal implementation uses a fixed junction deviation. Future work can expose this via STEPPER command.
 #define DEFAULT_JUNCTION_DEVIATION_MM 0.05f
+
+// Homing travel windows in physical units. Convert to steps per-axis so behavior
+// is consistent across machines with different steps/mm.
+#define DEFAULT_HOMING_BACKOFF_MM 3.0f
+#define HOMING_SWITCH_DEBOUNCE_SAMPLES 5
+#define HOMING_SWITCH_DEBOUNCE_US 1000
+#define HOMING_HIT_DWELL_US 250000
 
 // Planner position state (separate from ISR-updated current_pos)
 // These track where the next planned move will start
@@ -75,6 +83,28 @@ static inline void stepper_spindle_set(bool on)
 static inline void stepper_spindle_off(void)
 {
     stepper_spindle_set(false);
+}
+
+static inline bool stepper_estop_is_active(void)
+{
+    if (stepper_system.estop_pin == 0xFF)
+        return false;
+    uint64_t gpio_state = gpio_get_all64();
+    return ((~gpio_state & ((uint64_t)1 << stepper_system.estop_pin)) != 0);
+}
+
+static bool homing_limit_state_debounced(uint64_t limit_mask, bool want_active)
+{
+    for (int i = 0; i < HOMING_SWITCH_DEBOUNCE_SAMPLES; i++)
+    {
+        uint64_t gpio_state = gpio_get_all64();
+        bool is_active = ((~gpio_state & limit_mask) != 0);
+        if (is_active != want_active)
+            return false;
+        if (i + 1 < HOMING_SWITCH_DEBOUNCE_SAMPLES)
+            busy_wait_us(HOMING_SWITCH_DEBOUNCE_US);
+    }
+    return true;
 }
 
 static inline void stepper_release_gp_pin(uint8_t gp)
@@ -1106,9 +1136,90 @@ int stepper_query_active(void)
     return active;
 }
 
+// Latched hardware E-STOP trip (set in ISR, reported in main context)
+static volatile bool stepper_estop_trip_latched = false;
+
 // Latched hardware-limit trip (set in ISR, reported in main context)
 static volatile bool stepper_limit_trip_latched = false;
 static volatile uint64_t stepper_limit_trip_mask = 0; // subset of limit_switch_mask that is currently asserted
+
+// Report and clear ISR-latched safety trips from main context.
+// Returns true if an E-STOP trip was reported.
+static bool stepper_report_latched_trips(void)
+{
+    bool estop_reported = false;
+
+    if (stepper_limit_trip_latched)
+    {
+        uint64_t mask;
+        uint32_t save = save_and_disable_interrupts();
+        mask = stepper_limit_trip_mask;
+        stepper_limit_trip_mask = 0;
+        stepper_limit_trip_latched = false;
+        restore_interrupts(save);
+
+        MMPrintString("Hardware limit switch trip - emergency stop\r\n");
+
+        // Best-effort decode of which configured limits were asserted.
+        // (Pins are active-low; mask bits are GP numbers.)
+        char which[120];
+        which[0] = 0;
+        bool first = true;
+        struct
+        {
+            const char *name;
+            uint8_t pin;
+        } lims[] = {
+            {"X_MIN", stepper_system.x_min_limit_pin},
+            {"X_MAX", stepper_system.x_max_limit_pin},
+            {"Y_MIN", stepper_system.y_min_limit_pin},
+            {"Y_MAX", stepper_system.y_max_limit_pin},
+            {"Z_MIN", stepper_system.z_min_limit_pin},
+            {"Z_MAX", stepper_system.z_max_limit_pin},
+        };
+
+        for (unsigned i = 0; i < sizeof(lims) / sizeof(lims[0]); i++)
+        {
+            if (lims[i].pin == 0xFF)
+                continue;
+            if ((mask & (1ULL << lims[i].pin)) == 0)
+                continue;
+
+            if (!first)
+                strncat(which, ", ", sizeof(which) - strlen(which) - 1);
+            strncat(which, lims[i].name, sizeof(which) - strlen(which) - 1);
+            first = false;
+        }
+
+        if (!first)
+        {
+            MMPrintString("Asserted: ");
+            MMPrintString(which);
+            MMPrintString("\r\n");
+        }
+
+        MMPrintString("Mode forced to TEST, buffer cleared, position unknown\r\n");
+        MMPrintString("Clear the switch condition and re-home (G28), then STEPPER RUN\r\n");
+    }
+
+    if (stepper_estop_trip_latched)
+    {
+        uint32_t save = save_and_disable_interrupts();
+        stepper_estop_trip_latched = false;
+        restore_interrupts(save);
+
+        MMPrintString("Hardware E-STOP trip - emergency stop\r\n");
+        MMPrintString("Clear E-STOP switch, re-home (G28), then STEPPER RUN\r\n");
+        estop_reported = true;
+    }
+
+    return estop_reported;
+}
+
+void stepper_poll_events(void)
+{
+    (void)stepper_report_latched_trips();
+}
 
 // Current move state (used by ISR)
 static volatile stepper_move_t current_move = {0};
@@ -1317,6 +1428,7 @@ void stepper_close_subsystem(void)
     uint8_t z_dir_pin = stepper_system.z.dir_pin;
     uint8_t z_enable_pin = stepper_system.z.enable_pin;
     uint8_t spindle_pin = stepper_system.spindle_pin;
+    uint8_t estop_pin = stepper_system.estop_pin;
     uint8_t x_min_limit_pin = stepper_system.x_min_limit_pin;
     uint8_t x_max_limit_pin = stepper_system.x_max_limit_pin;
     uint8_t y_min_limit_pin = stepper_system.y_min_limit_pin;
@@ -1369,6 +1481,7 @@ void stepper_close_subsystem(void)
     stepper_release_gp_pin(z_dir_pin);
     stepper_release_gp_pin(z_enable_pin);
     stepper_release_gp_pin(spindle_pin);
+    stepper_release_gp_pin(estop_pin);
     stepper_release_gp_pin(x_min_limit_pin);
     stepper_release_gp_pin(x_max_limit_pin);
     stepper_release_gp_pin(y_min_limit_pin);
@@ -2065,6 +2178,46 @@ void __not_in_flash_func(stepper_timer_isr)(void)
 
     // Increment tick counter
     stepper_tick_count++;
+
+    // Hardware E-STOP has highest priority and is enforced regardless of
+    // normal armed/homing state.
+    if (stepper_estop_is_active())
+    {
+        stepper_estop_trip_latched = true;
+
+        current_move.phase = MOVE_PHASE_IDLE;
+        stepper_system.motion_active = false;
+        stepper_system.homing_active = false;
+        stepper_armed = false;
+
+        if (stepper_system.x.enable_pin != 0xFF)
+            gpio_put(stepper_system.x.enable_pin, 1);
+        if (stepper_system.y.enable_pin != 0xFF)
+            gpio_put(stepper_system.y.enable_pin, 1);
+        if (stepper_system.z.enable_pin != 0xFF)
+            gpio_put(stepper_system.z.enable_pin, 1);
+
+        stepper_spindle_off();
+
+        gcode_buffer_release_all_payloads(&gcode_buffer);
+        gcode_buffer.head = 0;
+        gcode_buffer.tail = 0;
+        gcode_buffer.count = 0;
+        gcode_buffer.buffer_full = false;
+        gcode_buffer.buffer_empty = true;
+        stepper_gcode_buffer_space = gcode_buffer.size;
+
+        stepper_system.position_known = false;
+        stepper_system.x_g92_offset = 0.0f;
+        stepper_system.y_g92_offset = 0.0f;
+        stepper_system.z_g92_offset = 0.0f;
+
+        stepper_reset_accumulator_carry();
+        stepper_dwell_active = false;
+        stepper_dwell_until_tick = 0;
+        stepper_release_current_arc();
+        return;
+    }
 
     // If not armed, don't execute motion.
     if (!stepper_armed)
@@ -2815,6 +2968,7 @@ static void stepper_axis_init(stepper_axis_t *axis)
     axis->steps_per_mm = 200.0f;
     axis->max_velocity = 100.0f;
     axis->max_accel = 500.0f;
+    axis->homing_backoff_mm = DEFAULT_HOMING_BACKOFF_MM;
     axis->current_pos = 0;
     axis->target_pos = 0;
     axis->current_vel = 0.0f;
@@ -2861,6 +3015,49 @@ static bool position_within_limits(stepper_axis_t *axis, float pos_mm)
     return (pos_steps >= axis->min_limit && pos_steps <= axis->max_limit);
 }
 
+static bool stepper_pin_conflicts_with_axis_pins(uint8_t gp)
+{
+    if (gp == 0xFF)
+        return false;
+
+    const stepper_axis_t *axes[] = {&stepper_system.x, &stepper_system.y, &stepper_system.z};
+    for (int i = 0; i < 3; i++)
+    {
+        const stepper_axis_t *a = axes[i];
+        if (a->step_pin == gp || a->dir_pin == gp || a->enable_pin == gp)
+            return true;
+    }
+    return false;
+}
+
+static bool stepper_pin_conflicts_with_other_machine_io(uint8_t gp, const stepper_axis_t *self_axis)
+{
+    if (gp == 0xFF)
+        return false;
+
+    const stepper_axis_t *axes[] = {&stepper_system.x, &stepper_system.y, &stepper_system.z};
+    for (int i = 0; i < 3; i++)
+    {
+        const stepper_axis_t *a = axes[i];
+        if (a == self_axis)
+            continue;
+        if (a->step_pin == gp || a->dir_pin == gp || a->enable_pin == gp)
+            return true;
+    }
+
+    if (stepper_system.x_min_limit_pin == gp || stepper_system.x_max_limit_pin == gp ||
+        stepper_system.y_min_limit_pin == gp || stepper_system.y_max_limit_pin == gp ||
+        stepper_system.z_min_limit_pin == gp || stepper_system.z_max_limit_pin == gp)
+        return true;
+
+    if (stepper_system.spindle_pin == gp)
+        return true;
+    if (stepper_system.estop_pin == gp)
+        return true;
+
+    return false;
+}
+
 // Helper: true if gp is currently used by any configured motion/limit signal pin.
 static bool stepper_pin_conflicts_with_machine_io(uint8_t gp)
 {
@@ -2878,6 +3075,12 @@ static bool stepper_pin_conflicts_with_machine_io(uint8_t gp)
     if (stepper_system.x_min_limit_pin == gp || stepper_system.x_max_limit_pin == gp ||
         stepper_system.y_min_limit_pin == gp || stepper_system.y_max_limit_pin == gp ||
         stepper_system.z_min_limit_pin == gp || stepper_system.z_max_limit_pin == gp)
+        return true;
+
+    if (stepper_system.spindle_pin == gp)
+        return true;
+
+    if (stepper_system.estop_pin == gp)
         return true;
 
     return false;
@@ -3018,7 +3221,7 @@ static void calculate_default_jerk(void)
 }
 
 // G28 homing implementation - homes one axis at a time in negative direction
-// Two-pass approach: fast approach at 50% speed, then slow precision at 5% speed
+// Two-phase approach: fast approach at 50% speed, then slow backoff at 5% speed.
 static void cmd_stepper_home_axes(int argc, unsigned char **argv)
 {
     if (!stepper_initialized)
@@ -3030,7 +3233,9 @@ static void cmd_stepper_home_axes(int argc, unsigned char **argv)
         stepper_error("Cannot home while motion active");
 
     // Parse which axes to home (X, Y, Z parameters with non-zero values)
+    // If no axis words are provided, default to all configured axes.
     bool home_x = false, home_y = false, home_z = false;
+    bool explicit_axis_word = false;
 
     for (int i = 2; i < argc; i += 4)
     {
@@ -3038,6 +3243,8 @@ static void cmd_stepper_home_axes(int argc, unsigned char **argv)
             break;
 
         int axis_idx = checkparam((char *)argv[i], 3, "X", "Y", "Z");
+        if (axis_idx != 0)
+            explicit_axis_word = true;
         float value = getnumber(argv[i + 2]);
         if (value != 0.0f)
         {
@@ -3051,7 +3258,21 @@ static void cmd_stepper_home_axes(int argc, unsigned char **argv)
     }
 
     if (!home_x && !home_y && !home_z)
-        stepper_error("G28 requires at least one axis specified (X, Y, or Z with non-zero value)");
+    {
+        if (!explicit_axis_word)
+        {
+            home_x = axis_is_configured(&stepper_system.x);
+            home_y = axis_is_configured(&stepper_system.y);
+            home_z = axis_is_configured(&stepper_system.z);
+        }
+        else
+        {
+            stepper_error("G28 requires at least one axis specified (X, Y, or Z with non-zero value)");
+        }
+    }
+
+    if (!home_x && !home_y && !home_z)
+        stepper_error("G28 has no configured axes to home");
 
     // Validate required minimum limit switches for the requested axes only.
     if (!stepper_system.limits_enabled)
@@ -3066,17 +3287,22 @@ static void cmd_stepper_home_axes(int argc, unsigned char **argv)
     // Homing redefines machine zero; any queued motion becomes invalid.
     gcode_buffer_init(&gcode_buffer);
 
+    // Disarm the ISR during homing to prevent limit-check races
+    // when homing_active transitions back to false.
+    bool was_armed = stepper_armed;
+    stepper_armed = false;
+
     // Enter homing mode
     stepper_system.homing_active = true;
     MMPrintString("Homing axes...\r\n");
 
-    // Home each axis sequentially
-    stepper_axis_t *axes[] = {&stepper_system.x, &stepper_system.y, &stepper_system.z};
-    bool home_flags[] = {home_x, home_y, home_z};
-    uint8_t limit_pins[] = {stepper_system.x_min_limit_pin,
-                            stepper_system.y_min_limit_pin,
-                            stepper_system.z_min_limit_pin};
-    const char *axis_names[] = {"X", "Y", "Z"};
+    // Home each axis sequentially in Z, X, Y order.
+    stepper_axis_t *axes[] = {&stepper_system.z, &stepper_system.x, &stepper_system.y};
+    bool home_flags[] = {home_z, home_x, home_y};
+    uint8_t limit_pins[] = {stepper_system.z_min_limit_pin,
+                            stepper_system.x_min_limit_pin,
+                            stepper_system.y_min_limit_pin};
+    const char *axis_names[] = {"Z", "X", "Y"};
 
     for (int axis_idx = 0; axis_idx < 3; axis_idx++)
     {
@@ -3093,7 +3319,7 @@ static void cmd_stepper_home_axes(int argc, unsigned char **argv)
         if (fast_speed <= 0.0f || axis->steps_per_mm <= 0.0f)
             stepper_error("Invalid axis configuration for homing");
 
-        // Move in negative direction until limit hit
+        // Move in negative direction until limit hit (debounced)
         bool limit_hit = false;
 
         // Calculate large negative move distance (will stop at limit)
@@ -3106,9 +3332,12 @@ static void cmd_stepper_home_axes(int argc, unsigned char **argv)
 
         while (axis->current_pos > target_steps && !limit_hit)
         {
+            if (stepper_estop_trip_latched || stepper_estop_is_active())
+                stepper_error("Hardware E-STOP active");
+
             // Check limit switch
             uint64_t gpio_state = gpio_get_all64();
-            if ((~gpio_state & limit_mask) != 0)
+            if ((~gpio_state & limit_mask) != 0 && homing_limit_state_debounced(limit_mask, true))
             {
                 limit_hit = true;
                 break;
@@ -3132,79 +3361,47 @@ static void cmd_stepper_home_axes(int argc, unsigned char **argv)
         if (!limit_hit)
             stepper_error("Homing failed - limit not reached");
 
-        // Back off until limit clears
+        // Let mechanics settle before clearing the switch in reverse.
+        busy_wait_us(HOMING_HIT_DWELL_US);
+
+        float slow_speed = axis->max_velocity * stepper_system.homing_slow_rate;
+        if (slow_speed <= 0.0f)
+            stepper_error("Invalid axis configuration for homing");
+        uint32_t slow_delay_us = (uint32_t)(1000000.0f / (slow_speed * axis->steps_per_mm));
+
+        // Back off slowly until limit clears (debounced)
         bool dir_level = true; // Positive direction
         if (axis->dir_invert)
             dir_level = !dir_level;
         gpio_put(axis->dir_pin, dir_level);
         busy_wait_us(10);
 
-        for (int i = 0; i < 100; i++) // Max 100 steps backoff
+        int backoff_steps = (int)(axis->steps_per_mm * axis->homing_backoff_mm + 0.5f);
+        if (backoff_steps < 1)
+            backoff_steps = 1;
+
+        bool backoff_cleared = false;
+        for (int i = 0; i < backoff_steps; i++)
         {
+            if (stepper_estop_trip_latched || stepper_estop_is_active())
+                stepper_error("Hardware E-STOP active");
+
             uint64_t gpio_state = gpio_get_all64();
-            if ((gpio_state & limit_mask) != 0)
-                break; // Limit cleared
-
-            gpio_put(axis->step_pin, 1);
-            busy_wait_us(2);
-            gpio_put(axis->step_pin, 0);
-            axis->current_pos++;
-            busy_wait_us(delay_us * 2); // Slower backoff
-        }
-
-        // Slow precision approach at 5% max speed
-        float slow_speed = axis->max_velocity * stepper_system.homing_slow_rate;
-
-        if (slow_speed <= 0.0f)
-            stepper_error("Invalid axis configuration for homing");
-        delay_us = (uint32_t)(1000000.0f / (slow_speed * axis->steps_per_mm));
-
-        // Set direction back to negative
-        dir_level = false;
-        if (axis->dir_invert)
-            dir_level = !dir_level;
-        gpio_put(axis->dir_pin, dir_level);
-        busy_wait_us(10);
-
-        limit_hit = false;
-        for (int i = 0; i < 100; i++) // Max 100 steps for precision
-        {
-            uint64_t gpio_state = gpio_get_all64();
-            if ((~gpio_state & limit_mask) != 0)
+            if ((gpio_state & limit_mask) != 0 && homing_limit_state_debounced(limit_mask, false))
             {
-                limit_hit = true;
-                break;
+                backoff_cleared = true;
+                break; // Limit cleared
             }
 
             gpio_put(axis->step_pin, 1);
             busy_wait_us(2);
             gpio_put(axis->step_pin, 0);
-            axis->current_pos--;
-            busy_wait_us(delay_us);
-        }
-
-        if (!limit_hit)
-            stepper_error("Precision homing failed");
-
-        // Final backoff
-        dir_level = true;
-        if (axis->dir_invert)
-            dir_level = !dir_level;
-        gpio_put(axis->dir_pin, dir_level);
-        busy_wait_us(10);
-
-        for (int i = 0; i < 10; i++)
-        {
-            uint64_t gpio_state = gpio_get_all64();
-            if ((gpio_state & limit_mask) != 0)
-                break;
-
-            gpio_put(axis->step_pin, 1);
-            busy_wait_us(2);
-            gpio_put(axis->step_pin, 0);
             axis->current_pos++;
-            busy_wait_us(delay_us * 2);
+            busy_wait_us(slow_delay_us);
         }
+
+        if (!backoff_cleared)
+            stepper_error("Homing failed - limit switch did not clear during backoff");
 
         // Zero the position
         axis->current_pos = 0;
@@ -3223,9 +3420,34 @@ static void cmd_stepper_home_axes(int argc, unsigned char **argv)
     // Sync planner position to zeroed hardware position (and cleared offsets)
     planner_sync_to_physical();
 
+    // Verify all homed axes' limit switches are clear before leaving homing mode.
+    // If any switch is still asserted the ISR would immediately E-Stop.
+    {
+        uint64_t gpio_state = gpio_get_all64();
+        uint64_t homed_limit_mask = 0;
+        if (home_x)
+            homed_limit_mask |= (uint64_t)1 << stepper_system.x_min_limit_pin;
+        if (home_y)
+            homed_limit_mask |= (uint64_t)1 << stepper_system.y_min_limit_pin;
+        if (home_z)
+            homed_limit_mask |= (uint64_t)1 << stepper_system.z_min_limit_pin;
+
+        if ((~gpio_state & homed_limit_mask) != 0)
+            stepper_error("Homing failed - limit switch still active after backoff");
+    }
+
     // Exit homing mode and mark position as known
     stepper_system.homing_active = false;
     stepper_system.position_known = true;
+
+    // Clear any spurious limit latch that the ISR may have set before
+    // we entered homing mode, so it doesn't fire on the next command.
+    stepper_limit_trip_latched = false;
+    stepper_limit_trip_mask = 0;
+
+    // Restore armed state now that all limits are verified clear.
+    stepper_armed = was_armed;
+
     MMPrintString("Homing complete\r\n");
 }
 
@@ -3237,62 +3459,10 @@ void cmd_stepper(void)
     if (Option.audio_i2s_bclk)
         stepper_error("Stepper incompatible with I2S audio");
 
-    // Report any latched hardware limit trip (set by ISR) as soon as we re-enter command context.
-    // This avoids "silent" stops where the buffer is cleared and mode forced to TEST.
-    if (stepper_limit_trip_latched)
-    {
-        uint64_t mask;
-        uint32_t save = save_and_disable_interrupts();
-        mask = stepper_limit_trip_mask;
-        stepper_limit_trip_mask = 0;
-        stepper_limit_trip_latched = false;
-        restore_interrupts(save);
+    if (stepper_report_latched_trips())
+        return;
 
-        MMPrintString("Hardware limit switch trip - emergency stop\r\n");
-
-        // Best-effort decode of which configured limits were asserted.
-        // (Pins are active-low; mask bits are GP numbers.)
-        char which[120];
-        which[0] = 0;
-        bool first = true;
-        struct
-        {
-            const char *name;
-            uint8_t pin;
-        } lims[] = {
-            {"X_MIN", stepper_system.x_min_limit_pin},
-            {"X_MAX", stepper_system.x_max_limit_pin},
-            {"Y_MIN", stepper_system.y_min_limit_pin},
-            {"Y_MAX", stepper_system.y_max_limit_pin},
-            {"Z_MIN", stepper_system.z_min_limit_pin},
-            {"Z_MAX", stepper_system.z_max_limit_pin},
-        };
-
-        for (unsigned i = 0; i < sizeof(lims) / sizeof(lims[0]); i++)
-        {
-            if (lims[i].pin == 0xFF)
-                continue;
-            if ((mask & (1ULL << lims[i].pin)) == 0)
-                continue;
-
-            if (!first)
-                strncat(which, ", ", sizeof(which) - strlen(which) - 1);
-            strncat(which, lims[i].name, sizeof(which) - strlen(which) - 1);
-            first = false;
-        }
-
-        if (!first)
-        {
-            MMPrintString("Asserted: ");
-            MMPrintString(which);
-            MMPrintString("\r\n");
-        }
-
-        MMPrintString("Mode forced to TEST, buffer cleared, position unknown\r\n");
-        MMPrintString("Clear the switch condition and re-home (G28), then STEPPER RUN\r\n");
-    }
-
-    // STEPPER INIT [arc_tolerance] [,buffer_size] - Initialize stepper system, G-code buffer, and 100KHz timer interrupt
+    // STEPPER INIT [arc_tolerance] [,buffer_size] [,estop_pin] - Initialize stepper system, G-code buffer, and 100KHz timer interrupt
     if ((tp = checkstring(cmdline, (unsigned char *)"INIT")) != NULL)
     {
         if (stepper_initialized)
@@ -3301,6 +3471,7 @@ void cmd_stepper(void)
         float tol = DEFAULT_ARC_TOLERANCE_MM;
         bool tol_set = false;
         int buf_size = GCODE_BUFFER_DEFAULT_SIZE;
+        int estop_pin_cfg = 0;
 
         // Parse optional parameters. Accepts either order.
         // Disambiguation rule:
@@ -3312,19 +3483,23 @@ void cmd_stepper(void)
         //   STEPPER INIT 64
         //   STEPPER INIT 0.25,64
         //   STEPPER INIT 64,0.25
-        getcsargs(&tp, 3);
-        if (!(argc == 0 || argc == 1 || argc == 3))
-            stepper_error("Syntax: STEPPER INIT [arc_tolerance] [,buffer_size]");
+        getcsargs(&tp, 5);
+        if (!(argc == 0 || argc == 1 || argc == 3 || argc == 5))
+            stepper_error("Syntax: STEPPER INIT [arc_tolerance] [,buffer_size] [,estop_pin]");
 
         bool have_tol = false;
         bool have_buf = false;
-        for (int i = 0; i < argc; i += 2)
+        int init_argc = (argc + 1) / 2;
+        int numeric_args = init_argc;
+        if (numeric_args > 2)
+            numeric_args = 2;
+        for (int i = 0; i < numeric_args; i++)
         {
-            double v = (double)getnumber(argv[i]);
+            double v = (double)getnumber(argv[i * 2]);
             if (v > 0.0 && v < 1.0)
             {
                 if (have_tol)
-                    stepper_error("Syntax: STEPPER INIT [arc_tolerance] [,buffer_size]");
+                    stepper_error("Syntax: STEPPER INIT [arc_tolerance] [,buffer_size] [,estop_pin]");
                 have_tol = true;
                 tol = (float)v;
                 tol_set = true;
@@ -3335,15 +3510,23 @@ void cmd_stepper(void)
             {
                 long iv = (long)v;
                 if ((double)iv != v)
-                    stepper_error("Syntax: STEPPER INIT [arc_tolerance] [,buffer_size]");
+                    stepper_error("Syntax: STEPPER INIT [arc_tolerance] [,buffer_size] [,estop_pin]");
                 if (have_buf)
-                    stepper_error("Syntax: STEPPER INIT [arc_tolerance] [,buffer_size]");
+                    stepper_error("Syntax: STEPPER INIT [arc_tolerance] [,buffer_size] [,estop_pin]");
                 have_buf = true;
                 buf_size = (int)iv;
                 continue;
             }
 
-            stepper_error("Syntax: STEPPER INIT [arc_tolerance] [,buffer_size]");
+            stepper_error("Syntax: STEPPER INIT [arc_tolerance] [,buffer_size] [,estop_pin]");
+        }
+
+        if (init_argc == 3 && *argv[4])
+        {
+            estop_pin_cfg = parse_pin(argv[4]);
+            if (estop_pin_cfg == 0)
+                stepper_error("E-STOP pin cannot be 0");
+            CheckPin(estop_pin_cfg, CP_IGNORE_INUSE);
         }
 
         if (tol_set && tol <= 0.0f)
@@ -3402,6 +3585,18 @@ void cmd_stepper(void)
         stepper_system.spindle_pin = 0xFF;
         stepper_system.spindle_invert = false;
         stepper_system.spindle_on = false;
+        stepper_system.estop_pin = 0xFF;
+
+        if (estop_pin_cfg != 0)
+        {
+            stepper_system.estop_pin = PinDef[estop_pin_cfg].GPno;
+            gpio_init(stepper_system.estop_pin);
+            gpio_set_dir(stepper_system.estop_pin, GPIO_IN);
+            gpio_pull_up(stepper_system.estop_pin);
+            ExtCfg(estop_pin_cfg, EXT_DIG_IN, 0);
+        }
+
+        stepper_estop_trip_latched = false;
 
         stepper_reset_accumulator_carry();
 
@@ -3447,6 +3642,9 @@ void cmd_stepper(void)
         stepper_axis_last_step_tick[0] = 0;
         stepper_axis_last_step_tick[1] = 0;
         stepper_axis_last_step_tick[2] = 0;
+
+        if (estop_pin_cfg != 0)
+            ExtCfg(estop_pin_cfg, EXT_COM_RESERVED, 0);
 
         // Warn if soft limits not configured
         MMPrintString("Stepper initialized - 100KHz timer active\r\n");
@@ -3539,10 +3737,10 @@ void cmd_stepper(void)
         return;
     }
 
-    // STEPPER AXIS X|Y|Z, step_pin, dir_pin [, enable_pin] [, dir_invert] [, steps_per_mm] [, max_velocity] [, max_accel]
+    // STEPPER AXIS X|Y|Z, step_pin, dir_pin [, enable_pin] [, dir_invert] [, steps_per_mm] [, max_velocity] [, max_accel] [, home_backoff_mm]
     if ((tp = checkstring(cmdline, (unsigned char *)"AXIS")) != NULL)
     {
-        getcsargs(&tp, 15);
+        getcsargs(&tp, 17);
         if (argc < 5)
             stepper_error("Syntax");
 
@@ -3555,13 +3753,20 @@ void cmd_stepper(void)
         if (axis == NULL)
             stepper_error("Axis must be X, Y, or Z");
 
+        int reserve_step_pin = 0;
+        int reserve_dir_pin = 0;
+        int reserve_enable_pin = 0;
+
         // Initialize axis to defaults first
         stepper_axis_init(axis);
 
         // Get step pin (required) - accepts physical pin or GPxx format
         int step_pin = parse_pin(argv[2]);
         CheckPin(step_pin, CP_IGNORE_INUSE);
-        axis->step_pin = PinDef[step_pin].GPno;
+        uint8_t step_gp = PinDef[step_pin].GPno;
+        if (stepper_pin_conflicts_with_other_machine_io(step_gp, axis))
+            stepper_error("Axis step pin conflicts with existing stepper IO pin");
+        axis->step_pin = step_gp;
 
         if (stepper_system.spindle_pin != 0xFF && axis->step_pin == stepper_system.spindle_pin)
             stepper_error("Axis step pin conflicts with spindle pin");
@@ -3569,7 +3774,12 @@ void cmd_stepper(void)
         // Get direction pin (required) - accepts physical pin or GPxx format
         int dir_pin = parse_pin(argv[4]);
         CheckPin(dir_pin, CP_IGNORE_INUSE);
-        axis->dir_pin = PinDef[dir_pin].GPno;
+        uint8_t dir_gp = PinDef[dir_pin].GPno;
+        if (dir_gp == axis->step_pin)
+            stepper_error("Axis dir pin conflicts with step pin");
+        if (stepper_pin_conflicts_with_other_machine_io(dir_gp, axis))
+            stepper_error("Axis dir pin conflicts with existing stepper IO pin");
+        axis->dir_pin = dir_gp;
 
         if (stepper_system.spindle_pin != 0xFF && axis->dir_pin == stepper_system.spindle_pin)
             stepper_error("Axis dir pin conflicts with spindle pin");
@@ -3579,13 +3789,13 @@ void cmd_stepper(void)
         gpio_set_dir(axis->step_pin, GPIO_OUT);
         gpio_put(axis->step_pin, 0);
         ExtCfg(step_pin, EXT_DIG_OUT, 0);
-        ExtCfg(step_pin, EXT_COM_RESERVED, 0);
+        reserve_step_pin = step_pin;
 
         gpio_init(axis->dir_pin);
         gpio_set_dir(axis->dir_pin, GPIO_OUT);
         gpio_put(axis->dir_pin, 0);
         ExtCfg(dir_pin, EXT_DIG_OUT, 0);
-        ExtCfg(dir_pin, EXT_COM_RESERVED, 0);
+        reserve_dir_pin = dir_pin;
 
         // Optional: enable pin (0 means not used)
         if (argc >= 7 && *argv[6])
@@ -3594,14 +3804,19 @@ void cmd_stepper(void)
             if (enable_pin != 0)
             {
                 CheckPin(enable_pin, CP_IGNORE_INUSE);
-                axis->enable_pin = PinDef[enable_pin].GPno;
+                uint8_t enable_gp = PinDef[enable_pin].GPno;
+                if (enable_gp == axis->step_pin || enable_gp == axis->dir_pin)
+                    stepper_error("Axis enable pin conflicts with step/dir pin");
+                if (stepper_pin_conflicts_with_other_machine_io(enable_gp, axis))
+                    stepper_error("Axis enable pin conflicts with existing stepper IO pin");
+                axis->enable_pin = enable_gp;
                 if (stepper_system.spindle_pin != 0xFF && axis->enable_pin == stepper_system.spindle_pin)
                     stepper_error("Axis enable pin conflicts with spindle pin");
                 gpio_init(axis->enable_pin);
                 gpio_set_dir(axis->enable_pin, GPIO_OUT);
                 gpio_put(axis->enable_pin, 1); // Typically active low, so disable by default
                 ExtCfg(enable_pin, EXT_DIG_OUT, 0);
-                ExtCfg(enable_pin, EXT_COM_RESERVED, 0);
+                reserve_enable_pin = enable_pin;
             }
         }
 
@@ -3637,6 +3852,14 @@ void cmd_stepper(void)
                 stepper_error("Max acceleration must be > 0");
         }
 
+        // Optional: homing backoff distance (mm)
+        if (argc >= 17 && *argv[16])
+        {
+            axis->homing_backoff_mm = getnumber(argv[16]);
+            if (axis->homing_backoff_mm <= 0.0f)
+                stepper_error("Homing backoff distance must be > 0");
+        }
+
         // Update ISR hard-timing limits for this axis configuration.
         {
             uint32_t save = save_and_disable_interrupts();
@@ -3647,6 +3870,13 @@ void cmd_stepper(void)
         // Auto-calculate reasonable default jerk based on configured axes
         // User can still override with explicit STEPPER JERK command
         calculate_default_jerk();
+
+        if (reserve_step_pin != 0)
+            ExtCfg(reserve_step_pin, EXT_COM_RESERVED, 0);
+        if (reserve_dir_pin != 0)
+            ExtCfg(reserve_dir_pin, EXT_COM_RESERVED, 0);
+        if (reserve_enable_pin != 0)
+            ExtCfg(reserve_enable_pin, EXT_COM_RESERVED, 0);
 
         return;
     }
@@ -3796,6 +4026,8 @@ void cmd_stepper(void)
         stepper_system.spindle_pin = 0xFF;
         stepper_system.spindle_invert = false;
         stepper_system.spindle_on = false;
+        stepper_system.estop_pin = 0xFF;
+        stepper_estop_trip_latched = false;
         return;
     }
 
@@ -3823,8 +4055,11 @@ void cmd_stepper(void)
         CheckPin(spindle_pin, CP_IGNORE_INUSE);
 
         uint8_t spindle_gp = PinDef[spindle_pin].GPno;
-        if (stepper_pin_conflicts_with_machine_io(spindle_gp))
-            stepper_error("Spindle pin conflicts with axis or limit pin");
+        if (!(stepper_system.spindle_pin != 0xFF && spindle_gp == stepper_system.spindle_pin))
+        {
+            if (stepper_pin_conflicts_with_machine_io(spindle_gp))
+                stepper_error("Spindle pin conflicts with existing stepper IO pin");
+        }
 
         stepper_system.spindle_pin = spindle_gp;
         stepper_system.spindle_invert = (argc == 3) ? (getint(argv[2], 0, 1) != 0) : false;
@@ -3834,6 +4069,7 @@ void cmd_stepper(void)
         gpio_set_dir(stepper_system.spindle_pin, GPIO_OUT);
         stepper_spindle_off();
         ExtCfg(spindle_pin, EXT_DIG_OUT, 0);
+        ExtCfg(spindle_pin, EXT_COM_RESERVED, 0);
         return;
     }
 
@@ -3858,17 +4094,80 @@ void cmd_stepper(void)
         CheckPin(y_min_pin, CP_IGNORE_INUSE);
         CheckPin(z_min_pin, CP_IGNORE_INUSE);
 
-        stepper_system.x_min_limit_pin = PinDef[x_min_pin].GPno;
-        stepper_system.y_min_limit_pin = PinDef[y_min_pin].GPno;
-        stepper_system.z_min_limit_pin = PinDef[z_min_pin].GPno;
+        uint8_t x_min_gp = PinDef[x_min_pin].GPno;
+        uint8_t y_min_gp = PinDef[y_min_pin].GPno;
+        uint8_t z_min_gp = PinDef[z_min_pin].GPno;
 
-        if (stepper_system.spindle_pin != 0xFF)
+        // Read optional maximum limit pins first (for full validation before applying).
+        int x_max_pin = 0, y_max_pin = 0, z_max_pin = 0;
+        uint8_t x_max_gp = 0xFF, y_max_gp = 0xFF, z_max_gp = 0xFF;
+
+        if (argc >= 7 && *argv[6])
         {
-            if (stepper_system.x_min_limit_pin == stepper_system.spindle_pin ||
-                stepper_system.y_min_limit_pin == stepper_system.spindle_pin ||
-                stepper_system.z_min_limit_pin == stepper_system.spindle_pin)
-                stepper_error("Limit pin conflicts with spindle pin");
+            x_max_pin = parse_pin(argv[6]);
+            if (x_max_pin != 0)
+            {
+                CheckPin(x_max_pin, CP_IGNORE_INUSE);
+                x_max_gp = PinDef[x_max_pin].GPno;
+            }
         }
+
+        if (argc >= 9 && *argv[8])
+        {
+            y_max_pin = parse_pin(argv[8]);
+            if (y_max_pin != 0)
+            {
+                CheckPin(y_max_pin, CP_IGNORE_INUSE);
+                y_max_gp = PinDef[y_max_pin].GPno;
+            }
+        }
+
+        if (argc >= 11 && *argv[10])
+        {
+            z_max_pin = parse_pin(argv[10]);
+            if (z_max_pin != 0)
+            {
+                CheckPin(z_max_pin, CP_IGNORE_INUSE);
+                z_max_gp = PinDef[z_max_pin].GPno;
+            }
+        }
+
+        // All limit pins must not overlap axis pins, spindle pin, or E-STOP pin.
+        uint8_t lims[] = {x_min_gp, x_max_gp, y_min_gp, y_max_gp, z_min_gp, z_max_gp};
+        for (int i = 0; i < 6; i++)
+        {
+            if (lims[i] == 0xFF)
+                continue;
+            if (stepper_pin_conflicts_with_axis_pins(lims[i]))
+                stepper_error("Limit pin conflicts with axis pin");
+            if (stepper_system.spindle_pin != 0xFF && lims[i] == stepper_system.spindle_pin)
+                stepper_error("Limit pin conflicts with spindle pin");
+            if (stepper_system.estop_pin != 0xFF && lims[i] == stepper_system.estop_pin)
+                stepper_error("Limit pin conflicts with E-STOP pin");
+        }
+
+        // Pins must be unique across axes; allow only same-axis min/max sharing.
+        for (int i = 0; i < 6; i++)
+        {
+            for (int j = i + 1; j < 6; j++)
+            {
+                if (lims[i] == 0xFF || lims[j] == 0xFF)
+                    continue;
+                if (lims[i] != lims[j])
+                    continue;
+                bool same_axis_pair = ((i == 0 && j == 1) || (i == 2 && j == 3) || (i == 4 && j == 5));
+                if (!same_axis_pair)
+                    stepper_error("Limit pins must be unique (except same-axis min/max)");
+            }
+        }
+
+        // Apply configuration after validation.
+        stepper_system.x_min_limit_pin = x_min_gp;
+        stepper_system.y_min_limit_pin = y_min_gp;
+        stepper_system.z_min_limit_pin = z_min_gp;
+        stepper_system.x_max_limit_pin = x_max_gp;
+        stepper_system.y_max_limit_pin = y_max_gp;
+        stepper_system.z_max_limit_pin = z_max_gp;
 
         // Configure as inputs with pull-ups (active-low switches)
         gpio_init(stepper_system.x_min_limit_pin);
@@ -3886,66 +4185,45 @@ void cmd_stepper(void)
         gpio_pull_up(stepper_system.z_min_limit_pin);
         ExtCfg(z_min_pin, EXT_DIG_IN, 0);
 
-        // Build initial mask with minimum limits
         uint64_t mask = ((uint64_t)1 << stepper_system.x_min_limit_pin) |
                         ((uint64_t)1 << stepper_system.y_min_limit_pin) |
                         ((uint64_t)1 << stepper_system.z_min_limit_pin);
 
-        // Read optional maximum limit pins
-        stepper_system.x_max_limit_pin = 0xFF;
-        stepper_system.y_max_limit_pin = 0xFF;
-        stepper_system.z_max_limit_pin = 0xFF;
-
-        if (argc >= 7 && *argv[6])
+        if (stepper_system.x_max_limit_pin != 0xFF)
         {
-            int x_max_pin = parse_pin(argv[6]);
-            if (x_max_pin != 0)
-            {
-                CheckPin(x_max_pin, CP_IGNORE_INUSE);
-                stepper_system.x_max_limit_pin = PinDef[x_max_pin].GPno;
-                if (stepper_system.spindle_pin != 0xFF && stepper_system.x_max_limit_pin == stepper_system.spindle_pin)
-                    stepper_error("Limit pin conflicts with spindle pin");
-                gpio_init(stepper_system.x_max_limit_pin);
-                gpio_set_dir(stepper_system.x_max_limit_pin, GPIO_IN);
-                gpio_pull_up(stepper_system.x_max_limit_pin);
-                ExtCfg(x_max_pin, EXT_DIG_IN, 0);
-                mask |= ((uint64_t)1 << stepper_system.x_max_limit_pin);
-            }
+            gpio_init(stepper_system.x_max_limit_pin);
+            gpio_set_dir(stepper_system.x_max_limit_pin, GPIO_IN);
+            gpio_pull_up(stepper_system.x_max_limit_pin);
+            ExtCfg(x_max_pin, EXT_DIG_IN, 0);
+            mask |= ((uint64_t)1 << stepper_system.x_max_limit_pin);
+        }
+        if (stepper_system.y_max_limit_pin != 0xFF)
+        {
+            gpio_init(stepper_system.y_max_limit_pin);
+            gpio_set_dir(stepper_system.y_max_limit_pin, GPIO_IN);
+            gpio_pull_up(stepper_system.y_max_limit_pin);
+            ExtCfg(y_max_pin, EXT_DIG_IN, 0);
+            mask |= ((uint64_t)1 << stepper_system.y_max_limit_pin);
+        }
+        if (stepper_system.z_max_limit_pin != 0xFF)
+        {
+            gpio_init(stepper_system.z_max_limit_pin);
+            gpio_set_dir(stepper_system.z_max_limit_pin, GPIO_IN);
+            gpio_pull_up(stepper_system.z_max_limit_pin);
+            ExtCfg(z_max_pin, EXT_DIG_IN, 0);
+            mask |= ((uint64_t)1 << stepper_system.z_max_limit_pin);
         }
 
-        if (argc >= 9 && *argv[8])
-        {
-            int y_max_pin = parse_pin(argv[8]);
-            if (y_max_pin != 0)
-            {
-                CheckPin(y_max_pin, CP_IGNORE_INUSE);
-                stepper_system.y_max_limit_pin = PinDef[y_max_pin].GPno;
-                if (stepper_system.spindle_pin != 0xFF && stepper_system.y_max_limit_pin == stepper_system.spindle_pin)
-                    stepper_error("Limit pin conflicts with spindle pin");
-                gpio_init(stepper_system.y_max_limit_pin);
-                gpio_set_dir(stepper_system.y_max_limit_pin, GPIO_IN);
-                gpio_pull_up(stepper_system.y_max_limit_pin);
-                ExtCfg(y_max_pin, EXT_DIG_IN, 0);
-                mask |= ((uint64_t)1 << stepper_system.y_max_limit_pin);
-            }
-        }
-
-        if (argc >= 11 && *argv[10])
-        {
-            int z_max_pin = parse_pin(argv[10]);
-            if (z_max_pin != 0)
-            {
-                CheckPin(z_max_pin, CP_IGNORE_INUSE);
-                stepper_system.z_max_limit_pin = PinDef[z_max_pin].GPno;
-                if (stepper_system.spindle_pin != 0xFF && stepper_system.z_max_limit_pin == stepper_system.spindle_pin)
-                    stepper_error("Limit pin conflicts with spindle pin");
-                gpio_init(stepper_system.z_max_limit_pin);
-                gpio_set_dir(stepper_system.z_max_limit_pin, GPIO_IN);
-                gpio_pull_up(stepper_system.z_max_limit_pin);
-                ExtCfg(z_max_pin, EXT_DIG_IN, 0);
-                mask |= ((uint64_t)1 << stepper_system.z_max_limit_pin);
-            }
-        }
+        // Reserve only after full parse + validation.
+        ExtCfg(x_min_pin, EXT_COM_RESERVED, 0);
+        ExtCfg(y_min_pin, EXT_COM_RESERVED, 0);
+        ExtCfg(z_min_pin, EXT_COM_RESERVED, 0);
+        if (x_max_pin != 0)
+            ExtCfg(x_max_pin, EXT_COM_RESERVED, 0);
+        if (y_max_pin != 0)
+            ExtCfg(y_max_pin, EXT_COM_RESERVED, 0);
+        if (z_max_pin != 0)
+            ExtCfg(z_max_pin, EXT_COM_RESERVED, 0);
 
         // Store mask and enable limit checking
         stepper_system.limit_switch_mask = mask;
@@ -4368,15 +4646,12 @@ void cmd_stepper(void)
         if (word_p)
             stepper_error("P only valid with G4");
 
-        // G28 - Home specified axes
+        // G28 - Home specified axes (or all configured axes if none specified)
         if (primary_is_home)
         {
             bool home_x = word_x && (!word_x_has || (word_x_val != 0.0));
             bool home_y = word_y && (!word_y_has || (word_y_val != 0.0));
             bool home_z = word_z && (!word_z_has || (word_z_val != 0.0));
-
-            if (!home_x && !home_y && !home_z)
-                stepper_error("G28 requires at least one axis specified (X, Y, or Z)");
 
             unsigned char *hargv[16];
             int hargc = 0;
@@ -5393,6 +5668,9 @@ void cmd_stepper(void)
         if (!stepper_initialized)
             stepper_error("Stepper not initialized");
 
+        if (stepper_estop_is_active())
+            stepper_error("E-STOP active - clear E-STOP and re-home");
+
         if (!stepper_system.position_known)
             stepper_error("Machine position unknown - use STEPPER POSITION or G28 homing first");
 
@@ -5483,14 +5761,15 @@ void cmd_stepper(void)
                     (long)stepper_system.x.current_pos);
             MMPrintString(buf);
 
-            sprintf(buf, "X cfg: step=%u dir=%u en=%u inv=%d spmm=%.3f vmax=%.3f(mm/s) amax=%.3f\r\n",
+            sprintf(buf, "X cfg: step=%u dir=%u en=%u inv=%d spmm=%.3f vmax=%.3f(mm/s) amax=%.3f hback=%.3f(mm)\r\n",
                     (unsigned)stepper_system.x.step_pin,
                     (unsigned)stepper_system.x.dir_pin,
                     (unsigned)stepper_system.x.enable_pin,
                     stepper_system.x.dir_invert ? 1 : 0,
                     (double)stepper_system.x.steps_per_mm,
                     (double)stepper_system.x.max_velocity,
-                    (double)stepper_system.x.max_accel);
+                    (double)stepper_system.x.max_accel,
+                    (double)stepper_system.x.homing_backoff_mm);
             MMPrintString(buf);
         }
         if (axis_is_configured(&stepper_system.y))
@@ -5500,14 +5779,15 @@ void cmd_stepper(void)
                     (long)stepper_system.y.current_pos);
             MMPrintString(buf);
 
-            sprintf(buf, "Y cfg: step=%u dir=%u en=%u inv=%d spmm=%.3f vmax=%.3f(mm/s) amax=%.3f\r\n",
+            sprintf(buf, "Y cfg: step=%u dir=%u en=%u inv=%d spmm=%.3f vmax=%.3f(mm/s) amax=%.3f hback=%.3f(mm)\r\n",
                     (unsigned)stepper_system.y.step_pin,
                     (unsigned)stepper_system.y.dir_pin,
                     (unsigned)stepper_system.y.enable_pin,
                     stepper_system.y.dir_invert ? 1 : 0,
                     (double)stepper_system.y.steps_per_mm,
                     (double)stepper_system.y.max_velocity,
-                    (double)stepper_system.y.max_accel);
+                    (double)stepper_system.y.max_accel,
+                    (double)stepper_system.y.homing_backoff_mm);
             MMPrintString(buf);
         }
         if (axis_is_configured(&stepper_system.z))
@@ -5517,14 +5797,15 @@ void cmd_stepper(void)
                     (long)stepper_system.z.current_pos);
             MMPrintString(buf);
 
-            sprintf(buf, "Z cfg: step=%u dir=%u en=%u inv=%d spmm=%.3f vmax=%.3f(mm/s) amax=%.3f\r\n",
+            sprintf(buf, "Z cfg: step=%u dir=%u en=%u inv=%d spmm=%.3f vmax=%.3f(mm/s) amax=%.3f hback=%.3f(mm)\r\n",
                     (unsigned)stepper_system.z.step_pin,
                     (unsigned)stepper_system.z.dir_pin,
                     (unsigned)stepper_system.z.enable_pin,
                     stepper_system.z.dir_invert ? 1 : 0,
                     (double)stepper_system.z.steps_per_mm,
                     (double)stepper_system.z.max_velocity,
-                    (double)stepper_system.z.max_accel);
+                    (double)stepper_system.z.max_accel,
+                    (double)stepper_system.z.homing_backoff_mm);
             MMPrintString(buf);
         }
 

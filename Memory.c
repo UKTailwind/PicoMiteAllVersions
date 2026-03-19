@@ -138,13 +138,13 @@ void SBitsSet(unsigned char *addr, int bits);
 #endif
 static inline unsigned int MBitsGet(unsigned char *addr);
 static inline void MBitsSet(unsigned char *addr, int bits);
-volatile char *g_StrTmp[MAXTEMPSTRINGS];          // used to track temporary string space on the heap
-volatile char g_StrTmpLocalIndex[MAXTEMPSTRINGS]; // used to track the g_LocalIndex for each temporary string space on the heap
+char *g_StrTmp[MAXTEMPSTRINGS];          // used to track temporary string space on the heap
+char g_StrTmpLocalIndex[MAXTEMPSTRINGS]; // used to track the g_LocalIndex for each temporary string space on the heap
 
 void *getheap(int size);
 unsigned int UsedHeap(void);
 bool g_TempMemoryIsChanged = false; // used to prevent unnecessary scanning of strtmp[]
-short g_StrTmpIndex = 0;            // index to the next unallocated slot in strtmp[]
+int g_StrTmpIndex = 0;              // index to the next unallocated slot in strtmp[]
 
 /***********************************************************************************************************************
  MMBasic commands

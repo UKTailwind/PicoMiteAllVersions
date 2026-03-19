@@ -34,11 +34,12 @@ Initialise the stepper subsystem.
 This starts the 100kHz timer interrupt, initialises the G-code buffer and
 starts DISARMED (no motion execution) until STEPPER RUN is issued.
 
-STEPPER INIT [,arc_tolerance] [,buffer_size]
+STEPPER INIT [,arc_tolerance] [,buffer_size] [,estop_pin]
 Initialise the stepper subsystem and optionally set the arc tolerance in mm.
 This controls the maximum linear segment length used to approximate arcs.
 Default is 0.5mm.
 The optional buffer_size sets the number of buffered G-code blocks (default 16).
+The optional estop_pin configures a hardware emergency-stop input (active-low).
 
 STEPPER CLOSE
 Shutdown the stepper subsystem and stop the 100kHz timer interrupt.
@@ -53,13 +54,14 @@ Recover from an abnormal state (eg. after a runtime error).
 Stops any executing move, clears the G-code buffer, turns the spindle off,
 and DISARMS motion execution (no automatic resume). Drivers are not automatically disabled.
 
-STEPPER AXIS X|Y|Z, step_pin, dir_pin [,enable_pin] [,dir_invert] [,steps_per_mm] [,max_velocity] [,max_accel]
+STEPPER AXIS X|Y|Z, step_pin, dir_pin [,enable_pin] [,dir_invert] [,steps_per_mm] [,max_velocity] [,max_accel] [,home_backoff_mm]
 Configure an axis.
 Pins may be specified as a physical pin number or GPxx.
 ‘enable_pin’ is optional; if omitted then ENABLE for that axis is unavailable.
 ‘dir_invert’ is 0 or 1.
 ‘max_velocity’ is in mm/min (same units as G-code F).
 ‘max_accel’ is in mm/s^2.
+‘home_backoff_mm’ is the homing switch clear/backoff distance in mm (default 3.0).
 A reasonable default jerk is automatically calculated when axes are configured.
 
 STEPPER JERK jerk_mm_s^3
@@ -111,7 +113,9 @@ Note: This does not stop the 100kHz timer; use STEPPER CLOSE for shutdown.
 STEPPER GCODE G0|G1|G2|G3|G4|G28|G61|G64|G90|G91|G92|M03|M05 [,X x] [,Y y] [,Z z] [,F feedrate] [,I i] [,J j] [,K k] [,R r] [,P ms]
 Queue a G-code command into the circular buffer.
 G28: Home specified axes (requires min limit switches configured).
-     Homes in negative direction at 50% then 5% of max speed.
+    If no axes are specified, homes all configured axes.
+    Two-phase homing: fast approach at 50%, 250ms settle pause,
+    then slow reverse clear at 5% with debounced limit detection.
      Zeros hardware position and clears G92 offsets.
      Example: STEPPER GCODE G28, X, 1, Y, 1 (homes X and Y)
 G92: Set workspace coordinate offsets (without moving machine).
@@ -174,6 +178,9 @@ bool stepper_query_position_mm(char axis, float *pos_mm);
 // True when stepper execution is armed and currently processing queued work.
 int stepper_query_active(void);
 
+// Poll and report latched stepper safety events (E-STOP/limits) from main context.
+void stepper_poll_events(void);
+
 // Structure to hold parameters for a single stepper motor axis
 typedef struct
 {
@@ -183,9 +190,10 @@ typedef struct
     uint enable_pin; // Enable pin (optional, set to 0xFF if not used)
 
     // Motion parameters
-    float steps_per_mm; // Steps per millimeter (or unit of measurement)
-    float max_velocity; // Maximum velocity in mm/s (configured in mm/min)
-    float max_accel;    // Maximum acceleration in mm/s²
+    float steps_per_mm;      // Steps per millimeter (or unit of measurement)
+    float max_velocity;      // Maximum velocity in mm/s (configured in mm/min)
+    float max_accel;         // Maximum acceleration in mm/s²
+    float homing_backoff_mm; // Homing switch clear/backoff distance in mm
 
     // Current state
     int32_t current_pos; // Current position in steps
@@ -241,6 +249,9 @@ typedef struct
     uint8_t spindle_pin; // Output pin for spindle enable (0xFF = not used)
     bool spindle_invert; // 0 = active-high, 1 = active-low
     bool spindle_on;     // Current spindle output state
+
+    // Hardware emergency-stop input (optional, active-low)
+    uint8_t estop_pin; // E-STOP input pin (0xFF = not used)
 
 } stepper_system_t;
 

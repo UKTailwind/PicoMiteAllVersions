@@ -43,6 +43,164 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "pico/multicore.h"
 extern mutex_t frameBufferMutex;
 #endif
+// Hidden-line helpers are only compiled for rp2350 builds.
+#if defined(rp2350) && !defined(PICOMITEWEB)
+
+static bool is_hiddenline_target(void)
+{
+    if (WriteBuf == NULL)
+        return false;
+
+    if (WriteBuf == FrameBuf || WriteBuf == LayerBuf
+#ifdef PICOMITEVGA
+        || WriteBuf == DisplayBuf || WriteBuf == SecondFrame
+#ifdef rp2350
+        || WriteBuf == SecondLayer
+#endif
+#endif
+    )
+        return true;
+
+    return false;
+}
+
+static void hiddenline_raster_triangle(short x0, short y0, FLOAT3D iz0,
+                                       short x1, short y1, FLOAT3D iz1,
+                                       short x2, short y2, FLOAT3D iz2,
+                                       int minx, int miny, int maxx, int maxy,
+                                       FLOAT3D *zbuf, int bw)
+{
+    int tri_minx = x0 < x1 ? x0 : x1;
+    tri_minx = tri_minx < x2 ? tri_minx : x2;
+    int tri_maxx = x0 > x1 ? x0 : x1;
+    tri_maxx = tri_maxx > x2 ? tri_maxx : x2;
+    int tri_miny = y0 < y1 ? y0 : y1;
+    tri_miny = tri_miny < y2 ? tri_miny : y2;
+    int tri_maxy = y0 > y1 ? y0 : y1;
+    tri_maxy = tri_maxy > y2 ? tri_maxy : y2;
+
+    int bbminx = tri_minx > minx ? tri_minx : minx;
+    int bbmaxx = tri_maxx < maxx ? tri_maxx : maxx;
+    int bbminy = tri_miny > miny ? tri_miny : miny;
+    int bbmaxy = tri_maxy < maxy ? tri_maxy : maxy;
+
+    int den_i = (y1 - y2) * (x0 - x2) + (x2 - x1) * (y0 - y2);
+    if (den_i == 0)
+        return;
+
+    FLOAT3D inv_den = 1.0 / (FLOAT3D)den_i;
+    FLOAT3D c0 = iz0 * inv_den;
+    FLOAT3D c1 = iz1 * inv_den;
+    FLOAT3D c2 = iz2 * inv_den;
+
+    // Edge-function coefficients: e(x,y) = A*x + B*y + C
+    int A0 = y1 - y2, B0 = x2 - x1, C0 = x1 * y2 - x2 * y1;
+    int A1 = y2 - y0, B1 = x0 - x2, C1 = x2 * y0 - x0 * y2;
+    int A2 = y0 - y1, B2 = x1 - x0, C2 = x0 * y1 - x1 * y0;
+
+    int sign = den_i > 0 ? 1 : -1;
+
+    for (int y = bbminy; y <= bbmaxy; y++)
+    {
+        int e0 = A0 * bbminx + B0 * y + C0;
+        int e1 = A1 * bbminx + B1 * y + C1;
+        int e2 = A2 * bbminx + B2 * y + C2;
+        for (int x = bbminx; x <= bbmaxx; x++)
+        {
+            if (e0 * sign >= 0 && e1 * sign >= 0 && e2 * sign >= 0)
+            {
+                FLOAT3D iz = ((FLOAT3D)e0 * c0) + ((FLOAT3D)e1 * c1) + ((FLOAT3D)e2 * c2);
+                int idx = (y - miny) * bw + (x - minx);
+                if (iz > zbuf[idx])
+                    zbuf[idx] = iz;
+            }
+            e0 += A0;
+            e1 += A1;
+            e2 += A2;
+        }
+    }
+}
+
+static void hiddenline_draw_edge(short x0, short y0, FLOAT3D iz0,
+                                 short x1, short y1, FLOAT3D iz1,
+                                 int c,
+                                 int minx, int miny, int maxx, int maxy,
+                                 FLOAT3D *zbuf, int bw)
+{
+    int dx = abs(x1 - x0);
+    int dy = abs(y1 - y0);
+    int steps = dx > dy ? dx : dy;
+    if (steps == 0)
+    {
+        if (x0 >= minx && x0 <= maxx && y0 >= miny && y0 <= maxy)
+        {
+            int idx = (y0 - miny) * bw + (x0 - minx);
+            if (iz0 >= zbuf[idx] - 0.0005)
+                DrawPixel(x0, y0, c);
+        }
+        return;
+    }
+
+    FLOAT3D izstep = (iz1 - iz0) / (FLOAT3D)steps;
+    int sx = (x0 < x1) ? 1 : -1;
+    int sy = (y0 < y1) ? 1 : -1;
+    int err = dx - dy;
+    int x = x0;
+    int y = y0;
+    FLOAT3D izf = iz0;
+
+    for (int i = 0; i <= steps; i++)
+    {
+        if (x >= minx && x <= maxx && y >= miny && y <= maxy)
+        {
+            int idx = (y - miny) * bw + (x - minx);
+            if (izf >= zbuf[idx] - 0.0005)
+                DrawPixel(x, y, c);
+        }
+        int e2 = err << 1;
+        if (e2 > -dy)
+        {
+            err -= dy;
+            x += sx;
+        }
+        if (e2 < dx)
+        {
+            err += dx;
+            y += sy;
+        }
+        izf += izstep;
+    }
+}
+
+static FLOAT3D *hiddenline_zbuf_cache = NULL;
+static int hiddenline_zbuf_capacity = 0;
+
+static FLOAT3D *hiddenline_get_zbuf(int count)
+{
+    if (count <= 0)
+        return NULL;
+    if (count > hiddenline_zbuf_capacity)
+    {
+        if (hiddenline_zbuf_cache != NULL)
+            FreeMemory((unsigned char *)hiddenline_zbuf_cache);
+        hiddenline_zbuf_cache = (FLOAT3D *)GetMemory(count * sizeof(FLOAT3D));
+        hiddenline_zbuf_capacity = count;
+    }
+    return hiddenline_zbuf_cache;
+}
+
+static void hiddenline_release_zbuf(void)
+{
+    if (hiddenline_zbuf_cache != NULL)
+    {
+        FreeMemory((unsigned char *)hiddenline_zbuf_cache);
+        hiddenline_zbuf_cache = NULL;
+        hiddenline_zbuf_capacity = 0;
+    }
+}
+
+#endif
+
 #ifdef PICOMITEWEB
 #include "pico/cyw43_arch.h"
 #endif
@@ -277,11 +435,6 @@ uint8_t __not_in_flash_func(RGB332)(uint32_t c)
     return (c >> 16 & 0xE0) | (c >> 11 & 0x1C) | (c >> 6 & 0x03);
 }
 /*  @endcond */
-void CheckDisplay(void)
-{
-    if (Option.DISPLAY_TYPE == 0)
-        DisplayNotSet();
-}
 void MIPS16 cmd_guiMX170(void)
 {
     unsigned char *p;
@@ -514,7 +667,7 @@ void MIPS16 cmd_guiMX170(void)
  * The following section will be excluded from the documentation.
  */
 
-void getargaddress(unsigned char *p, long long int **ip, MMFLOAT **fp, int *n, int *stride)
+static inline void getargaddress(unsigned char *p, long long int **ip, MMFLOAT **fp, int *n, int *stride)
 {
     unsigned char *ptr = NULL;
     *fp = NULL;
@@ -934,7 +1087,7 @@ void RestoreLine(int x1, int y1, int x2, int y2, char *buff)
     }
 }
 
-void DrawLine(int x1, int y1, int x2, int y2, int w, int c)
+void __no_inline_not_in_flash_func(DrawLine)(int x1, int y1, int x2, int y2, int w, int c)
 {
 
     if (y1 == y2 && w > 0)
@@ -6173,49 +6326,136 @@ void MIPS16 loadarray(unsigned char *p)
     else
         error((char *)"Buffer already in use");
 }
+
+typedef enum
+{
+    SCROLL_BPP_1 = 1,
+    SCROLL_BPP_4 = 4,
+    SCROLL_BPP_8 = 8,
+    SCROLL_BPP_16 = 16
+} scroll_bpp_t;
+
+static inline scroll_bpp_t scroll_get_bpp(void)
+{
+#ifdef PICOMITEVGA
+    if (DISPLAY_TYPE == SCREENMODE1)
+        return SCROLL_BPP_1;
+#ifdef HDMI
+    if (DISPLAY_TYPE == SCREENMODE4)
+        return SCROLL_BPP_16;
+    if (DISPLAY_TYPE == SCREENMODE5)
+        return SCROLL_BPP_8;
+#endif
+    return SCROLL_BPP_4; // SCREENMODE2 and SCREENMODE3
+#else
+    // On non-VGA platforms sprite scroll is only valid when WriteBuf != NULL and is always RGB121 packed (4bpp).
+    return SCROLL_BPP_4;
+#endif
+}
+
+static inline int scroll_row_bytes(int width, scroll_bpp_t bpp)
+{
+    switch (bpp)
+    {
+    case SCROLL_BPP_1:
+        return ((width + 7) >> 3);
+    case SCROLL_BPP_4:
+        return ((width + 1) >> 1);
+    case SCROLL_BPP_8:
+        return width;
+    case SCROLL_BPP_16:
+        return (width << 1);
+    default:
+        return ((width + 1) >> 1);
+    }
+}
+
+static inline int scroll_rect_bytes(int width, int height, scroll_bpp_t bpp)
+{
+    return scroll_row_bytes(width, bpp) * height;
+}
+
 void ScrollBufferH(int pixels)
 {
     if (!pixels)
         return;
-    volatile uint8_t *s, *d, *l, *ss, *dd;
+    volatile uint8_t *s, *d, *l;
     int y;
-    if (Option.DISPLAY_TYPE != SCREENMODE1 && !(pixels & 1))
+    scroll_bpp_t bpp = scroll_get_bpp();
+    int row_bytes = scroll_row_bytes(HRes, bpp);
+
+    if (bpp == SCROLL_BPP_8 || bpp == SCROLL_BPP_16)
     {
+        int bytes_per_pixel = (bpp == SCROLL_BPP_16 ? 2 : 1);
+        int shift_bytes = (pixels > 0 ? pixels : -pixels) * bytes_per_pixel;
         if (pixels > 0)
         {
             for (y = 0; y < VRes; y++)
             {
-                s = (((y * HRes) >> 1) + WriteBuf);
-                d = s + (pixels >> 1);
-                memmove((void *)d, (void *)s, HRes / 2 - (pixels >> 1));
+                s = (WriteBuf + y * row_bytes);
+                d = s + shift_bytes;
+                memmove((void *)d, (void *)s, row_bytes - shift_bytes);
             }
         }
         else
         {
             pixels = -pixels;
+            shift_bytes = pixels * bytes_per_pixel;
             for (y = 0; y < VRes; y++)
             {
-                s = (((y * HRes) >> 1) + WriteBuf);
+                s = (WriteBuf + y * row_bytes);
                 d = s;
-                s += (pixels >> 1);
-                memmove((void *)d, (void *)s, HRes / 2 - (pixels >> 1));
+                s += shift_bytes;
+                memmove((void *)d, (void *)s, row_bytes - shift_bytes);
             }
         }
     }
     else
     {
+        int pack_mode = (bpp == SCROLL_BPP_1 ? 1 : 0);
+        int align_pixels = (bpp == SCROLL_BPP_1 ? 8 : 2);
+        int abs_pixels = (pixels > 0 ? pixels : -pixels);
+
+        if ((abs_pixels % align_pixels) == 0)
+        {
+            int shift_bytes = abs_pixels / align_pixels;
+            if (pixels > 0)
+            {
+                for (y = 0; y < VRes; y++)
+                {
+                    s = (WriteBuf + y * row_bytes);
+                    d = s + shift_bytes;
+                    memmove((void *)d, (void *)s, row_bytes - shift_bytes);
+                }
+            }
+            else
+            {
+                pixels = -pixels;
+                shift_bytes = pixels / align_pixels;
+                for (y = 0; y < VRes; y++)
+                {
+                    s = (WriteBuf + y * row_bytes);
+                    d = s;
+                    s += shift_bytes;
+                    memmove((void *)d, (void *)s, row_bytes - shift_bytes);
+                }
+            }
+            return;
+        }
+
+        volatile uint8_t *ss, *dd;
         ss = GetTempMainMemory(HRes);
         dd = GetTempMainMemory(HRes);
         if (pixels > 0)
         {
             for (y = 0; y < VRes; y++)
             {
-                l = (((y * HRes) >> (Option.DISPLAY_TYPE != SCREENMODE1 ? 1 : 3)) + WriteBuf);
+                l = (WriteBuf + y * row_bytes);
                 s = ss;
                 d = dd + pixels;
-                expandpixel(l, s, HRes, (Option.DISPLAY_TYPE != SCREENMODE1 ? 0 : 1));
+                expandpixel(l, s, HRes, pack_mode);
                 memcpy((void *)d, (void *)s, (HRes - pixels));
-                contractpixel(dd, l, HRes, (Option.DISPLAY_TYPE != SCREENMODE1 ? 0 : 1));
+                contractpixel(dd, l, HRes, pack_mode);
             }
         }
         else
@@ -6223,13 +6463,13 @@ void ScrollBufferH(int pixels)
             pixels = -pixels;
             for (y = 0; y < VRes; y++)
             {
-                l = (((y * HRes) >> (Option.DISPLAY_TYPE != SCREENMODE1 ? 1 : 3)) + WriteBuf);
+                l = (WriteBuf + y * row_bytes);
                 s = ss;
                 d = dd;
-                expandpixel(l, s, HRes, (Option.DISPLAY_TYPE != SCREENMODE1 ? 0 : 1));
+                expandpixel(l, s, HRes, pack_mode);
                 s += pixels;
                 memcpy((void *)d, (void *)s, (HRes - pixels));
-                contractpixel(d, l, HRes, (Option.DISPLAY_TYPE != SCREENMODE1 ? 0 : 1));
+                contractpixel(d, l, HRes, pack_mode);
             }
         }
     }
@@ -6239,67 +6479,35 @@ void ScrollBufferV(int lines, int blank)
 {
     uint8_t *s, *d;
     int y, yy;
-    if (Option.DISPLAY_TYPE != SCREENMODE1)
+    scroll_bpp_t bpp = scroll_get_bpp();
+    int row_bytes = scroll_row_bytes(HRes, bpp);
+
+    if (lines > 0)
     {
-        int n = (HRes >> 1);
-        if (lines > 0)
+        for (y = 0; y < VRes - lines; y++)
         {
-            for (y = 0; y < VRes - lines; y++)
-            {
-                yy = y + lines;
-                d = (uint8_t *)(((y * HRes) >> 1) + WriteBuf);
-                s = (uint8_t *)(((yy * HRes) >> 1) + WriteBuf);
-                memcpy(d, s, n);
-            }
-            if (blank)
-            {
-                DrawRectangle(0, VRes - lines, HRes - 1, VRes - 1, gui_bcolour); // erase the line to be scrolled off
-            }
+            yy = y + lines;
+            d = (uint8_t *)(WriteBuf + y * row_bytes);
+            s = (uint8_t *)(WriteBuf + yy * row_bytes);
+            memcpy(d, s, row_bytes);
         }
-        else if (lines < 0)
+        if (blank)
         {
-            lines = -lines;
-            for (y = VRes - 1; y >= lines; y--)
-            {
-                yy = y - lines;
-                d = (uint8_t *)(((y * HRes) >> 1) + WriteBuf);
-                s = (uint8_t *)(((yy * HRes) >> 1) + WriteBuf);
-                memcpy(d, s, n);
-            }
-            if (blank)
-                DrawRectangle(0, 0, HRes - 1, lines - 1, gui_bcolour); // erase the line to be scrolled off
+            DrawRectangle(0, VRes - lines, HRes - 1, VRes - 1, gui_bcolour); // erase the line to be scrolled off
         }
     }
-    else
+    else if (lines < 0)
     {
-        int n = (HRes >> 3);
-        if (lines > 0)
+        lines = -lines;
+        for (y = VRes - 1; y >= lines; y--)
         {
-            for (y = 0; y < VRes - lines; y++)
-            {
-                yy = y + lines;
-                d = (uint8_t *)(((y * HRes) >> 3) + WriteBuf);
-                s = (uint8_t *)(((yy * HRes) >> 3) + WriteBuf);
-                memcpy(d, s, n);
-            }
-            if (blank)
-            {
-                DrawRectangle(0, VRes - lines, HRes - 1, VRes - 1, gui_bcolour); // erase the line to be scrolled off
-            }
+            yy = y - lines;
+            d = (uint8_t *)(WriteBuf + y * row_bytes);
+            s = (uint8_t *)(WriteBuf + yy * row_bytes);
+            memcpy(d, s, row_bytes);
         }
-        else if (lines < 0)
-        {
-            lines = -lines;
-            for (y = VRes - 1; y >= lines; y--)
-            {
-                yy = y - lines;
-                d = (uint8_t *)(((y * HRes) >> 3) + WriteBuf);
-                s = (uint8_t *)(((yy * HRes) >> 3) + WriteBuf);
-                memcpy(d, s, n);
-            }
-            if (blank)
-                DrawRectangle(0, 0, HRes - 1, lines - 1, gui_bcolour); // erase the line to be scrolled off
-        }
+        if (blank)
+            DrawRectangle(0, 0, HRes - 1, lines - 1, gui_bcolour); // erase the line to be scrolled off
     }
 }
 /*  @endcond */
@@ -6333,14 +6541,16 @@ void cmd_sprite(void)
 {
     int x1, y1, w, h, bnbr;
     unsigned char *p;
-    int maxW = HRes;
-    int maxH = VRes;
+    int maxW;
+    int maxH;
     int newb = 0;
 #ifndef PICOMITEVGA
     if (WriteBuf == NULL)
         error("Not available on physical display");
 #endif
     CheckDisplay();
+    maxW = HRes;
+    maxH = VRes;
     if (DISPLAY_TYPE == SCREENMODE4 || DISPLAY_TYPE == SCREENMODE5)
         error("Not available for this display mode");
     if ((p = checkstring(cmdline, (unsigned char *)"SHOW SAFE")))
@@ -7166,6 +7376,7 @@ void cmd_sprite(void)
         }
         ProcessCollisions(0);
     }
+
     else if ((p = checkstring(cmdline, (unsigned char *)"SCROLL")))
     {
         int i, n, m = 0, blank = -2, x, y;
@@ -7179,8 +7390,11 @@ void cmd_sprite(void)
             blank = (int)getColour((char *)argv[4], 1);
         if (!(x == 0 && y == 0))
         {
-            m = ((maxW * (y > 0 ? y : -y) + 1) >> 1);
-            n = ((maxH * (x > 0 ? x : -x) + 1) >> 1);
+            scroll_bpp_t bpp = scroll_get_bpp();
+            int ay = (y > 0 ? y : -y);
+            int ax = (x > 0 ? x : -x);
+            m = scroll_rect_bytes(maxW, ay, bpp);
+            n = scroll_rect_bytes(ax, maxH, bpp);
             if (n > m)
                 m = n;
             if (blank == -2)
@@ -7292,6 +7506,7 @@ void cmd_sprite(void)
                 FreeMemory((unsigned char *)current);
         }
     }
+
     else if ((p = checkstring(cmdline, (unsigned char *)"SET TRANSPARENT")))
     {
         sprite_transparent = getint((unsigned char *)p, 0, 15);
@@ -12681,6 +12896,9 @@ void MIPS16 closeall3d(void)
     {
         camera[i].viewplane = -32767;
     }
+#ifdef rp2350
+    hiddenline_release_zbuf();
+#endif
 }
 void T_Mult(FLOAT3D *q1, FLOAT3D *q2, FLOAT3D *n)
 {
@@ -12753,6 +12971,16 @@ void display3d(int n, FLOAT3D x, FLOAT3D y, FLOAT3D z, int clear, int nonormals,
     int maxH = VRes;
     int maxW = HRes;
     int vp, v, f, sortindex, csave = 0, fsave = 0;
+#ifdef rp2350
+    FLOAT3D invzcoord[MAX_3D_POLYGON_VERTICES];
+    int hiddenline = (depthmode == 2);
+    FLOAT3D *hlr_zbuf = NULL;
+    int hlr_minx = maxW, hlr_maxx = -1, hlr_miny = maxH, hlr_maxy = -1;
+    int hlr_bw = 0, hlr_bh = 0;
+    short *hlr_projx = NULL, *hlr_projy = NULL;
+    FLOAT3D *hlr_projiz = NULL;
+    uint8_t *hlr_visible = NULL;
+#endif
     if (struct3d[n]->vmax > 4)
     { // needed for polygon fill
         main_fill_polyX = (TFLOAT *)GetMemory(struct3d[n]->tot_face_x_vert * sizeof(TFLOAT));
@@ -12801,15 +13029,15 @@ void display3d(int n, FLOAT3D x, FLOAT3D y, FLOAT3D z, int clear, int nonormals,
         if (depthmode == 0)
         {
             tmp = struct3d[n]->r_centroids[f].m;
-            struct3d[n]->depth[f] = sqrt3d(
+            struct3d[n]->depth[f] =
                 (struct3d[n]->r_centroids[f].z * tmp + z - camera[struct3d[n]->camera].z) *
                     (struct3d[n]->r_centroids[f].z * tmp + z - camera[struct3d[n]->camera].z) +
                 (struct3d[n]->r_centroids[f].y * tmp + y - camera[struct3d[n]->camera].y) *
                     (struct3d[n]->r_centroids[f].y * tmp + y - camera[struct3d[n]->camera].y) +
                 (struct3d[n]->r_centroids[f].x * tmp + x - camera[struct3d[n]->camera].x) *
-                    (struct3d[n]->r_centroids[f].x * tmp + x - camera[struct3d[n]->camera].x));
+                    (struct3d[n]->r_centroids[f].x * tmp + x - camera[struct3d[n]->camera].x);
             struct3d[n]->depthindex[f] = f;
-            struct3d[n]->distance += struct3d[n]->depth[f];
+            struct3d[n]->distance += sqrt3d(struct3d[n]->depth[f]);
         }
         else
         {
@@ -12817,13 +13045,13 @@ void display3d(int n, FLOAT3D x, FLOAT3D y, FLOAT3D z, int clear, int nonormals,
             for (v = 0; v < struct3d[n]->facecount[f]; v++)
             {
                 tmp = struct3d[n]->r_vertices[struct3d[n]->face_x_vert[vp + v]].m;
-                FLOAT3D vertex_depth = sqrt3d(
+                FLOAT3D vertex_depth =
                     (struct3d[n]->r_vertices[struct3d[n]->face_x_vert[vp + v]].z * tmp + z - camera[struct3d[n]->camera].z) *
                         (struct3d[n]->r_vertices[struct3d[n]->face_x_vert[vp + v]].z * tmp + z - camera[struct3d[n]->camera].z) +
                     (struct3d[n]->r_vertices[struct3d[n]->face_x_vert[vp + v]].y * tmp + y - camera[struct3d[n]->camera].y) *
                         (struct3d[n]->r_vertices[struct3d[n]->face_x_vert[vp + v]].y * tmp + y - camera[struct3d[n]->camera].y) +
                     (struct3d[n]->r_vertices[struct3d[n]->face_x_vert[vp + v]].x * tmp + x - camera[struct3d[n]->camera].x) *
-                        (struct3d[n]->r_vertices[struct3d[n]->face_x_vert[vp + v]].x * tmp + x - camera[struct3d[n]->camera].x));
+                        (struct3d[n]->r_vertices[struct3d[n]->face_x_vert[vp + v]].x * tmp + x - camera[struct3d[n]->camera].x);
                 if (vertex_depth > max_depth)
                 {
                     max_depth = vertex_depth;
@@ -12831,79 +13059,244 @@ void display3d(int n, FLOAT3D x, FLOAT3D y, FLOAT3D z, int clear, int nonormals,
             }
             struct3d[n]->depth[f] = max_depth;
             struct3d[n]->depthindex[f] = f;
-            struct3d[n]->distance += struct3d[n]->depth[f];
+            struct3d[n]->distance += sqrt3d(struct3d[n]->depth[f]);
         }
     }
     struct3d[n]->distance /= f;
     // sort the distances from the faces to the camera
     depthsort(struct3d[n]->depth, struct3d[n]->nf, struct3d[n]->depthindex);
-    // display the forward facing faces in the order of the furthest away first
-    for (f = 0; f < struct3d[n]->nf; f++)
+
+#ifdef rp2350
+    if (hiddenline)
     {
-        sortindex = struct3d[n]->depthindex[f];
-        vp = struct3d[n]->facestart[sortindex];
-        if (struct3d[n]->flags[sortindex] & 4)
-            struct3d[n]->dots[sortindex] = -struct3d[n]->dots[sortindex];
-        if (nonormals || struct3d[n]->dots[sortindex] < 0)
+        hlr_projx = (short *)GetTempMainMemory(struct3d[n]->tot_face_x_vert * sizeof(short));
+        hlr_projy = (short *)GetTempMainMemory(struct3d[n]->tot_face_x_vert * sizeof(short));
+        hlr_projiz = (FLOAT3D *)GetTempMainMemory(struct3d[n]->tot_face_x_vert * sizeof(FLOAT3D));
+        hlr_visible = (uint8_t *)GetTempMainMemory(struct3d[n]->nf);
+        memset(hlr_visible, 0, struct3d[n]->nf);
+
+        // First pass: project visible faces once and cache for depth fill and edge draw.
+        for (f = 0; f < struct3d[n]->nf; f++)
         {
+            sortindex = struct3d[n]->depthindex[f];
+            FLOAT3D facedot = struct3d[n]->dots[sortindex];
+            if (struct3d[n]->flags[sortindex] & 4)
+                facedot = -facedot;
+            if ((struct3d[n]->flags[sortindex] & 1) || !(nonormals || facedot < 0))
+                continue;
+            hlr_visible[sortindex] = 1;
+
+            vp = struct3d[n]->facestart[sortindex];
             for (v = 0; v < struct3d[n]->facecount[sortindex]; v++)
             {
+                int pi = vp + v;
                 x1 = struct3d[n]->r_vertices[struct3d[n]->face_x_vert[vp + v]].x * struct3d[n]->r_vertices[struct3d[n]->face_x_vert[vp + v]].m + x;
                 y1 = struct3d[n]->r_vertices[struct3d[n]->face_x_vert[vp + v]].y * struct3d[n]->r_vertices[struct3d[n]->face_x_vert[vp + v]].m + y;
                 z1 = struct3d[n]->r_vertices[struct3d[n]->face_x_vert[vp + v]].z * struct3d[n]->r_vertices[struct3d[n]->face_x_vert[vp + v]].m + z;
-                // We now have the coordinates in real space so project them
                 at = x1 - camera[struct3d[n]->camera].x;
                 bt = y1 - camera[struct3d[n]->camera].y;
                 ct = z1 - camera[struct3d[n]->camera].z;
-                t = -(/*A * x1 + B * y1*/ +C * z1 + D) / (/*A * at + B * bt + */ C * ct);
-                xcoord[v] = x1 + round3d(at * t) + (maxW >> 1) - camera[struct3d[n]->camera].x - camera[struct3d[n]->camera].panx;
-                ycoord[v] = maxH - round3d(y1 + bt * t) - 1;
-                ycoord[v] -= (maxH >> 1) - camera[struct3d[n]->camera].y - camera[struct3d[n]->camera].pany;
+                if (ct > -0.0005 && ct < 0.0005)
+                    ct = (ct < 0.0 ? -0.0005 : 0.0005);
+                t = -(C * z1 + D) / (C * ct);
+                hlr_projx[pi] = x1 + round3d(at * t) + (maxW >> 1) - camera[struct3d[n]->camera].x - camera[struct3d[n]->camera].panx;
+                hlr_projy[pi] = maxH - round3d(y1 + bt * t) - 1;
+                hlr_projy[pi] -= (maxH >> 1) - camera[struct3d[n]->camera].y - camera[struct3d[n]->camera].pany;
+                if (ct < 0.0005)
+                    ct = 0.0005;
+                hlr_projiz[pi] = 1.0 / ct;
+
+                if (hlr_projx[pi] < hlr_minx)
+                    hlr_minx = hlr_projx[pi];
+                if (hlr_projx[pi] > hlr_maxx)
+                    hlr_maxx = hlr_projx[pi];
+                if (hlr_projy[pi] < hlr_miny)
+                    hlr_miny = hlr_projy[pi];
+                if (hlr_projy[pi] > hlr_maxy)
+                    hlr_maxy = hlr_projy[pi];
+
                 if (clear)
                 {
-                    if (xcoord[v] > struct3d[n]->xmax)
-                        struct3d[n]->xmax = xcoord[v];
-                    if (xcoord[v] < struct3d[n]->xmin)
-                        struct3d[n]->xmin = xcoord[v];
-                    if (ycoord[v] > struct3d[n]->ymax)
-                        struct3d[n]->ymax = ycoord[v];
-                    if (ycoord[v] < struct3d[n]->ymin)
-                        struct3d[n]->ymin = ycoord[v];
+                    if (hlr_projx[pi] > struct3d[n]->xmax)
+                        struct3d[n]->xmax = hlr_projx[pi];
+                    if (hlr_projx[pi] < struct3d[n]->xmin)
+                        struct3d[n]->xmin = hlr_projx[pi];
+                    if (hlr_projy[pi] > struct3d[n]->ymax)
+                        struct3d[n]->ymax = hlr_projy[pi];
+                    if (hlr_projy[pi] < struct3d[n]->ymin)
+                        struct3d[n]->ymin = hlr_projy[pi];
                 }
             }
-            if ((struct3d[n]->flags[sortindex] & 1) == 0)
+        }
+
+        if (hlr_minx < 0)
+            hlr_minx = 0;
+        if (hlr_miny < 0)
+            hlr_miny = 0;
+        if (hlr_maxx >= maxW)
+            hlr_maxx = maxW - 1;
+        if (hlr_maxy >= maxH)
+            hlr_maxy = maxH - 1;
+
+        if (hlr_maxx >= hlr_minx && hlr_maxy >= hlr_miny)
+        {
+            hlr_bw = hlr_maxx - hlr_minx + 1;
+            hlr_bh = hlr_maxy - hlr_miny + 1;
+            hlr_zbuf = hiddenline_get_zbuf(hlr_bw * hlr_bh);
+            memset(hlr_zbuf, 0, hlr_bw * hlr_bh * sizeof(FLOAT3D));
+
+            // Second pass: depth prefill from all visible faces.
+            for (f = 0; f < struct3d[n]->nf; f++)
             {
-                if (struct3d[n]->flags[sortindex] & 10)
+                sortindex = struct3d[n]->depthindex[f];
+                if (!hlr_visible[sortindex])
+                    continue;
+
+                vp = struct3d[n]->facestart[sortindex];
+                for (v = 1; v < struct3d[n]->facecount[sortindex] - 1; v++)
                 {
-                    fsave = struct3d[n]->fill[sortindex];
-                    csave = struct3d[n]->line[sortindex];
-                    if (struct3d[n]->flags[sortindex] & 2)
-                        struct3d[n]->fill[sortindex] = 0xFF0000;
-                    if (struct3d[n]->flags[sortindex] & 8)
-                    {
-                        FLOAT3D lightratio = fabs3d(lighting.x * struct3d[n]->normals[sortindex].x + lighting.y * struct3d[n]->normals[sortindex].y + lighting.z * struct3d[n]->normals[sortindex].z);
-                        lightratio = (lightratio * struct3d[n]->ambient) + struct3d[n]->ambient;
-                        int red = (struct3d[n]->fill[sortindex] & 0xFF0000) >> 16;
-                        int green = (struct3d[n]->fill[sortindex] & 0xFF00) >> 8;
-                        int blue = (struct3d[n]->fill[sortindex] & 0xFF);
-                        red = (round3d)((FLOAT3D)red * lightratio);
-                        green = (round3d)((FLOAT3D)green * lightratio);
-                        blue = (round3d)((FLOAT3D)blue * lightratio);
-                        struct3d[n]->fill[sortindex] = (red << 16) | (green << 8) | blue;
-                        red = (struct3d[n]->line[sortindex] & 0xFF0000) >> 16;
-                        green = (struct3d[n]->line[sortindex] & 0xFF00) >> 8;
-                        blue = (struct3d[n]->line[sortindex] & 0xFF);
-                        red = (round3d)((FLOAT3D)red * lightratio);
-                        green = (round3d)((FLOAT3D)green * lightratio);
-                        blue = (round3d)((FLOAT3D)blue * lightratio);
-                        struct3d[n]->line[sortindex] = (red << 16) | (green << 8) | blue;
-                    }
+                    hiddenline_raster_triangle(hlr_projx[vp], hlr_projy[vp], hlr_projiz[vp],
+                                               hlr_projx[vp + v], hlr_projy[vp + v], hlr_projiz[vp + v],
+                                               hlr_projx[vp + v + 1], hlr_projy[vp + v + 1], hlr_projiz[vp + v + 1],
+                                               hlr_minx, hlr_miny, hlr_maxx, hlr_maxy,
+                                               hlr_zbuf, hlr_bw);
+                }
+            }
+        }
+    }
+#endif
+
+#ifdef rp2350
+    if (hiddenline && hlr_zbuf != NULL)
+    {
+        for (f = 0; f < struct3d[n]->nf; f++)
+        {
+            sortindex = struct3d[n]->depthindex[f];
+            if (!hlr_visible[sortindex])
+                continue;
+            vp = struct3d[n]->facestart[sortindex];
+            if (struct3d[n]->fill[sortindex] == 0xFFFFFFFF)
+            {
+                int vc = struct3d[n]->facecount[sortindex];
+                int lc = struct3d[n]->line[sortindex];
+                for (v = 0; v < vc; v++)
+                {
+                    int vn = (v + 1 == vc ? 0 : v + 1);
+                    hiddenline_draw_edge(hlr_projx[vp + v], hlr_projy[vp + v], hlr_projiz[vp + v],
+                                         hlr_projx[vp + vn], hlr_projy[vp + vn], hlr_projiz[vp + vn],
+                                         lc,
+                                         hlr_minx, hlr_miny, hlr_maxx, hlr_maxy,
+                                         hlr_zbuf, hlr_bw);
+                }
+            }
+            else
+            {
+                for (v = 0; v < struct3d[n]->facecount[sortindex]; v++)
+                {
+                    xcoord[v] = hlr_projx[vp + v];
+                    ycoord[v] = hlr_projy[vp + v];
                 }
                 DrawPolygon(n, xcoord, ycoord, sortindex);
-                if (struct3d[n]->flags[sortindex] & 10)
+            }
+        }
+    }
+    else
+#endif
+    {
+        // display the forward facing faces in the order of the furthest away first
+        for (f = 0; f < struct3d[n]->nf; f++)
+        {
+            sortindex = struct3d[n]->depthindex[f];
+            vp = struct3d[n]->facestart[sortindex];
+            if (struct3d[n]->flags[sortindex] & 4)
+                struct3d[n]->dots[sortindex] = -struct3d[n]->dots[sortindex];
+            if (nonormals || struct3d[n]->dots[sortindex] < 0)
+            {
+                for (v = 0; v < struct3d[n]->facecount[sortindex]; v++)
                 {
-                    struct3d[n]->fill[sortindex] = fsave;
-                    struct3d[n]->line[sortindex] = csave;
+                    x1 = struct3d[n]->r_vertices[struct3d[n]->face_x_vert[vp + v]].x * struct3d[n]->r_vertices[struct3d[n]->face_x_vert[vp + v]].m + x;
+                    y1 = struct3d[n]->r_vertices[struct3d[n]->face_x_vert[vp + v]].y * struct3d[n]->r_vertices[struct3d[n]->face_x_vert[vp + v]].m + y;
+                    z1 = struct3d[n]->r_vertices[struct3d[n]->face_x_vert[vp + v]].z * struct3d[n]->r_vertices[struct3d[n]->face_x_vert[vp + v]].m + z;
+                    // We now have the coordinates in real space so project them
+                    at = x1 - camera[struct3d[n]->camera].x;
+                    bt = y1 - camera[struct3d[n]->camera].y;
+                    ct = z1 - camera[struct3d[n]->camera].z;
+                    if (ct > -0.0005 && ct < 0.0005)
+                        ct = (ct < 0.0 ? -0.0005 : 0.0005);
+                    t = -(/*A * x1 + B * y1*/ +C * z1 + D) / (/*A * at + B * bt + */ C * ct);
+                    xcoord[v] = x1 + round3d(at * t) + (maxW >> 1) - camera[struct3d[n]->camera].x - camera[struct3d[n]->camera].panx;
+                    ycoord[v] = maxH - round3d(y1 + bt * t) - 1;
+                    ycoord[v] -= (maxH >> 1) - camera[struct3d[n]->camera].y - camera[struct3d[n]->camera].pany;
+                    if (ct < 0.0005)
+                        ct = 0.0005;
+#ifdef rp2350
+                    invzcoord[v] = 1.0 / ct;
+#endif
+                    if (clear)
+                    {
+                        if (xcoord[v] > struct3d[n]->xmax)
+                            struct3d[n]->xmax = xcoord[v];
+                        if (xcoord[v] < struct3d[n]->xmin)
+                            struct3d[n]->xmin = xcoord[v];
+                        if (ycoord[v] > struct3d[n]->ymax)
+                            struct3d[n]->ymax = ycoord[v];
+                        if (ycoord[v] < struct3d[n]->ymin)
+                            struct3d[n]->ymin = ycoord[v];
+                    }
+                }
+                if ((struct3d[n]->flags[sortindex] & 1) == 0)
+                {
+                    if (struct3d[n]->flags[sortindex] & 10)
+                    {
+                        fsave = struct3d[n]->fill[sortindex];
+                        csave = struct3d[n]->line[sortindex];
+                        if (struct3d[n]->flags[sortindex] & 2)
+                            struct3d[n]->fill[sortindex] = 0xFF0000;
+                        if (struct3d[n]->flags[sortindex] & 8)
+                        {
+                            FLOAT3D lightratio = fabs3d(lighting.x * struct3d[n]->normals[sortindex].x + lighting.y * struct3d[n]->normals[sortindex].y + lighting.z * struct3d[n]->normals[sortindex].z);
+                            lightratio = (lightratio * struct3d[n]->ambient) + struct3d[n]->ambient;
+                            int red = (struct3d[n]->fill[sortindex] & 0xFF0000) >> 16;
+                            int green = (struct3d[n]->fill[sortindex] & 0xFF00) >> 8;
+                            int blue = (struct3d[n]->fill[sortindex] & 0xFF);
+                            red = (round3d)((FLOAT3D)red * lightratio);
+                            green = (round3d)((FLOAT3D)green * lightratio);
+                            blue = (round3d)((FLOAT3D)blue * lightratio);
+                            struct3d[n]->fill[sortindex] = (red << 16) | (green << 8) | blue;
+                            red = (struct3d[n]->line[sortindex] & 0xFF0000) >> 16;
+                            green = (struct3d[n]->line[sortindex] & 0xFF00) >> 8;
+                            blue = (struct3d[n]->line[sortindex] & 0xFF);
+                            red = (round3d)((FLOAT3D)red * lightratio);
+                            green = (round3d)((FLOAT3D)green * lightratio);
+                            blue = (round3d)((FLOAT3D)blue * lightratio);
+                            struct3d[n]->line[sortindex] = (red << 16) | (green << 8) | blue;
+                        }
+                    }
+#ifdef rp2350
+                    if (hiddenline && hlr_zbuf != NULL && struct3d[n]->fill[sortindex] == 0xFFFFFFFF)
+                    {
+                        int vc = struct3d[n]->facecount[sortindex];
+                        int lc = struct3d[n]->line[sortindex];
+                        for (v = 0; v < vc; v++)
+                        {
+                            int vn = (v + 1 == vc ? 0 : v + 1);
+                            hiddenline_draw_edge(xcoord[v], ycoord[v], invzcoord[v],
+                                                 xcoord[vn], ycoord[vn], invzcoord[vn],
+                                                 lc,
+                                                 hlr_minx, hlr_miny, hlr_maxx, hlr_maxy,
+                                                 hlr_zbuf, hlr_bw);
+                        }
+                    }
+                    else
+#endif
+                    {
+                        DrawPolygon(n, xcoord, ycoord, sortindex);
+                    }
+                    if (struct3d[n]->flags[sortindex] & 10)
+                    {
+                        struct3d[n]->fill[sortindex] = fsave;
+                        struct3d[n]->line[sortindex] = csave;
+                    }
                 }
             }
         }
@@ -13238,11 +13631,18 @@ void MIPS16 cmd_3D(void)
         if (argc >= 9 && *argv[8])
             nonormals = getint(argv[8], 0, 1);
         if (argc == 11)
-            depthmode = getint(argv[10], 0, 1);
+            depthmode = getint(argv[10], 0, 2);
         if (struct3d[n] == NULL)
             StandardErrorParam(7, n);
         if (camera[struct3d[n]->camera].viewplane == -32767)
             error("Camera position not defined");
+#ifndef rp2350
+        if (depthmode == 2)
+            error("depthmode=2 requires rp2350");
+#else
+        if (depthmode == 2 && !is_hiddenline_target())
+            error("Hidden-line mode needs framebuffer/memory display");
+#endif
         display3d(n, x, y, z, 1, nonormals, depthmode);
         return;
     }
@@ -13388,11 +13788,18 @@ void MIPS16 cmd_3D(void)
         if (argc >= 9 && *argv[8])
             nonormals = getint(argv[8], 0, 1);
         if (argc == 11)
-            depthmode = getint(argv[10], 0, 1);
+            depthmode = getint(argv[10], 0, 2);
         if (struct3d[n] == NULL)
             StandardErrorParam(7, n);
         if (camera[struct3d[n]->camera].viewplane == -32767)
             error("Camera position not defined");
+#ifndef rp2350
+        if (depthmode == 2)
+            error("depthmode=2 requires rp2350");
+#else
+        if (depthmode == 2 && !is_hiddenline_target())
+            error("Hidden-line mode needs framebuffer/memory display");
+#endif
         display3d(n, x, y, z, 0, nonormals, depthmode);
         return;
     }

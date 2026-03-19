@@ -66,7 +66,8 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #else
 #define MOD_BUFFER_SIZE (WAV_BUFFER_SIZE / 4)
 #endif
-#define TONE_BUFFER_SIZE 4096 // ~23ms at 44100Hz stereo (1024 frames * 2ch * 2 bytes)
+#define TONE_BUFFER_SIZE 704  // ~23ms at 44100Hz stereo (176 frames * 2ch * 2 bytes)
+#define SOUND_BUFFER_SIZE 704 // ~4ms at 44100Hz stereo (176 frames * 2ch * 2 bytes)
 #include "hardware/pio.h"
 #include "hardware/pio_instructions.h"
 #include "dr_flac.h"
@@ -143,6 +144,7 @@ volatile uint64_t SoundPlay;
 
 volatile e_CurrentlyPlaying CurrentlyPlaying = P_NOTHING;
 volatile int v_left, v_right, vol_left = 100, vol_right = 100;
+volatile int vol_target_left = 100, vol_target_right = 100;
 char *wav_buf;			   // pointer to the buffer for received wav data
 volatile int wav_filesize; // head and tail of the ring buffer for com1
 volatile int tickspersample;
@@ -168,6 +170,8 @@ uint8_t nchannels;
 volatile uint32_t bcount[3] = {0, 0, 0};
 volatile int sound_v_left[MAXSOUNDS] = {[0 ... MAXSOUNDS - 1] = 25};
 volatile int sound_v_right[MAXSOUNDS] = {[0 ... MAXSOUNDS - 1] = 25};
+volatile int sound_v_target_left[MAXSOUNDS] = {[0 ... MAXSOUNDS - 1] = 25};
+volatile int sound_v_target_right[MAXSOUNDS] = {[0 ... MAXSOUNDS - 1] = 25};
 volatile float sound_PhaseAC_left[MAXSOUNDS], sound_PhaseAC_right[MAXSOUNDS];
 volatile float sound_PhaseM_left[MAXSOUNDS], sound_PhaseM_right[MAXSOUNDS];
 volatile unsigned short *sound_mode_left[MAXSOUNDS];
@@ -627,11 +631,25 @@ const char toneheader[44] = {0x52, 0x49, 0x46, 0x46,
 							 0x64, 0x61, 0x74, 0x61,
 							 0xFF, 0xFF, 0xFF, 0xFF};
 
+#define VOL_RAMP_INTERVAL 11 // step global volume once per ~0.5ms (11 samples at 44100Hz)
 static inline void iconvert(uint16_t *ibuff, int16_t *sbuff, int count)
 {
 	int i;
+	int ramp = 0;
 	for (i = 0; i < (count); i += 2)
 	{
+		if (++ramp >= VOL_RAMP_INTERVAL)
+		{
+			ramp = 0;
+			if (vol_left < vol_target_left)
+				vol_left++;
+			else if (vol_left > vol_target_left)
+				vol_left--;
+			if (vol_right < vol_target_right)
+				vol_right++;
+			else if (vol_right > vol_target_right)
+				vol_right--;
+		}
 		ibuff[i] = (uint16_t)((((int)sbuff[i] * mapping[vol_left] / 2000 + 32768)) >> 4);
 		ibuff[i + 1] = (uint16_t)((((int)sbuff[i + 1] * mapping[vol_right] / 2000 + 32768)) >> 4);
 	}
@@ -639,8 +657,21 @@ static inline void iconvert(uint16_t *ibuff, int16_t *sbuff, int count)
 static inline void i2sconvert(int16_t *fbuff, int16_t *sbuff, int count)
 {
 	int i;
+	int ramp = 0;
 	for (i = 0; i < (count); i += 2)
 	{
+		if (++ramp >= VOL_RAMP_INTERVAL)
+		{
+			ramp = 0;
+			if (vol_left < vol_target_left)
+				vol_left++;
+			else if (vol_left > vol_target_left)
+				vol_left--;
+			if (vol_right < vol_target_right)
+				vol_right++;
+			else if (vol_right > vol_target_right)
+				vol_right--;
+		}
 		sbuff[i] = (int16_t)((int)(fbuff[i]) * mapping[vol_left] / 2048);
 		sbuff[i + 1] = (int16_t)((int)(fbuff[i + 1]) * mapping[vol_right] / 2048);
 	}
@@ -684,6 +715,8 @@ void CloseAudio(int all)
 		swingbuf = nextbuf = playreadcomplete = 0;
 	}
 	StopAudio();
+	vol_left = vol_target_left;
+	vol_right = vol_target_right;
 	if (CurrentlyPlaying == P_WAVOPEN)
 		CurrentlyPlaying = P_NOTHING;
 	ForceFileClose(WAV_fnbr);
@@ -724,6 +757,8 @@ void CloseAudio(int all)
 		sound_PhaseAC_right[i] = 0;
 		sound_mode_left[i] = (uint16_t *)nulltable;
 		sound_mode_right[i] = (uint16_t *)nulltable;
+		sound_v_target_left[i] = sound_v_left[i];
+		sound_v_target_right[i] = sound_v_right[i];
 	}
 	if (XDCS != -1)
 	{
@@ -1056,76 +1091,10 @@ void flaccallback(char *p)
 }
 void rampvolume(int l, int r, int channel, int target)
 {
-	if (optionfastaudio)
-	{
-		if (l)
-			sound_v_left[channel] = target;
-		if (r)
-			sound_v_right[channel] = target;
-	}
-	else
-	{
-		int ramptime = 1000000 / PWM_FREQ + 2;
-		if (l && r)
-		{
-			if (sound_v_left[channel] > target)
-			{
-				for (int i = sound_v_left[channel] - 1; i >= target; i--)
-				{
-					sound_v_left[channel] = i;
-					sound_v_right[channel] = i;
-					uSec(ramptime);
-				}
-			}
-			else
-			{
-				for (int i = sound_v_left[channel] + 1; i <= target; i++)
-				{
-					sound_v_left[channel] = i;
-					sound_v_right[channel] = i;
-					uSec(ramptime);
-				}
-			}
-		}
-		else if (l)
-		{
-			if (sound_v_left[channel] > target)
-			{
-				for (int i = sound_v_left[channel] - 1; i >= target; i--)
-				{
-					sound_v_left[channel] = i;
-					uSec(ramptime);
-				}
-			}
-			else
-			{
-				for (int i = sound_v_left[channel] + 1; i <= target; i++)
-				{
-					sound_v_left[channel] = i;
-					uSec(ramptime);
-				}
-			}
-		}
-		else if (r)
-		{
-			if (sound_v_right[channel] > target)
-			{
-				for (int i = sound_v_right[channel] - 1; i >= target; i--)
-				{
-					sound_v_right[channel] = i;
-					uSec(ramptime);
-				}
-			}
-			else
-			{
-				for (int i = sound_v_right[channel] + 1; i <= target; i++)
-				{
-					sound_v_right[channel] = i;
-					uSec(ramptime);
-				}
-			}
-		}
-	}
+	if (l)
+		sound_v_target_left[channel] = target;
+	if (r)
+		sound_v_target_right[channel] = target;
 }
 
 void setnoise(void)
@@ -1436,13 +1405,15 @@ void MIPS16 cmd_play(void)
 		if (argc < 1)
 			StandardError(2);
 		if (*argv[0])
-			vol_left = getint(argv[0], 0, 100);
+			vol_target_left = getint(argv[0], 0, 100);
 		if (argc == 3)
-			vol_right = getint(argv[2], 0, 100);
-		if (CurrentlyPlaying == P_TONE && vol_left != vol_right && mono)
+			vol_target_right = getint(argv[2], 0, 100);
+		if (CurrentlyPlaying == P_TONE && vol_target_left != vol_target_right && mono)
 			mono = 0;
 		if (Option.AUDIO_MISO_PIN && CurrentlyPlaying != P_NOTHING)
 		{
+			vol_left = vol_target_left;
+			vol_right = vol_target_right;
 			pwm_set_irq0_enabled(AUDIO_SLICE, false);
 			setVolumes(vol_left, vol_right);
 			pwm_set_irq0_enabled(AUDIO_SLICE, true);
@@ -1467,7 +1438,7 @@ void MIPS16 cmd_play(void)
 				error("Sound output in use for $", PlayingStr[CurrentlyPlaying]);
 			f_left = getnumber(argv[0]); // get the arguments
 			f_right = getnumber(argv[2]);
-			if (f_left == f_right && vol_left == vol_right)
+			if (f_left == f_right && vol_target_left == vol_target_right)
 				mono = 1;
 			if (f_left < 0.0 || f_left > 22050.0)
 				error("Valid is 0Hz to 20KHz");
@@ -1520,31 +1491,39 @@ void MIPS16 cmd_play(void)
 				ubuff2 = (uint16_t *)sbuff2;
 				g_buff1 = (int16_t *)sbuff1;
 				g_buff2 = (int16_t *)sbuff2;
-			}
-			// Prime/refill buffer 1 with tone samples
-			bcount[1] = bcount[2] = 0;
-			ppos = 0;
-			swingbuf = 1;
-			nextbuf = 2;
-			playreadcomplete = 0;
-			if (Option.AUDIO_MISO_PIN)
-			{
-				bcount[1] = fillToneBuffer(sbuff1, TONE_BUFFER_SIZE) * 2; // bytes for VS1053
-			}
-			else if (Option.audio_i2s_bclk)
-			{
-				bcount[1] = fillToneBuffer(sbuff1, TONE_BUFFER_SIZE);
-				i2sconvert(g_buff1, (int16_t *)sbuff1, bcount[1]);
+				// Prime buffer 1 with tone samples
+				bcount[1] = bcount[2] = 0;
+				ppos = 0;
+				swingbuf = 1;
+				nextbuf = 2;
+				playreadcomplete = 0;
+				if (Option.AUDIO_MISO_PIN)
+				{
+					bcount[1] = fillToneBuffer(sbuff1, TONE_BUFFER_SIZE) * 2; // bytes for VS1053
+				}
+				else if (Option.audio_i2s_bclk)
+				{
+					bcount[1] = fillToneBuffer(sbuff1, TONE_BUFFER_SIZE);
+					i2sconvert(g_buff1, (int16_t *)sbuff1, bcount[1]);
+				}
+				else
+				{
+					bcount[1] = fillToneBuffer(sbuff1, TONE_BUFFER_SIZE);
+					iconvert(ubuff1, (int16_t *)sbuff1, bcount[1]);
+				}
+				wav_filesize = bcount[1];
+				CurrentlyPlaying = P_TONE;
+				pwm_set_irq0_enabled(AUDIO_SLICE, true);
+				pwm_set_enabled(AUDIO_SLICE, true);
 			}
 			else
 			{
-				bcount[1] = fillToneBuffer(sbuff1, TONE_BUFFER_SIZE);
-				iconvert(ubuff1, (int16_t *)sbuff1, bcount[1]);
+				// Repeat call: clear end-of-stream and re-enable IRQ
+				// so fillToneBuffer picks up the new SoundPlay/PhaseM
+				playreadcomplete = 0;
+				wav_filesize = 1;
+				pwm_set_irq0_enabled(AUDIO_SLICE, true);
 			}
-			wav_filesize = bcount[1];
-			CurrentlyPlaying = P_TONE;
-			pwm_set_irq0_enabled(AUDIO_SLICE, true);
-			pwm_set_enabled(AUDIO_SLICE, true);
 			return;
 		}
 	}
@@ -2020,27 +1999,27 @@ void MIPS16 cmd_play(void)
 				playimmediatevs1053(P_SOUND);
 			FreeMemorySafe((void **)&sbuff1);
 			FreeMemorySafe((void **)&sbuff2);
-			sbuff1 = GetMemory(TONE_BUFFER_SIZE);
-			sbuff2 = GetMemory(TONE_BUFFER_SIZE);
+			sbuff1 = GetMemory(SOUND_BUFFER_SIZE);
+			sbuff2 = GetMemory(SOUND_BUFFER_SIZE);
 			ubuff1 = (uint16_t *)sbuff1;
 			ubuff2 = (uint16_t *)sbuff2;
 			g_buff1 = (int16_t *)sbuff1;
 			g_buff2 = (int16_t *)sbuff2;
+			// Prime buffer 1 with sound samples
+			bcount[1] = bcount[2] = 0;
+			ppos = 0;
+			swingbuf = 1;
+			nextbuf = 2;
+			playreadcomplete = 0;
+			if (Option.AUDIO_MISO_PIN)
+				bcount[1] = fillSoundBuffer(sbuff1, SOUND_BUFFER_SIZE) * 2; // bytes for VS1053
+			else
+				bcount[1] = fillSoundBuffer(sbuff1, SOUND_BUFFER_SIZE);
+			wav_filesize = bcount[1];
+			CurrentlyPlaying = P_SOUND;
+			pwm_set_irq0_enabled(AUDIO_SLICE, true);
+			pwm_set_enabled(AUDIO_SLICE, true);
 		}
-		// Prime buffer 1 with sound samples
-		bcount[1] = bcount[2] = 0;
-		ppos = 0;
-		swingbuf = 1;
-		nextbuf = 2;
-		playreadcomplete = 0;
-		if (Option.AUDIO_MISO_PIN)
-			bcount[1] = fillSoundBuffer(sbuff1, TONE_BUFFER_SIZE) * 2; // bytes for VS1053
-		else
-			bcount[1] = fillSoundBuffer(sbuff1, TONE_BUFFER_SIZE);
-		wav_filesize = bcount[1];
-		CurrentlyPlaying = P_SOUND;
-		pwm_set_irq0_enabled(AUDIO_SLICE, true);
-		pwm_set_enabled(AUDIO_SLICE, true);
 		return;
 	}
 	if ((tp = checkstring(cmdline, (unsigned char *)"WAV")))
@@ -2877,18 +2856,39 @@ static int fillToneBuffer(char *buf, int bufsize)
 // For I2S: produces int16_t pairs using getsound modes 0/1.
 // For PWM DAC: produces uint16_t pairs using getsound modes 0/1.
 // Returns the count of int16_t (or uint16_t) values written.
+#define SOUND_RAMP_INTERVAL 44 // step volume once per ~1ms at 44100Hz
+static void step_sound_volumes(void)
+{
+	for (int i = 0; i < MAXSOUNDS; i++)
+	{
+		if (sound_v_left[i] < sound_v_target_left[i])
+			sound_v_left[i]++;
+		else if (sound_v_left[i] > sound_v_target_left[i])
+			sound_v_left[i]--;
+		if (sound_v_right[i] < sound_v_target_right[i])
+			sound_v_right[i]++;
+		else if (sound_v_right[i] > sound_v_target_right[i])
+			sound_v_right[i]--;
+	}
+}
 static int fillSoundBuffer(char *buf, int bufsize)
 {
 	static int noisedwellleft[MAXSOUNDS] = {0}, noisedwellright[MAXSOUNDS] = {0};
 	static uint32_t noiseleft[MAXSOUNDS] = {0}, noiseright[MAXSOUNDS] = {0};
 	int max_samples = bufsize / (int)sizeof(int16_t);
 	int n = 0;
+	int ramp_counter = 0;
 
 	if (Option.AUDIO_MISO_PIN)
 	{
 		int16_t *samples = (int16_t *)buf;
 		while (n < max_samples)
 		{
+			if (++ramp_counter >= SOUND_RAMP_INTERVAL)
+			{
+				ramp_counter = 0;
+				step_sound_volumes();
+			}
 			int i, j;
 			int leftv = 0, rightv = 0, Lcount = 0, Rcount = 0;
 			for (i = 0; i < MAXSOUNDS; i++)
@@ -2943,6 +2943,11 @@ static int fillSoundBuffer(char *buf, int bufsize)
 		int16_t *samples = (int16_t *)buf;
 		while (n < max_samples)
 		{
+			if (++ramp_counter >= SOUND_RAMP_INTERVAL)
+			{
+				ramp_counter = 0;
+				step_sound_volumes();
+			}
 			int i, j;
 			int leftv = 0, rightv = 0;
 			for (i = 0; i < MAXSOUNDS; i++)
@@ -3003,6 +3008,11 @@ static int fillSoundBuffer(char *buf, int bufsize)
 		uint16_t *samples = (uint16_t *)buf;
 		while (n < max_samples)
 		{
+			if (++ramp_counter >= SOUND_RAMP_INTERVAL)
+			{
+				ramp_counter = 0;
+				step_sound_volumes();
+			}
 			int i, j;
 			int leftv = 0, rightv = 0;
 			for (i = 0; i < MAXSOUNDS; i++)
@@ -3124,12 +3134,12 @@ void checkWAVinput(void)
 			{
 				if (swingbuf == 2)
 				{
-					bcount[1] = fillSoundBuffer(sbuff1, TONE_BUFFER_SIZE) * 2;
+					bcount[1] = fillSoundBuffer(sbuff1, SOUND_BUFFER_SIZE) * 2;
 					wav_filesize = bcount[1];
 				}
 				else
 				{
-					bcount[2] = fillSoundBuffer(sbuff2, TONE_BUFFER_SIZE) * 2;
+					bcount[2] = fillSoundBuffer(sbuff2, SOUND_BUFFER_SIZE) * 2;
 					wav_filesize = bcount[2];
 				}
 				nextbuf = swingbuf;
@@ -3304,12 +3314,12 @@ void checkWAVinput(void)
 			{
 				if (swingbuf == 2)
 				{
-					bcount[1] = fillSoundBuffer(sbuff1, TONE_BUFFER_SIZE);
+					bcount[1] = fillSoundBuffer(sbuff1, SOUND_BUFFER_SIZE);
 					wav_filesize = bcount[1];
 				}
 				else
 				{
-					bcount[2] = fillSoundBuffer(sbuff2, TONE_BUFFER_SIZE);
+					bcount[2] = fillSoundBuffer(sbuff2, SOUND_BUFFER_SIZE);
 					wav_filesize = bcount[2];
 				}
 				nextbuf = swingbuf;

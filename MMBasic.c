@@ -150,6 +150,59 @@ int PrepareProgramExt(unsigned char *, int, unsigned char **, int);
 char PreprogramErrMsg[MAXERRMSG];        // Error message from PrepareProgram if it fails
 unsigned char *PreprogramErrLine = NULL; // Line pointer where PrepareProgram error occurred
 
+#ifndef rp2350
+static int subfun_letter_start[26];
+
+// Compare two SUB/FUNCTION identifiers by base name (case-insensitive), ignoring type suffixes.
+static int CompareSubFunBaseName(unsigned char *a, unsigned char *b)
+{
+    unsigned char *p1 = a + sizeof(CommandToken);
+    unsigned char *p2 = b + sizeof(CommandToken);
+    skipspace(p1);
+    skipspace(p2);
+
+    while (isnamechar(*p1) && isnamechar(*p2))
+    {
+        int c1 = mytoupper(*p1);
+        int c2 = mytoupper(*p2);
+        if (c1 != c2)
+            return c1 - c2;
+        p1++;
+        p2++;
+    }
+
+    if (isnamechar(*p1))
+        return 1;
+    if (isnamechar(*p2))
+        return -1;
+    return 0;
+}
+
+// Compare a caller identifier to a subfun entry by base name only.
+static int CompareNameToSubFunBase(unsigned char *name, unsigned char *sub)
+{
+    unsigned char *p1 = name;
+    unsigned char *p2 = sub + sizeof(CommandToken);
+    skipspace(p2);
+
+    while (isnamechar(*p1) && isnamechar(*p2))
+    {
+        int c1 = mytoupper(*p1);
+        int c2 = mytoupper(*p2);
+        if (c1 != c2)
+            return c1 - c2;
+        p1++;
+        p2++;
+    }
+
+    if (isnamechar(*p1))
+        return 1;
+    if (isnamechar(*p2))
+        return -1;
+    return 0;
+}
+#endif
+
 // Helper function to find the T_NEWLINE that starts a line containing the given pointer
 // Returns the original pointer if it already points to T_NEWLINE or if not found
 static unsigned char *FindLineStart(unsigned char *linePtr, unsigned char *memStart)
@@ -597,8 +650,8 @@ int MIPS16 PrepareProgram(int ErrAbort)
     int u, namelen;
     uint32_t hash = FNV_offset_basis;
     char printvar[MAXVARLEN + 1];
-#endif
     unsigned char *p1, *p2;
+#endif
 
     // Clear any previous error state
     PreprogramErrMsg[0] = 0;
@@ -642,6 +695,52 @@ int MIPS16 PrepareProgram(int ErrAbort)
         ProgramValid = 0;
         return 1; // Error occurred
     }
+
+#ifndef rp2350
+    // RP2040: sort subfun table in-place by base name to enable binary search in FindSubFun.
+    for (i = 0; i < NbrFuncts - 1; i++)
+    {
+        for (j = 0; j < NbrFuncts - i - 1; j++)
+        {
+            if (CompareSubFunBaseName(subfun[j], subfun[j + 1]) > 0)
+            {
+                unsigned char *tmp = subfun[j];
+                subfun[j] = subfun[j + 1];
+                subfun[j + 1] = tmp;
+            }
+        }
+    }
+
+    // Build first-letter index (A..Z) for faster bounded lookup.
+    for (i = 0; i < 26; i++)
+        subfun_letter_start[i] = -1;
+    for (i = 0; i < NbrFuncts; i++)
+    {
+        unsigned char *sp = subfun[i] + sizeof(CommandToken);
+        skipspace(sp);
+        int first = mytoupper(*sp);
+        if (first >= 'A' && first <= 'Z')
+        {
+            int idx = first - 'A';
+            if (subfun_letter_start[idx] == -1)
+                subfun_letter_start[idx] = i;
+        }
+    }
+
+    // Duplicate-name check (same behavior as before: compares base names only).
+    if (ErrAbort)
+    {
+        for (i = 1; i < NbrFuncts; i++)
+        {
+            if (CompareSubFunBaseName(subfun[i - 1], subfun[i]) == 0)
+            {
+                SetPreprogramError("Duplicate name", subfun[i]);
+                ProgramValid = 0;
+                return 1;
+            }
+        }
+    }
+#endif
 
     // check the sub/fun table for duplicates
 #ifdef rp2350
@@ -699,6 +798,7 @@ int MIPS16 PrepareProgram(int ErrAbort)
     if (!ErrAbort)
         return 0;
 
+#ifdef rp2350
     for (i = 0; i < MAXSUBFUN && subfun[i] != NULL; i++)
     {
         for (j = i + 1; j < MAXSUBFUN && subfun[j] != NULL; j++)
@@ -729,6 +829,7 @@ int MIPS16 PrepareProgram(int ErrAbort)
             }
         }
     }
+#endif
     //    for(i=0;i<MAXSUBFUN;i++){
     //    	if(funtbl[i].name[0]!=0){
     //    		MMPrintString(funtbl[i].name);PIntHC(funtbl[i].index);PIntComma(i);PRet();
@@ -1070,38 +1171,78 @@ int __not_in_flash_func(FindSubFun)(unsigned char *p, int type)
     return -1;
 }
 #else
-int __not_in_flash_func(FindSubFun)(unsigned char *p, int type)
+int MIPS16 __not_in_flash_func(FindSubFun)(unsigned char *p, int type)
 {
-    unsigned char *p1, *p2;
-    int i;
+    int n = 0;
+    int low, high, mid, cmp;
+    int first;
+    unsigned char *p2, *p1;
 
-    for (i = 0; i < MAXSUBFUN && subfun[i] != NULL; i++)
+    while (n < MAXSUBFUN && subfun[n] != NULL)
+        n++;
+    if (n == 0)
+        return -1;
+
+    // subfun[] is pre-sorted by PrepareProgram() using base-name ordering.
+    low = 0;
+    high = n - 1;
+    first = mytoupper(*p);
+    if (first >= 'A' && first <= 'Z')
     {
-        p2 = subfun[i]; // point to the command token
-        CommandToken tkn = commandtbl_decode(p2);
-        if (type == 0)
-        { // if it is a sub and we want a fun or vice versa skip this one
-            if (!(tkn == cmdSUB || tkn == cmdCSUB))
-                continue;
+        int li = first - 'A';
+        if (subfun_letter_start[li] == -1)
+            return -1;
+        low = subfun_letter_start[li];
+        for (int ni = li + 1; ni < 26; ni++)
+        {
+            if (subfun_letter_start[ni] != -1)
+            {
+                high = subfun_letter_start[ni] - 1;
+                break;
+            }
         }
+    }
+
+    if (low > high)
+        return -1;
+
+    while (low <= high)
+    {
+        mid = low + ((high - low) >> 1);
+        cmp = CompareNameToSubFunBase(p, subfun[mid]);
+        if (cmp == 0)
+        {
+            p2 = subfun[mid];
+            CommandToken tkn = commandtbl_decode(p2);
+
+            if (type == 0)
+            {
+                if (!(tkn == cmdSUB || tkn == cmdCSUB))
+                    return -1;
+            }
+            else
+            {
+                if (!(tkn == cmdFUN /*|| tkn == cmdCFUN*/))
+                    return -1;
+            }
+
+            // Preserve existing suffix matching behavior.
+            p2 += sizeof(CommandToken);
+            skipspace(p2);
+            p1 = p;
+            while (isnamechar(*p1) && isnamechar(*p2))
+            {
+                p1++;
+                p2++;
+            }
+            if ((*p1 == '$' && *p2 == '$') || (*p1 == '%' && *p2 == '%') || (*p1 == '!' && *p2 == '!') || (!isnamechar(*p1) && !isnamechar(*p2)))
+                return mid;
+            return -1;
+        }
+        if (cmp < 0)
+            high = mid - 1;
         else
-        {
-            if (!(tkn == cmdFUN /*|| tkn == cmdCFUN*/))
-                continue;
-        }
-        p2 += sizeof(CommandToken);
-        skipspace(p2); // point to the identifier
-        if (mytoupper(*p) != mytoupper(*p2))
-            continue; // quick first test
-        p1 = p + 1;
-        p2++;
-        while (isnamechar(*p1) && toupper(*p1) == toupper(*p2))
-        {
-            p1++;
-            p2++;
-        };
-        if ((*p1 == '$' && *p2 == '$') || (*p1 == '%' && *p2 == '%') || (*p1 == '!' && *p2 == '!') || (!isnamechar(*p1) && !isnamechar(*p2)))
-            return i; // found it !
+            low = mid + 1;
     }
     return -1;
 }
@@ -3356,6 +3497,12 @@ void MIPS16 *ResolveStructMember(unsigned char *struct_ptr, int struct_idx, unsi
             int element_size = m_size;
             if (m_type & T_STR)
                 element_size = m_size + 1;
+            else if (m_type & T_STRUCT)
+            {
+                if (m_size < 0 || m_size >= g_structcnt || g_structtbl[m_size] == NULL)
+                    error("Invalid structure type index");
+                element_size = g_structtbl[m_size]->total_size;
+            }
 
             unsigned char *pstart = p;
             int paren_depth = 0;
@@ -4468,7 +4615,7 @@ void __not_in_flash_func(MakeCommaSeparatedArgs)(unsigned char **p, int maxargs,
 //   pointer to an integer that will contain (after the function has returned) the number of arguments found
 //   pointer to a string that contains the characters to be used in spliting up the line.  If the first unsigned char of that
 //       string is an opening bracket '(' this function will expect the arg list to be enclosed in brackets.
-void MIPS16 __not_in_flash_func(makeargs)(unsigned char **p, int maxargs, unsigned char *argbuf, unsigned char *argv[], int *argc, unsigned char *delim)
+void MIPS32 __not_in_flash_func(makeargs)(unsigned char **p, int maxargs, unsigned char *argbuf, unsigned char *argv[], int *argc, unsigned char *delim)
 {
     unsigned char *op;
     int inarg, expect_cmd, expect_bracket, then_tkn, else_tkn;

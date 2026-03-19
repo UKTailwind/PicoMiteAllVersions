@@ -260,7 +260,7 @@ uint8_t PSRAMpin;
     char id_out[12];
     MMFLOAT VCC = 3.3;
     int PromptFont, PromptFC = 0xFFFFFF, PromptBC = 0; // the font and colours selected at the prompt
-    volatile int DISPLAY_TYPE;
+    volatile int DISPLAY_TYPE = SCREENMODE1;
     volatile bool processtick = true;
     unsigned char WatchdogSet = false;
     unsigned char IgnorePIN = false;
@@ -571,6 +571,8 @@ uint8_t PSRAMpin;
 #ifndef USBKEYBOARD
         static int keyread = 0;
         int count;
+        if (Option.KeyboardConfig)
+            CheckKeyboard();
 #endif
 
         if (CurrentlyPlaying != P_NOTHING)
@@ -702,10 +704,12 @@ uint8_t PSRAMpin;
             CheckSDCard();
 
         // === Touch processing ===
-#ifdef GUICONTROLS
-        if (Ctrl && TOUCH_GETIRQTRIS && !calibrate)
-            ProcessTouch();
-#endif
+        /*
+        #ifdef GUICONTROLS
+                if (Ctrl && TOUCH_GETIRQTRIS && !calibrate)
+                    ProcessTouch();
+        #endif
+        */
 
         // === RTC update ===
         // Skip if user code is holding the I2C bus
@@ -762,6 +766,9 @@ uint8_t PSRAMpin;
         int c = -1;
 #ifdef PICOMITEWEB
         ProcessWeb(1);
+#endif
+#ifdef rp2350
+        stepper_poll_events();
 #endif
         CheckAbort();
         if (ConsoleRxBufHead != ConsoleRxBufTail)

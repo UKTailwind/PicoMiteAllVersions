@@ -9011,10 +9011,6 @@ int __not_in_flash_func(check_interrupt)(void)
             CheckGui(); // This implements a LED flash
     }
 #endif
-#ifndef USBKEYBOARD
-    if (Option.KeyboardConfig)
-        CheckKeyboard();
-#endif
     if (!InterruptUsed)
         return 0; // quick exit if there are no interrupts set
     if (InterruptReturn != NULL || CurrentLinePtr == NULL)
