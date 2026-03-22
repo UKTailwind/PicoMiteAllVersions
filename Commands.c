@@ -853,7 +853,11 @@ void array_slice(unsigned char *tp)
 // because the LET is implied (ie, line does not have a recognisable command)
 // it ends up as the place where mistyped commands are discovered.  This is why
 // the error message is "Unknown command"
+#ifdef rp2350
+void __not_in_flash_func(cmd_let)(void)
+#else
 void MIPS16 __not_in_flash_func(cmd_let)(void)
+#endif
 {
 	int t, size;
 	MMFLOAT f;
@@ -1847,7 +1851,11 @@ void cmd_goto(void)
 void cmd_if(void)
 {
 #else
+#ifdef rp2350
+void __not_in_flash_func(cmd_if)(void)
+#else
 void MIPS16 __not_in_flash_func(cmd_if)(void)
+#endif
 {
 #endif
 	int r, i, testgoto, testelseif;
@@ -2047,7 +2055,7 @@ retest_an_if:
 void cmd_else(void)
 {
 #else
-void MIPS32 __not_in_flash_func(cmd_else)(void)
+void __not_in_flash_func(cmd_else)(void)
 {
 #endif
 	int i;
@@ -2871,7 +2879,7 @@ static inline int mystrncasecmp(
 void cmd_for(void)
 {
 #else
-void MIPS32 __not_in_flash_func(cmd_for)(void)
+void __not_in_flash_func(cmd_for)(void)
 {
 #endif
 
@@ -3021,7 +3029,11 @@ void MIPS32 __not_in_flash_func(cmd_for)(void)
 void cmd_next(void)
 {
 #else
+#ifdef rp2350
+void __not_in_flash_func(cmd_next)(void)
+#else
 void MIPS16 __not_in_flash_func(cmd_next)(void)
+#endif
 {
 #endif
 	int i, vindex, test;

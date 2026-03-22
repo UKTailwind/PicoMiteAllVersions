@@ -141,11 +141,26 @@ STEPPER CLEAR
 Clear the G-code buffer.
 Cannot be used while motion is active.
 
-STEPPER RUN
+STEPPER RUN [,0|1]
 Arm motion execution and begin executing queued motion.
+Optional mode argument controls idle behavior after queue drain:
+0 = remain armed with drivers enabled (default)
+1 = disable configured axis enable pins when idle; re-enable automatically when queued work resumes
 
 STEPPER STATUS
 Report arming state, motion state, buffer status, and axis positions.
+
+PEEK(STEPPER X|Y|Z)
+Return current workspace axis position in mm.
+
+PEEK(STEPPER ACTIVE)
+Return 1 when stepper execution is armed and actively processing queued work, else 0.
+
+PEEK(STEPPER STATUS)
+Return status bitmap:
+bit0=X_MIN, bit1=X_MAX, bit2=Y_MIN, bit3=Y_MAX,
+bit4=Z_MIN, bit5=Z_MAX, bit6=E-STOP asserted,
+bit7=position known (machine coordinates established).
 
 MM.CODE
 Pseudo-variable returning free slots remaining in the stepper G-code buffer.
@@ -177,6 +192,20 @@ bool stepper_query_position_mm(char axis, float *pos_mm);
 
 // True when stepper execution is armed and currently processing queued work.
 int stepper_query_active(void);
+
+// Returns the number of free slots in the G-code buffer.
+int stepper_query_buffer_free(void);
+
+// Bitmap returned by PEEK(STEPPER STATUS):
+// bit0  X_MIN limit asserted
+// bit1  X_MAX limit asserted
+// bit2  Y_MIN limit asserted
+// bit3  Y_MAX limit asserted
+// bit4  Z_MIN limit asserted
+// bit5  Z_MAX limit asserted
+// bit6  E-STOP asserted
+// bit7  position known (machine coordinates established)
+int stepper_query_status_bitmap(void);
 
 // Poll and report latched stepper safety events (E-STOP/limits) from main context.
 void stepper_poll_events(void);
@@ -251,7 +280,8 @@ typedef struct
     bool spindle_on;     // Current spindle output state
 
     // Hardware emergency-stop input (optional, active-low)
-    uint8_t estop_pin; // E-STOP input pin (0xFF = not used)
+    uint8_t estop_pin;       // E-STOP input pin (0xFF = not used)
+    bool estop_keep_enabled; // If true, drivers stay enabled on E-STOP
 
 } stepper_system_t;
 

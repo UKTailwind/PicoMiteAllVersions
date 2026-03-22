@@ -306,9 +306,9 @@ void MIPS16 cmd_memory(void)
         }
         if (FileTable[fnbr].com > MAXCOMPORTS)
         {
-            while (!(MMfeof(fnbr)) && n--)
-                *fromp++ = FileGetChar(fnbr);
-            if (n)
+            unsigned int bytesRead = 0;
+            FileGetData(fnbr, fromp, n, &bytesRead);
+            if ((int)bytesRead != n)
                 error("End of file");
         }
         else
@@ -846,7 +846,7 @@ void MIPS16 cmd_memory(void)
         strcat((char *)inpbuf, "%) ");
         MMPrintString((char *)inpbuf);
         IntToStr((char *)inpbuf, FontNbr, 10);
-        strcat((char *)inpbuf, " Embedded Fonts");
+        strcat((char *)inpbuf, " Embedded Font");
         strcat((char *)inpbuf, FontNbr == 1 ? "\r\n" : "s\r\n");
         MMPrintString((char *)inpbuf);
     }
@@ -1465,7 +1465,7 @@ void *ReAllocMemory(void *addr, size_t msize)
     }
     return newaddr;
 }
-void __not_in_flash_func(FreeMemorySafe)(void **addr)
+void MIPS32 __not_in_flash_func(FreeMemorySafe)(void **addr)
 {
     if (*addr != NULL)
     {

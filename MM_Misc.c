@@ -8580,6 +8580,20 @@ void fun_peek(void)
             return;
         }
 
+        if (checkstring(p, (unsigned char *)"STATUS"))
+        {
+            iret = stepper_query_status_bitmap();
+            targ = T_INT;
+            return;
+        }
+
+        if (checkstring(p, (unsigned char *)"BUFFER"))
+        {
+            iret = stepper_query_buffer_free();
+            targ = T_INT;
+            return;
+        }
+
         float pos_mm = 0.0f;
         char axis = 0;
         if (checkstring(p, (unsigned char *)"X"))
@@ -8589,7 +8603,7 @@ void fun_peek(void)
         else if (checkstring(p, (unsigned char *)"Z"))
             axis = 'Z';
         else
-            error("Expected X, Y, Z, or ACTIVE");
+            error("Expected X, Y, Z, ACTIVE, STATUS, or BUFFER");
 
         if (!stepper_query_position_mm(axis, &pos_mm))
             error("Stepper axis not configured");

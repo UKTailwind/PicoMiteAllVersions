@@ -48,11 +48,12 @@ extern "C"
 #define MAXVARS (MAXGLOBALVARS + MAXLOCALVARS)
 
 #ifdef HDMI
-#define HEAP_MEMORY_SIZE (184 * 1024)
-#else
-#define HEAP_MEMORY_SIZE (192 * 1024)
-#endif
 #define FLASH_TARGET_OFFSET (912 * 1024)
+#define HEAP_MEMORY_SIZE (180 * 1024)
+#else
+#define FLASH_TARGET_OFFSET (896 * 1024)
+#define HEAP_MEMORY_SIZE (188 * 1024)
+#endif
 
 /* HDMI-specific settings */
 #ifdef HDMI
@@ -191,8 +192,8 @@ extern "C"
 #define MAXGLOBALVARS 512 // Configurable split
 #define MAXLOCALVARS 256
 #define MAXVARS (MAXGLOBALVARS + MAXLOCALVARS)
-#define HEAP_MEMORY_SIZE (208 * 1024)
-#define FLASH_TARGET_OFFSET (1232 * 1024)
+#define HEAP_MEMORY_SIZE (256 * 1024)
+#define FLASH_TARGET_OFFSET (1248 * 1024)
 #else
 #define MAXSUBFUN 256
 #define MAXGLOBALVARS 240 // Configurable split

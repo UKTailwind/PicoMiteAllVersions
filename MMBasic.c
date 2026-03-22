@@ -1260,8 +1260,13 @@ int MIPS16 __not_in_flash_func(FindSubFun)(unsigned char *p, int type)
 void MIPS16 DefinedSubFun(int isfun, unsigned char *cmd, int index, MMFLOAT *fa, long long int *i64a, unsigned char **sa, int *typ)
 {
 #else
+#ifdef rp2350
+void __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, int index, MMFLOAT *fa, long long int *i64a, unsigned char **sa, int *typ)
+{
+#else
 void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, int index, MMFLOAT *fa, long long int *i64a, unsigned char **sa, int *typ)
 {
+#endif
 #endif
 
     unsigned char *p, *s, *tp, *ttp, tcmdtoken;
@@ -2236,7 +2241,7 @@ void __not_in_flash_func (*DoExpression)(unsigned char *p, int *t)
 //  if *t = T_STR or T_NBR or T_INT will throw an error if the result is not the correct type
 //  if *t = T_NOTYPE it will not throw an error and will return the type found in *t
 // this will check that the expression is terminated correctly and throw an error if not.  flags & E_NOERROR will suppress that check
-unsigned char MIPS16 __not_in_flash_func (*evaluate)(unsigned char *p, MMFLOAT *fa, long long int *ia, unsigned char **sa, int *ta, int flags)
+unsigned char __not_in_flash_func (*evaluate)(unsigned char *p, MMFLOAT *fa, long long int *ia, unsigned char **sa, int *ta, int flags)
 {
     int o;
     int t = *ta;
@@ -2359,7 +2364,11 @@ unsigned char *getFstring(unsigned char *p)
 }
 
 // recursively evaluate an expression observing the rules of operator precedence
-unsigned char MIPS16 __not_in_flash_func (*doexpr)(unsigned char *p, MMFLOAT *fa, long long int *ia, unsigned char **sa, int *oo, int *ta)
+#ifdef rp2350
+unsigned char MIPS64 __not_in_flash_func (*doexpr)(unsigned char *p, MMFLOAT *fa, long long int *ia, unsigned char **sa, int *oo, int *ta)
+#else
+unsigned MIPS16 char __not_in_flash_func (*doexpr)(unsigned char *p, MMFLOAT *fa, long long int *ia, unsigned char **sa, int *oo, int *ta)
+#endif
 {
     MMFLOAT fa1, fa2;
     long long int ia1, ia2;
@@ -2476,7 +2485,11 @@ unsigned char MIPS16 __not_in_flash_func (*doexpr)(unsigned char *p, MMFLOAT *fa
 unsigned char MIPS16 *getvalue(unsigned char *p, MMFLOAT *fa, long long int *ia, unsigned char **sa, int *oo, int *ta)
 {
 #else
-unsigned char MIPS32 __not_in_flash_func (*getvalue)(unsigned char *p, MMFLOAT *fa, long long int *ia, unsigned char **sa, int *oo, int *ta)
+#ifdef rp2350
+unsigned char MIPS64 __not_in_flash_func (*getvalue)(unsigned char *p, MMFLOAT *fa, long long int *ia, unsigned char **sa, int *oo, int *ta)
+#else
+unsigned char __not_in_flash_func (*getvalue)(unsigned char *p, MMFLOAT *fa, long long int *ia, unsigned char **sa, int *oo, int *ta)
+#endif
 {
 #endif
     MMFLOAT f = 0;
@@ -3706,7 +3719,7 @@ void MIPS16 *findvar(unsigned char *p, int action)
  * - hash % (MAXVARS/2) replaced with hash % maxlocalvars
  * - Global offset is now maxlocalvars instead of MAXVARS/2
  ***********************************************************************************************/
-void MIPS32 __not_in_flash_func (*findvar)(unsigned char *p, int action)
+void MIPS64 __not_in_flash_func (*findvar)(unsigned char *p, int action)
 {
 #endif
     unsigned char name[MAXVARLEN + 1];
@@ -4615,7 +4628,7 @@ void __not_in_flash_func(MakeCommaSeparatedArgs)(unsigned char **p, int maxargs,
 //   pointer to an integer that will contain (after the function has returned) the number of arguments found
 //   pointer to a string that contains the characters to be used in spliting up the line.  If the first unsigned char of that
 //       string is an opening bracket '(' this function will expect the arg list to be enclosed in brackets.
-void MIPS32 __not_in_flash_func(makeargs)(unsigned char **p, int maxargs, unsigned char *argbuf, unsigned char *argv[], int *argc, unsigned char *delim)
+void __not_in_flash_func(makeargs)(unsigned char **p, int maxargs, unsigned char *argbuf, unsigned char *argv[], int *argc, unsigned char *delim)
 {
     unsigned char *op;
     int inarg, expect_cmd, expect_bracket, then_tkn, else_tkn;

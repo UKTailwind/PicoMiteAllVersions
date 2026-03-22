@@ -295,6 +295,15 @@ static float stepper_jerk_limit_mm_s3 = 0.0f;
 // Arc segments remain on the existing approach initially.
 static bool stepper_scurve_enable = false;
 
+// Optional RUN mode: automatically disable configured axis drivers when
+// no dwell/motion work remains in the G-code queue.
+static volatile bool stepper_auto_disable_on_idle = false;
+// Tracks whether at least one queued block has been observed since the last arm.
+// Prevents immediate auto-disarm when RUN is issued before the first command is queued.
+static volatile bool stepper_auto_disable_seen_work = false;
+// Tracks whether configured axis drivers are currently enabled (active-low outputs asserted).
+static volatile bool stepper_drivers_enabled = false;
+
 // Buffer management functions
 
 // Reset planner position (call when buffer is cleared or system initialized)
@@ -1003,10 +1012,12 @@ gcode_block_t create_cw_arc(float x, float y, float i, float j, float feedrate)
 // Apply a conservative minimum starting step rate for ACCEL phases only.
 // Rate units: step frequency (steps/s) ~= step_rate / 1000 (given current constants).
 #define STEPPER_START_MIN_STEP_RATE 20000  // ~20 steps/sec
+#define STEPPER_ENABLE_SETTLE_US 50        // Driver wake/enable settle before first queued step
 volatile bool stepper_initialized = false; // Non-static for access from External.c
 static volatile uint32_t stepper_tick_count = 0;
 static volatile bool stepper_dwell_active = false;
 static volatile uint32_t stepper_dwell_until_tick = 0;
+static volatile uint32_t stepper_enable_settle_until_tick = 0;
 
 static inline uint32_t stepper_dwell_ms_to_ticks(double ms)
 {
@@ -1136,8 +1147,47 @@ int stepper_query_active(void)
     return active;
 }
 
+int stepper_query_buffer_free(void)
+{
+    uint32_t save = save_and_disable_interrupts();
+    int free = stepper_initialized ? (int)stepper_gcode_buffer_space : 0;
+    restore_interrupts(save);
+    return free;
+}
+
+int stepper_query_status_bitmap(void)
+{
+    uint32_t save = save_and_disable_interrupts();
+    uint64_t gpio_state = gpio_get_all64();
+    int status = 0;
+
+    // Limit switches are active-low.
+    if (stepper_system.x_min_limit_pin != 0xFF && ((~gpio_state & (1ULL << stepper_system.x_min_limit_pin)) != 0))
+        status |= (1 << 0);
+    if (stepper_system.x_max_limit_pin != 0xFF && ((~gpio_state & (1ULL << stepper_system.x_max_limit_pin)) != 0))
+        status |= (1 << 1);
+    if (stepper_system.y_min_limit_pin != 0xFF && ((~gpio_state & (1ULL << stepper_system.y_min_limit_pin)) != 0))
+        status |= (1 << 2);
+    if (stepper_system.y_max_limit_pin != 0xFF && ((~gpio_state & (1ULL << stepper_system.y_max_limit_pin)) != 0))
+        status |= (1 << 3);
+    if (stepper_system.z_min_limit_pin != 0xFF && ((~gpio_state & (1ULL << stepper_system.z_min_limit_pin)) != 0))
+        status |= (1 << 4);
+    if (stepper_system.z_max_limit_pin != 0xFF && ((~gpio_state & (1ULL << stepper_system.z_max_limit_pin)) != 0))
+        status |= (1 << 5);
+
+    if (stepper_estop_is_active())
+        status |= (1 << 6);
+    if (stepper_system.position_known)
+        status |= (1 << 7);
+
+    restore_interrupts(save);
+    return status;
+}
+
 // Latched hardware E-STOP trip (set in ISR, reported in main context)
 static volatile bool stepper_estop_trip_latched = false;
+// Tracks whether E-STOP is currently asserted to edge-latch trips once per assertion.
+static volatile bool stepper_estop_asserted = false;
 
 // Latched hardware-limit trip (set in ISR, reported in main context)
 static volatile bool stepper_limit_trip_latched = false;
@@ -1391,12 +1441,16 @@ void stepper_abort_to_safe_state_on_error(void)
     stepper_system.homing_active = false;
 
     // Disable drivers (active-low enable pins) to avoid holding position after an error.
-    if (stepper_system.x.enable_pin != 0xFF)
-        gpio_put(stepper_system.x.enable_pin, 1);
-    if (stepper_system.y.enable_pin != 0xFF)
-        gpio_put(stepper_system.y.enable_pin, 1);
-    if (stepper_system.z.enable_pin != 0xFF)
-        gpio_put(stepper_system.z.enable_pin, 1);
+    if (!stepper_system.estop_keep_enabled)
+    {
+        if (stepper_system.x.enable_pin != 0xFF)
+            gpio_put(stepper_system.x.enable_pin, 1);
+        if (stepper_system.y.enable_pin != 0xFF)
+            gpio_put(stepper_system.y.enable_pin, 1);
+        if (stepper_system.z.enable_pin != 0xFF)
+            gpio_put(stepper_system.z.enable_pin, 1);
+        stepper_drivers_enabled = false;
+    }
 
     // Clear buffer and reset modal state.
     gcode_buffer_init(&gcode_buffer);
@@ -2180,22 +2234,30 @@ void __not_in_flash_func(stepper_timer_isr)(void)
     stepper_tick_count++;
 
     // Hardware E-STOP has highest priority and is enforced regardless of
-    // normal armed/homing state.
-    if (stepper_estop_is_active())
+    // normal armed/homing state. Latch a trip only on assertion edge so
+    // main-context reporting does not spam while the input remains active.
+    bool estop_active = stepper_estop_is_active();
+    if (estop_active)
     {
-        stepper_estop_trip_latched = true;
+        if (!stepper_estop_asserted)
+            stepper_estop_trip_latched = true;
+        stepper_estop_asserted = true;
 
         current_move.phase = MOVE_PHASE_IDLE;
         stepper_system.motion_active = false;
         stepper_system.homing_active = false;
         stepper_armed = false;
 
-        if (stepper_system.x.enable_pin != 0xFF)
-            gpio_put(stepper_system.x.enable_pin, 1);
-        if (stepper_system.y.enable_pin != 0xFF)
-            gpio_put(stepper_system.y.enable_pin, 1);
-        if (stepper_system.z.enable_pin != 0xFF)
-            gpio_put(stepper_system.z.enable_pin, 1);
+        if (!stepper_system.estop_keep_enabled)
+        {
+            if (stepper_system.x.enable_pin != 0xFF)
+                gpio_put(stepper_system.x.enable_pin, 1);
+            if (stepper_system.y.enable_pin != 0xFF)
+                gpio_put(stepper_system.y.enable_pin, 1);
+            if (stepper_system.z.enable_pin != 0xFF)
+                gpio_put(stepper_system.z.enable_pin, 1);
+            stepper_drivers_enabled = false;
+        }
 
         stepper_spindle_off();
 
@@ -2219,8 +2281,15 @@ void __not_in_flash_func(stepper_timer_isr)(void)
         return;
     }
 
+    // E-STOP released: allow a fresh latch on next assertion.
+    stepper_estop_asserted = false;
+
     // If not armed, don't execute motion.
     if (!stepper_armed)
+        return;
+
+    // After drivers are enabled (RUN), wait a short settle period before dequeuing work.
+    if ((int32_t)(stepper_tick_count - stepper_enable_settle_until_tick) < 0)
         return;
 
     // Check hardware limit switches (active-low, triggers on 0)
@@ -2246,6 +2315,7 @@ void __not_in_flash_func(stepper_timer_isr)(void)
                 gpio_put(stepper_system.y.enable_pin, 1);
             if (stepper_system.z.enable_pin != 0xFF)
                 gpio_put(stepper_system.z.enable_pin, 1);
+            stepper_drivers_enabled = false;
 
             // Disable spindle immediately
             stepper_spindle_off();
@@ -2291,7 +2361,41 @@ void __not_in_flash_func(stepper_timer_isr)(void)
         // Try to dequeue a new block
         stepper_runtime_block_t *block = gcode_buffer_peek(&gcode_buffer);
         if (block == NULL)
+        {
+            if (stepper_auto_disable_on_idle && stepper_auto_disable_seen_work)
+            {
+                if (stepper_drivers_enabled)
+                {
+                    if (stepper_system.x.enable_pin != 0xFF)
+                        gpio_put(stepper_system.x.enable_pin, 1);
+                    if (stepper_system.y.enable_pin != 0xFF)
+                        gpio_put(stepper_system.y.enable_pin, 1);
+                    if (stepper_system.z.enable_pin != 0xFF)
+                        gpio_put(stepper_system.z.enable_pin, 1);
+                    stepper_drivers_enabled = false;
+                }
+            }
             return;
+        }
+
+        stepper_auto_disable_seen_work = true;
+
+        // RUN auto-idle mode can leave drivers disabled while staying armed.
+        // Re-enable and allow the configured settle delay before executing queued work.
+        if (stepper_auto_disable_on_idle && !stepper_drivers_enabled)
+        {
+            if (stepper_system.x.enable_pin != 0xFF)
+                gpio_put(stepper_system.x.enable_pin, 0);
+            if (stepper_system.y.enable_pin != 0xFF)
+                gpio_put(stepper_system.y.enable_pin, 0);
+            if (stepper_system.z.enable_pin != 0xFF)
+                gpio_put(stepper_system.z.enable_pin, 0);
+            stepper_drivers_enabled = true;
+
+            const uint32_t settle_ticks = (uint32_t)(((uint64_t)STEPPER_ENABLE_SETTLE_US * (uint64_t)ISR_FREQ + 999999ULL) / 1000000ULL);
+            stepper_enable_settle_until_tick = stepper_tick_count + (settle_ticks ? settle_ticks : 1u);
+            return;
+        }
 
         if (block->type == GCODE_DWELL)
         {
@@ -3462,7 +3566,7 @@ void cmd_stepper(void)
     if (stepper_report_latched_trips())
         return;
 
-    // STEPPER INIT [arc_tolerance] [,buffer_size] [,estop_pin] - Initialize stepper system, G-code buffer, and 100KHz timer interrupt
+    // STEPPER INIT [arc_tolerance] [,buffer_size] [,estop_pin] [,estop_keep_enabled] - Initialize stepper system, G-code buffer, and 100KHz timer interrupt
     if ((tp = checkstring(cmdline, (unsigned char *)"INIT")) != NULL)
     {
         if (stepper_initialized)
@@ -3472,6 +3576,7 @@ void cmd_stepper(void)
         bool tol_set = false;
         int buf_size = GCODE_BUFFER_DEFAULT_SIZE;
         int estop_pin_cfg = 0;
+        int estop_keep_en = 0;
 
         // Parse optional parameters. Accepts either order.
         // Disambiguation rule:
@@ -3483,9 +3588,9 @@ void cmd_stepper(void)
         //   STEPPER INIT 64
         //   STEPPER INIT 0.25,64
         //   STEPPER INIT 64,0.25
-        getcsargs(&tp, 5);
-        if (!(argc == 0 || argc == 1 || argc == 3 || argc == 5))
-            stepper_error("Syntax: STEPPER INIT [arc_tolerance] [,buffer_size] [,estop_pin]");
+        getcsargs(&tp, 7);
+        if (!(argc == 0 || argc == 1 || argc == 3 || argc == 5 || argc == 7))
+            stepper_error("Syntax: STEPPER INIT [arc_tolerance] [,buffer_size] [,estop_pin] [,estop_keep_enabled]");
 
         bool have_tol = false;
         bool have_buf = false;
@@ -3499,7 +3604,7 @@ void cmd_stepper(void)
             if (v > 0.0 && v < 1.0)
             {
                 if (have_tol)
-                    stepper_error("Syntax: STEPPER INIT [arc_tolerance] [,buffer_size] [,estop_pin]");
+                    stepper_error("Syntax: STEPPER INIT [arc_tolerance] [,buffer_size] [,estop_pin] [,estop_keep_enabled]");
                 have_tol = true;
                 tol = (float)v;
                 tol_set = true;
@@ -3510,23 +3615,30 @@ void cmd_stepper(void)
             {
                 long iv = (long)v;
                 if ((double)iv != v)
-                    stepper_error("Syntax: STEPPER INIT [arc_tolerance] [,buffer_size] [,estop_pin]");
+                    stepper_error("Syntax: STEPPER INIT [arc_tolerance] [,buffer_size] [,estop_pin] [,estop_keep_enabled]");
                 if (have_buf)
-                    stepper_error("Syntax: STEPPER INIT [arc_tolerance] [,buffer_size] [,estop_pin]");
+                    stepper_error("Syntax: STEPPER INIT [arc_tolerance] [,buffer_size] [,estop_pin] [,estop_keep_enabled]");
                 have_buf = true;
                 buf_size = (int)iv;
                 continue;
             }
 
-            stepper_error("Syntax: STEPPER INIT [arc_tolerance] [,buffer_size] [,estop_pin]");
+            stepper_error("Syntax: STEPPER INIT [arc_tolerance] [,buffer_size] [,estop_pin] [,estop_keep_enabled]");
         }
 
-        if (init_argc == 3 && *argv[4])
+        if (init_argc >= 3 && *argv[4])
         {
             estop_pin_cfg = parse_pin(argv[4]);
             if (estop_pin_cfg == 0)
                 stepper_error("E-STOP pin cannot be 0");
             CheckPin(estop_pin_cfg, CP_IGNORE_INUSE);
+        }
+
+        if (init_argc >= 4 && *argv[6])
+        {
+            estop_keep_en = (int)getinteger(argv[6]);
+            if (estop_keep_en != 0 && estop_keep_en != 1)
+                stepper_error("estop_keep_enabled must be 0 or 1");
         }
 
         if (tol_set && tol <= 0.0f)
@@ -3596,7 +3708,9 @@ void cmd_stepper(void)
             ExtCfg(estop_pin_cfg, EXT_DIG_IN, 0);
         }
 
+        stepper_system.estop_keep_enabled = (estop_keep_en != 0);
         stepper_estop_trip_latched = false;
+        stepper_estop_asserted = false;
 
         stepper_reset_accumulator_carry();
 
@@ -3620,6 +3734,8 @@ void cmd_stepper(void)
 
         // Start disarmed; user must explicitly arm with STEPPER RUN.
         stepper_armed = false;
+        stepper_auto_disable_on_idle = false;
+        stepper_drivers_enabled = false;
 
         // Clear any pending interrupt
         pwm_clear_irq(STEPPER_PWM_SLICE);
@@ -3712,6 +3828,7 @@ void cmd_stepper(void)
             gpio_put(stepper_system.y.enable_pin, 1);
         if (stepper_system.z.enable_pin != 0xFF)
             gpio_put(stepper_system.z.enable_pin, 1);
+        stepper_drivers_enabled = false;
 
         // Disable spindle
         stepper_spindle_off();
@@ -4028,6 +4145,7 @@ void cmd_stepper(void)
         stepper_system.spindle_on = false;
         stepper_system.estop_pin = 0xFF;
         stepper_estop_trip_latched = false;
+        stepper_estop_asserted = false;
         return;
     }
 
@@ -4300,6 +4418,7 @@ void cmd_stepper(void)
                 gpio_put(stepper_system.y.enable_pin, enable ? 0 : 1);
             if (stepper_system.z.enable_pin != 0xFF)
                 gpio_put(stepper_system.z.enable_pin, enable ? 0 : 1);
+            stepper_drivers_enabled = enable;
         }
         else
         {
@@ -4310,6 +4429,8 @@ void cmd_stepper(void)
             if (axis->enable_pin == 0xFF)
                 stepper_error("Enable pin not configured for this axis");
             gpio_put(axis->enable_pin, enable ? 0 : 1); // Active low
+            if (!enable)
+                stepper_drivers_enabled = false;
         }
         return;
     }
@@ -5662,11 +5783,21 @@ void cmd_stepper(void)
         return;
     }
 
-    // STEPPER RUN - Arm and start executing buffered commands
-    if (checkstring(cmdline, (unsigned char *)"RUN"))
+    // STEPPER RUN [,0|1] - Arm and start executing buffered commands.
+    // Optional mode: when set to 1, the ISR will disable axis enable pins when
+    // no buffered work remains and re-enable on next queued work.
+    if ((tp = checkstring(cmdline, (unsigned char *)"RUN")) != NULL)
     {
         if (!stepper_initialized)
             stepper_error("Stepper not initialized");
+
+        getcsargs(&tp, 1);
+        if (!(argc == 0 || argc == 1))
+            stepper_error("Syntax: STEPPER RUN [,0|1]");
+
+        bool auto_disable_on_idle = stepper_auto_disable_on_idle;
+        if (argc == 1)
+            auto_disable_on_idle = (getint(argv[0], 0, 1) != 0);
 
         if (stepper_estop_is_active())
             stepper_error("E-STOP active - clear E-STOP and re-home");
@@ -5685,18 +5816,28 @@ void cmd_stepper(void)
 
         if (stepper_armed)
         {
+            uint32_t save = save_and_disable_interrupts();
+            stepper_auto_disable_on_idle = auto_disable_on_idle;
+            restore_interrupts(save);
             MMPrintString("Already armed\r\n");
             return;
         }
 
         // Explicit RUN means "arm and execute": re-enable configured drivers (active-low)
         uint32_t save = save_and_disable_interrupts();
+        stepper_auto_disable_on_idle = auto_disable_on_idle;
         if (stepper_system.x.enable_pin != 0xFF)
             gpio_put(stepper_system.x.enable_pin, 0);
         if (stepper_system.y.enable_pin != 0xFF)
             gpio_put(stepper_system.y.enable_pin, 0);
         if (stepper_system.z.enable_pin != 0xFF)
             gpio_put(stepper_system.z.enable_pin, 0);
+        stepper_drivers_enabled = true;
+        {
+            const uint32_t settle_ticks = (uint32_t)(((uint64_t)STEPPER_ENABLE_SETTLE_US * (uint64_t)ISR_FREQ + 999999ULL) / 1000000ULL);
+            stepper_enable_settle_until_tick = stepper_tick_count + (settle_ticks ? settle_ticks : 1u);
+        }
+        stepper_auto_disable_seen_work = false;
         stepper_armed = true;
         restore_interrupts(save);
         MMPrintString("Stepper armed - executing buffered commands\r\n");
@@ -5716,6 +5857,10 @@ void cmd_stepper(void)
         sprintf(buf, "Armed: %s, Motion: %s\r\n",
                 stepper_armed ? "YES" : "NO",
                 stepper_system.motion_active ? "ACTIVE" : "IDLE");
+        MMPrintString(buf);
+
+        sprintf(buf, "Auto-disable on idle: %s\r\n",
+                stepper_auto_disable_on_idle ? "ON" : "OFF");
         MMPrintString(buf);
 
         sprintf(buf, "S-curve: %s, Jerk: %.1f mm/s^3\r\n",
