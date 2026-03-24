@@ -1139,7 +1139,9 @@ bool stepper_query_position_mm(char axis, float *pos_mm)
 int stepper_query_active(void)
 {
     uint32_t save = save_and_disable_interrupts();
-    int active = (stepper_initialized && stepper_armed &&
+    int active;
+    if(!stepper_initialized)return -1;
+    active = (stepper_initialized && stepper_armed &&
                   (stepper_system.motion_active || stepper_dwell_active || gcode_buffer.count > 0))
                      ? 1
                      : 0;
