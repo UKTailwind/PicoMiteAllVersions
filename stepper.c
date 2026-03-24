@@ -1140,11 +1140,12 @@ int stepper_query_active(void)
 {
     uint32_t save = save_and_disable_interrupts();
     int active;
-    if(!stepper_initialized)return -1;
-    active = (stepper_initialized && stepper_armed &&
-                  (stepper_system.motion_active || stepper_dwell_active || gcode_buffer.count > 0))
-                     ? 1
-                     : 0;
+    if (!stepper_initialized)
+        return -1;
+    active = (stepper_armed &&
+              (stepper_system.motion_active || stepper_dwell_active || gcode_buffer.count > 0))
+                 ? 1
+                 : 0;
     restore_interrupts(save);
     return active;
 }

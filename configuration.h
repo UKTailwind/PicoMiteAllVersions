@@ -68,7 +68,7 @@ extern "C"
 #else
 #define MAXMODES 3
 #ifdef USBKEYBOARD
-#define MagicKey 0x7891214B3
+#define MagicKey 0x789124B3
 #else
 #define MagicKey 0x42283587
 #endif
@@ -245,7 +245,7 @@ extern "C"
 #ifdef USBKEYBOARD
 #define MagicKey 0x0E878DDA
 #else
-#define MagicKey 0xF1F5127C5
+#define MagicKey 0xF1F127C5
 #endif
 #endif
 
