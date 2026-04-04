@@ -6019,14 +6019,21 @@ void cmd_open(void)
         ;
         fname = (char *)getFstring(argv[0]);
 
+        // helper: check if this is a recognised COM port
+        int is_comport = mem_equal((unsigned char *)fname, (unsigned char *)"COM1:", 5) || mem_equal((unsigned char *)fname, (unsigned char *)"COM2:", 5)
+#ifdef USBKEYBOARD
+                         || mem_equal((unsigned char *)fname, (unsigned char *)"COM3:", 5) || mem_equal((unsigned char *)fname, (unsigned char *)"COM4:", 5) || mem_equal((unsigned char *)fname, (unsigned char *)"COM5:", 5) || mem_equal((unsigned char *)fname, (unsigned char *)"COM6:", 5)
+#endif
+            ;
+
         // check that it is a serial port that we are opening
-        if (argc == 5 && !(mem_equal((unsigned char *)fname, (unsigned char *)"COM1:", 5) || mem_equal((unsigned char *)fname, (unsigned char *)"COM2:", 5)))
+        if (argc == 5 && !is_comport)
         {
             FileOpen(fname, (char *)argv[2], (char *)argv[4]);
             diskchecktimer = DISKCHECKRATE;
             return;
         }
-        if (!(mem_equal((unsigned char *)fname, (unsigned char *)"COM1:", 5) || mem_equal((unsigned char *)fname, (unsigned char *)"COM2:", 5)))
+        if (!is_comport)
             error("Invalid COM port");
         if ((*argv[2] == 'G') || (*argv[2] == 'g'))
         {

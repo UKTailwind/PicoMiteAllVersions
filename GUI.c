@@ -1656,20 +1656,20 @@ void DrawBarGauge(int r)
     }
 }
 
-char *KeypadCaption[12][2] = {{"Alt", "123"},
-                              {"0", "Can"},
-                              {"Ent", "Ent"},
-                              {"1", "."},
-                              {"2", ""},
-                              {"3", ""},
-                              {"4", "+"},
-                              {"5", "-"},
-                              {"6", "E"},
-                              {"7", "Del"},
-                              {"8", "CE"},
-                              {"9", ""}};
+const char *const KeypadCaption[12][2] = {{"Alt", "123"},
+                                          {"0", "Can"},
+                                          {"Ent", "Ent"},
+                                          {"1", "."},
+                                          {"2", ""},
+                                          {"3", ""},
+                                          {"4", "+"},
+                                          {"5", "-"},
+                                          {"6", "E"},
+                                          {"7", "Del"},
+                                          {"8", "CE"},
+                                          {"9", ""}};
 
-char *KeyboardCaption[33][4] = {
+const char *const KeyboardCaption[33][4] = {
     // this is the bottom row of keys
     {"&12", "ABC", "&12", "ABC"},
     {"Z", "+", "z", "["},
@@ -1712,9 +1712,9 @@ char *KeyboardCaption[33][4] = {
 char *GetCaption(int k, int is_alpha, int alt)
 {
     if (is_alpha)
-        return KeyboardCaption[k][alt];
+        return (char *)KeyboardCaption[k][alt];
     else
-        return KeypadCaption[k][alt];
+        return (char *)KeypadCaption[k][alt];
 }
 
 // returns the top left coord of a key (x1 & y1) and the bottom right (x2 & y2)

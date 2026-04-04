@@ -169,6 +169,7 @@ void FreeMemory(unsigned char *addr);
 void FreeMemorySafe(void **addr);
 void ClearTempMemory(void);
 void ClearSpecificTempMemory(void *addr);
+void MemoryShareStop(void);
 
 /* ============================================================================
  * Function declarations - Memory information

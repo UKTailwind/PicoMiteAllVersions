@@ -269,7 +269,7 @@ typedef enum
 /* ============================================================================
  * External variables - Pin configuration and status
  * ============================================================================ */
-extern const char *PinFunction[];
+extern const char *const PinFunction[];
 extern volatile int ExtCurrentConfig[NBRPINS + 1];
 
 #ifdef rp2350

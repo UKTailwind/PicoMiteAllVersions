@@ -48,10 +48,10 @@ extern "C"
 #define MAXVARS (MAXGLOBALVARS + MAXLOCALVARS)
 
 #ifdef HDMI
-#define FLASH_TARGET_OFFSET (912 * 1024)
+#define FLASH_TARGET_OFFSET (928 * 1024)
 #define HEAP_MEMORY_SIZE (180 * 1024)
 #else
-#define FLASH_TARGET_OFFSET (896 * 1024)
+#define FLASH_TARGET_OFFSET (912 * 1024)
 #define HEAP_MEMORY_SIZE (188 * 1024)
 #endif
 
@@ -83,7 +83,7 @@ extern "C"
 #define MAXLOCALVARS 240
 #define MAXVARS (MAXGLOBALVARS + MAXLOCALVARS)
 #ifdef USBKEYBOARD
-#define FLASH_TARGET_OFFSET (768 * 1024)
+#define FLASH_TARGET_OFFSET (784 * 1024)
 #define MagicKey 0x356469F4
 #else
 #define FLASH_TARGET_OFFSET (768 * 1024)
@@ -220,11 +220,11 @@ extern "C"
 #define MIN_CPU 48000
 
 #ifdef rp2350
-#define HEAP_MEMORY_SIZE (328 * 1024)
+#define HEAP_MEMORY_SIZE (324 * 1024)
 #define MAXGLOBALVARS 512 // Configurable split
 #define MAXLOCALVARS 240
 #define MAXVARS (MAXGLOBALVARS + MAXLOCALVARS)
-#define FLASH_TARGET_OFFSET (992 * 1024)
+#define FLASH_TARGET_OFFSET (1008 * 1024)
 #define MAX_CPU 420000
 #define MAXSUBFUN 512
 
@@ -238,14 +238,16 @@ extern "C"
 #define MAXGLOBALVARS 256 // Configurable split
 #define MAXLOCALVARS 240
 #define MAXVARS (MAXGLOBALVARS + MAXLOCALVARS)
-#define FLASH_TARGET_OFFSET (848 * 1024)
+
 #define MAX_CPU 420000
 #define MAXSUBFUN 256
 
 #ifdef USBKEYBOARD
 #define MagicKey 0x0E878DDA
+#define FLASH_TARGET_OFFSET (848 * 1024)
 #else
 #define MagicKey 0xF1F127C5
+#define FLASH_TARGET_OFFSET (832 * 1024)
 #endif
 #endif
 
@@ -305,7 +307,11 @@ extern "C"
  * Operating characteristics - Files and I/O
  * ============================================================================ */
 #define MAXOPENFILES 10 // Maximum number of open files
-#define MAXCOMPORTS 2   // Maximum number of COM ports
+#ifdef USBKEYBOARD
+#define MAXCOMPORTS 6 // Maximum number of COM ports (COM1-2 = UART, COM3-6 = USB CDC host)
+#else
+#define MAXCOMPORTS 2 // Maximum number of COM ports
+#endif
 
 #ifdef rp2350
 #define MAXDIM 5 // Maximum number of dimensions to an array
@@ -499,6 +505,8 @@ extern "C"
 #define ADC_DMA2 7
 #define PIO_RX_DMA 8
 #define PIO_RX_DMA2 9
+#define SHARE_DMA_DATA 10
+#define SHARE_DMA_CTRL 11
 
 /* ============================================================================
  * Timing and frequency configuration

@@ -5421,7 +5421,7 @@ void MIPS16 cmd_option(void)
         if (CurrentLinePtr)
             StandardError(10);
         Option.NoScroll = 0;
-        if (!(Option.DISPLAY_TYPE == ST7789B || Option.DISPLAY_TYPE == ILI9488 || Option.DISPLAY_TYPE == ST7796SP || Option.DISPLAY_TYPE == ST7796S || Option.DISPLAY_TYPE == ILI9488P || Option.DISPLAY_TYPE == ILI9341 || Option.DISPLAY_TYPE >= VGADISPLAY))
+        if (!(Option.DISPLAY_TYPE == ST7789B || Option.DISPLAY_TYPE == ILI9488 || Option.DISPLAY_TYPE == ST7365P || Option.DISPLAY_TYPE == ST7796SP || Option.DISPLAY_TYPE == ST7796S || Option.DISPLAY_TYPE == ILI9488P || Option.DISPLAY_TYPE == ILI9341 || Option.DISPLAY_TYPE >= VGADISPLAY))
             Option.NoScroll = 1;
         if (!(Option.DISPLAY_ORIENTATION == DISPLAY_LANDSCAPE) && Option.DISPLAY_TYPE == SSDTYPE)
             error("Landscape only");
@@ -8930,6 +8930,28 @@ int checkdetailinterrupts(void)
         intaddr = com2_interrupt; // set the next stmt to the interrupt location
         goto GotAnInterrupt;
     }
+#ifdef USBKEYBOARD
+    if (com3_interrupt != NULL && SerialRxStatus(3) >= com3_ilevel)
+    {                             // do we need to interrupt?
+        intaddr = com3_interrupt; // set the next stmt to the interrupt location
+        goto GotAnInterrupt;
+    }
+    if (com4_interrupt != NULL && SerialRxStatus(4) >= com4_ilevel)
+    {                             // do we need to interrupt?
+        intaddr = com4_interrupt; // set the next stmt to the interrupt location
+        goto GotAnInterrupt;
+    }
+    if (com5_interrupt != NULL && SerialRxStatus(5) >= com5_ilevel)
+    {                             // do we need to interrupt?
+        intaddr = com5_interrupt; // set the next stmt to the interrupt location
+        goto GotAnInterrupt;
+    }
+    if (com6_interrupt != NULL && SerialRxStatus(6) >= com6_ilevel)
+    {                             // do we need to interrupt?
+        intaddr = com6_interrupt; // set the next stmt to the interrupt location
+        goto GotAnInterrupt;
+    }
+#endif
     if (IrGotMsg && IrInterrupt != NULL)
     {
         IrGotMsg = false;

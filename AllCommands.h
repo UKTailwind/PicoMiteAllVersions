@@ -131,6 +131,7 @@ void cmd_font(void);
 void cmd_colour(void);
 void cmd_refresh(void);
 void cmd_polygon(void);
+void cmd_fastcall(void);
 void cmd_gui(void);
 void cmd_tile(void);
 void cmd_mode(void);
@@ -233,6 +234,7 @@ void cmd_star(void);
 void cmd_locate(void);
 void cmd_stepper(void);
 void cmd_bitstream(void);
+void cmd_mandelbrot(void);
 
 void cmd_tilemap(void);
 void fun_tilemap(void);
@@ -651,6 +653,9 @@ void fun_frame(void);
 	{(unsigned char *)"I2CLCD", T_CMD, 0, cmd_i2clcd},
 	{(unsigned char *)"Bitstream", T_CMD, 0, cmd_bitstream},
 	{(unsigned char *)"OneShot", T_CMD, 0, cmd_oneshot},
+#if defined(PICOMITEVGA) || defined(rp2350)
+	{(unsigned char *)"Mandelbrot", T_CMD, 0, cmd_mandelbrot},
+#endif
 
 {
 	(unsigned char *)"", 0, 0, cmd_null

@@ -168,6 +168,41 @@ extern void start_com2(void);
 extern void stop_com2(void);
 extern void MX_USART1_UART_Init1(void);
 
+/* ==============================================================================================================
+ * USB CDC HOST SERIAL PORTS (COM3-COM6)
+ * Fixed mapping: COM3 = CDC idx 0 (channel 5), COM4 = CDC idx 1 (channel 6),
+ *                COM5 = CDC idx 2 (channel 7), COM6 = CDC idx 3 (channel 8)
+ * ============================================================================================================== */
+#ifdef USBKEYBOARD
+extern int com3;				  // true if COM3 (CDC host idx 0) is enabled
+extern int com3_buf_size;		  // size of the receive buffer
+extern char *com3_interrupt;	  // pointer to the interrupt routine
+extern int com3_ilevel;			  // number of chars in buffer for an interrupt
+extern unsigned char *com3Rx_buf; // pointer to the receive buffer
+extern volatile int com3Rx_head, com3Rx_tail;
+
+extern int com4;				  // true if COM4 (CDC host idx 1) is enabled
+extern int com4_buf_size;		  // size of the receive buffer
+extern char *com4_interrupt;	  // pointer to the interrupt routine
+extern int com4_ilevel;			  // number of chars in buffer for an interrupt
+extern unsigned char *com4Rx_buf; // pointer to the receive buffer
+extern volatile int com4Rx_head, com4Rx_tail;
+
+extern int com5;				  // true if COM5 (CDC host idx 2) is enabled
+extern int com5_buf_size;		  // size of the receive buffer
+extern char *com5_interrupt;	  // pointer to the interrupt routine
+extern int com5_ilevel;			  // number of chars in buffer for an interrupt
+extern unsigned char *com5Rx_buf; // pointer to the receive buffer
+extern volatile int com5Rx_head, com5Rx_tail;
+
+extern int com6;				  // true if COM6 (CDC host idx 3) is enabled
+extern int com6_buf_size;		  // size of the receive buffer
+extern char *com6_interrupt;	  // pointer to the interrupt routine
+extern int com6_ilevel;			  // number of chars in buffer for an interrupt
+extern unsigned char *com6Rx_buf; // pointer to the receive buffer
+extern volatile int com6Rx_head, com6Rx_tail;
+#endif
+
 #endif // SERIAL_HEADER
 #endif // !defined(INCLUDE_COMMAND_TABLE) && !defined(INCLUDE_TOKEN_TABLE)
 	   /* @endcond */

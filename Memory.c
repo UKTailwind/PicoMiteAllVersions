@@ -38,6 +38,8 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
+#include "hardware/dma.h"
+#include "hardware/pio_instructions.h"
 #define ASMMAX 6400 // maximum number of bytes that can be copied or set by assembler routines
 #define MAXCPY 3200 // tuned maximum number of bytes to copy using ZCOPY
 
@@ -150,9 +152,619 @@ int g_StrTmpIndex = 0;              // index to the next unallocated slot in str
  MMBasic commands
 ************************************************************************************************************************/
 /*  @endcond */
+
+/* ============================================================================
+ * MEMORY SHARE - Background DMA-to-PIO shared memory between two PicoMites
+ * ============================================================================ */
+typedef struct
+{
+    bool active;
+    bool is_host;
+    PIO pio;
+    uint sm;
+    uint data_base_gpio;
+    uint clk_gpio;
+    int data_pins[8]; // physical pin numbers for data (for ExtCfg cleanup)
+    int clk_pin_phys; // physical pin number for clock
+    uint32_t address;
+    uint32_t count;
+    uint16_t program_offset;
+    uint16_t program_len;
+    int bus_width;    // 4 or 8 data pins
+    uint dma_data_ch; // DMA data channel
+    uint dma_ctrl_ch; // DMA control/retrigger channel
+} share_state_t;
+
+static share_state_t share_host_state = {0};
+static share_state_t share_client_state = {0};
+
+// Pass address through unchanged — no translation needed.
+static inline uint32_t share_dma_address(uint32_t address)
+{
+    return address;
+}
+
+// Startup sync is done in the command handlers using plain GPIO and can wait indefinitely
+// (abortable by user). PIO programs are kept stream-only for deterministic timing.
+
+static inline void share_wait_loop(void)
+{
+    CheckAbort();
+    uSec(250);
+}
+
+#define SHARE_SYNC_POLL_US 50u
+#define SHARE_CLK_DETECT_WINDOW_US 2000u
+/* 8-bit sync: host drives 0101 on pins 0-3, client drives 1010 on pins 4-7.
+ * 4-bit sync: host drives 01 on pins 0-1, client drives 10 on pins 2-3. */
+#define SHARE_HOST_POST_SYNC_MS 5 /* ms host waits after sync before streaming */
+
+// Detect a host that is already streaming (clock toggling).
+static bool MIPS16 share_clock_is_toggling(uint clk_gpio)
+{
+    gpio_set_input_enabled(clk_gpio, true); // RP2350 A9 errata
+    uint32_t waited = 0;
+    bool last = gpio_get(clk_gpio) != 0;
+    int transitions = 0;
+
+    while (waited < SHARE_CLK_DETECT_WINDOW_US)
+    {
+        bool now = gpio_get(clk_gpio) != 0;
+        if (now != last)
+        {
+            transitions++;
+            last = now;
+            if (transitions >= 2)
+                return true;
+        }
+        CheckAbort();
+        uSec(SHARE_SYNC_POLL_US);
+        waited += SHARE_SYNC_POLL_US;
+    }
+    return false;
+}
+
+static void MIPS16 share_prepare_start(PIO pio, uint sm, uint data_base_gpio, uint clk_gpio, int bus_width, uint dma_data_ch, uint dma_ctrl_ch)
+{
+    // Force SM, DMA and bus pins to a known idle state before every start.
+    pio_sm_set_enabled(pio, sm, false);
+    pio_sm_clear_fifos(pio, sm);
+    pio_sm_restart(pio, sm);
+
+    dma_hw->abort = (1u << dma_data_ch) | (1u << dma_ctrl_ch);
+    while (dma_hw->abort)
+        tight_loop_contents();
+    dma_channel_set_irq0_enabled(dma_data_ch, false);
+
+    for (int i = 0; i < bus_width; i++)
+    {
+        uint gpio = data_base_gpio + i;
+        gpio_init(gpio);
+        gpio_set_function(gpio, GPIO_FUNC_SIO);
+        gpio_set_dir(gpio, false);
+        gpio_disable_pulls(gpio);
+        gpio_set_input_enabled(gpio, true); // RP2350 A9 errata
+    }
+    gpio_init(clk_gpio);
+    gpio_set_function(clk_gpio, GPIO_FUNC_SIO);
+    gpio_set_dir(clk_gpio, false);
+    gpio_disable_pulls(clk_gpio);
+    gpio_set_input_enabled(clk_gpio, true); // RP2350 A9 errata
+}
+
+// Host sync: drive pattern on lower half of data pins, wait for client on upper half.
+// 8-bit: host drives 0101 on pins 0-3, reads 1010 on pins 4-7.
+// 4-bit: host drives 01 on pins 0-1, reads 10 on pins 2-3.
+static void MIPS16 share_host_sync(uint data_base_gpio, uint clk_gpio, int bus_width)
+{
+    int half = bus_width / 2;
+    uint host_pattern = (bus_width == 8) ? 0x05u : 0x01u;   // 0101 or 01
+    uint client_pattern = (bus_width == 8) ? 0x0Au : 0x02u; // 1010 or 10
+    uint mask = (1u << half) - 1;
+
+    // Clock = output LOW
+    gpio_set_dir(clk_gpio, true);
+    gpio_put(clk_gpio, 0);
+
+    // Lower half = output, drive host pattern
+    for (int i = 0; i < half; i++)
+    {
+        uint pin = data_base_gpio + i;
+        gpio_set_dir(pin, true);
+        gpio_put(pin, (host_pattern >> i) & 1);
+    }
+
+    // Upper half = input
+    for (int i = half; i < bus_width; i++)
+    {
+        gpio_set_dir(data_base_gpio + i, false);
+        gpio_set_input_enabled(data_base_gpio + i, true); // RP2350 A9 errata
+    }
+
+    // Block until upper half reads client pattern.
+    while (((gpio_get_all() >> (data_base_gpio + half)) & mask) != client_pattern)
+        share_wait_loop();
+
+    // Hold sync pattern for 1ms so the client also registers.
+    uSec(1000);
+}
+
+// Client sync: error if host already streaming; drive pattern on upper half,
+// wait for host pattern on lower half.
+static void MIPS16 share_client_sync(uint data_base_gpio, uint clk_gpio, int bus_width)
+{
+    int half = bus_width / 2;
+    uint host_pattern = (bus_width == 8) ? 0x05u : 0x01u;   // 0101 or 01
+    uint client_pattern = (bus_width == 8) ? 0x0Au : 0x02u; // 1010 or 10
+    uint mask = (1u << half) - 1;
+
+    // If clock is already toggling the host is streaming — can't synchronise.
+    gpio_set_dir(clk_gpio, false);
+    gpio_set_input_enabled(clk_gpio, true); // RP2350 A9 errata
+    if (share_clock_is_toggling(clk_gpio))
+        error("Host already running - cannot synchronise");
+
+    // Upper half = output, drive client pattern
+    for (int i = half; i < bus_width; i++)
+    {
+        uint pin = data_base_gpio + i;
+        gpio_set_dir(pin, true);
+        gpio_put(pin, (client_pattern >> (i - half)) & 1);
+    }
+
+    // Lower half = input
+    for (int i = 0; i < half; i++)
+    {
+        gpio_set_dir(data_base_gpio + i, false);
+        gpio_set_input_enabled(data_base_gpio + i, true); // RP2350 A9 errata
+    }
+
+    // Block until lower half reads host pattern.
+    while (((gpio_get_all() >> data_base_gpio) & mask) != host_pattern)
+        share_wait_loop();
+
+    // Hold sync pattern for 1ms so the host also registers.
+    uSec(1000);
+}
+
+static void MIPS16 share_stop_internal(share_state_t *st)
+{
+    if (!st || !st->active)
+        return;
+
+    // Always abort DMA channels regardless of active state.
+    dma_hw->abort = (1u << st->dma_data_ch) | (1u << st->dma_ctrl_ch);
+    while (dma_hw->abort)
+        tight_loop_contents();
+    dma_channel_set_irq0_enabled(st->dma_data_ch, false);
+
+    // Stop PIO SM and remove program if one was loaded.
+    if (st->program_len > 0)
+    {
+        pio_sm_set_enabled(st->pio, st->sm, false);
+        pio_sm_clear_fifos(st->pio, st->sm);
+        pio_sm_restart(st->pio, st->sm);
+
+        pio_program_t prog = {
+            .instructions = NULL,
+            .length = st->program_len,
+            .origin = st->program_offset,
+        };
+        pio_remove_program(st->pio, &prog, st->program_offset);
+    }
+
+    // Reset GPIO and release pin reservations if pins were configured.
+    if (st->clk_pin_phys > 0)
+    {
+        int width = st->bus_width ? st->bus_width : 8;
+        for (int i = 0; i < width; i++)
+        {
+            gpio_init(st->data_base_gpio + i);
+            gpio_set_function(st->data_base_gpio + i, GPIO_FUNC_SIO);
+            gpio_set_dir(st->data_base_gpio + i, false);
+            gpio_disable_pulls(st->data_base_gpio + i);
+            if (st->data_pins[i])
+                ExtCfg(st->data_pins[i], EXT_NOT_CONFIG, 0);
+        }
+        gpio_init(st->clk_gpio);
+        gpio_set_function(st->clk_gpio, GPIO_FUNC_SIO);
+        gpio_set_dir(st->clk_gpio, false);
+        gpio_disable_pulls(st->clk_gpio);
+        ExtCfg(st->clk_pin_phys, EXT_NOT_CONFIG, 0);
+    }
+
+    // Zero all state.
+    st->active = false;
+    st->is_host = false;
+    st->pio = 0;
+    st->sm = 0;
+    st->data_base_gpio = 0;
+    st->clk_gpio = 0;
+    st->clk_pin_phys = 0;
+    for (uint i = 0; i < 8; i++)
+        st->data_pins[i] = 0;
+    st->address = 0;
+    st->count = 0;
+    st->program_offset = 0;
+    st->program_len = 0;
+    st->bus_width = 0;
+    st->dma_data_ch = 0;
+    st->dma_ctrl_ch = 0;
+}
+
+void MemoryShareStop(void)
+{
+    share_stop_internal(&share_host_state);
+    share_stop_internal(&share_client_state);
+}
+
+static void MIPS16 cmd_share_host(unsigned char *tp)
+{
+    getcsargs(&tp, 15);
+    if (argc < 11)
+        SyntaxError();
+
+    int pior = getint(argv[0], 0, PIOMAX - 1);
+    if (PIO0 == false && pior == 0)
+        StandardError(3);
+    if (PIO1 == false && pior == 1)
+        StandardError(4);
+#ifdef rp2350
+    if (PIO2 == false && pior == 2)
+        StandardError(5);
+    PIO pio = (pior == 0 ? pio0 : (pior == 1 ? pio1 : pio2));
+#else
+    PIO pio = (pior == 0 ? pio0 : pio1);
+#endif
+    int sm = getint(argv[2], 0, 3);
+    int data_pin_phys = getpinarg(argv[4]); // physical pin for first data pin
+    int clk_pin_phys = getpinarg(argv[6]);  // physical pin for clock
+    uint32_t address = getinteger(argv[8]);
+    uint32_t dma_address = share_dma_address(address);
+    int count = getinteger(argv[10]);
+    MMFLOAT clk_div = 10.0; // default clock divider
+    if (argc >= 13 && *argv[12])
+        clk_div = getnumber(argv[12]);
+    int bus_width = 8; // default 8-bit bus
+    if (argc >= 15 && *argv[14])
+        bus_width = getint(argv[14], 4, 8);
+
+    if (count <= 0 || (count & 3))
+        error("Count must be > 0 and multiple of 4");
+    if (clk_div < 3.0)
+        error("Clock divider must be >= 3");
+    if (bus_width != 4 && bus_width != 8)
+        error("Bus width must be 4 or 8");
+
+    // Get GPIO numbers from physical pins
+    int data_base_gpio = PinDef[data_pin_phys].GPno;
+    int clk_gpio = PinDef[clk_pin_phys].GPno;
+
+    if (data_base_gpio + bus_width - 1 > 29)
+        error("Need % consecutive GPIOs from data pin", bus_width);
+    if (clk_gpio >= data_base_gpio && clk_gpio <= data_base_gpio + bus_width - 1)
+        error("Clock pin overlaps data pins");
+
+    // Validate and reserve all data + clock pins
+    CheckPin(clk_pin_phys, CP_IGNORE_INUSE);
+    int data_pins_phys[8] = {0};
+    for (int i = 0; i < bus_width; i++)
+    {
+        data_pins_phys[i] = codemap(data_base_gpio + i);
+        CheckPin(data_pins_phys[i], CP_IGNORE_INUSE);
+    }
+
+    // Always stop previous host share (cleans up stale PIO programs, DMA, GPIO).
+    share_stop_internal(&share_host_state);
+
+    // Begin from a clean SM/DMA/GPIO state.
+    share_prepare_start(pio, (uint)sm, (uint)data_base_gpio, (uint)clk_gpio, bus_width, SHARE_DMA_DATA, SHARE_DMA_CTRL);
+
+    // Build host TX stream program (clock push-pull via side-set value, no startup logic).
+    static uint16_t host_program[2];
+    host_program[0] = pio_encode_out(pio_pins, bus_width) | pio_encode_sideset(1, 0); // clock LOW
+    host_program[1] = pio_encode_nop() | pio_encode_sideset(1, 1);                    // clock HIGH
+
+    pio_program_t prog = {
+        .instructions = host_program,
+        .length = 2,
+        .origin = -1,
+    };
+    if (!pio_can_add_program(pio, &prog))
+        error("No PIO instruction space available");
+    uint offset = pio_add_program(pio, &prog);
+
+    // Configure state machine
+    pio_sm_config cfg = pio_get_default_sm_config();
+    sm_config_set_wrap(&cfg, offset + 0, offset + 1);
+    sm_config_set_out_pins(&cfg, data_base_gpio, bus_width);
+    sm_config_set_sideset_pins(&cfg, clk_gpio);
+    sm_config_set_sideset(&cfg, 1, false, false);    // 1 side-set bit drives clock value
+    sm_config_set_out_shift(&cfg, true, true, 32);   // shift right, autopull, 32-bit threshold
+    sm_config_set_fifo_join(&cfg, PIO_FIFO_JOIN_TX); // join FIFOs for TX
+    sm_config_set_clkdiv(&cfg, clk_div);
+
+    pio_sm_init(pio, sm, offset, &cfg);
+
+    // Configure DMA: data channel transfers memory -> PIO TX FIFO
+    dma_channel_config c = dma_channel_get_default_config(SHARE_DMA_DATA);
+    channel_config_set_transfer_data_size(&c, DMA_SIZE_32);
+    channel_config_set_read_increment(&c, true);
+    channel_config_set_write_increment(&c, false);
+    channel_config_set_dreq(&c, pio_get_dreq(pio, sm, true));
+    channel_config_set_chain_to(&c, SHARE_DMA_CTRL);
+    dma_channel_configure(SHARE_DMA_DATA, &c,
+                          &pio->txf[sm],       // write to PIO TX FIFO
+                          (void *)dma_address, // read from shared memory
+                          count / 4,           // transfer count (32-bit words)
+                          false);              // don't start yet
+
+    // Configure DMA: control channel resets read address and retriggers data channel
+    static uint32_t share_read_addr;
+    share_read_addr = dma_address;
+    dma_channel_config c2 = dma_channel_get_default_config(SHARE_DMA_CTRL);
+    channel_config_set_transfer_data_size(&c2, DMA_SIZE_32);
+    channel_config_set_read_increment(&c2, false);
+    channel_config_set_write_increment(&c2, false);
+    channel_config_set_dreq(&c2, 0x3F); // unpaced
+    dma_channel_configure(SHARE_DMA_CTRL, &c2,
+                          &dma_hw->ch[SHARE_DMA_DATA].al3_read_addr_trig,
+                          &share_read_addr, // pointer to the start address constant
+                          1,
+                          false);
+
+    // Save state for STOP
+    share_host_state.active = true;
+    share_host_state.is_host = true;
+    share_host_state.pio = pio;
+    share_host_state.sm = sm;
+    share_host_state.data_base_gpio = data_base_gpio;
+    share_host_state.clk_gpio = clk_gpio;
+    share_host_state.clk_pin_phys = clk_pin_phys;
+    for (int i = 0; i < 8; i++)
+        share_host_state.data_pins[i] = (i < bus_width) ? data_pins_phys[i] : 0;
+    share_host_state.address = address;
+    share_host_state.count = count;
+    share_host_state.program_offset = offset;
+    share_host_state.program_len = 2;
+    share_host_state.bus_width = bus_width;
+    share_host_state.dma_data_ch = SHARE_DMA_DATA;
+    share_host_state.dma_ctrl_ch = SHARE_DMA_CTRL;
+
+    // Reserve all pins
+    for (int i = 0; i < bus_width; i++)
+        ExtCfg(data_pins_phys[i], EXT_COM_RESERVED, 0);
+    ExtCfg(clk_pin_phys, EXT_COM_RESERVED, 0);
+
+    // Sync: block until client responds.
+    // Returns after 1ms hold so client has also registered.
+    share_host_sync((uint)data_base_gpio, (uint)clk_gpio, bus_width);
+
+    // Wait 5ms for client to switch to PIO receive mode.
+    // Clock is LOW (SIO default) — client PIO starts at "wait 1 gpio CLK"
+    // and blocks until host PIO drives clock HIGH with first "nop side 1".
+    uSec(SHARE_HOST_POST_SYNC_MS * 1000);
+
+    // Switch data pins to PIO outputs.
+    for (int i = 0; i < bus_width; i++)
+    {
+        gpio_disable_pulls(data_base_gpio + i);
+        gpio_set_function(data_base_gpio + i,
+                          pio == pio0 ? GPIO_FUNC_PIO0 : GPIO_FUNC_PIO1);
+    }
+    pio_sm_set_consecutive_pindirs(pio, sm, data_base_gpio, bus_width, true);
+
+    // Now hand clock pin to PIO and set as output.
+    gpio_set_function(clk_gpio,
+                      pio == pio0 ? GPIO_FUNC_PIO0 : GPIO_FUNC_PIO1);
+    pio_sm_set_consecutive_pindirs(pio, sm, clk_gpio, 1, true);
+
+    // Start PIO — set clock HIGH first so client "wait 0 gpio CLK" stays
+    // blocked until host PIO's first "out pins,8 side 0" pulls it LOW.
+    pio_sm_clear_fifos(pio, sm);
+    pio_sm_restart(pio, sm);
+    pio_sm_set_enabled(pio, sm, true);
+
+    // Start DMA — fills TX FIFO, PIO begins clocking data out.
+    dma_start_channel_mask(1u << SHARE_DMA_CTRL);
+}
+
+static void MIPS16 cmd_share_client(unsigned char *tp)
+{
+    getcsargs(&tp, 13);
+    if (argc < 11)
+        SyntaxError();
+
+    int pior = getint(argv[0], 0, PIOMAX - 1);
+    if (PIO0 == false && pior == 0)
+        StandardError(3);
+    if (PIO1 == false && pior == 1)
+        StandardError(4);
+#ifdef rp2350
+    if (PIO2 == false && pior == 2)
+        StandardError(5);
+    PIO pio = (pior == 0 ? pio0 : (pior == 1 ? pio1 : pio2));
+#else
+    PIO pio = (pior == 0 ? pio0 : pio1);
+#endif
+    int sm = getint(argv[2], 0, 3);
+    int data_pin_phys = getpinarg(argv[4]); // physical pin for first data pin
+    int clk_pin_phys = getpinarg(argv[6]);  // physical pin for clock (input)
+    uint32_t address = getinteger(argv[8]);
+    uint32_t dma_address = share_dma_address(address);
+    int count = getinteger(argv[10]);
+    int bus_width = 8; // default 8-bit bus
+    if (argc >= 13 && *argv[12])
+        bus_width = getint(argv[12], 4, 8);
+
+    if (count <= 0 || (count & 3))
+        error("Count must be > 0 and multiple of 4");
+    if (bus_width != 4 && bus_width != 8)
+        error("Bus width must be 4 or 8");
+
+    // Get GPIO numbers from physical pins
+    int data_base_gpio = PinDef[data_pin_phys].GPno;
+    int clk_gpio = PinDef[clk_pin_phys].GPno;
+
+    if (data_base_gpio + bus_width - 1 > 29)
+        error("Need % consecutive GPIOs from data pin", bus_width);
+    if (clk_gpio >= data_base_gpio && clk_gpio <= data_base_gpio + bus_width - 1)
+        error("Clock pin overlaps data pins");
+
+    // Validate and reserve all data + clock pins
+    CheckPin(clk_pin_phys, CP_IGNORE_INUSE);
+    int data_pins_phys[8] = {0};
+    for (int i = 0; i < bus_width; i++)
+    {
+        data_pins_phys[i] = codemap(data_base_gpio + i);
+        CheckPin(data_pins_phys[i], CP_IGNORE_INUSE);
+    }
+
+    // Always stop previous client share (cleans up stale PIO programs, DMA, GPIO).
+    share_stop_internal(&share_client_state);
+
+    // Begin from a clean SM/DMA/GPIO state.
+    share_prepare_start(pio, (uint)sm, (uint)data_base_gpio, (uint)clk_gpio, bus_width, PIO_RX_DMA, PIO_RX_DMA2);
+
+    // Build client RX stream program: autopush after 32 bits.
+    // .wrap_target
+    //     wait 1 gpio CLK     ; [0] Wait for clock HIGH (data valid)
+    //     in pins, N           ; [1] Sample nibble/byte, autopush after 32 bits
+    //     wait 0 gpio CLK     ; [2] Wait for clock LOW (host loading new data)
+    // .wrap
+    static uint16_t client_program[3];
+    client_program[0] = pio_encode_wait_gpio(true, clk_gpio);
+    client_program[1] = pio_encode_in(pio_pins, bus_width);
+    client_program[2] = pio_encode_wait_gpio(false, clk_gpio);
+
+    pio_program_t prog = {
+        .instructions = client_program,
+        .length = 3,
+        .origin = -1,
+    };
+    if (!pio_can_add_program(pio, &prog))
+        error("No PIO instruction space available");
+    uint offset = pio_add_program(pio, &prog);
+
+    // Configure state machine
+    pio_sm_config cfg = pio_get_default_sm_config();
+    sm_config_set_wrap(&cfg, offset + 0, offset + 2);
+    sm_config_set_in_pins(&cfg, data_base_gpio);
+    sm_config_set_in_shift(&cfg, true, true, 32);    // shift right, autopush at 32 bits
+    sm_config_set_fifo_join(&cfg, PIO_FIFO_JOIN_RX); // join FIFOs for RX
+    sm_config_set_clkdiv(&cfg, 1.0);                 // run at full speed to catch clock edges
+
+    pio_sm_init(pio, sm, offset, &cfg);
+
+    // Configure DMA: data channel transfers PIO RX FIFO -> memory
+    dma_channel_config c = dma_channel_get_default_config(PIO_RX_DMA);
+    channel_config_set_transfer_data_size(&c, DMA_SIZE_32);
+    channel_config_set_read_increment(&c, false);
+    channel_config_set_write_increment(&c, true);
+    channel_config_set_dreq(&c, pio_get_dreq(pio, sm, false)); // RX FIFO not empty
+    channel_config_set_chain_to(&c, PIO_RX_DMA2);
+    dma_channel_configure(PIO_RX_DMA, &c,
+                          (void *)dma_address, // write to shared memory
+                          &pio->rxf[sm],       // read from PIO RX FIFO
+                          count / 4,           // transfer count (32-bit words)
+                          false);              // don't start yet
+
+    // Configure DMA: control channel resets write address and retriggers data channel
+    static uint32_t share_write_addr;
+    share_write_addr = dma_address;
+    dma_channel_config c2 = dma_channel_get_default_config(PIO_RX_DMA2);
+    channel_config_set_transfer_data_size(&c2, DMA_SIZE_32);
+    channel_config_set_read_increment(&c2, false);
+    channel_config_set_write_increment(&c2, false);
+    channel_config_set_dreq(&c2, 0x3F); // unpaced
+    dma_channel_configure(PIO_RX_DMA2, &c2,
+                          &dma_hw->ch[PIO_RX_DMA].al2_write_addr_trig,
+                          &share_write_addr, // pointer to the start address constant
+                          1,
+                          false);
+
+    // Save state for STOP
+    share_client_state.active = true;
+    share_client_state.is_host = false;
+    share_client_state.pio = pio;
+    share_client_state.sm = sm;
+    share_client_state.data_base_gpio = data_base_gpio;
+    share_client_state.clk_gpio = clk_gpio;
+    share_client_state.clk_pin_phys = clk_pin_phys;
+    for (int i = 0; i < 8; i++)
+        share_client_state.data_pins[i] = (i < bus_width) ? data_pins_phys[i] : 0;
+    share_client_state.address = address;
+    share_client_state.count = count;
+    share_client_state.program_offset = offset;
+    share_client_state.program_len = 3;
+    share_client_state.bus_width = bus_width;
+    share_client_state.dma_data_ch = SHARE_DMA_DATA;
+    share_client_state.dma_ctrl_ch = SHARE_DMA_CTRL;
+
+    // Reserve all pins
+    for (int i = 0; i < bus_width; i++)
+        ExtCfg(data_pins_phys[i], EXT_COM_RESERVED, 0);
+    ExtCfg(clk_pin_phys, EXT_COM_RESERVED, 0);
+
+    // Sync: block until host responds.
+    // Returns after 1ms hold so host has also registered.
+    share_client_sync((uint)data_base_gpio, (uint)clk_gpio, bus_width);
+
+    // Switch ALL data pins and clock to PIO as inputs.
+    for (int i = 0; i < bus_width; i++)
+    {
+        gpio_disable_pulls(data_base_gpio + i);
+        gpio_set_function(data_base_gpio + i,
+                          pio == pio0 ? GPIO_FUNC_PIO0 : GPIO_FUNC_PIO1);
+        gpio_set_input_enabled(data_base_gpio + i, true); // RP2350 A9 errata
+    }
+    gpio_disable_pulls(clk_gpio);
+    gpio_set_function(clk_gpio,
+                      pio == pio0 ? GPIO_FUNC_PIO0 : GPIO_FUNC_PIO1);
+    gpio_set_input_enabled(clk_gpio, true); // RP2350 A9 errata
+
+    // Start PIO (blocks at wait 0 gpio CLK — no clock yet, host hasn't started).
+    pio_sm_clear_fifos(pio, sm);
+    pio_sm_restart(pio, sm);
+    pio_sm_set_enabled(pio, sm, true);
+
+    // Start DMA (blocks on RX FIFO empty — no data until host starts clocking).
+    dma_start_channel_mask(1u << PIO_RX_DMA2);
+}
+
 void MIPS16 cmd_memory(void)
 {
     unsigned char *p, *tp;
+    tp = checkstring(cmdline, (unsigned char *)"SHARE HOST");
+    if (tp)
+    {
+        cmd_share_host(tp);
+        return;
+    }
+    tp = checkstring(cmdline, (unsigned char *)"SHARE CLIENT");
+    if (tp)
+    {
+        cmd_share_client(tp);
+        return;
+    }
+    tp = checkstring(cmdline, (unsigned char *)"SHARE STOP HOST");
+    if (tp)
+    {
+        share_stop_internal(&share_host_state);
+        return;
+    }
+    tp = checkstring(cmdline, (unsigned char *)"SHARE STOP CLIENT");
+    if (tp)
+    {
+        share_stop_internal(&share_client_state);
+        return;
+    }
+    tp = checkstring(cmdline, (unsigned char *)"SHARE STOP");
+    if (tp)
+    {
+        MemoryShareStop();
+        return;
+    }
     tp = checkstring(cmdline, (unsigned char *)"PACK");
     if (tp)
     {
@@ -846,7 +1458,7 @@ void MIPS16 cmd_memory(void)
         strcat((char *)inpbuf, "%) ");
         MMPrintString((char *)inpbuf);
         IntToStr((char *)inpbuf, FontNbr, 10);
-        strcat((char *)inpbuf, " Embedded Font");
+        strcat((char *)inpbuf, "  Embedded Font");
         strcat((char *)inpbuf, FontNbr == 1 ? "\r\n" : "s\r\n");
         MMPrintString((char *)inpbuf);
     }
@@ -1303,9 +1915,14 @@ void MIPS64 __not_in_flash_func (*GetSystemMemory)(int size)
         else
             n = 0; // not enough space here so reset our count
     }
+    // out of memory
+#ifdef rp2350
+    if (PSRAMsize)
+        return GetPSMemory(size);
+#endif
     TempStringClearStart = 0;
     ClearTempMemory(); // hopefully this will give us enough to print the prompt
-    error("Not enough Heap memory");
+    error("Not enough System Heap memory");
     return NULL; // keep the compiler happy
 }
 void MIPS64 __not_in_flash_func (*GetMemory)(int size)
@@ -1465,7 +2082,7 @@ void *ReAllocMemory(void *addr, size_t msize)
     }
     return newaddr;
 }
-void MIPS32 __not_in_flash_func(FreeMemorySafe)(void **addr)
+void __not_in_flash_func(FreeMemorySafe)(void **addr)
 {
     if (*addr != NULL)
     {

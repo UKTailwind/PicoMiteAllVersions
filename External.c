@@ -53,7 +53,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 extern MMFLOAT FDiv(MMFLOAT a, MMFLOAT b);
 extern MMFLOAT FMul(MMFLOAT a, MMFLOAT b);
 extern MMFLOAT FSub(MMFLOAT a, MMFLOAT b);
-const char *PinFunction[] = {
+const char *const PinFunction[] = {
     "OFF",
     "AIN",
     "DIN",
@@ -5644,9 +5644,12 @@ void SetADCFreq(float frequency)
 void MIPS16 ClearExternalIO(void)
 {
     int i;
+    MemoryShareStop();
     CloseAudio(1);
 #ifndef PICOMITEVGA
+#if defined(rp2350) || defined(PICOMITEWEB)
     cameraclose();
+#endif
 #endif
     InterruptUsed = false;
     InterruptReturn = NULL;

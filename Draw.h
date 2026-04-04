@@ -375,6 +375,11 @@ void DrawTriangle(int x0, int y0, int x1, int y1, int x2, int y2, int c, int fil
 void DrawPixelNormal(int x, int y, int c);
 
 /* ============================================================================
+ * Function declarations - FastCall dispatch
+ * ============================================================================ */
+int FastCallLookup(const char *name);
+
+/* ============================================================================
  * Function declarations - Buffer operations
  * ============================================================================ */
 void ReadBuffer2(int x1, int y1, int x2, int y2, unsigned char *c);

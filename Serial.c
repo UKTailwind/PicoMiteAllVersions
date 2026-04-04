@@ -59,6 +59,172 @@ volatile int com2Tx_head, com2Tx_tail; // head and tail of the ring buffer for c
 volatile int com2complete = 1;
 char com2_mode;				 // keeps track of the settings for com2
 unsigned char com2_bit9 = 0; // used to track the 9th bit
+
+// variables for USB CDC host ports (COM3-COM6)
+#ifdef USBKEYBOARD
+#include "tusb.h"
+
+int com3 = 0;						   // true if COM3 (CDC idx 0) is enabled
+int com3_buf_size;					   // size of the buffer used to receive chars
+char *com3_interrupt;				   // pointer to the interrupt routine
+int com3_ilevel;					   // number of chars in buffer for an interrupt
+unsigned char *com3Rx_buf;			   // pointer to the buffer for received characters
+volatile int com3Rx_head, com3Rx_tail; // head and tail of the ring buffer for com3
+
+int com4 = 0;						   // true if COM4 (CDC idx 1) is enabled
+int com4_buf_size;					   // size of the buffer used to receive chars
+char *com4_interrupt;				   // pointer to the interrupt routine
+int com4_ilevel;					   // number of chars in buffer for an interrupt
+unsigned char *com4Rx_buf;			   // pointer to the buffer for received characters
+volatile int com4Rx_head, com4Rx_tail; // head and tail of the ring buffer for com4
+
+int com5 = 0;						   // true if COM5 (CDC idx 2) is enabled
+int com5_buf_size;					   // size of the buffer used to receive chars
+char *com5_interrupt;				   // pointer to the interrupt routine
+int com5_ilevel;					   // number of chars in buffer for an interrupt
+unsigned char *com5Rx_buf;			   // pointer to the buffer for received characters
+volatile int com5Rx_head, com5Rx_tail; // head and tail of the ring buffer for com5
+
+int com6 = 0;						   // true if COM6 (CDC idx 3) is enabled
+int com6_buf_size;					   // size of the buffer used to receive chars
+char *com6_interrupt;				   // pointer to the interrupt routine
+int com6_ilevel;					   // number of chars in buffer for an interrupt
+unsigned char *com6Rx_buf;			   // pointer to the buffer for received characters
+volatile int com6Rx_head, com6Rx_tail; // head and tail of the ring buffer for com6
+
+// Helper arrays indexed by CDC idx (0-3) to access per-port state
+// These pointers are set once at startup and provide a uniform way to
+// access per-port variables from callbacks without large switch/if chains.
+static int *cdc_com_flag[4];		  // -> com3..com6
+static int *cdc_buf_size[4];		  // -> com3_buf_size..com6_buf_size
+static unsigned char **cdc_rx_buf[4]; // -> com3Rx_buf..com6Rx_buf
+static volatile int *cdc_rx_head[4];  // -> com3Rx_head..com6Rx_head
+static volatile int *cdc_rx_tail[4];  // -> com3Rx_tail..com6Rx_tail
+static char **cdc_interrupt[4];		  // -> com3_interrupt..com6_interrupt
+static int *cdc_ilevel[4];			  // -> com3_ilevel..com6_ilevel
+
+static bool cdc_arrays_inited = false;
+static void cdc_init_arrays(void)
+{
+	if (cdc_arrays_inited)
+		return;
+	cdc_com_flag[0] = &com3;
+	cdc_com_flag[1] = &com4;
+	cdc_com_flag[2] = &com5;
+	cdc_com_flag[3] = &com6;
+	cdc_buf_size[0] = &com3_buf_size;
+	cdc_buf_size[1] = &com4_buf_size;
+	cdc_buf_size[2] = &com5_buf_size;
+	cdc_buf_size[3] = &com6_buf_size;
+	cdc_rx_buf[0] = &com3Rx_buf;
+	cdc_rx_buf[1] = &com4Rx_buf;
+	cdc_rx_buf[2] = &com5Rx_buf;
+	cdc_rx_buf[3] = &com6Rx_buf;
+	cdc_rx_head[0] = &com3Rx_head;
+	cdc_rx_head[1] = &com4Rx_head;
+	cdc_rx_head[2] = &com5Rx_head;
+	cdc_rx_head[3] = &com6Rx_head;
+	cdc_rx_tail[0] = &com3Rx_tail;
+	cdc_rx_tail[1] = &com4Rx_tail;
+	cdc_rx_tail[2] = &com5Rx_tail;
+	cdc_rx_tail[3] = &com6Rx_tail;
+	cdc_interrupt[0] = &com3_interrupt;
+	cdc_interrupt[1] = &com4_interrupt;
+	cdc_interrupt[2] = &com5_interrupt;
+	cdc_interrupt[3] = &com6_interrupt;
+	cdc_ilevel[0] = &com3_ilevel;
+	cdc_ilevel[1] = &com4_ilevel;
+	cdc_ilevel[2] = &com5_ilevel;
+	cdc_ilevel[3] = &com6_ilevel;
+	cdc_arrays_inited = true;
+}
+
+// Fixed mapping: COM3 = CDC idx 0 (ch 5), COM4 = idx 1 (ch 6), COM5 = idx 2 (ch 7), COM6 = idx 3 (ch 8)
+
+// TinyUSB CDC host callbacks
+void tuh_cdc_mount_cb(uint8_t idx)
+{
+	if (idx >= 4)
+		return;
+	cdc_init_arrays();
+	if (!CurrentLinePtr)
+	{
+		MMPrintString("USB CDC Device Connected on channel ");
+		PInt(idx + 5);
+		MMPrintString(" (COM");
+		PInt(idx + 3);
+		MMPrintString(")\r\n> ");
+	}
+	// If the port was already open by BASIC, re-assert DTR/RTS for seamless reconnect
+	if (*cdc_com_flag[idx])
+		tuh_cdc_set_control_line_state(idx, CDC_CONTROL_LINE_STATE_DTR | CDC_CONTROL_LINE_STATE_RTS, NULL, 0);
+}
+
+void tuh_cdc_umount_cb(uint8_t idx)
+{
+	if (idx >= 4)
+		return;
+	// If the port is open by BASIC, keep the state intact so reconnection works
+	// transparently. Only print a message. SerialPutchar already guards on tuh_cdc_mounted().
+	if (!CurrentLinePtr)
+	{
+		MMPrintString("USB CDC Device Disconnected on channel ");
+		PInt(idx + 5);
+		MMPrintString(" (COM");
+		PInt(idx + 3);
+		MMPrintString(")\r\n> ");
+	}
+	// Don't tear down BASIC state here - the port stays "open" so that
+	// a reconnect resumes transparently. Cleanup happens in SerialClose.
+}
+
+void tuh_cdc_rx_cb(uint8_t idx)
+{
+	uint8_t buf[64];
+	if (idx >= 4)
+	{
+		while (tuh_cdc_read(idx, buf, sizeof(buf)) > 0)
+		{
+		}
+		return;
+	}
+	cdc_init_arrays();
+
+	if (*cdc_com_flag[idx] && *cdc_rx_buf[idx] != NULL)
+	{
+		uint32_t count;
+		int bsize = *cdc_buf_size[idx];
+		unsigned char *rxbuf = *cdc_rx_buf[idx];
+		volatile int *head = cdc_rx_head[idx];
+		volatile int *tail = cdc_rx_tail[idx];
+		while ((count = tuh_cdc_read(idx, buf, sizeof(buf))) > 0)
+		{
+			for (uint32_t i = 0; i < count; i++)
+			{
+				rxbuf[*head] = buf[i];
+				int next = (*head + 1) % bsize;
+				if (next == *tail)
+				{
+					*tail = (*tail + 1) % bsize;
+				}
+				*head = next;
+			}
+		}
+	}
+	else
+	{
+		// Port not open - drain the FIFO anyway to prevent the device from blocking
+		while (tuh_cdc_read(idx, buf, sizeof(buf)) > 0)
+		{
+		}
+	}
+}
+
+void tuh_cdc_tx_complete_cb(uint8_t idx)
+{
+	// TX complete - nothing special needed, writes are synchronous from BASIC's perspective
+}
+#endif // USBKEYBOARD
 // uart interrupt handler
 void on_uart_irq0()
 {
@@ -441,6 +607,40 @@ void MIPS16 SerialOpen(unsigned char *spec)
 		com2Rx_head = com2Rx_tail = 0;
 		com2Tx_head = com2Tx_tail = 0;
 	}
+#ifdef USBKEYBOARD
+	else if (spec[3] >= '3' && spec[3] <= '6')
+	{
+		///////////////////////////////// this is COM3-COM6 (USB CDC host) ////////////////////////////////////
+		int comnbr = spec[3] - '0'; // 3, 4, 5 or 6
+		int cdc_idx = comnbr - 3;	// 0, 1, 2 or 3
+
+		cdc_init_arrays();
+
+		if (*cdc_com_flag[cdc_idx])
+			StandardError(31);
+
+		if (!tuh_cdc_mounted(cdc_idx))
+		{
+			char errmsg[48];
+			sprintf(errmsg, "No USB CDC device on channel %d for COM%d", cdc_idx + 5, comnbr);
+			error(errmsg);
+		}
+
+		*cdc_buf_size[cdc_idx] = bufsize;
+		*cdc_interrupt[cdc_idx] = interrupt;
+		*cdc_ilevel[cdc_idx] = ilevel;
+
+		// setup for receive
+		*cdc_rx_buf[cdc_idx] = GetMemory(bufsize);
+		*cdc_rx_head[cdc_idx] = 0;
+		*cdc_rx_tail[cdc_idx] = 0;
+
+		*cdc_com_flag[cdc_idx] = true;
+
+		// Assert DTR (and RTS) to signal the device we are ready
+		tuh_cdc_set_control_line_state(cdc_idx, CDC_CONTROL_LINE_STATE_DTR | CDC_CONTROL_LINE_STATE_RTS, NULL, 0);
+	}
+#endif // USBKEYBOARD
 }
 
 /***************************************************************************************************
@@ -490,6 +690,25 @@ void MIPS16 SerialClose(int comnbr)
 			com2Tx_buf = NULL;
 		}
 	}
+#ifdef USBKEYBOARD
+	else if (comnbr >= 3 && comnbr <= 6)
+	{
+		int cdc_idx = comnbr - 3;
+		cdc_init_arrays();
+		if (*cdc_com_flag[cdc_idx])
+		{
+			if (tuh_cdc_mounted(cdc_idx))
+				tuh_cdc_set_control_line_state(cdc_idx, 0, NULL, 0);
+			*cdc_com_flag[cdc_idx] = false;
+			*cdc_interrupt[cdc_idx] = NULL;
+			if (*cdc_rx_buf[cdc_idx] != NULL)
+			{
+				FreeMemory(*cdc_rx_buf[cdc_idx]);
+				*cdc_rx_buf[cdc_idx] = NULL;
+			}
+		}
+	}
+#endif // USBKEYBOARD
 }
 
 /***************************************************************************************************
@@ -531,6 +750,24 @@ unsigned char SerialPutchar(int comnbr, unsigned char c)
 			irq_set_pending(UART1_IRQ);
 		}
 	}
+#ifdef USBKEYBOARD
+	else if (comnbr >= 3 && comnbr <= 6)
+	{
+		int idx = comnbr - 3;
+		if (tuh_cdc_mounted(idx))
+		{
+			// Write the byte directly via TinyUSB CDC host; wait if write buffer is full
+			while (tuh_cdc_write_available(idx) == 0)
+			{
+				tuh_task(); // keep the USB stack running while we wait
+				if (MMAbort)
+					longjmp(mark, 1);
+			}
+			tuh_cdc_write(idx, &c, 1);
+			tuh_cdc_write_flush(idx);
+		}
+	}
+#endif // USBKEYBOARD
 	return c;
 }
 
@@ -557,6 +794,16 @@ int SerialRxStatus(int comnbr)
 		if (i < 0)
 			i += com2_buf_size;
 	}
+#ifdef USBKEYBOARD
+	else if (comnbr >= 3 && comnbr <= 6)
+	{
+		int idx = comnbr - 3;
+		cdc_init_arrays();
+		i = *cdc_rx_head[idx] - *cdc_rx_tail[idx];
+		if (i < 0)
+			i += *cdc_buf_size[idx];
+	}
+#endif // USBKEYBOARD
 	return i;
 }
 
@@ -579,6 +826,13 @@ int SerialTxStatus(int comnbr)
 		if (i < 0)
 			i += TX_BUFFER_SIZE;
 	}
+#ifdef USBKEYBOARD
+	else if (comnbr >= 3 && comnbr <= 6)
+	{
+		// CDC host TX is written directly via TinyUSB, no local buffer
+		i = 0;
+	}
+#endif // USBKEYBOARD
 	return i;
 }
 
@@ -611,5 +865,17 @@ int SerialGetchar(int comnbr)
 		}
 		uart_set_irq_enables(uart1, true, true);
 	}
+#ifdef USBKEYBOARD
+	else if (comnbr >= 3 && comnbr <= 6)
+	{
+		int idx = comnbr - 3;
+		cdc_init_arrays();
+		if (*cdc_rx_head[idx] != *cdc_rx_tail[idx])
+		{
+			c = (*cdc_rx_buf[idx])[*cdc_rx_tail[idx]];
+			*cdc_rx_tail[idx] = (*cdc_rx_tail[idx] + 1) % *cdc_buf_size[idx];
+		}
+	}
+#endif // USBKEYBOARD
 	return c;
 }

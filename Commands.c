@@ -61,6 +61,138 @@ unsigned char *SaveNextDataLine = NULL;
 void execute_one_command(unsigned char *p);
 void ListNewLine(int *ListCnt, int all);
 int printWrappedText(const char *text, int screenWidth, int listcnt, int all);
+
+static int VarNameLength(const unsigned char *name)
+{
+	int len = 0;
+	while (len < MAXVARLEN && name[len] != 0)
+		len++;
+	return len;
+}
+
+static uint32_t VarNameHash(const unsigned char *name)
+{
+	uint32_t hash = FNV_offset_basis;
+	for (int i = 0; i < MAXVARLEN && name[i] != 0; i++)
+	{
+		hash ^= name[i];
+		hash *= FNV_prime;
+	}
+	return hash;
+}
+
+static int VarNamesEqual(const unsigned char *a, const unsigned char *b)
+{
+	int la = VarNameLength(a);
+	int lb = VarNameLength(b);
+	if (la != lb)
+		return 0;
+	return memcmp(a, b, la) == 0;
+}
+
+static void VarNameToC(char *dest, const unsigned char *name)
+{
+	int len = VarNameLength(name);
+	if (len > MAXVARLEN)
+		len = MAXVARLEN;
+	memcpy(dest, name, len);
+	dest[len] = 0;
+}
+
+static int IsActiveVariable(const struct s_vartbl *v)
+{
+#ifdef STRUCTENABLED
+	return (v->type & (T_INT | T_STR | T_NBR | T_STRUCT)) != 0;
+#else
+	return (v->type & (T_INT | T_STR | T_NBR)) != 0;
+#endif
+}
+
+static int PrintCollisionDomain(const char *domain_name, int start, int end, int slots, int local_domain)
+{
+	int groups = 0;
+	char line[80];
+	char namebuf[MAXVARLEN + 1];
+	unsigned char *processed = (unsigned char *)GetTempMemory(slots);
+	unsigned char **group_names = (unsigned char **)GetTempMemory((end - start) * sizeof(*group_names));
+
+	memset(processed, 0, slots);
+
+	for (int i = start; i < end; i++)
+	{
+		if (!IsActiveVariable(&g_vartbl[i]))
+			continue;
+		if (local_domain)
+		{
+			if (g_vartbl[i].level == 0)
+				continue;
+		}
+		else
+		{
+			if (g_vartbl[i].level != 0)
+				continue;
+		}
+
+		int bucket = (int)(VarNameHash(g_vartbl[i].name) % (uint32_t)slots);
+		if (processed[bucket])
+			continue;
+		processed[bucket] = 1;
+
+		int count = 0;
+		for (int j = start; j < end; j++)
+		{
+			if (!IsActiveVariable(&g_vartbl[j]))
+				continue;
+			if (local_domain)
+			{
+				if (g_vartbl[j].level == 0)
+					continue;
+			}
+			else
+			{
+				if (g_vartbl[j].level != 0)
+					continue;
+			}
+
+			if ((int)(VarNameHash(g_vartbl[j].name) % (uint32_t)slots) != bucket)
+				continue;
+
+			int duplicate = 0;
+			for (int k = 0; k < count; k++)
+			{
+				if (VarNamesEqual(group_names[k], g_vartbl[j].name))
+				{
+					duplicate = 1;
+					break;
+				}
+			}
+			if (!duplicate)
+				group_names[count++] = g_vartbl[j].name;
+		}
+
+		if (count > 1)
+		{
+			groups++;
+			snprintf(line, sizeof(line), "%s bucket %d:\r\n", domain_name, bucket);
+			MMPrintString(line);
+			for (int k = 0; k < count; k++)
+			{
+				VarNameToC(namebuf, group_names[k]);
+				snprintf(line, sizeof(line), "  %s\r\n", namebuf);
+				MMPrintString(line);
+			}
+		}
+	}
+
+	if (groups == 0)
+	{
+		snprintf(line, sizeof(line), "%s: none\r\n", domain_name);
+		MMPrintString(line);
+	}
+
+	return groups;
+}
+
 char MMErrMsg[MAXERRMSG]; // the error message
 volatile bool Keycomplete = false;
 int keyselect = 0;
@@ -202,7 +334,7 @@ void MIPS16 __not_in_flash_func(cmd_inc)(void)
 	}
 }
 // the PRINT command
-void cmd_print(void)
+void MIPS16 __not_in_flash_func(cmd_print)(void)
 {
 	unsigned char *s, *p;
 	unsigned char *ss;
@@ -429,10 +561,17 @@ void cmd_print(void)
 			bufsize += STRINGSIZE;
 		}
 		*bufptr++ = '\r';
-		*bufptr++ = '\n';
-		used += 2;
+		used++;
 		ADV_CHARPOS('\r');
-		ADV_CHARPOS('\n');
+#ifdef USBKEYBOARD
+		// For USB CDC host ports (COM3-COM6), send only CR, not CRLF
+		if (!(fnbr >= 1 && fnbr <= MAXOPENFILES && FileTable[fnbr].com >= 3 && FileTable[fnbr].com <= 6))
+#endif
+		{
+			*bufptr++ = '\n';
+			used++;
+			ADV_CHARPOS('\n');
+		}
 	}
 
 	// Null terminate the C string
@@ -1394,6 +1533,22 @@ void MIPS16 cmd_list(void)
 			}
 			dest[0] = ol;
 		}
+	}
+	else if ((p = checkstring(cmdline, (unsigned char *)"COLLISIONS")))
+	{
+		checkend(p);
+		int local_slots = GetLocalVarHashSize();
+		int global_slots = GetGlobalVarHashSize();
+		if (local_slots < 1 || local_slots >= MAXVARS)
+			local_slots = MAXLOCALVARS;
+		if (global_slots < 1 || local_slots + global_slots != MAXVARS)
+			global_slots = MAXVARS - local_slots;
+
+		int groups = 0;
+		groups += PrintCollisionDomain("LOCAL", 0, local_slots, local_slots, 1);
+		groups += PrintCollisionDomain("GLOBAL", local_slots, MAXVARS, global_slots, 0);
+		if (groups == 0)
+			MMPrintString("No hash collisions found\r\n");
 	}
 #ifdef STRUCTENABLED
 	else if ((p = checkstring(cmdline, (unsigned char *)"TYPE")))

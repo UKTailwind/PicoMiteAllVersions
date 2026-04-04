@@ -367,7 +367,7 @@ void MX470Display(int fn)
         break;
     case DRAW_LINE:
         DrawBox(0, gui_font_height * (Option.Height - 2), HRes - 1, VRes - 1, 0, 0, (DISPLAY_TYPE == SCREENMODE1 ? 0 : gui_bcolour));
-        DrawLine(0, (VRes / gui_font_height) * gui_font_height - gui_font_height - 6, HRes - 1, (VRes / gui_font_height) * gui_font_height - gui_font_height - 6, 1, GUI_C_LINE);
+        DrawLine(0, (VRes / gui_font_height) * gui_font_height - gui_font_height - 6, HRes - 1, (VRes / gui_font_height) * gui_font_height - gui_font_height - 6, 1, Option.ColourCode ? GUI_C_LINE : gui_fcolour);
 #ifdef PICOMITEVGA
 #ifdef HDMI
         if (FullColour)
@@ -462,31 +462,88 @@ void edit(unsigned char *cmdline, bool cmdfile)
     editactive = 1;
     oldmode = DISPLAY_TYPE;
     oldfont = PromptFont;
-    if (HRes < 512 || Option.DISPLAY_TYPE != SCREENMODE1)
     {
-        DISPLAY_TYPE = SCREENMODE1;
-        modmode = true;
-        ResetDisplay();
+        int chars_per_line = HRes / gui_font_width;
+        if (chars_per_line < 64)
+        {
+            // Rule 5: too few columns - switch to mode 1 and standard font
+            DISPLAY_TYPE = SCREENMODE1;
+            modmode = true;
+            ResetDisplay();
+#ifdef HDMI
+            if (HRes >= 1024)
+            {
+                SetFont(2 << 4 | 1); // font3 16x24 for HDMI high-res
+                PromptFont = 2 << 4 | 1;
+            }
+            else
+#endif
+            {
+                SetFont(1); // font1 8x12 for standard resolutions
+                PromptFont = 1;
+            }
+        }
+        else if (Option.ColourCode && DISPLAY_TYPE == SCREENMODE1 && gui_font_width % 8 != 0)
+        {
+            // Rule 4: mode 1 with colour coding but font not tile-aligned - switch font
+#ifdef HDMI
+            if (HRes >= 1024)
+            {
+                SetFont(2 << 4 | 1); // font3 16x24 for HDMI high-res
+                PromptFont = 2 << 4 | 1;
+            }
+            else
+#endif
+            {
+                SetFont(1); // font1 8x12 for standard resolutions
+                PromptFont = 1;
+            }
+        }
+        // Rule 1: chars>=64, ColourCode=0 - no switch (handled below for tiles)
+        // Rule 2: chars>=64, ColourCode=1, not mode 1 - no switch
+        // Rule 3: chars>=64, ColourCode=1, mode 1, fw%8==0 - no switch (happy path)
     }
-    //
     memset((void *)WriteBuf, 0, ScreenSize);
-
-#ifdef PICOMITEVGA
+    // Set tiles black and white if in mode 1 without colour coding
+    if (DISPLAY_TYPE == SCREENMODE1 && !Option.ColourCode)
+    {
+#ifdef HDMI
+        if (FullColour)
+        {
+            for (int t = 0; t < X_TILE * Y_TILE; t++)
+            {
+                tilefcols[t] = RGB555(WHITE);
+                tilebcols[t] = RGB555(BLACK);
+            }
+        }
+        else
+        {
+            for (int t = 0; t < X_TILE * Y_TILE; t++)
+            {
+                tilefcols_w[t] = RGB332(WHITE);
+                tilebcols_w[t] = RGB332(BLACK);
+            }
+        }
+#else
+        for (int t = 0; t < X_TILE * Y_TILE; t++)
+        {
+            tilefcols[t] = RGB121pack(WHITE);
+            tilebcols[t] = RGB121pack(BLACK);
+        }
+#endif
+    }
 #ifdef rp2350
 #ifdef HDMI
     mapreset();
-#else
-    if (DISPLAY_TYPE == SCREENMODE3)
-        for (int i = 0; i < 16; i++)
-            map16[i] = remap[i] = i;
 #endif
 #endif
-#endif
-
 #endif
 #ifndef USBKEYBOARD
     if (mouse0 == false && Option.MOUSE_CLOCK)
         initMouse0(0); // see if there is a mouse to initialise
+#endif
+#ifdef PICOMITEVGA
+    ytileheight = gui_font_height;
 #endif
     if (Option.ColourCode)
     {
@@ -503,37 +560,12 @@ void edit(unsigned char *cmdline, bool cmdfile)
         ClearVars(0, true);
         int tf = gui_fcolour;
         int tb = gui_bcolour; // *EB*
-        ClearRuntime(true);   // *EB*
+        int tpf = PromptFont; // save font chosen by decision block
+        ClearRuntime(true);   // *EB* (calls ResetDisplay which overwrites font)
         gui_bcolour = tb;
         gui_fcolour = tf; // *EB*
-    }
-    if (HRes == 640 || HRes == 512 || HRes == 848 || HRes == 720)
-    {
-        SetFont(1);
-        PromptFont = 1;
-    }
-    if (modmode)
-    {
-#ifdef HDMI
-        if (FullColour || MediumRes)
-        {
-#endif
-            SetFont(1);
-            PromptFont = 1;
-#ifdef HDMI
-        }
-        else
-        {
-            SetFont(2 << 4 | 1);
-            PromptFont = 2 << 4 | 1;
-        }
-        if (DISPLAY_TYPE == Option.DISPLAY_TYPE)
-        {
-            SetFont(Option.DefaultFont);
-            PromptFont = Option.DefaultFont;
-        }
-        ytileheight = gui_font_height;
-#endif
+        SetFont(tpf);     // restore font after ClearRuntime/ResetDisplay
+        PromptFont = tpf;
     }
 
 #ifdef PICOMITEWEB
@@ -1395,14 +1427,12 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
                 editactive = 0;
                 Y_TILE = OptionY_TILESave;
                 ytileheight = ytileheightsave;
-                if (modmode)
-                {
-                    DISPLAY_TYPE = oldmode;
-                    ResetDisplay();
-                    SetFont(oldfont);
-                    PromptFont = oldfont;
-                    MX470Display(DISPLAY_CLS); // clear screen on the MX470 display only
-                }
+                // Always restore mode and font on exit
+                DISPLAY_TYPE = oldmode;
+                ResetDisplay();
+                SetFont(oldfont);
+                PromptFont = oldfont;
+                MX470Display(DISPLAY_CLS); // clear screen on the MX470 display only
 #ifdef HDMI
                 while (v_scanline != 0)
                 {
@@ -1498,7 +1528,9 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
                 if (c == ESC || c == CTRLKEY('Q') || c == F1 || fname)
                 {
                     cmdline = NULL;
-                    do_end(false);
+                    do_end(false); // calls setmode/ResetDisplay which overwrites font
+                    SetFont(oldfont);
+                    PromptFont = oldfont;
                     longjmp(mark, 1); // jump back to the input prompt
                 }
                 // this must be save, exit and run.  We have done the first two, now do the run part.

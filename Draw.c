@@ -12464,8 +12464,16 @@ void MIPS16 ResetDisplay(void)
     {
         tilefcols = (uint16_t *)((uint32_t)FRAMEBUFFER + (MODE1SIZE * 3));
         tilebcols = (uint16_t *)((uint32_t)FRAMEBUFFER + (MODE1SIZE * 3) + (MODE1SIZE >> 1));
+        for (int x = 0; x < X_TILE; x++)
+        {
+            for (int y = 0; y < Y_TILE; y++)
+            {
+                tilefcols[y * X_TILE + x] = RGB121pack(Option.DefaultFC);
+                tilebcols[y * X_TILE + x] = RGB121pack(Option.DefaultBC);
+            }
+        }
     }
-#endif
+#else
     for (int x = 0; x < X_TILE; x++)
     {
         for (int y = 0; y < Y_TILE; y++)
@@ -12474,6 +12482,7 @@ void MIPS16 ResetDisplay(void)
             tilebcols[y * X_TILE + x] = RGB121pack(Option.DefaultBC);
         }
     }
+#endif
 #endif
 #else
 #ifdef GUICONTROLS
@@ -15822,3 +15831,183 @@ void cmd_fill(void)
     // Call with replace mode (boundary_colour = -1)
     floodfill(x, y, c, b);
 }
+#if defined(PICOMITEVGA) || defined(rp2350)
+/*****************************************************************************
+ * MANDELBROT command - fast fixed-point Mandelbrot set renderer
+ *
+ * Syntax:
+ *   MANDELBROT DRAW [maxiter]       - Draw at current view (default 64 iters)
+ *   MANDELBROT PAN dx, dy           - Pan by dx,dy pixels and redraw
+ *   MANDELBROT ZOOM factor          - Zoom by factor (>1 in, <1 out), redraw
+ *   MANDELBROT CENTRE x, y          - Re-centre on pixel x,y from last draw
+ *   MANDELBROT RESET                - Reset to default view
+ *
+ * Uses 32-bit fixed-point (8.24) for speed on RP2040/RP2350.
+ *****************************************************************************/
+
+/* Fixed-point format: 8 bits integer, 24 bits fraction */
+#define MB_FRAC 24
+#define MB_ONE (1 << MB_FRAC)
+#define MB_FOUR (4 << MB_FRAC)
+
+/* Convert double to fixed-point */
+#define MB_FROM_DBL(d) ((int32_t)((d) * (double)MB_ONE))
+
+/* Default view: real [-2.5, 1.0], imag [-1.5, 1.5] centred on (-0.5, 0) */
+static int32_t mb_centre_r = 0; /* initialised in mb_reset() */
+static int32_t mb_centre_i = 0;
+static int32_t mb_scale = 0; /* units per pixel */
+static int mb_maxiter = 64;
+static int mb_initialised = 0;
+
+static void mb_reset(void)
+{
+    mb_centre_r = MB_FROM_DBL(-0.5);
+    mb_centre_i = 0;
+    /* scale so the full set fits: 3.5 units across HRes pixels */
+    /* but also check vertical: 3.0 units across VRes pixels */
+    double hscale = 3.5 / (double)HRes;
+    double vscale = 3.0 / (double)VRes;
+    double s = (hscale > vscale) ? hscale : vscale;
+    mb_scale = MB_FROM_DBL(s);
+    if (mb_scale < 1)
+        mb_scale = 1;
+    mb_maxiter = 64;
+    mb_initialised = 1;
+}
+
+/* Palette using the 16 predefined colours from Draw.h */
+static const int mb_palette[16] = {
+    BLUE, COBALT, CERULEAN, CYAN,
+    MIDGREEN, GREEN, MYRTLE, YELLOW,
+    BROWN, RUST, RED, MAGENTA,
+    FUCHSIA, LILAC, WHITE, BLUE};
+
+static int mb_colour(int iter, int max_iter)
+{
+    if (iter >= max_iter)
+        return BLACK;
+    return mb_palette[iter & 15];
+}
+
+static void mb_draw(void)
+{
+    int w = HRes, h = VRes;
+    int32_t scale = mb_scale;
+    int max_iter = mb_maxiter;
+
+    /* Top-left corner in complex plane */
+    int32_t origin_r = mb_centre_r - (int32_t)((int64_t)scale * (w >> 1));
+    int32_t origin_i = mb_centre_i - (int32_t)((int64_t)scale * (h >> 1));
+
+    for (int py = 0; py < h; py++)
+    {
+        int32_t ci = origin_i + (int32_t)((int64_t)scale * py);
+        int32_t cr_row = origin_r;
+
+        for (int px = 0; px < w; px++)
+        {
+            int32_t cr = cr_row;
+            int32_t zr = 0, zi = 0;
+            int iter = 0;
+
+            /* Main iteration loop - tight fixed-point arithmetic */
+            while (iter < max_iter)
+            {
+                int32_t zr2 = (int32_t)(((int64_t)zr * zr) >> MB_FRAC);
+                int32_t zi2 = (int32_t)(((int64_t)zi * zi) >> MB_FRAC);
+                if (zr2 + zi2 > MB_FOUR)
+                    break;
+                int32_t new_zi = (int32_t)(((int64_t)zr * zi) >> (MB_FRAC - 1)) + ci;
+                zr = zr2 - zi2 + cr;
+                zi = new_zi;
+                iter++;
+            }
+
+            DrawPixel(px, py, mb_colour(iter, max_iter));
+            cr_row += scale;
+        }
+        /* Allow user to break with Ctrl-C every scanline */
+        CheckAbort();
+    }
+    if (Option.Refresh)
+        Display_Refresh();
+}
+
+void MIPS16 cmd_mandelbrot(void)
+{
+    unsigned char *p;
+
+    CheckDisplay();
+
+    if (!mb_initialised)
+        mb_reset();
+
+    if ((p = checkstring(cmdline, (unsigned char *)"DRAW")))
+    {
+        /* MANDELBROT DRAW [maxiter] */
+        if (*p)
+        {
+            mb_maxiter = getint(p, 1, 10000);
+        }
+        mb_draw();
+    }
+    else if ((p = checkstring(cmdline, (unsigned char *)"PAN")))
+    {
+        /* MANDELBROT PAN dx, dy */
+        getcsargs(&p, 3);
+        if (argc != 3)
+            SyntaxError();
+        int dx = getinteger(argv[0]);
+        int dy = getinteger(argv[2]);
+        mb_centre_r += (int32_t)((int64_t)mb_scale * dx);
+        mb_centre_i += (int32_t)((int64_t)mb_scale * dy);
+        mb_draw();
+    }
+    else if ((p = checkstring(cmdline, (unsigned char *)"ZOOM")))
+    {
+        /* MANDELBROT ZOOM factor  (>1 = zoom in, <1 = zoom out) */
+        MMFLOAT factor = getnumber(p);
+        if (factor <= 0.0)
+            error("Zoom factor must be > 0");
+        /* Divide scale by factor to zoom in */
+        double new_scale = (double)mb_scale / factor;
+        if (new_scale < 1.0)
+            new_scale = 1.0;
+        mb_scale = (int32_t)new_scale;
+        if (mb_scale < 1)
+            mb_scale = 1;
+        mb_draw();
+    }
+    else if ((p = checkstring(cmdline, (unsigned char *)"CENTRE")) ||
+             (p = checkstring(cmdline, (unsigned char *)"CENTER")))
+    {
+        /* MANDELBROT CENTRE x, y - re-centre on pixel coords from last draw */
+        getcsargs(&p, 3);
+        if (argc != 3)
+            SyntaxError();
+        int px = getint(argv[0], 0, HRes - 1);
+        int py = getint(argv[2], 0, VRes - 1);
+        /* Convert pixel to complex coordinate */
+        int32_t origin_r = mb_centre_r - (int32_t)((int64_t)mb_scale * (HRes >> 1));
+        int32_t origin_i = mb_centre_i - (int32_t)((int64_t)mb_scale * (VRes >> 1));
+        mb_centre_r = origin_r + (int32_t)((int64_t)mb_scale * px);
+        mb_centre_i = origin_i + (int32_t)((int64_t)mb_scale * py);
+        mb_draw();
+    }
+    else if ((p = checkstring(cmdline, (unsigned char *)"RESET")))
+    {
+        /* MANDELBROT RESET */
+        mb_reset();
+    }
+    else
+    {
+        /* Bare MANDELBROT with no subcommand - just draw */
+        if (*cmdline)
+        {
+            mb_maxiter = getint(cmdline, 1, 10000);
+        }
+        mb_draw();
+    }
+}
+#endif

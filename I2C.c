@@ -2371,6 +2371,7 @@ void classicproc(void)
 }
 
 #ifndef PICOMITEVGA
+#if defined(rp2350) || defined(PICOMITEWEB)
 #define ov7670_address 0x21
 #define top 120
 #define left 160
@@ -2728,7 +2729,6 @@ void saturation(int s) //-2 to 2
 }
 
 /*  @endcond */
-
 void MIPS16 cmd_camera(void)
 {
   union colourmap
@@ -3248,9 +3248,15 @@ void MIPS16 cmd_camera(void)
     SyntaxError();
   ;
 }
+#else
+void MIPS16 cmd_camera(void)
+{
+  error("Camera not supported on this device");
+}
+#endif
 #endif
 #if PICOCALC
-void CheckPicoCalcKeyboard(int noerror, int read)
+void MIPS16 CheckPicoCalcKeyboard(int noerror, int read)
 {
   uint16_t buff = 0x0000;
   int i2cret = 0;

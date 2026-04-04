@@ -533,6 +533,80 @@ int CheckEmpty(char *p)
     return emptyarray;
 }
 
+// Lightweight strtod for BASIC numeric literals only (digits, '.', 'E'/'e', '+'/'-')
+// Runs from RAM to avoid XIP cache thrashing on RP2040
+static double __not_in_flash_func(fast_strtod)(const char *s)
+{
+    double result = 0.0;
+    double frac = 0.0;
+    double frac_div = 1.0;
+    int sign = 1;
+    int in_frac = 0;
+
+    // optional sign
+    if (*s == '-')
+    {
+        sign = -1;
+        s++;
+    }
+    else if (*s == '+')
+    {
+        s++;
+    }
+
+    // integer and fractional digits
+    while (*s)
+    {
+        if (*s >= '0' && *s <= '9')
+        {
+            if (in_frac)
+            {
+                frac_div *= 10.0;
+                frac += (*s - '0') / frac_div;
+            }
+            else
+            {
+                result = result * 10.0 + (*s - '0');
+            }
+        }
+        else if (*s == '.' && !in_frac)
+        {
+            in_frac = 1;
+        }
+        else if (*s == 'e' || *s == 'E')
+        {
+            s++;
+            int exp_sign = 1;
+            int exp = 0;
+            if (*s == '-')
+            {
+                exp_sign = -1;
+                s++;
+            }
+            else if (*s == '+')
+            {
+                s++;
+            }
+            while (*s >= '0' && *s <= '9')
+                exp = exp * 10 + (*s++ - '0');
+            // apply exponent
+            double pow10 = 1.0;
+            for (int i = 0; i < exp; i++)
+                pow10 *= 10.0;
+            if (exp_sign > 0)
+                return sign * (result + frac) * pow10;
+            else
+                return sign * (result + frac) / pow10;
+        }
+        else
+        {
+            break;
+        }
+        s++;
+    }
+    return sign * (result + frac);
+}
+
 // run a program
 // this will continuously execute a program until the end (marked by TWO zero chars)
 // the argument p must point to the first line to be executed
@@ -2241,7 +2315,7 @@ void __not_in_flash_func (*DoExpression)(unsigned char *p, int *t)
 //  if *t = T_STR or T_NBR or T_INT will throw an error if the result is not the correct type
 //  if *t = T_NOTYPE it will not throw an error and will return the type found in *t
 // this will check that the expression is terminated correctly and throw an error if not.  flags & E_NOERROR will suppress that check
-unsigned char __not_in_flash_func (*evaluate)(unsigned char *p, MMFLOAT *fa, long long int *ia, unsigned char **sa, int *ta, int flags)
+unsigned char MIPS16 __not_in_flash_func (*evaluate)(unsigned char *p, MMFLOAT *fa, long long int *ia, unsigned char **sa, int *ta, int flags)
 {
     int o;
     int t = *ta;
@@ -2488,7 +2562,7 @@ unsigned char MIPS16 *getvalue(unsigned char *p, MMFLOAT *fa, long long int *ia,
 #ifdef rp2350
 unsigned char MIPS64 __not_in_flash_func (*getvalue)(unsigned char *p, MMFLOAT *fa, long long int *ia, unsigned char **sa, int *oo, int *ta)
 #else
-unsigned char __not_in_flash_func (*getvalue)(unsigned char *p, MMFLOAT *fa, long long int *ia, unsigned char **sa, int *oo, int *ta)
+unsigned char MIPS16 __not_in_flash_func (*getvalue)(unsigned char *p, MMFLOAT *fa, long long int *ia, unsigned char **sa, int *oo, int *ta)
 #endif
 {
 #endif
@@ -2695,7 +2769,7 @@ unsigned char __not_in_flash_func (*getvalue)(unsigned char *p, MMFLOAT *fa, lon
             }
             else
             {
-                f = (MMFLOAT)strtod(ts, &tsp);
+                f = (MMFLOAT)fast_strtod(ts);
                 t = T_NBR;
             }
         }
@@ -3719,7 +3793,11 @@ void MIPS16 *findvar(unsigned char *p, int action)
  * - hash % (MAXVARS/2) replaced with hash % maxlocalvars
  * - Global offset is now maxlocalvars instead of MAXVARS/2
  ***********************************************************************************************/
-void MIPS64 __not_in_flash_func (*findvar)(unsigned char *p, int action)
+#ifdef rp2350
+void MIPS32 __not_in_flash_func (*findvar)(unsigned char *p, int action)
+#else
+void MIPS16 __not_in_flash_func (*findvar)(unsigned char *p, int action)
+#endif
 {
 #endif
     unsigned char name[MAXVARLEN + 1];
@@ -4628,7 +4706,7 @@ void __not_in_flash_func(MakeCommaSeparatedArgs)(unsigned char **p, int maxargs,
 //   pointer to an integer that will contain (after the function has returned) the number of arguments found
 //   pointer to a string that contains the characters to be used in spliting up the line.  If the first unsigned char of that
 //       string is an opening bracket '(' this function will expect the arg list to be enclosed in brackets.
-void __not_in_flash_func(makeargs)(unsigned char **p, int maxargs, unsigned char *argbuf, unsigned char *argv[], int *argc, unsigned char *delim)
+void MIPS16 __not_in_flash_func(makeargs)(unsigned char **p, int maxargs, unsigned char *argbuf, unsigned char *argv[], int *argc, unsigned char *delim)
 {
     unsigned char *op;
     int inarg, expect_cmd, expect_bracket, then_tkn, else_tkn;
@@ -5082,7 +5160,7 @@ void SyntaxError(void)
 {
     error("Invalid syntax");
 }
-const char *errorstring[] = {
+const char *const errorstring[] = {
     "",                                                            // 0
     "Not available on this display",                               // 1
     "Argument count",                                              // 2
@@ -5507,6 +5585,16 @@ void MIPS16 cmd_localvars(unsigned char *p)
     int i = getint(p, 32, MAXVARS - 32);
     maxlocalvars = i;
     maxglobalvars = MAXVARS - i;
+}
+
+int GetLocalVarHashSize(void)
+{
+    return maxlocalvars;
+}
+
+int GetGlobalVarHashSize(void)
+{
+    return maxglobalvars;
 }
 /***********************************************************************************************
  * FUNCTION: erase(char *p) - Erase named global variables
