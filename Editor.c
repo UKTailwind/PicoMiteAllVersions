@@ -1528,9 +1528,12 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
                 if (c == ESC || c == CTRLKEY('Q') || c == F1 || fname)
                 {
                     cmdline = NULL;
-                    do_end(false); // calls setmode/ResetDisplay which overwrites font
+                    do_end(false);
+#ifdef PICOMITEVGA
+                    // do_end calls setmode/ResetDisplay which overwrites font - restore it
                     SetFont(oldfont);
                     PromptFont = oldfont;
+#endif
                     longjmp(mark, 1); // jump back to the input prompt
                 }
                 // this must be save, exit and run.  We have done the first two, now do the run part.
