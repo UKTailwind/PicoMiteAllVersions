@@ -33,6 +33,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  */
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
+#include "port_config.h"
 #include "ff.h"
 #include "diskio.h"
 #include "pico/stdlib.h"
@@ -3129,14 +3130,14 @@ void MIPS16 cmd_load(void)
         cmd_LoadJPGImage(p);
         return;
     }
-#ifdef rp2350
-    p = checkstring(cmdline, (unsigned char *)"PNG");
-    if (p)
-    {
-        LoadPNG(p);
-        return;
+    if (HAL_PORT_HAS_UPNG) {
+        /* LoadPNG only links on ports that compile upng.c; on others
+         * HAL_PORT_HAS_UPNG == 0 and the whole branch is compile-time
+         * dead, so the call never lands in .text. */
+        extern void LoadPNG(unsigned char *p);
+        p = checkstring(cmdline, (unsigned char *)"PNG");
+        if (p) { LoadPNG(p); return; }
     }
-#endif
     getargs(&cmdline, 3, (unsigned char *)",");
     CloseAudio(1);
     if (!(argc & 1) || argc == 0)
@@ -5298,12 +5299,14 @@ void ResetOptions(bool startup)
     Option.VGA_BLUE=24;
     uint8_t rxbuf[4] = {0};
     Option.heartbeatpin = 43;
-#ifdef rp2350
+    /* RP2350B (rp2350a==false) — 48-pin variant: reserve the heartbeat
+     * pin for GPIO to free up the pin budget. rp2350a is always true
+     * on RP2040 and RP2350A, so the branch is effectively gated to
+     * RP2350B builds with no preprocessor ifdef needed. */
     if(!rp2350a){
         Option.NoHeartbeat=1;
         Option.AllPins=1;
     }
-#endif
     hal_flash_read_jedec_id(rxbuf);
     Option.FlashSize= 1 << rxbuf[3];
     SaveOptions();
