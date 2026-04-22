@@ -158,7 +158,7 @@ New, more portable, method of manipulating an I/O pin
 #define EXT_PWM7A        44
 #define EXT_PWM7B        45
 #define EXT_ADCRAW       46
-#if HAL_PORT_PWM_SLICE_COUNT > 8
+#ifdef rp2350
 #define EXT_PWM8A        47
 #define EXT_PWM8B        48
 #define EXT_PWM9A        49
@@ -169,12 +169,8 @@ New, more portable, method of manipulating an I/O pin
 #define EXT_PWM11B        54
 #define EXT_PIO0_OUT      55
 #define EXT_PIO1_OUT      56
-#if HAL_PORT_HAS_PIO2
 #define EXT_PIO2_OUT      57
-#endif
-#if HAL_PORT_HAS_FAST_TIMER
 #define EXT_FAST_TIMER    58
-#endif
 #define EXT_KEYBOARD      59
 #else
 #define EXT_PIO0_OUT      47
@@ -223,7 +219,11 @@ extern void setBacklight(int level, int frequency);
 #else
 extern void setBacklight(int level);
 #endif
-extern const uint8_t PINMAP[HAL_PORT_GPIO_COUNT];
+#ifdef rp2350
+extern const uint8_t PINMAP[48];
+#else
+extern const uint8_t PINMAP[30];
+#endif
 void gpio_callback(uint gpio, uint32_t events);
 // for CheckPin() action can be set to:
 #define CP_CHECKALL          0b0000     // abort with an error if invalid, in use or reserved
@@ -285,6 +285,7 @@ extern uint8_t PWM4Bpin;
 extern uint8_t PWM5Bpin;
 extern uint8_t PWM6Bpin;
 extern uint8_t PWM7Bpin;
+#ifdef rp2350
 extern uint8_t PWM8Apin;
 extern uint8_t PWM8Bpin;
 extern uint8_t PWM9Apin;
@@ -293,6 +294,7 @@ extern uint8_t PWM10Apin;
 extern uint8_t PWM10Bpin;
 extern uint8_t PWM11Apin;
 extern uint8_t PWM11Bpin;
+#endif
 extern uint8_t UART1RXpin;
 extern uint8_t UART1TXpin;
 extern uint8_t UART0TXpin;

@@ -104,7 +104,7 @@ const char *PinFunction[] = {
         "PWM7A",
         "PWM7B",
         "ADCRAW",
-#if HAL_PORT_PWM_SLICE_COUNT > 8
+#ifdef rp2350
         "PWM8A",
         "PWM8B",
         "PWM9A",
@@ -115,12 +115,10 @@ const char *PinFunction[] = {
         "PWM11B",
 #endif
         "PIO0",
-#if HAL_PORT_HAS_PIO2
+#ifdef rp2350
         "PIO1",
         "PIO2",
-#if HAL_PORT_HAS_FAST_TIMER
         "FFIN",
-#endif
 #ifdef PICONITE
         "KEYBOARD"
 #endif
@@ -156,10 +154,12 @@ uint8_t PWM4Apin=99;
 uint8_t PWM5Apin=99;
 uint8_t PWM6Apin=99;
 uint8_t PWM7Apin=99;
+#ifdef rp2350
 uint8_t PWM8Apin=99;
 uint8_t PWM9Apin=99;
 uint8_t PWM10Apin=99;
 uint8_t PWM11Apin=99;
+#endif
 uint8_t PWM0Bpin=99;
 uint8_t PWM1Bpin=99;
 uint8_t PWM2Bpin=99;
@@ -168,10 +168,12 @@ uint8_t PWM4Bpin=99;
 uint8_t PWM5Bpin=99;
 uint8_t PWM6Bpin=99;
 uint8_t PWM7Bpin=99;
+#ifdef rp2350
 uint8_t PWM8Bpin=99;
 uint8_t PWM9Bpin=99;
 uint8_t PWM10Bpin=99;
 uint8_t PWM11Bpin=99;
+#endif
 uint8_t UART1RXpin=99;
 uint8_t UART1TXpin=99;
 uint8_t UART0TXpin=99;
@@ -187,11 +189,13 @@ uint8_t I2C1SCLpin=99;
 uint8_t I2C0SDApin=99;
 uint8_t I2C0SCLpin=99;
 uint8_t slice0=0,slice1=0,slice2=0,slice3=0,slice4=0,slice5=0,slice6=0,slice7=0;
+#ifdef rp2350
 uint8_t slice8=0,slice9=0,slice10=0,slice11=0;
 bool fast_timer_active=false;
 volatile uint64_t INT5Count, INT5Value, INT5InitTimer, INT5Timer;
 #ifdef PICOMITE
 int LocalKeyDown[7];
+#endif
 #endif
 bool dmarunning=false;
 bool ADCDualBuffering=false;
@@ -224,21 +228,27 @@ uint64_t readIRclock(void){
 void writeIRclock(uint64_t timeset){
   IRoffset=hal_time_us_64()-(uint64_t)timeset;
 }
-#if HAL_PORT_GPIO_COUNT == 48
-const uint8_t PINMAP[HAL_PORT_GPIO_COUNT]={1,2,4,5,6,7,9,10,11,12,14,15,16,17,19,20,21,22,24,25,26,27,29,41,42,43,31,32,34,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62};
-#else
-const uint8_t PINMAP[HAL_PORT_GPIO_COUNT]={1,2,4,5,6,7,9,10,11,12,14,15,16,17,19,20,21,22,24,25,26,27,29,41,42,43,31,32,34,44};
-#endif
+#ifdef rp2350
+const uint8_t PINMAP[48]={1,2,4,5,6,7,9,10,11,12,14,15,16,17,19,20,21,22,24,25,26,27,29,41,42,43,31,32,34,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62};
 int codemap(int pin){
 #ifdef PICOMITEWEB
     if(pin>29 || pin<0 || pin==23 || pin==24 || pin==25 || pin==29) error("Invalid GPIO");
-#elif HAL_PORT_GPIO_COUNT > 30
-    if(pin>(rp2350a? 29:47) || pin<0) error("Invalid GPIO");
 #else
-    if(pin>29 || pin<0) error("Invalid GPIO");
+	if(pin>(rp2350a? 29:47) || pin<0) error("Invalid GPIO");
 #endif
-    return (int)PINMAP[pin];
+	return (int)PINMAP[pin];
 }
+#else
+const uint8_t PINMAP[30]={1,2,4,5,6,7,9,10,11,12,14,15,16,17,19,20,21,22,24,25,26,27,29,41,42,43,31,32,34,44};
+int codemap(int pin){
+#ifdef PICOMITEWEB
+    if(pin>29 || pin<0 || pin==23 || pin==24 || pin==25 || pin==29) error("Invalid GPIO");
+#else
+	if(pin>29 || pin<0) error("Invalid GPIO");
+#endif
+	return (int)PINMAP[pin];
+}
+#endif
 int codecheck(unsigned char *line){
 	if((line[0]=='G' || line[0]=='g') && (line[1]=='P' || line[1]=='p')){
 		line+=2;
@@ -255,11 +265,12 @@ int codecheck(unsigned char *line){
 	} else return 4;
 	return 0;
 }
-#if HAL_PORT_HAS_FAST_TIMER
+#ifdef rp2350
 void __not_in_flash_func(on_pwm_wrap_1)(void) {
     pwm_clear_irq(0);
     INT5Count++;
 }
+
 #endif
 
 void SoftReset(void){
@@ -271,7 +282,15 @@ void SoftReset(void){
 	watchdog_enable(1, 1);
 	while(1);
 }
-void HAL_PORT_RAM_FUNC(PinSetBit)(int pin, unsigned int offset) {
+#ifdef rp2350
+void __not_in_flash_func(PinSetBit)(int pin, unsigned int offset) {
+#else
+#if defined(PICOMITEVGA) || defined(PICOMITEWEB)
+void PinSetBit(int pin, unsigned int offset) {
+#else
+void __not_in_flash_func(PinSetBit)(int pin, unsigned int offset) {
+#endif
+#endif
     uint32_t gpio = PinDef[pin].GPno;
     switch (offset){
     case LATCLR:
@@ -331,15 +350,31 @@ void HAL_PORT_RAM_FUNC(PinSetBit)(int pin, unsigned int offset) {
 }
 
 int IsInvalidPin(int pin) {
-    int max_pin = NBRPINS;
-#if NBRPINS > 44
-    if (rp2350a) max_pin = 44;
+#ifdef rp2350
+    #ifdef PICOMITEWEB
+        if(pin < 1 || pin > NBRPINS) return true;
+    #else
+        if(pin < 1 || pin > (rp2350a ? 44: NBRPINS)) return true;
+    #endif
+#else
+    if(pin < 1 || pin > NBRPINS) return true;
 #endif
-    if(pin < 1 || pin > max_pin) return true;
     if(PinDef[pin].mode & UNUSED) return true;
     return false;
 }
-void HAL_PORT_RAM_FUNC(ExtSet)(int pin, int val){
+#ifdef PICOMITEWEB
+void ExtSet(int pin, int val){
+#else
+#ifndef rp2350
+#ifdef PICOMITEVGA
+void ExtSet(int pin, int val){
+#else
+void __not_in_flash_func(ExtSet)(int pin, int val){
+#endif
+#else
+void __not_in_flash_func(ExtSet)(int pin, int val){
+#endif
+#endif
 
     if(ExtCurrentConfig[pin] == EXT_NOT_CONFIG || ExtCurrentConfig[pin] == EXT_DIG_OUT/* || ExtCurrentConfig[pin] == EXT_OC_OUT*/) {
         PinSetBit(pin, val ? LATSET : LATCLR);
@@ -362,7 +397,11 @@ void HAL_PORT_RAM_FUNC(ExtSet)(int pin, int val){
         error("Pin %/| is not an output",pin,pin);
 }
 /*  @endcond */
-void HAL_PORT_RAM_FUNC(cmd_sync)(void){
+#if defined(PICOMITEVGA) && !defined(rp2350)
+    void cmd_sync(void){
+#else
+void __not_in_flash_func(cmd_sync)(void){
+#endif
 	uint64_t i;
     static uint64_t synctime=0,endtime=0;
 	getargs(&cmdline,3,(unsigned char *)",");
@@ -424,10 +463,12 @@ void ClearPin(int pin){
     if(pin==PWM5Apin)PWM5Apin=99;
     if(pin==PWM6Apin)PWM6Apin=99;
     if(pin==PWM7Apin)PWM7Apin=99;
+#ifdef rp2350
     if(pin==PWM8Apin)PWM8Apin=99;
     if(pin==PWM9Apin)PWM9Apin=99;
     if(pin==PWM10Apin)PWM10Apin=99;
     if(pin==PWM11Apin)PWM11Apin=99;
+#endif
     if(pin==PWM0Bpin)PWM0Bpin=99;
     if(pin==PWM1Bpin)PWM1Bpin=99;
     if(pin==PWM2Bpin)PWM2Bpin=99;
@@ -436,10 +477,12 @@ void ClearPin(int pin){
     if(pin==PWM5Bpin)PWM5Bpin=99;
     if(pin==PWM6Bpin)PWM6Bpin=99;
     if(pin==PWM7Bpin)PWM7Bpin=99;
+#ifdef rp2350
     if(pin==PWM8Bpin)PWM8Bpin=99;
     if(pin==PWM9Bpin)PWM9Bpin=99;
     if(pin==PWM10Bpin)PWM10Bpin=99;
     if(pin==PWM11Bpin)PWM11Bpin=99;
+#endif
     if(pin==UART0TXpin)UART0TXpin=99;
     if(pin==UART0RXpin)UART0RXpin=99;
     if(pin==UART1RXpin)UART1RXpin=99;
@@ -488,7 +531,7 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
         else hal_pin_irq_set_edge(PinDef[pin].GPno, HAL_PIN_EDGE_BOTH, false);
         CallBackEnabled &= (~16);
     }
-    #if HAL_PORT_HAS_FAST_TIMER
+    #ifdef rp2350
     if(pin==FAST_TIMER_PIN && ExtCurrentConfig[pin]==EXT_FAST_TIMER){
         slice0=0;
         pwm_set_irq1_enabled(0, false);
@@ -542,7 +585,7 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
                                      case EXT_PWM7A:
 				                        PWM7Apin=99;
 					                    break;
-#if HAL_PORT_PWM_SLICE_COUNT > 8
+#ifdef rp2350
                                      case EXT_PWM8A:
 				                        PWM8Apin=99;
 					                    break;
@@ -580,7 +623,7 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
                                      case EXT_PWM7B:
 				                        PWM7Bpin=99;
 					                    break;
-#if HAL_PORT_PWM_SLICE_COUNT > 8
+#ifdef rp2350
                                      case EXT_PWM8B:
 				                        PWM8Bpin=99;
 					                    break;
@@ -639,14 +682,19 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
                                 }
                                 break;
 
+#ifdef rp2350
         case EXT_ADCRAW:
         case EXT_ANA_IN:        if(!(PinDef[pin].mode & ANALOG_IN)) error("Invalid configuration");
-#if NBRPINS > 44
                                 if(pin<=44 && rp2350a==0) error("Invalid configuration");
                                 if(pin> 44 && rp2350a) error("Invalid configuration");
-#endif
-                                tris = 1; ana = 0;
+                                tris = 1; ana = 0; 
                                 break;
+#else
+        case EXT_ADCRAW:
+        case EXT_ANA_IN:        if(!(PinDef[pin].mode & ANALOG_IN)) error("Invalid configuration");
+                                tris = 1; ana = 0; 
+                                break;
+#endif
         case EXT_CNT_IN:        
         case EXT_FREQ_IN:   // same as counting, so fall through
         case EXT_PER_IN:        // same as counting, so fall through
@@ -733,10 +781,10 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
 		                        hal_pin_set_input_hysteresis(PinDef[pin].GPno, true);
                                 break;
 
-        case EXT_PIO0_OUT:
-        case EXT_PIO1_OUT:
-#if HAL_PORT_HAS_PIO2
-        case EXT_PIO2_OUT:
+        case EXT_PIO0_OUT:       
+        case EXT_PIO1_OUT:       
+#ifdef rp2350
+        case EXT_PIO2_OUT:       
 #endif
         case EXT_DIG_OUT:       if(!(PinDef[pin].mode & DIGITAL_OUT)) error("Invalid configuration");
                                 tris = 0; ana = 1; 
@@ -830,7 +878,7 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
                                 if((PWM7Apin!=99 && PWM7Apin!=pin)) error("Already Set to pin %",PWM7Apin);
                                 PWM7Apin=pin;
                                 break;
-#if HAL_PORT_PWM_SLICE_COUNT > 8
+#ifdef rp2350
         case EXT_PWM8A:         if(!(PinDef[pin].mode & PWM8A) || rp2350a) error("Invalid configuration");
                                 if((PWM8Apin!=99 && PWM8Apin!=pin)) error("Already Set to pin %",PWM8Apin);
                                 PWM8Apin=pin;
@@ -880,7 +928,7 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
                                 if((PWM7Bpin!=99 && PWM7Bpin!=pin)) error("Already Set to pin %",PWM7Bpin);
                                 PWM7Bpin=pin;
                                 break;
-#if HAL_PORT_PWM_SLICE_COUNT > 8
+#ifdef rp2350
 #ifndef PICOMITEWEB
         case EXT_PWM8B:         if(!(PinDef[pin].mode & PWM8B) || rp2350a) error("Invalid configuration");
                                 if((PWM8Bpin!=99 && PWM8Bpin!=pin)) error("Blready Set to pin %",PWM8Bpin);
@@ -899,14 +947,13 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
                                 PWM11Bpin=pin;
                                 break;
 #endif
-#endif
-#if HAL_PORT_HAS_FAST_TIMER
         case EXT_FAST_TIMER:    if(!(PinDef[pin].mode & PWM0B)) error("Invalid configuration");
                                 if((PWM0Bpin!=99 && PWM0Bpin!=pin)) error("Already Set to pin %",PWM0Bpin);
                                 PWM0Bpin=pin;
                                 INT5Count = INT5Value = 0;
-                                INT5Timer = INT5InitTimer = option;
+                                INT5Timer = INT5InitTimer = option;  // only used for frequency and period measurement
                                 tris = 1; ana = 1;
+//                                PinSetBit(pin,TRISSET);
                                 hal_pin_set_input_hysteresis(PinDef[pin].GPno, true);
                                 hal_pin_set_function(PinDef[pin].GPno, HAL_PIN_FUNC_PWM);
                                 pwm_config cfg = pwm_get_default_config();
@@ -919,7 +966,7 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
                                 irq_set_enabled(PWM_IRQ_WRAP_1, true);
                                 irq_set_priority(PWM_IRQ_WRAP_1,0);
 	                            pwm_set_irq1_enabled(0, true);
-                                pwm_set_enabled(0, true);
+                                pwm_set_enabled(0, true); 
                                 break;
 #endif
         case EXT_I2C0SDA:       if(!(PinDef[pin].mode & I2C0SDA)) error("Invalid configuration");
@@ -962,7 +1009,7 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
     }
     else if(cfg>=EXT_I2C0SDA && cfg<=EXT_I2C1SCL)hal_pin_set_function(PinDef[pin].GPno, HAL_PIN_FUNC_I2C);
     else if(cfg>=EXT_SPI0RX && cfg<=EXT_SPI1SCK)hal_pin_set_function(PinDef[pin].GPno, HAL_PIN_FUNC_SPI);
-#if HAL_PORT_PWM_SLICE_COUNT > 8
+#ifdef rp2350
     else if(cfg>=EXT_PWM0A && cfg<=(rp2350a ? EXT_PWM7B : EXT_PWM11B))hal_pin_set_function(PinDef[pin].GPno, HAL_PIN_FUNC_PWM);
 #else
     else if(cfg>=EXT_PWM0A && cfg<=EXT_PWM7B)hal_pin_set_function(PinDef[pin].GPno, HAL_PIN_FUNC_PWM);
@@ -975,7 +1022,7 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
 	    hal_pin_set_input_enabled(PinDef[pin].GPno, true);
         hal_pin_set_function(PinDef[pin].GPno, HAL_PIN_FUNC_PIO1);
     }
-#if HAL_PORT_HAS_PIO2
+#ifdef rp2350
     else if(cfg==EXT_PIO2_OUT){
 	    hal_pin_set_input_enabled(PinDef[pin].GPno, true);
         hal_pin_set_function(PinDef[pin].GPno, HAL_PIN_FUNC_PIO2);
@@ -984,7 +1031,15 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
     uSec(2);
 }
 extern int adc_clk_div;
-int64_t HAL_PORT_RAM_FUNC(ExtInp)(int pin){
+#ifndef rp2350
+#ifdef PICOMITEVGA
+int64_t ExtInp(int pin){
+#else
+int64_t __not_in_flash_func(ExtInp)(int pin){
+#endif
+#else
+int64_t __not_in_flash_func(ExtInp)(int pin){
+#endif
     if(ExtCurrentConfig[pin]==EXT_ANA_IN || ExtCurrentConfig[pin]==EXT_ADCRAW){
         if(adc_clk_div!=adc_hw->div){
             SetADCFreq(500000.0);
@@ -1071,11 +1126,11 @@ void MIPS16 cmd_setpin(void) {
         value = EXT_PWM6A;
     else if(checkstring(argv[2], (unsigned char *)"PWM7A"))
         value = EXT_PWM7A;
-#if HAL_PORT_HAS_FAST_TIMER
+#ifdef rp2350
     else if(checkstring(argv[2], (unsigned char *)"FFIN"))
         value = EXT_FAST_TIMER;
 #endif
-#if HAL_PORT_PWM_SLICE_COUNT > 8
+#ifdef rp2350
     else if(checkstring(argv[2], (unsigned char *)"PWM8A"))
         value = EXT_PWM8A;
     else if(checkstring(argv[2], (unsigned char *)"PWM9A"))
@@ -1101,7 +1156,7 @@ void MIPS16 cmd_setpin(void) {
         value = EXT_PWM6B;
     else if(checkstring(argv[2], (unsigned char *)"PWM7B"))
         value = EXT_PWM7B;
-#if HAL_PORT_PWM_SLICE_COUNT > 8
+#ifdef rp2350
     else if(checkstring(argv[2], (unsigned char *)"PWM8B"))
         value = EXT_PWM8B;
     else if(checkstring(argv[2], (unsigned char *)"PWM9B"))
@@ -1115,7 +1170,7 @@ void MIPS16 cmd_setpin(void) {
         value = EXT_PIO0_OUT;
     else if(checkstring(argv[2], (unsigned char *)"PIO1"))
         value = EXT_PIO1_OUT;
-#if HAL_PORT_HAS_PIO2
+#ifdef rp2350
     else if(checkstring(argv[2], (unsigned char *)"PIO2"))
         value = EXT_PIO2_OUT;
 #endif
@@ -1136,7 +1191,7 @@ void MIPS16 cmd_setpin(void) {
         else if(PinDef[pin].mode & PWM6B)value = EXT_PWM6B;
         else if(PinDef[pin].mode & PWM7A)value = EXT_PWM7A;
         else if(PinDef[pin].mode & PWM7B)value = EXT_PWM7B;
-#if HAL_PORT_PWM_SLICE_COUNT > 8
+#ifdef rp2350
         else if(PinDef[pin].mode & PWM8A)value = EXT_PWM8A;
         else if(PinDef[pin].mode & PWM8B)value = EXT_PWM8B;
         else if(PinDef[pin].mode & PWM9A)value = EXT_PWM9A;
@@ -1259,7 +1314,7 @@ process:
         case EXT_DIG_IN:    if(argc == 5) {
                                 if(checkstring(argv[4], (unsigned char *)"PULLUP")) option = CNPUSET;
                                 else if(checkstring(argv[4], (unsigned char *)"PULLDOWN")) {
-#if HAL_PORT_PULLDOWN_NEEDS_RESET
+#ifdef rp2350
                                     PinSetBit(pin,TRISCLR);
                                     PinSetBit(pin,LATCLR);
                                     PinSetBit(pin,TRISSET);
@@ -1275,7 +1330,7 @@ process:
         case EXT_INT_BOTH:  if(argc == 7) {
                                 if(checkstring(argv[6], (unsigned char *)"PULLUP")) option = CNPUSET;
                                 else if(checkstring(argv[6], (unsigned char *)"PULLDOWN")) {
-#if HAL_PORT_PULLDOWN_NEEDS_RESET
+#ifdef rp2350
                                     PinSetBit(pin,TRISCLR);
                                     PinSetBit(pin,LATCLR);
                                     PinSetBit(pin,TRISSET);
@@ -1301,7 +1356,7 @@ process:
                             else
                                 option = 1;
                             break;
-#if HAL_PORT_HAS_FAST_TIMER
+#ifdef rp2350
         case EXT_FAST_TIMER:    if(pin!=FAST_TIMER_PIN)error("Use pin2/GP1 for fast counter");
                             if(BacklightSlice==0)error("Channel in use for LCD backlight");
 #ifdef PICOMITE
@@ -1396,7 +1451,7 @@ void fun_pin(void) {
         if(ADCDualBuffering || dmarunning)error("ADC in use");
         hal_pin_adc_init();
         hal_pin_adc_set_temp_sensor(true);
-#if HAL_PORT_GPIO_COUNT > 30
+#ifdef rp2350
         hal_pin_adc_select((rp2350a ? 4 : 8));
 #else
         hal_pin_adc_select(4);
@@ -1426,13 +1481,13 @@ void fun_pin(void) {
         case EXT_DIG_OUT:
         case EXT_PIO0_OUT:
         case EXT_PIO1_OUT:
-#if HAL_PORT_HAS_PIO2
+#ifdef rp2350
         case EXT_PIO2_OUT:
 #endif
                             iret = ExtInp(pin);
                             targ = T_INT;
                             return;
-#if HAL_PORT_HAS_FAST_TIMER
+#ifdef rp2350
         case EXT_FAST_TIMER:
                             fret = (MMFLOAT)INT5Value  * (MMFLOAT)1000.0 / (MMFLOAT)INT5InitTimer;
                             targ = T_NBR;
@@ -1489,7 +1544,7 @@ void fun_pin(void) {
 
 int CheckPin(int pin, int action) {
 
-#if NBRPINS > 44
+#ifdef rp2350
     if(rp2350a && pin>44)error("Pin | is invalid", pin);
 #endif
 
@@ -1814,7 +1869,7 @@ void IRSendSignal(int pin, int half_cycles) {
 void MIPS16 set_PWM(int slice, MMFLOAT duty1, MMFLOAT duty2, int high1, int high2, int delaystart){
     if(slice==0 && PWM0Apin==99 && duty1>=0.0)error("Pin not set for PWM");
     if(slice==0 && PWM0Bpin==99 && duty2>=0.0)error("Pin not set for PWM");
-#if HAL_PORT_HAS_FAST_TIMER
+#ifdef rp2350
     if(slice==0 && fast_timer_active)error("Channel 0 in use for fast timer");
 #endif
     if(slice==1 && PWM1Apin==99 && duty1>=0.0)error("Pin not set for PWM");
@@ -1831,7 +1886,7 @@ void MIPS16 set_PWM(int slice, MMFLOAT duty1, MMFLOAT duty2, int high1, int high
     if(slice==6 && PWM6Bpin==99 && duty2>=0.0)error("Pin not set for PWM");
     if(slice==7 && PWM7Apin==99 && duty1>=0.0)error("Pin not set for PWM");
     if(slice==7 && PWM7Bpin==99 && duty2>=0.0)error("Pin not set for PWM");
-#if HAL_PORT_PWM_SLICE_COUNT > 8
+#ifdef rp2350
     if(slice==8 && PWM8Apin==99 && duty1>=0.0)error("Pin not set for PWM");
     if(slice==8 && PWM8Bpin==99 && duty2>=0.0)error("Pin not set for PWM");
     if(slice==9 && PWM9Apin==99 && duty1>=0.0)error("Pin not set for PWM");
@@ -1905,7 +1960,7 @@ void MIPS16 set_PWM(int slice, MMFLOAT duty1, MMFLOAT duty2, int high1, int high
         ExtCfg(PWM7Bpin,EXT_COM_RESERVED,0);
         pwm_set_chan_level(slice, PWM_CHAN_B, high2);
     }
-#if HAL_PORT_PWM_SLICE_COUNT > 8
+#ifdef rp2350
     if(slice==8 && PWM8Apin!=99 && duty1>=0.0){
         ExtCfg(PWM8Apin,EXT_COM_RESERVED,0);
         pwm_set_chan_level(slice, PWM_CHAN_A, high1);
@@ -1971,7 +2026,7 @@ void MIPS16 set_PWM(int slice, MMFLOAT duty1, MMFLOAT duty2, int high1, int high
         if(!delaystart)pwm_set_enabled(slice, true);
         slice7=1;
     }
-#if HAL_PORT_PWM_SLICE_COUNT > 8
+#ifdef rp2350
         if(slice==8 && slice8==0){
         if(!delaystart)pwm_set_enabled(slice, true);
         slice8=1;
@@ -2040,7 +2095,7 @@ void PWMoff(int slice){
     if(slice==7 && PWM7Bpin!=99 && ExtCurrentConfig[PWM7Bpin] < EXT_BOOT_RESERVED){
         ExtCfg(PWM7Bpin,EXT_NOT_CONFIG,0);
     }
-#if HAL_PORT_PWM_SLICE_COUNT > 8
+#ifdef rp2350
     if(slice==8 && PWM8Apin!=99 && ExtCurrentConfig[PWM8Apin] < EXT_BOOT_RESERVED){
         ExtCfg(PWM8Apin,EXT_NOT_CONFIG,0);
     }
@@ -2071,7 +2126,7 @@ void PWMoff(int slice){
 #ifndef PICOMITEVGA
 #ifndef PICOCALC
 void setBacklight(int level, int setfrequency){
-#if defined(PICOMITE) && HAL_PORT_PWM_SLICE_COUNT > 8
+#if defined(PICOMITE) && defined(rp2350)
     if(((Option.DISPLAY_TYPE>I2C_PANEL && Option.DISPLAY_TYPE<BufferedPanel ) || Option .DISPLAY_TYPE>=NEXTGEN || (Option.DISPLAY_TYPE>=SSDPANEL && Option.DISPLAY_TYPE<VIRTUAL)) && Option.DISPLAY_BL){
 #else
     if(((Option.DISPLAY_TYPE>I2C_PANEL && Option.DISPLAY_TYPE<BufferedPanel ) || (Option.DISPLAY_TYPE>=SSDPANEL && Option.DISPLAY_TYPE<VIRTUAL)) && Option.DISPLAY_BL){
@@ -2116,7 +2171,7 @@ void MIPS16 cmd_backlight(void){
     int level=getint(argv[0],0,100);
 #ifndef PICOCALC
     int frequency=50000;
-#if defined(PICOMITE) && HAL_PORT_PWM_SLICE_COUNT > 8
+#if defined(PICOMITE) && defined(rp2350)
     if(((Option.DISPLAY_TYPE>I2C_PANEL && Option.DISPLAY_TYPE<BufferedPanel ) || (Option.DISPLAY_TYPE>=SSDPANEL && Option.DISPLAY_TYPE<VIRTUAL) || Option .DISPLAY_TYPE>=NEXTGEN) && Option.DISPLAY_BL){
 #else
     if(((Option.DISPLAY_TYPE>I2C_PANEL && Option.DISPLAY_TYPE<BufferedPanel ) || (Option.DISPLAY_TYPE>=SSDPANEL && Option.DISPLAY_TYPE<VIRTUAL)) && Option.DISPLAY_BL){
@@ -2150,7 +2205,7 @@ void MIPS16 cmd_Servo(void){
     getargs(&cmdline,5,(unsigned char *)",");
     if(!(argc>=3))error("Syntax");
     int CPU_Speed=Option.CPU_Speed;
-#if HAL_PORT_PWM_SLICE_COUNT > 8
+#ifdef rp2350
     int slice=getint(argv[0],0,rp2350a ? 7:11);
     if(slice==0 && ExtCurrentConfig[FAST_TIMER_PIN]==EXT_FAST_TIMER)error("Channel in use for fast frequency");
 #else
@@ -2169,7 +2224,7 @@ void MIPS16 cmd_Servo(void){
         if(slice==5)slice5=0;
         if(slice==6)slice6=0;
         if(slice==7)slice7=0;
-#if HAL_PORT_PWM_SLICE_COUNT > 8
+#ifdef rp2350
         if(slice==8)slice8=0;
         if(slice==9)slice9=0;
         if(slice==10)slice10=0;
@@ -2211,7 +2266,7 @@ void MIPS16 cmd_pwm(void){
     unsigned char *tp;
     if((tp=checkstring(cmdline, (unsigned char *)"SYNC"))) {
         MMFLOAT count0=-1.0,count1=-1.0,count2=-1.0,count3=-1.0,count4=-1.0,count5=-1.0,count6=-1.0,count7=-1.0;
-#if HAL_PORT_PWM_SLICE_COUNT > 8
+#ifdef rp2350
         MMFLOAT count8=-1.0,count9=-1.0,count10=-1.0,count11=-1.0;
         getargs(&tp,23,(unsigned char *)",");
 #else
@@ -2231,7 +2286,7 @@ void MIPS16 cmd_pwm(void){
         if((count5<0.0 || count5>100.0) && count5!=-1.0)error("Syntax");}
         if(argc>=13 && *argv[12]){count6=getnumber(argv[12]);
         if((count6<0.0 || count6>100.0) && count6!=-1.0)error("Syntax");}
-#if HAL_PORT_PWM_SLICE_COUNT > 8
+#ifdef rp2350
         if(argc>=15 && *argv[14]){count7=getnumber(argv[14]);
         if((count7<0.0 || count7>100.0) && count7!=-1.0)error("Syntax");}
         if(argc>=17 && *argv[16]){count8=getnumber(argv[16]);
@@ -2249,13 +2304,13 @@ void MIPS16 cmd_pwm(void){
         
         int enabled=0;
         if(slice0 || Option.AUDIO_SLICE ==0 || BacklightSlice==0 || CameraSlice==0
-#if defined(PICOMITE) && HAL_PORT_PWM_SLICE_COUNT > 8
+#if defined(PICOMITE) && defined(rp2350)
             || KeyboardlightSlice==0
 #endif
         ){
             enabled |=1;
             if(!(Option.AUDIO_SLICE ==0 || BacklightSlice==0 || CameraSlice==0 || count0<0.0
-#if defined(PICOMITE) && HAL_PORT_PWM_SLICE_COUNT > 8
+#if defined(PICOMITE) && defined(rp2350)
             || KeyboardlightSlice==0
 #endif
         )){
@@ -2265,13 +2320,13 @@ void MIPS16 cmd_pwm(void){
             }
         }
         if(slice1 || Option.AUDIO_SLICE ==1 || BacklightSlice==1 || CameraSlice==1
-#if defined(PICOMITE) && HAL_PORT_PWM_SLICE_COUNT > 8
+#if defined(PICOMITE) && defined(rp2350)
             || KeyboardlightSlice==1
 #endif
         ){
             enabled |=2;
             if(!(Option.AUDIO_SLICE ==1 || BacklightSlice==1 || CameraSlice==1 || count1<0.0
-#if defined(PICOMITE) && HAL_PORT_PWM_SLICE_COUNT > 8
+#if defined(PICOMITE) && defined(rp2350)
             || KeyboardlightSlice==1
 #endif
         )){
@@ -2281,13 +2336,13 @@ void MIPS16 cmd_pwm(void){
             }
         }
         if(slice2 || Option.AUDIO_SLICE ==2 || BacklightSlice==2 || CameraSlice==2
-#if defined(PICOMITE) && HAL_PORT_PWM_SLICE_COUNT > 8
+#if defined(PICOMITE) && defined(rp2350)
             || KeyboardlightSlice==2
 #endif
         ){
             enabled |=4;
             if(!(Option.AUDIO_SLICE ==2 || BacklightSlice==2 || CameraSlice==2 || count2<0.0
-#if defined(PICOMITE) && HAL_PORT_PWM_SLICE_COUNT > 8
+#if defined(PICOMITE) && defined(rp2350)
             || KeyboardlightSlice==2
 #endif
         )){
@@ -2297,13 +2352,13 @@ void MIPS16 cmd_pwm(void){
             }
         }
         if(slice3 || Option.AUDIO_SLICE ==3 || BacklightSlice==3 || CameraSlice==3
-#if defined(PICOMITE) && HAL_PORT_PWM_SLICE_COUNT > 8
+#if defined(PICOMITE) && defined(rp2350)
             || KeyboardlightSlice==3
 #endif
         ){
             enabled |=8;
             if(!(Option.AUDIO_SLICE ==3 || BacklightSlice==3 || CameraSlice==3 || count3<0.0
-#if defined(PICOMITE) && HAL_PORT_PWM_SLICE_COUNT > 8
+#if defined(PICOMITE) && defined(rp2350)
             || KeyboardlightSlice==3
 #endif
         )){
@@ -2313,13 +2368,13 @@ void MIPS16 cmd_pwm(void){
             }
         }
         if(slice4 || Option.AUDIO_SLICE ==4 || BacklightSlice==4 || CameraSlice==4
-#if defined(PICOMITE) && HAL_PORT_PWM_SLICE_COUNT > 8
+#if defined(PICOMITE) && defined(rp2350)
             || KeyboardlightSlice==4
 #endif
         ){
             enabled |=16;
             if(!(Option.AUDIO_SLICE ==4 || BacklightSlice==4 || CameraSlice==4 || count4<0.0
-#if defined(PICOMITE) && HAL_PORT_PWM_SLICE_COUNT > 8
+#if defined(PICOMITE) && defined(rp2350)
             || KeyboardlightSlice==4
 #endif
         )){
@@ -2329,13 +2384,13 @@ void MIPS16 cmd_pwm(void){
             }
         }
         if(slice5 || Option.AUDIO_SLICE ==5 || BacklightSlice==5 || CameraSlice==5
-#if defined(PICOMITE) && HAL_PORT_PWM_SLICE_COUNT > 8
+#if defined(PICOMITE) && defined(rp2350)
             || KeyboardlightSlice==5
 #endif
         ){
             enabled |=32;
             if(!(Option.AUDIO_SLICE ==5 || BacklightSlice==5 || CameraSlice==5 || count5<0.0
-#if defined(PICOMITE) && HAL_PORT_PWM_SLICE_COUNT > 8
+#if defined(PICOMITE) && defined(rp2350)
             || KeyboardlightSlice==5
 #endif
         )){
@@ -2345,13 +2400,13 @@ void MIPS16 cmd_pwm(void){
             }
         }
         if(slice6 || Option.AUDIO_SLICE ==6 || BacklightSlice==6 || CameraSlice==6
-#if defined(PICOMITE) && HAL_PORT_PWM_SLICE_COUNT > 8
+#if defined(PICOMITE) && defined(rp2350)
             || KeyboardlightSlice==6
 #endif
         ){
             enabled |=64;
             if(!(Option.AUDIO_SLICE ==6 || BacklightSlice==6 || CameraSlice==6 || count6<0.0
-#if defined(PICOMITE) && HAL_PORT_PWM_SLICE_COUNT > 8
+#if defined(PICOMITE) && defined(rp2350)
             || KeyboardlightSlice==6
 #endif
         )){
@@ -2361,13 +2416,13 @@ void MIPS16 cmd_pwm(void){
             }
         }
         if(slice7 || Option.AUDIO_SLICE ==7 || BacklightSlice==7 || CameraSlice==7
-#if defined(PICOMITE) && HAL_PORT_PWM_SLICE_COUNT > 8
+#if defined(PICOMITE) && defined(rp2350)
             || KeyboardlightSlice==7
 #endif
         ){
             enabled |=128;
             if(!(Option.AUDIO_SLICE ==7 || BacklightSlice==7 || CameraSlice==7 || count7<0.0
-#if defined(PICOMITE) && HAL_PORT_PWM_SLICE_COUNT > 8
+#if defined(PICOMITE) && defined(rp2350)
             || KeyboardlightSlice==7
 #endif
             )){
@@ -2376,7 +2431,7 @@ void MIPS16 cmd_pwm(void){
                 pwm_set_counter(7,count7);
             }
         }
-#if HAL_PORT_PWM_SLICE_COUNT > 8
+#ifdef rp2350
 #ifdef PICOMITE
         if(slice8 || Option.AUDIO_SLICE ==8 || BacklightSlice==8 || CameraSlice==8 || KeyboardlightSlice==8){
 #else
@@ -2451,7 +2506,7 @@ void MIPS16 cmd_pwm(void){
     getargs(&cmdline,11,(unsigned char *)",");
     if(!(argc>=3))error("Syntax");
     int CPU_Speed=Option.CPU_Speed;
-#if HAL_PORT_PWM_SLICE_COUNT > 8
+#ifdef rp2350
     int slice=getint(argv[0],0,rp2350a ? 7:11);
     if(slice==0 && ExtCurrentConfig[FAST_TIMER_PIN]==EXT_FAST_TIMER)error("Channel in use for fast frequency");
 #else
@@ -2470,7 +2525,7 @@ void MIPS16 cmd_pwm(void){
         if(slice==5)slice5=0;
         if(slice==6)slice6=0;
         if(slice==7)slice7=0;
-#if HAL_PORT_PWM_SLICE_COUNT > 8
+#ifdef rp2350
         if(slice==8)slice8=0;
         if(slice==9)slice9=0;
         if(slice==10)slice10=0;
@@ -2529,7 +2584,7 @@ void MIPS16 cmd_pwm(void){
  * @cond
  * The following section will be excluded from the documentation.
  */
-#if HAL_PORT_GPIO_COUNT > 30
+#ifdef rp2350
 static unsigned char keypad_pins[64]={0};
 int keypadcols=0;
 int keypadrows=0;
@@ -2553,10 +2608,14 @@ void cmd_keypad(void) {
         KeypadClose();
     else {
         getargs(&cmdline, 19, (unsigned char *)",");
-#if HAL_PORT_GPIO_COUNT > 30
+#ifdef rp2350
         if(argc==13){ // new format map%(c,r),variable,interrupt, startcolpin, nocols, startrowpin, norows
             MMFLOAT *a1float=NULL;
+            #ifdef rp2350
             int dims[MAXDIM]={0};
+            #else
+            short dims[MAXDIM]={0};
+            #endif
             KeypadInterrupt = GetIntAddress(argv[4]);					// get the interrupt location
             keypadrows=getint(argv[8],1,31);
             keypadcols=getint(argv[12],1,31);
@@ -2619,13 +2678,13 @@ void cmd_keypad(void) {
                 ExtCfg(j, EXT_COM_RESERVED, 0);
                 keypad_pins[i] = j;
             }
-#if HAL_PORT_GPIO_COUNT > 30
+#ifdef rp2350
         }
 #endif
     }
 }
 
-/*
+/* 
  * @cond
  * The following section will be excluded from the documentation.
  */
@@ -2633,7 +2692,7 @@ void cmd_keypad(void) {
 void KeypadClose(void) {
     int i;
     if(KeypadInterrupt == NULL) return;
-#if HAL_PORT_GPIO_COUNT > 30
+#ifdef rp2350
     keypadcols=0;
     keypadrows=0;
 //    PadLookup=NULL;
@@ -2652,7 +2711,7 @@ void KeypadClose(void) {
 int KeypadCheck(void) {
     static unsigned char count = 0, keydown = false;
     int rows, cols;
-#if HAL_PORT_GPIO_COUNT <= 30
+#ifndef rp2350
     const char PadLookup[16] = { 1, 2, 3, 20, 4, 5, 6, 21, 7, 8, 9, 22, 10, 0, 11, 23 };
 #endif
     if(count++ % 64) return false;                                  // only check every 64 loops through the interrupt processor
@@ -2681,7 +2740,7 @@ exitcheck:
     PinSetBit(keypad_pins[cols], ODCSET);
     return false;
 }
-#if defined(PICOMITE) && HAL_PORT_PWM_SLICE_COUNT > 8
+#if defined(PICOMITE) && defined(rp2350)
 const unsigned char localkeymap[10][5]={
 {1,2,3,4,5},
 {6,7,8,9,10},
@@ -3510,7 +3569,7 @@ void cmd_adc(void){
 #endif
         frequency=(float)getnumber(argv[0])*nbr;
         if(frequency<ADC_CLK_SPEED/65536.0/96.0 || frequency> ADC_CLK_SPEED/96.0)error("Invalid frequency");
-#if HAL_PORT_GPIO_COUNT > 30
+#ifdef rp2350
 #ifdef PICOMITEWEB
         if(!(ExtCurrentConfig[31] == EXT_ANA_IN || ExtCurrentConfig[31] == EXT_NOT_CONFIG)) error("Pin GP26 is not off or an ADC input");
         if(ExtCurrentConfig[31] == EXT_NOT_CONFIG)ExtCfg(31, EXT_ANA_IN, 0);
@@ -3604,7 +3663,7 @@ if(rp2350a){
         ADCpos=0;
         adcint1=adcint2=NULL;
         int64_t *adcval=NULL;
-#if HAL_PORT_GPIO_COUNT > 30
+#ifdef rp2350
         int dims[MAXDIM]={0};
 #else
         short dims[MAXDIM]={0};
@@ -3792,7 +3851,7 @@ if(rp2350a){
         dma_channel_abort(ADC_dma_chan2);
         adc_set_round_robin(0);
         SetADCFreq(500000);
-        #if HAL_PORT_GPIO_COUNT > 30
+        #ifdef rp2350
 if(rp2350a){
         ExtCfg(31, EXT_NOT_CONFIG, 0);
         if(ADCopen>=2)ExtCfg(32, EXT_NOT_CONFIG, 0);
@@ -3844,7 +3903,7 @@ void MIPS16 ClearExternalIO(void) {
     InterruptUsed = false;
 	InterruptReturn = NULL;
     irq_set_enabled(DMA_IRQ_1, false);
-#if HAL_PORT_PWM_SLICE_COUNT > 8
+#ifdef rp2350
     irq_set_enabled(PWM_IRQ_WRAP_1, false);
 #endif
     closeframebuffer('A');
@@ -3904,15 +3963,27 @@ void MIPS16 ClearExternalIO(void) {
     IrInterrupt = NULL;
     IrGotMsg = false;
     memset(&PIDchannels,0,sizeof(s_PIDchan)*(MAXPID+1));
-#if HAL_PORT_GPIO_COUNT > 30 && !defined(PICOMITEWEB)
-	for(i = 1; i < (rp2350a ? 44: NBRPINS) ; i++) {
-#else
+#ifdef rp2350
+#ifdef PICOMITEWEB
 	for(i = 1; i < (NBRPINS) ; i++) {
-#endif
-		if(CheckPin(i, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED)) {
-          ExtCfg(i, EXT_NOT_CONFIG, 0);
+		if(CheckPin(i, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED)) {    // don't reset invalid or boot reserved pins
+          ExtCfg(i, EXT_NOT_CONFIG, 0);                                       // all set to unconfigured
 		}
 	}
+#else
+	for(i = 1; i < (rp2350a ? 44: NBRPINS) ; i++) {
+		if(CheckPin(i, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED)) {    // don't reset invalid or boot reserved pins
+          ExtCfg(i, EXT_NOT_CONFIG, 0);                                       // all set to unconfigured
+		}
+	}
+#endif
+#else
+	for(i = 1; i < (NBRPINS) ; i++) {
+		if(CheckPin(i, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED)) {    // don't reset invalid or boot reserved pins
+          ExtCfg(i, EXT_NOT_CONFIG, 0);                                       // all set to unconfigured
+		}
+	}
+#endif
 	for(i = 0; i < NBRINTERRUPTS; i++) {
       inttbl[i].pin = 0;                                            // disable all interrupts
   	}
@@ -3935,15 +4006,15 @@ void MIPS16 ClearExternalIO(void) {
     for(i = 0; i < NBRSETTICKS; i++) TickActive[i] = 0;
 	for(i = 0; i < NBR_PULSE_SLOTS; i++) PulseCnt[i] = 0;             // disable any pending pulse commands
     PulseActive = false;
-    slice0=0;slice1=0;slice2=0;slice3=0;slice4=0;slice5=0;slice6=0;slice7=0;
-#if HAL_PORT_PWM_SLICE_COUNT > 8
-    slice8=0;slice9=0;slice10=0;slice11=0;
+#ifdef rp2350
+    slice0=0;slice1=0;slice2=0;slice3=0;slice4=0;slice5=0;slice6=0;slice7=0;slice8=0;slice9=0;slice10=0;slice11=0;
 #ifdef PICOMITE
     for(i=0; i<=(rp2350a ? 7:11);i++)if(!(i==Option.AUDIO_SLICE || i==BacklightSlice || i==KeyboardlightSlice))PWMoff(i);
 #else
     for(i=0; i<=(rp2350a ? 7:11);i++)if(!(i==Option.AUDIO_SLICE || i==BacklightSlice))PWMoff(i);
 #endif
 #else
+    slice0=0;slice1=0;slice2=0;slice3=0;slice4=0;slice5=0;slice6=0;slice7=0;
     for(i=0; i<=7;i++)if(!(i==Option.AUDIO_SLICE || i==BacklightSlice))PWMoff(i);
 #endif
     IRpin=99;
@@ -3955,7 +4026,7 @@ void MIPS16 ClearExternalIO(void) {
     PWM5Apin=99;
     PWM6Apin=99;
     PWM7Apin=99;
-#if HAL_PORT_PWM_SLICE_COUNT > 8
+#ifdef rp2350
     PWM8Apin=99;
     PWM9Apin=99;
     PWM10Apin=99;
@@ -3969,7 +4040,7 @@ void MIPS16 ClearExternalIO(void) {
     PWM5Bpin=99;
     PWM6Bpin=99;
     PWM7Bpin=99;
-#if HAL_PORT_PWM_SLICE_COUNT > 8
+#ifdef rp2350
     PWM8Bpin=99;
     PWM9Bpin=99;
     PWM10Bpin=99;
@@ -3993,7 +4064,7 @@ void MIPS16 ClearExternalIO(void) {
         I2C1SDApin=99;
         I2C1SCLpin=99;	
     }
-#if HAL_PORT_GPIO_COUNT > 30
+#ifdef rp2350
 if(rp2350a){
     if(ADCopen) ExtCfg(31, EXT_NOT_CONFIG, 0);
     if(ADCopen>=2)ExtCfg(32, EXT_NOT_CONFIG, 0);

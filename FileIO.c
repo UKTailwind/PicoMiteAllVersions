@@ -72,7 +72,7 @@ extern FRESULT host_f_getcwd(TCHAR *buff, UINT len);
  * unused externals don't break the build. */
 #endif
 #include "hardware/irq.h"
-#if defined(PICOCALC) && HAL_PORT_HAS_PSRAM
+#if defined(PICOCALC) && defined(rp2350)
 #include "bc_alloc.h"
 #include "bc_run_diag.h"
 #endif
@@ -91,7 +91,7 @@ extern FRESULT host_f_getcwd(TCHAR *buff, UINT len);
 	#include "pico/multicore.h"
 	extern mutex_t	frameBufferMutex;
 #endif
-#if HAL_PORT_HAS_PSRAM
+#ifdef rp2350
 #include "hardware/structs/qmi.h"
 #endif
 extern const uint8_t *flash_target_contents;
@@ -109,7 +109,7 @@ int dirflags;
 int GPSfnbr = 0;
 int lfs_FileFnbr=0;
 int FatFSFileSystem=0; //Assume we are using flash file system
-#if HAL_PORT_HAS_PSRAM
+#ifdef rp2350
 static uint32_t m1_rfmt;
 static uint32_t m1_timing;
 static uint32_t m0_rfmt;
@@ -179,7 +179,7 @@ void getfullfilepath(char *p, char *q);
 void fullpath(char *q);
 int FatFSFileSystemSave=0;
 #define overlap (VRes % (FontTable[gui_font >> 4][1] * (gui_font & 0b1111)) ? 0 : 1)
-#if HAL_PORT_HAS_DEFINES
+#ifdef rp2350
 typedef struct sa_dlist {
     char from[32];
     char to[32];
@@ -308,7 +308,7 @@ struct uFileTable FileTable[MAXOPENFILES + 1];
 volatile BYTE SDCardStat = STA_NOINIT | STA_NODISK;
 int OptionFileErrorAbort = true;
 volatile uint32_t irqs;
-#if HAL_PORT_HAS_PSRAM
+#ifdef rp2350
 static void save_psram_settings(void) {
     // We're about to invalidate the XIP cache, clean it first to commit any dirty writes to PSRAM
     uint8_t *maintenance_ptr = (uint8_t *)XIP_MAINTENANCE_BASE;
@@ -333,7 +333,7 @@ static void restore_psram_settings(void) {
 void disable_interrupts_pico(void)
 {
 #ifndef MMBASIC_HOST
-#if HAL_PORT_HAS_PSRAM
+#ifdef rp2350
     save_psram_settings();
 #endif
     irqs=save_and_disable_interrupts();
@@ -342,7 +342,7 @@ void disable_interrupts_pico(void)
 void enable_interrupts_pico(void)
 {
 #ifndef MMBASIC_HOST
-#if HAL_PORT_HAS_PSRAM
+#ifdef rp2350
     restore_psram_settings();
 #endif
     restore_interrupts(irqs);
@@ -418,7 +418,7 @@ void MIPS16 cmd_disk(void){
     }
     error((char *)"Syntax");
 }
-#if HAL_PORT_HAS_PSRAM && !defined(PICOMITEWEB)
+#if defined(rp2350) && !defined(PICOMITEWEB)
 extern unsigned int mmap[HEAP_MEMORY_SIZE/ PAGESIZE / PAGESPERWORD];
 extern unsigned int psmap[7*1024*1024/ PAGESIZE / PAGESPERWORD];
 void MIPS16 cmd_psram(void)
@@ -2122,7 +2122,7 @@ void MIPS16 cmd_save(void)
  * @cond
  * The following section will be excluded from the documentation.
  */
-#if HAL_PORT_HAS_DEFINES
+#ifdef rp2350
 #define loadbuffsize EDIT_BUFFER_SIZE-sizeof(a_dlist)*MAXDEFINES-4096
 int cmpstr(char *s1,char *s2)
 {
@@ -2580,7 +2580,7 @@ int FileLoadSourceProgram(unsigned char *fname, char **source_out)
 
 int FileLoadSourceProgramVM(unsigned char *fname, char **source_out)
 {
-#if defined(PICOCALC) && HAL_PORT_HAS_PSRAM
+#if defined(PICOCALC) && defined(rp2350)
     int fnbr;
     char *p, *buf;
     int fsize;
@@ -2634,7 +2634,7 @@ int FileLoadSourceProgramVM(unsigned char *fname, char **source_out)
     return FileLoadSourceProgram(fname, source_out);
 #endif
 }
-#if HAL_PORT_HAS_PSRAM
+#ifdef rp2350
 volatile uint32_t realmempointer;
 void MemWriteBlock(void){
     int i;
@@ -3052,7 +3052,7 @@ void MIPS16 cmd_loadCMM2(void){
 }
 
 #endif
-#if HAL_PORT_HAS_UPNG
+#ifdef rp2350
 void LoadPNG(unsigned char *p) {
 //	int fnbr;
 	int xOrigin, yOrigin,w,h, transparent=0, cutoff=20;
@@ -3165,7 +3165,7 @@ void MIPS16 cmd_load(void)
         cmd_LoadJPGImage(p);
         return;
     }
-#if HAL_PORT_HAS_UPNG
+#ifdef rp2350
     p = checkstring(cmdline, (unsigned char *)"PNG");
     if (p)
     {
@@ -5334,7 +5334,7 @@ void ResetOptions(bool startup)
     Option.VGA_BLUE=24;
     uint8_t rxbuf[4] = {0};
     Option.heartbeatpin = 43;
-#if HAL_PORT_GPIO_COUNT > 30
+#ifdef rp2350
     if(!rp2350a){
         Option.NoHeartbeat=1;
         Option.AllPins=1;
