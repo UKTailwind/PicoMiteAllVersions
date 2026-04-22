@@ -470,6 +470,29 @@ Each phase: green host build, green WASM build, every device CMake target builds
 
 Phases are ordered to **(a) lock the architecture in Phase 0, (b) hoist shared state in Phase 0.5 to unblock everything, (c) take low-risk surfaces first to validate the HAL shape, (d) attack the worst `#ifdef` offenders before they ossify around the HAL, and (e) leave host/WASM relocation for the very end.**
 
+## Pace and acceleration (end-of-phase-4 retrospective)
+
+Phases 0–4 landed in ~43 commits averaging ~10/phase. Phase 4 (file I/O) alone ate ~12 because `BasicFileOpen` / `FileGetChar` / BMP save / JPEG decode / boot-count / Editor load / TFTP / HTTP serve / WAV decoder is more call sites than any other HAL surface. The directory layout at end-of-phase-4 looks deceptively thin: `hal/` = 822 lines across 5 headers + contract, `ports/pico_sdk_common/` = 1059 lines of device HAL impls, `host/hal_*.c` = 695 lines of host impls, `drivers/` = 2131 lines (1967 of which is mmc_stm32.c *relocated* from root, not fresh code). Core BASIC files are **−358 lines net** across 18 files. The reason `drivers/` looks empty isn't that nothing has happened — it's that the plan explicitly splits work into two modes:
+
+- **Phases 0–4 (done):** write HAL contracts + impls, migrate core call sites to go through the HAL. The files that will *become* drivers (Draw.c, SPI-LCD.c, SSD1963.c, Keyboard.c, USBKeyboard.c, Audio.c, VS1053.c, psram.c, GUI.c, mouse/Touch/GPS/watchdog/CFunction) stay in repo root. Callers reach their backends via HAL.
+- **Phases 5–11 (not started):** relocate drivers. This is when `drivers/` fills out and repo root thins.
+
+From Phase 5 onward, collapse the two modes into one commit per driver to accelerate:
+
+1. **Combine interface-first and relocate-later into one commit per driver.** Phase 7a as originally drafted reads "write `hal_display.h`, then later relocate `SPI-LCD.c` into `drivers/ili9341/`." From Phase 5 on, do both in the *same* commit: the HAL header, the driver move, and the core-file call-site migration ride together. The interface is only ever validated by a real implementation anyway — drafting it in isolation buys nothing.
+2. **Batch `buildall.sh` verification to phase boundaries.** `buildall.sh` over 12 targets runs every commit today, ~10 minutes per pass. For phases where a HAL-interface change either compiles on all 12 targets or none (most of them), run `buildall.sh` once at phase end and `host/build.sh` + `run_tests.sh` per commit. Phases that touch peripheral drivers (7a/7b/7c/7d) keep per-commit `buildall` because display backends share headers.
+3. **Limit plan-meta commits.** Rules learned from incidents get one commit, not one-per-rule. Inline the rule with the code commit that taught the lesson whenever possible (e.g. "fix SAVE/LOAD IMAGE + add scrape-pass-counts rule" = one commit, not two).
+4. **Per-phase commit-count targets.** Explicit budgets to check against:
+   - Phase 5 (keyboard): **1–2 commits.** `hal_keyboard.h`, three driver lifts (ps2_matrix, usb_host_kbd, i2c_picocalc_kbd), MM_Misc.c migration — one push.
+   - Phase 6 (audio): **2–3 commits.** `hal_audio.h` + `drivers/pwm_synth/` lifted from Audio.c tones; `drivers/vs1053/` lifted from VS1053.c; Audio.c residual is dialect logic that stays in core. Separate VS1053 commit because it's Web-variant-only and adds a boot risk surface.
+   - Phase 7a–d (display): **3–4 commits each**, not compressible. Each display backend is a separate boot-risk surface; FASTGFX / scanout / layer logic varies enough per backend that compressing them risks silent perf regressions.
+   - Phase 8 (multicore): **1 commit.** Small surface (3 functions + channel IDs), device-only.
+   - Phase 9 (net): **1–2 commits.** `hal_net.h` + `drivers/cyw43/` lift; PICOMITEWEB only.
+   - Phase 10 (heap): **1 commit.** Memory.c cleanup.
+   - Phase 11 (sweep): **3–5 commits** for the misc drivers (watchdog, gps, touch, mouse, gui_controls, cfunction).
+
+Target end-state after Phase 11: ~20 more commits, not ~60. Phases 12 + 12.5 (host/WASM relocate + mmbasic_stdio) keep their own budgets — those are structural churn, not driver work.
+
 ### Phase 0 — Architecture lock + tooling (no behaviour change) ✅ partial
 
 Core scaffolding + purity gate + scoreboard landed. `check_ram_baseline.sh`, `perf_microbench/`, and the Tier-B display-inline prototype/measurement still pending — all need physical device access.
