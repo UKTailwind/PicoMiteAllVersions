@@ -156,13 +156,17 @@ uint8_t fmode[MAXOPENFILES + 1] = {0};
 static unsigned int bw[MAXOPENFILES + 1] = {[0 ... MAXOPENFILES] = -1};
 unsigned char filesource[MAXOPENFILES + 1] = {0};
 /* Per-fnbr HAL fd. 0 = no open HAL file on this slot. BasicFileOpen
- * allocates via hal_fs_open; ForceFileClose releases. The legacy
- * FileTable[fnbr].fptr / .lfsptr are shadow pointers that alias the
- * HAL's internal backend handle (FatFS FIL* or LFS lfs_file_t*); they
- * stay valid between open and close for pre-HAL callers in Audio.c /
- * MMtcpserver.c / upng.c / etc. that still touch them directly. */
-static hal_fs_fd_t hal_fds[MAXOPENFILES + 1] = {0};
+ * allocates via hal_fs_open; ForceFileClose releases. Exposed as
+ * `hal_fds[]` (declaration in FileIO.h) so other TUs can go straight
+ * to hal_fs_* without going through the legacy FileTable shadow. The
+ * FileTable[fnbr].fptr / .lfsptr shadow is being retired — it stays
+ * populated transitionally via hal_fs_peek_handle for a shrinking set
+ * of callers. */
+hal_fs_fd_t hal_fds[MAXOPENFILES + 1] = {0};
 static void hal_to_fserror(int rc, int fnbr);
+static void hal_write_checked(int fnbr, const void *buf, size_t n);
+static ssize_t hal_read_checked(int fnbr, void *buf, size_t n);
+static off_t hal_size_of(int fnbr);
 char filepath[2][FF_MAX_LFN]={
     "A:/",
     "B:/"
@@ -375,15 +379,11 @@ void ResetFlashStorage(int umount){
     FSerror=lfs_mount(&lfs, &pico_lfs_cfg);	ErrorCheck(0);
     int fnbr = FindFreeFileNbr();
     BasicFileOpen("bootcount",fnbr,FA_WRITE | FA_OPEN_APPEND | FA_READ);
-    FSerror=lfs_file_read(&lfs, FileTable[fnbr].lfsptr, &boot_count, sizeof(boot_count));
-    if(FSerror>0)FSerror=0;
-    ErrorCheck(fnbr);
+    (void)hal_read_checked(fnbr, &boot_count, sizeof(boot_count));
     boot_count+=1;
-    FSerror=lfs_file_rewind(&lfs, FileTable[fnbr].lfsptr);
-    ErrorCheck(fnbr);
-    FSerror=lfs_file_write(&lfs, FileTable[fnbr].lfsptr, &boot_count, sizeof(boot_count));
-    if(FSerror>0)FSerror=0;
-    ErrorCheck(fnbr);
+    off_t spos = hal_fs_seek(hal_fds[fnbr], 0, HAL_FS_SEEK_SET);
+    if (spos < 0) { hal_to_fserror((int)spos, fnbr); ErrorCheck(fnbr); }
+    hal_write_checked(fnbr, &boot_count, sizeof(boot_count));
     FileClose(fnbr);
  }
 
@@ -736,8 +736,7 @@ void MIPS16 cmd_flash(void)
         if (!InitSDCard())  return;
         char *pp = (char *)getFstring(argv[0]);
         if (!BasicFileOpen((char *)pp, fnbr, FA_READ)) return;
-		if(filesource[fnbr]!=FLASHFILE)  fsize = f_size(FileTable[fnbr].fptr);
-		else fsize = lfs_file_size(&lfs,FileTable[fnbr].lfsptr);
+		fsize = (int)hal_size_of(fnbr);
 		if(RoundUpK4(fsize)>1024*Option.modbuffsize)error("File too large for modbuffer");
         char *r = GetTempMemory(256);
         uint32_t j = RoundUpK4(TOP_OF_SYSTEM_FLASH);
@@ -776,8 +775,7 @@ void MIPS16 cmd_flash(void)
         if (!InitSDCard())  return;
         char *pp = (char *)getFstring(argv[2]);
         if (!BasicFileOpen((char *)pp, fnbr, FA_READ)) return;
-		if(filesource[fnbr]!=FLASHFILE)  fsize = f_size(FileTable[fnbr].fptr);
-		else fsize = lfs_file_size(&lfs,FileTable[fnbr].lfsptr);
+		fsize = (int)hal_size_of(fnbr);
         if(fsize>MAX_PROG_SIZE)error("File size % cannot exceed %",fsize,MAX_PROG_SIZE);
         FlashWriteInit(i);
         hal_flash_erase(realflashpointer, MAX_PROG_SIZE);
@@ -1158,8 +1156,8 @@ unsigned char pjpeg_need_bytes_callback(unsigned char *pBuf, unsigned char buf_s
 //    pCallback_data;
 
     n = min(g_nInFileSize - g_nInFileOfs, buf_size);
-    if(filesource[jpgfnbr]!=FLASHFILE)  f_read(FileTable[jpgfnbr].fptr, pBuf, n, &n_read);
-    else n_read=lfs_file_read(&lfs, FileTable[jpgfnbr].lfsptr, pBuf, n);
+    ssize_t r = hal_fs_read(hal_fds[jpgfnbr], pBuf, n);
+    n_read = (r < 0) ? 0 : (uint)r;
     if (n != n_read)
         return PJPG_STREAM_READ_ERROR;
     *pBytes_actually_read = (unsigned char)(n);
@@ -1211,8 +1209,7 @@ void cmd_LoadJPGImage(unsigned char *p)
     if (!BasicFileOpen((char *)p, jpgfnbr, FA_READ))
         return;
 
-    if(filesource[jpgfnbr]!=FLASHFILE)  g_nInFileSize = f_size(FileTable[jpgfnbr].fptr);
-    else g_nInFileSize = lfs_file_size(&lfs,FileTable[jpgfnbr].lfsptr);
+    g_nInFileSize = (uint)hal_size_of(jpgfnbr);
     status = pjpeg_decode_init(&image_info, pjpeg_need_bytes_callback, NULL, 0);
 
     if (status)
@@ -1872,29 +1869,9 @@ void MIPS16 cmd_save(void)
         bmpinfoheader[22] = (unsigned char)((h*w/2) >> 16);
         bmpinfoheader[23] = (unsigned char)((h*w/2) >> 24);
 
-        if(filesource[fnbr]==FATFSFILE) {
-#ifdef MMBASIC_HOST
-            if (host_fs_posix_active(fnbr)) {
-                host_fs_posix_write_bytes(fnbr, bmpfileheader, 14);
-                host_fs_posix_write_bytes(fnbr, bmpinfoheader, 40);
-                host_fs_posix_write_bytes(fnbr, bmpcolourpallette, 64);
-            } else
-#endif
-            {
-                f_write(FileTable[fnbr].fptr, bmpfileheader, 14, &nbr);
-                f_write(FileTable[fnbr].fptr, bmpinfoheader, 40, &nbr);
-                f_write(FileTable[fnbr].fptr, bmpcolourpallette, 64, &nbr);
-            }
-        } else {
-            FSerror=lfs_file_write(&lfs, FileTable[fnbr].lfsptr, bmpfileheader, 14);
-            if(FSerror>0)FSerror=0;
-            ErrorCheck(fnbr);
-            FSerror=lfs_file_write(&lfs, FileTable[fnbr].lfsptr, bmpinfoheader, 40);
-            if(FSerror>0)FSerror=0;
-            FSerror=lfs_file_write(&lfs, FileTable[fnbr].lfsptr, bmpcolourpallette, 64);
-            if(FSerror>0)FSerror=0;
-            ErrorCheck(fnbr);
-        }
+        hal_write_checked(fnbr, bmpfileheader, 14);
+        hal_write_checked(fnbr, bmpinfoheader, 40);
+        hal_write_checked(fnbr, bmpcolourpallette, 64);
         flinebuf = GetTempMemory(maxW * 4);
         outbuf=GetTempMemory(maxW/2);
         char *foutbuf=GetTempMemory(maxW);
@@ -1934,36 +1911,14 @@ void MIPS16 cmd_save(void)
                 ppp+=2;
             }
             *ppp++=0;*ppp++=0;count+=2;
-            if(filesource[fnbr]==FATFSFILE) {
-#ifdef MMBASIC_HOST
-                if (host_fs_posix_active(fnbr)) host_fs_posix_write_bytes(fnbr, foutbuf, count);
-                else
-#endif
-                f_write(FileTable[fnbr].fptr, foutbuf, count, &nbr);
-            }
-            else {
-                    FSerror=lfs_file_write(&lfs, FileTable[fnbr].lfsptr, foutbuf, count);
-            }
-            if(FSerror>0)FSerror=0;
-            ErrorCheck(fnbr);
+            hal_write_checked(fnbr, foutbuf, count);
 
         }
 #ifdef PICOMITEVGA
         mergedread=0;
 #endif
         foutbuf[0]=0;foutbuf[1]=1;
-        if(filesource[fnbr]==FATFSFILE) {
-#ifdef MMBASIC_HOST
-            if (host_fs_posix_active(fnbr)) host_fs_posix_write_bytes(fnbr, foutbuf, 2);
-            else
-#endif
-            f_write(FileTable[fnbr].fptr, foutbuf, 2, &nbr);
-        }
-        else {
-                FSerror=lfs_file_write(&lfs, FileTable[fnbr].lfsptr, foutbuf, 2);
-        }
-        if(FSerror>0)FSerror=0;
-        ErrorCheck(fnbr);
+        hal_write_checked(fnbr, foutbuf, 2);
         FileClose(fnbr);
         return;
     }
@@ -2048,29 +2003,9 @@ void MIPS16 cmd_save(void)
 	        bmpinfoheader[22] = (unsigned char)((h*w/2) >> 16);
 	        bmpinfoheader[23] = (unsigned char)((h*w/2) >> 24);
 	
-	        if(filesource[fnbr]==FATFSFILE) {
-#ifdef MMBASIC_HOST
-	            if (host_fs_posix_active(fnbr)) {
-	                host_fs_posix_write_bytes(fnbr, bmpfileheader, 14);
-	                host_fs_posix_write_bytes(fnbr, bmpinfoheader, 40);
-	                host_fs_posix_write_bytes(fnbr, bmpcolourpallette, 64);
-	            } else
-#endif
-	            {
-	                f_write(FileTable[fnbr].fptr, bmpfileheader, 14, &nbr);
-	                f_write(FileTable[fnbr].fptr, bmpinfoheader, 40, &nbr);
-	                f_write(FileTable[fnbr].fptr, bmpcolourpallette, 64, &nbr);
-	            }
-	        } else {
-	            FSerror=lfs_file_write(&lfs, FileTable[fnbr].lfsptr, bmpfileheader, 14);
-	            if(FSerror>0)FSerror=0;
-	            ErrorCheck(fnbr);
-	            FSerror=lfs_file_write(&lfs, FileTable[fnbr].lfsptr, bmpinfoheader, 40);
-	            if(FSerror>0)FSerror=0;
-	            FSerror=lfs_file_write(&lfs, FileTable[fnbr].lfsptr, bmpcolourpallette, 64);
-	            if(FSerror>0)FSerror=0;
-	            ErrorCheck(fnbr);
-	        }
+	        hal_write_checked(fnbr, bmpfileheader, 14);
+	        hal_write_checked(fnbr, bmpinfoheader, 40);
+	        hal_write_checked(fnbr, bmpcolourpallette, 64);
 	        flinebuf = GetTempMemory(maxW * 4);
 	        outbuf=GetTempMemory(maxW/2);
 #ifdef PICOMITEVGA
@@ -2093,31 +2028,9 @@ void MIPS16 cmd_save(void)
 	                    *pp = fcolour<<4;
 	                }
 	            }
-	            if(filesource[fnbr]==FATFSFILE) {
-#ifdef MMBASIC_HOST
-	                if (host_fs_posix_active(fnbr)) host_fs_posix_write_bytes(fnbr, outbuf, w / 2);
-	                else
-#endif
-	                f_write(FileTable[fnbr].fptr, outbuf, w / 2, &nbr);
-	            }
-	            else {
-	                    FSerror=lfs_file_write(&lfs, FileTable[fnbr].lfsptr, outbuf, w /2);
-	            }
-	            if(FSerror>0)FSerror=0;
-	            ErrorCheck(fnbr);
+	            hal_write_checked(fnbr, outbuf, w / 2);
 	            if ((w / 2) % 4 != 0){
-	                if(filesource[fnbr]==FATFSFILE) {
-#ifdef MMBASIC_HOST
-	                    if (host_fs_posix_active(fnbr)) host_fs_posix_write_bytes(fnbr, bmppad, 4 - ((w / 2 ) % 4));
-	                    else
-#endif
-	                    f_write(FileTable[fnbr].fptr, bmppad, 4 - ((w / 2 ) % 4), &nbr);
-	                }
-	                else {
-	                    FSerror=lfs_file_write(&lfs, FileTable[fnbr].lfsptr, bmppad, 4 - ((w / 2 ) % 4));
-	                }
-	                if(FSerror>0)FSerror=0;
-	                ErrorCheck(fnbr);
+	                hal_write_checked(fnbr, bmppad, 4 - ((w / 2 ) % 4));
                 }
 	        }
 #ifdef PICOMITEVGA
@@ -2172,55 +2085,14 @@ void MIPS16 cmd_save(void)
         bmpinfoheader[9] = (unsigned char)(h >> 8);
         bmpinfoheader[10] = (unsigned char)(h >> 16);
         bmpinfoheader[11] = (unsigned char)(h >> 24);
-        if(filesource[fnbr]==FATFSFILE) {
-#ifdef MMBASIC_HOST
-            if (host_fs_posix_active(fnbr)) {
-                host_fs_posix_write_bytes(fnbr, bmpfileheader, 14);
-                host_fs_posix_write_bytes(fnbr, bmpinfoheader, 40);
-            } else
-#endif
-            {
-                f_write(FileTable[fnbr].fptr, bmpfileheader, 14, &nbr);
-                f_write(FileTable[fnbr].fptr, bmpinfoheader, 40, &nbr);
-            }
-        } else {
-            FSerror=lfs_file_write(&lfs, FileTable[fnbr].lfsptr, bmpfileheader, 14);
-            if(FSerror>0)FSerror=0;
-            ErrorCheck(fnbr);
-            FSerror=lfs_file_write(&lfs, FileTable[fnbr].lfsptr, bmpinfoheader, 40);
-            if(FSerror>0)FSerror=0;
-            ErrorCheck(fnbr);
-        }
+        hal_write_checked(fnbr, bmpfileheader, 14);
+        hal_write_checked(fnbr, bmpinfoheader, 40);
         flinebuf = GetTempMemory(maxW * 4);
         for (i = y + h - 1; i >= y; i--)
         {
             ReadBuffer(x, i, x + w - 1, i, flinebuf);
-            if(filesource[fnbr]==FATFSFILE) {
-#ifdef MMBASIC_HOST
-                if (host_fs_posix_active(fnbr)) host_fs_posix_write_bytes(fnbr, flinebuf, w * 3);
-                else
-#endif
-                f_write(FileTable[fnbr].fptr, flinebuf, w * 3, &nbr);
-            }
-            else {
-                    FSerror=lfs_file_write(&lfs, FileTable[fnbr].lfsptr, flinebuf, w * 3);
-                    if(FSerror>0)FSerror=0;
-                    ErrorCheck(fnbr);
-            }
-            if ((w * 3) % 4 != 0){
-                if(filesource[fnbr]==FATFSFILE) {
-#ifdef MMBASIC_HOST
-                    if (host_fs_posix_active(fnbr)) host_fs_posix_write_bytes(fnbr, bmppad, 4 - ((w * 3) % 4));
-                    else
-#endif
-                    f_write(FileTable[fnbr].fptr, bmppad, 4 - ((w * 3) % 4), &nbr);
-                }
-                else {
-                    FSerror=lfs_file_write(&lfs, FileTable[fnbr].lfsptr, bmppad, 4 - ((w * 3) % 4));
-                    if(FSerror>0)FSerror=0;
-                    ErrorCheck(fnbr);
-                }
-            }
+            hal_write_checked(fnbr, flinebuf, w * 3);
+            if ((w * 3) % 4 != 0) hal_write_checked(fnbr, bmppad, 4 - ((w * 3) % 4));
         }
         FileClose(fnbr);
         return;
@@ -2687,8 +2559,7 @@ int FileLoadSourceProgram(unsigned char *fname, char **source_out)
 
     if (!BasicFileOpen(p, fnbr, FA_READ)) return false;
 
-    if(filesource[fnbr] != FLASHFILE) fsize = (int)f_size(FileTable[fnbr].fptr);
-    else fsize = lfs_file_size(&lfs, FileTable[fnbr].lfsptr);
+    fsize = (int)hal_size_of(fnbr);
     if (fsize < 0 || fsize >= EDIT_BUFFER_SIZE - 2048 - 512) {
         FileClose(fnbr);
         error("Not enough memory");
@@ -2728,10 +2599,7 @@ int FileLoadSourceProgramVM(unsigned char *fname, char **source_out)
     if (strchr((char *)p, '.') == NULL) strcat((char *)p, ".bas");
     if (!BasicFileOpen(p, fnbr, FA_READ)) return false;
 
-    if (filesource[fnbr] != FLASHFILE)
-        fsize = (int)f_size(FileTable[fnbr].fptr);
-    else
-        fsize = lfs_file_size(&lfs, FileTable[fnbr].lfsptr);
+    fsize = (int)hal_size_of(fnbr);
     bc_run_diag_note_load(filesource[fnbr] == FLASHFILE ? 'A' : 'B',
                           (unsigned)fsize,
                           (unsigned)FreeSpaceOnHeap(),
@@ -3379,6 +3247,35 @@ static void hal_to_fserror(int rc, int fnbr)
     case -ENOSPC:    FSerror = is_flash ? -28 : FR_DENIED;       break;
     default:         FSerror = is_flash ? -5  : FR_DISK_ERR;     break;
     }
+}
+
+/* Block-level HAL helpers for FileIO.c's binary save/load paths (BMP
+ * save, FLASH LOAD IMAGE, JPEG loader, fun_input, SEEK-position reads).
+ * Each handles errno→FSerror translation + ErrorCheck so the callers
+ * collapse from a filesource/host_fs_posix branch down to a single
+ * line. Short writes on any backend throw FR_DISK_ERR. */
+static void hal_write_checked(int fnbr, const void *buf, size_t n)
+{
+    ssize_t w = hal_fs_write(hal_fds[fnbr], buf, n);
+    if (w < 0) { hal_to_fserror((int)w, fnbr); ErrorCheck(fnbr); return; }
+    if ((size_t)w != n) {
+        FSerror = (filesource[fnbr] == FLASHFILE) ? -5 : FR_DISK_ERR;
+        ErrorCheck(fnbr);
+    } else {
+        FSerror = 0;
+    }
+}
+static ssize_t hal_read_checked(int fnbr, void *buf, size_t n)
+{
+    ssize_t r = hal_fs_read(hal_fds[fnbr], buf, n);
+    if (r < 0) { hal_to_fserror((int)r, fnbr); ErrorCheck(fnbr); return 0; }
+    FSerror = 0;
+    return r;
+}
+static off_t hal_size_of(int fnbr)
+{
+    off_t sz = hal_fs_size(hal_fds[fnbr]);
+    return sz < 0 ? 0 : sz;
 }
 
 char __not_in_flash_func(FileGetChar)(int fnbr)

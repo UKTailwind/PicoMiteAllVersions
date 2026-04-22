@@ -52,22 +52,10 @@ Pradeep Budagutta    03-Mar-2008    First release
 
 #define  IMG_FILE   fnbr
 int IMG_FREAD(int fnbr, void *buff, int count, unsigned int *read){
-#ifdef MMBASIC_HOST
-        /* POSIX-backed fnbrs have a stub FIL*; raw f_read fails validate().
-         * Route through host_fs_posix so BMP_bDecode reads actual bytes. */
-        if (host_fs_posix_active(IMG_FILE)) {
-                int n = host_fs_posix_read_bytes(IMG_FILE, buff, count);
-                if (read) *read = (unsigned int)(n < 0 ? 0 : n);
-                return n < 0 ? 1 : 0;
-        }
-#endif
-        if(filesource[IMG_FILE]==FATFSFILE){
-                return f_read(FileTable[IMG_FILE].fptr, buff, count, (UINT *)read);
-        } else {
-                int n=lfs_file_read(&lfs, FileTable[IMG_FILE].lfsptr, buff, count);
-                if(n>=0)return 0;
-                else return n;
-        }
+        ssize_t n = hal_fs_read(hal_fds[fnbr], buff, (size_t)count);
+        if (n < 0) { if (read) *read = 0; return 1; }
+        if (read) *read = (unsigned int)n;
+        return 0;
 }
 #define  IMG_vSetboundaries()
 #define  IMG_vLoopCallback()

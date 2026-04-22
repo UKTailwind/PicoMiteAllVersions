@@ -1,5 +1,9 @@
 # Real HAL Plan
 
+**There are no pre-existing failures.** Every commit on `real-hal` must leave `./run_tests.sh` at the full pass count. If a test fails, it's a regression you caused — fix it, do not dismiss it, do not move on. This applies to commits already landed on `real-hal`: if tip shows failures, the last migration commit that "landed green" actually didn't, and those failures are owned by this plan until they're fixed.
+
+**Never `git stash` + check out an earlier commit to prove a failure is "pre-existing."** There are no pre-existing errors. The exercise is wasted motion — any failure seen at tip is one to fix now, on the branch, in the next commit. Do not investigate blame, investigate the root cause.
+
 Promote the implicit hardware-abstraction layer that emerged from the host port (`docs/host-hal-plan.md`) into a **first-class HAL spanning every device target** — RP2040 and RP2350 in all 12 board variants — so the BASIC interpreter and bytecode VM compile with **zero references to hardware target macros**, and target variants are selected by directory composition, not by preprocessor surgery.
 
 ## Status (2026-04-22)

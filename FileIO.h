@@ -32,6 +32,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 extern "C" {
 #endif
 #include "ff.h"
+#include "hal/hal_filesystem.h"
 #ifdef rp2350
 #include "upng.h"
 #endif
@@ -283,6 +284,11 @@ enum {
     FATFSFILE
 };
 extern union uFileTable FileTable[MAXOPENFILES + 1];
+/* Per-fnbr HAL fd (see FileIO.c for ownership semantics). Indexed by
+ * MMBasic file number (1..MAXOPENFILES); slot 0 is the console sentinel.
+ * Callers that used to read FileTable[fnbr].fptr / .lfsptr should use
+ * hal_fs_* on hal_fds[fnbr] instead. */
+extern hal_fs_fd_t hal_fds[MAXOPENFILES + 1];
 
 #ifdef __cplusplus
 }
