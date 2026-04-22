@@ -42,6 +42,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "hal/hal_flash.h"
 #include "hal/hal_time.h"
 #include "hal/hal_pin.h"
+#include "hal/hal_keyboard.h"
 #include "hardware/regs/addressmap.h"     /* XIP_BASE */
 #include "hardware/spi.h"
 #include "hardware/pio.h"
@@ -5268,9 +5269,8 @@ int __not_in_flash_func(check_interrupt)(void) {
         if(CheckGuiFlag) CheckGui();                                    // This implements a LED flash
     }
 #endif
-#ifndef USBKEYBOARD
-    if(Option.KeyboardConfig)CheckKeyboard();
-#endif    
+    hal_keyboard_service();
+
     if(!InterruptUsed) return 0;                                    // quick exit if there are no interrupts set
     if(InterruptReturn != NULL || CurrentLinePtr == NULL) return 0; // skip if we are in an interrupt or in immediate mode
     return checkdetailinterrupts();

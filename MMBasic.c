@@ -37,6 +37,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "Operators.h"
 #include "Custom.h"
 #include "Hardware_Includes.h"
+#include "hal/hal_keyboard.h"
 #include "hal/hal_flash.h"
 #ifndef PICOMITEWEB
 #include "pico/multicore.h"
@@ -3813,9 +3814,7 @@ void MIPS16 ClearRuntime(bool all) {
     CloseAllFiles();
     ClearExternalIO();                                              // this MUST come before InitHeap(true)
     ClearStack();
-#ifdef USBKEYBOARD
-	clearrepeat();
-#endif	
+    hal_keyboard_clear_repeat_state();
     OptionExplicit = false;
     OptionEscape = false;
     OptionConsole=3;

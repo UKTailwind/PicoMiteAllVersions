@@ -154,20 +154,31 @@ int     hal_fs_stat(const char *path, struct hal_stat *out);
 
 ---
 
-## `hal_keyboard.h` — key + modifier + paste (Phase 5)
+## `hal_keyboard.h` — pump backend into ConsoleRxBuf (Phase 5)
 
-*Status: sketch; finalised in Phase 5.*
+*Status: minimal surface landed Phase 5a; `get`/`peek`/`modifiers`/`set_layout`/`paste` still future work.*
 
 ```c
-int      hal_keyboard_service(void);
-int      hal_keyboard_get(uint16_t *out);
-int      hal_keyboard_peek(uint16_t *out);
-uint32_t hal_keyboard_modifiers(void);
-int      hal_keyboard_set_layout(hal_kbd_layout_t layout);
-int      hal_keyboard_paste(const char *utf8, size_t len);
+void hal_keyboard_service(void);
+void hal_keyboard_clear_repeat_state(void);
 ```
 
-**Hard part:** USB host keyboard (TinyUSB) expects ≥1 kHz poll. `hal_keyboard_service` is the single callsite the interpreter knows about; the driver decides what "service" means (TinyUSB `tuh_task()` on USB ports, matrix scan step on PS/2 ports, no-op on USB-CDC-fed ports).
+The surface shrank during Phase 5 once the landscape was mapped: every keyboard backend (PS/2 matrix, USB host HID, generic I²C, PicoCalc I²C, host stdin) already feeds MMBasic's existing `ConsoleRxBuf` ring buffer. Core reads characters via `getConsole()` / `MMInkey()`. The HAL therefore does not return characters — it only pumps the hardware so the side-effect writes into the ring buffer can happen.
+
+**Call sites in core (migrated Phase 5a):**
+
+- `MM_Misc.c::check_interrupt` — `hal_keyboard_service()` replaces `#ifndef USBKEYBOARD if(Option.KeyboardConfig) CheckKeyboard();`.
+- `MMBasic.c::ClearExternalIO` / `Editor.c` x4 / `Commands.c` list-pager — `hal_keyboard_clear_repeat_state()` replaces `#ifdef USBKEYBOARD clearrepeat();`.
+
+**Call sites in `PicoMite.c` (board file, not subject to HAL purity — left with local `#ifdef` for now):** `routinechecks` 1 kHz USB pump / I²C poll block, `MMInkey` fallback `CheckKeyboard`, `initKeyboard` / `tuh_init` boot wiring. These migrate in a later Phase 5 pass once boot ordering can be proved safe on physical hardware.
+
+**Runtime dispatch inside the impl.** On non-USB builds `Option.KeyboardConfig` selects PS/2 vs I²C at run time; the HAL impl internally dispatches `CheckKeyboard()` vs `CheckI2CKeyboard()`. Core code does not know.
+
+**IRQ-safety:** not IRQ-safe. TinyUSB's `tuh_task()` must run at thread priority; PS/2 and I²C backends call into I²C/PIO drivers that also expect thread context.
+
+**Hard part:** USB host keyboard (TinyUSB) expects ≥1 kHz poll — the existing routinechecks timer provides that. The driver decides what "service" means (TinyUSB `tuh_task()`+`hid_app_task()` on USB ports, PS/2 scan poll on PICOMITEVGA/PicoMite, I²C read drive on PicoCalc, no-op on host).
+
+**Future surface (Phase 5 follow-up, not yet landed):** `hal_keyboard_init()` (so `initKeyboard()`/`tuh_init()` boot ordering can be collapsed); `hal_keyboard_keydown_scan(int slot)` so `fun_keydown()` stops reading `KeyDown[]` directly; `hal_keyboard_lock_state()` for caps/num/scroll; `hal_keyboard_set_layout()` for `OPTION KEYBOARD`. These collapse the remaining USBKEYBOARD gates in MM_Misc.c but are state-accessor plumbing rather than I/O pumping, so kept out of the initial HAL landing to keep the contract tight.
 
 ---
 

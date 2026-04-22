@@ -39,6 +39,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "hardware/dma.h"
 #include "hal/hal_flash.h"
 #include "hal/hal_time.h"
+#include "hal/hal_keyboard.h"
 #include "hardware/structs/watchdog.h"
 #ifdef PICOMITE
 #include "pico/multicore.h"
@@ -685,9 +686,7 @@ void MIPS16 ListNewLine(int *ListCnt, int all) {
 	MMPrintString("\r\n");
 	(*ListCnt)++;
     if(!all && *ListCnt >= Option.Height-overlap) {
-		#ifdef USBKEYBOARD
-		clearrepeat();
-		#endif
+		hal_keyboard_clear_repeat_state();
     	MMPrintString("PRESS ANY KEY ...");
     	MMgetchar();
     	MMPrintString("\r                 \r");

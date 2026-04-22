@@ -39,6 +39,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "hal/hal_flash.h"
 #include "hal/hal_time.h"
 #include "hal/hal_filesystem.h"
+#include "hal/hal_keyboard.h"
 #include <errno.h>
 #include "hardware/regs/addressmap.h"     /* XIP_BASE */
 #ifdef MMBASIC_HOST
@@ -1346,9 +1347,7 @@ void cmd_LoadJPGImage(unsigned char *p)
         }
     }
     FileClose(jpgfnbr);
-#ifdef USBKEYBOARD
-	clearrepeat();
-#endif
+    hal_keyboard_clear_repeat_state();
     if (Option.Refresh)
         Display_Refresh();
 }
@@ -2680,9 +2679,7 @@ void MIPS16 SaveProgramToRAM(unsigned char *pm, int msg, uint8_t *ram) {
     multi=false;
     uint32_t storedupdates[MAXCFUNCTION], updatecount=0, realmemsave;
     initFonts();
-#ifdef USBKEYBOARD
-	clearrepeat();
-#endif	
+    hal_keyboard_clear_repeat_state();
     memcpy(buf, tknbuf, STRINGSIZE);                                // save the token buffer because we are going to use it
     memset(ram,0xFF,MAX_PROG_SIZE);
     realmempointer=(volatile uint32_t)ram;
@@ -2949,9 +2946,7 @@ void MIPS16 SaveProgramToRAM(unsigned char *pm, int msg, uint8_t *ram) {
     }
     memcpy(tknbuf, buf, STRINGSIZE);                                // restore the token buffer in case there are other commands in it
 //    initConsole();
-#ifdef USBKEYBOARD
-	clearrepeat();
-#endif
+    hal_keyboard_clear_repeat_state();
     return;
 
     // we only get here in an error situation while writing the program to flash
@@ -3142,9 +3137,7 @@ void LoadPNG(unsigned char *p) {
         DrawBuffer(xOrigin, yOrigin, xOrigin+w-1, yOrigin+h-1,ppp);
     }
     upng_free(upng);
-#ifdef USBKEYBOARD
-	clearrepeat();
-#endif
+    hal_keyboard_clear_repeat_state();
 }
 #endif
 void MIPS16 cmd_load(void)
@@ -3627,9 +3620,7 @@ int BasicFileOpen(char *fname, int fnbr, int mode)
     if (filesource[fnbr] == FATFSFILE) SDbuffer[fnbr] = GetMemory(SDbufferSize);
 #endif
     FSerror = 0;
-#ifdef USBKEYBOARD
-    clearrepeat();
-#endif
+    hal_keyboard_clear_repeat_state();
     FatFSFileSystem = FatFSFileSystemSave;
     return true;
 }
@@ -4462,9 +4453,7 @@ void MIPS16 cmd_files(void)
             {
                 unsigned char noscroll=Option.NoScroll;
                 if((void *)ReadBuffer!=(void *)DisplayNotSet && Option.DISPLAY_CONSOLE)Option.NoScroll=0;
-                #ifdef USBKEYBOARD
-                clearrepeat();
-                #endif
+                hal_keyboard_clear_repeat_state();
                 MMPrintString("PRESS ANY KEY ...");
                 Option.NoScroll=noscroll;
                 do

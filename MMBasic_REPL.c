@@ -16,6 +16,7 @@
 
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
+#include "hal/hal_keyboard.h"
 
 /* Defined in MMBasic_Prompt.c. */
 extern int MMPromptPos;
@@ -143,9 +144,7 @@ void MMBasic_RunPromptLoop(void) {
      // we got here via a long jump which means an error or CTRL-C or the program wants to exit to the command prompt
         FlashLoad = 0;
 //        LoadOptions();
-#ifdef USBKEYBOARD
-	    clearrepeat();
-#endif
+        hal_keyboard_clear_repeat_state();
         ScrewUpTimer = 0;
         ProgMemory=(uint8_t *)flash_progmemory;
         ContinuePoint = nextstmt;                               // in case the user wants to use the continue command

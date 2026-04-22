@@ -34,6 +34,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
+#include "hal/hal_keyboard.h"
 
 #define CTRLKEY(a) (a & 0x1f)
 
@@ -1138,9 +1139,7 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
                             cleanserver();
                         #endif
                             nextstmt = ProgMemory;
-#ifdef USBKEYBOARD
-	                        clearrepeat();
-#endif	                        
+                            hal_keyboard_clear_repeat_state();
                             return;
  
               // Search

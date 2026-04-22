@@ -35,6 +35,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
 #include "hal/hal_time.h"
+#include "hal/hal_keyboard.h"
 #include "gfx_box_shared.h"
 #include "gfx_circle_shared.h"
 #include "gfx_line_shared.h"
@@ -7467,9 +7468,7 @@ if(DISPLAY_TYPE==SCREENMODE1){
 #endif
 }
 
-#ifdef USBKEYBOARD
-	clearrepeat();
-#endif	
+    hal_keyboard_clear_repeat_state();
 }
 
 
