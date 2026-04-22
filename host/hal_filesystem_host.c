@@ -19,6 +19,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/stat.h>
 
 #include "ff.h"
 #include "diskio.h"
@@ -109,20 +110,214 @@ int hal_fs_stat(const char *path, struct hal_stat *out)
 }
 
 /* -------------------------------------------------------------------- */
-/* File-table ops are not yet migrated on host — they still go through
- * FileIO.c's BasicFileOpen + FileTable[] machinery (which itself
- * dispatches to host_fs_posix_* or FatFS). These entries return ENOSYS
- * so the symbols resolve; no caller invokes them today. */
+/* File-table ops — host slot table. Dispatches to POSIX fopen/fread/...
+ * when host_sd_root is configured (REPL / --sim mode), and to the
+ * vendored FatFS running against vm_host_fat's RAM disk otherwise
+ * (test-harness mode). Self-contained: no dependence on FileIO.c's
+ * FileTable[] or on host_fs_posix_*. Legacy FileIO.c callers keep
+ * their existing paths until they're migrated to hal_fs_*. */
 /* -------------------------------------------------------------------- */
 
-int     hal_fs_open (const char *path, int flags, hal_fs_fd_t *out) { (void)path; (void)flags; (void)out; return -ENOSYS; }
-int     hal_fs_close(hal_fs_fd_t fd)                                 { (void)fd; return -ENOSYS; }
-ssize_t hal_fs_read (hal_fs_fd_t fd,       void *buf, size_t n)      { (void)fd; (void)buf; (void)n; return -ENOSYS; }
-ssize_t hal_fs_write(hal_fs_fd_t fd, const void *buf, size_t n)      { (void)fd; (void)buf; (void)n; return -ENOSYS; }
-off_t   hal_fs_seek (hal_fs_fd_t fd, off_t off, int whence)          { (void)fd; (void)off; (void)whence; return -ENOSYS; }
-off_t   hal_fs_tell (hal_fs_fd_t fd)                                 { (void)fd; return -ENOSYS; }
-int     hal_fs_eof  (hal_fs_fd_t fd)                                 { (void)fd; return -ENOSYS; }
-int     hal_fs_sync (hal_fs_fd_t fd)                                 { (void)fd; return -ENOSYS; }
+extern const char *host_sd_root;
+
+#define HAL_FS_MAX_OPEN 16
+
+typedef struct {
+    int is_posix;
+    FILE *fp;
+    FIL  *fatfs;
+    size_t posix_size;   /* cached at open for lof() */
+} host_fs_slot_t;
+
+static host_fs_slot_t host_fs_slots[HAL_FS_MAX_OPEN];
+
+static int host_alloc_slot(void)
+{
+    for (int i = 0; i < HAL_FS_MAX_OPEN; ++i) {
+        if (!host_fs_slots[i].fp && !host_fs_slots[i].fatfs) return i;
+    }
+    return -1;
+}
+
+static host_fs_slot_t *host_slot_from_fd(hal_fs_fd_t fd)
+{
+    if (fd < 1 || fd > HAL_FS_MAX_OPEN) return NULL;
+    host_fs_slot_t *s = &host_fs_slots[fd - 1];
+    if (!s->fp && !s->fatfs) return NULL;
+    return s;
+}
+
+/* Host mounts FatFS with the default empty drive (see vm_host_fat.c).
+ * Strip MMBasic's "A:"/"B:" prefix before dispatch. */
+static const char *host_hal_path(const char *p)
+{
+    if (p && p[0] && p[1] == ':') return p + 2;
+    return p;
+}
+
+static const char *hal_flags_to_fopen_mode(int flags)
+{
+    int rw = flags & HAL_FS_O_RDWR;
+    if (flags & HAL_FS_O_APPEND) {
+        if (rw == HAL_FS_O_RDWR) return "a+b";
+        return "ab";
+    }
+    if (flags & HAL_FS_O_TRUNC) {
+        if (rw == HAL_FS_O_RDWR) return "w+b";
+        return "wb";
+    }
+    if (rw == HAL_FS_O_RDWR) return (flags & HAL_FS_O_CREAT) ? "a+b" : "r+b";
+    if (flags & HAL_FS_O_WRONLY) return (flags & HAL_FS_O_CREAT) ? "wb" : "r+b";
+    return "rb";
+}
+
+static BYTE hal_flags_to_fatfs_host(int flags)
+{
+    BYTE m = 0;
+    if ((flags & HAL_FS_O_RDWR) == HAL_FS_O_RDWR) m |= FA_READ | FA_WRITE;
+    else if (flags & HAL_FS_O_WRONLY)             m |= FA_WRITE;
+    else                                          m |= FA_READ;
+    if (flags & HAL_FS_O_CREAT) {
+        if      (flags & HAL_FS_O_TRUNC) m |= FA_CREATE_ALWAYS;
+        else if (flags & HAL_FS_O_EXCL)  m |= FA_CREATE_NEW;
+        else                             m |= FA_OPEN_ALWAYS;
+    }
+    if (flags & HAL_FS_O_APPEND) m |= FA_OPEN_APPEND;
+    return m;
+}
+
+int hal_fs_open(const char *path, int flags, hal_fs_fd_t *out)
+{
+    if (!path || !out) return -EINVAL;
+    int idx = host_alloc_slot();
+    if (idx < 0) return -EMFILE;
+    host_fs_slot_t *s = &host_fs_slots[idx];
+    memset(s, 0, sizeof(*s));
+
+    if (host_sd_root) {
+        /* POSIX-backed. Build sd-root-joined path, stat for size, fopen. */
+        char rp[FF_MAX_LFN];
+        const char *bare = host_hal_path(path);
+        if (bare[0] == '/') {
+            snprintf(rp, sizeof(rp), "%s", bare);
+        } else {
+            size_t rl = strlen(host_sd_root);
+            int need_sep = (rl > 0 && host_sd_root[rl - 1] != '/');
+            snprintf(rp, sizeof(rp), "%s%s%s", host_sd_root, need_sep ? "/" : "", bare);
+        }
+        struct stat st;
+        if (stat(rp, &st) == 0) s->posix_size = (size_t)st.st_size;
+        const char *m = hal_flags_to_fopen_mode(flags);
+        FILE *fp = fopen(rp, m);
+        if (!fp) return -errno;
+        s->is_posix = 1;
+        s->fp = fp;
+        *out = idx + 1;
+        return 0;
+    }
+
+    /* FatFS RAM-disk. */
+    FIL *fp = (FIL *)calloc(1, sizeof(FIL));
+    if (!fp) return -ENOMEM;
+    FRESULT r = f_open(fp, host_hal_path(path), hal_flags_to_fatfs_host(flags));
+    if (r != FR_OK) { free(fp); return fatfs_rc_to_errno(r); }
+    s->fatfs = fp;
+    *out = idx + 1;
+    return 0;
+}
+
+int hal_fs_close(hal_fs_fd_t fd)
+{
+    host_fs_slot_t *s = host_slot_from_fd(fd);
+    if (!s) return -EBADF;
+    int rc = 0;
+    if (s->is_posix) {
+        if (fclose(s->fp) != 0) rc = -EIO;
+    } else {
+        FRESULT r = f_close(s->fatfs);
+        rc = fatfs_rc_to_errno(r);
+        free(s->fatfs);
+    }
+    memset(s, 0, sizeof(*s));
+    return rc;
+}
+
+ssize_t hal_fs_read(hal_fs_fd_t fd, void *buf, size_t n)
+{
+    host_fs_slot_t *s = host_slot_from_fd(fd);
+    if (!s || !buf) return -EBADF;
+    if (s->is_posix) {
+        size_t got = fread(buf, 1, n, s->fp);
+        if (got == 0 && ferror(s->fp)) return -EIO;
+        return (ssize_t)got;
+    }
+    UINT bw = 0;
+    FRESULT r = f_read(s->fatfs, buf, (UINT)n, &bw);
+    if (r != FR_OK) return fatfs_rc_to_errno(r);
+    return (ssize_t)bw;
+}
+
+ssize_t hal_fs_write(hal_fs_fd_t fd, const void *buf, size_t n)
+{
+    host_fs_slot_t *s = host_slot_from_fd(fd);
+    if (!s || !buf) return -EBADF;
+    if (s->is_posix) {
+        size_t w = fwrite(buf, 1, n, s->fp);
+        if (w != n) return -EIO;
+        return (ssize_t)w;
+    }
+    UINT bw = 0;
+    FRESULT r = f_write(s->fatfs, buf, (UINT)n, &bw);
+    if (r != FR_OK) return fatfs_rc_to_errno(r);
+    return (ssize_t)bw;
+}
+
+off_t hal_fs_seek(hal_fs_fd_t fd, off_t off, int whence)
+{
+    host_fs_slot_t *s = host_slot_from_fd(fd);
+    if (!s) return -EBADF;
+    if (s->is_posix) {
+        int w = (whence == HAL_FS_SEEK_CUR) ? SEEK_CUR
+              : (whence == HAL_FS_SEEK_END) ? SEEK_END : SEEK_SET;
+        if (fseek(s->fp, (long)off, w) != 0) return -EIO;
+        return (off_t)ftell(s->fp);
+    }
+    FRESULT r;
+    if (whence == HAL_FS_SEEK_SET)      r = f_lseek(s->fatfs, off);
+    else if (whence == HAL_FS_SEEK_CUR) r = f_lseek(s->fatfs, f_tell(s->fatfs) + off);
+    else                                r = f_lseek(s->fatfs, f_size(s->fatfs) + off);
+    if (r != FR_OK) return fatfs_rc_to_errno(r);
+    return (off_t)f_tell(s->fatfs);
+}
+
+off_t hal_fs_tell(hal_fs_fd_t fd)
+{
+    host_fs_slot_t *s = host_slot_from_fd(fd);
+    if (!s) return -EBADF;
+    if (s->is_posix) return (off_t)ftell(s->fp);
+    return (off_t)f_tell(s->fatfs);
+}
+
+int hal_fs_eof(hal_fs_fd_t fd)
+{
+    host_fs_slot_t *s = host_slot_from_fd(fd);
+    if (!s) return -EBADF;
+    if (s->is_posix) {
+        int c = fgetc(s->fp);
+        if (c == EOF) return 1;
+        ungetc(c, s->fp);
+        return 0;
+    }
+    return f_eof(s->fatfs) ? 1 : 0;
+}
+
+int hal_fs_sync(hal_fs_fd_t fd)
+{
+    host_fs_slot_t *s = host_slot_from_fd(fd);
+    if (!s) return -EBADF;
+    if (s->is_posix) { fflush(s->fp); return 0; }
+    return fatfs_rc_to_errno(f_sync(s->fatfs));
+}
 
 /* Directory iteration — host uses FatFS f_opendir/readdir/closedir
  * which route through host_fs_shims.c to either real POSIX (when

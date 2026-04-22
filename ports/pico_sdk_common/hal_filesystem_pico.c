@@ -198,16 +198,241 @@ int hal_fs_stat(const char *path, struct hal_stat *out)
     return 0;
 }
 
-/* -- File-table ops: not yet migrated on device. ---------------------- */
+/* -- File-table ops --------------------------------------------------- */
 
-int     hal_fs_open (const char *path, int flags, hal_fs_fd_t *out) { (void)path; (void)flags; (void)out; return -ENOSYS; }
-int     hal_fs_close(hal_fs_fd_t fd)                                 { (void)fd; return -ENOSYS; }
-ssize_t hal_fs_read (hal_fs_fd_t fd,       void *buf, size_t n)      { (void)fd; (void)buf; (void)n; return -ENOSYS; }
-ssize_t hal_fs_write(hal_fs_fd_t fd, const void *buf, size_t n)      { (void)fd; (void)buf; (void)n; return -ENOSYS; }
-off_t   hal_fs_seek (hal_fs_fd_t fd, off_t off, int whence)          { (void)fd; (void)off; (void)whence; return -ENOSYS; }
-off_t   hal_fs_tell (hal_fs_fd_t fd)                                 { (void)fd; return -ENOSYS; }
-int     hal_fs_eof  (hal_fs_fd_t fd)                                 { (void)fd; return -ENOSYS; }
-int     hal_fs_sync (hal_fs_fd_t fd)                                 { (void)fd; return -ENOSYS; }
+#include <stdlib.h>
+extern DWORD get_fattime(void);
+extern void *GetMemory(int msize);
+extern void FreeMemory(unsigned char *addr);
+
+/* HAL_FS_MAX_OPEN slots. Sized a few above MAXOPENFILES (=10 on device)
+ * so callers that open transient HAL-only fds (no FileTable slot) don't
+ * exhaust the table before MMBasic's own file-number capacity. */
+#define HAL_FS_MAX_OPEN 16
+
+typedef struct {
+    fs_kind_t kind;
+    union {
+        FIL        *fatfs;
+        lfs_file_t *lfs;
+    } h;
+    int writable;
+    char *lfs_path;  /* non-NULL for writable LFS slots — used to re-set 'A' xattr on sync/close */
+} pico_fs_slot_t;
+
+static pico_fs_slot_t pico_fs_slots[HAL_FS_MAX_OPEN];
+
+static int alloc_slot(void)
+{
+    for (int i = 0; i < HAL_FS_MAX_OPEN; ++i) {
+        if (pico_fs_slots[i].h.fatfs == NULL && pico_fs_slots[i].h.lfs == NULL) return i;
+    }
+    return -1;
+}
+
+static pico_fs_slot_t *slot_from_fd(hal_fs_fd_t fd)
+{
+    if (fd < 1 || fd > HAL_FS_MAX_OPEN) return NULL;
+    pico_fs_slot_t *s = &pico_fs_slots[fd - 1];
+    if (s->h.fatfs == NULL && s->h.lfs == NULL) return NULL;
+    return s;
+}
+
+static BYTE hal_flags_to_fatfs(int flags)
+{
+    BYTE m = 0;
+    if ((flags & HAL_FS_O_RDWR) == HAL_FS_O_RDWR) m |= FA_READ | FA_WRITE;
+    else if (flags & HAL_FS_O_WRONLY)             m |= FA_WRITE;
+    else                                          m |= FA_READ;
+    if (flags & HAL_FS_O_CREAT) {
+        if      (flags & HAL_FS_O_TRUNC) m |= FA_CREATE_ALWAYS;
+        else if (flags & HAL_FS_O_EXCL)  m |= FA_CREATE_NEW;
+        else                             m |= FA_OPEN_ALWAYS;
+    }
+    if (flags & HAL_FS_O_APPEND) m |= FA_OPEN_APPEND;
+    return m;
+}
+
+static int hal_flags_to_lfs(int flags)
+{
+    int m = 0;
+    if ((flags & HAL_FS_O_RDWR) == HAL_FS_O_RDWR) m |= LFS_O_RDWR;
+    else if (flags & HAL_FS_O_WRONLY)             m |= LFS_O_WRONLY;
+    else                                          m |= LFS_O_RDONLY;
+    if (flags & HAL_FS_O_CREAT) m |= LFS_O_CREAT;
+    if (flags & HAL_FS_O_TRUNC) m |= LFS_O_TRUNC;
+    if (flags & HAL_FS_O_EXCL)  m |= LFS_O_EXCL;
+    /* LFS_O_APPEND forces every write to the tail; MMBasic's R+W+APPEND
+     * combo wants "open at EOF, random-access R/W after" so we emulate
+     * that via explicit lfs_file_seek. Wonly+APPEND can use LFS_O_APPEND
+     * directly — every write goes to EOF. */
+    if ((flags & HAL_FS_O_APPEND) && !(m & LFS_O_RDWR))
+        m |= LFS_O_APPEND;
+    return m;
+}
+
+/* Write the MMBasic 'A' (modification-time) xattr on LFS. MMBasic uses
+ * lfs xattrs to track mtime because LFS has no native mtime. */
+static void lfs_stamp_atime(const char *path)
+{
+    DWORD dt = get_fattime();
+    (void)lfs_setattr(&lfs, path, 'A', &dt, 4);
+}
+
+int hal_fs_open(const char *path, int flags, hal_fs_fd_t *out)
+{
+    if (!path || !out) return -EINVAL;
+    int idx = alloc_slot();
+    if (idx < 0) return -EMFILE;
+    pico_fs_slot_t *s = &pico_fs_slots[idx];
+    memset(s, 0, sizeof(*s));
+    s->kind = path_fs(path);
+    const int want_write = (flags & (HAL_FS_O_WRONLY | HAL_FS_O_RDWR)) != 0;
+    s->writable = want_write;
+
+    if (s->kind == FS_LFS) {
+        const char *lfs_path = path_after_drive(path);
+        if (!*lfs_path) lfs_path = "/";
+        lfs_file_t *fh = (lfs_file_t *)GetMemory(sizeof(lfs_file_t));
+        if (!fh) return -ENOMEM;
+        int lfsmode = hal_flags_to_lfs(flags);
+        /* Original FileIO.c cleared the stale 'A' xattr before re-opening
+         * for write. Preserve that. */
+        if (want_write) {
+            struct lfs_info probe;
+            if (lfs_stat(&lfs, lfs_path, &probe) >= 0)
+                (void)lfs_removeattr(&lfs, lfs_path, 'A');
+        }
+        int r = lfs_file_open(&lfs, fh, lfs_path, lfsmode);
+        if (r < 0) { FreeMemory((unsigned char *)fh); return lfs_rc_to_errno(r); }
+        s->h.lfs = fh;
+        if (want_write) {
+            size_t plen = strlen(lfs_path) + 1;
+            s->lfs_path = (char *)GetMemory(plen);
+            if (s->lfs_path) memcpy(s->lfs_path, lfs_path, plen);
+            lfs_stamp_atime(lfs_path);
+            /* R+W+APPEND: position at EOF, then allow random access. */
+            if ((flags & HAL_FS_O_APPEND) && (lfsmode & LFS_O_RDWR))
+                lfs_file_seek(&lfs, fh, lfs_file_size(&lfs, fh), LFS_SEEK_SET);
+            lfs_file_sync(&lfs, fh);
+        }
+        *out = idx + 1;
+        return 0;
+    }
+
+    const char *ff_path = path_after_drive(path);
+    if (!*ff_path) ff_path = "/";
+    FIL *fp = (FIL *)GetMemory(sizeof(FIL));
+    if (!fp) return -ENOMEM;
+    BYTE ffmode = hal_flags_to_fatfs(flags);
+    FRESULT r = f_open(fp, ff_path, ffmode);
+    if (r != FR_OK) { FreeMemory((unsigned char *)fp); return fatfs_rc_to_errno(r); }
+    s->h.fatfs = fp;
+    *out = idx + 1;
+    return 0;
+}
+
+int hal_fs_close(hal_fs_fd_t fd)
+{
+    pico_fs_slot_t *s = slot_from_fd(fd);
+    if (!s) return -EBADF;
+    int rc = 0;
+    if (s->kind == FS_LFS) {
+        if (s->writable && s->lfs_path) lfs_stamp_atime(s->lfs_path);
+        int r = lfs_file_close(&lfs, s->h.lfs);
+        rc = lfs_rc_to_errno(r);
+        FreeMemory((unsigned char *)s->h.lfs);
+        if (s->lfs_path) FreeMemory((unsigned char *)s->lfs_path);
+    } else {
+        FRESULT r = f_close(s->h.fatfs);
+        rc = fatfs_rc_to_errno(r);
+        FreeMemory((unsigned char *)s->h.fatfs);
+    }
+    memset(s, 0, sizeof(*s));
+    return rc;
+}
+
+ssize_t hal_fs_read(hal_fs_fd_t fd, void *buf, size_t n)
+{
+    pico_fs_slot_t *s = slot_from_fd(fd);
+    if (!s) return -EBADF;
+    if (!buf) return -EINVAL;
+    if (s->kind == FS_LFS) {
+        int r = lfs_file_read(&lfs, s->h.lfs, buf, n);
+        if (r < 0) return lfs_rc_to_errno(r);
+        return r;
+    }
+    UINT bw = 0;
+    FRESULT r = f_read(s->h.fatfs, buf, (UINT)n, &bw);
+    if (r != FR_OK) return fatfs_rc_to_errno(r);
+    return (ssize_t)bw;
+}
+
+ssize_t hal_fs_write(hal_fs_fd_t fd, const void *buf, size_t n)
+{
+    pico_fs_slot_t *s = slot_from_fd(fd);
+    if (!s) return -EBADF;
+    if (!buf) return -EINVAL;
+    if (s->kind == FS_LFS) {
+        int r = lfs_file_write(&lfs, s->h.lfs, buf, n);
+        if (r < 0) return lfs_rc_to_errno(r);
+        return r;
+    }
+    UINT bw = 0;
+    FRESULT r = f_write(s->h.fatfs, buf, (UINT)n, &bw);
+    if (r != FR_OK) return fatfs_rc_to_errno(r);
+    return (ssize_t)bw;
+}
+
+off_t hal_fs_seek(hal_fs_fd_t fd, off_t off, int whence)
+{
+    pico_fs_slot_t *s = slot_from_fd(fd);
+    if (!s) return -EBADF;
+    if (s->kind == FS_LFS) {
+        int lw = (whence == HAL_FS_SEEK_CUR) ? LFS_SEEK_CUR
+                : (whence == HAL_FS_SEEK_END) ? LFS_SEEK_END
+                :                               LFS_SEEK_SET;
+        int r = lfs_file_seek(&lfs, s->h.lfs, off, lw);
+        if (r < 0) return lfs_rc_to_errno(r);
+        return r;
+    }
+    FRESULT r;
+    if (whence == HAL_FS_SEEK_SET)      r = f_lseek(s->h.fatfs, off);
+    else if (whence == HAL_FS_SEEK_CUR) r = f_lseek(s->h.fatfs, f_tell(s->h.fatfs) + off);
+    else                                r = f_lseek(s->h.fatfs, f_size(s->h.fatfs) + off);
+    if (r != FR_OK) return fatfs_rc_to_errno(r);
+    return (off_t)f_tell(s->h.fatfs);
+}
+
+off_t hal_fs_tell(hal_fs_fd_t fd)
+{
+    pico_fs_slot_t *s = slot_from_fd(fd);
+    if (!s) return -EBADF;
+    if (s->kind == FS_LFS) return (off_t)lfs_file_tell(&lfs, s->h.lfs);
+    return (off_t)f_tell(s->h.fatfs);
+}
+
+int hal_fs_eof(hal_fs_fd_t fd)
+{
+    pico_fs_slot_t *s = slot_from_fd(fd);
+    if (!s) return -EBADF;
+    if (s->kind == FS_LFS) {
+        return lfs_file_tell(&lfs, s->h.lfs) == lfs_file_size(&lfs, s->h.lfs) ? 1 : 0;
+    }
+    return f_eof(s->h.fatfs) ? 1 : 0;
+}
+
+int hal_fs_sync(hal_fs_fd_t fd)
+{
+    pico_fs_slot_t *s = slot_from_fd(fd);
+    if (!s) return -EBADF;
+    if (s->kind == FS_LFS) {
+        if (s->writable && s->lfs_path) lfs_stamp_atime(s->lfs_path);
+        return lfs_rc_to_errno(lfs_file_sync(&lfs, s->h.lfs));
+    }
+    return fatfs_rc_to_errno(f_sync(s->h.fatfs));
+}
+
 
 /* Directory iteration — holds either a FatFS DIR* (SD) or an LFS
  * lfs_dir_t* (internal flash) plus the base path so hal_fs_dir_next
