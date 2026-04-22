@@ -258,11 +258,15 @@ extern void clear320(void);
 	extern int MODE4SIZE;
 	extern int MODE5SIZE;
 #endif
+/* ProcessWeb(): real impl on PICOMITEWEB pumps the lwIP stack. On
+ * non-WEB builds a stub in MM_Misc.c no-ops. Declaration is
+ * unconditional so core code can call it from loops (cmd_files, LOAD)
+ * without wrapping each site in #ifdef PICOMITEWEB. */
+extern void ProcessWeb(int mode);
 #ifdef PICOMITEWEB
 	extern volatile int WIFIconnected;
 	extern volatile int scantimer;
 	extern int startupcomplete;
-	extern void ProcessWeb(int mode);
 	extern void WebConnect(void);
 	extern void close_tcpclient(void);
 #endif

@@ -193,10 +193,12 @@ void VGArecovery(int pin){
 #endif
 #endif
 #ifndef PICOMITEWEB
-/* Non-WEB targets lack the lwIP MQTT stack. Stub closeMQTT() so core's
- * ClearExternalIO teardown can call it unconditionally; on WEB the
- * real implementation in MMMqtt.c links instead. */
+/* Non-WEB targets lack the lwIP MQTT stack + the WEB request pump.
+ * Stubs so core's teardown / directory-walk / LOAD paths can call
+ * closeMQTT() and ProcessWeb() unconditionally; on WEB the real
+ * implementations link instead (MMMqtt.c / MMtcpserver.c). */
 void closeMQTT(void) {}
+void ProcessWeb(int mode) { (void)mode; }
 #endif
 extern const uint8_t *flash_target_contents;
 int TickPeriod[NBRSETTICKS]={0};

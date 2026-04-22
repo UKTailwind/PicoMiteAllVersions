@@ -4121,9 +4121,7 @@ void MIPS16 cmd_files(void)
         if(FatFSFileSystem){
             while (FSerror == FR_OK && fnod.fname[0])
             {
-            #ifdef PICOMITEWEB
                 ProcessWeb(1);
-            #endif
                 if (fcnt >= MAXFILES)
                 {
                     FreeMemorySafe((void **)&flist);
@@ -4240,9 +4238,7 @@ void MIPS16 cmd_files(void)
             } 
         } else {
             while(1){
-            #ifdef PICOMITEWEB
                 ProcessWeb(1);
-            #endif
                 int found=0;
                 FSerror=lfs_dir_read(&lfs, &lfs_dir, &lfs_info);
                 if(FSerror==0)break;
@@ -4380,9 +4376,7 @@ void MIPS16 cmd_files(void)
         for (i = dirs = 0; i < fcnt; i++)
         {
             memset(outbuff,0,sizeof(outbuff));
-            #ifdef PICOMITEWEB
                 ProcessWeb(1);
-            #endif
             if (flist[i].fn[0] == 'D')
             {
                 dirs++;
@@ -4424,9 +4418,7 @@ void MIPS16 cmd_files(void)
                 do
                 {
                     ShowCursor(1);
-                #ifdef PICOMITEWEB
                     ProcessWeb(1);
-                #endif
                     routinechecks();
                     if (MMAbort)
                     {
