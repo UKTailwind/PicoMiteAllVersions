@@ -104,9 +104,7 @@ extern uint8_t RGB121(uint32_t c);
 extern uint8_t RGB332(uint32_t c);
 extern uint16_t RGB555(uint32_t c);
 extern uint16_t RGB121pack(uint32_t c);
-#ifndef rp2350
-extern datetime_t rtc_t;
-#else
+#ifdef rp2350
 extern bool rp2350a;
 extern uint32_t PSRAMsize;
 extern const uint32_t MAP16DEF[16];

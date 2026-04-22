@@ -89,7 +89,7 @@ BC_SRCS = bc_alloc.c bc_bridge.c vm_host_fat.c \
 HOST_PORTABLE_SRCS = host_runtime.c host_fastgfx.c host_fs_shims.c \
                      host_peripheral_stubs.c host_fs.c \
                      host_time.c host_fb.c host_keys.c \
-                     hal_flash_host.c
+                     hal_flash_host.c hal_time_host.c
 HOST_WASM_SRCS = host_wasm_main.c host_wasm_console.c host_wasm_canvas.c \
                  host_wasm_audio.c
 
