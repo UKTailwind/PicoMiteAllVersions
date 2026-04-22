@@ -6,6 +6,8 @@
 
 **When you fix something, rebuild every artefact the user might be running.** The source tree is not the deliverable. `mmbasic_test`, `mmbasic_sim`, and `host/web/picomite.{mjs,wasm,data}` are three distinct binaries — fixing FileIO.c and only rebuilding the one you happened to run tests against leaves the user on stale bytes. Before reporting a fix as landed: rebuild `./host/build.sh`, `./host/build_sim.sh`, and `./host/build_wasm.sh` (when emcc is available). If a fix touches shared core code, all three must be regenerated in the same step.
 
+**Commit-message pass counts must be scraped, not recalled.** Any commit that states a pass count ("Host N/N", "239/239 green", etc.) must derive that number from the `Results: X passed, Y failed` line of a fresh `./run_tests.sh` invocation run against the built binary immediately before `git commit`. Not from an earlier session, not from `--interp`-only, not from a single-file run. If `Y != 0`, the commit does not go out — fix first. Commit 20a8629 ("Host 239/239") actually shipped at 237/239; the two failures (t195, t197) sat on `real-hal` tip for two commits before they were noticed. This rule exists because of that.
+
 Promote the implicit hardware-abstraction layer that emerged from the host port (`docs/host-hal-plan.md`) into a **first-class HAL spanning every device target** — RP2040 and RP2350 in all 12 board variants — so the BASIC interpreter and bytecode VM compile with **zero references to hardware target macros**, and target variants are selected by directory composition, not by preprocessor surgery.
 
 ## Status (2026-04-22)
