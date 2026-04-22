@@ -2,6 +2,7 @@ build/
 build2350/
 build2350_vm_only/
 build_rp2040/
+build_all/
 host/*.o
 host/*.d
 host/mmbasic_test

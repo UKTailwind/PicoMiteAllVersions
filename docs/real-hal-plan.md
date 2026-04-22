@@ -4,7 +4,7 @@ Promote the implicit hardware-abstraction layer that emerged from the host port 
 
 ## Status (2026-04-21)
 
-**12 commits on `real-hal`.** Host tests 239/239 after every commit. RP2040 CMake + WASM green throughout. RP2350 build not green (pre-existing pico-sdk 2.0 API churn — `hardware/structs/ssi.h` removed; unrelated to this refactor).
+**13 commits on `real-hal`.** Host tests 239/239 after every commit. All 12 device CMake variants green (`./buildall.sh` sweeps every `COMPILE` target: PICO/USB/VGA/VGAUSB/WEB for RP2040 and PICO/USB/VGA/VGAUSB/HDMI/HDMIUSB/WEB for RP2350). WASM link green.
 
 - Phase 0 ✅ — `hal/`, `drivers/`, `ports/` scaffolding; `hal/CONTRACT.md`; `tools/check_hal_purity.sh` (raw-grep mode); `tools/hal_scoreboard.sh`. Scoreboard rebaselined 476 → 606 after fixing regex that missed `PICOMITEPLUS`, `PICOCALC`, wider `PICOMITEWEB`. Deferred: `check_ram_baseline.sh`, `perf_microbench/`, Tier-B display-inline prototype (all need physical device).
 - Phase 0.5 ✅ — cross-cutting state hoisted to `core/state/`: `display_state.c`, `pin_state.c` (ExtCurrentConfig), `option_state.c`, `audio_state.c`. Plan correction: `PinDef[]` is board-level const in `PicoMite.c`/`host_runtime.c`, not mutable core state — stays where it is.
@@ -16,7 +16,7 @@ Promote the implicit hardware-abstraction layer that emerged from the host port 
   - Peripheral-driver gpio uses (Onewire.c, I2C.c, SPI-LCD.c, Touch.c, mouse.c, mmc_stm32.c, SSD1963.c) migrate with their HALs.
 - Phases 4–13 — not started.
 
-**Commits:** f89e9a9 (scaffolding), 9a53573 / f7a06f4 / 896eaa9 / f1207a6 (state hoists), 33163ad / ed610a2 (hal_flash), 029170b / f2d840f (hal_time), 67b4092 / bbbb4ec / 344def0 (hal_pin).
+**Commits:** f89e9a9 (scaffolding), 9a53573 / f7a06f4 / 896eaa9 / f1207a6 (state hoists), 33163ad / ed610a2 (hal_flash), 029170b / f2d840f (hal_time), 67b4092 / bbbb4ec / 344def0 / 2b374da (hal_pin).
 
 ---
 
