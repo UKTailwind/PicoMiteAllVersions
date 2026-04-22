@@ -633,8 +633,7 @@ void MIPS16 cmd_library(void) {
         if (strchr((char *)pp, '.') == NULL)
             strcat((char *)pp, ".lib");
         if (!BasicFileOpen((char *)pp, fnbr, FA_READ)) return;
-		if(filesource[fnbr]!=FLASHFILE)  fsize = f_size(FileTable[fnbr].fptr);
-		else fsize = lfs_file_size(&lfs,FileTable[fnbr].lfsptr);
+		fsize = (int)hal_fs_size(hal_fds[fnbr]);
         if(fsize>MAX_PROG_SIZE)error("File size % should be % or less",fsize,MAX_PROG_SIZE);
         FlashWriteInit(LIBRARY_FLASH);
         hal_flash_erase(realflashpointer, MAX_PROG_SIZE);
@@ -3718,8 +3717,7 @@ tp = checkstring(cmdline, (unsigned char *)"HEARTBEAT");
         if (strchr((char *)pp, '.') == NULL)
             strcat((char *)pp, ".opt");
         if (!BasicFileOpen((char *)pp, fnbr, FA_READ)) return;
-		if(filesource[fnbr]!=FLASHFILE)  fsize = f_size(FileTable[fnbr].fptr);
-		else fsize = lfs_file_size(&lfs,FileTable[fnbr].lfsptr);
+		fsize = (int)hal_fs_size(hal_fds[fnbr]);
         if(!(fsize==sizeof(Option) || fsize==sizeof(Option)-128))error("File size incorrect");
         char *s=(char *)&Option.Magic;
         for(int k = 0; k < fsize; k++){        // write to the flash byte by byte
@@ -3920,9 +3918,11 @@ void MIPS16 fun_info(void){
         FatFSFileSystem=0;
         int fnbr=FindFreeFileNbr();
         BasicFileOpen("bootcount",fnbr,FA_READ);
-        FSerror=lfs_file_read(&lfs, FileTable[fnbr].lfsptr, &boot_count, sizeof(boot_count));	
-        if(FSerror>0)FSerror=0;
-        ErrorCheck(fnbr);
+        {
+            ssize_t rc = hal_fs_read(hal_fds[fnbr], &boot_count, sizeof(boot_count));
+            if (rc < 0) { FSerror = (int)rc; ErrorCheck(fnbr); }
+            else FSerror = 0;
+        }
         FileClose(fnbr);
         FatFSFileSystem=FatFSFileSystemSave;
         iret=boot_count;

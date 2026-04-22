@@ -443,8 +443,7 @@ void cmd_transmit(unsigned char *cmd){
                 fn = FindFreeFileNbr();
                 if (!BasicFileOpen(fname, fn, FA_READ))
                 return;
-                if(FatFSFileSystem)  FileSize = f_size(FileTable[fn].fptr);
-                else FileSize = lfs_file_size(&lfs,FileTable[fn].lfsptr);
+                FileSize = (int)hal_fs_size(hal_fds[fn]);
                 IntToStr(p,FileSize,10);
                 strcat(outstr,p);
                 strcat(outstr,httpend);
@@ -457,8 +456,10 @@ void cmd_transmit(unsigned char *cmd){
                 tcp_server_send_data(state, state->client_pcb[pcb], pcb);
                 if(FileSize<TCP_MSS*4 && FileSize<FreeSpaceOnHeap()/4){
                         char *pBuf=GetTempMemory(FileSize);
-                        if(filesource[fn]!=FLASHFILE)  f_read(FileTable[fn].fptr, pBuf, FileSize, &n_read);
-                        else n_read=lfs_file_read(&lfs, FileTable[fn].lfsptr, pBuf, FileSize);
+                        {
+                            ssize_t nr = hal_fs_read(hal_fds[fn], pBuf, (size_t)FileSize);
+                            n_read = (nr < 0) ? 0 : (unsigned int)nr;
+                        }
                         state->buffer_sent[pcb]=(unsigned char *)pBuf;
                         while(n_read>TCP_MSS){
                                 state->to_send[pcb]=TCP_MSS;
@@ -476,12 +477,11 @@ void cmd_transmit(unsigned char *cmd){
                 } else {
                         char *pBuf=GetTempMemory(TCP_MSS);
                         while(1) {
-                                if(
-                                ((filesource[fn]==FLASHFILE) && (lfs_file_tell(&lfs,FileTable[fn].lfsptr)==lfs_file_size(&lfs,FileTable[fn].lfsptr)))
-                                || ((filesource[fn]!=FLASHFILE) && f_eof(FileTable[fn].fptr))
-                                ) break;
-                                if(filesource[fn]!=FLASHFILE)  f_read(FileTable[fn].fptr, pBuf, TCP_MSS, &n_read);
-                                else n_read=lfs_file_read(&lfs, FileTable[fn].lfsptr, pBuf, TCP_MSS);
+                                if (hal_fs_eof(hal_fds[fn]) == 1) break;
+                                {
+                                    ssize_t nr = hal_fs_read(hal_fds[fn], pBuf, TCP_MSS);
+                                    n_read = (nr < 0) ? 0 : (unsigned int)nr;
+                                }
                                 state->to_send[pcb]=n_read;
                                 state->buffer_sent[pcb]=(unsigned char *)pBuf;
                                 state->total_sent[pcb]+=n_read;
@@ -532,8 +532,7 @@ void cmd_transmit(unsigned char *cmd){
         if (ExistsFile(fname)) {
                 fn = FindFreeFileNbr();
                 if (!BasicFileOpen(fname, fn, FA_READ)) return;
-                if(filesource[fn]!=FLASHFILE) FileSize = f_size(FileTable[fn].fptr);
-                else FileSize = lfs_file_size(&lfs,FileTable[fn].lfsptr);
+                FileSize = (int)hal_fs_size(hal_fds[fn]);
                 char *SocketOut=GetMemory(FileSize+buffersize);
                 int SocketOutPointer=0;
                 while(1) {

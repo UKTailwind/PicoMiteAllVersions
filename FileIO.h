@@ -272,18 +272,24 @@ extern struct lfs_config pico_lfs_cfg;
 #define LIBRARY_FLASH 6
 #define SAVED_VARS_FLASH 7
 #define PROGRAM_FLASH 8
-typedef union uFileTable
+/* FileTable slot. `com` is the allocation marker:
+ *     0              → slot free
+ *     1..MAXCOMPORTS → slot holds a serial port
+ *     MAXCOMPORTS+1  → slot holds an open file (hal_fds[fnbr] has the fd)
+ * Pre-real-hal the union also held the raw FatFS/LFS backend pointer so
+ * callers could peek into it; every such caller now goes through
+ * hal_fs_* on hal_fds[fnbr] and the shadow retired. */
+typedef struct uFileTable
 {
     unsigned int com;
-    FIL *fptr;
-    lfs_file_t *lfsptr;
 }u_file;
 enum {
     NONEFILE,
     FLASHFILE,
     FATFSFILE
 };
-extern union uFileTable FileTable[MAXOPENFILES + 1];
+#define FILE_SLOT_MARKER (MAXCOMPORTS + 1)
+extern struct uFileTable FileTable[MAXOPENFILES + 1];
 /* Per-fnbr HAL fd (see FileIO.c for ownership semantics). Indexed by
  * MMBasic file number (1..MAXOPENFILES); slot 0 is the console sentinel.
  * Callers that used to read FileTable[fnbr].fptr / .lfsptr should use

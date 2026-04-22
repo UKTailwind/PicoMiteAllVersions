@@ -479,8 +479,7 @@ void edit(unsigned char *cmdline, bool cmdfile) {
             int fnbr1;
             fnbr1 = FindFreeFileNbr();
             BasicFileOpen(filename, fnbr1, FA_READ);
-            if(filesource[fnbr1]!=FLASHFILE)  fsize = f_size(FileTable[fnbr1].fptr);
-            else fsize = lfs_file_size(&lfs,FileTable[fnbr1].lfsptr);
+            fsize = (int)hal_fs_size(hal_fds[fnbr1]);
             if(fsize > edit_buff_size - 10) error("Out of memory");
             p=EdBuff;
             char *q=(char *)EdBuff;

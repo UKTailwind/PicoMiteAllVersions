@@ -606,10 +606,7 @@ void cmd_frun(void) {
         fnbr = FindFreeFileNbr();
         if (!BasicFileOpen(fname_buf, fnbr, FA_READ)) error("File not found");
 
-        if (filesource[fnbr] != FLASHFILE)
-            fsize = (int)f_size(FileTable[fnbr].fptr);
-        else
-            fsize = lfs_file_size(&lfs, FileTable[fnbr].lfsptr);
+        fsize = (int)hal_fs_size(hal_fds[fnbr]);
 
         if (fsize < 0 || fsize >= EDIT_BUFFER_SIZE - 2048) {
             FileClose(fnbr);

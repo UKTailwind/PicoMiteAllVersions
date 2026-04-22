@@ -441,22 +441,6 @@ off_t hal_fs_size(hal_fs_fd_t fd)
     return (off_t)f_size(s->h.fatfs);
 }
 
-/* Migration-period escape hatch — pre-HAL callers (Audio.c WAV decoder,
- * MMtcpserver.c HTTP file-serving, upng.c, BmpDecoder.c, Editor.c file
- * load, MMtftp.c, MM_Misc.c size lookups) still read the raw backend
- * handle from FileTable[].fptr / .lfsptr. BasicFileOpen stashes the
- * pointer returned here so those callers keep working until their own
- * migration. Remove once every direct FileTable.fptr / .lfsptr reader
- * has been HAL-routed. */
-void *hal_fs_peek_handle(hal_fs_fd_t fd, int *is_lfs_out)
-{
-    pico_fs_slot_t *s = slot_from_fd(fd);
-    if (!s) { if (is_lfs_out) *is_lfs_out = 0; return NULL; }
-    if (is_lfs_out) *is_lfs_out = (s->kind == FS_LFS);
-    return s->kind == FS_LFS ? (void *)s->h.lfs : (void *)s->h.fatfs;
-}
-
-
 /* Directory iteration — holds either a FatFS DIR* (SD) or an LFS
  * lfs_dir_t* (internal flash) plus the base path so hal_fs_dir_next
  * can reconstruct full paths for stat purposes. */

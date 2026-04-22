@@ -1173,8 +1173,7 @@ upng_t* upng_new_from_file(char *filename)
     if(!BasicFileOpen(filename, fnbr, FA_READ)) return 0;
 
 	/* get filesize */
-	if(filesource[fnbr]!=FLASHFILE)  size = fullsize = f_size(FileTable[fnbr].fptr);
-	else size = fullsize = lfs_file_size(&lfs,FileTable[fnbr].lfsptr);
+	size = fullsize = (unsigned long)hal_fs_size(hal_fds[fnbr]);
     buffer = buff = GetMemory(size);
 
 	/* read contents of the file into the vector */
@@ -1184,13 +1183,10 @@ upng_t* upng_new_from_file(char *filename)
 		return upng;
 	}
 	while(size>0){
-	if(filesource[fnbr]==FATFSFILE){
-		FSerror=f_read(FileTable[fnbr].fptr, buffer, 512, &sizeread);
-    	ErrorCheck(fnbr);
-	} else {
-		sizeread=lfs_file_read(&lfs, FileTable[fnbr].lfsptr, buffer, 512);
-		ErrorCheck(fnbr);
-	}
+		ssize_t n = hal_fs_read(hal_fds[fnbr], buffer, 512);
+		if (n < 0) { FSerror = (int)n; ErrorCheck(fnbr); break; }
+		if (n == 0) break;
+		sizeread = (unsigned int)n;
 		size-=sizeread;
 		buffer+=sizeread;
 	}

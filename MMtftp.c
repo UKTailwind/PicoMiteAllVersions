@@ -31,22 +31,16 @@ void tftp_close(void* handle){
     if(!optionsuppressstatus)MMPrintString("TFTP transfer complete\r\n");
 }
 int tftp_read(void* handle, void* buf, int bytes){
-    int n_read;
     int fnbr=*(int *)handle;
-    if(filesource[fnbr]==FATFSFILE)  f_read(FileTable[fnbr].fptr, buf, bytes, (UINT *)&n_read);
-    else n_read=lfs_file_read(&lfs, FileTable[fnbr].lfsptr, buf, bytes);
-    return n_read;
+    ssize_t n = hal_fs_read(hal_fds[fnbr], buf, (size_t)bytes);
+    return n < 0 ? 0 : (int)n;
 }
 int tftp_write(void* handle, struct pbuf* p){
-    int nbr;
     int fnbr=*(int *)handle;
-    if(filesource[fnbr]==FATFSFILE) f_write(FileTable[fnbr].fptr, p->payload, p->tot_len, (UINT *)&nbr);
-    else {
-        nbr=FSerror=lfs_file_write(&lfs, FileTable[fnbr].lfsptr, p->payload, p->tot_len); 
-    }
-    if(FSerror>0)FSerror=0;
+    ssize_t w = hal_fs_write(hal_fds[fnbr], p->payload, p->tot_len);
+    FSerror = (w < 0) ? (int)w : 0;
     ErrorCheck(tftp_fnbr);
-    return nbr; 
+    return w < 0 ? (int)w : (int)w;
 }
 void tftp_error(void* handle, int err, const char* msg, int size){
     int fnbr=*(int *)handle;

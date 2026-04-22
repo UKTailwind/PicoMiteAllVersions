@@ -43,8 +43,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "hardware/regs/addressmap.h"     /* XIP_BASE */
 #ifdef MMBASIC_HOST
 /* Host build routes file primitives through POSIX (REPL / --sim) or the
- * in-memory FatFS RAM disk (test harness). See host/host_fs_hal.h. */
-#include "host_fs_hal.h"
+ * in-memory FatFS RAM disk (test harness) via hal_fs_*. */
 #include "vm_host_fat.h"
 #include "vm_sys_file.h"
 /* Redirect FatFS directory-walker calls to the host wrappers. In REPL /
@@ -157,11 +156,9 @@ static unsigned int bw[MAXOPENFILES + 1] = {[0 ... MAXOPENFILES] = -1};
 unsigned char filesource[MAXOPENFILES + 1] = {0};
 /* Per-fnbr HAL fd. 0 = no open HAL file on this slot. BasicFileOpen
  * allocates via hal_fs_open; ForceFileClose releases. Exposed as
- * `hal_fds[]` (declaration in FileIO.h) so other TUs can go straight
- * to hal_fs_* without going through the legacy FileTable shadow. The
- * FileTable[fnbr].fptr / .lfsptr shadow is being retired — it stays
- * populated transitionally via hal_fs_peek_handle for a shrinking set
- * of callers. */
+ * `hal_fds[]` (declaration in FileIO.h) so other TUs read/write files
+ * exclusively through hal_fs_*. There is no shadow backend pointer
+ * anywhere now — FileTable just tracks allocation. */
 hal_fs_fd_t hal_fds[MAXOPENFILES + 1] = {0};
 static void hal_to_fserror(int rc, int fnbr);
 static void hal_write_checked(int fnbr, const void *buf, size_t n);
@@ -306,7 +303,7 @@ extern void InitReservedIO(void);
 int ForceFileClose(int fnbr);
 int FSerror;
 FATFS FatFs;
-union uFileTable FileTable[MAXOPENFILES + 1];
+struct uFileTable FileTable[MAXOPENFILES + 1];
 volatile BYTE SDCardStat = STA_NOINIT | STA_NODISK;
 int OptionFileErrorAbort = true;
 volatile uint32_t irqs;
@@ -3407,23 +3404,6 @@ int ForceFileClose(int fnbr)
     if (type == NONEFILE) type = FATFSFILE;  /* default for error-reporting path */
 
     hal_fs_fd_t fd = hal_fds[fnbr];
-#ifdef MMBASIC_HOST
-    /* Host stub FIL* allocated for POSIX-backed fds (see BasicFileOpen).
-     * Free before closing the HAL fd — calloc'd separately from the HAL
-     * internals. */
-    if (fd && FileTable[fnbr].fptr != NULL && filesource[fnbr] == FATFSFILE) {
-        int kind = 0;
-        void *h = hal_fs_peek_handle(fd, &kind);
-        if (kind == 2) {
-            free(FileTable[fnbr].fptr);
-            FileTable[fnbr].fptr = NULL;
-        } else {
-            (void)h;
-            FileTable[fnbr].fptr = NULL;  /* shadow pointer, HAL owns */
-        }
-    }
-#endif
-
     if (fd) {
         int rc = hal_fs_close(fd);
         hal_to_fserror(rc, fnbr);
@@ -3439,8 +3419,7 @@ int ForceFileClose(int fnbr)
     }
 #endif
 
-    FileTable[fnbr].fptr = NULL;
-    FileTable[fnbr].lfsptr = NULL;
+    FileTable[fnbr].com = 0;
     buffpointer[fnbr] = 0;
     lastfptr[fnbr] = -1;
     bw[fnbr] = -1;
@@ -3538,9 +3517,8 @@ int InitSDCard(void)
     if (!(SDCardStat & STA_NOINIT))
         return 1; // if the card is present and has been initialised we have nothing to do
     for (i = 0; i < MAXOPENFILES; i++)
-        if (FileTable[i].com > MAXCOMPORTS)
-            if (FileTable[i].fptr != NULL)
-                ForceFileClose(i);
+        if (FileTable[i].com > MAXCOMPORTS && hal_fds[i] != 0)
+            ForceFileClose(i);
     i = f_mount(&FatFs, "", 1);
     if (i)
     {
@@ -3633,30 +3611,11 @@ int BasicFileOpen(char *fname, int fnbr, int mode)
     }
 
     hal_fds[fnbr] = fd;
-    /* Shadow the backend handle into the legacy FileTable fields so
-     * external callers (Audio.c WAV, upng.c, Editor.c, MMtcpserver.c,
-     * MMtftp.c, BmpDecoder.c, MM_Misc.c, bc_runtime.c) keep working
-     * during the incremental migration. */
-    int kind = 0;
-    void *h = hal_fs_peek_handle(fd, &kind);
-    if (kind == 1) {
-        FileTable[fnbr].lfsptr = (lfs_file_t *)h;
-        filesource[fnbr] = FLASHFILE;
-    } else {
-        filesource[fnbr] = FATFSFILE;
-#ifdef MMBASIC_HOST
-        if (kind == 2) {
-            /* Host POSIX slot — HAL owns a FILE*; external callers that
-             * read f_size(FileTable[].fptr) want a FIL* with obj.objsize.
-             * Allocate a stub FIL seeded from hal_fs_size. */
-            FileTable[fnbr].fptr = calloc(1, sizeof(FIL));
-            if (!FileTable[fnbr].fptr) { hal_fs_close(fd); hal_fds[fnbr] = 0; error("Not enough memory"); }
-            off_t sz = hal_fs_size(fd);
-            FileTable[fnbr].fptr->obj.objsize = (FSIZE_t)(sz < 0 ? 0 : sz);
-        } else
-#endif
-        FileTable[fnbr].fptr = (FIL *)h;
-    }
+    FileTable[fnbr].com = FILE_SLOT_MARKER;
+    /* filesource still distinguishes A: (LFS) from B: (FatFS) for the
+     * SDbuffer read-cache decision and a handful of device error paths.
+     * The HAL does the actual dispatch. */
+    filesource[fnbr] = FatFSFileSystem ? FATFSFILE : FLASHFILE;
 
     buffpointer[fnbr] = 0;
     lastfptr[fnbr]    = -1;

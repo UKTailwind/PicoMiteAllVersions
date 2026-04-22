@@ -1162,7 +1162,7 @@ void cmd_help(void){
 						if(end)break;
 						if(buff[0]=='~'){ //now we need to rewind the file to check this line
 							ListNewLine(&ListCnt, false);
-							lfs_file_seek(&lfs, FileTable[fnbr].lfsptr, -(strlen(buff)+2), LFS_SEEK_CUR);
+							hal_fs_seek(hal_fds[fnbr], -(off_t)(strlen(buff)+2), HAL_FS_SEEK_CUR);
 							break;
 						} else {
 							ListCnt=printWrappedText(buff,Option.Width-1,ListCnt,false);

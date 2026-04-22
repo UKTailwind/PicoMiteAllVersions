@@ -4,10 +4,12 @@
  * Holds the FatFS walker wrappers (host_f_findfirst/findnext/closedir/
  * unlink/rename/mkdir/chdir/getcwd) that let FileIO.c's cmd_files /
  * cmd_copy / cmd_kill / fun_dir / fun_cwd walk real POSIX directories
- * when host_sd_root is set; the POSIX-backed per-fnbr file table
- * (host_fs_posix_* — serviced by FileIO.c's BasicFileOpen preamble);
- * and the simulated flash / LFS / existence-check stubs that let the
- * rest of the interpreter link unchanged.
+ * when host_sd_root is set; plus simulated flash / LFS / existence-check
+ * stubs that let the rest of the interpreter link unchanged. All file
+ * I/O now flows through hal/hal_filesystem.h — there is no separate
+ * host_fs_posix_* table; BasicFileOpen hands the path to hal_fs_open
+ * and the host adapter (hal_filesystem_host.c) owns the FILE* /
+ * vm_host_fat FIL dispatch.
  *
  * flash_option_contents is RAM-backed; host_options_snapshot() syncs
  * the live Option back into it so LoadOptions inside error() restores
@@ -24,7 +26,6 @@
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
 #include "host_fs.h"
-#include "host_fs_hal.h"
 
 /* Defined in host_main.c — used by FileLoadProgram when SaveProgramToFlash
  * feeds buffered source through the host tokeniser path. */
@@ -199,115 +200,6 @@ FRESULT host_f_getcwd(TCHAR *buff, UINT len) {
     /* Prepend drive prefix so Editor.c / PRINT CWD$ format works. */
     snprintf(buff, len, "0:%s", tmp);
     return FR_OK;
-}
-
-/* =========================================================================
- * POSIX file table servicing host_fs_hal.h.
- *
- * FileIO.c's primitives (BasicFileOpen, FileGetChar, FilePutChar,
- * FileClose, FileEOF, cmd_seek, cmd_flush, fun_loc, fun_lof) each begin
- * with a small #ifdef MMBASIC_HOST preamble that hands off to the
- * host_fs_posix_* routine below if this fnbr has a POSIX entry.
- * ======================================================================= */
-static FILE *host_posix_files[MAXOPENFILES + 1] = {0};
-
-int host_fs_posix_active(int fnbr) {
-    return fnbr >= 1 && fnbr <= MAXOPENFILES && host_posix_files[fnbr] != NULL;
-}
-
-int host_fs_posix_try_open(char *fname, int fnbr, int mode) {
-    if (!host_sd_root) return 0;
-    char path[STRINGSIZE];
-    host_resolve_sd_path(fname, path, sizeof(path));
-    const char *m = (mode & FA_WRITE) ? ((mode & FA_CREATE_ALWAYS) ? "wb"
-                                       : (mode & FA_OPEN_APPEND)  ? "ab" : "rb+")
-                                      : "rb";
-    /* stat() the path BEFORE fopen(). On emscripten IDBFS, fstat(fileno(fp))
-     * of a freshly-opened read FILE* can report size=0 until the first
-     * read touches the underlying data — it's the path-backed MEMFS
-     * inode that knows the real size, not the in-memory FILE* buffer.
-     * Editor.c's f_size(FileTable[fnbr].fptr) reads this back from the
-     * objsize we stash below; getting it wrong on WASM made the edit
-     * buffer load zero bytes and the backup copy come out empty. */
-    struct stat st;
-    size_t size = 0;
-    if (stat(path, &st) == 0) size = (size_t)st.st_size;
-
-    FILE *fp = fopen(path, m);
-    if (!fp) error("File error");
-    FileTable[fnbr].fptr = calloc(1, sizeof(FIL));
-    if (!FileTable[fnbr].fptr) { fclose(fp); error("Not enough memory"); }
-    FileTable[fnbr].fptr->obj.objsize = (FSIZE_t)size;
-    host_posix_files[fnbr] = fp;
-    filesource[fnbr] = FATFSFILE;
-    return 1;
-}
-
-char host_fs_posix_get_char(int fnbr) {
-    int c = fgetc(host_posix_files[fnbr]);
-    return c == EOF ? 0 : (char)c;
-}
-
-char host_fs_posix_put_char(char c, int fnbr) {
-    if (fputc((unsigned char)c, host_posix_files[fnbr]) == EOF) error("File error");
-    return c;
-}
-
-void host_fs_posix_put_str(int count, char *s, int fnbr) {
-    if (count <= 0) return;
-    if (fwrite(s, 1, (size_t)count, host_posix_files[fnbr]) != (size_t)count)
-        error("File error");
-}
-
-/* Block read/write helpers for SAVE IMAGE and COPY. The FilePutStr /
- * FileGetChar primitives live on the BASIC text-mode path; these two
- * bypass the text helpers and talk straight to fread/fwrite so callers
- * that track their own byte counts (f_read/f_write equivalents) don't
- * pay a per-byte cost. Returns bytes actually read/written. */
-int host_fs_posix_read_bytes(int fnbr, void *buf, int count) {
-    if (count <= 0) return 0;
-    return (int)fread(buf, 1, (size_t)count, host_posix_files[fnbr]);
-}
-
-int host_fs_posix_write_bytes(int fnbr, const void *buf, int count) {
-    if (count <= 0) return 0;
-    return (int)fwrite(buf, 1, (size_t)count, host_posix_files[fnbr]);
-}
-
-int host_fs_posix_eof(int fnbr) {
-    FILE *fp = host_posix_files[fnbr];
-    /* ANSI feof only returns true after a read that hit EOF — BASIC's EOF
-     * wants a lookahead. Peek one byte, push it back. */
-    int c = fgetc(fp);
-    if (c == EOF) return 1;
-    ungetc(c, fp);
-    return 0;
-}
-
-void host_fs_posix_close(int fnbr) {
-    fclose(host_posix_files[fnbr]);
-    host_posix_files[fnbr] = NULL;
-    free(FileTable[fnbr].fptr);
-    FileTable[fnbr].fptr = NULL;
-    filesource[fnbr] = NONEFILE;
-}
-
-int64_t host_fs_posix_loc(int fnbr) {
-    return (int64_t)ftell(host_posix_files[fnbr]);
-}
-
-int64_t host_fs_posix_lof(int fnbr) {
-    return (int64_t)FileTable[fnbr].fptr->obj.objsize;
-}
-
-void host_fs_posix_seek(int fnbr, int64_t offset) {
-    /* BASIC SEEK is 1-based. FileIO.c's cmd_seek adjusts before calling. */
-    if (fseek(host_posix_files[fnbr], (long)offset, SEEK_SET) != 0)
-        error("File error");
-}
-
-void host_fs_posix_flush(int fnbr) {
-    fflush(host_posix_files[fnbr]);
 }
 
 /* POSIX-backed existence check. The Editor's file-load path (EDIT "foo.bas")

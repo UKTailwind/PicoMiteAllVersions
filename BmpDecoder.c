@@ -45,9 +45,6 @@ Pradeep Budagutta    03-Mar-2008    First release
 #include "Hardware_Includes.h"
 //** SD CARD INCLUDES ***********************************************************
 #include "ff.h"
-#ifdef MMBASIC_HOST
-#include "host_fs_hal.h"
-#endif
 
 
 #define  IMG_FILE   fnbr

@@ -630,27 +630,16 @@ void MIPS64 __not_in_flash_func(i2sconvert)(int16_t *fbuff, int16_t *sbuff, int 
 }
 
 size_t onRead(void  *userdata,  char  *pBufferOut,   size_t bytesToRead){
-    unsigned int nbr;
-	if(filesource[WAV_fnbr]==FATFSFILE){
-		FSerror=f_read(FileTable[WAV_fnbr].fptr,pBufferOut, bytesToRead, &nbr);
-		if(FSerror)nbr=0;
-    	if(!MDD_SDSPI_CardDetectState())ErrorCheck(WAV_fnbr);
-	} else {
-		nbr=lfs_file_read(&lfs, FileTable[WAV_fnbr].lfsptr, pBufferOut, bytesToRead);
-		if(nbr<0)FSerror=nbr;	
-		else FSerror=0;
-		ErrorCheck(WAV_fnbr);
-	}
-    return nbr;
+    ssize_t n = hal_fs_read(hal_fds[WAV_fnbr], pBufferOut, bytesToRead);
+    if (n < 0) { FSerror = (filesource[WAV_fnbr] == FLASHFILE) ? (int)n : FR_DISK_ERR; ErrorCheck(WAV_fnbr); return 0; }
+    if (filesource[WAV_fnbr] == FATFSFILE && !MDD_SDSPI_CardDetectState()) ErrorCheck(WAV_fnbr);
+    FSerror = 0;
+    return (size_t)n;
 }
 drwav_bool32 onSeek(void  *userdata,  int offset,  drwav_seek_origin origin){
-	if(filesource[WAV_fnbr]==FATFSFILE){
-		if(origin==drwav_seek_origin_start) FSerror=f_lseek(FileTable[WAV_fnbr].fptr,offset);
-		else FSerror=f_lseek(FileTable[WAV_fnbr].fptr,FileTable[WAV_fnbr].fptr->fptr+offset);
-	} else {
-		if(origin==drwav_seek_origin_start) FSerror=lfs_file_seek(&lfs, FileTable[WAV_fnbr].lfsptr, offset, LFS_SEEK_SET);
-		else FSerror=lfs_file_seek(&lfs, FileTable[WAV_fnbr].lfsptr, offset, LFS_SEEK_CUR);
-	}
+    int whence = (origin == drwav_seek_origin_start) ? HAL_FS_SEEK_SET : HAL_FS_SEEK_CUR;
+    off_t r = hal_fs_seek(hal_fds[WAV_fnbr], offset, whence);
+    FSerror = (r < 0) ? ((filesource[WAV_fnbr] == FLASHFILE) ? (int)r : FR_DISK_ERR) : 0;
     return 1;
 }
 
@@ -1727,9 +1716,7 @@ void MIPS16 cmd_play(void) {
 		str_replace(buff,".Mp3",".mem",1);
 		str_replace(buff,".mP3",".mem",1);
     	if(!BasicFileOpen(buff, fnbr,  FA_WRITE | FA_CREATE_ALWAYS)) return;
-		int i;
-		if(filesource[WAV_fnbr]==FLASHFILE)i = lfs_file_tell(&lfs,FileTable[fnbr].lfsptr) + 1;
-        else i = (*(FileTable[WAV_fnbr].fptr)).fptr + 1;
+		int i = (int)hal_fs_tell(hal_fds[WAV_fnbr]) + 1;
 		i-=418;
 		if(i<0)i=0;
 		IntToStr(buff,i,10);
@@ -1752,7 +1739,7 @@ void MIPS16 cmd_play(void) {
 		if(!ExistsFile(buff))error("Track name");
     	if(!BasicFileOpen(buff, fnbr,  FA_READ)) return;
 		memset(buff,0,STRINGSIZE);
-		lfs_file_read(&lfs, FileTable[fnbr].lfsptr, buff, 255);
+		hal_fs_read(hal_fds[fnbr], buff, 255);
 		FileClose(fnbr);
 		p=strchr(buff,',');
 		p++;
@@ -1879,8 +1866,7 @@ void MIPS16 cmd_play(void) {
 			noloop=1;
         } else noloop=0;
         i=0;
-		if(filesource[WAV_fnbr]!=FLASHFILE)  fsize = f_size(FileTable[WAV_fnbr].fptr);
-		else fsize = lfs_file_size(&lfs,FileTable[WAV_fnbr].lfsptr);
+		fsize = (int)hal_fs_size(hal_fds[WAV_fnbr]);
 		int alreadythere=1;
 #ifdef rp2350
 		if(!PSRAMsize){

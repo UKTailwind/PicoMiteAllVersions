@@ -7,9 +7,10 @@
  * FatFS running on vm_host_fat's RAM disk (test-harness mode).
  *
  * Rather than re-implementing that dispatch here, hal_fs_* forwards to
- * the host_f_* wrappers where they exist, and to the vendored f_* /
- * host_fs_posix_* otherwise. Errors convert to negative POSIX errno;
- * FatFS FRESULT values translate via fatfs_rc_to_errno below.
+ * the host_f_* wrappers where they exist, and to the vendored FatFS
+ * (against vm_host_fat's RAM disk) otherwise. Errors convert to
+ * negative POSIX errno; FatFS FRESULT values translate via
+ * fatfs_rc_to_errno below.
  */
 
 #include <stdint.h>
@@ -324,21 +325,6 @@ off_t hal_fs_size(hal_fs_fd_t fd)
     if (!s) return -EBADF;
     if (s->is_posix) return (off_t)s->posix_size;
     return (off_t)f_size(s->fatfs);
-}
-
-/* Migration helper — see ports/pico_sdk_common/hal_filesystem_pico.c.
- * For POSIX-backed fds the host adapter returns the cached FILE*; the
- * stub FIL* that external callers want on FileTable[].fptr is owned by
- * BasicFileOpen (it pre-allocates a FIL and seeds obj.objsize from
- * hal_fs_size). is_lfs_out encodes: 0 = FatFS, 1 = LFS (device only),
- * 2 = POSIX FILE* (host REPL/--sim). */
-void *hal_fs_peek_handle(hal_fs_fd_t fd, int *is_lfs_out)
-{
-    host_fs_slot_t *s = host_slot_from_fd(fd);
-    if (!s) { if (is_lfs_out) *is_lfs_out = 0; return NULL; }
-    if (s->is_posix) { if (is_lfs_out) *is_lfs_out = 2; return s->fp; }
-    if (is_lfs_out) *is_lfs_out = 0;
-    return s->fatfs;
 }
 
 /* Directory iteration — host uses FatFS f_opendir/readdir/closedir
