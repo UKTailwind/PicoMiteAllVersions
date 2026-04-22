@@ -34,6 +34,8 @@
 #endif
 
 #ifdef USBKEYBOARD
+#include "tusb.h"
+#include "host/hcd.h"
 extern void clearrepeat(void);
 extern int KeyDown[7];
 extern int caps_lock;

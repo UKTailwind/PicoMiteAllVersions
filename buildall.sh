@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # Build every device CMake COMPILE variant from clean dirs.
 # Any failure stops the script — green across all targets is the gate.
+#
+# PICOCALC is only enabled for the default PICO target (the PicoCalc board).
+# All other targets build as standard PicoMite variants.
 set -euo pipefail
 
 TARGETS=(
@@ -16,7 +19,14 @@ for t in "${TARGETS[@]}"; do
     d="$root/build_all/$t"
     rm -rf "$d" && mkdir -p "$d"
     printf '=== %s ===\n' "$t"
-    if ! (cd "$d" && cmake -DCOMPILE="$t" "$root" > cmake.log 2>&1 && make -j8 > make.log 2>&1); then
+
+    # PICO target is the PicoCalc; all others are standard PicoMite.
+    picocalc_flag="false"
+    if [ "$t" = "PICO" ]; then
+        picocalc_flag="true"
+    fi
+
+    if ! (cd "$d" && cmake -DCOMPILE="$t" -DPICOCALC="$picocalc_flag" "$root" > cmake.log 2>&1 && make -j8 > make.log 2>&1); then
         printf 'FAIL (%s)\n' "$t"
         tail -30 "$d/make.log" || true
         fail=1

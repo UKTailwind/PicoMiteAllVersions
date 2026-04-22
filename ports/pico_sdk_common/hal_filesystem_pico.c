@@ -205,10 +205,8 @@ extern DWORD get_fattime(void);
 extern void *GetMemory(int msize);
 extern void FreeMemory(unsigned char *addr);
 
-/* HAL_FS_MAX_OPEN slots. Sized a few above MAXOPENFILES (=10 on device)
- * so callers that open transient HAL-only fds (no FileTable slot) don't
- * exhaust the table before MMBasic's own file-number capacity. */
-#define HAL_FS_MAX_OPEN 16
+/* HAL_FS_MAX_OPEN slots. Matches MAXOPENFILES (=10 on device). */
+#define HAL_FS_MAX_OPEN 10
 
 typedef struct {
     fs_kind_t kind;

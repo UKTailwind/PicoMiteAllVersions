@@ -87,7 +87,9 @@ static uint8_t vm_sys_graphics_rgb121(uint32_t c) {
 static size_t vm_sys_graphics_fb_bytes(void) {
     return (size_t)HRes * (size_t)VRes / 2u;
 }
+#endif /* !MMBASIC_HOST */
 
+#if defined(PICOMITE) && !defined(MMBASIC_HOST)
 static void vm_sys_graphics_fb_stop_merge(void) {
     if (mergerunning) {
         multicore_fifo_push_blocking(0xFF);
@@ -125,16 +127,10 @@ static void vm_sys_graphics_fb_merge_now(uint8_t transparent) {
 
     if (LayerBuf == NULL || FrameBuf == NULL) return;
 
-    /* If ShadowBuf is present (FRAMEBUFFER CREATE FAST), use DMA-optimized merge.
-     * ShadowBuf / merge_optimized only exist on PICOMITE (non-VGA, non-WEB) —
-     * WEB variants never allocate it, so the call is unreachable there. Guard
-     * the call so the symbol isn't referenced on those build targets. */
-#ifdef PICOMITE
     if (ShadowBuf != NULL) {
         merge_optimized(transparent);
         return;
     }
-#endif
 
     stride = HRes / 2;
     if (stride <= 0) return;
@@ -175,7 +171,7 @@ void vm_sys_graphics_reset(void) {
 
 #ifdef MMBASIC_HOST
     host_framebuffer_shutdown_runtime();
-#else
+#elif defined(PICOMITE)
     vm_sys_graphics_fb_stop_merge();
     vm_fb_copy_src = NULL;
     vm_fb_copy_pending = 0;
@@ -1810,7 +1806,7 @@ int vm_sys_graphics_read_pixel(int x, int y) {
 void vm_sys_graphics_service(void) {
 #ifdef MMBASIC_HOST
     host_framebuffer_service();
-#else
+#elif defined(PICOMITE)
     vm_sys_graphics_fb_complete_pending_copy();
 #endif
 }
@@ -1819,7 +1815,7 @@ void vm_sys_graphics_framebuffer_create(int fast) {
 #ifdef MMBASIC_HOST
     host_framebuffer_create();
     (void)fast;
-#else
+#elif defined(PICOMITE)
     size_t bytes;
 
     if (FrameBuf != NULL) error("Framebuffer already exists");
@@ -1840,7 +1836,7 @@ void vm_sys_graphics_framebuffer_create(int fast) {
 void vm_sys_graphics_framebuffer_layer(int has_colour, int colour) {
 #ifdef MMBASIC_HOST
     host_framebuffer_layer(has_colour, colour);
-#else
+#elif defined(PICOMITE)
     size_t bytes;
     uint8_t transparent = 0;
 
@@ -1857,7 +1853,7 @@ void vm_sys_graphics_framebuffer_layer(int has_colour, int colour) {
 void vm_sys_graphics_framebuffer_write(char which) {
 #ifdef MMBASIC_HOST
     host_framebuffer_write(which);
-#else
+#elif defined(PICOMITE)
     switch (which) {
         case BC_FB_TARGET_N:
             if (mergerunning) error("Display in use for merged operation");
@@ -1882,15 +1878,17 @@ void vm_sys_graphics_framebuffer_write(char which) {
 void vm_sys_graphics_framebuffer_close(char which) {
 #ifdef MMBASIC_HOST
     host_framebuffer_close(which);
-#else
+#elif defined(PICOMITE)
     if (which == BC_FB_TARGET_DEFAULT) which = 'A';
     vm_sys_graphics_fb_stop_merge();
     if ((which == 'A' || which == BC_FB_TARGET_F) && FrameBuf != NULL) {
         if (WriteBuf == FrameBuf) restorepanel();
         BC_FREE(FrameBuf);
         FrameBuf = NULL;
+#ifdef PICOMITE
         if (ShadowBuf) { BC_FREE(ShadowBuf); ShadowBuf = NULL; }
         if (fb_dma_chan >= 0) { dma_channel_unclaim(fb_dma_chan); fb_dma_chan = -1; }
+#endif
     }
     if ((which == 'A' || which == BC_FB_TARGET_L) && LayerBuf != NULL) {
         if (WriteBuf == LayerBuf) restorepanel();
@@ -1905,7 +1903,7 @@ void vm_sys_graphics_framebuffer_close(char which) {
 void vm_sys_graphics_framebuffer_merge(int has_colour, int colour, int mode, int has_rate, int rate_ms) {
 #ifdef MMBASIC_HOST
     host_framebuffer_merge(has_colour, colour, mode, has_rate, rate_ms);
-#else
+#elif defined(PICOMITE)
     uint8_t transparent = has_colour ? vm_sys_graphics_rgb121((uint32_t)colour) : 0;
 
     if (LayerBuf == NULL) error("Layer not created");
@@ -1961,7 +1959,7 @@ void vm_sys_graphics_framebuffer_merge(int has_colour, int colour, int mode, int
 void vm_sys_graphics_framebuffer_sync(void) {
 #ifdef MMBASIC_HOST
     host_framebuffer_sync();
-#else
+#elif defined(PICOMITE)
     vm_sys_graphics_fb_complete_pending_copy();
     if (mergerunning) {
         mergedone = false;
@@ -1975,7 +1973,7 @@ void vm_sys_graphics_framebuffer_sync(void) {
 void vm_sys_graphics_framebuffer_wait(void) {
 #ifdef MMBASIC_HOST
     host_framebuffer_wait();
-#else
+#elif defined(PICOMITE)
     if (Option.DISPLAY_TYPE == ILI9341 || Option.DISPLAY_TYPE == ST7796SP ||
         Option.DISPLAY_TYPE == ST7796S || Option.DISPLAY_TYPE == ST7789B ||
         Option.DISPLAY_TYPE == ILI9488 || Option.DISPLAY_TYPE == ILI9488P) {
@@ -1988,7 +1986,7 @@ void vm_sys_graphics_framebuffer_wait(void) {
 void vm_sys_graphics_framebuffer_copy(char from, char to, int background) {
 #ifdef MMBASIC_HOST
     host_framebuffer_copy(from, to, background);
-#else
+#elif defined(PICOMITE)
     int complex = 0;
     unsigned char *saved = WriteBuf;
     uint8_t *s = NULL;

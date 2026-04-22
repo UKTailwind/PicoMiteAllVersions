@@ -1,7 +1,9 @@
 cmake_minimum_required(VERSION 3.13)
 # Valid builds are PICO, PICOUSB, VGA, VGAUSB, HDMI(rp2350 only), HDMIUSB(rp2350 only), WEB
 
-set(PICOCALC true)
+if(NOT DEFINED PICOCALC)
+  set(PICOCALC true)
+endif()
 # For dynamic loading from SD card:
 # SDBOOT requires the bootloader to be in the first 256KB of flash
 # PicoMite will need to be shifted by this amount, and all references to
@@ -9,10 +11,12 @@ set(PICOCALC true)
 # details: https://github.com/adwuard/Picocalc_SD_Boot
 #set(SDBOOT true)
 
-# Compile for PICO 1 Board
-set(COMPILE PICO)
+# Compile for PICO 1 Board — overridden by -DCOMPILE=... on the cmake command line.
+if(NOT DEFINED COMPILE)
+  set(COMPILE PICO)
+endif()
 
-# Compile for PICO 2 Board
+# Compile for PICO 2 Board (uncomment one to override the default above)
 #set(COMPILE PICORP2350)
 #set(COMPILE WEBRP2350)
 
@@ -163,7 +167,6 @@ if (COMPILE STREQUAL "WEB" OR COMPILE STREQUAL "WEBRP2350" )
     target_sources(PicoMite PRIVATE
 	SSD1963.c
 	Touch.c
-	GUI.c
 	cJSON.c
     mqtt.c
     MMMqtt.c

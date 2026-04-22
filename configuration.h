@@ -81,8 +81,8 @@ extern "C" {
             #define MAXVARS             480                     // 8 + MAXVARLEN + MAXDIM * 2  (ie, 56 bytes) - these do not incl array members
     #endif
         #define MAXMODES 2
-        #define HEAP_MEMORY_SIZE (100*1024) 
-        #define MAX_CPU     378000 
+        #define HEAP_MEMORY_SIZE (99*1024)
+        #define MAX_CPU     378000
         #define MIN_CPU     252000
         #define MAXSUBFUN           256                     // each entry takes up 4 bytes
     #endif

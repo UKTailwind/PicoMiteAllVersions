@@ -174,9 +174,6 @@ uint32_t remap332[256];
 uint16_t remap256[256];
 #endif
 
- short gui_font_width, gui_font_height;
-int last_bcolour, last_fcolour;
-volatile int CursorTimer=0;               // used to time the flashing cursor
 extern volatile int QVgaScanLine;
 bool mergedread=0;
 int ScreenSize=0;
@@ -5447,13 +5444,15 @@ void cmd_framebuffer(void){
             int fast = 0;
             if(checkstring(p, (unsigned char *)"FAST")) fast = 1;
             FrameBuf=GetMemory(HRes*VRes/2);
+#ifdef PICOMITE
             if(fast){
                 ShadowBuf=GetMemory(HRes*VRes/2);
                 memset(ShadowBuf, 0, HRes*VRes/2);
-#ifdef PICOMITE
                 fb_dma_chan=dma_claim_unused_channel(true);
-#endif
             }
+#else
+            (void)fast;
+#endif
         }
         else error("Framebuffer already exists");
     } else if((p=checkstring(cmdline, (unsigned char *)"WRITE"))) {
@@ -6063,11 +6062,17 @@ void cmd_fastgfx(void) {
     }
 }
 #elif !defined(MMBASIC_HOST)
-/* Host build has its own cmd_fastgfx in host_stubs_legacy.c that drives
- * the host_framebuffer-backed bc_fastgfx_* helpers. */
+/* VGA/HDMI/WEB device builds: FASTGFX uses SPI-LCD DMA which doesn't apply.
+ * bc_fastgfx_* stubs satisfy bc_vm.c / bc_runtime.c link references. */
 void cmd_fastgfx(void) {
     error("FASTGFX not supported on this platform");
 }
+void bc_fastgfx_create(void) { error("FASTGFX not supported on this platform"); }
+void bc_fastgfx_swap(void)   { error("FASTGFX not supported on this platform"); }
+void bc_fastgfx_sync(void)   { error("FASTGFX not supported on this platform"); }
+void bc_fastgfx_close(void)  { }
+void bc_fastgfx_reset(void)  { }
+void bc_fastgfx_set_fps(int fps) { (void)fps; error("FASTGFX not supported on this platform"); }
 #endif
 
 void cmd_blit(void) {
