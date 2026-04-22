@@ -50,19 +50,6 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include <hardware/structs/sio.h>
 #include "picomite_gpio_irq.h"
 
-// Read the output level of every bank-0 GPIO as a 64-bit mask.
-// Stock Pico SDK 2.2.0 ships gpio_get_pad / gpio_get_all64 / gpio_get_dir_all
-// but no gpio_get_out_level_all64 helper, so PicoMite used to patch the SDK's
-// gpio.h. We only have two call sites (cmd_port and fun_distance) and no other
-// consumer, so the helper now lives here and the SDK is left alone.
-static inline uint64_t gpio_get_out_level_all64(void) {
-#if NUM_BANK0_GPIOS <= 32
-    return sio_hw->gpio_out;
-#else
-    return sio_hw->gpio_out | (((uint64_t)sio_hw->gpio_hi_out) << 32u);
-#endif
-}
-
 #define ANA_AVERAGE     10
 #define ANA_DISCARD     2
 
@@ -395,7 +382,7 @@ void __not_in_flash_func(ExtSet)(int pin, int val){
             pinmask|=(1<<PinDef[pin].GPno);
             if(val)pinmask|=(1<<PinDef[pin].GPno);
             else pinmask &= (~(1<<PinDef[pin].GPno));
-            gpio_set_input_enabled(PinDef[pin].GPno,false);
+            hal_pin_set_input_enabled(PinDef[pin].GPno, false);
             last_adc=99;
         }
 //        INTEnableInterrupts();
@@ -553,23 +540,23 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
  
 
     // make sure any pullups/pulldowns are removed in case we are changing from a digital input
-    gpio_disable_pulls(PinDef[pin].GPno);
+    hal_pin_set_pulls(PinDef[pin].GPno, HAL_PIN_PULL_NONE);
     // disable ADC if we are changing from a analogue input
     if(ExtCurrentConfig[pin]==EXT_ANA_IN || ExtCurrentConfig[pin]==EXT_ADCRAW  )PinSetBit(pin, ANSELCLR);
 
     for(i = 0; i < NBRINTERRUPTS; i++)
         if(inttbl[i].pin == pin)
             inttbl[i].pin = 0;                                      // start off by disable a software interrupt (if set) on this pin
-    gpio_set_input_enabled(PinDef[pin].GPno,false);
-    gpio_deinit(PinDef[pin].GPno); 
+    hal_pin_set_input_enabled(PinDef[pin].GPno, false);
+    hal_pin_deinit(PinDef[pin].GPno); 
     hal_pin_set_input_hysteresis(PinDef[pin].GPno, true);
-    if(cfg!=EXT_NOT_CONFIG)gpio_init(PinDef[pin].GPno); 
+    if(cfg!=EXT_NOT_CONFIG)hal_pin_init_digital(PinDef[pin].GPno); 
     switch(cfg) {
         case EXT_NOT_CONFIG:    tris = 1; ana = 1;
-//                                gpio_init(PinDef[pin].GPno); 
+//                                hal_pin_init_digital(PinDef[pin].GPno); 
 //		                        hal_pin_set_input_hysteresis(PinDef[pin].GPno, true);
-                                gpio_set_input_enabled(PinDef[pin].GPno,false);
-                                gpio_deinit(PinDef[pin].GPno);
+                                hal_pin_set_input_enabled(PinDef[pin].GPno, false);
+                                hal_pin_deinit(PinDef[pin].GPno);
                                 switch(ExtCurrentConfig[pin]){      //Disable the pin numbers used by the special function code
                                      case EXT_IR:
 				                        IRpin=99;
@@ -714,8 +701,8 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
                                     edge = GPIO_IRQ_EDGE_RISE;
                                     if(cfg==EXT_CNT_IN && option==2)edge = GPIO_IRQ_EDGE_FALL;
                                     if(cfg==EXT_CNT_IN && option>=3)edge = GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE;
-                                    if(option==1 || option==4)gpio_pull_down (PinDef[pin].GPno);
-                                    if(option==2 || option==5)gpio_pull_up (PinDef[pin].GPno);
+                                    if(option==1 || option==4)hal_pin_set_pulls(PinDef[pin].GPno, HAL_PIN_PULL_DOWN);
+                                    if(option==2 || option==5)hal_pin_set_pulls(PinDef[pin].GPno, HAL_PIN_PULL_UP);
                                     irq_set_priority(IO_IRQ_BANK0,0);
                                     PinSetBit(pin,TRISSET);
                                     if(pin == Option.INT1pin) {
@@ -801,7 +788,7 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
 #endif
         case EXT_DIG_OUT:       if(!(PinDef[pin].mode & DIGITAL_OUT)) error("Invalid configuration");
                                 tris = 0; ana = 1; 
-                                gpio_set_drive_strength(PinDef[pin].GPno,GPIO_DRIVE_STRENGTH_8MA);
+                                hal_pin_set_drive_mA(PinDef[pin].GPno, 8);
                                 break;
 #ifndef PICOMITEWEB
         case EXT_HEARTBEAT:     if(!(pin=HEARTBEATpin)) error("Invalid configuration");
@@ -868,7 +855,7 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
         case EXT_PWM2A:         if(!(PinDef[pin].mode & PWM2A)) error("Invalid configuration");
                                 if((PWM2Apin!=99 && PWM2Apin!=pin)) error("Already Set to pin %",PWM2Apin);
                                 PWM2Apin=pin;
-                                gpio_set_drive_strength (PinDef[pin].GPno, GPIO_DRIVE_STRENGTH_8MA);
+                                hal_pin_set_drive_mA(PinDef[pin].GPno, 8);
                                 hal_pin_set_slew_fast(PinDef[pin].GPno, true);
                                 break;
         case EXT_PWM3A:         if(!(PinDef[pin].mode & PWM3A)) error("Invalid configuration");
@@ -968,7 +955,7 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
                                 tris = 1; ana = 1;
 //                                PinSetBit(pin,TRISSET);
                                 hal_pin_set_input_hysteresis(PinDef[pin].GPno, true);
-                                gpio_set_function(PinDef[pin].GPno, GPIO_FUNC_PWM);
+                                hal_pin_set_function(PinDef[pin].GPno, HAL_PIN_FUNC_PWM);
                                 pwm_config cfg = pwm_get_default_config();
                                 pwm_config_set_clkdiv_mode(&cfg, PWM_DIV_B_RISING);
                                 pwm_config_set_clkdiv(&cfg, 1);
@@ -1017,28 +1004,28 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
         if(ana==0)PinSetBit(pin, ANSELSET);
     }
     else if(cfg>=EXT_UART0TX && cfg<=EXT_UART1RX){
-        gpio_set_function(PinDef[pin].GPno, GPIO_FUNC_UART);
-        if(cfg==EXT_UART0RX || cfg==EXT_UART1RX)gpio_set_pulls(PinDef[pin].GPno,true,false);
+        hal_pin_set_function(PinDef[pin].GPno, HAL_PIN_FUNC_UART);
+        if(cfg==EXT_UART0RX || cfg==EXT_UART1RX)hal_pin_set_pulls(PinDef[pin].GPno, HAL_PIN_PULL_UP);
     }
-    else if(cfg>=EXT_I2C0SDA && cfg<=EXT_I2C1SCL)gpio_set_function(PinDef[pin].GPno, GPIO_FUNC_I2C);
-    else if(cfg>=EXT_SPI0RX && cfg<=EXT_SPI1SCK)gpio_set_function(PinDef[pin].GPno, GPIO_FUNC_SPI);
+    else if(cfg>=EXT_I2C0SDA && cfg<=EXT_I2C1SCL)hal_pin_set_function(PinDef[pin].GPno, HAL_PIN_FUNC_I2C);
+    else if(cfg>=EXT_SPI0RX && cfg<=EXT_SPI1SCK)hal_pin_set_function(PinDef[pin].GPno, HAL_PIN_FUNC_SPI);
 #ifdef rp2350
-    else if(cfg>=EXT_PWM0A && cfg<=(rp2350a ? EXT_PWM7B : EXT_PWM11B))gpio_set_function(PinDef[pin].GPno, GPIO_FUNC_PWM);
+    else if(cfg>=EXT_PWM0A && cfg<=(rp2350a ? EXT_PWM7B : EXT_PWM11B))hal_pin_set_function(PinDef[pin].GPno, HAL_PIN_FUNC_PWM);
 #else
-    else if(cfg>=EXT_PWM0A && cfg<=EXT_PWM7B)gpio_set_function(PinDef[pin].GPno, GPIO_FUNC_PWM);
+    else if(cfg>=EXT_PWM0A && cfg<=EXT_PWM7B)hal_pin_set_function(PinDef[pin].GPno, HAL_PIN_FUNC_PWM);
 #endif
     else if(cfg==EXT_PIO0_OUT){
-	    gpio_set_input_enabled(PinDef[pin].GPno, true);
-        gpio_set_function(PinDef[pin].GPno, GPIO_FUNC_PIO0);
+	    hal_pin_set_input_enabled(PinDef[pin].GPno, true);
+        hal_pin_set_function(PinDef[pin].GPno, HAL_PIN_FUNC_PIO0);
     }
     else if(cfg==EXT_PIO1_OUT){
-	    gpio_set_input_enabled(PinDef[pin].GPno, true);
-        gpio_set_function(PinDef[pin].GPno, GPIO_FUNC_PIO1);
+	    hal_pin_set_input_enabled(PinDef[pin].GPno, true);
+        hal_pin_set_function(PinDef[pin].GPno, HAL_PIN_FUNC_PIO1);
     }
 #ifdef rp2350
     else if(cfg==EXT_PIO2_OUT){
-	    gpio_set_input_enabled(PinDef[pin].GPno, true);
-        gpio_set_function(PinDef[pin].GPno, GPIO_FUNC_PIO2);
+	    hal_pin_set_input_enabled(PinDef[pin].GPno, true);
+        hal_pin_set_function(PinDef[pin].GPno, HAL_PIN_FUNC_PIO2);
     }
 #endif
     uSec(2);
@@ -1623,9 +1610,9 @@ void cmd_port(void) {
             pincode++;
         }
     } 
-    readmask=gpio_get_out_level_all64();
+    readmask=hal_pin_bank_read_out_latch();
     readmask &=mask;
-    gpio_xor_mask(setmask ^ readmask);
+    hal_pin_bank_xor_mask(setmask ^ readmask);
 }
 
 
@@ -1679,8 +1666,8 @@ void fun_port(void) {
 
 	getargs(&ep, NBRPINS * 4, (unsigned char *)",");
 	if((argc & 0b11) != 0b11) error("Invalid syntax");
-    uint64_t pinstate=gpio_get_all64();
-    uint64_t outpinstate=gpio_get_out_level_all64();
+    uint64_t pinstate=hal_pin_bank_read_all();
+    uint64_t outpinstate=hal_pin_bank_read_out_latch();
     for(i = argc - 3; i >= 0; i -= 4) {
     	code=0;
     	if(!(code=codecheck(argv[i])))argv[i]+=2;
@@ -2844,7 +2831,7 @@ void cmd_keyscan(void){
     shift=pressed[5] ? true : false;
     ctrl=pressed[10] ? true : false;
     if(function && pressed[5]==1){
-        gpio_xor_mask64((uint64_t)1<<24);
+        hal_pin_bank_xor_mask((uint64_t)1<<24);
         s_lock^=1;
 
     }
@@ -3333,7 +3320,7 @@ void cmd_WS2812(void){
  */
 void __not_in_flash_func(bitstream)(int gppin, unsigned int *data, int num){
     for(int i=0;i<num;i++){
-        gpio_xor_mask64(gppin);
+        hal_pin_bank_xor_mask(gppin);
         shortpause(data[i])
     }
 }
@@ -3342,20 +3329,20 @@ void __not_in_flash_func(serialtx)(int gppin, unsigned char *string, int bittime
     int count = 0;
     while(count++ < string[0]) {
         systick_hw->cvr=0;
-        gpio_clr_mask64(gppin);                                    // send the start bit
+        hal_pin_bank_clr_mask(gppin);                                    // send the start bit
         mask=1;
         while(systick_hw->cvr>bittime){}; 
         systick_hw->cvr=0;
         for (mask=1;mask<0x100; mask<<=1) {
             if(string[count] & mask) {                               // check the bit to send
-                gpio_set_mask64(gppin);                                    // send the start bit
+                hal_pin_bank_set_mask(gppin);                                    // send the start bit
             } else {
-                gpio_clr_mask64(gppin);                                    // send the start bit
+                hal_pin_bank_clr_mask(gppin);                                    // send the start bit
             }
             while(systick_hw->cvr>bittime){}; 
             systick_hw->cvr=0;
         }
-        gpio_set_mask64(gppin);                                    // send the start bit
+        hal_pin_bank_set_mask(gppin);                                    // send the start bit
         while(systick_hw->cvr>bittime){}; 
     }
 }
@@ -3367,21 +3354,21 @@ unsigned short FloatToUint32(MMFLOAT x) {
 int __not_in_flash_func(serialrx)(int gppin, unsigned char *string, int timeout, int bittime, int half, int maxchars, char *termchars){
     int i,c,count=0;
     while(1){
-        while(gpio_get_all64() & gppin) {                              // wait for the start bit
+        while(hal_pin_bank_read_all() & gppin) {                              // wait for the start bit
             if(readusclock() >= timeout) return -1;                   // return if there is a timeout
         }
         systick_hw->cvr=0;
         while(systick_hw->cvr>half){}; 
         systick_hw->cvr=0;
-        if(gpio_get_all64() & gppin) continue;                         // go around again if not low
+        if(hal_pin_bank_read_all() & gppin) continue;                         // go around again if not low
         c=0;
         for(i = 0; i < 8; i++) {
             while(systick_hw->cvr>bittime){}; 
             systick_hw->cvr=0;
-            c |= (((gpio_get_all64() & gppin) ? 1 : 0) << i);                      // and add this bit in
+            c |= (((hal_pin_bank_read_all() & gppin) ? 1 : 0) << i);                      // and add this bit in
         }
         while(systick_hw->cvr>bittime){}; 
-        if(!(gpio_get_all64() & gppin)) continue;                      // a framing error if not high
+        if(!(hal_pin_bank_read_all() & gppin)) continue;                      // a framing error if not high
         count++;
         string[count] = c;                                          // save the character
         string[0] = count;                                          // and update the numbers of characters in the string
@@ -3482,7 +3469,7 @@ void cmd_device(void){
         writeusclock(0);
         int bittime=16777215 + 12  - (ticks_per_second/baudrate) ;
         int half = 16777215 + 12  - (ticks_per_second/(baudrate<<1)) ;
-        if(!(gpio_get_all64() & gppin))error("Framing error");
+        if(!(hal_pin_bank_read_all() & gppin))error("Framing error");
         disable_interrupts_pico();
         int istat=serialrx(gppin, string, timeout, bittime, half, maxchars, termchars);
         enable_interrupts_pico();
@@ -3506,7 +3493,7 @@ void cmd_device(void){
         unsigned char *string=getstring(argv[4]);
         if(!(ExtCurrentConfig[pin] == EXT_DIG_OUT || ExtCurrentConfig[pin] == EXT_NOT_CONFIG)) error("Pin %/| is not off or an output",pin,pin);
         if(ExtCurrentConfig[pin] == EXT_NOT_CONFIG)ExtCfg(pin, EXT_DIG_OUT, 0);
-        gpio_set_mask64(gppin);                                    // send the start bit
+        hal_pin_bank_set_mask(gppin);                                    // send the start bit
         int bittime=16777215 + 12  - (ticks_per_second/baudrate) ;
         disable_interrupts_pico();
         serialtx(gppin,string, bittime);
@@ -4007,8 +3994,8 @@ void MIPS16 ClearExternalIO(void) {
         if(CheckPin(44, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED))ExtCfg(44,EXT_ANA_IN,0);
     }
     if(CheckPin(HEARTBEATpin, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED) && !Option.NoHeartbeat){
-        gpio_init(PinDef[HEARTBEATpin].GPno);
-        gpio_set_dir(PinDef[HEARTBEATpin].GPno, GPIO_OUT);
+        hal_pin_init_digital(PinDef[HEARTBEATpin].GPno);
+        hal_pin_set_dir(PinDef[HEARTBEATpin].GPno, HAL_PIN_DIR_OUT);
         ExtCurrentConfig[PinDef[HEARTBEATpin].pin]=EXT_HEARTBEAT;
     }
     #endif
@@ -4309,7 +4296,7 @@ void MIPS16 __not_in_flash_func(IRHandler)(void) {
 void __not_in_flash_func(gpio_callback)(uint gpio, uint32_t events) {
 #ifndef USBKEYBOARD
     static uint64_t data;
-    data=gpio_get_all64();
+    data=hal_pin_bank_read_all();
     if(Option.KEYBOARD_CLOCK) if( !(Option.KeyboardConfig == NO_KEYBOARD || Option.KeyboardConfig == CONFIG_I2C ) && gpio==PinDef[Option.KEYBOARD_CLOCK].GPno) CNInterrupt(data);
     if(MOUSE_CLOCK && gpio==PinDef[MOUSE_CLOCK].GPno)MNInterrupt(data);
 #endif

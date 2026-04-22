@@ -109,3 +109,60 @@ void hal_pin_irq_set_edge(uint32_t gpio, uint32_t edge_mask, bool enabled)
     (void)edge_mask;
     (void)enabled;
 }
+
+void hal_pin_init_digital(uint32_t gpio)
+{
+    if (gpio < HAL_HOST_GPIO_MAX) {
+        host_pin_modes[gpio]  = HAL_PIN_MODE_INPUT;
+        host_pin_levels[gpio] = false;
+    }
+}
+
+void hal_pin_deinit(uint32_t gpio)
+{
+    if (gpio < HAL_HOST_GPIO_MAX) {
+        host_pin_modes[gpio]  = HAL_PIN_MODE_DISABLED;
+        host_pin_levels[gpio] = false;
+    }
+}
+
+void hal_pin_set_function(uint32_t gpio, hal_pin_func_t func)
+{
+    (void)gpio;
+    (void)func;
+}
+
+uint64_t hal_pin_bank_read_all(void)
+{
+    uint64_t m = 0;
+    for (uint32_t i = 0; i < HAL_HOST_GPIO_MAX; i++) {
+        if (host_pin_levels[i]) m |= 1ULL << i;
+    }
+    return m;
+}
+
+uint64_t hal_pin_bank_read_out_latch(void)
+{
+    return hal_pin_bank_read_all();
+}
+
+void hal_pin_bank_set_mask(uint64_t mask)
+{
+    for (uint32_t i = 0; i < HAL_HOST_GPIO_MAX; i++) {
+        if (mask & (1ULL << i)) host_pin_levels[i] = true;
+    }
+}
+
+void hal_pin_bank_clr_mask(uint64_t mask)
+{
+    for (uint32_t i = 0; i < HAL_HOST_GPIO_MAX; i++) {
+        if (mask & (1ULL << i)) host_pin_levels[i] = false;
+    }
+}
+
+void hal_pin_bank_xor_mask(uint64_t mask)
+{
+    for (uint32_t i = 0; i < HAL_HOST_GPIO_MAX; i++) {
+        if (mask & (1ULL << i)) host_pin_levels[i] = !host_pin_levels[i];
+    }
+}

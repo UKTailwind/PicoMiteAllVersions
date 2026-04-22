@@ -143,6 +143,52 @@ typedef enum {
 
 void hal_pin_irq_set_edge(uint32_t gpio, uint32_t edge_mask, bool enabled);
 
+/* -----------------------------------------------------------------------
+ * Pin init/deinit + function MUX.
+ *
+ * hal_pin_init_digital defaults the pad to SIO with output disabled; it
+ * is the canonical replacement for pico SDK gpio_init() when the caller
+ * is about to configure the pin for digital I/O itself. hal_pin_deinit
+ * returns the pad to reset state.
+ *
+ * hal_pin_set_function routes a pin to a peripheral MUX. Enum values
+ * map 1-for-1 to the pico SDK GPIO_FUNC_* selector space; the HAL does
+ * not abstract which peripherals exist on which target — a caller that
+ * asks for a MUX the target doesn't have gets the SDK's own error.
+ * ---------------------------------------------------------------------- */
+
+typedef enum {
+    HAL_PIN_FUNC_NONE = 0,  /* GPIO_FUNC_NULL — disconnect pad */
+    HAL_PIN_FUNC_SIO,       /* plain digital */
+    HAL_PIN_FUNC_UART,
+    HAL_PIN_FUNC_I2C,
+    HAL_PIN_FUNC_SPI,
+    HAL_PIN_FUNC_PWM,
+    HAL_PIN_FUNC_PIO0,
+    HAL_PIN_FUNC_PIO1,
+    HAL_PIN_FUNC_PIO2,      /* rp2350 only */
+} hal_pin_func_t;
+
+void hal_pin_init_digital(uint32_t gpio);
+void hal_pin_deinit(uint32_t gpio);
+void hal_pin_set_function(uint32_t gpio, hal_pin_func_t func);
+
+/* -----------------------------------------------------------------------
+ * Wide (bank-0) GPIO operations.
+ *
+ * These exist for parallel-LCD bus bitbang and serial bit-bang loops
+ * that need a single atomic write/read covering many pins at once.
+ * Callers assemble the mask from `1ULL << gpio` for each pin they want
+ * to touch. The HAL does not interpret the mask beyond delegating to
+ * the SDK's bank-0 mask primitives.
+ * ---------------------------------------------------------------------- */
+
+uint64_t hal_pin_bank_read_all(void);
+uint64_t hal_pin_bank_read_out_latch(void);
+void     hal_pin_bank_set_mask(uint64_t mask);
+void     hal_pin_bank_clr_mask(uint64_t mask);
+void     hal_pin_bank_xor_mask(uint64_t mask);
+
 #ifdef __cplusplus
 }
 #endif

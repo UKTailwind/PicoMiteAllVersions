@@ -8,6 +8,7 @@
 #include "pico/stdlib.h"
 #include "hardware/adc.h"
 #include "hardware/gpio.h"
+#include "hardware/structs/sio.h"
 
 #include "hal/hal_pin.h"
 
@@ -159,4 +160,63 @@ void hal_pin_irq_set_edge(uint32_t gpio, uint32_t edge_mask, bool enabled)
     if (edge_mask & HAL_PIN_EDGE_RISE) sdk |= GPIO_IRQ_EDGE_RISE;
     if (edge_mask & HAL_PIN_EDGE_FALL) sdk |= GPIO_IRQ_EDGE_FALL;
     gpio_set_irq_enabled(gpio, sdk, enabled);
+}
+
+void hal_pin_init_digital(uint32_t gpio)
+{
+    gpio_init(gpio);
+}
+
+void hal_pin_deinit(uint32_t gpio)
+{
+    gpio_deinit(gpio);
+}
+
+void hal_pin_set_function(uint32_t gpio, hal_pin_func_t func)
+{
+    int sdk;
+    switch (func) {
+    case HAL_PIN_FUNC_NONE: sdk = GPIO_FUNC_NULL; break;
+    case HAL_PIN_FUNC_SIO:  sdk = GPIO_FUNC_SIO;  break;
+    case HAL_PIN_FUNC_UART: sdk = GPIO_FUNC_UART; break;
+    case HAL_PIN_FUNC_I2C:  sdk = GPIO_FUNC_I2C;  break;
+    case HAL_PIN_FUNC_SPI:  sdk = GPIO_FUNC_SPI;  break;
+    case HAL_PIN_FUNC_PWM:  sdk = GPIO_FUNC_PWM;  break;
+    case HAL_PIN_FUNC_PIO0: sdk = GPIO_FUNC_PIO0; break;
+    case HAL_PIN_FUNC_PIO1: sdk = GPIO_FUNC_PIO1; break;
+#ifdef GPIO_FUNC_PIO2
+    case HAL_PIN_FUNC_PIO2: sdk = GPIO_FUNC_PIO2; break;
+#endif
+    default: sdk = GPIO_FUNC_NULL; break;
+    }
+    gpio_set_function(gpio, (gpio_function_t)sdk);
+}
+
+uint64_t hal_pin_bank_read_all(void)
+{
+    return gpio_get_all64();
+}
+
+uint64_t hal_pin_bank_read_out_latch(void)
+{
+#if NUM_BANK0_GPIOS <= 32
+    return sio_hw->gpio_out;
+#else
+    return sio_hw->gpio_out | (((uint64_t)sio_hw->gpio_hi_out) << 32u);
+#endif
+}
+
+void hal_pin_bank_set_mask(uint64_t mask)
+{
+    gpio_set_mask64(mask);
+}
+
+void hal_pin_bank_clr_mask(uint64_t mask)
+{
+    gpio_clr_mask64(mask);
+}
+
+void hal_pin_bank_xor_mask(uint64_t mask)
+{
+    gpio_xor_mask64(mask);
 }
