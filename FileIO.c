@@ -91,9 +91,8 @@ extern FRESULT host_f_getcwd(TCHAR *buff, UINT len);
 	#include "pico/multicore.h"
 	extern mutex_t	frameBufferMutex;
 #endif
-#ifdef rp2350
-#include "hardware/structs/qmi.h"
-#endif
+/* qmi.h (PSRAM controller) is only touched via mmbasic_save/restore_psram_settings
+ * in ports/pico_sdk_common/psram_cache.c — not included here anymore. */
 extern const uint8_t *flash_target_contents;
 extern const uint8_t *flash_option_contents;
 extern const uint8_t *SavedVarsFlash;
@@ -109,13 +108,13 @@ int dirflags;
 int GPSfnbr = 0;
 int lfs_FileFnbr=0;
 int FatFSFileSystem=0; //Assume we are using flash file system
-#ifdef rp2350
-static uint32_t m1_rfmt;
-static uint32_t m1_timing;
-static uint32_t m0_rfmt;
-static uint32_t m0_timing;
+/* PSRAM XIP-cache save/restore moved to
+ * ports/pico_sdk_common/psram_cache.c. These externs let FileIO.c call
+ * them unconditionally; the bodies no-op on RP2040. */
+extern void mmbasic_save_psram_settings(void);
+extern void mmbasic_restore_psram_settings(void);
+/* MemLoadProgram body lives in the #ifdef-rp2350 DEFINES block below. */
 int MemLoadProgram(unsigned char *fname, unsigned char *ram);
-#endif
 
 // 8*8*4 bytes * 3 = 768
 int16_t *gCoeffBuf;
@@ -179,7 +178,11 @@ void getfullfilepath(char *p, char *q);
 void fullpath(char *q);
 int FatFSFileSystemSave=0;
 #define overlap (VRes % (FontTable[gui_font >> 4][1] * (gui_font & 0b1111)) ? 0 : 1)
-#ifdef rp2350
+/* DEFINES dictionary state — used by the rp2350 compile-time defines
+ * feature (HAL_PORT_HAS_DEFINES). Types and globals declared on every
+ * target; on ports without the feature the globals stay at their
+ * initialisers and the LoadFile-time parser never touches them
+ * (HAL_PORT_HAS_DEFINES value-gated in the code path below). */
 typedef struct sa_dlist {
     char from[32];
     char to[32];
@@ -187,7 +190,6 @@ typedef struct sa_dlist {
 a_dlist *dlist;
 int nDefines;
 int LineCount=0;
-#endif
 /******************************************************************************************
 Text for the file related error messages reported by MMBasic
 ******************************************************************************************/
@@ -308,43 +310,17 @@ struct uFileTable FileTable[MAXOPENFILES + 1];
 volatile BYTE SDCardStat = STA_NOINIT | STA_NODISK;
 int OptionFileErrorAbort = true;
 volatile uint32_t irqs;
-#ifdef rp2350
-static void save_psram_settings(void) {
-    // We're about to invalidate the XIP cache, clean it first to commit any dirty writes to PSRAM
-    uint8_t *maintenance_ptr = (uint8_t *)XIP_MAINTENANCE_BASE;
-    for (int i = 1; i < 16 * 1024; i += 8) {
-        maintenance_ptr[i] = 0;
-    }
-
-    m1_timing = qmi_hw->m[1].timing;
-    m1_rfmt = qmi_hw->m[1].rfmt;
-    m0_timing = qmi_hw->m[0].timing;
-    m0_rfmt = qmi_hw->m[0].rfmt;
-}
-
-static void restore_psram_settings(void) {
-    qmi_hw->m[1].timing = m1_timing;
-    qmi_hw->m[1].rfmt = m1_rfmt;
-    qmi_hw->m[0].timing = m0_timing;
-    qmi_hw->m[0].rfmt = m0_rfmt;
-}
-#endif
-
 void disable_interrupts_pico(void)
 {
 #ifndef MMBASIC_HOST
-#ifdef rp2350
-    save_psram_settings();
-#endif
+    mmbasic_save_psram_settings();
     irqs=save_and_disable_interrupts();
 #endif /* !MMBASIC_HOST */
 }
 void enable_interrupts_pico(void)
 {
 #ifndef MMBASIC_HOST
-#ifdef rp2350
-    restore_psram_settings();
-#endif
+    mmbasic_restore_psram_settings();
     restore_interrupts(irqs);
     SecondsTimer+=(hal_time_us_64()/1000 - mSecTimer);
     mSecTimer=hal_time_us_64()/1000;
@@ -1871,9 +1847,7 @@ void MIPS16 cmd_save(void)
         flinebuf = GetTempMemory(maxW * 4);
         outbuf=GetTempMemory(maxW/2);
         char *foutbuf=GetTempMemory(maxW);
-#ifdef PICOMITEVGA
         mergedread=1;
-#endif
         for (i = y + h - 1; i >= y; i--)
         {
             ReadBuffer(x, i, x + w - 1, i, flinebuf);
@@ -1910,9 +1884,7 @@ void MIPS16 cmd_save(void)
             hal_write_checked(fnbr, foutbuf, count);
 
         }
-#ifdef PICOMITEVGA
         mergedread=0;
-#endif
         foutbuf[0]=0;foutbuf[1]=1;
         hal_write_checked(fnbr, foutbuf, 2);
         FileClose(fnbr);
@@ -2004,9 +1976,7 @@ void MIPS16 cmd_save(void)
 	        hal_write_checked(fnbr, bmpcolourpallette, 64);
 	        flinebuf = GetTempMemory(maxW * 4);
 	        outbuf=GetTempMemory(maxW/2);
-#ifdef PICOMITEVGA
             mergedread=1;
-#endif
 	        for (i = y + h - 1; i >= y; i--)
 	        {
 	            ReadBuffer(x, i, x + w - 1, i, flinebuf);
@@ -2029,9 +1999,7 @@ void MIPS16 cmd_save(void)
 	                hal_write_checked(fnbr, bmppad, 4 - ((w / 2 ) % 4));
                 }
 	        }
-#ifdef PICOMITEVGA
             mergedread=0;
-#endif
 	        FileClose(fnbr);
 	        return;
         }

@@ -165,6 +165,11 @@ bool CollisionFound = false;
 int sprite_which_collided = -1;
 static bool hideall = 0;
 uint8_t sprite_transparent=0;
+/* mergedread controls transparent-colour handling in the sprite blit
+ * paths. Only PICOMITEVGA actually toggles it during BMP save (FileIO.c);
+ * other targets never set it. Declared here unconditionally so
+ * FileIO.c's writes link on every build. */
+bool mergedread = 0;
 #ifdef PICOMITEVGA
 #ifndef HDMI
 uint8_t remap[256];
@@ -175,7 +180,6 @@ uint16_t remap256[256];
 #endif
 
 extern volatile int QVgaScanLine;
-bool mergedread=0;
 int ScreenSize=0;
 #else
     extern int SSD1963data;
