@@ -43,7 +43,7 @@ set(PICOMITE_BASE_COMMON_SOURCES
 	ff.c
 	ffsystem.c
 	ffunicode.c
-	mmc_stm32.c
+	drivers/sd_spi/mmc_stm32.c
 	picojpeg.c
 	lfs.c
 	lfs_util.c
@@ -214,7 +214,7 @@ if(PICOCALC STREQUAL "true")
 	)
 endif()
 
-set_source_files_properties(mmc_stm32.c PROPERTIES COMPILE_FLAGS -O2)
+set_source_files_properties(drivers/sd_spi/mmc_stm32.c PROPERTIES COMPILE_FLAGS -O2)
 set_source_files_properties(ff.c PROPERTIES COMPILE_FLAGS -Os)
 set_source_files_properties(GUI.c PROPERTIES COMPILE_FLAGS -Os)
 set_source_files_properties(BmpDecoder.c PROPERTIES COMPILE_FLAGS -Os)
