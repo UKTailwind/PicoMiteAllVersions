@@ -446,3 +446,10 @@ void cmd_mouse(void){
 	} else error("Syntax");
 }
 
+/* On non-USB builds there is no USB HID gamepad backend. Provide a stub
+ * so core can dispatch the GAMEPAD sub-command unconditionally. */
+void cmd_gamepad(void)
+{
+    error("GAMEPAD not supported on this build");
+}
+

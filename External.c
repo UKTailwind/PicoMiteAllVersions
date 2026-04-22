@@ -3219,7 +3219,11 @@ void cmd_device(void){
 		cmd_Nunchuck();
 		return;
 	}
-#ifdef USBKEYBOARD
+	/* MOUSE / GAMEPAD sub-commands. On USB-host builds cmd_mouse +
+	 * cmd_gamepad come from drivers/usb_host_kbd/USBKeyboard.c; on
+	 * non-USB builds mouse.c provides a PS/2 mouse cmd_mouse and a
+	 * stub cmd_gamepad that errors at runtime. Core dispatches
+	 * unconditionally. */
 	tp = checkstring(cmdline, (unsigned char *)"MOUSE");
 	if(tp) {
         cmdline=tp;
@@ -3232,7 +3236,6 @@ void cmd_device(void){
 		cmd_gamepad();
 		return;
 	}
-#endif
 	tp = checkstring(cmdline, (unsigned char *)"HUMID");
 	if(tp) {
         cmdline=tp;
@@ -3362,84 +3365,50 @@ void cmd_adc(void){
         int nbr=getint(argv[2],1,HAL_PORT_ADC_CHANNEL_MAX);
         frequency=(float)getnumber(argv[0])*nbr;
         if(frequency<ADC_CLK_SPEED/65536.0/96.0 || frequency> ADC_CLK_SPEED/96.0)error("Invalid frequency");
-#ifdef rp2350
-#ifdef PICOMITEWEB
-        if(!(ExtCurrentConfig[31] == EXT_ANA_IN || ExtCurrentConfig[31] == EXT_NOT_CONFIG)) error("Pin GP26 is not off or an ADC input");
-        if(ExtCurrentConfig[31] == EXT_NOT_CONFIG)ExtCfg(31, EXT_ANA_IN, 0);
-        ExtCfg(31, EXT_COM_RESERVED, 0);
-        if(nbr>=2){
-            if(!(ExtCurrentConfig[32] == EXT_ANA_IN || ExtCurrentConfig[32] == EXT_NOT_CONFIG)) error("Pin GP27 is not off or an ADC input");
-            if(ExtCurrentConfig[32] == EXT_NOT_CONFIG)ExtCfg(32, EXT_ANA_IN, 0);
-            ExtCfg(32, EXT_COM_RESERVED, 0);
+        /* ADC pin reserve. rp2350a==true on RP2040 / RP2040-WEB /
+         * RP2350A: channels live on pin slots 31/32/34(/44). RP2350B
+         * (rp2350a==false): channels on slots 55/56/57/58. nbr is
+         * already clamped to HAL_PORT_ADC_CHANNEL_MAX above, so WEB
+         * never reaches the 4th channel. */
+        if (rp2350a) {
+            if(!(ExtCurrentConfig[31] == EXT_ANA_IN || ExtCurrentConfig[31] == EXT_NOT_CONFIG)) error("Pin GP26 is not off or an ADC input");
+            if(ExtCurrentConfig[31] == EXT_NOT_CONFIG)ExtCfg(31, EXT_ANA_IN, 0);
+            ExtCfg(31, EXT_COM_RESERVED, 0);
+            if(nbr>=2){
+                if(!(ExtCurrentConfig[32] == EXT_ANA_IN || ExtCurrentConfig[32] == EXT_NOT_CONFIG)) error("Pin GP27 is not off or an ADC input");
+                if(ExtCurrentConfig[32] == EXT_NOT_CONFIG)ExtCfg(32, EXT_ANA_IN, 0);
+                ExtCfg(32, EXT_COM_RESERVED, 0);
+            }
+            if(nbr>=3){
+                if(!(ExtCurrentConfig[34] == EXT_ANA_IN || ExtCurrentConfig[34] == EXT_NOT_CONFIG)) error("Pin GP28 is not off or an ADC input");
+                if(ExtCurrentConfig[34] == EXT_NOT_CONFIG)ExtCfg(34, EXT_ANA_IN, 0);
+                ExtCfg(34, EXT_COM_RESERVED, 0);
+            }
+            if(nbr>=4){
+                if(!(ExtCurrentConfig[44] == EXT_ANA_IN || ExtCurrentConfig[44] == EXT_NOT_CONFIG)) error("Pin GP29 is not off or an ADC input");
+                if(ExtCurrentConfig[44] == EXT_NOT_CONFIG)ExtCfg(44, EXT_ANA_IN, 0);
+                ExtCfg(44, EXT_COM_RESERVED, 0);
+            }
+        } else {
+            if(!(ExtCurrentConfig[55] == EXT_ANA_IN || ExtCurrentConfig[55] == EXT_NOT_CONFIG)) error("Pin GP40 is not off or an ADC input");
+            if(ExtCurrentConfig[55] == EXT_NOT_CONFIG)ExtCfg(55, EXT_ANA_IN, 0);
+            ExtCfg(55, EXT_COM_RESERVED, 0);
+            if(nbr>=2){
+                if(!(ExtCurrentConfig[56] == EXT_ANA_IN || ExtCurrentConfig[56] == EXT_NOT_CONFIG)) error("Pin GP41 is not off or an ADC input");
+                if(ExtCurrentConfig[56] == EXT_NOT_CONFIG)ExtCfg(56, EXT_ANA_IN, 0);
+                ExtCfg(56, EXT_COM_RESERVED, 0);
+            }
+            if(nbr>=3){
+                if(!(ExtCurrentConfig[57] == EXT_ANA_IN || ExtCurrentConfig[57] == EXT_NOT_CONFIG)) error("Pin GP42 is not off or an ADC input");
+                if(ExtCurrentConfig[57] == EXT_NOT_CONFIG)ExtCfg(57, EXT_ANA_IN, 0);
+                ExtCfg(57, EXT_COM_RESERVED, 0);
+            }
+            if(nbr>=4){
+                if(!(ExtCurrentConfig[58] == EXT_ANA_IN || ExtCurrentConfig[58] == EXT_NOT_CONFIG)) error("Pin GP43 is not off or an ADC input");
+                if(ExtCurrentConfig[58] == EXT_NOT_CONFIG)ExtCfg(58, EXT_ANA_IN, 0);
+                ExtCfg(58, EXT_COM_RESERVED, 0);
+            }
         }
-        if(nbr>=3){
-            if(!(ExtCurrentConfig[34] == EXT_ANA_IN || ExtCurrentConfig[34] == EXT_NOT_CONFIG)) error("Pin GP28 is not off or an ADC input");
-            if(ExtCurrentConfig[34] == EXT_NOT_CONFIG)ExtCfg(34, EXT_ANA_IN, 0);
-            ExtCfg(34, EXT_COM_RESERVED, 0);
-        }
-#else
-if(rp2350a){
-        if(!(ExtCurrentConfig[31] == EXT_ANA_IN || ExtCurrentConfig[31] == EXT_NOT_CONFIG)) error("Pin GP26 is not off or an ADC input");
-        if(ExtCurrentConfig[31] == EXT_NOT_CONFIG)ExtCfg(31, EXT_ANA_IN, 0);
-        ExtCfg(31, EXT_COM_RESERVED, 0);
-        if(nbr>=2){
-            if(!(ExtCurrentConfig[32] == EXT_ANA_IN || ExtCurrentConfig[32] == EXT_NOT_CONFIG)) error("Pin GP27 is not off or an ADC input");
-            if(ExtCurrentConfig[32] == EXT_NOT_CONFIG)ExtCfg(32, EXT_ANA_IN, 0);
-            ExtCfg(32, EXT_COM_RESERVED, 0);
-        }
-        if(nbr>=3){
-            if(!(ExtCurrentConfig[34] == EXT_ANA_IN || ExtCurrentConfig[34] == EXT_NOT_CONFIG)) error("Pin GP28 is not off or an ADC input");
-            if(ExtCurrentConfig[34] == EXT_NOT_CONFIG)ExtCfg(34, EXT_ANA_IN, 0);
-            ExtCfg(34, EXT_COM_RESERVED, 0);
-        }
-        if(nbr>=4){
-            if(!(ExtCurrentConfig[44] == EXT_ANA_IN || ExtCurrentConfig[44] == EXT_NOT_CONFIG)) error("Pin GP29 is not off or an ADC input");
-            if(ExtCurrentConfig[44] == EXT_NOT_CONFIG)ExtCfg(44, EXT_ANA_IN, 0);
-            ExtCfg(44, EXT_COM_RESERVED, 0);
-        }
-} else {
-        if(!(ExtCurrentConfig[55] == EXT_ANA_IN || ExtCurrentConfig[55] == EXT_NOT_CONFIG)) error("Pin GP40 is not off or an ADC input");
-        if(ExtCurrentConfig[55] == EXT_NOT_CONFIG)ExtCfg(55, EXT_ANA_IN, 0);
-        ExtCfg(55, EXT_COM_RESERVED, 0);
-        if(nbr>=2){
-            if(!(ExtCurrentConfig[56] == EXT_ANA_IN || ExtCurrentConfig[56] == EXT_NOT_CONFIG)) error("Pin GP41 is not off or an ADC input");
-            if(ExtCurrentConfig[56] == EXT_NOT_CONFIG)ExtCfg(56, EXT_ANA_IN, 0);
-            ExtCfg(56, EXT_COM_RESERVED, 0);
-        }
-        if(nbr>=3){
-            if(!(ExtCurrentConfig[57] == EXT_ANA_IN || ExtCurrentConfig[57] == EXT_NOT_CONFIG)) error("Pin GP42 is not off or an ADC input");
-            if(ExtCurrentConfig[57] == EXT_NOT_CONFIG)ExtCfg(57, EXT_ANA_IN, 0);
-            ExtCfg(57, EXT_COM_RESERVED, 0);
-        }
-        if(nbr>=4){
-            if(!(ExtCurrentConfig[58] == EXT_ANA_IN || ExtCurrentConfig[58] == EXT_NOT_CONFIG)) error("Pin GP43 is not off or an ADC input");
-            if(ExtCurrentConfig[58] == EXT_NOT_CONFIG)ExtCfg(58, EXT_ANA_IN, 0);
-            ExtCfg(58, EXT_COM_RESERVED, 0);
-        }
-}
-#endif
-#else
-        if(!(ExtCurrentConfig[31] == EXT_ANA_IN || ExtCurrentConfig[31] == EXT_NOT_CONFIG)) error("Pin GP26 is not off or an ADC input");
-        if(ExtCurrentConfig[31] == EXT_NOT_CONFIG)ExtCfg(31, EXT_ANA_IN, 0);
-        ExtCfg(31, EXT_COM_RESERVED, 0);
-        if(nbr>=2){
-            if(!(ExtCurrentConfig[32] == EXT_ANA_IN || ExtCurrentConfig[32] == EXT_NOT_CONFIG)) error("Pin GP27 is not off or an ADC input");
-            if(ExtCurrentConfig[32] == EXT_NOT_CONFIG)ExtCfg(32, EXT_ANA_IN, 0);
-            ExtCfg(32, EXT_COM_RESERVED, 0);
-        }
-        if(nbr>=3){
-            if(!(ExtCurrentConfig[34] == EXT_ANA_IN || ExtCurrentConfig[34] == EXT_NOT_CONFIG)) error("Pin GP28 is not off or an ADC input");
-            if(ExtCurrentConfig[34] == EXT_NOT_CONFIG)ExtCfg(34, EXT_ANA_IN, 0);
-            ExtCfg(34, EXT_COM_RESERVED, 0);
-        }
-        /* nbr is bounded by HAL_PORT_ADC_CHANNEL_MAX above; WEB clamps
-         * to 3 there so this `nbr>=4` branch never runs on WEB. */
-        if(nbr>=4){
-            if(!(ExtCurrentConfig[44] == EXT_ANA_IN || ExtCurrentConfig[44] == EXT_NOT_CONFIG)) error("Pin GP29 is not off or an ADC input");
-            if(ExtCurrentConfig[44] == EXT_NOT_CONFIG)ExtCfg(44, EXT_ANA_IN, 0);
-            ExtCfg(44, EXT_COM_RESERVED, 0);
-        }
-#endif
         if(argc==5){
         	InterruptUsed = true;
         	ADCInterrupt = (char *)GetIntAddress(argv[4]);							// get the interrupt location
