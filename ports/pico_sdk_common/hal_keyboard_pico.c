@@ -26,11 +26,13 @@
 #include "Hardware_Includes.h"
 
 #include "hal/hal_keyboard.h"
+#include "hal/hal_pin.h"
 
 #include <string.h>
 
 #ifndef USBKEYBOARD
 #include "PS2Keyboard.h"  /* CheckKeyboard, initKeyboard, NO_KEYBOARD, CONFIG_* */
+extern void mouse0close(void);
 #endif
 
 #ifdef USBKEYBOARD
@@ -152,5 +154,55 @@ int hal_keyboard_set_layout(int layout)
         default:
             return -1;
     }
+#endif
+}
+
+void hal_keyboard_quiesce_for_reset(void)
+{
+#ifdef USBKEYBOARD
+    USBenabled = false;
+    uSec(50000);   /* let outstanding USB transfers complete */
+#endif
+}
+
+int hal_keyboard_usb_raw_report(int slot, unsigned char *out, int max_len)
+{
+    if (slot < 1 || slot > 4 || !out || max_len < 2) return 0;
+#ifdef USBKEYBOARD
+    /* HID[slot-1].report is a length-prefixed MMBasic string (report[0]
+     * is the byte count). Copy the length byte plus payload, clamped to
+     * the caller's buffer. */
+    int total = HID[slot - 1].report[0] + 1;
+    if (total > max_len) total = max_len;
+    memcpy(out, (const void *)HID[slot - 1].report, (size_t)total);
+    return total;
+#else
+    (void)slot; (void)out; (void)max_len;
+    return 0;
+#endif
+}
+
+void hal_keyboard_on_external_io_clear(void)
+{
+#ifndef USBKEYBOARD
+    OnPS2GOSUB = NULL;
+    PS2code = 0;
+    PS2int = false;
+    if (!Option.MOUSE_CLOCK) mouse0close();
+#endif
+}
+
+void hal_keyboard_on_gpio_edge(uint32_t gpio)
+{
+#ifndef USBKEYBOARD
+    uint64_t data = hal_pin_bank_read_all();
+    if (Option.KEYBOARD_CLOCK) {
+        if (!(Option.KeyboardConfig == NO_KEYBOARD || Option.KeyboardConfig == CONFIG_I2C) &&
+            gpio == PinDef[Option.KEYBOARD_CLOCK].GPno)
+            CNInterrupt(data);
+    }
+    if (MOUSE_CLOCK && gpio == PinDef[MOUSE_CLOCK].GPno) MNInterrupt(data);
+#else
+    (void)gpio;
 #endif
 }

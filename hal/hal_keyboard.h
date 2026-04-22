@@ -104,6 +104,30 @@ enum {
 
 int hal_keyboard_set_layout(int layout);
 
+/* Quiesce the keyboard backend ahead of a software reset. USB host
+ * backends clear the "USB enabled" flag and sleep briefly so outstanding
+ * transfers drain; PS/2 / I²C backends have nothing to quiesce. Callers
+ * invoke this right before triggering the watchdog reset in SoftReset(). */
+void hal_keyboard_quiesce_for_reset(void);
+
+/* Copy the most recent USB HID report for device slot `n` (1..4) into
+ * `out` (must hold at least `max_len` bytes). Returns the number of
+ * bytes written. On non-USB backends returns 0 and leaves `out`
+ * untouched. Exists so fun_nunchuck's "RAW" query can reach the USB HID
+ * report buffer without core touching HID[] directly. */
+int hal_keyboard_usb_raw_report(int slot, unsigned char *out, int max_len);
+
+/* Invoked from ClearExternalIO / gpio_callback teardown paths. PS/2
+ * backends clear their GOSUB / code / int globals and shut down the
+ * software mouse pump; USB / I²C backends have nothing to do. */
+void hal_keyboard_on_external_io_clear(void);
+
+/* Dispatched from gpio_callback on every GPIO edge. PS/2 backends
+ * match `gpio` against their clock / mouse-clock pins and decode the
+ * edge into scan-code state; USB backends are IRQ-driven from
+ * tinyusb and ignore this. */
+void hal_keyboard_on_gpio_edge(uint32_t gpio);
+
 #ifdef __cplusplus
 }
 #endif

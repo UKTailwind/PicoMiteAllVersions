@@ -36,6 +36,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "hal/hal_time.h"
 #include "hal/hal_pin.h"
 #include "hal/hal_fast_timer.h"
+#include "hal/hal_keyboard.h"
 #include "hardware/watchdog.h"
 #include "pico/stdlib.h"
 #include "hardware/clocks.h"
@@ -261,10 +262,7 @@ void __not_in_flash_func(on_pwm_wrap_1)(void) {
 
 void SoftReset(void){
     _excep_code = SOFT_RESET;
-#ifdef USBKEYBOARD
-    USBenabled=false;
-    uSec(50000); //wait for outstanding requests to complete
-#endif
+    hal_keyboard_quiesce_for_reset();
 	watchdog_enable(1, 1);
 	while(1);
 }
@@ -2100,12 +2098,8 @@ void MIPS16 cmd_Servo(void){
     getargs(&cmdline,5,(unsigned char *)",");
     if(!(argc>=3))error("Syntax");
     int CPU_Speed=Option.CPU_Speed;
-#ifdef rp2350
     int slice=getint(argv[0],0,rp2350a ? 7:11);
     if(slice==0 && ExtCurrentConfig[FAST_TIMER_PIN]==EXT_FAST_TIMER)error("Channel in use for fast frequency");
-#else
-    int slice=getint(argv[0],0,7);
-#endif
     if(slice==BacklightSlice)error("Channel in use for backlight");
     if(slice==Option.AUDIO_SLICE)error("Channel in use for Audio");
     if(slice==CameraSlice)error("Channel in use for Camera");
@@ -2119,12 +2113,10 @@ void MIPS16 cmd_Servo(void){
         if(slice==5)slice5=0;
         if(slice==6)slice6=0;
         if(slice==7)slice7=0;
-#ifdef rp2350
         if(slice==8)slice8=0;
         if(slice==9)slice9=0;
         if(slice==10)slice10=0;
         if(slice==11)slice11=0;
-#endif
         return;
     }
     MMFLOAT frequency=50.0;
@@ -2161,12 +2153,8 @@ void MIPS16 cmd_pwm(void){
     unsigned char *tp;
     if((tp=checkstring(cmdline, (unsigned char *)"SYNC"))) {
         MMFLOAT count0=-1.0,count1=-1.0,count2=-1.0,count3=-1.0,count4=-1.0,count5=-1.0,count6=-1.0,count7=-1.0;
-#ifdef rp2350
         MMFLOAT count8=-1.0,count9=-1.0,count10=-1.0,count11=-1.0;
         getargs(&tp,23,(unsigned char *)",");
-#else
-        getargs(&tp,15,(unsigned char *)",");
-#endif
         if(argc>=1){count0=getnumber(argv[0]);
         if((count0<0.0 || count0>100.0) && count0!=-1.0)error("Syntax");}
         if(argc>=3 && *argv[2]){count1=getnumber(argv[2]);
@@ -2181,7 +2169,6 @@ void MIPS16 cmd_pwm(void){
         if((count5<0.0 || count5>100.0) && count5!=-1.0)error("Syntax");}
         if(argc>=13 && *argv[12]){count6=getnumber(argv[12]);
         if((count6<0.0 || count6>100.0) && count6!=-1.0)error("Syntax");}
-#ifdef rp2350
         if(argc>=15 && *argv[14]){count7=getnumber(argv[14]);
         if((count7<0.0 || count7>100.0) && count7!=-1.0)error("Syntax");}
         if(argc>=17 && *argv[16]){count8=getnumber(argv[16]);
@@ -2192,10 +2179,6 @@ void MIPS16 cmd_pwm(void){
         if((count10<0.0 || count10>100.0) && count10!=-1.0)error("Syntax");}
         if(argc==23 && *argv[22]){count11=getnumber(argv[22]);
         if((count11<0.0 || count11>100.0) && count11!=-1.0)error("Syntax");}
-#else
-        if(argc==15 && *argv[14]){count7=getnumber(argv[14]);
-        if((count7<0.0 || count7>100.0) && count7!=-1.0)error("Syntax");}
-#endif
         
         int enabled=0;
         if(slice0 || Option.AUDIO_SLICE ==0 || BacklightSlice==0 || CameraSlice==0
@@ -2294,7 +2277,13 @@ void MIPS16 cmd_pwm(void){
                 pwm_set_counter(7,count7);
             }
         }
-#ifdef rp2350
+        /* Slices 8..11 only exist on RP2350; the guard-and-configure shape
+         * mirrors slices 0..7. On RP2040 none of the OR-chain conditions
+         * ever become true (no code path sets slice8..11 globals or
+         * BacklightSlice/AUDIO_SLICE to 8..11 there), so the body never
+         * runs. pwm_hw->slice[8..11] is out-of-bounds on RP2040 but
+         * unreachable at runtime; -Warray-bounds warning is acceptable
+         * in dead code. */
         if(slice8 || Option.AUDIO_SLICE ==8 || BacklightSlice==8 || CameraSlice==8 || KeyboardlightSlice==8){
             enabled |=256;
             if(!(Option.AUDIO_SLICE ==8 || BacklightSlice==8 || CameraSlice==8 || KeyboardlightSlice==8 || count8<0.0)){
@@ -2327,7 +2316,6 @@ void MIPS16 cmd_pwm(void){
                 pwm_set_counter(11,count11);
             }
         }
-#endif
         pwm_hw->en=enabled;
         return;
     }
@@ -2337,12 +2325,8 @@ void MIPS16 cmd_pwm(void){
     getargs(&cmdline,11,(unsigned char *)",");
     if(!(argc>=3))error("Syntax");
     int CPU_Speed=Option.CPU_Speed;
-#ifdef rp2350
     int slice=getint(argv[0],0,rp2350a ? 7:11);
     if(slice==0 && ExtCurrentConfig[FAST_TIMER_PIN]==EXT_FAST_TIMER)error("Channel in use for fast frequency");
-#else
-    int slice=getint(argv[0],0,7);
-#endif
     if(slice==BacklightSlice)error("Channel in use for backlight");
     if(slice==Option.AUDIO_SLICE)error("Channel in use for Audio");
     if(slice==CameraSlice)error("Channel in use for Camera");
@@ -2356,12 +2340,10 @@ void MIPS16 cmd_pwm(void){
         if(slice==5)slice5=0;
         if(slice==6)slice6=0;
         if(slice==7)slice7=0;
-#ifdef rp2350
         if(slice==8)slice8=0;
         if(slice==9)slice9=0;
         if(slice==10)slice10=0;
         if(slice==11)slice11=0;
-#endif
         return;
     }
     if(!(argc>=5))error("Syntax");
@@ -3034,14 +3016,16 @@ void fun_dev(void){
         else if(checkstring(argv[2], (unsigned char *)"AY"))iret=nunstruct[n].accs[1];
         else if(checkstring(argv[2], (unsigned char *)"AZ"))iret=nunstruct[n].accs[2];
         else if(checkstring(argv[2], (unsigned char *)"T"))iret=nunstruct[n].type;
-#ifdef USBKEYBOARD
         else if(checkstring(argv[2], (unsigned char *)"RAW")){
             sret=GetTempMemory(STRINGSIZE);
             targ=T_STR;
-            Mstrcpy(sret,(unsigned char *)HID[n-1].report);
+            /* Fills sret in MMBasic length-prefixed form. Returns 0 on
+             * ports without a USB keyboard backend — sret stays an
+             * empty MMBasic string (length byte = 0 via GetTempMemory's
+             * zero-fill). */
+            hal_keyboard_usb_raw_report(n, sret, STRINGSIZE);
             return;
         }
-#endif
         else iret=0;
         targ=T_INT;
     } else if((tp=checkstring(ep,(unsigned char *)"MOUSE"))){
@@ -3393,11 +3377,7 @@ void cmd_adc(void){
         getargs(&tp,5,(unsigned char *)",");
         if(ADCopen)error("Already open");
         if(!(argc==3 || argc==5))error("Syntax");
-#ifndef PICOMITEWEB
-        int nbr=getint(argv[2],1,4); //number of ADC channels
-#else
-        int nbr=getint(argv[2],1,3); //number of ADC channels
-#endif
+        int nbr=getint(argv[2],1,HAL_PORT_ADC_CHANNEL_MAX);
         frequency=(float)getnumber(argv[0])*nbr;
         if(frequency<ADC_CLK_SPEED/65536.0/96.0 || frequency> ADC_CLK_SPEED/96.0)error("Invalid frequency");
 #ifdef rp2350
@@ -3916,12 +3896,7 @@ if(rp2350a){
     SetADCFreq(500000);
     KeyInterrupt=NULL;
     OnKeyGOSUB=NULL;
-#ifndef USBKEYBOARD
-    OnPS2GOSUB=NULL;
-    PS2code=0;
-    PS2int=false;
-    if(!Option.MOUSE_CLOCK)mouse0close();
-#endif 
+    hal_keyboard_on_external_io_clear();
     for (int i=0; i<6;i++)nunInterruptc[i]=NULL;
     if((classic1 || nunchuck1) && (classicread || nunchuckread))WiiReceive(6, (char *)nunbuff);
     classic1=0;
@@ -4123,12 +4098,7 @@ void MIPS16 __not_in_flash_func(IRHandler)(void) {
         }
     }
 void __not_in_flash_func(gpio_callback)(uint gpio, uint32_t events) {
-#ifndef USBKEYBOARD
-    static uint64_t data;
-    data=hal_pin_bank_read_all();
-    if(Option.KEYBOARD_CLOCK) if( !(Option.KeyboardConfig == NO_KEYBOARD || Option.KeyboardConfig == CONFIG_I2C ) && gpio==PinDef[Option.KEYBOARD_CLOCK].GPno) CNInterrupt(data);
-    if(MOUSE_CLOCK && gpio==PinDef[MOUSE_CLOCK].GPno)MNInterrupt(data);
-#endif
+    hal_keyboard_on_gpio_edge(gpio);
     if(gpio==PinDef[IRpin].GPno)IRHandler();
     if(gpio==PinDef[Option.INT1pin].GPno)TM_EXTI_Handler_1();
     if(gpio==PinDef[Option.INT2pin].GPno)TM_EXTI_Handler_2();

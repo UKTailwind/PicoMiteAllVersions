@@ -21,6 +21,8 @@
 #define HAL_PORT_HAS_DEFINES             0
 /* WEB variants claim the onboard LED for the CYW43 radio — no heartbeat. */
 #define HAL_PORT_HAS_HEARTBEAT           0
+/* WEB reserves GP29 for the CYW43 radio — only 3 ADC channels. */
+#define HAL_PORT_ADC_CHANNEL_MAX         3
 
 /* WEB on rp2040 runs lwIP + CYW43 network stacks and can't afford the RAM
  * pressure of pinning GPIO loops in SRAM. Keep them in flash. */

@@ -33,6 +33,10 @@
  * because the CYW43 wireless chip claims the onboard LED. */
 #define HAL_PORT_HAS_HEARTBEAT           1
 
+/* ADC channel count exposed to ADC OPEN. WEB claims GP29 for the CYW43
+ * radio pin, so max 3; every other board has 4. */
+#define HAL_PORT_ADC_CHANNEL_MAX         4
+
 /* Hot-path placement: SPI-LCD RP2040 has spare RAM for the GPIO hot loops
  * so we force them into SRAM via __not_in_flash_func. */
 #define HAL_PORT_RAM_FUNC(name)          __not_in_flash_func(name)

@@ -20,6 +20,7 @@
 #define HAL_PORT_HAS_UPNG                0
 #define HAL_PORT_HAS_DEFINES             0
 #define HAL_PORT_HAS_HEARTBEAT           1
+#define HAL_PORT_ADC_CHANNEL_MAX         4
 
 /* VGA on rp2040 runs scanout from flash via XIP — forcing GPIO hot loops
  * into SRAM would starve the scanout buffer and cause tearing. Leave them
