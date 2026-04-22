@@ -119,6 +119,7 @@ set(PICOMITE_CORE_STATE_SOURCES
 set(PICOMITE_PICO_SDK_HAL_SOURCES
 	ports/pico_sdk_common/hal_flash_pico.c
 	ports/pico_sdk_common/hal_time_pico.c
+	ports/pico_sdk_common/hal_pin_pico.c
 )
 
 set(PICOMITE_VM_SOURCES
