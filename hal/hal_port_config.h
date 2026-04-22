@@ -20,6 +20,9 @@
 #define HAL_PORT_HAS_FAST_TIMER    1
 #define HAL_PORT_HAS_INT5          1
 #define HAL_PORT_PULLDOWN_NEEDS_RESET 1
+#define HAL_PORT_HAS_PSRAM         1
+#define HAL_PORT_HAS_UPNG          1
+#define HAL_PORT_HAS_DEFINES       1
 #else
 #define HAL_PORT_PWM_SLICE_COUNT   8
 #define HAL_PORT_PWM_MAX_SLICE     7
@@ -29,6 +32,9 @@
 #define HAL_PORT_HAS_FAST_TIMER    0
 #define HAL_PORT_HAS_INT5          0
 #define HAL_PORT_PULLDOWN_NEEDS_RESET 0
+#define HAL_PORT_HAS_PSRAM         0
+#define HAL_PORT_HAS_UPNG          0
+#define HAL_PORT_HAS_DEFINES       0
 #endif
 
 /*
