@@ -30,12 +30,15 @@ CFLAGS = -std=gnu11 -g -O0 -Wall -Wno-unused-variable -Wno-unused-function \
 LDFLAGS = -lm
 
 # Source directory
-VPATH = ..
+VPATH = ..:../core/state
 
 # Core MMBasic sources (language runtime)
 CORE_SRCS = MMBasic.c Commands.c Functions.c Operators.c MATHS.c Memory.c Editor.c MMBasic_Prompt.c MMBasic_Print.c MMBasic_REPL.c
 CORE_SRCS += gfx_box_shared.c gfx_circle_shared.c gfx_line_shared.c gfx_pixel_shared.c gfx_cls_shared.c gfx_text_shared.c gfx_console_shared.c
 CORE_SRCS += mm_misc_shared.c
+# Cross-cutting state hoisted from Draw.c / External.c / Audio.c in Phase 0.5 of
+# the Real HAL refactor (see docs/real-hal-plan.md § "Cross-cutting state").
+CORE_SRCS += display_state.c
 CORE_SRCS += Draw.c RGB121.c Tilemap.c FileIO.c Audio.c BmpDecoder.c re.c
 
 # Bytecode VM sources

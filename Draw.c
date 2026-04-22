@@ -144,21 +144,16 @@ int PrintPixelMode=0;
 
 short CurrentX=0, CurrentY=0;                                             // the current default position for the next char to be written
 short DisplayHRes, DisplayVRes;                                       // the physical characteristics of the display
-struct spritebuffer spritebuff[MAXBLITBUF+1] = { 0 };	
-struct blitbuffer blitbuff[MAXBLITBUF+1] = { 0 };	
+/* spritebuff[], struct3d[], camera[], layer_in_use[], HRes, VRes are
+ * defined in core/state/display_state.c (hoisted in Phase 0.5 of the Real
+ * HAL refactor — see docs/real-hal-plan.md). Extern declarations live in
+ * Draw.h. */
+struct blitbuffer blitbuff[MAXBLITBUF+1] = { 0 };
 char CMM1=0;
-// the MMBasic programming characteristics of the display
-// note that HRes == 0 is an indication that a display is not configured
-short HRes = 0, VRes = 0;
 short lastx,lasty;
 const int CMM1map[16]={BLACK,BLUE,GREEN,CYAN,RED,MAGENTA,YELLOW,WHITE,MYRTLE,COBALT,MIDGREEN,CERULEAN,RUST,FUCHSIA,BROWN,LILAC};
 int RGB121map[16];
 // pointers to the drawing primitives
-#ifndef PICOMITEWEB
-struct D3D* struct3d[MAX3D + 1] = { NULL };
-s_camera camera[MAXCAM + 1];
-#endif
-int layer_in_use[MAXLAYER + 1];
 unsigned char LIFO[MAXBLITBUF];
 unsigned char zeroLIFO[MAXBLITBUF];
 uint8_t LIFOpointer = 0;

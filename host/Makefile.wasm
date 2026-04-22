@@ -62,7 +62,7 @@ LDFLAGS = -pthread -sPTHREAD_POOL_SIZE=1 \
           --preload-file demos@/bundle \
           -Wl,--allow-multiple-definition
 
-VPATH = ..
+VPATH = ..:../core/state
 
 # Core MMBasic sources — mirror host/Makefile's CORE_SRCS exactly.
 CORE_SRCS = MMBasic.c Commands.c Functions.c Operators.c MATHS.c \
@@ -72,6 +72,7 @@ CORE_SRCS = MMBasic.c Commands.c Functions.c Operators.c MATHS.c \
             gfx_pixel_shared.c gfx_cls_shared.c gfx_text_shared.c \
             gfx_console_shared.c \
             mm_misc_shared.c \
+            display_state.c \
             Draw.c RGB121.c Tilemap.c FileIO.c Audio.c BmpDecoder.c re.c
 
 # Bytecode VM sources — mirror host/Makefile's BC_SRCS exactly.

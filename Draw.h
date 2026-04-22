@@ -240,7 +240,7 @@ struct blitbuffer {
 };
 extern struct spritebuffer spritebuff[MAXBLITBUF+1];
 extern struct blitbuffer blitbuff[MAXBLITBUF+1];
-//extern int layer_in_use[MAXLAYER + 1];
+extern int layer_in_use[MAXLAYER + 1];
 extern void closeall3d(void);
 extern void closeframebuffer(char layer);
 extern void closeallsprites(void);

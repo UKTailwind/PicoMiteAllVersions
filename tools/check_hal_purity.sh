@@ -91,6 +91,7 @@ INFO_FILES=(
   vm_sys_pin.c
   vm_sys_time.c
   vm_sys_input.c
+  core/state/display_state.c
 )
 
 fail=0

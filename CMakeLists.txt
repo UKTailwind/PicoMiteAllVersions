@@ -105,6 +105,15 @@ set(PICOMITE_VM_SHARED_GFX_SOURCES
 	gfx_console_shared.c
 )
 
+# Cross-cutting state hoisted in Phase 0.5 of the Real HAL refactor
+# (see docs/real-hal-plan.md § "Cross-cutting state"). These files
+# contain storage for globals that were historically defined inside
+# Draw.c / External.c / Audio.c; moving them out unblocks later phases
+# that split those files into drivers/<name>/.
+set(PICOMITE_CORE_STATE_SOURCES
+	core/state/display_state.c
+)
+
 set(PICOMITE_VM_SOURCES
 	bc_alloc.c
 	bc_bridge.c
@@ -126,6 +135,11 @@ add_executable(PicoMite
 	${PICOMITE_VM_SOURCES}
 )
 target_sources(PicoMite PRIVATE ${PICOMITE_LEGACY_CORE_SOURCES})
+target_sources(PicoMite PRIVATE ${PICOMITE_CORE_STATE_SOURCES})
+# The project's headers (MMBasic_Includes.h, Draw.h, etc.) live in the
+# repo root. Sources in subdirectories (core/state/, future hal/ + drivers/
+# + ports/) need the root on the include path so their #includes resolve.
+target_include_directories(PicoMite PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 if (COMPILE STREQUAL "HDMI" OR COMPILE STREQUAL "WEBRP2350" OR COMPILE STREQUAL "HDMIUSB"  OR COMPILE STREQUAL "VGARP2350"  OR COMPILE STREQUAL "VGAUSBRP2350"  OR COMPILE STREQUAL "PICORP2350"  OR COMPILE STREQUAL "PICOUSBRP2350" )
     target_sources(PicoMite PRIVATE psram.c)
 endif()
