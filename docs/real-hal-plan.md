@@ -2,6 +2,25 @@
 
 Promote the implicit hardware-abstraction layer that emerged from the host port (`docs/host-hal-plan.md`) into a **first-class HAL spanning every device target** — RP2040 and RP2350 in all 12 board variants — so the BASIC interpreter and bytecode VM compile with **zero references to hardware target macros**, and target variants are selected by directory composition, not by preprocessor surgery.
 
+## Status (2026-04-21)
+
+**11 commits on `real-hal`.** Host tests 239/239 after every commit. RP2040 CMake + WASM green throughout. RP2350 build not green (pre-existing pico-sdk 2.0 API churn — `hardware/structs/ssi.h` removed; unrelated to this refactor).
+
+- Phase 0 ✅ — `hal/`, `drivers/`, `ports/` scaffolding; `hal/CONTRACT.md`; `tools/check_hal_purity.sh` (raw-grep mode); `tools/hal_scoreboard.sh`. Scoreboard rebaselined 476 → 606 after fixing regex that missed `PICOMITEPLUS`, `PICOCALC`, wider `PICOMITEWEB`. Deferred: `check_ram_baseline.sh`, `perf_microbench/`, Tier-B display-inline prototype (all need physical device).
+- Phase 0.5 ✅ — cross-cutting state hoisted to `core/state/`: `display_state.c`, `pin_state.c` (ExtCurrentConfig), `option_state.c`, `audio_state.c`. Plan correction: `PinDef[]` is board-level const in `PicoMite.c`/`host_runtime.c`, not mutable core state — stays where it is.
+- Phase 1 ✅ — `hal_flash.h` + device (`ports/pico_sdk_common/hal_flash_pico.c`) + host (`host/hal_flash_host.c`) impls. Full migration: no core file includes `hardware/flash.h`; all 52 `flash_range_*` + `flash_do_cmd` call sites routed through the HAL. Added `hal_flash_read_jedec_id` and `host/hardware/regs/addressmap.h` stub along the way.
+- Phase 2 (`hal_time`) ✅ — contract + impls + migration of 42 core call sites (`MM_Misc.c`, `Audio.c`, `Commands.c`, `Draw.c`, `External.c`, `FileIO.c`, `MATHS.c`, `bc_vm.c`, `mm_misc_shared.c`). Peripheral files (`PicoMite.c`, `I2C.c`, `USBKeyboard.c`, `MMMqtt`, `MMntp`, `MMtcpserver.c`, `XModem.c`) still call SDK time directly — migrate with their HALs. RTC get/set dropped from the contract (dead `extern datetime_t rtc_t` didn't exist in pico-sdk 2.0; removing it unblocked the rp2350 build past that specific error).
+- Phase 3 (`hal_pin`) 🟡 — scaffold contract + impls landed: `set_mode`, `read`, `write`, `toggle`, `read_output_latch`, `set_drive_mA`. Config-time sites migrated in `External.c` (`fun_pin`, cmd_setpin level write) and `MM_Misc.c` (OPTION PWM/PFM, HEARTBEAT init). **Deferred (resume here next):**
+  - Tier-B inline variants (`hal_pin_{read,write,toggle}_fast` as `static inline`) so `__not_in_flash_func` callers don't pay cross-section overhead. Unblocks WS2812e bit-banger + ExtSet.
+  - PinSetBit in `External.c` — switch-per-legacy-register-offset (LATCLR/LATSET/TRISSET etc.) that mirrors PIC32 semantics. Needs richer hal_pin API.
+  - PWM slice control, ADC channel reads, edge-IRQ attach — not yet in HAL.
+  - Peripheral-driver gpio uses (Onewire.c, I2C.c, SPI-LCD.c, Touch.c, mouse.c, mmc_stm32.c, SSD1963.c) migrate with their HALs.
+- Phases 4–13 — not started.
+
+**Commits:** f89e9a9 (scaffolding), 9a53573 / f7a06f4 / 896eaa9 / f1207a6 (state hoists), 33163ad / ed610a2 (hal_flash), 029170b / f2d840f (hal_time), 67b4092 / bbbb4ec (hal_pin).
+
+---
+
 - **Branch:** `real-hal` (off `main`).
 - **Predecessor plans:** [`bridge-restoration-plan.md`](bridge-restoration-plan.md), [`host-hal-plan.md`](host-hal-plan.md), [`web-host-plan.md`](web-host-plan.md).
   - Bridge restoration locked in: interpreter is the primary runtime; VM is a perf backend behind `FRUN`.
@@ -442,7 +461,9 @@ Each phase: green host build, green WASM build, every device CMake target builds
 
 Phases are ordered to **(a) lock the architecture in Phase 0, (b) hoist shared state in Phase 0.5 to unblock everything, (c) take low-risk surfaces first to validate the HAL shape, (d) attack the worst `#ifdef` offenders before they ossify around the HAL, and (e) leave host/WASM relocation for the very end.**
 
-### Phase 0 — Architecture lock + tooling (no behaviour change)
+### Phase 0 — Architecture lock + tooling (no behaviour change) ✅ partial
+
+Core scaffolding + purity gate + scoreboard landed. `check_ram_baseline.sh`, `perf_microbench/`, and the Tier-B display-inline prototype/measurement still pending — all need physical device access.
 
 - Land this doc.
 - Create empty `hal/`, `drivers/`, `ports/` directories with `.gitkeep`.
@@ -455,7 +476,7 @@ Phases are ordered to **(a) lock the architecture in Phase 0, (b) hoist shared s
 
 **Exit gate:** plan reviewed; all tooling lands and runs green on current main; Tier-B mechanism chosen and measured; scoreboard captured.
 
-### Phase 0.5 — Hoist cross-cutting state into `core/state/`
+### Phase 0.5 — Hoist cross-cutting state into `core/state/` ✅
 
 - Move global definitions (not declarations) for `HRes`, `VRes`, `FontTable[]`, `layer_in_use[]`, `spritebuff[]`, `struct3d[]`, `frameBufferMutex` from `Draw.c` to `core/state/display_state.c`.
 - Move `PinDef[]` definition from `External.c` to `core/state/pin_state.c`.
@@ -466,7 +487,7 @@ Phases are ordered to **(a) lock the architecture in Phase 0, (b) hoist shared s
 
 **Exit gate:** all 12 device targets + host + WASM build clean. `./run_tests.sh` 192/192. No behaviour change. Linker maps show globals in their new TUs.
 
-### Phase 1 — `hal_flash.h` (true lowest-risk dry run)
+### Phase 1 — `hal_flash.h` (true lowest-risk dry run) ✅
 
 - **Why this and not `hal_time`:** `hal_time` crosses the cooperative-yield hook (`host_runtime_check_timeout`, `wasm_last_yield_us`) that web-host Phase 2.5/4 depends on. `hal_flash` has no IRQ/jitter semantics — it's the persistent option block + unique device ID, called rarely.
 - Define `hal/hal_flash.h`: `hal_flash_read_options(buf, size)`, `hal_flash_write_options(buf, size)`, `hal_flash_unique_id(out8)`, `hal_flash_erase_program_area()`.
@@ -476,7 +497,7 @@ Phases are ordered to **(a) lock the architecture in Phase 0, (b) hoist shared s
 
 **Exit gate:** core no longer includes `hardware/flash.h`. Tools green. `./run_tests.sh` 192/192. All 12 device targets build.
 
-### Phase 2 — `hal_time.h`
+### Phase 2 — `hal_time.h` ✅
 
 - Now that the tooling and Phase 0.5 are locked, time can be migrated safely.
 - Define `hal/hal_time.h`: `hal_time_us_64()`, `hal_time_sleep_us()`, `hal_time_ms_tick()`, RTC accessors.
@@ -487,7 +508,9 @@ Phases are ordered to **(a) lock the architecture in Phase 0, (b) hoist shared s
 
 **Exit gate:** core no longer calls `time_us_64()` directly. FASTGFX 50 Hz invariant verified.
 
-### Phase 3 — `hal_pin.h` (pins / PWM / ADC)
+### Phase 3 — `hal_pin.h` (pins / PWM / ADC) 🟡
+
+Scaffold contract + device/host impls landed (`set_mode`, `read`, `write`, `toggle`, `read_output_latch`, `set_drive_mA`). Config-time sites in External.c and MM_Misc.c migrated. **Resume here:** Tier-B inline variants for `__not_in_flash_func` callers → PWM → ADC → edge IRQ → bulk External.c migration.
 
 - The VM already does pin/PWM via `vm_sys_pin.c`. Define `hal/hal_pin.h` to subsume that surface plus the interpreter's needs (`cmd_pin`, `cmd_pwm`, `cmd_pulse`, `External.c`'s ADC).
 - Implementations: `ports/rp2040/hal_pin_rp2040.c`, `ports/rp2350/hal_pin_rp2350.c` (extra PWM slices, extra ADC channels, clock-speed validation).
