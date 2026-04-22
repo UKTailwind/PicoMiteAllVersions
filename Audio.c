@@ -125,13 +125,14 @@ volatile unsigned char PWM_count = 0;
 volatile float PhaseM_left, PhaseM_right;
 volatile uint64_t SoundPlay;
 
-volatile e_CurrentlyPlaying CurrentlyPlaying = P_NOTHING;
+/* CurrentlyPlaying, WAVInterrupt, WAVcomplete are defined in
+ * core/state/audio_state.c (hoisted in Phase 0.5 of the Real HAL
+ * refactor — see docs/real-hal-plan.md). Extern declarations are in
+ * Audio.h / Hardware_Includes.h. */
 volatile int v_left, v_right, vol_left = 100, vol_right = 100;
 char *wav_buf;                                                      // pointer to the buffer for received wav data
 volatile int wav_filesize;                                                   // head and tail of the ring buffer for com1
 volatile int tickspersample;
-char *WAVInterrupt = NULL;
-bool WAVcomplete;
 int WAV_fnbr=0;
 int PWM_FREQ;
 volatile int swingbuf = 0,nextbuf = 0, playreadcomplete = 1;
@@ -2191,10 +2192,9 @@ void audio_checks(void){
 
 #include "host_sim_audio.h"
 
-volatile e_CurrentlyPlaying CurrentlyPlaying = P_NOTHING;
+/* CurrentlyPlaying, WAVInterrupt, WAVcomplete are defined in
+ * core/state/audio_state.c — see Phase 0.5 hoist. */
 volatile int vol_left = 100, vol_right = 100;
-char *WAVInterrupt = NULL;
-bool WAVcomplete = 0;
 int WAV_fnbr = 0;
 int PWM_FREQ = 0;
 volatile uint64_t SoundPlay = 0;
