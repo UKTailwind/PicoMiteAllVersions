@@ -4,19 +4,20 @@ Promote the implicit hardware-abstraction layer that emerged from the host port 
 
 ## Status (2026-04-21)
 
-**13 commits on `real-hal`.** Host tests 239/239 after every commit. All 12 device CMake variants green (`./buildall.sh` sweeps every `COMPILE` target: PICO/USB/VGA/VGAUSB/WEB for RP2040 and PICO/USB/VGA/VGAUSB/HDMI/HDMIUSB/WEB for RP2350). WASM link green.
+**14 commits on `real-hal`.** Host tests 239/239 after every commit. All 12 device CMake variants green (`./buildall.sh` sweeps every `COMPILE` target: PICO/USB/VGA/VGAUSB/WEB for RP2040 and PICO/USB/VGA/VGAUSB/HDMI/HDMIUSB/WEB for RP2350). WASM link green.
 
 - Phase 0 ✅ — `hal/`, `drivers/`, `ports/` scaffolding; `hal/CONTRACT.md`; `tools/check_hal_purity.sh` (raw-grep mode); `tools/hal_scoreboard.sh`. Scoreboard rebaselined 476 → 606 after fixing regex that missed `PICOMITEPLUS`, `PICOCALC`, wider `PICOMITEWEB`. Deferred: `check_ram_baseline.sh`, `perf_microbench/`, Tier-B display-inline prototype (all need physical device).
 - Phase 0.5 ✅ — cross-cutting state hoisted to `core/state/`: `display_state.c`, `pin_state.c` (ExtCurrentConfig), `option_state.c`, `audio_state.c`. Plan correction: `PinDef[]` is board-level const in `PicoMite.c`/`host_runtime.c`, not mutable core state — stays where it is.
 - Phase 1 ✅ — `hal_flash.h` + device (`ports/pico_sdk_common/hal_flash_pico.c`) + host (`host/hal_flash_host.c`) impls. Full migration: no core file includes `hardware/flash.h`; all 52 `flash_range_*` + `flash_do_cmd` call sites routed through the HAL. Added `hal_flash_read_jedec_id` and `host/hardware/regs/addressmap.h` stub along the way.
 - Phase 2 (`hal_time`) ✅ — contract + impls + migration of 42 core call sites (`MM_Misc.c`, `Audio.c`, `Commands.c`, `Draw.c`, `External.c`, `FileIO.c`, `MATHS.c`, `bc_vm.c`, `mm_misc_shared.c`). Peripheral files (`PicoMite.c`, `I2C.c`, `USBKeyboard.c`, `MMMqtt`, `MMntp`, `MMtcpserver.c`, `XModem.c`) still call SDK time directly — migrate with their HALs. RTC get/set dropped from the contract (dead `extern datetime_t rtc_t` didn't exist in pico-sdk 2.0; removing it unblocked the rp2350 build past that specific error).
-- Phase 3 (`hal_pin`) 🟡 — scaffold contract + impls landed: `set_mode`, `read`, `write`, `toggle`, `read_output_latch`, `set_drive_mA`. Config-time sites migrated in `External.c` (`fun_pin`, cmd_setpin level write) and `MM_Misc.c` (OPTION PWM/PFM, HEARTBEAT init). Tier-B inlines (`hal_pin_{read,write,toggle}_fast`) landed via per-port `hal_pin_inlines.h` on each port's `-I` path; device impl wraps pico SDK GPIO, host forwards to the extern slow path. WS2812e bit-banger migrated as the first Tier-B caller. **Deferred (resume here next):**
-  - ExtSet + PinSetBit in `External.c` — switch-per-legacy-register-offset (LATCLR/LATSET/TRISSET etc.) that mirrors PIC32 semantics. Needs richer hal_pin API (drive strength, pulls, direction toggle, open-drain).
-  - PWM slice control, ADC channel reads, edge-IRQ attach — not yet in HAL.
+- Phase 3 (`hal_pin`) 🟡 — HAL surface is now: `set_mode`, `read`, `write`, `toggle`, `read_output_latch`, `set_drive_mA`, `set_pulls`, `set_dir`, `set_input_enabled`, `select_digital`, `adc_select`, `set_input_hysteresis`, `set_slew_fast`, `irq_set_edge`; Tier-B fast inlines (`read_fast`/`write_fast`/`toggle_fast`) via per-port `hal_pin_inlines.h`. Migrated sites: `External.c` — `fun_pin`, cmd_setpin level write, full `PinSetBit` switch (all 12 cases), cmd_setpin IRQ disarm + counter-input arm (INT1..INT4), cmd_ir open/close, master deinit sweep, input-hysteresis + slew tuning; `MM_Misc.c` — OPTION PWM/PFM, HEARTBEAT init; WS2812e bit-banger on the fast path. **Deferred (resume here next):**
+  - Function MUX (gpio_set_function for UART/I2C/SPI/PWM/PIO) — migrates with the UART/I2C/SPI/PWM HALs.
+  - Wide 64-bit GPIO ops (`gpio_get_all64`, `gpio_set_mask64`, `gpio_xor_mask`) used by parallel-LCD bus and pulse/bitbang paths — needs a `hal_pin_bank` surface.
+  - ADC init/single-shot read and DMA-streamed ADC (`adc_init`, `adc_read`, `adc_fifo_setup`, `adc_set_round_robin`) — belongs in a dedicated `hal_adc` or extended `hal_pin_adc_*`.
   - Peripheral-driver gpio uses (Onewire.c, I2C.c, SPI-LCD.c, Touch.c, mouse.c, mmc_stm32.c, SSD1963.c) migrate with their HALs.
 - Phases 4–13 — not started.
 
-**Commits:** f89e9a9 (scaffolding), 9a53573 / f7a06f4 / 896eaa9 / f1207a6 (state hoists), 33163ad / ed610a2 (hal_flash), 029170b / f2d840f (hal_time), 67b4092 / bbbb4ec / 344def0 / 2b374da (hal_pin).
+**Commits:** f89e9a9 (scaffolding), 9a53573 / f7a06f4 / 896eaa9 / f1207a6 (state hoists), 33163ad / ed610a2 (hal_flash), 029170b / f2d840f (hal_time), 67b4092 / bbbb4ec / 344def0 / 2b374da / dca6ba2 (hal_pin), e8e1439 (buildall sweep).
 
 ---
 
