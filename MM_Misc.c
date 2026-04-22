@@ -3456,22 +3456,22 @@ tp = checkstring(cmdline, (unsigned char *)"HEARTBEAT");
         int pin1,pin2,pin3,pin4;
         if(CallBackEnabled==2) picomite_gpio_irq_set_enabled(PinDef[Option.INT1pin].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
         else if(CallBackEnabled & 2){
-            gpio_set_irq_enabled(PinDef[Option.INT1pin].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
+            hal_pin_irq_set_edge(PinDef[Option.INT1pin].GPno, HAL_PIN_EDGE_BOTH, false);
             CallBackEnabled &= (~2);
         }
         if(CallBackEnabled==4) picomite_gpio_irq_set_enabled(PinDef[Option.INT2pin].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
         else if(CallBackEnabled & 4){
-            gpio_set_irq_enabled(PinDef[Option.INT2pin].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
+            hal_pin_irq_set_edge(PinDef[Option.INT2pin].GPno, HAL_PIN_EDGE_BOTH, false);
             CallBackEnabled &= (~4);
         }
         if(CallBackEnabled==8) picomite_gpio_irq_set_enabled(PinDef[Option.INT3pin].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
         else  if(CallBackEnabled & 8){
-            gpio_set_irq_enabled(PinDef[Option.INT3pin].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
+            hal_pin_irq_set_edge(PinDef[Option.INT3pin].GPno, HAL_PIN_EDGE_BOTH, false);
             CallBackEnabled &= (~8);
         }
         if(CallBackEnabled==16) picomite_gpio_irq_set_enabled(PinDef[Option.INT4pin].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
         else  if(CallBackEnabled & 16){
-            gpio_set_irq_enabled(PinDef[Option.INT4pin].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
+            hal_pin_irq_set_edge(PinDef[Option.INT4pin].GPno, HAL_PIN_EDGE_BOTH, false);
             CallBackEnabled &= (~16);
         }
     	getargs(&tp,7,(unsigned char *)",");
@@ -5143,7 +5143,7 @@ int checkdetailinterrupts(void) {
             }
         intaddr = ADCInterrupt;                                   // get a pointer to the interrupt routine
         dmarunning=false;
-        adc_init();
+        hal_pin_adc_init();
         last_adc=99;
         FreeMemory((void *)ADCbuffer);
         goto GotAnInterrupt;

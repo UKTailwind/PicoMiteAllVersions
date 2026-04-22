@@ -39,6 +39,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include <float.h>
 #include "xregex.h"
 #include "hardware/adc.h"
+#include "hal/hal_pin.h"
 
 #ifdef rp2350
 #include "pico/rand.h"
@@ -609,14 +610,14 @@ typedef enum {
 #ifndef PICOMITEWEB
 			case  MMSUPPLY:
 			if(ExtCurrentConfig[44]== EXT_ANA_IN || Option.LOCAL_KEYBOARD){
-		        adc_init();
+		        hal_pin_adc_init();
 #ifdef rp2350
-		        adc_select_input((rp2350a ? 3 : 7));
+		        hal_pin_adc_select((rp2350a ? 3 : 7));
 #else
-		        adc_select_input(3);
+		        hal_pin_adc_select(3);
 #endif
 		        last_adc=99;
-		        MMFLOAT t=(MMFLOAT)adc_read()/4095.0*VCC;
+		        MMFLOAT t=(MMFLOAT)hal_pin_adc_read()/4095.0*VCC;
 				if(Option.LOCAL_KEYBOARD)fret=t*2.0;
 				else fret=t*3.0;
 			} else fret=-1.0;
