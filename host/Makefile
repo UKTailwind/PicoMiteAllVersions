@@ -36,8 +36,8 @@ VPATH = ..:../core/state
 CORE_SRCS = MMBasic.c Commands.c Functions.c Operators.c MATHS.c Memory.c Editor.c MMBasic_Prompt.c MMBasic_Print.c MMBasic_REPL.c
 CORE_SRCS += gfx_box_shared.c gfx_circle_shared.c gfx_line_shared.c gfx_pixel_shared.c gfx_cls_shared.c gfx_text_shared.c gfx_console_shared.c
 CORE_SRCS += mm_misc_shared.c
-# Cross-cutting state hoisted from Draw.c / External.c / Audio.c in Phase 0.5 of
-# the Real HAL refactor (see docs/real-hal-plan.md § "Cross-cutting state").
+# Cross-cutting state (display, pin, Option, audio globals) shared across
+# Draw.c / External.c / FileIO.c / Audio.c.
 CORE_SRCS += display_state.c pin_state.c option_state.c audio_state.c
 CORE_SRCS += Draw.c RGB121.c Tilemap.c FileIO.c Audio.c BmpDecoder.c re.c
 
@@ -47,7 +47,7 @@ BC_SRCS = bc_alloc.c bc_bridge.c vm_host_fat.c ff.c ffunicode.c ffsystem.c \
           bc_vm.c bc_runtime.c bc_debug.c
 
 # Host-specific sources
-HOST_SRCS = host_runtime.c host_fastgfx.c host_fs_shims.c host_peripheral_stubs.c host_main.c host_terminal.c host_fs.c host_sim_audio.c host_time.c host_fb.c host_keys.c
+HOST_SRCS = host_runtime.c host_fastgfx.c host_fs_shims.c host_peripheral_stubs.c host_main.c host_terminal.c host_fs.c host_sim_audio.c host_time.c host_fb.c host_keys.c hal_flash_host.c
 
 SRCS = $(HOST_SRCS) $(CORE_SRCS) $(BC_SRCS)
 OBJS = $(SRCS:.c=.o)

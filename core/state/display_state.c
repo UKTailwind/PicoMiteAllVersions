@@ -1,18 +1,12 @@
 /*
- * core/state/display_state.c — hoisted cross-cutting display globals.
+ * core/state/display_state.c — cross-cutting display globals.
  *
- * See docs/real-hal-plan.md § "Cross-cutting state — hoisted in Phase 0.5".
+ * Storage for display-state globals referenced from many translation
+ * units (Draw.c, MM_Misc.c, External.c, Editor.c, GUI.c, the VM). Keeping
+ * the definitions here lets per-display driver files live alongside each
+ * other without hitting multiple-definition link errors.
  *
- * Phase 0.5 hoist: move storage of display-state globals out of Draw.c so that
- * later phases can split Draw.c into per-display drivers in drivers/<name>/
- * without hitting multiple-definition link errors.
- *
- * This file defines the storage. Callers continue to use the extern
- * declarations already in Draw.h / Include.h. No behavioural change — only
- * the translation unit that owns the storage has moved.
- *
- * Subsequent hoists (FontTable, CursorTimer, gui_font*, other gated display
- * globals) land in follow-up commits to this same file.
+ * Extern declarations live in Draw.h.
  */
 
 #include "MMBasic_Includes.h"

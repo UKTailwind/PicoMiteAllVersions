@@ -1,31 +1,20 @@
 /*
- * core/state/audio_state.c — hoisted audio globals referenced across TUs.
+ * core/state/audio_state.c — audio globals read from multiple TUs.
  *
- * See docs/real-hal-plan.md § "Cross-cutting state — hoisted in Phase 0.5".
+ * These three globals are the audio state BASIC-visible commands poll:
+ * CurrentlyPlaying reports the current playback mode (used by MM.INFO,
+ * OPTION AUDIO, Touch.c), and WAVInterrupt / WAVcomplete are the BASIC
+ * interrupt hook and done-flag read by External.c's interrupt dispatch.
  *
- * Phase 0.5 hoist: audio globals that appear in both the device and host
- * branches of Audio.c (gated by #ifndef MMBASIC_HOST) AND are referenced
- * from outside Audio.c. Consolidates the duplicated definitions into one
- * translation unit.
+ * Keeping storage here consolidates what previously lived in both the
+ * device (#ifndef MMBASIC_HOST) and host (#else) branches of Audio.c.
  *
- * Hoisted:
- *   - CurrentlyPlaying: audio state machine (MM.INFO, OPTION AUDIO, etc.
- *     read this from Commands.c / MM_Misc.c / PicoMite.c / Touch.c).
- *   - WAVInterrupt    : BASIC-visible interrupt hook (set from cmd_play,
- *     read from External.c's interrupt dispatcher).
- *   - WAVcomplete     : done-flag read by the same dispatcher.
+ * Extern declarations live in Audio.h / Hardware_Includes.h.
  *
- * Deferred to Audio.c proper (device-only, not cross-cutting):
- *   - sound_v_left/right, sound_PhaseAC_*, sound_PhaseM_* (voice slot
- *     arrays — used only inside Audio.c's DMA + synth code).
- *   - bcount[3], swingbuf, nextbuf, playreadcomplete, ppos (sample-buffer
- *     bookkeeping — used only by Audio.c's PIO/DMA path).
- *   - WAV codec object pointers (mywav, myflac, mymp3) — local decoder
- *     state.
- *
- * When Phase 6 lands hal_audio, the codec/DMA/PWM machinery becomes a
- * driver-private concern; what remains as cross-cutting state (these
- * three) is what BASIC-visible commands poll.
+ * Audio.c still owns its internal state: per-voice SOUND arrays
+ * (sound_v_left/right, sound_PhaseAC_*, sound_PhaseM_*), DMA buffer
+ * bookkeeping (bcount, swingbuf, nextbuf, playreadcomplete, ppos), and
+ * codec objects (mywav, myflac, mymp3). None of those leave Audio.c.
  */
 
 #include "MMBasic_Includes.h"

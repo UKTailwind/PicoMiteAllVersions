@@ -105,16 +105,19 @@ set(PICOMITE_VM_SHARED_GFX_SOURCES
 	gfx_console_shared.c
 )
 
-# Cross-cutting state hoisted in Phase 0.5 of the Real HAL refactor
-# (see docs/real-hal-plan.md § "Cross-cutting state"). These files
-# contain storage for globals that were historically defined inside
-# Draw.c / External.c / Audio.c; moving them out unblocks later phases
-# that split those files into drivers/<name>/.
+# Cross-cutting state (display, pin, Option, audio globals) shared across
+# Draw.c / External.c / FileIO.c / Audio.c. Consolidating storage here lets
+# per-driver source files coexist without multiple-definition link errors.
 set(PICOMITE_CORE_STATE_SOURCES
 	core/state/display_state.c
 	core/state/pin_state.c
 	core/state/option_state.c
 	core/state/audio_state.c
+)
+
+# HAL implementations shared across every RP2040/RP2350 device target.
+set(PICOMITE_PICO_SDK_HAL_SOURCES
+	ports/pico_sdk_common/hal_flash_pico.c
 )
 
 set(PICOMITE_VM_SOURCES
@@ -139,6 +142,7 @@ add_executable(PicoMite
 )
 target_sources(PicoMite PRIVATE ${PICOMITE_LEGACY_CORE_SOURCES})
 target_sources(PicoMite PRIVATE ${PICOMITE_CORE_STATE_SOURCES})
+target_sources(PicoMite PRIVATE ${PICOMITE_PICO_SDK_HAL_SOURCES})
 # The project's headers (MMBasic_Includes.h, Draw.h, etc.) live in the
 # repo root. Sources in subdirectories (core/state/, future hal/ + drivers/
 # + ports/) need the root on the include path so their #includes resolve.

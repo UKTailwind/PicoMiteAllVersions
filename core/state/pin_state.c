@@ -1,21 +1,18 @@
 /*
- * core/state/pin_state.c — hoisted cross-cutting pin globals.
+ * core/state/pin_state.c — cross-cutting mutable pin state.
  *
- * See docs/real-hal-plan.md § "Cross-cutting state — hoisted in Phase 0.5".
+ * ExtCurrentConfig[] is the per-pin mode/config table written by cmd_setpin
+ * and read from External.c / vm_sys_pin.c / I2C.c / SPI.c / SPI-LCD.c /
+ * Touch.c / mouse.c / MM_Misc.c / Onewire.c / Custom.c / SSD1963.c /
+ * PicoMite.c / Functions.c. Storage lives here so the per-MCU hal_pin
+ * implementations under ports/ can read/write pin state without pulling
+ * in External.c's command-level code.
  *
- * Phase 0.5 hoist: mutable pin-state tables that are read and written from
- * multiple translation units (External.c, vm_sys_pin.c, I2C.c, SPI.c,
- * SPI-LCD.c, Touch.c, mouse.c, MM_Misc.c, Onewire.c, Custom.c, SSD1963.c,
- * PicoMite.c, Functions.c).
+ * Extern declaration lives in External.h.
  *
- * Storage moved here so Phase 3's per-MCU hal_pin implementations in
- * ports/rp2040/ and ports/rp2350/ can read/write pin state without pulling
- * in External.c's BASIC-level command bodies.
- *
- * Note: the const `PinDef[]` lookup table (board-level metadata — pin →
- * GPIO mapping, capability bits) stays in PicoMite.c for device builds and
- * host/host_runtime.c for the host build. That's per-board data; the plan's
- * earlier sketch conflated it with mutable pin state.
+ * Note: `PinDef[]` (const pin → GPIO mapping) is board-level data, not
+ * mutable state. Device builds carry it in PicoMite.c; host builds in
+ * host/host_runtime.c. It is deliberately not hoisted here.
  */
 
 #include "MMBasic_Includes.h"

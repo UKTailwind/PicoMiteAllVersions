@@ -1,21 +1,16 @@
 /*
- * core/state/option_state.c — hoisted Option block storage.
+ * core/state/option_state.c — persistent Option block storage.
  *
- * See docs/real-hal-plan.md § "Cross-cutting state — hoisted in Phase 0.5".
+ * The Option struct is the canonical in-RAM copy of the persistent user
+ * configuration; LoadOptions() reads the backing flash into it and
+ * SaveOptions() writes it back. Keeping its storage in a single TU avoids
+ * duplication between the device and host builds.
  *
- * Phase 0.5 hoist: consolidates the `Option` struct definition that was
- * previously duplicated across FileIO.c (device) and host/host_runtime.c
- * (host). Extern declaration lives in FileIO.h.
+ * Extern declaration lives in FileIO.h.
  *
- * The 256-byte alignment is load-bearing on device builds: cmd_option
- * writes the Option block to flash via `flash_range_program`, which
- * requires the source buffer to be aligned to a flash page boundary.
- * On host the attribute is harmless — the backing store just sits on a
- * 256-byte-aligned address in RAM.
- *
- * When Phase 1 lands hal_flash, the read/write path routes through
- * hal_flash_read_options / hal_flash_write_options; this storage is the
- * in-RAM working copy those functions populate.
+ * The 256-byte alignment is load-bearing on device: cmd_option writes the
+ * Option block to flash via flash_range_program, which requires the source
+ * buffer to be aligned to a flash page boundary. Harmless on host.
  */
 
 #include "MMBasic_Includes.h"

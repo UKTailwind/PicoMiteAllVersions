@@ -99,9 +99,8 @@ extern const uint8_t *flash_libgmemory;
 extern void routinechecks(void);
 extern bool mergedread;
 extern int TraceOn;
-/* Option struct storage moved to core/state/option_state.c in Phase 0.5 of
- * the Real HAL refactor — see docs/real-hal-plan.md. Extern decl is in
- * FileIO.h. */
+/* Option struct storage lives in core/state/option_state.c; extern decl
+ * is in FileIO.h. */
 int dirflags;
 int GPSfnbr = 0;
 int lfs_FileFnbr=0;

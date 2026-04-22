@@ -145,8 +145,7 @@ int PrintPixelMode=0;
 short CurrentX=0, CurrentY=0;                                             // the current default position for the next char to be written
 short DisplayHRes, DisplayVRes;                                       // the physical characteristics of the display
 /* spritebuff[], struct3d[], camera[], layer_in_use[], HRes, VRes are
- * defined in core/state/display_state.c (hoisted in Phase 0.5 of the Real
- * HAL refactor — see docs/real-hal-plan.md). Extern declarations live in
+ * defined in core/state/display_state.c. Extern declarations live in
  * Draw.h. */
 struct blitbuffer blitbuff[MAXBLITBUF+1] = { 0 };
 char CMM1=0;
