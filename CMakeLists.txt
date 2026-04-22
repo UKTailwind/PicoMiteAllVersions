@@ -195,11 +195,11 @@ endif()
 
 if (COMPILE STREQUAL "VGAUSB" OR COMPILE STREQUAL "PICOUSBRP2350" OR COMPILE STREQUAL "VGAUSBRP2350" OR COMPILE STREQUAL "PICOUSB" OR COMPILE STREQUAL "HDMIUSB")
     target_sources(PicoMite PRIVATE
-	USBKeyboard.c
+	drivers/usb_host_kbd/USBKeyboard.c
 	)
 else()
 	target_sources(PicoMite PRIVATE
-	Keyboard.c
+	drivers/ps2_matrix/Keyboard.c
 	mouse.c
 	)
 endif()
@@ -212,7 +212,7 @@ endif()
 
 if(PICOCALC STREQUAL "true")
 	target_sources(PicoMite PRIVATE
-	picocalc/i2ckbd.c
+	drivers/i2c_picocalc_kbd/i2ckbd.c
 	)
 endif()
 

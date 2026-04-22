@@ -1,5 +1,5 @@
-#include "../MMBasic.h"
-#include "../Hardware_Includes.h"
+#include "MMBasic.h"
+#include "Hardware_Includes.h"
 #include "i2ckbd.h"
 
 static uint8_t i2c_inited = 0;

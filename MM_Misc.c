@@ -55,7 +55,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "pico/rand.h"
 #endif
 #ifdef PICOCALC
-#include "picocalc/i2ckbd.h"
+#include "drivers/i2c_picocalc_kbd/i2ckbd.h"
 #include "picocalc/conf_app.h"
 #endif
 #if defined(USBKEYBOARD)
