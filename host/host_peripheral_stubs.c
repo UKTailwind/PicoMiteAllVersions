@@ -530,3 +530,11 @@ void cmd_guiBasic(void) {}
 const struct Displays display_details[1] = {{ .ref = 0, .name = {0}, .speed = 0,
     .horizontal = 0, .vertical = 0, .bits = 0, .buffered = 0,
     .CPOL = 0, .CPHASE = 0 }};
+
+/* PSRAM-cache save/restore stubs — real implementation lives in
+ * ports/pico_sdk_common/psram_cache.c for device builds; host has no
+ * PSRAM and no XIP cache to manage. Lets FileIO.c's
+ * disable_interrupts_pico / enable_interrupts_pico bodies run
+ * unconditionally. */
+void mmbasic_save_psram_settings(void) {}
+void mmbasic_restore_psram_settings(void) {}

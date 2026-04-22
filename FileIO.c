@@ -312,20 +312,16 @@ int OptionFileErrorAbort = true;
 volatile uint32_t irqs;
 void disable_interrupts_pico(void)
 {
-#ifndef MMBASIC_HOST
     mmbasic_save_psram_settings();
-    irqs=save_and_disable_interrupts();
-#endif /* !MMBASIC_HOST */
+    irqs = save_and_disable_interrupts();
 }
 void enable_interrupts_pico(void)
 {
-#ifndef MMBASIC_HOST
     mmbasic_restore_psram_settings();
     restore_interrupts(irqs);
-    SecondsTimer+=(hal_time_us_64()/1000 - mSecTimer);
-    mSecTimer=hal_time_us_64()/1000;
-    irqs=0;
-#endif /* !MMBASIC_HOST */
+    SecondsTimer += (hal_time_us_64() / 1000 - mSecTimer);
+    mSecTimer = hal_time_us_64() / 1000;
+    irqs = 0;
 }
 void ErrorThrow(int e, int type)
 {
