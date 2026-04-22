@@ -267,19 +267,34 @@ Counting `#ifdef` occurrences with grep is gameable: a phase that introduces `#d
 
 The numeric scoreboard at the bottom of this doc tracks the *raw grep count* as a progress metric, but the *gate* is `tools/check_hal_purity.sh`. A phase passes when the gate passes; the scoreboard just shows the trend.
 
-## Current state (from 2026-04-21 survey)
+## Current state (from 2026-04-21 survey, re-measured Phase 0 with `tools/hal_scoreboard.sh`)
 
 ```
-Hardware-related #ifdefs in core files:
-  Draw.c        118   (HDMI 29, PICOMITEVGA 25, rp2350 23, PICOMITE 18) — undercounts compound conditions
-  MM_Misc.c     102   (rp2350 19, USBKEYBOARD 12, PICOMITEVGA 12, HDMI 10)
-  External.c     95   (rp2350 55, PICOMITE 11, PICOMITEWEB 6)
-  FileIO.c       64   (MMBASIC_HOST 26, rp2350 11, USBKEYBOARD 5)
-  Commands.c     35
-  Memory.c       32
+Hardware-related #ifdefs in core files (Phase 0 baseline):
+  Draw.c        162
+  MM_Misc.c     135
+  External.c    120
+  FileIO.c       75
+  Commands.c     46
+  Memory.c       37
   Functions.c    17
-  Audio.c        13
+  Audio.c        14
   Operators.c     0   ← already clean
+
+Per-macro totals across the scored files:
+  rp2350           258
+  PICOMITE         112    (excluding PICOMITEVGA/WEB/PLUS)
+  PICOMITEVGA       88
+  PICOMITEWEB       79
+  HDMI              62
+  USBKEYBOARD       43
+  MMBASIC_HOST      41
+  PICOCALC          16
+
+The initial draft of this plan counted 476 and used a regex that missed
+`PICOMITEPLUS`, `PICOCALC`, and wider `PICOMITEWEB` patterns. The real total
+is 606. Phase-by-phase deltas in the scoreboard below remain estimates; the
+gate is `tools/check_hal_purity.sh`, not the raw count.
 
 12 device targets:
   PicoMite, PicoMite USB, PicoMite VGA, PicoMite VGA USB,
@@ -668,24 +683,24 @@ The numeric metric is for trend visibility only. The actual gate is `tools/check
 
 ```
 Phase   Draw.c  MM_Misc  External  FileIO  Commands  Memory  Functions  Audio   Total
-0       118     102      95        64      35        32      17         13      476
-0.5     118     102      95        64      35        32      17         13      476  (state hoist, no #ifdef change)
-1       118     100      93        64      33        30      17         13      468  (hal_flash)
-2       118      96      91        62      32        30      15         11      455  (hal_time)
-3       118      88      40        62      28        30      15         11      392  (hal_pin)
-4       118      88      40        10      28        30      15         11      340  (hal_storage/fs)
-5       108      48      40        10      28        30      15         11      290  (hal_keyboard)
-6       108      48      40        10      28        30      15         0       279  (hal_audio)
-7a       80      48      40        10      28        30      15         0       251  (hal_display ILI9341)
-7b       40      48      40        10      28        30      15         0       211  (hal_display VGA)
-7c       15      48      40        10      28        30      15         0       186  (hal_display HDMI)
-7d        0      48      40        10      28        30      15         0       171  (hal_display SSD1963)
-8         0      48      35        10      28        30      15         0       166  (hal_multicore)
-9         0      48       0        10      28        30      15         0       131  (hal_net)
-10        0      48       0        10      28         0      15         0       101  (hal_heap)
-11        0       0       0         0       0         0       0         0         0  (sweep + remaining drivers)
-12        0       0       0         0       0         0       0         0         0  (host/WASM relocate; no core change)
-13        0       0       0         0       0         0       0         0         0  (lock the contract)
+0       162     135      120       75      46        37      17         14      606  (measured baseline — `tools/hal_scoreboard.sh`)
+0.5     162     135      120       75      46        37      17         14      606  (state hoist, no #ifdef change)
+1       162     133      118       75      44        35      17         14      598  (hal_flash, estimated delta)
+2       162     129      116       73      43        35      15         12      585  (hal_time)
+3       162     119       55       73      39        35      15         12      510  (hal_pin)
+4       162     119       55       15      39        35      15         12      452  (hal_storage/fs)
+5       147      75       55       15      39        35      15         12      393  (hal_keyboard)
+6       147      75       55       15      39        35      15         0       381  (hal_audio)
+7a      115      75       55       15      39        35      15         0       349  (hal_display ILI9341)
+7b       65      75       55       15      39        35      15         0       299  (hal_display VGA)
+7c       20      75       55       15      39        35      15         0       254  (hal_display HDMI)
+7d        0      75       55       15      39        35      15         0       234  (hal_display SSD1963)
+8         0      75       45       15      39        35      15         0       224  (hal_multicore)
+9         0      75        0       15      39        35      15         0       179  (hal_net)
+10        0      75        0       15      39         0      15         0       144  (hal_heap)
+11        0       0        0        0       0         0       0         0         0  (sweep + remaining drivers)
+12        0       0        0        0       0         0       0         0         0  (host/WASM relocate; no core change)
+13        0       0        0        0       0         0       0         0         0  (lock the contract)
 ```
 
 Numbers are estimates. The gate is the tooling, not the table.
