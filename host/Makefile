@@ -107,6 +107,11 @@ sim_obj/%.o: ../%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(SIM_CFLAGS) -c -o $@ $<
 
+# core/state/*.c lives under ../core/state/, not ../ — add a matching rule.
+sim_obj/%.o: ../core/state/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(SIM_CFLAGS) -c -o $@ $<
+
 # Host sources compile from current directory
 host_stubs_legacy.o: host_stubs_legacy.c
 	$(CC) $(CFLAGS) -c -o $@ $<
