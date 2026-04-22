@@ -102,6 +102,35 @@ void hal_pin_select_digital(uint32_t gpio);
  * (`PinDef[].ADCpin` on pico). */
 void hal_pin_adc_select(uint32_t adc_channel);
 
+/* -----------------------------------------------------------------------
+ * Input pad tuning (hysteresis, slew rate).
+ *
+ * Both default to hysteresis-on, slow-slew on pico SDK. Callers flip them
+ * only where the datasheet cares — e.g. open-collector counter inputs,
+ * high-speed parallel-LCD data buses.
+ * ---------------------------------------------------------------------- */
+
+void hal_pin_set_input_hysteresis(uint32_t gpio, bool enabled);
+void hal_pin_set_slew_fast(uint32_t gpio, bool fast);
+
+/* -----------------------------------------------------------------------
+ * Edge-trigger enable (no callback registration).
+ *
+ * Lets a caller arm or disarm a GPIO edge trigger without owning the
+ * IRQ handler. The handler itself is installed elsewhere (e.g. via the
+ * PicoMite shared-handler dispatch in picomite_gpio_irq.c on device).
+ * A richer hal_pin_irq_attach(cb, ctx) lives in Phase 11.
+ * ---------------------------------------------------------------------- */
+
+typedef enum {
+    HAL_PIN_EDGE_NONE = 0,
+    HAL_PIN_EDGE_RISE = 1 << 0,
+    HAL_PIN_EDGE_FALL = 1 << 1,
+    HAL_PIN_EDGE_BOTH = HAL_PIN_EDGE_RISE | HAL_PIN_EDGE_FALL,
+} hal_pin_edge_t;
+
+void hal_pin_irq_set_edge(uint32_t gpio, uint32_t edge_mask, bool enabled);
+
 #ifdef __cplusplus
 }
 #endif

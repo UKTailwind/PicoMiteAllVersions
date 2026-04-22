@@ -526,22 +526,22 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
     ClearPin(pin);  //disable the link to any special functions
     if(pin == Option.INT1pin) {
         if(CallBackEnabled==2) picomite_gpio_irq_set_enabled(PinDef[pin].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
-        else gpio_set_irq_enabled(PinDef[pin].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
+        else hal_pin_irq_set_edge(PinDef[pin].GPno, HAL_PIN_EDGE_BOTH, false);
         CallBackEnabled &= (~2);
     }
     if(pin == Option.INT2pin) {
         if(CallBackEnabled==4) picomite_gpio_irq_set_enabled(PinDef[pin].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
-        else gpio_set_irq_enabled(PinDef[pin].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
+        else hal_pin_irq_set_edge(PinDef[pin].GPno, HAL_PIN_EDGE_BOTH, false);
         CallBackEnabled &= (~4);
     }
     if(pin == Option.INT3pin) {
         if(CallBackEnabled==8) picomite_gpio_irq_set_enabled(PinDef[pin].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
-        else gpio_set_irq_enabled(PinDef[pin].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
+        else hal_pin_irq_set_edge(PinDef[pin].GPno, HAL_PIN_EDGE_BOTH, false);
         CallBackEnabled &= (~8);
     }
     if(pin == Option.INT4pin) {
         if(CallBackEnabled==16) picomite_gpio_irq_set_enabled(PinDef[pin].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
-        else gpio_set_irq_enabled(PinDef[pin].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
+        else hal_pin_irq_set_edge(PinDef[pin].GPno, HAL_PIN_EDGE_BOTH, false);
         CallBackEnabled &= (~16);
     }
     #ifdef rp2350
@@ -562,12 +562,12 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
             inttbl[i].pin = 0;                                      // start off by disable a software interrupt (if set) on this pin
     gpio_set_input_enabled(PinDef[pin].GPno,false);
     gpio_deinit(PinDef[pin].GPno); 
-    gpio_set_input_hysteresis_enabled(PinDef[pin].GPno,true);
+    hal_pin_set_input_hysteresis(PinDef[pin].GPno, true);
     if(cfg!=EXT_NOT_CONFIG)gpio_init(PinDef[pin].GPno); 
     switch(cfg) {
         case EXT_NOT_CONFIG:    tris = 1; ana = 1;
 //                                gpio_init(PinDef[pin].GPno); 
-//		                        gpio_set_input_hysteresis_enabled(PinDef[pin].GPno,true);
+//		                        hal_pin_set_input_hysteresis(PinDef[pin].GPno, true);
                                 gpio_set_input_enabled(PinDef[pin].GPno,false);
                                 gpio_deinit(PinDef[pin].GPno);
                                 switch(ExtCurrentConfig[pin]){      //Disable the pin numbers used by the special function code
@@ -723,13 +723,15 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
                                         picomite_gpio_irq_set_enabled(PinDef[pin].GPno, edge , true);
                                         CallBackEnabled=2;
                                     } else {
-                                        gpio_set_irq_enabled(PinDef[pin].GPno, edge, true);
+                                        hal_pin_irq_set_edge(PinDef[pin].GPno,
+                                            ((edge & GPIO_IRQ_EDGE_RISE) ? HAL_PIN_EDGE_RISE : 0) |
+                                            ((edge & GPIO_IRQ_EDGE_FALL) ? HAL_PIN_EDGE_FALL : 0), true);
                                         CallBackEnabled|=2;
                                     }
                                     INT1Count = INT1Value = 0;
                                     INT1Timer = INT1InitTimer = option;  // only used for frequency and period measurement
                                     tris = 1; ana = 1;
-		                            gpio_set_input_hysteresis_enabled(PinDef[pin].GPno,true);
+		                            hal_pin_set_input_hysteresis(PinDef[pin].GPno, true);
                                     break;
                                 }
                                 if(pin == Option.INT2pin) {
@@ -737,13 +739,15 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
                                         picomite_gpio_irq_set_enabled(PinDef[pin].GPno, edge , true);
                                         CallBackEnabled=4;
                                     } else {
-                                        gpio_set_irq_enabled(PinDef[pin].GPno, edge, true);
+                                        hal_pin_irq_set_edge(PinDef[pin].GPno,
+                                            ((edge & GPIO_IRQ_EDGE_RISE) ? HAL_PIN_EDGE_RISE : 0) |
+                                            ((edge & GPIO_IRQ_EDGE_FALL) ? HAL_PIN_EDGE_FALL : 0), true);
                                         CallBackEnabled|=4;
                                     }
                                     INT2Count = INT2Value = 0;
                                     INT2Timer = INT2InitTimer = option;  // only used for frequency and period measurement
                                     tris = 1; ana = 1; 
-		                            gpio_set_input_hysteresis_enabled(PinDef[pin].GPno,true);
+		                            hal_pin_set_input_hysteresis(PinDef[pin].GPno, true);
                                     break;
                                 }
                                 if(pin == Option.INT3pin) {
@@ -751,13 +755,15 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
                                         picomite_gpio_irq_set_enabled(PinDef[pin].GPno, edge , true);
                                         CallBackEnabled=8;
                                     } else {
-                                        gpio_set_irq_enabled(PinDef[pin].GPno, edge, true);
+                                        hal_pin_irq_set_edge(PinDef[pin].GPno,
+                                            ((edge & GPIO_IRQ_EDGE_RISE) ? HAL_PIN_EDGE_RISE : 0) |
+                                            ((edge & GPIO_IRQ_EDGE_FALL) ? HAL_PIN_EDGE_FALL : 0), true);
                                         CallBackEnabled|=8;
                                     }
                                     INT3Count = INT3Value = 0;
                                     INT3Timer = INT3InitTimer = option;  // only used for frequency and period measurement
                                     tris = 1; ana = 1; 
-		                            gpio_set_input_hysteresis_enabled(PinDef[pin].GPno,true);
+		                            hal_pin_set_input_hysteresis(PinDef[pin].GPno, true);
                                     break;
                                 }
                                 if(pin == Option.INT4pin) {
@@ -765,13 +771,15 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
                                         picomite_gpio_irq_set_enabled(PinDef[pin].GPno, edge , true);
                                         CallBackEnabled=16;
                                     } else {
-                                        gpio_set_irq_enabled(PinDef[pin].GPno, edge, true);
+                                        hal_pin_irq_set_edge(PinDef[pin].GPno,
+                                            ((edge & GPIO_IRQ_EDGE_RISE) ? HAL_PIN_EDGE_RISE : 0) |
+                                            ((edge & GPIO_IRQ_EDGE_FALL) ? HAL_PIN_EDGE_FALL : 0), true);
                                         CallBackEnabled|=16;
                                     }
                                     INT4Count = INT4Value = 0;
                                     INT4Timer = INT4InitTimer = option;  // only used for frequency and period measurement
                                     tris = 1; ana = 1; 
-		                            gpio_set_input_hysteresis_enabled(PinDef[pin].GPno,true);
+		                            hal_pin_set_input_hysteresis(PinDef[pin].GPno, true);
                                     break;
                                 }
                                 error("Invalid configuration");       // not an interrupt enabled pin
@@ -783,7 +791,7 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
         case EXT_DIG_IN:        if(!(PinDef[pin].mode & DIGITAL_IN)) error("Invalid configuration");
                                 if(option) PinSetBit(pin, option);
                                 tris = 1; ana = 1; 
-		                        gpio_set_input_hysteresis_enabled(PinDef[pin].GPno,true);
+		                        hal_pin_set_input_hysteresis(PinDef[pin].GPno, true);
                                 break;
 
         case EXT_PIO0_OUT:       
@@ -861,7 +869,7 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
                                 if((PWM2Apin!=99 && PWM2Apin!=pin)) error("Already Set to pin %",PWM2Apin);
                                 PWM2Apin=pin;
                                 gpio_set_drive_strength (PinDef[pin].GPno, GPIO_DRIVE_STRENGTH_8MA);
-                                gpio_set_slew_rate(PinDef[pin].GPno,GPIO_SLEW_RATE_FAST);
+                                hal_pin_set_slew_fast(PinDef[pin].GPno, true);
                                 break;
         case EXT_PWM3A:         if(!(PinDef[pin].mode & PWM3A)) error("Invalid configuration");
                                 if((PWM3Apin!=99 && PWM3Apin!=pin)) error("Already Set to pin %",PWM3Apin);
@@ -959,7 +967,7 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
                                 INT5Timer = INT5InitTimer = option;  // only used for frequency and period measurement
                                 tris = 1; ana = 1;
 //                                PinSetBit(pin,TRISSET);
-                                gpio_set_input_hysteresis_enabled(PinDef[pin].GPno,true);
+                                hal_pin_set_input_hysteresis(PinDef[pin].GPno, true);
                                 gpio_set_function(PinDef[pin].GPno, GPIO_FUNC_PWM);
                                 pwm_config cfg = pwm_get_default_config();
                                 pwm_config_set_clkdiv_mode(&cfg, PWM_DIV_B_RISING);
@@ -1790,7 +1798,7 @@ void cmd_ir(void) {
     if(checkstring(cmdline, (unsigned char *)"CLOSE")) {
         if(IrState == IR_CLOSED) error("Not Open");
         if(CallBackEnabled==1) picomite_gpio_irq_set_enabled(PinDef[IRpin].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
-        else gpio_set_irq_enabled(PinDef[IRpin].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
+        else hal_pin_irq_set_edge(PinDef[IRpin].GPno, HAL_PIN_EDGE_BOTH, false);
         IrInterrupt = NULL;
         CallBackEnabled &= (~1);
         ExtCfg(IRpin, EXT_NOT_CONFIG, 0);
@@ -1849,7 +1857,7 @@ void IrInit(void) {
         picomite_gpio_irq_set_enabled(PinDef[IRpin].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, true);
         CallBackEnabled=1;
     } else {
-        gpio_set_irq_enabled(PinDef[IRpin].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, true);
+        hal_pin_irq_set_edge(PinDef[IRpin].GPno, HAL_PIN_EDGE_BOTH, true);
         CallBackEnabled|=1;
     }
     IrReset();
@@ -3914,27 +3922,27 @@ void MIPS16 ClearExternalIO(void) {
     closeframebuffer('A');
     if(CallBackEnabled==1) picomite_gpio_irq_set_enabled(PinDef[IRpin].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
     else if(CallBackEnabled & 1){
-        gpio_set_irq_enabled(PinDef[IRpin].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
+        hal_pin_irq_set_edge(PinDef[IRpin].GPno, HAL_PIN_EDGE_BOTH, false);
         CallBackEnabled &= (~1);
     }
     if(CallBackEnabled==2) picomite_gpio_irq_set_enabled(PinDef[Option.INT1pin].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
     else if(CallBackEnabled & 2){
-        gpio_set_irq_enabled(PinDef[Option.INT1pin].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
+        hal_pin_irq_set_edge(PinDef[Option.INT1pin].GPno, HAL_PIN_EDGE_BOTH, false);
         CallBackEnabled &= (~2);
     }
     if(CallBackEnabled==4) picomite_gpio_irq_set_enabled(PinDef[Option.INT2pin].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
     else if(CallBackEnabled & 4){
-        gpio_set_irq_enabled(PinDef[Option.INT2pin].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
+        hal_pin_irq_set_edge(PinDef[Option.INT2pin].GPno, HAL_PIN_EDGE_BOTH, false);
         CallBackEnabled &= (~4);
     }
     if(CallBackEnabled==8) picomite_gpio_irq_set_enabled(PinDef[Option.INT3pin].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
     else  if(CallBackEnabled & 8){
-        gpio_set_irq_enabled(PinDef[Option.INT3pin].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
+        hal_pin_irq_set_edge(PinDef[Option.INT3pin].GPno, HAL_PIN_EDGE_BOTH, false);
         CallBackEnabled &= (~8);
     }
     if(CallBackEnabled==16) picomite_gpio_irq_set_enabled(PinDef[Option.INT4pin].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
     else  if(CallBackEnabled & 16){
-        gpio_set_irq_enabled(PinDef[Option.INT4pin].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
+        hal_pin_irq_set_edge(PinDef[Option.INT4pin].GPno, HAL_PIN_EDGE_BOTH, false);
         CallBackEnabled &= (~16);
     }
     CallBackEnabled &= (~32);

@@ -76,3 +76,22 @@ void hal_pin_adc_select(uint32_t adc_channel)
 {
     (void)adc_channel;
 }
+
+void hal_pin_set_input_hysteresis(uint32_t gpio, bool enabled)
+{
+    (void)gpio;
+    (void)enabled;
+}
+
+void hal_pin_set_slew_fast(uint32_t gpio, bool fast)
+{
+    (void)gpio;
+    (void)fast;
+}
+
+void hal_pin_irq_set_edge(uint32_t gpio, uint32_t edge_mask, bool enabled)
+{
+    (void)gpio;
+    (void)edge_mask;
+    (void)enabled;
+}

@@ -127,3 +127,21 @@ void hal_pin_adc_select(uint32_t adc_channel)
 {
     adc_select_input(adc_channel);
 }
+
+void hal_pin_set_input_hysteresis(uint32_t gpio, bool enabled)
+{
+    gpio_set_input_hysteresis_enabled(gpio, enabled);
+}
+
+void hal_pin_set_slew_fast(uint32_t gpio, bool fast)
+{
+    gpio_set_slew_rate(gpio, fast ? GPIO_SLEW_RATE_FAST : GPIO_SLEW_RATE_SLOW);
+}
+
+void hal_pin_irq_set_edge(uint32_t gpio, uint32_t edge_mask, bool enabled)
+{
+    uint32_t sdk = 0;
+    if (edge_mask & HAL_PIN_EDGE_RISE) sdk |= GPIO_IRQ_EDGE_RISE;
+    if (edge_mask & HAL_PIN_EDGE_FALL) sdk |= GPIO_IRQ_EDGE_FALL;
+    gpio_set_irq_enabled(gpio, sdk, enabled);
+}
