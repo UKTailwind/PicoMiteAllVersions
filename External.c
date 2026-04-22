@@ -3216,14 +3216,15 @@ void cmd_device(void){
 		cmd_lcd();
 		return;
 	}
-#ifndef PICOMITEVGA
+	/* CAMERA command lives in I2C.c on every target; on VGA variants
+	 * the camera hardware is unusable but parsing + cmd_camera()'s
+	 * own "not configured" error path handles that cleanly. */
 	tp = checkstring(cmdline, (unsigned char *)"CAMERA");
 	if(tp) {
         cmdline=tp;
 		cmd_camera();
 		return;
 	}
-#endif
     tp = checkstring(cmdline, (unsigned char *)"WII CLASSIC");
     if(tp==NULL)tp = checkstring(cmdline, (unsigned char *)"WII");
 	if(tp) {
@@ -3450,13 +3451,13 @@ if(rp2350a){
             if(ExtCurrentConfig[34] == EXT_NOT_CONFIG)ExtCfg(34, EXT_ANA_IN, 0);
             ExtCfg(34, EXT_COM_RESERVED, 0);
         }
-#ifndef PICOMITEWEB
+        /* nbr is bounded by HAL_PORT_ADC_CHANNEL_MAX above; WEB clamps
+         * to 3 there so this `nbr>=4` branch never runs on WEB. */
         if(nbr>=4){
             if(!(ExtCurrentConfig[44] == EXT_ANA_IN || ExtCurrentConfig[44] == EXT_NOT_CONFIG)) error("Pin GP29 is not off or an ADC input");
             if(ExtCurrentConfig[44] == EXT_NOT_CONFIG)ExtCfg(44, EXT_ANA_IN, 0);
             ExtCfg(44, EXT_COM_RESERVED, 0);
         }
-#endif
 #endif
         if(argc==5){
         	InterruptUsed = true;
@@ -3474,6 +3475,10 @@ if(rp2350a){
         ADCpos=0;
         adcint1=adcint2=NULL;
         int64_t *adcval=NULL;
+        /* parseintegerarray's dim-array type differs by chip (int on
+         * RP2350, short on RP2040) to match each platform's native
+         * array-dim representation. Gate stays until parseintegerarray
+         * is unified. */
 #ifdef rp2350
         int dims[MAXDIM]={0};
 #else
@@ -3662,24 +3667,21 @@ if(rp2350a){
         dma_channel_abort(ADC_dma_chan2);
         adc_set_round_robin(0);
         SetADCFreq(500000);
-        #ifdef rp2350
-if(rp2350a){
-        ExtCfg(31, EXT_NOT_CONFIG, 0);
-        if(ADCopen>=2)ExtCfg(32, EXT_NOT_CONFIG, 0);
-        if(ADCopen>=3)ExtCfg(34, EXT_NOT_CONFIG, 0);
-        if(ADCopen>=4)ExtCfg(44, EXT_NOT_CONFIG, 0);
-} else {
-        ExtCfg(55, EXT_NOT_CONFIG, 0);
-        if(ADCopen>=2)ExtCfg(56, EXT_NOT_CONFIG, 0);
-        if(ADCopen>=3)ExtCfg(57, EXT_NOT_CONFIG, 0);
-        if(ADCopen>=4)ExtCfg(58, EXT_NOT_CONFIG, 0);
-}
-#else
-        ExtCfg(31, EXT_NOT_CONFIG, 0);
-        if(ADCopen>=2)ExtCfg(32, EXT_NOT_CONFIG, 0);
-        if(ADCopen>=3)ExtCfg(34, EXT_NOT_CONFIG, 0);
-        if(ADCopen>=4)ExtCfg(44, EXT_NOT_CONFIG, 0);
-#endif
+        /* rp2350a==true matches both RP2040 (always true) and RP2350A
+         * (30-pin variant): ADC channels live on GP26..29 == pin slots
+         * 31/32/34/44. RP2350B exposes the same channels via GP40..43
+         * == slots 55/56/57/58. */
+        if(rp2350a){
+            ExtCfg(31, EXT_NOT_CONFIG, 0);
+            if(ADCopen>=2)ExtCfg(32, EXT_NOT_CONFIG, 0);
+            if(ADCopen>=3)ExtCfg(34, EXT_NOT_CONFIG, 0);
+            if(ADCopen>=4)ExtCfg(44, EXT_NOT_CONFIG, 0);
+        } else {
+            ExtCfg(55, EXT_NOT_CONFIG, 0);
+            if(ADCopen>=2)ExtCfg(56, EXT_NOT_CONFIG, 0);
+            if(ADCopen>=3)ExtCfg(57, EXT_NOT_CONFIG, 0);
+            if(ADCopen>=4)ExtCfg(58, EXT_NOT_CONFIG, 0);
+        }
         ADCopen=0;
         adcint=adcint1=adcint2=NULL;
         ADCDualBuffering=false;
@@ -3708,9 +3710,11 @@ void SetADCFreq(float frequency){
 void MIPS16 ClearExternalIO(void) {
     int i;
   	CloseAudio(1);
-	#ifndef PICOMITEVGA
-        cameraclose();
-    #endif
+    /* cameraclose() short-circuits if the camera globals are unset,
+     * which is the default on targets that never expose the CAMERA
+     * BASIC command (VGA variants). Calling unconditionally keeps core
+     * port-neutral. */
+    cameraclose();
     InterruptUsed = false;
 	InterruptReturn = NULL;
     irq_set_enabled(DMA_IRQ_1, false);
@@ -3772,27 +3776,20 @@ void MIPS16 ClearExternalIO(void) {
     IrInterrupt = NULL;
     IrGotMsg = false;
     memset(&PIDchannels,0,sizeof(s_PIDchan)*(MAXPID+1));
-#ifdef rp2350
-#ifdef PICOMITEWEB
-	for(i = 1; i < (NBRPINS) ; i++) {
-		if(CheckPin(i, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED)) {    // don't reset invalid or boot reserved pins
-          ExtCfg(i, EXT_NOT_CONFIG, 0);                                       // all set to unconfigured
+	/* Pin sweep upper bound. Upstream used distinct per-target limits
+	 * (RP2350A non-WEB: 44; everyone else: NBRPINS) because RP2350A's
+	 * NBRPINS (48) includes pins that aren't usable as GPIO. On RP2040,
+	 * RP2040-WEB, and RP2350B the original upper bound was NBRPINS.
+	 * Iterations past each port's real pin count are CheckPin() calls
+	 * that return false harmlessly. Ternary on rp2350a covers both
+	 * RP2040 (rp2350a==true, hits min(44,NBRPINS)) and RP2350A. */
+	int sweep_max = rp2350a ? 44 : NBRPINS;
+	if (sweep_max > NBRPINS) sweep_max = NBRPINS;
+	for(i = 1; i < sweep_max ; i++) {
+		if(CheckPin(i, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED)) {
+          ExtCfg(i, EXT_NOT_CONFIG, 0);
 		}
 	}
-#else
-	for(i = 1; i < (rp2350a ? 44: NBRPINS) ; i++) {
-		if(CheckPin(i, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED)) {    // don't reset invalid or boot reserved pins
-          ExtCfg(i, EXT_NOT_CONFIG, 0);                                       // all set to unconfigured
-		}
-	}
-#endif
-#else
-	for(i = 1; i < (NBRPINS) ; i++) {
-		if(CheckPin(i, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED)) {    // don't reset invalid or boot reserved pins
-          ExtCfg(i, EXT_NOT_CONFIG, 0);                                       // all set to unconfigured
-		}
-	}
-#endif
 	for(i = 0; i < NBRINTERRUPTS; i++) {
       inttbl[i].pin = 0;                                            // disable all interrupts
   	}
@@ -3815,17 +3812,14 @@ void MIPS16 ClearExternalIO(void) {
     for(i = 0; i < NBRSETTICKS; i++) TickActive[i] = 0;
 	for(i = 0; i < NBR_PULSE_SLOTS; i++) PulseCnt[i] = 0;             // disable any pending pulse commands
     PulseActive = false;
-#ifdef rp2350
-    slice0=0;slice1=0;slice2=0;slice3=0;slice4=0;slice5=0;slice6=0;slice7=0;slice8=0;slice9=0;slice10=0;slice11=0;
-#ifdef PICOMITE
-    for(i=0; i<=(rp2350a ? 7:11);i++)if(!(i==Option.AUDIO_SLICE || i==BacklightSlice || i==KeyboardlightSlice))PWMoff(i);
-#else
-    for(i=0; i<=(rp2350a ? 7:11);i++)if(!(i==Option.AUDIO_SLICE || i==BacklightSlice))PWMoff(i);
-#endif
-#else
     slice0=0;slice1=0;slice2=0;slice3=0;slice4=0;slice5=0;slice6=0;slice7=0;
-    for(i=0; i<=7;i++)if(!(i==Option.AUDIO_SLICE || i==BacklightSlice))PWMoff(i);
-#endif
+    slice8=0;slice9=0;slice10=0;slice11=0;
+    /* Upper bound: 7 on RP2040 / RP2350A (8 slices), 11 on RP2350B
+     * (12 slices). KeyboardlightSlice stays -1 on ports without keypad
+     * backlight, so the conflict check is harmless there. */
+    for(i=0; i<=(rp2350a ? 7:11);i++)
+        if(!(i==Option.AUDIO_SLICE || i==BacklightSlice || i==KeyboardlightSlice))
+            PWMoff(i);
     IRpin=99;
     PWM0Apin=99;
     PWM1Apin=99;
@@ -3835,12 +3829,10 @@ void MIPS16 ClearExternalIO(void) {
     PWM5Apin=99;
     PWM6Apin=99;
     PWM7Apin=99;
-#ifdef rp2350
     PWM8Apin=99;
     PWM9Apin=99;
     PWM10Apin=99;
     PWM11Apin=99;
-#endif
     PWM0Bpin=99;
     PWM1Bpin=99;
     PWM2Bpin=99;
@@ -3849,12 +3841,10 @@ void MIPS16 ClearExternalIO(void) {
     PWM5Bpin=99;
     PWM6Bpin=99;
     PWM7Bpin=99;
-#ifdef rp2350
     PWM8Bpin=99;
     PWM9Bpin=99;
     PWM10Bpin=99;
     PWM11Bpin=99;
-#endif
     UART1RXpin=99;
     UART1TXpin=99;
     UART0TXpin=99;
@@ -3873,24 +3863,19 @@ void MIPS16 ClearExternalIO(void) {
         I2C1SDApin=99;
         I2C1SCLpin=99;	
     }
-#ifdef rp2350
-if(rp2350a){
-    if(ADCopen) ExtCfg(31, EXT_NOT_CONFIG, 0);
-    if(ADCopen>=2)ExtCfg(32, EXT_NOT_CONFIG, 0);
-    if(ADCopen>=3)ExtCfg(34, EXT_NOT_CONFIG, 0);
-    if(ADCopen>=4)ExtCfg(44, EXT_NOT_CONFIG, 0);
-} else {
-    if(ADCopen) ExtCfg(55, EXT_NOT_CONFIG, 0);
-    if(ADCopen>=2)ExtCfg(56, EXT_NOT_CONFIG, 0);
-    if(ADCopen>=3)ExtCfg(57, EXT_NOT_CONFIG, 0);
-    if(ADCopen>=4)ExtCfg(58, EXT_NOT_CONFIG, 0);
-}
-#else
-    if(ADCopen) ExtCfg(31, EXT_NOT_CONFIG, 0);
-    if(ADCopen>=2)ExtCfg(32, EXT_NOT_CONFIG, 0);
-    if(ADCopen>=3)ExtCfg(34, EXT_NOT_CONFIG, 0);
-    if(ADCopen>=4)ExtCfg(44, EXT_NOT_CONFIG, 0);
-#endif
+    /* ADC close: same rp2350a split as the cmd_adc CLOSE path above —
+     * RP2040 / RP2350A use pin slots 31/32/34/44; RP2350B uses 55..58. */
+    if(rp2350a){
+        if(ADCopen) ExtCfg(31, EXT_NOT_CONFIG, 0);
+        if(ADCopen>=2)ExtCfg(32, EXT_NOT_CONFIG, 0);
+        if(ADCopen>=3)ExtCfg(34, EXT_NOT_CONFIG, 0);
+        if(ADCopen>=4)ExtCfg(44, EXT_NOT_CONFIG, 0);
+    } else {
+        if(ADCopen) ExtCfg(55, EXT_NOT_CONFIG, 0);
+        if(ADCopen>=2)ExtCfg(56, EXT_NOT_CONFIG, 0);
+        if(ADCopen>=3)ExtCfg(57, EXT_NOT_CONFIG, 0);
+        if(ADCopen>=4)ExtCfg(58, EXT_NOT_CONFIG, 0);
+    }
     ADCopen=0;
     adc_set_round_robin(0);
     SetADCFreq(500000);

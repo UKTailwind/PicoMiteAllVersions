@@ -2498,4 +2498,11 @@ void MIPS16 cmd_camera(void) {
     cameraclose();
   } else error("Syntax");
 }
+#else
+/* VGA variants have no CAMERA hardware. Stubs so core can call
+ * cmd_camera / cameraclose unconditionally without a preprocessor
+ * gate; the BASIC layer sees "no camera configured" instead of a
+ * missing command. */
+void cmd_camera(void)  { error("Camera not supported on this display"); }
+void cameraclose(void) {}
 #endif
