@@ -162,8 +162,8 @@ volatile int MMAbort = 0;
 volatile unsigned int WDTimer = 0;
 /* Display_Refresh is a function - see function stubs below */
 
-/* struct option_s Option */
-struct option_s Option = {0};
+/* struct option_s Option moved to core/state/option_state.c in Phase 0.5
+ * of the Real HAL refactor — see docs/real-hal-plan.md. */
 
 /* PinDef array */
 const struct s_PinDef PinDef[NBRPINS + 1] = {{0}};

@@ -113,6 +113,7 @@ set(PICOMITE_VM_SHARED_GFX_SOURCES
 set(PICOMITE_CORE_STATE_SOURCES
 	core/state/display_state.c
 	core/state/pin_state.c
+	core/state/option_state.c
 )
 
 set(PICOMITE_VM_SOURCES

@@ -38,7 +38,7 @@ CORE_SRCS += gfx_box_shared.c gfx_circle_shared.c gfx_line_shared.c gfx_pixel_sh
 CORE_SRCS += mm_misc_shared.c
 # Cross-cutting state hoisted from Draw.c / External.c / Audio.c in Phase 0.5 of
 # the Real HAL refactor (see docs/real-hal-plan.md § "Cross-cutting state").
-CORE_SRCS += display_state.c pin_state.c
+CORE_SRCS += display_state.c pin_state.c option_state.c
 CORE_SRCS += Draw.c RGB121.c Tilemap.c FileIO.c Audio.c BmpDecoder.c re.c
 
 # Bytecode VM sources
