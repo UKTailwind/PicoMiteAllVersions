@@ -70,11 +70,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
     extern volatile int ClickTimer;                                 // used to time the click when touch occurs
     extern volatile int TouchTimer;                                 // used to time the response to touch
     extern void ScrollSSD1963(int lines);
-    #ifdef rp2350
-    extern const uint8_t PINMAP[48];
-    #else 
-    extern const uint8_t PINMAP[30];
-    #endif
+    extern const uint8_t PINMAP[HAL_PORT_GPIO_COUNT];
     void WriteData16bit(int data);
     void Write16bitCommand(int cmd) ;
     void  SetAreaIPS_4_16(int xstart, int ystart, int xend, int yend, int rw);

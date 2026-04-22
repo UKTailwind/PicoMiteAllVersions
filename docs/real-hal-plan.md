@@ -18,14 +18,21 @@ Promote the implicit hardware-abstraction layer that emerged from the host port 
 
 **31 commits on `real-hal`.** Host tests 239/239 after every commit. All 12 device CMake variants green (`./buildall.sh` sweeps every `COMPILE` target: PICO/USB/VGA/VGAUSB/WEB for RP2040 and PICO/USB/VGA/VGAUSB/HDMI/HDMIUSB/WEB for RP2350). WASM link green.
 
+### What "done" means
+
+A phase is ✅ when **the target-macro `#ifdef` blocks are gone from core files** — the conditional bodies have moved into HAL implementations or port-config headers, and core calls a single HAL function with no branching on hardware target. Adding a HAL wrapper that core calls while leaving the `#ifdef` blocks in place is *infrastructure* (marked 🔧), not completion. The scoreboard measures actual `#ifdef` counts via `tools/hal_scoreboard.sh`; a phase's exit gate is the measured count, not the presence of HAL headers.
+
+### Phase status
+
 - Phase 0 ✅ — `hal/`, `drivers/`, `ports/` scaffolding; `hal/CONTRACT.md`; `tools/check_hal_purity.sh` (raw-grep mode); `tools/hal_scoreboard.sh`. Scoreboard rebaselined 476 → 606 after fixing regex that missed `PICOMITEPLUS`, `PICOCALC`, wider `PICOMITEWEB`. Deferred: `check_ram_baseline.sh`, `perf_microbench/`, Tier-B display-inline prototype (all need physical device).
 - Phase 0.5 ✅ — cross-cutting state hoisted to `core/state/`: `display_state.c`, `pin_state.c` (ExtCurrentConfig), `option_state.c`, `audio_state.c`. Plan correction: `PinDef[]` is board-level const in `PicoMite.c`/`host_runtime.c`, not mutable core state — stays where it is.
-- Phase 1 ✅ — `hal_flash.h` + device (`ports/pico_sdk_common/hal_flash_pico.c`) + host (`host/hal_flash_host.c`) impls. Full migration: no core file includes `hardware/flash.h`; all 52 `flash_range_*` + `flash_do_cmd` call sites routed through the HAL. Added `hal_flash_read_jedec_id` and `host/hardware/regs/addressmap.h` stub along the way.
-- Phase 2 (`hal_time`) ✅ — contract + impls + migration of 42 core call sites (`MM_Misc.c`, `Audio.c`, `Commands.c`, `Draw.c`, `External.c`, `FileIO.c`, `MATHS.c`, `bc_vm.c`, `mm_misc_shared.c`). Peripheral files (`PicoMite.c`, `I2C.c`, `USBKeyboard.c`, `MMMqtt`, `MMntp`, `MMtcpserver.c`, `XModem.c`) still call SDK time directly — migrate with their HALs. RTC get/set dropped from the contract (dead `extern datetime_t rtc_t` didn't exist in pico-sdk 2.0; removing it unblocked the rp2350 build past that specific error).
-- Phase 3 (`hal_pin`) 🟢 API surface complete — HAL covers: `set_mode`, `read`, `write`, `toggle`, `read_output_latch`, `set_drive_mA`, `set_pulls`, `set_dir`, `set_input_enabled`, `select_digital`, `init_digital`, `deinit`, `set_function`, `adc_select`, `adc_init`, `adc_set_temp_sensor`, `adc_read`, `set_input_hysteresis`, `set_slew_fast`, `irq_set_edge`, `bank_read_all`, `bank_read_out_latch`, `bank_{set,clr,xor}_mask`; Tier-B fast inlines (`read_fast`/`write_fast`/`toggle_fast`) via per-port `hal_pin_inlines.h`. **External.c is clean of single-pin `gpio_*` and single-shot `adc_*` calls.** Residual direct SDK usage: ADC DMA-streaming path (`adc_set_round_robin`, `adc_fifo_setup`, `adc_run`, `adc_fifo_drain`, `adc_set_clkdiv`) + EXT_ANA_IN inner-loop `adc_hw` error poll — 13 sites, grouped under future `hal_adc`. **Exit-gate note:** the plan's original `#ifdef` count target for External.c (120 → ≤30) is RP2040-vs-RP2350 *structural* cleanup — extra PWM slots, ADC temp-sensor channel, extra PIO, pin count — not further `gpio_*` call migration. That restructuring (port constants or hoisted-unconditional state) belongs in Phase 11 sweep, not Phase 3.
-- Phase 4 (`hal_storage` + `hal_filesystem`) ✅ — foundation, path ops, driver extractions, dir iteration, file-op scaffolding, interpreter primitives, external callers, and shadow retirement all landed. Full arc: `hal/hal_storage.h` + `hal/hal_filesystem.h` contracts (293c98d), `hal_storage_pico.c` thin adapter to FatFS `disk_*` + `pico_lfs_cfg` geometry (293c98d), `hal_filesystem_pico.c` path-prefix dispatcher A:→LFS / B:→FatFS (b929139), `hal_filesystem_host.c` forwarding through `host_f_*` (d171e87). FileIO.c cmd_mkdir/cmd_rmdir/cmd_name/cmd_kill single-file branch + GetCWD migrated via `ErrorCheckHAL` errno→FSerror shim (d171e87, 25d6bd7). hal_fs_dir_open/next/close working on host and device (25d6bd7). Drivers relocated per plan: `mmc_stm32.c` → `drivers/sd_spi/` (0d7940d), `fs_flash_*` + `pico_lfs_cfg` → `drivers/pico_flash/pico_flash_lfs.c` (25d6bd7). `fun_dir` + `mmbasic_chdir` migrated to `hal_fs_dir_*` / `hal_fs_chdir` (1ca8347). `hal_fs_open`/`close`/`read`/`write`/`seek`/`tell`/`eof`/`sync` implemented on device (16-slot table with FIL*/lfs_file_t*, MMBasic 'A' xattr re-stamp on close/sync for writable LFS) and host (16-slot table dispatching to POSIX fopen when `host_sd_root` set, vendored FatFS otherwise) (581a1db). `BasicFileOpen` / `FileGetChar` / `FilePutChar` / `FilePutStr` / `FileEOF` / `FileClose` / `ForceFileClose` / `positionfile` / `cmd_seek` / `cmd_flush` / `fun_loc` / `fun_lof` / `B2A`/`A2B`/`B2B`/`A2A` all HAL-routed via the new `hal_fds[fnbr]` array (20a8629). The four copy variants collapsed to one `copy_via_hal()`. 2d76e16 + followup migrated FileIO.c's remaining BMP save paths, JPEG decoder, FLASH LOAD IMAGE size reads, ResetFlashStorage's bootcount read/rewind/write, BmpDecoder.c's IMG_FREAD, Audio.c's WAV onRead/onSeek + TRACK pause tell + CONTINUE read + WAV size, MM_Misc.c LIB/OPT size + BOOT COUNT read, Commands.c LIST rewind, bc_runtime.c FRUN size, Editor.c EDIT size, upng.c PNG read, MMtftp.c read/write, MMtcpserver.c HTTP file serve. `FileTable` collapsed to `{ com }` struct — `.fptr` / `.lfsptr` union arms retired, `hal_fs_peek_handle` removed from the HAL contract, host_fs_posix_* shim family (`host_fs_posix_active` / `try_open` / `read_bytes` / `write_bytes` / `eof` / `close` / `loc` / `lof` / `seek` / `flush` / `get_char` / `put_char` / `put_str`) deleted along with `host/host_fs_hal.h`. The only FileTable field remaining is `com` — 0=free, 1..MAXCOMPORTS=serial port number, `FILE_SLOT_MARKER=MAXCOMPORTS+1`=file slot (hal_fds[fnbr] carries the HAL fd).
-- Phase 5 (`hal_keyboard`) ✅ — full surface landed in three commits (1c24fee service + clear_repeat, 95a92e4 driver relocations, this commit init + keydown + lock_state + set_layout). `hal_keyboard.h` now declares `service`, `clear_repeat_state`, `init`, `keydown_count`, `keydown_slot`, `lock_state`, `set_layout`. `ports/pico_sdk_common/hal_keyboard_pico.c` dispatches PS/2 (`initKeyboard` + `CheckKeyboard`) vs USB (`hcd_port_reset` + `tuh_init` + HID reset + `clearrepeat`); `KeyDown[]` / `LocalKeyDown[]` / `caps_lock`/`num_lock`/`scroll_lock` are read through the keydown/lock accessors. `host/hal_keyboard_host.c` no-ops init/service/clear, forwards keydown to `host_keydown`, rejects every layout. Migrated sites: `PicoMite.c` (early PS/2 init + late USB init replaced by `hal_keyboard_init()` at each gate); `MM_Misc.c::check_interrupt` PS/2 poll, `clearrepeat()` x6, OPTION KEYBOARD layout ladder; `vm_sys_input.c` now owns `fun_keydown` (unified definition, routes through HAL) and `vm_sys_input_keydown` (VM syscall wrapper). `host_peripheral_stubs.c` + `MM_Misc.c`'s duplicate `fun_keydown` bodies retired. Drivers relocated in the earlier commit: `Keyboard.c` → `drivers/ps2_matrix/`, `USBKeyboard.c` → `drivers/usb_host_kbd/`, `picocalc/i2ckbd.{c,h}` → `drivers/i2c_picocalc_kbd/`. Residual: `routinechecks`'s 1 kHz USB pump / I²C poll in `PicoMite.c` stays under local `#ifdef USBKEYBOARD` — migrates with the display/touch service loop in Phase 7.
-- Phase 6 (`hal_audio`) 🟡 — Phase 6a landed: `hal_audio.h` contract (tone/sound/stop/volume/pause/resume; init is no-op on host), `host/hal_audio_host.c` forwarding to the existing `host_sim_audio_*` family (which links to either `host/host_sim_audio.c` for sim or `host/host_wasm_audio.c` for WASM at Makefile-time). `Audio.c` host arm migrated to call `hal_audio_*` instead of `host_sim_audio_*` directly. Device arm (~2000 lines of PWM/DMA/codec) untouched — device `cmd_play` stays hardware-gated under `#ifndef MMBASIC_HOST` until a Phase 6b pass separates parsing from primitive calls on hardware. `hal_audio_sample_push()` for WAV/MP3/FLAC/MOD streaming and `drivers/pwm_synth/` + `drivers/vs1053/` relocation pending.
+- Phase 1 ✅ — `hal_flash.h` + device (`ports/pico_sdk_common/hal_flash_pico.c`) + host (`host/hal_flash_host.c`) impls. All 52 `flash_range_*` + `flash_do_cmd` call sites routed through the HAL. Added `hal_flash_read_jedec_id` and `host/hardware/regs/addressmap.h` stub along the way. Note: `Include.h` still pulls `hardware/flash.h` unconditionally — the header is available everywhere even though no core file calls the SDK directly. Clean that up in Phase 3b (port-config).
+- Phase 2 (`hal_time`) ✅ — contract + impls + migration of 42 core call sites (`MM_Misc.c`, `Audio.c`, `Commands.c`, `Draw.c`, `External.c`, `FileIO.c`, `MATHS.c`, `bc_vm.c`, `mm_misc_shared.c`). All scored files call `hal_time_us_64()` — zero direct `time_us_64()`. Peripheral files (`PicoMite.c`, `I2C.c`, `USBKeyboard.c`, `MMMqtt`, `MMntp`, `MMtcpserver.c`, `XModem.c`) still call SDK time directly — migrate with their HALs.
+- Phase 3 (`hal_pin`) 🔧 **infrastructure landed, ifdef elimination pending** — HAL API surface complete: `set_mode`, `read`, `write`, `toggle`, `read_output_latch`, `set_drive_mA`, `set_pulls`, `set_dir`, `set_input_enabled`, `select_digital`, `init_digital`, `deinit`, `set_function`, `adc_select`, `adc_init`, `adc_set_temp_sensor`, `adc_read`, `set_input_hysteresis`, `set_slew_fast`, `irq_set_edge`, `bank_read_all`, `bank_read_out_latch`, `bank_{set,clr,xor}_mask`; Tier-B fast inlines (`read_fast`/`write_fast`/`toggle_fast`) via per-port `hal_pin_inlines.h`. 107 `hal_pin_*` call sites in External.c (real migration). Direct `gpio_put`/`gpio_get`/`gpio_init`/`gpio_set_function`/`gpio_set_pulls` calls eliminated. **Remaining SDK calls not yet in HAL:** `adc_select_input` + `adc_read` (single-shot ADC in `ExtInp`, lines 1050-1052 — these are NOT DMA-streaming), `adc_hw->div`/`adc_hw->cs` register access, `sio_hw->gpio_hi_in`, 15 `picomite_gpio_irq_set_enabled` calls, ADC DMA-streaming path (`adc_set_round_robin`, `adc_fifo_setup`, `adc_run`, `adc_set_clkdiv`). **Ifdef count unchanged:** External.c is still 120 (baseline was 120). The 37 rp2350 PWM-slice/PIO-count blocks and other structural `#ifdef`s were not moved into HAL impls. → Phase 3b.
+- Phase 4 (`hal_storage` + `hal_filesystem`) 🔧 **infrastructure landed, ifdef elimination pending** — HAL contracts, device/host impls, and call-site migration all done. `hal_fs_open`/`close`/`read`/`write`/`seek`/`tell`/`eof`/`sync` working on device and host. `BasicFileOpen`/`FileGetChar`/`FilePutChar`/`FilePutStr`/`FileEOF`/`FileClose`/`ForceFileClose`/`positionfile`/`cmd_seek`/`cmd_flush`/`fun_loc`/`fun_lof`/copy variants all HAL-routed. `FileTable` collapsed to `{ com }`. BMP/JPEG/WAV/TFTP/HTTP callers migrated. Drivers relocated: `mmc_stm32.c` → `drivers/sd_spi/`, `fs_flash_*` → `drivers/pico_flash/`. **Ifdef count: FileIO.c went from 75 → 60, not the target of <10.** 24 `MMBASIC_HOST` blocks, 8 `rp2350` blocks, 8 `PICOMITEVGA` blocks, and 10 `PICOMITEWEB` blocks remain — SD card init, flash erase geometry, VGA image paths, and network file ops still branch on target in the core file. → Phase 4b.
+- Phase 5 (`hal_keyboard`) 🔧 **infrastructure landed, ifdef elimination pending** — HAL surface complete (`service`, `clear_repeat_state`, `init`, `keydown_count`, `keydown_slot`, `lock_state`, `set_layout`). Device impl dispatches PS/2 vs USB. `fun_keydown` unified in `vm_sys_input.c`. Drivers relocated: `Keyboard.c` → `drivers/ps2_matrix/`, `USBKeyboard.c` → `drivers/usb_host_kbd/`, `picocalc/i2ckbd.{c,h}` → `drivers/i2c_picocalc_kbd/`. **Ifdef count: MM_Misc.c went from 135 → 134, not the target of <50.** 21 `USBKEYBOARD` blocks remain in MM_Misc.c — OPTION output formatting, interrupt config, keyboard buffer handling still branch on `USBKEYBOARD` in the core file instead of routing through HAL. → Phase 5b.
+- Phase 6 (`hal_audio`) 🟡 — Phase 6a landed: `hal_audio.h` contract (tone/sound/stop/volume/pause/resume; init is no-op on host), `host/hal_audio_host.c` forwarding to the existing `host_sim_audio_*` family. `Audio.c` host arm migrated to call `hal_audio_*` instead of `host_sim_audio_*` directly. VS1053 relocated to `drivers/vs1053/`. Device arm (~2000 lines of PWM/DMA/codec) untouched. `hal_audio_sample_push()` for WAV/MP3/FLAC/MOD streaming and `drivers/pwm_synth/` relocation pending.
+- Phases 3b/4b/5b — ifdef-elimination passes for Phases 3-5. See phase descriptions below.
 - Phases 7–13 — not started.
 
 **Commits:** f89e9a9 (scaffolding), 9a53573 / f7a06f4 / 896eaa9 / f1207a6 (state hoists), 33163ad / ed610a2 (hal_flash), 029170b / f2d840f (hal_time), 67b4092 / bbbb4ec / 344def0 / 2b374da / dca6ba2 / 8919341 / 67c1313 / e733405 (hal_pin), e8e1439 (buildall sweep), 293c98d / b929139 / d171e87 / 0d7940d / 25d6bd7 / 1ca8347 / 581a1db / 20a8629 (hal_storage + hal_filesystem + drivers/sd_spi + drivers/pico_flash + fun_dir/chdir migration + hal_fs_open/read/write/close scaffolding + FileIO.c file-table primitives routed through HAL), 2d76e16 (SAVE/LOAD IMAGE regression fix + BMP/JPEG migration + hal_fds[] exposed), f0e83c9 (external-caller sweep + FileTable retirement), 1c24fee (hal_keyboard service + clear_repeat_state), 95a92e4 (hal_keyboard driver relocations), 5232a46 / 7e733d6 (hal_audio Phase 6a + VS1053 relocation), this commit (hal_keyboard init + keydown + lock_state + set_layout — Phase 5 closed).
@@ -92,6 +99,34 @@ Several globals are referenced by both the interpreter and would-be drivers:
 - **Audio state:** sample buffers, voice slots — currently in `Audio.c`.
 
 If `Draw.c` is split into `drivers/<display>/` files in Phase 7+, every driver that references `HRes` would either re-declare it (multiple-definition link error) or include `Draw.c` indirectly (defeats the split). **Phase 0.5 hoists these globals into `core/state/` files** (`core/state/display_state.c`, `core/state/pin_state.c`, `core/state/option_state.c`, `core/state/audio_state.c`) before any driver split begins. The current files keep `extern` declarations; the global definitions move. This is mechanical, low-risk, and unblocks every later phase.
+
+## Port-config mechanism
+
+Many `#ifdef` blocks in core files don't dispatch to different *code* — they select different *constants*: how many PWM slices, how many PIO blocks, how many pins, which ADC channel is the temperature sensor, what the board name string is, whether PSRAM exists. These don't need HAL functions — they need compile-time constants that vary per port.
+
+**Mechanism:** each port directory provides a `port_config.h` that defines a set of required constants. Core files `#include "port_config.h"` (resolved via include path, not relative path — each port directory is on the include path for its build). The constants replace `#ifdef rp2350` / `#ifdef PICOMITEVGA` / `#ifdef PICOCALC` blocks with direct references.
+
+**Required constants (initial set, grows as phases eliminate ifdefs):**
+
+```c
+// port_config.h — provided by each port directory
+#define PORT_BOARD_NAME        "PicoMite VGA RP2350"
+#define PORT_PWM_SLICE_COUNT   12          // 8 on rp2040, 12 on rp2350
+#define PORT_PIO_COUNT         3           // 2 on rp2040, 3 on rp2350
+#define PORT_PIN_COUNT         48          // 30 on rp2040, 48 on rp2350
+#define PORT_ADC_TEMP_CHANNEL  4           // 4 on both, but rp2350 has more ADC channels
+#define PORT_ADC_CHANNEL_COUNT 5           // rp2040=5, rp2350=6+
+#define PORT_HAS_PSRAM         1           // 0 or 1
+#define PORT_HAS_NETWORK       0           // 1 only on PICOMITEWEB
+#define PORT_HAS_DISPLAY       1           // 0 on mmbasic_stdio
+#define PORT_MAX_CPU_KHZ       250000      // rp2040=200000, rp2350=250000
+```
+
+Core code uses these directly: `for (int i = 0; i < PORT_PWM_SLICE_COUNT; i++)` instead of `#ifdef rp2350 ... 12 ... #else ... 8 ... #endif`. The compiler dead-code-eliminates unreachable paths when a constant is 0/1, so `if (PORT_HAS_PSRAM) { ... }` compiles to nothing on ports without PSRAM — same binary effect as `#ifdef`, no preprocessor branching in core.
+
+The host port's `port_config.h` defines `PORT_HAS_DISPLAY 1` (it simulates a display), `PORT_HAS_NETWORK 0`, `PORT_PWM_SLICE_COUNT 0`, etc. The `mmbasic_stdio` port (Phase 12.5) defines `PORT_HAS_DISPLAY 0`, `PORT_HAS_NETWORK 0`, `PORT_PWM_SLICE_COUNT 0` — any BASIC program that tries to use those features gets an error from the hard-error HAL stubs, not from an `#ifdef` in core.
+
+This mechanism is introduced alongside Phase 3b (which needs it most heavily for the rp2350 PWM/PIO/pin-count blocks) and used by every subsequent phase.
 
 ## Combinatorial gates: drivers may have local `#ifdef`s
 
@@ -468,32 +503,28 @@ The hot-path question — how does `hal_display_put_pixel` inline across the HAL
 
 ## Phased plan
 
-Each phase: green host build, green WASM build, every device CMake target builds clean (`buildall.sh`), `./run_tests.sh` 192/192, `tools/check_hal_purity.sh` passes for the files in scope, performance gates pass. Each phase ends with a commit.
+Each phase: green host build, green WASM build, every device CMake target builds clean (`buildall.sh`), `./run_tests.sh` passes, `tools/check_hal_purity.sh` passes for the files in scope, performance gates pass. Each phase ends with a commit. **Each phase's exit gate includes a measured `tools/hal_scoreboard.sh` result showing the target ifdef count was reached.**
 
-Phases are ordered to **(a) lock the architecture in Phase 0, (b) hoist shared state in Phase 0.5 to unblock everything, (c) take low-risk surfaces first to validate the HAL shape, (d) attack the worst `#ifdef` offenders before they ossify around the HAL, and (e) leave host/WASM relocation for the very end.**
+Phases are ordered to **(a) lock the architecture in Phase 0, (b) hoist shared state in Phase 0.5 to unblock everything, (c) build HAL infrastructure (contracts + impls), (d) eliminate `#ifdef` blocks by moving conditional bodies into HAL impls and port-config, and (e) leave host/WASM relocation for the very end.** Steps (c) and (d) happen together for new phases (6+). For phases 3-5 where infrastructure landed without ifdef elimination, sub-phases 3b/4b/5b do the cleanup.
 
-## Pace and acceleration (end-of-phase-4 retrospective)
+## Retrospective and course correction (end-of-phase-5a, 2026-04-22)
 
-Phases 0–4 landed in ~43 commits averaging ~10/phase. Phase 4 (file I/O) alone ate ~12 because `BasicFileOpen` / `FileGetChar` / BMP save / JPEG decode / boot-count / Editor load / TFTP / HTTP serve / WAV decoder is more call sites than any other HAL surface. The directory layout at end-of-phase-4 looks deceptively thin: `hal/` = 822 lines across 5 headers + contract, `ports/pico_sdk_common/` = 1059 lines of device HAL impls, `host/hal_*.c` = 695 lines of host impls, `drivers/` = 2131 lines (1967 of which is mmc_stm32.c *relocated* from root, not fresh code). Core BASIC files are **−358 lines net** across 18 files. The reason `drivers/` looks empty isn't that nothing has happened — it's that the plan explicitly splits work into two modes:
+Phases 0–5a + 6a landed in 31 commits. HAL headers, device/host impls, call-site migrations, and driver relocations are real work — 7 HAL contracts, 7 device impls, 7 host impls, 6 driver directories. Tests 239/239. All 12 device CMake targets build.
 
-- **Phases 0–4 (done):** write HAL contracts + impls, migrate core call sites to go through the HAL. The files that will *become* drivers (Draw.c, SPI-LCD.c, SSD1963.c, Keyboard.c, USBKeyboard.c, Audio.c, VS1053.c, psram.c, GUI.c, mouse/Touch/GPS/watchdog/CFunction) stay in repo root. Callers reach their backends via HAL.
-- **Phases 5–11 (not started):** relocate drivers. This is when `drivers/` fills out and repo root thins.
+**But the primary goal — eliminating hardware `#ifdef`s from core files — barely moved.** The scoreboard went from 606 → 587 (−3%). The phases added HAL wrappers and migrated call sites, but left the `#ifdef` blocks in place. That means core files still branch on `PICOMITEVGA`, `USBKEYBOARD`, `rp2350`, `MMBASIC_HOST`, etc. — the HAL infrastructure exists but the core isn't clean.
 
-From Phase 5 onward, collapse the two modes into one commit per driver to accelerate:
+**Course correction:** Phases 3, 4, 5 are relabelled from ✅ to 🔧 (infrastructure landed). New sub-phases 3b, 4b, 5b do the actual ifdef elimination by moving conditional bodies into the HAL impls that already exist. A new "port-config mechanism" (see section below) absorbs structural constants (PWM slice count, PIO count, pin count, etc.) that don't need function calls.
 
-1. **Combine interface-first and relocate-later into one commit per driver.** Phase 7a as originally drafted reads "write `hal_display.h`, then later relocate `SPI-LCD.c` into `drivers/ili9341/`." From Phase 5 on, do both in the *same* commit: the HAL header, the driver move, and the core-file call-site migration ride together. The interface is only ever validated by a real implementation anyway — drafting it in isolation buys nothing.
-2. **Batch `buildall.sh` verification to phase boundaries.** `buildall.sh` over 12 targets runs every commit today, ~10 minutes per pass. For phases where a HAL-interface change either compiles on all 12 targets or none (most of them), run `buildall.sh` once at phase end and `host/build.sh` + `run_tests.sh` per commit. Phases that touch peripheral drivers (7a/7b/7c/7d) keep per-commit `buildall` because display backends share headers.
-3. **Limit plan-meta commits.** Rules learned from incidents get one commit, not one-per-rule. Inline the rule with the code commit that taught the lesson whenever possible (e.g. "fix SAVE/LOAD IMAGE + add scrape-pass-counts rule" = one commit, not two).
-4. **Per-phase commit-count targets.** Explicit budgets to check against:
-   - Phase 5 (keyboard): **1–2 commits.** `hal_keyboard.h`, three driver lifts (ps2_matrix, usb_host_kbd, i2c_picocalc_kbd), MM_Misc.c migration — one push.
-   - Phase 6 (audio): **2–3 commits.** `hal_audio.h` + `drivers/pwm_synth/` lifted from Audio.c tones; `drivers/vs1053/` lifted from VS1053.c; Audio.c residual is dialect logic that stays in core. Separate VS1053 commit because it's Web-variant-only and adds a boot risk surface.
-   - Phase 7a–d (display): **3–4 commits each**, not compressible. Each display backend is a separate boot-risk surface; FASTGFX / scanout / layer logic varies enough per backend that compressing them risks silent perf regressions.
-   - Phase 8 (multicore): **1 commit.** Small surface (3 functions + channel IDs), device-only.
-   - Phase 9 (net): **1–2 commits.** `hal_net.h` + `drivers/cyw43/` lift; PICOMITEWEB only.
-   - Phase 10 (heap): **1 commit.** Memory.c cleanup.
-   - Phase 11 (sweep): **3–5 commits** for the misc drivers (watchdog, gps, touch, mouse, gui_controls, cfunction).
+From this point forward, every phase's exit gate is measured by `tools/hal_scoreboard.sh`. If the number didn't go down, the phase isn't done. No more marking phases complete based on infrastructure alone.
 
-Target end-state after Phase 11: ~20 more commits, not ~60. Phases 12 + 12.5 (host/WASM relocate + mmbasic_stdio) keep their own budgets — those are structural churn, not driver work.
+**Per-phase commit-count targets:**
+- Phase 3b/4b/5b: **1–2 commits each.** Infrastructure exists; this is moving `#ifdef` bodies.
+- Phase 6b (audio device arm): **2–3 commits.**
+- Phase 7a–d (display): **3–4 commits each.**
+- Phase 8 (multicore): **1 commit.**
+- Phase 9 (net): **1–2 commits.** 67 `PICOMITEWEB` blocks across 8 files.
+- Phase 10 (heap): **1 commit.**
+- Phase 11 (sweep): **3–5 commits** for remaining drivers + final cleanup of every file to 0.
 
 ### Phase 0 — Architecture lock + tooling (no behaviour change) ✅ partial
 
@@ -542,41 +573,87 @@ Core scaffolding + purity gate + scoreboard landed. `check_ram_baseline.sh`, `pe
 
 **Exit gate:** core no longer calls `time_us_64()` directly. FASTGFX 50 Hz invariant verified.
 
-### Phase 3 — `hal_pin.h` (pins / PWM / ADC) 🟡
+### Phase 3 — `hal_pin.h` (pins / PWM / ADC) 🔧
 
-Scaffold contract + device/host impls landed (`set_mode`, `read`, `write`, `toggle`, `read_output_latch`, `set_drive_mA`). Config-time sites in External.c and MM_Misc.c migrated. **Resume here:** Tier-B inline variants for `__not_in_flash_func` callers → PWM → ADC → edge IRQ → bulk External.c migration.
+HAL API surface and call-site migration landed (see status above). The HAL contract is complete and both device and host impls exist. What remains is eliminating the `#ifdef` blocks from core files — the conditional bodies need to move *into* HAL implementations and port-config headers so core calls a single function with no target branching.
 
-- The VM already does pin/PWM via `vm_sys_pin.c`. Define `hal/hal_pin.h` to subsume that surface plus the interpreter's needs (`cmd_pin`, `cmd_pwm`, `cmd_pulse`, `External.c`'s ADC).
-- Implementations: `ports/rp2040/hal_pin_rp2040.c`, `ports/rp2350/hal_pin_rp2350.c` (extra PWM slices, extra ADC channels, clock-speed validation).
-- `vm_sys_pin.c` becomes a thin adapter that calls the HAL.
-- Targets: External.c's 55 `#ifdef rp2350` blocks; Commands.c PWM/PIN handlers; the rp2350 clock-speed validation in MM_Misc.c.
+**What landed (Phase 3a):**
+- `hal/hal_pin.h` with full API surface (26 functions + Tier-B inlines).
+- `ports/pico_sdk_common/hal_pin_pico.c` + `host/hal_pin_host.c` impls.
+- 107 `hal_pin_*` call sites in External.c replacing direct `gpio_*` SDK calls.
+- `vm_sys_pin.c` adapted to call the HAL.
 
-**Exit gate:** External.c hardware-ifdef count from 95 to under 30 (the residue is multicore IPC, deferred to Phase 8). `tools/check_hal_purity.sh` passes for `vm_sys_pin.c`.
+**What remains (Phase 3b):**
+- External.c still has 120 hardware `#ifdef`s (unchanged from baseline). The bodies of 37 rp2350 PWM-slice-count / PIO-block-count / pin-count blocks need to move into HAL impls or port-config constants.
+- Single-shot ADC calls (`adc_select_input`, `adc_read` at line 1050-1052, `adc_hw` register access) need to go through `hal_pin_adc_*`.
+- 15 `picomite_gpio_irq_set_enabled` calls need `hal_pin_irq_set_edge` or equivalent.
+- `sio_hw->gpio_hi_in` direct register read needs a HAL accessor.
+- ADC DMA-streaming path (`adc_set_round_robin`, `adc_fifo_setup`, `adc_run`, `adc_set_clkdiv`) — consider `hal_adc_stream_*` or leave in a driver.
 
-### Phase 4 — `hal_storage.h` + `hal_filesystem.h`
+**Exit gate:** External.c hardware-ifdef count → 0. All pin/PWM/ADC differences between rp2040 and rp2350 live in HAL impls or port-config, not in External.c. `tools/check_hal_purity.sh` passes for External.c and `vm_sys_pin.c`.
 
-- Two-tier: `hal_storage.h` is block-level (read/write/erase/sync), `hal_filesystem.h` is POSIX-style on top.
-- Implementations: `drivers/sd_spi/`, `drivers/pico_flash/` (LFS-backed), and the existing host POSIX path which keeps its current host_fs_*.c files but is now reached via the HAL header.
-- `FileIO.c`'s 26 `#ifdef MMBASIC_HOST` blocks collapse into HAL calls.
-- Storage drivers ship with conformance tests (`drivers/sd_spi/tests/conformance.c`) that exercise the HAL contract end-to-end.
+### Phase 4 — `hal_storage.h` + `hal_filesystem.h` 🔧
 
-**Exit gate:** FileIO.c hardware-ifdef count from 64 to under 10. SD-card and host-POSIX use the same upper layer. Conformance tests green for all storage drivers.
+HAL contracts, device/host impls, and file-op call-site migration all landed (see status above). What remains is eliminating the `#ifdef` blocks from FileIO.c.
 
-### Phase 5 — `hal_keyboard.h`
+**What landed (Phase 4a):**
+- `hal/hal_storage.h` + `hal/hal_filesystem.h` contracts.
+- `hal_storage_pico.c`, `hal_filesystem_pico.c`, `hal_filesystem_host.c` impls.
+- `BasicFileOpen`/`FileGetChar`/`FilePutChar`/`FilePutStr`/copy variants/BMP/JPEG/WAV/TFTP/HTTP all HAL-routed.
+- `FileTable` collapsed. `host_fs_posix_*` shim family deleted.
+- Drivers relocated: `mmc_stm32.c` → `drivers/sd_spi/`, `fs_flash_*` → `drivers/pico_flash/`.
 
-- Define `hal/hal_keyboard.h` (poll, peek, modifiers, layout, paste-buffer hook).
-- Drivers: `drivers/ps2_matrix/` (lifted from `Keyboard.c`), `drivers/usb_host_kbd/` (lifted from `USBKeyboard.c`), `drivers/i2c_picocalc_kbd/` (lifted from `picocalc/i2ckbd.c`).
-- Host keyboard stays in `host/host_keys.c`; HAL header has an extern that resolves to the host symbol on host builds.
-- MM_Misc.c's `USBKEYBOARD` (12) and PICOMITEVGA-keyboard (12) blocks collapse.
+**What remains (Phase 4b):**
+- FileIO.c still has 60 hardware `#ifdef`s (baseline was 75). The remaining blocks:
+  - 24 `MMBASIC_HOST` blocks: SD card init, flash erase geometry, POSIX-vs-FatFS dispatch. These conditional bodies need to move into `hal_filesystem_pico.c` / `hal_filesystem_host.c`.
+  - 8 `rp2350` blocks: flash sector sizes, PSRAM bank switching. Move into `hal_flash_pico.c` or port-config constants.
+  - 8 `PICOMITEVGA` blocks: display-specific image load paths. Move into display HAL (Phase 7) or a display-aware file helper.
+  - 10 `PICOMITEWEB` blocks: MQTT config, network file ops. Move into `hal_net` (Phase 9) or network-aware file helper.
+  - 1 `PICOCALC` + `rp2350` block: flash layout. Port-config.
 
-**Exit gate:** All keyboard input flows through `hal_keyboard_*` on device. MM_Misc.c hardware-ifdef count from 102 to under 50.
+**Exit gate:** FileIO.c hardware-ifdef count → 0. Every target-specific file-system behaviour lives in a HAL impl, not in FileIO.c.
+
+### Phase 5 — `hal_keyboard.h` 🔧
+
+HAL surface, driver relocations, and key call-site migrations landed (see status above). What remains is eliminating the `#ifdef USBKEYBOARD` blocks from MM_Misc.c and other core files.
+
+**What landed (Phase 5a):**
+- `hal/hal_keyboard.h` with full surface (service, clear_repeat_state, init, keydown_count, keydown_slot, lock_state, set_layout).
+- `ports/pico_sdk_common/hal_keyboard_pico.c` + `host/hal_keyboard_host.c` impls.
+- `fun_keydown` unified in `vm_sys_input.c`.
+- Drivers relocated: `Keyboard.c` → `drivers/ps2_matrix/`, `USBKeyboard.c` → `drivers/usb_host_kbd/`, `picocalc/i2ckbd.{c,h}` → `drivers/i2c_picocalc_kbd/`.
+
+**What remains (Phase 5b):**
+- MM_Misc.c still has 21 `USBKEYBOARD` blocks (baseline was ~21 — no reduction). The conditional bodies — OPTION output formatting, interrupt config, keyboard buffer handling, repeat-rate setup, PS/2 pin configuration — need to move into `hal_keyboard_pico.c` (which already dispatches USB vs PS/2) or into a new HAL function (e.g. `hal_keyboard_get_option_string`, `hal_keyboard_get_config`).
+- FileIO.c has 2 `USBKEYBOARD` blocks: keyboard buffer persistence. Move into HAL.
+- Functions.c has 3 `USBKEYBOARD` blocks: keyboard read functions. Move into HAL.
+- Commands.c has 3 keyboard-related blocks. Move into HAL.
+
+**Exit gate:** Zero `USBKEYBOARD` references in any scored core file. All keyboard-type dispatch lives in HAL impls.
+
+### Phase 3b/4b/5b — ifdef elimination for landed HAL surfaces
+
+These are the cleanup passes that complete the phases whose infrastructure landed but whose `#ifdef` blocks weren't moved into HAL impls. Each pass:
+1. Identifies every remaining `#ifdef TARGET_MACRO` block in the phase's core files.
+2. Moves the conditional body into the appropriate HAL implementation (already exists) or into port-config constants (see "Port-config mechanism" below).
+3. Replaces the `#ifdef` block with a single HAL call or port-config constant reference.
+
+**Phase 3b** (External.c + pin/PWM/ADC): target 120 → 0 in External.c. Requires port-config constants for `HAL_PWM_SLICE_COUNT`, `HAL_PIO_COUNT`, `HAL_PIN_COUNT`, `HAL_ADC_TEMP_CHANNEL`. ADC single-shot and DMA-streaming paths move into HAL. `picomite_gpio_irq_set_enabled` → `hal_pin_irq_*`.
+
+**Phase 4b** (FileIO.c): target 60 → 0. Host-stub blocks move into `hal_filesystem_host.c`. rp2350 flash geometry → port-config or `hal_flash`. PICOMITEVGA image blocks → Phase 7 (display HAL). PICOMITEWEB file blocks → Phase 9 (net HAL). After 4b + 7 + 9, FileIO.c is clean.
+
+**Phase 5b** (MM_Misc.c keyboard blocks): target 21 USBKEYBOARD refs → 0. Keyboard option formatting, interrupt config, buffer handling move into `hal_keyboard_pico.c`. Functions.c/Commands.c keyboard blocks also cleaned.
+
+These can run in any order. Each is a 1-2 commit job since the HAL infrastructure already exists — it's just moving the `#ifdef` bodies into the impls. Do them before Phase 6 so the pattern is validated before tackling audio, display, and net.
+
+**Exit gate for all three:** `tools/hal_scoreboard.sh` shows the target reductions. The original phase exit gates (External.c → 0, FileIO.c → 0, MM_Misc.c USBKEYBOARD → 0) are now met.
 
 ### Phase 6 — `hal_audio.h`
 
 - `Audio.c` is 115 KB but mostly dialect logic.
-- Define `hal/hal_audio.h` (tone freq+vol, sample buffer push, codec stream, stop, voice slot management).
-- Drivers: `drivers/pwm_synth/` (rp2040+rp2350 PWM, lifted from Audio.c hardware sections), `drivers/vs1053/` (lifted from VS1053.c, Web variants only).
-- Host audio stays in `host/host_sim_audio.c` + `host/host_wasm_audio.c`; HAL extern resolves there.
+- Phase 6a landed: `hal_audio.h` contract, host impl, VS1053 relocated to `drivers/vs1053/`. Audio.c host arm calls `hal_audio_*`.
+- Phase 6b: device arm. Move ~2000 lines of PWM/DMA/codec code into `drivers/pwm_synth/`. Audio.c becomes pure BASIC dialect logic (parsing PLAY command syntax, managing voice slots) with zero hardware `#ifdef`s — all hardware dispatch goes through `hal_audio_*` impls linked per target.
+- A `mmbasic_stdio` port would link `hal_audio_hard_error.c` — any PLAY statement returns a BASIC error.
 
 **Exit gate:** Audio.c hardware-ifdef count → 0. Audio bench (`PLAY TONE` 1 kHz for 5 s, capture buffer underruns) shows zero regressions.
 
@@ -589,29 +666,31 @@ Scaffold contract + device/host impls landed (`set_mode`, `read`, `write`, `togg
 - `Draw.c` for ILI9341 ports: replace direct `SPI-LCD.c` calls with HAL calls. `gfx_*_shared.c` calls Tier-B inlines for hot pixel paths.
 - Picomite (RP2040 + RP2350 USB and non-USB variants) — 4 ports — switch to `drivers/ili9341/`.
 
-**Exit gate:** Draw.c hardware-ifdef count for ILI9341 ports drops to (current count − ILI9341-specific gates). 4 ports build clean. Smoke-boot on physical RP2040 PicoMite + RP2350 PicoMite. `pico_blocks_tilemap` FPS held; `mand` wall time held. RAM baseline check passes.
+**Exit gate:** Draw.c `#ifdef` count drops by the ILI9341-specific gates (measured before and after). Draw.c must have zero `PICOMITE`-only display ifdefs for the ILI9341 path. 4 ports build clean. Smoke-boot on physical RP2040 PicoMite + RP2350 PicoMite. `pico_blocks_tilemap` FPS held; `mand` wall time held. RAM baseline check passes.
 
 ### Phase 7b — `hal_display.h` for VGA (PIO)
 
 - `drivers/vga_pio/` lifted from current VGA scanout code. Multi-mode (SCREENMODE1/2/3) — driver internally handles mode dispatch with local `#ifdef` allowed where it simplifies.
 - `Draw.c` for VGA ports: VGA-specific code moves into the driver; the driver implements `hal_display`.
+- All `PICOMITEVGA` ifdefs in Draw.c move into `drivers/vga_pio/` — the driver owns the conditional logic, not Draw.c.
 - 4 VGA ports (RP2040 + RP2350 × USB / non-USB) switch over.
 
-**Exit gate:** VGA ports build + boot. Scanout integrity verified visually (test pattern). FASTGFX FPS held.
+**Exit gate:** Zero `PICOMITEVGA` references in Draw.c. VGA ports build + boot. Scanout integrity verified visually. FASTGFX FPS held.
 
 ### Phase 7c — `hal_display.h` for HDMI
 
 - `drivers/hdmi/` lifted from rp2350 HDMI code. Includes the multicore scrolling/clearing path (uses `hal_multicore`, see Phase 8).
+- All `HDMI` ifdefs in Draw.c move into `drivers/hdmi/`.
 - 2 HDMI ports switch over.
 
-**Exit gate:** HDMI ports build + boot. SCREENMODE4/5 verified.
+**Exit gate:** Zero `HDMI` references in Draw.c. HDMI ports build + boot. SCREENMODE4/5 verified.
 
 ### Phase 7d — `hal_display.h` for SSD1963 + Web variants
 
 - `drivers/ssd1963/` lifted from current `SSD1963.c`. Web variants pull in `drivers/cyw43/` (Phase 9) at the same time.
 - 2 Web ports switch over.
 
-**Exit gate:** Draw.c hardware-ifdef count → 0. All 12 device ports use `hal_display`. RAM baseline check passes for every target.
+**Exit gate:** Draw.c hardware-ifdef count → 0. Zero display-target macros (`PICOMITE`, `PICOMITEVGA`, `HDMI`) in Draw.c. All 12 device ports use `hal_display`. RAM baseline check passes for every target.
 
 ### Phase 8 — `hal_multicore.h`
 
@@ -620,22 +699,23 @@ Scaffold contract + device/host impls landed (`set_mode`, `read`, `write`, `togg
 - Implementations: `ports/pico_sdk_common/hal_multicore_pico.c` (real FIFO), `ports/host_native/hal_multicore_stub.c` (single-core no-op for host).
 - Drivers that use multicore (HDMI in particular) call the HAL.
 
-**Exit gate:** No direct `multicore_fifo_*` calls outside `ports/pico_sdk_common/`.
+**Exit gate:** No direct `multicore_fifo_*` calls outside `ports/pico_sdk_common/` and drivers. Zero multicore-related ifdefs in scored core files.
 
 ### Phase 9 — `hal_net.h`
 
-- PICOMITEWEB only.
+- PICOMITEWEB only. 67 `PICOMITEWEB` blocks across 8 files.
 - Define `hal/hal_net.h` (TCP listen/accept, UDP send/recv, DNS, HTTP server hook).
 - `drivers/cyw43/` lifted from current Pico W network code.
-- Web ports use it.
+- Move all `PICOMITEWEB` conditional bodies out of External.c (13 blocks), MM_Misc.c (15 blocks), Memory.c (12 blocks), FileIO.c (10 blocks), Commands.c (6 blocks), Functions.c (5 blocks), Draw.c (5 blocks), Audio.c (1 block) into `hal_net` impls, `drivers/cyw43/`, or port-config (`PORT_HAS_NETWORK`).
+- Non-network ports (including host, mmbasic_stdio) link `hal_net_hard_error.c` — network commands return a BASIC error.
 
-**Exit gate:** External.c network sections route through `hal_net_*`.
+**Exit gate:** Zero `PICOMITEWEB` references in any scored core file. All network dispatch lives in HAL impls or drivers.
 
 ### Phase 10 — `hal_heap.h` + Memory.c cleanup
 
-- `Memory.c`'s 15 `#ifdef rp2350` blocks: heap-size choice, PSRAM use, allocator hooks.
+- `Memory.c`'s 37 hardware `#ifdef`s: heap-size choice, PSRAM use, allocator hooks, network buffer allocation, framebuffer memory sizing.
 - Define `hal/hal_heap.h`: `hal_heap_size()`, `hal_heap_base()`, `hal_heap_psram_base()`, `hal_heap_psram_size()`.
-- `Memory.c` becomes target-neutral; ports + `drivers/psram/` supply heap base + size at link time.
+- `Memory.c` becomes target-neutral; ports + `drivers/psram/` supply heap base + size at link time. Network buffer sizing uses `PORT_HAS_NETWORK`. Framebuffer sizing uses `hal_display_get_framebuffer_size()` or port-config.
 
 **Exit gate:** Memory.c hardware-ifdef count → 0.
 
@@ -647,10 +727,14 @@ Scaffold contract + device/host impls landed (`set_mode`, `read`, `write`, `togg
   - **Touch / mouse:** `drivers/goodix_touch/`, `drivers/mouse_serial/`. Optional drivers any port can pull in.
   - **GUICONTROLS:** `drivers/gui_controls/`. Pulled in by ports that have display + touch.
   - **CFunctions:** decide whether the embedded-native-code mechanism stays as a core MMBasic feature with a HAL hook (`hal_cfunc_resolve`) or becomes a per-port concern. Resolve the wasm-ld `CallCFunction` warning documented in web-host-plan.
+  - **PICOCALC variant (12 blocks):** I²C keyboard selection, pin layout overrides, flash layout. All move into PicoCalc port-config + `drivers/i2c_picocalc_kbd/`.
+  - **MM_Misc.c remaining (43 display blocks, 15 rp2350 blocks, 8 hardware-variant blocks):** whatever wasn't absorbed by Phases 5b/7/9. These are the OPTION output formatting blocks that print device identity strings, display option names, etc. Approach: `hal_board_get_option_string()` or similar — the HAL impl generates the board-specific option text.
+  - **Commands.c remaining (19 rp2350 blocks, 4 display blocks, 6 network blocks):** PIO clock, COP control, extra RAM commands. rp2350 blocks → HAL or port-config. Display/network blocks should already be gone after Phases 7/9.
+  - **Functions.c remaining (7 rp2350 blocks, 1 display, 5 network, 3 keyboard, 1 pin):** should mostly be gone after earlier phases. Sweep catches stragglers.
 - `OP_BRIDGE_CMD` interaction: confirm that relocated `cmd_*` functions are still resolved by `commandtbl[].fptr` (they should be — link-time resolution doesn't care about source-tree location).
-- Final pass: any residual `#ifdef PICOMITE` etc. in core gets routed through HAL or moved into a driver.
+- Final pass: **every** scored core file must reach 0 hardware `#ifdef`s.
 
-**Exit gate:** `tools/check_hal_purity.sh` passes for the entire `core/` and `hal/` tree. Every device target builds clean. All 12 device targets boot to REPL on physical hardware (or accurate emulation).
+**Exit gate:** `tools/hal_scoreboard.sh` shows 0 for every column. `tools/check_hal_purity.sh` passes for the entire `core/` and `hal/` tree. Every device target builds clean. All 12 device targets boot to REPL on physical hardware (or accurate emulation).
 
 ### Phase 12 — Host + WASM relocation
 
@@ -734,33 +818,31 @@ If any of (1-6) fails, the phase doesn't merge. (7) is required for display/keyb
 - Cross-target binary releases (one binary per target, as today).
 - Refactoring the BASIC dialect or the parser.
 
-## Scoreboard (raw grep count, updated each phase)
+## Scoreboard (raw grep count — measured, not estimated)
 
-The numeric metric is for trend visibility only. The actual gate is `tools/check_hal_purity.sh`.
+Every row in this table must be measured by running `tools/hal_scoreboard.sh` after the phase lands. The scoreboard is a hard gate, not a trend indicator — if the number didn't go down, the ifdef elimination didn't happen.
 
 ```
-Phase   Draw.c  MM_Misc  External  FileIO  Commands  Memory  Functions  Audio   Total
-0       162     135      120       75      46        37      17         14      606  (measured baseline — `tools/hal_scoreboard.sh`)
-0.5     162     135      120       75      46        37      17         14      606  (state hoist, no #ifdef change)
-1       162     133      118       75      44        35      17         14      598  (hal_flash, estimated delta)
-2       162     129      116       73      43        35      15         12      585  (hal_time)
-3       162     119       55       73      39        35      15         12      510  (hal_pin)
-4       162     119       55       15      39        35      15         12      452  (hal_storage/fs)
-5       147      75       55       15      39        35      15         12      393  (hal_keyboard)
-6       147      75       55       15      39        35      15         0       381  (hal_audio)
-7a      115      75       55       15      39        35      15         0       349  (hal_display ILI9341)
-7b       65      75       55       15      39        35      15         0       299  (hal_display VGA)
-7c       20      75       55       15      39        35      15         0       254  (hal_display HDMI)
-7d        0      75       55       15      39        35      15         0       234  (hal_display SSD1963)
-8         0      75       45       15      39        35      15         0       224  (hal_multicore)
-9         0      75        0       15      39        35      15         0       179  (hal_net)
-10        0      75        0       15      39         0      15         0       144  (hal_heap)
-11        0       0        0        0       0         0       0         0         0  (sweep + remaining drivers)
-12        0       0        0        0       0         0       0         0         0  (host/WASM relocate; no core change)
-13        0       0        0        0       0         0       0         0         0  (lock the contract)
+Phase    Draw.c  MM_Misc  External  FileIO  Commands  Memory  Functions  Audio   Total
+0        162     135      120       75      46        37      17         14      606  (measured baseline)
+0.5      162     135      120       75      46        37      17         14      606  (state hoist, no #ifdef change)
+1-5a     160     134      120       60      45        37      17         14      587  (MEASURED at tip — infra landed, ifdefs mostly unchanged)
+─── ifdef elimination passes ───
+3b         .       .        0        .       .         .       .          .        .  (External.c pin/PWM/ADC → HAL + port-config)
+4b         .       .        .        0       .         .       .          .        .  (FileIO.c host/storage/flash → HAL)
+5b         .       .        .        .       .         .       .          .        .  (MM_Misc.c USBKEYBOARD → HAL)
+6          .       .        .        .       .         .       .          0        .  (Audio.c → HAL)
+7a         .       .        .        .       .         .       .          .        .  (Draw.c ILI9341 → HAL)
+7b         .       .        .        .       .         .       .          .        .  (Draw.c VGA → HAL)
+7c         .       .        .        .       .         .       .          .        .  (Draw.c HDMI → HAL)
+7d         0       .        .        .       .         .       .          .        .  (Draw.c SSD1963 → HAL)
+8          .       .        .        .       .         .       .          .        .  (multicore)
+9          .       .        0        .       .         .       .          .        .  (net — External.c + FileIO.c PICOMITEWEB)
+10         .       .        .        .       .         0       .          .        .  (heap)
+11         0       0        0        0       0         0       0          0        0  (sweep)
 ```
 
-Numbers are estimates. The gate is the tooling, not the table.
+Dots (`.`) mean "not targeted by this phase — carry forward from previous." Zeros are the exit-gate targets. Each row gets filled with measured values when the phase lands.
 
 ## Summary
 

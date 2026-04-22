@@ -28,6 +28,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 ************************************************************************************************************************/
 #ifndef __CONFIGURATION_H
 #define __CONFIGURATION_H
+#include "hal/hal_port_config.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
