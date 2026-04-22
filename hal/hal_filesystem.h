@@ -68,6 +68,14 @@ off_t   hal_fs_seek (hal_fs_fd_t fd, off_t off, int whence);
 off_t   hal_fs_tell (hal_fs_fd_t fd);
 int     hal_fs_eof  (hal_fs_fd_t fd);
 int     hal_fs_sync (hal_fs_fd_t fd);
+off_t   hal_fs_size (hal_fs_fd_t fd);
+
+/* Migration-period helper: return the underlying backend handle for an
+ * open fd, with *is_lfs_out set to 0=FatFS FIL*, 1=LFS lfs_file_t*,
+ * 2=POSIX FILE*. Used by FileIO.c to keep FileTable[].fptr / .lfsptr
+ * populated for legacy callers during the incremental migration. Retire
+ * once every direct FileTable.fptr / .lfsptr reader is HAL-routed. */
+void   *hal_fs_peek_handle(hal_fs_fd_t fd, int *is_lfs_out);
 
 /* Path ops */
 int     hal_fs_unlink(const char *path);

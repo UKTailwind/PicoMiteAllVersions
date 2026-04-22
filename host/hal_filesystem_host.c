@@ -195,16 +195,15 @@ int hal_fs_open(const char *path, int flags, hal_fs_fd_t *out)
     memset(s, 0, sizeof(*s));
 
     if (host_sd_root) {
-        /* POSIX-backed. Build sd-root-joined path, stat for size, fopen. */
+        /* POSIX-backed. MMBasic "A:/foo" or "/foo" are both drive-rooted
+         * paths that map to $host_sd_root/foo, NOT real POSIX /foo.
+         * Strip the drive prefix and the leading '/', then join. */
         char rp[FF_MAX_LFN];
         const char *bare = host_hal_path(path);
-        if (bare[0] == '/') {
-            snprintf(rp, sizeof(rp), "%s", bare);
-        } else {
-            size_t rl = strlen(host_sd_root);
-            int need_sep = (rl > 0 && host_sd_root[rl - 1] != '/');
-            snprintf(rp, sizeof(rp), "%s%s%s", host_sd_root, need_sep ? "/" : "", bare);
-        }
+        while (bare[0] == '/') bare++;
+        size_t rl = strlen(host_sd_root);
+        int need_sep = (rl > 0 && host_sd_root[rl - 1] != '/');
+        snprintf(rp, sizeof(rp), "%s%s%s", host_sd_root, need_sep ? "/" : "", bare);
         struct stat st;
         if (stat(rp, &st) == 0) s->posix_size = (size_t)st.st_size;
         const char *m = hal_flags_to_fopen_mode(flags);
@@ -317,6 +316,29 @@ int hal_fs_sync(hal_fs_fd_t fd)
     if (!s) return -EBADF;
     if (s->is_posix) { fflush(s->fp); return 0; }
     return fatfs_rc_to_errno(f_sync(s->fatfs));
+}
+
+off_t hal_fs_size(hal_fs_fd_t fd)
+{
+    host_fs_slot_t *s = host_slot_from_fd(fd);
+    if (!s) return -EBADF;
+    if (s->is_posix) return (off_t)s->posix_size;
+    return (off_t)f_size(s->fatfs);
+}
+
+/* Migration helper — see ports/pico_sdk_common/hal_filesystem_pico.c.
+ * For POSIX-backed fds the host adapter returns the cached FILE*; the
+ * stub FIL* that external callers want on FileTable[].fptr is owned by
+ * BasicFileOpen (it pre-allocates a FIL and seeds obj.objsize from
+ * hal_fs_size). is_lfs_out encodes: 0 = FatFS, 1 = LFS (device only),
+ * 2 = POSIX FILE* (host REPL/--sim). */
+void *hal_fs_peek_handle(hal_fs_fd_t fd, int *is_lfs_out)
+{
+    host_fs_slot_t *s = host_slot_from_fd(fd);
+    if (!s) { if (is_lfs_out) *is_lfs_out = 0; return NULL; }
+    if (s->is_posix) { if (is_lfs_out) *is_lfs_out = 2; return s->fp; }
+    if (is_lfs_out) *is_lfs_out = 0;
+    return s->fatfs;
 }
 
 /* Directory iteration — host uses FatFS f_opendir/readdir/closedir

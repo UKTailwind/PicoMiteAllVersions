@@ -155,6 +155,14 @@ static uint32_t lastfptr[MAXOPENFILES + 1] = {[0 ... MAXOPENFILES] = -1};
 uint8_t fmode[MAXOPENFILES + 1] = {0};
 static unsigned int bw[MAXOPENFILES + 1] = {[0 ... MAXOPENFILES] = -1};
 unsigned char filesource[MAXOPENFILES + 1] = {0};
+/* Per-fnbr HAL fd. 0 = no open HAL file on this slot. BasicFileOpen
+ * allocates via hal_fs_open; ForceFileClose releases. The legacy
+ * FileTable[fnbr].fptr / .lfsptr are shadow pointers that alias the
+ * HAL's internal backend handle (FatFS FIL* or LFS lfs_file_t*); they
+ * stay valid between open and close for pre-HAL callers in Audio.c /
+ * MMtcpserver.c / upng.c / etc. that still touch them directly. */
+static hal_fs_fd_t hal_fds[MAXOPENFILES + 1] = {0};
+static void hal_to_fserror(int rc, int fnbr);
 char filepath[2][FF_MAX_LFN]={
     "A:/",
     "B:/"
@@ -1703,29 +1711,26 @@ void MIPS16 cmd_kill(void)
  */
 
 void positionfile(int fnbr, int idx){
-    char *buff;
-    if(filesource[fnbr]==FLASHFILE){
-//        if(idx>FileTable[fnbr].lfsptr->ctz.size)idx=FileTable[fnbr].lfsptr->ctz.size;
-        FSerror = lfs_file_seek(&lfs, FileTable[fnbr].lfsptr, idx, LFS_SEEK_SET);
-        if(FSerror<0)ErrorCheck(fnbr);
-    } else {
-        if (fmode[fnbr] & FA_WRITE)
-        {
-            FSerror = f_lseek(FileTable[fnbr].fptr, idx);
-            ErrorCheck(fnbr);
-        }
-        else
-        {
-            buff = SDbuffer[fnbr];
-            FSerror = f_lseek(FileTable[fnbr].fptr, idx - (idx % 512));
-            ErrorCheck(fnbr);
-            FSerror = f_read(FileTable[fnbr].fptr, buff, SDbufferSize, &bw[fnbr]);
-            ErrorCheck(fnbr);
-            buffpointer[fnbr] = idx % 512;
-            lastfptr[fnbr] = (uint32_t)FileTable[fnbr].fptr;
-        }
+    hal_fs_fd_t fd = hal_fds[fnbr];
+    if (!fd) return;
+#ifndef MMBASIC_HOST
+    /* Device FatFS read path: seek to SD-sector boundary, refill the
+     * SD read-cache, leave buffpointer at the in-sector offset so the
+     * next FileGetChar returns idx. */
+    if (filesource[fnbr] == FATFSFILE && !(fmode[fnbr] & FA_WRITE)) {
+        off_t sr = hal_fs_seek(fd, idx - (idx % 512), HAL_FS_SEEK_SET);
+        if (sr < 0) { hal_to_fserror((int)sr, fnbr); ErrorCheck(fnbr); return; }
+        char *buff = SDbuffer[fnbr];
+        ssize_t got = hal_fs_read(fd, buff, SDbufferSize);
+        if (got < 0) { hal_to_fserror((int)got, fnbr); ErrorCheck(fnbr); return; }
+        bw[fnbr] = (unsigned int)got;
+        buffpointer[fnbr] = idx % 512;
+        lastfptr[fnbr] = (uint32_t)(uintptr_t)fd;
+        return;
     }
-
+#endif
+    off_t r = hal_fs_seek(fd, idx, HAL_FS_SEEK_SET);
+    if (r < 0) { hal_to_fserror((int)r, fnbr); ErrorCheck(fnbr); }
 }
 /*  @endcond */
 void cmd_seek(void)
@@ -1746,9 +1751,6 @@ void cmd_seek(void)
     idx = getint(argv[2], 1, 0x7FFFFFFF) - 1;
     if (idx < 0)
         idx = 0;
-#ifdef MMBASIC_HOST
-    if (host_fs_posix_active(fnbr)) { host_fs_posix_seek(fnbr, idx); return; }
-#endif
     positionfile(fnbr, idx);
 }
 
@@ -3362,86 +3364,89 @@ void MIPS16 cmd_load(void)
  * @cond
  * The following section will be excluded from the documentation.
  */
+/* Map HAL negative errno into FSerror for ErrorCheck. On LFS filesource
+ * FSerror uses LFS-style negative codes; on FatFS FSerror is FRESULT. */
+static void hal_to_fserror(int rc, int fnbr)
+{
+    if (rc >= 0) { FSerror = 0; return; }
+    int is_flash = (filesource[fnbr] == FLASHFILE);
+    switch (rc) {
+    case -ENOENT:    FSerror = is_flash ? -2  : FR_NO_FILE;      break;
+    case -EEXIST:    FSerror = is_flash ? -17 : FR_EXIST;        break;
+    case -EINVAL:    FSerror = is_flash ? -22 : FR_INVALID_NAME; break;
+    case -EACCES:    FSerror = is_flash ? -13 : FR_DENIED;       break;
+    case -EBADF:     FSerror = is_flash ? -9  : FR_INVALID_OBJECT; break;
+    case -ENOSPC:    FSerror = is_flash ? -28 : FR_DENIED;       break;
+    default:         FSerror = is_flash ? -5  : FR_DISK_ERR;     break;
+    }
+}
+
 char __not_in_flash_func(FileGetChar)(int fnbr)
 {
-    char ch;
-#ifdef MMBASIC_HOST
-    if (host_fs_posix_active(fnbr)) return host_fs_posix_get_char(fnbr);
-#endif
-    if(filesource[fnbr]==FLASHFILE){
-        FSerror=lfs_file_read(&lfs, FileTable[fnbr].lfsptr, &ch, 1);
-        if(FSerror>0)FSerror=0;
-        ErrorCheck(fnbr);
-        return ch;
-    } else {
+    hal_fs_fd_t fd = hal_fds[fnbr];
+    if (!fd) return 0;
+#ifndef MMBASIC_HOST
+    /* Device FatFS/SD path uses per-fnbr SDbuffer[] read-cache to
+     * amortise 512-byte SD sector reads across per-byte FileGetChar
+     * calls. On host (POSIX or vm_host_fat RAM disk) the HAL backend
+     * handles caching — fread buffers internally, FatFS on RAM disk
+     * is zero-cost. */
+    if (filesource[fnbr] == FATFSFILE && !(fmode[fnbr] & FA_WRITE)) {
         char *buff = SDbuffer[fnbr];
-        if (!InitSDCard())
-            return 0;
-        if (fmode[fnbr] & FA_WRITE)
-        {
-            FSerror = f_read(FileTable[fnbr].fptr, &ch, 1, &bw[fnbr]);
-            ErrorCheck(fnbr);
+        if (!InitSDCard()) return 0;
+        if (!(lastfptr[fnbr] == (uint32_t)(uintptr_t)fd && buffpointer[fnbr] < SDbufferSize)) {
+            ssize_t got = hal_fs_read(fd, buff, SDbufferSize);
+            if (got < 0) { hal_to_fserror((int)got, fnbr); ErrorCheck(fnbr); return 0; }
+            bw[fnbr] = (unsigned int)got;
+            buffpointer[fnbr] = 0;
+            lastfptr[fnbr] = (uint32_t)(uintptr_t)fd;
         }
-        else
-        {
-            if (!(lastfptr[fnbr] == (uint32_t)FileTable[fnbr].fptr && buffpointer[fnbr] < SDbufferSize))
-            {
-                FSerror = f_read(FileTable[fnbr].fptr, buff, SDbufferSize, &bw[fnbr]);
-                ErrorCheck(fnbr);
-                buffpointer[fnbr] = 0;
-                lastfptr[fnbr] = (uint32_t)FileTable[fnbr].fptr;
-            }
-            ch = buff[buffpointer[fnbr]];
-            buffpointer[fnbr]++;
-        }
+        char ch = buff[buffpointer[fnbr]];
+        buffpointer[fnbr]++;
         diskchecktimer = DISKCHECKRATE;
-    return ch;
+        return ch;
     }
+#endif
+    char ch = 0;
+    ssize_t got = hal_fs_read(fd, &ch, 1);
+    if (got < 0) { hal_to_fserror((int)got, fnbr); ErrorCheck(fnbr); return 0; }
+#ifndef MMBASIC_HOST
+    if (filesource[fnbr] == FATFSFILE) diskchecktimer = DISKCHECKRATE;
+#endif
+    return ch;
 }
 
 char __not_in_flash_func(FilePutChar)(char c, int fnbr)
 {
-#ifdef MMBASIC_HOST
-    if (host_fs_posix_active(fnbr)) return host_fs_posix_put_char(c, fnbr);
+    hal_fs_fd_t fd = hal_fds[fnbr];
+    if (!fd) return 0;
+#ifndef MMBASIC_HOST
+    if (filesource[fnbr] == FATFSFILE && !InitSDCard()) return 0;
 #endif
-    if(filesource[fnbr]==FLASHFILE){
-        FSerror=lfs_file_write(&lfs, FileTable[fnbr].lfsptr, &c, 1);
-        if(FSerror!=1)FSerror=-5;
-        if(FSerror>0)FSerror=0;
-        ErrorCheck(fnbr);
-        return c;
-    } else {
-        static char t;
-        unsigned int bw;
-        t = c;
-        if (!InitSDCard())
-            return 0;
-        FSerror = f_write(FileTable[fnbr].fptr, &t, 1, &bw);
-        lastfptr[fnbr] = -1; // invalidate the read file buffer
-        ErrorCheck(fnbr);
-        diskchecktimer = DISKCHECKRATE;
-        return t;
-    }
+    ssize_t w = hal_fs_write(fd, &c, 1);
+    if (w < 0) { hal_to_fserror((int)w, fnbr); ErrorCheck(fnbr); return 0; }
+    if (w != 1) { FSerror = (filesource[fnbr] == FLASHFILE) ? -5 : FR_DISK_ERR; ErrorCheck(fnbr); }
+    lastfptr[fnbr] = -1;
+#ifndef MMBASIC_HOST
+    if (filesource[fnbr] == FATFSFILE) diskchecktimer = DISKCHECKRATE;
+#endif
+    return c;
 }
+
 int FileEOF(int fnbr)
 {
-    int i;
-#ifdef MMBASIC_HOST
-    if (host_fs_posix_active(fnbr)) return host_fs_posix_eof(fnbr);
-#endif
-    if(filesource[fnbr]==FATFSFILE){
-        if (!InitSDCard())
-            return 0;
-        if (buffpointer[fnbr] <= bw[fnbr] - 1 && !(fmode[fnbr] & FA_WRITE))
-            i = 0;
-        else
-        {
-            i = f_eof(FileTable[fnbr].fptr);
-        }
-    } else {
-        i = (lfs_file_tell(&lfs,FileTable[fnbr].lfsptr)==lfs_file_size(&lfs,FileTable[fnbr].lfsptr));
+    hal_fs_fd_t fd = hal_fds[fnbr];
+    if (!fd) return 1;
+#ifndef MMBASIC_HOST
+    if (filesource[fnbr] == FATFSFILE) {
+        if (!InitSDCard()) return 0;
+        /* Unconsumed bytes in the SD read-cache mean we're not at EOF. */
+        if (buffpointer[fnbr] <= bw[fnbr] - 1 && !(fmode[fnbr] & FA_WRITE)) return 0;
     }
-    return i;
+#endif
+    int r = hal_fs_eof(fd);
+    if (r < 0) { hal_to_fserror(r, fnbr); ErrorCheck(fnbr); return 1; }
+    return r;
 }
 // send a character to a file or the console
 // if fnbr == 0 then send the char to the console
@@ -3501,33 +3506,44 @@ void FileClose(int fnbr)
 int ForceFileClose(int fnbr)
 {
     FatFSFileSystem = FatFSFileSystemSave;
-    int type=NONEFILE;
+    int type = filesource[fnbr];
+    if (type == NONEFILE) type = FATFSFILE;  /* default for error-reporting path */
+
+    hal_fs_fd_t fd = hal_fds[fnbr];
 #ifdef MMBASIC_HOST
-    if (host_fs_posix_active(fnbr)) {
-        host_fs_posix_close(fnbr);
-        buffpointer[fnbr] = 0;
-        lastfptr[fnbr] = -1;
-        bw[fnbr] = -1;
-        fmode[fnbr] = 0;
-        return FATFSFILE;
+    /* Host stub FIL* allocated for POSIX-backed fds (see BasicFileOpen).
+     * Free before closing the HAL fd — calloc'd separately from the HAL
+     * internals. */
+    if (fd && FileTable[fnbr].fptr != NULL && filesource[fnbr] == FATFSFILE) {
+        int kind = 0;
+        void *h = hal_fs_peek_handle(fd, &kind);
+        if (kind == 2) {
+            free(FileTable[fnbr].fptr);
+            FileTable[fnbr].fptr = NULL;
+        } else {
+            (void)h;
+            FileTable[fnbr].fptr = NULL;  /* shadow pointer, HAL owns */
+        }
     }
 #endif
-    if (fnbr && FileTable[fnbr].fptr != NULL && filesource[fnbr]==FATFSFILE)
-    {
-        
-        FSerror = f_close(FileTable[fnbr].fptr);
-        FreeMemory((void *)FileTable[fnbr].fptr);
-        FreeMemory((void *)SDbuffer[fnbr]);
-        FileTable[fnbr].fptr = NULL;
-        type=FATFSFILE;
-    } else {
-        if(FileTable[fnbr].lfsptr != NULL){
-        FSerror = lfs_file_close(&lfs, FileTable[fnbr].lfsptr);
-        FreeMemory((void *)FileTable[fnbr].lfsptr);
-        FileTable[fnbr].lfsptr = NULL;
-        }
-        type=FLASHFILE;
+
+    if (fd) {
+        int rc = hal_fs_close(fd);
+        hal_to_fserror(rc, fnbr);
+        hal_fds[fnbr] = 0;
     }
+
+    /* Device FatFS path allocates a 512-byte SDbuffer on open; release
+     * on close. Host slots don't allocate SDbuffer. */
+#ifndef MMBASIC_HOST
+    if (filesource[fnbr] == FATFSFILE && SDbuffer[fnbr]) {
+        FreeMemory((void *)SDbuffer[fnbr]);
+        SDbuffer[fnbr] = NULL;
+    }
+#endif
+
+    FileTable[fnbr].fptr = NULL;
+    FileTable[fnbr].lfsptr = NULL;
     buffpointer[fnbr] = 0;
     lastfptr[fnbr] = -1;
     bw[fnbr] = -1;
@@ -3571,22 +3587,17 @@ void MIPS16 CloseAllFiles(void)
 
 void FilePutStr(int count, char *c, int fnbr)
 {
-#ifdef MMBASIC_HOST
-    if (host_fs_posix_active(fnbr)) { host_fs_posix_put_str(count, c, fnbr); return; }
+    hal_fs_fd_t fd = hal_fds[fnbr];
+    if (!fd || count <= 0) return;
+#ifndef MMBASIC_HOST
+    if (filesource[fnbr] == FATFSFILE) InitSDCard();
 #endif
-   if(filesource[fnbr]==FLASHFILE){
-//        int err;
-        FSerror=lfs_file_write(&lfs, FileTable[fnbr].lfsptr, c, count);
-        if(FSerror!=count)FSerror=-5;
-        if(FSerror>0)FSerror=0;
-        ErrorCheck(fnbr);
-    } else {
-        unsigned int bw;
-        InitSDCard();
-        FSerror = f_write(FileTable[fnbr].fptr, c, count, &bw);
-        ErrorCheck(fnbr);
-        diskchecktimer = DISKCHECKRATE;
-    }
+    ssize_t w = hal_fs_write(fd, c, (size_t)count);
+    if (w < 0) { hal_to_fserror((int)w, fnbr); ErrorCheck(fnbr); return; }
+    if (w != count) { FSerror = (filesource[fnbr] == FLASHFILE) ? -5 : FR_DISK_ERR; ErrorCheck(fnbr); }
+#ifndef MMBASIC_HOST
+    if (filesource[fnbr] == FATFSFILE) diskchecktimer = DISKCHECKRATE;
+#endif
 }
 
 // output a string to a file
@@ -3678,67 +3689,93 @@ void getfullfilename(char *fname, char *q){
 // this performs the basic duties of opening a file, all file opens in MMBasic should use this
 // it will open the file, set the FileTable[] entry and populate the file descriptor
 // it returns with true if successful or false if an error
+/* Translate MMBasic's FA_* open mode + implicit FatFSFileSystem drive
+ * into HAL flags. The HAL then translates to FatFS FA_* / LFS LFS_O_*
+ * per its dispatch. */
+static int basic_mode_to_hal_flags(int mode)
+{
+    if (mode == FA_READ)                                 return HAL_FS_O_RDONLY;
+    if (mode == (FA_WRITE | FA_CREATE_ALWAYS))           return HAL_FS_O_WRONLY | HAL_FS_O_CREAT | HAL_FS_O_TRUNC;
+    if (mode == (FA_WRITE | FA_OPEN_APPEND))             return HAL_FS_O_WRONLY | HAL_FS_O_CREAT | HAL_FS_O_APPEND;
+    if (mode == (FA_WRITE | FA_OPEN_APPEND | FA_READ))   return HAL_FS_O_RDWR   | HAL_FS_O_CREAT | HAL_FS_O_APPEND;
+    return -1;
+}
+
 int BasicFileOpen(char *fname, int fnbr, int mode)
 {
     if (fnbr < 1 || fnbr > MAXOPENFILES) error("File number");
     if (FileTable[fnbr].com != 0) error("File number already open");
-#ifdef MMBASIC_HOST
-    /* REPL / --sim: when host_sd_root is set, open the real file via
-     * fopen(); subsequent FileGetChar / FilePutChar / FileClose / EOF /
-     * LOC / LOF / SEEK / FLUSH primitives all detect this fnbr in the
-     * POSIX side table and dispatch to host_fs_posix_*. If host_sd_root
-     * is NULL (test harness) the helper returns 0 and we fall through to
-     * the regular path below (FatFS in-memory disk via vm_host_fat.c). */
-    if (host_fs_posix_try_open(fname, fnbr, mode)) return 1;
-#endif
-    char q[FF_MAX_LFN]={0};
-    getfullfilename(fname,q);
-    if(FatFSFileSystem){
-        if (!InitSDCard())
-            return false;
-        // if we are writing check the write protect pin (negative pin number means that low = write protect)
-        FileTable[fnbr].fptr = GetMemory(sizeof(FIL)); // allocate the file descriptor
-        SDbuffer[fnbr] = GetMemory(SDbufferSize);
-        FSerror = f_open(FileTable[fnbr].fptr, q, mode); // open it
-        ErrorCheck(fnbr);
-        filesource[fnbr] = FATFSFILE;
-        buffpointer[fnbr] = 0;
-        lastfptr[fnbr] = -1;
-        bw[fnbr] = -1;
-        fmode[fnbr] = mode;
+    int hal_flags = basic_mode_to_hal_flags(mode);
+    if (hal_flags < 0) error("Internal error");
 
-    } else {
-        int lfsmode=0;
-        if(mode == FA_READ)lfsmode=LFS_O_RDONLY;
-        else if(mode==(FA_WRITE | FA_CREATE_ALWAYS))lfsmode=LFS_O_WRONLY | LFS_O_CREAT | LFS_O_TRUNC;
-        else if(mode==(FA_WRITE | FA_OPEN_APPEND)) lfsmode = LFS_O_WRONLY | LFS_O_CREAT | LFS_O_APPEND;
-        else if(mode==(FA_WRITE | FA_OPEN_APPEND | FA_READ))lfsmode =LFS_O_RDWR | LFS_O_CREAT;
-        else error("Internal error");
-        FileTable[fnbr].lfsptr = GetMemory(sizeof(lfs_file_t)); // allocate the file descriptor
-        if(mode!=LFS_O_RDONLY && ExistsFile(q))lfs_removeattr(&lfs, q, 'A');
-        FSerror=lfs_file_open(&lfs, FileTable[fnbr].lfsptr, q, lfsmode);
-        if(mode!=LFS_O_RDONLY){
-            int dt=get_fattime();
-            FSerror=lfs_setattr(&lfs, q, 'A', &dt,   4);
-            ErrorCheck(0);
-            if(mode != (FA_WRITE | FA_CREATE_ALWAYS))lfs_file_seek(&lfs, FileTable[fnbr].lfsptr, lfs_file_size(&lfs,FileTable[fnbr].lfsptr), LFS_SEEK_SET);
-            lfs_file_sync(&lfs, FileTable[fnbr].lfsptr);
+    char q[FF_MAX_LFN] = {0};
+    getfullfilename(fname, q);
+
+    if (FatFSFileSystem && !InitSDCard()) return false;
+
+    /* Build drive-prefixed path for the HAL dispatcher. */
+    char prefixed[FF_MAX_LFN + 4];
+    snprintf(prefixed, sizeof(prefixed), "%s%s",
+             FatFSFileSystem ? "B:" : "A:", q);
+
+    hal_fs_fd_t fd = 0;
+    int rc = hal_fs_open(prefixed, hal_flags, &fd);
+    if (rc < 0) {
+        /* Map POSIX errno back to the legacy FSerror codes
+         * ErrorCheck/ErrorThrow understand. */
+        switch (rc) {
+        case -ENOENT:    FSerror = FatFSFileSystem ? FR_NO_FILE     : -2;  break;
+        case -EEXIST:    FSerror = FatFSFileSystem ? FR_EXIST       : -17; break;
+        case -EACCES:    FSerror = FatFSFileSystem ? FR_DENIED      : -13; break;
+        case -EINVAL:    FSerror = FatFSFileSystem ? FR_INVALID_NAME: -22; break;
+        case -ENOSPC:    FSerror = FatFSFileSystem ? FR_DENIED      : -28; break;
+        default:         FSerror = FatFSFileSystem ? FR_DISK_ERR    : -5;  break;
         }
-	    ErrorCheck(fnbr);
-        filesource[fnbr] = FLASHFILE;
-    }
-#ifdef USBKEYBOARD
-	clearrepeat();
-#endif
-    if (FSerror)
-    {
-        ForceFileClose(fnbr);
+        ErrorCheck(fnbr);
         return false;
     }
-    else {
-        FatFSFileSystem=FatFSFileSystemSave;
-        return true;
+
+    hal_fds[fnbr] = fd;
+    /* Shadow the backend handle into the legacy FileTable fields so
+     * external callers (Audio.c WAV, upng.c, Editor.c, MMtcpserver.c,
+     * MMtftp.c, BmpDecoder.c, MM_Misc.c, bc_runtime.c) keep working
+     * during the incremental migration. */
+    int kind = 0;
+    void *h = hal_fs_peek_handle(fd, &kind);
+    if (kind == 1) {
+        FileTable[fnbr].lfsptr = (lfs_file_t *)h;
+        filesource[fnbr] = FLASHFILE;
+    } else {
+        filesource[fnbr] = FATFSFILE;
+#ifdef MMBASIC_HOST
+        if (kind == 2) {
+            /* Host POSIX slot — HAL owns a FILE*; external callers that
+             * read f_size(FileTable[].fptr) want a FIL* with obj.objsize.
+             * Allocate a stub FIL seeded from hal_fs_size. */
+            FileTable[fnbr].fptr = calloc(1, sizeof(FIL));
+            if (!FileTable[fnbr].fptr) { hal_fs_close(fd); hal_fds[fnbr] = 0; error("Not enough memory"); }
+            off_t sz = hal_fs_size(fd);
+            FileTable[fnbr].fptr->obj.objsize = (FSIZE_t)(sz < 0 ? 0 : sz);
+        } else
+#endif
+        FileTable[fnbr].fptr = (FIL *)h;
     }
+
+    buffpointer[fnbr] = 0;
+    lastfptr[fnbr]    = -1;
+    bw[fnbr]          = -1;
+    fmode[fnbr]       = mode;
+    /* SDbuffer read-cache only applies to the device FatFS/SD path;
+     * host POSIX (kind==2) reads through fread directly. */
+#ifndef MMBASIC_HOST
+    if (filesource[fnbr] == FATFSFILE) SDbuffer[fnbr] = GetMemory(SDbufferSize);
+#endif
+    FSerror = 0;
+#ifdef USBKEYBOARD
+    clearrepeat();
+#endif
+    FatFSFileSystem = FatFSFileSystemSave;
+    return true;
 }
 
 /* MAXFILES caps the flist[] buffer size in cmd_files (sizeof(s_flist)
@@ -3770,119 +3807,38 @@ int strcicmp(char const *a, char const *b)
             return d;
     }
 }
-void B2A(unsigned char *fromfile, unsigned char *tofile){
+/* Shared copy routine — source and destination drives are selected by
+ * the caller before invoking. With the HAL's uniform read/write surface
+ * the four historical variants (B2A/A2B/B2B/A2A) all reduce to this. */
+static void copy_via_hal(unsigned char *fromfile, unsigned char *tofile,
+                         int src_fs, int dst_fs)
+{
     char buff[512];
-    unsigned int nbr = 0;
     int fnbr1, fnbr2;
     fnbr1 = FindFreeFileNbr();
-    FatFSFileSystem=1; //set to SD
+    FatFSFileSystem = src_fs;
     BasicFileOpen((char *)fromfile, fnbr1, FA_READ);
     fnbr2 = FindFreeFileNbr();
-    FatFSFileSystem=0; //set to flash
-    if (!BasicFileOpen((char *)tofile, fnbr2, FA_WRITE | FA_CREATE_ALWAYS))
-    {
+    FatFSFileSystem = dst_fs;
+    if (!BasicFileOpen((char *)tofile, fnbr2, FA_WRITE | FA_CREATE_ALWAYS)) {
         FileClose(fnbr1);
+        return;
     }
-    while (!f_eof(FileTable[fnbr1].fptr))
-    {
-        FSerror = f_read(FileTable[fnbr1].fptr, buff, 512, &nbr);
-        ErrorCheck(fnbr1);
-        FSerror=lfs_file_write(&lfs, FileTable[fnbr2].lfsptr, buff, nbr); 
-        if(FSerror>0)FSerror=0;
-        ErrorCheck(fnbr2);
-
+    for (;;) {
+        ssize_t n = hal_fs_read(hal_fds[fnbr1], buff, sizeof(buff));
+        if (n < 0) { hal_to_fserror((int)n, fnbr1); ErrorCheck(fnbr1); break; }
+        if (n == 0) break;
+        ssize_t w = hal_fs_write(hal_fds[fnbr2], buff, (size_t)n);
+        if (w < 0) { hal_to_fserror((int)w, fnbr2); ErrorCheck(fnbr2); break; }
     }
     FileClose(fnbr1);
     FileClose(fnbr2);
-    FatFSFileSystem=FatFSFileSystemSave;
+    FatFSFileSystem = FatFSFileSystemSave;
 }
-void A2B(unsigned char *fromfile, unsigned char *tofile){
-    char buff[512];
-    unsigned int nbr = 0, bw;
-    int fnbr1, fnbr2;
-    FatFSFileSystem=0; //set to flash
-    fnbr1 = FindFreeFileNbr();
-    BasicFileOpen((char *)fromfile, fnbr1, FA_READ);
-    fnbr2 = FindFreeFileNbr();
-    FatFSFileSystem=1; //set to SD
-    if (!BasicFileOpen((char *)tofile, fnbr2, FA_WRITE | FA_CREATE_ALWAYS))
-    {
-        FileClose(fnbr1);
-    }
-    while (!(lfs_file_tell(&lfs,FileTable[fnbr1].lfsptr)==lfs_file_size(&lfs,FileTable[fnbr1].lfsptr)))
-    {
-        nbr=lfs_file_read(&lfs, FileTable[fnbr1].lfsptr, buff, 512);
-        if(nbr<0)FSerror=nbr;	
-        ErrorCheck(fnbr1);
-        FSerror = f_write(FileTable[fnbr2].fptr, buff, nbr, &bw);
-        ErrorCheck(fnbr2);
-    }
-    FileClose(fnbr1);
-    FileClose(fnbr2);
-    FatFSFileSystem=FatFSFileSystemSave;
-}
-void B2B(unsigned char *fromfile, unsigned char *tofile){
-    char buff[512];
-    unsigned int nbr = 0, bw;
-    int fnbr1, fnbr2;
-    fnbr1 = FindFreeFileNbr();
-    FatFSFileSystem=1; //set to SD
-    BasicFileOpen((char *)fromfile, fnbr1, FA_READ);
-    FatFSFileSystem=1; //set to SD
-    fnbr2 = FindFreeFileNbr();
-    if (!BasicFileOpen((char *)tofile, fnbr2, FA_WRITE | FA_CREATE_ALWAYS))
-    {
-        FileClose(fnbr1);
-    }
-#ifdef MMBASIC_HOST
-    /* POSIX-backed fnbrs have a stub FIL* whose FatFs state is zeroed,
-     * so f_eof/f_read/f_write all fail validate() and silently produce
-     * an empty copy. Route through host_fs_posix on host. */
-    if (host_fs_posix_active(fnbr1) && host_fs_posix_active(fnbr2)) {
-        for (;;) {
-            int n = host_fs_posix_read_bytes(fnbr1, buff, sizeof(buff));
-            if (n <= 0) break;
-            host_fs_posix_write_bytes(fnbr2, buff, n);
-        }
-    } else
-#endif
-    while (!f_eof(FileTable[fnbr1].fptr))
-    {
-        FSerror = f_read(FileTable[fnbr1].fptr, buff, 512, &nbr);
-        ErrorCheck(fnbr1);
-        FSerror = f_write(FileTable[fnbr2].fptr, buff, nbr, &bw);
-        ErrorCheck(fnbr2);
-    }
-    FileClose(fnbr1);
-    FileClose(fnbr2);
-    FatFSFileSystem=FatFSFileSystemSave;
-}
-void A2A(unsigned char *fromfile, unsigned char *tofile){
-    char buff[512];
-    unsigned int nbr = 0;
-    int fnbr1, fnbr2;
-    fnbr1 = FindFreeFileNbr();
-    FatFSFileSystem=0; //set to FLASH
-    BasicFileOpen((char *)fromfile, fnbr1, FA_READ);
-    fnbr2 = FindFreeFileNbr();
-    FatFSFileSystem=0; //set to FLASH
-    if (!BasicFileOpen((char *)tofile, fnbr2, FA_WRITE | FA_CREATE_ALWAYS))
-    {
-        FileClose(fnbr1);
-    }
-    while (!(lfs_file_tell(&lfs,FileTable[fnbr1].lfsptr)==lfs_file_size(&lfs,FileTable[fnbr1].lfsptr)))
-    {
-        nbr=lfs_file_read(&lfs, FileTable[fnbr1].lfsptr, buff, 512);
-        if(nbr<0)FSerror=nbr;	
-        ErrorCheck(fnbr1);
-        FSerror=lfs_file_write(&lfs, FileTable[fnbr2].lfsptr, buff, nbr); 
-        if(FSerror>0)FSerror=0;
-        ErrorCheck(fnbr2);
-    }
-    FileClose(fnbr1);
-    FileClose(fnbr2);
-    FatFSFileSystem=FatFSFileSystemSave;
-}
+void B2A(unsigned char *fromfile, unsigned char *tofile){ copy_via_hal(fromfile, tofile, 1, 0); }
+void A2B(unsigned char *fromfile, unsigned char *tofile){ copy_via_hal(fromfile, tofile, 0, 1); }
+void B2B(unsigned char *fromfile, unsigned char *tofile){ copy_via_hal(fromfile, tofile, 1, 1); }
+void A2A(unsigned char *fromfile, unsigned char *tofile){ copy_via_hal(fromfile, tofile, 0, 0); }
 int drivecheck(char *p, int *waste){
     *waste=0;
     if(strlen(p)==2){
@@ -5184,11 +5140,11 @@ void cmd_flush(void)
             error("File number is not open");
         if (FileTable[fnbr].com > MAXCOMPORTS )
         {
-#ifdef MMBASIC_HOST
-            if (host_fs_posix_active(fnbr)) { host_fs_posix_flush(fnbr); return; }
-#endif
-            if(filesource[fnbr]==FATFSFILE)f_sync(FileTable[fnbr].fptr);
-            else lfs_file_sync(&lfs, FileTable[fnbr].lfsptr);
+            hal_fs_fd_t fd = hal_fds[fnbr];
+            if (fd) {
+                int rc = hal_fs_sync(fd);
+                if (rc < 0) { hal_to_fserror(rc, fnbr); ErrorCheck(fnbr); }
+            }
         }
         else
         {
@@ -5219,19 +5175,22 @@ void fun_loc(void)
             error("File number is not open");
         if (FileTable[fnbr].com > MAXCOMPORTS)
         {
-#ifdef MMBASIC_HOST
-            if (host_fs_posix_active(fnbr)) { iret = host_fs_posix_loc(fnbr) + 1; targ = T_INT; return; }
-#endif
-            if(filesource[fnbr]==FLASHFILE)iret = lfs_file_tell(&lfs,FileTable[fnbr].lfsptr) + 1;
-            else {
-//                iret = (*(FileTable[fnbr].fptr)).fptr + 1;
-                if(fmode[fnbr] & FA_WRITE){
-                    iret = (*(FileTable[fnbr].fptr)).fptr + 1;
-                } else {
-                    iret = (RoundUptoBlock((*(FileTable[fnbr].fptr)).fptr)  -511 + buffpointer[fnbr]);
-                    if(iret<0)iret+=512;
-                }
+            hal_fs_fd_t fd = hal_fds[fnbr];
+            if (!fd) { iret = 1; targ = T_INT; return; }
+            off_t pos = hal_fs_tell(fd);
+            if (pos < 0) { hal_to_fserror((int)pos, fnbr); ErrorCheck(fnbr); pos = 0; }
+#ifndef MMBASIC_HOST
+            /* Device FatFS read path: hal_fs_tell reports the backend's
+             * physical position — which on SD is one 512-byte sector
+             * past the logical cursor because we pre-cached the sector.
+             * Adjust back to the logical cursor the user sees. */
+            if (filesource[fnbr] == FATFSFILE && !(fmode[fnbr] & FA_WRITE)) {
+                off_t logical = (pos - 512) + buffpointer[fnbr];
+                if (logical < 0) logical += 512;
+                pos = logical;
             }
+#endif
+            iret = (int64_t)pos + 1;  /* MMBasic LOC is 1-based. */
         }
         else
             iret = SerialRxStatus(FileTable[fnbr].com);
@@ -5258,16 +5217,12 @@ void fun_lof(void)
             error("File number is not open");
         if (FileTable[fnbr].com > MAXCOMPORTS)
         {
-#ifdef MMBASIC_HOST
-            if (host_fs_posix_active(fnbr)) { iret = host_fs_posix_lof(fnbr); targ = T_INT; return; }
-#endif
-            if(filesource[fnbr]==FATFSFILE){
-                f_sync(FileTable[fnbr].fptr);
-                iret = f_size(FileTable[fnbr].fptr);
-            } else {
-                lfs_file_sync(&lfs, FileTable[fnbr].lfsptr);
-                iret = FileTable[fnbr].lfsptr->ctz.size;
-            }
+            hal_fs_fd_t fd = hal_fds[fnbr];
+            if (!fd) { iret = 0; targ = T_INT; return; }
+            (void)hal_fs_sync(fd);
+            off_t sz = hal_fs_size(fd);
+            if (sz < 0) { hal_to_fserror((int)sz, fnbr); ErrorCheck(fnbr); sz = 0; }
+            iret = (int64_t)sz;
         }
         else
             iret = (TX_BUFFER_SIZE - SerialTxStatus(FileTable[fnbr].com));
