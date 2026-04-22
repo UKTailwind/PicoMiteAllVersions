@@ -372,7 +372,11 @@ extern uint8_t PSRAMpin;
 #define PWM6B     2147483648
 #define PWM7A     4294967296
 #define PWM7B     8589934592
-#ifdef rp2350
+/* RP2350-only PWM slices 8..11 and fast-timer pin. Defined on every target
+ * so the PinDef[].mode bitfield masks are valid to reference in portable
+ * code; the actual bits are never set on RP2040 (no PinDef entry there
+ * carries a PWM8A..PWM11B capability), so the checks that test them just
+ * fall through to the "Invalid configuration" error arm. */
 #define PWM8A     17179869184
 #define PWM8B     34359738368
 #define PWM9A     68719476736
@@ -383,7 +387,6 @@ extern uint8_t PSRAMpin;
 #define PWM11B    2199023255552
 #define FAST_TIMER 4398046511104
 #define FAST_TIMER_PIN 2
-#endif
 #define MAXCOLLISIONS 4
 #define MAXLAYER   4
 #define MAXCONTROLS 200

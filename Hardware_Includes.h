@@ -104,8 +104,12 @@ extern uint8_t RGB121(uint32_t c);
 extern uint8_t RGB332(uint32_t c);
 extern uint16_t RGB555(uint32_t c);
 extern uint16_t RGB121pack(uint32_t c);
-#ifdef rp2350
+/* rp2350a: true on the 30-pin RP2350A variant, false on the 48-pin RP2350B.
+ * On RP2040 the variable exists (unconditionally declared) and is fixed at
+ * true — RP2040 has 30 pins and no PWM8..11, matching the "A variant"
+ * behaviour that callers check for. Defined in PicoMite.c. */
 extern bool rp2350a;
+#ifdef rp2350
 extern uint32_t PSRAMsize;
 extern const uint32_t MAP16DEF[16];
 extern void _Z10copy_wordsPKmPmm(uint32_t *s, uint32_t *d, int n);

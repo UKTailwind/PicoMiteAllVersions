@@ -249,13 +249,14 @@ int codecheck(unsigned char *line){
 	} else return 4;
 	return 0;
 }
-#ifdef rp2350
+/* PWM-wrap ISR used by the RP2350 fast-timer path. Installed only on ports
+ * where HAL_PORT_HAS_INT5 is set; on other ports the function sits unused
+ * in flash (linker -gc-sections drops it). */
 void __not_in_flash_func(on_pwm_wrap_1)(void) {
     pwm_clear_irq(0);
     INT5Count++;
 }
 
-#endif
 
 void SoftReset(void){
     _excep_code = SOFT_RESET;
@@ -427,12 +428,10 @@ void ClearPin(int pin){
     if(pin==PWM5Apin)PWM5Apin=99;
     if(pin==PWM6Apin)PWM6Apin=99;
     if(pin==PWM7Apin)PWM7Apin=99;
-#ifdef rp2350
     if(pin==PWM8Apin)PWM8Apin=99;
     if(pin==PWM9Apin)PWM9Apin=99;
     if(pin==PWM10Apin)PWM10Apin=99;
     if(pin==PWM11Apin)PWM11Apin=99;
-#endif
     if(pin==PWM0Bpin)PWM0Bpin=99;
     if(pin==PWM1Bpin)PWM1Bpin=99;
     if(pin==PWM2Bpin)PWM2Bpin=99;
@@ -441,12 +440,10 @@ void ClearPin(int pin){
     if(pin==PWM5Bpin)PWM5Bpin=99;
     if(pin==PWM6Bpin)PWM6Bpin=99;
     if(pin==PWM7Bpin)PWM7Bpin=99;
-#ifdef rp2350
     if(pin==PWM8Bpin)PWM8Bpin=99;
     if(pin==PWM9Bpin)PWM9Bpin=99;
     if(pin==PWM10Bpin)PWM10Bpin=99;
     if(pin==PWM11Bpin)PWM11Bpin=99;
-#endif
     if(pin==UART0TXpin)UART0TXpin=99;
     if(pin==UART0RXpin)UART0RXpin=99;
     if(pin==UART1RXpin)UART1RXpin=99;
@@ -549,7 +546,6 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
                                      case EXT_PWM7A:
 				                        PWM7Apin=99;
 					                    break;
-#ifdef rp2350
                                      case EXT_PWM8A:
 				                        PWM8Apin=99;
 					                    break;
@@ -562,7 +558,6 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
                                      case EXT_PWM11A:
 				                        PWM11Apin=99;
 					                    break;
-#endif
                                      case EXT_PWM0B:
 				                        PWM0Bpin=99;
 					                    break;
@@ -587,7 +582,6 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
                                      case EXT_PWM7B:
 				                        PWM7Bpin=99;
 					                    break;
-#ifdef rp2350
                                      case EXT_PWM8B:
 				                        PWM8Bpin=99;
 					                    break;
@@ -600,7 +594,6 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
                                      case EXT_PWM11B:
 				                        PWM11Bpin=99;
 					                    break;
-#endif
                                      case EXT_UART0TX:
 				                        UART0TXpin=99;
 					                    break;
@@ -646,19 +639,17 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
                                 }
                                 break;
 
-#ifdef rp2350
         case EXT_ADCRAW:
         case EXT_ANA_IN:        if(!(PinDef[pin].mode & ANALOG_IN)) error("Invalid configuration");
+                                /* RP2350B (48-pin, rp2350a==0) exposes ADC pins
+                                 * in the upper bank; RP2350A (rp2350a==1) and
+                                 * RP2040 (rp2350a==true by init) use pins 1..44.
+                                 * Both checks are no-ops on RP2040 since
+                                 * NBRPINS < 44, keeping the logic flat. */
                                 if(pin<=44 && rp2350a==0) error("Invalid configuration");
                                 if(pin> 44 && rp2350a) error("Invalid configuration");
-                                tris = 1; ana = 0; 
+                                tris = 1; ana = 0;
                                 break;
-#else
-        case EXT_ADCRAW:
-        case EXT_ANA_IN:        if(!(PinDef[pin].mode & ANALOG_IN)) error("Invalid configuration");
-                                tris = 1; ana = 0; 
-                                break;
-#endif
         case EXT_CNT_IN:        
         case EXT_FREQ_IN:   // same as counting, so fall through
         case EXT_PER_IN:        // same as counting, so fall through
@@ -745,11 +736,9 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
 		                        hal_pin_set_input_hysteresis(PinDef[pin].GPno, true);
                                 break;
 
-        case EXT_PIO0_OUT:       
-        case EXT_PIO1_OUT:       
-#ifdef rp2350
-        case EXT_PIO2_OUT:       
-#endif
+        case EXT_PIO0_OUT:
+        case EXT_PIO1_OUT:
+        case EXT_PIO2_OUT:
         case EXT_DIG_OUT:       if(!(PinDef[pin].mode & DIGITAL_OUT)) error("Invalid configuration");
                                 tris = 0; ana = 1; 
                                 hal_pin_set_drive_mA(PinDef[pin].GPno, 8);
@@ -842,7 +831,6 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
                                 if((PWM7Apin!=99 && PWM7Apin!=pin)) error("Already Set to pin %",PWM7Apin);
                                 PWM7Apin=pin;
                                 break;
-#ifdef rp2350
         case EXT_PWM8A:         if(!(PinDef[pin].mode & PWM8A) || rp2350a) error("Invalid configuration");
                                 if((PWM8Apin!=99 && PWM8Apin!=pin)) error("Already Set to pin %",PWM8Apin);
                                 PWM8Apin=pin;
@@ -859,7 +847,6 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
                                 if((PWM11Apin!=99 && PWM11Apin!=pin)) error("Already Set to pin %",PWM11Apin);
                                 PWM11Apin=pin;
                                 break;
-#endif
         case EXT_PWM0B:         if(!(PinDef[pin].mode & PWM0B)) error("Invalid configuration");
                                 if((PWM0Bpin!=99 && PWM0Bpin!=pin)) error("Already Set to pin %",PWM0Bpin);
                                 PWM0Bpin=pin;
@@ -892,8 +879,6 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
                                 if((PWM7Bpin!=99 && PWM7Bpin!=pin)) error("Already Set to pin %",PWM7Bpin);
                                 PWM7Bpin=pin;
                                 break;
-#ifdef rp2350
-#ifndef PICOMITEWEB
         case EXT_PWM8B:         if(!(PinDef[pin].mode & PWM8B) || rp2350a) error("Invalid configuration");
                                 if((PWM8Bpin!=99 && PWM8Bpin!=pin)) error("Blready Set to pin %",PWM8Bpin);
                                 PWM8Bpin=pin;
@@ -910,7 +895,11 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
                                 if((PWM11Bpin!=99 && PWM11Bpin!=pin)) error("Blready Set to pin %",PWM11Bpin);
                                 PWM11Bpin=pin;
                                 break;
-#endif
+#ifdef rp2350
+        /* Fast-timer mode uses PWM_IRQ_WRAP_1 which only exists on RP2350;
+         * the RP2040 hardware has a single PWM_IRQ_WRAP. Leave this case
+         * arm gated until a hal_fast_timer_configure() surface exists to
+         * hide the SDK name difference. */
         case EXT_FAST_TIMER:    if(!(PinDef[pin].mode & PWM0B)) error("Invalid configuration");
                                 if((PWM0Bpin!=99 && PWM0Bpin!=pin)) error("Already Set to pin %",PWM0Bpin);
                                 PWM0Bpin=pin;
@@ -930,7 +919,7 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
                                 irq_set_enabled(PWM_IRQ_WRAP_1, true);
                                 irq_set_priority(PWM_IRQ_WRAP_1,0);
 	                            pwm_set_irq1_enabled(0, true);
-                                pwm_set_enabled(0, true); 
+                                pwm_set_enabled(0, true);
                                 break;
 #endif
         case EXT_I2C0SDA:       if(!(PinDef[pin].mode & I2C0SDA)) error("Invalid configuration");
@@ -973,11 +962,11 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
     }
     else if(cfg>=EXT_I2C0SDA && cfg<=EXT_I2C1SCL)hal_pin_set_function(PinDef[pin].GPno, HAL_PIN_FUNC_I2C);
     else if(cfg>=EXT_SPI0RX && cfg<=EXT_SPI1SCK)hal_pin_set_function(PinDef[pin].GPno, HAL_PIN_FUNC_SPI);
-#ifdef rp2350
+    /* rp2350a is true on RP2040 (30-pin, no PWM8..11) and on RP2350A;
+     * false only on the 48-pin RP2350B. The ternary collapses both the
+     * RP2040 bound (EXT_PWM7B) and the RP2350A bound (EXT_PWM7B) into a
+     * single expression with no preprocessor branch. */
     else if(cfg>=EXT_PWM0A && cfg<=(rp2350a ? EXT_PWM7B : EXT_PWM11B))hal_pin_set_function(PinDef[pin].GPno, HAL_PIN_FUNC_PWM);
-#else
-    else if(cfg>=EXT_PWM0A && cfg<=EXT_PWM7B)hal_pin_set_function(PinDef[pin].GPno, HAL_PIN_FUNC_PWM);
-#endif
     else if(cfg==EXT_PIO0_OUT){
 	    hal_pin_set_input_enabled(PinDef[pin].GPno, true);
         hal_pin_set_function(PinDef[pin].GPno, HAL_PIN_FUNC_PIO0);
@@ -986,12 +975,10 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
 	    hal_pin_set_input_enabled(PinDef[pin].GPno, true);
         hal_pin_set_function(PinDef[pin].GPno, HAL_PIN_FUNC_PIO1);
     }
-#ifdef rp2350
-    else if(cfg==EXT_PIO2_OUT){
+    else if (HAL_PORT_HAS_PIO2 && cfg==EXT_PIO2_OUT) {
 	    hal_pin_set_input_enabled(PinDef[pin].GPno, true);
         hal_pin_set_function(PinDef[pin].GPno, HAL_PIN_FUNC_PIO2);
     }
-#endif
     uSec(2);
 }
 extern int adc_clk_div;
@@ -1082,11 +1069,8 @@ void MIPS16 cmd_setpin(void) {
         value = EXT_PWM6A;
     else if(checkstring(argv[2], (unsigned char *)"PWM7A"))
         value = EXT_PWM7A;
-#ifdef rp2350
     else if(checkstring(argv[2], (unsigned char *)"FFIN"))
         value = EXT_FAST_TIMER;
-#endif
-#ifdef rp2350
     else if(checkstring(argv[2], (unsigned char *)"PWM8A"))
         value = EXT_PWM8A;
     else if(checkstring(argv[2], (unsigned char *)"PWM9A"))
@@ -1095,7 +1079,6 @@ void MIPS16 cmd_setpin(void) {
         value = EXT_PWM10A;
     else if(checkstring(argv[2], (unsigned char *)"PWM711"))
         value = EXT_PWM11A;
-#endif
     else if(checkstring(argv[2], (unsigned char *)"PWM0B"))
         value = EXT_PWM0B;
     else if(checkstring(argv[2], (unsigned char *)"PWM1B"))
@@ -1112,7 +1095,6 @@ void MIPS16 cmd_setpin(void) {
         value = EXT_PWM6B;
     else if(checkstring(argv[2], (unsigned char *)"PWM7B"))
         value = EXT_PWM7B;
-#ifdef rp2350
     else if(checkstring(argv[2], (unsigned char *)"PWM8B"))
         value = EXT_PWM8B;
     else if(checkstring(argv[2], (unsigned char *)"PWM9B"))
@@ -1121,15 +1103,12 @@ void MIPS16 cmd_setpin(void) {
         value = EXT_PWM10B;
     else if(checkstring(argv[2], (unsigned char *)"PWM11B"))
         value = EXT_PWM11B;
-#endif
     else if(checkstring(argv[2], (unsigned char *)"PIO0"))
         value = EXT_PIO0_OUT;
     else if(checkstring(argv[2], (unsigned char *)"PIO1"))
         value = EXT_PIO1_OUT;
-#ifdef rp2350
     else if(checkstring(argv[2], (unsigned char *)"PIO2"))
         value = EXT_PIO2_OUT;
-#endif
     else if(checkstring(argv[2],(unsigned char *)"PWM")){
         if(PinDef[pin].mode & PWM0A)value = EXT_PWM0A;
         else if(PinDef[pin].mode & PWM0B)value = EXT_PWM0B;
@@ -1147,7 +1126,6 @@ void MIPS16 cmd_setpin(void) {
         else if(PinDef[pin].mode & PWM6B)value = EXT_PWM6B;
         else if(PinDef[pin].mode & PWM7A)value = EXT_PWM7A;
         else if(PinDef[pin].mode & PWM7B)value = EXT_PWM7B;
-#ifdef rp2350
         else if(PinDef[pin].mode & PWM8A)value = EXT_PWM8A;
         else if(PinDef[pin].mode & PWM8B)value = EXT_PWM8B;
         else if(PinDef[pin].mode & PWM9A)value = EXT_PWM9A;
@@ -1156,7 +1134,6 @@ void MIPS16 cmd_setpin(void) {
         else if(PinDef[pin].mode & PWM10B)value = EXT_PWM10B;
         else if(PinDef[pin].mode & PWM11A)value = EXT_PWM11A;
         else if(PinDef[pin].mode & PWM11B)value = EXT_PWM11B;
-#endif
         else error("Invalid configuration");
     }  else if(checkstring(argv[2],(unsigned char *)"INT")){
         if(pin==Option.INT1pin)value = EXT_INT1;
@@ -1407,11 +1384,9 @@ void fun_pin(void) {
         if(ADCDualBuffering || dmarunning)error("ADC in use");
         hal_pin_adc_init();
         hal_pin_adc_set_temp_sensor(true);
-#ifdef rp2350
-        hal_pin_adc_select((rp2350a ? 4 : 8));
-#else
-        hal_pin_adc_select(4);
-#endif
+        /* Temperature sensor channel: 4 on RP2040 and RP2350A (rp2350a==true),
+         * 8 on the 48-pin RP2350B. */
+        hal_pin_adc_select(rp2350a ? 4 : 8);
         last_adc=4;
         t=(MMFLOAT)hal_pin_adc_read()/4095.0*VCC;
         fret=(27.0-(t-0.706)/0.001721);
@@ -1437,18 +1412,14 @@ void fun_pin(void) {
         case EXT_DIG_OUT:
         case EXT_PIO0_OUT:
         case EXT_PIO1_OUT:
-#ifdef rp2350
         case EXT_PIO2_OUT:
-#endif
                             iret = ExtInp(pin);
                             targ = T_INT;
                             return;
-#ifdef rp2350
         case EXT_FAST_TIMER:
                             fret = (MMFLOAT)INT5Value  * (MMFLOAT)1000.0 / (MMFLOAT)INT5InitTimer;
                             targ = T_NBR;
                             return;
-#endif
         case EXT_PER_IN:	// if period measurement get the count and average it over the number of cycles
                             if(pin == Option.INT1pin) fret = (MMFLOAT)ExtInp(pin) / (MMFLOAT)INT1InitTimer;
                             else if(pin == Option.INT2pin)  fret = (MMFLOAT)ExtInp(pin) / (MMFLOAT)INT2InitTimer;
@@ -1500,9 +1471,10 @@ void fun_pin(void) {
 
 int CheckPin(int pin, int action) {
 
-#ifdef rp2350
+    /* RP2350A is limited to 44 usable pins. On RP2040 rp2350a is true but
+     * pin<=44 is always the case (NBRPINS==30), so this check is a no-op;
+     * on RP2350B (rp2350a==false) it short-circuits. */
     if(rp2350a && pin>44)error("Pin | is invalid", pin);
-#endif
 
     if(pin < 1 || pin > NBRPINS || (PinDef[pin].mode & UNUSED)) {
         if(!(action & CP_NOABORT)) error("Pin %/| is invalid", pin,pin);
@@ -1825,9 +1797,9 @@ void IRSendSignal(int pin, int half_cycles) {
 void MIPS16 set_PWM(int slice, MMFLOAT duty1, MMFLOAT duty2, int high1, int high2, int delaystart){
     if(slice==0 && PWM0Apin==99 && duty1>=0.0)error("Pin not set for PWM");
     if(slice==0 && PWM0Bpin==99 && duty2>=0.0)error("Pin not set for PWM");
-#ifdef rp2350
+    /* fast_timer_active is always false on RP2040 (no HAL_PORT_HAS_FAST_TIMER),
+     * so this check never fires there and stays a simple runtime condition. */
     if(slice==0 && fast_timer_active)error("Channel 0 in use for fast timer");
-#endif
     if(slice==1 && PWM1Apin==99 && duty1>=0.0)error("Pin not set for PWM");
     if(slice==1 && PWM1Bpin==99 && duty2>=0.0)error("Pin not set for PWM");
     if(slice==2 && PWM2Apin==99 && duty1>=0.0)error("Pin not set for PWM");
@@ -1842,7 +1814,6 @@ void MIPS16 set_PWM(int slice, MMFLOAT duty1, MMFLOAT duty2, int high1, int high
     if(slice==6 && PWM6Bpin==99 && duty2>=0.0)error("Pin not set for PWM");
     if(slice==7 && PWM7Apin==99 && duty1>=0.0)error("Pin not set for PWM");
     if(slice==7 && PWM7Bpin==99 && duty2>=0.0)error("Pin not set for PWM");
-#ifdef rp2350
     if(slice==8 && PWM8Apin==99 && duty1>=0.0)error("Pin not set for PWM");
     if(slice==8 && PWM8Bpin==99 && duty2>=0.0)error("Pin not set for PWM");
     if(slice==9 && PWM9Apin==99 && duty1>=0.0)error("Pin not set for PWM");
@@ -1851,7 +1822,6 @@ void MIPS16 set_PWM(int slice, MMFLOAT duty1, MMFLOAT duty2, int high1, int high
     if(slice==10 && PWM10Bpin==99 && duty2>=0.0)error("Pin not set for PWM");
     if(slice==11 && PWM11Apin==99 && duty1>=0.0)error("Pin not set for PWM");
     if(slice==11 && PWM11Bpin==99 && duty2>=0.0)error("Pin not set for PWM");
-#endif
     if(slice==0 && PWM0Apin!=99 && duty1>=0.0){
         ExtCfg(PWM0Apin,EXT_COM_RESERVED,0);
         pwm_set_chan_level(slice, PWM_CHAN_A, high1);
@@ -1916,7 +1886,6 @@ void MIPS16 set_PWM(int slice, MMFLOAT duty1, MMFLOAT duty2, int high1, int high
         ExtCfg(PWM7Bpin,EXT_COM_RESERVED,0);
         pwm_set_chan_level(slice, PWM_CHAN_B, high2);
     }
-#ifdef rp2350
     if(slice==8 && PWM8Apin!=99 && duty1>=0.0){
         ExtCfg(PWM8Apin,EXT_COM_RESERVED,0);
         pwm_set_chan_level(slice, PWM_CHAN_A, high1);
@@ -1949,7 +1918,6 @@ void MIPS16 set_PWM(int slice, MMFLOAT duty1, MMFLOAT duty2, int high1, int high
         ExtCfg(PWM11Bpin,EXT_COM_RESERVED,0);
         pwm_set_chan_level(slice, PWM_CHAN_B, high2);
     }
-#endif
         if(slice==0 && slice0==0){
         if(!delaystart)pwm_set_enabled(slice, true);
         slice0=1;
@@ -1982,7 +1950,6 @@ void MIPS16 set_PWM(int slice, MMFLOAT duty1, MMFLOAT duty2, int high1, int high
         if(!delaystart)pwm_set_enabled(slice, true);
         slice7=1;
     }
-#ifdef rp2350
         if(slice==8 && slice8==0){
         if(!delaystart)pwm_set_enabled(slice, true);
         slice8=1;
@@ -1999,7 +1966,6 @@ void MIPS16 set_PWM(int slice, MMFLOAT duty1, MMFLOAT duty2, int high1, int high
         if(!delaystart)pwm_set_enabled(slice, true);
         slice11=1;
     }
-#endif
 }
 
 void PWMoff(int slice){
@@ -2051,7 +2017,6 @@ void PWMoff(int slice){
     if(slice==7 && PWM7Bpin!=99 && ExtCurrentConfig[PWM7Bpin] < EXT_BOOT_RESERVED){
         ExtCfg(PWM7Bpin,EXT_NOT_CONFIG,0);
     }
-#ifdef rp2350
     if(slice==8 && PWM8Apin!=99 && ExtCurrentConfig[PWM8Apin] < EXT_BOOT_RESERVED){
         ExtCfg(PWM8Apin,EXT_NOT_CONFIG,0);
     }
@@ -2076,7 +2041,6 @@ void PWMoff(int slice){
     if(slice==11 && PWM11Bpin!=99 && ExtCurrentConfig[PWM11Bpin] < EXT_BOOT_RESERVED){
         ExtCfg(PWM11Bpin,EXT_NOT_CONFIG,0);
     }
-#endif
     pwm_set_enabled(slice, false);
 }
 #ifndef PICOMITEVGA
@@ -2260,15 +2224,11 @@ void MIPS16 cmd_pwm(void){
         
         int enabled=0;
         if(slice0 || Option.AUDIO_SLICE ==0 || BacklightSlice==0 || CameraSlice==0
-#if defined(PICOMITE) && defined(rp2350)
             || KeyboardlightSlice==0
-#endif
         ){
             enabled |=1;
             if(!(Option.AUDIO_SLICE ==0 || BacklightSlice==0 || CameraSlice==0 || count0<0.0
-#if defined(PICOMITE) && defined(rp2350)
             || KeyboardlightSlice==0
-#endif
         )){
                 pwm_set_enabled(0,false);
                 count0=(MMFLOAT)pwm_hw->slice[0].top * (100.0-count0) / 100.0;
@@ -2276,15 +2236,11 @@ void MIPS16 cmd_pwm(void){
             }
         }
         if(slice1 || Option.AUDIO_SLICE ==1 || BacklightSlice==1 || CameraSlice==1
-#if defined(PICOMITE) && defined(rp2350)
             || KeyboardlightSlice==1
-#endif
         ){
             enabled |=2;
             if(!(Option.AUDIO_SLICE ==1 || BacklightSlice==1 || CameraSlice==1 || count1<0.0
-#if defined(PICOMITE) && defined(rp2350)
             || KeyboardlightSlice==1
-#endif
         )){
                 pwm_set_enabled(1,false);
                 count1=(MMFLOAT)pwm_hw->slice[1].top * (100.0-count1) / 100.0;
@@ -2292,15 +2248,11 @@ void MIPS16 cmd_pwm(void){
             }
         }
         if(slice2 || Option.AUDIO_SLICE ==2 || BacklightSlice==2 || CameraSlice==2
-#if defined(PICOMITE) && defined(rp2350)
             || KeyboardlightSlice==2
-#endif
         ){
             enabled |=4;
             if(!(Option.AUDIO_SLICE ==2 || BacklightSlice==2 || CameraSlice==2 || count2<0.0
-#if defined(PICOMITE) && defined(rp2350)
             || KeyboardlightSlice==2
-#endif
         )){
                 pwm_set_enabled(2,false);
                 count2=(MMFLOAT)pwm_hw->slice[2].top * (100.0-count2) / 100.0;
@@ -2308,15 +2260,11 @@ void MIPS16 cmd_pwm(void){
             }
         }
         if(slice3 || Option.AUDIO_SLICE ==3 || BacklightSlice==3 || CameraSlice==3
-#if defined(PICOMITE) && defined(rp2350)
             || KeyboardlightSlice==3
-#endif
         ){
             enabled |=8;
             if(!(Option.AUDIO_SLICE ==3 || BacklightSlice==3 || CameraSlice==3 || count3<0.0
-#if defined(PICOMITE) && defined(rp2350)
             || KeyboardlightSlice==3
-#endif
         )){
                 pwm_set_enabled(3,false);
                 count3=(MMFLOAT)pwm_hw->slice[3].top * (100.0-count3) / 100.0;
@@ -2324,15 +2272,11 @@ void MIPS16 cmd_pwm(void){
             }
         }
         if(slice4 || Option.AUDIO_SLICE ==4 || BacklightSlice==4 || CameraSlice==4
-#if defined(PICOMITE) && defined(rp2350)
             || KeyboardlightSlice==4
-#endif
         ){
             enabled |=16;
             if(!(Option.AUDIO_SLICE ==4 || BacklightSlice==4 || CameraSlice==4 || count4<0.0
-#if defined(PICOMITE) && defined(rp2350)
             || KeyboardlightSlice==4
-#endif
         )){
                 pwm_set_enabled(4,false);
                 count4=(MMFLOAT)pwm_hw->slice[4].top * (100.0-count4) / 100.0;
@@ -2340,15 +2284,11 @@ void MIPS16 cmd_pwm(void){
             }
         }
         if(slice5 || Option.AUDIO_SLICE ==5 || BacklightSlice==5 || CameraSlice==5
-#if defined(PICOMITE) && defined(rp2350)
             || KeyboardlightSlice==5
-#endif
         ){
             enabled |=32;
             if(!(Option.AUDIO_SLICE ==5 || BacklightSlice==5 || CameraSlice==5 || count5<0.0
-#if defined(PICOMITE) && defined(rp2350)
             || KeyboardlightSlice==5
-#endif
         )){
                 pwm_set_enabled(5,false);
                 count5=(MMFLOAT)pwm_hw->slice[5].top * (100.0-count5) / 100.0;
@@ -2356,15 +2296,11 @@ void MIPS16 cmd_pwm(void){
             }
         }
         if(slice6 || Option.AUDIO_SLICE ==6 || BacklightSlice==6 || CameraSlice==6
-#if defined(PICOMITE) && defined(rp2350)
             || KeyboardlightSlice==6
-#endif
         ){
             enabled |=64;
             if(!(Option.AUDIO_SLICE ==6 || BacklightSlice==6 || CameraSlice==6 || count6<0.0
-#if defined(PICOMITE) && defined(rp2350)
             || KeyboardlightSlice==6
-#endif
         )){
                 pwm_set_enabled(6,false);
                 count6=(MMFLOAT)pwm_hw->slice[6].top * (100.0-count6) / 100.0;
@@ -2372,15 +2308,11 @@ void MIPS16 cmd_pwm(void){
             }
         }
         if(slice7 || Option.AUDIO_SLICE ==7 || BacklightSlice==7 || CameraSlice==7
-#if defined(PICOMITE) && defined(rp2350)
             || KeyboardlightSlice==7
-#endif
         ){
             enabled |=128;
             if(!(Option.AUDIO_SLICE ==7 || BacklightSlice==7 || CameraSlice==7 || count7<0.0
-#if defined(PICOMITE) && defined(rp2350)
             || KeyboardlightSlice==7
-#endif
             )){
                 pwm_set_enabled(7,false);
                 count7=(MMFLOAT)pwm_hw->slice[7].top * (100.0-count7) / 100.0;
@@ -2388,65 +2320,33 @@ void MIPS16 cmd_pwm(void){
             }
         }
 #ifdef rp2350
-#ifdef PICOMITE
         if(slice8 || Option.AUDIO_SLICE ==8 || BacklightSlice==8 || CameraSlice==8 || KeyboardlightSlice==8){
-#else
-        if(slice8 || Option.AUDIO_SLICE ==8 || BacklightSlice==8 || CameraSlice==8){
-#endif
             enabled |=256;
-#ifdef PICOMITE
             if(!(Option.AUDIO_SLICE ==8 || BacklightSlice==8 || CameraSlice==8 || KeyboardlightSlice==8 || count8<0.0)){
-#else
-            if(!(Option.AUDIO_SLICE ==8 || BacklightSlice==8 || CameraSlice==8 || count8<0.0)){
-#endif
                 pwm_set_enabled(8,false);
                 count8=(MMFLOAT)pwm_hw->slice[8].top * (100.0-count8) / 100.0;
                 pwm_set_counter(8,count8);
             }
         }
-#ifdef PICOMITE
         if(slice9 || Option.AUDIO_SLICE ==9 || BacklightSlice==9 || CameraSlice==9 || KeyboardlightSlice==9){
-#else
-        if(slice9 || Option.AUDIO_SLICE ==9 || BacklightSlice==9 || CameraSlice==9){
-#endif
             enabled |=512;
-#ifdef PICOMITE
             if(!(Option.AUDIO_SLICE ==9 || BacklightSlice==9 || CameraSlice==9 || KeyboardlightSlice==9 || count9<0.0)){
-#else
-            if(!(Option.AUDIO_SLICE ==9 || BacklightSlice==9 || CameraSlice==9 || count9<0.0)){
-#endif
                 pwm_set_enabled(9,false);
                 count9=(MMFLOAT)pwm_hw->slice[9].top * (100.0-count9) / 100.0;
                 pwm_set_counter(9,count9);
             }
         }
-#ifdef PICOMITE
         if(slice10 || Option.AUDIO_SLICE ==10 || BacklightSlice==10 || CameraSlice==10 || KeyboardlightSlice==10){
-#else
-        if(slice10 || Option.AUDIO_SLICE ==10 || BacklightSlice==10 || CameraSlice==10){
-#endif
             enabled |=1024;
-#ifdef PICOMITE
             if(!(Option.AUDIO_SLICE ==10 || BacklightSlice==10 || CameraSlice==10 || KeyboardlightSlice==10 || count10<0.0)){
-#else
-            if(!(Option.AUDIO_SLICE ==10 || BacklightSlice==10 || CameraSlice==10 || count10<0.0)){
-#endif
                 pwm_set_enabled(10,false);
                 count10=(MMFLOAT)pwm_hw->slice[10].top * (100.0-count10) / 100.0;
                 pwm_set_counter(10,count10);
             }
         }
-#ifdef PICOMITE
         if(slice11 || Option.AUDIO_SLICE ==11 || BacklightSlice==11 || CameraSlice==11 || KeyboardlightSlice==11){
-#else
-        if(slice11 || Option.AUDIO_SLICE ==11 || BacklightSlice==11 || CameraSlice==11){
-#endif
             enabled |=2048;
-#ifdef PICOMITE
             if(!(Option.AUDIO_SLICE ==11 || BacklightSlice==11 || CameraSlice==11  || KeyboardlightSlice==11 || count11<0.0)){
-#else
-            if(!(Option.AUDIO_SLICE ==11 || BacklightSlice==11 || CameraSlice==11 || count11<0.0)){
-#endif
                 pwm_set_enabled(11,false);
                 count11=(MMFLOAT)pwm_hw->slice[11].top * (100.0-count11) / 100.0;
                 pwm_set_counter(11,count11);

@@ -94,10 +94,15 @@ extern void start_vga_i2s(void);
     #include <string.h>
     #include "hardware/regs/sysinfo.h"
     #include "hardware/regs/powman.h"
-    bool rp2350a=true;
     uint32_t PSRAMsize=0;
     uint8_t PSRAMpin;
 #endif
+/* rp2350a: on RP2350 this is runtime-detected in the init path from the
+ * chip's SYSINFO_PACKAGE_SEL register; on RP2040 the variable still exists
+ * and is fixed at true (RP2040 matches the "30-pin / no PWM8..11"
+ * behaviour the flag gates on). Defining it unconditionally lets portable
+ * code check the flag without wrapping every reference in #ifdef rp2350. */
+bool rp2350a=true;
 #include "hardware/structs/bus_ctrl.h"
 #include <pico/bootrom.h>
 #include "hardware/irq.h"

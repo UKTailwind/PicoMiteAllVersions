@@ -114,10 +114,11 @@ uint8_t SPI0locked=0;
 uint8_t SPI1locked=0;
 int BacklightSlice=-1;
 int BacklightChannel=-1;
-#if defined(PICOMITE) && defined(rp2350)
+/* Keyboard backlight state globals. Defined on every target so portable
+ * code can reference them directly; on ports without keyboard-backlight
+ * hardware these stay at -1 and the paths that read them short-circuit. */
 int KeyboardlightSlice=-1;
 int KeyboardlightChannel=-1;
-#endif
 extern const unsigned short whitenoise[2];
 uint16_t AUDIO_SPI;
 volatile uint16_t VSbuffer=0;
