@@ -304,63 +304,62 @@ void PinSetBit(int pin, unsigned int offset) {
 void __not_in_flash_func(PinSetBit)(int pin, unsigned int offset) {
 #endif
 #endif
-	switch (offset){
-	case LATCLR:
-		gpio_set_pulls(PinDef[pin].GPno,false,false);
-		gpio_pull_down(PinDef[pin].GPno);
-		gpio_put(PinDef[pin].GPno,GPIO_PIN_RESET);
-		return;
-	case LATSET:
-		gpio_set_pulls(PinDef[pin].GPno,false,false);
-		gpio_pull_up(PinDef[pin].GPno);
-		gpio_put(PinDef[pin].GPno,GPIO_PIN_SET);
-		return;
-	case LATINV:
-        gpio_xor_mask64(1<<PinDef[pin].GPno);
-		return;
-	case TRISSET:
-        gpio_set_dir(PinDef[pin].GPno, GPIO_IN);
-	    gpio_set_input_enabled(PinDef[pin].GPno, true);
+    uint32_t gpio = PinDef[pin].GPno;
+    switch (offset){
+    case LATCLR:
+        hal_pin_set_pulls(gpio, HAL_PIN_PULL_DOWN);
+        hal_pin_write_fast(gpio, false);
+        return;
+    case LATSET:
+        hal_pin_set_pulls(gpio, HAL_PIN_PULL_UP);
+        hal_pin_write_fast(gpio, true);
+        return;
+    case LATINV:
+        hal_pin_toggle_fast(gpio);
+        return;
+    case TRISSET:
+        hal_pin_set_dir(gpio, HAL_PIN_DIR_IN);
+        hal_pin_set_input_enabled(gpio, true);
         uSec(2);
         return;
-	case TRISCLR:
-        gpio_set_dir(PinDef[pin].GPno, GPIO_OUT);
-        gpio_set_input_enabled(PinDef[pin].GPno, false);
-        gpio_set_drive_strength (PinDef[pin].GPno, GPIO_DRIVE_STRENGTH_8MA);
+    case TRISCLR:
+        hal_pin_set_dir(gpio, HAL_PIN_DIR_OUT);
+        hal_pin_set_input_enabled(gpio, false);
+        hal_pin_set_drive_mA(gpio, 8);
         uSec(2);
         return;
-	case CNPUSET:
-		gpio_set_pulls(PinDef[pin].GPno,true,false);
-	    return;
-	case CNPDSET:
-		gpio_set_pulls(PinDef[pin].GPno,false,true);
-	    return;
-	case CNPUCLR:
-	case CNPDCLR:
-		gpio_set_pulls(PinDef[pin].GPno,false,false);
-		return;
-	case ODCCLR:
-        gpio_set_dir(PinDef[pin].GPno, GPIO_OUT);
-		gpio_put(PinDef[pin].GPno,GPIO_PIN_RESET);
+    case CNPUSET:
+        hal_pin_set_pulls(gpio, HAL_PIN_PULL_UP);
+        return;
+    case CNPDSET:
+        hal_pin_set_pulls(gpio, HAL_PIN_PULL_DOWN);
+        return;
+    case CNPUCLR:
+    case CNPDCLR:
+        hal_pin_set_pulls(gpio, HAL_PIN_PULL_NONE);
+        return;
+    case ODCCLR:
+        hal_pin_set_dir(gpio, HAL_PIN_DIR_OUT);
+        hal_pin_write_fast(gpio, false);
         uSec(2);
-		return;
-	case ODCSET:
-		gpio_set_pulls(PinDef[pin].GPno,true,false);
-        gpio_set_dir(PinDef[pin].GPno, GPIO_IN);
+        return;
+    case ODCSET:
+        hal_pin_set_pulls(gpio, HAL_PIN_PULL_UP);
+        hal_pin_set_dir(gpio, HAL_PIN_DIR_IN);
         uSec(2);
-		return;
+        return;
     case ANSELCLR:
-        gpio_set_function(PinDef[pin].GPno, GPIO_FUNC_SIO);
-        gpio_set_dir(PinDef[pin].GPno, GPIO_IN);
+        hal_pin_select_digital(gpio);
+        hal_pin_set_dir(gpio, HAL_PIN_DIR_IN);
         return;
     case ANSELSET:
-        gpio_set_dir(PinDef[pin].GPno, GPIO_IN);
-        gpio_disable_pulls(PinDef[pin].GPno);
-        gpio_set_input_enabled(PinDef[pin].GPno, false);
-        adc_select_input(PinDef[pin].ADCpin);
+        hal_pin_set_dir(gpio, HAL_PIN_DIR_IN);
+        hal_pin_set_pulls(gpio, HAL_PIN_PULL_NONE);
+        hal_pin_set_input_enabled(gpio, false);
+        hal_pin_adc_select(PinDef[pin].ADCpin);
         return;
-	default: error("Unknown PinSetBit command");
-	}
+    default: error("Unknown PinSetBit command");
+    }
 }
 
 int IsInvalidPin(int pin) {

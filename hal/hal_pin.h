@@ -66,6 +66,42 @@ bool hal_pin_read_output_latch(uint32_t gpio);
  * supported value. */
 void hal_pin_set_drive_mA(uint32_t gpio, uint8_t mA);
 
+/* -----------------------------------------------------------------------
+ * Low-level pad / pull / direction knobs.
+ *
+ * These exist so PinSetBit (External.c) — a legacy per-register-offset
+ * switch that mirrors the PIC32 LATCLR/LATSET/TRISSET/ODCCLR/etc.
+ * semantics of the original MMBasic — can be expressed without calling
+ * pico SDK gpio_* primitives directly. Callers that set a "real" mode
+ * should use hal_pin_set_mode; these knobs are for the legacy bit-twiddle
+ * paths only.
+ * ---------------------------------------------------------------------- */
+
+typedef enum {
+    HAL_PIN_PULL_NONE = 0,
+    HAL_PIN_PULL_UP,
+    HAL_PIN_PULL_DOWN,
+} hal_pin_pull_t;
+
+typedef enum {
+    HAL_PIN_DIR_IN = 0,
+    HAL_PIN_DIR_OUT,
+} hal_pin_dir_t;
+
+void hal_pin_set_pulls(uint32_t gpio, hal_pin_pull_t pull);
+void hal_pin_set_dir(uint32_t gpio, hal_pin_dir_t dir);
+void hal_pin_set_input_enabled(uint32_t gpio, bool enabled);
+
+/* Route `gpio` to the SIO function and leave it as a plain digital pin
+ * (no ADC, no peripheral MUX). Used when transitioning a pin away from
+ * analog-in. */
+void hal_pin_select_digital(uint32_t gpio);
+
+/* Bind an ADC peripheral channel for subsequent single-shot reads. The
+ * channel is *not* a GPIO number — it is the per-target ADC input index
+ * (`PinDef[].ADCpin` on pico). */
+void hal_pin_adc_select(uint32_t adc_channel);
+
 #ifdef __cplusplus
 }
 #endif

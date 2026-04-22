@@ -48,3 +48,31 @@ void hal_pin_set_drive_mA(uint32_t gpio, uint8_t mA)
     (void)gpio;
     (void)mA;
 }
+
+void hal_pin_set_pulls(uint32_t gpio, hal_pin_pull_t pull)
+{
+    (void)gpio;
+    (void)pull;
+}
+
+void hal_pin_set_dir(uint32_t gpio, hal_pin_dir_t dir)
+{
+    (void)gpio;
+    (void)dir;
+}
+
+void hal_pin_set_input_enabled(uint32_t gpio, bool enabled)
+{
+    (void)gpio;
+    (void)enabled;
+}
+
+void hal_pin_select_digital(uint32_t gpio)
+{
+    (void)gpio;
+}
+
+void hal_pin_adc_select(uint32_t adc_channel)
+{
+    (void)adc_channel;
+}

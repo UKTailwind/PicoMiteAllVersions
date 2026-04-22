@@ -6,6 +6,7 @@
  */
 
 #include "pico/stdlib.h"
+#include "hardware/adc.h"
 #include "hardware/gpio.h"
 
 #include "hal/hal_pin.h"
@@ -96,4 +97,33 @@ void hal_pin_set_drive_mA(uint32_t gpio, uint8_t mA)
     else if (mA <= 8)  s = GPIO_DRIVE_STRENGTH_8MA;
     else               s = GPIO_DRIVE_STRENGTH_12MA;
     gpio_set_drive_strength(gpio, s);
+}
+
+void hal_pin_set_pulls(uint32_t gpio, hal_pin_pull_t pull)
+{
+    switch (pull) {
+    case HAL_PIN_PULL_NONE: gpio_set_pulls(gpio, false, false); break;
+    case HAL_PIN_PULL_UP:   gpio_set_pulls(gpio, true,  false); break;
+    case HAL_PIN_PULL_DOWN: gpio_set_pulls(gpio, false, true);  break;
+    }
+}
+
+void hal_pin_set_dir(uint32_t gpio, hal_pin_dir_t dir)
+{
+    gpio_set_dir(gpio, dir == HAL_PIN_DIR_OUT ? GPIO_OUT : GPIO_IN);
+}
+
+void hal_pin_set_input_enabled(uint32_t gpio, bool enabled)
+{
+    gpio_set_input_enabled(gpio, enabled);
+}
+
+void hal_pin_select_digital(uint32_t gpio)
+{
+    gpio_set_function(gpio, GPIO_FUNC_SIO);
+}
+
+void hal_pin_adc_select(uint32_t adc_channel)
+{
+    adc_select_input(adc_channel);
 }
