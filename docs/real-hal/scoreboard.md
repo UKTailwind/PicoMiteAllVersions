@@ -10,7 +10,21 @@ Every row below must be measured by running the scoreboard script after the phas
 Phase    Draw    MM_Misc  External  FileIO  Commands  Memory  Functions  Audio   Total
 F1       164     139      123       62      45        38      17         14      602  (honest baseline — revert of 2c034d7+61cb08e)
 ─── fixup (real elimination, per ../real-hal-fixup-plan.md) ───
-F2         .       .        0        .       .         .       .          .        .  (External.c → HAL impls; bodies moved, not renamed)
+F2a step 1 164     139     107      62      45        38      17         14      586  (per-port port_config.h + first cull; −16)
+F2a step 2 164     139      58      62      45        38      17         14      537  (unconditional globals + case arms; −49)
+F2a step 3a 164    139      50      62      45        38      17         14      529  (hal_fast_timer + HEARTBEAT; −8)
+F2a step 3b 164    139      38      62      45        38      17         14      517  (keyboard HAL + ADC_CHANNEL_MAX; −12)
+F2a step 3c 164    139      27      62      45        38      17         14      506  (rp2350a runtime split + camera stubs; −11)
+F2a step 3d 164    139      22      62      45        38      17         14      501  (PINMAP + codemap to per-port .c; −5)
+F2a step 3e 164    139      19      62      45        38      17         14      498  (ADC OPEN rp2350a + MOUSE stub; −3)
+F2a step 3f 164    140      16      62      45        38      17         14      496  (MQTT + Collision unconditional; −2)
+F2a step 3g 164    140      10      62      45        38      17         14      490  (setBacklight unified + NEXTGEN; −6)
+─── deferred for F2 close ───
+            External.c: 8 target ifdefs remain — 6 KEYPAD (extended-vs-legacy
+            needs MATHS.c parseintegerarray signature unification or KEYPAD
+            rewrite), 1 PicoCalc keymap data block (128 lines → per-port file),
+            1 ADC RUN dims-type split (blocked on parseintegerarray unify).
+            F2 is 93% done by target-macro count (120 → 8).
 F3         .       .        .        0       .         .       .          .        .  (FileIO.c → HAL impls)
 F4         .       .        .        .       .         .       .          .        .  (MM_Misc.c USBKEYBOARD → HAL)
 ─── post-fixup phases ───
