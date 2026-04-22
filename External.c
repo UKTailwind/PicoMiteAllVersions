@@ -139,7 +139,9 @@ const char *PinFunction[] = {
 };
 ;
 
-volatile int ExtCurrentConfig[NBRPINS + 1];
+/* ExtCurrentConfig[] is defined in core/state/pin_state.c (hoisted in
+ * Phase 0.5 of the Real HAL refactor — see docs/real-hal-plan.md).
+ * Extern declaration lives in External.h. */
 volatile int INT1Value, INT1InitTimer, INT1Timer;
 volatile int INT2Value, INT2InitTimer, INT2Timer;
 volatile int INT3Value, INT3InitTimer, INT3Timer;
