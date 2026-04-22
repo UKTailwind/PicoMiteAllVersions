@@ -128,8 +128,17 @@ echo ""
 if [ -n "$SINGLE_FILE" ]; then
     echo "Running: $SINGLE_FILE ($display_mode)"
     echo ""
-    # For single file, show full output
-    $BINARY "$SINGLE_FILE" $MODE
+    # Honour the test file's RUN_ARGS: header the same way the full-suite
+    # runner does. Without this, spot-checking a named test silently skips
+    # --sd-root / --resolution / other mode flags and returns PASS when the
+    # suite run would have gone red. Caught this after 20a8629 lied about
+    # the pass count.
+    single_run_args=$(sed -n '1s/^.*RUN_ARGS: //p' "$SINGLE_FILE")
+    single_extra=()
+    if [ -n "$single_run_args" ]; then
+        read -r -a single_extra <<< "$single_run_args"
+    fi
+    $BINARY "$SINGLE_FILE" "${single_extra[@]}" $MODE
     exit $?
 fi
 
