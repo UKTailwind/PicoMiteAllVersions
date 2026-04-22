@@ -40,6 +40,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "hardware/adc.h"
 #include "hardware/pwm.h"
 #include "hal/hal_flash.h"
+#include "hal/hal_time.h"
 #include "hardware/regs/addressmap.h"     /* XIP_BASE */
 #include "hardware/spi.h"
 #include "hardware/pio.h"
@@ -3990,7 +3991,7 @@ void MIPS16 fun_info(void){
             targ=T_STR;
             return;
         } else if((tp=checkstring(ep, (unsigned char *)"DEBUG"))){
-            iret=abs(time_us_64()-mSecTimer*1000);
+            iret=abs(hal_time_us_64()-mSecTimer*1000);
             targ=T_INT;
             return; 
         } else if(checkstring(ep, (unsigned char *)"DISK SIZE")){
@@ -4616,7 +4617,7 @@ void MIPS16 fun_info(void){
         targ=T_INT;
         return;
     } else if((tp=checkstring(ep, (unsigned char *)"UPTIME"))){
-        fret = (MMFLOAT)time_us_64()/1000000.0;
+        fret = (MMFLOAT)hal_time_us_64()/1000000.0;
         targ = T_NBR;
         return;
     } else if((tp=checkstring(ep, (unsigned char *)"MAX GP"))){
@@ -4673,7 +4674,7 @@ void cmd_cpu(void) {
             getargs(&p, 3, (unsigned char *)",");
             totalseconds=getnumber(p);
             if(totalseconds<=0.0)error("Invalid period");
-            sleep_us(totalseconds*1000000);
+            hal_time_sleep_us(totalseconds*1000000);
 
     } else error("Syntax");
 }
@@ -5016,8 +5017,8 @@ int checkdetailinterrupts(void) {
     char *intaddr;
     static char rti[2];
     for(int i=1;i<=MAXPID;i++){
-        if(PIDchannels[i].interrupt!=NULL && time_us_64()>PIDchannels[i].timenext && PIDchannels[i].active){
-            PIDchannels[i].timenext=time_us_64()+(PIDchannels[i].PIDparams->T * 1000000);
+        if(PIDchannels[i].interrupt!=NULL && hal_time_us_64()>PIDchannels[i].timenext && PIDchannels[i].active){
+            PIDchannels[i].timenext=hal_time_us_64()+(PIDchannels[i].PIDparams->T * 1000000);
             intaddr=(char *)PIDchannels[i].interrupt;
             goto GotAnInterrupt;
         }

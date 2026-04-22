@@ -32,6 +32,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
+#include "hal/hal_time.h"
 #include "pico/stdlib.h"
 #include <time.h>
 #include <string.h>
@@ -265,21 +266,21 @@ void cmd_sort(void){
 // search through the line looking for the equals sign and step over it,
 // evaluate the rest of the command and save in the timer
 void cmd_timer(void) {
-  uint64_t mytime=time_us_64();
+  uint64_t mytime=hal_time_us_64();
   while(*cmdline && tokenfunction(*cmdline) != op_equal) cmdline++;
   if(!*cmdline) error("Syntax");
   timeroffset=mytime-(uint64_t)getint(++cmdline,0,mytime/1000)*1000;
 }
 // this is invoked as a function
 void __not_in_flash_func(fun_timer)(void) {
-    fret = (MMFLOAT)(time_us_64()-timeroffset)/1000.0;
+    fret = (MMFLOAT)(hal_time_us_64()-timeroffset)/1000.0;
     targ = T_NBR;
 }
 uint64_t gettimefromepoch(int *year, int *month, int *day, int *hour, int *minute, int *second){
     struct tm  *tm;
     struct tm tma;
     tm=&tma;
-    uint64_t fulltime=time_us_64();
+    uint64_t fulltime=hal_time_us_64();
     time_t epochnow=fulltime/1000000 + TimeOffsetToUptime;
     tm=gmtime(&epochnow);
     *year=tm->tm_year+1900;
@@ -391,8 +392,8 @@ void cmd_pause(void) {
     if(f < 2) return;
 
     if(f < 1500) {
-        PauseTimer=time_us_64()+(uint64_t)f;
-        while(time_us_64() <  PauseTimer){}                                       // if less than 1.5mS do the pause right now
+        PauseTimer=hal_time_us_64()+(uint64_t)f;
+        while(hal_time_us_64() <  PauseTimer){}                                       // if less than 1.5mS do the pause right now
         return;                                                     // and exit straight away
       }
 
@@ -400,10 +401,10 @@ void cmd_pause(void) {
         // we are running pause in a normal program
         // first check if we have reentered (from an interrupt) and only zero the timer if we have NOT been interrupted.
         // This means an interrupted pause will resume from where it was when interrupted
-        if(!interrupted) PauseTimer = time_us_64();
+        if(!interrupted) PauseTimer = hal_time_us_64();
         interrupted = false;
 
-        while(time_us_64() < FloatToInt32(f) + PauseTimer) {
+        while(hal_time_us_64() < FloatToInt32(f) + PauseTimer) {
             CheckAbort();
             if(check_interrupt()) {
                 // if there is an interrupt fake the return point to the start of this stmt
@@ -422,8 +423,8 @@ void cmd_pause(void) {
     else {
         // we are running pause in an interrupt, this is much simpler but note that
         // we use a different timer from the main pause code (above)
-        IntPauseTimer = time_us_64();
-        while( time_us_64()< FloatToInt32(f) + IntPauseTimer ) CheckAbort();
+        IntPauseTimer = hal_time_us_64();
+        while( hal_time_us_64()< FloatToInt32(f) + IntPauseTimer ) CheckAbort();
     }
 }
 
@@ -1077,7 +1078,7 @@ void cmd_date(void) {
 	    tm=gmtime(&timestamp);
 	    day_of_week=tm->tm_wday;
 	    if(day_of_week==0)day_of_week=7;
-        TimeOffsetToUptime=get_epoch(year, month, day, hour, minute, second)-time_us_64()/1000000;
+        TimeOffsetToUptime=get_epoch(year, month, day, hour, minute, second)-hal_time_us_64()/1000000;
 //		update_clock();
 //		mT4IntEnable(1);       										// enable interrupt
 	}
@@ -1228,7 +1229,7 @@ void cmd_time(void) {
 //		update_clock();
 //    	mT4IntEnable(1);       										// enable interrupt
 	}
-    TimeOffsetToUptime=get_epoch(year, month, day, hour, minute, second)-time_us_64()/1000000;
+    TimeOffsetToUptime=get_epoch(year, month, day, hour, minute, second)-hal_time_us_64()/1000000;
 }
 
 // this is invoked as a function

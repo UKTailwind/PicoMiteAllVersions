@@ -37,6 +37,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "diskio.h"
 #include "pico/stdlib.h"
 #include "hal/hal_flash.h"
+#include "hal/hal_time.h"
 #include "hardware/regs/addressmap.h"     /* XIP_BASE */
 #ifdef MMBASIC_HOST
 /* Host build routes file primitives through POSIX (REPL / --sim) or the
@@ -356,8 +357,8 @@ void enable_interrupts_pico(void)
     restore_psram_settings();
 #endif
     restore_interrupts(irqs);
-    SecondsTimer+=(time_us_64()/1000 - mSecTimer);
-    mSecTimer=time_us_64()/1000;
+    SecondsTimer+=(hal_time_us_64()/1000 - mSecTimer);
+    mSecTimer=hal_time_us_64()/1000;
     irqs=0;
 #endif /* !MMBASIC_HOST */
 }
@@ -4971,7 +4972,7 @@ void cmd_autosave(void)
 readin:;
     while ((c = MMInkey()) != 0x1a && c != F1 && c != F2)
     { // while waiting for the end of text char
-        if (c == -1 && count && time_us_64() - timeout > 100000)
+        if (c == -1 && count && hal_time_us_64() - timeout > 100000)
         {
             fflush(stdout);
             count = 0;
@@ -4993,7 +4994,7 @@ readin:;
                 {
                     MMputchar(c, 0);
                     count++;
-                    timeout = time_us_64();
+                    timeout = hal_time_us_64();
                 } // and echo it
                 if (c == '\r')
                 {
@@ -5077,7 +5078,7 @@ void cmd_autosave(void)
         }
     while ((c = MMInkey()) != 0x1a && c != F1 && c != F2)
     { // while waiting for the end of text char
-        if (c == -1 && count && time_us_64() - timeout > 100000)
+        if (c == -1 && count && hal_time_us_64() - timeout > 100000)
         {
             fflush(stdout);
             count = 0;
@@ -5099,7 +5100,7 @@ void cmd_autosave(void)
                 {
                     MMputchar(c, 0);
                     count++;
-                    timeout = time_us_64();
+                    timeout = hal_time_us_64();
                 } // and echo it
                 if (c == '\r')
                 {

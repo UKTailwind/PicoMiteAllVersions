@@ -14,6 +14,7 @@
 
 #include "bytecode.h"
 #include "bc_alloc.h"
+#include "hal/hal_time.h"
 #include "vm_device_support.h"
 #include "vm_sys_input.h"
 #include "vm_sys_graphics.h"
@@ -4202,7 +4203,7 @@ op_randomize: {
 #ifdef MMBASIC_HOST
         seed = 42;  /* deterministic for testing */
 #else
-        seed = time_us_32();
+        seed = (uint32_t)hal_time_us_64();
 #endif
     }
     if (seed < 0) bc_vm_error(vm, "Number out of bounds");

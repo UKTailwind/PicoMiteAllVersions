@@ -40,6 +40,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
 #include "hal/hal_flash.h"
+#include "hal/hal_time.h"
 #include "hardware/regs/addressmap.h"     /* XIP_BASE */
 
 #ifndef MMBASIC_HOST
@@ -752,12 +753,12 @@ void playvs1053(int mode){
 	playreadcomplete=0;
 	pwm_set_irq0_enabled(AUDIO_SLICE, true);
 	pwm_set_enabled(AUDIO_SLICE, true); 
-	uint64_t t=time_us_64();
+	uint64_t t=hal_time_us_64();
 	uSec(25);
 	while(1){ //read all the headers without stalling
 		checkWAVinput();
 		uSec(25);
-		if(time_us_64()-t>500000)break;
+		if(hal_time_us_64()-t>500000)break;
 	}
 }
 void playimmediatevs1053(int play){

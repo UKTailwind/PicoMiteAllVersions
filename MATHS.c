@@ -34,6 +34,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
+#include "hal/hal_time.h"
 #include <math.h>
 #include <complex.h>
 #ifdef rp2350
@@ -1695,7 +1696,7 @@ void cmd_math(void){
 			if((pi=checkstring(tp, (unsigned char *)"START"))){
 				int channel = getint(pi,1,MAXPID);
 				if(PIDchannels[channel].interrupt==NULL)error("Channel not initialised");
-				PIDchannels[channel].timenext=time_us_64() + (PIDchannels[channel].PIDparams->T * 1000);
+				PIDchannels[channel].timenext=hal_time_us_64() + (PIDchannels[channel].PIDparams->T * 1000);
 				PIDchannels[channel].active=true;
 				InterruptUsed=true;
 			} else if((pi=checkstring(tp, (unsigned char *)"STOP"))){
@@ -1807,7 +1808,7 @@ void cmd_math(void){
 			int i;
 			getargs(&tp,1,(unsigned char *)",");
 			if(argc==1)i = getinteger(argv[0]);
-			else i=time_us_32();
+			else i=(uint32_t)hal_time_us_64();
 			if(i < 0) error("Number out of bounds");
 			if(g_myrand==NULL)g_myrand=(struct tagMTRand *)GetMemory(sizeof(struct tagMTRand));
 			seedRand(i);
@@ -2641,7 +2642,7 @@ void fun_math(void){
 		if(tp) {
 			if(g_myrand==NULL){
 				g_myrand=(struct tagMTRand *)GetMemory(sizeof(struct tagMTRand));
-				seedRand(time_us_32());
+				seedRand((uint32_t)hal_time_us_64());
 			}
 			fret=genRand(g_myrand);
 			targ = T_NBR;

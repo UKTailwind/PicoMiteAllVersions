@@ -32,6 +32,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * The following section will be excluded from the documentation.
  */
 #include "Hardware_Includes.h"
+#include "hal/hal_time.h"
 #include "hardware/watchdog.h"
 #include "pico/stdlib.h"
 #include "hardware/clocks.h"
@@ -228,16 +229,16 @@ extern void mouse0close(void);
 //Vector to CFunction routine called every command (ie, from the BASIC interrupt checker)
 
 uint64_t readusclock(void){
-    return time_us_64()-uSecoffset;
+    return hal_time_us_64()-uSecoffset;
 }
 void writeusclock(uint64_t timeset){
-  uSecoffset=time_us_64()-(uint64_t)timeset;
+  uSecoffset=hal_time_us_64()-(uint64_t)timeset;
 }
 uint64_t readIRclock(void){
-    return time_us_64()-IRoffset;
+    return hal_time_us_64()-IRoffset;
 }
 void writeIRclock(uint64_t timeset){
-  IRoffset=time_us_64()-(uint64_t)timeset;
+  IRoffset=hal_time_us_64()-(uint64_t)timeset;
 }
 #ifdef rp2350
 const uint8_t PINMAP[48]={1,2,4,5,6,7,9,10,11,12,14,15,16,17,19,20,21,22,24,25,26,27,29,41,42,43,31,32,34,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62};
@@ -418,8 +419,8 @@ void __not_in_flash_func(cmd_sync)(void){
     static uint64_t synctime=0,endtime=0;
 	getargs(&cmdline,3,(unsigned char *)",");
 	if(synctime && argc==0){
-        while(time_us_64()<endtime){
-            if(synctime-time_us_64()> 2000)CheckAbort();
+        while(hal_time_us_64()<endtime){
+            if(synctime-hal_time_us_64()> 2000)CheckAbort();
         }
         endtime+=synctime;
 	} else {
@@ -436,7 +437,7 @@ void __not_in_flash_func(cmd_sync)(void){
 				}
             }
             synctime=i;
-            endtime=time_us_64()+synctime;
+            endtime=hal_time_us_64()+synctime;
 		} else {
 			synctime=endtime=0;
 		}
@@ -3293,7 +3294,7 @@ void cmd_WS2812(void){
         if(!(ExtCurrentConfig[pin] == EXT_DIG_OUT || ExtCurrentConfig[pin] == EXT_NOT_CONFIG)) error("Pin %/| is not off or an output",pin,pin);
         if(ExtCurrentConfig[pin] == EXT_NOT_CONFIG)ExtCfg(pin, EXT_DIG_OUT, 0);
 		p=GetTempMemory((nbr+1)*colours);
-		uint64_t endreset=time_us_64()+TRST;
+		uint64_t endreset=hal_time_us_64()+TRST;
     	for(i=0;i<nbr;i++){
     		green=(dest[i]>>8) & 0xFF;
     		red=(dest[i]>>16) & 0xFF;
@@ -3313,7 +3314,7 @@ void cmd_WS2812(void){
     		p+=colours;
     	}
     	p-=(nbr*colours);
-        while(time_us_64()<endreset){}
+        while(hal_time_us_64()<endreset){}
         disable_interrupts_pico();
         WS2812e(gppin, T1H, T1L, T0H, T0L, nbr*colours, (char *)p);
         enable_interrupts_pico();

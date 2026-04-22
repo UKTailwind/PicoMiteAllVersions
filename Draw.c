@@ -34,6 +34,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
+#include "hal/hal_time.h"
 #include "gfx_box_shared.h"
 #include "gfx_circle_shared.h"
 #include "gfx_line_shared.h"
@@ -395,7 +396,7 @@ void MIPS16 cmd_guiMX170(void) {
     if((p = checkstring(cmdline, (unsigned char *)"TEST"))) {
         if((checkstring(p, (unsigned char *)"LCDPANEL"))) {
             int t,count=0;
-            uint64_t start=time_us_64();
+            uint64_t start=hal_time_us_64();
             t = ((HRes > VRes) ? HRes : VRes) / 7;
             while(getConsole() < '\r') {
                 routinechecks();
@@ -413,7 +414,7 @@ void MIPS16 cmd_guiMX170(void) {
                 #endif
             }
             ClearScreen(gui_bcolour);
-            PFlt(((MMFLOAT)count)/(((MMFLOAT)(time_us_64()-start))/1000000.0));MMPrintString(" Circles per Second");
+            PFlt(((MMFLOAT)count)/(((MMFLOAT)(hal_time_us_64()-start))/1000000.0));MMPrintString(" Circles per Second");
             return;
         }
 #if !defined(PICOMITEVGA) && !defined(MMBASIC_HOST)
@@ -5952,11 +5953,11 @@ void bc_fastgfx_swap(void) {
     if (!fastgfx_active) error("FASTGFX not active");
     while (!fastgfx_done) { __dmb(); }
     if (fastgfx_frame_us > 0) {
-        while (time_us_64() - fastgfx_last_swap_us < fastgfx_frame_us) {
+        while (hal_time_us_64() - fastgfx_last_swap_us < fastgfx_frame_us) {
             tight_loop_contents();
         }
     }
-    fastgfx_last_swap_us = time_us_64();
+    fastgfx_last_swap_us = hal_time_us_64();
     fastgfx_done = false;
     __dmb();
     multicore_fifo_push_blocking(8);

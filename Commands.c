@@ -38,6 +38,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "Hardware_Includes.h"
 #include "hardware/dma.h"
 #include "hal/hal_flash.h"
+#include "hal/hal_time.h"
 #include "hardware/structs/watchdog.h"
 #ifdef PICOMITE
 #include "pico/multicore.h"
@@ -2472,7 +2473,7 @@ void cmd_error(void) {
 	int i;
 	getargs(&cmdline,1,(unsigned char *)",");
 	if(argc==1)i = getinteger(argv[0]);
-	else i=time_us_32();
+	else i=(uint32_t)hal_time_us_64();
 	if(i < 0) error("Number out of bounds");
 	srand(i);
 }
