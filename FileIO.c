@@ -39,6 +39,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "hal/hal_flash.h"
 #include "hal/hal_time.h"
 #include "hal/hal_filesystem.h"
+#include <errno.h>
 #include "hardware/regs/addressmap.h"     /* XIP_BASE */
 #ifdef MMBASIC_HOST
 /* Host build routes file primitives through POSIX (REPL / --sim) or the
@@ -1363,13 +1364,10 @@ void cmd_LoadJPGImage(unsigned char *p) { (void)p; error("Not supported on host"
 // If s$ is empty then no (more) files found
 void fun_dir(void)
 {
-    static DIR djd;
-    static FILINFO fnod;
+    static hal_fs_dir_t *dir_handle = NULL;
+    static struct hal_dirent dent;
     static char pp[FF_MAX_LFN];
     static char path[FF_MAX_LFN];
-    static int FSsave;
-    static lfs_dir_t lfs_dir_dir;
-    struct lfs_info lfs_info_dir;
     unsigned char *p;
     getargs(&ep, 3, (unsigned char *)",");
     if (argc != 0)
@@ -1393,13 +1391,12 @@ void fun_dir(void)
     {
         memset(pp,0,FF_MAX_LFN);
         memset(path,0,FF_MAX_LFN);
-        memset(&djd, 0, sizeof(DIR));
-        memset(&fnod, 0, sizeof(FILINFO));
+        memset(&dent, 0, sizeof(dent));
+        if (dir_handle) { hal_fs_dir_close(dir_handle); dir_handle = NULL; }
         // this must be the first call eg:  DIR$("*.*", FILE)
         p = getFstring(argv[0]);
         char fullfilename[FF_MAX_LFN]={0};
         getfullfilename((char *)p,(char *)fullfilename);
-        FSsave=FatFSFileSystem;
         int i = strlen(fullfilename) - 1;
         while (i > 1 && !(fullfilename[i] == '/')) i--;
         if(i>1){
@@ -1410,89 +1407,40 @@ void fun_dir(void)
         }
         if(!(*pp))*pp='*';
         if(!(*path))*path='/';
-        djd.pat = pp;
         if (!InitSDCard())
             return; // setup the SD card
-        if(FSsave==1)FSerror = f_opendir(&djd, path);
-        else FSerror=lfs_dir_open(&lfs, &lfs_dir_dir, path);
-        ErrorCheck(0);
-    }
-    if (SDCardStat & STA_NOINIT && FSsave==1)
-    {
-        f_closedir(&djd);
-        error("SD card not found");
-    }
-    if (dirflags == AM_DIR)
-    {
-        for (;;)
-        {
-            if(FSsave==1){
-                FSerror = f_readdir(&djd, &fnod); // Get a directory item
-                if (FSerror != FR_OK || !fnod.fname[0])
-                    break; // Terminate if any error or end of directory
-                if (pattern_matching(pp, fnod.fname, 0, 0) && (fnod.fattrib & AM_DIR) && !(fnod.fattrib & AM_SYS))
-                    break; // Test for the file name
-            } else {
-                FSerror=lfs_dir_read(&lfs, &lfs_dir_dir, &lfs_info_dir);
-                strcpy(fnod.fname,lfs_info_dir.name);
-                if(FSerror==0)                    
-                    break;
-                if (lfs_info_dir.type==LFS_TYPE_DIR && pattern_matching(pp, lfs_info_dir.name, 0, 0) && !(strcmp(lfs_info_dir.name,".")==0 || strcmp(lfs_info_dir.name,"..")==0 )){
-                    break;
-                }
-            }
-        }
-    }
-    else if (dirflags == -1)
-    {
-        for (;;)
-        {
-            if(FSsave==1){
-                FSerror = f_readdir(&djd, &fnod); // Get a directory item
-                if (FSerror != FR_OK || !fnod.fname[0])
-                    break; // Terminate if any error or end of directory
-                if (pattern_matching(pp, fnod.fname, 0, 0) && !(fnod.fattrib & AM_DIR) && !(fnod.fattrib & AM_SYS))
-                    break; // Test for the file name
-            } else {
-                FSerror=lfs_dir_read(&lfs, &lfs_dir_dir, &lfs_info_dir);
-                strcpy(fnod.fname,lfs_info_dir.name);
-                if(FSerror==0)                    
-                    break;
-                if (lfs_info_dir.type==LFS_TYPE_REG && pattern_matching(pp, lfs_info_dir.name, 0, 0)){
-                    break;
-                }
-            }
-        }
-    }
-    else
-    {
-        for (;;)
-        {
-            if(FSsave==1){
-                FSerror = f_readdir(&djd, &fnod); // Get a directory item
-                if (FSerror != FR_OK || !fnod.fname[0])
-                    break; // Terminate if any error or end of directory
-                if (pattern_matching(pp, fnod.fname, 0, 0) && !(fnod.fattrib & AM_SYS))
-                    break; // Test for the file name
-            } else {
-                FSerror=lfs_dir_read(&lfs, &lfs_dir_dir, &lfs_info_dir);
-                strcpy(fnod.fname,lfs_info_dir.name);
-                if(FSerror==0)                    
-                    break;
-                if (lfs_info_dir.type & (LFS_TYPE_REG |  LFS_TYPE_DIR) && pattern_matching(pp, lfs_info_dir.name, 0, 0) && !(strcmp(lfs_info_dir.name,".")==0 || strcmp(lfs_info_dir.name,"..")==0 )){
-                    break;
-                }
-            }
-        }
+        int rc = hal_fs_dir_open(path, &dir_handle);
+        if (rc < 0) { ErrorCheckHAL(rc); dir_handle = NULL; }
     }
 
-    if (FSerror != FR_OK || !fnod.fname[0]){
-         if(FSsave==1)f_closedir(&djd);
-        else lfs_dir_close(&lfs, &lfs_dir_dir);
+    dent.name[0] = '\0';
+    while (dir_handle) {
+        int r = hal_fs_dir_next(dir_handle, &dent);
+        if (r < 0) {
+            ErrorCheckHAL(r);
+            hal_fs_dir_close(dir_handle);
+            dir_handle = NULL;
+            dent.name[0] = '\0';
+            break;
+        }
+        if (r == 0) {
+            hal_fs_dir_close(dir_handle);
+            dir_handle = NULL;
+            dent.name[0] = '\0';
+            break;
+        }
+        if (dent.mode & HAL_FS_S_IFHIDDEN) continue;
+        bool is_dir = (dent.mode & HAL_FS_S_IFDIR) != 0;
+        bool want;
+        if (dirflags == AM_DIR)      want = is_dir;
+        else if (dirflags == -1)     want = !is_dir;
+        else                         want = true;  /* ALL */
+        if (!want) continue;
+        if (pattern_matching(pp, dent.name, 0, 0)) break;
     }
 
     sret = GetTempMemory(STRINGSIZE); // this will last for the life of the command
-    strcpy((char *)sret, fnod.fname);
+    strcpy((char *)sret, dent.name);
     CtoM(sret); // convert to a MMBasic style string
     FatFSFileSystem=FatFSFileSystemSave;
     targ = T_STR;
@@ -1563,15 +1511,16 @@ void mmbasic_chdir(char *p){
     	strcpy(filepath[FatFSFileSystem],oldfilepath);
     	return;
     }
-//    MMPrintString(filepath[FatFSFileSystem]);
-	if(FatFSFileSystem)FSerror = f_chdir(&filepath[FatFSFileSystem][2]); //finally change directory always using an absolute pathname
-    else {
-        if(filepath[FatFSFileSystem][3]==0)FSerror=lfs_dir_open(&lfs, &lfs_dir, "/");
-        else FSerror=lfs_dir_open(&lfs, &lfs_dir, &filepath[FatFSFileSystem][3]);
-        if(!FSerror)lfs_dir_close(&lfs, &lfs_dir);
-    }
-    if(FSerror==-2)FSerror=-3;
-	if(FSerror)strcpy(filepath[FatFSFileSystem],oldfilepath); //if it didn't work restore the original path
+    /* hal_fs_chdir dispatches A:/... via lfs_dir_open probe and B:/... via
+     * f_chdir, matching the original dual-backend logic. Pass the path
+     * including drive prefix so the HAL can pick the right filesystem. */
+    int rc = hal_fs_chdir(filepath[FatFSFileSystem]);
+    /* Original mapped FR_NO_PATH / LFS_ERR_NOENT (-2) to -3 so ErrorCheck
+     * reports "Pathname invalid" rather than "File not found". Preserve. */
+    if (rc == -ENOENT) FSerror = -3;
+    else if (rc < 0)   FSerror = (rc == -EACCES) ? -6 : -5;
+    else               FSerror = 0;
+    if(FSerror)strcpy(filepath[FatFSFileSystem],oldfilepath); //if it didn't work restore the original path
 	ErrorCheck(0); // error if the pathname was invalid
 
 }

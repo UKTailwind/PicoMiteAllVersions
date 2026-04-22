@@ -149,17 +149,23 @@ int hal_fs_rename(const char *from, const char *to)
 int hal_fs_chdir(const char *path)
 {
     if (!path) return -EINVAL;
-    /* cmd_chdir has its own path-resolution logic (mmbasic_chdir) — it
-     * still drives f_chdir / lfs_dir_open directly. This entry is here
-     * for completeness; if it ever gets called on device, route to the
-     * simpler of the two. */
+    /* LFS has no chdir — probe existence via lfs_dir_open and caller
+     * (mmbasic_chdir) keeps track of the cwd in filepath[]. FatFS's
+     * f_chdir wants a path without the MMBasic drive prefix (FatFS on
+     * both host and device is mounted with the default drive "" = 0:,
+     * so a literal "B:" or "A:" confuses it). Strip the drive letter
+     * before dispatching to either backend. */
     if (path_fs(path) == FS_LFS) {
+        const char *pp = path_after_drive(path);
+        if (!*pp) pp = "/";
         lfs_dir_t d;
-        int r = lfs_dir_open(&lfs, &d, path_after_drive(path));
+        int r = lfs_dir_open(&lfs, &d, pp);
         if (r == 0) lfs_dir_close(&lfs, &d);
         return lfs_rc_to_errno(r);
     }
-    return fatfs_rc_to_errno(f_chdir(path));
+    const char *pp = path_after_drive(path);
+    if (!*pp) pp = "/";
+    return fatfs_rc_to_errno(f_chdir(pp));
 }
 
 char *hal_fs_getcwd(char *buf, size_t n)
@@ -187,7 +193,7 @@ int hal_fs_stat(const char *path, struct hal_stat *out)
     if (r != FR_OK) return fatfs_rc_to_errno(r);
     out->size = fno.fsize;
     out->mode = (fno.fattrib & AM_DIR) ? HAL_FS_S_IFDIR : HAL_FS_S_IFREG;
-    if (fno.fattrib & AM_HID) out->mode |= HAL_FS_S_IFHIDDEN;
+    if (fno.fattrib & (AM_HID | AM_SYS)) out->mode |= HAL_FS_S_IFHIDDEN;
     out->mtime_us = 0;
     return 0;
 }
@@ -259,7 +265,7 @@ int hal_fs_dir_next(hal_fs_dir_t *dir, struct hal_dirent *out)
     out->name[sizeof(out->name) - 1] = '\0';
     out->size = fno.fsize;
     out->mode = (fno.fattrib & AM_DIR) ? HAL_FS_S_IFDIR : HAL_FS_S_IFREG;
-    if (fno.fattrib & AM_HID) out->mode |= HAL_FS_S_IFHIDDEN;
+    if (fno.fattrib & (AM_HID | AM_SYS)) out->mode |= HAL_FS_S_IFHIDDEN;
     return 1;
 }
 

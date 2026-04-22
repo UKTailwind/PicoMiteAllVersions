@@ -66,11 +66,27 @@ static int fatfs_rc_to_errno(FRESULT r)
  * vm_host_fat RAM disk. */
 /* -------------------------------------------------------------------- */
 
-int hal_fs_unlink(const char *path)           { return fatfs_rc_to_errno(host_f_unlink(path)); }
-int hal_fs_rename(const char *from, const char *to) { return fatfs_rc_to_errno(host_f_rename(from, to)); }
-int hal_fs_mkdir (const char *path)           { return fatfs_rc_to_errno(host_f_mkdir(path)); }
-int hal_fs_rmdir (const char *path)           { return fatfs_rc_to_errno(host_f_unlink(path)); }  /* FatFS f_unlink handles dirs */
-int hal_fs_chdir (const char *path)           { return fatfs_rc_to_errno(host_f_chdir(path)); }
+/* Strip "A:" / "B:" drive prefix before dispatching. Host FatFS is
+ * mounted with the default empty drive name (= drive 0), so a literal
+ * "B:..." path confuses FatFS's drive-letter parser. The single-backend
+ * host build treats both MMBasic drives as the same FatFS / POSIX tree
+ * (the test harness RAM disk, or the user's real cwd under host_sd_root). */
+static const char *host_path_after_drive(const char *p)
+{
+    if (p && p[0] && p[1] == ':') return p + 2;
+    return p;
+}
+
+int hal_fs_unlink(const char *path)           { return fatfs_rc_to_errno(host_f_unlink(host_path_after_drive(path))); }
+int hal_fs_rename(const char *from, const char *to) { return fatfs_rc_to_errno(host_f_rename(host_path_after_drive(from), host_path_after_drive(to))); }
+int hal_fs_mkdir (const char *path)           { return fatfs_rc_to_errno(host_f_mkdir(host_path_after_drive(path))); }
+int hal_fs_rmdir (const char *path)           { return fatfs_rc_to_errno(host_f_unlink(host_path_after_drive(path))); }
+int hal_fs_chdir (const char *path)
+{
+    const char *pp = host_path_after_drive(path);
+    if (!pp || !*pp) pp = "/";
+    return fatfs_rc_to_errno(host_f_chdir(pp));
+}
 
 char *hal_fs_getcwd(char *buf, size_t n)
 {
@@ -87,7 +103,7 @@ int hal_fs_stat(const char *path, struct hal_stat *out)
     if (r != FR_OK) return fatfs_rc_to_errno(r);
     out->size = fno.fsize;
     out->mode = (fno.fattrib & AM_DIR) ? HAL_FS_S_IFDIR : HAL_FS_S_IFREG;
-    if (fno.fattrib & AM_HID) out->mode |= HAL_FS_S_IFHIDDEN;
+    if (fno.fattrib & (AM_HID | AM_SYS)) out->mode |= HAL_FS_S_IFHIDDEN;
     out->mtime_us = 0;
     return 0;
 }
@@ -138,7 +154,7 @@ int hal_fs_dir_next(hal_fs_dir_t *dir, struct hal_dirent *out)
     out->name[sizeof(out->name) - 1] = '\0';
     out->size = fno.fsize;
     out->mode = (fno.fattrib & AM_DIR) ? HAL_FS_S_IFDIR : HAL_FS_S_IFREG;
-    if (fno.fattrib & AM_HID) out->mode |= HAL_FS_S_IFHIDDEN;
+    if (fno.fattrib & (AM_HID | AM_SYS)) out->mode |= HAL_FS_S_IFHIDDEN;
     return 1;
 }
 
