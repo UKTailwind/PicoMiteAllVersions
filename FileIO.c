@@ -38,6 +38,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "pico/stdlib.h"
 #include "hal/hal_flash.h"
 #include "hal/hal_time.h"
+#include "hal/hal_filesystem.h"
 #include "hardware/regs/addressmap.h"     /* XIP_BASE */
 #ifdef MMBASIC_HOST
 /* Host build routes file primitives through POSIX (REPL / --sim) or the
