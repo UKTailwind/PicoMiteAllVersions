@@ -54,6 +54,16 @@ int hal_flash_unique_id(uint8_t out[8])
     return 0;
 }
 
+int hal_flash_read_jedec_id(uint8_t out[4])
+{
+    if (out == NULL) return -EINVAL;
+    const uint8_t txbuf[4] = { 0x9f, 0, 0, 0 };
+    uint32_t irqs = save_and_disable_interrupts();
+    flash_do_cmd(txbuf, out, 4);
+    restore_interrupts(irqs);
+    return 0;
+}
+
 int hal_flash_read_options(void *buf, size_t len)
 {
     if (buf == NULL) return -EINVAL;
@@ -64,13 +74,20 @@ int hal_flash_read_options(void *buf, size_t len)
 int hal_flash_write_options(const void *buf, size_t len)
 {
     if (buf == NULL) return -EINVAL;
-    /* Erase one 4K sector at FLASH_TARGET_OFFSET, then program the buffer.
-     * Current call sites use either sizeof(struct option_s) or a padded
-     * 768 bytes; both are well under FLASH_ERASE_SIZE. Caller must have
-     * rounded `len` up to a multiple of FLASH_PAGE_SIZE (256). */
+    if (len == 0 || len > FLASH_ERASE_SIZE) return -EINVAL;
+
+    /* Round up to the flash page boundary so non-page-multiple struct sizes
+     * (e.g. sizeof(struct option_s) = 896 on rp2040) can be written without
+     * asking the caller to worry about alignment. Tail bytes are filled
+     * with 0xFF (erased state). */
+    size_t pad_len = (len + FLASH_PAGE_SIZE - 1) & ~((size_t)FLASH_PAGE_SIZE - 1);
+    uint8_t staging[FLASH_ERASE_SIZE];
+    memset(staging, 0xFF, pad_len);
+    memcpy(staging, buf, len);
+
     int rc = hal_flash_erase(FLASH_TARGET_OFFSET, FLASH_ERASE_SIZE);
     if (rc != 0) return rc;
-    return hal_flash_program(FLASH_TARGET_OFFSET, buf, len);
+    return hal_flash_program(FLASH_TARGET_OFFSET, staging, pad_len);
 }
 
 int hal_flash_erase_program_area(void)

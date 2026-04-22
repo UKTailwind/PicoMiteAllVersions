@@ -39,7 +39,8 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "hardware/dma.h"
 #include "hardware/adc.h"
 #include "hardware/pwm.h"
-#include "hardware/flash.h"
+#include "hal/hal_flash.h"
+#include "hardware/regs/addressmap.h"     /* XIP_BASE */
 #include "hardware/spi.h"
 #include "hardware/pio.h"
 #include "hardware/pio_instructions.h"
@@ -500,7 +501,7 @@ void MIPS16 cmd_library(void) {
         //now write the library from ram to the library flash area
         // initialise for writing to the flash
         FlashWriteInit(LIBRARY_FLASH);
-        flash_range_erase(realflashpointer, MAX_PROG_SIZE);
+        hal_flash_erase(realflashpointer, MAX_PROG_SIZE);
         i=MAX_PROG_SIZE/4;
        
         int *ppp=(int *)(flash_progmemory - MAX_PROG_SIZE);
@@ -541,7 +542,7 @@ void MIPS16 cmd_library(void) {
         if(Option.LIBRARY_FLASH_SIZE != MAX_PROG_SIZE) return;
         
         FlashWriteInit(LIBRARY_FLASH);
-        flash_range_erase(realflashpointer, MAX_PROG_SIZE);
+        hal_flash_erase(realflashpointer, MAX_PROG_SIZE);
         i=MAX_PROG_SIZE/4;
        
         int *ppp=(int *)(flash_progmemory - MAX_PROG_SIZE);
@@ -634,7 +635,7 @@ void MIPS16 cmd_library(void) {
 		else fsize = lfs_file_size(&lfs,FileTable[fnbr].lfsptr);
         if(fsize>MAX_PROG_SIZE)error("File size % should be % or less",fsize,MAX_PROG_SIZE);
         FlashWriteInit(LIBRARY_FLASH);
-        flash_range_erase(realflashpointer, MAX_PROG_SIZE);
+        hal_flash_erase(realflashpointer, MAX_PROG_SIZE);
         int i=MAX_PROG_SIZE/4;
         int *ppp=(int *)(flash_progmemory - MAX_PROG_SIZE);
         while(i--)if(*ppp++ != 0xFFFFFFFF){
@@ -3734,11 +3735,7 @@ tp = checkstring(cmdline, (unsigned char *)"HEARTBEAT");
         FileClose(fnbr);
         uSec(100000);
         disable_interrupts_pico();
-        flash_range_erase(FLASH_TARGET_OFFSET, FLASH_ERASE_SIZE);
-        enable_interrupts_pico();
-        uSec(10000);
-        disable_interrupts_pico();
-        flash_range_program(FLASH_TARGET_OFFSET, (const uint8_t *)&Option, 768);
+        hal_flash_write_options(&Option, sizeof(struct option_s));
         enable_interrupts_pico();
         _excep_code = RESET_COMMAND;
         SoftReset();
@@ -3750,7 +3747,7 @@ tp = checkstring(cmdline, (unsigned char *)"HEARTBEAT");
           uint32_t j = FLASH_TARGET_OFFSET + FLASH_ERASE_SIZE + SAVEDVARS_FLASH_SIZE + ((MAXFLASHSLOTS - 1) * MAX_PROG_SIZE);
           uSec(250000);
           disable_interrupts_pico();
-          flash_range_erase(j, MAX_PROG_SIZE);
+          hal_flash_erase(j, MAX_PROG_SIZE);
           enable_interrupts_pico();
         }
         configure(tp);
@@ -4311,11 +4308,8 @@ void MIPS16 fun_info(void){
             targ=T_STR;
             return;
 		} else if(checkstring(tp, (unsigned char *)"FLASH SIZE")){
-            uint8_t txbuf[4] = {0x9f};
             uint8_t rxbuf[4] = {0};
-            disable_interrupts_pico();
-            flash_do_cmd(txbuf, rxbuf, 4);
-            enable_interrupts_pico();
+            hal_flash_read_jedec_id(rxbuf);
             iret= 1 << rxbuf[3];
 			targ=T_INT;
 			return;

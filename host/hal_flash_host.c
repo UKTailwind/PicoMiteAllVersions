@@ -58,6 +58,19 @@ int hal_flash_unique_id(uint8_t out[8])
     return 0;
 }
 
+int hal_flash_read_jedec_id(uint8_t out[4])
+{
+    if (out == NULL) return -EINVAL;
+    /* Canned JEDEC response for an 8 MB flash, matching what the existing
+     * host flash_do_cmd stub returned. Callers use out[3] = 23 as the
+     * capacity code (1 << 23 = 8 MB). */
+    out[0] = 0;     /* command echo */
+    out[1] = 0;     /* mfg */
+    out[2] = 0;     /* memory type */
+    out[3] = 23;    /* log2(8 MB) */
+    return 0;
+}
+
 int hal_flash_read_options(void *buf, size_t len)
 {
     if (buf == NULL) return -EINVAL;

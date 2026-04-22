@@ -63,6 +63,18 @@ int hal_flash_program(uint32_t offset, const void *buf, size_t len);
  */
 int hal_flash_unique_id(uint8_t out[8]);
 
+/* Query the flash chip's JEDEC Read ID (command 0x9F).
+ *
+ * Returns 4 bytes from the SPI transaction in the same layout as the
+ * Pico SDK's `flash_do_cmd` RX buffer for a 4-byte 0x9F command:
+ *   out[0] = echo of the command (useless — don't rely on value)
+ *   out[1] = manufacturer ID
+ *   out[2] = memory type
+ *   out[3] = capacity code (log2 of size in bytes — 23 means 8 MB)
+ * MMBasic uses this at boot to set Option.FlashSize. On host, returns a
+ * canned response matching an 8 MB chip. */
+int hal_flash_read_jedec_id(uint8_t out[4]);
+
 /* -----------------------------------------------------------------------
  * Option-block convenience helpers.
  *

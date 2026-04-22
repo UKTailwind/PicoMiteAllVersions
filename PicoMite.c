@@ -33,7 +33,8 @@ extern "C" {
 #include "configuration.h"
 #include "hardware/watchdog.h"
 #include "hardware/clocks.h"
-#include "hardware/flash.h"
+#include "hal/hal_flash.h"
+#include "hardware/regs/addressmap.h"     /* XIP_BASE */
 #include "hardware/adc.h"
 #include "hardware/exception.h"
 #include "MMBasic_Includes.h"
@@ -3821,7 +3822,7 @@ void MIPS16 SaveProgramToFlash(unsigned char *pm, int msg) {
 #endif	
     memcpy(buf, tknbuf, STRINGSIZE);                                // save the token buffer because we are going to use it
     FlashWriteInit(PROGRAM_FLASH);
-    flash_range_erase(realflashpointer, MAX_PROG_SIZE);
+    hal_flash_erase(realflashpointer, MAX_PROG_SIZE);
     j=MAX_PROG_SIZE/4;
     int *pp=(int *)(flash_progmemory);
         while(j--)if(*pp++ != 0xFFFFFFFF){

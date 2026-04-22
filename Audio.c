@@ -37,9 +37,10 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "ffconf.h"
 #include "hardware/pwm.h"
 #include "hardware/irq.h"
-#include "hardware/flash.h"
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
+#include "hal/hal_flash.h"
+#include "hardware/regs/addressmap.h"     /* XIP_BASE */
 
 #ifndef MMBASIC_HOST
 /* Device body: decoder libraries (dr_wav/mp3/flac, hxcmod), VS1053
@@ -1906,7 +1907,7 @@ void MIPS16 cmd_play(void) {
 			positionfile(WAV_fnbr,0);
 			uint32_t j = RoundUpK4(TOP_OF_SYSTEM_FLASH);
 			disable_interrupts_pico();
-			flash_range_erase(j, RoundUpK4(fsize));
+			hal_flash_erase(j, RoundUpK4(fsize));
 			enable_interrupts_pico();
 			while(!FileEOF(WAV_fnbr)) { 
 				memset(r,0,256) ;
@@ -1915,7 +1916,7 @@ void MIPS16 cmd_play(void) {
 					r[i] = FileGetChar(WAV_fnbr);
 				}  
 				disable_interrupts_pico();
-				flash_range_program(j, (uint8_t *)r, 256);
+				hal_flash_program(j, (uint8_t *)r, 256);
 				enable_interrupts_pico();
 				routinechecks();
 				j+=256;

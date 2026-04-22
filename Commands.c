@@ -36,8 +36,8 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
-#include "hardware/flash.h"
 #include "hardware/dma.h"
+#include "hal/hal_flash.h"
 #include "hardware/structs/watchdog.h"
 #ifdef PICOMITE
 #include "pico/multicore.h"
@@ -1207,7 +1207,7 @@ void MIPS16 cmd_new(void) {
 	FlashLoad=0;
 	uSec(250000);
     FlashWriteInit(PROGRAM_FLASH);
-    flash_range_erase(realflashpointer, MAX_PROG_SIZE);
+    hal_flash_erase(realflashpointer, MAX_PROG_SIZE);
     FlashWriteByte(0); FlashWriteByte(0); FlashWriteByte(0);    // terminate the program in flash
     FlashWriteClose();
 #ifdef PICOMITEVGA

@@ -37,7 +37,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "Operators.h"
 #include "Custom.h"
 #include "Hardware_Includes.h"
-#include "hardware/flash.h"
+#include "hal/hal_flash.h"
 #ifndef PICOMITEWEB
 #include "pico/multicore.h"
 #endif
@@ -742,7 +742,7 @@ int   MIPS16 PrepareProgramExt(unsigned char *p, int i, unsigned char **CFunPtr,
         if(tkn == cmdSUB || tkn == cmdFUN /*|| tkn == cmdCFUN*/ || tkn == cmdCSUB) {         // found a SUB, FUN, CFUNCTION or CSUB token
             if(i >= MAXSUBFUN) {
                 FlashWriteInit(PROGRAM_FLASH);
-                flash_range_erase(realflashpointer, MAX_PROG_SIZE);
+                hal_flash_erase(realflashpointer, MAX_PROG_SIZE);
                 int j=MAX_PROG_SIZE/4;
                 int *pp=(int *)(flash_progmemory);
                     while(j--)if(*pp++ != 0xFFFFFFFF){
