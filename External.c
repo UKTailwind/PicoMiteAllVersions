@@ -2380,19 +2380,21 @@ void MIPS16 cmd_pwm(void){
  * @cond
  * The following section will be excluded from the documentation.
  */
-#ifdef rp2350
-static unsigned char keypad_pins[64]={0};
-int keypadcols=0;
-int keypadrows=0;
-MMFLOAT *PadLookup=NULL;
+/* Keypad state — unified across targets. RP2350 PicoCalc uses an
+ * extended keypad (up to 64 pins, runtime rows/cols, caller-supplied
+ * PadLookup table); RP2040 PicoMite historically exposed only a fixed
+ * 4×4 matrix with a static PadLookup. Using the RP2350 shape on every
+ * target costs 56 extra static bytes of keypad_pins[] + a pointer and
+ * a const 128-byte lookup table in flash — negligible on RP2040 and
+ * lets core run a single code path for both modes (legacy mode just
+ * initialises keypadrows=keypadcols=4 + PadLookup=PadLookupDefault). */
+static unsigned char keypad_pins[64] = {0};
+int keypadcols = 0;
+int keypadrows = 0;
+MMFLOAT *PadLookup = NULL;
 MMFLOAT *KeypadVar;
-const MMFLOAT PadLookupDefault[16] = { 1.0, 2.0, 3.0, 20.0, 4.0, 5.0, 6.0, 21.0, 7.0, 8.0, 9.0, 22.0, 10.0, 0.0, 11.0, 23.0 };
-#else
-static char keypad_pins[8]={0};
-MMFLOAT *KeypadVar;
-#define keypadcols 4
-#define keypadrows 4
-#endif
+const MMFLOAT PadLookupDefault[16] = { 1.0, 2.0, 3.0, 20.0, 4.0, 5.0, 6.0, 21.0,
+                                        7.0, 8.0, 9.0, 22.0, 10.0, 0.0, 11.0, 23.0 };
 unsigned char *KeypadInterrupt = NULL;
 void KeypadClose(void);
 /*  @endcond */
@@ -2404,14 +2406,9 @@ void cmd_keypad(void) {
         KeypadClose();
     else {
         getargs(&cmdline, 19, (unsigned char *)",");
-#ifdef rp2350
         if(argc==13){ // new format map%(c,r),variable,interrupt, startcolpin, nocols, startrowpin, norows
             MMFLOAT *a1float=NULL;
-            #ifdef rp2350
             int dims[MAXDIM]={0};
-            #else
-            short dims[MAXDIM]={0};
-            #endif
             KeypadInterrupt = GetIntAddress(argv[4]);					// get the interrupt location
             keypadrows=getint(argv[8],1,31);
             keypadcols=getint(argv[12],1,31);
@@ -2451,7 +2448,6 @@ void cmd_keypad(void) {
             PadLookup=(MMFLOAT *)PadLookupDefault;
             keypadcols=4;
             keypadrows=4;
-#endif
             if(argc%2 == 0 || argc < 17) error("Invalid syntax");
             if(KeypadInterrupt != NULL) error("Already open");
             KeypadVar = findvar(argv[0], V_FIND);
@@ -2474,9 +2470,7 @@ void cmd_keypad(void) {
                 ExtCfg(j, EXT_COM_RESERVED, 0);
                 keypad_pins[i] = j;
             }
-#ifdef rp2350
         }
-#endif
     }
 }
 
@@ -2486,18 +2480,14 @@ void cmd_keypad(void) {
  */
 
 void KeypadClose(void) {
-    int i;
     if(KeypadInterrupt == NULL) return;
-#ifdef rp2350
-    keypadcols=0;
-    keypadrows=0;
-//    PadLookup=NULL;
-    for(i = 0; i < 64; i++) {
-#else
-    for(i = 0; i < 8; i++) {
-#endif
+    keypadcols = 0;
+    keypadrows = 0;
+    /* Slots 8..63 are only ever written on extended-mode boards; the
+     * check is a harmless zero-test on legacy 4×4 targets. */
+    for(int i = 0; i < 64; i++) {
         if(keypad_pins[i]) {
-            ExtCfg(keypad_pins[i], EXT_NOT_CONFIG, 0);				// all set to unconfigured
+            ExtCfg(keypad_pins[i], EXT_NOT_CONFIG, 0);
         }
     }
     KeypadInterrupt = NULL;
@@ -2507,9 +2497,9 @@ void KeypadClose(void) {
 int KeypadCheck(void) {
     static unsigned char count = 0, keydown = false;
     int rows, cols;
-#ifndef rp2350
-    const char PadLookup[16] = { 1, 2, 3, 20, 4, 5, 6, 21, 7, 8, 9, 22, 10, 0, 11, 23 };
-#endif
+    /* PadLookup is a file-scope MMFLOAT* populated by cmd_keypad; the
+     * legacy-mode path sets it to PadLookupDefault. No per-target
+     * fallback declaration is needed here. */
     if(count++ % 64) return false;                                  // only check every 64 loops through the interrupt processor
 
     for(cols = keypadrows; cols < keypadrows+keypadcols; cols++) {   
@@ -2536,134 +2526,10 @@ exitcheck:
     PinSetBit(keypad_pins[cols], ODCSET);
     return false;
 }
-#if defined(PICOMITE) && defined(rp2350)
-const unsigned char localkeymap[10][5]={
-{1,2,3,4,5},
-{6,7,8,9,10},
-{11,12,13,14,15},
-{16,17,18,19,20},
-{21,22,23,24,25},
-{26,27,28,29,30},
-{31,32,33,34,35},
-{36,37,38,39,40},
-{41,42,43,44,45},
-{46,47,48,49,50}
-};
-const unsigned char asciimapl[51]={
-    255,
-    '1','q','a','z',255,
-    '2','w','s','x',255,
-    '3','e','d','c',255,
-    '4','r','f','v',' ',
-    '5','t','g','b',',',
-    '6','y','h','n','.',
-    '7','u','j','m',';',
-    '8','i','k',0x80,0x81,
-    '9','o','l','=',0x82,
-    '0','p',8,13,0x83
-};
-const unsigned char asciimapu[51]={
-    255,
-    '!','Q','A','Z',255,
-    '"','W','S','X',255,
-    '#','E','D','C',255,
-    '$','R','F','V',' ',
-    '%','T','G','B','<',
-    '^','Y','H','N','>',
-    '&','U','J','M',':',
-    '*','I','K',0x80,0x81,
-    '(','O','L','+',0x82,
-    ')','P',8,13,0x83
-};
-const unsigned char asciimapfl[51]={
-    255,
-    0x91,'@','a','z',255,
-    0x92,'~','s','x',9,
-    0x93,'`','d','c',255,
-    0x94,'|','f','v',' ',
-    0x95,'{','g','b','\\',
-    0x96,'}','h','n','_',
-    0x97,'[','j','m','\'',
-    0x98,']','k',0x88,0x89,
-    0x99,0x9B,'-','/',0x86,
-    0x9A,0x9C,127,27,0x87
-};
-const unsigned char asciimapfu[51]={
-    255,
-    0xB1,'@','a','z',255,
-    0xB2,'~','s','x',9,
-    0xB3,'`','d','c',255,
-    0xB4,'|','f','v',' ',
-    0xB5,'{','g','b','\\',
-    0xB6,'}','h','n','_',
-    0xB7,'[','j','m','\'',
-    0xB8,']','k',0x88,0x89,
-    0xB9,0xBB,'-','/',0x86,
-    0xBA,0xBC,127,27,0x87
-};
-bool checkpressedtime(int count){
-    if(!count)return false;
-    if(count==1)return true;
-    if(count==Option.RepeatStart/LOCALKEYSCANRATE)return true;
-    if(count >= (Option.RepeatStart+Option.RepeatRate)/LOCALKEYSCANRATE && 
-    (count-Option.RepeatStart/LOCALKEYSCANRATE) % (Option.RepeatRate/LOCALKEYSCANRATE)==0)return true;
-    return false;
-}
-void cmd_keyscan(void){
-    static bool shift=false, function=false, s_lock=false, ctrl=false ;//, alt=false, light=true;
-    int key=0;
-    static unsigned short pressed[51]={0};
-    for(int cols = 31; cols < 41; cols++) {   
-            PinSetBit(PINMAP[cols], ODCCLR);                      // pull it low
-            for(int rows = 26; rows < 31; rows++) {   
-                int index=localkeymap[cols-31][rows-26];
-                if(PinRead((unsigned char)PINMAP[rows]) == 0) {                  // if it is low we have found a keypress
-                    pressed[index]++;
-                } else pressed[index]=0;
-            }
-            PinSetBit(PINMAP[cols], ODCSET);                      // wasn't this pin, clear the pulldown
-    }
-    function=pressed[15] ? true : false;
-    shift=pressed[5] ? true : false;
-    ctrl=pressed[10] ? true : false;
-    if(function && pressed[5]==1){
-        hal_pin_bank_xor_mask((uint64_t)1<<24);
-        s_lock^=1;
-
-    }
-//    if(pressed[13]==1){
-//        light^=1;
-//        setpwm(PINMAP[43], &KeyboardlightChannel, &KeyboardlightSlice, 50000.0, light ? Option.KeyboardBrightness: 0);
-//    }
-    LocalKeyDown[6]= (ctrl ? 2: 0) |
-    (function ? 4: 0) |
-    (shift ? 8: 0);
-
-    for(int i=1;i<=50;i++){
-        if(checkpressedtime(pressed[i])){
-            if(function)key=(s_lock ^ shift) ? asciimapfu[i]: asciimapfl[i];
-            else key=(s_lock ^ shift) ? asciimapu[i]: asciimapl[i];
-            if(ctrl && (key>='a' && key<='z'))key-=('a'-1);
-            if(ctrl && key>='A' && key<='Z')key-=('A'-1);
-            if (key == BreakKey) { // if the user wants to stop the progran
-                MMAbort = true; // set the flag for the interpreter to see
-                ConsoleRxBufHead = ConsoleRxBufTail; // empty the buffer
-                // break;
-            } else {
-                ConsoleRxBuf[ConsoleRxBufHead] = key; // store the byte in the ring buffer
-                if (ConsoleRxBuf[ConsoleRxBufHead] == keyselect && KeyInterrupt != NULL) {
-                    Keycomplete = true;
-                } else {
-                    ConsoleRxBufHead = (ConsoleRxBufHead + 1) % CONSOLE_RX_BUF_SIZE; // advance the head of the queue
-                    if (ConsoleRxBufHead == ConsoleRxBufTail) { // if the buffer has overflowed
-                        ConsoleRxBufTail = (ConsoleRxBufTail + 1) % CONSOLE_RX_BUF_SIZE; // throw away the oldest char
-                }
-                }
-            }
-        }
-    }
-}
-#endif
+/* cmd_keyscan() (PicoCalc hardware-keypad scanner) + its keymap tables
+ * moved to ports/pico_rp2350/picocalc_keypad.c. Only linked on
+ * COMPILE=PICORP2350 and PICOUSBRP2350; other targets never reference
+ * the symbol (the one caller in PicoMite.c is itself gated). */
 
 
 /****************************************************************************************************************************
@@ -3431,11 +3297,7 @@ void cmd_adc(void){
          * RP2350, short on RP2040) to match each platform's native
          * array-dim representation. Gate stays until parseintegerarray
          * is unified. */
-#ifdef rp2350
         int dims[MAXDIM]={0};
-#else
-        short dims[MAXDIM]={0};
-#endif
         int card1=parseintegerarray(argv[0], &adcval, 1, 1, dims, true);
         adcint1=(uint8_t *)adcval;
         adcval=NULL;

@@ -589,22 +589,27 @@ uint64_t crc64(const uint8_t *array, uint16_t length, const uint64_t polynome,
   if (reverseOut) crc = reverse64(crc);
   return crc;
 }
-#ifdef rp2350
+/* Widening copy from g_vartbl[].dims into caller's int dims[MAXDIM]. The
+ * sizeof() branch is a compile-time constant: on RP2350 (int dims in the
+ * var table) the memcpy path survives; on RP2040 (short dims) the loop
+ * path does. Dead-code elimination keeps one per target — no #ifdef. */
+static inline void vartbl_copy_dims_to_int(int *dst) {
+    if (sizeof(g_vartbl[0].dims[0]) == sizeof(int)) {
+        memcpy(dst, g_vartbl[g_VarIndex].dims, MAXDIM * sizeof(int));
+    } else {
+        for (int k = 0; k < MAXDIM; k++) dst[k] = g_vartbl[g_VarIndex].dims[k];
+    }
+}
+
 int parseintegerarray(unsigned char *tp, int64_t **a1int, int argno, int dimensions, int *dims, bool ConstantNotAllowed){
-#else
-int parseintegerarray(unsigned char *tp, int64_t **a1int, int argno, int dimensions, short *dims, bool ConstantNotAllowed){
-#endif
 	void *ptr1 = NULL;
 	int i,j;
+	int local_dims[MAXDIM];
 	ptr1 = findvar(tp, V_FIND | V_EMPTY_OK | V_NOFIND_ERR);
 	if((g_vartbl[g_VarIndex].type & T_CONST) && ConstantNotAllowed) error("Cannot change a constant");
-	if(dims==NULL)dims=g_vartbl[g_VarIndex].dims;
+	if(dims==NULL)dims=local_dims;
 	if(g_vartbl[g_VarIndex].type & T_INT) {
-#ifdef rp2350
-		memcpy(dims,g_vartbl[g_VarIndex].dims, MAXDIM * sizeof(int));
-#else
-		memcpy(dims,g_vartbl[g_VarIndex].dims, MAXDIM * sizeof(short));
-#endif
+		vartbl_copy_dims_to_int(dims);
 		*a1int = (int64_t *)ptr1;
 		if((uint32_t)ptr1!=(uint32_t)g_vartbl[g_VarIndex].val.s)error("Syntax");
 	} else error("Argument % must be an integer array",argno);
@@ -617,22 +622,15 @@ int parseintegerarray(unsigned char *tp, int64_t **a1int, int argno, int dimensi
 	}
 	return card;
 }
-#ifdef rp2350
 int parsestringarray(unsigned char *tp, unsigned char **a1str, int argno, int dimensions, int *dims, bool ConstantNotAllowed, unsigned char *length){
-#else
-int parsestringarray(unsigned char *tp, unsigned char **a1str, int argno, int dimensions, short *dims, bool ConstantNotAllowed, unsigned char *length){
-#endif
 	void *ptr1 = NULL;
 	int i,j;
+	int local_dims[MAXDIM];
 	ptr1 = findvar(tp, V_FIND | V_EMPTY_OK | V_NOFIND_ERR);
 	if((g_vartbl[g_VarIndex].type & T_CONST) && ConstantNotAllowed) error("Cannot change a constant");
-	if(dims==NULL)dims=g_vartbl[g_VarIndex].dims;
+	if(dims==NULL)dims=local_dims;
 	if(g_vartbl[g_VarIndex].type & T_STR) {
-#ifdef rp2350
-		memcpy(dims,g_vartbl[g_VarIndex].dims, MAXDIM * sizeof(int));
-#else
-		memcpy(dims,g_vartbl[g_VarIndex].dims, MAXDIM * sizeof(short));
-#endif
+		vartbl_copy_dims_to_int(dims);
 		*length=g_vartbl[g_VarIndex].size;
 		*a1str = (unsigned char *)ptr1;
 		if((uint32_t)ptr1!=(uint32_t)g_vartbl[g_VarIndex].val.s)error("Syntax");
@@ -647,22 +645,15 @@ int parsestringarray(unsigned char *tp, unsigned char **a1str, int argno, int di
 	return card;
 }
 
-#ifdef rp2350
 int parsenumberarray(unsigned char *tp, MMFLOAT **a1float, int64_t **a1int, int argno, int dimensions, int *dims, bool ConstantNotAllowed){
-#else
-int parsenumberarray(unsigned char *tp, MMFLOAT **a1float, int64_t **a1int, int argno, short dimensions, short *dims, bool ConstantNotAllowed){
-#endif
 	void *ptr1 = NULL;
 	int i,j;
+	int local_dims[MAXDIM];
 	ptr1 = findvar(tp, V_FIND | V_EMPTY_OK | V_NOFIND_ERR);
 	if((g_vartbl[g_VarIndex].type & T_CONST) && ConstantNotAllowed) error("Cannot change a constant");
-	if(dims==NULL)dims=g_vartbl[g_VarIndex].dims;
+	if(dims==NULL)dims=local_dims;
 	if(g_vartbl[g_VarIndex].type & (T_INT | T_NBR)) {
-#ifdef rp2350
-		memcpy(dims,g_vartbl[g_VarIndex].dims, MAXDIM * sizeof(int));
-#else
-		memcpy(dims,g_vartbl[g_VarIndex].dims, MAXDIM * sizeof(short));
-#endif
+		vartbl_copy_dims_to_int(dims);
 		if(g_vartbl[g_VarIndex].type & T_NBR) *a1float = (MMFLOAT *)ptr1;
 		else *a1int=(int64_t *)ptr1;
 		if((uint32_t)ptr1!=(uint32_t)g_vartbl[g_VarIndex].val.s)error("Syntax");
@@ -676,22 +667,15 @@ int parsenumberarray(unsigned char *tp, MMFLOAT **a1float, int64_t **a1int, int 
 	}
 	return card;
 }
-#ifdef rp2350
 int parsefloatrarray(unsigned char *tp, MMFLOAT **a1float, int argno, int dimensions, int *dims, bool ConstantNotAllowed){
-#else
-int parsefloatrarray(unsigned char *tp, MMFLOAT **a1float, int argno, int dimensions, short *dims, bool ConstantNotAllowed){
-#endif
 	void *ptr1 = NULL;
 	int i,j;
+	int local_dims[MAXDIM];
 	ptr1 = findvar(tp, V_FIND | V_EMPTY_OK | V_NOFIND_ERR);
 	if((g_vartbl[g_VarIndex].type & T_CONST) && ConstantNotAllowed) error("Cannot change a constant");
-	if(dims==NULL)dims=g_vartbl[g_VarIndex].dims;
+	if(dims==NULL)dims=local_dims;
 	if(g_vartbl[g_VarIndex].type & T_NBR) {
-#ifdef rp2350
-		memcpy(dims,g_vartbl[g_VarIndex].dims, MAXDIM * sizeof(int));
-#else
-		memcpy(dims,g_vartbl[g_VarIndex].dims, MAXDIM * sizeof(short));
-#endif
+		vartbl_copy_dims_to_int(dims);
 		*a1float = (MMFLOAT *)ptr1;
 		if((uint32_t)ptr1!=(uint32_t)g_vartbl[g_VarIndex].val.s)error("Syntax");
 	} else error("Argument % must be a floating point array",argno);
@@ -1000,11 +984,7 @@ void cmd_math(void){
     MMFLOAT f;
     long long int i64;
     unsigned char *s;
-	#ifdef rp2350
 	int dims[MAXDIM]={0};
-	#else
-	short dims[MAXDIM]={0};
-	#endif
 
 	skipspace(cmdline);
 	if(toupper(*cmdline)=='S'){
@@ -1885,11 +1865,7 @@ void retComplex(fcplx in){
 
 void fun_math(void){
 	unsigned char *tp, *tp1;
-#ifdef rp2350
 	int dims[MAXDIM]={0};
-#else
-	short dims[MAXDIM]={0};
-#endif
 	skipspace(ep);
 	if(toupper(*ep)=='P'){
 		tp = checkstring(ep, (unsigned char *)"PID");
@@ -2746,11 +2722,7 @@ bool Fft_transformRadix2(double complex vec[], size_t n, bool inverse) {
 void cmd_FFT(unsigned char *pp){
     unsigned char *tp;
 	PI = atan2(1, 1) * 4;
-#ifdef rp2350
 	int dims[MAXDIM]={0};
-#else
-	short dims[MAXDIM]={0};
-#endif
     cplx *a1cplx=NULL, *a2cplx=NULL;
     MMFLOAT *a3float=NULL, *a4float=NULL, *a5float;
     int i, card1,card2, powerof2=0;

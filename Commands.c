@@ -283,11 +283,7 @@ void array_set(unsigned char *tp){
     MMFLOAT f;
     long long int i64;
     unsigned char *s;
-	#ifdef rp2350
 	int dims[MAXDIM]={0};
-	#else
-	short dims[MAXDIM]={0};
-	#endif
 	int i,t,copy,card1=1;
 	unsigned char size=0;
 	MMFLOAT *a1float=NULL;
@@ -326,11 +322,7 @@ void array_add(unsigned char *tp){
     MMFLOAT f;
     long long int i64;
     unsigned char *s;
-	#ifdef rp2350
 	int dims[MAXDIM]={0};
-	#else
-	short dims[MAXDIM]={0};
-	#endif
 	int i,t,card1=1, card2=1;
 	MMFLOAT *a1float=NULL,*a2float=NULL, scale;
 	int64_t *a1int=NULL, *a2int=NULL;
@@ -401,7 +393,7 @@ void array_insert(unsigned char *tp){
 #ifdef rp2350
     int dims[MAXDIM]={0}; 
 #else
-    short dims[MAXDIM]={0};
+    int dims[MAXDIM]={0};
 #endif
 	getargs(&tp, 15,(unsigned char *)",");
 	if(argc<7)error("Argument count");
@@ -473,11 +465,7 @@ void array_slice(unsigned char *tp){
 	MMFLOAT *afloat=NULL;
 	unsigned char *a1str=NULL,*a2str=NULL;
 	unsigned char size=0,size2=0;
-#ifdef rp2350
     int dims[MAXDIM]={0};
-#else
-    short dims[MAXDIM]={0};
-#endif
 	getargs(&tp, 15,(unsigned char *)",");
 	if(argc<7)error("Argument count");
 	findvar(argv[0], V_FIND | V_EMPTY_OK | V_NOFIND_ERR);
@@ -3672,7 +3660,7 @@ const char *ParseStructMember(unsigned char *p, struct s_structdef *sd) {
     int namelen = 0;
     int type = T_NOTYPE;
     int size = 0;
-    short dims[MAXDIM] = {0};
+    int dims[MAXDIM] = {0};
     int ndims = 0;
     int array_elements = 1;
 
@@ -4505,11 +4493,9 @@ void MIPS16 cmd_struct(void) {
 // Host-safe: uses void* throughout instead of upstream's uint32_t (which
 // truncates on 64-bit).  STRUCTENABLED paths are omitted — TYPE/STRUCT is
 // not yet ported.
-#ifdef rp2350
+/* Unified `int *dims` parameter; matches the rest of the Commands.c
+ * REDIM pipeline after the parseintegerarray signature unification. */
 static void parse_and_strip(char *string, int *dims)
-#else
-static void parse_and_strip(char *string, short *dims)
-#endif
 {
     for (int i = 0; i < MAXDIM; i++) dims[i] = 0;
     char *open  = strchr(string, '(');
@@ -4542,11 +4528,10 @@ static void parse_and_strip(char *string, short *dims)
     }
 }
 
-#ifdef rp2350
+/* array_comp takes the caller's unified `int dims[MAXDIM]` on every
+ * target; the two inputs are scratch buffers filled by parseintegerarray
+ * / findvar dim copies, not the var-table fields directly. */
 static bool array_comp(int in[MAXDIM], int out[MAXDIM])
-#else
-static bool array_comp(short in[MAXDIM], short out[MAXDIM])
-#endif
 {
     int last_in = -1, last_out = -1;
     for (int i = MAXDIM - 1; i >= 0; i--) {
@@ -4606,13 +4591,8 @@ static void *redim_erase_var(char *p, bool nofree) {
 }
 
 void cmd_redim(void) {
-#ifdef rp2350
-    int   dims[MAXDIM]    = {0};
-    int   newdims[MAXDIM] = {0};
-#else
-    short dims[MAXDIM]    = {0};
-    short newdims[MAXDIM] = {0};
-#endif
+    int dims[MAXDIM]    = {0};
+    int newdims[MAXDIM] = {0};
     void *oldmemory = NULL, *newmemory = NULL;
     int oldsize = 0, newsize = 0;
     int length  = -1;

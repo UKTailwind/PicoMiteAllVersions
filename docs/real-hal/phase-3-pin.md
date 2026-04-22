@@ -1,6 +1,6 @@
-# Real HAL — Phase 3: `hal_pin` (pins / PWM / ADC) 🔧 (93% — F2 fixup)
+# Real HAL — Phase 3: `hal_pin` (pins / PWM / ADC) ✅ (F2 closed)
 
-**Status:** infrastructure landed (3a). The first elimination attempt (old "3b") was reverted. The corrected elimination (fixup plan F2, seven sub-steps) has driven External.c target ifdefs from **120 → 8** — a 93% reduction. Eight ifdefs remain, deferred: six KEYPAD extended-vs-legacy gates, one PicoCalc keymap data block, and one ADC-RUN dims-type split (the last blocked on MATHS.c `parseintegerarray`/`parsefloatrarray` signature unification).
+**Status:** infrastructure landed (3a); the first elimination attempt (old "3b") was reverted; the corrected elimination (fixup plan F2, eight sub-steps) drove External.c target-macro ifdefs from **120 → 0**. External.c is promoted to `STRICT_FILES` in `tools/check_hal_purity.sh` — the purity gate now rejects any future target-macro or port-config-macro ifdef added to External.c.
 
 HAL API surface and call-site migration landed. The HAL contract is complete and both device and host impls exist. What remains is eliminating the `#ifdef` blocks from core files — the conditional bodies need to move *into* HAL implementations and driver files so core calls a single function with no target branching.
 
@@ -40,17 +40,24 @@ Commits `2c034d7` and `61cb08e` claimed to eliminate 79 ifdefs via a port-config
 | F2a 3e | `e59f02d` | ADC OPEN `rp2350a` + MOUSE/GAMEPAD stubs | −3 |
 | F2a 3f | `1b9ce12` | MQTT + `CollisionFound` unconditional | −3 |
 | F2a 3g | `30f4f84` | `setBacklight` unified + NEXTGEN unconditional | −6 |
-| **total** | | | **−115 (120 → 8 → deferred = 5?)** see note |
+| F2a 3h | (this session) | KEYPAD unification + PicoCalc keymap → per-port + MATHS.c dims widening | −8 |
+| **total** | | | **−120 (120 → 0)** |
 
-Ongoing target-macro count at HEAD: **8 in External.c** (down from the F1 baseline of 120).
+Ongoing target-macro count at HEAD: **0 in External.c**. Two `#ifdef GUICONTROLS` blocks remain — not counted (GUICONTROLS is a feature flag, not a target macro).
 
-## What's deferred (F2 close blockers)
+## F2a step 3h (final) — how the last eight landed
 
-The last 8 ifdefs all need broader refactors that would cascade beyond External.c:
+- **`parseintegerarray` / `parsefloatrarray` / `parsestringarray` / `parsenumberarray` signature unification** (MATHS.c). All four functions now take `int *dims` on every target. The function body's memcpy from `g_vartbl[].dims` (still `short` on RP2040, `int` on RP2350) into the caller's dim buffer is guarded by a compile-time `sizeof(g_vartbl[0].dims[0]) == sizeof(int)` check that dead-code-eliminates into a straight memcpy on RP2350 and an element-by-element widening copy on RP2040. Zero RAM impact — var-table field stays `short` on RP2040. Small, bounded CPU cost (a 5-iteration widening copy in a function already doing variable lookup and type checks). No preprocessor gate.
+- **All callers** (`External.c`, `Commands.c`, `MATHS.c`, `Custom.c`) now declare `int dims[MAXDIM]` unconditionally. Matching `array_comp` / `parse_and_strip` signatures in Commands.c unified too.
+- **KEYPAD extended mode** (cmd_keypad / KeypadClose / KeypadCheck) now runs on every target. `keypad_pins[64]`, `keypadrows`/`keypadcols` (runtime int), `PadLookup` (MMFLOAT*), and `PadLookupDefault[16]` are all unconditional globals. Legacy-mode path in cmd_keypad sets `keypadrows=keypadcols=4` + `PadLookup=PadLookupDefault` — identical behaviour to the old RP2040 macros. Static RAM cost: 56 extra bytes for `keypad_pins[]` + 132 bytes for `PadLookupDefault[]` const in flash.
+- **PicoCalc keymap + cmd_keyscan** (128 lines of `localkeymap[][]` / `asciimapl/u/fl/fu[]` + `cmd_keyscan`) moved to `ports/pico_rp2350/picocalc_keypad.c`. Only `COMPILE=PICORP2350` and `COMPILE=PICOUSBRP2350` link it; the one caller in PicoMite.c is already gated so no link surprise on other targets.
 
-- **KEYPAD extended-vs-legacy mode** (6 ifdefs at External.c:2377–2504). RP2350 has a runtime 64-pin keypad with `keypadrows`/`keypadcols`/`PadLookup` globals and a new `argc==13` parse path; RP2040 is a fixed 4×4 keypad with `#define keypadcols 4`. Unification requires either moving `cmd_keypad` / `KeypadClose` / `KeypadCheck` into a per-port `.c` or pushing everything through a `hal_keypad_*` surface. User-directed deferral.
-- **PicoCalc keymap / asciimap data block** (External.c:2533, 128 lines of `const unsigned char localkeymap[][]` + `cmd_keyscan`). Whole block should move to `ports/pico_rp2350/picocalc_keypad.c` or `ports/pico_rp2350/pin_tables.c`.
-- **ADC RUN `dims` type split** (External.c:3428). `parseintegerarray` and `parsefloatrarray` take `short *dims` on RP2040 and `int *dims` on RP2350. Unifying requires touching `MATHS.h`/`MATHS.c` signatures + the variable-table struct's `dims[MAXDIM]` field in `MMBasic.h` (from `short` to `int` everywhere). That costs ~10 bytes per variable × MAXVARS, which is a real RAM hit on RP2040. Needs explicit RAM-budget sign-off before the switch.
+## Exit gate — PASSED
+
+- `External.c`: zero `#if*` directives on target or port-config macros. (Two `#ifdef GUICONTROLS` remain — not in scope.)
+- `External.c` added to `STRICT_FILES` in `tools/check_hal_purity.sh`; gate green.
+- Host `mmbasic_test` 239/239, all 12 device CMake variants build clean.
+- Scoreboard grand total: **602 → 476** (−126 since F1 baseline).
 
 ## Exit gate
 

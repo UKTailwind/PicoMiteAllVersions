@@ -179,7 +179,10 @@ elseif (COMPILE STREQUAL "WEB")
 	target_sources(PicoMite PRIVATE ports/web/pin_tables.c)
 elseif (COMPILE STREQUAL "PICORP2350" OR COMPILE STREQUAL "PICOUSBRP2350")
 	target_include_directories(PicoMite PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/ports/pico_rp2350)
-	target_sources(PicoMite PRIVATE ports/pico_rp2350/pin_tables.c)
+	target_sources(PicoMite PRIVATE
+		ports/pico_rp2350/pin_tables.c
+		ports/pico_rp2350/picocalc_keypad.c
+	)
 elseif (COMPILE STREQUAL "VGARP2350" OR COMPILE STREQUAL "VGAUSBRP2350")
 	target_include_directories(PicoMite PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/ports/vga_rp2350)
 	target_sources(PicoMite PRIVATE ports/vga_rp2350/pin_tables.c)

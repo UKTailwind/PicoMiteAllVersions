@@ -390,11 +390,7 @@ int getGPpin(unsigned char *pinarg, int pio, int base){
 /*  @endcond */
 void MIPS16 cmd_pio(void){
     unsigned char *tp;
-    #ifdef rp2350
     int dims[MAXDIM]={0};
-    #else
-    short dims[MAXDIM]={0};
-    #endif
     tp = checkstring(cmdline, (unsigned char *)"EXECUTE");
     if(tp){
         int i;

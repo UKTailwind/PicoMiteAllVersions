@@ -85,7 +85,7 @@ PORT_IFDEF_RE="${ALL_IFDEF_RE}.*\\b(HAL_PORT_[A-Za-z0-9_]+|PORT_[A-Za-z0-9_]+)\\
 # Files whose purity is currently enforced (fail on any hit).
 # Empty at Phase 0 start — populated as phases migrate files.
 STRICT_FILES=(
-  # hal/*.h is checked dynamically below.
+  External.c  # F2 close: zero target-macro, zero port-config ifdefs.
 )
 
 # Files tracked informationally (report counts, do not fail).
