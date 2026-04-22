@@ -52,6 +52,11 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 extern uint8_t pioTXlast[4][3];
 extern char *pioRXinterrupts[4][3];
 extern char *pioTXinterrupts[4][3];
+/* closeMQTT is the only WEB-ish symbol core code needs to reference
+ * unconditionally (ClearExternalIO calls it during teardown). The
+ * strong implementation lives in MMMqtt.c on WEB builds; MM_Misc.c
+ * provides a no-op fallback on every other target. */
+extern void closeMQTT(void);
 #ifdef PICOMITEWEB
 	extern void GetNTPTime(void);
 	extern void checkTCPOptions(void);

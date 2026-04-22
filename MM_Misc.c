@@ -110,9 +110,14 @@ struct s_inttbl inttbl[NBRINTERRUPTS];
 unsigned char *InterruptReturn;
 extern const char *FErrorMsg[];
 uint8_t *buff320=NULL;
+/* MQTT state globals. Defined on every target so MMBasic's interrupt
+ * dispatch (which runs in core) can reference them without gating.
+ * Only PICOMITEWEB actually populates them from MMMqtt.c; elsewhere
+ * they stay at their initialisers. closeMQTT is strong-linked in
+ * MMMqtt.c on WEB and falls back to the stub below otherwise. */
+char *MQTTInterrupt = NULL;
+volatile bool MQTTComplete = false;
 #ifdef PICOMITEWEB
-	char *MQTTInterrupt=NULL;
-	volatile bool MQTTComplete=false;
     char *UDPinterrupt=NULL;
     volatile bool UDPreceive=false;
     void setwifi(unsigned char *tp){
@@ -186,6 +191,12 @@ void VGArecovery(int pin){
 #endif
     }
 #endif
+#endif
+#ifndef PICOMITEWEB
+/* Non-WEB targets lack the lwIP MQTT stack. Stub closeMQTT() so core's
+ * ClearExternalIO teardown can call it unconditionally; on WEB the
+ * real implementation in MMMqtt.c links instead. */
+void closeMQTT(void) {}
 #endif
 extern const uint8_t *flash_target_contents;
 int TickPeriod[NBRSETTICKS]={0};

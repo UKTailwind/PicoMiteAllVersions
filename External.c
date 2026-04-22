@@ -3838,17 +3838,15 @@ void MIPS16 ClearExternalIO(void) {
     nunchuck1=0;
     classicread=false;
     nunchuckread=false;
-#ifdef PICOMITEWEB
-    MQTTInterrupt=NULL;
-    MQTTComplete=0;
+    /* MQTT/Collision state resets. All three globals exist on every
+     * target (MM_Misc.c / Draw.c); on ports without MQTT or collision
+     * detection these stay at their init values after the reset.
+     * closeMQTT is real on PICOMITEWEB and a stub elsewhere. */
+    MQTTInterrupt = NULL;
+    MQTTComplete = 0;
     closeMQTT();
-#endif
-#ifndef PICOMITEWEB
-#ifdef PICOMITEVGA
     CollisionFound = false;
-    COLLISIONInterrupt=NULL;
-#endif
-#endif
+    COLLISIONInterrupt = NULL;
 #ifdef GUICONTROLS
     gui_int_down = false;
     gui_int_up = false;
