@@ -182,22 +182,37 @@ The surface shrank during Phase 5 once the landscape was mapped: every keyboard 
 
 ---
 
-## `hal_audio.h` — tone + sample + codec (Phase 6)
+## `hal_audio.h` — tone + sound + stop + volume + pause + resume (Phase 6)
 
-*Status: sketch; finalised in Phase 6.*
+*Status: Phase 6a landed — top-level BASIC PLAY commands routed through the HAL on host. Device arm migration + `hal_audio_sample_push` (WAV/MP3/FLAC/MOD streaming) + driver relocation (`drivers/pwm_synth/`, `drivers/vs1053/`) deferred to Phase 6b/6c.*
 
 ```c
-int hal_audio_init(void);
-int hal_audio_tone(uint channel, uint freq_hz, uint8_t vol_pct);
-int hal_audio_sound(uint slot, uint freq_hz, uint8_t vol_pct, hal_sound_wave_t wave);
-int hal_audio_sample_push(const int16_t *samples, size_t frames);
-int hal_audio_stop(uint channel_or_slot);
-int hal_audio_set_master_volume(uint8_t vol_pct);
-int hal_audio_pause(void);
-int hal_audio_resume(void);
+void hal_audio_init(void);
+void hal_audio_tone(double left_hz, double right_hz,
+                    int has_duration, long long duration_ms);
+void hal_audio_sound(int slot, const char *ch, const char *type,
+                     double freq_hz, int volume);
+void hal_audio_stop(void);
+void hal_audio_volume(int left_pct, int right_pct);
+void hal_audio_pause(void);
+void hal_audio_resume(void);
 ```
 
-**Hard part:** WASM's gesture-armed AudioContext (web-host Phase 3). `hal_audio_resume` must be idempotent and callable from any input event path.
+The real signatures grew to match the actual BASIC semantics: independent L/R frequencies for TONE, 1..4 slot numbering with "L"/"R"/"B" channel / "S"|"Q"|"T"|"W"|"O"|"P"|"N" waveform strings for SOUND. Passing channel/waveform as `const char *` keeps the impl from having to re-parse and matches the host_sim_audio function set that the host impl already speaks.
+
+Return type dropped to `void` — the earlier sketch returned `int` but neither backend has a meaningful error to surface at this level (arg validation happens in cmd_play before the HAL call; internal backend failures are diagnostic only).
+
+**Call sites in core (migrated Phase 6a):**
+
+- `Audio.c` host arm (lines 2225–2323) — `cmd_play`, `CloseAudio`, `StopAudio` route through `hal_audio_*` instead of calling `host_sim_audio_*` directly.
+
+**Not yet migrated:**
+
+- `Audio.c` device arm (~2000 lines of PWM / DMA / codec logic). Device `cmd_play` TONE/SOUND/STOP/VOLUME/PAUSE/RESUME handling stays hardware-gated until the `#ifndef MMBASIC_HOST` wrapper is collapsed in Phase 6b.
+- `hal_audio_sample_push(const int16_t *samples, size_t frames)` for WAV/FLAC/MP3/MOD/MIDI streaming — Phase 6b.
+- `drivers/pwm_synth/` + `drivers/vs1053/` physical relocation — Phase 6c.
+
+**Hard part:** WASM's gesture-armed AudioContext (web-host Phase 3). `hal_audio_resume` must be idempotent and callable from any input event path. Both host impls (host_sim_audio.c and host_wasm_audio.c) already honour this; the HAL forwards to them unchanged.
 
 ---
 

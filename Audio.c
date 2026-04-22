@@ -2174,10 +2174,10 @@ void audio_checks(void){
 
 /* Host body: minimal PLAY for --sim (WS-emitted tones / SFX). File-based
  * playback (WAV/FLAC/MP3/MODFILE/MIDI etc.) is rejected at parse time.
- * vm_sys_audio.c's host branch drives the same host_sim_audio_* HAL, so
+ * vm_sys_audio.c's host branch drives the same hal_audio backend, so
  * PLAY TONE via interp and FRUN emit identical events. */
 
-#include "host_sim_audio.h"
+#include "hal/hal_audio.h"
 
 /* CurrentlyPlaying, WAVInterrupt, WAVcomplete are defined in
  * core/state/audio_state.c. */
@@ -2226,20 +2226,20 @@ void MIPS16 cmd_play(void) {
     unsigned char *tp;
 
     if (checkstring(cmdline, (unsigned char *)"STOP")) {
-        host_sim_audio_stop();
+        hal_audio_stop();
         CurrentlyPlaying = P_NOTHING;
         return;
     }
     if (checkstring(cmdline, (unsigned char *)"PAUSE")) {
-        host_sim_audio_pause();
+        hal_audio_pause();
         return;
     }
     if (checkstring(cmdline, (unsigned char *)"RESUME")) {
-        host_sim_audio_resume();
+        hal_audio_resume();
         return;
     }
     if (checkstring(cmdline, (unsigned char *)"CLOSE")) {
-        host_sim_audio_stop();
+        hal_audio_stop();
         CurrentlyPlaying = P_NOTHING;
         return;
     }
@@ -2250,7 +2250,7 @@ void MIPS16 cmd_play(void) {
         if (*argv[0]) vl = getint(argv[0], 0, 100);
         vr = vl;
         if (argc == 3) vr = getint(argv[2], 0, 100);
-        host_sim_audio_volume(vl, vr);
+        hal_audio_volume(vl, vr);
         vol_left = vl;
         vol_right = vr;
         return;
@@ -2271,7 +2271,7 @@ void MIPS16 cmd_play(void) {
         }
         /* Interrupt arg (argv[6]) is ignored on host — WAV interrupts
          * aren't plumbed through --sim. */
-        host_sim_audio_tone((double)f_left, (double)f_right, has_dur, dur_ms);
+        hal_audio_tone((double)f_left, (double)f_right, has_dur, dur_ms);
         CurrentlyPlaying = P_TONE;
         return;
     }
@@ -2292,7 +2292,7 @@ void MIPS16 cmd_play(void) {
         int vol = 25;
         if (argc == 9) vol = getint(argv[8], 0, 25);
         const char *ch = (left && right) ? "B" : (left ? "L" : "R");
-        host_sim_audio_sound(slot, ch, type, (double)f_in, vol);
+        hal_audio_sound(slot, ch, type, (double)f_in, vol);
         CurrentlyPlaying = P_SOUND;
         return;
     }
@@ -2307,13 +2307,13 @@ void MIPS16 cmd_play(void) {
 
 void CloseAudio(int all) {
     (void)all;
-    host_sim_audio_stop();
+    hal_audio_stop();
     CurrentlyPlaying = P_NOTHING;
     WAV_fnbr = 0;
 }
 
 void StopAudio(void) {
-    host_sim_audio_stop();
+    hal_audio_stop();
     CurrentlyPlaying = P_NOTHING;
 }
 
