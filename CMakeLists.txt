@@ -57,7 +57,7 @@ set(PICOMITE_BASE_SOURCES
 	MMBasic_Prompt.c
 	MMBasic_Print.c
 	MMBasic_REPL.c
-	VS1053.c
+	drivers/vs1053/VS1053.c
 	Memory.c
 )
 
