@@ -28,6 +28,11 @@
 #define HAL_PORT_HAS_UPNG                0
 #define HAL_PORT_HAS_DEFINES             0
 
+/* Board-level features. HAL_PORT_HAS_HEARTBEAT is set on boards that
+ * expose a user-configurable heartbeat LED pin. PICOMITEWEB omits it
+ * because the CYW43 wireless chip claims the onboard LED. */
+#define HAL_PORT_HAS_HEARTBEAT           1
+
 /* Hot-path placement: SPI-LCD RP2040 has spare RAM for the GPIO hot loops
  * so we force them into SRAM via __not_in_flash_func. */
 #define HAL_PORT_RAM_FUNC(name)          __not_in_flash_func(name)

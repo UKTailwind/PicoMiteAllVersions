@@ -19,6 +19,8 @@
 #define HAL_PORT_HAS_PSRAM               0
 #define HAL_PORT_HAS_UPNG                0
 #define HAL_PORT_HAS_DEFINES             0
+/* WEB variants claim the onboard LED for the CYW43 radio — no heartbeat. */
+#define HAL_PORT_HAS_HEARTBEAT           0
 
 /* WEB on rp2040 runs lwIP + CYW43 network stacks and can't afford the RAM
  * pressure of pinning GPIO loops in SRAM. Keep them in flash. */

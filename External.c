@@ -35,6 +35,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "port_config.h"
 #include "hal/hal_time.h"
 #include "hal/hal_pin.h"
+#include "hal/hal_fast_timer.h"
 #include "hardware/watchdog.h"
 #include "pico/stdlib.h"
 #include "hardware/clocks.h"
@@ -362,11 +363,7 @@ void HAL_PORT_RAM_FUNC(ExtSet)(int pin, int val) {
         error("Pin %/| is not an output",pin,pin);
 }
 /*  @endcond */
-#if defined(PICOMITEVGA) && !defined(rp2350)
-    void cmd_sync(void){
-#else
-void __not_in_flash_func(cmd_sync)(void){
-#endif
+void HAL_PORT_RAM_FUNC(cmd_sync)(void) {
 	uint64_t i;
     static uint64_t synctime=0,endtime=0;
 	getargs(&cmdline,3,(unsigned char *)",");
@@ -492,12 +489,10 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
         else hal_pin_irq_set_edge(PinDef[pin].GPno, HAL_PIN_EDGE_BOTH, false);
         CallBackEnabled &= (~16);
     }
-    #ifdef rp2350
     if(pin==FAST_TIMER_PIN && ExtCurrentConfig[pin]==EXT_FAST_TIMER){
         slice0=0;
-        pwm_set_irq1_enabled(0, false);
+        hal_fast_timer_disable();
     }
-    #endif
  
 
     // make sure any pullups/pulldowns are removed in case we are changing from a digital input
@@ -743,11 +738,10 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
                                 tris = 0; ana = 1; 
                                 hal_pin_set_drive_mA(PinDef[pin].GPno, 8);
                                 break;
-#ifndef PICOMITEWEB
-        case EXT_HEARTBEAT:     if(!(pin=HEARTBEATpin)) error("Invalid configuration");
-                                tris = 0; ana = 1; 
+        case EXT_HEARTBEAT:     if (!HAL_PORT_HAS_HEARTBEAT) error("Invalid configuration");
+                                if(!(pin=HEARTBEATpin)) error("Invalid configuration");
+                                tris = 0; ana = 1;
                                 break;
-#endif
         case EXT_UART0TX:       if(!(PinDef[pin].mode & UART0TX)) error("Invalid configuration");
                                 if((UART0TXpin!=99)) error("Already Set to pin %",UART0TXpin);
                                 UART0TXpin=pin;
@@ -895,33 +889,17 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
                                 if((PWM11Bpin!=99 && PWM11Bpin!=pin)) error("Blready Set to pin %",PWM11Bpin);
                                 PWM11Bpin=pin;
                                 break;
-#ifdef rp2350
-        /* Fast-timer mode uses PWM_IRQ_WRAP_1 which only exists on RP2350;
-         * the RP2040 hardware has a single PWM_IRQ_WRAP. Leave this case
-         * arm gated until a hal_fast_timer_configure() surface exists to
-         * hide the SDK name difference. */
-        case EXT_FAST_TIMER:    if(!(PinDef[pin].mode & PWM0B)) error("Invalid configuration");
+        case EXT_FAST_TIMER:    if (!hal_fast_timer_available()) error("Invalid configuration");
+                                if(!(PinDef[pin].mode & PWM0B)) error("Invalid configuration");
                                 if((PWM0Bpin!=99 && PWM0Bpin!=pin)) error("Already Set to pin %",PWM0Bpin);
                                 PWM0Bpin=pin;
                                 INT5Count = INT5Value = 0;
-                                INT5Timer = INT5InitTimer = option;  // only used for frequency and period measurement
+                                INT5Timer = INT5InitTimer = option;  /* only used for frequency and period measurement */
                                 tris = 1; ana = 1;
-//                                PinSetBit(pin,TRISSET);
                                 hal_pin_set_input_hysteresis(PinDef[pin].GPno, true);
                                 hal_pin_set_function(PinDef[pin].GPno, HAL_PIN_FUNC_PWM);
-                                pwm_config cfg = pwm_get_default_config();
-                                pwm_config_set_clkdiv_mode(&cfg, PWM_DIV_B_RISING);
-                                pwm_config_set_clkdiv(&cfg, 1);
-                                pwm_init(0, &cfg, false);
-                                pwm_set_wrap(0, 49999);
-                                pwm_clear_irq(0);
-                                irq_set_exclusive_handler(PWM_IRQ_WRAP_1, on_pwm_wrap_1);
-                                irq_set_enabled(PWM_IRQ_WRAP_1, true);
-                                irq_set_priority(PWM_IRQ_WRAP_1,0);
-	                            pwm_set_irq1_enabled(0, true);
-                                pwm_set_enabled(0, true);
+                                hal_fast_timer_configure(49999, on_pwm_wrap_1);
                                 break;
-#endif
         case EXT_I2C0SDA:       if(!(PinDef[pin].mode & I2C0SDA)) error("Invalid configuration");
                                 if(I2C0locked)error("I2C in use for SYSTEM I2C");
                                 if((I2C0SDApin!=99 && I2C0SDApin!=pin)) error("Already Set to pin %",I2C0SDApin);
@@ -1289,12 +1267,10 @@ process:
                             else
                                 option = 1;
                             break;
-#ifdef rp2350
-        case EXT_FAST_TIMER:    if(pin!=FAST_TIMER_PIN)error("Use pin2/GP1 for fast counter");
+        case EXT_FAST_TIMER:    if (!hal_fast_timer_available()) error("Invalid configuration");
+                            if(pin!=FAST_TIMER_PIN)error("Use pin2/GP1 for fast counter");
                             if(BacklightSlice==0)error("Channel in use for LCD backlight");
-#ifdef PICOMITE
                             if(KeyboardlightSlice==0)error("Channel in use for keyboard backlight");
-#endif
                             if(Option.AUDIO_SLICE==0)error("Channel in use for Audio");
                             if(CameraSlice==0)error("Channel in use for Camera");
                             if(argc == 5)
@@ -1302,7 +1278,6 @@ process:
                             else
                                 option = 1000;
                             break;
-#endif
         case EXT_DIG_OUT:
         case EXT_HEARTBEAT:   
                             option=0;
@@ -3759,9 +3734,7 @@ void MIPS16 ClearExternalIO(void) {
     InterruptUsed = false;
 	InterruptReturn = NULL;
     irq_set_enabled(DMA_IRQ_1, false);
-#ifdef rp2350
-    irq_set_enabled(PWM_IRQ_WRAP_1, false);
-#endif
+    hal_fast_timer_disable();
     closeframebuffer('A');
     if(CallBackEnabled==1) picomite_gpio_irq_set_enabled(PinDef[IRpin].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
     else if(CallBackEnabled & 1){
@@ -3843,18 +3816,18 @@ void MIPS16 ClearExternalIO(void) {
 	for(i = 0; i < NBRINTERRUPTS; i++) {
       inttbl[i].pin = 0;                                            // disable all interrupts
   	}
-    #ifndef PICOMITEWEB
-    if(!Option.AllPins){
-        if(CheckPin(41, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED))ExtCfg(41,EXT_DIG_OUT,Option.PWM);
-        if(CheckPin(42, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED))ExtCfg(42,EXT_DIG_IN,0);
-        if(CheckPin(44, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED))ExtCfg(44,EXT_ANA_IN,0);
+    if (HAL_PORT_HAS_HEARTBEAT) {
+        if(!Option.AllPins){
+            if(CheckPin(41, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED))ExtCfg(41,EXT_DIG_OUT,Option.PWM);
+            if(CheckPin(42, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED))ExtCfg(42,EXT_DIG_IN,0);
+            if(CheckPin(44, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED))ExtCfg(44,EXT_ANA_IN,0);
+        }
+        if(CheckPin(HEARTBEATpin, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED) && !Option.NoHeartbeat){
+            hal_pin_init_digital(PinDef[HEARTBEATpin].GPno);
+            hal_pin_set_dir(PinDef[HEARTBEATpin].GPno, HAL_PIN_DIR_OUT);
+            ExtCurrentConfig[PinDef[HEARTBEATpin].pin]=EXT_HEARTBEAT;
+        }
     }
-    if(CheckPin(HEARTBEATpin, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED) && !Option.NoHeartbeat){
-        hal_pin_init_digital(PinDef[HEARTBEATpin].GPno);
-        hal_pin_set_dir(PinDef[HEARTBEATpin].GPno, HAL_PIN_DIR_OUT);
-        ExtCurrentConfig[PinDef[HEARTBEATpin].pin]=EXT_HEARTBEAT;
-    }
-    #endif
     FreeMemorySafe((void **)&ds18b20Timers);
     KeypadInterrupt = NULL;
 
