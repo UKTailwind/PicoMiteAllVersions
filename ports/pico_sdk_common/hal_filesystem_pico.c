@@ -3,9 +3,14 @@
  * for device builds.
  *
  * The PicoMite device exposes two filesystems:
- *   A:   SD card via FatFS (f_* ops, backed by disk_* in mmc_stm32.c)
- *   B:   internal flash via littlefs (lfs_* ops, backed by fs_flash_* in
- *        FileIO.c, cfg in pico_lfs_cfg)
+ *   A:   internal flash via littlefs (lfs_* ops, backed by fs_flash_*
+ *        in FileIO.c, cfg in pico_lfs_cfg)
+ *   B:   SD card via FatFS (f_* ops, backed by disk_* in mmc_stm32.c)
+ *
+ * (The naming is a historical PicoMite convention — A: is the on-chip
+ * flash, B: is the removable SD card. Confirmed by the filepath[]
+ * initialiser in FileIO.c: FatFSFileSystem==0 → A: → LFS,
+ *                         FatFSFileSystem==1 → B: → FatFS.)
  *
  * This adapter inspects the path prefix and routes each POSIX-style op
  * to the correct library. Paths without an explicit drive prefix fall
@@ -91,15 +96,14 @@ static const char *path_after_drive(const char *path)
     return path;
 }
 
-/* Choose which filesystem owns a given path. Only an explicit "A:" or
- * "B:" prefix selects; unprefixed paths default to FatFS (historical
- * behaviour — the boot drive on device). */
+/* Choose which filesystem owns a given path. "A:" -> LFS, "B:" -> FatFS.
+ * Unprefixed paths default to LFS (the historical boot drive). */
 typedef enum { FS_FATFS, FS_LFS } fs_kind_t;
 
 static fs_kind_t path_fs(const char *path)
 {
-    if (path && (path[0] == 'B' || path[0] == 'b') && path[1] == ':') return FS_LFS;
-    return FS_FATFS;
+    if (path && (path[0] == 'B' || path[0] == 'b') && path[1] == ':') return FS_FATFS;
+    return FS_LFS;
 }
 
 /* -- Path ops ---------------------------------------------------------- */

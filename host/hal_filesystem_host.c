@@ -1,215 +1,113 @@
 /*
- * host/hal_filesystem_host.c — hal_filesystem over libc / POSIX for the
- * native + WASM hosts.
+ * host/hal_filesystem_host.c — hal_filesystem on host.
  *
- * No callers yet — this TU exists so the HAL headers compile and link
- * on host as the Phase 4 foundation. FileIO.c callers migrate in a
- * follow-up commit; until then this implementation is dead weight, but
- * it proves the contract maps cleanly to libc (the shape the plan
- * committed to in "hal_fs.h deliberately mirrors POSIX").
+ * The host port already has a dispatch layer (host/host_fs_shims.c)
+ * that routes FatFS-style f_* and host_f_* calls to either real POSIX
+ * (when host_sd_root is set for REPL / --sim) or to the vendored
+ * FatFS running on vm_host_fat's RAM disk (test-harness mode).
  *
- * Note: we undef any mmbasic_* POSIX renames introduced by
- * host_platform.h (timegm/chdir etc.) so we reach real libc here.
+ * Rather than re-implementing that dispatch here, hal_fs_* forwards to
+ * the host_f_* wrappers where they exist, and to the vendored f_* /
+ * host_fs_posix_* otherwise. Errors convert to negative POSIX errno;
+ * FatFS FRESULT values translate via fatfs_rc_to_errno below.
  */
 
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
-#include <fcntl.h>
-#include <unistd.h>
 #include <errno.h>
+#include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
-#include <sys/stat.h>
-#include <dirent.h>
 
-/* host_platform.h renames libc chdir to mmbasic_chdir; undo locally
- * so hal_fs_chdir reaches real libc. */
+#include "ff.h"
+#include "diskio.h"
+
+/* host_platform.h's rename-to-mmbasic_chdir applies to any code that
+ * includes it; hal_filesystem_host.c does not include host_platform.h,
+ * so chdir/rename here reach libc's real symbols. Explicit paranoia: */
 #ifdef chdir
 #undef chdir
-#endif
-#ifdef rename
-#undef rename
 #endif
 
 #include "hal/hal_filesystem.h"
 
-/* A small fd table. The HAL's hal_fs_fd_t is an index into this array;
- * slot 0 is reserved (unused) so 0 is never a valid fd. */
-#define HAL_FS_HOST_MAX 32
-static FILE *host_fs_slots[HAL_FS_HOST_MAX] = { NULL };
+/* Existing host FatFS adapters (host/host_fs_shims.c). */
+extern FRESULT host_f_unlink (const TCHAR *path);
+extern FRESULT host_f_rename (const TCHAR *from, const TCHAR *to);
+extern FRESULT host_f_mkdir  (const TCHAR *path);
+extern FRESULT host_f_chdir  (const TCHAR *path);
+extern FRESULT host_f_getcwd (TCHAR *buf, UINT len);
 
-static int host_fs_alloc_slot(FILE *fp)
+static int fatfs_rc_to_errno(FRESULT r)
 {
-    for (int i = 1; i < HAL_FS_HOST_MAX; i++) {
-        if (host_fs_slots[i] == NULL) {
-            host_fs_slots[i] = fp;
-            return i;
-        }
+    switch (r) {
+    case FR_OK:              return 0;
+    case FR_NO_FILE:         return -ENOENT;
+    case FR_NO_PATH:         return -ENOENT;
+    case FR_DENIED:          return -EACCES;
+    case FR_EXIST:           return -EEXIST;
+    case FR_WRITE_PROTECTED: return -EROFS;
+    case FR_INVALID_NAME:    return -EINVAL;
+    case FR_INVALID_DRIVE:   return -ENODEV;
+    case FR_NOT_READY:       return -EIO;
+    case FR_DISK_ERR:        return -EIO;
+    case FR_INT_ERR:         return -EIO;
+    case FR_NOT_ENABLED:     return -ENODEV;
+    case FR_NO_FILESYSTEM:   return -ENOENT;
+    case FR_TIMEOUT:         return -ETIMEDOUT;
+    case FR_LOCKED:          return -EACCES;
+    default:                 return -EIO;
     }
-    return -1;
 }
 
-static FILE *host_fs_lookup(hal_fs_fd_t fd)
+/* -------------------------------------------------------------------- */
+/* Path ops — route through host_f_* which knows about host_sd_root vs
+ * vm_host_fat RAM disk. */
+/* -------------------------------------------------------------------- */
+
+int hal_fs_unlink(const char *path)           { return fatfs_rc_to_errno(host_f_unlink(path)); }
+int hal_fs_rename(const char *from, const char *to) { return fatfs_rc_to_errno(host_f_rename(from, to)); }
+int hal_fs_mkdir (const char *path)           { return fatfs_rc_to_errno(host_f_mkdir(path)); }
+int hal_fs_rmdir (const char *path)           { return fatfs_rc_to_errno(host_f_unlink(path)); }  /* FatFS f_unlink handles dirs */
+int hal_fs_chdir (const char *path)           { return fatfs_rc_to_errno(host_f_chdir(path)); }
+
+char *hal_fs_getcwd(char *buf, size_t n)
 {
-    if (fd < 1 || fd >= HAL_FS_HOST_MAX) return NULL;
-    return host_fs_slots[fd];
+    if (!buf || n == 0) return NULL;
+    if (host_f_getcwd(buf, (UINT)n) != FR_OK) return NULL;
+    return buf;
 }
-
-static const char *mode_from_flags(int flags)
-{
-    bool rd = (flags & HAL_FS_O_RDONLY) || (flags & HAL_FS_O_RDWR);
-    bool wr = (flags & HAL_FS_O_WRONLY) || (flags & HAL_FS_O_RDWR);
-    bool trunc  = flags & HAL_FS_O_TRUNC;
-    bool append = flags & HAL_FS_O_APPEND;
-    bool creat  = flags & HAL_FS_O_CREAT;
-
-    if (append && wr)          return rd ? "a+b" : "ab";
-    if (trunc  && wr)          return rd ? "w+b" : "wb";
-    if (creat  && wr && !rd)   return "wb";
-    if (wr && !rd)             return "r+b";   /* open-existing-for-write: best libc match */
-    if (wr && rd)              return "r+b";
-    return "rb";
-}
-
-int hal_fs_open(const char *path, int flags, hal_fs_fd_t *out)
-{
-    if (!path || !out) return -EINVAL;
-    FILE *fp = fopen(path, mode_from_flags(flags));
-    if (!fp) return -errno;
-    int fd = host_fs_alloc_slot(fp);
-    if (fd < 0) { fclose(fp); return -EMFILE; }
-    *out = fd;
-    return 0;
-}
-
-int hal_fs_close(hal_fs_fd_t fd)
-{
-    FILE *fp = host_fs_lookup(fd);
-    if (!fp) return -EBADF;
-    host_fs_slots[fd] = NULL;
-    return fclose(fp) == 0 ? 0 : -errno;
-}
-
-ssize_t hal_fs_read(hal_fs_fd_t fd, void *buf, size_t n)
-{
-    FILE *fp = host_fs_lookup(fd);
-    if (!fp) return -EBADF;
-    size_t got = fread(buf, 1, n, fp);
-    if (got == 0 && ferror(fp)) return -EIO;
-    return (ssize_t)got;
-}
-
-ssize_t hal_fs_write(hal_fs_fd_t fd, const void *buf, size_t n)
-{
-    FILE *fp = host_fs_lookup(fd);
-    if (!fp) return -EBADF;
-    size_t put = fwrite(buf, 1, n, fp);
-    if (put != n) return -EIO;
-    return (ssize_t)put;
-}
-
-off_t hal_fs_seek(hal_fs_fd_t fd, off_t off, int whence)
-{
-    FILE *fp = host_fs_lookup(fd);
-    if (!fp) return -EBADF;
-    int w = (whence == HAL_FS_SEEK_SET) ? SEEK_SET
-          : (whence == HAL_FS_SEEK_CUR) ? SEEK_CUR
-          : SEEK_END;
-    if (fseek(fp, off, w) != 0) return -errno;
-    return ftell(fp);
-}
-
-off_t hal_fs_tell(hal_fs_fd_t fd)
-{
-    FILE *fp = host_fs_lookup(fd);
-    if (!fp) return -EBADF;
-    return ftell(fp);
-}
-
-int hal_fs_eof(hal_fs_fd_t fd)
-{
-    FILE *fp = host_fs_lookup(fd);
-    if (!fp) return -EBADF;
-    return feof(fp) ? 1 : 0;
-}
-
-int hal_fs_sync(hal_fs_fd_t fd)
-{
-    FILE *fp = host_fs_lookup(fd);
-    if (!fp) return -EBADF;
-    return fflush(fp) == 0 ? 0 : -errno;
-}
-
-int hal_fs_unlink(const char *path) { return unlink(path) == 0 ? 0 : -errno; }
-int hal_fs_rename(const char *from, const char *to) { return rename(from, to) == 0 ? 0 : -errno; }
-int hal_fs_mkdir (const char *path) { return mkdir (path, 0777) == 0 ? 0 : -errno; }
-int hal_fs_rmdir (const char *path) { return rmdir (path) == 0 ? 0 : -errno; }
-int hal_fs_chdir (const char *path) { return chdir (path) == 0 ? 0 : -errno; }
-
-char *hal_fs_getcwd(char *buf, size_t n) { return getcwd(buf, n); }
 
 int hal_fs_stat(const char *path, struct hal_stat *out)
 {
-    struct stat st;
-    if (stat(path, &st) != 0) return -errno;
-    out->size     = st.st_size;
-    out->mode     = S_ISDIR(st.st_mode) ? HAL_FS_S_IFDIR
-                  : S_ISREG(st.st_mode) ? HAL_FS_S_IFREG : 0;
-    out->mtime_us = (uint64_t)st.st_mtime * 1000000ULL;
-    return 0;
-}
-
-/* Directory iteration. Hide DIR* + base path behind the opaque
- * hal_fs_dir_t shape. */
-struct hal_fs_dir {
-    DIR  *dp;
-    char  path[512];
-};
-
-int hal_fs_dir_open(const char *path, hal_fs_dir_t **out)
-{
     if (!path || !out) return -EINVAL;
-    hal_fs_dir_t *d = (hal_fs_dir_t *)calloc(1, sizeof(*d));
-    if (!d) return -ENOMEM;
-    d->dp = opendir(path);
-    if (!d->dp) { int e = errno; free(d); return -e; }
-    strncpy(d->path, path, sizeof(d->path) - 1);
-    *out = d;
+    FILINFO fno;
+    FRESULT r = f_stat(path, &fno);
+    if (r != FR_OK) return fatfs_rc_to_errno(r);
+    out->size = fno.fsize;
+    out->mode = (fno.fattrib & AM_DIR) ? HAL_FS_S_IFDIR : HAL_FS_S_IFREG;
+    if (fno.fattrib & AM_HID) out->mode |= HAL_FS_S_IFHIDDEN;
+    out->mtime_us = 0;
     return 0;
 }
 
-int hal_fs_dir_next(hal_fs_dir_t *dir, struct hal_dirent *out)
-{
-    if (!dir || !dir->dp || !out) return -EINVAL;
-    struct dirent *e;
-    errno = 0;
-    while ((e = readdir(dir->dp)) != NULL) {
-        if (strcmp(e->d_name, ".") == 0 || strcmp(e->d_name, "..") == 0) continue;
-        strncpy(out->name, e->d_name, sizeof(out->name) - 1);
-        out->name[sizeof(out->name) - 1] = '\0';
+/* -------------------------------------------------------------------- */
+/* File-table ops are not yet migrated on host — they still go through
+ * FileIO.c's BasicFileOpen + FileTable[] machinery (which itself
+ * dispatches to host_fs_posix_* or FatFS). These entries return ENOSYS
+ * so the symbols resolve; no caller invokes them today. */
+/* -------------------------------------------------------------------- */
 
-        char full[1024];
-        snprintf(full, sizeof(full), "%s/%s", dir->path, e->d_name);
-        struct stat st;
-        if (stat(full, &st) == 0) {
-            out->mode = S_ISDIR(st.st_mode) ? HAL_FS_S_IFDIR
-                      : S_ISREG(st.st_mode) ? HAL_FS_S_IFREG : 0;
-            out->size = st.st_size;
-        } else {
-            out->mode = 0;
-            out->size = 0;
-        }
-        return 1;
-    }
-    return errno ? -errno : 0;
-}
+int     hal_fs_open (const char *path, int flags, hal_fs_fd_t *out) { (void)path; (void)flags; (void)out; return -ENOSYS; }
+int     hal_fs_close(hal_fs_fd_t fd)                                 { (void)fd; return -ENOSYS; }
+ssize_t hal_fs_read (hal_fs_fd_t fd,       void *buf, size_t n)      { (void)fd; (void)buf; (void)n; return -ENOSYS; }
+ssize_t hal_fs_write(hal_fs_fd_t fd, const void *buf, size_t n)      { (void)fd; (void)buf; (void)n; return -ENOSYS; }
+off_t   hal_fs_seek (hal_fs_fd_t fd, off_t off, int whence)          { (void)fd; (void)off; (void)whence; return -ENOSYS; }
+off_t   hal_fs_tell (hal_fs_fd_t fd)                                 { (void)fd; return -ENOSYS; }
+int     hal_fs_eof  (hal_fs_fd_t fd)                                 { (void)fd; return -ENOSYS; }
+int     hal_fs_sync (hal_fs_fd_t fd)                                 { (void)fd; return -ENOSYS; }
 
-int hal_fs_dir_close(hal_fs_dir_t *dir)
-{
-    if (!dir) return -EINVAL;
-    int r = dir->dp ? closedir(dir->dp) : 0;
-    free(dir);
-    return r == 0 ? 0 : -errno;
-}
+int hal_fs_dir_open (const char *path, hal_fs_dir_t **out)      { (void)path; (void)out; return -ENOSYS; }
+int hal_fs_dir_next (hal_fs_dir_t *dir, struct hal_dirent *out) { (void)dir; (void)out; return -ENOSYS; }
+int hal_fs_dir_close(hal_fs_dir_t *dir)                          { (void)dir; return -ENOSYS; }

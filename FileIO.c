@@ -1112,6 +1112,28 @@ void ErrorCheck(int fnbr)
         ErrorThrow(e, FLASHFILE);
     return;
 }
+
+/* Translate a hal_fs_* POSIX-errno return into the legacy FSerror +
+ * ErrorCheck contract. hal_fs returns 0 on success or a negative errno
+ * on failure. We map the common errno values to LFS-style negative
+ * codes (in [-84, 0]) which ErrorCheck routes through ErrorThrow as
+ * FLASHFILE — the message text is still accurate since the underlying
+ * error is a filesystem error regardless of backend. */
+static void ErrorCheckHAL(int rc)
+{
+    if (rc >= 0) { FSerror = 0; return; }
+    switch (rc) {
+    case -2:  FSerror = -2;  break;  /* ENOENT  -> LFS_ERR_NOENT */
+    case -17: FSerror = -17; break;  /* EEXIST  -> LFS_ERR_EXIST */
+    case -20: FSerror = -20; break;  /* ENOTDIR -> LFS_ERR_NOTDIR */
+    case -21: FSerror = -21; break;  /* EISDIR  -> LFS_ERR_ISDIR */
+    case -39: FSerror = -39; break;  /* ENOTEMPTY -> LFS_ERR_NOTEMPTY */
+    case -22: FSerror = -22; break;  /* EINVAL  -> LFS_ERR_INVAL */
+    case -28: FSerror = -28; break;  /* ENOSPC  -> LFS_ERR_NOSPC */
+    default:  FSerror = -5;  break;  /* EIO-ish -> LFS_ERR_IO */
+    }
+    ErrorCheck(0);
+}
 char *GetCWD(void)
 {
     char *b;
@@ -1544,15 +1566,8 @@ void MIPS16 cmd_mkdir(void)
     p = (char *)getFstring(cmdline);                                        // get the directory name and convert to a standard C string
     if(drivecheck(p,&i)!=FatFSFileSystem+1) error("Only valid on current drive");
     getfullpath(p,q);
-    if(FatFSFileSystem){
-        if (!InitSDCard())
-        return;
-        FSerror = f_mkdir(q);
-        ErrorCheck(0);
-    } else {
-        FSerror=lfs_mkdir(&lfs, q);
-        ErrorCheck(0);
-    }
+    if(FatFSFileSystem && !InitSDCard()) return;
+    ErrorCheckHAL(hal_fs_mkdir(q));
 }
 
 void MIPS16 cmd_rmdir(void)
@@ -1563,15 +1578,8 @@ void MIPS16 cmd_rmdir(void)
     p = (char *)getFstring(cmdline);                                        // get the directory name and convert to a standard C string
     if(drivecheck(p,&i)!=FatFSFileSystem+1) error("Only valid on current drive");
     getfullpath(p,q);
-    if(FatFSFileSystem){
-        if (!InitSDCard())
-            return;
-        FSerror = f_unlink(q);
-        ErrorCheck(0);
-    } else {
-        FSerror=lfs_remove(&lfs, q);
-        ErrorCheck(0);
-    }
+    if(FatFSFileSystem && !InitSDCard()) return;
+    ErrorCheckHAL(hal_fs_rmdir(q));
 }
 /* 
  * @cond
@@ -1795,13 +1803,8 @@ void MIPS16 cmd_kill(void)
         tp+=waste;
         FatFSFileSystem=t-1;
         getfullfilepath(tp,q);
-        if(!FatFSFileSystem){
-            FSerror=lfs_remove(&lfs, q);	ErrorCheck(0);
-        } else {
-            if (!InitSDCard()) return;
-            FSerror = f_unlink(q);
-            ErrorCheck(0);
-        }
+        if(FatFSFileSystem && !InitSDCard()) return;
+        ErrorCheckHAL(hal_fs_unlink(q));
         FatFSFileSystem=FatFSFileSystemSave;
     }
 }
@@ -1876,16 +1879,8 @@ void MIPS16 cmd_name(void)
     new = (char *)getFstring(argv[2]);                                  // get the new name
     if(drivecheck(new,&i)!=FatFSFileSystem+1) error("Only valid on current drive");
     getfullfilepath(new,qnew);
-    if(!FatFSFileSystem){
-    	// start a new block
-        FSerror = lfs_rename(&lfs, qold, qnew);
-        ErrorCheck(0);
-
-    } else {                             // start a new block
-       if (!InitSDCard()) return;
-        FSerror = f_rename(qold, qnew);
-        ErrorCheck(0);
-    }
+    if(FatFSFileSystem && !InitSDCard()) return;
+    ErrorCheckHAL(hal_fs_rename(qold, qnew));
 }
 extern uint64_t __uninitialized_ram(_persistent);
 void MIPS16 cmd_save(void)
