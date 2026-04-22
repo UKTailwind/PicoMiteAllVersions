@@ -52,6 +52,12 @@ bool hal_pin_read(uint32_t gpio);
 void hal_pin_write(uint32_t gpio, bool high);
 void hal_pin_toggle(uint32_t gpio);
 
+/* Read the output latch value regardless of whether the pin is currently
+ * configured as input or output. MMBasic's `fun_pin` returns this for
+ * pins in output mode so the user sees what they last wrote, not whatever
+ * the pad is being driven to externally. */
+bool hal_pin_read_output_latch(uint32_t gpio);
+
 /* Strong / weak drive strength for outputs. Default after
  * HAL_PIN_MODE_OUTPUT is implementation-defined (SDK default on RP2040
  * is 4 mA). Callers that care call this explicitly.

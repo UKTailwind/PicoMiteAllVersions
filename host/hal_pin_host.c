@@ -37,6 +37,12 @@ void hal_pin_toggle(uint32_t gpio)
     if (gpio < HAL_HOST_GPIO_MAX) host_pin_levels[gpio] = !host_pin_levels[gpio];
 }
 
+bool hal_pin_read_output_latch(uint32_t gpio)
+{
+    if (gpio >= HAL_HOST_GPIO_MAX) return false;
+    return host_pin_levels[gpio];
+}
+
 void hal_pin_set_drive_mA(uint32_t gpio, uint8_t mA)
 {
     (void)gpio;

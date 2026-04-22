@@ -83,6 +83,11 @@ void hal_pin_toggle(uint32_t gpio)
     gpio_xor_mask64(1ULL << gpio);
 }
 
+bool hal_pin_read_output_latch(uint32_t gpio)
+{
+    return gpio_get_out_level(gpio);
+}
+
 void hal_pin_set_drive_mA(uint32_t gpio, uint8_t mA)
 {
     enum gpio_drive_strength s = GPIO_DRIVE_STRENGTH_4MA;

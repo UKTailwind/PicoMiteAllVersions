@@ -41,6 +41,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "hardware/pwm.h"
 #include "hal/hal_flash.h"
 #include "hal/hal_time.h"
+#include "hal/hal_pin.h"
 #include "hardware/regs/addressmap.h"     /* XIP_BASE */
 #include "hardware/spi.h"
 #include "hardware/pio.h"
@@ -2623,10 +2624,9 @@ tp = checkstring(cmdline, (unsigned char *)"HEARTBEAT");
         SaveOptions();
         if(CheckPin(HEARTBEATpin, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED)){
             if(Option.NoHeartbeat==0){
-                gpio_init(PinDef[HEARTBEATpin].GPno);
-                gpio_set_dir(PinDef[HEARTBEATpin].GPno, GPIO_OUT);
+                hal_pin_set_mode(PinDef[HEARTBEATpin].GPno, HAL_PIN_MODE_OUTPUT);
                 ExtCurrentConfig[PinDef[HEARTBEATpin].pin]=EXT_HEARTBEAT;
-            } else ExtCfg(HEARTBEATpin, EXT_NOT_CONFIG, 0); 
+            } else ExtCfg(HEARTBEATpin, EXT_NOT_CONFIG, 0);
         } else error("Pin %/| is reserved", HEARTBEATpin, HEARTBEATpin);
 #endif
         return;
@@ -3126,15 +3126,8 @@ tp = checkstring(cmdline, (unsigned char *)"HEARTBEAT");
         if(checkstring(tp, (unsigned char *)"PWM"))  Option.PWM = true;
         if(checkstring(tp, (unsigned char *)"PFM"))  Option.PWM = false;
         SaveOptions();
-        if(Option.PWM){
-            gpio_init(23);
-            gpio_put(23,GPIO_PIN_SET);
-            gpio_set_dir(23, GPIO_OUT);
-        } else {
-            gpio_init(23);
-            gpio_put(23,GPIO_PIN_RESET);
-            gpio_set_dir(23, GPIO_OUT);
-    	}
+        hal_pin_set_mode(23, HAL_PIN_MODE_OUTPUT);
+        hal_pin_write(23, Option.PWM);
         return;
     }
 

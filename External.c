@@ -33,6 +33,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  */
 #include "Hardware_Includes.h"
 #include "hal/hal_time.h"
+#include "hal/hal_pin.h"
 #include "hardware/watchdog.h"
 #include "pico/stdlib.h"
 #include "hardware/clocks.h"
@@ -1002,7 +1003,7 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
         //    *GetPortAddr(pin, ana ? ANSELCLR : ANSELSET) = (1 << GetPinBit(pin));// if ana = 1 then it is a digital I/O
         PinSetBit(pin, tris ? TRISSET : TRISCLR);                         // if tris = 1 then it is an input
         if(!tris && (pinmask & (1<<PinDef[pin].GPno))){
-            gpio_put(PinDef[pin].GPno,GPIO_PIN_SET);
+            hal_pin_write(PinDef[pin].GPno, true);
         }
         pinmask &= (~(1<<PinDef[pin].GPno));
         if(cfg == EXT_NOT_CONFIG) ExtSet(pin, 0);                         // set the default output to low
@@ -1073,9 +1074,9 @@ int64_t __not_in_flash_func(ExtInp)(int pin){
             if(pin == Option.INT3pin) return INT3Count;
             if(pin == Option.INT4pin) return INT4Count;
     }  else if(ExtCurrentConfig[pin] == EXT_DIG_OUT) {
-        return gpio_get_out_level(PinDef[pin].GPno);
+        return hal_pin_read_output_latch(PinDef[pin].GPno);
     }  else {
-        return  gpio_get(PinDef[pin].GPno);
+        return hal_pin_read(PinDef[pin].GPno);
     }
     return 0;
 }
