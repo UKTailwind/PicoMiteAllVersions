@@ -22,6 +22,8 @@
 #ifndef HAL_KEYBOARD_H
 #define HAL_KEYBOARD_H
 
+#include <stdint.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -50,6 +52,57 @@ void hal_keyboard_service(void);
  * in the new context. A no-op on backends that don't implement
  * software repeat (PS/2, I²C, host scripted stdin). */
 void hal_keyboard_clear_repeat_state(void);
+
+/* Bring the keyboard backend hardware up. Called once from the port's
+ * boot sequence (PicoMite.c / host main). PS/2 backends enable GPIO
+ * edge IRQs on the clock pin and seed caps/num lock LEDs. USB host
+ * backends run hcd_port_reset() + tuh_init() and flag the stack ready.
+ * I²C keyboards (PicoCalc) may be a no-op if their poll loop is
+ * driven elsewhere.
+ *
+ * Safe to call a second time — backend-specific re-init semantics. */
+void hal_keyboard_init(void);
+
+/* fun_keydown plumbing. Backends that report USB HID slots or a
+ * local scanned key vector expose them through these accessors; other
+ * backends return zeros. All three are thread-context only.
+ *
+ * hal_keyboard_keydown_count() — number of keys currently pressed
+ *   (0..6). Corresponds to fun_keydown(0).
+ *
+ * hal_keyboard_keydown_slot(slot) — slot is 1-based (1..6); returns
+ *   the HID keycode currently held in that slot, or 0 if empty.
+ *   Corresponds to fun_keydown(n) for n in 1..6.
+ *
+ * hal_keyboard_lock_state() — returns a bitmap, bit0 = caps lock,
+ *   bit1 = num lock, bit2 = scroll lock. Corresponds to
+ *   fun_keydown(8). */
+int      hal_keyboard_keydown_count(void);
+int      hal_keyboard_keydown_slot(int slot);
+uint32_t hal_keyboard_lock_state(void);
+
+/* OPTION KEYBOARD layout select. Codes mirror the legacy CONFIG_*
+ * namespace so backend code can index tables directly.
+ * USB backends reject BE/BR/I2C (returns -1). Non-USB
+ * backends accept the full set.
+ *
+ * On success, the backend has written the appropriate Option field
+ * (Option.KeyboardConfig vs Option.USBKeyboard) and the caller is
+ * responsible for SaveOptions() + reboot. On unsupported input the
+ * HAL returns -1 without touching Option. */
+enum {
+    HAL_KBD_LAYOUT_US  = 1,
+    HAL_KBD_LAYOUT_FR  = 2,
+    HAL_KBD_LAYOUT_GR  = 3,
+    HAL_KBD_LAYOUT_IT  = 4,
+    HAL_KBD_LAYOUT_BE  = 5,
+    HAL_KBD_LAYOUT_UK  = 6,
+    HAL_KBD_LAYOUT_ES  = 7,
+    HAL_KBD_LAYOUT_BR  = 8,
+    HAL_KBD_LAYOUT_I2C = 128,
+};
+
+int hal_keyboard_set_layout(int layout);
 
 #ifdef __cplusplus
 }

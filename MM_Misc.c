@@ -58,12 +58,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "drivers/i2c_picocalc_kbd/i2ckbd.h"
 #include "picocalc/conf_app.h"
 #endif
-#if defined(USBKEYBOARD)
-extern int caps_lock;
-extern int num_lock;
-extern int scroll_lock;
-extern int KeyDown[7];
-#else
+#ifndef USBKEYBOARD
 extern char *mouse0Interruptc;
 extern volatile int mouse0foundc;
 #endif
@@ -1123,25 +1118,8 @@ void MIPS16 setterminal(int height,int width){
 	  strcat(sp,"t");
 	  SSPrintString(sp);						//
 }
-#ifdef USBKEYBOARD
-void fun_keydown(void) {
-	int i,n=getint(ep,0,8);
-	iret=0;
-	while(getConsole() != -1); // clear anything in the input buffer
-	if(n==8){
-		iret=(caps_lock ? 1: 0) |
-				(num_lock ? 2: 0) |
-				(scroll_lock ? 4: 0);
-	} else if(n){
-		iret = KeyDown[n-1];											        // this is the character
-	} else {
-		for(i=0;i<6;i++){
-			if(KeyDown[i])iret++;
-		}
-	}
-	targ=T_INT;
-}
-#else
+/* fun_keydown lives in vm_sys_input.c — routes through hal_keyboard_*. */
+#ifndef USBKEYBOARD
 void MIPS16 cmd_update(void){
     uint gpio_mask = 0u;
     reset_usb_boot(gpio_mask, PICO_STDIO_USB_RESET_BOOTSEL_INTERFACE_DISABLE_MASK);
@@ -2391,25 +2369,18 @@ void MIPS16 cmd_option(void) {
         }
         if(ExtCurrentConfig[Option.KEYBOARD_CLOCK] != EXT_NOT_CONFIG && Option.KeyboardConfig == NO_KEYBOARD)  error("Pin %/| is in use",Option.KEYBOARD_CLOCK,Option.KEYBOARD_CLOCK);
         if(ExtCurrentConfig[Option.KEYBOARD_DATA] != EXT_NOT_CONFIG && Option.KeyboardConfig == NO_KEYBOARD)  error("Pin %/| is in use",Option.KEYBOARD_DATA,Option.KEYBOARD_DATA);
-
-        if(checkstring(argv[0], (unsigned char *)"US"))	Option.KeyboardConfig = CONFIG_US;
-		else if(checkstring(argv[0], (unsigned char *)"FR"))	Option.KeyboardConfig = CONFIG_FR;
-		else if(checkstring(argv[0], (unsigned char *)"GR"))	Option.KeyboardConfig = CONFIG_GR;
-		else if(checkstring(argv[0], (unsigned char *)"IT"))	Option.KeyboardConfig = CONFIG_IT;
-		else if(checkstring(argv[0], (unsigned char *)"UK"))	Option.KeyboardConfig = CONFIG_UK;
-		else if(checkstring(argv[0], (unsigned char *)"ES"))	Option.KeyboardConfig = CONFIG_ES;
-		else if(checkstring(argv[0], (unsigned char *)"BE"))	Option.KeyboardConfig = CONFIG_BE;
-		else if(checkstring(argv[0], (unsigned char *)"BR"))	Option.KeyboardConfig = CONFIG_BR;
-		else if(checkstring(argv[0], (unsigned char *)"I2C"))   Option.KeyboardConfig = CONFIG_I2C;
-#else
-        if(checkstring(argv[0], (unsigned char *)"US"))	Option.USBKeyboard = CONFIG_US;
-		else if(checkstring(argv[0], (unsigned char *)"FR"))	Option.USBKeyboard = CONFIG_FR;
-		else if(checkstring(argv[0], (unsigned char *)"GR"))	Option.USBKeyboard = CONFIG_GR;
-		else if(checkstring(argv[0], (unsigned char *)"IT"))	Option.USBKeyboard = CONFIG_IT;
-		else if(checkstring(argv[0], (unsigned char *)"UK"))	Option.USBKeyboard = CONFIG_UK;
-		else if(checkstring(argv[0], (unsigned char *)"ES"))	Option.USBKeyboard = CONFIG_ES;
 #endif
-        else error("Syntax");
+        int hal_kbd_layout = -1;
+        if(checkstring(argv[0], (unsigned char *)"US"))       hal_kbd_layout = HAL_KBD_LAYOUT_US;
+        else if(checkstring(argv[0], (unsigned char *)"FR"))  hal_kbd_layout = HAL_KBD_LAYOUT_FR;
+        else if(checkstring(argv[0], (unsigned char *)"GR"))  hal_kbd_layout = HAL_KBD_LAYOUT_GR;
+        else if(checkstring(argv[0], (unsigned char *)"IT"))  hal_kbd_layout = HAL_KBD_LAYOUT_IT;
+        else if(checkstring(argv[0], (unsigned char *)"UK"))  hal_kbd_layout = HAL_KBD_LAYOUT_UK;
+        else if(checkstring(argv[0], (unsigned char *)"ES"))  hal_kbd_layout = HAL_KBD_LAYOUT_ES;
+        else if(checkstring(argv[0], (unsigned char *)"BE"))  hal_kbd_layout = HAL_KBD_LAYOUT_BE;
+        else if(checkstring(argv[0], (unsigned char *)"BR"))  hal_kbd_layout = HAL_KBD_LAYOUT_BR;
+        else if(checkstring(argv[0], (unsigned char *)"I2C")) hal_kbd_layout = HAL_KBD_LAYOUT_I2C;
+        if (hal_kbd_layout < 0 || hal_keyboard_set_layout(hal_kbd_layout) != 0) error("Syntax");
         Option.capslock=0;
         Option.numlock=1;
 #ifndef USBKEYBOARD

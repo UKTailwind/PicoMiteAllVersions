@@ -34,6 +34,7 @@ extern "C" {
 #include "hardware/watchdog.h"
 #include "hardware/clocks.h"
 #include "hal/hal_flash.h"
+#include "hal/hal_keyboard.h"
 #include "hardware/regs/addressmap.h"     /* XIP_BASE */
 #include "hardware/adc.h"
 #include "hardware/exception.h"
@@ -3613,7 +3614,7 @@ if(Option.CPU_Speed==FreqSVGA){ //adjust the size of the heap
             if(time_us_64()-t>5000000)break;
         }
     }
-    initKeyboard();
+    hal_keyboard_init();
 #endif
 	InitBasic();
 #ifndef PICOMITEVGA
@@ -3763,17 +3764,7 @@ if(Option.CPU_Speed==FreqSVGA){ //adjust the size of the heap
     *tknbuf = 0;
      ContinuePoint = nextstmt;                               // in case the user wants to use the continue command
 #ifdef USBKEYBOARD
-	clearrepeat();
-     for(int i=0;i<4;i++){
-        memset((void *)&HID[i],0,sizeof(struct s_HID));
-        HID[i].report_requested=true;
-    }
-//    USB_bus_reset();
-    hcd_port_reset(BOARD_TUH_RHPORT);
-    uSec(10000); //wait for any hub to power up
-    hcd_port_reset_end(BOARD_TUH_RHPORT);
-    tuh_init(BOARD_TUH_RHPORT);
-    USBenabled=true;
+    hal_keyboard_init();
 #else
     initMouse0(0);
 #endif

@@ -156,21 +156,27 @@ int     hal_fs_stat(const char *path, struct hal_stat *out);
 
 ## `hal_keyboard.h` — pump backend into ConsoleRxBuf (Phase 5)
 
-*Status: minimal surface landed Phase 5a; `get`/`peek`/`modifiers`/`set_layout`/`paste` still future work.*
+*Status: Phase 5 closed — service + clear_repeat_state + init + keydown + lock_state + set_layout all landed.*
 
 ```c
-void hal_keyboard_service(void);
-void hal_keyboard_clear_repeat_state(void);
+void     hal_keyboard_service(void);
+void     hal_keyboard_clear_repeat_state(void);
+void     hal_keyboard_init(void);
+int      hal_keyboard_keydown_count(void);
+int      hal_keyboard_keydown_slot(int slot);  /* slot=1..6 */
+uint32_t hal_keyboard_lock_state(void);
+int      hal_keyboard_set_layout(int layout);  /* HAL_KBD_LAYOUT_* */
 ```
 
-The surface shrank during Phase 5 once the landscape was mapped: every keyboard backend (PS/2 matrix, USB host HID, generic I²C, PicoCalc I²C, host stdin) already feeds MMBasic's existing `ConsoleRxBuf` ring buffer. Core reads characters via `getConsole()` / `MMInkey()`. The HAL therefore does not return characters — it only pumps the hardware so the side-effect writes into the ring buffer can happen.
+The surface shrank during Phase 5 once the landscape was mapped: every keyboard backend (PS/2 matrix, USB host HID, generic I²C, PicoCalc I²C, host stdin) already feeds MMBasic's existing `ConsoleRxBuf` ring buffer. Core reads characters via `getConsole()` / `MMInkey()`. The HAL therefore does not return characters for the streaming path — it only pumps the hardware so the side-effect writes into the ring buffer can happen. `fun_keydown()`'s one-shot snapshot surface (KeyDown[] slot / lock-state bitmap) is exposed separately through `hal_keyboard_keydown_*` + `hal_keyboard_lock_state()`.
 
-**Call sites in core (migrated Phase 5a):**
+**Call sites in core (all migrated):**
 
 - `MM_Misc.c::check_interrupt` — `hal_keyboard_service()` replaces `#ifndef USBKEYBOARD if(Option.KeyboardConfig) CheckKeyboard();`.
 - `MMBasic.c::ClearExternalIO` / `Editor.c` x4 / `Commands.c` list-pager — `hal_keyboard_clear_repeat_state()` replaces `#ifdef USBKEYBOARD clearrepeat();`.
-
-**Call sites in `PicoMite.c` (board file, not subject to HAL purity — left with local `#ifdef` for now):** `routinechecks` 1 kHz USB pump / I²C poll block, `MMInkey` fallback `CheckKeyboard`, `initKeyboard` / `tuh_init` boot wiring. These migrate in a later Phase 5 pass once boot ordering can be proved safe on physical hardware.
+- `vm_sys_input.c::fun_keydown` — unified BASIC `KEYDOWN()` handler. Dispatches `n=0` to `hal_keyboard_keydown_count()`, `n=1..6` to `hal_keyboard_keydown_slot()`, `n=8` to `hal_keyboard_lock_state()`. Removes the prior USBKEYBOARD/PICOCALC/MMBASIC_HOST fan-out.
+- `MM_Misc.c::OPTION KEYBOARD` layout ladder — picks a `HAL_KBD_LAYOUT_*` code then calls `hal_keyboard_set_layout()`. The USB backend rejects BE/BR/I2C; PS/2 accepts all. Repeat-timing parameter ranges still live inside an `#ifdef USBKEYBOARD` block because the semantics diverge (PS/2 packs a rate register; USB stores ms values).
+- `PicoMite.c` — `hal_keyboard_init()` replaces both the PS/2 `initKeyboard()` call and the USB `hcd_port_reset` / `tuh_init` / HID reset block. Early-vs-late call siting is preserved via the existing `#ifdef USBKEYBOARD` guards, so the PS/2 path still initialises before banner-print and the USB path still initialises after. The per-backend ordering is inside `ports/pico_sdk_common/hal_keyboard_pico.c` now.
 
 **Runtime dispatch inside the impl.** On non-USB builds `Option.KeyboardConfig` selects PS/2 vs I²C at run time; the HAL impl internally dispatches `CheckKeyboard()` vs `CheckI2CKeyboard()`. Core code does not know.
 
@@ -178,7 +184,7 @@ The surface shrank during Phase 5 once the landscape was mapped: every keyboard 
 
 **Hard part:** USB host keyboard (TinyUSB) expects ≥1 kHz poll — the existing routinechecks timer provides that. The driver decides what "service" means (TinyUSB `tuh_task()`+`hid_app_task()` on USB ports, PS/2 scan poll on PICOMITEVGA/PicoMite, I²C read drive on PicoCalc, no-op on host).
 
-**Future surface (Phase 5 follow-up, not yet landed):** `hal_keyboard_init()` (so `initKeyboard()`/`tuh_init()` boot ordering can be collapsed); `hal_keyboard_keydown_scan(int slot)` so `fun_keydown()` stops reading `KeyDown[]` directly; `hal_keyboard_lock_state()` for caps/num/scroll; `hal_keyboard_set_layout()` for `OPTION KEYBOARD`. These collapse the remaining USBKEYBOARD gates in MM_Misc.c but are state-accessor plumbing rather than I/O pumping, so kept out of the initial HAL landing to keep the contract tight.
+**Residuals deferred to later phases:** `routinechecks`'s 1 kHz USB pump / I²C poll block in `PicoMite.c` still uses local `#ifdef USBKEYBOARD`; that's a board-file concern that migrates together with the display/touch service loop in Phase 7.
 
 ---
 

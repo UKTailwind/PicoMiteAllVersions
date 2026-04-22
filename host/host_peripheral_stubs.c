@@ -319,11 +319,7 @@ void fun_info(void) {
     targ = T_INT;
 }
 
-void fun_keydown(void) {
-    int n = getint(ep, 0, 8);
-    iret = host_keydown(n);
-    targ = T_INT;
-}
+/* fun_keydown moved to MM_Misc.c — routes through hal_keyboard_* now. */
 
 /* Minimal PEEK on host — enough to support flash-slot inspection from
  * test programs (PEEK(BYTE addr) / PEEK(INT8 addr) / WORD / SHORT /

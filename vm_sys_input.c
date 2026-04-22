@@ -9,41 +9,30 @@
 
 #include "vm_sys_input.h"
 #include "vm_device_support.h"
+#include "MMBasic_Includes.h"
 
-#ifdef MMBASIC_HOST
-extern int host_keydown(int n);
-#elif defined(USBKEYBOARD)
-extern int KeyDown[7];
-#elif defined(PICOCALC) && defined(rp2350)
-extern int LocalKeyDown[7];
-#endif
+#include "hal/hal_keyboard.h"
 
 int vm_sys_input_keydown(int n) {
     if (n < 0 || n > 8) error("Number out of bounds");
-
-#ifdef MMBASIC_HOST
-    return host_keydown(n);
-#elif defined(USBKEYBOARD)
-    if (n == 8) return 0;
-    if (n) return KeyDown[n - 1];
-    int count = 0;
-    for (int i = 0; i < 6; i++)
-        if (KeyDown[i]) count++;
-    return count;
-#elif defined(PICOCALC) && defined(rp2350)
-    if (n == 8) return 0;
-    if (n) return LocalKeyDown[n - 1];
-    int count = 0;
-    for (int i = 0; i < 6; i++)
-        if (LocalKeyDown[i]) count++;
-    return count;
-#else
-    return 0;
-#endif
+    if (n == 8) return (int)hal_keyboard_lock_state();
+    if (n == 0) return hal_keyboard_keydown_count();
+    return hal_keyboard_keydown_slot(n);
 }
 
-#if defined(PICOCALC) && !defined(USBKEYBOARD) && !defined(MMBASIC_HOST)
+/* fun_keydown is the BASIC-level `KEYDOWN(n)` handler. It lives here
+ * (not in MM_Misc.c) so the host build — which swaps MM_Misc.c for
+ * mm_misc_shared.c — still picks it up via the VM-syscall translation
+ * unit that both builds share. */
 void fun_keydown(void) {
-    error("KEYDOWN is VM-only");
+    int n = getint(ep, 0, 8);
+    while (getConsole() != -1);         /* drain any buffered console input */
+    if (n == 8) {
+        iret = (int)hal_keyboard_lock_state();
+    } else if (n) {
+        iret = hal_keyboard_keydown_slot(n);
+    } else {
+        iret = hal_keyboard_keydown_count();
+    }
+    targ = T_INT;
 }
-#endif
