@@ -16,7 +16,7 @@ Promote the implicit hardware-abstraction layer that emerged from the host port 
   - Peripheral-driver gpio uses (Onewire.c, I2C.c, SPI-LCD.c, Touch.c, mouse.c, mmc_stm32.c, SSD1963.c) migrate with their HALs.
 - Phases 4–13 — not started.
 
-**Commits:** f89e9a9 (scaffolding), 9a53573 / f7a06f4 / 896eaa9 / f1207a6 (state hoists), 33163ad / ed610a2 (hal_flash), 029170b / f2d840f (hal_time), 67b4092 / bbbb4ec (hal_pin), `<pending>` (hal_pin Tier-B inlines + WS2812e).
+**Commits:** f89e9a9 (scaffolding), 9a53573 / f7a06f4 / 896eaa9 / f1207a6 (state hoists), 33163ad / ed610a2 (hal_flash), 029170b / f2d840f (hal_time), 67b4092 / bbbb4ec / 344def0 (hal_pin).
 
 ---
 
