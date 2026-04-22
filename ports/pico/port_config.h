@@ -37,6 +37,11 @@
  * radio pin, so max 3; every other board has 4. */
 #define HAL_PORT_ADC_CHANNEL_MAX         4
 
+/* SSD1963 backlight helper is compiled for PicoMite + WebMite variants;
+ * VGA and HDMI boards don't link SSD1963.c, so the call has to be
+ * compile-time dead on those targets. Used as a value in `if`. */
+#define HAL_PORT_HAS_SSD1963             1
+
 /* Hot-path placement: SPI-LCD RP2040 has spare RAM for the GPIO hot loops
  * so we force them into SRAM via __not_in_flash_func. */
 #define HAL_PORT_RAM_FUNC(name)          __not_in_flash_func(name)

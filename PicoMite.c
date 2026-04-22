@@ -3632,12 +3632,10 @@ if(Option.CPU_Speed==FreqSVGA){ //adjust the size of the heap
     InitDisplayVirtual();
 #endif
     InitTouch();
-#ifndef PICOCALC
-    if(Option.BackLightLevel)setBacklight(Option.BackLightLevel, 0);
-#else
+#ifdef PICOCALC
     uSec(300000);
-    if(Option.BackLightLevel)setBacklight(Option.BackLightLevel);
 #endif
+    if(Option.BackLightLevel)setBacklight(Option.BackLightLevel, 0);
 #endif
     /* ErrorInPrompt is a static inside MMBasic_RunPromptLoop; initialized there. */
     exception_set_exclusive_handler(HARDFAULT_EXCEPTION,sigbus);

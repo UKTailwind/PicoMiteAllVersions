@@ -21,6 +21,8 @@
 #define HAL_PORT_HAS_DEFINES             0
 #define HAL_PORT_HAS_HEARTBEAT           1
 #define HAL_PORT_ADC_CHANNEL_MAX         4
+/* VGA boards don't ship SSD1963 support. */
+#define HAL_PORT_HAS_SSD1963             0
 
 /* VGA on rp2040 runs scanout from flash via XIP — forcing GPIO hot loops
  * into SRAM would starve the scanout buffer and cause tearing. Leave them

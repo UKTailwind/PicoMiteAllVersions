@@ -23,6 +23,7 @@
 #define HAL_PORT_HAS_HEARTBEAT           0
 /* WEBRP2350 reserves GP29 for the CYW43 radio. */
 #define HAL_PORT_ADC_CHANNEL_MAX         3
+#define HAL_PORT_HAS_SSD1963             1
 
 /* WEBRP2350 runs lwIP + CYW43; the deleted hal_port_config.h kept GPIO
  * loops out of SRAM for every PICOMITEWEB build (both rp2040 and rp2350).

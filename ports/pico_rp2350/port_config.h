@@ -21,6 +21,7 @@
 #define HAL_PORT_HAS_DEFINES             1
 #define HAL_PORT_HAS_HEARTBEAT           1
 #define HAL_PORT_ADC_CHANNEL_MAX         4
+#define HAL_PORT_HAS_SSD1963             1
 
 #define HAL_PORT_RAM_FUNC(name)          __not_in_flash_func(name)
 

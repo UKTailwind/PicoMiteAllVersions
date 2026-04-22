@@ -356,10 +356,13 @@ if(COMPILE STREQUAL "WEBRP2350")
 	target_compile_options(PicoMite PRIVATE -DGUICONTROLS
 											)
 endif()
-#set the PICOCALC flag
+#set the PICOCALC flag + its port-constant companion
 if(PICOCALC STREQUAL "true")
 	target_compile_options(PicoMite PRIVATE -DPICOCALC
+	                                        -DHAL_PORT_BACKLIGHT_VIA_KEYPAD_I2C=1
 											)
+else()
+	target_compile_options(PicoMite PRIVATE -DHAL_PORT_BACKLIGHT_VIA_KEYPAD_I2C=0)
 endif()
 
 

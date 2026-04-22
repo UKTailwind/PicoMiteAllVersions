@@ -338,7 +338,10 @@ extern void __not_in_flash_func(spi_finish)(spi_inst_t *spi);
 #define VIRTUAL_M       55
 #define VS1053slow      56
 #define VS1053fast      57
-#if defined(PICOMITE) && defined(rp2350)
+/* PICOMITE+rp2350 display types. Defined unconditionally so portable
+ * core code can compare Option.DISPLAY_TYPE against NEXTGEN without a
+ * preprocessor gate; on ports that don't expose these DISPLAY_TYPE
+ * values through OPTION the comparison never matches. */
 #define ST7796SPBUFF    58
 #define NEXTGEN          ST7796SPBUFF
 #define ILI9341BUFF     59
@@ -347,7 +350,6 @@ extern void __not_in_flash_func(spi_finish)(spi_inst_t *spi);
 #define ILI9488PBUFF    62
 #define ILI9488WBUFF    63
 #define ST7789C         64
-#endif
 #define TFT_NOP 0x00
 #define TFT_SWRST 0x01
 #define SSDTYPE (Option.DISPLAY_TYPE>=SSDPANEL && Option.DISPLAY_TYPE<VIRTUAL_C && !(Option.DISPLAY_TYPE==ILI9341_16 || Option.DISPLAY_TYPE==ILI9341_8 || Option.DISPLAY_TYPE==IPS_4_16 || Option.DISPLAY_TYPE==ILI9486_16))

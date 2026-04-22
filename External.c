@@ -37,6 +37,12 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "hal/hal_pin.h"
 #include "hal/hal_fast_timer.h"
 #include "hal/hal_keyboard.h"
+
+/* SetBacklightSSD1963 only links on ports that compile SSD1963.c; the
+ * call site in setBacklight() is compile-time dead on others via
+ * HAL_PORT_HAS_SSD1963 so the linker never needs the body. Declared
+ * here because SSD1963.h is not reachable from VGA builds. */
+extern void SetBacklightSSD1963(int intensity);
 #include "hardware/watchdog.h"
 #include "pico/stdlib.h"
 #include "hardware/clocks.h"
@@ -1997,14 +2003,25 @@ void PWMoff(int slice){
     }
     pwm_set_enabled(slice, false);
 }
-#ifndef PICOMITEVGA
-#ifndef PICOCALC
+/* Unified backlight set. Signature is (level, setfrequency) on every
+ * target; PICOCALC's body writes the keypad-controller I2C register
+ * and ignores setfrequency, non-PICOCALC drives a PWM slice. VGA
+ * variants have no BASIC-level backlight control — the function is
+ * still defined so core can call it unconditionally; on VGA the
+ * DISPLAY_TYPE check falls through to the error arm and the BASIC
+ * layer reports "Backlight not set up". */
 void setBacklight(int level, int setfrequency){
-#if defined(PICOMITE) && defined(rp2350)
-    if(((Option.DISPLAY_TYPE>I2C_PANEL && Option.DISPLAY_TYPE<BufferedPanel ) || Option .DISPLAY_TYPE>=NEXTGEN || (Option.DISPLAY_TYPE>=SSDPANEL && Option.DISPLAY_TYPE<VIRTUAL)) && Option.DISPLAY_BL){
-#else
-    if(((Option.DISPLAY_TYPE>I2C_PANEL && Option.DISPLAY_TYPE<BufferedPanel ) || (Option.DISPLAY_TYPE>=SSDPANEL && Option.DISPLAY_TYPE<VIRTUAL)) && Option.DISPLAY_BL){
-#endif
+    if (HAL_PORT_BACKLIGHT_VIA_KEYPAD_I2C) {
+        (void)setfrequency;
+        level*=255;
+        level/=100;
+        I2C_Send_RegData(0x1f,0x05,(uint8_t)level);
+        return;
+    }
+    /* NEXTGEN is defined on every target (ST7796SPBUFF constant). On
+     * non-PICOMITE-rp2350 ports Option.DISPLAY_TYPE never reaches
+     * NEXTGEN so the clause just short-circuits there. */
+    if(((Option.DISPLAY_TYPE>I2C_PANEL && Option.DISPLAY_TYPE<BufferedPanel ) || Option.DISPLAY_TYPE>=NEXTGEN || (Option.DISPLAY_TYPE>=SSDPANEL && Option.DISPLAY_TYPE<VIRTUAL)) && Option.DISPLAY_BL){
         MMFLOAT frequency=setfrequency ? (MMFLOAT)setfrequency : (Option.DISPLAY_TYPE==ILI9488W ? 1000.0 : 50000.0);
         int wrap=(Option.CPU_Speed*1000)/frequency;
         int high=(int)((MMFLOAT)Option.CPU_Speed/frequency*level*10.0);
@@ -2023,40 +2040,30 @@ void setBacklight(int level, int setfrequency){
         level/=100;
         I2C_Send_Command(0x81);//SETCONTRAST
         I2C_Send_Command((uint8_t)level);
-    } else if(Option.DISPLAY_TYPE>=SSDPANEL && Option.DISPLAY_TYPE<VIRTUAL){
+    } else if(HAL_PORT_HAS_SSD1963 && Option.DISPLAY_TYPE>=SSDPANEL && Option.DISPLAY_TYPE<VIRTUAL){
         SetBacklightSSD1963(level);
     } else if(Option.DISPLAY_TYPE==SSD1306SPI){
         level*=255;
         level/=100;
         spi_write_command(0x81);//SETCONTRAST
         spi_write_command((uint8_t)level);
-    } 
-#else
-void setBacklight(int level){//STM32: i2c reg is REG_ID_BKL(0x05)
-    //level is 0-100%
-    level*=255;
-    level/=100;
-    I2C_Send_RegData(0x1f,0x05,(uint8_t)level);
-#endif
+    }
 }
 /*  @endcond */
 void MIPS16 cmd_backlight(void){
     getargs(&cmdline,3,(unsigned char *)",");
     int level=getint(argv[0],0,100);
-#ifndef PICOCALC
     int frequency=50000;
-#if defined(PICOMITE) && defined(rp2350)
-    if(((Option.DISPLAY_TYPE>I2C_PANEL && Option.DISPLAY_TYPE<BufferedPanel ) || (Option.DISPLAY_TYPE>=SSDPANEL && Option.DISPLAY_TYPE<VIRTUAL) || Option .DISPLAY_TYPE>=NEXTGEN) && Option.DISPLAY_BL){
-#else
-    if(((Option.DISPLAY_TYPE>I2C_PANEL && Option.DISPLAY_TYPE<BufferedPanel ) || (Option.DISPLAY_TYPE>=SSDPANEL && Option.DISPLAY_TYPE<VIRTUAL)) && Option.DISPLAY_BL){
-#endif
-    } else if(Option.DISPLAY_TYPE<=I2C_PANEL){
-    } else if(Option.DISPLAY_TYPE>=SSDPANEL && Option.DISPLAY_TYPE<VIRTUAL){
-    } else if(Option.DISPLAY_TYPE==SSD1306SPI){
-    } else error("Backlight not set up");
-#else
-    int frequency=0;
-#endif
+    if (!HAL_PORT_BACKLIGHT_VIA_KEYPAD_I2C) {
+        /* Validate that the current display supports backlight control.
+         * PicoCalc's keypad-I2C path works on any DISPLAY_TYPE, so the
+         * pre-check is skipped on that port. */
+        if(!(((Option.DISPLAY_TYPE>I2C_PANEL && Option.DISPLAY_TYPE<BufferedPanel ) || (Option.DISPLAY_TYPE>=SSDPANEL && Option.DISPLAY_TYPE<VIRTUAL) || Option.DISPLAY_TYPE>=NEXTGEN) && Option.DISPLAY_BL) &&
+           !(Option.DISPLAY_TYPE<=I2C_PANEL) &&
+           !(Option.DISPLAY_TYPE>=SSDPANEL && Option.DISPLAY_TYPE<VIRTUAL) &&
+           !(Option.DISPLAY_TYPE==SSD1306SPI))
+            error("Backlight not set up");
+    }
     if(argc==3){
         if(checkstring(argv[2],(unsigned char *)"DEFAULT")){
             Option.BackLightLevel=level;
@@ -2065,13 +2072,8 @@ void MIPS16 cmd_backlight(void){
             frequency=getint(argv[2],100,100000);
         }
     }
-#ifndef PICOCALC
     setBacklight(level, frequency);
-#else
-    setBacklight(level);
-#endif
 }
-#endif
 void MIPS16 cmd_Servo(void){
     unsigned char *tp;
     int div=1, high1=0, high2=0;

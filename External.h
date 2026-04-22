@@ -219,11 +219,9 @@ extern int BacklightSlice,BacklightChannel;
  * control paths that read them are guarded elsewhere. */
 extern int KeyboardlightSlice,KeyboardlightChannel;
 extern void SetADCFreq(float frequency);
-#ifndef PICOCALC
+/* Unified backlight setter — PICOCALC's implementation ignores the
+ * frequency; other variants map it to the backlight PWM's wrap. */
 extern void setBacklight(int level, int frequency);
-#else
-extern void setBacklight(int level);
-#endif
 /* PINMAP is defined per-port in ports/<COMPILE>/pin_tables.c.
  * Declared here as a pointer-to-array so core can index it without
  * knowing the length (which differs by chip: 30 on RP2040 / WEB,

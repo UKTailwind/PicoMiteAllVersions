@@ -21,6 +21,7 @@
 #define HAL_PORT_HAS_DEFINES             1
 #define HAL_PORT_HAS_HEARTBEAT           1
 #define HAL_PORT_ADC_CHANNEL_MAX         4
+#define HAL_PORT_HAS_SSD1963             0
 
 /* RP2350 has the RAM budget to place GPIO hot loops in SRAM even on VGA. */
 #define HAL_PORT_RAM_FUNC(name)          __not_in_flash_func(name)

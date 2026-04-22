@@ -89,9 +89,12 @@ extern char *I2C_Slave_Send_IntLine;                                // pointer t
 extern char *I2C_Slave_Receive_IntLine;                             // pointer to the slave receive interrupt line number
 extern char *I2C2_Slave_Send_IntLine;                                // pointer to the slave send interrupt line number
 extern char *I2C2_Slave_Receive_IntLine;                             // pointer to the slave receive interrupt line number
-#ifdef PICOCALC
+/* PicoCalc keypad-register write. Declared unconditionally so portable
+ * core code can reference it under an `if (HAL_PORT_BACKLIGHT_VIA_KEYPAD_I2C)`
+ * runtime guard. The body only exists on PICOCALC builds (I2C.c); on
+ * other targets the compile-time-zero guard turns the call into dead
+ * code that the linker never needs. */
 extern void I2C_Send_RegData(int i2caddr,int reg,char command);
-#endif
 extern void I2C_Send_Command(char command);
 extern void CheckI2CKeyboard(int noerror, int read);
 extern void cmd_camera(void);
