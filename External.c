@@ -3086,14 +3086,14 @@ void __not_in_flash_func(WS2812e)(int gppin, int T1H, int T1L, int T0H, int T0L,
     for(int i=0;i<nbr;i++){
         for(int j=0;j<8;j++){
             if(*p & 1){
-                gpio_put(gppin,true);
+                hal_pin_write_fast(gppin, true);
                 shortpause(T1H);
-                gpio_put(gppin,false);
+                hal_pin_write_fast(gppin, false);
                 shortpause(T1L);
             } else {
-                gpio_put(gppin,true);
+                hal_pin_write_fast(gppin, true);
                 shortpause(T0H);
-                gpio_put(gppin,false);
+                hal_pin_write_fast(gppin, false);
                 shortpause(T0L);
             }
             *p>>=1;

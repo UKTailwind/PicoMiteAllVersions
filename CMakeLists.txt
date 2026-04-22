@@ -149,6 +149,9 @@ target_sources(PicoMite PRIVATE ${PICOMITE_PICO_SDK_HAL_SOURCES})
 # repo root. Sources in subdirectories (core/state/, future hal/ + drivers/
 # + ports/) need the root on the include path so their #includes resolve.
 target_include_directories(PicoMite PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+# ports/pico_sdk_common/ supplies port-specific Tier-B inline headers
+# (hal_pin_inlines.h) that hal/*.h pulls in via a plain "" include.
+target_include_directories(PicoMite PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/ports/pico_sdk_common)
 if (COMPILE STREQUAL "HDMI" OR COMPILE STREQUAL "WEBRP2350" OR COMPILE STREQUAL "HDMIUSB"  OR COMPILE STREQUAL "VGARP2350"  OR COMPILE STREQUAL "VGAUSBRP2350"  OR COMPILE STREQUAL "PICORP2350"  OR COMPILE STREQUAL "PICOUSBRP2350" )
     target_sources(PicoMite PRIVATE psram.c)
 endif()

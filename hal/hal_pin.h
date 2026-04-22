@@ -70,4 +70,14 @@ void hal_pin_set_drive_mA(uint32_t gpio, uint8_t mA);
 }
 #endif
 
+/* -----------------------------------------------------------------------
+ * Tier-B hot-path variants (hal_pin_*_fast).
+ *
+ * Provided by each port as a `static inline` header so functions placed
+ * in SRAM with __not_in_flash_func can write/read/toggle a pin without a
+ * cross-section call into flash. Every port directory on the compiler's
+ * `-I` path supplies its own `hal_pin_inlines.h`.
+ * ---------------------------------------------------------------------- */
+#include "hal_pin_inlines.h"
+
 #endif  /* HAL_PIN_H */
