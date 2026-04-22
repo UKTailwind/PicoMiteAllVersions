@@ -1462,15 +1462,15 @@ void fun_pin(void) {
     MMFLOAT t;
 	if(checkstring(ep, (unsigned char *)"TEMP")){
         if(ADCDualBuffering || dmarunning)error("ADC in use");
-        adc_init();
-        adc_set_temp_sensor_enabled(true);
+        hal_pin_adc_init();
+        hal_pin_adc_set_temp_sensor(true);
 #ifdef rp2350
-        adc_select_input((rp2350a ? 4 : 8));
+        hal_pin_adc_select((rp2350a ? 4 : 8));
 #else
-        adc_select_input(4);
+        hal_pin_adc_select(4);
 #endif
         last_adc=4;
-        t=(MMFLOAT)adc_read()/4095.0*VCC;
+        t=(MMFLOAT)hal_pin_adc_read()/4095.0*VCC;
         fret=(27.0-(t-0.706)/0.001721);
         targ=T_NBR;
         return;
@@ -3690,7 +3690,7 @@ if(rp2350a){
         ADCmax *=8;
         dma_channel_cleanup(ADC_dma_chan);
         dma_channel_cleanup(ADC_dma_chan2);
-        adc_init();
+        hal_pin_adc_init();
         adc_set_round_robin(ADCopen==1 ? 1 : ADCopen==2 ? 3 : ADCopen==3 ? 7 : 15);
         adc_fifo_setup(
             true,    // Write each completed conversion to the sample FIFO
@@ -3803,7 +3803,7 @@ if(rp2350a){
         }
         ADCmax++;
         ADCbuffer=GetMemory(ADCmax*ADCopen*2);
-        adc_init();
+        hal_pin_adc_init();
         adc_set_round_robin(ADCopen==1 ? 1 : ADCopen==2 ? 3 : ADCopen==3 ? 7 : 15);
         adc_fifo_setup(
             true,    // Write each completed conversion to the sample FIFO
@@ -3850,7 +3850,7 @@ if(rp2350a){
                 }
             }
             FreeMemory((void *)ADCbuffer);
-            adc_init();
+            hal_pin_adc_init();
             last_adc=99;
         } else dmarunning=true;
 		return;
@@ -3887,7 +3887,7 @@ if(rp2350a){
         ADCDualBuffering=false;
         dmarunning=false;
         last_adc=99;
-        adc_init();
+        hal_pin_adc_init();
 		return;
 	}
     error("Syntax");

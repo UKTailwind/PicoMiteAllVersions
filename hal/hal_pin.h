@@ -102,6 +102,18 @@ void hal_pin_select_digital(uint32_t gpio);
  * (`PinDef[].ADCpin` on pico). */
 void hal_pin_adc_select(uint32_t adc_channel);
 
+/* Single-shot ADC subsystem:
+ *   init            — one-time power-up; idempotent.
+ *   set_temp_sensor — enable/disable the on-die temperature sensor;
+ *                     after enabling, the caller selects the sensor's
+ *                     channel via hal_pin_adc_select.
+ *   read            — single 12-bit conversion on the currently-selected
+ *                     channel; returns raw 0..4095.
+ * DMA/round-robin/FIFO is a separate (later) hal_adc surface. */
+void     hal_pin_adc_init(void);
+void     hal_pin_adc_set_temp_sensor(bool enabled);
+uint16_t hal_pin_adc_read(void);
+
 /* -----------------------------------------------------------------------
  * Input pad tuning (hysteresis, slew rate).
  *

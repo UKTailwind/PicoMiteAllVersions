@@ -77,6 +77,20 @@ void hal_pin_adc_select(uint32_t adc_channel)
     (void)adc_channel;
 }
 
+void hal_pin_adc_init(void)
+{
+}
+
+void hal_pin_adc_set_temp_sensor(bool enabled)
+{
+    (void)enabled;
+}
+
+uint16_t hal_pin_adc_read(void)
+{
+    return 0;
+}
+
 void hal_pin_set_input_hysteresis(uint32_t gpio, bool enabled)
 {
     (void)gpio;
