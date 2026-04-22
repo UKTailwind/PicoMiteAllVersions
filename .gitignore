@@ -16,3 +16,4 @@ host/wasm_obj/
 .claude/
 hardcopy.*
 out.bmp
+build_test/

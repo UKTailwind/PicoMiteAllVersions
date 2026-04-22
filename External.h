@@ -158,11 +158,17 @@ New, more portable, method of manipulating an I/O pin
 #define EXT_PWM7A        44
 #define EXT_PWM7B        45
 #define EXT_ADCRAW       46
-#ifdef rp2350
-#define EXT_PWM8A        47
-#define EXT_PWM8B        48
-#define EXT_PWM9A        49
-#define EXT_PWM9B        50
+/* RP2350 ships four extra PWM slices (8..11 on channels A/B), a third PIO
+ * block, a fast-timer mode on pin2/GP1, and a keypad pseudo-peripheral that
+ * RP2040 lacks. The enum values are defined on every target so PinFunction[]
+ * and ExtCurrentConfig[] share a single indexing scheme; on ports without
+ * the hardware the corresponding code paths are unreachable (no BASIC syntax
+ * can set a pin to a mode the port doesn't support). See port_config.h for
+ * the HAL_PORT_HAS_* flags callers can test. */
+#define EXT_PWM8A         47
+#define EXT_PWM8B         48
+#define EXT_PWM9A         49
+#define EXT_PWM9B         50
 #define EXT_PWM10A        51
 #define EXT_PWM10B        52
 #define EXT_PWM11A        53
@@ -172,10 +178,6 @@ New, more portable, method of manipulating an I/O pin
 #define EXT_PIO2_OUT      57
 #define EXT_FAST_TIMER    58
 #define EXT_KEYBOARD      59
-#else
-#define EXT_PIO0_OUT      47
-#define EXT_PIO1_OUT      48
-#endif
 #define EXT_DS18B20_RESERVED    0x100                 // this pin is reserved for DS18B20 and cannot be used
 #define EXT_COM_RESERVED        0x200                 // this pin is reserved and SETPIN and PIN cannot be used
 #define EXT_BOOT_RESERVED       0x400                 // this pin is reserved at bootup and cannot be used
@@ -210,9 +212,12 @@ extern void WriteCount5(unsigned long timeset);
 extern void SoftReset(void);
 extern volatile uint64_t IRoffset;
 extern int BacklightSlice,BacklightChannel;
-#if defined(PICOMITE) && defined(rp2350)
+/* Keyboard backlight slice/channel globals are defined in
+ * drivers/sd_spi/mmc_stm32.c on every target; the extern is unconditional
+ * so callers don't need to gate the reference. On ports without keyboard
+ * backlight hardware the values stay at their init sentinel (-1) and the
+ * control paths that read them are guarded elsewhere. */
 extern int KeyboardlightSlice,KeyboardlightChannel;
-#endif
 extern void SetADCFreq(float frequency);
 #ifndef PICOCALC
 extern void setBacklight(int level, int frequency);
@@ -285,7 +290,9 @@ extern uint8_t PWM4Bpin;
 extern uint8_t PWM5Bpin;
 extern uint8_t PWM6Bpin;
 extern uint8_t PWM7Bpin;
-#ifdef rp2350
+/* RP2350-only PWM slices. Declared unconditionally so the pin-assignment
+ * code paths can share symbols across all targets; on RP2040 these stay
+ * at their sentinel (99) and the corresponding BASIC syntax never triggers. */
 extern uint8_t PWM8Apin;
 extern uint8_t PWM8Bpin;
 extern uint8_t PWM9Apin;
@@ -294,7 +301,6 @@ extern uint8_t PWM10Apin;
 extern uint8_t PWM10Bpin;
 extern uint8_t PWM11Apin;
 extern uint8_t PWM11Bpin;
-#endif
 extern uint8_t UART1RXpin;
 extern uint8_t UART1TXpin;
 extern uint8_t UART0TXpin;

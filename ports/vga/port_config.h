@@ -1,0 +1,28 @@
+/*
+ * ports/vga/port_config.h — COMPILE=VGA and COMPILE=VGAUSB (rp2040 VGA).
+ *
+ * Port-scoped compile-time constants. See ports/pico/port_config.h for
+ * the mechanism; values below are plain #defines with no #ifdef gates.
+ */
+#ifndef PORT_CONFIG_H
+#define PORT_CONFIG_H
+
+/* Chip-level: RP2040. */
+#define HAL_PORT_PWM_SLICE_COUNT         8
+#define HAL_PORT_GPIO_COUNT              30
+#define HAL_PORT_PIO_COUNT               2
+#define HAL_PORT_HAS_PIO2                0
+#define HAL_PORT_HAS_FAST_TIMER          0
+#define HAL_PORT_HAS_INT5                0
+#define HAL_PORT_PULLDOWN_NEEDS_RESET    0
+
+#define HAL_PORT_HAS_PSRAM               0
+#define HAL_PORT_HAS_UPNG                0
+#define HAL_PORT_HAS_DEFINES             0
+
+/* VGA on rp2040 runs scanout from flash via XIP — forcing GPIO hot loops
+ * into SRAM would starve the scanout buffer and cause tearing. Leave them
+ * in flash; scanout bandwidth takes priority over pin-write latency. */
+#define HAL_PORT_RAM_FUNC(name)          name
+
+#endif /* PORT_CONFIG_H */

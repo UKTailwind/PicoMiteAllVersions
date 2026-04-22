@@ -32,6 +32,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * The following section will be excluded from the documentation.
  */
 #include "Hardware_Includes.h"
+#include "port_config.h"
 #include "hal/hal_time.h"
 #include "hal/hal_pin.h"
 #include "hardware/watchdog.h"
@@ -104,7 +105,6 @@ const char *PinFunction[] = {
         "PWM7A",
         "PWM7B",
         "ADCRAW",
-#ifdef rp2350
         "PWM8A",
         "PWM8B",
         "PWM9A",
@@ -113,18 +113,10 @@ const char *PinFunction[] = {
         "PWM10B",
         "PWM11A",
         "PWM11B",
-#endif
         "PIO0",
-#ifdef rp2350
         "PIO1",
         "PIO2",
         "FFIN",
-#ifdef PICONITE
-        "KEYBOARD"
-#endif
-#else
-        "PIO1"
-#endif
 };
 ;
 
@@ -154,12 +146,10 @@ uint8_t PWM4Apin=99;
 uint8_t PWM5Apin=99;
 uint8_t PWM6Apin=99;
 uint8_t PWM7Apin=99;
-#ifdef rp2350
 uint8_t PWM8Apin=99;
 uint8_t PWM9Apin=99;
 uint8_t PWM10Apin=99;
 uint8_t PWM11Apin=99;
-#endif
 uint8_t PWM0Bpin=99;
 uint8_t PWM1Bpin=99;
 uint8_t PWM2Bpin=99;
@@ -168,12 +158,10 @@ uint8_t PWM4Bpin=99;
 uint8_t PWM5Bpin=99;
 uint8_t PWM6Bpin=99;
 uint8_t PWM7Bpin=99;
-#ifdef rp2350
 uint8_t PWM8Bpin=99;
 uint8_t PWM9Bpin=99;
 uint8_t PWM10Bpin=99;
 uint8_t PWM11Bpin=99;
-#endif
 uint8_t UART1RXpin=99;
 uint8_t UART1TXpin=99;
 uint8_t UART0TXpin=99;
@@ -189,14 +177,10 @@ uint8_t I2C1SCLpin=99;
 uint8_t I2C0SDApin=99;
 uint8_t I2C0SCLpin=99;
 uint8_t slice0=0,slice1=0,slice2=0,slice3=0,slice4=0,slice5=0,slice6=0,slice7=0;
-#ifdef rp2350
 uint8_t slice8=0,slice9=0,slice10=0,slice11=0;
 bool fast_timer_active=false;
 volatile uint64_t INT5Count, INT5Value, INT5InitTimer, INT5Timer;
-#ifdef PICOMITE
 int LocalKeyDown[7];
-#endif
-#endif
 bool dmarunning=false;
 bool ADCDualBuffering=false;
 uint32_t ADCmax=0;
@@ -282,15 +266,7 @@ void SoftReset(void){
 	watchdog_enable(1, 1);
 	while(1);
 }
-#ifdef rp2350
-void __not_in_flash_func(PinSetBit)(int pin, unsigned int offset) {
-#else
-#if defined(PICOMITEVGA) || defined(PICOMITEWEB)
-void PinSetBit(int pin, unsigned int offset) {
-#else
-void __not_in_flash_func(PinSetBit)(int pin, unsigned int offset) {
-#endif
-#endif
+void HAL_PORT_RAM_FUNC(PinSetBit)(int pin, unsigned int offset) {
     uint32_t gpio = PinDef[pin].GPno;
     switch (offset){
     case LATCLR:
@@ -362,19 +338,7 @@ int IsInvalidPin(int pin) {
     if(PinDef[pin].mode & UNUSED) return true;
     return false;
 }
-#ifdef PICOMITEWEB
-void ExtSet(int pin, int val){
-#else
-#ifndef rp2350
-#ifdef PICOMITEVGA
-void ExtSet(int pin, int val){
-#else
-void __not_in_flash_func(ExtSet)(int pin, int val){
-#endif
-#else
-void __not_in_flash_func(ExtSet)(int pin, int val){
-#endif
-#endif
+void HAL_PORT_RAM_FUNC(ExtSet)(int pin, int val) {
 
     if(ExtCurrentConfig[pin] == EXT_NOT_CONFIG || ExtCurrentConfig[pin] == EXT_DIG_OUT/* || ExtCurrentConfig[pin] == EXT_OC_OUT*/) {
         PinSetBit(pin, val ? LATSET : LATCLR);
@@ -1031,15 +995,7 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
     uSec(2);
 }
 extern int adc_clk_div;
-#ifndef rp2350
-#ifdef PICOMITEVGA
-int64_t ExtInp(int pin){
-#else
-int64_t __not_in_flash_func(ExtInp)(int pin){
-#endif
-#else
-int64_t __not_in_flash_func(ExtInp)(int pin){
-#endif
+int64_t HAL_PORT_RAM_FUNC(ExtInp)(int pin) {
     if(ExtCurrentConfig[pin]==EXT_ANA_IN || ExtCurrentConfig[pin]==EXT_ADCRAW){
         if(adc_clk_div!=adc_hw->div){
             SetADCFreq(500000.0);
@@ -1314,11 +1270,11 @@ process:
         case EXT_DIG_IN:    if(argc == 5) {
                                 if(checkstring(argv[4], (unsigned char *)"PULLUP")) option = CNPUSET;
                                 else if(checkstring(argv[4], (unsigned char *)"PULLDOWN")) {
-#ifdef rp2350
-                                    PinSetBit(pin,TRISCLR);
-                                    PinSetBit(pin,LATCLR);
-                                    PinSetBit(pin,TRISSET);
-#endif
+                                    if (HAL_PORT_PULLDOWN_NEEDS_RESET) {
+                                        PinSetBit(pin,TRISCLR);
+                                        PinSetBit(pin,LATCLR);
+                                        PinSetBit(pin,TRISSET);
+                                    }
                                     option = CNPDSET;
                                 }
                                 else error("Invalid configuration");
@@ -1330,11 +1286,11 @@ process:
         case EXT_INT_BOTH:  if(argc == 7) {
                                 if(checkstring(argv[6], (unsigned char *)"PULLUP")) option = CNPUSET;
                                 else if(checkstring(argv[6], (unsigned char *)"PULLDOWN")) {
-#ifdef rp2350
-                                    PinSetBit(pin,TRISCLR);
-                                    PinSetBit(pin,LATCLR);
-                                    PinSetBit(pin,TRISSET);
-#endif
+                                    if (HAL_PORT_PULLDOWN_NEEDS_RESET) {
+                                        PinSetBit(pin,TRISCLR);
+                                        PinSetBit(pin,LATCLR);
+                                        PinSetBit(pin,TRISSET);
+                                    }
                                     option = CNPDSET;
                                 }
                                 else error("Invalid configuration");

@@ -160,6 +160,28 @@ target_include_directories(PicoMite PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 # ports/pico_sdk_common/ supplies port-specific Tier-B inline headers
 # (hal_pin_inlines.h) that hal/*.h pulls in via a plain "" include.
 target_include_directories(PicoMite PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/ports/pico_sdk_common)
+# ports/<board>/port_config.h defines compile-time port-scoped constants
+# (HAL_PORT_PWM_SLICE_COUNT, HAL_PORT_GPIO_COUNT, HAL_PORT_HAS_*, …). Each
+# port directory holds a single file with plain #defines and no #ifdef
+# gates inside; the build system picks exactly one per COMPILE variant by
+# putting that directory on the include path. Core uses these as *values*
+# in expressions and array sizes; using them as preprocessor gates is
+# forbidden (see docs/real-hal-fixup-plan.md F2).
+if (COMPILE STREQUAL "PICO" OR COMPILE STREQUAL "PICOUSB")
+	target_include_directories(PicoMite PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/ports/pico)
+elseif (COMPILE STREQUAL "VGA" OR COMPILE STREQUAL "VGAUSB")
+	target_include_directories(PicoMite PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/ports/vga)
+elseif (COMPILE STREQUAL "WEB")
+	target_include_directories(PicoMite PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/ports/web)
+elseif (COMPILE STREQUAL "PICORP2350" OR COMPILE STREQUAL "PICOUSBRP2350")
+	target_include_directories(PicoMite PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/ports/pico_rp2350)
+elseif (COMPILE STREQUAL "VGARP2350" OR COMPILE STREQUAL "VGAUSBRP2350")
+	target_include_directories(PicoMite PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/ports/vga_rp2350)
+elseif (COMPILE STREQUAL "WEBRP2350")
+	target_include_directories(PicoMite PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/ports/web_rp2350)
+elseif (COMPILE STREQUAL "HDMI" OR COMPILE STREQUAL "HDMIUSB")
+	target_include_directories(PicoMite PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/ports/hdmi_rp2350)
+endif()
 if (COMPILE STREQUAL "HDMI" OR COMPILE STREQUAL "WEBRP2350" OR COMPILE STREQUAL "HDMIUSB"  OR COMPILE STREQUAL "VGARP2350"  OR COMPILE STREQUAL "VGAUSBRP2350"  OR COMPILE STREQUAL "PICORP2350"  OR COMPILE STREQUAL "PICOUSBRP2350" )
     target_sources(PicoMite PRIVATE psram.c)
 endif()
