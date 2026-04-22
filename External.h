@@ -224,11 +224,11 @@ extern void setBacklight(int level, int frequency);
 #else
 extern void setBacklight(int level);
 #endif
-#ifdef rp2350
-extern const uint8_t PINMAP[48];
-#else
-extern const uint8_t PINMAP[30];
-#endif
+/* PINMAP is defined per-port in ports/<COMPILE>/pin_tables.c.
+ * Declared here as a pointer-to-array so core can index it without
+ * knowing the length (which differs by chip: 30 on RP2040 / WEB,
+ * 48 on RP2350 variants). */
+extern const uint8_t PINMAP[];
 void gpio_callback(uint gpio, uint32_t events);
 // for CheckPin() action can be set to:
 #define CP_CHECKALL          0b0000     // abort with an error if invalid, in use or reserved
