@@ -57,18 +57,18 @@ extern FRESULT host_f_findfirst(DIR *dp, FILINFO *fi, const TCHAR *path,
 extern FRESULT host_f_findnext(DIR *dp, FILINFO *fi);
 extern FRESULT host_f_closedir(DIR *dp);
 extern FRESULT host_f_unlink(const TCHAR *path);
-extern FRESULT host_f_rename(const TCHAR *from, const TCHAR *to);
-extern FRESULT host_f_mkdir(const TCHAR *path);
 extern FRESULT host_f_chdir(const TCHAR *path);
 extern FRESULT host_f_getcwd(TCHAR *buff, UINT len);
 #define f_findfirst(d,fi,path,pat) host_f_findfirst(d,fi,path,pat)
 #define f_findnext(d,fi) host_f_findnext(d,fi)
 #define f_closedir(d) host_f_closedir(d)
 #define f_unlink(p) host_f_unlink(p)
-#define f_rename(a,b) host_f_rename(a,b)
-#define f_mkdir(p) host_f_mkdir(p)
 #define f_chdir(p) host_f_chdir(p)
 #define f_getcwd(b,l) host_f_getcwd(b,l)
+/* f_mkdir / f_rename are no longer called from FileIO.c — cmd_mkdir /
+ * cmd_name / cmd_rmdir route through hal_fs_*. The host wrappers
+ * (host_f_mkdir / host_f_rename) stay in host_fs_shims.c for now;
+ * unused externals don't break the build. */
 #endif
 #include "hardware/irq.h"
 #if defined(PICOCALC) && defined(rp2350)
@@ -131,33 +131,10 @@ uint8_t *gHuffVal2;
 uint8_t *gHuffVal3;
 uint8_t *gInBuf;
 #define BLOCK_SIZE 4096
-char FlashReadBuffer[256];
-char FlashProgBuffer[256];
-char FlashLookBuffer[256];
-int fs_flash_read(const struct lfs_config *cfg, lfs_block_t block,
-        lfs_off_t off, void *buffer, lfs_size_t size);
-int fs_flash_prog(const struct lfs_config *cfg, lfs_block_t block,
-            lfs_off_t off, const void *buffer, lfs_size_t size);
-int fs_flash_erase(const struct lfs_config *cfg, lfs_block_t block);
-int fs_flash_sync(const struct lfs_config *c);
-struct lfs_config pico_lfs_cfg = {
-    // block device operations
-    .read  = fs_flash_read,
-    .prog  = fs_flash_prog,
-    .erase = fs_flash_erase,
-    .sync  = fs_flash_sync,
-   // block device configuration
-    .read_size = 1,
-    .prog_size = 256,
-    .block_size = BLOCK_SIZE,
-    .block_count = 0,
-    .block_cycles=500,
-    .cache_size=256,
-    .lookahead_size = 256,
-	.read_buffer = (void *)FlashReadBuffer,
-	.prog_buffer = (void *)FlashProgBuffer,
-	.lookahead_buffer = (void *)FlashLookBuffer,
-};
+/* pico_lfs_cfg + fs_flash_* live in drivers/pico_flash/pico_flash_lfs.c.
+ * PicoMite.c sets pico_lfs_cfg.block_count at boot once Option.FlashSize
+ * is known. */
+extern struct lfs_config pico_lfs_cfg;
 
 volatile union u_flash
 {
@@ -401,42 +378,6 @@ void ResetFlashStorage(int umount){
     FileClose(fnbr);
  }
 
-int __not_in_flash_func(fs_flash_read)(const struct lfs_config *cfg, lfs_block_t block,
-        lfs_off_t off, void *buffer, lfs_size_t size)
-{
-    assert(off  % cfg->read_size == 0);
-    assert(size % cfg->read_size == 0);
-    assert(block < cfg->block_count);
-    uint32_t addr = XIP_BASE + RoundUpK4(TOP_OF_SYSTEM_FLASH) + (Option.modbuff ? 1024*Option.modbuffsize : 0) + block*4096 + off;
-    memcpy(buffer,(char *)addr,size);
-    return 0;
-}
-int __not_in_flash_func(fs_flash_prog)(const struct lfs_config *cfg, lfs_block_t block,
-            lfs_off_t off, const void *buffer, lfs_size_t size)
-{
-    assert(off  % cfg->prog_size == 0);
-    assert(size % cfg->prog_size == 0);
-    assert(block < cfg->block_count);
-
-    uint32_t addr = RoundUpK4(TOP_OF_SYSTEM_FLASH) + (Option.modbuff ? 1024*Option.modbuffsize : 0) + block*4096 + off;
-    disable_interrupts_pico();
-    hal_flash_program(addr, buffer, size);
-    enable_interrupts_pico();
-    return 0;
-}
-int __not_in_flash_func(fs_flash_erase)(const struct lfs_config *cfg, lfs_block_t block){
-    assert(block < cfg->block_count);
-
-    uint32_t block_addr = RoundUpK4(TOP_OF_SYSTEM_FLASH) + (Option.modbuff ? 1024*Option.modbuffsize : 0) + block*4096;
-        disable_interrupts_pico();
-        hal_flash_erase(block_addr, BLOCK_SIZE);
-        enable_interrupts_pico();
-        return 0;
-}
-int __not_in_flash_func(fs_flash_sync)(const struct lfs_config *c)
-{
-    return 0;
-}
 /*  @endcond */
 void MIPS16 cmd_disk(void){
     char *p=(char *)getCstring(cmdline);
@@ -1141,8 +1082,7 @@ char *GetCWD(void)
     if(FatFSFileSystem){
         if (!InitSDCard())
             return b;
-        FSerror = f_getcwd(b, STRINGSIZE);
-        ErrorCheck(0);
+        if (hal_fs_getcwd(b, STRINGSIZE) == NULL) { FSerror = -5; ErrorCheck(0); }
         return &b[1];
     }   else {
         fullpath("");

@@ -498,3 +498,11 @@ static void host_flash_contents_init(void) {
 void host_options_snapshot(void) {
     memcpy(host_flash_option_buf, &Option, sizeof(Option));
 }
+
+/* pico_lfs_cfg lives in drivers/pico_flash/pico_flash_lfs.c on device,
+ * which pulls in hal_flash + hardware headers (not present on host).
+ * FileIO.c keeps an `extern struct lfs_config pico_lfs_cfg;` that the
+ * host link also needs to satisfy, even though every host lfs_* call
+ * above is a stub that doesn't touch the cfg. A zero-initialised
+ * definition is enough. */
+struct lfs_config pico_lfs_cfg;

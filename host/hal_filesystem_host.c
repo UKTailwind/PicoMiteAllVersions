@@ -108,6 +108,44 @@ off_t   hal_fs_tell (hal_fs_fd_t fd)                                 { (void)fd;
 int     hal_fs_eof  (hal_fs_fd_t fd)                                 { (void)fd; return -ENOSYS; }
 int     hal_fs_sync (hal_fs_fd_t fd)                                 { (void)fd; return -ENOSYS; }
 
-int hal_fs_dir_open (const char *path, hal_fs_dir_t **out)      { (void)path; (void)out; return -ENOSYS; }
-int hal_fs_dir_next (hal_fs_dir_t *dir, struct hal_dirent *out) { (void)dir; (void)out; return -ENOSYS; }
-int hal_fs_dir_close(hal_fs_dir_t *dir)                          { (void)dir; return -ENOSYS; }
+/* Directory iteration — host uses FatFS f_opendir/readdir/closedir
+ * which route through host_fs_shims.c to either real POSIX (when
+ * host_sd_root is set) or vm_host_fat's RAM disk (test-harness mode).
+ * Avoids pulling <dirent.h> which collides with ff.h's `DIR` typedef. */
+struct hal_fs_dir {
+    DIR fatfs_dir;
+};
+
+int hal_fs_dir_open(const char *path, hal_fs_dir_t **out)
+{
+    if (!path || !out) return -EINVAL;
+    hal_fs_dir_t *d = (hal_fs_dir_t *)calloc(1, sizeof(*d));
+    if (!d) return -ENOMEM;
+    FRESULT r = f_opendir(&d->fatfs_dir, path);
+    if (r != FR_OK) { free(d); return fatfs_rc_to_errno(r); }
+    *out = d;
+    return 0;
+}
+
+int hal_fs_dir_next(hal_fs_dir_t *dir, struct hal_dirent *out)
+{
+    if (!dir || !out) return -EINVAL;
+    FILINFO fno;
+    FRESULT r = f_readdir(&dir->fatfs_dir, &fno);
+    if (r != FR_OK) return fatfs_rc_to_errno(r);
+    if (fno.fname[0] == 0) return 0;
+    strncpy(out->name, fno.fname, sizeof(out->name) - 1);
+    out->name[sizeof(out->name) - 1] = '\0';
+    out->size = fno.fsize;
+    out->mode = (fno.fattrib & AM_DIR) ? HAL_FS_S_IFDIR : HAL_FS_S_IFREG;
+    if (fno.fattrib & AM_HID) out->mode |= HAL_FS_S_IFHIDDEN;
+    return 1;
+}
+
+int hal_fs_dir_close(hal_fs_dir_t *dir)
+{
+    if (!dir) return -EINVAL;
+    FRESULT r = f_closedir(&dir->fatfs_dir);
+    free(dir);
+    return fatfs_rc_to_errno(r);
+}

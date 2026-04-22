@@ -203,6 +203,75 @@ off_t   hal_fs_tell (hal_fs_fd_t fd)                                 { (void)fd;
 int     hal_fs_eof  (hal_fs_fd_t fd)                                 { (void)fd; return -ENOSYS; }
 int     hal_fs_sync (hal_fs_fd_t fd)                                 { (void)fd; return -ENOSYS; }
 
-int hal_fs_dir_open (const char *path, hal_fs_dir_t **out)      { (void)path; (void)out; return -ENOSYS; }
-int hal_fs_dir_next (hal_fs_dir_t *dir, struct hal_dirent *out) { (void)dir; (void)out; return -ENOSYS; }
-int hal_fs_dir_close(hal_fs_dir_t *dir)                          { (void)dir; return -ENOSYS; }
+/* Directory iteration — holds either a FatFS DIR* (SD) or an LFS
+ * lfs_dir_t* (internal flash) plus the base path so hal_fs_dir_next
+ * can reconstruct full paths for stat purposes. */
+#include <stdlib.h>
+struct hal_fs_dir {
+    fs_kind_t kind;
+    union {
+        DIR      fatfs;
+        lfs_dir_t lfs;
+    } h;
+    char path[256];
+};
+
+int hal_fs_dir_open(const char *path, hal_fs_dir_t **out)
+{
+    if (!path || !out) return -EINVAL;
+    hal_fs_dir_t *d = (hal_fs_dir_t *)calloc(1, sizeof(*d));
+    if (!d) return -ENOMEM;
+    d->kind = path_fs(path);
+    strncpy(d->path, path, sizeof(d->path) - 1);
+    int r;
+    if (d->kind == FS_LFS) {
+        r = lfs_rc_to_errno(lfs_dir_open(&lfs, &d->h.lfs, path_after_drive(path)));
+    } else {
+        r = fatfs_rc_to_errno(f_opendir(&d->h.fatfs, path));
+    }
+    if (r < 0) { free(d); return r; }
+    *out = d;
+    return 0;
+}
+
+int hal_fs_dir_next(hal_fs_dir_t *dir, struct hal_dirent *out)
+{
+    if (!dir || !out) return -EINVAL;
+    if (dir->kind == FS_LFS) {
+        struct lfs_info info;
+        int r = lfs_dir_read(&lfs, &dir->h.lfs, &info);
+        if (r == 0) return 0;  /* end */
+        if (r < 0) return lfs_rc_to_errno(r);
+        if (strcmp(info.name, ".") == 0 || strcmp(info.name, "..") == 0) {
+            return hal_fs_dir_next(dir, out);
+        }
+        strncpy(out->name, info.name, sizeof(out->name) - 1);
+        out->name[sizeof(out->name) - 1] = '\0';
+        out->size = info.size;
+        out->mode = (info.type == LFS_TYPE_DIR) ? HAL_FS_S_IFDIR : HAL_FS_S_IFREG;
+        return 1;
+    }
+    FILINFO fno;
+    FRESULT r = f_readdir(&dir->h.fatfs, &fno);
+    if (r != FR_OK) return fatfs_rc_to_errno(r);
+    if (fno.fname[0] == 0) return 0;
+    strncpy(out->name, fno.fname, sizeof(out->name) - 1);
+    out->name[sizeof(out->name) - 1] = '\0';
+    out->size = fno.fsize;
+    out->mode = (fno.fattrib & AM_DIR) ? HAL_FS_S_IFDIR : HAL_FS_S_IFREG;
+    if (fno.fattrib & AM_HID) out->mode |= HAL_FS_S_IFHIDDEN;
+    return 1;
+}
+
+int hal_fs_dir_close(hal_fs_dir_t *dir)
+{
+    if (!dir) return -EINVAL;
+    int r;
+    if (dir->kind == FS_LFS) {
+        r = lfs_rc_to_errno(lfs_dir_close(&lfs, &dir->h.lfs));
+    } else {
+        r = fatfs_rc_to_errno(f_closedir(&dir->h.fatfs));
+    }
+    free(dir);
+    return r;
+}

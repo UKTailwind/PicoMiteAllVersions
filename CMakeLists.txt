@@ -122,6 +122,7 @@ set(PICOMITE_PICO_SDK_HAL_SOURCES
 	ports/pico_sdk_common/hal_pin_pico.c
 	ports/pico_sdk_common/hal_storage_pico.c
 	ports/pico_sdk_common/hal_filesystem_pico.c
+	drivers/pico_flash/pico_flash_lfs.c
 )
 
 set(PICOMITE_VM_SOURCES
