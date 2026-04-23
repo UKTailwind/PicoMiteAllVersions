@@ -310,6 +310,16 @@ if(COMPILE STREQUAL "VGARP2350" OR COMPILE STREQUAL "WEBRP2350" OR COMPILE STREQ
 else()
     target_sources(PicoMite PRIVATE drivers/upng_sprite/upng_sprite_stub.c)
 endif()
+
+# GUI touch-panel sub-commands (BEEP / RESET LCDPANEL / CALIBRATE /
+# TEST TOUCH): SPI-LCD + touch-panel variants (PICOMITE / WEB) get
+# the real impl; VGA/HDMI link no-op stubs so cmd_guiMX170 reports
+# "Unknown command" for touch-panel commands on those boards.
+if (COMPILE STREQUAL "VGA" OR COMPILE STREQUAL "VGAUSB" OR COMPILE STREQUAL "VGARP2350" OR COMPILE STREQUAL "VGAUSBRP2350" OR COMPILE STREQUAL "HDMI" OR COMPILE STREQUAL "HDMIUSB")
+    target_sources(PicoMite PRIVATE drivers/gui_touch/gui_touch_stub.c)
+else()
+    target_sources(PicoMite PRIVATE drivers/gui_touch/gui_touch.c)
+endif()
 if (COMPILE STREQUAL "WEB" OR COMPILE STREQUAL "WEBRP2350" )
     target_sources(PicoMite PRIVATE
 	SSD1963.c

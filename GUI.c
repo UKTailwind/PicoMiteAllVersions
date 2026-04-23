@@ -94,13 +94,10 @@ struct s_GaugeS {
 int SetupPage;
 unsigned int CurrentPages;
 
-short gui_font_width, gui_font_height;
-
-int display_backlight;                  // the brightness of the backlight (1 to 100)
-
-int gui_click_pin = 0;                  // the sound pin
-
-volatile int CursorTimer;               // used to time the flashing cursor
+/* gui_font_width / gui_font_height / display_backlight / gui_click_pin
+ * / CursorTimer moved to core/state/display_state.c so they're
+ * available on every target (including non-GUICONTROLS PicoMite and
+ * host) without target-macro gates in Draw.c. */
 volatile int ClickTimer = 0;            // used to time the click when touch occurs
 volatile int TouchTimer;                // used to time the response to touch
 int CheckGuiFlag = 0;                   // used to tell the mSec timer to call CheckGui()
@@ -120,7 +117,7 @@ volatile bool TouchState = false;
 
 int last_x2, last_y2;                   // defaults used when creating controls
 MMFLOAT last_inc, last_min, last_max;
-int last_fcolour, last_bcolour;
+/* last_fcolour / last_bcolour moved to core/state/display_state.c. */
 MMFLOAT last_ta, last_tb, last_tc;
 int last_c1 = -1, last_c2, last_c3, last_c4;
 char last_units[32];

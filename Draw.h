@@ -89,6 +89,9 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 
     extern int gui_fcolour;
     extern int gui_bcolour;
+    extern int last_fcolour, last_bcolour;
+    extern int display_backlight;
+    extern int gui_click_pin;
 
     extern short DisplayHRes, DisplayVRes;        // resolution of the display
     extern short HRes, VRes;                      // the programming charteristics of the display

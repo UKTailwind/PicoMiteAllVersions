@@ -94,11 +94,9 @@ int FSerror = 0;
 int GPSchannel = 0;
 int gui_bcolour = 0;
 int gui_fcolour = 0xFFFFFF;
-int last_bcolour = 0;
-int last_fcolour = 0xFFFFFF;
 short gui_font = 0;
-short gui_font_height = 8;
-short gui_font_width = 6;
+/* last_bcolour / last_fcolour / gui_font_height / gui_font_width moved
+ * to core/state/display_state.c (unconditional on every target). */
 uint8_t I2C0locked = 0;
 uint8_t I2C1locked = 0;
 unsigned char IgnorePIN = 0;
@@ -189,7 +187,7 @@ volatile unsigned int Timer1 = 0, Timer2 = 0, Timer3 = 0, Timer4 = 0, Timer5 = 0
 volatile unsigned int diskchecktimer = 0;
 volatile unsigned int clocktimer = 0;
 volatile int ds18b20Timer = 0;
-volatile int CursorTimer = 0;
+/* CursorTimer moved to core/state/display_state.c. */
 volatile unsigned int I2CTimer = 0;
 volatile unsigned int MouseTimer = 0;
 volatile unsigned int SecondsTimer = 0;

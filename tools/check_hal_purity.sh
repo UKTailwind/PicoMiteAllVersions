@@ -89,6 +89,9 @@ STRICT_FILES=(
   FileIO.c    # F3 close: zero target-macro, zero port-config ifdefs.
   MM_Misc.c   # F4 close: zero target-macro, zero port-config ifdefs.
   Audio.c     # Phase 6b close: zero target-macro, zero port-config ifdefs.
+  Draw.c      # Phase 7b close: zero target-macro, zero port-config ifdefs.
+              # Remaining 3 #ifdef GUICONTROLS gates are feature flags
+              # (not target macros), permitted by the strict check.
 )
 
 # Files tracked informationally (report counts, do not fail).

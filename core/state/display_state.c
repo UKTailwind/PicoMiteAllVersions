@@ -41,3 +41,16 @@ uint32_t mergetimer = 0;
  * MM_Misc.c reference it unconditionally now that the
  * ScrollLCD==ScrollLCDMEM332 branch is gate-free. */
 volatile int ScrollStart = 0;
+
+/* GUI-related globals formerly split across GUI.c (GUICONTROLS
+ * builds), Draw.c (non-GUICONTROLS non-host PicoMite), and
+ * host_runtime.c (host). Consolidated here so Draw.c can drop its
+ * `#if !defined(GUICONTROLS) && !defined(MMBASIC_HOST)` storage
+ * block and the definitions don't multiply across GUI.c / host. */
+short gui_font_width;
+short gui_font_height;
+int display_backlight;
+int gui_click_pin = 0;
+int last_fcolour;
+int last_bcolour;
+volatile int CursorTimer = 0;
