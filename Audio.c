@@ -1943,9 +1943,7 @@ void MIPS16 cmd_play(void) {
 		Timer1=500;
 		while(Timer1){
 			checkWAVinput();
-		#ifdef PICOMITEWEB
 			ProcessWeb(1);
-		#endif
 		}
         return;
     }
