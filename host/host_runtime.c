@@ -838,6 +838,8 @@ void cmd_load_post_cleanup(void)
     longjmp(mark, 1);
 }
 
+extern volatile BYTE SDCardStat;
+
 int port_mount_sd_drive(void)
 {
     /* Host FatFS is vm_host_fat.c's in-memory disk (or the POSIX dir
@@ -849,6 +851,25 @@ int port_mount_sd_drive(void)
     if (vm_host_fat_mount() != FR_OK) error("Host FAT init failed");
     SDCardStat = 0;
     return 2;
+}
+
+void port_apply_load_overrides(void)
+{
+    /* Host has no display/SD/audio pins to override; LoadOptions's flash
+     * read into Option already wins. Real per-board overrides for device
+     * builds live in ports/pico_sdk_common/port_load_overrides.c. */
+}
+
+void port_drive_check(char drive)
+{
+    /* Host has only one logical disk (B:, backed by POSIX under
+     * host_sd_root or the vm_host_fat RAM disk). The A: drive is the
+     * device's LittleFS-on-flash filesystem; LFS is stubbed on host,
+     * so switching to A: lands on a broken branch and subsequent
+     * FILES / COPY / etc. trip on the stubbed lfs_* calls (one
+     * side-effect being console-routing corruption). Treat A: as an
+     * error; B: is always available — no SD_CS pin to check. */
+    if (drive == 'A') error("A: drive not available on host");
 }
 
 /* str_replace/STR_REPLACE provided by MATHS.c */

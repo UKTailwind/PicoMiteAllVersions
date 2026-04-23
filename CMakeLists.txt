@@ -134,6 +134,7 @@ set(PICOMITE_PICO_SDK_HAL_SOURCES
 	ports/pico_sdk_common/mem_writeblock.c
 	ports/pico_sdk_common/load_png.c
 	ports/pico_sdk_common/cmd_files_hooks.c
+	ports/pico_sdk_common/port_load_overrides.c
 	drivers/pico_flash/pico_flash_lfs.c
 )
 

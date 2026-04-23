@@ -60,6 +60,17 @@ void cmd_load_post_cleanup(void)
      * clobber the in-flight tknbuf; cmd_load returns normally. */
 }
 
+void port_drive_check(char drive)
+{
+    /* Both A: (LFS-on-flash) and B: (FatFS-on-SD) exist on device. A:
+     * needs no validation — flash is always present. B: requires the
+     * SD-card chip-select pin to be configured (SD_CS or CombinedCS). */
+    if (drive == 'B') {
+        if (!(Option.SD_CS || Option.CombinedCS))
+            error("B: drive not enabled");
+    }
+}
+
 int port_mount_sd_drive(void)
 {
     int i;

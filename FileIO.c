@@ -84,10 +84,6 @@ extern FRESULT host_f_getcwd(TCHAR *buff, UINT len);
 #include "sys/stat.h"
 #include "picojpeg.h"
 #include "hardware/sync.h"
-#ifdef PICOMITE
-	#include "pico/multicore.h"
-	extern mutex_t	frameBufferMutex;
-#endif
 /* qmi.h (PSRAM controller) is only touched via mmbasic_save/restore_psram_settings
  * in ports/pico_sdk_common/psram_cache.c — not included here anymore. */
 extern const uint8_t *flash_target_contents;
@@ -124,6 +120,8 @@ extern void cmd_files_restore_program_context(void);
 extern void cmd_files_pump_console_key(int *c);
 extern void cmd_load_post_cleanup(void);
 extern int  port_mount_sd_drive(void);
+extern void port_apply_load_overrides(void);
+extern void port_drive_check(char drive);
 /* MemLoadProgram body lives in the #ifdef-rp2350 DEFINES block below. */
 int MemLoadProgram(unsigned char *fname, unsigned char *ram);
 
@@ -365,29 +363,15 @@ void MIPS16 cmd_disk(void){
     char *p=(char *)getCstring(cmdline);
     char *b=GetTempMemory(STRINGSIZE);
     for(int i=0;i<strlen(p);i++)b[i]=toupper(p[i]);
-#ifdef MMBASIC_HOST
-    /* Host has only one logical disk (B:, backed by POSIX under
-     * host_sd_root or the vm_host_fat RAM disk). The A: drive is the
-     * device's LittleFS-on-flash filesystem; LFS is stubbed on host,
-     * so switching to A: lands on a broken branch and subsequent
-     * FILES / COPY / etc. trip on the stubbed lfs_* calls (one
-     * side-effect being console-routing corruption). Treat any A:
-     * form as an error instead. */
-    if (strcmp(b, "A:/FORMAT") == 0 || strcmp(b, "A:") == 0)
-        error("A: drive not available on host");
-#endif
     if(strcmp(b, "A:/FORMAT")==0)  {
+        port_drive_check('A');
         FatFSFileSystem = FatFSFileSystemSave = 0;
         ResetFlashStorage(1);
         return;
     }
-    if(strcmp(b, "A:")==0)  { FatFSFileSystem = FatFSFileSystemSave = 0;  return; }
+    if(strcmp(b, "A:")==0)  { port_drive_check('A'); FatFSFileSystem = FatFSFileSystemSave = 0;  return; }
     if(strcmp(b, "B:")==0)    {
-#ifndef MMBASIC_HOST
-        /* Host: B: is always available (backed by vm_host_fat RAM disk
-         * or POSIX via host_sd_root). No SD_CS pin to check. */
-        if(!(Option.SD_CS || Option.CombinedCS))error("B: drive not enabled");
-#endif
+        port_drive_check('B');
         FatFSFileSystem = FatFSFileSystemSave = 1;
         return;
     }
@@ -3884,54 +3868,11 @@ void LoadOptions(void)
     RGB121map[14] = YELLOW;
     RGB121map[15] = WHITE;
 
-#ifdef PICOCALC
-    Option.DISPLAY_TYPE = ST7796SP;
-    Option.SYSTEM_CLK = 14;
-    Option.SYSTEM_MOSI = 15;
-    Option.SYSTEM_MISO = 16;
-    Option.DISPLAY_BL = 0; //stm32 control the backlight
-    Option.LCD_CD = 19;
-    Option.LCD_CS = 17;
-    Option.LCD_Reset = 20;
-    Option.DISPLAY_ORIENTATION = PORTRAIT;
-    Option.DISPLAY_CONSOLE = 1;
-    Option.SerialConsole = 1;
-    Option.SerialTX = 1;
-    Option.SerialRX = 2;
-
-    Option.CombinedCS = 0;
-    Option.SD_CS = 22;
-    Option.SD_CLK_PIN = 24;
-    Option.SD_MOSI_PIN = 25;
-    Option.SD_MISO_PIN = 21;
-
-    Option.TOUCH_CS = 0;
-    Option.TOUCH_IRQ = 0;
-
-    Option.DefaultFC = GREEN;
-
-    Option.AUDIO_L = 31;
-    Option.AUDIO_R = 32;
-    Option.AUDIO_SLICE=5;
-
-    Option.AUDIO_CLK_PIN=0;
-    Option.AUDIO_MOSI_PIN = 0;
-    Option.AUDIO_DCS_PIN = 0;
-    Option.AUDIO_DREQ_PIN = 0;
-    Option.AUDIO_RESET_PIN = 0;
-
-    Option.KeyboardConfig =CONFIG_I2C;
-    Option.SYSTEM_I2C_SDA = 9;
-    Option.SYSTEM_I2C_SCL = 10;
-    Option.SYSTEM_I2C_SLOW=1; //10khz for picocalc
-
-    Option.DefaultFont = 0x01;
-
-    Option.BGR = 1;
-    Option.BackLightLevel = 20; //default 20,sync with i2c keyboard
-    Option.ColourCode = 1;
-    strcpy((char *)Option.platform,"PicoCalc");
-#endif
+    /* Per-board overrides applied after the saved Option struct is read
+     * from flash. Implementations live in ports/<board>/port_defaults.c
+     * (PicoCalc forces ST7796 + I2C keyboard + audio pins) and
+     * host/host_runtime.c (no-op). */
+    port_apply_load_overrides();
 }
 
 void ResetOptions(bool startup)
