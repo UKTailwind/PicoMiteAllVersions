@@ -145,12 +145,12 @@ volatile uint32_t realflashpointer;
 int FlashLoad = 0;
 unsigned char *CFunctionFlash = NULL;
 unsigned char *CFunctionLibrary = NULL;
-#define SDbufferSize 512
-static char *SDbuffer[MAXOPENFILES + 1] = {NULL};
-int buffpointer[MAXOPENFILES + 1] = {0};
-static uint32_t lastfptr[MAXOPENFILES + 1] = {[0 ... MAXOPENFILES] = -1};
-uint8_t fmode[MAXOPENFILES + 1] = {0};
-static unsigned int bw[MAXOPENFILES + 1] = {[0 ... MAXOPENFILES] = -1};
+/* SD-sector read-cache + per-fnbr file mode used to live here as
+ * MMBASIC_HOST-gated arrays (SDbuffer/buffpointer/bw/lastfptr/fmode).
+ * The cache moved into ports/pico_sdk_common/hal_filesystem_pico.c
+ * (per-slot, allocated in hal_fs_open for FATFS read-only); FileIO.c
+ * just calls hal_fs_getc / hal_fs_putc and lets the HAL deal with
+ * sector-granular reads. */
 unsigned char filesource[MAXOPENFILES + 1] = {0};
 /* Per-fnbr HAL fd. 0 = no open HAL file on this slot. BasicFileOpen
  * allocates via hal_fs_open; ForceFileClose releases. Exposed as
@@ -1493,22 +1493,6 @@ void MIPS16 cmd_kill(void)
 void positionfile(int fnbr, int idx){
     hal_fs_fd_t fd = hal_fds[fnbr];
     if (!fd) return;
-#ifndef MMBASIC_HOST
-    /* Device FatFS read path: seek to SD-sector boundary, refill the
-     * SD read-cache, leave buffpointer at the in-sector offset so the
-     * next FileGetChar returns idx. */
-    if (filesource[fnbr] == FATFSFILE && !(fmode[fnbr] & FA_WRITE)) {
-        off_t sr = hal_fs_seek(fd, idx - (idx % 512), HAL_FS_SEEK_SET);
-        if (sr < 0) { hal_to_fserror((int)sr, fnbr); ErrorCheck(fnbr); return; }
-        char *buff = SDbuffer[fnbr];
-        ssize_t got = hal_fs_read(fd, buff, SDbufferSize);
-        if (got < 0) { hal_to_fserror((int)got, fnbr); ErrorCheck(fnbr); return; }
-        bw[fnbr] = (unsigned int)got;
-        buffpointer[fnbr] = idx % 512;
-        lastfptr[fnbr] = (uint32_t)(uintptr_t)fd;
-        return;
-    }
-#endif
     off_t r = hal_fs_seek(fd, idx, HAL_FS_SEEK_SET);
     if (r < 0) { hal_to_fserror((int)r, fnbr); ErrorCheck(fnbr); }
 }
@@ -2197,51 +2181,22 @@ char __not_in_flash_func(FileGetChar)(int fnbr)
 {
     hal_fs_fd_t fd = hal_fds[fnbr];
     if (!fd) return 0;
-#ifndef MMBASIC_HOST
-    /* Device FatFS/SD path uses per-fnbr SDbuffer[] read-cache to
-     * amortise 512-byte SD sector reads across per-byte FileGetChar
-     * calls. On host (POSIX or vm_host_fat RAM disk) the HAL backend
-     * handles caching — fread buffers internally, FatFS on RAM disk
-     * is zero-cost. */
-    if (filesource[fnbr] == FATFSFILE && !(fmode[fnbr] & FA_WRITE)) {
-        char *buff = SDbuffer[fnbr];
-        if (!InitSDCard()) return 0;
-        if (!(lastfptr[fnbr] == (uint32_t)(uintptr_t)fd && buffpointer[fnbr] < SDbufferSize)) {
-            ssize_t got = hal_fs_read(fd, buff, SDbufferSize);
-            if (got < 0) { hal_to_fserror((int)got, fnbr); ErrorCheck(fnbr); return 0; }
-            bw[fnbr] = (unsigned int)got;
-            buffpointer[fnbr] = 0;
-            lastfptr[fnbr] = (uint32_t)(uintptr_t)fd;
-        }
-        char ch = buff[buffpointer[fnbr]];
-        buffpointer[fnbr]++;
-        diskchecktimer = DISKCHECKRATE;
-        return ch;
-    }
-#endif
-    char ch = 0;
-    ssize_t got = hal_fs_read(fd, &ch, 1);
-    if (got < 0) { hal_to_fserror((int)got, fnbr); ErrorCheck(fnbr); return 0; }
-#ifndef MMBASIC_HOST
-    if (filesource[fnbr] == FATFSFILE) diskchecktimer = DISKCHECKRATE;
-#endif
-    return ch;
+    int r = hal_fs_getc(fd);
+    if (r == -ENODATA) return 0;
+    if (r < 0) { hal_to_fserror(r, fnbr); ErrorCheck(fnbr); return 0; }
+    return (char)r;
 }
 
 char __not_in_flash_func(FilePutChar)(char c, int fnbr)
 {
     hal_fs_fd_t fd = hal_fds[fnbr];
     if (!fd) return 0;
-#ifndef MMBASIC_HOST
-    if (filesource[fnbr] == FATFSFILE && !InitSDCard()) return 0;
-#endif
-    ssize_t w = hal_fs_write(fd, &c, 1);
-    if (w < 0) { hal_to_fserror((int)w, fnbr); ErrorCheck(fnbr); return 0; }
-    if (w != 1) { FSerror = (filesource[fnbr] == FLASHFILE) ? -5 : FR_DISK_ERR; ErrorCheck(fnbr); }
-    lastfptr[fnbr] = -1;
-#ifndef MMBASIC_HOST
-    if (filesource[fnbr] == FATFSFILE) diskchecktimer = DISKCHECKRATE;
-#endif
+    int r = hal_fs_putc(fd, c);
+    if (r < 0) {
+        hal_to_fserror(r, fnbr);
+        ErrorCheck(fnbr);
+        return 0;
+    }
     return c;
 }
 
@@ -2249,13 +2204,6 @@ int FileEOF(int fnbr)
 {
     hal_fs_fd_t fd = hal_fds[fnbr];
     if (!fd) return 1;
-#ifndef MMBASIC_HOST
-    if (filesource[fnbr] == FATFSFILE) {
-        if (!InitSDCard()) return 0;
-        /* Unconsumed bytes in the SD read-cache mean we're not at EOF. */
-        if (buffpointer[fnbr] <= bw[fnbr] - 1 && !(fmode[fnbr] & FA_WRITE)) return 0;
-    }
-#endif
     int r = hal_fs_eof(fd);
     if (r < 0) { hal_to_fserror(r, fnbr); ErrorCheck(fnbr); return 1; }
     return r;
@@ -2328,20 +2276,8 @@ int ForceFileClose(int fnbr)
         hal_fds[fnbr] = 0;
     }
 
-    /* Device FatFS path allocates a 512-byte SDbuffer on open; release
-     * on close. Host slots don't allocate SDbuffer. */
-#ifndef MMBASIC_HOST
-    if (filesource[fnbr] == FATFSFILE && SDbuffer[fnbr]) {
-        FreeMemory((void *)SDbuffer[fnbr]);
-        SDbuffer[fnbr] = NULL;
-    }
-#endif
-
+    /* SD-sector cache, if any, was freed by hal_fs_close. */
     FileTable[fnbr].com = 0;
-    buffpointer[fnbr] = 0;
-    lastfptr[fnbr] = -1;
-    bw[fnbr] = -1;
-    fmode[fnbr] = 0;
     filesource[fnbr] = NONEFILE;
     return type;
 }
@@ -2381,15 +2317,9 @@ void FilePutStr(int count, char *c, int fnbr)
 {
     hal_fs_fd_t fd = hal_fds[fnbr];
     if (!fd || count <= 0) return;
-#ifndef MMBASIC_HOST
-    if (filesource[fnbr] == FATFSFILE) InitSDCard();
-#endif
     ssize_t w = hal_fs_write(fd, c, (size_t)count);
     if (w < 0) { hal_to_fserror((int)w, fnbr); ErrorCheck(fnbr); return; }
     if (w != count) { FSerror = (filesource[fnbr] == FLASHFILE) ? -5 : FR_DISK_ERR; ErrorCheck(fnbr); }
-#ifndef MMBASIC_HOST
-    if (filesource[fnbr] == FATFSFILE) diskchecktimer = DISKCHECKRATE;
-#endif
 }
 
 // output a string to a file
@@ -2528,20 +2458,10 @@ int BasicFileOpen(char *fname, int fnbr, int mode)
 
     hal_fds[fnbr] = fd;
     FileTable[fnbr].com = FILE_SLOT_MARKER;
-    /* filesource still distinguishes A: (LFS) from B: (FatFS) for the
-     * SDbuffer read-cache decision and a handful of device error paths.
-     * The HAL does the actual dispatch. */
+    /* filesource still distinguishes A: (LFS) from B: (FatFS) for error-
+     * code mapping and Audio.c's WAV-streaming SD-removal probe. The
+     * SD read-cache lives in the HAL slot, not here. */
     filesource[fnbr] = FatFSFileSystem ? FATFSFILE : FLASHFILE;
-
-    buffpointer[fnbr] = 0;
-    lastfptr[fnbr]    = -1;
-    bw[fnbr]          = -1;
-    fmode[fnbr]       = mode;
-    /* SDbuffer read-cache only applies to the device FatFS/SD path;
-     * host POSIX (kind==2) reads through fread directly. */
-#ifndef MMBASIC_HOST
-    if (filesource[fnbr] == FATFSFILE) SDbuffer[fnbr] = GetMemory(SDbufferSize);
-#endif
     FSerror = 0;
     hal_keyboard_clear_repeat_state();
     FatFSFileSystem = FatFSFileSystemSave;
@@ -3921,19 +3841,11 @@ void fun_loc(void)
         {
             hal_fs_fd_t fd = hal_fds[fnbr];
             if (!fd) { iret = 1; targ = T_INT; return; }
+            /* hal_fs_tell already reports the logical cursor — the device
+             * FATFS backend subtracts the unread bytes still sitting in
+             * its read-cache. */
             off_t pos = hal_fs_tell(fd);
             if (pos < 0) { hal_to_fserror((int)pos, fnbr); ErrorCheck(fnbr); pos = 0; }
-#ifndef MMBASIC_HOST
-            /* Device FatFS read path: hal_fs_tell reports the backend's
-             * physical position — which on SD is one 512-byte sector
-             * past the logical cursor because we pre-cached the sector.
-             * Adjust back to the logical cursor the user sees. */
-            if (filesource[fnbr] == FATFSFILE && !(fmode[fnbr] & FA_WRITE)) {
-                off_t logical = (pos - 512) + buffpointer[fnbr];
-                if (logical < 0) logical += 512;
-                pos = logical;
-            }
-#endif
             iret = (int64_t)pos + 1;  /* MMBasic LOC is 1-based. */
         }
         else

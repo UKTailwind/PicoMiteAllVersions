@@ -208,6 +208,13 @@ extern void FreeMemory(unsigned char *addr);
 /* HAL_FS_MAX_OPEN slots. Matches MAXOPENFILES (=10 on device). */
 #define HAL_FS_MAX_OPEN 10
 
+/* SD reads are 512-byte sector-granular. FileGetChar / fun_input loops
+ * fan single-byte requests across sectors; without a per-slot read
+ * cache every byte is its own sector fetch. The cache amortises reads
+ * to one sector per 512 calls. Only allocated for FATFS read-mode
+ * slots — LFS reads are zero-cost and FATFS writes don't benefit. */
+#define PICO_FS_SD_CACHE_SIZE 512
+
 typedef struct {
     fs_kind_t kind;
     union {
@@ -216,6 +223,13 @@ typedef struct {
     } h;
     int writable;
     char *lfs_path;  /* non-NULL for writable LFS slots — used to re-set 'A' xattr on sync/close */
+    /* SD read-cache. cache != NULL on FATFS read-only slots. cache_pos
+     * is the next byte to hand out; cache_len is the number of valid
+     * bytes refilled from the backing FIL. cache_pos == cache_len
+     * means "empty, refill on next getc". */
+    char    *cache;
+    unsigned cache_pos;
+    unsigned cache_len;
 } pico_fs_slot_t;
 
 static pico_fs_slot_t pico_fs_slots[HAL_FS_MAX_OPEN];
@@ -326,6 +340,14 @@ int hal_fs_open(const char *path, int flags, hal_fs_fd_t *out)
     FRESULT r = f_open(fp, ff_path, ffmode);
     if (r != FR_OK) { FreeMemory((unsigned char *)fp); return fatfs_rc_to_errno(r); }
     s->h.fatfs = fp;
+    /* Allocate SD-sector read-cache for read-only opens. Writes don't
+     * benefit (and the cache would have to be flushed); R+W opens skip
+     * it too because cache + interleaved writes would require explicit
+     * invalidation we don't currently track. */
+    if (!want_write) {
+        s->cache = (char *)GetMemory(PICO_FS_SD_CACHE_SIZE);
+        s->cache_pos = s->cache_len = 0;
+    }
     *out = idx + 1;
     return 0;
 }
@@ -346,8 +368,29 @@ int hal_fs_close(hal_fs_fd_t fd)
         rc = fatfs_rc_to_errno(r);
         FreeMemory((unsigned char *)s->h.fatfs);
     }
+    if (s->cache) FreeMemory((unsigned char *)s->cache);
     memset(s, 0, sizeof(*s));
     return rc;
+}
+
+/* Bump the SD-removal watchdog. PicoMite.c's main loop polls
+ * diskchecktimer and, on hit, remounts the SD if it was pulled. We
+ * reset it on every FATFS access so an idle program doesn't trip the
+ * remount during a long read. LFS reads (internal flash) don't need
+ * this — the medium can't go away. */
+extern volatile unsigned int diskchecktimer;
+#define DISKCHECKRATE_LOCAL 500
+static inline void poke_diskcheck(pico_fs_slot_t *s)
+{
+    if (s->kind == FS_FATFS) diskchecktimer = DISKCHECKRATE_LOCAL;
+}
+
+/* Invalidate the per-slot SD read-cache. Called on seek and on bulk
+ * reads that bypass it — otherwise hal_fs_getc would hand out stale
+ * bytes from the previous sector. */
+static inline void invalidate_cache(pico_fs_slot_t *s)
+{
+    if (s->cache) s->cache_pos = s->cache_len = 0;
 }
 
 ssize_t hal_fs_read(hal_fs_fd_t fd, void *buf, size_t n)
@@ -360,8 +403,13 @@ ssize_t hal_fs_read(hal_fs_fd_t fd, void *buf, size_t n)
         if (r < 0) return lfs_rc_to_errno(r);
         return r;
     }
+    /* Bulk read through the backing FIL bypasses the byte-level cache,
+     * so any cached bytes become stale relative to the FIL's new
+     * position. Drop them. */
+    invalidate_cache(s);
     UINT bw = 0;
     FRESULT r = f_read(s->h.fatfs, buf, (UINT)n, &bw);
+    poke_diskcheck(s);
     if (r != FR_OK) return fatfs_rc_to_errno(r);
     return (ssize_t)bw;
 }
@@ -378,8 +426,61 @@ ssize_t hal_fs_write(hal_fs_fd_t fd, const void *buf, size_t n)
     }
     UINT bw = 0;
     FRESULT r = f_write(s->h.fatfs, buf, (UINT)n, &bw);
+    poke_diskcheck(s);
     if (r != FR_OK) return fatfs_rc_to_errno(r);
     return (ssize_t)bw;
+}
+
+int hal_fs_getc(hal_fs_fd_t fd)
+{
+    pico_fs_slot_t *s = slot_from_fd(fd);
+    if (!s) return -EBADF;
+    if (s->kind == FS_LFS) {
+        unsigned char c;
+        int r = lfs_file_read(&lfs, s->h.lfs, &c, 1);
+        if (r < 0) return lfs_rc_to_errno(r);
+        if (r == 0) return -ENODATA;
+        return c;
+    }
+    /* FATFS read-only opens use the per-slot cache. Writable opens fall
+     * through to a single-byte f_read (rare path; cmd_input). */
+    if (s->cache) {
+        if (s->cache_pos >= s->cache_len) {
+            UINT bw = 0;
+            FRESULT r = f_read(s->h.fatfs, s->cache, PICO_FS_SD_CACHE_SIZE, &bw);
+            poke_diskcheck(s);
+            if (r != FR_OK) return fatfs_rc_to_errno(r);
+            if (bw == 0) return -ENODATA;
+            s->cache_pos = 0;
+            s->cache_len = bw;
+        }
+        return (unsigned char)s->cache[s->cache_pos++];
+    }
+    unsigned char c;
+    UINT bw = 0;
+    FRESULT r = f_read(s->h.fatfs, &c, 1, &bw);
+    poke_diskcheck(s);
+    if (r != FR_OK) return fatfs_rc_to_errno(r);
+    if (bw == 0) return -ENODATA;
+    return c;
+}
+
+int hal_fs_putc(hal_fs_fd_t fd, char c)
+{
+    pico_fs_slot_t *s = slot_from_fd(fd);
+    if (!s) return -EBADF;
+    if (s->kind == FS_LFS) {
+        int r = lfs_file_write(&lfs, s->h.lfs, &c, 1);
+        if (r < 0) return lfs_rc_to_errno(r);
+        if (r != 1) return -EIO;
+        return 0;
+    }
+    UINT bw = 0;
+    FRESULT r = f_write(s->h.fatfs, &c, 1, &bw);
+    poke_diskcheck(s);
+    if (r != FR_OK) return fatfs_rc_to_errno(r);
+    if (bw != 1) return -EIO;
+    return 0;
 }
 
 off_t hal_fs_seek(hal_fs_fd_t fd, off_t off, int whence)
@@ -394,10 +495,35 @@ off_t hal_fs_seek(hal_fs_fd_t fd, off_t off, int whence)
         if (r < 0) return lfs_rc_to_errno(r);
         return r;
     }
-    FRESULT r;
-    if (whence == HAL_FS_SEEK_SET)      r = f_lseek(s->h.fatfs, off);
-    else if (whence == HAL_FS_SEEK_CUR) r = f_lseek(s->h.fatfs, f_tell(s->h.fatfs) + off);
-    else                                r = f_lseek(s->h.fatfs, f_size(s->h.fatfs) + off);
+    /* FATFS path: any explicit seek aligns to a sector boundary in the
+     * backing FIL and pre-fills the cache so subsequent hal_fs_getc
+     * calls return bytes starting at the requested offset. SEEK_CUR is
+     * resolved against the logical position (physical f_tell minus the
+     * cache offset). SEEK_END uses the file's size directly. */
+    off_t target;
+    if (whence == HAL_FS_SEEK_SET)      target = off;
+    else if (whence == HAL_FS_SEEK_END) target = (off_t)f_size(s->h.fatfs) + off;
+    else {
+        off_t cur = (off_t)f_tell(s->h.fatfs);
+        if (s->cache && s->cache_len) cur -= (off_t)(s->cache_len - s->cache_pos);
+        target = cur + off;
+    }
+    if (target < 0) target = 0;
+    invalidate_cache(s);
+    if (s->cache) {
+        off_t aligned = target - (target % PICO_FS_SD_CACHE_SIZE);
+        FRESULT r = f_lseek(s->h.fatfs, (FSIZE_t)aligned);
+        if (r != FR_OK) return fatfs_rc_to_errno(r);
+        UINT bw = 0;
+        r = f_read(s->h.fatfs, s->cache, PICO_FS_SD_CACHE_SIZE, &bw);
+        poke_diskcheck(s);
+        if (r != FR_OK) return fatfs_rc_to_errno(r);
+        s->cache_len = bw;
+        s->cache_pos = (unsigned)(target - aligned);
+        if (s->cache_pos > s->cache_len) s->cache_pos = s->cache_len;
+        return target;
+    }
+    FRESULT r = f_lseek(s->h.fatfs, (FSIZE_t)target);
     if (r != FR_OK) return fatfs_rc_to_errno(r);
     return (off_t)f_tell(s->h.fatfs);
 }
@@ -407,7 +533,11 @@ off_t hal_fs_tell(hal_fs_fd_t fd)
     pico_fs_slot_t *s = slot_from_fd(fd);
     if (!s) return -EBADF;
     if (s->kind == FS_LFS) return (off_t)lfs_file_tell(&lfs, s->h.lfs);
-    return (off_t)f_tell(s->h.fatfs);
+    /* Logical position = physical FIL position minus the unread bytes
+     * still sitting in the cache. */
+    off_t pos = (off_t)f_tell(s->h.fatfs);
+    if (s->cache && s->cache_len) pos -= (off_t)(s->cache_len - s->cache_pos);
+    return pos;
 }
 
 int hal_fs_eof(hal_fs_fd_t fd)
@@ -417,6 +547,8 @@ int hal_fs_eof(hal_fs_fd_t fd)
     if (s->kind == FS_LFS) {
         return lfs_file_tell(&lfs, s->h.lfs) == lfs_file_size(&lfs, s->h.lfs) ? 1 : 0;
     }
+    /* Cache holding unread bytes ⇒ definitely not EOF. */
+    if (s->cache && s->cache_pos < s->cache_len) return 0;
     return f_eof(s->h.fatfs) ? 1 : 0;
 }
 

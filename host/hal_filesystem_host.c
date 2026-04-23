@@ -272,6 +272,26 @@ ssize_t hal_fs_write(hal_fs_fd_t fd, const void *buf, size_t n)
     return (ssize_t)bw;
 }
 
+int hal_fs_getc(hal_fs_fd_t fd)
+{
+    /* Host has no SD-sector cache: libc fread (POSIX) and FatFS-on-RAM
+     * (vm_host_fat) both buffer adequately on their own. Single-byte
+     * fall-through. */
+    unsigned char c;
+    ssize_t r = hal_fs_read(fd, &c, 1);
+    if (r < 0) return (int)r;
+    if (r == 0) return -ENODATA;
+    return (int)c;
+}
+
+int hal_fs_putc(hal_fs_fd_t fd, char c)
+{
+    ssize_t w = hal_fs_write(fd, &c, 1);
+    if (w < 0) return (int)w;
+    if (w != 1) return -EIO;
+    return 0;
+}
+
 off_t hal_fs_seek(hal_fs_fd_t fd, off_t off, int whence)
 {
     host_fs_slot_t *s = host_slot_from_fd(fd);

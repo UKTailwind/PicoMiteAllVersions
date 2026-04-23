@@ -59,11 +59,18 @@ struct hal_dirent {
 typedef int hal_fs_fd_t;
 typedef struct hal_fs_dir hal_fs_dir_t;  /* opaque */
 
-/* File ops */
+/* File ops. Bulk read/write and the single-byte getc/putc share the same
+ * fd; backends that buffer (the device SD-card port reads in 512-byte
+ * sectors via a per-slot cache) keep tell/seek/eof cache-aware so callers
+ * never see the cache. Returns from hal_fs_getc: 0..255 on success, < 0
+ * on error; -ENODATA at EOF. hal_fs_putc returns 0 on success, < 0 on error.
+ */
 int     hal_fs_open (const char *path, int flags, hal_fs_fd_t *out);
 int     hal_fs_close(hal_fs_fd_t fd);
 ssize_t hal_fs_read (hal_fs_fd_t fd,       void *buf, size_t n);
 ssize_t hal_fs_write(hal_fs_fd_t fd, const void *buf, size_t n);
+int     hal_fs_getc (hal_fs_fd_t fd);
+int     hal_fs_putc (hal_fs_fd_t fd, char c);
 off_t   hal_fs_seek (hal_fs_fd_t fd, off_t off, int whence);
 off_t   hal_fs_tell (hal_fs_fd_t fd);
 int     hal_fs_eof  (hal_fs_fd_t fd);
