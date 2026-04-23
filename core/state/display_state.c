@@ -18,10 +18,13 @@ int layer_in_use[MAXLAYER + 1];
 
 struct spritebuffer spritebuff[MAXBLITBUF + 1] = { 0 };
 
-#ifndef PICOMITEWEB
+/* 3D polygon + camera state. Referenced only from
+ * drivers/gfx_3d/gfx_3d.c, which is not linked on WEB builds (WEB
+ * provides a closeall3d stub via MMtcpserver.c). Storage is
+ * unconditional — the few bytes of BSS on WEB are not worth a
+ * target-macro gate in this file. */
 struct D3D *struct3d[MAX3D + 1] = { NULL };
 s_camera   camera[MAXCAM + 1];
-#endif
 
 /* Async layer/framebuffer merge-pipeline state. Only the PICOMITE
  * (SPI-LCD) device target actually runs the pipeline on core1; on VGA,
