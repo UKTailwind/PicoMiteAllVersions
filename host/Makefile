@@ -68,7 +68,7 @@ CORE_SRCS += psram_heap_stub.c
 
 # Bytecode VM sources
 BC_SRCS = bc_alloc.c bc_bridge.c vm_host_fat.c ff.c ffunicode.c ffsystem.c \
-          vm_sys_input.c vm_sys_graphics.c vm_sys_time.c vm_sys_pin_host.c vm_sys_file.c bc_source.c bc_compiler_core.c \
+          vm_sys_input.c vm_sys_graphics.c vm_sys_time.c vm_sys_pin_host.c vm_sys_file_host.c bc_source.c bc_compiler_core.c \
           bc_vm.c bc_runtime.c bc_debug.c
 
 # Host-specific sources
