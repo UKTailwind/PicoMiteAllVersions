@@ -1,6 +1,8 @@
-# Real HAL Fixup Plan
+# Real HAL Fixup Plan ✅ CLOSED 2026-04-23
 
 Short, self-contained correction plan for the `real-hal` branch. Written 2026-04-22 after an audit found Phase 3b was gaming the ifdef scoreboard by renaming conditionals instead of eliminating them. This doc is the standard and the active work queue. `docs/real-hal-plan.md` is the slim index and `docs/real-hal/` holds per-topic detail; their claims for Phases 3/4/5 and 3b are superseded by F1–F5 below.
+
+**Outcome:** F1 ✅, F2 ✅ (External.c 120 → 0), F3 ✅ (FileIO.c 60 → 0), F4 ✅ (MM_Misc.c 135 → 0), F5 ✅. Three core files in `STRICT_FILES`; HAL purity gate green; all 12 device builds + host (239/239) + WASM green. F4 close commit: `38cb691`. See `real-hal/retrospective.md` "F5 closure" for the full numbers and lessons.
 
 ## The standard (non-negotiable)
 
