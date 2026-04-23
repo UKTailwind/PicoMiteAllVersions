@@ -33,11 +33,24 @@ Pilot one display end-to-end before scaling. ILI9341 SPI LCD is the simplest dis
 
 - Define `hal/hal_display.h` (Tier A slow path: init, set-mode, sync, vsync-wait, scroll, blit-rect; Tier B hot path: `static inline put_pixel` via per-port inline header chosen in Phase 0).
 - Define `hal/hal_irq.h` with `HAL_TIME_CRITICAL` macro.
-- Implement `drivers/ili9341/` from the current `SPI-LCD.c`, lifted with no behaviour change.
+- Implement `drivers/spi_lcd/` from the current `SPI-LCD.c`, lifted with no behaviour change. (Named `spi_lcd` rather than `ili9341` because the file covers the full SPI-controller family — ILI9341, ST7796, ILI9488, ST7789B, GC9A01, ILI9163, ILI9481, SSD1306, N5110, ST7920 — not just ILI9341.)
 - `Draw.c` for ILI9341 ports: replace direct `SPI-LCD.c` calls with HAL calls. `gfx_*_shared.c` calls Tier-B inlines for hot pixel paths.
-- 4 Picomite ports (RP2040 + RP2350 × USB / non-USB) switch to `drivers/ili9341/`.
+- 4 Picomite ports (RP2040 + RP2350 × USB / non-USB) switch to `drivers/spi_lcd/`.
 
 **Exit gate:** Zero `PICOMITE`-only display ifdefs in Draw.c for the ILI9341 path. All 12 device variants + host (239/239) + HAL purity gate green. (Physical `pico_blocks_tilemap` FPS / `mand` wall-time / RAM-baseline verification is desirable post-merge but not a blocker for landing the phase — consistent with Phase 6's close.)
+
+### Progress (as of 2026-04-23)
+
+- **Step 1** (`1e495e1`): relocate `SPI-LCD.c` → `drivers/spi_lcd/spi_lcd.c`. Pure file move — infrastructure only, scoreboard unchanged.
+- **Step 2** (`b793387`): introduce `hal/hal_display_merge.h` with `hal_display_merge_abort()` and `hal_display_merge_check_busy()`. Real impl in `drivers/display_merge/display_merge_pico.c` (PICOMITE variants), stub in `display_merge_stub.c` (others). Move `mergerunning` / `mergedone` / `mergetimer` to unconditional storage in `core/state/display_state.c`. Draw.c ifdefs: 164 → 160 (−4).
+- **Step 3** (`9c2af50`): extend `hal_display_merge` with `lock_fb` / `unlock_fb` / `mark_done` (wraps `frameBufferMutex` + the `mergedone` signal pair) and `fast_dma_alloc` / `fast_dma_free` (wraps `ShadowBuf` + `fb_dma_chan` setup/teardown for FRAMEBUFFER CREATE FAST). Draw.c ifdefs: 160 → 151 (−9).
+
+Cumulative Phase 7a progress: Draw.c 164 → 151 (−13 ifdefs). All concerns cleared are multicore-merge-pipeline flavoured, which straddles Phase 7's display scope and Phase 8's `hal_multicore` scope — the hooks added live under `hal/hal_display_merge.h` and can migrate to `hal/hal_multicore.h` in Phase 8 if that API wins a cross-driver role.
+
+Remaining PICOMITE ifdefs in Draw.c fall into three rough buckets:
+- **Async merge protocol** (~5 ifdefs): `FRAMEBUFFER MERGE B/R/A` and `COPY ..., B` issue `multicore_fifo_push_blocking(1|2|3,…)` to wake the core1 pipeline. Needs either `hal_display_merge_post_copy/fill/bg` hooks (the shape used in steps 2/3) or Phase 8's generic `hal_multicore_post`. Also the `FRAMEBUFFER SYNC` spin on `mergedone`.
+- **rp2350 NEXTGEN dispatch** (~20 ifdefs): `#if defined(PICOMITE) && defined(rp2350)` guards around `Option.DISPLAY_TYPE >= NEXTGEN` branches. `NEXTGEN` is already defined unconditionally (`SPI-LCD.h:346`), so each guard drops to a plain runtime branch — `Option.DISPLAY_TYPE >= NEXTGEN` simply never matches on rp2040 (the option value can't be set there).
+- **LCD_CLK vs SYSTEM_CLK pin naming** (2 gates): rp2350 PicoMite exposes `Option.LCD_CLK`; rp2040 uses `Option.SYSTEM_CLK`. Either unify the field via Option struct layout or add a small runtime helper that returns the right pin.
 
 ## Phase 7b — `hal_display.h` for VGA (PIO)
 

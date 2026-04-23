@@ -87,6 +87,10 @@ F4 step 30 164      4       2       2      39        39      17         14      
 6b step 4  164      4        2         2      39        39        17          1       268  (drop 4 rp2350 guards around PSRAM MOD buffer code — CloseAudio modbuff reset, MODFILE "not enabled" check, and the paired flash/PSRAM load branches — PSRAMsize=0 on RP2040 collapses them to the flash path at runtime; −4)
 6b step 5  164      4        2         2      39        39        17          0       267  (relocate device body ~2100 lines → drivers/pwm_synth/pwm_synth.c linked per-target via CMakeLists; Audio.c collapses to host-only cmd_play (199 lines), zero target-macro and zero port-config ifdefs; −1. Audio.c promoted to STRICT_FILES. Phase 6b CLOSED.)
 6          .       .        .        .       .         .       .          0        .  (Audio.c → HAL)
+─── Phase 7a (Draw.c ILI9341 → HAL) ───
+7a step 1  164      4        2         2      39        39        17          0       267  (relocate SPI-LCD.c → drivers/spi_lcd/ — pure file move, no ifdef change. Infrastructure-only.)
+7a step 2  160      4        2         2      39        39        17          0       263  (hal_display_merge_abort + hal_display_merge_check_busy hooks; mergerunning/mergedone/mergetimer → display_state.c unconditional; drivers/display_merge/{pico,stub}.c; −4)
+7a step 3  151      4        2         2      39        39        17          0       254  (hal_display_merge lock_fb/unlock_fb/mark_done + fast_dma_alloc/free; blitmerge + merge + closeframebuffer + FRAMEBUFFER CREATE FAST / CLOSE F / CLOSE L migrated; −9)
 7a         .       .        .        .       .         .       .          .        .  (Draw.c ILI9341 → HAL)
 7b         .       .        .        .       .         .       .          .        .  (Draw.c VGA → HAL)
 7c         .       .        .        .       .         .       .          .        .  (Draw.c HDMI → HAL)
