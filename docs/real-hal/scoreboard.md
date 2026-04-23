@@ -83,6 +83,7 @@ F4 step 30 164      4       2       2      39        39      17         14      
 6b step 1  164      4        2         2      39        39        17         13       280  (drop PICOMITEWEB guard around ProcessWeb — F3 step 4 stub is unconditional; −1)
 6b step 2  164      4        2         2      39        39        17         12       279  (FLAC max sample-rate cap → HAL_PORT_AUDIO_FLAC_MAX_BASE_HZ port constant; −1)
 6b step 3a 164      4        2         2      39        39        17         11       278  (dr_mp3 amalgamated impl → drivers/audio_mp3/{real,stub}.c; dr_mp3.h unconditional in Audio.c; MOD_BUFFER_SIZE → HAL_PORT_AUDIO_MOD_BUFFER_SIZE; HAL_PORT_HAS_MP3 defined; −1)
+6b step 3b 164      4        2         2      39        39        17          5       272  (drop 6 rp2350 guards around MP3 code in Audio.c — drmp3 *mymp3 decl, CloseAudio MP3+PSRAM cleanup, mp3callback body, PLAY MP3 precondition → HAL_PORT_HAS_MP3 runtime branch, checkWAVinput pump, audio_checks cleanup; PSRAMsize definition promoted to unconditional in PicoMite.c and extern in Hardware_Includes.h; −6)
 6          .       .        .        .       .         .       .          0        .  (Audio.c → HAL)
 7a         .       .        .        .       .         .       .          .        .  (Draw.c ILI9341 → HAL)
 7b         .       .        .        .       .         .       .          .        .  (Draw.c VGA → HAL)

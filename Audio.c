@@ -167,9 +167,7 @@ volatile int *streamwritepointer=NULL;
 volatile int *streamreadpointer=NULL;
 char *streambuffer=NULL;
 char WAVfilename[FF_MAX_LFN]={0};
-#ifdef rp2350
 drmp3 *mymp3;
-#endif
 void* my_malloc(size_t sz, void* pUserData)
 {
     return GetMemory(sz);
@@ -665,13 +663,11 @@ void CloseAudio(int all){
 	FSerror = 0;
 	if(was_playing == P_FLAC || was_playing == P_PAUSE_FLAC )FreeMemorySafe((void **)&myflac);
 	if(was_playing == P_WAV || was_playing == P_PAUSE_WAV )FreeMemorySafe((void **)&mywav);
-#ifdef rp2350
 	if((was_playing == P_MP3 || was_playing == P_PAUSE_MP3 ) && (Option.AUDIO_L || Option.audio_i2s_bclk || Option.AUDIO_MOSI_PIN)){
 		drmp3_uninit(mymp3);
 		FreeMemorySafe((void **)&mymp3);
 	}
 	if(PSRAMsize && was_playing == P_MOD)FreeMemorySafe((void **)&modbuff);
-#endif
     int i;
     for(i=0;i<MAXSOUNDS;i++){
     	sound_PhaseM_left[i]=0;
@@ -827,7 +823,6 @@ void mp3callback(char *p, int position){
 		playvs1053(P_MP3);
 		return;
 	}
-#ifdef rp2350
 	int actualrate;
 	drmp3_allocation_callbacks allocationCallbacks;
     allocationCallbacks.pUserData = NULL;
@@ -841,8 +836,6 @@ void mp3callback(char *p, int position){
     if(drmp3_init(mymp3, (drmp3_read_proc)onRead, (drmp3_seek_proc)onSeek, NULL, &allocationCallbacks)==DRMP3_FALSE)error("Mp3 init");
     FreeMemorySafe((void *)&sbuff1);
     FreeMemorySafe((void *)&sbuff2);
-//	PInt(mymp3->channels);MMPrintString(" Channels\r\n");
-//	PInt(mymp3->sampleRate);MMPrintString(" Sample rate\r\n");
     sbuff1 = GetMemory(MP3_BUFFER_SIZE);
     sbuff2 = GetMemory(MP3_BUFFER_SIZE);
     ubuff1 = (uint16_t *)sbuff1;
@@ -871,9 +864,7 @@ void mp3callback(char *p, int position){
     ppos=0;
     playreadcomplete=0;
 	pwm_set_irq0_enabled(AUDIO_SLICE, true);
-	pwm_set_enabled(AUDIO_SLICE, true); 
-//	MMPrintString("Playing ");MMPrintString(p);PRet();
-#endif
+	pwm_set_enabled(AUDIO_SLICE, true);
 }
 void midicallback(char *p){
     if(strchr((char *)p, '.') == NULL) strcat((char *)p, ".mid");
@@ -1751,11 +1742,11 @@ void MIPS16 cmd_play(void) {
         int i __attribute((unused))=0;
         getargs(&tp, 3,(unsigned char *)",");                                  // this MUST be the first executable line in the function
         if(!(argc == 1 || argc == 3)) error("Argument count");
-#ifndef rp2350
-		if(!Option.AUDIO_MISO_PIN)error("Only available with VS1053 audio");
-#else
-        if(Option.CPU_Speed<200000 && !Option.AUDIO_MISO_PIN)error("CPUSPEED >=200000 for MP3 playback");
-#endif
+		if (HAL_PORT_HAS_MP3) {
+            if(Option.CPU_Speed<200000 && !Option.AUDIO_MISO_PIN)error("CPUSPEED >=200000 for MP3 playback");
+        } else {
+            if(!Option.AUDIO_MISO_PIN)error("Only available with VS1053 audio");
+        }
 		if(CurrentlyPlaying==P_WAVOPEN)CloseAudio(1);
         if(CurrentlyPlaying != P_NOTHING) error("Sound output in use for $",PlayingStr[CurrentlyPlaying]);
 
@@ -2055,7 +2046,6 @@ void checkWAVinput(void){
 					wav_filesize = bcount[2];
 				}
 				nextbuf=swingbuf;
-#ifdef rp2350
 			} else if(CurrentlyPlaying == P_MP3){
 				if(swingbuf==2){
 					bcount[1]=drmp3_read_pcm_frames_s16(mymp3, MP3_BUFFER_SIZE/4, (int16_t *)sbuff1) * mymp3->channels;
@@ -2069,7 +2059,6 @@ void checkWAVinput(void){
 					wav_filesize = bcount[2];
 				}
 				nextbuf=swingbuf;
-#endif
 			} else if(CurrentlyPlaying == P_MOD){
 				if(swingbuf==2){
 					if(hxcmod_fillbuffer( mcontext, (msample*)sbuff1, MOD_BUFFER_SIZE/4,NULL, noloop ))playreadcomplete = 1;
@@ -2143,12 +2132,10 @@ void audio_checks(void){
             if(CurrentlyPlaying == P_FLAC)drflac_close(myflac);
 			if(CurrentlyPlaying == P_MOD)FreeMemory((void *)mcontext);
             if(CurrentlyPlaying == P_WAV)FreeMemorySafe((void **)&mywav);
-#ifdef rp2350
             if(CurrentlyPlaying == P_MP3 && Option.AUDIO_MISO_PIN==0){
 				drmp3_uninit(mymp3);
 				FreeMemorySafe((void **)&mymp3);
 			}
-#endif
             FreeMemorySafe((void **)&sbuff1);
             FreeMemorySafe((void **)&sbuff2);
             FreeMemorySafe((void **)&alist);

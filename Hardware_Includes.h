@@ -109,8 +109,12 @@ extern uint16_t RGB121pack(uint32_t c);
  * true — RP2040 has 30 pins and no PWM8..11, matching the "A variant"
  * behaviour that callers check for. Defined in PicoMite.c. */
 extern bool rp2350a;
-#ifdef rp2350
+/* PSRAMsize is defined unconditionally in PicoMite.c (fixed at 0 on RP2040
+ * since those boards have no PSRAM). Core code treats it as a runtime
+ * value — `if (PSRAMsize)` branches dead-code on RP2040 — so the extern
+ * must be visible on every target. */
 extern uint32_t PSRAMsize;
+#ifdef rp2350
 extern const uint32_t MAP16DEF[16];
 extern void _Z10copy_wordsPKmPmm(uint32_t *s, uint32_t *d, int n);
 #endif

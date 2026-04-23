@@ -94,9 +94,13 @@ extern void start_vga_i2s(void);
     #include <string.h>
     #include "hardware/regs/sysinfo.h"
     #include "hardware/regs/powman.h"
-    uint32_t PSRAMsize=0;
     uint8_t PSRAMpin;
 #endif
+/* PSRAMsize is fixed at 0 on RP2040 (no PSRAM); runtime-detected to the
+ * chip's reported size on RP2350. The definition lives outside any
+ * target guard so `extern uint32_t PSRAMsize;` (Hardware_Includes.h)
+ * resolves on every port — core code reads it as a runtime value. */
+uint32_t PSRAMsize = 0;
 /* rp2350a: on RP2350 this is runtime-detected in the init path from the
  * chip's SYSINFO_PACKAGE_SEL register; on RP2040 the variable still exists
  * and is fixed at true (RP2040 matches the "30-pin / no PWM8..11"
