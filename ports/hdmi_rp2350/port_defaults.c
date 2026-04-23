@@ -324,3 +324,24 @@ const char *port_pin_reserved_label(int pin)
     if (pin >= 16 && pin <= 25) return "Boot Reserved : HDMI";
     return NULL;
 }
+
+/* OPTION LCDPANEL CONSOLE: pre-fill the tile-color arrays with the
+ * default fg/bg so existing tiles render in the new colours. HDMI
+ * has two tile representations selected at runtime by FullColour:
+ * 16-bit (RGB555) when full-colour, 8-bit (RGB332) otherwise. */
+void port_apply_default_console_colors(int default_fc, int default_bc)
+{
+    int fcolour = (FullColour ? RGB555(default_fc) : RGB332(default_fc));
+    int bcolour = (FullColour ? RGB555(default_bc) : RGB332(default_bc));
+    for (int xp = 0; xp < X_TILE; xp++) {
+        for (int yp = 0; yp < Y_TILE; yp++) {
+            if (FullColour) {
+                if (fcolour != 0xFFFFFFFF) tilefcols[yp * X_TILE + xp] = (uint16_t)fcolour;
+                if (bcolour != 0xFFFFFFFF) tilebcols[yp * X_TILE + xp] = (uint16_t)bcolour;
+            } else {
+                if (fcolour != 0xFFFFFFFF) tilefcols_w[yp * X_TILE + xp] = (uint8_t)fcolour;
+                if (bcolour != 0xFFFFFFFF) tilebcols_w[yp * X_TILE + xp] = (uint8_t)bcolour;
+            }
+        }
+    }
+}

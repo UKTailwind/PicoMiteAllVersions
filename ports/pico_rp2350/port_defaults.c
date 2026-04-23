@@ -389,3 +389,7 @@ void port_clear_lcd_spi_if_shares_system(void)
 int port_pinno_alias_for_name(const char *name) { (void)name; return 0; }
 int port_pin_is_reserved_alias(int pin) { (void)pin; return 0; }
 const char *port_pin_reserved_label(int pin) { (void)pin; return NULL; }
+
+/* No tile-mode console — OPTION LCDPANEL CONSOLE color reset is a no-op. */
+void port_apply_default_console_colors(int default_fc, int default_bc)
+{ (void)default_fc; (void)default_bc; }

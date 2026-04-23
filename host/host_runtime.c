@@ -919,6 +919,10 @@ int port_misc_option_setter(unsigned char *cmdline) { (void)cmdline; return 0; }
 int port_pico_pins_option_setter(unsigned char *cmdline) { (void)cmdline; return 0; }
 int port_heartbeat_option_setter(unsigned char *cmdline) { (void)cmdline; return 0; }
 
+/* OPTION LCDPANEL CONSOLE color reset — host has no tile-mode console. */
+void port_apply_default_console_colors(int default_fc, int default_bc)
+{ (void)default_fc; (void)default_bc; }
+
 /* WEB-only hooks — host has no WiFi. Real impls live in MMsetwifi.c on
  * PICOMITEWEB device builds. */
 void port_web_print_options(void) {}

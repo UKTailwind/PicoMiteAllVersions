@@ -81,6 +81,7 @@ extern int  port_lcd320_option_setter(unsigned char *cmdline);
 extern int  port_misc_option_setter(unsigned char *cmdline);
 extern int  port_pico_pins_option_setter(unsigned char *cmdline);
 extern int  port_heartbeat_option_setter(unsigned char *cmdline);
+extern void port_apply_default_console_colors(int default_fc, int default_bc);
 extern void port_web_print_options(void);
 extern int  port_web_option_setter(unsigned char *cmdline);
 extern int  port_web_mminfo(unsigned char *ep, int64_t *out_iret,
@@ -1339,30 +1340,7 @@ if(tp){
             pwm_set_wrap(BacklightSlice, wrap);
             pwm_set_chan_level(BacklightSlice, BacklightChannel, high);
         }
-#ifdef PICOMITEVGA
-#ifdef HDMI
-        int fcolour=(FullColour ? RGB555(Option.DefaultFC) : RGB332(Option.DefaultFC));
-        int bcolour=(FullColour ? RGB555(Option.DefaultBC) : RGB332(Option.DefaultBC));
-#else
-        int  fcolour = RGB121pack(Option.DefaultFC);
-        int bcolour = RGB121pack(Option.DefaultBC);
-#endif
-        for(int xp=0;xp<X_TILE;xp++){
-            for(int yp=0;yp<Y_TILE;yp++){
-#ifdef HDMI
-                if(FullColour){
-#endif
-                    if(fcolour!=0xFFFFFFFF) tilefcols[yp*X_TILE+xp]=(uint16_t)fcolour;
-                    if(bcolour!=0xFFFFFFFF) tilebcols[yp*X_TILE+xp]=(uint16_t)bcolour;
-#ifdef HDMI
-                } else {
-                    if(fcolour!=0xFFFFFFFF) tilefcols_w[yp*X_TILE+xp]=(uint8_t)fcolour;
-                    if(bcolour!=0xFFFFFFFF) tilebcols_w[yp*X_TILE+xp]=(uint8_t)bcolour;
-                }
-#endif
-            }
-        }
-#endif
+        port_apply_default_console_colors(Option.DefaultFC, Option.DefaultBC);
         Option.DISPLAY_CONSOLE = true; 
         if(!CurrentLinePtr) {
             ResetDisplay();

@@ -398,3 +398,18 @@ void port_clear_lcd_spi_if_shares_system(void) {}
 int port_pinno_alias_for_name(const char *name) { (void)name; return 0; }
 int port_pin_is_reserved_alias(int pin) { (void)pin; return 0; }
 const char *port_pin_reserved_label(int pin) { (void)pin; return NULL; }
+
+/* OPTION LCDPANEL CONSOLE: pre-fill the tile-color arrays with the
+ * default fg/bg so existing tiles render in the new colours. RGB121
+ * 16-bit tile representation. */
+void port_apply_default_console_colors(int default_fc, int default_bc)
+{
+    int fcolour = RGB121pack(default_fc);
+    int bcolour = RGB121pack(default_bc);
+    for (int xp = 0; xp < X_TILE; xp++) {
+        for (int yp = 0; yp < Y_TILE; yp++) {
+            if (fcolour != 0xFFFFFFFF) tilefcols[yp * X_TILE + xp] = (uint16_t)fcolour;
+            if (bcolour != 0xFFFFFFFF) tilebcols[yp * X_TILE + xp] = (uint16_t)bcolour;
+        }
+    }
+}

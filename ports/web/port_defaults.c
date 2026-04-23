@@ -292,3 +292,7 @@ const char *port_pin_reserved_label(int pin)
     if (pin >= 41 && pin <= 44) return "Boot Reserved : CYW43";
     return NULL;
 }
+
+/* No tile-mode console — OPTION LCDPANEL CONSOLE color reset is a no-op. */
+void port_apply_default_console_colors(int default_fc, int default_bc)
+{ (void)default_fc; (void)default_bc; }
