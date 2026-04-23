@@ -78,6 +78,7 @@ extern int  port_pinno_alias_for_name(const char *name);
 extern int  port_pin_is_reserved_alias(int pin);
 extern const char *port_pin_reserved_label(int pin);
 extern int  port_lcd320_option_setter(unsigned char *cmdline);
+extern int  port_misc_option_setter(unsigned char *cmdline);
 extern void port_web_print_options(void);
 extern int  port_web_option_setter(unsigned char *cmdline);
 extern int  port_web_mminfo(unsigned char *ep, int64_t *out_iret,
@@ -1136,144 +1137,7 @@ void MIPS16 cmd_option(void) {
 		SaveOptions();
 		return;
 	}
-#ifdef rp2350
-#ifdef HDMI
-    tp = checkstring(cmdline, (unsigned char *)"HDMI PINS");
-    if(tp) {
-        getargs(&tp,7,(unsigned char *)",");
-    	if(CurrentLinePtr) error("Invalid in a program");
-        if(argc!=7)error("Syntax");
-        uint8_t clock=getint(argv[0],0,7);
-        uint8_t d0=getint(argv[2],0,7);
-        uint8_t d1=getint(argv[4],0,7);
-        uint8_t d2=getint(argv[6],0,7);
-        if((clock & 0x6)==(d0 & 0x6) || (clock & 0x6)==(d1 & 0x6) || (clock & 0x6)==(d2 & 0x6) || (d0 & 0x6)==(d1 & 0x6) || (d0 & 0x6)==(d2 & 0x6) || (d1 & 0x6)==(d2 & 0x6))error("Channels not unique");
-        Option.HDMIclock=clock;
-        Option.HDMId0=d0;
-        Option.HDMId1=d1;
-        Option.HDMId2=d2;
-        SaveOptions();
-        _excep_code = RESET_COMMAND;
-        SoftReset();
-        return;
-    }
-#endif
-#if defined(PICOMITE) && defined(rp2350)
-    tp = checkstring(cmdline, (unsigned char *)"KEYBOARD BACKLIGHT");
-    if(tp) {
-        if(!Option.LOCAL_KEYBOARD)error("Invalid option");
-        Option.KeyboardBrightness=getint(tp,0,100);
-		setpwm(PINMAP[43], &KeyboardlightChannel, &KeyboardlightSlice, 50000.0, Option.KeyboardBrightness);
-        SaveOptions();
-        return;
-    }
-#endif
-    tp = checkstring(cmdline, (unsigned char *)"PSRAM PIN");
-    if(tp) {
-		if(checkstring(tp, (unsigned char *)"DISABLE")){
-            Option.PSRAM_CS_PIN=0;
-            SaveOptions();
-            _excep_code = RESET_COMMAND;
-            SoftReset();
-            return;
-        }
-        int pin1;
-        unsigned char code;
-        getargs(&tp,1,(unsigned char *)",");
-    	if(CurrentLinePtr) error("Invalid in a program");
-        if(!(code=codecheck(argv[0])))argv[0]+=2;
-        pin1 = getinteger(argv[0]);
-        if(!code)pin1=codemap(pin1);
-        if(IsInvalidPin(pin1)) error("Invalid pin");
-        if(ExtCurrentConfig[pin1] != EXT_NOT_CONFIG)  error("Pin | is in use",pin1);
-        if(!(pin1==1 || pin1==11 || pin1==25 || pin1==62))error("Invalid pin for PSRAM chip select (GP0,GP8,GP19,GP47)");
-        Option.PSRAM_CS_PIN=pin1;
-        SaveOptions();
-        _excep_code = RESET_COMMAND;
-        SoftReset();
-        return;
-    }
-#endif
-#ifdef USBKEYBOARD
-    tp = checkstring(cmdline, (unsigned char *)"KEYBOARD REPEAT");
-	if(tp) {
-		getargs(&tp,3,(unsigned char *)",");
-		Option.RepeatStart=getint(argv[0],100,2000);
-		Option.RepeatRate=getint(argv[2],25,2000);
-		SaveOptions();
-		return;
-	}
-
-#else
-#if defined(PICOMITE) && defined(rp2350)
-    tp = checkstring(cmdline, (unsigned char *)"KEYBOARD REPEAT");
-	if(tp) {
-		getargs(&tp,3,(unsigned char *)",");
-        if(!Option.LOCAL_KEYBOARD)error("Syntax");
-		Option.RepeatStart=getint(argv[0],100,2000);
-		Option.RepeatRate=getint(argv[2],25,2000);
-		SaveOptions();
-		return;
-	}
-#endif
-    tp = checkstring(cmdline, (unsigned char *)"PS2 PINS");
-    if(tp==NULL)tp = checkstring(cmdline, (unsigned char *)"KEYBOARD PINS");
-	if(tp) {
-        int pin1,pin2;
-        unsigned char code;
-		getargs(&tp,3,(unsigned char *)",");
-    	if(CurrentLinePtr) error("Invalid in a program");
-        if(Option.KEYBOARD_CLOCK)error("Keyboard must be disabled to change pins");
-        if(argc!=3)error("Syntax");
-        if(!(code=codecheck(argv[0])))argv[0]+=2;
-        pin1 = getinteger(argv[0]);
-        if(!code)pin1=codemap(pin1);
-        if(IsInvalidPin(pin1)) error("Invalid pin");
-        if(ExtCurrentConfig[pin1] != EXT_NOT_CONFIG)  error("Pin %/| is in use",pin1,pin1);
-        if(!(code=codecheck(argv[2])))argv[2]+=2;
-        pin2 = getinteger(argv[2]);
-        if(!code)pin2=codemap(pin2);
-        if(IsInvalidPin(pin2)) error("Invalid pin");
-        if(ExtCurrentConfig[pin2] != EXT_NOT_CONFIG)  error("Pin %/| is in use",pin2,pin2);
-        Option.KEYBOARD_CLOCK=pin1;
-        Option.KEYBOARD_DATA=pin2;
-        SaveOptions();
-        _excep_code = RESET_COMMAND;
-        SoftReset();
-        return;
-	}
-    tp = checkstring(cmdline, (unsigned char *)"MOUSE");
-	if(tp) {
-    	if(CurrentLinePtr) error("Invalid in a program");
-        if(checkstring(tp,(unsigned char *)"DISABLE")){
-            Option.MOUSE_CLOCK=0;
-            Option.MOUSE_DATA=0;
-        } else {
-            int pin1,pin2;
-            unsigned char code;
-            getargs(&tp,3,(unsigned char *)",");
-            if(Option.MOUSE_CLOCK)error("Mouse must be disabled to change pins");
-            if(argc!=3)error("Syntax");
-            if(!(code=codecheck(argv[0])))argv[0]+=2;
-            pin1 = getinteger(argv[0]);
-            if(!code)pin1=codemap(pin1);
-            if(IsInvalidPin(pin1)) error("Invalid pin");
-            if(ExtCurrentConfig[pin1] != EXT_NOT_CONFIG)  error("Pin %/| is in use",pin1,pin1);
-            if(!(code=codecheck(argv[2])))argv[2]+=2;
-            pin2 = getinteger(argv[2]);
-            if(!code)pin2=codemap(pin2);
-            if(IsInvalidPin(pin2)) error("Invalid pin");
-            if(ExtCurrentConfig[pin2] != EXT_NOT_CONFIG)  error("Pin %/| is in use",pin2,pin2);
-            Option.MOUSE_CLOCK=pin1;
-            Option.MOUSE_DATA=pin2;
-        }
-        SaveOptions();
-        _excep_code = RESET_COMMAND;
-        SoftReset();
-        return;
-	}
-
-#endif
+    if (port_misc_option_setter(cmdline)) return;
     if (port_keyboard_option_setter(cmdline)) return;
 
     tp = checkstring(cmdline, (unsigned char *)"BAUDRATE");

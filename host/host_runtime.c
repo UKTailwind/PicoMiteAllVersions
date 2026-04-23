@@ -910,6 +910,10 @@ int port_lcd320_option_setter(unsigned char *cmdline) { (void)cmdline; return 0;
 /* OPTION KEYBOARD setter — host has no keyboard config to set. */
 int port_keyboard_option_setter(unsigned char *cmdline) { (void)cmdline; return 0; }
 
+/* OPTION HDMI PINS / KEYBOARD BACKLIGHT / PSRAM PIN / KEYBOARD REPEAT /
+ * PS2 PINS / MOUSE — peripheral pin/feature setters. Host has none. */
+int port_misc_option_setter(unsigned char *cmdline) { (void)cmdline; return 0; }
+
 /* WEB-only hooks — host has no WiFi. Real impls live in MMsetwifi.c on
  * PICOMITEWEB device builds. */
 void port_web_print_options(void) {}

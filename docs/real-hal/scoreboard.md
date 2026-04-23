@@ -66,6 +66,7 @@ F4 step 19 164     46       2       2      39        39      17         14      
 F4 step 20 164     34       2       2      39        39      17         14      311  (printoptions LCD320/USB-keyboard/heartbeat → per-port helper files; −12)
 F4 step 21 164     32       2       2      39        39      17         14      309  (disable_lcdspi → port hook + LCD320 SYSTEM-shared cleanup → port hook; −2)
 F4 step 22 164     29       2       2      39        39      17         14      306  (ConfigDisplayUser/clear320/OPTION LCD320 → ports/pico_sdk_common/spi_lcd_options.c; −3)
+F4 step 23 164     24       2       2      39        39      17         14      301  (OPTION HDMI PINS / KEYBOARD BACKLIGHT / PSRAM PIN / KEYBOARD REPEAT / PS2 PINS / MOUSE → port_misc_option_setter(); −5)
 ─── post-fixup phases ───
 6          .       .        .        .       .         .       .          0        .  (Audio.c → HAL)
 7a         .       .        .        .       .         .       .          .        .  (Draw.c ILI9341 → HAL)
