@@ -273,6 +273,15 @@ else()
     target_sources(PicoMite PRIVATE drivers/spi_lcd/spi_lcd_fastgfx_stub.c)
 endif()
 
+# SPI-LCD FRAMEBUFFER subsystem: PICOMITE + WEB variants. VGA/HDMI
+# supply their own cmd_framebuffer / restorepanel / etc. in
+# drivers/vga_pio/. Host has its own simulator impl.
+if (COMPILE STREQUAL "VGA" OR COMPILE STREQUAL "VGAUSB" OR COMPILE STREQUAL "VGARP2350" OR COMPILE STREQUAL "VGAUSBRP2350" OR COMPILE STREQUAL "HDMI" OR COMPILE STREQUAL "HDMIUSB")
+    # VGA/HDMI: drivers/vga_pio/vga_mode_ops.c provides closeframebuffer etc.
+else()
+    target_sources(PicoMite PRIVATE drivers/spi_lcd/spi_lcd_framebuffer.c)
+endif()
+
 # VGA framebuffer CLS/layer helpers: PICOMITEVGA (VGA + HDMI) gets the
 # real impl, everyone else gets a no-op stub.
 if (COMPILE STREQUAL "VGA" OR COMPILE STREQUAL "VGAUSB" OR COMPILE STREQUAL "VGARP2350" OR COMPILE STREQUAL "VGAUSBRP2350" OR COMPILE STREQUAL "HDMI" OR COMPILE STREQUAL "HDMIUSB")
