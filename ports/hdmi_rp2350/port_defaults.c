@@ -184,3 +184,108 @@ int port_factory_reset_board(unsigned char *p)
 #endif
     return 0;
 }
+
+/* OPTION setters for VGA / HDMI displays. Each VGA-family port
+ * (vga, vga_rp2350, hdmi_rp2350) has its own version of this function
+ * with the resolutions and screen modes its hardware supports. */
+extern void ResetDisplay(void);
+extern void ClearScreen(int colour);
+extern short HRes;
+extern short VRes;
+extern short CurrentX;
+extern short CurrentY;
+extern int ScreenSize;
+extern unsigned char *WriteBuf;
+extern volatile int DISPLAY_TYPE;
+extern void VGArecovery(int pin);
+
+int port_display_option_setter(unsigned char *cmdline)
+{
+    unsigned char *tp;
+    tp = checkstring(cmdline, (unsigned char *)"RESOLUTION");
+    if(tp) {
+        getargs(&tp,3,(unsigned char *)",");
+        if(CurrentLinePtr) error("Invalid in a program");
+        if((checkstring(argv[0], (unsigned char *)"640")) || (checkstring(argv[0], (unsigned char *)"640x480"))){
+            if(argc==3){
+                int i=getint(argv[2],Freq252P,Freq378P);
+                if(!(i==Freq252P || i==Freq480P || i==Freq378P))error("Invalid speed");
+                Option.CPU_Speed = i;
+            } else Option.CPU_Speed = Freq252P;
+            Option.DISPLAY_TYPE=SCREENMODE1;
+            Option.DefaultFont = 1 ;
+        }
+        else if(checkstring(argv[0], (unsigned char *)"1280") || checkstring(argv[0], (unsigned char *)"1280x720")){
+            Option.CPU_Speed = Freq720P;
+            Option.DISPLAY_TYPE=SCREENMODE1;
+            Option.DefaultFont=(2<<4) | 1 ;
+        }
+        else if(checkstring(argv[0], (unsigned char *)"1024") || checkstring(argv[0], (unsigned char *)"1024x768")){
+            Option.CPU_Speed = FreqXGA;
+            Option.DISPLAY_TYPE=SCREENMODE1;
+            Option.DefaultFont=(2<<4) | 1 ;
+        }
+        else if(checkstring(argv[0], (unsigned char *)"1024x600")){
+            Option.CPU_Speed = FreqX;
+            Option.DISPLAY_TYPE=SCREENMODE1;
+            Option.DefaultFont=1 ;
+        }
+        else if(checkstring(argv[0], (unsigned char *)"800x480")){
+            Option.CPU_Speed = FreqY;
+            Option.DISPLAY_TYPE=SCREENMODE1;
+            Option.DefaultFont=1 ;
+        }
+        else if(checkstring(argv[0], (unsigned char *)"800") || checkstring(argv[0], (unsigned char *)"800x600")){
+            Option.CPU_Speed = FreqSVGA;
+            Option.DISPLAY_TYPE=SCREENMODE1;
+            Option.DefaultFont= 1 ;
+        }
+        else if(checkstring(argv[0], (unsigned char *)"848") || checkstring(argv[0], (unsigned char *)"848x480")){
+            Option.CPU_Speed = Freq848;
+            Option.DISPLAY_TYPE=SCREENMODE1;
+            Option.DefaultFont= 1 ;
+        }
+        else if(checkstring(argv[0], (unsigned char *)"720") || checkstring(argv[0], (unsigned char *)"720x400")){
+            Option.CPU_Speed = Freq400;
+            Option.DISPLAY_TYPE=SCREENMODE1;
+            Option.DefaultFont= 1 ;
+        }
+        else error("Syntax");
+        /* HDMI: no X_TILE/Y_TILE assignment. */
+        SaveOptions();
+        _excep_code = RESET_COMMAND;
+        SoftReset();
+        return 1;
+    }
+    /* HDMI: no VGA PINS option. */
+    tp = checkstring(cmdline, (unsigned char *)"DEFAULT MODE");
+    if(tp) {
+        int mode=getint(tp,1,MAXMODES);
+        if(mode==3){
+            Option.DISPLAY_TYPE=SCREENMODE3;
+            Option.DefaultFont = 1 ;
+        } else if(mode==4){
+            if(!(FullColour))error("Mode not available in this resolution");
+            Option.DISPLAY_TYPE=SCREENMODE4;
+            Option.DefaultFont=(6<<4) | 1 ;
+        } else if(mode==5){
+            Option.DISPLAY_TYPE=SCREENMODE5;
+            Option.DefaultFont=(6<<4) | 1 ;
+        } else if(mode==2){
+            Option.DISPLAY_TYPE=SCREENMODE2;
+            Option.DefaultFont=(6<<4) | 1 ;
+        } else {
+            Option.DISPLAY_TYPE=SCREENMODE1;
+            Option.DefaultFont= 1 ;
+        }
+        SaveOptions();
+        DISPLAY_TYPE= Option.DISPLAY_TYPE;
+        memset((void *)WriteBuf, 0, ScreenSize);
+        ResetDisplay();
+        CurrentX = CurrentY =0;
+        if(Option.DISPLAY_TYPE!=SCREENMODE1)ClearScreen(Option.DefaultBC);
+        SetFont(Option.DefaultFont);
+        return 1;
+    }
+    return 0;
+}

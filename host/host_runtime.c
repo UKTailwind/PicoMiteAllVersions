@@ -892,6 +892,10 @@ void port_picocalc_factory_reset_options(void)       { error("Not supported on h
 void port_print_supported_boards(void) {}
 int  port_factory_reset_board(unsigned char *p) { (void)p; return 0; }
 
+/* Display-related OPTION setters (CPUSPEED, AUTOREFRESH, LCDPANEL, TOUCH,
+ * RESOLUTION, VGA PINS, DEFAULT MODE) — host has no display hardware. */
+int  port_display_option_setter(unsigned char *cmdline) { (void)cmdline; return 0; }
+
 /* WEB-only hooks — host has no WiFi. Real impls live in MMsetwifi.c on
  * PICOMITEWEB device builds. */
 void port_web_print_options(void) {}
