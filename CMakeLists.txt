@@ -91,7 +91,7 @@ set(PICOMITE_LEGACY_CORE_SOURCES
 	I2C.c
 	SPI.c
 	Serial.c
-	SPI-LCD.c
+	drivers/spi_lcd/spi_lcd.c
 	BmpDecoder.c
 	GPS.c
 	CFunction.c
