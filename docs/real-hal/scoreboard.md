@@ -23,7 +23,20 @@ F2a step 3h 164    140       2      62      39        38      17         14     
             External.c: 0 target-macro ifdefs (only 2 #ifdef GUICONTROLS
             remain — not in scope). Promoted to STRICT_FILES in the purity
             gate. F2 CLOSED.
-F3         .       .        .        0       .         .       .          .        .  (FileIO.c → HAL impls)
+─── F3 (FileIO.c) ───
+F3 step 1  164    140       2      52      39        38      17         14      466  (PSRAM cache→port file + mergedread/a_dlist/MemLoadProgram uncond; −10)
+F3 step 2  164    140       2      50      39        38      17         14      464  (disable/enable_interrupts_pico MMBASIC_HOST gate off; −2)
+F3 step 3  164    140       2      48      39        38      17         14      462  (heartbeat rp2350a runtime + LoadPNG HAS_UPNG; −2)
+F3 step 4  164    140       2      44      39        38      17         14      458  (ProcessWeb stub + 4 PICOMITEWEB sites; −4)
+F3 step 5  164    140       2      39      39        38      17         14      453  (TCP recv-buffer helpers + closeall3d stub; −5)
+F3 step 6  164    140       2      32      39        38      17         14      446  (ResetOptions → 7 per-port port_defaults.c; −7)
+F3 step 7  164    140       2      31      39        38      17         14      445  (cmd_psram → ports/pico_sdk_common/cmd_psram.c; −1)
+F3 step 8  164    140       2      30      39        38      17         14      444  (DEFINES loader → ports/pico_sdk_common/defines_loader.c; −1)
+F3 step 9  164    140       2      28      39        38      17         14      442  (MemWriteBlock + LoadPNG → port files; −2)
+            FileIO.c: 60 → 26 target ifdefs (57% reduction). ~20 remaining
+            are MMBASIC_HOST gates around the SD read/write cache — genuine
+            backend distinction between device (FatFS+SD) and host
+            (POSIX/RAM-disk). See phase-4-filesystem.md for options.
 F4         .       .        .        .       .         .       .          .        .  (MM_Misc.c USBKEYBOARD → HAL)
 ─── post-fixup phases ───
 6          .       .        .        .       .         .       .          0        .  (Audio.c → HAL)
