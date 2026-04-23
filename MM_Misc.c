@@ -682,10 +682,6 @@ void PO5Int(char *s1, int n1, int n2, int n3, int n4) {
 void MIPS16 printoptions(void){
 //	LoadOptions();
     MMPrintString(banner);
-#ifndef PICOMITEVGA
-    int i=Option.DISPLAY_ORIENTATION;
-#endif     
-
     if(Option.SerialConsole){
         MMPrintString("OPTION SERIAL CONSOLE COM");
         MMputchar((Option.SerialConsole & 3)+48,1);
@@ -695,19 +691,18 @@ void MIPS16 printoptions(void){
         if(Option.SerialConsole & 4)MMPrintString((char *)",BOTH");
         PRet();
     }
-#ifndef PICOMITEVGA
-    if(Option.SYSTEM_CLK){
-        PO("SYSTEM SPI");
-        MMPrintString((char *)PinDef[Option.SYSTEM_CLK].pinname);MMputchar(',',1);;
-        MMPrintString((char *)PinDef[Option.SYSTEM_MOSI].pinname);MMputchar(',',1);;
-        MMPrintString((char *)PinDef[Option.SYSTEM_MISO].pinname);MMPrintString("\r\n");
+    /* SYSTEM SPI + LCD SPI prints — VGA targets share SYSTEM_CLK with
+     * the VGA scanout PIO, so they print VGA PINS instead (handled in
+     * port_print_display_options). Skip both on VGA. */
+    if (!HAL_PORT_IS_VGA) {
+        if (Option.SYSTEM_CLK) {
+            PO("SYSTEM SPI");
+            MMPrintString((char *)PinDef[Option.SYSTEM_CLK].pinname); MMputchar(',', 1);
+            MMPrintString((char *)PinDef[Option.SYSTEM_MOSI].pinname); MMputchar(',', 1);
+            MMPrintString((char *)PinDef[Option.SYSTEM_MISO].pinname); MMPrintString("\r\n");
+        }
+        port_print_lcd_spi();
     }
-    /* PICOMITE rp2350 has separate LCD_CLK/MOSI/MISO Option fields for
-     * a dedicated SPI bus to the SPI-LCD; other ports only have the
-     * shared SYSTEM_CLK. Body lives in print_display_options.c (port
-     * impl file). */
-    port_print_lcd_spi();
-#endif
     if(Option.SYSTEM_I2C_SDA){
         PO("SYSTEM I2C");
         MMPrintString((char *)PinDef[Option.SYSTEM_I2C_SDA].pinname);MMputchar(',',1);
