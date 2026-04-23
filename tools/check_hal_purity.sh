@@ -106,6 +106,11 @@ STRICT_FILES=(
   bc_bridge.c # Phase 11 step 13 close: zero target-macro, zero
               # port-config ifdefs. rp2350 funtbl[] subfun-hash rebuild
               # moved to port_bc_bridge_{clear,rehash}_subfun hooks.
+  vm_sys_graphics.c # Phase 11 step 14 close: zero target-macro, zero
+              # port-config ifdefs. Host's DrawCircle-delegating fork
+              # deleted — the 170-line VM-local draw_circle impl works
+              # on host too (uses only shared DrawPixel/DrawRectangle
+              # plus the VM's own scratch allocator, both unconditional).
 )
 
 # Files tracked informationally (report counts, do not fail).

@@ -1795,14 +1795,6 @@ void vm_sys_graphics_text_execute(const GfxTextArg *args, int field_count, const
     vm_sys_graphics_render_text(x, y, font, scale, jh, jv, jo, fc, bc, text);
 }
 
-#ifdef MMBASIC_HOST
-
-static void vm_sys_graphics_draw_circle(int x, int y, int radius, int w, int c, int fill, MMFLOAT aspect) {
-    DrawCircle(x, y, radius, w, c, fill, aspect);
-}
-
-#else
-
 static void vm_sys_graphics_hline(int x0, int x1, int y, int f, int ints_per_line, uint32_t *br) {
     uint32_t w1, xx1, w0, xx0, x, xn, i;
     const uint32_t a[] = {
@@ -1973,8 +1965,6 @@ static void vm_sys_graphics_draw_circle(int x, int y, int radius, int w, int c, 
     }
     if (Option.Refresh) Display_Refresh();
 }
-
-#endif
 
 void vm_sys_graphics_circle_execute(GfxCircleMode mode, const GfxCircleArg *args, int field_count,
                            const GfxCircleErrorSink *errors) {
