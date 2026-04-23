@@ -53,11 +53,14 @@ F4 step 6  164    113       2       2      39        38      17         14      
 F4 step 7  164     98       2       2      39        38      17         14      374  (OPTION RESET <BOARD> → port_factory_reset_board() per port_defaults.c; −15)
 F4 step 8  164     96       2       2      39        38      17         14      372  (USB device-info + KEYBOARD$ runtime check via Option.{USBKeyboard,KeyboardConfig}; −2)
 F4 step 9  164     91       2       2      39        38      17         14      367  (WEB OPTION setters + MM.* info + printoptions → MMsetwifi.c + new MMweb_stubs.c + USB hooks; −5)
-            MM_Misc.c: 140 → 91 across 9 sub-steps (target-macro 135 → 84). Remaining
-            ~84 split across rp2350-specific bodies (interrupts, multicore, PSRAM
-            mode, FAST/SLOW), VGA-specific (RESOLUTION, screen modes, FASTGFX), HDMI-
-            specific clock setup, and a few HEARTBEAT / KEYBOARD setter branches that
-            still mix USBKEYBOARD vs PS/2 syntax.
+F4 step 10 164     82       2       2      39        38      17         14      358  (display OPTION setters → port_display_option_setter() per port_defaults.c; −9)
+F4 step 11 164     78       2       2      39        38      17         14      354  (HAL_PORT_IS_VGA runtime branches in OPTION SDCARD/SYSTEM I2C; −4)
+F4 step 12 164     77       2       2      39        38      17         14      354  (MM.INFO TILE HEIGHT unconditional + ytileheight non-VGA default; −1)
+F4 step 13 164     67       2       2      39        39      17         14      344  (printoptions display section → port_print_display_options() shared file; −10)
+            MM_Misc.c: 140 → 67 across 13 sub-steps (target-macro 135 → 60). Remaining
+            ~60 are rp2350-specific bodies (interrupts, multicore, PSRAM mode), HEARTBEAT
+            setter, KEYBOARD setter (USBKEYBOARD vs PS/2 syntax), and the printoptions
+            cluster's PICOMITE+rp2350 LCD_CLK / PICOMITEVGA leftovers.
 ─── post-fixup phases ───
 6          .       .        .        .       .         .       .          0        .  (Audio.c → HAL)
 7a         .       .        .        .       .         .       .          .        .  (Draw.c ILI9341 → HAL)
