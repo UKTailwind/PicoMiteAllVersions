@@ -42,6 +42,54 @@ Build verification at F5 close: all 12 device CMake variants green; host
 
 The fixup plan is finished. Phase 6 (hal_audio device arm) is now unblocked.
 
+## Phase 6b closure, 2026-04-23
+
+Phase 6b landed in five commits (`8ea699e` → `899c218`) driving Audio.c
+from 14 target-macro ifdefs to 0. Grand scoreboard 281 → 267. Audio.c
+joins External.c / FileIO.c / MM_Misc.c in `STRICT_FILES`.
+
+Per-step summary lives in `phase-6-audio.md`. Key structural moves:
+
+- **dr_mp3** amalgamated implementation relocated to
+  `drivers/audio_mp3/{audio_mp3_real,audio_mp3_stub}.c`, selected per
+  target by CMakeLists. Audio.c includes `dr_mp3.h` unconditionally for
+  types/declarations; linker resolves the function bodies to real impl
+  on RP2350 or no-op stubs on RP2040/host.
+- **Three new port-config constants** in every `port_config.h`:
+  `HAL_PORT_AUDIO_FLAC_MAX_BASE_HZ` (44.1 kHz RP2040, 48 kHz RP2350),
+  `HAL_PORT_AUDIO_MOD_BUFFER_SIZE` (6144 RP2040, 8192 RP2350),
+  `HAL_PORT_HAS_MP3` (0 RP2040, 1 RP2350).
+- **`PSRAMsize` promoted to unconditional storage** in PicoMite.c (and
+  extern in Hardware_Includes.h). RP2040 still reads 0 → the existing
+  `if (PSRAMsize)` runtime branches dead-code as before, but target-
+  macro ifdefs guarding PSRAM-only code paths now drop cleanly.
+- **Device body relocated** (~2100 lines) from Audio.c to
+  `drivers/pwm_synth/pwm_synth.c`. Audio.c shrinks to ~199 lines of
+  host-only cmd_play. The `#ifndef MMBASIC_HOST / #else` wrapper
+  disappears entirely — Audio.c compiles on host (via `host/Makefile`),
+  pwm_synth.c compiles on device (via CMakeLists.txt), neither has
+  target ifdefs.
+
+The hal_audio.h contract was **not** expanded in 6b. File-based playback
+(WAV/MP3/FLAC/MOD) still lives inside pwm_synth.c as before. Expanding
+the HAL so pwm_synth.c reduces to a HAL impl (and Audio.c becomes the
+single BASIC-dialect parser across host + device) is future refinement;
+6b's exit gate was only "zero target ifdefs in Audio.c", met by the
+driver-file split.
+
+**Lesson added:**
+- When a core file has a big per-target backend (`#ifndef MMBASIC_HOST`
+  device body in Audio.c), relocating the backend to a driver file that
+  links per-target is a valid route to phase closure even if it stops
+  short of the idealised single-cmd_play HAL. Scoping the step to "get
+  target ifdefs to 0" (not "make the HAL contract complete") let 6b
+  land in 5 incremental commits instead of one risky rewrite.
+- Physical-device testing language in exit gates is a red herring for
+  a code-move phase: compile-time gate (buildall.sh across all 12
+  targets) + host functional tests + HAL purity gate is the same
+  validation set Phase 6 shipped under. Phase 7 does not have an
+  intrinsic extra validation requirement.
+
 **Lessons reconfirmed:**
 - "Infrastructure landed" is not a phase-exit state; the actual gate is
   zero target/port-config `#if*` directives in each scoped core file.

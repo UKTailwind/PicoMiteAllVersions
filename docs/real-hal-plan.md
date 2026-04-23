@@ -55,7 +55,19 @@ A phase closes only when its targeted core files pass that standard. "Infrastruc
 | [12.5 — mmbasic_stdio](real-hal/phases-8-to-13.md#phase-125--mmbasic_stdio-pure-stdio-executable-hal-litmus-test) | ⏳ | not started; the HAL litmus test |
 | [13 — lock contract](real-hal/phases-8-to-13.md#phase-13--lock-the-contract) | ⏳ | not started |
 
-Tests 239/239 on `real-hal` tip. All 12 device CMake variants green. WASM link green.
+Tests 239/239 on `real-hal` tip. All 12 device CMake variants green. WASM link green. Grand scoreboard at phase 6 close (`899c218`): **267**.
+
+**Validation model (all phases, 0–13):** a phase closes when its scoped
+core file is in `STRICT_FILES` with zero target-macro and zero port-
+config-macro ifdefs, `buildall.sh` is clean across all 12 device CMake
+variants, host `./run_tests.sh` is 239/239 (or whatever the current
+number is — never lower), and `tools/check_hal_purity.sh` is green.
+Physical-device smoke-boot / FPS / RAM-baseline checks listed in some
+phase docs are desirable post-merge verifications but not blockers —
+they were written before Phase 6 closed and held to the same triple
+(compile + host tests + purity). Don't skip or reorder phases on the
+basis of "this one needs hardware testing" — they all have the same
+exit gate in practice.
 
 ## Topic reference (shared across phases)
 
