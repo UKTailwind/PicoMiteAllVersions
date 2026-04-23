@@ -328,3 +328,34 @@ int port_display_option_setter(unsigned char *cmdline)
     }
     return 0;
 }
+
+/* VGA pin de-allocation helper. Called from OPTION VGA PINS (in this
+ * file's port_factory_reset_board / port_display_option_setter) and
+ * from drivers/sd_spi/mmc_stm32.c on non-HDMI VGA builds when SD-card
+ * pin reassignment requires reclaiming a VGA pin. The body lives only
+ * on VGA ports because it touches piomap[QVGA_PIO_NUM] which is
+ * VGA-stack-only. */
+extern uint64_t piomap[];
+void VGArecovery(int pin){
+        ExtCurrentConfig[Option.VGA_BLUE]=EXT_BOOT_RESERVED;
+        ExtCurrentConfig[Option.VGA_HSYNC]=EXT_BOOT_RESERVED;
+        ExtCurrentConfig[PINMAP[PinDef[Option.VGA_BLUE].GPno+1]]=EXT_BOOT_RESERVED;
+        ExtCurrentConfig[PINMAP[PinDef[Option.VGA_BLUE].GPno+2]]=EXT_BOOT_RESERVED;
+        ExtCurrentConfig[PINMAP[PinDef[Option.VGA_BLUE].GPno+3]]=EXT_BOOT_RESERVED;
+        ExtCurrentConfig[PINMAP[PinDef[Option.VGA_HSYNC].GPno+1]]=EXT_BOOT_RESERVED;
+
+        if(pin)error("Pin %/| is in use",pin,pin);
+#ifdef rp2350
+        piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)PinDef[Option.VGA_BLUE].GPno);
+        piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.VGA_BLUE].GPno+1));
+        piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.VGA_BLUE].GPno+2));
+        piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.VGA_BLUE].GPno+3));
+        piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)PinDef[Option.VGA_HSYNC].GPno);
+        piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.VGA_HSYNC].GPno+1));
+        if(Option.audio_i2s_bclk){
+            piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)PinDef[Option.audio_i2s_data].GPno);
+            piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)PinDef[Option.audio_i2s_bclk].GPno);
+            piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.audio_i2s_bclk].GPno+1));
+        }
+#endif
+}

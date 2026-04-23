@@ -62,6 +62,19 @@ extern short HRes;
 extern short VRes;
 extern void port_web_print_options(void);
 
+void port_print_lcd_spi(void)
+{
+#if defined(PICOMITE) && defined(rp2350)
+    /* LCD_CLK/MOSI/MISO only exist in struct option_s on PICOMITE+rp2350. */
+    if(Option.LCD_CLK && !(Option.SYSTEM_CLK==Option.LCD_CLK)){
+        PO("LCD SPI");
+        MMPrintString((char *)PinDef[Option.LCD_CLK].pinname);MMputchar(',',1);
+        MMPrintString((char *)PinDef[Option.LCD_MOSI].pinname);MMputchar(',',1);
+        MMPrintString((char *)PinDef[Option.LCD_MISO].pinname);MMPrintString("\r\n");
+    }
+#endif
+}
+
 void port_print_display_options(void)
 {
     if (HAL_PORT_IS_VGA) {

@@ -63,6 +63,7 @@ extern void port_print_supported_boards(void);
 extern int  port_factory_reset_board(unsigned char *p);
 extern int  port_display_option_setter(unsigned char *cmdline);
 extern void port_print_display_options(void);
+extern void port_print_lcd_spi(void);
 extern void port_web_print_options(void);
 extern int  port_web_option_setter(unsigned char *cmdline);
 extern int  port_web_mminfo(unsigned char *ep, int64_t *out_iret,
@@ -141,33 +142,8 @@ extern void setwifi(unsigned char *tp);
  * encapsulated on USB builds; non-USB pays no BSS for it. */
 extern int port_usb_count(void);
 extern int port_usb_hid_field(int n, int field);
-#ifdef PICOMITEVGA
-#ifndef HDMI
-void VGArecovery(int pin){
-        ExtCurrentConfig[Option.VGA_BLUE]=EXT_BOOT_RESERVED;
-        ExtCurrentConfig[Option.VGA_HSYNC]=EXT_BOOT_RESERVED;
-        ExtCurrentConfig[PINMAP[PinDef[Option.VGA_BLUE].GPno+1]]=EXT_BOOT_RESERVED;
-        ExtCurrentConfig[PINMAP[PinDef[Option.VGA_BLUE].GPno+2]]=EXT_BOOT_RESERVED;
-        ExtCurrentConfig[PINMAP[PinDef[Option.VGA_BLUE].GPno+3]]=EXT_BOOT_RESERVED;
-        ExtCurrentConfig[PINMAP[PinDef[Option.VGA_HSYNC].GPno+1]]=EXT_BOOT_RESERVED;
-
-        if(pin)error("Pin %/| is in use",pin,pin);
-#ifdef rp2350
-        piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)PinDef[Option.VGA_BLUE].GPno);
-        piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.VGA_BLUE].GPno+1));
-        piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.VGA_BLUE].GPno+2));
-        piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.VGA_BLUE].GPno+3));
-        piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)PinDef[Option.VGA_HSYNC].GPno);
-        piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.VGA_HSYNC].GPno+1));
-        if(Option.audio_i2s_bclk){
-            piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)PinDef[Option.audio_i2s_data].GPno);
-            piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)PinDef[Option.audio_i2s_bclk].GPno);
-            piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.audio_i2s_bclk].GPno+1));
-        }
-#endif
-    }
-#endif
-#endif
+/* VGArecovery (PICOMITEVGA && !HDMI helper) lives in
+ * ports/vga{,_rp2350}/port_defaults.c — VGA ports only. */
 /* WEB-stack stubs — closeMQTT / ProcessWeb / tcp_*_recv_buffers /
  * port_web_* — live in MMweb_stubs.c (linked on non-WEB device) and
  * host_runtime.c (host); real impls in MMsetwifi.c / MMMqtt.c /
@@ -723,14 +699,11 @@ void MIPS16 printoptions(void){
         MMPrintString((char *)PinDef[Option.SYSTEM_MOSI].pinname);MMputchar(',',1);;
         MMPrintString((char *)PinDef[Option.SYSTEM_MISO].pinname);MMPrintString("\r\n");
     }
-#if defined(PICOMITE) && defined(rp2350)
-    if(Option.LCD_CLK && !(Option.SYSTEM_CLK==Option.LCD_CLK)){
-        PO("LCD SPI");
-        MMPrintString((char *)PinDef[Option.LCD_CLK].pinname);MMputchar(',',1);;
-        MMPrintString((char *)PinDef[Option.LCD_MOSI].pinname);MMputchar(',',1);;
-        MMPrintString((char *)PinDef[Option.LCD_MISO].pinname);MMPrintString("\r\n");
-    }
-#endif
+    /* PICOMITE rp2350 has separate LCD_CLK/MOSI/MISO Option fields for
+     * a dedicated SPI bus to the SPI-LCD; other ports only have the
+     * shared SYSTEM_CLK. Body lives in print_display_options.c (port
+     * impl file). */
+    port_print_lcd_spi();
 #endif
     if(Option.SYSTEM_I2C_SDA){
         PO("SYSTEM I2C");
