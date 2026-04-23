@@ -279,6 +279,7 @@ if (COMPILE STREQUAL "VGA" OR COMPILE STREQUAL "VGAUSB" OR COMPILE STREQUAL "VGA
     target_sources(PicoMite PRIVATE
         drivers/vga_pio/vga_ops.c
         drivers/vga_pio/vga_mode_ops.c
+        drivers/vga_pio/vga_blit_ops.c
     )
 else()
     target_sources(PicoMite PRIVATE drivers/vga_pio/vga_ops_stub.c)

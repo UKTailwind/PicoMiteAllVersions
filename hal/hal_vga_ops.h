@@ -95,6 +95,20 @@ void hal_vga_ops_scroll_tile_colours(int lines);
  * non-VGA the caller uses fixed white/black. */
 void hal_vga_ops_tile_colour(int x, int y, int *front, int *back);
 
+/* BLIT command COPY move for VGA — fast per-SCREENMODE path. The
+ * function is monolithic on purpose: it owns byte-aligned memcpy
+ * loops for SCREENMODE2/3, HDMI direct mem copy for SCREENMODE4/5, a
+ * SCREENMODE1 tile-copy path, and a generic ReadBLITBuffer /
+ * DrawBLITBuffer fallback (the latter is also what non-VGA targets
+ * would use — but non-VGA cmd_blit doesn't take the COPY path; the
+ * ReadBuffer==DisplayNotSet precondition check at the call site
+ * already catches "can't blit on this display").
+ *
+ * Returns 1 if it handled the copy (caller is done). Returns 0 only
+ * on the stub for non-VGA targets. Inputs have been clipped / flipped
+ * by the caller before this is invoked. */
+int hal_vga_ops_handle_blit_move(int x1, int y1, int x2, int y2, int w, int h);
+
 #ifdef __cplusplus
 }
 #endif

@@ -149,6 +149,7 @@ void restorepanel(void);
 #define FONT_TABLE_SIZE      16
 extern void (*DrawPixel)(int x1, int y1, int c);
 extern void (*ReadBufferFast)(int x1, int y1, int x2, int y2, unsigned char *c);
+extern void (*DrawBufferFast)(int x1, int y1, int x2, int y2, int blank, unsigned char *c);
 extern uint8_t sprite_transparent;
 #ifndef PICOMITEVGA
     extern void DrawRectangleUser(int x1, int y1, int x2, int y2, int c);

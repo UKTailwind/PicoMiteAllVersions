@@ -34,3 +34,6 @@ void hal_vga_ops_scroll_tile_colours(int lines) { (void)lines; }
 void hal_vga_ops_tile_colour(int x, int y, int *front, int *back) {
     (void)x; (void)y; *front = 0xFFFFFF; *back = 0;
 }
+int hal_vga_ops_handle_blit_move(int x1, int y1, int x2, int y2, int w, int h) {
+    (void)x1; (void)y1; (void)x2; (void)y2; (void)w; (void)h; return 0;
+}
