@@ -872,4 +872,11 @@ void port_drive_check(char drive)
     if (drive == 'A') error("A: drive not available on host");
 }
 
+/* PicoCalc HW hooks — error stubs on host. Real impls in
+ * ports/pico_sdk_common/picocalc_features.c on PICOCALC builds. */
+void port_picocalc_set_keyboard_backlight(int level) { (void)level; error("Not supported on host"); }
+int  port_picocalc_battery_pct(void)                 { error("Not supported on host"); return 0; }
+int  port_picocalc_is_charging(void)                 { error("Not supported on host"); return 0; }
+void port_picocalc_factory_reset_options(void)       { error("Not supported on host"); }
+
 /* str_replace/STR_REPLACE provided by MATHS.c */

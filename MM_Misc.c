@@ -51,10 +51,13 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "xregex.h"
 #include "hardware/structs/pwm.h"
 #include "aes.h"
-#ifdef PICOCALC
-#include "drivers/i2c_picocalc_kbd/i2ckbd.h"
-#include "picocalc/conf_app.h"
-#endif
+
+/* PicoCalc HW hooks — real impls in ports/pico_sdk_common/picocalc_features.c
+ * (PICOCALC builds) and host/host_runtime.c (host stubs). */
+extern void port_picocalc_set_keyboard_backlight(int level);
+extern int  port_picocalc_battery_pct(void);
+extern int  port_picocalc_is_charging(void);
+extern void port_picocalc_factory_reset_options(void);
 /* TimeOffsetToUptime defined in mm_misc_shared.c (also used by vm_sys_time.c) */
 extern int64_t TimeOffsetToUptime;
 extern int last_adc;
@@ -1779,53 +1782,10 @@ OPTION PLATFORM HDMIUSB
             _excep_code = RESET_COMMAND;
             SoftReset();
        }
-#ifdef PICOCALC
        if(checkstring(p,(unsigned char *) "PICOCALC"))  {
-            ResetOptions(false);
-            Option.ColourCode = 1;
-            Option.SYSTEM_CLK = 14;
-            Option.SYSTEM_MOSI = 15;
-            Option.SYSTEM_MISO = 16;
-            Option.SYSTEM_I2C_SDA = 9;
-            Option.SYSTEM_I2C_SCL = 10;
-            Option.SYSTEM_I2C_SLOW = 1;//10khz for picocalc
-            Option.AUDIO_L = 31;
-            Option.AUDIO_R = 32;
-            Option.AUDIO_SLICE = 5;
-            Option.AUDIO_CLK_PIN = 0;
-            Option.AUDIO_MOSI_PIN = 0;
-            Option.AUDIO_DCS_PIN = 0;
-            Option.AUDIO_DREQ_PIN = 0;
-            Option.AUDIO_RESET_PIN = 0;
-            Option.DISPLAY_TYPE = ST7796SP;
-            Option.DISPLAY_BL = 0; //stm32 controls the backlight
-            Option.DISPLAY_ORIENTATION = PORTRAIT;
-            Option.LCD_CD = 19;
-            Option.LCD_Reset = 20;
-            Option.LCD_CS = 17;
-            Option.BGR = 1;
-            Option.BackLightLevel = 20;//default 20,sync with i2c keyboard
-            Option.TOUCH_CS = 0;
-            Option.TOUCH_IRQ = 0;
-            Option.DefaultFC = GREEN;
-            Option.DefaultFont = 0x01;
-            Option.ColourCode = 1;
-            Option.KeyboardConfig =CONFIG_I2C;
-            Option.CombinedCS = 0;
-            Option.SD_CS = 22;
-            Option.SD_CLK_PIN = 24;
-            Option.SD_MOSI_PIN = 25;
-            Option.SD_MISO_PIN = 21;
-            Option.DISPLAY_CONSOLE = 1;
-            Option.SerialConsole = 1;
-            Option.SerialTX = 1;
-            Option.SerialRX = 2;
-            SaveOptions();
-            printoptions();uSec(100000);
-            _excep_code = RESET_COMMAND;
-            SoftReset();
+            port_picocalc_factory_reset_options();  /* never returns — SoftReset */
+            return;
        }
-#endif
        if(checkstring(p,(unsigned char *) "PICORESTOUCHLCD3.5"))  {
             ResetOptions(false);
             Option.CPU_Speed=252000;
@@ -2718,17 +2678,14 @@ tp = checkstring(cmdline, (unsigned char *)"HEARTBEAT");
         if(checkstring(tp, (unsigned char *)"ON"))      { CMM1=1; return;  }
         error("Syntax");
     }
-#ifdef PICOCALC
     tp = checkstring(cmdline, (unsigned char *)"BACKLIGHT KB");
     if(tp) {
         getargs(&tp,1,(unsigned char *)",");
-        Option.KEYBOARDBL=getint(argv[0],0,255);
-        init_i2c_kbd();
-        int kbd_backlight = set_kbd_backlight(Option.KEYBOARDBL);
+        int level = getint(argv[0],0,255);
+        port_picocalc_set_keyboard_backlight(level);
         SaveOptions();
         return;
     }
-#endif
 #ifdef PICOMITEWEB
 	tp = checkstring(cmdline, (unsigned char *)"WEB MESSAGES");
 	if(tp) {
@@ -3878,16 +3835,10 @@ void MIPS16 fun_info(void){
         targ=T_INT;
         iret=((adcint==adcint1 && adcint) ? 1 : ((adcint==adcint2 && adcint) ? 2 : 0));
         return;
-#ifdef PICOCALC
     } else if((tp=checkstring(ep, (unsigned char *)"BATTERY"))){
-        init_i2c_kbd();
-        int bat_pcnt = read_battery();
-        bat_pcnt = bat_pcnt>>8;
-        bitClear(bat_pcnt,7);
-        iret=bat_pcnt;
+        iret = port_picocalc_battery_pct();
         targ=T_INT;
         return;
-#endif
     } else if(checkstring(ep, (unsigned char *)"BCOLOUR") || checkstring(ep, (unsigned char *)"BCOLOR")){
             iret=gui_bcolour;
             targ=T_INT;
@@ -3930,17 +3881,10 @@ void MIPS16 fun_info(void){
             iret = (int64_t)(uint32_t)CallTable;
             targ = T_INT;
             return;
-#ifdef PICOCALC
         } else if((tp=checkstring(ep, (unsigned char *)"CHARGING"))){
-            init_i2c_kbd();
-            int bat_pcnt = read_battery();
-            bat_pcnt = bat_pcnt>>8;
-            int bat_charging = bitRead(bat_pcnt,7);
-            bitClear(bat_pcnt,7);
-            iret=bat_charging;
+            iret = port_picocalc_is_charging();
             targ=T_INT;
             return;
-#endif
         } else if(checkstring(ep, (unsigned char *)"CPUSPEED")){
             IntToStr((char *)sret,Option.CPU_Speed*1000,10);
             CtoM(sret);
