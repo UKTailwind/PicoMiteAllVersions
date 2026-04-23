@@ -36,6 +36,8 @@
 
 /* FLAC decoder base sample-rate cap (RP2350 → 48 kHz). */
 #define HAL_PORT_AUDIO_FLAC_MAX_BASE_HZ  48000
+#define HAL_PORT_AUDIO_MOD_BUFFER_SIZE   8192
+#define HAL_PORT_HAS_MP3                 1
 
 #define HAL_PORT_RAM_FUNC(name)          __not_in_flash_func(name)
 

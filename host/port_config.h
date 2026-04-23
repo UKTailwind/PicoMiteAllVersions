@@ -54,6 +54,8 @@
  * FLAC, but the port-config standard wants the constant defined on
  * every port. RP2040 number is fine here. */
 #define HAL_PORT_AUDIO_FLAC_MAX_BASE_HZ  44100
+#define HAL_PORT_AUDIO_MOD_BUFFER_SIZE   6144
+#define HAL_PORT_HAS_MP3                 0
 
 #define HAL_PORT_RAM_FUNC(name)          name
 

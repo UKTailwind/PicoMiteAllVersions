@@ -61,21 +61,13 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #define DR_FLAC_NO_SIMD
 #define DR_FLAC_NO_OGG
 #define FLAC_BUFFER_SIZE WAV_BUFFER_SIZE
-#define DR_MP3_IMPLEMENTATION
-#define DR_MP3_NO_STDIO
-//#define DRMP3_COPY_MEMORY(dst, src, sz) memcpy((dst), (src), (sz))
-//#define DRMP3_ZERO_MEMORY(p, sz) memset((p), 0, (sz))
-//#define DR_MP3_FLOAT_OUTPUT
-#define DR_MP3_ONLY_MP3
-#define DR_MP3_NO_SIMD
-#define DRMP3_DATA_CHUNK_SIZE 32768
 #define MP3_BUFFER_SIZE WAV_BUFFER_SIZE
-#ifdef rp2350
+/* dr_mp3 amalgamated implementation lives in drivers/audio_mp3/; RP2350
+ * targets link audio_mp3_real.c (full decoder), RP2040 and host link
+ * audio_mp3_stub.c (no-op bodies). Including the header here is safe on
+ * every target — it only emits declarations. */
 #include "dr_mp3.h"
-#define MOD_BUFFER_SIZE WAV_BUFFER_SIZE
-#else 
-#define MOD_BUFFER_SIZE (WAV_BUFFER_SIZE/4)*3
-#endif
+#define MOD_BUFFER_SIZE HAL_PORT_AUDIO_MOD_BUFFER_SIZE
 #include "hardware/pio.h"
 #include "hardware/pio_instructions.h"
 #include "dr_flac.h"

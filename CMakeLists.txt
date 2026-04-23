@@ -226,6 +226,16 @@ endif()
 if (COMPILE STREQUAL "HDMI" OR COMPILE STREQUAL "WEBRP2350" OR COMPILE STREQUAL "HDMIUSB"  OR COMPILE STREQUAL "VGARP2350"  OR COMPILE STREQUAL "VGAUSBRP2350"  OR COMPILE STREQUAL "PICORP2350"  OR COMPILE STREQUAL "PICOUSBRP2350" )
     target_sources(PicoMite PRIVATE psram.c)
 endif()
+
+# MP3 decoder (dr_mp3 amalgamated impl) is ~100 KB of code — only RP2350
+# targets have the flash + RAM budget. RP2040 variants link no-op stubs so
+# Audio.c can include dr_mp3.h unconditionally for types/decls without
+# blowing the binary size on the small chip.
+if (COMPILE STREQUAL "HDMI" OR COMPILE STREQUAL "WEBRP2350" OR COMPILE STREQUAL "HDMIUSB"  OR COMPILE STREQUAL "VGARP2350"  OR COMPILE STREQUAL "VGAUSBRP2350"  OR COMPILE STREQUAL "PICORP2350"  OR COMPILE STREQUAL "PICOUSBRP2350" )
+    target_sources(PicoMite PRIVATE drivers/audio_mp3/audio_mp3_real.c)
+else()
+    target_sources(PicoMite PRIVATE drivers/audio_mp3/audio_mp3_stub.c)
+endif()
 if (COMPILE STREQUAL "WEB" OR COMPILE STREQUAL "WEBRP2350" )
     target_sources(PicoMite PRIVATE
 	SSD1963.c
