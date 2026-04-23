@@ -263,6 +263,11 @@ extern void clear320(void);
  * unconditional so core code can call it from loops (cmd_files, LOAD)
  * without wrapping each site in #ifdef PICOMITEWEB. */
 extern void ProcessWeb(int mode);
+/* Per-port factory-reset hook. Each ports/<COMPILE>/port_defaults.c
+ * provides a body with the board's Option.* initialisation (CPU speed,
+ * keyboard config, HDMI pins, touch scale…). FileIO.c::ResetOptions
+ * calls it once after setting the target-neutral defaults. */
+extern void port_set_default_options(void);
 /* TCP-state recv-buffer alloc/free: real impl on WEB iterates
  * TCPstate->buffer_recv[]; non-WEB stubs no-op. Core calls from
  * cmd_new / cmd_load teardown + post-ClearTempMemory refill. */

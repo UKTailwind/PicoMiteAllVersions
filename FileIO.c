@@ -5197,61 +5197,11 @@ void ResetOptions(bool startup)
     Option.ColourCode=0x01;
     Option.RepeatStart=600;
     Option.RepeatRate=150;
-#ifdef PICOMITEVGA
-    Option.DISPLAY_CONSOLE = 1;
-    Option.DISPLAY_TYPE = SCREENMODE1;
-//    Option.VGAFC = 0xFFFF;
-    Option.X_TILE=80;
-    Option.Y_TILE=40;
-    Option.CPU_Speed = Freq252P;
-    #ifdef USBKEYBOARD
-        #ifdef HDMI
-            Option.HDMIclock=2;
-            Option.HDMId0=0;
-            Option.HDMId1=6;
-            Option.HDMId2=4;
-        #endif
-        Option.USBKeyboard = CONFIG_US;
-        Option.SerialConsole = 2; 
-        Option.SerialTX = 11;
-        Option.SerialRX = 12;
-        Option.capslock=0;
-        Option.numlock=1;
-        Option.ColourCode=1;
-    #else
-        #ifdef HDMI
-            Option.HDMIclock=2;
-            Option.HDMId0=0;
-            Option.HDMId1=6;
-            Option.HDMId2=4;
-        #else
-            Option.VGA_HSYNC=21;
-            Option.VGA_BLUE=24;
-        #endif
-        Option.KEYBOARD_CLOCK=KEYBOARDCLOCK;
-        Option.KEYBOARD_DATA=KEYBOARDDATA;
-        Option.KeyboardConfig = CONFIG_US;
-    #endif
-#else
-    Option.CPU_Speed=FreqDefault;
-    #ifdef USBKEYBOARD
-        Option.USBKeyboard = CONFIG_US;
-        Option.RepeatStart=600;
-        Option.RepeatRate=150;
-        Option.SerialConsole = 2; 
-        Option.SerialTX = 11;
-        Option.SerialRX = 12;
-        Option.capslock=0;
-        Option.numlock=1;
-        Option.ColourCode=1;
-    #else
-        Option.KeyboardConfig = NO_KEYBOARD;
-        Option.SSD_RESET = -1;
-    #endif
-#endif
-#ifdef PICOMITEWEB
-    Option.ServerResponceTime=5000;
-#endif
+    /* Board-specific defaults (CPU_Speed, keyboard/USB, HDMI pins,
+     * display type, VGA sync, WebMite response time, touch scale)
+     * live in ports/<COMPILE>/port_defaults.c::port_set_default_options().
+     * Shared defaults below are identical on every target. */
+    port_set_default_options();
     Option.AUDIO_SLICE = 99;
     Option.SDspeed = 12;
     Option.DISPLAY_ORIENTATION = DISPLAY_LANDSCAPE;
@@ -5263,10 +5213,6 @@ void ResetOptions(bool startup)
     Option.INT2pin = 10;
     Option.INT3pin = 11;
     Option.INT4pin = 12;
-#ifndef PICOMITEVGA
-    Option.TOUCH_XSCALE=1.0f;
-    Option.TOUCH_YSCALE=1.0f;
-#endif
     Option.numlock = 1;
     Option.repeat = 0b101100;
     Option.VGA_HSYNC=21;
