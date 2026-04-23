@@ -13,6 +13,7 @@
 
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
+#include "hal/hal_pin.h"
 
 #if !defined(MMBASIC_HOST)
 
@@ -165,6 +166,88 @@ int MIPS16 port_misc_option_setter(unsigned char *cmdline)
 #endif
     (void)tp;
     return 0;
+}
+
+/* OPTION PICO ON/OFF — exposes/hides CYW43-shadow pins (41/42/44).
+ * Disabled on WEB (CYW43 actually owns those pins). RP2350B not
+ * supported (no shadow needed). */
+int MIPS16 port_pico_pins_option_setter(unsigned char *cmdline)
+{
+#ifdef PICOMITEWEB
+    (void)cmdline;
+    return 0;
+#else
+    unsigned char *tp = checkstring(cmdline, (unsigned char *)"PICO");
+    if (!tp) return 0;
+#ifdef rp2350
+    if (!rp2350a) error("Invalid for RP2350B");
+#endif
+    if (checkstring(tp, (unsigned char *)"OFF") || checkstring(tp, (unsigned char *)"DISABLE"))
+        Option.AllPins = 1;
+    else if (checkstring(tp, (unsigned char *)"ON") || checkstring(tp, (unsigned char *)"ENABLE"))
+        Option.AllPins = 0;
+    else error("Syntax");
+    SaveOptions();
+    if (Option.AllPins == 0) {
+        if (CheckPin(41, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED)) ExtCfg(41, EXT_DIG_OUT, Option.PWM);
+        if (CheckPin(42, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED)) ExtCfg(42, EXT_DIG_IN, 0);
+        if (CheckPin(44, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED)) ExtCfg(44, EXT_ANA_IN, 0);
+    } else {
+        if (CheckPin(41, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED)) ExtCfg(41, EXT_NOT_CONFIG, 0);
+        if (CheckPin(42, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED)) ExtCfg(42, EXT_NOT_CONFIG, 0);
+        if (CheckPin(44, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED)) ExtCfg(44, EXT_NOT_CONFIG, 0);
+    }
+    return 1;
+#endif
+}
+
+/* OPTION HEARTBEAT — WEB only allows ON/OFF (no pin reassignment);
+ * other ports allow pin selection. */
+int MIPS16 port_heartbeat_option_setter(unsigned char *cmdline)
+{
+    unsigned char *tp = checkstring(cmdline, (unsigned char *)"HEARTBEAT");
+    if (!tp) return 0;
+    if (checkstring(tp, (unsigned char *)"OFF") || checkstring(tp, (unsigned char *)"DISABLE")) {
+        Option.NoHeartbeat = 1;
+    } else {
+#ifdef PICOMITEWEB
+        if (checkstring(tp, (unsigned char *)"ON") || checkstring(tp, (unsigned char *)"ENABLE"))
+            Option.NoHeartbeat = 0;
+        else error("Syntax");
+        SaveOptions();
+        return 1;
+#else
+        unsigned char *p = NULL;
+        p = checkstring(tp, (unsigned char *)"ON");
+        if (p == NULL) p = checkstring(tp, (unsigned char *)"ENABLE");
+        if (p) {
+            getargs(&p, 1, (unsigned char *)",");
+            if (argc) {
+                unsigned char code, pin1;
+                if (!(code = codecheck(p))) p += 2;
+                pin1 = getinteger(p);
+                if (!code) pin1 = codemap(pin1);
+                if (IsInvalidPin(pin1)) error("Invalid pin");
+                if (ExtCurrentConfig[pin1] != EXT_NOT_CONFIG) error("Pin %/| is in use", pin1, pin1);
+                Option.NoHeartbeat = 0;
+                Option.heartbeatpin = pin1;
+                SaveOptions();
+                _excep_code = RESET_COMMAND;
+                SoftReset();
+            } else Option.NoHeartbeat = 0;
+        } else error("Syntax");
+#endif
+    }
+#ifndef PICOMITEWEB
+    SaveOptions();
+    if (CheckPin(HEARTBEATpin, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED)) {
+        if (Option.NoHeartbeat == 0) {
+            hal_pin_set_mode(PinDef[HEARTBEATpin].GPno, HAL_PIN_MODE_OUTPUT);
+            ExtCurrentConfig[PinDef[HEARTBEATpin].pin] = EXT_HEARTBEAT;
+        } else ExtCfg(HEARTBEATpin, EXT_NOT_CONFIG, 0);
+    } else error("Pin %/| is reserved", HEARTBEATpin, HEARTBEATpin);
+#endif
+    return 1;
 }
 
 #endif /* !MMBASIC_HOST */

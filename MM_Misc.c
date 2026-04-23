@@ -79,6 +79,8 @@ extern int  port_pin_is_reserved_alias(int pin);
 extern const char *port_pin_reserved_label(int pin);
 extern int  port_lcd320_option_setter(unsigned char *cmdline);
 extern int  port_misc_option_setter(unsigned char *cmdline);
+extern int  port_pico_pins_option_setter(unsigned char *cmdline);
+extern int  port_heartbeat_option_setter(unsigned char *cmdline);
 extern void port_web_print_options(void);
 extern int  port_web_option_setter(unsigned char *cmdline);
 extern int  port_web_mminfo(unsigned char *ep, int64_t *out_iret,
@@ -1220,28 +1222,7 @@ void MIPS16 cmd_option(void) {
         Option.Autorun=getint(argv[0],0,MAXFLASHSLOTS);
         SaveOptions(); return; 
     } 
-#ifndef PICOMITEWEB
-    tp = checkstring(cmdline, (unsigned char *)"PICO");
-    if(tp) {
-#ifdef rp2350
-        if(!rp2350a)error("Invalid for RP2350B");
-#endif
-        if(checkstring(tp, (unsigned char *)"OFF") || checkstring(tp, (unsigned char *)"DISABLE"))      Option.AllPins = 1; 
-        else if(checkstring(tp, (unsigned char *)"ON") || checkstring(tp, (unsigned char *)"ENABLE"))      Option.AllPins = 0; 
-        else error("Syntax");
-        SaveOptions();
-        if(Option.AllPins==0){
-            if(CheckPin(41, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED))ExtCfg(41,EXT_DIG_OUT,Option.PWM);
-            if(CheckPin(42, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED))ExtCfg(42,EXT_DIG_IN,0);
-            if(CheckPin(44, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED))ExtCfg(44,EXT_ANA_IN,0);
-        } else {
-            if(CheckPin(41, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED))ExtCfg(41, EXT_NOT_CONFIG, 0); 
-            if(CheckPin(42, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED))ExtCfg(42, EXT_NOT_CONFIG, 0); 
-            if(CheckPin(44, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED))ExtCfg(44, EXT_NOT_CONFIG, 0); 
-        }
-        return;
-    }
-#endif
+    if (port_pico_pins_option_setter(cmdline)) return;
 tp = checkstring(cmdline, (unsigned char *)"DEFAULT COLOURS");
 if(tp==NULL)tp = checkstring(cmdline, (unsigned char *)"DEFAULT COLORS");
 if(tp){
@@ -1292,47 +1273,7 @@ if(tp){
     if(Option.DISPLAY_TYPE!=SCREENMODE1)ClearScreen(gui_bcolour);
     return;
 }
-tp = checkstring(cmdline, (unsigned char *)"HEARTBEAT");
-    if(tp) {
-        if(checkstring(tp, (unsigned char *)"OFF") || checkstring(tp, (unsigned char *)"DISABLE"))      Option.NoHeartbeat = 1; 
-        else {
-#ifdef PICOMITEWEB
-            if(checkstring(tp, (unsigned char *)"ON") || checkstring(tp, (unsigned char *)"ENABLE"))      Option.NoHeartbeat = 0; 
-            else error("Syntax");
-            SaveOptions();
-            return;
-        }
-#else
-            unsigned char *p=NULL;
-            p=checkstring(tp, (unsigned char *)"ON");
-            if(p==NULL)p=checkstring(tp, (unsigned char *)"ENABLE");
-                if(p){
-                    getargs(&p,1,(unsigned char *)",");
-                    if(argc){
-                        unsigned char code,pin1;
-                        if(!(code=codecheck(p)))p+=2;
-                        pin1 = getinteger(p);
-                        if(!code)pin1=codemap(pin1);
-                        if(IsInvalidPin(pin1)) error("Invalid pin");
-                        if(ExtCurrentConfig[pin1] != EXT_NOT_CONFIG)  error("Pin %/| is in use",pin1,pin1);
-                        Option.NoHeartbeat = 0;
-                        Option.heartbeatpin=pin1;
-                        SaveOptions();
-                        _excep_code = RESET_COMMAND;
-                        SoftReset();
-                    } else Option.NoHeartbeat = 0; 
-                } else error("Syntax");
-            }
-        SaveOptions();
-        if(CheckPin(HEARTBEATpin, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED)){
-            if(Option.NoHeartbeat==0){
-                hal_pin_set_mode(PinDef[HEARTBEATpin].GPno, HAL_PIN_MODE_OUTPUT);
-                ExtCurrentConfig[PinDef[HEARTBEATpin].pin]=EXT_HEARTBEAT;
-            } else ExtCfg(HEARTBEATpin, EXT_NOT_CONFIG, 0);
-        } else error("Pin %/| is reserved", HEARTBEATpin, HEARTBEATpin);
-#endif
-        return;
-    }
+    if (port_heartbeat_option_setter(cmdline)) return;
     tp = checkstring(cmdline, (unsigned char *)"LCDPANEL NOCONSOLE");
     if(tp){
    	    if(CurrentLinePtr) error("Invalid in a program");

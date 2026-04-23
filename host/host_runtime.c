@@ -914,6 +914,11 @@ int port_keyboard_option_setter(unsigned char *cmdline) { (void)cmdline; return 
  * PS2 PINS / MOUSE — peripheral pin/feature setters. Host has none. */
 int port_misc_option_setter(unsigned char *cmdline) { (void)cmdline; return 0; }
 
+/* OPTION PICO ON/OFF (CYW43-shadow pin gating) and OPTION HEARTBEAT
+ * (pin selection). Host has neither. */
+int port_pico_pins_option_setter(unsigned char *cmdline) { (void)cmdline; return 0; }
+int port_heartbeat_option_setter(unsigned char *cmdline) { (void)cmdline; return 0; }
+
 /* WEB-only hooks — host has no WiFi. Real impls live in MMsetwifi.c on
  * PICOMITEWEB device builds. */
 void port_web_print_options(void) {}
