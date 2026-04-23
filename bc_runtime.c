@@ -29,10 +29,12 @@ extern unsigned int bc_alloc_fail_total;
 #define VMRUN_DBG(s)       ((void)0)
 #define VMRUN_DBGF(fmt...) ((void)0)
 
-#ifndef MMBASIC_HOST
-/* BCCompiler and BCVMState are heap-allocated via BC_ALLOC on all platforms.
- * On host: calloc.  On VM-only device: arena.  On bridge device: TryGetMemory.
- */
+/* Runtime diagnostic state. Populated per VM stage by
+ * bc_run_diag_note_* and dumped by bc_run_diag_dump when the VM
+ * reports a fatal runtime error (NEM[vm:...]). Kept unconditional so
+ * bc_runtime.c's stage-transition calls don't need target gates —
+ * host writes the struct fields too (they just go unread; host
+ * doesn't call bc_run_diag_dump). */
 typedef struct {
     unsigned before_clear_used, before_clear_free, before_clear_contig;
     unsigned after_clear_used, after_clear_free, after_clear_contig;
@@ -145,7 +147,6 @@ void bc_run_diag_dump(const char *reason) {
         MMPrintString(b);
     }
 }
-#endif
 
 /*
  * Compiles raw BASIC source directly to bytecode and executes it on the VM.
@@ -170,7 +171,6 @@ void bc_run_source_string_ex(const char *source, const char *source_name, int is
     }
     bc_crash_checkpoint(BC_CK_VM_ENTRY, "source entry");
     VMRUN_DBG("VM: entry\r\n");
-#ifndef MMBASIC_HOST
     bc_run_diag_note_vm_stage(BC_RUN_VM_ENTRY,
                               (unsigned)bc_alloc_bytes_used_peek(),
                               (unsigned)bc_alloc_bytes_high_water_peek(),
@@ -178,7 +178,6 @@ void bc_run_source_string_ex(const char *source, const char *source_name, int is
                               (unsigned)bc_compile_bytes_free(),
                               (unsigned)bc_runtime_bytes_limit(),
                               (unsigned)bc_alloc_bytes_capacity());
-#endif
 
     bc_crash_checkpoint(BC_CK_VM_ALLOC_CS, "alloc BCCompiler");
     BCCompiler *cs = (BCCompiler *)BC_ALLOC(sizeof(BCCompiler));
@@ -201,7 +200,6 @@ void bc_run_source_string_ex(const char *source, const char *source_name, int is
     bc_crash_checkpoint(BC_CK_VM_COMP_ALLOC, "bc_compiler_alloc");
     if (bc_compiler_alloc(cs) != 0) {
         VMRUN_DBG("VM: compiler alloc failed\r\n");
-#ifndef MMBASIC_HOST
         bc_run_diag_note_vm_stage(BC_RUN_VM_COMPILER_ALLOC_FAIL,
                                   (unsigned)bc_alloc_bytes_used_peek(),
                                   (unsigned)bc_alloc_bytes_high_water_peek(),
@@ -210,7 +208,6 @@ void bc_run_source_string_ex(const char *source, const char *source_name, int is
                                   (unsigned)bc_runtime_bytes_limit(),
                                   (unsigned)bc_alloc_bytes_capacity());
         bc_run_diag_dump("vm compiler alloc");
-#endif
         if (bc_compile_owns(source)) {
             bc_compile_release_all();
             source = NULL;
@@ -230,7 +227,6 @@ void bc_run_source_string_ex(const char *source, const char *source_name, int is
         return;
     }
     VMRUN_DBG("VM: compiler alloc ok\r\n");
-#ifndef MMBASIC_HOST
     bc_run_diag_note_vm_stage(BC_RUN_VM_COMPILER_ALLOC_OK,
                               (unsigned)bc_alloc_bytes_used_peek(),
                               (unsigned)bc_alloc_bytes_high_water_peek(),
@@ -238,7 +234,6 @@ void bc_run_source_string_ex(const char *source, const char *source_name, int is
                               (unsigned)bc_compile_bytes_free(),
                               (unsigned)bc_runtime_bytes_limit(),
                               (unsigned)bc_alloc_bytes_capacity());
-#endif
 
     bc_compiler_init(cs);
 
@@ -282,7 +277,6 @@ void bc_run_source_string_ex(const char *source, const char *source_name, int is
     if (bc_debug_enabled)
         bc_disassemble(cs);
 #endif
-#ifndef MMBASIC_HOST
     bc_run_diag_note_vm_stage(BC_RUN_VM_COMPILE_OK,
                               (unsigned)bc_alloc_bytes_used_peek(),
                               (unsigned)bc_alloc_bytes_high_water_peek(),
@@ -290,7 +284,6 @@ void bc_run_source_string_ex(const char *source, const char *source_name, int is
                               (unsigned)bc_compile_bytes_free(),
                               (unsigned)bc_runtime_bytes_limit(),
                               (unsigned)bc_alloc_bytes_capacity());
-#endif
 
     /* Source kept alive through compact + bc_bridge_prepare_subfun
      * below. Freed afterwards (device catch-all) so the bridge buffer
@@ -298,7 +291,6 @@ void bc_run_source_string_ex(const char *source, const char *source_name, int is
 
     if (bc_compiler_compact(cs) != 0) {
         VMRUN_DBG("VM: compact failed\r\n");
-#ifndef MMBASIC_HOST
         bc_run_diag_note_vm_stage(BC_RUN_VM_COMPACT_FAIL,
                                   (unsigned)bc_alloc_bytes_used_peek(),
                                   (unsigned)bc_alloc_bytes_high_water_peek(),
@@ -307,7 +299,6 @@ void bc_run_source_string_ex(const char *source, const char *source_name, int is
                                   (unsigned)bc_runtime_bytes_limit(),
                                   (unsigned)bc_alloc_bytes_capacity());
         bc_run_diag_dump("vm compact");
-#endif
         bc_compiler_free(cs);
         bc_compile_release_all();
 #ifndef MMBASIC_HOST
@@ -323,7 +314,6 @@ void bc_run_source_string_ex(const char *source, const char *source_name, int is
         return;
     }
     VMRUN_DBG("VM: compact ok\r\n");
-#ifndef MMBASIC_HOST
     bc_run_diag_note_vm_stage(BC_RUN_VM_COMPACT_OK,
                               (unsigned)bc_alloc_bytes_used_peek(),
                               (unsigned)bc_alloc_bytes_high_water_peek(),
@@ -331,9 +321,7 @@ void bc_run_source_string_ex(const char *source, const char *source_name, int is
                               (unsigned)bc_compile_bytes_free(),
                               (unsigned)bc_runtime_bytes_limit(),
                               (unsigned)bc_alloc_bytes_capacity());
-#endif
     bc_compile_release_all();
-#ifndef MMBASIC_HOST
     bc_run_diag_note_vm_stage(BC_RUN_VM_COMPILE_RELEASED,
                               (unsigned)bc_alloc_bytes_used_peek(),
                               (unsigned)bc_alloc_bytes_high_water_peek(),
@@ -341,7 +329,6 @@ void bc_run_source_string_ex(const char *source, const char *source_name, int is
                               (unsigned)bc_compile_bytes_free(),
                               (unsigned)bc_runtime_bytes_limit(),
                               (unsigned)bc_alloc_bytes_capacity());
-#endif
 
     /* Prepare the bridge subfun buffer NOW — compile-only arrays have
      * been freed, runtime arrays shrunk, so the ~src_len buffer lands
@@ -369,7 +356,6 @@ void bc_run_source_string_ex(const char *source, const char *source_name, int is
     bc_crash_checkpoint(BC_CK_VM_ALLOC, "bc_vm_alloc");
     if (bc_vm_alloc(vm) != 0) {
         VMRUN_DBG("VM: runtime alloc failed\r\n");
-#ifndef MMBASIC_HOST
         bc_run_diag_note_vm_stage(BC_RUN_VM_RUNTIME_ALLOC_FAIL,
                                   (unsigned)bc_alloc_bytes_used_peek(),
                                   (unsigned)bc_alloc_bytes_high_water_peek(),
@@ -378,7 +364,6 @@ void bc_run_source_string_ex(const char *source, const char *source_name, int is
                                   (unsigned)bc_runtime_bytes_limit(),
                                   (unsigned)bc_alloc_bytes_capacity());
         bc_run_diag_dump("vm runtime alloc");
-#endif
         bc_compiler_free(cs);
         bc_compile_release_all();
         BC_FREE(cs);
@@ -391,7 +376,6 @@ void bc_run_source_string_ex(const char *source, const char *source_name, int is
         return;
     }
     VMRUN_DBG("VM: runtime alloc ok\r\n");
-#ifndef MMBASIC_HOST
     bc_run_diag_note_vm_stage(BC_RUN_VM_RUNTIME_ALLOC_OK,
                               (unsigned)bc_alloc_bytes_used_peek(),
                               (unsigned)bc_alloc_bytes_high_water_peek(),
@@ -399,7 +383,6 @@ void bc_run_source_string_ex(const char *source, const char *source_name, int is
                               (unsigned)bc_compile_bytes_free(),
                               (unsigned)bc_runtime_bytes_limit(),
                               (unsigned)bc_alloc_bytes_capacity());
-#endif
 
     bc_crash_checkpoint(BC_CK_VM_INIT, "bc_vm_init");
     bc_vm_init(vm, cs);
