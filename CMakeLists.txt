@@ -244,6 +244,19 @@ else()
     target_sources(PicoMite PRIVATE drivers/audio_mp3/audio_mp3_stub.c)
 endif()
 
+# QSPI PSRAM heap: rp2350 non-WEB variants (PicoMite + VGA + HDMI at
+# rp2350) can optionally attach a PSRAM module via Option.PSRAM_CS_PIN.
+# Memory.c's GetMemory / TryGetMemory / FreeMemory / MemSize / ... call
+# into the psram_heap driver; callers runtime-guard with `if(PSRAMsize)`
+# or an address-range check so the stub is safe. rp2040 variants and
+# WEBRP2350 (where the QSPI pins are consumed by the CYW43 radio) link
+# the no-op stub.
+if (COMPILE STREQUAL "PICORP2350" OR COMPILE STREQUAL "PICOUSBRP2350" OR COMPILE STREQUAL "VGARP2350" OR COMPILE STREQUAL "VGAUSBRP2350" OR COMPILE STREQUAL "HDMI" OR COMPILE STREQUAL "HDMIUSB")
+    target_sources(PicoMite PRIVATE drivers/psram_heap/psram_heap_pico.c)
+else()
+    target_sources(PicoMite PRIVATE drivers/psram_heap/psram_heap_stub.c)
+endif()
+
 # Merge pipeline: only PICOMITE (SPI-LCD) variants run the core1 merge
 # loop. VGA/HDMI/WEB composite via other means, so they link a no-op
 # stub that lets Draw.c / cmd_framebuffer call the HAL hooks

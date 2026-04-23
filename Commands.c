@@ -1535,7 +1535,13 @@ void cmd_end(void) {
 	longjmp(mark, 1);												// jump back to the input prompt
 }
 extern unsigned int mmap[HEAP_MEMORY_SIZE/ PAGESIZE / PAGESPERWORD];
-extern unsigned int psmap[7*1024*1024/ PAGESIZE / PAGESPERWORD];
+/* psmap is the PSRAM heap page-bitmap. Real size lives in
+ * drivers/psram_heap/psram_heap_pico.c (rp2350 non-WEB) or
+ * psram_heap_stub.c (1-word stub everywhere else). Use the driver's
+ * psmap_size_bytes constant instead of sizeof(psmap) because the
+ * extern has an incomplete array bound here. */
+extern unsigned int psmap[];
+extern const unsigned int psmap_size_bytes;
 extern struct s_hash g_hashlist[MAXVARS/2];
 extern int g_hashlistpointer;
 extern short g_StrTmpIndex;
@@ -1589,8 +1595,8 @@ void SaveContext(void){
 		p+=heap_memory_size+256;
 		memcpy(p,  mmap, sizeof(mmap));
 		p+=sizeof(mmap);
-		memcpy(p, psmap, sizeof(psmap));
-		p+=sizeof(psmap);
+		memcpy(p, psmap, psmap_size_bytes);
+		p+=psmap_size_bytes;
 	} else {
 		lfs_file_t lfs_file;
         struct lfs_info lfsinfo={0};
@@ -1670,8 +1676,8 @@ void RestoreContext(bool keep){
 		p+=heap_memory_size+256;
 		memcpy(mmap, p, sizeof(mmap));
 		p+=sizeof(mmap);
-		memcpy(psmap, p, sizeof(psmap));
-		p+=sizeof(psmap);
+		memcpy(psmap, p, psmap_size_bytes);
+		p+=psmap_size_bytes;
 	} else {
 		lfs_file_t lfs_file;
         struct lfs_info lfsinfo={0};

@@ -30,7 +30,7 @@ CFLAGS = -std=gnu11 -g -O0 -Wall -Wno-unused-variable -Wno-unused-function \
 LDFLAGS = -lm
 
 # Source directory
-VPATH = ..:../core/state:../drivers/audio_mp3:../drivers/spi_lcd:../drivers/display_merge:../drivers/vga_pio:../drivers/gfx_3d:../drivers/upng_sprite:../drivers/gui_touch
+VPATH = ..:../core/state:../drivers/audio_mp3:../drivers/spi_lcd:../drivers/display_merge:../drivers/vga_pio:../drivers/gfx_3d:../drivers/upng_sprite:../drivers/gui_touch:../drivers/psram_heap
 
 # Core MMBasic sources (language runtime)
 CORE_SRCS = MMBasic.c Commands.c Functions.c Operators.c MATHS.c Memory.c Editor.c MMBasic_Prompt.c MMBasic_Print.c MMBasic_REPL.c
@@ -62,6 +62,9 @@ CORE_SRCS += gfx_3d.c
 CORE_SRCS += upng_sprite_stub.c
 # GUI touch-panel sub-commands: host has no touch panel, stub them.
 CORE_SRCS += gui_touch_stub.c
+# PSRAM heap driver: host has no QSPI PSRAM, link the no-op stub so
+# Memory.c's GetPSMemory / SBitsGet / SBitsSet references resolve.
+CORE_SRCS += psram_heap_stub.c
 
 # Bytecode VM sources
 BC_SRCS = bc_alloc.c bc_bridge.c vm_host_fat.c ff.c ffunicode.c ffsystem.c \

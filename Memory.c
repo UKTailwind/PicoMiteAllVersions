@@ -154,18 +154,14 @@ volatile int ytileheight = 0;
 #endif
 
 unsigned int mmap[HEAP_MEMORY_SIZE/ PAGESIZE / PAGESPERWORD]={0};
-#if defined(rp2350)
-unsigned int psmap[6*1024*1024/ PAGESIZE / PAGESPERWORD]={0};
-unsigned int SBitsGet(unsigned char *addr);
-void SBitsSet(unsigned char *addr, int bits);
-#else
-/* psmap is the page-bitmap for the rp2350 PSRAM heap; on rp2040 and
- * host there is no PSRAM, but Commands.c's SaveContext / RestoreContext
- * reference psmap unconditionally (the reference is inside
- * `if(PSRAMsize)` and never executes). A 1-word stub keeps the
- * linker happy without paying the full 6 MB bitmap's BSS cost. */
-unsigned int psmap[1]={0};
-#endif
+/* psmap[] + SBitsGet / SBitsSet / GetPSMemory live in
+ * drivers/psram_heap/ — see psram_heap_pico.c (rp2350 non-WEB real
+ * impl) + psram_heap_stub.c (everyone else). Externs in Memory.h. */
+extern unsigned int psmap[];
+extern const unsigned int psmap_size_bytes;
+extern unsigned int SBitsGet(unsigned char *addr);
+extern void SBitsSet(unsigned char *addr, int bits);
+extern void *GetPSMemory(int size);
 static inline unsigned int MBitsGet(unsigned char *addr);
 static inline void MBitsSet(unsigned char *addr, int bits);
 volatile char *g_StrTmp[MAXTEMPSTRINGS];                                       // used to track temporary string space on the heap
@@ -548,9 +544,8 @@ void MIPS16 cmd_memory(void) {
     unsigned int CurrentRAM, *pint;
 
     CurrentRAM = heap_memory_size + MAXVARS * sizeof(struct s_vartbl);
-#ifdef rp2350
+    /* PSRAMsize is 0 on targets without PSRAM, so this just adds 0. */
     CurrentRAM+=PSRAMsize;
-#endif
     // calculate the space allocated to variables on the heap
     for(i = VarCnt = vsize = var = 0; var < MAXVARS; var++) {
         if(g_vartbl[var].type == T_NOTYPE) continue;
@@ -760,7 +755,10 @@ void MIPS16 cmd_memory(void) {
     IntToStrPad((char *)inpbuf + strlen((char *)inpbuf), 100 - VarPercent - GeneralPercent, ' ', 2, 10); strcat((char *)inpbuf, "%) Free\r\n");
 	MMPrintString((char *)inpbuf);
 
-#if defined(PICOCALC) && defined(rp2350)
+    /* VM arena diagnostics — bc_alloc_bytes_* are defined on every
+     * target (bc_alloc.c routes to TryGetMemory on device, calloc on
+     * host). The "MEMORY" command shows an extra section reporting
+     * the VM arena capacity/used/high-water on every target. */
     MMPrintString("\r\nVM arena:\r\n");
     IntToStrPad((char *)inpbuf, (bc_alloc_bytes_capacity() + 512)/1024, ' ', 4, 10); strcat((char *)inpbuf, "K Capacity\r\n");
     MMPrintString((char *)inpbuf);
@@ -768,7 +766,6 @@ void MIPS16 cmd_memory(void) {
     MMPrintString((char *)inpbuf);
     IntToStrPad((char *)inpbuf, (bc_alloc_bytes_high_water() + 512)/1024, ' ', 4, 10); strcat((char *)inpbuf, "K High water\r\n");
     MMPrintString((char *)inpbuf);
-#endif
 }
 
 /* 
@@ -819,12 +816,11 @@ void m_alloc(int type) {
     switch(type) {
 
         case M_PROG:
-#ifdef rp2350
-                        /* PSRAM clear — no-op on rp2350 WEB where
-                         * PSRAMsize is always 0 (CYW43 consumes the
-                         * QSPI PSRAM pins). */
+                        /* PSRAM clear — no-op on targets without PSRAM
+                         * (PSRAMsize == 0; PSRAMbase is 0 too on those
+                         * ports, but the runtime guard keeps us from
+                         * dereferencing). */
                         if(PSRAMsize)memset((uint8_t *)PSRAMbase,0,PSRAMsize);
-#endif
         case M_LIMITED:    // this is called initially in InitBasic() to set the base pointer for program memory
                         // everytime the program size is adjusted up or down this must be called to check for memory overflow
                         ProgMemory = (uint8_t *)flash_progmemory;
@@ -914,24 +910,19 @@ void __not_in_flash_func(TestStackOverflow)(void) {
 
 void MIPS64 __not_in_flash_func(FreeMemory)(unsigned char *addr) {
     if(addr == NULL) return;
-#ifdef rp2350
-    /* On rp2350 WEB PSRAMsize is always 0 so the PSRAM branch below
-     * is never entered — no target gate needed. */
     int bits;
-    if(PSRAMsize){
-        if(addr>(unsigned char *)PSRAMbase && addr<(unsigned char *)(PSRAMbase+PSRAMsize)){
-            do {
-                bits = SBitsGet(addr);
-                SBitsSet(addr, 0);
-                addr += PAGESIZE;
-            } while(bits != (PUSED | PLAST));
-        } else {
-            do {
-                bits = MBitsGet(addr);
-                MBitsSet(addr, 0);
-                addr += PAGESIZE;
-            } while(bits != (PUSED | PLAST));
-        }
+    /* PSRAM range check — PSRAMsize is 0 on targets without PSRAM, so
+     * the PSRAM branch is a runtime no-op everywhere except rp2350
+     * non-WEB. The PSRAM bitmap helpers live in drivers/psram_heap/
+     * and have no-op stubs on non-PSRAM targets. */
+    if(PSRAMsize &&
+       addr > (unsigned char *)PSRAMbase &&
+       addr < (unsigned char *)(PSRAMbase + PSRAMsize)) {
+        do {
+            bits = SBitsGet(addr);
+            SBitsSet(addr, 0);
+            addr += PAGESIZE;
+        } while(bits != (PUSED | PLAST));
     } else {
         do {
             bits = MBitsGet(addr);
@@ -939,14 +930,6 @@ void MIPS64 __not_in_flash_func(FreeMemory)(unsigned char *addr) {
             addr += PAGESIZE;
         } while(bits != (PUSED | PLAST));
     }
-#else
-    int bits;
-    do {
-        bits = MBitsGet(addr);
-        MBitsSet(addr, 0);
-        addr += PAGESIZE;
-    } while(bits != (PUSED | PLAST));
-#endif
 }
 
 
@@ -955,9 +938,11 @@ void InitHeap(bool all) {
     int i;
     memset(mmap,0,sizeof(mmap));
     memset(MMHeap,0,heap_memory_size+256);
-#ifdef rp2350
-    if(all)memset(psmap,0,sizeof(psmap));
-#endif
+    /* psmap is a 1-word stub on non-PSRAM ports (see drivers/psram_heap/
+     * psram_heap_stub.c) so the memset is cheap everywhere. Size comes
+     * from the driver's `psmap_size_bytes` extern because `psmap` is
+     * declared with an incomplete array bound here. */
+    if(all)memset(psmap,0,psmap_size_bytes);
     for(i = 0; i < MAXTEMPSTRINGS; i++) g_StrTmp[i] = NULL;
 #ifdef PICOMITEVGA
     WriteBuf=(unsigned char *)FRAMEBUFFER;
@@ -978,26 +963,9 @@ void InitHeap(bool all) {
  Private memory management functions
 ************************************************************************************************************************/
 
-#ifdef rp2350
-/* PSRAM bitmap helpers (SBitsGet / SBitsSet / GetPSMemory) — rp2350
- * non-WEB has PSRAM; on rp2350 WEB PSRAMsize stays 0 at runtime and
- * no caller ever reaches this code. Compiling it on WEB is harmless. */
-unsigned int __not_in_flash_func(SBitsGet)(unsigned char *addr) {
-    unsigned int i, *p;
-    addr -= (unsigned int)PSRAMbase;
-    p = &psmap[((unsigned int)addr/PAGESIZE) / PAGESPERWORD];        // point to the word in the memory map
-    i = ((((unsigned int)addr/PAGESIZE)) & (PAGESPERWORD - 1)) * PAGEBITS; // get the position of the bits in the word
-    return (*p >> i) & ((1 << PAGEBITS) -1);
-}
-
-void __not_in_flash_func(SBitsSet)(unsigned char *addr, int bits) {
-    unsigned int i, *p;
-    addr -= (unsigned int)PSRAMbase;
-    p = &psmap[((unsigned int)addr/PAGESIZE) / PAGESPERWORD];        // point to the word in the memory map
-    i = ((((unsigned int)addr/PAGESIZE)) & (PAGESPERWORD - 1)) * PAGEBITS; // get the position of the bits in the word
-    *p = (bits << i) | (*p & (~(((1 << PAGEBITS) -1) << i)));
-}
-#endif
+/* PSRAM bitmap + allocator live in drivers/psram_heap/psram_heap_pico.c
+ * (rp2350 non-WEB) or psram_heap_stub.c (everyone else). Memory.c
+ * references the symbols via externs in Memory.h. */
 
 static inline __attribute__ ((always_inline)) unsigned int MBitsGet(unsigned char *addr) {
     unsigned int i, *p;
@@ -1016,33 +984,6 @@ static inline __attribute__ ((always_inline)) void MBitsSet(unsigned char *addr,
     i = ((((unsigned int)addr/PAGESIZE)) & (PAGESPERWORD - 1)) * PAGEBITS; // get the position of the bits in the word
     *p = (bits << i) | (*p & (~(((1 << PAGEBITS) -1) << i)));
 }
-#ifdef rp2350
-/* GetPSMemory — rp2350 PSRAM allocator. Never called on rp2350 WEB
- * because PSRAMsize stays 0 there; compiling it is harmless. */
-void __not_in_flash_func(*GetPSMemory)(int size) {
-    unsigned int j, n;
-    unsigned char *addr;
-    j = n = (size + PAGESIZE - 1)/PAGESIZE;                         // nbr of pages rounded up
-    for(addr = (unsigned char *)(PSRAMbase + PSRAMsize - PAGESIZE); addr >= (unsigned char *)PSRAMbase; addr -= PAGESIZE) {
-        if(!(SBitsGet(addr) & PUSED)) {
-            if(--n == 0) {                                          // found a free slot
-                j--;
-                SBitsSet(addr + (j * PAGESIZE), PUSED | PLAST);     // show that this is used and the last in the chain of pages
-                while(j--) SBitsSet(addr + (j * PAGESIZE), PUSED);  // set the other pages to show that they are used
-                memset(addr, 0, size);                              // zero the memory
- //               dp("alloc = %p (%d)", addr, size);
-                return (void *)addr;
-            }
-        } else
-            n = j;                                                  // not enough space here so reset our count
-    }
-    // out of memory
-    TempStringClearStart = 0;
-    ClearTempMemory();                                               // hopefully this will give us enough to print the prompt
-    error("Not enough PSRAM memory");
-    return NULL;                                                    // keep the compiler happy
-}
-#endif
 void MIPS64 __not_in_flash_func(*GetSystemMemory)(int size) { //get memory from the bottom up 
     int n=0, k;
     unsigned char *addr;
@@ -1092,9 +1033,10 @@ void heap_scan_stats(unsigned int *used_pages,
 }
 
 void MIPS64 __not_in_flash_func(*GetMemory)(int size) {
-#ifdef rp2350
+    /* PSRAM fast path on rp2350 non-WEB when the request is large
+     * enough to warrant the PSRAM allocator; PSRAMsize is 0 on ports
+     * without PSRAM so this branch is a runtime no-op there. */
     if(PSRAMsize && size> heap_memory_size/2)return GetPSMemory(size);
-#endif
     unsigned int j, n, k;
     unsigned char *addr;
     j = n = k= (size + PAGESIZE - 1)/PAGESIZE;                         // nbr of pages rounded up
@@ -1109,10 +1051,8 @@ void MIPS64 __not_in_flash_func(*GetMemory)(int size) {
             }
         } else n = j;                                               // not enough space here so reset our count
     }
-    // out of memory
-#ifdef rp2350
+    // out of heap — fall back to PSRAM if the port has it
     if(PSRAMsize)return GetPSMemory(size);
-#endif
     TempStringClearStart = 0;
     ClearTempMemory();                                               // hopefully this will give us enough to print the prompt
     {
@@ -1131,9 +1071,7 @@ void MIPS64 __not_in_flash_func(*GetMemory)(int size) {
 void *TryGetMemory(int size) {
     unsigned int j, n, k;
     unsigned char *addr;
-#ifdef rp2350
     if(PSRAMsize && size > heap_memory_size/2) return GetPSMemory(size);
-#endif
     j = n = k = (size + PAGESIZE - 1) / PAGESIZE;
     for(addr = MMHeap + heap_memory_size - PAGESIZE; addr >= MMHeap; addr -= PAGESIZE) {
         if(!(MBitsGet(addr) & PUSED)) {
@@ -1146,9 +1084,7 @@ void *TryGetMemory(int size) {
             }
         } else n = j;
     }
-#ifdef rp2350
     if(PSRAMsize) return GetPSMemory(size);
-#endif
     /* Record last failed alloc stats for diagnostics */
     bc_alloc_fail_size = size;
     bc_alloc_fail_pages = k;
@@ -1181,12 +1117,10 @@ int FreeSpaceOnHeap(void) {
     nbr = 0;
     for(addr = MMHeap + heap_memory_size - PAGESIZE; addr >= MMHeap; addr -= PAGESIZE)
         if(!(MBitsGet(addr) & PUSED)) nbr++;
-#ifdef rp2350
     if(PSRAMsize){
         for(addr = (unsigned char*)(PSRAMbase + PSRAMsize - PAGESIZE); addr >= (unsigned char*)PSRAMbase; addr -= PAGESIZE)
             if(!(SBitsGet(addr) & PUSED)) nbr++;
     }
-#endif
     return nbr * PAGESIZE;
 }
 
@@ -1208,30 +1142,27 @@ unsigned int UsedHeap(void) {
     nbr = 0;
     for(addr = MMHeap + heap_memory_size - PAGESIZE; addr >= MMHeap; addr -= PAGESIZE)
         if(MBitsGet(addr) & PUSED) nbr++;
-#ifdef rp2350
     if(PSRAMsize){
         for(addr = (unsigned char*)(PSRAMbase + PSRAMsize - PAGESIZE); addr >= (unsigned char*)PSRAMbase; addr -= PAGESIZE)
             if(SBitsGet(addr) & PUSED) nbr++;
     }
-#endif
     return nbr * PAGESIZE;
 }
 
 int MemSize(void *addr){ //returns the amount of heap memory allocated to an address
     int i=0;
     int bits;
-#ifdef rp2350
-    if(addr>(void *)PSRAMbase && addr<(void *)(PSRAMbase+PSRAMsize)){
-        if(addr >= (void *)PSRAMbase && addr < (void *)(PSRAMbase + PSRAMsize)){
-            do {
-                bits = SBitsGet(addr);
-                addr += PAGESIZE;
-                i+=PAGESIZE;
-            } while(bits != (PUSED | PLAST));
-        }
+    /* PSRAM range (rp2350 non-WEB only — PSRAMsize == 0 elsewhere). */
+    if(PSRAMsize &&
+       addr > (void *)PSRAMbase &&
+       addr < (void *)(PSRAMbase + PSRAMsize)) {
+        do {
+            bits = SBitsGet(addr);
+            addr += PAGESIZE;
+            i += PAGESIZE;
+        } while(bits != (PUSED | PLAST));
         return i;
     }
-#endif
     if(addr >= (void *)MMHeap && addr < (void *)(MMHeap + heap_memory_size)){
         do {
             bits = MBitsGet(addr);
@@ -1257,11 +1188,11 @@ void *ReAllocMemory(void *addr, size_t msize){
 void __not_in_flash_func(FreeMemorySafe)(void **addr){
 	if(*addr!=NULL){
         if(*addr >= (void *)MMHeap && *addr < (void *)(MMHeap + heap_memory_size)) {FreeMemory(*addr);*addr=NULL;}
-#ifdef rp2350
-        /* PSRAM free — PSRAMbase is 0 on rp2350 WEB so the range check
-         * is always false there. */
-        if(*addr >= (void *)PSRAMbase && *addr < (void *)(PSRAMbase + PSRAMsize)) {FreeMemory(*addr);*addr=NULL;}
-#endif
+        /* PSRAM free — PSRAMbase + PSRAMsize are both 0 on targets
+         * without PSRAM so the range check is always false there. */
+        if(*addr != NULL &&
+           *addr >= (void *)PSRAMbase &&
+           *addr < (void *)(PSRAMbase + PSRAMsize)) {FreeMemory(*addr);*addr=NULL;}
 	}
 }
 
