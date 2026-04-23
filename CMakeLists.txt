@@ -234,6 +234,14 @@ elseif (COMPILE STREQUAL "HDMI" OR COMPILE STREQUAL "HDMIUSB")
 		ports/hdmi_rp2350/port_defaults.c
 	)
 endif()
+# HDMI provides its own MMBasic port-hook body because prompt-font
+# selection has extra cases for FullColour / SCREENMODE3; every other
+# target links the simple pico_sdk_common variant.
+if (COMPILE STREQUAL "HDMI" OR COMPILE STREQUAL "HDMIUSB")
+	target_sources(PicoMite PRIVATE ports/hdmi_rp2350/mmbasic_port_hdmi.c)
+else()
+	target_sources(PicoMite PRIVATE ports/pico_sdk_common/mmbasic_port_pico.c)
+endif()
 if (COMPILE STREQUAL "HDMI" OR COMPILE STREQUAL "WEBRP2350" OR COMPILE STREQUAL "HDMIUSB"  OR COMPILE STREQUAL "VGARP2350"  OR COMPILE STREQUAL "VGAUSBRP2350"  OR COMPILE STREQUAL "PICORP2350"  OR COMPILE STREQUAL "PICOUSBRP2350" )
     target_sources(PicoMite PRIVATE psram.c)
 endif()

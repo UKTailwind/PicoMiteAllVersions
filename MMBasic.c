@@ -81,6 +81,11 @@ struct s_funtbl funtbl[MAXSUBFUN];
 //void hashlabels(int errabort);
 void hashlabels(unsigned char *p,int ErrAbort);
 #endif
+
+/* Port hook: after an error, pick the prompt font. Simple
+ * (`gui_font_width > 8 → narrow`) on non-HDMI; HDMI overrides with
+ * extra FullColour/SCREENMODE3 cases. Host stubs to a no-op. */
+extern void port_select_error_prompt_font(void);
 struct s_vartbl __attribute__ ((aligned (64))) g_vartbl[MAXVARS]={0};                                            // this table stores all variables
 int g_varcnt=0;                                                         // number of variables
 int g_VarIndex;                                                       // Global set by findvar after a variable has been created or found
@@ -3391,20 +3396,7 @@ void MIPS16 error(char *msg, ...) {
             SetFont((6<<4) | 1) ;
             PromptFont=(6<<4) | 1;
         } else {
-#ifdef HDMI
-            if(((FullColour) || DISPLAY_TYPE==SCREENMODE3) && gui_font_width>8){
-                SetFont(1) ;
-                PromptFont = 1;
-            } else if(gui_font_width>16){
-                SetFont((2<<4) | 1) ;
-                PromptFont=(2<<4) | 1;
-            }
-#else
-            if(gui_font_width>8){
-                SetFont(1) ;
-                PromptFont = 1;
-            }
-#endif
+            port_select_error_prompt_font();
         }
         if(DISPLAY_TYPE==Option.DISPLAY_TYPE){
             SetFont(Option.DefaultFont) ;

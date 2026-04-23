@@ -959,6 +959,12 @@ int  port_web_get_ssid(unsigned char *out_sret, int *out_targ)
 uint32_t port_bc_crash_get_sp(void) { return 0; }
 void port_bc_crash_save_fault_regs(BCCrashInfo *info) { (void)info; }
 
+/* MMBasic.c error-prompt-font hook — host has no SetFont / narrow
+ * font switch, so the hook is a no-op. Real impls live in
+ * ports/pico_sdk_common/mmbasic_port_pico.c and ports/hdmi_rp2350/
+ * mmbasic_port_hdmi.c. */
+void port_select_error_prompt_font(void) {}
+
 /* bc_bridge.c subfun-hash hooks — rp2350 maintains a funtbl[] hash
  * alongside subfun[] for O(1) FindSubFun lookups; rp2040 + host use
  * the linear scan, so the hooks are no-ops. Real impl lives in
