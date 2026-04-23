@@ -307,9 +307,11 @@ const uint8_t PINMAP[30] = {0};
 /* PinFunction */
 const char *PinFunction[64] = {NULL};
 
-/* volatile HID */
-volatile struct s_HID HID[4] = {{0}};
-unsigned char Current_USB_devices = 0;
+/* Host has no USB host stack — USB hooks return 0 (no devices). The
+ * full HID[4] array (≈336 B BSS) lives only in USBKeyboard.c on USB
+ * device builds. */
+int port_usb_count(void) { return 0; }
+int port_usb_hid_field(int n, int field) { (void)n; (void)field; return 0; }
 
 /* LFS config is defined by FileIO.c. */
 
@@ -889,5 +891,15 @@ void port_picocalc_factory_reset_options(void)       { error("Not supported on h
 /* CONFIGURE LIST entries — host advertises no factory board profiles. */
 void port_print_supported_boards(void) {}
 int  port_factory_reset_board(unsigned char *p) { (void)p; return 0; }
+
+/* WEB-only hooks — host has no WiFi. Real impls live in MMsetwifi.c on
+ * PICOMITEWEB device builds. */
+void port_web_print_options(void) {}
+int  port_web_option_setter(unsigned char *cmdline) { (void)cmdline; return 0; }
+int  port_web_mminfo(unsigned char *ep, int64_t *out_iret,
+                     unsigned char *out_sret, int *out_targ)
+{ (void)ep; (void)out_iret; (void)out_sret; (void)out_targ; return 0; }
+int  port_web_get_ssid(unsigned char *out_sret, int *out_targ)
+{ (void)out_sret; (void)out_targ; return 0; }
 
 /* str_replace/STR_REPLACE provided by MATHS.c */

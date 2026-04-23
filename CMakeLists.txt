@@ -245,6 +245,10 @@ if (COMPILE STREQUAL "WEB" OR COMPILE STREQUAL "WEBRP2350" )
 	${CMAKE_CURRENT_LIST_DIR}/.. # for our common lwipopts
 	)
 	Pico_enable_stdio_usb(PicoMite 1)
+else()
+    # Non-WEB device builds get the no-op stubs so MM_Misc.c can call
+    # WEB-stack symbols (closeMQTT, ProcessWeb, port_web_*) unconditionally.
+    target_sources(PicoMite PRIVATE MMweb_stubs.c)
 endif()
 
 if ((COMPILE STREQUAL "PICO") OR (COMPILE STREQUAL "PICOUSB") OR (COMPILE STREQUAL "PICORP2350") OR (COMPILE STREQUAL "PICOUSBRP2350") OR (COMPILE STREQUAL "WEBRP2350"))

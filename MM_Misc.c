@@ -60,6 +60,11 @@ extern int  port_picocalc_is_charging(void);
 extern void port_picocalc_factory_reset_options(void);
 extern void port_print_supported_boards(void);
 extern int  port_factory_reset_board(unsigned char *p);
+extern void port_web_print_options(void);
+extern int  port_web_option_setter(unsigned char *cmdline);
+extern int  port_web_mminfo(unsigned char *ep, int64_t *out_iret,
+                            unsigned char *out_sret, int *out_targ);
+extern int  port_web_get_ssid(unsigned char *out_sret, int *out_targ);
 /* TimeOffsetToUptime defined in mm_misc_shared.c (also used by vm_sys_time.c) */
 extern int64_t TimeOffsetToUptime;
 extern int last_adc;
@@ -127,11 +132,12 @@ extern volatile bool TCPreceived;
 extern char         *TCPreceiveInterrupt;
 /* setwifi lives in MMsetwifi.c on WEB builds. */
 extern void setwifi(unsigned char *tp);
-/* Current_USB_devices is declared in Hardware_Includes.h under
- * `#ifdef USBKEYBOARD` so non-USB builds need an explicit decl —
- * the symbol now exists on every device + host (USB-driver impl
- * or PS/2 / host_runtime stub). */
-extern uint8_t Current_USB_devices;
+/* USB device-info hooks: real impls in drivers/usb_host_kbd/USBKeyboard.c
+ * (USB device builds) and stubs in drivers/ps2_matrix/Keyboard.c (non-USB
+ * device builds) and host_runtime.c (host). The HID[4] array stays
+ * encapsulated on USB builds; non-USB pays no BSS for it. */
+extern int port_usb_count(void);
+extern int port_usb_hid_field(int n, int field);
 #ifdef PICOMITEVGA
 #ifndef HDMI
 void VGArecovery(int pin){
@@ -159,16 +165,10 @@ void VGArecovery(int pin){
     }
 #endif
 #endif
-#ifndef PICOMITEWEB
-/* Non-WEB targets lack the lwIP MQTT stack + the WEB request pump.
- * Stubs so core's teardown / directory-walk / LOAD paths can call
- * closeMQTT() and ProcessWeb() unconditionally; on WEB the real
- * implementations link instead (MMMqtt.c / MMtcpserver.c). */
-void closeMQTT(void) {}
-void ProcessWeb(int mode) { (void)mode; }
-void tcp_free_recv_buffers(void) {}
-void tcp_realloc_recv_buffers(void) {}
-#endif
+/* WEB-stack stubs — closeMQTT / ProcessWeb / tcp_*_recv_buffers /
+ * port_web_* — live in MMweb_stubs.c (linked on non-WEB device) and
+ * host_runtime.c (host); real impls in MMsetwifi.c / MMMqtt.c /
+ * MMtcpserver.c on WEB. */
 extern const uint8_t *flash_target_contents;
 int TickPeriod[NBRSETTICKS]={0};
 volatile int TickTimer[NBRSETTICKS]={0};
@@ -933,37 +933,7 @@ void MIPS16 printoptions(void){
     #ifdef PICOCALC
     if(Option.KEYBOARDBL)PO2Int("BACKLIGHT KB", Option.KEYBOARDBL);
     #endif
-    #ifdef PICOMITEWEB
-    if(*Option.SSID){
-        char password[]="****************************************************************";
-        password[strlen((char *)Option.PASSWORD)]=0;
-        PO("WIFI");
-        MMPrintString((char *)Option.SSID);MMputchar(',',1);MMputchar(' ',1);
-        MMPrintString(password);
-        MMputchar(',',1);
-            MMputchar(' ',1);
-        MMPrintString(Option.hostname);
-        if(*Option.ipaddress){
-            MMputchar(',',1);
-            MMputchar(' ',1);
-            MMPrintString(Option.ipaddress);
-            MMputchar(',',1);
-            MMputchar(' ',1);
-            MMPrintString(Option.mask);
-            MMputchar(',',1);
-            MMputchar(' ',1);
-            MMPrintString(Option.gateway);
-        }
-        PRet();
-    }
-    if(Option.TCP_PORT && Option.ServerResponceTime!=5000)PO3Int("TCP SERVER PORT", Option.TCP_PORT, Option.ServerResponceTime);
-    if(Option.TCP_PORT && Option.ServerResponceTime==5000)PO2Int("TCP SERVER PORT", Option.TCP_PORT);
-    if(Option.UDP_PORT && Option.UDPServerResponceTime!=5000)PO3Int("UDP SERVER PORT", Option.UDP_PORT, Option.UDPServerResponceTime);
-    if(Option.UDP_PORT && Option.UDPServerResponceTime==5000)PO2Int("UDP SERVER PORT", Option.UDP_PORT);
-    if(Option.Telnet==1)PO2Str("TELNET", "CONSOLE ON");
-    if(Option.Telnet==-1)PO2Str("TELNET", "CONSOLE ONLY");
-    if(Option.disabletftp==1)PO2Str("TFTP", "OFF");
-    #endif
+    port_web_print_options();
     if(Option.TOUCH_CS) {
         PO("TOUCH"); 
         if(Option.TOUCH_CAP==1)(MMPrintString("FT6336 "));
@@ -1984,70 +1954,7 @@ tp = checkstring(cmdline, (unsigned char *)"HEARTBEAT");
         SaveOptions();
         return;
     }
-#ifdef PICOMITEWEB
-	tp = checkstring(cmdline, (unsigned char *)"WEB MESSAGES");
-	if(tp) {
-		if(checkstring(tp, (unsigned char *)"OFF"))	{ optionsuppressstatus=1; return; }
-		if(checkstring(tp, (unsigned char *)"ON"))	{ optionsuppressstatus=0; return; }
-	}
-    tp = checkstring(cmdline, (unsigned char *)"WIFI");
-    if(tp) {
-        setwifi(tp);
-         _excep_code = RESET_COMMAND;
-        SoftReset();
-        return;
-    }
-    tp = checkstring(cmdline, (unsigned char *)"TCP SERVER PORT");
-    if(tp) {
-        getargs(&tp,3,(unsigned char *)",");
-   	    if(CurrentLinePtr) error("Invalid in a program");
-        Option.TCP_PORT=getint(argv[0],0,65535);
-        Option.ServerResponceTime=5000;
-        if(argc==3)Option.ServerResponceTime=getint(argv[2],1000,20000);
-        SaveOptions();
-         _excep_code = RESET_COMMAND;
-        SoftReset();
-        return;
-    }
-    tp = checkstring(cmdline, (unsigned char *)"UDP SERVER PORT");
-    if(tp) {
-        getargs(&tp,3,(unsigned char *)",");
-   	    if(CurrentLinePtr) error("Invalid in a program");
-        Option.UDP_PORT=getint(argv[0],0,65535);
-        Option.UDPServerResponceTime=5000;
-        if(argc==3)Option.UDPServerResponceTime=getint(argv[2],1000,20000);
-        SaveOptions();
-         _excep_code = RESET_COMMAND;
-        SoftReset();
-        return;
-    }
-    tp = checkstring(cmdline, (unsigned char *)"TELNET CONSOLE");
-    if(tp) {
-   	    if(CurrentLinePtr) error("Invalid in a program");
-        if(checkstring(tp, (unsigned char *)"OFF"))Option.Telnet=0;
-        else if(checkstring(tp, (unsigned char *)"ON"))Option.Telnet=1;
-        else if(checkstring(tp, (unsigned char *)"ONLY")) Option.Telnet=-1;
-        else error("Syntax");
-        SaveOptions();
-         _excep_code = RESET_COMMAND;
-        SoftReset();
-        return;
-    }
-    tp = checkstring(cmdline, (unsigned char *)"TFTP");
-    if(tp) {
-   	    if(CurrentLinePtr) error("Invalid in a program");
-        if(checkstring(tp, (unsigned char *)"OFF"))Option.disabletftp=1;
-        else if(checkstring(tp, (unsigned char *)"ON"))Option.disabletftp=0;
-        else if(checkstring(tp, (unsigned char *)"ENABLE"))Option.disabletftp=0;
-        else if(checkstring(tp, (unsigned char *)"DISABLE"))Option.disabletftp=1;
-        else error("Syntax");
-        SaveOptions();
-         _excep_code = RESET_COMMAND;
-        SoftReset();
-        return;
-    }
-
-#endif
+    if (port_web_option_setter(cmdline)) return;
 
 #ifdef PICOMITEVGA
     tp = checkstring(cmdline, (unsigned char *)"RESOLUTION");
@@ -3306,39 +3213,9 @@ void MIPS16 fun_info(void){
         CtoM(sret);
         targ=T_STR;
         return;
-#ifdef PICOMITEWEB
-    } else if((tp=checkstring(ep, (unsigned char *)"TCP REQUEST"))){
-        int i=getint(tp,1,MaxPcb)-1;
-        iret=TCPstate->inttrig[i];
-        targ=T_INT;
+    } else if (port_web_mminfo(ep, &iret, sret, &targ)) {
         return;
-    } else if((tp=checkstring(ep, (unsigned char *)"TCP PORT"))){
-        iret=Option.TCP_PORT;
-        targ=T_INT;
-        return;
-    } else if((tp=checkstring(ep, (unsigned char *)"UDP PORT"))){
-        iret=Option.UDP_PORT;
-        targ=T_INT;
-        return;
-     } else if(checkstring(ep,(unsigned char *)"IP ADDRESS")){  
-        strcpy((char *)sret,ip4addr_ntoa(netif_ip4_addr(netif_list)));
-        CtoM(sret);
-        targ=T_STR;
-        return;
-    } else if(checkstring(ep,(unsigned char *)"MAX CONNECTIONS")){  
-        iret=MaxPcb;
-        targ=T_INT;
-        return;
-    } else if(checkstring(ep,(unsigned char *)"WIFI STATUS")){  
-        iret=cyw43_wifi_link_status(&cyw43_state,CYW43_ITF_STA);
-        targ=T_INT;
-        return;
-    } else if(checkstring(ep,(unsigned char *)"TCPIP STATUS")){  
-        iret=cyw43_tcpip_link_status(&cyw43_state,CYW43_ITF_STA);
-        targ=T_INT;
-        return;
-#endif
-    } 
+    }
 #ifndef rp2350
     else if(checkstring(ep, (unsigned char *)"INTERRUPTS")){
     iret=(int64_t)(uint32_t)*((io_rw_32 *) (PPB_BASE + M0PLUS_NVIC_ISER_OFFSET));
@@ -3359,24 +3236,23 @@ void MIPS16 fun_info(void){
         return;
     } 
 #endif
-    /* USB device info: HID[]/Current_USB_devices are zero on non-USB
-     * builds (PS/2 + host stubs) so the values come back as 0. */
+    /* USB device info: routed through port_usb_* hooks so the HID[4]
+     * array (≈336 B BSS) only exists on USB device builds. */
     else if((tp=checkstring(ep, (unsigned char *)"USB VID"))){
         int n=getint((unsigned char *)tp,1,4);
-        iret=HID[n-1].vid;
+        iret=port_usb_hid_field(n, 0);
         targ=T_INT;
         return;
     }
     else if((tp=checkstring(ep, (unsigned char *)"USB PID"))){
         int n=getint((unsigned char *)tp,1,4);
-        iret=HID[n-1].pid;
+        iret=port_usb_hid_field(n, 1);
         targ=T_INT;
         return;
     }
     else if((tp=checkstring(ep, (unsigned char *)"USB"))){
         int n=getint((unsigned char *)tp,0,4);
-        if(n==0)iret=Current_USB_devices;
-        else iret=HID[n-1].Device_type;
+        iret = (n==0) ? port_usb_count() : port_usb_hid_field(n, 2);
         targ=T_INT;
         return;
     }
@@ -3524,13 +3400,8 @@ void MIPS16 fun_info(void){
             iret = Option.Width;
             targ = T_INT;
             return;
-#ifdef PICOMITEWEB
-		} else if(checkstring(tp, (unsigned char *)"SSID")){
-			strcpy((char *)sret,(char *)Option.SSID);
-            CtoM(sret);
-            targ=T_STR;
+		} else if(checkstring(tp, (unsigned char *)"SSID") && port_web_get_ssid(sret, &targ)) {
             return;
-#endif
 		} else error("Syntax");
     } else if(*ep=='p' || *ep=='P'){
         if((tp=checkstring(ep, (unsigned char *)"PINNO"))){

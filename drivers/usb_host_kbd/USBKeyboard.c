@@ -52,6 +52,21 @@ int justset = 0;
  * fires on USB builds (PS2int stays false). */
 volatile int  PS2code = 0;
 volatile bool PS2int  = false;
+
+/* USB-host hooks for MM.USB / MM.USB VID / MM.USB PID. Real impls read
+ * the HID[] array populated by the USB host stack. */
+extern unsigned char Current_USB_devices;
+int port_usb_count(void) { return Current_USB_devices; }
+int port_usb_hid_field(int n, int field)
+{
+    if (n < 1 || n > 4) return 0;
+    switch (field) {
+    case 0: return HID[n-1].vid;
+    case 1: return HID[n-1].pid;
+    case 2: return HID[n-1].Device_type;
+    default: return 0;
+    }
+}
 // extern char ConsoleRxBuf[];
 uint32_t repeattime;
 void USR_KEYBRD_ProcessData(uint8_t data);
