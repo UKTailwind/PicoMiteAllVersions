@@ -39,9 +39,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "Hardware_Includes.h"
 #include "hal/hal_keyboard.h"
 #include "hal/hal_flash.h"
-#ifndef PICOMITEWEB
-#include "pico/multicore.h"
-#endif
+#include "hal/hal_display_merge.h"
 
 // this is the command table that defines the various tokens for commands in the source code
 // most of them are listed in the .h files so you should not add your own here but instead add
@@ -3395,14 +3393,7 @@ void MIPS16 error(char *msg, ...) {
         DefinedSubFunMem=0;
     }  
     if(OptionErrorSkip) longjmp(ErrNext, 1);                       // if OPTION ERROR SKIP/IGNORE is in force
-#ifdef PICOMITE
-            multicore_fifo_push_blocking(0xFF);
-            busy_wait_ms(mergetimer+200);
-            if(mergerunning){
-                _excep_code = RESET_COMMAND;
-                SoftReset();
-        }
-#endif
+    hal_display_merge_abort();
 
     LoadOptions();                                                  // make sure that the option struct is in a clean state
     OptionConsole=1;
@@ -3851,12 +3842,9 @@ void MIPS16 ClearRuntime(bool all) {
         WriteData(0);
         WriteData(0);
     }
-#if defined(PICOMITE) && defined(rp2350)
     if(ScrollLCD==ScrollLCDMEM332){
-		multicore_fifo_push_blocking(7);
-		multicore_fifo_push_blocking((uint32_t)0);
+        hal_display_nextgen_scroll_reset();
     }
-#endif
     if(SSD16TYPE || Option.DISPLAY_TYPE==IPS_4_16 || SPI480)clear320();
 #endif
     MMerrno = 0;                                                    // clear the error flags

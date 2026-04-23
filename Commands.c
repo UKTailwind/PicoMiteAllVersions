@@ -40,10 +40,8 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "hal/hal_flash.h"
 #include "hal/hal_time.h"
 #include "hal/hal_keyboard.h"
+#include "hal/hal_display_merge.h"
 #include "hardware/structs/watchdog.h"
-#ifdef PICOMITE
-#include "pico/multicore.h"
-#endif
 #include "bc_alloc.h"
 #include "bc_run_diag.h"
 #define overlap (VRes % (FontTable[gui_font >> 4][1] * (gui_font & 0b1111)) ? 0 : 1)
@@ -1487,13 +1485,7 @@ void MIPS16 __not_in_flash_func(cmd_else)(void) {
 
 
 void do_end(bool ecmd) {
-#ifdef PICOMITE
-    if(mergerunning){
-        multicore_fifo_push_blocking(0xFF);
-        mergerunning=false;
-        busy_wait_ms(100);
-    }
-#endif
+    hal_display_merge_abort();
 if(Option.SerialConsole)while(ConsoleTxBufHead!=ConsoleTxBufTail)routinechecks();
 	fflush(stdout);
 	if(ecmd){

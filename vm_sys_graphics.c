@@ -20,9 +20,9 @@
 #ifdef PICOMITE
 #include "Draw.h"               /* for merge_optimized() (PICOMITE only) */
 #endif
-#include "pico/multicore.h"
 #include "hardware/dma.h"
 #endif
+#include "hal/hal_display_merge.h"
 
 typedef struct VMGfxScratchBuffer {
     void *ptr;
@@ -91,14 +91,7 @@ static size_t vm_sys_graphics_fb_bytes(void) {
 
 #if defined(PICOMITE) && !defined(MMBASIC_HOST)
 static void vm_sys_graphics_fb_stop_merge(void) {
-    if (mergerunning) {
-        multicore_fifo_push_blocking(0xFF);
-        busy_wait_ms(mergetimer + 200);
-        if (mergerunning) {
-            _excep_code = RESET_COMMAND;
-            SoftReset();
-        }
-    }
+    hal_display_merge_abort();
     vm_fb_merge_running = 0;
     mergerunning = 0;
     mergetimer = 0;
@@ -1926,8 +1919,7 @@ void vm_sys_graphics_framebuffer_merge(int has_colour, int colour, int mode, int
                 error("Not available on this display");
             }
             if (diskchecktimer < 200 && SPIatRisk) diskchecktimer = 200;
-            multicore_fifo_push_blocking(2);
-            multicore_fifo_push_blocking((uint32_t)transparent);
+            hal_display_merge_post_fill(transparent);
             return;
         case BC_FB_MERGE_MODE_R:
             if (!(((Option.DISPLAY_TYPE > I2C_PANEL && Option.DISPLAY_TYPE < BufferedPanel) ||
@@ -1943,9 +1935,7 @@ void vm_sys_graphics_framebuffer_merge(int has_colour, int colour, int mode, int
             vm_fb_merge_colour = transparent;
             mergetimer = (uint32_t)(has_rate ? rate_ms : 0);
             vm_fb_merge_interval_us = (uint32_t)(has_rate ? rate_ms * 1000 : 0);
-            multicore_fifo_push_blocking(3);
-            multicore_fifo_push_blocking((uint32_t)transparent);
-            multicore_fifo_push_blocking((uint32_t)vm_fb_merge_interval_us);
+            hal_display_merge_post_bg(transparent, vm_fb_merge_interval_us);
             return;
         case BC_FB_MERGE_MODE_A:
             vm_sys_graphics_fb_stop_merge();
