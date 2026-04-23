@@ -109,6 +109,18 @@ void hal_vga_ops_tile_colour(int x, int y, int *front, int *back);
  * by the caller before this is invoked. */
 int hal_vga_ops_handle_blit_move(int x1, int y1, int x2, int y2, int w, int h);
 
+/* ResetDisplay VGA body: applies the per-SCREENMODE/per-CPU_Speed
+ * HRes/VRes/ScreenSize table, rewires DrawRectangle/DrawBitmap/… to
+ * the right mode-specific function pointers, and repaints the tile
+ * fg/bg arrays. No-op on non-VGA (the caller still runs
+ * ResetGUI() under #ifdef GUICONTROLS, which is orthogonal). */
+void hal_vga_ops_reset_display_vga(void);
+
+/* closeframebuffer VGA impl lives in drivers/vga_pio/vga_mode_ops.c
+ * as a direct (non-hooked) definition. The non-VGA build has its
+ * own closeframebuffer in Draw.c that uses the merge-pipeline hooks;
+ * the two never coexist in a link. */
+
 #ifdef __cplusplus
 }
 #endif

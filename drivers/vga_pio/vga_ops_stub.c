@@ -37,3 +37,4 @@ void hal_vga_ops_tile_colour(int x, int y, int *front, int *back) {
 int hal_vga_ops_handle_blit_move(int x1, int y1, int x2, int y2, int w, int h) {
     (void)x1; (void)y1; (void)x2; (void)y2; (void)w; (void)h; return 0;
 }
+void hal_vga_ops_reset_display_vga(void) { }
