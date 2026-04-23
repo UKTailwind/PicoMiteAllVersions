@@ -8,6 +8,8 @@
  */
 
 #include <stddef.h>
+#include <stdbool.h>
+#include <stdint.h>
 #include "hal/hal_vga_ops.h"
 
 int  hal_vga_ops_handle_cls(int c)         { (void)c; return 0; }
@@ -63,3 +65,10 @@ volatile int ytileheight = 0;
 /* Called from Memory.c::InitHeap — no-op on non-VGA (no framebuffer
  * planes to rebind). */
 void vga_memory_init_planes(void) { }
+
+/* setmode is a VGA-only entry for switching SCREENMODE (1-5) live.
+ * Draw.h extern-declares it unconditionally; Commands.c calls it from
+ * cmd_new / cmd_end. Non-VGA ports don't have QVGA SCREENMODEs and
+ * Option.DISPLAY_TYPE never takes a SCREENMODE value there, so the
+ * stub is safely unreachable at runtime. */
+void setmode(int mode, bool clear) { (void)mode; (void)clear; }

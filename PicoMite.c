@@ -215,10 +215,7 @@ volatile int ConsoleTxBufHead = 0;
 volatile int ConsoleTxBufTail = 0;
 uint I2SOff;
 
-#ifndef USBKEYBOARD
-extern void initMouse0(int sensitivity);
 volatile unsigned int MouseTimer = 0;
-#endif
 volatile unsigned int AHRSTimer = 0;
 volatile unsigned int InkeyTimer = 0;
 volatile long long int mSecTimer = 0;                               // this is used to count mSec

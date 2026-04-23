@@ -53,6 +53,16 @@ int justset = 0;
 volatile int  PS2code = 0;
 volatile bool PS2int  = false;
 
+/* mouse.c is not linked on USB builds — the PS/2-style Option.MOUSE
+ * mechanism isn't available on USB keyboards. Commands.c / PicoMite.c
+ * reference mouse0 / initMouse0 / MOUSE_CLOCK / MOUSE_DATA
+ * unconditionally (the runtime check `Option.MOUSE_CLOCK` is always 0
+ * on USB ports since OPTION MOUSE isn't offered); stubbing them here
+ * lets those call sites stay target-gate-free. */
+bool mouse0 = false;
+int MOUSE_CLOCK = 0, MOUSE_DATA = 0;
+void initMouse0(int sensitivity) { (void)sensitivity; }
+
 /* USB-host hooks for MM.USB / MM.USB VID / MM.USB PID. Real impls read
  * the HID[] array populated by the USB host stack. */
 extern unsigned char Current_USB_devices;

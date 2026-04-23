@@ -568,11 +568,10 @@ if(COMPILE STREQUAL "VGA" OR COMPILE STREQUAL "PICO" OR COMPILE STREQUAL "HDMI" 
 	)
 endif()
 
-if(COMPILE STREQUAL "VGARP2350" OR COMPILE STREQUAL "WEBRP2350" OR COMPILE STREQUAL "PICORP2350" OR COMPILE STREQUAL "HDMI" OR COMPILE STREQUAL "HDMIUSB" OR COMPILE STREQUAL "VGAUSBRP2350" OR COMPILE STREQUAL "PICOUSBRP2350")
-	target_link_libraries(PicoMite
-	pico_rand
-	)
-endif()
+# pico_rand: available on both rp2040 and rp2350 (lives in rp2_common).
+# Linked on every device target so Functions.c::fun_rnd can call
+# get_rand_32() unconditionally.
+target_link_libraries(PicoMite pico_rand)
 
 if(COMPILE STREQUAL "WEB" OR COMPILE STREQUAL "WEBRP2350" )
 	target_link_libraries(PicoMite

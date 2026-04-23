@@ -40,10 +40,11 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "xregex.h"
 #include "hardware/adc.h"
 #include "hal/hal_pin.h"
+#include "port_config.h"
 
-#ifdef rp2350
-#include "pico/rand.h"
-#endif
+#include "pico/rand.h"  /* get_rand_32/64: pico_rand is linked on every
+                         * device target; host supplies a libc-backed
+                         * shim at host/pico/rand.h. */
 extern long long int  llabs (long long int  n);
 extern void port_fun_mm_mqtt_copy(int which, unsigned char *out);
 const char* overlaid_functions[]={
@@ -53,9 +54,7 @@ const char* overlaid_functions[]={
 	"MM.I2C",
 	"MM.FONTHEIGHT",
 	"MM.FONTWIDTH",
-#ifndef USBKEYBOARD
 	"MM.PS2",
-#endif
 	"MM.HPOS",
 	"MM.VPOS",
 	"MM.ONEWIRE",
@@ -75,7 +74,11 @@ const char* overlaid_functions[]={
 	"MM.SUPPLY",
 	"MM.END"
 };
-#ifndef rp2350
+/* Integer-degree sine LUT. Used by fun_sin / fun_cos / fun_tan fast
+ * paths when OPTION ANGLE DEGREES is active and the argument is an
+ * integer. Kept unconditional (~2.8 KB of flash) — on rp2350 the
+ * hardware FPU is fast enough that the LUT isn't essential, but the
+ * fast path is still a win and the flash cost is small. */
 const MMFLOAT sinetab[360]={
 	0.000000000000000,0.017452406437284,0.034899496702501,0.052335956242944,0.069756473744125,0.087155742747658,0.104528463267653,0.121869343405147,0.139173100960065,0.156434465040231,
 	0.173648177666930,0.190808995376545,0.207911690817759,0.224951054343865,0.241921895599668,0.258819045102521,0.275637355816999,0.292371704722737,0.309016994374947,0.325568154457157,
@@ -114,7 +117,6 @@ const MMFLOAT sinetab[360]={
 	-0.342020143325669,-0.325568154457157,-0.309016994374948,-0.292371704722737,-0.275637355817000,-0.258819045102521,-0.241921895599668,-0.224951054343865,-0.207911690817760,-0.190808995376545,
 	-0.173648177666930,-0.156434465040231,-0.139173100960066,-0.121869343405148,-0.104528463267653,-0.087155742747658,-0.069756473744126,-0.052335956242944,-0.034899496702501,-0.017452406437284
 };
-#endif
 /********************************************************************************************************************************************
  basic functions
  each function is responsible for decoding a basic function
@@ -509,11 +511,12 @@ void fun_tilde(void){
 		case MMFONTWIDTH:
 			iret = FontTable[gui_font >> 4][0] * (gui_font & 0b1111);
 			break;
-#ifndef USBKEYBOARD
+		/* MM.PS2 — returns the last PS/2 scan code. PS2code is
+		 * unconditionally defined (0 on USB-keyboard builds via
+		 * drivers/usb_host_kbd/USBKeyboard.c stub). */
 		case MMPS2:
 			iret = (int64_t)(uint32_t)PS2code;
 			break;
-#endif
 		case MMHPOS:
 			iret = CurrentX;
 			break;
@@ -584,11 +587,10 @@ void fun_tilde(void){
 		case  MMSUPPLY:
 			if(ExtCurrentConfig[44]== EXT_ANA_IN || Option.LOCAL_KEYBOARD){
 		        hal_pin_adc_init();
-#ifdef rp2350
+		        /* rp2350a is unconditionally true on rp2040 (stubbed in
+		         * PicoMite.c), so the ternary reduces to channel 3 there;
+		         * on rp2350 non-WEB it selects 3 or 7 per chip package. */
 		        hal_pin_adc_select((rp2350a ? 3 : 7));
-#else
-		        hal_pin_adc_select(3);
-#endif
 		        last_adc=99;
 		        MMFLOAT t=(MMFLOAT)hal_pin_adc_read()/4095.0*VCC;
 				if(Option.LOCAL_KEYBOARD)fret=t*2.0;
@@ -696,16 +698,13 @@ void fun_cint(void) {
 
 void fun_cos(void) {
 	if(useoptionangle){
-#ifndef rp2350
 		MMFLOAT t=getnumber(ep);
 		if (t == (int)t) {
 			int integerPart = (int)t;
 			// Modulus 360 and ensure it's in the range [0, 359]
 			fret= sinetab[(integerPart % 360 + 450) % 360];
-		}
-		else 
-#endif
-		fret=cos(getnumber(ep)/optionangle);
+		} else
+			fret=cos(getnumber(ep)/optionangle);
 	} else {
 		fret = cos(getnumber(ep));
 	}
@@ -978,11 +977,7 @@ void fun_rad(void) {
 // generate a random number that is greater than or equal to 0 but less than 1
 // n = RND()
 void fun_rnd(void) {
-#ifdef rp2350
 	fret = (MMFLOAT)get_rand_32()/(MMFLOAT)0x100000000;
-#else
-	fret = (MMFLOAT)rand()/((MMFLOAT)RAND_MAX + (MMFLOAT)RAND_MAX/1000000);
-#endif
     targ = T_NBR;
 }
 
@@ -1007,16 +1002,13 @@ void fun_sgn(void) {
 // n = SIN( number )
 void fun_sin(void) {
 	if(useoptionangle){
-#ifndef rp2350
 		MMFLOAT t=getnumber(ep);
 		if (t == (int)t) {
 			int integerPart = (int)t;
 			// Modulus 360 and ensure it's in the range [0, 359]
 			fret= sinetab[(integerPart % 360 + 360) % 360];
-		}
-		else 
-#endif
-		fret=sin(getnumber(ep)/optionangle);
+		} else
+			fret=sin(getnumber(ep)/optionangle);
 	} else {
 		fret = sin(getnumber(ep));
 	}
@@ -1038,7 +1030,6 @@ void fun_sqr(void) {
 
 void fun_tan(void) {
 	if(useoptionangle){
-#ifndef rp2350
 		MMFLOAT t=getnumber(ep);
 		if (t == (int)t) {
 			int integerPart = (int)t;
@@ -1046,10 +1037,8 @@ void fun_tan(void) {
 			MMFLOAT cosval=sinetab[(integerPart % 360 + 450) % 360];
 			if(cosval==0.0)error("Overflow");
 			fret= sinetab[(integerPart % 360 + 360) % 360]/cosval;
-		}
-		else 
-#endif
-		fret=tan(getnumber(ep)/optionangle);
+		} else
+			fret=tan(getnumber(ep)/optionangle);
 	} else {
 		fret = tan(getnumber(ep));
 	}
@@ -1384,15 +1373,7 @@ void fun_max(void) {
 void fun_min(void) {
     do_max_min(0);
 }
-#ifdef rp2350
-void __not_in_flash_func(fun_ternary)(void){
-#else
-#ifdef PICOMITEVGA
-void fun_ternary(void){
-#else
-void __not_in_flash_func(fun_ternary)(void){
-#endif
-#endif
+void HAL_PORT_MMBASIC_SUBFUN_FUNC(fun_ternary)(void){
     MMFLOAT f = 0;
     long long int i64 = 0;
     unsigned char *s = NULL;

@@ -454,9 +454,7 @@ typedef enum {
     MMI2C,
 	MMFONTHEIGHT,
 	MMFONTWIDTH,
-#ifndef USBKEYBOARD
 	MMPS2,
-#endif
 	MMHPOS,
 	MMVPOS,
 	MMONEWIRE,

@@ -380,4 +380,15 @@ int FileLoadCMM2Program(char *fname, bool message) {
     return true;
 }
 
+#else /* !defined(rp2350) */
+
+/* rp2040 stub — Commands.c's do_run CMM2mode branch references this
+ * unconditionally; returns failure so the BASIC command just exits
+ * without loading. CMM2mode = false is the default caller, so
+ * ordinary RUN is unaffected on rp2040. */
+int FileLoadCMM2Program(char *fname, bool message) {
+    (void)fname; (void)message;
+    return 0;
+}
+
 #endif /* defined(rp2350) */

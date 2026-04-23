@@ -54,27 +54,6 @@ extern void bc_run_source_string(const char *source, const char *source_name);
  * MMTCPclient.c, no-op stubs in MMweb_stubs.c / host_peripheral_stubs.c. */
 extern void cleanserver(void);
 extern void close_tcpclient(void);
-#if defined(PICOCALC) && defined(rp2350)
-static void vm_run_memdiag(const char *stage) {
-    if (strcmp(stage, "before_clear") == 0) {
-        bc_run_diag_note_before_clear((unsigned)UsedHeap(),
-                                      (unsigned)FreeSpaceOnHeap(),
-                                      (unsigned)LargestContiguousHeap());
-    } else if (strcmp(stage, "after_clear") == 0) {
-        bc_run_diag_note_after_clear((unsigned)UsedHeap(),
-                                     (unsigned)FreeSpaceOnHeap(),
-                                     (unsigned)LargestContiguousHeap());
-    } else if (strcmp(stage, "after_vm_reset") == 0) {
-        bc_run_diag_note_after_vm_reset((unsigned)UsedHeap(),
-                                        (unsigned)FreeSpaceOnHeap(),
-                                        (unsigned)LargestContiguousHeap(),
-                                        (unsigned)bc_alloc_bytes_used_peek(),
-                                        (unsigned)bc_compile_bytes_used(),
-                                        (unsigned)bc_compile_bytes_free(),
-                                        (unsigned)bc_alloc_bytes_capacity());
-    }
-}
-#endif
 char *KeyInterrupt=NULL;
 unsigned char* SaveNextDataLine = NULL;
 void execute_one_command(unsigned char *p);
@@ -385,11 +364,7 @@ void array_insert(unsigned char *tp){
 	MMFLOAT *afloat=NULL;
 	unsigned char *a1str=NULL, *a2str=NULL;
 	unsigned char size=0,size2=0;
-#ifdef rp2350
-    int dims[MAXDIM]={0}; 
-#else
     int dims[MAXDIM]={0};
-#endif
 	getargs(&tp, 15,(unsigned char *)",");
 	if(argc<7)error("Argument count");
 	findvar(argv[0], V_FIND | V_EMPTY_OK | V_NOFIND_ERR);
@@ -744,15 +719,13 @@ void MIPS16 do_run(unsigned char *cmdline, bool CMM2mode) {
     }
     unsigned char *pcmd_args = buf + strlen((char *)filename) + 3; // *** THW 16/4/23
 
-#ifdef rp2350
     if(CMM2mode){
+		/* FileLoadCMM2Program has a failure-returning stub on rp2040
+		 * (defines_loader.c), so CMM2mode always no-ops there. */
 		if (*filename && !FileLoadCMM2Program((char *)buf,false)) return;
 	} else {
-#endif
 		if (*filename && !FileLoadProgram(buf, false)) return;
-#ifdef rp2350
 	}
-#endif
     ClearRuntime(true);
     PrepareProgram(true);
     if(Option.DISPLAY_CONSOLE && (SPIREAD  || Option.NoScroll)){ClearScreen(gui_bcolour);CurrentX=0;CurrentY=0;}
@@ -765,9 +738,9 @@ void MIPS16 do_run(unsigned char *cmdline, bool CMM2mode) {
 	if(Option.LIBRARY_FLASH_SIZE == MAX_PROG_SIZE) ExecuteProgram(LibMemory);       // run anything that might be in the library
     if(*ProgMemory != T_NEWLINE) return;                             // no program to run
 	cleanserver();
-#ifndef USBKEYBOARD
-    if(mouse0==false && Option.MOUSE_CLOCK)initMouse0(0);  //see if there is a mouse to initialise
-#endif
+    /* initMouse0 is a no-op stub on USB builds (drivers/usb_host_kbd/
+     * USBKeyboard.c) since Option.MOUSE_CLOCK is never set there. */
+    if(mouse0==false && Option.MOUSE_CLOCK)initMouse0(0);
 	nextstmt = ProgMemory;
 }
 /** @endcond */
@@ -1193,10 +1166,12 @@ void MIPS16 cmd_new(void) {
     hal_flash_erase(realflashpointer, MAX_PROG_SIZE);
     FlashWriteByte(0); FlashWriteByte(0); FlashWriteByte(0);    // terminate the program in flash
     FlashWriteClose();
-#ifdef PICOMITEVGA
-	int mode = DISPLAY_TYPE-SCREENMODE1+1;
-	setmode(mode, true);
-#endif
+	/* setmode is a no-op on non-VGA ports (drivers/vga_pio/
+	 * vga_ops_stub.c); DISPLAY_TYPE is never a SCREENMODE there. */
+	{
+		int mode = DISPLAY_TYPE-SCREENMODE1+1;
+		setmode(mode, true);
+	}
     memset(inpbuf,0,STRINGSIZE);
 	longjmp(mark, 1);							                    // jump back to the input prompt
 }
@@ -1516,19 +1491,17 @@ if(Option.SerialConsole)while(ConsoleTxBufHead!=ConsoleTxBufTail)routinechecks()
 	if(g_myrand)FreeMemory((void *)g_myrand);
 	g_myrand=NULL;
 	OptionConsole=3;
-#ifdef PICOMITEVGA
-	int mode = DISPLAY_TYPE-SCREENMODE1+1;
-	setmode(mode,false);
-#endif
+	{
+		int mode = DISPLAY_TYPE-SCREENMODE1+1;
+		setmode(mode,false);
+	}
 	SSPrintString("\033[?25h"); //in case application has turned the cursor off
 	SSPrintString("\033[97;40m");
 	close_tcpclient();
-#ifndef USBKEYBOARD
-    if(mouse0==false && Option.MOUSE_CLOCK)initMouse0(0);  //see if there is a mouse to initialise 
-#endif
-#if defined(PICOMITE) && defined(rp2350)
+    if(mouse0==false && Option.MOUSE_CLOCK)initMouse0(0);
+	/* NEXTGEN refresh auto-enable — DISPLAY_TYPE is never >= NEXTGEN
+	 * outside rp2350 PICOMITE so this is a runtime no-op elsewhere. */
 	if(Option.DISPLAY_TYPE>=NEXTGEN)Option.Refresh=1;
-#endif
 }
 void cmd_end(void) {
 	do_end(true);
@@ -1755,9 +1728,9 @@ void MIPS16 do_chain(unsigned char *cmdline){
 	if(Option.LIBRARY_FLASH_SIZE == MAX_PROG_SIZE) ExecuteProgram(LibMemory );       // run anything that might be in the library
     if(*ProgMemory != T_NEWLINE) return;                             // no program to run
 	cleanserver();
-#ifndef USBKEYBOARD
-    if(mouse0==false && Option.MOUSE_CLOCK)initMouse0(0);  //see if there is a mouse to initialise
-#endif
+    /* initMouse0 is a no-op stub on USB builds (drivers/usb_host_kbd/
+     * USBKeyboard.c) since Option.MOUSE_CLOCK is never set there. */
+    if(mouse0==false && Option.MOUSE_CLOCK)initMouse0(0);
 	nextstmt = ProgMemory;
 }
 void cmd_chain(void){
@@ -2012,15 +1985,7 @@ void MIPS16 cmd_trace(void) {
 
 
 // FOR command
-#ifndef PICOMITE
-#ifdef rp2350
-void MIPS16 __not_in_flash_func(cmd_for)(void) {
-#else
-void cmd_for(void) {
-#endif
-#else
-void MIPS16 __not_in_flash_func(cmd_for)(void) {
-#endif
+void MIPS16 HAL_PORT_MMBASIC_SUBFUN_FUNC(cmd_for)(void) {
 	int i, t, vlen, test;
 	unsigned char ss[4];														// this will be used to split up the argument line
 	unsigned char *p, *tp, *xp;
@@ -2138,15 +2103,7 @@ void MIPS16 __not_in_flash_func(cmd_for)(void) {
 
 
 
-#ifndef PICOMITE
-#ifdef rp2350
-void MIPS16 __not_in_flash_func(cmd_next)(void) {
-#else
-void cmd_next(void) {
-#endif
-#else
-void MIPS16 __not_in_flash_func(cmd_next)(void) {
-#endif
+void MIPS16 HAL_PORT_MMBASIC_SUBFUN_FUNC(cmd_next)(void) {
 	int i, vindex, test;
 	void *vtbl[MAXFORLOOPS];
 	int vcnt;
@@ -2226,15 +2183,7 @@ void MIPS16 __not_in_flash_func(cmd_next)(void) {
 
 
 
-#ifndef PICOMITE
-#ifdef rp2350
-void MIPS16 __not_in_flash_func(cmd_do)(void) {
-#else
-void cmd_do(void) {
-#endif
-#else
-void MIPS16 __not_in_flash_func(cmd_do)(void) {
-#endif
+void MIPS16 HAL_PORT_MMBASIC_SUBFUN_FUNC(cmd_do)(void) {
 	int i;
 	unsigned char *p, *tp, *evalp;
     if(cmdtoken==cmdWHILE)error("Unknown command");
@@ -2403,8 +2352,10 @@ void cmd_error(void) {
 }
 
 
-#ifndef rp2350
-	void cmd_randomize(void) {
+/* RANDOMIZE — seeds libc's rand() state. On rp2350 fun_rnd uses
+ * get_rand_32() from pico_rand (hardware entropy), so RANDOMIZE is a
+ * no-op there semantically but still accepted for source compat. */
+void cmd_randomize(void) {
 	int i;
 	getargs(&cmdline,1,(unsigned char *)",");
 	if(argc==1)i = getinteger(argv[0]);
@@ -2412,7 +2363,6 @@ void cmd_error(void) {
 	if(i < 0) error("Number out of bounds");
 	srand(i);
 }
-#endif
 
 // this is the Sub or Fun command
 // it simply skips over text until it finds the end of it

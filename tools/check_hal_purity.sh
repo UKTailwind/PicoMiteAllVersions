@@ -95,6 +95,10 @@ STRICT_FILES=(
   Memory.c    # Phase 10 close: zero target-macro, zero port-config
               # ifdefs. Remaining 1 #ifdef GUICONTROLS is a feature
               # flag, permitted by the strict check.
+  Commands.c  # Phase 11 close: zero target-macro, zero port-config
+              # ifdefs.
+  Functions.c # Phase 11 close: zero target-macro, zero port-config
+              # ifdefs.
 )
 
 # Files tracked informationally (report counts, do not fail).

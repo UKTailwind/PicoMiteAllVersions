@@ -66,12 +66,16 @@ extern volatile unsigned int clocktimer;
 extern volatile int ds18b20Timer;
 extern volatile int CursorTimer;
 extern volatile unsigned int I2CTimer;
-#ifndef USBKEYBOARD
+/* MouseTimer / mouse0 / initMouse0 / MOUSE_CLOCK / MOUSE_DATA are
+ * defined unconditionally: mouse.c on non-USB device builds,
+ * drivers/usb_host_kbd/USBKeyboard.c stubs on USB device builds,
+ * host_peripheral_stubs.c on host. Core code (Commands.c, PicoMite.c)
+ * reads them without a target gate — Option.MOUSE_CLOCK is always 0
+ * on USB ports so the mouse-init runtime branches are unreachable. */
 extern volatile unsigned int MouseTimer;
 extern void initMouse0(int sensitivity);
 extern bool mouse0;
 extern int MOUSE_CLOCK,MOUSE_DATA;
-#endif
 //extern volatile int second;
 //extern volatile int minute;
 //extern volatile int hour;

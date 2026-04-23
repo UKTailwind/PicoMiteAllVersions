@@ -388,7 +388,22 @@ void fun_touch(void) {}
  * legacy device code paths that never fire on host.
  * ======================================================================= */
 void UnloadFont(int f) { (void)f; }
-void setmode(int mode, bool clear) { (void)mode; (void)clear; }
+
+/* Host stub for FileLoadCMM2Program — only the rp2350 non-WEB path
+ * in ports/pico_sdk_common/defines_loader.c has a real body; host
+ * doesn't link that file. Commands.c::do_run calls this from its
+ * CMM2mode branch; returning 0 is the failure sentinel the caller
+ * already handles. */
+int FileLoadCMM2Program(char *fname, bool message) {
+    (void)fname; (void)message;
+    return 0;
+}
+/* setmode stub moved to drivers/vga_pio/vga_ops_stub.c (which host
+ * links as part of the CORE_SRCS) so Commands.c / Draw.c can call it
+ * without a target-macro gate. */
+/* copyframetoscreen: host has no LCD to push to — this stub covers
+ * Draw.c's docompressed / cmd_blitmemory fallback paths that run on
+ * every target but are guarded at runtime by a NULL buffer check. */
 void copyframetoscreen(uint8_t *s, int xstart, int xend, int ystart, int yend, int odd) { (void)s; (void)xstart; (void)xend; (void)ystart; (void)yend; (void)odd; }
 void copybuffertoscreen(unsigned char *s, int lx, int ly, int hx, int hy) { (void)s; (void)lx; (void)ly; (void)hx; (void)hy; }
 void merge(uint8_t colour) { (void)colour; }
