@@ -669,14 +669,11 @@ void DrawPixelNormal(int x, int y, int c) {
 }
 #endif
 void ClearScreen(int c) {
-#if defined(PICOMITE) && defined(rp2350)
 #ifndef PICOMITEVGA
     if(ScrollLCD==ScrollLCDMEM332){
-		multicore_fifo_push_blocking(7);
-		multicore_fifo_push_blocking((uint32_t)0);
+        hal_display_nextgen_scroll_reset();
         ScrollStart=0;
     }
-#endif
 #endif
 #ifdef PICOMITEVGA
     if(DISPLAY_TYPE==SCREENMODE1 && WriteBuf==DisplayBuf){
@@ -6607,11 +6604,7 @@ void cmd_blit(void) {
         } else {
 	        if(x1 >= x2) {
 	            max_x = 1;
-#if defined(PICOMITE) && defined(rp2350)
 	            buff = GetMemory(max_x * h * (SSD16TYPE  || Option.DISPLAY_TYPE==IPS_4_16 ? 2 : (Option.DISPLAY_TYPE>=NEXTGEN ? 1 : 3)));
-#else
-	            buff = GetMemory(max_x * h * (SSD16TYPE  || Option.DISPLAY_TYPE==IPS_4_16 ? 2 : 3));
-#endif
 	            while(w > max_x){
 	                ReadBLITBuffer(x1, y1, x1 + max_x - 1, y1 + h - 1, buff);
 	                DrawBLITBuffer(x2, y2, x2 + max_x - 1, y2 + h - 1, buff);
@@ -6628,11 +6621,7 @@ void cmd_blit(void) {
 	        if(x1 < x2) {
 	            int start_x1, start_x2;
 	            max_x = 1;
-#if defined(PICOMITE) && defined(rp2350)
 	            buff = GetMemory(max_x * h * (SSD16TYPE  || Option.DISPLAY_TYPE==IPS_4_16 ? 2 : (Option.DISPLAY_TYPE>=NEXTGEN ? 1 : 3)));
-#else
-	            buff = GetMemory(max_x * h * (SSD16TYPE  || Option.DISPLAY_TYPE==IPS_4_16 ? 2 : 3));
-#endif
 	            start_x1 = x1 + w - max_x;
 	            start_x2 = x2 + w - max_x;
 	            while(w > max_x){
@@ -7435,21 +7424,15 @@ void fun_mmcharheight(void) {
 ****************************************************************************************************/
 void cmd_refresh(void){
     if(Option.DISPLAY_TYPE == 0) error("Display not configured");
-#if defined(PICOMITE) && defined(rp2350)
     if(Option.DISPLAY_TYPE>=NEXTGEN){
         if(!Option.Refresh){
-            multicore_fifo_push_blocking(6);
-            multicore_fifo_push_blocking((uint32_t)low_x | (high_x<<16));
-            multicore_fifo_push_blocking((uint32_t)low_y | (high_y<<16));
+            hal_display_nextgen_refresh_rect(low_x, low_y, high_x, high_y);
             low_x=silly_low; high_y=silly_high; low_y=silly_low; high_x=silly_high;
         }
     } else {
-#endif
         low_y=0; high_y=DisplayVRes-1; low_x=0; high_x=DisplayHRes-1;
         Display_Refresh();
-#if defined(PICOMITE) && defined(rp2350)
     }
-#endif
 }
 /* 
  * @cond
@@ -7458,11 +7441,7 @@ void cmd_refresh(void){
 
 void DrawPixel16(int x, int y, int c){
     if(x<0 || y<0 || x>=HRes || y>=VRes)return;
-#if defined(PICOMITE) && defined(rp2350)
     if((Option.DISPLAY_TYPE>=VIRTUAL &&  Option.DISPLAY_TYPE<NEXTGEN) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
-#else
-    if((Option.DISPLAY_TYPE>=VIRTUAL) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
-#endif
     unsigned char colour = RGB121(c);
 	uint8_t *p=(uint8_t *)(((uint32_t) WriteBuf)+(y*(HRes>>1))+(x>>1));
     if(x & 1){
@@ -7478,11 +7457,7 @@ void DrawRectangle16(int x1, int y1, int x2, int y2, int c){
 //    unsigned char mask;
     unsigned char colour = RGB121(c);;
     unsigned char bcolour=(colour<<4) | colour;
-#if defined(PICOMITE) && defined(rp2350)
     if((Option.DISPLAY_TYPE>=VIRTUAL &&  Option.DISPLAY_TYPE<NEXTGEN) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
-#else
-    if((Option.DISPLAY_TYPE>=VIRTUAL ) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
-#endif
     if(x1 < 0) x1 = 0;
     if(x1 >= HRes) x1 = HRes - 1;
     if(x2 < 0) x2 = 0;
@@ -7520,11 +7495,7 @@ void DrawBitmap16(int x1, int y1, int width, int height, int scale, int fc, int 
     if(x1>=HRes || y1>=VRes || x1+width*scale<0 || y1+height*scale<0)return;
     unsigned char fcolour = RGB121(fc);
     unsigned char bcolour = RGB121(bc);
-#if defined(PICOMITE) && defined(rp2350)
     if((Option.DISPLAY_TYPE>=VIRTUAL &&  Option.DISPLAY_TYPE<NEXTGEN) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
-#else
-    if((Option.DISPLAY_TYPE>=VIRTUAL) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
-#endif
     for(i = 0; i < height; i++) {                                   // step thru the font scan line by line
         for(j = 0; j < scale; j++) {                                // repeat lines to scale the font
             for(k = 0; k < width; k++) {                            // step through each bit in a scan line
@@ -7586,11 +7557,7 @@ void DrawBuffer16(int x1, int y1, int x2, int y2, unsigned char *p){
     } c;
     unsigned char fcolour;
     uint8_t *pp;
-#if defined(PICOMITE) && defined(rp2350)
     if((Option.DISPLAY_TYPE>=VIRTUAL &&  Option.DISPLAY_TYPE<NEXTGEN) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
-#else
-    if((Option.DISPLAY_TYPE>=VIRTUAL) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
-#endif
     // make sure the coordinates are kept within the display area
     if(x2 <= x1) { t = x1; x1 = x2; x2 = t; }
     if(y2 <= y1) { t = y1; y1 = y2; y2 = t; }
@@ -7626,11 +7593,7 @@ void DrawBuffer16Fast(int x1, int y1, int x2, int y2, int blank, unsigned char *
     // make sure the coordinates are kept within the display area
     if(x2 <= x1) { t = x1; x1 = x2; x2 = t; }
     if(y2 <= y1) { t = y1; y1 = y2; y2 = t; }
-#if defined(PICOMITE) && defined(rp2350)
     if((Option.DISPLAY_TYPE>=VIRTUAL &&  Option.DISPLAY_TYPE<NEXTGEN) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
-#else
-    if((Option.DISPLAY_TYPE>=VIRTUAL) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
-#endif
 	for(y=y1;y<=y2;y++){
     	for(x=x1;x<=x2;x++){
             if(x>=0 && x<HRes && y>=0 && y<VRes){
@@ -7665,11 +7628,7 @@ void DrawBuffer16Fast(int x1, int y1, int x2, int y2, int blank, unsigned char *
 void ReadBuffer16(int x1, int y1, int x2, int y2, unsigned char *c){
     int x,y,t;
     uint8_t *pp;
-#if defined(PICOMITE) && defined(rp2350)
     if((Option.DISPLAY_TYPE>=VIRTUAL &&  Option.DISPLAY_TYPE<NEXTGEN) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
-#else
-    if((Option.DISPLAY_TYPE>=VIRTUAL) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
-#endif
     if(x2 <= x1) { t = x1; x1 = x2; x2 = t; }
     if(y2 <= y1) { t = y1; y1 = y2; y2 = t; }
     int xx1=x1, yy1=y1, xx2=x2, yy2=y2;
@@ -7713,11 +7672,7 @@ void ReadBuffer16Fast(int x1, int y1, int x2, int y2, unsigned char *c){
     uint8_t *pp;
     if(x2 <= x1) { t = x1; x1 = x2; x2 = t; }
     if(y2 <= y1) { t = y1; y1 = y2; y2 = t; }
-#if defined(PICOMITE) && defined(rp2350)
     if((Option.DISPLAY_TYPE>=VIRTUAL && Option.DISPLAY_TYPE<NEXTGEN) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
-#else
-    if((Option.DISPLAY_TYPE>=VIRTUAL) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
-#endif
 	for(y=y1;y<=y2;y++){
     	for(x=x1;x<=x2;x++){
 			if(x>=0 && x<HRes && y>=0 && y<VRes){
@@ -7746,11 +7701,7 @@ void Display_Refresh(void){
 #endif
 void DrawPixel2(int x, int y, int c){
     if(x<0 || y<0 || x>=HRes || y>=VRes)return;
-#if defined(PICOMITE) && defined(rp2350)
     if((Option.DISPLAY_TYPE>=VIRTUAL &&  Option.DISPLAY_TYPE<NEXTGEN) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
-#else
-    if((Option.DISPLAY_TYPE>=VIRTUAL) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
-#endif
 	uint8_t *p=(uint8_t *)(((uint32_t) WriteBuf)+(y*(HRes>>3))+(x>>3));
 	uint8_t bit = 1<<(x % 8);
 	if(c)*p |=bit;
@@ -7760,11 +7711,7 @@ void DrawRectangle2(int x1, int y1, int x2, int y2, int c){
     int x,y,x1p, x2p, t;
     unsigned char mask;
     volatile unsigned char *p;
-#if defined(PICOMITE) && defined(rp2350)
     if((Option.DISPLAY_TYPE>=VIRTUAL &&  Option.DISPLAY_TYPE<NEXTGEN) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
-#else
-    if((Option.DISPLAY_TYPE>=VIRTUAL) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
-#endif
     if(x1 < 0) x1 = 0;
     if(x1 >= HRes) x1 = HRes - 1;
     if(x2 < 0) x2 = 0;
@@ -7832,11 +7779,7 @@ void DrawBitmap2(int x1, int y1, int width, int height, int scale, int fc, int b
     unsigned char mask;
     if(x1>=HRes || y1>=VRes || x1+width*scale<0 || y1+height*scale<0)return;
     int tilematch=0;
-#if defined(PICOMITE) && defined(rp2350)
     if((Option.DISPLAY_TYPE>=VIRTUAL &&  Option.DISPLAY_TYPE<NEXTGEN) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
-#else
-    if((Option.DISPLAY_TYPE>=VIRTUAL) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
-#endif
 #ifdef PICOMITEVGA
     int xa= 8;
     int ya=ytileheight;
@@ -8035,11 +7978,7 @@ void DrawBuffer2(int x1, int y1, int x2, int y2, unsigned char *p){
     char rgbbytes[4];
     unsigned int rgb;
     } c;
-#if defined(PICOMITE) && defined(rp2350)
     if((Option.DISPLAY_TYPE>=VIRTUAL &&  Option.DISPLAY_TYPE<NEXTGEN) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
-#else
-    if((Option.DISPLAY_TYPE>=VIRTUAL) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
-#endif
     // make sure the coordinates are kept within the display area
     if(x2 <= x1) { t = x1; x1 = x2; x2 = t; }
     if(y2 <= y1) { t = y1; y1 = y2; y2 = t; }
@@ -8076,11 +8015,7 @@ void DrawBuffer2Fast(int x1, int y1, int x2, int y2, int blank, unsigned char *p
     // make sure the coordinates are kept within the display area
     if(x2 <= x1) { t = x1; x1 = x2; x2 = t; }
     if(y2 <= y1) { t = y1; y1 = y2; y2 = t; }
-#if defined(PICOMITE) && defined(rp2350)
     if((Option.DISPLAY_TYPE>=VIRTUAL &&  Option.DISPLAY_TYPE<NEXTGEN) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
-#else
-    if((Option.DISPLAY_TYPE>=VIRTUAL) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
-#endif
 	for(y=y1;y<=y2;y++){
     	for(x=x1;x<=x2;x++){
             if(x>=0 && x<HRes && y>=0 && y<VRes){
@@ -8112,11 +8047,7 @@ void ReadBuffer2(int x1, int y1, int x2, int y2, unsigned char *c){
     int x,y,t,loc;
 //    uint8_t *pp;
     unsigned char mask;
-#if defined(PICOMITE) && defined(rp2350)
     if((Option.DISPLAY_TYPE>=VIRTUAL &&  Option.DISPLAY_TYPE<NEXTGEN) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
-#else
-    if((Option.DISPLAY_TYPE>=VIRTUAL) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
-#endif
     if(x2 <= x1) { t = x1; x1 = x2; x2 = t; }
     if(y2 <= y1) { t = y1; y1 = y2; y2 = t; }
     int xx1=x1, yy1=y1, xx2=x2, yy2=y2;
@@ -8157,11 +8088,7 @@ void ReadBuffer2Fast(int x1, int y1, int x2, int y2, unsigned char *c){
     int x,y,t,loc,toggle=0;;
 //    uint8_t *pp;
     unsigned char mask;
-#if defined(PICOMITE) && defined(rp2350)
     if((Option.DISPLAY_TYPE>=VIRTUAL &&  Option.DISPLAY_TYPE<NEXTGEN) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
-#else
-    if((Option.DISPLAY_TYPE>=VIRTUAL) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
-#endif
     if(x2 <= x1) { t = x1; x1 = x2; x2 = t; }
     if(y2 <= y1) { t = y1; y1 = y2; y2 = t; }
 	for(y=y1;y<=y2;y++){
@@ -8204,11 +8131,7 @@ void MIPS16 ConfigDisplayVirtual(unsigned char *p) {
     Option.DISPLAY_ORIENTATION = LANDSCAPE;
 }
 void MIPS16 InitDisplayVirtual(void){
-#if defined(PICOMITE) && defined(rp2350)
     if(Option.DISPLAY_TYPE==0 || Option.DISPLAY_TYPE < VIRTUAL || Option.DISPLAY_TYPE >= NEXTGEN) return;
-#else
-    if(Option.DISPLAY_TYPE==0 || Option.DISPLAY_TYPE < VIRTUAL) return;
-#endif
     DisplayHRes = HRes = display_details[Option.DISPLAY_TYPE].horizontal;
     DisplayVRes = VRes = display_details[Option.DISPLAY_TYPE].vertical;
 	if(Option.DISPLAY_TYPE==VIRTUAL_M){

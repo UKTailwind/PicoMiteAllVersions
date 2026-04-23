@@ -64,3 +64,14 @@ void hal_display_fast_dma_free(void) {
     if (ShadowBuf) { FreeMemory(ShadowBuf); ShadowBuf = NULL; }
     if (fb_dma_chan >= 0) { dma_channel_unclaim(fb_dma_chan); fb_dma_chan = -1; }
 }
+
+void hal_display_nextgen_refresh_rect(int x_lo, int y_lo, int x_hi, int y_hi) {
+    multicore_fifo_push_blocking(6);
+    multicore_fifo_push_blocking((uint32_t)x_lo | ((uint32_t)x_hi << 16));
+    multicore_fifo_push_blocking((uint32_t)y_lo | ((uint32_t)y_hi << 16));
+}
+
+void hal_display_nextgen_scroll_reset(void) {
+    multicore_fifo_push_blocking(7);
+    multicore_fifo_push_blocking((uint32_t)0);
+}

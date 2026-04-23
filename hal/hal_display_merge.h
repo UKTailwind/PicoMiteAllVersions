@@ -50,6 +50,18 @@ void hal_display_merge_mark_done(void);
 void hal_display_fast_dma_alloc(unsigned bytes);
 void hal_display_fast_dma_free(void);
 
+/* NEXTGEN (MEM332) shadow-buffer → LCD rectangle push. Posts a rect-
+ * refresh message to core1 which DMAs the rect under the frame-buffer
+ * mutex. Only PICOMITE rp2350 ever runs the NEXTGEN pipeline; the
+ * stub is a no-op everywhere else. Caller must have already checked
+ * `Option.DISPLAY_TYPE >= NEXTGEN`. */
+void hal_display_nextgen_refresh_rect(int x_lo, int y_lo, int x_hi, int y_hi);
+
+/* NEXTGEN scroll-register reset. Posts (7, 0) to core1 which rewrites
+ * the scroll-start register on the ST7796SP / ILI9341BUFF family so
+ * CLS resets the visible origin. No-op stub elsewhere. */
+void hal_display_nextgen_scroll_reset(void);
+
 #ifdef __cplusplus
 }
 #endif

@@ -30,7 +30,7 @@ CFLAGS = -std=gnu11 -g -O0 -Wall -Wno-unused-variable -Wno-unused-function \
 LDFLAGS = -lm
 
 # Source directory
-VPATH = ..:../core/state:../drivers/audio_mp3:../drivers/spi_lcd
+VPATH = ..:../core/state:../drivers/audio_mp3:../drivers/spi_lcd:../drivers/display_merge
 
 # Core MMBasic sources (language runtime)
 CORE_SRCS = MMBasic.c Commands.c Functions.c Operators.c MATHS.c Memory.c Editor.c MMBasic_Prompt.c MMBasic_Print.c MMBasic_REPL.c
@@ -48,6 +48,10 @@ CORE_SRCS += audio_mp3_stub.c
 # Draw.c unconditionally references the MEM332 function pointers in
 # restorepanel(). Link the stub file for the symbols.
 CORE_SRCS += spi_lcd_nextgen_stub.c
+# Merge-pipeline HAL stubs: cmd_refresh / the FASTGFX path / etc. call
+# the hal_display_merge_* / hal_display_nextgen_* hooks unconditionally;
+# host has no core1 and no DMA, so link the no-op stubs.
+CORE_SRCS += display_merge_stub.c
 
 # Bytecode VM sources
 BC_SRCS = bc_alloc.c bc_bridge.c vm_host_fat.c ff.c ffunicode.c ffsystem.c \
