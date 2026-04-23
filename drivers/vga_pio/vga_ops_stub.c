@@ -24,3 +24,9 @@ uint8_t hal_vga_ops_layer_merge_rgb8(uint8_t primary, int x, int y) {
 volatile unsigned char *hal_vga_ops_fb_n_target(void) { return NULL; }
 volatile unsigned char *hal_vga_ops_fb_t_target(void) { return NULL; }
 int hal_vga_ops_fb_t_supported(void) { return 0; }
+int  hal_vga_ops_fb2_tilematch(int x1, int y1, int w_px, int h_px) {
+    (void)x1; (void)y1; (void)w_px; (void)h_px; return 0;
+}
+void hal_vga_ops_fb2_fill_tile_colours(int x1, int y1, int w_px, int h_px, int fc, int bc) {
+    (void)x1; (void)y1; (void)w_px; (void)h_px; (void)fc; (void)bc;
+}

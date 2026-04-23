@@ -96,6 +96,45 @@ uint8_t hal_vga_ops_layer_merge_byte(uint8_t primary, int x, int y) {
     return (uint8_t)((hi << 4) | lo);
 }
 
+int hal_vga_ops_fb2_tilematch(int x1, int y1, int w_px, int h_px) {
+    const int xa = 8;
+    const int ya = ytileheight;
+    return (x1 % xa == 0 && y1 % ya == 0 && w_px % xa == 0 && h_px % ya == 0);
+}
+
+void hal_vga_ops_fb2_fill_tile_colours(int x1, int y1, int w_px, int h_px, int fc, int bc) {
+    const int xa = 8;
+    const int ya = ytileheight;
+    int xt = x1 / xa, yt = y1 / ya;
+    int w = w_px / xa, h = h_px / ya;
+    int fcolour, bcolour;
+#ifdef HDMI
+    fcolour = FullColour ? RGB555(fc) : RGB332(fc);
+    bcolour = FullColour ? RGB555(bc) : RGB332(bc);
+    if (FullColour) {
+        for (int yy = yt; yy < yt + h; yy++)
+            for (int xx = xt; xx < xt + w; xx++) {
+                tilefcols[yy * X_TILE + xx] = (uint16_t)fcolour;
+                tilebcols[yy * X_TILE + xx] = (uint16_t)bcolour;
+            }
+    } else {
+        for (int yy = yt; yy < yt + h; yy++)
+            for (int xx = xt; xx < xt + w; xx++) {
+                tilefcols_w[yy * X_TILE + xx] = (uint8_t)fcolour;
+                tilebcols_w[yy * X_TILE + xx] = (uint8_t)bcolour;
+            }
+    }
+#else
+    fcolour = RGB121pack(fc);
+    bcolour = RGB121pack(bc);
+    for (int yy = yt; yy < yt + h; yy++)
+        for (int xx = xt; xx < xt + w; xx++) {
+            tilefcols[yy * X_TILE + xx] = (uint16_t)fcolour;
+            tilebcols[yy * X_TILE + xx] = (uint16_t)bcolour;
+        }
+#endif
+}
+
 volatile unsigned char *hal_vga_ops_fb_n_target(void) {
     return (volatile unsigned char *)DisplayBuf;
 }

@@ -74,6 +74,15 @@ volatile unsigned char *hal_vga_ops_fb_n_target(void);
 volatile unsigned char *hal_vga_ops_fb_t_target(void);
 int hal_vga_ops_fb_t_supported(void);
 
+/* DrawBitmap2 tile-alignment fast path for SCREENMODE1:
+ *  - tilematch(x1,y1,w_px,h_px) returns 1 when the bitmap aligns to
+ *    the 8 × ytileheight tile grid, 0 otherwise. Non-VGA stub: 0.
+ *  - fill_tile_colours(x1,y1,w_px,h_px,fc,bc) bulk-writes the tile fg
+ *    and bg colour arrays for every tile covered by the bitmap.
+ *    Caller only invokes when tilematch()==1. No-op on non-VGA. */
+int  hal_vga_ops_fb2_tilematch(int x1, int y1, int w_px, int h_px);
+void hal_vga_ops_fb2_fill_tile_colours(int x1, int y1, int w_px, int h_px, int fc, int bc);
+
 #ifdef __cplusplus
 }
 #endif

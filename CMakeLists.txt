@@ -276,7 +276,10 @@ endif()
 # VGA framebuffer CLS/layer helpers: PICOMITEVGA (VGA + HDMI) gets the
 # real impl, everyone else gets a no-op stub.
 if (COMPILE STREQUAL "VGA" OR COMPILE STREQUAL "VGAUSB" OR COMPILE STREQUAL "VGARP2350" OR COMPILE STREQUAL "VGAUSBRP2350" OR COMPILE STREQUAL "HDMI" OR COMPILE STREQUAL "HDMIUSB")
-    target_sources(PicoMite PRIVATE drivers/vga_pio/vga_ops.c)
+    target_sources(PicoMite PRIVATE
+        drivers/vga_pio/vga_ops.c
+        drivers/vga_pio/vga_mode_ops.c
+    )
 else()
     target_sources(PicoMite PRIVATE drivers/vga_pio/vga_ops_stub.c)
 endif()
