@@ -2776,12 +2776,12 @@ void MIPS16 fun_info(void){
         CtoM(sret);
         targ=T_STR;
         return;
-#ifdef PICOMITEVGA
     } else if((tp=checkstring(ep, (unsigned char *)"TILE HEIGHT"))){
+        /* ytileheight is defined in Memory.c on every device build (VGA
+         * tile renderer height + non-VGA SPI-LCD scroll-block height). */
         iret=ytileheight;
         targ=T_INT;
         return;
-#endif
     } else if((tp=checkstring(ep, (unsigned char *)"ADC DMA"))){
         targ=T_INT;
         iret=ADCDualBuffering | dmarunning;

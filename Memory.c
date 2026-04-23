@@ -144,6 +144,14 @@ unsigned char *SecondFrame=video;
     unsigned char *FrameBuf=NULL;
 #endif
 
+/* ytileheight is read by MM_Misc.c's MM.INFO("TILE HEIGHT") on every
+ * build (was VGA-gated in core; ungated in F4 step 12). The two
+ * VGA-specific definitions above (480/12 for HDMI, 16 for VGA) only
+ * compile on PICOMITEVGA — non-VGA builds need a default. */
+#ifndef PICOMITEVGA
+volatile int ytileheight = 0;
+#endif
+
 #if defined(rp2350)
 unsigned int mmap[HEAP_MEMORY_SIZE/ PAGESIZE / PAGESPERWORD]={0};
 unsigned int psmap[6*1024*1024/ PAGESIZE / PAGESPERWORD]={0};
