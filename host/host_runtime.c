@@ -899,6 +899,8 @@ int  port_display_option_setter(unsigned char *cmdline) { (void)cmdline; return 
 /* OPTION LIST display-related lines — host has no display hardware. */
 void port_print_display_options(void) {}
 void port_print_lcd_spi(void) {}
+void port_print_keyboard_heartbeat(void) {}
+void port_print_usb_kb_repeat(void) {}
 
 /* OPTION KEYBOARD setter — host has no keyboard config to set. */
 int port_keyboard_option_setter(unsigned char *cmdline) { (void)cmdline; return 0; }

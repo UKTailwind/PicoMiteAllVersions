@@ -65,6 +65,8 @@ extern int  port_display_option_setter(unsigned char *cmdline);
 extern void port_print_display_options(void);
 extern void port_print_lcd_spi(void);
 extern int  port_keyboard_option_setter(unsigned char *cmdline);
+extern void port_print_keyboard_heartbeat(void);
+extern void port_print_usb_kb_repeat(void);
 extern void port_web_print_options(void);
 extern int  port_web_option_setter(unsigned char *cmdline);
 extern int  port_web_mminfo(unsigned char *ep, int64_t *out_iret,
@@ -765,56 +767,11 @@ void MIPS16 printoptions(void){
             else if(Option.DefaultBC==BLACK)MMPrintString(" BLACK");
         PRet();
     }
-#ifdef USBKEYBOARD
-    if(!(Option.USBKeyboard == NO_KEYBOARD)){
-        PO("KEYBOARD"); MMPrintString((char *)KBrdList[(int)Option.USBKeyboard]); 
-        if(Option.capslock || Option.numlock!=1 || Option.repeat!=0b00101100){
-            PIntComma(Option.capslock);PIntComma(Option.numlock);PIntComma(Option.RepeatStart);
-            PIntComma(Option.RepeatRate);
-        }
-        PRet();
-    } 
-#else
-#if defined(PICOMITE) && defined(rp2350)
-    if(Option.LOCAL_KEYBOARD)PO3Int("KEYBOARD REPEAT",Option.RepeatStart,Option.RepeatRate);
-#endif
-    if(!(Option.KeyboardConfig == NO_KEYBOARD ||Option.KeyboardConfig == CONFIG_I2C)){
-        PO("KEYBOARD"); MMPrintString((char *)KBrdList[(int)Option.KeyboardConfig]); 
-        if(Option.capslock || Option.numlock!=1 || Option.repeat!=0b00101100){
-            PIntComma(Option.capslock);PIntComma(Option.numlock);PIntComma(Option.repeat>>5);
-            PIntComma(Option.repeat & 0x1f);
-        }
-        PRet();
-    } 
-    if(!((Option.KEYBOARD_CLOCK==11 && Option.KEYBOARD_DATA==12) ||(Option.KEYBOARD_CLOCK==0 && Option.KEYBOARD_DATA==0)) && Option.KeyboardConfig != NO_KEYBOARD){
-        PO("KEYBOARD PINS"); MMPrintString((char *)PinDef[Option.KEYBOARD_CLOCK].pinname);
-        MMputchar(',',0);MMPrintString((char *)PinDef[Option.KEYBOARD_DATA].pinname);PRet();
-    }
-    if(Option.MOUSE_CLOCK){
-        PO("MOUSE"); MMPrintString((char *)PinDef[Option.MOUSE_CLOCK].pinname);
-        MMputchar(',',0);MMPrintString((char *)PinDef[Option.MOUSE_DATA].pinname);PRet();
-    }
-#endif   
-    if(Option.KeyboardConfig == CONFIG_I2C)PO2Str("KEYBOARD", "I2C");
-#ifdef rp2350
-    if(Option.NoHeartbeat && rp2350a)PO2Str("HEARTBEAT", "OFF");
-#if defined(PICOMITE)
-    if(Option.LOCAL_KEYBOARD)PO2Str("KEYBOARD", "LOCAL");
-    if(Option.LOCAL_KEYBOARD)PO2Int("KEYBOARD BACKLIGHT", Option.KeyboardBrightness);
-#endif
-#else
-    if(Option.NoHeartbeat )PO2Str("HEARTBEAT", "OFF");
-#endif
+    port_print_keyboard_heartbeat();
     if(Option.AllPins)PO2Str("PICO", "OFF");
     port_print_display_options();
     if(Option.CombinedCS)PO2Str("SDCARD", "COMBINED CS");
-#ifdef USBKEYBOARD
-    if(!(Option.RepeatStart==600 && Option.RepeatRate==150)){
-    	char buff[40]={0};
-    	sprintf(buff,"OPTION KEYBOARD REPEAT %d,%d\r\n",Option.RepeatStart, Option.RepeatRate);
-    	MMPrintString(buff);
-    }
-#endif
+    port_print_usb_kb_repeat();
     if(Option.AUDIO_L || Option.AUDIO_CLK_PIN || Option.audio_i2s_bclk){
         PO("AUDIO");
         if(Option.AUDIO_L){
@@ -865,14 +822,21 @@ void MIPS16 printoptions(void){
     if(*Option.F9key)PO2Str("F9", (const char *)Option.F9key);
     if(*Option.platform && *Option.platform!=0xFF)PO2Str("PLATFORM", (const char *)Option.platform);
     if(Option.DefaultFont!=1)PO3Int("DEFAULT FONT",(Option.DefaultFont>>4)+1, Option.DefaultFont & 0xF);
-#ifdef rp2350
-    if(Option.PSRAM_CS_PIN!=0)PO2Str("PSRAM PIN", PinDef[Option.PSRAM_CS_PIN].pinname);
-#endif
-    if((Option.heartbeatpin!=43 && !Option.NoHeartbeat)
-#ifdef rp2350
-     || (Option.heartbeatpin==43 && !rp2350a && !Option.NoHeartbeat)
-#endif
-    )PO2Str("HEARTBEAT PIN", PinDef[Option.heartbeatpin].pinname);
+    /* PSRAM_CS_PIN is only meaningful on rp2350 (HAL_PORT_HAS_PSRAM == 1
+     * there, 0 elsewhere); on rp2040 the field stays zero so the print
+     * is a no-op. */
+    if (HAL_PORT_HAS_PSRAM && Option.PSRAM_CS_PIN != 0)
+        PO2Str("PSRAM PIN", PinDef[Option.PSRAM_CS_PIN].pinname);
+    /* HEARTBEAT PIN: rp2040 prints when heartbeatpin != default (43).
+     * rp2350 also prints the default-pin case when rp2350a==false
+     * (RP2350B has different default). Both pieces stay runtime-gated
+     * via HAL_PORT_PWM_SLICE_COUNT > 8 (the rp2350 detector). */
+    {
+        int print_pin = (Option.heartbeatpin != 43 && !Option.NoHeartbeat)
+            || (HAL_PORT_PWM_SLICE_COUNT > 8 &&
+                Option.heartbeatpin == 43 && !rp2350a && !Option.NoHeartbeat);
+        if (print_pin) PO2Str("HEARTBEAT PIN", PinDef[Option.heartbeatpin].pinname);
+    }
 }
 
 int MIPS16 checkslice(int pin1,int pin2, int ignore){

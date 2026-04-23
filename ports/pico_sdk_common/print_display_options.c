@@ -62,6 +62,64 @@ extern short HRes;
 extern short VRes;
 extern void port_web_print_options(void);
 
+extern bool rp2350a;
+extern const char *KBrdList[];
+
+void port_print_keyboard_heartbeat(void)
+{
+#ifdef USBKEYBOARD
+    if(!(Option.USBKeyboard == NO_KEYBOARD)){
+        PO("KEYBOARD"); MMPrintString((char *)KBrdList[(int)Option.USBKeyboard]);
+        if(Option.capslock || Option.numlock!=1 || Option.repeat!=0b00101100){
+            PIntComma(Option.capslock);PIntComma(Option.numlock);PIntComma(Option.RepeatStart);
+            PIntComma(Option.RepeatRate);
+        }
+        PRet();
+    }
+#else
+#  if defined(PICOMITE) && defined(rp2350)
+    if(Option.LOCAL_KEYBOARD)PO3Int("KEYBOARD REPEAT",Option.RepeatStart,Option.RepeatRate);
+#  endif
+    if(!(Option.KeyboardConfig == NO_KEYBOARD || Option.KeyboardConfig == CONFIG_I2C)){
+        PO("KEYBOARD"); MMPrintString((char *)KBrdList[(int)Option.KeyboardConfig]);
+        if(Option.capslock || Option.numlock!=1 || Option.repeat!=0b00101100){
+            PIntComma(Option.capslock);PIntComma(Option.numlock);PIntComma(Option.repeat>>5);
+            PIntComma(Option.repeat & 0x1f);
+        }
+        PRet();
+    }
+    if(!((Option.KEYBOARD_CLOCK==11 && Option.KEYBOARD_DATA==12) ||(Option.KEYBOARD_CLOCK==0 && Option.KEYBOARD_DATA==0)) && Option.KeyboardConfig != NO_KEYBOARD){
+        PO("KEYBOARD PINS"); MMPrintString((char *)PinDef[Option.KEYBOARD_CLOCK].pinname);
+        MMputchar(',',0);MMPrintString((char *)PinDef[Option.KEYBOARD_DATA].pinname);PRet();
+    }
+    if(Option.MOUSE_CLOCK){
+        PO("MOUSE"); MMPrintString((char *)PinDef[Option.MOUSE_CLOCK].pinname);
+        MMputchar(',',0);MMPrintString((char *)PinDef[Option.MOUSE_DATA].pinname);PRet();
+    }
+#endif
+    if(Option.KeyboardConfig == CONFIG_I2C)PO2Str("KEYBOARD", "I2C");
+#ifdef rp2350
+    if(Option.NoHeartbeat && rp2350a)PO2Str("HEARTBEAT", "OFF");
+#  if defined(PICOMITE)
+    if(Option.LOCAL_KEYBOARD)PO2Str("KEYBOARD", "LOCAL");
+    if(Option.LOCAL_KEYBOARD)PO2Int("KEYBOARD BACKLIGHT", Option.KeyboardBrightness);
+#  endif
+#else
+    if(Option.NoHeartbeat)PO2Str("HEARTBEAT", "OFF");
+#endif
+}
+
+void port_print_usb_kb_repeat(void)
+{
+#ifdef USBKEYBOARD
+    if(!(Option.RepeatStart==600 && Option.RepeatRate==150)){
+        char buff[40]={0};
+        sprintf(buff,"OPTION KEYBOARD REPEAT %d,%d\r\n",Option.RepeatStart, Option.RepeatRate);
+        MMPrintString(buff);
+    }
+#endif
+}
+
 void port_print_lcd_spi(void)
 {
 #if defined(PICOMITE) && defined(rp2350)
