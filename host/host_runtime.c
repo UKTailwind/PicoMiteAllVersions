@@ -795,4 +795,47 @@ struct tm *mmbasic_gmtime(const time_t *timer) {
     return gmtime(timer);
 }
 
+/* FileIO.c command-level lifecycle hooks. The device implementations live
+ * in ports/pico_sdk_common/cmd_files_hooks.c. */
+
+void cmd_files_save_program_context(void)
+{
+    /* Host can't SaveContext + InitHeap mid-FRUN — bc_alloc backs both
+     * the heap and the live VMState. The 76 KB FILES sort buffer fits
+     * fine in host RAM without the dance. */
+}
+
+void cmd_files_restore_program_context(void) {}
+
+void cmd_files_pump_console_key(int *c)
+{
+    /* Host has no interrupt-driven ConsoleRxBuf filler — the REPL reads
+     * keys via MMInkey (stdin / scripted key queue / --sim websocket).
+     * Poll it here so the "PRESS ANY KEY" prompt unblocks on any
+     * keypress instead of hanging forever. */
+    if (*c == -1) {
+        int k = MMInkey();
+        if (k != -1) *c = k;
+        else host_sleep_us(10000);  /* 10ms — don't peg a core */
+    }
+}
+
+void cmd_load_post_cleanup(void)
+{
+    /* Host's SaveProgramToFlash stub calls load_basic_source, which
+     * tokenises each line of the loaded file into tknbuf — clobbering
+     * the tknbuf that ExecuteProgram is currently iterating over. On
+     * return, nextstmt points into corrupted bytes (the tail of the
+     * last-tokenised line from the loaded program) and ExecuteProgram
+     * trips "Unknown command". Bounce back to the prompt so the
+     * iterator never resumes. Also zero inpbuf — tokenise wrote each
+     * line of the loaded file through it, so the prompt loop's next
+     * EditInputLine would otherwise echo the tail of the last line as
+     * if the user had typed it. */
+    extern unsigned char inpbuf[];
+    extern jmp_buf mark;
+    memset(inpbuf, 0, STRINGSIZE);
+    longjmp(mark, 1);
+}
+
 /* str_replace/STR_REPLACE provided by MATHS.c */

@@ -114,6 +114,19 @@ int FatFSFileSystem=0; //Assume we are using flash file system
  * them unconditionally; the bodies no-op on RP2040. */
 extern void mmbasic_save_psram_settings(void);
 extern void mmbasic_restore_psram_settings(void);
+
+/* Per-port hooks for command-level lifecycle quirks that diverge between
+ * device (interrupt-driven console, large heap, can SaveContext+InitHeap
+ * mid-program) and host (cooperative MMInkey poll, shared bc_alloc heap
+ * that mustn't be wiped under a live VM). Implementations:
+ *   - Device: ports/pico_sdk_common/cmd_files_hooks.c (no-ops + the
+ *     SaveContext/RestoreContext dance for FILES called inside a program).
+ *   - Host:   host/host_runtime.c (real polling pump + post-LOAD bounce).
+ */
+extern void cmd_files_save_program_context(void);
+extern void cmd_files_restore_program_context(void);
+extern void cmd_files_pump_console_key(int *c);
+extern void cmd_load_post_cleanup(void);
 /* MemLoadProgram body lives in the #ifdef-rp2350 DEFINES block below. */
 int MemLoadProgram(unsigned char *fname, unsigned char *ram);
 
@@ -2111,21 +2124,7 @@ void MIPS16 cmd_load(void)
     }
     SetFont(oldfont);
     PromptFont=oldfont;
-#ifdef MMBASIC_HOST
-    /* Host's SaveProgramToFlash stub calls load_basic_source, which
-     * tokenises each line of the loaded file into tknbuf — clobbering
-     * the tknbuf that ExecuteProgram is currently iterating over. On
-     * return, nextstmt points into corrupted bytes (the tail of the
-     * last-tokenised line from the loaded program) and ExecuteProgram
-     * trips "Unknown command". Bounce back to the prompt so the
-     * iterator never resumes. Also zero inpbuf — tokenise wrote each
-     * line of the loaded file through it, so the prompt loop's next
-     * EditInputLine would otherwise echo the tail of the last line as
-     * if the user had typed it. Device SaveProgramToFlash uses its own
-     * tokeniser buffer and is unaffected. */
-    memset(inpbuf, 0, STRINGSIZE);
-    longjmp(mark, 1);
-#endif
+    cmd_load_post_cleanup();
 }
 /* 
  * @cond
@@ -2968,18 +2967,7 @@ void MIPS16 cmd_files(void)
                 error("Syntax");
         }
     }
-#ifndef MMBASIC_HOST
-    /* Device: FILES allocates up to MAXFILES*s_flist on the heap, so if
-     * we're called from inside a program we save the caller's state and
-     * wipe the heap to have room. Host has plenty of RAM and LFS is
-     * stubbed (no /.vars backing), so skip the save/restore dance. */
-    if(CurrentLinePtr){
-        CloseAudio(1);
-        SaveContext();
-        ClearVars(0,false);
-        InitHeap(false);
-    }
-#endif
+    cmd_files_save_program_context();
     if (pp[0] == 0)
         strcpy(pp, "*");
     FatFSFileSystem=t-1;
@@ -3308,9 +3296,7 @@ void MIPS16 cmd_files(void)
                         ShowCursor(false);
                         FatFSFileSystem=FatFSFileSystemSave;
                         PromptFont=oldfont;
-#ifndef MMBASIC_HOST
-                        if(CurrentLinePtr)RestoreContext(false);
-#endif
+                        cmd_files_restore_program_context();
                         MMAbort=false;
                         return;
 //                        longjmp(mark, 1);
@@ -3321,18 +3307,7 @@ void MIPS16 cmd_files(void)
                         c = ConsoleRxBuf[ConsoleRxBufTail];
                         ConsoleRxBufTail = (ConsoleRxBufTail + 1) % CONSOLE_RX_BUF_SIZE; // advance the head of the queue
                     }
-#ifdef MMBASIC_HOST
-                    /* Host has no interrupt-driven ConsoleRxBuf filler —
-                     * the REPL reads keys via MMInkey (stdin / scripted
-                     * key queue / --sim websocket). Poll it here so the
-                     * "PRESS ANY KEY" prompt unblocks on any keypress
-                     * instead of hanging forever. */
-                    if (c == -1) {
-                        int k = MMInkey();
-                        if (k != -1) c = k;
-                        else host_sleep_us(10000);  /* 10ms — don't peg a core */
-                    }
-#endif
+                    cmd_files_pump_console_key(&c);
                 } while (c == -1);
                 ShowCursor(0);
                 MMPrintString("\r                 \r");
@@ -3363,9 +3338,7 @@ void MIPS16 cmd_files(void)
         FatFSFileSystem=FatFSFileSystemSave;
         Option.NoScroll=noscroll;
         PromptFont=oldfont;
-#ifndef MMBASIC_HOST
-        if(CurrentLinePtr)RestoreContext(false);
-#endif
+        cmd_files_restore_program_context();
         return;
 //        longjmp(mark, 1);
 
