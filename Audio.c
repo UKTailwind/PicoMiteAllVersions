@@ -635,10 +635,8 @@ drwav_bool32 onSeek(void  *userdata,  int offset,  drwav_seek_origin origin){
 }
 
 void CloseAudio(int all){
-#ifdef rp2350
 	if(!PSRAMsize)
-#endif
-	modbuff =  (Option.modbuff ?  (char *)(XIP_BASE + RoundUpK4(TOP_OF_SYSTEM_FLASH)) : NULL);
+		modbuff =  (Option.modbuff ?  (char *)(XIP_BASE + RoundUpK4(TOP_OF_SYSTEM_FLASH)) : NULL);
 	int was_playing=CurrentlyPlaying;
 	if(!Option.audio_i2s_bclk){
 		bcount[1] = bcount[2] = wav_filesize = 0;
@@ -1819,11 +1817,9 @@ void MIPS16 cmd_play(void) {
         modfilesamplerate=22050;
 		if(CurrentlyPlaying==P_WAVOPEN)CloseAudio(1);
         if(CurrentlyPlaying != P_NOTHING) error("Sound output in use");
-#ifdef rp2350
+		/* PSRAMsize is 0 on targets without PSRAM — the check collapses to
+		 * `!modbuff` there. */
 		if(!(modbuff || PSRAMsize))error("Mod playback not enabled");
-#else
-		if(!(modbuff))error("Mod playback not enabled");
-#endif
         if(!InitSDCard()) return;
         sbuff1 = GetMemory(MOD_BUFFER_SIZE);
         sbuff2 = GetMemory(MOD_BUFFER_SIZE);
@@ -1853,27 +1849,25 @@ void MIPS16 cmd_play(void) {
         i=0;
 		fsize = (int)hal_fs_size(hal_fds[WAV_fnbr]);
 		int alreadythere=1;
-#ifdef rp2350
+		/* PSRAM-less targets always take the flash-check branch (PSRAMsize=0);
+		 * the PSRAM-load branch is live only on RP2350 with PSRAM detected. */
 		if(!PSRAMsize){
-#endif
 			if(RoundUpK4(fsize)>1024*Option.modbuffsize)error("File too large for modbuffer");
 			char *check=modbuff;
-			while(!FileEOF(WAV_fnbr)) { 
+			while(!FileEOF(WAV_fnbr)) {
 				if(*check++ != FileGetChar(WAV_fnbr)){
 					alreadythere=0;
 					break;
 				}
 			}
-#ifdef rp2350
 		} else {
 			modbuff=GetMemory(RoundUpK4(fsize));
 			positionfile(WAV_fnbr,0);
 			char *r=modbuff;
-			while(!FileEOF(WAV_fnbr)) { 
+			while(!FileEOF(WAV_fnbr)) {
 				*r++=FileGetChar(WAV_fnbr);
 			}
 		}
-#endif
 		if(!alreadythere){
 			unsigned char *r = GetTempMemory(256);
 			positionfile(WAV_fnbr,0);
