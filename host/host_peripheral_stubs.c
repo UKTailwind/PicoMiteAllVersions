@@ -393,6 +393,9 @@ void copyframetoscreen(uint8_t *s, int xstart, int xend, int ystart, int yend, i
 void copybuffertoscreen(unsigned char *s, int lx, int ly, int hx, int hy) { (void)s; (void)lx; (void)ly; (void)hx; (void)hy; }
 void merge(uint8_t colour) { (void)colour; }
 void blitmerge(int x0, int y0, int w, int h, uint8_t colour) { (void)x0; (void)y0; (void)w; (void)h; (void)colour; }
+/* cmd_blit MERGE calls setframebuffer + hal_display_merge_post_blit_bg;
+ * host gets here via the dead branch after has_pipeline() returns 0. */
+void setframebuffer(void) { }
 
 /* =========================================================================
  * SPI / Serial / Audio stubs

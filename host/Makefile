@@ -30,7 +30,7 @@ CFLAGS = -std=gnu11 -g -O0 -Wall -Wno-unused-variable -Wno-unused-function \
 LDFLAGS = -lm
 
 # Source directory
-VPATH = ..:../core/state:../drivers/audio_mp3:../drivers/spi_lcd:../drivers/display_merge:../drivers/vga_pio:../drivers/gfx_3d
+VPATH = ..:../core/state:../drivers/audio_mp3:../drivers/spi_lcd:../drivers/display_merge:../drivers/vga_pio:../drivers/gfx_3d:../drivers/upng_sprite
 
 # Core MMBasic sources (language runtime)
 CORE_SRCS = MMBasic.c Commands.c Functions.c Operators.c MATHS.c Memory.c Editor.c MMBasic_Prompt.c MMBasic_Print.c MMBasic_REPL.c
@@ -58,6 +58,8 @@ CORE_SRCS += vga_ops_stub.c
 # 3D polygon / DRAW3D subsystem: Draw.c references closeall3d, cmd_3D,
 # fun_3D. Host gets the real impl.
 CORE_SRCS += gfx_3d.c
+# upng sprite LOADPNG: host doesn't link upng, so ship the stub.
+CORE_SRCS += upng_sprite_stub.c
 
 # Bytecode VM sources
 BC_SRCS = bc_alloc.c bc_bridge.c vm_host_fat.c ff.c ffunicode.c ffsystem.c \

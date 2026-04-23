@@ -301,6 +301,15 @@ if (COMPILE STREQUAL "WEB" OR COMPILE STREQUAL "WEBRP2350")
 else()
     target_sources(PicoMite PRIVATE drivers/gfx_3d/gfx_3d.c)
 endif()
+
+# upng sprite LOADPNG decoder: rp2350 variants get the real impl
+# (upng.c already linked there per line 299 of this CMakeLists); every
+# other target gets a stub that errors at runtime.
+if(COMPILE STREQUAL "VGARP2350" OR COMPILE STREQUAL "WEBRP2350" OR COMPILE STREQUAL "PICORP2350" OR COMPILE STREQUAL "HDMI" OR COMPILE STREQUAL "HDMIUSB" OR COMPILE STREQUAL "VGAUSBRP2350" OR COMPILE STREQUAL "PICOUSBRP2350")
+    target_sources(PicoMite PRIVATE drivers/upng_sprite/upng_sprite.c)
+else()
+    target_sources(PicoMite PRIVATE drivers/upng_sprite/upng_sprite_stub.c)
+endif()
 if (COMPILE STREQUAL "WEB" OR COMPILE STREQUAL "WEBRP2350" )
     target_sources(PicoMite PRIVATE
 	SSD1963.c

@@ -41,6 +41,16 @@ void copyframetoscreen(uint8_t *s, int xstart, int xend, int ystart, int yend, i
     (void)s; (void)xstart; (void)xend; (void)ystart; (void)yend; (void)odd;
 }
 
+/* cmd_blit MERGE on non-VGA uses blitmerge + setframebuffer in the
+ * SPI-LCD FRAMEBUFFER subsystem (drivers/spi_lcd/spi_lcd_framebuffer.c).
+ * On VGA those commands are rejected at runtime by the
+ * hal_display_merge_has_pipeline() guard, but the linker still needs
+ * the symbols — the branches are dead code on VGA. */
+void blitmerge(int x0, int y0, int w, int h, uint8_t colour) {
+    (void)x0; (void)y0; (void)w; (void)h; (void)colour;
+}
+void setframebuffer(void) { }
+
 int hal_vga_ops_handle_cls(int c) {
     if (!(DISPLAY_TYPE == SCREENMODE1 && WriteBuf == DisplayBuf)) return 0;
     DrawRectangle(0, 0, HRes - 1, VRes - 1, 0);
