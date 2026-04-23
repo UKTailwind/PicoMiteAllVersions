@@ -49,13 +49,10 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "bc_alloc.h"
 #include "hardware/spi.h"
 #include "Memory.h"
-#ifndef PICOMITEWEB
-#include "pico/multicore.h"
-extern mutex_t	frameBufferMutex;
-#endif
-#ifdef PICOMITEWEB
-#include "pico/cyw43_arch.h"
-#endif
+/* pico/multicore.h and the frameBufferMutex extern moved to the
+ * hal_display_merge hooks in drivers/display_merge/. pico/cyw43_arch.h
+ * was included on PICOMITEWEB only but Draw.c no longer makes
+ * cyw43-arch calls directly. */
 
 #define LONG long
 #define max(x, y) (((x) > (y)) ? (x) : (y))
@@ -92,11 +89,6 @@ typedef struct _BMPDECODER
     #include "ArialNumFontPlus.h"
     #include "Font_8x6.h"
     #include "arial_bold.h"
-#ifdef PICOMITEVGA
-#ifndef HDMI
-    #include "Include.h"
-#endif
-#endif
     #include "smallfont.h"
     #include "font-8x10.h"
 
@@ -165,27 +157,18 @@ uint8_t sprite_transparent=0;
  * other targets never set it. Declared here unconditionally so
  * FileIO.c's writes link on every build. */
 bool mergedread = 0;
-#ifdef PICOMITEVGA
-#ifndef HDMI
-uint8_t remap[256];
-#else
-uint32_t remap555[256];
-uint32_t remap332[256];
-uint16_t remap256[256];
-#endif
-
-extern volatile int QVgaScanLine;
-int ScreenSize=0;
-#else
-    extern int SSD1963data;
-    int map[16]={0};
-    /* CursorTimer / gui_font_* / display_backlight are already defined
-     * by the !GUICONTROLS block at the top of this file for every
-     * rp2040 build that doesn't compile GUI.c (WEB included).
-     * mergerunning / mergedone / mergetimer moved to
-     * core/state/display_state.c as unconditional globals. */
-    extern int InvokingCtrl;
-#endif
+/* remap[] / remap555[] / remap332[] / remap256[] VGA palette tables
+ * moved to drivers/vga_pio/vga_ops.c (linked VGA only). ScreenSize
+ * moved there as well. QVgaScanLine lives in the QVGA scanout driver
+ * in PicoMite.c; references in core go through
+ * hal_vga_ops_wait_scanline_zero().
+ *
+ * map[16], SSD1963data, InvokingCtrl are non-VGA globals; keep
+ * unconditional so FileIO / Editor / bc_vm / etc. link on every
+ * build. */
+int map[16] = {0};
+extern int SSD1963data;
+extern int InvokingCtrl;
 void cmd_ReadTriangle(unsigned char *p);
 void (*DrawRectangle)(int x1, int y1, int x2, int y2, int c) = (void (*)(int , int , int , int , int ))DisplayNotSet;
 void (*DrawBitmap)(int x1, int y1, int width, int height, int scale, int fc, int bc, unsigned char *bitmap) = (void (*)(int , int , int , int , int , int , int , unsigned char *))DisplayNotSet;
@@ -2823,7 +2806,10 @@ static inline char getnextnibble(char **fc, int reset){
     return out;
 }
 void docompressed(char *fc,int x1, int y1, int w, int h, int8_t blank){
-#ifndef PICOMITEVGA
+    /* On VGA WriteBuf is always backed by the tile buffer so the
+     * direct-to-screen branch below is dead code there — the compiler
+     * can still hoist it as unreachable. Non-VGA targets reach it
+     * when the user hasn't set WriteBuf via FRAMEBUFFER WRITE. */
     if(!WriteBuf){ //direct to screen
         if(blank==-1){
             char tobuff[w/2], *to;
@@ -2905,11 +2891,10 @@ void docompressed(char *fc,int x1, int y1, int w, int h, int8_t blank){
                         if(ww>0)copyframetoscreen((unsigned char *)t,0, ww-1, y, y, xx&1);
                     }
                     if(x>=x1+w)break;
-                }           
+                }
             }
         }
-    } else 
-#endif
+    } else
     if(x1 %2 == 0 && w % 2 == 0 && blank==-1){
         char c, *to;
         c=getnextnibble(&fc,1); //reset the decoder
@@ -2979,7 +2964,9 @@ void cmd_blitmemory(void){
     if(size[0] & 0x8000 || size[1] &  0x8000) {
         docompressed(from, x1, y1, w, h, blank);
     } else {
-#ifndef PICOMITEVGA
+        /* Direct-to-screen uncompressed path — dead branch on VGA
+         * (WriteBuf is always non-NULL there), handled at runtime by
+         * the `if(!WriteBuf)` guard. */
         if(!WriteBuf){
             if(blank==-1){
                 char *fc=from;
@@ -3063,11 +3050,10 @@ void cmd_blitmemory(void){
                             if(ww>0)copyframetoscreen((unsigned char *)t,0, ww-1, y, y, xx&1);
                         }
                         if(x>=x1+w)break;
-                    }           
+                    }
                 }
             }
-        } else 
-#endif
+        } else
         if(x1 %2 == 0 && w % 2 == 0 && blank==-1){
             char c, *to;
             for(int y=y1;y<y1+h;y++){
@@ -3213,8 +3199,11 @@ if ((p = checkstring(cmdline, (unsigned char*)"COMPRESSED"))) {
                 }
             }
             return 1;
-        } 
-#ifndef PICOMITEVGA
+        }
+        /* Writing to a physical LCD: non-VGA only path in practice,
+         * but copyframetoscreen is defined on every target so the
+         * branch is safely unreachable on VGA (s is never NULL there
+         * and the previous branch captures all VGA cases). */
         else if(s!=NULL){ //writing to a physical LCD display
             if(x1==0 && x2==0 && w==HRes && blank==-1){
                 s+=y1*HRes/2;
@@ -3340,7 +3329,6 @@ if ((p = checkstring(cmdline, (unsigned char*)"COMPRESSED"))) {
             }
 	        return 1;
         }
-#endif
     }
     return 0;
 }

@@ -16,6 +16,31 @@
  * true (via BMP-save code paths). */
 extern bool mergedread;
 
+/* VGA palette-remap tables — relocated from Draw.c's
+ * `#ifdef PICOMITEVGA` block. HDMI uses 16-bit + 32-bit lookup
+ * arrays; non-HDMI QVGA uses a single 8-bit index table. */
+#ifdef HDMI
+uint32_t remap555[256];
+uint32_t remap332[256];
+uint16_t remap256[256];
+#else
+uint8_t remap[256];
+#endif
+
+/* Size-of-screen-in-bytes scratch used by VGA mode dispatch. */
+int ScreenSize = 0;
+
+/* copyframetoscreen is the SPI-LCD path for pushing a scanline into the
+ * physical LCD; on VGA there is no physical LCD to push to — the
+ * framebuffer IS the display. Draw.c's docompressed / cmd_blitmemory
+ * direct-to-screen fallbacks unconditionally reference this symbol
+ * since the ifdef went away; the VGA stub below satisfies the link
+ * and is never called (the dead branches are guarded by
+ * `if(!WriteBuf)` / `if(s != NULL)`, both always false on VGA). */
+void copyframetoscreen(uint8_t *s, int xstart, int xend, int ystart, int yend, int odd) {
+    (void)s; (void)xstart; (void)xend; (void)ystart; (void)yend; (void)odd;
+}
+
 int hal_vga_ops_handle_cls(int c) {
     if (!(DISPLAY_TYPE == SCREENMODE1 && WriteBuf == DisplayBuf)) return 0;
     DrawRectangle(0, 0, HRes - 1, VRes - 1, 0);
