@@ -183,7 +183,71 @@ purity gate green. Memory.c promoted to STRICT_FILES.
 
 **Commit-count target:** 3 commits (step 1 + step 2 + step 3 combined).
 
-## Phase 11 — Sweep + remaining drivers + scope cleanup
+## Phase 11 — Sweep + remaining drivers + scope cleanup ✅ partial
+
+### Step 1 ✅ — Commands.c + Functions.c → STRICT_FILES
+
+Commands.c (17 ifdefs) and Functions.c (11 ifdefs) drive to zero
+target-macro ifdefs. Patterns:
+
+  - Dead-code blocks deleted (vm_run_memdiag, identical-branch
+    rp2350 dead `int dims[MAXDIM]={0}` fork, stale `#ifndef rp2350`
+    sinetab gates left over from an older fast-path split).
+  - Placement macros on cmd_for / cmd_next / cmd_do / cmd_inc /
+    cmd_if / cmd_else / cmd_loop / fun_ternary collapse to
+    HAL_PORT_MMBASIC_HOT_FUNC / HAL_PORT_MMBASIC_SUBFUN_FUNC from
+    Phase 9.
+  - `pico_rand` linked on every device target (it's in rp2_common),
+    so `pico/rand.h` + `get_rand_32()` are unconditional.
+  - Operation enum + overlaid_functions[] flattened; MMPS2 now always
+    recognized (stub PS2code = 0 on USB builds).
+  - ADC channel select: `(rp2350a ? 3 : 7)` collapses to `3` on
+    rp2040 since rp2350a stubs to true there.
+  - sinetab[360] promoted to unconditional (2.8 KB of flash) —
+    fast-path available on every target.
+  - setmode stub moved to drivers/vga_pio/vga_ops_stub.c; host picks
+    it up via the existing CORE_SRCS link.
+  - cleanserver + close_tcpclient + initMouse0 now stubbed on USB
+    device builds (USBKeyboard.c) + host (host_peripheral_stubs.c)
+    so Commands.c + PicoMite.c can call them unconditionally.
+  - FileLoadCMM2Program stubbed on rp2040 (defines_loader.c `#else`)
+    and host. CMM2mode is now a runtime parameter, no compile gate.
+  - RANDOMIZE always available (srand harmless on rp2350's hardware
+    RNG path).
+
+### Step 2 ✅ — bc_alloc + bc_source + bc_vm target-macro sweep
+
+  - bc_alloc.c collapses to a single body (the MMBASIC_HOST/else
+    fork had identical TryGetMemory/FreeMemory wiring).
+  - bc_source.c: dead `bc_opt_level` duplicate definition deleted;
+    PWM8A..PWM11B parser keywords unconditional (enum values
+    promoted to unconditional in vm_sys_pin.h).
+  - bc_vm.c: op_randomize's `seed==0` default sources from new
+    `HAL_PORT_RANDOMIZE_DEFAULT_SEED()` port macro; backward-branch
+    slowdown routed through new `hal_time_slowdown_tick()` HAL
+    hook.
+
+### Result ✅
+
+**All 8 main-scoreboard core files have zero target-macro ifdefs
+across every tracked macro (PICOMITE, PICOMITEVGA, PICOMITEWEB,
+HDMI, rp2350, PICO_RP2350, USBKEYBOARD, MMBASIC_HOST, MMBASIC_WASM,
+PICOMITEPLUS, PICOCALC, HAL_PORT_*).** The scoreboard total of 12
+is entirely `#ifdef GUICONTROLS` feature-flag gates + two `#ifndef
+min/max` stdlib polyfills in FileIO.c. Memory.c + Commands.c +
+Functions.c are now all in STRICT_FILES alongside Draw.c / MM_Misc.c
+/ External.c / FileIO.c / Audio.c.
+
+### Remaining work (deferred to later step)
+
+INFO-tracked VM files (MMBasic.c, bc_runtime.c, bc_debug.c,
+vm_sys_graphics.c, vm_sys_pin.c, vm_sys_file.c, vm_sys_time.c)
+still have target-macro ifdefs. Most are MMBASIC_HOST splits
+(host vs device code paths) that want dedicated host-side files or
+HAL hooks. A naive "flatten findlabel/funtbl" attempt on MMBasic.c
+overflowed rp2040 PICO RAM by 440 bytes (funtbl is ~10 KB on that
+target) and was reverted — that one needs a link-time port hook
+rather than a runtime branch.
 
 Pick up the smaller systems:
 
