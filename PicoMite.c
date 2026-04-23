@@ -33,6 +33,7 @@ extern "C" {
 #include "configuration.h"
 #include "hardware/watchdog.h"
 #include "hardware/clocks.h"
+#include "hal/hal_display_merge.h"
 #include "hal/hal_flash.h"
 #include "hal/hal_keyboard.h"
 #include "hardware/regs/addressmap.h"     /* XIP_BASE */
@@ -496,16 +497,12 @@ void __not_in_flash_func(routinechecks)(void){
         }
     }
 #endif
-#if defined(PICOMITE) && defined(rp2350)
 	if(Option.DISPLAY_TYPE>=NEXTGEN && !(low_x==silly_low && high_x==silly_high && low_y==silly_low && high_y==silly_high)){// Buffered LCD displays
         if(Option.Refresh){
-            multicore_fifo_push_blocking(6);
-            multicore_fifo_push_blocking((uint32_t)low_x | (high_x<<16));
-            multicore_fifo_push_blocking((uint32_t)low_y | (high_y<<16));
+            hal_display_nextgen_refresh_rect(low_x, low_y, high_x, high_y);
             low_x=silly_low; high_y=silly_high; low_y=silly_low; high_x=silly_high;
         }
-	}  
-#endif
+	}
 	if(GPSchannel)processgps();
     if(diskchecktimer == 0)CheckSDCard();
 #ifdef GUICONTROLS
@@ -1117,16 +1114,7 @@ void __not_in_flash_func(CheckAbort)(void) {
         WDTimer = 0;                                                // turn off the watchdog timer
         calibrate=0;
         ShowCursor(false);
-#ifdef PICOMITE
-        if(mergerunning){
-            multicore_fifo_push_blocking(0xFF);
-            busy_wait_ms(mergetimer+200);
-            if(mergerunning){
-                _excep_code = RESET_COMMAND;
-                SoftReset();
-            }
-        }
-#endif
+        hal_display_merge_abort();
         do_end(false);
         longjmp(mark, 1);												// jump back to the input prompt
 }
@@ -1725,110 +1713,10 @@ void __not_in_flash_func(QVgaCore)()
 uint32_t core1stack[128];
 #endif /* !HDMI — QVGA scanout */
 #else
-#ifdef PICOMITE
-#include "pico/multicore.h"
-void __not_in_flash_func(UpdateCore)()
-{
-//    systick_hw->csr = 0x5;
-//    systick_hw->rvr = 0x00FFFFFF;
-//    while(multicore_fifo_rvalid()) {
-//        multicore_fifo_pop_blocking();
-//    }
-
-	while (true)
-	{
-		// data memory barrier
-		__dmb();
-        if (multicore_fifo_rvalid()) {
-            int command=multicore_fifo_pop_blocking();
-			if(command==3){
-                uint8_t colour=(uint8_t)multicore_fifo_pop_blocking();
-                uint32_t timer=(uint32_t)multicore_fifo_pop_blocking();
-                uint64_t delaytime=0;
-                if(timer)delaytime=time_us_64()+timer;
-                mergerunning=true;
-                while(1){
-                    if (multicore_fifo_rvalid()){
-                        int a;
-                        if(((a=multicore_fifo_pop_blocking())==0xff)){
-                            mergerunning=false;
-                            break;
-                        }
-                    }
-                    if(timer){
-                        busy_wait_until(delaytime);
-                        delaytime=time_us_64()+timer;
-                    }
-                    if(ShadowBuf) merge_optimized(colour);
-                    else merge(colour);
-                }
-            } else if(command==2){
-                uint8_t colour=(uint8_t)multicore_fifo_pop_blocking();
-                if(ShadowBuf) merge_optimized(colour);
-                else merge(colour);
-            } else if(command==4){
-                int x1=multicore_fifo_pop_blocking();
-                int y1=multicore_fifo_pop_blocking();
-                int w=multicore_fifo_pop_blocking();
-                int h=multicore_fifo_pop_blocking();
-                uint8_t colour=(uint8_t)multicore_fifo_pop_blocking();
-                blitmerge(x1,y1,w,h,colour);
-			} else if(command==5){
-                int x1=multicore_fifo_pop_blocking();
-                int y1=multicore_fifo_pop_blocking();
-                int w=multicore_fifo_pop_blocking();
-                int h=multicore_fifo_pop_blocking();
-                uint8_t colour=(uint8_t)multicore_fifo_pop_blocking();
-                uint32_t timer=(uint32_t)multicore_fifo_pop_blocking();
-                uint64_t delaytime=0;
-                if(timer)delaytime=time_us_64()+timer;
-                mergerunning=true;
-                while(1){
-                    if (multicore_fifo_rvalid()){
-                        int a;
-                        if(((a=multicore_fifo_pop_blocking())==0xff)){
-                            mergerunning=false;
-                            break;
-                        }
-                    }
-                    if(timer){
-                        busy_wait_until(delaytime);
-                        delaytime=time_us_64()+timer;
-                    }
-                    blitmerge(x1,y1,w,h,colour);
-                }
-#if defined(PICOMITE) && defined(rp2350)
-			} else if(command==6){
-                int x_low=(int)multicore_fifo_pop_blocking();
-                int y_low=(int)multicore_fifo_pop_blocking();
-                int x_high=x_low>>16;
-                x_low &=0xFFFF;
-                int y_high=y_low>>16;
-                y_low &=0xFFFF;
-                mutex_enter_blocking(&frameBufferMutex);			// lock the frame buffer
-                copybuffertoscreen((uint8_t *)ScreenBuffer,x_low,y_low,x_high,y_high);
-                mutex_exit(&frameBufferMutex);
-			} else if(command==7){
-                int t=(int)multicore_fifo_pop_blocking();
-                spi_write_command(CMD_SET_SCROLL_START);
-                spi_write_data(t >> 8);
-                spi_write_data(t);
-#endif
-            } else if(command==1){
-                uint8_t *s=(uint8_t *)multicore_fifo_pop_blocking();
-                mutex_enter_blocking(&frameBufferMutex);			// lock the frame buffer
-                copyframetoscreen(s,0,HRes-1,0,VRes-1,0);
-                mutex_exit(&frameBufferMutex);
-            } else if(command==8){
-                extern void fastgfx_swap_core1(void);
-                fastgfx_swap_core1();
-            }
-        }
-    }
-
-}
-uint32_t core1stack[512];
-#endif
+/* UpdateCore (core1 merge receiver) + its 512-word stack live in
+ * drivers/display_merge/display_merge_pico.c — see phase-8 notes. The
+ * launch site below still references the UpdateCore symbol via the
+ * extern in Hardware_Includes.h. */
 #endif
 #ifndef rp2350
 void __no_inline_not_in_flash_func(modclock)(uint16_t speed){

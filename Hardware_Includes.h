@@ -141,6 +141,7 @@ extern uint16_t tilebcols[];
 #endif
 #endif
 extern void __not_in_flash_func(QVgaCore)(void);
+extern void __not_in_flash_func(UpdateCore)(void);
 extern uint32_t core1stack[];
 extern int QVGA_CLKDIV;
 extern int getslice(int pin);

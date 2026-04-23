@@ -3,8 +3,9 @@
  * control for the PicoMite (SPI-LCD) device family.
  *
  * Linked only into PICOMITE variants (rp2040 + rp2350). The pipeline
- * is driven through the rp2040 inter-core FIFO; core1 runs the merge
- * loop in PicoMite.c::UpdateCore. See hal/hal_display_merge.h for the
+ * is driven through the rp2040 inter-core FIFO; core1 runs UpdateCore
+ * (defined at the bottom of this file), which receives the command
+ * words posted by the hooks below. See hal/hal_display_merge.h for the
  * contract.
  */
 
@@ -22,6 +23,7 @@ extern uint32_t _excep_code;
 extern mutex_t frameBufferMutex;
 extern unsigned char *ShadowBuf;
 extern int fb_dma_chan;
+extern void fastgfx_swap_core1(void);
 
 void hal_display_merge_abort(void) {
     if (!mergerunning) return;
@@ -118,4 +120,95 @@ void hal_display_merge_post_blit_bg(int x, int y, int w, int h,
     multicore_fifo_push_blocking((uint32_t)h);
     multicore_fifo_push_blocking((uint32_t)colour);
     multicore_fifo_push_blocking((uint32_t)timer_us);
+}
+
+/* Core1 entry point + stack. core1stack[0] is set to the 0x12345678
+ * canary by the launch site (PicoMite.c boot path); MMBasic.c's
+ * per-statement loop verifies it is still intact to catch core1 stack
+ * overflow. Symbol and size match the legacy in-PicoMite.c definition.
+ *
+ * UpdateCore is the receiver counterpart to the post_* functions above:
+ * it spins on the inter-core FIFO, decoding the command word + payloads
+ * posted by core0 and driving the SPI-LCD merge path on core1. */
+uint32_t core1stack[512];
+
+void __not_in_flash_func(UpdateCore)(void) {
+    while (true) {
+        __dmb();
+        if (!multicore_fifo_rvalid()) continue;
+        int command = multicore_fifo_pop_blocking();
+        if (command == 3) {
+            uint8_t colour = (uint8_t)multicore_fifo_pop_blocking();
+            uint32_t timer = (uint32_t)multicore_fifo_pop_blocking();
+            uint64_t delaytime = 0;
+            if (timer) delaytime = time_us_64() + timer;
+            mergerunning = true;
+            while (1) {
+                if (multicore_fifo_rvalid()) {
+                    int a = multicore_fifo_pop_blocking();
+                    if (a == 0xff) { mergerunning = false; break; }
+                }
+                if (timer) {
+                    busy_wait_until(delaytime);
+                    delaytime = time_us_64() + timer;
+                }
+                if (ShadowBuf) merge_optimized(colour);
+                else            merge(colour);
+            }
+        } else if (command == 2) {
+            uint8_t colour = (uint8_t)multicore_fifo_pop_blocking();
+            if (ShadowBuf) merge_optimized(colour);
+            else           merge(colour);
+        } else if (command == 4) {
+            int x1 = multicore_fifo_pop_blocking();
+            int y1 = multicore_fifo_pop_blocking();
+            int w  = multicore_fifo_pop_blocking();
+            int h  = multicore_fifo_pop_blocking();
+            uint8_t colour = (uint8_t)multicore_fifo_pop_blocking();
+            blitmerge(x1, y1, w, h, colour);
+        } else if (command == 5) {
+            int x1 = multicore_fifo_pop_blocking();
+            int y1 = multicore_fifo_pop_blocking();
+            int w  = multicore_fifo_pop_blocking();
+            int h  = multicore_fifo_pop_blocking();
+            uint8_t colour = (uint8_t)multicore_fifo_pop_blocking();
+            uint32_t timer = (uint32_t)multicore_fifo_pop_blocking();
+            uint64_t delaytime = 0;
+            if (timer) delaytime = time_us_64() + timer;
+            mergerunning = true;
+            while (1) {
+                if (multicore_fifo_rvalid()) {
+                    int a = multicore_fifo_pop_blocking();
+                    if (a == 0xff) { mergerunning = false; break; }
+                }
+                if (timer) {
+                    busy_wait_until(delaytime);
+                    delaytime = time_us_64() + timer;
+                }
+                blitmerge(x1, y1, w, h, colour);
+            }
+#if defined(PICOMITE) && defined(rp2350)
+        } else if (command == 6) {
+            int x_low = (int)multicore_fifo_pop_blocking();
+            int y_low = (int)multicore_fifo_pop_blocking();
+            int x_high = x_low >> 16; x_low &= 0xFFFF;
+            int y_high = y_low >> 16; y_low &= 0xFFFF;
+            mutex_enter_blocking(&frameBufferMutex);
+            copybuffertoscreen((uint8_t *)ScreenBuffer, x_low, y_low, x_high, y_high);
+            mutex_exit(&frameBufferMutex);
+        } else if (command == 7) {
+            int t = (int)multicore_fifo_pop_blocking();
+            spi_write_command(CMD_SET_SCROLL_START);
+            spi_write_data(t >> 8);
+            spi_write_data(t);
+#endif
+        } else if (command == 1) {
+            uint8_t *s = (uint8_t *)multicore_fifo_pop_blocking();
+            mutex_enter_blocking(&frameBufferMutex);
+            copyframetoscreen(s, 0, HRes - 1, 0, VRes - 1, 0);
+            mutex_exit(&frameBufferMutex);
+        } else if (command == 8) {
+            fastgfx_swap_core1();
+        }
+    }
 }

@@ -4,15 +4,23 @@ Sketches for the later phases. These are not started and their details will firm
 
 ## Phase 8 — `hal_multicore.h`
 
-23 `multicore_fifo_push_blocking` calls in Draw.c (RP2350 PicoMite + Web). This isn't a peripheral — it's a *cross-core protocol* for scrolling/clearing.
+The surviving raw `multicore_fifo_*` calls form a cross-core protocol for the SPI-LCD merge pipeline (sender core0 → receiver core1) plus ad-hoc QVGA DMA-IRQ toggle messages. This isn't a peripheral — it's a channel.
 
-- Define `hal/hal_multicore.h`: `hal_multicore_post(channel, payload)`, `hal_multicore_recv()`, `hal_multicore_init()`, with channel IDs in `hal/hal_multicore_channels.h`.
-- Implementations: `ports/pico_sdk_common/hal_multicore_pico.c` (real FIFO), `ports/host_native/hal_multicore_stub.c` (single-core no-op for host).
-- Drivers that use multicore (HDMI in particular) call the HAL.
+Rather than introduce a generic `hal_multicore` contract up-front, the pragmatic move is: push every multicore user through its own driver (`drivers/display_merge/`, `drivers/vga_pio/`, `drivers/hdmi/`), and only consider a formal `hal_multicore.h` abstraction if a second cross-cutting use emerges. The driver-owned pattern established in Phase 7 (HDMI scanout receiver in `drivers/hdmi/hdmi_scanout.c::HDMICore`) is the template.
 
 **Exit gate:** no direct `multicore_fifo_*` calls outside `ports/pico_sdk_common/` and drivers. Zero multicore-related ifdefs in scored core files.
 
-**Commit-count target:** 1 commit.
+### Step 1 ✅ (commit 8185531)
+
+Routed `error()` / `do_end()` / `vm_sys_graphics_fb_stop_merge` / `ClearRuntime()` through the existing `hal_display_merge_abort()` + `hal_display_nextgen_scroll_reset()` hooks (which were landed in Phase 7a but whose four remaining in-core call-sites still did raw FIFO pushes). `#include "pico/multicore.h"` dropped from MMBasic.c / Commands.c / vm_sys_graphics.c. Commands.c target-macro ifdefs 39 → 37.
+
+### Step 2 ✅
+
+Relocated `UpdateCore()` — the 100-line core1 FIFO receiver loop — from `PicoMite.c` into `drivers/display_merge/display_merge_pico.c`, alongside the senders it pairs with. The 512-word `core1stack[]` moved with it (same symbol name, same size — MMBasic.c's canary check `core1stack[0] != 0x12345678` still resolves via the `extern uint32_t core1stack[]` in `Hardware_Includes.h`). PicoMite.c's `CheckAbort()` merge-abort block collapsed to `hal_display_merge_abort()`; the NEXTGEN refresh-rect push in `routinechecks()` collapsed to `hal_display_nextgen_refresh_rect()`. `#ifdef PICOMITE` / `#if defined(PICOMITE) && defined(rp2350)` guards around those sites removed (the HAL stubs are no-ops on non-PICOMITE targets). PicoMite.c now `#include`s `hal/hal_display_merge.h` directly. Net: the inter-core FIFO protocol lives in one file, `drivers/display_merge/display_merge_pico.c`.
+
+Remaining raw `multicore_fifo_*` in the tree outside ports/drivers: `PicoMite.c` `QVgaCore()` (2 calls, DMA-IRQ-toggle loop for VGA/QVGA scanout). That relocation is part of the QVGA → `drivers/vga_pio/` move, not this phase — QVgaCore is the *VGA* scanout receiver, not a merge receiver. It will move when the VGA scanout engine does (parallel to what Phase 7c did for HDMICore).
+
+**Commit-count target:** 2–3 commits (step 1 done; step 2 done; one more for QVgaCore → drivers/vga_pio/).
 
 ## Phase 9 — `hal_net.h`
 
