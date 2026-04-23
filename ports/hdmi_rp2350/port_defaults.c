@@ -299,3 +299,28 @@ int SSD1963data = 0;
  * this build); the share-clear hook is a no-op. disable_lcdspi isn't
  * called from core on these ports. */
 void port_clear_lcd_spi_if_shares_system(void) {}
+
+/* HDMI exposes GP12-19 as virtual pins 16-25 (the HDMI clock/data lanes
+ * claim those GPIOs; MMBasic addresses them via the alias). */
+static int starts_with_gp(const char *s, char d1, char d2)
+{
+    return (s[0]=='G' || s[0]=='g') && (s[1]=='P' || s[1]=='p') && s[2]==d1 && s[3]==d2;
+}
+int port_pinno_alias_for_name(const char *name)
+{
+    if (starts_with_gp(name,'1','2')) return 16;
+    if (starts_with_gp(name,'1','3')) return 17;
+    if (starts_with_gp(name,'1','4')) return 19;
+    if (starts_with_gp(name,'1','5')) return 20;
+    if (starts_with_gp(name,'1','6')) return 21;
+    if (starts_with_gp(name,'1','7')) return 22;
+    if (starts_with_gp(name,'1','8')) return 24;
+    if (starts_with_gp(name,'1','9')) return 25;
+    return 0;
+}
+int port_pin_is_reserved_alias(int pin) { (void)pin; return 0; }
+const char *port_pin_reserved_label(int pin)
+{
+    if (pin >= 16 && pin <= 25) return "Boot Reserved : HDMI";
+    return NULL;
+}

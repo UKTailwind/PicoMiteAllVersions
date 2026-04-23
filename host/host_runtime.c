@@ -902,6 +902,9 @@ void port_print_lcd_spi(void) {}
 void port_print_keyboard_heartbeat(void) {}
 void port_print_usb_kb_repeat(void) {}
 void port_clear_lcd_spi_if_shares_system(void) {}
+int port_pinno_alias_for_name(const char *name) { (void)name; return 0; }
+int port_pin_is_reserved_alias(int pin) { (void)pin; return 0; }
+const char *port_pin_reserved_label(int pin) { (void)pin; return NULL; }
 
 /* OPTION KEYBOARD setter — host has no keyboard config to set. */
 int port_keyboard_option_setter(unsigned char *cmdline) { (void)cmdline; return 0; }

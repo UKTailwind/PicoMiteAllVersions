@@ -384,3 +384,8 @@ void port_clear_lcd_spi_if_shares_system(void)
         Option.LCD_CLK  = 0;
     }
 }
+
+/* Port has no pin aliases for MM.PINNO / MM.PIN. */
+int port_pinno_alias_for_name(const char *name) { (void)name; return 0; }
+int port_pin_is_reserved_alias(int pin) { (void)pin; return 0; }
+const char *port_pin_reserved_label(int pin) { (void)pin; return NULL; }

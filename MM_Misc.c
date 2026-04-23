@@ -71,6 +71,12 @@ extern void port_clear_lcd_spi_if_shares_system(void);
 /* PICOMITE+rp2350 only — defined in ports/pico_rp2350/port_defaults.c.
  * Caller is gated `#if defined(PICOMITE) && defined(rp2350)`. */
 extern void disable_lcdspi(void);
+/* Port-specific pin alias maps for MM.PINNO / MM.PIN. PICOMITEWEB
+ * exposes virtual GP23/24/25/29 → 41-44 (CYW43-reserved); HDMI
+ * exposes GP12-19 → 16-25 (HDMI-reserved). Other ports return 0/NULL. */
+extern int  port_pinno_alias_for_name(const char *name);
+extern int  port_pin_is_reserved_alias(int pin);
+extern const char *port_pin_reserved_label(int pin);
 extern void port_web_print_options(void);
 extern int  port_web_option_setter(unsigned char *cmdline);
 extern int  port_web_mminfo(unsigned char *ep, int64_t *out_iret,
@@ -2897,32 +2903,8 @@ void MIPS16 fun_info(void){
             char code, *ptr;
             char *string=GetTempMemory(STRINGSIZE);
             skipspace(tp);
-        #ifdef PICOMITEWEB
-            iret=0;
-	        if((tp[0]=='G' || tp[0]=='g') && (tp[1]=='P' || tp[1]=='p') && tp[2]=='2' && tp[3]=='3')iret=41;
-	        if((tp[0]=='G' || tp[0]=='g') && (tp[1]=='P' || tp[1]=='p') && tp[2]=='2' && tp[3]=='4')iret=42;
-	        if((tp[0]=='G' || tp[0]=='g') && (tp[1]=='P' || tp[1]=='p') && tp[2]=='2' && tp[3]=='5')iret=43;
-	        if((tp[0]=='G' || tp[0]=='g') && (tp[1]=='P' || tp[1]=='p') && tp[2]=='2' && tp[3]=='9')iret=44;
-            if(iret){
-                targ=T_INT;
-                return;
-            }
-        #endif
-        #ifdef HDMI
-            iret=0;
-	        if((tp[0]=='G' || tp[0]=='g') && (tp[1]=='P' || tp[1]=='p') && tp[2]=='1' && tp[3]=='2')iret=16;
-	        if((tp[0]=='G' || tp[0]=='g') && (tp[1]=='P' || tp[1]=='p') && tp[2]=='1' && tp[3]=='3')iret=17;
-	        if((tp[0]=='G' || tp[0]=='g') && (tp[1]=='P' || tp[1]=='p') && tp[2]=='1' && tp[3]=='4')iret=19;
-	        if((tp[0]=='G' || tp[0]=='g') && (tp[1]=='P' || tp[1]=='p') && tp[2]=='1' && tp[3]=='5')iret=20;
-	        if((tp[0]=='G' || tp[0]=='g') && (tp[1]=='P' || tp[1]=='p') && tp[2]=='1' && tp[3]=='6')iret=21;
-	        if((tp[0]=='G' || tp[0]=='g') && (tp[1]=='P' || tp[1]=='p') && tp[2]=='1' && tp[3]=='7')iret=22;
-	        if((tp[0]=='G' || tp[0]=='g') && (tp[1]=='P' || tp[1]=='p') && tp[2]=='1' && tp[3]=='8')iret=24;
-	        if((tp[0]=='G' || tp[0]=='g') && (tp[1]=='P' || tp[1]=='p') && tp[2]=='1' && tp[3]=='9')iret=25;
-             if(iret){
-                targ=T_INT;
-                return;
-            }
-        #endif
+            iret = port_pinno_alias_for_name((const char *)tp);
+            if (iret) { targ = T_INT; return; }
             if(codecheck(tp))evaluate(tp, &f, &i64, &ss, &t, false);
             if(t & T_STR ){
                 ptr=(char *)getCstring(tp);
@@ -2930,43 +2912,17 @@ void MIPS16 fun_info(void){
             } else {
                 strcpy(string,(char *)tp);
             }
-        #ifdef PICOMITEWEB
-            iret=0;
-	        if((string[0]=='G' || string[0]=='g') && (string[1]=='P' || string[1]=='p') && string[2]=='2' && string[3]=='3')iret=41;
-	        if((string[0]=='G' || string[0]=='g') && (string[1]=='P' || string[1]=='p') && string[2]=='2' && string[3]=='4')iret=42;
-	        if((string[0]=='G' || string[0]=='g') && (string[1]=='P' || string[1]=='p') && string[2]=='2' && string[3]=='5')iret=43;
-	        if((string[0]=='G' || string[0]=='g') && (string[1]=='P' || string[1]=='p') && string[2]=='2' && string[3]=='9')iret=44;
-            if(iret){
-                targ=T_INT;
-                return;
-            }
-        #endif
-        #ifdef HDMI
-            iret=0;
-	        if((string[0]=='G' || string[0]=='g') && (string[1]=='P' || string[1]=='p') && string[2]=='1' && string[3]=='2')iret=16;
-	        if((string[0]=='G' || string[0]=='g') && (string[1]=='P' || string[1]=='p') && string[2]=='1' && string[3]=='3')iret=17;
-	        if((string[0]=='G' || string[0]=='g') && (string[1]=='P' || string[1]=='p') && string[2]=='1' && string[3]=='4')iret=19;
-	        if((string[0]=='G' || string[0]=='g') && (string[1]=='P' || string[1]=='p') && string[2]=='1' && string[3]=='5')iret=20;
-	        if((string[0]=='G' || string[0]=='g') && (string[1]=='P' || string[1]=='p') && string[2]=='1' && string[3]=='6')iret=21;
-	        if((string[0]=='G' || string[0]=='g') && (string[1]=='P' || string[1]=='p') && string[2]=='1' && string[3]=='7')iret=22;
-	        if((string[0]=='G' || string[0]=='g') && (string[1]=='P' || string[1]=='p') && string[2]=='1' && string[3]=='8')iret=24;
-	        if((string[0]=='G' || string[0]=='g') && (string[1]=='P' || string[1]=='p') && string[2]=='1' && string[3]=='9')iret=25;
-             if(iret){
-                targ=T_INT;
-                return;
-            }
-        #endif
-            if(!(code=codecheck( (unsigned char *)string)))string+=2;  
+            iret = port_pinno_alias_for_name((const char *)string);
+            if (iret) { targ = T_INT; return; }
+            if(!(code=codecheck( (unsigned char *)string)))string+=2;
             else error("Syntax");
             pin = getinteger((unsigned char *)string);
             if(!code)pin=codemap(pin);
-        #ifdef PICOMITEWEB
-            if(pin>=41 && pin<=44){
-                iret=pin;
-                targ=T_INT;
+            if (port_pin_is_reserved_alias(pin)) {
+                iret = pin;
+                targ = T_INT;
                 return;
             }
-        #endif
             if(IsInvalidPin(pin))error("Invalid pin");
             iret=pin;
             targ=T_INT;
@@ -3010,22 +2966,15 @@ void MIPS16 fun_info(void){
             if(!(code=codecheck(tp)))tp+=2;
             pin = getinteger(tp);
             if(!code)pin=codemap(pin);
-        #ifdef HDMI
-            if(pin>=16 && pin<=25){
-                strcpy((char *)sret,"Boot Reserved : HDMI");
-                CtoM(sret);
-                targ=T_STR;
-                return;
+            {
+                const char *reserved = port_pin_reserved_label(pin);
+                if (reserved) {
+                    strcpy((char *)sret, reserved);
+                    CtoM(sret);
+                    targ = T_STR;
+                    return;
+                }
             }
-        #endif
-        #ifdef PICOMITEWEB
-            if(pin>=41 && pin<=44){
-                strcpy((char *)sret,"Boot Reserved : CYW43");
-                CtoM(sret);
-                targ=T_STR;
-                return;
-            }
-        #endif
             if(IsInvalidPin(pin))strcpy((char *)sret,"Invalid");
             else strcpy((char *)sret,PinFunction[ExtCurrentConfig[pin] & 0xFF]);
             if(ExtCurrentConfig[pin] & EXT_BOOT_RESERVED){

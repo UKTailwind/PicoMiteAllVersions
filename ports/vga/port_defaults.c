@@ -369,3 +369,8 @@ int SSD1963data = 0;
  * this build); the share-clear hook is a no-op. disable_lcdspi isn't
  * called from core on these ports. */
 void port_clear_lcd_spi_if_shares_system(void) {}
+
+/* Port has no pin aliases for MM.PINNO / MM.PIN. */
+int port_pinno_alias_for_name(const char *name) { (void)name; return 0; }
+int port_pin_is_reserved_alias(int pin) { (void)pin; return 0; }
+const char *port_pin_reserved_label(int pin) { (void)pin; return NULL; }

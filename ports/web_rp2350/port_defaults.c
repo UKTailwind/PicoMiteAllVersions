@@ -271,3 +271,24 @@ int port_display_option_setter(unsigned char *cmdline)
  * this build); the share-clear hook is a no-op. disable_lcdspi isn't
  * called from core on these ports. */
 void port_clear_lcd_spi_if_shares_system(void) {}
+
+/* PICOMITEWEB exposes GP23/24/25/29 as virtual pins 41-44 (the CYW43
+ * radio claims those GPIOs; MMBasic still wants them addressable). */
+static int starts_with_gp(const char *s, char d1, char d2)
+{
+    return (s[0]=='G' || s[0]=='g') && (s[1]=='P' || s[1]=='p') && s[2]==d1 && s[3]==d2;
+}
+int port_pinno_alias_for_name(const char *name)
+{
+    if (starts_with_gp(name,'2','3')) return 41;
+    if (starts_with_gp(name,'2','4')) return 42;
+    if (starts_with_gp(name,'2','5')) return 43;
+    if (starts_with_gp(name,'2','9')) return 44;
+    return 0;
+}
+int port_pin_is_reserved_alias(int pin) { return pin >= 41 && pin <= 44; }
+const char *port_pin_reserved_label(int pin)
+{
+    if (pin >= 41 && pin <= 44) return "Boot Reserved : CYW43";
+    return NULL;
+}
