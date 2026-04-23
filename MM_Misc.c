@@ -58,6 +58,7 @@ extern void port_picocalc_set_keyboard_backlight(int level);
 extern int  port_picocalc_battery_pct(void);
 extern int  port_picocalc_is_charging(void);
 extern void port_picocalc_factory_reset_options(void);
+extern void port_print_supported_boards(void);
 /* TimeOffsetToUptime defined in mm_misc_shared.c (also used by vm_sys_time.c) */
 extern int64_t TimeOffsetToUptime;
 extern int last_adc;
@@ -1332,51 +1333,7 @@ void MIPS16 configure(unsigned char *p){
         SoftReset();
     } else {
         if(checkstring(p,(unsigned char *) "LIST")){
-#ifdef PICOMITEVGA
-#ifndef HDMI
-#ifdef USBKEYBOARD
-            MMPrintString("CMM1.5\r\n");
-#else
-            MMPrintString("PICOMITEVGA V1.1\r\n");
-            MMPrintString("PICOMITEVGA V1.0\r\n");
-            MMPrintString("VGA Design 1\r\n");
-            MMPrintString("VGA Design 2\r\n");
-            MMPrintString("SWEETIEPI\r\n");
-            MMPrintString("VGA Basic\r\n");
-#endif
-#else
-#ifdef USBKEYBOARD
-            MMPrintString("HDMIUSB\r\n");
-            MMPrintString("OLIMEX USB\r\n");
-            MMPrintString("PICO COMPUTER\r\n");
-            MMPrintString("HDMIUSBI2S\r\n");
-#else
-            MMPrintString("OLIMEX\r\n");
-            MMPrintString("HDMIBasic\r\n");
-#endif
-#endif
-#endif
-#if defined(PICOMITE) || defined(PICOMITEWEB)
-#if defined(rp2350)
-            MMPrintString("Palm Pico");
-#endif
-#ifndef USBKEYBOARD
-            MMPrintString("Game*Mite\r\n");
-#ifdef PICOCALC
-            MMPrintString("PicoCalc\r\n");
-#endif
-            MMPrintString("Pico-ResTouch-LCD-3.5\r\n");
-            MMPrintString("Pico-ResTouch-LCD-2.8\r\n");
-            MMPrintString("PICO BACKPACK\r\n");
-#ifndef PICOMITEWEB
-            MMPrintString("RP2040-LCD-1.28\r\n");
-            MMPrintString("RP2040LCD-0.96\r\n");
-            MMPrintString("RP2040-GEEK\r\n");
-#endif
-#else
-            MMPrintString("USB Edition V1.0\r\n");
-#endif
-#endif
+            port_print_supported_boards();
             return;
         }       
 #ifdef PICOMITEVGA

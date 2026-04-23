@@ -30,3 +30,19 @@ void port_set_default_options(void)
 #endif
     /* VGA has no touch — TOUCH_XSCALE / TOUCH_YSCALE stay at 0. */
 }
+
+/* Boards advertised by `CONFIGURE LIST`. */
+#include "MMBasic.h"
+void port_print_supported_boards(void)
+{
+#ifdef USBKEYBOARD
+    MMPrintString("CMM1.5\r\n");
+#else
+    MMPrintString("PICOMITEVGA V1.1\r\n");
+    MMPrintString("PICOMITEVGA V1.0\r\n");
+    MMPrintString("VGA Design 1\r\n");
+    MMPrintString("VGA Design 2\r\n");
+    MMPrintString("SWEETIEPI\r\n");
+    MMPrintString("VGA Basic\r\n");
+#endif
+}

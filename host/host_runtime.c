@@ -880,4 +880,7 @@ int  port_picocalc_battery_pct(void)                 { error("Not supported on h
 int  port_picocalc_is_charging(void)                 { error("Not supported on host"); return 0; }
 void port_picocalc_factory_reset_options(void)       { error("Not supported on host"); }
 
+/* CONFIGURE LIST entries — host advertises no factory board profiles. */
+void port_print_supported_boards(void) {}
+
 /* str_replace/STR_REPLACE provided by MATHS.c */

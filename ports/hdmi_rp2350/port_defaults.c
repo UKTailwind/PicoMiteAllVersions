@@ -32,3 +32,18 @@ void port_set_default_options(void)
     Option.KeyboardConfig = CONFIG_US;
 #endif
 }
+
+/* Boards advertised by `CONFIGURE LIST`. */
+#include "MMBasic.h"
+void port_print_supported_boards(void)
+{
+#ifdef USBKEYBOARD
+    MMPrintString("HDMIUSB\r\n");
+    MMPrintString("OLIMEX USB\r\n");
+    MMPrintString("PICO COMPUTER\r\n");
+    MMPrintString("HDMIUSBI2S\r\n");
+#else
+    MMPrintString("OLIMEX\r\n");
+    MMPrintString("HDMIBasic\r\n");
+#endif
+}

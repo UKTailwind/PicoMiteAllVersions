@@ -29,3 +29,19 @@ void port_set_default_options(void)
     Option.KeyboardConfig = CONFIG_US;
 #endif
 }
+
+/* Boards advertised by `CONFIGURE LIST`. */
+#include "MMBasic.h"
+void port_print_supported_boards(void)
+{
+#ifdef USBKEYBOARD
+    MMPrintString("CMM1.5\r\n");
+#else
+    MMPrintString("PICOMITEVGA V1.1\r\n");
+    MMPrintString("PICOMITEVGA V1.0\r\n");
+    MMPrintString("VGA Design 1\r\n");
+    MMPrintString("VGA Design 2\r\n");
+    MMPrintString("SWEETIEPI\r\n");
+    MMPrintString("VGA Basic\r\n");
+#endif
+}
