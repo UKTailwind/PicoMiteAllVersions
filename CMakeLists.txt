@@ -237,6 +237,7 @@ if (COMPILE STREQUAL "WEB" OR COMPILE STREQUAL "WEBRP2350" )
     tftp.c
     MMtftp.c
     MMudp.c
+    MMsetwifi.c
 	)
 	set_source_files_properties(cJSON.c PROPERTIES COMPILE_FLAGS -Os)
 	target_include_directories(PicoMite PRIVATE

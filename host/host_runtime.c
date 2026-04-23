@@ -121,6 +121,11 @@ int PromptFC = 0xFFFFFF;
 int PromptBC = 0;
 volatile int  PS2code = 0;
 volatile bool PS2int  = false;
+/* WEB networking interrupt globals — defined in Custom.c on device WEB
+ * builds; stubbed here so MM_Misc.c's interrupt-dispatch loop can read
+ * them unconditionally. They never go non-zero on host. */
+volatile bool TCPreceived = false;
+char         *TCPreceiveInterrupt = NULL;
 /* ReadBuffer is a function pointer - defined in function pointers section below */
 volatile uint32_t realflashpointer = 0;
 /* Simulated erased-flash regions so Memory.c's scan loops terminate on the

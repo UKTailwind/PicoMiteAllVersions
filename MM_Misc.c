@@ -114,54 +114,18 @@ uint8_t *buff320=NULL;
  * MMMqtt.c on WEB and falls back to the stub below otherwise. */
 char *MQTTInterrupt = NULL;
 volatile bool MQTTComplete = false;
-#ifdef PICOMITEWEB
-    char *UDPinterrupt=NULL;
-    volatile bool UDPreceive=false;
-    void setwifi(unsigned char *tp){
-        getargs(&tp,11,(unsigned char *)",");
-        if(!(argc==3 || argc==5 || argc==11))error("Syntax");
-   	    if(CurrentLinePtr) error("Invalid in a program");
-        char *ssid=GetTempMemory(STRINGSIZE);
-        char *password=GetTempMemory(STRINGSIZE);
-        char *hostname=GetTempMemory(STRINGSIZE);
-        char *ipaddress=GetTempMemory(STRINGSIZE);
-        char *mask=GetTempMemory(STRINGSIZE);
-        char *gateway=GetTempMemory(STRINGSIZE);
-        strcpy(ssid,(char *)getCstring(argv[0]));
-        strcpy(password,(char *)getCstring(argv[2]));
-        if(strlen(ssid)>MAXKEYLEN-1)error("SSID too long, max 63 chars");
-        if(strlen(password)>MAXKEYLEN-1)error("Password too long, max 63 chars");
-        if(argc==11){
-            strcpy(ipaddress,(char *)getCstring(argv[6]));
-            strcpy(mask,(char *)getCstring(argv[8]));
-            strcpy(gateway,(char *)getCstring(argv[10]));
-            ip4_addr_t ipaddr;
-            if(!ip4addr_aton(ipaddress, &ipaddr))error("Invalid IP address");
-            if(!ip4addr_aton(mask, &ipaddr))error("Invalid mask address");
-            if(!ip4addr_aton(gateway, &ipaddr))error("Invalid gateway address");
-        }
-        if(argc>=5 && *argv[4]){
-            strcpy(hostname,(char *)getCstring(argv[4]));
-            if(strlen(hostname)>31)error("Hostname too long, max 31 chars");
-        }  else {
-            strcpy(hostname,"PICO");
-            strcat(hostname,id_out);
-        }
-        strcpy((char *)Option.SSID,ssid);
-        strcpy((char *)Option.PASSWORD,password);
-        if(argc==11){
-            strcpy(Option.ipaddress,ipaddress);    
-            strcpy(Option.mask,mask);
-            strcpy(Option.gateway,gateway);
-        } else {
-            memset(Option.ipaddress,0,16);
-            memset(Option.mask,0,16);
-            memset(Option.gateway,0,16);
-        }
-        strcpy(Option.hostname,hostname);
-        SaveOptions();
-    }
-#endif
+/* UDP / TCP wifi interrupt globals always exist so the interrupt-dispatch
+ * loop below can reference them unconditionally. setwifi lives in
+ * MMsetwifi.c on PICOMITEWEB builds (see CMakeLists). TCP{received,
+ * receiveInterrupt} are defined in Custom.c on device WEB builds and
+ * stubbed in host_runtime.c — extern'd here because Custom.h's decls
+ * are gated under `#ifdef PICOMITEWEB`. */
+char         *UDPinterrupt = NULL;
+volatile bool UDPreceive   = false;
+extern volatile bool TCPreceived;
+extern char         *TCPreceiveInterrupt;
+/* setwifi lives in MMsetwifi.c on WEB builds. */
+extern void setwifi(unsigned char *tp);
 #ifdef PICOMITEVGA
 #ifndef HDMI
 void VGArecovery(int pin){
@@ -4964,23 +4928,24 @@ int checkdetailinterrupts(void) {
         intaddr = (char *)COLLISIONInterrupt;									    // set the next stmt to the interrupt location
         goto GotAnInterrupt;
     }
-#ifdef PICOMITEWEB
+    /* WEB-only interrupt sources. Globals are zero on non-WEB builds
+     * (see top-of-file unconditional defs + host_runtime.c stubs), so
+     * the conditions never fire. */
     if(TCPreceived && TCPreceiveInterrupt){
-        intaddr = (char *)TCPreceiveInterrupt;                                   // get a pointer to the interrupt routine
-        TCPreceived=0;
+        intaddr = (char *)TCPreceiveInterrupt;
+        TCPreceived = 0;
         goto GotAnInterrupt;
     }
     if(MQTTComplete && MQTTInterrupt != NULL) {
         MQTTComplete = false;
-        intaddr = (char *)MQTTInterrupt;                                      // set the next stmt to the interrupt location
+        intaddr = (char *)MQTTInterrupt;
         goto GotAnInterrupt;
     }
     if(UDPreceive && UDPinterrupt != NULL) {
         UDPreceive = false;
-        intaddr = (char *)UDPinterrupt;                                     // set the next stmt to the interrupt location
+        intaddr = (char *)UDPinterrupt;
         goto GotAnInterrupt;
     }
-#endif
     for(int i=0;i<6;i++){
         if(nunInterruptc[i] !=NULL && nunfoundc[i]){
             nunfoundc[i]=false;
