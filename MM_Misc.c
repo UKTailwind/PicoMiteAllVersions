@@ -87,6 +87,8 @@ extern int  port_mminfo_interrupts(int64_t *out_iret);
 extern int  port_mminfo_touch_status(unsigned char *out_sret);
 extern int  port_mminfo_scroll_start(int64_t *out_iret);
 extern int  port_mminfo_screenbuff(int64_t *out_iret);
+extern PIO  port_pio_for_index(int pio_idx);
+extern int  port_poke_display_panel(unsigned char *p);
 extern void port_apply_default_console_colors(int default_fc, int default_bc);
 extern void port_web_print_options(void);
 extern int  port_web_option_setter(unsigned char *cmdline);
@@ -2814,29 +2816,8 @@ void cmd_poke(void) {
         } else if((q=checkstring(p,(unsigned char *)"VRES"))){
             VRes=getint(q,0,1200);
             return;
-#ifndef PICOMITEVGA
-        } else {
-            getargs(&p,(MAX_ARG_COUNT * 2) - 3,(unsigned char *)",");
-            if(!argc)return;
-            if(Option.DISPLAY_TYPE>=SSDPANEL && Option.DISPLAY_TYPE<VIRTUAL){
-                WriteComand(getinteger(argv[0]));
-                for(int i = 2; i < argc; i += 2) {
-                    WriteData(getinteger(argv[i]));
-                }
-                return;
-            } else if(Option.DISPLAY_TYPE>I2C_PANEL && Option.DISPLAY_TYPE<ST7920){
-                spi_write_command(getinteger(argv[0]));
-                for(int i = 2; i < argc; i += 2) {
-                    spi_write_data(getinteger(argv[i]));
-                }
-                return;
-            } else if(Option.DISPLAY_TYPE<=I2C_PANEL){
-                if(argc>1)error("UNsupported command");
-                I2C_Send_Command(getinteger(argv[0]));
-                return;
-            } else 
-            error("Display not supported");
-#endif
+        } else if (port_poke_display_panel(p)) {
+            return;
         } error("Syntax");
     } else {
         getargs(&cmdline, 5, (unsigned char *)",");
@@ -3119,11 +3100,7 @@ int checkdetailinterrupts(void) {
     }
     if(piointerrupt){  // have any PIO interrupts been set
         for(int pio=0 ;pio<PIOMAX;pio++){
-#ifdef rp2350
-            PIO pioinuse = (pio==0 ? pio0: (pio==1 ? pio1: pio2));
-#else
-            PIO pioinuse = (pio==0 ? pio1: pio0);
-#endif
+            PIO pioinuse = port_pio_for_index(pio);
             for(int sm=0;sm<4;sm++){
                 int TXlevel=((pioinuse->flevel)>>(sm*4)) & 0xf;
                 int RXlevel=((pioinuse->flevel)>>(sm*4+4)) & 0xf;

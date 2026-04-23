@@ -937,6 +937,13 @@ int port_mminfo_touch_status(unsigned char *out_sret) { (void)out_sret; return 0
 int port_mminfo_scroll_start(int64_t *out_iret) { (void)out_iret; return 0; }
 int port_mminfo_screenbuff(int64_t *out_iret) { (void)out_iret; return 0; }
 
+/* PIO interrupt-poll lookup — host has no PIO. */
+#include "hardware/pio.h"
+PIO port_pio_for_index(int pio_idx) { (void)pio_idx; return NULL; }
+
+/* POKE DISPLAY raw panel write — host has no display panel. */
+int port_poke_display_panel(unsigned char *p) { (void)p; return 0; }
+
 /* WEB-only hooks — host has no WiFi. Real impls live in MMsetwifi.c on
  * PICOMITEWEB device builds. */
 void port_web_print_options(void) {}

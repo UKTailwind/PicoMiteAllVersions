@@ -73,6 +73,11 @@ F4 step 26 164     13       2       2      39        39      17         14      
 F4 step 27 164     11       2       2      39        39      17         14      288  (OPTION AUDIO I2S PIO check + slice selection → port_audio_i2s_pio_slice() in misc_option_setters.c; −2)
 F4 step 28 164      8       2       2      39        39      17         14      285  (fun_device chip suffix → HAL_PORT_PIO_COUNT runtime + MM.INFO INTERRUPTS → port_mminfo_interrupts() + MM.INFO LCDPANEL/LCD320 → HAL_PORT_IS_VGA runtime; −3)
 F4 step 29 164      6       2       2      39        39      17         14      283  (MM.INFO TOUCH/SCROLL/SCREENBUFF → port_mminfo_touch_status / port_mminfo_scroll_start / port_mminfo_screenbuff hooks; −2)
+F4 step 30 164      4       2       2      39        39      17         14      281  (PIO instance lookup → port_pio_for_index() + POKE DISPLAY raw panel → port_poke_display_panel(); −2)
+            MM_Misc.c: 140 → 4 across 30 sub-steps (target-macro 135 → 0).
+            Remaining 4 are #ifdef GUICONTROLS — feature flag (not a target
+            or port-config macro), out of scope. F4 CLOSED. MM_Misc.c
+            promoted to STRICT_FILES in the purity gate.
 ─── post-fixup phases ───
 6          .       .        .        .       .         .       .          0        .  (Audio.c → HAL)
 7a         .       .        .        .       .         .       .          .        .  (Draw.c ILI9341 → HAL)

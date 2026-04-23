@@ -14,6 +14,7 @@
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
 #include "hal/hal_pin.h"
+#include "hardware/pio.h"
 
 #if !defined(MMBASIC_HOST)
 
@@ -449,6 +450,48 @@ int MIPS16 port_mminfo_screenbuff(int64_t *out_iret)
 #else
     (void)out_iret;
     return 0;
+#endif
+}
+
+/* POKE DISPLAY <args> raw command/data byte sequence. Dispatches by
+ * panel class (SSD1963 parallel / SPI-LCD / I2C) — none of those
+ * drivers exist on PICOMITEVGA. */
+int MIPS16 port_poke_display_panel(unsigned char *p)
+{
+#ifdef PICOMITEVGA
+    (void)p;
+    return 0;
+#else
+    getargs(&p, (MAX_ARG_COUNT * 2) - 3, (unsigned char *)",");
+    if (!argc) return 1;
+    if (Option.DISPLAY_TYPE >= SSDPANEL && Option.DISPLAY_TYPE < VIRTUAL) {
+        WriteComand(getinteger(argv[0]));
+        for (int i = 2; i < argc; i += 2) WriteData(getinteger(argv[i]));
+        return 1;
+    } else if (Option.DISPLAY_TYPE > I2C_PANEL && Option.DISPLAY_TYPE < ST7920) {
+        spi_write_command(getinteger(argv[0]));
+        for (int i = 2; i < argc; i += 2) spi_write_data(getinteger(argv[i]));
+        return 1;
+    } else if (Option.DISPLAY_TYPE <= I2C_PANEL) {
+        if (argc > 1) error("UNsupported command");
+        I2C_Send_Command(getinteger(argv[0]));
+        return 1;
+    } else {
+        error("Display not supported");
+    }
+    return 1;
+#endif
+}
+
+/* PIO instance lookup for the interrupt poll loop. RP2040 has 2 PIOs
+ * with the legacy index-0=pio1 ordering; RP2350 has 3 in natural
+ * order. PIOMAX (= HAL_PORT_PIO_COUNT) bounds the caller's loop. */
+PIO port_pio_for_index(int pio_idx)
+{
+#ifdef rp2350
+    return (pio_idx == 0 ? pio0 : (pio_idx == 1 ? pio1 : pio2));
+#else
+    return (pio_idx == 0 ? pio1 : pio0);
 #endif
 }
 
