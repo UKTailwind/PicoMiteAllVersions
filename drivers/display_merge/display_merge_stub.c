@@ -12,3 +12,8 @@
 
 void hal_display_merge_abort(void) { }
 void hal_display_merge_check_busy(void) { }
+void hal_display_merge_lock_fb(void) { }
+void hal_display_merge_unlock_fb(void) { }
+void hal_display_merge_mark_done(void) { }
+void hal_display_fast_dma_alloc(unsigned bytes) { (void)bytes; }
+void hal_display_fast_dma_free(void) { }

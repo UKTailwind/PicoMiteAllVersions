@@ -29,6 +29,27 @@ extern "C" {
 void hal_display_merge_abort(void);
 void hal_display_merge_check_busy(void);
 
+/* Take / release the framebuffer mutex guarding the layer buffer
+ * against concurrent writes from core1's merge loop. No-op on targets
+ * without a merge pipeline (they have no concurrent writer). */
+void hal_display_merge_lock_fb(void);
+void hal_display_merge_unlock_fb(void);
+
+/* Signal that a full-frame merge has completed and advertise a clean
+ * memory-barrier ordering for any waiter spinning on `mergedone`. The
+ * spin is in FRAMEBUFFER SYNC (Draw.c::cmd_framebuffer), reading
+ * `mergedone` from core0 while core1 sets it via this hook. No-op on
+ * targets without a merge pipeline. */
+void hal_display_merge_mark_done(void);
+
+/* FRAMEBUFFER CREATE FAST DMA scaffolding. Allocates a shadow buffer +
+ * claims a DMA channel used by the FASTGFX merge to diff the layer
+ * against the last-drawn frame and DMA only the changed scanlines to
+ * the LCD. No-op on targets without the pipeline (FAST silently
+ * degrades to the standard merge path on non-PICOMITE). */
+void hal_display_fast_dma_alloc(unsigned bytes);
+void hal_display_fast_dma_free(void);
+
 #ifdef __cplusplus
 }
 #endif

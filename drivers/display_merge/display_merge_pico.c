@@ -12,10 +12,16 @@
 #include "Hardware_Includes.h"
 #include "hal/hal_display_merge.h"
 #include "pico/multicore.h"
+#include "pico/mutex.h"
+#include "hardware/dma.h"
 
 extern bool mergerunning;
+extern volatile bool mergedone;
 extern uint32_t mergetimer;
 extern uint32_t _excep_code;
+extern mutex_t frameBufferMutex;
+extern unsigned char *ShadowBuf;
+extern int fb_dma_chan;
 
 void hal_display_merge_abort(void) {
     if (!mergerunning) return;
@@ -33,4 +39,28 @@ void hal_display_merge_abort(void) {
 
 void hal_display_merge_check_busy(void) {
     if (mergerunning) error("Display in use for merged operation");
+}
+
+void hal_display_merge_lock_fb(void) {
+    mutex_enter_blocking(&frameBufferMutex);
+}
+
+void hal_display_merge_unlock_fb(void) {
+    mutex_exit(&frameBufferMutex);
+}
+
+void hal_display_merge_mark_done(void) {
+    mergedone = true;
+    __dmb();
+}
+
+void hal_display_fast_dma_alloc(unsigned bytes) {
+    ShadowBuf = GetMemory(bytes);
+    memset(ShadowBuf, 0, bytes);
+    fb_dma_chan = dma_claim_unused_channel(true);
+}
+
+void hal_display_fast_dma_free(void) {
+    if (ShadowBuf) { FreeMemory(ShadowBuf); ShadowBuf = NULL; }
+    if (fb_dma_chan >= 0) { dma_channel_unclaim(fb_dma_chan); fb_dma_chan = -1; }
 }

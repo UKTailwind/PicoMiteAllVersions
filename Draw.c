@@ -5063,18 +5063,8 @@ void setframebuffer(void){
     DrawPixel=DrawPixel16;
 }
 void closeframebuffer(char layer){
-#ifdef PICOMITE
-    if(mergerunning){
-        multicore_fifo_push_blocking(0xFF);
-        busy_wait_ms(mergetimer+200);
-        if(mergerunning){
-            _excep_code = RESET_COMMAND;
-            SoftReset();
-        }
-    }
-    if(ShadowBuf){FreeMemory(ShadowBuf);ShadowBuf=NULL;}
-    if(fb_dma_chan>=0){dma_channel_unclaim(fb_dma_chan);fb_dma_chan=-1;}
-#endif
+    hal_display_merge_abort();
+    hal_display_fast_dma_free();
     if(FrameBuf)FreeMemory(FrameBuf);
     if(LayerBuf)FreeMemory(LayerBuf);
     if(FrameBuf || LayerBuf)restorepanel();
@@ -5359,9 +5349,7 @@ void blitmerge (int x0, int y0, int w, int h, uint8_t colour){
     uint8_t *d=FrameBuf;
     uint8_t LineBuf[HRes/2];
     uint8_t highcolour=colour<<4;
-#ifdef PICOMITE
-    mutex_enter_blocking(&frameBufferMutex);			// lock the frame buffer
-#endif
+    hal_display_merge_lock_fb();
     if(Option.DISPLAY_TYPE==ILI9341 || Option.DISPLAY_TYPE == ST7796SP || Option.DISPLAY_TYPE == ST7796S || Option.DISPLAY_TYPE==ST7789B || Option.DISPLAY_TYPE==ILI9488 || Option.DISPLAY_TYPE == ILI9488P ){
         while(GetLineILI9341()!=0){}
     }
@@ -5384,11 +5372,8 @@ void blitmerge (int x0, int y0, int w, int h, uint8_t colour){
         }
         copyframetoscreen(&LineBuf[x0/2],x0,x0+w-1,y,y,0);
     }
-#ifdef PICOMITE
-    mutex_exit(&frameBufferMutex);
-    mergedone=true;
-    __dmb();
-#endif
+    hal_display_merge_unlock_fb();
+    hal_display_merge_mark_done();
 }
 void merge(uint8_t colour){
     if(LayerBuf==NULL || FrameBuf==NULL)return;
@@ -5396,9 +5381,7 @@ void merge(uint8_t colour){
     uint8_t *d=FrameBuf;
     uint8_t LineBuf[HRes/2];
     uint8_t highcolour=colour<<4;
-#ifdef PICOMITE
-    mutex_enter_blocking(&frameBufferMutex);			// lock the frame buffer
-#endif
+    hal_display_merge_lock_fb();
     if(Option.DISPLAY_TYPE==ILI9341 || Option.DISPLAY_TYPE == ST7796SP || Option.DISPLAY_TYPE == ST7796S || Option.DISPLAY_TYPE==ST7789B || Option.DISPLAY_TYPE==ILI9488 || Option.DISPLAY_TYPE == ILI9488P ){
         while(GetLineILI9341()!=0){}
     }
@@ -5420,12 +5403,9 @@ void merge(uint8_t colour){
         }
         copyframetoscreen(LineBuf,0,HRes-1,y,y,0);
     }
-#ifdef PICOMITE
-        mutex_exit(&frameBufferMutex);
-        mergedone=true;
-        __dmb();
-        low_x=0;low_y=0;high_x=HRes-1;high_y=VRes-1;
-#endif
+    hal_display_merge_unlock_fb();
+    hal_display_merge_mark_done();
+    low_x=0;low_y=0;high_x=HRes-1;high_y=VRes-1;
 }
 /*  @endcond */
 void cmd_framebuffer(void){
@@ -5435,15 +5415,7 @@ void cmd_framebuffer(void){
             int fast = 0;
             if(checkstring(p, (unsigned char *)"FAST")) fast = 1;
             FrameBuf=GetMemory(HRes*VRes/2);
-#ifdef PICOMITE
-            if(fast){
-                ShadowBuf=GetMemory(HRes*VRes/2);
-                memset(ShadowBuf, 0, HRes*VRes/2);
-                fb_dma_chan=dma_claim_unused_channel(true);
-            }
-#else
-            (void)fast;
-#endif
+            if(fast) hal_display_fast_dma_alloc(HRes*VRes/2);
         }
         else error("Framebuffer already exists");
     } else if((p=checkstring(cmdline, (unsigned char *)"WRITE"))) {
@@ -5544,35 +5516,14 @@ void cmd_framebuffer(void){
         }
     } else if((p=checkstring(cmdline, (unsigned char *)"CLOSE"))) {
         if(checkstring(p, (unsigned char *)"F")){
-#ifdef PICOMITE
-            if(mergerunning){
-                multicore_fifo_push_blocking(0xFF);
-                busy_wait_ms(mergetimer+200);
-                if(mergerunning){
-                    _excep_code = RESET_COMMAND;
-                    SoftReset();
-                }
-            }
-#endif
+            hal_display_merge_abort();
             if(WriteBuf!=LayerBuf)restorepanel();
             if(FrameBuf)FreeMemory(FrameBuf);
             FrameBuf=NULL;
-#ifdef PICOMITE
-            if(ShadowBuf){FreeMemory(ShadowBuf);ShadowBuf=NULL;}
-            if(fb_dma_chan>=0){dma_channel_unclaim(fb_dma_chan);fb_dma_chan=-1;}
-#endif
+            hal_display_fast_dma_free();
         } else if(checkstring(p, (unsigned char *)"L")){
-#ifdef PICOMITE
-            if(mergerunning){
-                multicore_fifo_push_blocking(0xFF);
-                busy_wait_ms(mergetimer+200);
-                if(mergerunning){
-                    _excep_code = RESET_COMMAND;
-                    SoftReset();
-                }
-            }
-#endif
-            if(WriteBuf!=FrameBuf)restorepanel();            
+            hal_display_merge_abort();
+            if(WriteBuf!=FrameBuf)restorepanel();
             if(LayerBuf)FreeMemory(LayerBuf);
             LayerBuf=NULL;
         } else  closeframebuffer('A');
