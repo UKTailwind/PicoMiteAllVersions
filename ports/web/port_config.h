@@ -34,6 +34,9 @@
 /* Non-VGA port — used as a value in `if (HAL_PORT_IS_VGA)` runtime branches. */
 #define HAL_PORT_IS_VGA                  0
 
+#define HAL_PORT_HAS_HDMI                0
+#define HAL_PORT_HAS_NEXTGEN_DISPLAY    0
+
 #define HAL_PORT_RAM_FUNC(name)          name
 
 #endif /* PORT_CONFIG_H */

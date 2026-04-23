@@ -285,7 +285,7 @@ int BacklightSlice = 0, BacklightChannel = 0;
 
 /* QVGA / display */
 int QVGA_CLKDIV = 0;
-volatile int ytileheight = 0;
+/* ytileheight defined in Memory.c (which builds on host) under #ifndef PICOMITEVGA. */
 volatile int X_TILE = 0, Y_TILE = 0;
 int CameraSlice = 0, CameraChannel = 0;
 char id_out[256] = {0};
@@ -895,6 +895,9 @@ int  port_factory_reset_board(unsigned char *p) { (void)p; return 0; }
 /* Display-related OPTION setters (CPUSPEED, AUTOREFRESH, LCDPANEL, TOUCH,
  * RESOLUTION, VGA PINS, DEFAULT MODE) — host has no display hardware. */
 int  port_display_option_setter(unsigned char *cmdline) { (void)cmdline; return 0; }
+
+/* OPTION LIST display-related lines — host has no display hardware. */
+void port_print_display_options(void) {}
 
 /* WEB-only hooks — host has no WiFi. Real impls live in MMsetwifi.c on
  * PICOMITEWEB device builds. */

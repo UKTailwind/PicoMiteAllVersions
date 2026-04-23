@@ -36,6 +36,9 @@
  * the original source. */
 #define HAL_PORT_IS_VGA                  1
 
+#define HAL_PORT_HAS_HDMI                0
+#define HAL_PORT_HAS_NEXTGEN_DISPLAY    0
+
 #define HAL_PORT_RAM_FUNC(name)          name
 
 #endif /* PORT_CONFIG_H */

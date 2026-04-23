@@ -32,6 +32,10 @@
  * the original source. */
 #define HAL_PORT_IS_VGA                  1
 
+/* HDMI variant of the VGA family. */
+#define HAL_PORT_HAS_HDMI                1
+#define HAL_PORT_HAS_NEXTGEN_DISPLAY    0
+
 #define HAL_PORT_RAM_FUNC(name)          __not_in_flash_func(name)
 
 #endif /* PORT_CONFIG_H */
