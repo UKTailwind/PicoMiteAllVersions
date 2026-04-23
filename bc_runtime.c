@@ -22,9 +22,6 @@ extern unsigned int bc_alloc_fail_free;
 extern unsigned int bc_alloc_fail_longest;
 extern unsigned int bc_alloc_fail_total;
 #include "vm_sys_graphics.h"
-#ifdef MMBASIC_HOST
-#include "vm_host_fat.h"
-#endif
 
 #define VMRUN_DBG(s)       ((void)0)
 #define VMRUN_DBGF(fmt...) ((void)0)
@@ -165,6 +162,18 @@ void bc_run_source_string_ex(const char *source, const char *source_name, int is
  * emscripten FS), so the hook is a no-op there. */
 extern void port_bc_runtime_free_source(const char **source);
 
+/* FRUN / RUN source-file load + release hooks. Device impl lives in
+ * ports/pico_sdk_common/bc_runtime_pico.c (reads via InitSDCard + file
+ * syscalls, allocates from MMHeap). Host impl in host/host_runtime.c
+ * (reads via stdio or the in-memory FAT, allocates via GetMemory for
+ * FRUN and malloc for RUN). The release hooks are no-ops on device
+ * because bc_run_source_string already frees source through
+ * port_bc_runtime_free_source; on host they call FreeMemory / free. */
+extern char *port_bc_frun_load_source(const char *fname_buf);
+extern void  port_bc_frun_release_source(char **source);
+extern char *port_bc_run_file_load_source(const char *fname_buf);
+extern void  port_bc_run_file_release_source(char **source);
+
 void bc_run_source_string(const char *source, const char *source_name) {
     bc_run_source_string_ex(source, source_name, 0);
 }
@@ -276,10 +285,10 @@ void bc_run_source_string_ex(const char *source, const char *source_name, int is
     VMRUN_DBGF("VM: compile ok code=%u const=%u slots=%u subs=%u data=%u meta=%u\r\n",
                (unsigned)cs->code_len, (unsigned)cs->const_count, (unsigned)cs->slot_count,
                (unsigned)cs->subfun_count, (unsigned)cs->data_count, (unsigned)cs->local_meta_count);
-#ifdef MMBASIC_HOST
+    /* bc_debug_enabled defaults to 0 on device (no way to turn it on
+     * from BASIC); host's --dump-vm-disasm flag sets it to 1. */
     if (bc_debug_enabled)
         bc_disassemble(cs);
-#endif
     bc_run_diag_note_vm_stage(BC_RUN_VM_COMPILE_OK,
                               (unsigned)bc_alloc_bytes_used_peek(),
                               (unsigned)bc_alloc_bytes_high_water_peek(),
@@ -508,119 +517,9 @@ void cmd_frun(void) {
     fname_buf[STRINGSIZE - 5] = '\0';
     if (!strchr(fname_buf, '.')) strcat(fname_buf, ".bas");
 
-    char *source = NULL;
-
-#ifdef MMBASIC_HOST
-    {
-        /* When the REPL has a real filesystem root configured, read through
-         * stdio so FRUN finds files the user can see (matches LOAD behavior).
-         * The test harness leaves host_sd_root == NULL and falls back to the
-         * in-memory FAT. */
-        extern const char *host_sd_root;
-        extern char *read_basic_source_file(const char *filename);
-
-        if (host_sd_root) {
-            char path[FF_MAX_LFN + 1];
-            const char *root = host_sd_root;
-            size_t rl = strlen(root);
-            int need_sep = (rl > 0 && root[rl - 1] != '/');
-            if (fname_buf[0] == '/') {
-                if (strlen(fname_buf) >= sizeof(path)) error("File name too long");
-                strcpy(path, fname_buf);
-            } else {
-                if (rl + (need_sep ? 1 : 0) + strlen(fname_buf) + 1 > sizeof(path))
-                    error("File name too long");
-                memcpy(path, root, rl);
-                if (need_sep) path[rl++] = '/';
-                strcpy(path + rl, fname_buf);
-            }
-            /* Read through stdio but allocate through MMHeap so the
-             * source buffer counts against heap_memory_size — same as
-             * the device path. Otherwise the WASM rp2040 simulator has
-             * ~25 KB more headroom than the real RP2040 for the same
-             * program and FRUN succeeds where it should OOM. */
-            FILE *f = fopen(path, "r");
-            if (!f) error("File not found");
-            fseek(f, 0, SEEK_END);
-            long fsize = ftell(f);
-            fseek(f, 0, SEEK_SET);
-            source = (char *)GetMemory((int)fsize + 1);
-            if (!source) { fclose(f); error("Not enough memory"); }
-            size_t got = fread(source, 1, (size_t)fsize, f);
-            fclose(f);
-            source[got] = '\0';
-        } else {
-            char path[FF_MAX_LFN + 1];
-            FIL file;
-            FRESULT res;
-            UINT bytes_read;
-            int fsize;
-
-            vm_host_fat_mount();
-            vm_sys_file_host_resolve_path(fname_buf, path, sizeof(path));
-
-            res = f_open(&file, path, FA_READ);
-            if (res != FR_OK) error("File not found");
-
-            fsize = (int)f_size(&file);
-            /* GetMemory (not malloc) so the source buffer counts against
-             * the simulated MMHeap, matching device behaviour — otherwise
-             * the simulator has ~25 KB more headroom than the real device
-             * for the same program and FRUN succeeds where it would OOM. */
-            source = (char *)GetMemory(fsize + 1);
-            if (!source) { f_close(&file); error("Not enough memory"); }
-
-            res = f_read(&file, source, (UINT)fsize, &bytes_read);
-            f_close(&file);
-            if (res != FR_OK) { FreeMemory((unsigned char *)source); error("File error"); }
-            source[bytes_read] = '\0';
-        }
-    }
-#else
-    {
-        int fnbr;
-        int c, fsize;
-        char *p;
-
-        if (!InitSDCard()) error("SD card not found");
-        fnbr = FindFreeFileNbr();
-        if (!BasicFileOpen(fname_buf, fnbr, FA_READ)) error("File not found");
-
-        fsize = (int)hal_fs_size(hal_fds[fnbr]);
-
-        if (fsize < 0 || fsize >= EDIT_BUFFER_SIZE - 2048) {
-            FileClose(fnbr);
-            error("File too large");
-        }
-
-        source = (char *)GetMemory(fsize + 1);
-        if (!source) { FileClose(fnbr); error("NEM[frun:src] want=%", fsize+1); }
-
-        p = source;
-        while (!FileEOF(fnbr)) {
-            if ((p - source) >= fsize) break;
-            c = FileGetChar(fnbr) & 0x7f;
-            if (isprint(c) || c == '\r' || c == '\n' || c == '\t') {
-                if (c == '\t') c = ' ';
-                *p++ = (char)c;
-            }
-        }
-        *p = '\0';
-        FileClose(fnbr);
-    }
-#endif
-
+    char *source = port_bc_frun_load_source(fname_buf);
     bc_run_source_string(source, fname_buf);
-
-#ifdef MMBASIC_HOST
-    /* Source was allocated via GetMemory so it counts against
-     * heap_memory_size — release through FreeMemory, not free(). */
-    if (source) { FreeMemory((unsigned char *)source); source = NULL; }
-#else
-    /* Device path freed source inside bc_run_source_string (via the
-     * `#ifndef MMBASIC_HOST` block after compile). Nothing to do here. */
-    source = NULL;
-#endif
+    port_bc_frun_release_source(&source);
 }
 
 /*
@@ -630,63 +529,14 @@ void cmd_frun(void) {
  */
 void bc_run_file(const char *filename) {
     char fname_buf[STRINGSIZE];
-    char *source = NULL;
 
     strncpy(fname_buf, filename, STRINGSIZE - 5);
     fname_buf[STRINGSIZE - 5] = '\0';
     if (!strchr(fname_buf, '.')) strcat(fname_buf, ".bas");
 
-#ifdef MMBASIC_HOST
-    {
-        char path[FF_MAX_LFN + 1];
-        FIL file;
-        FRESULT res;
-        UINT bytes_read;
-        int fsize;
-
-        vm_host_fat_mount();
-        vm_sys_file_host_resolve_path(fname_buf, path, sizeof(path));
-
-        res = f_open(&file, path, FA_READ);
-        if (res != FR_OK) error("File not found");
-
-        fsize = (int)f_size(&file);
-        source = (char *)malloc(fsize + 1);
-        if (!source) { f_close(&file); error("Not enough memory"); }
-
-        res = f_read(&file, source, (UINT)fsize, &bytes_read);
-        f_close(&file);
-        if (res != FR_OK) { free(source); error("File error"); }
-        source[bytes_read] = '\0';
-
-        bc_run_source_string(source, fname_buf);
-        free(source);
-    }
-#else
-    /* Interpreter+VM build: load source via VM-owned file I/O */
-    bc_alloc_reset();
-    {
-        int fnbr = 1;
-        int c, fsize;
-        char *p;
-
-        vm_sys_file_open(fname_buf, fnbr, VM_FILE_MODE_INPUT);
-        fsize = vm_sys_file_lof(fnbr);
-        source = (char *)bc_compile_alloc((size_t)fsize + 1);
-        if (!source) { vm_sys_file_close(fnbr); error("NEM[run_file:src] want=%", fsize+1); }
-        p = source;
-        while (!vm_sys_file_eof(fnbr)) {
-            c = vm_sys_file_getc(fnbr) & 0x7f;
-            if (isprint(c) || c == '\r' || c == '\n' || c == '\t') {
-                if (c == '\t') c = ' ';
-                *p++ = (char)c;
-            }
-        }
-        *p = '\0';
-        vm_sys_file_close(fnbr);
-        bc_run_source_string(source, fname_buf);
-    }
-#endif
+    char *source = port_bc_run_file_load_source(fname_buf);
+    bc_run_source_string(source, fname_buf);
+    port_bc_run_file_release_source(&source);
 
     longjmp(mark, 1);
 }

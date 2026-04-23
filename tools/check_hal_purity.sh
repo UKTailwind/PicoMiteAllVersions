@@ -99,6 +99,10 @@ STRICT_FILES=(
               # ifdefs.
   Functions.c # Phase 11 close: zero target-macro, zero port-config
               # ifdefs.
+  bc_runtime.c # Phase 11 step 12 close: zero target-macro, zero
+              # port-config ifdefs. Source-load and source-free moved
+              # to port_bc_frun_*, port_bc_run_file_*,
+              # port_bc_runtime_free_source hooks.
 )
 
 # Files tracked informationally (report counts, do not fail).
