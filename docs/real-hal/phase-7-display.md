@@ -74,6 +74,47 @@ With PICOMITE cleared from Draw.c, phase 7a's ILI9341-proof exit gate is effecti
 
 **Exit gate:** zero `HDMI` preprocessor directives in Draw.c. All 12 device variants + host + purity gate green. (SCREENMODE4/5 visual verification: desirable, not a blocker.)
 
+### Progress (as of 2026-04-23)
+
+Draw.c already had zero HDMI ifdefs at phase 7b close — 7b's
+vga_ops.c / vga_mode_ops.c lifts swept the last of them. Phase 7c is
+therefore scope-exit-gate-met by inheritance. The remaining 7c work
+is the *optional* driver-hygiene refinement: making `drivers/hdmi/`
+genuinely own every piece of HDMI-specific code, so the directory
+matches how `drivers/spi_lcd/` owns the SPI-LCD family and
+`drivers/vga_pio/` owns the QVGA PIO scanout.
+
+- **Step 1** (`3d6f189`): `drivers/hdmi/hdmi_modes.c` — extract the
+  HDMI half of `drivers/vga_pio/vga_mode_ops.c`'s `#ifndef HDMI /
+  #else / #endif` block: DrawRectangle555/256 family, DrawBitmap555/
+  256, DrawBuffer555/256, ReadBuffer555/256, DrawPixel555/256,
+  ScrollLCD555/256, and the HDMI flavour of `cmd_map` / `cmd_tile`
+  that dispatches on DISPLAY_TYPE. Sister file
+  `drivers/vga_pio/vga_qvga_modes.c` takes the non-HDMI side. CMake
+  selects the right file per target. Also drops the vestigial
+  `#include "hardware/spi.h"` from Draw.c — a step toward the
+  mmbasic_stdio (12.5) goal of compiling the interpreter core
+  without any Pico SDK headers on its include path.
+- **Step 2** (`022d3ee`): `drivers/hdmi/hdmi_scanout.c` — pure
+  file-level move of the 1444-line HDMI TMDS scanout engine out of
+  `PicoMite.c`'s `#ifdef PICOMITEVGA / #ifndef HDMI / #else [body]
+  / #endif / #endif` block: TMDS sync-line constants, the
+  MODE_H/V_* mode tables, `dma_irq_handler0`, `HDMIloop0/1/2/3/X`,
+  `HDMICore`, and the HDMI flavour of `settiles`. PicoMite.c's
+  PICOMITEVGA block shrinks to just the QVGA (non-HDMI) scanout.
+  `HDMICore` gains an extern in Hardware_Includes.h for the
+  `multicore_launch_core1_with_stack` call-site that stays in
+  PicoMite.c. IRQ priorities, DMA chains, and RAM-resident
+  placement (`MIPS32` / `MIPS64` / `__not_in_flash_func`) are
+  preserved exactly.
+
+Scoreboard unchanged through both steps — neither file was tracked
+at phase-7c entry (PicoMite.c is port-level, not core). The
+refinement is structural: HDMI code now has exactly one home.
+Remaining HDMI conditional code in the tree (10 in PicoMite.c, 18
+in Editor.c, a handful elsewhere) is port/UI adapter logic, not
+core-interpreter code, and not scoped to this phase.
+
 ## Phase 7d — `hal_display.h` for SSD1963 + Web variants
 
 - `drivers/ssd1963/` lifted from current `SSD1963.c`. Web variants pull in `drivers/cyw43/` (Phase 9) at the same time.
