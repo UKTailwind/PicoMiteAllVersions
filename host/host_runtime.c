@@ -887,5 +887,6 @@ void port_picocalc_factory_reset_options(void)       { error("Not supported on h
 
 /* CONFIGURE LIST entries — host advertises no factory board profiles. */
 void port_print_supported_boards(void) {}
+int  port_factory_reset_board(unsigned char *p) { (void)p; return 0; }
 
 /* str_replace/STR_REPLACE provided by MATHS.c */

@@ -12,6 +12,8 @@
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
 
+extern int checkslice(int pin1, int pin2, int ignore);
+extern void port_picocalc_factory_reset_options(void);
 void port_set_default_options(void)
 {
     Option.CPU_Speed = FreqDefault;
@@ -55,4 +57,243 @@ void port_print_supported_boards(void)
 #else
     MMPrintString("USB Edition V1.0\r\n");
 #endif
+}
+
+/* OPTION RESET <BOARD> factory profiles for PICOMITE / PICOMITEWEB
+ * (rp2040). Internal #ifdefs handle USBKEYBOARD vs PS/2 +
+ * PICOMITE-vs-PICOMITEWEB differences (RP2040LCD-* boards exclude WEB
+ * to save flash). */
+int port_factory_reset_board(unsigned char *p)
+{
+#ifndef USBKEYBOARD
+    if(checkstring(p,(unsigned char *) "GAMEMITE"))  {
+        ResetOptions(false);
+        Option.CPU_Speed=252000;
+        Option.ColourCode = 1;
+        Option.SYSTEM_CLK=PINMAP[6];
+        Option.SYSTEM_MOSI=PINMAP[3];
+        Option.SYSTEM_MISO=PINMAP[4];
+        Option.AUDIO_L=PINMAP[20];
+        Option.AUDIO_R=PINMAP[21];
+        Option.modbuffsize=192;
+        Option.DISPLAY_TYPE=ILI9341;
+        Option.LCD_CD=PINMAP[2];
+        Option.LCD_Reset=PINMAP[1];
+        Option.LCD_CS=PINMAP[0];
+        Option.TOUCH_CS=PINMAP[5];
+        Option.TOUCH_IRQ=PINMAP[7];
+        Option.SD_CS=PINMAP[22];
+        Option.modbuff = true;
+        Option.DISPLAY_ORIENTATION=3;
+        Option.AUDIO_SLICE=checkslice(PINMAP[20],PINMAP[21], 0);
+        Option.TOUCH_SWAPXY = 0;
+        Option.TOUCH_XZERO = 407;
+        Option.TOUCH_YZERO = 267;
+        Option.TOUCH_XSCALE = 0.0897;
+        Option.TOUCH_YSCALE = 0.0677;
+        strcpy((char *)Option.platform,"Game*Mite");
+        SaveOptions();
+        printoptions();uSec(100000);
+        _excep_code = RESET_COMMAND;
+        SoftReset();
+        return 1;
+    }
+    if(checkstring(p,(unsigned char *) "PICOCALC"))  {
+        port_picocalc_factory_reset_options();
+        return 1;
+    }
+    if(checkstring(p,(unsigned char *) "PICORESTOUCHLCD3.5"))  {
+        ResetOptions(false);
+        Option.CPU_Speed=252000;
+        Option.ColourCode = 1;
+        Option.SYSTEM_CLK=PINMAP[10];
+        Option.SYSTEM_MOSI=PINMAP[11];
+        Option.SYSTEM_MISO=PINMAP[12];
+        Option.modbuffsize=192;
+        Option.DISPLAY_TYPE=ILI9488W;
+        Option.LCD_CD=PINMAP[8];
+        Option.LCD_Reset=PINMAP[15];
+        Option.LCD_CS=PINMAP[9];
+        Option.TOUCH_CS=PINMAP[16];
+        Option.TOUCH_IRQ=PINMAP[17];
+        Option.SD_CS=PINMAP[22];
+        Option.DISPLAY_BL=PINMAP[13];
+        Option.modbuff = true;
+        Option.DISPLAY_ORIENTATION=1;
+        Option.TOUCH_SWAPXY = 0;
+        Option.TOUCH_XZERO = 3963;
+        Option.TOUCH_YZERO = 216;
+        Option.TOUCH_XSCALE = -0.1285;
+        Option.TOUCH_YSCALE = 0.0859;
+        strcpy((char *)Option.platform,"Pico-ResTouch-LCD-3.5");
+        SaveOptions();
+        printoptions();uSec(100000);
+        _excep_code = RESET_COMMAND;
+        SoftReset();
+        return 1;
+    }
+    if(checkstring(p,(unsigned char *) "PICO BACKPACK"))  {
+        ResetOptions(false);
+        Option.CPU_Speed=252000;
+        Option.ColourCode = 1;
+        Option.SYSTEM_CLK=PINMAP[18];
+        Option.SYSTEM_MOSI=PINMAP[19];
+        Option.SYSTEM_MISO=PINMAP[16];
+        Option.DISPLAY_TYPE=ILI9341;
+        Option.LCD_CD=PINMAP[20];
+        Option.LCD_Reset=PINMAP[21];
+        Option.LCD_CS=PINMAP[17];
+        Option.TOUCH_CS=PINMAP[14];
+        Option.TOUCH_IRQ=PINMAP[15];
+        Option.SD_CS=PINMAP[22];
+        Option.DISPLAY_ORIENTATION=1;
+        Option.TOUCH_SWAPXY = 0;
+        Option.TOUCH_XZERO = 3963;
+        Option.TOUCH_YZERO = 216;
+        Option.TOUCH_XSCALE = -0.1285;
+        Option.TOUCH_YSCALE = 0.0859;
+        strcpy((char *)Option.platform,"Pico Backpack");
+        SaveOptions();
+        printoptions();uSec(100000);
+        _excep_code = RESET_COMMAND;
+        SoftReset();
+        return 1;
+    }
+    if(checkstring(p,(unsigned char *) "PICORESTOUCHLCD2.8"))  {
+        ResetOptions(false);
+        Option.CPU_Speed=252000;
+        Option.ColourCode = 1;
+        Option.SYSTEM_CLK=PINMAP[10];
+        Option.SYSTEM_MOSI=PINMAP[11];
+        Option.SYSTEM_MISO=PINMAP[12];
+        Option.modbuffsize=192;
+        Option.DISPLAY_TYPE=ST7789B;
+        Option.LCD_CD=PINMAP[8];
+        Option.LCD_Reset=PINMAP[15];
+        Option.LCD_CS=PINMAP[9];
+        Option.TOUCH_CS=PINMAP[16];
+        Option.TOUCH_IRQ=PINMAP[17];
+        Option.SD_CS=PINMAP[22];
+        Option.DISPLAY_BL=PINMAP[13];
+        Option.modbuff = true;
+        Option.DISPLAY_ORIENTATION=1;
+        Option.TOUCH_SWAPXY = 0;
+        Option.TOUCH_XZERO = 373;
+        Option.TOUCH_YZERO = 3859;
+        Option.TOUCH_XSCALE = 0.0894;
+        Option.TOUCH_YSCALE = -0.0657;
+        strcpy((char *)Option.platform,"Pico-ResTouch-LCD-2.8");
+        SaveOptions();
+        printoptions();uSec(100000);
+        _excep_code = RESET_COMMAND;
+        SoftReset();
+        return 1;
+    }
+#  ifndef PICOMITEWEB
+    if(checkstring(p,(unsigned char *) "RP2040LCD1.28"))  {
+        ResetOptions(false);
+        Option.CPU_Speed=252000;
+        Option.AllPins = 1;
+        Option.ColourCode = 1;
+        Option.NoHeartbeat = 1;
+        Option.SYSTEM_CLK=PINMAP[10];
+        Option.SYSTEM_MOSI=PINMAP[11];
+        Option.SYSTEM_MISO=PINMAP[28];
+        Option.DISPLAY_TYPE=GC9A01;
+        Option.LCD_CD=PINMAP[8];
+        Option.LCD_Reset=PINMAP[12];
+        Option.LCD_CS=PINMAP[9];
+        Option.DISPLAY_BL=PINMAP[25];
+        Option.DISPLAY_ORIENTATION=1;
+        Option.SYSTEM_I2C_SDA=PINMAP[6];
+        Option.SYSTEM_I2C_SCL=PINMAP[7];
+        strcpy((char *)Option.platform,"RP2040-LCD-1.28");
+        SaveOptions();
+        printoptions();uSec(100000);
+        _excep_code = RESET_COMMAND;
+        SoftReset();
+        return 1;
+    }
+    if(checkstring(p,(unsigned char *) "RP2040LCD0.96"))  {
+        ResetOptions(false);
+        Option.CPU_Speed=252000;
+        Option.ColourCode = 1;
+        Option.NoHeartbeat = 1;
+        Option.SYSTEM_CLK=PINMAP[10];
+        Option.SYSTEM_MOSI=PINMAP[11];
+        Option.SYSTEM_MISO=PINMAP[28];
+        Option.DISPLAY_TYPE=ST7735S;
+        Option.LCD_CD=PINMAP[8];
+        Option.LCD_Reset=PINMAP[12];
+        Option.LCD_CS=PINMAP[9];
+        Option.DISPLAY_BL=PINMAP[25];
+        Option.DISPLAY_ORIENTATION=1;
+        strcpy((char *)Option.platform,"RP2040-LCD-0.96");
+        SaveOptions();
+        printoptions();uSec(100000);
+        _excep_code = RESET_COMMAND;
+        SoftReset();
+        return 1;
+    }
+    if(checkstring(p,(unsigned char *) "RP2040GEEK"))  {
+        ResetOptions(false);
+        Option.CPU_Speed=252000;
+        Option.ColourCode = 1;
+        Option.NoHeartbeat = 1;
+        Option.AllPins = 1;
+        Option.SYSTEM_CLK=PINMAP[10];
+        Option.SYSTEM_MOSI=PINMAP[11];
+        Option.SYSTEM_MISO=PINMAP[24];
+        Option.DISPLAY_TYPE=ST7789A;
+        Option.LCD_CD=PINMAP[8];
+        Option.LCD_Reset=PINMAP[12];
+        Option.LCD_CS=PINMAP[9];
+        Option.SD_CS=PINMAP[23];
+        Option.SD_CLK_PIN=PINMAP[18];
+        Option.SD_MOSI_PIN=PINMAP[19];
+        Option.SD_MISO_PIN=PINMAP[20];
+        Option.DISPLAY_BL=PINMAP[25];
+        Option.DISPLAY_ORIENTATION=1;
+        strcpy((char *)Option.platform,"RP2040-GEEK");
+        SaveOptions();
+        printoptions();uSec(100000);
+        _excep_code = RESET_COMMAND;
+        SoftReset();
+        return 1;
+    }
+#  endif
+#else
+    if(checkstring(p,(unsigned char *) "USB Edition V1.0"))  {
+        ResetOptions(false);
+        Option.CPU_Speed=252000;
+        Option.ColourCode = 1;
+        Option.NoHeartbeat = 1;
+        Option.AllPins = 1;
+        Option.SYSTEM_I2C_SDA=PINMAP[24];
+        Option.SYSTEM_I2C_SCL=PINMAP[25];
+        Option.RTC = true;
+        Option.TOUCH_CS=PINMAP[21];
+        Option.TOUCH_IRQ=PINMAP[19];
+        Option.SYSTEM_CLK=PINMAP[22];
+        Option.SYSTEM_MOSI=PINMAP[23];
+        Option.SYSTEM_MISO=PINMAP[20];
+        Option.AUDIO_L=PINMAP[26];
+        Option.AUDIO_R=PINMAP[27];
+        Option.SerialTX=PINMAP[28];
+        Option.SerialRX=PINMAP[29];
+        Option.SerialConsole=1;
+        Option.CombinedCS=1;
+        Option.SD_CS=0;
+        Option.modbuffsize=512;
+        Option.modbuff = true;
+        Option.AUDIO_SLICE=checkslice(PINMAP[26],PINMAP[27], 0);
+        strcpy((char *)Option.platform,"USB Edition V1.0");
+        SaveOptions();
+        printoptions();uSec(100000);
+        _excep_code = RESET_COMMAND;
+        SoftReset();
+        return 1;
+    }
+#endif
+    return 0;
 }
