@@ -269,6 +269,16 @@ else()
     target_sources(PicoMite PRIVATE drivers/display_merge/display_merge_stub.c)
 endif()
 
+# VM FRAMEBUFFER command surface (hal/hal_vm_framebuffer.h): SPI-LCD
+# PICOMITE variants get the real impl that drives the merge pipeline;
+# VGA/HDMI/WEB get the error stub because FRAMEBUFFER commands don't
+# map onto scanout-framebuffer hardware.
+if (COMPILE STREQUAL "PICO" OR COMPILE STREQUAL "PICOUSB" OR COMPILE STREQUAL "PICORP2350" OR COMPILE STREQUAL "PICOUSBRP2350")
+    target_sources(PicoMite PRIVATE drivers/vm_framebuffer_picomite/vm_framebuffer_picomite.c)
+else()
+    target_sources(PicoMite PRIVATE drivers/vm_framebuffer_unsupported/vm_framebuffer_stub.c)
+endif()
+
 # NEXTGEN (MEM332) SPI-LCD display types are rp2350 PICOMITE only. Real
 # implementations live in drivers/spi_lcd/spi_lcd.c under
 # `#if PICOMITE && rp2350` gates; every other target links a no-op stub

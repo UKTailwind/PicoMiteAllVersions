@@ -16,13 +16,8 @@
 #include "vm_device_support.h"
 #include "vm_sys_graphics.h"
 
-#ifndef MMBASIC_HOST
-#ifdef PICOMITE
-#include "Draw.h"               /* for merge_optimized() (PICOMITE only) */
-#endif
-#include "hardware/dma.h"
-#endif
 #include "hal/hal_display_merge.h"
+#include "hal/hal_vm_framebuffer.h"
 
 typedef struct VMGfxScratchBuffer {
     void *ptr;
@@ -40,28 +35,6 @@ static VMGfxScratchBuffer vm_gfx_int_c;
 static VMGfxScratchBuffer vm_gfx_int_d;
 static VMGfxScratchBuffer vm_gfx_mask_a;
 static VMGfxScratchBuffer vm_gfx_fb_line;
-
-static int vm_fb_merge_running = 0;
-static uint8_t vm_fb_merge_colour = 0;
-static uint32_t vm_fb_merge_interval_us = 0;
-static uint64_t vm_fb_next_merge_us = 0;
-static uint8_t *vm_fb_copy_src = NULL;
-static int vm_fb_copy_pending = 0;
-
-#ifdef MMBASIC_HOST
-extern void host_framebuffer_reset_runtime(int colour);
-extern void host_framebuffer_shutdown_runtime(void);
-extern void host_framebuffer_clear_target(int colour);
-extern void host_framebuffer_create(void);
-extern void host_framebuffer_layer(int has_colour, int colour);
-extern void host_framebuffer_write(char which);
-extern void host_framebuffer_close(char which);
-extern void host_framebuffer_merge(int has_colour, int colour, int mode, int has_rate, int rate_ms);
-extern void host_framebuffer_sync(void);
-extern void host_framebuffer_wait(void);
-extern void host_framebuffer_copy(char from, char to, int background);
-extern void host_framebuffer_service(void);
-#endif
 
 static void *vm_sys_graphics_reserve_scratch(VMGfxScratchBuffer *buffer, size_t bytes) {
     void *new_ptr;
@@ -83,75 +56,11 @@ static uint8_t vm_sys_graphics_rgb121(uint32_t c) {
                      ((c & 0x000080u) >> 7));
 }
 
-#ifndef MMBASIC_HOST
-static size_t vm_sys_graphics_fb_bytes(void) {
-    return (size_t)HRes * (size_t)VRes / 2u;
-}
-#endif /* !MMBASIC_HOST */
-
-#if defined(PICOMITE) && !defined(MMBASIC_HOST)
-static void vm_sys_graphics_fb_stop_merge(void) {
-    hal_display_merge_abort();
-    vm_fb_merge_running = 0;
-    mergerunning = 0;
-    mergetimer = 0;
-    vm_fb_merge_interval_us = 0;
-    vm_fb_next_merge_us = 0;
-}
-
-static void vm_sys_graphics_fb_copy_to_screen(uint8_t *src) {
-    if (src == NULL) return;
-    copyframetoscreen(src, 0, HRes - 1, 0, VRes - 1, 0);
-}
-
-static void vm_sys_graphics_fb_complete_pending_copy(void) {
-    if (!vm_fb_copy_pending || vm_fb_copy_src == NULL) return;
-    vm_sys_graphics_fb_copy_to_screen(vm_fb_copy_src);
-    vm_fb_copy_src = NULL;
-    vm_fb_copy_pending = 0;
-}
-
-static void vm_sys_graphics_fb_merge_now(uint8_t transparent) {
-    int stride;
-    uint8_t *linebuf;
-    uint8_t *src_layer;
-    uint8_t *src_frame;
-    int y;
-
-    if (LayerBuf == NULL || FrameBuf == NULL) return;
-
-    if (ShadowBuf != NULL) {
-        merge_optimized(transparent);
-        return;
-    }
-
-    stride = HRes / 2;
-    if (stride <= 0) return;
-    linebuf = (uint8_t *)vm_sys_graphics_reserve_scratch(&vm_gfx_fb_line, (size_t)stride);
-    src_layer = LayerBuf;
-    src_frame = FrameBuf;
-
-    for (y = 0; y < VRes; ++y) {
-        uint8_t *layer_row = src_layer + (size_t)y * (size_t)stride;
-        uint8_t *frame_row = src_frame + (size_t)y * (size_t)stride;
-        memcpy(linebuf, frame_row, (size_t)stride);
-        for (int x = 0; x < stride; ++x) {
-            uint8_t layer = layer_row[x];
-            uint8_t top = layer & 0xF0u;
-            uint8_t bottom = layer & 0x0Fu;
-            if (top == (uint8_t)(transparent << 4) && bottom == transparent) continue;
-            if (top != (uint8_t)(transparent << 4) && bottom != transparent) {
-                linebuf[x] = layer;
-            } else if (top != (uint8_t)(transparent << 4)) {
-                linebuf[x] = (uint8_t)((linebuf[x] & 0x0Fu) | top);
-            } else {
-                linebuf[x] = (uint8_t)((linebuf[x] & 0xF0u) | bottom);
-            }
-        }
-        copyframetoscreen(linebuf, 0, HRes - 1, y, y, 0);
-    }
-}
-#endif
+/* FRAMEBUFFER merge-pipeline + copy scratch state + PICOMITE-side
+ * internal helpers have moved to drivers/vm_framebuffer_picomite/
+ * vm_framebuffer_picomite.c. Host impl lives in
+ * host/hal_vm_framebuffer_host.c; scanout ports (VGA/HDMI/WEB) link
+ * the error-stub at drivers/vm_framebuffer_unsupported/. */
 
 void vm_sys_graphics_reset(void) {
     VMGfxScratchBuffer *buffers[] = {
@@ -162,22 +71,7 @@ void vm_sys_graphics_reset(void) {
     };
     size_t i;
 
-#ifdef MMBASIC_HOST
-    host_framebuffer_shutdown_runtime();
-#elif defined(PICOMITE)
-    vm_sys_graphics_fb_stop_merge();
-    vm_fb_copy_src = NULL;
-    vm_fb_copy_pending = 0;
-    if (WriteBuf == FrameBuf || WriteBuf == LayerBuf) restorepanel();
-    if (ShadowBuf) BC_FREE(ShadowBuf);
-    ShadowBuf = NULL;
-    if (fb_dma_chan >= 0) { dma_channel_unclaim(fb_dma_chan); fb_dma_chan = -1; }
-    if (FrameBuf) BC_FREE(FrameBuf);
-    if (LayerBuf) BC_FREE(LayerBuf);
-    FrameBuf = NULL;
-    LayerBuf = NULL;
-    WriteBuf = NULL;
-#endif
+    hal_vm_framebuffer_shutdown_runtime();
 
     for (i = 0; i < sizeof(buffers) / sizeof(buffers[0]); i++) {
         if (buffers[i]->ptr) BC_FREE(buffers[i]->ptr);
@@ -1783,257 +1677,27 @@ void vm_sys_graphics_pixel_execute(GfxPixelMode mode, const GfxPixelArg *args, i
 }
 
 int vm_sys_graphics_read_pixel(int x, int y) {
-    int p = 0;
-
     if (HRes <= 0 || VRes <= 0) error("Display not configured");
-#ifdef MMBASIC_HOST
-    extern uint32_t host_runtime_get_pixel(int x, int y);
-    return (int)(host_runtime_get_pixel(x, y) & 0xFFFFFFu);
-#else
-    if ((void *)ReadBuffer == (void *)DisplayNotSet) error("Invalid on this display");
-    ReadBuffer(x, y, x, y, (unsigned char *)&p);
-    return p & 0xFFFFFF;
-#endif
+    return (int)hal_vm_framebuffer_pixel(x, y);
 }
 
 void vm_sys_graphics_service(void) {
-#ifdef MMBASIC_HOST
-    host_framebuffer_service();
-#elif defined(PICOMITE)
-    vm_sys_graphics_fb_complete_pending_copy();
-#endif
+    hal_vm_framebuffer_service();
 }
 
-void vm_sys_graphics_framebuffer_create(int fast) {
-#ifdef MMBASIC_HOST
-    host_framebuffer_create();
-    (void)fast;
-#elif defined(PICOMITE)
-    size_t bytes;
-
-    if (FrameBuf != NULL) error("Framebuffer already exists");
-    if (HRes <= 0 || VRes <= 0) error("Display not configured");
-    bytes = vm_sys_graphics_fb_bytes();
-    FrameBuf = (unsigned char *)BC_ALLOC(bytes);
-    if (FrameBuf == NULL) error("NEM[gfx:fb] want=%", (int)bytes);
-    memset(FrameBuf, 0, bytes);
-    if (fast) {
-        ShadowBuf = (unsigned char *)BC_ALLOC(bytes);
-        if (ShadowBuf == NULL) error("NEM[gfx:shadow] want=%", (int)bytes);
-        memset(ShadowBuf, 0, bytes);
-        fb_dma_chan = dma_claim_unused_channel(true);
-    }
-#endif
-}
-
+void vm_sys_graphics_framebuffer_create(int fast) { hal_vm_framebuffer_create(fast); }
 void vm_sys_graphics_framebuffer_layer(int has_colour, int colour) {
-#ifdef MMBASIC_HOST
-    host_framebuffer_layer(has_colour, colour);
-#elif defined(PICOMITE)
-    size_t bytes;
-    uint8_t transparent = 0;
-
-    if (LayerBuf != NULL) error("Framebuffer already exists");
-    if (HRes <= 0 || VRes <= 0) error("Display not configured");
-    bytes = vm_sys_graphics_fb_bytes();
-    if (has_colour) transparent = vm_sys_graphics_rgb121((uint32_t)colour);
-    LayerBuf = (unsigned char *)BC_ALLOC(bytes);
-    if (LayerBuf == NULL) error("NEM[gfx:layer] want=%", (int)bytes);
-    memset(LayerBuf, (int)(transparent | (transparent << 4)), bytes);
-#endif
+    hal_vm_framebuffer_layer(has_colour, colour);
 }
-
-void vm_sys_graphics_framebuffer_write(char which) {
-#ifdef MMBASIC_HOST
-    host_framebuffer_write(which);
-#elif defined(PICOMITE)
-    switch (which) {
-        case BC_FB_TARGET_N:
-            if (mergerunning) error("Display in use for merged operation");
-            restorepanel();
-            return;
-        case BC_FB_TARGET_F:
-            if (FrameBuf == NULL) error("Frame buffer not created");
-            WriteBuf = FrameBuf;
-            setframebuffer();
-            return;
-        case BC_FB_TARGET_L:
-            if (LayerBuf == NULL) error("Layer buffer not created");
-            WriteBuf = LayerBuf;
-            setframebuffer();
-            return;
-        default:
-            error("Syntax");
-    }
-#endif
-}
-
-void vm_sys_graphics_framebuffer_close(char which) {
-#ifdef MMBASIC_HOST
-    host_framebuffer_close(which);
-#elif defined(PICOMITE)
-    if (which == BC_FB_TARGET_DEFAULT) which = 'A';
-    vm_sys_graphics_fb_stop_merge();
-    if ((which == 'A' || which == BC_FB_TARGET_F) && FrameBuf != NULL) {
-        if (WriteBuf == FrameBuf) restorepanel();
-        BC_FREE(FrameBuf);
-        FrameBuf = NULL;
-#ifdef PICOMITE
-        if (ShadowBuf) { BC_FREE(ShadowBuf); ShadowBuf = NULL; }
-        if (fb_dma_chan >= 0) { dma_channel_unclaim(fb_dma_chan); fb_dma_chan = -1; }
-#endif
-    }
-    if ((which == 'A' || which == BC_FB_TARGET_L) && LayerBuf != NULL) {
-        if (WriteBuf == LayerBuf) restorepanel();
-        BC_FREE(LayerBuf);
-        LayerBuf = NULL;
-    }
-    if (which != 'A' && which != BC_FB_TARGET_F && which != BC_FB_TARGET_L)
-        error("Syntax");
-#endif
-}
-
+void vm_sys_graphics_framebuffer_write(char which) { hal_vm_framebuffer_write(which); }
+void vm_sys_graphics_framebuffer_close(char which) { hal_vm_framebuffer_close(which); }
 void vm_sys_graphics_framebuffer_merge(int has_colour, int colour, int mode, int has_rate, int rate_ms) {
-#ifdef MMBASIC_HOST
-    host_framebuffer_merge(has_colour, colour, mode, has_rate, rate_ms);
-#elif defined(PICOMITE)
-    uint8_t transparent = has_colour ? vm_sys_graphics_rgb121((uint32_t)colour) : 0;
-
-    if (LayerBuf == NULL) error("Layer not created");
-    if (FrameBuf == NULL) error("Framebuffer not created");
-    if (has_rate && rate_ms < 0) error("Number out of bounds");
-
-    switch (mode) {
-        case BC_FB_MERGE_MODE_NOW:
-            vm_sys_graphics_fb_stop_merge();
-            vm_sys_graphics_fb_merge_now(transparent);
-            return;
-        case BC_FB_MERGE_MODE_B:
-            vm_sys_graphics_fb_stop_merge();
-            if (!(((Option.DISPLAY_TYPE > I2C_PANEL && Option.DISPLAY_TYPE < BufferedPanel) ||
-                   (Option.DISPLAY_TYPE >= SSDPANEL && Option.DISPLAY_TYPE < VIRTUAL)
-#if defined(PICOMITE) && defined(rp2350)
-                   || Option.DISPLAY_TYPE >= NEXTGEN
-#endif
-                   ))) {
-                error("Not available on this display");
-            }
-            if (diskchecktimer < 200 && SPIatRisk) diskchecktimer = 200;
-            hal_display_merge_post_fill(transparent);
-            return;
-        case BC_FB_MERGE_MODE_R:
-            if (!(((Option.DISPLAY_TYPE > I2C_PANEL && Option.DISPLAY_TYPE < BufferedPanel) ||
-                   (Option.DISPLAY_TYPE >= SSDPANEL && Option.DISPLAY_TYPE < VIRTUAL)))) {
-                error("Not available on this display");
-            }
-            if (WriteBuf == NULL) {
-                WriteBuf = FrameBuf;
-                setframebuffer();
-            }
-            vm_sys_graphics_fb_stop_merge();
-            vm_fb_merge_running = 1;
-            vm_fb_merge_colour = transparent;
-            mergetimer = (uint32_t)(has_rate ? rate_ms : 0);
-            vm_fb_merge_interval_us = (uint32_t)(has_rate ? rate_ms * 1000 : 0);
-            hal_display_merge_post_bg(transparent, vm_fb_merge_interval_us);
-            return;
-        case BC_FB_MERGE_MODE_A:
-            vm_sys_graphics_fb_stop_merge();
-            return;
-        default:
-            error("Syntax");
-    }
-#endif
+    hal_vm_framebuffer_merge(has_colour, colour, mode, has_rate, rate_ms);
 }
-
-void vm_sys_graphics_framebuffer_sync(void) {
-#ifdef MMBASIC_HOST
-    host_framebuffer_sync();
-#elif defined(PICOMITE)
-    vm_sys_graphics_fb_complete_pending_copy();
-    if (mergerunning) {
-        mergedone = false;
-        while (mergedone == false) {
-            CheckAbort();
-        }
-    }
-#endif
-}
-
-void vm_sys_graphics_framebuffer_wait(void) {
-#ifdef MMBASIC_HOST
-    host_framebuffer_wait();
-#elif defined(PICOMITE)
-    if (Option.DISPLAY_TYPE == ILI9341 || Option.DISPLAY_TYPE == ST7796SP ||
-        Option.DISPLAY_TYPE == ST7796S || Option.DISPLAY_TYPE == ST7789B ||
-        Option.DISPLAY_TYPE == ILI9488 || Option.DISPLAY_TYPE == ILI9488P) {
-        while (GetLineILI9341() != 0) {
-        }
-    }
-#endif
-}
-
+void vm_sys_graphics_framebuffer_sync(void) { hal_vm_framebuffer_sync(); }
+void vm_sys_graphics_framebuffer_wait(void) { hal_vm_framebuffer_wait(); }
 void vm_sys_graphics_framebuffer_copy(char from, char to, int background) {
-#ifdef MMBASIC_HOST
-    host_framebuffer_copy(from, to, background);
-#elif defined(PICOMITE)
-    int complex = 0;
-    unsigned char *saved = WriteBuf;
-    uint8_t *s = NULL;
-    uint8_t *d = NULL;
-
-    from = (char)toupper((unsigned char)from);
-    to = (char)toupper((unsigned char)to);
-    if (from == to) return;
-
-    if (from == BC_FB_TARGET_N) {
-        complex = 1;
-        if ((void *)ReadBuffer == (void *)DisplayNotSet) error("Invalid on this display");
-    } else if (from == BC_FB_TARGET_L) {
-        if (LayerBuf == NULL) error("Layer buffer not created");
-        s = LayerBuf;
-    } else if (from == BC_FB_TARGET_F) {
-        if (FrameBuf == NULL) error("Frame buffer not created");
-        s = FrameBuf;
-    } else error("Syntax");
-
-    if (to == BC_FB_TARGET_N) {
-        complex = 2;
-    } else if (to == BC_FB_TARGET_L) {
-        if (LayerBuf == NULL) error("Layer buffer not created");
-        d = LayerBuf;
-    } else if (to == BC_FB_TARGET_F) {
-        if (FrameBuf == NULL) error("Frame buffer not created");
-        d = FrameBuf;
-    } else error("Syntax");
-
-    if (!complex) {
-        if (d != s) memcpy(d, s, vm_sys_graphics_fb_bytes());
-    } else if (complex == 1) {
-        unsigned char *linebuf = (unsigned char *)vm_sys_graphics_reserve_scratch(&vm_gfx_fb_line, (size_t)HRes * 3u);
-        int y;
-        WriteBuf = d;
-        setframebuffer();
-        for (y = 0; y < VRes; ++y) {
-            restorepanel();
-            ReadBuffer(0, y, HRes - 1, y, linebuf);
-            WriteBuf = d;
-            setframebuffer();
-            DrawBuffer(0, y, HRes - 1, y, linebuf);
-        }
-    } else {
-        if (background) {
-            vm_fb_copy_src = s;
-            vm_fb_copy_pending = 1;
-        } else {
-            vm_sys_graphics_fb_copy_to_screen(s);
-        }
-    }
-
-    WriteBuf = saved;
-    if (WriteBuf == FrameBuf || WriteBuf == LayerBuf) setframebuffer();
-    else restorepanel();
-#endif
+    hal_vm_framebuffer_copy(from, to, background);
 }
 
 void vm_sys_graphics_text_execute(const GfxTextArg *args, int field_count, const GfxTextOps *ops) {
