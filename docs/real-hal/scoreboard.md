@@ -43,7 +43,8 @@ F3 step 15 164    140       2       2      39        38      17         14      
             conditionals are `#ifndef max` / `#ifndef min` macro
             definitions — neither target nor port-config. F3 CLOSED.
             FileIO.c promoted to STRICT_FILES in the purity gate.
-F4         .       .        .        .       .         .       .          .        .  (MM_Misc.c USBKEYBOARD → HAL)
+─── F4 (MM_Misc.c USBKEYBOARD → HAL) ───
+F4 step 1  164    138       2       2      39        38      17         14      414  (drop dead pico/rand.h + mouse0 externs; −2)
 ─── post-fixup phases ───
 6          .       .        .        .       .         .       .          0        .  (Audio.c → HAL)
 7a         .       .        .        .       .         .       .          .        .  (Draw.c ILI9341 → HAL)
