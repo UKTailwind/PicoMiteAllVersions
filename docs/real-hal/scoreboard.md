@@ -50,10 +50,14 @@ F4 step 3  164    131       2       2      39        38      17         14      
 F4 step 4  164    124       2       2      39        38      17         14      400  (fun_device → HAL_PORT_DEVICE_NAME compile-time string; −7)
 F4 step 5  164    115       2       2      39        38      17         14      391  (CONFIGURE LIST → port_print_supported_boards(); −9)
 F4 step 6  164    113       2       2      39        38      17         14      389  (setwifi → MMsetwifi.c + WEB interrupt-dispatch unconditional; −2)
-            MM_Misc.c: 140 → 113 across 6 sub-steps (target-macro 135 → 108). Remaining
-            ~108 are mostly board-profile OPTION RESET branches (rp2350 × VGA × HDMI ×
-            USBKEYBOARD × PICOMITE/PICOMITEWEB combinations) and printoptions display
-            divergences. Per-board factory-reset extraction is the big remaining lever.
+F4 step 7  164     98       2       2      39        38      17         14      374  (OPTION RESET <BOARD> → port_factory_reset_board() per port_defaults.c; −15)
+F4 step 8  164     96       2       2      39        38      17         14      372  (USB device-info + KEYBOARD$ runtime check via Option.{USBKeyboard,KeyboardConfig}; −2)
+F4 step 9  164     91       2       2      39        38      17         14      367  (WEB OPTION setters + MM.* info + printoptions → MMsetwifi.c + new MMweb_stubs.c + USB hooks; −5)
+            MM_Misc.c: 140 → 91 across 9 sub-steps (target-macro 135 → 84). Remaining
+            ~84 split across rp2350-specific bodies (interrupts, multicore, PSRAM
+            mode, FAST/SLOW), VGA-specific (RESOLUTION, screen modes, FASTGFX), HDMI-
+            specific clock setup, and a few HEARTBEAT / KEYBOARD setter branches that
+            still mix USBKEYBOARD vs PS/2 syntax.
 ─── post-fixup phases ───
 6          .       .        .        .       .         .       .          0        .  (Audio.c → HAL)
 7a         .       .        .        .       .         .       .          .        .  (Draw.c ILI9341 → HAL)
