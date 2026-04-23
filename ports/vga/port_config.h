@@ -46,4 +46,11 @@
 
 #define HAL_PORT_RAM_FUNC(name)          name
 
+
+/* SPI-LCD clock-pin field: rp2040 PICOMITE shares SYSTEM_CLK for the
+ * LCD; rp2350 PICOMITE breaks it out as Option.LCD_CLK. Ports without
+ * an SPI LCD at all (VGA/HDMI/WEB) never read it at runtime but need
+ * the macro defined so Draw.c compiles. */
+#define HAL_PORT_LCD_SPI_CLK_PIN         Option.SYSTEM_CLK
+
 #endif /* PORT_CONFIG_H */

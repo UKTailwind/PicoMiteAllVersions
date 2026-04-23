@@ -34,6 +34,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
+#include "port_config.h"
 #include "hal/hal_time.h"
 #include "hal/hal_keyboard.h"
 #include "hal/hal_display_merge.h"
@@ -234,11 +235,9 @@ void MIPS16 initFonts(void){
 	FontTable[14] = NULL;
 	FontTable[15] = NULL;
 }
-#if defined(PICOMITE) && defined(rp2350)
 uint16_t __not_in_flash_func(RGB565)(uint32_t c){
     return ((c >> 16) & 0b11111000) | ((c >> 13) & 0b00000111) | ((c << 3) & 0b1110000000000000) |  ((c << 5) & 0b0001111100000000);
 }
-#endif
 
 uint16_t __not_in_flash_func(RGB555)(uint32_t c){
     return ((c & 0xf8)>>3) | ((c& 0xf800)>>6) | ((c & 0xf80000)>>9);
@@ -5144,11 +5143,7 @@ void copyframetoscreen(uint8_t *s,int xstart, int xend, int ystart, int yend, in
     }
     i=(xend-xstart+1)*(yend-ystart+1);
     if(Option.DISPLAY_TYPE>I2C_PANEL && Option.DISPLAY_TYPE<BufferedPanel ){
-#if defined(PICOMITE) && defined(rp2350)
-        if(PinDef[Option.LCD_CLK].mode & SPI0SCK){
-#else
-        if(PinDef[Option.SYSTEM_CLK].mode & SPI0SCK){
-#endif
+        if(PinDef[HAL_PORT_LCD_SPI_CLK_PIN].mode & SPI0SCK){
             if(odd){
                 c=map[(*s & 0xF0)>>4];
                 spi_write_fast(spi0,(uint8_t *)&c,cnt);
@@ -5183,11 +5178,7 @@ void copyframetoscreen(uint8_t *s,int xstart, int xend, int ystart, int yend, in
                 i-=2;
             }
         }
-#if defined(PICOMITE) && defined(rp2350)
-        if(PinDef[Option.LCD_CLK].mode & SPI0SCK)spi_finish(spi0);
-#else
-        if(PinDef[Option.SYSTEM_CLK].mode & SPI0SCK)spi_finish(spi0);
-#endif
+        if(PinDef[HAL_PORT_LCD_SPI_CLK_PIN].mode & SPI0SCK)spi_finish(spi0);
         else spi_finish(spi1);
         ClearCS(Option.LCD_CS);                  //set CS high
 #if defined(PICOMITE) && defined(rp2350)
@@ -5621,11 +5612,7 @@ static uint16_t fastgfx_linebuf[2][320];
 
 // Determine which SPI instance the LCD is on
 static inline spi_inst_t *fastgfx_get_spi(void) {
-#if defined(rp2350)
-    return (PinDef[Option.LCD_CLK].mode & SPI0SCK) ? spi0 : spi1;
-#else
-    return (PinDef[Option.SYSTEM_CLK].mode & SPI0SCK) ? spi0 : spi1;
-#endif
+    return (PinDef[HAL_PORT_LCD_SPI_CLK_PIN].mode & SPI0SCK) ? spi0 : spi1;
 }
 
 // Core1 swap: diff back vs front, DMA changed scanlines to SPI, copy back->front

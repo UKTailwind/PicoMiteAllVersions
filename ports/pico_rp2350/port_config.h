@@ -41,4 +41,11 @@
 
 #define HAL_PORT_RAM_FUNC(name)          __not_in_flash_func(name)
 
+/* SPI-LCD clock-pin field: rp2350 PICOMITE adds a dedicated Option.LCD_CLK
+ * alongside SYSTEM_CLK so the LCD can sit on its own SPI instance. On
+ * rp2040 PICOMITE (and non-PICOMITE ports) SYSTEM_CLK doubles as the LCD
+ * clock. Core code uses the macro as a plain expression value — never
+ * as a preprocessor gate — so it complies with the port-config standard. */
+#define HAL_PORT_LCD_SPI_CLK_PIN         Option.LCD_CLK
+
 #endif /* PORT_CONFIG_H */

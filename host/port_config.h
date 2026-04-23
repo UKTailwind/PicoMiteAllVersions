@@ -63,4 +63,11 @@
  * advertises itself as "MMBasic Host" so test programs can branch on it. */
 #define HAL_PORT_DEVICE_NAME             "MMBasic Host"
 
+
+/* SPI-LCD clock-pin field: rp2040 PICOMITE shares SYSTEM_CLK for the
+ * LCD; rp2350 PICOMITE breaks it out as Option.LCD_CLK. Ports without
+ * an SPI LCD at all (VGA/HDMI/WEB) never read it at runtime but need
+ * the macro defined so Draw.c compiles. */
+#define HAL_PORT_LCD_SPI_CLK_PIN         Option.SYSTEM_CLK
+
 #endif /* PORT_CONFIG_H */
