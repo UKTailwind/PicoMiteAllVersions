@@ -48,7 +48,7 @@ A phase closes only when its targeted core files pass that standard. "Infrastruc
 | [6 — hal_audio](real-hal/phase-6-audio.md) | ✅ | 6a + 6b done; Audio.c in STRICT_FILES; device body in drivers/pwm_synth/ |
 | [7 — hal_display](real-hal/phase-7-display.md) | ✅ | 7a + 7b + 7c closed — Draw.c 164 → 3, STRICT_FILES; `drivers/hdmi/` owns modes + scanout; 7d (SSD1963) optional refinement remains |
 | [8 — hal_multicore](real-hal/phases-8-to-13.md#phase-8--hal_multicoreh) | ✅ | 8 steps 1–3 done; no direct multicore_fifo_* outside drivers; driver-owned pattern (no generic HAL contract) |
-| [9 — hal_net](real-hal/phases-8-to-13.md#phase-9--hal_neth) | ⏳ | not started; 67 `PICOMITEWEB` blocks to clear |
+| [9 — hal_net](real-hal/phases-8-to-13.md#phase-9--hal_neth) | ✅ | PICOMITEWEB references across core files 30 → 0 (5 steps); routed through port hooks / runtime PSRAMsize / port-config macros; no `hal/hal_net.h` contract introduced |
 | [10 — hal_heap + Memory.c](real-hal/phases-8-to-13.md#phase-10--hal_heaph--memoryc-cleanup) | ⏳ | not started |
 | [11 — sweep](real-hal/phases-8-to-13.md#phase-11--sweep--remaining-drivers--scope-cleanup) | ⏳ | not started |
 | [12 — host + WASM relocation](real-hal/phases-8-to-13.md#phase-12--host--wasm-relocation) | ⏳ | not started |

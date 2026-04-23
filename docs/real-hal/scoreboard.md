@@ -159,3 +159,14 @@ The scoreboard is a trend indicator. The gate is `tools/check_hal_purity.sh`. Th
 2. Any file in `STRICT_FILES` has zero target-macro ifdefs AND zero port-config-macro ifdefs.
 
 As each phase lands, it promotes its targeted file(s) into `STRICT_FILES`. A phase closes only when the gate passes with that file promoted. Renaming a `#ifdef rp2350` to `#if HAL_PORT_PWM_SLICE_COUNT > 8` now fails the gate at both (1) and (2).
+
+## Phase 9 (PICOMITEWEB across core files → 0)
+
+| Phase   | Draw | MM_Misc | External | FileIO | Commands | Memory | Functions | Audio | Total | Notes |
+|---------|------|---------|----------|--------|----------|--------|-----------|-------|-------|-------|
+| 9 start | 3    | 4       | 2        | 2      | 37       | 39     | 17        | 0     | 104   | tip of phase 8 |
+| 9 step 1| 3    | 4       | 2        | 2      | 37       | 39     | 17        | 0     | 104   | display_state.c 3D globals unconditional — INFO-only delta |
+| 9 step 2| 3    | 4       | 2        | 2      | 37       | 39     | 11        | 0     | 98    | Functions.c MQTT / MMSUPPLY via port hook + enum flattening (−6) |
+| 9 step 3| 3    | 4       | 2        | 2      | 37       | 39     | 11        | 0     | 98    | MMBasic.c hot-func port macros + PSRAMbase unconditional + port_web_clear_runtime_state — INFO-only delta (MMBasic.c target ifdefs 28 → 19) |
+| 9 step 4| 3    | 4       | 2        | 2      | 17       | 39     | 11        | 0     | 78    | Commands.c placement macros + cleanserver/close_tcpclient stubs + SaveContext flatten (−20) |
+| 9 step 5| 3    | 4       | 2        | 2      | 17       | 27     | 11        | 0     | 66    | Memory.c PSRAM nested ifdefs dropped (−12). **PICOMITEWEB refs across scored files: 30 → 0. Phase 9 CLOSED.** |

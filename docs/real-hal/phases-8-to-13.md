@@ -32,12 +32,83 @@ PICOMITEWEB only. 67 `PICOMITEWEB` blocks across 8 files.
 
 - Define `hal/hal_net.h` (TCP listen/accept, UDP send/recv, DNS, HTTP server hook).
 - `drivers/cyw43/` lifted from current Pico W network code.
-- Move all `PICOMITEWEB` conditional bodies out of External.c (13 blocks), MM_Misc.c (15 blocks), Memory.c (12 blocks), FileIO.c (10 blocks), Commands.c (6 blocks), Functions.c (5 blocks), Draw.c (5 blocks), Audio.c (1 block) into `hal_net` impls, `drivers/cyw43/`, or port-config (`PORT_HAS_NETWORK`).
-- Non-network ports (including host, mmbasic_stdio) link `hal_net_hard_error.c` — network commands return a BASIC error.
+Original plan called for a `hal/hal_net.h` contract with TCP/UDP/DNS
+entry points and a `drivers/cyw43/` driver. In practice the
+PICOMITEWEB sprinkle across core files came in two flavours — one was
+"WEB-specific dispatch" which did want a network HAL surface, the
+other was "WEB-specific non-network state tweaks" that were really
+disguised PSRAM-sizing / framebuffer / interpreter-placement
+decisions that belong to other HAL surfaces (heap / display /
+port-config). The phase closed by treating each site on its merits
+rather than forcing every site through a single `hal_net.h` contract.
 
-**Exit gate:** zero `PICOMITEWEB` references in any scored core file. All network dispatch lives in HAL impls or drivers.
+**Exit gate:** zero `PICOMITEWEB` references in any scored core file. ✅ met.
 
-**Commit-count target:** 1–2 commits.
+### Step 1 ✅ — display_state.c
+
+1 ifdef. `struct3d` + `camera` storage promoted to unconditional
+(`drivers/gfx_3d/gfx_3d.c` is the only reader and is not linked on
+WEB; the ~150 bytes of dead BSS on WEB isn't worth a gate).
+
+### Step 2 ✅ — Functions.c
+
+5 ifdefs. MM.MESSAGE$ / MM.ADDRESS$ / MM.TOPIC$ routed through a
+`port_fun_mm_mqtt_copy(which, out)` port hook (WEB real impl in
+MMMqtt.c, non-WEB stub in MMweb_stubs.c / host_peripheral_stubs.c).
+MM.SUPPLY case body was already runtime-checking
+`ExtCurrentConfig[44]==EXT_ANA_IN || Option.LOCAL_KEYBOARD` which is
+false on WEB — the `#ifndef PICOMITEWEB` gate was redundant. Enum
+(Operation) and overlaid_functions[] flattened to include every
+entry on every target; the flattening dropped 2 more ifdefs in
+configuration.h.
+
+### Step 3 ✅ — MMBasic.c
+
+6 ifdefs. Mix of:
+  - `core1stack[0]` canary check — added a 1-element core1stack stub
+    to MMtcpserver.c (WEB has no core1 but needs the symbol).
+  - `DefinedSubFun` / `getvalue` / `findvar` flash-vs-RAM placement
+    — introduced per-port `HAL_PORT_MMBASIC_HOT_FUNC(name)` and
+    `HAL_PORT_MMBASIC_SUBFUN_FUNC(name)` macros in every
+    `ports/*/port_config.h` + `host/port_config.h`. Each expands to
+    `__not_in_flash_func(name)` or plain `name` per port, preserving
+    the exact existing placement on every target.
+  - PSRAM range-check in ClearVars — promoted `PSRAMbase` to
+    unconditional in configuration.h (0 on non-rp2350, 0x11000000 on
+    rp2350 non-WEB). The range check becomes a runtime no-op on
+    targets without PSRAM.
+  - ClearRuntime TCP-state teardown — routed through new
+    `port_web_clear_runtime_state()` hook.
+
+### Step 4 ✅ — Commands.c
+
+12 ifdefs. Four categories:
+  - Flash-vs-RAM placement on cmd_inc / cmd_if / cmd_else / cmd_loop
+    → HAL_PORT_MMBASIC_SUBFUN_FUNC or HAL_PORT_MMBASIC_HOT_FUNC
+    (cmd_loop uses HOT, the other three use SUBFUN — they differ on
+    rp2040 VGA placement).
+  - cleanserver() + close_tcpclient() stubs added to MMweb_stubs.c +
+    host_peripheral_stubs.c.
+  - SaveContext / RestoreContext PSRAM fast-path flattened to
+    runtime `if(PSRAMsize)` branch; psmap bitmap stubbed as a 1-word
+    array on non-rp2350 so Commands.c's `sizeof(psmap)` references
+    resolve.
+  - rp2350a-package runtime check at the "CONFIGURE LIST PINS"
+    dispatch — `rp2350a` is always true on rp2040 so the check is a
+    no-op elsewhere.
+
+### Step 5 ✅ — Memory.c
+
+13 ifdefs. Every site was a nested `#ifdef rp2350 / #ifndef
+PICOMITEWEB / PSRAM code` — since PSRAMsize stays 0 at runtime on
+rp2350 WEB (CYW43 consumes the QSPI pins), the `#ifndef PICOMITEWEB`
+inner gate was redundant with the `if(PSRAMsize)` runtime check.
+Dropped all 12 nested ifdefs. The remaining framebuffer-pointer
+storage block (`#if defined(PICOMITE) || defined(PICOMITEWEB)`
+originally, from the step-1 merge) rewrote as `#ifndef PICOMITEVGA`
+to eliminate the PICOMITEWEB token entirely.
+
+**Commit-count target:** 5 commits (actual: 5).
 
 ## Phase 10 — `hal_heap.h` + Memory.c cleanup
 
