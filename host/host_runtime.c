@@ -953,3 +953,42 @@ int  port_web_get_ssid(unsigned char *out_sret, int *out_targ)
 { (void)out_sret; (void)out_targ; return 0; }
 
 /* str_replace/STR_REPLACE provided by MATHS.c */
+
+/* bc_debug.c crash-dump port hooks — host has no ARM fault registers. */
+#include "bytecode.h"  /* BCCrashInfo */
+uint32_t port_bc_crash_get_sp(void) { return 0; }
+void port_bc_crash_save_fault_regs(BCCrashInfo *info) { (void)info; }
+
+/* vm_sys_time port hook — host picks up MMBASIC_HOST_DATE /
+ * MMBASIC_HOST_TIME env-var overrides (tests pin deterministic values
+ * so interpreter-vs-VM output comparison is stable) and falls back to
+ * localtime(). vm_sys_time.c formats the result into MMBasic string
+ * buffers. Device impl lives in ports/pico_sdk_common/vm_sys_time_pico.c. */
+#include <time.h>
+int port_vm_time_get_tm(struct tm *out) {
+    /* Start from wall-clock localtime; env-var overrides apply per
+     * field so MMBASIC_HOST_DATE affects only DATE$ and
+     * MMBASIC_HOST_TIME affects only TIME$, matching the pre-refactor
+     * semantics where the two BASIC functions had separate mocks. */
+    time_t now = time(NULL);
+    struct tm *lt = localtime(&now);
+    if (!lt) return 0;
+    *out = *lt;
+    const char *mock_date = getenv("MMBASIC_HOST_DATE");
+    if (mock_date && *mock_date) {
+        int d = 1, mo = 1, y = 2020;
+        sscanf(mock_date, "%d-%d-%d", &d, &mo, &y);
+        out->tm_mday = d;
+        out->tm_mon  = mo - 1;
+        out->tm_year = y - 1900;
+    }
+    const char *mock_time = getenv("MMBASIC_HOST_TIME");
+    if (mock_time && *mock_time) {
+        int h = 0, mi = 0, s = 0;
+        sscanf(mock_time, "%d:%d:%d", &h, &mi, &s);
+        out->tm_hour = h;
+        out->tm_min  = mi;
+        out->tm_sec  = s;
+    }
+    return 1;
+}

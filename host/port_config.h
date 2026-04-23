@@ -89,4 +89,8 @@
 /* Host uses a deterministic seed for test reproducibility. */
 #define HAL_PORT_RANDOMIZE_DEFAULT_SEED() ((int64_t)42)
 
+/* BCCrashInfo storage placement — host has no persistent section,
+ * so use plain BSS. */
+#define HAL_PORT_BC_CRASH_INFO_ATTR
+
 #endif /* PORT_CONFIG_H */

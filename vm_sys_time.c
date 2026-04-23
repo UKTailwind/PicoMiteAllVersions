@@ -15,10 +15,6 @@
 #include "vm_sys_time.h"
 #include "vm_device_support.h"
 
-#ifndef MMBASIC_HOST
-extern int64_t TimeOffsetToUptime;
-#endif
-
 static void vm_sys_time_set_mstring(uint8_t *out, const char *text) {
     size_t len = strlen(text);
     if (len > MAXSTRLEN) len = MAXSTRLEN;
@@ -26,63 +22,20 @@ static void vm_sys_time_set_mstring(uint8_t *out, const char *text) {
     if (len) memcpy(out + 1, text, len);
 }
 
-#ifdef MMBASIC_HOST
-
-/* Tests set MMBASIC_HOST_DATE / MMBASIC_HOST_TIME to pin deterministic
- * values for the interpreter + VM comparison; otherwise fall back to
- * wall clock so the --sim clock demo and friends show real time. */
-
-void vm_sys_time_date(uint8_t *out) {
-    const char *mock = getenv("MMBASIC_HOST_DATE");
-    if (mock && *mock) {
-        vm_sys_time_set_mstring(out, mock);
-        return;
-    }
-    time_t now = time(NULL);
-    struct tm lt;
-    localtime_r(&now, &lt);
-    char text[16];
-    snprintf(text, sizeof(text), "%02d-%02d-%04d",
-             lt.tm_mday, lt.tm_mon + 1, lt.tm_year + 1900);
-    vm_sys_time_set_mstring(out, text);
-}
-
-void vm_sys_time_time(uint8_t *out) {
-    const char *mock = getenv("MMBASIC_HOST_TIME");
-    if (mock && *mock) {
-        vm_sys_time_set_mstring(out, mock);
-        return;
-    }
-    time_t now = time(NULL);
-    struct tm lt;
-    localtime_r(&now, &lt);
-    char text[16];
-    snprintf(text, sizeof(text), "%02d:%02d:%02d",
-             lt.tm_hour, lt.tm_min, lt.tm_sec);
-    vm_sys_time_set_mstring(out, text);
-}
-
-#else
-
-static int vm_sys_time_now(struct tm *tm_out, uint64_t *now_us_out) {
-    uint64_t now_us = readusclock();
-    time_t epoch = (time_t)(now_us / 1000000ULL + TimeOffsetToUptime);
-    struct tm *tm = gmtime(&epoch);
-    if (!tm) return 0;
-    *tm_out = *tm;
-    if (now_us_out) *now_us_out = now_us;
-    return 1;
-}
+/* Port hook — fill `out` with the current local-time `struct tm` and
+ * return 1, or return 0 if the port couldn't read the clock. On device
+ * this reads readusclock() + MMBasic's TimeOffsetToUptime; on host it
+ * checks the MMBASIC_HOST_DATE / MMBASIC_HOST_TIME env-var overrides
+ * (for deterministic tests) and falls back to localtime(). */
+extern int port_vm_time_get_tm(struct tm *out);
 
 void vm_sys_time_date(uint8_t *out) {
     struct tm tm;
     char text[32];
-
-    if (!vm_sys_time_now(&tm, NULL)) {
+    if (!port_vm_time_get_tm(&tm)) {
         vm_sys_time_set_mstring(out, "00-00-0000");
         return;
     }
-
     snprintf(text, sizeof(text), "%02d-%02d-%04d",
              tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900);
     vm_sys_time_set_mstring(out, text);
@@ -91,15 +44,11 @@ void vm_sys_time_date(uint8_t *out) {
 void vm_sys_time_time(uint8_t *out) {
     struct tm tm;
     char text[16];
-
-    if (!vm_sys_time_now(&tm, NULL)) {
+    if (!port_vm_time_get_tm(&tm)) {
         vm_sys_time_set_mstring(out, "00:00:00");
         return;
     }
-
     snprintf(text, sizeof(text), "%02d:%02d:%02d",
              tm.tm_hour, tm.tm_min, tm.tm_sec);
     vm_sys_time_set_mstring(out, text);
 }
-
-#endif

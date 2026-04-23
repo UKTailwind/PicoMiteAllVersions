@@ -26,11 +26,7 @@ static void dbg_print(const char *fmt, ...) {
     va_start(ap, fmt);
     vsnprintf(dbg_buf, sizeof(dbg_buf), fmt, ap);
     va_end(ap);
-#ifdef MMBASIC_HOST
-    fputs(dbg_buf, stdout);
-#else
     MMPrintString(dbg_buf);
-#endif
 }
 
 /* ======================================================================
@@ -888,12 +884,12 @@ void bc_dump_vm_state(BCVMState *vm) {
  * On host: regular static var (for testing the API).
  * ====================================================================== */
 
-#ifndef MMBASIC_HOST
-/* Place in .uninitialized_data section — survives soft/watchdog reset */
-BCCrashInfo __attribute__((section(".uninitialized_data.bc_crash_info"))) bc_crash_info;
-#else
-static BCCrashInfo bc_crash_info;
-#endif
+/* Storage attribute comes from port_config.h: the device ports put the
+ * struct in .uninitialized_data so it survives a soft / watchdog reset
+ * for next-boot crash-report recovery; host's HAL_PORT_BC_CRASH_INFO_ATTR
+ * expands to empty (plain BSS). */
+#include "port_config.h"
+HAL_PORT_BC_CRASH_INFO_ATTR BCCrashInfo bc_crash_info;
 
 /*
  * Record a checkpoint — always writes to breadcrumb, always prints.
@@ -915,14 +911,14 @@ void bc_crash_checkpoint(int stage, const char *label) {
 
     bc_crash_info.checkpoint = (uint32_t)stage;
 
-    /* Capture ARM stack pointer + track deepest (lowest) SP */
-#ifndef MMBASIC_HOST
-    register uint32_t sp_val __asm("sp");
-    bc_crash_info.sp = sp_val;
-    if (sp_val < bc_crash_info.sp_lowest) bc_crash_info.sp_lowest = sp_val;
-#else
-    bc_crash_info.sp = 0;
-#endif
+    /* Capture stack pointer via port hook (device reads `sp`; host
+     * returns 0). */
+    {
+        extern uint32_t port_bc_crash_get_sp(void);
+        uint32_t sp_val = port_bc_crash_get_sp();
+        bc_crash_info.sp = sp_val;
+        if (sp_val && sp_val < bc_crash_info.sp_lowest) bc_crash_info.sp_lowest = sp_val;
+    }
 
     /* Snapshot heap usage (works on host too, returns 0 on device) */
     bc_crash_info.heap_used     = (uint32_t)bc_alloc_bytes_used_peek();
@@ -982,12 +978,8 @@ void bc_crash_snapshot_cs(BCCompiler *cs) {
  * into the breadcrumb before the device resets.
  */
 void bc_crash_save_fault(void) {
-#ifndef MMBASIC_HOST
-    bc_crash_info.cfsr  = *(volatile uint32_t *)0xE000ED28;  /* CFSR */
-    bc_crash_info.hfsr  = *(volatile uint32_t *)0xE000ED2C;  /* HFSR */
-    bc_crash_info.bfar  = *(volatile uint32_t *)0xE000ED38;  /* BFAR */
-    bc_crash_info.mmfar = *(volatile uint32_t *)0xE000ED34;  /* MMFAR */
-#endif
+    extern void port_bc_crash_save_fault_regs(BCCrashInfo *info);
+    port_bc_crash_save_fault_regs(&bc_crash_info);
 }
 
 /*
@@ -1030,41 +1022,44 @@ void bc_crash_dump_if_any(void) {
     }
     dbg_print("\r\n");
 
-#ifndef MMBASIC_HOST
-    /* Decode CFSR */
-    uint32_t cfsr = bc_crash_info.cfsr;
-    dbg_print("  CFSR:   0x%08X", (unsigned)cfsr);
-    if (cfsr & 0x00000001) dbg_print(" IACCVIOL");
-    if (cfsr & 0x00000002) dbg_print(" DACCVIOL");
-    if (cfsr & 0x00000008) dbg_print(" MUNSTKERR");
-    if (cfsr & 0x00000010) dbg_print(" MSTKERR");
-    if (cfsr & 0x00000080) dbg_print(" MMARVALID");
-    if (cfsr & 0x00000100) dbg_print(" IBUSERR");
-    if (cfsr & 0x00000200) dbg_print(" PRECISERR");
-    if (cfsr & 0x00000400) dbg_print(" IMPRECISERR");
-    if (cfsr & 0x00000800) dbg_print(" UNSTKERR");
-    if (cfsr & 0x00001000) dbg_print(" STKERR");
-    if (cfsr & 0x00008000) dbg_print(" BFARVALID");
-    if (cfsr & 0x00010000) dbg_print(" UNDEFINSTR");
-    if (cfsr & 0x00020000) dbg_print(" INVSTATE");
-    if (cfsr & 0x00040000) dbg_print(" INVPC");
-    if (cfsr & 0x00080000) dbg_print(" NOCP");
-    if (cfsr & 0x01000000) dbg_print(" UNALIGNED");
-    if (cfsr & 0x02000000) dbg_print(" DIVBYZERO");
-    dbg_print("\r\n");
+    /* ARM CFSR/HFSR/BFAR/MMFAR decode. On host (and any port that
+     * doesn't implement port_bc_crash_save_fault_regs) the four
+     * registers stay 0 and the decode prints a single line of zeros
+     * with no bit names — harmless. */
+    {
+        uint32_t cfsr = bc_crash_info.cfsr;
+        dbg_print("  CFSR:   0x%08X", (unsigned)cfsr);
+        if (cfsr & 0x00000001) dbg_print(" IACCVIOL");
+        if (cfsr & 0x00000002) dbg_print(" DACCVIOL");
+        if (cfsr & 0x00000008) dbg_print(" MUNSTKERR");
+        if (cfsr & 0x00000010) dbg_print(" MSTKERR");
+        if (cfsr & 0x00000080) dbg_print(" MMARVALID");
+        if (cfsr & 0x00000100) dbg_print(" IBUSERR");
+        if (cfsr & 0x00000200) dbg_print(" PRECISERR");
+        if (cfsr & 0x00000400) dbg_print(" IMPRECISERR");
+        if (cfsr & 0x00000800) dbg_print(" UNSTKERR");
+        if (cfsr & 0x00001000) dbg_print(" STKERR");
+        if (cfsr & 0x00008000) dbg_print(" BFARVALID");
+        if (cfsr & 0x00010000) dbg_print(" UNDEFINSTR");
+        if (cfsr & 0x00020000) dbg_print(" INVSTATE");
+        if (cfsr & 0x00040000) dbg_print(" INVPC");
+        if (cfsr & 0x00080000) dbg_print(" NOCP");
+        if (cfsr & 0x01000000) dbg_print(" UNALIGNED");
+        if (cfsr & 0x02000000) dbg_print(" DIVBYZERO");
+        dbg_print("\r\n");
 
-    dbg_print("  HFSR:   0x%08X", (unsigned)bc_crash_info.hfsr);
-    if (bc_crash_info.hfsr & 0x40000000) dbg_print(" FORCED");
-    if (bc_crash_info.hfsr & 0x00000002) dbg_print(" VECTTBL");
-    dbg_print("\r\n");
+        dbg_print("  HFSR:   0x%08X", (unsigned)bc_crash_info.hfsr);
+        if (bc_crash_info.hfsr & 0x40000000) dbg_print(" FORCED");
+        if (bc_crash_info.hfsr & 0x00000002) dbg_print(" VECTTBL");
+        dbg_print("\r\n");
 
-    if (cfsr & 0x00008000)  /* BFARVALID */
-        dbg_print("  BFAR:   0x%08X  <-- faulting address\r\n",
-                  (unsigned)bc_crash_info.bfar);
-    if (cfsr & 0x00000080)  /* MMARVALID */
-        dbg_print("  MMFAR:  0x%08X  <-- faulting address\r\n",
-                  (unsigned)bc_crash_info.mmfar);
-#endif
+        if (cfsr & 0x00008000)  /* BFARVALID */
+            dbg_print("  BFAR:   0x%08X  <-- faulting address\r\n",
+                      (unsigned)bc_crash_info.bfar);
+        if (cfsr & 0x00000080)  /* MMARVALID */
+            dbg_print("  MMFAR:  0x%08X  <-- faulting address\r\n",
+                      (unsigned)bc_crash_info.mmfar);
+    }
 
     dbg_print("==================================\r\n\r\n");
 

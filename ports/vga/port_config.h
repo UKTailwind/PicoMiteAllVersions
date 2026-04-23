@@ -80,4 +80,11 @@
  * ports have their own policy (see host/port_config.h). */
 #define HAL_PORT_RANDOMIZE_DEFAULT_SEED() ((int64_t)hal_time_us_64())
 
+/* BCCrashInfo storage placement. On device it lives in an
+ * uninitialized section (.uninitialized_data) that survives soft /
+ * watchdog reset so the next-boot bc_crash_dump_if_any can read
+ * register values stored before the fault. Host has no such
+ * section — plain BSS. */
+#define HAL_PORT_BC_CRASH_INFO_ATTR __attribute__((section(".uninitialized_data.bc_crash_info")))
+
 #endif /* PORT_CONFIG_H */
