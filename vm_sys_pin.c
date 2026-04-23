@@ -125,13 +125,11 @@ void vm_sys_pin_setpin(int64_t pin, int mode, int option) {
         mode != VM_PIN_MODE_PWM4A && mode != VM_PIN_MODE_PWM4B &&
         mode != VM_PIN_MODE_PWM5A && mode != VM_PIN_MODE_PWM5B &&
         mode != VM_PIN_MODE_PWM6A && mode != VM_PIN_MODE_PWM6B &&
-        mode != VM_PIN_MODE_PWM7A && mode != VM_PIN_MODE_PWM7B
-#ifdef rp2350
-        && mode != VM_PIN_MODE_PWM8A && mode != VM_PIN_MODE_PWM8B &&
+        mode != VM_PIN_MODE_PWM7A && mode != VM_PIN_MODE_PWM7B &&
+        mode != VM_PIN_MODE_PWM8A && mode != VM_PIN_MODE_PWM8B &&
         mode != VM_PIN_MODE_PWM9A && mode != VM_PIN_MODE_PWM9B &&
         mode != VM_PIN_MODE_PWM10A && mode != VM_PIN_MODE_PWM10B &&
         mode != VM_PIN_MODE_PWM11A && mode != VM_PIN_MODE_PWM11B
-#endif
     )
         error("Unsupported SETPIN mode");
 
@@ -290,38 +288,37 @@ enum {
     VM_PIN_EXT_ADC_RAW = 46
 };
 
-#ifdef rp2350
+/* vm_pin_gpio_map is the superset — 48 entries so rp2350b (QFN-80,
+ * 48 GPIOs) is covered. rp2040 and rp2350a both bound-check at
+ * runtime via `max_gpio_index` in vm_pin_codemap and never reach past
+ * index 29. */
 static const uint8_t vm_pin_gpio_map[48] = {
     1, 2, 4, 5, 6, 7, 9, 10, 11, 12, 14, 15, 16, 17, 19, 20,
     21, 22, 24, 25, 26, 27, 29, 41, 42, 43, 31, 32, 34, 44, 45, 46,
     47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62
 };
-#else
-static const uint8_t vm_pin_gpio_map[30] = {
-    1, 2, 4, 5, 6, 7, 9, 10, 11, 12, 14, 15, 16, 17, 19,
-    20, 21, 22, 24, 25, 26, 27, 29, 41, 42, 43, 31, 32, 34, 44
-};
-#endif
 
 extern volatile int ExtCurrentConfig[NBRPINS + 1];
 extern uint32_t pinmask;
 extern int last_adc;
 extern int BacklightSlice;
 extern int CameraSlice;
-#ifdef rp2350
+/* rp2350a is unconditionally true on rp2040 (stubbed in PicoMite.c),
+ * so portable code can branch on the package-variant flag without a
+ * target gate. fast_timer_active is defined everywhere via
+ * port-stubs; KeyboardlightSlice is PICOMITE-specific but declared
+ * here unconditionally because vm_sys_pin's PWM detach path touches
+ * it only after a PinDef[].mode check that's always false elsewhere. */
 extern bool fast_timer_active;
 extern bool rp2350a;
-#if defined(PICOMITE)
 extern int KeyboardlightSlice;
-#endif
-#endif
 
 static int vm_pin_codemap(int64_t gpio_index) {
-#ifdef rp2350
+    /* rp2350a = 30-pin package (QFN-60, max GPIO index 29),
+     * rp2350b = 48-pin package (QFN-80, max GPIO index 47).
+     * rp2040 = QFN-56 with 30 GPIOs (also index 29); rp2350a stub is
+     * true on rp2040 so the same ternary works there. */
     int max_gpio_index = rp2350a ? 29 : 47;
-#else
-    int max_gpio_index = 29;
-#endif
     if (gpio_index < 0 || gpio_index > max_gpio_index)
         error("Invalid GPIO");
     return vm_pin_gpio_map[(int)gpio_index];
@@ -336,13 +333,12 @@ static int vm_pin_resolve(int64_t encoded_pin) {
     else
         error("Invalid pin");
 
-#ifdef rp2350
+    /* Pin range: rp2350b has 62 GPIOs (NBRPINS=62 there); rp2040 +
+     * rp2350a cap at 44. rp2040's NBRPINS (44) is the same number the
+     * rp2350a arm uses, so the condition below collapses to one branch
+     * covering every target. */
     if (pin < 1 || pin > (rp2350a ? 44 : NBRPINS))
         error("Invalid pin");
-#else
-    if (pin < 1 || pin > NBRPINS)
-        error("Invalid pin");
-#endif
     if (PinDef[pin].mode & UNUSED)
         error("Invalid pin");
     return pin;
@@ -416,7 +412,8 @@ static int vm_pin_pwm_mode_valid_for_pin(int pin, int mode) {
         case VM_PIN_MODE_PWM6B: return (PinDef[pin].mode & PWM6B) != 0;
         case VM_PIN_MODE_PWM7A: return (PinDef[pin].mode & PWM7A) != 0;
         case VM_PIN_MODE_PWM7B: return (PinDef[pin].mode & PWM7B) != 0;
-#ifdef rp2350
+        /* PWM8..11 mask bits are unconditional in configuration.h;
+         * on rp2040 no PinDef entry ever sets them so these return 0. */
         case VM_PIN_MODE_PWM8A: return (PinDef[pin].mode & PWM8A) != 0;
         case VM_PIN_MODE_PWM8B: return (PinDef[pin].mode & PWM8B) != 0;
         case VM_PIN_MODE_PWM9A: return (PinDef[pin].mode & PWM9A) != 0;
@@ -425,7 +422,6 @@ static int vm_pin_pwm_mode_valid_for_pin(int pin, int mode) {
         case VM_PIN_MODE_PWM10B: return (PinDef[pin].mode & PWM10B) != 0;
         case VM_PIN_MODE_PWM11A: return (PinDef[pin].mode & PWM11A) != 0;
         case VM_PIN_MODE_PWM11B: return (PinDef[pin].mode & PWM11B) != 0;
-#endif
         default: return 0;
     }
 }
@@ -498,10 +494,12 @@ void vm_sys_pin_setpin(int64_t encoded_pin, int mode, int option) {
     if (mode == VM_PIN_MODE_ARAW) {
         if (!(PinDef[pin].mode & ANALOG_IN))
             error("Invalid configuration");
-#ifdef rp2350
+        /* rp2350 package check: rp2350a has ADC on pins > 44 only.
+         * rp2350a is unconditionally true on rp2040, so on rp2040 the
+         * first branch short-circuits false and the second is
+         * unreachable (NBRPINS = 44). */
         if (pin <= 44 && rp2350a == 0) error("Invalid configuration");
         if (pin > 44 && rp2350a) error("Invalid configuration");
-#endif
         gpio_init(PinDef[pin].GPno);
         gpio_set_function(PinDef[pin].GPno, GPIO_FUNC_NULL);
         vm_pin_clear_pwm_assignment(pin);
@@ -592,20 +590,21 @@ void vm_sys_pwm_configure(int slice, MMFLOAT frequency,
 
     if (slice < 0 || slice > vm_pwm_max_slice())
         error("Number out of bounds");
-#ifdef rp2350
+    /* fast_timer_active stays false on rp2040 + host, so this check
+     * is live only on rp2350 where the feature is driven from
+     * ports/pico_sdk_common/hal_fast_timer_pico.c. */
     if (slice == 0 && fast_timer_active)
         error("Channel 0 in use for fast timer");
-#endif
     if (slice == BacklightSlice)
         error("Channel in use for backlight");
     if (slice == Option.AUDIO_SLICE)
         error("Channel in use for Audio");
     if (slice == CameraSlice)
         error("Channel in use for Camera");
-#if defined(PICOMITE) && defined(rp2350)
+    /* KeyboardlightSlice starts at -1 on non-PicoCalc ports so the
+     * check below is a no-op there. */
     if (slice == KeyboardlightSlice)
         error("Channel in use for keyboard backlight");
-#endif
 
     if (frequency > (MMFLOAT)(cpu_speed >> 2) * 1000.0 || frequency <= 0.0)
         error("Invalid frequency");

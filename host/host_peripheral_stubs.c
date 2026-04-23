@@ -597,3 +597,9 @@ void close_tcpclient(void) {}
  * read as a runtime value by MMBasic.c (the PSRAM-range check in
  * ClearVars); PicoMite.c defines it on device. Host has no PSRAM. */
 uint32_t PSRAMsize = 0;
+
+/* PWM-slice claim for the PicoCalc keyboard-backlight LED, owned by
+ * drivers/sd_spi/mmc_stm32.c on device. Host doesn't link that
+ * driver; stub to the "unclaimed" sentinel so vm_sys_pin.c's
+ * `slice == KeyboardlightSlice` check is a no-op on host. */
+int KeyboardlightSlice = -1;
