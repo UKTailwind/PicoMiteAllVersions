@@ -41,6 +41,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "hal/hal_time.h"
 #include "hal/hal_keyboard.h"
 #include "hal/hal_display_merge.h"
+#include "port_config.h"
 #include "hardware/structs/watchdog.h"
 #include "bc_alloc.h"
 #include "bc_run_diag.h"
@@ -49,6 +50,10 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 void flist(int, int, int);
 //void clearprog(void);
 extern void bc_run_source_string(const char *source, const char *source_name);
+/* WEB stack teardown hooks — real impls in MMtcpserver.c /
+ * MMTCPclient.c, no-op stubs in MMweb_stubs.c / host_peripheral_stubs.c. */
+extern void cleanserver(void);
+extern void close_tcpclient(void);
 #if defined(PICOCALC) && defined(rp2350)
 static void vm_run_memdiag(const char *stage) {
     if (strcmp(stage, "before_clear") == 0) {
@@ -148,15 +153,7 @@ void __not_in_flash_func(cmd_null)(void) {
  * @param a the integer, float or string to be changed
  * @param b OPTIONAL for integers and floats - defaults to 1. Otherwise the amount to increment the number or the string to concatenate
  */
-#ifdef rp2350
-void MIPS16 __not_in_flash_func(cmd_inc)(void){
-#else
-#if defined(PICOMITEVGA) || (defined(PICOMITEWEB) && !defined(rp2350))
-void MIPS16 cmd_inc(void){
-#else
-void MIPS16 __not_in_flash_func(cmd_inc)(void){
-#endif
-#endif
+void MIPS16 HAL_PORT_MMBASIC_SUBFUN_FUNC(cmd_inc)(void){
 	unsigned char *p, *q;
     int vtype;
 	getargs(&cmdline,3,(unsigned char *)",");
@@ -767,9 +764,7 @@ void MIPS16 do_run(unsigned char *cmdline, bool CMM2mode) {
     IgnorePIN = false;
 	if(Option.LIBRARY_FLASH_SIZE == MAX_PROG_SIZE) ExecuteProgram(LibMemory);       // run anything that might be in the library
     if(*ProgMemory != T_NEWLINE) return;                             // no program to run
-#ifdef PICOMITEWEB
 	cleanserver();
-#endif
 #ifndef USBKEYBOARD
     if(mouse0==false && Option.MOUSE_CLOCK)initMouse0(0);  //see if there is a mouse to initialise
 #endif
@@ -875,9 +870,11 @@ void MIPS16 cmd_list(void) {
 		}
 		
    	} else if((p = checkstring(cmdline, (unsigned char *)"PINS"))) {
-#if defined(PICOMITEWEB) && defined(rp2350)
+		/* rp2350a is unconditionally true on rp2040 targets and runtime-
+		 * detected on rp2350; only the rp2350 WEB pinlist actually
+		 * requires the RP2350A package. On every other target this
+		 * branch is a no-op. */
 		if(!rp2350a)error("Incompatible board, RP2350A only" );
-#endif
 		CallExecuteProgram((char *)pinlist);
 		return;
    	} else if((p = checkstring(cmdline, (unsigned char *)"SYSTEM I2C"))) {
@@ -1264,23 +1261,7 @@ void cmd_goto(void) {
 
 
 
-#ifdef PICOMITEWEB
-#ifdef rp2350
-void MIPS16 __not_in_flash_func(cmd_if)(void) {
-#else
-void cmd_if(void) {
-#endif
-#else
-#ifndef rp2350
-#ifdef PICOMITEVGA
-void cmd_if(void) {
-#else
-void MIPS16 __not_in_flash_func(cmd_if)(void) {
-#endif
-#else
-void MIPS16 __not_in_flash_func(cmd_if)(void) {
-#endif
-#endif
+void MIPS16 HAL_PORT_MMBASIC_SUBFUN_FUNC(cmd_if)(void) {
  	int r, i, testgoto, testelseif;
 	unsigned char ss[3];														// this will be used to split up the argument line
 	unsigned char *p, *tp;
@@ -1436,23 +1417,7 @@ retest_an_if:
 
 
 
-#ifdef PICOMITEWEB
-#ifdef rp2350
-void MIPS16 __not_in_flash_func(cmd_else)(void) {
-#else
-void cmd_else(void) {
-#endif
-#else
-#ifndef rp2350
-#ifdef PICOMITEVGA
-void cmd_else(void) {
-#else
-void MIPS16 __not_in_flash_func(cmd_else)(void) {
-#endif
-#else
-void MIPS16 __not_in_flash_func(cmd_else)(void) {
-#endif
-#endif
+void MIPS16 HAL_PORT_MMBASIC_SUBFUN_FUNC(cmd_else)(void) {
 	int i;
 	unsigned char *p, *tp;
 
@@ -1557,9 +1522,7 @@ if(Option.SerialConsole)while(ConsoleTxBufHead!=ConsoleTxBufTail)routinechecks()
 #endif
 	SSPrintString("\033[?25h"); //in case application has turned the cursor off
 	SSPrintString("\033[97;40m");
-#ifdef PICOMITEWEB
 	close_tcpclient();
-#endif
 #ifndef USBKEYBOARD
     if(mouse0==false && Option.MOUSE_CLOCK)initMouse0(0);  //see if there is a mouse to initialise 
 #endif
@@ -1581,7 +1544,10 @@ extern volatile char *g_StrTmp[MAXTEMPSTRINGS];                                 
 extern volatile char g_StrTmpLocalIndex[MAXTEMPSTRINGS];                              // used to track the g_LocalIndex for each temporary string space on the heap
 void SaveContext(void){
 	CloseAudio(1);
-	#if defined(rp2350) && !defined(PICOMITEWEB)
+	/* PSRAM-backed fast save (rp2350 non-WEB). On every other target
+	 * PSRAMsize==0 so this falls through to the LFS save path below.
+	 * The closing } + else + LFS block + final } all collapse to a
+	 * plain C if/else with no preprocessor gates. */
 	if(PSRAMsize){
 		ClearTempMemory();
 		uint8_t *p=(uint8_t *)PSRAMbase+PSRAMsize;
@@ -1626,7 +1592,6 @@ void SaveContext(void){
 		memcpy(p, psmap, sizeof(psmap));
 		p+=sizeof(psmap);
 	} else {
-#endif
 		lfs_file_t lfs_file;
         struct lfs_info lfsinfo={0};
         FSerror = lfs_stat(&lfs, "/.vars", &lfsinfo);
@@ -1660,13 +1625,11 @@ void SaveContext(void){
 		lfs_file_write(&lfs, &lfs_file, MMHeap, heap_memory_size+256);
 		lfs_file_write(&lfs, &lfs_file, mmap, sizeof(mmap));
 		lfs_file_close(&lfs, &lfs_file);
-#if defined(rp2350) && !defined(PICOMITEWEB)
 	}
-#endif
 }
 void RestoreContext(bool keep){
 	CloseAudio(1);
-	#if defined(rp2350) && !defined(PICOMITEWEB)
+	/* PSRAM-backed fast restore (rp2350 non-WEB); LFS fallback otherwise. */
 	if(PSRAMsize){
 		uint8_t *p=(uint8_t *)PSRAMbase+PSRAMsize;
 		memcpy(&g_StrTmpIndex, p, sizeof(g_StrTmpIndex));
@@ -1710,7 +1673,6 @@ void RestoreContext(bool keep){
 		memcpy(psmap, p, sizeof(psmap));
 		p+=sizeof(psmap);
 	} else {
-#endif
 		lfs_file_t lfs_file;
         struct lfs_info lfsinfo={0};
         FSerror = lfs_stat(&lfs, "/.vars", &lfsinfo);
@@ -1737,9 +1699,7 @@ void RestoreContext(bool keep){
 		lfs_file_read(&lfs, &lfs_file, mmap, sizeof(mmap));
 		lfs_file_close(&lfs, &lfs_file);
 		if(!keep)lfs_remove(&lfs, "/.vars");
-#if defined(rp2350) && !defined(PICOMITEWEB)
 	}
-#endif
 }
 void MIPS16 do_chain(unsigned char *cmdline){
     unsigned char *filename = (unsigned char *)"", *cmd_args = (unsigned char *)"";
@@ -1788,11 +1748,9 @@ void MIPS16 do_chain(unsigned char *cmdline){
     IgnorePIN = false;
 	if(Option.LIBRARY_FLASH_SIZE == MAX_PROG_SIZE) ExecuteProgram(LibMemory );       // run anything that might be in the library
     if(*ProgMemory != T_NEWLINE) return;                             // no program to run
-#ifdef PICOMITEWEB
 	cleanserver();
-#endif
 #ifndef USBKEYBOARD
-    if(mouse0==false && Option.MOUSE_CLOCK)initMouse0(0);  //see if there is a mouse to initialise 
+    if(mouse0==false && Option.MOUSE_CLOCK)initMouse0(0);  //see if there is a mouse to initialise
 #endif
 	nextstmt = ProgMemory;
 }
@@ -2342,15 +2300,7 @@ void MIPS16 __not_in_flash_func(cmd_do)(void) {
 
 
 
-#ifdef PICOMITEWEB
-#ifdef rp2350
-void MIPS16 __not_in_flash_func(cmd_loop)(void) {
-#else
-void cmd_loop(void) {
-#endif
-#else
-void MIPS16 __not_in_flash_func(cmd_loop)(void) {
-#endif
+void MIPS16 HAL_PORT_MMBASIC_HOT_FUNC(cmd_loop)(void) {
     unsigned char *p;
 	int tst = 0;                                                    // initialise tst to stop the compiler from complaining
 	int i;

@@ -152,13 +152,18 @@ unsigned char *SecondFrame=video;
 volatile int ytileheight = 0;
 #endif
 
-#if defined(rp2350)
 unsigned int mmap[HEAP_MEMORY_SIZE/ PAGESIZE / PAGESPERWORD]={0};
+#if defined(rp2350)
 unsigned int psmap[6*1024*1024/ PAGESIZE / PAGESPERWORD]={0};
 unsigned int SBitsGet(unsigned char *addr);
 void SBitsSet(unsigned char *addr, int bits);
 #else
-unsigned int mmap[HEAP_MEMORY_SIZE/ PAGESIZE / PAGESPERWORD]={0};
+/* psmap is the page-bitmap for the rp2350 PSRAM heap; on rp2040 and
+ * host there is no PSRAM, but Commands.c's SaveContext / RestoreContext
+ * reference psmap unconditionally (the reference is inside
+ * `if(PSRAMsize)` and never executes). A 1-word stub keeps the
+ * linker happy without paying the full 6 MB bitmap's BSS cost. */
+unsigned int psmap[1]={0};
 #endif
 static inline unsigned int MBitsGet(unsigned char *addr);
 static inline void MBitsSet(unsigned char *addr, int bits);

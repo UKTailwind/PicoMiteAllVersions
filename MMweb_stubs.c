@@ -35,6 +35,13 @@ void port_fun_mm_mqtt_copy(int which, unsigned char *out) {
  * non-WEB has no TCP state so the hook is a no-op. */
 void port_web_clear_runtime_state(void) {}
 
+/* TCP server + client teardown hooks called from Commands.c's cmd_run
+ * and cmd_mmcls2; WEB has real impls in MMtcpserver.c / MMTCPclient.c.
+ * Non-WEB builds need the symbols defined so Commands.c can call them
+ * unconditionally. */
+void cleanserver(void) {}
+void close_tcpclient(void) {}
+
 void port_web_print_options(void) {}
 int  port_web_option_setter(unsigned char *cmdline) { (void)cmdline; return 0; }
 int  port_web_mminfo(unsigned char *ep, int64_t *out_iret,

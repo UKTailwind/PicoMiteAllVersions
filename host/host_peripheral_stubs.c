@@ -574,6 +574,10 @@ void port_fun_mm_mqtt_copy(int which, unsigned char *out) {
 /* ClearRuntime TCP-state teardown. Host has no TCP state. */
 void port_web_clear_runtime_state(void) {}
 
+/* TCP server + client teardown hooks — host has neither. */
+void cleanserver(void) {}
+void close_tcpclient(void) {}
+
 /* PSRAMsize is extern'd unconditionally in Hardware_Includes.h and
  * read as a runtime value by MMBasic.c (the PSRAM-range check in
  * ClearVars); PicoMite.c defines it on device. Host has no PSRAM. */
