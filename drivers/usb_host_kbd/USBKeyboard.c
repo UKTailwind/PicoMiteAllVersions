@@ -43,9 +43,15 @@ the non US keyboard layouts
 #include "tusb.h"
 #include "hardware/structs/usb.h"
 extern volatile int ConsoleRxBufHead;
-extern volatile int ConsoleRxBufTail; 
+extern volatile int ConsoleRxBufTail;
 extern volatile int keytimer;
 int justset = 0;
+/* PS/2 matrix keyboard symbols. Defined in drivers/ps2_matrix/Keyboard.c
+ * on non-USB device builds; stubbed here so MM_Misc.c can read them
+ * unconditionally. The OnPS2GOSUB interrupt path checks PS2int and never
+ * fires on USB builds (PS2int stays false). */
+volatile int  PS2code = 0;
+volatile bool PS2int  = false;
 // extern char ConsoleRxBuf[];
 uint32_t repeattime;
 void USR_KEYBRD_ProcessData(uint8_t data);

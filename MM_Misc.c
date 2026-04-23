@@ -4408,12 +4408,11 @@ void MIPS16 fun_info(void){
             iret = (int64_t)(uint32_t)ProgMemory;
             targ = T_INT;
             return;
-#ifndef USBKEYBOARD
         } else if(checkstring(ep, (unsigned char *)"PS2")){
+            /* PS2code is 0 on USB-keyboard builds (USBKeyboard.c stubs it). */
             iret = (int64_t)(uint32_t)PS2code;
             targ = T_INT;
             return;
-#endif            
         } else if(checkstring(ep, (unsigned char *)"PATH")){
 //            strcpy((char *)sret,GetCWD());
 //            if(sret[strlen((char *)sret)-1]!='/')strcat((char *)sret,"/");
@@ -4952,13 +4951,12 @@ int checkdetailinterrupts(void) {
         intaddr = (char *)OnKeyGOSUB;                                       // set the next stmt to the interrupt location
         goto GotAnInterrupt;
     }
-#ifndef USBKEYBOARD
     if(OnPS2GOSUB && PS2int) {
-        intaddr = (char *)OnPS2GOSUB;                                       // set the next stmt to the interrupt location
+        /* PS2int is always false on USB-keyboard builds. */
+        intaddr = (char *)OnPS2GOSUB;
         PS2int=false;
         goto GotAnInterrupt;
     }
-#endif    
     if(piointerrupt){  // have any PIO interrupts been set
         for(int pio=0 ;pio<PIOMAX;pio++){
 #ifdef rp2350

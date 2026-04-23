@@ -119,7 +119,8 @@ bool optionlogging = 0;
 int PromptFont = 1;
 int PromptFC = 0xFFFFFF;
 int PromptBC = 0;
-volatile int PS2code = 0;
+volatile int  PS2code = 0;
+volatile bool PS2int  = false;
 /* ReadBuffer is a function pointer - defined in function pointers section below */
 volatile uint32_t realflashpointer = 0;
 /* Simulated erased-flash regions so Memory.c's scan loops terminate on the
