@@ -81,6 +81,17 @@
  * page of RAM for this one function matters. */
 #define HAL_PORT_MMBASIC_SUBFUN_FUNC(name) __not_in_flash_func(name)
 
+/* Memory-layout port knobs:
+ *   TRAILER_BYTES = extra bytes appended to AllMemory[] after the
+ *                   heap + safety pad. VGA ports pack the scanout
+ *                   framebuffer there; non-VGA ports have 0 and keep
+ *                   AllMemory lean.
+ *   ALLMEMORY_ALIGN = alignment boundary for AllMemory[]. 4096 on
+ *                     rp2040 VGA so the heap fronts a flash-page
+ *                     boundary for USB MSC; 256 everywhere else. */
+#define HAL_PORT_FRAMEBUFFER_TRAILER_BYTES 0
+#define HAL_PORT_ALLMEMORY_ALIGN           256
+
 
 /* SPI-LCD clock-pin field: rp2040 PICOMITE shares SYSTEM_CLK for the
  * LCD; rp2350 PICOMITE breaks it out as Option.LCD_CLK. Ports without

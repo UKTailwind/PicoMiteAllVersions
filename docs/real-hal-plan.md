@@ -49,7 +49,7 @@ A phase closes only when its targeted core files pass that standard. "Infrastruc
 | [7 — hal_display](real-hal/phase-7-display.md) | ✅ | 7a + 7b + 7c closed — Draw.c 164 → 3, STRICT_FILES; `drivers/hdmi/` owns modes + scanout; 7d (SSD1963) optional refinement remains |
 | [8 — hal_multicore](real-hal/phases-8-to-13.md#phase-8--hal_multicoreh) | ✅ | 8 steps 1–3 done; no direct multicore_fifo_* outside drivers; driver-owned pattern (no generic HAL contract) |
 | [9 — hal_net](real-hal/phases-8-to-13.md#phase-9--hal_neth) | ✅ | PICOMITEWEB references across core files 30 → 0 (5 steps); routed through port hooks / runtime PSRAMsize / port-config macros; no `hal/hal_net.h` contract introduced |
-| [10 — hal_heap + Memory.c](real-hal/phases-8-to-13.md#phase-10--hal_heaph--memoryc-cleanup) | ⏳ | not started |
+| [10 — hal_heap + Memory.c](real-hal/phases-8-to-13.md#phase-10--hal_heaph--memoryc-cleanup) | ✅ | Memory.c 39 → 1 (#ifdef GUICONTROLS feature flag only); promoted to STRICT_FILES; PSRAM bitmap + allocator in drivers/psram_heap/; VGA framebuffer + tile state in drivers/vga_pio/vga_memory.c; unified AllMemory layout via `HAL_PORT_FRAMEBUFFER_TRAILER_BYTES` + `HAL_PORT_ALLMEMORY_ALIGN` port-config macros. No `hal/hal_heap.h` contract introduced. |
 | [11 — sweep](real-hal/phases-8-to-13.md#phase-11--sweep--remaining-drivers--scope-cleanup) | ⏳ | not started |
 | [12 — host + WASM relocation](real-hal/phases-8-to-13.md#phase-12--host--wasm-relocation) | ⏳ | not started |
 | [12.5 — mmbasic_stdio](real-hal/phases-8-to-13.md#phase-125--mmbasic_stdio-pure-stdio-executable-hal-litmus-test) | ⏳ | not started; the HAL litmus test |

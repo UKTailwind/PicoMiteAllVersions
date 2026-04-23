@@ -110,16 +110,78 @@ to eliminate the PICOMITEWEB token entirely.
 
 **Commit-count target:** 5 commits (actual: 5).
 
-## Phase 10 — `hal_heap.h` + Memory.c cleanup
+## Phase 10 — `hal_heap.h` + Memory.c cleanup ✅
 
-Memory.c's 37 hardware `#ifdef`s: heap-size choice, PSRAM use, allocator hooks, network buffer allocation, framebuffer memory sizing.
+Memory.c's 39 hardware `#ifdef`s (phase-9 tip) → 1 (remaining is
+`#ifdef GUICONTROLS`, a feature flag, permitted by the strict
+check). No `hal/hal_heap.h` contract introduced — the original plan
+sketched `hal_heap_size()` / `hal_heap_base()` / `hal_heap_psram_base()`
+/ `hal_heap_psram_size()` getters, but driver relocation + runtime
+`if(PSRAMsize)` checks + port-config value macros turned out cleaner
+than a function-pointer HAL surface.
 
-- Define `hal/hal_heap.h`: `hal_heap_size()`, `hal_heap_base()`, `hal_heap_psram_base()`, `hal_heap_psram_size()`.
-- Memory.c becomes target-neutral; ports + `drivers/psram/` supply heap base + size at link time. Network buffer sizing uses `PORT_HAS_NETWORK`. Framebuffer sizing uses `hal_display_get_framebuffer_size()` or port-config.
+**Exit gate:** Memory.c in STRICT_FILES with zero target-macro and zero
+port-config-macro ifdefs. ✅ met.
 
-**Exit gate:** Memory.c hardware-ifdef count → 0.
+### Step 1 ✅ — PSRAM bitmap + allocator → drivers/psram_heap/
 
-**Commit-count target:** 1 commit.
+Relocated `psmap` page-bitmap + `SBitsGet` / `SBitsSet` / `GetPSMemory`
+into `drivers/psram_heap/psram_heap_pico.c` (rp2350 non-WEB real impl,
+~24 KB BSS) + `drivers/psram_heap/psram_heap_stub.c` (no-op on every
+other target). Callers in Memory.c (FreeMemory / GetMemory /
+TryGetMemory / FreeSpaceOnHeap / UsedHeap / MemSize / FreeMemorySafe)
+drop their nested `#ifdef rp2350` gates — runtime `if(PSRAMsize)` and
+address-range checks keep the paths dormant where PSRAMsize == 0.
+Commands.c's SaveContext / RestoreContext use the new driver const
+`psmap_size_bytes` instead of `sizeof(psmap)` (which broke after the
+extern lost its array bound). Fixes a pre-existing
+7 MB-vs-6 MB size mismatch between Commands.c's extern and Memory.c's
+definition in the process.
+
+### Step 2 ✅ — VGA framebuffer + tile state → drivers/vga_pio/vga_memory.c
+
+Lifted the VGA/HDMI-specific storage block (tilefcols / tilebcols /
+HDMIlines / tilefcols_w / tilebcols_w / X_TILE / Y_TILE / ytileheight
+/ M_Foreground / M_Background / WriteBuf / DisplayBuf / LayerBuf /
+FrameBuf / SecondLayer / SecondFrame) out of Memory.c into
+`drivers/vga_pio/vga_memory.c` (VGA + HDMI real impl) +
+`drivers/vga_pio/vga_ops_stub.c` (non-VGA stubs). InitHeap calls
+new `vga_memory_init_planes()` hook instead of an inline
+`#ifdef PICOMITEVGA` plane rebind. HDMICore's core1stack moved into
+`drivers/hdmi/hdmi_scanout.c` alongside its core1 entry function.
+
+### Step 3 ✅ — Unified AllMemory layout via port-config
+
+Collapsed the 4-branch memory-layout block (`rp2350 VGA` / `rp2350 non-VGA`
+/ `rp2040 VGA` / `rp2040 non-VGA`) into a single unconditional
+declaration:
+
+```c
+unsigned char __attribute__((aligned(HAL_PORT_ALLMEMORY_ALIGN)))
+    AllMemory[HEAP_MEMORY_SIZE + 256 + HAL_PORT_FRAMEBUFFER_TRAILER_BYTES];
+unsigned char *MMHeap = AllMemory;
+```
+
+New port-config macros in every `ports/*/port_config.h`:
+
+  - `HAL_PORT_FRAMEBUFFER_TRAILER_BYTES`: 320*240*2 on rp2350 VGA +
+    HDMI, 640*480/8 on rp2040 VGA, 0 everywhere else.
+  - `HAL_PORT_ALLMEMORY_ALIGN`: 4096 on rp2040 VGA (preserves the
+    USB MSC flash-page alignment the old `Heap[]` array had), 256
+    elsewhere.
+
+`FRAMEBUFFER` and `framebuffersize` now live in the VGA driver
+(`vga_memory.c` points FRAMEBUFFER at `AllMemory + HEAP + 256`;
+`vga_ops_stub.c` sets it NULL). The rp2040 VGA path no longer has a
+separate `video[]` array — the 38400-byte scanout buffer is now the
+trailer of AllMemory, same layout as rp2350 VGA.
+
+Scoreboard: Memory.c 39 → 1 (−38 across phase 9 step 5 + phase 10
+steps 1–3). Total 104 → 40. rp2350 refs across core files 48 → 17.
+PICOMITEVGA 11 → 3. All 12 device variants + host 239/239 + HAL
+purity gate green. Memory.c promoted to STRICT_FILES.
+
+**Commit-count target:** 3 commits (step 1 + step 2 + step 3 combined).
 
 ## Phase 11 — Sweep + remaining drivers + scope cleanup
 

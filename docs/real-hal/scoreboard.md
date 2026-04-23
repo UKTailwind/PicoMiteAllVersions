@@ -170,3 +170,12 @@ As each phase lands, it promotes its targeted file(s) into `STRICT_FILES`. A pha
 | 9 step 3| 3    | 4       | 2        | 2      | 37       | 39     | 11        | 0     | 98    | MMBasic.c hot-func port macros + PSRAMbase unconditional + port_web_clear_runtime_state — INFO-only delta (MMBasic.c target ifdefs 28 → 19) |
 | 9 step 4| 3    | 4       | 2        | 2      | 17       | 39     | 11        | 0     | 78    | Commands.c placement macros + cleanserver/close_tcpclient stubs + SaveContext flatten (−20) |
 | 9 step 5| 3    | 4       | 2        | 2      | 17       | 27     | 11        | 0     | 66    | Memory.c PSRAM nested ifdefs dropped (−12). **PICOMITEWEB refs across scored files: 30 → 0. Phase 9 CLOSED.** |
+
+## Phase 10 (Memory.c hardware-ifdef count → 0)
+
+| Phase    | Draw | MM_Misc | External | FileIO | Commands | Memory | Functions | Audio | Total | Notes |
+|----------|------|---------|----------|--------|----------|--------|-----------|-------|-------|-------|
+| 10 start | 3    | 4       | 2        | 2      | 17       | 27     | 11        | 0     | 66    | tip of phase 9 |
+| 10 step 1| 3    | 4       | 2        | 2      | 17       | 11     | 11        | 0     | 50    | PSRAM bitmap + SBitsGet / SBitsSet / GetPSMemory → drivers/psram_heap/ (real + stub); 8 rp2350 gates flattened to runtime `if(PSRAMsize)`; `psmap_size_bytes` const replaces broken `sizeof(psmap)` externs; VM-arena + CurrentRAM += PSRAMsize unconditional (−16) |
+| 10 step 2| 3    | 4       | 2        | 2      | 17       | 4      | 11        | 0     | 43    | VGA tile state + plane pointers + ytileheight + ShadowBuf/fb_dma_chan → drivers/vga_pio/vga_memory.c (real) + vga_ops_stub.c (non-VGA); HDMICore's core1stack → drivers/hdmi/hdmi_scanout.c; InitHeap's VGA plane rebind → port hook (−7) |
+| 10 step 3| 3    | 4       | 2        | 2      | 17       | 1      | 11        | 0     | 40    | AllMemory unified at compile-time via `HAL_PORT_FRAMEBUFFER_TRAILER_BYTES` + `HAL_PORT_ALLMEMORY_ALIGN` port-config macros; FRAMEBUFFER + framebuffersize moved to VGA driver; rp2040 `video[]` + `Heap[]` merged into AllMemory trailer. **Memory.c promoted to STRICT_FILES. Phase 10 CLOSED.** |

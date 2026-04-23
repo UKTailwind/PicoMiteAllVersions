@@ -49,6 +49,10 @@
 #define HAL_PORT_MMBASIC_HOT_FUNC(name)    __not_in_flash_func(name)
 #define HAL_PORT_MMBASIC_SUBFUN_FUNC(name) __not_in_flash_func(name)
 
+/* rp2350 VGA framebuffer trailer: 320*240*2 = 153600 bytes. */
+#define HAL_PORT_FRAMEBUFFER_TRAILER_BYTES (320*240*2)
+#define HAL_PORT_ALLMEMORY_ALIGN           256
+
 
 /* SPI-LCD clock-pin field: rp2040 PICOMITE shares SYSTEM_CLK for the
  * LCD; rp2350 PICOMITE breaks it out as Option.LCD_CLK. Ports without

@@ -40,6 +40,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
+#include "port_config.h"
 #include "bc_alloc.h"
 #define ASMMAX 6400 // maximum number of bytes that can be copied or set by assembler routines
 #define MAXCPY 3200 // tuned maximum number of bytes to copy using ZCOPY
@@ -48,35 +49,24 @@ extern const uint8_t *SavedVarsFlash;
 extern const uint8_t *flash_progmemory;
 // memory management parameters
 
-// allocate static memory for programs, variables and the heap
-// this is simple memory management because DOS has plenty of memory
-//unsigned char __attribute__ ((aligned (256))) AllMemory[ALL_MEMORY_SIZE];
-#if defined(rp2350)
-    #ifdef PICOMITEVGA
-        unsigned char __attribute__ ((aligned (256))) AllMemory[HEAP_MEMORY_SIZE+256+320*240*2];
-        unsigned char *FRAMEBUFFER=AllMemory+HEAP_MEMORY_SIZE+256;
-        uint32_t framebuffersize=320*240*2;
-        unsigned char *MMHeap=AllMemory;
-    #else
-        unsigned char __attribute__ ((aligned (256))) AllMemory[HEAP_MEMORY_SIZE+256];
-        unsigned char *MMHeap=AllMemory;
-        uint32_t framebuffersize=0;
-        unsigned char *FRAMEBUFFER=NULL;
-    #endif
-#else
-    #ifdef PICOMITEVGA
-        unsigned char __attribute__ ((aligned (256))) video[640*480/8];
-        unsigned char __attribute__ ((aligned (4096))) Heap[HEAP_MEMORY_SIZE+256];
-        unsigned char *FRAMEBUFFER=video;
-        uint32_t framebuffersize=640*480/8;
-        unsigned char *MMHeap=Heap;
-    #else
-        unsigned char __attribute__ ((aligned (256))) AllMemory[HEAP_MEMORY_SIZE+256];
-        unsigned char *MMHeap=AllMemory;
-        uint32_t framebuffersize=0;
-        unsigned char *FRAMEBUFFER=NULL;
-    #endif
-#endif
+/* AllMemory is the unified SRAM slab holding both the MMBasic heap
+ * and (on VGA/HDMI targets) the VGA scanout framebuffer in a trailer
+ * at the end. Size and alignment come from port-config macros so the
+ * layout is one compile-time expression across every target:
+ *
+ *   HEAP_MEMORY_SIZE + 256            = heap region + safety pad
+ *   HAL_PORT_FRAMEBUFFER_TRAILER_BYTES = 0 on non-VGA, the scanout
+ *                                       byte count on VGA/HDMI
+ *   HAL_PORT_ALLMEMORY_ALIGN          = 4096 on rp2040 VGA (USB MSC
+ *                                       flash-page alignment); 256
+ *                                       elsewhere
+ *
+ * `FRAMEBUFFER` + `framebuffersize` are owned by drivers/vga_pio/ —
+ * vga_memory.c (VGA real impl) points FRAMEBUFFER at the trailer;
+ * vga_ops_stub.c (non-VGA) points it at NULL. */
+unsigned char __attribute__((aligned(HAL_PORT_ALLMEMORY_ALIGN)))
+    AllMemory[HEAP_MEMORY_SIZE + 256 + HAL_PORT_FRAMEBUFFER_TRAILER_BYTES];
+unsigned char *MMHeap = AllMemory;
 
 uint32_t heap_memory_size=HEAP_MEMORY_SIZE;
 
@@ -87,70 +77,15 @@ unsigned int bc_alloc_fail_used    = 0;
 unsigned int bc_alloc_fail_free    = 0;
 unsigned int bc_alloc_fail_longest = 0;
 unsigned int bc_alloc_fail_total   = 0;
-#ifdef PICOMITEVGA
-#ifdef rp2350
-uint16_t *tilefcols;//=(uint16_t *)((uint32_t)FRAMEBUFFER+(MODE1SIZE_S*3));
-uint16_t *tilebcols;//=(uint16_t *)((uint32_t)FRAMEBUFFER+(MODE1SIZE_S*3)+(MODE1SIZE_S>>1));
-#else
-uint16_t __attribute__ ((aligned (256))) tilefcols[80*40];
-uint16_t __attribute__ ((aligned (256))) tilebcols[80*40];
-#endif
-#ifdef HDMI
-uint8_t *tilefcols_w; 
-uint8_t *tilebcols_w;
-uint16_t HDMIlines[2][848]={0};
-volatile int X_TILE=80, Y_TILE=40;
-uint32_t core1stack[128];
-volatile int ytileheight=480/12;
-#else
-uint16_t M_Foreground[16] ={
-0x0000,0x000F,0x00f0,0x00ff,0x0f00,0x0f0F,0x0ff0,0x0fff,0xf000,0xf00F,0xf0f0,0xf0ff,0xff00,0xff0F,0xfff0,0xffff
-};
-uint16_t M_Background[16] ={
-0xffff,0xfff0,0xff0f,0xff00,0xf0ff,0xf0f0,0xf00f,0xf000,0x0fff,0x0ff0,0x0f0f,0x0f00,0x00ff,0x00f0,0x000f,0x0000
-};
-volatile int ytileheight=16;
-#endif
-#ifdef rp2350
-unsigned char *WriteBuf=AllMemory+HEAP_MEMORY_SIZE+256;
-unsigned char *DisplayBuf=AllMemory+HEAP_MEMORY_SIZE+256;
-unsigned char *LayerBuf=AllMemory+HEAP_MEMORY_SIZE+256;
-unsigned char *FrameBuf=AllMemory+HEAP_MEMORY_SIZE+256;
-unsigned char *SecondLayer=AllMemory+HEAP_MEMORY_SIZE+256;
-unsigned char *SecondFrame=AllMemory+HEAP_MEMORY_SIZE+256;
-#else
-unsigned char *WriteBuf=video;
-unsigned char *DisplayBuf=video;
-unsigned char *LayerBuf=video;
-unsigned char *FrameBuf=video;
-unsigned char *SecondLayer=video;
-unsigned char *SecondFrame=video;
-#endif
-#endif
-#ifndef PICOMITEVGA
-    /* Framebuffer pointers for targets without a fixed VGA/HDMI buffer
-     * (SPI-LCD PICOMITE, WEB, host). FrameBuf/LayerBuf/WriteBuf default
-     * to NULL until cmd_framebuffer allocates them. ShadowBuf and
-     * fb_dma_chan are FASTGFX/DMA state that only SPI-LCD actually
-     * uses, but defining them unconditionally lets vm_sys_graphics.c
-     * and the display_merge HAL stubs reference them without a gate. */
-    unsigned char *WriteBuf=NULL;
-    unsigned char *LayerBuf=NULL;
-    unsigned char *FrameBuf=NULL;
-    unsigned char *ShadowBuf=NULL;
-    int fb_dma_chan=-1;
-#endif
+/* VGA framebuffer / tile state (tilefcols, HDMIlines, WriteBuf,
+ * DisplayBuf, LayerBuf, FrameBuf, SecondLayer, SecondFrame, etc.)
+ * live in drivers/vga_pio/vga_memory.c (real) / vga_ops_stub.c
+ * (stubs on non-VGA). ytileheight, ShadowBuf, fb_dma_chan also
+ * resolved there. Externs in Memory.h. */
+
 #ifdef GUICONTROLS
     struct s_ctrl CTRLS[MAXCONTROLS];
     struct s_ctrl *Ctrl=CTRLS;
-#endif
-
-/* ytileheight is read by MM_Misc.c's MM.INFO("TILE HEIGHT") on every
- * build (was VGA-gated in core; ungated in F4 step 12). The two
- * VGA-specific definitions above (480/12 for HDMI, 16 for VGA) only
- * compile on PICOMITEVGA — non-VGA builds need a default. */
-#ifndef PICOMITEVGA
-volatile int ytileheight = 0;
 #endif
 
 unsigned int mmap[HEAP_MEMORY_SIZE/ PAGESIZE / PAGESPERWORD]={0};
@@ -934,6 +869,7 @@ void MIPS64 __not_in_flash_func(FreeMemory)(unsigned char *addr) {
 
 
 
+extern void vga_memory_init_planes(void);
 void InitHeap(bool all) {
     int i;
     memset(mmap,0,sizeof(mmap));
@@ -944,16 +880,18 @@ void InitHeap(bool all) {
      * declared with an incomplete array bound here. */
     if(all)memset(psmap,0,psmap_size_bytes);
     for(i = 0; i < MAXTEMPSTRINGS; i++) g_StrTmp[i] = NULL;
-#ifdef PICOMITEVGA
-    WriteBuf=(unsigned char *)FRAMEBUFFER;
-    DisplayBuf=(unsigned char *)FRAMEBUFFER;
-    LayerBuf=(unsigned char *)FRAMEBUFFER;
-    FrameBuf=(unsigned char *)FRAMEBUFFER;
-#else
-    FrameBuf=NULL;
-    WriteBuf=NULL;
-    LayerBuf=NULL;
-#endif
+    /* Rebind VGA framebuffer plane pointers back to the head of the
+     * framebuffer. No-op on non-VGA targets (those planes are always
+     * NULL — see drivers/vga_pio/vga_ops_stub.c). */
+    vga_memory_init_planes();
+    /* Ensure the non-plane pointers (FrameBuf / WriteBuf / LayerBuf)
+     * are reset on non-VGA too; on VGA vga_memory_init_planes set
+     * them to FRAMEBUFFER above. */
+    if(FRAMEBUFFER == NULL) {
+        FrameBuf = NULL;
+        WriteBuf = NULL;
+        LayerBuf = NULL;
+    }
 }
 
 

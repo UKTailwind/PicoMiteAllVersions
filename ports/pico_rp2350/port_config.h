@@ -47,6 +47,9 @@
 #define HAL_PORT_MMBASIC_HOT_FUNC(name)    __not_in_flash_func(name)
 #define HAL_PORT_MMBASIC_SUBFUN_FUNC(name) __not_in_flash_func(name)
 
+#define HAL_PORT_FRAMEBUFFER_TRAILER_BYTES 0
+#define HAL_PORT_ALLMEMORY_ALIGN           256
+
 /* SPI-LCD clock-pin field: rp2350 PICOMITE adds a dedicated Option.LCD_CLK
  * alongside SYSTEM_CLK so the LCD can sit on its own SPI instance. On
  * rp2040 PICOMITE (and non-PICOMITE ports) SYSTEM_CLK doubles as the LCD

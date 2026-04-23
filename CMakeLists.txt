@@ -302,6 +302,7 @@ if (COMPILE STREQUAL "VGA" OR COMPILE STREQUAL "VGAUSB" OR COMPILE STREQUAL "VGA
         drivers/vga_pio/vga_ops.c
         drivers/vga_pio/vga_mode_ops.c
         drivers/vga_pio/vga_blit_ops.c
+        drivers/vga_pio/vga_memory.c
     )
     # VGA-without-HDMI gets QVGA-specific cmd_map/cmd_tile; HDMI gets
     # the HDMI-specific mode-ops (DrawRectangle555/256 family and

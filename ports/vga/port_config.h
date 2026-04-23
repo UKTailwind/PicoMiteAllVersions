@@ -55,6 +55,11 @@
  * framebuffer + mode tables have more SRAM. */
 #define HAL_PORT_MMBASIC_SUBFUN_FUNC(name) name
 
+/* QVGA scanout framebuffer trailer (640*480/8 = 38400 bytes) and
+ * the 4096-byte alignment needed for the USB MSC view of the heap. */
+#define HAL_PORT_FRAMEBUFFER_TRAILER_BYTES (640*480/8)
+#define HAL_PORT_ALLMEMORY_ALIGN           4096
+
 
 /* SPI-LCD clock-pin field: rp2040 PICOMITE shares SYSTEM_CLK for the
  * LCD; rp2350 PICOMITE breaks it out as Option.LCD_CLK. Ports without

@@ -64,6 +64,9 @@
 #define HAL_PORT_MMBASIC_HOT_FUNC(name)    name
 #define HAL_PORT_MMBASIC_SUBFUN_FUNC(name) name
 
+#define HAL_PORT_FRAMEBUFFER_TRAILER_BYTES 0
+#define HAL_PORT_ALLMEMORY_ALIGN           256
+
 /* Device-name string returned by `fun_device` (MM.DEVICE$). Host
  * advertises itself as "MMBasic Host" so test programs can branch on it. */
 #define HAL_PORT_DEVICE_NAME             "MMBasic Host"
