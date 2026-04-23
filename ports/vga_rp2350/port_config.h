@@ -24,6 +24,10 @@
 #define HAL_PORT_HAS_SSD1963             0
 
 /* RP2350 has the RAM budget to place GPIO hot loops in SRAM even on VGA. */
+/* cmd_files flist[] cap. Device has the RAM and the SaveContext+InitHeap
+ * dance to allocate ~76 KB. Host caps lower in host/port_config.h. */
+#define HAL_PORT_FILES_MAX               1000
+
 #define HAL_PORT_RAM_FUNC(name)          __not_in_flash_func(name)
 
 #endif /* PORT_CONFIG_H */

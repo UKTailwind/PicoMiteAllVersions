@@ -73,10 +73,6 @@ extern FRESULT host_f_getcwd(TCHAR *buff, UINT len);
  * unused externals don't break the build. */
 #endif
 #include "hardware/irq.h"
-#if defined(PICOCALC) && defined(rp2350)
-#include "bc_alloc.h"
-#include "bc_run_diag.h"
-#endif
 #include "hardware/gpio.h"
 #include "pico/binary_info.h"
 #include "hardware/structs/watchdog.h"
@@ -127,6 +123,7 @@ extern void cmd_files_save_program_context(void);
 extern void cmd_files_restore_program_context(void);
 extern void cmd_files_pump_console_key(int *c);
 extern void cmd_load_post_cleanup(void);
+extern int  port_mount_sd_drive(void);
 /* MemLoadProgram body lives in the #ifdef-rp2350 DEFINES block below. */
 int MemLoadProgram(unsigned char *fname, unsigned char *ram);
 
@@ -2003,62 +2000,6 @@ int FileLoadSourceProgram(unsigned char *fname, char **source_out)
     return true;
 }
 
-int FileLoadSourceProgramVM(unsigned char *fname, char **source_out)
-{
-#if defined(PICOCALC) && defined(rp2350)
-    int fnbr;
-    char *p, *buf;
-    int fsize;
-    int c;
-
-    if (source_out) *source_out = NULL;
-    if (!source_out) error("Internal error");
-    if (!InitSDCard()) return false;
-
-    fnbr = FindFreeFileNbr();
-    p = (char *)getFstring(fname);
-    if (strchr((char *)p, '.') == NULL) strcat((char *)p, ".bas");
-    if (!BasicFileOpen(p, fnbr, FA_READ)) return false;
-
-    fsize = (int)hal_size_of(fnbr);
-    bc_run_diag_note_load(filesource[fnbr] == FLASHFILE ? 'A' : 'B',
-                          (unsigned)fsize,
-                          (unsigned)FreeSpaceOnHeap(),
-                          (unsigned)bc_compile_bytes_free());
-    if (fsize < 0 || fsize >= EDIT_BUFFER_SIZE - 2048 - 512) {
-        FileClose(fnbr);
-        error("Not enough memory");
-    }
-
-    p = buf = (char *)bc_compile_alloc((size_t)fsize + 1u);
-    if (buf == NULL) {
-        bc_run_diag_note_source_alloc_fail((unsigned)(fsize + 1u),
-                                           (unsigned)bc_compile_bytes_free(),
-                                           (unsigned)bc_alloc_bytes_capacity());
-        bc_run_diag_dump("source alloc");
-        FileClose(fnbr);
-        error("Not enough memory");
-    }
-
-    while (!FileEOF(fnbr)) {
-        if ((p - buf) >= fsize)
-            error("Not enough memory");
-        c = FileGetChar(fnbr) & 0x7f;
-        if (isprint(c) || c == '\r' || c == '\n' || c == TAB) {
-            if (c == TAB) c = ' ';
-            *p++ = (char)c;
-        }
-    }
-    FileClose(fnbr);
-
-    *p = 0;
-    ClearSavedVars();
-    *source_out = buf;
-    return true;
-#else
-    return FileLoadSourceProgram(fname, source_out);
-#endif
-}
 /* MemWriteBlock / MemWriteByte / MemWriteInt / CMM2 load helpers
  * moved to ports/pico_sdk_common/mem_writeblock.c (rp2350-only). */
 /* LoadPNG moved to ports/pico_sdk_common/load_png.c (rp2350-only). */
@@ -2343,35 +2284,12 @@ void MMfputs(unsigned char *p, int filenbr)
 // evaluate the rest of the command, split it up and save in the system counters
 int InitSDCard(void)
 {
-    if(!FatFSFileSystem) return 1;
-#ifdef MMBASIC_HOST
-    /* Host FatFS is vm_host_fat.c's in-memory disk (or the POSIX dir
-     * walker when host_sd_root is set). No SPI/SD pins to validate —
-     * just make sure the RAM disk is mounted. Also clear SDCardStat's
-     * "no disk / not initialised" bits: they block fun_dir and other
-     * callers that test them after a successful init (`SDCardStat &
-     * STA_NOINIT` → "SD card not found" on host). */
-    if (vm_host_fat_mount() != FR_OK) error("Host FAT init failed");
-    SDCardStat = 0;
-    return 2;
-#endif
-    int i;
-    ErrorThrow(0,NONEFILE); // reset mm.errno to zero
-    if (((IsInvalidPin(Option.SD_CS) && !Option.CombinedCS) || (IsInvalidPin(Option.SYSTEM_MOSI) && IsInvalidPin(Option.SD_MOSI_PIN)) || (IsInvalidPin(Option.SYSTEM_MISO) && IsInvalidPin(Option.SD_MISO_PIN)) || (IsInvalidPin(Option.SYSTEM_CLK) && IsInvalidPin(Option.SD_CLK_PIN))))
-        error("SDcard not configured");
-    if (!(SDCardStat & STA_NOINIT))
-        return 1; // if the card is present and has been initialised we have nothing to do
-    for (i = 0; i < MAXOPENFILES; i++)
-        if (FileTable[i].com > MAXCOMPORTS && hal_fds[i] != 0)
-            ForceFileClose(i);
-    i = f_mount(&FatFs, "", 1);
-    if (i)
-    {
-        FatFSFileSystem=0;
-        ErrorThrow(i,FATFSFILE);
-        return false;
-    }
-    return 2;
+    if (!FatFSFileSystem) return 1;
+    /* Backend-specific mount (device pin check + f_mount, or host
+     * vm_host_fat). port_mount_sd_drive() returns 1/2 on success or 0
+     * on failure — see ports/pico_sdk_common/cmd_files_hooks.c (device)
+     * and host/host_runtime.c (host). */
+    return port_mount_sd_drive();
 }
 void getfullfilename(char *fname, char *q){
     int waste=0, t=FatFSFileSystem+1;
@@ -2468,17 +2386,11 @@ int BasicFileOpen(char *fname, int fnbr, int mode)
 }
 
 /* MAXFILES caps the flist[] buffer size in cmd_files (sizeof(s_flist)
- * ≈ 76 bytes; on device that's 76 KB). On device the in-program path
- * SaveContexts + InitHeaps before allocating, so 76 KB fits in the
- * freshly-cleared MMHeap. The host path can't InitHeap mid-FRUN
- * without wiping the live VMState on the shared bc_alloc heap — so
- * the 76 KB alloc races against VM state and fragments out. 256 is
- * ample for any test fixture and any plausible interactive use. */
-#ifdef MMBASIC_HOST
-#define MAXFILES 256
-#else
-#define MAXFILES 1000
-#endif
+ * ≈ 76 bytes). Each port picks its budget in port_config.h's
+ * HAL_PORT_FILES_MAX — device targets allocate ~76 KB after the
+ * SaveContext+InitHeap dance; host caps lower because bc_alloc backs
+ * both the heap and the live VMState. */
+#define MAXFILES HAL_PORT_FILES_MAX
 typedef struct ss_flist
 {
     char fn[FF_MAX_LFN];

@@ -28,6 +28,10 @@
 /* WEBRP2350 runs lwIP + CYW43; the deleted hal_port_config.h kept GPIO
  * loops out of SRAM for every PICOMITEWEB build (both rp2040 and rp2350).
  * Preserve that behaviour here. */
+/* cmd_files flist[] cap. Device has the RAM and the SaveContext+InitHeap
+ * dance to allocate ~76 KB. Host caps lower in host/port_config.h. */
+#define HAL_PORT_FILES_MAX               1000
+
 #define HAL_PORT_RAM_FUNC(name)          name
 
 #endif /* PORT_CONFIG_H */

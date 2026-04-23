@@ -27,6 +27,10 @@
 /* VGA on rp2040 runs scanout from flash via XIP — forcing GPIO hot loops
  * into SRAM would starve the scanout buffer and cause tearing. Leave them
  * in flash; scanout bandwidth takes priority over pin-write latency. */
+/* cmd_files flist[] cap. Device has the RAM and the SaveContext+InitHeap
+ * dance to allocate ~76 KB. Host caps lower in host/port_config.h. */
+#define HAL_PORT_FILES_MAX               1000
+
 #define HAL_PORT_RAM_FUNC(name)          name
 
 #endif /* PORT_CONFIG_H */

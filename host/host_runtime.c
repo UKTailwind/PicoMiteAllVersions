@@ -838,4 +838,17 @@ void cmd_load_post_cleanup(void)
     longjmp(mark, 1);
 }
 
+int port_mount_sd_drive(void)
+{
+    /* Host FatFS is vm_host_fat.c's in-memory disk (or the POSIX dir
+     * walker when host_sd_root is set). No SPI/SD pins to validate —
+     * just make sure the RAM disk is mounted. Also clear SDCardStat's
+     * "no disk / not initialised" bits: they block fun_dir and other
+     * callers that test them after a successful init (`SDCardStat &
+     * STA_NOINIT` → "SD card not found" on host). */
+    if (vm_host_fat_mount() != FR_OK) error("Host FAT init failed");
+    SDCardStat = 0;
+    return 2;
+}
+
 /* str_replace/STR_REPLACE provided by MATHS.c */

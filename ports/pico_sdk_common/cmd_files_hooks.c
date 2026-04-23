@@ -18,14 +18,20 @@
  * Host implementations live in host/host_runtime.c.
  */
 
-#include <stdbool.h>
+#include "MMBasic_Includes.h"
+#include "Hardware_Includes.h"
+#include "ff.h"
+#include "diskio.h"
 
-extern unsigned char *CurrentLinePtr;
 extern void CloseAudio(int all);
 extern void SaveContext(void);
-extern void ClearVars(int level, int all);
-extern void InitHeap(bool all);
 extern void RestoreContext(bool keep);
+extern void ErrorThrow(int e, int type);
+extern struct uFileTable FileTable[];
+extern hal_fs_fd_t hal_fds[];
+extern FATFS FatFs;
+extern int FatFSFileSystem;
+extern volatile BYTE SDCardStat;
 
 void cmd_files_save_program_context(void)
 {
@@ -52,4 +58,27 @@ void cmd_load_post_cleanup(void)
 {
     /* Device SaveProgramToFlash uses its own tokeniser buffer and doesn't
      * clobber the in-flight tknbuf; cmd_load returns normally. */
+}
+
+int port_mount_sd_drive(void)
+{
+    int i;
+    ErrorThrow(0, NONEFILE);  /* reset mm.errno */
+    if ((IsInvalidPin(Option.SD_CS) && !Option.CombinedCS) ||
+        (IsInvalidPin(Option.SYSTEM_MOSI) && IsInvalidPin(Option.SD_MOSI_PIN)) ||
+        (IsInvalidPin(Option.SYSTEM_MISO) && IsInvalidPin(Option.SD_MISO_PIN)) ||
+        (IsInvalidPin(Option.SYSTEM_CLK)  && IsInvalidPin(Option.SD_CLK_PIN)))
+        error("SDcard not configured");
+    if (!(SDCardStat & STA_NOINIT))
+        return 1;  /* already mounted */
+    for (i = 0; i < MAXOPENFILES; i++)
+        if (FileTable[i].com > MAXCOMPORTS && hal_fds[i] != 0)
+            ForceFileClose(i);
+    i = f_mount(&FatFs, "", 1);
+    if (i) {
+        FatFSFileSystem = 0;
+        ErrorThrow(i, FATFSFILE);
+        return 0;
+    }
+    return 2;
 }

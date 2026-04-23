@@ -27,6 +27,10 @@
 
 /* WEB on rp2040 runs lwIP + CYW43 network stacks and can't afford the RAM
  * pressure of pinning GPIO loops in SRAM. Keep them in flash. */
+/* cmd_files flist[] cap. Device has the RAM and the SaveContext+InitHeap
+ * dance to allocate ~76 KB. Host caps lower in host/port_config.h. */
+#define HAL_PORT_FILES_MAX               1000
+
 #define HAL_PORT_RAM_FUNC(name)          name
 
 #endif /* PORT_CONFIG_H */

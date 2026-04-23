@@ -37,6 +37,12 @@
 #define HAL_PORT_HAS_SSD1963             0
 #define HAL_PORT_BACKLIGHT_VIA_KEYPAD_I2C 0
 
+/* cmd_files flist[] cap. Host bc_alloc backs both the heap *and* the
+ * live VMState — wiping it via SaveContext+InitHeap mid-FRUN is unsafe,
+ * so the alloc has to fit in whatever heap space happens to be free.
+ * 256 entries (≈19 KB) covers any test fixture or interactive use. */
+#define HAL_PORT_FILES_MAX               256
+
 /* No flash sections to place hot loops in. */
 #define HAL_PORT_RAM_FUNC(name)          name
 

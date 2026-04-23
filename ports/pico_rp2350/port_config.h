@@ -23,6 +23,10 @@
 #define HAL_PORT_ADC_CHANNEL_MAX         4
 #define HAL_PORT_HAS_SSD1963             1
 
+/* cmd_files flist[] cap. Device has the RAM and the SaveContext+InitHeap
+ * dance to allocate ~76 KB. Host caps lower in host/port_config.h. */
+#define HAL_PORT_FILES_MAX               1000
+
 #define HAL_PORT_RAM_FUNC(name)          __not_in_flash_func(name)
 
 #endif /* PORT_CONFIG_H */
