@@ -280,10 +280,13 @@ extern void tcp_realloc_recv_buffers(void);
 #ifdef PICOMITEWEB
 	extern volatile int WIFIconnected;
 	extern volatile int scantimer;
-	extern int startupcomplete;
 	extern void WebConnect(void);
 	extern void close_tcpclient(void);
 #endif
+/* startupcomplete is always defined: WEB sets it true when the wifi
+ * stack finishes initialising; non-WEB (including host) stub it to 0
+ * in MMweb_stubs.c / host_peripheral_stubs.c. */
+extern int startupcomplete;
 // console related I/O
 #ifdef USBKEYBOARD
 extern void clearrepeat(void);

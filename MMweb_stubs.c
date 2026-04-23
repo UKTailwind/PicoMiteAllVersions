@@ -14,6 +14,7 @@
 
 void closeMQTT(void) {}
 void ProcessWeb(int mode) { (void)mode; }
+int  startupcomplete = 0;
 void tcp_free_recv_buffers(void) {}
 void tcp_realloc_recv_buffers(void) {}
 
