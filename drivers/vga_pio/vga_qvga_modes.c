@@ -11,10 +11,14 @@
 
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
+#include "pico/multicore.h"
+#include "hardware/irq.h"
+#include "hardware/dma.h"
 
 extern volatile int QVgaScanLine;
 extern uint8_t remap[256];
 extern const int CMM1map[16];
+extern void QVgaInit(void);
 
 void cmd_map(void){
 	unsigned char *p;
@@ -91,6 +95,30 @@ void cmd_tile(void){
                 if(fcolour!=0xFFFFFFFF) tilefcols[yp*X_TILE+xp]=(uint16_t)fcolour;
                 if(bcolour!=0xFFFFFFFF) tilebcols[yp*X_TILE+xp]=(uint16_t)bcolour;
             }
+        }
+    }
+}
+
+/* QVGA scanout core1 entry + its 128-word stack. Linked only on
+ * PICOMITEVGA non-HDMI targets. Runs QVgaInit() once to stand up the
+ * PIO/DMA scanout chain, then spins on the inter-core FIFO to accept
+ * 0x5555 / 0xAAAA commands that disable/enable DMA_IRQ_0 (used by the
+ * audio sub-system to pause VGA scanout during PWM-synth transitions
+ * so the scanline timer doesn't jitter during I²S setup).
+ *
+ * QVgaInit() itself still lives in PicoMite.c because it pulls in a
+ * large chain of PIO/DMA init globals local to that file; moving it
+ * is a separate refactor. */
+uint32_t core1stack[128];
+
+void __not_in_flash_func(QVgaCore)(void) {
+    QVgaInit();
+    while (true) {
+        __dmb();
+        if (multicore_fifo_rvalid()) {
+            int command = multicore_fifo_pop_blocking();
+            if (command == 0x5555) irq_set_enabled(DMA_IRQ_0, false);
+            if (command == 0xAAAA) irq_set_enabled(DMA_IRQ_0, true);
         }
     }
 }

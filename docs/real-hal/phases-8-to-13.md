@@ -18,9 +18,13 @@ Routed `error()` / `do_end()` / `vm_sys_graphics_fb_stop_merge` / `ClearRuntime(
 
 Relocated `UpdateCore()` — the 100-line core1 FIFO receiver loop — from `PicoMite.c` into `drivers/display_merge/display_merge_pico.c`, alongside the senders it pairs with. The 512-word `core1stack[]` moved with it (same symbol name, same size — MMBasic.c's canary check `core1stack[0] != 0x12345678` still resolves via the `extern uint32_t core1stack[]` in `Hardware_Includes.h`). PicoMite.c's `CheckAbort()` merge-abort block collapsed to `hal_display_merge_abort()`; the NEXTGEN refresh-rect push in `routinechecks()` collapsed to `hal_display_nextgen_refresh_rect()`. `#ifdef PICOMITE` / `#if defined(PICOMITE) && defined(rp2350)` guards around those sites removed (the HAL stubs are no-ops on non-PICOMITE targets). PicoMite.c now `#include`s `hal/hal_display_merge.h` directly. Net: the inter-core FIFO protocol lives in one file, `drivers/display_merge/display_merge_pico.c`.
 
-Remaining raw `multicore_fifo_*` in the tree outside ports/drivers: `PicoMite.c` `QVgaCore()` (2 calls, DMA-IRQ-toggle loop for VGA/QVGA scanout). That relocation is part of the QVGA → `drivers/vga_pio/` move, not this phase — QVgaCore is the *VGA* scanout receiver, not a merge receiver. It will move when the VGA scanout engine does (parallel to what Phase 7c did for HDMICore).
+### Step 3 ✅
 
-**Commit-count target:** 2–3 commits (step 1 done; step 2 done; one more for QVgaCore → drivers/vga_pio/).
+Relocated `QVgaCore()` — the core1 QVGA scanout entry that calls `QVgaInit()` once and then spins on the inter-core FIFO for 0x5555 / 0xAAAA DMA-IRQ toggle messages — from `PicoMite.c` into `drivers/vga_pio/vga_qvga_modes.c`. Its 128-word `core1stack[]` moved with it (symbol + size preserved). `QVgaInit()` and the underlying `QVgaPioInit/QVgaBufInit/QVgaDmaInit` chain stay in PicoMite.c for now and are called via an `extern void QVgaInit(void);` in the driver; moving that machinery is a separate refactor.
+
+**Phase 8 closed.** PicoMite.c has zero direct `multicore_fifo_*` calls. All inter-core FIFO traffic now lives in `drivers/` (display_merge, vga_pio, hdmi, spi_lcd for FASTGFX). Zero multicore-related ifdefs exist in any scored core file. No generic `hal/hal_multicore.h` abstraction was introduced — the driver-owned pattern is cleaner and the HAL contract stays focused on display/audio/fs/net surfaces rather than inter-core plumbing.
+
+**Commit-count target:** 3 commits (step 1 done; step 2 done; step 3 done). Closed.
 
 ## Phase 9 — `hal_net.h`
 

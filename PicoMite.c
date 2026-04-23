@@ -1688,29 +1688,11 @@ void QVgaInit()
 
 void (* volatile Core1Fnc)() = NULL; // core 1 remote function
 
-// QVGA core
-void __not_in_flash_func(QVgaCore)()
-{
-	// initialize QVGA
-	QVgaInit();
-
-	// infinite loop
-	while (true)
-	{
-		// data memory barrier
-		__dmb();
-        if (multicore_fifo_rvalid()) {
-            int command=multicore_fifo_pop_blocking();
-            if(command==0x5555){
-                irq_set_enabled(DMA_IRQ_0, false);
-            };
-            if(command==0xAAAA){
-                irq_set_enabled(DMA_IRQ_0, true);
-            }
-        } 
-    }
-}
-uint32_t core1stack[128];
+/* QVgaCore (core1 QVGA scanout entry) + its 128-word core1stack live
+ * in drivers/vga_pio/vga_qvga_modes.c — see phase-8 notes. The launch
+ * site below references the QVgaCore symbol via the extern in
+ * Hardware_Includes.h. QVgaInit() still lives in this file and is
+ * called from the driver on core1 start-up. */
 #endif /* !HDMI — QVGA scanout */
 #else
 /* UpdateCore (core1 merge receiver) + its 512-word stack live in
