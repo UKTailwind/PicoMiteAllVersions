@@ -33,10 +33,14 @@ F3 step 6  164    140       2      32      39        38      17         14      
 F3 step 7  164    140       2      31      39        38      17         14      445  (cmd_psram → ports/pico_sdk_common/cmd_psram.c; −1)
 F3 step 8  164    140       2      30      39        38      17         14      444  (DEFINES loader → ports/pico_sdk_common/defines_loader.c; −1)
 F3 step 9  164    140       2      28      39        38      17         14      442  (MemWriteBlock + LoadPNG → port files; −2)
-            FileIO.c: 60 → 26 target ifdefs (57% reduction). ~20 remaining
-            are MMBASIC_HOST gates around the SD read/write cache — genuine
-            backend distinction between device (FatFS+SD) and host
-            (POSIX/RAM-disk). See phase-4-filesystem.md for options.
+F3 step 10 164    140       2      17      39        38      17         14      431  (SD read-cache → hal_filesystem_pico per-slot + getc/putc; −11)
+F3 step 11 164    140       2      12      39        38      17         14      426  (cmd_files save/restore + key-pump + cmd_load post-cleanup hooks; −5)
+F3 step 12 164    140       2       8      39        38      17         14      422  (dead FileLoadSourceProgramVM + MAXFILES port-config + InitSDCard split; −4)
+F3 step 13 164    140       2       4      39        38      17         14      418  (dead multicore extern + cmd_disk + LoadOptions PICOCALC overrides; −4)
+            FileIO.c: 60 → 4 (93% reduction; target-macro 60 → 2). The
+            two remaining are the top-of-file MMBASIC_HOST include
+            block (vm_host_fat.h + f_* macro renames) and
+            cmd_LoadJPGImage's host stub. F3 ready to close.
 F4         .       .        .        .       .         .       .          .        .  (MM_Misc.c USBKEYBOARD → HAL)
 ─── post-fixup phases ───
 6          .       .        .        .       .         .       .          0        .  (Audio.c → HAL)

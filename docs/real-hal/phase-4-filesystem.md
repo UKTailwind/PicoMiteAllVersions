@@ -1,6 +1,6 @@
-# Real HAL — Phase 4: `hal_storage` + `hal_filesystem` 🔧 (57% — F3 in progress)
+# Real HAL — Phase 4: `hal_storage` + `hal_filesystem` 🔧 (97% — F3 nearly closed)
 
-**Status:** infrastructure landed (4a); F3 ifdef elimination is driving FileIO.c target-macro ifdefs from 60 → 26 across nine sub-steps, with MMBASIC_HOST SD-cache gates remaining as the architectural holdout. See the step table below and the rows in `scoreboard.md`. `../real-hal-fixup-plan.md` (F3) is the standard.
+**Status:** infrastructure landed (4a); F3 ifdef elimination drove FileIO.c target-macro ifdefs from 60 → 2 across thirteen sub-steps. The two remaining gates (top-of-file MMBASIC_HOST include block, cmd_LoadJPGImage host stub) are scoped for one final step. See the step table below and the rows in `scoreboard.md`. `../real-hal-fixup-plan.md` (F3) is the standard.
 
 ## What landed (Phase 4a)
 
@@ -34,17 +34,21 @@ Commit `61cb08e` claimed to eliminate 14 `rp2350` ifdefs from FileIO.c by conver
 | F3 step 7 | `353038b` | `cmd_psram` (178 lines) → `ports/pico_sdk_common/cmd_psram.c` | −1 |
 | F3 step 8 | `3d3ae10` | DEFINES loader + `MemLoadProgram` + `FileLoadCMM2Program` (353 lines) → `ports/pico_sdk_common/defines_loader.c`; `a_dlist` typedef to FileIO.h | −1 |
 | F3 step 9 | `2875acd` | `MemWriteBlock` + CMM2 helpers (418 lines) → `ports/pico_sdk_common/mem_writeblock.c`; `LoadPNG` (88 lines) → `ports/pico_sdk_common/load_png.c`; `union u_flash` + `MemWord` + `mi8p` to FileIO.h | −2 |
-| **total** | | | **−34 (60 → 26)** |
+| F3 fixup  | `2fdce89` | Restore host build: add `host/port_config.h` (ports/<board>/port_config.h was on every device include path but host had none); add `rp2350a` / `port_set_default_options` / `closeMQTT` / `ProcessWeb` / `tcp_*_recv_buffers` host stubs (the F3 step 5/6 extractions removed their device-side definitions from host's link surface) | 0 |
+| F3 step 10 | `79f96aa` | SD-sector read-cache moves from FileIO.c arrays (`SDbuffer[fnbr]`, `buffpointer`, `bw[fnbr]`, `lastfptr`, `fmode`) into `pico_fs_slot_t`. New HAL primitives `hal_fs_getc` / `hal_fs_putc`; `hal_fs_seek` / `tell` / `eof` are now cache-aware. `FileGetChar` / `FilePutChar` / `FileEOF` / `positionfile` / `BasicFileOpen` / `ForceFileClose` / `FilePutStr` / `fun_loc` collapse to single HAL calls. `diskchecktimer` poke moves into the device backend. Host backend gets trivial single-byte fread/fwrite | −11 |
+| F3 step 11 | `9c29781` | Four command-level lifecycle hooks (`cmd_files_save_program_context`, `cmd_files_restore_program_context`, `cmd_files_pump_console_key`, `cmd_load_post_cleanup`) split host vs device behaviour for the SaveContext+InitHeap dance, the PRESS-ANY-KEY MMInkey poll, and cmd_load's tknbuf-clobber bounce. Real impls in `host/host_runtime.c`; device no-ops in new `ports/pico_sdk_common/cmd_files_hooks.c` | −5 |
+| F3 step 12 | `e6adb08` | Three small wins: (a) delete dead `FileLoadSourceProgramVM` + its `bc_alloc.h` / `bc_run_diag.h` includes (function added in `e27f8d4` but never called); (b) `MAXFILES` becomes `HAL_PORT_FILES_MAX` in each port_config.h (256 host, 1000 device); (c) `InitSDCard` body splits into `port_mount_sd_drive()` (device pin check + f_mount; host vm_host_fat_mount + SDCardStat clear) | −4 |
+| F3 step 13 | `c3e7481` | Drop dead `#ifdef PICOMITE` multicore.h include + unused `frameBufferMutex` extern; `cmd_disk` A:/B: rejection collapses to `port_drive_check(char)` HAL call; LoadOptions's 47-line PICOCALC override block moves to new `ports/pico_sdk_common/port_load_overrides.c` exposing `port_apply_load_overrides()` (host stub no-ops) | −4 |
+| **total** | | | **−58 (60 → 2)** |
 
-## What remains (~26 ifdefs)
+## What remains (2 ifdefs)
 
-- **~20 `MMBASIC_HOST` gates:** SD read/write cache optimization (`SDbuffer[fnbr]`, `buffpointer`, `bw[fnbr]`, sector-seek in `positionfile`). Host's POSIX/RAM-disk path doesn't need the per-fnbr cache — `fread` buffers natively and FatFS-on-RAM is zero-cost. Clean migration requires either pushing the SD read cache into `hal_filesystem_pico.c` (so `hal_fs_read` does the caching on device and `hal_fs_host` doesn't need to) or accepting the gates as a hal_backend-distinction and exempting MMBASIC_HOST from the FileIO.c strict gate.
-- **~3 `rp2350`-specific** smaller blocks still in FileIO.c beyond the big extracted ones — likely flash geometry constants.
-- **2 `MMBASIC_HOST` includes** at the top of the file (vm_host_fat.h + host FatFS shims). Hard to unconditionalize without pulling host-only symbols onto device.
-- **1 `PICOCALC` + `rp2350`** block at line 75 — `bc_alloc.h` / `bc_run_diag.h` include for FileLoadSourceProgramVM. Policy gate.
-- **1 `PICOMITE`** block for `pico/multicore.h` + `frameBufferMutex` extern (line 91).
+Two top-of-file MMBASIC_HOST gates:
 
-Remaining work is either (a) introducing a HAL layer for SD-cache management (real architectural change) or (b) calling F3 done-at-architectural-boundary and promoting FileIO.c to STRICT_FILES with an MMBASIC_HOST exemption line in `check_hal_purity.sh`.
+- **Line 46 includes** — `vm_host_fat.h`, `vm_sys_file.h`, the `host_f_findfirst` / `host_f_findnext` / etc. externs, and the `f_findfirst` / `f_findnext` / `f_closedir` / `f_unlink` / `f_chdir` / `f_getcwd` macro renames. These route FatFS directory-walker calls through the host wrappers in REPL / --sim mode (real POSIX walker via `host_sd_root`) or vm_host_fat (test harness) without touching every call site. Migrating requires either a separate compile unit or wrapping the dispatch behind another HAL layer; both are bigger moves than what F3 targets.
+- **`cmd_LoadJPGImage`** (line ~917) — host stubs the entire body with `error("Not supported on host")` because picojpeg.c's `pjpeg_need_bytes_callback` was originally written for raw-FIL access. The body now reads through `hal_fs_read` so it should work on host directly; testing required.
+
+F3 closes once these two land. Promote FileIO.c to `STRICT_FILES` then.
 
 ## Exit gate
 
