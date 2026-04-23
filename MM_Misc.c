@@ -82,6 +82,7 @@ extern int  port_misc_option_setter(unsigned char *cmdline);
 extern int  port_pico_pins_option_setter(unsigned char *cmdline);
 extern int  port_heartbeat_option_setter(unsigned char *cmdline);
 extern int  port_system_lcd_spi_option_setter(unsigned char *cmdline);
+extern int  port_audio_i2s_pio_slice(int pin1, int pin2);
 extern void port_apply_default_console_colors(int default_fc, int default_bc);
 extern void port_web_print_options(void);
 extern int  port_web_option_setter(unsigned char *cmdline);
@@ -1666,22 +1667,7 @@ if(tp){
             if(IsInvalidPin(pin2)) error("Invalid pin");
             if(ExtCurrentConfig[pin2] != EXT_NOT_CONFIG || pin2==pin1 || pin2==pin3)  error("Pin %/| is in use",pin2,pin2);
 
-//
-#ifdef rp2350
-    #if defined(PICOMITEVGA) && !defined(HMDI)
-            int pio=QVGA_PIO_NUM;
-    #else
-            int pio=2;
-    #endif
-    uint64_t map=piomap[pio]; 
-            map|=(uint64_t)((uint64_t)1<< (uint64_t)PinDef[pin2].GPno);
-            map|=((uint64_t)1<< (uint64_t)PinDef[pin1].GPno);
-            map|=((uint64_t)1<<(uint64_t)(PinDef[pin1].GPno+1));
-            if((map & (uint64_t)0xFFFF) && (map & (uint64_t)0xFFFF00000000))error("Attempt to define incompatible PIO pins");
-            if(rp2350a)slice=11;
-            else
-#endif
-            slice=checkslice(pin1,pin1, 1);
+            slice = port_audio_i2s_pio_slice(pin1, pin2);
             Option.audio_i2s_bclk=pin1;
             Option.audio_i2s_data=pin2;
             if((PinDef[Option.DISPLAY_BL].slice & 0x7f) == slice) error("Channel in use for backlight");

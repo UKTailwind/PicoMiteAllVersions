@@ -365,4 +365,36 @@ int MIPS16 port_system_lcd_spi_option_setter(unsigned char *cmdline)
 #endif
 }
 
+/* OPTION AUDIO I2S — PWM-slice selection for the I2S backend.
+ *
+ * On RP2040 there's only checkslice(); the bclk pin's slice is the
+ * one we keep. On RP2350 there's an extra PIO conflict check (the
+ * I2S state-machine shares PIO bits with QVGA on PICOMITEVGA-non-HDMI
+ * builds; on other rp2350 ports it lands in pio2). RP2350A reserves
+ * slice 11 for audio. */
+extern int checkslice(int pin1, int pin2, int ignore);
+#ifdef rp2350
+extern uint64_t piomap[];
+#endif
+
+int MIPS16 port_audio_i2s_pio_slice(int pin1, int pin2)
+{
+#ifdef rp2350
+#if defined(PICOMITEVGA) && !defined(HDMI)
+    int pio = QVGA_PIO_NUM;
+#else
+    int pio = 2;
+#endif
+    uint64_t map = piomap[pio];
+    map |= (uint64_t)((uint64_t)1 << (uint64_t)PinDef[pin2].GPno);
+    map |= ((uint64_t)1 << (uint64_t)PinDef[pin1].GPno);
+    map |= ((uint64_t)1 << (uint64_t)(PinDef[pin1].GPno + 1));
+    if ((map & (uint64_t)0xFFFF) && (map & (uint64_t)0xFFFF00000000))
+        error("Attempt to define incompatible PIO pins");
+    if (rp2350a) return 11;
+#endif
+    (void)pin2;
+    return checkslice(pin1, pin1, 1);
+}
+
 #endif /* !MMBASIC_HOST */

@@ -926,6 +926,9 @@ void port_apply_default_console_colors(int default_fc, int default_bc)
 /* OPTION SYSTEM SPI / OPTION LCD SPI — host has no SPI peripheral. */
 int port_system_lcd_spi_option_setter(unsigned char *cmdline) { (void)cmdline; return 0; }
 
+/* OPTION AUDIO I2S — host has no I2S peripheral. */
+int port_audio_i2s_pio_slice(int pin1, int pin2) { (void)pin1; (void)pin2; return 0; }
+
 /* WEB-only hooks — host has no WiFi. Real impls live in MMsetwifi.c on
  * PICOMITEWEB device builds. */
 void port_web_print_options(void) {}

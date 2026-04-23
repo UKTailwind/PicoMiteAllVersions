@@ -70,6 +70,7 @@ F4 step 23 164     24       2       2      39        39      17         14      
 F4 step 24 164     21       2       2      39        39      17         14      298  (OPTION PICO + HEARTBEAT → port_pico_pins_option_setter / port_heartbeat_option_setter; −3)
 F4 step 25 164     17       2       2      39        39      17         14      294  (LCDPANEL CONSOLE tile-color reset → port_apply_default_console_colors() per port_defaults.c; −4)
 F4 step 26 164     13       2       2      39        39      17         14      290  (OPTION SYSTEM SPI / LCD SPI → port_system_lcd_spi_option_setter() + SDCARD COMBINED CS → HAL_PORT_IS_VGA runtime; −4)
+F4 step 27 164     11       2       2      39        39      17         14      288  (OPTION AUDIO I2S PIO check + slice selection → port_audio_i2s_pio_slice() in misc_option_setters.c; −2)
 ─── post-fixup phases ───
 6          .       .        .        .       .         .       .          0        .  (Audio.c → HAL)
 7a         .       .        .        .       .         .       .          .        .  (Draw.c ILI9341 → HAL)
