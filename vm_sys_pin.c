@@ -13,11 +13,12 @@
 #define VM_PWM_SLICE_COUNT 12
 
 static int vm_pin_mode_is_pwm(int mode) {
-    return (mode >= VM_PIN_MODE_PWM0A && mode <= VM_PIN_MODE_PWM7B)
-#ifdef rp2350
-        || (mode >= VM_PIN_MODE_PWM8A && mode <= VM_PIN_MODE_PWM11B)
-#endif
-        ;
+    /* PWM8A..PWM11B enum values are unconditional (bc_source accepts the
+     * keywords on every port); they only map to real hardware slices on
+     * rp2350. The range check below returns true for them on rp2040 too,
+     * but vm_sys_pin_setpin errors at configure time against
+     * vm_pwm_max_slice(). */
+    return (mode >= VM_PIN_MODE_PWM0A && mode <= VM_PIN_MODE_PWM11B);
 }
 
 static int vm_pin_pwm_mode_to_slice_chan(int mode, int *slice, int *chan) {
@@ -27,14 +28,12 @@ static int vm_pin_pwm_mode_to_slice_chan(int mode, int *slice, int *chan) {
         *chan = index & 1;
         return 1;
     }
-#ifdef rp2350
     if (mode >= VM_PIN_MODE_PWM8A && mode <= VM_PIN_MODE_PWM11B) {
         int index = mode - VM_PIN_MODE_PWM8A;
         *slice = 8 + index / 2;
         *chan = index & 1;
         return 1;
     }
-#endif
     return 0;
 }
 
@@ -55,7 +54,9 @@ static int vm_pin_pwm_mode_for_auto(int pin) {
     if (PinDef[pin].mode & PWM6B) return VM_PIN_MODE_PWM6B;
     if (PinDef[pin].mode & PWM7A) return VM_PIN_MODE_PWM7A;
     if (PinDef[pin].mode & PWM7B) return VM_PIN_MODE_PWM7B;
-#ifdef rp2350
+    /* PWM8A..PWM11B bits are defined unconditionally (configuration.h)
+     * but only set in PinDef[] on rp2350 — on rp2040 these checks fall
+     * through. */
     if (PinDef[pin].mode & PWM8A) return VM_PIN_MODE_PWM8A;
     if (PinDef[pin].mode & PWM8B) return VM_PIN_MODE_PWM8B;
     if (PinDef[pin].mode & PWM9A) return VM_PIN_MODE_PWM9A;
@@ -64,17 +65,16 @@ static int vm_pin_pwm_mode_for_auto(int pin) {
     if (PinDef[pin].mode & PWM10B) return VM_PIN_MODE_PWM10B;
     if (PinDef[pin].mode & PWM11A) return VM_PIN_MODE_PWM11A;
     if (PinDef[pin].mode & PWM11B) return VM_PIN_MODE_PWM11B;
-#endif
     return 0;
 }
 
 static int vm_pwm_max_slice(void) {
-#ifdef rp2350
+    /* rp2350a is unconditionally true on rp2040 (stubbed in PicoMite.c)
+     * so this returns 7 there — matching the rp2040 PWM slice count.
+     * On rp2350 non-WEB, runtime-detected: A package has 8 slices
+     * (max index 7), B has 12 slices (max index 11). */
     extern bool rp2350a;
     return rp2350a ? 7 : 11;
-#else
-    return 7;
-#endif
 }
 
 static int vm_pwm_pin_a[VM_PWM_SLICE_COUNT];
