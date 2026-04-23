@@ -243,6 +243,16 @@ if (COMPILE STREQUAL "HDMI" OR COMPILE STREQUAL "WEBRP2350" OR COMPILE STREQUAL 
 else()
     target_sources(PicoMite PRIVATE drivers/audio_mp3/audio_mp3_stub.c)
 endif()
+
+# Merge pipeline: only PICOMITE (SPI-LCD) variants run the core1 merge
+# loop. VGA/HDMI/WEB composite via other means, so they link a no-op
+# stub that lets Draw.c / cmd_framebuffer call the HAL hooks
+# unconditionally.
+if (COMPILE STREQUAL "PICO" OR COMPILE STREQUAL "PICOUSB" OR COMPILE STREQUAL "PICORP2350" OR COMPILE STREQUAL "PICOUSBRP2350")
+    target_sources(PicoMite PRIVATE drivers/display_merge/display_merge_pico.c)
+else()
+    target_sources(PicoMite PRIVATE drivers/display_merge/display_merge_stub.c)
+endif()
 if (COMPILE STREQUAL "WEB" OR COMPILE STREQUAL "WEBRP2350" )
     target_sources(PicoMite PRIVATE
 	SSD1963.c

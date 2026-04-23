@@ -22,3 +22,15 @@ struct spritebuffer spritebuff[MAXBLITBUF + 1] = { 0 };
 struct D3D *struct3d[MAX3D + 1] = { NULL };
 s_camera   camera[MAXCAM + 1];
 #endif
+
+/* Async layer/framebuffer merge-pipeline state. Only the PICOMITE
+ * (SPI-LCD) device target actually runs the pipeline on core1; on VGA,
+ * HDMI, WEB, and host builds, mergerunning is never set true but the
+ * storage has to exist because the flags are read from every build
+ * (Draw.c, MM_Misc.c, vm_sys_graphics.c, host_fb.c, …). Previously
+ * these lived in a PICOMITE-gated branch in Draw.c and were duplicated
+ * on host via the same branch falling through. Consolidating here lets
+ * the #ifdef in Draw.c go away. */
+bool mergerunning = false;
+volatile bool mergedone = false;
+uint32_t mergetimer = 0;

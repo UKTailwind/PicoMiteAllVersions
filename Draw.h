@@ -254,6 +254,7 @@ extern void merge_optimized(uint8_t colour);
 #endif
 extern void blitmerge (int x0, int y0, int w, int h, uint8_t colour);
 extern bool mergerunning;
+extern volatile bool mergedone;
 extern uint32_t mergetimer;
 extern int RGB121map[16];
 

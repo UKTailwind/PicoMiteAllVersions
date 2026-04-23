@@ -36,6 +36,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "Hardware_Includes.h"
 #include "hal/hal_time.h"
 #include "hal/hal_keyboard.h"
+#include "hal/hal_display_merge.h"
 #include "gfx_box_shared.h"
 #include "gfx_circle_shared.h"
 #include "gfx_line_shared.h"
@@ -184,17 +185,12 @@ int ScreenSize=0;
 #else
     extern int SSD1963data;
     int map[16]={0};
-    #ifdef PICOMITEWEB
     /* CursorTimer / gui_font_* / display_backlight are already defined
      * by the !GUICONTROLS block at the top of this file for every
-     * rp2040 build that doesn't compile GUI.c (WEB included). */
+     * rp2040 build that doesn't compile GUI.c (WEB included).
+     * mergerunning / mergedone / mergetimer moved to
+     * core/state/display_state.c as unconditional globals. */
     extern int InvokingCtrl;
-    #else
-    extern int InvokingCtrl;
-    bool mergerunning=false;
-    volatile bool mergedone=false;
-    uint32_t mergetimer=0;
-    #endif
 #endif
 void cmd_ReadTriangle(unsigned char *p);
 void (*DrawRectangle)(int x1, int y1, int x2, int y2, int c) = (void (*)(int , int , int , int , int ))DisplayNotSet;
@@ -308,16 +304,7 @@ void MIPS16 cmd_guiMX170(void) {
 #endif
     if((p = checkstring(cmdline, (unsigned char *)"RESET"))) {
         if((checkstring(p, (unsigned char *)"LCDPANEL"))) {
-#ifdef PICOMITE
-            if(mergerunning){
-                multicore_fifo_push_blocking(0xFF);
-                busy_wait_ms(mergetimer+200);
-                if(mergerunning){
-                    _excep_code = RESET_COMMAND;
-                    SoftReset();
-                }
-            }
-#endif
+            hal_display_merge_abort();
             InitDisplaySPI(true);
             InitDisplayI2C(true);
             if((Option.TOUCH_CS || Option.TOUCH_IRQ) && !Option.TOUCH_CAP) {
@@ -5461,11 +5448,9 @@ void cmd_framebuffer(void){
         else error("Framebuffer already exists");
     } else if((p=checkstring(cmdline, (unsigned char *)"WRITE"))) {
         if(checkstring(p, (unsigned char *)"N")){
-#ifdef PICOMITE
-            if(mergerunning)error("Display in use for merged operation");
-#endif
-            restorepanel(); 
-            return;           
+            hal_display_merge_check_busy();
+            restorepanel();
+            return;
         }
         else if(checkstring(p, (unsigned char *)"L")){
             if(!LayerBuf)error("Layer buffer not created");
@@ -5484,10 +5469,8 @@ void cmd_framebuffer(void){
             if(argc!=1)error("Syntax");
             char *q=(char *)getCstring(argv[0]);
             if(strcasecmp(q,"N")==0){
-    #ifdef PICOMITE
-                if(mergerunning)error("Display in use for merged operation");
-    #endif
-                restorepanel(); 
+                hal_display_merge_check_busy();
+                restorepanel();
             } else if(strcasecmp(q,"L")==0){
                 if(!LayerBuf)error("Layer buffer not created");
                 WriteBuf=LayerBuf;
