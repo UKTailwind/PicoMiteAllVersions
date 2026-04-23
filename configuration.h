@@ -401,10 +401,16 @@ extern uint8_t PSRAMpin;
 #define QVGA_PIO_NUM 0	
 #ifdef rp2350
 #define QVGA_PIO (QVGA_PIO_NUM==0 ? pio0: (QVGA_PIO_NUM==1 ? pio1: pio2))
-#define ScreenBuffer FRAMEBUFFER
 #else
 #define QVGA_PIO (QVGA_PIO_NUM==0 ?  pio0: pio1)
 #endif
+/* ScreenBuffer is an alias for FRAMEBUFFER. On rp2350 PICOMITE it
+ * points at the NEXTGEN MEM332 shadow buffer; on every other target
+ * FRAMEBUFFER is either NULL or the VGA/HDMI scanout buffer. Defining
+ * unconditionally lets core code reference ScreenBuffer without a
+ * target gate; branches that actually dereference it are guarded by
+ * their own runtime DISPLAY_TYPE check. */
+#define ScreenBuffer FRAMEBUFFER
 // QVGA PIO
 #define QVGA_SM		0	// QVGA state machine
 #define QVGA_I2S_SM 1   //I2S state machine when running VGA

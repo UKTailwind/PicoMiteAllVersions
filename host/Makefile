@@ -30,7 +30,7 @@ CFLAGS = -std=gnu11 -g -O0 -Wall -Wno-unused-variable -Wno-unused-function \
 LDFLAGS = -lm
 
 # Source directory
-VPATH = ..:../core/state:../drivers/audio_mp3
+VPATH = ..:../core/state:../drivers/audio_mp3:../drivers/spi_lcd
 
 # Core MMBasic sources (language runtime)
 CORE_SRCS = MMBasic.c Commands.c Functions.c Operators.c MATHS.c Memory.c Editor.c MMBasic_Prompt.c MMBasic_Print.c MMBasic_REPL.c
@@ -44,6 +44,10 @@ CORE_SRCS += Draw.c RGB121.c Tilemap.c FileIO.c Audio.c BmpDecoder.c re.c picojp
 # still includes dr_mp3.h for types — the stub resolves the drmp3_*
 # symbols to no-ops.
 CORE_SRCS += audio_mp3_stub.c
+# SPI-LCD NEXTGEN stubs: host doesn't compile spi_lcd.c at all, but
+# Draw.c unconditionally references the MEM332 function pointers in
+# restorepanel(). Link the stub file for the symbols.
+CORE_SRCS += spi_lcd_nextgen_stub.c
 
 # Bytecode VM sources
 BC_SRCS = bc_alloc.c bc_bridge.c vm_host_fat.c ff.c ffunicode.c ffsystem.c \

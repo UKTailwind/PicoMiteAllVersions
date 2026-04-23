@@ -253,6 +253,17 @@ if (COMPILE STREQUAL "PICO" OR COMPILE STREQUAL "PICOUSB" OR COMPILE STREQUAL "P
 else()
     target_sources(PicoMite PRIVATE drivers/display_merge/display_merge_stub.c)
 endif()
+
+# NEXTGEN (MEM332) SPI-LCD display types are rp2350 PICOMITE only. Real
+# implementations live in drivers/spi_lcd/spi_lcd.c under
+# `#if PICOMITE && rp2350` gates; every other target links a no-op stub
+# so Draw.c's restorepanel() can assign the function pointers without
+# a target-macro ifdef.
+if (COMPILE STREQUAL "PICORP2350" OR COMPILE STREQUAL "PICOUSBRP2350")
+    # real impls already compiled inside drivers/spi_lcd/spi_lcd.c
+else()
+    target_sources(PicoMite PRIVATE drivers/spi_lcd/spi_lcd_nextgen_stub.c)
+endif()
 if (COMPILE STREQUAL "WEB" OR COMPILE STREQUAL "WEBRP2350" )
     target_sources(PicoMite PRIVATE
 	SSD1963.c

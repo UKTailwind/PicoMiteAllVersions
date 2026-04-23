@@ -50,14 +50,17 @@ extern void DrawRectangleSPI(int x1, int y1, int x2, int y2, int c);
 extern void DrawBufferSPI(int x1, int y1, int x2, int y2, unsigned char* p);
 extern void DrawBitmapSPI(int x1, int y1, int width, int height, int scale, int fc, int bc, unsigned char *bitmap);
 extern void ReadBufferSPI(int x1, int y1, int x2, int y2, unsigned char* p) ;
-#if defined(PICOMITE) && defined(rp2350)
+/* NEXTGEN (MEM332) buffered framebuffer display functions. Declared
+ * unconditionally; real impls on rp2350 PICOMITE live in spi_lcd.c,
+ * no-op stubs on every other target live in spi_lcd_nextgen_stub.c
+ * (selected per target by the build system). */
 extern void DrawRectangleMEM332(int x1, int y1, int x2, int y2, int c);
 extern void DrawBitmapMEM332(int x1, int y1, int width, int height, int scale, int fc, int bc, unsigned char *bitmap);
 extern void DrawBufferMEM332(int x1, int y1, int x2, int y2, unsigned char* p) ;
 extern void ReadBufferMEM332(int x1, int y1, int x2, int y2, unsigned char* buff);
 extern void DrawBlitBufferMEM332(int x1, int y1, int x2, int y2, unsigned char* p) ;
 extern void ReadBlitBufferMEM332(int x1, int y1, int x2, int y2, unsigned char* buff);
-#endif
+extern void ScrollLCDMEM332(int lines);
 extern void DrawRectangleSPISCR(int x1, int y1, int x2, int y2, int c);
 extern void DrawBufferSPISCR(int x1, int y1, int x2, int y2, unsigned char* p);
 extern void DrawBitmapSPISCR(int x1, int y1, int width, int height, int scale, int fc, int bc, unsigned char *bitmap);
@@ -504,8 +507,8 @@ extern void __not_in_flash_func(HW0ReadSPI)(BYTE *buff, int cnt);
 extern void __not_in_flash_func(HW1ReadSPI)(BYTE *buff, int cnt);
 extern void BitBangReadSPI(BYTE *buff, int cnt);
 extern void ScrollLCDSPI(int lines);
+/* ScrollLCDMEM332 already declared at top of file. */
 #if defined(PICOMITE) && defined(rp2350)
-extern void ScrollLCDMEM332(int lines);
 extern void init_RGB332_to_RGB565_LUT(void);
 extern void init_RGB332_to_RGB888_LUT(void);
 #endif

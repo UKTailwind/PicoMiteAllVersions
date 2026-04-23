@@ -5030,8 +5030,13 @@ void restorepanel(void){
         DrawPixel = DrawPixelNormal;
         if(!(Option.DISPLAY_TYPE == ILI9341_8 || Option.DISPLAY_TYPE == ILI9341_16 || Option.DISPLAY_TYPE == IPS_4_16 ))ScrollLCD = ScrollSSD1963;
         else ScrollLCD=ScrollLCDSPI;
-#if defined(PICOMITE) && defined(rp2350)
     } else if(Option.DISPLAY_TYPE>=NEXTGEN){
+        /* NEXTGEN framebuffer display types are rp2350 PICOMITE only;
+         * non-rp2350 targets never reach this branch because the OPTION
+         * command won't let the user set a NEXTGEN display type there.
+         * MEM332 function symbols are stubbed via
+         * drivers/spi_lcd/spi_lcd_nextgen_stub.c on other builds so the
+         * assignments below link unconditionally. */
         DrawRectangle = DrawRectangleMEM332;
         DrawBitmap = DrawBitmapMEM332;
         DrawBuffer = DrawBufferMEM332;
@@ -5040,16 +5045,11 @@ void restorepanel(void){
         ReadBLITBuffer = ReadBlitBufferMEM332;
         ScrollLCD = ScrollLCDMEM332;
         DrawPixel = DrawPixelNormal;
-#endif
     }
     WriteBuf=NULL;
 }
 void setframebuffer(void){
-#if defined(PICOMITE) && defined(rp2350)
     if(!((Option.DISPLAY_TYPE>I2C_PANEL && Option.DISPLAY_TYPE < BufferedPanel) || (Option.DISPLAY_TYPE>=SSDPANEL && Option.DISPLAY_TYPE<VIRTUAL) || Option.DISPLAY_TYPE>=NEXTGEN))return;
-#else
-    if(!((Option.DISPLAY_TYPE>I2C_PANEL && Option.DISPLAY_TYPE < BufferedPanel) || (Option.DISPLAY_TYPE>=SSDPANEL && Option.DISPLAY_TYPE<VIRTUAL)))return;
-#endif
     DrawRectangle=DrawRectangle16;
     DrawBitmap= DrawBitmap16;
     ScrollLCD=ScrollLCD16;
@@ -5090,10 +5090,8 @@ void copyframetoscreen(uint8_t *s,int xstart, int xend, int ystart, int yend, in
         } else {
             SetAreaIPS_4_16(xstart,ystart,xend,yend, 1);                               // setup the area to be filled
         }
-#if defined(PICOMITE) && defined(rp2350)
     } else if(Option.DISPLAY_TYPE>=NEXTGEN) {
-        //nothing to do
-#endif
+        //nothing to do (NEXTGEN framebuffer already in RAM; non-rp2350 never reaches here)
     } else {
         if(screen320){
             if(Option.DISPLAY_TYPE!=SSD1963_4_16)SetAreaSSD1963(xstart+80,ystart*2,xend*2-xstart+81,yend*2+1);                                // setup the area to be filled
@@ -5118,18 +5116,12 @@ void copyframetoscreen(uint8_t *s,int xstart, int xend, int ystart, int yend, in
                 col[2]=(RGB121map[i]>>16);
                 col[1]=(RGB121map[i]>>8) & 0xFF;
                 col[0]=(RGB121map[i] & 0xFF);
-#if defined(PICOMITE) && defined(rp2350)
             } else if(Option.DISPLAY_TYPE>SSD_PANEL_8 && Option.DISPLAY_TYPE< NEXTGEN){
-#else
-            } else if(Option.DISPLAY_TYPE>SSD_PANEL_8){
-#endif
                 map[i]=((RGB121map[i]>>8) & 0xf800) | ((RGB121map[i]>>5) & 0x07e0) | ((RGB121map[i]>>3) & 0x001f);
                 continue;
-#if defined(PICOMITE) && defined(rp2350)
             } else if(Option.DISPLAY_TYPE>=NEXTGEN){
                 map[i]=RGB332(RGB121map[i]);
                 continue;
-#endif
             } else {
                 col[0]= ((RGB121map[i] >> 16) & 0b11111000) | ((RGB121map[i] >> 13) & 0b00000111);
                 col[1] = ((RGB121map[i] >>  5) & 0b11100000) | ((RGB121map[i] >>  3) & 0b00011111);
@@ -5181,7 +5173,6 @@ void copyframetoscreen(uint8_t *s,int xstart, int xend, int ystart, int yend, in
         if(PinDef[HAL_PORT_LCD_SPI_CLK_PIN].mode & SPI0SCK)spi_finish(spi0);
         else spi_finish(spi1);
         ClearCS(Option.LCD_CS);                  //set CS high
-#if defined(PICOMITE) && defined(rp2350)
     } else if(Option.DISPLAY_TYPE>=NEXTGEN){
         unsigned char *screen=(unsigned char *)(ScreenBuffer);
         for(int y=ystart;y<=yend;y++){
@@ -5198,7 +5189,6 @@ void copyframetoscreen(uint8_t *s,int xstart, int xend, int ystart, int yend, in
                 p[x]=c;
             }
         }
-#endif
     } else {
         if(screen320  && Option.DISPLAY_TYPE!=SSD1963_4_16){
             unsigned char *q = buff320;
