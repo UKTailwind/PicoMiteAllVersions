@@ -7,6 +7,7 @@
  * (ClearScreen, DrawRectangle, …).
  */
 
+#include <stddef.h>
 #include "hal/hal_vga_ops.h"
 
 int  hal_vga_ops_handle_cls(int c)         { (void)c; return 0; }
@@ -14,3 +15,12 @@ int  hal_vga_ops_handle_tile_cls(int c)    { (void)c; return 0; }
 int  hal_vga_ops_handle_layer_clear(void)  { return 0; }
 void hal_vga_ops_retile_for_font(void)     { }
 void hal_vga_ops_wait_scanline_zero(void)  { }
+uint8_t hal_vga_ops_layer_merge_byte(uint8_t primary, int x, int y) {
+    (void)x; (void)y; return primary;
+}
+uint8_t hal_vga_ops_layer_merge_rgb8(uint8_t primary, int x, int y) {
+    (void)x; (void)y; return primary;
+}
+volatile unsigned char *hal_vga_ops_fb_n_target(void) { return NULL; }
+volatile unsigned char *hal_vga_ops_fb_t_target(void) { return NULL; }
+int hal_vga_ops_fb_t_supported(void) { return 0; }

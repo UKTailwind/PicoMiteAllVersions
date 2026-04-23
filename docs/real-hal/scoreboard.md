@@ -98,6 +98,7 @@ F4 step 30 164      4       2       2      39        39      17         14      
 7a         .       .        .        .       .         .       .          .        .  (Draw.c ILI9341 → HAL)
 ─── Phase 7b (Draw.c VGA → HAL) ───
 7b step 1  97       4        2         2      39        39        17          0       200  (HAL_PORT_CONSOLE_FONT_MEDIUM port-config macro collapses the FontTable[2] HDMI/VGA/other split; new hal/hal_vga_ops.h + drivers/vga_pio/{vga_ops,vga_ops_stub}.c with handle_cls / handle_tile_cls / handle_layer_clear / retile_for_font / wait_scanline_zero hooks; ClearScreen + gfx_cls_helper + cmd_font + benchmark loop migrated; ScrollStart promoted to unconditional in core/state/display_state.c (removes SSD1963.c + host_runtime.c dups); −13)
+7b step 2  88       4        2         2      39        39        17          0       191  (hal_vga_ops layer-merge read helpers: _layer_merge_byte (4-bit framebuffer) + _layer_merge_rgb8 (RGB332 sprite); ReadBuffer16 + sprite 24-bit read migrated (3 #ifdef pairs each → hook call). cmd_blit_framebuffer "N"/"T" parse unified via _fb_n_target / _fb_t_target / _fb_t_supported helpers (VGA+rp2350 T branch, non-VGA NULL fallback); −9)
 7b         .       .        .        .       .         .       .          .        .  (Draw.c VGA → HAL)
 7c         .       .        .        .       .         .       .          .        .  (Draw.c HDMI → HAL)
 7d         0       .        .        .       .         .       .          .        .  (Draw.c SSD1963 → HAL)

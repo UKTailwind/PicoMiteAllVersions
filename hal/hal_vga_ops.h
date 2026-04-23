@@ -1,6 +1,8 @@
 #ifndef HAL_VGA_OPS_H
 #define HAL_VGA_OPS_H
 
+#include <stdint.h>
+
 /* hal_vga_ops — small helpers wrapping VGA-specific branches that used
  * to live behind `#ifdef PICOMITEVGA` in Draw.c.
  *
@@ -44,6 +46,33 @@ void hal_vga_ops_retile_for_font(void);
  * on QVgaScanLine (QVGA non-HDMI) or v_scanline (HDMI). No-op on
  * non-VGA. */
 void hal_vga_ops_wait_scanline_zero(void);
+
+/* ReadBuffer16 / ReadBuffer16Fast / Read sprite-blit helpers: VGA can
+ * have a LayerBuf sitting above DisplayBuf, and when `mergedread` is
+ * set (BMP-save code paths), reads at layer-pixel positions should
+ * return the *layer* nibble if it is non-transparent, otherwise the
+ * primary framebuffer nibble. The helper takes the primary byte read
+ * from WriteBuf at byte-offset (y, x>>1) and returns the effective
+ * byte after per-nibble layer substitution. Non-VGA stub returns the
+ * input unchanged. */
+uint8_t hal_vga_ops_layer_merge_byte(uint8_t primary, int x, int y);
+
+/* Sprite-blit 24-bit RGB read (ReadBuffer pixel format uses 3 bytes
+ * per pixel — RGB332-packed layer + BLIT buffer). Same idea as
+ * _layer_merge_byte but for the 8-bit RGB332 sprite-blit path, where
+ * the sprite read also checks the layer's mergedread substitution. */
+uint8_t hal_vga_ops_layer_merge_rgb8(uint8_t primary, int x, int y);
+
+/* BLIT FRAMEBUFFER "N" / "T" source/dest resolution. Used by
+ * cmd_blit_framebuffer to turn user-typed letters into
+ * framebuffer pointers:
+ *  - VGA:       N → DisplayBuf
+ *  - non-VGA:   N → NULL (direct-to-LCD read/write path)
+ *  - rp2350 VGA/HDMI: T → SecondLayer
+ *  - others:    T not accepted (caller should error "Syntax") */
+volatile unsigned char *hal_vga_ops_fb_n_target(void);
+volatile unsigned char *hal_vga_ops_fb_t_target(void);
+int hal_vga_ops_fb_t_supported(void);
 
 #ifdef __cplusplus
 }

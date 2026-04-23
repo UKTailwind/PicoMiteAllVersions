@@ -12,6 +12,10 @@
 #include "port_config.h"
 #include "hal/hal_vga_ops.h"
 
+/* Declared in Draw.c unconditionally; only PICOMITEVGA ever toggles it
+ * true (via BMP-save code paths). */
+extern bool mergedread;
+
 int hal_vga_ops_handle_cls(int c) {
     if (!(DISPLAY_TYPE == SCREENMODE1 && WriteBuf == DisplayBuf)) return 0;
     DrawRectangle(0, 0, HRes - 1, VRes - 1, 0);
@@ -77,6 +81,47 @@ int hal_vga_ops_handle_layer_clear(void) {
     }
 #endif
     return 0;
+}
+
+uint8_t hal_vga_ops_layer_merge_byte(uint8_t primary, int x, int y) {
+    if (!(WriteBuf == DisplayBuf && LayerBuf != DisplayBuf && LayerBuf != NULL)) return primary;
+    uint8_t layer = *(uint8_t *)(((uintptr_t)LayerBuf) + (y * (HRes >> 1)) + (x >> 1));
+    if (!mergedread) return primary;
+    uint8_t hi = (primary >> 4) & 0xF;
+    uint8_t lo = primary & 0xF;
+    uint8_t lhi = (layer >> 4) & 0xF;
+    uint8_t llo = layer & 0xF;
+    if (lhi != transparent) hi = lhi;
+    if (llo != transparent) lo = llo;
+    return (uint8_t)((hi << 4) | lo);
+}
+
+volatile unsigned char *hal_vga_ops_fb_n_target(void) {
+    return (volatile unsigned char *)DisplayBuf;
+}
+
+volatile unsigned char *hal_vga_ops_fb_t_target(void) {
+#ifdef rp2350
+    return (volatile unsigned char *)SecondLayer;
+#else
+    return NULL;
+#endif
+}
+
+int hal_vga_ops_fb_t_supported(void) {
+#ifdef rp2350
+    return 1;
+#else
+    return 0;
+#endif
+}
+
+uint8_t hal_vga_ops_layer_merge_rgb8(uint8_t primary, int x, int y) {
+    if (!(WriteBuf == DisplayBuf && LayerBuf != DisplayBuf && LayerBuf != NULL)) return primary;
+    uint8_t layer = *(uint8_t *)(((uintptr_t)LayerBuf) + (y * HRes) + x);
+    if (!mergedread) return primary;
+    if (layer == transparent) return primary;
+    return layer;
 }
 
 void hal_vga_ops_wait_scanline_zero(void) {

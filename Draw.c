@@ -3145,25 +3145,13 @@ if ((p = checkstring(cmdline, (unsigned char*)"COMPRESSED"))) {
         if(argc<15)error("Syntax");
         if(checkstring(argv[0],(unsigned char*)"L"))s=LayerBuf;
         else if(checkstring(argv[0],(unsigned char*)"F"))s=FrameBuf;
-#ifdef PICOMITEVGA
-        else if(checkstring(argv[0],(unsigned char*)"N"))s=DisplayBuf;
-#ifdef rp2350
-        else if(checkstring(argv[0],(unsigned char*)"T"))s=SecondLayer;
-#endif
-#else
-        else if(checkstring(argv[0],(unsigned char*)"N"))s=NULL;
-#endif
+        else if(checkstring(argv[0],(unsigned char*)"N"))s=hal_vga_ops_fb_n_target();
+        else if(hal_vga_ops_fb_t_supported() && checkstring(argv[0],(unsigned char*)"T"))s=hal_vga_ops_fb_t_target();
         else error("Syntax");
         if(checkstring(argv[2],(unsigned char*)"L"))d=LayerBuf;
         else if(checkstring(argv[2],(unsigned char*)"F"))d=FrameBuf;
-#ifdef PICOMITEVGA
-        else if(checkstring(argv[2],(unsigned char*)"N"))d=DisplayBuf;
-#ifdef rp2350
-        else if(checkstring(argv[2],(unsigned char*)"T"))d=SecondLayer;
-#endif
-#else
-        else if(checkstring(argv[2],(unsigned char*)"N"))d=NULL;
-#endif
+        else if(checkstring(argv[2],(unsigned char*)"N"))d=hal_vga_ops_fb_n_target();
+        else if(hal_vga_ops_fb_t_supported() && checkstring(argv[2],(unsigned char*)"T"))d=hal_vga_ops_fb_t_target();
         else error("Syntax");
         if(s==d)error("Same framebuffer");
         if(s==NULL && (void *)ReadBuffer == (void *)DisplayNotSet) error("Invalid on this display");
@@ -6556,16 +6544,7 @@ void ReadBuffer256(int x1, int y1, int x2, int y2, unsigned char *c){
 	for(y=yy1;y<=yy2;y++){
     	for(x=xx1;x<=xx2;x++){
 	        pp=(uint8_t *)((uint32_t)(WriteBuf+y*HRes+x));
-#ifdef PICOMITEVGA
-            unsigned int q;
-            uint8_t *qq=pp;
-            if(WriteBuf==DisplayBuf && LayerBuf != DisplayBuf && LayerBuf !=NULL)qq=(uint8_t *)((uint32_t)(LayerBuf+y*HRes+x));
-#endif
-            t=*pp;
-#ifdef PICOMITEVGA
-            q=*qq;
-            if(!(*qq==transparent) && mergedread)t=q;
-#endif
+            t = hal_vga_ops_layer_merge_rgb8(*pp, x, y);
             *c++=((t & 0x3)<<6);
             *c++=(((t>>2) & 0x7)<<5);
             *c++=(((t>>5) & 0x7)<<5);
@@ -7088,24 +7067,9 @@ void ReadBuffer16(int x1, int y1, int x2, int y2, unsigned char *c){
 	for(y=yy1;y<=yy2;y++){
     	for(x=xx1;x<=xx2;x++){
 	        pp=(uint8_t *)(((uint32_t) WriteBuf)+(y*(HRes>>1))+(x>>1));
-#ifdef PICOMITEVGA
-            unsigned int q;
-            uint8_t *qq=pp;
-            if(WriteBuf==DisplayBuf && LayerBuf != DisplayBuf && LayerBuf !=NULL)qq=(uint8_t *)(((uint32_t) LayerBuf)+(y*(HRes>>1))+(x>>1));
-#endif
-            if(x & 1){
-                t=colours[(*pp)>>4];
-#ifdef PICOMITEVGA
-                q=colours[(*qq)>>4];
-                if(!(((*qq)>>4)==transparent) && mergedread)t=q;
-#endif
-            } else {
-                t=colours[(*pp)&0x0F];
-#ifdef PICOMITEVGA
-                q=colours[(*qq)&0x0F];
-                 if(!(((*qq)&0x0F)==transparent) && mergedread)t=q;
-#endif
-            }
+            uint8_t eff = hal_vga_ops_layer_merge_byte(*pp, x, y);
+            if (x & 1) t = colours[eff >> 4];
+            else       t = colours[eff & 0x0F];
             *c++=(t&0xFF);
             *c++=(t>>8)&0xFF;
             *c++=t>>16;
