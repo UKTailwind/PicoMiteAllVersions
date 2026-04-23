@@ -83,6 +83,18 @@ int hal_vga_ops_fb_t_supported(void);
 int  hal_vga_ops_fb2_tilematch(int x1, int y1, int w_px, int h_px);
 void hal_vga_ops_fb2_fill_tile_colours(int x1, int y1, int w_px, int h_px, int fc, int bc);
 
+/* ScrollLCD2 tile-colour scroll helper: when the pixel scroll lines
+ * is a whole number of tile rows, shift the tile fg/bg colour arrays
+ * to match. `lines` is the vertical pixel delta (positive scrolls
+ * content up, negative scrolls it down). No-op on non-VGA. */
+void hal_vga_ops_scroll_tile_colours(int lines);
+
+/* ReadBuffer2 per-pixel tile-colour lookup: the bit-mode framebuffer
+ * reads need to translate 1/0 bits into the active tile's fg/bg
+ * colour, which on VGA means consulting tilefcols[]/tilebcols[]. On
+ * non-VGA the caller uses fixed white/black. */
+void hal_vga_ops_tile_colour(int x, int y, int *front, int *back);
+
 #ifdef __cplusplus
 }
 #endif

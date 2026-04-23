@@ -28,6 +28,44 @@ extern uint32_t remap332[256];
 extern uint16_t remap256[256];
 extern int ScreenSize;
 
+/* fun_getscanline — BASIC function "GetScanLine". Lifted from Draw.c's
+ * PICOMITEVGA block. */
+#ifdef HDMI
+extern volatile int32_t v_scanline;
+void fun_getscanline(void) {
+    if (Option.CPU_Speed == Freq720P) {
+        iret = v_scanline - 30;
+        if (iret < 0) iret += 750;
+        targ = T_INT;
+    } else if (Option.CPU_Speed == Freq480P) {
+        iret = v_scanline - 20;
+        if (iret < 0) iret += 500;
+        targ = T_INT;
+    } else if (Option.CPU_Speed == FreqXGA) {
+        iret = v_scanline - 38;
+        if (iret < 0) iret += 806;
+        targ = T_INT;
+    } else if (Option.CPU_Speed == FreqSVGA) {
+        iret = v_scanline - 25;
+        if (iret < 0) iret += 625;
+        targ = T_INT;
+    } else if (Option.CPU_Speed == Freq252P || Option.CPU_Speed == Freq378P) {
+        iret = v_scanline - 45;
+        if (iret < 0) iret += 525;
+        targ = T_INT;
+    } else if (Option.CPU_Speed == Freq848) {
+        iret = v_scanline - 37;
+        if (iret < 0) iret += 517;
+        targ = T_INT;
+    }
+}
+#else
+void fun_getscanline(void) {
+    iret = QVgaScanLine;
+    targ = T_INT;
+}
+#endif
+
 #ifdef PICOMITEVGA
 void cmd_colourmap(void){
     long long int *cptr=NULL, *fptr=NULL;

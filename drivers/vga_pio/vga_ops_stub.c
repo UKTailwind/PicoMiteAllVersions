@@ -30,3 +30,7 @@ int  hal_vga_ops_fb2_tilematch(int x1, int y1, int w_px, int h_px) {
 void hal_vga_ops_fb2_fill_tile_colours(int x1, int y1, int w_px, int h_px, int fc, int bc) {
     (void)x1; (void)y1; (void)w_px; (void)h_px; (void)fc; (void)bc;
 }
+void hal_vga_ops_scroll_tile_colours(int lines) { (void)lines; }
+void hal_vga_ops_tile_colour(int x, int y, int *front, int *back) {
+    (void)x; (void)y; *front = 0xFFFFFF; *back = 0;
+}

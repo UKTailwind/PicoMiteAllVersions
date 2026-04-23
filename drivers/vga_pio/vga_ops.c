@@ -96,6 +96,57 @@ uint8_t hal_vga_ops_layer_merge_byte(uint8_t primary, int x, int y) {
     return (uint8_t)((hi << 4) | lo);
 }
 
+void hal_vga_ops_tile_colour(int x, int y, int *front, int *back) {
+    int tile = (x / 8) + (y / ytileheight) * X_TILE;
+    *back  = RGB121map[tilebcols[tile] & 0xF];
+    *front = RGB121map[tilefcols[tile] & 0xF];
+}
+
+void hal_vga_ops_scroll_tile_colours(int lines) {
+    int ya = ytileheight;
+    if (lines == 0) return;
+    if (lines > 0) {
+        if ((lines % ya) != 0) return;
+        int offset = lines / ya;
+        for (int y = 0; y < Y_TILE - offset; y++) {
+            int d = y * X_TILE, s = (y + offset) * X_TILE;
+            for (int x = 0; x < X_TILE; x++) {
+#ifdef HDMI
+                if (FullColour) {
+#endif
+                    tilefcols[d + x] = tilefcols[s + x];
+                    tilebcols[d + x] = tilebcols[s + x];
+#ifdef HDMI
+                } else {
+                    tilefcols_w[d + x] = tilefcols_w[s + x];
+                    tilebcols_w[d + x] = tilebcols_w[s + x];
+                }
+#endif
+            }
+        }
+    } else {
+        lines = -lines;
+        if ((lines % ya) != 0) return;
+        int offset = lines / ya;
+        for (int y = Y_TILE - 1; y >= offset; y--) {
+            int d = y * X_TILE, s = (y - offset) * X_TILE;
+            for (int x = 0; x < X_TILE; x++) {
+#ifdef HDMI
+                if (FullColour) {
+#endif
+                    tilefcols[d + x] = tilefcols[s + x];
+                    tilebcols[d + x] = tilebcols[s + x];
+#ifdef HDMI
+                } else {
+                    tilefcols_w[d + x] = tilefcols_w[s + x];
+                    tilebcols_w[d + x] = tilebcols_w[s + x];
+                }
+#endif
+            }
+        }
+    }
+}
+
 int hal_vga_ops_fb2_tilematch(int x1, int y1, int w_px, int h_px) {
     const int xa = 8;
     const int ya = ytileheight;

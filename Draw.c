@@ -6586,72 +6586,20 @@ void DrawBitmap2(int x1, int y1, int width, int height, int scale, int fc, int b
 void ScrollLCD2(int lines){
     if(lines==0)return;
 
-     if(lines >= 0) {
-#ifdef PICOMITEVGA
-#ifndef HDMI
-        while(QVgaScanLine!=0){}
-#else
-        while(v_scanline!=0){} 
-#endif
-    	int ya=ytileheight;
-        if((lines % ya ==0)){
-            int offset=lines/ya;
-            for(int y=0;y<Y_TILE-offset;y++){
-                int d=y*X_TILE;
-                int s=(y+offset)*X_TILE;
-                for(int x=0;x<X_TILE;x++){
-#ifdef HDMI
-                    if(FullColour){
-#endif
-                        tilefcols[d+x]=tilefcols[s+x];
-                        tilebcols[d+x]=tilebcols[s+x];
-#ifdef HDMI
-                    } else {
-                        tilefcols_w[d+x]=tilefcols_w[s+x];
-                        tilebcols_w[d+x]=tilebcols_w[s+x];
-                    }
-#endif
-                }
-            }
-        }
-#endif
+    if(lines >= 0) {
+        hal_vga_ops_wait_scanline_zero();
+        hal_vga_ops_scroll_tile_colours(lines);
         for(int i=0;i<VRes-lines;i++) {
-            int d=i*(HRes>>3),s=(i+lines)*(HRes>>3); 
+            int d=i*(HRes>>3),s=(i+lines)*(HRes>>3);
             for(int c=0;c<(HRes>>3);c++)WriteBuf[d+c]=WriteBuf[s+c];
         }
         DrawRectangle(0, VRes-lines, HRes - 1, VRes - 1, 0); // erase the lines to be scrolled off
     } else {
-    	lines=-lines;
-#ifdef PICOMITEVGA
-#ifndef HDMI
-        while(QVgaScanLine!=0){}
-#else
-        while(v_scanline!=0){}
-#endif
-    	int ya=ytileheight;
-        if((lines % ya ==0)){
-            int offset=lines/ya;
-            for(int y=Y_TILE-1;y>=offset;y--){
-                int d=y*X_TILE;
-                int s=(y-offset)*X_TILE;
-                for(int x=0;x<X_TILE;x++){
-#ifdef HDMI
-                    if(FullColour){
-#endif
-                        tilefcols[d+x]=tilefcols[s+x];
-                        tilebcols[d+x]=tilebcols[s+x];
-#ifdef HDMI
-                    } else {
-                        tilefcols_w[d+x]=tilefcols_w[s+x];
-                        tilebcols_w[d+x]=tilebcols_w[s+x];
-                    }
-#endif
-                }
-            }
-        }
-#endif
+        lines=-lines;
+        hal_vga_ops_wait_scanline_zero();
+        hal_vga_ops_scroll_tile_colours(-lines);
         for(int i=VRes-1;i>=lines;i--) {
-            int d=i*(HRes>>3),s=(i-lines)*(HRes>>3); 
+            int d=i*(HRes>>3),s=(i-lines)*(HRes>>3);
             for(int c=0;c<(HRes>>3);c++)WriteBuf[d+c]=WriteBuf[s+c];
         }
         DrawRectangle(0, 0, HRes - 1, lines - 1, 0); // erase the lines introduced at the top
@@ -6748,14 +6696,8 @@ void ReadBuffer2(int x1, int y1, int x2, int y2, unsigned char *c){
     if(y2 >= VRes) yy2 = VRes - 1;
 	for(y=yy1;y<=yy2;y++){
     	for(x=xx1;x<=xx2;x++){
-#ifdef PICOMITEVGA 
-            int tile= x/8 + (y/ytileheight)*X_TILE;
-            int back=RGB121map[tilebcols[tile] & 0xF];
-            int front=RGB121map[tilefcols[tile] & 0xF];
-#else
-            int front=0xFFFFFF;
-            int back=0;
-#endif
+            int front, back;
+            hal_vga_ops_tile_colour(x, y, &front, &back);
             loc=(y*(HRes>>3))+(x>>3);
             mask=1<<(x % 8); //get the bit position for this bit
             if(WriteBuf[loc]&mask){
@@ -6845,43 +6787,9 @@ void MIPS16 InitDisplayVirtual(void){
 
 /*  @endcond */
 
-#ifdef PICOMITEVGA
-#ifdef HDMI
-void fun_getscanline(void){
-    if(Option.CPU_Speed==Freq720P){
-        iret = v_scanline - 30;
-        if(iret<0)iret+=750;
-        targ=T_INT;
-    } else if(Option.CPU_Speed==Freq480P){
-        iret = v_scanline - 20;
-        if(iret<0)iret+=500;
-        targ=T_INT;
-    } else if(Option.CPU_Speed==FreqXGA){
-        iret = v_scanline - 38;
-        if(iret<0)iret+=806;
-        targ=T_INT;
-    } else if(Option.CPU_Speed==FreqSVGA){
-        iret = v_scanline - 25;
-        if(iret<0)iret+=625;
-        targ=T_INT;
-    } else if(Option.CPU_Speed==Freq252P || Option.CPU_Speed==Freq378P){
-        iret = v_scanline - 45;
-        if(iret<0)iret+=525;
-        targ=T_INT;
-    } else if(Option.CPU_Speed==Freq848){
-        iret = v_scanline - 37;
-        if(iret<0)iret+=517;
-        targ=T_INT;
-    }
-}
-#else
-void fun_getscanline(void){
-    iret=QVgaScanLine;
-    targ=T_INT;
-}
-#endif
-#else
-/* 
+/* fun_getscanline lives in drivers/vga_pio/vga_mode_ops.c — only VGA
+ * targets register it in the command table.
+ *
  * @cond
  * The following section will be excluded from the documentation.
  */
@@ -6938,7 +6846,6 @@ void MIPS16 DrawBitmapUser(int x1, int y1, int width, int height, int scale, int
     } else
         error("MM.USER_BITMAP not defined");
 }
-#endif
 
 /****************************************************************************************************
 
