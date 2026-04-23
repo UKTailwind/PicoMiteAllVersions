@@ -145,7 +145,7 @@ static unsigned char host_cfunction_flash_buf[32] = {
 unsigned char *SavedVarsFlash = host_saved_vars_flash_buf;
 volatile unsigned int ScrewUpTimer = 0;
 /* ScrollLCDSPISCR is a function - see function stubs below */
-volatile int ScrollStart = 0;
+/* ScrollStart now defined in core/state/display_state.c. */
 /* StartEditChar / StartEditPoint are defined in Editor.c now that it is
  * compiled into the host build. */
 unsigned char *TickInt[NBRSETTICKS] = {NULL};

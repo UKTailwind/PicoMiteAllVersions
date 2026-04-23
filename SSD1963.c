@@ -34,7 +34,8 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
-volatile int ScrollStart;
+/* ScrollStart moved to core/state/display_state.c as unconditional
+ * storage so Draw.c can reference it without #ifndef PICOMITEVGA. */
 int Has100Pins = 0;
 
 // parameters for the SSD1963 display panel (refer to the glass data sheet)

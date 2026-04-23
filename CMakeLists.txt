@@ -272,6 +272,14 @@ if (COMPILE STREQUAL "PICO" OR COMPILE STREQUAL "PICOUSB" OR COMPILE STREQUAL "P
 else()
     target_sources(PicoMite PRIVATE drivers/spi_lcd/spi_lcd_fastgfx_stub.c)
 endif()
+
+# VGA framebuffer CLS/layer helpers: PICOMITEVGA (VGA + HDMI) gets the
+# real impl, everyone else gets a no-op stub.
+if (COMPILE STREQUAL "VGA" OR COMPILE STREQUAL "VGAUSB" OR COMPILE STREQUAL "VGARP2350" OR COMPILE STREQUAL "VGAUSBRP2350" OR COMPILE STREQUAL "HDMI" OR COMPILE STREQUAL "HDMIUSB")
+    target_sources(PicoMite PRIVATE drivers/vga_pio/vga_ops.c)
+else()
+    target_sources(PicoMite PRIVATE drivers/vga_pio/vga_ops_stub.c)
+endif()
 if (COMPILE STREQUAL "WEB" OR COMPILE STREQUAL "WEBRP2350" )
     target_sources(PicoMite PRIVATE
 	SSD1963.c

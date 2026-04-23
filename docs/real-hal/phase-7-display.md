@@ -62,6 +62,10 @@ With PICOMITE cleared from Draw.c, phase 7a's ILI9341-proof exit gate is effecti
 
 **Exit gate:** zero `PICOMITEVGA` preprocessor directives in Draw.c. All 12 device variants + host + purity gate green. (Visual scanout / FASTGFX FPS verification: desirable, not a blocker — same policy as 7a.)
 
+### Progress (as of 2026-04-23)
+
+- **Step 1** (TBD): first `hal_vga_ops.h` surface and per-function lifts. Five hooks — `handle_cls`, `handle_tile_cls`, `handle_layer_clear`, `retile_for_font`, `wait_scanline_zero` — cover `ClearScreen` + `gfx_cls_helper` + `cmd_font` + the DrawCircle benchmark loop. Real impls in `drivers/vga_pio/vga_ops.c` (HDMI-vs-QVGA dispatch local-ifdef'd inside); no-op stubs in `drivers/vga_pio/vga_ops_stub.c`. `HAL_PORT_CONSOLE_FONT_MEDIUM` port-config macro collapses the FontTable[2] arial_bold-vs-Hom_16x24 triple-nested `#ifdef PICOMITEVGA/HDMI` pair. `ScrollStart` promoted to unconditional storage in `core/state/display_state.c` (was duplicated between SSD1963.c and host_runtime.c). Draw.c ifdefs: 110 → 97 (−13).
+
 ## Phase 7c — `hal_display.h` for HDMI
 
 - `drivers/hdmi/` lifted from rp2350 HDMI code. Includes the multicore scrolling/clearing path (uses `hal_multicore`, see Phase 8).

@@ -38,6 +38,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "hal/hal_time.h"
 #include "hal/hal_keyboard.h"
 #include "hal/hal_display_merge.h"
+#include "hal/hal_vga_ops.h"
 #include "gfx_box_shared.h"
 #include "gfx_circle_shared.h"
 #include "gfx_line_shared.h"
@@ -101,15 +102,7 @@ typedef struct _BMPDECODER
 
     unsigned char *FontTable[FONT_TABLE_SIZE] = {   (unsigned char *)font1,
                                                     (unsigned char *)Misc_12x20_LE,
-#ifdef PICOMITEVGA
-#ifdef HDMI
-                                                    (unsigned char *)Hom_16x24_LE,
-#else
-                                                    (unsigned char *)arial_bold,
-#endif
-#else
-                                                    (unsigned char *)Hom_16x24_LE,
-#endif
+                                                    (unsigned char *)HAL_PORT_CONSOLE_FONT_MEDIUM,
                                                     (unsigned char *)Fnt_10x16,
                                                     (unsigned char *)Inconsola,
                                                     (unsigned char *)ArialNumFontPlus,
@@ -209,18 +202,10 @@ void DrawTriangle(int x0, int y0, int x1, int y1, int x2, int y2, int c, int fil
 // in the case of the MX170 this function is called directly by MMBasic when the GUI command is used
 // in the case of the MX470 it is called by MX470GUI in GUI.c
 const int colours[16]={0x00,0xFF,0x4000,0x40ff,0x8000,0x80ff,0xff00,0xffff,0xff0000,0xff00FF,0xff4000,0xff40ff,0xff8000,0xff80ff,0xffff00,0xffffff};
-void MIPS16 initFonts(void){    
+void MIPS16 initFonts(void){
 	FontTable[0] = (unsigned char *)font1;
 	FontTable[1] = (unsigned char *)Misc_12x20_LE;
-	#ifdef PICOMITEVGA
-    #ifdef HDMI
-	FontTable[2] = (unsigned char *)Hom_16x24_LE;
-    #else
-	FontTable[2] = (unsigned char *)arial_bold;
-    #endif
-	#else
-	FontTable[2] = (unsigned char *)Hom_16x24_LE;
-	#endif
+	FontTable[2] = (unsigned char *)HAL_PORT_CONSOLE_FONT_MEDIUM;
 	FontTable[3] = (unsigned char *)Fnt_10x16;
 	FontTable[4] = (unsigned char *)Inconsola;
 	FontTable[5] = (unsigned char *)ArialNumFontPlus;
@@ -393,13 +378,7 @@ void MIPS16 cmd_guiMX170(void) {
         #endif
                 DrawCircle(rand() % HRes, rand() % VRes, (rand() % t) + t/5, 1, 1, rgb((rand() % 8)*256/8, (rand() % 8)*256/8, (rand() % 8)*256/8), 1);
                 count++;
-                #ifdef PICOMITEVGA
-                #ifdef HDMI
-                while(v_scanline!=0){} 
-                #else
-                while(QVgaScanLine!=0){}
-                #endif
-                #endif
+                hal_vga_ops_wait_scanline_zero();
             }
             ClearScreen(gui_bcolour);
             PFlt(((MMFLOAT)count)/(((MMFLOAT)(hal_time_us_64()-start))/1000000.0));MMPrintString(" Circles per Second");
@@ -557,36 +536,12 @@ static void draw_cls_fail_range(void *ctx, int value, int min, int max) {
 
 static void draw_cls_do_clear(void *ctx, int use_default, int colour) {
     (void)ctx;
-#ifdef PICOMITEVGA
     if (!use_default) {
-        if(DISPLAY_TYPE==SCREENMODE2 || DISPLAY_TYPE==SCREENMODE3 ){
-            int fc = colour;
-            unsigned char fcolour = RGB121(fc);
-            fcolour |= (fcolour << 4);
-            memset((void *)WriteBuf, fcolour, ScreenSize);
-        } else {
-            ClearScreen(colour);
-        }
+        if (!hal_vga_ops_handle_tile_cls(colour)) ClearScreen(colour);
         return;
     }
-    if((WriteBuf==LayerBuf && (DISPLAY_TYPE==SCREENMODE2 || DISPLAY_TYPE==SCREENMODE3 ) && LayerBuf!=DisplayBuf)
-    || (WriteBuf==SecondLayer && (DISPLAY_TYPE==SCREENMODE2 || DISPLAY_TYPE==SCREENMODE3 ) && SecondLayer!=DisplayBuf)){
-        uint8_t colourv=(WriteBuf==LayerBuf ? transparent|(transparent<<4) :  transparents|(transparents<<4)) ;
-        memset((void *)WriteBuf,colourv,HRes*VRes/2);
-#ifdef HDMI
-    } else if(WriteBuf==LayerBuf && (DISPLAY_TYPE==SCREENMODE5 ) && LayerBuf!=DisplayBuf){
-        memset((void *)WriteBuf,transparent,HRes*VRes);
-    } else if((void *)WriteBuf==LayerBuf && (DISPLAY_TYPE==SCREENMODE4 ) && LayerBuf!=DisplayBuf){
-        uint16_t *p=(uint16_t *)WriteBuf;
-        for(int i=0;i<HRes*VRes;i++)*p++=RGBtransparent;
-#endif
-    } else {
+    if (!hal_vga_ops_handle_layer_clear())
         ClearScreen(gui_bcolour);
-    }
-#else
-    if (use_default) ClearScreen(gui_bcolour);
-    else ClearScreen(colour);
-#endif
 }
 
 static int draw_text_get_int(void *ctx) {
@@ -669,48 +624,12 @@ void DrawPixelNormal(int x, int y, int c) {
 }
 #endif
 void ClearScreen(int c) {
-#ifndef PICOMITEVGA
-    if(ScrollLCD==ScrollLCDMEM332){
+    if (ScrollLCD == ScrollLCDMEM332) {
         hal_display_nextgen_scroll_reset();
-        ScrollStart=0;
+        ScrollStart = 0;
     }
-#endif
-#ifdef PICOMITEVGA
-    if(DISPLAY_TYPE==SCREENMODE1 && WriteBuf==DisplayBuf){
-        DrawRectangle(0, 0, HRes - 1, VRes - 1, 0);
-#ifdef HDMI
-        memset((void *)WriteBuf,0,ScreenSize);
-        if(FullColour){
-            uint16_t bcolour = RGB555(c);
-            for(int x=0;x<X_TILE;x++){
-                for(int y=0;y<Y_TILE;y++){
-                    tilefcols[y*X_TILE+x]=RGB555(gui_fcolour);
-                    tilebcols[y*X_TILE+x]=bcolour;
-                } 
-            }
-        } else {
-           uint8_t bcolour = RGB332(c);
-            for(int x=0;x<X_TILE;x++){
-                for(int y=0;y<Y_TILE;y++){
-                    tilefcols_w[y*X_TILE+x]=RGB332(gui_fcolour);
-                    tilebcols_w[y*X_TILE+x]=bcolour;
-                } 
-            }
-        }
-        CurrentX=CurrentY=0;
-#else
-        memset((void *)WriteBuf,0,ScreenSize);
-        for(int x=0;x<X_TILE;x++){
-            for(int y=0;y<Y_TILE;y++){
-                tilefcols[y*X_TILE+x]=RGB121pack(gui_fcolour);
-                tilebcols[y*X_TILE+x]=RGB121pack(c);
-            } 
-        }
-#endif
-    } else DrawRectangle(0, 0, HRes - 1, VRes - 1, c);
-#else
-    DrawRectangle(0, 0, HRes - 1, VRes - 1, c);
-#endif
+    if (!hal_vga_ops_handle_cls(c))
+        DrawRectangle(0, 0, HRes - 1, VRes - 1, c);
 }
 void DrawBuffered(int xti, int yti, int c, int complete){
 	static unsigned char pos=0;
@@ -6196,26 +6115,7 @@ void MIPS16 cmd_font(void) {
     else
         SetFont(((getint(argv[0], 1, FONT_TABLE_SIZE) - 1) << 4) | 1);
     if(Option.DISPLAY_CONSOLE && !CurrentLinePtr) {                 // if we are at the command prompt on the LCD
-#ifdef PICOMITEVGA
-        if(gui_font_height>=8 && (gui_font_width % 8)==0){
-            ytileheight=gui_font_height;
-            Y_TILE=(VRes+ytileheight-1)/ytileheight;
-            for(int i=0;i<X_TILE*Y_TILE;i++){
-#if defined(rp2350) && defined(HDMI)
-                if(FullColour){
-                    tilefcols[i]=tilefcols[0];
-                    tilebcols[i]=tilebcols[0];
-                } else {
-                    tilefcols_w[i]=tilefcols_w[0];
-                    tilebcols_w[i]=tilebcols_w[0];
-                }
-#else
-                tilefcols[i]=tilefcols[0];
-                tilebcols[i]=tilebcols[0];
-#endif                
-            }
-        }
-#endif
+        hal_vga_ops_retile_for_font();
         PromptFont = gui_font;
         if(CurrentY + gui_font_height >= VRes) {
             ScrollLCD(CurrentY + gui_font_height - VRes);           // scroll up if the font change split the line over the bottom

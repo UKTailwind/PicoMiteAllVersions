@@ -124,6 +124,10 @@ extern int rgb(int r, int g, int b);
 extern void (*DrawRectangle)(int x1, int y1, int x2, int y2, int c);
 extern void (*DrawBitmap)(int x1, int y1, int width, int height, int scale, int fc, int bc, unsigned char *bitmap);
 extern void (*ScrollLCD) (int lines);
+/* SSD1963 scroll-start register shadow; defined in core/state/display_state.c
+ * so non-SSD1963 ports (VGA / HDMI / host) can still reference it without
+ * pulling in SSD1963.h. */
+extern volatile int ScrollStart;
 extern void (*DrawBuffer)(int x1, int y1, int x2, int y2, unsigned char *c);
 extern void (*ReadBuffer)(int x1, int y1, int x2, int y2, unsigned char *c);
 extern void (*DrawBLITBuffer)(int x1, int y1, int x2, int y2, unsigned char *c);

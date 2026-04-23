@@ -77,4 +77,12 @@
  * the macro defined so Draw.c compiles. */
 #define HAL_PORT_LCD_SPI_CLK_PIN         Option.SYSTEM_CLK
 
+
+/* Console medium font (FontTable[2]) — VGA ports at QVGA
+ * resolution use the narrower arial_bold so an 80-column console
+ * fits; every other port (including HDMI, which runs true VGA or
+ * higher) uses the wider Hom_16x24_LE.  Value is a symbol name, the
+ * actual const arrays are included by Draw.c. */
+#define HAL_PORT_CONSOLE_FONT_MEDIUM Hom_16x24_LE
+
 #endif /* PORT_CONFIG_H */

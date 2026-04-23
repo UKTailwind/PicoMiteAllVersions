@@ -34,3 +34,10 @@ s_camera   camera[MAXCAM + 1];
 bool mergerunning = false;
 volatile bool mergedone = false;
 uint32_t mergetimer = 0;
+
+/* SSD1963 scroll-start register shadow. Only SSD1963.c actually
+ * exercises this (as the display's current scroll origin); non-
+ * SSD1963 targets never read a non-zero value but Draw.c /
+ * MM_Misc.c reference it unconditionally now that the
+ * ScrollLCD==ScrollLCDMEM332 branch is gate-free. */
+volatile int ScrollStart = 0;
