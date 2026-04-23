@@ -64,6 +64,7 @@ extern int  port_factory_reset_board(unsigned char *p);
 extern int  port_display_option_setter(unsigned char *cmdline);
 extern void port_print_display_options(void);
 extern void port_print_lcd_spi(void);
+extern int  port_keyboard_option_setter(unsigned char *cmdline);
 extern void port_web_print_options(void);
 extern int  port_web_option_setter(unsigned char *cmdline);
 extern int  port_web_mminfo(unsigned char *ep, int64_t *out_iret,
@@ -1406,68 +1407,7 @@ void MIPS16 cmd_option(void) {
 	}
 
 #endif
-    tp = checkstring(cmdline, (unsigned char *)"KEYBOARD");
-	if(tp) {
-    	if(CurrentLinePtr) error("Invalid in a program");
-#ifndef USBKEYBOARD
-		if(checkstring(tp, (unsigned char *)"DISABLE")){
-			Option.KeyboardConfig = NO_KEYBOARD;
-            Option.capslock=0;
-            Option.numlock=0;
-            Option.KEYBOARD_CLOCK=0;
-            Option.KEYBOARD_DATA=0;
-            SaveOptions();
-            _excep_code = RESET_COMMAND;
-            SoftReset();
-		} else {
-#endif
-        getargs(&tp,9,(unsigned char *)",");
-#ifndef USBKEYBOARD
-        if(!Option.KEYBOARD_CLOCK){
-            Option.KEYBOARD_CLOCK=KEYBOARDCLOCK;
-            Option.KEYBOARD_DATA=KEYBOARDDATA;
-        }
-        if(ExtCurrentConfig[Option.KEYBOARD_CLOCK] != EXT_NOT_CONFIG && Option.KeyboardConfig == NO_KEYBOARD)  error("Pin %/| is in use",Option.KEYBOARD_CLOCK,Option.KEYBOARD_CLOCK);
-        if(ExtCurrentConfig[Option.KEYBOARD_DATA] != EXT_NOT_CONFIG && Option.KeyboardConfig == NO_KEYBOARD)  error("Pin %/| is in use",Option.KEYBOARD_DATA,Option.KEYBOARD_DATA);
-#endif
-        int hal_kbd_layout = -1;
-        if(checkstring(argv[0], (unsigned char *)"US"))       hal_kbd_layout = HAL_KBD_LAYOUT_US;
-        else if(checkstring(argv[0], (unsigned char *)"FR"))  hal_kbd_layout = HAL_KBD_LAYOUT_FR;
-        else if(checkstring(argv[0], (unsigned char *)"GR"))  hal_kbd_layout = HAL_KBD_LAYOUT_GR;
-        else if(checkstring(argv[0], (unsigned char *)"IT"))  hal_kbd_layout = HAL_KBD_LAYOUT_IT;
-        else if(checkstring(argv[0], (unsigned char *)"UK"))  hal_kbd_layout = HAL_KBD_LAYOUT_UK;
-        else if(checkstring(argv[0], (unsigned char *)"ES"))  hal_kbd_layout = HAL_KBD_LAYOUT_ES;
-        else if(checkstring(argv[0], (unsigned char *)"BE"))  hal_kbd_layout = HAL_KBD_LAYOUT_BE;
-        else if(checkstring(argv[0], (unsigned char *)"BR"))  hal_kbd_layout = HAL_KBD_LAYOUT_BR;
-        else if(checkstring(argv[0], (unsigned char *)"I2C")) hal_kbd_layout = HAL_KBD_LAYOUT_I2C;
-        if (hal_kbd_layout < 0 || hal_keyboard_set_layout(hal_kbd_layout) != 0) error("Syntax");
-        Option.capslock=0;
-        Option.numlock=1;
-#ifndef USBKEYBOARD
-        int rs=0b00100000;
-        int rr=0b00001100;
-        if(Option.KeyboardConfig!=CONFIG_I2C){
-            if(argc>=3 && *argv[2])Option.capslock=getint(argv[2],0,1);
-            if(argc>=5 && *argv[4])Option.numlock=getint(argv[4],0,1);
-            if(argc>=7 && *argv[6])rs=getint(argv[6],0,3)<<5;
-            if(argc==9 && *argv[8])rr=getint(argv[8],0,31);
-            Option.repeat = rs | rr;
-        } else {
-            if(!Option.SYSTEM_I2C_SCL)error("Option System I2C not set");
-        }
-#else
-        if(argc>=3 && *argv[2])Option.capslock=getint(argv[2],0,1);
-        if(argc>=5 && *argv[4])Option.numlock=getint(argv[4],0,1);
-		if(argc>=7 && *argv[6])Option.RepeatStart=getint(argv[6],100,2000);
-		if(argc>=9 && *argv[8])Option.RepeatRate=getint(argv[8],25,2000);
-#endif        
-        SaveOptions();
-        _excep_code = RESET_COMMAND;
-        SoftReset();
-		}
-#ifndef USBKEYBOARD
-	}
-#endif
+    if (port_keyboard_option_setter(cmdline)) return;
 
     tp = checkstring(cmdline, (unsigned char *)"BAUDRATE");
     if(tp) {

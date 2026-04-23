@@ -900,6 +900,9 @@ int  port_display_option_setter(unsigned char *cmdline) { (void)cmdline; return 
 void port_print_display_options(void) {}
 void port_print_lcd_spi(void) {}
 
+/* OPTION KEYBOARD setter — host has no keyboard config to set. */
+int port_keyboard_option_setter(unsigned char *cmdline) { (void)cmdline; return 0; }
+
 /* WEB-only hooks — host has no WiFi. Real impls live in MMsetwifi.c on
  * PICOMITEWEB device builds. */
 void port_web_print_options(void) {}
