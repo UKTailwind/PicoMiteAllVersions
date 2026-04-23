@@ -538,3 +538,22 @@ const struct Displays display_details[1] = {{ .ref = 0, .name = {0}, .speed = 0,
  * unconditionally. */
 void mmbasic_save_psram_settings(void) {}
 void mmbasic_restore_psram_settings(void) {}
+
+/* RP2350 chip-variant flag. On every device build PicoMite.c defines this
+ * (true=RP2350A or RP2040, false=RP2350B); host has no chip so default to
+ * the RP2040-equivalent value (true) — code paths that branch on this
+ * pick the larger-pin-count behaviour, which is what RP2040 already used. */
+bool rp2350a = true;
+
+/* Per-port factory-default Option setup. Real implementations live in
+ * ports/<board>/port_defaults.c; host doesn't pre-set hardware-tied pins
+ * (LCD_CS, AUDIO_L, …) because none of them mean anything. */
+void port_set_default_options(void) {}
+
+/* Networking stubs — real implementations only link on PICOMITEWEB. The
+ * non-WEB MM_Misc.c block that defines these doesn't compile on host
+ * (host links mm_misc_shared.c instead of MM_Misc.c). */
+void closeMQTT(void) {}
+void ProcessWeb(int mode) { (void)mode; }
+void tcp_free_recv_buffers(void) {}
+void tcp_realloc_recv_buffers(void) {}
