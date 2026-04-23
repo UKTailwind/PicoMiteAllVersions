@@ -959,6 +959,12 @@ int  port_web_get_ssid(unsigned char *out_sret, int *out_targ)
 uint32_t port_bc_crash_get_sp(void) { return 0; }
 void port_bc_crash_save_fault_regs(BCCrashInfo *info) { (void)info; }
 
+/* bc_runtime.c source-free hook — host hands bc_run_source_string an
+ * externally-owned buffer (malloc / emscripten FS), so releasing it is
+ * the caller's job. Device impl in ports/pico_sdk_common/bc_runtime_pico.c
+ * releases through BC_FREE / FreeMemory. */
+void port_bc_runtime_free_source(const char **source) { (void)source; }
+
 /* vm_sys_time port hook — host picks up MMBASIC_HOST_DATE /
  * MMBASIC_HOST_TIME env-var overrides (tests pin deterministic values
  * so interpreter-vs-VM output comparison is stable) and falls back to

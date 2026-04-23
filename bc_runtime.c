@@ -158,6 +158,13 @@ void bc_run_diag_dump(const char *reason) {
  */
 void bc_run_source_string_ex(const char *source, const char *source_name, int is_immediate);
 
+/* Free the source buffer if this port owns it. On device the caller
+ * allocates source via GetMemory (MMHeap), so the buffer must be
+ * released through FreeMemory / BC_FREE before the VM runtime tables
+ * allocate. Host hands an externally-owned pointer in (malloc or
+ * emscripten FS), so the hook is a no-op there. */
+extern void port_bc_runtime_free_source(const char **source);
+
 void bc_run_source_string(const char *source, const char *source_name) {
     bc_run_source_string_ex(source, source_name, 0);
 }
@@ -215,9 +222,7 @@ void bc_run_source_string_ex(const char *source, const char *source_name, int is
             BC_FREE((void *)source);
             source = NULL;
         }
-#ifndef MMBASIC_HOST
-        if (source) { BC_FREE((void *)source); source = NULL; }
-#endif
+        port_bc_runtime_free_source(&source);
         BC_FREE(cs);
         BC_FREE(vm);
         error("NEM[vm:comptbl] want=% pg=% used=%/% free=% run=%",
@@ -261,9 +266,7 @@ void bc_run_source_string_ex(const char *source, const char *source_name, int is
             BC_FREE((void *)source);
             source = NULL;
         }
-#ifndef MMBASIC_HOST
-        if (source) { BC_FREE((void *)source); source = NULL; }
-#endif
+        port_bc_runtime_free_source(&source);
         BC_FREE(cs);
         BC_FREE(vm);
         if (!is_immediate) bc_bridge_release_subfun_buffer();
@@ -301,9 +304,7 @@ void bc_run_source_string_ex(const char *source, const char *source_name, int is
         bc_run_diag_dump("vm compact");
         bc_compiler_free(cs);
         bc_compile_release_all();
-#ifndef MMBASIC_HOST
-        if (source) BC_FREE((void *)source);
-#endif
+        port_bc_runtime_free_source(&source);
         BC_FREE(cs);
         BC_FREE(vm);
         if (!is_immediate) bc_bridge_release_subfun_buffer();
@@ -339,9 +340,7 @@ void bc_run_source_string_ex(const char *source, const char *source_name, int is
             bc_compiler_free(cs);
             BC_FREE(cs);
             BC_FREE(vm);
-#ifndef MMBASIC_HOST
-            if (source) BC_FREE((void *)source);
-#endif
+            port_bc_runtime_free_source(&source);
             error("FRUN: out of memory (bridge sub table)");
             return;
         }
@@ -349,9 +348,7 @@ void bc_run_source_string_ex(const char *source, const char *source_name, int is
 
     /* Source no longer needed on device — free before VM runtime tables
      * allocate. Host leaves source to the caller (existing contract). */
-#ifndef MMBASIC_HOST
-    if (source) { BC_FREE((void *)source); source = NULL; }
-#endif
+    port_bc_runtime_free_source(&source);
 
     bc_crash_checkpoint(BC_CK_VM_ALLOC, "bc_vm_alloc");
     if (bc_vm_alloc(vm) != 0) {
