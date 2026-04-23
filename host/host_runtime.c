@@ -309,6 +309,7 @@ const char *PinFunction[64] = {NULL};
 
 /* volatile HID */
 volatile struct s_HID HID[4] = {{0}};
+unsigned char Current_USB_devices = 0;
 
 /* LFS config is defined by FileIO.c. */
 

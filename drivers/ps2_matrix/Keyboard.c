@@ -1077,3 +1077,10 @@ void __not_in_flash_func(CNInterrupt)(uint64_t dd)
   }
 }
 
+
+/* USB-host symbols stubbed for non-USB device builds. The PS/2 build
+ * never registers USB devices but MM_Misc.c reads these globals for
+ * MM.USB / MM.USB VID / MM.USB PID — they stay zero. struct s_HID is
+ * defined in Hardware_Includes.h. */
+volatile struct s_HID HID[4] = {{0}};
+unsigned char Current_USB_devices = 0;

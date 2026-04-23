@@ -127,6 +127,11 @@ extern volatile bool TCPreceived;
 extern char         *TCPreceiveInterrupt;
 /* setwifi lives in MMsetwifi.c on WEB builds. */
 extern void setwifi(unsigned char *tp);
+/* Current_USB_devices is declared in Hardware_Includes.h under
+ * `#ifdef USBKEYBOARD` so non-USB builds need an explicit decl —
+ * the symbol now exists on every device + host (USB-driver impl
+ * or PS/2 / host_runtime stub). */
+extern uint8_t Current_USB_devices;
 #ifdef PICOMITEVGA
 #ifndef HDMI
 void VGArecovery(int pin){
@@ -3354,7 +3359,8 @@ void MIPS16 fun_info(void){
         return;
     } 
 #endif
-#ifdef USBKEYBOARD
+    /* USB device info: HID[]/Current_USB_devices are zero on non-USB
+     * builds (PS/2 + host stubs) so the values come back as 0. */
     else if((tp=checkstring(ep, (unsigned char *)"USB VID"))){
         int n=getint((unsigned char *)tp,1,4);
         iret=HID[n-1].vid;
@@ -3374,7 +3380,6 @@ void MIPS16 fun_info(void){
         targ=T_INT;
         return;
     }
-#endif
     else if (checkstring(ep, (unsigned char *)"LINE")) {
         if (!CurrentLinePtr) {
             strcpy((char *)sret, "UNKNOWN");
@@ -3486,11 +3491,10 @@ void MIPS16 fun_info(void){
             targ=T_STR;
             return;
  		} else if(checkstring(tp, (unsigned char *)"KEYBOARD")){
-#ifdef USBKEYBOARD
-            strcpy((char *)sret,(char *)KBrdList[(int)Option.USBKeyboard]);
-#else
-            strcpy((char *)sret,(char *)KBrdList[(int)Option.KeyboardConfig]);
-#endif
+            /* USB builds populate Option.USBKeyboard; PS/2 builds populate
+             * Option.KeyboardConfig. The other field stays zero. */
+            int kb = Option.USBKeyboard ? Option.USBKeyboard : Option.KeyboardConfig;
+            strcpy((char *)sret, (char *)KBrdList[kb]);
             CtoM(sret);
             targ=T_STR;
             return;
