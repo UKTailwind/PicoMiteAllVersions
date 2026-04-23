@@ -45,6 +45,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "pico/rand.h"
 #endif
 extern long long int  llabs (long long int  n);
+extern void port_fun_mm_mqtt_copy(int which, unsigned char *out);
 const char* overlaid_functions[]={
     "MM.HRES",
     "MM.VRES",
@@ -63,19 +64,15 @@ const char* overlaid_functions[]={
 	"MM.WATCHDOG",
 	"MM.DEVICE$",
 	"MM.CMDLINE$",
-#ifdef PICOMITEWEB
 	"MM.MESSAGE$",
 	"MM.ADDRESS$",
 	"MM.TOPIC$",
-#endif
 	"MM.FLAGS",
 	"MM.DISPLAY",
 	"MM.WIDTH",
 	"MM.HEIGHT",
 	"MM.PERSISTENT",
-#ifndef PICOMITEWEB
 	"MM.SUPPLY",
-#endif
 	"MM.END"
 };
 #ifndef rp2350
@@ -493,38 +490,6 @@ void fun_byte(void){
 }
 void fun_tilde(void){
 	targ=T_INT;
-/*
-typedef enum {
-    MMHRES,
-    MMVRES,
-    MMVER,
-    MMI2C,
-	MMFONTHEIGHT,
-	MMFONTWIDTH,
-#ifndef USBKEYBOARD
-	MMPS2,
-#endif
-	MMHPOS,
-	MMVPOS,
-	MMONEWIRE,
-    MMERRNO,
-    MMERRMSG,
-	MMWATCHDOG,
-	MMDEVICE,
-	MMCMDLINE,
-#ifdef PICOMITEWEB
-	MMMESSAGE,
-    MMADDRESS,
-    MMTOPIC,
-#endif
-    MMFLAG,  
-    MMDISPLAY,
-    MMWIDTH,
-    MMHEIGHT,
-	MMPERSISTENT,
-    MMEND
-} Operation;
-*/
 	switch(*ep-'A'){
 		case MMHRES:
 			iret=HRes;
@@ -575,23 +540,26 @@ typedef enum {
 			Mstrcpy(sret,cmdlinebuff);
 			targ=T_STR;
 			break;
-#ifdef PICOMITEWEB
+		/* MM.MESSAGE$ / MM.ADDRESS$ / MM.TOPIC$ — route through port
+		 * hook. On WEB, port_fun_mm_mqtt_copy() (MMMqtt.c) copies
+		 * from the real MQTT state. On non-WEB builds (MMweb_stubs.c,
+		 * host_peripheral_stubs.c) the hook writes an empty MMBasic
+		 * string and the function returns "". */
 		case MMMESSAGE:
-			sret = GetTempMemory(STRINGSIZE);                                        // this will last for the life of the command
-			Mstrcpy(sret,messagebuff);
+			sret = GetTempMemory(STRINGSIZE);
+			port_fun_mm_mqtt_copy(0, sret);
 			targ=T_STR;
 			break;
 		case MMADDRESS:
-			sret = GetTempMemory(STRINGSIZE);                                        // this will last for the life of the command
-			Mstrcpy(sret,addressbuff);
+			sret = GetTempMemory(STRINGSIZE);
+			port_fun_mm_mqtt_copy(1, sret);
 			targ=T_STR;
 			break;
 		case MMTOPIC:
-			sret = GetTempMemory(STRINGSIZE);                                        // this will last for the life of the command
-			Mstrcpy(sret,topicbuff);
+			sret = GetTempMemory(STRINGSIZE);
+			port_fun_mm_mqtt_copy(2, sret);
 			targ=T_STR;
 			break;
-#endif
 		case  MMFLAG:
 			iret=g_flag;
 			break;
@@ -607,8 +575,13 @@ typedef enum {
 		case  MMPERSISTENT:
 			iret=_persistent;
 			break;
-#ifndef PICOMITEWEB
-			case  MMSUPPLY:
+		/* MM.SUPPLY — supply-voltage read via external ADC pin or the
+		 * PicoCalc keypad bridge. On WEB the ADC pin is consumed by
+		 * the CYW43 SPI, ExtCurrentConfig[44]==EXT_ANA_IN is false
+		 * and Option.LOCAL_KEYBOARD is false, so the runtime check
+		 * below falls through to fret = -1.0 — the function returns
+		 * "no external supply reading" without needing a target gate. */
+		case  MMSUPPLY:
 			if(ExtCurrentConfig[44]== EXT_ANA_IN || Option.LOCAL_KEYBOARD){
 		        hal_pin_adc_init();
 #ifdef rp2350
@@ -623,7 +596,6 @@ typedef enum {
 			} else fret=-1.0;
 			targ=T_NBR;
 			break;
-#endif
 		default:
 			iret=-1;
 	}

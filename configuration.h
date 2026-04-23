@@ -431,6 +431,11 @@ extern uint8_t PSRAMpin;
 #define PROGSTART (FLASH_TARGET_OFFSET + FLASH_ERASE_SIZE + SAVEDVARS_FLASH_SIZE + ((MAXFLASHSLOTS) * MAX_PROG_SIZE))
 #define TOP_OF_SYSTEM_FLASH  (FLASH_TARGET_OFFSET + FLASH_ERASE_SIZE + SAVEDVARS_FLASH_SIZE + ((MAXFLASHSLOTS+1) * MAX_PROG_SIZE))
 #define RoundUpK4(a)     (((a) + (4096 - 1)) & (~(4096 - 1)))// round up to the nearest page size      [position 131:9]	
+/* MM.* overlaid-function enum. All entries are unconditional so the
+ * enum layout is identical across targets; case bodies in fun_tilde
+ * that are hardware- or port-specific dispatch through port hooks or
+ * runtime Option checks, and harmless default values (empty string,
+ * -1.0) fall out on targets that don't own the underlying feature. */
 typedef enum {
     MMHRES,
     MMVRES,
@@ -449,19 +454,15 @@ typedef enum {
 	MMWATCHDOG,
 	MMDEVICE,
 	MMCMDLINE,
-#ifdef PICOMITEWEB
 	MMMESSAGE,
     MMADDRESS,
     MMTOPIC,
-#endif
-    MMFLAG,  
+    MMFLAG,
     MMDISPLAY,
     MMWIDTH,
     MMHEIGHT,
     MMPERSISTENT,
-#ifndef PICOMITEWEB
     MMSUPPLY,
-#endif
     MMEND
 } Operation;
 extern const char* overlaid_functions[];

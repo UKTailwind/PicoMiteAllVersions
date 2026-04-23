@@ -18,6 +18,19 @@ int  startupcomplete = 0;
 void tcp_free_recv_buffers(void) {}
 void tcp_realloc_recv_buffers(void) {}
 
+/* MM.MESSAGE$ / MM.ADDRESS$ / MM.TOPIC$ buffer accessor. On WEB,
+ * port_fun_mm_mqtt_copy() in MMMqtt.c copies from messagebuff /
+ * addressbuff / topicbuff. Non-WEB builds have no MQTT state, so this
+ * stub writes an empty MMBasic string (length byte zero) and the
+ * BASIC function returns "". Kept out of MMweb_stubs.c's larger
+ * buffer declarations to avoid ~550 bytes of dead BSS on RAM-tight
+ * VGA builds. */
+void port_fun_mm_mqtt_copy(int which, unsigned char *out) {
+    (void)which;
+    out[0] = 0;
+    out[1] = 0;
+}
+
 void port_web_print_options(void) {}
 int  port_web_option_setter(unsigned char *cmdline) { (void)cmdline; return 0; }
 int  port_web_mminfo(unsigned char *ep, int64_t *out_iret,

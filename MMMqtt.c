@@ -52,6 +52,18 @@ static mqtt_client_t* mqtt_client=NULL;
 unsigned char topicbuff[STRINGSIZE]={0};
 unsigned char messagebuff[STRINGSIZE]={0};
 unsigned char addressbuff[20]={0};
+
+/* MM.MESSAGE$ / MM.ADDRESS$ / MM.TOPIC$ — called from Functions.c's
+ * fun_tilde via a port hook so fun_tilde doesn't need a target gate.
+ * which ∈ {0=MESSAGE, 1=ADDRESS, 2=TOPIC}. */
+void port_fun_mm_mqtt_copy(int which, unsigned char *out) {
+    unsigned char *src =
+        which == 0 ? messagebuff :
+        which == 1 ? addressbuff :
+        which == 2 ? topicbuff   : NULL;
+    if (!src) { out[0] = 0; out[1] = 0; return; }
+    Mstrcpy(out, src);
+}
 typedef struct mqtt_dns_t_ {
         ip_addr_t remote;
         int complete;

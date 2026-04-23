@@ -561,3 +561,12 @@ void ProcessWeb(int mode) { (void)mode; }
 int  startupcomplete = 0;
 void tcp_free_recv_buffers(void) {}
 void tcp_realloc_recv_buffers(void) {}
+
+/* MM.MESSAGE$ / MM.ADDRESS$ / MM.TOPIC$ buffer accessor — see
+ * MMweb_stubs.c for the rationale. Host has no MQTT state so the
+ * function writes an empty MMBasic string. */
+void port_fun_mm_mqtt_copy(int which, unsigned char *out) {
+    (void)which;
+    out[0] = 0;
+    out[1] = 0;
+}
