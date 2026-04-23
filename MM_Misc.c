@@ -82,9 +82,11 @@ extern unsigned int b64e_size(unsigned int in_size);
 extern unsigned int b64_encode(const unsigned char* in, unsigned int in_len, unsigned char* out);
 extern unsigned int b64_decode(const unsigned char* in, unsigned int in_len, unsigned char* out);
 void parselongAES(uint8_t *p, int ivadd, uint8_t *keyx, uint8_t *ivx, int64_t **inint, int64_t **outint);
-#ifndef PICOMITEVGA
-    extern int SSD1963data;
-#endif
+/* SSD1963data is defined in SSD1963.c on PICO/PICORP2350/PICOUSB/
+ * PICOUSBRP2350/WEB/WEBRP2350; ports/vga{,_rp2350}/port_defaults.c +
+ * ports/hdmi_rp2350/port_defaults.c stub it so the OPTION LCDPANEL
+ * DISABLE reset path can write 0 unconditionally. */
+extern int SSD1963data;
 uint32_t getTotalHeap(void) {
    extern char __StackLimit, __bss_end__;
    

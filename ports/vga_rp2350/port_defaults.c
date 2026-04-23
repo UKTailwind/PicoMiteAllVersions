@@ -383,3 +383,8 @@ void VGArecovery(int pin){
         }
 #endif
 }
+
+/* SSD1963 data-bus base GPIO. Defined in SSD1963.c on non-VGA/HDMI
+ * ports; stubbed here so MM_Misc.c can read it unconditionally for
+ * the OPTION LCDPANEL DISABLE reset path. */
+int SSD1963data = 0;
