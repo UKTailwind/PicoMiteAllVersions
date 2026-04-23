@@ -57,10 +57,16 @@ F4 step 10 164     82       2       2      39        38      17         14      
 F4 step 11 164     78       2       2      39        38      17         14      354  (HAL_PORT_IS_VGA runtime branches in OPTION SDCARD/SYSTEM I2C; −4)
 F4 step 12 164     77       2       2      39        38      17         14      354  (MM.INFO TILE HEIGHT unconditional + ytileheight non-VGA default; −1)
 F4 step 13 164     67       2       2      39        39      17         14      344  (printoptions display section → port_print_display_options() shared file; −10)
-            MM_Misc.c: 140 → 67 across 13 sub-steps (target-macro 135 → 60). Remaining
-            ~60 are rp2350-specific bodies (interrupts, multicore, PSRAM mode), HEARTBEAT
-            setter, KEYBOARD setter (USBKEYBOARD vs PS/2 syntax), and the printoptions
-            cluster's PICOMITE+rp2350 LCD_CLK / PICOMITEVGA leftovers.
+F4 step 14 164     61       2       2      39        39      17         14      338  (PWM slice + GPIO + power + audio rp2350 gates → runtime checks; −6)
+F4 step 15 164     57       2       2      39        39      17         14      334  (VGArecovery + LCD SPI printoptions → port files; −4)
+F4 step 16 164     53       2       2      39        39      17         14      330  (OPTION KEYBOARD setter → port_keyboard_option_setter(); −4)
+F4 step 17 164     52       2       2      39        39      17         14      329  (SSD1963data extern unconditional via VGA stubs; −1)
+F4 step 18 164     50       2       2      39        39      17         14      327  (SYSTEM SPI printoptions via HAL_PORT_IS_VGA + dead `i` decl; −2)
+            MM_Misc.c: 140 → 50 across 18 sub-steps (target-macro 135 → 43). Remaining
+            ~40 are rp2350 chip-specific bodies (interrupts, multicore, PSRAM mode, I2S
+            audio PIO map), HDMI PINS setter (option struct fields gated), HEARTBEAT
+            setter (USBKEYBOARD-vs-PS/2 with pin reservation), and various small
+            PICOMITEVGA prints (RTC/POWER/etc.) inside printoptions.
 ─── post-fixup phases ───
 6          .       .        .        .       .         .       .          0        .  (Audio.c → HAL)
 7a         .       .        .        .       .         .       .          .        .  (Draw.c ILI9341 → HAL)
