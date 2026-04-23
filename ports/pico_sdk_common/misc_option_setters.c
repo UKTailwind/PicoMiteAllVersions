@@ -412,4 +412,44 @@ int MIPS16 port_mminfo_interrupts(int64_t *out_iret)
 #endif
 }
 
+/* MM.INFO TOUCH — VGA Option struct lacks TOUCH_XZERO/TOUCH_CS so
+ * the field is unavailable. Other ports return the calibration state. */
+int MIPS16 port_mminfo_touch_status(unsigned char *out_sret)
+{
+#ifdef PICOMITEVGA
+    (void)out_sret;
+    return 0;
+#else
+    if (Option.TOUCH_CS == false)                       strcpy((char *)out_sret, "Disabled");
+    else if (Option.TOUCH_XZERO == TOUCH_NOT_CALIBRATED) strcpy((char *)out_sret, "Not calibrated");
+    else                                                 strcpy((char *)out_sret, "Ready");
+    return 1;
+#endif
+}
+
+/* MM.INFO SCROLL / MM.INFO SCREENBUFF — PicoCalc framebuffer accessors
+ * (PICOMITE + rp2350 only; ScreenBuffer macro = FRAMEBUFFER on rp2350).
+ * ScrollStart's volatile qualifier comes from SSD1963.h, included via
+ * Hardware_Includes.h. */
+int MIPS16 port_mminfo_scroll_start(int64_t *out_iret)
+{
+#if defined(PICOMITE) && defined(rp2350)
+    *out_iret = ScrollStart;
+    return 1;
+#else
+    (void)out_iret;
+    return 0;
+#endif
+}
+int MIPS16 port_mminfo_screenbuff(int64_t *out_iret)
+{
+#if defined(PICOMITE) && defined(rp2350)
+    *out_iret = (int64_t)(uint32_t)ScreenBuffer;
+    return 1;
+#else
+    (void)out_iret;
+    return 0;
+#endif
+}
+
 #endif /* !MMBASIC_HOST */

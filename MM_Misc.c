@@ -84,6 +84,9 @@ extern int  port_heartbeat_option_setter(unsigned char *cmdline);
 extern int  port_system_lcd_spi_option_setter(unsigned char *cmdline);
 extern int  port_audio_i2s_pio_slice(int pin1, int pin2);
 extern int  port_mminfo_interrupts(int64_t *out_iret);
+extern int  port_mminfo_touch_status(unsigned char *out_sret);
+extern int  port_mminfo_scroll_start(int64_t *out_iret);
+extern int  port_mminfo_screenbuff(int64_t *out_iret);
 extern void port_apply_default_console_colors(int default_fc, int default_bc);
 extern void port_web_print_options(void);
 extern int  port_web_option_setter(unsigned char *cmdline);
@@ -2643,28 +2646,22 @@ void MIPS16 fun_info(void){
             CtoM(sret);
             targ=T_STR;
             return;
-#if defined(PICOMITE) && defined(rp2350)
-        } else if(checkstring(ep, (unsigned char *)"SCROLL")){
-            iret = ScrollStart;
-            targ=T_INT;
-            return;
-        } else if(checkstring(ep, (unsigned char *)"SCREENBUFF")){
-            iret = (int64_t)(uint32_t)ScreenBuffer;
-            targ=T_INT;
-            return;
-#endif
+        } else if (checkstring(ep, (unsigned char *)"SCROLL")) {
+            if (port_mminfo_scroll_start(&iret)) { targ = T_INT; return; }
+            error("Syntax");
+        } else if (checkstring(ep, (unsigned char *)"SCREENBUFF")) {
+            if (port_mminfo_screenbuff(&iret)) { targ = T_INT; return; }
+            error("Syntax");
         } else error("Syntax");
     }
-#ifndef PICOMITEVGA
-    else if(checkstring(ep, (unsigned char *)"TOUCH")){
-        if(Option.TOUCH_CS == false)strcpy((char *)sret,"Disabled");
-        else if(Option.TOUCH_XZERO == TOUCH_NOT_CALIBRATED)strcpy((char *)sret,"Not calibrated");
-        else strcpy((char *)sret,"Ready");
-        CtoM(sret);
-        targ=T_STR;
-        return;
-    } 
-#endif
+    else if (checkstring(ep, (unsigned char *)"TOUCH")) {
+        if (port_mminfo_touch_status(sret)) {
+            CtoM(sret);
+            targ = T_STR;
+            return;
+        }
+        error("Syntax");
+    }
 	else if(checkstring(ep, (unsigned char *)"TRACK")){
 		if(CurrentlyPlaying == P_MP3 || CurrentlyPlaying == P_FLAC || CurrentlyPlaying == P_WAV|| CurrentlyPlaying == P_MOD || CurrentlyPlaying == P_MIDI) strcpy((char *)sret,WAVfilename);
 		else strcpy((char *)sret,"OFF");

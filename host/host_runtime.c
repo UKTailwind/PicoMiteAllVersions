@@ -932,6 +932,11 @@ int port_audio_i2s_pio_slice(int pin1, int pin2) { (void)pin1; (void)pin2; retur
 /* MM.INFO INTERRUPTS — host has no NVIC. */
 int port_mminfo_interrupts(int64_t *out_iret) { (void)out_iret; return 0; }
 
+/* MM.INFO TOUCH / SCROLL / SCREENBUFF — host has none. */
+int port_mminfo_touch_status(unsigned char *out_sret) { (void)out_sret; return 0; }
+int port_mminfo_scroll_start(int64_t *out_iret) { (void)out_iret; return 0; }
+int port_mminfo_screenbuff(int64_t *out_iret) { (void)out_iret; return 0; }
+
 /* WEB-only hooks — host has no WiFi. Real impls live in MMsetwifi.c on
  * PICOMITEWEB device builds. */
 void port_web_print_options(void) {}
