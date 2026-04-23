@@ -1869,9 +1869,8 @@ tp = checkstring(cmdline, (unsigned char *)"HEARTBEAT");
 
     tp = checkstring(cmdline, (unsigned char *)"POWER");
     if(tp) {
-#ifdef rp2350
-        if(!rp2350a)error("Invalid for RP2350B");
-#endif
+        /* RP2350B (rp2350a==false) has no PWR_EN power-control pin. */
+        if (HAL_PORT_PWM_SLICE_COUNT > 8 && !rp2350a) error("Invalid for RP2350B");
         if(Option.AllPins)error("OPTION PICO set");
         if(checkstring(tp, (unsigned char *)"PWM"))  Option.PWM = true;
         if(checkstring(tp, (unsigned char *)"PFM"))  Option.PWM = false;
@@ -2069,11 +2068,10 @@ tp = checkstring(cmdline, (unsigned char *)"HEARTBEAT");
             Option.AUDIO_CS_PIN=pin1;
             Option.AUDIO_CLK_PIN=pin2;
             Option.AUDIO_MOSI_PIN=pin3;
-#ifdef rp2350
-            if(rp2350a)slice=11;
-            else
-#endif
-            slice=checkslice(pin2,pin2, 1);
+            /* RP2350A (rp2350a==true) and rp2040 (rp2350a default-true)
+             * use checkslice; RP2350B reserves slice 11 for audio. */
+            if (HAL_PORT_PWM_SLICE_COUNT > 8 && rp2350a) slice = 11;
+            else slice = checkslice(pin2, pin2, 1);
             if((PinDef[Option.DISPLAY_BL].slice & 0x7f) == slice) error("Channel in use for backlight");
             Option.AUDIO_SLICE=slice;
             SaveOptions();
@@ -2663,19 +2661,23 @@ void MIPS16 fun_info(void){
         iret=boot_count;
         targ=T_INT;
     } else if(checkstring(ep, (unsigned char *)"BOOT")){
-        if(restart_reason==0xFFFFFFFF)strcpy((char *)sret, "Restart");
-        else if(restart_reason==0xFFFFFFFE)strcpy((char *)sret, "S/W Watchdog");
-        else if(restart_reason==0xFFFFFFFD)strcpy((char *)sret, "H/W Watchdog");
-        else if(restart_reason==0xFFFFFFFC)strcpy((char *)sret, "Firmware update");
-#ifdef rp2350
-        else if(restart_reason & 0x30000)strcpy((char *)sret, "Power On");
-        else if(restart_reason & 0x40000)strcpy((char *)sret, "Reset Switch");
-        else if(restart_reason & 0x280000)strcpy((char *)sret, "Debug");
-#else
-        else if(restart_reason==0x100)strcpy((char *)sret, "Power On");
-        else if(restart_reason==0x10000)strcpy((char *)sret, "Reset Switch");
-        else if(restart_reason==0x100000)strcpy((char *)sret, "Debug");
-#endif
+        const char *boot_label = NULL;
+        if(restart_reason==0xFFFFFFFF) boot_label = "Restart";
+        else if(restart_reason==0xFFFFFFFE) boot_label = "S/W Watchdog";
+        else if(restart_reason==0xFFFFFFFD) boot_label = "H/W Watchdog";
+        else if(restart_reason==0xFFFFFFFC) boot_label = "Firmware update";
+        else if (HAL_PORT_PWM_SLICE_COUNT > 8) {
+            /* rp2350: bit-mask reset reasons. */
+            if      (restart_reason & 0x30000)  boot_label = "Power On";
+            else if (restart_reason & 0x40000)  boot_label = "Reset Switch";
+            else if (restart_reason & 0x280000) boot_label = "Debug";
+        } else {
+            /* rp2040: exact-match reset reasons. */
+            if      (restart_reason == 0x100)    boot_label = "Power On";
+            else if (restart_reason == 0x10000)  boot_label = "Reset Switch";
+            else if (restart_reason == 0x100000) boot_label = "Debug";
+        }
+        if (boot_label) strcpy((char *)sret, boot_label);
         else sprintf((char *)sret, "Unknown code %X",(unsigned int)restart_reason);
         CtoM(sret);
         targ=T_STR;
@@ -3117,22 +3119,21 @@ void MIPS16 fun_info(void){
             targ=T_INT;
             return;
         } else if((tp=checkstring(ep, (unsigned char *)"PWM COUNT"))){
-#ifdef rp2350
-            int channel=getint(tp,0,rp2350a? 7 : 11);
-#else
-            int channel=getint(tp,0,7);
-#endif
+            /* rp2040: 8 slices (0..7). rp2350a==true (RP2350A or RP2040
+             * runtime probe): 0..7. rp2350a==false (RP2350B): 0..11.
+             * HAL_PORT_PWM_SLICE_COUNT is 8 on rp2040, 12 on rp2350. */
+            int max_slice = HAL_PORT_PWM_SLICE_COUNT - 1;
+            if (HAL_PORT_PWM_SLICE_COUNT > 8 && rp2350a) max_slice = 7;
+            int channel=getint(tp,0,max_slice);
             iret=pwm_hw->slice[channel].top;
             targ=T_INT;
             return;
         } else if((tp=checkstring(ep, (unsigned char *)"PWM DUTY"))){
             getargs(&tp,3,(unsigned char *)",");
             if(argc!=3)error("Syntax");
-#ifdef rp2350
-            int channel=getint(argv[0],0,rp2350a? 7 : 11);
-#else
-            int channel=getint(argv[0],0,7);
-#endif
+            int max_slice = HAL_PORT_PWM_SLICE_COUNT - 1;
+            if (HAL_PORT_PWM_SLICE_COUNT > 8 && rp2350a) max_slice = 7;
+            int channel=getint(argv[0],0,max_slice);
             int AorB=getint(argv[2],0,1);
             if(AorB)iret=((pwm_hw->slice[channel].cc) >> 16);
             else iret=(pwm_hw->slice[channel].cc & 0xFFFF);
@@ -3304,11 +3305,10 @@ void MIPS16 fun_info(void){
         targ = T_NBR;
         return;
     } else if((tp=checkstring(ep, (unsigned char *)"MAX GP"))){
-#ifdef rp2350
-        iret=(rp2350a ? 29 : 47);
-#else
-        iret=29;
-#endif
+        /* rp2040: 30 GPIOs (0..29). rp2350a==true: 0..29. rp2350a==false
+         * (RP2350B): 0..47. HAL_PORT_GPIO_COUNT is 30 on rp2040, 48 on
+         * rp2350. */
+        iret = (HAL_PORT_GPIO_COUNT > 30 && !rp2350a) ? 47 : 29;
         targ = T_INT;
         return;
     } else error("Syntax");
