@@ -901,6 +901,7 @@ void port_print_display_options(void) {}
 void port_print_lcd_spi(void) {}
 void port_print_keyboard_heartbeat(void) {}
 void port_print_usb_kb_repeat(void) {}
+void port_clear_lcd_spi_if_shares_system(void) {}
 
 /* OPTION KEYBOARD setter — host has no keyboard config to set. */
 int port_keyboard_option_setter(unsigned char *cmdline) { (void)cmdline; return 0; }

@@ -359,3 +359,28 @@ int port_display_option_setter(unsigned char *cmdline)
     }
     return 0;
 }
+
+/* PICOMITE rp2350 has dedicated LCD_CLK/MOSI/MISO Option fields. */
+void MIPS16 disable_lcdspi(void)
+{
+    if(!IsInvalidPin(Option.LCD_MOSI))ExtCurrentConfig[Option.LCD_MOSI] = EXT_DIG_IN;
+    if(!IsInvalidPin(Option.LCD_MISO))ExtCurrentConfig[Option.LCD_MISO] = EXT_DIG_IN;
+    if(!IsInvalidPin(Option.LCD_CLK))ExtCurrentConfig[Option.LCD_CLK] = EXT_DIG_IN;
+    if(!IsInvalidPin(Option.LCD_MOSI))ExtCfg(Option.LCD_MOSI, EXT_NOT_CONFIG, 0);
+    if(!IsInvalidPin(Option.LCD_MISO))ExtCfg(Option.LCD_MISO, EXT_NOT_CONFIG, 0);
+    if(!IsInvalidPin(Option.LCD_CLK))ExtCfg(Option.LCD_CLK, EXT_NOT_CONFIG, 0);
+    Option.LCD_MOSI=Option.SYSTEM_MOSI ? Option.SYSTEM_MOSI : 0;
+    Option.LCD_MISO=Option.SYSTEM_MISO ? Option.SYSTEM_MISO : 0;
+    Option.LCD_CLK=Option.SYSTEM_CLK ? Option.SYSTEM_CLK : 0;
+}
+
+/* Called from disable_systemspi: if LCD_CLK shares SYSTEM_CLK pin,
+ * clear the LCD_* fields too. */
+void port_clear_lcd_spi_if_shares_system(void)
+{
+    if (Option.LCD_CLK == Option.SYSTEM_CLK) {
+        Option.LCD_MOSI = 0;
+        Option.LCD_MISO = 0;
+        Option.LCD_CLK  = 0;
+    }
+}

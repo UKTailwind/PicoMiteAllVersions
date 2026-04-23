@@ -67,6 +67,10 @@ extern void port_print_lcd_spi(void);
 extern int  port_keyboard_option_setter(unsigned char *cmdline);
 extern void port_print_keyboard_heartbeat(void);
 extern void port_print_usb_kb_repeat(void);
+extern void port_clear_lcd_spi_if_shares_system(void);
+/* PICOMITE+rp2350 only — defined in ports/pico_rp2350/port_defaults.c.
+ * Caller is gated `#if defined(PICOMITE) && defined(rp2350)`. */
+extern void disable_lcdspi(void);
 extern void port_web_print_options(void);
 extern int  port_web_option_setter(unsigned char *cmdline);
 extern int  port_web_mminfo(unsigned char *ep, int64_t *out_iret,
@@ -856,13 +860,9 @@ void MIPS16 setterminal(int height,int width){
 	  strcat(sp,"t");
 	  SSPrintString(sp);						//
 }
-/* fun_keydown lives in vm_sys_input.c — routes through hal_keyboard_*. */
-#ifndef USBKEYBOARD
-void MIPS16 cmd_update(void){
-    uint gpio_mask = 0u;
-    reset_usb_boot(gpio_mask, PICO_STDIO_USB_RESET_BOOTSEL_INTERFACE_DISABLE_MASK);
-}
-#endif
+/* fun_keydown lives in vm_sys_input.c — routes through hal_keyboard_*.
+ * cmd_update (Update Firmware) is non-USB-only — moved to
+ * ports/pico_sdk_common/cmd_files_hooks.c. */
 void MIPS16 disable_systemspi(void){
     if(!IsInvalidPin(Option.SYSTEM_MOSI))ExtCurrentConfig[Option.SYSTEM_MOSI] = EXT_DIG_IN ;   
     if(!IsInvalidPin(Option.SYSTEM_MISO))ExtCurrentConfig[Option.SYSTEM_MISO] = EXT_DIG_IN ;   
@@ -870,30 +870,17 @@ void MIPS16 disable_systemspi(void){
     if(!IsInvalidPin(Option.SYSTEM_MOSI))ExtCfg(Option.SYSTEM_MOSI, EXT_NOT_CONFIG, 0);
     if(!IsInvalidPin(Option.SYSTEM_MISO))ExtCfg(Option.SYSTEM_MISO, EXT_NOT_CONFIG, 0);
     if(!IsInvalidPin(Option.SYSTEM_CLK))ExtCfg(Option.SYSTEM_CLK, EXT_NOT_CONFIG, 0);
-#if defined(PICOMITE) && defined(rp2350)
-    if(Option.LCD_CLK==Option.SYSTEM_CLK){
-        Option.LCD_MOSI=0;
-        Option.LCD_MISO=0;
-        Option.LCD_CLK=0;
-    }
-#endif
+    /* PICOMITE+rp2350 has dedicated LCD_CLK/MOSI/MISO Option fields
+     * that may share pins with SYSTEM_CLK; clear them too if so.
+     * No-op on every other build (host stub). */
+    port_clear_lcd_spi_if_shares_system();
     Option.SYSTEM_MOSI=0;
     Option.SYSTEM_MISO=0;
     Option.SYSTEM_CLK=0;
 }
-#if defined(PICOMITE) && defined(rp2350)
-void MIPS16 disable_lcdspi(void){
-    if(!IsInvalidPin(Option.LCD_MOSI))ExtCurrentConfig[Option.LCD_MOSI] = EXT_DIG_IN ;   
-    if(!IsInvalidPin(Option.LCD_MISO))ExtCurrentConfig[Option.LCD_MISO] = EXT_DIG_IN ;   
-    if(!IsInvalidPin(Option.LCD_CLK))ExtCurrentConfig[Option.LCD_CLK] = EXT_DIG_IN ;   
-    if(!IsInvalidPin(Option.LCD_MOSI))ExtCfg(Option.LCD_MOSI, EXT_NOT_CONFIG, 0);
-    if(!IsInvalidPin(Option.LCD_MISO))ExtCfg(Option.LCD_MISO, EXT_NOT_CONFIG, 0);
-    if(!IsInvalidPin(Option.LCD_CLK))ExtCfg(Option.LCD_CLK, EXT_NOT_CONFIG, 0);
-    Option.LCD_MOSI=Option.SYSTEM_MOSI ? Option.SYSTEM_MOSI : 0;
-    Option.LCD_MISO=Option.SYSTEM_MISO ? Option.SYSTEM_MISO : 0;
-    Option.LCD_CLK=Option.SYSTEM_CLK ? Option.SYSTEM_CLK : 0;
-}
-#endif
+/* disable_lcdspi (PICOMITE+rp2350-only) lives in
+ * ports/pico_rp2350/port_defaults.c — only that port has LCD_CLK
+ * Option fields. */
 void MIPS16 disable_systemi2c(void){
     if(!IsInvalidPin(Option.SYSTEM_I2C_SCL))ExtCurrentConfig[Option.SYSTEM_I2C_SCL] = EXT_DIG_IN ;   
     if(!IsInvalidPin(Option.SYSTEM_I2C_SDA))ExtCurrentConfig[Option.SYSTEM_I2C_SDA] = EXT_DIG_IN ;   
@@ -916,17 +903,21 @@ void MIPS16 disable_sd(void){
     if(!IsInvalidPin(Option.SD_MISO_PIN))ExtCfg(Option.SD_MISO_PIN, EXT_NOT_CONFIG, 0);
     Option.SD_MISO_PIN=0;
     Option.CombinedCS=0;
-#ifdef PICOMITEVGA
-    if(!IsInvalidPin(Option.SYSTEM_CLK))ExtCurrentConfig[Option.SYSTEM_CLK] = EXT_DIG_IN ;   
-    if(!IsInvalidPin(Option.SYSTEM_CLK))ExtCfg(Option.SYSTEM_CLK, EXT_NOT_CONFIG, 0);
-    Option.SYSTEM_CLK=0;
-    if(!IsInvalidPin(Option.SYSTEM_MISO))ExtCurrentConfig[Option.SYSTEM_MISO] = EXT_DIG_IN ;   
-    if(!IsInvalidPin(Option.SYSTEM_MISO))ExtCfg(Option.SYSTEM_MISO, EXT_NOT_CONFIG, 0);
-    Option.SYSTEM_MISO=0;
-    if(!IsInvalidPin(Option.SYSTEM_MOSI))ExtCurrentConfig[Option.SYSTEM_MOSI] = EXT_DIG_IN ;   
-    if(!IsInvalidPin(Option.SYSTEM_MOSI))ExtCfg(Option.SYSTEM_MOSI, EXT_NOT_CONFIG, 0);
-    Option.SYSTEM_MOSI=0;
-#endif
+    /* VGA targets share SYSTEM_CLK/MOSI/MISO with the SD card (the
+     * non-VGA SDCARD setter wires SD to dedicated pins; VGA reuses
+     * the system SPI). Clear them too on VGA so the SDCARD-disable
+     * fully releases the bus. */
+    if (HAL_PORT_IS_VGA) {
+        if(!IsInvalidPin(Option.SYSTEM_CLK))ExtCurrentConfig[Option.SYSTEM_CLK] = EXT_DIG_IN;
+        if(!IsInvalidPin(Option.SYSTEM_CLK))ExtCfg(Option.SYSTEM_CLK, EXT_NOT_CONFIG, 0);
+        Option.SYSTEM_CLK=0;
+        if(!IsInvalidPin(Option.SYSTEM_MISO))ExtCurrentConfig[Option.SYSTEM_MISO] = EXT_DIG_IN;
+        if(!IsInvalidPin(Option.SYSTEM_MISO))ExtCfg(Option.SYSTEM_MISO, EXT_NOT_CONFIG, 0);
+        Option.SYSTEM_MISO=0;
+        if(!IsInvalidPin(Option.SYSTEM_MOSI))ExtCurrentConfig[Option.SYSTEM_MOSI] = EXT_DIG_IN;
+        if(!IsInvalidPin(Option.SYSTEM_MOSI))ExtCfg(Option.SYSTEM_MOSI, EXT_NOT_CONFIG, 0);
+        Option.SYSTEM_MOSI=0;
+    }
 }
 void disable_audio(void){
     if(!IsInvalidPin(Option.AUDIO_L))ExtCurrentConfig[Option.AUDIO_L] = EXT_DIG_IN ;   

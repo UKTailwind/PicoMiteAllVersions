@@ -294,3 +294,8 @@ int port_display_option_setter(unsigned char *cmdline)
  * ports; stubbed here so MM_Misc.c can read it unconditionally for
  * the OPTION LCDPANEL DISABLE reset path. */
 int SSD1963data = 0;
+
+/* Port has no separate LCD SPI bus (LCD_CLK Option fields don't exist on
+ * this build); the share-clear hook is a no-op. disable_lcdspi isn't
+ * called from core on these ports. */
+void port_clear_lcd_spi_if_shares_system(void) {}

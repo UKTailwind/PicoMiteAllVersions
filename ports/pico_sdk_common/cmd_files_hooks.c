@@ -176,3 +176,16 @@ int port_keyboard_option_setter(unsigned char *cmdline)
     SoftReset();
     return 1;
 }
+
+#ifndef USBKEYBOARD
+/* `Update Firmware` jumps to BOOTSEL on non-USB-keyboard device builds.
+ * USB-keyboard variants register `Gamepad` in the same commandtbl slot
+ * (AllCommands.h gates the entry), so cmd_update is never referenced
+ * and doesn't need to exist. */
+#include "pico/bootrom.h"
+void MIPS16 cmd_update(void)
+{
+    uint gpio_mask = 0u;
+    reset_usb_boot(gpio_mask, PICO_STDIO_USB_RESET_BOOTSEL_INTERFACE_DISABLE_MASK);
+}
+#endif
