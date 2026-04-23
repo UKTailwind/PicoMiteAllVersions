@@ -42,6 +42,17 @@ typedef struct sa_dlist {
     char from[32];
     char to[32];
 } a_dlist;
+
+/* Flash/PSRAM-write scratch word. Defined in FileIO.c; the extracted
+ * MemWriteBlock / MemWriteByte helpers in
+ * ports/pico_sdk_common/mem_writeblock.c need it declared here. */
+union u_flash {
+    uint64_t i64[32];
+    uint8_t  i8[256];
+    uint32_t i32[64];
+};
+extern volatile union u_flash MemWord;
+extern volatile int mi8p;
 #ifdef rp2350
 #include "upng.h"
 #endif
