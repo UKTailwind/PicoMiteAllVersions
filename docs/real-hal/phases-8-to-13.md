@@ -238,16 +238,49 @@ min/max` stdlib polyfills in FileIO.c. Memory.c + Commands.c +
 Functions.c are now all in STRICT_FILES alongside Draw.c / MM_Misc.c
 / External.c / FileIO.c / Audio.c.
 
-### Remaining work (deferred to later step)
+### Step 3 ✅ — vm_sys_time + bc_debug port hooks
 
-INFO-tracked VM files (MMBasic.c, bc_runtime.c, bc_debug.c,
-vm_sys_graphics.c, vm_sys_pin.c, vm_sys_file.c, vm_sys_time.c)
-still have target-macro ifdefs. Most are MMBASIC_HOST splits
-(host vs device code paths) that want dedicated host-side files or
-HAL hooks. A naive "flatten findlabel/funtbl" attempt on MMBasic.c
+  - vm_sys_time.c: 2 → 0. New port hook `port_vm_time_get_tm()`
+    (device impl in ports/pico_sdk_common/vm_sys_time_pico.c reading
+    readusclock + TimeOffsetToUptime; host impl in host_runtime.c
+    with MMBASIC_HOST_DATE / MMBASIC_HOST_TIME env-var per-field
+    overrides).
+  - bc_debug.c: 5 → 0. `dbg_print` collapses to MMPrintString (host
+    has its own routing). `BCCrashInfo` storage attribute via new
+    per-port macro `HAL_PORT_BC_CRASH_INFO_ATTR`
+    (`.uninitialized_data` section on device, plain BSS on host).
+    Stack-pointer + CFSR/HFSR/BFAR/MMFAR reads moved to
+    `port_bc_crash_get_sp()` + `port_bc_crash_save_fault_regs()`
+    port hooks (device impl in `ports/pico_sdk_common/bc_crash_pico.c`,
+    host stubs in host_runtime.c). Fault-register decode print
+    stays inline in bc_debug.c — harmless on host since the fields
+    stay zero.
+
+### Step 4 ✅ — vm_sys_pin PWM-slice gates
+
+vm_sys_pin.c: 15 → 11. Drop 4 `#ifdef rp2350` gates around PWM
+slice / mode-lookup helpers now that PWM0A..PWM11B enum values and
+PinDef-mask bits are unconditional. Remaining 11 ifdefs are genuine
+device-code splits (register-layout differences between chips) that
+want a vm_sys_pin_device spin-off — deferred to a later step.
+
+### Remaining work (deferred)
+
+INFO-tracked VM files still have target-macro ifdefs:
+  - MMBasic.c: 19
+  - bc_runtime.c: 20
+  - bc_bridge.c: 2 (rp2350 funtbl)
+  - vm_sys_graphics.c: 29
+  - vm_sys_file.c: 1 (big MMBASIC_HOST FAT block)
+  - vm_sys_pin.c: 11 (hardware PWM register splits)
+
+Most are MMBASIC_HOST splits (host vs device code paths) or rp2350
+chip-feature splits; the right fix is a per-file spin-off (e.g.
+vm_sys_graphics_host.c + vm_sys_graphics_device.c) or dedicated
+port hooks. A naive "flatten findlabel/funtbl" attempt on MMBasic.c
 overflowed rp2040 PICO RAM by 440 bytes (funtbl is ~10 KB on that
-target) and was reverted — that one needs a link-time port hook
-rather than a runtime branch.
+target) and was reverted — that one needs a link-time port hook,
+not a runtime branch.
 
 Pick up the smaller systems:
 
