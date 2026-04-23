@@ -46,4 +46,8 @@
 /* No flash sections to place hot loops in. */
 #define HAL_PORT_RAM_FUNC(name)          name
 
+/* Device-name string returned by `fun_device` (MM.DEVICE$). Host
+ * advertises itself as "MMBasic Host" so test programs can branch on it. */
+#define HAL_PORT_DEVICE_NAME             "MMBasic Host"
+
 #endif /* PORT_CONFIG_H */

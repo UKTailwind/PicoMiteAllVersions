@@ -3686,35 +3686,17 @@ tp = checkstring(cmdline, (unsigned char *)"HEARTBEAT");
 }
 
 void fun_device(void){
-    sret = GetTempMemory(STRINGSIZE);                                        // this will last for the life of the command
-#ifdef PICOMITEVGA
-#ifdef USBKEYBOARD
-#ifdef HDMI
-    strcpy((char *)sret, "PicoMiteHDMIUSB");
-#else
-    strcpy((char *)sret, "PicoMiteVGAUSB");
-#endif
-#else
-#ifdef HDMI
-    strcpy((char *)sret, "PicoMiteHDMI");
-#else
-    strcpy((char *)sret, "PicoMiteVGA");
-#endif
-#endif
-#endif
-#ifdef PICOMITE
-#ifdef USBKEYBOARD
-    strcpy((char *)sret, "PicoMiteUSB");
-#else
-    strcpy((char *)sret, "PicoMite");
-#endif
-#endif
-#ifdef PICOMITEWEB
-    strcpy((char *)sret, "WebMite");
-#endif
+    sret = GetTempMemory(STRINGSIZE);
+    /* Device name string baked in at compile time per COMPILE variant
+     * (CMakeLists.txt + host/port_config.h). RP2350A/B suffix appended at
+     * runtime when applicable; rp2350a flag is true on RP2040 too, so the
+     * suffix only fires for actual RP2350 builds via Option.CPU_Speed
+     * range or runtime probe (kept in vm_sys_pin.c). On non-rp2350 builds
+     * the conditional becomes dead at compile time. */
+    strcpy((char *)sret, HAL_PORT_DEVICE_NAME);
 #ifdef rp2350
     if(rp2350a)strcat((char *)sret," RP2350A");
-    else strcat((char *)sret," RP2350B");
+    else       strcat((char *)sret," RP2350B");
 #endif
     CtoM(sret);
     targ = T_STR;

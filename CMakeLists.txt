@@ -386,6 +386,24 @@ if(COMPILE STREQUAL "WEBRP2350")
 	target_compile_options(PicoMite PRIVATE -DGUICONTROLS
 											)
 endif()
+# Per-variant device-name string used by fun_device. Lets MM_Misc.c
+# replace its 13-line nested-ifdef block with a single strcpy.
+if (COMPILE STREQUAL "PICO" OR COMPILE STREQUAL "PICORP2350")
+    target_compile_options(PicoMite PRIVATE -DHAL_PORT_DEVICE_NAME="PicoMite")
+elseif (COMPILE STREQUAL "PICOUSB" OR COMPILE STREQUAL "PICOUSBRP2350")
+    target_compile_options(PicoMite PRIVATE -DHAL_PORT_DEVICE_NAME="PicoMiteUSB")
+elseif (COMPILE STREQUAL "VGA" OR COMPILE STREQUAL "VGARP2350")
+    target_compile_options(PicoMite PRIVATE -DHAL_PORT_DEVICE_NAME="PicoMiteVGA")
+elseif (COMPILE STREQUAL "VGAUSB" OR COMPILE STREQUAL "VGAUSBRP2350")
+    target_compile_options(PicoMite PRIVATE -DHAL_PORT_DEVICE_NAME="PicoMiteVGAUSB")
+elseif (COMPILE STREQUAL "HDMI")
+    target_compile_options(PicoMite PRIVATE -DHAL_PORT_DEVICE_NAME="PicoMiteHDMI")
+elseif (COMPILE STREQUAL "HDMIUSB")
+    target_compile_options(PicoMite PRIVATE -DHAL_PORT_DEVICE_NAME="PicoMiteHDMIUSB")
+elseif (COMPILE STREQUAL "WEB" OR COMPILE STREQUAL "WEBRP2350")
+    target_compile_options(PicoMite PRIVATE -DHAL_PORT_DEVICE_NAME="WebMite")
+endif()
+
 #set the PICOCALC flag + its port-constant companion
 if(PICOCALC STREQUAL "true")
 	target_compile_options(PicoMite PRIVATE -DPICOCALC
