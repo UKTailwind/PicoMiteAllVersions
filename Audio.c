@@ -39,6 +39,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "hardware/irq.h"
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
+#include "port_config.h"
 #include "hal/hal_flash.h"
 #include "hal/hal_time.h"
 #include "hardware/regs/addressmap.h"     /* XIP_BASE */
@@ -911,11 +912,12 @@ void flaccallback(char *p){
     allocationCallbacks.onRealloc = my_realloc;
     allocationCallbacks.onFree    = my_free;
     myflac=drflac_open((drflac_read_proc)onRead, (drflac_seek_proc)onSeek, NULL, &allocationCallbacks);
-#ifdef rp2350
-    if(myflac->sampleRate>48000*((int)((float)Option.CPU_Speed/126000.0f)))error("Max %KHz sample rate",48000*((int)((float)Option.CPU_Speed/126000.0f)));
-#else
-    if(myflac->sampleRate>44100*((int)((float)Option.CPU_Speed/126000.0f)))error("Max %KHz sample rate",44100*((int)((float)Option.CPU_Speed/126000.0f)));
-#endif
+    {
+        int flac_max = HAL_PORT_AUDIO_FLAC_MAX_BASE_HZ *
+                       ((int)((float)Option.CPU_Speed/126000.0f));
+        if(myflac->sampleRate > flac_max)
+            error("Max %KHz sample rate", flac_max);
+    }
 //	PInt(myflac->channels);MMPrintString(" Channels\r\n");
 //	PInt(myflac->bitsPerSample);MMPrintString(" Bits per sample\r\n");
 //	PInt(myflac->sampleRate);MMPrintString(" Sample rate\r\n");

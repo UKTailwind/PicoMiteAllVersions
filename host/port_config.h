@@ -50,6 +50,11 @@
 #define HAL_PORT_HAS_HDMI                0
 #define HAL_PORT_HAS_NEXTGEN_DISPLAY    0
 
+/* FLAC decoder base sample-rate cap. Host Audio.c body doesn't decode
+ * FLAC, but the port-config standard wants the constant defined on
+ * every port. RP2040 number is fine here. */
+#define HAL_PORT_AUDIO_FLAC_MAX_BASE_HZ  44100
+
 #define HAL_PORT_RAM_FUNC(name)          name
 
 /* Device-name string returned by `fun_device` (MM.DEVICE$). Host

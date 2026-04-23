@@ -38,6 +38,9 @@
 #define HAL_PORT_HAS_HDMI                0
 #define HAL_PORT_HAS_NEXTGEN_DISPLAY    0
 
+/* FLAC decoder base sample-rate cap (RP2350 → 48 kHz). */
+#define HAL_PORT_AUDIO_FLAC_MAX_BASE_HZ  48000
+
 #define HAL_PORT_RAM_FUNC(name)          name
 
 #endif /* PORT_CONFIG_H */

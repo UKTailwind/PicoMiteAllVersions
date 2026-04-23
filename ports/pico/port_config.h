@@ -44,6 +44,11 @@
 
 /* Hot-path placement: SPI-LCD RP2040 has spare RAM for the GPIO hot loops
  * so we force them into SRAM via __not_in_flash_func. */
+
+/* FLAC decoder: base max sample rate, scaled by CPU_Speed/126MHz. RP2040
+ * caps at 44.1 kHz; RP2350 can drive 48 kHz at stock CPU speed. Used as
+ * a value in a runtime check in Audio.c flaccallback. */
+#define HAL_PORT_AUDIO_FLAC_MAX_BASE_HZ  44100
 /* cmd_files flist[] cap. Device has the RAM and the SaveContext+InitHeap
  * dance to allocate ~76 KB. Host caps lower in host/port_config.h. */
 #define HAL_PORT_FILES_MAX               1000

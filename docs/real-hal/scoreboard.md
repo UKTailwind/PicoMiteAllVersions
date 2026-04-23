@@ -81,6 +81,7 @@ F4 step 30 164      4       2       2      39        39      17         14      
 ─── post-fixup phases ───
 ─── Phase 6b (Audio.c device body → HAL) ───
 6b step 1  164      4        2         2      39        39        17         13       280  (drop PICOMITEWEB guard around ProcessWeb — F3 step 4 stub is unconditional; −1)
+6b step 2  164      4        2         2      39        39        17         12       279  (FLAC max sample-rate cap → HAL_PORT_AUDIO_FLAC_MAX_BASE_HZ port constant; −1)
 6          .       .        .        .       .         .       .          0        .  (Audio.c → HAL)
 7a         .       .        .        .       .         .       .          .        .  (Draw.c ILI9341 → HAL)
 7b         .       .        .        .       .         .       .          .        .  (Draw.c VGA → HAL)
