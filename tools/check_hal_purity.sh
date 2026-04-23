@@ -103,6 +103,9 @@ STRICT_FILES=(
               # port-config ifdefs. Source-load and source-free moved
               # to port_bc_frun_*, port_bc_run_file_*,
               # port_bc_runtime_free_source hooks.
+  bc_bridge.c # Phase 11 step 13 close: zero target-macro, zero
+              # port-config ifdefs. rp2350 funtbl[] subfun-hash rebuild
+              # moved to port_bc_bridge_{clear,rehash}_subfun hooks.
 )
 
 # Files tracked informationally (report counts, do not fail).

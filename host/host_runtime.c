@@ -959,6 +959,13 @@ int  port_web_get_ssid(unsigned char *out_sret, int *out_targ)
 uint32_t port_bc_crash_get_sp(void) { return 0; }
 void port_bc_crash_save_fault_regs(BCCrashInfo *info) { (void)info; }
 
+/* bc_bridge.c subfun-hash hooks — rp2350 maintains a funtbl[] hash
+ * alongside subfun[] for O(1) FindSubFun lookups; rp2040 + host use
+ * the linear scan, so the hooks are no-ops. Real impl lives in
+ * ports/pico_sdk_common/bc_bridge_pico.c. */
+void port_bc_bridge_clear_subfun_hash(void) {}
+void port_bc_bridge_rehash_subfun(unsigned char **subfun_arr) { (void)subfun_arr; }
+
 /* bc_runtime.c source-free hook — host hands bc_run_source_string an
  * externally-owned buffer (malloc / emscripten FS), so releasing it is
  * the caller's job. Device impl in ports/pico_sdk_common/bc_runtime_pico.c

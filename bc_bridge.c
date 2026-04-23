@@ -14,6 +14,15 @@
 #include "bytecode.h"
 #include "bc_alloc.h"
 
+/* Subfun-hash port hooks. rp2350 maintains a funtbl[] hash alongside
+ * subfun[] so FindSubFun can resolve bridged SUB / FUNCTION names in
+ * O(1). On rp2040 and host the hooks are no-ops (linear subfun[] scan
+ * is fine at the smaller program sizes those targets run). Device
+ * impl: ports/pico_sdk_common/bc_bridge_pico.c; host stub:
+ * host/host_runtime.c. */
+extern void port_bc_bridge_clear_subfun_hash(void);
+extern void port_bc_bridge_rehash_subfun(unsigned char **subfun_arr);
+
 /* ------------------------------------------------------------------ */
 /*  Variable sync: VM globals <-> MMBasic variable table               */
 /* ------------------------------------------------------------------ */
@@ -745,9 +754,7 @@ void bc_bridge_release_subfun_buffer(void) {
         g_bridge_prog_buf = NULL;
     }
     for (int i = 0; i < MAXSUBFUN; i++) subfun[i] = NULL;
-#ifdef rp2350
-    memset(funtbl, 0, sizeof(struct s_funtbl) * MAXSUBFUN);
-#endif
+    port_bc_bridge_clear_subfun_hash();
 }
 
 int bc_bridge_prepare_subfun(const char *source) {
@@ -846,36 +853,10 @@ buf_full:
         while (*p) p++;  /* skip to end-of-element */
     }
 
-#ifdef rp2350
-    /* Rebuild funtbl[] hash for FindSubFun's rp2350 fast path. Mirrors
-     * PrepareProgram's hashing logic. */
-    memset(funtbl, 0, sizeof(struct s_funtbl) * MAXSUBFUN);
-    for (int i = 0; i < MAXSUBFUN && subfun[i] != NULL; i++) {
-        unsigned char *np = subfun[i];
-        np += sizeof(CommandToken);
-        while (*np == ' ') np++;
-        char name[MAXVARLEN + 1];
-        int namelen = 0;
-        uint32_t hash = FNV_offset_basis;
-        do {
-            unsigned u = mytoupper(*np);
-            hash ^= u;
-            hash *= FNV_prime;
-            if (namelen < MAXVARLEN) name[namelen] = (char)u;
-            np++;
-            namelen++;
-        } while (isnamechar(*np));
-        if (namelen < MAXVARLEN) name[namelen] = 0;
-        else namelen = MAXVARLEN;
-        hash %= MAXSUBHASH;
-        while (funtbl[hash].name[0] != 0) {
-            hash++;
-            if (hash == MAXSUBFUN) hash = 0;
-        }
-        funtbl[hash].index = i;
-        memcpy(funtbl[hash].name, name, (size_t)namelen);
-    }
-#endif
+    /* Rebuild the rp2350-only funtbl[] hash for FindSubFun's fast
+     * path. Rp2040 + host use the linear subfun[] scan, so the hook
+     * is a no-op there. */
+    port_bc_bridge_rehash_subfun(subfun);
 
     g_bridge_prog_buf = buf;
     return 0;
