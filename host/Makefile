@@ -30,7 +30,7 @@ CFLAGS = -std=gnu11 -g -O0 -Wall -Wno-unused-variable -Wno-unused-function \
 LDFLAGS = -lm
 
 # Source directory
-VPATH = ..:../core/state:../drivers/audio_mp3:../drivers/spi_lcd:../drivers/display_merge:../drivers/vga_pio
+VPATH = ..:../core/state:../drivers/audio_mp3:../drivers/spi_lcd:../drivers/display_merge:../drivers/vga_pio:../drivers/gfx_3d
 
 # Core MMBasic sources (language runtime)
 CORE_SRCS = MMBasic.c Commands.c Functions.c Operators.c MATHS.c Memory.c Editor.c MMBasic_Prompt.c MMBasic_Print.c MMBasic_REPL.c
@@ -55,6 +55,9 @@ CORE_SRCS += display_merge_stub.c
 # VGA helper stubs: Draw.c's gfx_cls / ClearScreen call hal_vga_ops_*
 # unconditionally.  Host has no QVGA framebuffer so link the no-ops.
 CORE_SRCS += vga_ops_stub.c
+# 3D polygon / DRAW3D subsystem: Draw.c references closeall3d, cmd_3D,
+# fun_3D. Host gets the real impl.
+CORE_SRCS += gfx_3d.c
 
 # Bytecode VM sources
 BC_SRCS = bc_alloc.c bc_bridge.c vm_host_fat.c ff.c ffunicode.c ffsystem.c \

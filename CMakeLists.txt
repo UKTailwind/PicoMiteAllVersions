@@ -284,6 +284,14 @@ if (COMPILE STREQUAL "VGA" OR COMPILE STREQUAL "VGAUSB" OR COMPILE STREQUAL "VGA
 else()
     target_sources(PicoMite PRIVATE drivers/vga_pio/vga_ops_stub.c)
 endif()
+
+# 3D polygon / DRAW3D subsystem: linked on every target except
+# PICOMITEWEB (WEB links MMtcpserver.c's closeall3d stub).
+if (COMPILE STREQUAL "WEB" OR COMPILE STREQUAL "WEBRP2350")
+    # closeall3d stub already in MMtcpserver.c; no-op body
+else()
+    target_sources(PicoMite PRIVATE drivers/gfx_3d/gfx_3d.c)
+endif()
 if (COMPILE STREQUAL "WEB" OR COMPILE STREQUAL "WEBRP2350" )
     target_sources(PicoMite PRIVATE
 	SSD1963.c
