@@ -43,7 +43,7 @@ A phase closes only when its targeted core files pass that standard. "Infrastruc
 | [1 — hal_flash](real-hal/phases-0-to-2.md) | ✅ | 52 flash call sites routed through HAL; `Include.h` still pulls `hardware/flash.h` — clean in fixup F2 |
 | [2 — hal_time](real-hal/phases-0-to-2.md) | ✅ | 42 core call sites migrated; `pico_blocks_tilemap` 50 Hz invariant held |
 | [3 — hal_pin](real-hal/phase-3-pin.md) | 🔧 | 3a (HAL + 107 call sites) done; 3b attempt was an ifdef rename, to be reverted and redone per fixup F2 |
-| [4 — hal_storage + hal_filesystem](real-hal/phase-4-filesystem.md) | 🔧 | 4a done; FileIO.c ifdef elimination redo per fixup F3 |
+| [4 — hal_storage + hal_filesystem](real-hal/phase-4-filesystem.md) | ✅ | 4a + F3 done; FileIO.c is in STRICT_FILES (zero target/port-config ifdefs) |
 | [5 — hal_keyboard](real-hal/phase-5-keyboard.md) | 🔧 | 5a done; MM_Misc.c `USBKEYBOARD` elimination redo per fixup F4 |
 | [6 — hal_audio](real-hal/phase-6-audio.md) | 🟡 | 6a (host arm + VS1053 relocation) done; device arm (6b) pending |
 | [7 — hal_display](real-hal/phase-7-display.md) | ⏳ | four sub-phases (ILI9341 / VGA / HDMI / SSD1963) not started |

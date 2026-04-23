@@ -1,6 +1,6 @@
-# Real HAL — Phase 4: `hal_storage` + `hal_filesystem` 🔧 (97% — F3 nearly closed)
+# Real HAL — Phase 4: `hal_storage` + `hal_filesystem` ✅ (F3 closed)
 
-**Status:** infrastructure landed (4a); F3 ifdef elimination drove FileIO.c target-macro ifdefs from 60 → 2 across thirteen sub-steps. The two remaining gates (top-of-file MMBASIC_HOST include block, cmd_LoadJPGImage host stub) are scoped for one final step. See the step table below and the rows in `scoreboard.md`. `../real-hal-fixup-plan.md` (F3) is the standard.
+**Status:** infrastructure landed (4a); F3 ifdef elimination drove FileIO.c target-macro ifdefs from 60 → 0 across fifteen sub-steps. FileIO.c is in `STRICT_FILES`. See the step table below and the rows in `scoreboard.md`.
 
 ## What landed (Phase 4a)
 
@@ -39,16 +39,12 @@ Commit `61cb08e` claimed to eliminate 14 `rp2350` ifdefs from FileIO.c by conver
 | F3 step 11 | `9c29781` | Four command-level lifecycle hooks (`cmd_files_save_program_context`, `cmd_files_restore_program_context`, `cmd_files_pump_console_key`, `cmd_load_post_cleanup`) split host vs device behaviour for the SaveContext+InitHeap dance, the PRESS-ANY-KEY MMInkey poll, and cmd_load's tknbuf-clobber bounce. Real impls in `host/host_runtime.c`; device no-ops in new `ports/pico_sdk_common/cmd_files_hooks.c` | −5 |
 | F3 step 12 | `e6adb08` | Three small wins: (a) delete dead `FileLoadSourceProgramVM` + its `bc_alloc.h` / `bc_run_diag.h` includes (function added in `e27f8d4` but never called); (b) `MAXFILES` becomes `HAL_PORT_FILES_MAX` in each port_config.h (256 host, 1000 device); (c) `InitSDCard` body splits into `port_mount_sd_drive()` (device pin check + f_mount; host vm_host_fat_mount + SDCardStat clear) | −4 |
 | F3 step 13 | `c3e7481` | Drop dead `#ifdef PICOMITE` multicore.h include + unused `frameBufferMutex` extern; `cmd_disk` A:/B: rejection collapses to `port_drive_check(char)` HAL call; LoadOptions's 47-line PICOCALC override block moves to new `ports/pico_sdk_common/port_load_overrides.c` exposing `port_apply_load_overrides()` (host stub no-ops) | −4 |
-| **total** | | | **−58 (60 → 2)** |
+| F3 step 14 | `7e2d6c8` | FatFS directory + path dispatch through new `hal/hal_fatfs_dispatch.h` (`hal_ff_findfirst` / `findnext` / `closedir` / `unlink` / `chdir` / `getcwd`). Device impls in `cmd_files_hooks.c` forward to FatFS f_*; host impls in `host_fs_shims.c` forward to `host_f_*` | −2 |
+| F3 step 15 | `7e2d6c8` | `cmd_LoadJPGImage` body is unconditionally compiled — picojpeg.c added to host's CORE_SRCS so the symbols link. The host stub goes away | 0 (no scoreboard delta — the leftover 2 are `#ifndef max/min`) |
+| F3 close   | `7e2d6c8` | `FileIO.c` added to `STRICT_FILES`; gate now fails on any future target-macro or port-config #ifdef in the file | — |
+| **total**  | | | **−60 (60 → 0 target ifdefs)** |
 
-## What remains (2 ifdefs)
-
-Two top-of-file MMBASIC_HOST gates:
-
-- **Line 46 includes** — `vm_host_fat.h`, `vm_sys_file.h`, the `host_f_findfirst` / `host_f_findnext` / etc. externs, and the `f_findfirst` / `f_findnext` / `f_closedir` / `f_unlink` / `f_chdir` / `f_getcwd` macro renames. These route FatFS directory-walker calls through the host wrappers in REPL / --sim mode (real POSIX walker via `host_sd_root`) or vm_host_fat (test harness) without touching every call site. Migrating requires either a separate compile unit or wrapping the dispatch behind another HAL layer; both are bigger moves than what F3 targets.
-- **`cmd_LoadJPGImage`** (line ~917) — host stubs the entire body with `error("Not supported on host")` because picojpeg.c's `pjpeg_need_bytes_callback` was originally written for raw-FIL access. The body now reads through `hal_fs_read` so it should work on host directly; testing required.
-
-F3 closes once these two land. Promote FileIO.c to `STRICT_FILES` then.
+F3 CLOSED. Promote-to-STRICT lands in the same commit as steps 14+15.
 
 ## Exit gate
 

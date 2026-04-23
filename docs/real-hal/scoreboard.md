@@ -37,10 +37,12 @@ F3 step 10 164    140       2      17      39        38      17         14      
 F3 step 11 164    140       2      12      39        38      17         14      426  (cmd_files save/restore + key-pump + cmd_load post-cleanup hooks; −5)
 F3 step 12 164    140       2       8      39        38      17         14      422  (dead FileLoadSourceProgramVM + MAXFILES port-config + InitSDCard split; −4)
 F3 step 13 164    140       2       4      39        38      17         14      418  (dead multicore extern + cmd_disk + LoadOptions PICOCALC overrides; −4)
-            FileIO.c: 60 → 4 (93% reduction; target-macro 60 → 2). The
-            two remaining are the top-of-file MMBASIC_HOST include
-            block (vm_host_fat.h + f_* macro renames) and
-            cmd_LoadJPGImage's host stub. F3 ready to close.
+F3 step 14 164    140       2       2      39        38      17         14      416  (FatFS dir-walker dispatch via hal/hal_fatfs_dispatch.h; −2)
+F3 step 15 164    140       2       2      39        38      17         14      416  (cmd_LoadJPGImage host link, picojpeg.c → host CORE_SRCS; 0 ifdefs but no scoreboard delta — 2 leftovers are #ifndef max/min macro defs)
+            FileIO.c: 60 → 2 (target-macro 60 → 0). The two leftover
+            conditionals are `#ifndef max` / `#ifndef min` macro
+            definitions — neither target nor port-config. F3 CLOSED.
+            FileIO.c promoted to STRICT_FILES in the purity gate.
 F4         .       .        .        .       .         .       .          .        .  (MM_Misc.c USBKEYBOARD → HAL)
 ─── post-fixup phases ───
 6          .       .        .        .       .         .       .          0        .  (Audio.c → HAL)
