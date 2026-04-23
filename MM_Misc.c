@@ -51,16 +51,9 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "xregex.h"
 #include "hardware/structs/pwm.h"
 #include "aes.h"
-#ifdef rp2350
-#include "pico/rand.h"
-#endif
 #ifdef PICOCALC
 #include "drivers/i2c_picocalc_kbd/i2ckbd.h"
 #include "picocalc/conf_app.h"
-#endif
-#ifndef USBKEYBOARD
-extern char *mouse0Interruptc;
-extern volatile int mouse0foundc;
 #endif
 /* TimeOffsetToUptime defined in mm_misc_shared.c (also used by vm_sys_time.c) */
 extern int64_t TimeOffsetToUptime;
