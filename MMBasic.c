@@ -3856,30 +3856,14 @@ void MIPS16 ClearProgram(bool psram) {
 
 
 // round a float to an integer
-#ifdef rp2350
-int  __not_in_flash_func(FloatToInt32)(MMFLOAT x) {
-#else
-#ifdef PICOMITEVGA
-int FloatToInt32(MMFLOAT x) {
-#else
-int  __not_in_flash_func(FloatToInt32)(MMFLOAT x) {
-#endif
-#endif
+int HAL_PORT_MMBASIC_SUBFUN_FUNC(FloatToInt32)(MMFLOAT x) {
     if(x < LONG_MIN - 0.5 || x > LONG_MAX + 0.5)
         error("Number too large");
     return (x >= 0 ? (int)(x + 0.5) : (int)(x - 0.5)) ;
 }
 
 
-#ifdef rp2350
-long long int  __not_in_flash_func(FloatToInt64)(MMFLOAT x) {
-#else
-#ifdef PICOMITEVGA
-long long int FloatToInt64(MMFLOAT x) {
-#else
-long long int  __not_in_flash_func(FloatToInt64)(MMFLOAT x) {
-#endif
-#endif
+long long int HAL_PORT_MMBASIC_SUBFUN_FUNC(FloatToInt64)(MMFLOAT x) {
     if(x < (-(0x7fffffffffffffffLL) -1) - 0.5 || x > 0x7fffffffffffffffLL + 0.5)
         error("Number too large");
     if ((x < -0xfffffffffffff) || (x > 0xfffffffffffff))
@@ -4145,15 +4129,7 @@ unsigned char __not_in_flash_func(*CtoM)(unsigned char *p) {
 
 
 // copy a MMBasic string to a new location
-#ifdef rp2350
-void __not_in_flash_func(Mstrcpy)(unsigned char *dest, unsigned char *src) {
- #else
-#ifdef PICOMITEVGA
-void Mstrcpy(unsigned char *dest, unsigned char *src) {
- #else
-void __not_in_flash_func(Mstrcpy)(unsigned char *dest, unsigned char *src) {
-#endif
-#endif
+void HAL_PORT_MMBASIC_SUBFUN_FUNC(Mstrcpy)(unsigned char *dest, unsigned char *src) {
    int i;
     i = *src + 1;
     while(i--) *dest++ = *src++;

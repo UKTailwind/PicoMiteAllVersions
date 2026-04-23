@@ -603,3 +603,4 @@ uint32_t PSRAMsize = 0;
  * driver; stub to the "unclaimed" sentinel so vm_sys_pin.c's
  * `slice == KeyboardlightSlice` check is a no-op on host. */
 int KeyboardlightSlice = -1;
+
