@@ -397,4 +397,19 @@ int MIPS16 port_audio_i2s_pio_slice(int pin1, int pin2)
     return checkslice(pin1, pin1, 1);
 }
 
+/* MM.INFO INTERRUPTS — read NVIC ISER. Cortex-M0+ (RP2040) has the
+ * register at PPB+M0PLUS_NVIC_ISER_OFFSET; Cortex-M33 (RP2350) uses
+ * different offsets (and the SDK header doesn't define the M0+
+ * symbol on rp2350), so we just don't expose this on rp2350. */
+int MIPS16 port_mminfo_interrupts(int64_t *out_iret)
+{
+#ifdef rp2350
+    (void)out_iret;
+    return 0;
+#else
+    *out_iret = (int64_t)(uint32_t)*((io_rw_32 *) (PPB_BASE + M0PLUS_NVIC_ISER_OFFSET));
+    return 1;
+#endif
+}
+
 #endif /* !MMBASIC_HOST */

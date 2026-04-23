@@ -83,6 +83,7 @@ extern int  port_pico_pins_option_setter(unsigned char *cmdline);
 extern int  port_heartbeat_option_setter(unsigned char *cmdline);
 extern int  port_system_lcd_spi_option_setter(unsigned char *cmdline);
 extern int  port_audio_i2s_pio_slice(int pin1, int pin2);
+extern int  port_mminfo_interrupts(int64_t *out_iret);
 extern void port_apply_default_console_colors(int default_fc, int default_bc);
 extern void port_web_print_options(void);
 extern int  port_web_option_setter(unsigned char *cmdline);
@@ -1967,10 +1968,12 @@ void fun_device(void){
      * range or runtime probe (kept in vm_sys_pin.c). On non-rp2350 builds
      * the conditional becomes dead at compile time. */
     strcpy((char *)sret, HAL_PORT_DEVICE_NAME);
-#ifdef rp2350
-    if(rp2350a)strcat((char *)sret," RP2350A");
-    else       strcat((char *)sret," RP2350B");
-#endif
+    /* Suffix the chip variant on RP2350 ports. PIO count distinguishes
+     * RP2040 (2 PIOs) from RP2350 (3 PIOs); the rp2350a flag is true
+     * on RP2040 by default but only consulted on rp2350 ports. */
+    if (HAL_PORT_PIO_COUNT > 2) {
+        strcat((char *)sret, rp2350a ? " RP2350A" : " RP2350B");
+    }
     CtoM(sret);
     targ = T_STR;
 }
@@ -2288,26 +2291,23 @@ void MIPS16 fun_info(void){
     } else if (port_web_mminfo(ep, &iret, sret, &targ)) {
         return;
     }
-#ifndef rp2350
-    else if(checkstring(ep, (unsigned char *)"INTERRUPTS")){
-    iret=(int64_t)(uint32_t)*((io_rw_32 *) (PPB_BASE + M0PLUS_NVIC_ISER_OFFSET));
-    targ=T_INT;
-    return;
+    else if (checkstring(ep, (unsigned char *)"INTERRUPTS")) {
+        if (port_mminfo_interrupts(&iret)) { targ = T_INT; return; }
     }
-#endif
-#ifndef PICOMITEVGA
-    else if(checkstring(ep, (unsigned char *)"LCDPANEL")){
-        strcpy((char *)sret,display_details[Option.DISPLAY_TYPE].name);
+    /* LCDPANEL / LCD320 are SPI-LCD-port concepts — VGA has no
+     * runtime panel switcher. Macros (display_details, SSD16TYPE)
+     * are defined everywhere, so this is a runtime gate. */
+    else if (!HAL_PORT_IS_VGA && checkstring(ep, (unsigned char *)"LCDPANEL")) {
+        strcpy((char *)sret, display_details[Option.DISPLAY_TYPE].name);
         CtoM(sret);
-        targ=T_STR;
+        targ = T_STR;
         return;
-    } 
-    else if(checkstring(ep, (unsigned char *)"LCD320")){
-        iret=(SSD16TYPE || Option.DISPLAY_TYPE==IPS_4_16);
-        targ=T_INT;
+    }
+    else if (!HAL_PORT_IS_VGA && checkstring(ep, (unsigned char *)"LCD320")) {
+        iret = (SSD16TYPE || Option.DISPLAY_TYPE == IPS_4_16);
+        targ = T_INT;
         return;
-    } 
-#endif
+    }
     /* USB device info: routed through port_usb_* hooks so the HID[4]
      * array (≈336 B BSS) only exists on USB device builds. */
     else if((tp=checkstring(ep, (unsigned char *)"USB VID"))){
