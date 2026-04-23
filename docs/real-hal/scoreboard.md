@@ -45,6 +45,15 @@ F3 step 15 164    140       2       2      39        38      17         14      
             FileIO.c promoted to STRICT_FILES in the purity gate.
 ─── F4 (MM_Misc.c USBKEYBOARD → HAL) ───
 F4 step 1  164    138       2       2      39        38      17         14      414  (drop dead pico/rand.h + mouse0 externs; −2)
+F4 step 2  164    133       2       2      39        38      17         14      409  (PicoCalc HW ops → port_picocalc_*() hooks; −5)
+F4 step 3  164    131       2       2      39        38      17         14      407  (PS2 stubs on USB builds → drop PS2 USBKEYBOARD gates; −2)
+F4 step 4  164    124       2       2      39        38      17         14      400  (fun_device → HAL_PORT_DEVICE_NAME compile-time string; −7)
+F4 step 5  164    115       2       2      39        38      17         14      391  (CONFIGURE LIST → port_print_supported_boards(); −9)
+F4 step 6  164    113       2       2      39        38      17         14      389  (setwifi → MMsetwifi.c + WEB interrupt-dispatch unconditional; −2)
+            MM_Misc.c: 140 → 113 across 6 sub-steps (target-macro 135 → 108). Remaining
+            ~108 are mostly board-profile OPTION RESET branches (rp2350 × VGA × HDMI ×
+            USBKEYBOARD × PICOMITE/PICOMITEWEB combinations) and printoptions display
+            divergences. Per-board factory-reset extraction is the big remaining lever.
 ─── post-fixup phases ───
 6          .       .        .        .       .         .       .          0        .  (Audio.c → HAL)
 7a         .       .        .        .       .         .       .          .        .  (Draw.c ILI9341 → HAL)
