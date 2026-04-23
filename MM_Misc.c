@@ -81,6 +81,7 @@ extern int  port_lcd320_option_setter(unsigned char *cmdline);
 extern int  port_misc_option_setter(unsigned char *cmdline);
 extern int  port_pico_pins_option_setter(unsigned char *cmdline);
 extern int  port_heartbeat_option_setter(unsigned char *cmdline);
+extern int  port_system_lcd_spi_option_setter(unsigned char *cmdline);
 extern void port_apply_default_console_colors(int default_fc, int default_bc);
 extern void port_web_print_options(void);
 extern int  port_web_option_setter(unsigned char *cmdline);
@@ -1817,105 +1818,7 @@ if(tp){
         SaveOptions();
         return;
     }
-#ifndef PICOMITEVGA
-    tp = checkstring(cmdline, (unsigned char *)"SYSTEM SPI");
-    if(tp) {
-        int pin1,pin2,pin3;
-        if(checkstring(tp, (unsigned char *)"DISABLE")){
-   	    if(CurrentLinePtr) error("Invalid in a program");
-         if((Option.SD_CS && Option.SD_CLK_PIN==0) || Option.TOUCH_CS || Option.LCD_CS || Option.CombinedCS)error("In use");
-            disable_systemspi();
-            SaveOptions();
-            _excep_code = RESET_COMMAND;
-            SoftReset();
-            return;                                // this will restart the processor ? only works when not in debug
-        }
-    	getargs(&tp,5,(unsigned char *)",");
-   	    if(CurrentLinePtr) error("Invalid in a program");
-         if(argc!=5)error("Syntax");
-        if(Option.SYSTEM_CLK)error("SYSTEM SPI already configured");
-        unsigned char code;
-        if(!(code=codecheck(argv[0])))argv[0]+=2;
-        pin1 = getinteger(argv[0]);
-        if(!code)pin1=codemap(pin1);
-        if(IsInvalidPin(pin1)) error("Invalid pin");
-        if(ExtCurrentConfig[pin1] != EXT_NOT_CONFIG)  error("Pin %/| is in use",pin1,pin1);
-        if(!(code=codecheck(argv[2])))argv[2]+=2;
-        pin2 = getinteger(argv[2]);
-        if(!code)pin2=codemap(pin2);
-        if(IsInvalidPin(pin2)) error("Invalid pin");
-        if(ExtCurrentConfig[pin2] != EXT_NOT_CONFIG)  error("Pin %/| is in use",pin2,pin2);
-        if(!(code=codecheck(argv[4])))argv[4]+=2;
-        pin3 = getinteger(argv[4]);
-        if(!code)pin3=codemap(pin3);
-        if(IsInvalidPin(pin3)) error("Invalid pin");
-        if(ExtCurrentConfig[pin3] != EXT_NOT_CONFIG)  error("Pin %/| is in use",pin3,pin3);
-		if(!(PinDef[pin1].mode & SPI0SCK && PinDef[pin2].mode & SPI0TX  && PinDef[pin3].mode & SPI0RX  ) &&
-        !(PinDef[pin1].mode & SPI1SCK && PinDef[pin2].mode & SPI1TX  && PinDef[pin3].mode & SPI1RX  ))error("Not valid SPI pins");
-        if(PinDef[pin1].mode & SPI0SCK && SPI0locked)error("SPI channel already configured");
-        if(PinDef[pin1].mode & SPI1SCK && SPI1locked)error("SPI channel already configured");
-        Option.SYSTEM_CLK=pin1;
-        Option.SYSTEM_MOSI=pin2;
-        Option.SYSTEM_MISO=pin3;
-#if defined(PICOMITE) && defined(rp2350)
-        if(!Option.LCD_CLK){
-            Option.LCD_CLK=Option.SYSTEM_CLK;
-            Option.LCD_MOSI=Option.SYSTEM_MOSI;
-            Option.LCD_MISO=Option.SYSTEM_MISO;
-        }
-#endif
-        SaveOptions();
-        _excep_code = RESET_COMMAND;
-        SoftReset();
-        return;
-    }
-#if defined(PICOMITE) && defined(rp2350)
-    tp = checkstring(cmdline, (unsigned char *)"LCD SPI");
-    if(tp) {
-        int pin1,pin2,pin3;
-        if(checkstring(tp, (unsigned char *)"DISABLE")){
-   	    if(CurrentLinePtr) error("Invalid in a program");
-         if(Option.LCD_CS )error("In use");
-            disable_lcdspi();
-            SaveOptions();
-            _excep_code = RESET_COMMAND;
-            SoftReset();
-            return;                                // this will restart the processor ? only works when not in debug
-        }
-    	getargs(&tp,5,(unsigned char *)",");
-   	    if(CurrentLinePtr) error("Invalid in a program");
-         if(argc!=5)error("Syntax");
-        if(Option.LCD_CLK && !(Option.LCD_CLK==Option.SYSTEM_CLK))error("LCD SPI already configured");
-        unsigned char code;
-        if(!(code=codecheck(argv[0])))argv[0]+=2;
-        pin1 = getinteger(argv[0]);
-        if(!code)pin1=codemap(pin1);
-        if(IsInvalidPin(pin1)) error("Invalid pin");
-        if(ExtCurrentConfig[pin1] != EXT_NOT_CONFIG)  error("Pin %/| is in use",pin1,pin1);
-        if(!(code=codecheck(argv[2])))argv[2]+=2;
-        pin2 = getinteger(argv[2]);
-        if(!code)pin2=codemap(pin2);
-        if(IsInvalidPin(pin2)) error("Invalid pin");
-        if(ExtCurrentConfig[pin2] != EXT_NOT_CONFIG)  error("Pin %/| is in use",pin2,pin2);
-        if(!(code=codecheck(argv[4])))argv[4]+=2;
-        pin3 = getinteger(argv[4]);
-        if(!code)pin3=codemap(pin3);
-        if(IsInvalidPin(pin3)) error("Invalid pin");
-        if(ExtCurrentConfig[pin3] != EXT_NOT_CONFIG)  error("Pin %/| is in use",pin3,pin3);
-		if(!(PinDef[pin1].mode & SPI0SCK && PinDef[pin2].mode & SPI0TX  && PinDef[pin3].mode & SPI0RX  ) &&
-        !(PinDef[pin1].mode & SPI1SCK && PinDef[pin2].mode & SPI1TX  && PinDef[pin3].mode & SPI1RX  ))error("Not valid SPI pins");
-        if(PinDef[pin1].mode & SPI0SCK && SPI0locked)error("SPI channel already configured");
-        if(PinDef[pin1].mode & SPI1SCK && SPI1locked)error("SPI channel already configured");
-        Option.LCD_CLK=pin1;
-        Option.LCD_MOSI=pin2;
-        Option.LCD_MISO=pin3;
-        SaveOptions();
-        _excep_code = RESET_COMMAND;
-        SoftReset();
-        return;
-    }
-#endif
-#endif
+    if (port_system_lcd_spi_option_setter(cmdline)) return;
 	tp = checkstring(cmdline, (unsigned char *)"SDCARD");
     int pin1, pin2, pin3, pin4;
     if(CurrentLinePtr) error("Invalid in a program");
@@ -1926,19 +1829,20 @@ if(tp){
             SaveOptions();
             return;                                // this will restart the processor ? only works when not in debug
         }
-#ifndef PICOMITEVGA
-        if(checkstring(tp, (unsigned char *)"COMBINED CS")){
-            if(Option.SD_CS || Option.CombinedCS)error("SDcard already configured");
-            if(!Option.SYSTEM_CLK)error("System SPI not configured");
-            if(!Option.TOUCH_CS)error("Touch CS pin not configured");
-            Option.CombinedCS=1;
-            Option.SD_CS=0;
+        /* COMBINED CS: SD shares the touch-controller's CS pin to free
+         * up an external pin. Not available on VGA — VGA uses dedicated
+         * SD pins from the SDIO lines. */
+        if (!HAL_PORT_IS_VGA && checkstring(tp, (unsigned char *)"COMBINED CS")) {
+            if (Option.SD_CS || Option.CombinedCS) error("SDcard already configured");
+            if (!Option.SYSTEM_CLK) error("System SPI not configured");
+            if (!Option.TOUCH_CS) error("Touch CS pin not configured");
+            Option.CombinedCS = 1;
+            Option.SD_CS = 0;
             SaveOptions();
             _excep_code = RESET_COMMAND;
             SoftReset();
             return;
         }
-#endif
     	getargs(&tp,7,(unsigned char *)",");
         /* VGA forces all 7 args (no implicit SYSTEM SPI sharing); other
          * ports allow 1-arg form (CS only) or full 7-arg. */
