@@ -27,6 +27,11 @@
  * dance to allocate ~76 KB. Host caps lower in host/port_config.h. */
 #define HAL_PORT_FILES_MAX               1000
 
+/* VGA-family build (PICOMITEVGA defined). VGA+HDMI ports share core paths
+ * that branch on this flag at runtime — gated as preprocessor #ifdef in
+ * the original source. */
+#define HAL_PORT_IS_VGA                  1
+
 #define HAL_PORT_RAM_FUNC(name)          __not_in_flash_func(name)
 
 #endif /* PORT_CONFIG_H */

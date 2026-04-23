@@ -26,6 +26,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
+#include "port_config.h"
 #include "pico/stdlib.h"
 #include "hardware/clocks.h"
 #include <time.h>
@@ -2309,11 +2310,12 @@ tp = checkstring(cmdline, (unsigned char *)"HEARTBEAT");
         int pin1,pin2,channel=-1;
         if(checkstring(tp, (unsigned char *)"DISABLE")){
    	    if(CurrentLinePtr) error("Invalid in a program");
- #ifdef PICOMITEVGA
-        if(Option.RTC_Clock || Option.RTC_Data)error("In use");
-#else
-        if(Option.DISPLAY_TYPE == SSD1306I2C || Option.DISPLAY_TYPE == SSD1306I2C32 || Option.RTC_Clock || Option.RTC_Data)error("In use");
-#endif
+        /* Non-VGA targets also disallow disabling I2C if the SSD1306
+         * I2C panel is using it; VGA never has SSD1306I2C. */
+        if (Option.RTC_Clock || Option.RTC_Data) error("In use");
+        if (!HAL_PORT_IS_VGA &&
+            (Option.DISPLAY_TYPE == SSD1306I2C || Option.DISPLAY_TYPE == SSD1306I2C32))
+            error("In use");
             disable_systemi2c();
             SaveOptions();
             _excep_code = RESET_COMMAND;
@@ -2528,11 +2530,13 @@ tp = checkstring(cmdline, (unsigned char *)"HEARTBEAT");
         }
 #endif
     	getargs(&tp,7,(unsigned char *)",");
-#ifdef PICOMITEVGA
-        if(!(argc==7))error("Syntax");
-#else
-        if(!(argc==1 || argc==7))error("Syntax");
-#endif
+        /* VGA forces all 7 args (no implicit SYSTEM SPI sharing); other
+         * ports allow 1-arg form (CS only) or full 7-arg. */
+        if (HAL_PORT_IS_VGA) {
+            if (argc != 7) error("Syntax");
+        } else {
+            if (!(argc == 1 || argc == 7)) error("Syntax");
+        }
          if(Option.SD_CS || Option.CombinedCS)error("SDcard already configured");
         if(argc==1 && !Option.SYSTEM_CLK)error("System SPI not configured");
         unsigned char code;
@@ -2562,25 +2566,30 @@ tp = checkstring(cmdline, (unsigned char *)"HEARTBEAT");
             if(!code)pin3=codemap(pin3);
             if(IsInvalidPin(pin3)) error("Invalid pin");
             if(ExtCurrentConfig[pin3] != EXT_NOT_CONFIG)  error("Pin %/| is in use",pin3,pin3);
-#ifdef PICOMITEVGA
-			if(PinDef[pin1].mode & SPI0SCK && PinDef[pin2].mode & SPI0TX  && PinDef[pin3].mode & SPI0RX && !Option.SYSTEM_CLK){
-                Option.SYSTEM_CLK=pin1;
-                Option.SYSTEM_MOSI=pin2;
-                Option.SYSTEM_MISO=pin3;
-                MMPrintString("SPI channel 0 in use for SDcard\r\n");
-			} else if(PinDef[pin1].mode & SPI1SCK && PinDef[pin2].mode & SPI1TX  && PinDef[pin3].mode & SPI1RX  && !Option.SYSTEM_CLK){
-                Option.SYSTEM_CLK=pin1;
-                Option.SYSTEM_MOSI=pin2;
-                Option.SYSTEM_MISO=pin3;
-                MMPrintString("SPI channel 1 in use for SDcard\r\n");
-			} else {
-#endif
+            /* VGA shares SPI0/SPI1 hw pins with SD when the chosen pins
+             * match an SPI peripheral. Other ports always assign
+             * dedicated SD pins. */
+            int sdcard_via_system_spi = 0;
+            if (HAL_PORT_IS_VGA && !Option.SYSTEM_CLK) {
+                if (PinDef[pin1].mode & SPI0SCK && PinDef[pin2].mode & SPI0TX && PinDef[pin3].mode & SPI0RX) {
+                    Option.SYSTEM_CLK=pin1;
+                    Option.SYSTEM_MOSI=pin2;
+                    Option.SYSTEM_MISO=pin3;
+                    MMPrintString("SPI channel 0 in use for SDcard\r\n");
+                    sdcard_via_system_spi = 1;
+                } else if (PinDef[pin1].mode & SPI1SCK && PinDef[pin2].mode & SPI1TX && PinDef[pin3].mode & SPI1RX) {
+                    Option.SYSTEM_CLK=pin1;
+                    Option.SYSTEM_MOSI=pin2;
+                    Option.SYSTEM_MISO=pin3;
+                    MMPrintString("SPI channel 1 in use for SDcard\r\n");
+                    sdcard_via_system_spi = 1;
+                }
+            }
+            if (!sdcard_via_system_spi) {
                 Option.SD_CLK_PIN=pin1;
                 Option.SD_MOSI_PIN=pin2;
                 Option.SD_MISO_PIN=pin3;
-#ifdef PICOMITEVGA
             }
-#endif
         }
         SaveOptions();
         _excep_code = RESET_COMMAND;

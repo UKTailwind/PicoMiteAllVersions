@@ -48,6 +48,9 @@
  * dance to allocate ~76 KB. Host caps lower in host/port_config.h. */
 #define HAL_PORT_FILES_MAX               1000
 
+/* Non-VGA port — used as a value in `if (HAL_PORT_IS_VGA)` runtime branches. */
+#define HAL_PORT_IS_VGA                  0
+
 #define HAL_PORT_RAM_FUNC(name)          __not_in_flash_func(name)
 
 #endif /* PORT_CONFIG_H */

@@ -44,6 +44,9 @@
 #define HAL_PORT_FILES_MAX               256
 
 /* No flash sections to place hot loops in. */
+/* Non-VGA port — used as a value in `if (HAL_PORT_IS_VGA)` runtime branches. */
+#define HAL_PORT_IS_VGA                  0
+
 #define HAL_PORT_RAM_FUNC(name)          name
 
 /* Device-name string returned by `fun_device` (MM.DEVICE$). Host
