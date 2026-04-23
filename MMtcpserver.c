@@ -27,6 +27,14 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "Hardware_Includes.h"
 bool optionsuppressstatus=0;
 int TCP_PORT ;
+
+/* WEB builds never launch core1; MMBasic's per-statement canary check
+ * `core1stack[0] != 0x12345678` reads this symbol via the `extern
+ * uint32_t core1stack[]` in Hardware_Includes.h. Providing a 1-word
+ * array pre-initialised to the canary value lets the check run
+ * unconditionally without ever failing on WEB. */
+uint32_t core1stack[1] = { 0x12345678 };
+
 //#define //DEBUG_printf printf
 #define DEBUG_printf
 const char httpheadersfail[]="HTTP/1.0 404\r\n\r\n";
@@ -753,3 +761,22 @@ void tcp_realloc_recv_buffers(void) {
  * (inside its #ifndef PICOMITEWEB block). WEB builds don't include that
  * feature; stub so FileIO.c::CloseAllFiles can call it unconditionally. */
 void closeall3d(void) {}
+
+/* Called from MMBasic.c::ClearRuntime() to tear down per-client TCP
+ * state + reset the suppress-status flag when a BASIC program
+ * restarts. MMweb_stubs.c and host_peripheral_stubs.c provide the
+ * no-op non-WEB stub so ClearRuntime can call this unconditionally. */
+void port_web_clear_runtime_state(void) {
+    if(TCPstate){
+        TCP_SERVER_T *state = (TCP_SERVER_T*)TCPstate;
+        for(int i=0 ; i<MaxPcb ; i++){
+            if(state->client_pcb[i] && state->telnet_pcb_no!=i) tcp_server_close(state, i);
+            if(state->buffer_recv[i]) FreeMemorySafe((void **)&state->buffer_recv[i]);
+            state->inttrig[i]=0;
+            state->sent_len[i]=0;
+            state->recv_len[i]=0;
+            state->to_send[i]=0;
+        }
+    }
+    optionsuppressstatus=0;
+}

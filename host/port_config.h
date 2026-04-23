@@ -59,6 +59,11 @@
 
 #define HAL_PORT_RAM_FUNC(name)          name
 
+/* Placement for MMBasic's hot interpreter functions. Host has no
+ * flash/RAM distinction — everything is normal RAM. */
+#define HAL_PORT_MMBASIC_HOT_FUNC(name)    name
+#define HAL_PORT_MMBASIC_SUBFUN_FUNC(name) name
+
 /* Device-name string returned by `fun_device` (MM.DEVICE$). Host
  * advertises itself as "MMBasic Host" so test programs can branch on it. */
 #define HAL_PORT_DEVICE_NAME             "MMBasic Host"

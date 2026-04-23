@@ -44,6 +44,13 @@
 
 #define HAL_PORT_RAM_FUNC(name)          name
 
+/* Placement for MMBasic's per-expression hot functions (getvalue,
+ * findvar) and the big DefinedSubFun dispatch. rp2040 WEB is the
+ * most RAM-tight target (CYW43 + lwIP stack + TCP buffers); keep
+ * all three in flash. */
+#define HAL_PORT_MMBASIC_HOT_FUNC(name)    name
+#define HAL_PORT_MMBASIC_SUBFUN_FUNC(name) name
+
 
 /* SPI-LCD clock-pin field: rp2040 PICOMITE shares SYSTEM_CLK for the
  * LCD; rp2350 PICOMITE breaks it out as Option.LCD_CLK. Ports without

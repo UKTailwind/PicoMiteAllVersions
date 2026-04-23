@@ -70,6 +70,17 @@
 
 #define HAL_PORT_RAM_FUNC(name)          __not_in_flash_func(name)
 
+/* Placement for MMBasic's per-expression hot functions (getvalue,
+ * findvar — called hundreds of times per BASIC statement). Keep in
+ * RAM on every port except the most RAM-constrained (rp2040 WEB). */
+#define HAL_PORT_MMBASIC_HOT_FUNC(name)  __not_in_flash_func(name)
+
+/* Placement for the DefinedSubFun dispatch (called once per user
+ * SUB/FUNCTION invocation, and it's ~800 lines of code). Flash on
+ * rp2040 WEB AND rp2040 VGA — both are tight enough that the extra
+ * page of RAM for this one function matters. */
+#define HAL_PORT_MMBASIC_SUBFUN_FUNC(name) __not_in_flash_func(name)
+
 
 /* SPI-LCD clock-pin field: rp2040 PICOMITE shares SYSTEM_CLK for the
  * LCD; rp2350 PICOMITE breaks it out as Option.LCD_CLK. Ports without

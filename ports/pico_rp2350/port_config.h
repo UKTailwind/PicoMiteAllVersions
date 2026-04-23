@@ -41,6 +41,12 @@
 
 #define HAL_PORT_RAM_FUNC(name)          __not_in_flash_func(name)
 
+/* Placement for MMBasic's per-expression hot functions (getvalue,
+ * findvar) and the big DefinedSubFun dispatch. rp2350 has plenty of
+ * RAM; put both categories in SRAM. */
+#define HAL_PORT_MMBASIC_HOT_FUNC(name)    __not_in_flash_func(name)
+#define HAL_PORT_MMBASIC_SUBFUN_FUNC(name) __not_in_flash_func(name)
+
 /* SPI-LCD clock-pin field: rp2350 PICOMITE adds a dedicated Option.LCD_CLK
  * alongside SYSTEM_CLK so the LCD can sit on its own SPI instance. On
  * rp2040 PICOMITE (and non-PICOMITE ports) SYSTEM_CLK doubles as the LCD

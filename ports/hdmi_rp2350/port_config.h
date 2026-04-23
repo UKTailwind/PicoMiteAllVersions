@@ -43,6 +43,12 @@
 
 #define HAL_PORT_RAM_FUNC(name)          __not_in_flash_func(name)
 
+/* Placement for MMBasic's per-expression hot functions (getvalue,
+ * findvar) and the big DefinedSubFun dispatch. rp2350 HDMI has plenty
+ * of RAM; put both in SRAM. */
+#define HAL_PORT_MMBASIC_HOT_FUNC(name)    __not_in_flash_func(name)
+#define HAL_PORT_MMBASIC_SUBFUN_FUNC(name) __not_in_flash_func(name)
+
 
 /* SPI-LCD clock-pin field: rp2040 PICOMITE shares SYSTEM_CLK for the
  * LCD; rp2350 PICOMITE breaks it out as Option.LCD_CLK. Ports without

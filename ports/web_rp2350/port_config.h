@@ -45,6 +45,14 @@
 
 #define HAL_PORT_RAM_FUNC(name)          name
 
+/* Placement for MMBasic's per-expression hot functions (getvalue,
+ * findvar) and the big DefinedSubFun dispatch. rp2350 WEB has enough
+ * RAM for the interpreter hot paths even with the CYW43 stack; the
+ * small GPIO helpers covered by HAL_PORT_RAM_FUNC stay in flash
+ * alongside network buffers. */
+#define HAL_PORT_MMBASIC_HOT_FUNC(name)    __not_in_flash_func(name)
+#define HAL_PORT_MMBASIC_SUBFUN_FUNC(name) __not_in_flash_func(name)
+
 
 /* SPI-LCD clock-pin field: rp2040 PICOMITE shares SYSTEM_CLK for the
  * LCD; rp2350 PICOMITE breaks it out as Option.LCD_CLK. Ports without

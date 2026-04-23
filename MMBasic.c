@@ -40,6 +40,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "hal/hal_keyboard.h"
 #include "hal/hal_flash.h"
 #include "hal/hal_display_merge.h"
+#include "port_config.h"
 
 // this is the command table that defines the various tokens for commands in the source code
 // most of them are listed in the .h files so you should not add your own here but instead add
@@ -611,9 +612,7 @@ void MIPS16 __not_in_flash_func(ExecuteProgram)(unsigned char *p) {
                 }
                 if(OptionErrorSkip > 0) OptionErrorSkip--;        // if OPTION ERROR SKIP decrement the count - we do not error if it is greater than zero
                 if(g_TempMemoryIsChanged) ClearTempMemory();          // at the end of each command we need to clear any temporary string vars
-#ifndef PICOMITEWEB
                 if(core1stack[0]!=0x12345678)error("CPU2 Stack overflow");
-#endif
                 if(!OptionNoCheck){
                     CheckAbort();
                     check_interrupt();                                  // check for an MMBasic interrupt or touch event and handle it
@@ -952,15 +951,7 @@ int __not_in_flash_func(FindSubFun)(unsigned char *p, int type) {
 //   cmd      = pointer to the command name used by the caller (in program memory)
 //   index    = index into subfun[i] which points to the definition of the sub or funct
 //   fa, i64a, sa and typ are pointers to where the return value is to be stored (used by functions only)
-#if defined(PICOMITEWEB) || defined(PICOMITEVGA)
-#ifdef rp2350
-void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, int index, MMFLOAT *fa, long long int  *i64a, unsigned char **sa, int *typ) {
-#else
-void MIPS16 DefinedSubFun(int isfun, unsigned char *cmd, int index, MMFLOAT *fa, long long int  *i64a, unsigned char **sa, int *typ) {
-#endif
-#else
-void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, int index, MMFLOAT *fa, long long int  *i64a, unsigned char **sa, int *typ) {
-#endif
+void MIPS16 HAL_PORT_MMBASIC_SUBFUN_FUNC(DefinedSubFun)(int isfun, unsigned char *cmd, int index, MMFLOAT *fa, long long int  *i64a, unsigned char **sa, int *typ) {
 
     unsigned char *p, *s, *tp, *ttp, tcmdtoken;
     unsigned char *CallersLinePtr, *SubLinePtr = NULL;
@@ -1920,11 +1911,7 @@ unsigned char MIPS16 __not_in_flash_func(*doexpr)(unsigned char *p, MMFLOAT *fa,
 
 // get a value, either from a constant, function or variable
 // also returns the next operator to the right of the value or E_END if no operator
-#if defined(PICOMITEWEB) && !defined(rp2350)
-unsigned char MIPS16 *getvalue(unsigned char *p, MMFLOAT *fa, long long int  *ia, unsigned char **sa, int *oo, int *ta) {
-#else
-unsigned char MIPS16 __not_in_flash_func(*getvalue)(unsigned char *p, MMFLOAT *fa, long long int  *ia, unsigned char **sa, int *oo, int *ta) {
-#endif
+unsigned char MIPS16 HAL_PORT_MMBASIC_HOT_FUNC(*getvalue)(unsigned char *p, MMFLOAT *fa, long long int  *ia, unsigned char **sa, int *oo, int *ta) {
     MMFLOAT f = 0;
     long long int  i64 = 0;
     unsigned char *s = NULL;
@@ -2550,15 +2537,7 @@ routines for storing and manipulating variables
 // storage of the variable's data:
 //      if it is type T_NBR or T_INT the value is held in the variable slot
 //      for T_STR a block of memory of MAXSTRLEN size (or size determined by the LENGTH keyword) will be malloc'ed and the pointer stored in the variable slot.
-#ifdef PICOMITEWEB
-#ifdef rp2350
-void MIPS16 __not_in_flash_func(*findvar)(unsigned char *p, int action) {
-#else
-void MIPS16 *findvar(unsigned char *p, int action) {
-#endif
-#else
-void MIPS16 __not_in_flash_func(*findvar)(unsigned char *p, int action) {
-#endif
+void MIPS16 HAL_PORT_MMBASIC_HOT_FUNC(*findvar)(unsigned char *p, int action) {
     unsigned char name[MAXVARLEN + 1];
     int i=0, j, size, ifree, globalifree, localifree, nbr, vtype, vindex, namelen, tmp;
     unsigned char *s, *x, u, suffix=0;
@@ -3726,8 +3705,9 @@ void MIPS16 __not_in_flash_func(ClearVars)(int level, bool all) {
                     FreeMemorySafe((void **)&g_vartbl[i].val.s);                        // free any memory (if allocated)
                 }
             }
-#ifdef rp2350
-#ifndef PICOMITEWEB
+            /* PSRAM range check — non-PSRAM targets have PSRAMsize==0
+             * and PSRAMbase==0 (configuration.h), so the comparison
+             * is always false and this branch is a no-op. */
             if(all){
                 if(((g_vartbl[i].type & (T_STR | T_STRUCT)) || g_vartbl[i].dims[0] != 0) && !(g_vartbl[i].type & T_PTR)) {
                     if((uint32_t)g_vartbl[i].val.s>(uint32_t)PSRAMbase && (uint32_t)g_vartbl[i].val.s<(uint32_t)PSRAMbase + PSRAMsize){
@@ -3735,8 +3715,6 @@ void MIPS16 __not_in_flash_func(ClearVars)(int level, bool all) {
                     }
                 }
             }
-#endif
-#endif
 			memset(&g_vartbl[i],0,sizeof(struct s_vartbl));
 		}
 	}
@@ -3786,22 +3764,10 @@ void  MIPS16 ClearStack(void) {
 
 // clear the runtime (eg, variables, external I/O, etc) includes ClearStack() and ClearVars()
 // this is done before running a program
+extern void port_web_clear_runtime_state(void);
 void MIPS16 ClearRuntime(bool all) {
     int i;
-#ifdef PICOMITEWEB
-    if(TCPstate){
-        TCP_SERVER_T *state = (TCP_SERVER_T*)TCPstate;
-        for(int i=0 ; i<MaxPcb ; i++){
-            if(state->client_pcb[i] && state->telnet_pcb_no!=i)tcp_server_close(state, i);
-            if(state->buffer_recv[i])FreeMemorySafe((void **)&state->buffer_recv[i]);
-            state->inttrig[i]=0;
-            state->sent_len[i]=0;
-            state->recv_len[i]=0;
-            state->to_send[i]=0;
-        }
-    }
-    optionsuppressstatus=0;
-#endif
+    port_web_clear_runtime_state();
     CloseAllFiles();
     ClearExternalIO();                                              // this MUST come before InitHeap(true)
     ClearStack();

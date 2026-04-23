@@ -46,6 +46,15 @@
 
 #define HAL_PORT_RAM_FUNC(name)          name
 
+/* Placement for MMBasic's per-expression hot functions (getvalue,
+ * findvar — per-token hot path). rp2040 VGA tolerates them in RAM. */
+#define HAL_PORT_MMBASIC_HOT_FUNC(name)    __not_in_flash_func(name)
+
+/* DefinedSubFun dispatch is large (~800 lines) and called only once
+ * per SUB/FUNCTION invocation — flash on rp2040 VGA so the QVGA
+ * framebuffer + mode tables have more SRAM. */
+#define HAL_PORT_MMBASIC_SUBFUN_FUNC(name) name
+
 
 /* SPI-LCD clock-pin field: rp2040 PICOMITE shares SYSTEM_CLK for the
  * LCD; rp2350 PICOMITE breaks it out as Option.LCD_CLK. Ports without

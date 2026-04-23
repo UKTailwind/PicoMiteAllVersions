@@ -31,6 +31,10 @@ void port_fun_mm_mqtt_copy(int which, unsigned char *out) {
     out[1] = 0;
 }
 
+/* ClearRuntime TCP-state teardown. WEB real impl in MMtcpserver.c;
+ * non-WEB has no TCP state so the hook is a no-op. */
+void port_web_clear_runtime_state(void) {}
+
 void port_web_print_options(void) {}
 int  port_web_option_setter(unsigned char *cmdline) { (void)cmdline; return 0; }
 int  port_web_mminfo(unsigned char *ep, int64_t *out_iret,

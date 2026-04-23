@@ -312,6 +312,17 @@ extern uint8_t PSRAMpin;
     #endif
     #define NBRPINS             40
 #endif
+/* PSRAMbase is the XIP cache region for QSPI PSRAM on rp2350
+ * non-WEB. On every other port (rp2040 anywhere, rp2350 WEB where
+ * the PSRAM pins are consumed by the CYW43 SPI) there is no PSRAM;
+ * define the base to 0 so portable address-range checks like
+ * `ptr > PSRAMbase && ptr < PSRAMbase + PSRAMsize` short-circuit to
+ * false at runtime (PSRAMsize is unconditionally 0 on those targets).
+ * Driver/HAL code that actually touches the PSRAM region is already
+ * gated behind `#ifdef rp2350 && !defined(PICOMITEWEB)`. */
+#ifndef PSRAMbase
+    #define PSRAMbase 0
+#endif
 #define MAXPROMPTLEN        49                      // max length of a prompt incl the terminating null
 #define BREAK_KEY           3                       // the default value (CTRL-C) for the break key.  Reset at the command prompt.
 #define FNV_prime           16777619
