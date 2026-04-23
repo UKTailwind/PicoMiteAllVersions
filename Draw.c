@@ -47,7 +47,6 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "gfx_text_shared.h"
 #include "gfx_console_shared.h"
 #include "bc_alloc.h"
-#include "hardware/spi.h"
 #include "Memory.h"
 /* pico/multicore.h and the frameBufferMutex extern moved to the
  * hal_display_merge hooks in drivers/display_merge/. pico/cyw43_arch.h

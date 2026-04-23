@@ -290,6 +290,14 @@ if (COMPILE STREQUAL "VGA" OR COMPILE STREQUAL "VGAUSB" OR COMPILE STREQUAL "VGA
         drivers/vga_pio/vga_mode_ops.c
         drivers/vga_pio/vga_blit_ops.c
     )
+    # VGA-without-HDMI gets QVGA-specific cmd_map/cmd_tile; HDMI gets
+    # the HDMI-specific mode-ops (DrawRectangle555/256 family and
+    # HDMI-flavoured cmd_map/cmd_tile).
+    if (COMPILE STREQUAL "HDMI" OR COMPILE STREQUAL "HDMIUSB")
+        target_sources(PicoMite PRIVATE drivers/hdmi/hdmi_modes.c)
+    else()
+        target_sources(PicoMite PRIVATE drivers/vga_pio/vga_qvga_modes.c)
+    endif()
 else()
     target_sources(PicoMite PRIVATE drivers/vga_pio/vga_ops_stub.c)
 endif()
