@@ -294,7 +294,10 @@ if (COMPILE STREQUAL "VGA" OR COMPILE STREQUAL "VGAUSB" OR COMPILE STREQUAL "VGA
     # the HDMI-specific mode-ops (DrawRectangle555/256 family and
     # HDMI-flavoured cmd_map/cmd_tile).
     if (COMPILE STREQUAL "HDMI" OR COMPILE STREQUAL "HDMIUSB")
-        target_sources(PicoMite PRIVATE drivers/hdmi/hdmi_modes.c)
+        target_sources(PicoMite PRIVATE
+            drivers/hdmi/hdmi_modes.c
+            drivers/hdmi/hdmi_scanout.c
+        )
     else()
         target_sources(PicoMite PRIVATE drivers/vga_pio/vga_qvga_modes.c)
     endif()

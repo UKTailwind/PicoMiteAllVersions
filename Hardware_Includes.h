@@ -124,6 +124,7 @@ extern uint16_t *tilebcols;
 extern uint8_t *tilefcols_w; 
 extern uint8_t *tilebcols_w;
 extern void settiles(void);
+extern void HDMICore(void);
 extern uint16_t map256[256];
 extern uint32_t map16quads[16];
 extern uint32_t map16pairs[16];
