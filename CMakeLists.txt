@@ -264,6 +264,14 @@ if (COMPILE STREQUAL "PICORP2350" OR COMPILE STREQUAL "PICOUSBRP2350")
 else()
     target_sources(PicoMite PRIVATE drivers/spi_lcd/spi_lcd_nextgen_stub.c)
 endif()
+
+# FASTGFX double-buffered scanline-diff DMA swap path: PICOMITE (SPI-LCD)
+# only. VGA/HDMI/WEB get cmd_fastgfx / bc_fastgfx_* stubs that error.
+if (COMPILE STREQUAL "PICO" OR COMPILE STREQUAL "PICOUSB" OR COMPILE STREQUAL "PICORP2350" OR COMPILE STREQUAL "PICOUSBRP2350")
+    target_sources(PicoMite PRIVATE drivers/spi_lcd/spi_lcd_fastgfx.c)
+else()
+    target_sources(PicoMite PRIVATE drivers/spi_lcd/spi_lcd_fastgfx_stub.c)
+endif()
 if (COMPILE STREQUAL "WEB" OR COMPILE STREQUAL "WEBRP2350" )
     target_sources(PicoMite PRIVATE
 	SSD1963.c

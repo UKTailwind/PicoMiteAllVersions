@@ -62,6 +62,38 @@ void hal_display_nextgen_refresh_rect(int x_lo, int y_lo, int x_hi, int y_hi);
  * CLS resets the visible origin. No-op stub elsewhere. */
 void hal_display_nextgen_scroll_reset(void);
 
+/* Return 1 if the target has a running core1 merge pipeline (only
+ * PICOMITE variants link the real impl), 0 otherwise. Used by
+ * cmd_framebuffer MERGE / COPY to reject the async B/R/A flags on
+ * targets without a pipeline with a consistent error message. */
+int hal_display_merge_has_pipeline(void);
+
+/* Spin until the most-recent background merge has signalled done, or
+ * CheckAbort() trips. Paired with hal_display_merge_mark_done() set by
+ * core1 on completion. No-op on stub. */
+void hal_display_merge_sync_wait(void);
+
+/* Post a FRAMEBUFFER MERGE B (opaque fill) message: (cmd=2, colour).
+ * Real impl fires core1 once. Stub is a no-op (caller guards with
+ * hal_display_merge_has_pipeline() first). */
+void hal_display_merge_post_fill(unsigned colour);
+
+/* Post a FRAMEBUFFER MERGE R (repeating timed merge) message:
+ * (cmd=3, colour, timer_us). */
+void hal_display_merge_post_bg(unsigned colour, unsigned timer_us);
+
+/* Post a FRAMEBUFFER COPY B (async buffer copy) message: (cmd=1, src). */
+void hal_display_merge_post_copy(const void *src);
+
+/* Post a BLIT WRITE …, B rect-fill-merge message:
+ * (cmd=4, x, y, w, h, colour). */
+void hal_display_merge_post_blit_fill(int x, int y, int w, int h, unsigned colour);
+
+/* Post a BLIT WRITE …, R timed rect-fill-merge message:
+ * (cmd=5, x, y, w, h, colour, timer_us). */
+void hal_display_merge_post_blit_bg(int x, int y, int w, int h,
+                                    unsigned colour, unsigned timer_us);
+
 #ifdef __cplusplus
 }
 #endif

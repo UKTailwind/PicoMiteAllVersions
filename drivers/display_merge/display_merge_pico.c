@@ -75,3 +75,47 @@ void hal_display_nextgen_scroll_reset(void) {
     multicore_fifo_push_blocking(7);
     multicore_fifo_push_blocking((uint32_t)0);
 }
+
+int hal_display_merge_has_pipeline(void) { return 1; }
+
+void hal_display_merge_sync_wait(void) {
+    mergedone = false;
+    __dmb();
+    while (mergedone == false) CheckAbort();
+}
+
+void hal_display_merge_post_fill(unsigned colour) {
+    multicore_fifo_push_blocking(2);
+    multicore_fifo_push_blocking((uint32_t)colour);
+}
+
+void hal_display_merge_post_bg(unsigned colour, unsigned timer_us) {
+    multicore_fifo_push_blocking(3);
+    multicore_fifo_push_blocking((uint32_t)colour);
+    multicore_fifo_push_blocking((uint32_t)timer_us);
+}
+
+void hal_display_merge_post_copy(const void *src) {
+    multicore_fifo_push_blocking(1);
+    multicore_fifo_push_blocking((uint32_t)(uintptr_t)src);
+}
+
+void hal_display_merge_post_blit_fill(int x, int y, int w, int h, unsigned colour) {
+    multicore_fifo_push_blocking(4);
+    multicore_fifo_push_blocking((uint32_t)x);
+    multicore_fifo_push_blocking((uint32_t)y);
+    multicore_fifo_push_blocking((uint32_t)w);
+    multicore_fifo_push_blocking((uint32_t)h);
+    multicore_fifo_push_blocking((uint32_t)colour);
+}
+
+void hal_display_merge_post_blit_bg(int x, int y, int w, int h,
+                                    unsigned colour, unsigned timer_us) {
+    multicore_fifo_push_blocking(5);
+    multicore_fifo_push_blocking((uint32_t)x);
+    multicore_fifo_push_blocking((uint32_t)y);
+    multicore_fifo_push_blocking((uint32_t)w);
+    multicore_fifo_push_blocking((uint32_t)h);
+    multicore_fifo_push_blocking((uint32_t)colour);
+    multicore_fifo_push_blocking((uint32_t)timer_us);
+}
