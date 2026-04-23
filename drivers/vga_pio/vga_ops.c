@@ -163,6 +163,11 @@ uint8_t hal_vga_ops_layer_merge_rgb8(uint8_t primary, int x, int y) {
     return layer;
 }
 
+/* Display_Refresh on VGA: the scanline-DMA runs continuously so there
+ * is no flush step. SPI-LCD ports implement the real thing in
+ * drivers/spi_lcd/spi_lcd.c. */
+void Display_Refresh(void) { }
+
 void hal_vga_ops_wait_scanline_zero(void) {
 #ifdef HDMI
     extern volatile int32_t v_scanline;

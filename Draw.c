@@ -618,11 +618,15 @@ int getColour(char *c, int minus){
 	return colour;
 
 }
-#ifndef PICOMITEVGA
+/* Function-pointer-compatible wrapper around DrawRectangle. Only
+ * non-VGA targets ever install it (restorepanel / setframebuffer etc.
+ * assign DrawPixel = DrawPixelNormal on the SPI-LCD and SSD1963
+ * paths); VGA uses DrawPixel16 / DrawPixel2 / DrawPixel555 / … set
+ * from setmode() in drivers/vga_pio/vga_mode_ops.c. Unconditional
+ * here so the symbol exists on every link. */
 void DrawPixelNormal(int x, int y, int c) {
     DrawRectangle(x, y, x, y, c);
 }
-#endif
 void ClearScreen(int c) {
     if (ScrollLCD == ScrollLCDMEM332) {
         hal_display_nextgen_scroll_reset();
@@ -4118,9 +4122,11 @@ void cmd_sprite(void) {
     int maxW = HRes;
     int maxH = VRes;
     int newb = 0;
-#ifndef PICOMITEVGA
+    /* On VGA WriteBuf is always backed by the tile/scanout buffer, so this
+     * check only ever fires on non-VGA (where the user can have WriteBuf=
+     * NULL meaning "write directly to the LCD", a path this command
+     * doesn't support). */
     if(WriteBuf==NULL)error("Not available on physical display");
-#endif
     if(Option.DISPLAY_TYPE == 0) error("Display not configured");
     if(DISPLAY_TYPE==SCREENMODE4 || DISPLAY_TYPE==SCREENMODE5 )error("Not available for this display mode");
     if ((p = checkstring(cmdline, (unsigned char *)"SHOW SAFE"))) {
@@ -6416,11 +6422,9 @@ void ReadBuffer16Fast(int x1, int y1, int x2, int y2, unsigned char *c){
     }
 }
 
-#ifdef PICOMITEVGA
-
-void Display_Refresh(void){
-}
-#endif
+/* Display_Refresh: on VGA it's a no-op (the scanline DMA runs
+ * continuously), defined in drivers/vga_pio/vga_ops.c. On SPI-LCD it
+ * drives the DMA flush and lives in drivers/spi_lcd/spi_lcd.c. */
 void DrawPixel2(int x, int y, int c){
     if(x<0 || y<0 || x>=HRes || y>=VRes)return;
     if((Option.DISPLAY_TYPE>=VIRTUAL &&  Option.DISPLAY_TYPE<NEXTGEN) && WriteBuf==NULL) WriteBuf=GetMemory(VMaxH*VMaxV/8);
