@@ -45,7 +45,7 @@ A phase closes only when its targeted core files pass that standard. "Infrastruc
 | [3 — hal_pin](real-hal/phase-3-pin.md) | ✅ | 3a + F2 done; External.c is in STRICT_FILES (zero target/port-config ifdefs) |
 | [4 — hal_storage + hal_filesystem](real-hal/phase-4-filesystem.md) | ✅ | 4a + F3 done; FileIO.c is in STRICT_FILES (zero target/port-config ifdefs) |
 | [5 — hal_keyboard](real-hal/phase-5-keyboard.md) | ✅ | 5a + F4 done; MM_Misc.c is in STRICT_FILES (zero target/port-config ifdefs) |
-| [6 — hal_audio](real-hal/phase-6-audio.md) | 🟡 | 6a (host arm + VS1053 relocation) done; device arm (6b) pending |
+| [6 — hal_audio](real-hal/phase-6-audio.md) | ✅ | 6a + 6b done; Audio.c in STRICT_FILES; device body in drivers/pwm_synth/ |
 | [7 — hal_display](real-hal/phase-7-display.md) | ⏳ | four sub-phases (ILI9341 / VGA / HDMI / SSD1963) not started |
 | [8 — hal_multicore](real-hal/phases-8-to-13.md#phase-8--hal_multicoreh) | ⏳ | not started |
 | [9 — hal_net](real-hal/phases-8-to-13.md#phase-9--hal_neth) | ⏳ | not started; 67 `PICOMITEWEB` blocks to clear |

@@ -88,6 +88,7 @@ STRICT_FILES=(
   External.c  # F2 close: zero target-macro, zero port-config ifdefs.
   FileIO.c    # F3 close: zero target-macro, zero port-config ifdefs.
   MM_Misc.c   # F4 close: zero target-macro, zero port-config ifdefs.
+  Audio.c     # Phase 6b close: zero target-macro, zero port-config ifdefs.
 )
 
 # Files tracked informationally (report counts, do not fail).

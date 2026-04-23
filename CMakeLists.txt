@@ -94,9 +94,15 @@ set(PICOMITE_LEGACY_CORE_SOURCES
 	SPI-LCD.c
 	BmpDecoder.c
 	GPS.c
-	Audio.c
 	CFunction.c
 	picomite_gpio_irq.c
+)
+
+# Audio: device body lives in drivers/pwm_synth/pwm_synth.c (PWM/PIO
+# tones, WAV/FLAC/MP3/MOD decoders, VS1053 glue). Audio.c itself holds
+# only the host cmd_play and compiles on host builds via host/Makefile.
+set(PICOMITE_AUDIO_DEVICE_SOURCES
+	drivers/pwm_synth/pwm_synth.c
 )
 
 set(PICOMITE_VM_SHARED_GFX_SOURCES
@@ -163,6 +169,7 @@ add_executable(PicoMite
 	${PICOMITE_VM_SOURCES}
 )
 target_sources(PicoMite PRIVATE ${PICOMITE_LEGACY_CORE_SOURCES})
+target_sources(PicoMite PRIVATE ${PICOMITE_AUDIO_DEVICE_SOURCES})
 target_sources(PicoMite PRIVATE ${PICOMITE_CORE_STATE_SOURCES})
 target_sources(PicoMite PRIVATE ${PICOMITE_PICO_SDK_HAL_SOURCES})
 # The project's headers (MMBasic_Includes.h, Draw.h, etc.) live in the
