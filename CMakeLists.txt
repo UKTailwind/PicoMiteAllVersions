@@ -130,6 +130,7 @@ set(PICOMITE_PICO_SDK_HAL_SOURCES
 	ports/pico_sdk_common/hal_fast_timer_pico.c
 	ports/pico_sdk_common/psram_cache.c
 	ports/pico_sdk_common/cmd_psram.c
+	ports/pico_sdk_common/defines_loader.c
 	drivers/pico_flash/pico_flash_lfs.c
 )
 

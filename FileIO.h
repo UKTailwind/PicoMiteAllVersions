@@ -33,6 +33,15 @@ extern "C" {
 #endif
 #include "ff.h"
 #include "hal/hal_filesystem.h"
+
+/* DEFINES dictionary state — used by the rp2350 compile-time
+ * DEFINES feature. Declared here so the extracted loader in
+ * ports/pico_sdk_common/defines_loader.c and the legacy callers in
+ * FileIO.c share a single definition. */
+typedef struct sa_dlist {
+    char from[32];
+    char to[32];
+} a_dlist;
 #ifdef rp2350
 #include "upng.h"
 #endif

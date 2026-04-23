@@ -19,7 +19,7 @@
  * extern brings them into this TU without pulling in all of External.h. */
 extern int LocalKeyDown[7];
 
-#define LOCALKEYSCANRATE 20  /* ms between scans; matches PicoMite.c's call cadence */
+/* LOCALKEYSCANRATE comes from configuration.h (10 ms). */
 
 const unsigned char localkeymap[10][5]={
     { 1, 2, 3, 4, 5},
