@@ -39,7 +39,7 @@ CORE_SRCS += mm_misc_shared.c
 # Cross-cutting state (display, pin, Option, audio globals) shared across
 # Draw.c / External.c / FileIO.c / Audio.c.
 CORE_SRCS += display_state.c pin_state.c option_state.c audio_state.c
-CORE_SRCS += Draw.c RGB121.c Tilemap.c FileIO.c Audio.c BmpDecoder.c re.c
+CORE_SRCS += Draw.c RGB121.c Tilemap.c FileIO.c Audio.c BmpDecoder.c re.c picojpeg.c
 
 # Bytecode VM sources
 BC_SRCS = bc_alloc.c bc_bridge.c vm_host_fat.c ff.c ffunicode.c ffsystem.c \

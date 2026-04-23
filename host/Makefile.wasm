@@ -73,7 +73,7 @@ CORE_SRCS = MMBasic.c Commands.c Functions.c Operators.c MATHS.c \
             gfx_console_shared.c \
             mm_misc_shared.c \
             display_state.c pin_state.c option_state.c audio_state.c \
-            Draw.c RGB121.c Tilemap.c FileIO.c Audio.c BmpDecoder.c re.c
+            Draw.c RGB121.c Tilemap.c FileIO.c Audio.c BmpDecoder.c re.c picojpeg.c
 
 # Bytecode VM sources — mirror host/Makefile's BC_SRCS exactly.
 BC_SRCS = bc_alloc.c bc_bridge.c vm_host_fat.c \

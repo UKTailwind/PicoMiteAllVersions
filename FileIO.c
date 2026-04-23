@@ -41,37 +41,9 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "hal/hal_time.h"
 #include "hal/hal_filesystem.h"
 #include "hal/hal_keyboard.h"
+#include "hal/hal_fatfs_dispatch.h"
 #include <errno.h>
 #include "hardware/regs/addressmap.h"     /* XIP_BASE */
-#ifdef MMBASIC_HOST
-/* Host build routes file primitives through POSIX (REPL / --sim) or the
- * in-memory FatFS RAM disk (test harness) via hal_fs_*. */
-#include "vm_host_fat.h"
-#include "vm_sys_file.h"
-/* Redirect FatFS directory-walker calls to the host wrappers. In REPL /
- * --sim (host_sd_root set) they walk the user's real directory via
- * host_fs_walk_*; without host_sd_root they delegate straight to FatFS
- * against vm_host_fat. Keeps cmd_files / cmd_copy / cmd_kill / fun_dir
- * on one shared code path — the interpreter and the VM (via
- * OP_BRIDGE_CMD) both hit FileIO.c's native implementations. */
-extern FRESULT host_f_findfirst(DIR *dp, FILINFO *fi, const TCHAR *path,
-                                const TCHAR *pattern);
-extern FRESULT host_f_findnext(DIR *dp, FILINFO *fi);
-extern FRESULT host_f_closedir(DIR *dp);
-extern FRESULT host_f_unlink(const TCHAR *path);
-extern FRESULT host_f_chdir(const TCHAR *path);
-extern FRESULT host_f_getcwd(TCHAR *buff, UINT len);
-#define f_findfirst(d,fi,path,pat) host_f_findfirst(d,fi,path,pat)
-#define f_findnext(d,fi) host_f_findnext(d,fi)
-#define f_closedir(d) host_f_closedir(d)
-#define f_unlink(p) host_f_unlink(p)
-#define f_chdir(p) host_f_chdir(p)
-#define f_getcwd(b,l) host_f_getcwd(b,l)
-/* f_mkdir / f_rename are no longer called from FileIO.c — cmd_mkdir /
- * cmd_name / cmd_rmdir route through hal_fs_*. The host wrappers
- * (host_f_mkdir / host_f_rename) stay in host_fs_shims.c for now;
- * unused externals don't break the build. */
-#endif
 #include "hardware/irq.h"
 #include "hardware/gpio.h"
 #include "pico/binary_info.h"
@@ -914,7 +886,6 @@ void cmd_LoadImage(unsigned char *p)
         Display_Refresh();
 }
 
-#ifndef MMBASIC_HOST
 /*
  * @cond
  * The following section will be excluded from the documentation.
@@ -1132,13 +1103,6 @@ void cmd_LoadJPGImage(unsigned char *p)
     if (Option.Refresh)
         Display_Refresh();
 }
-#else /* MMBASIC_HOST */
-/* cmd_LoadJPGImage still needs a linkable symbol on host. picojpeg.c and
- * its pjpeg_need_bytes_callback (raw f_read on a POSIX pseudo-FIL) aren't
- * ported yet; stub returns an explicit error. cmd_LoadImage IS supported
- * on host — see the definition above. */
-void cmd_LoadJPGImage(unsigned char *p) { (void)p; error("Not supported on host"); }
-#endif /* !MMBASIC_HOST */
 
 // search for a volume label, directory or file
 // s$ = DIR$(fspec, DIR|FILE|ALL)       will return the first entry
@@ -1392,7 +1356,7 @@ void MIPS16 cmd_kill(void)
             PRet();
         }
         if(fromfilesystem==0) FSerror=lfs_dir_open(&lfs, &lfs_dir, fromdir);
-        else FSerror = f_findfirst(&djd, &fnod, fromdir, pp);
+        else FSerror = hal_ff_findfirst(&djd, &fnod, fromdir, pp);
         ErrorCheck(0);
         
 
@@ -1420,11 +1384,11 @@ void MIPS16 cmd_kill(void)
                         strcpy(in,fromdir);
                         if(in[strlen(in)-1]!='/')strcat(in,"/");
                         strcat(in,fnod.fname);
-                        FSerror = f_unlink(in);
+                        FSerror = hal_ff_unlink(in);
                         ErrorCheck(0);
                         }
                 }
-            FSerror = f_findnext(&djd, &fnod);
+            FSerror = hal_ff_findnext(&djd, &fnod);
             } 
         } else {
             while(1){
@@ -1464,7 +1428,7 @@ void MIPS16 cmd_kill(void)
                 }
             }
         }
-        if(fromfilesystem) f_closedir(&djd);
+        if(fromfilesystem) hal_ff_closedir(&djd);
         else lfs_dir_close(&lfs, &lfs_dir);
         FatFSFileSystem=FatFSFileSystemSave;
     } else {
@@ -2566,7 +2530,7 @@ void MIPS16 cmd_copy(void)
             error("Source and destination are the same");
         }
         if(fromfilesystem==0) FSerror=lfs_dir_open(&lfs, &lfs_dir, fromdir);
-        else FSerror = f_findfirst(&djd, &fnod, fromdir, pp);
+        else FSerror = hal_ff_findfirst(&djd, &fnod, fromdir, pp);
         ErrorCheck(0);
         if(fromfilesystem){
             while (FSerror == FR_OK && fnod.fname[0])
@@ -2589,7 +2553,7 @@ void MIPS16 cmd_copy(void)
                     else if(fromfilesystem==1 && tofilesystem==0)B2A(in,out);
                     else if(fromfilesystem==0 && tofilesystem==1)A2B(in,out);
                 }
-            FSerror = f_findnext(&djd, &fnod);
+            FSerror = hal_ff_findnext(&djd, &fnod);
             } 
         } else {
             while(1){
@@ -2623,7 +2587,7 @@ void MIPS16 cmd_copy(void)
                 }
             }
         }
-        if(fromfilesystem) f_closedir(&djd);
+        if(fromfilesystem) hal_ff_closedir(&djd);
         else lfs_dir_close(&lfs, &lfs_dir);
         FatFSFileSystem=FatFSFileSystemSave;
         return;
@@ -2876,7 +2840,7 @@ void MIPS16 cmd_files(void)
     putConsole(':',1);
     MMPrintString(fullpathname[FatFSFileSystem]);PRet();
     if(FatFSFileSystem==0) FSerror=lfs_dir_open(&lfs, &lfs_dir, fullpathname[FatFSFileSystem]);
-    else FSerror = f_findfirst(&djd, &fnod, fullpathname[FatFSFileSystem], pp);
+    else FSerror = hal_ff_findfirst(&djd, &fnod, fullpathname[FatFSFileSystem], pp);
     ErrorCheck(0);
     flist = GetMemory(sizeof(s_flist) * MAXFILES);
         // add the file to the list, search for the next and keep looping until no more files
@@ -2887,7 +2851,7 @@ void MIPS16 cmd_files(void)
                 if (fcnt >= MAXFILES)
                 {
                     FreeMemorySafe((void **)&flist);
-                    f_closedir(&djd);
+                    hal_ff_closedir(&djd);
                     error("Too many files to list");
                 }
                 if (!(fnod.fattrib & (AM_SYS | AM_HID)))
@@ -2996,7 +2960,7 @@ void MIPS16 cmd_files(void)
                     flist[i].ft = fnod.ftime;
                     fcnt++;
                 }
-            FSerror = f_findnext(&djd, &fnod);
+            FSerror = hal_ff_findnext(&djd, &fnod);
             } 
         } else {
             while(1){
@@ -3185,7 +3149,7 @@ void MIPS16 cmd_files(void)
                     if (MMAbort)
                     {
                         FreeMemorySafe((void **)&flist);
-                        if(FatFSFileSystem) f_closedir(&djd);
+                        if(FatFSFileSystem) hal_ff_closedir(&djd);
                         else lfs_dir_close(&lfs, &lfs_dir);
                         WDTimer = 0; // turn off the watchdog timer
                         memset(inpbuf, 0, STRINGSIZE);
@@ -3221,7 +3185,7 @@ void MIPS16 cmd_files(void)
         MMPrintString(" file");
         MMPrintString((fcnt - dirs) == 1 ? "" : "s");
         FreeMemorySafe((void **)&flist);
-        if(FatFSFileSystem) f_closedir(&djd);
+        if(FatFSFileSystem) hal_ff_closedir(&djd);
         else {
             lfs_dir_close(&lfs, &lfs_dir);
             IntToStr(ts, Option.FlashSize-(Option.modbuff ? 1024*Option.modbuffsize : 0)-RoundUpK4(TOP_OF_SYSTEM_FLASH)-lfs_fs_size(&lfs)*4096,10);

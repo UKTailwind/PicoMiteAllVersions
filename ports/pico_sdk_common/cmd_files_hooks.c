@@ -22,6 +22,7 @@
 #include "Hardware_Includes.h"
 #include "ff.h"
 #include "diskio.h"
+#include "hal/hal_fatfs_dispatch.h"
 
 extern void CloseAudio(int all);
 extern void SaveContext(void);
@@ -70,6 +71,17 @@ void port_drive_check(char drive)
             error("B: drive not enabled");
     }
 }
+
+/* hal_ff_* directory + path ops on device just forward to the vendored
+ * FatFS in ff.c. Host impls in host/host_fs_shims.c (host_f_*) handle
+ * the vm_host_fat / POSIX dispatch. */
+FRESULT hal_ff_findfirst(DIR *dp, FILINFO *fi, const TCHAR *path,
+                         const TCHAR *pattern) { return f_findfirst(dp, fi, path, pattern); }
+FRESULT hal_ff_findnext (DIR *dp, FILINFO *fi)                  { return f_findnext(dp, fi); }
+FRESULT hal_ff_closedir (DIR *dp)                                { return f_closedir(dp); }
+FRESULT hal_ff_unlink   (const TCHAR *path)                      { return f_unlink(path); }
+FRESULT hal_ff_chdir    (const TCHAR *path)                      { return f_chdir(path); }
+FRESULT hal_ff_getcwd   (TCHAR *buf, UINT len)                   { return f_getcwd(buf, len); }
 
 int port_mount_sd_drive(void)
 {

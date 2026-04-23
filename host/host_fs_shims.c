@@ -202,6 +202,18 @@ FRESULT host_f_getcwd(TCHAR *buff, UINT len) {
     return FR_OK;
 }
 
+/* hal_ff_* directory + path ops on host route through the host_f_*
+ * wrappers above so vm_host_fat / POSIX dispatch via host_sd_root keeps
+ * working without core seeing a #ifdef MMBASIC_HOST. */
+#include "hal/hal_fatfs_dispatch.h"
+FRESULT hal_ff_findfirst(DIR *dp, FILINFO *fi, const TCHAR *path,
+                         const TCHAR *pattern) { return host_f_findfirst(dp, fi, path, pattern); }
+FRESULT hal_ff_findnext (DIR *dp, FILINFO *fi)                  { return host_f_findnext(dp, fi); }
+FRESULT hal_ff_closedir (DIR *dp)                                { return host_f_closedir(dp); }
+FRESULT hal_ff_unlink   (const TCHAR *path)                      { return host_f_unlink(path); }
+FRESULT hal_ff_chdir    (const TCHAR *path)                      { return host_f_chdir(path); }
+FRESULT hal_ff_getcwd   (TCHAR *buf, UINT len)                   { return host_f_getcwd(buf, len); }
+
 /* POSIX-backed existence check. The Editor's file-load path (EDIT "foo.bas")
  * needs this to return truthful answers — otherwise `edit` leaves its p
  * pointer NULL and dereferences it at Editor.c:511. Also relied on by
