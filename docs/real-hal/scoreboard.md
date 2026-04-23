@@ -62,11 +62,10 @@ F4 step 15 164     57       2       2      39        39      17         14      
 F4 step 16 164     53       2       2      39        39      17         14      330  (OPTION KEYBOARD setter → port_keyboard_option_setter(); −4)
 F4 step 17 164     52       2       2      39        39      17         14      329  (SSD1963data extern unconditional via VGA stubs; −1)
 F4 step 18 164     50       2       2      39        39      17         14      327  (SYSTEM SPI printoptions via HAL_PORT_IS_VGA + dead `i` decl; −2)
-            MM_Misc.c: 140 → 50 across 18 sub-steps (target-macro 135 → 43). Remaining
-            ~40 are rp2350 chip-specific bodies (interrupts, multicore, PSRAM mode, I2S
-            audio PIO map), HDMI PINS setter (option struct fields gated), HEARTBEAT
-            setter (USBKEYBOARD-vs-PS/2 with pin reservation), and various small
-            PICOMITEVGA prints (RTC/POWER/etc.) inside printoptions.
+F4 step 19 164     46       2       2      39        39      17         14      323  (PIN reserved-name hooks → port_pin_is_reserved_alias / port_pinno_alias_for_name; −4)
+F4 step 20 164     34       2       2      39        39      17         14      311  (printoptions LCD320/USB-keyboard/heartbeat → per-port helper files; −12)
+F4 step 21 164     32       2       2      39        39      17         14      309  (disable_lcdspi → port hook + LCD320 SYSTEM-shared cleanup → port hook; −2)
+F4 step 22 164     29       2       2      39        39      17         14      306  (ConfigDisplayUser/clear320/OPTION LCD320 → ports/pico_sdk_common/spi_lcd_options.c; −3)
 ─── post-fixup phases ───
 6          .       .        .        .       .         .       .          0        .  (Audio.c → HAL)
 7a         .       .        .        .       .         .       .          .        .  (Draw.c ILI9341 → HAL)

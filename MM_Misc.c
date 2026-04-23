@@ -77,6 +77,7 @@ extern void disable_lcdspi(void);
 extern int  port_pinno_alias_for_name(const char *name);
 extern int  port_pin_is_reserved_alias(int pin);
 extern const char *port_pin_reserved_label(int pin);
+extern int  port_lcd320_option_setter(unsigned char *cmdline);
 extern void port_web_print_options(void);
 extern int  port_web_option_setter(unsigned char *cmdline);
 extern int  port_web_mminfo(unsigned char *ep, int64_t *out_iret,
@@ -977,77 +978,8 @@ void disable_audio(void){
     Option.audio_i2s_data=0;
     Option.AUDIO_SLICE=99;
 }
-#ifndef PICOMITEVGA
-void MIPS16 ConfigDisplayUser(unsigned char *tp){
-    getargs(&tp, 13, (unsigned char *)",");
-    if(str_equal(argv[0], (unsigned char *)"USER")) {
-        if(Option.DISPLAY_TYPE) error("Display already configured");
-        if(argc != 5) error("Argument count");
-        HRes = DisplayHRes = getint(argv[2], 1, 10000);
-        VRes = DisplayVRes = getint(argv[4], 1, 10000);
-        Option.DISPLAY_TYPE = DISP_USER;
-        // setup the pointers to the drawing primitives
-        DrawRectangle = DrawRectangleUser;
-        DrawBitmap = DrawBitmapUser;
-        return;
-    }  
-
-}
-void MIPS16 clear320(void){
-    if(SPI480){
-#ifdef PICOCALC
-        HRes=320;
-        VRes=480;
-#else
-        if(Option.DISPLAY_ORIENTATION & 1) {
-            HRes=DisplayHRes;
-            VRes=DisplayVRes;
-        } else {
-            HRes=DisplayVRes;
-            VRes=DisplayHRes;
-        }
-#endif
-        return;
-    }
-    screen320=0;
-    DrawRectangle = DrawRectangleSSD1963;
-    DrawBitmap = DrawBitmapSSD1963;
-    DrawBuffer = DrawBufferSSD1963;
-    ReadBuffer = ReadBufferSSD1963;
-    if(SSD16TYPE || Option.DISPLAY_TYPE==IPS_4_16){
-        DrawBLITBuffer= DrawBLITBufferSSD1963;
-        ReadBLITBuffer = ReadBLITBufferSSD1963;
-    } else {
-        DrawBLITBuffer= DrawBufferSSD1963;
-        ReadBLITBuffer = ReadBufferSSD1963;
-    }
-    if(Option.DISPLAY_TYPE!=SSD1963_4_16){
-    if(Option.DISPLAY_ORIENTATION & 1) {
-        HRes=800;
-        VRes=480;
-    } else {
-        HRes=480;
-        VRes=800;
-    }
-    } else {
-    if(Option.DISPLAY_ORIENTATION & 1) {
-        HRes=480;
-        VRes=272;
-    } else {
-        HRes=272;
-        VRes=480;
-    }
-    }
-    FreeMemorySafe((void **)&buff320);
-    return;
-}
-//void MIPS16 clearSPI320(void){
-//    HRes=480;
-//    VRes=320;
-//    return;
-//}
-
-#endif
+/* ConfigDisplayUser + clear320 (SPI-LCD-only) live in
+ * ports/pico_sdk_common/spi_lcd_options.c. */
 
 void MIPS16 configure(unsigned char *p){
     if(!*p){
@@ -1104,30 +1036,7 @@ void MIPS16 cmd_option(void) {
 		if(checkstring(tp, (unsigned char *)"ON"))	{ optionfulltime=1; return; }
 	}
 
-#ifndef PICOMITEVGA
-	tp = checkstring(cmdline, (unsigned char *)"LCD320");
-	if(tp) {
-        if(!( SSD16TYPE  && (Option.DISPLAY_ORIENTATION==LANDSCAPE || Option.DISPLAY_ORIENTATION==RLANDSCAPE))) error("Only available on 16-bit SSD1963 and IPS_4_16 displays in Landscape");
-        if(( SSD16TYPE || Option.DISPLAY_TYPE==IPS_4_16)){
-            if(checkstring(tp, (unsigned char *)"OFF"))	{ 
-                clear320();
-            }
-            else if(checkstring(tp, (unsigned char *)"ON"))	{ 
-                screen320=1; 
-                DrawRectangle = DrawRectangle320;
-                DrawBitmap = DrawBitmap320;
-                DrawBuffer = DrawBuffer320;
-                ReadBuffer = ReadBuffer320;
-                DrawBLITBuffer= DrawBLITBuffer320;
-                ReadBLITBuffer = ReadBLITBuffer320;
-                HRes=320;
-                VRes=240;
-                buff320=GetMemory(320*6);
-                return; 
-            } else error("Syntax");
-        } else error("Invalid display type");
-	}
-#endif 
+    if (port_lcd320_option_setter(cmdline)) return;
     tp = checkstring(cmdline, (unsigned char *)"ESCAPE");
     if(tp) {
         OptionEscape = true;

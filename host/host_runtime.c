@@ -905,6 +905,7 @@ void port_clear_lcd_spi_if_shares_system(void) {}
 int port_pinno_alias_for_name(const char *name) { (void)name; return 0; }
 int port_pin_is_reserved_alias(int pin) { (void)pin; return 0; }
 const char *port_pin_reserved_label(int pin) { (void)pin; return NULL; }
+int port_lcd320_option_setter(unsigned char *cmdline) { (void)cmdline; return 0; }
 
 /* OPTION KEYBOARD setter — host has no keyboard config to set. */
 int port_keyboard_option_setter(unsigned char *cmdline) { (void)cmdline; return 0; }
