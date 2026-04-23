@@ -732,3 +732,24 @@ int cmd_tcpserver(void){
         }
         return 0;
 }
+
+/* Core calls these from cmd_new / cmd_load teardown paths (FileIO.c)
+ * to free and re-allocate the per-TCP-client receive buffers across a
+ * program reset. Non-WEB targets get stubs in MM_Misc.c. */
+void tcp_free_recv_buffers(void) {
+    if (TCPstate) {
+        for (int i = 0; i < MaxPcb; i++) FreeMemory(TCPstate->buffer_recv[i]);
+    }
+}
+
+void tcp_realloc_recv_buffers(void) {
+    if (TCPstate) {
+        for (int i = 0; i < MaxPcb; i++)
+            TCPstate->buffer_recv[i] = GetMemory(TCP_READ_BUFFER_SIZE);
+    }
+}
+
+/* 3D sprite-builder teardown: real implementation lives in Draw.c
+ * (inside its #ifndef PICOMITEWEB block). WEB builds don't include that
+ * feature; stub so FileIO.c::CloseAllFiles can call it unconditionally. */
+void closeall3d(void) {}

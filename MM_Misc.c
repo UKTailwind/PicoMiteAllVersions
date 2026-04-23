@@ -199,6 +199,8 @@ void VGArecovery(int pin){
  * implementations link instead (MMMqtt.c / MMtcpserver.c). */
 void closeMQTT(void) {}
 void ProcessWeb(int mode) { (void)mode; }
+void tcp_free_recv_buffers(void) {}
+void tcp_realloc_recv_buffers(void) {}
 #endif
 extern const uint8_t *flash_target_contents;
 int TickPeriod[NBRSETTICKS]={0};

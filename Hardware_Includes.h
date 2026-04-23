@@ -263,6 +263,11 @@ extern void clear320(void);
  * unconditional so core code can call it from loops (cmd_files, LOAD)
  * without wrapping each site in #ifdef PICOMITEWEB. */
 extern void ProcessWeb(int mode);
+/* TCP-state recv-buffer alloc/free: real impl on WEB iterates
+ * TCPstate->buffer_recv[]; non-WEB stubs no-op. Core calls from
+ * cmd_new / cmd_load teardown + post-ClearTempMemory refill. */
+extern void tcp_free_recv_buffers(void);
+extern void tcp_realloc_recv_buffers(void);
 #ifdef PICOMITEWEB
 	extern volatile int WIFIconnected;
 	extern volatile int scantimer;

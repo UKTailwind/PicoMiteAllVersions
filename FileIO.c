@@ -3400,9 +3400,7 @@ void MIPS16 CloseAllFiles(void)
 {
     int i;
     closeallsprites();
-#ifndef PICOMITEWEB
     closeall3d();
-#endif
     closeframebuffer('A');
     for (i = 1; i <= MAXOPENFILES; i++)
     {
@@ -4583,11 +4581,7 @@ void cmd_autosave(void)
         CloseAudio(1);
         CloseAllFiles();
         ClearExternalIO();                                              // this MUST come before InitHeap(true)
-#ifdef PICOMITEWEB
-        if(TCPstate){
-            for(int i=0;i<MaxPcb;i++)FreeMemory(TCPstate->buffer_recv[i]);
-        }
-#endif
+        tcp_free_recv_buffers();
         p = buf = GetTempMemory(EDIT_BUFFER_SIZE);
         char * fromp  = (char *)ProgMemory;
         p = buf;
@@ -4658,11 +4652,7 @@ readin:;
     SaveProgramToFlash(buf, true);
     ClearSavedVars(); // clear any saved variables
     ClearTempMemory(); 
- #ifdef PICOMITEWEB
-        if(TCPstate){
-            for(int i=0;i<MaxPcb;i++)TCPstate->buffer_recv[i]=GetMemory(TCP_READ_BUFFER_SIZE);
-        }
-#endif
+        tcp_realloc_recv_buffers();
     if (c == F2)
     {
         ClearVars(0,true);
@@ -4700,11 +4690,7 @@ void cmd_autosave(void)
         CloseAudio(1);
         CloseAllFiles();
         ClearExternalIO();                                              // this MUST come before InitHeap(true)
-#ifdef PICOMITEWEB
-        if(TCPstate){
-            for(int i=0;i<MaxPcb;i++)FreeMemory(TCPstate->buffer_recv[i]);
-        }
-#endif
+        tcp_free_recv_buffers();
         p = buf = GetTempMemory(EDIT_BUFFER_SIZE-2048);
         char * fromp  = (char *)ProgMemory;
         if(*fromp){
@@ -4766,11 +4752,7 @@ void cmd_autosave(void)
         SaveProgramToFlash(buf, true);
         ClearSavedVars(); // clear any saved variables
         ClearTempMemory(); 
-#ifdef PICOMITEWEB
-            if(TCPstate){
-                for(int i=0;i<MaxPcb;i++)TCPstate->buffer_recv[i]=GetMemory(TCP_READ_BUFFER_SIZE);
-            }
-#endif
+            tcp_realloc_recv_buffers();
         if (c == F2)
         {
             ClearVars(0,true);
