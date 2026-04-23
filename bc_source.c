@@ -88,11 +88,7 @@ static void source_asm_buf_free(BCSourceFrontend *fe) {
     if (fe->asm_line_nos) { BC_FREE(fe->asm_line_nos); fe->asm_line_nos = NULL; }
 }
 
-#ifdef MMBASIC_HOST
 int bc_opt_level = 1;
-#else
-int bc_opt_level = 1;
-#endif
 
 static uint8_t source_parse_expression(BCSourceFrontend *fe, BCCompiler *cs, const char **pp);
 static void source_compile_statement(BCSourceFrontend *fe, BCCompiler *cs, const char *stmt);
@@ -1065,7 +1061,9 @@ static int source_parse_setpin_mode(const char **pp, int *mode) {
         *mode = VM_PIN_MODE_PWM7A;
     } else if (source_keyword(&p, "PWM7B")) {
         *mode = VM_PIN_MODE_PWM7B;
-#ifdef rp2350
+    /* PWM8A..PWM11B are rp2350-only hardware slices; the keywords are
+     * always accepted so parser / FRUN are portable, but VM setpin
+     * errors on rp2040 if the program actually drives them. */
     } else if (source_keyword(&p, "PWM8A")) {
         *mode = VM_PIN_MODE_PWM8A;
     } else if (source_keyword(&p, "PWM8B")) {
@@ -1082,7 +1080,6 @@ static int source_parse_setpin_mode(const char **pp, int *mode) {
         *mode = VM_PIN_MODE_PWM11A;
     } else if (source_keyword(&p, "PWM11B")) {
         *mode = VM_PIN_MODE_PWM11B;
-#endif
     } else if (source_keyword(&p, "PWM")) {
         *mode = -1;
     } else if (*p == '0' && !isnamechar((unsigned char)p[1])) {

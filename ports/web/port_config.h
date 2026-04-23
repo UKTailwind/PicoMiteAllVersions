@@ -69,4 +69,9 @@
  * actual const arrays are included by Draw.c. */
 #define HAL_PORT_CONSOLE_FONT_MEDIUM Hom_16x24_LE
 
+/* RANDOMIZE default seed when the BASIC program passes 0 (or omits
+ * the seed). Device ports use the hardware timer for entropy; host
+ * ports have their own policy (see host/port_config.h). */
+#define HAL_PORT_RANDOMIZE_DEFAULT_SEED() ((int64_t)hal_time_us_64())
+
 #endif /* PORT_CONFIG_H */

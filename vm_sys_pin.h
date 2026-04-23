@@ -26,9 +26,11 @@ enum {
     VM_PIN_MODE_PWM6B = 43,
     VM_PIN_MODE_PWM7A = 44,
     VM_PIN_MODE_PWM7B = 45,
-    VM_PIN_MODE_ARAW = 46
-#ifdef rp2350
-    ,
+    VM_PIN_MODE_ARAW = 46,
+    /* Extended PWM slice modes only drive hardware on rp2350 (slices
+     * 8-11 exist only there); the enum values are unconditional so
+     * bc_source's keyword parser can accept `PWM8A..PWM11B` on every
+     * target. On rp2040 the VM's setpin routes these to an error. */
     VM_PIN_MODE_PWM8A = 47,
     VM_PIN_MODE_PWM8B = 48,
     VM_PIN_MODE_PWM9A = 49,
@@ -37,7 +39,6 @@ enum {
     VM_PIN_MODE_PWM10B = 52,
     VM_PIN_MODE_PWM11A = 53,
     VM_PIN_MODE_PWM11B = 54
-#endif
 };
 
 enum {

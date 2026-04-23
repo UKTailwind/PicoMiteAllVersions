@@ -39,6 +39,14 @@ void hal_time_sleep_us(uint32_t us);
  * so callers that only need 32-bit ms precision stay branch-free. */
 uint32_t hal_time_ms_tick(void);
 
+/* Throttle hook called on every VM backward branch (bc_vm.c's
+ * bc_vm_poll_interrupts) and on the interpreter's per-statement loop
+ * if the host emulator is running with `--slowdown`. Real body is
+ * host-only (host_runtime.c's host_sim_apply_slowdown); device impl
+ * is a no-op. Declared here so core code can call it without a
+ * target gate. */
+void hal_time_slowdown_tick(void);
+
 #ifdef __cplusplus
 }
 #endif

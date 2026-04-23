@@ -15,6 +15,7 @@
 #include "bytecode.h"
 #include "bc_alloc.h"
 #include "hal/hal_time.h"
+#include "port_config.h"
 #include "vm_device_support.h"
 #include "vm_sys_input.h"
 #include "vm_sys_graphics.h"
@@ -574,12 +575,9 @@ static void vm_text_fail_range(void *ctx, int value, int min, int max) {
 
 static void bc_vm_poll_interrupts(void) {
     static uint32_t loop_poll_counter = 0;
-#if defined(MMBASIC_HOST)
     /* Host --slowdown applies per-backward-branch so FRUN throttles at
-     * the same granularity as RUN. On device this is a no-op. */
-    extern void host_sim_apply_slowdown(void);
-    host_sim_apply_slowdown();
-#endif
+     * the same granularity as RUN. No-op on device. */
+    hal_time_slowdown_tick();
     loop_poll_counter++;
     if ((loop_poll_counter & 0x3FFu) != 0) return;
     CheckAbort();
@@ -4197,15 +4195,9 @@ op_keydown: {
      * ================================================================== */
 
 op_randomize: {
-    /* RANDOMIZE seed — pop int seed (0 = use time) */
+    /* RANDOMIZE seed — pop int seed (0 = use time / port default) */
     int64_t seed = POP_I();
-    if (seed == 0) {
-#ifdef MMBASIC_HOST
-        seed = 42;  /* deterministic for testing */
-#else
-        seed = (uint32_t)hal_time_us_64();
-#endif
-    }
+    if (seed == 0) seed = HAL_PORT_RANDOMIZE_DEFAULT_SEED();
     if (seed < 0) bc_vm_error(vm, "Number out of bounds");
     srand((unsigned int)seed);
     DISPATCH();

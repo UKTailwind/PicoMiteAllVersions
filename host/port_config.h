@@ -86,4 +86,7 @@
  * actual const arrays are included by Draw.c. */
 #define HAL_PORT_CONSOLE_FONT_MEDIUM Hom_16x24_LE
 
+/* Host uses a deterministic seed for test reproducibility. */
+#define HAL_PORT_RANDOMIZE_DEFAULT_SEED() ((int64_t)42)
+
 #endif /* PORT_CONFIG_H */

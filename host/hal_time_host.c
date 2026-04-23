@@ -27,3 +27,9 @@ uint32_t hal_time_ms_tick(void)
 {
     return (uint32_t)(host_time_us_64() / 1000ULL);
 }
+
+extern void host_sim_apply_slowdown(void);
+void hal_time_slowdown_tick(void)
+{
+    host_sim_apply_slowdown();
+}
