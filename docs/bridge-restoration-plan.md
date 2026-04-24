@@ -189,3 +189,7 @@ Status: no action needed
 - The host `--immediate` and `--try-compile` modes call `bc_run_immediate()` and `bc_try_compile_line()`. These are convenience test modes. They can be kept, adapted, or removed as part of step 2 — but if removed, update `host_main.c` accordingly.
 - Steps 4 and 5 (pre-tokenize + bridge dispatch) are tightly coupled. Implement together or add a stub `OP_BRIDGE_CMD` handler that cleanly errors, so existing tests still pass between the two steps.
 - Every step must be independently committable with a green test suite. No "break now, fix later" across commits.
+
+---
+
+**Superseded by [real-hal-plan.md](real-hal-plan.md) (Phase 13 in progress, 2026-04-24).** Retained as historical record of the interpreter-primary + VM-as-performance-backend bridge restoration. Invariants locked here (FRUN dispatch, OP_BRIDGE_CMD, shared MMHeap) still govern; newer plans build on top rather than reopening them.

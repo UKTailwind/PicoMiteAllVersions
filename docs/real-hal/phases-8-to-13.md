@@ -320,7 +320,7 @@ Now the device HAL contract is locked, observed across 12 targets.
 
 ✅ **Header subsumption into `hal/`: not needed.** Audit of the five port-internal headers showed every caller is inside `ports/host_native/` or `ports/host_wasm/` — no device / no shared-core file includes them. They're legitimate port-private headers, not device-divergent shortcuts. No action taken.
 
-⏳ **`host/` full retirement deferred.** Remaining content is user-facing tooling: `build.sh` / `build_wasm.sh` (delegated), `run_tests.sh` + sibling `run_*.sh` harnesses, `tests/` data, `demos/`, `web/` bundle, `README.md`. Moving them touches CI + ~20 doc files. Planned as Phase 12.6 separately so Phase 12.5 litmus test can proceed unblocked.
+❌ **Phase 12.6 (`host/` full retirement) SKIPPED (2026-04-24).** Remaining content is user-facing tooling: `build.sh` / `build_wasm.sh` (delegated), `run_tests.sh` + sibling `run_*.sh` harnesses, `tests/` data, `demos/`, `web/` bundle, `README.md`. The architectural goal — source code out of `host/`, ports self-contained, canonical builds under `ports/host_native/` + `ports/host_wasm/` — is already met by Phase 12. Further moves are cosmetic and cost high churn (CI, `buildall.sh`, `serve.py`, ~20 doc URLs, external bookmarks, muscle memory). The purity gate prevents re-introduction of target spaghetti at the source level; that's what Phase 13 locks in. Decision: skip as a dedicated phase; do opportunistic moves only if a future third native port makes the symmetry argument concrete.
 
 ## Phase 12.5 — `mmbasic_stdio` pure-stdio executable (HAL litmus test)
 

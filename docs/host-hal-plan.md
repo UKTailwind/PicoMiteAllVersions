@@ -639,3 +639,7 @@ Every phase is a single commit (or small commit chain) on the `host-hal-refactor
 Phase 2 (Draw.c) is the largest and highest-value phase — it removes the most duplication and closes the most drift risk. But it's also the one most likely to surface surprises in the pico-sdk dependency graph. If Phase 2 reveals that `Draw.c` is more entangled than expected, bail and narrow to the three smallest commands (cmd_box, cmd_pixel, cmd_line) as a proof-of-concept before committing to the full file.
 
 Phase 3 and 4 can be parallelized if desired (independent files). Phase 5 is optional — it's a smaller win and `MM_Misc.c` has more fundamentally device-bound code than the others.
+
+---
+
+**Superseded by [real-hal-plan.md](real-hal-plan.md) (Phase 13 in progress, 2026-04-24).** The host-HAL refactor demonstrated the technique on a single non-device axis; the real-HAL plan generalises it to every device target. Patterns established here (shared Draw.c / FileIO.c / Audio.c / mm_misc_shared.c behind `#ifdef MMBASIC_HOST`) are the direct ancestors of the current `hal/*.h` + `drivers/*/` + `ports/*/` layout.

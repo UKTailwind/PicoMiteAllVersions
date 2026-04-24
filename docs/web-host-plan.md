@@ -373,3 +373,7 @@ The Phase 2.5 work already handled the groundwork — `host_sleep_us` → `emscr
 - Cold page load to first prompt: under 2 seconds on a modern laptop over a fast connection.
 - Memory footprint: under 64 MB for an idle REPL session.
 - Zero backend dependencies: a static bundle dropped in `s3://anywhere` is the complete deployable.
+
+---
+
+**Superseded by [real-hal-plan.md](real-hal-plan.md) (Phase 13 in progress, 2026-04-24).** The WASM port proved the HAL technique composes to a third target; real-hal Phase 12 absorbed `host_wasm_*.c` into `ports/host_wasm/` alongside `ports/host_native/`. Phase-by-phase notes here remain authoritative for the browser behaviour (gesture-armed AudioContext, IDBFS persistence, rAF throttling, ASYNCIFY yield hook) that the WASM port still depends on.
