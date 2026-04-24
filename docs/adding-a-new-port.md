@@ -228,21 +228,11 @@ The test harness uses the same hook to capture output; mmbasic_ansi uses it to d
 
 ## Step B3 — POSIX path sizing (gotcha)
 
-FatFS's `FF_MAX_LFN` defaults to 63 bytes. POSIX cwds on macOS/Linux routinely exceed that (e.g. `/Users/joshv/picocalc/PicoMiteAllVersions` is 44 chars before any filename). Path-manipulating code in `FileIO.c` and `Editor.c` declares static buffers sized `char path[FF_MAX_LFN]`, so a 63-byte cap silently truncates `LOAD` / `SAVE` / `RUN` operations from deep POSIX cwds.
+`ffconf.h` automatically sets `FF_MAX_LFN=255` for any build that defines `MMBASIC_HOST` or `MMBASIC_WASM`; `HOST_PATH_MAX=4096` in `host_fs_shims.c` is unconditional. You get the right path sizing for free as long as your Makefile includes `-DMMBASIC_HOST`, which every simulation port does.
 
-Two existing simulation ports (`mmbasic_ansi`, `host_wasm`) override this in `ffconf.h`:
+Background: the default `FF_MAX_LFN=63` was chosen for 8.3 FAT. POSIX cwds on macOS/Linux routinely exceed that (e.g. `/Users/joshv/picocalc/PicoMiteAllVersions` is 44 chars before any filename), and core MMBasic path buffers in `FileIO.c` / `Editor.c` are sized by `FF_MAX_LFN`. At 63, deep cwds silently truncate `LOAD` / `SAVE` / `RUN`.
 
-```c
-#if defined(MMBASIC_ANSI) || defined(MMBASIC_WASM)
-#define FF_MAX_LFN  255
-#else
-#define FF_MAX_LFN  63
-#endif
-```
-
-If your port needs to load/save files from deep POSIX cwds, add your `MMBASIC_*` flag to that conditional. The 255-byte cap has a cost: it inflates `flist[]` (used by `FILES` / directory listing) from ~19 KB to ~67 KB per `HAL_PORT_FILES_MAX=1000` entries, so you may also need to bump `HEAP_MEMORY_SIZE` in `configuration.h` or lower your port's files-max.
-
-`HOST_PATH_MAX=4096` in `ports/host_native/host_fs_shims.c` is already unconditional — the shim layer is fine at 4096 on every host port. The FF_MAX_LFN issue is specifically about static buffers inside core MMBasic code (FileIO.c, Editor.c).
+Cost of the 255-byte cap: `flist[]` (allocated transiently by `cmd_files`) is sized `HAL_PORT_FILES_MAX × sizeof(s_flist{fn[FF_MAX_LFN+1]; …})`. `ports/host_native/port_config.h` caps `HAL_PORT_FILES_MAX=128` so the peak allocation (~36 KB) fits the test harness's 128 KB heap. If your port provides its own `port_config.h` on a tighter heap, keep this cap similar or lower.
 
 ## Step B4 — configuration overrides
 

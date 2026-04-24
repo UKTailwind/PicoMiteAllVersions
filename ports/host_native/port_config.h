@@ -40,8 +40,10 @@
 /* cmd_files flist[] cap. Host bc_alloc backs both the heap *and* the
  * live VMState — wiping it via SaveContext+InitHeap mid-FRUN is unsafe,
  * so the alloc has to fit in whatever heap space happens to be free.
- * 256 entries (≈19 KB) covers any test fixture or interactive use. */
-#define HAL_PORT_FILES_MAX               256
+ * 128 entries (≈36 KB at FF_MAX_LFN=255) fits the test harness's 128 KB
+ * heap; mmbasic_ansi's 2 MB heap has plenty of headroom. Covers any
+ * realistic test fixture or interactive use. */
+#define HAL_PORT_FILES_MAX               128
 
 /* No flash sections to place hot loops in. */
 /* Non-VGA port — used as a value in `if (HAL_PORT_IS_VGA)` runtime branches. */
