@@ -86,6 +86,12 @@ void hashlabels(unsigned char *p,int ErrAbort);
  * (`gui_font_width > 8 → narrow`) on non-HDMI; HDMI overrides with
  * extra FullColour/SCREENMODE3 cases. Host stubs to a no-op. */
 extern void port_select_error_prompt_font(void);
+
+/* Port hook: ClearRuntime() display-reset. Real impl in
+ * ports/pico_sdk_common/clear_runtime_port.c resets SPI-LCD / MEM332
+ * scroll state (and NEXTGEN LUTs on rp2350 PicoMite); VGA and host
+ * stub to no-op. */
+extern void port_clear_runtime_display_reset(void);
 struct s_vartbl __attribute__ ((aligned (64))) g_vartbl[MAXVARS]={0};                                            // this table stores all variables
 int g_varcnt=0;                                                         // number of variables
 int g_VarIndex;                                                       // Global set by findvar after a variable has been created or found
@@ -3776,35 +3782,11 @@ void MIPS16 ClearRuntime(bool all) {
     optionfulltime=false;
     optionfastaudio=0;
     optionlogging=false;
-#if defined(PICOMITE) && defined(rp2350)
-	if(Option.DISPLAY_TYPE>=NEXTGEN){
-        Option.Refresh=1;
-		if(Option.DISPLAY_TYPE==ILI9488BUFF  || Option.DISPLAY_TYPE == ILI9488PBUFF)init_RGB332_to_RGB888_LUT();
-		else init_RGB332_to_RGB565_LUT();
-    }
-#endif
 /*frame
     frame=NULL;
     outframe=NULL;
 */
-#ifndef PICOMITEVGA
-    if(ScrollLCD==ScrollLCDSPISCR){
-        ScrollStart=0;
-        spi_write_command(CMD_SET_SCROLL_START);
-        spi_write_data(0);
-        spi_write_data(0);
-    }
-    if(ScrollLCD==ScrollLCDSPISCR){
-        ScrollStart=0;
-        WriteComand(CMD_SET_SCROLL_START);
-        WriteData(0);
-        WriteData(0);
-    }
-    if(ScrollLCD==ScrollLCDMEM332){
-        hal_display_nextgen_scroll_reset();
-    }
-    if(SSD16TYPE || Option.DISPLAY_TYPE==IPS_4_16 || SPI480)clear320();
-#endif
+    port_clear_runtime_display_reset();
     MMerrno = 0;                                                    // clear the error flags
    *MMErrMsg = 0;
     InitHeap(true);

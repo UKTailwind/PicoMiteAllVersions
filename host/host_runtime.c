@@ -965,6 +965,10 @@ void port_bc_crash_save_fault_regs(BCCrashInfo *info) { (void)info; }
  * mmbasic_port_hdmi.c. */
 void port_select_error_prompt_font(void) {}
 
+/* MMBasic.c ClearRuntime display-reset hook — host has no SPI-LCD
+ * panel to reset. Real impl in ports/pico_sdk_common/clear_runtime_port.c. */
+void port_clear_runtime_display_reset(void) {}
+
 /* bc_bridge.c subfun-hash hooks — rp2350 maintains a funtbl[] hash
  * alongside subfun[] for O(1) FindSubFun lookups; rp2040 + host use
  * the linear scan, so the hooks are no-ops. Real impl lives in
