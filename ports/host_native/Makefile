@@ -69,8 +69,7 @@ SIM_OBJS = $(OBJS) $(addprefix $(BUILD_DIR)/sim/,$(SIM_EXTRA_SRCS:.c=.o)) \
 SIM_CFLAGS  = $(CFLAGS) -DMMBASIC_SIM -pthread
 SIM_LDFLAGS = $(LDFLAGS) -pthread
 
-# Mongoose currently lives under host/vendor/ (retired in a later step).
-MONGOOSE_DIR = $(REPO_ROOT)/host/vendor
+MONGOOSE_DIR = $(PORT_DIR)/vendor
 
 all: $(TARGET)
 
