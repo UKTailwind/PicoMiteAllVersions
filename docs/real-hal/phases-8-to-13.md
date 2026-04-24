@@ -343,7 +343,7 @@ Now the device HAL contract is locked, observed across 12 targets.
 - Wire `tools/check_hal_purity.sh`, `tools/check_ram_baseline.sh`, and the perf microbench into `./run_tests.sh` and into `buildall.sh` so every commit is gated.
 - Append "Superseded by `real-hal-plan.md` (Phase 13 complete)" to `bridge-restoration-plan.md`, `host-hal-plan.md`, `web-host-plan.md`. They remain in `docs/` as historical record but contributors know to follow this plan.
 - Update MEMORY.md: replace project_host_is_its_own_port and related entries with a single pointer to this plan.
-- Land `docs/adding-a-new-board.md`: 1-page guide to creating a new port directory.
+- Land `docs/adding-a-new-port.md`: guide to creating a new port directory (covers both hardware boards and simulation ports).
 - Land `drivers/CONTRIBUTING.md`: rules for new drivers (one peripheral, conformance test required, no cross-driver coupling, RAM-resident annotations honoured).
 
 **Exit gate:** future contributors can't quietly re-introduce target spaghetti, and they have a paved path for adding a new board or driver.
