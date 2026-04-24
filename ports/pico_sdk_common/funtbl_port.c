@@ -24,6 +24,10 @@
 
 #ifdef rp2350
 
+/* Relocated from MMBasic.c — funtbl is only used on rp2350. */
+struct s_funtbl funtbl[MAXSUBFUN];
+
+
 static void hashlabels(unsigned char *p, int ErrAbort) {
     int j, u, namelen;
     uint32_t originalhash, hash = FNV_offset_basis;

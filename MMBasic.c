@@ -76,9 +76,10 @@ static inline CommandToken commandtbl_decode(const unsigned char *p){
 }
 // these are initialised at startup
 int CommandTableSize, TokenTableSize;
-#ifdef rp2350
-struct s_funtbl funtbl[MAXSUBFUN];
-#endif
+/* struct s_funtbl funtbl[MAXSUBFUN] is defined on rp2350 in
+ * ports/pico_sdk_common/funtbl_port.c (the only target that uses it).
+ * Rp2040 + host don't maintain the hash; MMBasic.c never touches
+ * funtbl directly any more — all access flows through port hooks. */
 
 /* Port hook: after an error, pick the prompt font. Simple
  * (`gui_font_width > 8 → narrow`) on non-HDMI; HDMI overrides with
@@ -90,6 +91,13 @@ extern void port_select_error_prompt_font(void);
  * scroll state (and NEXTGEN LUTs on rp2350 PicoMite); VGA and host
  * stub to no-op. */
 extern void port_clear_runtime_display_reset(void);
+
+/* Port hooks: error() helpers that route display surface setup per
+ * target. VGA retargets WriteBuf/DisplayBuf at FRAMEBUFFER;
+ * SPI-LCD calls restorepanel(). LCD_error banner runs on SPI-LCD
+ * targets with a real panel; VGA + host no-op. */
+extern void port_error_restore_console_surface(void);
+extern void port_error_show_lcd_banner(int line_num, const char *source_line, const char *err_msg);
 struct s_vartbl __attribute__ ((aligned (64))) g_vartbl[MAXVARS]={0};                                            // this table stores all variables
 int g_varcnt=0;                                                         // number of variables
 int g_VarIndex;                                                       // Global set by findvar after a variable has been created or found
@@ -3191,12 +3199,8 @@ void MIPS16 error(char *msg, ...) {
     OptionConsole=1;
     if(Option.DISPLAY_CONSOLE) {
         OptionConsole=3;
-        #ifdef PICOMITEVGA
-            WriteBuf=(unsigned char *)FRAMEBUFFER;
-            DisplayBuf=(unsigned char *)FRAMEBUFFER;
-        #else
-            restorepanel();            
-        #endif       // we now have CurrentLinePtr pointing to the start of the line
+        port_error_restore_console_surface();     // VGA retargets WriteBuf/DisplayBuf to FRAMEBUFFER;
+                                                  // SPI-LCD calls restorepanel().
         SetFont(PromptFont);
         gui_fcolour = PromptFC;
         gui_bcolour = PromptBC;
@@ -3268,16 +3272,7 @@ void MIPS16 error(char *msg, ...) {
         sprintf(tstr, "Error");
     }
     MMPrintString(tstr);
-    #ifndef PICOMITEVGA
-    if (!Option.DISPLAY_CONSOLE && Option.DISPLAY_TYPE>I2C_PANEL) {
-        int width=Option.Width;
-        int height=Option.Height;
-        LCD_error(line_num, p, MMErrMsg);
-        Option.Width=width;
-        Option.Height=height;
-    }
-    
-    #endif
+    port_error_show_lcd_banner(line_num, p, MMErrMsg);
     cmdline=NULL;
 	do_end(false);
 	longjmp(mark, 1);												// jump back to the input prompt

@@ -969,6 +969,15 @@ void port_select_error_prompt_font(void) {}
  * panel to reset. Real impl in ports/pico_sdk_common/clear_runtime_port.c. */
 void port_clear_runtime_display_reset(void) {}
 
+/* MMBasic.c error() display hooks — host has no WriteBuf/DisplayBuf
+ * or LCD panel, so both stub to no-ops. */
+void port_error_restore_console_surface(void) {}
+void port_error_show_lcd_banner(int line_num, const char *source_line, const char *err_msg) {
+    (void)line_num;
+    (void)source_line;
+    (void)err_msg;
+}
+
 /* MMBasic.c FindSubFun hash-lookup hook — host has no funtbl hash
  * (rp2350-only). Return 0 to fall through to the linear scan. */
 int port_try_find_subfun_hash(unsigned char *p, int *out_index) {

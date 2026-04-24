@@ -111,6 +111,15 @@ STRICT_FILES=(
               # deleted — the 170-line VM-local draw_circle impl works
               # on host too (uses only shared DrawPixel/DrawRectangle
               # plus the VM's own scratch allocator, both unconditional).
+  MMBasic.c   # Phase 11 step 20 close: zero target-macro, zero
+              # port-config ifdefs. funtbl[] + hashlabels + hash-based
+              # FindSubFun / findlabel / findvar collision check moved
+              # to ports/pico_sdk_common/funtbl_port.c behind
+              # port_try_* hooks.  error()'s console-surface + LCD
+              # banner helpers extracted to clear_runtime_port.c.
+              # Remaining 3 #ifdef gates are feature flags (MMFAMILY,
+              # GUICONTROLS, __PIC32MX__), permitted by the strict
+              # check.
 )
 
 # Files tracked informationally (report counts, do not fail).
