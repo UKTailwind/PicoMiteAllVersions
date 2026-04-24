@@ -116,7 +116,7 @@ sim_obj/host_terminal.o: host_terminal.c host_terminal.h
 	@mkdir -p $(dir $@)
 	$(CC) $(SIM_CFLAGS) -c -o $@ $<
 
-sim_obj/host_fs.o: host_fs.c host_fs.h
+sim_obj/host_fs.o: ../ports/host_native/host_fs.c ../ports/host_native/host_fs.h
 	@mkdir -p $(dir $@)
 	$(CC) $(SIM_CFLAGS) -c -o $@ $<
 
@@ -147,13 +147,13 @@ host_main.o: host_main.c
 host_terminal.o: host_terminal.c host_terminal.h
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-host_fs.o: host_fs.c host_fs.h
+host_fs.o: ../ports/host_native/host_fs.c ../ports/host_native/host_fs.h
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-host_sim_audio.o: host_sim_audio.c host_sim_audio.h
+host_sim_audio.o: ../ports/host_native/host_sim_audio.c ../ports/host_native/host_sim_audio.h
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-sim_obj/host_sim_audio.o: host_sim_audio.c host_sim_audio.h
+sim_obj/host_sim_audio.o: ../ports/host_native/host_sim_audio.c ../ports/host_native/host_sim_audio.h
 	@mkdir -p $(dir $@)
 	$(CC) $(SIM_CFLAGS) -c -o $@ $<
 
