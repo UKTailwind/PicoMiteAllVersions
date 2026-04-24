@@ -38,14 +38,44 @@ If a macro doesn't apply to your board, define it to `0` (or the null form). The
 
 ## Step 2 — pin_tables.c
 
-Two exports:
+**Background: `PinDef[]` and the two numbering systems.** MMBasic has two ways of naming a pin in user code: the physical *package pin number* (1, 2, 4, 5, … — what's silkscreened on the header), and the *GPIO number* (`GP0`, `GP1`, `GP2`, … — what the chip datasheet calls the line). BASIC syntax accepts either. Internally, everything goes through `PinDef[]` — an array indexed by package-pin number. Each entry carries `{pin, GPno, pinname, mode, ADCpin, slice}`: the chip's GPIO number, the printable label, a bitmask of supported modes (`DIGITAL_IN`, `PWM4A`, `I2C0SDA`, `SPI1SCK`, …), the ADC channel number if any, and the PWM slice number. `PinDef[]` itself lives in `PicoMite.c` today (relocation to `ports/` is tracked separately) — as a new-port author you're not redefining `PinDef[]`, you're supplying two smaller lookup tables that reference it.
+
+**PINMAP** is the GPIO-number → package-pin-number map: `PINMAP[gpio]` gives the `PinDef[]` index for that GPIO. One entry per GPIO on your chip (30 on RP2040, 48 on RP2350). When a BASIC program writes `SETPIN GP0, DOUT`, the parser resolves `GP0` to GPIO 0, then the runtime calls `codemap(0)` → `PINMAP[0]` → the `PinDef[]` slot for whichever header pin GP0 is wired to.
+
+**codemap** is the validated accessor:
 
 ```c
-const uint8_t PINMAP[<N>] = { /* BASIC-pin → GPIO mapping */ };
-int codemap(int pin) { /* validate + return PinDef[] slot */ }
+int codemap(int pin)
+{
+    if (pin > <HAL_PORT_GPIO_COUNT - 1> || pin < 0) error("Invalid GPIO");
+    return (int)PINMAP[pin];
+}
 ```
 
-Copy from an existing port with the same GPIO count. Update the array to match your board's silkscreen or header layout. `codemap()` is the one place BASIC's `PIN(n)` numbering lands; if it returns the wrong slot, every GPIO operation is wrong.
+Bounds-check the GPIO, error if out of range, return the `PinDef[]` slot. The bound is your chip's GPIO count, not its package pin count.
+
+**Worked example — `ports/pico/pin_tables.c`:**
+
+```c
+const uint8_t PINMAP[30] = {
+     1,  2,  4,  5,  6,  7,  9, 10, 11, 12,   // GP0..GP9
+    14, 15, 16, 17, 19, 20, 21, 22, 24, 25,   // GP10..GP19
+    26, 27, 29, 41, 42, 43, 31, 32, 34, 44    // GP20..GP29
+};
+```
+
+Read line by line: GPIO 0 is on package pin 1, GPIO 1 is on package pin 2, GPIO 2 is on package pin 4 (pin 3 is GND, so the sequence skips it), and so on. The "skipped" numbers are the GND / VSYS / RUN / etc. pins on the board header.
+
+**How to build PINMAP for a new board:**
+
+1. Open `PicoMite.c` and find the `const struct s_PinDef PinDef[] = {...}` definition. Skim it — each entry's comment gives the package-pin number.
+2. For GPIO 0, find the `PinDef[]` entry whose `GPno` field is 0. Its `pin` field is what goes in `PINMAP[0]`.
+3. Repeat for every GPIO 0..`HAL_PORT_GPIO_COUNT - 1`.
+4. If your board routes a GPIO to something other than a user header (e.g. onboard LED, QSPI to flash, CYW43 SDIO on PicoW), that GPIO still gets a `PinDef[]` slot — just one marked `UNUSED` or with a special label. It still needs a `PINMAP[]` entry pointing there.
+
+**Why `codemap()` matters:** it's the single point of translation between GPIO-numbered BASIC syntax (`SETPIN GP0, DOUT`) and `PinDef[]`. If your `PINMAP` is wrong, every GPIO-numbered BASIC statement on that pin silently targets the wrong `PinDef[]` slot — the mode-mask check will refuse legal operations, the PWM slice will come back wrong, `PIN READ` will read a different line. There's no secondary cross-check; verify PINMAP against `PinDef[]` by hand before first boot.
+
+**Pitfall to watch:** if you change `PinDef[]` to add a new pin entry for your board, the package-pin indices after the insertion point shift and every `PINMAP[]` entry that pointed past the insertion needs updating. Safer to append new `PinDef[]` entries at the end rather than inserting into the middle.
 
 ## Step 3 — port_defaults.c
 
