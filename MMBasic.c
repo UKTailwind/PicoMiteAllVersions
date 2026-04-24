@@ -78,8 +78,6 @@ static inline CommandToken commandtbl_decode(const unsigned char *p){
 int CommandTableSize, TokenTableSize;
 #ifdef rp2350
 struct s_funtbl funtbl[MAXSUBFUN];
-//void hashlabels(int errabort);
-void hashlabels(unsigned char *p,int ErrAbort);
 #endif
 
 /* Port hook: after an error, pick the prompt font. Simple
@@ -644,13 +642,9 @@ void MIPS16 __not_in_flash_func(ExecuteProgram)(unsigned char *p) {
 // Scan through the program loaded in flash and build a table pointing to the definition of all user defined subroutines and functions.
 // This pre processing speeds up the program when using defined subroutines and functions
 // this routine also looks for embedded fonts and adds them to the font table
+extern void port_prepare_program_finalize_subfun(int ErrAbort);
 void   MIPS16 PrepareProgram(int ErrAbort) {
     int i, j, NbrFuncts;
-#ifdef rp2350
-    int u, namelen;
-    uint32_t hash=FNV_offset_basis;
-    char printvar[MAXVARLEN+1];
-#endif
     unsigned char *p1, *p2;
     for(i = FONT_BUILTIN_NBR; i < FONT_TABLE_SIZE-1; i++)
         FontTable[i] = NULL;                                        // clear the font table
@@ -672,46 +666,9 @@ void   MIPS16 PrepareProgram(int ErrAbort) {
          NbrFuncts = PrepareProgramExt(LibMemory , 0, &CFunctionLibrary, ErrAbort);
     PrepareProgramExt(ProgMemory, NbrFuncts,&CFunctionFlash, ErrAbort);
     
-    // check the sub/fun table for duplicates
-#ifdef rp2350
-    memset(funtbl,0,sizeof(struct s_funtbl)*MAXSUBFUN);
-    for(i = 0; i < MAXSUBFUN && subfun[i] != NULL; i++) {
-    	// First we will hash the function name and add it to the function table
-    	// This allows for a fast check of a variable name being the same as a function name
-    	// It also allows a hash look up for function name matching
-    	p1 = subfun[i];
-        p1+=sizeof(CommandToken);
-        skipspace(p1);
-        p2 = (unsigned char *)printvar; namelen = 0;
-        hash=FNV_offset_basis;
-    	do {
-            u=mytoupper(*p1);
-    		hash ^= u;
-    		hash*=FNV_prime;
-    		*p2++ = u;
-            p1++;
-    		if(++namelen > MAXVARLEN){
-    			if(ErrAbort) error("Function name too long");
-    		}
-
-    	} while(isnamechar(*p1));
-    	if(namelen!=MAXVARLEN)*p2=0;
-    	hash %= MAXSUBHASH; //scale to size of table
-		while(funtbl[hash].name[0]!=0){
-			hash++;
-			if(hash==MAXSUBFUN)hash=0;
-		}
-		funtbl[hash].index=i;
-		memcpy(funtbl[hash].name,printvar,(namelen == MAXVARLEN ? namelen :namelen+1));
-    }
-        if(Option.LIBRARY_FLASH_SIZE == MAX_PROG_SIZE){
-            hashlabels(LibMemory,ErrAbort);
-           // if(!ErrAbort) return;
-        }   
-          hashlabels(ProgMemory,ErrAbort);
-          //if(!ErrAbort) return;
-
-#endif
+    // rp2350 fills the funtbl[] hash for FindSubFun / findvar / findlabel
+    // fast paths; rp2040 + host keep the linear subfun[] scan.
+    port_prepare_program_finalize_subfun(ErrAbort);
     if(!ErrAbort) return;
 
     for(i = 0; i < MAXSUBFUN && subfun[i] != NULL; i++) {
@@ -2260,113 +2217,19 @@ unsigned char MIPS16 *findline(int nbr, int mustfind) {
         error("Line number");
     return p;
 }
-#ifdef rp2350
-void hashlabels(unsigned char *p,int ErrAbort){   
-    //unsigned char *p = (unsigned char *)ProgMemory;
-    int j, u, namelen;
-    uint32_t originalhash,hash=FNV_offset_basis;
-   // char *lastp = (char *)ProgMemory + 1;
-    char *lastp = (char *)p + 1;
-    // now do the search
-    while(1) {
-        if(p[0] == 0 && p[1] == 0)                                  // end of the program
-            break;
-
-        if(p[0] == T_NEWLINE) {
-            lastp = (char *)p;                                              // save in case this is the right line
-            p++;                                                    // and step over the line number
-            continue;
-        }
-
-        if(p[0] == T_LINENBR) {
-            p += 3;                                                 // and step over the line number
-            continue;
-        }
-
-        if(p[0] == T_LABEL) {
-            p++;                                                    // point to the length of the label
-            hash=FNV_offset_basis;
-            namelen=0;
-        	for(j=1;j<=p[0];j++) {
-                u=mytoupper(p[j]);
-        		hash ^= u;
-        		hash*=FNV_prime;
-        		namelen++;
-        	}
-        	hash %= MAXSUBHASH; //scale to size of table
-            originalhash=hash-1;
-            if(originalhash<0)originalhash+=MAXSUBFUN;
-    		while(funtbl[hash].name[0]!=0 && hash!=originalhash){
-     			hash++;
-     			hash %= MAXSUBFUN;
-    		}
-            if(hash==originalhash){
-                MMPrintString("Error: Too many labels - erasing program\r\n");
-                unsigned char dummy=0;
-                cmdline=&dummy;
-                cmd_new();
-                // jump back to the input prompt
-            }
-    		funtbl[hash].index=(uint32_t)lastp;
-            for(j=0;j<p[0];j++)funtbl[hash].name[j]=mytoupper(p[j+1]);
-            p += p[0] + 1;                                          // still looking! skip over the label
-            continue;
-        }
-        p++;
-    }
-}
-
 // search through program memory looking for a label.
-// returns a pointer to the T_NEWLINE token or throws an error if not found
-// non cached version
-unsigned char *findlabel(unsigned char *labelptr) {
-//    char *p, *lastp = (char *)ProgMemory + 1;
-	unsigned char  *tp, *ip;
-    int i;
-    uint32_t hash=FNV_offset_basis;
-    char label[MAXVARLEN + 1];
-
-    // first, just exit we have a NULL argument
-    if(labelptr == NULL) return NULL;
-
-    // convert the label to the token format and load into label[]
-    // this assumes that the first character has already been verified as a valid label character
-    label[1] = mytoupper(*labelptr++);
-	hash ^= label[1];
-	hash*=FNV_prime;
-    for(i = 2; ; i++) {
-        if(!isnamechar(*labelptr)) break;                           // the end of the label
-        if(i > MAXVARLEN ) error("Label too long");                 // too long, not a correctly formed label
-        label[i]=mytoupper(*labelptr++);
-		hash ^= label[i];
-		hash*=FNV_prime;
-    }
-    label[0] = i - 1;                                               // the length byte
-	hash %= MAXSUBHASH; //scale to size of table
-	if(funtbl[hash].name[0]==0)error("Cannot find label");
-	while(funtbl[hash].name[0]!=0){
-		//if(funtbl[hash].index>=(uint32_t)ProgMemory){  //Is there a need to test this? Without this we can find labels in the Library
-			tp=(unsigned char *)funtbl[hash].name;
-			ip=(unsigned char *)&label[1];
-			if(*ip++ == *tp++) {                 // preliminary quick check
-				i = label[0]-1;
-				while(i > 0 && *ip == *tp) {                              // compare each letter
-					i--; ip++; tp++;
-				}
-				if(i == 0  && (*(char *)tp == 0)) {       // found a matching name
-					return (unsigned char *)funtbl[hash].index;
-				}
-			}
-		//}
-		hash++;
-		hash %= MAXSUBFUN;
-	}
-	if(funtbl[hash].name[0]==0)error("Cannot find label");
-	return 0;
-
-}
-#else
+// returns a pointer to the T_NEWLINE token or throws an error if not found.
+// non cached version.
+//
+// rp2350 has the funtbl[] hash populated by PrepareProgram's finalize
+// port hook — the port_try_find_label_hash hook walks the probe
+// chain.  Rp2040 and host don't maintain the hash, so the hook
+// returns 0 and we fall through to the linear ProgMemory scan.
+extern int port_try_find_label_hash(unsigned char *labelptr, unsigned char **out_ptr);
 unsigned char MIPS16 *findlabel(unsigned char *labelptr) {
+    unsigned char *result;
+    if (port_try_find_label_hash(labelptr, &result)) return result;
+
     char *p, *lastp = (char *)ProgMemory + 1;
     char *next;
     int i,j=0;
@@ -2431,7 +2294,6 @@ unsigned char MIPS16 *findlabel(unsigned char *labelptr) {
         p++;
     }
 }
-#endif
 
 // returns true if 'line' is a valid line in the program
 int IsValidLine(int nbr) {

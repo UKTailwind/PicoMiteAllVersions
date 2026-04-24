@@ -977,6 +977,19 @@ int port_try_find_subfun_hash(unsigned char *p, int *out_index) {
     return 0;
 }
 
+/* MMBasic.c PrepareProgram finalize hook — rp2350 rebuilds the
+ * funtbl[] hash from subfun[] and runs hashlabels() against
+ * ProgMemory + LibMemory. Host has neither, so no-op. */
+void port_prepare_program_finalize_subfun(int ErrAbort) { (void)ErrAbort; }
+
+/* MMBasic.c findlabel hash-lookup hook — host has no funtbl label
+ * hash (rp2350-only). Return 0 to fall through to the linear scan. */
+int port_try_find_label_hash(unsigned char *labelptr, unsigned char **out_ptr) {
+    (void)labelptr;
+    (void)out_ptr;
+    return 0;
+}
+
 /* bc_bridge.c subfun-hash hooks — rp2350 maintains a funtbl[] hash
  * alongside subfun[] for O(1) FindSubFun lookups; rp2040 + host use
  * the linear scan, so the hooks are no-ops. Real impl lives in
