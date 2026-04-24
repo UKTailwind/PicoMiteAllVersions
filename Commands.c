@@ -38,7 +38,9 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "hardware/flash.h"
 #include "hardware/dma.h"
 #include "hardware/structs/watchdog.h"
+#ifndef PICOMITEMIN
 #include "re.h"
+#endif
 #ifndef USBKEYBOARD
 #include "class/cdc/cdc_device.h"
 #endif
@@ -58,9 +60,25 @@ void flist(int, int, int);
 // void clearprog(void);
 char *KeyInterrupt = NULL;
 unsigned char *SaveNextDataLine = NULL;
+#ifdef MMBASIC_FM
+int fm_program_launched_from_fm = 0;
+char fm_relaunch_status[STRINGSIZE * 2] = {0};
+int fm_relaunch_status_valid = 0;
+int fm_suppress_error_output = 0;
+char fm_last_launched_bas[FF_MAX_LFN] = {0};
+char fm_error_file[FF_MAX_LFN] = {0};
+int fm_error_line = 0;
+int fm_error_char = 0;
+int fm_error_location_valid = 0;
+int fm_pending_edit_seek_valid = 0;
+int fm_pending_edit_seek_line = 0;
+int fm_pending_edit_seek_char = 0;
+int fm_sanitize_next_console_input = 0;
+#endif
 void execute_one_command(unsigned char *p);
 void ListNewLine(int *ListCnt, int all);
 int printWrappedText(const char *text, int screenWidth, int listcnt, int all);
+static void perf_print(const char *s, int *cnt);
 
 static int VarNameLength(const unsigned char *name)
 {
@@ -108,7 +126,7 @@ static int IsActiveVariable(const struct s_vartbl *v)
 #endif
 }
 
-static int PrintCollisionDomain(const char *domain_name, int start, int end, int slots, int local_domain)
+static int PrintCollisionDomain(const char *domain_name, int start, int end, int slots, int local_domain, int *list_cnt)
 {
 	int groups = 0;
 	char line[80];
@@ -174,12 +192,12 @@ static int PrintCollisionDomain(const char *domain_name, int start, int end, int
 		{
 			groups++;
 			snprintf(line, sizeof(line), "%s bucket %d:\r\n", domain_name, bucket);
-			MMPrintString(line);
+			perf_print(line, list_cnt);
 			for (int k = 0; k < count; k++)
 			{
 				VarNameToC(namebuf, group_names[k]);
 				snprintf(line, sizeof(line), "  %s\r\n", namebuf);
-				MMPrintString(line);
+				perf_print(line, list_cnt);
 			}
 		}
 	}
@@ -187,7 +205,7 @@ static int PrintCollisionDomain(const char *domain_name, int start, int end, int
 	if (groups == 0)
 	{
 		snprintf(line, sizeof(line), "%s: none\r\n", domain_name);
-		MMPrintString(line);
+		perf_print(line, list_cnt);
 	}
 
 	return groups;
@@ -992,7 +1010,7 @@ void array_slice(unsigned char *tp)
 // because the LET is implied (ie, line does not have a recognisable command)
 // it ends up as the place where mistyped commands are discovered.  This is why
 // the error message is "Unknown command"
-#ifdef rp2350
+#if defined(rp2350) || defined(PICOMITEMIN)
 void __not_in_flash_func(cmd_let)(void)
 #else
 void MIPS16 __not_in_flash_func(cmd_let)(void)
@@ -1005,6 +1023,12 @@ void MIPS16 __not_in_flash_func(cmd_let)(void)
 	unsigned char *p1, *p2;
 	int vartype; // effective type (may differ for struct members)
 
+#ifdef CACHE
+	/* Trace-cache fast path (Phase 1.1: top-level global scalar LET only).
+	 * Gate inline so the OFF case is one load + one branch (no call).        */
+	if ((g_trace_cache_flags & (TCF_LET_NUM | TCF_LET_STR)) && TraceCacheTryLet(cmdline))
+		return;
+#endif
 	p1 = cmdline;
 	// search through the line looking for the equals sign
 	while (*p1 && tokenfunction(*p1) != op_equal)
@@ -1155,25 +1179,234 @@ void MIPS16 sortStrings(char **arr, int n)
 		}
 	}
 }
+// Read one file line character-by-character and display it with word-wrap.
+// Handles lines of any length without a large buffer or error() calls.
+// Tab characters are expanded to spaces. Empty lines produce no output,
+// matching the behaviour of printWrappedText("", ...).
+// Returns updated listcnt.
+static int file_display_line(int fnbr, int screenWidth, int listcnt, int all)
+{
+	char seg[STRINGSIZE]; // holds at most screenWidth (<=255) chars + NUL
+	int seg_len = 0;
+
+	for (;;)
+	{
+		// Fill the segment buffer up to screenWidth chars or end of line.
+		bool eol = false;
+		while (seg_len < screenWidth)
+		{
+			if (FileEOF(fnbr)) { eol = true; break; }
+			int c = MMfgetc(fnbr);
+			if (c == '\r') continue;
+			if (c == '\n') { eol = true; break; }
+			if (c <= 0) continue;
+			if (c == '\t') c = ' ';
+			seg[seg_len++] = (char)c;
+		}
+
+		if (eol)
+		{
+			// End of line: print remaining segment (if any) and newline.
+			// seg_len==0 means an empty line; produce no output to match
+			// the existing printWrappedText("") behaviour.
+			if (seg_len > 0)
+			{
+				seg[seg_len] = 0;
+				MMPrintString(seg);
+				ListNewLine(&listcnt, all);
+			}
+			break;
+		}
+
+		// Segment is full and the line continues — need to wrap.
+		// Find the last space in the segment (word-wrap break point).
+		int last_space = -1;
+		for (int i = 0; i < seg_len; i++)
+			if (seg[i] == ' ') last_space = i;
+
+		if (last_space >= 0)
+		{
+			// Word-wrap: print up to (not including) the space.
+			seg[last_space] = 0;
+			MMPrintString(seg);
+			ListNewLine(&listcnt, all);
+			// Carry chars after the space forward into the next segment.
+			int carry = seg_len - last_space - 1;
+			memmove(seg, seg + last_space + 1, carry);
+			seg_len = carry;
+		}
+		else
+		{
+			// No space found: hard-break at screen width.
+			seg[seg_len] = 0;
+			MMPrintString(seg);
+			ListNewLine(&listcnt, all);
+			seg_len = 0;
+		}
+	}
+
+	return listcnt;
+}
+
+// Count the number of screen rows that file_display_line would produce for
+// the next file line, using the same word-wrap algorithm.  Seeks back to the
+// start of the line afterwards so the caller can re-read and display it.
+// Returns 0 for empty lines (matching countWrappedLines("") == 0).
+static int file_count_line_rows(int fnbr, int screenWidth)
+{
+	int saved_pos = filegetpos(fnbr);
+	char seg[STRINGSIZE];
+	int seg_len = 0;
+	int rows = 0;
+
+	for (;;)
+	{
+		bool eol = false;
+		while (seg_len < screenWidth)
+		{
+			if (FileEOF(fnbr)) { eol = true; break; }
+			int c = MMfgetc(fnbr);
+			if (c == '\r') continue;
+			if (c == '\n') { eol = true; break; }
+			if (c <= 0) continue;
+			if (c == '\t') c = ' ';
+			seg[seg_len++] = (char)c;
+		}
+
+		if (eol)
+		{
+			if (seg_len > 0) rows++;
+			break;
+		}
+
+		// Segment full — wrap and continue counting.
+		int last_space = -1;
+		for (int i = 0; i < seg_len; i++)
+			if (seg[i] == ' ') last_space = i;
+
+		rows++;
+		if (last_space >= 0)
+		{
+			int carry = seg_len - last_space - 1;
+			memmove(seg, seg + last_space + 1, carry);
+			seg_len = carry;
+		}
+		else
+		{
+			seg_len = 0;
+		}
+	}
+
+	positionfile(fnbr, saved_pos, false);
+	return rows;
+}
+
 void MIPS16 ListFile(char *pp, int all)
 {
-	char buff[STRINGSIZE];
 	int fnbr;
-	int i, ListCnt = CurrentY / (FontTable[gui_font >> 4][1] * (gui_font & 0b1111)) + 2;
+	int ListCnt = CurrentY / (FontTable[gui_font >> 4][1] * (gui_font & 0b1111)) + 2;
 	fnbr = FindFreeFileNbr();
 	if (!BasicFileOpen(pp, fnbr, FA_READ))
 		return;
 	while (!FileEOF(fnbr))
-	{ // while waiting for the end of file
-		memset(buff, 0, 256);
-		MMgetline(fnbr, (char *)buff); // get the input line
-		for (i = 0; i < strlen(buff); i++)
-			if (buff[i] == TAB)
-				buff[i] = ' ';
-		ListCnt = printWrappedText(buff, Option.Width, ListCnt, all);
+	{
+		ListCnt = file_display_line(fnbr, Option.Width, ListCnt, all);
 		routinechecks();
 		CheckAbort();
 	}
+	FileClose(fnbr);
+}
+
+#define LIST_MAX_PAGES 64
+
+static int countWrappedLines(const char *text, int screenWidth)
+{
+	int len = strlen(text);
+	int start = 0, count = 0;
+	while (start < len)
+	{
+		int end = start + screenWidth;
+		if (end >= len) { count++; break; }
+		int lastSpace = -1;
+		for (int i = start; i < end; i++)
+			if (text[i] == ' ') lastSpace = i;
+		if (lastSpace != -1) { count++; start = lastSpace + 1; }
+		else                  { count++; start += screenWidth; }
+	}
+	return count;
+}
+
+void ListFilePaged(char *pp)
+{
+	int fnbr;
+	int page_starts[LIST_MAX_PAGES];
+	int nstarts, cur_page, list_cnt;
+	int page_threshold = Option.Height - overlap;
+	bool need_clear = false;
+
+	fnbr = FindFreeFileNbr();
+	if (!BasicFileOpen(pp, fnbr, FA_READ))
+		return;
+
+	page_starts[0] = 0;
+	nstarts = 1;
+	cur_page = 0;
+
+	for (;;)
+	{
+		if (need_clear && Option.DISPLAY_CONSOLE)
+		{
+			ClearScreen(gui_bcolour);
+			CurrentX = 0;
+			CurrentY = 0;
+		}
+		need_clear = true;
+
+		positionfile(fnbr, page_starts[cur_page], false);
+		list_cnt = 2;
+		bool overflowed = false;
+
+		while (!FileEOF(fnbr))
+		{
+			int line_pos = filegetpos(fnbr);
+			// Count rows this line will occupy without consuming it, then
+			// display it.  file_count_line_rows seeks back to line_pos.
+			int rows = file_count_line_rows(fnbr, Option.Width);
+			if (list_cnt > 2 && list_cnt + rows >= page_threshold)
+			{
+				if (cur_page + 1 >= nstarts && nstarts < LIST_MAX_PAGES)
+					page_starts[nstarts++] = line_pos;
+				overflowed = true;
+				break;
+			}
+			list_cnt = file_display_line(fnbr, Option.Width, list_cnt, true);
+			routinechecks();
+			CheckAbort();
+		}
+
+		clearrepeat();
+		if (cur_page > 0)
+			MMPrintString(overflowed ? "UP=prev  ANY KEY=next ..." :
+			                           "UP=prev  ANY KEY=quit ...");
+		else
+			MMPrintString("PRESS ANY KEY ...");
+
+		int c = -1;
+		while (c == -1) { routinechecks(); c = MMInkey(); }
+		MMPrintString("\r                              \r");
+
+		if (c == UP) {
+			if (cur_page > 0)
+				cur_page--;
+			/* else UP on page 0: no-op, loop re-displays page 0 */
+		} else if (!overflowed)
+			break;
+		else if (cur_page + 1 < nstarts)
+			cur_page++;
+		else
+			break;
+	}
+
 	FileClose(fnbr);
 }
 
@@ -1251,8 +1484,113 @@ void MIPS16 ListProgram(unsigned char *p, int all)
 	}
 }
 
+void ListProgramPaged(unsigned char *prog)
+{
+	char b[STRINGSIZE];
+	char *pp;
+	unsigned char *page_starts[LIST_MAX_PAGES];
+	int nstarts = 1, cur_page = 0;
+	int page_threshold = Option.Height - overlap;
+	bool need_clear = false;
+
+	page_starts[0] = prog;
+
+	for (;;)
+	{
+		if (need_clear && Option.DISPLAY_CONSOLE)
+		{
+			ClearScreen(gui_bcolour);
+			CurrentX = 0;
+			CurrentY = 0;
+		}
+		need_clear = true;
+
+		unsigned char *p = page_starts[cur_page];
+		int list_cnt = 2;
+		bool overflowed = false;
+
+		while (!(*p == 0 || *p == 0xff))
+		{
+			if (*p == T_NEWLINE)
+			{
+				unsigned char *line_start = p;
+				p = llist((unsigned char *)b, p);
+				if (b[0] == '\'' && b[1] == '#')
+					continue;
+
+				pp = b;
+				int rows = countWrappedLines(pp, Option.Width);
+				if (list_cnt > 2 && list_cnt + rows >= page_threshold)
+				{
+					if (cur_page + 1 >= nstarts && nstarts < LIST_MAX_PAGES)
+						page_starts[nstarts++] = line_start;
+					overflowed = true;
+					break;
+				}
+
+				if (Option.continuation)
+				{
+					format_string(pp, Option.Width);
+					while (*pp)
+					{
+						if (*pp == '\n')
+						{
+							ListNewLine(&list_cnt, true);
+							pp++;
+							continue;
+						}
+						MMputchar(*pp++, 0);
+					}
+				}
+				else
+				{
+					while (*pp)
+					{
+						if (MMCharPos > Option.Width)
+							ListNewLine(&list_cnt, true);
+						MMputchar(*pp++, 0);
+					}
+				}
+#ifndef USBKEYBOARD
+				tud_cdc_write_flush();
+#endif
+				ListNewLine(&list_cnt, true);
+				routinechecks();
+				CheckAbort();
+				if (p[0] == 0 && p[1] == 0)
+					break;
+			}
+		}
+
+		clearrepeat();
+		if (cur_page > 0)
+			MMPrintString(overflowed ? "UP=prev  ANY KEY=next ..." :
+			                           "UP=prev  ANY KEY=quit ...");
+		else
+			MMPrintString("PRESS ANY KEY ...");
+
+		int c = -1;
+		while (c == -1) { routinechecks(); c = MMInkey(); }
+		MMPrintString("\r                              \r");
+
+		if (c == UP)
+		{
+			if (cur_page > 0)
+				cur_page--;
+		}
+		else if (!overflowed)
+			break;
+		else if (cur_page + 1 < nstarts)
+			cur_page++;
+		else
+			break;
+	}
+}
+
 void MIPS16 do_run(unsigned char *cmdline, bool CMM2mode)
 {
+	extern void ResetPerfCounters(void);
+	ResetPerfCounters();
 	// RUN [ filename$ ] [, cmd_args$ ]
 	unsigned char *filename = (unsigned char *)"", *cmd_args = (unsigned char *)"";
 	unsigned char *cmdbuf = GetTempMemory(256);
@@ -1537,6 +1875,7 @@ void MIPS16 cmd_list(void)
 	else if ((p = checkstring(cmdline, (unsigned char *)"COLLISIONS")))
 	{
 		checkend(p);
+		int list_cnt = 2;
 		int local_slots = GetLocalVarHashSize();
 		int global_slots = GetGlobalVarHashSize();
 		if (local_slots < 1 || local_slots >= MAXVARS)
@@ -1545,10 +1884,10 @@ void MIPS16 cmd_list(void)
 			global_slots = MAXVARS - local_slots;
 
 		int groups = 0;
-		groups += PrintCollisionDomain("LOCAL", 0, local_slots, local_slots, 1);
-		groups += PrintCollisionDomain("GLOBAL", local_slots, MAXVARS, global_slots, 0);
+		groups += PrintCollisionDomain("LOCAL", 0, local_slots, local_slots, 1, &list_cnt);
+		groups += PrintCollisionDomain("GLOBAL", local_slots, MAXVARS, global_slots, 0, &list_cnt);
 		if (groups == 0)
-			MMPrintString("No hash collisions found\r\n");
+			perf_print("No hash collisions found\r\n", &list_cnt);
 	}
 #ifdef STRUCTENABLED
 	else if ((p = checkstring(cmdline, (unsigned char *)"TYPE")))
@@ -1781,17 +2120,11 @@ void MIPS16 cmd_list(void)
 				if (!ExistsFile(buff))
 					strcat(buff, ".bas");
 			}
-			ListFile(buff, false);
+			ListFilePaged(buff);
 		}
 		else
 		{
-			if (Option.DISPLAY_CONSOLE && (SPIREAD || Option.NoScroll))
-			{
-				ClearScreen(gui_bcolour);
-				CurrentX = 0;
-				CurrentY = 0;
-			}
-			ListProgram(ProgMemory, false);
+			ListProgramPaged(ProgMemory);
 			checkend(cmdline);
 		}
 	}
@@ -1995,10 +2328,31 @@ void MIPS16 cmd_clear(void)
 
 void cmd_goto(void)
 {
+#ifdef CACHE
+	/* Guard: only cache when cmdline is a stable ProgMemory pointer.
+	 * When called from cmd_if's testgoto path the fix above ensures this,
+	 * but the execute_one_command path (IF..THEN cmd ELSE) still passes an
+	 * argbuf pointer — skip caching for any non-ProgMemory cmdline.       */
+	int _goto_cacheable = (g_trace_cache_flags & TCF_JUMP) &&
+		cmdline >= ProgMemory && cmdline < ProgMemory + MAX_PROG_SIZE;
+	if (_goto_cacheable)
+	{
+		unsigned char *cached_tgt;
+		if (TraceCacheTryJump(cmdline, &cached_tgt))
+		{
+			nextstmt = CurrentLinePtr = cached_tgt;
+			return;
+		}
+	}
+#endif
 	if (isnamestart(*cmdline))
 		nextstmt = findlabel(cmdline); // must be a label
 	else
 		nextstmt = findline(getinteger(cmdline), true); // try for a line number
+#ifdef CACHE
+	if (_goto_cacheable)
+		TraceCacheStoreJump(cmdline, nextstmt);
+#endif
 	CurrentLinePtr = nextstmt;
 }
 
@@ -2017,6 +2371,11 @@ void MIPS16 __not_in_flash_func(cmd_if)(void)
 	unsigned char ss[3]; // this will be used to split up the argument line
 	unsigned char *p, *tp;
 	unsigned char *rp = NULL;
+#ifdef CACHE
+	/* Save the cmdline pointer BEFORE getargs (makeargs) can advance it.
+	 * This stable ProgMemory pointer is the cache key for the IF condition. */
+	unsigned char *if_cond_key = cmdline;
+#endif
 
 	ss[0] = tokenTHEN;
 	ss[1] = tokenELSE;
@@ -2052,7 +2411,20 @@ retest_an_if:
 		SyntaxError();
 	;
 
+#ifdef CACHE
+	{
+		int _cached_r;
+		if ((g_trace_cache_flags & TCF_IF) && TraceCacheTryIf(if_cond_key, &_cached_r))
+		{
+			r = _cached_r;
+			goto if_condition_done;
+		}
+	}
+#endif
 	r = (getnumber(argv[0]) != 0); // evaluate the expression controlling the if statement
+#ifdef CACHE
+if_condition_done:;
+#endif
 
 	if (r)
 	{
@@ -2069,7 +2441,30 @@ retest_an_if:
 			// Because the test was TRUE we are just interested in the THEN cmd stage.
 			if (*argv[1] == tokenGOTO)
 			{
+#ifdef CACHE
+				/* argv[2] points into the local argbuf stack buffer, not ProgMemory.
+				 * Every IF...GoTo statement with the same-length condition shares the
+				 * same argbuf address, so the jump cache would return the first label
+				 * cached for all of them.  Scan from if_cond_key (a stable ProgMemory
+				 * pointer saved before getargs) to find tokenGOTO, then skip past it
+				 * and any spaces (mirroring what makeargs does) to give cmd_goto a
+				 * unique, ProgMemory-anchored cache key and correct argument.        */
+				{
+					unsigned char *goto_arg = if_cond_key;
+					while (*goto_arg && *goto_arg != tokenGOTO)
+						goto_arg++;
+					if (*goto_arg == tokenGOTO)
+					{
+						goto_arg++;                          /* skip tokenGOTO byte  */
+						while (*goto_arg == ' ') goto_arg++; /* skip spaces          */
+						cmdline = goto_arg;
+					}
+					else
+						cmdline = argv[2]; /* fallback: should never happen */
+				}
+#else
 				cmdline = argv[2];
+#endif
 				cmd_goto();
 				return;
 			}
@@ -2150,6 +2545,9 @@ retest_an_if:
 					nextstmt = p;
 					testgoto = false;
 					testelseif = true;
+#ifdef CACHE
+					if_cond_key = cmdline; /* each ELSEIF has its own cache entry */
+#endif
 					goto retest_an_if;
 				}
 
@@ -2378,9 +2776,254 @@ void do_end(bool ecmd)
 		Option.Refresh = 1;
 #endif
 }
+
+static void perf_print(const char *s, int *cnt)
+{
+	MMPrintString((char *)s);
+	for (const char *p = s; *p; p++)
+		if (*p == '\n')
+			(*cnt)++;
+	if (*cnt >= Option.Height - overlap)
+	{
+		clearrepeat();
+		MMPrintString("PRESS ANY KEY ...");
+		MMgetchar();
+		MMPrintString("\r                 \r");
+		if (Option.DISPLAY_CONSOLE)
+		{
+			ClearScreen(gui_bcolour);
+			CurrentX = 0;
+			CurrentY = 0;
+		}
+		*cnt = 2;
+	}
+}
+
 void cmd_end(void)
 {
+	// ---- Performance counter report (gated by OPTION PROFILING ON) -----
+	if (g_option_profiling)
+	{
+		int list_cnt = 2;
+		extern uint32_t *g_perf_cmdcount;
+		extern uint32_t g_perf_usercmd_count;
+		extern uint32_t g_perf_findvar_calls;
+		extern uint32_t g_perf_findvar_locals;
+		extern uint32_t g_perf_findvar_globals;
+		extern uint64_t g_perf_start_us;
+#define PERF_CMDTOKEN_MAX 1024
+		uint64_t elapsed_us = time_us_64() - g_perf_start_us;
+		uint64_t total_cmds = g_perf_usercmd_count;
+		for (int k = 0; k < PERF_CMDTOKEN_MAX; k++)
+			total_cmds += g_perf_cmdcount[k];
+		char buf[200];
+		unsigned resolved = g_perf_findvar_locals + g_perf_findvar_globals;
+		unsigned local_pct = resolved ? (unsigned)((uint64_t)g_perf_findvar_locals * 100 / resolved) : 0;
+		unsigned global_pct = resolved ? (unsigned)((uint64_t)g_perf_findvar_globals * 100 / resolved) : 0;
+		snprintf(buf, sizeof(buf),
+				 "\r\n[PERF] elapsed=%llu us  statements=%llu  findvar=%u (locals=%u [%u%%] globals=%u [%u%%])  user_subs=%u\r\n",
+				 (unsigned long long)elapsed_us,
+				 (unsigned long long)total_cmds,
+				 (unsigned)g_perf_findvar_calls,
+				 (unsigned)g_perf_findvar_locals, local_pct,
+				 (unsigned)g_perf_findvar_globals, global_pct,
+				 (unsigned)g_perf_usercmd_count);
+		perf_print(buf, &list_cnt);
+#ifdef CACHE
+		snprintf(buf, sizeof(buf),
+				 "[PERF] tracecache: flags=0x%02x size=%d replays=%u compiles_ok=%u compiles_bad=%u\r\n",
+				 (unsigned)g_trace_cache_flags,
+				 TraceCacheGetSize(),
+				 (unsigned)g_trace_replays,
+				 (unsigned)g_trace_compiles_ok,
+				 (unsigned)g_trace_compiles_bad);
+		if (g_trace_cache_flags)
+			perf_print(buf, &list_cnt);
+		snprintf(buf, sizeof(buf),
+				 "[PERF] tracecache: lookup_null=%u alloc_fail=%u optin_skip=%u jump_hits=%u\r\n",
+				 (unsigned)g_trace_lookup_null,
+				 (unsigned)g_trace_alloc_fail,
+				 (unsigned)g_trace_optin_skip,
+				 (unsigned)g_trace_jump_hits);
+		if (g_trace_cache_flags)
+			perf_print(buf, &list_cnt);
+		// Per-sub cache hit table (top-20 by total LET+IF replays).
+		if (g_trace_cache_flags)
+		{
+			extern uint32_t *g_tc_sub_let_hits;
+			extern uint32_t *g_tc_sub_if_hits;
+			extern unsigned char *subfun[];
+			// Check whether any sub has hits, or top-level has hits.
+			int any = 0;
+			if (g_tc_sub_let_hits && g_tc_sub_if_hits)
+				for (int k = 0; k <= MAXSUBFUN; k++)
+					if (g_tc_sub_let_hits[k] || g_tc_sub_if_hits[k]) { any = 1; break; }
+			if (any)
+			{
+				uint32_t *scratch = (uint32_t *)GetMemory((MAXSUBFUN + 1) * sizeof(uint32_t));
+				for (int k = 0; k <= MAXSUBFUN; k++)
+					scratch[k] = g_tc_sub_let_hits[k] + g_tc_sub_if_hits[k];
+				perf_print("[PERF] tracecache hits by SUB (top 20):\r\n", &list_cnt);
+				perf_print("        let_hits   if_hits     total  name\r\n", &list_cnt);
+				for (int rank = 0; rank < 20; rank++)
+				{
+					uint32_t best = 0;
+					int best_idx = -1;
+					for (int k = 0; k <= MAXSUBFUN; k++)
+						if (scratch[k] > best) { best = scratch[k]; best_idx = k; }
+					if (best_idx < 0 || best == 0)
+						break;
+					char nm[MAXVARLEN + 1];
+					nm[0] = 0;
+					if (best_idx < MAXSUBFUN && subfun[best_idx] != NULL)
+					{
+						unsigned char *sp = subfun[best_idx] + sizeof(CommandToken);
+						skipspace(sp);
+						int j = 0;
+						while (j < MAXVARLEN && isnamechar(*sp))
+							nm[j++] = *sp++;
+						nm[j] = 0;
+					}
+					snprintf(buf, sizeof(buf), "  %10u  %8u  %8u  %s\r\n",
+							 (unsigned)g_tc_sub_let_hits[best_idx],
+							 (unsigned)g_tc_sub_if_hits[best_idx],
+							 (unsigned)best,
+							 nm[0] ? nm : "(top-level)");
+					perf_print(buf, &list_cnt);
+					scratch[best_idx] = 0;
+				}
+				FreeMemorySafe((void **)&scratch);
+			}
+		}
+#endif
+		// Find and print the top-20 most-executed builtin commands.
+		perf_print("[PERF] top commands by dispatch count:\r\n", &list_cnt);
+		for (int rank = 0; rank < 20; rank++)
+		{
+			uint32_t best = 0;
+			int best_idx = -1;
+			for (int k = 0; k < PERF_CMDTOKEN_MAX; k++)
+			{
+				if (g_perf_cmdcount[k] > best)
+				{
+					best = g_perf_cmdcount[k];
+					best_idx = k;
+				}
+			}
+			if (best_idx < 0 || best == 0)
+				break;
+			snprintf(buf, sizeof(buf), "  %10u  %s\r\n",
+					 (unsigned)best, (const char *)commandname(best_idx));
+			perf_print(buf, &list_cnt);
+			g_perf_cmdcount[best_idx] = 0; // consume so next iteration finds the next
+		}
+
+		// Top-20 user SUB/FUNCTIONs by inclusive wall-clock time.
+		{
+			extern uint32_t *g_perf_subcall_count;
+			extern unsigned char *subfun[];
+			int any = 0;
+			for (int k = 0; k < MAXSUBFUN; k++)
+				if (g_perf_subcall_count[k])
+				{
+					any = 1;
+					break;
+				}
+			if (any)
+			{
+				extern uint64_t *g_perf_subexcl_us;
+				/* Snapshot exclusive (self) time into a scratch array so we
+				 * can zero-out the "best" each iteration without losing the
+				 * inclusive time / call counts used for the per-row report. */
+				uint64_t *scratch_us = (uint64_t *)GetMemory(MAXSUBFUN * sizeof(uint64_t));
+				memcpy(scratch_us, g_perf_subexcl_us, MAXSUBFUN * sizeof(uint64_t));
+
+				perf_print("[PERF] top SUBs by exclusive (self) time:\r\n", &list_cnt);
+				perf_print("       self_us    incl_us     calls   self_us/call  name\r\n", &list_cnt);
+				for (int rank = 0; rank < 20; rank++)
+				{
+					uint64_t best = 0;
+					int best_idx = -1;
+					for (int k = 0; k < MAXSUBFUN; k++)
+					{
+						if (scratch_us[k] > best)
+						{
+							best = scratch_us[k];
+							best_idx = k;
+						}
+					}
+					if (best_idx < 0 || best == 0)
+						break;
+					char nm[MAXVARLEN + 1];
+					nm[0] = 0;
+					if (subfun[best_idx] != NULL)
+					{
+						unsigned char *sp = subfun[best_idx] + sizeof(CommandToken);
+						skipspace(sp);
+						int j = 0;
+						while (j < MAXVARLEN && isnamechar(*sp))
+							nm[j++] = *sp++;
+						nm[j] = 0;
+					}
+					uint32_t calls = g_perf_subcall_count[best_idx];
+					unsigned long long incl = (unsigned long long)g_perf_subtime_us[best_idx];
+					unsigned long long per_call = calls ? (best / calls) : 0;
+					snprintf(buf, sizeof(buf),
+							 "  %12llu  %10llu  %8u  %12llu  %s\r\n",
+							 (unsigned long long)best, incl, (unsigned)calls,
+							 per_call, nm[0] ? nm : "(unknown)");
+					perf_print(buf, &list_cnt);
+					scratch_us[best_idx] = 0;
+				}
+
+				perf_print("[PERF] top SUBs by call count:\r\n", &list_cnt);
+				for (int rank = 0; rank < 20; rank++)
+				{
+					uint32_t best = 0;
+					int best_idx = -1;
+					for (int k = 0; k < MAXSUBFUN; k++)
+					{
+						if (g_perf_subcall_count[k] > best)
+						{
+							best = g_perf_subcall_count[k];
+							best_idx = k;
+						}
+					}
+					if (best_idx < 0 || best == 0)
+						break;
+					char nm[MAXVARLEN + 1];
+					nm[0] = 0;
+					if (subfun[best_idx] != NULL)
+					{
+						unsigned char *sp = subfun[best_idx] + sizeof(CommandToken);
+						skipspace(sp);
+						int j = 0;
+						while (j < MAXVARLEN && isnamechar(*sp))
+							nm[j++] = *sp++;
+						nm[j] = 0;
+					}
+					snprintf(buf, sizeof(buf), "  %10u  %s\r\n",
+							 (unsigned)best, nm[0] ? nm : "(unknown)");
+					perf_print(buf, &list_cnt);
+					g_perf_subcall_count[best_idx] = 0;
+				}
+				FreeMemorySafe((void **)&scratch_us);
+			}
+		}
+	}
+#ifdef MMBASIC_FM
+	int relaunch_fm = fm_program_launched_from_fm;
+	fm_program_launched_from_fm = 0;
 	do_end(true);
+	if (relaunch_fm)
+	{
+		fm_program_launched_from_fm = 1;
+		CurrentLinePtr = NULL;
+		cmdline = (unsigned char *)"";
+	}
+#else
+	do_end(true);
+#endif
 	longjmp(mark, 1); // jump back to the input prompt
 }
 extern unsigned int mmap[HEAP_MEMORY_SIZE / PAGESIZE / PAGESPERWORD];
@@ -2866,9 +3509,7 @@ void cmd_input(void)
 		// if so, print it followed by an optional question mark
 		if (argc >= 3 && *argv[0] == '"' && (*argv[1] == ',' || *argv[1] == ';'))
 		{
-			*(argv[0] + strlen((char *)argv[0]) - 1) = 0;
-			argv[0]++;
-			MMPrintString((char *)argv[0]);
+			MMPrintString((char *)getCstring(argv[0]));
 			if (*argv[1] == ';')
 				MMPrintString((char *)"? ");
 			i = 2;
@@ -3292,22 +3933,23 @@ void cmd_do(void)
 void MIPS16 __not_in_flash_func(cmd_do)(void)
 {
 #endif
-	int i;
+	int i, doUntil;
 	unsigned char *p, *tp, *evalp;
 	if (cmdtoken == cmdWHILE)
 		StandardError(36);
-	// if it is a DO loop find the WHILE token and (if found) get a pointer to its expression
+	// if it is a DO loop find the WHILE/UNTIL token and (if found) get a pointer to its expression
 	while (*cmdline && *cmdline != tokenWHILE && *cmdline != tokenUNTIL)
 		cmdline++;
-	if (*cmdline == tokenUNTIL)
-		SyntaxError();
-	;
-	if (*cmdline == tokenWHILE)
+	if (*cmdline == tokenWHILE || *cmdline == tokenUNTIL)
 	{
+		doUntil = (*cmdline == tokenUNTIL);
 		evalp = ++cmdline;
 	}
 	else
+	{
+		doUntil = 0;
 		evalp = NULL;
+	}
 	// check if this loop is already in the stack and remove it if it is
 	// this is necessary as the program can jump out of the loop without hitting
 	// the LOOP or WEND stmt and this will eventually result in a stack overflow
@@ -3321,6 +3963,7 @@ void MIPS16 __not_in_flash_func(cmd_do)(void)
 				g_dostack[i].loopptr = g_dostack[i + 1].loopptr;
 				g_dostack[i].doptr = g_dostack[i + 1].doptr;
 				g_dostack[i].level = g_dostack[i + 1].level;
+				g_dostack[i].untiltest = g_dostack[i + 1].untiltest;
 				i++;
 			}
 			g_doindex--;
@@ -3334,6 +3977,7 @@ void MIPS16 __not_in_flash_func(cmd_do)(void)
 	g_dostack[g_doindex].evalptr = evalp;
 	g_dostack[g_doindex].doptr = nextstmt;
 	g_dostack[g_doindex].level = g_LocalIndex;
+	g_dostack[g_doindex].untiltest = doUntil;
 
 	// now find the matching LOOP command
 	i = 1;
@@ -3370,11 +4014,27 @@ void MIPS16 __not_in_flash_func(cmd_do)(void)
 	g_doindex++;
 
 	// do the evaluation (if there is something to evaluate) and if false go straight to the command after the LOOP or WEND statement
-	if (g_dostack[g_doindex - 1].evalptr != NULL && getnumber(g_dostack[g_doindex - 1].evalptr) == 0)
+	if (g_dostack[g_doindex - 1].evalptr != NULL)
 	{
-		g_doindex--;							 // remove the entry in the table
-		nextstmt = g_dostack[g_doindex].loopptr; // point to the LOOP or WEND statement
-		skipelement(nextstmt);					 // skip to the next command
+		int condval;
+#ifdef CACHE
+		{
+			int _cached_r;
+			if ((g_trace_cache_flags & TCF_LOOP) && TraceCacheTryIf(g_dostack[g_doindex - 1].evalptr, &_cached_r))
+				condval = _cached_r;
+			else
+				condval = (getnumber(g_dostack[g_doindex - 1].evalptr) != 0);
+		}
+#else
+		condval = (getnumber(g_dostack[g_doindex - 1].evalptr) != 0);
+#endif
+		if (g_dostack[g_doindex - 1].untiltest) condval = !condval; // DO UNTIL: skip body if condition is already true
+		if (!condval)
+		{
+			g_doindex--;							 // remove the entry in the table
+			nextstmt = g_dostack[g_doindex].loopptr; // point to the LOOP or WEND statement
+			skipelement(nextstmt);					 // skip to the next command
+		}
 	}
 }
 
@@ -3400,16 +4060,26 @@ void MIPS16 __not_in_flash_func(cmd_loop)(void)
 			// first check if the DO statement had a WHILE component
 			// if not find the WHILE statement here and evaluate it
 			if (g_dostack[i].evalptr == NULL)
-			{ // if it was a DO without a WHILE
+			{ // if it was a DO without a WHILE/UNTIL
 				if (*cmdline >= 0x80)
 				{ // if there is something
-					if (*cmdline == tokenWHILE)
-						tst = (getnumber(++cmdline) != 0); // evaluate the expression
-					else if (*cmdline == tokenUNTIL)
-						tst = (getnumber(++cmdline) == 0); // evaluate the expression
-					else
+					if (*cmdline != tokenWHILE && *cmdline != tokenUNTIL)
 						SyntaxError();
-					;
+					int isUntil = (*cmdline == tokenUNTIL);
+					unsigned char *condkey = ++cmdline; // advance past the keyword token
+					int condval;
+#ifdef CACHE
+					{
+						int _cached_r;
+						if ((g_trace_cache_flags & TCF_LOOP) && TraceCacheTryIf(condkey, &_cached_r))
+							condval = _cached_r;
+						else
+							condval = (getnumber(condkey) != 0);
+					}
+#else
+					condval = (getnumber(condkey) != 0);
+#endif
+					tst = isUntil ? !condval : condval;
 				}
 				else
 				{
@@ -3418,8 +4088,20 @@ void MIPS16 __not_in_flash_func(cmd_loop)(void)
 				}
 			}
 			else
-			{												  // if was DO WHILE
-				tst = (getnumber(g_dostack[i].evalptr) != 0); // evaluate its expression
+			{												  // if was DO WHILE or DO UNTIL
+				int condval;
+#ifdef CACHE
+				{
+					int _cached_r;
+					if ((g_trace_cache_flags & TCF_LOOP) && TraceCacheTryIf(g_dostack[i].evalptr, &_cached_r))
+						condval = _cached_r;
+					else
+						condval = (getnumber(g_dostack[i].evalptr) != 0);
+				}
+#else
+				condval = (getnumber(g_dostack[i].evalptr) != 0);
+#endif
+				tst = g_dostack[i].untiltest ? !condval : condval; // UNTIL inverts: loop while condition is false
 				checkend(cmdline);							  // make sure that there is nothing else
 			}
 
@@ -3553,15 +4235,36 @@ void cmd_gosub(void)
 	if (gosubindex >= MAXGOSUB)
 		error("Too many nested GOSUB");
 	char *return_to = (char *)nextstmt;
+#ifdef CACHE
+	int _gosub_cacheable = (g_trace_cache_flags & TCF_JUMP) &&
+		cmdline >= ProgMemory && cmdline < ProgMemory + MAX_PROG_SIZE;
+	if (_gosub_cacheable)
+	{
+		unsigned char *cached_tgt;
+		if (TraceCacheTryJump(cmdline, &cached_tgt))
+		{
+			nextstmt = cached_tgt;
+			goto gosub_resolved;
+		}
+	}
+#endif
 	if (isnamestart(*cmdline))
 		nextstmt = findlabel(cmdline);
 	else
 		nextstmt = findline(getinteger(cmdline), true);
+#ifdef CACHE
+	if (_gosub_cacheable)
+		TraceCacheStoreJump(cmdline, nextstmt);
+gosub_resolved:;
+#endif
 	IgnorePIN = false;
 
 	errorstack[gosubindex] = CurrentLinePtr;
 	gosubstack[gosubindex++] = (unsigned char *)return_to;
 	g_LocalIndex++;
+#ifdef CACHE
+	EnterLocalFrame(); // open a new local-variable frame for this GOSUB
+#endif
 	CurrentLinePtr = nextstmt;
 }
 
@@ -3710,7 +4413,10 @@ void MIPS16 __not_in_flash_func(cmd_return)(void)
 	checkend(cmdline);
 	if (gosubindex == 0 || gosubstack[gosubindex - 1] == NULL)
 		error("Nothing to return to");
-	ClearVars(g_LocalIndex--, true);	 // delete any local variables
+	ClearVars(g_LocalIndex--, true); // delete any local variables
+#ifdef CACHE
+	LeaveLocalFrame(); // pop this GOSUB's local frame
+#endif
 	g_TempMemoryIsChanged = true;		 // signal that temporary memory should be checked
 	nextstmt = gosubstack[--gosubindex]; // return to the caller
 	CurrentLinePtr = errorstack[gosubindex];
@@ -6041,19 +6747,55 @@ void MIPS16 cmd_restore(void)
 	}
 	else
 	{
+#ifdef CACHE
+		unsigned char *restore_key = cmdline; /* stable key before skipspace  */
+#endif
 		skipspace(cmdline);
 		if (*cmdline == '"')
 		{
+#ifdef CACHE
+			if (g_trace_cache_flags & TCF_RESTORE)
+			{
+				unsigned char *cached_tgt;
+				if (TraceCacheTryJump(restore_key, &cached_tgt))
+				{
+					NextDataLine = cached_tgt;
+					NextData = 0;
+					return;
+				}
+			}
+#endif
 			NextDataLine = findlabel(getCstring(cmdline));
 			NextData = 0;
+#ifdef CACHE
+			if (g_trace_cache_flags & TCF_RESTORE)
+				TraceCacheStoreJump(restore_key, NextDataLine);
+#endif
 		}
 		else if (isdigit(*cmdline) || *cmdline == GetTokenValue((unsigned char *)"+") || *cmdline == GetTokenValue((unsigned char *)"-") || *cmdline == '.')
 		{
+#ifdef CACHE
+			if (g_trace_cache_flags & TCF_RESTORE)
+			{
+				unsigned char *cached_tgt;
+				if (TraceCacheTryJump(restore_key, &cached_tgt))
+				{
+					NextDataLine = cached_tgt;
+					NextData = 0;
+					return;
+				}
+			}
+#endif
 			NextDataLine = findline(getinteger(cmdline), true); // try for a line number
 			NextData = 0;
+#ifdef CACHE
+			if (g_trace_cache_flags & TCF_RESTORE)
+				TraceCacheStoreJump(restore_key, NextDataLine);
+#endif
 		}
 		else
 		{
+			/* Variable argument — target changes at run time; never cache.   */
 			void *ptr = findvar(cmdline, V_NOFIND_NULL);
 			if (ptr)
 			{
@@ -6082,7 +6824,23 @@ void MIPS16 cmd_restore(void)
 			}
 			else if (isnamestart(*cmdline))
 			{
+#ifdef CACHE
+				if (g_trace_cache_flags & TCF_RESTORE)
+				{
+					unsigned char *cached_tgt;
+					if (TraceCacheTryJump(restore_key, &cached_tgt))
+					{
+						NextDataLine = cached_tgt;
+						NextData = 0;
+						return;
+					}
+				}
+#endif
 				NextDataLine = findlabel(cmdline); // must be a label
+#ifdef CACHE
+				if (g_trace_cache_flags & TCF_RESTORE)
+					TraceCacheStoreJump(restore_key, NextDataLine);
+#endif
 			}
 			NextData = 0;
 		}
@@ -6435,12 +7193,28 @@ void MIPS16 cmd_dim(void)
 			else
 				strcpy((char *)VarName, (char *)argv[i]);
 
-			v = findvar(VarName, type | V_NOFIND_NULL); // check if the variable exists
 			typeSave = type;
-			VIndexSave = g_VarIndex;
+			if (StaticVar)
+			{
+				// STATIC: the global mangled-name backing variable may be
+				// reused across calls, so we must NOT raise "$ already
+				// declared".  Use the historical two-step: probe first, then
+				// create only if missing.
+				v = findvar(VarName, type | V_NOFIND_NULL);
+				VIndexSave = g_VarIndex;
+			}
+			else
+			{
+				// Plain DIM / LOCAL: collapse the legacy "check then create"
+				// pair into a single findvar() call by passing V_DIM_NEW,
+				// which makes findvar emit "$ already declared" itself if
+				// the name is taken.
+				v = NULL;
+				VIndexSave = -1;
+			}
 			if (v == NULL)
-			{													 // if not found
-				v = findvar(VarName, type | V_FIND | V_DIM_VAR); // create the variable
+			{																 // not found (or not yet looked up for non-STATIC case)
+				v = findvar(VarName, type | V_FIND | V_DIM_VAR | V_DIM_NEW); // create the variable
 				type = TypeMask(g_vartbl[g_VarIndex].type);
 				VIndexSave = g_VarIndex;
 				// Mark static variables with NAMELEN_STATIC so struct member lookup skips them
@@ -6587,11 +7361,14 @@ void MIPS16 cmd_dim(void)
 			// if it is a STATIC var create a local var pointing to the global var
 			if (StaticVar)
 			{
-				tv = findvar(argv[i], typeSave | V_LOCAL | V_NOFIND_NULL); // check if the local variable exists
-				if (tv != NULL)
-					error("$ already declared", argv[i]);
-				tv = findvar(argv[i], typeSave | V_LOCAL | V_FIND | V_DIM_VAR); // create the variable
+				// Single call: V_DIM_NEW errors with "$ already declared" if the
+				// local pointer name is already taken, otherwise creates it.
+				tv = findvar(argv[i], typeSave | V_LOCAL | V_FIND | V_DIM_VAR | V_DIM_NEW);
+#ifdef STRUCTENABLED
 				if (g_vartbl[VIndexSave].dims[0] > 0 || (g_vartbl[VIndexSave].type & (T_STR | T_STRUCT)))
+#else
+				if (g_vartbl[VIndexSave].dims[0] > 0 || (g_vartbl[VIndexSave].type & T_STR))
+#endif
 				{
 					FreeMemorySafe((void **)&tv);							 // we don't need the memory allocated to the local
 					g_vartbl[g_VarIndex].val.s = g_vartbl[VIndexSave].val.s; // point to the memory of the global variable
@@ -8091,7 +8868,12 @@ void MIPS16 fun_struct(void)
 
 		// Determine if regex mode (argc==7 means regex with size variable)
 		if (argc == 7)
+		{
+#ifdef PICOMITEMIN
+			error("Regular expressions not supported on PICOMITEMIN");
+#endif
 			use_regex = 1;
+		}
 
 		// Get the struct array member variable (argv[0])
 		// This uses findvar which will populate g_StructMemberOffset and g_StructMemberSize

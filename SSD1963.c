@@ -34,7 +34,6 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
-volatile int ScrollStart;
 int Has100Pins = 0;
 
 // parameters for the SSD1963 display panel (refer to the glass data sheet)
@@ -44,9 +43,11 @@ int SSD1963PClock1, SSD1963PClock2, SSD1963PClock3;
 int SSD1963Mode1, SSD1963Mode2;
 unsigned int RDpin, RDport;
 int SSD1963PixelInterface, SSD1963PixelFormat;
+#define SSD1963_5_QUIRK_EXTRA_VFP 4
+#define SSD1963_5_QUIRK_18BIT_PATH 1
 #define DELAY 0x80  // Bit7 of the count indicates a delay is also added.
 #define REPEAT 0x40 // Bit6 of the count indicates same data is repeated instead of reading next byte.
-int SSD1963rgb = 0, SSD1963data = 0;
+int SSD1963rgb = 0;
 void WriteCmdDataIPS_4_16(int cmd, int n, int data);
 unsigned int ReadData(void);
 void ReadBLITBufferSSD1963(int x1, int y1, int x2, int y2, unsigned char *p);
@@ -835,7 +836,9 @@ void MIPS16 InitDisplaySSD(void)
         SSD1963HorizFrontPorch = 40;
         SSD1963VertPulseWidth = 2;
         SSD1963VertBackPorch = 25;
-        SSD1963VertFrontPorch = 18;
+        // Panel-specific quirk: some 5" modules require extra vertical blanking
+        // to avoid line 0/1 wrapping to the bottom (visible as lines 480/481).
+        SSD1963VertFrontPorch = 18 + SSD1963_5_QUIRK_EXTRA_VFP;
         // Set LSHIFT freq, i.e. the DCLK with PLL freq 120MHz set previously
         // Typical DCLK is 33MHz.  30MHz = 120MHz*(LCDC_FPR+1)/2^20.  LCDC_FPR = 262143 (0x3FFFF)
         SSD1963PClock1 = 0x03;
@@ -992,6 +995,18 @@ void MIPS16 InitDisplaySSD(void)
         SSD1963PixelInterface = 0;       // PIXEL data interface - 8-bit
         SSD1963PixelFormat = 0b01110000; // PIXEL data interface 24-bit
     }
+
+    // Panel-specific quirk: use 18-bit format on standard 5" 24-bit paths.
+    // Keep 16-bit paths unchanged.
+#if SSD1963_5_QUIRK_18BIT_PATH
+    if (Option.DISPLAY_TYPE == SSD1963_5)
+        SSD1963PixelFormat = 0b01100000;
+#if PICOMITERP2350
+    if (Option.DISPLAY_TYPE == SSD1963_5_12BUFF || Option.DISPLAY_TYPE == SSD1963_5_BUFF)
+        SSD1963PixelFormat = 0b01100000;
+#endif
+#endif
+
     DrawPixel = DrawPixelNormal;
     WriteColor = (Option.SSD_DATA == 1 ? WriteColorD0 : WriteColorFlex);
     uint64_t bits = 0xFF;
@@ -1683,15 +1698,21 @@ void MIPS16 InitSSD1963(void)
     ScrollStart = 0;
 
     ClearScreen(Option.DefaultBC);
-    SetBacklightSSD1963(0);
+    if (Option.DISPLAY_BL)
+        SetBacklightSSD1963(100);
+    else
+        SetBacklightSSD1963(0);
     if (!(restart_reason & 0xFFFFFFF0 || restart_reason & 0x30000))
         uSec(500000);            // Give time for power to stabilise
     WriteComand(CMD_ON_DISPLAY); // Turn on display; show the image on display
-    for (int i = 0; i < Option.BackLightLevel; i++)
+    if (!Option.DISPLAY_BL)
     {
-        SetBacklightSSD1963(Option.BackLightLevel);
-        routinechecks();
-        uSec(10000);
+        for (int i = 0; i < Option.BackLightLevel; i++)
+        {
+            SetBacklightSSD1963(i + 1);
+            routinechecks();
+            uSec(10000);
+        }
     }
 }
 void SetAreaIPS_4_16(int xstart, int ystart, int xend, int yend, int rw)

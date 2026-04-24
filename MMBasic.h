@@ -107,6 +107,9 @@ extern "C"
 #define V_LOCAL 0x1000       // create a local variable
 #define V_EMPTY_OK 0x2000    // allow an empty array variable. ie, var()
 #define V_FUNCT 0x4000       // we are defining the name of a function
+#define V_DIM_NEW 0x8000     // declaration must be a NEW variable; error "$ already declared" if it exists.
+                             // Lets DIM/LOCAL collapse the historical "check then create" pair of
+                             // findvar() calls into a single call.
 
 /* ============================================================================
  * Struct member array protection macro
@@ -343,7 +346,26 @@ extern "C"
     extern int g_Localvarcnt;
     extern int g_VarIndex;
     extern int g_LocalIndex;
-
+#ifdef CACHE
+    /* Local-variable side index (Phase 2 lookup acceleration) — see MMBasic.c */
+    extern uint32_t g_localframe_quick[MAXLOCALVARS];
+    extern uint8_t g_localframe_namelen[MAXLOCALVARS];
+    extern int g_localframe_base;
+    extern int g_framebase_stack[MAXGOSUB];
+    extern int g_framebase_sp;
+    extern int g_current_sub_idx;
+    extern int g_subidx_stack[MAXGOSUB];
+    extern uint64_t g_subentry_us[MAXGOSUB];
+#endif
+    extern uint32_t *g_perf_cmdcount;
+    extern uint32_t *g_perf_subcall_count;
+    extern uint64_t *g_perf_subtime_us;
+    extern uint64_t *g_perf_subexcl_us;
+    extern int g_option_profiling;
+    void EnterLocalFrame(void);
+    void LeaveLocalFrame(void);
+    void ProfilingAlloc(void);
+    void ProfilingFree(void);
     /* ============================================================================
      * External variables - Options and settings
      * ============================================================================ */
@@ -463,8 +485,25 @@ extern "C"
     /* ============================================================================
      * Function declarations - Type conversions
      * ============================================================================ */
+#ifndef MMBASIC_C_INTERNAL
+static inline int FloatToInt32(MMFLOAT x)
+{
+    if (x < LONG_MIN - 0.5 || x > LONG_MAX + 0.5)
+        error("Number too large");
+    return (x >= 0 ? (int)(x + 0.5) : (int)(x - 0.5));
+}
+static inline long long int FloatToInt64(MMFLOAT x)
+{
+    if (x < (-(0x7fffffffffffffffLL) - 1) - 0.5 || x > 0x7fffffffffffffffLL + 0.5)
+        error("Number too large");
+    if ((x < -0xfffffffffffff) || (x > 0xfffffffffffff))
+        return (long long int)(x);
+    return (x >= 0 ? (long long int)(x + 0.5) : (long long int)(x - 0.5));
+}
+#else
     int FloatToInt32(MMFLOAT);
     long long int FloatToInt64(MMFLOAT x);
+#endif
     void IntToStrPad(char *p, long long int nbr, signed char padch, int maxch, int radix);
     void IntToStr(char *strr, long long int nbr, unsigned int base);
     void FloatToStr(char *p, MMFLOAT f, int m, int n, unsigned char ch);

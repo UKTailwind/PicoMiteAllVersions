@@ -47,6 +47,11 @@ the non US keyboard layouts
 #include "Hardware_Includes.h"
 #include "tusb.h"
 #include "hardware/structs/usb.h"
+#ifdef USBKEYBOARD
+#include "Audio.h"
+#include "Connect.h"
+#include "Remove.h"
+#endif /* USBKEYBOARD */
 extern volatile int ConsoleRxBufHead;
 extern volatile int ConsoleRxBufTail;
 extern volatile int keytimer;
@@ -1910,6 +1915,7 @@ void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance, uint8_t const *desc_re
 			MMPrintString("\r\n> ");
 		}
 		//		tuh_hid_set_report(HID[slot].Device_address, HID[slot].Device_instance, 0, HID_REPORT_TYPE_OUTPUT, (void *)&HID[n].sendlights,1);
+		PlayMemWav(ezyZip_wav, EZYZIP_WAV_SIZE);
 		Current_USB_devices++;
 		return;
 	}
@@ -1953,6 +1959,7 @@ void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance, uint8_t const *desc_re
 			PInt(slot + 1);
 			MMPrintString("\r\n> ");
 		}
+		PlayMemWav(ezyZip_wav, EZYZIP_WAV_SIZE);
 		Current_USB_devices++;
 		return;
 	}
@@ -2062,6 +2069,7 @@ void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance, uint8_t const *desc_re
 			return;
 		}
 	}
+	PlayMemWav(ezyZip_wav, EZYZIP_WAV_SIZE);
 	Current_USB_devices++;
 }
 
@@ -2118,6 +2126,7 @@ void tuh_hid_umount_cb(uint8_t dev_addr, uint8_t instance)
 	}
 	if (i < 4)
 	{
+		PlayMemWav(remove_wav, REMOVE_WAV_SIZE);
 		memset((void *)&HID[i], 0, sizeof(struct s_HID));
 		HID[i].report_requested = true;
 		Current_USB_devices--;

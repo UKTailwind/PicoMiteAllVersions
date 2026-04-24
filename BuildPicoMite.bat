@@ -6,140 +6,57 @@ set "start_time=%time%"
 echo Build started at: %start_time%
 echo.
 
-set "fixed_string=V6.01.00"
+set "fixed_string=V6.03.00B1"
 set "extension=.uf2"
 set "directory=../"
-ren buildRP2040L build
-cd build
-cmake -G "NMake Makefiles" -DCOMPILE=PICO ..
-nmake
-set "filename=PicoMiteRP2040"
-if exist "%filename%%fixed_string%%extension%" del "%filename%%fixed_string%%extension%"
-copy "PicoMite.uf2" "%directory%%filename%%fixed_string%%extension%"
-echo "%directory%%filename%%fixed_string%%extension%"
-findstr /B ".heap" PicoMite.elf.map
-::
-python ../GetHighestHexAddress.py PicoMite.hex
-::
-cmake -G "NMake Makefiles" -DCOMPILE=PICOUSB ..
-nmake
-set "filename=PicoMiteRP2040USB"
-if exist "%filename%%fixed_string%%extension%" del "%filename%%fixed_string%%extension%"
-copy "PicoMite.uf2" "%directory%%filename%%fixed_string%%extension%"
-echo "%directory%%filename%%fixed_string%%extension%"
-findstr /B ".heap" PicoMite.elf.map
-::
-python ../GetHighestHexAddress.py PicoMite.hex
-::
-cmake -G "NMake Makefiles" -DCOMPILE=VGA ..
-nmake
-set "filename=PicoMiteRP2040VGA"
-if exist "%filename%%fixed_string%%extension%" del "%filename%%fixed_string%%extension%"
-copy "PicoMite.uf2" "%directory%%filename%%fixed_string%%extension%"
-echo "%directory%%filename%%fixed_string%%extension%"
-findstr /B ".heap" PicoMite.elf.map
-::
-python ../GetHighestHexAddress.py PicoMite.hex
-::
-cmake -G "NMake Makefiles" -DCOMPILE=VGAUSB ..
-nmake
-set "filename=PicoMiteRP2040VGAUSB"
-if exist "%filename%%fixed_string%%extension%" del "%filename%%fixed_string%%extension%"
-copy "PicoMite.uf2" "%directory%%filename%%fixed_string%%extension%"
-echo "%directory%%filename%%fixed_string%%extension%"
-findstr /B ".heap" PicoMite.elf.map
-::
-python ../GetHighestHexAddress.py PicoMite.hex
-::
-cmake -G "NMake Makefiles" -DCOMPILE=WEB ..
-nmake
-set "filename=WebMiteRP2040"
-if exist "%filename%%fixed_string%%extension%" del "%filename%%fixed_string%%extension%"
-copy "PicoMite.uf2" "%directory%%filename%%fixed_string%%extension%"
-echo "%directory%%filename%%fixed_string%%extension%"
-findstr /B ".heap" PicoMite.elf.map
-::
-python ../GetHighestHexAddress.py PicoMite.hex
-::
-cd ..
-timeout /t 20 /nobreak
-ren build buildRP2040L
-ren buildRP2350L build
-cd build
-::
-cmake -G "NMake Makefiles" -DCOMPILE=WEBRP2350 ..
-nmake
-set "filename=WebMiteRP2350"
-if exist "%filename%%fixed_string%%extension%" del "%filename%%fixed_string%%extension%"
-copy "PicoMite.uf2" "%directory%%filename%%fixed_string%%extension%"
-echo "%directory%%filename%%fixed_string%%extension%"
-findstr /B ".heap" PicoMite.elf.map
-::
-python ../GetHighestHexAddress.py PicoMite.hex
-::
-cmake -G "NMake Makefiles" -DCOMPILE=VGARP2350 ..
-nmake
-set "filename=PicoMiteRP2350VGA"
-if exist "%filename%%fixed_string%%extension%" del "%filename%%fixed_string%%extension%"
-copy "PicoMite.uf2" "%directory%%filename%%fixed_string%%extension%"
-echo "%directory%%filename%%fixed_string%%extension%"
-findstr /B ".heap" PicoMite.elf.map
-::
-python ../GetHighestHexAddress.py PicoMite.hex
-::
-cmake -G "NMake Makefiles" -DCOMPILE=VGAUSBRP2350 ..
-nmake
-set "filename=PicoMiteRP2350VGAUSB"
-if exist "%filename%%fixed_string%%extension%" del "%filename%%fixed_string%%extension%"
-copy "PicoMite.uf2" "%directory%%filename%%fixed_string%%extension%"
-echo "%directory%%filename%%fixed_string%%extension%"
-findstr /B ".heap" PicoMite.elf.map
-::
-python ../GetHighestHexAddress.py PicoMite.hex
-::
-cmake -G "NMake Makefiles" -DCOMPILE=PICORP2350 ..
-nmake
-set "filename=PicoMiteRP2350"
-if exist "%filename%%fixed_string%%extension%" del "%filename%%fixed_string%%extension%"
-copy "PicoMite.uf2" "%directory%%filename%%fixed_string%%extension%"
-echo "%directory%%filename%%fixed_string%%extension%"
-findstr /B ".heap" PicoMite.elf.map
-::
-python ../GetHighestHexAddress.py PicoMite.hex
-::
-cmake -G "NMake Makefiles" -DCOMPILE=PICOUSBRP2350 ..
-nmake
-set "filename=PicoMiteRP2350USB"
-if exist "%filename%%fixed_string%%extension%" del "%filename%%fixed_string%%extension%"
-copy "PicoMite.uf2" "%directory%%filename%%fixed_string%%extension%"
-echo "%directory%%filename%%fixed_string%%extension%"
-findstr /B ".heap" PicoMite.elf.map
-::
-python ../GetHighestHexAddress.py PicoMite.hex
-::
-cmake -G "NMake Makefiles" -DCOMPILE=HDMI ..
-nmake
-set "filename=PicoMiteHDMI"
-if exist "%filename%%fixed_string%%extension%" del "%filename%%fixed_string%%extension%"
-copy "PicoMite.uf2" "%directory%%filename%%fixed_string%%extension%"
-echo "%directory%%filename%%fixed_string%%extension%"
-findstr /B ".heap" PicoMite.elf.map
-::
-python ../GetHighestHexAddress.py PicoMite.hex
-::
-cmake -G "NMake Makefiles" -DCOMPILE=HDMIUSB ..
-nmake
-set "filename=PicoMiteHDMIUSB"
-if exist "%filename%%fixed_string%%extension%" del "%filename%%fixed_string%%extension%"
-copy "PicoMite.uf2" "%directory%%filename%%fixed_string%%extension%"
-echo "%directory%%filename%%fixed_string%%extension%"
-findstr /B ".heap" PicoMite.elf.map
-::
-python ../GetHighestHexAddress.py PicoMite.hex
-::
-cd ..
-timeout /t 20 /nobreak
-ren build buildRP2350L
+set "generator=NMake Makefiles"
+set "artifact=PicoMite.uf2"
+set "mapfile=PicoMite.elf.map"
+set "hexfile=PicoMite.hex"
+set "failed_target="
+set "active_build_dir="
+set "exit_code=0"
+
+call :activate_build_dir "buildRP2040L"
+if errorlevel 1 goto :fail
+
+call :build_targets ^
+    "PICO:PicoMiteRP2040" ^
+    "PICOMIN:PicoMiteRP2040MIN" ^
+    "PICOUSB:PicoMiteRP2040USB" ^
+    "VGA:PicoMiteRP2040VGA" ^
+    "VGAUSB:PicoMiteRP2040VGAUSB" ^
+    "WEB:WebMiteRP2040"
+if errorlevel 1 goto :fail
+
+call :deactivate_build_dir "buildRP2040L"
+if errorlevel 1 goto :fail
+
+call :activate_build_dir "buildRP2350L"
+if errorlevel 1 goto :fail
+
+call :build_targets ^
+    "WEBRP2350:WebMiteRP2350" ^
+    "VGARP2350:PicoMiteRP2350VGA" ^
+    "VGAUSBRP2350:PicoMiteRP2350VGAUSB" ^
+    "PICORP2350:PicoMiteRP2350" ^
+    "PICOUSBRP2350:PicoMiteRP2350USB" ^
+    "HDMI:PicoMiteHDMI" ^
+    "HDMIUSB:PicoMiteHDMIUSB"
+if errorlevel 1 goto :fail
+
+call :deactivate_build_dir "buildRP2350L"
+if errorlevel 1 goto :fail
+
+goto :summary
+
+:fail
+set "exit_code=1"
+echo.
+echo Build failed for target: %failed_target%
+if defined active_build_dir if exist build call :deactivate_build_dir "%active_build_dir%" >nul 2>&1
+
+:summary
 
 :: Record end time and calculate elapsed time
 set "end_time=%time%"
@@ -152,7 +69,47 @@ echo Build started at:   %start_time%
 call :elapsed_time "%start_time%" "%end_time%"
 
 endlocal
-goto :eof
+exit /b %exit_code%
+
+:activate_build_dir
+set "active_build_dir=%~1"
+ren "%~1" build || exit /b 1
+cd build || exit /b 1
+exit /b 0
+
+:deactivate_build_dir
+cd .. || exit /b 1
+timeout /t 20 /nobreak >nul
+ren build "%~1" || exit /b 1
+set "active_build_dir="
+exit /b 0
+
+:build_targets
+if "%~1"=="" exit /b 0
+for /f "tokens=1,2 delims=:" %%A in (%1) do call :build_target "%%~A" "%%~B"
+if errorlevel 1 exit /b 1
+shift
+goto :build_targets
+
+:build_target
+set "compile=%~1"
+set "filename=%~2"
+set "failed_target=%compile%"
+
+echo ========================================
+echo Building %compile%
+echo ========================================
+
+cmake -G "%generator%" -DCOMPILE=%compile% .. || exit /b 1
+nmake || exit /b 1
+
+if exist "%filename%%fixed_string%%extension%" del "%filename%%fixed_string%%extension%"
+copy "%artifact%" "%directory%%filename%%fixed_string%%extension%" >nul || exit /b 1
+echo "%directory%%filename%%fixed_string%%extension%"
+findstr /B ".heap" "%mapfile%"
+python ../GetHighestHexAddress.py "%hexfile%"
+echo.
+exit /b 0
 
 :elapsed_time
 setlocal

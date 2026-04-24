@@ -2371,7 +2371,7 @@ void classicproc(void)
 }
 
 #ifndef PICOMITEVGA
-#if defined(rp2350) || defined(PICOMITEWEB)
+#if defined(rp2350) || defined(PICOMITEWEB) || defined(PICOMITE)
 #define ov7670_address 0x21
 #define top 120
 #define left 160
@@ -2641,11 +2641,80 @@ void OV7670_set_size(OV7670_size size)
 #define ST_PCLK gpio_get(PCLKGP)
 #define ST_HREF gpio_get(HREFGP)
 #define ST_VSYNC gpio_get(VSYNCGP)
-#if LOWRAM
-void capture(char *buff)
+#ifndef rp2350
+void __not_in_flash_func(capture)(char *buff)
+{
+  char *k = buff;
+  while (ST_VSYNC)
+  {
+  } /* wait for the old frame to end */
+  while (!ST_VSYNC)
+  {
+  } /* wait for a new frame to start */
+  // At this point VSync has gone high and the frame is about to start
+  while (!ST_HREF)
+  {
+  } // wait for the first line to start
+  while (!ST_PCLK)
+  {
+  } // wait for clock to go high /
+  while (ST_PCLK)
+  {
+  } // wait for clock to go back low /
+  for (int i = 0; i < 160; i++)
+  {
+    while (!ST_PCLK)
+    {
+    } // wait for clock to go high /
+    *k++ = gpio_get_all() >> PinDef[D0].GPno;
+    while (ST_PCLK)
+    {
+    } // wait for clock to go back low /
+
+    // second byte/
+    while (!ST_PCLK)
+    {
+    } // wait for clock to go high /
+    *k++ = gpio_get_all() >> PinDef[D0].GPno;
+    while (ST_PCLK)
+    {
+    } // wait for clock to go back low /
+  }
+  while (ST_HREF)
+  {
+  } // wait for the first line to end*/
+  k = buff;
+  for (int j = 0; j < 119; j++)
+  {
+    while (!ST_HREF)
+    {
+    } // wait for the first line to end
+    for (int i = 0; i < 160; i++)
+    {
+      while (!ST_PCLK)
+      {
+      } // wait for clock to go high /
+      *k++ = gpio_get_all() >> PinDef[D0].GPno;
+      while (ST_PCLK)
+      {
+      } // wait for clock to go back low /
+
+      // second byte/
+      while (!ST_PCLK)
+      {
+      } // wait for clock to go high /
+      *k++ = gpio_get_all() >> PinDef[D0].GPno;
+      while (ST_PCLK)
+      {
+      } // wait for clock to go back low /
+    }
+    while (ST_HREF)
+    {
+    } // wait for the first line to end
+  }
+}
 #else
 void __not_in_flash_func(capture)(char *buff)
-#endif
 {
   char *k = buff;
   while (ST_VSYNC)
@@ -2716,6 +2785,7 @@ void __not_in_flash_func(capture)(char *buff)
     } // wait for the first line to end
   }
 }
+#endif
 void saturation(int s) //-2 to 2
 {
   // color matrix values

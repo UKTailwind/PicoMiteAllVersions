@@ -28,7 +28,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 ************************************************************************************************************************/
 #include <stdbool.h>
 #if !defined(INCLUDE_COMMAND_TABLE) && !defined(INCLUDE_TOKEN_TABLE)
-
+#include "ffconf.h"
 typedef struct s_forstack
 {
     unsigned char *forptr;  // pointer to the FOR command in program memory
@@ -54,12 +54,28 @@ extern unsigned char addressbuff[20];
 extern struct s_forstack g_forstack[MAXFORLOOPS + 1];
 extern int g_forindex;
 extern unsigned char cmdlinebuff[STRINGSIZE];
+#ifdef MMBASIC_FM
+extern int fm_program_launched_from_fm;
+extern char fm_relaunch_status[STRINGSIZE * 2];
+extern int fm_relaunch_status_valid;
+extern int fm_suppress_error_output;
+extern char fm_last_launched_bas[FF_MAX_LFN];
+extern char fm_error_file[FF_MAX_LFN];
+extern int fm_error_line;
+extern int fm_error_char;
+extern int fm_error_location_valid;
+extern int fm_pending_edit_seek_valid;
+extern int fm_pending_edit_seek_line;
+extern int fm_pending_edit_seek_char;
+extern int fm_sanitize_next_console_input;
+#endif
 typedef struct s_dostack
 {
     unsigned char *evalptr; // pointer to the expression to be evaluated
     unsigned char *loopptr; // pointer to the loop statement
     unsigned char *doptr;   // pointer to the DO statement
     unsigned char level;    // the sub/function level that the loop was created
+    unsigned char untiltest; // 1 if DO UNTIL (exits when condition becomes true)
 } dostackval;
 
 extern struct s_dostack g_dostack[MAXDOLOOPS];
@@ -72,7 +88,10 @@ extern unsigned char g_DimUsed;
 
 // extern unsigned char *GetFileName(char* CmdLinePtr, unsigned char *LastFilePtr);
 // extern void mergefile(unsigned char *fname, unsigned char *MemPtr);
+extern void MIPS16 ListFile(char *pp, int all);
+extern void ListFilePaged(char *pp);
 extern void ListProgram(unsigned char *p, int all);
+extern void ListProgramPaged(unsigned char *prog);
 extern unsigned char *llist(unsigned char *b, unsigned char *p);
 extern unsigned char *CheckIfTypeSpecified(unsigned char *p, int *type, int AllowDefaultType);
 

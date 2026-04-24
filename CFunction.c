@@ -185,9 +185,15 @@ void CallExecuteProgram(char *p)
 {
     unsigned char *nextstmtSaved = nextstmt;
     g_LocalIndex++;
+#ifdef CACHE
+    EnterLocalFrame();
+#endif
     ExecuteProgram((unsigned char *)p);
     nextstmt = nextstmtSaved;
     g_LocalIndex--;
+#ifdef CACHE
+    LeaveLocalFrame();
+#endif
     g_TempMemoryIsChanged = true; // signal that temporary memory should be checked
 }
 

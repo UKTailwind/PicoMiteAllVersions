@@ -147,6 +147,12 @@
 #define VS1053fast 58
 
 #if PICOMITERP2350
+#define IS_VIRTUAL_DISPLAY(t) ((t) >= VIRTUAL && (t) < VGA222)
+#else
+#define IS_VIRTUAL_DISPLAY(t) ((t) == VIRTUAL_C || (t) == VIRTUAL_M)
+#endif
+
+#if PICOMITERP2350
 #define VGA222 59
 #define VGA222X320 60
 #define VGA222X720 61

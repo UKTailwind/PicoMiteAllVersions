@@ -73,6 +73,11 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "dr_flac.h"
 #include "hxcmod.h"
 #include "VS1053.h"
+#if defined(PICOMITEMIN)
+#define AUDIO_USES_VS1053 0
+#else
+#define AUDIO_USES_VS1053 (Option.AUDIO_MISO_PIN != 0)
+#endif
 extern BYTE MDD_SDSPI_CardDetectState(void);
 #define MAXALBUM 20
 extern int InitSDCard(void);
@@ -677,7 +682,7 @@ static inline void i2sconvert(int16_t *fbuff, int16_t *sbuff, int count)
 	}
 }
 
-size_t onRead(void *userdata, char *pBufferOut, size_t bytesToRead)
+size_t __not_in_flash_func(onRead)(void *userdata, char *pBufferOut, size_t bytesToRead)
 {
 	unsigned int nbr;
 	FileGetData(WAV_fnbr, pBufferOut, bytesToRead, &nbr);
@@ -762,7 +767,9 @@ void CloseAudio(int all)
 	}
 	if (XDCS != -1)
 	{
+#if !defined(PICOMITEMIN)
 		VS1053reset(XRST);
+#endif
 		XDCS = XCS = DREQ = XRST = -1;
 		midienabled = 0;
 		streamsize = 0;
@@ -797,6 +804,7 @@ void setrate(int rate)
 		pio_sm_set_clkdiv(pioi2s, i2ssm, clockdiv);
 	}
 }
+#if !defined(PICOMITEMIN)
 void playvs1053(int mode)
 {
 	XCS = PinDef[Option.AUDIO_CS_PIN].GPno;
@@ -856,6 +864,18 @@ void playimmediatevs1053(int play)
 	CurrentlyPlaying = play;
 	playChunk((uint8_t *)toneheader, sizeof(toneheader));
 }
+#else
+void playvs1053(int mode)
+{
+	(void)mode;
+	error("VS1053 audio not enabled");
+}
+void playimmediatevs1053(int play)
+{
+	(void)play;
+	error("VS1053 audio not enabled");
+}
+#endif
 void wavcallback(char *p)
 {
 	int actualrate;
@@ -870,7 +890,7 @@ void wavcallback(char *p)
 	if (!BasicFileOpen(p, WAV_fnbr, FA_READ))
 		return;
 	strcpy(WAVfilename, p);
-	if (Option.AUDIO_MISO_PIN)
+	if (AUDIO_USES_VS1053)
 	{
 		playvs1053(P_WAV);
 		return;
@@ -924,6 +944,59 @@ void wavcallback(char *p)
 	pwm_set_irq0_enabled(AUDIO_SLICE, true);
 	pwm_set_enabled(AUDIO_SLICE, true);
 }
+
+#ifdef USBKEYBOARD
+// Play a WAV file embedded as a byte array in flash (e.g. from a C header).
+// Safe to call from main-loop context (not from hard interrupt).
+void PlayMemWav(const unsigned char *data, unsigned int len)
+{
+	if (!(Option.AUDIO_L || Option.AUDIO_CLK_PIN || Option.audio_i2s_bclk))
+		return;
+	if (CurrentlyPlaying != P_NOTHING)
+		return;
+	drwav_allocation_callbacks allocationCallbacks = {NULL, my_malloc, NULL, my_free};
+	mywav = GetMemory(sizeof(drwav));
+	if (!drwav_init_memory(mywav, data, len, &allocationCallbacks))
+	{
+		FreeMemorySafe((void **)&mywav);
+		return;
+	}
+	audiorepeat = 1;
+	int actualrate = mywav->sampleRate;
+	if (Option.AUDIO_L)
+	{
+		while (actualrate < 32000)
+		{
+			actualrate += mywav->sampleRate;
+			audiorepeat++;
+		}
+	}
+	setrate(actualrate);
+	FreeMemorySafe((void **)&sbuff1);
+	FreeMemorySafe((void **)&sbuff2);
+	sbuff1 = GetMemory(WAV_BUFFER_SIZE);
+	sbuff2 = GetMemory(WAV_BUFFER_SIZE);
+	ubuff1 = (uint16_t *)sbuff1;
+	ubuff2 = (uint16_t *)sbuff2;
+	mono = (mywav->channels == 1 ? 1 : 0);
+	g_buff1 = (int16_t *)sbuff1;
+	g_buff2 = (int16_t *)sbuff2;
+	bcount[1] = (volatile unsigned int)drwav_read_pcm_frames_s16(mywav, WAV_BUFFER_SIZE / 4, (drwav_int16 *)sbuff1) * mywav->channels;
+	if (Option.audio_i2s_bclk)
+		i2sconvert((drwav_int16 *)sbuff1, (drwav_int16 *)sbuff1, bcount[1]);
+	else
+		iconvert(ubuff1, (int16_t *)sbuff1, bcount[1]);
+	wav_filesize = bcount[1];
+	CurrentlyPlaying = P_WAV;
+	swingbuf = 1;
+	nextbuf = 2;
+	ppos = 0;
+	playreadcomplete = 0;
+	pwm_set_irq0_enabled(AUDIO_SLICE, true);
+	pwm_set_enabled(AUDIO_SLICE, true);
+}
+#endif /* USBKEYBOARD */
+
 void mp3callback(char *p, int position)
 {
 	audiorepeat = 1;
@@ -937,7 +1010,7 @@ void mp3callback(char *p, int position)
 	strcpy(WAVfilename, p);
 	if (!BasicFileOpen(p, WAV_fnbr, FA_READ))
 		return;
-	if (Option.AUDIO_MISO_PIN)
+	if (AUDIO_USES_VS1053)
 	{
 		positionfile(WAV_fnbr, position, true);
 		playvs1053(P_MP3);
@@ -1026,7 +1099,7 @@ void flaccallback(char *p)
 	if (!BasicFileOpen(p, WAV_fnbr, FA_READ))
 		return;
 	strcpy(WAVfilename, p);
-	if (Option.AUDIO_MISO_PIN)
+	if (AUDIO_USES_VS1053)
 	{
 		playvs1053(P_FLAC);
 		return;
@@ -1086,6 +1159,132 @@ void flaccallback(char *p)
 	nextbuf = 2;
 	ppos = 0;
 	playreadcomplete = 0;
+	pwm_set_irq0_enabled(AUDIO_SLICE, true);
+	pwm_set_enabled(AUDIO_SLICE, true);
+}
+void modcallback(char *p)
+{
+	int fsize;
+	if (strchr(p, '.') == NULL)
+		strcat(p, ".MOD");
+	if (CurrentlyPlaying == P_MOD)
+		CloseAudio(0);
+	if (CurrentlyPlaying != P_NOTHING)
+		return;
+#ifdef rp2350
+	if (!(modbuff || PSRAMsize))
+		return;
+#else
+	if (!modbuff)
+		return;
+#endif
+	fsize = FileSize(p);
+	if (fsize <= 0)
+		return;
+	WAV_fnbr = FindFreeFileNbr();
+	if (!BasicFileOpen(p, WAV_fnbr, FA_READ))
+		return;
+	strcpy(WAVfilename, p);
+	modfilesamplerate = 22050;
+	WAVInterrupt = NULL;
+	WAVcomplete = 0;
+	noloop = 0;
+	sbuff1 = GetMemory(MOD_BUFFER_SIZE);
+	sbuff2 = GetMemory(MOD_BUFFER_SIZE);
+	ubuff1 = (uint16_t *)sbuff1;
+	ubuff2 = (uint16_t *)sbuff2;
+	g_buff1 = (int16_t *)sbuff1;
+	g_buff2 = (int16_t *)sbuff2;
+	int alreadythere = 1;
+#ifdef rp2350
+	if (!PSRAMsize)
+	{
+#endif
+		if (RoundUpK4(fsize) > 1024 * Option.modbuffsize)
+		{
+			FileClose(WAV_fnbr);
+			FreeMemorySafe((void **)&sbuff1);
+			FreeMemorySafe((void **)&sbuff2);
+			return;
+		}
+		char *check = modbuff;
+		while (!FileEOF(WAV_fnbr))
+		{
+			if (*check++ != FileGetChar(WAV_fnbr))
+			{
+				alreadythere = 0;
+				break;
+			}
+		}
+#ifdef rp2350
+	}
+	else
+	{
+		modbuff = GetMemory(RoundUpK4(fsize));
+		positionfile(WAV_fnbr, 0, false);
+		char *r = modbuff;
+		while (!FileEOF(WAV_fnbr))
+			*r++ = FileGetChar(WAV_fnbr);
+	}
+#endif
+	if (!alreadythere)
+	{
+		unsigned char *r = GetTempMemory(256);
+		positionfile(WAV_fnbr, 0, false);
+		uint32_t j = RoundUpK4(TOP_OF_SYSTEM_FLASH);
+		disable_interrupts_pico();
+		safe_flash_range_erase(j, RoundUpK4(fsize));
+		enable_interrupts_pico();
+		while (!FileEOF(WAV_fnbr))
+		{
+			memset(r, 0, 256);
+			for (int i = 0; i < 256; i++)
+			{
+				if (FileEOF(WAV_fnbr))
+					break;
+				r[i] = FileGetChar(WAV_fnbr);
+			}
+			disable_interrupts_pico();
+			safe_flash_range_program(j, (uint8_t *)r, 256);
+			enable_interrupts_pico();
+			routinechecks();
+			j += 256;
+		}
+		FileClose(WAV_fnbr);
+	}
+	FileClose(WAV_fnbr);
+	mcontext = GetMemory(sizeof(modcontext));
+	hxcmod_init(mcontext);
+	hxcmod_setcfg(mcontext, modfilesamplerate, 1, 1);
+	hxcmod_load(mcontext, (void *)modbuff, fsize);
+	if (!mcontext->mod_loaded)
+	{
+		FreeMemorySafe((void **)&mcontext);
+		FreeMemorySafe((void **)&sbuff1);
+		FreeMemorySafe((void **)&sbuff2);
+		return;
+	}
+	if (AUDIO_USES_VS1053)
+	{
+		playvs1053(P_MOD);
+		return;
+	}
+	hxcmod_fillbuffer(mcontext, (msample *)sbuff1, MOD_BUFFER_SIZE / 8, NULL, noloop);
+	wav_filesize = MOD_BUFFER_SIZE / 4;
+	bcount[1] = MOD_BUFFER_SIZE / 4;
+	bcount[2] = 0;
+	if (Option.audio_i2s_bclk)
+		i2sconvert(g_buff1, (int16_t *)sbuff1, bcount[1]);
+	else
+		iconvert(ubuff1, (int16_t *)sbuff1, bcount[1]);
+	nchannels = 2;
+	CurrentlyPlaying = P_MOD;
+	swingbuf = 1;
+	nextbuf = 2;
+	ppos = 0;
+	playreadcomplete = 0;
+	setrate(44100);
+	audiorepeat = 2;
 	pwm_set_irq0_enabled(AUDIO_SLICE, true);
 	pwm_set_enabled(AUDIO_SLICE, true);
 }
@@ -1227,7 +1426,7 @@ void MIPS16 cmd_play(void)
 		error((char *)"Audio not enabled");
 	if ((tp = checkstring(cmdline, (unsigned char *)"LOAD SOUND")))
 	{
-		if (Option.AUDIO_MISO_PIN)
+		if (AUDIO_USES_VS1053)
 			error("Not available with VS1053 audio");
 		if (usertable != NULL)
 			error("Already loaded");
@@ -1410,7 +1609,7 @@ void MIPS16 cmd_play(void)
 			vol_target_right = getint(argv[2], 0, 100);
 		if (CurrentlyPlaying == P_TONE && vol_target_left != vol_target_right && mono)
 			mono = 0;
-		if (Option.AUDIO_MISO_PIN && CurrentlyPlaying != P_NOTHING)
+		if (AUDIO_USES_VS1053 && CurrentlyPlaying != P_NOTHING)
 		{
 			vol_left = vol_target_left;
 			vol_right = vol_target_right;
@@ -1481,7 +1680,7 @@ void MIPS16 cmd_play(void)
 				setrate(PWM_FREQ);
 				PhaseAC_right = 0.0;
 				PhaseAC_left = 0.0;
-				if (Option.AUDIO_MISO_PIN)
+				if (AUDIO_USES_VS1053)
 					playimmediatevs1053(P_TONE);
 				FreeMemorySafe((void **)&sbuff1);
 				FreeMemorySafe((void **)&sbuff2);
@@ -1497,7 +1696,7 @@ void MIPS16 cmd_play(void)
 				swingbuf = 1;
 				nextbuf = 2;
 				playreadcomplete = 0;
-				if (Option.AUDIO_MISO_PIN)
+				if (AUDIO_USES_VS1053)
 				{
 					bcount[1] = fillToneBuffer(sbuff1, TONE_BUFFER_SIZE) * 2; // bytes for VS1053
 				}
@@ -1945,7 +2144,7 @@ void MIPS16 cmd_play(void)
 			}
 			if (lastleft != local_sound_mode_left)
 			{
-				if (!Option.AUDIO_MISO_PIN)
+				if (!AUDIO_USES_VS1053)
 					rampvolume(1, 0, channel, 0);
 				sound_PhaseAC_left[channel] = 0.0;
 			}
@@ -1968,7 +2167,7 @@ void MIPS16 cmd_play(void)
 			}
 			if (lastright != local_sound_mode_right)
 			{
-				if (!Option.AUDIO_MISO_PIN)
+				if (!AUDIO_USES_VS1053)
 					rampvolume(0, 1, channel, 0);
 				sound_PhaseAC_right[channel] = 0.0;
 			}
@@ -1979,13 +2178,13 @@ void MIPS16 cmd_play(void)
 				local_sound_v_right = 25;
 			local_sound_v_right = local_sound_v_right * 41 / (100 / MAXSOUNDS);
 		}
-		if (left && right && local_sound_v_left == local_sound_v_right && sound_v_left[channel] == sound_v_right[channel] && !Option.AUDIO_MISO_PIN)
+		if (left && right && local_sound_v_left == local_sound_v_right && sound_v_left[channel] == sound_v_right[channel] && !AUDIO_USES_VS1053)
 			rampvolume(1, 1, channel, local_sound_v_left);
 		else
 		{
-			if (left && !Option.AUDIO_MISO_PIN)
+			if (left && !AUDIO_USES_VS1053)
 				rampvolume(1, 0, channel, local_sound_v_left);
-			if (right && !Option.AUDIO_MISO_PIN)
+			if (right && !AUDIO_USES_VS1053)
 				rampvolume(0, 1, channel, local_sound_v_right);
 		}
 		if (left)
@@ -1995,7 +2194,7 @@ void MIPS16 cmd_play(void)
 		if (!(CurrentlyPlaying == P_SOUND || CurrentlyPlaying == P_PAUSE_SOUND))
 		{
 			setrate(PWM_FREQ);
-			if (Option.AUDIO_MISO_PIN)
+			if (AUDIO_USES_VS1053)
 				playimmediatevs1053(P_SOUND);
 			FreeMemorySafe((void **)&sbuff1);
 			FreeMemorySafe((void **)&sbuff2);
@@ -2011,7 +2210,7 @@ void MIPS16 cmd_play(void)
 			swingbuf = 1;
 			nextbuf = 2;
 			playreadcomplete = 0;
-			if (Option.AUDIO_MISO_PIN)
+			if (AUDIO_USES_VS1053)
 				bcount[1] = fillSoundBuffer(sbuff1, SOUND_BUFFER_SIZE) * 2; // bytes for VS1053
 			else
 				bcount[1] = fillSoundBuffer(sbuff1, SOUND_BUFFER_SIZE);
@@ -2040,8 +2239,13 @@ void MIPS16 cmd_play(void)
 		getfullfilename(p, q);
 		if (!InitSDCard())
 			return;
-		if (!FatFSFileSystem && mytoupper(p[0]) == 'B' && p[1] == ':')
-			FatFSFileSystem = 1;
+		if (!FatFSFileSystem && p[1] == ':')
+		{
+			if (mytoupper(p[0]) == 'B')
+				FatFSFileSystem = 1;
+			else if (mytoupper(p[0]) == 'C')
+				FatFSFileSystem = 2;
+		}
 		WAVInterrupt = NULL;
 		WAVcomplete = 0;
 		if (argc == 3)
@@ -2075,7 +2279,14 @@ void MIPS16 cmd_play(void)
 					if (pattern_matching(djd.pat, fno.fname, 0, 0))
 					{
 						// Get a directory item
-						strcpy(alist[trackstoplay].fn, "B:");
+						alist[trackstoplay].fn[0] =
+#if defined(USBKEYBOARD) && defined(rp2350)
+							(FatFSFileSystem == 2) ? 'C' : 'B';
+#else
+							'B';
+#endif
+						alist[trackstoplay].fn[1] = ':';
+						alist[trackstoplay].fn[2] = 0;
 						strcat(alist[trackstoplay].fn, q);
 						strcat(alist[trackstoplay].fn, "/");
 						strcat(alist[trackstoplay].fn, fno.fname);
@@ -2105,7 +2316,7 @@ void MIPS16 cmd_play(void)
 		getfullfilename(p, q);
 		memmove(&q[2], q, strlen(q));
 		q[1] = ':';
-		q[0] = FatFSFileSystem ? 'B' : 'A';
+		q[0] = FatFSFileSystem == 0 ? 'A' : (FatFSFileSystem == 1 ? 'B' : 'C');
 		wavcallback(q);
 		return;
 	}
@@ -2127,8 +2338,13 @@ void MIPS16 cmd_play(void)
 		getfullfilename(p, q);
 		if (!InitSDCard())
 			return;
-		if (!FatFSFileSystem && mytoupper(p[0]) == 'B' && p[1] == ':')
-			FatFSFileSystem = 1;
+		if (!FatFSFileSystem && p[1] == ':')
+		{
+			if (mytoupper(p[0]) == 'B')
+				FatFSFileSystem = 1;
+			else if (mytoupper(p[0]) == 'C')
+				FatFSFileSystem = 2;
+		}
 		WAVInterrupt = NULL;
 		WAVcomplete = 0;
 		if (argc == 3)
@@ -2162,7 +2378,14 @@ void MIPS16 cmd_play(void)
 					if (pattern_matching(djd.pat, fno.fname, 0, 0))
 					{
 						// Get a directory item
-						strcpy(alist[trackstoplay].fn, "B:");
+						alist[trackstoplay].fn[0] =
+#if defined(USBKEYBOARD) && defined(rp2350)
+							(FatFSFileSystem == 2) ? 'C' : 'B';
+#else
+							'B';
+#endif
+						alist[trackstoplay].fn[1] = ':';
+						alist[trackstoplay].fn[2] = 0;
 						strcat(alist[trackstoplay].fn, q);
 						strcat(alist[trackstoplay].fn, "/");
 						strcat(alist[trackstoplay].fn, fno.fname);
@@ -2192,10 +2415,11 @@ void MIPS16 cmd_play(void)
 		getfullfilename(p, q);
 		memmove(&q[2], q, strlen(q));
 		q[1] = ':';
-		q[0] = FatFSFileSystem ? 'B' : 'A';
+		q[0] = FatFSFileSystem == 0 ? 'A' : (FatFSFileSystem == 1 ? 'B' : 'C');
 		flaccallback(q);
 		return;
 	}
+#if !defined(PICOMITEMIN)
 	if ((tp = checkstring(cmdline, (unsigned char *)"NOTE")))
 	{
 		if (!Option.AUDIO_MISO_PIN)
@@ -2386,7 +2610,14 @@ void MIPS16 cmd_play(void)
 					if (pattern_matching(djd.pat, fno.fname, 0, 0))
 					{
 						// Get a directory item
-						strcpy(alist[trackstoplay].fn, "B:");
+						alist[trackstoplay].fn[0] =
+#if defined(USBKEYBOARD) && defined(rp2350)
+							(FatFSFileSystem == 2) ? 'C' : 'B';
+#else
+							'B';
+#endif
+						alist[trackstoplay].fn[1] = ':';
+						alist[trackstoplay].fn[2] = 0;
 						strcat(alist[trackstoplay].fn, q);
 						strcat(alist[trackstoplay].fn, "/");
 						strcat(alist[trackstoplay].fn, fno.fname);
@@ -2415,7 +2646,7 @@ void MIPS16 cmd_play(void)
 		getfullfilename(p, q);
 		memmove(&q[2], q, strlen(q));
 		q[1] = ':';
-		q[0] = FatFSFileSystem ? 'B' : 'A';
+		q[0] = FatFSFileSystem == 0 ? 'A' : (FatFSFileSystem == 1 ? 'B' : 'C');
 		midicallback(q);
 		return;
 	}
@@ -2483,6 +2714,7 @@ void MIPS16 cmd_play(void)
 		mp3callback(p, num);
 		return;
 	}
+#endif
 	if ((tp = checkstring(cmdline, (unsigned char *)"MP3")))
 	{
 		char *p;
@@ -2492,10 +2724,10 @@ void MIPS16 cmd_play(void)
 		if (!(argc == 1 || argc == 3))
 			StandardError(2);
 #ifndef rp2350
-		if (!Option.AUDIO_MISO_PIN)
+		if (!AUDIO_USES_VS1053)
 			error("Only available with VS1053 audio");
 #else
-		if (Option.CPU_Speed < 200000 && !Option.AUDIO_MISO_PIN)
+		if (Option.CPU_Speed < 200000 && !AUDIO_USES_VS1053)
 			error("CPUSPEED >=200000 for MP3 playback");
 #endif
 		if (CurrentlyPlaying == P_WAVOPEN)
@@ -2508,8 +2740,13 @@ void MIPS16 cmd_play(void)
 		getfullfilename(p, q);
 		if (!InitSDCard())
 			return;
-		if (!FatFSFileSystem && mytoupper(p[0]) == 'B' && p[1] == ':')
-			FatFSFileSystem = 1;
+		if (!FatFSFileSystem && p[1] == ':')
+		{
+			if (mytoupper(p[0]) == 'B')
+				FatFSFileSystem = 1;
+			else if (mytoupper(p[0]) == 'C')
+				FatFSFileSystem = 2;
+		}
 		WAVInterrupt = NULL;
 		WAVcomplete = 0;
 		if (argc == 3)
@@ -2543,7 +2780,14 @@ void MIPS16 cmd_play(void)
 					if (pattern_matching(djd.pat, fno.fname, 0, 0))
 					{
 						// Get a directory item
-						strcpy(alist[trackstoplay].fn, "B:");
+						alist[trackstoplay].fn[0] =
+#if defined(USBKEYBOARD) && defined(rp2350)
+							(FatFSFileSystem == 2) ? 'C' : 'B';
+#else
+							'B';
+#endif
+						alist[trackstoplay].fn[1] = ':';
+						alist[trackstoplay].fn[2] = 0;
 						strcat(alist[trackstoplay].fn, q);
 						strcat(alist[trackstoplay].fn, "/");
 						strcat(alist[trackstoplay].fn, fno.fname);
@@ -2573,7 +2817,7 @@ void MIPS16 cmd_play(void)
 		getfullfilename(p, q);
 		memmove(&q[2], q, strlen(q));
 		q[1] = ':';
-		q[0] = FatFSFileSystem ? 'B' : 'A';
+		q[0] = FatFSFileSystem == 0 ? 'A' : (FatFSFileSystem == 1 ? 'B' : 'C');
 		mp3callback(q, 0);
 		return;
 	}
@@ -2612,10 +2856,10 @@ void MIPS16 cmd_play(void)
 		getfullfilename(p, q);
 		memmove(&q[2], q, strlen(q));
 		q[1] = ':';
-		q[0] = FatFSFileSystem ? 'B' : 'A';
+		q[0] = FatFSFileSystem == 0 ? 'A' : (FatFSFileSystem == 1 ? 'B' : 'C');
 		strcpy(WAVfilename, q);
-		WAV_fnbr = FindFreeFileNbr();
 		fsize = FileSize(p);
+		WAV_fnbr = FindFreeFileNbr();
 		if (!BasicFileOpen(p, WAV_fnbr, FA_READ))
 			return;
 		if (argc == 3)
@@ -2696,7 +2940,7 @@ void MIPS16 cmd_play(void)
 			MMPrintString((char *)mcontext->song.title);
 			PRet();
 		}
-		if (Option.AUDIO_MISO_PIN)
+		if (AUDIO_USES_VS1053)
 		{
 			playvs1053(P_MOD);
 			return;
@@ -2805,7 +3049,7 @@ void StopAudio(void)
 			setrate(PWM_FREQ);
 		}
 		ppos = 0;
-		if (Option.AUDIO_MISO_PIN && (CurrentlyPlaying == P_TONE || CurrentlyPlaying == P_SOUND))
+		if (AUDIO_USES_VS1053 && (CurrentlyPlaying == P_TONE || CurrentlyPlaying == P_SOUND))
 			CurrentlyPlaying = P_WAVOPEN;
 		else
 			CurrentlyPlaying = P_NOTHING;
@@ -2879,7 +3123,7 @@ static int fillSoundBuffer(char *buf, int bufsize)
 	int n = 0;
 	int ramp_counter = 0;
 
-	if (Option.AUDIO_MISO_PIN)
+	if (AUDIO_USES_VS1053)
 	{
 		int16_t *samples = (int16_t *)buf;
 		while (n < max_samples)
@@ -3081,9 +3325,9 @@ void checkWAVinput(void)
 		return;
 	if (swingbuf != nextbuf)
 	{ // IR has moved to next buffer
-		if (Option.AUDIO_MISO_PIN)
+		if (AUDIO_USES_VS1053)
 		{
-			if (CurrentlyPlaying == P_FLAC || CurrentlyPlaying == P_WAV || (CurrentlyPlaying == P_MP3 && Option.AUDIO_MISO_PIN) || CurrentlyPlaying == P_MIDI)
+			if (CurrentlyPlaying == P_FLAC || CurrentlyPlaying == P_WAV || (CurrentlyPlaying == P_MP3 && AUDIO_USES_VS1053) || CurrentlyPlaying == P_MIDI)
 			{
 				if (swingbuf == 2)
 				{
@@ -3351,7 +3595,7 @@ void checkWAVinput(void)
 			}
 			else if (CurrentlyPlaying == P_MIDI)
 			{
-				if (Option.AUDIO_MISO_PIN && VSbuffer > 32)
+				if (AUDIO_USES_VS1053 && VSbuffer > 32)
 					return;
 				trackplaying++;
 				midicallback(alist[trackplaying].fn);
@@ -3365,7 +3609,7 @@ void audio_checks(void)
 	{
 		if (!(bcount[1] || bcount[2]))
 		{
-			if (Option.AUDIO_MISO_PIN && VSbuffer > 32)
+			if (AUDIO_USES_VS1053 && VSbuffer > 32)
 				return;
 			int wasPlaying = CurrentlyPlaying; // save before StopAudio changes it
 			if (CurrentlyPlaying == P_FLAC)
@@ -3375,7 +3619,7 @@ void audio_checks(void)
 			if (CurrentlyPlaying == P_WAV)
 				FreeMemorySafe((void **)&mywav);
 #ifdef rp2350
-			if (CurrentlyPlaying == P_MP3 && Option.AUDIO_MISO_PIN == 0)
+			if (CurrentlyPlaying == P_MP3 && !AUDIO_USES_VS1053)
 			{
 				drmp3_uninit(mymp3);
 				FreeMemorySafe((void **)&mymp3);
@@ -3384,7 +3628,7 @@ void audio_checks(void)
 			FreeMemorySafe((void **)&sbuff1);
 			FreeMemorySafe((void **)&sbuff2);
 			FreeMemorySafe((void **)&alist);
-			if (Option.AUDIO_MISO_PIN)
+			if (AUDIO_USES_VS1053)
 			{
 				pwm_set_irq0_enabled(AUDIO_SLICE, false);
 				CurrentlyPlaying = P_NOTHING;

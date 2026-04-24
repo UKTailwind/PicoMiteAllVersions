@@ -183,13 +183,18 @@ uint8_t PSRAMpin;
 #include "pico/multicore.h"
     mutex_t frameBufferMutex; // mutex to lock frame buffer
 #else
+#ifdef PICOMITEMIN
+#define MES_SIGNON "\rPicoMiteMin MMBasic " CHIP " V" VERSION "\r\n"
+#else
 #define MES_SIGNON "\rPicoMite MMBasic " CHIP " V" VERSION "\r\n"
+#endif
 #include "pico/multicore.h"
     mutex_t frameBufferMutex; // mutex to lock frame buffer
 #endif
     char LCDAttrib = 0;
 #endif
 #define KEYCHECKTIME 20
+#define BUFFER_REFRESH_INTERVAL_MS 20
 #define LCDBLCHECKTIME 1000 // once per second - staggered   // *EB*
 #define KBDBLCHECKTIME 1000 // once per second - staggered   // *EB*
     int ListCnt;
@@ -487,7 +492,7 @@ uint8_t PSRAMpin;
     const char DaysInMonth[] = {0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
     char banner[64];
 // Helper macro for mutex-protected operations
-#ifdef PICOMITE
+#if defined(PICOMITE) || defined(PICOMITEMIN)
 #define WITH_FRAMEBUFFER_LOCK(condition, code)       \
     do                                               \
     {                                                \
@@ -672,7 +677,7 @@ uint8_t PSRAMpin;
         if (bufferupdatetimer == 0)
         {
 
-            bufferupdatetimer = 10;
+            bufferupdatetimer = BUFFER_REFRESH_INTERVAL_MS;
 
             if (Option.DISPLAY_TYPE >= NEXTGEN &&
                 !(low_x == silly_low && high_x == silly_high &&
@@ -681,15 +686,22 @@ uint8_t PSRAMpin;
 
                 if (Option.Refresh)
                 {
-                    if (multicore_fifo_push_timeout_us(6, 10))
-                    {
-                        multicore_fifo_push_blocking((uint32_t)low_x | (high_x << 16));
-                        multicore_fifo_push_blocking((uint32_t)low_y | (high_y << 16));
-                        multicore_fifo_push_blocking((uint32_t)ScrollStart);
+                    int dirty_x1 = low_x;
+                    int dirty_x2 = high_x;
+                    int dirty_y1 = low_y;
+                    int dirty_y2 = high_y;
 
-                        low_x = low_y = silly_low;
-                        high_x = high_y = silly_high;
-                    }
+                    uint32_t xbounds = (uint32_t)dirty_x1 | (dirty_x2 << 16);
+                    uint32_t ybounds = (uint32_t)dirty_y1 | (dirty_y2 << 16);
+                    uint32_t scroll = (uint32_t)ScrollStart;
+
+                    // Fully blocking enqueue for benchmarking refresh cost.
+                    multicore_fifo_push_blocking(6);
+                    multicore_fifo_push_blocking(xbounds);
+                    multicore_fifo_push_blocking(ybounds);
+                    multicore_fifo_push_blocking(scroll);
+                    low_x = low_y = silly_low;
+                    high_x = high_y = silly_high;
                 }
             }
         }
@@ -1022,6 +1034,17 @@ int __not_in_flash_func(MMInkey)(void)
     {
         int c, nbrchars = 0;
         char *tp;
+        static int skip_console_lf = 0;
+
+#ifdef MMBASIC_FM
+        if (filenbr == 0 && fm_sanitize_next_console_input)
+        {
+            while (MMInkey() != -1)
+                ;
+            fm_sanitize_next_console_input = 0;
+            skip_console_lf = 0;
+        }
+#endif
 
         while (1)
         {
@@ -1031,6 +1054,17 @@ int __not_in_flash_func(MMInkey)(void)
             c = MMfgetc(filenbr);
             if (c <= 0)
                 continue; // keep looping if there are no chars
+
+            // If the previous console line ended on CR, ignore a following LF once.
+            if (filenbr == 0 && skip_console_lf)
+            {
+                if (c == '\n')
+                {
+                    skip_console_lf = 0;
+                    continue;
+                }
+                skip_console_lf = 0;
+            }
 
             // if this is the console, check for a programmed function key and insert the text
             if (filenbr == 0)
@@ -1098,20 +1132,31 @@ int __not_in_flash_func(MMInkey)(void)
             }
 
             if (c == '\n')
-            {          // what to do with a newline
-                break; // a newline terminates a line (for a file)
+            { // what to do with a newline
+                if (filenbr == 0)
+                {
+                    if (EchoOption)
+                        MMPrintString("\r\n");
+                    break; // LF-only terminals terminate console input here
+                }
+                break; // a newline terminates a line for a file
             }
 
             if (c == '\r')
             {
-                if (filenbr == 0 && EchoOption)
+                if (filenbr == 0)
                 {
-                    MMPrintString("\r\n");
+                    if (EchoOption)
+                        MMPrintString("\r\n");
+                    skip_console_lf = 1;
                     break; // on the console this means the end of the line - stop collecting
                 }
                 else
                     continue; // for files loop around looking for the following newline
             }
+
+            if (filenbr == 0 && !isprint(c))
+                continue; // ignore stray console control codes
 
             if (isprint(c))
             {
@@ -2522,6 +2567,7 @@ int __not_in_flash_func(MMInkey)(void)
         routinechecks();
         if (MMAbort)
         {
+            MMAbort = false;
             WDTimer = 0; // turn off the watchdog timer
             calibrate = 0;
             ShowCursor(false);
@@ -2537,6 +2583,13 @@ int __not_in_flash_func(MMInkey)(void)
             }
 #endif
             do_end(false);
+#ifdef MMBASIC_FM
+            if (fm_program_launched_from_fm)
+            {
+                CurrentLinePtr = NULL;
+                cmdline = (unsigned char *)"";
+            }
+#endif
             longjmp(mark, 1); // jump back to the input prompt
         }
     }
@@ -5523,7 +5576,7 @@ uint32_t testPSRAM(void)
 
 #endif
 #ifdef PICOMITE
-        if (Option.DISPLAY_TYPE >= VIRTUAL && Option.DISPLAY_TYPE <= VIRTUAL_M)
+        if (IS_VIRTUAL_DISPLAY(Option.DISPLAY_TYPE))
         {
             int framebuffersize = 320 * 240 / 2;
             heap_memory_size -= framebuffersize;
@@ -5630,7 +5683,9 @@ uint32_t testPSRAM(void)
 #endif
         InitBasic();
 #ifndef PICOMITEVGA
+#ifndef PICOMITEMIN
         InitDisplaySSD();
+#endif
         InitDisplaySPI(0);
 #if PICOMITERP2350
         InitDisplay222();
@@ -5930,6 +5985,22 @@ uint32_t testPSRAM(void)
         }
         while (1)
         {
+#ifdef MMBASIC_FM
+            if (fm_program_launched_from_fm || fm_relaunch_status_valid)
+            {
+                fm_program_launched_from_fm = 0;
+                CurrentLinePtr = NULL;
+                cmdline = (unsigned char *)"";
+                memset(tknbuf, 0, STRINGSIZE);
+                {
+                    unsigned short fmtkn = GetCommandValue((unsigned char *)"FM");
+                    tknbuf[0] = (fmtkn & 0x7f) + C_BASETOKEN;
+                    tknbuf[1] = (fmtkn >> 7) + C_BASETOKEN;
+                }
+                goto autorun;
+                continue;
+            }
+#endif
             if (Option.DISPLAY_CONSOLE)
             {
                 SetFont(PromptFont);
@@ -5996,6 +6067,10 @@ uint32_t testPSRAM(void)
                     strcpy(p, "drive \"a:\"");
                 if (mytoupper(*p) == 'B')
                     strcpy(p, "drive \"b:\"");
+#if defined(USBKEYBOARD) && defined(rp2350)
+                if (mytoupper(*p) == 'C')
+                    strcpy(p, "drive \"c:\"");
+#endif
             }
             if (*p == '*' && p[1] != '(')
             { // shortform RUN command so convert to a normal version
@@ -6016,6 +6091,21 @@ uint32_t testPSRAM(void)
                 CurrentLinePtr = 0;
             }
             ExecuteProgram(tknbuf); // execute the line straight away
+#ifdef MMBASIC_FM
+            if (fm_program_launched_from_fm || fm_relaunch_status_valid)
+            {
+                fm_program_launched_from_fm = 0;
+                CurrentLinePtr = NULL;
+                cmdline = (unsigned char *)"";
+                memset(tknbuf, 0, STRINGSIZE);
+                {
+                    unsigned short fmtkn = GetCommandValue((unsigned char *)"FM");
+                    tknbuf[0] = (fmtkn & 0x7f) + C_BASETOKEN;
+                    tknbuf[1] = (fmtkn >> 7) + C_BASETOKEN;
+                }
+                goto autorun;
+            }
+#endif
             if (i)
             {
                 cmdline = NULL;

@@ -27,6 +27,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 
 ************************************************************************************************************************/
 
+#define MMBASIC_C_INTERNAL  /* suppress static inline FloatToInt32/64 in MMBasic.h */
 #include <stdio.h>
 #include <limits.h>
 #include <stdarg.h>
@@ -38,6 +39,9 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "Custom.h"
 #include "Hardware_Includes.h"
 #include "Turtle.h"
+#ifdef CACHE
+#include "MMtrace.h"
+#endif
 #include "hardware/flash.h"
 #ifndef PICOMITEWEB
 #include "pico/multicore.h"
@@ -133,11 +137,183 @@ jmp_buf mark;                     // longjump to recover from an error and abort
 jmp_buf ErrNext;                  // longjump to recover from an error and continue
 unsigned char inpbuf[STRINGSIZE]; // used to store user keystrokes until we have a line
 unsigned char tknbuf[STRINGSIZE]; // used to store the tokenised representation of the users input line
+
+// ---------------------------------------------------------------------------
+// Performance instrumentation counters.
+//
+// All large counter arrays are heap-allocated only when OPTION PROFILING ON
+// is in effect; the pointer is the gate (NULL = disabled, no allocation, no
+// per-statement overhead beyond a single null check).
+//
+// Lifetime: ProfilingAlloc() called from OPTION PROFILING ON; ProfilingFree()
+// called from OPTION PROFILING OFF.  ResetPerfCounters() is called from RUN
+// only when profiling is currently enabled.
+// ---------------------------------------------------------------------------
+#define PERF_CMDTOKEN_MAX 1024
+uint32_t *g_perf_cmdcount = NULL;      // [PERF_CMDTOKEN_MAX] when enabled
+uint32_t *g_perf_subcall_count = NULL; // [MAXSUBFUN]          when enabled
+uint64_t *g_perf_subtime_us = NULL;    // [MAXSUBFUN] inclusive (self+callees)
+uint64_t *g_perf_subexcl_us = NULL;    // [MAXSUBFUN] exclusive (self only)
+uint32_t g_perf_usercmd_count;         // defined (non-C) sub dispatches
+uint32_t g_perf_findvar_calls;         // total findvar() calls
+uint32_t g_perf_findvar_locals;        // findvar() calls that resolved to a local slot
+uint32_t g_perf_findvar_globals;       // findvar() calls that resolved to a global slot
+uint64_t g_perf_start_us;              // time_us_64() sampled at program start
+int g_option_profiling = 0;            // OPTION PROFILING - master gate
+
+void ProfilingAlloc(void)
+{
+    if (g_perf_cmdcount == NULL)
+        g_perf_cmdcount = (uint32_t *)GetMemory(PERF_CMDTOKEN_MAX * sizeof(uint32_t));
+    if (g_perf_subcall_count == NULL)
+        g_perf_subcall_count = (uint32_t *)GetMemory(MAXSUBFUN * sizeof(uint32_t));
+    if (g_perf_subtime_us == NULL)
+        g_perf_subtime_us = (uint64_t *)GetMemory(MAXSUBFUN * sizeof(uint64_t));
+    if (g_perf_subexcl_us == NULL)
+        g_perf_subexcl_us = (uint64_t *)GetMemory(MAXSUBFUN * sizeof(uint64_t));
+    /* GetMemory zeros, but be explicit for re-enables.                     */
+    memset(g_perf_cmdcount, 0, PERF_CMDTOKEN_MAX * sizeof(uint32_t));
+    memset(g_perf_subcall_count, 0, MAXSUBFUN * sizeof(uint32_t));
+    memset(g_perf_subtime_us, 0, MAXSUBFUN * sizeof(uint64_t));
+    memset(g_perf_subexcl_us, 0, MAXSUBFUN * sizeof(uint64_t));
+    g_perf_usercmd_count = 0;
+    g_perf_findvar_calls = 0;
+    g_perf_findvar_locals = 0;
+    g_perf_findvar_globals = 0;
+    g_perf_start_us = time_us_64();
+}
+
+void ProfilingFree(void)
+{
+    FreeMemorySafe((void **)&g_perf_cmdcount);
+    FreeMemorySafe((void **)&g_perf_subcall_count);
+    FreeMemorySafe((void **)&g_perf_subtime_us);
+    FreeMemorySafe((void **)&g_perf_subexcl_us);
+}
+
+void ResetPerfCounters(void)
+{
+    if (!g_option_profiling)
+        return;
+    /* Reallocate buffers if needed (e.g. RUN after OPTION PROFILING ON).   */
+    ProfilingAlloc();
+}
 // unsigned char lastcmd[STRINGSIZE];                                           // used to store the last command in case it is needed by the EDIT command
 unsigned char PromptString[MAXPROMPTLEN]; // the prompt for input, an empty string means use the default
 int ProgramChanged;                       // true if the program in memory has been changed and not saved
 struct s_hash g_hashlist[MAXLOCALVARS] = {0};
 int g_hashlistpointer = 0;
+
+// ---------------------------------------------------------------------------
+// Local-variable side index (Phase 2 lookup acceleration)
+//
+// `g_hashlist[]` already records every active local's slot index and lexical
+// level in creation order.  These parallel arrays add per-entry quick-reject
+// data so that findvar's local probe can do a short linear scan over the
+// current frame instead of a hash-table probe.
+//
+// `g_localframe_base` is the index in g_hashlist[] at which the current
+// frame's locals start.  `g_framebase_stack[]` saves the previous base on
+// every level transition (sub/fun entry, gosub, CFunction call).
+//
+// `g_localframe_quick[i]` holds the first 4 chars of the name at hashlist[i]
+// (lower-case-folded already; padded with zero) so that an O(1) integer
+// compare can reject most non-matches before a full byte-by-byte compare.
+// `g_localframe_namelen[i]` holds the name length.
+//
+// The structure of g_hashlist itself is unchanged so SAVE/RESTORE STATE
+// continues to use the existing on-disk format.  The side arrays are
+// reconstructible from g_hashlist + g_vartbl when a state is restored.
+// ---------------------------------------------------------------------------
+#ifdef CACHE
+uint32_t g_localframe_quick[MAXLOCALVARS];
+uint8_t g_localframe_namelen[MAXLOCALVARS];
+int g_localframe_base = 0;       // first hashlist index in current frame
+int g_framebase_stack[MAXGOSUB]; // saved bases, one per active level
+int g_framebase_sp = 0;          // stack pointer / current depth
+
+// Per-frame: which subfun[] index is currently executing (-1 if none).
+// Maintained by EnterLocalFrame/LeaveLocalFrame in parallel with the
+// frame-base stack.  Used by the trace cache for per-sub opt-in.
+int g_current_sub_idx = -1;
+int g_subidx_stack[MAXGOSUB];
+
+// Per-frame entry timestamp (us) - used to accumulate per-sub inclusive time.
+// Pushed in EnterLocalFrame, popped in LeaveLocalFrame.
+uint64_t g_subentry_us[MAXGOSUB];
+
+// Per-frame accumulator: total time spent inside CALLEES of this frame.
+// Zeroed on entry; on exit  exclusive = inclusive - child_us  is added to
+// the leaving sub's exclusive bucket, and inclusive is added to the parent
+// frame's child_us so that grandparent frames also subtract correctly.
+uint64_t g_subchild_us[MAXGOSUB];
+
+// Push the current frame base on entry to a new local scope (sub/fun, gosub,
+// CFunction).  Called *immediately after* g_LocalIndex++.
+void EnterLocalFrame(void)
+{
+    if (g_framebase_sp < MAXGOSUB)
+    {
+        g_framebase_stack[g_framebase_sp] = g_localframe_base;
+        g_subidx_stack[g_framebase_sp] = g_current_sub_idx;
+        if (g_option_profiling)
+        {
+            g_subentry_us[g_framebase_sp] = time_us_64();
+            g_subchild_us[g_framebase_sp] = 0;
+        }
+        g_framebase_sp++;
+    }
+    g_localframe_base = g_hashlistpointer;
+    /* g_current_sub_idx is left unchanged here; DefinedSubFun overrides it
+     * for sub/fun calls right after this returns.  GOSUB/CFun keep the
+     * caller's current sub as the "enclosing" context.                    */
+    TraceBumpFrameGen(); // any cached local-var slot in a trace is now stale
+}
+
+// Pop one frame on exit from a local scope.  Called *immediately after*
+// ClearVars(g_LocalIndex--, true) (which has already removed this frame's
+// hashlist entries).
+void LeaveLocalFrame(void)
+{
+    /* Capture which sub we're leaving and accumulate its inclusive time     */
+    /* before we pop g_current_sub_idx back to the caller's value.           */
+    int leaving_idx = g_current_sub_idx;
+    if (g_framebase_sp > 0)
+    {
+        g_framebase_sp--;
+        if (g_perf_subtime_us && leaving_idx >= 0 && leaving_idx < MAXSUBFUN)
+        {
+            uint64_t entry_us = g_subentry_us[g_framebase_sp];
+            uint64_t inclusive = time_us_64() - entry_us;
+            uint64_t children = g_subchild_us[g_framebase_sp];
+            uint64_t exclusive = (inclusive > children) ? (inclusive - children) : 0;
+            g_perf_subtime_us[leaving_idx] += inclusive;
+            g_perf_subexcl_us[leaving_idx] += exclusive;
+            /* Charge our inclusive time to the parent frame's child total
+             * so the parent subtracts us from its own self-time.          */
+            if (g_framebase_sp > 0)
+                g_subchild_us[g_framebase_sp - 1] += inclusive;
+        }
+        g_localframe_base = g_framebase_stack[g_framebase_sp];
+        g_current_sub_idx = g_subidx_stack[g_framebase_sp];
+    }
+    else
+    {
+        g_localframe_base = 0;
+        g_current_sub_idx = -1;
+    }
+    TraceBumpFrameGen(); // returning to the caller's frame: invalidate cached locals
+}
+
+// Reset all frame-stack state (called from ClearVars(0,...) and on RUN start).
+static inline void ResetLocalFrames(void)
+{
+    g_framebase_sp = 0;
+    g_localframe_base = 0;
+    g_current_sub_idx = -1;
+    TraceBumpFrameGen();
+}
+#endif
 unsigned char *LibMemory; // This is where the library is stored. At the last flash slot (4)
 int multi = false;
 unsigned char *ProgMemory; // program memory, this is where the program is stored
@@ -511,204 +687,6 @@ static inline void TestStackOverflow(void)
     if (stack < heapend)
         error("Stack overflow, at depth %, stack \\, heap \\", g_LocalIndex, (int64_t)stack, (int64_t)heapend);
 }
-
-int CheckEmpty(char *p)
-{
-    int emptyarray = 0;
-    char *pp = strchr((char *)p, '(');
-    if (pp)
-    {
-        pp++;
-        skipspace(pp);
-        if (*pp == ')')
-            emptyarray = 1;
-    }
-    while (*(++pp))
-    {
-        if (*pp == '(')
-            return 1; // can't be a function call with an implied opening
-        if (*pp == ')')
-            return 0; // closing bracket without open so much be implied in a function call e.g. PEEK(
-    }
-    return emptyarray;
-}
-
-// Lightweight strtod for BASIC numeric literals only (digits, '.', 'E'/'e', '+'/'-')
-// Runs from RAM to avoid XIP cache thrashing on RP2040
-static double __not_in_flash_func(fast_strtod)(const char *s)
-{
-    double result = 0.0;
-    double frac = 0.0;
-    double frac_div = 1.0;
-    int sign = 1;
-    int in_frac = 0;
-
-    // optional sign
-    if (*s == '-')
-    {
-        sign = -1;
-        s++;
-    }
-    else if (*s == '+')
-    {
-        s++;
-    }
-
-    // integer and fractional digits
-    while (*s)
-    {
-        if (*s >= '0' && *s <= '9')
-        {
-            if (in_frac)
-            {
-                frac_div *= 10.0;
-                frac += (*s - '0') / frac_div;
-            }
-            else
-            {
-                result = result * 10.0 + (*s - '0');
-            }
-        }
-        else if (*s == '.' && !in_frac)
-        {
-            in_frac = 1;
-        }
-        else if (*s == 'e' || *s == 'E')
-        {
-            s++;
-            int exp_sign = 1;
-            int exp = 0;
-            if (*s == '-')
-            {
-                exp_sign = -1;
-                s++;
-            }
-            else if (*s == '+')
-            {
-                s++;
-            }
-            while (*s >= '0' && *s <= '9')
-                exp = exp * 10 + (*s++ - '0');
-            // apply exponent
-            double pow10 = 1.0;
-            for (int i = 0; i < exp; i++)
-                pow10 *= 10.0;
-            if (exp_sign > 0)
-                return sign * (result + frac) * pow10;
-            else
-                return sign * (result + frac) / pow10;
-        }
-        else
-        {
-            break;
-        }
-        s++;
-    }
-    return sign * (result + frac);
-}
-
-// run a program
-// this will continuously execute a program until the end (marked by TWO zero chars)
-// the argument p must point to the first line to be executed
-void __not_in_flash_func(ExecuteProgram)(unsigned char *p)
-{
-    int i, SaveLocalIndex = 0;
-    jmp_buf SaveErrNext;
-    memcpy(SaveErrNext, ErrNext, sizeof(jmp_buf)); // we call ExecuteProgram() recursively so we need to store/restore old jump buffer between calls
-    skipspace(p);                                  // just in case, skip any whitespace
-
-    while (1)
-    {
-        if (*p == 0)
-            p++; // step over the zero byte marking the beginning of a new element
-        if (*p == T_NEWLINE)
-        {
-            CurrentLinePtr = p;            // and pointer to the line for error reporting
-            TraceBuff[TraceBuffIndex] = p; // used by TRACE LIST
-            if (++TraceBuffIndex >= TRACE_BUFF_SIZE)
-                TraceBuffIndex = 0;
-            if (TraceOn && p > ProgMemory && p < ProgMemory + MAX_PROG_SIZE)
-            {
-                inpbuf[0] = '[';
-                IntToStr((char *)inpbuf + 1, CountLines(p), 10);
-                strcat((char *)inpbuf, "]");
-                MMPrintString((char *)inpbuf);
-                uSec(1000);
-            }
-            p++; // and step over the token
-        }
-        if (*p == T_LINENBR)
-            p += 3;   // and step over the number
-        skipspace(p); // and skip any trailing white space
-        if (p[0] == T_LABEL)
-        {                  // got a label
-            p += p[1] + 2; // skip over the label
-            skipspace(p);  // and any following spaces
-        }
-
-        if (*p)
-        { // if p is pointing to a command
-            if (*p == '\'')
-                nextstmt = cmdline = p + 1;
-            else
-                nextstmt = cmdline = p + sizeof(CommandToken);
-            skipspace(cmdline);
-            skipelement(nextstmt);
-            if (*p && *p != '\'')
-            {                                  // ignore a comment line
-                SaveLocalIndex = g_LocalIndex; // save this if we need to cleanup after an error
-                if (setjmp(ErrNext) == 0)
-                { // return to the else leg of this if error and OPTION ERROR SKIP/IGNORE is in effect
-                    if (p[0] >= C_BASETOKEN && p[1] >= C_BASETOKEN)
-                    {
-                        cmdtoken = commandtbl_decode(p);
-                        targ = T_CMD;
-                        commandtbl[cmdtoken].fptr(); // execute the command
-                    }
-                    else
-                    {
-                        if (!isnamestart(*p) && *p == '~')
-                            StandardError(36);
-                        else if (!isnamestart(*p))
-                            error("Invalid character: @", (int)(*p));
-                        {
-                            i = FindSubFun(p, false); // it could be a defined command
-                            if (i >= 0)
-                            { // >= 0 means it is a user defined command
-                                DefinedSubFun(false, p, i, NULL, NULL, NULL, NULL);
-                            }
-                            else
-                                StandardError(36);
-                        }
-                    }
-                }
-                else
-                {
-                    g_LocalIndex = SaveLocalIndex; // restore so that we can clean up any memory leaks
-                    ClearTempMemory();
-                }
-                if (OptionErrorSkip > 0 && OptionErrorSkip < 100000)
-                    OptionErrorSkip--; // if OPTION ERROR SKIP decrement the count - we do not error if it is greater than zero
-                if (g_TempMemoryIsChanged)
-                    ClearTempMemory(); // at the end of each command we need to clear any temporary string vars
-#ifndef PICOMITEWEB
-                if (core1stack[0] != 0x12345678)
-                    error("CPU2 Stack overflow");
-#endif
-                if (!OptionNoCheck)
-                {
-                    CheckAbort();
-                    check_interrupt(); // check for an MMBasic interrupt or touch event and handle it
-                }
-            }
-            p = nextstmt;
-        }
-        if ((p[0] == 0 && p[1] == 0) || (p[0] == 0xff && p[1] == 0xff))
-            break; // the end of the program is marked by TWO zero chars, empty flash by two 0xff
-    }
-    memcpy(ErrNext, SaveErrNext, sizeof(jmp_buf)); // restore old jump buffer
-}
-
 /********************************************************************************************************************************************
  Code associated with processing user defined subroutines and functions
 ********************************************************************************************************************************************/
@@ -1186,735 +1164,6 @@ int MIPS16 PrepareProgramExt(unsigned char *p, int i, unsigned char **CFunPtr, i
     }
     return i;
 }
-
-// searches the subfun[] table to locate a defined sub or fun
-// returns with the index of the sub/function in the table or -1 if not found
-// if type = 0 then look for a sub otherwise a function
-#ifdef rp2350
-int __not_in_flash_func(FindSubFun)(unsigned char *p, int type)
-{
-    unsigned char *s;
-    unsigned char name[MAXVARLEN + 1];
-    int j, u, namelen;
-    unsigned int hash = FNV_offset_basis;
-    unsigned char *tp, *ip;
-
-    // copy the variable name into name
-    s = name;
-    namelen = 0;
-    do
-    {
-        u = mytoupper(*p);
-        hash ^= u;
-        //        PIntComma(u);
-        hash *= FNV_prime;
-        *s++ = u;
-        p++;
-        if (++namelen > MAXVARLEN)
-            error("Variable name too long");
-    } while (isnamechar(*p));
-    //    PRet();
-    *s = 0;
-    hash %= MAXSUBFUN; // scale 0-512
-    //	MMPrintString("Searching for function: ");MMPrintString((char *)name);PIntComma(hash);PRet();
-    while (funtbl[hash].name[0] != 0)
-    {
-        ip = name;
-        tp = (unsigned char *)funtbl[hash].name;
-        //		MMPrintString("Testing : ");MMPrintString((char *)tp);PRet();
-        if (*ip++ == *tp++)
-        { // preliminary quick check
-            j = namelen - 1;
-            while (j > 0 && *ip == *tp)
-            { // compare each letter
-                j--;
-                ip++;
-                tp++;
-            }
-            if (j == 0 && (*(char *)tp == 0 || namelen == MAXVARLEN) && funtbl[hash].index < MAXSUBFUN)
-            { // found a matching name
-                //				MMPrintString("Found : ");MMPrintString((char *)name);MMPrintString(", hash key : ");PInt(hash);PRet();
-                return funtbl[hash].index;
-                break;
-            }
-        }
-        hash++;
-        if (hash == MAXSUBFUN)
-            hash = 0;
-    }
-    return -1;
-}
-#else
-int MIPS16 __not_in_flash_func(FindSubFun)(unsigned char *p, int type)
-{
-    int n = 0;
-    int low, high, mid, cmp;
-    int first;
-    unsigned char *p2, *p1;
-
-    while (n < MAXSUBFUN && subfun[n] != NULL)
-        n++;
-    if (n == 0)
-        return -1;
-
-    // subfun[] is pre-sorted by PrepareProgram() using base-name ordering.
-    low = 0;
-    high = n - 1;
-    first = mytoupper(*p);
-    if (first >= 'A' && first <= 'Z')
-    {
-        int li = first - 'A';
-        if (subfun_letter_start[li] == -1)
-            return -1;
-        low = subfun_letter_start[li];
-        for (int ni = li + 1; ni < 26; ni++)
-        {
-            if (subfun_letter_start[ni] != -1)
-            {
-                high = subfun_letter_start[ni] - 1;
-                break;
-            }
-        }
-    }
-
-    if (low > high)
-        return -1;
-
-    while (low <= high)
-    {
-        mid = low + ((high - low) >> 1);
-        cmp = CompareNameToSubFunBase(p, subfun[mid]);
-        if (cmp == 0)
-        {
-            p2 = subfun[mid];
-            CommandToken tkn = commandtbl_decode(p2);
-
-            if (type == 0)
-            {
-                if (!(tkn == cmdSUB || tkn == cmdCSUB))
-                    return -1;
-            }
-            else
-            {
-                if (!(tkn == cmdFUN /*|| tkn == cmdCFUN*/))
-                    return -1;
-            }
-
-            // Preserve existing suffix matching behavior.
-            p2 += sizeof(CommandToken);
-            skipspace(p2);
-            p1 = p;
-            while (isnamechar(*p1) && isnamechar(*p2))
-            {
-                p1++;
-                p2++;
-            }
-            if ((*p1 == '$' && *p2 == '$') || (*p1 == '%' && *p2 == '%') || (*p1 == '!' && *p2 == '!') || (!isnamechar(*p1) && !isnamechar(*p2)))
-                return mid;
-            return -1;
-        }
-        if (cmp < 0)
-            high = mid - 1;
-        else
-            low = mid + 1;
-    }
-    return -1;
-}
-#endif
-
-// This function is responsible for executing a defined subroutine or function.
-// As these two are similar they are processed in the one lump of code.
-//
-// The arguments when called are:
-//   isfun    = true if we are executing a function
-//   cmd      = pointer to the command name used by the caller (in program memory)
-//   index    = index into subfun[i] which points to the definition of the sub or funct
-//   fa, i64a, sa and typ are pointers to where the return value is to be stored (used by functions only)
-#if LOWRAM
-void MIPS16 DefinedSubFun(int isfun, unsigned char *cmd, int index, MMFLOAT *fa, long long int *i64a, unsigned char **sa, int *typ)
-{
-#else
-#ifdef rp2350
-void __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, int index, MMFLOAT *fa, long long int *i64a, unsigned char **sa, int *typ)
-{
-#else
-void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, int index, MMFLOAT *fa, long long int *i64a, unsigned char **sa, int *typ)
-{
-#endif
-#endif
-
-    unsigned char *p, *s, *tp, *ttp, tcmdtoken;
-    unsigned char *CallersLinePtr, *SubLinePtr = NULL;
-    unsigned char *argbuf1;
-    unsigned char **argv1;
-    int argc1;
-    unsigned char *argbuf2;
-    unsigned char **argv2;
-    int argc2;
-    unsigned char fun_name[MAXVARLEN + 1];
-    unsigned char *argbyref;
-    int i;
-    int ArgType, FunType;
-    int *argtype;
-    union u_argval
-    {
-        MMFLOAT f;         // the value if it is a float
-        long long int i;   // the value if it is an integer
-        MMFLOAT *fa;       // pointer to the allocated memory if it is an array of floats
-        long long int *ia; // pointer to the allocated memory if it is an array of integers
-        unsigned char *s;  // pointer to the allocated memory if it is a string
-    } *argval;
-    int *argVarIndex;
-
-    // Errors generated after gosubindex is incremented need to restore the original value
-    // Any variables created if LocalIndex was incremented also need to be cleared
-    // Memory allocated to *argval needs to be recovered.
-    // This allows unit tests to recover cleanly from skipped errors.i.e. ON ERROR SKIP
-    DefinedSubFunLocalIndex = g_LocalIndex; // save the LocalIndex
-
-    CallersLinePtr = CurrentLinePtr;
-    SubLinePtr = subfun[index];            // used for error reporting
-    p = SubLinePtr + sizeof(CommandToken); // point to the sub or function definition
-    skipspace(p);
-    ttp = p;
-
-    // copy the sub/fun name from the definition into temp storage and terminate
-    // p is left pointing to the end of the name (ie, start of the argument list in the definition)
-    CurrentLinePtr = SubLinePtr; // report errors at the definition
-    tp = fun_name;
-    *tp++ = *p++;
-    while (isnamechar(*p))
-        *tp++ = *p++;
-    if (*p == '$' || *p == '%' || *p == '!')
-    {
-        if (!isfun)
-        {
-            error("Type specification is invalid: @", (int)(*p));
-        }
-        *tp++ = *p++;
-    }
-    *tp = 0;
-
-    if (isfun && *p != '(' /*&& (*SubLinePtr != cmdCFUN)*/)
-        error("Function definition");
-
-    // find the end of the caller's identifier, tp is left pointing to the start of the caller's argument list
-    CurrentLinePtr = CallersLinePtr; // report errors at the caller
-    tp = cmd + 1;
-    while (isnamechar(*tp))
-        tp++;
-    if (*tp == '$' || *tp == '%' || *tp == '!')
-    {
-        if (!isfun)
-            error("Type specification");
-        tp++;
-    }
-    if (mytoupper(*(p - 1)) != mytoupper(*(tp - 1)))
-        error("Inconsistent type suffix");
-
-    // if this is a function we check to find if the function's type has been specified with AS <type> and save it
-    CurrentLinePtr = SubLinePtr; // report errors at the definition
-    FunType = T_NOTYPE;
-#ifdef STRUCTENABLED
-    int SavedStructArg = -1; // Save struct index for function return type
-#endif
-    if (isfun)
-    {
-        ttp = skipvar(ttp, false); // point to after the function name and bracketed arguments
-        skipspace(ttp);
-        if (*ttp == tokenAS)
-        {                                                    // are we using Microsoft syntax (eg, AS INTEGER)?
-            ttp++;                                           // step over the AS token
-            ttp = CheckIfTypeSpecified(ttp, &FunType, true); // get the type
-            if (!(FunType & T_IMPLIED))
-                error("Variable type");
-#ifdef STRUCTENABLED
-            SavedStructArg = g_StructArg; // Save before argument processing overwrites it
-#endif
-        }
-        FunType |= (V_FIND | V_DIM_VAR | V_LOCAL | V_EMPTY_OK);
-    }
-
-    // from now on
-    // tp  = the caller's argument list
-    // p   = the argument list for the definition
-    skipspace(tp);
-    skipspace(p);
-
-    // similar if this is a CSUB
-    CommandToken tkn = commandtbl_decode(SubLinePtr);
-    if (tkn == cmdCSUB)
-    {
-        CallCFunction(SubLinePtr, tp, p, CallersLinePtr); // run the CSUB
-        g_TempMemoryIsChanged = true;                     // signal that temporary memory should be checked
-        return;
-    }
-    // from now on we have a user defined sub or function (not a C routine)
-
-    if (gosubindex >= MAXGOSUB)
-        error("Too many nested SUB/FUN");
-    errorstack[gosubindex] = CallersLinePtr;
-    gosubstack[gosubindex++] = isfun ? NULL : nextstmt; // NULL signifies that this is returned to by ending ExecuteProgram()
-#define buffneeded MAX_ARG_COUNT * (sizeof(union u_argval) + 2 * sizeof(int) + 3 * sizeof(unsigned char *) + sizeof(unsigned char)) + 2 * STRINGSIZE
-    // allocate memory for processing the arguments
-    argval = GetSystemMemory(buffneeded);
-    DefinedSubFunMem = (uint32_t)argval; // save pointer to memory for cleanup on error
-    argtype = (void *)argval + MAX_ARG_COUNT * sizeof(union u_argval);
-    argVarIndex = (void *)argtype + MAX_ARG_COUNT * sizeof(int);
-    argbuf1 = (void *)argVarIndex + MAX_ARG_COUNT * sizeof(int);
-    argv1 = (void *)argbuf1 + STRINGSIZE;
-    argbuf2 = (void *)argv1 + MAX_ARG_COUNT * sizeof(unsigned char *);
-    argv2 = (void *)argbuf2 + STRINGSIZE;
-    argbyref = (void *)argv2 + MAX_ARG_COUNT * sizeof(unsigned char *);
-
-    // now split up the arguments in the caller
-    CurrentLinePtr = CallersLinePtr; // report errors at the caller
-    argc1 = 0;
-    if (*tp)
-        makeargs(&tp, MAX_ARG_COUNT, argbuf1, argv1, &argc1, (*tp == '(') ? (unsigned char *)"(," : (unsigned char *)",");
-
-    // split up the arguments in the definition
-    CurrentLinePtr = SubLinePtr; // any errors must be at the definition
-    argc2 = 0;
-    if (*p)
-        makeargs(&p, MAX_ARG_COUNT, argbuf2, argv2, &argc2, (*p == '(') ? (unsigned char *)"(," : (unsigned char *)",");
-
-    // error checking
-    if (argc2 && (argc2 & 1) == 0)
-        error("Argument list");
-    CurrentLinePtr = CallersLinePtr; // report errors at the caller
-    if (argc1 > argc2 || (argc1 && (argc1 & 1) == 0))
-        error("Argument list");
-
-    // step through the arguments supplied by the caller and get the value supplied
-    // these can be:
-    //    - missing (ie, caller did not supply that parameter)
-    //    - a variable, in which case we need to get a pointer to that variable's data and save its index so later we can get its type
-    //    - an expression, in which case we evaluate the expression and get its value and type
-    for (i = 0; i < argc2; i += 2)
-    { // count through the arguments in the definition of the sub/fun
-        if (i < argc1 && *argv1[i])
-        {
-            // check if the argument is a valid variable
-            if (i < argc1 && isnamestart(*argv1[i]) && *skipvar(argv1[i], false) == 0)
-            {
-                // yes, it is a variable (or perhaps a user defined function which looks the same)?
-                if (!(FindSubFun(argv1[i], 1) >= 0 && strchr((char *)argv1[i], '(') != NULL))
-                {
-                    // yes, this is a valid variable.  set argvalue to point to the variable's data and argtype to its type
-                    argval[i].s = findvar(argv1[i], V_FIND | V_EMPTY_OK); // get a pointer to the variable's data
-#ifdef STRUCTENABLED
-                    // For struct member access, use the member's type instead of the struct's type
-                    if ((g_vartbl[g_VarIndex].type & T_STRUCT) && g_StructMemberType != 0)
-                        argtype[i] = g_StructMemberType;
-                    else
-#endif
-                        argtype[i] = g_vartbl[g_VarIndex].type; // and the variable's type
-                    argVarIndex[i] = g_VarIndex;
-                    if (argtype[i] & T_CONST)
-                    {
-                        argtype[i] = 0; // we don't want to point to a constant
-                    }
-                    else
-                    {
-                        argtype[i] |= T_PTR; // flag this as a pointer
-                    }
-                }
-            }
-
-            // check for BYVAL or BYREF in sub/fun definition
-            argbyref[i] = 0;
-            skipspace(argv2[i]);
-            if (toupper(*argv2[i]) == 'B' && toupper(*(argv2[i] + 1)) == 'Y')
-            {
-                if ((checkstring(argv2[i] + 2, (unsigned char *)"VAL")) != NULL)
-                { // if BYVAL
-                    // Only if not an array remove any pointer flag in the caller
-                    argtype[i] = 0;
-
-                    // Trap an array but not an array element
-                    if (g_vartbl[argVarIndex[i]].dims[0] > 0)
-                    {
-                        /* See if we have an array or an array element */
-                        tp = argv1[i];
-                        do
-                        {
-                            tp++;
-                        } while (*tp != '('); // We should find a '(' because it must be an array or and array element to get here
-                        tp++;
-                        skipspace(tp);
-                        if (*tp == ')')
-                            error("Array as BYVAL not allowed $", argv1[i]);
-                    }
-                    argv2[i] += 5; // skip to the variable start
-                }
-                else
-                {
-                    if ((checkstring(argv2[i] + 2, (unsigned char *)"REF")) != NULL)
-                    { // if BYREF
-                        if ((argtype[i] & T_PTR) == 0)
-                            error("Variable required for BYREF $", argv1[i]);
-
-                        argv2[i] += 5; // skip to the variable start
-                        argbyref[i] = 1;
-                    }
-                }
-            }
-
-            // if argument is present and is not a pointer to a variable then evaluate it as an expression
-            if (argtype[i] == 0)
-            {
-                long long int ia;
-                evaluate(argv1[i], &argval[i].f, &ia, &s, &argtype[i], false); // get the value and type of the argument
-                if (argtype[i] & T_INT)
-                    argval[i].i = ia;
-                else if (argtype[i] & T_STR)
-                {
-                    argval[i].s = GetMemory(STRINGSIZE);
-                    Mstrcpy(argval[i].s, s);
-                }
-            }
-        }
-    }
-
-    // now we step through the parameters in the definition of the sub/fun
-    // for each one we create the local variable and compare its type to that supplied in the callers list
-    CurrentLinePtr = SubLinePtr; // any errors must be at the definition
-    g_LocalIndex++;
-    for (i = 0; i < argc2; i += 2)
-    { // count through the arguments in the definition of the sub/fun
-        ArgType = T_NOTYPE;
-        // skip BYVAL/BYREF keywords
-        if (toupper(*argv2[i]) == 'B' && toupper(*(argv2[i] + 1)) == 'Y')
-        {
-            if ((checkstring(argv2[i] + 2, (unsigned char *)"VAL")) != NULL)
-            {
-                argv2[i] += 5;
-            }
-            else if ((checkstring(argv2[i] + 2, (unsigned char *)"REF")) != NULL)
-            {                  // if BYREF
-                argv2[i] += 5; // skip to the variable start
-            }
-        }
-
-        tp = skipvar(argv2[i], false); // point to after the variable
-        skipspace(tp);
-        if (*tp == tokenAS)
-        {                                                  // are we using Microsoft syntax (eg, AS INTEGER)?
-            *tp++ = 0;                                     // terminate the string and step over the AS token
-            tp = CheckIfTypeSpecified(tp, &ArgType, true); // and get the type
-            if (!(ArgType & T_IMPLIED))
-                error("Variable type");
-        }
-        ArgType |= (V_FIND | V_DIM_VAR | V_LOCAL | V_EMPTY_OK);
-        tp = findvar(argv2[i], ArgType); // declare the local variable
-        if (g_vartbl[g_VarIndex].dims[0] > 0)
-            error("Argument list"); // if it is an array it must be an empty array
-
-        CurrentLinePtr = CallersLinePtr; // report errors at the caller
-
-        // if the definition called for an array, special processing and checking will be required
-        if (g_vartbl[g_VarIndex].dims[0] == -1)
-        {
-            int j;
-            if (g_vartbl[argVarIndex[i]].dims[0] == 0)
-                error("Expected an array");
-            if (TypeMask(g_vartbl[g_VarIndex].type) != TypeMask(argtype[i]))
-                error("Incompatible type: $", argv1[i]);
-#ifdef STRUCTENABLED
-            // For struct arrays, verify the struct types match
-            if ((g_vartbl[g_VarIndex].type & T_STRUCT) && (argtype[i] & T_STRUCT))
-            {
-                if (g_vartbl[g_VarIndex].size != g_vartbl[argVarIndex[i]].size)
-                    error("Structure type mismatch: $", argv1[i]);
-            }
-#endif
-            g_vartbl[g_VarIndex].val.s = argval[i].s; // Point to caller's array data (uses element offset if specified, e.g. array(3) -> &array[3])
-            g_vartbl[g_VarIndex].type |= T_PTR;       // Mark as pointer so we don't free caller's memory
-            for (j = 0; j < MAXDIM; j++)              // copy the dimensions of the supplied variable into our local variable
-                g_vartbl[g_VarIndex].dims[j] = g_vartbl[argVarIndex[i]].dims[j];
-            g_vartbl[g_VarIndex].size = g_vartbl[argVarIndex[i]].size; // copy string length for string arrays
-            continue;                                                  // Skip the rest of parameter handling
-        }
-
-#ifdef STRUCTENABLED
-        // if the definition called for a struct, use helper (NOT in RAM for size savings)
-        if (ValidateStructParam(g_VarIndex, argVarIndex[i], argval[i].s, argtype[i], argv1[i]))
-            continue; // Skip normal pointer/value handling below
-#endif
-
-        // if this is a pointer check and the type is NOT the same as that requested in the sub/fun definition
-        if ((argtype[i] & T_PTR) && TypeMask(g_vartbl[g_VarIndex].type) != TypeMask(argtype[i]))
-        {
-            if (argbyref[i])
-                error("BYREF requires same types: $", argv1[i]);
-            if ((TypeMask(g_vartbl[g_VarIndex].type) & T_STR) || (TypeMask(argtype[i]) & T_STR))
-                error("Incompatible type: $", argv1[i]);
-            // make this into an ordinary argument - use argval[i].s which already points to the correct data
-            // (for struct members, findvar resolved the member offset; for pointer variables, it's the target)
-            argval[i].i = *(long long int *)argval[i].s;
-            argtype[i] &= ~T_PTR; // and remove the pointer flag
-        }
-
-        // if this is a pointer (note: at this point the caller type and the required type must be the same)
-        if (argtype[i] & T_PTR)
-        {
-            // the argument supplied was a variable so we must setup the local variable as a pointer
-            if ((g_vartbl[g_VarIndex].type & T_STR) && g_vartbl[g_VarIndex].val.s != NULL)
-            {
-                FreeMemorySafe((void **)&g_vartbl[g_VarIndex].val.s); // free up the local variable's memory if it is a pointer to a string
-            }
-            g_vartbl[g_VarIndex].val.s = argval[i].s;                  // point to the data of the variable supplied as an argument
-            g_vartbl[g_VarIndex].type |= T_PTR;                        // set the type to a pointer
-            g_vartbl[g_VarIndex].size = g_vartbl[argVarIndex[i]].size; // just in case it is a string copy the size
-            // this is not a pointer
-        }
-        else if (argtype[i] != 0)
-        { // in getting the memory argtype[] is initialised to zero
-            // the parameter was an expression or a just straight variables with different types (therefore not a pointer))
-            if ((g_vartbl[g_VarIndex].type & T_STR) && (argtype[i] & T_STR))
-            { // both are a string
-                Mstrcpy(g_vartbl[g_VarIndex].val.s, argval[i].s);
-                FreeMemorySafe((void **)&argval[i].s);
-            }
-            else if ((g_vartbl[g_VarIndex].type & T_NBR) && (argtype[i] & T_NBR)) // both are a float
-                g_vartbl[g_VarIndex].val.f = argval[i].f;
-            else if ((g_vartbl[g_VarIndex].type & T_NBR) && (argtype[i] & T_INT)) // need a float but supplied an integer
-                g_vartbl[g_VarIndex].val.f = argval[i].i;
-            else if ((g_vartbl[g_VarIndex].type & T_INT) && (argtype[i] & T_INT)) // both are integers
-                g_vartbl[g_VarIndex].val.i = argval[i].i;
-            else if ((g_vartbl[g_VarIndex].type & T_INT) && (argtype[i] & T_NBR)) // need an integer but was supplied with a float
-                g_vartbl[g_VarIndex].val.i = FloatToInt64(argval[i].f);
-            else
-                error("Incompatible type: $", argv1[i]);
-        }
-    }
-
-    // memory used in setting up the arguments can be deleted now
-    FreeMemory((void *)argval);
-    DefinedSubFunMem = 0; // we got here so we wont need to cleanup any memory
-    strcpy((char *)CurrentSubFunName, (char *)fun_name);
-    // if it is a defined command we simply point to the first statement in our command and allow ExecuteProgram() to carry on as before
-    // exit from the sub is via cmd_return which will decrement g_LocalIndex
-    if (!isfun)
-    {
-        skipelement(p);
-        nextstmt = p; // point to the body of the subroutine
-        return;
-    }
-
-    // if it is a defined function we have a lot more work to do.  We must:
-    //   - Create a local variable for the function's name
-    //   - Save the globals being used by the current command that caused the function to be called
-    //   - Invoke another instance of ExecuteProgram() to execute the body of the function
-    //   - When that returns we need to restore the global variables
-    //   - Get the variable's value and save that in the return value globals (fret or sret)
-    //   - Return to the expression parser
-#ifdef STRUCTENABLED
-    g_StructArg = SavedStructArg; // Restore struct index for function return type
-#endif
-    tp = findvar(fun_name, FunType | V_FUNCT); // declare the local variable
-    FunType = g_vartbl[g_VarIndex].type;
-#ifdef STRUCTENABLED
-    int FunStructType = -1; // struct type index if returning a struct
-#endif
-    if (FunType & T_STR)
-    {
-        FreeMemorySafe((void **)&g_vartbl[g_VarIndex].val.s); // free the memory if it is a string
-        g_vartbl[g_VarIndex].type |= T_PTR;
-        g_LocalIndex--;                                       // allocate the memory at the previous level
-        g_vartbl[g_VarIndex].val.s = tp = GetTempStrMemory(); // and use our own memory
-        g_LocalIndex++;
-    }
-#ifdef STRUCTENABLED
-    else if (FunType & T_STRUCT)
-    {
-        // Function returns a struct - save info for later copy to temp memory
-        FunStructType = (int)g_vartbl[g_VarIndex].size;
-        // tp already points to the struct data from findvar
-    }
-#endif
-    skipelement(p); // point to the body of the function
-
-    ttp = nextstmt; // save the globals used by commands
-    tcmdtoken = cmdtoken;
-    s = cmdline;
-
-    ExecuteProgram(p);               // execute the function's code
-    CurrentLinePtr = CallersLinePtr; // report errors at the caller
-
-    cmdline = s; // restore the globals
-    cmdtoken = tcmdtoken;
-    nextstmt = ttp;
-
-    // return the value of the function's variable to the caller
-    if (FunType & T_NBR)
-        *fa = *(MMFLOAT *)tp;
-    else if (FunType & T_INT)
-        *i64a = *(long long int *)tp;
-#ifdef STRUCTENABLED
-    else if (FunType & T_STRUCT)
-    {
-        // Use helper to copy struct return (NOT in RAM for size savings)
-        *sa = CopyStructReturn(tp, FunStructType, &g_ExprStructType);
-    }
-#endif
-    else
-        *sa = tp;                    // for a string we just need to return the local memory
-    *typ = FunType;                  // save the function type for the caller
-    ClearVars(g_LocalIndex--, true); // delete any local variables
-    g_TempMemoryIsChanged = true;    // signal that temporary memory should be checked
-    gosubindex--;
-}
-
-char MIPS16 *strcasechr(const char *p, int ch)
-{
-    char c;
-
-    c = mytoupper(ch);
-    for (;; ++p)
-    {
-        if (mytoupper(*p) == c)
-            return ((char *)p);
-        if (*p == '\0')
-            return (NULL);
-    }
-    /* NOTREACHED */
-}
-
-char MIPS16 *fstrstr(const char *s1, const char *s2)
-{
-    const char *p = s1;
-    const size_t len = strlen(s2);
-
-    for (; (p = strcasechr(p, *s2)) != 0; p++)
-    {
-        if (strncasecmp(p, s2, len) == 0)
-            return (char *)p;
-    }
-    return (0);
-}
-
-void MIPS16 str_replace(char *target, const char *needle, const char *replacement, uint8_t ignoresurround)
-{
-    char buffer[288] = {0};
-    char *insert_point = &buffer[0];
-    const char *tmp = target;
-    size_t needle_len = strlen(needle);
-    size_t repl_len = strlen(replacement);
-
-    while (1)
-    {
-        const char *p = fstrstr(tmp, needle);
-
-        // walked past last occurrence of needle; copy remaining part
-        if (p == NULL)
-        {
-            strcpy(insert_point, tmp);
-            break;
-        }
-        char *q;
-        if (p == target)
-        {
-            ignoresurround |= 1;
-            q = (char *)p;
-        }
-        else
-            q = (char *)p - 1;
-        if ((isnamechar(*q) && !(ignoresurround & 1)) || (isnameend(p[strlen(needle)]) && !(ignoresurround & 2)))
-        {
-            // copy part before needle
-            memcpy(insert_point, tmp, p - tmp);
-            insert_point += p - tmp;
-
-            // copy replacement string
-            memcpy(insert_point, needle, needle_len);
-            insert_point += needle_len;
-
-            // adjust pointers, move on
-            tmp = p + needle_len;
-        }
-        else
-        {
-            // copy part before needle
-            memcpy(insert_point, tmp, p - tmp);
-            insert_point += p - tmp;
-
-            // copy replacement string
-            memcpy(insert_point, replacement, repl_len);
-            insert_point += repl_len;
-
-            // adjust pointers, move on
-            tmp = p + needle_len;
-        }
-    }
-
-    // write altered string back to target
-    strcpy(target, buffer);
-}
-
-void MIPS16 STR_REPLACE(char *target, const char *needle, const char *replacement, uint8_t ignoresurround)
-{
-    char *ip = target;
-    int toggle = 0;
-    char comment[STRINGSIZE] = {0};
-    skipspace(ip);
-    if (!(mytoupper(*ip) == 'R' && mytoupper(ip[1]) == 'E' && mytoupper(ip[2]) == 'M'))
-    {
-        while (*ip)
-        {
-            if (*ip == 34)
-            {
-                if (toggle == 0)
-                    toggle = 1;
-                else
-                    toggle = 0;
-            }
-            if (toggle && *ip == ' ')
-            {
-                *ip = 0xFF;
-            }
-            if (toggle && *ip == '.')
-            {
-                *ip = 0xFE;
-            }
-            if (toggle && *ip == '=')
-            {
-                *ip = 0xFD;
-            }
-            if (toggle && *ip == '\\')
-            {
-                *ip = 0xFC;
-            }
-            if (toggle == 0 && *ip == '\'')
-            {
-                strcpy(comment, ip);
-                *ip = 0;
-                break;
-            }
-            ip++;
-        }
-        str_replace(target, needle, replacement, ignoresurround);
-        ip = target;
-        if (comment[0] == '\'')
-        {
-            strcat(target, comment);
-        }
-        while (*ip)
-        {
-            if (*ip == 0xFF)
-                *ip = ' ';
-            if (*ip == 0xFE)
-                *ip = '.';
-            if (*ip == 0xFD)
-                *ip = '=';
-            if (*ip == 0xFC)
-                *ip = '\\';
-            ip++;
-        }
-    }
-}
-
 /********************************************************************************************************************************************
  take an input line and turn it into a line with tokens suitable saving into memory
 ********************************************************************************************************************************************/
@@ -2278,6 +1527,963 @@ void MIPS16 tokenise(int console)
     *op++ = 0; // terminate with  zero chars
 }
 
+int CheckEmpty(char *p)
+{
+    int emptyarray = 0;
+    char *pp = strchr((char *)p, '(');
+    if (pp)
+    {
+        pp++;
+        skipspace(pp);
+        if (*pp == ')')
+            emptyarray = 1;
+    }
+    while (*(++pp))
+    {
+        if (*pp == '(')
+            return 1; // can't be a function call with an implied opening
+        if (*pp == ')')
+            return 0; // closing bracket without open so much be implied in a function call e.g. PEEK(
+    }
+    return emptyarray;
+}
+
+// Lightweight strtod for BASIC numeric literals only (digits, '.', 'E'/'e', '+'/'-')
+// Runs from RAM to avoid XIP cache thrashing on RP2040
+static double __not_in_flash_func(fast_strtod)(const char *s)
+{
+    double result = 0.0;
+    double frac = 0.0;
+    double frac_div = 1.0;
+    int sign = 1;
+    int in_frac = 0;
+
+    // optional sign
+    if (*s == '-')
+    {
+        sign = -1;
+        s++;
+    }
+    else if (*s == '+')
+    {
+        s++;
+    }
+
+    // integer and fractional digits
+    while (*s)
+    {
+        if (*s >= '0' && *s <= '9')
+        {
+            if (in_frac)
+            {
+                frac_div *= 10.0;
+                frac += (*s - '0') / frac_div;
+            }
+            else
+            {
+                result = result * 10.0 + (*s - '0');
+            }
+        }
+        else if (*s == '.' && !in_frac)
+        {
+            in_frac = 1;
+        }
+        else if (*s == 'e' || *s == 'E')
+        {
+            s++;
+            int exp_sign = 1;
+            int exp = 0;
+            if (*s == '-')
+            {
+                exp_sign = -1;
+                s++;
+            }
+            else if (*s == '+')
+            {
+                s++;
+            }
+            while (*s >= '0' && *s <= '9')
+                exp = exp * 10 + (*s++ - '0');
+            // apply exponent
+            double pow10 = 1.0;
+            for (int i = 0; i < exp; i++)
+                pow10 *= 10.0;
+            if (exp_sign > 0)
+                return sign * (result + frac) * pow10;
+            else
+                return sign * (result + frac) / pow10;
+        }
+        else
+        {
+            break;
+        }
+        s++;
+    }
+    return sign * (result + frac);
+}
+
+// run a program
+// this will continuously execute a program until the end (marked by TWO zero chars)
+// the argument p must point to the first line to be executed
+void __not_in_flash_func(ExecuteProgram)(unsigned char *p)
+{
+    int i, SaveLocalIndex = 0;
+    jmp_buf SaveErrNext;
+    memcpy(SaveErrNext, ErrNext, sizeof(jmp_buf)); // we call ExecuteProgram() recursively so we need to store/restore old jump buffer between calls
+    skipspace(p);                                  // just in case, skip any whitespace
+
+    while (1)
+    {
+        if (*p == 0)
+            p++; // step over the zero byte marking the beginning of a new element
+        if (*p == T_NEWLINE)
+        {
+            CurrentLinePtr = p;            // and pointer to the line for error reporting
+            TraceBuff[TraceBuffIndex] = p; // used by TRACE LIST
+            if (++TraceBuffIndex >= TRACE_BUFF_SIZE)
+                TraceBuffIndex = 0;
+            if (TraceOn && p > ProgMemory && p < ProgMemory + MAX_PROG_SIZE)
+            {
+                inpbuf[0] = '[';
+                IntToStr((char *)inpbuf + 1, CountLines(p), 10);
+                strcat((char *)inpbuf, "]");
+                MMPrintString((char *)inpbuf);
+                uSec(1000);
+            }
+            p++; // and step over the token
+        }
+        if (*p == T_LINENBR)
+            p += 3;   // and step over the number
+        skipspace(p); // and skip any trailing white space
+        if (p[0] == T_LABEL)
+        {                  // got a label
+            p += p[1] + 2; // skip over the label
+            skipspace(p);  // and any following spaces
+        }
+
+        if (*p)
+        { // if p is pointing to a command
+            if (*p == '\'')
+                nextstmt = cmdline = p + 1;
+            else
+                nextstmt = cmdline = p + sizeof(CommandToken);
+            skipspace(cmdline);
+            skipelement(nextstmt);
+            if (*p && *p != '\'')
+            {                                  // ignore a comment line
+                SaveLocalIndex = g_LocalIndex; // save this if we need to cleanup after an error
+                                               // Fast path: when OPTION ERROR SKIP/IGNORE is not active (the common case),
+                                               // error() will longjmp to 'mark' rather than to ErrNext, so we can skip the
+                                               // per-statement setjmp. setjmp on Cortex-M saves all callee-saved regs and
+                                               // defeats register allocation across the call, so avoiding it per-statement
+                                               // is a significant win for CPU-bound programs.
+#define EXEC_ONE_STATEMENT()                                            \
+    do                                                                  \
+    {                                                                   \
+        if (p[0] >= C_BASETOKEN && p[1] >= C_BASETOKEN)                 \
+        {                                                               \
+            cmdtoken = commandtbl_decode(p);                            \
+            if (g_perf_cmdcount && cmdtoken < PERF_CMDTOKEN_MAX)        \
+                g_perf_cmdcount[cmdtoken]++;                            \
+            targ = T_CMD;                                               \
+            commandtbl[cmdtoken].fptr();                                \
+        }                                                               \
+        else                                                            \
+        {                                                               \
+            if (!isnamestart(*p) && *p == '~')                          \
+                StandardError(36);                                      \
+            else if (!isnamestart(*p))                                  \
+                error("Invalid character: @", (int)(*p));               \
+            {                                                           \
+                i = FindSubFun(p, false);                               \
+                if (i >= 0)                                             \
+                {                                                       \
+                    if (g_option_profiling)                             \
+                    {                                                   \
+                        g_perf_usercmd_count++;                         \
+                        if (g_perf_subcall_count && i < MAXSUBFUN)      \
+                            g_perf_subcall_count[i]++;                  \
+                    }                                                   \
+                    DefinedSubFun(false, p, i, NULL, NULL, NULL, NULL); \
+                }                                                       \
+                else                                                    \
+                    StandardError(36);                                  \
+            }                                                           \
+        }                                                               \
+    } while (0)
+
+                if (OptionErrorSkip == 0)
+                {
+                    // No error trapping active - skip setjmp entirely.
+                    EXEC_ONE_STATEMENT();
+                }
+                else if (setjmp(ErrNext) == 0)
+                { // return to the else leg of this if error and OPTION ERROR SKIP/IGNORE is in effect
+                    EXEC_ONE_STATEMENT();
+                }
+                else
+                {
+                    g_LocalIndex = SaveLocalIndex; // restore so that we can clean up any memory leaks
+                    ClearTempMemory();
+                }
+#undef EXEC_ONE_STATEMENT
+                if (OptionErrorSkip > 0 && OptionErrorSkip < 100000)
+                    OptionErrorSkip--; // if OPTION ERROR SKIP decrement the count - we do not error if it is greater than zero
+                if (g_TempMemoryIsChanged)
+                    ClearTempMemory(); // at the end of each command we need to clear any temporary string vars
+#ifndef PICOMITEWEB
+                if (core1stack[0] != 0x12345678)
+                    error("CPU2 Stack overflow");
+#endif
+                if (!OptionNoCheck)
+                {
+                    CheckAbort();
+                    check_interrupt(); // check for an MMBasic interrupt or touch event and handle it
+                }
+            }
+            p = nextstmt;
+        }
+        if ((p[0] == 0 && p[1] == 0) || (p[0] == 0xff && p[1] == 0xff))
+            break; // the end of the program is marked by TWO zero chars, empty flash by two 0xff
+    }
+    memcpy(ErrNext, SaveErrNext, sizeof(jmp_buf)); // restore old jump buffer
+}
+
+// searches the subfun[] table to locate a defined sub or fun
+// returns with the index of the sub/function in the table or -1 if not found
+// if type = 0 then look for a sub otherwise a function
+#ifdef rp2350
+int __not_in_flash_func(FindSubFun)(unsigned char *p, int type)
+{
+    unsigned char *s;
+    unsigned char name[MAXVARLEN + 1];
+    int j, u, namelen;
+    unsigned int hash = FNV_offset_basis;
+    unsigned char *tp, *ip;
+
+    // copy the variable name into name
+    s = name;
+    namelen = 0;
+    do
+    {
+        u = mytoupper(*p);
+        hash ^= u;
+        //        PIntComma(u);
+        hash *= FNV_prime;
+        *s++ = u;
+        p++;
+        if (++namelen > MAXVARLEN)
+            error("Variable name too long");
+    } while (isnamechar(*p));
+    //    PRet();
+    *s = 0;
+    hash %= MAXSUBFUN; // scale 0-512
+    //	MMPrintString("Searching for function: ");MMPrintString((char *)name);PIntComma(hash);PRet();
+    while (funtbl[hash].name[0] != 0)
+    {
+        ip = name;
+        tp = (unsigned char *)funtbl[hash].name;
+        //		MMPrintString("Testing : ");MMPrintString((char *)tp);PRet();
+        if (*ip++ == *tp++)
+        { // preliminary quick check
+            j = namelen - 1;
+            while (j > 0 && *ip == *tp)
+            { // compare each letter
+                j--;
+                ip++;
+                tp++;
+            }
+            if (j == 0 && (*(char *)tp == 0 || namelen == MAXVARLEN) && funtbl[hash].index < MAXSUBFUN)
+            { // found a matching name
+                //				MMPrintString("Found : ");MMPrintString((char *)name);MMPrintString(", hash key : ");PInt(hash);PRet();
+                return funtbl[hash].index;
+                break;
+            }
+        }
+        hash++;
+        if (hash == MAXSUBFUN)
+            hash = 0;
+    }
+    return -1;
+}
+#else
+int MIPS16 __not_in_flash_func(FindSubFun)(unsigned char *p, int type)
+{
+    int n = 0;
+    int low, high, mid, cmp;
+    int first;
+    unsigned char *p2, *p1;
+
+    while (n < MAXSUBFUN && subfun[n] != NULL)
+        n++;
+    if (n == 0)
+        return -1;
+
+    // subfun[] is pre-sorted by PrepareProgram() using base-name ordering.
+    low = 0;
+    high = n - 1;
+    first = mytoupper(*p);
+    if (first >= 'A' && first <= 'Z')
+    {
+        int li = first - 'A';
+        if (subfun_letter_start[li] == -1)
+            return -1;
+        low = subfun_letter_start[li];
+        for (int ni = li + 1; ni < 26; ni++)
+        {
+            if (subfun_letter_start[ni] != -1)
+            {
+                high = subfun_letter_start[ni] - 1;
+                break;
+            }
+        }
+    }
+
+    if (low > high)
+        return -1;
+
+    while (low <= high)
+    {
+        mid = low + ((high - low) >> 1);
+        cmp = CompareNameToSubFunBase(p, subfun[mid]);
+        if (cmp == 0)
+        {
+            p2 = subfun[mid];
+            CommandToken tkn = commandtbl_decode(p2);
+
+            if (type == 0)
+            {
+                if (!(tkn == cmdSUB || tkn == cmdCSUB))
+                    return -1;
+            }
+            else
+            {
+                if (!(tkn == cmdFUN /*|| tkn == cmdCFUN*/))
+                    return -1;
+            }
+
+            // Preserve existing suffix matching behavior.
+            p2 += sizeof(CommandToken);
+            skipspace(p2);
+            p1 = p;
+            while (isnamechar(*p1) && isnamechar(*p2))
+            {
+                p1++;
+                p2++;
+            }
+            if ((*p1 == '$' && *p2 == '$') || (*p1 == '%' && *p2 == '%') || (*p1 == '!' && *p2 == '!') || (!isnamechar(*p1) && !isnamechar(*p2)))
+                return mid;
+            return -1;
+        }
+        if (cmp < 0)
+            high = mid - 1;
+        else
+            low = mid + 1;
+    }
+    return -1;
+}
+#endif
+
+// This function is responsible for executing a defined subroutine or function.
+// As these two are similar they are processed in the one lump of code.
+//
+// The arguments when called are:
+//   isfun    = true if we are executing a function
+//   cmd      = pointer to the command name used by the caller (in program memory)
+//   index    = index into subfun[i] which points to the definition of the sub or funct
+//   fa, i64a, sa and typ are pointers to where the return value is to be stored (used by functions only)
+#if LOWRAM
+void MIPS16 DefinedSubFun(int isfun, unsigned char *cmd, int index, MMFLOAT *fa, long long int *i64a, unsigned char **sa, int *typ)
+{
+#else
+#if defined(rp2350) || defined(PICOMITEMIN)
+void __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, int index, MMFLOAT *fa, long long int *i64a, unsigned char **sa, int *typ)
+{
+#else
+void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, int index, MMFLOAT *fa, long long int *i64a, unsigned char **sa, int *typ)
+{
+#endif
+#endif
+
+    unsigned char *p, *s, *tp, *ttp, tcmdtoken;
+    unsigned char *CallersLinePtr, *SubLinePtr = NULL;
+    unsigned char *argbuf1;
+    unsigned char **argv1;
+    int argc1;
+    unsigned char *argbuf2;
+    unsigned char **argv2;
+    int argc2;
+    unsigned char fun_name[MAXVARLEN + 1];
+    unsigned char *argbyref;
+    int i;
+    int ArgType, FunType;
+    int *argtype;
+    union u_argval
+    {
+        MMFLOAT f;         // the value if it is a float
+        long long int i;   // the value if it is an integer
+        MMFLOAT *fa;       // pointer to the allocated memory if it is an array of floats
+        long long int *ia; // pointer to the allocated memory if it is an array of integers
+        unsigned char *s;  // pointer to the allocated memory if it is a string
+    } *argval;
+    int *argVarIndex;
+
+    // Errors generated after gosubindex is incremented need to restore the original value
+    // Any variables created if LocalIndex was incremented also need to be cleared
+    // Memory allocated to *argval needs to be recovered.
+    // This allows unit tests to recover cleanly from skipped errors.i.e. ON ERROR SKIP
+    DefinedSubFunLocalIndex = g_LocalIndex; // save the LocalIndex
+
+    CallersLinePtr = CurrentLinePtr;
+    SubLinePtr = subfun[index];            // used for error reporting
+    p = SubLinePtr + sizeof(CommandToken); // point to the sub or function definition
+    skipspace(p);
+    ttp = p;
+
+    // copy the sub/fun name from the definition into temp storage and terminate
+    // p is left pointing to the end of the name (ie, start of the argument list in the definition)
+    CurrentLinePtr = SubLinePtr; // report errors at the definition
+    tp = fun_name;
+    *tp++ = *p++;
+    while (isnamechar(*p))
+        *tp++ = *p++;
+    if (*p == '$' || *p == '%' || *p == '!')
+    {
+        if (!isfun)
+        {
+            error("Type specification is invalid: @", (int)(*p));
+        }
+        *tp++ = *p++;
+    }
+    *tp = 0;
+
+    if (isfun && *p != '(' /*&& (*SubLinePtr != cmdCFUN)*/)
+        error("Function definition");
+
+    // find the end of the caller's identifier, tp is left pointing to the start of the caller's argument list
+    CurrentLinePtr = CallersLinePtr; // report errors at the caller
+    tp = cmd + 1;
+    while (isnamechar(*tp))
+        tp++;
+    if (*tp == '$' || *tp == '%' || *tp == '!')
+    {
+        if (!isfun)
+            error("Type specification");
+        tp++;
+    }
+    if (mytoupper(*(p - 1)) != mytoupper(*(tp - 1)))
+        error("Inconsistent type suffix");
+
+    // if this is a function we check to find if the function's type has been specified with AS <type> and save it
+    CurrentLinePtr = SubLinePtr; // report errors at the definition
+    FunType = T_NOTYPE;
+#ifdef STRUCTENABLED
+    int SavedStructArg = -1; // Save struct index for function return type
+#endif
+    if (isfun)
+    {
+        ttp = skipvar(ttp, false); // point to after the function name and bracketed arguments
+        skipspace(ttp);
+        if (*ttp == tokenAS)
+        {                                                    // are we using Microsoft syntax (eg, AS INTEGER)?
+            ttp++;                                           // step over the AS token
+            ttp = CheckIfTypeSpecified(ttp, &FunType, true); // get the type
+            if (!(FunType & T_IMPLIED))
+                error("Variable type");
+#ifdef STRUCTENABLED
+            SavedStructArg = g_StructArg; // Save before argument processing overwrites it
+#endif
+        }
+        FunType |= (V_FIND | V_DIM_VAR | V_LOCAL | V_EMPTY_OK);
+    }
+
+    // from now on
+    // tp  = the caller's argument list
+    // p   = the argument list for the definition
+    skipspace(tp);
+    skipspace(p);
+
+    // similar if this is a CSUB
+    CommandToken tkn = commandtbl_decode(SubLinePtr);
+    if (tkn == cmdCSUB)
+    {
+        CallCFunction(SubLinePtr, tp, p, CallersLinePtr); // run the CSUB
+        g_TempMemoryIsChanged = true;                     // signal that temporary memory should be checked
+        return;
+    }
+    // from now on we have a user defined sub or function (not a C routine)
+
+    if (gosubindex >= MAXGOSUB)
+        error("Too many nested SUB/FUN");
+    errorstack[gosubindex] = CallersLinePtr;
+    gosubstack[gosubindex++] = isfun ? NULL : nextstmt; // NULL signifies that this is returned to by ending ExecuteProgram()
+#define buffneeded MAX_ARG_COUNT * (sizeof(union u_argval) + 2 * sizeof(int) + 3 * sizeof(unsigned char *) + sizeof(unsigned char)) + 2 * STRINGSIZE
+    // allocate memory for processing the arguments
+    argval = GetSystemMemory(buffneeded);
+    DefinedSubFunMem = (uint32_t)argval; // save pointer to memory for cleanup on error
+    argtype = (void *)argval + MAX_ARG_COUNT * sizeof(union u_argval);
+    argVarIndex = (void *)argtype + MAX_ARG_COUNT * sizeof(int);
+    argbuf1 = (void *)argVarIndex + MAX_ARG_COUNT * sizeof(int);
+    argv1 = (void *)argbuf1 + STRINGSIZE;
+    argbuf2 = (void *)argv1 + MAX_ARG_COUNT * sizeof(unsigned char *);
+    argv2 = (void *)argbuf2 + STRINGSIZE;
+    argbyref = (void *)argv2 + MAX_ARG_COUNT * sizeof(unsigned char *);
+
+    // now split up the arguments in the caller
+    CurrentLinePtr = CallersLinePtr; // report errors at the caller
+    argc1 = 0;
+    if (*tp)
+        makeargs(&tp, MAX_ARG_COUNT, argbuf1, argv1, &argc1, (*tp == '(') ? (unsigned char *)"(," : (unsigned char *)",");
+
+    // split up the arguments in the definition
+    CurrentLinePtr = SubLinePtr; // any errors must be at the definition
+    argc2 = 0;
+    if (*p)
+        makeargs(&p, MAX_ARG_COUNT, argbuf2, argv2, &argc2, (*p == '(') ? (unsigned char *)"(," : (unsigned char *)",");
+
+    // error checking
+    if (argc2 && (argc2 & 1) == 0)
+        error("Argument list");
+    CurrentLinePtr = CallersLinePtr; // report errors at the caller
+    if (argc1 > argc2 || (argc1 && (argc1 & 1) == 0))
+        error("Argument list");
+
+    // step through the arguments supplied by the caller and get the value supplied
+    // these can be:
+    //    - missing (ie, caller did not supply that parameter)
+    //    - a variable, in which case we need to get a pointer to that variable's data and save its index so later we can get its type
+    //    - an expression, in which case we evaluate the expression and get its value and type
+    for (i = 0; i < argc2; i += 2)
+    { // count through the arguments in the definition of the sub/fun
+        if (i < argc1 && *argv1[i])
+        {
+            // check if the argument is a valid variable
+            if (i < argc1 && isnamestart(*argv1[i]) && *skipvar(argv1[i], false) == 0)
+            {
+                // yes, it is a variable (or perhaps a user defined function which looks the same)?
+                if (!(FindSubFun(argv1[i], 1) >= 0 && strchr((char *)argv1[i], '(') != NULL))
+                {
+                    // yes, this is a valid variable.  set argvalue to point to the variable's data and argtype to its type
+                    argval[i].s = findvar(argv1[i], V_FIND | V_EMPTY_OK); // get a pointer to the variable's data
+#ifdef STRUCTENABLED
+                    // For struct member access, use the member's type instead of the struct's type
+                    if ((g_vartbl[g_VarIndex].type & T_STRUCT) && g_StructMemberType != 0)
+                        argtype[i] = g_StructMemberType;
+                    else
+#endif
+                        argtype[i] = g_vartbl[g_VarIndex].type; // and the variable's type
+                    argVarIndex[i] = g_VarIndex;
+                    if (argtype[i] & T_CONST)
+                    {
+                        argtype[i] = 0; // we don't want to point to a constant
+                    }
+                    else
+                    {
+                        argtype[i] |= T_PTR; // flag this as a pointer
+                    }
+                }
+            }
+
+            // check for BYVAL or BYREF in sub/fun definition
+            argbyref[i] = 0;
+            skipspace(argv2[i]);
+            if (toupper(*argv2[i]) == 'B' && toupper(*(argv2[i] + 1)) == 'Y')
+            {
+                if ((checkstring(argv2[i] + 2, (unsigned char *)"VAL")) != NULL)
+                { // if BYVAL
+                    // Only if not an array remove any pointer flag in the caller
+                    argtype[i] = 0;
+
+                    // Trap an array but not an array element
+                    if (g_vartbl[argVarIndex[i]].dims[0] > 0)
+                    {
+                        /* See if we have an array or an array element */
+                        tp = argv1[i];
+                        do
+                        {
+                            tp++;
+                        } while (*tp != '('); // We should find a '(' because it must be an array or and array element to get here
+                        tp++;
+                        skipspace(tp);
+                        if (*tp == ')')
+                            error("Array as BYVAL not allowed $", argv1[i]);
+                    }
+                    argv2[i] += 5; // skip to the variable start
+                }
+                else
+                {
+                    if ((checkstring(argv2[i] + 2, (unsigned char *)"REF")) != NULL)
+                    { // if BYREF
+                        if ((argtype[i] & T_PTR) == 0)
+                            error("Variable required for BYREF $", argv1[i]);
+
+                        argv2[i] += 5; // skip to the variable start
+                        argbyref[i] = 1;
+                    }
+                }
+            }
+
+            // if argument is present and is not a pointer to a variable then evaluate it as an expression
+            if (argtype[i] == 0)
+            {
+                long long int ia;
+                evaluate(argv1[i], &argval[i].f, &ia, &s, &argtype[i], false); // get the value and type of the argument
+                if (argtype[i] & T_INT)
+                    argval[i].i = ia;
+                else if (argtype[i] & T_STR)
+                {
+                    argval[i].s = GetMemory(STRINGSIZE);
+                    Mstrcpy(argval[i].s, s);
+                }
+            }
+        }
+    }
+
+    // now we step through the parameters in the definition of the sub/fun
+    // for each one we create the local variable and compare its type to that supplied in the callers list
+    CurrentLinePtr = SubLinePtr; // any errors must be at the definition
+    g_LocalIndex++;
+#ifdef CACHE
+    EnterLocalFrame();         // open a new local-variable frame for this sub/fun
+    g_current_sub_idx = index; // for trace-cache per-sub opt-in
+#endif
+    for (i = 0; i < argc2; i += 2)
+    { // count through the arguments in the definition of the sub/fun
+        ArgType = T_NOTYPE;
+        // skip BYVAL/BYREF keywords
+        if (toupper(*argv2[i]) == 'B' && toupper(*(argv2[i] + 1)) == 'Y')
+        {
+            if ((checkstring(argv2[i] + 2, (unsigned char *)"VAL")) != NULL)
+            {
+                argv2[i] += 5;
+            }
+            else if ((checkstring(argv2[i] + 2, (unsigned char *)"REF")) != NULL)
+            {                  // if BYREF
+                argv2[i] += 5; // skip to the variable start
+            }
+        }
+
+        tp = skipvar(argv2[i], false); // point to after the variable
+        skipspace(tp);
+        if (*tp == tokenAS)
+        {                                                  // are we using Microsoft syntax (eg, AS INTEGER)?
+            *tp++ = 0;                                     // terminate the string and step over the AS token
+            tp = CheckIfTypeSpecified(tp, &ArgType, true); // and get the type
+            if (!(ArgType & T_IMPLIED))
+                error("Variable type");
+        }
+        ArgType |= (V_FIND | V_DIM_VAR | V_LOCAL | V_EMPTY_OK);
+        tp = findvar(argv2[i], ArgType); // declare the local variable
+        if (g_vartbl[g_VarIndex].dims[0] > 0)
+            error("Argument list"); // if it is an array it must be an empty array
+
+        CurrentLinePtr = CallersLinePtr; // report errors at the caller
+
+        // if the definition called for an array, special processing and checking will be required
+        if (g_vartbl[g_VarIndex].dims[0] == -1)
+        {
+            int j;
+            if (g_vartbl[argVarIndex[i]].dims[0] == 0)
+                error("Expected an array");
+            if (TypeMask(g_vartbl[g_VarIndex].type) != TypeMask(argtype[i]))
+                error("Incompatible type: $", argv1[i]);
+#ifdef STRUCTENABLED
+            // For struct arrays, verify the struct types match
+            if ((g_vartbl[g_VarIndex].type & T_STRUCT) && (argtype[i] & T_STRUCT))
+            {
+                if (g_vartbl[g_VarIndex].size != g_vartbl[argVarIndex[i]].size)
+                    error("Structure type mismatch: $", argv1[i]);
+            }
+#endif
+            g_vartbl[g_VarIndex].val.s = argval[i].s; // Point to caller's array data (uses element offset if specified, e.g. array(3) -> &array[3])
+            g_vartbl[g_VarIndex].type |= T_PTR;       // Mark as pointer so we don't free caller's memory
+            for (j = 0; j < MAXDIM; j++)              // copy the dimensions of the supplied variable into our local variable
+                g_vartbl[g_VarIndex].dims[j] = g_vartbl[argVarIndex[i]].dims[j];
+            g_vartbl[g_VarIndex].size = g_vartbl[argVarIndex[i]].size; // copy string length for string arrays
+            continue;                                                  // Skip the rest of parameter handling
+        }
+
+#ifdef STRUCTENABLED
+        // if the definition called for a struct, use helper (NOT in RAM for size savings)
+        if (ValidateStructParam(g_VarIndex, argVarIndex[i], argval[i].s, argtype[i], argv1[i]))
+            continue; // Skip normal pointer/value handling below
+#endif
+
+        // if this is a pointer check and the type is NOT the same as that requested in the sub/fun definition
+        if ((argtype[i] & T_PTR) && TypeMask(g_vartbl[g_VarIndex].type) != TypeMask(argtype[i]))
+        {
+            if (argbyref[i])
+                error("BYREF requires same types: $", argv1[i]);
+            if ((TypeMask(g_vartbl[g_VarIndex].type) & T_STR) || (TypeMask(argtype[i]) & T_STR))
+                error("Incompatible type: $", argv1[i]);
+            // make this into an ordinary argument - use argval[i].s which already points to the correct data
+            // (for struct members, findvar resolved the member offset; for pointer variables, it's the target)
+            argval[i].i = *(long long int *)argval[i].s;
+            argtype[i] &= ~T_PTR; // and remove the pointer flag
+        }
+
+        // if this is a pointer (note: at this point the caller type and the required type must be the same)
+        if (argtype[i] & T_PTR)
+        {
+            // the argument supplied was a variable so we must setup the local variable as a pointer
+            if ((g_vartbl[g_VarIndex].type & T_STR) && g_vartbl[g_VarIndex].val.s != NULL)
+            {
+                FreeMemorySafe((void **)&g_vartbl[g_VarIndex].val.s); // free up the local variable's memory if it is a pointer to a string
+            }
+            g_vartbl[g_VarIndex].val.s = argval[i].s;                  // point to the data of the variable supplied as an argument
+            g_vartbl[g_VarIndex].type |= T_PTR;                        // set the type to a pointer
+            g_vartbl[g_VarIndex].size = g_vartbl[argVarIndex[i]].size; // just in case it is a string copy the size
+            // this is not a pointer
+        }
+        else if (argtype[i] != 0)
+        { // in getting the memory argtype[] is initialised to zero
+            // the parameter was an expression or a just straight variables with different types (therefore not a pointer))
+            if ((g_vartbl[g_VarIndex].type & T_STR) && (argtype[i] & T_STR))
+            { // both are a string
+                Mstrcpy(g_vartbl[g_VarIndex].val.s, argval[i].s);
+                FreeMemorySafe((void **)&argval[i].s);
+            }
+            else if ((g_vartbl[g_VarIndex].type & T_NBR) && (argtype[i] & T_NBR)) // both are a float
+                g_vartbl[g_VarIndex].val.f = argval[i].f;
+            else if ((g_vartbl[g_VarIndex].type & T_NBR) && (argtype[i] & T_INT)) // need a float but supplied an integer
+                g_vartbl[g_VarIndex].val.f = argval[i].i;
+            else if ((g_vartbl[g_VarIndex].type & T_INT) && (argtype[i] & T_INT)) // both are integers
+                g_vartbl[g_VarIndex].val.i = argval[i].i;
+            else if ((g_vartbl[g_VarIndex].type & T_INT) && (argtype[i] & T_NBR)) // need an integer but was supplied with a float
+                g_vartbl[g_VarIndex].val.i = FloatToInt64(argval[i].f);
+            else
+                error("Incompatible type: $", argv1[i]);
+        }
+    }
+
+    // memory used in setting up the arguments can be deleted now
+    FreeMemory((void *)argval);
+    DefinedSubFunMem = 0; // we got here so we wont need to cleanup any memory
+    strcpy((char *)CurrentSubFunName, (char *)fun_name);
+    // if it is a defined command we simply point to the first statement in our command and allow ExecuteProgram() to carry on as before
+    // exit from the sub is via cmd_return which will decrement g_LocalIndex
+    if (!isfun)
+    {
+        skipelement(p);
+        nextstmt = p; // point to the body of the subroutine
+        return;
+    }
+
+    // if it is a defined function we have a lot more work to do.  We must:
+    //   - Create a local variable for the function's name
+    //   - Save the globals being used by the current command that caused the function to be called
+    //   - Invoke another instance of ExecuteProgram() to execute the body of the function
+    //   - When that returns we need to restore the global variables
+    //   - Get the variable's value and save that in the return value globals (fret or sret)
+    //   - Return to the expression parser
+#ifdef STRUCTENABLED
+    g_StructArg = SavedStructArg; // Restore struct index for function return type
+#endif
+    tp = findvar(fun_name, FunType | V_FUNCT); // declare the local variable
+    FunType = g_vartbl[g_VarIndex].type;
+#ifdef STRUCTENABLED
+    int FunStructType = -1; // struct type index if returning a struct
+#endif
+    if (FunType & T_STR)
+    {
+        FreeMemorySafe((void **)&g_vartbl[g_VarIndex].val.s); // free the memory if it is a string
+        g_vartbl[g_VarIndex].type |= T_PTR;
+        g_LocalIndex--;                                       // allocate the memory at the previous level
+        g_vartbl[g_VarIndex].val.s = tp = GetTempStrMemory(); // and use our own memory
+        g_LocalIndex++;
+    }
+#ifdef STRUCTENABLED
+    else if (FunType & T_STRUCT)
+    {
+        // Function returns a struct - save info for later copy to temp memory
+        FunStructType = (int)g_vartbl[g_VarIndex].size;
+        // tp already points to the struct data from findvar
+    }
+#endif
+    skipelement(p); // point to the body of the function
+
+    ttp = nextstmt; // save the globals used by commands
+    tcmdtoken = cmdtoken;
+    s = cmdline;
+
+    ExecuteProgram(p);               // execute the function's code
+    CurrentLinePtr = CallersLinePtr; // report errors at the caller
+
+    cmdline = s; // restore the globals
+    cmdtoken = tcmdtoken;
+    nextstmt = ttp;
+
+    // return the value of the function's variable to the caller
+    if (FunType & T_NBR)
+        *fa = *(MMFLOAT *)tp;
+    else if (FunType & T_INT)
+        *i64a = *(long long int *)tp;
+#ifdef STRUCTENABLED
+    else if (FunType & T_STRUCT)
+    {
+        // Use helper to copy struct return (NOT in RAM for size savings)
+        *sa = CopyStructReturn(tp, FunStructType, &g_ExprStructType);
+    }
+#endif
+    else
+        *sa = tp;                    // for a string we just need to return the local memory
+    *typ = FunType;                  // save the function type for the caller
+    ClearVars(g_LocalIndex--, true); // delete any local variables
+#ifdef CACHE
+    LeaveLocalFrame(); // pop this sub/fun's local frame
+#endif
+    g_TempMemoryIsChanged = true; // signal that temporary memory should be checked
+    gosubindex--;
+}
+
+char MIPS16 *strcasechr(const char *p, int ch)
+{
+    char c;
+
+    c = mytoupper(ch);
+    for (;; ++p)
+    {
+        if (mytoupper(*p) == c)
+            return ((char *)p);
+        if (*p == '\0')
+            return (NULL);
+    }
+    /* NOTREACHED */
+}
+
+char MIPS16 *fstrstr(const char *s1, const char *s2)
+{
+    const char *p = s1;
+    const size_t len = strlen(s2);
+
+    for (; (p = strcasechr(p, *s2)) != 0; p++)
+    {
+        if (strncasecmp(p, s2, len) == 0)
+            return (char *)p;
+    }
+    return (0);
+}
+
+void MIPS16 str_replace(char *target, const char *needle, const char *replacement, uint8_t ignoresurround)
+{
+    char buffer[288] = {0};
+    char *insert_point = &buffer[0];
+    const char *tmp = target;
+    size_t needle_len = strlen(needle);
+    size_t repl_len = strlen(replacement);
+
+    while (1)
+    {
+        const char *p = fstrstr(tmp, needle);
+
+        // walked past last occurrence of needle; copy remaining part
+        if (p == NULL)
+        {
+            strcpy(insert_point, tmp);
+            break;
+        }
+        char *q;
+        if (p == target)
+        {
+            ignoresurround |= 1;
+            q = (char *)p;
+        }
+        else
+            q = (char *)p - 1;
+        if ((isnamechar(*q) && !(ignoresurround & 1)) || (isnameend(p[strlen(needle)]) && !(ignoresurround & 2)))
+        {
+            // copy part before needle
+            memcpy(insert_point, tmp, p - tmp);
+            insert_point += p - tmp;
+
+            // copy replacement string
+            memcpy(insert_point, needle, needle_len);
+            insert_point += needle_len;
+
+            // adjust pointers, move on
+            tmp = p + needle_len;
+        }
+        else
+        {
+            // copy part before needle
+            memcpy(insert_point, tmp, p - tmp);
+            insert_point += p - tmp;
+
+            // copy replacement string
+            memcpy(insert_point, replacement, repl_len);
+            insert_point += repl_len;
+
+            // adjust pointers, move on
+            tmp = p + needle_len;
+        }
+    }
+
+    // write altered string back to target
+    strcpy(target, buffer);
+}
+
+void MIPS16 STR_REPLACE(char *target, const char *needle, const char *replacement, uint8_t ignoresurround)
+{
+    char *ip = target;
+    int toggle = 0;
+    char comment[STRINGSIZE] = {0};
+    skipspace(ip);
+    if (!(mytoupper(*ip) == 'R' && mytoupper(ip[1]) == 'E' && mytoupper(ip[2]) == 'M'))
+    {
+        while (*ip)
+        {
+            if (*ip == 34)
+            {
+                if (toggle == 0)
+                    toggle = 1;
+                else
+                    toggle = 0;
+            }
+            if (toggle && *ip == ' ')
+            {
+                *ip = 0xFF;
+            }
+            if (toggle && *ip == '.')
+            {
+                *ip = 0xFE;
+            }
+            if (toggle && *ip == '=')
+            {
+                *ip = 0xFD;
+            }
+            if (toggle && *ip == '\\')
+            {
+                *ip = 0xFC;
+            }
+            if (toggle == 0 && *ip == '\'')
+            {
+                strcpy(comment, ip);
+                *ip = 0;
+                break;
+            }
+            ip++;
+        }
+        str_replace(target, needle, replacement, ignoresurround);
+        ip = target;
+        if (comment[0] == '\'')
+        {
+            strcat(target, comment);
+        }
+        while (*ip)
+        {
+            if (*ip == 0xFF)
+                *ip = ' ';
+            if (*ip == 0xFE)
+                *ip = '.';
+            if (*ip == 0xFD)
+                *ip = '=';
+            if (*ip == 0xFC)
+                *ip = '\\';
+            ip++;
+        }
+    }
+}
+
 /********************************************************************************************************************************************
  routines for evaluating expressions
  the main functions are getnumber(), getinteger() and getstring()
@@ -2425,7 +2631,7 @@ unsigned char *getFstring(unsigned char *p)
     for (int i = 1; i <= *tp; i++)
         if (tp[i] == '\\')
             tp[i] = '/';
-    if ((mytoupper(tp[1]) == 'A' || mytoupper(tp[1]) == 'B') && tp[2] == ':' && !(tp[3] == '/'))
+    if ((mytoupper(tp[1]) == 'A' || mytoupper(tp[1]) == 'B' || mytoupper(tp[1]) == 'C') && tp[2] == ':' && !(tp[3] == '/'))
     {
         memmove(&tp[4], &tp[3], tp[0] - 2);
         tp[3] = '/';
@@ -2438,7 +2644,7 @@ unsigned char *getFstring(unsigned char *p)
 }
 
 // recursively evaluate an expression observing the rules of operator precedence
-#ifdef rp2350
+#if defined(rp2350) || defined(PICOMITEMIN)
 unsigned char MIPS64 __not_in_flash_func (*doexpr)(unsigned char *p, MMFLOAT *fa, long long int *ia, unsigned char **sa, int *oo, int *ta)
 #else
 unsigned MIPS16 char __not_in_flash_func (*doexpr)(unsigned char *p, MMFLOAT *fa, long long int *ia, unsigned char **sa, int *oo, int *ta)
@@ -2559,7 +2765,7 @@ unsigned MIPS16 char __not_in_flash_func (*doexpr)(unsigned char *p, MMFLOAT *fa
 unsigned char MIPS16 *getvalue(unsigned char *p, MMFLOAT *fa, long long int *ia, unsigned char **sa, int *oo, int *ta)
 {
 #else
-#ifdef rp2350
+#if defined(rp2350) || defined(PICOMITEMIN)
 unsigned char MIPS64 __not_in_flash_func (*getvalue)(unsigned char *p, MMFLOAT *fa, long long int *ia, unsigned char **sa, int *oo, int *ta)
 #else
 unsigned char MIPS16 __not_in_flash_func (*getvalue)(unsigned char *p, MMFLOAT *fa, long long int *ia, unsigned char **sa, int *oo, int *ta)
@@ -2707,7 +2913,21 @@ unsigned char MIPS16 __not_in_flash_func (*getvalue)(unsigned char *p, MMFLOAT *
                 if (t & T_INT)
                     i64 = (*(long long int *)s);
             }
-            p = skipvar(p, false);
+            // Fast path: for a plain scalar reference (no '(' array index,
+            // no '.' struct member, no trailing space) the lookahead pointer
+            // tp already points to the byte just past the variable name and
+            // its suffix.  Avoid calling skipvar() which would walk the name
+            // a third time.  Fall through to skipvar() for arrays, struct
+            // member access, or anything else that requires bracket / dot
+            // handling.
+            if (*tp != '(' && *tp != ' '
+#ifdef STRUCTENABLED
+                && *tp != '.'
+#endif
+            )
+                p = tp;
+            else
+                p = skipvar(p, false);
         }
         // Numeric constant
         else if (IsDigitinline(c) || c == '.')
@@ -3065,6 +3285,7 @@ void hashlabels(unsigned char *p, int ErrAbort)
 // search through program memory looking for a label.
 // returns a pointer to the T_NEWLINE token or throws an error if not found
 // non cached version
+
 unsigned char *findlabel(unsigned char *labelptr)
 {
     //    char *p, *lastp = (char *)ProgMemory + 1;
@@ -3124,6 +3345,7 @@ unsigned char *findlabel(unsigned char *labelptr)
     return 0;
 }
 #else
+
 unsigned char MIPS16 *findlabel(unsigned char *labelptr)
 {
     char *p, *lastp = (char *)ProgMemory + 1;
@@ -3757,6 +3979,159 @@ int MIPS16 FindStructBase(unsigned char *basename, int baselen, int *pvindex)
 }
 #endif
 
+// ---------------------------------------------------------------------------
+// findvar() internal probe helpers (Phase 1 refactor)
+//
+// The two helpers below perform the hash-based open-addressing probe of the
+// variable table.  They are byte-for-byte semantically equivalent to the
+// inlined loops they replace.  They are extracted so that (a) the local and
+// global lookup paths are clearly separated and (b) Phase 2 can replace the
+// local-variable strategy (frame-stack + linear scan) without touching the
+// global code.
+//
+// Both helpers write the probe's terminal slot index to *out_hashIndex.  On
+// "found" the slot at that index contains the matching name; on "miss" it is
+// empty (name[0] == 0).  *out_ifree is set to -1 on "found", or to a slot
+// suitable for insertion on "miss".
+// ---------------------------------------------------------------------------
+
+#if defined(rp2350) || defined(PICOMITEMIN)
+static inline void __not_in_flash_func(probe_local_slot)(const unsigned char *name, int namelen,
+                                                         uint32_t hash,
+                                                         int *out_hashIndex, int *out_ifree)
+#else
+static inline void probe_local_slot(const unsigned char *name, int namelen,
+                                    uint32_t hash,
+                                    int *out_hashIndex, int *out_ifree)
+#endif
+{
+    int LocalhashIndex = hash % maxlocalvars;
+    int OriginalLocalHash = LocalhashIndex - 1;
+    if (OriginalLocalHash < 0)
+        OriginalLocalHash += maxlocalvars;
+    int localifree = -1;
+    int tmp = -1;
+
+    if (g_vartbl[LocalhashIndex].type == T_NOTYPE)
+    {
+        localifree = LocalhashIndex;
+    }
+    else
+    {
+        while (g_vartbl[LocalhashIndex].name[0] != 0)
+        {
+            const char *ip = (const char *)name;
+            char *tp = (char *)g_vartbl[LocalhashIndex].name;
+            if (g_vartbl[LocalhashIndex].type == T_BLOCKED)
+                tmp = LocalhashIndex;
+            if (*ip++ == *tp++)
+            { // preliminary quick check
+                int j = namelen - 1;
+                while (j > 0 && *ip == *tp)
+                { // compare each letter
+                    j--;
+                    ip++;
+                    tp++;
+                }
+                if (j == 0 && (*(char *)tp == 0 || namelen == MAXVARLEN))
+                { // found a matching name
+                    if (g_vartbl[LocalhashIndex].level == g_LocalIndex)
+                        break; // matching local at current scope
+                }
+            }
+            LocalhashIndex++;
+            LocalhashIndex %= maxlocalvars;
+            if (LocalhashIndex == OriginalLocalHash)
+            {
+                ClearVars(0, true);
+                error("Too many local variables");
+            }
+        }
+        if (g_vartbl[LocalhashIndex].name[0] == 0)
+        { // not found
+            localifree = LocalhashIndex;
+            if (tmp != -1)
+            {
+                localifree = tmp;
+                g_vartbl[LocalhashIndex].type = T_NOTYPE;
+                g_vartbl[LocalhashIndex].name[0] = 0;
+            }
+        }
+    }
+    *out_hashIndex = LocalhashIndex;
+    *out_ifree = localifree;
+}
+
+// Probe the global portion of the variable table.
+// `error_on_wrap` controls whether running the probe all the way around the
+// global range raises "Too many global variables".  The two historical call
+// sites differ in this regard; parameterising here preserves existing
+// behaviour exactly.
+#if defined(rp2350) || defined(PICOMITEMIN)
+static inline void __not_in_flash_func(probe_global_slot)(const unsigned char *name, int namelen,
+                                                          int GlobalhashIndex, int OriginalGlobalHash,
+                                                          int error_on_wrap,
+                                                          int *out_hashIndex, int *out_ifree)
+#else
+static inline void probe_global_slot(const unsigned char *name, int namelen,
+                                     int GlobalhashIndex, int OriginalGlobalHash,
+                                     int error_on_wrap,
+                                     int *out_hashIndex, int *out_ifree)
+#endif
+{
+    int globalifree = -1;
+    int tmp = -1;
+
+    if (g_vartbl[GlobalhashIndex].type == T_NOTYPE)
+    {
+        globalifree = GlobalhashIndex;
+    }
+    else
+    {
+        while (g_vartbl[GlobalhashIndex].name[0] != 0)
+        {
+            const char *ip = (const char *)name;
+            char *tp = (char *)g_vartbl[GlobalhashIndex].name;
+            if (g_vartbl[GlobalhashIndex].type == T_BLOCKED)
+                tmp = GlobalhashIndex;
+            if (*ip++ == *tp++)
+            { // preliminary quick check
+                int j = namelen - 1;
+                while (j > 0 && *ip == *tp)
+                { // compare each letter
+                    j--;
+                    ip++;
+                    tp++;
+                }
+                if (j == 0 && (*(char *)tp == 0 || namelen == MAXVARLEN))
+                {          // found a matching name
+                    break; // matching global
+                }
+            }
+            GlobalhashIndex++;
+            if (GlobalhashIndex == MAXVARS)
+                GlobalhashIndex = maxlocalvars;
+            if (error_on_wrap && GlobalhashIndex == OriginalGlobalHash)
+            {
+                ClearVars(0, true);
+                error("Too many global variables");
+            }
+        }
+        if (g_vartbl[GlobalhashIndex].name[0] == 0)
+        { // not found
+            globalifree = GlobalhashIndex;
+            if (tmp != -1)
+            {
+                globalifree = tmp;
+                g_vartbl[GlobalhashIndex].type = T_NOTYPE;
+                g_vartbl[GlobalhashIndex].name[0] = 0;
+            }
+        }
+    }
+    *out_hashIndex = GlobalhashIndex;
+    *out_ifree = globalifree;
+}
+
 // find or create a variable
 // the action parameter can be the following (these can be ORed together)
 // - V_FIND    a straight forward find, if the variable is not found it is created and set to zero
@@ -3793,7 +4168,7 @@ void MIPS16 *findvar(unsigned char *p, int action)
  * - hash % (MAXVARS/2) replaced with hash % maxlocalvars
  * - Global offset is now maxlocalvars instead of MAXVARS/2
  ***********************************************************************************************/
-#ifdef rp2350
+#if defined(rp2350) || defined(PICOMITEMIN)
 void MIPS32 __not_in_flash_func (*findvar)(unsigned char *p, int action)
 #else
 void MIPS16 __not_in_flash_func (*findvar)(unsigned char *p, int action)
@@ -3805,12 +4180,12 @@ void MIPS16 __not_in_flash_func (*findvar)(unsigned char *p, int action)
     unsigned char *s = name, *x, u, suffix = 0;
     void *mptr;
     int GlobalhashIndex, OriginalGlobalHash;
-    int LocalhashIndex, OriginalLocalHash;
+    int LocalhashIndex;
     uint32_t hash = FNV_offset_basis;
-    char *tp, *ip;
     int dim[MAXDIM];
     int dim_error_deferred = 0; // set if V_NOFIND_NULL deferred a "Dimensions" error
 #ifdef rp2350
+    char *tp, *ip;
     uint32_t funhash;
 #endif
 #ifdef STRUCTENABLED
@@ -3819,6 +4194,8 @@ void MIPS16 __not_in_flash_func (*findvar)(unsigned char *p, int action)
     g_StructMemberSize = 0;   // Reset struct member size
 #endif
     emptyarray = 0;
+    if (g_option_profiling)
+        g_perf_findvar_calls++;
 
     // check the first char for a legal variable name
     skipspace(p);
@@ -3876,7 +4253,13 @@ void MIPS16 __not_in_flash_func (*findvar)(unsigned char *p, int action)
         vtype = 0;
 
 #ifdef STRUCTENABLED
-    // Check for struct member access (variable.member or variable.nested.member)
+    // Check for struct member access (variable.member or variable.nested.member).
+    // Skip entirely when no STRUCT types are defined in the program - in that
+    // case a dot in a name is just part of a normal MMBasic variable name, and
+    // FindStructBase would do a full second hash+probe of the var table only to
+    // return -1. Guarding on g_structcnt eliminates the double lookup for every
+    // dotted variable name in programs that don't use STRUCT.
+    if (g_structcnt > 0)
     {
         unsigned char *dot = (unsigned char *)strchr((char *)name, '.');
         if (dot != NULL)
@@ -3914,6 +4297,14 @@ void MIPS16 __not_in_flash_func (*findvar)(unsigned char *p, int action)
                 );
 
                 g_VarIndex = vindex;
+                // struct base is always in the global half of the var table
+                if (g_option_profiling)
+                {
+                    if (vindex < maxlocalvars)
+                        g_perf_findvar_locals++;
+                    else
+                        g_perf_findvar_globals++;
+                }
                 g_StructMemberType = member_type;
                 return result;
             }
@@ -3993,154 +4384,26 @@ void MIPS16 __not_in_flash_func (*findvar)(unsigned char *p, int action)
     // search the table looking for a match
 
     if (g_LocalIndex)
-    { // search
-        LocalhashIndex = hash % maxlocalvars;
-        OriginalLocalHash = LocalhashIndex - 1;
-        if (OriginalLocalHash < 0)
-            OriginalLocalHash += maxlocalvars; // CHANGED: was MAXVARS/2
-        localifree = -1;
-        if (g_vartbl[LocalhashIndex].type == T_NOTYPE)
-        {
-            localifree = LocalhashIndex;
-        }
-        else
-        {
-            while (g_vartbl[LocalhashIndex].name[0] != 0)
-            {
-                ip = (char *)name;
-                tp = (char *)g_vartbl[LocalhashIndex].name;
-                if (g_vartbl[LocalhashIndex].type == T_BLOCKED)
-                    tmp = LocalhashIndex;
-                if (*ip++ == *tp++)
-                { // preliminary quick check
-                    j = namelen - 1;
-                    while (j > 0 && *ip == *tp)
-                    { // compare each letter
-                        j--;
-                        ip++;
-                        tp++;
-                    }
-                    if (j == 0 && (*(char *)tp == 0 || namelen == MAXVARLEN))
-                    { // found a matching name
-                        if (g_vartbl[LocalhashIndex].level == g_LocalIndex)
-                            break; // matching global while not in a subroutine
-                    }
-                }
-                LocalhashIndex++;
-                LocalhashIndex %= maxlocalvars; // CHANGED: was MAXVARS/2
-                if (LocalhashIndex == OriginalLocalHash)
-                {
-                    ClearVars(0, true);
-                    error("Too many local variables");
-                }
-            }
-            if (g_vartbl[LocalhashIndex].name[0] == 0)
-            { // not found
-                localifree = LocalhashIndex;
-                if (tmp != -1)
-                {
-                    localifree = tmp;
-                    g_vartbl[LocalhashIndex].type = T_NOTYPE;
-                    g_vartbl[LocalhashIndex].name[0] = 0;
-                }
-            }
-        }
+    {
+        // Search the local portion of the variable table first.
+        probe_local_slot(name, namelen, hash, &LocalhashIndex, &localifree);
+
         if (g_vartbl[LocalhashIndex].name[0] == 0)
-        { // not found in the local table so try the global
-            tmp = -1;
-            globalifree = -1;
-            if (g_vartbl[GlobalhashIndex].type == T_NOTYPE)
-            {
-                globalifree = GlobalhashIndex;
-            }
-            else
-            {
-                while (g_vartbl[GlobalhashIndex].name[0] != 0)
-                {
-                    ip = (char *)name;
-                    tp = (char *)g_vartbl[GlobalhashIndex].name;
-                    if (g_vartbl[GlobalhashIndex].type == T_BLOCKED)
-                        tmp = GlobalhashIndex;
-                    if (*ip++ == *tp++)
-                    { // preliminary quick check
-                        j = namelen - 1;
-                        while (j > 0 && *ip == *tp)
-                        { // compare each letter
-                            j--;
-                            ip++;
-                            tp++;
-                        }
-                        if (j == 0 && (*(char *)tp == 0 || namelen == MAXVARLEN))
-                        {          // found a matching name
-                            break; // matching global while not in a subroutine
-                        }
-                    }
-                    GlobalhashIndex++;
-                    if (GlobalhashIndex == MAXVARS)     // CHANGED: still MAXVARS (end of table)
-                        GlobalhashIndex = maxlocalvars; // CHANGED: was MAXVARS/2
-                    if (GlobalhashIndex == OriginalGlobalHash)
-                    {
-                        ClearVars(0, true);
-                        error("Too many global variables");
-                    }
-                }
-                if (g_vartbl[GlobalhashIndex].name[0] == 0)
-                { // not found
-                    globalifree = GlobalhashIndex;
-                    if (tmp != -1)
-                    {
-                        globalifree = tmp;
-                        g_vartbl[GlobalhashIndex].type = T_NOTYPE;
-                        g_vartbl[GlobalhashIndex].name[0] = 0;
-                    }
-                }
-            }
+        {
+            // Not found in the local table; fall through to the global table.
+            probe_global_slot(name, namelen,
+                              GlobalhashIndex, OriginalGlobalHash,
+                              1, // error on wrap (preserves historical behaviour)
+                              &GlobalhashIndex, &globalifree);
         }
     }
     else
     {
         localifree = 9999; // set a marker that a local variable is irrelevant
-        if (g_vartbl[GlobalhashIndex].type == T_NOTYPE)
-        {
-            globalifree = GlobalhashIndex;
-        }
-        else
-        {
-            while (g_vartbl[GlobalhashIndex].name[0] != 0)
-            {
-                ip = (char *)name;
-                tp = (char *)g_vartbl[GlobalhashIndex].name;
-                if (g_vartbl[GlobalhashIndex].type == T_BLOCKED)
-                    tmp = GlobalhashIndex;
-                if (*ip++ == *tp++)
-                { // preliminary quick check
-                    j = namelen - 1;
-                    while (j > 0 && *ip == *tp)
-                    { // compare each letter
-                        j--;
-                        ip++;
-                        tp++;
-                    }
-                    if (j == 0 && (*(char *)tp == 0 || namelen == MAXVARLEN))
-                    {          // found a matching name
-                        break; // matching global while not in a subroutine
-                    }
-                }
-                GlobalhashIndex++;
-                if (GlobalhashIndex == MAXVARS)     // CHANGED: still MAXVARS (end of table)
-                    GlobalhashIndex = maxlocalvars; // CHANGED: was MAXVARS/2
-            }
-            if (g_vartbl[GlobalhashIndex].name[0] == 0)
-            { // not found
-                globalifree = GlobalhashIndex;
-                if (tmp != -1)
-                {
-                    globalifree = tmp;
-                    g_vartbl[GlobalhashIndex].type = T_NOTYPE;
-                    g_vartbl[GlobalhashIndex].name[0] = 0;
-                }
-            }
-        }
+        probe_global_slot(name, namelen,
+                          GlobalhashIndex, OriginalGlobalHash,
+                          0, // do not raise on wrap (preserves historical behaviour)
+                          &GlobalhashIndex, &globalifree);
     }
 
     // At this point we know if a local variable has been found or if a global variable has been found
@@ -4148,13 +4411,17 @@ void MIPS16 __not_in_flash_func (*findvar)(unsigned char *p, int action)
     {
         // if we declared the variable as LOCAL within a sub/fun and an existing local was found
         if (localifree == -1)
-            error("$ Local variable already declared", name);
+            error((action & V_DIM_NEW) ? "$ already declared"
+                                       : "$ Local variable already declared",
+                  name);
     }
     else if (action & V_DIM_VAR)
     {
         // if are using DIM to declare a global variable and an existing global variable was found
         if (globalifree == -1)
-            error("$ Global variable already declared", name);
+            error((action & V_DIM_NEW) ? "$ already declared"
+                                       : "$ Global variable already declared",
+                  name);
     }
     // we are not declaring the variable but it may need to be created
     if (action & V_LOCAL)
@@ -4181,17 +4448,37 @@ void MIPS16 __not_in_flash_func (*findvar)(unsigned char *p, int action)
     if (ifree == -1 && g_vartbl[i].name[0] != 0)
     {
         g_VarIndex = vindex = i;
-
-        // check that the dimensions match
-        for (i = 0; i < MAXDIM && g_vartbl[vindex].dims[i] != 0; i++)
-            ;
-        if (dnbr == -1)
+        if (g_option_profiling)
         {
-            if (i == 0)
+            if (vindex < maxlocalvars)
+                g_perf_findvar_locals++;
+            else
+                g_perf_findvar_globals++;
+        }
+
+        // check that the dimensions match.  Fast paths for the common
+        // cases (scalar reference, empty-array reference) avoid the
+        // MAXDIM-iteration counting loop that fired on every resolved
+        // findvar() call.  Only true array references (dnbr > 0) still
+        // need to count and compare dimensions.
+        if (dnbr == 0)
+        {
+            // scalar reference: declared variable must also be scalar
+            if (g_vartbl[vindex].dims[0] != 0)
+                error("Array dimensions");
+            i = 0;
+        }
+        else if (dnbr == -1)
+        {
+            // empty-array reference (e.g. arr()): variable must be an array
+            if (g_vartbl[vindex].dims[0] == 0)
                 error("Array dimensions");
         }
         else
         {
+            // array reference with explicit indices: count declared dims
+            for (i = 0; i < MAXDIM && g_vartbl[vindex].dims[i] != 0; i++)
+                ;
             if (i != dnbr)
                 error("Array dimensions");
         }
@@ -4252,11 +4539,20 @@ void MIPS16 __not_in_flash_func (*findvar)(unsigned char *p, int action)
             }
 #endif
             if (dnbr == -1 || g_vartbl[vindex].type & (T_PTR | T_STR))
-                return g_vartbl[vindex].val.s; // if it is a string or pointer just return the pointer to the data
+            {
+                void *r = g_vartbl[vindex].val.s; // if it is a string or pointer just return the pointer to the data
+                return r;
+            }
             else if (g_vartbl[vindex].type & (T_INT))
-                return &(g_vartbl[vindex].val.i); // must be an integer, point to its value
+            {
+                void *r = &(g_vartbl[vindex].val.i); // must be an integer, point to its value
+                return r;
+            }
             else
-                return &(g_vartbl[vindex].val.f); // must be a straight number (float), point to its value
+            {
+                void *r = &(g_vartbl[vindex].val.f); // must be a straight number (float), point to its value
+                return r;
+            }
         }
 
         // if we reached this point it must be a reference to an existing array
@@ -4446,6 +4742,13 @@ void MIPS16 __not_in_flash_func (*findvar)(unsigned char *p, int action)
     }
     g_varcnt = g_Globalvarcnt + g_Localvarcnt;
     g_VarIndex = vindex = ifree;
+    if (g_option_profiling)
+    {
+        if (vindex < maxlocalvars)
+            g_perf_findvar_locals++;
+        else
+            g_perf_findvar_globals++;
+    }
 
     // initialise it: save the name, set the initial value to zero and set the type
     s = name;
@@ -4462,6 +4765,24 @@ void MIPS16 __not_in_flash_func (*findvar)(unsigned char *p, int action)
     if (ifree < maxlocalvars) // CHANGED: was MAXVARS/2
     {
         g_hashlist[g_hashlistpointer].level = g_LocalIndex;
+        // Populate side-index quick-reject data for this hashlist entry.
+        // 4-byte prefix of the upper-cased name (already in `name[]`),
+        // zero-padded if the name is shorter than 4 characters.
+        {
+            uint32_t qn = 0;
+            if (namelen >= 1)
+                qn = (uint32_t)name[0];
+            if (namelen >= 2)
+                qn |= ((uint32_t)name[1]) << 8;
+            if (namelen >= 3)
+                qn |= ((uint32_t)name[2]) << 16;
+            if (namelen >= 4)
+                qn |= ((uint32_t)name[3]) << 24;
+#ifdef CACHE
+            g_localframe_quick[g_hashlistpointer] = qn;
+            g_localframe_namelen[g_hashlistpointer] = (uint8_t)namelen;
+#endif
+        }
         g_hashlist[g_hashlistpointer++].hash = ifree;
         g_vartbl[ifree].level = g_LocalIndex;
     }
@@ -5000,7 +5321,12 @@ void MIPS16 error(char *msg, ...)
     if (DefinedSubFunMem)
     {
         if (g_LocalIndex != DefinedSubFunLocalIndex)
+        {
             ClearVars(g_LocalIndex, true);
+#ifdef CACHE
+            LeaveLocalFrame(); // unwind the partially-entered frame
+#endif
+        }
         gosubindex--;
         FreeMemory((void *)DefinedSubFunMem);
         DefinedSubFunMem = 0;
@@ -5067,8 +5393,15 @@ void MIPS16 error(char *msg, ...)
         if (CurrentX != 0)
             MMPrintString("\r\n"); // error message should be on a new line
     }
-    if (MMCharPos > 1)
-        MMPrintString("\r\n");
+    int suppress_error_output = 0;
+#ifdef MMBASIC_FM
+    suppress_error_output = fm_suppress_error_output;
+#endif
+    if (!suppress_error_output)
+    {
+        if (MMCharPos > 1)
+            MMPrintString("\r\n");
+    }
     int line_num = -2;
     if (CurrentLinePtr)
     {
@@ -5118,7 +5451,7 @@ void MIPS16 error(char *msg, ...)
     }
 
     // Print the line.
-    if (line_num != -2)
+    if (!suppress_error_output && line_num != -2)
     {
         if (line_num == -1)
         {
@@ -5132,17 +5465,18 @@ void MIPS16 error(char *msg, ...)
     }
 
     // Print the error message.
-    if (*MMErrMsg)
+    if (!suppress_error_output && *MMErrMsg)
     {
         sprintf(tstr, "Error : %s\r\n", MMErrMsg);
     }
-    else
+    else if (!suppress_error_output)
     {
         sprintf(tstr, "Error");
     }
-    MMPrintString(tstr);
+    if (!suppress_error_output)
+        MMPrintString(tstr);
 #ifndef PICOMITEVGA
-    if (!Option.DISPLAY_CONSOLE && Option.DISPLAY_TYPE > I2C_PANEL)
+    if (!suppress_error_output && !Option.DISPLAY_CONSOLE && Option.DISPLAY_TYPE > I2C_PANEL)
     {
         int width = Option.Width;
         int height = Option.Height;
@@ -5154,6 +5488,56 @@ void MIPS16 error(char *msg, ...)
 #endif
     cmdline = NULL;
     do_end(false);
+#ifdef MMBASIC_FM
+    if (fm_program_launched_from_fm)
+    {
+        fm_error_location_valid = 0;
+        fm_error_line = 0;
+        fm_error_char = 0;
+        fm_error_file[0] = 0;
+
+        if (line_num > 0 && fm_last_launched_bas[0])
+        {
+            fm_error_location_valid = 1;
+            fm_error_line = line_num;
+            fm_error_char = StartEditChar;
+            strncpy(fm_error_file, fm_last_launched_bas, sizeof(fm_error_file) - 1);
+            fm_error_file[sizeof(fm_error_file) - 1] = 0;
+        }
+
+        if (*MMErrMsg)
+        {
+            if (fm_error_location_valid)
+            {
+                if (fm_error_char > 0)
+                    snprintf(fm_relaunch_status, sizeof(fm_relaunch_status), "Error: %s (F2 line %d col %d)", MMErrMsg, fm_error_line, fm_error_char + 1);
+                else
+                    snprintf(fm_relaunch_status, sizeof(fm_relaunch_status), "Error: %s (F2 line %d)", MMErrMsg, fm_error_line);
+            }
+            else
+            {
+                snprintf(fm_relaunch_status, sizeof(fm_relaunch_status), "Error: %s", MMErrMsg);
+            }
+        }
+        else
+        {
+            if (fm_error_location_valid)
+            {
+                if (fm_error_char > 0)
+                    snprintf(fm_relaunch_status, sizeof(fm_relaunch_status), "Error (F2 line %d col %d)", fm_error_line, fm_error_char + 1);
+                else
+                    snprintf(fm_relaunch_status, sizeof(fm_relaunch_status), "Error (F2 line %d)", fm_error_line);
+            }
+            else
+            {
+                strcpy(fm_relaunch_status, "Error");
+            }
+        }
+        fm_relaunch_status_valid = 1;
+        CurrentLinePtr = NULL;
+        cmdline = (unsigned char *)"";
+    }
+#endif
     longjmp(mark, 1); // jump back to the input prompt
 }
 void SyntaxError(void)
@@ -5577,6 +5961,9 @@ void MIPS32 __not_in_flash_func(ClearVars)(int level, bool all)
     g_OptionBase = 0;
     g_DimUsed = false;
     g_hashlistpointer = 0;
+#ifdef CACHE
+    ResetLocalFrames(); // discard all per-frame side-index state
+#endif
 }
 void MIPS16 cmd_localvars(unsigned char *p)
 {
@@ -5706,6 +6093,18 @@ void MIPS16 ClearStack(void)
 void MIPS16 ClearRuntime(bool all)
 {
     int i;
+    /* Profiling buffers were allocated from the BASIC variable pool via
+     * GetMemory().  ClearRuntime() is about to wipe that pool, so we must
+     * release our references first - otherwise the pointers stay valid in
+     * C but the bytes get recycled for user variables, and END prints
+     * garbage.  ProfilingFree() NULLs the pointers; if profiling stays on,
+     * ResetPerfCounters()/ProfilingAlloc() will reallocate before RUN.   */
+    ProfilingFree();
+    /* Reset the master flag so a program WITHOUT "OPTION PROFILING ON"
+     * runs un-profiled even if a previous run enabled it.  The program's
+     * own OPTION line (if present) executes after ClearRuntime and will
+     * re-enable + reallocate the buffers.                                */
+    g_option_profiling = 0;
 #ifdef PICOMITEWEB
     if (TCPstate)
     {
@@ -5775,14 +6174,8 @@ void MIPS16 ClearRuntime(bool all)
     if (ScrollLCD == ScrollLCDMEM332)
     {
         ScrollStart = 0;
-        if (Option.DISPLAY_TYPE >= SSD1963_5_12BUFF)
-        {
-        }
-        else
-        {
-            multicore_fifo_push_blocking(7);
-            multicore_fifo_push_blocking((uint32_t)0);
-        }
+        multicore_fifo_push_blocking(7);
+        multicore_fifo_push_blocking((uint32_t)0);
     }
 #endif
     if (SSD16TYPE || Option.DISPLAY_TYPE == IPS_4_16 || SPI480)
@@ -5791,7 +6184,7 @@ void MIPS16 ClearRuntime(bool all)
     MMerrno = 0; // clear the error flags
     *MMErrMsg = 0;
     ClearVars(0, true);
-#ifndef PICOMITEWEB
+#if !(defined(PICOMITEWEB) || defined(PICOMITEMIN))
     turtle_free(); // Free turtle state before heap is wiped
 #endif
     InitHeap(true);

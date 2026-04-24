@@ -238,7 +238,9 @@ void MIPS16 cmd_xmodem(void)
                 uart_set_irq_enables((Option.SerialConsole & 3) == 1 ? uart0 : uart1, false, false);
             }
             if (xmodem)
+            {
                 xmodemReceive(NULL, 0, fnbr, false);
+            }
 #if defined(rp2350) && !defined(USBKEYBOARD)
             else
             {
@@ -1091,6 +1093,7 @@ static void flushinput(void)
 #endif
             ;
 }
+
 void xmodemReceive(char *sp, int maxbytes, int fnbr, int crunch)
 {
     unsigned char xbuff[X_BUF_SIZE];
@@ -1154,18 +1157,15 @@ void xmodemReceive(char *sp, int maxbytes, int fnbr, int crunch)
         {
             if (xbuff[1] == packetno)
             {
-                for (i = 0; i < X_BLOCK_SIZE; i++)
+                if (sp != NULL)
                 {
-                    if (sp != NULL)
+                    for (i = 0; i < X_BLOCK_SIZE; i++)
                     {
                         // save the data to the RAM buffer
                         if (--maxbytes > 0)
                         {
                             if (xbuff[i + 3] == PAD)
                                 continue;
-                            //                            if(xbuff[i + 3] == PAD)
-                            //                                *sp++ = 0;                          // replace any EOF's (used to pad out a block) with NUL
-                            //                            else
                             if (xbuff[i + 3] == 0)
                                 continue;
                             if (crunch)
@@ -1174,11 +1174,11 @@ void xmodemReceive(char *sp, int maxbytes, int fnbr, int crunch)
                                 *sp++ = xbuff[i + 3]; // saving to a memory buffer
                         }
                     }
-                    else
-                    {
-                        // we are saving to a file
-                        FilePutChar(xbuff[i + 3], fnbr);
-                    }
+                }
+                else
+                {
+                    // we are saving to a file - write entire block at once
+                    FilePutData((char *)&xbuff[3], fnbr, X_BLOCK_SIZE);
                 }
                 ++packetno;
                 retrans = MAXRETRANS + 1;
@@ -1199,6 +1199,7 @@ void xmodemReceive(char *sp, int maxbytes, int fnbr, int crunch)
         _outbyte(NAK, 1);
     }
 }
+
 // XMODEM transmit function
 // p: pointer to data in memory (NULL if sending from file)
 // fnbr: file number if sending from file

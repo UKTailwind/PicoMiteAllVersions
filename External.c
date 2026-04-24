@@ -2888,6 +2888,15 @@ void setBacklight(int level, int setfrequency)
     {
 #endif
         MMFLOAT frequency = setfrequency ? (MMFLOAT)setfrequency : (Option.DISPLAY_TYPE == ILI9488W ? 1000.0 : 50000.0);
+        if (Option.DISPLAY_TYPE >= SSDPANEL && Option.DISPLAY_TYPE < VIRTUAL)
+            SetBacklightSSD1963(100);
+        if (BacklightSlice < 0 || BacklightChannel < 0)
+        {
+            setpwm(Option.DISPLAY_BL, &BacklightChannel, &BacklightSlice, frequency, (MMFLOAT)level);
+            return;
+        }
+        gpio_init(PinDef[Option.DISPLAY_BL].GPno);
+        gpio_set_function(PinDef[Option.DISPLAY_BL].GPno, GPIO_FUNC_PWM);
         int wrap = (Option.CPU_Speed * 1000) / frequency;
         int high = (int)((MMFLOAT)Option.CPU_Speed / frequency * level * 10.0);
         int div = 1;
@@ -2898,11 +2907,18 @@ void setBacklight(int level, int setfrequency)
                 high >>= 1;
             div <<= 1;
         }
+        if (wrap < 2)
+            wrap = 2;
         wrap--;
+        if (high < 0)
+            high = 0;
+        if (high > wrap)
+            high = wrap;
         if (div != 1)
             pwm_set_clkdiv(BacklightSlice, (float)div);
         pwm_set_wrap(BacklightSlice, wrap);
         pwm_set_chan_level(BacklightSlice, BacklightChannel, high);
+        pwm_set_enabled(BacklightSlice, true);
     }
     else if (Option.DISPLAY_TYPE <= I2C_PANEL)
     {
@@ -5647,9 +5663,7 @@ void MIPS16 ClearExternalIO(void)
     MemoryShareStop();
     CloseAudio(1);
 #ifndef PICOMITEVGA
-#if defined(rp2350) || defined(PICOMITEWEB)
     cameraclose();
-#endif
 #endif
     InterruptUsed = false;
     InterruptReturn = NULL;

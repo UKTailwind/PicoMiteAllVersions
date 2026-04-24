@@ -1043,6 +1043,7 @@ static volatile bool stepper_armed = false;
 // all axis steps scheduled for that tick are deferred (maintains coordination).
 static volatile uint16_t stepper_axis_min_step_ticks[3] = {1, 1, 1};
 static volatile uint32_t stepper_axis_last_step_tick[3] = {0, 0, 0};
+static uint64_t stepper_pending_step_mask = 0; // step pins asserted last tick, cleared at next ISR entry
 
 typedef struct
 {
@@ -1139,10 +1140,12 @@ bool stepper_query_position_mm(char axis, float *pos_mm)
 int stepper_query_active(void)
 {
     uint32_t save = save_and_disable_interrupts();
-    int active;
     if (!stepper_initialized)
+    {
+        restore_interrupts(save);
         return -1;
-    active = (stepper_armed &&
+    }
+    int active = (stepper_armed &&
               (stepper_system.motion_active || stepper_dwell_active || gcode_buffer.count > 0))
                  ? 1
                  : 0;
@@ -2233,6 +2236,14 @@ void __not_in_flash_func(stepper_timer_isr)(void)
     // Clear the interrupt flag for PWM slice 10
     pwm_clear_irq(STEPPER_PWM_SLICE);
 
+    // Deassert step pins from the previous tick (deferred pulse deassertion).
+    // Pulse width = time from last ISR's assertion to now, approximately one ISR period (10us).
+    if (stepper_pending_step_mask)
+    {
+        gpio_clr_mask64(stepper_pending_step_mask);
+        stepper_pending_step_mask = 0;
+    }
+
     // Increment tick counter
     stepper_tick_count++;
 
@@ -2829,10 +2840,8 @@ void __not_in_flash_func(stepper_timer_isr)(void)
 
     if (step_mask)
     {
+        stepper_pending_step_mask = step_mask;
         gpio_set_mask64(step_mask);
-        if (STEPPER_STEP_PULSE_US > 0)
-            busy_wait_us_32((uint32_t)STEPPER_STEP_PULSE_US);
-        gpio_clr_mask64(step_mask);
     }
 
     // Update per-axis last-step timing and positions in single pass.

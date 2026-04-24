@@ -31,29 +31,48 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "pico/multicore.h"
 #include "hardware/structs/pio.h"
 #endif
+#if defined(PICOMITEMIN)
+#define PICOMIN_SPI_NAME_ILI9163 ""
+#define PICOMIN_SPI_NAME_ST7735 ""
+#define PICOMIN_SPI_NAME_SSD1331 ""
+#define PICOMIN_SPI_NAME_ILI9481 ""
+#define PICOMIN_SPI_NAME_ILI9488P ""
+#define PICOMIN_SPI_NAME_GC9A01 ""
+#define PICOMIN_SPI_NAME_ILI9481IPS ""
+#define PICOMIN_SPI_DISPLAY_REMOVED(type) ((type) == ILI9163 || (type) == ST7735 || (type) == SSD1331 || (type) == ILI9481 || (type) == ILI9488P || (type) == GC9A01 || (type) == ILI9481IPS)
+#else
+#define PICOMIN_SPI_NAME_ILI9163 "ILI9163"
+#define PICOMIN_SPI_NAME_ST7735 "ST7735"
+#define PICOMIN_SPI_NAME_SSD1331 "SSD1331"
+#define PICOMIN_SPI_NAME_ILI9481 "ILI9481"
+#define PICOMIN_SPI_NAME_ILI9488P "ILI9488P"
+#define PICOMIN_SPI_NAME_GC9A01 "GC9A01"
+#define PICOMIN_SPI_NAME_ILI9481IPS "ILI9481IPS"
+#define PICOMIN_SPI_DISPLAY_REMOVED(type) 0
+#endif
 int CurrentSPIDevice = NONE_SPI_DEVICE;
 const struct Displays display_details[] = {
 	{0, "", SDCARD_SPI_SPEED, 0, 0, 0, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
 	{1, "", SDCARD_SPI_SPEED, 0, 0, 0, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
 	{2, "SSD1306I2C", 400, 128, 64, 1, 1, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
 	{3, "SSD1306I2C32", 400, 128, 32, 1, 1, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
-	{4, "ILI9163", LCD_SPI_SPEED, 128, 128, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
-	{5, "ILI9341", 50000000, 320, 240, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
-	{6, "ST7735", LCD_SPI_SPEED, 160, 128, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
+	{4, PICOMIN_SPI_NAME_ILI9163, LCD_SPI_SPEED, 128, 128, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
+	{5, "ILI9341", 63000000, 320, 240, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
+	{6, PICOMIN_SPI_NAME_ST7735, LCD_SPI_SPEED, 160, 128, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
 	{7, "ST7735S", LCD_SPI_SPEED, 160, 80, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
-	{8, "SSD1331", LCD_SPI_SPEED, 96, 64, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
+	{8, PICOMIN_SPI_NAME_SSD1331, LCD_SPI_SPEED, 96, 64, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
 	{9, "ST7789", LCD_SPI_SPEED, 240, 240, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
-	{10, "ILI9481", LCD_SPI_SPEED, 480, 320, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
+	{10, PICOMIN_SPI_NAME_ILI9481, LCD_SPI_SPEED, 480, 320, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
 	{11, "ILI9488", LCD_SPI_SPEED, 480, 320, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
-	{12, "ILI9488P", LCD_SPI_SPEED, 320, 320, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
+	{12, PICOMIN_SPI_NAME_ILI9488P, LCD_SPI_SPEED, 320, 320, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
 	{13, "ST7789_135", LCD_SPI_SPEED, 240, 135, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
-	{14, "ST7789_320", 50000000, 320, 240, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
+	{14, "ST7789_320", 63000000, 320, 240, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
 	{15, "ILI9488W", LCD_SPI_SPEED, 480, 320, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
 	{16, "ST7796S", 50000000, 480, 320, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
 	{17, "ST7796SP", 50000000, 320, 320, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
 	{18, "ST7735S_W", LCD_SPI_SPEED, 128, 128, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
-	{19, "GC9A01", LCD_SPI_SPEED, 240, 240, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
-	{20, "ILI9481IPS", 12000000, 480, 320, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
+	{19, PICOMIN_SPI_NAME_GC9A01, LCD_SPI_SPEED, 240, 240, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
+	{20, PICOMIN_SPI_NAME_ILI9481IPS, 12000000, 480, 320, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
 	{21, "ST7365P", 50000000, 320, 320, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
 	{22, "N5110", NOKIA_SPI_SPEED, 84, 48, 1, 1, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
 	{23, "SSD1306SPI", LCD_SPI_SPEED, 128, 64, 1, 1, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
@@ -229,7 +248,11 @@ void MIPS16 ConfigDisplaySPI(unsigned char *p)
 	int DISPLAY_TYPE = 0;
 	int orientation = 1;
 	getcsargs(&p, 13);
-	if (checkstring(argv[0], (unsigned char *)"ILI9163"))
+	if (0)
+	{
+	}
+#if !defined(PICOMITEMIN)
+	else if (checkstring(argv[0], (unsigned char *)"ILI9163"))
 	{
 		DISPLAY_TYPE = ILI9163;
 	}
@@ -237,14 +260,17 @@ void MIPS16 ConfigDisplaySPI(unsigned char *p)
 	{
 		DISPLAY_TYPE = SSD1331;
 	}
+#endif
 	else if (checkstring(argv[0], (unsigned char *)"ST7735S"))
 	{
 		DISPLAY_TYPE = ST7735S;
 	}
+#if !defined(PICOMITEMIN)
 	else if (checkstring(argv[0], (unsigned char *)"ST7735"))
 	{
 		DISPLAY_TYPE = ST7735;
 	}
+#endif
 	else if (checkstring(argv[0], (unsigned char *)"ST7789"))
 	{
 		DISPLAY_TYPE = ST7789;
@@ -257,26 +283,32 @@ void MIPS16 ConfigDisplaySPI(unsigned char *p)
 	{
 		DISPLAY_TYPE = ST7789B;
 	}
+#if !defined(PICOMITEMIN)
 	else if (checkstring(argv[0], (unsigned char *)"ILI9481IPS"))
 	{
 		DISPLAY_TYPE = ILI9481IPS;
 	}
+#endif
 	else if (checkstring(argv[0], (unsigned char *)"ST7365P"))
 	{
 		DISPLAY_TYPE = ST7365P;
 	}
+#if !defined(PICOMITEMIN)
 	else if (checkstring(argv[0], (unsigned char *)"ILI9481"))
 	{
 		DISPLAY_TYPE = ILI9481;
 	}
+#endif
 	else if (checkstring(argv[0], (unsigned char *)"ILI9488"))
 	{
 		DISPLAY_TYPE = ILI9488;
 	}
+#if !defined(PICOMITEMIN)
 	else if (checkstring(argv[0], (unsigned char *)"ILI9488P"))
 	{
 		DISPLAY_TYPE = ILI9488P;
 	}
+#endif
 	else if (checkstring(argv[0], (unsigned char *)"ILI9488W"))
 	{
 		DISPLAY_TYPE = ILI9488W;
@@ -297,10 +329,12 @@ void MIPS16 ConfigDisplaySPI(unsigned char *p)
 	{
 		DISPLAY_TYPE = ST7735S_W;
 	}
+#if !defined(PICOMITEMIN)
 	else if (checkstring(argv[0], (unsigned char *)"GC9A01"))
 	{
 		DISPLAY_TYPE = GC9A01;
 	}
+#endif
 	else if (checkstring(argv[0], (unsigned char *)"N5110"))
 	{
 		DISPLAY_TYPE = N5110;
@@ -437,6 +471,11 @@ void MIPS16 InitDisplaySPI(int InitOnly)
 	if (Option.DISPLAY_TYPE == 0 || Option.DISPLAY_TYPE >= DISP_USER || Option.DISPLAY_TYPE <= I2C_PANEL)
 		return;
 #endif
+	if (PICOMIN_SPI_DISPLAY_REMOVED(Option.DISPLAY_TYPE))
+	{
+		Option.DISPLAY_TYPE = 0;
+		return;
+	}
 	DisplayHRes = display_details[Option.DISPLAY_TYPE].horizontal;
 	DisplayVRes = display_details[Option.DISPLAY_TYPE].vertical;
 
@@ -570,10 +609,14 @@ void MIPS16 InitDisplaySPI(int InitOnly)
 	}
 	break;
 	case ILI9488:
+#if !defined(PICOMITEMIN)
 	case ILI9488P:
+#endif
 	case ILI9488W:
 #if PICOMITERP2350
+#if !defined(PICOMITEMIN)
 	case ILI9488PBUFF:
+#endif
 	case ILI9488BUFF:
 	case ILI9488WBUFF:
 #endif
@@ -643,6 +686,7 @@ void MIPS16 InitDisplaySPI(int InitOnly)
 		spi_write_cd(ILI9341_MEMCONTROL, 1, madctl[Option.DISPLAY_ORIENTATION - 1]);
 	}
 	break;
+#if !defined(PICOMITEMIN)
 	case ILI9481IPS:
 	{
 		static const uint8_t ili9481ips_seq[] = {
@@ -729,6 +773,7 @@ void MIPS16 InitDisplaySPI(int InitOnly)
 			spi_write_command(ssd1331_seq[i]);
 	}
 	break;
+#endif
 	case ILI9341:
 #if PICOMITERP2350
 	case ILI9341BUFF:
@@ -759,6 +804,7 @@ void MIPS16 InitDisplaySPI(int InitOnly)
 	}
 	break;
 
+#if !defined(PICOMITEMIN)
 	case GC9A01:
 	{
 		static const uint8_t gc9a01_seq[] = {
@@ -840,7 +886,10 @@ void MIPS16 InitDisplaySPI(int InitOnly)
 		uSec(1000);
 	}
 	break;
+#endif
+#if !defined(PICOMITEMIN)
 	case ST7735:
+#endif
 	case ST7735S:
 	case ST7735S_W:
 	{
@@ -1132,7 +1181,11 @@ void MIPS16 ResetController(void)
 	uSec(200000);
 }
 
+#if PICOMITERP2350 || defined(PICOMITEMIN)
+void __not_in_flash_func(DefineRegionSPI)(int xstart, int ystart, int xend, int yend, int rw)
+#else
 void DefineRegionSPI(int xstart, int ystart, int xend, int yend, int rw)
+#endif
 {
 	unsigned char coord[4];
 #if PICOMITERP2350
@@ -2411,6 +2464,19 @@ void ScrollLCDMEM332(int lines)
 		}
 	}
 }
+
+static inline int mem332_scroll_y(int y)
+{
+	int scroll_y;
+	if (Option.DISPLAY_ORIENTATION == RLANDSCAPE)
+		scroll_y = y + (VRes - ScrollStart);
+	else
+		scroll_y = y + ScrollStart;
+	if (scroll_y >= VRes)
+		scroll_y -= VRes;
+	return scroll_y;
+}
+
 void DrawBufferMEM332(int x1, int y1, int x2, int y2, unsigned char *p)
 {
 	int x, y;
@@ -2437,7 +2503,7 @@ void DrawBlitBufferMEM332(int x1, int y1, int x2, int y2, unsigned char *p)
 	unsigned char *screen = (unsigned char *)(ScreenBuffer);
 	for (int y = y1; y <= y2; y++)
 	{
-		unsigned char *buff = screen + (y + ScrollStart < VRes ? y + ScrollStart : y + ScrollStart - VRes) * HRes;
+		unsigned char *buff = screen + mem332_scroll_y(y) * HRes;
 		for (int x = x1; x <= x2; x++)
 		{
 			buff[x] = *p++;
@@ -2466,6 +2532,19 @@ void DrawBufferMEM(int x1, int y1, int x2, int y2, unsigned char *p)
 	{
 		for (x = x1; x <= x2; x++)
 		{
+#if PICOMITERP2350
+			if (Option.DISPLAY_TYPE < NEXTGEN)
+#endif
+			{
+				if (y < low_y)
+					low_y = y;
+				if (y > high_y)
+					high_y = y;
+				if (x < low_x)
+					low_x = x;
+				if (x > high_x)
+					high_x = x;
+			}
 			c.rgbbytes[0] = *p++; // this order swaps the bytes to match the .BMP file
 			if (c.rgbbytes[0] < 0x40)
 				c.rgbbytes[0] = 0;
@@ -2525,17 +2604,9 @@ void ReadBufferMEM332(int x1, int y1, int x2, int y2, unsigned char *buff)
 		y1 = y2;
 		y2 = t;
 	}
-	if (y1 < low_y)
-		low_y = y1;
-	if (y2 > high_y)
-		high_y = y2;
-	if (x1 < low_x)
-		low_x = x1;
-	if (x2 > high_x)
-		high_x = x2;
 	for (y = y1; y <= y2; y++)
 	{
-		unsigned char *p = screen + (y + ScrollStart < VRes ? y + ScrollStart : y + ScrollStart - VRes) * HRes;
+		unsigned char *p = screen + mem332_scroll_y(y) * HRes;
 		for (x = x1; x <= x2; x++)
 		{
 			*buff++ = ((p[x] & 3) << 6);
@@ -2589,17 +2660,9 @@ void ReadBlitBufferMEM332(int x1, int y1, int x2, int y2, unsigned char *buff)
 		y1 = y2;
 		y2 = t;
 	}
-	if (y1 < low_y)
-		low_y = y1;
-	if (y2 > high_y)
-		high_y = y2;
-	if (x1 < low_x)
-		low_x = x1;
-	if (x2 > high_x)
-		high_x = x2;
 	for (int y = y1; y <= y2; y++)
 	{
-		unsigned char *p = screen + (y + ScrollStart < VRes ? y + ScrollStart : y + ScrollStart - VRes) * HRes;
+		unsigned char *p = screen + mem332_scroll_y(y) * HRes;
 		for (int x = x1; x <= x2; x++)
 		{
 			*buff++ = p[x];
@@ -2678,14 +2741,6 @@ void ReadBufferMEM(int x1, int y1, int x2, int y2, unsigned char *buff)
 		y2 = t;
 	}
 
-	if (y1 < low_y)
-		low_y = y1;
-	if (y2 > high_y)
-		high_y = y2;
-	if (x1 < low_x)
-		low_x = x1;
-	if (x2 > high_x)
-		high_x = x2;
 	for (x = x1; x <= x2; x++)
 	{
 		for (y = y1; y <= y2; y++)
@@ -2786,14 +2841,19 @@ void DrawRectangleMEM(int x1, int y1, int x2, int y2, int c)
 		y2 = t;
 	}
 
-	if (y1 < low_y)
-		low_y = y1;
-	if (y2 > high_y)
-		high_y = y2;
-	if (x1 < low_x)
-		low_x = x1;
-	if (x2 > high_x)
-		high_x = x2;
+#if PICOMITERP2350
+	if (Option.DISPLAY_TYPE < NEXTGEN)
+#endif
+	{
+		if (y1 < low_y)
+			low_y = y1;
+		if (y2 > high_y)
+			high_y = y2;
+		if (x1 < low_x)
+			low_x = x1;
+		if (x2 > high_x)
+			high_x = x2;
+	}
 	for (x = x1; x <= x2; x++)
 	{
 		for (y = y1; y <= y2; y++)
@@ -2868,29 +2928,10 @@ void DrawRectangleMEM332(int x1, int y1, int x2, int y2, int c)
 	// Pre-calculate width
 	int width = x2 - x1 + 1;
 
-	// Optimize for common case: no scrolling wraps around
-	if (y1 + ScrollStart < VRes && y2 + ScrollStart < VRes)
+	for (int y = y1; y <= y2; y++)
 	{
-		// Fast path: no scroll wraparound
-		unsigned char *p = screen + (y1 + ScrollStart) * HRes + x1;
-		for (int y = y1; y <= y2; y++)
-		{
-			memset(p, colour, width);
-			p += HRes; // Move to next line
-		}
-	}
-	else
-	{
-		// Handle scroll wraparound
-		for (int y = y1; y <= y2; y++)
-		{
-			int scroll_y = y + ScrollStart;
-			if (scroll_y >= VRes)
-				scroll_y -= VRes;
-
-			unsigned char *p = screen + scroll_y * HRes + x1;
-			memset(p, colour, width);
-		}
+		unsigned char *p = screen + mem332_scroll_y(y) * HRes + x1;
+		memset(p, colour, width);
 	}
 }
 
@@ -2913,10 +2954,7 @@ void DrawPixelMEM332(int x, int y, int c)
 	if (x > high_x)
 		high_x = x;
 
-	// Handle scroll wraparound
-	int scroll_y = y + ScrollStart;
-	if (scroll_y >= VRes)
-		scroll_y -= VRes;
+	int scroll_y = mem332_scroll_y(y);
 
 	// Draw the pixel
 	screen[scroll_y * HRes + x] = colour;
@@ -2969,7 +3007,7 @@ void DrawBitmapMEM332(int x1, int y1, int width, int height, int scale, int fc, 
 			if (y < 0)
 				continue;
 
-			int scroll_y = (y + ScrollStart < VRes) ? y + ScrollStart : y + ScrollStart - VRes;
+			int scroll_y = mem332_scroll_y(y);
 			unsigned char *line_ptr = screen + scroll_y * HRes + draw_x_start;
 
 			int bitmap_row_start = i * width;
@@ -3011,7 +3049,7 @@ void DrawBitmapMEM332(int x1, int y1, int width, int height, int scale, int fc, 
 				if (y < 0)
 					continue;
 
-				int scroll_y = (y + ScrollStart < VRes) ? y + ScrollStart : y + ScrollStart - VRes;
+				int scroll_y = mem332_scroll_y(y);
 				unsigned char *line_ptr = screen + scroll_y * HRes;
 
 				for (int k = src_x_start; k < width; k++)
@@ -3086,14 +3124,19 @@ void DrawBitmapMEM(int x1, int y1, int width, int height, int scale, int fc, int
 						y = HRes - x - 1;
 						x = t;
 					}
-					if (y < low_y)
-						low_y = y;
-					if (y > high_y)
-						high_y = y;
-					if (x < low_x)
-						low_x = x;
-					if (x > high_x)
-						high_x = x;
+#if PICOMITERP2350
+					if (Option.DISPLAY_TYPE < NEXTGEN)
+#endif
+					{
+						if (y < low_y)
+							low_y = y;
+						if (y > high_y)
+							high_y = y;
+						if (x < low_x)
+							low_x = x;
+						if (x > high_x)
+							high_x = x;
+					}
 					if (!PackHorizontal)
 					{
 						loc = x + (y / 8) * DisplayHRes; // get the byte address for this bit
@@ -3702,7 +3745,10 @@ void __not_in_flash_func(copybuffertoscreen)(int low_x, int low_y, int high_x, i
 			init_RGB332_to_RGB565_LUT();
 	}
 	int t = high_y - low_y; // get the distance between the top and bottom
-	low_y = (low_y + scrollStart) % VRes;
+	if (Option.DISPLAY_ORIENTATION == RLANDSCAPE)
+		low_y = (low_y + (VRes - scrollStart)) % VRes;
+	else
+		low_y = (low_y + scrollStart) % VRes;
 	high_y = low_y + t; // and set y2 to the same
 	if (Option.DISPLAY_TYPE >= SSD1963_5_12BUFF)
 	{

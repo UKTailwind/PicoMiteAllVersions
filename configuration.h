@@ -48,11 +48,21 @@ extern "C"
 #define MAXVARS (MAXGLOBALVARS + MAXLOCALVARS)
 
 #ifdef HDMI
-#define FLASH_TARGET_OFFSET (928 * 1024)
-#define HEAP_MEMORY_SIZE (180 * 1024)
+#ifdef USBKEYBOARD
+#define FLASH_TARGET_OFFSET (1008 * 1024)
+#define HEAP_MEMORY_SIZE (164 * 1024)
 #else
-#define FLASH_TARGET_OFFSET (912 * 1024)
-#define HEAP_MEMORY_SIZE (188 * 1024)
+#define FLASH_TARGET_OFFSET (976 * 1024)
+#define HEAP_MEMORY_SIZE (164 * 1024)
+#endif
+#else
+#ifdef USBKEYBOARD
+#define FLASH_TARGET_OFFSET (992 * 1024)
+#define HEAP_MEMORY_SIZE (172 * 1024)
+#else
+#define FLASH_TARGET_OFFSET (960 * 1024)
+#define HEAP_MEMORY_SIZE (172 * 1024)
+#endif
 #endif
 
 /* HDMI-specific settings */
@@ -83,15 +93,19 @@ extern "C"
 #define MAXLOCALVARS 240
 #define MAXVARS (MAXGLOBALVARS + MAXLOCALVARS)
 #ifdef USBKEYBOARD
-#define FLASH_TARGET_OFFSET (784 * 1024)
+#define FLASH_TARGET_OFFSET (832 * 1024)
 #define MagicKey 0x356469F4
 #else
-#define FLASH_TARGET_OFFSET (768 * 1024)
+#define FLASH_TARGET_OFFSET (800 * 1024)
 #define MagicKey 0xD4201AF5
 #endif
 
 #define MAXMODES 2
-#define HEAP_MEMORY_SIZE (104 * 1024)
+#ifdef CACHE
+#define HEAP_MEMORY_SIZE ((104 * 1024) - 4096)
+#else
+#define HEAP_MEMORY_SIZE (100 * 1024)
+#endif
 #define MAX_CPU 378000
 #define MIN_CPU 252000
 #endif
@@ -192,15 +206,23 @@ extern "C"
 #define MAXGLOBALVARS 512 // Configurable split
 #define MAXLOCALVARS 256
 #define MAXVARS (MAXGLOBALVARS + MAXLOCALVARS)
+#ifdef CACHE
+#define HEAP_MEMORY_SIZE ((256 * 1024) - 4096)
+#else
 #define HEAP_MEMORY_SIZE (256 * 1024)
-#define FLASH_TARGET_OFFSET (1248 * 1024)
+#endif
+#define FLASH_TARGET_OFFSET (1296 * 1024)
 #else
 #define MAXSUBFUN 256
 #define MAXGLOBALVARS 240 // Configurable split
 #define MAXLOCALVARS 240
 #define MAXVARS (MAXGLOBALVARS + MAXLOCALVARS)
+#ifdef CACHE
+#define HEAP_MEMORY_SIZE ((88 * 1024) - 4096)
+#else
 #define HEAP_MEMORY_SIZE (88 * 1024)
-#define FLASH_TARGET_OFFSET (1104 * 1024)
+#endif
+#define FLASH_TARGET_OFFSET (1136 * 1024)
 #endif
 
 #include "lwipopts_examples_common.h"
@@ -220,21 +242,30 @@ extern "C"
 #define MIN_CPU 48000
 
 #ifdef rp2350
-#define HEAP_MEMORY_SIZE (324 * 1024)
+#ifdef CACHE
+#define HEAP_MEMORY_SIZE (308 * 1024)
+#else
+#define HEAP_MEMORY_SIZE (308 * 1024)
+#endif
 #define MAXGLOBALVARS 512 // Configurable split
 #define MAXLOCALVARS 240
 #define MAXVARS (MAXGLOBALVARS + MAXLOCALVARS)
-#define FLASH_TARGET_OFFSET (1008 * 1024)
 #define MAX_CPU 420000
 #define MAXSUBFUN 512
 
 #ifdef USBKEYBOARD
 #define MagicKey 0x52211A65
+#define FLASH_TARGET_OFFSET (1088 * 1024)
 #else
+#define FLASH_TARGET_OFFSET (1056 * 1024)
 #define MagicKey 0x989626B4
 #endif
 #else
-#define HEAP_MEMORY_SIZE (136 * 1024)
+#ifdef CACHE
+#define HEAP_MEMORY_SIZE ((128 * 1024) - 4096)
+#else
+#define HEAP_MEMORY_SIZE (128 * 1024)
+#endif
 #define MAXGLOBALVARS 256 // Configurable split
 #define MAXLOCALVARS 240
 #define MAXVARS (MAXGLOBALVARS + MAXLOCALVARS)
@@ -244,10 +275,15 @@ extern "C"
 
 #ifdef USBKEYBOARD
 #define MagicKey 0x0E878DDA
-#define FLASH_TARGET_OFFSET (848 * 1024)
+#define FLASH_TARGET_OFFSET (912 * 1024)
 #else
+#ifdef PICOMITEMIN
+#define FLASH_TARGET_OFFSET (704 * 1024)
 #define MagicKey 0xF1F127C5
-#define FLASH_TARGET_OFFSET (832 * 1024)
+#else
+#define FLASH_TARGET_OFFSET (896 * 1024)
+#define MagicKey 0x142127C5
+#endif
 #endif
 #endif
 

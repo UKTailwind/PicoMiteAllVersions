@@ -600,6 +600,26 @@ void decodeBMPheader(int *width, int *height)
         // Seek back to start of file for decodeBMP
         onBMPSeek(0, 0);
 }
+
+// Helper to extract shift amount and bit count from a bitmask
+static void getMaskInfo(uint32_t mask, int *shift, int *bits)
+{
+        *shift = 0;
+        *bits = 0;
+        if (mask == 0)
+                return;
+        while ((mask & 1) == 0)
+        {
+                mask >>= 1;
+                (*shift)++;
+        }
+        while (mask & 1)
+        {
+                mask >>= 1;
+                (*bits)++;
+        }
+}
+
 BMP_Result decodeBMP(bool topdown)
 {
         BMP_Result result = {0};
@@ -657,9 +677,15 @@ BMP_Result decodeBMP(bool topdown)
                 cleanupAndError("RLE4 compression requires 4-bit color", &palette, &rowBuffer, &lineData, &lineTable);
         }
 
+        if (infoHeader.biCompression == BI_BITFIELDS && infoHeader.biBitCount != 16)
+        {
+                cleanupAndError("BI_BITFIELDS only supported with 16-bit color", &palette, &rowBuffer, &lineData, &lineTable);
+        }
+
         if (infoHeader.biCompression != BI_RGB &&
             infoHeader.biCompression != BI_RLE8 &&
-            infoHeader.biCompression != BI_RLE4)
+            infoHeader.biCompression != BI_RLE4 &&
+            infoHeader.biCompression != BI_BITFIELDS)
         {
                 cleanupAndError("Unsupported compression format", &palette, &rowBuffer, &lineData, &lineTable);
         }
@@ -710,9 +736,36 @@ BMP_Result decodeBMP(bool topdown)
         pixelDataStart = fileHeader.bfOffBits;
 
         // Seek to pixel data (skip any additional headers/data)
-        size_t bytesRead = sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER);
+        size_t bytesRead = sizeof(BITMAPFILEHEADER) + infoHeader.biSize;
         if (palette)
                 bytesRead += paletteSize * sizeof(RGBQUAD);
+
+        // Read bitfield masks for BI_BITFIELDS format
+        uint32_t redMask = 0x7C00; // Default: RGB555
+        uint32_t greenMask = 0x03E0;
+        uint32_t blueMask = 0x001F;
+        int redShift = 10, redBits = 5;
+        int greenShift = 5, greenBits = 5;
+        int blueShift = 0, blueBits = 5;
+        int redMax = 31, greenMax = 31, blueMax = 31;
+
+        if (infoHeader.biCompression == BI_BITFIELDS && infoHeader.biBitCount == 16 &&
+            bytesRead + 12 <= fileHeader.bfOffBits)
+        {
+                if (onBMPRead((char *)&redMask, 4) != 4 ||
+                    onBMPRead((char *)&greenMask, 4) != 4 ||
+                    onBMPRead((char *)&blueMask, 4) != 4)
+                {
+                        cleanupAndError("Failed to read bitfield masks", &palette, &rowBuffer, &lineData, &lineTable);
+                }
+                bytesRead += 12;
+                getMaskInfo(redMask, &redShift, &redBits);
+                getMaskInfo(greenMask, &greenShift, &greenBits);
+                getMaskInfo(blueMask, &blueShift, &blueBits);
+                redMax = redBits ? ((1 << redBits) - 1) : 1;
+                greenMax = greenBits ? ((1 << greenBits) - 1) : 1;
+                blueMax = blueBits ? ((1 << blueBits) - 1) : 1;
+        }
 
         while (bytesRead < fileHeader.bfOffBits)
         {
@@ -930,14 +983,13 @@ BMP_Result decodeBMP(bool topdown)
                         }
                         break;
 
-                case 16: // 16-bit RGB (assume 5-5-5)
+                case 16: // 16-bit RGB using bitfield masks
                         for (col = 0; col < result.width; col++)
                         {
                                 uint16_t pixel = *(uint16_t *)(rowBuffer + col * 2);
-                                // Extract RGB components (5-5-5 format) and expand to 8-bit
-                                uint8_t r = ((pixel >> 10) & 0x1F) << 3;
-                                uint8_t g = ((pixel >> 5) & 0x1F) << 3;
-                                uint8_t b = (pixel & 0x1F) << 3;
+                                uint8_t r = ((pixel & redMask) >> redShift) * 255 / redMax;
+                                uint8_t g = ((pixel & greenMask) >> greenShift) * 255 / greenMax;
+                                uint8_t b = ((pixel & blueMask) >> blueShift) * 255 / blueMax;
                                 lineData[col] = (r << 16) | (g << 8) | b;
                         }
                         break;

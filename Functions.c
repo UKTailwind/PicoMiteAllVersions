@@ -37,7 +37,9 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
 #include <float.h>
+#ifndef PICOMITEMIN
 #include "re.h"
+#endif
 #include "hardware/adc.h"
 
 #ifdef rp2350
@@ -769,7 +771,8 @@ void fun_tilde(void)
 // return the arctangent of a number in radians
 void fun_atn(void)
 {
-	fret = useoptionangle ? atan(getnumber(ep)) * optionangle : atan(getnumber(ep));
+	MMFLOAT f = atan(getnumber(ep));
+	fret = useoptionangle ? f * optionangle : f;
 	targ = T_NBR;
 }
 
@@ -915,7 +918,7 @@ void fun_cos(void)
 	}
 	else
 	{
-		fret = cos(getnumber(ep));
+		fret = cosf(getnumber(ep));
 	}
 	targ = T_NBR;
 }
@@ -1035,6 +1038,9 @@ void fun_instr(void)
 	}
 	else
 	{
+#ifdef PICOMITEMIN
+		error("Regular expressions not supported on PICOMITEMIN");
+#else
 		int match_length;
 
 		// int  re_match(const char* pattern, const char* text, int* matchlength);
@@ -1054,7 +1060,8 @@ void fun_instr(void)
 			temp = findvar(argv[4 + n], V_FIND);
 			regex_vtype = g_vartbl[g_VarIndex].type;
 #ifdef STRUCTENABLED
-			if (g_StructMemberType != 0) regex_vtype = g_StructMemberType;
+			if (g_StructMemberType != 0)
+				regex_vtype = g_StructMemberType;
 #endif
 			if (!(regex_vtype & (T_NBR | T_INT)))
 				error("Invalid variable");
@@ -1093,6 +1100,7 @@ void fun_instr(void)
 					*tempi = 0;
 			}
 		}
+#endif
 	}
 	targ = T_INT;
 }
@@ -1236,7 +1244,12 @@ void fun_rad(void)
 void fun_rnd(void)
 {
 #ifdef rp2350
-	fret = (MMFLOAT)get_rand_32() / (MMFLOAT)0x100000000;
+	static unsigned int rnd_count = 0;
+	if (rnd_count++ % 100 == 0)
+	{ // reseed every 100 calls to keep the random numbers changing
+		srand(get_rand_32());
+	}
+	fret = (MMFLOAT)rand() / ((MMFLOAT)RAND_MAX + (MMFLOAT)RAND_MAX / 1000000);
 #else
 	fret = (MMFLOAT)rand() / ((MMFLOAT)RAND_MAX + (MMFLOAT)RAND_MAX / 1000000);
 #endif
@@ -1247,14 +1260,15 @@ void fun_rnd(void)
 // n = SGN( number )
 void fun_sgn(void)
 {
+	unsigned char *s;
 	MMFLOAT f;
-	f = getnumber(ep);
-	if (f > 0)
-		iret = +1;
-	else if (f < 0)
-		iret = -1;
+	long long int i64;
+	int t = T_INT;
+	evaluate(ep, &f, &i64, &s, &t, false);
+	if (t & T_INT)
+		iret = (i64 > 0LL) - (i64 < 0LL);
 	else
-		iret = 0;
+		iret = (f > 0) - (f < 0);
 	targ = T_INT;
 }
 
@@ -1278,7 +1292,7 @@ void fun_sin(void)
 	}
 	else
 	{
-		fret = sin(getnumber(ep));
+		fret = sinf(getnumber(ep));
 	}
 	targ = T_NBR;
 }

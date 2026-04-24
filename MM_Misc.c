@@ -44,7 +44,9 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include <malloc.h>
 #include "hardware/structs/pwm.h"
 #include "aes.h"
+#ifndef PICOMITEMIN
 #include "re.h"
+#endif
 #ifdef rp2350
 #include "pico/rand.h"
 #include "stepper.h"
@@ -1491,7 +1493,10 @@ void fun_LInstr(void)
     }
     else
     { // search string is a regular expression
-        // Alternate regex library as used in Armmite H7
+#ifdef PICOMITEMIN
+        error("Regular expressions not supported on PICOMITEMIN");
+#else
+      // Alternate regex library as used in Armmite H7
         int tmp = OptionEscape;
         OptionEscape = 0;
         Mstrcpy((unsigned char *)srch, (unsigned char *)getstring(argv[2]));
@@ -1528,6 +1533,7 @@ void fun_LInstr(void)
                     *tempi = 0;
             }
         }
+#endif
     }
     targ = T_INT;
 }
@@ -3055,16 +3061,13 @@ void MIPS16 printoptions(void)
             MMputchar(',', 1);
             MMPrintString((char *)PinDef[Option.audio_i2s_data].pinname);
         }
-        else if (!Option.AUDIO_DCS_PIN)
-        {
-            MMPrintString((char *)"SPI ");
-            MMPrintString((char *)PinDef[Option.AUDIO_CS_PIN].pinname);
-            MMputchar(',', 1);
-            MMPrintString((char *)PinDef[Option.AUDIO_CLK_PIN].pinname);
-            MMputchar(',', 1);
-            MMPrintString((char *)PinDef[Option.AUDIO_MOSI_PIN].pinname);
-        }
-        else
+        else if (
+#if !defined(PICOMITEMIN)
+            Option.AUDIO_DCS_PIN && Option.AUDIO_MISO_PIN
+#else
+            0
+#endif
+        )
         {
             MMPrintString((char *)"VS1053 ");
             MMPrintString((char *)PinDef[Option.AUDIO_CLK_PIN].pinname);
@@ -3080,6 +3083,15 @@ void MIPS16 printoptions(void)
             MMPrintString((char *)PinDef[Option.AUDIO_DREQ_PIN].pinname);
             MMputchar(',', 1);
             MMPrintString((char *)PinDef[Option.AUDIO_RESET_PIN].pinname);
+        }
+        else
+        {
+            MMPrintString((char *)"SPI ");
+            MMPrintString((char *)PinDef[Option.AUDIO_CS_PIN].pinname);
+            MMputchar(',', 1);
+            MMPrintString((char *)PinDef[Option.AUDIO_CLK_PIN].pinname);
+            MMputchar(',', 1);
+            MMPrintString((char *)PinDef[Option.AUDIO_MOSI_PIN].pinname);
         }
         MMPrintString("', ON PWM CHANNEL ");
         PInt(Option.AUDIO_SLICE);
@@ -3167,8 +3179,9 @@ void MIPS16 setterminal(int height, int width)
     strcpy(sp, "\033[8;");
     IntToStr(&sp[strlen(sp)], height, 10);
     strcat(sp, ";");
-    IntToStr(&sp[strlen(sp)], width + 1, 10);
+    IntToStr(&sp[strlen(sp)], width, 10);
     strcat(sp, "t");
+    strcat(sp, "\033[?7l");
     SSPrintString(sp); //
 }
 #ifdef USBKEYBOARD
@@ -3966,6 +3979,8 @@ void MIPS16 configure(unsigned char *p, bool noask)
             Option.TOUCH_YZERO = 293;
             Option.TOUCH_XSCALE = 0.1058;
             Option.TOUCH_YSCALE = 0.0650;
+            Option.RepeatStart = 400;
+            Option.RepeatRate = 25;
             strcpy((char *)Option.platform, "PALM PICO");
             SaveOptions();
             OptionConsole = 1;
@@ -4370,6 +4385,103 @@ void MIPS16 cmd_option(void)
     {
         OptionExplicit = true;
         return;
+    }
+#ifdef CACHE
+    tp = checkstring(cmdline, (unsigned char *)"TRACECACHE");
+    if (tp)
+    {
+        unsigned char *tp2 = checkstring(tp, (unsigned char *)"ON");
+        if (tp2)
+        {
+            /* OPTION TRACECACHE ON [size [, flags]]
+             * size  : slot count (power-of-two, default 64)
+             * flags : TCF_* bitmask 0..63 (default TCF_ALL = 0x3F)         */
+            getcsargs(&tp2, 3);
+            uint8_t new_flags = TCF_ALL;
+            int size = TRACE_CACHE_SIZE_DEFAULT;
+            if (argc >= 1)
+                size = getint(argv[0], TRACE_CACHE_SIZE_MIN, TRACE_CACHE_SIZE_MAX);
+            if (argc == 3)
+                new_flags = (uint8_t)getint(argv[2], 0, TCF_ALL);
+            TraceCacheSetSize(size);
+            g_trace_cache_flags = new_flags;
+            return;
+        }
+        if (checkstring(tp, (unsigned char *)"OFF"))
+        {
+            g_trace_cache_flags = 0;
+            TraceCacheFree();
+            return;
+        }
+        error((char *)"Syntax");
+    }
+    /* OPTION CACHE DEBUG ON|OFF - print first ~60 chars of every LET that
+     * fails to compile, prefixed with the enclosing sub name.  Useful for
+     * finding out why coverage is low.                                       */
+    tp = checkstring(cmdline, (unsigned char *)"CACHE DEBUG");
+    if (tp)
+    {
+        if (checkstring(tp, (unsigned char *)"ON"))
+        {
+            g_trace_debug_bad = 1;
+            return;
+        }
+        if (checkstring(tp, (unsigned char *)"OFF"))
+        {
+            g_trace_debug_bad = 0;
+            return;
+        }
+        error((char *)"Syntax");
+    }
+    /* OPTION CACHE SUB OFF                  - clear opt-in list (cache everywhere)
+     * OPTION CACHE SUB name [, name]*       - add named sub/funcs to opt-in list
+     *                                         (only LETs in those will be cached) */
+    tp = checkstring(cmdline, (unsigned char *)"CACHE SUB");
+    if (tp)
+    {
+        unsigned char *off = checkstring(tp, (unsigned char *)"OFF");
+        if (off)
+        {
+            TraceCacheOptInClear();
+            return;
+        }
+        getargs(&tp, 31, (unsigned char *)",");
+        if ((argc & 1) == 0)
+            error((char *)"Syntax");
+        for (int i = 0; i < argc; i += 2)
+        {
+            unsigned char *np = argv[i];
+            skipspace(np);
+            int sidx = FindSubFun(np, 0); /* try SUB */
+            if (sidx < 0)
+                sidx = FindSubFun(np, 1); /* try FUNCTION */
+            if (sidx < 0)
+                error((char *)"Sub/function not found");
+            TraceCacheOptInAdd(sidx);
+        }
+        return;
+    }
+#endif
+    /* OPTION PROFILING ON|OFF - gates the [PERF] reports printed by END.   */
+    /* ON allocates the per-cmd / per-sub counter arrays from heap; OFF     */
+    /* frees them.  All counter increments are gated on these pointers     */
+    /* (or on g_option_profiling) so disabled profiling is zero-overhead.  */
+    tp = checkstring(cmdline, (unsigned char *)"PROFILING");
+    if (tp)
+    {
+        if (checkstring(tp, (unsigned char *)"ON"))
+        {
+            ProfilingAlloc();
+            g_option_profiling = 1;
+            return;
+        }
+        if (checkstring(tp, (unsigned char *)"OFF"))
+        {
+            g_option_profiling = 0;
+            ProfilingFree();
+            return;
+        }
+        error((char *)"Syntax");
     }
     tp = checkstring(cmdline, (unsigned char *)"ANGLE");
     if (tp)
@@ -6297,6 +6409,7 @@ void MIPS16 cmd_option(void)
             SoftReset(SOFT_RESET);
             return; // this will restart the processor ? only works when not in debug
         }
+#if !defined(PICOMITEMIN)
         if ((p = checkstring(tp, (unsigned char *)"VS1053")))
         {
             int pin1, pin2, pin3, pin4, pin5, pin6, pin7;
@@ -6357,6 +6470,7 @@ void MIPS16 cmd_option(void)
             SoftReset(SOFT_RESET);
             return;
         }
+#endif
         if ((p = checkstring(tp, (unsigned char *)"SPI")))
         {
             int pin1, pin2, pin3;
@@ -7002,7 +7116,7 @@ void MIPS16 fun_info(void)
         int FatFSFileSystemSave = FatFSFileSystem;
         FatFSFileSystem = 0;
         int fnbr = FindFreeFileNbr();
-        BasicFileOpen("bootcount", fnbr, FA_READ);
+        BasicFileOpen("a:/bootcount", fnbr, FA_READ);
         FSerror = lfs_file_read(&lfs, FileTable[fnbr].lfsptr, &boot_count, sizeof(boot_count));
         if (FSerror > 0)
             FSerror = 0;
@@ -7083,7 +7197,14 @@ void MIPS16 fun_info(void)
         }
         else if ((tp = checkstring(ep, (unsigned char *)"DRIVE")))
         {
-            strcpy((char *)sret, FatFSFileSystem ? "B:" : "A:");
+            strcpy((char *)sret,
+                   FatFSFileSystem == 0 ? "A:" :
+#if HAS_USB_MSC
+                                        (FatFSFileSystem == 1 ? "B:" : "C:")
+#else
+                                        "B:"
+#endif
+            );
             CtoM(sret);
             targ = T_STR;
             return;
@@ -7506,8 +7627,10 @@ void MIPS16 fun_info(void)
         {
             if (Option.AUDIO_L)
                 strcpy((char *)sret, "PWM");
+#if !defined(PICOMITEMIN)
             else if (Option.AUDIO_MISO_PIN)
                 strcpy((char *)sret, "VS1053");
+#endif
             else if (Option.AUDIO_CLK_PIN)
                 strcpy((char *)sret, "SPI");
             else if (Option.audio_i2s_bclk)

@@ -37,6 +37,14 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 
 void CloseAudio(int all);
 void StopAudio(void);
+void wavcallback(char *p);
+#ifdef USBKEYBOARD
+void PlayMemWav(const unsigned char *data, unsigned int len);
+#endif /* USBKEYBOARD */
+void mp3callback(char *p, int position);
+void flaccallback(char *p);
+void midicallback(char *p);
+void modcallback(char *p);
 void audioInterrupt(void);
 void CheckAudio(void);
 void checkWAVinput(void);

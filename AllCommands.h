@@ -139,6 +139,9 @@ void cmd_3D(void);
 void cmd_framebuffer(void);
 void cmd_edit(void);
 void cmd_editfile(void);
+#ifdef MMBASIC_FM
+void cmd_fm(void);
+#endif
 void cmd_port(void);
 void cmd_adc(void);
 void cmd_ir(void);
@@ -240,7 +243,7 @@ void cmd_tilemap(void);
 void fun_tilemap(void);
 void tilemap_closeall(void);
 
-#ifdef rp2350
+#ifdef RAYCASTER
 void cmd_ray(void);
 void fun_ray(void);
 void ray_close(void);
@@ -594,7 +597,9 @@ void fun_frame(void);
 	{(unsigned char *)"Backlight", T_CMD, 0, cmd_backlight},
 	{(unsigned char *)"WEB", T_CMD, 0, cmd_web},
 #else
+#if !defined(PICOMITEMIN)
 	{(unsigned char *)"Draw3D", T_CMD, 0, cmd_3D},
+#endif
 #endif
 #ifndef USBKEYBOARD
 	{(unsigned char *)"Update Firmware", T_CMD, 0, cmd_update},
@@ -613,7 +618,9 @@ void fun_frame(void);
 #endif
 	{(unsigned char *)"Bit(", T_CMD | T_FUN, 0, cmd_bit},
 	{(unsigned char *)"Flags", T_CMD | T_FUN, 0, cmd_flags},
+#ifndef PICOMITEMIN
 	{(unsigned char *)"Help", T_CMD | T_FUN, 0, cmd_help},
+#endif
 	{(unsigned char *)"Array Slice", T_CMD, 0, cmd_slice},
 	{(unsigned char *)"Array Insert", T_CMD, 0, cmd_insert},
 	{(unsigned char *)"Array Add", T_CMD, 0, cmd_add},
@@ -627,22 +634,24 @@ void fun_frame(void);
 #if defined(rp2350) && !defined(USBKEYBOARD)
 	{(unsigned char *)"YModem", T_CMD, 0, cmd_xmodem},
 #endif
-#ifndef PICOMITEWEB
+#if !(defined(PICOMITEWEB) || defined(PICOMITEMIN))
 	{(unsigned char *)"Turtle", T_CMD, 0, cmd_turtle},
 #endif
 	{(unsigned char *)"LMid(", T_CMD | T_FUN, 0, cmd_lmid},
 	{(unsigned char *)"ReDim", T_CMD, 0, cmd_redim},
 	{(unsigned char *)"Bezier", T_CMD, 0, cmd_bezier},
+	// #ifndef PICOMITEMIN
 	{(unsigned char *)"Tilemap", T_CMD, 0, cmd_tilemap},
+// #endif
 #ifdef rp2350
 	{(unsigned char *)"Star", T_CMD, 0, cmd_star},
 	{(unsigned char *)"Astro", T_CMD, 0, cmd_star},
 	{(unsigned char *)"Location", T_CMD, 0, cmd_locate},
 	{(unsigned char *)"Stepper", T_CMD, 0, cmd_stepper},
 	{(unsigned char *)"Frame", T_CMD, 0, cmd_frame},
-#ifndef PICOMITEWEB
-	{(unsigned char *)"Ray", T_CMD, 0, cmd_ray},
 #endif
+#ifdef RAYCASTER
+	{(unsigned char *)"Ray", T_CMD, 0, cmd_ray},
 #endif
 #ifdef STRUCTENABLED
 	{(unsigned char *)"Type", T_CMD, 0, cmd_type},
@@ -655,6 +664,9 @@ void fun_frame(void);
 	{(unsigned char *)"OneShot", T_CMD, 0, cmd_oneshot},
 #if defined(PICOMITEVGA) || defined(rp2350)
 	{(unsigned char *)"Mandelbrot", T_CMD, 0, cmd_mandelbrot},
+#endif
+#ifdef MMBASIC_FM
+	{(unsigned char *)"FM", T_CMD, 0, cmd_fm},
 #endif
 
 {
@@ -788,7 +800,9 @@ void fun_frame(void);
 	{(unsigned char *)"~(", T_FUN | T_INT | T_NBR | T_STR, 0, fun_tilde},
 	{(unsigned char *)"KeyDown(", T_FUN | T_INT, 0, fun_keydown},
 #ifdef PICOMITEVGA
+#if !(defined(PICOMITEWEB) || defined(PICOMITEMIN))
 	{(unsigned char *)"DRAW3D(", T_FUN | T_INT, 0, fun_3D},
+#endif
 	{(unsigned char *)"GetScanLine", T_FNA | T_INT, 0, fun_getscanline},
 	{(unsigned char *)"Map(", T_FUN | T_INT, 0, fun_map},
 #else
@@ -812,11 +826,13 @@ void fun_frame(void);
 #endif
 #ifdef rp2350
 	{(unsigned char *)"Frame(", T_FUN | T_INT | T_NBR | T_STR, 0, fun_frame},
-#ifndef PICOMITEWEB
+#endif
+#ifdef RAYCASTER
 	{(unsigned char *)"Ray(", T_FUN | T_INT | T_NBR, 0, fun_ray},
 #endif
-#endif
+#if !(defined(PICOMITEWEB))
 	{(unsigned char *)"Tilemap(", T_FUN | T_INT, 0, fun_tilemap},
+#endif
 {
 	(unsigned char *)"", 0, 0, cmd_null
 } // this dummy entry is always at the end

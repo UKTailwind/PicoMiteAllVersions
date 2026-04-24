@@ -358,19 +358,24 @@ extern volatile int QVgaScanLine;
 bool mergedread = 0;
 int ScreenSize = 0;
 #else
-extern int SSD1963data;
+volatile int ScrollStart;
+int SSD1963data = 0;
 int map[16] = {0};
-#ifdef PICOMITEWEB
+#if defined(PICOMITEWEB) || defined(PICOMITEMIN)
 #ifndef rp2350
 short gui_font_width, gui_font_height;
 int last_bcolour, last_fcolour;
 volatile int CursorTimer = 0; // used to time the flashing cursor
 int display_backlight;        // the brightness of the backlight (1 to 100)
-#else
 #endif
 extern int InvokingCtrl;
 #else
 extern int InvokingCtrl;
+bool mergerunning = false;
+volatile bool mergedone = false;
+uint32_t mergetimer = 0;
+#endif
+#ifdef PICOMITEMIN
 bool mergerunning = false;
 volatile bool mergedone = false;
 uint32_t mergetimer = 0;
@@ -846,16 +851,9 @@ void ClearScreen(int c)
 #if PICOMITERP2350
     if (ScrollLCD == ScrollLCDMEM332)
     {
-        if (Option.DISPLAY_TYPE >= SSD1963_5_12BUFF)
-        {
-            ScrollStart = 0;
-        }
-        else
-        {
-            multicore_fifo_push_blocking(7);
-            multicore_fifo_push_blocking((uint32_t)0);
-            ScrollStart = 0;
-        }
+        multicore_fifo_push_blocking(7);
+        multicore_fifo_push_blocking((uint32_t)0);
+        ScrollStart = 0;
     }
 #endif
 #ifdef PICOMITEVGA
@@ -7956,7 +7954,7 @@ void fun_sprite(void)
 #ifndef PICOMITEVGA
 void restorepanel(void)
 {
-    if (Option.DISPLAY_TYPE >= VIRTUAL && Option.DISPLAY_TYPE <= VIRTUAL_M)
+    if (IS_VIRTUAL_DISPLAY(Option.DISPLAY_TYPE))
     {
         InitDisplayVirtual();
         return;
@@ -8258,7 +8256,6 @@ void copy_rgb121_to_rgb222(uint8_t *s, int xstart, int xend, int ystart, int yen
         }
     }
 }
-
 void copyframetoscreen(uint8_t *s, int xstart, int xend, int ystart, int yend, int odd)
 {
 #ifndef PICOMITEWEB
@@ -8740,7 +8737,7 @@ void merge(uint8_t colour)
     // Allocate batch buffer for multiple scanlines
     uint8_t BatchBuf[MERGE_BATCH_LINES * (HRes / 2)];
 
-#ifdef PICOMITE
+#if defined(PICOMITE) || defined(PICOMITEMIN)
     mutex_enter_blocking(&frameBufferMutex);
 #endif
 
@@ -8779,7 +8776,7 @@ void merge(uint8_t colour)
         copyframetoscreen(BatchBuf, 0, HRes - 1, y_start, y_end, 0);
     }
 
-#ifdef PICOMITE
+#if defined(PICOMITE) || defined(PICOMITEMIN)
     mutex_exit(&frameBufferMutex);
     mergedone = true;
     __dmb();
@@ -9012,6 +9009,7 @@ void cmd_framebuffer(void)
         else
 #endif
             merge(colour);
+
 #endif
     }
     else if ((p = checkstring(cmdline, (unsigned char *)"LAYER")))
@@ -9588,8 +9586,46 @@ void cmd_blit(void)
             int rotation = mode & 3;
             if (x1 >= HRes || x1 + w < 0 || y1 >= VRes || y1 + h < 0)
                 return;
-            if (x1 >= 0 && mode == 0 && x1 + w <= HRes)
-                buff = (unsigned char *)blitbuff[bnbr].blitbuffptr;
+            if (mode == 0)
+            {
+                int src_x = 0, src_y = 0;
+                int draw_x = x1, draw_y = y1;
+                int draw_w = w, draw_h = h;
+                unsigned char *src = (unsigned char *)blitbuff[bnbr].blitbuffptr;
+
+                if (draw_x < 0)
+                {
+                    src_x = -draw_x;
+                    draw_w += draw_x;
+                    draw_x = 0;
+                }
+                if (draw_y < 0)
+                {
+                    src_y = -draw_y;
+                    draw_h += draw_y;
+                    draw_y = 0;
+                }
+                if (draw_x + draw_w > HRes)
+                    draw_w = HRes - draw_x;
+                if (draw_y + draw_h > VRes)
+                    draw_h = VRes - draw_y;
+                if (draw_w < 1 || draw_h < 1)
+                    return;
+
+                if (src_x == 0 && src_y == 0 && draw_w == w && draw_h == h)
+                {
+                    DrawBuffer(draw_x, draw_y, draw_x + draw_w - 1, draw_y + draw_h - 1, src);
+                }
+                else
+                {
+                    unsigned char *row_src = src + (src_y * w + src_x) * 3;
+                    for (int row = 0; row < draw_h; row++)
+                    {
+                        DrawBuffer(draw_x, draw_y + row, draw_x + draw_w - 1, draw_y + row, row_src + row * w * 3);
+                    }
+                }
+                return;
+            }
             else
             {
                 buff = GetTempMainMemory(w * h * 4);
@@ -12255,9 +12291,15 @@ void MIPS16 DrawRectangleUser(int x1, int y1, int x2, int y2, int c)
         IntToStr(callstr + strlen(callstr), c, 10);
         callstr[strlen(callstr) + 1] = 0; // two NULL chars required to terminate the call
         g_LocalIndex++;
+#ifdef CACHE
+        EnterLocalFrame();
+#endif
         ExecuteProgram((unsigned char *)callstr);
         nextstmt = nextstmtSaved;
         g_LocalIndex--;
+#ifdef CACHE
+        LeaveLocalFrame();
+#endif
         g_TempMemoryIsChanged = true; // signal that temporary memory should be checked
     }
     else
@@ -12295,8 +12337,14 @@ void MIPS16 DrawBitmapUser(int x1, int y1, int width, int height, int scale, int
         IntToStr(callstr + strlen(callstr), (unsigned int)bitmap, 16);
         callstr[strlen(callstr) + 1] = 0; // two NULL chars required to terminate the call
         g_LocalIndex++;
+#ifdef CACHE
+        EnterLocalFrame();
+#endif
         ExecuteProgram((unsigned char *)callstr);
         g_LocalIndex--;
+#ifdef CACHE
+        LeaveLocalFrame();
+#endif
         g_TempMemoryIsChanged = true; // signal that temporary memory should be checked
         nextstmt = nextstmtSaved;
     }
@@ -14956,7 +15004,7 @@ void floodfill(int x, int y, int internal_colour, int boundary_colour)
     FreeMemorySafe((void **)&line_buffer);
     free_stack(&stack);
 }
-
+// #ifndef PICOMITEMIN
 /* ============================================================================
  * TILEMAP subsystem
  *
@@ -15811,7 +15859,7 @@ void MIPS16 fun_tilemap(void)
         SyntaxError();
     }
 }
-
+// #endif
 void cmd_fill(void)
 {
     uint32_t c = -1, b = -1;

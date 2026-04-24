@@ -485,14 +485,14 @@ int __not_in_flash_func(GetTouchAxis)(int cmd)
             CurrentlyPlaying == P_MIDI || CurrentlyPlaying == P_MP3 ||
             CurrentlyPlaying == P_ARRAY)
         {
-#ifdef PICOMITE
+#if defined(PICOMITE) || defined(PICOMITEMIN)
             if (SPIatRisk)
             {
                 mutex_enter_blocking(&frameBufferMutex);
             }
 #endif
             checkWAVinput();
-#ifdef PICOMITE
+#if defined(PICOMITE) || defined(PICOMITEMIN)
             if (SPIatRisk)
             {
                 mutex_exit(&frameBufferMutex);

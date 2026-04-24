@@ -1808,6 +1808,10 @@ void InitHeap(bool all)
 #endif
     for (i = 0; i < MAXTEMPSTRINGS; i++)
         g_StrTmp[i] = NULL;
+#ifdef CACHE
+    /* The trace cache lives in this heap; its pointer is now dangling.    */
+    TraceCacheReset();
+#endif
 #ifdef PICOMITEVGA
     WriteBuf = (unsigned char *)FRAMEBUFFER;
     DisplayBuf = (unsigned char *)FRAMEBUFFER;

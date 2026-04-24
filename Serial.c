@@ -63,6 +63,9 @@ unsigned char com2_bit9 = 0; // used to track the 9th bit
 // variables for USB CDC host ports (COM3-COM6)
 #ifdef USBKEYBOARD
 #include "tusb.h"
+#include "Audio.h"
+#include "Connect.h"
+#include "Remove.h"
 
 int com3 = 0;						   // true if COM3 (CDC idx 0) is enabled
 int com3_buf_size;					   // size of the buffer used to receive chars
@@ -102,6 +105,7 @@ static volatile int *cdc_rx_head[4];  // -> com3Rx_head..com6Rx_head
 static volatile int *cdc_rx_tail[4];  // -> com3Rx_tail..com6Rx_tail
 static char **cdc_interrupt[4];		  // -> com3_interrupt..com6_interrupt
 static int *cdc_ilevel[4];			  // -> com3_ilevel..com6_ilevel
+static uint32_t cdc_baud[4];		  // stored baud rate per CDC port for SET_LINE_CODING
 
 static bool cdc_arrays_inited = false;
 static void cdc_init_arrays(void)
@@ -147,6 +151,7 @@ void tuh_cdc_mount_cb(uint8_t idx)
 	if (idx >= 4)
 		return;
 	cdc_init_arrays();
+	PlayMemWav(ezyZip_wav, EZYZIP_WAV_SIZE);
 	if (!CurrentLinePtr)
 	{
 		MMPrintString("USB CDC Device Connected on channel ");
@@ -155,9 +160,14 @@ void tuh_cdc_mount_cb(uint8_t idx)
 		PInt(idx + 3);
 		MMPrintString(")\r\n> ");
 	}
-	// If the port was already open by BASIC, re-assert DTR/RTS for seamless reconnect
+	// If the port was already open by BASIC, re-assert DTR/RTS and line coding for seamless reconnect
 	if (*cdc_com_flag[idx])
+	{
+		cdc_line_coding_t coding = {cdc_baud[idx], CDC_LINE_CODING_STOP_BITS_1, CDC_LINE_CODING_PARITY_NONE, 8};
+		if (!tuh_cdc_set_line_coding(idx, &coding, NULL, 0))
+			tuh_cdc_set_baudrate(idx, cdc_baud[idx], NULL, 0); // fallback for FTDI/CP210x
 		tuh_cdc_set_control_line_state(idx, CDC_CONTROL_LINE_STATE_DTR | CDC_CONTROL_LINE_STATE_RTS, NULL, 0);
+	}
 }
 
 void tuh_cdc_umount_cb(uint8_t idx)
@@ -166,6 +176,7 @@ void tuh_cdc_umount_cb(uint8_t idx)
 		return;
 	// If the port is open by BASIC, keep the state intact so reconnection works
 	// transparently. Only print a message. SerialPutchar already guards on tuh_cdc_mounted().
+	PlayMemWav(remove_wav, REMOVE_WAV_SIZE);
 	if (!CurrentLinePtr)
 	{
 		MMPrintString("USB CDC Device Disconnected on channel ");
@@ -636,6 +647,12 @@ void MIPS16 SerialOpen(unsigned char *spec)
 		*cdc_rx_tail[cdc_idx] = 0;
 
 		*cdc_com_flag[cdc_idx] = true;
+
+		// Send SET_LINE_CODING with the requested baud rate (essential for USB-UART bridges like CH340)
+		cdc_baud[cdc_idx] = baud;
+		cdc_line_coding_t coding = {baud, CDC_LINE_CODING_STOP_BITS_1, CDC_LINE_CODING_PARITY_NONE, 8};
+		if (!tuh_cdc_set_line_coding(cdc_idx, &coding, NULL, 0))
+			tuh_cdc_set_baudrate(cdc_idx, baud, NULL, 0); // fallback for FTDI/CP210x
 
 		// Assert DTR (and RTS) to signal the device we are ready
 		tuh_cdc_set_control_line_state(cdc_idx, CDC_CONTROL_LINE_STATE_DTR | CDC_CONTROL_LINE_STATE_RTS, NULL, 0);

@@ -44,6 +44,12 @@ extern "C"
 #include "upng.h"
 #endif
 
+#if defined(USBKEYBOARD) && defined(rp2350)
+#define HAS_USB_MSC 1
+#else
+#define HAS_USB_MSC 0
+#endif
+
 /* ============================================================================
  * Constants - Flash storage regions
  * ============================================================================ */
@@ -56,12 +62,13 @@ extern "C"
         /* ============================================================================
          * Constants - File types
          * ============================================================================ */
-        enum
+        typedef enum
         {
                 NONEFILE,
                 FLASHFILE,
-                FATFSFILE
-        };
+                FATFSFILE,
+                USBFILE
+        } filetype_t;
 
         /* ============================================================================
          * Type definitions - File table union
@@ -213,7 +220,7 @@ extern "C"
                 unsigned char AUDIO_R;
                 unsigned char AUDIO_SLICE;
                 unsigned char SDspeed;
-                unsigned char pins[3]; // General use storage for CFunctions
+                unsigned char pinsx[3]; // General use storage for CFunctions
 
                 /* Touch and display */
                 unsigned char TOUCH_CAP;
@@ -275,7 +282,7 @@ extern "C"
 #endif
 
                 /* Miscellaneous pins and settings */
-                unsigned short GPSBaud;
+                unsigned short GPSBaudx;
                 unsigned char GPSRX;
                 unsigned char GPSTX;
                 unsigned char heartbeatpin;
@@ -325,7 +332,9 @@ extern "C"
                 uint8_t BACKLIGHT_KBD;        // *EB*
                 uint8_t BACKLIGHT_LCD;        // *EB*
                 uint16_t D4;                  // *EB*
-                unsigned char extensions[92]; // 896 bytes == 7 XMODEM blocks
+                unsigned int GPSBaud;         // *EB*
+                unsigned char pins[8];        // General use storage for CFunctions
+                unsigned char extensions[80]; // 896 bytes == 7 XMODEM blocks
 
                 /* NOTE: To enable older CFunctions to run, any new options MUST be added at the end of the list */
         } __attribute__((packed));
@@ -392,6 +401,7 @@ extern "C"
          * Function declarations - File positioning
          * ============================================================================ */
         void positionfile(int fnbr, int idx, bool noread);
+        int filegetpos(int fnbr);
 
         /* ============================================================================
          * Function declarations - Program loading
@@ -442,9 +452,13 @@ extern "C"
         void CrunchData(unsigned char **p, int c);
 
         /* ============================================================================
-         * Function declarations - SD card
+         * Function declarations - SD card / USB drive
          * ============================================================================ */
         void CheckSDCard(void);
+#if HAS_USB_MSC
+        bool usb_msc_is_mounted(void);
+        extern volatile BYTE USBDriveStat;
+#endif
 
         /* ============================================================================
          * Function declarations - Interrupt control
