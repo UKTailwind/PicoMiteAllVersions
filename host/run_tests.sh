@@ -160,3 +160,21 @@ if [ $FAILED -gt 0 ]; then
     echo -e "$ERRORS"
     exit 1
 fi
+
+# HAL purity gate. Skip with SKIP_HAL_PURITY=1 for quick iteration; never skip in CI.
+if [ "${SKIP_HAL_PURITY:-0}" != "1" ]; then
+    echo ""
+    PURITY_TOOL="$(cd "$(dirname "$0")/.." && pwd)/tools/check_hal_purity.sh"
+    if [ -x "$PURITY_TOOL" ]; then
+        if ! "$PURITY_TOOL" > /tmp/hal_purity.$$.log 2>&1; then
+            cat /tmp/hal_purity.$$.log
+            rm -f /tmp/hal_purity.$$.log
+            echo ""
+            echo "HAL purity gate FAILED (tests passed, but a strict core file regressed)."
+            echo "Fix the ifdef leak or bypass temporarily with SKIP_HAL_PURITY=1."
+            exit 1
+        fi
+        rm -f /tmp/hal_purity.$$.log
+        echo "HAL purity gate: clean"
+    fi
+fi

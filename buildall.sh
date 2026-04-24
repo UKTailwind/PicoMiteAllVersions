@@ -15,6 +15,18 @@ TARGETS=(
 root="$(cd "$(dirname "$0")" && pwd)"
 fail=0
 
+# HAL purity gate — runs first so source-level regressions fail fast before the
+# ~10-minute 12-target build loop burns cycles. Skip with SKIP_HAL_PURITY=1.
+if [ "${SKIP_HAL_PURITY:-0}" != "1" ]; then
+    if [ -x "$root/tools/check_hal_purity.sh" ]; then
+        printf '=== HAL purity gate ===\n'
+        if ! "$root/tools/check_hal_purity.sh"; then
+            echo "HAL purity gate FAILED — fix the ifdef leak before building."
+            exit 1
+        fi
+    fi
+fi
+
 for t in "${TARGETS[@]}"; do
     d="$root/build_all/$t"
     rm -rf "$d" && mkdir -p "$d"
