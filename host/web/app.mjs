@@ -294,7 +294,18 @@ function startRenderLoop() {
     let lastGen = 0xFFFFFFFF;
     const loop = () => {
         try {
-            const gen = memoryU32[fbGenerationIdx];
+            // Atomics.load, not a plain indexed read.  The counter is
+            // written by the wasm worker thread; without Atomics, V8 on
+            // Chrome is free to hoist the read out of this loop (the JS
+            // side never writes it, so V8's alias analysis proves the
+            // value doesn't change from this thread's point of view).
+            // Symptom when that optimisation kicks in: the canvas shows
+            // frame 1 forever — game logic runs in the worker, but the
+            // main thread's rAF never sees subsequent generation bumps
+            // and blitFrame is never called again.  Firefox's
+            // SpiderMonkey happened to be conservative enough to reread
+            // on every iteration, which is why the bug was Chrome-only.
+            const gen = Atomics.load(memoryU32, fbGenerationIdx);
             if (gen !== lastGen) {
                 lastGen = gen;
                 blitFrame();
