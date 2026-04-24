@@ -4,7 +4,7 @@ Compile with GCC 13.3.1 arm-none-eabi<br>
 <br> Note: CmakeLists.txt is changed. Building without this version of the CMake file will not work.
 
 <b style="color:red;"> Build with sdk V2.2.0 but replace gpio.c with the one included here. Note the change in gpio.c is just to set the gpio interrupt to be in ram<br>
-</b><b>Replace the RaspBerry Pi supplied version of TinyUSB with V0.20.0 https://github.com/hathach/tinyusb/releases</br>
+</br><br>Replace the RaspBerry Pi supplied version of TinyUSB with V0.20.0 https://github.com/hathach/tinyusb/releases</br></b>
 
 Change CMakeLists.txt line 23 to determine which variant to build<br>
 <br>
