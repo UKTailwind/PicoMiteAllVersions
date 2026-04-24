@@ -108,11 +108,11 @@ sim_obj/host_stubs_legacy.o: host_stubs_legacy.c
 	@mkdir -p $(dir $@)
 	$(CC) $(SIM_CFLAGS) -c -o $@ $<
 
-sim_obj/host_main.o: host_main.c
+sim_obj/host_main.o: ../ports/host_native/host_main.c
 	@mkdir -p $(dir $@)
 	$(CC) $(SIM_CFLAGS) -c -o $@ $<
 
-sim_obj/host_terminal.o: host_terminal.c host_terminal.h
+sim_obj/host_terminal.o: ../ports/host_native/host_terminal.c ../ports/host_native/host_terminal.h
 	@mkdir -p $(dir $@)
 	$(CC) $(SIM_CFLAGS) -c -o $@ $<
 
@@ -141,10 +141,10 @@ sim_obj/%.o: ../core/state/%.c
 host_stubs_legacy.o: host_stubs_legacy.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-host_main.o: host_main.c
+host_main.o: ../ports/host_native/host_main.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-host_terminal.o: host_terminal.c host_terminal.h
+host_terminal.o: ../ports/host_native/host_terminal.c ../ports/host_native/host_terminal.h
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 host_fs.o: ../ports/host_native/host_fs.c ../ports/host_native/host_fs.h
