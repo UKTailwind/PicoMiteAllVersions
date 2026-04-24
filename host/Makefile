@@ -24,13 +24,13 @@ CFLAGS = -std=gnu11 -g -O0 -Wall -Wno-unused-variable -Wno-unused-function \
          -Wno-missing-braces -funsigned-char \
          -DPICOMITE -DMMBASIC_HOST $(SIM_FLAGS) \
          -include host_platform.h \
-         -I. -I.. \
+         -I. -I.. -I../ports/host_native \
          -MMD -MP
 
 LDFLAGS = -lm
 
 # Source directory
-VPATH = ..:../core/state:../drivers/audio_mp3:../drivers/spi_lcd:../drivers/display_merge:../drivers/vga_pio:../drivers/gfx_3d:../drivers/upng_sprite:../drivers/gui_touch:../drivers/psram_heap
+VPATH = ..:../core/state:../drivers/audio_mp3:../drivers/spi_lcd:../drivers/display_merge:../drivers/vga_pio:../drivers/gfx_3d:../drivers/upng_sprite:../drivers/gui_touch:../drivers/psram_heap:../ports/host_native
 
 # Core MMBasic sources (language runtime)
 CORE_SRCS = MMBasic.c Commands.c Functions.c Operators.c MATHS.c Memory.c Editor.c MMBasic_Prompt.c MMBasic_Print.c MMBasic_REPL.c
@@ -157,10 +157,10 @@ sim_obj/host_sim_audio.o: host_sim_audio.c host_sim_audio.h
 	@mkdir -p $(dir $@)
 	$(CC) $(SIM_CFLAGS) -c -o $@ $<
 
-host_time.o: host_time.c host_time.h
+host_time.o: ../ports/host_native/host_time.c ../ports/host_native/host_time.h
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-sim_obj/host_time.o: host_time.c host_time.h
+sim_obj/host_time.o: ../ports/host_native/host_time.c ../ports/host_native/host_time.h
 	@mkdir -p $(dir $@)
 	$(CC) $(SIM_CFLAGS) -c -o $@ $<
 
