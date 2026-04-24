@@ -1,0 +1,7 @@
+FOR i = 1 TO 3
+  PRINT i
+NEXT i
+
+' EXPECT:  1
+' EXPECT:  2
+' EXPECT:  3

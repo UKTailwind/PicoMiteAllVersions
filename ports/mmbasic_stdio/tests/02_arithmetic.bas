@@ -1,0 +1,7 @@
+PRINT 3 + 4
+PRINT 3 * 4
+PRINT 10 MOD 4
+
+' EXPECT:  7
+' EXPECT:  12
+' EXPECT:  2

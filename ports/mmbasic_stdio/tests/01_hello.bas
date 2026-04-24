@@ -1,0 +1,3 @@
+PRINT "hello"
+
+' EXPECT: hello
