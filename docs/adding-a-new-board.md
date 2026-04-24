@@ -2,7 +2,7 @@
 
 One-page guide to onboarding a new device target onto the real-HAL layout.
 
-Prerequisites: read `docs/real-hal-plan.md` (the index) + `docs/real-hal/architecture.md` (directory layout) first. The standard is non-negotiable — see §"The standard" in the plan doc. This guide is the paved path; it assumes you accept it.
+Prerequisites: read `docs/real-hal-plan.md` (the index) + `docs/real-hal/architecture.md` (directory layout) first.
 
 ## The shape of a port
 
@@ -21,7 +21,7 @@ That's it. Copy the closest existing port (usually `ports/pico/` for RP2040 vari
 
 ## Step 1 — port_config.h
 
-All port-config macros have the `HAL_PORT_` prefix. They are **values**, not gates — core reads them inside C expressions and array sizes. Renaming a `#ifdef` to `#if HAL_PORT_FOO` is gaming the rule, not following it.
+All port-config macros have the `HAL_PORT_` prefix. They are **values** — core reads them inside C expressions and array sizes, never as preprocessor gates.
 
 Start from `ports/pico/port_config.h` (the simplest). Key knobs, grouped:
 
@@ -38,7 +38,7 @@ If a macro doesn't apply to your board, define it to `0` (or the null form). The
 
 ## Step 2 — pin_tables.c
 
-**Background: `PinDef[]` and the two numbering systems.** MMBasic has two ways of naming a pin in user code: the physical *package pin number* (1, 2, 4, 5, … — what's silkscreened on the header), and the *GPIO number* (`GP0`, `GP1`, `GP2`, … — what the chip datasheet calls the line). BASIC syntax accepts either. Internally, everything goes through `PinDef[]` — an array indexed by package-pin number. Each entry carries `{pin, GPno, pinname, mode, ADCpin, slice}`: the chip's GPIO number, the printable label, a bitmask of supported modes (`DIGITAL_IN`, `PWM4A`, `I2C0SDA`, `SPI1SCK`, …), the ADC channel number if any, and the PWM slice number. `PinDef[]` itself lives in `PicoMite.c` today (relocation to `ports/` is tracked separately) — as a new-port author you're not redefining `PinDef[]`, you're supplying two smaller lookup tables that reference it.
+**Background: `PinDef[]` and the two numbering systems.** MMBasic has two ways of naming a pin in user code: the physical *package pin number* (1, 2, 4, 5, … — what's silkscreened on the header), and the *GPIO number* (`GP0`, `GP1`, `GP2`, … — what the chip datasheet calls the line). BASIC syntax accepts either. Internally, everything goes through `PinDef[]` — an array indexed by package-pin number. Each entry carries `{pin, GPno, pinname, mode, ADCpin, slice}`: the chip's GPIO number, the printable label, a bitmask of supported modes (`DIGITAL_IN`, `PWM4A`, `I2C0SDA`, `SPI1SCK`, …), the ADC channel number if any, and the PWM slice number. `PinDef[]` lives in `PicoMite.c`. As a new-port author you're not redefining `PinDef[]`, you're supplying two smaller lookup tables that reference it.
 
 **PINMAP** is the GPIO-number → package-pin-number map: `PINMAP[gpio]` gives the `PinDef[]` index for that GPIO. One entry per GPIO on your chip (30 on RP2040, 48 on RP2350). When a BASIC program writes `SETPIN GP0, DOUT`, the parser resolves `GP0` to GPIO 0, then the runtime calls `codemap(0)` → `PINMAP[0]` → the `PinDef[]` slot for whichever header pin GP0 is wired to.
 
@@ -87,7 +87,7 @@ void port_set_default_options(void);
 
 Called by `FileIO.c::ResetOptions()` after shared defaults. Set any `Option.*` field whose factory value differs from the shared default — typical: SSD_RESET, TOUCH_XSCALE, SerialTX/RX, KeyboardConfig, ColourCode.
 
-Port impl files are **exempt from the purity gate** (the core/header rule only applies to files under `core/` and `hal/`). Target-macro `#ifdef` is fine here — that's where conditional bodies are supposed to live.
+Port impl files may contain target-macro `#ifdef` blocks — that's where conditional bodies belong. The purity gate only enforces `core/` and `hal/`.
 
 ## Step 4 — wire into CMake
 
@@ -109,7 +109,7 @@ A port is done when **all** of these pass:
 3. `./buildall.sh` builds every target including yours, clean.
 4. Your target boots to the MMBasic prompt on real hardware.
 
-If any of (1)–(3) regresses while adding your board, you've introduced an ifdef into core or violated the purity standard — fix that, don't exempt the file. Physical boot-up is the hardware-specific check the other three don't cover.
+If (1) or (2) regresses while adding your board, an `#ifdef` has landed in a core or HAL file — the answer is a port-config macro, a port hook, or a driver flavour (see "Ground rules" below), not a widened exemption.
 
 ## New drivers
 
@@ -124,16 +124,19 @@ Rules for new drivers:
 - `HAL_PORT_RAM_FUNC` / `__not_in_flash_func` annotations honoured for hot paths.
 - Ships with a `tests/` subdir if the peripheral admits an off-board conformance test.
 
-## Two ground rules
+## Ground rules
 
-1. **Don't add `#ifdef YOUR_BOARD` to core files.** The whole refactor exists to make that unnecessary. If you're tempted, stop — the answer is either a new port-config macro (if it's a value-shaped knob), a new port hook function (if it's a body-shaped divergence), or a new driver flavour (if it's a whole peripheral swap).
+Core files (`core/*.c`, `hal/*.h`) must compile identically for every port with zero preprocessor conditionals on target macros or `HAL_PORT_*` macros. Differences between boards are expressed three ways:
 
-2. **Don't rename a `#ifdef rp2350` to `#if HAL_PORT_FOO`.** Per the fixup-plan standard, that's gaming, not eliminating. Core files must have zero preprocessor conditionals on any target-macro OR port-config macro. Port-config constants are values, not gates.
+- **Port-config macro** — value-shaped knob. Add to `HAL_PORT_*` in your `port_config.h`; core reads it as a C value (in an expression or array size), never as a preprocessor gate.
+- **Port hook function** — body-shaped divergence. Add a `port_*()` entry point with a real impl in your port dir and stub impls in the other ports.
+- **Driver flavour** — whole-peripheral swap. Add a new directory under `drivers/` and select it in your CMake branch.
+
+If you find yourself wanting an `#ifdef` in a core or HAL file, one of the three above is the answer.
 
 ## Further reading
 
 - `docs/real-hal-plan.md` — the plan index.
 - `docs/real-hal/architecture.md` — directory layout + composition example.
-- `docs/real-hal/port-config.md` — how port-config macros work + what to avoid.
+- `docs/real-hal/port-config.md` — how port-config macros work.
 - `docs/real-hal/contracts.md` — HAL contract sketches per surface.
-- `docs/real-hal-fixup-plan.md` — worked examples of port hooks + port-config moves.
