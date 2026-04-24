@@ -21,15 +21,22 @@ else
   SIM_FLAGS =
 endif
 
-CFLAGS = -std=gnu11 -g -O0 -Wall -Wno-unused-variable -Wno-unused-function \
+CFLAGS = -std=gnu11 -g -Os -flto -Wall -Wno-unused-variable -Wno-unused-function \
          -Wno-unused-but-set-variable -Wno-misleading-indentation \
          -Wno-missing-braces -funsigned-char \
+         -ffunction-sections -fdata-sections \
          -DPICOMITE -DMMBASIC_HOST -DMMBASIC_STDIO $(SIM_FLAGS) \
          -include host_platform.h \
          -I$(PORT_DIR) -I$(REPO_ROOT)/ports/host_native -I$(REPO_ROOT) \
          -MMD -MP
 
-LDFLAGS = -lm
+# Dead-code stripping: macOS ld uses -dead_strip; GNU ld uses --gc-sections.
+UNAME_S := $(shell uname -s)
+ifeq ($(UNAME_S),Darwin)
+  LDFLAGS = -lm -flto -Wl,-dead_strip
+else
+  LDFLAGS = -lm -flto -Wl,--gc-sections
+endif
 
 # Core MMBasic — same list as host_native minus Editor.c,
 # MMBasic_REPL.c, MMBasic_Prompt.c.  Keep shared gfx / state so Draw.c
