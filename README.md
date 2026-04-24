@@ -1,9 +1,10 @@
 # PicoMiteRP2350
-This contains files to build MMbasic 6.02.02b0 to run on both RP2040 and RP2350<br>
+This contains files to build MMbasic 6.03.00B1to run on both RP2040 and RP2350<br>
 Compile with GCC 13.3.1 arm-none-eabi<br>
-<br> Note: CmakeLists.txt is changed (since V6.02.01b7) to use a custom load. Building without this version of the CMake file will not work.
+<br> Note: CmakeLists.txt is changed. Building without this version of the CMake file will not work.
 
-<b style="color:red;"> Build with sdk V2.2.0 but replace gpio.c with the one included here. Note the change in gpio.c is just to set the gpio interrupt to be in ram<br></b>
+<b style="color:red;"> Build with sdk V2.2.0 but replace gpio.c with the one included here. Note the change in gpio.c is just to set the gpio interrupt to be in ram<br>
+</b><b>Replace the RaspBerry Pi supplied version of TinyUSB with V0.20.0 https://github.com/hathach/tinyusb/releases</br>
 
 Change CMakeLists.txt line 4 to determine which variant to build<br>
 <br>
