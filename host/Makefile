@@ -164,10 +164,10 @@ sim_obj/host_time.o: ../ports/host_native/host_time.c ../ports/host_native/host_
 	@mkdir -p $(dir $@)
 	$(CC) $(SIM_CFLAGS) -c -o $@ $<
 
-host_fb.o: host_fb.c host_fb.h
+host_fb.o: ../ports/host_native/host_fb.c ../ports/host_native/host_fb.h
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-sim_obj/host_fb.o: host_fb.c host_fb.h
+sim_obj/host_fb.o: ../ports/host_native/host_fb.c ../ports/host_native/host_fb.h
 	@mkdir -p $(dir $@)
 	$(CC) $(SIM_CFLAGS) -c -o $@ $<
 
