@@ -27,6 +27,15 @@
 #include "Hardware_Includes.h"
 #include "host_fs.h"
 
+/* FatFS's FF_MAX_LFN is 63 — fine for the 8.3-style FAT world, but
+ * POSIX paths on a real desktop regularly run several hundred chars
+ * (macOS/Linux typically cap at PATH_MAX = 1024 or 4096). Any code that
+ * joins host_sd_root + a filename and buffers the result in an
+ * FF_MAX_LFN-sized array will truncate — or worse, throw "File name too
+ * long" — on perfectly ordinary cwds. Size host-side path buffers to a
+ * POSIX-friendly ceiling instead. */
+#define HOST_PATH_MAX 4096
+
 /* Defined in host_main.c — used by FileLoadProgram when SaveProgramToFlash
  * feeds buffered source through the host tokeniser path. */
 extern int load_basic_source(const char *source);
@@ -105,7 +114,7 @@ FRESULT host_f_findfirst(DIR *dp, FILINFO *fi, const TCHAR *path,
      * (drive prefix already stripped by fullpath(). Join it onto
      * host_sd_root so FILES / COPY / KILL / DIR$ see the subdirectory
      * the user has CHDIR'd into. */
-    char target[FF_MAX_LFN];
+    char target[HOST_PATH_MAX];
     host_join_sd_root(path, target, sizeof(target));
     if (host_find_walker) host_fs_walk_close(host_find_walker);
     host_find_walker = host_fs_walk_open(target, pattern);
@@ -159,21 +168,21 @@ static void host_strip_fatfs_drive(const char *in, char *out, int out_cap) {
 }
 
 void host_join_sd_root(const char *relpath, char *out, int out_cap) {
-    char stripped[FF_MAX_LFN];
+    char stripped[HOST_PATH_MAX];
     host_strip_fatfs_drive(relpath, stripped, sizeof(stripped));
     host_resolve_sd_path(stripped, out, (size_t)out_cap);
 }
 
 FRESULT host_f_unlink(const TCHAR *path) {
     if (!host_sd_root) return f_unlink(path);
-    char p[FF_MAX_LFN];
+    char p[HOST_PATH_MAX];
     host_join_sd_root(path, p, sizeof(p));
     return host_fs_unlink(p) == 0 ? FR_OK : FR_NO_FILE;
 }
 
 FRESULT host_f_rename(const TCHAR *from, const TCHAR *to) {
     if (!host_sd_root) return f_rename(from, to);
-    char a[FF_MAX_LFN], b[FF_MAX_LFN];
+    char a[HOST_PATH_MAX], b[HOST_PATH_MAX];
     host_join_sd_root(from, a, sizeof(a));
     host_join_sd_root(to, b, sizeof(b));
     return host_fs_rename(a, b) == 0 ? FR_OK : FR_NO_FILE;
@@ -181,21 +190,21 @@ FRESULT host_f_rename(const TCHAR *from, const TCHAR *to) {
 
 FRESULT host_f_mkdir(const TCHAR *path) {
     if (!host_sd_root) return f_mkdir(path);
-    char p[FF_MAX_LFN];
+    char p[HOST_PATH_MAX];
     host_join_sd_root(path, p, sizeof(p));
     return host_fs_mkdir(p) == 0 ? FR_OK : FR_EXIST;
 }
 
 FRESULT host_f_chdir(const TCHAR *path) {
     if (!host_sd_root) return f_chdir(path);
-    char p[FF_MAX_LFN];
+    char p[HOST_PATH_MAX];
     host_join_sd_root(path, p, sizeof(p));
     return host_fs_chdir(p) == 0 ? FR_OK : FR_NO_PATH;
 }
 
 FRESULT host_f_getcwd(TCHAR *buff, UINT len) {
     if (!host_sd_root) return f_getcwd(buff, len);
-    char tmp[FF_MAX_LFN];
+    char tmp[HOST_PATH_MAX];
     if (host_fs_getcwd(tmp, (int)sizeof(tmp)) != 0) return FR_INT_ERR;
     /* Prepend drive prefix so Editor.c / PRINT CWD$ format works. */
     snprintf(buff, len, "0:%s", tmp);

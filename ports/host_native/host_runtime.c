@@ -693,11 +693,15 @@ void putConsole(int c, int flush) {
 }
 
 char MMputchar(char c, int flush) {
-    if (host_output_hook) {
-        host_output_hook(&c, 1);
-    } else {
-        putConsole(c, flush);
-    }
+    /* Always dispatch through putConsole so OptionConsole's SCREEN/SERIAL
+     * routing is honoured. The hook is consulted downstream in
+     * SerialConsolePutC (captures SERIAL-bound text for test harness,
+     * swallows stray SERIAL-bound text in mmbasic_ansi) and in host_print
+     * (the bypass path used by myprintf / MMfputs-to-stdout). Hooking
+     * MMputchar itself would bypass OptionConsole entirely — that's what
+     * left mmbasic_ansi showing a blinking cursor with no prompt or echo,
+     * because its OptionConsole=2 (SCREEN-only) route never ran. */
+    putConsole(c, flush);
     if (isprint((unsigned char)c)) MMCharPos++;
     if (c == '\r') MMCharPos = 1;
     return c;
@@ -754,12 +758,21 @@ void printoptions(void) {}
 int getConsole(void) { return -1; }
 void myprintf(char *s) { host_prints(s); }
 char SerialConsolePutC(char c, int flush) {
-    /* Host's "serial port" is stdout. The output-capture hook has already
-     * been taken care of at the MMputchar level for console text.
+    /* Host's "serial port" is stdout. Route through host_output_hook
+     * when one is installed: SSPrintString (do_end's cursor/SGR reset,
+     * Editor VT100 escapes, Prompt cursor nudges) otherwise bypasses
+     * the hook and writes raw stdout. Ports that own stdout for other
+     * purposes (mmbasic_ansi's render thread) or capture all BASIC
+     * output (test harness strip_ansi_sequences) need the SSPrintString
+     * stream too.
      *
      * In raw mode OPOST is disabled, so '\n' on its own no longer returns
      * the cursor to column 0 — without this translation, every prompt and
      * error message stair-steps down the terminal. */
+    if (host_output_hook) {
+        host_output_hook(&c, 1);
+        return c;
+    }
     if (c == '\n' && host_raw_mode_is_active()) fputc('\r', stdout);
     fputc(c, stdout);
     if (flush) fflush(stdout);
@@ -1038,7 +1051,9 @@ char *port_bc_frun_load_source(const char *fname_buf) {
     char *source = NULL;
 
     if (host_sd_root) {
-        char path[FF_MAX_LFN + 1];
+        /* POSIX paths can run to 1024+ chars; FF_MAX_LFN=63 underflows for
+         * any cwd longer than ~50 chars (e.g. any repo under /Users/...). */
+        char path[4096];
         const char *root = host_sd_root;
         size_t rl = strlen(root);
         int need_sep = (rl > 0 && root[rl - 1] != '/');

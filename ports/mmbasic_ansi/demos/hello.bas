@@ -1,0 +1,9 @@
+CLS
+FOR i = 1 TO 5
+  PRINT "Hello from half-block MMBasic!"; i
+NEXT i
+BOX 10, 10, 100, 50, 1, RGB(255,0,0), RGB(0,0,128)
+CIRCLE 200, 100, 40, 2, 1.0, RGB(0,255,0)
+LINE 0, 200, 319, 250, 2, RGB(255,255,0)
+PAUSE 2000
+END

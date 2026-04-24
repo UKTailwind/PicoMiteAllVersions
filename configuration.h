@@ -225,6 +225,16 @@ extern "C" {
 #define HEAP_MEMORY_SIZE (8 * 1024 * 1024)
 #endif
 
+/* mmbasic_ansi: runs on a desktop, inherits PICOMITE's default 128 KB
+ * MMHeap which is too tight for BC_SIM_RP2350 compile-time arrays —
+ * bc_compiler_alloc fragments the heap and fails "NEM[vm:comptbl]"
+ * on anything non-trivial. Bump to 2 MB so the VM can always compile
+ * without fragmentation. */
+#ifdef MMBASIC_ANSI
+#undef HEAP_MEMORY_SIZE
+#define HEAP_MEMORY_SIZE (2 * 1024 * 1024)
+#endif
+
 #define MMFLOAT double
 #define FLOAT3D float
 #define sqrt3d sqrtf

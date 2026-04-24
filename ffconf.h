@@ -106,7 +106,24 @@
 
 
 #define FF_USE_LFN		1
+#if defined(MMBASIC_ANSI) || defined(MMBASIC_WASM)
+/* mmbasic_ansi / WASM run against real POSIX paths via host_fs_shims.c —
+ * cwds easily exceed FatFS's 8.3-tuned 63-byte ceiling, and many buffers
+ * in FileIO.c (q in getfullfilename/BasicFileOpen, prefixed paths) are
+ * sized FF_MAX_LFN. Size them up to FatFS's hardcoded 255-byte ceiling
+ * (ff.c:505) so `run`/`load`/`chdir` from a deep directory doesn't
+ * truncate the resolved path and turn into "Could not find the file".
+ *
+ * Scoped to _ANSI/_WASM rather than all MMBASIC_HOST because the test
+ * harness (mmbasic_test / host_native) sizes flist[] = HAL_PORT_FILES_MAX
+ * × sizeof(s_flist{char fn[FF_MAX_LFN]; …}); with 256 slots and the
+ * bigger LFN the array jumps 19 KB → 67 KB and blows the test's 128 KB
+ * heap (NEM[mem:heap] on copy_a.txt). _ANSI gets a 2 MB heap (configuration.h)
+ * and _WASM gets 8 MB so the larger LFN fits comfortably. */
+#define FF_MAX_LFN		255
+#else
 #define FF_MAX_LFN		63
+#endif
 /* The FF_USE_LFN switches the support for LFN (long file name).
 /
 /   0: Disable LFN. FF_MAX_LFN has no effect.
