@@ -109,6 +109,36 @@ void port_prepare_program_finalize_subfun(int ErrAbort) {
     hashlabels(ProgMemory, ErrAbort);
 }
 
+int port_try_check_var_subfun_collision(const unsigned char *name, int namelen) {
+    uint32_t hash = FNV_offset_basis;
+    uint32_t funhash;
+    int j;
+    const char *ip;
+    char *tp;
+
+    for (int i = 0; i < namelen; i++) {
+        hash ^= name[i];
+        hash *= FNV_prime;
+    }
+    funhash = hash % MAXSUBHASH;
+    if (funtbl[funhash].name[0] == 0) return 1;
+    while (funtbl[funhash].name[0] != 0) {
+        ip = (const char *)name;
+        tp = funtbl[funhash].name;
+        if (*ip++ == *tp++) {
+            j = namelen - 1;
+            while (j > 0 && *ip == *tp) { j--; ip++; tp++; }
+            if (j == 0 && (*(char *)tp == 0 || namelen == MAXVARLEN)) {
+                if (funtbl[funhash].index < MAXSUBFUN)
+                    error("A sub/fun has the same name: $", (char *)name);
+            }
+        }
+        funhash++;
+        if (funhash == MAXSUBFUN) funhash = 0;
+    }
+    return 1;
+}
+
 int port_try_find_label_hash(unsigned char *labelptr, unsigned char **out_ptr) {
     unsigned char *tp, *ip;
     int i;
@@ -201,6 +231,12 @@ void port_prepare_program_finalize_subfun(int ErrAbort) {
 int port_try_find_label_hash(unsigned char *labelptr, unsigned char **out_ptr) {
     (void)labelptr;
     (void)out_ptr;
+    return 0;
+}
+
+int port_try_check_var_subfun_collision(const unsigned char *name, int namelen) {
+    (void)name;
+    (void)namelen;
     return 0;
 }
 

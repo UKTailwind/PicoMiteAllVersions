@@ -2382,9 +2382,6 @@ void MIPS16 HAL_PORT_MMBASIC_HOT_FUNC(*findvar)(unsigned char *p, int action) {
     int GlobalhashIndex, OriginalGlobalHash;
     int LocalhashIndex, OriginalLocalHash;
     uint32_t hash=FNV_offset_basis;
-#ifdef rp2350
-	uint32_t funhash;
-#endif
 	char  *tp, *ip;
     int dim[MAXDIM]={0}, dnbr;
 //	if(__get_MSP() < (uint32_t)&stackcheck-0x5000){
@@ -2408,9 +2405,6 @@ void MIPS16 HAL_PORT_MMBASIC_HOT_FUNC(*findvar)(unsigned char *p, int action) {
 		*s++ = u;
 		if(++namelen > MAXVARLEN) error("Variable name too long");
 	} while(isnamechar(*p));
-#ifdef rp2350
-    funhash=hash % MAXSUBHASH;
-#endif
 	hash %= MAXVARHASH; //scale 0-255
     
 	if(namelen!=MAXVARLEN)*s=0;
@@ -2770,26 +2764,10 @@ void MIPS16 HAL_PORT_MMBASIC_HOT_FUNC(*findvar)(unsigned char *p, int action) {
             vtype = DefaultType;
     }
     // now scan the sub/fun table to make sure that there is not a sub/fun with the same name
-#ifdef rp2350
-    if(!(action & V_FUNCT) && (funtbl[funhash].name[0])) {                                       // don't do this if we are defining the local variable for a function name
-		while(funtbl[funhash].name[0]!=0){
-			ip=(char *)name;
-			tp=funtbl[funhash].name;
-			if(*ip++ == *tp++) {                 // preliminary quick check
-				j = namelen-1;
-				while(j > 0 && *ip == *tp) {                              // compare each letter
-					j--; ip++; tp++;
-				}
-				if(j == 0  && (*(char *)tp == 0 || namelen == MAXVARLEN)) {       // found a matching name
-					if(funtbl[funhash].index<MAXSUBFUN)error("A sub/fun has the same name: $", name);
-				}
-			}
-			funhash++;
-			if(funhash==MAXSUBFUN)funhash=0;
-        }
-    }
-#else
-    if(!(action & V_FUNCT)) {                                       // don't do this if we are defining the local variable for a function name
+    // rp2350 uses the funtbl[] hash probe; rp2040 + host fall through to
+    // the linear subfun[] scan below.
+    extern int port_try_check_var_subfun_collision(const unsigned char *name, int namelen);
+    if(!(action & V_FUNCT) && !port_try_check_var_subfun_collision(name, namelen)) {
         for(i = 0;  i < MAXSUBFUN && subfun[i] != NULL; i++) {
             x = subfun[i];                                          // point to the command token
             x++; skipspace(x);                                      // point to the identifier
@@ -2802,7 +2780,6 @@ void MIPS16 HAL_PORT_MMBASIC_HOT_FUNC(*findvar)(unsigned char *p, int action) {
             }
         }
     }
-#endif
     // set a default string size
     size = MAXSTRLEN;
 

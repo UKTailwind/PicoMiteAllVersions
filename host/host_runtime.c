@@ -990,6 +990,15 @@ int port_try_find_label_hash(unsigned char *labelptr, unsigned char **out_ptr) {
     return 0;
 }
 
+/* MMBasic.c findvar / sub-fun collision check — rp2350 probes the
+ * funtbl[] hash directly. Host has no hash; return 0 so findvar runs
+ * its linear subfun[] scan fallback. */
+int port_try_check_var_subfun_collision(const unsigned char *name, int namelen) {
+    (void)name;
+    (void)namelen;
+    return 0;
+}
+
 /* bc_bridge.c subfun-hash hooks — rp2350 maintains a funtbl[] hash
  * alongside subfun[] for O(1) FindSubFun lookups; rp2040 + host use
  * the linear scan, so the hooks are no-ops. Real impl lives in
