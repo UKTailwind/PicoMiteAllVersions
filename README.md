@@ -6,7 +6,7 @@ Compile with GCC 13.3.1 arm-none-eabi<br>
 <b style="color:red;"> Build with sdk V2.2.0 but replace gpio.c with the one included here. Note the change in gpio.c is just to set the gpio interrupt to be in ram<br>
 </b><b>Replace the RaspBerry Pi supplied version of TinyUSB with V0.20.0 https://github.com/hathach/tinyusb/releases</br>
 
-Change CMakeLists.txt line 4 to determine which variant to build<br>
+Change CMakeLists.txt line 23 to determine which variant to build<br>
 <br>
 RP2040<br>
 set(COMPILE PICO)<br>
