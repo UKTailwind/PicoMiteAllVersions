@@ -314,6 +314,14 @@ Now the device HAL contract is locked, observed across 12 targets.
 
 **Exit gate:** no `host/` directory. `./run_tests.sh` (now under `tests/`) 192/192. WASM smoke harnesses green. All device targets still build clean (this phase touched no device source).
 
+### Phase 12 status (2026-04-23)
+
+✅ **Source-code retirement CLOSED (steps 1–13).** Every `host/*.c` + `host/*.h` moved to `ports/host_native/` or `ports/host_wasm/`; SDK-shim trees (`host/pico/`, `host/hardware/`) moved under `ports/host_native/`; `host/vendor/mongoose.{c,h}` moved under `ports/host_native/vendor/`. `ports/host_native/Makefile` + `ports/host_wasm/Makefile` are now the canonical builds (objects land in their own build trees). `host/Makefile` + `host/Makefile.wasm` demoted to 3-target `$(MAKE) -f` delegators. Binaries + WASM artefacts still land at legacy `host/` paths so every existing workflow (`run_tests.sh`, `buildall.sh`, docs URLs, `serve.py`) keeps working. Host 239/239 + 12/12 device variants green.
+
+✅ **Header subsumption into `hal/`: not needed.** Audit of the five port-internal headers showed every caller is inside `ports/host_native/` or `ports/host_wasm/` — no device / no shared-core file includes them. They're legitimate port-private headers, not device-divergent shortcuts. No action taken.
+
+⏳ **`host/` full retirement deferred.** Remaining content is user-facing tooling: `build.sh` / `build_wasm.sh` (delegated), `run_tests.sh` + sibling `run_*.sh` harnesses, `tests/` data, `demos/`, `web/` bundle, `README.md`. Moving them touches CI + ~20 doc files. Planned as Phase 12.6 separately so Phase 12.5 litmus test can proceed unblocked.
+
 ## Phase 12.5 — `mmbasic_stdio` pure-stdio executable (HAL litmus test)
 
 - Land `ports/mmbasic_stdio/` with the layout from `architecture.md`.
