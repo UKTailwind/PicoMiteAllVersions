@@ -37,7 +37,7 @@ CFLAGS = -O2 -std=gnu11 -funsigned-char \
          -Wno-missing-braces \
          -DPICOMITE -DMMBASIC_HOST -DMMBASIC_WASM $(SIM_FLAGS) \
          -include host_platform.h \
-         -I. -I.. \
+         -I. -I.. -I../ports/host_native -I../ports/host_wasm \
          -MMD -MP \
          -pthread
 # `-pthread` here makes the wasm module's linear memory a
@@ -62,7 +62,7 @@ LDFLAGS = -pthread -sPTHREAD_POOL_SIZE=1 \
           --preload-file demos@/bundle \
           -Wl,--allow-multiple-definition
 
-VPATH = ..:../core/state
+VPATH = ..:../core/state:../ports/host_native:../ports/host_wasm
 
 # Core MMBasic sources — mirror host/Makefile's CORE_SRCS exactly.
 CORE_SRCS = MMBasic.c Commands.c Functions.c Operators.c MATHS.c \
