@@ -171,10 +171,10 @@ sim_obj/host_fb.o: host_fb.c host_fb.h
 	@mkdir -p $(dir $@)
 	$(CC) $(SIM_CFLAGS) -c -o $@ $<
 
-host_keys.o: host_keys.c host_keys.h
+host_keys.o: ../ports/host_native/host_keys.c ../ports/host_native/host_keys.h
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-sim_obj/host_keys.o: host_keys.c host_keys.h
+sim_obj/host_keys.o: ../ports/host_native/host_keys.c ../ports/host_native/host_keys.h
 	@mkdir -p $(dir $@)
 	$(CC) $(SIM_CFLAGS) -c -o $@ $<
 
