@@ -888,54 +888,18 @@ int   MIPS16 PrepareProgramExt(unsigned char *p, int i, unsigned char **CFunPtr,
 // searches the subfun[] table to locate a defined sub or fun
 // returns with the index of the sub/function in the table or -1 if not found
 // if type = 0 then look for a sub otherwise a function
-#ifdef rp2350
+//
+// rp2350 maintains a funtbl[] hash alongside subfun[]; FindSubFun first
+// asks the port hook to try the hash. Rp2040 and host have no hash
+// table, so the hook returns false and we fall through to the linear
+// subfun[] scan.
+extern int port_try_find_subfun_hash(unsigned char *p, int *out_index);
 int __not_in_flash_func(FindSubFun)(unsigned char *p, int type) {
-    unsigned char *s;
-    unsigned char name[MAXVARLEN + 1];
-    int j, u, namelen;
-    unsigned int hash=FNV_offset_basis;
-	unsigned char *tp, *ip;
+    int idx;
+    if (port_try_find_subfun_hash(p, &idx)) return idx;
 
-// copy the variable name into name
-    s = name; namelen = 0;
-	do {
-        u=mytoupper(*p);
-		hash ^= u;
-//        PIntComma(u);
-		hash*=FNV_prime;
-		*s++ = u;
-        p++;
-		if(++namelen > MAXVARLEN) error("Variable name too long");
-	} while(isnamechar(*p));
-//    PRet();
-	*s=0;
-	hash %= MAXSUBHASH; //scale 0-512
-//	MMPrintString("Searching for function: ");MMPrintString((char *)name);PIntComma(hash);PRet();
-	while(funtbl[hash].name[0]!=0){
-		ip=name;
-		tp=(unsigned char *)funtbl[hash].name;
-//		MMPrintString("Testing : ");MMPrintString((char *)tp);PRet();
-		if(*ip++ == *tp++) {                 // preliminary quick check
-			j = namelen-1;
-			while(j > 0 && *ip == *tp) {                              // compare each letter
-				j--; ip++; tp++;
-			}
-			if(j == 0  && (*(char *)tp == 0 || namelen == MAXVARLEN) && funtbl[hash].index<MAXSUBFUN) {       // found a matching name
-//				MMPrintString("Found : ");MMPrintString((char *)name);MMPrintString(", hash key : ");PInt(hash);PRet();
-					return funtbl[hash].index;
-					break;
-			}
-		}
-		hash++;
-		if(hash==MAXSUBFUN)hash=0;
-	}
-    return -1;
-}
-#else
-int __not_in_flash_func(FindSubFun)(unsigned char *p, int type) {
     unsigned char *p1, *p2;
     int i;
-
     for(i = 0;  i < MAXSUBFUN && subfun[i] != NULL; i++) {
         p2 = subfun[i];                                             // point to the command token
         CommandToken tkn=commandtbl_decode(p2);
@@ -952,7 +916,6 @@ int __not_in_flash_func(FindSubFun)(unsigned char *p, int type) {
     }
     return -1;
 }
-#endif
 
 // This function is responsible for executing a defined subroutine or function.
 // As these two are similar they are processed in the one lump of code.

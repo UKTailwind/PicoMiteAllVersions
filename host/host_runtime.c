@@ -969,6 +969,14 @@ void port_select_error_prompt_font(void) {}
  * panel to reset. Real impl in ports/pico_sdk_common/clear_runtime_port.c. */
 void port_clear_runtime_display_reset(void) {}
 
+/* MMBasic.c FindSubFun hash-lookup hook — host has no funtbl hash
+ * (rp2350-only). Return 0 to fall through to the linear scan. */
+int port_try_find_subfun_hash(unsigned char *p, int *out_index) {
+    (void)p;
+    (void)out_index;
+    return 0;
+}
+
 /* bc_bridge.c subfun-hash hooks — rp2350 maintains a funtbl[] hash
  * alongside subfun[] for O(1) FindSubFun lookups; rp2040 + host use
  * the linear scan, so the hooks are no-ops. Real impl lives in
