@@ -26,6 +26,7 @@ extern jmp_buf mark;
 /* flash_range_erase lives in hal_flash_host.c (also hal_flash HAL
  * surface) but has no public header.  Declare here. */
 extern void flash_range_erase(uint32_t off, uint32_t count);
+extern void host_runtime_begin(void);
 
 /* Read an entire file (or stdin if path is "-" or NULL) into a newly
  * malloc'd, NUL-terminated buffer.  Caller frees. */
@@ -93,10 +94,23 @@ int main(int argc, char **argv) {
     char *source = read_all(path);
     if (!source) return 2;
 
+    /* Allocate backing storage for flash_progmemory (mirrors device
+     * flash layout).  First half zeroed (program); second half 0xFF
+     * (erased flash) so PrepareProgramExt finds the CFunction
+     * terminator.  Mirrors host_main.c:701-703. */
+    extern unsigned char flash_prog_buf[];
+    extern const uint8_t *flash_progmemory;
+    memset(flash_prog_buf, 0, MAX_PROG_SIZE);
+    memset(flash_prog_buf + MAX_PROG_SIZE, 0xFF, MAX_PROG_SIZE);
+    flash_progmemory = flash_prog_buf;
+
     /* Minimal runtime bring-up mirroring host_main.c's run_interpreter. */
+    LoadOptions();
+    InitBasic();        /* seeds ProgMemory via m_alloc(M_LIMITED) */
     InitHeap(true);
     MMerrno = 0;
     MMErrMsg[0] = '\0';
+    host_runtime_begin();
 
     if (load_source(source) != 0) {
         fprintf(stderr, "mmbasic_stdio: failed to tokenise input\n");
@@ -104,6 +118,12 @@ int main(int argc, char **argv) {
         return 1;
     }
 
+    extern void vm_host_fat_reset(void);
+    extern void vm_sys_file_reset(void);
+    extern void vm_sys_pin_reset(void);
+    vm_host_fat_reset();
+    vm_sys_file_reset();
+    vm_sys_pin_reset();
     ClearRuntime(true);
     PrepareProgram(1);
 

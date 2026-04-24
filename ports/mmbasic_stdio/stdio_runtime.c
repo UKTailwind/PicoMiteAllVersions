@@ -32,11 +32,14 @@ static void stdio_nope(const char *op) {
 
 /* ------------------------------------------------------------- */
 /*  Output hook — PRINT lands here via host_runtime.c's           */
-/*  MMputchar -> host_output_hook(ch).                            */
+/*  MMputchar -> host_output_hook(text, len).  Function-pointer   */
+/*  variable, not a function — host_runtime.c declares it as      */
+/*  `extern void (*host_output_hook)(const char *, int);`.        */
 /* ------------------------------------------------------------- */
-void host_output_hook(char c) {
-    fputc((unsigned char)c, stdout);
+static void stdio_output(const char *text, int len) {
+    fwrite(text, 1, (size_t)len, stdout);
 }
+void (*host_output_hook)(const char *text, int len) = stdio_output;
 
 /* ------------------------------------------------------------- */
 /*  Terminal stubs — stdin / no-tty.                              */
@@ -115,11 +118,13 @@ int  editactive = 0;
 unsigned char *StartEditPoint = NULL;
 int  StartEditChar  = 0;
 
-/* flash_prog_buf is a shared RAM buffer that Editor / cmd_save use
- * when SaveProgramToFlash assembles tokenised output. mmbasic_stdio
- * doesn't save programs, but the symbol is pulled in by the linker
- * because host_fs_shims.c references it. Zero-size placeholder. */
-unsigned char flash_prog_buf[1];
+/* flash_prog_buf backs flash_progmemory on host ports — the
+ * buffer MMBasic tokenises into.  First half is program area,
+ * second half mimics erased flash (0xFF) so PrepareProgramExt
+ * can find the CFunction terminator.  host_main.c does this in
+ * its argv parser; mmbasic_stdio has no argv parser, so main.c
+ * initialises it directly before InitBasic(). */
+unsigned char flash_prog_buf[MAX_PROG_SIZE * 2];
 
 /* load_basic_source is main.c's static helper, but host_fs_shims.c
  * references the symbol at link time for --sd-root loads.  Forward
