@@ -332,6 +332,12 @@ Now the device HAL contract is locked, observed across 12 targets.
 
 **Exit gate:** `mmbasic_stdio` builds. Stdio test corpus passes. Link line audit shows no display/REPL/editor files pulled in. The binary is small (target: under 500 KB stripped on x86_64 macOS, since it carries no graphics or filesystem-sim code).
 
+### Phase 12.5 status (2026-04-23)
+
+✅ **Functional.** `ports/mmbasic_stdio/` builds; `./mmbasic_stdio` runs BASIC programs via stdin/stdout. Test vectors (`PRINT`, FOR/NEXT, arithmetic) all execute correctly. Link-line audit clean: `build/` contains zero objects for `Editor.c`, `MMBasic_REPL.c`, `MMBasic_Prompt.c`, `host_fb.c`, `host_terminal.c`, `host_main.c`, or `host_fastgfx.c` — the MMBasic core is genuinely hardware-clean.
+
+⏳ **Exit-gate polish pending.** Stdio test corpus harness not written; binary is 1.2 MB stripped at `-O0` (target <500 KB requires `-O2` + `--gc-sections` or gating unused CORE_SRCS). Functional win booked; polish lands with Phase 13.
+
 ## Phase 13 — Lock the contract
 
 - Wire `tools/check_hal_purity.sh`, `tools/check_ram_baseline.sh`, and the perf microbench into `./run_tests.sh` and into `buildall.sh` so every commit is gated.

@@ -103,6 +103,70 @@ driver-file split.
   pattern via `ports/pico_sdk_common/misc_option_setters.c` to absorb
   seven OPTION setters behind one hook.
 
+## Phase 12 + 12.5 findings (2026-04-23)
+
+Two bugs escaped into user-facing binaries during this session and both point
+at the same systemic gap: the WASM build isn't gated by `buildall.sh`.
+
+### Finding 1 — WASM Makefile drift
+
+Three real-hal phases relocated core/driver code and each correctly updated
+`ports/host_native/Makefile` — but not `ports/host_wasm/Makefile`.  The drift
+accumulated silently:
+
+- Phase 10: `LayerBuf` / `FrameBuf` relocated from `Memory.c` to
+  `drivers/vga_pio/vga_ops_stub.c`.  WASM Makefile didn't link
+  `vga_ops_stub.c` → undefined symbols at link time.
+- Phase 11 step 6: `vm_sys_graphics.c` split via `hal_vm_framebuffer.h`.
+  WASM Makefile didn't link `hal_vm_framebuffer_host.c`.
+- Phase 11 steps 9-10: `vm_sys_pin.c` / `vm_sys_file.c` split into device
+  body + host body (`_host.c`).  WASM Makefile still listed the device
+  body — references `gpio_set_dir`, `GPIO_FUNC_PWM`, etc. → compile
+  errors under emcc.
+
+Any one alone stops `make` producing `picomite.wasm`.  Because the user kept
+running a pre-real-hal cached binary from their browser, the drift went
+unnoticed for the entire real-hal branch.  Fixed in `bde0751`.
+
+**Action (folded into Phase 13):** `buildall.sh` must run
+`cd ports/host_native && make clean && make` **and**
+`cd ports/host_wasm && make clean && make` after the 12 device variants.
+
+### Finding 2 — Chrome rAF main-thread staleness
+
+The page's rAF loop read the framebuffer generation counter from
+SharedArrayBuffer via a plain indexed load:
+
+```js
+const gen = memoryU32[fbGenerationIdx];
+```
+
+V8 is free to hoist that out of the loop — alias analysis proves no JS
+write to the slot (all writes come from the wasm worker thread).  Once
+hoisted, the main thread reads frame 1's generation forever, never calls
+`blitFrame` again, and the canvas freezes on frame 1 even as the worker
+keeps updating the back buffer.  Firefox's SpiderMonkey was conservative
+enough to reread each iteration, which is why the bug was Chrome-only.
+Fix (`8751747`): swap to `Atomics.load(memoryU32, fbGenerationIdx)`.
+
+**Generalisation:** any non-`Atomics` read of `memoryU32` / `memoryBytes`
+on the main thread is a bug-in-waiting.  A grep-level lint or eslint rule
+enforcing `Atomics.{load,store}` for these views is a cheap guard and
+should land alongside the Phase 13 CI gates.
+
+### Prevention items for Phase 13
+
+1. `buildall.sh` runs native + WASM builds + purity check.
+2. A Playwright smoke suite (`host/web/smoke_*.mjs`) runs on **both**
+   Chromium and Firefox — Chrome-only regressions should fail CI the
+   moment they're introduced, not months later from user reports.
+3. `host/web/smoke_tilemap.mjs` (added this session) covers
+   TILEMAP SPRITE + FASTGFX + rAF in one run; treat it as the canary
+   for any canvas/shared-memory regression.
+4. Stamp the `.wasm` URL with its SHA so stale-browser-cache debugging
+   stops consuming sessions.  The day lost to "is this the fresh build?"
+   was the worst part of both bugs.
+
 ## Per-phase commit-count targets (from the original course correction, unchanged by the fixup)
 
 - Fixup F2/F3/F4 (redone Phase 3/4/5 ifdef elimination): **2–3 commits each.** Actual work of moving bodies into HAL impls, not just renaming gates.
