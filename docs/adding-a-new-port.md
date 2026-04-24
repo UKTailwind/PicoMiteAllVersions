@@ -260,14 +260,7 @@ The `mmbasic_stdio` port is the strictest test of core HAL cleanliness: its link
 
 If your board needs a peripheral not already under `drivers/*/`, add it there — **not in your port directory**. Drivers are shared across ports; port directories are per-board recipes, not per-board code.
 
-Rules for new drivers:
-
-- One peripheral per driver.
-- Driver depends on at most one MCU shim (`ports/pico_sdk_common/`).
-- Driver may contain local target-macro `#ifdef` gates (e.g. rp2040-vs-rp2350 register differences).
-- No cross-driver coupling.
-- `HAL_PORT_RAM_FUNC` / `__not_in_flash_func` annotations honoured for hot paths.
-- Ships with a `tests/` subdir if the peripheral admits an off-board conformance test.
+Short version of the rules: one peripheral per driver, no cross-driver includes, at most one MCU shim, local target-macro `#ifdef` gates are fine inside driver files, RAM-resident annotations honoured, ship conformance tests under `drivers/<name>/tests/` if feasible. Full detail in `drivers/CONTRIBUTING.md`.
 
 # Ground rules
 
@@ -285,3 +278,4 @@ If you find yourself wanting an `#ifdef YOUR_FLAG` in a core or HAL file, one of
 - `docs/real-hal/architecture.md` — directory layout + composition example.
 - `docs/real-hal/port-config.md` — how port-config macros work.
 - `docs/real-hal/contracts.md` — HAL contract sketches per surface.
+- `drivers/CONTRIBUTING.md` — rules for writing a new driver.
