@@ -21,12 +21,13 @@ Three files under `ports/<your_board>/` plus a selection in the top-level CMake 
 
 ```
 ports/<your_board>/
-    port_config.h      — 20-odd #define constants (plain #defines, no #ifdef)
-    pin_tables.c       — PINMAP[] + codemap(pin)
-    port_defaults.c    — port_set_default_options() for factory reset
+    port_config.h        — port-scoped #define constants (plain #defines, no #ifdef)
+    port_sources.cmake   — source list + per-port build config (compile flags, libs)
+    pin_tables.c         — PINMAP[] + codemap(pin)
+    port_defaults.c      — port_set_default_options() for factory reset
 ```
 
-That's it. Copy the closest existing port (usually `ports/pico/` for RP2040 variants or `ports/pico_rp2350/` for RP2350), then change the values.
+Four files. Copy the closest existing port (usually `ports/pico/` for RP2040 variants or `ports/pico_rp2350/` for RP2350), then change the values.
 
 ## Step A1 — port_config.h
 
@@ -37,8 +38,10 @@ Start from `ports/pico/port_config.h` (the simplest). Key knobs, grouped:
 - **Chip identity:** `HAL_PORT_PWM_SLICE_COUNT`, `HAL_PORT_GPIO_COUNT`, `HAL_PORT_PIO_COUNT`, `HAL_PORT_HAS_PIO2`, `HAL_PORT_HAS_FAST_TIMER`, `HAL_PORT_HAS_INT5`.
 - **Chip features present:** `HAL_PORT_HAS_PSRAM`, `HAL_PORT_HAS_UPNG`, `HAL_PORT_HAS_DEFINES`, `HAL_PORT_HAS_MP3`.
 - **Board features:** `HAL_PORT_HAS_HEARTBEAT`, `HAL_PORT_HAS_SSD1963`, `HAL_PORT_HAS_HDMI`, `HAL_PORT_HAS_NEXTGEN_DISPLAY`, `HAL_PORT_IS_VGA`.
+- **Decascade palette flags:** `HAL_PORT_HAS_WIFI`, `HAL_PORT_HAS_VGA_PIO`, `HAL_PORT_HAS_GUICONTROLS`. Drive WiFi-stack inclusion, VGA-PIO scanout family, and the GUI widget command set (Touch.c + Option.MaxCtrls). Pick 0 / 1 per your board's hardware and feature set.
 - **Numeric caps:** `HAL_PORT_ADC_CHANNEL_MAX`, `HAL_PORT_FILES_MAX`, `HAL_PORT_AUDIO_FLAC_MAX_BASE_HZ`, `HAL_PORT_AUDIO_MOD_BUFFER_SIZE`.
-- **Memory layout:** `HAL_PORT_FRAMEBUFFER_TRAILER_BYTES`, `HAL_PORT_ALLMEMORY_ALIGN`.
+- **Memory + clock + MMBasic-table:** `HAL_PORT_HEAP_MEMORY_SIZE`, `HAL_PORT_MAX_CPU`, `HAL_PORT_MIN_CPU`, `HAL_PORT_MAX_VARS`, `HAL_PORT_MAX_SUBFUN`, `HAL_PORT_MAX_MODES` (VGA-family ports only), `HAL_PORT_FLASH_TARGET_OFFSET[_USB]`, `HAL_PORT_MAGIC_KEY[_USB]`, `HAL_PORT_HEAP_TOP[_USB]`, `HAL_PORT_CONSOLE_RX_BUF_SIZE` (non-WiFi ports), `HAL_PORT_PIOMAX`, `HAL_PORT_NBR_PINS`, `HAL_PORT_PSRAM_BASE` + `HAL_PORT_PSRAM_BLOCK_SIZE` (rp2350 non-WEB ports). The `_USB` siblings let configuration.h pick the USB-keyboard variant via a single USBKEYBOARD ifdef.
+- **Memory layout:** `HAL_PORT_FRAMEBUFFER_TRAILER_BYTES`, `HAL_PORT_ALLMEMORY_ALIGN`, `HAL_PORT_CORE1_STACK_WORDS` (size of the shared core1 stack — 512 for ports running the SPI-LCD merge pipeline, 128 for VGA/HDMI scanout, 1 for WEB ports that never launch core1).
 - **Flash-vs-RAM placement macros:** `HAL_PORT_RAM_FUNC`, `HAL_PORT_MMBASIC_HOT_FUNC`, `HAL_PORT_MMBASIC_SUBFUN_FUNC`. Expand to `__not_in_flash_func(name)` where RAM is available; plain `name` on RAM-constrained variants (rp2040 WEB, rp2040 VGA).
 - **Per-board references:** `HAL_PORT_LCD_SPI_CLK_PIN` (which `Option.*` field carries the LCD SPI clock pin), `HAL_PORT_CONSOLE_FONT_MEDIUM` (symbol name for the medium console font).
 - **Port hooks:** `HAL_PORT_RANDOMIZE_DEFAULT_SEED()`, `HAL_PORT_BC_CRASH_INFO_ATTR`.
@@ -98,16 +101,63 @@ Called by `FileIO.c::ResetOptions()` after shared defaults. Set any `Option.*` f
 
 Port impl files may contain target-macro `#ifdef` blocks — that's where conditional bodies belong. The purity gate only enforces `core/` and `hal/`.
 
-## Step A4 — wire into CMake
+## Step A4 — port_sources.cmake
 
-Top-level `CMakeLists.txt` (RP2040) or `CMakeLists 2350.txt` (RP2350) has big `if (COMPILE STREQUAL "<NAME>")` blocks. Add your target name to:
+Each port directory ships a `port_sources.cmake` snippet that owns the
+source list AND the per-port build config (compile flags, link
+libraries, SDK feature toggles). Top-level `CMakeLists.txt` includes
+exactly one snippet per build via a small `COMPILE → PORT_DIR` map. You
+do **not** edit a central driver-selection ladder anymore — there isn't
+one.
 
-1. The include-path block (so `ports/<your_board>/port_config.h` is found).
-2. The `add_executable` source list (add `ports/<your_board>/pin_tables.c` and `ports/<your_board>/port_defaults.c`).
-3. The driver-selection blocks — add your target name to each `if (COMPILE STREQUAL ...)` that gates a driver you need (spi_lcd, vga_pio, hdmi, pwm_synth, sd_spi, etc.). See the existing branches for the pattern.
-4. Any preprocessor-define blocks (`add_compile_definitions`) that set target macros your drivers expect (`PICOMITE`, `PICOMITEVGA`, `USBKEYBOARD`, etc.).
+Copy the closest existing snippet (`ports/pico/port_sources.cmake` for
+RP2040 SPI-LCD, `ports/hdmi_rp2350/port_sources.cmake` for an
+HDMI-family board, `ports/web_rp2350/port_sources.cmake` for a
+WiFi-family board) and adjust two sections:
 
-Finally add your target name to `buildall.sh` under `TARGETS=(...)`.
+1. **Source list** — `target_sources(PicoMite PRIVATE …)` lists every
+   driver and stub your port links. Driver flavours come in pairs
+   (real impl vs no-op stub); pick one per axis. Existing axes:
+   `display_merge_pico` vs `display_merge_stub`, `vm_framebuffer_picomite`
+   vs `vm_framebuffer_stub`, `audio_mp3_real` vs `audio_mp3_stub`,
+   `psram_heap_pico` vs `psram_heap_stub`, `upng_sprite` vs
+   `upng_sprite_stub`, `gui_touch` vs `gui_touch_stub`, `spi_lcd_fastgfx`
+   vs `spi_lcd_fastgfx_stub`. Add `MMweb_stubs.c` if your port doesn't
+   link the WiFi stack, `gfx_3d.c` if it does link the 3D family
+   (everyone except WiFi), `SSD1963.c` + `Touch.c` if you have an
+   SPI-LCD touch panel, the `drivers/vga_pio/*` family if your port has
+   `HAL_PORT_HAS_VGA_PIO=1`, the `drivers/hdmi/*` files if HDMI=1, etc.
+
+2. **Per-port build config** — at the bottom of the snippet, add the
+   `target_compile_options`, `target_link_libraries`, and SDK feature
+   toggles your board needs:
+     - `-DPICOMITE` / `-DPICOMITEVGA` (still consulted by core for the
+       PicoMite-vs-VGA-vs-WEB dialect axis until that decascade lands)
+     - `-DPICO_HEAP_SIZE=…` and `-DPICO_CORE0_STACK_SIZE=…`
+     - `-Drp2350` (rp2350 ports only)
+     - `-DHAL_PORT_DEVICE_NAME="…"`
+     - USB-keyboard axis: `-DUSBKEYBOARD` + `tinyusb_host` /
+       `tinyusb_board` linkage + `Pico_enable_stdio_usb(PicoMite 0)`,
+       OR `Pico_enable_stdio_usb(PicoMite 1)` for non-USB
+     - `target_link_libraries(PicoMite pico_multicore)` (most ports
+       except WEBRP2350)
+     - `target_link_libraries(PicoMite pico_cyw43_arch_lwip_poll)`
+       (WiFi ports)
+     - `pico_set_float_implementation(PicoMite pico_dcp)` (rp2350)
+     - `pico_define_boot_stage2(slower_boot2 …)` (rp2040)
+
+Then add your port's name to the COMPILE → PORT_DIR map at the top of
+CMakeLists.txt:
+
+```cmake
+elseif (COMPILE STREQUAL "<YOURPORT>")
+    set(PORT_DIR <your_board>)
+```
+
+That's the only edit to the top-level file.
+
+Finally add your target name to `buildall.sh` under `TARGETS=(...)` so
+the local + CI buildall gate exercises it.
 
 ## Step A5 — acceptance
 
