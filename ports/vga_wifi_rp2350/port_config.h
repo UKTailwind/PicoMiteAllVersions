@@ -1,0 +1,97 @@
+/*
+ * ports/vga_wifi_rp2350/port_config.h — F-stage validation port:
+ * VGA-PIO scanout + WiFi (CYW43 polled) on RP2350.
+ *
+ * This is a Stage-F validation port — exists to prove the decascade
+ * lets HAS_WIFI=1 + HAS_VGA_PIO=1 coexist cleanly. Real hardware is the
+ * pico2_w board with the QVGA scanout PIO running on core1 alongside
+ * the CYW43 polled stack on core0. CYW43 owns the QSPI pins so PSRAM
+ * is unavailable; ADC channel 3 (GP29) is reserved for the radio.
+ */
+#ifndef PORT_CONFIG_H
+#define PORT_CONFIG_H
+
+#define HAL_PORT_CONFIG_INCLUDED 1
+
+/* Chip-level: RP2350 (pico2_w is RP2350A — 30 GPIO). */
+#define HAL_PORT_PWM_SLICE_COUNT         12
+#define HAL_PORT_GPIO_COUNT              48
+#define HAL_PORT_PIO_COUNT               3
+#define HAL_PORT_HAS_PIO2                1
+#define HAL_PORT_HAS_FAST_TIMER          1
+#define HAL_PORT_HAS_INT5                1
+#define HAL_PORT_PULLDOWN_NEEDS_RESET    1
+
+/* CYW43 owns the QSPI pins — no PSRAM heap. */
+#define HAL_PORT_HAS_PSRAM               0
+#define HAL_PORT_HAS_UPNG                1
+#define HAL_PORT_HAS_DEFINES             1
+/* Radio claims the onboard LED. */
+#define HAL_PORT_HAS_HEARTBEAT           0
+/* GP29 reserved for CYW43 — only ADC0..2 user-accessible. */
+#define HAL_PORT_ADC_CHANNEL_MAX         3
+#define HAL_PORT_HAS_SSD1963             0
+
+#define HAL_PORT_FILES_MAX               1000
+
+/* VGA family (PICOMITEVGA defined). */
+#define HAL_PORT_IS_VGA                  1
+#define HAL_PORT_HAS_HDMI                0
+
+/* Stage-A palette flags — F2 combines WiFi + VGA-PIO. No GUICONTROLS
+ * (matches WEB on rp2040 — a tighter heap budget than WEBRP2350). */
+#define HAL_PORT_HAS_WIFI                1
+#define HAL_PORT_HAS_VGA_PIO             1
+#define HAL_PORT_HAS_GUICONTROLS         0
+#define HAL_PORT_HAS_NEXTGEN_DISPLAY     0
+
+/* core1stack[] in words. QVGA scanout core1 (vga_qvga_modes::QVgaCore)
+ * needs 128 words; CYW43 polled stack runs on core0, no extra core1
+ * consumer. */
+#define HAL_PORT_CORE1_STACK_WORDS       128
+
+/* Memory + clock + MMBasic-table values. Heap budget midway between
+ * vga_rp2350 (184 KB, no WiFi) and web_rp2350 (208 KB, no scanout) —
+ * scanout framebuffer eats ~150 KB of trailer, WiFi stack eats ~30 KB. */
+#define HAL_PORT_HEAP_MEMORY_SIZE        (160 * 1024)
+#define HAL_PORT_MAX_CPU                 378000
+#define HAL_PORT_MIN_CPU                 252000
+#define HAL_PORT_MAX_VARS                768
+#define HAL_PORT_MAX_SUBFUN              512
+#define HAL_PORT_MAX_MODES               3
+#define HAL_PORT_FLASH_TARGET_OFFSET     (1080 * 1024)
+#define HAL_PORT_FLASH_TARGET_OFFSET_USB (1080 * 1024)
+#define HAL_PORT_MAGIC_KEY               0x6A12C7E1
+#define HAL_PORT_MAGIC_KEY_USB           0x6A12C7E1
+#define HAL_PORT_HEAP_TOP                0x2007C000
+#define HAL_PORT_HEAP_TOP_USB            0x2007C000
+#define HAL_PORT_PIOMAX                  3
+#define HAL_PORT_NBR_PINS                40
+/* F2 combines VGA-PIO scanout (PIO1+PIO2) with CYW43 SPI (PIO0); all
+ * three PIO instances are claimed. No user PIO instances available. */
+#define HAL_PORT_PIO0_CLAIMED            true
+#define HAL_PORT_PIO1_CLAIMED            true
+#define HAL_PORT_PIO2_CLAIMED            true
+/* No PSRAM — base 0 short-circuits the address-range guard
+ * (PSRAMsize is unconditionally 0 on this port). */
+#define HAL_PORT_PSRAM_BASE              0
+#define HAL_PORT_PSRAM_BLOCK_SIZE        0
+
+#define HAL_PORT_AUDIO_FLAC_MAX_BASE_HZ  48000
+#define HAL_PORT_AUDIO_MOD_BUFFER_SIZE   8192
+#define HAL_PORT_HAS_MP3                 1
+
+#define HAL_PORT_RAM_FUNC(name)          name
+#define HAL_PORT_MMBASIC_HOT_FUNC(name)  __not_in_flash_func(name)
+#define HAL_PORT_MMBASIC_SUBFUN_FUNC(name) __not_in_flash_func(name)
+
+/* QVGA scanout framebuffer trailer (320*240*2 = 153600 bytes). */
+#define HAL_PORT_FRAMEBUFFER_TRAILER_BYTES (320*240*2)
+#define HAL_PORT_ALLMEMORY_ALIGN           256
+
+#define HAL_PORT_LCD_SPI_CLK_PIN         Option.SYSTEM_CLK
+#define HAL_PORT_CONSOLE_FONT_MEDIUM     arial_bold
+#define HAL_PORT_RANDOMIZE_DEFAULT_SEED() ((int64_t)hal_time_us_64())
+#define HAL_PORT_BC_CRASH_INFO_ATTR __attribute__((section(".uninitialized_data.bc_crash_info")))
+
+#endif /* PORT_CONFIG_H */

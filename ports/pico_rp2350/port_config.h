@@ -67,6 +67,10 @@
 #define HAL_PORT_CONSOLE_RX_BUF_SIZE     256
 #define HAL_PORT_PIOMAX                  3
 #define HAL_PORT_NBR_PINS                62
+/* PICOMITE rp2350 claims all three PIO instances. */
+#define HAL_PORT_PIO0_CLAIMED            true
+#define HAL_PORT_PIO1_CLAIMED            true
+#define HAL_PORT_PIO2_CLAIMED            true
 /* QSPI PSRAM region. PSRAMblock = base + size + 0x60000; size is filled
  * in by runtime PSRAM detect. PSRAMbase is the XIP cache region. */
 #define HAL_PORT_PSRAM_BASE              0x11000000

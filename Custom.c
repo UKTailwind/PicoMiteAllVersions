@@ -108,42 +108,16 @@ int dma_tx_pio;
 int dma_tx_sm;
 int dma_rx_pio;
 int dma_rx_sm;
-#ifdef PICOMITE
-#ifdef rp2350
-bool PIO0=true;
-bool PIO1=true;
-bool PIO2=true;
-#else
-bool PIO0=true;
-bool PIO1=true;
-bool PIO2=false;
-#endif
-#endif
-#ifdef PICOMITEVGA
-#ifdef rp2350
-#if HAL_PORT_HAS_HDMI
-bool PIO0=true;
-#else
-bool PIO0=false;
-#endif
-bool PIO1=true;
-bool PIO2=true;
-#else
-bool PIO0=false;
-bool PIO1=true;
-bool PIO2=false;
-#endif
-#endif
+/* PIO0/PIO1/PIO2 — "is this PIO instance claimed by the port?"
+ * Drives which PIO instance user PIO commands can grab. Per-port values
+ * live in port_config.h's HAL_PORT_PIO{0,1,2}_CLAIMED so combined port
+ * shapes (e.g. F2 = VGA + WiFi) can OR-merge their claims without
+ * relying on an `#ifdef PICOMITEVGA` / `#if HAL_PORT_HAS_WIFI` cascade
+ * that produced redefinitions when both flags were set. */
+bool PIO0 = HAL_PORT_PIO0_CLAIMED;
+bool PIO1 = HAL_PORT_PIO1_CLAIMED;
+bool PIO2 = HAL_PORT_PIO2_CLAIMED;
 #if HAL_PORT_HAS_WIFI
-#ifdef rp2350
-bool PIO0=true;
-bool PIO1=false;
-bool PIO2=true;
-#else
-bool PIO0=true;
-bool PIO1=false;
-bool PIO2=false;
-#endif
 extern void setwifi(unsigned char *tp);
 #endif
 /* TCPreceived / TCPreceiveInterrupt are read by MM_Misc.c's

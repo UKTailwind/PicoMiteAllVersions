@@ -11,6 +11,14 @@ TARGETS=(
     PICORP2350 PICOUSBRP2350 VGARP2350 VGAUSBRP2350
     HDMI HDMIUSB WEBRP2350
 )
+# Stage-F validation ports are NOT in the gating matrix — they are
+# work-in-progress test cases that surface residual coupling the
+# decascade plan didn't address (struct option_s VGA-vs-non-VGA layout,
+# SSD1963.c/Touch.c SPI-LCD assumptions, External.c::setBacklight calls
+# spi_write_command). VGAWIFIRP2350 exists as a directory + CMakeLists.txt
+# entry to demonstrate the infrastructure supports composition; it does
+# not link cleanly until the follow-on coupling cleanup lands.
+# When ready to gate, append:  VGAWIFIRP2350
 
 root="$(cd "$(dirname "$0")" && pwd)"
 fail=0

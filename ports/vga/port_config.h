@@ -72,6 +72,10 @@
 #define HAL_PORT_CONSOLE_RX_BUF_SIZE     256
 #define HAL_PORT_PIOMAX                  2
 #define HAL_PORT_NBR_PINS                44
+/* VGA-PIO scanout claims PIO1 on rp2040; PIO0 free for user. */
+#define HAL_PORT_PIO0_CLAIMED            false
+#define HAL_PORT_PIO1_CLAIMED            true
+#define HAL_PORT_PIO2_CLAIMED            false
 
 /* FLAC decoder base sample-rate cap (RP2040 → 44.1 kHz). */
 #define HAL_PORT_AUDIO_FLAC_MAX_BASE_HZ  44100

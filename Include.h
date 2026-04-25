@@ -44,13 +44,13 @@ typedef unsigned char Bool;
 // default LED pin
 #define LED_PIN 25
 
-// nop instruction
-INLINE void nop()
-	{ __asm volatile (" nop\n"); }
-
-// compiler barrier
-INLINE void cb()
-	{ __asm volatile ("" ::: "memory"); }
+// (The original `INLINE void nop()` and `INLINE void cb()` definitions
+//  lived here but were never called. They also collided with SSD1963.h's
+//  `#define nop asm("NOP")` macro on any port that combined HAS_VGA_PIO
+//  with HAS_WIFI — Include.h gets pulled in via `#ifdef PICOMITEVGA` in
+//  PicoMite.c / mmc_stm32.c, and SSD1963.h gets pulled in via
+//  HAS_WIFI=1's branch in Hardware_Includes.h. Removed to unblock the
+//  combined VGA+WiFi port shape.)
 
 // ----------------------------------------------------------------------------
 //                               Constants

@@ -123,5 +123,9 @@
 #define HAL_PORT_CONSOLE_RX_BUF_SIZE     256
 #define HAL_PORT_PIOMAX                  2
 #define HAL_PORT_NBR_PINS                44
+/* Host has no PIO hardware — no claims. */
+#define HAL_PORT_PIO0_CLAIMED            false
+#define HAL_PORT_PIO1_CLAIMED            false
+#define HAL_PORT_PIO2_CLAIMED            false
 
 #endif /* PORT_CONFIG_H */

@@ -102,6 +102,11 @@
 #define HAL_PORT_CONSOLE_RX_BUF_SIZE     256
 #define HAL_PORT_PIOMAX                  2
 #define HAL_PORT_NBR_PINS                44
+/* Per-PIO claim flags — drives Custom.c's PIO0/PIO1/PIO2. PICOMITE
+ * rp2040 claims PIO0+PIO1; PIO2 doesn't exist on rp2040. */
+#define HAL_PORT_PIO0_CLAIMED            true
+#define HAL_PORT_PIO1_CLAIMED            true
+#define HAL_PORT_PIO2_CLAIMED            false
 
 #define HAL_PORT_RAM_FUNC(name)          __not_in_flash_func(name)
 

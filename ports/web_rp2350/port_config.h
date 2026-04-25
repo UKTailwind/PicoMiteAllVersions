@@ -69,6 +69,10 @@
 #define HAL_PORT_HEAP_TOP_USB            0x2006E000
 #define HAL_PORT_PIOMAX                  3
 #define HAL_PORT_NBR_PINS                40
+/* CYW43 SPI runs on PIO0; rp2350 also claims PIO2; PIO1 free. */
+#define HAL_PORT_PIO0_CLAIMED            true
+#define HAL_PORT_PIO1_CLAIMED            false
+#define HAL_PORT_PIO2_CLAIMED            true
 /* WEBRP2350 doesn't link the QSPI PSRAM heap (CYW43 claims those pins),
  * but the address-range guard in core uses PSRAMbase for short-circuit
  * checks. Define base to 0 so the runtime check `ptr > PSRAMbase` is

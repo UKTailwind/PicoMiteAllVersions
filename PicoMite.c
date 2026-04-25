@@ -151,36 +151,23 @@ bool rp2350a=true;
     #include "Include.h"
     #endif
     #ifdef USBKEYBOARD
-        #if HAL_PORT_HAS_HDMI
-            #define MES_SIGNON  "\rPicoMiteHDMI MMBasic USB " CHIP " Edition V"VERSION "\r\n"
-        #else
-            #define MES_SIGNON  "\rPicoMiteVGA MMBasic USB " CHIP " Edition V"VERSION "\r\n"
-        #endif
         extern void hid_app_task(void);
         volatile int keytimer=0;
         extern void USB_bus_reset(void);
         bool USBenabled=false;
-    #else
-        #if HAL_PORT_HAS_HDMI
-            #define MES_SIGNON  "\rPicoMiteHDMI MMBasic " CHIP " Edition V"VERSION "\r\n"
-        #else
-            #define MES_SIGNON  "\rPicoMiteVGA MMBasic " CHIP " Edition V"VERSION "\r\n"
-        #endif
+    #endif
 #endif
 
-#endif
 #if HAL_PORT_HAS_WIFI
-    #define MES_SIGNON  "\rWebMite MMBasic " CHIP " Edition V"VERSION "\r\n"
     volatile int WIFIconnected=0;
     int startupcomplete=0;
     void ProcessWeb(int mode);
     char LCDAttrib=0;
-    #endif
+#endif
 #ifdef PICOMITE
     #ifdef USBKEYBOARD
         #include "tusb.h"
         #include "host/hcd.h"
-        #define MES_SIGNON  "\rPicoMite MMBasic USB " CHIP " Edition V"VERSION "\r\n"
         extern void hid_app_task(void);
         volatile int keytimer=0;
         extern void USB_bus_reset(void);
@@ -188,12 +175,18 @@ bool rp2350a=true;
         #include "pico/multicore.h"
         mutex_t	frameBufferMutex;					// mutex to lock frame buffer
     #else
-        #define MES_SIGNON  "\rPicoMite MMBasic " CHIP " V"VERSION "\r\n"
         #include "pico/multicore.h"
         mutex_t	frameBufferMutex;					// mutex to lock frame buffer
-        #endif
-        char LCDAttrib=0;
+    #endif
+    char LCDAttrib=0;
 #endif
+
+/* Boot banner. HAL_PORT_DEVICE_NAME is set per port via CMake
+ * target_compile_options ("PicoMite" / "PicoMiteVGA" / "PicoMiteHDMI" /
+ * "WebMite" / "PicoMiteUSB" / etc.) so a single template covers every
+ * port shape — including novel WiFi+display combinations that the old
+ * per-target #define cascade couldn't represent without conflicts. */
+#define MES_SIGNON  "\r" HAL_PORT_DEVICE_NAME " MMBasic " CHIP " Edition V" VERSION "\r\n"
 #define KEYCHECKTIME 16
 int ListCnt;
 int MMCharPos;

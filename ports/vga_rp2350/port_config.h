@@ -70,6 +70,10 @@
 #define HAL_PORT_CONSOLE_RX_BUF_SIZE     256
 #define HAL_PORT_PIOMAX                  3
 #define HAL_PORT_NBR_PINS                62
+/* VGA-PIO scanout claims PIO1+PIO2 on rp2350; PIO0 free for user. */
+#define HAL_PORT_PIO0_CLAIMED            false
+#define HAL_PORT_PIO1_CLAIMED            true
+#define HAL_PORT_PIO2_CLAIMED            true
 /* QSPI PSRAM region. */
 #define HAL_PORT_PSRAM_BASE              0x11000000
 #define HAL_PORT_PSRAM_BLOCK_SIZE        0x1C0000
