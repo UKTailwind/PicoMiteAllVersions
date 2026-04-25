@@ -2199,7 +2199,7 @@ if(Option.CPU_Speed==FreqSVGA){ //adjust the size of the heap
 #endif
 #ifdef rp2350
     if(PSRAMsize){MMPrintString("Total of ");PInt(PSRAMsize/(1024*1024));MMPrintString(" Mbytes PSRAM available\r\n");}
-    #if defined(PICOMITEVGA) && !defined(HMDI)
+    #if defined(PICOMITEVGA) && !defined(HDMI)
         start_i2s(QVGA_PIO_NUM,1);
     #else
         start_i2s(2,1);

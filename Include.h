@@ -10,7 +10,8 @@
 #ifndef _INCLUDE_H
 #define _INCLUDE_H
 
-
+#include "port_config.h"   /* Stage B converts the HDMI gate near the
+                              end of this header to HAL_PORT_HAS_HDMI. */
 
 typedef unsigned char Bool;
 #define True 1

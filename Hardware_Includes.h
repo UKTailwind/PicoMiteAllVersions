@@ -26,6 +26,8 @@ LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON A
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
 
 ************************************************************************************************************************/
+#include "port_config.h"   /* HAL_PORT_HAS_* palette must be visible before
+                              AllCommands.h / configuration.h consult it. */
 #include "AllCommands.h"
 #include "Memory.h"
 #include "hardware/watchdog.h"

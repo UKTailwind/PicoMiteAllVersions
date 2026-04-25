@@ -7,6 +7,11 @@
 #ifndef PORT_CONFIG_H
 #define PORT_CONFIG_H
 
+/* Sentinel for hal/hal_port_assert.h: every TU that uses HAL_PORT_HAS_* in
+ * a #if directive can include hal_port_assert.h to turn a missing
+ * port_config.h into a build error instead of a silent eval-to-zero. */
+#define HAL_PORT_CONFIG_INCLUDED 1
+
 /* Chip-level: RP2040. */
 #define HAL_PORT_PWM_SLICE_COUNT         8
 #define HAL_PORT_GPIO_COUNT              30
@@ -37,6 +42,12 @@
 #define HAL_PORT_IS_VGA                  1
 
 #define HAL_PORT_HAS_HDMI                0
+
+/* Stage-A palette flags (decascade plan). VGA-PIO scanout drivers are
+ * shared with HDMI; this port uses them but does not link the HDMI sink. */
+#define HAL_PORT_HAS_WIFI                0
+#define HAL_PORT_HAS_VGA_PIO             1
+#define HAL_PORT_HAS_GUICONTROLS         0
 #define HAL_PORT_HAS_NEXTGEN_DISPLAY    0
 
 /* FLAC decoder base sample-rate cap (RP2040 → 44.1 kHz). */

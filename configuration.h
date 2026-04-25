@@ -31,7 +31,10 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #ifdef __cplusplus
 extern "C" {
 #endif
-#ifdef PICOMITEVGA 
+/* Pull in HAL_PORT_HAS_* before the cascades below — Stage B converts the
+ * PICOMITEWEB / HDMI #ifdefs in this file to HAL_PORT_HAS_* tests. */
+#include "port_config.h"
+#ifdef PICOMITEVGA
     #ifdef rp2350
         #define MAXSUBFUN           512                     // each entry takes up 4 bytes
         #define MAXVARS             768                     // 8 + MAXVARLEN + MAXDIM * 2  (ie, 56 bytes) - these do not incl array members

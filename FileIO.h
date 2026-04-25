@@ -31,6 +31,8 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #ifdef __cplusplus
 extern "C" {
 #endif
+#include "port_config.h"   /* Stage B converts PICOMITEWEB / GUICONTROLS
+                              gates in this file to HAL_PORT_HAS_*. */
 #include "ff.h"
 #include "hal/hal_filesystem.h"
 

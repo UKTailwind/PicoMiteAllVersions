@@ -28,6 +28,8 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 ************************************************************************************************************************/
 
 #include <stdint.h>
+#include "port_config.h"   /* HAL_PORT_HAS_* palette must be visible before
+                              AllCommands.h / Custom.h consult it. */
 #include "Version.h"
 #include "MMBasic.h"
 #include "AllCommands.h"

@@ -15,6 +15,11 @@
 #ifndef PORT_CONFIG_H
 #define PORT_CONFIG_H
 
+/* Sentinel for hal/hal_port_assert.h: every TU that uses HAL_PORT_HAS_* in
+ * a #if directive can include hal_port_assert.h to turn a missing
+ * port_config.h into a build error instead of a silent eval-to-zero. */
+#define HAL_PORT_CONFIG_INCLUDED 1
+
 /* Chip-level: no hardware. Values still need to be in-range for the
  * arrays they bound on device (PinFunction[] etc.) — using the RP2040
  * numbers keeps host arrays the same size as the smallest device target. */
@@ -51,6 +56,12 @@
 
 #define HAL_PORT_HAS_HDMI                0
 #define HAL_PORT_HAS_NEXTGEN_DISPLAY    0
+
+/* Stage-A palette flags (decascade plan). Host has no hardware backends
+ * for any of these — stubs cover every gated path. */
+#define HAL_PORT_HAS_WIFI                0
+#define HAL_PORT_HAS_VGA_PIO             0
+#define HAL_PORT_HAS_GUICONTROLS         0
 
 /* FLAC decoder base sample-rate cap. Host Audio.c body doesn't decode
  * FLAC, but the port-config standard wants the constant defined on

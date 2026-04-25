@@ -26,6 +26,8 @@ LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON A
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
 
 ************************************************************************************************************************/
+#include "port_config.h"   /* expose HAL_PORT_HAS_WIFI for the Stage-B
+                              conversion of the gate below. */
 #ifdef PICOMITEWEB
 #include "pico/cyw43_arch.h"
 #include "lwip/dns.h"

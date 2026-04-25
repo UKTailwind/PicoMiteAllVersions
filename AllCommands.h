@@ -6,6 +6,11 @@
  the C language function associated with commands, functions or operators should be
  declared here
 **********************************************************************************/
+/* Pull in the port-config palette so the HAL_PORT_HAS_* gates inside this
+ * header (and the per-port macros they expand to) resolve no matter how
+ * the file was reached. AllCommands.h is included from both umbrella
+ * headers and from a few stand-alone TUs. */
+#include "port_config.h"
 #if !defined(INCLUDE_COMMAND_TABLE) && !defined(INCLUDE_TOKEN_TABLE)
 // format:
 //      void cmd_???(void)

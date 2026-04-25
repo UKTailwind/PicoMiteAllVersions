@@ -7,6 +7,11 @@
 #ifndef PORT_CONFIG_H
 #define PORT_CONFIG_H
 
+/* Sentinel for hal/hal_port_assert.h: every TU that uses HAL_PORT_HAS_* in
+ * a #if directive can include hal_port_assert.h to turn a missing
+ * port_config.h into a build error instead of a silent eval-to-zero. */
+#define HAL_PORT_CONFIG_INCLUDED 1
+
 /* Chip-level: RP2350 (HDMI is rp2350-only). */
 #define HAL_PORT_PWM_SLICE_COUNT         12
 #define HAL_PORT_GPIO_COUNT              48
@@ -18,6 +23,13 @@
 
 #define HAL_PORT_HAS_PSRAM               1
 #define HAL_PORT_HAS_UPNG                1
+
+/* Stage-A palette flags (decascade plan). HDMI shares the VGA-PIO scanout
+ * scaffolding but adds the HDMI sink + DVI mode tables. No GUICONTROLS
+ * today — touchscreen widgets are PICOMITE/WEBRP2350 only. */
+#define HAL_PORT_HAS_WIFI                0
+#define HAL_PORT_HAS_VGA_PIO             1
+#define HAL_PORT_HAS_GUICONTROLS         0
 #define HAL_PORT_HAS_DEFINES             1
 #define HAL_PORT_HAS_HEARTBEAT           1
 #define HAL_PORT_ADC_CHANNEL_MAX         4
