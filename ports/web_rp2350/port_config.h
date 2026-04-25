@@ -54,6 +54,29 @@
  * word satisfies MMBasic.c's overflow check at core1stack[0]. */
 #define HAL_PORT_CORE1_STACK_WORDS       1
 
+/* Stage-D per-port memory + clock + MMBasic-table values (decascade plan
+ * D1). WEBRP2350 has no USB-keyboard variant. */
+#define HAL_PORT_HEAP_MEMORY_SIZE        (208 * 1024)
+#define HAL_PORT_MAX_CPU                 252000
+#define HAL_PORT_MIN_CPU                 126000
+#define HAL_PORT_MAX_VARS                768
+#define HAL_PORT_MAX_SUBFUN              512
+#define HAL_PORT_FLASH_TARGET_OFFSET     (1080 * 1024)
+#define HAL_PORT_FLASH_TARGET_OFFSET_USB (1080 * 1024)
+#define HAL_PORT_MAGIC_KEY               0x53472B1C
+#define HAL_PORT_MAGIC_KEY_USB           0x53472B1C
+#define HAL_PORT_HEAP_TOP                0x2006E000
+#define HAL_PORT_HEAP_TOP_USB            0x2006E000
+#define HAL_PORT_PIOMAX                  3
+#define HAL_PORT_NBR_PINS                40
+/* WEBRP2350 doesn't link the QSPI PSRAM heap (CYW43 claims those pins),
+ * but the address-range guard in core uses PSRAMbase for short-circuit
+ * checks. Define base to 0 so the runtime check `ptr > PSRAMbase` is
+ * trivially true and the body's `ptr < PSRAMbase + PSRAMsize` (PSRAMsize
+ * always 0 on WEB) makes the whole expression false. */
+#define HAL_PORT_PSRAM_BASE              0
+#define HAL_PORT_PSRAM_BLOCK_SIZE        0
+
 /* FLAC decoder base sample-rate cap (RP2350 → 48 kHz). */
 #define HAL_PORT_AUDIO_FLAC_MAX_BASE_HZ  48000
 #define HAL_PORT_AUDIO_MOD_BUFFER_SIZE   8192

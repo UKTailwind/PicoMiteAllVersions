@@ -106,4 +106,22 @@
  * so use plain BSS. */
 #define HAL_PORT_BC_CRASH_INFO_ATTR
 
+/* Stage-D per-port memory + clock + MMBasic-table values. Host overrides
+ * HEAP_MEMORY_SIZE in configuration.h via MMBASIC_WASM / MMBASIC_ANSI;
+ * these defaults are inherited by mmbasic_test (BC_SIM_RP2040 profile). */
+#define HAL_PORT_HEAP_MEMORY_SIZE        (128 * 1024)
+#define HAL_PORT_MAX_CPU                 420000
+#define HAL_PORT_MIN_CPU                 48000
+#define HAL_PORT_MAX_VARS                512
+#define HAL_PORT_MAX_SUBFUN              256
+#define HAL_PORT_FLASH_TARGET_OFFSET     (1024 * 1024)
+#define HAL_PORT_FLASH_TARGET_OFFSET_USB (1024 * 1024)
+#define HAL_PORT_MAGIC_KEY               0xE0799B93
+#define HAL_PORT_MAGIC_KEY_USB           0xE0799B93
+#define HAL_PORT_HEAP_TOP                0x2003EC00
+#define HAL_PORT_HEAP_TOP_USB            0x2003EC00
+#define HAL_PORT_CONSOLE_RX_BUF_SIZE     256
+#define HAL_PORT_PIOMAX                  2
+#define HAL_PORT_NBR_PINS                44
+
 #endif /* PORT_CONFIG_H */

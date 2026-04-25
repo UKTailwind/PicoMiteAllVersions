@@ -54,6 +54,25 @@
 #define HAL_PORT_CORE1_STACK_WORDS       128
 #define HAL_PORT_HAS_NEXTGEN_DISPLAY    0
 
+/* Stage-D per-port memory + clock + MMBasic-table values (decascade plan
+ * D1). VGA rp2040 differs from VGAUSB rp2040 in FLASH_TARGET_OFFSET (the
+ * USB build's flash image is smaller). */
+#define HAL_PORT_HEAP_MEMORY_SIZE        (99 * 1024)
+#define HAL_PORT_MAX_CPU                 378000
+#define HAL_PORT_MIN_CPU                 252000
+#define HAL_PORT_MAX_VARS                480
+#define HAL_PORT_MAX_SUBFUN              256
+#define HAL_PORT_MAX_MODES               2
+#define HAL_PORT_FLASH_TARGET_OFFSET     (864 * 1024)
+#define HAL_PORT_FLASH_TARGET_OFFSET_USB (848 * 1024)
+#define HAL_PORT_MAGIC_KEY               0xA2349A2F
+#define HAL_PORT_MAGIC_KEY_USB           0x4776A715
+#define HAL_PORT_HEAP_TOP                0x2003F000
+#define HAL_PORT_HEAP_TOP_USB            0x2003F000
+#define HAL_PORT_CONSOLE_RX_BUF_SIZE     256
+#define HAL_PORT_PIOMAX                  2
+#define HAL_PORT_NBR_PINS                44
+
 /* FLAC decoder base sample-rate cap (RP2040 → 44.1 kHz). */
 #define HAL_PORT_AUDIO_FLAC_MAX_BASE_HZ  44100
 #define HAL_PORT_AUDIO_MOD_BUFFER_SIZE   6144

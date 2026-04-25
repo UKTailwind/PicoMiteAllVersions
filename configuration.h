@@ -33,61 +33,53 @@ extern "C" {
 #endif
 /* HAL_PORT_HAS_* palette must be visible before the gates below. */
 #include "port_config.h"
-#ifdef PICOMITEVGA
-    #ifdef rp2350
-        #define MAXSUBFUN           512                     // each entry takes up 4 bytes
-        #define MAXVARS             768                     // 8 + MAXVARLEN + MAXDIM * 2  (ie, 56 bytes) - these do not incl array members
+
+/* Stage-D alias layer (decascade plan). Heap, flash, CPU, MMBasic-table,
+ * console, pin, and PSRAM values come from ports/<port>/port_config.h's
+ * HAL_PORT_* set. Each port's port_config.h is the single source of
+ * truth; configuration.h just renames them to the legacy macro names
+ * core code already references (HEAP_MEMORY_SIZE, MAX_CPU, etc.).
+ *
+ * USB-keyboard variants pick the _USB sibling. Stage F is expected to
+ * split USB ports into their own port directories, after which this
+ * USBKEYBOARD ifdef collapses too. */
 #ifdef USBKEYBOARD
-    #define HEAP_MEMORY_SIZE (184*1024) 
+    #define FLASH_TARGET_OFFSET HAL_PORT_FLASH_TARGET_OFFSET_USB
+    #define MagicKey            HAL_PORT_MAGIC_KEY_USB
+    #define HEAPTOP             HAL_PORT_HEAP_TOP_USB
 #else
-        #define HEAP_MEMORY_SIZE (184*1024) 
+    #define FLASH_TARGET_OFFSET HAL_PORT_FLASH_TARGET_OFFSET
+    #define MagicKey            HAL_PORT_MAGIC_KEY
+    #define HEAPTOP             HAL_PORT_HEAP_TOP
 #endif
-        #define FLASH_TARGET_OFFSET (864 * 1024) 
-        #if HAL_PORT_HAS_HDMI
-            #define MAXMODES 5
-            #ifdef USBKEYBOARD
-                #define MagicKey 0x84223124
-                #define HEAPTOP 0x2007D000
-            #else
-                #define MagicKey 0x9687B2A0
-                #define HEAPTOP 0x2007D000
-            #endif
-            #define MAX_CPU     Freq378P 
-            #define MIN_CPU     FreqX
-        #else
-            #define MAXMODES 3
-            #ifdef USBKEYBOARD
-                #define MagicKey 0x82115904
-                #define HEAPTOP 0x2007C000
-            #else
-                #define MagicKey 0x84005FAF
-                #define HEAPTOP 0x2007C000
-            #endif
-#ifdef rp2350
-            #define MAX_CPU     378000
+
+/* PICOMITE rp2350 PICOCALC trims heap by 4 KB to fit the VM alongside
+ * the full interpreter — handled here so port_config.h stays ifdef-free. */
+#if defined(PICOCALC) && defined(HAL_PORT_HEAP_MEMORY_SIZE_PICOCALC)
+    #define HEAP_MEMORY_SIZE    HAL_PORT_HEAP_MEMORY_SIZE_PICOCALC
 #else
-            #define MAX_CPU     378000
+    #define HEAP_MEMORY_SIZE    HAL_PORT_HEAP_MEMORY_SIZE
 #endif
-            #define MIN_CPU     252000
-        #endif
-    #else
-        #ifdef USBKEYBOARD
-            #define FLASH_TARGET_OFFSET (848* 1024) 
-            #define MagicKey 0x4776A715
-            #define HEAPTOP 0x2003F000
-            #define MAXVARS             480                     // 8 + MAXVARLEN + MAXDIM * 2  (ie, 56 bytes) - these do not incl array members
-    #else
-            #define FLASH_TARGET_OFFSET (864 * 1024) 
-            #define MagicKey 0xA2349A2F
-            #define HEAPTOP 0x2003f000
-            #define MAXVARS             480                     // 8 + MAXVARLEN + MAXDIM * 2  (ie, 56 bytes) - these do not incl array members
-    #endif
-        #define MAXMODES 2
-        #define HEAP_MEMORY_SIZE (99*1024)
-        #define MAX_CPU     378000
-        #define MIN_CPU     252000
-        #define MAXSUBFUN           256                     // each entry takes up 4 bytes
-    #endif
+
+#define MAX_CPU     HAL_PORT_MAX_CPU
+#define MIN_CPU     HAL_PORT_MIN_CPU
+#define MAXVARS     HAL_PORT_MAX_VARS
+#define MAXSUBFUN   HAL_PORT_MAX_SUBFUN
+#ifdef HAL_PORT_MAX_MODES
+    #define MAXMODES    HAL_PORT_MAX_MODES
+#endif
+
+/* WiFi ports include the lwIP options + a TCP control-block ceiling. */
+#if HAL_PORT_HAS_WIFI
+    #include "lwipopts_examples_common.h"
+    #define MaxPcb 8
+#endif
+
+/* VGA-family display constants — mode-size tables and CPU-speed name
+ * aliases. Compiled into VGA + HDMI ports only; gated on
+ * HAL_PORT_IS_VGA which both ports set to 1. Keeps the VGA-specific
+ * vocabulary out of non-VGA TUs. */
+#if HAL_PORT_IS_VGA
     #define MODE_H_S_ACTIVE_PIXELS 640
     #define MODE_V_S_ACTIVE_LINES 480
     #define MODE1SIZE_S   MODE_H_S_ACTIVE_PIXELS     * MODE_V_S_ACTIVE_LINES /8
@@ -150,69 +142,6 @@ extern "C" {
     #define FreqX    250000
     #define FullColour (Option.CPU_Speed ==Freq252P || Option.CPU_Speed==Freq378P || Option.CPU_Speed ==Freq480P || Option.CPU_Speed ==Freq400)
     #define MediumRes (Option.CPU_Speed==FreqSVGA || Option.CPU_Speed==Freq848 || Option.CPU_Speed==FreqY || Option.CPU_Speed==FreqX)
-#endif
-
-#if HAL_PORT_HAS_WIFI
-#ifdef rp2350
-    #define MAXSUBFUN           512                     // each entry takes up 4 bytes
-    #define MAXVARS             768                    // 8 + MAXVARLEN + MAXDIM * 2  (ie, 56 bytes) - these do not incl array members
-    #define HEAP_MEMORY_SIZE (208*1024) 
-    #define HEAPTOP 0x2006E000
-#else
-    #define MAXSUBFUN           256                     // each entry takes up 4 bytes
-    #define MAXVARS             480                    // 8 + MAXVARLEN + MAXDIM * 2  (ie, 56 bytes) - these do not incl array members
-    #define HEAP_MEMORY_SIZE (88*1024) 
-    #define HEAPTOP 0x2003D000
-#endif
-
-    #include "lwipopts_examples_common.h"
-    #define FLASH_TARGET_OFFSET (1080 * 1024) 
-    #define MagicKey 0x53472B1C
-    #define MaxPcb 8
-    #define MAX_CPU     252000
-    #define MIN_CPU     126000
-#endif
-
-#ifdef PICOMITE
-    #define MIN_CPU     48000
-    #ifdef rp2350
-        #ifdef PICOCALC
-        /* Slightly reduced to fit VM code alongside full interpreter in RAM */
-        #define HEAP_MEMORY_SIZE (296*1024)
-        #else
-        #define HEAP_MEMORY_SIZE (300*1024)
-        #endif
-        #define MAXVARS             768
-        #define MAXSUBFUN           512
-        /* The rp2350 PicoCalc/PicoMite image now exceeds 880 KiB.
-         * Keep the persisted options/program area above a 1 MiB boundary
-         * so firmware updates do not overwrite display/config flash. */
-        #define FLASH_TARGET_OFFSET (1024 * 1024) 
-        #define MAX_CPU     396000
-        #ifdef USBKEYBOARD
-            #define MagicKey 0xD27F4F27
-            #define HEAPTOP 0x20078000
-        #else
-            #define MagicKey 0x182084D7
-            #define HEAPTOP 0x20078000
-        #endif
-    #else
-        #define HEAP_MEMORY_SIZE (128*1024)
-        #define MAXVARS             512                     // 8 + MAXVARLEN + MAXDIM * 2  (ie, 56 bytes) - these do not incl array members
-        /* The rp2040 PicoCalc/PicoMite bridge-restoration image exceeds
-         * 940 KiB. Push the persisted options/program area above 1 MiB
-         * so the first write of defaults doesn't erase running code. */
-        #define FLASH_TARGET_OFFSET (1024 * 1024)
-        #define MAX_CPU     420000
-        #define MAXSUBFUN           256                     // each entry takes up 4 bytes
-        #ifdef USBKEYBOARD
-            #define MagicKey 0x6110519E
-            #define HEAPTOP 0x2003F000
-        #else
-            #define MagicKey 0xE0799B93
-            #define HEAPTOP 0x2003EC00
-        #endif
-    #endif
 #endif
 
 /* WASM build: single binary simulates multiple device memory profiles.
@@ -280,10 +209,14 @@ extern uint8_t PSRAMpin;
 #else
 #define MAXDIM              6                       // maximum nbr of dimensions to an array
 #endif
+/* CONSOLE_RX_BUF_SIZE: WiFi ports size the console RX buffer to a single
+ * lwIP TCP segment so character flow into the BASIC parser matches the
+ * network MTU. Non-WiFi ports use a 256-byte ring; HAL_PORT_CONSOLE_RX_BUF_SIZE
+ * is undefined on WiFi ports (the macro is gated below). */
 #if HAL_PORT_HAS_WIFI
 #define CONSOLE_RX_BUF_SIZE TCP_MSS
 #else
-#define CONSOLE_RX_BUF_SIZE 256
+#define CONSOLE_RX_BUF_SIZE HAL_PORT_CONSOLE_RX_BUF_SIZE
 #endif
 #define CONSOLE_TX_BUF_SIZE 256
 #define MAXOPENFILES  10
@@ -305,35 +238,23 @@ extern uint8_t PSRAMpin;
 #define STR_SIG_DIGITS 9                            // number of significant digits to use when converting MMFLOAT to a string
 #define STR_FLOAT_DIGITS 6                            // number of significant digits to use when converting MMFLOAT to a string
 #define NBRSETTICKS         4                       // the number of SETTICK interrupts available
-#if !HAL_PORT_HAS_WIFI
-    #ifdef rp2350
-        #define PIOMAX 3
-        #define NBRPINS             62
-        #define PSRAMbase 0x11000000
-        #define PSRAMblock (PSRAMbase+PSRAMsize+0x60000)
-        #define PSRAMblocksize 0x1C0000
-    #else
-        #define PIOMAX 2
-        #define NBRPINS             44
-    #endif
+#define PIOMAX  HAL_PORT_PIOMAX
+#define NBRPINS HAL_PORT_NBR_PINS
+
+/* QSPI PSRAM region. Defined per-port: rp2350 non-WEB ports set
+ * HAL_PORT_PSRAM_BASE to 0x11000000 and HAL_PORT_PSRAM_BLOCK_SIZE to the
+ * BASIC RAM-slot region. WEBRP2350 (CYW43 owns the QSPI pins) and rp2040
+ * variants fall back to base 0 / block size 0 — portable address-range
+ * checks (`ptr > PSRAMbase && ptr < PSRAMbase + PSRAMsize`) then
+ * short-circuit to false because PSRAMsize is always 0 on those ports. */
+#ifdef HAL_PORT_PSRAM_BASE
+    #define PSRAMbase HAL_PORT_PSRAM_BASE
 #else
-    #ifdef rp2350
-        #define PIOMAX 3
-    #else
-        #define PIOMAX 2
-    #endif
-    #define NBRPINS             40
-#endif
-/* PSRAMbase is the XIP cache region for QSPI PSRAM on rp2350
- * non-WEB. On every other port (rp2040 anywhere, rp2350 WEB where
- * the PSRAM pins are consumed by the CYW43 SPI) there is no PSRAM;
- * define the base to 0 so portable address-range checks like
- * `ptr > PSRAMbase && ptr < PSRAMbase + PSRAMsize` short-circuit to
- * false at runtime (PSRAMsize is unconditionally 0 on those targets).
- * Driver/HAL code that actually touches the PSRAM region is already
- * gated behind `#ifdef rp2350 && !defined(PICOMITEWEB)`. */
-#ifndef PSRAMbase
     #define PSRAMbase 0
+#endif
+#ifdef HAL_PORT_PSRAM_BLOCK_SIZE
+    #define PSRAMblocksize HAL_PORT_PSRAM_BLOCK_SIZE
+    #define PSRAMblock (PSRAMbase + PSRAMsize + 0x60000)
 #endif
 #define MAXPROMPTLEN        49                      // max length of a prompt incl the terminating null
 #define BREAK_KEY           3                       // the default value (CTRL-C) for the break key.  Reset at the command prompt.

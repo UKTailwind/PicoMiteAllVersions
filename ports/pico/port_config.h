@@ -86,6 +86,23 @@
  * core1 (drivers/display_merge/display_merge_pico.c, ~2 KB stack). */
 #define HAL_PORT_CORE1_STACK_WORDS       512
 
+/* Stage-D per-port memory + clock + MMBasic-table values (decascade plan
+ * D1). Replaces the configuration.h #ifdef PICOMITE cascade. */
+#define HAL_PORT_HEAP_MEMORY_SIZE        (128 * 1024)
+#define HAL_PORT_MAX_CPU                 420000
+#define HAL_PORT_MIN_CPU                 48000
+#define HAL_PORT_MAX_VARS                512
+#define HAL_PORT_MAX_SUBFUN              256
+#define HAL_PORT_FLASH_TARGET_OFFSET     (1024 * 1024)
+#define HAL_PORT_FLASH_TARGET_OFFSET_USB (1024 * 1024)
+#define HAL_PORT_MAGIC_KEY               0xE0799B93
+#define HAL_PORT_MAGIC_KEY_USB           0x6110519E
+#define HAL_PORT_HEAP_TOP                0x2003EC00
+#define HAL_PORT_HEAP_TOP_USB            0x2003F000
+#define HAL_PORT_CONSOLE_RX_BUF_SIZE     256
+#define HAL_PORT_PIOMAX                  2
+#define HAL_PORT_NBR_PINS                44
+
 #define HAL_PORT_RAM_FUNC(name)          __not_in_flash_func(name)
 
 /* Placement for MMBasic's per-expression hot functions (getvalue,

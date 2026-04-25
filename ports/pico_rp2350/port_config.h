@@ -49,6 +49,29 @@
  * on core1 (display_merge_pico, ~2 KB stack). */
 #define HAL_PORT_CORE1_STACK_WORDS       512
 
+/* Stage-D per-port memory + clock + MMBasic-table values (decascade plan
+ * D1). PICOCALC trims heap by 4 KB to fit the VM alongside the full
+ * interpreter — handled in configuration.h with a runtime PICOCALC ifdef. */
+#define HAL_PORT_HEAP_MEMORY_SIZE        (300 * 1024)
+#define HAL_PORT_HEAP_MEMORY_SIZE_PICOCALC (296 * 1024)
+#define HAL_PORT_MAX_CPU                 396000
+#define HAL_PORT_MIN_CPU                 48000
+#define HAL_PORT_MAX_VARS                768
+#define HAL_PORT_MAX_SUBFUN              512
+#define HAL_PORT_FLASH_TARGET_OFFSET     (1024 * 1024)
+#define HAL_PORT_FLASH_TARGET_OFFSET_USB (1024 * 1024)
+#define HAL_PORT_MAGIC_KEY               0x182084D7
+#define HAL_PORT_MAGIC_KEY_USB           0xD27F4F27
+#define HAL_PORT_HEAP_TOP                0x20078000
+#define HAL_PORT_HEAP_TOP_USB            0x20078000
+#define HAL_PORT_CONSOLE_RX_BUF_SIZE     256
+#define HAL_PORT_PIOMAX                  3
+#define HAL_PORT_NBR_PINS                62
+/* QSPI PSRAM region. PSRAMblock = base + size + 0x60000; size is filled
+ * in by runtime PSRAM detect. PSRAMbase is the XIP cache region. */
+#define HAL_PORT_PSRAM_BASE              0x11000000
+#define HAL_PORT_PSRAM_BLOCK_SIZE        0x1C0000
+
 /* FLAC decoder base sample-rate cap (RP2350 → 48 kHz). */
 #define HAL_PORT_AUDIO_FLAC_MAX_BASE_HZ  48000
 #define HAL_PORT_AUDIO_MOD_BUFFER_SIZE   8192

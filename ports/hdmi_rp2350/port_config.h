@@ -34,6 +34,30 @@
 /* core1stack[] size in words. HDMI runs the DVI scanout loop on core1
  * (hdmi_scanout::HDMICore, 512-byte stack). */
 #define HAL_PORT_CORE1_STACK_WORDS       128
+
+/* Stage-D per-port memory + clock + MMBasic-table values (decascade plan
+ * D1). HDMI's MIN_CPU is FreqX (250 MHz in the VGA-family freq table);
+ * MAX_CPU is Freq378P (378 MHz). Numeric values pass through; the
+ * Freq* constant aliases are defined in configuration.h under
+ * HAL_PORT_IS_VGA so HDMI / VGA programs can still write the symbolic
+ * speed constants. */
+#define HAL_PORT_HEAP_MEMORY_SIZE        (184 * 1024)
+#define HAL_PORT_MAX_CPU                 378000
+#define HAL_PORT_MIN_CPU                 250000
+#define HAL_PORT_MAX_VARS                768
+#define HAL_PORT_MAX_SUBFUN              512
+#define HAL_PORT_MAX_MODES               5
+#define HAL_PORT_FLASH_TARGET_OFFSET     (864 * 1024)
+#define HAL_PORT_FLASH_TARGET_OFFSET_USB (864 * 1024)
+#define HAL_PORT_MAGIC_KEY               0x9687B2A0
+#define HAL_PORT_MAGIC_KEY_USB           0x84223124
+#define HAL_PORT_HEAP_TOP                0x2007D000
+#define HAL_PORT_HEAP_TOP_USB            0x2007D000
+#define HAL_PORT_CONSOLE_RX_BUF_SIZE     256
+#define HAL_PORT_PIOMAX                  3
+#define HAL_PORT_NBR_PINS                62
+#define HAL_PORT_PSRAM_BASE              0x11000000
+#define HAL_PORT_PSRAM_BLOCK_SIZE        0x1C0000
 #define HAL_PORT_HAS_DEFINES             1
 #define HAL_PORT_HAS_HEARTBEAT           1
 #define HAL_PORT_ADC_CHANNEL_MAX         4

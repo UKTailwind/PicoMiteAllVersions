@@ -52,6 +52,25 @@
  * word satisfies MMBasic.c's overflow check at core1stack[0]. */
 #define HAL_PORT_CORE1_STACK_WORDS       1
 
+/* Stage-D per-port memory + clock + MMBasic-table values (decascade plan
+ * D1). WEB has no USB-keyboard variant; the _USB siblings are defined
+ * equal to the non-USB ones so configuration.h's USBKEYBOARD-axis macro
+ * resolves correctly. CONSOLE_RX_BUF_SIZE = TCP_MSS via lwIP — handled
+ * in configuration.h since TCP_MSS lives in lwipopts.h. */
+#define HAL_PORT_HEAP_MEMORY_SIZE        (88 * 1024)
+#define HAL_PORT_MAX_CPU                 252000
+#define HAL_PORT_MIN_CPU                 126000
+#define HAL_PORT_MAX_VARS                480
+#define HAL_PORT_MAX_SUBFUN              256
+#define HAL_PORT_FLASH_TARGET_OFFSET     (1080 * 1024)
+#define HAL_PORT_FLASH_TARGET_OFFSET_USB (1080 * 1024)
+#define HAL_PORT_MAGIC_KEY               0x53472B1C
+#define HAL_PORT_MAGIC_KEY_USB           0x53472B1C
+#define HAL_PORT_HEAP_TOP                0x2003D000
+#define HAL_PORT_HEAP_TOP_USB            0x2003D000
+#define HAL_PORT_PIOMAX                  2
+#define HAL_PORT_NBR_PINS                40
+
 /* FLAC decoder base sample-rate cap (RP2040 → 44.1 kHz). */
 #define HAL_PORT_AUDIO_FLAC_MAX_BASE_HZ  44100
 #define HAL_PORT_AUDIO_MOD_BUFFER_SIZE   6144

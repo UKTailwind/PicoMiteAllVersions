@@ -52,6 +52,28 @@
  * (vga_qvga_modes::QVgaCore, 512-byte stack). */
 #define HAL_PORT_CORE1_STACK_WORDS       128
 
+/* Stage-D per-port memory + clock + MMBasic-table values (decascade plan
+ * D1). PICOMITEVGA on rp2350 has the same heap/flash layout for both
+ * USB and PS/2 keyboard variants. */
+#define HAL_PORT_HEAP_MEMORY_SIZE        (184 * 1024)
+#define HAL_PORT_MAX_CPU                 378000
+#define HAL_PORT_MIN_CPU                 252000
+#define HAL_PORT_MAX_VARS                768
+#define HAL_PORT_MAX_SUBFUN              512
+#define HAL_PORT_MAX_MODES               3
+#define HAL_PORT_FLASH_TARGET_OFFSET     (864 * 1024)
+#define HAL_PORT_FLASH_TARGET_OFFSET_USB (864 * 1024)
+#define HAL_PORT_MAGIC_KEY               0x84005FAF
+#define HAL_PORT_MAGIC_KEY_USB           0x82115904
+#define HAL_PORT_HEAP_TOP                0x2007C000
+#define HAL_PORT_HEAP_TOP_USB            0x2007C000
+#define HAL_PORT_CONSOLE_RX_BUF_SIZE     256
+#define HAL_PORT_PIOMAX                  3
+#define HAL_PORT_NBR_PINS                62
+/* QSPI PSRAM region. */
+#define HAL_PORT_PSRAM_BASE              0x11000000
+#define HAL_PORT_PSRAM_BLOCK_SIZE        0x1C0000
+
 /* FLAC decoder base sample-rate cap (RP2350 → 48 kHz). */
 #define HAL_PORT_AUDIO_FLAC_MAX_BASE_HZ  48000
 #define HAL_PORT_AUDIO_MOD_BUFFER_SIZE   8192
