@@ -24,7 +24,7 @@
 
 int hal_port_gui_touch_cmd(unsigned char *cmdline) {
     unsigned char *p;
-#ifdef GUICONTROLS
+#if HAL_PORT_HAS_GUICONTROLS
     if((p = checkstring(cmdline, (unsigned char *)"BEEP"))) {
         if(Option.TOUCH_Click == 0) error("Click option not set");
         ClickTimer = getint(p, 0, INT_MAX) + 1;

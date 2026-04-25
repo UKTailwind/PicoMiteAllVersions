@@ -47,14 +47,14 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "hardware/i2c.h"
 #include "hardware/dma.h"
 #include "MM_Misc.h"
-#ifdef PICOMITEWEB
+#if HAL_PORT_HAS_WIFI
 #include "pico/cyw43_arch.h"
 #endif
 #ifdef PICOMITEVGA
 #include "Include.h"
 #endif
 #include "VS1053.h"
-#ifndef PICOMITEWEB
+#if !HAL_PORT_HAS_WIFI
 #include "pico/multicore.h"
 #endif
 #include "hardware/pio.h"
@@ -233,7 +233,7 @@ void MIPS16 __not_in_flash_func(on_pwm_wrap)(void) {
 	static uint32_t noiseleft[MAXSOUNDS]={0}, noiseright[MAXSOUNDS]={0};
 	static int repeatcount=1;
     // play a tone
-#ifndef PICOMITEWEB
+#if !HAL_PORT_HAS_WIFI
 	__dsb();
 #endif
     pwm_clear_irq(AUDIO_SLICE);
@@ -1471,7 +1471,7 @@ void InitReservedIO(void) {
 #endif
 #endif
 #ifdef PICOMITEVGA
-#ifndef HDMI
+#if !HAL_PORT_HAS_HDMI
 	VGArecovery(0);
 #endif
 #else
@@ -1804,7 +1804,7 @@ void InitReservedIO(void) {
  		}
 	}
 
-#ifndef PICOMITEWEB
+#if !HAL_PORT_HAS_WIFI
 #ifdef rp2350
 	if(rp2350a){
 #endif
@@ -1925,7 +1925,7 @@ char *pinsearch(int pin){
 	else if(pin==Option.audio_i2s_bclk)strcpy(buff,"I2S BCLK");
 	else if(pin==PINMAP[PinDef[Option.audio_i2s_bclk].GPno+1])strcpy(buff,"I2S LRCK");
 #ifdef PICOMITEVGA
-#ifndef HDMI
+#if !HAL_PORT_HAS_HDMI
 	else if(pin==Option.VGA_BLUE)strcpy(buff,"VGA BLUE");
 	else if(pin==Option.VGA_HSYNC)strcpy(buff,"VGA HSYNC");
 	else if(pin==PINMAP[PinDef[Option.VGA_HSYNC].GPno+1])strcpy(buff,"VGA VSYNC");

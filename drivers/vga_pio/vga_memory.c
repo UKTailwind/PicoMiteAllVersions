@@ -39,7 +39,7 @@ uint16_t __attribute__ ((aligned (256))) tilefcols[80*40];
 uint16_t __attribute__ ((aligned (256))) tilebcols[80*40];
 #endif
 
-#ifdef HDMI
+#if HAL_PORT_HAS_HDMI
 uint8_t *tilefcols_w;
 uint8_t *tilebcols_w;
 uint16_t HDMIlines[2][848] = {0};

@@ -124,7 +124,7 @@ extern uint32_t PSRAMsize;
 extern const uint32_t MAP16DEF[16];
 extern void _Z10copy_wordsPKmPmm(uint32_t *s, uint32_t *d, int n);
 #endif
-#ifdef HDMI
+#if HAL_PORT_HAS_HDMI
 extern uint16_t *tilefcols;
 extern uint16_t *tilebcols;
 extern uint8_t *tilefcols_w; 
@@ -243,7 +243,7 @@ extern void clear320(void);
 	extern volatile uint8_t transparent;
 	extern volatile uint8_t transparents;
 	extern volatile int RGBtransparent;
-	#ifndef HDMI
+	#if !HAL_PORT_HAS_HDMI
 		extern uint8_t remap[];
 		extern uint16_t __attribute__ ((aligned (256))) M_Foreground[16];
 		extern uint16_t __attribute__ ((aligned (256))) M_Background[16];
@@ -273,7 +273,7 @@ extern void clear320(void);
 /* ProcessWeb(): real impl on PICOMITEWEB pumps the lwIP stack. On
  * non-WEB builds a stub in MM_Misc.c no-ops. Declaration is
  * unconditional so core code can call it from loops (cmd_files, LOAD)
- * without wrapping each site in #ifdef PICOMITEWEB. */
+ * without wrapping each site in #if HAL_PORT_HAS_WIFI. */
 extern void ProcessWeb(int mode);
 /* Per-port factory-reset hook. Each ports/<COMPILE>/port_defaults.c
  * provides a body with the board's Option.* initialisation (CPU speed,
@@ -285,7 +285,7 @@ extern void port_set_default_options(void);
  * cmd_new / cmd_load teardown + post-ClearTempMemory refill. */
 extern void tcp_free_recv_buffers(void);
 extern void tcp_realloc_recv_buffers(void);
-#ifdef PICOMITEWEB
+#if HAL_PORT_HAS_WIFI
 	extern volatile int WIFIconnected;
 	extern volatile int scantimer;
 	extern void WebConnect(void);
@@ -418,13 +418,13 @@ extern struct tagMTRand *g_myrand;
 #include "Serial.h"
 #include "SPI-LCD.h"
 #ifndef PICOMITEVGA
-#ifndef PICOMITEWEB
+#if !HAL_PORT_HAS_WIFI
 	#include "SSD1963.h"
 	#include "Touch.h"
 	#include "GUI.h"
 #endif
 #endif
-#ifdef PICOMITEWEB
+#if HAL_PORT_HAS_WIFI
 	#include "SSD1963.h"
 	#include "Touch.h"
 	#ifdef rp2350

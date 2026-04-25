@@ -282,7 +282,7 @@ void cmd_ireturn(void){
     if(g_LocalIndex)    ClearVars(g_LocalIndex--, true);                        // delete any local variables
     g_TempMemoryIsChanged = true;                                     // signal that temporary memory should be checked
     *CurrentInterruptName = 0;                                        // for static vars we are not in an interrupt
-#ifdef GUICONTROLS
+#if HAL_PORT_HAS_GUICONTROLS
     if(DelayedDrawKeyboard) {
         DrawKeyboard(1);                                            // the pop-up GUI keyboard should be drawn AFTER the pen down interrupt
         DelayedDrawKeyboard = false;
@@ -1393,7 +1393,7 @@ if(tp){
         if(argc >= 1 )SaveOptions();  //Only save if necessary
         return;
     }
-#ifdef GUICONTROLS
+#if HAL_PORT_HAS_GUICONTROLS
     tp = checkstring(cmdline,(unsigned char *)"GUI CONTROLS");
     if(tp) {
         getargs(&tp, 1, (unsigned char *)",");
@@ -3141,7 +3141,7 @@ int checkdetailinterrupts(void) {
         }
     }
 
-#ifdef GUICONTROLS
+#if HAL_PORT_HAS_GUICONTROLS
     if(Ctrl!=NULL){
         if(gui_int_down && GuiIntDownVector) {                          // interrupt on pen down
             intaddr = GuiIntDownVector;                                 // get a pointer to the interrupt routine
@@ -3322,7 +3322,7 @@ GotAnInterrupt:
     return 1;
 }
 int __not_in_flash_func(check_interrupt)(void) {
-#ifdef GUICONTROLS
+#if HAL_PORT_HAS_GUICONTROLS
     if(Ctrl!=NULL){
         if(!(DelayedDrawKeyboard || DelayedDrawFmtBox || calibrate))ProcessTouch();
         if(CheckGuiFlag) CheckGui();                                    // This implements a LED flash

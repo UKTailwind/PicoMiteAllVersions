@@ -31,8 +31,8 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #ifdef __cplusplus
 extern "C" {
 #endif
-#include "port_config.h"   /* Stage B converts PICOMITEWEB / GUICONTROLS
-                              gates in this file to HAL_PORT_HAS_*. */
+#include "port_config.h"   /* HAL_PORT_HAS_WIFI / HAL_PORT_HAS_GUICONTROLS
+                              gates inside FileIO.h read from this. */
 #include "ff.h"
 #include "hal/hal_filesystem.h"
 
@@ -143,7 +143,7 @@ struct option_s {
     #if defined(PICOMITE) && !defined(rp2350)
         char dummy[4];                // maximum number of controls allowed //64
     #endif
-    #ifdef PICOMITEWEB
+    #if HAL_PORT_HAS_WIFI
         uint16_t TCP_PORT;                // maximum number of controls allowed //64
         uint16_t ServerResponceTime;
     #endif
@@ -171,7 +171,7 @@ struct option_s {
     short Width;
     char dummy[12];
 #endif
-#ifdef GUICONTROLS
+#if HAL_PORT_HAS_GUICONTROLS
     uint8_t MaxCtrls;
     unsigned char spare3[3];
 #else
@@ -224,7 +224,7 @@ struct option_s {
     unsigned char AUDIO_MOSI_PIN;
     unsigned char SYSTEM_I2C_SLOW;
     unsigned char AUDIO_CS_PIN; //4=144
-    #ifdef PICOMITEWEB
+    #if HAL_PORT_HAS_WIFI
         uint16_t UDP_PORT;                // maximum number of controls allowed //48
         uint16_t UDPServerResponceTime;
         char hostname[32];

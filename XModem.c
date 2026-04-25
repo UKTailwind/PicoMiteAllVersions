@@ -198,7 +198,7 @@ static int check(const unsigned char *buf, int sz)
 static void flushinput(void)
 {
   while (_inbyte(((DLY_1S)*3)>>1) >= 0)
-#ifdef PICOMITEWEB
+#if HAL_PORT_HAS_WIFI
   ProcessWeb(1)
 #endif
   ;

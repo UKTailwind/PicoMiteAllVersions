@@ -104,7 +104,7 @@ void DisplayPutClever(char c){
                     } while((CurrentX/gui_font_width) % Option.Tab);
                     return;
     }
-#ifdef HDMI
+#if HAL_PORT_HAS_HDMI
     if(r_on){
         if(FullColour){
             if(r_on)for(int i=0; i< gui_font_width / 8; i++)tilebcols[CurrentY/gui_font_height*X_TILE+CurrentX/8+i]=RGB555(BLUE);
@@ -116,7 +116,7 @@ void DisplayPutClever(char c){
 #else
     if(r_on)for(int i=0; i< gui_font_width / 8; i++)tilebcols[CurrentY/gui_font_height*X_TILE+CurrentX/8+i]=0x1111;
 #endif
-#ifdef HDMI
+#if HAL_PORT_HAS_HDMI
     else {
         if(FullColour){
             for(int i=0; i< gui_font_width / 8; i++)tilebcols[CurrentY/gui_font_height*X_TILE+CurrentX/8+i]=RGB555(Option.DefaultBC);
@@ -194,7 +194,7 @@ static char (*SSputchar)(char buff, int flush)=SerialConsolePutC;
 #ifdef PICOMITEVGA
             case CLEAR_TO_EOS:      MX470Display(CLEAR_TO_EOL);
                                     DrawRectangle(0, CurrentY + gui_font_height, HRes-1, VRes-1, DISPLAY_TYPE==SCREENMODE1 ? 0 : gui_bcolour);
-#ifdef HDMI
+#if HAL_PORT_HAS_HDMI
                                     if(FullColour){
                                         if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==gui_font_height){
                                             for(int y=(CurrentY + gui_font_height)/ytileheight;y<Y_TILE;y++)
@@ -233,7 +233,7 @@ static char (*SSputchar)(char buff, int flush)=SerialConsolePutC;
                                     }
                                     break;
             case CLEAR_TO_EOL:      DrawBox(CurrentX, CurrentY, HRes-1, CurrentY + gui_font_height-1, 0, 0, DISPLAY_TYPE==SCREENMODE1 ? 0 : gui_bcolour);
-#ifdef HDMI
+#if HAL_PORT_HAS_HDMI
                                     if(FullColour){
                                         if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==gui_font_height){
                                             for(int x=CurrentX/8;x<X_TILE;x++){
@@ -276,7 +276,7 @@ static char (*SSputchar)(char buff, int flush)=SerialConsolePutC;
             case DRAW_LINE:         DrawBox(0, gui_font_height * (Option.Height - 2), HRes - 1, VRes - 1, 0, 0, (DISPLAY_TYPE==SCREENMODE1 ? 0 :gui_bcolour));
                                     DrawLine(0, (VRes/gui_font_height)*gui_font_height - gui_font_height - 6, HRes - 1, (VRes/gui_font_height)*gui_font_height - gui_font_height - 6, 1, GUI_C_LINE);
 #ifdef PICOMITEVGA
-#ifdef HDMI
+#if HAL_PORT_HAS_HDMI
                                     if(FullColour){
                                         if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==gui_font_height)for(int i=0; i<HRes/8; i++)tilefcols[(Option.Height - 2)*X_TILE+i]=RGB555(MAGENTA);
                                     } else {
@@ -365,7 +365,7 @@ void edit(unsigned char *cmdline, bool cmdfile) {
 
 #ifdef PICOMITEVGA
 #ifdef rp2350
-    #ifdef HDMI
+    #if HAL_PORT_HAS_HDMI
         mapreset();
     #else
         if(DISPLAY_TYPE==SCREENMODE3)for(int i=0;i<16;i++)map16[i]=remap[i]=i;
@@ -396,12 +396,12 @@ void edit(unsigned char *cmdline, bool cmdfile) {
         PromptFont=1;
     }
     if(modmode){
-#ifdef HDMI
+#if HAL_PORT_HAS_HDMI
         if(FullColour  || MediumRes ){
 #endif
             SetFont(1);
             PromptFont=1;
-#ifdef HDMI
+#if HAL_PORT_HAS_HDMI
         } else {
             SetFont(2<<4 | 1);
             PromptFont=2<<4 | 1;
@@ -413,7 +413,7 @@ void edit(unsigned char *cmdline, bool cmdfile) {
 #endif
     }
 
-#ifdef PICOMITEWEB
+#if HAL_PORT_HAS_WIFI
     cleanserver();
 #endif
     multilinecomment = false;
@@ -575,7 +575,7 @@ int find_longest_line_length(const char *text ,int *linein) {
  * The following section will be excluded from the documentation.
  */
 #ifndef PICOMITE
-#ifndef PICOMITEWEB
+#if !HAL_PORT_HAS_WIFI
     static short lastx1=9999, lasty1=9999;
     static uint16_t lastfc, lastbc;
     static bool leftpushed=false, rightpushed=false, middlepushed=false;
@@ -618,7 +618,7 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
         statuscount = 0;
         do {
 #ifndef PICOMITE 
-#ifndef PICOMITEWEB
+#if !HAL_PORT_HAS_WIFI
             c=-1;
 #ifdef USBKEYBOARD
             if(HID[1].Device_type==2 && DISPLAY_TYPE==SCREENMODE1){
@@ -630,12 +630,12 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
                 if(!nunstruct[2].C)middlepushed=false;
                 if(nunstruct[2].y1!=lasty1 || nunstruct[2].x1!=lastx1){
                     if(lastx1!=9999){
-#ifdef HDMI
+#if HAL_PORT_HAS_HDMI
                         if(FullColour){
 #endif
                             for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilefcols[lasty1*X_TILE+i]=lastfc;
                             for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilebcols[lasty1*X_TILE+i]=lastbc;
-#ifdef HDMI
+#if HAL_PORT_HAS_HDMI
                         } else {
                             for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilefcols_w[lasty1*X_TILE+i]=lastfc;
                             for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilebcols_w[lasty1*X_TILE+i]=lastbc;
@@ -645,12 +645,12 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
                     lastx1=nunstruct[2].x1;
                     lasty1=nunstruct[2].y1;
                     if(lasty1>=VHeight)lasty1=VHeight-1;
-#ifdef HDMI
+#if HAL_PORT_HAS_HDMI
                     if(FullColour){
 #endif
                         lastfc=tilefcols[lasty1*X_TILE+lastx1*fontinc];
                         lastbc=tilebcols[lasty1*X_TILE+lastx1*fontinc];
-#ifdef HDMI
+#if HAL_PORT_HAS_HDMI
                     } else {
                         lastfc=tilefcols_w[lasty1*X_TILE+lastx1*fontinc];
                         lastbc=tilebcols_w[lasty1*X_TILE+lastx1*fontinc];
@@ -685,12 +685,12 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
                         PositionCursor(txtp);
                         PrintStatus();
                         ShowCursor(true);
-#ifdef HDMI
+#if HAL_PORT_HAS_HDMI
                         if(FullColour){
 #endif
                             for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilefcols[lasty1*X_TILE+i]=lastfc;
                             for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilebcols[lasty1*X_TILE+i]=lastbc;
-#ifdef HDMI
+#if HAL_PORT_HAS_HDMI
                         } else {
                             for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilefcols_w[lasty1*X_TILE+i]=lastfc;
                             for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilebcols_w[lasty1*X_TILE+i]=lastbc;
@@ -1054,7 +1054,7 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
                                 PromptFont=oldfont;
                                 MX470Display(DISPLAY_CLS);                        // clear screen on the MX470 display only
                             }
-#ifdef HDMI
+#if HAL_PORT_HAS_HDMI
         while(v_scanline!=0){}
         mapreset();
         if(DISPLAY_TYPE==SCREENMODE1)  {
@@ -1135,7 +1135,7 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
 //                            (void) findvar((unsigned char *)"MM.CMDLINE$", V_FIND | V_DIM_VAR | T_CONST);
                             if(Option.LIBRARY_FLASH_SIZE == MAX_PROG_SIZE) ExecuteProgram(LibMemory );       // run anything that might be in the library
                             if(*ProgMemory != T_NEWLINE) return;                             // no program to run
-                        #ifdef PICOMITEWEB
+                        #if HAL_PORT_HAS_WIFI
                             cleanserver();
                         #endif
                             nextstmt = ProgMemory;
@@ -1270,7 +1270,7 @@ void MarkMode(unsigned char *cb, unsigned char *buf) {
     while(1) {
         c=-1;
 #ifndef PICOMITE
-#ifndef PICOMITEWEB
+#if !HAL_PORT_HAS_WIFI
 #ifdef USBKEYBOARD
         if(HID[1].Device_type==2 && DISPLAY_TYPE==SCREENMODE1){
 #else
@@ -1281,12 +1281,12 @@ void MarkMode(unsigned char *cb, unsigned char *buf) {
             if(!nunstruct[2].C)middlepushed=false;
             if(nunstruct[2].y1!=lasty1 || nunstruct[2].x1!=lastx1){
                 if(lastx1!=9999){
-#ifdef HDMI
+#if HAL_PORT_HAS_HDMI
                     if(FullColour){
 #endif
                         for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilefcols[lasty1*X_TILE+i]=lastfc;
                         for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilebcols[lasty1*X_TILE+i]=lastbc;
-#ifdef HDMI
+#if HAL_PORT_HAS_HDMI
                     } else {
                         for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilefcols_w[lasty1*X_TILE+i]=lastfc;
                         for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilebcols_w[lasty1*X_TILE+i]=lastbc;
@@ -1296,12 +1296,12 @@ void MarkMode(unsigned char *cb, unsigned char *buf) {
                 lastx1=nunstruct[2].x1;
                 lasty1=nunstruct[2].y1;
                 if(lasty1>=VHeight)lasty1=VHeight-1;
-#ifdef HDMI
+#if HAL_PORT_HAS_HDMI
                 if(FullColour){
 #endif
                     lastfc=tilefcols[lasty1*X_TILE+lastx1*fontinc];
                     lastbc=tilebcols[lasty1*X_TILE+lastx1*fontinc];
-#ifdef HDMI
+#if HAL_PORT_HAS_HDMI
                 } else {
                     lastfc=tilefcols_w[lasty1*X_TILE+lastx1*fontinc];
                     lastbc=tilebcols_w[lasty1*X_TILE+lastx1*fontinc];
@@ -1452,7 +1452,7 @@ void MarkMode(unsigned char *cb, unsigned char *buf) {
                       if(c == F5 || c == CTRLKEY('Y')) {
                           PositionCursor(txtp);
 #ifndef PICOMITE
-#ifndef PICOMITEWEB
+#if !HAL_PORT_HAS_WIFI
 #ifdef USBKEYBOARD
                         if(HID[1].Device_type==2 && DISPLAY_TYPE==SCREENMODE1){     
 #else
@@ -1478,7 +1478,7 @@ void MarkMode(unsigned char *cb, unsigned char *buf) {
                       TextChanged = true;
                       PositionCursor(txtp);
 #ifndef PICOMITE
-#ifndef PICOMITEWEB
+#if !HAL_PORT_HAS_WIFI
 #ifdef USBKEYBOARD
                         if(HID[1].Device_type==2 && DISPLAY_TYPE==SCREENMODE1){     
 #else
@@ -1616,7 +1616,7 @@ void SetColour(unsigned char *p, int DoVT100) {
     // the list must be terminated with a NULL
     char *twokeywordtbl[] = {
         "BASE", "EXPLICIT", "DEFAULT", "BREAK", "AUTORUN", "BAUDRATE", "DISPLAY",
-#if defined(GUICONTROLS)
+#if HAL_PORT_HAS_GUICONTROLS
         "BUTTON", "SWITCH", "CHECKBOX", "RADIO", "LED", "FRAME", "NUMBERBOX", "SPINBOX", "TEXTBOX", "DISPLAYBOX", "CAPTION", "DELETE",
         "DISABLE", "HIDE", "ENABLE", "SHOW", "FCOLOUR", "BCOLOUR", "REDRAW", "BEEP", "INTERRUPT",
 #endif

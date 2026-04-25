@@ -27,7 +27,7 @@ int MIPS16 port_misc_option_setter(unsigned char *cmdline)
     unsigned char *tp;
 
 #ifdef rp2350
-#ifdef HDMI
+#if HAL_PORT_HAS_HDMI
     tp = checkstring(cmdline, (unsigned char *)"HDMI PINS");
     if (tp) {
         getargs(&tp, 7, (unsigned char *)",");
@@ -176,7 +176,7 @@ int MIPS16 port_misc_option_setter(unsigned char *cmdline)
  * supported (no shadow needed). */
 int MIPS16 port_pico_pins_option_setter(unsigned char *cmdline)
 {
-#ifdef PICOMITEWEB
+#if HAL_PORT_HAS_WIFI
     (void)cmdline;
     return 0;
 #else
@@ -213,7 +213,7 @@ int MIPS16 port_heartbeat_option_setter(unsigned char *cmdline)
     if (checkstring(tp, (unsigned char *)"OFF") || checkstring(tp, (unsigned char *)"DISABLE")) {
         Option.NoHeartbeat = 1;
     } else {
-#ifdef PICOMITEWEB
+#if HAL_PORT_HAS_WIFI
         if (checkstring(tp, (unsigned char *)"ON") || checkstring(tp, (unsigned char *)"ENABLE"))
             Option.NoHeartbeat = 0;
         else error("Syntax");
@@ -241,7 +241,7 @@ int MIPS16 port_heartbeat_option_setter(unsigned char *cmdline)
         } else error("Syntax");
 #endif
     }
-#ifndef PICOMITEWEB
+#if !HAL_PORT_HAS_WIFI
     SaveOptions();
     if (CheckPin(HEARTBEATpin, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED)) {
         if (Option.NoHeartbeat == 0) {
@@ -381,7 +381,7 @@ extern uint64_t piomap[];
 int MIPS16 port_audio_i2s_pio_slice(int pin1, int pin2)
 {
 #ifdef rp2350
-#if defined(PICOMITEVGA) && !defined(HDMI)
+#if defined(PICOMITEVGA) && !HAL_PORT_HAS_HDMI
     int pio = QVGA_PIO_NUM;
 #else
     int pio = 2;

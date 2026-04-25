@@ -167,7 +167,7 @@ void MMBasic_RunPromptLoop(void) {
         else {
             ClearProgram(true);
         }
-    #ifdef PICOMITEWEB
+    #if HAL_PORT_HAS_WIFI
     if (cyw43_arch_init()==0) {
         startupcomplete=1;
         WebConnect();

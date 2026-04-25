@@ -10,8 +10,8 @@
 #ifndef _INCLUDE_H
 #define _INCLUDE_H
 
-#include "port_config.h"   /* Stage B converts the HDMI gate near the
-                              end of this header to HAL_PORT_HAS_HDMI. */
+#include "port_config.h"   /* HAL_PORT_HAS_HDMI gates the PIO header
+                              picks near the end of this file. */
 
 typedef unsigned char Bool;
 #define True 1
@@ -86,7 +86,7 @@ INLINE void cb()
 #include <pico/bootrom.h>
 #include "hardware/irq.h"
 #include "hardware/pio.h"
-#ifndef HDMI
+#if !HAL_PORT_HAS_HDMI
 	#include "PicoMiteVGA.pio.h"
 	#include "PicoMiteI2S.pio.h"
 #endif

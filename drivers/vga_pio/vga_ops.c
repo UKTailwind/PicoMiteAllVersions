@@ -19,7 +19,7 @@ extern bool mergedread;
 /* VGA palette-remap tables — relocated from Draw.c's
  * `#ifdef PICOMITEVGA` block. HDMI uses 16-bit + 32-bit lookup
  * arrays; non-HDMI QVGA uses a single 8-bit index table. */
-#ifdef HDMI
+#if HAL_PORT_HAS_HDMI
 uint32_t remap555[256];
 uint32_t remap332[256];
 uint16_t remap256[256];
@@ -54,7 +54,7 @@ void setframebuffer(void) { }
 int hal_vga_ops_handle_cls(int c) {
     if (!(DISPLAY_TYPE == SCREENMODE1 && WriteBuf == DisplayBuf)) return 0;
     DrawRectangle(0, 0, HRes - 1, VRes - 1, 0);
-#ifdef HDMI
+#if HAL_PORT_HAS_HDMI
     memset((void *)WriteBuf, 0, ScreenSize);
     if (FullColour) {
         uint16_t bcolour = RGB555(c);
@@ -104,7 +104,7 @@ int hal_vga_ops_handle_layer_clear(void) {
         memset((void *)WriteBuf, colourv, HRes * VRes / 2);
         return 1;
     }
-#ifdef HDMI
+#if HAL_PORT_HAS_HDMI
     if (WriteBuf == LayerBuf && DISPLAY_TYPE == SCREENMODE5 && LayerBuf != DisplayBuf) {
         memset((void *)WriteBuf, transparent, HRes * VRes);
         return 1;
@@ -146,12 +146,12 @@ void hal_vga_ops_scroll_tile_colours(int lines) {
         for (int y = 0; y < Y_TILE - offset; y++) {
             int d = y * X_TILE, s = (y + offset) * X_TILE;
             for (int x = 0; x < X_TILE; x++) {
-#ifdef HDMI
+#if HAL_PORT_HAS_HDMI
                 if (FullColour) {
 #endif
                     tilefcols[d + x] = tilefcols[s + x];
                     tilebcols[d + x] = tilebcols[s + x];
-#ifdef HDMI
+#if HAL_PORT_HAS_HDMI
                 } else {
                     tilefcols_w[d + x] = tilefcols_w[s + x];
                     tilebcols_w[d + x] = tilebcols_w[s + x];
@@ -166,12 +166,12 @@ void hal_vga_ops_scroll_tile_colours(int lines) {
         for (int y = Y_TILE - 1; y >= offset; y--) {
             int d = y * X_TILE, s = (y - offset) * X_TILE;
             for (int x = 0; x < X_TILE; x++) {
-#ifdef HDMI
+#if HAL_PORT_HAS_HDMI
                 if (FullColour) {
 #endif
                     tilefcols[d + x] = tilefcols[s + x];
                     tilebcols[d + x] = tilebcols[s + x];
-#ifdef HDMI
+#if HAL_PORT_HAS_HDMI
                 } else {
                     tilefcols_w[d + x] = tilefcols_w[s + x];
                     tilebcols_w[d + x] = tilebcols_w[s + x];
@@ -194,7 +194,7 @@ void hal_vga_ops_fb2_fill_tile_colours(int x1, int y1, int w_px, int h_px, int f
     int xt = x1 / xa, yt = y1 / ya;
     int w = w_px / xa, h = h_px / ya;
     int fcolour, bcolour;
-#ifdef HDMI
+#if HAL_PORT_HAS_HDMI
     fcolour = FullColour ? RGB555(fc) : RGB332(fc);
     bcolour = FullColour ? RGB555(bc) : RGB332(bc);
     if (FullColour) {
@@ -255,7 +255,7 @@ uint8_t hal_vga_ops_layer_merge_rgb8(uint8_t primary, int x, int y) {
 void Display_Refresh(void) { }
 
 void hal_vga_ops_wait_scanline_zero(void) {
-#ifdef HDMI
+#if HAL_PORT_HAS_HDMI
     extern volatile int32_t v_scanline;
     while (v_scanline != 0) { }
 #else
@@ -269,7 +269,7 @@ void hal_vga_ops_retile_for_font(void) {
     ytileheight = gui_font_height;
     Y_TILE = (VRes + ytileheight - 1) / ytileheight;
     for (int i = 0; i < X_TILE * Y_TILE; i++) {
-#if defined(rp2350) && defined(HDMI)
+#if defined(rp2350) && HAL_PORT_HAS_HDMI
         if (FullColour) {
             tilefcols[i] = tilefcols[0];
             tilebcols[i] = tilebcols[0];

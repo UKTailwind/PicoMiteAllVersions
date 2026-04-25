@@ -13,7 +13,7 @@
 #include "Hardware_Includes.h"
 #include "hal/hal_flash.h"
 
-#if defined(rp2350) && !defined(PICOMITEWEB)
+#if defined(rp2350) && !HAL_PORT_HAS_WIFI
 
 extern unsigned int mmap[HEAP_MEMORY_SIZE / PAGESIZE / PAGESPERWORD];
 extern unsigned int psmap[7 * 1024 * 1024 / PAGESIZE / PAGESPERWORD];
@@ -177,4 +177,4 @@ void MIPS16 cmd_psram(void)
     }
 }
 
-#endif /* defined(rp2350) && !defined(PICOMITEWEB) */
+#endif /* defined(rp2350) && !HAL_PORT_HAS_WIFI */

@@ -979,7 +979,7 @@ static void bc_vm_execute_syscall(BCVMState *vm, uint16_t sysid, uint8_t argc,
                 arg.get_int = vm_cls_get_int;
             }
             bc_vm_require_display(vm);
-#ifdef GUICONTROLS
+#if HAL_PORT_HAS_GUICONTROLS
             HideAllControls();
 #endif
             ops.ctx = vm;

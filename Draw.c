@@ -1356,7 +1356,7 @@ void GUIPrintString(int x, int y, int fnt, int jh, int jv, int jo, int fc, int b
         if(jv == JUSTIFY_BOTTOM) CurrentY -= (strlen(str) * GetFontWidth(fnt));
     }
     while(*str) {
-#ifdef GUICONTROLS
+#if HAL_PORT_HAS_GUICONTROLS
         if(*str == 0xff && Ctrl[InvokingCtrl].type == 10) {
 //            fc = rgb(0, 0, 255);                                // this is specially for GUI FORMATBOX
             str++;
@@ -3233,7 +3233,7 @@ void cmd_cls(void) {
     GfxClsArg arg = {0};
     GfxClsOps ops;
     if(Option.DISPLAY_TYPE == 0) error("Display not configured");
-#ifdef GUICONTROLS
+#if HAL_PORT_HAS_GUICONTROLS
     HideAllControls();
 #endif
     skipspace(cmdline);
@@ -5889,7 +5889,7 @@ void MIPS16 ResetDisplay(void) {
      * function-pointer dispatch table per SCREENMODE. No-op on
      * non-VGA; GUICONTROLS builds fall through to ResetGUI. */
     hal_vga_ops_reset_display_vga();
-#ifdef GUICONTROLS
+#if HAL_PORT_HAS_GUICONTROLS
     ResetGUI();
 #endif
 }

@@ -189,7 +189,7 @@ int port_factory_reset_board(unsigned char *p)
         SoftReset();
         return 1;
     }
-#  ifndef PICOMITEWEB
+#  if !HAL_PORT_HAS_WIFI
     if(checkstring(p,(unsigned char *) "RP2040LCD1.28"))  {
         ResetOptions(false);
         Option.CPU_Speed=252000;

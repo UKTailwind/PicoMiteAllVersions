@@ -146,7 +146,7 @@ void port_print_display_options(void)
         if(Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P || Option.CPU_Speed==Freq378P )PO2StrInt("RESOLUTION", "640x480",Option.CPU_Speed);
         if(Option.DISPLAY_TYPE!=SCREENMODE1)PO2Int("DEFAULT MODE", Option.DISPLAY_TYPE-SCREENMODE1+1);
         if(Option.Height != 40 || Option.Width != 80) PO3Int("DISPLAY", Option.Height, Option.Width);
-#ifdef HDMI
+#if HAL_PORT_HAS_HDMI
         /* HDMIclock/HDMId0..2 only exist in struct option_s when
          * !GUICONTROLS, which the HDMI builds satisfy. */
         if(Option.HDMIclock!=2 || Option.HDMId0!=0 || Option.HDMId1!=6 ||Option.HDMId2!=4){
@@ -236,7 +236,7 @@ void port_print_display_options(void)
             }
         }
         if(Option.BackLightLevel!=100)PO2Int("LCD BACKLIGHT", Option.BackLightLevel);
-#ifdef GUICONTROLS
+#if HAL_PORT_HAS_GUICONTROLS
         if(Option.MaxCtrls)PO2Int("GUI CONTROLS", Option.MaxCtrls-1);
 #endif
 #ifdef PICOCALC

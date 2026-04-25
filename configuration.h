@@ -31,8 +31,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #ifdef __cplusplus
 extern "C" {
 #endif
-/* Pull in HAL_PORT_HAS_* before the cascades below — Stage B converts the
- * PICOMITEWEB / HDMI #ifdefs in this file to HAL_PORT_HAS_* tests. */
+/* HAL_PORT_HAS_* palette must be visible before the gates below. */
 #include "port_config.h"
 #ifdef PICOMITEVGA
     #ifdef rp2350
@@ -44,7 +43,7 @@ extern "C" {
         #define HEAP_MEMORY_SIZE (184*1024) 
 #endif
         #define FLASH_TARGET_OFFSET (864 * 1024) 
-        #ifdef HDMI
+        #if HAL_PORT_HAS_HDMI
             #define MAXMODES 5
             #ifdef USBKEYBOARD
                 #define MagicKey 0x84223124
@@ -153,7 +152,7 @@ extern "C" {
     #define MediumRes (Option.CPU_Speed==FreqSVGA || Option.CPU_Speed==Freq848 || Option.CPU_Speed==FreqY || Option.CPU_Speed==FreqX)
 #endif
 
-#ifdef PICOMITEWEB
+#if HAL_PORT_HAS_WIFI
 #ifdef rp2350
     #define MAXSUBFUN           512                     // each entry takes up 4 bytes
     #define MAXVARS             768                    // 8 + MAXVARLEN + MAXDIM * 2  (ie, 56 bytes) - these do not incl array members
@@ -281,7 +280,7 @@ extern uint8_t PSRAMpin;
 #else
 #define MAXDIM              6                       // maximum nbr of dimensions to an array
 #endif
-#ifdef PICOMITEWEB
+#if HAL_PORT_HAS_WIFI
 #define CONSOLE_RX_BUF_SIZE TCP_MSS
 #else
 #define CONSOLE_RX_BUF_SIZE 256
@@ -306,7 +305,7 @@ extern uint8_t PSRAMpin;
 #define STR_SIG_DIGITS 9                            // number of significant digits to use when converting MMFLOAT to a string
 #define STR_FLOAT_DIGITS 6                            // number of significant digits to use when converting MMFLOAT to a string
 #define NBRSETTICKS         4                       // the number of SETTICK interrupts available
-#ifndef PICOMITEWEB
+#if !HAL_PORT_HAS_WIFI
     #ifdef rp2350
         #define PIOMAX 3
         #define NBRPINS             62

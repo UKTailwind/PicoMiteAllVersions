@@ -83,7 +83,7 @@ unsigned int bc_alloc_fail_total   = 0;
  * (stubs on non-VGA). ytileheight, ShadowBuf, fb_dma_chan also
  * resolved there. Externs in Memory.h. */
 
-#ifdef GUICONTROLS
+#if HAL_PORT_HAS_GUICONTROLS
     struct s_ctrl CTRLS[MAXCONTROLS];
     struct s_ctrl *Ctrl=CTRLS;
 #endif

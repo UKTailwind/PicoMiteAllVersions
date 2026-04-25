@@ -35,10 +35,10 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
 #include "hardware/structs/systick.h"
-#ifdef PICOMITEWEB
+#if HAL_PORT_HAS_WIFI
 #include "pico/cyw43_arch.h"
 #endif
-#ifndef PICOMITEWEB
+#if !HAL_PORT_HAS_WIFI
 #include "pico/multicore.h"
 extern mutex_t	frameBufferMutex;
 #endif
@@ -354,7 +354,7 @@ int __not_in_flash_func(GetTouchValue)(int cmd) {
     val |= (lb >> 3) & 0b11111;          // the bottom 5 bits
     if(Option.CombinedCS)gpio_set_dir(TOUCH_CS_PIN, GPIO_IN);
     else ClearCS(Option.TOUCH_CS);
-    #ifdef PICOMITEWEB
+    #if HAL_PORT_HAS_WIFI
             ProcessWeb(1);
     #endif
    return val;
@@ -380,7 +380,7 @@ void fun_touch(void) {
         iret = TOUCH_DOWN;
     else if(checkstring(ep, (unsigned char *)"UP"))
         iret = !TOUCH_DOWN;
-#ifdef GUICONTROLS
+#if HAL_PORT_HAS_GUICONTROLS
     else if(checkstring(ep, (unsigned char *)"REF"))
         iret = CurrentRef;
     else if(checkstring(ep, (unsigned char *)"LASTREF"))

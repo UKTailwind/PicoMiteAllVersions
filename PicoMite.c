@@ -57,7 +57,7 @@ extern void start_i2s(int pio, int sm);
 #endif
 #ifdef PICOMITEVGA
 extern void start_vga_i2s(void);
-#ifndef HDMI
+#if !HAL_PORT_HAS_HDMI
 #endif
 #endif
 /* COPYRIGHT text moved to Version.h as MMBASIC_COPYRIGHT; banner is
@@ -75,7 +75,7 @@ extern void start_vga_i2s(void);
     #include "hardware/structs/ssi.h"
     #include "hardware/vreg.h"
 #else
-    #ifdef HDMI
+    #if HAL_PORT_HAS_HDMI
         #include "hardware/structs/hstx_ctrl.h"
         #include "hardware/structs/hstx_fifo.h"
     #endif
@@ -113,7 +113,7 @@ bool rp2350a=true;
 #include "hardware/irq.h"
 #include "hardware/pio.h"
 #include "hardware/pio_instructions.h"
-#ifdef PICOMITEWEB
+#if HAL_PORT_HAS_WIFI
     #include "lwipopts.h"
     #include "pico/cyw43_arch.h"
     #include "lwip/pbuf.h"
@@ -127,7 +127,7 @@ bool rp2350a=true;
     volatile uint8_t transparents=0;
     volatile int RGBtransparent=0;
     int MODE1SIZE, MODE2SIZE, MODE3SIZE, MODE4SIZE, MODE5SIZE;
-#ifdef HDMI
+#if HAL_PORT_HAS_HDMI
     uint32_t map16quads[16];
     uint32_t map16pairs[16];
     // 126 MHz timings
@@ -147,11 +147,11 @@ bool rp2350a=true;
     int QVGA_HACT;	// V active scanlines (= 2*HEIGHT)
 #endif
 
-    #ifndef HDMI
+    #if !HAL_PORT_HAS_HDMI
     #include "Include.h"
     #endif
     #ifdef USBKEYBOARD
-        #ifdef HDMI
+        #if HAL_PORT_HAS_HDMI
             #define MES_SIGNON  "\rPicoMiteHDMI MMBasic USB " CHIP " Edition V"VERSION "\r\n"
         #else
             #define MES_SIGNON  "\rPicoMiteVGA MMBasic USB " CHIP " Edition V"VERSION "\r\n"
@@ -161,7 +161,7 @@ bool rp2350a=true;
         extern void USB_bus_reset(void);
         bool USBenabled=false;
     #else
-        #ifdef HDMI
+        #if HAL_PORT_HAS_HDMI
             #define MES_SIGNON  "\rPicoMiteHDMI MMBasic " CHIP " Edition V"VERSION "\r\n"
         #else
             #define MES_SIGNON  "\rPicoMiteVGA MMBasic " CHIP " Edition V"VERSION "\r\n"
@@ -169,7 +169,7 @@ bool rp2350a=true;
 #endif
 
 #endif
-#ifdef PICOMITEWEB
+#if HAL_PORT_HAS_WIFI
     #define MES_SIGNON  "\rWebMite MMBasic " CHIP " Edition V"VERSION "\r\n"
     volatile int WIFIconnected=0;
     int startupcomplete=0;
@@ -292,7 +292,7 @@ MMFLOAT FAdd(MMFLOAT a, MMFLOAT b){ return a + b; }
 MMFLOAT FSub(MMFLOAT a, MMFLOAT b){ return a - b; }
 MMFLOAT FDiv(MMFLOAT a, MMFLOAT b){ return a / b; }
 uint32_t CFunc_delay_us;
-#ifndef HDMI
+#if !HAL_PORT_HAS_HDMI
 int QVGA_CLKDIV;	// SM divide clock ticks
 #endif
 void PIOExecute(int pion, int sm, uint32_t ins){
@@ -377,7 +377,7 @@ const struct s_PinDef PinDef[]={
 		{ 13, 99, "GND",  UNUSED  ,99, 99},                                                         // pin 13
 		{ 14, 10, "GP10",  DIGITAL_IN | DIGITAL_OUT | SPI1SCK | I2C1SDA | PWM5A	,99, 5},  			// pin 14
 		{ 15, 11, "GP11",  DIGITAL_IN | DIGITAL_OUT | SPI1TX | I2C1SCL | PWM5B	,99, 133},       	// pin 15
-#ifdef HDMI
+#if HAL_PORT_HAS_HDMI
 		{ 16, 12, "HDMI", UNUSED  ,99, 99},                                                          // pin 16
 		{ 17, 13, "HDMI", UNUSED  ,99, 99},                                                          // pin 17
 		{ 18, 99, "GND", UNUSED  ,99, 99},                                                          // pin 18
@@ -416,14 +416,14 @@ const struct s_PinDef PinDef[]={
 		{ 38, 99, "GND", UNUSED  ,99, 99},                                                          // pin 38
 		{ 39, 99, "VSYS", UNUSED  ,99, 99},                                                         // pin 39
 		{ 40, 99, "VBUS", UNUSED  ,99, 99},                                                         // pin 40
-    #ifndef PICOMITEWEB
+    #if !HAL_PORT_HAS_WIFI
 		{ 41, 23, "GP23", DIGITAL_IN | DIGITAL_OUT | SPI0TX | I2C1SCL| PWM3B  ,99 , 131},           // pseudo pin 41
 		{ 42, 24, "GP24", DIGITAL_IN | DIGITAL_OUT | SPI1RX | UART1TX | I2C0SDA| PWM4A  ,99 , 4},   // pseudo pin 42
 		{ 43, 25, "GP25", DIGITAL_IN | DIGITAL_OUT | UART1RX | I2C0SCL| PWM4B  ,99 , 132},          // pseudo pin 43
 		{ 44, 29, "GP29", DIGITAL_IN | DIGITAL_OUT | ANALOG_IN | UART0RX | I2C0SCL | PWM6B, 3, 134},// pseudo pin 44
     #endif
     #ifdef rp2350
-    #ifndef PICOMITEWEB
+    #if !HAL_PORT_HAS_WIFI
 		{ 45, 30, "GP30", DIGITAL_IN | DIGITAL_OUT | SPI1SCK | I2C1SDA | PWM7A  ,99 , 7},           // pseudo pin 45
 		{ 46, 31, "GP31", DIGITAL_IN | DIGITAL_OUT | SPI1TX | I2C1SCL| PWM7B  ,99 , 135},           // pseudo pin 46
 		{ 47, 32, "GP32", DIGITAL_IN | DIGITAL_OUT | UART0TX | SPI0RX | I2C0SDA| PWM8A  ,99 , 8},           // pseudo pin 47
@@ -502,7 +502,7 @@ void __not_in_flash_func(routinechecks)(void){
 	}
 	if(GPSchannel)processgps();
     if(diskchecktimer == 0)CheckSDCard();
-#ifdef GUICONTROLS
+#if HAL_PORT_HAS_GUICONTROLS
     if(Ctrl && TOUCH_GETIRQTRIS && !calibrate)ProcessTouch();
 #endif
 
@@ -563,7 +563,7 @@ void __not_in_flash_func(routinechecks)(void){
 
 int __not_in_flash_func(getConsole)(void) {
     int c=-1;
-#ifdef PICOMITEWEB
+#if HAL_PORT_HAS_WIFI
     ProcessWeb(1);
 #endif
     CheckAbort();
@@ -585,7 +585,7 @@ char  __not_in_flash_func(SerialConsolePutC)(char c, int flush) {
 		   MMCharPos -= 1;
 	   	}
 	}    
-#ifdef PICOMITEWEB
+#if HAL_PORT_HAS_WIFI
     if(Option.Telnet!=-1){
 #endif
 #ifndef USBKEYBOARD
@@ -609,7 +609,7 @@ char  __not_in_flash_func(SerialConsolePutC)(char c, int flush) {
 			irq_set_pending((Option.SerialConsole & 3)==1 ? UART0_IRQ : UART1_IRQ);
 		}
     }
-#ifdef PICOMITEWEB
+#if HAL_PORT_HAS_WIFI
     }
     TelnetPutC(c,flush);
     ProcessWeb(1);
@@ -634,7 +634,7 @@ int kbhitConsole(void) {
 // check if there is a keystroke waiting in the buffer and, if so, return with the char
 // returns -1 if no char waiting
 // the main work is to check for vt100 escape code sequences and map to Maximite codes
-#if (defined(PICOMITEVGA) || defined(PICOMITEWEB)) && !defined(rp2350)
+#if (defined(PICOMITEVGA) || HAL_PORT_HAS_WIFI) && !defined(rp2350)
 int MMInkey(void) {
 #else
 int __not_in_flash_func(MMInkey)(void) {
@@ -934,7 +934,7 @@ bool MIPS16 __not_in_flash_func(timer_callback)(repeating_timer_t *rt)
             IrDevTmp = ((IrBits >> 16) & 0xffff);
             IrCmdTmp = ((IrBits >> 8) & 0xff);
         }
-#ifdef GUICONTROLS
+#if HAL_PORT_HAS_GUICONTROLS
     // check on the touch panel, is the pen down?
 
     TouchTimer++;
@@ -998,7 +998,7 @@ bool MIPS16 __not_in_flash_func(timer_callback)(repeating_timer_t *rt)
     ////////////////////////////////// this code runs once a second /////////////////////////////////
     if(++SecondsTimer >= 1000) {
         SecondsTimer -= 1000; 
-    #ifndef PICOMITEWEB
+    #if !HAL_PORT_HAS_WIFI
         if(ExtCurrentConfig[PinDef[HEARTBEATpin].pin]==EXT_HEARTBEAT)gpio_xor_mask64(1<<PinDef[HEARTBEATpin].GPno);
     #endif
             // keep track of the time and date
@@ -1023,7 +1023,7 @@ bool MIPS16 __not_in_flash_func(timer_callback)(repeating_timer_t *rt)
   return 1;
 }
 void __not_in_flash_func(uSec)(int us) {
-#ifdef PICOMITEWEB
+#if HAL_PORT_HAS_WIFI
 	if(us<500){
 		busy_wait_us(us);
 	} else {
@@ -1036,7 +1036,7 @@ void __not_in_flash_func(uSec)(int us) {
 	busy_wait_us(us);
 #endif
 }
-#ifdef PICOMITEWEB
+#if HAL_PORT_HAS_WIFI
 void __not_in_flash_func(ProcessWeb)(int mode){
     static uint64_t flushtimer=0;
     static uint64_t lastusec=0;
@@ -1103,7 +1103,7 @@ void __not_in_flash_func(ProcessWeb)(int mode){
 }
 #endif
 void __not_in_flash_func(CheckAbort)(void) {
-#ifdef PICOMITEWEB
+#if HAL_PORT_HAS_WIFI
     ProcessWeb(1);
 #endif
     routinechecks();
@@ -1137,7 +1137,7 @@ void sigbus(void){
 #ifdef PICOMITEVGA
 int vgaloop1,vgaloop2, vgaloop4, vgaloop8, vgaloop16, vgaloop32;
 
-#ifndef HDMI
+#if !HAL_PORT_HAS_HDMI
 // ****************************************************************************
 //
 //                                  QVGA
@@ -1705,7 +1705,7 @@ void __no_inline_not_in_flash_func(modclock)(uint16_t speed){
        ssi_hw->ssienr=1;
 }
 #else
-#ifndef PICOMITEWEB
+#if !HAL_PORT_HAS_WIFI
 uint32_t testPSRAM(void){
     uint32_t *p=(uint32_t *)PSRAMbase;
     uint32_t *q=(uint32_t *)PSRAMbase;
@@ -1757,7 +1757,7 @@ void MIPS16 updatebootcount(void){
  *   *foo --wom="bat"  =>  RUN "foo", "--wom=" + Chr$(34) + "bat" + Chr$(34)
  */
 
-#ifdef PICOMITEWEB
+#if HAL_PORT_HAS_WIFI
 void WebConnect(void){
     if(*Option.SSID){
         if(*Option.ipaddress){
@@ -1829,7 +1829,7 @@ int MIPS16 main(){
         watchdog_enable(1, 1);
         while(1);
     }
-#ifndef HDMI
+#if !HAL_PORT_HAS_HDMI
     if(Option.VGA_HSYNC==0){
         Option.VGA_HSYNC=21;
         Option.VGA_BLUE=24;
@@ -1846,7 +1846,7 @@ int MIPS16 main(){
     uSec(100);
     if(_excep_code == RESET_CLOCKSPEED) {
 #ifdef PICOMITEVGA
-#ifdef HDMI
+#if HAL_PORT_HAS_HDMI
         Option.CPU_Speed=Freq480P;              // init the options if this is the very first startup
 #else
         Option.CPU_Speed=Freq252P;              // init the options if this is the very first startup
@@ -1890,7 +1890,7 @@ int MIPS16 main(){
     if(Option.CPU_Speed<=288000)qmi_hw->m[0].timing = 0x40006202;
     sleep_ms(2);
 #endif
-#if defined(HDMI) && defined(rp2350)
+#if HAL_PORT_HAS_HDMI && defined(rp2350)
     set_sys_clock_khz(Option.CPU_Speed==FreqX ? 252000 : Option.CPU_Speed, false);
 #else
     set_sys_clock_khz(Option.CPU_Speed, false);
@@ -1902,7 +1902,7 @@ int MIPS16 main(){
     PWM_FREQ=44100;
     pico_get_unique_board_id_string (id_out,12);
 #ifdef rp2350
-#ifndef PICOMITEWEB
+#if !HAL_PORT_HAS_WIFI
     if(Option.PSRAM_CS_PIN){
         PSRAMpin=PinDef[Option.PSRAM_CS_PIN].GPno;
         psram_setup();
@@ -1945,7 +1945,7 @@ int MIPS16 main(){
         FRAMEBUFFER=AllMemory+heap_memory_size+256;
     }
 #endif
-#ifdef HDMI
+#if HAL_PORT_HAS_HDMI
     if((FullColour || MediumRes) && !(Option.CPU_Speed==FreqX)){
         clock_configure(
             clk_hstx,
@@ -1976,7 +1976,7 @@ int MIPS16 main(){
     hw_clear_bits(&watchdog_hw->ctrl, WATCHDOG_CTRL_ENABLE_BITS);
     _excep_code=excep;
 #ifdef PICOMITEVGA
-#ifndef HDMI
+#if !HAL_PORT_HAS_HDMI
     if(Option.CPU_Speed == Freq252P || Option.CPU_Speed == Freq480P  || Option.CPU_Speed == Freq848  || Option.CPU_Speed == Freq400   || Option.CPU_Speed == FreqSVGA )QVGA_CLKDIV= 2;
     else if(Option.CPU_Speed == 378000)QVGA_CLKDIV= 3;
     else QVGA_CLKDIV= 1;
@@ -2073,7 +2073,7 @@ if(Option.CPU_Speed==FreqSVGA){ //adjust the size of the heap
     
 #ifdef PICOMITEVGA
 //        bus_ctrl_hw->priority = BUSCTRL_BUS_PRIORITY_DMA_W_BITS | BUSCTRL_BUS_PRIORITY_DMA_R_BITS;
-    #ifdef HDMI
+    #if HAL_PORT_HAS_HDMI
 //    bus_ctrl_hw->priority = BUSCTRL_BUS_PRIORITY_DMA_W_BITS | BUSCTRL_BUS_PRIORITY_DMA_R_BITS | BUSCTRL_BUS_PRIORITY_PROC1_BITS;
         multicore_launch_core1_with_stack(HDMICore,core1stack,512);
         core1stack[0]=0x12345678;
@@ -2112,7 +2112,7 @@ if(Option.CPU_Speed==FreqSVGA){ //adjust the size of the heap
         strcpy((char *)banner,MES_SIGNON); 
 #ifdef rp2350
     #ifdef PICOMITEVGA
-        #ifdef HDMI
+        #if HAL_PORT_HAS_HDMI
             #ifdef USBKEYBOARD
                 banner[32]=(rp2350a?'A':'B');
             #else
@@ -2129,7 +2129,7 @@ if(Option.CPU_Speed==FreqSVGA){ //adjust the size of the heap
         #ifdef USBKEYBOARD
             banner[28]=(rp2350a?'A':'B');
         #else
-            #ifdef PICOMITEWEB
+            #if HAL_PORT_HAS_WIFI
                 banner[23]=(rp2350a?'A':'B');
             #else
                 banner[24]=(rp2350a?'A':'B');
@@ -2199,7 +2199,7 @@ if(Option.CPU_Speed==FreqSVGA){ //adjust the size of the heap
 #endif
 #ifdef rp2350
     if(PSRAMsize){MMPrintString("Total of ");PInt(PSRAMsize/(1024*1024));MMPrintString(" Mbytes PSRAM available\r\n");}
-    #if defined(PICOMITEVGA) && !defined(HDMI)
+    #if defined(PICOMITEVGA) && !HAL_PORT_HAS_HDMI
         start_i2s(QVGA_PIO_NUM,1);
     #else
         start_i2s(2,1);

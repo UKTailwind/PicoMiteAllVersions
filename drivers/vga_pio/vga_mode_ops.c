@@ -65,7 +65,7 @@ void hal_vga_ops_reset_display_vga(void) {
     else if(Option.CPU_Speed==FreqSVGA)VRes=((DISPLAY_TYPE == SCREENMODE1 ||  DISPLAY_TYPE == SCREENMODE3) ? 600: 300);
 #endif
     else VRes=((DISPLAY_TYPE == SCREENMODE1 ||  DISPLAY_TYPE == SCREENMODE3) ? 480: 240);
-#ifdef HDMI
+#if HAL_PORT_HAS_HDMI
         if(Option.CPU_Speed==Freq720P){
             HRes=(DISPLAY_TYPE == SCREENMODE1 ? 1280 : ((DISPLAY_TYPE==SCREENMODE2 || DISPLAY_TYPE==SCREENMODE5) ? 320 : 640));
             VRes=(DISPLAY_TYPE == SCREENMODE1 ? 720 :  ((DISPLAY_TYPE==SCREENMODE2 || DISPLAY_TYPE==SCREENMODE5) ? 180 : 360));
@@ -107,7 +107,7 @@ void hal_vga_ops_reset_display_vga(void) {
             DrawBufferFast=DrawBuffer16Fast;
             ReadBufferFast=ReadBuffer16Fast;
             DrawPixel=DrawPixel16;
-#ifdef HDMI
+#if HAL_PORT_HAS_HDMI
         } else if(DISPLAY_TYPE == SCREENMODE4){
             /* HDMI SCREENMODE4/5 dispatchers live in
              * drivers/vga_pio/vga_mode_ops.c (PICOMITEVGA+HDMI real
@@ -159,7 +159,7 @@ void hal_vga_ops_reset_display_vga(void) {
             PromptFC = gui_fcolour= Option.DefaultFC;
             PromptBC = gui_bcolour= Option.DefaultBC;
         }
-#ifdef HDMI
+#if HAL_PORT_HAS_HDMI
         settiles();
 #else
 #ifdef rp2350
@@ -200,7 +200,7 @@ void closeframebuffer(char layer) {
             case SCREENMODE3:
                 FreeMemory((void *)FrameBuf);
                 break;
-#ifdef HDMI
+#if HAL_PORT_HAS_HDMI
             case SCREENMODE4:
             case SCREENMODE5:
                 FreeMemory((void *)FrameBuf);
@@ -232,7 +232,7 @@ void closeframebuffer(char layer) {
                 LayerBuf=DisplayBuf;
                 FreeMemory((void *)temp);
                 break;
-#ifdef HDMI
+#if HAL_PORT_HAS_HDMI
             case SCREENMODE4:
                 LayerBuf=DisplayBuf;
                 FreeMemory((void *)temp);
@@ -265,7 +265,7 @@ void closeframebuffer(char layer) {
                 SecondLayer=DisplayBuf;
                 FreeMemory((void *)temp);
                 break;
-#ifdef HDMI
+#if HAL_PORT_HAS_HDMI
             case SCREENMODE4:
                 SecondLayer=DisplayBuf;
                 FreeMemory((void *)temp);
@@ -335,7 +335,7 @@ XGA:
                 case SCREENMODE3:
                      SecondFrame=GetMemory(ScreenSize);
                     break;
-#ifdef HDMI
+#if HAL_PORT_HAS_HDMI
                 case SCREENMODE4:
                     SecondFrame=GetMemory(ScreenSize);
                     break;
@@ -365,7 +365,7 @@ XGA:
                 case SCREENMODE3:
                     FrameBuf=GetMemory(ScreenSize);
                     break;
-#ifdef HDMI
+#if HAL_PORT_HAS_HDMI
                 case SCREENMODE4:
                 case SCREENMODE5:
                     FrameBuf=GetMemory(ScreenSize);
@@ -400,7 +400,7 @@ XGA:
                     }
                     colour=transparents | (transparents<<4);
                     break;
-#ifdef HDMI
+#if HAL_PORT_HAS_HDMI
                 case SCREENMODE4:
                     SecondLayer=GetMemory(ScreenSize);
                     break;
@@ -440,7 +440,7 @@ XGA:
                     LayerBuf=GetMemory(ScreenSize);
                     colour=transparent | (transparent<<4);
                     break;
-#ifdef HDMI
+#if HAL_PORT_HAS_HDMI
                 case SCREENMODE4:
                     LayerBuf=GetMemory(ScreenSize);
                     if(argc==1)RGBtransparent=RGB555(getColour((char *)argv[0],0));
@@ -519,7 +519,7 @@ XGA:
             else error("Syntax");
         }
     } else if((p=checkstring(cmdline, (unsigned char *)"WAIT"))) {
-            #ifdef HDMI
+            #if HAL_PORT_HAS_HDMI
             while(v_scanline!=0){}
             #else
             while(QVgaScanLine!=0){}
@@ -543,7 +543,7 @@ XGA:
         else error("Syntax");
         if(argc==5){
             if(checkstring(argv[4],(unsigned char *)"B")){
-                #ifdef HDMI
+                #if HAL_PORT_HAS_HDMI
                 while(v_scanline!=0){} 
                 #else
                 while(QVgaScanLine!=0){}
@@ -562,7 +562,7 @@ XGA:
 
 /* fun_getscanline — BASIC function "GetScanLine". Lifted from Draw.c's
  * PICOMITEVGA block. */
-#ifdef HDMI
+#if HAL_PORT_HAS_HDMI
 extern volatile int32_t v_scanline;
 void fun_getscanline(void) {
     if (Option.CPU_Speed == Freq720P) {
@@ -658,7 +658,7 @@ void fun_map(void){
 void setmode(int mode, bool clear){
     closeframebuffer('A');
     if(clear)memset((void *)FRAMEBUFFER,0,framebuffersize);
-#ifdef HDMI
+#if HAL_PORT_HAS_HDMI
     while(v_scanline!=0){}
 #else
     while(QVgaScanLine!=0){}
@@ -678,7 +678,7 @@ void setmode(int mode, bool clear){
         ScreenSize=MODE2SIZE;
     } else { //mode=1
 #ifdef rp2350
-#ifndef HDMI
+#if !HAL_PORT_HAS_HDMI
         tilefcols=(uint16_t *)((uint8_t*)FRAMEBUFFER+(MODE1SIZE*3));
         tilebcols=(uint16_t *)((uint8_t*)FRAMEBUFFER+(MODE1SIZE*3)+(MODE1SIZE>>1));
 #else
@@ -695,7 +695,7 @@ void setmode(int mode, bool clear){
         CurrentX = CurrentY =0;
         ClearScreen(Option.DefaultBC);
     }
-#ifdef HDMI
+#if HAL_PORT_HAS_HDMI
     if(FullColour || MediumRes){
 #endif
         if(DISPLAY_TYPE==SCREENMODE2 || DISPLAY_TYPE==SCREENMODE4 || DISPLAY_TYPE==SCREENMODE5){
@@ -705,7 +705,7 @@ void setmode(int mode, bool clear){
             SetFont(1) ;
             PromptFont = 1;
         }
-#ifdef HDMI
+#if HAL_PORT_HAS_HDMI
     } else {
         if(DISPLAY_TYPE==SCREENMODE1){
             SetFont((2<<4) | 1) ;
@@ -731,7 +731,7 @@ if(DISPLAY_TYPE==SCREENMODE1){
     if(DISPLAY_TYPE==SCREENMODE1/* && WriteBuf==DisplayBuf*/){
         gui_fcolour=Option.DefaultFC;
         gui_bcolour=Option.DefaultBC;
-#ifdef HDMI
+#if HAL_PORT_HAS_HDMI
         settiles();
 #else
         int bcolour = RGB121pack(gui_bcolour);

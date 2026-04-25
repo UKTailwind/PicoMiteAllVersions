@@ -208,7 +208,7 @@ void cmd_insert(void);
 void cmd_add(void);
 void cmd_arrayset(void);
 void cmd_keyscan(void);
-#ifdef PICOMITEWEB
+#if HAL_PORT_HAS_WIFI
     void cmd_web(void);
 #endif
 #ifdef rp2350
@@ -352,7 +352,7 @@ void fun_tilde(void);
 void fun_byte(void);
 void fun_bit(void);
 void fun_flag(void);
-#ifdef PICOMITEWEB
+#if HAL_PORT_HAS_WIFI
     void fun_json(void);
 #endif
 void fun_dev(void);
@@ -465,7 +465,7 @@ void fun_map(void);
 	{ (unsigned char *)"Port(",		T_CMD | T_FUN,		0, cmd_port	    },
 	{ (unsigned char *)"IR",                 T_CMD,			0, cmd_ir           },
 	{ (unsigned char *)"Blit Memory",           T_CMD,                      0, cmd_blitmemory	},
-#ifdef GUICONTROLS
+#if HAL_PORT_HAS_GUICONTROLS
   	{ (unsigned char *)"GUI",            T_CMD,                      0, cmd_gui   },
 #else
   	{ (unsigned char *)"GUI",            T_CMD,                      0, cmd_guiMX170   },
@@ -552,13 +552,13 @@ void fun_map(void);
     { (unsigned char *)"Camera",         T_CMD,                      0, cmd_camera },
     { (unsigned char *)"Refresh",         T_CMD,                      0, cmd_refresh },
 #endif
-#ifdef GUICONTROLS
+#if HAL_PORT_HAS_GUICONTROLS
 	{ (unsigned char *)"CtrlVal(",       T_CMD | T_FUN,              0, cmd_ctrlval    },
 #endif
 #ifdef PICOMITE
 	{ (unsigned char *)"Backlight",		T_CMD,		0, cmd_backlight		},
 #endif
-#ifdef PICOMITEWEB
+#if HAL_PORT_HAS_WIFI
 	{ (unsigned char *)"Backlight",		T_CMD,		0, cmd_backlight		},
     { (unsigned char *)"WEB",       T_CMD,              0, cmd_web	    },
 #else
@@ -575,7 +575,7 @@ void fun_map(void);
 	{ (unsigned char *)"CMM2 Load",		T_CMD,				0, cmd_loadCMM2	},
 	{ (unsigned char *)"CMM2 Run",		T_CMD,				0, cmd_RunCMM2	},
 	{ (unsigned char *)"Randomize",          T_CMD,				0, cmd_null},
-#ifndef PICOMITEWEB
+#if !HAL_PORT_HAS_WIFI
 	{ (unsigned char *)"Ram",		T_CMD,				0, cmd_psram	},
 #endif
 #else
@@ -729,10 +729,10 @@ void fun_map(void);
 #else
   	{ (unsigned char *)"Touch(",       T_FUN | T_INT,        0, fun_touch  },
 #endif
-#ifdef PICOMITEWEB
+#if HAL_PORT_HAS_WIFI
 	{ (unsigned char *)"Json$(",		T_FUN | T_STR,          0, fun_json		},
 #endif
-#ifdef GUICONTROLS
+#if HAL_PORT_HAS_GUICONTROLS
 	  { (unsigned char *)"MsgBox(",        T_FUN | T_INT,              0, fun_msgbox     },
 	  { (unsigned char *)"CtrlVal(",       T_FUN | T_NBR | T_STR,      0, fun_ctrlval    },
 #endif

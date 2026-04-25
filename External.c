@@ -1270,7 +1270,7 @@ process:
     }
     // this allows the user to set a software interrupt on the touch IRQ pin if the GUI environment is not enabled
     if(pin == Option.TOUCH_IRQ)
-    #ifdef GUICONTROLS
+    #if HAL_PORT_HAS_GUICONTROLS
     if(Option.MaxCtrls==0) 
     #endif
     {
@@ -3711,7 +3711,7 @@ void MIPS16 ClearExternalIO(void) {
     closeMQTT();
     CollisionFound = false;
     COLLISIONInterrupt = NULL;
-#ifdef GUICONTROLS
+#if HAL_PORT_HAS_GUICONTROLS
     gui_int_down = false;
     gui_int_up = false;
     GuiIntDownVector=NULL;

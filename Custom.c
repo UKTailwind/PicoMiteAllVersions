@@ -40,7 +40,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "hardware/structs/dma.h"
 #include "hardware/irq.h"
 #include "hardware/pwm.h"
-#ifdef PICOMITEWEB
+#if HAL_PORT_HAS_WIFI
 #define CJSON_NESTING_LIMIT 100
 #include "cJSON.h"
 #endif
@@ -121,7 +121,7 @@ bool PIO2=false;
 #endif
 #ifdef PICOMITEVGA
 #ifdef rp2350
-#ifdef HDMI
+#if HAL_PORT_HAS_HDMI
 bool PIO0=true;
 #else
 bool PIO0=false;
@@ -134,7 +134,7 @@ bool PIO1=true;
 bool PIO2=false;
 #endif
 #endif
-#ifdef PICOMITEWEB
+#if HAL_PORT_HAS_WIFI
 #ifdef rp2350
 bool PIO0=true;
 bool PIO1=false;
@@ -261,7 +261,7 @@ void pio_init(int pior, int sm, uint32_t pinctrl, uint32_t execctrl, uint32_t sh
         cfg.shiftctrl=shiftctrl;
         cfg.pinctrl=pinctrl;
         #ifdef rp2350
-        #ifdef PICOMITEWEB
+        #if HAL_PORT_HAS_WIFI
                 for(int i = 1; i < (NBRPINS) ; i++) {
         #else
                 for(int i = 1; i < (rp2350a ? 44:NBRPINS) ; i++) {
@@ -311,7 +311,7 @@ void start_i2s(int pior, int sm){
 #else
         pioi2s = (pior==0 ? pio0: pio1);
 #endif
-#if !defined(PICOMITEVGA) || defined(HDMI)
+#if !defined(PICOMITEVGA) || HAL_PORT_HAS_HDMI
 #ifdef rp2350
         if(PinDef[Option.audio_i2s_bclk].GPno+1>31 || PinDef[Option.audio_i2s_data].GPno>31)pio_set_gpio_base(pioi2s,16);
 #endif
@@ -1502,7 +1502,7 @@ pushthreshold, pullthreshold, autopush, autopull, inshiftdir, outshiftdir, joinr
         if(argc>55 && *argv[56]) joinrxfifoput=getint(argv[56],0,1); // FJOIN_RX_PUT
 #endif
         #ifdef rp2350
-        #ifdef PICOMITEWEB
+        #if HAL_PORT_HAS_WIFI
                 for(int i = 1; i < (NBRPINS) ; i++) {
         #else
                 for(int i = 1; i < (rp2350a ? 44:NBRPINS) ; i++) {
@@ -1844,7 +1844,7 @@ void cmd_label(void){
  * The following section will be excluded from the documentation.
  */
 
-#ifdef PICOMITEWEB
+#if HAL_PORT_HAS_WIFI
 char *scan_dest=NULL;
 volatile char *scan_dups=NULL; 
 volatile int scan_size;

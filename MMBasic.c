@@ -3596,7 +3596,7 @@ void MIPS16 ClearRuntime(bool all) {
     g_varcnt = 0;
     CurrentLinePtr = ContinuePoint = NULL;
     for(i = 0;  i < MAXSUBFUN; i++)  subfun[i] = NULL;
-#ifdef GUICONTROLS
+#if HAL_PORT_HAS_GUICONTROLS
     for(i = 1; i < Option.MaxCtrls; i++) {
         memset(&Ctrl[i],0,sizeof(struct s_ctrl));
         Ctrl[i].state = Ctrl[i].type = 0;
