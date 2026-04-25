@@ -281,48 +281,37 @@ target_compile_options(PicoMite PRIVATE -DPICOMITE
 										-DPICO_CORE0_STACK_SIZE=0x1000
 										)
 endif()
-# GUI widget command family — rp2350 PicoMite variants + WEBRP2350. Costs
-# ~10 KB of static .bss (CTRLS[200] @ ~52 bytes each); rp2040 PicoCalc has
-# no touchscreen and needs that RAM for the MMHeap to compile larger
-# programs. WEBRP2350 needs GUICONTROLS because it compiles GUI.c, which
-# references Option.MaxCtrls and MAX_CAPTION_LINES unconditionally —
-# matches upstream's "#special case WEB RP2350 gets the GUI controls" block.
-if (COMPILE STREQUAL "PICORP2350" OR COMPILE STREQUAL "PICOUSBRP2350" OR COMPILE STREQUAL "WEBRP2350")
-target_compile_options(PicoMite PRIVATE -DGUICONTROLS)
-endif()
-# all VGA variants 
+# VGA family (VGA, VGARP2350, HDMI all set -DPICOMITEVGA — still consulted
+# by Hardware_Includes.h's `#ifdef PICOMITEVGA` for the multicore include
+# and configuration.h's PICOMITEVGA mode-table block. PICOMITEVGA decascade
+# is a follow-on to this plan).
 if (COMPILE STREQUAL "VGA" OR COMPILE STREQUAL "VGAUSB" OR COMPILE STREQUAL "VGARP2350" OR COMPILE STREQUAL "VGAUSBRP2350")
 target_compile_options(PicoMite PRIVATE -DPICOMITEVGA
-										-DPICO_HEAP_SIZE=0x1000 
+										-DPICO_HEAP_SIZE=0x1000
 										-DPICO_CORE0_STACK_SIZE=0x2000
 										)
 endif()
-# HDMI variants
+# HDMI variants (PICOMITEVGA-family, HDMI sink).
 if (COMPILE STREQUAL "HDMI" OR COMPILE STREQUAL "HDMIUSB")
 target_compile_options(PicoMite PRIVATE -DPICOMITEVGA
-										-DHDMI
-										-DPICO_HEAP_SIZE=0x2000 
+										-DPICO_HEAP_SIZE=0x2000
 										-DPICO_CORE0_STACK_SIZE=0x2000
 										)
 endif()
-#Web variants need more heap
+# WiFi variants — heap + lwIP/CYW43 settings.
 if(COMPILE STREQUAL "WEB" OR COMPILE STREQUAL "WEBRP2350")
-	target_compile_options(PicoMite PRIVATE -DPICOMITEWEB 
-											-DPICO_HEAP_SIZE=0x3000 
-											-DCYW43_HOST_NAME="WebMite" 
+	target_compile_options(PicoMite PRIVATE -DPICO_HEAP_SIZE=0x3000
+											-DCYW43_HOST_NAME="WebMite"
 											-DPICO_CYW43_ARCH_POLL
 											-DPICO_CORE0_STACK_SIZE=0x4000
 											)
 endif()
-#USB variants
+# USB-host keyboard variants — USBKEYBOARD is consulted by per-port impl
+# files (port_defaults.c, mmbasic_port_pico.c) for keyboard backend
+# selection; remains until USB ports split into their own directories.
 if (COMPILE STREQUAL "PICOUSB" OR COMPILE STREQUAL "PICOUSBRP2350" OR COMPILE STREQUAL "VGAUSB" OR COMPILE STREQUAL "VGAUSBRP2350" OR COMPILE STREQUAL "HDMIUSB")
 target_compile_options(PicoMite PRIVATE -DUSBKEYBOARD
 										)
-endif()
-#special case WEB RP2350 gets the GUI controls
-if(COMPILE STREQUAL "WEBRP2350")
-	target_compile_options(PicoMite PRIVATE -DGUICONTROLS
-											)
 endif()
 # Per-variant device-name string used by fun_device. Lets MM_Misc.c
 # replace its 13-line nested-ifdef block with a single strcpy.
