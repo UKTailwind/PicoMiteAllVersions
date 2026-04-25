@@ -55,3 +55,19 @@ target_sources(PicoMite PRIVATE
 )
 
 set_source_files_properties(${CMAKE_SOURCE_DIR}/cJSON.c PROPERTIES COMPILE_FLAGS -Os)
+
+# --- Per-port build config (Stage E2) -------------------------------------
+# WEB rp2040 — CYW43 polled stack, larger heap, no PICOMITE/PICOMITEVGA flag.
+target_compile_options(PicoMite PRIVATE -DPICO_HEAP_SIZE=0x3000
+                                        -DCYW43_HOST_NAME="WebMite"
+                                        -DPICO_CYW43_ARCH_POLL
+                                        -DPICO_CORE0_STACK_SIZE=0x4000
+                                        -DHAL_PORT_DEVICE_NAME="WebMite"
+                                        )
+target_link_libraries(PicoMite pico_cyw43_arch_lwip_poll)
+
+pico_define_boot_stage2(slower_boot2 ${PICO_DEFAULT_BOOT_STAGE2_FILE})
+target_compile_definitions(slower_boot2 PRIVATE PICO_FLASH_SPI_CLKDIV=4)
+pico_set_boot_stage2(PicoMite slower_boot2)
+
+Pico_enable_stdio_usb(PicoMite 1)

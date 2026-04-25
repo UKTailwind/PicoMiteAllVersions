@@ -56,3 +56,23 @@ target_sources(PicoMite PRIVATE
 )
 
 set_source_files_properties(${CMAKE_SOURCE_DIR}/cJSON.c PROPERTIES COMPILE_FLAGS -Os)
+
+# --- Per-port build config (Stage E2) -------------------------------------
+target_compile_options(PicoMite PRIVATE -DPICO_HEAP_SIZE=0x3000
+                                        -DCYW43_HOST_NAME="WebMite"
+                                        -DPICO_CYW43_ARCH_POLL
+                                        -DPICO_CORE0_STACK_SIZE=0x4000
+                                        -DHAL_PORT_DEVICE_NAME="WebMite"
+                                        )
+target_compile_options(PicoMite PRIVATE -Drp2350
+                                        -DPICO_FLASH_SPI_CLKDIV=4
+                                        -DPICO_PIO_USE_GPIO_BASE
+                                        )
+target_link_libraries(PicoMite pico_cyw43_arch_lwip_poll)
+pico_set_float_implementation(PicoMite pico_dcp)
+
+Pico_enable_stdio_usb(PicoMite 1)
+
+if (SDBOOT STREQUAL "true")
+    pico_set_linker_script(PicoMite ${CMAKE_SOURCE_DIR}/memmap_default_rp2350.ld)
+endif()

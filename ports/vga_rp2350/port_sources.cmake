@@ -47,3 +47,29 @@ else()
 endif()
 
 pico_generate_pio_header(PicoMite ${CMAKE_SOURCE_DIR}/PicoMiteVGA.pio)
+
+# --- Per-port build config (Stage E2) -------------------------------------
+target_compile_options(PicoMite PRIVATE -DPICOMITEVGA
+                                        -DPICO_HEAP_SIZE=0x1000
+                                        -DPICO_CORE0_STACK_SIZE=0x2000
+                                        )
+target_compile_options(PicoMite PRIVATE -Drp2350
+                                        -DPICO_FLASH_SPI_CLKDIV=4
+                                        -DPICO_PIO_USE_GPIO_BASE
+                                        )
+target_link_libraries(PicoMite pico_multicore)
+pico_set_float_implementation(PicoMite pico_dcp)
+
+if (COMPILE STREQUAL "VGAUSBRP2350")
+    target_compile_options(PicoMite PRIVATE -DUSBKEYBOARD
+                                            -DHAL_PORT_DEVICE_NAME="PicoMiteVGAUSB"
+                                            )
+    target_link_libraries(PicoMite tinyusb_host tinyusb_board)
+    target_include_directories(PicoMite PRIVATE
+        ${CMAKE_SOURCE_DIR}/usb_host_files
+    )
+    Pico_enable_stdio_usb(PicoMite 0)
+else()
+    target_compile_options(PicoMite PRIVATE -DHAL_PORT_DEVICE_NAME="PicoMiteVGA")
+    Pico_enable_stdio_usb(PicoMite 1)
+endif()

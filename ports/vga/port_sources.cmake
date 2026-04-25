@@ -47,3 +47,30 @@ endif()
 
 # VGA scanout PIO (PIOmite I2S is generated globally for every device build).
 pico_generate_pio_header(PicoMite ${CMAKE_SOURCE_DIR}/PicoMiteVGA.pio)
+
+# --- Per-port build config (Stage E2) -------------------------------------
+# PICOMITEVGA still consulted by Hardware_Includes.h (multicore include)
+# and configuration.h's mode-table block. Decascade follow-on item.
+target_compile_options(PicoMite PRIVATE -DPICOMITEVGA
+                                        -DPICO_HEAP_SIZE=0x1000
+                                        -DPICO_CORE0_STACK_SIZE=0x2000
+                                        )
+target_link_libraries(PicoMite pico_multicore)
+
+pico_define_boot_stage2(slower_boot2 ${PICO_DEFAULT_BOOT_STAGE2_FILE})
+target_compile_definitions(slower_boot2 PRIVATE PICO_FLASH_SPI_CLKDIV=4)
+pico_set_boot_stage2(PicoMite slower_boot2)
+
+if (COMPILE STREQUAL "VGAUSB")
+    target_compile_options(PicoMite PRIVATE -DUSBKEYBOARD
+                                            -DHAL_PORT_DEVICE_NAME="PicoMiteVGAUSB"
+                                            )
+    target_link_libraries(PicoMite tinyusb_host tinyusb_board)
+    target_include_directories(PicoMite PRIVATE
+        ${CMAKE_SOURCE_DIR}/usb_host_files
+    )
+    Pico_enable_stdio_usb(PicoMite 0)
+else()
+    target_compile_options(PicoMite PRIVATE -DHAL_PORT_DEVICE_NAME="PicoMiteVGA")
+    Pico_enable_stdio_usb(PicoMite 1)
+endif()

@@ -46,3 +46,39 @@ else()
         ${CMAKE_SOURCE_DIR}/mouse.c
     )
 endif()
+
+# --- Per-port build config (Stage E2) -------------------------------------
+# PICOMITE base defines + heap/stack budget. PICOMITE is consulted by
+# drivers/spi_lcd/spi_lcd.c (NEXTGEN gates) and a handful of port files.
+target_compile_options(PicoMite PRIVATE -DPICOMITE
+                                        -DPICO_HEAP_SIZE=0x800
+                                        -DPICO_CORE0_STACK_SIZE=0x1000
+                                        )
+target_link_libraries(PicoMite pico_multicore)
+
+# rp2040 ports use a slower flash boot stage so external SPI flash fans
+# the clock down 4×.
+pico_define_boot_stage2(slower_boot2 ${PICO_DEFAULT_BOOT_STAGE2_FILE})
+target_compile_definitions(slower_boot2 PRIVATE PICO_FLASH_SPI_CLKDIV=4)
+pico_set_boot_stage2(PicoMite slower_boot2)
+
+# USB axis: device name + USB-host stack vs USB-CDC stdio.
+if (COMPILE STREQUAL "PICOUSB")
+    target_compile_options(PicoMite PRIVATE -DUSBKEYBOARD
+                                            -DHAL_PORT_DEVICE_NAME="PicoMiteUSB"
+                                            )
+    target_link_libraries(PicoMite tinyusb_host tinyusb_board)
+    target_include_directories(PicoMite PRIVATE
+        ${CMAKE_SOURCE_DIR}/usb_host_files
+    )
+    Pico_enable_stdio_usb(PicoMite 0)
+else()
+    target_compile_options(PicoMite PRIVATE -DHAL_PORT_DEVICE_NAME="PicoMite")
+    Pico_enable_stdio_usb(PicoMite 1)
+endif()
+
+# Optional SDBOOT linker script — relocates firmware so a 256 KB
+# bootloader can sit in the first part of flash.
+if (SDBOOT STREQUAL "true" AND COMPILE STREQUAL "PICO")
+    pico_set_linker_script(PicoMite ${CMAKE_SOURCE_DIR}/memmap_default_rp2040.ld)
+endif()
