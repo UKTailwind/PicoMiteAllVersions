@@ -28,13 +28,6 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 bool optionsuppressstatus=0;
 int TCP_PORT ;
 
-/* WEB builds never launch core1; MMBasic's per-statement canary check
- * `core1stack[0] != 0x12345678` reads this symbol via the `extern
- * uint32_t core1stack[]` in Hardware_Includes.h. Providing a 1-word
- * array pre-initialised to the canary value lets the check run
- * unconditionally without ever failing on WEB. */
-uint32_t core1stack[1] = { 0x12345678 };
-
 //#define //DEBUG_printf printf
 #define DEBUG_printf
 const char httpheadersfail[]="HTTP/1.0 404\r\n\r\n";

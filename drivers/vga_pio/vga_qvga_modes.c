@@ -108,9 +108,9 @@ void cmd_tile(void){
  *
  * QVgaInit() itself still lives in PicoMite.c because it pulls in a
  * large chain of PIO/DMA init globals local to that file; moving it
- * is a separate refactor. */
-uint32_t core1stack[128];
-
+ * is a separate refactor.
+ *
+ * core1stack[] is owned by ports/pico_sdk_common/core1_runtime.c. */
 void __not_in_flash_func(QVgaCore)(void) {
     QVgaInit();
     while (true) {

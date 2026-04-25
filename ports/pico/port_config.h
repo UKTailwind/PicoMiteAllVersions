@@ -82,6 +82,10 @@
 #define HAL_PORT_HAS_GUICONTROLS         0
 #define HAL_PORT_HAS_NEXTGEN_DISPLAY    0
 
+/* core1stack[] size in words. PICOMITE runs the SPI-LCD merge pipeline on
+ * core1 (drivers/display_merge/display_merge_pico.c, ~2 KB stack). */
+#define HAL_PORT_CORE1_STACK_WORDS       512
+
 #define HAL_PORT_RAM_FUNC(name)          __not_in_flash_func(name)
 
 /* Placement for MMBasic's per-expression hot functions (getvalue,

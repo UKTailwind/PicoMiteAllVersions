@@ -45,6 +45,10 @@
 #define HAL_PORT_HAS_VGA_PIO             0
 #define HAL_PORT_HAS_GUICONTROLS         1
 
+/* core1stack[] size in words. PICOMITE runs the SPI-LCD merge pipeline
+ * on core1 (display_merge_pico, ~2 KB stack). */
+#define HAL_PORT_CORE1_STACK_WORDS       512
+
 /* FLAC decoder base sample-rate cap (RP2350 → 48 kHz). */
 #define HAL_PORT_AUDIO_FLAC_MAX_BASE_HZ  48000
 #define HAL_PORT_AUDIO_MOD_BUFFER_SIZE   8192

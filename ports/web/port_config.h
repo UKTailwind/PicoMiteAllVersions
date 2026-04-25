@@ -48,6 +48,10 @@
 #define HAL_PORT_HAS_VGA_PIO             0
 #define HAL_PORT_HAS_GUICONTROLS         0
 
+/* core1stack[] size in words. WEB never launches core1 — single canary
+ * word satisfies MMBasic.c's overflow check at core1stack[0]. */
+#define HAL_PORT_CORE1_STACK_WORDS       1
+
 /* FLAC decoder base sample-rate cap (RP2040 → 44.1 kHz). */
 #define HAL_PORT_AUDIO_FLAC_MAX_BASE_HZ  44100
 #define HAL_PORT_AUDIO_MOD_BUFFER_SIZE   6144

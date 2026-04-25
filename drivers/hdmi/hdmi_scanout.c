@@ -1145,13 +1145,9 @@ void mapreset(void){
         map16quads[i]=remap332[i]=((RGB332(MAP16DEF[i])<<24) | (RGB332(MAP16DEF[i])<<16) | (RGB332(MAP16DEF[i])<<8) | RGB332(MAP16DEF[i]));
     }
 }
-/* HDMICore is launched on core1 by PicoMite.c's boot path with this
- * stack. Relocated from Memory.c's `#ifdef HDMI` block along with the
- * rest of the VGA/HDMI state during phase-10 cleanup. Symbol matches
- * the extern in Hardware_Includes.h so MMBasic.c's canary check
- * (core1stack[0] != 0x12345678) resolves at link time. */
-uint32_t core1stack[128];
-
+/* HDMICore is launched on core1 by PicoMite.c's boot path. core1stack[]
+ * is owned by ports/pico_sdk_common/core1_runtime.c — sized per port via
+ * HAL_PORT_CORE1_STACK_WORDS. */
 void HDMICore(void){
     mapreset();
     if(Option.CPU_Speed==FreqXGA){

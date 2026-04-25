@@ -122,16 +122,12 @@ void hal_display_merge_post_blit_bg(int x, int y, int w, int h,
     multicore_fifo_push_blocking((uint32_t)timer_us);
 }
 
-/* Core1 entry point + stack. core1stack[0] is set to the 0x12345678
- * canary by the launch site (PicoMite.c boot path); MMBasic.c's
- * per-statement loop verifies it is still intact to catch core1 stack
- * overflow. Symbol and size match the legacy in-PicoMite.c definition.
- *
- * UpdateCore is the receiver counterpart to the post_* functions above:
+/* UpdateCore is the receiver counterpart to the post_* functions above:
  * it spins on the inter-core FIFO, decoding the command word + payloads
- * posted by core0 and driving the SPI-LCD merge path on core1. */
-uint32_t core1stack[512];
-
+ * posted by core0 and driving the SPI-LCD merge path on core1.
+ *
+ * core1stack[] is owned by ports/pico_sdk_common/core1_runtime.c — sized
+ * per port via HAL_PORT_CORE1_STACK_WORDS. */
 void __not_in_flash_func(UpdateCore)(void) {
     while (true) {
         __dmb();

@@ -48,6 +48,10 @@
 #define HAL_PORT_HAS_WIFI                0
 #define HAL_PORT_HAS_VGA_PIO             1
 #define HAL_PORT_HAS_GUICONTROLS         0
+
+/* core1stack[] size in words. VGA runs the QVGA scanout PIO loop on core1
+ * (vga_qvga_modes::QVgaCore, 512-byte stack). */
+#define HAL_PORT_CORE1_STACK_WORDS       128
 #define HAL_PORT_HAS_NEXTGEN_DISPLAY    0
 
 /* FLAC decoder base sample-rate cap (RP2040 → 44.1 kHz). */
