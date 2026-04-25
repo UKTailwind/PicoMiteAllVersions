@@ -193,237 +193,28 @@ target_include_directories(PicoMite PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/ports/pi
 # putting that directory on the include path. Core uses these as *values*
 # in expressions and array sizes; using them as preprocessor gates is
 # forbidden (see docs/real-hal-fixup-plan.md F2).
+# Source-list inclusion is per-port composition. Each port directory
+# under ports/<port>/ ships a port_sources.cmake snippet that declares
+# the source files for that port's hardware backends (SPI-LCD vs VGA-PIO
+# vs HDMI vs WiFi, USB-host vs PS/2 keyboard, rp2040 stubs vs rp2350
+# real-feature backends). The COMPILE → port-directory map below selects
+# exactly one snippet per build.
 if (COMPILE STREQUAL "PICO" OR COMPILE STREQUAL "PICOUSB")
-	target_include_directories(PicoMite PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/ports/pico)
-	target_sources(PicoMite PRIVATE
-		ports/pico/pin_tables.c
-		ports/pico/port_defaults.c
-	)
+    set(PORT_DIR pico)
 elseif (COMPILE STREQUAL "VGA" OR COMPILE STREQUAL "VGAUSB")
-	target_include_directories(PicoMite PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/ports/vga)
-	target_sources(PicoMite PRIVATE
-		ports/vga/pin_tables.c
-		ports/vga/port_defaults.c
-	)
+    set(PORT_DIR vga)
 elseif (COMPILE STREQUAL "WEB")
-	target_include_directories(PicoMite PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/ports/web)
-	target_sources(PicoMite PRIVATE
-		ports/web/pin_tables.c
-		ports/web/port_defaults.c
-	)
+    set(PORT_DIR web)
 elseif (COMPILE STREQUAL "PICORP2350" OR COMPILE STREQUAL "PICOUSBRP2350")
-	target_include_directories(PicoMite PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/ports/pico_rp2350)
-	target_sources(PicoMite PRIVATE
-		ports/pico_rp2350/pin_tables.c
-		ports/pico_rp2350/picocalc_keypad.c
-		ports/pico_rp2350/port_defaults.c
-	)
+    set(PORT_DIR pico_rp2350)
 elseif (COMPILE STREQUAL "VGARP2350" OR COMPILE STREQUAL "VGAUSBRP2350")
-	target_include_directories(PicoMite PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/ports/vga_rp2350)
-	target_sources(PicoMite PRIVATE
-		ports/vga_rp2350/pin_tables.c
-		ports/vga_rp2350/port_defaults.c
-	)
+    set(PORT_DIR vga_rp2350)
 elseif (COMPILE STREQUAL "WEBRP2350")
-	target_include_directories(PicoMite PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/ports/web_rp2350)
-	target_sources(PicoMite PRIVATE
-		ports/web_rp2350/pin_tables.c
-		ports/web_rp2350/port_defaults.c
-	)
+    set(PORT_DIR web_rp2350)
 elseif (COMPILE STREQUAL "HDMI" OR COMPILE STREQUAL "HDMIUSB")
-	target_include_directories(PicoMite PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/ports/hdmi_rp2350)
-	target_sources(PicoMite PRIVATE
-		ports/hdmi_rp2350/pin_tables.c
-		ports/hdmi_rp2350/port_defaults.c
-	)
+    set(PORT_DIR hdmi_rp2350)
 endif()
-# HDMI provides its own MMBasic port-hook body because prompt-font
-# selection has extra cases for FullColour / SCREENMODE3; every other
-# target links the simple pico_sdk_common variant.
-if (COMPILE STREQUAL "HDMI" OR COMPILE STREQUAL "HDMIUSB")
-	target_sources(PicoMite PRIVATE ports/hdmi_rp2350/mmbasic_port_hdmi.c)
-else()
-	target_sources(PicoMite PRIVATE ports/pico_sdk_common/mmbasic_port_pico.c)
-endif()
-if (COMPILE STREQUAL "HDMI" OR COMPILE STREQUAL "WEBRP2350" OR COMPILE STREQUAL "HDMIUSB"  OR COMPILE STREQUAL "VGARP2350"  OR COMPILE STREQUAL "VGAUSBRP2350"  OR COMPILE STREQUAL "PICORP2350"  OR COMPILE STREQUAL "PICOUSBRP2350" )
-    target_sources(PicoMite PRIVATE psram.c)
-endif()
-
-# MP3 decoder (dr_mp3 amalgamated impl) is ~100 KB of code — only RP2350
-# targets have the flash + RAM budget. RP2040 variants link no-op stubs so
-# Audio.c can include dr_mp3.h unconditionally for types/decls without
-# blowing the binary size on the small chip.
-if (COMPILE STREQUAL "HDMI" OR COMPILE STREQUAL "WEBRP2350" OR COMPILE STREQUAL "HDMIUSB"  OR COMPILE STREQUAL "VGARP2350"  OR COMPILE STREQUAL "VGAUSBRP2350"  OR COMPILE STREQUAL "PICORP2350"  OR COMPILE STREQUAL "PICOUSBRP2350" )
-    target_sources(PicoMite PRIVATE drivers/audio_mp3/audio_mp3_real.c)
-else()
-    target_sources(PicoMite PRIVATE drivers/audio_mp3/audio_mp3_stub.c)
-endif()
-
-# QSPI PSRAM heap: rp2350 non-WEB variants (PicoMite + VGA + HDMI at
-# rp2350) can optionally attach a PSRAM module via Option.PSRAM_CS_PIN.
-# Memory.c's GetMemory / TryGetMemory / FreeMemory / MemSize / ... call
-# into the psram_heap driver; callers runtime-guard with `if(PSRAMsize)`
-# or an address-range check so the stub is safe. rp2040 variants and
-# WEBRP2350 (where the QSPI pins are consumed by the CYW43 radio) link
-# the no-op stub.
-if (COMPILE STREQUAL "PICORP2350" OR COMPILE STREQUAL "PICOUSBRP2350" OR COMPILE STREQUAL "VGARP2350" OR COMPILE STREQUAL "VGAUSBRP2350" OR COMPILE STREQUAL "HDMI" OR COMPILE STREQUAL "HDMIUSB")
-    target_sources(PicoMite PRIVATE drivers/psram_heap/psram_heap_pico.c)
-else()
-    target_sources(PicoMite PRIVATE drivers/psram_heap/psram_heap_stub.c)
-endif()
-
-# Merge pipeline: only PICOMITE (SPI-LCD) variants run the core1 merge
-# loop. VGA/HDMI/WEB composite via other means, so they link a no-op
-# stub that lets Draw.c / cmd_framebuffer call the HAL hooks
-# unconditionally.
-if (COMPILE STREQUAL "PICO" OR COMPILE STREQUAL "PICOUSB" OR COMPILE STREQUAL "PICORP2350" OR COMPILE STREQUAL "PICOUSBRP2350")
-    target_sources(PicoMite PRIVATE drivers/display_merge/display_merge_pico.c)
-else()
-    target_sources(PicoMite PRIVATE drivers/display_merge/display_merge_stub.c)
-endif()
-
-# VM FRAMEBUFFER command surface (hal/hal_vm_framebuffer.h): SPI-LCD
-# PICOMITE variants get the real impl that drives the merge pipeline;
-# VGA/HDMI/WEB get the error stub because FRAMEBUFFER commands don't
-# map onto scanout-framebuffer hardware.
-if (COMPILE STREQUAL "PICO" OR COMPILE STREQUAL "PICOUSB" OR COMPILE STREQUAL "PICORP2350" OR COMPILE STREQUAL "PICOUSBRP2350")
-    target_sources(PicoMite PRIVATE drivers/vm_framebuffer_picomite/vm_framebuffer_picomite.c)
-else()
-    target_sources(PicoMite PRIVATE drivers/vm_framebuffer_unsupported/vm_framebuffer_stub.c)
-endif()
-
-# NEXTGEN (MEM332) SPI-LCD display types are rp2350 PICOMITE only. Real
-# implementations live in drivers/spi_lcd/spi_lcd.c under
-# `#if PICOMITE && rp2350` gates; every other target links a no-op stub
-# so Draw.c's restorepanel() can assign the function pointers without
-# a target-macro ifdef.
-if (COMPILE STREQUAL "PICORP2350" OR COMPILE STREQUAL "PICOUSBRP2350")
-    # real impls already compiled inside drivers/spi_lcd/spi_lcd.c
-else()
-    target_sources(PicoMite PRIVATE drivers/spi_lcd/spi_lcd_nextgen_stub.c)
-endif()
-
-# FASTGFX double-buffered scanline-diff DMA swap path: PICOMITE (SPI-LCD)
-# only. VGA/HDMI/WEB get cmd_fastgfx / bc_fastgfx_* stubs that error.
-if (COMPILE STREQUAL "PICO" OR COMPILE STREQUAL "PICOUSB" OR COMPILE STREQUAL "PICORP2350" OR COMPILE STREQUAL "PICOUSBRP2350")
-    target_sources(PicoMite PRIVATE drivers/spi_lcd/spi_lcd_fastgfx.c)
-else()
-    target_sources(PicoMite PRIVATE drivers/spi_lcd/spi_lcd_fastgfx_stub.c)
-endif()
-
-# SPI-LCD FRAMEBUFFER subsystem: PICOMITE + WEB variants. VGA/HDMI
-# supply their own cmd_framebuffer / restorepanel / etc. in
-# drivers/vga_pio/. Host has its own simulator impl.
-if (COMPILE STREQUAL "VGA" OR COMPILE STREQUAL "VGAUSB" OR COMPILE STREQUAL "VGARP2350" OR COMPILE STREQUAL "VGAUSBRP2350" OR COMPILE STREQUAL "HDMI" OR COMPILE STREQUAL "HDMIUSB")
-    # VGA/HDMI: drivers/vga_pio/vga_mode_ops.c provides closeframebuffer etc.
-else()
-    target_sources(PicoMite PRIVATE drivers/spi_lcd/spi_lcd_framebuffer.c)
-endif()
-
-# VGA framebuffer CLS/layer helpers: PICOMITEVGA (VGA + HDMI) gets the
-# real impl, everyone else gets a no-op stub.
-if (COMPILE STREQUAL "VGA" OR COMPILE STREQUAL "VGAUSB" OR COMPILE STREQUAL "VGARP2350" OR COMPILE STREQUAL "VGAUSBRP2350" OR COMPILE STREQUAL "HDMI" OR COMPILE STREQUAL "HDMIUSB")
-    target_sources(PicoMite PRIVATE
-        drivers/vga_pio/vga_ops.c
-        drivers/vga_pio/vga_mode_ops.c
-        drivers/vga_pio/vga_blit_ops.c
-        drivers/vga_pio/vga_memory.c
-    )
-    # VGA-without-HDMI gets QVGA-specific cmd_map/cmd_tile; HDMI gets
-    # the HDMI-specific mode-ops (DrawRectangle555/256 family and
-    # HDMI-flavoured cmd_map/cmd_tile).
-    if (COMPILE STREQUAL "HDMI" OR COMPILE STREQUAL "HDMIUSB")
-        target_sources(PicoMite PRIVATE
-            drivers/hdmi/hdmi_modes.c
-            drivers/hdmi/hdmi_scanout.c
-        )
-    else()
-        target_sources(PicoMite PRIVATE drivers/vga_pio/vga_qvga_modes.c)
-    endif()
-else()
-    target_sources(PicoMite PRIVATE drivers/vga_pio/vga_ops_stub.c)
-endif()
-
-# 3D polygon / DRAW3D subsystem: linked on every target except
-# PICOMITEWEB (WEB links MMtcpserver.c's closeall3d stub).
-if (COMPILE STREQUAL "WEB" OR COMPILE STREQUAL "WEBRP2350")
-    # closeall3d stub already in MMtcpserver.c; no-op body
-else()
-    target_sources(PicoMite PRIVATE drivers/gfx_3d/gfx_3d.c)
-endif()
-
-# upng sprite LOADPNG decoder: rp2350 variants get the real impl
-# (upng.c already linked there per line 299 of this CMakeLists); every
-# other target gets a stub that errors at runtime.
-if(COMPILE STREQUAL "VGARP2350" OR COMPILE STREQUAL "WEBRP2350" OR COMPILE STREQUAL "PICORP2350" OR COMPILE STREQUAL "HDMI" OR COMPILE STREQUAL "HDMIUSB" OR COMPILE STREQUAL "VGAUSBRP2350" OR COMPILE STREQUAL "PICOUSBRP2350")
-    target_sources(PicoMite PRIVATE drivers/upng_sprite/upng_sprite.c)
-else()
-    target_sources(PicoMite PRIVATE drivers/upng_sprite/upng_sprite_stub.c)
-endif()
-
-# GUI touch-panel sub-commands (BEEP / RESET LCDPANEL / CALIBRATE /
-# TEST TOUCH): SPI-LCD + touch-panel variants (PICOMITE / WEB) get
-# the real impl; VGA/HDMI link no-op stubs so cmd_guiMX170 reports
-# "Unknown command" for touch-panel commands on those boards.
-if (COMPILE STREQUAL "VGA" OR COMPILE STREQUAL "VGAUSB" OR COMPILE STREQUAL "VGARP2350" OR COMPILE STREQUAL "VGAUSBRP2350" OR COMPILE STREQUAL "HDMI" OR COMPILE STREQUAL "HDMIUSB")
-    target_sources(PicoMite PRIVATE drivers/gui_touch/gui_touch_stub.c)
-else()
-    target_sources(PicoMite PRIVATE drivers/gui_touch/gui_touch.c)
-endif()
-if (COMPILE STREQUAL "WEB" OR COMPILE STREQUAL "WEBRP2350" )
-    target_sources(PicoMite PRIVATE
-	SSD1963.c
-	Touch.c
-	cJSON.c
-    mqtt.c
-    MMMqtt.c
-    MMTCPclient.c
-    MMtelnet.c
-    MMntp.c
-    MMtcpserver.c
-    tftp.c
-    MMtftp.c
-    MMudp.c
-    MMsetwifi.c
-	)
-	set_source_files_properties(cJSON.c PROPERTIES COMPILE_FLAGS -Os)
-	target_include_directories(PicoMite PRIVATE
-	${CMAKE_CURRENT_LIST_DIR}
-	${CMAKE_CURRENT_LIST_DIR}/.. # for our common lwipopts
-	)
-	Pico_enable_stdio_usb(PicoMite 1)
-else()
-    # Non-WEB device builds get the no-op stubs so MM_Misc.c can call
-    # WEB-stack symbols (closeMQTT, ProcessWeb, port_web_*) unconditionally.
-    target_sources(PicoMite PRIVATE MMweb_stubs.c)
-endif()
-
-if ((COMPILE STREQUAL "PICO") OR (COMPILE STREQUAL "PICOUSB") OR (COMPILE STREQUAL "PICORP2350") OR (COMPILE STREQUAL "PICOUSBRP2350") OR (COMPILE STREQUAL "WEBRP2350"))
-    target_sources(PicoMite PRIVATE
-	SSD1963.c
-	Touch.c)
-endif()
-# GUI.c — widget command family, only compiled where GUICONTROLS is enabled.
-if ((COMPILE STREQUAL "PICORP2350") OR (COMPILE STREQUAL "PICOUSBRP2350") OR (COMPILE STREQUAL "WEBRP2350"))
-    target_sources(PicoMite PRIVATE GUI.c)
-endif()
-
-if (COMPILE STREQUAL "VGAUSB" OR COMPILE STREQUAL "PICOUSBRP2350" OR COMPILE STREQUAL "VGAUSBRP2350" OR COMPILE STREQUAL "PICOUSB" OR COMPILE STREQUAL "HDMIUSB")
-    target_sources(PicoMite PRIVATE
-	drivers/usb_host_kbd/USBKeyboard.c
-	)
-else()
-	target_sources(PicoMite PRIVATE
-	drivers/ps2_matrix/Keyboard.c
-	mouse.c
-	)
-endif()
-
-if(COMPILE STREQUAL "VGARP2350" OR COMPILE STREQUAL "WEBRP2350" OR COMPILE STREQUAL "PICORP2350" OR COMPILE STREQUAL "HDMI" OR COMPILE STREQUAL "HDMIUSB" OR COMPILE STREQUAL "VGAUSBRP2350" OR COMPILE STREQUAL "PICOUSBRP2350")
-	target_sources(PicoMite PRIVATE 
-	upng.c
-	)
-endif()
+include(${CMAKE_SOURCE_DIR}/ports/${PORT_DIR}/port_sources.cmake)
 
 if(PICOCALC STREQUAL "true")
 	target_sources(PicoMite PRIVATE
@@ -450,11 +241,6 @@ if (COMPILE STREQUAL "VGAUSB" OR COMPILE STREQUAL "VGA" OR COMPILE STREQUAL "PIC
 	target_compile_definitions(slower_boot2 PRIVATE PICO_FLASH_SPI_CLKDIV=4)
 	pico_set_boot_stage2(PicoMite slower_boot2)
 endif()
-if (COMPILE STREQUAL "VGAUSB" OR COMPILE STREQUAL "VGA" OR COMPILE STREQUAL "VGAUSBRP2350" OR COMPILE STREQUAL "VGARP2350")
-	pico_generate_pio_header(PicoMite ${CMAKE_CURRENT_LIST_DIR}/PicoMiteVGA.pio)
-endif()
-
-
 if (COMPILE STREQUAL "VGAUSB" OR COMPILE STREQUAL "PICOUSB" OR COMPILE STREQUAL "HDMIUSB" OR COMPILE STREQUAL "PICOUSBRP2350" OR COMPILE STREQUAL "VGAUSBRP2350")
 	Pico_enable_stdio_usb(PicoMite 0)
 	target_include_directories(PicoMite PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}
