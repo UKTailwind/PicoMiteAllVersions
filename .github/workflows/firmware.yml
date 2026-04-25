@@ -15,7 +15,35 @@ permissions:
   contents: read
 
 jobs:
+  # All-12-target compile gate. Mirrors the local buildall.sh — every
+  # COMPILE variant must build clean before release artifacts are
+  # uploaded for the two PicoCalc targets.
+  buildall:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+              cmake ninja-build \
+              gcc-arm-none-eabi libnewlib-arm-none-eabi libstdc++-arm-none-eabi-newlib \
+              python3 build-essential
+      - name: Check out Pico SDK
+        uses: actions/checkout@v4
+        with:
+          repository: raspberrypi/pico-sdk
+          ref: 2.2.0
+          path: pico-sdk
+          submodules: recursive
+      - name: Run buildall.sh
+        env:
+          PICO_SDK_PATH: ${{ github.workspace }}/pico-sdk
+          SKIP_HAL_PURITY: '1'
+        run: ./buildall.sh
+
   build:
+    needs: buildall
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -44,24 +72,16 @@ jobs:
           path: pico-sdk
           submodules: recursive
 
-      - name: Pick COMPILE target
-        # The repo's CMakeLists has `set(COMPILE PICO)` hardcoded near the
-        # top with the other variants commented out. Rewrite those lines
-        # so only our chosen target is active — matrix-friendly without
-        # modifying how the file is structured.
-        run: |
-          sed -i -E 's|^[[:space:]]*set\(COMPILE [A-Z0-9]+\)|#&|' CMakeLists.txt
-          sed -i -E "0,/^#set\(COMPILE ${{ matrix.target }}\)/s||set(COMPILE ${{ matrix.target }})|" CMakeLists.txt
-          echo '--- COMPILE selection ---'
-          grep -nE 'set\(COMPILE' CMakeLists.txt | head
-
       - name: Build
+        # CMakeLists.txt's `if(NOT DEFINED COMPILE) set(COMPILE PICO)`
+        # default lets us select a target by passing -DCOMPILE=<variant>
+        # — no source-tree rewriting needed.
         env:
           PICO_SDK_PATH: ${{ github.workspace }}/pico-sdk
         run: |
           mkdir -p build
           cd build
-          cmake -G Ninja -DCMAKE_BUILD_TYPE=Release ..
+          cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -DCOMPILE=${{ matrix.target }} ..
           ninja
 
       - name: Stage artifacts

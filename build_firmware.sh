@@ -89,44 +89,13 @@ else
     done
 fi
 
-# --- snapshot CMakeLists.txt; always restore on exit ----------------------
-
-# Snapshot the current file (not git's HEAD) so uncommitted edits are
-# preserved. Restored on any exit path — Ctrl-C, SIGTERM, failure.
-CMAKE_SNAPSHOT=$(mktemp -t picomite_cmakelists.XXXXXX)
-cp CMakeLists.txt "$CMAKE_SNAPSHOT"
-trap 'cp "$CMAKE_SNAPSHOT" CMakeLists.txt 2>/dev/null || true; rm -f "$CMAKE_SNAPSHOT"' EXIT INT TERM
-
-# --- flip active COMPILE target via sed ------------------------------------
-
-# Mirrors .github/workflows/firmware.yml: comment out ANY active
-# set(COMPILE X) line, then uncomment the one we want. BSD/GNU portable.
-set_compile() {
-    local target="$1"
-    cp "$CMAKE_SNAPSHOT" CMakeLists.txt
-    # Comment out every existing active line.
-    sed -i.bak -E 's|^[[:space:]]*set\(COMPILE [A-Z0-9]+\)|#&|' CMakeLists.txt
-    rm -f CMakeLists.txt.bak
-    # Uncomment the target. Portable replacement for GNU sed's
-    # "0,/pattern/s//repl/" range addressing.
-    awk -v tgt="$target" '
-        !done && $0 ~ "^#set\\(COMPILE " tgt "\\)" {
-            sub(/^#/, "")
-            done = 1
-        }
-        { print }
-    ' CMakeLists.txt > CMakeLists.txt.tmp
-    mv CMakeLists.txt.tmp CMakeLists.txt
-
-    local active
-    active=$(grep -cE '^set\(COMPILE ' CMakeLists.txt || true)
-    if [ "$active" -ne 1 ]; then
-        echo "error: CMakeLists.txt has $active active COMPILE lines after rewrite (expected 1 for $target)" >&2
-        exit 2
-    fi
-}
-
 # --- per-target build ------------------------------------------------------
+#
+# CMakeLists.txt's `if(NOT DEFINED COMPILE) set(COMPILE PICO)` default lets
+# us pick a target by passing -DCOMPILE=<variant> to cmake — no source-tree
+# rewriting needed. (An earlier version of this script sed-rewrote the
+# active set(COMPILE …) line in CMakeLists.txt; the per-port decascade
+# moved that line inside an if() guard which broke the rewrite.)
 
 build_one() {
     local name="$1" compile build_dir stamp prev jobs
@@ -135,7 +104,6 @@ build_one() {
 
     echo
     echo "=== Building $name (COMPILE=$compile, dir=$build_dir) ==="
-    set_compile "$compile"
 
     # Pico SDK caches PICO_PLATFORM in the build dir's CMakeCache; wipe
     # if the active target has changed since the last configure.
@@ -150,7 +118,7 @@ build_one() {
         mkdir -p "$build_dir"
     fi
 
-    (cd "$build_dir" && cmake -DPICO_SDK_PATH="$PICO_SDK_PATH" ..)
+    (cd "$build_dir" && cmake -DPICO_SDK_PATH="$PICO_SDK_PATH" -DCOMPILE="$compile" ..)
     echo "$compile" > "$stamp"
 
     jobs=$(sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null || echo 4)
