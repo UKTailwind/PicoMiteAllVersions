@@ -50,7 +50,12 @@ target_sources(PicoMite PRIVATE
     ${CMAKE_SOURCE_DIR}/drivers/spi_lcd/spi_lcd_nextgen_stub.c
     ${CMAKE_SOURCE_DIR}/drivers/spi_lcd/spi_lcd_fastgfx_stub.c
 
-    # gfx_3d excluded — WiFi ports use MMtcpserver.c's closeall3d stub.
+    # gfx_3d.c included — F2 has PICOMITEVGA so the dispatch table
+    # references fun_3D / fun_map / fun_getscanline (gated on
+    # #ifdef PICOMITEVGA in AllCommands.h). MMtcpserver.c's closeall3d
+    # stub is gated out on PICOMITEVGA so the real closeall3d from
+    # gfx_3d.c provides it.
+    ${CMAKE_SOURCE_DIR}/drivers/gfx_3d/gfx_3d.c
     # gui_touch_stub for VGA-family (no SPI-LCD touch panel).
     ${CMAKE_SOURCE_DIR}/drivers/gui_touch/gui_touch_stub.c
 

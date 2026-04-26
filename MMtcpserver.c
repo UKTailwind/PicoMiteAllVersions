@@ -750,10 +750,15 @@ void tcp_realloc_recv_buffers(void) {
     }
 }
 
-/* 3D sprite-builder teardown: real implementation lives in Draw.c
- * (inside its #ifndef PICOMITEWEB block). WEB builds don't include that
- * feature; stub so FileIO.c::CloseAllFiles can call it unconditionally. */
+/* 3D sprite-builder teardown: real implementation lives in
+ * drivers/gfx_3d/gfx_3d.c. WEB-only WiFi ports (WEB, WEBRP2350) don't
+ * link gfx_3d.c — stub so FileIO.c::CloseAllFiles can call it
+ * unconditionally. WiFi+PICOMITEVGA ports (F2 = VGAWIFIRP2350) DO
+ * link gfx_3d.c (because their dispatch table needs fun_3D), so this
+ * stub must NOT also be present there. */
+#if !defined(PICOMITEVGA)
 void closeall3d(void) {}
+#endif
 
 /* Called from MMBasic.c::ClearRuntime() to tear down per-client TCP
  * state + reset the suppress-status flag when a BASIC program

@@ -2042,11 +2042,19 @@ void setBacklight(int level, int setfrequency){
         I2C_Send_Command((uint8_t)level);
     } else if(HAL_PORT_HAS_SSD1963 && Option.DISPLAY_TYPE>=SSDPANEL && Option.DISPLAY_TYPE<VIRTUAL){
         SetBacklightSSD1963(level);
+#if !HAL_PORT_IS_VGA
     } else if(Option.DISPLAY_TYPE==SSD1306SPI){
+        /* SSD1306SPI is a small SPI OLED — only configurable on
+         * SPI-LCD ports (PICOMITE / WiFi). spi_write_command lives in
+         * drivers/spi_lcd/spi_lcd.c's `#ifndef PICOMITEVGA` block, so
+         * VGA-family ports compile this branch out to keep the call
+         * site from referencing an undefined symbol when the dispatch
+         * table also includes cmd_backlight (e.g. F2 = VGA + WiFi). */
         level*=255;
         level/=100;
         spi_write_command(0x81);//SETCONTRAST
         spi_write_command((uint8_t)level);
+#endif
     }
 }
 /*  @endcond */

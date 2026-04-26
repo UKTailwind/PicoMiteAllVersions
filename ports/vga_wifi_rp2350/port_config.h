@@ -50,10 +50,12 @@
  * consumer. */
 #define HAL_PORT_CORE1_STACK_WORDS       128
 
-/* Memory + clock + MMBasic-table values. Heap budget midway between
- * vga_rp2350 (184 KB, no WiFi) and web_rp2350 (208 KB, no scanout) —
- * scanout framebuffer eats ~150 KB of trailer, WiFi stack eats ~30 KB. */
-#define HAL_PORT_HEAP_MEMORY_SIZE        (160 * 1024)
+/* Memory + clock + MMBasic-table values. RP2350A on pico2_w only has
+ * 264 KB SRAM, and CYW43 + lwIP buffers eat ~30 KB before any
+ * BASIC heap. The QVGA scanout framebuffer trailer dominates if
+ * sized like vga_rp2350 (153 KB). Reduce heap + use the smaller
+ * rp2040-style scanout trailer (38 KB) so the overall image fits. */
+#define HAL_PORT_HEAP_MEMORY_SIZE        (80 * 1024)
 #define HAL_PORT_MAX_CPU                 378000
 #define HAL_PORT_MIN_CPU                 252000
 #define HAL_PORT_MAX_VARS                768
@@ -85,9 +87,12 @@
 #define HAL_PORT_MMBASIC_HOT_FUNC(name)  __not_in_flash_func(name)
 #define HAL_PORT_MMBASIC_SUBFUN_FUNC(name) __not_in_flash_func(name)
 
-/* QVGA scanout framebuffer trailer (320*240*2 = 153600 bytes). */
-#define HAL_PORT_FRAMEBUFFER_TRAILER_BYTES (320*240*2)
-#define HAL_PORT_ALLMEMORY_ALIGN           256
+/* QVGA scanout framebuffer trailer — smaller rp2040-style 1bpp QVGA
+ * (640*480/8 = 38400 bytes) so the image fits on pico2_w's 264 KB
+ * SRAM. RP2350A doesn't expose enough RAM for the 16-bit QVGA mode
+ * once CYW43 is also resident. */
+#define HAL_PORT_FRAMEBUFFER_TRAILER_BYTES (640*480/8)
+#define HAL_PORT_ALLMEMORY_ALIGN           4096
 
 #define HAL_PORT_LCD_SPI_CLK_PIN         Option.SYSTEM_CLK
 #define HAL_PORT_CONSOLE_FONT_MEDIUM     arial_bold

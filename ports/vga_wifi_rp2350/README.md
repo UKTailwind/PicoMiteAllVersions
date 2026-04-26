@@ -1,82 +1,69 @@
-# ports/vga_wifi_rp2350 — F2 validation port (work in progress)
+# ports/vga_wifi_rp2350 — F2 validation port
 
 Stage-F validation port from `docs/hal-decascade-plan.md`. Combines
-`HAL_PORT_HAS_VGA_PIO=1` + `HAL_PORT_HAS_WIFI=1` on RP2350 — the first
-port shape to coexist VGA-PIO scanout with the CYW43 + lwIP stack.
+`HAL_PORT_HAS_VGA_PIO=1` + `HAL_PORT_HAS_WIFI=1` on RP2350. First port
+shape to coexist VGA-PIO scanout with the CYW43 + lwIP polled stack.
 
 ## Status
 
-The port directory builds + configures cleanly via the new per-port
-`port_sources.cmake` infrastructure. The link step does **not** succeed
-yet — F2 surfaced architectural coupling between the SPI-LCD subsystem
-and the WiFi stack that the decascade plan didn't address. Documented
-below as follow-on items.
+Builds clean via the per-port `port_sources.cmake` infrastructure and
+is gated by `buildall.sh`. Hardware target is `pico2_w` (RP2350A +
+CYW43). Real-hardware boot has not been smoke-tested by this branch.
 
-```
-$ cmake -DCOMPILE=VGAWIFIRP2350 -DPICOCALC=false ..   # OK
-$ make                                                # link fails
-  ld: .bss won't fit in RAM (overflow ~14 KB)
-  ld: undefined reference to fun_3D
-  ld: undefined reference to spi_write_command
-```
-
-## Why F2 is excluded from `buildall.sh`
-
-The 12-port gate stays green. F2 is a forward-looking compose target
-that proves the decascade infrastructure (palette flags, per-port
-snippets, source-list composition) supports a novel combination
-without inventing new top-level enums — the unblocked path forward
-for HDMI+WiFi (F1) is the same set of files in a different combination.
-
-## What this port already validates
+## What this port validates
 
 - `HAL_PORT_HAS_VGA_PIO=1` and `HAL_PORT_HAS_WIFI=1` coexist in one
   `port_config.h` without ifdef gymnastics.
+- Per-port PIO claim flags (`HAL_PORT_PIO0_CLAIMED`,
+  `HAL_PORT_PIO1_CLAIMED`, `HAL_PORT_PIO2_CLAIMED`) cleanly OR-merge
+  hardware claims when the QVGA scanout (PIO1+PIO2) and CYW43 SPI
+  (PIO0) coexist.
+- The unified `MES_SIGNON` template
+  `"\r" HAL_PORT_DEVICE_NAME " MMBasic " CHIP " Edition V" VERSION`
+  produces a sensible boot banner ("VGAMiteWiFi MMBasic …") for the
+  combined shape; the previous per-target `#define` cascade would
+  have produced a redefinition error here.
 - `core1stack[]` (Stage C3) sized via `HAL_PORT_CORE1_STACK_WORDS=128`
   works with CYW43 polled (which doesn't claim core1).
-- `HAL_PORT_PIO0_CLAIMED=1`, `HAL_PORT_PIO1_CLAIMED=1`,
-  `HAL_PORT_PIO2_CLAIMED=1` cleanly OR-merge VGA-PIO scanout claims
-  (PIO1+PIO2) with CYW43 SPI claims (PIO0) — the per-port flags
-  introduced for F2 also benefit every existing port.
-- The single-source `MES_SIGNON` template
-  `"\r" HAL_PORT_DEVICE_NAME " MMBasic " CHIP " Edition V" VERSION`
-  produces a sensible boot banner ("VGAMiteWiFi MMBasic …") for this
-  combo, where the previous per-target `#define` cascade would have
-  produced a redefinition error.
-- The new port directory is wired into `CMakeLists.txt` via a single
-  `elseif (COMPILE STREQUAL "VGAWIFIRP2350") set(PORT_DIR vga_wifi_rp2350)`
-  + the `pico2_w` board branch — no other top-level edits.
+- Adding a new port to the build needed only:
+    `ports/vga_wifi_rp2350/port_config.h`
+    `ports/vga_wifi_rp2350/port_sources.cmake`
+    `ports/vga_wifi_rp2350/pin_tables.c`
+    `ports/vga_wifi_rp2350/port_defaults.c`
+  + one `elseif (COMPILE STREQUAL …) set(PORT_DIR …)` entry in
+  `CMakeLists.txt` + adding the target to the `pico2_w` board branch
+  + appending the target name to `buildall.sh`. No central
+  driver-selection ladder edits, no new `-D` defines, no
+  configuration.h cascade entries.
 
-## What needs to happen before F2 links cleanly
+## Latent bugs F2 surfaced and the decascade fixed
 
-1. **`struct option_s` VGA-vs-non-VGA layout.** `Touch.c` references
-   `Option.TOUCH_XSCALE` / `TOUCH_YSCALE` / `TOUCH_XZERO` / `TOUCH_YZERO`,
-   which only exist in the `#ifndef PICOMITEVGA` branch of FileIO.h's
-   union. F2 has `PICOMITEVGA` defined, so `Touch.c` can't compile on
-   this port. Either:
-   - Make those struct fields unconditional (move the VGA-side `Height`/`Width`/`dummy[12]`
-     overlay to a different slot), OR
-   - Introduce `HAL_PORT_HAS_TOUCH` and gate `Touch.c` on it.
-2. **`SSD1963.c` is touch-aware.** Line 202 zeros `Option.TOUCH_XZERO/YZERO`
-   on display reset — same struct issue. F2 currently omits `SSD1963.c`
-   from its source list, but `External.c::setBacklight` calls
-   `spi_write_command` (defined in SSD1963.c) so the link fails.
-   Either gate `setBacklight` on a HAS_SPI_LCD flag or move
-   `spi_write_command` into a shared SPI-LCD HAL.
-3. **`fun_3D` / DRAW3D dispatch.** `AllCommands.h` references `fun_3D`
-   inside `#ifdef PICOMITEVGA`. F2 has `PICOMITEVGA` so the dispatch
-   table needs `fun_3D` defined. `gfx_3d.c` provides it but the
-   current source-list logic excludes `gfx_3d.c` on WiFi ports
-   (because the WEB stack's `MMtcpserver.c` provides a `closeall3d`
-   stub, not a `fun_3D` stub). Include `gfx_3d.c` on F2 (since it's
-   PICOMITEVGA, not just non-WEB).
-4. **Heap budget.** Combined VGA scanout framebuffer (~150 KB) +
-   CYW43 + lwIP buffers + interpreter heap overflows RP2350's 256 KB
-   SRAM by ~15 KB. Either drop heap to 128 KB or move scanout
-   framebuffer to PSRAM (which CYW43 owns the QSPI pins for, so PSRAM
-   is unavailable on this port shape).
+These would have remained latent until somebody tried this port shape:
 
-Items 1-3 are real architectural decoupling work outside the
-decascade plan's scope — they were latent in the existing codebase,
-just hidden by the assumption that PICOMITEVGA and PICOMITEWEB are
-mutually exclusive. F2 surfaces them.
+- **External.c::setBacklight** → `spi_write_command` undefined when the
+  dispatch table includes `cmd_backlight` (because of `HAL_PORT_HAS_WIFI`)
+  AND the SPI-LCD primitives aren't compiled (because of `PICOMITEVGA`).
+  Gated the SSD1306SPI branch on `#if !HAL_PORT_IS_VGA` — small SPI
+  OLEDs aren't physically present on a VGA port anyway, so this is
+  pure compile-time dead-code elimination.
+- **MMtcpserver.c::closeall3d** stub multi-defined against
+  `gfx_3d.c::closeall3d` real impl on PICOMITEVGA WiFi ports. Gated
+  the stub on `#if !defined(PICOMITEVGA)`.
+- **gfx_3d.c** must be linked on PICOMITEVGA ports because the
+  dispatch table references `fun_3D` / `fun_map` / `fun_getscanline`
+  inside `#ifdef PICOMITEVGA` in AllCommands.h. F2's
+  `port_sources.cmake` includes it.
+
+## Memory layout notes
+
+RP2350A on pico2_w is RAM-tight after CYW43:
+
+  HEAP_MEMORY_SIZE          = 80 KB    (smaller than vga_rp2350's 184 KB)
+  FRAMEBUFFER_TRAILER_BYTES = 38400    (1bpp QVGA, rp2040 layout — RP2350's
+                                        16-bit QVGA layout would not fit)
+  HAL_PORT_HAS_PSRAM        = 0        (CYW43 owns the QSPI pins)
+  HAL_PORT_HAS_HEARTBEAT    = 0        (CYW43 owns the LED)
+
+Real-hardware boot will need pin-map and OPTION RESET profile work
+specific to the target board. The current `port_defaults.c` has a
+single generic profile.
