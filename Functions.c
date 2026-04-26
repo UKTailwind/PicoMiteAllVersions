@@ -918,7 +918,7 @@ void fun_cos(void)
 	}
 	else
 	{
-		fret = cosf(getnumber(ep));
+		fret = cos(getnumber(ep));
 	}
 	targ = T_NBR;
 }
@@ -1292,7 +1292,7 @@ void fun_sin(void)
 	}
 	else
 	{
-		fret = sinf(getnumber(ep));
+		fret = sin(getnumber(ep));
 	}
 	targ = T_NBR;
 }

@@ -74,6 +74,16 @@ extern "C"
 #define TCF_RESTORE  0x20u  /* RESTORE target caching                        */
 #define TCF_ALL      0x3Fu  /* all features                                  */
 
+    /* Op codes for the DO-loop fast-condition path.  Stored in the dostack
+     * at DO setup time; interpreted inline in cmd_loop without going through
+     * the trace cache replay machinery.                                     */
+#define DOFAST_LT    1u  /* var <  limit                                     */
+#define DOFAST_GT    2u  /* var >  limit                                     */
+#define DOFAST_LTE   3u  /* var <= limit                                     */
+#define DOFAST_GTE   4u  /* var >= limit                                     */
+#define DOFAST_EQ    5u  /* var == limit                                     */
+#define DOFAST_NE    6u  /* var != limit                                     */
+
     extern uint8_t g_trace_cache_flags;
 
     /* ---------------------------------------------------------------------- */
@@ -145,6 +155,15 @@ extern "C"
      *        Caller must run the statement through the normal interpreter.   */
     int TraceCacheTryExec(unsigned char *stmt_src);
 
+    /* Try to execute a numeric INC statement from the cache.
+     *   cmdline: raw argument bytes BEFORE any getcsargs / makeargs call.
+     *            Handles: Inc var  and  Inc var, const  (numeric literals only).
+     *            Rejects string Inc, array Inc, and variable-expression steps.
+     * Returns:
+     *   1  - Inc was executed from cache; cmd_inc must return immediately.
+     *   0  - cache miss / too complex; caller runs normal cmd_inc.            */
+    int TraceCacheTryInc(unsigned char *cmdline);
+
     /* Try to execute a LET statement (or implicit assignment) from the cache.
      *   cmdline: as passed to cmd_let - points at the start of the LHS variable
      *            name in the tokenised source.
@@ -175,10 +194,60 @@ extern "C"
      * on the next call.  Must NOT be called for variable-argument RESTORE
      * (where the target depends on run-time variable values).                */
     void TraceCacheStoreJump(unsigned char *key, unsigned char *target);
+
+    /* Try to execute a SELECT CASE statement from the pre-compiled arm table.
+     *   key        : cmdline pointer (stable ProgMemory address of the selector
+     *                expression — used as cache key).
+     *   scan_start : nextstmt at cmd_select entry (first stmt inside SELECT body).
+     *   sel_type   : T_INT or T_NBR (T_STR always returns 0 immediately).
+     *   sel_i/sel_f: the already-evaluated selector value.
+     *   out_nextstmt: set to the matching case body's first statement.
+     * Returns:
+     *   1 - match found; caller must set nextstmt = *out_nextstmt and return.
+     *   0 - cache miss / disabled / string selector / ST_BAD; caller runs
+     *       the normal linear scan.                                           */
+    int TraceCacheTrySelect(unsigned char *key,
+                             unsigned char *scan_start,
+                             int sel_type, int64_t sel_i, MMFLOAT sel_f,
+                             unsigned char **out_nextstmt);
+
+    /* Attempt to compile a simple VAR OP CONST or CONST OP VAR comparison
+     * from the tokenised condition at condptr into pre-resolved fast-condition
+     * fields.  VAR must be a plain numeric scalar (not an array or struct);
+     * CONST must be a numeric literal or a T_CONST variable.
+     *
+     * On success returns 1 and writes:
+     *   *out_var        direct pointer to g_vartbl[vidx].val (or .val.s for T_PTR)
+     *   *out_varindex   g_vartbl slot
+     *   *out_is_local   1 = local variable (re-resolve when frame_gen changes)
+     *   *out_frame_gen  g_local_frame_gen at resolve time
+     *   *out_type       T_INT or T_NBR
+     *   *out_op         DOFAST_LT / DOFAST_GT / DOFAST_LTE / DOFAST_GTE /
+     *                   DOFAST_EQ / DOFAST_NE  (already inverted for CONST-first)
+     *   *out_limit_i    constant limit value (integer; valid when *out_type==T_INT)
+     *   *out_limit_f    constant limit value (float;   valid when *out_type==T_NBR)
+     *   out_name        upper-cased variable name written into caller's
+     *                   MAXVARLEN+1-byte buffer (used to re-resolve locals)
+     * Returns 0 when the expression is too complex; no out_* are modified.  */
+    int TraceCacheCompileDoFast(unsigned char *condptr,
+                                 void     **out_var,
+                                 int       *out_varindex,
+                                 uint8_t   *out_is_local,
+                                 uint16_t  *out_frame_gen,
+                                 uint8_t   *out_type,
+                                 uint8_t   *out_op,
+                                 int64_t   *out_limit_i,
+                                 MMFLOAT   *out_limit_f,
+                                 unsigned char *out_name);
 #else
 static inline int TraceCacheTryExec(unsigned char *stmt_src)
 {
     (void)stmt_src;
+    return 0;
+}
+static inline int TraceCacheTryInc(unsigned char *cmdline)
+{
+    (void)cmdline;
     return 0;
 }
 static inline int TraceCacheTryLet(unsigned char *cmdline)
@@ -199,6 +268,14 @@ static inline int TraceCacheTryJump(unsigned char *key, unsigned char **out_targ
 static inline void TraceCacheStoreJump(unsigned char *key, unsigned char *target)
 {
     (void)key; (void)target;
+}
+static inline int TraceCacheTrySelect(unsigned char *key, unsigned char *scan_start,
+                                       int sel_type, int64_t sel_i, MMFLOAT sel_f,
+                                       unsigned char **out_nextstmt)
+{
+    (void)key; (void)scan_start; (void)sel_type;
+    (void)sel_i; (void)sel_f; (void)out_nextstmt;
+    return 0;
 }
 #endif
 

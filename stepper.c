@@ -1146,9 +1146,9 @@ int stepper_query_active(void)
         return -1;
     }
     int active = (stepper_armed &&
-              (stepper_system.motion_active || stepper_dwell_active || gcode_buffer.count > 0))
-                 ? 1
-                 : 0;
+                  (stepper_system.motion_active || stepper_dwell_active || gcode_buffer.count > 0))
+                     ? 1
+                     : 0;
     restore_interrupts(save);
     return active;
 }
@@ -4531,7 +4531,7 @@ void cmd_stepper(void)
     // Notes:
     // - This is in addition to STEPPER GCODE (comma-separated); STEPPER GCODE is unchanged.
     // - Words may be supplied as X10 or as X 10 (commas are also accepted as separators).
-    if ((tp = checkstring(cmdline, (unsigned char *)"GC")) != NULL)
+    void stepper_parse_gcode_command(unsigned char *tp)
     {
         if (!stepper_initialized)
             stepper_error("Stepper not initialized");
@@ -5167,6 +5167,17 @@ void cmd_stepper(void)
         planner_y = target_y;
         planner_z = target_z;
 
+        return;
+    }
+    if ((tp = checkstring(cmdline, (unsigned char *)"GC")) != NULL)
+    {
+        stepper_parse_gcode_command(tp);
+        return;
+    }
+    if ((tp = checkstring(cmdline, (unsigned char *)"GS")) != NULL)
+    {
+        unsigned char *p = getCstring(tp);
+        stepper_parse_gcode_command(p);
         return;
     }
 

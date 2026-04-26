@@ -296,6 +296,10 @@ void MIPS16 __not_in_flash_func(cmd_inc)(void)
 #endif
 	unsigned char *p, *q;
 	int vtype;
+#ifdef CACHE
+	if ((g_trace_cache_flags & TCF_LET_NUM) && TraceCacheTryInc(cmdline))
+		return;
+#endif
 	getcsargs(&cmdline, 3);
 	if (argc == 1)
 	{
@@ -3313,7 +3317,18 @@ void cmd_select(void)
 		Mstrcpy((unsigned char *)s, (unsigned char *)v);
 		ClearSpecificTempMemory(v); // free temp memory now that value is copied
 	}
-
+#ifdef CACHE
+	{
+		unsigned char *cached_nextstmt;
+		if (TraceCacheTrySelect(cmdline, nextstmt, type,
+		                        (long long int)i64, (MMFLOAT)f,
+		                        &cached_nextstmt))
+		{
+			nextstmt = cached_nextstmt;
+			return;
+		}
+	}
+#endif
 	// now search through the program looking for a matching CASE statement
 	// i tracks the nesting level of any nested SELECT CASE commands
 	SaveCurrentLinePtr = CurrentLinePtr; // save where we are because we will have to fake CurrentLinePtr to get errors reported correctly
@@ -3465,7 +3480,19 @@ void cmd_case(void)
 {
 	int i;
 	unsigned char *p;
-
+#ifdef CACHE
+	unsigned char *entry_key = nextstmt; /* stable ProgMemory ptr; used as jump cache key */
+	int _case_cacheable = (g_trace_cache_flags & TCF_JUMP) != 0;
+	if (_case_cacheable)
+	{
+		unsigned char *cached_target;
+		if (TraceCacheTryJump(entry_key, &cached_target))
+		{
+			nextstmt = cached_target;
+			return;
+		}
+	}
+#endif
 	// search through the program looking for a END SELECT statement
 	// i tracks the nesting level of any nested SELECT CASE commands
 	i = 1;
@@ -3483,6 +3510,10 @@ void cmd_case(void)
 			// found our matching END SELECT stmt.  Step over it and continue with the statement after it
 			skipelement(p);
 			nextstmt = p;
+#ifdef CACHE
+			if (_case_cacheable)
+				TraceCacheStoreJump(entry_key, p);
+#endif
 			break;
 		}
 	}
@@ -3832,53 +3863,27 @@ void MIPS16 __not_in_flash_func(cmd_next)(void)
 #endif
 {
 #endif
-	int i, vindex, test;
-	void *vtbl[MAXFORLOOPS];
-	int vcnt;
+	int i, test;
 	unsigned char *p;
-	getargs(&cmdline, MAXFORLOOPS * 2, (unsigned char *)","); // getargs macro must be the first executable stmt in a block
 
-	vindex = 0; // keep lint happy
-
-	for (vcnt = i = 0; i < argc; i++)
+	// Find the matching forstack entry by program position.  cmd_for stored
+	// nextptr pointing to the NEXT statement whose argument list contains the
+	// loop variable name, so this pointer comparison is valid for both named
+	// (NEXT i) and unnamed (NEXT) forms.  makeargs never writes back to *p,
+	// so cmdline still points into program memory at the first byte after the
+	// NEXT token — the same location as nextptr + sizeof(CommandToken).
+	// Search innermost-first so multi-variable NEXT (NEXT i, j) closes the
+	// right loop.
+	for (i = g_forindex - 1; i >= 0; i--)
 	{
-		if (i & 0x01)
-		{
-			if (*argv[i] != ',')
-				SyntaxError();
-			;
-		}
-		else
-			vtbl[vcnt++] = findvar(argv[i], V_FIND | V_NOFIND_ERR); // find the variable and error if not found
+		p = g_forstack[i].nextptr + sizeof(CommandToken);
+		skipspace(p);
+		if (p == cmdline)
+			goto breakout;
 	}
-
-loopback:
-	// first search the for stack for a loop with the same variable specified on the NEXT's line
-	if (vcnt)
-	{
-		for (i = g_forindex - 1; i >= 0; i--)
-			for (vindex = vcnt - 1; vindex >= 0; vindex--)
-				if (g_forstack[i].var == vtbl[vindex])
-					goto breakout;
-	}
-	else
-	{
-		// if no variables specified search the for stack looking for an entry with the same program position as
-		// this NEXT statement. This cheats by using the cmdline as an identifier and may not work inside an IF THEN ELSE
-		for (i = 0; i < g_forindex; i++)
-		{
-			p = g_forstack[i].nextptr + sizeof(CommandToken);
-			skipspace(p);
-			if (p == cmdline)
-				goto breakout;
-		}
-	}
-
 	error("Cannot find a matching FOR");
 
 breakout:
-
-	// found a match
 	// apply the STEP value to the variable and test against the TO value
 	if (g_forstack[i].vartype & T_INT)
 	{
@@ -3893,30 +3898,22 @@ breakout:
 
 	if (test)
 	{
-		// the loop has terminated
-		// remove the entry in the table, then skip forward to the next element and continue on from there
+		// the loop has terminated — remove it from the stack
 		while (i < g_forindex - 1)
 		{
-			g_forstack[i].forptr = g_forstack[i + 1].forptr;
-			g_forstack[i].nextptr = g_forstack[i + 1].nextptr;
-			g_forstack[i].var = g_forstack[i + 1].var;
-			g_forstack[i].vartype = g_forstack[i + 1].vartype;
-			g_forstack[i].level = g_forstack[i + 1].level;
-			g_forstack[i].tovalue.i = g_forstack[i + 1].tovalue.i;
-			g_forstack[i].stepvalue.i = g_forstack[i + 1].stepvalue.i;
+			g_forstack[i] = g_forstack[i + 1];
 			i++;
 		}
 		g_forindex--;
-		if (vcnt > 0)
+		// For multi-variable NEXT (e.g. NEXT j, i): if another loop also has
+		// its nextptr pointing here, close it too.  g_forstack[i].var already
+		// holds the direct variable pointer so no findvar needed.
+		for (i = g_forindex - 1; i >= 0; i--)
 		{
-			// remove that entry from our FOR stack
-			for (; vindex < vcnt - 1; vindex++)
-				vtbl[vindex] = vtbl[vindex + 1];
-			vcnt--;
-			if (vcnt > 0)
-				goto loopback;
-			else
-				return;
+			p = g_forstack[i].nextptr + sizeof(CommandToken);
+			skipspace(p);
+			if (p == cmdline)
+				goto breakout;
 		}
 	}
 	else
@@ -3950,6 +3947,7 @@ void MIPS16 __not_in_flash_func(cmd_do)(void)
 		doUntil = 0;
 		evalp = NULL;
 	}
+
 	// check if this loop is already in the stack and remove it if it is
 	// this is necessary as the program can jump out of the loop without hitting
 	// the LOOP or WEND stmt and this will eventually result in a stack overflow
@@ -3959,11 +3957,7 @@ void MIPS16 __not_in_flash_func(cmd_do)(void)
 		{
 			while (i < g_doindex - 1)
 			{
-				g_dostack[i].evalptr = g_dostack[i + 1].evalptr;
-				g_dostack[i].loopptr = g_dostack[i + 1].loopptr;
-				g_dostack[i].doptr = g_dostack[i + 1].doptr;
-				g_dostack[i].level = g_dostack[i + 1].level;
-				g_dostack[i].untiltest = g_dostack[i + 1].untiltest;
+				g_dostack[i] = g_dostack[i + 1]; // copy all fields including do_fast_*
 				i++;
 			}
 			g_doindex--;
@@ -3998,17 +3992,60 @@ void MIPS16 __not_in_flash_func(cmd_do)(void)
 		}
 	}
 
+	// Scan the LOOP statement's arguments (needed for conflict check and fast-cond)
+	unsigned char *loop_arg = p + sizeof(CommandToken);
+	while (*loop_arg && *loop_arg < 0x80)
+		loop_arg++;
+
 	if (g_dostack[g_doindex].evalptr != NULL)
 	{
 		// if this is a DO WHILE ... LOOP statement
 		// search the LOOP statement for a WHILE or UNTIL token (p is pointing to the matching LOOP statement)
-		p += sizeof(CommandToken);
-		while (*p && *p < 0x80)
-			p++;
-		if (*p == tokenWHILE)
+		if (*loop_arg == tokenWHILE)
 			error("LOOP has a WHILE test");
-		if (*p == tokenUNTIL)
+		if (*loop_arg == tokenUNTIL)
 			error("LOOP has an UNTIL test");
+	}
+
+	// Pre-compile fast condition: try to resolve a simple VAR OP CONST or
+	// CONST OP VAR comparison into direct pointer + constant at setup time,
+	// so cmd_loop can evaluate it with an inline load+compare instead of
+	// going through TraceCacheTryIf → replay_common on every iteration.
+	{
+#ifdef CACHE
+		g_dostack[g_doindex].do_fast_var = NULL; // default: no fast path
+		unsigned char *fast_src = NULL;
+		int fast_is_until = 0;
+		if (evalp != NULL)
+		{
+			// Condition is on the DO line (DO WHILE/UNTIL expr)
+			fast_src = evalp;
+			fast_is_until = doUntil;
+		}
+		else if (*loop_arg == tokenWHILE || *loop_arg == tokenUNTIL)
+		{
+			// Condition is on the LOOP line (DO ... LOOP WHILE/UNTIL expr)
+			fast_is_until = (*loop_arg == tokenUNTIL);
+			fast_src = loop_arg + 1; // past the WHILE/UNTIL token byte
+		}
+		if (fast_src != NULL)
+		{
+			struct s_dostack *ds = &g_dostack[g_doindex];
+			if (TraceCacheCompileDoFast(fast_src,
+					&ds->do_fast_var,
+					&ds->do_fast_varindex,
+					&ds->do_fast_is_local,
+					&ds->do_fast_frame_gen,
+					&ds->do_fast_type,
+					&ds->do_fast_op,
+					&ds->do_fast_limit.i,
+					&ds->do_fast_limit.f,
+					ds->do_fast_name))
+			{
+				ds->do_fast_is_until = (uint8_t)fast_is_until;
+			}
+		}
+#endif
 	}
 
 	g_doindex++;
@@ -4059,6 +4096,74 @@ void MIPS16 __not_in_flash_func(cmd_loop)(void)
 			// found a match
 			// first check if the DO statement had a WHILE component
 			// if not find the WHILE statement here and evaluate it
+#ifdef CACHE
+			// Fast path: if cmd_do pre-compiled a simple VAR OP CONST condition,
+			// evaluate it with a direct load+compare — no hash probe, no replay.
+			if (g_dostack[i].do_fast_var != NULL)
+			{
+				struct s_dostack *ds = &g_dostack[i];
+				// Re-resolve local variable if the call frame has changed
+				if (ds->do_fast_is_local && ds->do_fast_frame_gen != g_local_frame_gen)
+				{
+					void *new_var = NULL;
+					int loc_size = GetLocalVarHashSize();
+					for (int j = 0; j < loc_size; j++)
+					{
+						if (g_vartbl[j].name[0] == 0) continue;
+						if (g_vartbl[j].level != g_LocalIndex) continue;
+						if (g_vartbl[j].dims[0] != 0) continue;
+						int t = g_vartbl[j].type;
+						if (ds->do_fast_type == T_INT && !(t & T_INT)) continue;
+						if (ds->do_fast_type == T_NBR && !(t & T_NBR)) continue;
+						if (strncmp((char *)g_vartbl[j].name,
+						            (char *)ds->do_fast_name, MAXVARLEN) != 0) continue;
+						new_var = (t & T_PTR)
+						          ? (void *)g_vartbl[j].val.s
+						          : (void *)&g_vartbl[j].val;
+						ds->do_fast_varindex = j;
+						break;
+					}
+					if (new_var == NULL)
+					{
+						ds->do_fast_var = NULL; // local gone — disable fast path
+						goto do_loop_slow;
+					}
+					ds->do_fast_var = new_var;
+					ds->do_fast_frame_gen = g_local_frame_gen;
+				}
+				if (ds->do_fast_type == T_INT)
+				{
+					long long int val = *(long long int *)ds->do_fast_var;
+					long long int lim = ds->do_fast_limit.i;
+					switch (ds->do_fast_op)
+					{
+					case DOFAST_LT:  tst = (val <  lim); break;
+					case DOFAST_GT:  tst = (val >  lim); break;
+					case DOFAST_LTE: tst = (val <= lim); break;
+					case DOFAST_GTE: tst = (val >= lim); break;
+					case DOFAST_EQ:  tst = (val == lim); break;
+					default:         tst = (val != lim); break; /* DOFAST_NE */
+					}
+				}
+				else
+				{
+					MMFLOAT val = *(MMFLOAT *)ds->do_fast_var;
+					MMFLOAT lim = ds->do_fast_limit.f;
+					switch (ds->do_fast_op)
+					{
+					case DOFAST_LT:  tst = (val <  lim); break;
+					case DOFAST_GT:  tst = (val >  lim); break;
+					case DOFAST_LTE: tst = (val <= lim); break;
+					case DOFAST_GTE: tst = (val >= lim); break;
+					case DOFAST_EQ:  tst = (val == lim); break;
+					default:         tst = (val != lim); break;
+					}
+				}
+				if (ds->do_fast_is_until) tst = !tst;
+				goto do_loop_branch;
+			}
+do_loop_slow:
+#endif
 			if (g_dostack[i].evalptr == NULL)
 			{ // if it was a DO without a WHILE/UNTIL
 				if (*cmdline >= 0x80)
@@ -4104,6 +4209,9 @@ void MIPS16 __not_in_flash_func(cmd_loop)(void)
 				tst = g_dostack[i].untiltest ? !condval : condval; // UNTIL inverts: loop while condition is false
 				checkend(cmdline);							  // make sure that there is nothing else
 			}
+#ifdef CACHE
+do_loop_branch:
+#endif
 
 			// test the expression value and reset the program pointer if we are still looping
 			// otherwise remove this entry from the do stack

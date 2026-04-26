@@ -185,18 +185,26 @@ extern "C"
     x++
 
 #define IsDigitinline(a) ((a) >= '0' && (a) <= '9')
-
-/* Character classification macros */
+    /*static inline char mytoupper(char c)
+    {
+        uint32_t x = (uint32_t)c;
+        uint32_t mask = (x - 'a' <= 'z' - 'a') ? 0x20 : 0x00;
+        return (char)(x - mask);
+    }*/
+    static inline __attribute__((always_inline)) int mytoupper(int c)
+    {
+        if ((unsigned)(c - 'a') < 26u)
+            c &= ~0x20;
+        return c;
+    }
 #ifdef rp2350
 #define isnamestart(c) (name_start_tbl[((uint8_t)(c))])
 #define isnamechar(c) (name_char_tbl[((uint8_t)(c))])
 #define isnameend(c) (name_end_tbl[((uint8_t)(c))])
-#define mytoupper(c) (charmap[(uint8_t)(c)])
 #else
 #define isnamestart(c) (isalpha((unsigned char)(c)) || (c) == '_')
 #define isnamechar(c) (isalnum((unsigned char)(c)) || (c) == '_' || (c) == '.' || (c) == 0x1e)
 #define isnameend(c) (isalnum((unsigned char)(c)) || (c) == '_' || (c) == '.' || (c) == '$' || (c) == '!' || (c) == '%')
-#define mytoupper(c) (toupper(c))
 #endif
 
 /* Token table access macros - safer versions that evaluate parameter only once */
@@ -347,15 +355,13 @@ extern "C"
     extern int g_VarIndex;
     extern int g_LocalIndex;
 #ifdef CACHE
-    /* Local-variable side index (Phase 2 lookup acceleration) — see MMBasic.c */
-    extern uint32_t g_localframe_quick[MAXLOCALVARS];
-    extern uint8_t g_localframe_namelen[MAXLOCALVARS];
+    /* Local-variable frame tracking — see MMBasic.c */
     extern int g_localframe_base;
     extern int g_framebase_stack[MAXGOSUB];
     extern int g_framebase_sp;
     extern int g_current_sub_idx;
     extern int g_subidx_stack[MAXGOSUB];
-    extern uint64_t g_subentry_us[MAXGOSUB];
+    extern uint64_t *g_subentry_us;
 #endif
     extern uint32_t *g_perf_cmdcount;
     extern uint32_t *g_perf_subcall_count;
@@ -486,23 +492,23 @@ extern "C"
      * Function declarations - Type conversions
      * ============================================================================ */
 #ifndef MMBASIC_C_INTERNAL
-static inline int FloatToInt32(MMFLOAT x)
-{
-    if (x < LONG_MIN - 0.5 || x > LONG_MAX + 0.5)
-        error("Number too large");
-    return (x >= 0 ? (int)(x + 0.5) : (int)(x - 0.5));
-}
-static inline long long int FloatToInt64(MMFLOAT x)
-{
-    if (x < (-(0x7fffffffffffffffLL) - 1) - 0.5 || x > 0x7fffffffffffffffLL + 0.5)
-        error("Number too large");
-    if ((x < -0xfffffffffffff) || (x > 0xfffffffffffff))
-        return (long long int)(x);
-    return (x >= 0 ? (long long int)(x + 0.5) : (long long int)(x - 0.5));
-}
+    static inline int FloatToInt32(MMFLOAT x)
+    {
+        if (x < LONG_MIN - 0.5 || x > LONG_MAX + 0.5)
+            error("Number too large");
+        return (x >= 0 ? (int)(x + 0.5) : (int)(x - 0.5));
+    }
+    static inline long long int FloatToInt64(MMFLOAT x)
+    {
+        if (x < (-(0x7fffffffffffffffLL) - 1) - 0.5 || x > 0x7fffffffffffffffLL + 0.5)
+            error("Number too large");
+        if ((x < -0xfffffffffffff) || (x > 0xfffffffffffff))
+            return (long long int)(x);
+        return (x >= 0 ? (long long int)(x + 0.5) : (long long int)(x - 0.5));
+    }
 #else
-    int FloatToInt32(MMFLOAT);
-    long long int FloatToInt64(MMFLOAT x);
+int FloatToInt32(MMFLOAT);
+long long int FloatToInt64(MMFLOAT x);
 #endif
     void IntToStrPad(char *p, long long int nbr, signed char padch, int maxch, int radix);
     void IntToStr(char *strr, long long int nbr, unsigned int base);

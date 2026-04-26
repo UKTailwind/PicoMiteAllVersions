@@ -47,67 +47,54 @@ extern "C"
 #define MAXLOCALVARS 256
 #define MAXVARS (MAXGLOBALVARS + MAXLOCALVARS)
 
-#ifdef HDMI
-#ifdef USBKEYBOARD
-#define FLASH_TARGET_OFFSET (1008 * 1024)
-#define HEAP_MEMORY_SIZE (164 * 1024)
-#else
-#define FLASH_TARGET_OFFSET (976 * 1024)
-#define HEAP_MEMORY_SIZE (164 * 1024)
-#endif
-#else
-#ifdef USBKEYBOARD
-#define FLASH_TARGET_OFFSET (992 * 1024)
-#define HEAP_MEMORY_SIZE (172 * 1024)
-#else
-#define FLASH_TARGET_OFFSET (960 * 1024)
-#define HEAP_MEMORY_SIZE (172 * 1024)
-#endif
-#endif
-
-/* HDMI-specific settings */
-#ifdef HDMI
+#ifdef HDMI //RP2350 HDMI
 #define MAXMODES 5
+#define MAX_CPU Freq378P
+#define MIN_CPU FreqX
 #ifdef USBKEYBOARD
+#define FLASH_TARGET_OFFSET (1024 * 1024)
+#define HEAP_MEMORY_SIZE (160 * 1024)
 #define MagicKey 0x82321F85
 #else
 #define MagicKey 0x12175CED
+#define FLASH_TARGET_OFFSET (976 * 1024)
+#define HEAP_MEMORY_SIZE (164 * 1024)
 #endif
-#define MAX_CPU Freq378P
-#define MIN_CPU FreqX
-#else
+#else //rp2350 VGA
 #define MAXMODES 3
-#ifdef USBKEYBOARD
-#define MagicKey 0x789124B3
-#else
-#define MagicKey 0x42283587
-#endif
 #define MAX_CPU 378000
 #define MIN_CPU 252000
+#ifdef USBKEYBOARD
+#define FLASH_TARGET_OFFSET (1008 * 1024)
+#define HEAP_MEMORY_SIZE (168 * 1024)
+#define MagicKey 0x789124B3
+#else
+#define FLASH_TARGET_OFFSET (960 * 1024)
+#define HEAP_MEMORY_SIZE (172 * 1024)
+#define MagicKey 0x42283587
+#endif
 #endif
 
-/* Non-RP2350 configuration */
+
+/* RP2040 configuration */
 #else
 #define MAXSUBFUN 256
 #define MAXGLOBALVARS 240 // Configurable split
 #define MAXLOCALVARS 240
 #define MAXVARS (MAXGLOBALVARS + MAXLOCALVARS)
+#define MAXMODES 2
+#define MAX_CPU 378000
+#define MIN_CPU 252000
 #ifdef USBKEYBOARD
 #define FLASH_TARGET_OFFSET (832 * 1024)
 #define MagicKey 0x356469F4
+#define HEAP_MEMORY_SIZE (100 * 1024)
 #else
 #define FLASH_TARGET_OFFSET (800 * 1024)
+#define HEAP_MEMORY_SIZE (100 * 1024)
 #define MagicKey 0xD4201AF5
 #endif
 
-#define MAXMODES 2
-#ifdef CACHE
-#define HEAP_MEMORY_SIZE ((104 * 1024) - 4096)
-#else
-#define HEAP_MEMORY_SIZE (100 * 1024)
-#endif
-#define MAX_CPU 378000
-#define MIN_CPU 252000
 #endif
 
 /* VGA display mode definitions - Standard (640x480) */
@@ -200,37 +187,30 @@ extern "C"
  * Platform-specific configuration - PICOMITEWEB
  * ============================================================================ */
 #ifdef PICOMITEWEB
+#define MaxPcb 8
+#define MAX_CPU 252000
+#define MIN_CPU 126000
 
 #ifdef rp2350
+#define MagicKey 0x978128E6
 #define MAXSUBFUN 512
 #define MAXGLOBALVARS 512 // Configurable split
 #define MAXLOCALVARS 256
 #define MAXVARS (MAXGLOBALVARS + MAXLOCALVARS)
-#ifdef CACHE
-#define HEAP_MEMORY_SIZE ((256 * 1024) - 4096)
+#define HEAP_MEMORY_SIZE (252 * 1024)
+#define FLASH_TARGET_OFFSET (1312 * 1024)
 #else
-#define HEAP_MEMORY_SIZE (256 * 1024)
-#endif
-#define FLASH_TARGET_OFFSET (1296 * 1024)
-#else
+#define MagicKey 0x927945E6
 #define MAXSUBFUN 256
 #define MAXGLOBALVARS 240 // Configurable split
 #define MAXLOCALVARS 240
 #define MAXVARS (MAXGLOBALVARS + MAXLOCALVARS)
-#ifdef CACHE
-#define HEAP_MEMORY_SIZE ((88 * 1024) - 4096)
-#else
 #define HEAP_MEMORY_SIZE (88 * 1024)
-#endif
 #define FLASH_TARGET_OFFSET (1136 * 1024)
 #endif
 
 #include "lwipopts_examples_common.h"
 
-#define MagicKey 0x978128E6
-#define MaxPcb 8
-#define MAX_CPU 252000
-#define MIN_CPU 126000
 
 #endif /* PICOMITEWEB */
 
@@ -242,11 +222,6 @@ extern "C"
 #define MIN_CPU 48000
 
 #ifdef rp2350
-#ifdef CACHE
-#define HEAP_MEMORY_SIZE (308 * 1024)
-#else
-#define HEAP_MEMORY_SIZE (308 * 1024)
-#endif
 #define MAXGLOBALVARS 512 // Configurable split
 #define MAXLOCALVARS 240
 #define MAXVARS (MAXGLOBALVARS + MAXLOCALVARS)
@@ -255,32 +230,32 @@ extern "C"
 
 #ifdef USBKEYBOARD
 #define MagicKey 0x52211A65
-#define FLASH_TARGET_OFFSET (1088 * 1024)
+#define FLASH_TARGET_OFFSET (1104 * 1024)
+#define HEAP_MEMORY_SIZE (308 * 1024)
 #else
-#define FLASH_TARGET_OFFSET (1056 * 1024)
+#define FLASH_TARGET_OFFSET (1072 * 1024)
+#define HEAP_MEMORY_SIZE (308 * 1024)
 #define MagicKey 0x989626B4
 #endif
-#else
-#ifdef CACHE
-#define HEAP_MEMORY_SIZE ((128 * 1024) - 4096)
-#else
-#define HEAP_MEMORY_SIZE (128 * 1024)
-#endif
+
+#else  //RP2040
 #define MAXGLOBALVARS 256 // Configurable split
 #define MAXLOCALVARS 240
 #define MAXVARS (MAXGLOBALVARS + MAXLOCALVARS)
-
 #define MAX_CPU 420000
 #define MAXSUBFUN 256
 
 #ifdef USBKEYBOARD
 #define MagicKey 0x0E878DDA
 #define FLASH_TARGET_OFFSET (912 * 1024)
+#define HEAP_MEMORY_SIZE (132 * 1024)
 #else
 #ifdef PICOMITEMIN
 #define FLASH_TARGET_OFFSET (704 * 1024)
 #define MagicKey 0xF1F127C5
+#define HEAP_MEMORY_SIZE (132 * 1024)
 #else
+#define HEAP_MEMORY_SIZE (120 * 1024)
 #define FLASH_TARGET_OFFSET (896 * 1024)
 #define MagicKey 0x142127C5
 #endif

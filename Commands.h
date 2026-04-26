@@ -71,11 +71,25 @@ extern int fm_sanitize_next_console_input;
 #endif
 typedef struct s_dostack
 {
-    unsigned char *evalptr; // pointer to the expression to be evaluated
-    unsigned char *loopptr; // pointer to the loop statement
-    unsigned char *doptr;   // pointer to the DO statement
-    unsigned char level;    // the sub/function level that the loop was created
+    unsigned char *evalptr;  // pointer to the expression to be evaluated
+    unsigned char *loopptr;  // pointer to the loop statement
+    unsigned char *doptr;    // pointer to the DO statement
+    unsigned char level;     // the sub/function level that the loop was created
     unsigned char untiltest; // 1 if DO UNTIL (exits when condition becomes true)
+#ifdef CACHE
+    // Fast condition: pre-resolved VAR OP CONST comparison compiled at DO setup
+    // time so cmd_loop can do a direct load+compare with no hash probe or replay.
+    // do_fast_var == NULL means the fast path is not available for this loop.
+    void    *do_fast_var;           // direct ptr to variable storage in g_vartbl
+    int      do_fast_varindex;      // g_vartbl index (for local re-resolution)
+    uint16_t do_fast_frame_gen;     // g_local_frame_gen at compile time
+    uint8_t  do_fast_is_local;      // 1 = local variable
+    uint8_t  do_fast_type;          // T_INT or T_NBR
+    uint8_t  do_fast_op;            // DOFAST_LT/GT/LTE/GTE/EQ/NE
+    uint8_t  do_fast_is_until;      // 1 = UNTIL sense (invert result)
+    union { long long int i; MMFLOAT f; } do_fast_limit;
+    unsigned char do_fast_name[MAXVARLEN + 1]; // upper-cased; for local re-resolve
+#endif
 } dostackval;
 
 extern struct s_dostack g_dostack[MAXDOLOOPS];

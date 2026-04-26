@@ -27,7 +27,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 
 ************************************************************************************************************************/
 
-#define MMBASIC_C_INTERNAL  /* suppress static inline FloatToInt32/64 in MMBasic.h */
+#define MMBASIC_C_INTERNAL /* suppress static inline FloatToInt32/64 in MMBasic.h */
 #include <stdio.h>
 #include <limits.h>
 #include <stdarg.h>
@@ -90,7 +90,7 @@ __not_in_flash("data") const unsigned char name_char_tbl[256] = {
 __not_in_flash("data") const unsigned char name_end_tbl[256] = {
     ['A' ... 'Z'] = 1, ['a' ... 'z'] = 1, ['0' ... '9'] = 1, ['_'] = 1, ['.'] = 1, ['$'] = 1, ['!'] = 1, ['%'] = 1};
 
-__not_in_flash("data") const unsigned char charmap[256] = {
+/*__not_in_flash("data") const unsigned char charmap[256] = {
     0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
     0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f,
     0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2a, 0x2b, 0x2c, 0x2d, 0x2e, 0x2f,
@@ -107,6 +107,7 @@ __not_in_flash("data") const unsigned char charmap[256] = {
     0xd0, 0xd1, 0xd2, 0xd3, 0xd4, 0xd5, 0xd6, 0xd7, 0xd8, 0xd9, 0xda, 0xdb, 0xdc, 0xdd, 0xde, 0xdf,
     0xe0, 0xe1, 0xe2, 0xe3, 0xe4, 0xe5, 0xe6, 0xe7, 0xe8, 0xe9, 0xea, 0xeb, 0xec, 0xed, 0xee, 0xef,
     0xf0, 0xf1, 0xf2, 0xf3, 0xf4, 0xf5, 0xf6, 0xf7, 0xf8, 0xf9, 0xfa, 0xfb, 0xfc, 0xfd, 0xfe, 0xff};
+*/
 #endif
 
 // Forward declarations for struct helper functions (NOT in RAM for size savings)
@@ -160,6 +161,11 @@ uint32_t g_perf_findvar_locals;        // findvar() calls that resolved to a loc
 uint32_t g_perf_findvar_globals;       // findvar() calls that resolved to a global slot
 uint64_t g_perf_start_us;              // time_us_64() sampled at program start
 int g_option_profiling = 0;            // OPTION PROFILING - master gate
+#ifdef CACHE
+// Per-frame call-stack profiling buffers; allocated with ProfilingAlloc().
+uint64_t *g_subentry_us = NULL;
+uint64_t *g_subchild_us = NULL;
+#endif
 
 void ProfilingAlloc(void)
 {
@@ -171,11 +177,21 @@ void ProfilingAlloc(void)
         g_perf_subtime_us = (uint64_t *)GetMemory(MAXSUBFUN * sizeof(uint64_t));
     if (g_perf_subexcl_us == NULL)
         g_perf_subexcl_us = (uint64_t *)GetMemory(MAXSUBFUN * sizeof(uint64_t));
+#ifdef CACHE
+    if (g_subentry_us == NULL)
+        g_subentry_us = (uint64_t *)GetMemory(MAXGOSUB * sizeof(uint64_t));
+    if (g_subchild_us == NULL)
+        g_subchild_us = (uint64_t *)GetMemory(MAXGOSUB * sizeof(uint64_t));
+#endif
     /* GetMemory zeros, but be explicit for re-enables.                     */
     memset(g_perf_cmdcount, 0, PERF_CMDTOKEN_MAX * sizeof(uint32_t));
     memset(g_perf_subcall_count, 0, MAXSUBFUN * sizeof(uint32_t));
     memset(g_perf_subtime_us, 0, MAXSUBFUN * sizeof(uint64_t));
     memset(g_perf_subexcl_us, 0, MAXSUBFUN * sizeof(uint64_t));
+#ifdef CACHE
+    memset(g_subentry_us, 0, MAXGOSUB * sizeof(uint64_t));
+    memset(g_subchild_us, 0, MAXGOSUB * sizeof(uint64_t));
+#endif
     g_perf_usercmd_count = 0;
     g_perf_findvar_calls = 0;
     g_perf_findvar_locals = 0;
@@ -189,6 +205,10 @@ void ProfilingFree(void)
     FreeMemorySafe((void **)&g_perf_subcall_count);
     FreeMemorySafe((void **)&g_perf_subtime_us);
     FreeMemorySafe((void **)&g_perf_subexcl_us);
+#ifdef CACHE
+    FreeMemorySafe((void **)&g_subentry_us);
+    FreeMemorySafe((void **)&g_subchild_us);
+#endif
 }
 
 void ResetPerfCounters(void)
@@ -205,29 +225,13 @@ struct s_hash g_hashlist[MAXLOCALVARS] = {0};
 int g_hashlistpointer = 0;
 
 // ---------------------------------------------------------------------------
-// Local-variable side index (Phase 2 lookup acceleration)
-//
-// `g_hashlist[]` already records every active local's slot index and lexical
-// level in creation order.  These parallel arrays add per-entry quick-reject
-// data so that findvar's local probe can do a short linear scan over the
-// current frame instead of a hash-table probe.
+// Local-variable frame tracking (used by the trace cache)
 //
 // `g_localframe_base` is the index in g_hashlist[] at which the current
 // frame's locals start.  `g_framebase_stack[]` saves the previous base on
 // every level transition (sub/fun entry, gosub, CFunction call).
-//
-// `g_localframe_quick[i]` holds the first 4 chars of the name at hashlist[i]
-// (lower-case-folded already; padded with zero) so that an O(1) integer
-// compare can reject most non-matches before a full byte-by-byte compare.
-// `g_localframe_namelen[i]` holds the name length.
-//
-// The structure of g_hashlist itself is unchanged so SAVE/RESTORE STATE
-// continues to use the existing on-disk format.  The side arrays are
-// reconstructible from g_hashlist + g_vartbl when a state is restored.
 // ---------------------------------------------------------------------------
 #ifdef CACHE
-uint32_t g_localframe_quick[MAXLOCALVARS];
-uint8_t g_localframe_namelen[MAXLOCALVARS];
 int g_localframe_base = 0;       // first hashlist index in current frame
 int g_framebase_stack[MAXGOSUB]; // saved bases, one per active level
 int g_framebase_sp = 0;          // stack pointer / current depth
@@ -237,16 +241,6 @@ int g_framebase_sp = 0;          // stack pointer / current depth
 // frame-base stack.  Used by the trace cache for per-sub opt-in.
 int g_current_sub_idx = -1;
 int g_subidx_stack[MAXGOSUB];
-
-// Per-frame entry timestamp (us) - used to accumulate per-sub inclusive time.
-// Pushed in EnterLocalFrame, popped in LeaveLocalFrame.
-uint64_t g_subentry_us[MAXGOSUB];
-
-// Per-frame accumulator: total time spent inside CALLEES of this frame.
-// Zeroed on entry; on exit  exclusive = inclusive - child_us  is added to
-// the leaving sub's exclusive bucket, and inclusive is added to the parent
-// frame's child_us so that grandparent frames also subtract correctly.
-uint64_t g_subchild_us[MAXGOSUB];
 
 // Push the current frame base on entry to a new local scope (sub/fun, gosub,
 // CFunction).  Called *immediately after* g_LocalIndex++.
@@ -4765,24 +4759,6 @@ void MIPS16 __not_in_flash_func (*findvar)(unsigned char *p, int action)
     if (ifree < maxlocalvars) // CHANGED: was MAXVARS/2
     {
         g_hashlist[g_hashlistpointer].level = g_LocalIndex;
-        // Populate side-index quick-reject data for this hashlist entry.
-        // 4-byte prefix of the upper-cased name (already in `name[]`),
-        // zero-padded if the name is shorter than 4 characters.
-        {
-            uint32_t qn = 0;
-            if (namelen >= 1)
-                qn = (uint32_t)name[0];
-            if (namelen >= 2)
-                qn |= ((uint32_t)name[1]) << 8;
-            if (namelen >= 3)
-                qn |= ((uint32_t)name[2]) << 16;
-            if (namelen >= 4)
-                qn |= ((uint32_t)name[3]) << 24;
-#ifdef CACHE
-            g_localframe_quick[g_hashlistpointer] = qn;
-            g_localframe_namelen[g_hashlistpointer] = (uint8_t)namelen;
-#endif
-        }
         g_hashlist[g_hashlistpointer++].hash = ifree;
         g_vartbl[ifree].level = g_LocalIndex;
     }

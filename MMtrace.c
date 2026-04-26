@@ -199,6 +199,7 @@ enum trace_opcode
     OP_CINT,    /* round-to-nearest(NBR) -> INT  (CInt())                  */
     OP_DEG,     /* radians -> degrees: NBR * RADCONV -> NBR                */
     OP_RAD,     /* degrees -> radians: NBR / RADCONV -> NBR                */
+    OP_RND_0,   /* Rnd (no-arg): calls fun_rnd(), pushes NBR result        */
 
     /* 2-arg intrinsics: consume NBR[sp-2] and NBR[sp-1], push one NBR    */
     OP_ATAN2,   /* atan2(y, x) -> NBR; bails on useoptionangle             */
@@ -1698,18 +1699,27 @@ static int compile_primary(unsigned char **pp, struct compile_ctx *cx)
             return T_NBR;
         }
 
-        /* Zero-argument numeric constants (T_FNA | T_NBR with no side effects).
-         * Folded to OP_LOAD_CONST_NBR at compile time so no new opcode is
-         * needed and the replayer handles them for free.                      */
+        /* Zero-argument numeric functions (T_FNA | T_NBR).
+         * PI is a true constant: folded to OP_LOAD_CONST_NBR at compile time.
+         * Rnd has no argument but changes every call: emits OP_RND_0 so the
+         * RNG is invoked at replay time (advancing state identically to the
+         * normal interpreter path).                                           */
         if ((tokentype(c) & (T_FNA | T_NBR)) == (T_FNA | T_NBR))
         {
             void (*f)(void) = tokenfunction(c);
+            p++;
+            if (f == fun_rnd)
+            {
+                if (cx->nops >= TRACE_MAX_OPS) return 0;
+                cx->ops[cx->nops++].opcode = OP_RND_0;
+                *pp = p;
+                return T_NBR;
+            }
             MMFLOAT cval;
             if (f == fun_pi)
                 cval = M_PI;
             else
-                return 0; /* other T_FNA functions may have side effects */
-            p++;
+                return 0; /* other T_FNA functions not supported */
             if (cx->nops >= TRACE_MAX_OPS)
                 return 0;
             struct trace_op *op = &cx->ops[cx->nops++];
@@ -2842,6 +2852,12 @@ static int __not_in_flash_func(replay_common)(struct cache_entry *e, int *out_bo
                 return 0;
             fstk[sp - 1] /= RADCONV;
             break;
+        case OP_RND_0:
+            if (sp >= TRACE_MAX_STACK) return 0;
+            fun_rnd();          /* advances RNG state (incl. rp2350 reseeding) */
+            fstk[sp] = fret;
+            tag[sp++] = T_NBR;
+            break;
         case OP_ATAN2:
             if (sp < 2 || tag[sp - 2] != T_NBR || tag[sp - 1] != T_NBR || useoptionangle)
                 return 0; /* degree-mode output scaling: let interpreter handle */
@@ -3182,8 +3198,11 @@ static int compile_if_cond(unsigned char *condline, struct cache_entry *e)
 
 /* Per-sub opt-in: when g_sub_optin_active is non-zero, only LETs whose
  * enclosing sub (subfun[] index recorded in g_current_sub_idx) is on the
- * opt-in list will be cached/replayed.                                       */
-static uint8_t g_sub_optin[MAXSUBFUN];
+ * opt-in list will be cached/replayed.
+ * g_sub_optin is lazily allocated on first TraceCacheOptInAdd() call and
+ * freed by TraceCacheOptInClear() / TraceCacheFree().
+ * Invariant: g_sub_optin_active==1  =>  g_sub_optin != NULL               */
+static uint8_t *g_sub_optin = NULL;
 static uint8_t g_sub_optin_active = 0;
 
 /* ------------------------------------------------------------------------- */
@@ -3261,6 +3280,8 @@ void TraceCacheFree(void)
     g_arena_used = 0;
     FreeMemorySafe((void **)&g_tc_sub_let_hits);
     FreeMemorySafe((void **)&g_tc_sub_if_hits);
+    FreeMemorySafe((void **)&g_sub_optin);
+    g_sub_optin_active = 0;
     g_local_frame_gen++;
 }
 
@@ -3292,7 +3313,7 @@ int TraceCacheGetSize(void)
 
 void TraceCacheOptInClear(void)
 {
-    memset(g_sub_optin, 0, sizeof(g_sub_optin));
+    FreeMemorySafe((void **)&g_sub_optin);
     g_sub_optin_active = 0;
     /* Existing cache entries may have been compiled while the opt-in list
      * was either active or not; safest to wipe so the new policy applies. */
@@ -3303,6 +3324,8 @@ void TraceCacheOptInAdd(int subfun_idx)
 {
     if (subfun_idx < 0 || subfun_idx >= MAXSUBFUN)
         return;
+    if (g_sub_optin == NULL)
+        g_sub_optin = (uint8_t *)GetMemory(MAXSUBFUN);
     g_sub_optin[subfun_idx] = 1;
     g_sub_optin_active = 1;
     TraceCacheInvalidateAll();
@@ -3315,7 +3338,8 @@ void TraceCacheOptInAdd(int subfun_idx)
  * the wrong sub - clear unconditionally.                                    */
 void OptInResetSilent(void)
 {
-    memset(g_sub_optin, 0, sizeof(g_sub_optin));
+    /* Called during heap reset — pointer is stale; just drop it. */
+    g_sub_optin = NULL;
     g_sub_optin_active = 0;
 }
 
@@ -3371,6 +3395,801 @@ static void debug_print_stmt(unsigned char *stmt, const char *tag)
     }
     snprintf(dbg, sizeof(dbg), "[%s] %s: %s\r\n", tag, sname, tmp);
     MMPrintString(dbg);
+}
+
+/* =========================================================================
+ * DO-loop fast-condition compiler
+ *
+ * Recognises VAR OP CONST and CONST OP VAR (where OP is a comparison and
+ * CONST is a numeric literal) and fills the caller's out_* slots so that
+ * cmd_loop can evaluate the condition with a single load+compare instead of
+ * going through TraceCacheTryIf → replay_common.
+ * ========================================================================= */
+
+/* Map a comparison operator function pointer to a DOFAST_* code.
+ * Returns 0 when fp is not a pure comparison operator.                     */
+static int dofast_map_op(void (*fp)(void), uint8_t *out)
+{
+    if      (fp == op_lt)    *out = DOFAST_LT;
+    else if (fp == op_gt)    *out = DOFAST_GT;
+    else if (fp == op_lte)   *out = DOFAST_LTE;
+    else if (fp == op_gte)   *out = DOFAST_GTE;
+    else if (fp == op_equal) *out = DOFAST_EQ;
+    else if (fp == op_ne)    *out = DOFAST_NE;
+    else return 0;
+    return 1;
+}
+
+/* Invert a DOFAST_* comparison for the CONST-on-left case.                */
+static uint8_t dofast_invert_op(uint8_t op)
+{
+    switch (op)
+    {
+    case DOFAST_LT:  return DOFAST_GT;
+    case DOFAST_GT:  return DOFAST_LT;
+    case DOFAST_LTE: return DOFAST_GTE;
+    case DOFAST_GTE: return DOFAST_LTE;
+    default:         return op; /* EQ and NE are symmetric */
+    }
+}
+
+/* Fill the caller's out_* slots from a resolved scalar variable.           */
+static void dofast_fill(int scope, int vtype, int vidx,
+                         int ctype, int64_t limi, MMFLOAT limf,
+                         uint8_t op_code,
+                         unsigned char *upname, int uplen,
+                         void **out_var, int *out_varindex,
+                         uint8_t *out_is_local, uint16_t *out_frame_gen,
+                         uint8_t *out_type, uint8_t *out_op,
+                         int64_t *out_limit_i, MMFLOAT *out_limit_f,
+                         unsigned char *out_name)
+{
+    void *var = (scope == SCOPE_LOCAL_PTR)
+                ? (void *)g_vartbl[vidx].val.s
+                : (void *)&g_vartbl[vidx].val;
+    *out_var       = var;
+    *out_varindex  = vidx;
+    *out_is_local  = (scope == SCOPE_LOCAL || scope == SCOPE_LOCAL_PTR) ? 1 : 0;
+    *out_frame_gen = (uint16_t)g_local_frame_gen;
+    *out_type      = vtype;
+    *out_op        = op_code;
+    if (vtype == T_INT)
+        *out_limit_i = (ctype == T_INT) ? limi : (int64_t)limf;
+    else
+        *out_limit_f = (ctype == T_NBR) ? limf : (MMFLOAT)limi;
+    int cplen = (uplen < MAXVARLEN) ? uplen : MAXVARLEN;
+    memcpy(out_name, upname, cplen);
+    out_name[cplen] = 0;
+}
+
+int TraceCacheCompileDoFast(unsigned char *condptr,
+                             void     **out_var,
+                             int       *out_varindex,
+                             uint8_t   *out_is_local,
+                             uint16_t  *out_frame_gen,
+                             uint8_t   *out_type,
+                             uint8_t   *out_op,
+                             int64_t   *out_limit_i,
+                             MMFLOAT   *out_limit_f,
+                             unsigned char *out_name)
+{
+    unsigned char *p = condptr;
+    skipspace(p);
+    if (is_stmt_end(*p))
+        return 0;
+
+    if (isnamestart(*p))
+    {
+        /* ---- VAR OP CONST ---- */
+        unsigned char namebuf[MAXVARLEN + 2];
+        unsigned char upname[MAXVARLEN + 2];
+        unsigned char suffix;
+        unsigned char *pp;
+        if (!read_name(p, &pp, namebuf, sizeof(namebuf), &suffix)) return 0;
+        skipspace(pp);
+        if (*pp == '(') return 0; /* array subscript — bail */
+
+        int vtype, vidx, uplen;
+        MMFLOAT cval_f = 0; int64_t cval_i = 0;
+        int scope = resolve_scalar(namebuf, suffix, &vtype, &vidx,
+                                   upname, &uplen, &cval_f, &cval_i);
+        if (scope == SCOPE_NONE || scope == SCOPE_CONST ||
+            scope == SCOPE_GLOBAL_ARR || scope == SCOPE_LOCAL_ARR)
+            return 0;
+
+        if (*pp < C_BASETOKEN || !(tokentype(*pp) & T_OPER)) return 0;
+        uint8_t op_code;
+        if (!dofast_map_op(tokenfunction(*pp++), &op_code)) return 0;
+
+        skipspace(pp);
+        int ctype = 0; int64_t limi = 0; MMFLOAT limf = 0;
+        if (!parse_numeric(&pp, &ctype, &limf, &limi)) return 0;
+        skipspace(pp);
+        if (!is_stmt_end(*pp)) return 0;
+
+        dofast_fill(scope, vtype, vidx, ctype, limi, limf, op_code,
+                    upname, uplen, out_var, out_varindex,
+                    out_is_local, out_frame_gen, out_type, out_op,
+                    out_limit_i, out_limit_f, out_name);
+        return 1;
+    }
+
+    {
+        /* ---- CONST OP VAR ---- */
+        unsigned char *pp = p;
+        int ctype = 0; int64_t limi = 0; MMFLOAT limf = 0;
+        if (!parse_numeric(&pp, &ctype, &limf, &limi)) return 0;
+        skipspace(pp);
+        if (*pp < C_BASETOKEN || !(tokentype(*pp) & T_OPER)) return 0;
+        uint8_t op_raw;
+        if (!dofast_map_op(tokenfunction(*pp++), &op_raw)) return 0;
+        uint8_t op_code = dofast_invert_op(op_raw);
+
+        skipspace(pp);
+        if (!isnamestart(*pp)) return 0;
+        unsigned char namebuf[MAXVARLEN + 2];
+        unsigned char upname[MAXVARLEN + 2];
+        unsigned char suffix;
+        unsigned char *ppp;
+        if (!read_name(pp, &ppp, namebuf, sizeof(namebuf), &suffix)) return 0;
+        skipspace(ppp);
+        if (*ppp == '(') return 0;
+        if (!is_stmt_end(*ppp)) return 0;
+
+        int vtype, vidx, uplen;
+        MMFLOAT cv_f = 0; int64_t cv_i = 0;
+        int scope = resolve_scalar(namebuf, suffix, &vtype, &vidx,
+                                   upname, &uplen, &cv_f, &cv_i);
+        if (scope == SCOPE_NONE || scope == SCOPE_CONST ||
+            scope == SCOPE_GLOBAL_ARR || scope == SCOPE_LOCAL_ARR)
+            return 0;
+
+        dofast_fill(scope, vtype, vidx, ctype, limi, limf, op_code,
+                    upname, uplen, out_var, out_varindex,
+                    out_is_local, out_frame_gen, out_type, out_op,
+                    out_limit_i, out_limit_f, out_name);
+        return 1;
+    }
+}
+
+/* =========================================================================
+ * INC statement fast path
+ *
+ * Handles:   Inc var              (default step +1)
+ *            Inc var, const       (constant numeric literal step)
+ *            Inc var, stepvar     (simple scalar variable step)
+ *
+ * Type coercion matches cmd_inc: target type determines the operation;
+ * a step of the other numeric type is coerced (float→int truncates).
+ *
+ * Rejects string Inc, array Inc, struct Inc, and expression steps.
+ * ========================================================================= */
+
+#define ENTRY_KIND_INC 4
+
+/* Compact record stored in the arena for ENTRY_KIND_INC entries.
+ * Union first → struct inherits 8-byte alignment from int64_t/MMFLOAT.
+ * step_var == NULL  → constant step (amount union is valid).
+ * step_var != NULL  → variable step (dereference step_var at replay time).  */
+typedef struct {
+    union { int64_t i; MMFLOAT f; } amount;  /* constant step (step_var==NULL) */
+    void          *var;           /* direct ptr to target variable              */
+    void          *step_var;      /* direct ptr to step variable; NULL=constant */
+    int            varindex;      /* g_vartbl slot for target (local re-resolve)*/
+    int            step_varindex; /* g_vartbl slot for step variable            */
+    uint8_t        type;          /* T_INT or T_NBR (target)                    */
+    uint8_t        is_local;      /* 1 if target is local                       */
+    uint8_t        step_type;     /* T_INT or T_NBR (step; valid when step_var) */
+    uint8_t        step_is_local; /* 1 if step variable is local                */
+    unsigned char  name[MAXVARLEN + 1];      /* target upper-cased name         */
+    unsigned char  step_name[MAXVARLEN + 1]; /* step upper-cased name           */
+    uint8_t        _pad[2];       /* pad sizeof to multiple of 8                */
+} inc_payload_t;
+/* sizeof == 8+4+4+4+4+1+1+1+1+33+33+2 = 96 bytes */
+
+/* Execute the increment described by pl — shared by compile and replay.     */
+static inline void inc_exec(inc_payload_t *pl)
+{
+    if (pl->step_var != NULL)
+    {
+        /* Variable step — coerce to target type                              */
+        if (pl->type == T_INT)
+        {
+            int64_t step = (pl->step_type == T_INT)
+                           ? *(int64_t  *)pl->step_var
+                           : (int64_t)*(MMFLOAT *)pl->step_var;
+            *(int64_t *)pl->var += step;
+        }
+        else
+        {
+            MMFLOAT step = (pl->step_type == T_NBR)
+                           ? *(MMFLOAT  *)pl->step_var
+                           : (MMFLOAT)*(int64_t *)pl->step_var;
+            *(MMFLOAT *)pl->var += step;
+        }
+    }
+    else
+    {
+        /* Constant step                                                      */
+        if (pl->type == T_INT) *(int64_t *)pl->var += pl->amount.i;
+        else                   *(MMFLOAT *)pl->var += pl->amount.f;
+    }
+}
+
+int __not_in_flash_func(TraceCacheTryInc)(unsigned char *cmdline)
+{
+    /* Caller already inlined the g_trace_cache_flags check.                 */
+
+    if (g_sub_optin_active)
+    {
+        if (g_current_sub_idx < 0 ||
+            g_current_sub_idx >= MAXSUBFUN ||
+            !g_sub_optin[g_current_sub_idx])
+        {
+            g_trace_optin_skip++;
+            return 0;
+        }
+    }
+
+    struct cache_entry *e = cache_lookup_or_create(cmdline);
+    if (e == NULL)
+    {
+        g_trace_lookup_null++;
+        if (g_trace_debug_bad && !g_trace_lookup_warned)
+        {
+            g_trace_lookup_warned = 1;
+            debug_print_stmt(cmdline, "TC-FULL");
+        }
+        return 0;
+    }
+
+    switch (e->state)
+    {
+    case ST_COMPILED:
+    {
+        if (e->entry_kind != ENTRY_KIND_INC)
+            return 0; /* different kind in probe chain */
+        inc_payload_t *pl = (inc_payload_t *)(g_arena + e->payload_off);
+
+        /* Re-resolve any local variables if the call frame has changed       */
+        if (e->has_locals && e->frame_gen != g_local_frame_gen)
+        {
+            int loc_size = GetLocalVarHashSize();
+            if (pl->is_local)
+            {
+                void *nv = NULL;
+                for (int j = 0; j < loc_size; j++)
+                {
+                    if (g_vartbl[j].name[0] == 0) continue;
+                    if (g_vartbl[j].level != g_LocalIndex) continue;
+                    if (g_vartbl[j].dims[0] != 0) continue;
+                    int t = g_vartbl[j].type;
+                    if (pl->type == T_INT && !(t & T_INT)) continue;
+                    if (pl->type == T_NBR && !(t & T_NBR)) continue;
+                    if (strncmp((char *)g_vartbl[j].name,
+                                (char *)pl->name, MAXVARLEN) != 0) continue;
+                    nv = (t & T_PTR) ? (void *)g_vartbl[j].val.s
+                                     : (void *)&g_vartbl[j].val;
+                    pl->varindex = j;
+                    break;
+                }
+                if (nv == NULL) { e->state = ST_BAD; return 0; }
+                pl->var = nv;
+            }
+            if (pl->step_is_local)
+            {
+                void *snv = NULL;
+                for (int j = 0; j < loc_size; j++)
+                {
+                    if (g_vartbl[j].name[0] == 0) continue;
+                    if (g_vartbl[j].level != g_LocalIndex) continue;
+                    if (g_vartbl[j].dims[0] != 0) continue;
+                    int t = g_vartbl[j].type;
+                    if (pl->step_type == T_INT && !(t & T_INT)) continue;
+                    if (pl->step_type == T_NBR && !(t & T_NBR)) continue;
+                    if (strncmp((char *)g_vartbl[j].name,
+                                (char *)pl->step_name, MAXVARLEN) != 0) continue;
+                    snv = (t & T_PTR) ? (void *)g_vartbl[j].val.s
+                                      : (void *)&g_vartbl[j].val;
+                    pl->step_varindex = j;
+                    break;
+                }
+                if (snv == NULL) { e->state = ST_BAD; return 0; }
+                pl->step_var = snv;
+            }
+            e->frame_gen = g_local_frame_gen;
+        }
+
+        inc_exec(pl);
+        g_trace_replays++;
+        if (g_tc_sub_let_hits)
+            g_tc_sub_let_hits[tc_sub_idx()]++;
+        return 1;
+    }
+
+    case ST_PENDING:
+    {
+        e->entry_kind = ENTRY_KIND_INC;
+        unsigned char *p = cmdline;
+        skipspace(p);
+
+        /* Parse target variable name                                         */
+        unsigned char namebuf[MAXVARLEN + 2];
+        unsigned char upname[MAXVARLEN + 2];
+        unsigned char suffix;
+        unsigned char *pp;
+        if (!read_name(p, &pp, namebuf, sizeof(namebuf), &suffix))
+            goto inc_bad;
+        skipspace(pp);
+        if (*pp == '(' || *pp == '.') goto inc_bad; /* array / struct */
+
+        /* Resolve target to a numeric scalar                                 */
+        MMFLOAT dummy_f = 0; int64_t dummy_i = 0;
+        int vtype, vidx, uplen;
+        int scope = resolve_scalar(namebuf, suffix, &vtype, &vidx, upname,
+                                   &uplen, &dummy_f, &dummy_i);
+        if (scope == SCOPE_NONE || scope == SCOPE_CONST ||
+            scope == SCOPE_GLOBAL_ARR || scope == SCOPE_LOCAL_ARR)
+            goto inc_bad;
+        if (!(vtype & (T_INT | T_NBR))) goto inc_bad;
+
+        /* Parse optional step: ', const'  or  ', stepvar'                   */
+        int64_t amt_i = 1;
+        MMFLOAT amt_f = 1.0;
+        int step_is_var = 0;
+        int svtype = 0, svidx = 0, suplen = 0, sscope = 0;
+        unsigned char supname[MAXVARLEN + 2];
+
+        if (*pp == ',')
+        {
+            pp++;
+            skipspace(pp);
+
+            int ctype = 0; MMFLOAT cf = 0; int64_t ci = 0;
+            if (parse_numeric(&pp, &ctype, &cf, &ci))
+            {
+                /* Constant step                                              */
+                skipspace(pp);
+                if (!is_stmt_end(*pp)) goto inc_bad;
+                if (vtype & T_INT)
+                    amt_i = (ctype == T_INT) ? ci : (int64_t)cf;
+                else
+                    amt_f = (ctype == T_NBR) ? cf : (MMFLOAT)ci;
+            }
+            else if (isnamestart(*pp))
+            {
+                /* Variable step — must be a plain scalar name, no subscript */
+                unsigned char snamebuf[MAXVARLEN + 2];
+                unsigned char ssuffix;
+                unsigned char *spp;
+                if (!read_name(pp, &spp, snamebuf, sizeof(snamebuf), &ssuffix))
+                    goto inc_bad;
+                skipspace(spp);
+                if (*spp == '(' || *spp == '.') goto inc_bad;
+                if (!is_stmt_end(*spp)) goto inc_bad; /* expression, not a plain var */
+
+                MMFLOAT sdummy_f = 0; int64_t sdummy_i = 0;
+                sscope = resolve_scalar(snamebuf, ssuffix, &svtype, &svidx,
+                                        supname, &suplen, &sdummy_f, &sdummy_i);
+                if (sscope == SCOPE_NONE || sscope == SCOPE_CONST ||
+                    sscope == SCOPE_GLOBAL_ARR || sscope == SCOPE_LOCAL_ARR)
+                    goto inc_bad;
+                if (!(svtype & (T_INT | T_NBR))) goto inc_bad;
+                pp = spp;
+                step_is_var = 1;
+            }
+            else
+                goto inc_bad;
+        }
+        else
+        {
+            if (!is_stmt_end(*pp)) goto inc_bad;
+        }
+
+        /* Allocate inc_payload_t from the arena (8-byte aligned)             */
+        {
+            uint32_t off = (g_arena_used + 7u) & ~7u;
+            if (off + (uint32_t)sizeof(inc_payload_t) > g_arena_cap)
+            {
+                g_trace_alloc_fail++;
+                goto inc_bad;
+            }
+            inc_payload_t *pl = (inc_payload_t *)(g_arena + off);
+            g_arena_used = off + (uint32_t)sizeof(inc_payload_t);
+            e->payload_off = off;
+
+            /* Target variable                                                */
+            pl->var      = (scope == SCOPE_LOCAL_PTR)
+                           ? (void *)g_vartbl[vidx].val.s
+                           : (void *)&g_vartbl[vidx].val;
+            pl->varindex = vidx;
+            pl->type     = (uint8_t)(vtype & (T_INT | T_NBR));
+            pl->is_local = (scope == SCOPE_LOCAL || scope == SCOPE_LOCAL_PTR) ? 1 : 0;
+            {
+                int cplen = (uplen < MAXVARLEN) ? uplen : MAXVARLEN;
+                memcpy(pl->name, upname, cplen);
+                pl->name[cplen] = 0;
+            }
+
+            /* Step                                                           */
+            if (step_is_var)
+            {
+                pl->step_var  = (sscope == SCOPE_LOCAL_PTR)
+                                ? (void *)g_vartbl[svidx].val.s
+                                : (void *)&g_vartbl[svidx].val;
+                pl->step_varindex = svidx;
+                pl->step_type     = (uint8_t)(svtype & (T_INT | T_NBR));
+                pl->step_is_local = (sscope == SCOPE_LOCAL || sscope == SCOPE_LOCAL_PTR) ? 1 : 0;
+                {
+                    int cplen = (suplen < MAXVARLEN) ? suplen : MAXVARLEN;
+                    memcpy(pl->step_name, supname, cplen);
+                    pl->step_name[cplen] = 0;
+                }
+            }
+            else
+            {
+                pl->step_var      = NULL; /* constant step */
+                pl->step_is_local = 0;
+                if (vtype & T_INT) pl->amount.i = amt_i;
+                else               pl->amount.f = amt_f;
+            }
+
+            e->frame_gen  = (uint16_t)g_local_frame_gen;
+            e->has_locals = pl->is_local | pl->step_is_local;
+            e->state      = ST_COMPILED;
+            g_trace_compiles_ok++;
+
+            inc_exec(pl);
+            g_trace_replays++;
+            if (g_tc_sub_let_hits)
+                g_tc_sub_let_hits[tc_sub_idx()]++;
+            return 1;
+        }
+
+    inc_bad:
+        e->compile_attempts++;
+        if (e->compile_attempts < TRACE_COMPILE_RETRY_BUDGET)
+            return 0;
+        e->state = ST_BAD;
+        g_trace_compiles_bad++;
+        if (g_trace_debug_bad)
+            debug_print_stmt(cmdline, "TC-BAD");
+        return 0;
+    }
+
+    case ST_BAD:
+    default:
+        return 0;
+    }
+}
+
+/* =========================================================================
+ * SELECT CASE structure cache
+ *
+ * On first execution, scans the SELECT body once and builds a compact table
+ * of (arm_type, lo, hi, body_ptr) entries in the arena.  On every subsequent
+ * hit the selector value is compared against the pre-built table directly —
+ * no GetNextCommand scan, no evaluate() calls per arm.
+ *
+ * Supported arm forms (all with numeric literal values only):
+ *   CASE value            SELECT_ARM_CONST
+ *   CASE lo TO hi         SELECT_ARM_RANGE
+ *   CASE IS op value      SELECT_ARM_IS_OP  (op = any comparison)
+ *   CASE op value         SELECT_ARM_IS_OP  (IS is optional)
+ *   CASE ELSE             handled separately as else_ptr
+ *
+ * Multiple comma-separated elements on one CASE line become multiple arms
+ * that all point to the same body_ptr.
+ *
+ * String selectors: rejected (fall back to normal interpreter forever).
+ * More than SELECT_MAX_ARMS arms: rejected.
+ * Any non-literal CASE value (variable, function call): rejected.
+ *
+ * Gated by TCF_IF.
+ * ========================================================================= */
+
+#define ENTRY_KIND_SELECT  5
+#define SELECT_MAX_ARMS   32
+#define SELECT_ARM_CONST   0   /* CASE single value                          */
+#define SELECT_ARM_RANGE   1   /* CASE lo TO hi                              */
+#define SELECT_ARM_IS_OP   2   /* CASE IS op value  -or-  CASE op value      */
+
+typedef struct {
+    union { int64_t i; MMFLOAT f; } lo;   /* lower bound / IS_OP limit      */
+    union { int64_t i; MMFLOAT f; } hi;   /* upper bound (RANGE only)        */
+    unsigned char *body_ptr;               /* first stmt in case body         */
+    uint8_t arm_type;                      /* SELECT_ARM_*                    */
+    uint8_t op;                            /* DOFAST_* for IS_OP              */
+    /* compiler inserts natural padding here to maintain alignment            */
+} select_arm_t;
+
+typedef struct {
+    unsigned char *else_ptr;    /* CASE ELSE first stmt; NULL if none        */
+    unsigned char *end_ptr;     /* first stmt after END SELECT               */
+    uint8_t n_arms;
+    uint8_t sel_type;           /* T_INT or T_NBR                            */
+    /* arms start at offset ((sizeof(select_hdr_t)+7)&~7) from this struct   */
+} select_hdr_t;
+
+/* Inline match helper — called from both ST_COMPILED and end of ST_PENDING. */
+static int __not_in_flash_func(select_eval_match)(select_hdr_t *hdr,
+                                                    select_arm_t *arms,
+                                                    uint8_t stype,
+                                                    int64_t sel_i,
+                                                    MMFLOAT sel_f,
+                                                    unsigned char **out_nextstmt)
+{
+    for (int a = 0; a < (int)hdr->n_arms; a++)
+    {
+        select_arm_t *arm = &arms[a];
+        int match = 0;
+        switch (arm->arm_type)
+        {
+        case SELECT_ARM_CONST:
+            match = (stype == T_INT) ? (sel_i == arm->lo.i)
+                                     : (sel_f == arm->lo.f);
+            break;
+        case SELECT_ARM_RANGE:
+            match = (stype == T_INT) ? (sel_i >= arm->lo.i && sel_i <= arm->hi.i)
+                                     : (sel_f >= arm->lo.f && sel_f <= arm->hi.f);
+            break;
+        case SELECT_ARM_IS_OP:
+            if (stype == T_INT)
+            {
+                int64_t lim = arm->lo.i;
+                switch (arm->op)
+                {
+                case DOFAST_LT:  match = (sel_i <  lim); break;
+                case DOFAST_GT:  match = (sel_i >  lim); break;
+                case DOFAST_LTE: match = (sel_i <= lim); break;
+                case DOFAST_GTE: match = (sel_i >= lim); break;
+                case DOFAST_EQ:  match = (sel_i == lim); break;
+                default:         match = (sel_i != lim); break;
+                }
+            }
+            else
+            {
+                MMFLOAT lim = arm->lo.f;
+                switch (arm->op)
+                {
+                case DOFAST_LT:  match = (sel_f <  lim); break;
+                case DOFAST_GT:  match = (sel_f >  lim); break;
+                case DOFAST_LTE: match = (sel_f <= lim); break;
+                case DOFAST_GTE: match = (sel_f >= lim); break;
+                case DOFAST_EQ:  match = (sel_f == lim); break;
+                default:         match = (sel_f != lim); break;
+                }
+            }
+            break;
+        }
+        if (match)
+        {
+            *out_nextstmt = arm->body_ptr;
+            return 1;
+        }
+    }
+    /* No arm matched: jump to CASE ELSE body or past END SELECT             */
+    *out_nextstmt = hdr->else_ptr ? hdr->else_ptr : hdr->end_ptr;
+    return 1;
+}
+
+/* Parse one constant value (with optional unary minus) from arg_p.
+ * Advances *arg_p past the value.  Returns 1 on success, 0 on failure.     */
+static int select_parse_const(unsigned char **arg_p,
+                               uint8_t stype,
+                               int64_t *out_i, MMFLOAT *out_f)
+{
+    unsigned char *p = *arg_p;
+    skipspace(p);
+    int neg = (p[0] >= C_BASETOKEN && tokenfunction(p[0]) == op_subtract);
+    if (neg) { p++; skipspace(p); }
+    int ctype; MMFLOAT cf = 0; int64_t ci = 0;
+    if (!parse_numeric(&p, &ctype, &cf, &ci)) return 0;
+    if (neg) { cf = -cf; ci = -ci; }
+    skipspace(p);
+    if (stype == T_INT)
+        *out_i = (ctype == T_INT) ? ci : (int64_t)cf;
+    else
+        *out_f = (ctype == T_NBR) ? cf : (MMFLOAT)ci;
+    *arg_p = p;
+    return 1;
+}
+
+int __not_in_flash_func(TraceCacheTrySelect)(unsigned char *key,
+                                              unsigned char *scan_start,
+                                              int sel_type,
+                                              int64_t sel_i, MMFLOAT sel_f,
+                                              unsigned char **out_nextstmt)
+{
+    if (!(g_trace_cache_flags & TCF_IF))
+        return 0;
+    if (sel_type & T_STR)
+        return 0;   /* string selectors not supported */
+
+    if (g_sub_optin_active)
+    {
+        if (g_current_sub_idx < 0 ||
+            g_current_sub_idx >= MAXSUBFUN ||
+            !g_sub_optin[g_current_sub_idx])
+        {
+            g_trace_optin_skip++;
+            return 0;
+        }
+    }
+
+    struct cache_entry *e = cache_lookup_or_create(key);
+    if (e == NULL) { g_trace_lookup_null++; return 0; }
+
+    uint8_t stype = (sel_type & T_INT) ? (uint8_t)T_INT : (uint8_t)T_NBR;
+
+    switch (e->state)
+    {
+    case ST_COMPILED:
+    {
+        if (e->entry_kind != ENTRY_KIND_SELECT) return 0;
+        select_hdr_t *hdr = (select_hdr_t *)(g_arena + e->payload_off);
+        if (hdr->sel_type != stype) { e->state = ST_BAD; return 0; }
+        uint32_t arms_off = ((uint32_t)sizeof(select_hdr_t) + 7u) & ~7u;
+        select_arm_t *arms = (select_arm_t *)((uint8_t *)hdr + arms_off);
+        int r = select_eval_match(hdr, arms, stype, sel_i, sel_f, out_nextstmt);
+        if (r) { g_trace_replays++; if (g_tc_sub_if_hits) g_tc_sub_if_hits[tc_sub_idx()]++; }
+        return r;
+    }
+
+    case ST_PENDING:
+    {
+        e->entry_kind = ENTRY_KIND_SELECT;
+
+        /* --- Compile: scan SELECT body and build arm table ---------------  */
+        select_arm_t tmp[SELECT_MAX_ARMS];
+        int n_arms = 0;
+        unsigned char *else_ptr = NULL;
+        unsigned char *end_ptr  = NULL;
+        unsigned char *scan_p   = scan_start;
+        int depth = 1;
+
+        while (1)
+        {
+            scan_p = GetNextCommand(scan_p, NULL,
+                                    (unsigned char *)"No matching END SELECT");
+            CommandToken tkn = commandtbl_decode(scan_p);
+
+            if (tkn == cmdSELECT_CASE) { depth++; continue; }
+
+            if (tkn == cmdEND_SELECT)
+            {
+                if (--depth == 0)
+                {
+                    unsigned char *ep = scan_p;
+                    skipelement(ep);
+                    end_ptr = ep;
+                    break;
+                }
+                continue;
+            }
+
+            if (tkn == cmdCASE_ELSE && depth == 1)
+            {
+                unsigned char *bp = scan_p;
+                skipelement(bp);
+                else_ptr = bp;
+                continue;
+            }
+
+            if (tkn != cmdCASE || depth != 1) continue;
+
+            /* CASE stmt at our level: body starts at next statement         */
+            unsigned char *body_p = scan_p;
+            skipelement(body_p);
+
+            /* Parse comma-separated arm elements using a local pointer.
+             * Mirrors cmd_select: p++ to byte1 then do{p++} to first arg.  */
+            unsigned char *arg_p = scan_p;
+            arg_p++;  /* byte 0 → byte 1 of CASE token                      */
+            do
+            {
+                arg_p++;  /* byte 1 → first arg byte; or past ',' separator  */
+                skipspace(arg_p);
+                if (n_arms >= SELECT_MAX_ARMS) goto sel_bad;
+
+                select_arm_t *arm = &tmp[n_arms];
+                arm->body_ptr = body_p;
+
+                /* CASE IS op value  -or-  CASE op value (IS optional)      */
+                unsigned char *after_is = checkstring(arg_p,
+                                                       (unsigned char *)"IS");
+                unsigned char *op_pos = after_is ? after_is : arg_p;
+                skipspace(op_pos);
+
+                int is_op = (after_is != NULL) ||
+                            ((tokentype(*op_pos) & T_OPER) &&
+                             !(tokenfunction(*op_pos) == op_subtract ||
+                               tokenfunction(*op_pos) == op_add));
+
+                if (is_op)
+                {
+                    if (!(tokentype(*op_pos) & T_OPER)) goto sel_bad;
+                    uint8_t op_code;
+                    if (!dofast_map_op(tokenfunction(*op_pos), &op_code))
+                        goto sel_bad;
+                    op_pos++;
+                    skipspace(op_pos);
+                    int64_t ci = 0; MMFLOAT cf = 0;
+                    if (!select_parse_const(&op_pos, stype, &ci, &cf)) goto sel_bad;
+                    arm->arm_type = SELECT_ARM_IS_OP;
+                    arm->op       = op_code;
+                    arm->lo.i     = ci;
+                    arm->lo.f     = cf;
+                    arg_p = op_pos;
+                }
+                else
+                {
+                    /* Single value or lo TO hi range                        */
+                    int64_t ci = 0; MMFLOAT cf = 0;
+                    if (!select_parse_const(&arg_p, stype, &ci, &cf)) goto sel_bad;
+
+                    if (*arg_p == tokenTO)
+                    {
+                        arg_p++;
+                        skipspace(arg_p);
+                        int64_t ci2 = 0; MMFLOAT cf2 = 0;
+                        if (!select_parse_const(&arg_p, stype, &ci2, &cf2)) goto sel_bad;
+                        arm->arm_type = SELECT_ARM_RANGE;
+                        arm->lo.i = ci;  arm->lo.f = cf;
+                        arm->hi.i = ci2; arm->hi.f = cf2;
+                    }
+                    else
+                    {
+                        arm->arm_type = SELECT_ARM_CONST;
+                        arm->lo.i = ci;
+                        arm->lo.f = cf;
+                    }
+                    arm->op = 0;
+                }
+                n_arms++;
+            } while (*arg_p == ',');
+        }
+
+        /* --- Allocate payload in arena ----------------------------------- */
+        {
+            uint32_t hdr_bytes  = (uint32_t)sizeof(select_hdr_t);
+            uint32_t arms_off_r = (hdr_bytes + 7u) & ~7u;  /* 8-byte align  */
+            uint32_t arms_bytes = (uint32_t)n_arms * (uint32_t)sizeof(select_arm_t);
+            uint32_t total      = arms_off_r + arms_bytes;
+            uint32_t off        = (g_arena_used + 7u) & ~7u;
+            if (off + total > g_arena_cap) { g_trace_alloc_fail++; goto sel_bad; }
+
+            select_hdr_t *hdr = (select_hdr_t *)(g_arena + off);
+            hdr->else_ptr = else_ptr;
+            hdr->end_ptr  = end_ptr;
+            hdr->n_arms   = (uint8_t)n_arms;
+            hdr->sel_type = stype;
+            select_arm_t *arms = (select_arm_t *)((uint8_t *)hdr + arms_off_r);
+            memcpy(arms, tmp, n_arms * sizeof(select_arm_t));
+            g_arena_used  = off + total;
+            e->payload_off = off;
+            e->has_locals  = 0;
+            e->state       = ST_COMPILED;
+            g_trace_compiles_ok++;
+
+            int r = select_eval_match(hdr, arms, stype, sel_i, sel_f, out_nextstmt);
+            if (r) { g_trace_replays++; if (g_tc_sub_if_hits) g_tc_sub_if_hits[tc_sub_idx()]++; }
+            return r;
+        }
+
+    sel_bad:
+        e->compile_attempts++;
+        if (e->compile_attempts < TRACE_COMPILE_RETRY_BUDGET) return 0;
+        e->state = ST_BAD;
+        g_trace_compiles_bad++;
+        if (g_trace_debug_bad) debug_print_stmt(key, "TC-BAD-SEL");
+        return 0;
+    }
+
+    case ST_BAD:
+    default:
+        return 0;
+    }
 }
 
 int __not_in_flash_func(TraceCacheTryLet)(unsigned char *cmdline)
