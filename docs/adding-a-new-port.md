@@ -168,6 +168,300 @@ A hardware port is done when **all** of these pass:
 3. `./buildall.sh` builds every target including yours, clean.
 4. Your target boots to the MMBasic prompt on real hardware.
 
+---
+
+## Worked example: custom RP2350 + HDMI + PSRAM board
+
+Exact recipe for a hypothetical board called **`mymite`** — RP2350B
+(80-pin), HDMI display via DVI scanout, external QSPI PSRAM module.
+Closest existing port: `ports/hdmi_rp2350/` (HDMI + PSRAM, RP2350B,
+no WiFi, no USB-keyboard variant). We'll copy and adjust.
+
+### Step 1 — copy the closest port
+
+```bash
+cp -r ports/hdmi_rp2350 ports/mymite
+```
+
+You now have:
+
+```
+ports/mymite/
+    port_config.h
+    port_sources.cmake
+    pin_tables.c
+    port_defaults.c
+    mmbasic_port_hdmi.c   # HDMI-specific MMBasic port hook
+```
+
+### Step 2 — pick a COMPILE name
+
+Convention is uppercase-no-underscore: `MYMITE`. This is what users
+pass to `cmake -DCOMPILE=MYMITE` and what appears in `buildall.sh`'s
+TARGETS list. (After Stage E2e collapses the COMPILE enum, the name
+will simply be `mymite` — same as the directory.)
+
+### Step 3 — wire `mymite` into the COMPILE → PORT_DIR map
+
+`CMakeLists.txt` has a single map at ~line 195:
+
+```cmake
+elseif (COMPILE STREQUAL "HDMI" OR COMPILE STREQUAL "HDMIUSB")
+    set(PORT_DIR hdmi_rp2350)
+elseif (COMPILE STREQUAL "VGAWIFIRP2350")
+    set(PORT_DIR vga_wifi_rp2350)
++ elseif (COMPILE STREQUAL "MYMITE")
++     set(PORT_DIR mymite)
+endif()
+```
+
+**Also add `MYMITE` to the rp2350-platform branch and the board branch**
+at the top of CMakeLists.txt:
+
+```cmake
+if (COMPILE STREQUAL "HDMI" OR ... OR COMPILE STREQUAL "MYMITE" )
+    set(PICO_PLATFORM rp2350)
+    if (COMPILE STREQUAL "WEBRP2350" OR COMPILE STREQUAL "VGAWIFIRP2350")
+        set(PICO_BOARD pico2_w)
+    else()
+        set(PICO_BOARD pimoroni_pga2350)   # MYMITE picks up this default
+    endif()
+```
+
+If `mymite` uses a different board (custom PCB, different cyw43 module,
+etc.), add a board-name branch the same way `pico2_w` was added for
+WiFi ports.
+
+### Step 4 — adjust `port_config.h`
+
+Open `ports/mymite/port_config.h`. The HDMI base values are mostly
+correct for your scenario. You'll typically only need to:
+
+```c
+/* Update if your board is RP2350A (30 GPIO) instead of RP2350B (48): */
+#define HAL_PORT_GPIO_COUNT              48      /* 30 for RP2350A */
+#define HAL_PORT_NBR_PINS                62      /* 44 for RP2350A */
+
+/* PSRAM region — usually unchanged across RP2350+PSRAM boards: */
+#define HAL_PORT_PSRAM_BASE              0x11000000
+#define HAL_PORT_PSRAM_BLOCK_SIZE        0x1C0000
+
+/* Heap budget — depends on your PSRAM size + board layout. The
+ * existing HDMI port uses 184 KB for the BASIC heap with a
+ * 153 KB framebuffer trailer (320*240*16-bit). If your board has
+ * a much bigger PSRAM module you can increase HEAP_MEMORY_SIZE; if
+ * tighter, decrease. */
+#define HAL_PORT_HEAP_MEMORY_SIZE        (184 * 1024)
+
+/* Magic key — pick something unique to your board. The save area
+ * stamps this on first boot; if a saved-options blob doesn't match
+ * (because the layout changed or the binary is from a different
+ * port), MMBasic re-initialises Option from defaults. */
+#define HAL_PORT_MAGIC_KEY               0xAB12CD34
+#define HAL_PORT_MAGIC_KEY_USB           0xAB12CD34   /* same if no USB variant */
+```
+
+Everything else (PIO claims, fast-timer, MP3 decoder, FLAC sample-rate
+cap, scanout core1 stack words, framebuffer trailer size) usually
+stays the same as `hdmi_rp2350`'s values for an HDMI+PSRAM board.
+
+### Step 5 — write `pin_tables.c` for your board
+
+This is the **only file that requires real per-board work**. It maps
+GPIO numbers to the package pins your board exposes on its header.
+
+For an off-the-shelf RP2350B reference board, the `PINMAP[]` from
+`ports/hdmi_rp2350/pin_tables.c` (which uses the pimoroni_pga2350
+package layout) often works as-is. For a custom PCB:
+
+1. Open `PicoMite.c` and find `const struct s_PinDef PinDef[]`.
+2. For each GPIO 0..47, identify which `PinDef[]` slot it should
+   point at. Most custom RP2350 boards reuse the standard package
+   pin layout, so `PINMAP[gpio] = PinDef[].pin` lookup is mechanical.
+3. Pin-out anything board-specific. Example: if your board routes
+   GP12 → an HDMI pin pair (DVI clock+/clock-), make sure
+   `PinDef[]`'s entry for the corresponding package pin marks that
+   GPIO as a PIO output (the existing PinDef entries already do this
+   for the standard pin map).
+
+Verify by hand: every `PINMAP[gpio]` entry should point to a `PinDef[]`
+slot whose `GPno` field matches that `gpio`. Mistakes here silently
+break GPIO-numbered BASIC syntax — see "Why codemap() matters" in
+Step A2.
+
+### Step 6 — write `port_defaults.c` for your board
+
+Three things to customise in the copied `hdmi_rp2350` version:
+
+1. **`port_set_default_options`** — set Option fields whose factory
+   value differs from the shared default. For an HDMI board:
+
+   ```c
+   void port_set_default_options(void)
+   {
+       Option.DISPLAY_TYPE = SCREENMODE1;
+       Option.HDMIclock = 0;        /* HDMI clock pair on GP12+13 */
+       Option.HDMId0    = 1;        /* GP14+15 */
+       Option.HDMId1    = 2;        /* GP16+17 */
+       Option.HDMId2    = 3;        /* GP18+19 */
+       Option.X_TILE = 80;
+       Option.Y_TILE = 30;
+       Option.CPU_Speed = Freq378P;
+       Option.KeyboardConfig = NO_KEYBOARD;
+       Option.SSD_RESET = -1;
+   }
+   ```
+
+2. **`port_print_supported_boards`** — what `CONFIGURE LIST` prints:
+
+   ```c
+   void port_print_supported_boards(void)
+   {
+       MMPrintString("MYMITE\r\n");
+   }
+   ```
+
+3. **`port_factory_reset_board`** — what `OPTION RESET <BOARD>`
+   accepts. Add one entry per board profile your firmware ships:
+
+   ```c
+   int port_factory_reset_board(unsigned char *p)
+   {
+       if (checkstring(p, (unsigned char *)"MYMITE")) {
+           ResetOptions(false);
+           Option.CPU_Speed     = Freq378P;
+           Option.HDMIclock     = 0;
+           Option.HDMId0        = 1;
+           Option.HDMId1        = 2;
+           Option.HDMId2        = 3;
+           Option.SD_CS         = PINMAP[20];
+           Option.SD_CLK_PIN    = PINMAP[18];
+           Option.SD_MOSI_PIN   = PINMAP[19];
+           Option.SD_MISO_PIN   = PINMAP[16];
+           Option.PSRAM_CS_PIN  = 1;       /* GP0 */
+           strcpy((char *)Option.platform, "MYMITE");
+           SaveOptions();
+           printoptions();
+           uSec(100000);
+           _excep_code = RESET_COMMAND;
+           SoftReset();
+           return 1;
+       }
+       return 0;
+   }
+   ```
+
+Leave the OPTION setters (`port_display_option_setter`, `VGArecovery`,
+`port_apply_default_console_colors`, etc.) alone — they're shared
+HDMI behaviour and don't usually need per-board tweaking.
+
+### Step 7 — adjust `port_sources.cmake`
+
+The HDMI snippet you copied already has the right source-list
+(VGA-PIO scaffolding + HDMI sink + PSRAM heap + audio MP3 +
+upng_sprite + gfx_3d + gui_touch_stub + ...). You only need to:
+
+1. **Set the device name string:**
+
+   ```cmake
+   target_compile_options(PicoMite PRIVATE -DHAL_PORT_DEVICE_NAME="MyMite")
+   ```
+
+   This appears in the boot banner and `MM.DEVICE$`.
+
+2. **Decide whether to ship a USB-host keyboard variant.** If yes,
+   keep the `if (COMPILE STREQUAL "MYMITEUSB")` axis (rename the
+   COMPILE label) — same pattern as `hdmi_rp2350`. If no, simplify
+   to the PS/2 branch only.
+
+Everything else — `pico_multicore` linkage, `pico_set_float_implementation`,
+the `-Drp2350` flag, USB stdio config — stays the same.
+
+### Step 8 — add `MYMITE` to `buildall.sh`
+
+```bash
+TARGETS=(
+    PICO PICOUSB VGA VGAUSB WEB
+    PICORP2350 PICOUSBRP2350 VGARP2350 VGAUSBRP2350
+    HDMI HDMIUSB WEBRP2350
+    VGAWIFIRP2350
++   MYMITE
+)
+```
+
+### Step 9 — first build
+
+```bash
+mkdir build_mymite && cd build_mymite
+cmake -DCOMPILE=MYMITE -DPICOCALC=false -DPICO_SDK_PATH="$HOME/pico/pico-sdk" ..
+make -j8
+```
+
+Expect either a clean `PicoMite.uf2` or a focused error. The most
+common first-build failures and what they mean:
+
+- **`undefined reference to <symbol>`** — your snippet's source list
+  is missing a file. Cross-reference `ports/hdmi_rp2350/port_sources.cmake`
+  for what your closest sibling links.
+- **`region 'RAM' overflowed by N bytes`** — `HEAP_MEMORY_SIZE` +
+  `FRAMEBUFFER_TRAILER_BYTES` + CYW43/lwIP stack (if WiFi) > available
+  SRAM. Reduce `HEAP_MEMORY_SIZE` in `port_config.h`.
+- **`region 'FLASH' overflowed by N bytes`** — your firmware image
+  is bigger than the flash region above `FLASH_TARGET_OFFSET`.
+  Either increase `HAL_PORT_FLASH_TARGET_OFFSET` (eats into save
+  region) or trim the source list.
+- **`'struct option_s' has no member named …`** — you're referencing
+  an `Option.*` field that's gated by a target macro you don't have.
+  Check the field's definition in `FileIO.h`'s `struct option_s`.
+
+### Step 10 — first boot
+
+```bash
+picotool load -v build_mymite/PicoMite.uf2 -fx   # or drag-and-drop
+```
+
+Connect a serial terminal (USB-CDC at 115200 baud). You should see:
+
+```
+MyMite MMBasic RP2350 Edition V6.00.05
+> _
+```
+
+If the prompt appears but `MM.DEVICE$` returns the wrong name, your
+`-DHAL_PORT_DEVICE_NAME` got overridden somewhere — re-check
+`port_sources.cmake`. If `OPTION RESET MYMITE` doesn't resolve,
+`port_factory_reset_board` isn't matching the string — check spelling
+and `checkstring()`'s case-sensitivity (it's case-insensitive).
+
+### Step 11 — verify acceptance
+
+From the repo root:
+
+```bash
+./host/run_tests.sh                   # 239/239 expected
+SKIP_HAL_PURITY=1 ./buildall.sh       # all 14 targets clean
+```
+
+Your port being in `buildall.sh`'s TARGETS list means a regression in
+any other port that breaks yours blocks `main`.
+
+### Common decisions for an HDMI + PSRAM board
+
+| Question | Answer |
+|---|---|
+| Set `HAL_PORT_HAS_HDMI`? | `1` |
+| Set `HAL_PORT_HAS_VGA_PIO`? | `1` (HDMI rides on the VGA-PIO scaffolding) |
+| Set `HAL_PORT_HAS_PSRAM`? | `1` |
+| Set `HAL_PORT_IS_VGA`? | `1` (PICOMITEVGA family) |
+| Set `HAL_PORT_HAS_WIFI`? | `0` (HDMI + WiFi together is F1 — much harder, see `ports/vga_wifi_rp2350/README.md`) |
+| Set `HAL_PORT_HAS_GUICONTROLS`? | `0` (no touch panel on HDMI) |
+| `core1stack[]` words? | `128` (HDMI scanout uses 512 bytes = 128 words) |
+| `FRAMEBUFFER_TRAILER_BYTES`? | `(320*240*2) = 153600` (HDMI 16-bit QVGA shadow) |
+| Link `pico_multicore`? | yes (HDMI scanout runs on core1) |
+| Link `pico_cyw43_arch_lwip_poll`? | no |
+| `pico_set_float_implementation pico_dcp`? | yes (rp2350) |
+| `pico_define_boot_stage2 slower_boot2`? | no (rp2040-only) |
+
 If (1) or (2) regresses while adding your board, an `#ifdef` has landed in a core or HAL file — the answer is a port-config macro, a port hook, or a driver flavour (see "Ground rules" below), not a widened exemption.
 
 ---
