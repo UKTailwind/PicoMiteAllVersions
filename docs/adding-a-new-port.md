@@ -91,15 +91,38 @@ Read line by line: GPIO 0 is on package pin 1, GPIO 1 is on package pin 2, GPIO 
 
 ## Step A3 — port_defaults.c
 
-One export:
+This file owns the **per-port behaviour core code calls into**. Core
+calls each entry point unconditionally (no #ifdef gates in core), so
+**every port must define every entry point** — provide a no-op stub
+when the behaviour isn't relevant to your hardware.
 
-```c
-void port_set_default_options(void);
-```
+The closest existing port's `port_defaults.c` is the right starting
+point — copy it and adjust. The full set of required exports:
 
-Called by `FileIO.c::ResetOptions()` after shared defaults. Set any `Option.*` field whose factory value differs from the shared default — typical: SSD_RESET, TOUCH_XSCALE, SerialTX/RX, KeyboardConfig, ColourCode.
+| Function | What it does |
+|---|---|
+| `void port_set_default_options(void)` | First-boot factory defaults. Set `Option.*` fields that differ from the shared `ResetOptions()` baseline (display type, CPU speed, keyboard config, board-specific pin assignments). Called by `FileIO.c::ResetOptions()` after the shared defaults run. |
+| `void port_print_supported_boards(void)` | What `CONFIGURE LIST` prints. One `MMPrintString("YourBoard\r\n")` per board profile this port ships. |
+| `int port_factory_reset_board(unsigned char *p)` | Body of `OPTION RESET <BOARD>`. Match `p` against each board name your port supports; on match, set `Option.*` fields, `SaveOptions()`, `SoftReset()`, return 1. Return 0 if no board name matched. |
+| `int port_display_option_setter(unsigned char *cmdline)` | Per-port `OPTION` setters for display config. SPI-LCD ports handle `OPTION CPUSPEED`, `OPTION LCDPANEL`, `OPTION TOUCH`. VGA/HDMI ports handle `OPTION RESOLUTION`, `OPTION VGA PINS`, `OPTION DEFAULT MODE`. Return 1 if `cmdline` matched a setter, 0 otherwise. |
+| `void port_clear_lcd_spi_if_shares_system(void)` | Hook called when reassigning the SYSTEM SPI pins. Clears LCD-SPI state on ports where the LCD shares SYSTEM SPI; no-op on ports with a dedicated LCD SPI bus or no LCD. |
+| `int port_pinno_alias_for_name(const char *name)` | `MM.PINNO`-style name-to-pin aliasing. Return non-zero pin number for a recognised alias (e.g. WiFi ports map `GP23..GP29` → virtual pins 41-44 because CYW43 owns those GPIOs). Return 0 for "no alias." |
+| `int port_pin_is_reserved_alias(int pin)` | Companion to the above — return non-zero if `pin` is a board-reserved alias number. |
+| `const char *port_pin_reserved_label(int pin)` | Companion — return human-readable label for a reserved pin (e.g. `"Boot Reserved : CYW43"`), or `NULL`. |
+| `void port_apply_default_console_colors(int default_fc, int default_bc)` | `OPTION LCDPANEL CONSOLE` colour reset hook. VGA-family ports pre-fill the tile-colour arrays so existing tiles render in the new colours; non-VGA ports stub it. |
 
-Port impl files may contain target-macro `#ifdef` blocks — that's where conditional bodies belong. The purity gate only enforces `core/` and `hal/`.
+VGA-family ports also export `void VGArecovery(int pin)` — called from
+`drivers/sd_spi/mmc_stm32.c` when SD-card pin reassignment needs to
+reclaim a VGA-PIO pin. Copy verbatim from the closest existing
+VGA-family port_defaults.c if your port has `HAL_PORT_HAS_VGA_PIO=1`.
+
+For a concrete walkthrough of writing each of these for a custom
+board, see the worked example below.
+
+**Per-port `#ifdef` is fine in this file.** The HAL purity gate only
+enforces `core/*.c` and `hal/*.h`. Port-implementation files like
+`port_defaults.c` may use `#ifdef USBKEYBOARD`, `#ifdef PICOMITEVGA`,
+etc. for body-shaped divergence — that's the right scope for them.
 
 ## Step A4 — port_sources.cmake
 
