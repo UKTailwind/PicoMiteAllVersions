@@ -95,6 +95,17 @@ extern "C"
 #define T_LINENBR 2 // three bytes for a line number
 #define T_LABEL 3   // variable length indicating a label
 
+// Phase A1: every T_NEWLINE token is followed by a 1-byte placeholder.
+// The placeholder is currently always written as T_NEWLINE_SKIP_NONE (0xFE)
+// -- a non-zero sentinel chosen so it cannot be confused with the program
+// terminator (two consecutive 0 bytes) by per-line flash-write loops, nor
+// with flash-erased state (0xFF), nor with any token byte.  Code that
+// advances past a T_NEWLINE token must skip T_NEWLINE_HDR bytes total.
+// Callers that only TEST for T_NEWLINE (e.g. sanity checks) or that
+// already lookahead via p[1] are unaffected.
+#define T_NEWLINE_HDR 2
+#define T_NEWLINE_SKIP_NONE 0xFE
+
 #define E_END 255 // dummy last operator in an expression
 
 /* ============================================================================
@@ -607,6 +618,48 @@ int str_equal(const unsigned char *s1, const unsigned char *s2);
     extern unsigned char *PreprogramErrLine; // Line pointer where PrepareProgram error occurred
     void PrintPreprogramError(void);         // Print PrepareProgram error with line info
     extern int ProgramValid;                 // 0 = program has errors (cannot run), 1 = valid/runnable
+
+    /* ============================================================================
+     * IF / ELSEIF / ELSE / ENDIF jump table
+     *
+     * Built once (per region) by PrepareProgram so that cmd_if's false branch
+     * and cmd_else can locate the next sibling arm / matching ENDIF in O(log N)
+     * instead of doing a linear scan of ProgMemory every execution.
+     *
+     * Each entry's `tok` is the address of the IF / ELSEIF / ELSE command
+     * token (the byte at which commandtbl_decode sees the token) inside
+     * ProgMemory or LibMemory.
+     * `next_arm`  points at the next ELSEIF / ELSE / ENDIF token at the
+     *             same nesting level (or the matching ENDIF if this is the
+     *             last arm).
+     * `endif_tok` points at the matching ENDIF token (same value for every
+     *             arm of one IF construct).
+     * `line_ptr`  is the T_NEWLINE that begins the line containing
+     *             next_arm — used to set CurrentLinePtr when re-entering
+     *             cmd_if for an ELSEIF.
+     * ============================================================================ */
+    struct iftab_entry
+    {
+        unsigned char *tok;
+        unsigned char *next_arm;
+        unsigned char *endif_tok;
+        unsigned char *line_ptr;
+    };
+
+    void IfTableBuild(void);                               // build for both ProgMemory and LibMemory
+    void IfTableFree(void);                                // free all entries
+    struct iftab_entry *IfTableLookup(unsigned char *tok); // NULL if not found
+
+    /* ============================================================================
+     * Phase A3: line skip-byte verifier
+     * ============================================================================ */
+    // When non-zero, PrepareProgram walks the program after tokenisation and
+    // checks that every T_NEWLINE skip byte either points to the next
+    // T_NEWLINE/end of program, or is T_NEWLINE_SKIP_NONE.  Mismatches are
+    // reported via MMPrintString but do not abort.  Cost is one O(N) walk
+    // per RUN.  Default is 0 (off).
+    extern int g_verify_line_skip;
+    int VerifyLineSkipBytes(unsigned char *start); // returns number of mismatches
 
     /* ============================================================================
      * Function declarations - I/O

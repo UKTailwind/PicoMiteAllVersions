@@ -15206,7 +15206,7 @@ static uint16_t *tilemap_read_data(unsigned char *label, int count)
                 error("Not enough DATA for tilemap (need %, found %)", count, idx);
             }
             if (*p == T_NEWLINE)
-                p++;
+                p += T_NEWLINE_HDR; // skip newline + skip byte
             if (*p == T_LINENBR)
                 p += 3;
             skipspace(p);

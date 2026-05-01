@@ -3687,7 +3687,7 @@ void MIPS16 SaveProgramToRAM(unsigned char *pm, int msg, uint8_t *ram)
         if (*p == T_NEWLINE)
         {
             CurrentLinePtr = p;
-            p++; // skip the newline token
+            p += T_NEWLINE_HDR; // skip newline + skip byte
         }
         if (*p == T_LINENBR)
             p += 3; // step over the line number
@@ -3749,7 +3749,7 @@ void MIPS16 SaveProgramToRAM(unsigned char *pm, int msg, uint8_t *ram)
                     if (*p == T_NEWLINE)
                     {
                         CurrentLinePtr = p;
-                        p++; // skip the newline token
+                        p += T_NEWLINE_HDR; // skip newline + skip byte
                     }
                     if (*p == T_LINENBR)
                         p += 3; // skip over a line number
@@ -3798,7 +3798,7 @@ void MIPS16 SaveProgramToRAM(unsigned char *pm, int msg, uint8_t *ram)
                 if (*p == T_NEWLINE)
                 {
                     CurrentLinePtr = p;
-                    p++; // skip the newline token
+                    p += T_NEWLINE_HDR; // skip newline + skip byte
                 }
                 if (*p == T_LINENBR)
                     p += 3; // skip over the line number
@@ -3824,7 +3824,7 @@ void MIPS16 SaveProgramToRAM(unsigned char *pm, int msg, uint8_t *ram)
         if (*p == T_NEWLINE)
         {
             CurrentLinePtr = p;
-            p++; // skip the newline token
+            p += T_NEWLINE_HDR; // skip newline + skip byte
         }
         if (*p == T_LINENBR)
             p += 3; // step over the line number
@@ -3892,7 +3892,7 @@ void MIPS16 SaveProgramToRAM(unsigned char *pm, int msg, uint8_t *ram)
                     if (*p == T_NEWLINE)
                     {
                         CurrentLinePtr = p;
-                        p++; // skip the newline token
+                        p += T_NEWLINE_HDR; // skip newline + skip byte
                     }
                     if (*p == T_LINENBR)
                         p += 3; // skip over a line number
@@ -3934,7 +3934,7 @@ void MIPS16 SaveProgramToRAM(unsigned char *pm, int msg, uint8_t *ram)
                 if (*p == T_NEWLINE)
                 {
                     CurrentLinePtr = p;
-                    p++; // skip the newline token
+                    p += T_NEWLINE_HDR; // skip newline + skip byte
                 }
                 if (*p == T_LINENBR)
                     p += 3; // skip over a line number

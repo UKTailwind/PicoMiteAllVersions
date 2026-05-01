@@ -220,29 +220,38 @@ struct sa_data datastore[MAXRESTORE];
 int restorepointer = 0;
 uint64_t g_flag = 0;
 const uint8_t pinlist[] = { // this is a Basic program to print out the status of all the pins
-	1, 132, 128, 95, 113, 37, 0,
-	1, 153, 128, 95, 113, 37, 144, 48, 32, 204, 32, 241, 109, 97, 120, 32, 103, 112, 41, 0,
-	1, 168, 128, 34, 71, 80, 34, 130, 186, 95, 113, 37, 41, 44, 32, 241, 112, 105, 110, 110, 111, 32, 34, 71, 80, 34, 130, 186,
+	// Each line is preceded by T_NEWLINE (1) followed by the line skip
+	// byte (offset from this T_NEWLINE to the next T_NEWLINE / EOP).
+	1, 8, 132, 128, 95, 113, 37, 0,
+	1, 21, 153, 128, 95, 113, 37, 144, 48, 32, 204, 32, 241, 109, 97, 120, 32, 103, 112, 41, 0,
+	1, 60, 168, 128, 34, 71, 80, 34, 130, 186, 95, 113, 37, 41, 44, 32, 241, 112, 105, 110, 110, 111, 32, 34, 71, 80, 34, 130, 186,
 	95, 113, 37, 41, 41, 44, 241, 112, 105, 110, 32, 241, 112, 105, 110, 110, 111, 32, 34, 71, 80, 34, 130, 186, 95, 113, 37, 41, 41, 41, 0,
-	1, 166, 128, 0,
-	1, 147, 128, 95, 113, 37, 0, 0};
+	1, 5, 166, 128, 0,
+	1, 8, 147, 128, 95, 113, 37, 0, 0};
 const uint8_t i2clist[] = { // this is a Basic program to print out the I2C devices connected to the SYSTEM I2C pins
-	1, 132, 128, 105, 110, 116, 101, 103, 101, 114, 32, 95, 97, 100, 0,
-	1, 132, 128, 105, 110, 116, 101, 103, 101, 114, 32, 120, 95, 44, 121, 95, 0,
-	1, 168, 128, 34, 32, 72, 69, 88, 32, 32, 48, 32, 32, 49, 32, 32, 50, 32, 32, 51, 32, 32, 52, 32, 32, 53, 32, 32, 54, 32, 32, 55, 32, 32,
+	// Each line is preceded by T_NEWLINE (1) followed by the line skip
+	// byte (offset from this T_NEWLINE to the next T_NEWLINE / EOP).
+	1, 16, 132, 128, 105, 110, 116, 101, 103, 101, 114, 32, 95, 97, 100, 0,
+	1, 18, 132, 128, 105, 110, 116, 101, 103, 101, 114, 32, 120, 95, 44, 121, 95, 0,
+	1, 59, 168, 128, 34, 32, 72, 69, 88, 32, 32, 48, 32, 32, 49, 32, 32, 50, 32, 32, 51, 32, 32, 52, 32, 32, 53, 32, 32, 54, 32, 32, 55, 32, 32,
 	56, 32, 32, 57, 32, 32, 65, 32, 32, 66, 32, 32, 67, 32, 32, 68, 32, 32, 69, 32, 32, 70, 34, 0,
-	1, 153, 128, 121, 95, 32, 144, 32, 48, 32, 204, 32, 55, 0,
-	1, 168, 128, 34, 32, 34, 59, 32, 164, 121, 95, 44, 32, 49, 41, 59, 32, 34, 48, 58, 32, 34, 59, 0,
-	1, 153, 128, 120, 95, 32, 144, 32, 48, 32, 204, 32, 49, 53, 0,
-	1, 161, 128, 95, 97, 100, 32, 144, 32, 121, 95, 32, 133, 32, 49, 54, 32, 130, 32, 120, 95, 0,
-	1, 158, 128, 241, 83, 89, 83, 84, 69, 77, 32, 73, 50, 67, 41, 144, 34, 73, 50, 67, 34, 32, 203, 32, 228, 128, 99, 104,
+	1, 15, 153, 128, 121, 95, 32, 144, 32, 48, 32, 204, 32, 55, 0,
+	1, 25, 168, 128, 34, 32, 34, 59, 32, 164, 121, 95, 44, 32, 49, 41, 59, 32, 34, 48, 58, 32, 34, 59, 0,
+	1, 16, 153, 128, 120, 95, 32, 144, 32, 48, 32, 204, 32, 49, 53, 0,
+	1, 23, 161, 128, 95, 97, 100, 32, 144, 32, 121, 95, 32, 133, 32, 49, 54, 32, 130, 32, 120, 95, 0,
+	1, 52, 158, 128, 241, 83, 89, 83, 84, 69, 77, 32, 73, 50, 67, 41, 144, 34, 73, 50, 67, 34, 32, 203, 32, 228, 128, 99, 104,
 	101, 99, 107, 32, 95, 97, 100, 32, 199, 32, 229, 128, 32, 99, 104, 101, 99, 107, 32, 95, 97, 100, 0,
-	1, 158, 128, 243, 68, 41, 32, 144, 32, 48, 32, 203, 0,
-	1, 158, 128, 95, 97, 100, 32, 144, 32, 48, 32, 203, 32, 168, 128, 34, 45, 45, 32, 34, 59, 0,
-	1, 158, 128, 95, 97, 100, 32, 143, 32, 48, 32, 203, 32, 168, 128, 164, 95, 97, 100, 44, 32, 50, 41, 59, 34, 32, 34, 59, 0,
-	1, 139, 128, 0, 1, 168, 128, 34, 45, 45, 32, 34, 59, 0, 1, 143, 128, 0, 1, 166, 128, 120, 95, 0,
-	1, 168, 128, 0, 1, 166, 128, 121, 95, 0, 1, 147, 128, 120, 95, 44, 121, 95, 0,
-	1, 147, 128, 95, 97, 100, 0, 0};
+	1, 14, 158, 128, 243, 68, 41, 32, 144, 32, 48, 32, 203, 0,
+	1, 23, 158, 128, 95, 97, 100, 32, 144, 32, 48, 32, 203, 32, 168, 128, 34, 45, 45, 32, 34, 59, 0,
+	1, 30, 158, 128, 95, 97, 100, 32, 143, 32, 48, 32, 203, 32, 168, 128, 164, 95, 97, 100, 44, 32, 50, 41, 59, 34, 32, 34, 59, 0,
+	1, 5, 139, 128, 0,
+	1, 11, 168, 128, 34, 45, 45, 32, 34, 59, 0,
+	1, 5, 143, 128, 0,
+	1, 7, 166, 128, 120, 95, 0,
+	1, 5, 168, 128, 0,
+	1, 7, 166, 128, 121, 95, 0,
+	1, 10, 147, 128, 120, 95, 44, 121, 95, 0,
+	1, 8, 147, 128, 95, 97, 100, 0, 0};
 // stack to keep track of nested FOR/NEXT loops
 struct s_forstack g_forstack[MAXFORLOOPS + 1];
 int g_forindex;
@@ -1199,12 +1208,23 @@ static int file_display_line(int fnbr, int screenWidth, int listcnt, int all)
 		bool eol = false;
 		while (seg_len < screenWidth)
 		{
-			if (FileEOF(fnbr)) { eol = true; break; }
+			if (FileEOF(fnbr))
+			{
+				eol = true;
+				break;
+			}
 			int c = MMfgetc(fnbr);
-			if (c == '\r') continue;
-			if (c == '\n') { eol = true; break; }
-			if (c <= 0) continue;
-			if (c == '\t') c = ' ';
+			if (c == '\r')
+				continue;
+			if (c == '\n')
+			{
+				eol = true;
+				break;
+			}
+			if (c <= 0)
+				continue;
+			if (c == '\t')
+				c = ' ';
 			seg[seg_len++] = (char)c;
 		}
 
@@ -1226,7 +1246,8 @@ static int file_display_line(int fnbr, int screenWidth, int listcnt, int all)
 		// Find the last space in the segment (word-wrap break point).
 		int last_space = -1;
 		for (int i = 0; i < seg_len; i++)
-			if (seg[i] == ' ') last_space = i;
+			if (seg[i] == ' ')
+				last_space = i;
 
 		if (last_space >= 0)
 		{
@@ -1268,25 +1289,38 @@ static int file_count_line_rows(int fnbr, int screenWidth)
 		bool eol = false;
 		while (seg_len < screenWidth)
 		{
-			if (FileEOF(fnbr)) { eol = true; break; }
+			if (FileEOF(fnbr))
+			{
+				eol = true;
+				break;
+			}
 			int c = MMfgetc(fnbr);
-			if (c == '\r') continue;
-			if (c == '\n') { eol = true; break; }
-			if (c <= 0) continue;
-			if (c == '\t') c = ' ';
+			if (c == '\r')
+				continue;
+			if (c == '\n')
+			{
+				eol = true;
+				break;
+			}
+			if (c <= 0)
+				continue;
+			if (c == '\t')
+				c = ' ';
 			seg[seg_len++] = (char)c;
 		}
 
 		if (eol)
 		{
-			if (seg_len > 0) rows++;
+			if (seg_len > 0)
+				rows++;
 			break;
 		}
 
 		// Segment full — wrap and continue counting.
 		int last_space = -1;
 		for (int i = 0; i < seg_len; i++)
-			if (seg[i] == ' ') last_space = i;
+			if (seg[i] == ' ')
+				last_space = i;
 
 		rows++;
 		if (last_space >= 0)
@@ -1330,12 +1364,25 @@ static int countWrappedLines(const char *text, int screenWidth)
 	while (start < len)
 	{
 		int end = start + screenWidth;
-		if (end >= len) { count++; break; }
+		if (end >= len)
+		{
+			count++;
+			break;
+		}
 		int lastSpace = -1;
 		for (int i = start; i < end; i++)
-			if (text[i] == ' ') lastSpace = i;
-		if (lastSpace != -1) { count++; start = lastSpace + 1; }
-		else                  { count++; start += screenWidth; }
+			if (text[i] == ' ')
+				lastSpace = i;
+		if (lastSpace != -1)
+		{
+			count++;
+			start = lastSpace + 1;
+		}
+		else
+		{
+			count++;
+			start += screenWidth;
+		}
 	}
 	return count;
 }
@@ -1390,20 +1437,25 @@ void ListFilePaged(char *pp)
 
 		clearrepeat();
 		if (cur_page > 0)
-			MMPrintString(overflowed ? "UP=prev  ANY KEY=next ..." :
-			                           "UP=prev  ANY KEY=quit ...");
+			MMPrintString(overflowed ? "UP=prev  ANY KEY=next ..." : "UP=prev  ANY KEY=quit ...");
 		else
 			MMPrintString("PRESS ANY KEY ...");
 
 		int c = -1;
-		while (c == -1) { routinechecks(); c = MMInkey(); }
+		while (c == -1)
+		{
+			routinechecks();
+			c = MMInkey();
+		}
 		MMPrintString("\r                              \r");
 
-		if (c == UP) {
+		if (c == UP)
+		{
 			if (cur_page > 0)
 				cur_page--;
 			/* else UP on page 0: no-op, loop re-displays page 0 */
-		} else if (!overflowed)
+		}
+		else if (!overflowed)
 			break;
 		else if (cur_page + 1 < nstarts)
 			cur_page++;
@@ -1568,13 +1620,16 @@ void ListProgramPaged(unsigned char *prog)
 
 		clearrepeat();
 		if (cur_page > 0)
-			MMPrintString(overflowed ? "UP=prev  ANY KEY=next ..." :
-			                           "UP=prev  ANY KEY=quit ...");
+			MMPrintString(overflowed ? "UP=prev  ANY KEY=next ..." : "UP=prev  ANY KEY=quit ...");
 		else
 			MMPrintString("PRESS ANY KEY ...");
 
 		int c = -1;
-		while (c == -1) { routinechecks(); c = MMInkey(); }
+		while (c == -1)
+		{
+			routinechecks();
+			c = MMInkey();
+		}
 		MMPrintString("\r                              \r");
 
 		if (c == UP)
@@ -2338,7 +2393,7 @@ void cmd_goto(void)
 	 * but the execute_one_command path (IF..THEN cmd ELSE) still passes an
 	 * argbuf pointer — skip caching for any non-ProgMemory cmdline.       */
 	int _goto_cacheable = (g_trace_cache_flags & TCF_JUMP) &&
-		cmdline >= ProgMemory && cmdline < ProgMemory + MAX_PROG_SIZE;
+						  cmdline >= ProgMemory && cmdline < ProgMemory + MAX_PROG_SIZE;
 	if (_goto_cacheable)
 	{
 		unsigned char *cached_tgt;
@@ -2360,6 +2415,391 @@ void cmd_goto(void)
 	CurrentLinePtr = nextstmt;
 }
 
+/* ============================================================================
+ * IF / ELSEIF / ELSE / ENDIF jump table
+ *
+ * Built by PrepareProgram so that cmd_if's false branch and cmd_else can
+ * locate the matching arm or ENDIF via O(log N) binary search instead of
+ * the linear GetNextCommand walk.
+ *
+ * Single-line IFs (IF expr THEN cmd [ELSE cmd]) are NOT entered into the
+ * table — cmd_if resolves them inline from argv[].  Only IFs whose THEN is
+ * the last token on the line generate entries.
+ *
+ * If the program is malformed (ELSE without IF, unmatched ENDIF, or an
+ * unclosed IF at end of program), the affected entries are simply left
+ * with next_arm == NULL / endif_tok == NULL and the run-time scan path is
+ * used as a fallback — preserving the original error-reporting behaviour.
+ * ============================================================================ */
+
+#define IFTAB_MAX_NEST 64
+#define IFTAB_INITIAL_CAPACITY 32
+
+static struct iftab_entry *iftab = NULL;
+static int iftab_count = 0;
+static int iftab_capacity = 0;
+/* iftab_lib_count is the number of entries built from LibMemory.  All
+ * LibMemory entries occupy iftab[0..iftab_lib_count-1] (sorted ascending),
+ * all ProgMemory entries occupy iftab[iftab_lib_count..iftab_count-1]
+ * (sorted ascending).  IfTableLookup picks the slice based on whether the
+ * key falls inside LibMemory's range. */
+static int iftab_lib_count = 0;
+
+void IfTableFree(void)
+{
+	if (iftab)
+		FreeMemorySafe((void **)&iftab);
+	iftab_count = 0;
+	iftab_capacity = 0;
+	iftab_lib_count = 0;
+}
+
+static int iftab_grow(void)
+{
+	int newcap = iftab_capacity ? iftab_capacity * 2 : IFTAB_INITIAL_CAPACITY;
+	struct iftab_entry *n = (struct iftab_entry *)GetMemory(newcap * sizeof(struct iftab_entry));
+	if (!n)
+		return 0;
+	if (iftab)
+	{
+		memcpy(n, iftab, iftab_count * sizeof(struct iftab_entry));
+		FreeMemorySafe((void **)&iftab);
+	}
+	iftab = n;
+	iftab_capacity = newcap;
+	return 1;
+}
+
+/* Append an entry, returning its index (or -1 on allocation failure). */
+static int iftab_append(unsigned char *tok, unsigned char *line_ptr)
+{
+	if (iftab_count >= iftab_capacity && !iftab_grow())
+		return -1;
+	iftab[iftab_count].tok = tok;
+	iftab[iftab_count].next_arm = NULL;
+	iftab[iftab_count].endif_tok = NULL;
+	iftab[iftab_count].line_ptr = line_ptr;
+	return iftab_count++;
+}
+
+/* Determine whether the IF at p is multi-line, ie. the THEN is the last
+ * non-comment token on the line.  Same predicate used by cmd_else.  */
+static int iftab_is_multiline_if(unsigned char *p)
+{
+	unsigned char *tp = p + sizeof(CommandToken);
+	while (*tp && *tp != tokenTHEN)
+		tp++;
+	if (*tp)
+		tp++;
+	skipspace(tp);
+	return (*tp == 0 || *tp == '\'');
+}
+
+/* Build IF table entries for one region (ProgMemory or LibMemory).
+ * Uses a parallel "previous arm" chain (prev_arm[]) keyed by iftab index,
+ * so that we can patch endif_tok for every arm of a frame when ENDIF is
+ * seen, without walking through nested closed frames. */
+static void iftab_build_region(unsigned char *prog)
+{
+	if (!prog || *prog == 0xff || *prog == 0)
+		return;
+
+	/* Per-frame state (small fixed nesting cap; deeper nesting falls
+	 * back to the linear scan at runtime). */
+	int last_arm[IFTAB_MAX_NEST]; /* iftab index of most recent arm in frame */
+	int sp = 0;
+	int sp_extra = 0; /* over-cap nesting: just track depth so ENDIFs balance */
+
+	/* prev_arm[i] is the previous arm index for entry i (-1 for IF, or for
+	 * an ELSEIF/ELSE that we couldn't link because the frame stack was
+	 * full).  Lives only during this build. */
+	int prev_arm_capacity = iftab_capacity;
+	int *prev_arm = NULL;
+	if (prev_arm_capacity > 0)
+	{
+		prev_arm = (int *)GetMemory(prev_arm_capacity * sizeof(int));
+		if (!prev_arm)
+			return;
+	}
+
+	unsigned char *p = prog;
+	unsigned char *line_ptr = NULL;
+
+	while (*p != 0xff)
+	{
+		p = GetNextCommand(p, &line_ptr, NULL);
+		if (*p == 0)
+			break;
+		CommandToken tkn = commandtbl_decode(p);
+
+		if (tkn == cmdIF)
+		{
+			if (!iftab_is_multiline_if(p))
+			{
+				/* skip past this single-line IF */
+				continue;
+			}
+			if (sp >= IFTAB_MAX_NEST)
+			{
+				sp_extra++;
+			}
+			else
+			{
+				int prev_count = iftab_count;
+				int idx = iftab_append(p, line_ptr);
+				if (idx < 0)
+				{
+					/* allocation failed: abandon */
+					if (prev_arm)
+						FreeMemorySafe((void **)&prev_arm);
+					return;
+				}
+				/* keep prev_arm[] sized in step with iftab_capacity */
+				if (iftab_capacity != prev_arm_capacity)
+				{
+					int *np = (int *)GetMemory(iftab_capacity * sizeof(int));
+					if (!np)
+					{
+						if (prev_arm)
+							FreeMemorySafe((void **)&prev_arm);
+						return;
+					}
+					if (prev_arm)
+					{
+						memcpy(np, prev_arm, prev_count * sizeof(int));
+						FreeMemorySafe((void **)&prev_arm);
+					}
+					prev_arm = np;
+					prev_arm_capacity = iftab_capacity;
+				}
+				prev_arm[idx] = -1;
+				last_arm[sp++] = idx;
+			}
+		}
+		else if (tkn == cmdELSEIF || tkn == cmdELSE_IF || tkn == cmdELSE)
+		{
+			if (sp_extra > 0 || sp == 0)
+				continue; /* malformed or over-cap; runtime scan handles it */
+			int prev = last_arm[sp - 1];
+			int prev_count = iftab_count;
+			int idx = iftab_append(p, line_ptr);
+			if (idx < 0)
+			{
+				if (prev_arm)
+					FreeMemorySafe((void **)&prev_arm);
+				return;
+			}
+			if (iftab_capacity != prev_arm_capacity)
+			{
+				int *np = (int *)GetMemory(iftab_capacity * sizeof(int));
+				if (!np)
+				{
+					if (prev_arm)
+						FreeMemorySafe((void **)&prev_arm);
+					return;
+				}
+				if (prev_arm)
+				{
+					memcpy(np, prev_arm, prev_count * sizeof(int));
+					FreeMemorySafe((void **)&prev_arm);
+				}
+				prev_arm = np;
+				prev_arm_capacity = iftab_capacity;
+			}
+			iftab[prev].next_arm = p;
+			prev_arm[idx] = prev;
+			last_arm[sp - 1] = idx;
+		}
+		else if (tkn == cmdENDIF || tkn == cmdEND_IF)
+		{
+			if (sp_extra > 0)
+			{
+				sp_extra--;
+			}
+			else if (sp > 0)
+			{
+				int last = last_arm[--sp];
+				iftab[last].next_arm = p;
+				int i = last;
+				while (i >= 0)
+				{
+					iftab[i].endif_tok = p;
+					i = prev_arm[i];
+				}
+			}
+		}
+	}
+
+	/* Any unclosed IFs leave their entries with next_arm/endif_tok NULL.
+	 * IfTableLookup callers fall back to the linear scan, which then
+	 * triggers the existing "No matching ENDIF" error.               */
+	if (prev_arm)
+		FreeMemorySafe((void **)&prev_arm);
+}
+
+/* Insertion sort iftab[lo..hi-1] by tok ascending.  Each region is
+ * already sorted by construction; this only fixes the LibMemory/ProgMemory
+ * boundary in pathological cases.  */
+static void iftab_sort_range(int lo, int hi)
+{
+	for (int i = lo + 1; i < hi; i++)
+	{
+		struct iftab_entry tmp = iftab[i];
+		int j = i;
+		while (j > lo && iftab[j - 1].tok > tmp.tok)
+		{
+			iftab[j] = iftab[j - 1];
+			j--;
+		}
+		iftab[j] = tmp;
+	}
+}
+
+void MIPS16 IfTableBuild(void)
+{
+	IfTableFree();
+
+	if (Option.LIBRARY_FLASH_SIZE == MAX_PROG_SIZE && LibMemory)
+	{
+		iftab_build_region(LibMemory);
+		iftab_lib_count = iftab_count;
+		iftab_sort_range(0, iftab_lib_count);
+	}
+
+	int prog_lo = iftab_count;
+	iftab_build_region(ProgMemory);
+	iftab_sort_range(prog_lo, iftab_count);
+}
+
+#if LOWRAM
+struct iftab_entry *IfTableLookup(unsigned char *tok)
+#else
+struct iftab_entry *__not_in_flash_func(IfTableLookup)(unsigned char *tok)
+#endif
+{
+	if (iftab_count == 0 || tok == NULL)
+		return NULL;
+
+	int lo, hi;
+	/* Pick the slice corresponding to the region the key lives in. */
+	if (iftab_lib_count > 0 &&
+		tok >= LibMemory && tok < LibMemory + MAX_PROG_SIZE)
+	{
+		lo = 0;
+		hi = iftab_lib_count;
+	}
+	else
+	{
+		lo = iftab_lib_count;
+		hi = iftab_count;
+	}
+
+	while (lo < hi)
+	{
+		int mid = (lo + hi) >> 1;
+		unsigned char *m = iftab[mid].tok;
+		if (m == tok)
+			return &iftab[mid];
+		if (m < tok)
+			lo = mid + 1;
+		else
+			hi = mid;
+	}
+	return NULL;
+}
+
+/* ============================================================================
+ * Phase A3: line skip-byte verifier
+ * ============================================================================
+ * Walks a tokenised program region and validates that every T_NEWLINE skip
+ * byte either equals T_NEWLINE_SKIP_NONE or accurately points at the next
+ * T_NEWLINE / end-of-program.  Returns the number of mismatches found.
+ * Used as a debug check; does not abort the program. */
+/*
+int g_verify_line_skip = 0; // 0 = silent off; 1 = run the check; 2 = also report counts
+
+int MIPS16 VerifyLineSkipBytes(unsigned char *start)
+{
+	if (start == NULL)
+		return 0;
+	unsigned char *p = start;
+	int mismatches = 0;
+	int lines = 0;
+
+	while (1)
+	{
+		// End of program: two consecutive zeros (or erased flash).
+		if ((p[0] == 0 && p[1] == 0) || p[0] == 0xff)
+			break;
+
+		if (*p == T_NEWLINE)
+		{
+			lines++;
+			unsigned char skip = p[1];
+
+			// Find the actual next T_NEWLINE / end by structural scan.
+			// We must step over T_LINENBR (3 bytes) and T_LABEL
+			// (length byte + N name bytes) so that stray 0x01 bytes
+			// inside line numbers or labels aren't misread as T_NEWLINE.
+			unsigned char *q = p + T_NEWLINE_HDR;
+			while (1)
+			{
+				if ((q[0] == 0 && q[1] == 0) || q[0] == 0xff)
+					break;
+				if (*q == T_NEWLINE)
+					break;
+				if (*q == T_LINENBR)
+				{
+					q += 3;
+					continue;
+				}
+				if (*q == T_LABEL)
+				{
+					q += q[1] + 2;
+					continue;
+				}
+				q++;
+			}
+			ptrdiff_t actual = q - p;
+			// At end of program the per-line writer emits the line's
+			// trailing 0 and the outer code writes a second 0 as the
+			// program terminator, so the verifier sees 0,0 at offset
+			// (skip-1) for the final line.  Accept skip == actual+1
+			// in that case (the +1 byte is the program terminator that
+			// would have been the next line's T_NEWLINE).
+			int at_eop = (q[0] == 0 && q[1] == 0);
+
+			if (skip != T_NEWLINE_SKIP_NONE)
+			{
+				if ((ptrdiff_t)skip != actual && !(at_eop && (ptrdiff_t)skip == actual + 1))
+				{
+					mismatches++;
+					if (g_verify_line_skip)
+					{
+						char buf[80];
+						snprintf(buf, sizeof(buf), "VerifySkip: line %d skip=%d actual=%d at %p\r\n",
+								 lines, (int)skip, (int)actual, (void *)p);
+						MMPrintString(buf);
+					}
+				}
+			}
+
+			p = q;
+			continue;
+		}
+
+		p++;
+	}
+
+	if (g_verify_line_skip >= 2)
+	{
+		char buf[64];
+		snprintf(buf, sizeof(buf), "VerifySkip: %d lines, %d mismatches\r\n", lines, mismatches);
+		MMPrintString(buf);
+	}
+	return mismatches;
+}
+*/
 #if LOWRAM
 void cmd_if(void)
 {
@@ -2380,6 +2820,11 @@ void MIPS16 __not_in_flash_func(cmd_if)(void)
 	 * This stable ProgMemory pointer is the cache key for the IF condition. */
 	unsigned char *if_cond_key = cmdline;
 #endif
+	/* Address of the IF / ELSEIF command token in ProgMemory (or LibMemory).
+	 * Used as the key into the IF jump table built by PrepareProgram so the
+	 * false-branch can skip directly to the matching ELSEIF / ELSE / ENDIF
+	 * without scanning.  Updated when re-entering for an ELSEIF.            */
+	unsigned char *if_token_addr = cmdline - sizeof(CommandToken);
 
 	ss[0] = tokenTHEN;
 	ss[1] = tokenELSE;
@@ -2459,8 +2904,9 @@ if_condition_done:;
 						goto_arg++;
 					if (*goto_arg == tokenGOTO)
 					{
-						goto_arg++;                          /* skip tokenGOTO byte  */
-						while (*goto_arg == ' ') goto_arg++; /* skip spaces          */
+						goto_arg++; /* skip tokenGOTO byte  */
+						while (*goto_arg == ' ')
+							goto_arg++; /* skip spaces          */
 						cmdline = goto_arg;
 					}
 					else
@@ -2500,50 +2946,21 @@ if_condition_done:;
 		// first check if it is a multiline IF (ie, only 2 args)
 		if (argc == 2)
 		{
-			// search for the next ELSE, or ENDIF and pass control to the following line
-			// if an ELSEIF is found re execute this function to evaluate the condition following the ELSEIF
-			i = 1;
-			p = nextstmt;
-			while (1)
+			/* Fast path: PrepareProgram has built a table mapping every
+			 * multi-line IF / ELSEIF / ELSE token to its next sibling
+			 * arm and matching ENDIF.  When present, jump directly. */
+			struct iftab_entry *_ife = IfTableLookup(if_token_addr);
+			if (_ife && _ife->next_arm)
 			{
-				p = GetNextCommand(p, &rp, (unsigned char *)"No matching ENDIF");
-				CommandToken tkn = commandtbl_decode(p);
-				if (tkn == cmdtoken)
+				unsigned char *target = _ife->next_arm;
+				CommandToken ttkn = commandtbl_decode(target);
+				if (ttkn == cmdELSEIF || ttkn == cmdELSE_IF)
 				{
-					// found a nested IF command, we now need to determine if it is a single or multiline IF
-					// search for a THEN, then check if only white space follows.  If so, it is multiline.
-					tp = p + sizeof(CommandToken);
-					while (*tp && *tp != ss[0])
-						tp++;
-					if (*tp)
-						tp++; // step over the THEN
-					skipspace(tp);
-					if (*tp == 0 || *tp == '\'') // yes, only whitespace follows
-						i++;					 // count it as a nested IF
-					else						 // no, it is a single line IF
-						skipelement(p);			 // skip to the end so that we avoid an ELSE
-					continue;
-				}
-
-				if (tkn == cmdELSE && i == 1)
-				{
-					// found an ELSE at the same level as this IF.  Step over it and continue with the statement after it
-					skipelement(p);
-					nextstmt = p;
-					break;
-				}
-
-				if ((tkn == cmdELSEIF || tkn == cmdELSE_IF) && i == 1)
-				{
-					// we have found an ELSEIF statement at the same level as our IF statement
-					// setup the environment to make this function evaluate the test following ELSEIF and jump back
-					// to the start of the function.  This is not very clean (it uses the dreaded goto for a start) but it works
-					p += sizeof(CommandToken); // step over the token
+					p = target + sizeof(CommandToken);
 					skipspace(p);
-					CurrentLinePtr = rp;
+					CurrentLinePtr = _ife->line_ptr;
 					if (*p == 0)
 						SyntaxError();
-					; // there must be a test after the elseif
 					cmdline = p;
 					skipelement(p);
 					nextstmt = p;
@@ -2552,17 +2969,80 @@ if_condition_done:;
 #ifdef CACHE
 					if_cond_key = cmdline; /* each ELSEIF has its own cache entry */
 #endif
+					if_token_addr = target;
 					goto retest_an_if;
 				}
-
-				if (tkn == cmdENDIF || tkn == cmdEND_IF)
-					i--; // found an ENDIF so decrement our nested counter
-				if (i == 0)
+				/* ELSE or ENDIF — step past it and continue. */
+				skipelement(target);
+				nextstmt = target;
+			}
+			else
+			{
+				// search for the next ELSE, or ENDIF and pass control to the following line
+				// if an ELSEIF is found re execute this function to evaluate the condition following the ELSEIF
+				i = 1;
+				p = nextstmt;
+				while (1)
 				{
-					// found our matching ENDIF stmt.  Step over it and continue with the statement after it
-					skipelement(p);
-					nextstmt = p;
-					break;
+					p = GetNextCommand(p, &rp, (unsigned char *)"No matching ENDIF");
+					CommandToken tkn = commandtbl_decode(p);
+					if (tkn == cmdtoken)
+					{
+						// found a nested IF command, we now need to determine if it is a single or multiline IF
+						// search for a THEN, then check if only white space follows.  If so, it is multiline.
+						tp = p + sizeof(CommandToken);
+						while (*tp && *tp != ss[0])
+							tp++;
+						if (*tp)
+							tp++; // step over the THEN
+						skipspace(tp);
+						if (*tp == 0 || *tp == '\'') // yes, only whitespace follows
+							i++;					 // count it as a nested IF
+						else						 // no, it is a single line IF
+							skipelement(p);			 // skip to the end so that we avoid an ELSE
+						continue;
+					}
+
+					if (tkn == cmdELSE && i == 1)
+					{
+						// found an ELSE at the same level as this IF.  Step over it and continue with the statement after it
+						skipelement(p);
+						nextstmt = p;
+						break;
+					}
+
+					if ((tkn == cmdELSEIF || tkn == cmdELSE_IF) && i == 1)
+					{
+						// we have found an ELSEIF statement at the same level as our IF statement
+						// setup the environment to make this function evaluate the test following ELSEIF and jump back
+						// to the start of the function.  This is not very clean (it uses the dreaded goto for a start) but it works
+						if_token_addr = p;		   /* token addr before increment */
+						p += sizeof(CommandToken); // step over the token
+						skipspace(p);
+						CurrentLinePtr = rp;
+						if (*p == 0)
+							SyntaxError();
+						; // there must be a test after the elseif
+						cmdline = p;
+						skipelement(p);
+						nextstmt = p;
+						testgoto = false;
+						testelseif = true;
+#ifdef CACHE
+						if_cond_key = cmdline; /* each ELSEIF has its own cache entry */
+#endif
+						goto retest_an_if;
+					}
+
+					if (tkn == cmdENDIF || tkn == cmdEND_IF)
+						i--; // found an ENDIF so decrement our nested counter
+					if (i == 0)
+					{
+						// found our matching ENDIF stmt.  Step over it and continue with the statement after it
+						skipelement(p);
+						nextstmt = p;
+						break;
+					}
 				}
 			}
 		}
@@ -2618,12 +3098,28 @@ void __not_in_flash_func(cmd_else)(void)
 	int i;
 	unsigned char *p, *tp;
 
+	if (cmdtoken == cmdELSE)
+		checkend(cmdline);
+
+	/* Fast path: PrepareProgram has built a table mapping every ELSE /
+	 * ELSEIF / ELSE_IF token to its matching ENDIF.  cmdline points at
+	 * the first byte after the command token, so the token address is
+	 * (cmdline - sizeof(CommandToken)).                                  */
+	{
+		unsigned char *_else_token = cmdline - sizeof(CommandToken);
+		struct iftab_entry *_ife = IfTableLookup(_else_token);
+		if (_ife && _ife->endif_tok)
+		{
+			p = _ife->endif_tok;
+			skipelement(p);
+			nextstmt = p;
+			return;
+		}
+	}
+
 	// search for the next ENDIF and pass control to the following line
 	i = 1;
 	p = nextstmt;
-
-	if (cmdtoken == cmdELSE)
-		checkend(cmdline);
 
 	while (1)
 	{
@@ -2861,7 +3357,11 @@ void cmd_end(void)
 			int any = 0;
 			if (g_tc_sub_let_hits && g_tc_sub_if_hits)
 				for (int k = 0; k <= MAXSUBFUN; k++)
-					if (g_tc_sub_let_hits[k] || g_tc_sub_if_hits[k]) { any = 1; break; }
+					if (g_tc_sub_let_hits[k] || g_tc_sub_if_hits[k])
+					{
+						any = 1;
+						break;
+					}
 			if (any)
 			{
 				uint32_t *scratch = (uint32_t *)GetMemory((MAXSUBFUN + 1) * sizeof(uint32_t));
@@ -2874,7 +3374,11 @@ void cmd_end(void)
 					uint32_t best = 0;
 					int best_idx = -1;
 					for (int k = 0; k <= MAXSUBFUN; k++)
-						if (scratch[k] > best) { best = scratch[k]; best_idx = k; }
+						if (scratch[k] > best)
+						{
+							best = scratch[k];
+							best_idx = k;
+						}
 					if (best_idx < 0 || best == 0)
 						break;
 					char nm[MAXVARLEN + 1];
@@ -3321,8 +3825,8 @@ void cmd_select(void)
 	{
 		unsigned char *cached_nextstmt;
 		if (TraceCacheTrySelect(cmdline, nextstmt, type,
-		                        (long long int)i64, (MMFLOAT)f,
-		                        &cached_nextstmt))
+								(long long int)i64, (MMFLOAT)f,
+								&cached_nextstmt))
 		{
 			nextstmt = cached_nextstmt;
 			return;
@@ -4032,15 +4536,15 @@ void MIPS16 __not_in_flash_func(cmd_do)(void)
 		{
 			struct s_dostack *ds = &g_dostack[g_doindex];
 			if (TraceCacheCompileDoFast(fast_src,
-					&ds->do_fast_var,
-					&ds->do_fast_varindex,
-					&ds->do_fast_is_local,
-					&ds->do_fast_frame_gen,
-					&ds->do_fast_type,
-					&ds->do_fast_op,
-					&ds->do_fast_limit.i,
-					&ds->do_fast_limit.f,
-					ds->do_fast_name))
+										&ds->do_fast_var,
+										&ds->do_fast_varindex,
+										&ds->do_fast_is_local,
+										&ds->do_fast_frame_gen,
+										&ds->do_fast_type,
+										&ds->do_fast_op,
+										&ds->do_fast_limit.i,
+										&ds->do_fast_limit.f,
+										ds->do_fast_name))
 			{
 				ds->do_fast_is_until = (uint8_t)fast_is_until;
 			}
@@ -4065,7 +4569,8 @@ void MIPS16 __not_in_flash_func(cmd_do)(void)
 #else
 		condval = (getnumber(g_dostack[g_doindex - 1].evalptr) != 0);
 #endif
-		if (g_dostack[g_doindex - 1].untiltest) condval = !condval; // DO UNTIL: skip body if condition is already true
+		if (g_dostack[g_doindex - 1].untiltest)
+			condval = !condval; // DO UNTIL: skip body if condition is already true
 		if (!condval)
 		{
 			g_doindex--;							 // remove the entry in the table
@@ -4109,17 +4614,23 @@ void MIPS16 __not_in_flash_func(cmd_loop)(void)
 					int loc_size = GetLocalVarHashSize();
 					for (int j = 0; j < loc_size; j++)
 					{
-						if (g_vartbl[j].name[0] == 0) continue;
-						if (g_vartbl[j].level != g_LocalIndex) continue;
-						if (g_vartbl[j].dims[0] != 0) continue;
+						if (g_vartbl[j].name[0] == 0)
+							continue;
+						if (g_vartbl[j].level != g_LocalIndex)
+							continue;
+						if (g_vartbl[j].dims[0] != 0)
+							continue;
 						int t = g_vartbl[j].type;
-						if (ds->do_fast_type == T_INT && !(t & T_INT)) continue;
-						if (ds->do_fast_type == T_NBR && !(t & T_NBR)) continue;
+						if (ds->do_fast_type == T_INT && !(t & T_INT))
+							continue;
+						if (ds->do_fast_type == T_NBR && !(t & T_NBR))
+							continue;
 						if (strncmp((char *)g_vartbl[j].name,
-						            (char *)ds->do_fast_name, MAXVARLEN) != 0) continue;
+									(char *)ds->do_fast_name, MAXVARLEN) != 0)
+							continue;
 						new_var = (t & T_PTR)
-						          ? (void *)g_vartbl[j].val.s
-						          : (void *)&g_vartbl[j].val;
+									  ? (void *)g_vartbl[j].val.s
+									  : (void *)&g_vartbl[j].val;
 						ds->do_fast_varindex = j;
 						break;
 					}
@@ -4137,12 +4648,24 @@ void MIPS16 __not_in_flash_func(cmd_loop)(void)
 					long long int lim = ds->do_fast_limit.i;
 					switch (ds->do_fast_op)
 					{
-					case DOFAST_LT:  tst = (val <  lim); break;
-					case DOFAST_GT:  tst = (val >  lim); break;
-					case DOFAST_LTE: tst = (val <= lim); break;
-					case DOFAST_GTE: tst = (val >= lim); break;
-					case DOFAST_EQ:  tst = (val == lim); break;
-					default:         tst = (val != lim); break; /* DOFAST_NE */
+					case DOFAST_LT:
+						tst = (val < lim);
+						break;
+					case DOFAST_GT:
+						tst = (val > lim);
+						break;
+					case DOFAST_LTE:
+						tst = (val <= lim);
+						break;
+					case DOFAST_GTE:
+						tst = (val >= lim);
+						break;
+					case DOFAST_EQ:
+						tst = (val == lim);
+						break;
+					default:
+						tst = (val != lim);
+						break; /* DOFAST_NE */
 					}
 				}
 				else
@@ -4151,18 +4674,31 @@ void MIPS16 __not_in_flash_func(cmd_loop)(void)
 					MMFLOAT lim = ds->do_fast_limit.f;
 					switch (ds->do_fast_op)
 					{
-					case DOFAST_LT:  tst = (val <  lim); break;
-					case DOFAST_GT:  tst = (val >  lim); break;
-					case DOFAST_LTE: tst = (val <= lim); break;
-					case DOFAST_GTE: tst = (val >= lim); break;
-					case DOFAST_EQ:  tst = (val == lim); break;
-					default:         tst = (val != lim); break;
+					case DOFAST_LT:
+						tst = (val < lim);
+						break;
+					case DOFAST_GT:
+						tst = (val > lim);
+						break;
+					case DOFAST_LTE:
+						tst = (val <= lim);
+						break;
+					case DOFAST_GTE:
+						tst = (val >= lim);
+						break;
+					case DOFAST_EQ:
+						tst = (val == lim);
+						break;
+					default:
+						tst = (val != lim);
+						break;
 					}
 				}
-				if (ds->do_fast_is_until) tst = !tst;
+				if (ds->do_fast_is_until)
+					tst = !tst;
 				goto do_loop_branch;
 			}
-do_loop_slow:
+		do_loop_slow:
 #endif
 			if (g_dostack[i].evalptr == NULL)
 			{ // if it was a DO without a WHILE/UNTIL
@@ -4193,7 +4729,7 @@ do_loop_slow:
 				}
 			}
 			else
-			{												  // if was DO WHILE or DO UNTIL
+			{ // if was DO WHILE or DO UNTIL
 				int condval;
 #ifdef CACHE
 				{
@@ -4207,10 +4743,10 @@ do_loop_slow:
 				condval = (getnumber(g_dostack[i].evalptr) != 0);
 #endif
 				tst = g_dostack[i].untiltest ? !condval : condval; // UNTIL inverts: loop while condition is false
-				checkend(cmdline);							  // make sure that there is nothing else
+				checkend(cmdline);								   // make sure that there is nothing else
 			}
 #ifdef CACHE
-do_loop_branch:
+		do_loop_branch:
 #endif
 
 			// test the expression value and reset the program pointer if we are still looping
@@ -4345,7 +4881,7 @@ void cmd_gosub(void)
 	char *return_to = (char *)nextstmt;
 #ifdef CACHE
 	int _gosub_cacheable = (g_trace_cache_flags & TCF_JUMP) &&
-		cmdline >= ProgMemory && cmdline < ProgMemory + MAX_PROG_SIZE;
+						   cmdline >= ProgMemory && cmdline < ProgMemory + MAX_PROG_SIZE;
 	if (_gosub_cacheable)
 	{
 		unsigned char *cached_tgt;
@@ -6660,7 +7196,10 @@ search_again:
 		if (*p == 0 /* || *p == 0xff*/)
 			error("No DATA to read"); // end of the program and we still need more data
 		if (*p == T_NEWLINE)
-			lineptr = p++;
+		{
+			lineptr = p;
+			p += T_NEWLINE_HDR;
+		}
 		if (*p == T_LINENBR)
 			p += 3;
 		skipspace(p);
@@ -9414,7 +9953,7 @@ unsigned char *llist(unsigned char *b, unsigned char *p)
 	{
 		if (*p == T_NEWLINE)
 		{
-			p++;
+			p += T_NEWLINE_HDR;
 			firstnonwhite = true;
 			continue;
 		}

@@ -395,6 +395,7 @@ static unsigned char *FindLineStart(unsigned char *linePtr, unsigned char *memSt
         if (p[1] == T_NEWLINE)
         {
             tp = ++p; // save because it might be the line we want
+            p++;      // Phase A1: also step over the skip byte (so unconditional p++ below lands on line content)
         }
         p++; // step over the zero marking the start of the element
         skipspace(p);
@@ -477,6 +478,7 @@ void PrintPreprogramError(void)
                     if (p[1] == T_NEWLINE)
                     {
                         tp = ++p; // save because it might be the line we want
+                        p++;      // Phase A1: step over skip byte
                     }
                     p++; // step over the zero marking the start of the element
                     skipspace(p);
@@ -841,6 +843,22 @@ int MIPS16 PrepareProgram(int ErrAbort)
     // if(!ErrAbort) return;
 
 #endif
+    /* Build the IF/ELSEIF/ELSE/ENDIF jump table.  Done unconditionally
+     * (regardless of ErrAbort) so the runtime fast-path is available
+     * whenever a valid program is prepared for execution.              */
+    IfTableBuild();
+
+    /* Phase A3: optionally validate that every T_NEWLINE skip byte
+     * agrees with the actual line offset.  Off by default; enable by
+     * setting g_verify_line_skip from the debugger or via a future
+     * OPTION DEBUG command.                                            */
+    /*    if (g_verify_line_skip)
+        {
+            if (Option.LIBRARY_FLASH_SIZE == MAX_PROG_SIZE && LibMemory)
+                VerifyLineSkipBytes(LibMemory);
+            VerifyLineSkipBytes(ProgMemory);
+        }*/
+
     if (!ErrAbort)
         return 0;
 
@@ -1018,7 +1036,7 @@ int MIPS16 PrepareProgramExt(unsigned char *p, int i, unsigned char **CFunPtr, i
                 if (c == T_NEWLINE)
                 {
                     CurrentLinePtr = p;
-                    p++;
+                    p += T_NEWLINE_HDR;
                     c = *p;
                 }
 
@@ -1222,7 +1240,10 @@ void MIPS16 tokenise(int console)
     p = inpbuf;
     op = tknbuf;
     if (!console)
+    {
         *op++ = T_NEWLINE;
+        *op++ = T_NEWLINE_SKIP_NONE; // Phase A1: skip-byte placeholder (non-zero so empty lines aren't truncated by per-line writers that stop at two consecutive zero bytes)
+    }
 
     // get the line number if it exists
     tp = p;
@@ -1519,6 +1540,31 @@ void MIPS16 tokenise(int console)
     *op++ = 0;
     *op++ = 0;
     *op++ = 0; // terminate with  zero chars
+
+    // Phase A2: populate the skip byte after T_NEWLINE with the in-flash
+    // line length (bytes from the T_NEWLINE to the start of the next line).
+    // For !console, tknbuf[0] = T_NEWLINE and tknbuf[1] = skip byte.
+    // The flash/RAM writers copy until two consecutive zero bytes are seen,
+    // then write one extra terminating 0.  We must therefore measure the
+    // in-flash length from the position of the FIRST 0,0 pair in tknbuf
+    // rather than from op: a line ending with a `:` separator (or any
+    // construct that emits a trailing 0 byte) creates an embedded 0,0
+    // before the three zeros we appended, and the writer stops there.
+    // Encoding: 3..0xFD = exact offset to next T_NEWLINE; 0xFE = unknown
+    // (too long).  Values 0 and 0xFF are reserved (0 would prematurely
+    // terminate the per-line copy loop; 0xFF resembles erased flash).
+    if (!console)
+    {
+        unsigned char *q = tknbuf;
+        unsigned char *end = op - 1; // last appended zero
+        while (q < end && !(q[0] == 0 && q[1] == 0))
+            q++;
+        size_t flash_len = (size_t)(q - tknbuf) + 1; // +1 for the terminator
+        if (flash_len >= 3 && flash_len <= 0xFD)
+            tknbuf[1] = (unsigned char)flash_len;
+        else
+            tknbuf[1] = T_NEWLINE_SKIP_NONE;
+    }
 }
 
 int CheckEmpty(char *p)
@@ -1623,6 +1669,8 @@ void __not_in_flash_func(ExecuteProgram)(unsigned char *p)
 {
     int i, SaveLocalIndex = 0;
     jmp_buf SaveErrNext;
+    unsigned char *line_start = NULL;              // start of current line (T_NEWLINE byte) - Phase B
+    unsigned char line_skip = 0;                   // skip byte for current line - Phase B
     memcpy(SaveErrNext, ErrNext, sizeof(jmp_buf)); // we call ExecuteProgram() recursively so we need to store/restore old jump buffer between calls
     skipspace(p);                                  // just in case, skip any whitespace
 
@@ -1632,6 +1680,8 @@ void __not_in_flash_func(ExecuteProgram)(unsigned char *p)
             p++; // step over the zero byte marking the beginning of a new element
         if (*p == T_NEWLINE)
         {
+            line_start = p;                // Phase B: remember line start for fast comment-line skip
+            line_skip = p[1];              // Phase B: skip byte
             CurrentLinePtr = p;            // and pointer to the line for error reporting
             TraceBuff[TraceBuffIndex] = p; // used by TRACE LIST
             if (++TraceBuffIndex >= TRACE_BUFF_SIZE)
@@ -1644,7 +1694,7 @@ void __not_in_flash_func(ExecuteProgram)(unsigned char *p)
                 MMPrintString((char *)inpbuf);
                 uSec(1000);
             }
-            p++; // and step over the token
+            p += T_NEWLINE_HDR; // step over T_NEWLINE + skip byte
         }
         if (*p == T_LINENBR)
             p += 3;   // and step over the number
@@ -1658,7 +1708,20 @@ void __not_in_flash_func(ExecuteProgram)(unsigned char *p)
         if (*p)
         { // if p is pointing to a command
             if (*p == '\'')
+            {
+                // Phase B: comment-line fast path.  If the skip byte is a
+                // valid offset AND it lands on the next T_NEWLINE, jump
+                // straight there without scanning the comment.  The
+                // T_NEWLINE check guards the LAST line of a program, where
+                // skip points just past the line terminator into the
+                // program-end 0,0 terminator (not a real T_NEWLINE).
+                if (line_start != NULL && line_skip >= 3 && line_skip != T_NEWLINE_SKIP_NONE && line_skip != 0xFF && line_start[line_skip] == T_NEWLINE)
+                {
+                    p = line_start + line_skip;
+                    continue;
+                }
                 nextstmt = cmdline = p + 1;
+            }
             else
                 nextstmt = cmdline = p + sizeof(CommandToken);
             skipspace(cmdline);
@@ -3177,7 +3240,38 @@ unsigned char MIPS16 *findline(int nbr, int mustfind)
 
         if (p[0] == T_NEWLINE)
         {
-            p++;
+            // Phase B: peek for T_LINENBR immediately after the newline
+            // header.  If it matches, return pointing at the T_LINENBR
+            // (matches the legacy break behaviour).  Otherwise jump to
+            // the next line via the skip byte when valid.
+            unsigned char skip = p[1];
+            if (p[T_NEWLINE_HDR] == T_LINENBR)
+            {
+                i = (p[T_NEWLINE_HDR + 1] << 8) | p[T_NEWLINE_HDR + 2];
+                if (mustfind)
+                {
+                    if (i == nbr)
+                    {
+                        p += T_NEWLINE_HDR;
+                        break;
+                    }
+                }
+                else
+                {
+                    if (i >= nbr)
+                    {
+                        p += T_NEWLINE_HDR;
+                        break;
+                    }
+                }
+            }
+            if (skip >= 3 && skip != T_NEWLINE_SKIP_NONE && skip != 0xFF)
+            {
+                p += skip;
+                continue;
+            }
+            // skip byte unavailable - fall back to structural byte scan
+            p += T_NEWLINE_HDR;
             continue;
         }
 
@@ -3226,8 +3320,21 @@ void hashlabels(unsigned char *p, int ErrAbort)
 
         if (p[0] == T_NEWLINE)
         {
-            lastp = (char *)p; // save in case this is the right line
-            p++;               // and step over the line number
+            // Phase B (B3): only T_LABEL ever needs hashing.  Peek the byte
+            // immediately after the newline header (or past T_LINENBR) to
+            // see if this line carries a label; if not, jump straight to
+            // the next line via the skip byte.
+            unsigned char skip = p[1];
+            unsigned char *q = p + T_NEWLINE_HDR;
+            if (q[0] == T_LINENBR)
+                q += 3;
+            if (q[0] != T_LABEL && skip >= 3 && skip != T_NEWLINE_SKIP_NONE && skip != 0xFF)
+            {
+                p += skip;
+                continue;
+            }
+            lastp = (char *)p;  // save in case this is the right line
+            p += T_NEWLINE_HDR; // step over T_NEWLINE + skip byte
             continue;
         }
 
@@ -3399,8 +3506,25 @@ unsigned char MIPS16 *findlabel(unsigned char *labelptr)
         }
         if (p[0] == T_NEWLINE)
         {
-            lastp = p; // save in case this is the right line
-            p++;       // and step over the line number
+            // Phase B: peek for T_LABEL immediately after the newline
+            // header (optionally past T_LINENBR).  Compare; if no match,
+            // jump to the next line via the skip byte when valid.
+            unsigned char skip = (unsigned char)p[1];
+            char *q = p + T_NEWLINE_HDR;
+            if (q[0] == T_LINENBR)
+                q += 3;
+            if (q[0] == T_LABEL)
+            {
+                if (mem_equal((unsigned char *)q + 1, (unsigned char *)label, label[0] + 1))
+                    return (unsigned char *)p; // pointer to T_NEWLINE of matched line
+            }
+            if (skip >= 3 && skip != T_NEWLINE_SKIP_NONE && skip != 0xFF)
+            {
+                p += skip;
+                continue;
+            }
+            lastp = p;          // save in case this is the right line
+            p += T_NEWLINE_HDR; // step over T_NEWLINE + skip byte
             continue;
         }
 
@@ -3444,8 +3568,17 @@ int MIPS16 CountLines(unsigned char *target)
 
         if (*p == T_NEWLINE)
         {
-            p++; // and step over the line number
+            // Phase B: jump line-by-line using the skip byte when valid.
+            unsigned char skip = p[1];
             cnt++;
+            if (skip >= 3 && skip != T_NEWLINE_SKIP_NONE && skip != 0xFF)
+            {
+                if (p + skip >= target)
+                    return cnt;
+                p += skip;
+                continue;
+            }
+            p += T_NEWLINE_HDR; // fallback: structural scan
             if (p >= target)
                 return cnt;
             continue;
@@ -5401,6 +5534,7 @@ void MIPS16 error(char *msg, ...)
                 if (p[1] == T_NEWLINE)
                 {
                     tp = ++p; // save because it might be the line we want
+                    p++;      // Phase A1: step over skip byte
                 }
                 p++; // step over the zero marking the start of the element
                 skipspace(p);
@@ -6206,6 +6340,9 @@ void MIPS16 ClearProgram(bool psram)
     if (Option.DISPLAY_TYPE >= VGA222 && WriteBuf)
         FreeMemorySafe((void **)&WriteBuf);
 #endif
+    /* Drop the IF/ELSEIF/ELSE/ENDIF jump table BEFORE ClearRuntime wipes
+     * the heap tracking — otherwise iftab would be a dangling pointer. */
+    IfTableFree();
     ClearRuntime(true);
     //    ProgMemory[0] = ProgMemory[1] = ProgMemory[3] = ProgMemory[4] = 0;
     PSize = 0;
@@ -6441,6 +6578,8 @@ unsigned char __not_in_flash_func (*skipexpression)(unsigned char *p)
 unsigned char __not_in_flash_func (*GetNextCommand)(unsigned char *p, unsigned char **CLine, unsigned char *EOFMsg)
 {
     unsigned char c;
+    unsigned char *line_start = NULL; // Phase B (B4): start of current line
+    unsigned char line_skip = 0;      // Phase B (B4): its skip byte
 
     do
     {
@@ -6448,11 +6587,24 @@ unsigned char __not_in_flash_func (*GetNextCommand)(unsigned char *p, unsigned c
 
         if (c != T_NEWLINE)
         { // if we are not already at the start of a line
-            // Scan to end of element - look for the zero
-            while (*p)
-                p++;
-            p++; // step over the zero
-            c = *p;
+            // Phase B (B4): when the next "statement" on this line is a
+            // comment ('), the rest of the line up to T_NEWLINE is comment
+            // text.  Use the line skip byte (captured the last time we
+            // crossed a T_NEWLINE) to jump straight to the next line
+            // instead of byte-walking the comment.
+            if (c == '\'' && line_start != NULL && line_skip >= 3 && line_skip != T_NEWLINE_SKIP_NONE && line_skip != 0xFF && line_start[line_skip] == T_NEWLINE)
+            {
+                p = line_start + line_skip;
+                c = *p;
+            }
+            else
+            {
+                // Scan to end of element - look for the zero
+                while (*p)
+                    p++;
+                p++; // step over the zero
+                c = *p;
+            }
         }
 
         if (c == 0)
@@ -6464,9 +6616,11 @@ unsigned char __not_in_flash_func (*GetNextCommand)(unsigned char *p, unsigned c
 
         if (c == T_NEWLINE)
         {
+            line_start = p; // Phase B (B4): remember for comment jump
+            line_skip = p[1];
             if (CLine)
                 *CLine = p; // pointer to the line for error reporting
-            p++;
+            p += T_NEWLINE_HDR;
             c = *p;
         }
 

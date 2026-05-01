@@ -1965,13 +1965,14 @@ void MIPS16 cmd_library(void)
                 TempPtr = m;
                 CurrentLinePtr = p;
                 *m++ = *p++;
+                *m++ = *p++;        // Phase A1: copy skip byte
                 CmdExpected = true; // if true we can expect a command next (possibly a CFunction, etc)
                 if (*p == 0)
                 { // if this is an empty line we can skip it
                     p++;
                     if (*p == 0)
-                        break; // end of the program or module
-                    m--;
+                        break;   // end of the program or module
+                    m = TempPtr; // Phase A1: rewind past T_NEWLINE + skip byte
                     continue;
                 }
             }
@@ -8327,7 +8328,7 @@ void cmd_cfunction(void)
         if (*p == 0)
             error("Missing END declaration"); // end of the program
         if (*p == T_NEWLINE)
-            p++; // skip over the newline token
+            p += T_NEWLINE_HDR; // skip over newline + skip byte
         if (*p == T_LINENBR)
             p += 3; // skip over the line number
         skipspace(p);

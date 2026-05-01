@@ -1410,8 +1410,8 @@ void MIPS16 cmd_memory(void)
             break; // end of the program or module
         if (*p == T_NEWLINE)
         {
-            i++; // count the line
-            p++; // skip over the newline token
+            i++;                // count the line
+            p += T_NEWLINE_HDR; // skip newline + skip byte
         }
         if (*p == T_LINENBR)
             p += 3; // skip over the line number

@@ -310,17 +310,23 @@ void MX470Display(int fn)
         }
         else
         {
-            if (!mark_lcd_reverse) {
+            if (!mark_lcd_reverse)
+            {
                 mark_saved_fcolour = gui_fcolour;
                 mark_saved_bcolour = gui_bcolour;
-                if (Option.ColourCode) {
+                if (Option.ColourCode)
+                {
                     gui_bcolour = BLUE;
-                } else {
+                }
+                else
+                {
                     gui_fcolour = BLACK;
                     gui_bcolour = WHITE;
                 }
                 mark_lcd_reverse = 1;
-            } else {
+            }
+            else
+            {
                 gui_fcolour = mark_saved_fcolour;
                 gui_bcolour = mark_saved_bcolour;
                 mark_lcd_reverse = 0;
@@ -367,17 +373,23 @@ void MX470Display(int fn)
         break;
 #else
     case REVERSE_VIDEO:
-        if (!mark_lcd_reverse) {
+        if (!mark_lcd_reverse)
+        {
             mark_saved_fcolour = gui_fcolour;
             mark_saved_bcolour = gui_bcolour;
-            if (Option.ColourCode) {
+            if (Option.ColourCode)
+            {
                 gui_bcolour = BLUE;
-            } else {
+            }
+            else
+            {
                 gui_fcolour = BLACK;
                 gui_bcolour = WHITE;
             }
             mark_lcd_reverse = 1;
-        } else {
+        }
+        else
+        {
             gui_fcolour = mark_saved_fcolour;
             gui_bcolour = mark_saved_bcolour;
             mark_lcd_reverse = 0;
@@ -1361,6 +1373,14 @@ static void fm_draw_field(int x, int y, int width, const char *text, const char 
 {
     char line[STRINGSIZE * 2];
     int n;
+    /* Audio launched from FM uses a producer/consumer double buffer fed by
+     * checkWAVinput().  A full FM redraw can spend tens to hundreds of ms in
+     * filesystem reads, serial blasts and framebuffer paints; if no buffer
+     * refill happens in that window the IRQ replays the same buffer and the
+     * playback stutters at startup.  Pump the audio at every field draw -
+     * this is the lowest-level call site shared by every FM repaint path.   */
+    if (CurrentlyPlaying != P_NOTHING)
+        checkWAVinput();
     if (width <= 0)
         return;
     if (width >= (int)sizeof(line))
@@ -1505,6 +1525,13 @@ static void fm_serial_repaint_ui(fm_panel_t *panels, int active, const char *sta
         int ri = panels[1].top + row;
         const char *left_ansi = FM_ANSI_NORMAL;
         const char *right_ansi = FM_ANSI_NORMAL;
+
+        /* Pump the audio double-buffer: serial PrintString of the full
+         * two-panel UI can take 100+ ms on slow consoles, long enough for
+         * the IRQ to drain the only buffer the file callback primed and
+         * begin replaying it (the audible "warble" at start of playback). */
+        if (CurrentlyPlaying != P_NOTHING)
+            checkWAVinput();
 
         if (Option.Height > 2 || row > 0)
             PrintString("\r\n");
@@ -1690,6 +1717,8 @@ static int fm_build_panel_cache(fm_panel_t *panel, char *errmsg, int errmsglen)
         while ((rc = lfs_dir_read(&lfs, &dir, &info)) > 0)
         {
             int namelen;
+            if (CurrentlyPlaying != P_NOTHING)
+                checkWAVinput();
             if (strcmp(info.name, ".") == 0 || strcmp(info.name, "..") == 0)
                 continue;
             if (!pattern_matching(panel->filter, info.name, 0, 0))
@@ -1725,6 +1754,8 @@ static int fm_build_panel_cache(fm_panel_t *panel, char *errmsg, int errmsglen)
         while (fr == FR_OK && info.fname[0])
         {
             int namelen;
+            if (CurrentlyPlaying != P_NOTHING)
+                checkWAVinput();
             if (strcmp(info.fname, ".") == 0 || strcmp(info.fname, "..") == 0)
             {
                 fr = f_findnext(&dir, &info);
@@ -1794,6 +1825,8 @@ static int fm_build_panel_cache(fm_panel_t *panel, char *errmsg, int errmsglen)
         while ((rc = lfs_dir_read(&lfs, &dir, &info)) > 0)
         {
             fm_entry_t *e;
+            if (CurrentlyPlaying != P_NOTHING)
+                checkWAVinput();
             if (strcmp(info.name, ".") == 0 || strcmp(info.name, "..") == 0)
                 continue;
             if (!pattern_matching(panel->filter, info.name, 0, 0))
@@ -1862,6 +1895,8 @@ static int fm_build_panel_cache(fm_panel_t *panel, char *errmsg, int errmsglen)
         while (fr == FR_OK && info.fname[0])
         {
             fm_entry_t *e;
+            if (CurrentlyPlaying != P_NOTHING)
+                checkWAVinput();
             if (strcmp(info.fname, ".") == 0 || strcmp(info.fname, "..") == 0)
             {
                 fr = f_findnext(&dir, &info);
@@ -2114,7 +2149,15 @@ static int fm_draw_panel_entries(fm_panel_t *panel, int active, int x, int width
         errmsg[0] = 0;
 
     for (row = 0; row < list_rows; row++)
+    {
         fm_draw_field(x, list_top + row, width, "", FM_ANSI_NORMAL, WHITE, BLACK);
+        /* Painting a full panel can take many milliseconds; service the
+         * audio double-buffer so a MOD/WAV/FLAC/MP3 launched from FM does
+         * not underrun and re-play its first buffer until the redraw
+         * completes.                                                       */
+        if (CurrentlyPlaying != P_NOTHING)
+            checkWAVinput();
+    }
 
     if (!fm_build_panel_cache(panel, errmsg, errmsglen))
     {
@@ -2136,6 +2179,8 @@ static int fm_draw_panel_entries(fm_panel_t *panel, int active, int x, int width
                       idx == panel->selected ? (active ? FM_ANSI_ACTIVE : FM_ANSI_INACTIVE) : FM_ANSI_NORMAL,
                       (idx == panel->selected ? BLACK : WHITE),
                       (idx == panel->selected ? (active ? CYAN : WHITE) : BLACK));
+        if (CurrentlyPlaying != P_NOTHING)
+            checkWAVinput();
     }
 
     if (drawn == 0 && panel->count == 0)
@@ -3328,6 +3373,9 @@ static void fm_draw_ui(fm_panel_t *panels, int active, const char *status)
     fm_clamp_panel(&panels[0], list_rows);
     fm_clamp_panel(&panels[1], list_rows);
 
+    if (CurrentlyPlaying != P_NOTHING)
+        checkWAVinput();
+
     fm_serial_repaint_ui(panels, active, status, left_ok, left_err, right_ok, right_err);
 
     fm_skip_serial_output = 1;
@@ -4266,6 +4314,32 @@ fm_relaunch:
     mode_changed = false;
 #endif
 
+    /* Release any per-program memory left behind by a BASIC program that
+     * was launched from FM (RUN-from-FM, F2, or auto-relaunch after END).
+     * The trace-cache slab and OPTION PROFILING counters live on the
+     * BASIC heap and persist across the program-end -> FM-relaunch path
+     * (do_end + longjmp do not wipe the heap).  FM is about to allocate
+     * its own panel/buffer memory; without this cleanup a cached or
+     * profiled program can starve the file manager of user heap.
+     * These calls are safe no-ops when nothing is allocated.            */
+#ifdef CACHE
+    TraceCacheFree();
+#endif
+    ProfilingFree();
+    g_option_profiling = 0;
+
+    /* If the just-finished BASIC program left an off-screen framebuffer
+     * active (FRAMEBUFFER CREATE / WRITE F / WRITE L), do_end does NOT
+     * release it - only ClearRuntime does, and the FM-relaunch path skips
+     * ClearRuntime.  Leaving it active means FM's draw calls (Box, Text,
+     * etc. via DrawRectangle / DrawPixel function pointers) still write
+     * into the off-screen buffer instead of the physical panel, so the
+     * serial console redraws correctly but the screen shows the stale
+     * pre-program contents.  Free the buffers and restore the panel
+     * draw-function pointers before FM repaints.                         */
+    if (FrameBuf != NULL || LayerBuf != NULL)
+        closeframebuffer('A');
+
     if (CurrentLinePtr)
         StandardError(10);
     if (*cmdline)
@@ -4276,9 +4350,18 @@ fm_relaunch:
         int chars_per_line = HRes / gui_font_width;
         if (chars_per_line < 64)
         {
+            /* Clear the framebuffer before switching modes.  Otherwise the
+             * pixels left behind by the just-finished BASIC program get
+             * re-interpreted in the new (higher-res / different-bpp) mode
+             * and appear as garbled blocks until FM finishes its first
+             * full redraw a few milliseconds later.                       */
+            ClearScreen(BLACK);
             DISPLAY_TYPE = SCREENMODE1;
             mode_changed = true;
             ResetDisplay();
+            /* New mode's framebuffer contents are undefined; clear it with
+             * the default background colour ResetDisplay() just restored. */
+            ClearScreen(gui_bcolour);
 #ifdef HDMI
             if (HRes >= 1024)
             {
@@ -5087,8 +5170,17 @@ fm_relaunch:
 #ifdef PICOMITEVGA
     if (mode_changed || font_changed)
     {
+        if (mode_changed && DISPLAY_TYPE != oldmode_local)
+        {
+            /* Clear current-mode framebuffer before switching back so the
+             * leftover FM pixels do not appear as garbage in the restored
+             * mode.                                                        */
+            ClearScreen(BLACK);
+        }
         DISPLAY_TYPE = oldmode_local;
         ResetDisplay();
+        if (mode_changed)
+            ClearScreen(gui_bcolour);
         SetFont(oldfont_local);
         PromptFont = oldfont_local;
     }
@@ -5676,7 +5768,8 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
                     int abs_col = 0;
                     {
                         unsigned char *q = txtp;
-                        while (q > EdBuff && *(q - 1) != '\n') {
+                        while (q > EdBuff && *(q - 1) != '\n')
+                        {
                             abs_col++;
                             q--;
                         }
@@ -5945,6 +6038,13 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
                 }
                 //                            }
                 c = buf[0];
+#ifdef MMBASIC_FM
+                /* Capture the exit key now: the file-write loop below reuses
+                 * `c` as the byte being written and ends with c == NUL, which
+                 * loses the F2 / Ctrl-W "save, exit and run" indication that
+                 * FM relies on after edit() returns.                         */
+                int fm_exit_key = c;
+#endif
                 PrintString("\033[?1000l");        // Tera Term turn off mouse click report in vt200 mode
                 PrintString("\0338\033[2J\033[H"); // vt100 clear screen and home cursor
                 gui_fcolour = GUI_C_NORMAL;
@@ -6056,7 +6156,7 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
                 if (cmdfile == false)
                 {
 #ifdef MMBASIC_FM
-                    fm_edit_wants_run = (c == F2 || c == CTRLKEY('W')) ? 1 : 0;
+                    fm_edit_wants_run = (fm_exit_key == F2 || fm_exit_key == CTRLKEY('W')) ? 1 : 0;
 #endif
                     RestoreContext(false);
                     return;

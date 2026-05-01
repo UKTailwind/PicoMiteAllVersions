@@ -27,7 +27,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 list all
 ************************************************************************************************************************/
 
-#define VERSION "6.03.00B2" // define the version number
+#define VERSION "6.03.00B4" // define the version number
 #define YEAR "2011-2026"    // and the year
 #define YEAR2 "2016-2026"
 #ifdef rp2350

@@ -47,7 +47,7 @@ extern "C"
 #define MAXLOCALVARS 256
 #define MAXVARS (MAXGLOBALVARS + MAXLOCALVARS)
 
-#ifdef HDMI //RP2350 HDMI
+#ifdef HDMI // RP2350 HDMI
 #define MAXMODES 5
 #define MAX_CPU Freq378P
 #define MIN_CPU FreqX
@@ -57,10 +57,10 @@ extern "C"
 #define MagicKey 0x82321F85
 #else
 #define MagicKey 0x12175CED
-#define FLASH_TARGET_OFFSET (976 * 1024)
+#define FLASH_TARGET_OFFSET (992 * 1024)
 #define HEAP_MEMORY_SIZE (164 * 1024)
 #endif
-#else //rp2350 VGA
+#else // rp2350 VGA
 #define MAXMODES 3
 #define MAX_CPU 378000
 #define MIN_CPU 252000
@@ -69,12 +69,11 @@ extern "C"
 #define HEAP_MEMORY_SIZE (168 * 1024)
 #define MagicKey 0x789124B3
 #else
-#define FLASH_TARGET_OFFSET (960 * 1024)
+#define FLASH_TARGET_OFFSET (976 * 1024)
 #define HEAP_MEMORY_SIZE (172 * 1024)
 #define MagicKey 0x42283587
 #endif
 #endif
-
 
 /* RP2040 configuration */
 #else
@@ -198,7 +197,7 @@ extern "C"
 #define MAXLOCALVARS 256
 #define MAXVARS (MAXGLOBALVARS + MAXLOCALVARS)
 #define HEAP_MEMORY_SIZE (252 * 1024)
-#define FLASH_TARGET_OFFSET (1312 * 1024)
+#define FLASH_TARGET_OFFSET (1280 * 1024)
 #else
 #define MagicKey 0x927945E6
 #define MAXSUBFUN 256
@@ -210,7 +209,6 @@ extern "C"
 #endif
 
 #include "lwipopts_examples_common.h"
-
 
 #endif /* PICOMITEWEB */
 
@@ -238,7 +236,7 @@ extern "C"
 #define MagicKey 0x989626B4
 #endif
 
-#else  //RP2040
+#else                     // RP2040
 #define MAXGLOBALVARS 256 // Configurable split
 #define MAXLOCALVARS 240
 #define MAXVARS (MAXGLOBALVARS + MAXLOCALVARS)

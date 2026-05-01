@@ -112,9 +112,9 @@ uint8_t PSRAMpin;
 #endif
 #ifdef PICOMITERP2350
 #include "VGA222.h"
-    const uint8_t kickvga[] = {1, 198, 128, 100, 109, 97, 32, 116, 120, 32, 116, 97, 98, 108,
+    const uint8_t kickvga[] = {1, 54, 198, 128, 100, 109, 97, 32, 116, 120, 32, 116, 97, 98, 108,
                                101, 32, 48, 44, 50, 44, 52, 56, 48, 44, 241, 115, 99, 114, 101, 101, 110, 98, 117, 102,
-                               102, 41, 130, 243, 65, 41, 135, 53, 133, 243, 66, 41, 133, 52, 44, 49, 50, 56, 0, 1, 198,
+                               102, 41, 130, 243, 65, 41, 135, 53, 133, 243, 66, 41, 133, 52, 44, 49, 50, 56, 0, 1, 20, 198,
                                128, 119, 114, 105, 116, 101, 32, 48, 44, 48, 44, 49, 44, 55, 57, 57, 0, 0};
 #endif
 #ifdef PICOMITEVGA
@@ -6243,7 +6243,7 @@ uint32_t testPSRAM(void)
             if (*p == T_NEWLINE)
             {
                 CurrentLinePtr = p;
-                p++; // skip the newline token
+                p += T_NEWLINE_HDR; // skip newline + skip byte
             }
             if (*p == T_LINENBR)
                 p += 3; // step over the line number
@@ -6307,7 +6307,7 @@ uint32_t testPSRAM(void)
                         if (*p == T_NEWLINE)
                         {
                             CurrentLinePtr = p;
-                            p++; // skip the newline token
+                            p += T_NEWLINE_HDR; // skip newline + skip byte
                         }
                         if (*p == T_LINENBR)
                             p += 3; // skip over a line number
@@ -6359,7 +6359,7 @@ uint32_t testPSRAM(void)
                     if (*p == T_NEWLINE)
                     {
                         CurrentLinePtr = p;
-                        p++; // skip the newline token
+                        p += T_NEWLINE_HDR; // skip newline + skip byte
                     }
                     if (*p == T_LINENBR)
                         p += 3; // skip over the line number
@@ -6385,7 +6385,7 @@ uint32_t testPSRAM(void)
             if (*p == T_NEWLINE)
             {
                 CurrentLinePtr = p;
-                p++; // skip the newline token
+                p += T_NEWLINE_HDR; // skip newline + skip byte
             }
             if (*p == T_LINENBR)
                 p += 3; // step over the line number
@@ -6455,7 +6455,7 @@ uint32_t testPSRAM(void)
                         if (*p == T_NEWLINE)
                         {
                             CurrentLinePtr = p;
-                            p++; // skip the newline token
+                            p += T_NEWLINE_HDR; // skip newline + skip byte
                         }
                         if (*p == T_LINENBR)
                             p += 3; // skip over a line number
@@ -6499,7 +6499,7 @@ uint32_t testPSRAM(void)
                     if (*p == T_NEWLINE)
                     {
                         CurrentLinePtr = p;
-                        p++; // skip the newline token
+                        p += T_NEWLINE_HDR; // skip newline + skip byte
                     }
                     if (*p == T_LINENBR)
                         p += 3; // skip over a line number
