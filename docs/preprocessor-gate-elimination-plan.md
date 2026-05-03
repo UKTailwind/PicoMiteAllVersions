@@ -149,16 +149,17 @@ Tree gate count: **361 → 224** (137 eliminated, 38%).
 | E5b — board-profile registry                     | TODO     | —   | —   |
 | E5i — PinDef[] split into per-port pin_tables.c  | DONE     | TBD | TBD |
 | E5j — InitReservedIO ownership untangle          | DONE     | 5   | TBD |
+| E5j-tail — drain remaining InitReservedIO gates  | DONE     | 2   | TBD |
 | E5k — Editor.c (49 sites, 5 flag types)          | TODO     | —   | —   |
 | E6 — finish PicoMite.c (41 remaining)            | TODO     | —   | —   |
 | E7 — argue/resolve any leftovers                 | TODO     | —   | —   |
 | E8 — purity-script enforcement                   | TODO     | —   | —   |
 
-Top remaining offender files (post-E5j sites):
+Top remaining offender files (post-E5j-tail sites):
 
-  Editor.c                                    38
+  Editor.c                                    49
   PicoMite.c                                  29
-  drivers/sd_spi/mmc_stm32.c                  ~10  (InitReservedIO drained; remaining are LCD-clock + USB-keyboard branches)
+  drivers/sd_spi/mmc_stm32.c                  14   (InitReservedIO is fully gate-free; remaining gates live in other functions)
   ports/pico_sdk_common/misc_option_setters.c 15
   AllCommands.h                               11
   drivers/vga_pio/vga_ops.c                   10
