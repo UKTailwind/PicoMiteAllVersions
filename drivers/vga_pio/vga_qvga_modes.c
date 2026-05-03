@@ -122,3 +122,18 @@ void __not_in_flash_func(QVgaCore)(void) {
         }
     }
 }
+
+/* Pure-VGA impl of hal_vga_init_screenmode1_tiles. The RGB121-packed
+ * tile-color arrays are written by hand on this scanout path
+ * (vga_memory.c owns tilefcols/tilebcols). */
+void hal_vga_init_screenmode1_tiles(void) {
+    extern int gui_fcolour, gui_bcolour;
+    int bcolour = RGB121pack(gui_bcolour);
+    int fcolour = RGB121pack(gui_fcolour);
+    for (int x = 0; x < X_TILE; x++) {
+        for (int y = 0; y < Y_TILE; y++) {
+            tilefcols[y * X_TILE + x] = fcolour;
+            tilebcols[y * X_TILE + x] = bcolour;
+        }
+    }
+}

@@ -1505,6 +1505,12 @@ void settiles(void){
     }
 }
 
+/* HDMI port impl of hal_vga_init_screenmode1_tiles — delegate to
+ * settiles() which knows the HDMI tile-buffer layout. */
+void hal_vga_init_screenmode1_tiles(void) {
+    settiles();
+}
+
 
 #ifdef __cplusplus
 }

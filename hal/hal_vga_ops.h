@@ -47,6 +47,11 @@ void hal_vga_ops_retile_for_font(void);
  * non-VGA. */
 void hal_vga_ops_wait_scanline_zero(void);
 
+/* SCREENMODE1 tile-color buffer init. HDMI ports call into the
+ * scanout's settiles(); pure-VGA ports do an RGB121-tile-color loop
+ * over X_TILE x Y_TILE tilefcols/tilebcols arrays. */
+void hal_vga_init_screenmode1_tiles(void);
+
 /* ReadBuffer16 / ReadBuffer16Fast / Read sprite-blit helpers: VGA can
  * have a LayerBuf sitting above DisplayBuf, and when `mergedread` is
  * set (BMP-save code paths), reads at layer-pixel positions should

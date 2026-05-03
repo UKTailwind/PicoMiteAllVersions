@@ -598,7 +598,8 @@ void fun_getscanline(void) {
 }
 #endif
 
-#if HAL_PORT_IS_VGA
+/* This file is linked only on VGA-family ports (where HAL_PORT_IS_VGA=1),
+ * so the gate is always-true. Dropped. */
 void cmd_colourmap(void){
     long long int *cptr=NULL, *fptr=NULL;
     MMFLOAT *cfptr=NULL, *ffptr=NULL;
@@ -633,9 +634,7 @@ void cmd_colourmap(void){
         else fptr[i]=map[in];
     }
 }
-#endif
 
-#if HAL_PORT_IS_VGA
 void fun_map(void){
 	int cl=getint(ep,0,255);
     switch(DISPLAY_TYPE){
@@ -727,24 +726,15 @@ if(DISPLAY_TYPE==SCREENMODE1){
     ytileheight=gui_font_height;
     Y_TILE=VRes/ytileheight;
     if(VRes % ytileheight)Y_TILE++;
-#if HAL_PORT_IS_VGA
-    if(DISPLAY_TYPE==SCREENMODE1/* && WriteBuf==DisplayBuf*/){
+    /* File is VGA-family-only; outer HAL_PORT_IS_VGA gate dropped.
+     * The HDMI vs non-HDMI tile-init split is handled by a HAL hook
+     * — settiles() is real on HDMI ports (drivers/hdmi/) and a stub
+     * on pure-VGA ports that does the RGB121-tile-color loop. */
+    if(DISPLAY_TYPE==SCREENMODE1) {
         gui_fcolour=Option.DefaultFC;
         gui_bcolour=Option.DefaultBC;
-#if HAL_PORT_HAS_HDMI
-        settiles();
-#else
-        int bcolour = RGB121pack(gui_bcolour);
-        int fcolour = RGB121pack(gui_fcolour);
-        for(int x=0;x<X_TILE;x++){
-            for(int y=0;y<Y_TILE;y++){
-                tilefcols[y*X_TILE+x]=fcolour;
-                tilebcols[y*X_TILE+x]=bcolour;
-            } 
-        }
-#endif
+        hal_vga_init_screenmode1_tiles();
     }
-#endif
 }
 
     hal_keyboard_clear_repeat_state();
@@ -755,4 +745,3 @@ void cmd_mode(void){
     int mode =getint(cmdline,1,MAXMODES);
     setmode(mode, true);
 }
-#endif
