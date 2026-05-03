@@ -11,21 +11,16 @@
 #include "Hardware_Includes.h"
 #include "port_config.h"
 #include "hal/hal_vga_ops.h"
+#include "hal/hal_editor_console.h"
 
 /* Declared in Draw.c unconditionally; only PICOMITEVGA ever toggles it
  * true (via BMP-save code paths). */
 extern bool mergedread;
 
-/* VGA palette-remap tables — relocated from Draw.c's
- * `#ifdef PICOMITEVGA` block. HDMI uses 16-bit + 32-bit lookup
- * arrays; non-HDMI QVGA uses a single 8-bit index table. */
-#if HAL_PORT_HAS_HDMI
-uint32_t remap555[256];
-uint32_t remap332[256];
-uint16_t remap256[256];
-#else
-uint8_t remap[256];
-#endif
+/* VGA palette-remap tables now live in the per-port real impl
+ * files: drivers/vga_pio/vga_qvga_modes.c (pure-VGA — `remap[256]`)
+ * and drivers/hdmi/hdmi_scanout.c (HDMI — remap555/remap332/
+ * remap256). The shared vga_ops.c never references them directly. */
 
 /* Size-of-screen-in-bytes scratch used by VGA mode dispatch. */
 int ScreenSize = 0;
@@ -54,35 +49,12 @@ void setframebuffer(void) { }
 int hal_vga_ops_handle_cls(int c) {
     if (!(DISPLAY_TYPE == SCREENMODE1 && WriteBuf == DisplayBuf)) return 0;
     DrawRectangle(0, 0, HRes - 1, VRes - 1, 0);
-#if HAL_PORT_HAS_HDMI
     memset((void *)WriteBuf, 0, ScreenSize);
-    if (FullColour) {
-        uint16_t bcolour = RGB555(c);
-        for (int x = 0; x < X_TILE; x++) {
-            for (int y = 0; y < Y_TILE; y++) {
-                tilefcols[y * X_TILE + x] = RGB555(gui_fcolour);
-                tilebcols[y * X_TILE + x] = bcolour;
-            }
-        }
-    } else {
-        uint8_t bcolour = RGB332(c);
-        for (int x = 0; x < X_TILE; x++) {
-            for (int y = 0; y < Y_TILE; y++) {
-                tilefcols_w[y * X_TILE + x] = RGB332(gui_fcolour);
-                tilebcols_w[y * X_TILE + x] = bcolour;
-            }
-        }
+    /* hal_editor_tile_paint_rgb hides the FullColour (HDMI) /
+     * RGB121pack (pure VGA) tile-write dispatch. */
+    for (int y = 0; y < Y_TILE; y++) {
+        hal_editor_tile_paint_rgb(0, X_TILE, y, gui_fcolour, c);
     }
-    CurrentX = CurrentY = 0;
-#else
-    memset((void *)WriteBuf, 0, ScreenSize);
-    for (int x = 0; x < X_TILE; x++) {
-        for (int y = 0; y < Y_TILE; y++) {
-            tilefcols[y * X_TILE + x] = RGB121pack(gui_fcolour);
-            tilebcols[y * X_TILE + x] = RGB121pack(c);
-        }
-    }
-#endif
     return 1;
 }
 
@@ -104,7 +76,11 @@ int hal_vga_ops_handle_layer_clear(void) {
         memset((void *)WriteBuf, colourv, HRes * VRes / 2);
         return 1;
     }
-#if HAL_PORT_HAS_HDMI
+    /* SCREENMODE4 / SCREENMODE5 are HDMI-only screen modes — the
+     * pure-VGA OPTION setter rejects them, so on pure-VGA ports
+     * Option.DISPLAY_TYPE never matches and these blocks are dead
+     * code. Keep them unconditional and let runtime guards do the
+     * work. */
     if (WriteBuf == LayerBuf && DISPLAY_TYPE == SCREENMODE5 && LayerBuf != DisplayBuf) {
         memset((void *)WriteBuf, transparent, HRes * VRes);
         return 1;
@@ -114,7 +90,6 @@ int hal_vga_ops_handle_layer_clear(void) {
         for (int i = 0; i < HRes * VRes; i++) *p++ = RGBtransparent;
         return 1;
     }
-#endif
     return 0;
 }
 
@@ -140,43 +115,27 @@ void hal_vga_ops_tile_colour(int x, int y, int *front, int *back) {
 void hal_vga_ops_scroll_tile_colours(int lines) {
     int ya = ytileheight;
     if (lines == 0) return;
-    if (lines > 0) {
-        if ((lines % ya) != 0) return;
-        int offset = lines / ya;
+    int up = (lines > 0);
+    if (!up) lines = -lines;
+    if ((lines % ya) != 0) return;
+    int offset = lines / ya;
+    /* Per-tile read+write through the editor_console hooks hides the
+     * FullColour (HDMI 16-bit / 8-bit) vs pure-VGA (RGB121-packed
+     * 16-bit) array dispatch. */
+    if (up) {
         for (int y = 0; y < Y_TILE - offset; y++) {
-            int d = y * X_TILE, s = (y + offset) * X_TILE;
             for (int x = 0; x < X_TILE; x++) {
-#if HAL_PORT_HAS_HDMI
-                if (FullColour) {
-#endif
-                    tilefcols[d + x] = tilefcols[s + x];
-                    tilebcols[d + x] = tilebcols[s + x];
-#if HAL_PORT_HAS_HDMI
-                } else {
-                    tilefcols_w[d + x] = tilefcols_w[s + x];
-                    tilebcols_w[d + x] = tilebcols_w[s + x];
-                }
-#endif
+                uint16_t fc, bc;
+                hal_editor_tile_save(x, y + offset, &fc, &bc);
+                hal_editor_tile_paint_saved(x, x + 1, y, fc, bc);
             }
         }
     } else {
-        lines = -lines;
-        if ((lines % ya) != 0) return;
-        int offset = lines / ya;
         for (int y = Y_TILE - 1; y >= offset; y--) {
-            int d = y * X_TILE, s = (y - offset) * X_TILE;
             for (int x = 0; x < X_TILE; x++) {
-#if HAL_PORT_HAS_HDMI
-                if (FullColour) {
-#endif
-                    tilefcols[d + x] = tilefcols[s + x];
-                    tilebcols[d + x] = tilebcols[s + x];
-#if HAL_PORT_HAS_HDMI
-                } else {
-                    tilefcols_w[d + x] = tilefcols_w[s + x];
-                    tilebcols_w[d + x] = tilebcols_w[s + x];
-                }
-#endif
+                uint16_t fc, bc;
+                hal_editor_tile_save(x, y - offset, &fc, &bc);
+                hal_editor_tile_paint_saved(x, x + 1, y, fc, bc);
             }
         }
     }
@@ -193,32 +152,11 @@ void hal_vga_ops_fb2_fill_tile_colours(int x1, int y1, int w_px, int h_px, int f
     const int ya = ytileheight;
     int xt = x1 / xa, yt = y1 / ya;
     int w = w_px / xa, h = h_px / ya;
-    int fcolour, bcolour;
-#if HAL_PORT_HAS_HDMI
-    fcolour = FullColour ? RGB555(fc) : RGB332(fc);
-    bcolour = FullColour ? RGB555(bc) : RGB332(bc);
-    if (FullColour) {
-        for (int yy = yt; yy < yt + h; yy++)
-            for (int xx = xt; xx < xt + w; xx++) {
-                tilefcols[yy * X_TILE + xx] = (uint16_t)fcolour;
-                tilebcols[yy * X_TILE + xx] = (uint16_t)bcolour;
-            }
-    } else {
-        for (int yy = yt; yy < yt + h; yy++)
-            for (int xx = xt; xx < xt + w; xx++) {
-                tilefcols_w[yy * X_TILE + xx] = (uint8_t)fcolour;
-                tilebcols_w[yy * X_TILE + xx] = (uint8_t)bcolour;
-            }
+    /* hal_editor_tile_paint_rgb dispatches per port (RGB121pack on
+     * pure VGA; FullColour-aware RGB555/RGB332 on HDMI). */
+    for (int yy = yt; yy < yt + h; yy++) {
+        hal_editor_tile_paint_rgb(xt, xt + w, yy, fc, bc);
     }
-#else
-    fcolour = RGB121pack(fc);
-    bcolour = RGB121pack(bc);
-    for (int yy = yt; yy < yt + h; yy++)
-        for (int xx = xt; xx < xt + w; xx++) {
-            tilefcols[yy * X_TILE + xx] = (uint16_t)fcolour;
-            tilebcols[yy * X_TILE + xx] = (uint16_t)bcolour;
-        }
-#endif
 }
 
 volatile unsigned char *hal_vga_ops_fb_n_target(void) {
@@ -254,32 +192,20 @@ uint8_t hal_vga_ops_layer_merge_rgb8(uint8_t primary, int x, int y) {
  * drivers/spi_lcd/spi_lcd.c. */
 void Display_Refresh(void) { }
 
-void hal_vga_ops_wait_scanline_zero(void) {
-#if HAL_PORT_HAS_HDMI
-    extern volatile int32_t v_scanline;
-    while (v_scanline != 0) { }
-#else
-    extern volatile int QVgaScanLine;
-    while (QVgaScanLine != 0) { }
-#endif
-}
+/* hal_vga_ops_wait_scanline_zero impl moved to per-port files:
+ * vga_qvga_modes.c (pure-VGA — spins on QVgaScanLine) and
+ * hdmi_scanout.c (HDMI — spins on v_scanline). */
 
 void hal_vga_ops_retile_for_font(void) {
     if (!(gui_font_height >= 8 && (gui_font_width % 8) == 0)) return;
     ytileheight = gui_font_height;
     Y_TILE = (VRes + ytileheight - 1) / ytileheight;
-    for (int i = 0; i < X_TILE * Y_TILE; i++) {
-#if defined(rp2350) && HAL_PORT_HAS_HDMI
-        if (FullColour) {
-            tilefcols[i] = tilefcols[0];
-            tilebcols[i] = tilebcols[0];
-        } else {
-            tilefcols_w[i] = tilefcols_w[0];
-            tilebcols_w[i] = tilebcols_w[0];
-        }
-#else
-        tilefcols[i] = tilefcols[0];
-        tilebcols[i] = tilebcols[0];
-#endif
+    /* Replicate tile [0,0]'s fg/bg across the new grid. The editor
+     * tile hooks dispatch the correct array (FullColour on HDMI vs
+     * RGB121pack on pure VGA). */
+    uint16_t fc, bc;
+    hal_editor_tile_save(0, 0, &fc, &bc);
+    for (int y = 0; y < Y_TILE; y++) {
+        hal_editor_tile_paint_saved(0, X_TILE, y, fc, bc);
     }
 }

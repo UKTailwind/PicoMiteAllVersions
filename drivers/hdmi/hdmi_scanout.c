@@ -24,6 +24,7 @@ extern "C" {
 #endif
 
 #include <stdio.h>
+#include <stdint.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
@@ -57,6 +58,13 @@ extern "C" {
 #include "bytecode.h"
 
 extern int vgaloop1, vgaloop2, vgaloop4, vgaloop8, vgaloop16, vgaloop32;
+
+/* HDMI palette-remap tables — RGB555 16-entry, RGB332 16-entry, and
+ * RGB555 256-entry indirections. Pure-VGA ports define their own
+ * 8-bit remap[256] in vga_qvga_modes.c. */
+uint32_t remap555[256];
+uint32_t remap332[256];
+uint16_t remap256[256];
 
 extern uint16_t HDMIlines[2][800];
 // DVI constants
@@ -1595,6 +1603,12 @@ int hal_vga_setmode_select_alt_font(int display_type) {
 /* HDMI scanout uses the HSTX peripheral, not GP-pin RGB121 PIO, so
  * there is no GPIO state to recover after a soft reset. */
 void hal_vga_ops_reserved_io_recovery(void) { }
+
+/* Wait for the HDMI scanout's vertical-line counter to wrap so
+ * tile-buffer writes don't tear visibly. */
+void hal_vga_ops_wait_scanline_zero(void) {
+    while (v_scanline != 0) { }
+}
 
 /* HDMI fun_getscanline impl — per-CPU_Speed offset against the
  * v_scanline counter. */

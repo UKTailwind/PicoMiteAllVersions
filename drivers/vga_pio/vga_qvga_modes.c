@@ -16,7 +16,8 @@
 #include "hardware/dma.h"
 
 extern volatile int QVgaScanLine;
-extern uint8_t remap[256];
+/* Pure-VGA palette-remap table (RGB121 16-entry indirection). */
+uint8_t remap[256];
 extern const int CMM1map[16];
 extern void QVgaInit(void);
 
@@ -183,4 +184,10 @@ int hal_vga_setmode_select_alt_font(int display_type) {
  * no-op there. */
 void hal_vga_ops_reserved_io_recovery(void) {
     VGArecovery(0);
+}
+
+/* Wait for the pure-VGA QVGA scanout to reach the top of frame so
+ * tile-buffer writes can land between displayed scanlines. */
+void hal_vga_ops_wait_scanline_zero(void) {
+    while (QVgaScanLine != 0) { }
 }
