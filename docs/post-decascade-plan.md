@@ -93,6 +93,27 @@ What's still wrong (the audit's findings):
 Each stage independently committable, leaving `buildall.sh` green at
 every step.
 
+### Status (2026-05-02)
+
+| Stage | Subject | Status | Commit |
+|---|---|---|---|
+| P1 | `struct option_s` layout independence | DONE | `8789d29` |
+| P2 | `PICOMITEVGA` → `HAL_PORT_IS_VGA` (+ allies) | DONE | `d761d2d` |
+| P3 | `PICOMITE` → `HAL_PORT_HAS_PICOMITE` (+ GUICONTROLS HAL) | DONE | `4b62a1f` |
+| P4 | `USBKEYBOARD` → `HAL_PORT_HAS_USB_KEYBOARD` | DONE | `eb629c9` |
+| P5 | `PICOCALC` → `HAL_PORT_HAS_I2C_KEYPAD` | DONE | `ea74496` |
+| P6 | `PORT` replaces `COMPILE` as the canonical selector | DONE | `5695f85` |
+| P7 | Docs + buildall.sh accept direct `-DPORT` names | DONE | `8f9cfb0` |
+| P8 | Specify the `port_*()` HAL contract | TODO | — |
+| P9 | Validation matrix (novel feature combinations) | partial | F1 + F2 |
+
+P9 is partial: F1 (`dvi_wifi_rp2350` — HDMI + WiFi + USB-host kbd +
+I²S + PSRAM) and F2 (`vga_wifi_rp2350` — VGA-PIO + WiFi) already
+validate two of the three combinations the plan calls for. The
+third (SPI-LCD + WiFi + USB-host keyboard) hasn't been tried yet
+but the F1/F2 ports prove the per-port composition machinery works
+in practice.
+
 ### Stage P1 — `struct option_s` layout independence
 
 The single most dangerous coupling — a wrong feature combination
