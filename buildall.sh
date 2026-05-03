@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
-# Build every device CMake COMPILE variant from clean dirs.
-# Any failure stops the script — green across all targets is the gate.
+# Build every device target from clean dirs. Any failure stops the
+# script — green across all targets is the gate.
+#
+# Two target-name conventions:
+#   - UPPERCASE entries (PICO, HDMIUSB, ...) are legacy COMPILE values.
+#     buildall passes them as -DCOMPILE=<NAME>; CMakeLists.txt's shim
+#     resolves them to the matching ports/<dir>.
+#   - lowercase entries (e.g. mymite, my_board_v2) are direct port
+#     directory names. buildall passes them as -DPORT=<dir>.
+# New single-board ports should use the lowercase form.
 #
 # PICOCALC is only enabled for the default PICO target (the PicoCalc board).
 # All other targets build as standard PicoMite variants.
@@ -39,7 +47,14 @@ for t in "${TARGETS[@]}"; do
         picocalc_flag="true"
     fi
 
-    if ! (cd "$d" && cmake -DCOMPILE="$t" -DPICOCALC="$picocalc_flag" "$root" > cmake.log 2>&1 && make -j8 > make.log 2>&1); then
+    # Uppercase target → legacy -DCOMPILE; lowercase → direct -DPORT.
+    if [[ "$t" =~ ^[A-Z0-9_]+$ ]]; then
+        select_arg="-DCOMPILE=$t"
+    else
+        select_arg="-DPORT=$t"
+    fi
+
+    if ! (cd "$d" && cmake "$select_arg" -DPICOCALC="$picocalc_flag" "$root" > cmake.log 2>&1 && make -j8 > make.log 2>&1); then
         printf 'FAIL (%s)\n' "$t"
         tail -30 "$d/make.log" || true
         fail=1

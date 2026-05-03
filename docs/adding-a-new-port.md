@@ -169,9 +169,9 @@ ifdefs at all.
 Each port directory ships a `port_sources.cmake` snippet that owns the
 source list AND the per-port build config (compile flags, link
 libraries, SDK feature toggles). Top-level `CMakeLists.txt` includes
-exactly one snippet per build via a small `COMPILE → PORT_DIR` map. You
-do **not** edit a central driver-selection ladder anymore — there isn't
-one.
+exactly one snippet per build — `include(${CMAKE_SOURCE_DIR}/ports/${PORT}/port_sources.cmake)`,
+where `PORT` is the directory name. You do **not** edit a central
+driver-selection ladder anymore — there isn't one.
 
 Copy the closest existing snippet (`ports/pico/port_sources.cmake` for
 RP2040 SPI-LCD, `ports/hdmi_rp2350/port_sources.cmake` for an
@@ -194,14 +194,14 @@ WiFi-family board) and adjust two sections:
 2. **Per-port build config** — at the bottom of the snippet, add the
    `target_compile_options`, `target_link_libraries`, and SDK feature
    toggles your board needs:
-     - `-DPICOMITE` / `-DPICOMITEVGA` (still consulted by core for the
-       PicoMite-vs-VGA-vs-WEB dialect axis until that decascade lands)
      - `-DPICO_HEAP_SIZE=…` and `-DPICO_CORE0_STACK_SIZE=…`
      - `-Drp2350` (rp2350 ports only)
      - `-DHAL_PORT_DEVICE_NAME="…"`
-     - USB-keyboard axis: `-DUSBKEYBOARD` + `tinyusb_host` /
-       `tinyusb_board` linkage + `Pico_enable_stdio_usb(PicoMite 0)`,
-       OR `Pico_enable_stdio_usb(PicoMite 1)` for non-USB
+     - USB-host keyboard: set `HAL_PORT_HAS_USB_KEYBOARD 1` in
+       `port_config.h`, link `tinyusb_host` + `tinyusb_board`,
+       `Pico_enable_stdio_usb(PicoMite 0)`. PS/2 ports leave
+       `HAL_PORT_HAS_USB_KEYBOARD 0` and call
+       `Pico_enable_stdio_usb(PicoMite 1)`.
      - `target_link_libraries(PicoMite pico_multicore)` (most ports
        except WEBRP2350)
      - `target_link_libraries(PicoMite pico_cyw43_arch_lwip_poll)`
@@ -209,18 +209,19 @@ WiFi-family board) and adjust two sections:
      - `pico_set_float_implementation(PicoMite pico_dcp)` (rp2350)
      - `pico_define_boot_stage2(slower_boot2 …)` (rp2040)
 
-Then add your port's name to the COMPILE → PORT_DIR map at the top of
-CMakeLists.txt:
+No top-level edit is needed for new ports — `cmake -DPORT=<your_board>`
+picks up `ports/<your_board>/port_sources.cmake` directly. Only the
+chip-platform / `PICO_BOARD` lookup at the top of `CMakeLists.txt`
+needs an entry if your board uses a non-default platform or board
+file (see Step 3 in the worked example).
 
-```cmake
-elseif (COMPILE STREQUAL "<YOURPORT>")
-    set(PORT_DIR <your_board>)
-```
+The legacy `-DCOMPILE=<TARGET>` enum still works for the historical
+ports (PICO, HDMIUSB, etc.) via a backwards-compat shim in
+`CMakeLists.txt`, but new ports should pass `-DPORT=<dir>` directly
+and not extend the COMPILE→PORT inference table.
 
-That's the only edit to the top-level file.
-
-Finally add your target name to `buildall.sh` under `TARGETS=(...)` so
-the local + CI buildall gate exercises it.
+Finally add your port's directory name to `buildall.sh` under
+`TARGETS=(...)` so the local + CI buildall gate exercises it.
 
 ## Step A5 — acceptance
 
@@ -282,41 +283,37 @@ and copy in:
   CYW43 + lwIP buffers (HDMI alone uses 184 KB; with WiFi added,
   ~120 KB fits cleanly on RP2350's 520 KB SRAM)
 
-### Step 2 — pick a COMPILE name
+### Step 2 — pick a port-directory name
 
-Convention is uppercase-no-underscore: `MYMITE`. This is what users
-pass to `cmake -DCOMPILE=MYMITE` and what appears in `buildall.sh`'s
-TARGETS list. (After Stage E2e collapses the COMPILE enum, the name
-will simply be `mymite` — same as the directory.)
+Convention is lowercase snake_case: `mymite`. This is the directory
+name under `ports/`, the value users pass to `cmake -DPORT=mymite`,
+and what appears in `buildall.sh`'s TARGETS list.
 
-### Step 3 — wire `mymite` into the COMPILE → PORT_DIR map
+### Step 3 — wire `mymite` into the platform/board lookup
 
-`CMakeLists.txt` has a single map at ~line 195:
+`CMakeLists.txt` has a per-port platform/board lookup near the top.
+You only need to extend it if your board is on RP2350 and uses a
+different `PICO_BOARD` than the default `pimoroni_pga2350`:
 
 ```cmake
-elseif (COMPILE STREQUAL "HDMI" OR COMPILE STREQUAL "HDMIUSB")
-    set(PORT_DIR hdmi_rp2350)
-elseif (COMPILE STREQUAL "VGAWIFIRP2350")
-    set(PORT_DIR vga_wifi_rp2350)
-+ elseif (COMPILE STREQUAL "MYMITE")
-+     set(PORT_DIR mymite)
+set(_RP2350_PORTS pico_rp2350 vga_rp2350 web_rp2350 hdmi_rp2350
+                  vga_wifi_rp2350 dvi_wifi_rp2350 mymite)   # add yours
+
+if (PORT IN_LIST _RP2350_PORTS)
+    set(PICO_PLATFORM rp2350)
+    if (PORT STREQUAL "web_rp2350" OR PORT STREQUAL "vga_wifi_rp2350")
+        set(PICO_BOARD pico2_w)
+    elseif (PORT STREQUAL "mymite")                       # your branch
+        set(PICO_BOARD pimoroni_pico_plus2_w_rp2350)      # if RP2350B + CYW43
+    else()
+        set(PICO_BOARD pimoroni_pga2350)                  # default RP2350B + no CYW43
+    endif()
 endif()
 ```
 
-**Also add `MYMITE` to the rp2350-platform branch and the board branch**
-at the top of CMakeLists.txt:
-
-```cmake
-if (COMPILE STREQUAL "HDMI" OR ... OR COMPILE STREQUAL "MYMITE" )
-    set(PICO_PLATFORM rp2350)
-    if (COMPILE STREQUAL "WEBRP2350" OR COMPILE STREQUAL "VGAWIFIRP2350")
-        set(PICO_BOARD pico2_w)
-    elseif (COMPILE STREQUAL "MYMITE_WIFI_VARIANT")
-        set(PICO_BOARD pimoroni_pico_plus2_w_rp2350)   # if RP2350B + CYW43
-    else()
-        set(PICO_BOARD pimoroni_pga2350)               # if RP2350B + no CYW43
-    endif()
-```
+If your board uses the default `pimoroni_pga2350` (RP2350B no CYW43),
+just add the directory name to `_RP2350_PORTS` and you're done — no
+elseif branch needed.
 
 **Picking the right `PICO_BOARD`** (this is critical and undermentioned
 elsewhere — pico-sdk uses the board file to define chip variant,
@@ -484,23 +481,36 @@ upng_sprite + gfx_3d + gui_touch_stub + ...). You only need to:
 Everything else — `pico_multicore` linkage, `pico_set_float_implementation`,
 the `-Drp2350` flag, USB stdio config — stays the same.
 
-### Step 8 — add `MYMITE` to `buildall.sh`
+### Step 8 — add `mymite` to `buildall.sh`
+
+`buildall.sh` still drives `cmake -DCOMPILE=…` for the historical
+multi-board targets, so the TARGETS list is uppercase. Single-board
+new ports get added the same way (the COMPILE→PORT inference shim in
+`CMakeLists.txt` falls through to a `FATAL_ERROR`, so for a new port
+you instead want buildall.sh to call `-DPORT=mymite` directly).
+
+A simple way: add a small branch in buildall.sh that handles new
+single-board PORTs separately, or extend buildall.sh's invocation to
+prefer `-DPORT` when the target name doesn't match a legacy COMPILE
+value. Either way add the directory-style name to TARGETS:
 
 ```bash
 TARGETS=(
     PICO PICOUSB VGA VGAUSB WEB
     PICORP2350 PICOUSBRP2350 VGARP2350 VGAUSBRP2350
     HDMI HDMIUSB WEBRP2350
-    VGAWIFIRP2350
-+   MYMITE
+    VGAWIFIRP2350 DVIWIFIRP2350
++   mymite
 )
 ```
 
 ### Step 9 — first build
 
+Direct `-DPORT` invocation (preferred for new single-board ports):
+
 ```bash
 mkdir build_mymite && cd build_mymite
-cmake -DCOMPILE=MYMITE -DPICOCALC=false -DPICO_SDK_PATH="$HOME/pico/pico-sdk" ..
+cmake -DPORT=mymite -DPICOCALC=false -DPICO_SDK_PATH="$HOME/pico/pico-sdk" ..
 make -j8
 ```
 
