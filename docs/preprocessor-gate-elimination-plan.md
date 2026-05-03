@@ -156,13 +156,23 @@ Tree gate count: **361 → 224** (137 eliminated, 38%).
 | E6 batch 2 — PicoMite.c boot display + CPU speed | DONE     | 3   | TBD |
 | E6 batch 3 — vga_ops.c HDMI tile dispatch        | DONE     | 10  | TBD |
 | E6 batch 4 — mmc_stm32.c CS / PS2 / pinsearch    | DONE     | 9   | TBD |
+| E6 batch 5 — WebConnect + NEXTGEN drain          | DONE     | 2   | TBD |
 | E6 — finish PicoMite.c (41 remaining)            | TODO     | —   | —   |
 | E7 — argue/resolve any leftovers                 | TODO     | —   | —   |
 | E8 — purity-script enforcement                   | TODO     | —   | —   |
 
-Top remaining offender files (post-E6 batch 4):
+Top remaining offender files (post-E6 batch 5):
 
-  PicoMite.c                                  23
+  PicoMite.c                                  21   (most of remaining
+                                                    are the embedded
+                                                    QVGA scanout core
+                                                    L907–L1463 + the
+                                                    HDMI core1 launch
+                                                    + HSTX clock; need
+                                                    file-relocation to
+                                                    drivers/vga_pio/ +
+                                                    drivers/hdmi/ to
+                                                    drain further)
   ports/pico_sdk_common/misc_option_setters.c 15
   AllCommands.h                               11
   Hardware_Includes.h                          9
