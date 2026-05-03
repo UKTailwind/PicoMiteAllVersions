@@ -1511,43 +1511,9 @@ void MIPS16 updatebootcount(void){
  *   *foo --wom="bat"  =>  RUN "foo", "--wom=" + Chr$(34) + "bat" + Chr$(34)
  */
 
-#if HAL_PORT_HAS_WIFI
-void WebConnect(void){
-    if(*Option.SSID){
-        if(*Option.ipaddress){
-            cyw43_arch_enable_sta_mode();
-            dhcp_stop(cyw43_state.netif);
-            ip4_addr_t ipaddr, gateway, mask;
-            ip4addr_aton(Option.ipaddress, &ipaddr);
-            ip4addr_aton(Option.gateway, &gateway);
-            ip4addr_aton(Option.mask, &mask);
-            netif_set_addr( cyw43_state.netif,&ipaddr,&mask,&gateway);
-        } else cyw43_arch_enable_sta_mode();
-        if(*Option.hostname){
-            MMPrintString(Option.hostname);
-            netif_set_hostname(cyw43_state.netif, Option.hostname);
-        }
-        cyw43_wifi_pm(&cyw43_state, CYW43_NO_POWERSAVE_MODE);        
-        MMPrintString(" connecting to WiFi...\r\n");
-        if (cyw43_arch_wifi_connect_timeout_ms((char *)Option.SSID, (char *)(*Option.PASSWORD ? Option.PASSWORD : NULL), (*Option.PASSWORD ? CYW43_AUTH_WPA2_AES_PSK : CYW43_AUTH_OPEN), 30000)) {
-            MMPrintString("failed to connect.\r\n");
-            WIFIconnected=0;
-        } else {
-            char buff[STRINGSIZE]={0};
-            sprintf(buff,"Connected %s\r\n",ip4addr_ntoa(netif_ip4_addr(netif_list)));
-            MMPrintString(buff);
-            WIFIconnected=1;
-            open_tcp_server();
-            if(!Option.disabletftp)cmd_tftp_server_init();
-            if(Option.UDP_PORT)open_udp_server();
-        }
-    } else {
-        cyw43_arch_enable_sta_mode();
-        cyw43_wifi_pm(&cyw43_state, CYW43_NO_POWERSAVE_MODE);        
-    }
-    cyw43_wifi_pm(&cyw43_state, CYW43_DEFAULT_PM & ~0xf);
-}
-#endif
+/* WebConnect body relocated to MMsetwifi.c (WiFi ports) +
+ * MMweb_stubs.c (non-WiFi). Hardware_Includes.h declares the symbol
+ * unconditionally so call sites stay clean. */
 
 int MIPS16 main(){
     int i=0;
@@ -1688,13 +1654,15 @@ int MIPS16 main(){
 #ifndef rp2350
     if(Option.CPU_Speed<=200000)modclock(2);
 #else
-#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
-    if(Option.DISPLAY_TYPE>=NEXTGEN){ //adjust the size of the heap
-        framebuffersize=display_details[Option.DISPLAY_TYPE].horizontal*display_details[Option.DISPLAY_TYPE].vertical;
-        heap_memory_size-=framebuffersize;
-        FRAMEBUFFER=AllMemory+heap_memory_size+256;
+    /* NEXTGEN displays are MEM332-family SPI-LCD with shadow
+     * framebuffer; the runtime guard `Option.DISPLAY_TYPE >= NEXTGEN`
+     * is dead on ports whose OPTION setter rejects those values. */
+    if (Option.DISPLAY_TYPE >= NEXTGEN) {
+        framebuffersize = display_details[Option.DISPLAY_TYPE].horizontal *
+                          display_details[Option.DISPLAY_TYPE].vertical;
+        heap_memory_size -= framebuffersize;
+        FRAMEBUFFER = AllMemory + heap_memory_size + 256;
     }
-#endif
 #if HAL_PORT_HAS_HDMI
     if((FullColour || MediumRes) && !(Option.CPU_Speed==FreqX)){
         clock_configure(

@@ -289,9 +289,11 @@ extern void tcp_realloc_recv_buffers(void);
 #if HAL_PORT_HAS_WIFI
 	extern volatile int WIFIconnected;
 	extern volatile int scantimer;
-	extern void WebConnect(void);
 	extern void close_tcpclient(void);
 #endif
+/* WebConnect lives in MMsetwifi.c on WiFi ports and is stubbed in
+ * MMweb_stubs.c on non-WiFi devices, so the prototype is uniform. */
+extern void WebConnect(void);
 /* startupcomplete is always defined: WEB sets it true when the wifi
  * stack finishes initialising; non-WEB (including host) stub it to 0
  * in MMweb_stubs.c / host_peripheral_stubs.c. */

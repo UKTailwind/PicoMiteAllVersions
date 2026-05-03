@@ -15,6 +15,7 @@
 void closeMQTT(void) {}
 void ProcessWeb(int mode) { (void)mode; }
 void TelnetPutC(int c, int flush) { (void)c; (void)flush; }
+void WebConnect(void) {}
 
 /* Whether the WiFi telnet client is configured (Option.Telnet != -1).
  * Real impl on WiFi ports lives in MMtelnet.c; stub returns 1 on
