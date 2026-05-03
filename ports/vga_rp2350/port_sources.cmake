@@ -40,10 +40,12 @@ target_sources(PicoMite PRIVATE
 if (COMPILE STREQUAL "VGAUSBRP2350")
     target_sources(PicoMite PRIVATE
         ${CMAKE_SOURCE_DIR}/drivers/usb_host_kbd/USBKeyboard.c
+        ${CMAKE_SOURCE_DIR}/drivers/usb_host_kbd/hal_keyboard_usb.c
     )
 else()
     target_sources(PicoMite PRIVATE
         ${CMAKE_SOURCE_DIR}/drivers/ps2_matrix/Keyboard.c
+        ${CMAKE_SOURCE_DIR}/drivers/ps2_matrix/hal_keyboard_ps2.c
         ${CMAKE_SOURCE_DIR}/mouse.c
     )
 endif()

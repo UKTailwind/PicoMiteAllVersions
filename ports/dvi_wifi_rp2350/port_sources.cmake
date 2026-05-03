@@ -72,6 +72,7 @@ target_sources(PicoMite PRIVATE
     # per the pico_stretch board file) or use the HDMI display +
     # local USB keyboard with no remote terminal.
     ${CMAKE_SOURCE_DIR}/drivers/usb_host_kbd/USBKeyboard.c
+        ${CMAKE_SOURCE_DIR}/drivers/usb_host_kbd/hal_keyboard_usb.c
 )
 
 set_source_files_properties(${CMAKE_SOURCE_DIR}/cJSON.c PROPERTIES COMPILE_FLAGS -Os)

@@ -172,7 +172,10 @@ set(PICOMITE_PICO_SDK_HAL_SOURCES
 	ports/pico_sdk_common/hal_pin_pico.c
 	ports/pico_sdk_common/hal_storage_pico.c
 	ports/pico_sdk_common/hal_filesystem_pico.c
-	ports/pico_sdk_common/hal_keyboard_pico.c
+	# hal_keyboard_pico.c was a multiplexer; replaced with per-backend
+	# real impls selected by port_sources.cmake below:
+	#   drivers/usb_host_kbd/hal_keyboard_usb.c   (HAL_PORT_HAS_USB_KEYBOARD=1)
+	#   drivers/ps2_matrix/hal_keyboard_ps2.c     (HAL_PORT_HAS_USB_KEYBOARD=0)
 	ports/pico_sdk_common/hal_fast_timer_pico.c
 	ports/pico_sdk_common/psram_cache.c
 	ports/pico_sdk_common/cmd_psram.c

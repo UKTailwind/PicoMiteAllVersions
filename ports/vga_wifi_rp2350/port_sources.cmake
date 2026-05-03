@@ -64,6 +64,7 @@ target_sources(PicoMite PRIVATE
 
     # PS/2 keyboard (no USB variant for this validation port).
     ${CMAKE_SOURCE_DIR}/drivers/ps2_matrix/Keyboard.c
+        ${CMAKE_SOURCE_DIR}/drivers/ps2_matrix/hal_keyboard_ps2.c
     ${CMAKE_SOURCE_DIR}/mouse.c
 )
 
