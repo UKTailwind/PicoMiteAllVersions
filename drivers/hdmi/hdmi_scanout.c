@@ -1592,6 +1592,10 @@ int hal_vga_setmode_select_alt_font(int display_type) {
     return 1;
 }
 
+/* HDMI scanout uses the HSTX peripheral, not GP-pin RGB121 PIO, so
+ * there is no GPIO state to recover after a soft reset. */
+void hal_vga_ops_reserved_io_recovery(void) { }
+
 /* HDMI fun_getscanline impl — per-CPU_Speed offset against the
  * v_scanline counter. */
 void fun_getscanline(void) {

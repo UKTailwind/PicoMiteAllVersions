@@ -78,3 +78,20 @@ void hal_i2c_keypad_apply_spi480_resolution(void) {
     HRes = 320;
     VRes = 480;
 }
+
+/* PicoCalc keypad-matrix pin reservation, called from
+ * InitReservedIO() at boot. Reserves the analogue backlight pin, the
+ * keypad-power digital out, and the 15 matrix-row digital inputs so
+ * the user's BASIC code can't reassign them. Skipped when the user
+ * has disabled the local keyboard. */
+void hal_i2c_keypad_reserve_io(void) {
+    if (!Option.LOCAL_KEYBOARD) return;
+    ExtCfg(PINMAP[47], EXT_ANA_IN, 0);
+    ExtCfg(PINMAP[47], EXT_BOOT_RESERVED, 0);
+    ExtCfg(PINMAP[24], EXT_DIG_OUT, 0);
+    ExtCfg(PINMAP[24], EXT_BOOT_RESERVED, 0);
+    for (int i = 26; i < 41; i++) {
+        ExtCfg(PINMAP[i], EXT_DIG_IN, ODCSET);
+        ExtCfg(PINMAP[i], EXT_BOOT_RESERVED, 0);
+    }
+}

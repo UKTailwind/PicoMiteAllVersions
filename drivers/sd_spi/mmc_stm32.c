@@ -47,6 +47,9 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "hardware/i2c.h"
 #include "hardware/dma.h"
 #include "MM_Misc.h"
+#include "hal/hal_i2c_keypad.h"
+#include "hal/hal_vga_ops.h"
+#include "hal/hal_periph_io.h"
 #if HAL_PORT_HAS_WIFI
 #include "pico/cyw43_arch.h"
 #endif
@@ -1459,100 +1462,19 @@ void InitReservedIO(void) {
 	if(Option.PSRAM_CS_PIN){
 		ExtCfg(Option.PSRAM_CS_PIN, EXT_BOOT_RESERVED, 0);
 	}
-#if HAL_PORT_HAS_PICOMITE
-	if(Option.LOCAL_KEYBOARD){
-		ExtCfg(PINMAP[47],EXT_ANA_IN,0);
-		ExtCfg(PINMAP[47], EXT_BOOT_RESERVED, 0);
-		ExtCfg(PINMAP[24],EXT_DIG_OUT,0);
-		ExtCfg(PINMAP[24], EXT_BOOT_RESERVED, 0);
-//		setpwm(PINMAP[41], &KeyboardlightChannel, &KeyboardlightSlice, 50000.0, Option.KeyboardBrightness);
-		for(int i=26;i<41;i++){
-			ExtCfg(PINMAP[i], EXT_DIG_IN, ODCSET);
-			ExtCfg(PINMAP[i], EXT_BOOT_RESERVED, 0);
-		}
-	}
+	/* PicoCalc keypad-matrix pin reservation. Real on PicoCalc-flavoured
+	 * rp2350 PicoMite (drivers/i2c_picocalc_kbd/i2c_keypad_real.c
+	 * sets HAL_PORT_HAS_I2C_KEYPAD=1); stub no-op elsewhere. */
+	hal_i2c_keypad_reserve_io();
 #endif
-#endif
-#if HAL_PORT_IS_VGA
-#if !HAL_PORT_HAS_HDMI
-	VGArecovery(0);
-#endif
-#else
-	if(Option.DISPLAY_TYPE>=SSDPANEL && Option.DISPLAY_TYPE<VIRTUAL){
-		ExtCfg(SSD1963_DC_PIN, EXT_BOOT_RESERVED, 0);gpio_init(SSD1963_DC_GPPIN);gpio_put(SSD1963_DC_GPPIN,GPIO_PIN_SET);gpio_set_dir(SSD1963_DC_GPPIN, GPIO_OUT);
-		if(Option.SSD_RESET!=-1){
-			ExtCfg(SSD1963_RESET_PIN, EXT_BOOT_RESERVED, 0);gpio_init(SSD1963_RESET_GPPIN);gpio_put(SSD1963_RESET_GPPIN,GPIO_PIN_SET);gpio_set_dir(SSD1963_RESET_GPPIN, GPIO_OUT);
-		}
-		ExtCfg(SSD1963_WR_PIN, EXT_BOOT_RESERVED, 0);gpio_init(SSD1963_WR_GPPIN);gpio_put(SSD1963_WR_GPPIN,GPIO_PIN_SET);gpio_set_dir(SSD1963_WR_GPPIN, GPIO_OUT);
-		ExtCfg(SSD1963_RD_PIN, EXT_BOOT_RESERVED, 0);gpio_init(SSD1963_RD_GPPIN);gpio_put(SSD1963_RD_GPPIN,GPIO_PIN_SET);gpio_set_dir(SSD1963_RD_GPPIN, GPIO_OUT);
-		ExtCfg(SSD1963_DAT1, EXT_BOOT_RESERVED, 0);gpio_init(SSD1963_GPDAT1);gpio_put(SSD1963_GPDAT1,GPIO_PIN_SET);gpio_set_dir(SSD1963_GPDAT1, GPIO_OUT);gpio_set_input_enabled(SSD1963_GPDAT1, true);
-		ExtCfg(SSD1963_DAT2, EXT_BOOT_RESERVED, 0);gpio_init(SSD1963_GPDAT2);gpio_put(SSD1963_GPDAT2,GPIO_PIN_SET);gpio_set_dir(SSD1963_GPDAT2, GPIO_OUT);gpio_set_input_enabled(SSD1963_GPDAT2, true);
-		ExtCfg(SSD1963_DAT3, EXT_BOOT_RESERVED, 0);gpio_init(SSD1963_GPDAT3);gpio_put(SSD1963_GPDAT3,GPIO_PIN_SET);gpio_set_dir(SSD1963_GPDAT3, GPIO_OUT);gpio_set_input_enabled(SSD1963_GPDAT3, true);
-		ExtCfg(SSD1963_DAT4, EXT_BOOT_RESERVED, 0);gpio_init(SSD1963_GPDAT4);gpio_put(SSD1963_GPDAT4,GPIO_PIN_SET);gpio_set_dir(SSD1963_GPDAT4, GPIO_OUT);gpio_set_input_enabled(SSD1963_GPDAT4, true);
-		ExtCfg(SSD1963_DAT5, EXT_BOOT_RESERVED, 0);gpio_init(SSD1963_GPDAT5);gpio_put(SSD1963_GPDAT5,GPIO_PIN_SET);gpio_set_dir(SSD1963_GPDAT5, GPIO_OUT);gpio_set_input_enabled(SSD1963_GPDAT5, true);
-		ExtCfg(SSD1963_DAT6, EXT_BOOT_RESERVED, 0);gpio_init(SSD1963_GPDAT6);gpio_put(SSD1963_GPDAT6,GPIO_PIN_SET);gpio_set_dir(SSD1963_GPDAT6, GPIO_OUT);gpio_set_input_enabled(SSD1963_GPDAT6, true);
-		ExtCfg(SSD1963_DAT7, EXT_BOOT_RESERVED, 0);gpio_init(SSD1963_GPDAT7);gpio_put(SSD1963_GPDAT7,GPIO_PIN_SET);gpio_set_dir(SSD1963_GPDAT7, GPIO_OUT);gpio_set_input_enabled(SSD1963_GPDAT7, true);
-		ExtCfg(SSD1963_DAT8, EXT_BOOT_RESERVED, 0);gpio_init(SSD1963_GPDAT8);gpio_put(SSD1963_GPDAT8,GPIO_PIN_SET);gpio_set_dir(SSD1963_GPDAT8, GPIO_OUT);gpio_set_input_enabled(SSD1963_GPDAT8, true);
-        if(Option.DISPLAY_TYPE>SSD_PANEL_8){
-			ExtCfg(SSD1963_DAT9, EXT_BOOT_RESERVED, 0);gpio_init(SSD1963_GPDAT9);gpio_put(SSD1963_GPDAT9,GPIO_PIN_SET);gpio_set_dir(SSD1963_GPDAT9, GPIO_OUT);gpio_set_input_enabled(SSD1963_GPDAT9, true);
-			ExtCfg(SSD1963_DAT10, EXT_BOOT_RESERVED, 0);gpio_init(SSD1963_GPDAT10);gpio_put(SSD1963_GPDAT10,GPIO_PIN_SET);gpio_set_dir(SSD1963_GPDAT10, GPIO_OUT);gpio_set_input_enabled(SSD1963_GPDAT10, true);
-			ExtCfg(SSD1963_DAT11, EXT_BOOT_RESERVED, 0);gpio_init(SSD1963_GPDAT11);gpio_put(SSD1963_GPDAT11,GPIO_PIN_SET);gpio_set_dir(SSD1963_GPDAT11, GPIO_OUT);gpio_set_input_enabled(SSD1963_GPDAT11, true);
-			ExtCfg(SSD1963_DAT12, EXT_BOOT_RESERVED, 0);gpio_init(SSD1963_GPDAT12);gpio_put(SSD1963_GPDAT12,GPIO_PIN_SET);gpio_set_dir(SSD1963_GPDAT12, GPIO_OUT);gpio_set_input_enabled(SSD1963_GPDAT12, true);
-			ExtCfg(SSD1963_DAT13, EXT_BOOT_RESERVED, 0);gpio_init(SSD1963_GPDAT13);gpio_put(SSD1963_GPDAT13,GPIO_PIN_SET);gpio_set_dir(SSD1963_GPDAT13, GPIO_OUT);gpio_set_input_enabled(SSD1963_GPDAT13, true);
-			ExtCfg(SSD1963_DAT14, EXT_BOOT_RESERVED, 0);gpio_init(SSD1963_GPDAT14);gpio_put(SSD1963_GPDAT14,GPIO_PIN_SET);gpio_set_dir(SSD1963_GPDAT14, GPIO_OUT);gpio_set_input_enabled(SSD1963_GPDAT14, true);
-			ExtCfg(SSD1963_DAT15, EXT_BOOT_RESERVED, 0);gpio_init(SSD1963_GPDAT15);gpio_put(SSD1963_GPDAT15,GPIO_PIN_SET);gpio_set_dir(SSD1963_GPDAT15, GPIO_OUT);gpio_set_input_enabled(SSD1963_GPDAT15, true);
-			ExtCfg(SSD1963_DAT16, EXT_BOOT_RESERVED, 0);gpio_init(SSD1963_GPDAT16);gpio_put(SSD1963_GPDAT16,GPIO_PIN_SET);gpio_set_dir(SSD1963_GPDAT16, GPIO_OUT);gpio_set_input_enabled(SSD1963_GPDAT16, true);
- 		}
-		dobacklight();
-	}
-	if(Option.LCD_CD){
-		ExtCfg(Option.LCD_CD, EXT_BOOT_RESERVED, 0);
-		if(!(Option.DISPLAY_TYPE==ST7920))ExtCfg(Option.LCD_CS, EXT_BOOT_RESERVED, 0);
-		ExtCfg(Option.LCD_Reset, EXT_BOOT_RESERVED, 0);
-		LCD_CD_PIN=PinDef[Option.LCD_CD].GPno;
-		LCD_CS_PIN=PinDef[Option.LCD_CS].GPno;
-		LCD_Reset_PIN=PinDef[Option.LCD_Reset].GPno;
-		gpio_init(LCD_CD_PIN);
-		gpio_put(LCD_CD_PIN,Option.DISPLAY_TYPE!=ST7920 ? GPIO_PIN_SET : GPIO_PIN_RESET);
-		gpio_set_dir(LCD_CD_PIN, GPIO_OUT);
-		gpio_init(LCD_CS_PIN);
-		gpio_set_drive_strength(LCD_CS_PIN,GPIO_DRIVE_STRENGTH_8MA);
-		if(!(Option.DISPLAY_TYPE==ST7920)){
-			gpio_put(LCD_CS_PIN,GPIO_PIN_SET);
-			gpio_set_dir(LCD_CS_PIN, GPIO_OUT);
-		}
-		gpio_init(LCD_Reset_PIN);
-		gpio_put(LCD_Reset_PIN,GPIO_PIN_RESET);
-		gpio_set_dir(LCD_Reset_PIN, GPIO_OUT);
-		CurrentSPISpeed=NONE_SPI_SPEED;
-		dobacklight();
-	}
-	if(Option.TOUCH_CS || Option.TOUCH_IRQ){
-		if(Option.TOUCH_CS){
-			ExtCfg(Option.TOUCH_CS, EXT_BOOT_RESERVED, 0);
-			TOUCH_CS_PIN=PinDef[Option.TOUCH_CS].GPno;
-			gpio_init(TOUCH_CS_PIN);
-			gpio_set_drive_strength(TOUCH_CS_PIN,GPIO_DRIVE_STRENGTH_8MA);
-			gpio_set_slew_rate(TOUCH_CS_PIN, GPIO_SLEW_RATE_SLOW);
-			gpio_put(TOUCH_CS_PIN,GPIO_PIN_SET);
-			if(Option.CombinedCS)gpio_set_dir(TOUCH_CS_PIN, GPIO_IN);
-			else gpio_set_dir(TOUCH_CS_PIN, GPIO_OUT);
-		}
-		ExtCfg(Option.TOUCH_IRQ, EXT_BOOT_RESERVED, 0);
-		TOUCH_IRQ_PIN=PinDef[Option.TOUCH_IRQ].GPno;
-		gpio_init(TOUCH_IRQ_PIN);
-		gpio_pull_up(TOUCH_IRQ_PIN);
-		gpio_set_dir(TOUCH_IRQ_PIN, GPIO_IN);
-		gpio_set_input_hysteresis_enabled(TOUCH_IRQ_PIN,true);
-		if(Option.TOUCH_Click){
-			ExtCfg(Option.TOUCH_Click, EXT_BOOT_RESERVED, 0);
-			TOUCH_Click_PIN=PinDef[Option.TOUCH_Click].GPno;
-			gpio_init(TOUCH_Click_PIN);
-			gpio_put(TOUCH_Click_PIN,GPIO_PIN_RESET);
-			gpio_set_dir(TOUCH_Click_PIN, GPIO_OUT);
-		}
-	}
-#endif
+	/* Pure-VGA scanout recovery from soft reset. Real impl in the
+	 * VGA-only side of the port_sources.cmake split (vga_qvga_modes.c);
+	 * stub no-op on HDMI / non-VGA ports. */
+	hal_vga_ops_reserved_io_recovery();
+	/* SSD1963 panel + SPI-LCD CD/CS/Reset + XPT2046 touch reservation.
+	 * Real impl in drivers/spi_lcd/spi_lcd_periph_io.c (linked on the
+	 * four non-VGA SPI-LCD ports); stub no-op on VGA family + HDMI. */
+	hal_periph_reserve_io();
 	if(Option.SYSTEM_I2C_SDA){
 		ExtCfg(Option.SYSTEM_I2C_SCL, EXT_BOOT_RESERVED, 0);
 		ExtCfg(Option.SYSTEM_I2C_SDA, EXT_BOOT_RESERVED, 0);

@@ -45,6 +45,11 @@ void hal_i2c_keypad_print_options(void);
  * portrait. Stub picks DisplayHRes/VRes via Option.DISPLAY_ORIENTATION. */
 void hal_i2c_keypad_apply_spi480_resolution(void);
 
+/* Boot-time keypad-matrix pin reservation (rp2350 only). Real
+ * (PicoCalc) reserves the keypad backlight + matrix-row pins via
+ * ExtCfg(...) when Option.LOCAL_KEYBOARD is set; stub no-op. */
+void hal_i2c_keypad_reserve_io(void);
+
 #ifdef __cplusplus
 }
 #endif

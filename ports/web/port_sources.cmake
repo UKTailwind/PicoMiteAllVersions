@@ -31,6 +31,7 @@ target_sources(PicoMite PRIVATE
     # rp2350 nextgen displays).
     ${CMAKE_SOURCE_DIR}/drivers/spi_lcd/spi_lcd_framebuffer.c
     ${CMAKE_SOURCE_DIR}/drivers/spi_lcd/spi_lcd_mem332_stub.c
+    ${CMAKE_SOURCE_DIR}/drivers/spi_lcd/spi_lcd_periph_io.c
 
     # Non-PICOMITE stubs.
     ${CMAKE_SOURCE_DIR}/drivers/display_merge/display_merge_stub.c

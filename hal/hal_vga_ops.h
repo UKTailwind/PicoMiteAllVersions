@@ -147,6 +147,11 @@ int hal_vga_ops_handle_blit_move(int x1, int y1, int x2, int y2, int w, int h);
  * ResetGUI() under #ifdef GUICONTROLS, which is orthogonal). */
 void hal_vga_ops_reset_display_vga(void);
 
+/* Boot-time scanout pin recovery from soft reset (called from
+ * InitReservedIO). Pure-VGA ports run VGArecovery(0) to re-claim the
+ * RGB121 PIO pin block; HDMI + non-VGA ports no-op. */
+void hal_vga_ops_reserved_io_recovery(void);
+
 /* closeframebuffer VGA impl lives in drivers/vga_pio/vga_mode_ops.c
  * as a direct (non-hooked) definition. The non-VGA build has its
  * own closeframebuffer in Draw.c that uses the merge-pipeline hooks;

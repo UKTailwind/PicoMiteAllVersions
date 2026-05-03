@@ -176,3 +176,11 @@ int hal_vga_setmode_select_alt_font(int display_type) {
     (void)display_type;
     return 0;       /* common font path always */
 }
+
+/* Boot-time scanout-pin recovery from soft reset. Pure-VGA only —
+ * HDMI ports use the HSTX peripheral and don't share VGA's
+ * GP-pin-driven RGB121 PIO program, so the recovery sequence is a
+ * no-op there. */
+void hal_vga_ops_reserved_io_recovery(void) {
+    VGArecovery(0);
+}
