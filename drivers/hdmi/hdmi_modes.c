@@ -373,17 +373,13 @@ void cmd_tile(void){
         bcolour=(FullColour) ? RGB555(Option.DefaultBC):  RGB332(Option.DefaultBC);
         for(int x=0;x<X_TILE;x++){
             for(int y=0;y<Y_TILE;y++){
-#if HAL_PORT_HAS_HDMI
                 if(FullColour){
-#endif
                     if(fcolour!=0xFFFFFFFF) tilefcols[y*X_TILE+x]=fcolour;
                     if(bcolour!=0xFFFFFFFF) tilebcols[y*X_TILE+x]=bcolour;
-#if HAL_PORT_HAS_HDMI
                 } else {
                     if(fcolour!=0xFFFFFFFF) tilefcols_w[y*X_TILE+x]=fcolour;
                     if(bcolour!=0xFFFFFFFF) tilebcols_w[y*X_TILE+x]=bcolour;
                 }
-#endif
             }
         }
     } else if((tp=checkstring(cmdline,(unsigned char *)"HEIGHT"))){
@@ -414,17 +410,13 @@ void cmd_tile(void){
         }
         for(int xp=x;xp<x+xlen;xp++){
             for(int yp=y;yp<y+ylen;yp++){
-#if HAL_PORT_HAS_HDMI
                 if(FullColour){
-#endif
                     if(fcolour!=0xFFFFFFFF) tilefcols[yp*X_TILE+xp]=(uint16_t)fcolour;
                     if(bcolour!=0xFFFFFFFF) tilebcols[yp*X_TILE+xp]=(uint16_t)bcolour;
-#if HAL_PORT_HAS_HDMI
                 } else {
                     if(fcolour!=0xFFFFFFFF) tilefcols_w[yp*X_TILE+xp]=(uint8_t)fcolour;
                     if(bcolour!=0xFFFFFFFF) tilebcols_w[yp*X_TILE+xp]=(uint8_t)bcolour;
                 }
-#endif
             }
         }
     }

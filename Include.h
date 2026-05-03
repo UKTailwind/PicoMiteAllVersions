@@ -86,14 +86,13 @@ typedef unsigned char Bool;
 #include <pico/bootrom.h>
 #include "hardware/irq.h"
 #include "hardware/pio.h"
-#if !HAL_PORT_HAS_HDMI
-	#include "PicoMiteVGA.pio.h"
-	#include "PicoMiteI2S.pio.h"
-#endif
-#if !HAL_PORT_HAS_USB_KEYBOARD
-	#include "pico/unique_id.h"
-	#include "class/cdc/cdc_device.h" 
-#endif
+/* Include.h is now consumed only by drivers/vga_pio/vga_qvga_modes.c
+ * (non-HDMI VGA scanout) — pull in the QVGA / I²S PIO headers it
+ * needs without preprocessor gates. The historical USB-axis branch
+ * pulled in pico/unique_id.h and class/cdc/cdc_device.h, but neither
+ * is referenced from the QVGA scanout body. */
+#include "PicoMiteVGA.pio.h"
+#include "PicoMiteI2S.pio.h"
 
 
 // ****************************************************************************
