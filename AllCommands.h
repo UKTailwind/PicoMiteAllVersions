@@ -465,11 +465,10 @@ void fun_map(void);
 	{ (unsigned char *)"Port(",		T_CMD | T_FUN,		0, cmd_port	    },
 	{ (unsigned char *)"IR",                 T_CMD,			0, cmd_ir           },
 	{ (unsigned char *)"Blit Memory",           T_CMD,                      0, cmd_blitmemory	},
-#if HAL_PORT_HAS_GUICONTROLS
-  	{ (unsigned char *)"GUI",            T_CMD,                      0, cmd_gui   },
-#else
-  	{ (unsigned char *)"GUI",            T_CMD,                      0, cmd_guiMX170   },
-#endif
+    /* cmd_gui lives in GUI.c on GUICONTROLS=1 ports; on stub ports
+     * gui_controls_stub.c provides a cmd_gui that delegates to
+     * cmd_guiMX170 (Draw.c), preserving the legacy behaviour. */
+    { (unsigned char *)"GUI",            T_CMD,                      0, cmd_gui   },
 	{ (unsigned char *)"Device",              T_CMD,			0, cmd_device        },
 	{ (unsigned char *)"PWM",		T_CMD,		0, cmd_pwm		},
 	{ (unsigned char *)"CSub",           T_CMD,              0, cmd_cfunction},
@@ -552,9 +551,8 @@ void fun_map(void);
     { (unsigned char *)"Camera",         T_CMD,                      0, cmd_camera },
     { (unsigned char *)"Refresh",         T_CMD,                      0, cmd_refresh },
 #endif
-#if HAL_PORT_HAS_GUICONTROLS
-	{ (unsigned char *)"CtrlVal(",       T_CMD | T_FUN,              0, cmd_ctrlval    },
-#endif
+    /* cmd_ctrlval real impl in GUI.c; stub in gui_controls_stub.c. */
+    { (unsigned char *)"CtrlVal(",       T_CMD | T_FUN,              0, cmd_ctrlval    },
 #if HAL_PORT_HAS_PICOMITE
 	{ (unsigned char *)"Backlight",		T_CMD,		0, cmd_backlight		},
 #endif
@@ -732,10 +730,10 @@ void fun_map(void);
 #if HAL_PORT_HAS_WIFI
 	{ (unsigned char *)"Json$(",		T_FUN | T_STR,          0, fun_json		},
 #endif
-#if HAL_PORT_HAS_GUICONTROLS
-	  { (unsigned char *)"MsgBox(",        T_FUN | T_INT,              0, fun_msgbox     },
-	  { (unsigned char *)"CtrlVal(",       T_FUN | T_NBR | T_STR,      0, fun_ctrlval    },
-#endif
+    /* fun_msgbox / fun_ctrlval real impls in GUI.c; stubs in
+     * gui_controls_stub.c. */
+    { (unsigned char *)"MsgBox(",        T_FUN | T_INT,              0, fun_msgbox     },
+    { (unsigned char *)"CtrlVal(",       T_FUN | T_NBR | T_STR,      0, fun_ctrlval    },
 { (unsigned char *)"Bit(",	T_FUN | T_INT,		0, fun_bit,	},
 #if defined(rp2350) && HAL_PORT_HAS_PICOMITE
 	{ (unsigned char*)"Map(",	    T_FUN | T_INT,		0, fun_map, },

@@ -34,6 +34,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
+#include "hal/hal_gui_controls.h"
 #include "hardware/structs/systick.h"
 #if HAL_PORT_HAS_WIFI
 #include "pico/cyw43_arch.h"
@@ -380,16 +381,8 @@ void fun_touch(void) {
         iret = TOUCH_DOWN;
     else if(checkstring(ep, (unsigned char *)"UP"))
         iret = !TOUCH_DOWN;
-#if HAL_PORT_HAS_GUICONTROLS
-    else if(checkstring(ep, (unsigned char *)"REF"))
-        iret = CurrentRef;
-    else if(checkstring(ep, (unsigned char *)"LASTREF"))
-        iret = LastRef;
-    else if(checkstring(ep, (unsigned char *)"LASTX"))
-        iret = LastX;
-    else if(checkstring(ep, (unsigned char *)"LASTY"))
-        iret = LastY;
- #endif        
+    else if(hal_gui_controls_get_touch_attr(ep, &iret))
+        ; /* matched a GUICONTROLS attribute (REF/LASTREF/LASTX/LASTY) */
     else {
         if(Option.TOUCH_CAP){
             if(checkstring(ep, (unsigned char *)"X2"))

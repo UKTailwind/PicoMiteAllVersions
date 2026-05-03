@@ -36,6 +36,7 @@ extern "C" {
 #include "hal/hal_display_merge.h"
 #include "hal/hal_flash.h"
 #include "hal/hal_keyboard.h"
+#include "hal/hal_gui_controls.h"
 #include "hardware/regs/addressmap.h"     /* XIP_BASE */
 #include "hardware/adc.h"
 #include "hardware/exception.h"
@@ -495,9 +496,7 @@ void __not_in_flash_func(routinechecks)(void){
 	}
 	if(GPSchannel)processgps();
     if(diskchecktimer == 0)CheckSDCard();
-#if HAL_PORT_HAS_GUICONTROLS
-    if(Ctrl && TOUCH_GETIRQTRIS && !calibrate)ProcessTouch();
-#endif
+    hal_gui_controls_routine_check_touch();
 
 //        if(tud_cdc_connected() && KeyCheck==0){
 //            SSPrintString(alive);
@@ -927,31 +926,9 @@ bool MIPS16 __not_in_flash_func(timer_callback)(repeating_timer_t *rt)
             IrDevTmp = ((IrBits >> 16) & 0xffff);
             IrCmdTmp = ((IrBits >> 8) & 0xff);
         }
-#if HAL_PORT_HAS_GUICONTROLS
-    // check on the touch panel, is the pen down?
-
-    TouchTimer++;
-    if(CheckGuiFlag) CheckGuiTimeouts();                            // are blinking LEDs in use?  If so count down their timers
-
-    if(TOUCH_GETIRQTRIS){                       // is touch enabled and the PEN IRQ pin an input?
-        if(TOUCH_DOWN) {                                            // is the pen down
-            if(!TouchState) {                                       // yes, it is.  If we have not reported this before
-                TouchState = TouchDown = true;                      // set the flags
-//                TouchUp = false;
-            }
-        } else {
-            if(TouchState) {                                        // the pen is not down.  If we have not reported this before
-                TouchState/* = TouchDown*/ = false;                     // set the flags
-                TouchUp = true;
-            }
-        }
-    }
-
-    if(ClickTimer) {
-        ClickTimer--;
-        if(Option.TOUCH_Click) PinSetBit(Option.TOUCH_Click, ClickTimer ? LATSET : LATCLR);
-    }
-#endif
+    // GUI controls timer tick — touch pen-state machine + ClickTimer
+    // countdown. No-op on stub ports.
+    hal_gui_controls_timer_tick();
     // now process the IR message, this includes handling auto repeat while the key is held down
     // IrTick counts how many mS since the key was first pressed
     // NextIrTick is used to time the auto repeat

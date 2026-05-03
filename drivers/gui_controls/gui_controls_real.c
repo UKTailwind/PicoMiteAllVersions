@@ -95,3 +95,55 @@ void hal_gui_controls_reset_interrupts(void) {
     GuiIntDownVector = NULL;
     GuiIntUpVector = NULL;
 }
+
+/* Touch.c globals + helpers used by the routine/timer ticks. */
+extern int TOUCH_GETIRQTRIS;
+extern volatile bool TouchDown, TouchUp, TouchState;
+
+int hal_gui_controls_get_touch_attr(unsigned char *p, long long int *iret_out) {
+    if      (checkstring(p, (unsigned char *)"REF"))      *iret_out = CurrentRef;
+    else if (checkstring(p, (unsigned char *)"LASTREF"))  *iret_out = LastRef;
+    else if (checkstring(p, (unsigned char *)"LASTX"))    *iret_out = LastX;
+    else if (checkstring(p, (unsigned char *)"LASTY"))    *iret_out = LastY;
+    else return 0;
+    return 1;
+}
+
+void hal_gui_controls_set_beep_timer(int ms) {
+    if (Option.TOUCH_Click == 0) error("Click option not set");
+    ClickTimer = ms + 1;
+}
+
+void hal_gui_controls_routine_check_touch(void) {
+    if (Ctrl && TOUCH_GETIRQTRIS && !calibrate) ProcessTouch();
+}
+
+void hal_gui_controls_timer_tick(void) {
+    TouchTimer++;
+    if (CheckGuiFlag) CheckGuiTimeouts();
+
+    if (TOUCH_GETIRQTRIS) {
+        if (TOUCH_DOWN) {
+            if (!TouchState) {
+                TouchState = TouchDown = true;
+            }
+        } else {
+            if (TouchState) {
+                TouchState = false;
+                TouchUp = true;
+            }
+        }
+    }
+
+    if (ClickTimer) {
+        ClickTimer--;
+        if (Option.TOUCH_Click)
+            PinSetBit(Option.TOUCH_Click, ClickTimer ? LATSET : LATCLR);
+    }
+}
+
+extern void PO2Int(char *s1, int n);
+
+void hal_gui_controls_print_options(void) {
+    if (Option.MaxCtrls) PO2Int("GUI CONTROLS", Option.MaxCtrls - 1);
+}

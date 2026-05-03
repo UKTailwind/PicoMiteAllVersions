@@ -14,6 +14,7 @@
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
 #include "port_config.h"
+#include "hal/hal_gui_controls.h"
 
 /* The Freq* / SCREENMODE* / NEXTGEN / VIRTUAL / SSDPANEL constants are
  * defined in configuration.h only on PICOMITEVGA builds. On non-VGA the
@@ -236,9 +237,7 @@ void port_print_display_options(void)
             }
         }
         if(Option.BackLightLevel!=100)PO2Int("LCD BACKLIGHT", Option.BackLightLevel);
-#if HAL_PORT_HAS_GUICONTROLS
-        if(Option.MaxCtrls)PO2Int("GUI CONTROLS", Option.MaxCtrls-1);
-#endif
+        hal_gui_controls_print_options();
 #if HAL_PORT_HAS_I2C_KEYPAD
         if(Option.KEYBOARDBL)PO2Int("BACKLIGHT KB", Option.KEYBOARDBL);
 #endif

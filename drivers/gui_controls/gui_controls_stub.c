@@ -11,6 +11,8 @@
 #include "Hardware_Includes.h"
 #include "hal/hal_gui_controls.h"
 
+extern void cmd_guiMX170(void);
+
 struct s_ctrl *Ctrl = NULL;
 
 void hal_gui_controls_alloc_array(void) {}
@@ -28,3 +30,22 @@ int  hal_gui_controls_print_char_escape(int fnt, int fc, int bc,
 void hal_gui_controls_hide_all(void) {}
 void hal_gui_controls_reset(void) {}
 void hal_gui_controls_reset_interrupts(void) {}
+
+int hal_gui_controls_get_touch_attr(unsigned char *p, long long int *iret_out) {
+    (void)p; (void)iret_out;
+    return 0;
+}
+void hal_gui_controls_set_beep_timer(int ms) { (void)ms; error("Not supported on this board"); }
+void hal_gui_controls_routine_check_touch(void) {}
+void hal_gui_controls_timer_tick(void) {}
+void hal_gui_controls_print_options(void) {}
+
+/* GUI command/function stubs. The token table in AllCommands.h
+ * references these unconditionally; on stub ports they all error.
+ * cmd_gui falls through to cmd_guiMX170 (the legacy non-GUICONTROLS
+ * GUI sub-command parser, which lives in Draw.c and is linked on
+ * every port). */
+void cmd_gui(void) { cmd_guiMX170(); }
+void cmd_ctrlval(void) { error("Not supported on this board"); }
+void fun_msgbox(void) { error("Not supported on this board"); }
+void fun_ctrlval(void) { error("Not supported on this board"); }

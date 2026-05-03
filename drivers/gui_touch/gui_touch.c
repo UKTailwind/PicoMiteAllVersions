@@ -17,6 +17,7 @@
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
 #include "hal/hal_display_merge.h"
+#include "hal/hal_gui_controls.h"
 
 #ifndef max
 #define max(x, y) (((x) > (y)) ? (x) : (y))
@@ -24,13 +25,10 @@
 
 int hal_port_gui_touch_cmd(unsigned char *cmdline) {
     unsigned char *p;
-#if HAL_PORT_HAS_GUICONTROLS
     if((p = checkstring(cmdline, (unsigned char *)"BEEP"))) {
-        if(Option.TOUCH_Click == 0) error("Click option not set");
-        ClickTimer = getint(p, 0, INT_MAX) + 1;
+        hal_gui_controls_set_beep_timer(getint(p, 0, INT_MAX));
         return 1;
     }
-#endif
     if((p = checkstring(cmdline, (unsigned char *)"RESET"))) {
         if((checkstring(p, (unsigned char *)"LCDPANEL"))) {
             hal_display_merge_abort();

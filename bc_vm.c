@@ -15,6 +15,7 @@
 #include "bytecode.h"
 #include "bc_alloc.h"
 #include "hal/hal_time.h"
+#include "hal/hal_gui_controls.h"
 #include "port_config.h"
 #include "vm_device_support.h"
 #include "vm_sys_input.h"
@@ -979,9 +980,7 @@ static void bc_vm_execute_syscall(BCVMState *vm, uint16_t sysid, uint8_t argc,
                 arg.get_int = vm_cls_get_int;
             }
             bc_vm_require_display(vm);
-#if HAL_PORT_HAS_GUICONTROLS
-            HideAllControls();
-#endif
+            hal_gui_controls_hide_all();
             ops.ctx = vm;
             ops.do_clear = vm_cls_do_clear;
             ops.fail_msg = vm_cls_fail_msg;

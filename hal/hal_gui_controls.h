@@ -68,6 +68,38 @@ void hal_gui_controls_reset(void);
  * External.c. No-op on stub ports. */
 void hal_gui_controls_reset_interrupts(void);
 
+/* TOUCH(REF/LASTREF/LASTX/LASTY) attribute lookup. Returns 1 if `p`
+ * matched one of the GUICONTROLS-only attribute names and stores the
+ * value in *iret_out; returns 0 if not matched (caller continues
+ * parsing). Stub returns 0 for every attribute. */
+int hal_gui_controls_get_touch_attr(unsigned char *p, long long int *iret_out);
+
+/* GUI BEEP <ms> — start the click-pin pulse for `ms` milliseconds.
+ * Real impl sets ClickTimer; stub errors with "Not supported on this
+ * board". */
+void hal_gui_controls_set_beep_timer(int ms);
+
+/* Routine-check tick (PicoMite.c routinechecks): drive a touch-panel
+ * scan when a control is active and the IRQ pin is configured.
+ * No-op on stub ports. */
+void hal_gui_controls_routine_check_touch(void);
+
+/* Timer-callback tick (PicoMite.c timer_callback): TouchTimer
+ * counter, CheckGuiTimeouts blink-LED service, pen-down state
+ * machine, ClickTimer countdown driving the click pin. No-op on stub
+ * ports. */
+void hal_gui_controls_timer_tick(void);
+
+/* OPTION LIST — print Option.MaxCtrls if GUICONTROLS is configured.
+ * Stub no-op. */
+void hal_gui_controls_print_options(void);
+
+/* cmd_gui, cmd_ctrlval, fun_msgbox, fun_ctrlval are declared in
+ * AllCommands.h. On GUICONTROLS=1 ports their bodies live in GUI.c;
+ * on stub ports their bodies live in gui_controls_stub.c and error
+ * with "Not supported on this board". The token table references
+ * them unconditionally. */
+
 #ifdef __cplusplus
 }
 #endif

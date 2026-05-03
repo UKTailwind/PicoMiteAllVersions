@@ -1616,10 +1616,12 @@ void SetColour(unsigned char *p, int DoVT100) {
     // the list must be terminated with a NULL
     char *twokeywordtbl[] = {
         "BASE", "EXPLICIT", "DEFAULT", "BREAK", "AUTORUN", "BAUDRATE", "DISPLAY",
-#if HAL_PORT_HAS_GUICONTROLS
+        /* GUI sub-keywords are recognized by the syntax highlighter on
+         * every port; the runtime errors with "Not supported on this
+         * board" if the port isn't GUICONTROLS-built. Highlighting
+         * unrecognized keywords is harmless. */
         "BUTTON", "SWITCH", "CHECKBOX", "RADIO", "LED", "FRAME", "NUMBERBOX", "SPINBOX", "TEXTBOX", "DISPLAYBOX", "CAPTION", "DELETE",
         "DISABLE", "HIDE", "ENABLE", "SHOW", "FCOLOUR", "BCOLOUR", "REDRAW", "BEEP", "INTERRUPT",
-#endif
         NULL
     };
 
