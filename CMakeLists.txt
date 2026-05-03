@@ -1,5 +1,10 @@
 cmake_minimum_required(VERSION 3.13)
-# Valid builds are PICO, PICOUSB, VGA, VGAUSB, HDMI(rp2350 only), HDMIUSB(rp2350 only), WEB
+# Port selector is -DPORT=<port_dir_name>; the legacy -DCOMPILE=<TARGET>
+# knob is still recognized for backwards compatibility (buildall.sh +
+# build_firmware.sh + the GitHub Actions matrix all still drive
+# -DCOMPILE=). When only COMPILE is set, the inference block below picks
+# the matching ports/<dir>. New invocations should pass -DPORT=<dir>
+# directly.
 
 if(NOT DEFINED PICOCALC)
   set(PICOCALC true)
@@ -11,34 +16,64 @@ endif()
 # details: https://github.com/adwuard/Picocalc_SD_Boot
 #set(SDBOOT true)
 
-# Compile for PICO 1 Board — overridden by -DCOMPILE=... on the cmake command line.
-if(NOT DEFINED COMPILE)
-  set(COMPILE PICO)
+# Port selection. PORT names a directory under ports/.
+if(NOT DEFINED PORT)
+    if(DEFINED COMPILE)
+        # Legacy COMPILE → PORT inference. New ports should not extend
+        # this list; pass -DPORT=<dir> directly.
+        if (COMPILE STREQUAL "PICO" OR COMPILE STREQUAL "PICOUSB")
+            set(PORT pico)
+        elseif (COMPILE STREQUAL "VGA" OR COMPILE STREQUAL "VGAUSB")
+            set(PORT vga)
+        elseif (COMPILE STREQUAL "WEB")
+            set(PORT web)
+        elseif (COMPILE STREQUAL "PICORP2350" OR COMPILE STREQUAL "PICOUSBRP2350")
+            set(PORT pico_rp2350)
+        elseif (COMPILE STREQUAL "VGARP2350" OR COMPILE STREQUAL "VGAUSBRP2350")
+            set(PORT vga_rp2350)
+        elseif (COMPILE STREQUAL "WEBRP2350")
+            set(PORT web_rp2350)
+        elseif (COMPILE STREQUAL "HDMI" OR COMPILE STREQUAL "HDMIUSB")
+            set(PORT hdmi_rp2350)
+        elseif (COMPILE STREQUAL "VGAWIFIRP2350")
+            set(PORT vga_wifi_rp2350)
+        elseif (COMPILE STREQUAL "DVIWIFIRP2350")
+            set(PORT dvi_wifi_rp2350)
+        else()
+            message(FATAL_ERROR
+                "Unknown legacy COMPILE=${COMPILE}; pass -DPORT=<dir> instead.")
+        endif()
+    else()
+        # Default port: the original rp2040 PicoMite SPI-LCD board.
+        set(PORT pico)
+    endif()
 endif()
 
-# Compile for PICO 2 Board (uncomment one to override the default above)
-#set(COMPILE PICORP2350)
-#set(COMPILE WEBRP2350)
-
-if (COMPILE STREQUAL "HDMI" OR COMPILE STREQUAL "WEBRP2350" OR COMPILE STREQUAL "HDMIUSB"  OR COMPILE STREQUAL "VGARP2350"  OR COMPILE STREQUAL "VGAUSBRP2350"  OR COMPILE STREQUAL "PICORP2350"  OR COMPILE STREQUAL "PICOUSBRP2350"  OR COMPILE STREQUAL "VGAWIFIRP2350"  OR COMPILE STREQUAL "DVIWIFIRP2350" )
-	set(PICO_PLATFORM rp2350)
-	if (COMPILE STREQUAL "WEBRP2350" OR COMPILE STREQUAL "VGAWIFIRP2350")
-		set(PICO_BOARD pico2_w)
-	elseif (COMPILE STREQUAL "DVIWIFIRP2350")
-		# Custom board file lives in the repo at boards/include/boards/.
-		# pico-sdk picks it up via PICO_BOARD_HEADER_DIRS (set below).
-		list(APPEND PICO_BOARD_HEADER_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/boards/include/boards)
-		set(PICO_BOARD pico_stretch)
-	else()
-		set(PICO_BOARD pimoroni_pga2350)
-	endif()
+# pico-sdk platform / board selection per PORT. PICO_PLATFORM and
+# PICO_BOARD have to be set before pico_sdk_import.cmake / pico_sdk_init,
+# so the lookup lives here at top-level CMakeLists rather than in the
+# per-port port_sources.cmake (which runs after sdk init).
+set(_RP2350_PORTS pico_rp2350 vga_rp2350 web_rp2350 hdmi_rp2350
+                  vga_wifi_rp2350 dvi_wifi_rp2350)
+if (PORT IN_LIST _RP2350_PORTS)
+    set(PICO_PLATFORM rp2350)
+    if (PORT STREQUAL "web_rp2350" OR PORT STREQUAL "vga_wifi_rp2350")
+        set(PICO_BOARD pico2_w)
+    elseif (PORT STREQUAL "dvi_wifi_rp2350")
+        # Custom board file lives in the repo at boards/include/boards/.
+        # pico-sdk picks it up via PICO_BOARD_HEADER_DIRS (set below).
+        list(APPEND PICO_BOARD_HEADER_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/boards/include/boards)
+        set(PICO_BOARD pico_stretch)
+    else()
+        set(PICO_BOARD pimoroni_pga2350)
+    endif()
 else()
-	set(PICO_PLATFORM rp2040)
-	if (COMPILE STREQUAL "WEB")
-		set(PICO_BOARD pico_w)
-	else()
-		set(PICO_BOARD pico)
-	endif()
+    set(PICO_PLATFORM rp2040)
+    if (PORT STREQUAL "web")
+        set(PICO_BOARD pico_w)
+    else()
+        set(PICO_BOARD pico)
+    endif()
 endif()
 include(pico_sdk_import.cmake)
 project(PicoMite C CXX ASM)
@@ -194,36 +229,16 @@ target_include_directories(PicoMite PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/ports/pi
 # ports/<board>/port_config.h defines compile-time port-scoped constants
 # (HAL_PORT_PWM_SLICE_COUNT, HAL_PORT_GPIO_COUNT, HAL_PORT_HAS_*, …). Each
 # port directory holds a single file with plain #defines and no #ifdef
-# gates inside; the build system picks exactly one per COMPILE variant by
-# putting that directory on the include path. Core uses these as *values*
-# in expressions and array sizes; using them as preprocessor gates is
+# gates inside; the build system picks exactly one per port by putting
+# that directory on the include path. Core uses these as *values* in
+# expressions and array sizes; using them as preprocessor gates is
 # forbidden (see docs/real-hal-fixup-plan.md F2).
 # Source-list inclusion is per-port composition. Each port directory
 # under ports/<port>/ ships a port_sources.cmake snippet that declares
 # the source files for that port's hardware backends (SPI-LCD vs VGA-PIO
 # vs HDMI vs WiFi, USB-host vs PS/2 keyboard, rp2040 stubs vs rp2350
-# real-feature backends). The COMPILE → port-directory map below selects
-# exactly one snippet per build.
-if (COMPILE STREQUAL "PICO" OR COMPILE STREQUAL "PICOUSB")
-    set(PORT_DIR pico)
-elseif (COMPILE STREQUAL "VGA" OR COMPILE STREQUAL "VGAUSB")
-    set(PORT_DIR vga)
-elseif (COMPILE STREQUAL "WEB")
-    set(PORT_DIR web)
-elseif (COMPILE STREQUAL "PICORP2350" OR COMPILE STREQUAL "PICOUSBRP2350")
-    set(PORT_DIR pico_rp2350)
-elseif (COMPILE STREQUAL "VGARP2350" OR COMPILE STREQUAL "VGAUSBRP2350")
-    set(PORT_DIR vga_rp2350)
-elseif (COMPILE STREQUAL "WEBRP2350")
-    set(PORT_DIR web_rp2350)
-elseif (COMPILE STREQUAL "HDMI" OR COMPILE STREQUAL "HDMIUSB")
-    set(PORT_DIR hdmi_rp2350)
-elseif (COMPILE STREQUAL "VGAWIFIRP2350")
-    set(PORT_DIR vga_wifi_rp2350)
-elseif (COMPILE STREQUAL "DVIWIFIRP2350")
-    set(PORT_DIR dvi_wifi_rp2350)
-endif()
-include(${CMAKE_SOURCE_DIR}/ports/${PORT_DIR}/port_sources.cmake)
+# real-feature backends). PORT names the directory directly.
+include(${CMAKE_SOURCE_DIR}/ports/${PORT}/port_sources.cmake)
 
 if(PICOCALC STREQUAL "true")
 	target_sources(PicoMite PRIVATE
