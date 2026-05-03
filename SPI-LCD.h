@@ -357,11 +357,11 @@ extern void __not_in_flash_func(spi_finish)(spi_inst_t *spi);
 #define TFT_SWRST 0x01
 #define SSDTYPE (Option.DISPLAY_TYPE>=SSDPANEL && Option.DISPLAY_TYPE<VIRTUAL_C && !(Option.DISPLAY_TYPE==ILI9341_16 || Option.DISPLAY_TYPE==ILI9341_8 || Option.DISPLAY_TYPE==IPS_4_16 || Option.DISPLAY_TYPE==ILI9486_16))
 #define SSD16TYPE (Option.DISPLAY_TYPE>SSD_PANEL_8 && Option.DISPLAY_TYPE<VIRTUAL_C && !(Option.DISPLAY_TYPE==ILI9341_16 || Option.DISPLAY_TYPE==IPS_4_16 || Option.DISPLAY_TYPE==ILI9486_16))
-#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
-#define SPIREAD (Option.DISPLAY_TYPE == ILI9341 || Option.DISPLAY_TYPE == ILI9488P || Option.DISPLAY_TYPE == ILI9488 || Option.DISPLAY_TYPE == ST7796SP  || Option.DISPLAY_TYPE == ST7796S || Option.DISPLAY_TYPE == ST7789B|| Option.DISPLAY_TYPE>=NEXTGEN)
-#else
-#define SPIREAD (Option.DISPLAY_TYPE == ILI9341 || Option.DISPLAY_TYPE == ILI9488P || Option.DISPLAY_TYPE == ILI9488 || Option.DISPLAY_TYPE == ST7796SP  || Option.DISPLAY_TYPE == ST7796S || Option.DISPLAY_TYPE == ST7789B)
-#endif
+/* SPIREAD includes the NEXTGEN range unconditionally. Non-NEXTGEN
+ * ports never set Option.DISPLAY_TYPE to a NEXTGEN value (the OPTION
+ * setter rejects it), so the extra `>= NEXTGEN` term is always false
+ * on those ports. */
+#define SPIREAD (Option.DISPLAY_TYPE == ILI9341 || Option.DISPLAY_TYPE == ILI9488P || Option.DISPLAY_TYPE == ILI9488 || Option.DISPLAY_TYPE == ST7796SP  || Option.DISPLAY_TYPE == ST7796S || Option.DISPLAY_TYPE == ST7789B || Option.DISPLAY_TYPE >= NEXTGEN)
 #define FASTSCROLL (SSDTYPE || Option.DISPLAY_TYPE==SCREENMODE1 ||  Option.DISPLAY_TYPE == SCREENMODE2 || Option.DISPLAY_TYPE == VIRTUAL_C || Option.DISPLAY_ORIENTATION == VIRTUAL_M)
 #define SPI480 (Option.DISPLAY_TYPE==ILI9488 || Option.DISPLAY_TYPE==ST7796S || Option.DISPLAY_TYPE==ILI9488W || Option.DISPLAY_TYPE==ILI9481 || Option.DISPLAY_TYPE==ILI9481IPS) 
 #define TFT_SLPIN 0x10
@@ -468,11 +468,10 @@ extern void Display_Refresh(void);
 extern void waitwhilebusy(void);
 struct Displays {
     unsigned char ref;
-#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
-	char name [16];
-#else
-	char name [13];
-#endif
+    /* 16 chars accommodates the longest NEXTGEN display name on
+     * rp2350-PicoMite. Other ports use shorter names but the extra
+     * 3 bytes per entry is cheap and eliminates a port-config gate. */
+    char name [16];
     int speed;
     int horizontal;
     int vertical;
@@ -508,10 +507,11 @@ extern void __not_in_flash_func(HW1ReadSPI)(BYTE *buff, int cnt);
 extern void BitBangReadSPI(BYTE *buff, int cnt);
 extern void ScrollLCDSPI(int lines);
 /* ScrollLCDMEM332 already declared at top of file. */
-#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
+/* RGB332 LUT initializers — only called from NEXTGEN-display init
+ * paths; declared unconditionally so the extern visibility doesn't
+ * depend on a port-config gate. */
 extern void init_RGB332_to_RGB565_LUT(void);
 extern void init_RGB332_to_RGB888_LUT(void);
-#endif
 extern void SetCS(void);
 extern int GetLineILI9341(void);
 extern void SPI111init(void);

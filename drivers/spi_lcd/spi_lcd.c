@@ -27,9 +27,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
 #include "hardware/dma.h"
-#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
 #include "pico/multicore.h"
-#endif
 int CurrentSPIDevice=NONE_SPI_DEVICE;
 const struct Displays display_details[]={
 		{0,"", SDCARD_SPI_SPEED, 0, 0, 0, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
@@ -90,7 +88,9 @@ const struct Displays display_details[]={
 		{55,"VIRTUAL_M", 0, 640, 480, 0, 0, 0, 0},
 		{56,"VS1053slow", 200000, 0, 0, 0, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
 		{57,"VS1053fast", 4000000, 0, 0, 0, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
-#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
+		/* NEXTGEN buffered display rows. Compiled on every port; the
+		 * runtime never sets Option.DISPLAY_TYPE to one of these on
+		 * non-NEXTGEN ports because the OPTION setter rejects them. */
 		{58,"ST7796SPBUFF",90000000, 320, 320, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
 		{59,"ILI9341BUFF",50000000, 320, 240, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
 		{60,"ST7796SBUFF", 90000000, 480, 320, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
@@ -98,7 +98,6 @@ const struct Displays display_details[]={
 		{62,"ILI9488PBUFF", 45000000, 320, 320, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
 		{63,"ILI9488WBUFF", 45000000, 480, 320, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
 		{64,"ST7789_320BUFF", 50000000, 320, 240, 16, 0, SPI_POLARITY_LOW, SPI_PHASE_1EDGE},
-#endif
 };
 void __not_in_flash_func(spi_write_fast)(spi_inst_t *spi, const uint8_t *src, size_t len) {
     // Write to TX FIFO whilst ignoring RX, then clean up afterward. When RX
@@ -136,13 +135,12 @@ extern void I2C_Send_Data(unsigned char* data, int n);
 void I2C_Send_Command(char command);
 extern int mmI2Cvalue;												// value of MM.I2C
 void waitwhilebusy(void);
-#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
+/* All LCD bus writes go through lcd_xmit_byte_multi; on non-NEXTGEN
+ * ports it's initialized to share the system SPI sender (set in
+ * SPISpeedSet alongside xmit_byte_multi). NEXTGEN ports may
+ * override it to a separate sender when the LCD has its own clock. */
 #define SPIsend(a) {uint8_t b=a;lcd_xmit_byte_multi(&b,1);}
 #define SPIqueue(a) {(Option.DISPLAY_TYPE==ILI9488  || Option.DISPLAY_TYPE == ILI9488P || Option.DISPLAY_TYPE==ILI9481IPS) ? lcd_xmit_byte_multi(a,3) : lcd_xmit_byte_multi(a,2) ;}
-#else
-#define SPIsend(a) {uint8_t b=a;xmit_byte_multi(&b,1);}
-#define SPIqueue(a) {(Option.DISPLAY_TYPE==ILI9488  || Option.DISPLAY_TYPE == ILI9488P || Option.DISPLAY_TYPE==ILI9481IPS) ? xmit_byte_multi(a,3) : xmit_byte_multi(a,2) ;}
-#endif
 #define SPIsend2(a) {SPIsend(0);SPIsend(a);}
 int PackHorizontal=0;
 int fullrefreshcount=0;
@@ -1028,24 +1026,19 @@ void SetCS(void) {
 void spi_write_data(unsigned char data){
     gpio_put(LCD_CD_PIN,GPIO_PIN_SET);
     SetCS();
-#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
-    if(Option.DISPLAY_TYPE == ILI9481 || Option.DISPLAY_TYPE == ILI9488W || Option.DISPLAY_TYPE == ILI9488WBUFF)	{SPIsend2(data);}
-#else
-    if(Option.DISPLAY_TYPE == ILI9481 || Option.DISPLAY_TYPE == ILI9488W)	{SPIsend2(data);}
-#endif
+    /* ILI9488WBUFF is a NEXTGEN-only DISPLAY_TYPE. Non-NEXTGEN ports
+     * never set DISPLAY_TYPE to it, so the extra term is always false
+     * there. Unify the comparison. */
+    if(Option.DISPLAY_TYPE == ILI9481 || Option.DISPLAY_TYPE == ILI9488W || Option.DISPLAY_TYPE == ILI9488WBUFF) {SPIsend2(data);}
     else {SPIsend(data);}
-     ClearCS(Option.LCD_CS);
+    ClearCS(Option.LCD_CS);
 }
 
 
 void spi_write_command(unsigned char data){
     gpio_put(LCD_CD_PIN,GPIO_PIN_RESET);
     SetCS();
-#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
-    if(Option.DISPLAY_TYPE == ILI9481 || Option.DISPLAY_TYPE == ILI9488W || Option.DISPLAY_TYPE == ILI9488WBUFF)	{SPIsend2(data);}
-#else
-    if(Option.DISPLAY_TYPE == ILI9481 || Option.DISPLAY_TYPE == ILI9488W)	{SPIsend2(data);}
-#endif
+    if(Option.DISPLAY_TYPE == ILI9481 || Option.DISPLAY_TYPE == ILI9488W || Option.DISPLAY_TYPE == ILI9488WBUFF) {SPIsend2(data);}
     else {SPIsend(data);}
     ClearCS(Option.LCD_CS);
 }
@@ -2635,12 +2628,16 @@ void SPISpeedSet(int device){
 				xchg_byte= HW0SwapSPI;
 				xmit_byte_multi=HW0SendSPI;
 				rcvr_byte_multi=HW0ReadSPI;
-#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
+				/* On non-NEXTGEN ports Option.LCD_CLK is always 0
+				 * (no separate LCD clock pin), so the inner branch
+				 * always takes — unifying lcd_xmit_byte_multi with
+				 * xmit_byte_multi. NEXTGEN ports may have a separate
+				 * LCD clock; the assignment still applies when
+				 * LCD_CLK == SYSTEM_CLK. */
 				if(!Option.LCD_CLK || Option.LCD_CLK==Option.SYSTEM_CLK){
 					lcd_xmit_byte_multi=HW0SendSPI;
 					lcd_rcvr_byte_multi=HW0ReadSPI;
 				}
-#endif
 				SET_SPI_CLK=HW0Clk;
                 gpio_set_input_enabled(PinDef[Option.SYSTEM_CLK].GPno,false);
                 gpio_set_input_enabled(PinDef[Option.SYSTEM_MOSI].GPno,false);
@@ -2650,19 +2647,22 @@ void SPISpeedSet(int device){
 				xchg_byte= HW1SwapSPI;
 				xmit_byte_multi=HW1SendSPI;
 				rcvr_byte_multi=HW1ReadSPI;
-#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
 				if(!Option.LCD_CLK || Option.LCD_CLK==Option.SYSTEM_CLK){
 					lcd_xmit_byte_multi=HW1SendSPI;
 					lcd_rcvr_byte_multi=HW1ReadSPI;
 				}
-#endif
 				SET_SPI_CLK=HW1Clk;
 			} else {
 //				MMPrintString("Fast Bitbang\r\n");
 				xchg_byte= BitBangSwapSPI;
 				xmit_byte_multi=BitBangSendSPI;
 				rcvr_byte_multi=BitBangReadSPI;
-				SET_SPI_CLK=BitBangSetClk; 
+				/* Default LCD pointers to share the bit-bang sender —
+				 * non-NEXTGEN ports always take this path, NEXTGEN
+				 * ports override when they have a separate LCD clock. */
+				lcd_xmit_byte_multi=BitBangSendSPI;
+				lcd_rcvr_byte_multi=BitBangReadSPI;
+				SET_SPI_CLK=BitBangSetClk;
 			}
 			SET_SPI_CLK(display_details[device].speed, display_details[device].CPOL, display_details[device].CPHASE);
 		}

@@ -90,11 +90,13 @@ BYTE (*xchg_byte)(BYTE data_out)= NULL;
 void (*xmit_byte_multi)(const BYTE *buff, int cnt)= NULL;
 void (*rcvr_byte_multi)(BYTE *buff, int cnt)= NULL;
 int (*SET_SPI_CLK)(int speed, int polarity, int edge)=NULL;
-#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
+/* LCD bus pointers — set in SPISpeedSet to share the system SPI on
+ * non-NEXTGEN ports, or assigned to a separate bus on NEXTGEN ports
+ * where the LCD has its own clock pin. Defined unconditionally so
+ * the symbols always link. */
 void (*lcd_xmit_byte_multi)(const BYTE *buff, int cnt)= NULL;
 void (*lcd_rcvr_byte_multi)(BYTE *buff, int cnt)= NULL;
 int (*LCD_SET_SPI_CLK)(int speed, int polarity, int edge)=NULL;
-#endif
 extern const uint8_t PINMAP[];
 const int mapping[101]={
 	0,4,11,18,25,33,41,49,57,66,75,
