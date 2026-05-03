@@ -96,8 +96,40 @@ calls each entry point unconditionally (no #ifdef gates in core), so
 **every port must define every entry point** — provide a no-op stub
 when the behaviour isn't relevant to your hardware.
 
-The closest existing port's `port_defaults.c` is the right starting
-point — copy it and adjust. The full set of required exports:
+### Single-board vs multi-board ports
+
+Before you start: decide which kind of port you're writing.
+
+- **Multi-board port** — one firmware binary, multiple physical boards
+  the user picks between with `OPTION RESET <BOARD>`. The existing
+  `ports/pico/`, `ports/hdmi_rp2350/`, etc. are this kind: each ships
+  a `port_factory_reset_board()` that's a long `if (checkstring(p,
+  "GAMEMITE")) … else if (checkstring(p, "PICOCALC")) …` ladder of
+  per-board profiles, plus a `port_print_supported_boards()` that
+  lists them all for `CONFIGURE LIST`. This pattern made sense for
+  upstream PicoMite, which shipped one binary across many community
+  boards.
+
+- **Single-board port** — one firmware binary for one specific PCB.
+  The user never picks a profile because there's nothing to pick
+  between. `port_factory_reset_board()` is `return 0;`,
+  `port_print_supported_boards()` is empty (or prints a single name
+  for diagnostics), `port_set_default_options()` is one unconditional
+  block applying that board's defaults. **No `if (checkstring(...))`
+  ladder.**
+
+If you're building a custom board for yourself or a small audience,
+you almost certainly want single-board. The multi-board mechanism is
+genuinely useful only when you're shipping ONE firmware to multiple
+physically different boards and need runtime board selection.
+
+**Don't copy a multi-board port_defaults.c and trim it** — you'll
+inherit conditionals you don't need. Write the file from scratch
+using the entry-point list below; total length for a single-board
+port is ~150 lines, mostly the display-OPTION setter and the
+console-colour helper.
+
+### Required exports
 
 | Function | What it does |
 |---|---|
@@ -113,16 +145,24 @@ point — copy it and adjust. The full set of required exports:
 
 VGA-family ports also export `void VGArecovery(int pin)` — called from
 `drivers/sd_spi/mmc_stm32.c` when SD-card pin reassignment needs to
-reclaim a VGA-PIO pin. Copy verbatim from the closest existing
+reclaim a VGA-PIO pin. Copy the body verbatim from the closest existing
 VGA-family port_defaults.c if your port has `HAL_PORT_HAS_VGA_PIO=1`.
 
+WiFi-family ports also need to declare which GPIOs the CYW43 radio
+reserves — `port_pinno_alias_for_name`, `port_pin_is_reserved_alias`,
+`port_pin_reserved_label` map `GP23/24/25/29` (the standard CYW43 SPI
+pins on pico_w / pico2_w / pimoroni_pico_plus2_w) to virtual pins
+41-44. Copy from `ports/web_rp2350/port_defaults.c`.
+
 For a concrete walkthrough of writing each of these for a custom
-board, see the worked example below.
+single-board port, see the worked example below.
 
 **Per-port `#ifdef` is fine in this file.** The HAL purity gate only
 enforces `core/*.c` and `hal/*.h`. Port-implementation files like
 `port_defaults.c` may use `#ifdef USBKEYBOARD`, `#ifdef PICOMITEVGA`,
 etc. for body-shaped divergence — that's the right scope for them.
+But if you're writing a single-board port, you usually don't need any
+ifdefs at all.
 
 ## Step A4 — port_sources.cmake
 
@@ -217,6 +257,31 @@ ports/mymite/
     mmbasic_port_hdmi.c   # HDMI-specific MMBasic port hook
 ```
 
+**If your board adds a feature the closest port doesn't have** (WiFi
+in particular, but the same applies to any axis): you're splicing
+two ports, not copying one. Pick the second port that has the
+missing feature and merge into the four files above.
+
+For HDMI + WiFi specifically (`ports/dvi_wifi_rp2350/` is a worked
+example of this exact splice), you start from `ports/hdmi_rp2350/`
+and copy in:
+- WiFi stack source list from `ports/web_rp2350/port_sources.cmake`
+  (cJSON / mqtt / MMMqtt / MMTCPclient / MMtelnet / MMntp /
+  MMtcpserver / tftp / MMtftp / MMudp / MMsetwifi)
+- `pico_cyw43_arch_lwip_poll` link library
+- `-DCYW43_HOST_NAME` and `-DPICO_CYW43_ARCH_POLL` compile options
+- CYW43-pin alias hooks from `ports/web_rp2350/port_defaults.c`
+  (`port_pinno_alias_for_name` / `port_pin_is_reserved_alias` /
+  `port_pin_reserved_label` mapping `GP23/24/25/29` → 41-44)
+- `Option.ServerResponceTime = 5000;` in `port_set_default_options`
+- `HAL_PORT_HAS_WIFI 1` in `port_config.h`
+- Drop `MMweb_stubs.c` and `SSD1963.c`/`Touch.c` from the source list
+  (Touch.c references `Option.TOUCH_XSCALE` which doesn't exist on
+  PICOMITEVGA's `struct option_s` layout)
+- Trim `HAL_PORT_HEAP_MEMORY_SIZE` by ~30-60 KB to make room for
+  CYW43 + lwIP buffers (HDMI alone uses 184 KB; with WiFi added,
+  ~120 KB fits cleanly on RP2350's 520 KB SRAM)
+
 ### Step 2 — pick a COMPILE name
 
 Convention is uppercase-no-underscore: `MYMITE`. This is what users
@@ -246,14 +311,33 @@ if (COMPILE STREQUAL "HDMI" OR ... OR COMPILE STREQUAL "MYMITE" )
     set(PICO_PLATFORM rp2350)
     if (COMPILE STREQUAL "WEBRP2350" OR COMPILE STREQUAL "VGAWIFIRP2350")
         set(PICO_BOARD pico2_w)
+    elseif (COMPILE STREQUAL "MYMITE_WIFI_VARIANT")
+        set(PICO_BOARD pimoroni_pico_plus2_w_rp2350)   # if RP2350B + CYW43
     else()
-        set(PICO_BOARD pimoroni_pga2350)   # MYMITE picks up this default
+        set(PICO_BOARD pimoroni_pga2350)               # if RP2350B + no CYW43
     endif()
 ```
 
-If `mymite` uses a different board (custom PCB, different cyw43 module,
-etc.), add a board-name branch the same way `pico2_w` was added for
-WiFi ports.
+**Picking the right `PICO_BOARD`** (this is critical and undermentioned
+elsewhere — pico-sdk uses the board file to define chip variant,
+default LED, USB IDs, and especially `CYW43_*` pin assignments and
+`PICO_CYW43_SUPPORTED`):
+
+| Your hardware | `PICO_BOARD` to use |
+|---|---|
+| RP2350**A** (30-pin), no WiFi | `pimoroni_pga2350` (or `pico2`) |
+| RP2350**B** (80-pin), no WiFi | `pimoroni_pga2350` |
+| RP2350**A** + CYW43 (Pico 2 W) | `pico2_w` |
+| RP2350**B** + CYW43 (Pico Plus 2 W, RM2 module) | `pimoroni_pico_plus2_w_rp2350` |
+| Custom board with non-standard CYW43 wiring | Custom board file (drop a `.h` in `boards/include/boards/` and override `CYW43_DEFAULT_PIN_WL_*`) |
+
+For RP2350B + RM2 specifically, `pimoroni_pico_plus2_w_rp2350` is the
+right stock SDK board file: `PICO_RP2350A 0` (selects 80-pin chip),
+CYW43 SPI on GP23/24/25/29 (matches RM2 module's standard pinout),
+and SDK's `cyw43_arch` library is built (because the board file calls
+`pico_board_cmake_set(PICO_CYW43_SUPPORTED, 1)`). You don't need to
+write a custom board file unless your PCB wires CYW43 to different
+GPIOs.
 
 ### Step 4 — adjust `port_config.h`
 
@@ -470,20 +554,26 @@ any other port that breaks yours blocks `main`.
 
 ### Common decisions for an HDMI + PSRAM board
 
-| Question | Answer |
-|---|---|
-| Set `HAL_PORT_HAS_HDMI`? | `1` |
-| Set `HAL_PORT_HAS_VGA_PIO`? | `1` (HDMI rides on the VGA-PIO scaffolding) |
-| Set `HAL_PORT_HAS_PSRAM`? | `1` |
-| Set `HAL_PORT_IS_VGA`? | `1` (PICOMITEVGA family) |
-| Set `HAL_PORT_HAS_WIFI`? | `0` (HDMI + WiFi together is F1 — much harder, see `ports/vga_wifi_rp2350/README.md`) |
-| Set `HAL_PORT_HAS_GUICONTROLS`? | `0` (no touch panel on HDMI) |
-| `core1stack[]` words? | `128` (HDMI scanout uses 512 bytes = 128 words) |
-| `FRAMEBUFFER_TRAILER_BYTES`? | `(320*240*2) = 153600` (HDMI 16-bit QVGA shadow) |
-| Link `pico_multicore`? | yes (HDMI scanout runs on core1) |
-| Link `pico_cyw43_arch_lwip_poll`? | no |
-| `pico_set_float_implementation pico_dcp`? | yes (rp2350) |
-| `pico_define_boot_stage2 slower_boot2`? | no (rp2040-only) |
+| Question | HDMI alone | HDMI + WiFi (RM2) |
+|---|---|---|
+| Set `HAL_PORT_HAS_HDMI`? | `1` | `1` |
+| Set `HAL_PORT_HAS_VGA_PIO`? | `1` (HDMI rides on the VGA-PIO scaffolding) | `1` |
+| Set `HAL_PORT_HAS_PSRAM`? | `1` | `1` (RM2 wires CYW43 off the QSPI pins, so PSRAM stays available — different from `web_rp2350` where CYW43 owns QSPI) |
+| Set `HAL_PORT_IS_VGA`? | `1` (PICOMITEVGA family) | `1` |
+| Set `HAL_PORT_HAS_WIFI`? | `0` | `1` |
+| Set `HAL_PORT_HAS_GUICONTROLS`? | `0` (no touch panel on HDMI) | `0` |
+| `HAL_PORT_HAS_HEARTBEAT`? | `1` (board has a user LED) | `0` (CYW43 owns the LED on standard RP2350+CYW43 boards) |
+| `HAL_PORT_ADC_CHANNEL_MAX`? | `4` | `3` (GP29 reserved for CYW43 SPI clock → ADC3 unavailable) |
+| `core1stack[]` words? | `128` (HDMI scanout uses 512 bytes = 128 words) | `128` |
+| `FRAMEBUFFER_TRAILER_BYTES`? | `(320*240*2) = 153600` (HDMI 16-bit QVGA shadow) | same |
+| `HAL_PORT_HEAP_MEMORY_SIZE`? | ~184 KB | ~120 KB (CYW43 + lwIP eat ~30-60 KB; trim heap to fit on RP2350's 520 KB SRAM) |
+| Link `pico_multicore`? | yes (HDMI scanout runs on core1) | yes |
+| Link `pico_cyw43_arch_lwip_poll`? | no | yes |
+| `pico_set_float_implementation pico_dcp`? | yes (rp2350) | yes |
+| `pico_define_boot_stage2 slower_boot2`? | no (rp2040-only) | no |
+| `PICO_BOARD`? | `pimoroni_pga2350` (RP2350B no CYW43) | `pimoroni_pico_plus2_w_rp2350` (RP2350B + CYW43, matches RM2 standard pinout) |
+
+`ports/dvi_wifi_rp2350/` is a complete worked example of the right column.
 
 If (1) or (2) regresses while adding your board, an `#ifdef` has landed in a core or HAL file — the answer is a port-config macro, a port hook, or a driver flavour (see "Ground rules" below), not a widened exemption.
 
