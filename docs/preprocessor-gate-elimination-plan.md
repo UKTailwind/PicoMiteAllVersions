@@ -87,29 +87,39 @@ Five categories:
    reference symbols that exist on every port.
 4. **delete** — the gated block is dead, the flag has zero remaining
    consumers, or the surrounding code can be unconditionally compiled.
-5. **legacy-multi-board** — file lives under `ports/<legacy>/`
-   (port-impl scope per the post-decascade rule). Excluded from
-   elimination — the post-decascade plan tags these as "leave legacy
-   multi-board ports as they are." E1 still records them but the
-   action is "skip".
+5. **(no exemption)** — earlier drafts proposed exempting the legacy
+   multi-board `OPTION RESET <BOARD>` ladders. That was wrong: those
+   ladders are the densest preprocessor coupling in the codebase and
+   the multi-board mechanism itself is a target for elimination.
+   Per-board profile data moves to `drivers/board_profiles/<board>.c`
+   files registered at link time; the `OPTION RESET <BOARD>` command
+   becomes a runtime table walk, not an `#if`-bracketed
+   `checkstring()` ladder. The dual-shipping legacy port directories
+   continue to exist (so existing user `OPTION RESET` invocations
+   keep working), but their `port_defaults.c` files lose all
+   preprocessor gates.
 
 The audit gives a real worklist. Without it, the rest of the plan is
 hand-waving.
 
-### Stage E2 — Drop dead gates (smallest payoff first)
+### Stage E2 — Drop dead gates + finish the small flags
 
-From the E1 audit, attack everything in the **delete** category. Some
-candidates already visible:
+From the E1 audit, attack the smallest-flag elimination first:
 
-- `HAL_PORT_HAS_GUICONTROLS` only has 10 sites. After P3 most should
-  already be hooks. Remaining sites are likely in `Touch.c` /
-  `gui_touch.c` and may be legitimately gated (Touch.c is itself
-  GUI-only and may not need to compile at all on non-GUICONTROLS
-  ports). If `Touch.c` isn't linked on non-GUICONTROLS ports, the
-  internal `#if HAL_PORT_HAS_GUICONTROLS` gates are vestigial — drop
-  them.
-- `HAL_PORT_HAS_I2C_KEYPAD` only has 14 sites — small enough to fully
-  decompose into hooks in one stage.
+- `HAL_PORT_HAS_GUICONTROLS` (10 sites). After P3 most should already
+  be hooks. Remaining sites are likely in `Touch.c` / `gui_touch.c`.
+  `Touch.c` is itself GUI-only and may not need to compile at all on
+  non-GUICONTROLS ports — gate it via `port_sources.cmake` linkage
+  rather than in-file `#if`s. Drop the internal gates.
+- `HAL_PORT_HAS_I2C_KEYPAD` (14 sites). Small enough to fully
+  decompose. Targets: I2C.c keypad protocol → real-vs-stub split,
+  PicoMite.c boot delay → hook, drivers/sd_spi/mmc_stm32.c
+  shared-bus init → hook, port_load_overrides.c + picocalc_features.c
+  → split.
+
+Both flags should drop to zero source-level gates by end of E2. CMake
+keeps the flag for linkage selection; runtime keeps it for
+value-in-expression checks.
 
 ### Stage E3 — Split `drivers/spi_lcd/spi_lcd.c` by display family
 
@@ -165,6 +175,43 @@ drivers/editor_keys/editor_keys_ps2.c   — PS/2 impl
 `Editor.c` calls `hal_editor_translate_key()` once per keystroke; the
 50 inline gates collapse to a single call.
 
+### Stage E5b — Convert multi-board mechanism to a board-profile registry
+
+The dual-shipping legacy ports' `port_defaults.c` files (16 sites
+across 5 ports) plus `port_load_overrides.c` (1 site) are the densest
+preprocessor coupling in the codebase. The multi-board axis itself —
+runtime selection of *which physical board* this firmware was burned
+to — is not the problem; it's a real user-facing feature
+(`OPTION RESET PICOCALC` etc.). The problem is that today it's
+implemented as `#ifdef`-bracketed `checkstring()` ladders inside one
+`port_defaults.c` per port directory.
+
+Replacement design:
+
+```
+drivers/board_profiles/
+    board_profile.h            — struct board_profile { name, defaults_fn, ... }
+    board_profile_registry.c   — table of registered profiles + dispatch
+    profile_picocalc.c         — sets OPTION defaults for the PicoCalc board
+    profile_gamemite.c         —      …      Game*Mite
+    profile_pico_computer.c    —      …      Pico Computer
+    profile_picoresttouch.c    —      …      Pico-ResTouch
+    profile_hdmi_usb.c         —      …      HDMI-USB
+    …
+```
+
+Each profile file is linked from `port_sources.cmake` only on ports
+that physically support that board. `OPTION RESET <BOARD>` walks the
+registry table, matches by name, calls the profile's `defaults_fn`,
+saves, soft-resets. The `port_defaults.c` files in legacy ports
+collapse from 100+ lines of `#if`-laden ladder to a one-line
+"register the profiles this port knows about and delegate to the
+registry."
+
+This is a real refactor — ~3 days of work — but eliminates 17 `#if`
+sites and turns the multi-board mechanism into a proper data-driven
+system.
+
 ### Stage E6 — Decompose `PicoMite.c` (67 gates)
 
 `PicoMite.c` is the boot file + main dispatch loop + interrupt
@@ -218,8 +265,10 @@ grep -rE '^\s*#\s*(if|ifdef|ifndef|elif).*\bHAL_PORT_(HAS|IS)_' \
 returns empty. `tools/check_hal_purity.sh` extends to enforce this
 across all source files (not just the strict-scope set).
 
-The legacy multi-board port_defaults.c files (E1's category 5) are
-exempted explicitly — they're allowed `#if` on the multi-board axis.
+No file-level exemptions. Including the dual-shipping legacy port
+directories — those were initially proposed as exempt, but the
+multi-board mechanism is itself a target for elimination
+(see Stage E1's "no exemption" note).
 
 ## What the flags are still for after E8
 
@@ -265,9 +314,10 @@ dead documentation — delete in E2.
 | E3 — split spi_lcd.c | 1 week |
 | E4 — split vga_mode_ops.c | 2 days |
 | E5 — extract Editor.c keys | 2 days |
+| E5b — board-profile registry | 3 days |
 | E6 — decompose PicoMite.c | 3–4 days |
 | E7 — reformulate residue | 2 days |
 | E8 — gate + acceptance | 1 day |
 
-Total: ~3 weeks of focused work to drive `#if HAL_PORT_*` to zero in
-core + drivers.
+Total: ~3.5 weeks of focused work to drive `#if HAL_PORT_*` to zero
+across core, drivers, and legacy port impl files (no exemptions).

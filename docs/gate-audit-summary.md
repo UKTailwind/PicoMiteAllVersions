@@ -6,15 +6,23 @@ data in `docs/gate-audit.csv`; this file is the rolled-up summary.
 
 ## Totals
 
-360 gate sites, classified as:
+359 gate sites, classified as:
 
 | Category | Sites | %  |
 |---|---:|---:|
-| extract-hook        | 209 | 58% |
-| split-driver        | 102 | 28% |
+| extract-hook        | 229 | 64% |
+| split-driver        | 104 | 29% |
 | value-in-expression |  26 |  7% |
-| legacy-multi-board  |  22 |  6% |
-| delete (E1 result)  |   1 | (none flagged in this pass; revisit during E2) |
+| delete (E1 result)  |   0 | revisit during E2 |
+
+**No exemptions.** The multi-board `OPTION RESET <BOARD>` mechanism in
+`ports/{pico,pico_rp2350,vga,vga_rp2350,hdmi_rp2350}/port_defaults.c`
+is itself a target for elimination — per-board defaults move to
+`drivers/board_profiles/<board>.c` files selected at link time, the
+`#if HAL_PORT_HAS_USB_KEYBOARD` ladders inside the multi-board ports
+collapse along with them. `configuration.h`'s legacy translation
+layer dies along with `-DPICOCALC=true|false` becoming a port-config
+flag set in port_config.h.
 
 ## Per-flag distribution
 
@@ -46,26 +54,32 @@ data in `docs/gate-audit.csv`; this file is the rolled-up summary.
 | `Touch.c`                                          |  8 | split-driver        | Gate the entire file by linkage; drop in-file gates. |
 | `Custom.c`                                         |  6 | extract-hook        | CSUB / CFunction WiFi gates → hook. |
 | `I2C.c`                                            |  5 | extract-hook        | I2C-keypad protocol → `drivers/i2c_picocalc_kbd` hook. |
-| `ports/pico/port_defaults.c`                       |  4 | legacy-multi-board  | Skip — OPTION RESET handlers in legacy multi-board port. |
+| `ports/pico/port_defaults.c`                       |  4 | extract-hook        | Per-board defaults → `drivers/board_profiles/<board>.c` linked at port composition; OPTION RESET <BOARD> ladder becomes a runtime board-profile dispatch. |
 | `ports/pico_sdk_common/cmd_files_hooks.c`          |  4 | extract-hook        | cmd_files USBKEYBOARD axis → hook. |
 | `ports/pico_sdk_common/clear_runtime_port.c`       |  4 | extract-hook        | |
 | `drivers/hdmi/hdmi_modes.c`                        |  4 | split-driver        | HDMI vs DVI mode tables. |
-| `configuration.h`                                  |  4 | legacy-multi-board  | Skip — translation layer for legacy multi-board ports. |
+| `configuration.h`                                  |  4 | extract-hook        | Move USB-axis FLASH/MagicKey/HEAPTOP + WiFi config + VGA config to flat per-port `port_config.h` values. The legacy translation layer dies. |
 | (long tail of 1–3 site files)                      |  … | (mixed)             | |
 
 ## Per-category notes
 
-### extract-hook (209 sites, 58%)
+### extract-hook (229 sites, 64%)
 
 The biggest bucket. Most sites are HAL operations that vary per port —
 boot sequencing, keyboard input, OPTION setters, `cmd_files` plumbing.
 Each maps to a HAL hook in `hal/hal_*.h` plus a real-impl + stub pair
 under `drivers/<topic>/` or `ports/pico_sdk_common/`.
 
-Approximate hook count to define: ~30 new hooks across the 209 sites
+Approximate hook count to define: ~35 new hooks across the 229 sites
 (many sites collapse to the same hook).
 
-### split-driver (102 sites, 28%)
+This bucket also includes the legacy multi-board `port_defaults.c`
+ladders (16 sites): the per-board profile data moves to
+`drivers/board_profiles/<board>.c` files linked unconditionally; the
+`OPTION RESET <BOARD>` command becomes a table-driven runtime
+dispatch rather than an `#if`-bracketed `checkstring()` ladder.
+
+### split-driver (104 sites, 29%)
 
 `drivers/spi_lcd/spi_lcd.c` alone owns 47 of these; `drivers/vga_pio/`
 owns 31; `Hardware_Includes.h` 9; `Touch.c` 8; `drivers/hdmi/` 4;
@@ -116,24 +130,38 @@ laziness rather than a hard linkage requirement.
 const array; conditional rows can become runtime predicates inside
 the dispatch function rather than build-time inclusions.
 
-### legacy-multi-board (22 sites, 6%)
+### Multi-board mechanism (folded into extract-hook + split-driver)
 
-Exempt from elimination. These are:
+Earlier drafts of this audit tagged ~22 sites as "legacy-multi-board
+exempt." That was wrong. The multi-board `OPTION RESET <BOARD>`
+mechanism is the single biggest source of preprocessor coupling in
+the legacy ports and must die along with the rest. Specifics:
 
-- `ports/{pico,vga,vga_rp2350,pico_rp2350,hdmi_rp2350}/port_defaults.c`
-  — `OPTION RESET <BOARD>` handlers in the legacy multi-board ports
-  (16 sites total).
-- `configuration.h` (4 sites) — translation layer that maps the
-  legacy `-DPICOCALC=true|false` CMake variable to the right
-  `HAL_PORT_*` constants for the legacy multi-board ports.
-- `ports/pico_sdk_common/picocalc_features.c` (1 site) — already a
-  real-vs-stub split inside the file.
-- `ports/pico_sdk_common/port_load_overrides.c` (1 site) — board
-  profile defaults override.
+- `ports/{pico,pico_rp2350,vga,vga_rp2350,hdmi_rp2350}/port_defaults.c`
+  (16 sites) — re-categorized as **extract-hook**. Per-board profile
+  data moves to `drivers/board_profiles/<board>.c` files (one file
+  per profile: gamemite, picocalc, hdmi_usb, pico_computer, etc.).
+  Each profile file exports a const struct of OPTION defaults; the
+  `OPTION RESET <BOARD>` command becomes a runtime dispatch over a
+  registry table built at link time. The dual-shipping legacy port
+  directories continue to exist (so existing user `OPTION RESET`
+  invocations keep working), but the file body becomes a single
+  no-`#if` table walk.
+- `configuration.h` (4 sites) — re-categorized as **extract-hook**.
+  The USB-axis `FLASH_TARGET_OFFSET_USB` / `MagicKey_USB` /
+  `HEAPTOP_USB` siblings become flat per-port `port_config.h`
+  values; the WiFi / VGA gates become per-port flat values too.
+  When all four sites are eliminated the file becomes a tiny
+  unconditional include or disappears entirely.
+- `ports/pico_sdk_common/picocalc_features.c` (1 site) —
+  re-categorized as **split-driver**: split into `picocalc_features_real.c`
+  (linked when `HAL_PORT_HAS_I2C_KEYPAD=1`) + `picocalc_features_stub.c`.
+- `ports/pico_sdk_common/port_load_overrides.c` (1 site) —
+  re-categorized as **split-driver**: per-board profile files under
+  `drivers/board_profiles/` (same target as the per-port `port_defaults.c`
+  cleanup above).
 
-The post-decascade plan tags these as "leave legacy multi-board ports
-as they are." The acceptance gate for E8 will skip these files
-explicitly.
+The acceptance gate for E8 has no multi-board exemption.
 
 ## Next stage entry points
 
