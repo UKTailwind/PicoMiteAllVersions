@@ -171,3 +171,68 @@ void starttelnet(struct tcp_pcb *client_pcb, int pcb, void *arg){
         }
 
 }
+
+void __not_in_flash_func(ProcessWeb)(int mode){
+    static uint64_t flushtimer=0;
+    static uint64_t lastusec=0;
+    static int testcount=0;  
+    static int lastonoff=0;
+    static uint64_t lastheartmsec=0;
+    uint64_t timenow=time_us_64();   
+    if(!WIFIconnected && startupcomplete)goto flashonly;
+    TCP_SERVER_T *state = (TCP_SERVER_T*)TCPstate;
+    if(!state)return;
+    int t=0;
+    for(int i=0;i<MaxPcb;i++){
+        if(state->client_pcb[i]==NULL){
+                t++;
+        } else if(state->client_pcb[i]==(struct tcp_pcb *)44){
+            if(timenow-state->pcbopentime[i] > 1000*(uint32_t)Option.ServerResponceTime + 20000000 && !state->keepalive[i]){
+                state->client_pcb[i]=NULL;
+//                    printf("PCB %d should be closed by now\r\n", i);
+            }
+        } else {
+            if(timenow-state->pcbopentime[i] > 1000*(uint32_t)Option.ServerResponceTime && !state->keepalive[i]){
+//                    printf("Warning PCB %d still open\r\n", i);
+                    if(state->buffer_recv[i]){
+                            tcp_server_close(state,i);
+                            error("No response to request from connection no. %",i+1);
+//                            printf("Warning: No response to request from connection no. %d\r\n",i+1);
+                    }
+                    tcp_server_close(state,i);
+                    state->client_pcb[i]=(struct tcp_pcb *)44;
+            }
+        }
+    }
+    if(testcount == 0 || timenow>lastusec){
+        lastusec=timenow+1000;
+        testcount = 0 ;
+        if(startupcomplete)cyw43_arch_poll();
+    }
+    testcount++;
+    if(testcount==100)testcount=0;
+    if(!mode)return;
+    if(state->telnet_pcb_no!=99){
+        if(timenow > flushtimer){
+            TelnetPutC(0,-1);
+            flushtimer=timenow+5000;
+        }
+    }
+    flashonly:;
+    if(Option.NoHeartbeat){
+        if(lastonoff!=2){
+            if(startupcomplete){
+                if(cyw43_arch_gpio_get(CYW43_WL_GPIO_LED_PIN)) cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
+                lastonoff=2;
+            }
+        }
+    } else {
+        if(lastonoff==2)lastonoff=0;
+        if(timenow-lastheartmsec>(WIFIconnected ? 500000:1000000) && startupcomplete){
+            lastheartmsec=timenow;
+            if(lastonoff)cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);
+            else cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
+            lastonoff^=1;
+        }
+    }
+}
