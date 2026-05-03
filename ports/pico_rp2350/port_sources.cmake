@@ -14,6 +14,10 @@ target_sources(PicoMite PRIVATE
     ${CMAKE_SOURCE_DIR}/drivers/vm_framebuffer_picomite/vm_framebuffer_picomite.c
     ${CMAKE_SOURCE_DIR}/drivers/spi_lcd/spi_lcd_fastgfx.c
     ${CMAKE_SOURCE_DIR}/drivers/spi_lcd/spi_lcd_framebuffer.c
+    # rp2350 PicoMite is the only port with the RAM budget for the
+    # MEM332 RGB332 shadow framebuffer family (ILI9488WBUFF,
+    # ST7796SPBUFF, etc.). Other SPI-LCD ports link _mem332_stub.c.
+    ${CMAKE_SOURCE_DIR}/drivers/spi_lcd/spi_lcd_mem332.c
     ${CMAKE_SOURCE_DIR}/drivers/gui_touch/gui_touch.c
     ${CMAKE_SOURCE_DIR}/drivers/gui_controls/gui_controls_real.c
     ${CMAKE_SOURCE_DIR}/SSD1963.c

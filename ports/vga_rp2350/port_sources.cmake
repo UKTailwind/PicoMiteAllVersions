@@ -26,7 +26,7 @@ target_sources(PicoMite PRIVATE
     # Non-PICOMITE / non-HDMI stubs.
     ${CMAKE_SOURCE_DIR}/drivers/display_merge/display_merge_stub.c
     ${CMAKE_SOURCE_DIR}/drivers/vm_framebuffer_unsupported/vm_framebuffer_stub.c
-    ${CMAKE_SOURCE_DIR}/drivers/spi_lcd/spi_lcd_nextgen_stub.c
+    ${CMAKE_SOURCE_DIR}/drivers/spi_lcd/spi_lcd_mem332_stub.c
     ${CMAKE_SOURCE_DIR}/drivers/spi_lcd/spi_lcd_fastgfx_stub.c
     ${CMAKE_SOURCE_DIR}/drivers/spi_lcd/spi_oled_stub.c
     ${CMAKE_SOURCE_DIR}/drivers/gui_touch/gui_touch_stub.c

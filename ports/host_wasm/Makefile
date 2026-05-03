@@ -74,7 +74,7 @@ CORE_SRCS = MMBasic.c Commands.c Functions.c Operators.c MATHS.c \
             display_state.c pin_state.c option_state.c audio_state.c \
             Draw.c RGB121.c Tilemap.c FileIO.c Audio.c BmpDecoder.c re.c picojpeg.c
 # Stubs + host-only subsystems — match ports/host_native/Makefile.
-CORE_SRCS += audio_mp3_stub.c spi_lcd_nextgen_stub.c display_merge_stub.c vga_ops_stub.c
+CORE_SRCS += audio_mp3_stub.c spi_lcd_mem332_stub.c display_merge_stub.c vga_ops_stub.c
 CORE_SRCS += gfx_3d.c upng_sprite_stub.c gui_touch_stub.c gui_controls_stub.c psram_heap_stub.c i2c_keypad_stub.c
 
 # Bytecode VM sources.

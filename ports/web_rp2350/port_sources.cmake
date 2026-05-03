@@ -40,7 +40,7 @@ target_sources(PicoMite PRIVATE
 
     # SPI-LCD framebuffer.
     ${CMAKE_SOURCE_DIR}/drivers/spi_lcd/spi_lcd_framebuffer.c
-    ${CMAKE_SOURCE_DIR}/drivers/spi_lcd/spi_lcd_nextgen_stub.c
+    ${CMAKE_SOURCE_DIR}/drivers/spi_lcd/spi_lcd_mem332_stub.c
 
     # Non-PICOMITE stubs.
     ${CMAKE_SOURCE_DIR}/drivers/display_merge/display_merge_stub.c
