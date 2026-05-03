@@ -185,7 +185,7 @@ void I2C_Send_Data(unsigned char * data, int n) {
   if (i2cret == PICO_ERROR_GENERIC) mmI2Cvalue = 1;
   if (i2cret == PICO_ERROR_TIMEOUT) mmI2Cvalue = 2;
 }
-#ifndef PICOMITEVGA
+#if !HAL_PORT_IS_VGA
 void ConfigDisplayI2C(unsigned char * p) {
   unsigned char DISPLAY_TYPE = 0;
   getargs( & p, 5, (unsigned char * )
@@ -1717,7 +1717,7 @@ void classicproc(void) {
   nunstruct[0].x0 = ((nunbuff[4] >> 1) | (nunbuff[5] << 7)) ^ 0b111111111111111;
 }
 
-#ifndef PICOMITEVGA
+#if !HAL_PORT_IS_VGA
 #define ov7670_address 0x21
 #define top 120
 #define left 160

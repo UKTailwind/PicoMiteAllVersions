@@ -76,7 +76,7 @@ extern void *GetAlignedMemory(int size);
 extern void FreeMemorySafe(void **addr);
 extern int MemSize(void *addr);
 extern unsigned char *MMHeap;
-#ifdef PICOMITEVGA
+#if HAL_PORT_IS_VGA
 extern unsigned char *WriteBuf;
 extern unsigned char *FrameBuf;
 extern unsigned char *SecondFrame;

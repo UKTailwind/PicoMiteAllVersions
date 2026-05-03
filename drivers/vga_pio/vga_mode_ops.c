@@ -598,7 +598,7 @@ void fun_getscanline(void) {
 }
 #endif
 
-#ifdef PICOMITEVGA
+#if HAL_PORT_IS_VGA
 void cmd_colourmap(void){
     long long int *cptr=NULL, *fptr=NULL;
     MMFLOAT *cfptr=NULL, *ffptr=NULL;
@@ -635,7 +635,7 @@ void cmd_colourmap(void){
 }
 #endif
 
-#ifdef PICOMITEVGA
+#if HAL_PORT_IS_VGA
 void fun_map(void){
 	int cl=getint(ep,0,255);
     switch(DISPLAY_TYPE){
@@ -727,7 +727,7 @@ if(DISPLAY_TYPE==SCREENMODE1){
     ytileheight=gui_font_height;
     Y_TILE=VRes/ytileheight;
     if(VRes % ytileheight)Y_TILE++;
-#ifdef PICOMITEVGA
+#if HAL_PORT_IS_VGA
     if(DISPLAY_TYPE==SCREENMODE1/* && WriteBuf==DisplayBuf*/){
         gui_fcolour=Option.DefaultFC;
         gui_bcolour=Option.DefaultBC;

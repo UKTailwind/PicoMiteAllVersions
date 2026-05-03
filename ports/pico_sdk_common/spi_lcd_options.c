@@ -11,7 +11,7 @@
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
 
-#ifndef PICOMITEVGA
+#if !HAL_PORT_IS_VGA
 
 void MIPS16 ConfigDisplayUser(unsigned char *tp)
 {

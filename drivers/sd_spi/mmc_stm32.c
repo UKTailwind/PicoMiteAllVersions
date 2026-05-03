@@ -50,7 +50,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #if HAL_PORT_HAS_WIFI
 #include "pico/cyw43_arch.h"
 #endif
-#ifdef PICOMITEVGA
+#if HAL_PORT_IS_VGA
 #include "Include.h"
 #endif
 #include "VS1053.h"
@@ -830,13 +830,13 @@ int wait_ready (void)
 
 static void __not_in_flash_func(deselect)(void)
 {
-#ifndef PICOMITEVGA
+#if !HAL_PORT_IS_VGA
 	if(Option.CombinedCS){
 		gpio_set_dir(TOUCH_CS_PIN, GPIO_IN);
 	} else {
 #endif
 		gpio_put(SD_CS_PIN,GPIO_PIN_SET);
-#ifndef PICOMITEVGA
+#if !HAL_PORT_IS_VGA
 	}
 	nop;nop;nop;nop;nop;
 #endif
@@ -855,7 +855,7 @@ int __not_in_flash_func(selectSD)(void)	/* 1:Successful, 0:Timeout */
 {
 	if(SD_SPI_SPEED==SD_SLOW_SPI_SPEED)	SPISpeedSet(SDSLOW);
 	else SPISpeedSet(SDFAST);
-#ifndef PICOMITEVGA
+#if !HAL_PORT_IS_VGA
 	if(Option.CombinedCS){
 		gpio_put(TOUCH_CS_PIN,GPIO_PIN_RESET);
 		gpio_set_dir(TOUCH_CS_PIN, GPIO_OUT);
@@ -1470,7 +1470,7 @@ void InitReservedIO(void) {
 	}
 #endif
 #endif
-#ifdef PICOMITEVGA
+#if HAL_PORT_IS_VGA
 #if !HAL_PORT_HAS_HDMI
 	VGArecovery(0);
 #endif
@@ -1861,7 +1861,7 @@ void InitReservedIO(void) {
 
 char *pinsearch(int pin){
 	char *buff=GetTempMemory(STRINGSIZE);
-#ifndef PICOMITEVGA
+#if !HAL_PORT_IS_VGA
 	int ssd=PinDef[Option.SSD_DATA].GPno;
 	if(pin==Option.LCD_CD)strcpy(buff,"LCD DC");
 	else if(pin==Option.LCD_CS)strcpy(buff,"LCD CS");
@@ -1924,7 +1924,7 @@ char *pinsearch(int pin){
 	else if(pin==Option.audio_i2s_data)strcpy(buff,"I2S DATA");
 	else if(pin==Option.audio_i2s_bclk)strcpy(buff,"I2S BCLK");
 	else if(pin==PINMAP[PinDef[Option.audio_i2s_bclk].GPno+1])strcpy(buff,"I2S LRCK");
-#ifdef PICOMITEVGA
+#if HAL_PORT_IS_VGA
 #if !HAL_PORT_HAS_HDMI
 	else if(pin==Option.VGA_BLUE)strcpy(buff,"VGA BLUE");
 	else if(pin==Option.VGA_HSYNC)strcpy(buff,"VGA HSYNC");

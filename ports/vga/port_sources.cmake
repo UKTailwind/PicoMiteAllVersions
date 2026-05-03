@@ -51,8 +51,7 @@ pico_generate_pio_header(PicoMite ${CMAKE_SOURCE_DIR}/PicoMiteVGA.pio)
 # --- Per-port build config (Stage E2) -------------------------------------
 # PICOMITEVGA still consulted by Hardware_Includes.h (multicore include)
 # and configuration.h's mode-table block. Decascade follow-on item.
-target_compile_options(PicoMite PRIVATE -DPICOMITEVGA
-                                        -DPICO_HEAP_SIZE=0x1000
+target_compile_options(PicoMite PRIVATE                                         -DPICO_HEAP_SIZE=0x1000
                                         -DPICO_CORE0_STACK_SIZE=0x2000
                                         )
 target_link_libraries(PicoMite pico_multicore)

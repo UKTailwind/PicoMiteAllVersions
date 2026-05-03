@@ -258,7 +258,7 @@ int MIPS16 port_heartbeat_option_setter(unsigned char *cmdline)
  * system bus on first config. */
 int MIPS16 port_system_lcd_spi_option_setter(unsigned char *cmdline)
 {
-#ifdef PICOMITEVGA
+#if HAL_PORT_IS_VGA
     (void)cmdline;
     return 0;
 #else
@@ -381,7 +381,7 @@ extern uint64_t piomap[];
 int MIPS16 port_audio_i2s_pio_slice(int pin1, int pin2)
 {
 #ifdef rp2350
-#if defined(PICOMITEVGA) && !HAL_PORT_HAS_HDMI
+#if HAL_PORT_IS_VGA && !HAL_PORT_HAS_HDMI
     int pio = QVGA_PIO_NUM;
 #else
     int pio = 2;
@@ -417,7 +417,7 @@ int MIPS16 port_mminfo_interrupts(int64_t *out_iret)
  * the field is unavailable. Other ports return the calibration state. */
 int MIPS16 port_mminfo_touch_status(unsigned char *out_sret)
 {
-#ifdef PICOMITEVGA
+#if HAL_PORT_IS_VGA
     (void)out_sret;
     return 0;
 #else
@@ -458,7 +458,7 @@ int MIPS16 port_mminfo_screenbuff(int64_t *out_iret)
  * drivers exist on PICOMITEVGA. */
 int MIPS16 port_poke_display_panel(unsigned char *p)
 {
-#ifdef PICOMITEVGA
+#if HAL_PORT_IS_VGA
     (void)p;
     return 0;
 #else

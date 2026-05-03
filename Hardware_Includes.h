@@ -35,7 +35,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "hardware/clocks.h"
 #include "pico/stdlib.h"
 #include "pico/util/datetime.h"
-#ifdef PICOMITEVGA
+#if HAL_PORT_IS_VGA
 #include "pico/multicore.h"
 #endif
 #include "lfs.h"
@@ -239,7 +239,7 @@ extern uint16_t LCD_CLK_PIN,LCD_MOSI_PIN,LCD_MISO_PIN;
 #endif
 extern bool screen320;
 extern void clear320(void);
-#ifdef PICOMITEVGA
+#if HAL_PORT_IS_VGA
 	extern volatile uint8_t transparent;
 	extern volatile uint8_t transparents;
 	extern volatile int RGBtransparent;
@@ -417,7 +417,7 @@ extern struct tagMTRand *g_myrand;
 #include "SPI.h"
 #include "Serial.h"
 #include "SPI-LCD.h"
-#ifndef PICOMITEVGA
+#if !HAL_PORT_IS_VGA
 #if !HAL_PORT_HAS_WIFI
 	#include "SSD1963.h"
 	#include "Touch.h"

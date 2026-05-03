@@ -243,7 +243,7 @@ void port_print_display_options(void)
         if(Option.KEYBOARDBL)PO2Int("BACKLIGHT KB", Option.KEYBOARDBL);
 #endif
         port_web_print_options();
-#ifndef PICOMITEVGA
+#if !HAL_PORT_IS_VGA
         /* TOUCH_XZERO/YZERO/XSCALE/YSCALE only exist in struct option_s
          * on non-VGA builds (FileIO.h). */
         if(Option.TOUCH_CS) {

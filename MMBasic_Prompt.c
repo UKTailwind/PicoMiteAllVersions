@@ -388,7 +388,7 @@ void MIPS16 EditInputLine(void) {
                                     fflush(stdout);
                                   
                                 }
-#ifndef PICOMITEVGA                                                                     
+#if !HAL_PORT_IS_VGA                                                                     
                                 i = CharIndex;
                                 j = strlen((const char *)inpbuf);
                                 // If its going to scroll then clear screen

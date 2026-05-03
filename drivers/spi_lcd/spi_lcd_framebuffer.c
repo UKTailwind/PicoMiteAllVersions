@@ -489,7 +489,7 @@ void cmd_framebuffer(void){
                 setframebuffer();
             } else error("Syntax");
         }
-#ifndef PICOMITEVGA
+#if !HAL_PORT_IS_VGA
     } else if((p=checkstring(cmdline, (unsigned char *)"SYNC"))) {
         hal_display_merge_sync_wait();
     } else if((p=checkstring(cmdline, (unsigned char *)"MERGE"))) { //merge the layer onto the physical display

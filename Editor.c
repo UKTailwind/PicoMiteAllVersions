@@ -75,7 +75,7 @@ extern void routinechecks(void);
 int8_t optioncolourcodesave;
 int editactive=0;
 #if !defined(LITE)
-#ifdef PICOMITEVGA
+#if HAL_PORT_IS_VGA
 static int r_on=0;
 void DisplayPutClever(char c){
     if((DISPLAY_TYPE==SCREENMODE1 && markmode && Option.ColourCode && ytileheight==gui_font_height && gui_font_width % 8 ==0)){
@@ -148,14 +148,14 @@ static inline char nothingchar(char dummy,int flush){
 static void (*PrintString)(char *buff)=SSPrintString;
 static char (*SSputchar)(char buff, int flush)=SerialConsolePutC;
 //    #define PrintString       SSPrintString
-#ifdef PICOMITEVGA
+#if HAL_PORT_IS_VGA
     #define MX470PutC(c)        DisplayPutClever(c)
 #else
     #define MX470PutC(c)        DisplayPutC(c);
 #endif
 // Only SSD1963 displays support H/W scrolling so for other displays it is much quicker to redraw the screen than scroll it
 // However, we don't want to redraw the serial console so we dummy out the serial writes whiole re-drawing the physical screen
-#ifdef PICOMITEVGA
+#if HAL_PORT_IS_VGA
     #define MX470Scroll(n) ScrollLCD(n);
 #else
 #if defined(PICOMITE) && defined(rp2350)
@@ -191,7 +191,7 @@ static char (*SSputchar)(char buff, int flush)=SerialConsolePutC;
         switch(fn) {
             case DISPLAY_CLS:       ClearScreen(gui_bcolour);
                                     break;
-#ifdef PICOMITEVGA
+#if HAL_PORT_IS_VGA
             case CLEAR_TO_EOS:      MX470Display(CLEAR_TO_EOL);
                                     DrawRectangle(0, CurrentY + gui_font_height, HRes-1, VRes-1, DISPLAY_TYPE==SCREENMODE1 ? 0 : gui_bcolour);
 #if HAL_PORT_HAS_HDMI
@@ -275,7 +275,7 @@ static char (*SSputchar)(char buff, int flush)=SerialConsolePutC;
                                     break;
             case DRAW_LINE:         DrawBox(0, gui_font_height * (Option.Height - 2), HRes - 1, VRes - 1, 0, 0, (DISPLAY_TYPE==SCREENMODE1 ? 0 :gui_bcolour));
                                     DrawLine(0, (VRes/gui_font_height)*gui_font_height - gui_font_height - 6, HRes - 1, (VRes/gui_font_height)*gui_font_height - gui_font_height - 6, 1, GUI_C_LINE);
-#ifdef PICOMITEVGA
+#if HAL_PORT_IS_VGA
 #if HAL_PORT_HAS_HDMI
                                     if(FullColour){
                                         if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==gui_font_height)for(int i=0; i<HRes/8; i++)tilefcols[(Option.Height - 2)*X_TILE+i]=RGB555(MAGENTA);
@@ -350,7 +350,7 @@ void edit(unsigned char *cmdline, bool cmdfile) {
         SaveContext();
         ClearVars(0,FALSE);
     }
-#ifdef PICOMITEVGA
+#if HAL_PORT_IS_VGA
     modmode=false;
     editactive=1;
     oldmode = DISPLAY_TYPE;
@@ -363,7 +363,7 @@ void edit(unsigned char *cmdline, bool cmdfile) {
 //    
     memset((void *)WriteBuf, 0, ScreenSize);
 
-#ifdef PICOMITEVGA
+#if HAL_PORT_IS_VGA
 #ifdef rp2350
     #if HAL_PORT_HAS_HDMI
         mapreset();
@@ -587,7 +587,7 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
   unsigned char *p, *tp, BreakKeySave;
   char currdel=0, nextdel=0, lastdel=0;
   char multi=false;
-#ifdef PICOMITEVGA
+#if HAL_PORT_IS_VGA
   int fontinc=gui_font_width / 8; //use to decide where to position mouse cursor
   int OptionY_TILESave;
   int ytileheightsave;
@@ -1044,7 +1044,7 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
                             BreakKey = BreakKeySave;
                             Option.ColourCode=optioncolourcodesave;
                             editactive=0;
-#ifdef PICOMITEVGA
+#if HAL_PORT_IS_VGA
                             Y_TILE=OptionY_TILESave;
                             ytileheight=ytileheightsave;
                             if(modmode){
@@ -1261,7 +1261,7 @@ void PositionCursor(unsigned char *curp) {
 void MarkMode(unsigned char *cb, unsigned char *buf) {
     unsigned char *p, *mark, *oldmark;
     int c=-1, x, y, i, oldx, oldy, txtpx, txtpy, errmsg = false;
-#ifdef PICOMITEVGA
+#if HAL_PORT_IS_VGA
     int fontinc=gui_font_width/8;
 #endif
     PrintFunctKeys(MARK);

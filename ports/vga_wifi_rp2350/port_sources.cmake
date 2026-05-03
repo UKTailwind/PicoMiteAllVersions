@@ -70,8 +70,7 @@ pico_generate_pio_header(PicoMite ${CMAKE_SOURCE_DIR}/PicoMiteVGA.pio)
 
 # --- Per-port build config ------------------------------------------------
 # PICOMITEVGA — VGA-family core branches.
-target_compile_options(PicoMite PRIVATE -DPICOMITEVGA
-                                        -DPICO_HEAP_SIZE=0x1000
+target_compile_options(PicoMite PRIVATE                                         -DPICO_HEAP_SIZE=0x1000
                                         -DPICO_CORE0_STACK_SIZE=0x4000
                                         )
 # WiFi stack settings.

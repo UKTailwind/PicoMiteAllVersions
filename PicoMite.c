@@ -55,7 +55,7 @@ extern void start_i2s(int pio, int sm);
 #include "hardware/structs/qmi.h"
 #include "psram.h"
 #endif
-#ifdef PICOMITEVGA
+#if HAL_PORT_IS_VGA
 extern void start_vga_i2s(void);
 #if !HAL_PORT_HAS_HDMI
 #endif
@@ -122,7 +122,7 @@ bool rp2350a=true;
     #include "lwip/pbuf.h"
     #include "lwip/udp.h"
 #endif
-#ifdef PICOMITEVGA
+#if HAL_PORT_IS_VGA
     volatile uint8_t transparent=0;
     volatile uint8_t transparents=0;
     volatile int RGBtransparent=0;
@@ -627,7 +627,7 @@ int kbhitConsole(void) {
 // check if there is a keystroke waiting in the buffer and, if so, return with the char
 // returns -1 if no char waiting
 // the main work is to check for vt100 escape code sequences and map to Maximite codes
-#if (defined(PICOMITEVGA) || HAL_PORT_HAS_WIFI) && !defined(rp2350)
+#if (HAL_PORT_IS_VGA || HAL_PORT_HAS_WIFI) && !defined(rp2350)
 int MMInkey(void) {
 #else
 int __not_in_flash_func(MMInkey)(void) {
@@ -1127,7 +1127,7 @@ void sigbus(void){
     SoftReset();
 }
 
-#ifdef PICOMITEVGA
+#if HAL_PORT_IS_VGA
 int vgaloop1,vgaloop2, vgaloop4, vgaloop8, vgaloop16, vgaloop32;
 
 #if !HAL_PORT_HAS_HDMI
@@ -1838,7 +1838,7 @@ int MIPS16 main(){
     LibMemory = (uint8_t *)flash_libmemory;
     uSec(100);
     if(_excep_code == RESET_CLOCKSPEED) {
-#ifdef PICOMITEVGA
+#if HAL_PORT_IS_VGA
 #if HAL_PORT_HAS_HDMI
         Option.CPU_Speed=Freq480P;              // init the options if this is the very first startup
 #else
@@ -1968,7 +1968,7 @@ int MIPS16 main(){
     uSec(100);
     hw_clear_bits(&watchdog_hw->ctrl, WATCHDOG_CTRL_ENABLE_BITS);
     _excep_code=excep;
-#ifdef PICOMITEVGA
+#if HAL_PORT_IS_VGA
 #if !HAL_PORT_HAS_HDMI
     if(Option.CPU_Speed == Freq252P || Option.CPU_Speed == Freq480P  || Option.CPU_Speed == Freq848  || Option.CPU_Speed == Freq400   || Option.CPU_Speed == FreqSVGA )QVGA_CLKDIV= 2;
     else if(Option.CPU_Speed == 378000)QVGA_CLKDIV= 3;
@@ -2041,7 +2041,7 @@ if(Option.CPU_Speed==FreqSVGA){ //adjust the size of the heap
     hal_keyboard_init();
 #endif
 	InitBasic();
-#ifndef PICOMITEVGA
+#if !HAL_PORT_IS_VGA
 #ifndef PICOCALC
     InitDisplaySSD();
 #endif
@@ -2064,7 +2064,7 @@ if(Option.CPU_Speed==FreqSVGA){ //adjust the size of the heap
     exception_set_exclusive_handler(SYSTICK_EXCEPTION,sigbus);
     while((i=getConsole())!=-1){}
     
-#ifdef PICOMITEVGA
+#if HAL_PORT_IS_VGA
 //        bus_ctrl_hw->priority = BUSCTRL_BUS_PRIORITY_DMA_W_BITS | BUSCTRL_BUS_PRIORITY_DMA_R_BITS;
     #if HAL_PORT_HAS_HDMI
 //    bus_ctrl_hw->priority = BUSCTRL_BUS_PRIORITY_DMA_W_BITS | BUSCTRL_BUS_PRIORITY_DMA_R_BITS | BUSCTRL_BUS_PRIORITY_PROC1_BITS;
@@ -2104,7 +2104,7 @@ if(Option.CPU_Speed==FreqSVGA){ //adjust the size of the heap
 #endif
         strcpy((char *)banner,MES_SIGNON); 
 #ifdef rp2350
-    #ifdef PICOMITEVGA
+    #if HAL_PORT_IS_VGA
         #if HAL_PORT_HAS_HDMI
             #ifdef USBKEYBOARD
                 banner[32]=(rp2350a?'A':'B');
@@ -2192,7 +2192,7 @@ if(Option.CPU_Speed==FreqSVGA){ //adjust the size of the heap
 #endif
 #ifdef rp2350
     if(PSRAMsize){MMPrintString("Total of ");PInt(PSRAMsize/(1024*1024));MMPrintString(" Mbytes PSRAM available\r\n");}
-    #if defined(PICOMITEVGA) && !HAL_PORT_HAS_HDMI
+    #if HAL_PORT_IS_VGA && !HAL_PORT_HAS_HDMI
         start_i2s(QVGA_PIO_NUM,1);
     #else
         start_i2s(2,1);

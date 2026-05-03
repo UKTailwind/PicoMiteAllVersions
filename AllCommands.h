@@ -542,7 +542,7 @@ void fun_map(void);
 /*frame
 	{ (unsigned char *)"Frame",		T_CMD | T_FUN,				0, cmd_frame	},
 */
-	#ifdef PICOMITEVGA
+	#if HAL_PORT_IS_VGA
   	{ (unsigned char *)"TILE",            T_CMD,                     0, cmd_tile   },
   	{ (unsigned char *)"MODE",            T_CMD,                     0, cmd_mode   },
   	{ (unsigned char *)"Map(",            T_CMD | T_FUN  ,           0, cmd_map   },
@@ -722,7 +722,7 @@ void fun_map(void);
 #if defined(USBKEYBOARD) || defined(MMBASIC_HOST) || defined(PICOCALC)
 	{ (unsigned char*)"KeyDown(",    T_FUN | T_INT,		0, fun_keydown	},
 #endif
-#ifdef PICOMITEVGA
+#if HAL_PORT_IS_VGA
 	{ (unsigned char*)"DRAW3D(",	    T_FUN | T_INT,		0, fun_3D, },
 	{ (unsigned char *)"GetScanLine",	    	T_FNA | T_INT,		0, fun_getscanline 	    },
 	{ (unsigned char*)"Map(",	    T_FUN | T_INT,		0, fun_map, },

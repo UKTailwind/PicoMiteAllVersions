@@ -22,7 +22,7 @@
 #include "hal/hal_display_merge.h"
 
 void port_clear_runtime_display_reset(void) {
-#ifndef PICOMITEVGA
+#if !HAL_PORT_IS_VGA
 #if defined(PICOMITE) && defined(rp2350)
     if (Option.DISPLAY_TYPE >= NEXTGEN) {
         Option.Refresh = 1;
@@ -53,7 +53,7 @@ void port_clear_runtime_display_reset(void) {
 }
 
 void port_error_restore_console_surface(void) {
-#ifdef PICOMITEVGA
+#if HAL_PORT_IS_VGA
     WriteBuf   = (unsigned char *)FRAMEBUFFER;
     DisplayBuf = (unsigned char *)FRAMEBUFFER;
 #else
@@ -65,7 +65,7 @@ void port_error_restore_console_surface(void) {
 extern void LCD_error(int line_num, const char *line_txt, const char *error_msg);
 
 void port_error_show_lcd_banner(int line_num, const char *source_line, const char *err_msg) {
-#ifdef PICOMITEVGA
+#if HAL_PORT_IS_VGA
     (void)line_num; (void)source_line; (void)err_msg;
 #else
     if (!Option.DISPLAY_CONSOLE && Option.DISPLAY_TYPE > I2C_PANEL) {

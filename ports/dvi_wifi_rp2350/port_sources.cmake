@@ -76,8 +76,7 @@ set_source_files_properties(${CMAKE_SOURCE_DIR}/cJSON.c PROPERTIES COMPILE_FLAGS
 
 # --- Per-port build config -------------------------------------------------
 # PICOMITEVGA — VGA-family core branches.
-target_compile_options(PicoMite PRIVATE -DPICOMITEVGA
-                                        -DPICO_HEAP_SIZE=0x2000
+target_compile_options(PicoMite PRIVATE                                         -DPICO_HEAP_SIZE=0x2000
                                         -DPICO_CORE0_STACK_SIZE=0x4000
                                         )
 # WiFi stack settings. Device name is what shows in the boot banner

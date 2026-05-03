@@ -285,7 +285,7 @@ void start_i2s(int pior, int sm){
 #else
         pioi2s = (pior==0 ? pio0: pio1);
 #endif
-#if !defined(PICOMITEVGA) || HAL_PORT_HAS_HDMI
+#if !HAL_PORT_IS_VGA || HAL_PORT_HAS_HDMI
 #ifdef rp2350
         if(PinDef[Option.audio_i2s_bclk].GPno+1>31 || PinDef[Option.audio_i2s_data].GPno>31)pio_set_gpio_base(pioi2s,16);
 #endif

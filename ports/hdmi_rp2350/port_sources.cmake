@@ -51,8 +51,7 @@ endif()
 
 # --- Per-port build config (Stage E2) -------------------------------------
 # HDMI is a sibling of VGA inside the PICOMITEVGA family, with extra heap.
-target_compile_options(PicoMite PRIVATE -DPICOMITEVGA
-                                        -DPICO_HEAP_SIZE=0x2000
+target_compile_options(PicoMite PRIVATE                                         -DPICO_HEAP_SIZE=0x2000
                                         -DPICO_CORE0_STACK_SIZE=0x2000
                                         )
 target_compile_options(PicoMite PRIVATE -Drp2350

@@ -756,7 +756,7 @@ void tcp_realloc_recv_buffers(void) {
  * unconditionally. WiFi+PICOMITEVGA ports (F2 = VGAWIFIRP2350) DO
  * link gfx_3d.c (because their dispatch table needs fun_3D), so this
  * stub must NOT also be present there. */
-#if !defined(PICOMITEVGA)
+#if !HAL_PORT_IS_VGA
 void closeall3d(void) {}
 #endif
 

@@ -122,7 +122,7 @@ void __not_in_flash_func(spi_finish)(spi_inst_t *spi){
     // Don't leave overrun flag set
     spi_get_hw(spi)->icr = SPI_SSPICR_RORIC_BITS;
 }
-#ifndef PICOMITEVGA
+#if !HAL_PORT_IS_VGA
 int LCD_CS_PIN=0;
 int LCD_CD_PIN=0;
 int LCD_Reset_PIN=0;
@@ -2671,7 +2671,7 @@ void ClearCS(int pin) {
     	else gpio_put(PinDef[pin].GPno,GPIO_PIN_RESET);
     }
 }
-#ifndef PICOMITEVGA
+#if !HAL_PORT_IS_VGA
 int GetLineILI9341(void){
 	unsigned char q;
     SetCS();
