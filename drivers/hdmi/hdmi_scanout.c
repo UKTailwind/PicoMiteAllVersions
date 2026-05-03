@@ -1610,6 +1610,22 @@ void hal_vga_ops_wait_scanline_zero(void) {
     while (v_scanline != 0) { }
 }
 
+/* HDMI core1 launch — runs the HDMICore scanout worker. ResetDisplay
+ * + ClearScreen happen after a brief settle delay so the HSTX FIFO
+ * has primed by the time the framebuffer clear races against it. */
+#include "hal/hal_main_init.h"
+extern void HDMICore(void);
+extern void ResetDisplay(void);
+extern void ClearScreen(int colour);
+
+void port_main_launch_core1(void) {
+    multicore_launch_core1_with_stack(HDMICore, core1stack, 512);
+    core1stack[0] = 0x12345678;
+    uSec(1000);
+    ResetDisplay();
+    ClearScreen(Option.DefaultBC);
+}
+
 /* HDMI fun_getscanline impl — per-CPU_Speed offset against the
  * v_scanline counter. */
 void fun_getscanline(void) {

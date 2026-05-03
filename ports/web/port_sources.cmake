@@ -33,6 +33,7 @@ target_sources(PicoMite PRIVATE
     ${CMAKE_SOURCE_DIR}/drivers/spi_lcd/spi_lcd_mem332_stub.c
     ${CMAKE_SOURCE_DIR}/drivers/spi_lcd/spi_lcd_periph_io.c
     ${CMAKE_SOURCE_DIR}/drivers/editor_console/editor_console_stub.c
+    ${CMAKE_SOURCE_DIR}/drivers/main_init/main_init_stub.c
 
     # Non-PICOMITE stubs.
     ${CMAKE_SOURCE_DIR}/drivers/display_merge/display_merge_stub.c

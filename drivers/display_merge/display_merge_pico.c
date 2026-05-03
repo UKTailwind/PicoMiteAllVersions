@@ -212,3 +212,17 @@ void __not_in_flash_func(UpdateCore)(void) {
         }
     }
 }
+
+
+/* PicoMite SPI-LCD core1 launch — runs UpdateCore (the merge
+ * receiver) on core1. SPI-LCD ResetDisplay was already done in the
+ * boot sequence before InitDisplaySSD/SPI fired, so no display
+ * reset here. */
+#include "hal/hal_main_init.h"
+#include "hardware/structs/bus_ctrl.h"
+
+void port_main_launch_core1(void) {
+    bus_ctrl_hw->priority = 0x100;
+    multicore_launch_core1_with_stack(UpdateCore, core1stack, 2048);
+    core1stack[0] = 0x12345678;
+}

@@ -38,6 +38,7 @@ extern "C" {
 #include "hal/hal_keyboard.h"
 #include "hal/hal_gui_controls.h"
 #include "hal/hal_i2c_keypad.h"
+#include "hal/hal_main_init.h"
 #include "hal/hal_heartbeat.h"
 #include "hardware/regs/addressmap.h"     /* XIP_BASE */
 #include "hardware/adc.h"
@@ -1214,44 +1215,9 @@ if(Option.CPU_Speed==FreqSVGA){ //adjust the size of the heap
     exception_set_exclusive_handler(SYSTICK_EXCEPTION,sigbus);
     while((i=getConsole())!=-1){}
     
-#if HAL_PORT_IS_VGA
-//        bus_ctrl_hw->priority = BUSCTRL_BUS_PRIORITY_DMA_W_BITS | BUSCTRL_BUS_PRIORITY_DMA_R_BITS;
-    #if HAL_PORT_HAS_HDMI
-//    bus_ctrl_hw->priority = BUSCTRL_BUS_PRIORITY_DMA_W_BITS | BUSCTRL_BUS_PRIORITY_DMA_R_BITS | BUSCTRL_BUS_PRIORITY_PROC1_BITS;
-        multicore_launch_core1_with_stack(HDMICore,core1stack,512);
-        core1stack[0]=0x12345678;
-        uSec(1000);
-        #else
-    #ifdef rp2350
-    piomap[QVGA_PIO_NUM]=(uint64_t)((uint64_t)1<<(uint64_t)PinDef[Option.VGA_BLUE].GPno);
-    piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.VGA_BLUE].GPno+1));
-    piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.VGA_BLUE].GPno+2));
-    piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.VGA_BLUE].GPno+3));
-    piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)PinDef[Option.VGA_HSYNC].GPno);
-    piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.VGA_HSYNC].GPno+1));
-    if(Option.audio_i2s_bclk){
-        piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)PinDef[Option.audio_i2s_data].GPno);
-        piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)PinDef[Option.audio_i2s_bclk].GPno);
-        piomap[QVGA_PIO_NUM]|=(uint64_t)((uint64_t)1<<(uint64_t)(PinDef[Option.audio_i2s_bclk].GPno+1));
-    }
-    #endif        
-        X_TILE=Option.X_TILE;
-        Y_TILE=Option.Y_TILE;
-        ytileheight=(X_TILE==80 || X_TILE==106)? 12 : 16;
-        bus_ctrl_hw->priority=0x100;
-        multicore_launch_core1_with_stack(QVgaCore,core1stack,512);
-        core1stack[0]=0x12345678;
-        memset((void *)WriteBuf, 0, 38400);
-    #endif
-    ResetDisplay();
-    ClearScreen(Option.DefaultBC);
-    #else
-    #if HAL_PORT_HAS_PICOMITE
-        bus_ctrl_hw->priority=0x100;
-        multicore_launch_core1_with_stack(UpdateCore,core1stack,2048);
-        core1stack[0]=0x12345678;
-    #endif
-#endif
+    /* core1 launch + post-launch display prep dispatched per port via
+     * hal_main_init.h. */
+    port_main_launch_core1();
         strcpy((char *)banner,MES_SIGNON);
 #ifdef rp2350
         /* Stamp the package suffix (A/B) over the trailing space of

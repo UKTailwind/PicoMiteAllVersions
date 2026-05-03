@@ -16,9 +16,42 @@
 #include "hardware/dma.h"
 #include "hardware/pio.h"
 #include "hardware/pio_instructions.h"
+#include "hardware/structs/bus_ctrl.h"
 #include "PicoMiteVGA.pio.h"
 #include "PicoMiteI2S.pio.h"
 #include "Include.h"
+#include "hal/hal_main_init.h"
+
+extern void ResetDisplay(void);
+extern void ClearScreen(int colour);
+#ifdef rp2350
+extern uint64_t piomap[];
+#endif
+
+void port_main_launch_core1(void) {
+#ifdef rp2350
+    piomap[QVGA_PIO_NUM]  = (uint64_t)((uint64_t)1 << (uint64_t)PinDef[Option.VGA_BLUE].GPno);
+    piomap[QVGA_PIO_NUM] |= (uint64_t)((uint64_t)1 << (uint64_t)(PinDef[Option.VGA_BLUE].GPno + 1));
+    piomap[QVGA_PIO_NUM] |= (uint64_t)((uint64_t)1 << (uint64_t)(PinDef[Option.VGA_BLUE].GPno + 2));
+    piomap[QVGA_PIO_NUM] |= (uint64_t)((uint64_t)1 << (uint64_t)(PinDef[Option.VGA_BLUE].GPno + 3));
+    piomap[QVGA_PIO_NUM] |= (uint64_t)((uint64_t)1 << (uint64_t)PinDef[Option.VGA_HSYNC].GPno);
+    piomap[QVGA_PIO_NUM] |= (uint64_t)((uint64_t)1 << (uint64_t)(PinDef[Option.VGA_HSYNC].GPno + 1));
+    if (Option.audio_i2s_bclk) {
+        piomap[QVGA_PIO_NUM] |= (uint64_t)((uint64_t)1 << (uint64_t)PinDef[Option.audio_i2s_data].GPno);
+        piomap[QVGA_PIO_NUM] |= (uint64_t)((uint64_t)1 << (uint64_t)PinDef[Option.audio_i2s_bclk].GPno);
+        piomap[QVGA_PIO_NUM] |= (uint64_t)((uint64_t)1 << (uint64_t)(PinDef[Option.audio_i2s_bclk].GPno + 1));
+    }
+#endif
+    X_TILE = Option.X_TILE;
+    Y_TILE = Option.Y_TILE;
+    ytileheight = (X_TILE == 80 || X_TILE == 106) ? 12 : 16;
+    bus_ctrl_hw->priority = 0x100;
+    multicore_launch_core1_with_stack(QVgaCore, core1stack, 512);
+    core1stack[0] = 0x12345678;
+    memset((void *)WriteBuf, 0, 38400);
+    ResetDisplay();
+    ClearScreen(Option.DefaultBC);
+}
 
 /* Per-mode loop counters defined in drivers/vga_pio/vga_memory.c
  * (shared with HDMI scanout). */
