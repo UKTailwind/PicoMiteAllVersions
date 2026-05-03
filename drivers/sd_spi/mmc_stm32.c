@@ -62,16 +62,9 @@ extern int TOUCH_CS_PIN;
 #ifndef nop
 #define nop asm("NOP")
 #endif
-#if HAL_PORT_HAS_WIFI
-#include "pico/cyw43_arch.h"
-#endif
-#if HAL_PORT_IS_VGA
-#include "Include.h"
-#endif
 #include "VS1053.h"
-#if !HAL_PORT_HAS_WIFI
 #include "pico/multicore.h"
-#endif
+#include "hardware/sync.h"
 #include "hardware/pio.h"
 #include "hardware/pio_instructions.h"
 //#include "integer.h"
@@ -251,9 +244,7 @@ void MIPS16 __not_in_flash_func(on_pwm_wrap)(void) {
 	static uint32_t noiseleft[MAXSOUNDS]={0}, noiseright[MAXSOUNDS]={0};
 	static int repeatcount=1;
     // play a tone
-#if !HAL_PORT_HAS_WIFI
-	__dsb();
-#endif
+    __dsb();
     pwm_clear_irq(AUDIO_SLICE);
 	if(Option.audio_i2s_bclk){
 		if((pioi2s->flevel & (0xf<<(i2ssm*8))) > (0x6<<(i2ssm*8)))return;
@@ -1692,29 +1683,32 @@ void InitReservedIO(void) {
  		}
 	}
 
-#if !HAL_PORT_HAS_WIFI
+    /* PWM-mode shadow on GPIO 23. WiFi ports leave GPIO 23 to the
+     * CYW43 module — HAL_PORT_HAS_WIFI is a 0/1 value here, so the
+     * compiler folds the if() to dead code on WiFi builds. */
+    if (!HAL_PORT_HAS_WIFI) {
 #ifdef rp2350
-	if(rp2350a){
+        if (rp2350a) {
 #endif
-	if(!Option.AllPins){
-		if(Option.PWM){
-			if(CheckPin(41, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED)){
-				gpio_init(23);
-				gpio_put(23,GPIO_PIN_SET);
-				gpio_set_dir(23, GPIO_OUT);
-			}
-		} else {
-			if(CheckPin(41, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED)){
-				gpio_init(23);
-				gpio_put(23,GPIO_PIN_RESET);
-				gpio_set_dir(23, GPIO_OUT);
-			}
-		}
-	}
+            if (!Option.AllPins) {
+                if (Option.PWM) {
+                    if (CheckPin(41, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED)) {
+                        gpio_init(23);
+                        gpio_put(23, GPIO_PIN_SET);
+                        gpio_set_dir(23, GPIO_OUT);
+                    }
+                } else {
+                    if (CheckPin(41, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED)) {
+                        gpio_init(23);
+                        gpio_put(23, GPIO_PIN_RESET);
+                        gpio_set_dir(23, GPIO_OUT);
+                    }
+                }
+            }
 #ifdef rp2350
-	} 
+        }
 #endif
-#endif
+    }
 	if(Option.SerialConsole){
 		ExtCfg(Option.SerialTX, EXT_BOOT_RESERVED, 0);
 		ExtCfg(Option.SerialRX, EXT_BOOT_RESERVED, 0);
