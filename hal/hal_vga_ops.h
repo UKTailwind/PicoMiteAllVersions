@@ -52,6 +52,32 @@ void hal_vga_ops_wait_scanline_zero(void);
  * over X_TILE x Y_TILE tilefcols/tilebcols arrays. */
 void hal_vga_init_screenmode1_tiles(void);
 
+/* HDMI-specific HRes/VRes derivation from Option.CPU_Speed. Real
+ * (HDMI ports) handles Freq720P / FreqXGA / FreqSVGA / FreqX; stub
+ * is a no-op (pure-VGA CPU_Speed never matches those). */
+void hal_vga_apply_hdmi_resolution(int display_type);
+
+/* HDMI-only SCREENMODE4 / SCREENMODE5 framebuffer dispatch table.
+ * Returns 1 if display_type was an HDMI-only mode and the
+ * DrawRectangle / DrawBitmap / etc. function pointers were
+ * assigned; returns 0 if it wasn't (caller continues with the
+ * common SCREENMODE1/2/3 dispatch). */
+int hal_vga_assign_hdmi_screenmode(int display_type);
+
+/* Mode-1 tile-buffer init at the end of ResetDisplay. HDMI calls
+ * settiles(); pure-VGA sets up tilefcols/tilebcols pointers from
+ * the framebuffer + writes the initial tile colors. */
+void hal_vga_init_screenmode_tiles(void);
+
+/* Mode-1 tile init at the start of setmode (rp2350 only). HDMI
+ * calls mapreset(); pure-VGA assigns tilefcols/tilebcols pointers. */
+void hal_vga_setmode_mode1_pre_reset(void);
+
+/* Setmode font selection: HDMI applies a medium-res alternate font
+ * path when !FullColour && !MediumRes. Returns 1 if the hook set
+ * the font; 0 if the caller should run the common font logic. */
+int  hal_vga_setmode_select_alt_font(int display_type);
+
 /* ReadBuffer16 / ReadBuffer16Fast / Read sprite-blit helpers: VGA can
  * have a LayerBuf sitting above DisplayBuf, and when `mergedread` is
  * set (BMP-save code paths), reads at layer-pixel positions should

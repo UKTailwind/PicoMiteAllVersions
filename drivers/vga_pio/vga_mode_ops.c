@@ -65,21 +65,10 @@ void hal_vga_ops_reset_display_vga(void) {
     else if(Option.CPU_Speed==FreqSVGA)VRes=((DISPLAY_TYPE == SCREENMODE1 ||  DISPLAY_TYPE == SCREENMODE3) ? 600: 300);
 #endif
     else VRes=((DISPLAY_TYPE == SCREENMODE1 ||  DISPLAY_TYPE == SCREENMODE3) ? 480: 240);
-#if HAL_PORT_HAS_HDMI
-        if(Option.CPU_Speed==Freq720P){
-            HRes=(DISPLAY_TYPE == SCREENMODE1 ? 1280 : ((DISPLAY_TYPE==SCREENMODE2 || DISPLAY_TYPE==SCREENMODE5) ? 320 : 640));
-            VRes=(DISPLAY_TYPE == SCREENMODE1 ? 720 :  ((DISPLAY_TYPE==SCREENMODE2 || DISPLAY_TYPE==SCREENMODE5) ? 180 : 360));
-        } else if(Option.CPU_Speed==FreqXGA){
-            HRes=(DISPLAY_TYPE == SCREENMODE1 ? 1024 : ((DISPLAY_TYPE==SCREENMODE2 || DISPLAY_TYPE==SCREENMODE5) ? 256 : 512));
-            VRes=(DISPLAY_TYPE == SCREENMODE1 ? 768 :  ((DISPLAY_TYPE==SCREENMODE2 || DISPLAY_TYPE==SCREENMODE5) ? 192 : 384));
-        } else if(Option.CPU_Speed==FreqSVGA){
-            HRes=((DISPLAY_TYPE == SCREENMODE1 ||  DISPLAY_TYPE == SCREENMODE3) ? 800: 400);
-            VRes=((DISPLAY_TYPE == SCREENMODE1 ||  DISPLAY_TYPE == SCREENMODE3) ? 600: 300);
-        } else if(Option.CPU_Speed==FreqX){
-            HRes=(DISPLAY_TYPE == SCREENMODE1 ? 1024 : ((DISPLAY_TYPE==SCREENMODE2 || DISPLAY_TYPE==SCREENMODE5) ? 256 : 512));
-            VRes=(DISPLAY_TYPE == SCREENMODE1 ? 600 :  ((DISPLAY_TYPE==SCREENMODE2 || DISPLAY_TYPE==SCREENMODE5) ? 150 : 300));
-        } 
-#endif
+        /* HDMI ports may further override HRes/VRes based on the
+         * HDMI-only CPU_Speed values (Freq720P/FreqXGA/FreqX); stub
+         * no-op on pure-VGA. */
+        hal_vga_apply_hdmi_resolution(DISPLAY_TYPE);
         
         switch(DISPLAY_TYPE){
             case SCREENMODE1:
@@ -107,46 +96,11 @@ void hal_vga_ops_reset_display_vga(void) {
             DrawBufferFast=DrawBuffer16Fast;
             ReadBufferFast=ReadBuffer16Fast;
             DrawPixel=DrawPixel16;
-#if HAL_PORT_HAS_HDMI
-        } else if(DISPLAY_TYPE == SCREENMODE4){
-            /* HDMI SCREENMODE4/5 dispatchers live in
-             * drivers/vga_pio/vga_mode_ops.c (PICOMITEVGA+HDMI real
-             * impl). Extern forward decls here match the target
-             * function-pointer signatures. */
-            extern void DrawRectangle555(int x1, int y1, int x2, int y2, int c);
-            extern void DrawBitmap555(int x1, int y1, int width, int height, int scale, int fc, int bc, unsigned char *bitmap);
-            extern void ScrollLCD555(int lines);
-            extern void DrawBuffer555(int x1, int y1, int x2, int y2, unsigned char *p);
-            extern void ReadBuffer555(int x1, int y1, int x2, int y2, unsigned char *p);
-            extern void DrawBuffer555Fast(int x1, int y1, int x2, int y2, int blank, unsigned char *p);
-            extern void ReadBuffer555Fast(int x1, int y1, int x2, int y2, unsigned char *p);
-            extern void DrawPixel555(int x, int y, int c);
-            DrawRectangle=DrawRectangle555;
-            DrawBitmap= DrawBitmap555;
-            ScrollLCD=ScrollLCD555;
-            DrawBuffer=DrawBuffer555;
-            ReadBuffer=ReadBuffer555;
-            DrawBufferFast=DrawBuffer555Fast;
-            ReadBufferFast=ReadBuffer555Fast;
-            DrawPixel=DrawPixel555;
-        } else if(DISPLAY_TYPE == SCREENMODE5){
-            extern void DrawRectangle256(int x1, int y1, int x2, int y2, int c);
-            extern void DrawBitmap256(int x1, int y1, int width, int height, int scale, int fc, int bc, unsigned char *bitmap);
-            extern void ScrollLCD256(int lines);
-            extern void DrawBuffer256(int x1, int y1, int x2, int y2, unsigned char *p);
-            extern void ReadBuffer256(int x1, int y1, int x2, int y2, unsigned char *p);
-            extern void DrawBuffer256Fast(int x1, int y1, int x2, int y2, int blank, unsigned char *p);
-            extern void ReadBuffer256Fast(int x1, int y1, int x2, int y2, unsigned char *p);
-            extern void DrawPixel256(int x, int y, int c);
-            DrawRectangle=DrawRectangle256;
-            DrawBitmap= DrawBitmap256;
-            ScrollLCD=ScrollLCD256;
-            DrawBuffer=DrawBuffer256;
-            ReadBuffer=ReadBuffer256;
-            DrawBufferFast=DrawBuffer256Fast;
-            ReadBufferFast=ReadBuffer256Fast;
-            DrawPixel=DrawPixel256;
-#endif
+        /* HDMI-only SCREENMODE4 / SCREENMODE5 dispatch — real impl
+         * in drivers/hdmi/hdmi_modes.c, stub returns 0 elsewhere.
+         * Returns 1 if the function pointers were assigned. */
+        } else if(hal_vga_assign_hdmi_screenmode(DISPLAY_TYPE)) {
+            /* function pointers populated by the hook */
         } else {
             DrawRectangle=DrawRectangle2;
             DrawBitmap= DrawBitmap2;
@@ -159,22 +113,10 @@ void hal_vga_ops_reset_display_vga(void) {
             PromptFC = gui_fcolour= Option.DefaultFC;
             PromptBC = gui_bcolour= Option.DefaultBC;
         }
-#if HAL_PORT_HAS_HDMI
-        settiles();
-#else
-#ifdef rp2350
-        if(DISPLAY_TYPE==SCREENMODE1){
-            tilefcols=(uint16_t *)((uint32_t)FRAMEBUFFER+(MODE1SIZE*3));
-            tilebcols=(uint16_t *)((uint32_t)FRAMEBUFFER+(MODE1SIZE*3)+(MODE1SIZE>>1));
-        }
-#endif
-        for(int x=0;x<X_TILE;x++){
-            for(int y=0;y<Y_TILE;y++){
-                tilefcols[y*X_TILE+x]=RGB121pack(Option.DefaultFC);
-                tilebcols[y*X_TILE+x]=RGB121pack(Option.DefaultBC);
-           }
-        }
-#endif
+        /* Mode-1 tile-buffer init: HDMI calls settiles(); pure-VGA
+         * sets up tilefcols/tilebcols pointers + writes initial tile
+         * colors. Per-port impl. */
+        hal_vga_init_screenmode_tiles();
 }
 
 /* VGA closeframebuffer — mode-aware teardown of the framebuffer /
@@ -200,15 +142,16 @@ void closeframebuffer(char layer) {
             case SCREENMODE3:
                 FreeMemory((void *)FrameBuf);
                 break;
-#if HAL_PORT_HAS_HDMI
+            /* SCREENMODE4 / SCREENMODE5 are HDMI-only DISPLAY_TYPE
+             * values; non-HDMI ports never reach these case labels at
+             * runtime. */
             case SCREENMODE4:
             case SCREENMODE5:
                 FreeMemory((void *)FrameBuf);
                 break;
 #endif
-#endif
         }
-    } 
+    }
     if(LayerBuf!=DisplayBuf &&  (layer=='A' || layer=='L')){
         if(WriteBuf==LayerBuf)WriteBuf=DisplayBuf;
         volatile unsigned char *temp= LayerBuf;
@@ -232,7 +175,8 @@ void closeframebuffer(char layer) {
                 LayerBuf=DisplayBuf;
                 FreeMemory((void *)temp);
                 break;
-#if HAL_PORT_HAS_HDMI
+            /* SCREENMODE4 / SCREENMODE5 are HDMI-only — never reached
+             * on non-HDMI ports. */
             case SCREENMODE4:
                 LayerBuf=DisplayBuf;
                 FreeMemory((void *)temp);
@@ -241,7 +185,6 @@ void closeframebuffer(char layer) {
                 LayerBuf=DisplayBuf;
                 transparent=0;
                 break;
-#endif
 #endif
         }
     }
@@ -265,7 +208,7 @@ void closeframebuffer(char layer) {
                 SecondLayer=DisplayBuf;
                 FreeMemory((void *)temp);
                 break;
-#if HAL_PORT_HAS_HDMI
+            /* SCREENMODE4 / SCREENMODE5 are HDMI-only. */
             case SCREENMODE4:
                 SecondLayer=DisplayBuf;
                 FreeMemory((void *)temp);
@@ -274,7 +217,6 @@ void closeframebuffer(char layer) {
                 SecondLayer=DisplayBuf;
                 transparents=0;
                 break;
-#endif
 #endif
         }
     }
@@ -335,14 +277,13 @@ XGA:
                 case SCREENMODE3:
                      SecondFrame=GetMemory(ScreenSize);
                     break;
-#if HAL_PORT_HAS_HDMI
+                /* SCREENMODE4 / SCREENMODE5 — HDMI-only. */
                 case SCREENMODE4:
                     SecondFrame=GetMemory(ScreenSize);
                     break;
                 case SCREENMODE5:
                     SecondFrame=GetMemory(ScreenSize);
                     break;
-#endif
 #endif
             }
         } else error("Framebuffer 2 already exists");
@@ -365,12 +306,11 @@ XGA:
                 case SCREENMODE3:
                     FrameBuf=GetMemory(ScreenSize);
                     break;
-#if HAL_PORT_HAS_HDMI
+                /* HDMI-only modes. */
                 case SCREENMODE4:
                 case SCREENMODE5:
                     FrameBuf=GetMemory(ScreenSize);
                     break;
-#endif
 #endif
             }
         } else error("Framebuffer already exists");
@@ -400,7 +340,7 @@ XGA:
                     }
                     colour=transparents | (transparents<<4);
                     break;
-#if HAL_PORT_HAS_HDMI
+                /* HDMI-only modes. */
                 case SCREENMODE4:
                     SecondLayer=GetMemory(ScreenSize);
                     break;
@@ -413,7 +353,6 @@ XGA:
                     if(argc==1)transparents=getint(argv[0],0,255);
                     colour=transparents;
                     break;
-#endif
             }
         } else error("Framebuffer already exists");
         memset((void *)SecondLayer,colour,ScreenSize);
@@ -440,7 +379,7 @@ XGA:
                     LayerBuf=GetMemory(ScreenSize);
                     colour=transparent | (transparent<<4);
                     break;
-#if HAL_PORT_HAS_HDMI
+                /* HDMI-only modes. */
                 case SCREENMODE4:
                     LayerBuf=GetMemory(ScreenSize);
                     if(argc==1)RGBtransparent=RGB555(getColour((char *)argv[0],0));
@@ -452,7 +391,6 @@ XGA:
                     if(argc==1)transparent=getint(argv[0],0,255);
                     colour=transparent;
                     break;
-#endif
 #endif
                 }
 #ifdef rp2350
@@ -519,12 +457,7 @@ XGA:
             else error("Syntax");
         }
     } else if((p=checkstring(cmdline, (unsigned char *)"WAIT"))) {
-            #if HAL_PORT_HAS_HDMI
-            while(v_scanline!=0){}
-            #else
-            while(QVgaScanLine!=0){}
-            #endif
-
+            hal_vga_ops_wait_scanline_zero();
     } else if((p=checkstring(cmdline, (unsigned char *)"COPY"))) {
         getargs(&p,5,(unsigned char *)",");
         if(!(argc==3 || argc==5))error("Syntax");
@@ -543,11 +476,7 @@ XGA:
         else error("Syntax");
         if(argc==5){
             if(checkstring(argv[4],(unsigned char *)"B")){
-                #if HAL_PORT_HAS_HDMI
-                while(v_scanline!=0){} 
-                #else
-                while(QVgaScanLine!=0){}
-            #endif
+                hal_vga_ops_wait_scanline_zero();
             } else error("Syntax");
         }
         if(d!=s)
@@ -560,43 +489,9 @@ XGA:
     } else error("Syntax");
 }
 
-/* fun_getscanline — BASIC function "GetScanLine". Lifted from Draw.c's
- * PICOMITEVGA block. */
-#if HAL_PORT_HAS_HDMI
-extern volatile int32_t v_scanline;
-void fun_getscanline(void) {
-    if (Option.CPU_Speed == Freq720P) {
-        iret = v_scanline - 30;
-        if (iret < 0) iret += 750;
-        targ = T_INT;
-    } else if (Option.CPU_Speed == Freq480P) {
-        iret = v_scanline - 20;
-        if (iret < 0) iret += 500;
-        targ = T_INT;
-    } else if (Option.CPU_Speed == FreqXGA) {
-        iret = v_scanline - 38;
-        if (iret < 0) iret += 806;
-        targ = T_INT;
-    } else if (Option.CPU_Speed == FreqSVGA) {
-        iret = v_scanline - 25;
-        if (iret < 0) iret += 625;
-        targ = T_INT;
-    } else if (Option.CPU_Speed == Freq252P || Option.CPU_Speed == Freq378P) {
-        iret = v_scanline - 45;
-        if (iret < 0) iret += 525;
-        targ = T_INT;
-    } else if (Option.CPU_Speed == Freq848) {
-        iret = v_scanline - 37;
-        if (iret < 0) iret += 517;
-        targ = T_INT;
-    }
-}
-#else
-void fun_getscanline(void) {
-    iret = QVgaScanLine;
-    targ = T_INT;
-}
-#endif
+/* fun_getscanline lives in the per-flavor scanout driver:
+ *   drivers/hdmi/hdmi_modes.c       (HDMI: v_scanline + per-mode offset)
+ *   drivers/vga_pio/vga_qvga_modes.c (pure-VGA: QVgaScanLine direct) */
 
 /* This file is linked only on VGA-family ports (where HAL_PORT_IS_VGA=1),
  * so the gate is always-true. Dropped. */
@@ -657,32 +552,26 @@ void fun_map(void){
 void setmode(int mode, bool clear){
     closeframebuffer('A');
     if(clear)memset((void *)FRAMEBUFFER,0,framebuffersize);
-#if HAL_PORT_HAS_HDMI
-    while(v_scanline!=0){}
-#else
-    while(QVgaScanLine!=0){}
-#endif
+    hal_vga_ops_wait_scanline_zero();
     if(mode==5){
-        DISPLAY_TYPE=SCREENMODE5; 
+        DISPLAY_TYPE=SCREENMODE5;
         ScreenSize=MODE5SIZE;
     } else if(mode==4){
         if(!(FullColour))error("Mode not available in this resolution");
-        DISPLAY_TYPE=SCREENMODE4; 
+        DISPLAY_TYPE=SCREENMODE4;
         ScreenSize=MODE4SIZE;
     } else if(mode==3){
-        DISPLAY_TYPE=SCREENMODE3; 
+        DISPLAY_TYPE=SCREENMODE3;
         ScreenSize=MODE3SIZE;
     } else if(mode==2){
-        DISPLAY_TYPE=SCREENMODE2; 
+        DISPLAY_TYPE=SCREENMODE2;
         ScreenSize=MODE2SIZE;
     } else { //mode=1
 #ifdef rp2350
-#if !HAL_PORT_HAS_HDMI
-        tilefcols=(uint16_t *)((uint8_t*)FRAMEBUFFER+(MODE1SIZE*3));
-        tilebcols=(uint16_t *)((uint8_t*)FRAMEBUFFER+(MODE1SIZE*3)+(MODE1SIZE>>1));
-#else
-        mapreset();
-#endif
+        /* HDMI: mapreset() for the buffered tile-color planes;
+         * pure-VGA: set tilefcols/tilebcols pointers into the
+         * RGB121-packed framebuffer trailer. */
+        hal_vga_setmode_mode1_pre_reset();
 #endif
         DISPLAY_TYPE=SCREENMODE1;
         ScreenSize=MODE1SIZE;
@@ -694,9 +583,10 @@ void setmode(int mode, bool clear){
         CurrentX = CurrentY =0;
         ClearScreen(Option.DefaultBC);
     }
-#if HAL_PORT_HAS_HDMI
-    if(FullColour || MediumRes){
-#endif
+    /* HDMI ports apply an alternate medium-res font lookup when
+     * !FullColour && !MediumRes; the hook returns 1 if handled.
+     * Pure-VGA ports always fall through to the common font logic. */
+    if (!hal_vga_setmode_select_alt_font(DISPLAY_TYPE)) {
         if(DISPLAY_TYPE==SCREENMODE2 || DISPLAY_TYPE==SCREENMODE4 || DISPLAY_TYPE==SCREENMODE5){
             SetFont((6<<4) | 1) ;
             PromptFont=(6<<4) | 1;
@@ -704,20 +594,7 @@ void setmode(int mode, bool clear){
             SetFont(1) ;
             PromptFont = 1;
         }
-#if HAL_PORT_HAS_HDMI
-    } else {
-        if(DISPLAY_TYPE==SCREENMODE1){
-            SetFont((2<<4) | 1) ;
-            PromptFont=(2<<4) | 1;
-        } else if(DISPLAY_TYPE==SCREENMODE2 || DISPLAY_TYPE==SCREENMODE5){
-            SetFont((6<<4) | 1) ;
-            PromptFont=(6<<4) | 1;
-        } else if(DISPLAY_TYPE==SCREENMODE3){
-            SetFont(1) ;
-            PromptFont = 1;
-        }
     }
-#endif
 if(mode==Option.DISPLAY_TYPE-SCREENMODE1+1){
     SetFont(Option.DefaultFont);
     PromptFont=Option.DefaultFont;

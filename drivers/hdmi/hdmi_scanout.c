@@ -1511,6 +1511,117 @@ void hal_vga_init_screenmode1_tiles(void) {
     settiles();
 }
 
+void hal_vga_apply_hdmi_resolution(int display_type) {
+    if (Option.CPU_Speed == Freq720P) {
+        HRes = (display_type == SCREENMODE1 ? 1280 : ((display_type == SCREENMODE2 || display_type == SCREENMODE5) ? 320 : 640));
+        VRes = (display_type == SCREENMODE1 ? 720  : ((display_type == SCREENMODE2 || display_type == SCREENMODE5) ? 180 : 360));
+    } else if (Option.CPU_Speed == FreqXGA) {
+        HRes = (display_type == SCREENMODE1 ? 1024 : ((display_type == SCREENMODE2 || display_type == SCREENMODE5) ? 256 : 512));
+        VRes = (display_type == SCREENMODE1 ? 768  : ((display_type == SCREENMODE2 || display_type == SCREENMODE5) ? 192 : 384));
+    } else if (Option.CPU_Speed == FreqSVGA) {
+        HRes = ((display_type == SCREENMODE1 || display_type == SCREENMODE3) ? 800 : 400);
+        VRes = ((display_type == SCREENMODE1 || display_type == SCREENMODE3) ? 600 : 300);
+    } else if (Option.CPU_Speed == FreqX) {
+        HRes = (display_type == SCREENMODE1 ? 1024 : ((display_type == SCREENMODE2 || display_type == SCREENMODE5) ? 256 : 512));
+        VRes = (display_type == SCREENMODE1 ? 600  : ((display_type == SCREENMODE2 || display_type == SCREENMODE5) ? 150 : 300));
+    }
+}
+
+int hal_vga_assign_hdmi_screenmode(int display_type) {
+    extern void DrawRectangle555(int x1, int y1, int x2, int y2, int c);
+    extern void DrawBitmap555(int x1, int y1, int width, int height, int scale, int fc, int bc, unsigned char *bitmap);
+    extern void ScrollLCD555(int lines);
+    extern void DrawBuffer555(int x1, int y1, int x2, int y2, unsigned char *p);
+    extern void ReadBuffer555(int x1, int y1, int x2, int y2, unsigned char *p);
+    extern void DrawBuffer555Fast(int x1, int y1, int x2, int y2, int blank, unsigned char *p);
+    extern void ReadBuffer555Fast(int x1, int y1, int x2, int y2, unsigned char *p);
+    extern void DrawPixel555(int x, int y, int c);
+    extern void DrawRectangle256(int x1, int y1, int x2, int y2, int c);
+    extern void DrawBitmap256(int x1, int y1, int width, int height, int scale, int fc, int bc, unsigned char *bitmap);
+    extern void ScrollLCD256(int lines);
+    extern void DrawBuffer256(int x1, int y1, int x2, int y2, unsigned char *p);
+    extern void ReadBuffer256(int x1, int y1, int x2, int y2, unsigned char *p);
+    extern void DrawBuffer256Fast(int x1, int y1, int x2, int y2, int blank, unsigned char *p);
+    extern void ReadBuffer256Fast(int x1, int y1, int x2, int y2, unsigned char *p);
+    extern void DrawPixel256(int x, int y, int c);
+    if (display_type == SCREENMODE4) {
+        DrawRectangle = DrawRectangle555;
+        DrawBitmap = DrawBitmap555;
+        ScrollLCD = ScrollLCD555;
+        DrawBuffer = DrawBuffer555;
+        ReadBuffer = ReadBuffer555;
+        DrawBufferFast = DrawBuffer555Fast;
+        ReadBufferFast = ReadBuffer555Fast;
+        DrawPixel = DrawPixel555;
+        return 1;
+    }
+    if (display_type == SCREENMODE5) {
+        DrawRectangle = DrawRectangle256;
+        DrawBitmap = DrawBitmap256;
+        ScrollLCD = ScrollLCD256;
+        DrawBuffer = DrawBuffer256;
+        ReadBuffer = ReadBuffer256;
+        DrawBufferFast = DrawBuffer256Fast;
+        ReadBufferFast = ReadBuffer256Fast;
+        DrawPixel = DrawPixel256;
+        return 1;
+    }
+    return 0;
+}
+
+void hal_vga_init_screenmode_tiles(void) {
+    settiles();
+}
+
+void hal_vga_setmode_mode1_pre_reset(void) {
+    mapreset();
+}
+
+int hal_vga_setmode_select_alt_font(int display_type) {
+    if (FullColour || MediumRes) return 0;       /* common path */
+    if (display_type == SCREENMODE1) {
+        SetFont((2 << 4) | 1);
+        PromptFont = (2 << 4) | 1;
+    } else if (display_type == SCREENMODE2 || display_type == SCREENMODE5) {
+        SetFont((6 << 4) | 1);
+        PromptFont = (6 << 4) | 1;
+    } else if (display_type == SCREENMODE3) {
+        SetFont(1);
+        PromptFont = 1;
+    }
+    return 1;
+}
+
+/* HDMI fun_getscanline impl — per-CPU_Speed offset against the
+ * v_scanline counter. */
+void fun_getscanline(void) {
+    if (Option.CPU_Speed == Freq720P) {
+        iret = v_scanline - 30;
+        if (iret < 0) iret += 750;
+        targ = T_INT;
+    } else if (Option.CPU_Speed == Freq480P) {
+        iret = v_scanline - 20;
+        if (iret < 0) iret += 500;
+        targ = T_INT;
+    } else if (Option.CPU_Speed == FreqXGA) {
+        iret = v_scanline - 38;
+        if (iret < 0) iret += 806;
+        targ = T_INT;
+    } else if (Option.CPU_Speed == FreqSVGA) {
+        iret = v_scanline - 25;
+        if (iret < 0) iret += 625;
+        targ = T_INT;
+    } else if (Option.CPU_Speed == Freq252P || Option.CPU_Speed == Freq378P) {
+        iret = v_scanline - 45;
+        if (iret < 0) iret += 525;
+        targ = T_INT;
+    } else if (Option.CPU_Speed == Freq848) {
+        iret = v_scanline - 37;
+        if (iret < 0) iret += 517;
+        targ = T_INT;
+    }
+}
+
 
 #ifdef __cplusplus
 }

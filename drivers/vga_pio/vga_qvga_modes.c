@@ -137,3 +137,42 @@ void hal_vga_init_screenmode1_tiles(void) {
         }
     }
 }
+
+/* HDMI-only resolution / screenmode dispatch — pure-VGA stubs.
+ * Runtime never reaches HDMI-only CPU_Speed values or
+ * SCREENMODE4/5 on these ports (OPTION setter rejects them). */
+void hal_vga_apply_hdmi_resolution(int display_type) { (void)display_type; }
+int  hal_vga_assign_hdmi_screenmode(int display_type) { (void)display_type; return 0; }
+
+void hal_vga_init_screenmode_tiles(void) {
+#ifdef rp2350
+    if (DISPLAY_TYPE == SCREENMODE1) {
+        tilefcols = (uint16_t *)((uint32_t)FRAMEBUFFER + (MODE1SIZE * 3));
+        tilebcols = (uint16_t *)((uint32_t)FRAMEBUFFER + (MODE1SIZE * 3) + (MODE1SIZE >> 1));
+    }
+#endif
+    for (int x = 0; x < X_TILE; x++) {
+        for (int y = 0; y < Y_TILE; y++) {
+            tilefcols[y * X_TILE + x] = RGB121pack(Option.DefaultFC);
+            tilebcols[y * X_TILE + x] = RGB121pack(Option.DefaultBC);
+        }
+    }
+}
+
+/* Pure-VGA fun_getscanline — read the QVGA scanline counter directly. */
+void fun_getscanline(void) {
+    iret = QVgaScanLine;
+    targ = T_INT;
+}
+
+void hal_vga_setmode_mode1_pre_reset(void) {
+#ifdef rp2350
+    tilefcols = (uint16_t *)((uint8_t *)FRAMEBUFFER + (MODE1SIZE * 3));
+    tilebcols = (uint16_t *)((uint8_t *)FRAMEBUFFER + (MODE1SIZE * 3) + (MODE1SIZE >> 1));
+#endif
+}
+
+int hal_vga_setmode_select_alt_font(int display_type) {
+    (void)display_type;
+    return 0;       /* common font path always */
+}
