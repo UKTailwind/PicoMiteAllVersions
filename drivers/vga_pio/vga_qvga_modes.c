@@ -94,6 +94,18 @@ void port_video_post_clock_init(void) {
 #endif
 }
 
+#include "hal/hal_option_setters.h"
+
+/* VGA-family port: HDMI PINS, KEYBOARD BACKLIGHT, INFO SCROLL,
+ * SCREENBUFF, SYSTEM SPI, TOUCH, POKE DISPLAY are not supported. */
+int port_setter_hdmi_pins(unsigned char *cmdline)         { (void)cmdline; return 0; }
+int port_setter_keyboard_backlight(unsigned char *cmdline){ (void)cmdline; return 0; }
+int port_setter_scroll_start(int64_t *out_iret)           { (void)out_iret; return 0; }
+int port_setter_screenbuff(int64_t *out_iret)             { (void)out_iret; return 0; }
+int port_setter_system_lcd_spi(unsigned char *cmdline)    { (void)cmdline; return 0; }
+int port_setter_touch_status(unsigned char *out_sret)     { (void)out_sret; return 0; }
+int port_setter_poke_display(unsigned char *p)            { (void)p; return 0; }
+
 /* Per-mode loop counters defined in drivers/vga_pio/vga_memory.c
  * (shared with HDMI scanout). */
 extern int vgaloop1, vgaloop2, vgaloop4, vgaloop8, vgaloop16, vgaloop32;

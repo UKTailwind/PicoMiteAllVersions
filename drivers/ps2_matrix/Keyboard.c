@@ -1084,3 +1084,76 @@ void __not_in_flash_func(CNInterrupt)(uint64_t dd)
  * USB driver — the PS/2 build doesn't pay that RAM cost. */
 int port_usb_count(void) { return 0; }
 int port_usb_hid_field(int n, int field) { (void)n; (void)field; return 0; }
+
+#include "hal/hal_option_setters.h"
+
+int port_setter_keyboard_repeat(unsigned char *cmdline) {
+    unsigned char *tp = checkstring(cmdline, (unsigned char *)"KEYBOARD REPEAT");
+    if (!tp) return 0;
+    getargs(&tp, 3, (unsigned char *)",");
+    if (!Option.LOCAL_KEYBOARD) error("Syntax");
+    Option.RepeatStart = getint(argv[0], 100, 2000);
+    Option.RepeatRate = getint(argv[2], 25, 2000);
+    SaveOptions();
+    return 1;
+}
+
+int port_setter_ps2_pins(unsigned char *cmdline) {
+    unsigned char *tp = checkstring(cmdline, (unsigned char *)"PS2 PINS");
+    if (tp == NULL) tp = checkstring(cmdline, (unsigned char *)"KEYBOARD PINS");
+    if (!tp) return 0;
+    int pin1, pin2;
+    unsigned char code;
+    getargs(&tp, 3, (unsigned char *)",");
+    if (CurrentLinePtr) error("Invalid in a program");
+    if (Option.KEYBOARD_CLOCK) error("Keyboard must be disabled to change pins");
+    if (argc != 3) error("Syntax");
+    if (!(code = codecheck(argv[0]))) argv[0] += 2;
+    pin1 = getinteger(argv[0]);
+    if (!code) pin1 = codemap(pin1);
+    if (IsInvalidPin(pin1)) error("Invalid pin");
+    if (ExtCurrentConfig[pin1] != EXT_NOT_CONFIG) error("Pin %/| is in use", pin1, pin1);
+    if (!(code = codecheck(argv[2]))) argv[2] += 2;
+    pin2 = getinteger(argv[2]);
+    if (!code) pin2 = codemap(pin2);
+    if (IsInvalidPin(pin2)) error("Invalid pin");
+    if (ExtCurrentConfig[pin2] != EXT_NOT_CONFIG) error("Pin %/| is in use", pin2, pin2);
+    Option.KEYBOARD_CLOCK = pin1;
+    Option.KEYBOARD_DATA = pin2;
+    SaveOptions();
+    _excep_code = RESET_COMMAND;
+    SoftReset();
+    return 1;
+}
+
+int port_setter_mouse_pins(unsigned char *cmdline) {
+    unsigned char *tp = checkstring(cmdline, (unsigned char *)"MOUSE");
+    if (!tp) return 0;
+    if (CurrentLinePtr) error("Invalid in a program");
+    if (checkstring(tp, (unsigned char *)"DISABLE")) {
+        Option.MOUSE_CLOCK = 0;
+        Option.MOUSE_DATA = 0;
+    } else {
+        int pin1, pin2;
+        unsigned char code;
+        getargs(&tp, 3, (unsigned char *)",");
+        if (Option.MOUSE_CLOCK) error("Mouse must be disabled to change pins");
+        if (argc != 3) error("Syntax");
+        if (!(code = codecheck(argv[0]))) argv[0] += 2;
+        pin1 = getinteger(argv[0]);
+        if (!code) pin1 = codemap(pin1);
+        if (IsInvalidPin(pin1)) error("Invalid pin");
+        if (ExtCurrentConfig[pin1] != EXT_NOT_CONFIG) error("Pin %/| is in use", pin1, pin1);
+        if (!(code = codecheck(argv[2]))) argv[2] += 2;
+        pin2 = getinteger(argv[2]);
+        if (!code) pin2 = codemap(pin2);
+        if (IsInvalidPin(pin2)) error("Invalid pin");
+        if (ExtCurrentConfig[pin2] != EXT_NOT_CONFIG) error("Pin %/| is in use", pin2, pin2);
+        Option.MOUSE_CLOCK = pin1;
+        Option.MOUSE_DATA = pin2;
+    }
+    SaveOptions();
+    _excep_code = RESET_COMMAND;
+    SoftReset();
+    return 1;
+}

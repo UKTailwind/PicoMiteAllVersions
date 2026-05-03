@@ -2266,3 +2266,19 @@ void cmd_mouse(void){
 	} else error("Syntax");
 
 }
+
+#include "hal/hal_option_setters.h"
+
+int port_setter_keyboard_repeat(unsigned char *cmdline) {
+    unsigned char *tp = checkstring(cmdline, (unsigned char *)"KEYBOARD REPEAT");
+    if (!tp) return 0;
+    getargs(&tp, 3, (unsigned char *)",");
+    Option.RepeatStart = getint(argv[0], 100, 2000);
+    Option.RepeatRate = getint(argv[2], 25, 2000);
+    SaveOptions();
+    return 1;
+}
+
+/* USB-host keyboard ports don't expose PS/2 pin OPTION setters. */
+int port_setter_ps2_pins(unsigned char *cmdline)   { (void)cmdline; return 0; }
+int port_setter_mouse_pins(unsigned char *cmdline) { (void)cmdline; return 0; }

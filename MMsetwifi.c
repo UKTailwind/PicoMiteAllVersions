@@ -278,3 +278,26 @@ void WebConnect(void){
     }
     cyw43_wifi_pm(&cyw43_state, CYW43_DEFAULT_PM & ~0xf);
 }
+
+#include "hal/hal_option_setters.h"
+
+/* WiFi ports don't expose OPTION PICO ON/OFF (CYW43 actually owns the
+ * shadow pins). */
+int port_setter_pico_pins(unsigned char *cmdline) {
+    (void)cmdline;
+    return 0;
+}
+
+/* WiFi ports limit OPTION HEARTBEAT to ON/OFF — no pin reassignment
+ * (the heartbeat LED lives on the CYW43 module). */
+int port_setter_heartbeat(unsigned char *cmdline) {
+    unsigned char *tp = checkstring(cmdline, (unsigned char *)"HEARTBEAT");
+    if (!tp) return 0;
+    if (checkstring(tp, (unsigned char *)"OFF") || checkstring(tp, (unsigned char *)"DISABLE")) {
+        Option.NoHeartbeat = 1;
+    } else if (checkstring(tp, (unsigned char *)"ON") || checkstring(tp, (unsigned char *)"ENABLE")) {
+        Option.NoHeartbeat = 0;
+    } else error("Syntax");
+    SaveOptions();
+    return 1;
+}

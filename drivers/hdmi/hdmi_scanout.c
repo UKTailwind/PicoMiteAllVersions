@@ -1670,6 +1670,45 @@ void port_video_post_clock_init(void) {
     }
 }
 
+/* OPTION HDMI PINS — HDMI HSTX channel pin assignments. HSTX
+ * channels share GPIO pairs (`& 0x6`); reject duplicates. */
+#include "hal/hal_option_setters.h"
+
+int port_setter_hdmi_pins(unsigned char *cmdline) {
+    unsigned char *tp = checkstring(cmdline, (unsigned char *)"HDMI PINS");
+    if (!tp) return 0;
+    getargs(&tp, 7, (unsigned char *)",");
+    if (CurrentLinePtr) error("Invalid in a program");
+    if (argc != 7) error("Syntax");
+    uint8_t clock = getint(argv[0], 0, 7);
+    uint8_t d0 = getint(argv[2], 0, 7);
+    uint8_t d1 = getint(argv[4], 0, 7);
+    uint8_t d2 = getint(argv[6], 0, 7);
+    if ((clock & 0x6) == (d0 & 0x6) || (clock & 0x6) == (d1 & 0x6) ||
+        (clock & 0x6) == (d2 & 0x6) || (d0 & 0x6) == (d1 & 0x6) ||
+        (d0 & 0x6) == (d2 & 0x6) || (d1 & 0x6) == (d2 & 0x6))
+        error("Channels not unique");
+    Option.HDMIclock = clock;
+    Option.HDMId0 = d0;
+    Option.HDMId1 = d1;
+    Option.HDMId2 = d2;
+    SaveOptions();
+    _excep_code = RESET_COMMAND;
+    SoftReset();
+    return 1;
+}
+
+/* HDMI ports don't add anything to these setters. */
+int port_setter_keyboard_backlight(unsigned char *cmdline) { (void)cmdline; return 0; }
+int port_setter_scroll_start(int64_t *out_iret)            { (void)out_iret; return 0; }
+int port_setter_screenbuff(int64_t *out_iret)              { (void)out_iret; return 0; }
+
+/* HDMI is a VGA-family port: SYSTEM SPI / TOUCH / POKE DISPLAY are
+ * unsupported. */
+int port_setter_system_lcd_spi(unsigned char *cmdline) { (void)cmdline; return 0; }
+int port_setter_touch_status(unsigned char *out_sret)  { (void)out_sret; return 0; }
+int port_setter_poke_display(unsigned char *p)         { (void)p; return 0; }
+
 /* HDMI fun_getscanline impl — per-CPU_Speed offset against the
  * v_scanline counter. */
 void fun_getscanline(void) {
