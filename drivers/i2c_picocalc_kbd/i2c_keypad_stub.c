@@ -33,6 +33,7 @@ int hal_i2c_keypad_translate(uint16_t buff, int *ctrlheld_inout) {
 
 void hal_i2c_keypad_print_options(void) {}
 void hal_i2c_keypad_reserve_io(void) {}
+void hal_i2c_keypad_periodic_scan(uint64_t mSecTimer) { (void)mSecTimer; }
 void hal_i2c_keypad_apply_spi480_resolution(void) {
     /* HRes / VRes / DisplayHRes / DisplayVRes are all `short`,
      * declared extern in Draw.h (pulled in via Hardware_Includes.h). */

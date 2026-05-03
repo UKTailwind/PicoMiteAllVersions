@@ -20,6 +20,9 @@
 #define HAL_PORT_HAS_FAST_TIMER          1
 #define HAL_PORT_HAS_INT5                1
 #define HAL_PORT_PULLDOWN_NEEDS_RESET    1
+/* Pure-VGA shares PIO 0 with the QVGA scanout state machines for
+ * the I²S audio output. */
+#define HAL_PORT_AUDIO_I2S_PIO_NUM       0
 
 #define HAL_PORT_HAS_PSRAM               1
 #define HAL_PORT_HAS_UPNG                1

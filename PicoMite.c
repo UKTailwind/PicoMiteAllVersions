@@ -58,11 +58,11 @@ extern void start_i2s(int pio, int sm);
 #include "hardware/structs/qmi.h"
 #include "psram.h"
 #endif
-#if HAL_PORT_IS_VGA
+/* start_vga_i2s is implemented in the VGA-PIO scanout driver on
+ * pure-VGA ports; non-VGA ports never call it. The extern is harmless
+ * to declare unconditionally — link-time dead-code-elimination drops
+ * the symbol where unused. */
 extern void start_vga_i2s(void);
-#if !HAL_PORT_HAS_HDMI
-#endif
-#endif
 /* COPYRIGHT text moved to Version.h as MMBASIC_COPYRIGHT; banner is
  * emitted via MMBasic_PrintBanner() in MMBasic_REPL.c. */
 
@@ -728,9 +728,7 @@ bool MIPS16 __not_in_flash_func(timer_callback)(repeating_timer_t *rt)
         last=now;
         INT5Timer = INT5InitTimer; 
     }
-#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
-    if(Option.LOCAL_KEYBOARD && mSecTimer % LOCALKEYSCANRATE==0)cmd_keyscan();
-#endif
+    hal_i2c_keypad_periodic_scan((uint64_t)mSecTimer);
 #endif
         AHRSTimer++;
         InkeyTimer++;                                                     // used to delay on an escape character
@@ -1476,22 +1474,6 @@ void __no_inline_not_in_flash_func(modclock)(uint16_t speed){
        ssi_hw->baudr=speed;
        ssi_hw->ssienr=1;
 }
-#else
-#if !HAL_PORT_HAS_WIFI
-uint32_t testPSRAM(void){
-    uint32_t *p=(uint32_t *)PSRAMbase;
-    uint32_t *q=(uint32_t *)PSRAMbase;
-    for(int i=0;i<65536;i++)*p++=i;
-    __dmb();
-    for(int i=0;i<65536;i++)if(*q++!=i) return 0;
-    p=(uint32_t *)PSRAMbase;
-    q=(uint32_t *)PSRAMbase;
-    p[8*1024*1024/4-1]=0x12345678;
-    __dmb();
-    if(q[8*1024*1024/4-1]==0x12345678)return 6*1024*1024;
-    else return 0;
-}
-#endif
 #endif
 lfs_t lfs;
 lfs_dir_t lfs_dir;
@@ -1674,16 +1656,19 @@ int MIPS16 main(){
     PWM_FREQ=44100;
     pico_get_unique_board_id_string (id_out,12);
 #ifdef rp2350
-#if !HAL_PORT_HAS_WIFI
-    if(Option.PSRAM_CS_PIN){
-        PSRAMpin=PinDef[Option.PSRAM_CS_PIN].GPno;
+    /* PSRAM init: psram_setup/psram_size have stubs in
+     * drivers/psram_heap/psram_heap_stub.c on ports that don't link
+     * psram.c (web_rp2350, vga_wifi_rp2350 — CYW43 owns the QSPI
+     * pins). Option.PSRAM_CS_PIN is always 0 on those ports so the
+     * stub call never fires. */
+    if (Option.PSRAM_CS_PIN) {
+        PSRAMpin = PinDef[Option.PSRAM_CS_PIN].GPno;
         psram_setup();
-        if(!(PSRAMsize=psram_size())){
-            Option.PSRAM_CS_PIN=0;
+        if (!(PSRAMsize = psram_size())) {
+            Option.PSRAM_CS_PIN = 0;
             SaveOptions();
-        } else PSRAMsize-=2*1024*1024;
+        } else PSRAMsize -= 2 * 1024 * 1024;
     }
-#endif
 #endif
     if(clock_get_hz(clk_usb)!=48000000){
         ResetAllFlash();              // init the options if this is the very first startup
@@ -1871,33 +1856,16 @@ if(Option.CPU_Speed==FreqSVGA){ //adjust the size of the heap
         core1stack[0]=0x12345678;
     #endif
 #endif
-        strcpy((char *)banner,MES_SIGNON); 
+        strcpy((char *)banner,MES_SIGNON);
 #ifdef rp2350
-    #if HAL_PORT_IS_VGA
-        #if HAL_PORT_HAS_HDMI
-            #if HAL_PORT_HAS_USB_KEYBOARD
-                banner[32]=(rp2350a?'A':'B');
-            #else
-                banner[28]=(rp2350a?'A':'B');
-            #endif
-        #else
-            #if HAL_PORT_HAS_USB_KEYBOARD
-                banner[31]=(rp2350a?'A':'B');
-            #else
-                banner[27]=(rp2350a?'A':'B');
-            #endif
-        #endif
-    #else
-        #if HAL_PORT_HAS_USB_KEYBOARD
-            banner[28]=(rp2350a?'A':'B');
-        #else
-            #if HAL_PORT_HAS_WIFI
-                banner[23]=(rp2350a?'A':'B');
-            #else
-                banner[24]=(rp2350a?'A':'B');
-            #endif
-        #endif
-    #endif
+        /* Stamp the package suffix (A/B) over the trailing space of
+         * CHIP="RP2350 ". Independent of HAL_PORT_DEVICE_NAME length —
+         * which is what the previous per-port position table was
+         * compensating for. */
+        {
+            char *_pkg = strstr((char *)banner, "RP2350");
+            if (_pkg) _pkg[6] = (rp2350a ? 'A' : 'B');
+        }
 #endif
     extern void MMBasic_PrintBanner(void);
     if(!(_excep_code == RESTART_NOAUTORUN || _excep_code == INVALID_CLOCKSPEED || _excep_code == SCREWUP_TIMEOUT || _excep_code == WATCHDOG_TIMEOUT || (_excep_code==POSSIBLE_WATCHDOG && watchdog_caused_reboot()))){
@@ -1960,14 +1928,9 @@ if(Option.CPU_Speed==FreqSVGA){ //adjust the size of the heap
     hal_keyboard_init_external_mouse();
 #ifdef rp2350
     if(PSRAMsize){MMPrintString("Total of ");PInt(PSRAMsize/(1024*1024));MMPrintString(" Mbytes PSRAM available\r\n");}
-    #if HAL_PORT_IS_VGA && !HAL_PORT_HAS_HDMI
-        start_i2s(QVGA_PIO_NUM,1);
-    #else
-        start_i2s(2,1);
-    #endif
-#else
-    start_i2s(QVGA_PIO_NUM,1);
 #endif
+    /* HAL_PORT_AUDIO_I2S_PIO_NUM is set per port in port_config.h. */
+    start_i2s(HAL_PORT_AUDIO_I2S_PIO_NUM, 1);
 
    
     extern void MMBasic_RunPromptLoop(void);

@@ -26,6 +26,9 @@
 #define HAL_PORT_HAS_FAST_TIMER          0
 #define HAL_PORT_HAS_INT5                0
 #define HAL_PORT_PULLDOWN_NEEDS_RESET    0
+/* Audio I²S PIO instance — rp2040 ports use PIO 0 (shares with QVGA
+ * scanout state machines) since only two PIOs exist. */
+#define HAL_PORT_AUDIO_I2S_PIO_NUM       0
 
 /* Chip-feature: RP2040 variants don't ship PSRAM, upng, or the DEFINES
  * compile-time dictionary. */

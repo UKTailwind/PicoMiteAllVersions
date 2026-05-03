@@ -20,6 +20,9 @@
 #define HAL_PORT_HAS_FAST_TIMER          0
 #define HAL_PORT_HAS_INT5                0
 #define HAL_PORT_PULLDOWN_NEEDS_RESET    0
+/* rp2040 WEB has only 2 PIOs and CYW43 + scanout share them; audio
+ * goes on PIO 0. */
+#define HAL_PORT_AUDIO_I2S_PIO_NUM       0
 
 #define HAL_PORT_HAS_PSRAM               0
 #define HAL_PORT_HAS_UPNG                0

@@ -32,3 +32,13 @@ void *GetPSMemory(int size) {
     (void)size;
     return NULL;
 }
+
+/* PSRAM init stubs for ports that don't link psram.c (rp2040 ports
+ * never run this code path since the call is inside #ifdef rp2350;
+ * rp2350 WEB/VGA-WIFI ports' Option.PSRAM_CS_PIN stays 0 because the
+ * QSPI pins are owned by CYW43, so the runtime guard at the call site
+ * keeps these stubs unreached). */
+void psram_setup(void) { }
+
+#include <stddef.h>
+size_t psram_size(void) { return 0; }

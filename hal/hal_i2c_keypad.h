@@ -50,6 +50,12 @@ void hal_i2c_keypad_apply_spi480_resolution(void);
  * ExtCfg(...) when Option.LOCAL_KEYBOARD is set; stub no-op. */
 void hal_i2c_keypad_reserve_io(void);
 
+/* 1 kHz periodic keypad scan tick. Real (PicoCalc) checks
+ * Option.LOCAL_KEYBOARD + LOCALKEYSCANRATE rate-limit and dispatches
+ * cmd_keyscan(). Stub no-op. Called from the timer_callback path in
+ * PicoMite.c with mSecTimer as input. */
+void hal_i2c_keypad_periodic_scan(uint64_t mSecTimer);
+
 #ifdef __cplusplus
 }
 #endif

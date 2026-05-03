@@ -79,6 +79,17 @@ void hal_i2c_keypad_apply_spi480_resolution(void) {
     VRes = 480;
 }
 
+extern void cmd_keyscan(void);
+
+/* PicoCalc periodic keypad-matrix scan — runs at LOCALKEYSCANRATE
+ * (10 ms) from the timer-tick path. Skipped when the user has
+ * disabled the local keyboard. */
+void hal_i2c_keypad_periodic_scan(uint64_t mSecTimer) {
+    if (Option.LOCAL_KEYBOARD && (mSecTimer % LOCALKEYSCANRATE == 0)) {
+        cmd_keyscan();
+    }
+}
+
 /* PicoCalc keypad-matrix pin reservation, called from
  * InitReservedIO() at boot. Reserves the analogue backlight pin, the
  * keypad-power digital out, and the 15 matrix-row digital inputs so
