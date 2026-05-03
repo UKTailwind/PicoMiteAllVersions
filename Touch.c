@@ -35,6 +35,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
 #include "hal/hal_gui_controls.h"
+#include "hal/hal_display_merge.h"
 #include "hardware/structs/systick.h"
 #if HAL_PORT_HAS_WIFI
 #include "pico/cyw43_arch.h"
@@ -273,21 +274,15 @@ int __not_in_flash_func(GetTouchAxis)(int cmd) {
     int i, j, t, b[TOUCH_SAMPLES];
     TOUCH_GETIRQTRIS=0;
     PinSetBit(Option.TOUCH_IRQ, CNPDSET);                           // Set the PenIRQ to an output
-#if HAL_PORT_HAS_PICOMITE
-    if(SPIatRisk)mutex_enter_blocking(&frameBufferMutex);			// lock the frame buffer
-#endif
+    if (SPIatRisk) hal_display_merge_lock_fb();
     GetTouchValue(cmd);
     // we take TOUCH_SAMPLES readings and sort them into descending order in buffer b[].
     for(i = 0; i < TOUCH_SAMPLES; i++) {
         b[i] = GetTouchValue(cmd);                                  // get the value
         if (CurrentlyPlaying == P_WAV || CurrentlyPlaying == P_FLAC || CurrentlyPlaying == P_MIDI || CurrentlyPlaying == P_MP3 || CurrentlyPlaying == P_ARRAY){
-#if HAL_PORT_HAS_PICOMITE
-            if(SPIatRisk)mutex_enter_blocking(&frameBufferMutex);			// lock the frame buffer
-#endif
+            if (SPIatRisk) hal_display_merge_lock_fb();
             checkWAVinput();
-#if HAL_PORT_HAS_PICOMITE
-            if(SPIatRisk)mutex_exit(&frameBufferMutex);
-#endif
+            if (SPIatRisk) hal_display_merge_unlock_fb();
         }
         if(CurrentlyPlaying == P_MOD || CurrentlyPlaying == P_STREAM ) checkWAVinput();
         for(j = i; j > 0; j--) {                                    // and sort into position
@@ -309,9 +304,7 @@ int __not_in_flash_func(GetTouchAxis)(int cmd) {
     GetTouchValue(CMD_PENIRQ_ON);                                   // send the command to turn PenIRQ on
     PinSetBit(Option.TOUCH_IRQ, CNPUSET);                           // Set the PenIRQ to an input
     TOUCH_GETIRQTRIS=1;
-#if HAL_PORT_HAS_PICOMITE
-    if(SPIatRisk)mutex_exit(&frameBufferMutex);
-#endif
+    if (SPIatRisk) hal_display_merge_unlock_fb();
     return i;
 }
 

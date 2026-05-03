@@ -459,13 +459,12 @@ void __not_in_flash_func(routinechecks)(void){
         mSecTimer=time_us_64()/1000;
     }
     if (CurrentlyPlaying == P_WAV || CurrentlyPlaying == P_FLAC || CurrentlyPlaying==P_MP3 || CurrentlyPlaying==P_MIDI ){
-#if HAL_PORT_HAS_PICOMITE
-        if(SPIatRisk)mutex_enter_blocking(&frameBufferMutex);			// lock the frame buffer
-#endif
+        /* SPI-LCD ports take the framebuffer mutex around the WAV
+         * input poll because the merge pipeline writes the same
+         * memory; no-op on non-merge-pipeline ports. */
+        if (SPIatRisk) hal_display_merge_lock_fb();
         checkWAVinput();
-#if HAL_PORT_HAS_PICOMITE
-        if(SPIatRisk)mutex_exit(&frameBufferMutex);
-#endif
+        if (SPIatRisk) hal_display_merge_unlock_fb();
     }
     if(CurrentlyPlaying == P_MOD || CurrentlyPlaying==P_ARRAY ) checkWAVinput();
     if(++when & 7 && CurrentLinePtr) return;
