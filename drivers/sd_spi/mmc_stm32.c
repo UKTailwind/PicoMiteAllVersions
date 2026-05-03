@@ -51,6 +51,17 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "hal/hal_vga_ops.h"
 #include "hal/hal_periph_io.h"
 #include "hal/hal_keyboard.h"
+
+/* TOUCH_CS_PIN is defined in Touch.c on SPI-LCD ports and stubbed in
+ * spi_lcd_periph_io_stub.c on VGA-family ports; declare extern here
+ * so mmc_stm32 sees the symbol regardless of which Hardware_Includes
+ * gate is active. nop expands to an inline assembly NOP — the
+ * Touch/SSD1963 headers define this on non-VGA, so duplicate the
+ * definition here for the unified deselect/selectSD path. */
+extern int TOUCH_CS_PIN;
+#ifndef nop
+#define nop asm("NOP")
+#endif
 #if HAL_PORT_HAS_WIFI
 #include "pico/cyw43_arch.h"
 #endif
@@ -837,16 +848,16 @@ int wait_ready (void)
 
 static void __not_in_flash_func(deselect)(void)
 {
-#if !HAL_PORT_IS_VGA
-	if(Option.CombinedCS){
+	/* Option.CombinedCS is always 0 on VGA-family ports (no touch
+	 * configured), so the SD_CS_PIN branch always fires there.
+	 * TOUCH_CS_PIN is stubbed to 0 in spi_lcd_periph_io_stub.c so
+	 * the link succeeds even when Touch.c isn't built. */
+	if (Option.CombinedCS) {
 		gpio_set_dir(TOUCH_CS_PIN, GPIO_IN);
 	} else {
-#endif
-		gpio_put(SD_CS_PIN,GPIO_PIN_SET);
-#if !HAL_PORT_IS_VGA
+		gpio_put(SD_CS_PIN, GPIO_PIN_SET);
 	}
 	nop;nop;nop;nop;nop;
-#endif
 	xchg_byte(0xFF);		/* Dummy clock (force DO hi-z for multiple slave SPI) */
 }
 
@@ -862,14 +873,12 @@ int __not_in_flash_func(selectSD)(void)	/* 1:Successful, 0:Timeout */
 {
 	if(SD_SPI_SPEED==SD_SLOW_SPI_SPEED)	SPISpeedSet(SDSLOW);
 	else SPISpeedSet(SDFAST);
-#if !HAL_PORT_IS_VGA
-	if(Option.CombinedCS){
-		gpio_put(TOUCH_CS_PIN,GPIO_PIN_RESET);
+	if (Option.CombinedCS) {
+		gpio_put(TOUCH_CS_PIN, GPIO_PIN_RESET);
 		gpio_set_dir(TOUCH_CS_PIN, GPIO_OUT);
-	} else gpio_put(SD_CS_PIN,GPIO_PIN_RESET);
-#else
-	gpio_put(SD_CS_PIN,GPIO_PIN_RESET);
-#endif
+	} else {
+		gpio_put(SD_CS_PIN, GPIO_PIN_RESET);
+	}
     busy_wait_us_32(5);
     xchg_byte(0xFF);		/* Dummy clock (force DO enabled) */
 
@@ -1719,56 +1728,62 @@ void InitReservedIO(void) {
 		irq_set_enabled((Option.SerialConsole & 3)==1  ? UART0_IRQ : UART1_IRQ, true);
 		uart_set_irq_enables((Option.SerialConsole & 3)==1  ? uart0: uart1, true, false);
 	}
-#if !HAL_PORT_HAS_USB_KEYBOARD
-	if(!(Option.KeyboardConfig==NO_KEYBOARD || Option.KeyboardConfig==CONFIG_I2C)){
+	/* PS/2 keyboard / mouse pin reservation. USB-keyboard ports never
+	 * have NO_KEYBOARD/CONFIG_I2C disabled and never set MOUSE_CLOCK,
+	 * so the runtime guards keep the body unreached there. The
+	 * KEYBOARD_ and MOUSE_ Option fields are present in struct
+	 * option_s on every port. */
+	if (!(Option.KeyboardConfig == NO_KEYBOARD || Option.KeyboardConfig == CONFIG_I2C)
+	    && Option.KEYBOARD_CLOCK && Option.KEYBOARD_DATA) {
 		ExtCfg(Option.KEYBOARD_CLOCK, EXT_BOOT_RESERVED, 0);
-    	ExtCfg(Option.KEYBOARD_DATA, EXT_BOOT_RESERVED, 0);
+		ExtCfg(Option.KEYBOARD_DATA, EXT_BOOT_RESERVED, 0);
 		gpio_init(PinDef[Option.KEYBOARD_CLOCK].GPno);
-		gpio_set_pulls(PinDef[Option.KEYBOARD_CLOCK].GPno,true,false);
+		gpio_set_pulls(PinDef[Option.KEYBOARD_CLOCK].GPno, true, false);
 		gpio_set_dir(PinDef[Option.KEYBOARD_CLOCK].GPno, GPIO_IN);
-		gpio_set_input_hysteresis_enabled(PinDef[Option.KEYBOARD_CLOCK].GPno,true);
+		gpio_set_input_hysteresis_enabled(PinDef[Option.KEYBOARD_CLOCK].GPno, true);
 		gpio_init(PinDef[Option.KEYBOARD_DATA].GPno);
-		gpio_set_pulls(PinDef[Option.KEYBOARD_DATA].GPno,true,false);
+		gpio_set_pulls(PinDef[Option.KEYBOARD_DATA].GPno, true, false);
 		gpio_set_dir(PinDef[Option.KEYBOARD_DATA].GPno, GPIO_IN);
 	}
-	if(Option.MOUSE_CLOCK){
+	if (Option.MOUSE_CLOCK) {
 		ExtCfg(Option.MOUSE_CLOCK, EXT_BOOT_RESERVED, 0);
-    	ExtCfg(Option.MOUSE_DATA, EXT_BOOT_RESERVED, 0);
+		ExtCfg(Option.MOUSE_DATA, EXT_BOOT_RESERVED, 0);
 	}
-#endif	
 }
 
 char *pinsearch(int pin){
 	char *buff=GetTempMemory(STRINGSIZE);
-#if !HAL_PORT_IS_VGA
-	int ssd=PinDef[Option.SSD_DATA].GPno;
-	if(pin==Option.LCD_CD)strcpy(buff,"LCD DC");
-	else if(pin==Option.LCD_CS)strcpy(buff,"LCD CS");
-	else if(pin==Option.LCD_RD)strcpy(buff,"LCD RD");
-	else if(pin==Option.LCD_Reset)strcpy(buff,"LCD Reset");
-	else if(pin==Option.DISPLAY_BL)strcpy(buff,"LCD BACKLIGHT");
-	else if(pin==PINMAP[Option.SSD_DC] && Option.DISPLAY_TYPE>=SSDPANEL && Option.DISPLAY_TYPE<VIRTUAL_C)strcpy(buff,"SSD DC");
-	else if(pin==PINMAP[Option.SSD_WR] && Option.DISPLAY_TYPE>=SSDPANEL && Option.DISPLAY_TYPE<VIRTUAL_C)strcpy(buff,"SSD WR");
-	else if(pin==PINMAP[Option.SSD_RD] && Option.DISPLAY_TYPE>=SSDPANEL && Option.DISPLAY_TYPE<VIRTUAL_C)strcpy(buff,"SSD RD");
-	else if(pin==PINMAP[Option.SSD_RESET])strcpy(buff,"SSD RESET");
-	else if(pin==PINMAP[ssd] && Option.SSD_DC)strcpy(buff,"SSD D0");
-	else if(pin==PINMAP[ssd+1] && Option.SSD_DC)strcpy(buff,"SSD D1");
-	else if(pin==PINMAP[ssd+2] && Option.SSD_DC)strcpy(buff,"SSD D2");
-	else if(pin==PINMAP[ssd+3] && Option.SSD_DC)strcpy(buff,"SSD D3");
-	else if(pin==PINMAP[ssd+4] && Option.SSD_DC)strcpy(buff,"SSD D4");
-	else if(pin==PINMAP[ssd+5] && Option.SSD_DC)strcpy(buff,"SSD D5");
-	else if(pin==PINMAP[ssd+6] && Option.SSD_DC)strcpy(buff,"SSD D6");
-	else if(pin==PINMAP[ssd+7] && Option.SSD_DC)strcpy(buff,"SSD D7");
-	else if(pin==PINMAP[ssd+8] && Option.SSD_DC && Option.DISPLAY_TYPE>SSD_PANEL_8 && Option.DISPLAY_TYPE<VIRTUAL_C)strcpy(buff,"SSD D8");
-	else if(pin==PINMAP[ssd+9] && Option.SSD_DC && Option.DISPLAY_TYPE>SSD_PANEL_8 && Option.DISPLAY_TYPE<VIRTUAL_C)strcpy(buff,"SSD D9");
-	else if(pin==PINMAP[ssd+10] && Option.SSD_DC && Option.DISPLAY_TYPE>SSD_PANEL_8 && Option.DISPLAY_TYPE<VIRTUAL_C)strcpy(buff,"SSD D10");
-	else if(pin==PINMAP[ssd+11] && Option.SSD_DC && Option.DISPLAY_TYPE>SSD_PANEL_8 && Option.DISPLAY_TYPE<VIRTUAL_C)strcpy(buff,"SSD D11");
-	else if(pin==PINMAP[ssd+12] && Option.SSD_DC && Option.DISPLAY_TYPE>SSD_PANEL_8 && Option.DISPLAY_TYPE<VIRTUAL_C)strcpy(buff,"SSD D12");
-	else if(pin==PINMAP[ssd+13] && Option.SSD_DC && Option.DISPLAY_TYPE>SSD_PANEL_8 && Option.DISPLAY_TYPE<VIRTUAL_C)strcpy(buff,"SSD D13");
-	else if(pin==PINMAP[ssd+14] && Option.SSD_DC && Option.DISPLAY_TYPE>SSD_PANEL_8 && Option.DISPLAY_TYPE<VIRTUAL_C)strcpy(buff,"SSD D14");
-	else if(pin==PINMAP[ssd+15] && Option.SSD_DC && Option.DISPLAY_TYPE>SSD_PANEL_8 && Option.DISPLAY_TYPE<VIRTUAL_C)strcpy(buff,"SSD D15");
+	/* SPI-LCD / SSD pin labels. On VGA ports the OPTION setter
+	 * never assigns LCD_CD / SSD_DC etc., so the option fields stay
+	 * 0 and the runtime guards (`Option.X &&`) keep the body
+	 * unreached. */
+	int ssd = PinDef[Option.SSD_DATA].GPno;
+	if (Option.LCD_CD && pin == Option.LCD_CD) strcpy(buff, "LCD DC");
+	else if (Option.LCD_CS && pin == Option.LCD_CS) strcpy(buff, "LCD CS");
+	else if (Option.LCD_RD && pin == Option.LCD_RD) strcpy(buff, "LCD RD");
+	else if (Option.LCD_Reset && pin == Option.LCD_Reset) strcpy(buff, "LCD Reset");
+	else if (Option.DISPLAY_BL && pin == Option.DISPLAY_BL) strcpy(buff, "LCD BACKLIGHT");
+	else if (Option.SSD_DC && pin == PINMAP[Option.SSD_DC] && Option.DISPLAY_TYPE>=SSDPANEL && Option.DISPLAY_TYPE<VIRTUAL_C) strcpy(buff, "SSD DC");
+	else if (Option.SSD_WR && pin == PINMAP[Option.SSD_WR] && Option.DISPLAY_TYPE>=SSDPANEL && Option.DISPLAY_TYPE<VIRTUAL_C) strcpy(buff, "SSD WR");
+	else if (Option.SSD_RD && pin == PINMAP[Option.SSD_RD] && Option.DISPLAY_TYPE>=SSDPANEL && Option.DISPLAY_TYPE<VIRTUAL_C) strcpy(buff, "SSD RD");
+	else if (Option.SSD_RESET >= 0 && Option.SSD_DC && pin == PINMAP[Option.SSD_RESET]) strcpy(buff, "SSD RESET");
+	else if (Option.SSD_DC && pin == PINMAP[ssd]) strcpy(buff, "SSD D0");
+	else if (Option.SSD_DC && pin == PINMAP[ssd+1]) strcpy(buff, "SSD D1");
+	else if (Option.SSD_DC && pin == PINMAP[ssd+2]) strcpy(buff, "SSD D2");
+	else if (Option.SSD_DC && pin == PINMAP[ssd+3]) strcpy(buff, "SSD D3");
+	else if (Option.SSD_DC && pin == PINMAP[ssd+4]) strcpy(buff, "SSD D4");
+	else if (Option.SSD_DC && pin == PINMAP[ssd+5]) strcpy(buff, "SSD D5");
+	else if (Option.SSD_DC && pin == PINMAP[ssd+6]) strcpy(buff, "SSD D6");
+	else if (Option.SSD_DC && pin == PINMAP[ssd+7]) strcpy(buff, "SSD D7");
+	else if (Option.SSD_DC && Option.DISPLAY_TYPE>SSD_PANEL_8 && Option.DISPLAY_TYPE<VIRTUAL_C && pin == PINMAP[ssd+8]) strcpy(buff, "SSD D8");
+	else if (Option.SSD_DC && Option.DISPLAY_TYPE>SSD_PANEL_8 && Option.DISPLAY_TYPE<VIRTUAL_C && pin == PINMAP[ssd+9]) strcpy(buff, "SSD D9");
+	else if (Option.SSD_DC && Option.DISPLAY_TYPE>SSD_PANEL_8 && Option.DISPLAY_TYPE<VIRTUAL_C && pin == PINMAP[ssd+10]) strcpy(buff, "SSD D10");
+	else if (Option.SSD_DC && Option.DISPLAY_TYPE>SSD_PANEL_8 && Option.DISPLAY_TYPE<VIRTUAL_C && pin == PINMAP[ssd+11]) strcpy(buff, "SSD D11");
+	else if (Option.SSD_DC && Option.DISPLAY_TYPE>SSD_PANEL_8 && Option.DISPLAY_TYPE<VIRTUAL_C && pin == PINMAP[ssd+12]) strcpy(buff, "SSD D12");
+	else if (Option.SSD_DC && Option.DISPLAY_TYPE>SSD_PANEL_8 && Option.DISPLAY_TYPE<VIRTUAL_C && pin == PINMAP[ssd+13]) strcpy(buff, "SSD D13");
+	else if (Option.SSD_DC && Option.DISPLAY_TYPE>SSD_PANEL_8 && Option.DISPLAY_TYPE<VIRTUAL_C && pin == PINMAP[ssd+14]) strcpy(buff, "SSD D14");
+	else if (Option.SSD_DC && Option.DISPLAY_TYPE>SSD_PANEL_8 && Option.DISPLAY_TYPE<VIRTUAL_C && pin == PINMAP[ssd+15]) strcpy(buff, "SSD D15");
 	else
-#endif
 	if(pin==Option.KEYBOARD_CLOCK)strcpy(buff,"KEYBOARD CLOCK");
 	else if(pin==Option.KEYBOARD_DATA)strcpy(buff,"KEYBOARD DATA");
 	else if(pin==Option.MOUSE_CLOCK)strcpy(buff,"MOUSE CLOCK");
@@ -1795,51 +1810,53 @@ char *pinsearch(int pin){
 	else if(pin==Option.SYSTEM_CLK)strcpy(buff,"SPI SYSTEM CLK");
 	else if(pin==Option.SYSTEM_MOSI)strcpy(buff,"SPI SYSTEM MOSI");
 	else if(pin==Option.SYSTEM_MISO)strcpy(buff,"SPI SYSTEM MISO");
-#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
-	else if(pin==Option.LCD_CLK && Option.LCD_CLK!=Option.SYSTEM_CLK)strcpy(buff,"SPI LCD CLK");
-	else if(pin==Option.LCD_MOSI && Option.LCD_CLK!=Option.SYSTEM_CLK)strcpy(buff,"SPI LCD MOSI");
-	else if(pin==Option.LCD_MISO && Option.LCD_CLK!=Option.SYSTEM_CLK)strcpy(buff,"SPI LCD MISO");
-#endif
+	/* Secondary SPI bus dedicated to the LCD — only the rp2350
+	 * PicoMite OPTION setter accepts it; on every other port
+	 * Option.LCD_CLK stays 0 so the runtime guard skips this. */
+	else if(Option.LCD_CLK && Option.LCD_CLK != Option.SYSTEM_CLK && pin == Option.LCD_CLK)  strcpy(buff,"SPI LCD CLK");
+	else if(Option.LCD_CLK && Option.LCD_CLK != Option.SYSTEM_CLK && pin == Option.LCD_MOSI) strcpy(buff,"SPI LCD MOSI");
+	else if(Option.LCD_CLK && Option.LCD_CLK != Option.SYSTEM_CLK && pin == Option.LCD_MISO) strcpy(buff,"SPI LCD MISO");
 	else if(pin==Option.audio_i2s_data)strcpy(buff,"I2S DATA");
 	else if(pin==Option.audio_i2s_bclk)strcpy(buff,"I2S BCLK");
 	else if(pin==PINMAP[PinDef[Option.audio_i2s_bclk].GPno+1])strcpy(buff,"I2S LRCK");
-#if HAL_PORT_IS_VGA
-#if !HAL_PORT_HAS_HDMI
-	else if(pin==Option.VGA_BLUE)strcpy(buff,"VGA BLUE");
-	else if(pin==Option.VGA_HSYNC)strcpy(buff,"VGA HSYNC");
-	else if(pin==PINMAP[PinDef[Option.VGA_HSYNC].GPno+1])strcpy(buff,"VGA VSYNC");
-	else if(pin==PINMAP[PinDef[Option.VGA_BLUE].GPno+1])strcpy(buff,"VGA GREEN L");
-	else if(pin==PINMAP[PinDef[Option.VGA_BLUE].GPno+2])strcpy(buff,"VGA GREEN H");
-	else if(pin==PINMAP[PinDef[Option.VGA_BLUE].GPno+3])strcpy(buff,"VGA RED");
-#endif
-#endif
+	/* VGA scanout pin labels — only meaningful on pure-VGA QVGA
+	 * ports where Option.VGA_BLUE / VGA_HSYNC are non-zero.
+	 * Runtime-guarded so non-VGA / HDMI ports skip the lookup. */
+	else if (Option.VGA_BLUE  && pin == Option.VGA_BLUE) strcpy(buff, "VGA BLUE");
+	else if (Option.VGA_HSYNC && pin == Option.VGA_HSYNC) strcpy(buff, "VGA HSYNC");
+	else if (Option.VGA_HSYNC && pin == PINMAP[PinDef[Option.VGA_HSYNC].GPno + 1]) strcpy(buff, "VGA VSYNC");
+	else if (Option.VGA_BLUE  && pin == PINMAP[PinDef[Option.VGA_BLUE].GPno + 1]) strcpy(buff, "VGA GREEN L");
+	else if (Option.VGA_BLUE  && pin == PINMAP[PinDef[Option.VGA_BLUE].GPno + 2]) strcpy(buff, "VGA GREEN H");
+	else if (Option.VGA_BLUE  && pin == PINMAP[PinDef[Option.VGA_BLUE].GPno + 3]) strcpy(buff, "VGA RED");
 #ifdef rp2350
+	/* PSRAM_CS / PicoCalc keypad pin labels — Option.LOCAL_KEYBOARD
+	 * runtime guards keep them unreached on non-PicoCalc rp2350
+	 * ports. PINMAP[] is sized 48 on every rp2350 port so the
+	 * indexing is safe to share. */
 	else if(pin==Option.PSRAM_CS_PIN)strcpy(buff,"PSRAM CS");
-#if HAL_PORT_HAS_PICOMITE
-	else if(pin==PINMAP[24] && Option.LOCAL_KEYBOARD)strcpy(buff,"KEYBOARD C1");
-	else if(pin==PINMAP[26] && Option.LOCAL_KEYBOARD)strcpy(buff,"KEYBOARD C2");
-	else if(pin==PINMAP[27] && Option.LOCAL_KEYBOARD)strcpy(buff,"KEYBOARD C3");
-	else if(pin==PINMAP[28] && Option.LOCAL_KEYBOARD)strcpy(buff,"KEYBOARD C4");
-	else if(pin==PINMAP[29] && Option.LOCAL_KEYBOARD)strcpy(buff,"KEYBOARD C5");
-	else if(pin==PINMAP[30] && Option.LOCAL_KEYBOARD)strcpy(buff,"KEYBOARD C6");
-	else if(pin==PINMAP[31] && Option.LOCAL_KEYBOARD)strcpy(buff,"KEYBOARD C7");
-	else if(pin==PINMAP[32] && Option.LOCAL_KEYBOARD)strcpy(buff,"KEYBOARD C8");
-	else if(pin==PINMAP[33] && Option.LOCAL_KEYBOARD)strcpy(buff,"KEYBOARD C9");
-	else if(pin==PINMAP[34] && Option.LOCAL_KEYBOARD)strcpy(buff,"KEYBOARD C10");
-	else if(pin==PINMAP[35] && Option.LOCAL_KEYBOARD)strcpy(buff,"KEYBOARD C11");
-	else if(pin==PINMAP[36] && Option.LOCAL_KEYBOARD)strcpy(buff,"KEYBOARD C12");
-	else if(pin==PINMAP[37] && Option.LOCAL_KEYBOARD)strcpy(buff,"KEYBOARD R1");
-	else if(pin==PINMAP[38] && Option.LOCAL_KEYBOARD)strcpy(buff,"KEYBOARD R2");
-	else if(pin==PINMAP[39] && Option.LOCAL_KEYBOARD)strcpy(buff,"KEYBOARD R3");
-	else if(pin==PINMAP[40] && Option.LOCAL_KEYBOARD)strcpy(buff,"KEYBOARD R4");
-	else if(pin==PINMAP[41] && Option.LOCAL_KEYBOARD)strcpy(buff,"KEYBOARD R5");
-	else if(pin==PINMAP[42] && Option.LOCAL_KEYBOARD)strcpy(buff,"KEYBOARD R6");
-	else if(pin==PINMAP[43] && Option.LOCAL_KEYBOARD)strcpy(buff,"KEYBOARD BACKLIGHT");
-	else if(pin==PINMAP[44] && Option.LOCAL_KEYBOARD)strcpy(buff,"KEYBOARD LED3");
-	else if(pin==PINMAP[45] && Option.LOCAL_KEYBOARD)strcpy(buff,"KEYBOARD LED1");
-	else if(pin==PINMAP[46] && Option.LOCAL_KEYBOARD)strcpy(buff,"KEYBOARD LED2");
-	else if(pin==PINMAP[47] && Option.LOCAL_KEYBOARD)strcpy(buff,"BATTERY VOLTAGE");
-#endif
+	else if(Option.LOCAL_KEYBOARD && pin==PINMAP[24])strcpy(buff,"KEYBOARD C1");
+	else if(Option.LOCAL_KEYBOARD && pin==PINMAP[26])strcpy(buff,"KEYBOARD C2");
+	else if(Option.LOCAL_KEYBOARD && pin==PINMAP[27])strcpy(buff,"KEYBOARD C3");
+	else if(Option.LOCAL_KEYBOARD && pin==PINMAP[28])strcpy(buff,"KEYBOARD C4");
+	else if(Option.LOCAL_KEYBOARD && pin==PINMAP[29])strcpy(buff,"KEYBOARD C5");
+	else if(Option.LOCAL_KEYBOARD && pin==PINMAP[30])strcpy(buff,"KEYBOARD C6");
+	else if(Option.LOCAL_KEYBOARD && pin==PINMAP[31])strcpy(buff,"KEYBOARD C7");
+	else if(Option.LOCAL_KEYBOARD && pin==PINMAP[32])strcpy(buff,"KEYBOARD C8");
+	else if(Option.LOCAL_KEYBOARD && pin==PINMAP[33])strcpy(buff,"KEYBOARD C9");
+	else if(Option.LOCAL_KEYBOARD && pin==PINMAP[34])strcpy(buff,"KEYBOARD C10");
+	else if(Option.LOCAL_KEYBOARD && pin==PINMAP[35])strcpy(buff,"KEYBOARD C11");
+	else if(Option.LOCAL_KEYBOARD && pin==PINMAP[36])strcpy(buff,"KEYBOARD C12");
+	else if(Option.LOCAL_KEYBOARD && pin==PINMAP[37])strcpy(buff,"KEYBOARD R1");
+	else if(Option.LOCAL_KEYBOARD && pin==PINMAP[38])strcpy(buff,"KEYBOARD R2");
+	else if(Option.LOCAL_KEYBOARD && pin==PINMAP[39])strcpy(buff,"KEYBOARD R3");
+	else if(Option.LOCAL_KEYBOARD && pin==PINMAP[40])strcpy(buff,"KEYBOARD R4");
+	else if(Option.LOCAL_KEYBOARD && pin==PINMAP[41])strcpy(buff,"KEYBOARD R5");
+	else if(Option.LOCAL_KEYBOARD && pin==PINMAP[42])strcpy(buff,"KEYBOARD R6");
+	else if(Option.LOCAL_KEYBOARD && pin==PINMAP[43])strcpy(buff,"KEYBOARD BACKLIGHT");
+	else if(Option.LOCAL_KEYBOARD && pin==PINMAP[44])strcpy(buff,"KEYBOARD LED3");
+	else if(Option.LOCAL_KEYBOARD && pin==PINMAP[45])strcpy(buff,"KEYBOARD LED1");
+	else if(Option.LOCAL_KEYBOARD && pin==PINMAP[46])strcpy(buff,"KEYBOARD LED2");
+	else if(Option.LOCAL_KEYBOARD && pin==PINMAP[47])strcpy(buff,"BATTERY VOLTAGE");
 #endif
 	else strcpy(buff, "NOT KNOWN");
 	return buff;

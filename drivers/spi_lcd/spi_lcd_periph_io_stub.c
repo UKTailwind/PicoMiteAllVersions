@@ -20,3 +20,13 @@ void InitDisplaySSD(void) { }
 void InitDisplaySPI(int InitOnly) { (void)InitOnly; }
 void InitDisplayI2C(int InitOnly) { (void)InitOnly; }
 void InitTouch(void) { }
+
+/* TOUCH_*_PIN variables are defined in Touch.c on SPI-LCD ports;
+ * on the VGA-family ports Touch.c isn't linked, so satisfy the
+ * mmc_stm32 / Editor.c references with zero-initialized stubs. The
+ * runtime `if(Option.CombinedCS)` / `if(Option.TOUCH_CS)` guards keep
+ * them unreached because the OPTION setter rejects touch
+ * configuration on these ports. */
+int TOUCH_CS_PIN = 0;
+int TOUCH_IRQ_PIN = 0;
+int TOUCH_Click_PIN = 0;
