@@ -22,6 +22,28 @@
  * low_x/low_y/high_x/high_y / silly_low/silly_high / RGB565 are all
  * declared in SPI-LCD.h, Draw.h, or Hardware_Includes.h above. */
 
+int hal_spi_lcd_mem332_match_option(unsigned char *name) {
+    if (checkstring(name, (unsigned char *)"ST7796SPBUFF"))    return ST7796SPBUFF;
+    if (checkstring(name, (unsigned char *)"ST7796SBUFF"))     return ST7796SBUFF;
+    if (checkstring(name, (unsigned char *)"ILI9341BUFF"))     return ILI9341BUFF;
+    if (checkstring(name, (unsigned char *)"ILI9488BUFF"))     return ILI9488BUFF;
+    if (checkstring(name, (unsigned char *)"ILI9488PBUFF"))    return ILI9488PBUFF;
+    if (checkstring(name, (unsigned char *)"ILI9488WBUFF"))    return ILI9488WBUFF;
+    if (checkstring(name, (unsigned char *)"ST7789_320BUFF"))  return ST7789C;
+    return 0;
+}
+
+void hal_spi_lcd_mem332_init_display(int display_type) {
+    (void)display_type;
+    /* MEM332-specific init runs through the existing
+     * Draw* function-pointer dispatch in spi_lcd.c restorepanel().
+     * Nothing extra needed here for now. */
+}
+
+void hal_spi_lcd_mem332_init_luts(void) {
+    init_RGB332_to_RGB565_LUT();
+}
+
 void ScrollLCDMEM332(int lines){
     if(lines==0)return;
 	if(Option.DISPLAY_ORIENTATION==PORTRAIT){

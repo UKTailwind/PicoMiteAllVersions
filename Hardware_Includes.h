@@ -234,9 +234,10 @@ extern int CameraChannel;
 extern char id_out[];
 extern uint8_t *buff320;
 extern uint16_t SD_CLK_PIN,SD_MOSI_PIN,SD_MISO_PIN, SD_CS_PIN;
-#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
+/* LCD_*_PIN globals are defined unconditionally in mmc_stm32.c. The
+ * MEM332 path uses them when the LCD has its own SPI bus; other
+ * ports leave them at 0 and the dispatch never references them. */
 extern uint16_t LCD_CLK_PIN,LCD_MOSI_PIN,LCD_MISO_PIN;
-#endif
 extern bool screen320;
 extern void clear320(void);
 #if HAL_PORT_IS_VGA

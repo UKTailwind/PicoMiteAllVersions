@@ -66,9 +66,10 @@ int SPISpeed=0xFF;
 //#define SPI_CLK_PIN Option.SYSTEM_CLK
 //define SPI_MISO_PIN Option.SYSTEM_MISO
 uint16_t SPI_CLK_PIN,SPI_MOSI_PIN,SPI_MISO_PIN;
-#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
+/* LCD-specific SPI pins. Used only on MEM332 ports where the LCD has
+ * its own SPI clock distinct from the system one. Defined
+ * unconditionally so spi_lcd.c's references always link. */
 uint16_t LCD_CLK_PIN,LCD_MOSI_PIN,LCD_MISO_PIN;
-#endif
 uint16_t SD_CLK_PIN,SD_MOSI_PIN,SD_MISO_PIN, SD_CS_PIN;
 uint16_t AUDIO_CLK_PIN,AUDIO_MOSI_PIN,AUDIO_MISO_PIN, AUDIO_CS_PIN, AUDIO_RESET_PIN, AUDIO_DREQ_PIN, AUDIO_DCS_PIN, AUDIO_LDAC_PIN;
 uint16_t AUDIO_L_PIN, AUDIO_R_PIN, AUDIO_SLICE;

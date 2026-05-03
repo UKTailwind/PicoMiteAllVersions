@@ -26,6 +26,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include <stdarg.h>
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
+#include "hal/hal_spi_lcd_mem332.h"
 #include "hardware/dma.h"
 #include "pico/multicore.h"
 int CurrentSPIDevice=NONE_SPI_DEVICE;
@@ -207,28 +208,18 @@ void MIPS16 ConfigDisplaySPI(unsigned char *p) {
         DISPLAY_TYPE = SSD1306SPI;
     } else if(checkstring(argv[0], (unsigned char *)"ST7920")) {
         DISPLAY_TYPE = ST7920;
-#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
-    } else if(checkstring(argv[0], (unsigned char *)"ST7796SPBUFF")) {
-        DISPLAY_TYPE = ST7796SPBUFF;
-    } else if(checkstring(argv[0], (unsigned char *)"ST7796SBUFF")) {
-        DISPLAY_TYPE = ST7796SBUFF;
-    } else if(checkstring(argv[0], (unsigned char *)"ILI9341BUFF")) {
-        DISPLAY_TYPE = ILI9341BUFF;
-    } else if(checkstring(argv[0], (unsigned char *)"ILI9488BUFF")) {
-        DISPLAY_TYPE = ILI9488BUFF;
-    } else if(checkstring(argv[0], (unsigned char *)"ILI9488PBUFF")) {
-        DISPLAY_TYPE = ILI9488PBUFF;
-    } else if(checkstring(argv[0], (unsigned char *)"ILI9488WBUFF")) {
-        DISPLAY_TYPE = ILI9488WBUFF;
-    } else if(checkstring(argv[0], (unsigned char *)"ST7789_320BUFF")) {
-        DISPLAY_TYPE = ST7789C;
-#endif
-	} else return;
-#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
-	if(!(Option.SYSTEM_CLK || Option.LCD_CLK))error("SPI not configured");
-#else
-	if(!Option.SYSTEM_CLK)error("System SPI not configured");
-#endif
+    } else {
+        /* MEM332 buffered family — real matcher in spi_lcd_mem332.c
+         * (linked on rp2350 PicoMite); stub returns 0 on every other
+         * port and the "unknown display" return below fires. */
+        int mt = hal_spi_lcd_mem332_match_option(argv[0]);
+        if (mt) DISPLAY_TYPE = mt;
+        else return;
+    }
+    /* Option.LCD_CLK is a flat field in struct option_s on every port
+     * (P1); on non-MEM332 ports it's always 0, so the OR with
+     * SYSTEM_CLK reduces to the SYSTEM_CLK-only check. */
+    if(!(Option.SYSTEM_CLK || Option.LCD_CLK))error("SPI not configured");
     if(!(argc == 7 || argc == 9 || argc==11 || argc==13)) error("Argument count");
 	if(*argv[2]){
 		if(checkstring(argv[2], (unsigned char *)"L") || checkstring(argv[2], (unsigned char *)"LANDSCAPE"))
@@ -241,9 +232,11 @@ void MIPS16 ConfigDisplaySPI(unsigned char *p) {
 			orientation = RPORTRAIT;
 		else error("Orientation");
 	}
-#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
+	/* DISPLAY_TYPE never reaches NEXTGEN on non-MEM332 ports (the
+	 * matcher above doesn't accept those names there), so the check
+	 * is a no-op there. On MEM332 ports it enforces a dedicated LCD
+	 * SPI channel. */
 	if(DISPLAY_TYPE>=NEXTGEN && Option.LCD_CLK==Option.SYSTEM_CLK)error("Buffered drivers need a dedicated SPI channel");
-#endif
 	Option.DISPLAY_ORIENTATION=orientation;
     if(DISPLAY_TYPE==ST7789 || DISPLAY_TYPE == ST7789A|| DISPLAY_TYPE == ST7789A)Option.DISPLAY_ORIENTATION=(Option.DISPLAY_ORIENTATION+2) % 4;
 	if(!(code=codecheck(argv[4])))argv[4]+=2;
@@ -290,18 +283,20 @@ void MIPS16 ConfigDisplaySPI(unsigned char *p) {
 // initialise the display controller
 // this is used in the initial boot sequence of the Micromite
 void MIPS16 InitDisplaySPI(int InitOnly) {
-#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
+    /* The `< NEXTGEN` term is meaningful only on MEM332 ports (where
+     * DISPLAY_TYPE may reach NEXTGEN values that should NOT bail).
+     * On non-MEM332 ports DISPLAY_TYPE never reaches NEXTGEN so the
+     * extra term is always-true and reduces to the simple bail. */
     if(Option.DISPLAY_TYPE==0 || (Option.DISPLAY_TYPE >= DISP_USER && Option.DISPLAY_TYPE<NEXTGEN)  || Option.DISPLAY_TYPE <= I2C_PANEL) return;
-#else
-    if(Option.DISPLAY_TYPE==0 || Option.DISPLAY_TYPE >= DISP_USER || Option.DISPLAY_TYPE <= I2C_PANEL) return;
-#endif
     DisplayHRes = display_details[Option.DISPLAY_TYPE].horizontal;
     DisplayVRes = display_details[Option.DISPLAY_TYPE].vertical;
     if(!InitOnly) {
 //        SPI2on();
         // open the SPI port and reserve the I/O pins
-#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
-		if(Option.SYSTEM_CLK!=Option.LCD_CLK){ //configure the LCD SPI pins
+		/* MEM332 ports may have a separate LCD SPI clock pin
+		 * (Option.LCD_CLK) distinct from the system SPI clock. Other
+		 * ports always have LCD_CLK == 0, making this branch dead. */
+		if(Option.SYSTEM_CLK!=Option.LCD_CLK){
 			gpio_set_function(LCD_CLK_PIN, GPIO_FUNC_SPI);
 			gpio_set_function(LCD_MOSI_PIN, GPIO_FUNC_SPI);
 			gpio_set_function(LCD_MISO_PIN, GPIO_FUNC_SPI);
@@ -320,7 +315,6 @@ void MIPS16 InitDisplaySPI(int InitOnly) {
 				lcd_rcvr_byte_multi=HW1ReadSPI;
 			}
 		}
-#endif
         // setup the pointers to the drawing primitives
         if(Option.DISPLAY_TYPE>I2C_PANEL && Option.DISPLAY_TYPE < BufferedPanel){
 			if(Option.DISPLAY_ORIENTATION==PORTRAIT){
@@ -346,8 +340,12 @@ void MIPS16 InitDisplaySPI(int InitOnly) {
 					ScrollLCD = ScrollLCDSPI;
 				}
 			}
-#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
 		} else if(Option.DISPLAY_TYPE>=NEXTGEN){
+			/* MEM332 buffered family — function pointers link to the
+			 * real impls in spi_lcd_mem332.c on rp2350-PicoMite, or
+			 * to no-op stubs in spi_lcd_mem332_stub.c elsewhere. The
+			 * branch only fires on MEM332 ports (DISPLAY_TYPE never
+			 * reaches NEXTGEN values otherwise). */
             DrawRectangle = DrawRectangleMEM332;
             DrawBitmap = DrawBitmapMEM332;
         	DrawBuffer = DrawBufferMEM332;
@@ -355,7 +353,6 @@ void MIPS16 InitDisplaySPI(int InitOnly) {
         	DrawBLITBuffer = DrawBlitBufferMEM332;
 			ReadBLITBuffer = ReadBlitBufferMEM332;
 			ScrollLCD = ScrollLCDMEM332;
-#endif
 		} else {
             DrawRectangle = DrawRectangleMEM;
             DrawBitmap = DrawBitmapMEM;
@@ -369,12 +366,13 @@ void MIPS16 InitDisplaySPI(int InitOnly) {
     // the parameters for the display panel are set here
     // the initialisation sequences and the SPI driver code was written by Peter Mather (matherp on The Back Shed forum)
     switch(Option.DISPLAY_TYPE) {
+		/* The *BUFF cases are MEM332-only DISPLAY_TYPE values; non-
+		 * MEM332 ports never set Option.DISPLAY_TYPE to one of them
+		 * so the case labels are dead code there. */
 		case ST7796S:
 		case ST7796SP:
-#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
 		case ST7796SPBUFF:
 		case ST7796SBUFF:
-#endif
 		ResetController();
 		spi_write_cd(0xC5, 1, 0x1C);             //VCOM  Control 1 [1C]
 		spi_write_cd(0x3A, 1, 0x55);              //565
@@ -396,11 +394,7 @@ void MIPS16 InitDisplaySPI(int InitOnly) {
 			case RLANDSCAPE:    spi_write_cd(ILI9341_MEMCONTROL,1,ILI9341_Landscape180); break;
 			case RPORTRAIT:     spi_write_cd(ILI9341_MEMCONTROL,1,ILI9341_Portrait180); break;
 		}
-#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
 		if(Option.DISPLAY_TYPE==ST7796SP || Option.DISPLAY_TYPE==ST7796SPBUFF){
-#else
-		if(Option.DISPLAY_TYPE==ST7796SP){
-#endif
 			spi_write_cd(0x33,6,0x00,0x00,0x01,0x40,0x00,0xA0);
 		} else {
 			spi_write_cd(0x33,6,0x00,0x00,0x01,0xE0,0x00,0x00);
@@ -413,16 +407,11 @@ void MIPS16 InitDisplaySPI(int InitOnly) {
 		case ILI9488:
 		case ILI9488P:
 		case ILI9488W:
-#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
 		case ILI9488PBUFF:
 		case ILI9488BUFF:
 		case ILI9488WBUFF:
 			ResetController();
 			if(Option.DISPLAY_TYPE==ILI9488 || Option.DISPLAY_TYPE==ILI9488P || Option.DISPLAY_TYPE==ILI9488PBUFF || Option.DISPLAY_TYPE==ILI9488BUFF){
-#else
-			ResetController();
-			if(Option.DISPLAY_TYPE==ILI9488 || Option.DISPLAY_TYPE==ILI9488P){
-#endif
 				spi_write_command(0xE0); // Positive Gamma Control
 				spi_write_data(0x00);
 				spi_write_data(0x03);
@@ -500,11 +489,7 @@ void MIPS16 InitDisplaySPI(int InitOnly) {
 
 				spi_write_command(TFT_SLPOUT); //Exit Sleep
 				uSec(120000);
-#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
 				if(Option.DISPLAY_TYPE==ILI9488P || Option.DISPLAY_TYPE==ILI9488PBUFF){
-#else
-				if(Option.DISPLAY_TYPE==ILI9488P){
-#endif
 					spi_write_command(0x33);
 					spi_write_data(0x00);
 					spi_write_data(0x00);
@@ -748,9 +733,7 @@ void MIPS16 InitDisplaySPI(int InitOnly) {
         	spi_write_command(SSD1331_CMD_DISPLAYON);	//--turn on oled panel
     		break;
     case ILI9341:
-#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
 	case ILI9341BUFF:
-#endif
             ResetController();
             spi_write_command(ILI9341_SOFTRESET);                           //software reset
             uSec(20000);
@@ -912,9 +895,7 @@ void MIPS16 InitDisplaySPI(int InitOnly) {
         case ST7789:
 		case ST7789A:
 		case ST7789B:
-#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
 		case ST7789C:
-#endif
             ResetController();
             spi_write_command(ST77XX_SWRESET);    uSec(150000);
             spi_write_command(ST77XX_SLPOUT);    uSec(500000);
@@ -1054,11 +1035,9 @@ void ST7920command(unsigned char data){
 	a[1]=data & 0xF0;
 	a[2]=((data & 0x0F)<<4) & 0xF0;
     SetCS();
-#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
+	/* lcd_xmit_byte_multi is unconditionally assigned at SPISpeedSet
+	 * time — defaults to the system SPI sender on non-MEM332 ports. */
 	lcd_xmit_byte_multi(a,3);
-#else
-	xmit_byte_multi(a,3);
-#endif
 	ClearCS(Option.LCD_CD);
 }
 
@@ -1092,11 +1071,7 @@ void MIPS16 ResetController(void){
 
 void DefineRegionSPI(int xstart, int ystart, int xend, int yend, int rw) {
 	unsigned char coord[4];
-#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
     if(Option.DISPLAY_TYPE == ILI9481 || Option.DISPLAY_TYPE == ILI9488W || Option.DISPLAY_TYPE == ILI9488WBUFF){
-#else
-    if(Option.DISPLAY_TYPE == ILI9481 || Option.DISPLAY_TYPE == ILI9488W){
-#endif
 		SetCS();
     	gpio_put(LCD_CD_PIN,GPIO_PIN_RESET);
     	SPIsend2(ILI9341_COLADDRSET);
@@ -1226,11 +1201,7 @@ void DefineRegionSPI(int xstart, int ystart, int xend, int yend, int rw) {
 		coord[1]=xstart;
 		coord[2]=xend >> 8;
 		coord[3]=xend;
-#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
 		lcd_xmit_byte_multi(coord,4);//		HAL_SPI_Transmit(&hspi3,coord,4,500);
-#else
-		xmit_byte_multi(coord,4);//		HAL_SPI_Transmit(&hspi3,coord,4,500);
-#endif
     	gpio_put(LCD_CD_PIN,GPIO_PIN_RESET);
 		SPIsend(ILI9341_PAGEADDRSET);
     	gpio_put(LCD_CD_PIN,GPIO_PIN_SET);
@@ -1238,11 +1209,7 @@ void DefineRegionSPI(int xstart, int ystart, int xend, int yend, int rw) {
 		coord[1]=ystart;
 		coord[2]=yend >> 8;
 		coord[3]=yend;
-#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
 		lcd_xmit_byte_multi(coord,4);//		HAL_SPI_Transmit(&hspi3,coord,4,500);
-#else
-		xmit_byte_multi(coord,4);//		HAL_SPI_Transmit(&hspi3,coord,4,500);
-#endif
     	gpio_put(LCD_CD_PIN,GPIO_PIN_RESET);
 		if(rw) {
 			SPIsend(ILI9341_MEMORYWRITE);
@@ -1262,11 +1229,7 @@ void DefineRegionSPI(int xstart, int ystart, int xend, int yend, int rw) {
  ****************************************************************************************************
 ****************************************************************************************************/
 void spisendfast(unsigned char *n, int i){
-#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
 		lcd_xmit_byte_multi(n,i);//		HAL_SPI_Transmit(&hspi3,coord,4,500);
-#else
-		xmit_byte_multi(n,i);//		HAL_SPI_Transmit(&hspi3,coord,4,500);
-#endif
 }
 // Draw a filled rectangle
 // this is the basic drawing promitive used by most drawing routines
@@ -2194,11 +2157,7 @@ void ST7920SetXY(int x, int y){
 	a[3]=0x80;
 	a[4]=xx<<4;
     SetCS();
-#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
 	lcd_xmit_byte_multi(a,5);
-#else
-	xmit_byte_multi(a,5);
-#endif
 	uSec(50);
 	ClearCS(Option.LCD_CD);
 }
@@ -2220,11 +2179,7 @@ void Display_Refresh(void){
 			N5110SetXY(low_x, y);
 			SetCS();
 			gpio_put(LCD_CD_PIN,GPIO_PIN_SET);
-#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
 			lcd_xmit_byte_multi(p+(y*DisplayHRes)+low_x,high_x-low_x+1);
-#else
-			xmit_byte_multi(p+(y*DisplayHRes)+low_x,high_x-low_x+1);
-#endif
 			ClearCS(Option.LCD_CS);
 		}
 	} else if(Option.DISPLAY_TYPE<=I2C_PANEL){
@@ -2239,11 +2194,7 @@ void Display_Refresh(void){
 			SSD1306SPISetXY(Option.I2Coffset+low_x,y);
 			SetCS();
 			gpio_put(LCD_CD_PIN,GPIO_PIN_SET);
-#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
 			lcd_xmit_byte_multi(p+(y*DisplayHRes)+low_x,high_x-low_x+1);
-#else
-			xmit_byte_multi(p+(y*DisplayHRes)+low_x,high_x-low_x+1);
-#endif
 			ClearCS(Option.LCD_CS);
 		}
 	} else if(Option.DISPLAY_TYPE==ST7920){
@@ -2259,11 +2210,7 @@ void Display_Refresh(void){
 			}
 			ST7920SetXY(0,y);
 			SetCS();
-#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
 			lcd_xmit_byte_multi(x_array,33);
-#else
-			xmit_byte_multi(x_array,33);
-#endif
 			ClearCS(Option.LCD_CD);
 		}
 	}
