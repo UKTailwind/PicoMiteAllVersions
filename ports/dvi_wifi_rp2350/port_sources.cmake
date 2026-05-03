@@ -1,0 +1,104 @@
+# ports/dvi_wifi_rp2350/port_sources.cmake — single-board port for the
+# pico_stretch RP2350B board: DVI/HDMI display + RM2 (CYW43) WiFi +
+# QSPI PSRAM + I²S audio + USB-host keyboard. One PCB, one firmware
+# variant — no COMPILE-name keyboard axis. Source list is the union
+# of hdmi_rp2350 (HDMI + PSRAM scaffolding) and the WiFi stack from
+# the WiFi ports.
+
+target_include_directories(PicoMite PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}
+    ${CMAKE_SOURCE_DIR}     # for our common lwipopts
+)
+
+target_sources(PicoMite PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/pin_tables.c
+    ${CMAKE_CURRENT_LIST_DIR}/port_defaults.c
+    # HDMI provides its own MMBasic port-hook body (prompt-font selection
+    # has extra cases for FullColour / SCREENMODE3).
+    ${CMAKE_CURRENT_LIST_DIR}/mmbasic_port_hdmi.c
+
+    # VGA-PIO scanout scaffolding (HDMI rides on the VGA-PIO family) +
+    # HDMI sink + DVI mode tables.
+    ${CMAKE_SOURCE_DIR}/drivers/vga_pio/vga_ops.c
+    ${CMAKE_SOURCE_DIR}/drivers/vga_pio/vga_mode_ops.c
+    ${CMAKE_SOURCE_DIR}/drivers/vga_pio/vga_blit_ops.c
+    ${CMAKE_SOURCE_DIR}/drivers/vga_pio/vga_memory.c
+    ${CMAKE_SOURCE_DIR}/drivers/hdmi/hdmi_modes.c
+    ${CMAKE_SOURCE_DIR}/drivers/hdmi/hdmi_scanout.c
+
+    # WiFi stack (CYW43 + lwIP + MQTT/UDP/TFTP/Telnet/NTP). NOTE:
+    # SSD1963.c and Touch.c are intentionally omitted — they live in
+    # the SPI-LCD path and Touch.c references PICOMITEVGA-incompatible
+    # Option fields. AllCommands.h only dispatches fun_touch on
+    # non-VGA ports so the linker is happy without Touch.c here.
+    ${CMAKE_SOURCE_DIR}/cJSON.c
+    ${CMAKE_SOURCE_DIR}/mqtt.c
+    ${CMAKE_SOURCE_DIR}/MMMqtt.c
+    ${CMAKE_SOURCE_DIR}/MMTCPclient.c
+    ${CMAKE_SOURCE_DIR}/MMtelnet.c
+    ${CMAKE_SOURCE_DIR}/MMntp.c
+    ${CMAKE_SOURCE_DIR}/MMtcpserver.c
+    ${CMAKE_SOURCE_DIR}/tftp.c
+    ${CMAKE_SOURCE_DIR}/MMtftp.c
+    ${CMAKE_SOURCE_DIR}/MMudp.c
+    ${CMAKE_SOURCE_DIR}/MMsetwifi.c
+
+    # rp2350 features. RM2's CYW43 lives off the QSPI pins so PSRAM
+    # stays available — link the real psram_heap impl, not the stub.
+    ${CMAKE_SOURCE_DIR}/psram.c
+    ${CMAKE_SOURCE_DIR}/upng.c
+    ${CMAKE_SOURCE_DIR}/drivers/audio_mp3/audio_mp3_real.c
+    ${CMAKE_SOURCE_DIR}/drivers/psram_heap/psram_heap_pico.c
+    ${CMAKE_SOURCE_DIR}/drivers/upng_sprite/upng_sprite.c
+
+    # Non-PICOMITE / non-WEB stubs.
+    ${CMAKE_SOURCE_DIR}/drivers/display_merge/display_merge_stub.c
+    ${CMAKE_SOURCE_DIR}/drivers/vm_framebuffer_unsupported/vm_framebuffer_stub.c
+    ${CMAKE_SOURCE_DIR}/drivers/spi_lcd/spi_lcd_nextgen_stub.c
+    ${CMAKE_SOURCE_DIR}/drivers/spi_lcd/spi_lcd_fastgfx_stub.c
+    ${CMAKE_SOURCE_DIR}/drivers/gui_touch/gui_touch_stub.c
+
+    # PICOMITEVGA needs fun_3D / fun_map / fun_getscanline (gated on
+    # #ifdef PICOMITEVGA in AllCommands.h). MMtcpserver.c's closeall3d
+    # stub is gated out on PICOMITEVGA so the real closeall3d from
+    # gfx_3d.c provides it.
+    ${CMAKE_SOURCE_DIR}/drivers/gfx_3d/gfx_3d.c
+
+    # USB-host keyboard. The board's USB-A port is owned by TinyUSB
+    # host stack, which means USB-CDC stdio is unavailable — connect
+    # to the BASIC REPL via UART (Option.SerialConsole on GP0/GP1
+    # per the pico_stretch board file) or use the HDMI display +
+    # local USB keyboard with no remote terminal.
+    ${CMAKE_SOURCE_DIR}/drivers/usb_host_kbd/USBKeyboard.c
+)
+
+set_source_files_properties(${CMAKE_SOURCE_DIR}/cJSON.c PROPERTIES COMPILE_FLAGS -Os)
+
+# --- Per-port build config -------------------------------------------------
+# PICOMITEVGA — VGA-family core branches.
+target_compile_options(PicoMite PRIVATE -DPICOMITEVGA
+                                        -DPICO_HEAP_SIZE=0x2000
+                                        -DPICO_CORE0_STACK_SIZE=0x4000
+                                        )
+# WiFi stack settings. Device name is what shows in the boot banner
+# and MM.DEVICE$.
+target_compile_options(PicoMite PRIVATE -DCYW43_HOST_NAME="DVIWiFi"
+                                        -DPICO_CYW43_ARCH_POLL
+                                        -DHAL_PORT_DEVICE_NAME="DVIWiFiMite"
+                                        )
+# rp2350 chip flags.
+target_compile_options(PicoMite PRIVATE -Drp2350
+                                        -DPICO_FLASH_SPI_CLKDIV=4
+                                        -DPICO_PIO_USE_GPIO_BASE
+                                        )
+target_link_libraries(PicoMite pico_multicore pico_cyw43_arch_lwip_poll
+                               tinyusb_host tinyusb_board)
+pico_set_float_implementation(PicoMite pico_dcp)
+
+# USB-host keyboard config. -DUSBKEYBOARD switches the keyboard
+# backend in port-impl files; usb_host_files dir holds the TinyUSB
+# device-config headers (tusb_config.h, etc.); stdio_usb=0 because
+# the USB-A port is in host mode for the keyboard.
+target_compile_options(PicoMite PRIVATE -DUSBKEYBOARD)
+target_include_directories(PicoMite PRIVATE ${CMAKE_SOURCE_DIR}/usb_host_files)
+Pico_enable_stdio_usb(PicoMite 0)
