@@ -272,7 +272,7 @@ int __not_in_flash_func(GetTouchAxis)(int cmd) {
     int i, j, t, b[TOUCH_SAMPLES];
     TOUCH_GETIRQTRIS=0;
     PinSetBit(Option.TOUCH_IRQ, CNPDSET);                           // Set the PenIRQ to an output
-#ifdef PICOMITE
+#if HAL_PORT_HAS_PICOMITE
     if(SPIatRisk)mutex_enter_blocking(&frameBufferMutex);			// lock the frame buffer
 #endif
     GetTouchValue(cmd);
@@ -280,11 +280,11 @@ int __not_in_flash_func(GetTouchAxis)(int cmd) {
     for(i = 0; i < TOUCH_SAMPLES; i++) {
         b[i] = GetTouchValue(cmd);                                  // get the value
         if (CurrentlyPlaying == P_WAV || CurrentlyPlaying == P_FLAC || CurrentlyPlaying == P_MIDI || CurrentlyPlaying == P_MP3 || CurrentlyPlaying == P_ARRAY){
-#ifdef PICOMITE
+#if HAL_PORT_HAS_PICOMITE
             if(SPIatRisk)mutex_enter_blocking(&frameBufferMutex);			// lock the frame buffer
 #endif
             checkWAVinput();
-#ifdef PICOMITE
+#if HAL_PORT_HAS_PICOMITE
             if(SPIatRisk)mutex_exit(&frameBufferMutex);
 #endif
         }
@@ -308,7 +308,7 @@ int __not_in_flash_func(GetTouchAxis)(int cmd) {
     GetTouchValue(CMD_PENIRQ_ON);                                   // send the command to turn PenIRQ on
     PinSetBit(Option.TOUCH_IRQ, CNPUSET);                           // Set the PenIRQ to an input
     TOUCH_GETIRQTRIS=1;
-#ifdef PICOMITE
+#if HAL_PORT_HAS_PICOMITE
     if(SPIatRisk)mutex_exit(&frameBufferMutex);
 #endif
     return i;

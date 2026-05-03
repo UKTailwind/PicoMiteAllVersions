@@ -173,7 +173,7 @@ void MMBasic_RunPromptLoop(void) {
         WebConnect();
     }
     #endif
-#ifdef PICOMITE
+#if HAL_PORT_HAS_PICOMITE
     SPIatRisk=((Option.DISPLAY_TYPE>I2C_PANEL && Option.DISPLAY_TYPE<BufferedPanel) && Option.SD_CLK_PIN==0);
     low_x=0;high_x=HRes-1;low_y=0;high_y=VRes-1;
     if(Option.Refresh)Display_Refresh();

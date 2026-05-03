@@ -22,7 +22,9 @@ target_sources(PicoMite PRIVATE
     ${CMAKE_SOURCE_DIR}/drivers/vm_framebuffer_unsupported/vm_framebuffer_stub.c
     ${CMAKE_SOURCE_DIR}/drivers/spi_lcd/spi_lcd_nextgen_stub.c
     ${CMAKE_SOURCE_DIR}/drivers/spi_lcd/spi_lcd_fastgfx_stub.c
+    ${CMAKE_SOURCE_DIR}/drivers/spi_lcd/spi_oled_stub.c
     ${CMAKE_SOURCE_DIR}/drivers/gui_touch/gui_touch_stub.c
+    ${CMAKE_SOURCE_DIR}/drivers/gui_controls/gui_controls_stub.c
 
     # rp2040 stubs.
     ${CMAKE_SOURCE_DIR}/drivers/audio_mp3/audio_mp3_stub.c

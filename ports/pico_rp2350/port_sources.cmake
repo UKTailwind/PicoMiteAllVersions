@@ -15,6 +15,7 @@ target_sources(PicoMite PRIVATE
     ${CMAKE_SOURCE_DIR}/drivers/spi_lcd/spi_lcd_fastgfx.c
     ${CMAKE_SOURCE_DIR}/drivers/spi_lcd/spi_lcd_framebuffer.c
     ${CMAKE_SOURCE_DIR}/drivers/gui_touch/gui_touch.c
+    ${CMAKE_SOURCE_DIR}/drivers/gui_controls/gui_controls_real.c
     ${CMAKE_SOURCE_DIR}/SSD1963.c
     ${CMAKE_SOURCE_DIR}/Touch.c
     ${CMAKE_SOURCE_DIR}/GUI.c
@@ -47,7 +48,7 @@ else()
 endif()
 
 # --- Per-port build config (Stage E2) -------------------------------------
-target_compile_options(PicoMite PRIVATE -DPICOMITE
+target_compile_options(PicoMite PRIVATE
                                         -DPICO_HEAP_SIZE=0x800
                                         -DPICO_CORE0_STACK_SIZE=0x1000
                                         )

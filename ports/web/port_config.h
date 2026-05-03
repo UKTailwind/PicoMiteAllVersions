@@ -45,6 +45,7 @@
 /* Stage-A palette flags (decascade plan). PICOMITEWEB on rp2040 has the
  * CYW43+lwIP+mongoose stack but doesn't fit GUICONTROLS in heap. */
 #define HAL_PORT_HAS_WIFI                1
+#define HAL_PORT_HAS_PICOMITE         0
 #define HAL_PORT_HAS_VGA_PIO             0
 #define HAL_PORT_HAS_GUICONTROLS         0
 

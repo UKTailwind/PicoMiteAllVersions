@@ -26,7 +26,7 @@ endif
 CFLAGS = -std=gnu11 -g -O2 -Wall -Wno-unused-variable -Wno-unused-function \
          -Wno-unused-but-set-variable -Wno-misleading-indentation \
          -Wno-missing-braces -funsigned-char \
-         -DPICOMITE -DMMBASIC_HOST -DMMBASIC_ANSI $(SIM_FLAGS) \
+         -DMMBASIC_HOST -DMMBASIC_ANSI $(SIM_FLAGS) \
          -include host_platform.h \
          -I$(PORT_DIR) -I$(HOST_DIR) -I$(REPO_ROOT) \
          -MMD -MP
@@ -41,7 +41,7 @@ CORE_SRCS += mm_misc_shared.c
 CORE_SRCS += display_state.c pin_state.c option_state.c audio_state.c
 CORE_SRCS += Draw.c RGB121.c Tilemap.c FileIO.c Audio.c BmpDecoder.c re.c picojpeg.c
 CORE_SRCS += audio_mp3_stub.c spi_lcd_nextgen_stub.c display_merge_stub.c vga_ops_stub.c
-CORE_SRCS += gfx_3d.c upng_sprite_stub.c gui_touch_stub.c psram_heap_stub.c
+CORE_SRCS += gfx_3d.c upng_sprite_stub.c gui_touch_stub.c gui_controls_stub.c psram_heap_stub.c
 
 BC_SRCS = bc_alloc.c bc_bridge.c vm_host_fat.c ff.c ffunicode.c ffsystem.c \
           vm_sys_input.c vm_sys_graphics.c vm_sys_time.c vm_sys_pin_host.c vm_sys_file_host.c \
@@ -104,6 +104,9 @@ $(BUILD_DIR)/%.o: $(REPO_ROOT)/drivers/upng_sprite/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c -o $@ $<
 $(BUILD_DIR)/%.o: $(REPO_ROOT)/drivers/gui_touch/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c -o $@ $<
+$(BUILD_DIR)/%.o: $(REPO_ROOT)/drivers/gui_controls/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c -o $@ $<
 $(BUILD_DIR)/%.o: $(REPO_ROOT)/drivers/psram_heap/%.c

@@ -36,7 +36,7 @@ CFLAGS = -O2 -std=gnu11 -funsigned-char \
          -Wall -Wno-unused-variable -Wno-unused-function \
          -Wno-unused-but-set-variable -Wno-misleading-indentation \
          -Wno-missing-braces \
-         -DPICOMITE -DMMBASIC_HOST -DMMBASIC_WASM $(SIM_FLAGS) \
+         -DMMBASIC_HOST -DMMBASIC_WASM $(SIM_FLAGS) \
          -include host_platform.h \
          -I$(WASM_DIR) -I$(NATIVE_DIR) -I$(REPO_ROOT) \
          -MMD -MP \
@@ -75,7 +75,7 @@ CORE_SRCS = MMBasic.c Commands.c Functions.c Operators.c MATHS.c \
             Draw.c RGB121.c Tilemap.c FileIO.c Audio.c BmpDecoder.c re.c picojpeg.c
 # Stubs + host-only subsystems — match ports/host_native/Makefile.
 CORE_SRCS += audio_mp3_stub.c spi_lcd_nextgen_stub.c display_merge_stub.c vga_ops_stub.c
-CORE_SRCS += gfx_3d.c upng_sprite_stub.c gui_touch_stub.c psram_heap_stub.c
+CORE_SRCS += gfx_3d.c upng_sprite_stub.c gui_touch_stub.c gui_controls_stub.c psram_heap_stub.c
 
 # Bytecode VM sources.
 BC_SRCS = bc_alloc.c bc_bridge.c vm_host_fat.c \
@@ -151,6 +151,9 @@ $(BUILD_DIR)/%.o: $(REPO_ROOT)/drivers/upng_sprite/%.c
 	@mkdir -p $(dir $@)
 	$(EMCC) $(CFLAGS) -c -o $@ $<
 $(BUILD_DIR)/%.o: $(REPO_ROOT)/drivers/gui_touch/%.c
+	@mkdir -p $(dir $@)
+	$(EMCC) $(CFLAGS) -c -o $@ $<
+$(BUILD_DIR)/%.o: $(REPO_ROOT)/drivers/gui_controls/%.c
 	@mkdir -p $(dir $@)
 	$(EMCC) $(CFLAGS) -c -o $@ $<
 $(BUILD_DIR)/%.o: $(REPO_ROOT)/drivers/psram_heap/%.c

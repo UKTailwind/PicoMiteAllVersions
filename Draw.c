@@ -39,6 +39,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "hal/hal_keyboard.h"
 #include "hal/hal_display_merge.h"
 #include "hal/hal_vga_ops.h"
+#include "hal/hal_gui_controls.h"
 #include "gfx_box_shared.h"
 #include "gfx_circle_shared.h"
 #include "gfx_line_shared.h"
@@ -1356,13 +1357,7 @@ void GUIPrintString(int x, int y, int fnt, int jh, int jv, int jo, int fc, int b
         if(jv == JUSTIFY_BOTTOM) CurrentY -= (strlen(str) * GetFontWidth(fnt));
     }
     while(*str) {
-#if HAL_PORT_HAS_GUICONTROLS
-        if(*str == 0xff && Ctrl[InvokingCtrl].type == 10) {
-//            fc = rgb(0, 0, 255);                                // this is specially for GUI FORMATBOX
-            str++;
-            GUIPrintChar(fnt, bc, fc, *str++, jo);
-        } else
-#endif
+        if (!hal_gui_controls_print_char_escape(fnt, fc, bc, &str, jo))
             GUIPrintChar(fnt, fc, bc, *str++, jo);
     }
 }
@@ -3233,9 +3228,7 @@ void cmd_cls(void) {
     GfxClsArg arg = {0};
     GfxClsOps ops;
     if(Option.DISPLAY_TYPE == 0) error("Display not configured");
-#if HAL_PORT_HAS_GUICONTROLS
-    HideAllControls();
-#endif
+    hal_gui_controls_hide_all();
     skipspace(cmdline);
     arg.ctx = cmdline;
     arg.get_int = draw_cls_get_int;
@@ -5889,9 +5882,7 @@ void MIPS16 ResetDisplay(void) {
      * function-pointer dispatch table per SCREENMODE. No-op on
      * non-VGA; GUICONTROLS builds fall through to ResetGUI. */
     hal_vga_ops_reset_display_vga();
-#if HAL_PORT_HAS_GUICONTROLS
-    ResetGUI();
-#endif
+    hal_gui_controls_reset();
 }
 void hline(int x0, int x1, int y, int f, int ints_per_line, uint32_t *br) { //draw a horizontal line
     uint32_t w1, xx1, w0, xx0, x, xn, i;

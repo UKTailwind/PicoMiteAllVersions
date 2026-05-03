@@ -19,6 +19,7 @@ target_sources(PicoMite PRIVATE
     ${CMAKE_SOURCE_DIR}/drivers/spi_lcd/spi_lcd_framebuffer.c
     ${CMAKE_SOURCE_DIR}/drivers/spi_lcd/spi_lcd_nextgen_stub.c
     ${CMAKE_SOURCE_DIR}/drivers/gui_touch/gui_touch.c
+    ${CMAKE_SOURCE_DIR}/drivers/gui_controls/gui_controls_stub.c
     ${CMAKE_SOURCE_DIR}/SSD1963.c
     ${CMAKE_SOURCE_DIR}/Touch.c
 
@@ -50,7 +51,7 @@ endif()
 # --- Per-port build config (Stage E2) -------------------------------------
 # PICOMITE base defines + heap/stack budget. PICOMITE is consulted by
 # drivers/spi_lcd/spi_lcd.c (NEXTGEN gates) and a handful of port files.
-target_compile_options(PicoMite PRIVATE -DPICOMITE
+target_compile_options(PicoMite PRIVATE
                                         -DPICO_HEAP_SIZE=0x800
                                         -DPICO_CORE0_STACK_SIZE=0x1000
                                         )

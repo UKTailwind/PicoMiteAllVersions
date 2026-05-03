@@ -46,7 +46,7 @@ extern int scroll_lock;
 extern bool USBenabled;
 #endif
 
-#if defined(PICOMITE) && defined(rp2350)
+#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
 extern int LocalKeyDown[7];
 #endif
 
@@ -94,7 +94,7 @@ int hal_keyboard_keydown_count(void)
     int count = 0;
     for (int i = 0; i < 6; i++) if (KeyDown[i]) count++;
     return count;
-#elif defined(PICOMITE) && defined(rp2350)
+#elif HAL_PORT_HAS_PICOMITE && defined(rp2350)
     int count = 0;
     for (int i = 0; i < 6; i++) if (LocalKeyDown[i]) count++;
     return count;
@@ -108,7 +108,7 @@ int hal_keyboard_keydown_slot(int slot)
     if (slot < 1 || slot > 6) return 0;
 #ifdef USBKEYBOARD
     return KeyDown[slot - 1];
-#elif defined(PICOMITE) && defined(rp2350)
+#elif HAL_PORT_HAS_PICOMITE && defined(rp2350)
     return LocalKeyDown[slot - 1];
 #else
     (void)slot;

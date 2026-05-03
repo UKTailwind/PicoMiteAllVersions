@@ -48,6 +48,8 @@ target_sources(PicoMite PRIVATE
     # WEB has gui_touch (needed for SSD1963 + Touch flows). gfx_3d is
     # excluded — closeall3d stub already in MMtcpserver.c.
     ${CMAKE_SOURCE_DIR}/drivers/gui_touch/gui_touch.c
+    # WEB rp2040 has no GUICONTROLS (no headroom for the widget family).
+    ${CMAKE_SOURCE_DIR}/drivers/gui_controls/gui_controls_stub.c
 
     # PS/2 keyboard (no USB variant for WEB rp2040).
     ${CMAKE_SOURCE_DIR}/drivers/ps2_matrix/Keyboard.c

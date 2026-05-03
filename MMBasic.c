@@ -40,6 +40,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "hal/hal_keyboard.h"
 #include "hal/hal_flash.h"
 #include "hal/hal_display_merge.h"
+#include "hal/hal_gui_controls.h"
 #include "port_config.h"
 
 // this is the command table that defines the various tokens for commands in the source code
@@ -3596,13 +3597,7 @@ void MIPS16 ClearRuntime(bool all) {
     g_varcnt = 0;
     CurrentLinePtr = ContinuePoint = NULL;
     for(i = 0;  i < MAXSUBFUN; i++)  subfun[i] = NULL;
-#if HAL_PORT_HAS_GUICONTROLS
-    for(i = 1; i < Option.MaxCtrls; i++) {
-        memset(&Ctrl[i],0,sizeof(struct s_ctrl));
-        Ctrl[i].state = Ctrl[i].type = 0;
-        Ctrl[i].s = NULL;
-    }
-#endif
+    hal_gui_controls_clear_for_program();
 }
 
 

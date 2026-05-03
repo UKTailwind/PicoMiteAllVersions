@@ -357,7 +357,7 @@ extern void __not_in_flash_func(spi_finish)(spi_inst_t *spi);
 #define TFT_SWRST 0x01
 #define SSDTYPE (Option.DISPLAY_TYPE>=SSDPANEL && Option.DISPLAY_TYPE<VIRTUAL_C && !(Option.DISPLAY_TYPE==ILI9341_16 || Option.DISPLAY_TYPE==ILI9341_8 || Option.DISPLAY_TYPE==IPS_4_16 || Option.DISPLAY_TYPE==ILI9486_16))
 #define SSD16TYPE (Option.DISPLAY_TYPE>SSD_PANEL_8 && Option.DISPLAY_TYPE<VIRTUAL_C && !(Option.DISPLAY_TYPE==ILI9341_16 || Option.DISPLAY_TYPE==IPS_4_16 || Option.DISPLAY_TYPE==ILI9486_16))
-#if defined(PICOMITE) && defined(rp2350)
+#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
 #define SPIREAD (Option.DISPLAY_TYPE == ILI9341 || Option.DISPLAY_TYPE == ILI9488P || Option.DISPLAY_TYPE == ILI9488 || Option.DISPLAY_TYPE == ST7796SP  || Option.DISPLAY_TYPE == ST7796S || Option.DISPLAY_TYPE == ST7789B|| Option.DISPLAY_TYPE>=NEXTGEN)
 #else
 #define SPIREAD (Option.DISPLAY_TYPE == ILI9341 || Option.DISPLAY_TYPE == ILI9488P || Option.DISPLAY_TYPE == ILI9488 || Option.DISPLAY_TYPE == ST7796SP  || Option.DISPLAY_TYPE == ST7796S || Option.DISPLAY_TYPE == ST7789B)
@@ -468,7 +468,7 @@ extern void Display_Refresh(void);
 extern void waitwhilebusy(void);
 struct Displays {
     unsigned char ref;
-#if defined(PICOMITE) && defined(rp2350)
+#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
 	char name [16];
 #else
 	char name [13];
@@ -508,7 +508,7 @@ extern void __not_in_flash_func(HW1ReadSPI)(BYTE *buff, int cnt);
 extern void BitBangReadSPI(BYTE *buff, int cnt);
 extern void ScrollLCDSPI(int lines);
 /* ScrollLCDMEM332 already declared at top of file. */
-#if defined(PICOMITE) && defined(rp2350)
+#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
 extern void init_RGB332_to_RGB565_LUT(void);
 extern void init_RGB332_to_RGB888_LUT(void);
 #endif

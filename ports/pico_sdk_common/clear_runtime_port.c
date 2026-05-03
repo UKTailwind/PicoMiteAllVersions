@@ -23,7 +23,7 @@
 
 void port_clear_runtime_display_reset(void) {
 #if !HAL_PORT_IS_VGA
-#if defined(PICOMITE) && defined(rp2350)
+#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
     if (Option.DISPLAY_TYPE >= NEXTGEN) {
         Option.Refresh = 1;
         if (Option.DISPLAY_TYPE == ILI9488BUFF || Option.DISPLAY_TYPE == ILI9488PBUFF)

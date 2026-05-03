@@ -77,7 +77,7 @@ void port_print_keyboard_heartbeat(void)
         PRet();
     }
 #else
-#  if defined(PICOMITE) && defined(rp2350)
+#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
     if(Option.LOCAL_KEYBOARD)PO3Int("KEYBOARD REPEAT",Option.RepeatStart,Option.RepeatRate);
 #  endif
     if(!(Option.KeyboardConfig == NO_KEYBOARD || Option.KeyboardConfig == CONFIG_I2C)){
@@ -100,7 +100,7 @@ void port_print_keyboard_heartbeat(void)
     if(Option.KeyboardConfig == CONFIG_I2C)PO2Str("KEYBOARD", "I2C");
 #ifdef rp2350
     if(Option.NoHeartbeat && rp2350a)PO2Str("HEARTBEAT", "OFF");
-#  if defined(PICOMITE)
+#if HAL_PORT_HAS_PICOMITE
     if(Option.LOCAL_KEYBOARD)PO2Str("KEYBOARD", "LOCAL");
     if(Option.LOCAL_KEYBOARD)PO2Int("KEYBOARD BACKLIGHT", Option.KeyboardBrightness);
 #  endif
@@ -122,7 +122,7 @@ void port_print_usb_kb_repeat(void)
 
 void port_print_lcd_spi(void)
 {
-#if defined(PICOMITE) && defined(rp2350)
+#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
     /* LCD_CLK/MOSI/MISO only exist in struct option_s on PICOMITE+rp2350. */
     if(Option.LCD_CLK && !(Option.SYSTEM_CLK==Option.LCD_CLK)){
         PO("LCD SPI");

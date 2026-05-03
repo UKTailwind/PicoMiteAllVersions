@@ -257,7 +257,7 @@ extern bool CollisionFound;
 extern void InitDisplayVirtual(void);
 extern void ConfigDisplayVirtual(unsigned char *p);
 extern void merge(uint8_t colour);
-#if defined(PICOMITE) && !HAL_PORT_IS_VGA
+#if HAL_PORT_HAS_PICOMITE && !HAL_PORT_IS_VGA
 extern void merge_optimized(uint8_t colour);
 #endif
 extern void blitmerge (int x0, int y0, int w, int h, uint8_t colour);

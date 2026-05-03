@@ -49,6 +49,7 @@ target_sources(PicoMite PRIVATE
     ${CMAKE_SOURCE_DIR}/drivers/vm_framebuffer_unsupported/vm_framebuffer_stub.c
     ${CMAKE_SOURCE_DIR}/drivers/spi_lcd/spi_lcd_nextgen_stub.c
     ${CMAKE_SOURCE_DIR}/drivers/spi_lcd/spi_lcd_fastgfx_stub.c
+    ${CMAKE_SOURCE_DIR}/drivers/spi_lcd/spi_oled_stub.c
 
     # gfx_3d.c included — F2 has PICOMITEVGA so the dispatch table
     # references fun_3D / fun_map / fun_getscanline (gated on
@@ -58,6 +59,8 @@ target_sources(PicoMite PRIVATE
     ${CMAKE_SOURCE_DIR}/drivers/gfx_3d/gfx_3d.c
     # gui_touch_stub for VGA-family (no SPI-LCD touch panel).
     ${CMAKE_SOURCE_DIR}/drivers/gui_touch/gui_touch_stub.c
+    # No GUICONTROLS in VGA+WiFi composition.
+    ${CMAKE_SOURCE_DIR}/drivers/gui_controls/gui_controls_stub.c
 
     # PS/2 keyboard (no USB variant for this validation port).
     ${CMAKE_SOURCE_DIR}/drivers/ps2_matrix/Keyboard.c

@@ -44,6 +44,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "hal/hal_time.h"
 #include "hal/hal_pin.h"
 #include "hal/hal_keyboard.h"
+#include "hal/hal_gui_controls.h"
 #include "hardware/regs/addressmap.h"     /* XIP_BASE */
 #include "hardware/spi.h"
 #include "hardware/pio.h"
@@ -282,16 +283,7 @@ void cmd_ireturn(void){
     if(g_LocalIndex)    ClearVars(g_LocalIndex--, true);                        // delete any local variables
     g_TempMemoryIsChanged = true;                                     // signal that temporary memory should be checked
     *CurrentInterruptName = 0;                                        // for static vars we are not in an interrupt
-#if HAL_PORT_HAS_GUICONTROLS
-    if(DelayedDrawKeyboard) {
-        DrawKeyboard(1);                                            // the pop-up GUI keyboard should be drawn AFTER the pen down interrupt
-        DelayedDrawKeyboard = false;
-    }
-    if(DelayedDrawFmtBox) {
-        DrawFmtBox(1);                                              // the pop-up GUI keyboard should be drawn AFTER the pen down interrupt
-        DelayedDrawFmtBox = false;
-    }
-#endif
+    hal_gui_controls_post_irq_redraw();
 	if(SaveOptionErrorSkip>0)OptionErrorSkip=SaveOptionErrorSkip+1;
     strcpy(MMErrMsg , SaveErrorMessage);
     MMerrno = Saveerrno;
@@ -1393,18 +1385,7 @@ if(tp){
         if(argc >= 1 )SaveOptions();  //Only save if necessary
         return;
     }
-#if HAL_PORT_HAS_GUICONTROLS
-    tp = checkstring(cmdline,(unsigned char *)"GUI CONTROLS");
-    if(tp) {
-        getargs(&tp, 1, (unsigned char *)",");
-    	if(CurrentLinePtr) error("Invalid in a program");
-        Option.MaxCtrls=getint(argv[0],0,MAXCONTROLS-1);
-        if(Option.MaxCtrls)Option.MaxCtrls++;
-        SaveOptions();
-        _excep_code = RESET_COMMAND;
-        SoftReset();
-    }
-#endif
+    if (hal_gui_controls_option_set(cmdline)) return;
     tp = checkstring(cmdline, (unsigned char *)"CASE");
     if(tp) {
         if(checkstring(tp, (unsigned char *)"LOWER"))    { Option.Listcase = CONFIG_LOWER; SaveOptions(); return; }
@@ -3141,21 +3122,8 @@ int checkdetailinterrupts(void) {
         }
     }
 
-#if HAL_PORT_HAS_GUICONTROLS
-    if(Ctrl!=NULL){
-        if(gui_int_down && GuiIntDownVector) {                          // interrupt on pen down
-            intaddr = GuiIntDownVector;                                 // get a pointer to the interrupt routine
-            gui_int_down = false;
-            goto GotAnInterrupt;
-        }
-
-        if(gui_int_up && GuiIntUpVector) {
-            intaddr = GuiIntUpVector;                                   // get a pointer to the interrupt routine
-            gui_int_up = false;
-            goto GotAnInterrupt;
-        }
-    }
-#endif
+    intaddr = hal_gui_controls_pending_interrupt();
+    if (intaddr) goto GotAnInterrupt;
 
     if (COLLISIONInterrupt != NULL && CollisionFound) {
         CollisionFound = false;
@@ -3322,12 +3290,7 @@ GotAnInterrupt:
     return 1;
 }
 int __not_in_flash_func(check_interrupt)(void) {
-#if HAL_PORT_HAS_GUICONTROLS
-    if(Ctrl!=NULL){
-        if(!(DelayedDrawKeyboard || DelayedDrawFmtBox || calibrate))ProcessTouch();
-        if(CheckGuiFlag) CheckGui();                                    // This implements a LED flash
-    }
-#endif
+    hal_gui_controls_periodic();
     hal_keyboard_service();
 
     if(!InterruptUsed) return 0;                                    // quick exit if there are no interrupts set

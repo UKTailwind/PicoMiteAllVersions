@@ -51,7 +51,7 @@ int MIPS16 port_misc_option_setter(unsigned char *cmdline)
         return 1;
     }
 #endif
-#if defined(PICOMITE) && defined(rp2350)
+#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
     tp = checkstring(cmdline, (unsigned char *)"KEYBOARD BACKLIGHT");
     if (tp) {
         if (!Option.LOCAL_KEYBOARD) error("Invalid option");
@@ -99,7 +99,7 @@ int MIPS16 port_misc_option_setter(unsigned char *cmdline)
         return 1;
     }
 #else
-#if defined(PICOMITE) && defined(rp2350)
+#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
     tp = checkstring(cmdline, (unsigned char *)"KEYBOARD REPEAT");
     if (tp) {
         getargs(&tp, 3, (unsigned char *)",");
@@ -303,7 +303,7 @@ int MIPS16 port_system_lcd_spi_option_setter(unsigned char *cmdline)
         Option.SYSTEM_CLK = pin1;
         Option.SYSTEM_MOSI = pin2;
         Option.SYSTEM_MISO = pin3;
-#if defined(PICOMITE) && defined(rp2350)
+#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
         if (!Option.LCD_CLK) {
             Option.LCD_CLK = Option.SYSTEM_CLK;
             Option.LCD_MOSI = Option.SYSTEM_MOSI;
@@ -315,7 +315,7 @@ int MIPS16 port_system_lcd_spi_option_setter(unsigned char *cmdline)
         SoftReset();
         return 1;
     }
-#if defined(PICOMITE) && defined(rp2350)
+#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
     tp = checkstring(cmdline, (unsigned char *)"LCD SPI");
     if (tp) {
         int pin1, pin2, pin3;
@@ -434,7 +434,7 @@ int MIPS16 port_mminfo_touch_status(unsigned char *out_sret)
  * Hardware_Includes.h. */
 int MIPS16 port_mminfo_scroll_start(int64_t *out_iret)
 {
-#if defined(PICOMITE) && defined(rp2350)
+#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
     *out_iret = ScrollStart;
     return 1;
 #else
@@ -444,7 +444,7 @@ int MIPS16 port_mminfo_scroll_start(int64_t *out_iret)
 }
 int MIPS16 port_mminfo_screenbuff(int64_t *out_iret)
 {
-#if defined(PICOMITE) && defined(rp2350)
+#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
     *out_iret = (int64_t)(uint32_t)ScreenBuffer;
     return 1;
 #else

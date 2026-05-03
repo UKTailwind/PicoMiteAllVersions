@@ -29,6 +29,7 @@ target_sources(PicoMite PRIVATE
 
     # GUICONTROLS (only WEBRP2350 combines WiFi with the widget family).
     ${CMAKE_SOURCE_DIR}/GUI.c
+    ${CMAKE_SOURCE_DIR}/drivers/gui_controls/gui_controls_real.c
 
     # rp2350 features. WEB doesn't link the PSRAM heap (the QSPI pins are
     # consumed by the CYW43 radio).

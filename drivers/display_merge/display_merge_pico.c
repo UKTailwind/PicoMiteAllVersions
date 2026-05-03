@@ -183,7 +183,7 @@ void __not_in_flash_func(UpdateCore)(void) {
                 }
                 blitmerge(x1, y1, w, h, colour);
             }
-#if defined(PICOMITE) && defined(rp2350)
+#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
         } else if (command == 6) {
             int x_low = (int)multicore_fifo_pop_blocking();
             int y_low = (int)multicore_fifo_pop_blocking();

@@ -164,7 +164,7 @@ bool rp2350a=true;
     void ProcessWeb(int mode);
     char LCDAttrib=0;
 #endif
-#ifdef PICOMITE
+#if HAL_PORT_HAS_PICOMITE
     #ifdef USBKEYBOARD
         #include "tusb.h"
         #include "host/hcd.h"
@@ -451,11 +451,11 @@ void __not_in_flash_func(routinechecks)(void){
         mSecTimer=time_us_64()/1000;
     }
     if (CurrentlyPlaying == P_WAV || CurrentlyPlaying == P_FLAC || CurrentlyPlaying==P_MP3 || CurrentlyPlaying==P_MIDI ){
-#ifdef PICOMITE
+#if HAL_PORT_HAS_PICOMITE
         if(SPIatRisk)mutex_enter_blocking(&frameBufferMutex);			// lock the frame buffer
 #endif
         checkWAVinput();
-#ifdef PICOMITE
+#if HAL_PORT_HAS_PICOMITE
         if(SPIatRisk)mutex_exit(&frameBufferMutex);
 #endif
     }
@@ -846,7 +846,7 @@ bool MIPS16 __not_in_flash_func(timer_callback)(repeating_timer_t *rt)
         last=now;
         INT5Timer = INT5InitTimer; 
     }
-#if defined(PICOMITE) && defined(rp2350)
+#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
     if(Option.LOCAL_KEYBOARD && mSecTimer % LOCALKEYSCANRATE==0)cmd_keyscan();
 #endif
 #endif
@@ -1923,7 +1923,7 @@ int MIPS16 main(){
     adc_clk_div=adc_hw->div;
     systick_hw->csr = 0x5;
     systick_hw->rvr = 0x00FFFFFF;
-#ifdef PICOMITE
+#if HAL_PORT_HAS_PICOMITE
 	mutex_init( &frameBufferMutex );						// create a mutex to lock frame buffer
 #endif
 
@@ -1931,7 +1931,7 @@ int MIPS16 main(){
 #ifndef rp2350
     if(Option.CPU_Speed<=200000)modclock(2);
 #else
-#if defined(PICOMITE) && defined(rp2350)
+#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
     if(Option.DISPLAY_TYPE>=NEXTGEN){ //adjust the size of the heap
         framebuffersize=display_details[Option.DISPLAY_TYPE].horizontal*display_details[Option.DISPLAY_TYPE].vertical;
         heap_memory_size-=framebuffersize;
@@ -2096,7 +2096,7 @@ if(Option.CPU_Speed==FreqSVGA){ //adjust the size of the heap
     ResetDisplay();
     ClearScreen(Option.DefaultBC);
     #else
-    #ifdef PICOMITE
+    #if HAL_PORT_HAS_PICOMITE
         bus_ctrl_hw->priority=0x100;
         multicore_launch_core1_with_stack(UpdateCore,core1stack,2048);
         core1stack[0]=0x12345678;

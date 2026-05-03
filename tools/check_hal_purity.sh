@@ -180,6 +180,7 @@ check_hal_header() {
     | grep -vE "^[0-9]+:[[:space:]]*#[[:space:]]*ifndef[[:space:]]+(${guard}|${guard}_)\b" \
     | grep -vE "^[0-9]+:[[:space:]]*#[[:space:]]*(ifdef|ifndef)[[:space:]]+__cplusplus\b" \
     | grep -vE "^[0-9]+:[[:space:]]*#[[:space:]]*if[[:space:]]+(!)?defined\([[:space:]]*__cplusplus[[:space:]]*\)" \
+    | grep -vE "^[0-9]+:[[:space:]]*#[[:space:]]*ifndef[[:space:]]+HAL_PORT_CONFIG_INCLUDED\b" \
     || true)"
   if [[ -n "$offenders" ]]; then
     echo "HAL-PURITY FAIL: $file — HAL headers must be preprocessor-clean"

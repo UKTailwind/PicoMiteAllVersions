@@ -158,7 +158,7 @@ static char (*SSputchar)(char buff, int flush)=SerialConsolePutC;
 #if HAL_PORT_IS_VGA
     #define MX470Scroll(n) ScrollLCD(n);
 #else
-#if defined(PICOMITE) && defined(rp2350)
+#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
     #define MX470Scroll(n)      if(Option.DISPLAY_CONSOLE){if(!((SPIREAD && ScrollLCD != ScrollLCDSPISCR && ScrollLCD != ScrollLCDMEM332)  || Option.NoScroll))ScrollLCD(n);\
     else {PrintString=printnothing;SSputchar=nothingchar;printScreen();PrintString=SSPrintString;SSputchar=SerialConsolePutC;}}
 #else
@@ -382,7 +382,7 @@ void edit(unsigned char *cmdline, bool cmdfile) {
         gui_bcolour = BLACK;
     }
     if(Option.DISPLAY_CONSOLE == true && HRes/gui_font_width <32) error("Font is too large");
-#if defined(PICOMITE) && defined(rp2350)
+#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
     if(Option.DISPLAY_TYPE>=VIRTUAL  && Option.DISPLAY_TYPE<NEXTGEN && WriteBuf)FreeMemorySafe((void **)&WriteBuf);
 #else
     if(Option.DISPLAY_TYPE>=VIRTUAL && WriteBuf)FreeMemorySafe((void **)&WriteBuf);
@@ -574,7 +574,7 @@ int find_longest_line_length(const char *text ,int *linein) {
  * @cond
  * The following section will be excluded from the documentation.
  */
-#ifndef PICOMITE
+#if !HAL_PORT_HAS_PICOMITE
 #if !HAL_PORT_HAS_WIFI
     static short lastx1=9999, lasty1=9999;
     static uint16_t lastfc, lastbc;
@@ -598,7 +598,7 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
   if(VRes % ytileheight)Y_TILE++;
 #else 
   char RefreshSave=Option.Refresh;
-#if defined(PICOMITE) && defined(rp2350)
+#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
     if(!(Option.DISPLAY_TYPE>=NEXTGEN))
 #endif
   Option.Refresh=0;
@@ -617,7 +617,7 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
     while(1) {
         statuscount = 0;
         do {
-#ifndef PICOMITE 
+#if !HAL_PORT_HAS_PICOMITE 
 #if !HAL_PORT_HAS_WIFI
             c=-1;
 #ifdef USBKEYBOARD
@@ -1269,7 +1269,7 @@ void MarkMode(unsigned char *cb, unsigned char *buf) {
     txtpx = oldx = curx; txtpy = oldy = cury;
     while(1) {
         c=-1;
-#ifndef PICOMITE
+#if !HAL_PORT_HAS_PICOMITE
 #if !HAL_PORT_HAS_WIFI
 #ifdef USBKEYBOARD
         if(HID[1].Device_type==2 && DISPLAY_TYPE==SCREENMODE1){
@@ -1451,7 +1451,7 @@ void MarkMode(unsigned char *cb, unsigned char *buf) {
                       *cb = 0;
                       if(c == F5 || c == CTRLKEY('Y')) {
                           PositionCursor(txtp);
-#ifndef PICOMITE
+#if !HAL_PORT_HAS_PICOMITE
 #if !HAL_PORT_HAS_WIFI
 #ifdef USBKEYBOARD
                         if(HID[1].Device_type==2 && DISPLAY_TYPE==SCREENMODE1){     
@@ -1477,7 +1477,7 @@ void MarkMode(unsigned char *cb, unsigned char *buf) {
                       *p++ = 0; *p++ = 0;
                       TextChanged = true;
                       PositionCursor(txtp);
-#ifndef PICOMITE
+#if !HAL_PORT_HAS_PICOMITE
 #if !HAL_PORT_HAS_WIFI
 #ifdef USBKEYBOARD
                         if(HID[1].Device_type==2 && DISPLAY_TYPE==SCREENMODE1){     

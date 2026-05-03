@@ -34,6 +34,7 @@
  * (RM2's CYW43 lives off the QSPI pins so PSRAM stays available).
  * GUICONTROLS off — no touch panel on a DVI display. */
 #define HAL_PORT_HAS_WIFI                1
+#define HAL_PORT_HAS_PICOMITE         0
 #define HAL_PORT_HAS_VGA_PIO             1
 #define HAL_PORT_HAS_GUICONTROLS         0
 

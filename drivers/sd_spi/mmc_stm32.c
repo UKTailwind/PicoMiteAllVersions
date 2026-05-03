@@ -66,7 +66,7 @@ int SPISpeed=0xFF;
 //#define SPI_CLK_PIN Option.SYSTEM_CLK
 //define SPI_MISO_PIN Option.SYSTEM_MISO
 uint16_t SPI_CLK_PIN,SPI_MOSI_PIN,SPI_MISO_PIN;
-#if defined(PICOMITE) && defined(rp2350)
+#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
 uint16_t LCD_CLK_PIN,LCD_MOSI_PIN,LCD_MISO_PIN;
 #endif
 uint16_t SD_CLK_PIN,SD_MOSI_PIN,SD_MISO_PIN, SD_CS_PIN;
@@ -90,7 +90,7 @@ BYTE (*xchg_byte)(BYTE data_out)= NULL;
 void (*xmit_byte_multi)(const BYTE *buff, int cnt)= NULL;
 void (*rcvr_byte_multi)(BYTE *buff, int cnt)= NULL;
 int (*SET_SPI_CLK)(int speed, int polarity, int edge)=NULL;
-#if defined(PICOMITE) && defined(rp2350)
+#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
 void (*lcd_xmit_byte_multi)(const BYTE *buff, int cnt)= NULL;
 void (*lcd_rcvr_byte_multi)(BYTE *buff, int cnt)= NULL;
 int (*LCD_SET_SPI_CLK)(int speed, int polarity, int edge)=NULL;
@@ -1456,7 +1456,7 @@ void InitReservedIO(void) {
 	if(Option.PSRAM_CS_PIN){
 		ExtCfg(Option.PSRAM_CS_PIN, EXT_BOOT_RESERVED, 0);
 	}
-#if defined(PICOMITE)
+#if HAL_PORT_HAS_PICOMITE
 	if(Option.LOCAL_KEYBOARD){
 		ExtCfg(PINMAP[47],EXT_ANA_IN,0);
 		ExtCfg(PINMAP[47], EXT_BOOT_RESERVED, 0);
@@ -1592,7 +1592,7 @@ void InitReservedIO(void) {
 		}
 #endif	
 	}
-#if defined(PICOMITE) && defined(rp2350)
+#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
 	if(Option.LCD_CLK && !(Option.LCD_CLK==Option.SYSTEM_CLK)){
 		LCD_CLK_PIN=PinDef[Option.LCD_CLK].GPno;
 		LCD_MOSI_PIN=PinDef[Option.LCD_MOSI].GPno;
@@ -1916,7 +1916,7 @@ char *pinsearch(int pin){
 	else if(pin==Option.SYSTEM_CLK)strcpy(buff,"SPI SYSTEM CLK");
 	else if(pin==Option.SYSTEM_MOSI)strcpy(buff,"SPI SYSTEM MOSI");
 	else if(pin==Option.SYSTEM_MISO)strcpy(buff,"SPI SYSTEM MISO");
-#if defined(PICOMITE) && defined(rp2350)
+#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
 	else if(pin==Option.LCD_CLK && Option.LCD_CLK!=Option.SYSTEM_CLK)strcpy(buff,"SPI LCD CLK");
 	else if(pin==Option.LCD_MOSI && Option.LCD_CLK!=Option.SYSTEM_CLK)strcpy(buff,"SPI LCD MOSI");
 	else if(pin==Option.LCD_MISO && Option.LCD_CLK!=Option.SYSTEM_CLK)strcpy(buff,"SPI LCD MISO");
@@ -1936,7 +1936,7 @@ char *pinsearch(int pin){
 #endif
 #ifdef rp2350
 	else if(pin==Option.PSRAM_CS_PIN)strcpy(buff,"PSRAM CS");
-#if defined(PICOMITE)
+#if HAL_PORT_HAS_PICOMITE
 	else if(pin==PINMAP[24] && Option.LOCAL_KEYBOARD)strcpy(buff,"KEYBOARD C1");
 	else if(pin==PINMAP[26] && Option.LOCAL_KEYBOARD)strcpy(buff,"KEYBOARD C2");
 	else if(pin==PINMAP[27] && Option.LOCAL_KEYBOARD)strcpy(buff,"KEYBOARD C3");

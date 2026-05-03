@@ -41,6 +41,7 @@
 /* Stage-A palette flags — F2 combines WiFi + VGA-PIO. No GUICONTROLS
  * (matches WEB on rp2040 — a tighter heap budget than WEBRP2350). */
 #define HAL_PORT_HAS_WIFI                1
+#define HAL_PORT_HAS_PICOMITE         0
 #define HAL_PORT_HAS_VGA_PIO             1
 #define HAL_PORT_HAS_GUICONTROLS         0
 #define HAL_PORT_HAS_NEXTGEN_DISPLAY     0

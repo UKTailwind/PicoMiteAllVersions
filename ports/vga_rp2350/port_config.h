@@ -44,6 +44,7 @@
  * without GUICONTROLS today; the touchscreen widget family lives on
  * PICOMITE/HDMI/WEBRP2350 only. */
 #define HAL_PORT_HAS_WIFI                0
+#define HAL_PORT_HAS_PICOMITE         0
 #define HAL_PORT_HAS_VGA_PIO             1
 #define HAL_PORT_HAS_GUICONTROLS         0
 #define HAL_PORT_HAS_NEXTGEN_DISPLAY    0

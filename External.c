@@ -37,6 +37,8 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "hal/hal_pin.h"
 #include "hal/hal_fast_timer.h"
 #include "hal/hal_keyboard.h"
+#include "hal/hal_gui_controls.h"
+#include "hal/hal_display_oled_spi.h"
 
 /* SetBacklightSSD1963 only links on ports that compile SSD1963.c; the
  * call site in setBacklight() is compile-time dead on others via
@@ -1269,11 +1271,7 @@ process:
         default:            if(argc > 3 && !value2) error("Unexpected text");
     }
     // this allows the user to set a software interrupt on the touch IRQ pin if the GUI environment is not enabled
-    if(pin == Option.TOUCH_IRQ)
-    #if HAL_PORT_HAS_GUICONTROLS
-    if(Option.MaxCtrls==0) 
-    #endif
-    {
+    if(pin == Option.TOUCH_IRQ && Option.MaxCtrls == 0) {
         if(value == EXT_INT_HI || value == EXT_INT_LO || value == EXT_INT_BOTH)
             ExtCurrentConfig[pin] = value;
         else if(value == EXT_NOT_CONFIG) {
@@ -2042,19 +2040,8 @@ void setBacklight(int level, int setfrequency){
         I2C_Send_Command((uint8_t)level);
     } else if(HAL_PORT_HAS_SSD1963 && Option.DISPLAY_TYPE>=SSDPANEL && Option.DISPLAY_TYPE<VIRTUAL){
         SetBacklightSSD1963(level);
-#if !HAL_PORT_IS_VGA
     } else if(Option.DISPLAY_TYPE==SSD1306SPI){
-        /* SSD1306SPI is a small SPI OLED — only configurable on
-         * SPI-LCD ports (PICOMITE / WiFi). spi_write_command lives in
-         * drivers/spi_lcd/spi_lcd.c's `#ifndef PICOMITEVGA` block, so
-         * VGA-family ports compile this branch out to keep the call
-         * site from referencing an undefined symbol when the dispatch
-         * table also includes cmd_backlight (e.g. F2 = VGA + WiFi). */
-        level*=255;
-        level/=100;
-        spi_write_command(0x81);//SETCONTRAST
-        spi_write_command((uint8_t)level);
-#endif
+        hal_oled_spi_set_contrast(level);
     }
 }
 /*  @endcond */
@@ -3719,12 +3706,7 @@ void MIPS16 ClearExternalIO(void) {
     closeMQTT();
     CollisionFound = false;
     COLLISIONInterrupt = NULL;
-#if HAL_PORT_HAS_GUICONTROLS
-    gui_int_down = false;
-    gui_int_up = false;
-    GuiIntDownVector=NULL;
-    GuiIntUpVector=NULL;
-#endif
+    hal_gui_controls_reset_interrupts();
     dmarunning=false;
     ADCDualBuffering=false;
     ADCInterrupt=NULL;

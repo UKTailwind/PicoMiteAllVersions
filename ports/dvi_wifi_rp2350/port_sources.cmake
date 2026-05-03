@@ -56,7 +56,9 @@ target_sources(PicoMite PRIVATE
     ${CMAKE_SOURCE_DIR}/drivers/vm_framebuffer_unsupported/vm_framebuffer_stub.c
     ${CMAKE_SOURCE_DIR}/drivers/spi_lcd/spi_lcd_nextgen_stub.c
     ${CMAKE_SOURCE_DIR}/drivers/spi_lcd/spi_lcd_fastgfx_stub.c
+    ${CMAKE_SOURCE_DIR}/drivers/spi_lcd/spi_oled_stub.c
     ${CMAKE_SOURCE_DIR}/drivers/gui_touch/gui_touch_stub.c
+    ${CMAKE_SOURCE_DIR}/drivers/gui_controls/gui_controls_stub.c
 
     # PICOMITEVGA needs fun_3D / fun_map / fun_getscanline (gated on
     # #ifdef PICOMITEVGA in AllCommands.h). MMtcpserver.c's closeall3d

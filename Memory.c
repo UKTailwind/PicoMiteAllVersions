@@ -83,10 +83,9 @@ unsigned int bc_alloc_fail_total   = 0;
  * (stubs on non-VGA). ytileheight, ShadowBuf, fb_dma_chan also
  * resolved there. Externs in Memory.h. */
 
-#if HAL_PORT_HAS_GUICONTROLS
-    struct s_ctrl CTRLS[MAXCONTROLS];
-    struct s_ctrl *Ctrl=CTRLS;
-#endif
+/* The CTRLS[] array + the Ctrl pointer live in
+ * drivers/gui_controls/gui_controls_real.c (real impl, only linked on
+ * GUICONTROLS ports) or .../gui_controls_stub.c (Ctrl=NULL stub). */
 
 unsigned int mmap[HEAP_MEMORY_SIZE/ PAGESIZE / PAGESPERWORD]={0};
 /* psmap[] + SBitsGet / SBitsSet / GetPSMemory live in
