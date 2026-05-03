@@ -151,20 +151,20 @@ Tree gate count: **361 → 224** (137 eliminated, 38%).
 | E5j — InitReservedIO ownership untangle          | DONE     | 5   | TBD |
 | E5j-tail — drain remaining InitReservedIO gates  | DONE     | 2   | TBD |
 | E5k batch 1 — Editor.c HDMI/VGA tile dispatch    | DONE     | 21  | TBD |
-| E5k batch 2 — Editor.c remaining 28 gates        | TODO     | —   | —   |
+| E5k batch 2 — Editor.c entry/exit + mouse pump   | DONE     | 28  | TBD |
 | E6 — finish PicoMite.c (41 remaining)            | TODO     | —   | —   |
 | E7 — argue/resolve any leftovers                 | TODO     | —   | —   |
 | E8 — purity-script enforcement                   | TODO     | —   | —   |
 
-Top remaining offender files (post-E5k-batch-1 sites):
+Top remaining offender files (post-E5k):
 
-  Editor.c                                    28   (21 drained; HDMI/VGA tile dispatch now via hal_editor_console hooks)
   PicoMite.c                                  29
   drivers/sd_spi/mmc_stm32.c                  14
   ports/pico_sdk_common/misc_option_setters.c 15
   AllCommands.h                               11
   drivers/vga_pio/vga_ops.c                   10
   Hardware_Includes.h                          9
+  Editor.c                                    0   (DONE — fully drained over E5k batches 1 + 2)
 
 Pattern observed: gates accumulate at *chokepoint* functions — any
 boot-time hook (`InitReservedIO`), giant lookup table (`PinDef[]`),
