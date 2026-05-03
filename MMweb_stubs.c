@@ -14,6 +14,13 @@
 
 void closeMQTT(void) {}
 void ProcessWeb(int mode) { (void)mode; }
+void TelnetPutC(int c, int flush) { (void)c; (void)flush; }
+
+/* Whether the WiFi telnet client is configured (Option.Telnet != -1).
+ * Real impl on WiFi ports lives in MMtelnet.c; stub returns 1 on
+ * non-WiFi so the stdio console path runs unconditionally. */
+int wifi_serial_telnet_configured(void) { return 1; }
+
 int  startupcomplete = 0;
 void tcp_free_recv_buffers(void) {}
 void tcp_realloc_recv_buffers(void) {}

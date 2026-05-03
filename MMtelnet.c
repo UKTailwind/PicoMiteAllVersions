@@ -59,6 +59,14 @@ void TelnetPutCommand(int command, int option){
                 Telnetpos++;
         }
 }
+/* Whether the BASIC port has a configured telnet listener.
+ * SerialConsolePutC() in PicoMite.c uses this to gate the stdio
+ * (USB-CDC + UART) console path. Stub returns 1 on non-WiFi ports
+ * so stdio always runs there. */
+int wifi_serial_telnet_configured(void) {
+    return Option.Telnet != -1;
+}
+
 void __not_in_flash_func(TelnetPutC)(int c,int flush){
         TCP_SERVER_T *state = (TCP_SERVER_T*)TCPstate;
         if(state->telnet_pcb_no==99 || !WIFIconnected )return;

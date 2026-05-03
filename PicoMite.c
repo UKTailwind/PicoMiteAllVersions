@@ -38,6 +38,7 @@ extern "C" {
 #include "hal/hal_keyboard.h"
 #include "hal/hal_gui_controls.h"
 #include "hal/hal_i2c_keypad.h"
+#include "hal/hal_heartbeat.h"
 #include "hardware/regs/addressmap.h"     /* XIP_BASE */
 #include "hardware/adc.h"
 #include "hardware/exception.h"
@@ -163,9 +164,14 @@ bool rp2350a=true;
 #if HAL_PORT_HAS_WIFI
     volatile int WIFIconnected=0;
     int startupcomplete=0;
-    void ProcessWeb(int mode);
     char LCDAttrib=0;
 #endif
+/* ProcessWeb / TelnetPutC / wifi_serial_telnet_configured are real
+ * impls on WiFi ports and no-op stubs in MMweb_stubs.c elsewhere.
+ * Declared unconditionally so PicoMite.c references link cleanly. */
+extern void ProcessWeb(int mode);
+extern void TelnetPutC(int c, int flush);
+extern int  wifi_serial_telnet_configured(void);
 #if HAL_PORT_HAS_PICOMITE
     #if HAL_PORT_HAS_USB_KEYBOARD
         #include "tusb.h"
@@ -556,9 +562,7 @@ void __not_in_flash_func(routinechecks)(void){
 
 int __not_in_flash_func(getConsole)(void) {
     int c=-1;
-#if HAL_PORT_HAS_WIFI
-    ProcessWeb(1);
-#endif
+    ProcessWeb(1);          /* stub no-op on non-WiFi (MMweb_stubs.c) */
     CheckAbort();
     if(ConsoleRxBufHead != ConsoleRxBufTail) {                            // if the queue has something in it
         c = ConsoleRxBuf[ConsoleRxBufTail];
@@ -578,35 +582,35 @@ char  __not_in_flash_func(SerialConsolePutC)(char c, int flush) {
 		   MMCharPos -= 1;
 	   	}
 	}    
-#if HAL_PORT_HAS_WIFI
-    if(Option.Telnet!=-1){
-#endif
+    /* On WiFi ports the stdio (USB-CDC + UART) console only runs
+     * when telnet is also configured (mirroring); on non-WiFi ports
+     * the hook returns 1 so stdio always runs. TelnetPutC and
+     * ProcessWeb are no-op stubs on non-WiFi. */
+    if (wifi_serial_telnet_configured()) {
 #if !HAL_PORT_HAS_USB_KEYBOARD
-    if(Option.SerialConsole==0 || Option.SerialConsole>4){
-        if(tud_cdc_connected()){
-            putc(c,stdout);
-            if(flush){
-                fflush(stdout);
+        if(Option.SerialConsole==0 || Option.SerialConsole>4){
+            if(tud_cdc_connected()){
+                putc(c,stdout);
+                if(flush){
+                    fflush(stdout);
+                }
             }
         }
-    } 
 #endif
-    if(Option.SerialConsole){
-        int empty=uart_is_writable((Option.SerialConsole & 3)==1 ? uart0 : uart1);
-		while(ConsoleTxBufTail == ((ConsoleTxBufHead + 1) % CONSOLE_TX_BUF_SIZE)); //wait if buffer full
-		ConsoleTxBuf[ConsoleTxBufHead] = c;							// add the char
-		ConsoleTxBufHead = (ConsoleTxBufHead + 1) % CONSOLE_TX_BUF_SIZE;		   // advance the head of the queue
-		if(empty){
-            while(irqs){}
-	        uart_set_irq_enables((Option.SerialConsole & 3)==1 ? uart0 : uart1, true, true);
-			irq_set_pending((Option.SerialConsole & 3)==1 ? UART0_IRQ : UART1_IRQ);
-		}
+        if(Option.SerialConsole){
+            int empty=uart_is_writable((Option.SerialConsole & 3)==1 ? uart0 : uart1);
+            while(ConsoleTxBufTail == ((ConsoleTxBufHead + 1) % CONSOLE_TX_BUF_SIZE));
+            ConsoleTxBuf[ConsoleTxBufHead] = c;
+            ConsoleTxBufHead = (ConsoleTxBufHead + 1) % CONSOLE_TX_BUF_SIZE;
+            if(empty){
+                while(irqs){}
+                uart_set_irq_enables((Option.SerialConsole & 3)==1 ? uart0 : uart1, true, true);
+                irq_set_pending((Option.SerialConsole & 3)==1 ? UART0_IRQ : UART1_IRQ);
+            }
+        }
     }
-#if HAL_PORT_HAS_WIFI
-    }
-    TelnetPutC(c,flush);
+    TelnetPutC(c, flush);
     ProcessWeb(1);
-#endif
     return c;
 }
 char MMputchar(char c, int flush) {
@@ -968,10 +972,8 @@ bool MIPS16 __not_in_flash_func(timer_callback)(repeating_timer_t *rt)
 
     ////////////////////////////////// this code runs once a second /////////////////////////////////
     if(++SecondsTimer >= 1000) {
-        SecondsTimer -= 1000; 
-    #if !HAL_PORT_HAS_WIFI
-        if(ExtCurrentConfig[PinDef[HEARTBEATpin].pin]==EXT_HEARTBEAT)gpio_xor_mask64(1<<PinDef[HEARTBEATpin].GPno);
-    #endif
+        SecondsTimer -= 1000;
+        hal_heartbeat_tick();      /* no-op on ports without an onboard LED */
             // keep track of the time and date
 /*        if(++second >= 60) {
             second = 0 ;
@@ -994,18 +996,17 @@ bool MIPS16 __not_in_flash_func(timer_callback)(repeating_timer_t *rt)
   return 1;
 }
 void __not_in_flash_func(uSec)(int us) {
-#if HAL_PORT_HAS_WIFI
-	if(us<500){
-		busy_wait_us(us);
-	} else {
-    	uint64_t end=time_us_64()+us;
-    	while(time_us_64()<end){
-        if(time_us_64() % 500 ==0)ProcessWeb(1);
+    /* On WiFi ports a long busy-wait would starve the lwIP poll —
+     * pump ProcessWeb() every 500us. On non-WiFi the stub is a
+     * no-op so the inner branch reduces to the busy-wait below. */
+    if (us < 500) {
+        busy_wait_us(us);
+    } else {
+        uint64_t end = time_us_64() + us;
+        while (time_us_64() < end) {
+            if (time_us_64() % 500 == 0) ProcessWeb(1);
+        }
     }
-}
-#else
-	busy_wait_us(us);
-#endif
 }
 #if HAL_PORT_HAS_WIFI
 void __not_in_flash_func(ProcessWeb)(int mode){
@@ -1074,9 +1075,7 @@ void __not_in_flash_func(ProcessWeb)(int mode){
 }
 #endif
 void __not_in_flash_func(CheckAbort)(void) {
-#if HAL_PORT_HAS_WIFI
-    ProcessWeb(1);
-#endif
+    ProcessWeb(1);          /* stub no-op on non-WiFi */
     routinechecks();
     if(MMAbort) {
         WDTimer = 0;                                                // turn off the watchdog timer

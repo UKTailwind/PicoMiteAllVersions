@@ -42,7 +42,7 @@ CORE_SRCS += display_state.c pin_state.c option_state.c audio_state.c
 CORE_SRCS += Draw.c RGB121.c Tilemap.c FileIO.c Audio.c BmpDecoder.c re.c picojpeg.c
 # Stubs + host-only subsystems
 CORE_SRCS += audio_mp3_stub.c spi_lcd_mem332_stub.c display_merge_stub.c vga_ops_stub.c
-CORE_SRCS += gfx_3d.c upng_sprite_stub.c gui_touch_stub.c gui_controls_stub.c psram_heap_stub.c i2c_keypad_stub.c
+CORE_SRCS += gfx_3d.c upng_sprite_stub.c gui_touch_stub.c gui_controls_stub.c psram_heap_stub.c i2c_keypad_stub.c heartbeat_stub.c
 
 # Bytecode VM sources
 BC_SRCS = bc_alloc.c bc_bridge.c vm_host_fat.c ff.c ffunicode.c ffsystem.c \
@@ -130,6 +130,9 @@ $(BUILD_DIR)/%.o: $(REPO_ROOT)/drivers/gui_controls/%.c
 $(BUILD_DIR)/%.o: $(REPO_ROOT)/drivers/i2c_picocalc_kbd/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c -o $@ $<
+$(BUILD_DIR)/%.o: $(REPO_ROOT)/drivers/heartbeat/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c -o $@ $<
 $(BUILD_DIR)/%.o: $(REPO_ROOT)/drivers/psram_heap/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c -o $@ $<
@@ -172,6 +175,9 @@ $(BUILD_DIR)/sim/%.o: $(REPO_ROOT)/drivers/gui_controls/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(SIM_CFLAGS) -c -o $@ $<
 $(BUILD_DIR)/sim/%.o: $(REPO_ROOT)/drivers/i2c_picocalc_kbd/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(SIM_CFLAGS) -c -o $@ $<
+$(BUILD_DIR)/sim/%.o: $(REPO_ROOT)/drivers/heartbeat/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(SIM_CFLAGS) -c -o $@ $<
 $(BUILD_DIR)/sim/%.o: $(REPO_ROOT)/drivers/psram_heap/%.c
