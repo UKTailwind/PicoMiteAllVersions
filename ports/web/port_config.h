@@ -23,6 +23,7 @@
 /* rp2040 WEB has only 2 PIOs and CYW43 + scanout share them; audio
  * goes on PIO 0. */
 #define HAL_PORT_AUDIO_I2S_PIO_NUM       0
+#define HAL_PORT_DEFAULT_CPU_SPEED_KHZ   200000
 
 #define HAL_PORT_HAS_PSRAM               0
 #define HAL_PORT_HAS_UPNG                0

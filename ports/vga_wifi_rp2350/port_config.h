@@ -23,6 +23,7 @@
 #define HAL_PORT_PULLDOWN_NEEDS_RESET    1
 /* VGA + WiFi: I²S shares PIO 0 with QVGA scanout. */
 #define HAL_PORT_AUDIO_I2S_PIO_NUM       0
+#define HAL_PORT_DEFAULT_CPU_SPEED_KHZ   252000
 
 /* CYW43 owns the QSPI pins — no PSRAM heap. */
 #define HAL_PORT_HAS_PSRAM               0

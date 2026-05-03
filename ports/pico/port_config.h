@@ -29,6 +29,10 @@
 /* Audio I²S PIO instance — rp2040 ports use PIO 0 (shares with QVGA
  * scanout state machines) since only two PIOs exist. */
 #define HAL_PORT_AUDIO_I2S_PIO_NUM       0
+/* Boot-default sysclk in kHz when an invalid Option.CPU_Speed is
+ * detected on a watchdog reset. PicoMite/Web rp2040 default is
+ * 200 MHz. */
+#define HAL_PORT_DEFAULT_CPU_SPEED_KHZ   200000
 
 /* Chip-feature: RP2040 variants don't ship PSRAM, upng, or the DEFINES
  * compile-time dictionary. */

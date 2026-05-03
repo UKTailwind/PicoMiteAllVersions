@@ -10,3 +10,13 @@
 #include "hal/hal_periph_io.h"
 
 void hal_periph_reserve_io(void) { }
+
+/* SPI-LCD / SSD1963 / XPT2046 init entry-point stubs for VGA-family
+ * ports. The boot path in PicoMite.c calls these unconditionally; on
+ * VGA they no-op (Touch.c / SSD1963.c / spi_lcd.c bodies aren't
+ * linked here). Symbols match the signatures in SPI-LCD.h, SSD1963.h,
+ * Touch.h. */
+void InitDisplaySSD(void) { }
+void InitDisplaySPI(int InitOnly) { (void)InitOnly; }
+void InitDisplayI2C(int InitOnly) { (void)InitOnly; }
+void InitTouch(void) { }

@@ -1599,15 +1599,10 @@ int MIPS16 main(){
     LibMemory = (uint8_t *)flash_libmemory;
     uSec(100);
     if(_excep_code == RESET_CLOCKSPEED) {
-#if HAL_PORT_IS_VGA
-#if HAL_PORT_HAS_HDMI
-        Option.CPU_Speed=Freq480P;              // init the options if this is the very first startup
-#else
-        Option.CPU_Speed=Freq252P;              // init the options if this is the very first startup
-#endif
-#else
-        Option.CPU_Speed=200000;              // init the options if this is the very first startup
-#endif
+        /* HAL_PORT_DEFAULT_CPU_SPEED_KHZ is set per port in
+         * port_config.h (200 MHz for SPI-LCD, 252 MHz for pure VGA,
+         * 315 MHz for HDMI HSTX). */
+        Option.CPU_Speed = HAL_PORT_DEFAULT_CPU_SPEED_KHZ;
         SaveOptions();
         _excep_code=INVALID_CLOCKSPEED;
         watchdog_enable(1, 1);
@@ -1794,12 +1789,20 @@ if(Option.CPU_Speed==FreqSVGA){ //adjust the size of the heap
      * ports (USB-A in host mode). */
     hal_console_usb_cdc_boot_init();
 	InitBasic();
-#if !HAL_PORT_IS_VGA
-    /* Display + keypad init order. The PicoCalc keypad MCU shares the
-     * I²C bus, so on that port the SSD/I²C display init helpers are
-     * skipped (the keypad is busy on those addresses) and a 300 ms
-     * settle delay runs after touch-init. Other SPI-LCD boards run
-     * the standard sequence with no delay. */
+    /* Display + keypad init order. SPI-LCD ports run the SSD / SPI /
+     * I²C / virtual display + touch helpers; on VGA family these are
+     * stubs in spi_lcd_periph_io_stub.c. The PicoCalc keypad MCU
+     * shares the I²C bus, so on that port the SSD/I²C display init
+     * helpers are skipped (the keypad is busy on those addresses)
+     * and a 300 ms settle delay runs after touch-init. Other SPI-LCD
+     * boards run the standard sequence with no delay.
+     *
+     * SSD1963.h / Touch.h are gated in Hardware_Includes.h, so
+     * declare InitDisplaySSD / InitTouch here unconditionally. */
+    extern void InitDisplaySSD(void);
+    extern void InitDisplaySPI(int InitOnly);
+    extern void InitDisplayI2C(int InitOnly);
+    extern void InitTouch(void);
     if (!hal_i2c_keypad_owns_i2c_bus()) InitDisplaySSD();
     InitDisplaySPI(0);
     if (!hal_i2c_keypad_owns_i2c_bus()) {
@@ -1808,8 +1811,7 @@ if(Option.CPU_Speed==FreqSVGA){ //adjust the size of the heap
     }
     InitTouch();
     hal_i2c_keypad_boot_init();
-    if(Option.BackLightLevel)setBacklight(Option.BackLightLevel, 0);
-#endif
+    if (Option.BackLightLevel) setBacklight(Option.BackLightLevel, 0);
     /* ErrorInPrompt is a static inside MMBasic_RunPromptLoop; initialized there. */
     exception_set_exclusive_handler(HARDFAULT_EXCEPTION,sigbus);
     exception_set_exclusive_handler(SVCALL_EXCEPTION,sigbus);

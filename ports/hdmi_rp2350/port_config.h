@@ -23,6 +23,8 @@
 /* HDMI uses HSTX peripheral for scanout; PIOs are free, audio I²S
  * goes on PIO 2. */
 #define HAL_PORT_AUDIO_I2S_PIO_NUM       2
+/* HDMI HSTX scanout requires the higher 480p clock (Freq480P). */
+#define HAL_PORT_DEFAULT_CPU_SPEED_KHZ   315000
 
 #define HAL_PORT_HAS_PSRAM               1
 #define HAL_PORT_HAS_UPNG                1

@@ -23,6 +23,8 @@
 /* Audio I²S shares PIO 0 with the QVGA scanout (rp2040 has only
  * 2 PIOs). */
 #define HAL_PORT_AUDIO_I2S_PIO_NUM       0
+/* Pure VGA QVGA scanout requires 252 MHz (Freq252P). */
+#define HAL_PORT_DEFAULT_CPU_SPEED_KHZ   252000
 
 #define HAL_PORT_HAS_PSRAM               0
 #define HAL_PORT_HAS_UPNG                0
