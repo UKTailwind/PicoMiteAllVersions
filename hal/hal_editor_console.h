@@ -73,6 +73,46 @@ void hal_editor_tile_drawline(int yt, int fc_rgb);
 void hal_editor_tile_putchar_bg(int x_pixel, int yt,
                                 int gui_font_width, int bc_rgb, bool r_on);
 
+/* -----------------------------------------------------------------
+ * Editor enter/exit display-mode setup. VGA-family real impls swap
+ * into SCREENMODE1 when HRes<512 (modmode), reset the framebuffer +
+ * tile colours, and snapshot Y_TILE/ytileheight/oldmode/oldfont for
+ * later restore. Non-VGA stubs leave everything zeroed.
+ * ----------------------------------------------------------------- */
+typedef struct {
+    int  modmode;
+    int  oldmode;
+    int  oldfont;
+    int  Y_TILE_save;
+    int  ytileheight_save;
+    char RefreshSave;
+} hal_editor_display_state_t;
+
+void hal_editor_display_enter(hal_editor_display_state_t *st);
+void hal_editor_display_exit(const hal_editor_display_state_t *st);
+
+/* Modmode font selection — HDMI dispatches between SetFont(1) and
+ * SetFont((2<<4)|1) based on FullColour/MediumRes; pure-VGA always
+ * uses SetFont(1). Stub no-ops. */
+void hal_editor_modmode_font_select(void);
+
+/* -----------------------------------------------------------------
+ * Mouse-cursor pump — runs only on ports that bring the editor mouse
+ * into play (vga, vga_rp2350, hdmi_rp2350). Other ports link the
+ * mouse-stub which returns 1 (caller proceeds with MMInkey).
+ *
+ * Both pumps return 1 iff the caller should still call MMInkey()
+ * (i.e. no mouse click was intercepted). On a right click the pump
+ * sets *c_inout = F4; on middle, F5; MarkMode left click is 9999.
+ * ----------------------------------------------------------------- */
+int  hal_editor_mouse_main_pump(int fontinc, int *c_inout);
+int  hal_editor_mouse_mark_pump(int fontinc, int *c_inout, unsigned char **mark_io);
+
+/* Re-anchor the mouse to (curx, cury) after keyboard-driven cursor
+ * moves (called from MarkMode's clipboard-yank and DEL paths). Stub
+ * no-ops. */
+void hal_editor_mouse_anchor_reset(void);
+
 #ifdef __cplusplus
 }
 #endif

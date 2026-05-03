@@ -73,6 +73,11 @@ unsigned char *StartEditPoint = NULL;
 int StartEditChar = 0;
 static bool markmode=false;
 extern void routinechecks(void);
+/* WiFi server cleanup — real impl in MMtcpserver.c (WiFi ports);
+ * stub in MMweb_stubs.c (non-WiFi devices) and host_peripheral_stubs.c
+ * (host). Declared here unconditionally so Editor.c can call it
+ * without a port-flag gate. */
+extern void cleanserver(void);
 int8_t optioncolourcodesave;
 int editactive=0;
 #if !defined(LITE)
@@ -252,9 +257,11 @@ void MarkMode(unsigned char *cb, unsigned char *buf);
 void PositionCursor(unsigned char *curp);
 extern void setterminal();
 static int multilinecomment = false;
-bool modmode=false;
-int oldfont;
-int oldmode;
+/* Editor-mode snapshot — captured by hal_editor_display_enter() in
+ * edit() and consumed by hal_editor_display_exit() inside the
+ * FullScreenEditor save/exit/run handlers. File-scope so it survives
+ * the call chain. */
+static hal_editor_display_state_t edit_disp_state;
 #define MAXCLIP 1024
 // edit command:
 //  EDIT              Will run the full screen editor on the current program memory, if run after an error will place the cursor on the error line
@@ -274,43 +281,21 @@ void edit(unsigned char *cmdline, bool cmdfile) {
         SaveContext();
         ClearVars(0,FALSE);
     }
-#if HAL_PORT_IS_VGA
-    modmode=false;
-    editactive=1;
-    oldmode = DISPLAY_TYPE;
-    oldfont=PromptFont;
-    if(HRes<512){
-        DISPLAY_TYPE=SCREENMODE1;
-        modmode=true;
-        ResetDisplay();
-    }
-//    
-    memset((void *)WriteBuf, 0, ScreenSize);
-
-#if HAL_PORT_IS_VGA
-#ifdef rp2350
-    #if HAL_PORT_HAS_HDMI
-        mapreset();
-    #else
-        if(DISPLAY_TYPE==SCREENMODE3)for(int i=0;i<16;i++)map16[i]=remap[i]=i;
-    #endif
-#endif
-#endif
-
-#endif
-#if !HAL_PORT_HAS_USB_KEYBOARD
-    if(mouse0==false && Option.MOUSE_CLOCK)initMouse0(0);  //see if there is a mouse to initialise 
-#endif
+    hal_editor_display_enter(&edit_disp_state);
+    /* PS/2 mouse init — initMouse0() is a no-op on USB-keyboard ports
+     * (drivers/usb_host_kbd/USBKeyboard.c stubs it), so calling
+     * unconditionally is safe. */
+    if(mouse0==false && Option.MOUSE_CLOCK)initMouse0(0);
    if(Option.ColourCode) {
         gui_fcolour = WHITE;
         gui_bcolour = BLACK;
     }
     if(Option.DISPLAY_CONSOLE == true && HRes/gui_font_width <32) error("Font is too large");
-#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
-    if(Option.DISPLAY_TYPE>=VIRTUAL  && Option.DISPLAY_TYPE<NEXTGEN && WriteBuf)FreeMemorySafe((void **)&WriteBuf);
-#else
-    if(Option.DISPLAY_TYPE>=VIRTUAL && WriteBuf)FreeMemorySafe((void **)&WriteBuf);
-#endif
+    /* NEXTGEN is unconditionally defined; on ports whose OPTION setter
+     * rejects NEXTGEN values, Option.DISPLAY_TYPE never reaches that
+     * range so the `< NEXTGEN` term is vacuously true. */
+    if(Option.DISPLAY_TYPE>=VIRTUAL && Option.DISPLAY_TYPE<NEXTGEN && WriteBuf)
+        FreeMemorySafe((void **)&WriteBuf);
     if(cmdfile){
         ClearVars(0,true);
         ClearRuntime(true);
@@ -319,27 +304,13 @@ void edit(unsigned char *cmdline, bool cmdfile) {
         SetFont(1);
         PromptFont=1;
     }
-    if(modmode){
-#if HAL_PORT_HAS_HDMI
-        if(FullColour  || MediumRes ){
-#endif
-            SetFont(1);
-            PromptFont=1;
-#if HAL_PORT_HAS_HDMI
-        } else {
-            SetFont(2<<4 | 1);
-            PromptFont=2<<4 | 1;
-        }
-        if(DISPLAY_TYPE==Option.DISPLAY_TYPE){
-            SetFont(Option.DefaultFont) ;
-            PromptFont=Option.DefaultFont;
-        }
-#endif
+    if (edit_disp_state.modmode) {
+        hal_editor_modmode_font_select();
     }
 
-#if HAL_PORT_HAS_WIFI
+    /* cleanserver() has stubs in MMweb_stubs.c (non-WiFi) and host
+     * peripheral_stubs.c, so the call is safe on every port. */
     cleanserver();
-#endif
     multilinecomment = false;
     EdBuff = GetTempMemory(EDIT_BUFFER_SIZE);
     edit_buff_size=EDIT_BUFFER_SIZE;
@@ -498,35 +469,18 @@ int find_longest_line_length(const char *text ,int *linein) {
  * @cond
  * The following section will be excluded from the documentation.
  */
-#if !HAL_PORT_HAS_PICOMITE
-#if !HAL_PORT_HAS_WIFI
-    static short lastx1=9999, lasty1=9999;
-    static uint16_t lastfc, lastbc;
-    static bool leftpushed=false, rightpushed=false, middlepushed=false;
-#endif
-#endif
+/* Mouse-cursor pump state lives inside the editor_console driver
+ * (real on vga / vga_rp2350 / hdmi_rp2350; stub elsewhere). */
 void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdfile) {
   int c=-1, i;
   unsigned char buf[MAXCLIP+2], clipboard[MAXCLIP+2];
   unsigned char *p, *tp, BreakKeySave;
   char currdel=0, nextdel=0, lastdel=0;
   char multi=false;
-#if HAL_PORT_IS_VGA
-  int fontinc=gui_font_width / 8; //use to decide where to position mouse cursor
-  int OptionY_TILESave;
-  int ytileheightsave;
-  ytileheightsave=ytileheight;
-  OptionY_TILESave=Y_TILE;
-  ytileheight=gui_font_height;
-  Y_TILE=VRes/ytileheight;
-  if(VRes % ytileheight)Y_TILE++;
-#else 
-  char RefreshSave=Option.Refresh;
-#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
-    if(!(Option.DISPLAY_TYPE>=NEXTGEN))
-#endif
-  Option.Refresh=0;
-#endif
+  /* Mouse-cursor tile-coordinate factor — used by the editor mouse
+   * pump on VGA-family ports; computed unconditionally because it's
+   * cheap and the mouse pump itself stubs out on non-VGA. */
+  int fontinc = gui_font_width / 8;
     printScreen();                                                  // draw the screen
     SCursor(xx, yy);
     drawstatusline = true;
@@ -541,68 +495,11 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
     while(1) {
         statuscount = 0;
         do {
-#if !HAL_PORT_HAS_PICOMITE 
-#if !HAL_PORT_HAS_WIFI
-            c=-1;
-#if HAL_PORT_HAS_USB_KEYBOARD
-            if(HID[1].Device_type==2 && DISPLAY_TYPE==SCREENMODE1){
-#else
-            if(mouse0 && DISPLAY_TYPE==SCREENMODE1){
-#endif
-                if(!nunstruct[2].L)leftpushed=false;
-                if(!nunstruct[2].R)rightpushed=false;
-                if(!nunstruct[2].C)middlepushed=false;
-                if(nunstruct[2].y1!=lasty1 || nunstruct[2].x1!=lastx1){
-                    if(lastx1!=9999){
-                        hal_editor_tile_paint_saved(lastx1*fontinc, (lastx1+1)*fontinc,
-                                                    lasty1, lastfc, lastbc);
-                    }
-                    lastx1=nunstruct[2].x1;
-                    lasty1=nunstruct[2].y1;
-                    if(lasty1>=VHeight)lasty1=VHeight-1;
-                    hal_editor_tile_save(lastx1*fontinc, lasty1, &lastfc, &lastbc);
-                    hal_editor_tile_paint_rgb(lastx1*fontinc, (lastx1+1)*fontinc,
-                                              lasty1, RED, WHITE);
-                    }
-                if((nunstruct[2].L && leftpushed==false && rightpushed==false && middlepushed==false) ||
-                    (nunstruct[2].R && leftpushed==false && rightpushed==false && middlepushed==false) ||
-                    (nunstruct[2].C && leftpushed==false && rightpushed==false && middlepushed==false)){
-                    if(nunstruct[2].L)leftpushed=true;
-                    else if(nunstruct[2].R)rightpushed=true;
-                    else middlepushed=true;
-                    if(lastx1 >= 0 && lastx1 < VWidth && lasty1 >= 0 && lasty1 < VHeight) {  // c == ' ' means mouse down and no shift, ctrl, etc
-                        ShowCursor(false);
-                        // first position on the y axis
-                        while(*txtp != 0 && lasty1 > cury)                                       // assume we have to move down the screen
-                            if(*txtp++ == '\n') cury++;
-                        while(txtp != EdBuff && lasty1 < cury)                                   // assume we have to move up the screen
-                            if(*--txtp == '\n') cury--;
-                        while(txtp != EdBuff && *(txtp - 1) != '\n') txtp--;                // move to the beginning of the line
-                        for(curx = 0; curx < lastx1 && *txtp && *txtp != '\n'; curx++) txtp++;   // now position on the x axis
-                        PositionCursor(txtp);
-                        PrintStatus();
-                        ShowCursor(true);
-                        hal_editor_tile_paint_saved(lastx1*fontinc, (lastx1+1)*fontinc,
-                                                    lasty1, lastfc, lastbc);
-                    }
-                    if(rightpushed==true){
-                        c=F4;
-                    }
-                    else if(middlepushed==true){
-                        c=F5;
-                    }
-                }
+            c = -1;
+            ShowCursor(true);
+            if (hal_editor_mouse_main_pump(fontinc, &c)) {
+                c = MMInkey();
             }
-            ShowCursor(true);
-            if(!((rightpushed==true && c==F4) || (middlepushed==true && c==F5)))
-#else
-            ShowCursor(true);
-#endif
-#else
-            ShowCursor(true);
-#endif
-
-            c = MMInkey();
 
             if(statuscount++ == 5000) PrintStatus();
         } while(c == -1);
@@ -932,42 +829,7 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
                             BreakKey = BreakKeySave;
                             Option.ColourCode=optioncolourcodesave;
                             editactive=0;
-#if HAL_PORT_IS_VGA
-                            Y_TILE=OptionY_TILESave;
-                            ytileheight=ytileheightsave;
-                            if(modmode){
-                                DISPLAY_TYPE=oldmode;
-                                ResetDisplay();
-                                SetFont(oldfont);
-                                PromptFont=oldfont;
-                                MX470Display(DISPLAY_CLS);                        // clear screen on the MX470 display only
-                            }
-#if HAL_PORT_HAS_HDMI
-        while(v_scanline!=0){}
-        mapreset();
-        if(DISPLAY_TYPE==SCREENMODE1)  {
-                if(FullColour){
-                    tilefcols=(uint16_t *)((uint32_t)FRAMEBUFFER+(MODE1SIZE*3));
-                    tilebcols=(uint16_t *)((uint32_t)FRAMEBUFFER+(MODE1SIZE*3)+(MODE1SIZE>>1));
-                    X_TILE=MODE_H_ACTIVE_PIXELS/8;Y_TILE=MODE_V_ACTIVE_LINES/8;
-                    for(int x=0;x<X_TILE;x++){
-                        for(int y=0;y<Y_TILE;y++){
-                            tilefcols[y*X_TILE+x]=RGB555(Option.DefaultFC);
-                            tilebcols[y*X_TILE+x]=RGB555(Option.DefaultBC);
-                        }
-                    }
-                } else {
-                    tilefcols_w=(uint8_t *)DisplayBuf+MODE1SIZE;
-                    tilebcols_w=tilefcols_w+(MODE_H_ACTIVE_PIXELS/8)*(MODE_V_ACTIVE_LINES/8); //minimum tilesize is 8x8
-                    memset(tilefcols_w,RGB332(Option.DefaultFC),(MODE_H_ACTIVE_PIXELS/8)*(MODE_V_ACTIVE_LINES/8)*sizeof(uint8_t));
-                    memset(tilebcols_w,RGB332(Option.DefaultBC),(MODE_H_ACTIVE_PIXELS/8)*(MODE_V_ACTIVE_LINES/8)*sizeof(uint8_t));
-                    X_TILE=MODE_H_ACTIVE_PIXELS/8;Y_TILE=MODE_V_ACTIVE_LINES/ytileheight;
-                }
-            }
-#endif
-#else
-            Option.Refresh=RefreshSave;
-#endif                          
+                            hal_editor_display_exit(&edit_disp_state);
                             if(c != ESC && TextChanged && fname==NULL) SaveToProgMemory();
                             if(c != ESC && TextChanged && fname) {
                                 int fnbr1;
@@ -1023,9 +885,7 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
 //                            (void) findvar((unsigned char *)"MM.CMDLINE$", V_FIND | V_DIM_VAR | T_CONST);
                             if(Option.LIBRARY_FLASH_SIZE == MAX_PROG_SIZE) ExecuteProgram(LibMemory );       // run anything that might be in the library
                             if(*ProgMemory != T_NEWLINE) return;                             // no program to run
-                        #if HAL_PORT_HAS_WIFI
                             cleanserver();
-                        #endif
                             nextstmt = ProgMemory;
                             hal_keyboard_clear_repeat_state();
                             return;
@@ -1149,70 +1009,15 @@ void PositionCursor(unsigned char *curp) {
 void MarkMode(unsigned char *cb, unsigned char *buf) {
     unsigned char *p, *mark, *oldmark;
     int c=-1, x, y, i, oldx, oldy, txtpx, txtpy, errmsg = false;
-#if HAL_PORT_IS_VGA
-    int fontinc=gui_font_width/8;
-#endif
+    int fontinc = gui_font_width / 8;
     PrintFunctKeys(MARK);
     oldmark = mark = txtp;
     txtpx = oldx = curx; txtpy = oldy = cury;
     while(1) {
-        c=-1;
-#if !HAL_PORT_HAS_PICOMITE
-#if !HAL_PORT_HAS_WIFI
-#if HAL_PORT_HAS_USB_KEYBOARD
-        if(HID[1].Device_type==2 && DISPLAY_TYPE==SCREENMODE1){
-#else
-        if(mouse0 && DISPLAY_TYPE==SCREENMODE1){
-#endif
-            if(!nunstruct[2].L)leftpushed=false;
-            if(!nunstruct[2].R)rightpushed=false;
-            if(!nunstruct[2].C)middlepushed=false;
-            if(nunstruct[2].y1!=lasty1 || nunstruct[2].x1!=lastx1){
-                if(lastx1!=9999){
-                    hal_editor_tile_paint_saved(lastx1*fontinc, (lastx1+1)*fontinc,
-                                                lasty1, lastfc, lastbc);
-                }
-                lastx1=nunstruct[2].x1;
-                lasty1=nunstruct[2].y1;
-                if(lasty1>=VHeight)lasty1=VHeight-1;
-                hal_editor_tile_save(lastx1*fontinc, lasty1, &lastfc, &lastbc);
-                hal_editor_tile_paint_rgb(lastx1*fontinc, (lastx1+1)*fontinc,
-                                          lasty1, RED, WHITE);
-                }
-            if((nunstruct[2].L && leftpushed==false && rightpushed==false && middlepushed==false) ||
-                (nunstruct[2].R && leftpushed==false && rightpushed==false && middlepushed==false) ||
-                (nunstruct[2].C && leftpushed==false && rightpushed==false && middlepushed==false)){
-                if(nunstruct[2].L)leftpushed=true;
-                else if(nunstruct[2].R)rightpushed=true;
-                else middlepushed=true;
-                if(lastx1 >= 0 && lastx1 < VWidth && lasty1 >= 0 && lasty1 < VHeight) {  // c == ' ' means mouse down and no shift, ctrl, etc
-            //        unsigned char * mtxtp=txtp;
-                    p=txtp;
-                    // first position on the y axis
-                    while(*p != 0 && lasty1 > cury)                                       // assume we have to move down the screen
-                        if(*p++ == '\n') cury++;
-                    while(p != EdBuff && lasty1 < cury)                                   // assume we have to move up the screen
-                        if(*--p == '\n') cury--;
-                    while(p != EdBuff && *(p - 1) != '\n') p--;                // move to the beginning of the line
-                    for(curx = 0; curx < lastx1 && *p && *p != '\n'; curx++) p++;   // now position on the x axis
-                    PositionCursor(p);
-                    mark=p;
-                } 
-                if(rightpushed==true){
-                    c=F4;
-                }
-                if(middlepushed==true){
-                    c=F5;
-                }
-                if(leftpushed==true ){
-                   c=9999;
-                }
-            }
+        c = -1;
+        if (hal_editor_mouse_mark_pump(fontinc, &c, &mark)) {
+            c = MMInkey();
         }
-        if(!((rightpushed==true && c==F4) || (middlepushed==true && c==F5)  || (leftpushed==true && c==9999)))
-#endif
-#endif
-        c = MMInkey();
         if(c != -1 && errmsg) {
             PrintFunctKeys(MARK);
             errmsg = false;
@@ -1312,19 +1117,7 @@ void MarkMode(unsigned char *cb, unsigned char *buf) {
                       *cb = 0;
                       if(c == F5 || c == CTRLKEY('Y')) {
                           PositionCursor(txtp);
-#if !HAL_PORT_HAS_PICOMITE
-#if !HAL_PORT_HAS_WIFI
-#if HAL_PORT_HAS_USB_KEYBOARD
-                        if(HID[1].Device_type==2 && DISPLAY_TYPE==SCREENMODE1){     
-#else
-                        if(mouse0 && DISPLAY_TYPE==SCREENMODE1){ 
-#endif 
-                            nunstruct[2].ax =curx*FontTable[gui_font >> 4][0] * (gui_font & 0b1111);
-                            nunstruct[2].ay =cury*FontTable[gui_font >> 4][1] * (gui_font & 0b1111);
-                            lastx1=9999;lasty1=9999;
-                        }                    
-#endif                         
-#endif
+                          hal_editor_mouse_anchor_reset();
                           return;
                       }
                       // fall through
@@ -1338,19 +1131,7 @@ void MarkMode(unsigned char *cb, unsigned char *buf) {
                       *p++ = 0; *p++ = 0;
                       TextChanged = true;
                       PositionCursor(txtp);
-#if !HAL_PORT_HAS_PICOMITE
-#if !HAL_PORT_HAS_WIFI
-#if HAL_PORT_HAS_USB_KEYBOARD
-                        if(HID[1].Device_type==2 && DISPLAY_TYPE==SCREENMODE1){     
-#else
-                        if(mouse0 && DISPLAY_TYPE==SCREENMODE1){     
-#endif 
-                            nunstruct[2].ax =curx*FontTable[gui_font >> 4][0] * (gui_font & 0b1111);
-                            nunstruct[2].ay =cury*FontTable[gui_font >> 4][1] * (gui_font & 0b1111);
-                            lastx1=9999;lasty1=9999;
-                        }                    
-#endif
-#endif                         
+                      hal_editor_mouse_anchor_reset();
                       return;
             case 9999: break;
             default:    continue;
