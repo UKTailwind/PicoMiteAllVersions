@@ -35,6 +35,11 @@ void hal_display_merge_check_busy(void);
 void hal_display_merge_lock_fb(void);
 void hal_display_merge_unlock_fb(void);
 
+/* Initialise the merge-pipeline framebuffer mutex at boot. Real on
+ * SPI-LCD ports calls mutex_init(&frameBufferMutex); stub no-op
+ * elsewhere. */
+void hal_display_merge_init_fb_mutex(void);
+
 /* Signal that a full-frame merge has completed and advertise a clean
  * memory-barrier ordering for any waiter spinning on `mergedone`. The
  * spin is in FRAMEBUFFER SYNC (Draw.c::cmd_framebuffer), reading

@@ -1851,9 +1851,7 @@ int MIPS16 main(){
     adc_clk_div=adc_hw->div;
     systick_hw->csr = 0x5;
     systick_hw->rvr = 0x00FFFFFF;
-#if HAL_PORT_HAS_PICOMITE
-	mutex_init( &frameBufferMutex );						// create a mutex to lock frame buffer
-#endif
+    hal_display_merge_init_fb_mutex();           /* SPI-LCD ports only */
 
 
 #ifndef rp2350

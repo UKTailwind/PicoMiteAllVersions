@@ -51,6 +51,10 @@ void hal_display_merge_unlock_fb(void) {
     mutex_exit(&frameBufferMutex);
 }
 
+void hal_display_merge_init_fb_mutex(void) {
+    mutex_init(&frameBufferMutex);
+}
+
 void hal_display_merge_mark_done(void) {
     mergedone = true;
     __dmb();
