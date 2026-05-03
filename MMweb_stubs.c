@@ -16,6 +16,11 @@ void closeMQTT(void) {}
 void ProcessWeb(int mode) { (void)mode; }
 void TelnetPutC(int c, int flush) { (void)c; (void)flush; }
 void WebConnect(void) {}
+/* WEB cmd token is wired into the AllCommands.h table via the WiFi
+ * port_tokens.h palette; non-WiFi ports use a different palette and
+ * never invoke this stub. The definition keeps the symbol available
+ * if some build path adds the token regardless. */
+void cmd_web(void) { error("WEB not supported on this port"); }
 
 /* Whether the WiFi telnet client is configured (Option.Telnet != -1).
  * Real impl on WiFi ports lives in MMtelnet.c; stub returns 1 on

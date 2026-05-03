@@ -6,11 +6,14 @@
  the C language function associated with commands, functions or operators should be
  declared here
 **********************************************************************************/
-/* Pull in the port-config palette so the HAL_PORT_HAS_* gates inside this
- * header (and the per-port macros they expand to) resolve no matter how
- * the file was reached. AllCommands.h is included from both umbrella
- * headers and from a few stand-alone TUs. */
+/* Pull in the per-port token-palette macros that drive the
+ * INCLUDE_COMMAND_TABLE / INCLUDE_TOKEN_TABLE expansions further down.
+ * AllCommands.h is included from both umbrella headers and from a few
+ * stand-alone TUs, so this resolves regardless of inclusion path.
+ * port_tokens.h pulls in port_config.h transitively for any per-port
+ * USB-axis switching it needs internally. */
 #include "port_config.h"
+#include "port_tokens.h"
 #if !defined(INCLUDE_COMMAND_TABLE) && !defined(INCLUDE_TOKEN_TABLE)
 // format:
 //      void cmd_???(void)
@@ -208,9 +211,9 @@ void cmd_insert(void);
 void cmd_add(void);
 void cmd_arrayset(void);
 void cmd_keyscan(void);
-#if HAL_PORT_HAS_WIFI
-    void cmd_web(void);
-#endif
+/* cmd_web: real impl in Custom.c on WiFi ports, stub in MMweb_stubs.c
+ * elsewhere — declared unconditionally for the token table. */
+void cmd_web(void);
 #ifdef rp2350
 	void  cmd_loadCMM2(void);
 	void  cmd_RunCMM2(void);
@@ -352,9 +355,6 @@ void fun_tilde(void);
 void fun_byte(void);
 void fun_bit(void);
 void fun_flag(void);
-#if HAL_PORT_HAS_WIFI
-    void fun_json(void);
-#endif
 void fun_dev(void);
 void fun_map(void);
 #endif
@@ -541,41 +541,19 @@ void fun_map(void);
 /*frame
 	{ (unsigned char *)"Frame",		T_CMD | T_FUN,				0, cmd_frame	},
 */
-	#if HAL_PORT_IS_VGA
-  	{ (unsigned char *)"TILE",            T_CMD,                     0, cmd_tile   },
-  	{ (unsigned char *)"MODE",            T_CMD,                     0, cmd_mode   },
-  	{ (unsigned char *)"Map(",            T_CMD | T_FUN  ,           0, cmd_map   },
-	{ (unsigned char *)"Map",            T_CMD,           0, cmd_map   },
-	{ (unsigned char *)"Colour Map",         T_CMD,                      0, cmd_colourmap	},
-#else
-    { (unsigned char *)"Camera",         T_CMD,                      0, cmd_camera },
-    { (unsigned char *)"Refresh",         T_CMD,                      0, cmd_refresh },
-#endif
+    HAL_PORT_VIDEO_CMD_TOKENS
     /* cmd_ctrlval real impl in GUI.c; stub in gui_controls_stub.c. */
     { (unsigned char *)"CtrlVal(",       T_CMD | T_FUN,              0, cmd_ctrlval    },
-#if HAL_PORT_HAS_PICOMITE
-	{ (unsigned char *)"Backlight",		T_CMD,		0, cmd_backlight		},
-#endif
-#if HAL_PORT_HAS_WIFI
-	{ (unsigned char *)"Backlight",		T_CMD,		0, cmd_backlight		},
-    { (unsigned char *)"WEB",       T_CMD,              0, cmd_web	    },
-#else
-    { (unsigned char *)"Draw3D",         T_CMD,                      0, cmd_3D },
-#endif
-#if !HAL_PORT_HAS_USB_KEYBOARD
-	{ (unsigned char *)"Update Firmware",		T_CMD,				0, cmd_update},
-#else
-	{ (unsigned char *)"Gamepad",		T_CMD,				0, cmd_gamepad	},
-#endif
+    HAL_PORT_BACKLIGHT_PIC_CMD_TOKEN
+    HAL_PORT_WIFI_OR_3D_CMD_TOKENS
+    HAL_PORT_USB_OR_FIRMWARE_CMD_TOKEN
 	{ (unsigned char *)"Configure",		T_CMD,				0, cmd_configure	},
 	{ (unsigned char *)"Colour",         T_CMD,                      0, cmd_colour	},
 #ifdef rp2350
 	{ (unsigned char *)"CMM2 Load",		T_CMD,				0, cmd_loadCMM2	},
 	{ (unsigned char *)"CMM2 Run",		T_CMD,				0, cmd_RunCMM2	},
 	{ (unsigned char *)"Randomize",          T_CMD,				0, cmd_null},
-#if !HAL_PORT_HAS_WIFI
-	{ (unsigned char *)"Ram",		T_CMD,				0, cmd_psram	},
-#endif
+    HAL_PORT_RAM_CMD_TOKEN
 #else
 	{ (unsigned char *)"Randomize",          T_CMD,				0, cmd_randomize},
 #endif
@@ -586,10 +564,7 @@ void fun_map(void);
 { (unsigned char *)"Array Insert",	T_CMD,		0, cmd_insert	},
 { (unsigned char *)"Array Add",	T_CMD,		0, cmd_add	},
 { (unsigned char *)"Array Set",	T_CMD,		0, cmd_arrayset	},
-#if defined(rp2350) && HAL_PORT_HAS_PICOMITE
-  	{ (unsigned char *)"Map(",            T_CMD | T_FUN  ,           0, cmd_map   },
-	{ (unsigned char *)"Map",            T_CMD,           0, cmd_map   },
-#endif
+HAL_PORT_RP2350_PIC_MAP_CMD_TOKENS
 { (unsigned char *)"",   0,                  0, cmd_null,    }                   // this dummy entry is always at the end
 #endif
 /* ********************************************************************************
@@ -721,24 +696,14 @@ void fun_map(void);
      * exist on every port (USB host, PS/2 matrix, I²C keypad, host).
      * No gate needed. */
     { (unsigned char*)"KeyDown(",    T_FUN | T_INT,		0, fun_keydown	},
-#if HAL_PORT_IS_VGA
-	{ (unsigned char*)"DRAW3D(",	    T_FUN | T_INT,		0, fun_3D, },
-	{ (unsigned char *)"GetScanLine",	    	T_FNA | T_INT,		0, fun_getscanline 	    },
-	{ (unsigned char*)"Map(",	    T_FUN | T_INT,		0, fun_map, },
-#else
-  	{ (unsigned char *)"Touch(",       T_FUN | T_INT,        0, fun_touch  },
-#endif
-#if HAL_PORT_HAS_WIFI
-	{ (unsigned char *)"Json$(",		T_FUN | T_STR,          0, fun_json		},
-#endif
+    HAL_PORT_VIDEO_FUN_TOKENS
+    HAL_PORT_WIFI_JSON_FUN_TOKEN
     /* fun_msgbox / fun_ctrlval real impls in GUI.c; stubs in
      * gui_controls_stub.c. */
     { (unsigned char *)"MsgBox(",        T_FUN | T_INT,              0, fun_msgbox     },
     { (unsigned char *)"CtrlVal(",       T_FUN | T_NBR | T_STR,      0, fun_ctrlval    },
 { (unsigned char *)"Bit(",	T_FUN | T_INT,		0, fun_bit,	},
-#if defined(rp2350) && HAL_PORT_HAS_PICOMITE
-	{ (unsigned char*)"Map(",	    T_FUN | T_INT,		0, fun_map, },
-#endif
+HAL_PORT_RP2350_PIC_MAP_FUN_TOKEN
 { (unsigned char *)"",   0,                  0, cmd_null,    }                   // this dummy entry is always at the end
 #endif
 /*  @endcond */
