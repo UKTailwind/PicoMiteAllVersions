@@ -10,6 +10,7 @@
 
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
+#include "hal/hal_i2c_keypad.h"
 
 #if !HAL_PORT_IS_VGA
 
@@ -31,18 +32,7 @@ void MIPS16 ConfigDisplayUser(unsigned char *tp)
 void MIPS16 clear320(void)
 {
     if (SPI480) {
-#if HAL_PORT_HAS_I2C_KEYPAD
-        HRes = 320;
-        VRes = 480;
-#else
-        if (Option.DISPLAY_ORIENTATION & 1) {
-            HRes = DisplayHRes;
-            VRes = DisplayVRes;
-        } else {
-            HRes = DisplayVRes;
-            VRes = DisplayHRes;
-        }
-#endif
+        hal_i2c_keypad_apply_spi480_resolution();
         return;
     }
     screen320 = 0;

@@ -500,11 +500,10 @@ int IsInvalidPin(int pin) { (void)pin; return 1; }
 unsigned long ReadCount5(void) { return 0; }
 void WriteCount5(unsigned long timeset) { (void)timeset; }
 void SetADCFreq(float frequency) { (void)frequency; }
-#if !HAL_PORT_HAS_I2C_KEYPAD
+/* Host has no backlight to drive; the stub just consumes the args.
+ * The non-keypad signature is the canonical one — keypad ports
+ * provide their own setBacklight via picocalc_features_real.c. */
 void setBacklight(int level, int frequency) { (void)level; (void)frequency; }
-#else
-void setBacklight(int level) { (void)level; }
-#endif
 void gpio_callback(uint gpio, uint32_t events) { (void)gpio; (void)events; }
 int CheckPin(int pin, int action) { (void)pin; (void)action; return 0; }
 void CallCFuncInt1(void) {}

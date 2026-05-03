@@ -37,6 +37,7 @@ extern "C" {
 #include "hal/hal_flash.h"
 #include "hal/hal_keyboard.h"
 #include "hal/hal_gui_controls.h"
+#include "hal/hal_i2c_keypad.h"
 #include "hardware/regs/addressmap.h"     /* XIP_BASE */
 #include "hardware/adc.h"
 #include "hardware/exception.h"
@@ -2019,18 +2020,19 @@ if(Option.CPU_Speed==FreqSVGA){ //adjust the size of the heap
 #endif
 	InitBasic();
 #if !HAL_PORT_IS_VGA
-#if !HAL_PORT_HAS_I2C_KEYPAD
-    InitDisplaySSD();
-#endif
+    /* Display + keypad init order. The PicoCalc keypad MCU shares the
+     * I²C bus, so on that port the SSD/I²C display init helpers are
+     * skipped (the keypad is busy on those addresses) and a 300 ms
+     * settle delay runs after touch-init. Other SPI-LCD boards run
+     * the standard sequence with no delay. */
+    if (!hal_i2c_keypad_owns_i2c_bus()) InitDisplaySSD();
     InitDisplaySPI(0);
-#if !HAL_PORT_HAS_I2C_KEYPAD
-    InitDisplayI2C(0);
-    InitDisplayVirtual();
-#endif
+    if (!hal_i2c_keypad_owns_i2c_bus()) {
+        InitDisplayI2C(0);
+        InitDisplayVirtual();
+    }
     InitTouch();
-#if HAL_PORT_HAS_I2C_KEYPAD
-    uSec(300000);
-#endif
+    hal_i2c_keypad_boot_init();
     if(Option.BackLightLevel)setBacklight(Option.BackLightLevel, 0);
 #endif
     /* ErrorInPrompt is a static inside MMBasic_RunPromptLoop; initialized there. */

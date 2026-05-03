@@ -65,11 +65,11 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #define I2C_Status_Slave_Receive_Rdy            0x00100000
 #define I2C_Status_Slave_Receive_Full           0x00200000
 #define SSD1306_I2C_Addr 0x3c
-#if HAL_PORT_HAS_I2C_KEYPAD
-#define SystemI2CTimeout 500
-#else
-#define SystemI2CTimeout 5
-#endif
+/* SystemI2CTimeout is the per-byte wait the master allows before
+ * giving up. PicoCalc's keypad MCU is slow on startup and needs the
+ * longer 500 ms timeout; everyone else uses 5 ms. The value is set
+ * per-port via HAL_PORT_I2C_TIMEOUT_MS in port_config.h. */
+#define SystemI2CTimeout HAL_PORT_I2C_TIMEOUT_MS
 // Global variables provided by I2C.c
 extern unsigned int I2C_Timer;                                      // master timeout counter
 extern char *I2C_IntLine;                                           // pointer to the master interrupt line number

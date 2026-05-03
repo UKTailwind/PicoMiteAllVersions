@@ -15,6 +15,7 @@
 #include "Hardware_Includes.h"
 #include "port_config.h"
 #include "hal/hal_gui_controls.h"
+#include "hal/hal_i2c_keypad.h"
 
 /* The Freq* / SCREENMODE* / NEXTGEN / VIRTUAL / SSDPANEL constants are
  * defined in configuration.h only on PICOMITEVGA builds. On non-VGA the
@@ -238,9 +239,7 @@ void port_print_display_options(void)
         }
         if(Option.BackLightLevel!=100)PO2Int("LCD BACKLIGHT", Option.BackLightLevel);
         hal_gui_controls_print_options();
-#if HAL_PORT_HAS_I2C_KEYPAD
-        if(Option.KEYBOARDBL)PO2Int("BACKLIGHT KB", Option.KEYBOARDBL);
-#endif
+        hal_i2c_keypad_print_options();
         port_web_print_options();
 #if !HAL_PORT_IS_VGA
         /* TOUCH_XZERO/YZERO/XSCALE/YSCALE only exist in struct option_s

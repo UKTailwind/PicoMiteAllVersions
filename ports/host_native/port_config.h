@@ -66,6 +66,13 @@
 #define HAL_PORT_HAS_USB_KEYBOARD        0
 #define HAL_PORT_HAS_I2C_KEYPAD          0
 
+/* I²C bus timing constants — used by I2C.h for the master-timeout
+ * macro and by drivers/sd_spi/mmc_stm32.c for the i2c_init() clock
+ * rate. Host doesn't drive real I²C, but the constants still need
+ * to compile. */
+#define HAL_PORT_I2C_TIMEOUT_MS          5
+#define HAL_PORT_I2C_SLOW_HZ             100000
+
 /* FLAC decoder base sample-rate cap. Host Audio.c body doesn't decode
  * FLAC, but the port-config standard wants the constant defined on
  * every port. RP2040 number is fine here. */

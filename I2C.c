@@ -33,6 +33,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  */
 
 #include "MMBasic_Includes.h"
+#include "hal/hal_i2c_keypad.h"
 
 #include "Hardware_Includes.h"
 
@@ -141,21 +142,25 @@ These are the functions responsible for executing the I2C related commands in MM
 They are supported by utility functions that are grouped at the end of this file
 
 ********************************************************************************************/
-#if HAL_PORT_HAS_I2C_KEYPAD
-void I2C_Send_RegData(int i2caddr,int reg,char command){
+/* Keypad MCU register write. Used on PicoCalc by
+ * drivers/i2c_picocalc_kbd/i2ckbd.c; on non-keypad ports nothing
+ * calls it and the linker dead-code-eliminates the body. The
+ * underlying i2c_write_timeout_us is in the Pico SDK and links on
+ * every device port. */
+void I2C_Send_RegData(int i2caddr, int reg, char command) {
     int i2cret;
-    I2C_Send_Buffer[0]=reg;
-    I2C_Send_Buffer[1]=command;
-    I2C_Sendlen=2;
-    I2C_Timeout=1000;
-    if(I2C1locked)i2cret=i2c_write_timeout_us(i2c1, (uint8_t)i2caddr, (uint8_t *)I2C_Send_Buffer, I2C_Sendlen,false, I2C_Timeout*1000);
-    else i2cret=i2c_write_timeout_us(i2c0, (uint8_t)i2caddr, (uint8_t *)I2C_Send_Buffer, I2C_Sendlen,false, I2C_Timeout*1000);
-    mmI2Cvalue=0;
-    if(i2cret==PICO_ERROR_GENERIC)mmI2Cvalue=1;
-    if(i2cret==PICO_ERROR_TIMEOUT)mmI2Cvalue=2;
-//	mmI2Cvalue=HAL_I2C_Master_Transmit(&hi2c1, (uint16_t)i2caddr, I2C_Send_Buffer, I2C_Sendlen, I2C_Timeout);
+    I2C_Send_Buffer[0] = reg;
+    I2C_Send_Buffer[1] = command;
+    I2C_Sendlen = 2;
+    I2C_Timeout = 1000;
+    if (I2C1locked) i2cret = i2c_write_timeout_us(i2c1, (uint8_t)i2caddr,
+        (uint8_t *)I2C_Send_Buffer, I2C_Sendlen, false, I2C_Timeout * 1000);
+    else            i2cret = i2c_write_timeout_us(i2c0, (uint8_t)i2caddr,
+        (uint8_t *)I2C_Send_Buffer, I2C_Sendlen, false, I2C_Timeout * 1000);
+    mmI2Cvalue = 0;
+    if (i2cret == PICO_ERROR_GENERIC) mmI2Cvalue = 1;
+    if (i2cret == PICO_ERROR_TIMEOUT) mmI2Cvalue = 2;
 }
-#endif
 void I2C_Send_Command(char command) {
   int i2cret;
   int i2caddr = SSD1306_I2C_Addr;
@@ -499,119 +504,29 @@ void CheckI2CKeyboard(int noerror, int read) {
   }
   uSec(1000);
   if (buff) {
-#if HAL_PORT_HAS_I2C_KEYPAD
-    if (buff == 0xA503) ctrlheld = 0;
-    else if (buff == 0xA502) {
-      ctrlheld=1;
-    } else if((buff & 0xff) == 1) { //pressed
-      int c = buff >> 8;
-      int realc = 0;
-      switch(c) {
-        // Refer to Appendix H in PicoMite User Manual
-        // PicoCalc must be mapped to expected PicoMite keys
-        case 0xd4:
-          realc=DEL; break;
-        case 0xb5:
-          realc=UP; break;
-        case 0xb6:
-          realc=DOWN; break;
-        case 0xb4:
-          realc=LEFT; break;
-        case 0xb7:
-          realc=RIGHT; break;
-        case 0xd1:
-          realc=INSERT; break; // ALT + I
-        case 0xd2:
-          realc=HOME; break; // SHIFT + TAB (collision, see below)
-        case 0xd5:
-          realc=END; break; // SHIFT + DEL (collision, see below)
-        case 0xd6:
-          realc=PUP; break; // SHIFT + UP
-        case 0xd7:
-          realc=PDOWN; break; // SHIFT + DOWN (collision, see below)
-        case 0xa1:
-          realc=ALT; break; // Note: SHIFT + ENTER also sends ALT!
-        case 0x81:
-          realc=F1; break;
-        case 0x82:
-          realc=F2; break;
-        case 0x83:
-          realc=F3; break;
-        case 0x84:
-          realc=F4; break;
-        case 0x85:
-          realc=F5; break;
-        case 0x86:
-          realc=F6; break; // SHIFT + F1
-        case 0x87:
-          realc=F7; break; // SHIFT + F2
-        case 0x88:
-          realc=F8; break; // SHIFT + F3
-        case 0x89:
-          realc=F9; break; // SHIFT + F4
-        case 0x90:
-          realc=F10; break; // SHIFT + F5
-        // F11 not on PicoCalc
-        // F12 not on PicoCalc
-        // PrtScr/SysRq not on PicoCalc
-        case 0xd0:
-          realc=BreakKey; break;
-        // SHIFT_TAB sends Home on PicoCalc
-        // SHIFT_DEL sends End on PicoCalc
-        // DOWNSEL (SHIFT_DOWN_ARROW) sends Page Down (PDOWN) on PicoCalc
-        //   Note: (SHIFT_UP_ARROW) sends Page Up (PUP) on PicoCalc
-        // RIGHTSEL (SHIFT_RIGHT_ARROW) sends nothing on PicoCalc
-        //   Note: (SHIFT_LEFT_ARROW) sends nothing on PicoCalc
-        // Note: PicoCalc cannot send shifted Fn keys!
-        // --- Appendix H ends
-        case 0xb1:
-          realc=ESC; break;
-        case 0x0a:
-          realc=ENTER; break;
-        // --- This will only work when using the custom BIOS at:
-        //     https://github.com/shtirlic/picocalc_southbridge
-        //     Official BIOS (currently 1.4) does not support this key.
-        case 0x91:
-          realc=0x66; break; // USB_HID_KEYBOARD_KEYPAD_KEYBOARD_POWER
-        // --- Modifier keys must be consumed and ignored!
-        case 0xa2: // Shift (left)
-        case 0xa3: // Shift (right)
-        case 0xa5: // Ctrl
-        case 0xc1: // CapsLK
-          return;
-        default:
-          realc = c; break;
-      }
-      c = realc;
-#else
-    if (buff == 0x1203) ctrlheld = 0;
-    else if (buff == 0x1202) {
-      ctrlheld = 1;
-    } else if ((buff & 0xff) == 1) {
-      int c = buff >> 8;
-      if (c == 6) c = ESC;
-      if (c == 0x11) c = F1;
-      if (c == 5) c = F2;
-      if (c == 0x7) c = F4;
-#endif
+    /* Per-board scancode translator: real impl is the PicoCalc keymap
+     * (drivers/i2c_picocalc_kbd/i2c_keypad_real.c); stub impl is the
+     * legacy generic-I²C-keyboard keymap. Returns -1 to skip
+     * (modifier / state change / non-press); otherwise the cooked
+     * character to enqueue. */
+    int c = hal_i2c_keypad_translate(buff, &ctrlheld);
+    if (c >= 0) {
       if (c >= 'a' && c <= 'z' && ctrlheld) c = c - 'a' + 1;
       if (c == BreakKey) { // if the user wants to stop the progran
         MMAbort = true; // set the flag for the interpreter to see
         ConsoleRxBufHead = ConsoleRxBufTail; // empty the buffer
-        // break;
       } else {
         ConsoleRxBuf[ConsoleRxBufHead] = c; // store the byte in the ring buffer
         if (ConsoleRxBuf[ConsoleRxBufHead] == keyselect && KeyInterrupt != NULL) {
           Keycomplete = true;
         } else {
-          ConsoleRxBufHead = (ConsoleRxBufHead + 1) % CONSOLE_RX_BUF_SIZE; // advance the head of the queue
-          if (ConsoleRxBufHead == ConsoleRxBufTail) { // if the buffer has overflowed
-            ConsoleRxBufTail = (ConsoleRxBufTail + 1) % CONSOLE_RX_BUF_SIZE; // throw away the oldest char
+          ConsoleRxBufHead = (ConsoleRxBufHead + 1) % CONSOLE_RX_BUF_SIZE;
+          if (ConsoleRxBufHead == ConsoleRxBufTail) {
+            ConsoleRxBufTail = (ConsoleRxBufTail + 1) % CONSOLE_RX_BUF_SIZE;
           }
         }
       }
     }
-    //		} else readover=1;
   }
   return;
   i2c_error_exit:

@@ -180,8 +180,8 @@ set(PICOMITE_PICO_SDK_HAL_SOURCES
 	ports/pico_sdk_common/mem_writeblock.c
 	ports/pico_sdk_common/load_png.c
 	ports/pico_sdk_common/cmd_files_hooks.c
-	ports/pico_sdk_common/port_load_overrides.c
-	ports/pico_sdk_common/picocalc_features.c
+	# port_load_overrides + picocalc_features are added by the
+	# PICOCALC selection block below — real on PicoCalc, stub elsewhere.
 	ports/pico_sdk_common/print_display_options.c
 	ports/pico_sdk_common/spi_lcd_options.c
 	ports/pico_sdk_common/misc_option_setters.c
@@ -241,9 +241,18 @@ target_include_directories(PicoMite PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/ports/pi
 include(${CMAKE_SOURCE_DIR}/ports/${PORT}/port_sources.cmake)
 
 if(PICOCALC STREQUAL "true")
-	target_sources(PicoMite PRIVATE
-	drivers/i2c_picocalc_kbd/i2ckbd.c
-	)
+    target_sources(PicoMite PRIVATE
+        drivers/i2c_picocalc_kbd/i2ckbd.c
+        drivers/i2c_picocalc_kbd/i2c_keypad_real.c
+        ports/pico_sdk_common/picocalc_features_real.c
+        ports/pico_sdk_common/port_load_overrides_picocalc.c
+    )
+else()
+    target_sources(PicoMite PRIVATE
+        drivers/i2c_picocalc_kbd/i2c_keypad_stub.c
+        ports/pico_sdk_common/picocalc_features_stub.c
+        ports/pico_sdk_common/port_load_overrides_stub.c
+    )
 endif()
 
 set_source_files_properties(drivers/sd_spi/mmc_stm32.c PROPERTIES COMPILE_FLAGS -O2)
@@ -299,10 +308,14 @@ if(PICOCALC STREQUAL "true")
     target_compile_options(PicoMite PRIVATE -DPICOCALC
                                             -DHAL_PORT_HAS_I2C_KEYPAD=1
                                             -DHAL_PORT_BACKLIGHT_VIA_KEYPAD_I2C=1
+                                            -DHAL_PORT_I2C_TIMEOUT_MS=500
+                                            -DHAL_PORT_I2C_SLOW_HZ=10000
                                             )
 else()
     target_compile_options(PicoMite PRIVATE -DHAL_PORT_HAS_I2C_KEYPAD=0
-                                            -DHAL_PORT_BACKLIGHT_VIA_KEYPAD_I2C=0)
+                                            -DHAL_PORT_BACKLIGHT_VIA_KEYPAD_I2C=0
+                                            -DHAL_PORT_I2C_TIMEOUT_MS=5
+                                            -DHAL_PORT_I2C_SLOW_HZ=100000)
 endif()
 
 # Library linkage shared across every device port.

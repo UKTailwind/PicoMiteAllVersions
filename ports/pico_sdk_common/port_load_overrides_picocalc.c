@@ -1,13 +1,12 @@
 /*
- * ports/pico_sdk_common/port_load_overrides.c — board-profile overrides
- * applied on every LoadOptions(). Reads from flash always lose to these
- * compile-time-fixed pin assignments.
+ * ports/pico_sdk_common/port_load_overrides_picocalc.c — applied on
+ * every LoadOptions() to enforce the PicoCalc board's pin
+ * assignments. Reads from flash always lose to these hard-coded
+ * values.
  *
- * Currently only the PicoCalc profile has anything to set. PICOCALC is
- * the default board flag for every device CMake build (CMakeLists.txt:4-6
- * `if(NOT DEFINED PICOCALC) set(PICOCALC true)`); turning it off via
- * -DPICOCALC=false drops the overrides for non-PicoCalc PCBs. Host links
- * its own no-op stub from host_runtime.c.
+ * Linked only when the port_sources.cmake selects the PicoCalc
+ * profile. Other ports link drivers/.../port_load_overrides_stub.c
+ * which is a no-op.
  */
 
 #include "MMBasic_Includes.h"
@@ -15,7 +14,6 @@
 
 void port_apply_load_overrides(void)
 {
-#if HAL_PORT_HAS_I2C_KEYPAD
     Option.DISPLAY_TYPE = ST7796SP;
     Option.SYSTEM_CLK = 14;
     Option.SYSTEM_MOSI = 15;
@@ -62,5 +60,4 @@ void port_apply_load_overrides(void)
     Option.BackLightLevel = 20;  /* default 20, sync with i2c keyboard */
     Option.ColourCode = 1;
     strcpy((char *)Option.platform, "PicoCalc");
-#endif
 }

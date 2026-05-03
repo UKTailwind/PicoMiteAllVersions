@@ -1,0 +1,52 @@
+/*
+ * hal/hal_i2c_keypad.h — I²C-attached keypad controller (PicoCalc
+ * profile). Real impls live in drivers/i2c_picocalc_kbd/ and link
+ * only on ports with HAL_PORT_HAS_I2C_KEYPAD=1; other ports link the
+ * stub.
+ *
+ * The keypad MCU manages keyboard input, LCD backlight, and battery
+ * state. It shares the system I²C bus, requires a slower clock
+ * (10 kHz), and skews the boot init sequence (display init has to
+ * wait for the keypad MCU to come up).
+ */
+
+#ifndef HAL_I2C_KEYPAD_H
+#define HAL_I2C_KEYPAD_H
+
+#include <stdint.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* Boot-time delay after the keypad MCU comes online. Real waits
+ * 300 ms; stub no-op. */
+void hal_i2c_keypad_boot_init(void);
+
+/* Whether the keypad MCU is sharing the system I²C bus on this port.
+ * When 1, the boot path skips InitDisplaySSD / InitDisplayI2C /
+ * InitDisplayVirtual (the keypad MCU is busy on those addresses).
+ * When 0, those init helpers run normally. */
+int hal_i2c_keypad_owns_i2c_bus(void);
+
+/* Translate a 16-bit I²C-keyboard scan word into a cooked character.
+ * Updates *ctrlheld_inout for ctrl-down/ctrl-up sentinels. Returns
+ * -1 to skip (modifier / state change / non-press); >=0 is the
+ * character to enqueue. Real impl is the PicoCalc scancode map;
+ * stub is the legacy generic-I²C-keyboard map (0x1203/0x1202
+ * sentinels, ESC/F1/F2/F4 only). */
+int hal_i2c_keypad_translate(uint16_t buff, int *ctrlheld_inout);
+
+/* OPTION LIST line for the keypad-controlled keyboard backlight.
+ * Real prints `Option.KEYBOARDBL` if non-zero; stub no-op. */
+void hal_i2c_keypad_print_options(void);
+
+/* SPI480 panel resolution apply. Real (PicoCalc) fixes 320x480 in
+ * portrait. Stub picks DisplayHRes/VRes via Option.DISPLAY_ORIENTATION. */
+void hal_i2c_keypad_apply_spi480_resolution(void);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* HAL_I2C_KEYPAD_H */

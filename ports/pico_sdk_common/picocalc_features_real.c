@@ -1,19 +1,14 @@
 /*
- * ports/pico_sdk_common/picocalc_features.c — board-profile hooks for the
- * PicoCalc-specific HW (I2C keyboard backlight, battery gauge,
- * charging-state probe, and the OPTION RESET PICOCALC factory-reset
- * branch). Each hook is real on builds with -DPICOCALC and either errors
- * or returns 0 elsewhere.
+ * ports/pico_sdk_common/picocalc_features_real.c — real impls of the
+ * port_picocalc_* hooks for the PicoCalc board. Linked when the
+ * port's port_sources.cmake selects the keypad-MCU profile.
  *
  * MM_Misc.c calls these unconditionally so cmd_option / fun_mminfo /
- * fun_inkey paths stay preprocessor-clean. Host has its own no-op stubs
- * in host/host_runtime.c.
+ * fun_inkey paths stay preprocessor-clean.
  */
 
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
-
-#if HAL_PORT_HAS_I2C_KEYPAD
 #include "drivers/i2c_picocalc_kbd/i2ckbd.h"
 #include "picocalc/conf_app.h"
 
@@ -89,12 +84,3 @@ void port_picocalc_factory_reset_options(void)
     _excep_code = RESET_COMMAND;
     SoftReset();
 }
-
-#else  /* !HAL_PORT_HAS_I2C_KEYPAD — boards without an I²C keypad */
-
-void port_picocalc_set_keyboard_backlight(int level) { (void)level; error("Not supported on this board"); }
-int  port_picocalc_battery_pct(void)                 { error("Not supported on this board"); return 0; }
-int  port_picocalc_is_charging(void)                 { error("Not supported on this board"); return 0; }
-void port_picocalc_factory_reset_options(void)       { error("Not supported on this board"); }
-
-#endif
