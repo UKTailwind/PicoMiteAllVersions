@@ -135,6 +135,18 @@ void hal_keyboard_on_gpio_edge(uint32_t gpio);
  * ring buffer. No-op stub for ports without an input pump. */
 void hal_keyboard_routinechecks_pump(void);
 
+/* Output a single character to the USB-CDC stdio console if
+ * available. On non-USB-host-keyboard ports the USB-A peripheral is
+ * in device-CDC mode and the real impl checks tud_cdc_connected();
+ * USB-host-keyboard ports' USB-A is in host mode and the stub
+ * no-ops. */
+void hal_console_usb_cdc_putc(char c, int flush);
+
+/* 1 kHz timer tick — bumps per-backend timer state. USB ports tick
+ * keytimer + HID[].report_timer; non-USB ports tick nunstruct/mouse
+ * timers. Stub no-op for ports without timer state. */
+void hal_keyboard_timer_tick(void);
+
 #ifdef __cplusplus
 }
 #endif

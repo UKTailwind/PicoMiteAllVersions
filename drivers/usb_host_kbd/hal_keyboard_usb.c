@@ -111,3 +111,18 @@ void hal_keyboard_routinechecks_pump(void) {
         hid_app_task();
     }
 }
+
+void hal_console_usb_cdc_putc(char c, int flush) {
+    /* USB-host-keyboard port: USB-A is in host mode so there's no
+     * USB-CDC device-side stdio to write to. */
+    (void)c; (void)flush;
+}
+
+extern volatile int keytimer;
+
+void hal_keyboard_timer_tick(void) {
+    keytimer++;
+    for (int i = 0; i < 4; i++) {
+        if (HID[i].Device_type) HID[i].report_timer++;
+    }
+}

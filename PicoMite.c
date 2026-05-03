@@ -557,16 +557,7 @@ char  __not_in_flash_func(SerialConsolePutC)(char c, int flush) {
      * the hook returns 1 so stdio always runs. TelnetPutC and
      * ProcessWeb are no-op stubs on non-WiFi. */
     if (wifi_serial_telnet_configured()) {
-#if !HAL_PORT_HAS_USB_KEYBOARD
-        if(Option.SerialConsole==0 || Option.SerialConsole>4){
-            if(tud_cdc_connected()){
-                putc(c,stdout);
-                if(flush){
-                    fflush(stdout);
-                }
-            }
-        }
-#endif
+        hal_console_usb_cdc_putc(c, flush);
         if(Option.SerialConsole){
             int empty=uart_is_writable((Option.SerialConsole & 3)==1 ? uart0 : uart1);
             while(ConsoleTxBufTail == ((ConsoleTxBufHead + 1) % CONSOLE_TX_BUF_SIZE));
@@ -621,9 +612,9 @@ int __not_in_flash_func(MMInkey)(void) {
     }
 
     c = getConsole();                                               // do discarded chars so get the char
-#if !HAL_PORT_HAS_USB_KEYBOARD
-    if(c==-1)CheckKeyboard();
-#endif
+    /* hal_keyboard_service is a no-op on USB ports (TinyUSB pumps
+     * itself); on PS/2 it runs CheckKeyboard. */
+    if (c == -1) hal_keyboard_service();
     if(!(c==0x1b))return c;
     InkeyTimer = 0;                                             // start the timer
     while((c = getConsole()) == -1 && InkeyTimer < 30);         // get the second char with a delay of 30mS to allow the next char to arrive
@@ -831,17 +822,7 @@ bool MIPS16 __not_in_flash_func(timer_callback)(repeating_timer_t *rt)
         ds18b20Timer++;
 		GPSTimer++;
         I2CTimer++;
-#if HAL_PORT_HAS_USB_KEYBOARD
-		keytimer++;
-        for(int i=0;i<4;i++){
-            if(HID[i].Device_type){ 
-                HID[i].report_timer++;
-            }
-        }
-#else
-		nunstruct[2].type++;
-        MouseTimer++;
-#endif
+        hal_keyboard_timer_tick();
         if(clocktimer)clocktimer--;
         if(Timer5)Timer5--;
         if(Timer4)Timer4--;

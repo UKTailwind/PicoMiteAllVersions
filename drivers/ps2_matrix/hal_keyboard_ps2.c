@@ -105,6 +105,27 @@ void hal_keyboard_on_gpio_edge(uint32_t gpio) {
 
 #include "tusb.h"
 
+/* MouseTimer (unsigned) declared extern in Hardware_Includes.h;
+ * nunstruct[] declared in I2C.h (already pulled in by includes
+ * above via MMBasic_Includes.h). */
+void hal_keyboard_timer_tick(void) {
+    nunstruct[2].type++;
+    MouseTimer++;
+}
+
+void hal_console_usb_cdc_putc(char c, int flush) {
+    /* PS/2 ports run USB-A in device-CDC mode; output goes there
+     * when no other serial console is configured. */
+    if (Option.SerialConsole == 0 || Option.SerialConsole > 4) {
+        if (tud_cdc_connected()) {
+            putc(c, stdout);
+            if (flush) {
+                fflush(stdout);
+            }
+        }
+    }
+}
+
 void hal_keyboard_routinechecks_pump(void) {
     /* Drain USB-CDC stdio (the host-side USB-device serial) when the
      * board uses USB-CDC for stdin and Telnet isn't active. */
