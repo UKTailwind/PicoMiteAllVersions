@@ -147,6 +147,16 @@ void hal_console_usb_cdc_putc(char c, int flush);
  * timers. Stub no-op for ports without timer state. */
 void hal_keyboard_timer_tick(void);
 
+/* Initialise the external (PS/2) mouse if the port supports one.
+ * USB-host-keyboard ports have no PS/2 mouse — stub no-op. */
+void hal_keyboard_init_external_mouse(void);
+
+/* USB-CDC stdio boot setup. PS/2 ports run stdio_set_translate_crlf
+ * + a 5 s wait for the host to connect so kicked-off serial output
+ * isn't lost; USB-host-keyboard ports have no USB-CDC stdio and
+ * stub no-op. */
+void hal_console_usb_cdc_boot_init(void);
+
 #ifdef __cplusplus
 }
 #endif

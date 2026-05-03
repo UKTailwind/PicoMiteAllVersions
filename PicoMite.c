@@ -293,9 +293,10 @@ MMFLOAT FAdd(MMFLOAT a, MMFLOAT b){ return a + b; }
 MMFLOAT FSub(MMFLOAT a, MMFLOAT b){ return a - b; }
 MMFLOAT FDiv(MMFLOAT a, MMFLOAT b){ return a / b; }
 uint32_t CFunc_delay_us;
-#if !HAL_PORT_HAS_HDMI
-int QVGA_CLKDIV;	// SM divide clock ticks
-#endif
+/* QVGA scanout clock divider — used by the QVGA PIO state machine on
+ * pure-VGA ports; HDMI ports use a different timing source. Defined
+ * unconditionally; on HDMI ports the variable is unread. */
+int QVGA_CLKDIV;
 void PIOExecute(int pion, int sm, uint32_t ins){
     PIO pio = (pion ? pio1: pio0);
     pio_sm_exec(pio, sm, ins);
@@ -1932,9 +1933,6 @@ if(Option.CPU_Speed==FreqSVGA){ //adjust the size of the heap
     ticks_per_second = Option.CPU_Speed*1000;
     // The serial clock won't vary from this point onward, so we can configure
     // the UART etc.
-#if !HAL_PORT_HAS_USB_KEYBOARD
-    stdio_set_translate_crlf(&stdio_usb, false);
-#endif
     LoadOptions();
 	stdio_init_all();
     adc_init();
@@ -1957,16 +1955,10 @@ if(Option.CPU_Speed==FreqSVGA){ //adjust the size of the heap
     DISPLAY_TYPE = Option.DISPLAY_TYPE;
     // negative timeout means exact delay (rather than delay between callbacks)
 	OptionErrorSkip = false;
-#if !HAL_PORT_HAS_USB_KEYBOARD
-    if(!(Option.SerialConsole==1 || Option.SerialConsole==2) || Option.Telnet==-1) {
-        uint64_t t=time_us_64();
-        while(1){
-            if(tud_cdc_connected())break;
-            if(time_us_64()-t>5000000)break;
-        }
-    }
-    hal_keyboard_init();
-#endif
+    /* USB-CDC stdio boot setup — runs the translate_crlf reset and
+     * the 5-second host-attach wait on PS/2 ports; no-op on USB-host
+     * ports (USB-A in host mode). */
+    hal_console_usb_cdc_boot_init();
 	InitBasic();
 #if !HAL_PORT_IS_VGA
     /* Display + keypad init order. The PicoCalc keypad MCU shares the
@@ -2113,11 +2105,10 @@ if(Option.CPU_Speed==FreqSVGA){ //adjust the size of the heap
     updatebootcount();
     *tknbuf = 0;
      ContinuePoint = nextstmt;                               // in case the user wants to use the continue command
-#if HAL_PORT_HAS_USB_KEYBOARD
-    hal_keyboard_init();
-#else
-    initMouse0(0);
-#endif
+    hal_keyboard_init();        /* USB: TinyUSB init; PS/2: initKeyboard */
+    /* PS/2 ports also init mouse0 here. The hal_keyboard_init() PS/2
+     * impl already calls initKeyboard(); add the mouse init alongside. */
+    hal_keyboard_init_external_mouse();
 #ifdef rp2350
     if(PSRAMsize){MMPrintString("Total of ");PInt(PSRAMsize/(1024*1024));MMPrintString(" Mbytes PSRAM available\r\n");}
     #if HAL_PORT_IS_VGA && !HAL_PORT_HAS_HDMI
@@ -2158,9 +2149,7 @@ void MIPS16 SaveProgramToFlash(unsigned char *pm, int msg) {
 #ifdef rp2350
     __dsb();
 #endif
-#if HAL_PORT_HAS_USB_KEYBOARD
-	clearrepeat();
-#endif	
+    hal_keyboard_clear_repeat_state();          /* USB only — stub no-op */
     memcpy(buf, tknbuf, STRINGSIZE);                                // save the token buffer because we are going to use it
     FlashWriteInit(PROGRAM_FLASH);
     hal_flash_erase(realflashpointer, MAX_PROG_SIZE);
@@ -2451,9 +2440,7 @@ contloop:
     }
     memcpy(tknbuf, buf, STRINGSIZE);                                // restore the token buffer in case there are other commands in it
 //    initConsole();
-#if HAL_PORT_HAS_USB_KEYBOARD
-	clearrepeat();
-#endif
+    hal_keyboard_clear_repeat_state();         /* USB only — stub no-op */
     enable_interrupts_pico();
     return;
 

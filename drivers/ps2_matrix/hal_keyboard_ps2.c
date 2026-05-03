@@ -19,8 +19,12 @@
 #include "hal/hal_keyboard.h"
 #include "hal/hal_pin.h"
 #include "PS2Keyboard.h"
+#include "tusb.h"
+#include "class/cdc/cdc_device.h"
+#include "pico/stdlib.h"
 
 extern void mouse0close(void);
+extern void initMouse0(int dummy);
 extern int LocalKeyDown[7];
 
 /* Console-input pump support: KeyCheck rate-limit counter +
@@ -41,6 +45,30 @@ void hal_keyboard_clear_repeat_state(void) {
 }
 
 void hal_keyboard_init(void) {
+    initKeyboard();
+}
+
+void hal_keyboard_init_external_mouse(void) {
+    initMouse0(0);
+}
+
+void hal_console_usb_cdc_boot_init(void) {
+    stdio_set_translate_crlf(&stdio_usb, false);
+    /* Wait up to 5 s for the host to grab the USB-CDC console so
+     * boot-time serial output isn't dropped. Skipped if the user
+     * has explicitly chosen UART-1/2 as the active console without
+     * a Telnet client. */
+    if (!(Option.SerialConsole == 1 || Option.SerialConsole == 2) || Option.Telnet == -1) {
+        uint64_t t = time_us_64();
+        while (1) {
+            if (tud_cdc_connected()) break;
+            if (time_us_64() - t > 5000000) break;
+        }
+    }
+    /* Keyboard hardware needs to be live before display init so the
+     * PS/2 / I²C-keypad IRQ handlers see a consistent state. The USB
+     * host backend defers keyboard init to after display init (its
+     * own boot-init hook is a no-op so this never runs there). */
     initKeyboard();
 }
 

@@ -126,3 +126,11 @@ void hal_keyboard_timer_tick(void) {
         if (HID[i].Device_type) HID[i].report_timer++;
     }
 }
+
+void hal_keyboard_init_external_mouse(void) {
+    /* USB host keyboard backend has no PS/2 mouse to initialise. */
+}
+
+void hal_console_usb_cdc_boot_init(void) {
+    /* USB host keyboard owns USB-A — no USB-CDC device-side stdio. */
+}
