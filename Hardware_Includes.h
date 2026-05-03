@@ -35,9 +35,6 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "hardware/clocks.h"
 #include "pico/stdlib.h"
 #include "pico/util/datetime.h"
-#if HAL_PORT_IS_VGA
-#include "pico/multicore.h"
-#endif
 #include "lfs.h"
 
 
@@ -124,10 +121,10 @@ extern uint32_t PSRAMsize;
 extern const uint32_t MAP16DEF[16];
 extern void _Z10copy_wordsPKmPmm(uint32_t *s, uint32_t *d, int n);
 #endif
-#if HAL_PORT_HAS_HDMI
-extern uint16_t *tilefcols;
-extern uint16_t *tilebcols;
-extern uint8_t *tilefcols_w; 
+/* HDMI-only weights / palette tables / scanout state. Declared
+ * unconditionally — symbols only resolve on the HDMI driver but the
+ * extern is harmless on other ports. */
+extern uint8_t *tilefcols_w;
 extern uint8_t *tilebcols_w;
 extern void settiles(void);
 extern void HDMICore(void);
@@ -136,15 +133,17 @@ extern uint32_t map16quads[16];
 extern uint32_t map16pairs[16];
 extern const uint32_t MAP256DEF[256];
 extern volatile int32_t v_scanline;
-#else
+/* VGA-PIO 4-bpp palette — defined on pure-VGA ports only. */
 extern uint8_t map16[16];
+/* tilefcols/tilebcols storage shape varies by chip family: rp2350
+ * uses runtime-allocated buffers (pointer); rp2040 uses fixed-size
+ * arrays (the storage is in vga_qvga_modes.c). */
 #ifdef rp2350
 extern uint16_t *tilefcols;
 extern uint16_t *tilebcols;
 #else
 extern uint16_t tilefcols[];
 extern uint16_t tilebcols[];
-#endif
 #endif
 extern void __not_in_flash_func(QVgaCore)(void);
 extern void __not_in_flash_func(UpdateCore)(void);
@@ -240,37 +239,30 @@ extern uint16_t SD_CLK_PIN,SD_MOSI_PIN,SD_MISO_PIN, SD_CS_PIN;
 extern uint16_t LCD_CLK_PIN,LCD_MOSI_PIN,LCD_MISO_PIN;
 extern bool screen320;
 extern void clear320(void);
-#if HAL_PORT_IS_VGA
-	extern volatile uint8_t transparent;
-	extern volatile uint8_t transparents;
-	extern volatile int RGBtransparent;
-	#if !HAL_PORT_HAS_HDMI
-		extern uint8_t remap[];
-		extern uint16_t __attribute__ ((aligned (256))) M_Foreground[16];
-		extern uint16_t __attribute__ ((aligned (256))) M_Background[16];
-		#ifdef rp2350
-			extern uint16_t *tilefcols;
-			extern uint16_t *tilebcols;
-		#else
-			extern uint16_t __attribute__ ((aligned (256))) tilefcols[80*40];
-			extern uint16_t __attribute__ ((aligned (256))) tilebcols[80*40];
-		#endif
-		extern void VGArecovery(int pin);
-	#else
-		extern uint32_t remap555[];
-		extern uint32_t remap332[];
-		extern uint16_t remap256[];
-		extern void mapreset(void);
-		extern int MODE_H_SYNC_POLARITY, MODE_V_TOTAL_LINES, MODE_ACTIVE_LINES, MODE_ACTIVE_PIXELS;
-		extern int MODE_H_ACTIVE_PIXELS, MODE_H_FRONT_PORCH, MODE_H_SYNC_WIDTH, MODE_H_BACK_PORCH;
-		extern int MODE_V_SYNC_POLARITY ,MODE_V_ACTIVE_LINES ,MODE_V_FRONT_PORCH, MODE_V_SYNC_WIDTH, MODE_V_BACK_PORCH;
-	#endif
-	extern int MODE1SIZE;
-	extern int MODE2SIZE;
-	extern int MODE3SIZE;
-	extern int MODE4SIZE;
-	extern int MODE5SIZE;
-#endif
+/* VGA-family scratch globals. Defined unconditionally in PicoMite.c
+ * (LTO drops them where unused) so externs are unconditional too. */
+extern volatile uint8_t transparent;
+extern volatile uint8_t transparents;
+extern volatile int RGBtransparent;
+extern int MODE1SIZE;
+extern int MODE2SIZE;
+extern int MODE3SIZE;
+extern int MODE4SIZE;
+extern int MODE5SIZE;
+/* VGA-PIO non-HDMI palette + framebuffer arrays. Defined in the VGA
+ * scanout driver; other ports never reference them. */
+extern uint8_t remap[];
+extern uint16_t __attribute__ ((aligned (256))) M_Foreground[16];
+extern uint16_t __attribute__ ((aligned (256))) M_Background[16];
+extern void VGArecovery(int pin);
+/* HDMI palette tables + sync constants. Defined in the HDMI driver. */
+extern uint32_t remap555[];
+extern uint32_t remap332[];
+extern uint16_t remap256[];
+extern void mapreset(void);
+extern int MODE_H_SYNC_POLARITY, MODE_V_TOTAL_LINES, MODE_ACTIVE_LINES, MODE_ACTIVE_PIXELS;
+extern int MODE_H_ACTIVE_PIXELS, MODE_H_FRONT_PORCH, MODE_H_SYNC_WIDTH, MODE_H_BACK_PORCH;
+extern int MODE_V_SYNC_POLARITY ,MODE_V_ACTIVE_LINES ,MODE_V_FRONT_PORCH, MODE_V_SYNC_WIDTH, MODE_V_BACK_PORCH;
 /* ProcessWeb(): real impl on PICOMITEWEB pumps the lwIP stack. On
  * non-WEB builds a stub in MM_Misc.c no-ops. Declaration is
  * unconditional so core code can call it from loops (cmd_files, LOAD)
@@ -286,11 +278,11 @@ extern void port_set_default_options(void);
  * cmd_new / cmd_load teardown + post-ClearTempMemory refill. */
 extern void tcp_free_recv_buffers(void);
 extern void tcp_realloc_recv_buffers(void);
-#if HAL_PORT_HAS_WIFI
-	extern volatile int WIFIconnected;
-	extern volatile int scantimer;
-	extern void close_tcpclient(void);
-#endif
+/* WIFIconnected: defined in MMsetwifi.c (WiFi ports); unused elsewhere
+ * — extern is harmless. close_tcpclient has real / stub pair across
+ * MMTCPclient.c / MMweb_stubs.c so the symbol resolves on every port. */
+extern volatile int WIFIconnected;
+extern void close_tcpclient(void);
 /* WebConnect lives in MMsetwifi.c on WiFi ports and is stubbed in
  * MMweb_stubs.c on non-WiFi devices, so the prototype is uniform. */
 extern void WebConnect(void);
@@ -299,12 +291,12 @@ extern void WebConnect(void);
  * in MMweb_stubs.c / host_peripheral_stubs.c. */
 extern int startupcomplete;
 // console related I/O
-#if HAL_PORT_HAS_USB_KEYBOARD
-extern void clearrepeat(void);
-	extern uint8_t Current_USB_devices;
-	extern void cmd_mouse(void);
-	extern bool USBenabled;
-#endif
+/* cmd_mouse: real impl in mouse.c (PS/2) or USBKeyboard.c (USB). The
+ * MOUSE token is dispatched from External.c so the prototype is uniform.
+ * USBenabled / Current_USB_devices / clearrepeat are USB-host driver
+ * internals; their externs live in the driver TUs that need them. */
+extern void cmd_mouse(void);
+extern bool USBenabled;
 int __not_in_flash_func(MMInkey)(void);
 int MMgetchar(void);
 char MMputchar(char c, int flush);
@@ -420,20 +412,11 @@ extern struct tagMTRand *g_myrand;
 #include "SPI.h"
 #include "Serial.h"
 #include "SPI-LCD.h"
-#if !HAL_PORT_IS_VGA
-#if !HAL_PORT_HAS_WIFI
-	#include "SSD1963.h"
-	#include "Touch.h"
-	#include "GUI.h"
-#endif
-#endif
-#if HAL_PORT_HAS_WIFI
-	#include "SSD1963.h"
-	#include "Touch.h"
-	#ifdef rp2350
-		#include "GUI.h"
-	#endif
-#endif
+/* Per-port display-peripheral header pull-ins. SSD1963 / Touch / GUI
+ * exist on SPI-LCD ports and on WiFi ports (Web pulls them in for the
+ * web-served LCD shadow). VGA-non-WiFi ports skip them entirely. The
+ * file lives next to port_config.h in each ports/<port>/ directory. */
+#include "port_peripherals.h"
 #include "GPS.h"
 #include "Audio.h"
 #include "PS2Keyboard.h"

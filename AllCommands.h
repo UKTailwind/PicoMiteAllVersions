@@ -252,6 +252,10 @@ void fun_at(void);
 void fun_pixel(void);
 void fun_getscanline(void);
 void fun_3D(void);
+/* Touch( fn — declared via Touch.h on SPI-LCD/WiFi ports; redeclare
+ * here so the AllCommands.h token table sees the prototype on every
+ * port, including VGA/HDMI where Touch.h is omitted. */
+void fun_touch(void);
 void fun_sprite(void);
 void fun_tilemap(void);
 void fun_eof(void);

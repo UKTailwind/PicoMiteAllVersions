@@ -159,6 +159,7 @@ extern uint8_t sprite_transparent;
     extern void DrawBitmapUser(int x1, int y1, int width, int height, int scale, int fc, int bc, unsigned char *bitmap);
 #endif
 extern void DisplayPutC(char c);
+extern void DisplayPutS(char *s);
 extern void GUIPrintString(int x, int y, int fnt, int jh, int jv, int jo, int fc, int bc, char *str);
 extern void DrawTriangle(int x0, int y0, int x1, int y1, int x2, int y2, int c, int fill) ;
 extern void cmd_guiMX170(void);
