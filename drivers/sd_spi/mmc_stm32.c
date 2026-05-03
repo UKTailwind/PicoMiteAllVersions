@@ -1583,7 +1583,7 @@ void InitReservedIO(void) {
 			I2C2_Timeout=SystemI2CTimeout;
 		}
 		if(Option.RTC)RtcGetTime(1);
-#ifndef USBKEYBOARD
+#if !HAL_PORT_HAS_USB_KEYBOARD
 		if(Option.KeyboardConfig==CONFIG_I2C){
 			CheckI2CKeyboard(1,0);
 			uSec(2000);
@@ -1840,7 +1840,7 @@ void InitReservedIO(void) {
 		irq_set_enabled((Option.SerialConsole & 3)==1  ? UART0_IRQ : UART1_IRQ, true);
 		uart_set_irq_enables((Option.SerialConsole & 3)==1  ? uart0: uart1, true, false);
 	}
-#ifndef USBKEYBOARD
+#if !HAL_PORT_HAS_USB_KEYBOARD
 	if(!(Option.KeyboardConfig==NO_KEYBOARD || Option.KeyboardConfig==CONFIG_I2C)){
 		ExtCfg(Option.KEYBOARD_CLOCK, EXT_BOOT_RESERVED, 0);
     	ExtCfg(Option.KEYBOARD_DATA, EXT_BOOT_RESERVED, 0);

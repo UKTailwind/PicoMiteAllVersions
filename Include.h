@@ -90,7 +90,7 @@ typedef unsigned char Bool;
 	#include "PicoMiteVGA.pio.h"
 	#include "PicoMiteI2S.pio.h"
 #endif
-#ifndef USBKEYBOARD
+#if !HAL_PORT_HAS_USB_KEYBOARD
 	#include "pico/unique_id.h"
 	#include "class/cdc/cdc_device.h" 
 #endif

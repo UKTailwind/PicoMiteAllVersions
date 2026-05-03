@@ -8,7 +8,7 @@
  * cmdline matches a setter (which then SaveOptions / SoftReset /
  * error() before falling out), 0 otherwise. Internal #ifdef gating
  * lives here in the port file so MM_Misc.c carries no PICOMITE /
- * rp2350 / HDMI / USBKEYBOARD ifdefs around these blocks.
+ * rp2350 / HDMI / HAL_PORT_HAS_USB_KEYBOARD ifdefs around these blocks.
  */
 
 #include "MMBasic_Includes.h"
@@ -89,7 +89,7 @@ int MIPS16 port_misc_option_setter(unsigned char *cmdline)
     }
 #endif
 
-#ifdef USBKEYBOARD
+#if HAL_PORT_HAS_USB_KEYBOARD
     tp = checkstring(cmdline, (unsigned char *)"KEYBOARD REPEAT");
     if (tp) {
         getargs(&tp, 3, (unsigned char *)",");

@@ -65,7 +65,7 @@ pico_set_boot_stage2(PicoMite slower_boot2)
 
 # USB axis: device name + USB-host stack vs USB-CDC stdio.
 if (COMPILE STREQUAL "PICOUSB")
-    target_compile_options(PicoMite PRIVATE -DUSBKEYBOARD
+    target_compile_options(PicoMite PRIVATE -DHAL_PORT_HAS_USB_KEYBOARD=1
                                             -DHAL_PORT_DEVICE_NAME="PicoMiteUSB"
                                             )
     target_link_libraries(PicoMite tinyusb_host tinyusb_board)
@@ -74,7 +74,8 @@ if (COMPILE STREQUAL "PICOUSB")
     )
     Pico_enable_stdio_usb(PicoMite 0)
 else()
-    target_compile_options(PicoMite PRIVATE -DHAL_PORT_DEVICE_NAME="PicoMite")
+    target_compile_options(PicoMite PRIVATE -DHAL_PORT_HAS_USB_KEYBOARD=0
+                                            -DHAL_PORT_DEVICE_NAME="PicoMite")
     Pico_enable_stdio_usb(PicoMite 1)
 endif()
 

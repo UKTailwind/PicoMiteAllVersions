@@ -96,10 +96,10 @@ target_link_libraries(PicoMite pico_multicore pico_cyw43_arch_lwip_poll
                                tinyusb_host tinyusb_board)
 pico_set_float_implementation(PicoMite pico_dcp)
 
-# USB-host keyboard config. -DUSBKEYBOARD switches the keyboard
-# backend in port-impl files; usb_host_files dir holds the TinyUSB
-# device-config headers (tusb_config.h, etc.); stdio_usb=0 because
-# the USB-A port is in host mode for the keyboard.
-target_compile_options(PicoMite PRIVATE -DUSBKEYBOARD)
+# USB-host keyboard config. HAL_PORT_HAS_USB_KEYBOARD=1 (set in
+# port_config.h) selects the USB-host backend in port-impl files;
+# usb_host_files dir holds the TinyUSB device-config headers
+# (tusb_config.h, etc.); stdio_usb=0 because the USB-A port is in
+# host mode for the keyboard.
 target_include_directories(PicoMite PRIVATE ${CMAKE_SOURCE_DIR}/usb_host_files)
 Pico_enable_stdio_usb(PicoMite 0)

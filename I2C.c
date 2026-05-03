@@ -463,7 +463,7 @@ int DoRtcI2C(int addr, unsigned char * buff) {
   }
   return !mmI2Cvalue;
 }
-#ifndef USBKEYBOARD
+#if !HAL_PORT_HAS_USB_KEYBOARD
 void CheckI2CKeyboard(int noerror, int read) {
   uint16_t buff;
   //	int readover=0; 

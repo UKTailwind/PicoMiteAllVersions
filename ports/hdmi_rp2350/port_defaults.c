@@ -20,7 +20,7 @@ void port_set_default_options(void)
     Option.HDMId0 = 0;
     Option.HDMId1 = 6;
     Option.HDMId2 = 4;
-#ifdef USBKEYBOARD
+#if HAL_PORT_HAS_USB_KEYBOARD
     Option.USBKeyboard = CONFIG_US;
     Option.SerialConsole = 2;
     Option.SerialTX = 11;
@@ -39,7 +39,7 @@ void port_set_default_options(void)
 #include "MMBasic.h"
 void port_print_supported_boards(void)
 {
-#ifdef USBKEYBOARD
+#if HAL_PORT_HAS_USB_KEYBOARD
     MMPrintString("HDMIUSB\r\n");
     MMPrintString("OLIMEX USB\r\n");
     MMPrintString("PICO COMPUTER\r\n");
@@ -53,7 +53,7 @@ void port_print_supported_boards(void)
 /* OPTION RESET <BOARD> factory profiles for HDMI / HDMIUSB. */
 int port_factory_reset_board(unsigned char *p)
 {
-#ifdef USBKEYBOARD
+#if HAL_PORT_HAS_USB_KEYBOARD
     if(checkstring(p,(unsigned char *) "HDMIUSB") || checkstring(p,(unsigned char *) "PICO COMPUTER") )  {
         ResetOptions(false);
         if(checkstring(p,(unsigned char *) "HDMIUSB") )strcpy((char *)Option.platform,"HDMIUSB");

@@ -67,7 +67,7 @@ extern const char *KBrdList[];
 
 void port_print_keyboard_heartbeat(void)
 {
-#ifdef USBKEYBOARD
+#if HAL_PORT_HAS_USB_KEYBOARD
     if(!(Option.USBKeyboard == NO_KEYBOARD)){
         PO("KEYBOARD"); MMPrintString((char *)KBrdList[(int)Option.USBKeyboard]);
         if(Option.capslock || Option.numlock!=1 || Option.repeat!=0b00101100){
@@ -111,7 +111,7 @@ void port_print_keyboard_heartbeat(void)
 
 void port_print_usb_kb_repeat(void)
 {
-#ifdef USBKEYBOARD
+#if HAL_PORT_HAS_USB_KEYBOARD
     if(!(Option.RepeatStart==600 && Option.RepeatRate==150)){
         char buff[40]={0};
         sprintf(buff,"OPTION KEYBOARD REPEAT %d,%d\r\n",Option.RepeatStart, Option.RepeatRate);

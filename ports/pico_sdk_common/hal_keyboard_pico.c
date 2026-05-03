@@ -8,7 +8,7 @@
  * is selected.
  *
  * Backend selection:
- *   USBKEYBOARD builds — USB host HID (USBKeyboard.c). service() is a
+ *   HAL_PORT_HAS_USB_KEYBOARD builds — USB host HID (USBKeyboard.c). service() is a
  *     no-op here; the 1 kHz tuh_task() / hid_app_task() pump lives in
  *     PicoMite.c::routinechecks and will migrate later. clear_repeat_state
  *     calls into USBKeyboard.c's clearrepeat(). init() walks the same
@@ -30,12 +30,12 @@
 
 #include <string.h>
 
-#ifndef USBKEYBOARD
+#if !HAL_PORT_HAS_USB_KEYBOARD
 #include "PS2Keyboard.h"  /* CheckKeyboard, initKeyboard, NO_KEYBOARD, CONFIG_* */
 extern void mouse0close(void);
 #endif
 
-#ifdef USBKEYBOARD
+#if HAL_PORT_HAS_USB_KEYBOARD
 #include "tusb.h"
 #include "host/hcd.h"
 extern void clearrepeat(void);
@@ -52,7 +52,7 @@ extern int LocalKeyDown[7];
 
 void hal_keyboard_service(void)
 {
-#ifdef USBKEYBOARD
+#if HAL_PORT_HAS_USB_KEYBOARD
     /* 1 kHz USB pump lives in PicoMite.c::routinechecks for now. */
 #else
     if (Option.KeyboardConfig) {
@@ -63,7 +63,7 @@ void hal_keyboard_service(void)
 
 void hal_keyboard_clear_repeat_state(void)
 {
-#ifdef USBKEYBOARD
+#if HAL_PORT_HAS_USB_KEYBOARD
     clearrepeat();
 #else
     /* PS/2 / I²C backends do not run a software repeat state machine. */
@@ -72,7 +72,7 @@ void hal_keyboard_clear_repeat_state(void)
 
 void hal_keyboard_init(void)
 {
-#ifdef USBKEYBOARD
+#if HAL_PORT_HAS_USB_KEYBOARD
     clearrepeat();
     for (int i = 0; i < 4; i++) {
         memset((void *)&HID[i], 0, sizeof(struct s_HID));
@@ -90,7 +90,7 @@ void hal_keyboard_init(void)
 
 int hal_keyboard_keydown_count(void)
 {
-#ifdef USBKEYBOARD
+#if HAL_PORT_HAS_USB_KEYBOARD
     int count = 0;
     for (int i = 0; i < 6; i++) if (KeyDown[i]) count++;
     return count;
@@ -106,7 +106,7 @@ int hal_keyboard_keydown_count(void)
 int hal_keyboard_keydown_slot(int slot)
 {
     if (slot < 1 || slot > 6) return 0;
-#ifdef USBKEYBOARD
+#if HAL_PORT_HAS_USB_KEYBOARD
     return KeyDown[slot - 1];
 #elif HAL_PORT_HAS_PICOMITE && defined(rp2350)
     return LocalKeyDown[slot - 1];
@@ -118,7 +118,7 @@ int hal_keyboard_keydown_slot(int slot)
 
 uint32_t hal_keyboard_lock_state(void)
 {
-#ifdef USBKEYBOARD
+#if HAL_PORT_HAS_USB_KEYBOARD
     return (caps_lock   ? 1u : 0u) |
            (num_lock    ? 2u : 0u) |
            (scroll_lock ? 4u : 0u);
@@ -129,7 +129,7 @@ uint32_t hal_keyboard_lock_state(void)
 
 int hal_keyboard_set_layout(int layout)
 {
-#ifdef USBKEYBOARD
+#if HAL_PORT_HAS_USB_KEYBOARD
     /* USB backend accepts US/FR/GR/IT/UK/ES only. */
     if (layout != HAL_KBD_LAYOUT_US && layout != HAL_KBD_LAYOUT_FR &&
         layout != HAL_KBD_LAYOUT_GR && layout != HAL_KBD_LAYOUT_IT &&
@@ -159,7 +159,7 @@ int hal_keyboard_set_layout(int layout)
 
 void hal_keyboard_quiesce_for_reset(void)
 {
-#ifdef USBKEYBOARD
+#if HAL_PORT_HAS_USB_KEYBOARD
     USBenabled = false;
     uSec(50000);   /* let outstanding USB transfers complete */
 #endif
@@ -168,7 +168,7 @@ void hal_keyboard_quiesce_for_reset(void)
 int hal_keyboard_usb_raw_report(int slot, unsigned char *out, int max_len)
 {
     if (slot < 1 || slot > 4 || !out || max_len < 2) return 0;
-#ifdef USBKEYBOARD
+#if HAL_PORT_HAS_USB_KEYBOARD
     /* HID[slot-1].report is a length-prefixed MMBasic string (report[0]
      * is the byte count). Copy the length byte plus payload, clamped to
      * the caller's buffer. */
@@ -184,7 +184,7 @@ int hal_keyboard_usb_raw_report(int slot, unsigned char *out, int max_len)
 
 void hal_keyboard_on_external_io_clear(void)
 {
-#ifndef USBKEYBOARD
+#if !HAL_PORT_HAS_USB_KEYBOARD
     OnPS2GOSUB = NULL;
     PS2code = 0;
     PS2int = false;
@@ -194,7 +194,7 @@ void hal_keyboard_on_external_io_clear(void)
 
 void hal_keyboard_on_gpio_edge(uint32_t gpio)
 {
-#ifndef USBKEYBOARD
+#if !HAL_PORT_HAS_USB_KEYBOARD
     uint64_t data = hal_pin_bank_read_all();
     if (Option.KEYBOARD_CLOCK) {
         if (!(Option.KeyboardConfig == NO_KEYBOARD || Option.KeyboardConfig == CONFIG_I2C) &&

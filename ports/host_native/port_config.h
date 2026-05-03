@@ -60,9 +60,10 @@
 /* Stage-A palette flags (decascade plan). Host has no hardware backends
  * for any of these — stubs cover every gated path. */
 #define HAL_PORT_HAS_WIFI                0
-#define HAL_PORT_HAS_PICOMITE         1
+#define HAL_PORT_HAS_PICOMITE            1
 #define HAL_PORT_HAS_VGA_PIO             0
 #define HAL_PORT_HAS_GUICONTROLS         0
+#define HAL_PORT_HAS_USB_KEYBOARD        0
 
 /* FLAC decoder base sample-rate cap. Host Audio.c body doesn't decode
  * FLAC, but the port-config standard wants the constant defined on

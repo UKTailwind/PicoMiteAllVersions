@@ -564,7 +564,7 @@ void fun_map(void);
 #else
     { (unsigned char *)"Draw3D",         T_CMD,                      0, cmd_3D },
 #endif
-#ifndef USBKEYBOARD
+#if !HAL_PORT_HAS_USB_KEYBOARD
 	{ (unsigned char *)"Update Firmware",		T_CMD,				0, cmd_update},
 #else
 	{ (unsigned char *)"Gamepad",		T_CMD,				0, cmd_gamepad	},
@@ -719,7 +719,7 @@ void fun_map(void);
 	{ (unsigned char *)"MM.Info(",		T_FUN | T_INT  | T_NBR| T_STR,		0, fun_info		},
 	{ (unsigned char *)"Format$(",	T_FUN  | T_STR,			0, fun_format	},
 	{ (unsigned char*)"~(",	    T_FUN | T_INT | T_NBR | T_STR ,		0, fun_tilde },
-#if defined(USBKEYBOARD) || defined(MMBASIC_HOST) || defined(PICOCALC)
+#if HAL_PORT_HAS_USB_KEYBOARD || defined(MMBASIC_HOST) || defined(PICOCALC)
 	{ (unsigned char*)"KeyDown(",    T_FUN | T_INT,		0, fun_keydown	},
 #endif
 #if HAL_PORT_IS_VGA

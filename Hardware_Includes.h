@@ -296,7 +296,7 @@ extern void tcp_realloc_recv_buffers(void);
  * in MMweb_stubs.c / host_peripheral_stubs.c. */
 extern int startupcomplete;
 // console related I/O
-#ifdef USBKEYBOARD
+#if HAL_PORT_HAS_USB_KEYBOARD
 extern void clearrepeat(void);
 	extern uint8_t Current_USB_devices;
 	extern void cmd_mouse(void);

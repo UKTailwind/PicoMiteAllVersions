@@ -374,7 +374,7 @@ void edit(unsigned char *cmdline, bool cmdfile) {
 #endif
 
 #endif
-#ifndef USBKEYBOARD
+#if !HAL_PORT_HAS_USB_KEYBOARD
     if(mouse0==false && Option.MOUSE_CLOCK)initMouse0(0);  //see if there is a mouse to initialise 
 #endif
    if(Option.ColourCode) {
@@ -620,7 +620,7 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
 #if !HAL_PORT_HAS_PICOMITE 
 #if !HAL_PORT_HAS_WIFI
             c=-1;
-#ifdef USBKEYBOARD
+#if HAL_PORT_HAS_USB_KEYBOARD
             if(HID[1].Device_type==2 && DISPLAY_TYPE==SCREENMODE1){
 #else
             if(mouse0 && DISPLAY_TYPE==SCREENMODE1){
@@ -1271,7 +1271,7 @@ void MarkMode(unsigned char *cb, unsigned char *buf) {
         c=-1;
 #if !HAL_PORT_HAS_PICOMITE
 #if !HAL_PORT_HAS_WIFI
-#ifdef USBKEYBOARD
+#if HAL_PORT_HAS_USB_KEYBOARD
         if(HID[1].Device_type==2 && DISPLAY_TYPE==SCREENMODE1){
 #else
         if(mouse0 && DISPLAY_TYPE==SCREENMODE1){
@@ -1453,7 +1453,7 @@ void MarkMode(unsigned char *cb, unsigned char *buf) {
                           PositionCursor(txtp);
 #if !HAL_PORT_HAS_PICOMITE
 #if !HAL_PORT_HAS_WIFI
-#ifdef USBKEYBOARD
+#if HAL_PORT_HAS_USB_KEYBOARD
                         if(HID[1].Device_type==2 && DISPLAY_TYPE==SCREENMODE1){     
 #else
                         if(mouse0 && DISPLAY_TYPE==SCREENMODE1){ 
@@ -1479,7 +1479,7 @@ void MarkMode(unsigned char *cb, unsigned char *buf) {
                       PositionCursor(txtp);
 #if !HAL_PORT_HAS_PICOMITE
 #if !HAL_PORT_HAS_WIFI
-#ifdef USBKEYBOARD
+#if HAL_PORT_HAS_USB_KEYBOARD
                         if(HID[1].Device_type==2 && DISPLAY_TYPE==SCREENMODE1){     
 #else
                         if(mouse0 && DISPLAY_TYPE==SCREENMODE1){     

@@ -63,7 +63,7 @@ extern void start_vga_i2s(void);
 /* COPYRIGHT text moved to Version.h as MMBASIC_COPYRIGHT; banner is
  * emitted via MMBasic_PrintBanner() in MMBasic_REPL.c. */
 
-#ifdef USBKEYBOARD
+#if HAL_PORT_HAS_USB_KEYBOARD
     #include "tusb.h"
     #include "host/hcd.h"
     #include "usb_host_files/tusb_config.h"
@@ -150,7 +150,7 @@ bool rp2350a=true;
     #if !HAL_PORT_HAS_HDMI
     #include "Include.h"
     #endif
-    #ifdef USBKEYBOARD
+    #if HAL_PORT_HAS_USB_KEYBOARD
         extern void hid_app_task(void);
         volatile int keytimer=0;
         extern void USB_bus_reset(void);
@@ -165,7 +165,7 @@ bool rp2350a=true;
     char LCDAttrib=0;
 #endif
 #if HAL_PORT_HAS_PICOMITE
-    #ifdef USBKEYBOARD
+    #if HAL_PORT_HAS_USB_KEYBOARD
         #include "tusb.h"
         #include "host/hcd.h"
         extern void hid_app_task(void);
@@ -461,7 +461,7 @@ void __not_in_flash_func(routinechecks)(void){
     }
     if(CurrentlyPlaying == P_MOD || CurrentlyPlaying==P_ARRAY ) checkWAVinput();
     if(++when & 7 && CurrentLinePtr) return;
-#ifdef USBKEYBOARD
+#if HAL_PORT_HAS_USB_KEYBOARD
     if(USBenabled){
         if(mSecTimer>2000){
             tuh_task();
@@ -507,7 +507,7 @@ void __not_in_flash_func(routinechecks)(void){
             RtcGetTime(0);
         }
     }
-#ifndef USBKEYBOARD
+#if !HAL_PORT_HAS_USB_KEYBOARD
     if(Option.KeyboardConfig==CONFIG_I2C && KeyCheck==0){
         if(read==0){
             CheckI2CKeyboard(0,0);
@@ -581,7 +581,7 @@ char  __not_in_flash_func(SerialConsolePutC)(char c, int flush) {
 #if HAL_PORT_HAS_WIFI
     if(Option.Telnet!=-1){
 #endif
-#ifndef USBKEYBOARD
+#if !HAL_PORT_HAS_USB_KEYBOARD
     if(Option.SerialConsole==0 || Option.SerialConsole>4){
         if(tud_cdc_connected()){
             putc(c,stdout);
@@ -647,7 +647,7 @@ int __not_in_flash_func(MMInkey)(void) {
     }
 
     c = getConsole();                                               // do discarded chars so get the char
-#ifndef USBKEYBOARD
+#if !HAL_PORT_HAS_USB_KEYBOARD
     if(c==-1)CheckKeyboard();
 #endif
     if(!(c==0x1b))return c;
@@ -857,7 +857,7 @@ bool MIPS16 __not_in_flash_func(timer_callback)(repeating_timer_t *rt)
         ds18b20Timer++;
 		GPSTimer++;
         I2CTimer++;
-#ifdef USBKEYBOARD
+#if HAL_PORT_HAS_USB_KEYBOARD
 		keytimer++;
         for(int i=0;i<4;i++){
             if(HID[i].Device_type){ 
@@ -2005,7 +2005,7 @@ if(Option.CPU_Speed==FreqSVGA){ //adjust the size of the heap
     ticks_per_second = Option.CPU_Speed*1000;
     // The serial clock won't vary from this point onward, so we can configure
     // the UART etc.
-#ifndef USBKEYBOARD
+#if !HAL_PORT_HAS_USB_KEYBOARD
     stdio_set_translate_crlf(&stdio_usb, false);
 #endif
     LoadOptions();
@@ -2030,7 +2030,7 @@ if(Option.CPU_Speed==FreqSVGA){ //adjust the size of the heap
     DISPLAY_TYPE = Option.DISPLAY_TYPE;
     // negative timeout means exact delay (rather than delay between callbacks)
 	OptionErrorSkip = false;
-#ifndef USBKEYBOARD
+#if !HAL_PORT_HAS_USB_KEYBOARD
     if(!(Option.SerialConsole==1 || Option.SerialConsole==2) || Option.Telnet==-1) {
         uint64_t t=time_us_64();
         while(1){
@@ -2106,20 +2106,20 @@ if(Option.CPU_Speed==FreqSVGA){ //adjust the size of the heap
 #ifdef rp2350
     #if HAL_PORT_IS_VGA
         #if HAL_PORT_HAS_HDMI
-            #ifdef USBKEYBOARD
+            #if HAL_PORT_HAS_USB_KEYBOARD
                 banner[32]=(rp2350a?'A':'B');
             #else
                 banner[28]=(rp2350a?'A':'B');
             #endif
         #else
-            #ifdef USBKEYBOARD
+            #if HAL_PORT_HAS_USB_KEYBOARD
                 banner[31]=(rp2350a?'A':'B');
             #else
                 banner[27]=(rp2350a?'A':'B');
             #endif
         #endif
     #else
-        #ifdef USBKEYBOARD
+        #if HAL_PORT_HAS_USB_KEYBOARD
             banner[28]=(rp2350a?'A':'B');
         #else
             #if HAL_PORT_HAS_WIFI
@@ -2185,7 +2185,7 @@ if(Option.CPU_Speed==FreqSVGA){ //adjust the size of the heap
     updatebootcount();
     *tknbuf = 0;
      ContinuePoint = nextstmt;                               // in case the user wants to use the continue command
-#ifdef USBKEYBOARD
+#if HAL_PORT_HAS_USB_KEYBOARD
     hal_keyboard_init();
 #else
     initMouse0(0);
@@ -2230,7 +2230,7 @@ void MIPS16 SaveProgramToFlash(unsigned char *pm, int msg) {
 #ifdef rp2350
     __dsb();
 #endif
-#ifdef USBKEYBOARD
+#if HAL_PORT_HAS_USB_KEYBOARD
 	clearrepeat();
 #endif	
     memcpy(buf, tknbuf, STRINGSIZE);                                // save the token buffer because we are going to use it
@@ -2523,7 +2523,7 @@ contloop:
     }
     memcpy(tknbuf, buf, STRINGSIZE);                                // restore the token buffer in case there are other commands in it
 //    initConsole();
-#ifdef USBKEYBOARD
+#if HAL_PORT_HAS_USB_KEYBOARD
 	clearrepeat();
 #endif
     enable_interrupts_pico();

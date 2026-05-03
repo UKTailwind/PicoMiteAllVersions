@@ -47,9 +47,10 @@
  * combines WiFi with GUICONTROLS today (GUI.c references Option.MaxCtrls
  * unconditionally so the widget tables must exist). */
 #define HAL_PORT_HAS_WIFI                1
-#define HAL_PORT_HAS_PICOMITE         0
+#define HAL_PORT_HAS_PICOMITE            0
 #define HAL_PORT_HAS_VGA_PIO             0
 #define HAL_PORT_HAS_GUICONTROLS         1
+#define HAL_PORT_HAS_USB_KEYBOARD        0
 
 /* core1stack[] size in words. WEB never launches core1 — single canary
  * word satisfies MMBasic.c's overflow check at core1stack[0]. */

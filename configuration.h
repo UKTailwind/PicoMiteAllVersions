@@ -42,8 +42,8 @@ extern "C" {
  *
  * USB-keyboard variants pick the _USB sibling. Stage F is expected to
  * split USB ports into their own port directories, after which this
- * USBKEYBOARD ifdef collapses too. */
-#ifdef USBKEYBOARD
+ * HAL_PORT_HAS_USB_KEYBOARD ifdef collapses too. */
+#if HAL_PORT_HAS_USB_KEYBOARD
     #define FLASH_TARGET_OFFSET HAL_PORT_FLASH_TARGET_OFFSET_USB
     #define MagicKey            HAL_PORT_MAGIC_KEY_USB
     #define HEAPTOP             HAL_PORT_HEAP_TOP_USB
