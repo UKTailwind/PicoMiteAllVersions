@@ -22,6 +22,8 @@
 
 extern int CurrentSPISpeed;
 extern void dobacklight(void);
+/* SET_SPI_CLK / HW0Clk / HW1Clk and SPI0locked / SPI1locked come in via
+ * SPI-LCD.h and External.h, both pulled by Hardware_Includes.h. */
 
 void hal_periph_reserve_io(void) {
     if (Option.DISPLAY_TYPE >= SSDPANEL && Option.DISPLAY_TYPE < VIRTUAL) {
@@ -104,4 +106,45 @@ void hal_periph_reserve_io(void) {
             gpio_set_dir(TOUCH_Click_PIN, GPIO_OUT);
         }
     }
+
+#ifdef rp2350
+    /* Optional second-SPI bus dedicated to the LCD. Only the rp2350
+     * PicoMite OPTION setter ("OPTION LCD SPI ...") accepts these pin
+     * fields; on every other rp2350 port (web_rp2350 etc.) the OPTION
+     * setter rejects it and Option.LCD_CLK stays 0 so the runtime
+     * guard never fires. */
+    if (Option.LCD_CLK && !(Option.LCD_CLK == Option.SYSTEM_CLK)) {
+        LCD_CLK_PIN  = PinDef[Option.LCD_CLK].GPno;
+        LCD_MOSI_PIN = PinDef[Option.LCD_MOSI].GPno;
+        LCD_MISO_PIN = PinDef[Option.LCD_MISO].GPno;
+        ExtCfg(Option.LCD_CLK,  EXT_BOOT_RESERVED, 0);
+        ExtCfg(Option.LCD_MOSI, EXT_BOOT_RESERVED, 0);
+        ExtCfg(Option.LCD_MISO, EXT_BOOT_RESERVED, 0);
+        if (PinDef[Option.LCD_CLK].mode & SPI0SCK
+            && PinDef[Option.LCD_MOSI].mode & SPI0TX
+            && PinDef[Option.LCD_MISO].mode & SPI0RX) {
+            SET_SPI_CLK = HW0Clk;
+            SPI0locked = 1;
+        } else if (PinDef[Option.LCD_CLK].mode & SPI1SCK
+                   && PinDef[Option.LCD_MOSI].mode & SPI1TX
+                   && PinDef[Option.LCD_MISO].mode & SPI1RX) {
+            SET_SPI_CLK = HW1Clk;
+            SPI1locked = 1;
+        }
+        gpio_init(LCD_CLK_PIN);
+        gpio_set_drive_strength(LCD_CLK_PIN, GPIO_DRIVE_STRENGTH_8MA);
+        gpio_put(LCD_CLK_PIN, GPIO_PIN_RESET);
+        gpio_set_dir(LCD_CLK_PIN, GPIO_OUT);
+        gpio_set_slew_rate(LCD_CLK_PIN, GPIO_SLEW_RATE_FAST);
+        gpio_init(LCD_MOSI_PIN);
+        gpio_set_drive_strength(LCD_MOSI_PIN, GPIO_DRIVE_STRENGTH_8MA);
+        gpio_put(LCD_MOSI_PIN, GPIO_PIN_RESET);
+        gpio_set_dir(LCD_MOSI_PIN, GPIO_OUT);
+        gpio_set_slew_rate(LCD_MOSI_PIN, GPIO_SLEW_RATE_FAST);
+        gpio_init(LCD_MISO_PIN);
+        gpio_set_pulls(LCD_MISO_PIN, true, false);
+        gpio_set_dir(LCD_MISO_PIN, GPIO_IN);
+        gpio_set_input_hysteresis_enabled(LCD_MISO_PIN, true);
+    }
+#endif
 }

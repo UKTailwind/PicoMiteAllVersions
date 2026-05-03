@@ -52,6 +52,15 @@ void hal_keyboard_init_external_mouse(void) {
     initMouse0(0);
 }
 
+void hal_keyboard_i2c_probe_at_boot(void) {
+    if (Option.KeyboardConfig == CONFIG_I2C) {
+        CheckI2CKeyboard(1, 0);
+        uSec(2000);
+        CheckI2CKeyboard(1, 1);
+        uSec(2000);
+    }
+}
+
 void hal_console_usb_cdc_boot_init(void) {
     stdio_set_translate_crlf(&stdio_usb, false);
     /* Wait up to 5 s for the host to grab the USB-CDC console so

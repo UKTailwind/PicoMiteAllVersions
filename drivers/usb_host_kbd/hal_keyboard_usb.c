@@ -134,3 +134,8 @@ void hal_keyboard_init_external_mouse(void) {
 void hal_console_usb_cdc_boot_init(void) {
     /* USB host keyboard owns USB-A — no USB-CDC device-side stdio. */
 }
+
+void hal_keyboard_i2c_probe_at_boot(void) {
+    /* I²C keyboards conflict with the USB HID stack on this port —
+     * CheckI2CKeyboard isn't compiled here. */
+}

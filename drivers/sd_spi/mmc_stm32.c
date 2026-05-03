@@ -50,6 +50,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "hal/hal_i2c_keypad.h"
 #include "hal/hal_vga_ops.h"
 #include "hal/hal_periph_io.h"
+#include "hal/hal_keyboard.h"
 #if HAL_PORT_HAS_WIFI
 #include "pico/cyw43_arch.h"
 #endif
@@ -1500,49 +1501,10 @@ void InitReservedIO(void) {
 			I2C2_Timeout=SystemI2CTimeout;
 		}
 		if(Option.RTC)RtcGetTime(1);
-#if !HAL_PORT_HAS_USB_KEYBOARD
-		if(Option.KeyboardConfig==CONFIG_I2C){
-			CheckI2CKeyboard(1,0);
-			uSec(2000);
-			CheckI2CKeyboard(1,1);
-			uSec(2000);
-		}
-#endif	
+		/* Boot-time I²C keyboard probe (non-USB ports). Stub no-op on
+		 * USB-keyboard ports where CheckI2CKeyboard isn't compiled. */
+		hal_keyboard_i2c_probe_at_boot();
 	}
-#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
-	if(Option.LCD_CLK && !(Option.LCD_CLK==Option.SYSTEM_CLK)){
-		LCD_CLK_PIN=PinDef[Option.LCD_CLK].GPno;
-		LCD_MOSI_PIN=PinDef[Option.LCD_MOSI].GPno;
-		LCD_MISO_PIN=PinDef[Option.LCD_MISO].GPno;
-		ExtCfg(Option.LCD_CLK, EXT_BOOT_RESERVED, 0);
-		ExtCfg(Option.LCD_MOSI, EXT_BOOT_RESERVED, 0);
-		ExtCfg(Option.LCD_MISO, EXT_BOOT_RESERVED, 0);
-		if(PinDef[Option.LCD_CLK].mode & SPI0SCK && PinDef[Option.LCD_MOSI].mode & SPI0TX  && PinDef[Option.LCD_MISO].mode & SPI0RX  ){
-			SET_SPI_CLK=HW0Clk;
-			SPI0locked=1;
-		} else if(PinDef[Option.LCD_CLK].mode & SPI1SCK && PinDef[Option.LCD_MOSI].mode & SPI1TX  && PinDef[Option.LCD_MISO].mode & SPI1RX  ){
-			SET_SPI_CLK=HW1Clk;
-			SPI1locked=1;
-		}
-		gpio_init(LCD_CLK_PIN);
-		gpio_set_drive_strength(LCD_CLK_PIN,GPIO_DRIVE_STRENGTH_8MA);
-		gpio_put(LCD_CLK_PIN,GPIO_PIN_RESET);
-		gpio_set_dir(LCD_CLK_PIN, GPIO_OUT);
-		gpio_set_slew_rate(LCD_CLK_PIN, GPIO_SLEW_RATE_FAST);
-		gpio_init(LCD_MOSI_PIN);
-		gpio_set_drive_strength(LCD_MOSI_PIN,GPIO_DRIVE_STRENGTH_8MA);
-		gpio_put(LCD_MOSI_PIN,GPIO_PIN_RESET);
-		gpio_set_dir(LCD_MOSI_PIN, GPIO_OUT);
-		gpio_set_slew_rate(LCD_MOSI_PIN, GPIO_SLEW_RATE_FAST);
-		gpio_init(LCD_MISO_PIN);
-		gpio_set_pulls(LCD_MISO_PIN,true,false);
-		gpio_set_dir(LCD_MISO_PIN, GPIO_IN);
-		gpio_set_input_hysteresis_enabled(LCD_MISO_PIN,true);
-/*		xchg_byte= BitBangSwapSPI;
-		xmit_byte_multi=BitBangSendSPI;
-		rcvr_byte_multi=BitBangReadSPI;*/
-	}
-#endif
 	if(Option.SYSTEM_CLK){
 		SPI_CLK_PIN=PinDef[Option.SYSTEM_CLK].GPno;
 		SPI_MOSI_PIN=PinDef[Option.SYSTEM_MOSI].GPno;

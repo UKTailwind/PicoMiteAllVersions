@@ -157,6 +157,13 @@ void hal_keyboard_init_external_mouse(void);
  * stub no-op. */
 void hal_console_usb_cdc_boot_init(void);
 
+/* Boot-time I²C-keyboard probe. Non-USB-keyboard ports check
+ * Option.KeyboardConfig==CONFIG_I2C and run two CheckI2CKeyboard()
+ * passes to drain any pending keystroke; USB-keyboard ports no-op
+ * (CheckI2CKeyboard isn't compiled there). Called from
+ * InitReservedIO() after the SYSTEM_I2C bus comes up. */
+void hal_keyboard_i2c_probe_at_boot(void);
+
 #ifdef __cplusplus
 }
 #endif
