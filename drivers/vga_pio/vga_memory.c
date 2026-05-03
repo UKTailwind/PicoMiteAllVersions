@@ -39,6 +39,13 @@ uint16_t __attribute__ ((aligned (256))) tilefcols[80*40];
 uint16_t __attribute__ ((aligned (256))) tilebcols[80*40];
 #endif
 
+/* Per-mode pixel-stride scratch — shared between the QVGA scanout
+ * (drivers/vga_pio/vga_qvga_modes.c on pure-VGA ports) and the HDMI
+ * scanout (drivers/hdmi/hdmi_scanout.c). Set by the mode dispatchers
+ * (vga_mode_ops.c) when SCREENMODEx kicks in. Defined here so both
+ * scanout flavours pick the symbol up. */
+int vgaloop1, vgaloop2, vgaloop4, vgaloop8, vgaloop16, vgaloop32;
+
 #if HAL_PORT_HAS_HDMI
 uint8_t *tilefcols_w;
 uint8_t *tilebcols_w;
