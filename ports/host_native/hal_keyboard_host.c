@@ -52,3 +52,8 @@ int hal_keyboard_set_layout(int layout) {
     (void)layout;
     return -1;
 }
+
+int hal_keyboard_external_mouse_active(void) {
+    /* No PS/2 or USB pointer device on host. */
+    return 0;
+}

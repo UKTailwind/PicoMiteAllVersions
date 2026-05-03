@@ -35,6 +35,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
 #include "hal/hal_keyboard.h"
+#include "hal/hal_editor_console.h"
 
 #define CTRLKEY(a) (a & 0x1f)
 
@@ -75,7 +76,9 @@ extern void routinechecks(void);
 int8_t optioncolourcodesave;
 int editactive=0;
 #if !defined(LITE)
-#if HAL_PORT_IS_VGA
+/* VGA SCREENMODE1 reverse-video toggle. The runtime guard inside
+ * DisplayPutClever and MX470Display gates the tile-aware path so
+ * non-VGA targets never observe r_on. */
 static int r_on=0;
 void DisplayPutClever(char c){
     if((DISPLAY_TYPE==SCREENMODE1 && markmode && Option.ColourCode && ytileheight==gui_font_height && gui_font_width % 8 ==0)){
@@ -104,34 +107,11 @@ void DisplayPutClever(char c){
                     } while((CurrentX/gui_font_width) % Option.Tab);
                     return;
     }
-#if HAL_PORT_HAS_HDMI
-    if(r_on){
-        if(FullColour){
-            if(r_on)for(int i=0; i< gui_font_width / 8; i++)tilebcols[CurrentY/gui_font_height*X_TILE+CurrentX/8+i]=RGB555(BLUE);
-        }
-        else {
-            if(r_on)for(int i=0; i< gui_font_width / 8; i++)tilebcols_w[CurrentY/gui_font_height*X_TILE+CurrentX/8+i]=RGB332(BLUE);
-        }
-    }
-#else
-    if(r_on)for(int i=0; i< gui_font_width / 8; i++)tilebcols[CurrentY/gui_font_height*X_TILE+CurrentX/8+i]=0x1111;
-#endif
-#if HAL_PORT_HAS_HDMI
-    else {
-        if(FullColour){
-            for(int i=0; i< gui_font_width / 8; i++)tilebcols[CurrentY/gui_font_height*X_TILE+CurrentX/8+i]=RGB555(Option.DefaultBC);
-        }
-        else {
-            for(int i=0; i< gui_font_width / 8; i++)tilebcols_w[CurrentY/gui_font_height*X_TILE+CurrentX/8+i]=RGB332(Option.DefaultBC);
-        }
-    }
-#else
-    else for(int i=0; i< gui_font_width / 8; i++)tilebcols[CurrentY/gui_font_height*X_TILE+CurrentX/8+i]=RGB121pack(Option.DefaultBC);
-#endif
+    hal_editor_tile_putchar_bg(CurrentX, CurrentY / gui_font_height,
+                               gui_font_width, Option.DefaultBC, r_on != 0);
     CurrentX += gui_font_width;
     } else DisplayPutC(c);
 }
-#endif
 
 void DisplayPutS(char *s) {
     while(*s) DisplayPutC(*s++);
@@ -148,24 +128,20 @@ static inline char nothingchar(char dummy,int flush){
 static void (*PrintString)(char *buff)=SSPrintString;
 static char (*SSputchar)(char buff, int flush)=SerialConsolePutC;
 //    #define PrintString       SSPrintString
-#if HAL_PORT_IS_VGA
-    #define MX470PutC(c)        DisplayPutClever(c)
-#else
-    #define MX470PutC(c)        DisplayPutC(c);
-#endif
-// Only SSD1963 displays support H/W scrolling so for other displays it is much quicker to redraw the screen than scroll it
-// However, we don't want to redraw the serial console so we dummy out the serial writes whiole re-drawing the physical screen
-#if HAL_PORT_IS_VGA
-    #define MX470Scroll(n) ScrollLCD(n);
-#else
-#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
-    #define MX470Scroll(n)      if(Option.DISPLAY_CONSOLE){if(!((SPIREAD && ScrollLCD != ScrollLCDSPISCR && ScrollLCD != ScrollLCDMEM332)  || Option.NoScroll))ScrollLCD(n);\
+/* DisplayPutClever's first condition tests DISPLAY_TYPE==SCREENMODE1
+ * and falls back to DisplayPutC(c) on every non-VGA mode, so a single
+ * MX470PutC binding works on every port. */
+#define MX470PutC(c)        DisplayPutClever(c)
+
+/* Only SSD-class displays support hardware scroll; SPI-LCD panels with
+ * dirty-region or RGB332-shadow backends fall back to a full redraw via
+ * printScreen(). VGA's ScrollLCD is the QVGA framebuffer scroll, and
+ * SPIREAD is false for SCREENMODE1-5, so the SPIREAD branch never
+ * triggers on VGA — the ScrollLCD(n) call below is the right path
+ * unconditionally. ScrollLCDMEM332/ScrollLCDSPISCR are unconditionally
+ * declared and have stubs on ports without that backend. */
+#define MX470Scroll(n)      if(Option.DISPLAY_CONSOLE){if(!((SPIREAD && ScrollLCD != ScrollLCDSPISCR && ScrollLCD != ScrollLCDMEM332)  || Option.NoScroll))ScrollLCD(n);\
     else {PrintString=printnothing;SSputchar=nothingchar;printScreen();PrintString=SSPrintString;SSputchar=SerialConsolePutC;}}
-#else
-    #define MX470Scroll(n)      if(Option.DISPLAY_CONSOLE){if(!((SPIREAD && ScrollLCD != ScrollLCDSPISCR)  || Option.NoScroll))ScrollLCD(n);\
-    else {PrintString=printnothing;SSputchar=nothingchar;printScreen();PrintString=SSPrintString;SSputchar=SerialConsolePutC;}}
-#endif
-#endif
 
 //    #define dx(...) {char s[140];sprintf(s,  __VA_ARGS__); SerUSBPutS(s); SerUSBPutS("\r\n");}
 
@@ -185,109 +161,57 @@ static char (*SSputchar)(char buff, int flush)=SerialConsolePutC;
             CurrentY = y;
     }
 
+    static inline bool tile_aware(void) {
+        return DISPLAY_TYPE == SCREENMODE1
+            && Option.ColourCode
+            && ytileheight == gui_font_height;
+    }
+
     void MX470Display(int fn) {
         if(!Option.DISPLAY_CONSOLE) return;
         int t;
+        int bg = (DISPLAY_TYPE == SCREENMODE1) ? 0 : gui_bcolour;
         switch(fn) {
-            case DISPLAY_CLS:       ClearScreen(gui_bcolour);
-                                    break;
-#if HAL_PORT_IS_VGA
-            case CLEAR_TO_EOS:      MX470Display(CLEAR_TO_EOL);
-                                    DrawRectangle(0, CurrentY + gui_font_height, HRes-1, VRes-1, DISPLAY_TYPE==SCREENMODE1 ? 0 : gui_bcolour);
-#if HAL_PORT_HAS_HDMI
-                                    if(FullColour){
-                                        if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==gui_font_height){
-                                            for(int y=(CurrentY + gui_font_height)/ytileheight;y<Y_TILE;y++)
-                                            for(int x=0;x<X_TILE;x++){
-                                                tilefcols[y*X_TILE+x]=RGB555(gui_fcolour);
-                                                tilebcols[y*X_TILE+x]=RGB555(gui_bcolour);
-                                            }
-                                        }
-                                    } else {
-                                        if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==gui_font_height){
-                                            for(int y=(CurrentY + gui_font_height)/ytileheight;y<Y_TILE;y++)
-                                            for(int x=0;x<X_TILE;x++){
-                                                tilefcols_w[CurrentY/ytileheight*X_TILE+x]=RGB332(gui_fcolour);
-                                                tilebcols_w[CurrentY/ytileheight*X_TILE+x]=RGB332(gui_bcolour);
-                                            }
-                                        }
-                                    }
-#else
-                                    if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==gui_font_height){
-                                        for(int y=(CurrentY + gui_font_height)/ytileheight;y<Y_TILE;y++)
-                                        for(int x=0;x<X_TILE;x++){
-                                            tilefcols[CurrentY/ytileheight*X_TILE+x]=RGB121pack(gui_fcolour);
-                                            tilebcols[CurrentY/ytileheight*X_TILE+x]=RGB121pack(gui_bcolour);
-                                        }
-                                    }
-                                    
-#endif
-                                    break;
-            case REVERSE_VIDEO:     
-                                    if((DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==gui_font_height)){
-                                    r_on^=1;
-                                    } else {
-                                        t = gui_fcolour;
-                                        gui_fcolour = gui_bcolour;
-                                        gui_bcolour = t;
-                                    }
-                                    break;
-            case CLEAR_TO_EOL:      DrawBox(CurrentX, CurrentY, HRes-1, CurrentY + gui_font_height-1, 0, 0, DISPLAY_TYPE==SCREENMODE1 ? 0 : gui_bcolour);
-#if HAL_PORT_HAS_HDMI
-                                    if(FullColour){
-                                        if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==gui_font_height){
-                                            for(int x=CurrentX/8;x<X_TILE;x++){
-                                                tilefcols[CurrentY/ytileheight*X_TILE+x]=RGB555(gui_fcolour);
-                                                tilebcols[CurrentY/ytileheight*X_TILE+x]=RGB555(gui_bcolour);
-                                            }
-                                        }
-                                    } else {
-                                        if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==gui_font_height){
-                                            for(int x=CurrentX/8;x<X_TILE;x++){
-                                                tilefcols_w[CurrentY/ytileheight*X_TILE+x]=RGB332(gui_fcolour);
-                                                tilebcols_w[CurrentY/ytileheight*X_TILE+x]=RGB332(gui_bcolour);
-                                            }
-                                        }
-                                    }
-#else
-                                        if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==gui_font_height){
-                                            for(int x=CurrentX/8;x<X_TILE;x++){
-                                                tilefcols[CurrentY/ytileheight*X_TILE+x]=RGB121pack(gui_fcolour);
-                                                tilebcols[CurrentY/ytileheight*X_TILE+x]=RGB121pack(gui_bcolour);
-                                            }
-                                        }
-
-#endif
-
-                                    break;
-#else
-            case REVERSE_VIDEO:     t = gui_fcolour;
-                                    gui_fcolour = gui_bcolour;
-                                    gui_bcolour = t;
-                                    break;
-            case CLEAR_TO_EOL:      DrawBox(CurrentX, CurrentY, HRes-1, CurrentY + gui_font_height-1, 0, 0, gui_bcolour);
-                                    break;
-            case CLEAR_TO_EOS:      DrawBox(CurrentX, CurrentY, HRes-1, CurrentY + gui_font_height-1, 0, 0, gui_bcolour);
-                                    DrawRectangle(0, CurrentY + gui_font_height, HRes-1, VRes-1, gui_bcolour);
-                                    break;
-#endif
+            case DISPLAY_CLS:
+                ClearScreen(gui_bcolour);
+                break;
+            case CLEAR_TO_EOS:
+                MX470Display(CLEAR_TO_EOL);
+                DrawRectangle(0, CurrentY + gui_font_height, HRes-1, VRes-1, bg);
+                if (tile_aware()) {
+                    hal_editor_tile_clear_eos((CurrentY + gui_font_height) / ytileheight,
+                                              gui_fcolour, gui_bcolour);
+                }
+                break;
+            case REVERSE_VIDEO:
+                if (tile_aware()) {
+                    r_on ^= 1;
+                } else {
+                    t = gui_fcolour;
+                    gui_fcolour = gui_bcolour;
+                    gui_bcolour = t;
+                }
+                break;
+            case CLEAR_TO_EOL:
+                DrawBox(CurrentX, CurrentY, HRes-1, CurrentY + gui_font_height-1, 0, 0, bg);
+                if (tile_aware()) {
+                    hal_editor_tile_clear_eol(CurrentX / 8, CurrentY / ytileheight,
+                                              gui_fcolour, gui_bcolour);
+                }
+                break;
             case SCROLL_DOWN:
-                                    break;
-            case DRAW_LINE:         DrawBox(0, gui_font_height * (Option.Height - 2), HRes - 1, VRes - 1, 0, 0, (DISPLAY_TYPE==SCREENMODE1 ? 0 :gui_bcolour));
-                                    DrawLine(0, (VRes/gui_font_height)*gui_font_height - gui_font_height - 6, HRes - 1, (VRes/gui_font_height)*gui_font_height - gui_font_height - 6, 1, GUI_C_LINE);
-#if HAL_PORT_IS_VGA
-#if HAL_PORT_HAS_HDMI
-                                    if(FullColour){
-                                        if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==gui_font_height)for(int i=0; i<HRes/8; i++)tilefcols[(Option.Height - 2)*X_TILE+i]=RGB555(MAGENTA);
-                                    } else {
-                                        if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==gui_font_height)for(int i=0; i<HRes/8; i++)tilefcols_w[(Option.Height - 2)*X_TILE+i]=RGB332(MAGENTA);
-                                    }
-#else
-                                    if(DISPLAY_TYPE==SCREENMODE1 && Option.ColourCode && ytileheight==gui_font_height)for(int i=0; i<HRes/8; i++)tilefcols[(Option.Height - 2)*X_TILE+i]=0x9999;
-#endif
-#endif
-                                    CurrentX = 0; CurrentY = (VRes/gui_font_height)*gui_font_height - gui_font_height;
-                                    break;
+                break;
+            case DRAW_LINE:
+                DrawBox(0, gui_font_height * (Option.Height - 2), HRes - 1, VRes - 1, 0, 0, bg);
+                DrawLine(0, (VRes/gui_font_height)*gui_font_height - gui_font_height - 6,
+                         HRes - 1, (VRes/gui_font_height)*gui_font_height - gui_font_height - 6,
+                         1, GUI_C_LINE);
+                if (tile_aware()) {
+                    hal_editor_tile_drawline(Option.Height - 2, MAGENTA);
+                }
+                CurrentX = 0;
+                CurrentY = (VRes/gui_font_height)*gui_font_height - gui_font_height;
+                break;
         }
 }
 
@@ -630,42 +554,15 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
                 if(!nunstruct[2].C)middlepushed=false;
                 if(nunstruct[2].y1!=lasty1 || nunstruct[2].x1!=lastx1){
                     if(lastx1!=9999){
-#if HAL_PORT_HAS_HDMI
-                        if(FullColour){
-#endif
-                            for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilefcols[lasty1*X_TILE+i]=lastfc;
-                            for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilebcols[lasty1*X_TILE+i]=lastbc;
-#if HAL_PORT_HAS_HDMI
-                        } else {
-                            for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilefcols_w[lasty1*X_TILE+i]=lastfc;
-                            for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilebcols_w[lasty1*X_TILE+i]=lastbc;
-                        }
-#endif
+                        hal_editor_tile_paint_saved(lastx1*fontinc, (lastx1+1)*fontinc,
+                                                    lasty1, lastfc, lastbc);
                     }
                     lastx1=nunstruct[2].x1;
                     lasty1=nunstruct[2].y1;
                     if(lasty1>=VHeight)lasty1=VHeight-1;
-#if HAL_PORT_HAS_HDMI
-                    if(FullColour){
-#endif
-                        lastfc=tilefcols[lasty1*X_TILE+lastx1*fontinc];
-                        lastbc=tilebcols[lasty1*X_TILE+lastx1*fontinc];
-#if HAL_PORT_HAS_HDMI
-                    } else {
-                        lastfc=tilefcols_w[lasty1*X_TILE+lastx1*fontinc];
-                        lastbc=tilebcols_w[lasty1*X_TILE+lastx1*fontinc];
-                    }
-                    if(FullColour){
-                        for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilefcols[lasty1*X_TILE+i]=RGB555(RED);
-                        for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilebcols[lasty1*X_TILE+i]=RGB555(WHITE);
-                    } else {
-                        for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilefcols_w[lasty1*X_TILE+i]=RGB332(RED);
-                        for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilebcols_w[lasty1*X_TILE+i]=RGB332(WHITE);
-                    }
-#else
-                    for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilefcols[lasty1*X_TILE+i]=RGB121pack(RED);
-                    for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilebcols[lasty1*X_TILE+i]=RGB121pack(WHITE);
-#endif
+                    hal_editor_tile_save(lastx1*fontinc, lasty1, &lastfc, &lastbc);
+                    hal_editor_tile_paint_rgb(lastx1*fontinc, (lastx1+1)*fontinc,
+                                              lasty1, RED, WHITE);
                     }
                 if((nunstruct[2].L && leftpushed==false && rightpushed==false && middlepushed==false) ||
                     (nunstruct[2].R && leftpushed==false && rightpushed==false && middlepushed==false) ||
@@ -685,18 +582,9 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
                         PositionCursor(txtp);
                         PrintStatus();
                         ShowCursor(true);
-#if HAL_PORT_HAS_HDMI
-                        if(FullColour){
-#endif
-                            for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilefcols[lasty1*X_TILE+i]=lastfc;
-                            for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilebcols[lasty1*X_TILE+i]=lastbc;
-#if HAL_PORT_HAS_HDMI
-                        } else {
-                            for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilefcols_w[lasty1*X_TILE+i]=lastfc;
-                            for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilebcols_w[lasty1*X_TILE+i]=lastbc;
-                        }
-#endif
-                    } 
+                        hal_editor_tile_paint_saved(lastx1*fontinc, (lastx1+1)*fontinc,
+                                                    lasty1, lastfc, lastbc);
+                    }
                     if(rightpushed==true){
                         c=F4;
                     }
@@ -1281,42 +1169,15 @@ void MarkMode(unsigned char *cb, unsigned char *buf) {
             if(!nunstruct[2].C)middlepushed=false;
             if(nunstruct[2].y1!=lasty1 || nunstruct[2].x1!=lastx1){
                 if(lastx1!=9999){
-#if HAL_PORT_HAS_HDMI
-                    if(FullColour){
-#endif
-                        for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilefcols[lasty1*X_TILE+i]=lastfc;
-                        for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilebcols[lasty1*X_TILE+i]=lastbc;
-#if HAL_PORT_HAS_HDMI
-                    } else {
-                        for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilefcols_w[lasty1*X_TILE+i]=lastfc;
-                        for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilebcols_w[lasty1*X_TILE+i]=lastbc;
-                    }
-                    #endif
+                    hal_editor_tile_paint_saved(lastx1*fontinc, (lastx1+1)*fontinc,
+                                                lasty1, lastfc, lastbc);
                 }
                 lastx1=nunstruct[2].x1;
                 lasty1=nunstruct[2].y1;
                 if(lasty1>=VHeight)lasty1=VHeight-1;
-#if HAL_PORT_HAS_HDMI
-                if(FullColour){
-#endif
-                    lastfc=tilefcols[lasty1*X_TILE+lastx1*fontinc];
-                    lastbc=tilebcols[lasty1*X_TILE+lastx1*fontinc];
-#if HAL_PORT_HAS_HDMI
-                } else {
-                    lastfc=tilefcols_w[lasty1*X_TILE+lastx1*fontinc];
-                    lastbc=tilebcols_w[lasty1*X_TILE+lastx1*fontinc];
-                }
-                if(FullColour){
-                    for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilefcols[lasty1*X_TILE+i]=RGB555(RED);
-                    for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilebcols[lasty1*X_TILE+i]=RGB555(WHITE);
-                } else {
-                    for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilefcols_w[lasty1*X_TILE+i]=RGB332(RED);
-                    for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilebcols_w[lasty1*X_TILE+i]=RGB332(WHITE);
-                }
-#else
-                    for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilefcols[lasty1*X_TILE+i]=RGB121pack(RED);
-                    for(int i=lastx1*fontinc;i<(lastx1+1)*fontinc;i++)tilebcols[lasty1*X_TILE+i]=RGB121pack(WHITE);
-#endif
+                hal_editor_tile_save(lastx1*fontinc, lasty1, &lastfc, &lastbc);
+                hal_editor_tile_paint_rgb(lastx1*fontinc, (lastx1+1)*fontinc,
+                                          lasty1, RED, WHITE);
                 }
             if((nunstruct[2].L && leftpushed==false && rightpushed==false && middlepushed==false) ||
                 (nunstruct[2].R && leftpushed==false && rightpushed==false && middlepushed==false) ||

@@ -61,6 +61,10 @@ void hal_keyboard_i2c_probe_at_boot(void) {
     }
 }
 
+int hal_keyboard_external_mouse_active(void) {
+    return mouse0;
+}
+
 void hal_console_usb_cdc_boot_init(void) {
     stdio_set_translate_crlf(&stdio_usb, false);
     /* Wait up to 5 s for the host to grab the USB-CDC console so

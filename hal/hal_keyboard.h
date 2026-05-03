@@ -164,6 +164,12 @@ void hal_console_usb_cdc_boot_init(void);
  * InitReservedIO() after the SYSTEM_I2C bus comes up. */
 void hal_keyboard_i2c_probe_at_boot(void);
 
+/* Whether an external pointer device (USB HID mouse on USB-keyboard
+ * ports, PS/2 mouse on PS/2 ports) is currently attached. Used by
+ * the editor console to decide whether to run the mouse-cursor
+ * pump. Returns 0 on host / mmbasic_stdio / wasm. */
+int hal_keyboard_external_mouse_active(void);
+
 #ifdef __cplusplus
 }
 #endif

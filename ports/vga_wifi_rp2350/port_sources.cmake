@@ -52,6 +52,7 @@ target_sources(PicoMite PRIVATE
     ${CMAKE_SOURCE_DIR}/drivers/spi_lcd/spi_lcd_fastgfx_stub.c
     ${CMAKE_SOURCE_DIR}/drivers/spi_lcd/spi_oled_stub.c
     ${CMAKE_SOURCE_DIR}/drivers/spi_lcd/spi_lcd_periph_io_stub.c
+    ${CMAKE_SOURCE_DIR}/drivers/editor_console/editor_console_vga.c
 
     # gfx_3d.c included — F2 has PICOMITEVGA so the dispatch table
     # references fun_3D / fun_map / fun_getscanline (gated on

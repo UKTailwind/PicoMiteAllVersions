@@ -139,3 +139,7 @@ void hal_keyboard_i2c_probe_at_boot(void) {
     /* I²C keyboards conflict with the USB HID stack on this port —
      * CheckI2CKeyboard isn't compiled here. */
 }
+
+int hal_keyboard_external_mouse_active(void) {
+    return HID[1].Device_type == 2;
+}
