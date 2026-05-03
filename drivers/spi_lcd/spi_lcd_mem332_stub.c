@@ -49,6 +49,16 @@ int hal_spi_lcd_mem332_match_option(unsigned char *name) { (void)name; return 0;
 void hal_spi_lcd_mem332_init_display(int display_type) { (void)display_type; }
 void hal_spi_lcd_mem332_init_luts(void) {}
 
+extern BYTE (*xchg_byte)(BYTE data_out);
+
+unsigned char hal_spi_lcd_read_response_byte(void) {
+    /* Legacy path: 3 SPI swaps, capture the middle byte. */
+    xchg_byte(0);
+    unsigned char q = xchg_byte(0);
+    xchg_byte(0);
+    return q;
+}
+
 /* RGB332 LUT initializers — declared extern in SPI-LCD.h so they
  * always link. Real impls live in spi_lcd_mem332.c. */
 void init_RGB332_to_RGB565_LUT(void) {}

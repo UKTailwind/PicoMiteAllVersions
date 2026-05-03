@@ -1281,11 +1281,7 @@ void DrawRectangleSPI(int x1, int y1, int x2, int y2, int c){
 			col[2]=(c & 0xFC);
 			for(t=0;t<i;t+=3){p[t]=col[0];p[t+1]=col[1];p[t+2]=col[2];}
 			for(y=y1;y<=y2;y++){
-#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
-				if(PinDef[Option.LCD_CLK].mode & SPI0SCK)spi_write_fast(spi0,p,i);
-#else
-				if(PinDef[Option.SYSTEM_CLK].mode & SPI0SCK)spi_write_fast(spi0,p,i);
-#endif
+				if(PinDef[Option.LCD_CLK ? Option.LCD_CLK : Option.SYSTEM_CLK].mode & SPI0SCK)spi_write_fast(spi0,p,i);
 				else spi_write_fast(spi1,p,i);
 			}
 		} else {
@@ -1299,11 +1295,7 @@ void DrawRectangleSPI(int x1, int y1, int x2, int y2, int c){
 				col[1]=~col[1];
 			}
 			for(t=0;t<i;t+=2){p[t]=col[0];p[t+1]=col[1];}
-#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
-			if(PinDef[Option.LCD_CLK].mode & SPI0SCK){
-#else
-			if(PinDef[Option.SYSTEM_CLK].mode & SPI0SCK){
-#endif
+			if(PinDef[Option.LCD_CLK ? Option.LCD_CLK : Option.SYSTEM_CLK].mode & SPI0SCK){
 				for(t=y1;t<=y2;t++){
 					spi_write_fast(spi0,p,i);
 				} 
@@ -1314,11 +1306,7 @@ void DrawRectangleSPI(int x1, int y1, int x2, int y2, int c){
 			}
 		}
 	}
-#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
-	if(PinDef[Option.LCD_CLK].mode & SPI0SCK)spi_finish(spi0);
-#else
-	if(PinDef[Option.SYSTEM_CLK].mode & SPI0SCK)spi_finish(spi0);
-#endif
+	if(PinDef[Option.LCD_CLK ? Option.LCD_CLK : Option.SYSTEM_CLK].mode & SPI0SCK)spi_finish(spi0);
 	else spi_finish(spi1);
 	ClearCS(Option.LCD_CS);                                       //set CS high
 }
@@ -1336,11 +1324,7 @@ void PhysicalDrawRectSPI(int x1, int y1, int x2, int y2, int c){
 		col[2]=(c & 0xFC);
 		for(t=0;t<i;t+=3){p[t]=col[0];p[t+1]=col[1];p[t+2]=col[2];}
 		for(y=y1;y<=y2;y++){
-#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
-			if(PinDef[Option.LCD_CLK].mode & SPI0SCK)spi_write_fast(spi0,p,i);
-#else
-			if(PinDef[Option.SYSTEM_CLK].mode & SPI0SCK)spi_write_fast(spi0,p,i);
-#endif
+			if(PinDef[Option.LCD_CLK ? Option.LCD_CLK : Option.SYSTEM_CLK].mode & SPI0SCK)spi_write_fast(spi0,p,i);
 			else spi_write_fast(spi1,p,i);
 		}
 	} else {
@@ -1354,11 +1338,7 @@ void PhysicalDrawRectSPI(int x1, int y1, int x2, int y2, int c){
 			col[1]=~col[1];
 		}
 		for(t=0;t<i;t+=2){p[t]=col[0];p[t+1]=col[1];}
-#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
-		if(PinDef[Option.LCD_CLK].mode & SPI0SCK){
-#else
-		if(PinDef[Option.SYSTEM_CLK].mode & SPI0SCK){
-#endif
+		if(PinDef[Option.LCD_CLK ? Option.LCD_CLK : Option.SYSTEM_CLK].mode & SPI0SCK){
 			for(t=y1;t<=y2;t++){
 				spi_write_fast(spi0,p,i);
 			} 
@@ -1369,11 +1349,7 @@ void PhysicalDrawRectSPI(int x1, int y1, int x2, int y2, int c){
 		}
 	}
 
-#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
-	if(PinDef[Option.LCD_CLK].mode & SPI0SCK)spi_finish(spi0);
-#else
-	if(PinDef[Option.SYSTEM_CLK].mode & SPI0SCK)spi_finish(spi0);
-#endif
+	if(PinDef[Option.LCD_CLK ? Option.LCD_CLK : Option.SYSTEM_CLK].mode & SPI0SCK)spi_finish(spi0);
 	else spi_finish(spi1);
 	ClearCS(Option.LCD_CS);                                       //set CS high
 
@@ -1612,15 +1588,9 @@ void ReadBufferSPI(int x1, int y1, int x2, int y2, unsigned char* p) {
     if(Option.DISPLAY_TYPE==ILI9341 || Option.DISPLAY_TYPE==ST7789B )spi_write_cd(ILI9341_PIXELFORMAT,1,0x66); //change to RGB666 for read
     DefineRegionSPI(x1, y1, x2, y2, 0);
 	SPISpeedSet( (Option.DISPLAY_TYPE==ILI9488  || Option.DISPLAY_TYPE == ILI9488P || Option.DISPLAY_TYPE==ST7789B || Option.DISPLAY_TYPE==ILI9481IPS) ? ST7789RSpeed : SPIReadSpeed); //need to slow SPI for read on this display
-#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
 	lcd_rcvr_byte_multi((uint8_t *)p, 1);
     r=0;
 	lcd_rcvr_byte_multi((uint8_t *)p,N);
-#else
-	rcvr_byte_multi((uint8_t *)p, 1);
-    r=0;
-	rcvr_byte_multi((uint8_t *)p,N);
-#endif
 	gpio_put(LCD_CD_PIN,GPIO_PIN_RESET);
     ClearCS(Option.LCD_CS);                  //set CS high
 	SPISpeedSet(Option.DISPLAY_TYPE);
@@ -1673,15 +1643,9 @@ void ReadBufferSPISCR(int x1, int y1, int x2, int y2, unsigned char* p) {
 		N=(x2- x1+1) * (y2- VRes) * ((Option.DISPLAY_TYPE==ST7796S  || Option.DISPLAY_TYPE == ST7796SP) ? 2 : 3);
 		DefineRegionSPI(x1, y1, x2, VRes - 1,0);
 		SPISpeedSet( (Option.DISPLAY_TYPE==ILI9488  || Option.DISPLAY_TYPE == ILI9488P || Option.DISPLAY_TYPE==ST7789B || Option.DISPLAY_TYPE==ILI9481IPS) ? ST7789RSpeed : SPIReadSpeed); //need to slow SPI for read on this display
-#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
 		lcd_rcvr_byte_multi((uint8_t *)p, 1);
 		r=0;
 		lcd_rcvr_byte_multi((uint8_t *)p,N);
-#else
-		rcvr_byte_multi((uint8_t *)p, 1);
-		r=0;
-		rcvr_byte_multi((uint8_t *)p,N);
-#endif
 		gpio_put(LCD_CD_PIN,GPIO_PIN_RESET);
 		ClearCS(Option.LCD_CS);                  //set CS high
 		SPISpeedSet(Option.DISPLAY_TYPE);
@@ -1689,15 +1653,9 @@ void ReadBufferSPISCR(int x1, int y1, int x2, int y2, unsigned char* p) {
 		N=(x2- x1+1) * (y2 - VRes) * ((Option.DISPLAY_TYPE==ST7796S  || Option.DISPLAY_TYPE == ST7796SP) ? 2 : 3);
 		DefineRegionSPI(x1, 0, x2, y2 - VRes,0);
 		SPISpeedSet( (Option.DISPLAY_TYPE==ILI9488  || Option.DISPLAY_TYPE == ILI9488P || Option.DISPLAY_TYPE==ST7789B || Option.DISPLAY_TYPE==ILI9481IPS) ? ST7789RSpeed : SPIReadSpeed); //need to slow SPI for read on this display
-#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
 		lcd_rcvr_byte_multi((uint8_t *)p, 1);
 		r=0;
 		lcd_rcvr_byte_multi((uint8_t *)p,N);
-#else
-		rcvr_byte_multi((uint8_t *)p, 1);
-		r=0;
-		rcvr_byte_multi((uint8_t *)p,N);
-#endif
 		gpio_put(LCD_CD_PIN,GPIO_PIN_RESET);
 		ClearCS(Option.LCD_CS);                  //set CS high
 		SPISpeedSet(Option.DISPLAY_TYPE);
@@ -1706,15 +1664,9 @@ void ReadBufferSPISCR(int x1, int y1, int x2, int y2, unsigned char* p) {
 		N=(x2- x1+1) * (y2- y1+1) * ((Option.DISPLAY_TYPE==ST7796S  || Option.DISPLAY_TYPE == ST7796SP) ? 2 : 3);
 		DefineRegionSPI(x1, y1, x2, y2, 0);
 		SPISpeedSet( (Option.DISPLAY_TYPE==ILI9488  || Option.DISPLAY_TYPE == ILI9488P || Option.DISPLAY_TYPE==ST7789B || Option.DISPLAY_TYPE==ILI9481IPS) ? ST7789RSpeed : SPIReadSpeed); //need to slow SPI for read on this display
-#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
 		lcd_rcvr_byte_multi((uint8_t *)p, 1);
 		r=0;
 		lcd_rcvr_byte_multi((uint8_t *)p,N);
-#else
-		rcvr_byte_multi((uint8_t *)p, 1);
-		r=0;
-		rcvr_byte_multi((uint8_t *)p,N);
-#endif
 		gpio_put(LCD_CD_PIN,GPIO_PIN_RESET);
 		ClearCS(Option.LCD_CS);                  //set CS high
 		SPISpeedSet(Option.DISPLAY_TYPE);
@@ -2162,11 +2114,10 @@ void ST7920SetXY(int x, int y){
 	ClearCS(Option.LCD_CD);
 }
 void Display_Refresh(void){
-#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
+	/* The MEM332 (>=NEXTGEN) bail and the DISPLAY_TYPE==0 bail are
+	 * always-true on non-MEM332 ports anyway (DISPLAY_TYPE never
+	 * reaches NEXTGEN there), but they're harmless extras. */
 	if(Option.DISPLAY_TYPE>=NEXTGEN  || Option.DISPLAY_TYPE==0 || !(Option.DISPLAY_TYPE<=I2C_PANEL || Option.DISPLAY_TYPE>=BufferedPanel)) return;
-#else
-	if(!(Option.DISPLAY_TYPE<=I2C_PANEL || Option.DISPLAY_TYPE>=BufferedPanel)) return;
-#endif
 	unsigned char* p=(void *)((unsigned int)LCDBuffer);
 	if(low_x==silly_low && high_x==silly_high && low_y==silly_low && high_y==silly_high)return; //Nothing to do
 	if(low_x<0)low_x=0;
@@ -2234,9 +2185,10 @@ extern uint16_t SPI_CLK_PIN;
 // config the SPI port for output
 // it will not touch the port if it has already been opened
 void SPISpeedSet(int device){
-#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
-	if(Option.LCD_CLK && Option.LCD_CLK!=Option.SYSTEM_CLK && device>I2C_PANEL && device!=TOUCH && device!=SLOWTOUCH) return; //Everything is configured so nothing to do
-#endif
+	/* MEM332 ports with a separate LCD SPI clock have everything
+	 * configured already and bail early. Other ports always have
+	 * Option.LCD_CLK == 0 so this branch is dead. */
+	if(Option.LCD_CLK && Option.LCD_CLK!=Option.SYSTEM_CLK && device>I2C_PANEL && device!=TOUCH && device!=SLOWTOUCH) return;
     if(CurrentSPIDevice != device){
 		if(device==SDSLOW || (device==SDFAST && SPI_CLK_PIN!= SD_CLK_PIN)) {
 //			MMPrintString("Slow Bitbang\r\n");
@@ -2302,23 +2254,17 @@ void ClearCS(int pin) {
 }
 #if !HAL_PORT_IS_VGA
 int GetLineILI9341(void){
-	unsigned char q;
     SetCS();
 	SPISpeedSet(Option.DISPLAY_TYPE==ILI9341 ? SPIReadSpeed : ST7789RSpeed);
     gpio_put(LCD_CD_PIN,GPIO_PIN_RESET);
 	SPIsend(ILI9341_GETSCANLINE);
     gpio_put(LCD_CD_PIN,GPIO_PIN_SET);
 	uSec(3);
-#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
-	lcd_rcvr_byte_multi((uint8_t *)&q, 1);
-	lcd_rcvr_byte_multi((uint8_t *)&q, 1);
-#else
-	xchg_byte(0);
-	q=xchg_byte(0);
-	xchg_byte(0);
-#endif
+	/* The MEM332 and legacy paths use different SPI-read protocols
+	 * to recover the response byte. Per-port impl in spi_lcd_mem332*.c. */
+	int q = hal_spi_lcd_read_response_byte();
 	ClearCS(Option.LCD_CS);
 	SPISpeedSet(Option.DISPLAY_TYPE);
-	return (int)(q);
+	return q;
 }
 #endif

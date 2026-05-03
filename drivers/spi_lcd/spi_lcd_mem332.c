@@ -44,6 +44,14 @@ void hal_spi_lcd_mem332_init_luts(void) {
     init_RGB332_to_RGB565_LUT();
 }
 
+unsigned char hal_spi_lcd_read_response_byte(void) {
+    unsigned char q;
+    /* MEM332 path uses the DMA-multi reader; first byte is a dummy. */
+    lcd_rcvr_byte_multi(&q, 1);
+    lcd_rcvr_byte_multi(&q, 1);
+    return q;
+}
+
 void ScrollLCDMEM332(int lines){
     if(lines==0)return;
 	if(Option.DISPLAY_ORIENTATION==PORTRAIT){

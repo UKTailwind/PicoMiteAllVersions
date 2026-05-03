@@ -504,6 +504,15 @@ void SetADCFreq(float frequency) { (void)frequency; }
  * The non-keypad signature is the canonical one — keypad ports
  * provide their own setBacklight via picocalc_features_real.c. */
 void setBacklight(int level, int frequency) { (void)level; (void)frequency; }
+
+/* SPI byte-exchange function pointer — defined in mmc_stm32.c on
+ * device ports, never assigned on host. The MEM332 stub's
+ * GetLineILI9341 fallback would dereference it; provide a do-nothing
+ * default so the link succeeds. The function is never called on
+ * host because the runtime never sets DISPLAY_TYPE to ILI9341. */
+typedef unsigned char BYTE;
+static BYTE host_xchg_byte_noop(BYTE data_out) { (void)data_out; return 0; }
+BYTE (*xchg_byte)(BYTE data_out) = host_xchg_byte_noop;
 void gpio_callback(uint gpio, uint32_t events) { (void)gpio; (void)events; }
 int CheckPin(int pin, int action) { (void)pin; (void)action; return 0; }
 void CallCFuncInt1(void) {}

@@ -32,6 +32,12 @@ void hal_spi_lcd_mem332_init_display(int display_type);
  * the work; stub no-op. */
 void hal_spi_lcd_mem332_init_luts(void);
 
+/* Read a 1-byte response from the LCD bus. Real (MEM332) uses
+ * lcd_rcvr_byte_multi (DMA, with dummy first byte); stub (legacy)
+ * uses the xchg_byte function-pointer pattern (3 SPI swaps,
+ * capture middle). */
+unsigned char hal_spi_lcd_read_response_byte(void);
+
 #ifdef __cplusplus
 }
 #endif
