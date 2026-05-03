@@ -65,8 +65,8 @@
 #define HAL_PORT_MAX_MODES               2
 #define HAL_PORT_FLASH_TARGET_OFFSET     (864 * 1024)
 #define HAL_PORT_FLASH_TARGET_OFFSET_USB (848 * 1024)
-#define HAL_PORT_MAGIC_KEY               0xA2349A2F
-#define HAL_PORT_MAGIC_KEY_USB           0x4776A715
+#define HAL_PORT_MAGIC_KEY               0xA3349A2F
+#define HAL_PORT_MAGIC_KEY_USB           0x4876A715
 #define HAL_PORT_HEAP_TOP                0x2003F000
 #define HAL_PORT_HEAP_TOP_USB            0x2003F000
 #define HAL_PORT_CONSOLE_RX_BUF_SIZE     256

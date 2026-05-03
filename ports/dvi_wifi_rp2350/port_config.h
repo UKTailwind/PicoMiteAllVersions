@@ -61,8 +61,8 @@
 #define HAL_PORT_FLASH_TARGET_OFFSET     (1080 * 1024)
 #define HAL_PORT_FLASH_TARGET_OFFSET_USB (1080 * 1024)
 /* Unique magic key — pick anything not used by an existing port. */
-#define HAL_PORT_MAGIC_KEY               0xD41F77E2
-#define HAL_PORT_MAGIC_KEY_USB           0xD41F77E2
+#define HAL_PORT_MAGIC_KEY               0xD51F77E2
+#define HAL_PORT_MAGIC_KEY_USB           0xD51F77E2
 #define HAL_PORT_HEAP_TOP                0x2007D000
 #define HAL_PORT_HEAP_TOP_USB            0x2007D000
 #define HAL_PORT_CONSOLE_RX_BUF_SIZE     256

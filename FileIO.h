@@ -90,6 +90,26 @@ extern int OptionFileErrorAbort;
 extern unsigned char filesource[MAXOPENFILES + 1];
 extern int FatFSFileSystemSave;
 extern void positionfile(int fnbr, int idx);
+/* Stage P1 — flat layout. Every port sees the same struct layout
+ * regardless of which HAL_PORT_HAS_* flags are set, so no feature
+ * combination can silently corrupt persisted Option blobs by
+ * misaligning fields. Adds ~19 bytes per port over the old gated
+ * layout (negligible against the ~900-byte struct + 8 KB save area).
+ *
+ * Field meaning:
+ *   Height/Width         — console rows/cols (was char on non-VGA,
+ *                          short on VGA; now always short for both)
+ *   KEYBOARDBL           — PicoCalc keypad backlight (other ports
+ *                          ignore the field at runtime)
+ *   LCD_CLK/MOSI/MISO    — rp2350 PICOMITE LCD-on-its-own-SPI bus
+ *                          fields (other ports ignore)
+ *   TCP_PORT, ServerResponceTime, UDP_PORT, UDPServerResponceTime,
+ *   hostname, ipaddress, mask, gateway — WiFi networking fields
+ *   X_TILE, Y_TILE       — VGA tile-grid dimensions
+ *   TOUCH_XZERO/YZERO/XSCALE/YSCALE — SPI-LCD touch panel calibration
+ *   MaxCtrls             — GUICONTROLS widget table cap
+ *   HDMIclock/HDMId0..d2 — HDMI clock + 3 data PIO pair indices
+ */
 struct option_s {
     int  Magic;
     char Autorun;
@@ -99,14 +119,10 @@ struct option_s {
   //
     unsigned int PROG_FLASH_SIZE;
     unsigned int HEAP_SIZE;
-#ifndef PICOMITEVGA
-    char Height;
-    char Width;
-#else
-    short d2;
-#endif
+    short Height;        // console rows (was char on non-VGA, short on VGA)
+    short Width;         // console cols
     unsigned char DISPLAY_TYPE;
-    char DISPLAY_ORIENTATION; //12=20
+    char DISPLAY_ORIENTATION; //20
 //
     int  PIN;
     int  Baudrate;
@@ -114,73 +130,68 @@ struct option_s {
     unsigned char MOUSE_CLOCK;
     unsigned char MOUSE_DATA;
     char spare;
-    int CPU_Speed; 
+    int CPU_Speed;
     unsigned int Telnet;    // used to store the size of the program flash (also start of the LIBRARY code)
     int DefaultFC, DefaultBC;      // the default colours
-    short D3;         // default backlight brightness //40
+    short D3;         // default backlight brightness //48
     unsigned char KEYBOARD_CLOCK;
     unsigned char KEYBOARD_DATA;
     unsigned char continuation;
-    unsigned char LOCAL_KEYBOARD;  // dummy
+    unsigned char LOCAL_KEYBOARD;
     unsigned char KeyboardBrightness;
-    uint8_t  D2;      // dummy
+    uint8_t  D2;     //56
 //
     // display related
     unsigned char DefaultFont;
     unsigned char KeyboardConfig;
     unsigned char RTC_Clock;
-    unsigned char RTC_Data; //4=60
+    unsigned char RTC_Data; //60
 //
-    #ifdef PICOCALC
-        uint8_t KEYBOARDBL;
-    #endif
-    #if defined(PICOMITE) && defined(rp2350)
-        unsigned char LCD_CLK;
-        unsigned char LCD_MOSI;
-        unsigned char LCD_MISO;
-        char dummy;                // maximum number of controls allowed //64
-    #endif
-    #if defined(PICOMITE) && !defined(rp2350)
-        char dummy[4];                // maximum number of controls allowed //64
-    #endif
-    #if HAL_PORT_HAS_WIFI
-        uint16_t TCP_PORT;                // maximum number of controls allowed //64
-        uint16_t ServerResponceTime;
-    #endif
-    #ifdef PICOMITEVGA
-        int16_t X_TILE;                // maximum number of controls allowed //64
-        int16_t Y_TILE;                // maximum number of controls allowed //64
-    #endif
-        // for the SPI LCDs 4=64
+    /* PicoCalc keypad backlight. Always present so layout is
+     * port-independent; non-PicoCalc ports ignore the value at
+     * runtime (HAL_PORT_BACKLIGHT_VIA_KEYPAD_I2C=0 in port_config.h
+     * gates the read-side branch). */
+    uint8_t KEYBOARDBL;
+    /* rp2350 PICOMITE second-SPI-bus LCD pin fields. Always present;
+     * non-PICOMITE ports ignore them at runtime. */
+    unsigned char LCD_CLK;
+    unsigned char LCD_MOSI;
+    unsigned char LCD_MISO; //64
+    /* WiFi network-port + response-timeout. Always present; non-WiFi
+     * ports ignore. */
+    uint16_t TCP_PORT;
+    uint16_t ServerResponceTime; //68
+    /* VGA tile grid. Always present; non-VGA ports leave at 0. */
+    int16_t X_TILE;
+    int16_t Y_TILE; //72
+    // for the SPI LCDs
     unsigned char LCD_CD;
     unsigned char LCD_CS;
     unsigned char LCD_Reset;
     // touch related
     unsigned char TOUCH_CS;
     unsigned char TOUCH_IRQ;
-    char TOUCH_SWAPXY; 
+    char TOUCH_SWAPXY;
     unsigned char repeat;
-    char disabletftp;//56   8=72
-#ifndef PICOMITEVGA
+    char disabletftp; //80
+    /* SPI-LCD touch panel calibration. Always present; VGA/HDMI
+     * ports leave at 0 (no touch panel on a scanout-display port). */
     int  TOUCH_XZERO;
     int  TOUCH_YZERO;
     float TOUCH_XSCALE;
-    float TOUCH_YSCALE; //72 16=88
-#else
-    short Height;
-    short Width;
-    char dummy[12];
-#endif
-#if HAL_PORT_HAS_GUICONTROLS
+    float TOUCH_YSCALE; //96
+    /* GUICONTROLS widget cap. Always present; non-GUICONTROLS ports
+     * leave at 0 — code that reads MaxCtrls is gated on
+     * HAL_PORT_HAS_GUICONTROLS. */
     uint8_t MaxCtrls;
-    unsigned char spare3[3];
-#else
+    /* HDMI clock + 3 data PIO pair indices (0..7). Always present;
+     * non-HDMI ports ignore. */
     uint8_t HDMIclock;
     uint8_t HDMId0;
     uint8_t HDMId1;
     uint8_t HDMId2;
-#endif
-    unsigned int FlashSize; //8=96
+    unsigned char spare3[3]; //104
+    unsigned int FlashSize; //108
     unsigned char SD_CS;
     unsigned char SYSTEM_MOSI;
     unsigned char SYSTEM_MISO;
@@ -224,16 +235,14 @@ struct option_s {
     unsigned char AUDIO_MOSI_PIN;
     unsigned char SYSTEM_I2C_SLOW;
     unsigned char AUDIO_CS_PIN; //4=144
-    #if HAL_PORT_HAS_WIFI
-        uint16_t UDP_PORT;                // maximum number of controls allowed //48
-        uint16_t UDPServerResponceTime;
-        char hostname[32];
-        char ipaddress[16];
-        char mask[16];
-        char gateway[16];
-    #else
-        unsigned char x[84]; //85=229
-    #endif
+    /* WiFi UDP + DHCP-style network config. Always present; non-WiFi
+     * ports leave the strings empty / ports at 0. */
+    uint16_t UDP_PORT;
+    uint16_t UDPServerResponceTime;
+    char hostname[32];
+    char ipaddress[16];
+    char mask[16];
+    char gateway[16]; //84 bytes
     unsigned char heartbeatpin;
     unsigned char PSRAM_CS_PIN;
     unsigned char BGR;
