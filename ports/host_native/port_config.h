@@ -64,6 +64,7 @@
 #define HAL_PORT_HAS_VGA_PIO             0
 #define HAL_PORT_HAS_GUICONTROLS         0
 #define HAL_PORT_HAS_USB_KEYBOARD        0
+#define HAL_PORT_HAS_I2C_KEYPAD          0
 
 /* FLAC decoder base sample-rate cap. Host Audio.c body doesn't decode
  * FLAC, but the port-config standard wants the constant defined on

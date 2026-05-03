@@ -500,7 +500,7 @@ int IsInvalidPin(int pin) { (void)pin; return 1; }
 unsigned long ReadCount5(void) { return 0; }
 void WriteCount5(unsigned long timeset) { (void)timeset; }
 void SetADCFreq(float frequency) { (void)frequency; }
-#ifndef PICOCALC
+#if !HAL_PORT_HAS_I2C_KEYPAD
 void setBacklight(int level, int frequency) { (void)level; (void)frequency; }
 #else
 void setBacklight(int level) { (void)level; }

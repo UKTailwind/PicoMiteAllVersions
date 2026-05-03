@@ -46,6 +46,7 @@
 #define HAL_PORT_HAS_GUICONTROLS         0
 #define HAL_PORT_HAS_NEXTGEN_DISPLAY     0
 #define HAL_PORT_HAS_USB_KEYBOARD        0
+#define HAL_PORT_HAS_I2C_KEYPAD          0
 
 /* core1stack[] in words. QVGA scanout core1 (vga_qvga_modes::QVgaCore)
  * needs 128 words; CYW43 polled stack runs on core0, no extra core1

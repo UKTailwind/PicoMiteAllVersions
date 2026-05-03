@@ -2042,16 +2042,16 @@ if(Option.CPU_Speed==FreqSVGA){ //adjust the size of the heap
 #endif
 	InitBasic();
 #if !HAL_PORT_IS_VGA
-#ifndef PICOCALC
+#if !HAL_PORT_HAS_I2C_KEYPAD
     InitDisplaySSD();
 #endif
     InitDisplaySPI(0);
-#ifndef PICOCALC
+#if !HAL_PORT_HAS_I2C_KEYPAD
     InitDisplayI2C(0);
     InitDisplayVirtual();
 #endif
     InitTouch();
-#ifdef PICOCALC
+#if HAL_PORT_HAS_I2C_KEYPAD
     uSec(300000);
 #endif
     if(Option.BackLightLevel)setBacklight(Option.BackLightLevel, 0);

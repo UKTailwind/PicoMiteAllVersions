@@ -38,6 +38,7 @@
 #define HAL_PORT_HAS_VGA_PIO             1
 #define HAL_PORT_HAS_GUICONTROLS         0
 #define HAL_PORT_HAS_USB_KEYBOARD        1
+#define HAL_PORT_HAS_I2C_KEYPAD          0
 
 /* core1stack[] size in words. HDMI runs the DVI scanout loop on core1
  * (hdmi_scanout::HDMICore, 512-byte stack). */

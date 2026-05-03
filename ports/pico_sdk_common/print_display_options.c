@@ -239,7 +239,7 @@ void port_print_display_options(void)
 #if HAL_PORT_HAS_GUICONTROLS
         if(Option.MaxCtrls)PO2Int("GUI CONTROLS", Option.MaxCtrls-1);
 #endif
-#ifdef PICOCALC
+#if HAL_PORT_HAS_I2C_KEYPAD
         if(Option.KEYBOARDBL)PO2Int("BACKLIGHT KB", Option.KEYBOARDBL);
 #endif
         port_web_print_options();

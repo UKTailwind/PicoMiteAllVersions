@@ -13,7 +13,7 @@
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
 
-#ifdef PICOCALC
+#if HAL_PORT_HAS_I2C_KEYPAD
 #include "drivers/i2c_picocalc_kbd/i2ckbd.h"
 #include "picocalc/conf_app.h"
 
@@ -90,7 +90,7 @@ void port_picocalc_factory_reset_options(void)
     SoftReset();
 }
 
-#else  /* !PICOCALC — non-PicoCalc device builds */
+#else  /* !HAL_PORT_HAS_I2C_KEYPAD — boards without an I²C keypad */
 
 void port_picocalc_set_keyboard_backlight(int level) { (void)level; error("Not supported on this board"); }
 int  port_picocalc_battery_pct(void)                 { error("Not supported on this board"); return 0; }

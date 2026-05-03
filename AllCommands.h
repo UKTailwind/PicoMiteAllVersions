@@ -719,7 +719,7 @@ void fun_map(void);
 	{ (unsigned char *)"MM.Info(",		T_FUN | T_INT  | T_NBR| T_STR,		0, fun_info		},
 	{ (unsigned char *)"Format$(",	T_FUN  | T_STR,			0, fun_format	},
 	{ (unsigned char*)"~(",	    T_FUN | T_INT | T_NBR | T_STR ,		0, fun_tilde },
-#if HAL_PORT_HAS_USB_KEYBOARD || defined(MMBASIC_HOST) || defined(PICOCALC)
+#if HAL_PORT_HAS_USB_KEYBOARD || defined(MMBASIC_HOST) || HAL_PORT_HAS_I2C_KEYPAD
 	{ (unsigned char*)"KeyDown(",    T_FUN | T_INT,		0, fun_keydown	},
 #endif
 #if HAL_PORT_IS_VGA

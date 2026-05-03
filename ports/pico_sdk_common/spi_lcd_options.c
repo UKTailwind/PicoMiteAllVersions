@@ -31,7 +31,7 @@ void MIPS16 ConfigDisplayUser(unsigned char *tp)
 void MIPS16 clear320(void)
 {
     if (SPI480) {
-#ifdef PICOCALC
+#if HAL_PORT_HAS_I2C_KEYPAD
         HRes = 320;
         VRes = 480;
 #else

@@ -266,15 +266,28 @@ target_compile_options(PicoMite PRIVATE -DNDEBUG
                                         -O2
                                         -Wall)
 
-# PICOCALC global axis (set via -DPICOCALC=true|false). Pulls in the
-# i2ckbd driver via the source-list block above and the constant
-# companion HAL_PORT_BACKLIGHT_VIA_KEYPAD_I2C below.
+# PICOCALC global axis (set via -DPICOCALC=true|false). The CMake
+# variable PICOCALC drives:
+#   -DHAL_PORT_HAS_I2C_KEYPAD            — gates the I²C keypad-controller
+#                                           protocol in core/drivers and
+#                                           the keypad init delay in
+#                                           PicoMite.c boot.
+#   -DHAL_PORT_BACKLIGHT_VIA_KEYPAD_I2C  — switches setBacklight() to
+#                                           write the keypad's backlight
+#                                           register instead of driving
+#                                           a PWM slice.
+#   drivers/i2c_picocalc_kbd/i2ckbd.c    — linked above when PICOCALC=true.
+# configuration.h still consults the CMake-level PICOCALC name for the
+# heap-size override (HAL_PORT_HEAP_MEMORY_SIZE_PICOCALC) — that's a
+# legacy port-impl shim, kept for the dual-shipping ports/pico/.
 if(PICOCALC STREQUAL "true")
     target_compile_options(PicoMite PRIVATE -DPICOCALC
+                                            -DHAL_PORT_HAS_I2C_KEYPAD=1
                                             -DHAL_PORT_BACKLIGHT_VIA_KEYPAD_I2C=1
                                             )
 else()
-    target_compile_options(PicoMite PRIVATE -DHAL_PORT_BACKLIGHT_VIA_KEYPAD_I2C=0)
+    target_compile_options(PicoMite PRIVATE -DHAL_PORT_HAS_I2C_KEYPAD=0
+                                            -DHAL_PORT_BACKLIGHT_VIA_KEYPAD_I2C=0)
 endif()
 
 # Library linkage shared across every device port.

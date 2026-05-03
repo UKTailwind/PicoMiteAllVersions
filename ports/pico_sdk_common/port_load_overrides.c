@@ -15,7 +15,7 @@
 
 void port_apply_load_overrides(void)
 {
-#ifdef PICOCALC
+#if HAL_PORT_HAS_I2C_KEYPAD
     Option.DISPLAY_TYPE = ST7796SP;
     Option.SYSTEM_CLK = 14;
     Option.SYSTEM_MOSI = 15;
