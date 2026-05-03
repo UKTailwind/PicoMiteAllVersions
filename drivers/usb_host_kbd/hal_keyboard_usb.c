@@ -100,3 +100,14 @@ void hal_keyboard_on_gpio_edge(uint32_t gpio) {
      * from the GPIO edge handler. */
     (void)gpio;
 }
+
+extern void hid_app_task(void);
+
+void hal_keyboard_routinechecks_pump(void) {
+    /* TinyUSB host pump. Skip the first 2s after boot — TinyUSB's
+     * own enumeration is still settling. */
+    if (USBenabled && mSecTimer > 2000) {
+        tuh_task();
+        hid_app_task();
+    }
+}

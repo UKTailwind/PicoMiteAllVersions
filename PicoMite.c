@@ -469,32 +469,10 @@ void __not_in_flash_func(routinechecks)(void){
     }
     if(CurrentlyPlaying == P_MOD || CurrentlyPlaying==P_ARRAY ) checkWAVinput();
     if(++when & 7 && CurrentLinePtr) return;
-#if HAL_PORT_HAS_USB_KEYBOARD
-    if(USBenabled){
-        if(mSecTimer>2000){
-            tuh_task();
-            hid_app_task();
-        }
-    }
-#else
-	 static int c, read=0;
-     if(tud_cdc_connected() && (Option.SerialConsole==0 || Option.SerialConsole>4) && Option.Telnet!=-1){
-        while(( c=tud_cdc_read_char())!=-1){
-            ConsoleRxBuf[ConsoleRxBufHead] = c;
-            if(BreakKey && ConsoleRxBuf[ConsoleRxBufHead] == BreakKey) {// if the user wants to stop the progran
-                MMAbort = true;                                        // set the flag for the interpreter to see
-                ConsoleRxBufHead = ConsoleRxBufTail;                    // empty the buffer
-            } else if(ConsoleRxBuf[ConsoleRxBufHead] == keyselect && KeyInterrupt!=NULL){
-                Keycomplete=true;
-            } else {
-                ConsoleRxBufHead = (ConsoleRxBufHead + 1) % CONSOLE_RX_BUF_SIZE;     // advance the head of the queue
-                if(ConsoleRxBufHead == ConsoleRxBufTail) {                           // if the buffer has overflowed
-                    ConsoleRxBufTail = (ConsoleRxBufTail + 1) % CONSOLE_RX_BUF_SIZE; // throw away the oldest char
-                }
-            }
-        }
-    }
-#endif
+    /* USB-host-keyboard ports drive tuh_task / hid_app_task here;
+     * non-USB ports drain USB-CDC stdio characters into the console
+     * ring buffer. */
+    hal_keyboard_routinechecks_pump();
 	if(Option.DISPLAY_TYPE>=NEXTGEN && !(low_x==silly_low && high_x==silly_high && low_y==silly_low && high_y==silly_high)){// Buffered LCD displays
         if(Option.Refresh){
             hal_display_nextgen_refresh_rect(low_x, low_y, high_x, high_y);
@@ -513,18 +491,10 @@ void __not_in_flash_func(routinechecks)(void){
             RtcGetTime(0);
         }
     }
-#if !HAL_PORT_HAS_USB_KEYBOARD
-    if(Option.KeyboardConfig==CONFIG_I2C && KeyCheck==0){
-        if(read==0){
-            CheckI2CKeyboard(0,0);
-            read=1;
-        } else {
-            CheckI2CKeyboard(0,1);
-            read=0;
-        }
-        KeyCheck=KEYCHECKTIME;
-    }
-#endif
+    /* I²C keyboard polling moved into the PS/2 backend's
+     * hal_keyboard_routinechecks_pump() — runs alongside the USB-CDC
+     * console drain. USB-host-keyboard backend's pump only does
+     * tuh_task / hid_app_task. */
     if(classic1 && ClassicTimer>=10){
         if(classicread==0){
 			WiiSend(sizeof(readcontroller),(char *)readcontroller);

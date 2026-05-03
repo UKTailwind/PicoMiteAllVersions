@@ -23,6 +23,13 @@
 extern void mouse0close(void);
 extern int LocalKeyDown[7];
 
+/* Console-input pump support: KeyCheck rate-limit counter +
+ * KEYCHECKTIME reset value live in PicoMite.c. */
+extern volatile unsigned int KeyCheck;
+#ifndef KEYCHECKTIME
+#define KEYCHECKTIME 16
+#endif
+
 void hal_keyboard_service(void) {
     if (Option.KeyboardConfig) {
         CheckKeyboard();
@@ -94,4 +101,41 @@ void hal_keyboard_on_gpio_edge(uint32_t gpio) {
             CNInterrupt(data);
     }
     if (MOUSE_CLOCK && gpio == PinDef[MOUSE_CLOCK].GPno) MNInterrupt(data);
+}
+
+#include "tusb.h"
+
+void hal_keyboard_routinechecks_pump(void) {
+    /* Drain USB-CDC stdio (the host-side USB-device serial) when the
+     * board uses USB-CDC for stdin and Telnet isn't active. */
+    int c;
+    if (tud_cdc_connected() && (Option.SerialConsole == 0 || Option.SerialConsole > 4) && Option.Telnet != -1) {
+        while ((c = tud_cdc_read_char()) != -1) {
+            ConsoleRxBuf[ConsoleRxBufHead] = c;
+            if (BreakKey && ConsoleRxBuf[ConsoleRxBufHead] == BreakKey) {
+                MMAbort = true;
+                ConsoleRxBufHead = ConsoleRxBufTail;
+            } else if (ConsoleRxBuf[ConsoleRxBufHead] == keyselect && KeyInterrupt != NULL) {
+                Keycomplete = true;
+            } else {
+                ConsoleRxBufHead = (ConsoleRxBufHead + 1) % CONSOLE_RX_BUF_SIZE;
+                if (ConsoleRxBufHead == ConsoleRxBufTail) {
+                    ConsoleRxBufTail = (ConsoleRxBufTail + 1) % CONSOLE_RX_BUF_SIZE;
+                }
+            }
+        }
+    }
+    /* I²C keyboard polling — alternates between the two read phases
+     * once per KEYCHECKTIME to avoid blocking on the I²C bus. */
+    static int read = 0;
+    if (Option.KeyboardConfig == CONFIG_I2C && KeyCheck == 0) {
+        if (read == 0) {
+            CheckI2CKeyboard(0, 0);
+            read = 1;
+        } else {
+            CheckI2CKeyboard(0, 1);
+            read = 0;
+        }
+        KeyCheck = KEYCHECKTIME;
+    }
 }

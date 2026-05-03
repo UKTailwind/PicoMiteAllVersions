@@ -128,6 +128,13 @@ void hal_keyboard_on_external_io_clear(void);
  * tinyusb and ignore this. */
 void hal_keyboard_on_gpio_edge(uint32_t gpio);
 
+/* Routinechecks-tier console-input pump. Runs from PicoMite.c's
+ * routinechecks at 1 kHz when the BASIC interpreter has no current
+ * line. USB-host-keyboard ports drive tuh_task + hid_app_task here;
+ * non-USB ports drain USB-CDC stdio characters into the console
+ * ring buffer. No-op stub for ports without an input pump. */
+void hal_keyboard_routinechecks_pump(void);
+
 #ifdef __cplusplus
 }
 #endif
