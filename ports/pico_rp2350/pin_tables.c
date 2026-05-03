@@ -7,8 +7,20 @@
 #include <stdbool.h>
 
 #include "MMBasic_Includes.h"
+#include "Hardware_Includes.h"
+#include "ports/pico_sdk_common/pindef_blocks.h"
 
 extern bool rp2350a;
+
+/* rp2350 SPI-LCD PicoMite — no HDMI, no WiFi. RP2350B exposes 48
+ * GPIOs (GP0-GP47); the rp2350-extras block populates the upper 18. */
+const struct s_PinDef PinDef[] = {
+    PINDEF_BLOCK_HEADER_AND_GP0_15,
+    PINDEF_BLOCK_PINS_16_25_GENERIC,
+    PINDEF_BLOCK_PINS_26_40,
+    PINDEF_BLOCK_PSEUDO_GP23_29,
+    PINDEF_BLOCK_PSEUDO_RP2350_EXTRAS,
+};
 
 const uint8_t PINMAP[48] = {
     1,  2,  4,  5,  6,  7,  9, 10, 11, 12,

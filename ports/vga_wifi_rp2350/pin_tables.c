@@ -9,8 +9,19 @@
 #include <stdbool.h>
 
 #include "MMBasic_Includes.h"
+#include "Hardware_Includes.h"
+#include "ports/pico_sdk_common/pindef_blocks.h"
 
 extern bool rp2350a;
+
+/* rp2350 VGA-PIO + WiFi — CYW43 claims GP23/24/25/29 plus the QSPI
+ * overlay, so the GP23-29 pseudo block and the rp2350-extras block
+ * are both excluded. */
+const struct s_PinDef PinDef[] = {
+    PINDEF_BLOCK_HEADER_AND_GP0_15,
+    PINDEF_BLOCK_PINS_16_25_GENERIC,
+    PINDEF_BLOCK_PINS_26_40,
+};
 
 const uint8_t PINMAP[48] = {
     1,  2,  4,  5,  6,  7,  9, 10, 11, 12,

@@ -6,6 +6,17 @@
 #include <stdint.h>
 
 #include "MMBasic_Includes.h"
+#include "Hardware_Includes.h"
+#include "ports/pico_sdk_common/pindef_blocks.h"
+
+/* rp2350 WiFi (PicoMiteWEB) — CYW43 claims GP23/24/25/29. The radio
+ * also overlays GP30+ on the QSPI lines, so the rp2350-extras block
+ * is omitted. */
+const struct s_PinDef PinDef[] = {
+    PINDEF_BLOCK_HEADER_AND_GP0_15,
+    PINDEF_BLOCK_PINS_16_25_GENERIC,
+    PINDEF_BLOCK_PINS_26_40,
+};
 
 const uint8_t PINMAP[48] = {
     1,  2,  4,  5,  6,  7,  9, 10, 11, 12,

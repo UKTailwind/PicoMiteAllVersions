@@ -7,8 +7,21 @@
 #include <stdbool.h>
 
 #include "MMBasic_Includes.h"
+#include "Hardware_Includes.h"
+#include "ports/pico_sdk_common/pindef_blocks.h"
 
 extern bool rp2350a;
+
+/* rp2350 HDMI — HSTX claims GP12-GP19 for the DVI signal pairs.
+ * Pins 16-25 carry the HDMI label block instead of GP12-GP19. The
+ * rp2350-extras block is included since this port has no WiFi. */
+const struct s_PinDef PinDef[] = {
+    PINDEF_BLOCK_HEADER_AND_GP0_15,
+    PINDEF_BLOCK_PINS_16_25_HDMI,
+    PINDEF_BLOCK_PINS_26_40,
+    PINDEF_BLOCK_PSEUDO_GP23_29,
+    PINDEF_BLOCK_PSEUDO_RP2350_EXTRAS,
+};
 
 const uint8_t PINMAP[48] = {
     1,  2,  4,  5,  6,  7,  9, 10, 11, 12,

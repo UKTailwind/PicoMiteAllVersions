@@ -133,6 +133,43 @@ preprocessor gates.
 The audit gives a real worklist. Without it, the rest of the plan is
 hand-waving.
 
+### Status (2026-05-03)
+
+Tree gate count: **361 → 224** (137 eliminated, 38%).
+
+| Stage | Status | Eliminated | Cumulative |
+|---|---|---:|---:|
+| E1 — audit + classify                            | DONE     | 0   | 0   |
+| E2 — GUICONTROLS (10) + I2C_KEYPAD (14)          | DONE     | 24  | 24  |
+| E3 — split spi_lcd.c into MEM332 + sender hooks  | DONE     | 47  | 71  |
+| E4 — split vga_mode_ops.c HDMI / IS_VGA          | DONE     | 21  | 92  |
+| E5 — Editor.c keymap                             | deferred | —   | —   |
+| E5 — hal_keyboard_pico split (USB / PS2)         | DONE     | 16  | 108 |
+| E5b–E5h — PicoMite.c WiFi+heartbeat+keyboard+misc| DONE     | 26  | 134 |
+| E5b — board-profile registry                     | TODO     | —   | —   |
+| E5i — PinDef[] split into per-port pin_tables.c  | TODO (next) | — | — |
+| E5j — InitReservedIO ownership untangle          | TODO     | —   | —   |
+| E5k — Editor.c (49 sites, 5 flag types)          | TODO     | —   | —   |
+| E6 — finish PicoMite.c (41 remaining)            | TODO     | —   | —   |
+| E7 — argue/resolve any leftovers                 | TODO     | —   | —   |
+| E8 — purity-script enforcement                   | TODO     | —   | —   |
+
+Top remaining offender files (sites):
+
+  Editor.c                                    49
+  PicoMite.c                                  41
+  drivers/sd_spi/mmc_stm32.c                  19
+  ports/pico_sdk_common/misc_option_setters.c 15
+  AllCommands.h                               11
+  drivers/vga_pio/vga_ops.c                   10
+  Hardware_Includes.h                          9
+
+Pattern observed: gates accumulate at *chokepoint* functions — any
+boot-time hook (`InitReservedIO`), giant lookup table (`PinDef[]`),
+or "runs every tick" handler becomes a magnet for unrelated
+port-specific code. The structural fix is per-subsystem ownership
+splits (E5i, E5j) rather than more conditional compilation.
+
 ### Stage E2 — Drop dead gates + finish the small flags
 
 From the E1 audit, attack the smallest-flag elimination first:
