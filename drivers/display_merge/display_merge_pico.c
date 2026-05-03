@@ -20,7 +20,7 @@ extern bool mergerunning;
 extern volatile bool mergedone;
 extern uint32_t mergetimer;
 extern uint32_t _excep_code;
-extern mutex_t frameBufferMutex;
+mutex_t frameBufferMutex;
 extern unsigned char *ShadowBuf;
 extern int fb_dma_chan;
 extern void fastgfx_swap_core1(void);
@@ -226,3 +226,9 @@ void port_main_launch_core1(void) {
     multicore_launch_core1_with_stack(UpdateCore, core1stack, 2048);
     core1stack[0] = 0x12345678;
 }
+
+void port_video_validate_boot_options(void) { }
+
+unsigned port_video_sys_clock_khz(unsigned cpu_khz) { return cpu_khz; }
+
+void port_video_post_clock_init(void) { }

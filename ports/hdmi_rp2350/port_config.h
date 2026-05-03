@@ -26,6 +26,9 @@
 /* HDMI HSTX scanout requires the higher 480p clock (Freq480P). */
 #define HAL_PORT_DEFAULT_CPU_SPEED_KHZ   315000
 
+/* MMInkey pinned to RAM — rp2350 has plenty of SRAM. */
+#define HAL_PORT_MMINKEY_DECL(name)      __not_in_flash_func(name)
+
 #define HAL_PORT_HAS_PSRAM               1
 #define HAL_PORT_HAS_UPNG                1
 

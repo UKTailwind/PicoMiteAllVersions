@@ -37,6 +37,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 /* ScrollStart moved to core/state/display_state.c as unconditional
  * storage so Draw.c can reference it without #ifndef PICOMITEVGA. */
 int Has100Pins = 0;
+char LCDAttrib = 0;
 
 // parameters for the SSD1963 display panel (refer to the glass data sheet)
 int SSD1963HorizPulseWidth, SSD1963HorizBackPorch, SSD1963HorizFrontPorch;

@@ -53,6 +53,47 @@ void port_main_launch_core1(void) {
     ClearScreen(Option.DefaultBC);
 }
 
+void port_video_validate_boot_options(void) {
+    if (Option.VGA_HSYNC == 0) {
+        Option.VGA_HSYNC = 21;
+        Option.VGA_BLUE  = 24;
+        SaveOptions();
+    }
+}
+
+unsigned port_video_sys_clock_khz(unsigned cpu_khz) {
+    return cpu_khz;
+}
+
+void port_video_post_clock_init(void) {
+    if (Option.CPU_Speed == Freq252P || Option.CPU_Speed == Freq480P  ||
+        Option.CPU_Speed == Freq848  || Option.CPU_Speed == Freq400   ||
+        Option.CPU_Speed == FreqSVGA) QVGA_CLKDIV = 2;
+    else if (Option.CPU_Speed == 378000) QVGA_CLKDIV = 3;
+    else QVGA_CLKDIV = 1;
+#ifdef rp2350
+    if (Option.CPU_Speed == Freq848) {
+        framebuffersize  = 424 * 240 * 2;
+        heap_memory_size = HEAP_MEMORY_SIZE - framebuffersize + 320 * 240 * 2;
+        FRAMEBUFFER      = AllMemory + heap_memory_size + 256;
+        MODE1SIZE = MODE1SIZE_8;
+        MODE2SIZE = MODE2SIZE_8;
+        HRes = 848;
+    }
+    if (Option.CPU_Speed == FreqSVGA) {
+        framebuffersize  = 400 * 300 * 2;
+        heap_memory_size = HEAP_MEMORY_SIZE - framebuffersize + 320 * 240 * 2;
+        FRAMEBUFFER      = AllMemory + heap_memory_size + 256;
+        MODE1SIZE = MODE1SIZE_V;
+        MODE2SIZE = MODE2SIZE_V;
+        MODE3SIZE = MODE3SIZE_V;
+        MODE5SIZE = MODE5SIZE_V;
+        HRes = 800;
+        VRes = 600;
+    }
+#endif
+}
+
 /* Per-mode loop counters defined in drivers/vga_pio/vga_memory.c
  * (shared with HDMI scanout). */
 extern int vgaloop1, vgaloop2, vgaloop4, vgaloop8, vgaloop16, vgaloop32;

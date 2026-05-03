@@ -67,22 +67,10 @@ extern void start_vga_i2s(void);
 /* COPYRIGHT text moved to Version.h as MMBASIC_COPYRIGHT; banner is
  * emitted via MMBasic_PrintBanner() in MMBasic_REPL.c. */
 
-#if HAL_PORT_HAS_USB_KEYBOARD
-    #include "tusb.h"
-    #include "host/hcd.h"
-    #include "usb_host_files/tusb_config.h"
-#else
-    #include "pico/unique_id.h"
-    #include "class/cdc/cdc_device.h" 
-#endif
 #ifndef rp2350
     #include "hardware/structs/ssi.h"
     #include "hardware/vreg.h"
 #else
-    #if HAL_PORT_HAS_HDMI
-        #include "hardware/structs/hstx_ctrl.h"
-        #include "hardware/structs/hstx_fifo.h"
-    #endif
     #include "hardware/dma.h"
     #include "hardware/gpio.h"
     #include "hardware/irq.h"
@@ -117,67 +105,20 @@ bool rp2350a=true;
 #include "hardware/irq.h"
 #include "hardware/pio.h"
 #include "hardware/pio_instructions.h"
-#if HAL_PORT_HAS_WIFI
-    #include "lwipopts.h"
-    #include "pico/cyw43_arch.h"
-    #include "lwip/pbuf.h"
-    #include "lwip/tcp.h"
-    #include "lwip/dns.h"
-    #include "lwip/pbuf.h"
-    #include "lwip/udp.h"
-#endif
-#if HAL_PORT_IS_VGA
-    volatile uint8_t transparent=0;
-    volatile uint8_t transparents=0;
-    volatile int RGBtransparent=0;
-    int MODE1SIZE, MODE2SIZE, MODE3SIZE, MODE4SIZE, MODE5SIZE;
-#if HAL_PORT_HAS_HDMI
-    uint32_t map16quads[16];
-    uint32_t map16pairs[16];
-    // 126 MHz timings
-#else
-    /* map16 + QVGA_HSYNC etc. relocated to drivers/vga_pio/vga_qvga_modes.c
-     * alongside the QVGA scanout core. */
-#endif
-
-    #if !HAL_PORT_HAS_HDMI
-    #include "Include.h"
-    #endif
-    #if HAL_PORT_HAS_USB_KEYBOARD
-        extern void hid_app_task(void);
-        volatile int keytimer=0;
-        extern void USB_bus_reset(void);
-        bool USBenabled=false;
-    #endif
-#endif
-
-#if HAL_PORT_HAS_WIFI
-    volatile int WIFIconnected=0;
-    int startupcomplete=0;
-    char LCDAttrib=0;
-#endif
+/* VGA-family scratch globals — used only inside the VGA / HDMI scanout
+ * cores (drivers/vga_pio/, drivers/hdmi/). Defined unconditionally so
+ * Hardware_Includes.h externs resolve on every port; LTO drops them
+ * where unused. */
+volatile uint8_t transparent=0;
+volatile uint8_t transparents=0;
+volatile int RGBtransparent=0;
+int MODE1SIZE, MODE2SIZE, MODE3SIZE, MODE4SIZE, MODE5SIZE;
 /* ProcessWeb / TelnetPutC / wifi_serial_telnet_configured are real
  * impls on WiFi ports and no-op stubs in MMweb_stubs.c elsewhere.
  * Declared unconditionally so PicoMite.c references link cleanly. */
 extern void ProcessWeb(int mode);
 extern void TelnetPutC(int c, int flush);
 extern int  wifi_serial_telnet_configured(void);
-#if HAL_PORT_HAS_PICOMITE
-    #if HAL_PORT_HAS_USB_KEYBOARD
-        #include "tusb.h"
-        #include "host/hcd.h"
-        extern void hid_app_task(void);
-        volatile int keytimer=0;
-        extern void USB_bus_reset(void);
-        bool USBenabled=false;
-        #include "pico/multicore.h"
-        mutex_t	frameBufferMutex;					// mutex to lock frame buffer
-    #else
-        #include "pico/multicore.h"
-        mutex_t	frameBufferMutex;					// mutex to lock frame buffer
-    #endif
-    char LCDAttrib=0;
-#endif
 
 /* Boot banner. HAL_PORT_DEVICE_NAME is set per port via CMake
  * target_compile_options ("PicoMite" / "PicoMiteVGA" / "PicoMiteHDMI" /
@@ -499,11 +440,7 @@ int kbhitConsole(void) {
 // check if there is a keystroke waiting in the buffer and, if so, return with the char
 // returns -1 if no char waiting
 // the main work is to check for vt100 escape code sequences and map to Maximite codes
-#if (HAL_PORT_IS_VGA || HAL_PORT_HAS_WIFI) && !defined(rp2350)
-int MMInkey(void) {
-#else
-int __not_in_flash_func(MMInkey)(void) {
-#endif
+int HAL_PORT_MMINKEY_DECL(MMInkey)(void) {
     unsigned int c = -1;                                            // default no character
     unsigned int tc = -1;                                           // default no character
     unsigned int ttc = -1;                                          // default no character
@@ -976,18 +913,7 @@ int MIPS16 main(){
         watchdog_enable(1, 1);
         while(1);
     }
-#if !HAL_PORT_HAS_HDMI
-    if(Option.VGA_HSYNC==0){
-        Option.VGA_HSYNC=21;
-        Option.VGA_BLUE=24;
-        SaveOptions();
-    }
-#else
-    if(!(Option.CPU_Speed==Freq720P || Option.CPU_Speed==Freq378P || Option.CPU_Speed==Freq252P || Option.CPU_Speed==Freq848  || Option.CPU_Speed==Freq400 || Option.CPU_Speed==FreqSVGA || Option.CPU_Speed==Freq480P|| Option.CPU_Speed==FreqXGA || Option.CPU_Speed==FreqX  || Option.CPU_Speed==FreqY)){
-        Option.CPU_Speed=Freq480P;
-        SaveOptions();
-    }
-#endif
+    port_video_validate_boot_options();
     m_alloc(M_PROG);                                           // init the variables for program memory
     LibMemory = (uint8_t *)flash_libmemory;
     uSec(100);
@@ -1032,11 +958,7 @@ int MIPS16 main(){
     if(Option.CPU_Speed<=288000)qmi_hw->m[0].timing = 0x40006202;
     sleep_ms(2);
 #endif
-#if HAL_PORT_HAS_HDMI && defined(rp2350)
-    set_sys_clock_khz(Option.CPU_Speed==FreqX ? 252000 : Option.CPU_Speed, false);
-#else
-    set_sys_clock_khz(Option.CPU_Speed, false);
-#endif
+    set_sys_clock_khz(port_video_sys_clock_khz(Option.CPU_Speed), false);
 #ifdef rp2350
     if(Option.CPU_Speed<=288000)qmi_hw->m[0].timing = 0x40006202;
     sleep_ms(2);
@@ -1090,68 +1012,11 @@ int MIPS16 main(){
         heap_memory_size -= framebuffersize;
         FRAMEBUFFER = AllMemory + heap_memory_size + 256;
     }
-#if HAL_PORT_HAS_HDMI
-    if((FullColour || MediumRes) && !(Option.CPU_Speed==FreqX)){
-        clock_configure(
-            clk_hstx,
-            0,                                                // No glitchless mux
-            CLOCKS_CLK_PERI_CTRL_AUXSRC_VALUE_CLKSRC_PLL_SYS, // System PLL on AUX mux
-            Option.CPU_Speed * 1000,                               // Input frequency
-            Option.CPU_Speed * (Option.CPU_Speed==Freq378P ? 332:500) // Output (must be same as no divider)
-        );
-    }
-    if(Option.CPU_Speed==FreqSVGA){ //adjust the size of the heap
-        framebuffersize=400*300*2;
-        heap_memory_size=HEAP_MEMORY_SIZE-framebuffersize+320*240*2;
-        FRAMEBUFFER=AllMemory+heap_memory_size+256;
-    }
-    if(Option.CPU_Speed==Freq848){ //adjust the size of the heap
-        framebuffersize=424*240*2;
-        heap_memory_size=HEAP_MEMORY_SIZE-framebuffersize+320*240*2;
-        FRAMEBUFFER=AllMemory+heap_memory_size+256;
-    }
-    if(Option.CPU_Speed==FreqY){ //adjust the size of the heap
-        framebuffersize=400*240*2;
-        heap_memory_size=HEAP_MEMORY_SIZE-framebuffersize+320*240*2;
-        FRAMEBUFFER=AllMemory+heap_memory_size+256;
-    }
-#endif 
 #endif
     uSec(100);
     hw_clear_bits(&watchdog_hw->ctrl, WATCHDOG_CTRL_ENABLE_BITS);
     _excep_code=excep;
-#if HAL_PORT_IS_VGA
-#if !HAL_PORT_HAS_HDMI
-    if(Option.CPU_Speed == Freq252P || Option.CPU_Speed == Freq480P  || Option.CPU_Speed == Freq848  || Option.CPU_Speed == Freq400   || Option.CPU_Speed == FreqSVGA )QVGA_CLKDIV= 2;
-    else if(Option.CPU_Speed == 378000)QVGA_CLKDIV= 3;
-    else QVGA_CLKDIV= 1;
-#ifdef rp2350
-if(Option.CPU_Speed==Freq848){ //adjust the size of the heap
-    framebuffersize=424*240*2;
-    heap_memory_size=HEAP_MEMORY_SIZE-framebuffersize+320*240*2;
-    FRAMEBUFFER=AllMemory+heap_memory_size+256;
-    MODE1SIZE=MODE1SIZE_8;
-    MODE2SIZE=MODE2SIZE_8;
-    MODE2SIZE=MODE2SIZE_8;
-    MODE2SIZE=MODE2SIZE_8;
-    MODE2SIZE=MODE2SIZE_8;
-    HRes=848;
-}
-if(Option.CPU_Speed==FreqSVGA){ //adjust the size of the heap
-    framebuffersize=400*300*2;
-    heap_memory_size=HEAP_MEMORY_SIZE-framebuffersize+320*240*2;
-    FRAMEBUFFER=AllMemory+heap_memory_size+256;
-    MODE1SIZE=MODE1SIZE_V;
-    MODE2SIZE=MODE2SIZE_V;
-    MODE3SIZE=MODE3SIZE_V;
-    MODE5SIZE=MODE5SIZE_V;
-    HRes=800;
-    VRes=600;
-}
-
-#endif
-#endif
-#endif
+    port_video_post_clock_init();
     systick_hw->csr = 0x5;
     systick_hw->rvr = 0x00FFFFFF;
     ticks_per_second = Option.CPU_Speed*1000;

@@ -26,6 +26,10 @@
 /* Pure VGA QVGA scanout requires 252 MHz (Freq252P). */
 #define HAL_PORT_DEFAULT_CPU_SPEED_KHZ   252000
 
+/* MMInkey placement: rp2040 VGA has tight RAM (the QVGA scanout +
+ * shadow framebuffer eat most of it), so MMInkey stays in flash. */
+#define HAL_PORT_MMINKEY_DECL(name)      name
+
 #define HAL_PORT_HAS_PSRAM               0
 #define HAL_PORT_HAS_UPNG                0
 #define HAL_PORT_HAS_DEFINES             0

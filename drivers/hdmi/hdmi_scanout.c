@@ -65,6 +65,8 @@ extern int vgaloop1, vgaloop2, vgaloop4, vgaloop8, vgaloop16, vgaloop32;
 uint32_t remap555[256];
 uint32_t remap332[256];
 uint16_t remap256[256];
+uint32_t map16quads[16];
+uint32_t map16pairs[16];
 
 extern uint16_t HDMIlines[2][800];
 // DVI constants
@@ -1624,6 +1626,48 @@ void port_main_launch_core1(void) {
     uSec(1000);
     ResetDisplay();
     ClearScreen(Option.DefaultBC);
+}
+
+void port_video_validate_boot_options(void) {
+    if (!(Option.CPU_Speed == Freq720P || Option.CPU_Speed == Freq378P ||
+          Option.CPU_Speed == Freq252P || Option.CPU_Speed == Freq848  ||
+          Option.CPU_Speed == Freq400  || Option.CPU_Speed == FreqSVGA ||
+          Option.CPU_Speed == Freq480P || Option.CPU_Speed == FreqXGA  ||
+          Option.CPU_Speed == FreqX    || Option.CPU_Speed == FreqY)) {
+        Option.CPU_Speed = Freq480P;
+        SaveOptions();
+    }
+}
+
+unsigned port_video_sys_clock_khz(unsigned cpu_khz) {
+    return cpu_khz == FreqX ? 252000 : cpu_khz;
+}
+
+void port_video_post_clock_init(void) {
+    if ((FullColour || MediumRes) && !(Option.CPU_Speed == FreqX)) {
+        clock_configure(
+            clk_hstx,
+            0,
+            CLOCKS_CLK_PERI_CTRL_AUXSRC_VALUE_CLKSRC_PLL_SYS,
+            Option.CPU_Speed * 1000,
+            Option.CPU_Speed * (Option.CPU_Speed == Freq378P ? 332 : 500)
+        );
+    }
+    if (Option.CPU_Speed == FreqSVGA) {
+        framebuffersize  = 400 * 300 * 2;
+        heap_memory_size = HEAP_MEMORY_SIZE - framebuffersize + 320 * 240 * 2;
+        FRAMEBUFFER      = AllMemory + heap_memory_size + 256;
+    }
+    if (Option.CPU_Speed == Freq848) {
+        framebuffersize  = 424 * 240 * 2;
+        heap_memory_size = HEAP_MEMORY_SIZE - framebuffersize + 320 * 240 * 2;
+        FRAMEBUFFER      = AllMemory + heap_memory_size + 256;
+    }
+    if (Option.CPU_Speed == FreqY) {
+        framebuffersize  = 400 * 240 * 2;
+        heap_memory_size = HEAP_MEMORY_SIZE - framebuffersize + 320 * 240 * 2;
+        FRAMEBUFFER      = AllMemory + heap_memory_size + 256;
+    }
 }
 
 /* HDMI fun_getscanline impl — per-CPU_Speed offset against the

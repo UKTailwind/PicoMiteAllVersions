@@ -238,7 +238,8 @@ int port_web_get_ssid(unsigned char *out_sret, int *out_targ)
  * be unconditional. Linked only on WiFi ports (MMsetwifi.c is in the
  * WiFi-port source list); MMweb_stubs.c provides the no-op shim on
  * non-WiFi devices. */
-extern volatile int WIFIconnected;
+volatile int WIFIconnected = 0;
+int startupcomplete = 0;
 extern void open_tcp_server(void);
 extern void open_udp_server(void);
 

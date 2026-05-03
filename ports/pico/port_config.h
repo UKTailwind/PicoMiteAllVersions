@@ -34,6 +34,10 @@
  * 200 MHz. */
 #define HAL_PORT_DEFAULT_CPU_SPEED_KHZ   200000
 
+/* MMInkey placement: PicoMite SPI-LCD has the headroom to pin
+ * MMInkey to RAM (no scanout shadow framebuffer eating SRAM). */
+#define HAL_PORT_MMINKEY_DECL(name)      __not_in_flash_func(name)
+
 /* Chip-feature: RP2040 variants don't ship PSRAM, upng, or the DEFINES
  * compile-time dictionary. */
 #define HAL_PORT_HAS_PSRAM               0

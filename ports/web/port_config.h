@@ -25,6 +25,10 @@
 #define HAL_PORT_AUDIO_I2S_PIO_NUM       0
 #define HAL_PORT_DEFAULT_CPU_SPEED_KHZ   200000
 
+/* MMInkey placement: rp2040 WEB has tight RAM (CYW43 firmware + lwIP
+ * heap eat most of it), so MMInkey stays in flash. */
+#define HAL_PORT_MMINKEY_DECL(name)      name
+
 #define HAL_PORT_HAS_PSRAM               0
 #define HAL_PORT_HAS_UPNG                0
 #define HAL_PORT_HAS_DEFINES             0
