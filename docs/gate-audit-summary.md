@@ -6,14 +6,21 @@ data in `docs/gate-audit.csv`; this file is the rolled-up summary.
 
 ## Totals
 
-359 gate sites, classified as:
+359 gate sites. The four categories per the (revised) plan:
 
 | Category | Sites | %  |
 |---|---:|---:|
-| extract-hook        | 229 | 64% |
-| split-driver        | 104 | 29% |
-| value-in-expression |  26 |  7% |
-| delete (E1 result)  |   0 | revisit during E2 |
+| split-driver       | 130 | 36% |
+| extract-hook       | 229 | 64% |
+| delete             |   0 | revisit during E2 |
+| argued-exception   |   0 | populated case-by-case during E2–E7 |
+
+**No "value-in-expression" bucket.** Earlier drafts had 26 sites
+tagged for rewrite as `if (HAL_PORT_HAS_*) { ... }`. That's the same
+gate as `#if`, just dressed in syntax the purity script doesn't
+grep for. Removed from the toolkit. Those 26 sites are now classified
+as either split-driver, extract-hook, or delete depending on the
+actual hardware coupling at the site. (See per-file table.)
 
 **No exemptions.** The multi-board `OPTION RESET <BOARD>` mechanism in
 `ports/{pico,pico_rp2350,vga,vga_rp2350,hdmi_rp2350}/port_defaults.c`
@@ -22,7 +29,7 @@ is itself a target for elimination — per-board defaults move to
 `#if HAL_PORT_HAS_USB_KEYBOARD` ladders inside the multi-board ports
 collapse along with them. `configuration.h`'s legacy translation
 layer dies along with `-DPICOCALC=true|false` becoming a port-config
-flag set in port_config.h.
+flag set in `port_config.h`.
 
 ## Per-flag distribution
 
@@ -47,7 +54,7 @@ flag set in port_config.h.
 | `drivers/vga_pio/vga_mode_ops.c`                   | 21 | split-driver        | Split legacy vs NEXTGEN VGA modes. |
 | `ports/pico_sdk_common/hal_keyboard_pico.c`        | 16 | extract-hook        | USBKEYBOARD axis → split into `hal_keyboard_usb.c` / `hal_keyboard_ps2.c`. |
 | `ports/pico_sdk_common/misc_option_setters.c`      | 15 | extract-hook        | OPTION setters fork by board feature → per-feature hook impls. |
-| `AllCommands.h`                                    | 14 | value-in-expression | Token-table conditional rows; convert to runtime gating in the lookup. |
+| `AllCommands.h`                                    | 14 | delete              | Token rows go in unconditionally; the dispatcher already errors via the stub-hook surface. |
 | `drivers/vga_pio/vga_ops.c`                        | 10 | split-driver        | NEXTGEN + GUICONTROLS gates. |
 | `ports/pico_sdk_common/print_display_options.c`    |  9 | extract-hook        | OPTION LIST per feature → hooks. |
 | `Hardware_Includes.h`                              |  9 | split-driver        | Replace per-feature includes with port-config-driven include. |
@@ -101,34 +108,47 @@ owns 31; `Hardware_Includes.h` 9; `Touch.c` 8; `drivers/hdmi/` 4;
   includes; convert to umbrella-include pattern keyed by linkage,
   not preprocessor.
 
-### value-in-expression (26 sites, 7%)
+### Re-categorization of the former "value-in-expression" 26 sites
 
-Mostly scattered single-site files (`bc_vm.c`, `MMtcpserver.c`,
-`drivers/display_merge/display_merge_pico.c`, etc.) plus
-`AllCommands.h`'s 14 token-table rows.
+Each of those sites is now classified as the actual elimination it
+needs. Sample re-categorizations (full list in `gate-audit.csv`):
 
-Pattern:
-
-```c
-// before
-#if HAL_PORT_HAS_X
-    do_x();
-#else
-    do_y();
-#endif
-
-// after
-if (HAL_PORT_HAS_X) do_x();
-else                do_y();
-```
-
-Requires both `do_x()` and `do_y()` to *link* on every port. Most of
-these already do — these are sites where the `#if` is preprocessor
-laziness rather than a hard linkage requirement.
-
-`AllCommands.h`'s token rows are different: the table is a sparse
-const array; conditional rows can become runtime predicates inside
-the dispatch function rather than build-time inclusions.
+- **`AllCommands.h`** (14 sites, token-table rows). Now
+  **delete**: token rows go in the table unconditionally on every
+  port; the dispatcher already errors on unknown commands at
+  runtime, so a row pointing at a function that lives in a stub
+  module just turns into "Not supported on this board" via the
+  hook's stub impl. No predicate needed in the table.
+- **`bc_vm.c:982`** (single GUICONTROLS gate). Now **delete** — the
+  `HideAllControls()` call is already routed through
+  `hal_gui_controls_hide_all()` from P3; the stub is a no-op, so
+  the call site doesn't need a gate.
+- **`MMtcpserver.c`** (single WiFi gate). Now **split-driver**: the
+  whole file is already linked only on WiFi ports — drop the
+  internal gate, file selection handles it.
+- **`drivers/display_merge/display_merge_pico.c`** (single
+  PICOMITE-rp2350 gate). Now **split-driver** — the file is the
+  rp2350-PicoMite real impl; the gate body is the rp2350-only path,
+  so split into `display_merge_pico_rp2040.c` + `display_merge_pico_rp2350.c`
+  with each variant linked from the matching port.
+- **`drivers/gui_touch/gui_touch.c`** (single gate). Now **delete**
+  — the file is itself the real-vs-stub split (`gui_touch.c` real /
+  `gui_touch_stub.c` stub); the inner `#if` is redundant once
+  linkage selects one.
+- **`drivers/spi_lcd/spi_lcd_framebuffer.c`** (single gate). Now
+  **delete** — file is already linked only on SPI-LCD ports.
+- **`Memory.h`, `Draw.h`** (header-decl gates). Now **delete** —
+  unconditional `extern` declarations link cleanly because the
+  stub side defines the symbol.
+- **`I2C.h:68`** (`SystemI2CTimeout`). Now **extract-hook** — move
+  the timeout to a per-port `port_config.h` value (used as a
+  *constant in expression*, not a predicate).
+- **`ports/host_native/host_peripheral_stubs.c:503`** (single gate).
+  Now **delete** — `setBacklight` already has a real impl in
+  `picocalc_features.c` when keypad is present; host stub doesn't
+  need to gate.
+- **`drivers/vga_pio/vga_memory.c`** (single gate). Now
+  **split-driver** — fold into the vga_mode_ops split in E4.
 
 ### Multi-board mechanism (folded into extract-hook + split-driver)
 

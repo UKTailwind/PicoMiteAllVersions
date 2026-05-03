@@ -1,27 +1,54 @@
-# Preprocessor-gate elimination plan
+# Gate elimination plan
+
+## Goal
+
+**Zero `#if HAL_PORT_*` AND zero `if (HAL_PORT_HAS_*)` in C source.**
+Modularity comes from file selection at link time, not from gates of
+any kind. The two are the same coupling — `#if` versus runtime `if`
+is just syntax.
+
+The bar for keeping any gate, in either form, is "I tried to
+eliminate it, here's the concrete reason that didn't work" —
+documented at the site, with the alternative considered. Default is
+elimination, exceptions are argued individually.
 
 ## Premise
 
 After the post-decascade work (P1–P7), every port-config gate has been
 *renamed* into the `HAL_PORT_HAS_*` / `HAL_PORT_IS_*` palette. None are
-gone. 361 preprocessor sites remain across 30 files. The next stage is
-to actually eliminate them — at every site, either:
+gone. 361 preprocessor sites remain across 30 files. Each site gets
+eliminated by one of:
 
 - **Split** the surrounding source file into per-flavor driver files
-  selected by `port_sources.cmake` (the file-selection model gui_controls,
-  vga_ops_stub, audio_mp3 etc. already use), OR
-- **Extract** the gated block into a HAL hook with a real-impl + stub
-  pair under `drivers/<feature>/`, OR
-- **Reformulate** as a value-in-expression (`if (HAL_PORT_HAS_X) { … }`)
-  so the compiler dead-codes the unreachable branch but the source has
-  no `#if`, OR
-- **Delete** if the gate is dead / a flag has no remaining preprocessor
-  consumers.
+  selected by `port_sources.cmake` (the file-selection model
+  `gui_controls`, `vga_ops_stub`, `audio_mp3` etc. already use). The
+  whole file's body is unconditional inside; the linker picks one
+  variant per port. **Preferred default — this is what "modular"
+  means here.**
+- **Extract** the gated block into a HAL hook (function declared in
+  `hal/<topic>.h`, real impl + stub pair under `drivers/<topic>/`).
+  Use when the gated body is genuinely shared logic with a small
+  per-port variation point. Don't use as a one-call-site rebrand of
+  an `#if` — that's the same gate dressed up.
+- **Delete** if the gate is dead, the body is vestigial, or the
+  surrounding code can be unconditionally compiled with the symbols
+  it references already linking on every port.
+- **Argued exception** — last resort. The gate stays in source,
+  with an in-source comment explaining what was tried and why
+  elimination is impractical at that site. Tracked as a known
+  technical-debt entry.
 
-The flags themselves stay (they remain useful for CMake-level
-composition and runtime-value-in-expression checks; see "What the flags
-are for" at the bottom). What goes away is `#if HAL_PORT_HAS_*` /
-`#if HAL_PORT_IS_*` directives in C source.
+What's NOT in the toolkit:
+
+- ~~Value-in-expression (`if (HAL_PORT_HAS_X) { … }`)~~ — deleted
+  from the toolkit. It's the same coupling as `#if`, dressed in
+  syntax the purity script doesn't grep for. That's gaming, not
+  elimination. Earlier drafts of this plan listed it as a category;
+  it's gone now.
+
+The flags themselves stay (they remain useful for CMake-side file
+selection and as port_config.h self-documentation). What goes away
+is *every* form of `HAL_PORT_*` consultation in compiled source.
 
 ## Current state (2026-05-02)
 
@@ -74,30 +101,34 @@ Editor.c,*,HAL_PORT_HAS_USB_KEYBOARD,extract-hook,keymap dispatch -> hal_keyboar
 …
 ```
 
-Five categories:
+Four categories (down from five — the value-in-expression bucket is
+gone):
 
 1. **split-driver** — file is shared across hardware variants but the
    gated body is hardware-specific. Action: split into per-flavor
-   driver file selected by `port_sources.cmake`.
-2. **extract-hook** — gated block is logically a HAL operation that
-   varies by port. Action: define a hook in `hal/hal_<topic>.h`,
-   provide real + stub impls.
-3. **value-in-expression** — gate can be rewritten as an `if (FLAG)`
-   so the compiler dead-codes one branch. Works when both branches
-   reference symbols that exist on every port.
-4. **delete** — the gated block is dead, the flag has zero remaining
-   consumers, or the surrounding code can be unconditionally compiled.
-5. **(no exemption)** — earlier drafts proposed exempting the legacy
-   multi-board `OPTION RESET <BOARD>` ladders. That was wrong: those
-   ladders are the densest preprocessor coupling in the codebase and
-   the multi-board mechanism itself is a target for elimination.
-   Per-board profile data moves to `drivers/board_profiles/<board>.c`
-   files registered at link time; the `OPTION RESET <BOARD>` command
-   becomes a runtime table walk, not an `#if`-bracketed
-   `checkstring()` ladder. The dual-shipping legacy port directories
-   continue to exist (so existing user `OPTION RESET` invocations
-   keep working), but their `port_defaults.c` files lose all
-   preprocessor gates.
+   driver file selected by `port_sources.cmake`. Body inside each
+   file is unconditional. **Preferred default**.
+2. **extract-hook** — gated block is genuinely shared logic with a
+   small per-port variation point. Hook lives in `hal/hal_<topic>.h`,
+   real + stub impls live under `drivers/<topic>/`. Reserved for
+   cases that aren't trivially file-splittable.
+3. **delete** — the gate, or the body it guards, is vestigial.
+   Removing it changes nothing because the symbols already link on
+   every port (or the body was dead).
+4. **argued-exception** — site-by-site documented "this stays
+   because <concrete reason>, here's what I tried." Last resort,
+   not a default bucket.
+
+No file-level exemptions. The legacy multi-board `OPTION RESET <BOARD>`
+ladders in `ports/{pico,pico_rp2350,vga,vga_rp2350,hdmi_rp2350}/port_defaults.c`
+are NOT exempt — earlier drafts of this plan tagged them so, that was
+wrong. Per-board profile data moves to `drivers/board_profiles/<board>.c`
+files registered at link time; the `OPTION RESET <BOARD>` command
+becomes a runtime registry walk over a string-keyed table, not an
+`#if`-bracketed `checkstring()` ladder. The dual-shipping legacy port
+directories continue to exist (so existing user `OPTION RESET`
+invocations keep working), but their `port_defaults.c` files lose all
+preprocessor gates.
 
 The audit gives a real worklist. Without it, the rest of the plan is
 hand-waving.
@@ -226,70 +257,87 @@ to init, what order, how long to wait). Each maps to a port hook:
 
 Extract per-section. Plan ~2 stages over the file.
 
-### Stage E7 — Reformulate value-in-expression sites
+### Stage E7 — Argue and resolve every remaining gate
 
-After E2–E6, what's left should be small per-file residue that's
-"both branches link cleanly, just one is dead at compile time."
-Rewrite from:
+After E2–E6, walk the remaining sites one at a time. The default
+disposition is "split or extract"; the alternatives are "delete" or
+"argued exception." For each "argued exception" site, write a
+comment at the source that names:
 
-```c
-#if HAL_PORT_HAS_HDMI
-    init_hdmi_clocks();
-#else
-    init_pwm_backlight();
-#endif
-```
+  1. What was tried (split, extract, delete) and why each failed.
+  2. What the linkage / cost trade-off is.
+  3. The concrete reason the gate stays.
 
-to:
+Sites without all three notes don't survive E7.
 
-```c
-if (HAL_PORT_HAS_HDMI) init_hdmi_clocks();
-else                    init_pwm_backlight();
-```
+The E7 pattern that's NOT in the toolkit: rewriting `#if FLAG` as
+`if (FLAG)` while keeping the same coupling. That's gaming the
+purity script — same gate, different syntax. If a gate genuinely
+needs to stay, it stays as `#if` with a documented reason. If it
+can move out of source, it moves all the way out.
 
-This requires both `init_hdmi_clocks` and `init_pwm_backlight` to
-*link* on every port — usually means adding stub functions for the
-inactive side. Compiler folds the constant; same machine code.
+### Stage E8 — Acceptance: zero `HAL_PORT_*` consultation in source
 
-### Stage E8 — Acceptance: zero `#if HAL_PORT_*` in core / drivers
+Final gate. `tools/check_hal_purity.sh` extends to enforce both:
 
-Final gate:
+1. Zero `#if HAL_PORT_*` directives:
+   ```bash
+   grep -rE '^\s*#\s*(if|ifdef|ifndef|elif).*\bHAL_PORT_(HAS|IS)_' \
+       --include='*.c' --include='*.h' . | \
+       grep -v '^./ports/[a-z_]*/port_config\.h' | \
+       grep -v '^./build'
+   ```
+   returns empty.
 
-```bash
-grep -rE '^\s*#\s*(if|ifdef|ifndef|elif).*\bHAL_PORT_(HAS|IS)_' \
-    --include='*.c' --include='*.h' . | \
-    grep -v '^./ports/[a-z_]*/port_config\.h' | \
-    grep -v '^./build'
-```
+2. Zero runtime `if (HAL_PORT_HAS_*)` / `if (HAL_PORT_IS_*)`
+   expressions in C source:
+   ```bash
+   grep -rE '\bif\s*\([^)]*\bHAL_PORT_(HAS|IS)_' \
+       --include='*.c' --include='*.h' . | \
+       grep -v '^./ports/[a-z_]*/port_config\.h' | \
+       grep -v '^./build'
+   ```
+   returns empty.
 
-returns empty. `tools/check_hal_purity.sh` extends to enforce this
-across all source files (not just the strict-scope set).
+The flags themselves still appear in `port_config.h` files (their
+home), in `CMakeLists.txt` / `port_sources.cmake` (CMake-side
+composition reads them), and in array sizes / `static_assert`
+invariants where the flag is used as a *value* the compiler needs
+at compile time, not as a control-flow predicate. Those are the
+three legitimate uses; everything else is gone.
 
-No file-level exemptions. Including the dual-shipping legacy port
-directories — those were initially proposed as exempt, but the
-multi-board mechanism is itself a target for elimination
-(see Stage E1's "no exemption" note).
+The "argued-exception" sites from E7 (if any survive) are listed
+explicitly in `tools/check_hal_purity.sh` as named site exceptions,
+each with a comment pointing to the in-source justification. No
+file-level blanket exemptions.
 
 ## What the flags are still for after E8
 
-If every source-level `#if` goes, the flags don't disappear. They keep
-three jobs:
+If every source-level gate goes, the flags don't disappear. They
+keep three jobs:
 
 1. **CMake-side composition.** `port_sources.cmake` reads each port's
-   palette flags (or their CMake-variable twins) to decide which driver
-   file to link, which library to pull in, which `target_compile_options`
-   to add. Files are selected, not gated.
-2. **Runtime values in C expressions.** `if (HAL_PORT_HAS_SSD1963 &&
-   Option.DISPLAY_TYPE >= SSDPANEL)`, array sizes, `static_assert`
-   invariants, function-pointer table sizing. The flag is a constant
-   value the compiler dead-codes around.
-3. **Self-documenting port_config.h.** `ports/dvi_wifi_rp2350/port_config.h`
-   reads as the inventory: HDMI=1, WiFi=1, USB-host=1, GUI controls=0,
-   I²C keypad=0. New-port authors copy and adjust.
+   palette flags (or their CMake-variable twins) to decide which
+   driver file to link, which library to pull in, which
+   `target_compile_options` to add. Files are selected, not gated.
+2. **Compile-time values in array sizes / `static_assert` invariants
+   / table sizing.** The flag appears as a *value* the compiler
+   needs at compile time (`uint8_t buf[HAL_PORT_KBD_BUF_SIZE]`,
+   `static_assert(HAL_PORT_PIO_COUNT >= 2, "…")`). The flag is not
+   a control-flow predicate — it's an integer constant being used
+   as a number. This is a different thing from `if (FLAG) { ... }`.
+3. **Self-documenting `port_config.h`.** `ports/dvi_wifi_rp2350/port_config.h`
+   reads as the inventory: HDMI=1, WiFi=1, USB-host=1, GUI
+   controls=0, I²C keypad=0. New-port authors copy and adjust.
 
-If a flag has zero CMake consumers AND zero runtime-value consumers
-AND its `port_config.h` definition is the only place it appears, it's
-dead documentation — delete in E2.
+A flag that has zero CMake consumers, zero array-size / static_assert
+consumers, and its `port_config.h` definition is the only place it
+appears, is dead documentation — delete it.
+
+A flag that's used only as a control-flow predicate (`if (FLAG)` or
+`#if FLAG`) is failing the goal of this plan. Either eliminate the
+predicate (split / extract / delete) or document the argued
+exception.
 
 ## Risks
 
