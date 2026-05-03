@@ -155,19 +155,20 @@ Tree gate count: **361 → 224** (137 eliminated, 38%).
 | E6 batch 1 — PicoMite.c (banner/PSRAM/keyscan…)  | DONE     | 12  | TBD |
 | E6 batch 2 — PicoMite.c boot display + CPU speed | DONE     | 3   | TBD |
 | E6 batch 3 — vga_ops.c HDMI tile dispatch        | DONE     | 10  | TBD |
+| E6 batch 4 — mmc_stm32.c CS / PS2 / pinsearch    | DONE     | 9   | TBD |
 | E6 — finish PicoMite.c (41 remaining)            | TODO     | —   | —   |
 | E7 — argue/resolve any leftovers                 | TODO     | —   | —   |
 | E8 — purity-script enforcement                   | TODO     | —   | —   |
 
-Top remaining offender files (post-E6 batch 3):
+Top remaining offender files (post-E6 batch 4):
 
   PicoMite.c                                  23
   ports/pico_sdk_common/misc_option_setters.c 15
-  drivers/sd_spi/mmc_stm32.c                  14
   AllCommands.h                               11
   Hardware_Includes.h                          9
-  Editor.c                                    0   (DONE — fully drained over E5k batches 1 + 2)
-  drivers/vga_pio/vga_ops.c                   0   (DONE — E6 batch 3 routed dispatch through hal_editor_tile_* hooks)
+  drivers/sd_spi/mmc_stm32.c                  5
+  Editor.c                                    0   (DONE)
+  drivers/vga_pio/vga_ops.c                   0   (DONE)
 
 Pattern observed: gates accumulate at *chokepoint* functions — any
 boot-time hook (`InitReservedIO`), giant lookup table (`PinDef[]`),
