@@ -16,6 +16,9 @@ void closeMQTT(void) {}
 void ProcessWeb(int mode) { (void)mode; }
 void TelnetPutC(int c, int flush) { (void)c; (void)flush; }
 void WebConnect(void) {}
+/* port_repl_wifi_arch_init_and_connect is a no-op on non-WiFi ports;
+ * the WiFi init call from MMBasic_REPL.c falls through to nothing. */
+void port_repl_wifi_arch_init_and_connect(void) {}
 /* WEB cmd token is wired into the AllCommands.h table via the WiFi
  * port_tokens.h palette; non-WiFi ports use a different palette and
  * never invoke this stub. The definition keeps the symbol available

@@ -41,6 +41,16 @@ unsigned port_video_sys_clock_khz(unsigned cpu_khz);
  * + WEB are no-ops. */
 void port_video_post_clock_init(void);
 
+/* REPL-startup WiFi init: real impl on WiFi ports calls
+ * cyw43_arch_init + WebConnect; stub no-op elsewhere. Called from
+ * MMBasic_REPL.c after the program-memory clear. */
+void port_repl_wifi_arch_init_and_connect(void);
+
+/* REPL-startup display refresh: real impl on PicoMite SPI-LCD sets
+ * SPIatRisk and full-frame refreshes the panel; stub no-op
+ * elsewhere. */
+void port_repl_post_clear_display_refresh(void);
+
 #ifdef __cplusplus
 }
 #endif

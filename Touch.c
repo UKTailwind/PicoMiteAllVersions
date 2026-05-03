@@ -37,13 +37,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "hal/hal_gui_controls.h"
 #include "hal/hal_display_merge.h"
 #include "hardware/structs/systick.h"
-#if HAL_PORT_HAS_WIFI
-#include "pico/cyw43_arch.h"
-#endif
-#if !HAL_PORT_HAS_WIFI
 #include "pico/multicore.h"
-extern mutex_t	frameBufferMutex;
-#endif
 #include "hardware/i2c.h"
 
 int GetTouchValue(int cmd);
@@ -348,10 +342,10 @@ int __not_in_flash_func(GetTouchValue)(int cmd) {
     val |= (lb >> 3) & 0b11111;          // the bottom 5 bits
     if(Option.CombinedCS)gpio_set_dir(TOUCH_CS_PIN, GPIO_IN);
     else ClearCS(Option.TOUCH_CS);
-    #if HAL_PORT_HAS_WIFI
-            ProcessWeb(1);
-    #endif
-   return val;
+    /* ProcessWeb is universal: real impl on WiFi ports pumps lwIP,
+     * stub no-op elsewhere. Calling unconditionally is harmless. */
+    ProcessWeb(1);
+    return val;
 }
 
 

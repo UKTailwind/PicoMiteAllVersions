@@ -9,6 +9,11 @@
  */
 
 #include "hal/hal_display_merge.h"
+#include "hal/hal_main_init.h"
+
+/* Non-PicoMite ports don't drive an SPI-LCD shadow refresh from the
+ * REPL. Mutually exclusive with display_merge_pico.c's real impl. */
+void port_repl_post_clear_display_refresh(void) { }
 
 void hal_display_merge_abort(void) { }
 void hal_display_merge_check_busy(void) { }

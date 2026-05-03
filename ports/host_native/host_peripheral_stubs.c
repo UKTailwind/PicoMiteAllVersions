@@ -612,3 +612,9 @@ uint32_t PSRAMsize = 0;
  * `slice == KeyboardlightSlice` check is a no-op on host. */
 int KeyboardlightSlice = -1;
 
+/* MMBasic_REPL.c WiFi-init hook is a no-op on host (no WiFi stack).
+ * port_repl_post_clear_display_refresh is provided by
+ * drivers/display_merge/display_merge_stub.c, which the host build
+ * also links. */
+void port_repl_wifi_arch_init_and_connect(void) {}
+

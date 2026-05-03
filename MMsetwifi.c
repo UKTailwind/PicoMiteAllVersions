@@ -288,6 +288,17 @@ int port_setter_pico_pins(unsigned char *cmdline) {
     return 0;
 }
 
+/* REPL-startup WiFi init: cyw43_arch_init + WebConnect. */
+#include "hal/hal_main_init.h"
+extern int startupcomplete;
+
+void port_repl_wifi_arch_init_and_connect(void) {
+    if (cyw43_arch_init() == 0) {
+        startupcomplete = 1;
+        WebConnect();
+    }
+}
+
 /* WiFi ports limit OPTION HEARTBEAT to ON/OFF — no pin reassignment
  * (the heartbeat LED lives on the CYW43 module). */
 int port_setter_heartbeat(unsigned char *cmdline) {

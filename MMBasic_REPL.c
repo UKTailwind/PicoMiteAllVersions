@@ -17,6 +17,7 @@
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
 #include "hal/hal_keyboard.h"
+#include "hal/hal_main_init.h"
 
 /* Defined in MMBasic_Prompt.c. */
 extern int MMPromptPos;
@@ -167,17 +168,12 @@ void MMBasic_RunPromptLoop(void) {
         else {
             ClearProgram(true);
         }
-    #if HAL_PORT_HAS_WIFI
-    if (cyw43_arch_init()==0) {
-        startupcomplete=1;
-        WebConnect();
-    }
-    #endif
-#if HAL_PORT_HAS_PICOMITE
-    SPIatRisk=((Option.DISPLAY_TYPE>I2C_PANEL && Option.DISPLAY_TYPE<BufferedPanel) && Option.SD_CLK_PIN==0);
-    low_x=0;high_x=HRes-1;low_y=0;high_y=VRes-1;
-    if(Option.Refresh)Display_Refresh();
-#endif
+    /* WiFi-stack init + WebConnect: real impl in MMsetwifi.c, stub
+     * no-op in MMweb_stubs.c so the call is unconditional here.
+     * PicoMite SPI-LCD post-clear-program housekeeping (SPIatRisk
+     * + Display_Refresh) sits behind another universal hook. */
+    port_repl_wifi_arch_init_and_connect();
+    port_repl_post_clear_display_refresh();
         PrepareProgram(true);
         if(FindSubFun((unsigned char *)"MM.STARTUP", 0) >= 0) {
             ExecuteProgram((unsigned char *)"MM.STARTUP\0");

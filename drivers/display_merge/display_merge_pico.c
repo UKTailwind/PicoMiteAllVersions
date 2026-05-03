@@ -233,6 +233,17 @@ unsigned port_video_sys_clock_khz(unsigned cpu_khz) { return cpu_khz; }
 
 void port_video_post_clock_init(void) { }
 
+/* PicoMite SPI-LCD post-clear-program housekeeping: SPIatRisk
+ * marker (used by SD/Touch dispatch to avoid bus contention) and a
+ * full-frame refresh of the panel after an autorun-disabled boot. */
+extern unsigned char SPIatRisk;
+void port_repl_post_clear_display_refresh(void) {
+    SPIatRisk = ((Option.DISPLAY_TYPE > I2C_PANEL && Option.DISPLAY_TYPE < BufferedPanel) &&
+                 Option.SD_CLK_PIN == 0);
+    low_x = 0; high_x = HRes - 1; low_y = 0; high_y = VRes - 1;
+    if (Option.Refresh) Display_Refresh();
+}
+
 #include "hal/hal_option_setters.h"
 #include "hal/hal_pin.h"
 

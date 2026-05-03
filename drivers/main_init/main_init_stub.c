@@ -21,6 +21,9 @@ void port_video_post_clock_init(void) { }
 
 extern void disable_systemspi(void);
 
+/* port_repl_post_clear_display_refresh is provided by MMsetwifi.c
+ * on WEB ports (which always link the WiFi stack). */
+
 int port_setter_hdmi_pins(unsigned char *cmdline)         { (void)cmdline; return 0; }
 int port_setter_keyboard_backlight(unsigned char *cmdline){ (void)cmdline; return 0; }
 int port_setter_scroll_start(int64_t *out_iret)           { (void)out_iret; return 0; }
