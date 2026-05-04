@@ -10,13 +10,21 @@ This file is the index. Topic detail lives under `real-hal/` and `real-hal-fixup
 
 ## The standard (non-negotiable)
 
-A core file is "HAL-clean" when **all three** hold:
+A core file is "HAL-clean" when **all four** hold:
 
 1. **Zero `#if` / `#ifdef` / `#ifndef` / `#elif` lines referencing any target macro** — `rp2350`, `PICOMITE`, `PICOMITEVGA`, `PICOMITEWEB`, `MMB4L`, `USBKEYBOARD`, `MMBASIC_HOST`, `MMBASIC_WASM`, or any successor name for the same concept.
 2. **Zero `#if` / `#ifdef` / `#ifndef` lines referencing port-config macros** (`HAL_PORT_*`, `PORT_*`). Port-config constants are allowed as *values* in C expressions and array sizes; they are not allowed as preprocessor gates. Renaming `#ifdef rp2350` to `#if HAL_PORT_PWM_SLICE_COUNT > 8` does not count as elimination.
-3. **Conditional bodies live in HAL impl files or drivers**, not in headers that core includes. `hal/*.h` is pure contract — no target macros, no port-config ifdefs, no feature gates.
+3. **Zero `if (HAL_PORT_*)` / `if (!HAL_PORT_*)` runtime folds** in C statements. Replacing `#if HAL_PORT_X` with `if (HAL_PORT_X) { ... }` is gaming the rule, not eliminating the gate — the source still hard-codes a port-shape branch and the compiler folding it to dead code doesn't make the code portable. Acceptable elimination strategies:
+   - HAL hooks with real-impl + stub driver pair (mutually-exclusive linkage).
+   - File relocation (move the divergent body into a per-port-shape driver TU).
+   - Universal struct-field guards (`if (Option.X)`) where the field exists on every port.
+   - Per-port palette macros / per-port `port_*.h` files included by name.
+   Runtime checks on `Option.*` fields are fine — those reflect user-configurable state, not port shape. Pico SDK target macros (`#ifdef rp2350`) and host-build wrappers (`#if defined(MMBASIC_HOST)`) remain allowed per the existing scope rules.
+4. **Conditional bodies live in HAL impl files or drivers**, not in headers that core includes. `hal/*.h` is pure contract — no target macros, no port-config ifdefs, no feature gates.
 
 A phase closes only when its targeted core files pass that standard. "Infrastructure landed" (HAL header + call sites migrated) is not a phase-exit state. Either finish the ifdef elimination or leave the phase marked 🔧.
+
+The strict purity gate (`tools/check_hal_purity.sh`) currently catches rules 1, 2, and 4. Rule 3 is enforced by review until the gate is extended — running `grep -nE "if \(!?HAL_PORT_" path/to/file.c` is the manual check.
 
 ## Goals (unchanged from the original plan)
 

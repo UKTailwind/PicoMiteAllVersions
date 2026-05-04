@@ -24,12 +24,14 @@
 #   the header-guard is detected by filename match, not by exempting all ifdefs.
 #   See docs/real-hal-fixup-plan.md F1.
 #
-#   Strict core scope — files that must be 0 on target-macro ifdefs AND 0 on
-#   port-config-macro ifdefs. Populated as phases land. Initially empty; each
-#   phase that migrates a core file adds the file to STRICT_FILES below.
+#   Strict core scope — files that must be 0 on target-macro ifdefs, 0 on
+#   port-config-macro ifdefs, AND 0 on `if (HAL_PORT_*)` runtime folds.
+#   Populated as phases land. Initially empty; each phase that migrates a
+#   core file adds the file to STRICT_FILES below.
 #
 #   Informational core scope — all core files. Violations print as counts
-#   but do not fail. Progress-tracking view, not the gate.
+#   but do not fail. Progress-tracking view, not the gate. Reports separate
+#   counts for target ifdefs, port-config ifdefs, and runtime folds.
 #
 # Target macros:
 #   PICOMITE, PICOMITEVGA, PICOMITEWEB, HDMI, rp2350, PICO_RP2350, USBKEYBOARD,
@@ -40,6 +42,16 @@
 #   preprocessor-conditional operand. Allowed as *values* in C expressions and
 #   array sizes; not allowed as preprocessor gates. Renaming #ifdef rp2350 to
 #   #if HAL_PORT_PWM_SLICE_COUNT > 8 does not count as elimination.
+#
+# Runtime folds (rule 3 in docs/real-hal-plan.md "The standard"):
+#   `if (HAL_PORT_X) { ... }` and `if (!HAL_PORT_X) { ... }` count as gates.
+#   The compiler folds them to dead code on the 0/1 value, but the source
+#   still hard-codes a port-shape branch — that's gaming, not eliminating.
+#   Acceptable elimination strategies: HAL hooks with real-impl + stub
+#   driver pair, file relocation, universal Option.* field guards, per-port
+#   palette macros / per-port port_*.h files. Runtime checks on Option.*
+#   fields (e.g. `if (Option.TOUCH_CS)`) are fine — those reflect user
+#   state, not port shape.
 #
 # Detection:
 #   Phase 0: raw grep on #if/#ifdef/#ifndef/#elif lines. Does NOT catch macro
@@ -209,6 +221,21 @@ check_file_strict() {
     echo "$port_hits" | sed 's/^/    /'
     fail=1
   fi
+  # Rule 3: zero `if (HAL_PORT_*)` runtime folds. The compiler folds
+  # them to dead code on a 0/1 value, but the source still hard-codes
+  # a port-shape branch — that's gaming, not eliminating. Only catches
+  # C-statement form; the comment-and-doc form `if (HAL_PORT_X)` in a
+  # /* ... */ block is intentionally not flagged (grep can't tell).
+  local fold_hits
+  fold_hits="$(grep -nE 'if[[:space:]]*\([[:space:]]*!?[[:space:]]*HAL_PORT_' "$file" \
+               | grep -vE '^\s*[0-9]+:\s*[/ ]*\*' \
+               | grep -vE '^\s*[0-9]+:\s*//' \
+               || true)"
+  if [[ -n "$fold_hits" ]]; then
+    echo "HAL-PURITY FAIL: $file contains if (HAL_PORT_*) runtime folds"
+    echo "$fold_hits" | sed 's/^/    /'
+    fail=1
+  fi
 }
 
 check_file_info() {
@@ -216,13 +243,16 @@ check_file_info() {
   if [[ ! -f "$file" ]]; then
     return 0
   fi
-  local count port_count
+  local count port_count fold_count
   count="$(grep -cE "$pattern" "$file" || true)"
   count="${count:-0}"
   port_count="$(grep -cE "$PORT_IFDEF_RE" "$file" || true)"
   port_count="${port_count:-0}"
-  if [[ "$port_count" -gt 0 ]]; then
-    printf '    %-22s target=%-4s port-config=%s\n' "$file" "$count" "$port_count"
+  fold_count="$(grep -cE 'if[[:space:]]*\([[:space:]]*!?[[:space:]]*HAL_PORT_' "$file" || true)"
+  fold_count="${fold_count:-0}"
+  if [[ "$port_count" -gt 0 || "$fold_count" -gt 0 ]]; then
+    printf '    %-22s target=%-4s port-config=%-4s runtime-fold=%s\n' \
+      "$file" "$count" "$port_count" "$fold_count"
   else
     printf '    %-22s target=%s\n' "$file" "$count"
   fi
