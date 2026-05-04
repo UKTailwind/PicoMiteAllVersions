@@ -8,8 +8,9 @@
  * (currently rp2350 PicoMite). Other ports link
  * spi_lcd_mem332_stub.c.
  *
- * Extracted from drivers/spi_lcd/spi_lcd.c's
- * `#if HAL_PORT_HAS_PICOMITE && defined(rp2350)` blocks.
+ * Extracted from drivers/spi_lcd/spi_lcd.c's PicoMite-rp2350-only
+ * NEXTGEN-display blocks. Linkage selected per-port in
+ * port_sources.cmake.
  */
 
 #include "MMBasic_Includes.h"
