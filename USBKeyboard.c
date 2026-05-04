@@ -2609,23 +2609,15 @@ static void process_mouse_report(hid_mouse_report_t const *report, uint8_t n)
 		leftstate = 2;
 	}
 	if (leftstate == 2 && (buttons & MOUSE_BUTTON_LEFT))
-	{ // second press within 500mSec
-		if (timenow - leftpress > 100000)
-		{
-			leftpress = timenow;
-			leftstate = 3;
-			nunstruct[n].Z = 1;
-			nunfoundc[n] = 1;
-		}
-		else
-		{
-			leftstate = 0;
-		}
+	{ // second press within 500mSec - register double click
+		leftpress = timenow;
+		leftstate = 3;
+		nunstruct[n].Z = 1;
+		nunfoundc[n] = 1;
 	}
 	nunstruct[n].L = buttons & MOUSE_BUTTON_LEFT ? 1 : 0;
 	nunstruct[n].R = buttons & MOUSE_BUTTON_RIGHT ? 1 : 0;
 	nunstruct[n].C = buttons & MOUSE_BUTTON_MIDDLE ? 1 : 0;
-	nunstruct[n].x0 = buttons;
 	nunstruct[n].ax += x_delta / 2;
 	if (nunstruct[n].ax >= HRes)
 		nunstruct[n].ax = HRes - 1;

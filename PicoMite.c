@@ -1205,15 +1205,15 @@ int __not_in_flash_func(MMInkey)(void)
         // Calculate line wrap positions
         if (Option.DISPLAY_CONSOLE && Option.Width <= SCREENWIDTH)
         {
-            l2 = SCREENWIDTH + 1 - MMPromptPos;
-            l3 = 2 * SCREENWIDTH + 2 - MMPromptPos;
-            l4 = 3 * SCREENWIDTH + 3 - MMPromptPos;
+            l2 = SCREENWIDTH  - MMPromptPos;
+            l3 = 2 * SCREENWIDTH  - MMPromptPos;
+            l4 = 3 * SCREENWIDTH  - MMPromptPos;
         }
         else
         {
-            l2 = Option.Width + 1 - MMPromptPos;
-            l3 = 2 * Option.Width + 2 - MMPromptPos;
-            l4 = 3 * Option.Width + 3 - MMPromptPos;
+            l2 = Option.Width  - MMPromptPos;
+            l3 = 2 * Option.Width  - MMPromptPos;
+            l4 = 3 * Option.Width  - MMPromptPos;
         }
 
         strcpy(goend, "\e[");

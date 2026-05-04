@@ -3174,6 +3174,28 @@ int MIPS16 checkslice(int pin1, int pin2, int ignore)
     return PinDef[pin1].slice & 0xf;
 }
 
+/*  setterminal(height, width)
+ *  ---------------------------
+ *  Emit the VT100/xterm "resize window" escape sequence (CSI 8 ; H ; W t) on the
+ *  serial console so that an attached terminal emulator (Tera Term, PuTTY,
+ *  xterm, etc.) is asked to resize its window to `height` rows by `width`
+ *  columns. This is purely advisory: a real serial terminal will honour it,
+ *  the embedded LCD console ignores it.
+ *
+ *  Note: the autowrap mode is intentionally left untouched here. Callers that
+ *  need autowrap disabled (currently only the full-screen editor / FM) emit
+ *  their own DECAWM (CSI ?7l / ?7h) sequences around their own session so
+ *  that other callers (OPTION LCDPANEL CONSOLE, OPTION DISPLAY ...) do not
+ *  silently change the user's terminal wrap mode.
+ *
+ *  Call sites:
+ *    - OPTION LCDPANEL NOCONSOLE  : reset terminal back to 80x24 default.
+ *    - OPTION LCDPANEL CONSOLE    : grow terminal to LCD console size if >80x24.
+ *    - OPTION DISPLAY DISABLE     : reset terminal back to 80x24 default.
+ *    - OPTION DISPLAY h,w         : resize terminal to match new console size.
+ *    - EDIT / EDITFILE entry      : grow terminal to fit the editor.
+ *    - FM (file manager) entry    : grow terminal to fit FM.
+ */
 void MIPS16 setterminal(int height, int width)
 {
     char sp[20] = {0};
@@ -3182,7 +3204,6 @@ void MIPS16 setterminal(int height, int width)
     strcat(sp, ";");
     IntToStr(&sp[strlen(sp)], width, 10);
     strcat(sp, "t");
-    strcat(sp, "\033[?7l");
     SSPrintString(sp); //
 }
 #ifdef USBKEYBOARD
@@ -5524,6 +5545,8 @@ void MIPS16 cmd_option(void)
         Option.Height = SCREENHEIGHT;
         Option.Width = SCREENWIDTH;
         SaveOptions();
+        // OPTION LCDPANEL NOCONSOLE: console reverts to the LCD panel, so
+        // shrink any attached serial terminal back to the 80x24 default.
         setterminal(Option.Height, Option.Width);
         ClearScreen(Option.DefaultBC);
         return;
@@ -6052,6 +6075,8 @@ void MIPS16 cmd_option(void)
             {
                 Option.Height = SCREENHEIGHT;
                 Option.Width = SCREENWIDTH;
+                // OPTION DISPLAY DISABLE while the LCD console was active:
+                // restore the serial terminal to the 80x24 default.
                 setterminal(Option.Height, Option.Width);
             }
             DrawRectangle = (void (*)(int, int, int, int, int))DisplayNotSet;
@@ -6123,10 +6148,14 @@ void MIPS16 cmd_option(void)
             Option.Width = getint(argv[2], 37, 240);
         if (Option.DISPLAY_CONSOLE)
         {
+            // LCD console is active: ensure attached serial terminal is at
+            // least 80x24, growing it if the LCD console is larger.
             setterminal((Option.Height > SCREENHEIGHT) ? Option.Height : SCREENHEIGHT, (Option.Width > SCREENWIDTH) ? Option.Width : SCREENWIDTH); // or height is > 24
         }
         else
         {
+            // No LCD console: resize the serial terminal to exactly the
+            // requested dimensions.
             setterminal(Option.Height, Option.Width);
         }
         if (argc >= 1)
@@ -8726,8 +8755,10 @@ void fun_peek(void)
             axis = 'Y';
         else if (checkstring(p, (unsigned char *)"Z"))
             axis = 'Z';
+        else if (checkstring(p, (unsigned char *)"A"))
+            axis = 'A';
         else
-            error("Expected X, Y, Z, ACTIVE, STATUS, or BUFFER");
+            error("Expected X, Y, Z, A, ACTIVE, STATUS, or BUFFER");
 
         if (!stepper_query_position_mm(axis, &pos_mm))
             error("Stepper axis not configured");

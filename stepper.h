@@ -54,14 +54,14 @@ Recover from an abnormal state (eg. after a runtime error).
 Stops any executing move, clears the G-code buffer, turns the spindle off,
 and DISARMS motion execution (no automatic resume). Drivers are not automatically disabled.
 
-STEPPER AXIS X|Y|Z, step_pin, dir_pin [,enable_pin] [,dir_invert] [,steps_per_mm] [,max_velocity] [,max_accel] [,home_backoff_mm]
+STEPPER AXIS X|Y|Z|A, step_pin, dir_pin [,enable_pin] [,dir_invert] [,steps_per_mm] [,max_velocity] [,max_accel] [,home_backoff_mm]
 Configure an axis.
 Pins may be specified as a physical pin number or GPxx.
 ‘enable_pin’ is optional; if omitted then ENABLE for that axis is unavailable.
 ‘dir_invert’ is 0 or 1.
-‘max_velocity’ is in mm/min (same units as G-code F).
-‘max_accel’ is in mm/s^2.
-‘home_backoff_mm’ is the homing switch clear/backoff distance in mm (default 3.0).
+‘max_velocity’ is in mm/min (same units as G-code F).  For the A axis it is interpreted in deg/min and ' steps_per_mm' is interpreted as steps-per-degree.
+‘max_accel’ is in mm/s^2 (deg/s^2 for the A axis).
+‘home_backoff_mm’ is the homing switch clear/backoff distance in mm (default 3.0).  The A axis is not homed by G28.
 A reasonable default jerk is automatically calculated when axes are configured.
 
 STEPPER JERK jerk_mm_s^3
@@ -73,10 +73,10 @@ STEPPER SCURVE 0|1
 Enable (1) or disable (0) jerk-limited S-curve motion planning for standalone G0/G1 moves.
 Arc segments (from G2/G3 linearisation) use the existing approach initially.
 
-STEPPER INVERT X|Y|Z, 0|1
+STEPPER INVERT X|Y|Z|A, 0|1
 Invert the direction signal for an axis.
 
-STEPPER ENABLE X|Y|Z|ALL [,0|1]
+STEPPER ENABLE X|Y|Z|A|ALL [,0|1]
 Enable (1, default) or disable (0) stepper drivers.
 Enable pins are assumed active-low.
 
@@ -100,9 +100,10 @@ Example: STEPPER HWLIMITS 10, 11, 12  ' Only min limits
 STEPPER LIMITS X|Y|Z, min_mm, max_mm
 Set soft limits for an axis.
 Moves that would exceed limits will generate an error.
+Soft limits are not supported for the A axis (it is treated as unbounded rotary).
 
-STEPPER POSITION X|Y|Z, position_mm
-Set the current position for an axis (in mm).
+STEPPER POSITION X|Y|Z|A, position_mm
+Set the current position for an axis (in mm; degrees for A).
 This establishes the hardware position and marks position as known.
 G28 homing will override this by zeroing the hardware position.
 
@@ -110,7 +111,7 @@ STEPPER RESET
 Reset all axis configurations to defaults.
 Note: This does not stop the 100kHz timer; use STEPPER CLOSE for shutdown.
 
-STEPPER GCODE G0|G1|G2|G3|G4|G28|G61|G64|G90|G91|G92|M03|M05 [,X x] [,Y y] [,Z z] [,F feedrate] [,I i] [,J j] [,K k] [,R r] [,P ms]
+STEPPER GCODE G0|G1|G2|G3|G4|G28|G61|G64|G90|G91|G92|M03|M05 [,X x] [,Y y] [,Z z] [,A a] [,F feedrate] [,I i] [,J j] [,K k] [,R r] [,P ms]
 Queue a G-code command into the circular buffer.
 G28: Home specified axes (requires min limit switches configured).
     If no axes are specified, homes all configured axes.
@@ -131,6 +132,9 @@ G90 selects absolute mode and G91 selects incremental mode (no motion).
 For G1/G2/G3 a feedrate must have been set.
 Feedrate 'F' is specified in mm/min (as per G-code) and is converted to mm/s internally.
 Arc commands G2/G3 require either I,J (centre offsets) or R (radius).
+The A word is ignored on G2/G3 (rotary slave is not interpolated through arcs).
+For combined XYZ+A moves, F is interpreted in mm/min over the XYZ Euclidean length and A is dragged as a slave.  For A-only moves (no XYZ delta) F is interpreted as deg/min and the move duration is computed from |ΔA|.
+A is not homed by G28 and has no soft limits or hardware limit-switch support.
 All motion commands use workspace coordinates (respecting G92 offsets).
 Soft limits are checked against hardware position (workspace coords - G92 offset).
 
@@ -150,8 +154,8 @@ Optional mode argument controls idle behavior after queue drain:
 STEPPER STATUS
 Report arming state, motion state, buffer status, and axis positions.
 
-PEEK(STEPPER X|Y|Z)
-Return current workspace axis position in mm.
+PEEK(STEPPER X|Y|Z|A)
+Return current workspace axis position in mm (degrees for A).
 
 PEEK(STEPPER ACTIVE)
 Return 1 when stepper execution is armed and actively processing queued work, else 0.
@@ -242,12 +246,13 @@ typedef struct
 
 } stepper_axis_t;
 
-// Structure to hold all three axes
+// Structure to hold all axes (X, Y, Z plus optional rotary slave A axis)
 typedef struct
 {
     stepper_axis_t x; // X-axis parameters
     stepper_axis_t y; // Y-axis parameters
     stepper_axis_t z; // Z-axis parameters
+    stepper_axis_t a; // A-axis parameters (rotary slave; deg/min when A-only)
 
     // Global motion parameters
     bool motion_active;     // Is any motion currently active
@@ -272,6 +277,7 @@ typedef struct
     float x_g92_offset;  // G92 workspace offset for X axis (mm)
     float y_g92_offset;  // G92 workspace offset for Y axis (mm)
     float z_g92_offset;  // G92 workspace offset for Z axis (mm)
+    float a_g92_offset;  // G92 workspace offset for A axis (degrees)
     bool position_known; // True if POSITION or G28 has established machine position
 
     // Spindle control (optional)
@@ -358,9 +364,11 @@ typedef struct arc_segment_runtime
     int32_t x_steps;
     int32_t y_steps;
     int32_t z_steps;
+    int32_t a_steps;
     bool x_dir;
     bool y_dir;
     bool z_dir;
+    bool a_dir;
     int32_t major_steps;
     uint8_t major_axis_mask;
 } arc_segment_runtime_t;
@@ -374,11 +382,13 @@ typedef struct
     volatile bool x_active;
     volatile bool y_active;
     volatile bool z_active;
+    volatile bool a_active;
 
     // Direction per axis (true = positive, false = negative)
     volatile bool x_dir;
     volatile bool y_dir;
     volatile bool z_dir;
+    volatile bool a_dir;
 
     // Metadata for boundary management
     volatile uint8_t major_axis_mask;      // Bitmask of axes whose step counts match the major axis
@@ -390,9 +400,11 @@ typedef struct
     volatile int32_t x_steps;     // Total steps for X
     volatile int32_t y_steps;     // Total steps for Y
     volatile int32_t z_steps;     // Total steps for Z
+    volatile int32_t a_steps;     // Total steps for A
     volatile int32_t x_error;     // Bresenham error term for X
     volatile int32_t y_error;     // Bresenham error term for Y
     volatile int32_t z_error;     // Bresenham error term for Z
+    volatile int32_t a_error;     // Bresenham error term for A
 
     // Steps tracking (based on major axis)
     volatile int32_t steps_remaining;       // Steps left in current phase
@@ -451,12 +463,14 @@ typedef struct
     gcode_motion_type_t type; // Command type (G00, G01, G02, G03)
 
     // Target position (absolute or relative depending on mode)
-    float x;    // X target coordinate
-    float y;    // Y target coordinate
-    float z;    // Z target coordinate
+    float x;    // X target coordinate (mm)
+    float y;    // Y target coordinate (mm)
+    float z;    // Z target coordinate (mm)
+    float a;    // A target coordinate (degrees)
     bool has_x; // X coordinate specified
     bool has_y; // Y coordinate specified
     bool has_z; // Z coordinate specified
+    bool has_a; // A coordinate specified
 
     // Arc parameters (for G02/G03)
     float i;         // X offset to arc center
@@ -469,10 +483,11 @@ typedef struct
     float feedrate; // Feedrate in mm/s (converted from G-code mm/min)
 
     // Calculated values (filled during planning)
-    float distance;   // Total distance of move
+    float distance;   // Total distance of move (mm for XYZ-bearing moves; |ΔA| degrees for A-only moves)
     uint32_t steps_x; // Number of steps for X axis
     uint32_t steps_y; // Number of steps for Y axis
     uint32_t steps_z; // Number of steps for Z axis
+    uint32_t steps_a; // Number of steps for A axis
 
     // Motion profile
     float entry_velocity; // Velocity at start of move
@@ -486,9 +501,11 @@ typedef struct
     int32_t x_steps_planned; // Absolute steps for X
     int32_t y_steps_planned; // Absolute steps for Y
     int32_t z_steps_planned; // Absolute steps for Z
+    int32_t a_steps_planned; // Absolute steps for A
     bool x_dir;              // X direction (true = positive)
     bool y_dir;              // Y direction (true = positive)
     bool z_dir;              // Z direction (true = positive)
+    bool a_dir;              // A direction (true = positive)
 
     // Major axis (most steps) determines timing
     int32_t major_steps;          // Steps for major axis
@@ -522,6 +539,7 @@ typedef struct
     int32_t scurve_jd_decel_steps;
 
     // Geometry for junction speed estimation (unit direction vector + scaling)
+    // Note: A axis is excluded from the unit vector (treated as a slave for junction math).
     float unit_x;
     float unit_y;
     float unit_z;
@@ -551,9 +569,11 @@ typedef struct
     int32_t x_steps_planned;
     int32_t y_steps_planned;
     int32_t z_steps_planned;
+    int32_t a_steps_planned;
     bool x_dir;
     bool y_dir;
     bool z_dir;
+    bool a_dir;
 
     int32_t major_steps;
     int32_t accel_steps;

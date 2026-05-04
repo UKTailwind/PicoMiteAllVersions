@@ -767,9 +767,14 @@ void edit(unsigned char *cmdline, bool cmdfile)
     // Only setterminal if editor requires is bigger than 80*24
     if (Option.Width > SCREENWIDTH || Option.Height > SCREENHEIGHT)
     {
+        // Ask the attached serial terminal to grow to the editor's size.
+        // setterminal() no longer changes autowrap; the explicit DECAWM
+        // (CSI ?7l) below disables wrap for the duration of the editor and
+        // is paired with a CSI ?7h on exit further down in this function.
         setterminal((Option.Height > SCREENHEIGHT) ? Option.Height : SCREENHEIGHT, (Option.Width > SCREENWIDTH) ? Option.Width : SCREENWIDTH); // or height is > 24
     }
     PrintString("\033[?1000h");        // Tera Term turn on mouse click report in VT200 mode
+    PrintString("\033[?7l");           // disable autowrap while in editor
     PrintString("\0337\033[2J\033[H"); // vt100 clear screen and home cursor
     MX470Display(DISPLAY_CLS);         // clear screen on the MX470 display only
     SCursor(0, 0);
@@ -4410,6 +4415,10 @@ fm_relaunch:
         error("FM needs at least 8 rows");
 
     if (Option.Width > SCREENWIDTH || Option.Height > SCREENHEIGHT)
+        // FM entry: ask the attached serial terminal to grow to fit the
+        // file manager. Like the editor, FM manages its own DECAWM state if
+        // it needs autowrap disabled; setterminal() itself no longer touches
+        // wrap mode.
         setterminal((Option.Height > SCREENHEIGHT) ? Option.Height : SCREENHEIGHT,
                     (Option.Width > SCREENWIDTH) ? Option.Width : SCREENWIDTH);
 
@@ -5340,6 +5349,299 @@ static uint16_t lastfc, lastbc;
 static bool leftpushed = false, rightpushed = false, middlepushed = false;
 #endif
 #endif
+
+#ifndef PICOMITEMIN
+/* ----------------------------------------------------------------------------
+ * editBeautify - Re-indent the editor buffer with 2-space block indentation.
+ *
+ * Recognised block structures:
+ *   IF ... THEN  /  ELSE / ELSEIF / END IF / ENDIF       (multi-line only)
+ *   FOR ... NEXT
+ *   DO[/WHILE/UNTIL] ... LOOP[/WHILE/UNTIL]
+ *   SELECT CASE ... CASE / CASE ELSE ... END SELECT
+ *   FUNCTION ... END FUNCTION
+ *   SUB ... END SUB
+ *   TYPE ... END TYPE                                    (STRUCTENABLED only)
+ *
+ * Single-line IF (with statements after THEN) is left at the prevailing
+ * indent without opening a block.  Blank lines are emitted with no indent.
+ * Comment-only lines are indented at the current level.
+ * --------------------------------------------------------------------------*/
+static int beautify_token_match(const char *up, int idx, const char *kw)
+{
+    int klen = (int)strlen(kw);
+    for (int i = 0; i < klen; i++)
+    {
+        if (up[idx + i] != kw[i])
+            return 0;
+    }
+    char nxt = up[idx + klen];
+    return (nxt == 0 || nxt == ' ' || nxt == '\t' || nxt == ':');
+}
+
+static void editBeautify(int edit_buff_size)
+{
+    /* ---- Pass 1: remove all blank/whitespace-only lines ---- */
+    {
+        unsigned char *src = EdBuff;
+        unsigned char *dst = EdBuff;
+        while (*src)
+        {
+            unsigned char *line_start = src;
+            unsigned char *eol = src;
+            while (*eol && *eol != '\n')
+                eol++;
+            unsigned char *t = line_start;
+            while (t < eol && (*t == ' ' || *t == '\t'))
+                t++;
+            int blank = (t >= eol);
+            int line_len = (int)(eol - line_start) + (*eol == '\n' ? 1 : 0);
+            if (!blank)
+            {
+                if (dst != line_start)
+                    memmove(dst, line_start, line_len);
+                dst += line_len;
+            }
+            src = line_start + line_len;
+        }
+        *dst = 0;
+    }
+
+    /* ---- Pass 2: insert one blank line before each SUB / FUNCTION
+     *               (except at start of buffer).                       */
+    {
+        unsigned char *p = EdBuff;
+        int first_line = 1;
+        while (*p)
+        {
+            unsigned char *line_start = p;
+            unsigned char *eol = p;
+            while (*eol && *eol != '\n')
+                eol++;
+
+            unsigned char *s = line_start;
+            while (s < eol && (*s == ' ' || *s == '\t'))
+                s++;
+
+            char up[16] = {0};
+            int ulen = 0;
+            for (unsigned char *q = s; q < eol && ulen < (int)sizeof(up) - 1; q++)
+            {
+                char ch = (char)*q;
+                if (ch >= 'a' && ch <= 'z')
+                    ch = (char)(ch - 32);
+                up[ulen++] = ch;
+            }
+
+            int is_sub_or_func = (beautify_token_match(up, 0, "SUB") ||
+                                  beautify_token_match(up, 0, "FUNCTION"));
+
+            if (is_sub_or_func && !first_line)
+            {
+                /* Insert a single '\n' at line_start.  Need 1 byte of room. */
+                unsigned char *bufend = line_start;
+                while (*bufend)
+                    bufend++;
+                if ((bufend - EdBuff) + 1 >= edit_buff_size - 10)
+                {
+                    editDisplayMsg((unsigned char *)" BEAUTIFY: BUFFER FULL ");
+                    return;
+                }
+                int tail_len = (int)(bufend - line_start) + 1; /* incl. NUL */
+                memmove(line_start + 1, line_start, tail_len);
+                *line_start = '\n';
+                /* Skip past the inserted newline; recompute eol */
+                line_start++;
+                eol = line_start;
+                while (*eol && *eol != '\n')
+                    eol++;
+            }
+
+            first_line = 0;
+            p = eol + (*eol == '\n' ? 1 : 0);
+        }
+    }
+
+    /* ---- Pass 3: re-indent each line based on block structure ---- */
+    int level = 0;
+    unsigned char *p = EdBuff;
+
+    while (*p)
+    {
+        unsigned char *line_start = p;
+
+        /* Find current end-of-line and the existing leading whitespace */
+        unsigned char *eol = p;
+        while (*eol && *eol != '\n')
+            eol++;
+
+        unsigned char *s = line_start;
+        while (s < eol && (*s == ' ' || *s == '\t'))
+            s++;
+
+        /* Build a small uppercase token buffer for keyword sniffing */
+        char up[40] = {0};
+        int ulen = 0;
+        for (unsigned char *q = s; q < eol && ulen < (int)sizeof(up) - 1; q++)
+        {
+            char ch = (char)*q;
+            if (ch >= 'a' && ch <= 'z')
+                ch = (char)(ch - 32);
+            up[ulen++] = ch;
+        }
+
+        int dedent_self = 0;
+        int indent_after = 0;
+        int is_blank = (s >= eol);
+        int is_comment = 0;
+        if (!is_blank)
+        {
+            if (*s == '\'')
+                is_comment = 1;
+            else if (ulen >= 3 && up[0] == 'R' && up[1] == 'E' && up[2] == 'M' &&
+                     (ulen == 3 || up[3] == ' ' || up[3] == '\t'))
+                is_comment = 1;
+        }
+
+        if (!is_blank && !is_comment)
+        {
+            if (beautify_token_match(up, 0, "ENDIF"))
+                dedent_self = 1;
+            else if (beautify_token_match(up, 0, "END") && beautify_token_match(up, 4, "IF"))
+                dedent_self = 1;
+            else if (beautify_token_match(up, 0, "NEXT"))
+                dedent_self = 1;
+            else if (beautify_token_match(up, 0, "LOOP"))
+                dedent_self = 1;
+            else if (beautify_token_match(up, 0, "END") && beautify_token_match(up, 4, "SELECT"))
+                dedent_self = 1;
+            else if (beautify_token_match(up, 0, "END") && beautify_token_match(up, 4, "FUNCTION"))
+                dedent_self = 1;
+            else if (beautify_token_match(up, 0, "END") && beautify_token_match(up, 4, "SUB"))
+                dedent_self = 1;
+#ifdef STRUCTENABLED
+            else if (beautify_token_match(up, 0, "END") && beautify_token_match(up, 4, "TYPE"))
+                dedent_self = 1;
+#endif
+            else if (beautify_token_match(up, 0, "ELSE") ||
+                     beautify_token_match(up, 0, "ELSEIF"))
+            {
+                dedent_self = 1;
+                indent_after = 1;
+            }
+            else if (beautify_token_match(up, 0, "CASE"))
+            {
+                dedent_self = 1;
+                indent_after = 1;
+            }
+
+            if (beautify_token_match(up, 0, "FOR"))
+                indent_after = 1;
+            else if (beautify_token_match(up, 0, "DO"))
+                indent_after = 1;
+            else if (beautify_token_match(up, 0, "SELECT") && beautify_token_match(up, 7, "CASE"))
+                indent_after = 1;
+            else if (beautify_token_match(up, 0, "FUNCTION"))
+                indent_after = 1;
+            else if (beautify_token_match(up, 0, "SUB"))
+                indent_after = 1;
+#ifdef STRUCTENABLED
+            else if (beautify_token_match(up, 0, "TYPE"))
+                indent_after = 1;
+#endif
+            else if (beautify_token_match(up, 0, "IF"))
+            {
+                int found_after = -1;
+                for (unsigned char *r = s + 2; r + 4 < eol; r++)
+                {
+                    if ((r[0] == ' ' || r[0] == '\t') &&
+                        (r[1] == 'T' || r[1] == 't') && (r[2] == 'H' || r[2] == 'h') &&
+                        (r[3] == 'E' || r[3] == 'e') && (r[4] == 'N' || r[4] == 'n'))
+                    {
+                        unsigned char *after = r + 5;
+                        if (after == eol || *after == ' ' || *after == '\t')
+                        {
+                            found_after = (int)(after - s);
+                            break;
+                        }
+                    }
+                }
+                if (found_after >= 0)
+                {
+                    unsigned char *a = s + found_after;
+                    while (a < eol && (*a == ' ' || *a == '\t'))
+                        a++;
+                    if (a >= eol || *a == '\'')
+                        indent_after = 1;
+                }
+            }
+        }
+
+        int line_indent = level - dedent_self;
+        if (line_indent < 0)
+            line_indent = 0;
+        int want_spaces = is_blank ? 0 : (line_indent * 2);
+        int have_spaces = (int)(s - line_start);
+
+        /* Adjust leading whitespace in place by shifting the tail of the buffer */
+        if (want_spaces != have_spaces)
+        {
+            int diff = want_spaces - have_spaces; /* >0 grow, <0 shrink */
+
+            /* Find end of buffer (NUL terminator) */
+            unsigned char *bufend = s;
+            while (*bufend)
+                bufend++;
+            int tail_len = (int)(bufend - s); /* bytes from s through, not incl. NUL */
+
+            if (diff > 0)
+            {
+                /* Need to grow: ensure there's room (10-byte slack like editInsertChar) */
+                if ((bufend - EdBuff) + diff >= edit_buff_size - 10)
+                {
+                    editDisplayMsg((unsigned char *)" BEAUTIFY: BUFFER FULL ");
+                    return;
+                }
+                /* Shift tail (including NUL) right by diff */
+                memmove(s + diff, s, tail_len + 1);
+            }
+            else
+            {
+                /* Shrink: shift tail (including NUL) left by -diff */
+                memmove(s + diff, s, tail_len + 1);
+            }
+
+            /* Fill new leading spaces */
+            for (int i = 0; i < want_spaces; i++)
+                line_start[i] = ' ';
+
+            /* Recompute eol after shift */
+            eol = line_start + want_spaces;
+            while (*eol && *eol != '\n')
+                eol++;
+        }
+        else
+        {
+            /* Same width - just rewrite spaces (in case some were tabs) */
+            for (int i = 0; i < want_spaces; i++)
+                line_start[i] = ' ';
+        }
+
+        /* Advance to the character after the newline (or end) */
+        p = eol;
+        if (*p == '\n')
+            p++;
+
+        if (dedent_self)
+            level--;
+        if (indent_after)
+            level++;
+        if (level < 0)
+            level = 0;
+    }
+}
+#endif /* !PICOMITEMIN */
+
 void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdfile)
 {
     edit_is_bas = (fname == NULL || fstrstr(fname, ".bas") != NULL);
@@ -6046,6 +6348,7 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
                 int fm_exit_key = c;
 #endif
                 PrintString("\033[?1000l");        // Tera Term turn off mouse click report in vt200 mode
+                PrintString("\033[?7h");           // restore autowrap (was disabled by setterminal on entry)
                 PrintString("\0338\033[2J\033[H"); // vt100 clear screen and home cursor
                 gui_fcolour = GUI_C_NORMAL;
                 PrintString(VT100_C_NORMAL);
@@ -6441,10 +6744,27 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
             }
             break;
 
-            // F11 to F12 - Normal function keys
+            // F11 - reserved
             case F11:
+                break;
+
+#ifndef PICOMITEMIN
+            // F12 - Beautify (re-indent block structures)
+            case F12:
+                editBeautify(edit_buff_size);
+                TextChanged = true;
+                /* After buffer rewrite, restore cursor to start of buffer */
+                txtp = EdBuff;
+                edx = edy = curx = cury = 0;
+                printScreen();
+                PositionCursor(txtp);
+                PrintStatus();
+                editDisplayMsg((unsigned char *)" BEAUTIFIED ");
+                break;
+#else
             case F12:
                 break;
+#endif
 
             // a normal character
             default:
@@ -7883,11 +8203,11 @@ void PrintFunctKeys(int typ)
     if (typ == EDIT)
     {
         if (VWidth > 80)
-            p = "ESC:Exit F1:Save F2:Run F3/6:Find/r F4:Mrk F5:Paste F7/8:Rpl/r F9:In F10:Out";
+            p = "ESC:Exit F1:Save F2:Run F3/6:Find/r F4:Mrk F5:Paste F7/8:Rpl/r F9:In F10:Out F12:Beautify";
         else if (VWidth >= 70)
-            p = "F1:Save F2:Run F3:Find F4:Mark F5:Paste F7:Repl F7/8:Rpl/r";
+            p = "F1:Save F2:Run F3:Find F4:Mark F5:Paste F7:Repl F7/8:Rpl/r F12:Btfy";
         else if (VWidth >= 55)
-            p = "F1:Save F2:Run F3:Find F4:Mrk F5:Paste F9:In F10:Out";
+            p = "F1:Save F2:Run F3:Find F4:Mrk F5:Paste F9:In F10:Out F12:Btfy";
         else
             p = "EDIT MODE";
     }

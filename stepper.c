@@ -63,6 +63,7 @@ static inline uint32_t stepper_dwell_ms_to_ticks(double ms);
 static float planner_x = 0.0f;
 static float planner_y = 0.0f;
 static float planner_z = 0.0f;
+static float planner_a = 0.0f;
 
 // Global stepper system instance (must be defined before helpers that use it)
 static stepper_system_t stepper_system = {0};
@@ -135,6 +136,8 @@ float get_axis_position_mm(const stepper_axis_t *axis)
             return hw_position + stepper_system.y_g92_offset;
         else if (axis == &stepper_system.z)
             return hw_position + stepper_system.z_g92_offset;
+        else if (axis == &stepper_system.a)
+            return hw_position + stepper_system.a_g92_offset;
 
         return hw_position;
     }
@@ -182,9 +185,11 @@ static inline void stepper_pack_runtime_block(stepper_runtime_block_t *dst, cons
     dst->x_steps_planned = src->x_steps_planned;
     dst->y_steps_planned = src->y_steps_planned;
     dst->z_steps_planned = src->z_steps_planned;
+    dst->a_steps_planned = src->a_steps_planned;
     dst->x_dir = src->x_dir;
     dst->y_dir = src->y_dir;
     dst->z_dir = src->z_dir;
+    dst->a_dir = src->a_dir;
     dst->major_steps = src->major_steps;
     dst->accel_steps = src->accel_steps;
     dst->cruise_steps = src->cruise_steps;
@@ -226,9 +231,11 @@ static inline void stepper_unpack_runtime_block(gcode_block_t *dst, const steppe
     dst->x_steps_planned = src->x_steps_planned;
     dst->y_steps_planned = src->y_steps_planned;
     dst->z_steps_planned = src->z_steps_planned;
+    dst->a_steps_planned = src->a_steps_planned;
     dst->x_dir = src->x_dir;
     dst->y_dir = src->y_dir;
     dst->z_dir = src->z_dir;
+    dst->a_dir = src->a_dir;
     dst->major_steps = src->major_steps;
     dst->accel_steps = src->accel_steps;
     dst->cruise_steps = src->cruise_steps;
@@ -312,6 +319,7 @@ static void planner_reset_position(void)
     planner_x = 0.0f;
     planner_y = 0.0f;
     planner_z = 0.0f;
+    planner_a = 0.0f;
 }
 
 // Sync planner position to current physical position (derived from ISR-updated step counters)
@@ -332,6 +340,11 @@ static void planner_sync_to_physical(void)
         planner_z = (float)stepper_system.z.current_pos / stepper_system.z.steps_per_mm + stepper_system.z_g92_offset;
     else
         planner_z = 0.0f;
+
+    if (axis_is_configured(&stepper_system.a) && stepper_system.a.steps_per_mm > 0.0f)
+        planner_a = (float)stepper_system.a.current_pos / stepper_system.a.steps_per_mm + stepper_system.a_g92_offset;
+    else
+        planner_a = 0.0f;
 }
 
 // Recompute trapezoid/triangle profile for a linear move block.
@@ -1041,8 +1054,8 @@ static volatile bool stepper_armed = false;
 // Minimum allowed time between step pulses is derived from each axis' configured
 // max velocity and steps/mm. If any axis is not ready for its next step, then
 // all axis steps scheduled for that tick are deferred (maintains coordination).
-static volatile uint16_t stepper_axis_min_step_ticks[3] = {1, 1, 1};
-static volatile uint32_t stepper_axis_last_step_tick[3] = {0, 0, 0};
+static volatile uint16_t stepper_axis_min_step_ticks[4] = {1, 1, 1, 1};
+static volatile uint32_t stepper_axis_last_step_tick[4] = {0, 0, 0, 0};
 static uint64_t stepper_pending_step_mask = 0; // step pins asserted last tick, cleared at next ISR entry
 
 typedef struct
@@ -1098,6 +1111,7 @@ static void stepper_recompute_axis_step_tick_limits(void)
     stepper_axis_min_step_ticks[0] = stepper_compute_axis_min_step_ticks(&stepper_system.x);
     stepper_axis_min_step_ticks[1] = stepper_compute_axis_min_step_ticks(&stepper_system.y);
     stepper_axis_min_step_ticks[2] = stepper_compute_axis_min_step_ticks(&stepper_system.z);
+    stepper_axis_min_step_ticks[3] = stepper_compute_axis_min_step_ticks(&stepper_system.a);
 }
 
 bool stepper_query_position_mm(char axis, float *pos_mm)
@@ -1127,6 +1141,13 @@ bool stepper_query_position_mm(char axis, float *pos_mm)
         if (axis_is_configured(&stepper_system.z))
         {
             *pos_mm = get_axis_position_mm(&stepper_system.z);
+            ok = true;
+        }
+        break;
+    case 'A':
+        if (axis_is_configured(&stepper_system.a))
+        {
+            *pos_mm = get_axis_position_mm(&stepper_system.a);
             ok = true;
         }
         break;
@@ -1303,6 +1324,13 @@ static inline void stepper_apply_direction_pins(void)
             dir_level = !dir_level;
         gpio_put(stepper_system.z.dir_pin, dir_level);
     }
+    if (current_move.a_active && stepper_system.a.step_pin != 0xFF)
+    {
+        bool dir_level = current_move.a_dir;
+        if (stepper_system.a.dir_invert)
+            dir_level = !dir_level;
+        gpio_put(stepper_system.a.dir_pin, dir_level);
+    }
 }
 
 static bool stepper_load_arc_segment(uint16_t index)
@@ -1326,16 +1354,20 @@ static bool stepper_load_arc_segment(uint16_t index)
         current_move.x_steps = seg->x_steps;
         current_move.y_steps = seg->y_steps;
         current_move.z_steps = seg->z_steps;
+        current_move.a_steps = seg->a_steps;
         current_move.x_active = (seg->x_steps > 0);
         current_move.y_active = (seg->y_steps > 0);
         current_move.z_active = (seg->z_steps > 0);
+        current_move.a_active = (seg->a_steps > 0);
         current_move.x_dir = seg->x_dir;
         current_move.y_dir = seg->y_dir;
         current_move.z_dir = seg->z_dir;
+        current_move.a_dir = seg->a_dir;
         current_move.major_axis_mask = seg->major_axis_mask;
         current_move.x_error = seg->major_steps / 2;
         current_move.y_error = seg->major_steps / 2;
         current_move.z_error = seg->major_steps / 2;
+        current_move.a_error = seg->major_steps / 2;
         stepper_apply_direction_pins();
         return true;
     }
@@ -1455,6 +1487,8 @@ void stepper_abort_to_safe_state_on_error(void)
             gpio_put(stepper_system.y.enable_pin, 1);
         if (stepper_system.z.enable_pin != 0xFF)
             gpio_put(stepper_system.z.enable_pin, 1);
+        if (stepper_system.a.enable_pin != 0xFF)
+            gpio_put(stepper_system.a.enable_pin, 1);
         stepper_drivers_enabled = false;
     }
 
@@ -1487,6 +1521,9 @@ void stepper_close_subsystem(void)
     uint8_t z_step_pin = stepper_system.z.step_pin;
     uint8_t z_dir_pin = stepper_system.z.dir_pin;
     uint8_t z_enable_pin = stepper_system.z.enable_pin;
+    uint8_t a_step_pin = stepper_system.a.step_pin;
+    uint8_t a_dir_pin = stepper_system.a.dir_pin;
+    uint8_t a_enable_pin = stepper_system.a.enable_pin;
     uint8_t spindle_pin = stepper_system.spindle_pin;
     uint8_t estop_pin = stepper_system.estop_pin;
     uint8_t x_min_limit_pin = stepper_system.x_min_limit_pin;
@@ -1540,6 +1577,9 @@ void stepper_close_subsystem(void)
     stepper_release_gp_pin(z_step_pin);
     stepper_release_gp_pin(z_dir_pin);
     stepper_release_gp_pin(z_enable_pin);
+    stepper_release_gp_pin(a_step_pin);
+    stepper_release_gp_pin(a_dir_pin);
+    stepper_release_gp_pin(a_enable_pin);
     stepper_release_gp_pin(spindle_pin);
     stepper_release_gp_pin(estop_pin);
     stepper_release_gp_pin(x_min_limit_pin);
@@ -1561,7 +1601,8 @@ static inline int32_t mm_to_steps_rounded(float hw_mm, float steps_per_mm);
 static inline uint8_t compute_major_axis_mask(int32_t major_steps,
                                               int32_t x_steps,
                                               int32_t y_steps,
-                                              int32_t z_steps);
+                                              int32_t z_steps,
+                                              int32_t a_steps);
 
 static bool plan_arc_move(float start_x, float start_y, float start_z,
                           float target_x, float target_y, float target_z,
@@ -1941,11 +1982,13 @@ static bool plan_arc_move(float start_x, float start_y, float start_z,
         seg_runtime->x_steps = x_steps;
         seg_runtime->y_steps = y_steps;
         seg_runtime->z_steps = z_steps;
+        seg_runtime->a_steps = 0;
         seg_runtime->x_dir = x_dir;
         seg_runtime->y_dir = y_dir;
         seg_runtime->z_dir = z_dir;
+        seg_runtime->a_dir = true;
         seg_runtime->major_steps = major;
-        seg_runtime->major_axis_mask = compute_major_axis_mask(major, x_steps, y_steps, z_steps);
+        seg_runtime->major_axis_mask = compute_major_axis_mask(major, x_steps, y_steps, z_steps, 0);
 
         total_major_steps += major;
         total_x_steps += x_steps;
@@ -2077,7 +2120,8 @@ static inline int32_t mm_to_steps_rounded(float hw_mm, float steps_per_mm)
 static inline uint8_t compute_major_axis_mask(int32_t major_steps,
                                               int32_t x_steps,
                                               int32_t y_steps,
-                                              int32_t z_steps)
+                                              int32_t z_steps,
+                                              int32_t a_steps)
 {
     uint8_t mask = 0;
     if (major_steps <= 0)
@@ -2088,6 +2132,8 @@ static inline uint8_t compute_major_axis_mask(int32_t major_steps,
         mask |= 0x2;
     if (z_steps > 0 && z_steps == major_steps)
         mask |= 0x4;
+    if (a_steps > 0 && a_steps == major_steps)
+        mask |= 0x8;
     return mask;
 }
 
@@ -2270,6 +2316,8 @@ void __not_in_flash_func(stepper_timer_isr)(void)
                 gpio_put(stepper_system.y.enable_pin, 1);
             if (stepper_system.z.enable_pin != 0xFF)
                 gpio_put(stepper_system.z.enable_pin, 1);
+            if (stepper_system.a.enable_pin != 0xFF)
+                gpio_put(stepper_system.a.enable_pin, 1);
             stepper_drivers_enabled = false;
         }
 
@@ -2287,6 +2335,7 @@ void __not_in_flash_func(stepper_timer_isr)(void)
         stepper_system.x_g92_offset = 0.0f;
         stepper_system.y_g92_offset = 0.0f;
         stepper_system.z_g92_offset = 0.0f;
+        stepper_system.a_g92_offset = 0.0f;
 
         stepper_reset_accumulator_carry();
         stepper_dwell_active = false;
@@ -2329,6 +2378,8 @@ void __not_in_flash_func(stepper_timer_isr)(void)
                 gpio_put(stepper_system.y.enable_pin, 1);
             if (stepper_system.z.enable_pin != 0xFF)
                 gpio_put(stepper_system.z.enable_pin, 1);
+            if (stepper_system.a.enable_pin != 0xFF)
+                gpio_put(stepper_system.a.enable_pin, 1);
             stepper_drivers_enabled = false;
 
             // Disable spindle immediately
@@ -2349,6 +2400,7 @@ void __not_in_flash_func(stepper_timer_isr)(void)
             stepper_system.x_g92_offset = 0.0f;
             stepper_system.y_g92_offset = 0.0f;
             stepper_system.z_g92_offset = 0.0f;
+            stepper_system.a_g92_offset = 0.0f;
 
             stepper_reset_accumulator_carry();
             stepper_dwell_active = false;
@@ -2386,6 +2438,8 @@ void __not_in_flash_func(stepper_timer_isr)(void)
                         gpio_put(stepper_system.y.enable_pin, 1);
                     if (stepper_system.z.enable_pin != 0xFF)
                         gpio_put(stepper_system.z.enable_pin, 1);
+                    if (stepper_system.a.enable_pin != 0xFF)
+                        gpio_put(stepper_system.a.enable_pin, 1);
                     stepper_drivers_enabled = false;
                 }
             }
@@ -2404,6 +2458,8 @@ void __not_in_flash_func(stepper_timer_isr)(void)
                 gpio_put(stepper_system.y.enable_pin, 0);
             if (stepper_system.z.enable_pin != 0xFF)
                 gpio_put(stepper_system.z.enable_pin, 0);
+            if (stepper_system.a.enable_pin != 0xFF)
+                gpio_put(stepper_system.a.enable_pin, 0);
             stepper_drivers_enabled = true;
 
             const uint32_t settle_ticks = (uint32_t)(((uint64_t)STEPPER_ENABLE_SETTLE_US * (uint64_t)ISR_FREQ + 999999ULL) / 1000000ULL);
@@ -2443,13 +2499,16 @@ void __not_in_flash_func(stepper_timer_isr)(void)
         current_move.x_active = (block->x_steps_planned > 0);
         current_move.y_active = (block->y_steps_planned > 0);
         current_move.z_active = (block->z_steps_planned > 0);
+        current_move.a_active = (block->a_steps_planned > 0);
         current_move.x_dir = block->x_dir;
         current_move.y_dir = block->y_dir;
         current_move.z_dir = block->z_dir;
+        current_move.a_dir = block->a_dir;
         current_move.major_steps = block->major_steps;
         current_move.x_steps = block->x_steps_planned;
         current_move.y_steps = block->y_steps_planned;
         current_move.z_steps = block->z_steps_planned;
+        current_move.a_steps = block->a_steps_planned;
         current_move.cruise_rate = block->cruise_rate;
         current_move.exit_rate = block->exit_rate;
         current_move.accel_increment = block->accel_increment;
@@ -2525,6 +2584,7 @@ void __not_in_flash_func(stepper_timer_isr)(void)
         current_move.x_error = block->major_steps / 2;
         current_move.y_error = block->major_steps / 2;
         current_move.z_error = block->major_steps / 2;
+        current_move.a_error = block->major_steps / 2;
 
         // Use precomputed initial phase (computed in planner to reduce ISR overhead)
         current_move.phase = (move_phase_t)block->initial_phase;
@@ -2777,10 +2837,11 @@ void __not_in_flash_func(stepper_timer_isr)(void)
 
     // Bresenham algorithm (peek): determine which axes would step on this major step.
     // We compute on locals first so we can defer without mutating state.
-    bool step_x = false, step_y = false, step_z = false;
+    bool step_x = false, step_y = false, step_z = false, step_a = false;
     int32_t x_error = current_move.x_error;
     int32_t y_error = current_move.y_error;
     int32_t z_error = current_move.z_error;
+    int32_t a_error = current_move.a_error;
 
     if (current_move.x_active)
     {
@@ -2809,13 +2870,23 @@ void __not_in_flash_func(stepper_timer_isr)(void)
             step_z = true;
         }
     }
+    if (current_move.a_active)
+    {
+        a_error -= current_move.a_steps;
+        if (a_error < 0)
+        {
+            a_error += current_move.major_steps;
+            step_a = true;
+        }
+    }
 
     // Per-axis minimum tick-gap gate: defer step if any axis hasn't met its minimum interval.
     {
         const uint32_t now = stepper_tick_count;
         if ((step_x && (now - stepper_axis_last_step_tick[0]) < (uint32_t)stepper_axis_min_step_ticks[0]) ||
             (step_y && (now - stepper_axis_last_step_tick[1]) < (uint32_t)stepper_axis_min_step_ticks[1]) ||
-            (step_z && (now - stepper_axis_last_step_tick[2]) < (uint32_t)stepper_axis_min_step_ticks[2]))
+            (step_z && (now - stepper_axis_last_step_tick[2]) < (uint32_t)stepper_axis_min_step_ticks[2]) ||
+            (step_a && (now - stepper_axis_last_step_tick[3]) < (uint32_t)stepper_axis_min_step_ticks[3]))
         {
             current_move.step_accumulator = STEP_ACCUMULATOR_MAX - 1u;
             return;
@@ -2828,6 +2899,7 @@ void __not_in_flash_func(stepper_timer_isr)(void)
     current_move.x_error = x_error;
     current_move.y_error = y_error;
     current_move.z_error = z_error;
+    current_move.a_error = a_error;
 
     // Generate step pulses (multi-axis) with a configurable minimum pulse width.
     uint64_t step_mask = 0;
@@ -2837,6 +2909,8 @@ void __not_in_flash_func(stepper_timer_isr)(void)
         step_mask |= (1ULL << stepper_system.y.step_pin);
     if (step_z)
         step_mask |= (1ULL << stepper_system.z.step_pin);
+    if (step_a)
+        step_mask |= (1ULL << stepper_system.a.step_pin);
 
     if (step_mask)
     {
@@ -2861,6 +2935,11 @@ void __not_in_flash_func(stepper_timer_isr)(void)
         {
             stepper_axis_last_step_tick[2] = now;
             stepper_system.z.current_pos += current_move.z_dir ? 1 : -1;
+        }
+        if (step_a)
+        {
+            stepper_axis_last_step_tick[3] = now;
+            stepper_system.a.current_pos += current_move.a_dir ? 1 : -1;
         }
     }
 
@@ -3136,8 +3215,8 @@ static bool stepper_pin_conflicts_with_axis_pins(uint8_t gp)
     if (gp == 0xFF)
         return false;
 
-    const stepper_axis_t *axes[] = {&stepper_system.x, &stepper_system.y, &stepper_system.z};
-    for (int i = 0; i < 3; i++)
+    const stepper_axis_t *axes[] = {&stepper_system.x, &stepper_system.y, &stepper_system.z, &stepper_system.a};
+    for (int i = 0; i < 4; i++)
     {
         const stepper_axis_t *a = axes[i];
         if (a->step_pin == gp || a->dir_pin == gp || a->enable_pin == gp)
@@ -3151,8 +3230,8 @@ static bool stepper_pin_conflicts_with_other_machine_io(uint8_t gp, const steppe
     if (gp == 0xFF)
         return false;
 
-    const stepper_axis_t *axes[] = {&stepper_system.x, &stepper_system.y, &stepper_system.z};
-    for (int i = 0; i < 3; i++)
+    const stepper_axis_t *axes[] = {&stepper_system.x, &stepper_system.y, &stepper_system.z, &stepper_system.a};
+    for (int i = 0; i < 4; i++)
     {
         const stepper_axis_t *a = axes[i];
         if (a == self_axis)
@@ -3180,8 +3259,8 @@ static bool stepper_pin_conflicts_with_machine_io(uint8_t gp)
     if (gp == 0xFF)
         return false;
 
-    const stepper_axis_t *axes[] = {&stepper_system.x, &stepper_system.y, &stepper_system.z};
-    for (int i = 0; i < 3; i++)
+    const stepper_axis_t *axes[] = {&stepper_system.x, &stepper_system.y, &stepper_system.z, &stepper_system.a};
+    for (int i = 0; i < 4; i++)
     {
         const stepper_axis_t *a = axes[i];
         if (a->step_pin == gp || a->dir_pin == gp || a->enable_pin == gp)
@@ -3213,6 +3292,8 @@ static stepper_axis_t *get_axis_ptr(char axis_char)
         return &stepper_system.y;
     case 'Z':
         return &stepper_system.z;
+    case 'A':
+        return &stepper_system.a;
     default:
         return NULL;
     }
@@ -3309,6 +3390,13 @@ static void calculate_default_jerk(void)
             max_accel = stepper_system.z.max_accel;
         if (stepper_system.z.steps_per_mm > max_steps_per_mm)
             max_steps_per_mm = stepper_system.z.steps_per_mm;
+    }
+    if (axis_is_configured(&stepper_system.a))
+    {
+        if (stepper_system.a.max_accel > max_accel)
+            max_accel = stepper_system.a.max_accel;
+        if (stepper_system.a.steps_per_mm > max_steps_per_mm)
+            max_steps_per_mm = stepper_system.a.steps_per_mm;
     }
 
     if (max_accel <= 0.0f || max_steps_per_mm <= 0.0f)
@@ -3678,6 +3766,7 @@ void cmd_stepper(void)
         stepper_axis_init(&stepper_system.x);
         stepper_axis_init(&stepper_system.y);
         stepper_axis_init(&stepper_system.z);
+        stepper_axis_init(&stepper_system.a);
 
         // Derive per-axis minimum step tick spacing from configured limits.
         stepper_recompute_axis_step_tick_limits();
@@ -3703,6 +3792,7 @@ void cmd_stepper(void)
         stepper_system.x_g92_offset = 0.0f;
         stepper_system.y_g92_offset = 0.0f;
         stepper_system.z_g92_offset = 0.0f;
+        stepper_system.a_g92_offset = 0.0f;
         stepper_system.position_known = false;
 
         // Initialize spindle control
@@ -3770,6 +3860,7 @@ void cmd_stepper(void)
         stepper_axis_last_step_tick[0] = 0;
         stepper_axis_last_step_tick[1] = 0;
         stepper_axis_last_step_tick[2] = 0;
+        stepper_axis_last_step_tick[3] = 0;
 
         if (estop_pin_cfg != 0)
             ExtCfg(estop_pin_cfg, EXT_COM_RESERVED, 0);
@@ -3840,6 +3931,8 @@ void cmd_stepper(void)
             gpio_put(stepper_system.y.enable_pin, 1);
         if (stepper_system.z.enable_pin != 0xFF)
             gpio_put(stepper_system.z.enable_pin, 1);
+        if (stepper_system.a.enable_pin != 0xFF)
+            gpio_put(stepper_system.a.enable_pin, 1);
         stepper_drivers_enabled = false;
 
         // Disable spindle
@@ -3873,14 +3966,14 @@ void cmd_stepper(void)
         if (argc < 5)
             stepper_error("Syntax");
 
-        int axis_idx = checkparam((char *)argv[0], 3, "X", "Y", "Z");
+        int axis_idx = checkparam((char *)argv[0], 4, "X", "Y", "Z", "A");
         if (axis_idx == 0)
-            stepper_error("Axis must be X, Y, or Z");
+            stepper_error("Axis must be X, Y, Z, or A");
 
-        const char axis_chars[] = "XYZ";
+        const char axis_chars[] = "XYZA";
         stepper_axis_t *axis = get_axis_ptr(axis_chars[axis_idx - 1]);
         if (axis == NULL)
-            stepper_error("Axis must be X, Y, or Z");
+            stepper_error("Axis must be X, Y, Z, or A");
 
         int reserve_step_pin = 0;
         int reserve_dir_pin = 0;
@@ -4036,6 +4129,8 @@ void cmd_stepper(void)
             max_steps_per_mm = stepper_system.y.steps_per_mm;
         if (axis_is_configured(&stepper_system.z) && stepper_system.z.steps_per_mm > max_steps_per_mm)
             max_steps_per_mm = stepper_system.z.steps_per_mm;
+        if (axis_is_configured(&stepper_system.a) && stepper_system.a.steps_per_mm > max_steps_per_mm)
+            max_steps_per_mm = stepper_system.a.steps_per_mm;
 
         if (max_steps_per_mm <= 0.0f)
             stepper_error("No axes configured");
@@ -4139,6 +4234,7 @@ void cmd_stepper(void)
         stepper_axis_init(&stepper_system.x);
         stepper_axis_init(&stepper_system.y);
         stepper_axis_init(&stepper_system.z);
+        stepper_axis_init(&stepper_system.a);
 
         {
             uint32_t save = save_and_disable_interrupts();
@@ -4146,6 +4242,7 @@ void cmd_stepper(void)
             stepper_axis_last_step_tick[0] = 0;
             stepper_axis_last_step_tick[1] = 0;
             stepper_axis_last_step_tick[2] = 0;
+            stepper_axis_last_step_tick[3] = 0;
             restore_interrupts(save);
         }
         stepper_system.motion_active = false;
@@ -4406,7 +4503,7 @@ void cmd_stepper(void)
         return;
     }
 
-    // STEPPER ENABLE X|Y|Z|ALL [, 0|1]
+    // STEPPER ENABLE X|Y|Z|A|ALL [, 0|1]
     if ((tp = checkstring(cmdline, (unsigned char *)"ENABLE")) != NULL)
     {
         getcsargs(&tp, 3);
@@ -4417,9 +4514,9 @@ void cmd_stepper(void)
         if (argc >= 3)
             enable = getint(argv[2], 0, 1);
 
-        int axis_sel = checkparam((char *)argv[0], 4, "ALL", "X", "Y", "Z");
+        int axis_sel = checkparam((char *)argv[0], 5, "ALL", "X", "Y", "Z", "A");
         if (axis_sel == 0)
-            stepper_error("Axis must be X, Y, Z, or ALL");
+            stepper_error("Axis must be X, Y, Z, A, or ALL");
 
         if (axis_sel == 1)
         {
@@ -4430,14 +4527,16 @@ void cmd_stepper(void)
                 gpio_put(stepper_system.y.enable_pin, enable ? 0 : 1);
             if (stepper_system.z.enable_pin != 0xFF)
                 gpio_put(stepper_system.z.enable_pin, enable ? 0 : 1);
+            if (stepper_system.a.enable_pin != 0xFF)
+                gpio_put(stepper_system.a.enable_pin, enable ? 0 : 1);
             stepper_drivers_enabled = enable;
         }
         else
         {
-            const char axis_chars[] = "XYZ";
+            const char axis_chars[] = "XYZA";
             stepper_axis_t *axis = get_axis_ptr(axis_chars[axis_sel - 2]);
             if (axis == NULL)
-                stepper_error("Axis must be X, Y, Z, or ALL");
+                stepper_error("Axis must be X, Y, Z, A, or ALL");
             if (axis->enable_pin == 0xFF)
                 stepper_error("Enable pin not configured for this axis");
             gpio_put(axis->enable_pin, enable ? 0 : 1); // Active low
@@ -4447,21 +4546,21 @@ void cmd_stepper(void)
         return;
     }
 
-    // STEPPER INVERT X|Y|Z, 0|1 - Invert direction for an axis
+    // STEPPER INVERT X|Y|Z|A, 0|1 - Invert direction for an axis
     if ((tp = checkstring(cmdline, (unsigned char *)"INVERT")) != NULL)
     {
         getcsargs(&tp, 3);
         if (argc != 3)
             stepper_error("Syntax");
 
-        int axis_idx = checkparam((char *)argv[0], 3, "X", "Y", "Z");
+        int axis_idx = checkparam((char *)argv[0], 4, "X", "Y", "Z", "A");
         if (axis_idx == 0)
-            stepper_error("Axis must be X, Y, or Z");
+            stepper_error("Axis must be X, Y, Z, or A");
 
-        const char axis_chars[] = "XYZ";
+        const char axis_chars[] = "XYZA";
         stepper_axis_t *axis = get_axis_ptr(axis_chars[axis_idx - 1]);
         if (axis == NULL)
-            stepper_error("Axis must be X, Y, or Z");
+            stepper_error("Axis must be X, Y, Z, or A");
 
         axis->dir_invert = getint(argv[2], 0, 1);
         return;
@@ -4487,11 +4586,14 @@ void cmd_stepper(void)
             stepper_system.y.target_pos = 0;
             stepper_system.z.current_pos = 0;
             stepper_system.z.target_pos = 0;
+            stepper_system.a.current_pos = 0;
+            stepper_system.a.target_pos = 0;
 
             // Clear workspace offsets so reported/planned coordinates are also at 0.
             stepper_system.x_g92_offset = 0.0f;
             stepper_system.y_g92_offset = 0.0f;
             stepper_system.z_g92_offset = 0.0f;
+            stepper_system.a_g92_offset = 0.0f;
 
             stepper_system.position_known = true;
             planner_sync_to_physical();
@@ -4502,14 +4604,14 @@ void cmd_stepper(void)
         if (argc != 3)
             stepper_error("Syntax");
 
-        int axis_idx = checkparam((char *)argv[0], 3, "X", "Y", "Z");
+        int axis_idx = checkparam((char *)argv[0], 4, "X", "Y", "Z", "A");
         if (axis_idx == 0)
-            stepper_error("Axis must be X, Y, or Z");
+            stepper_error("Axis must be X, Y, Z, or A");
 
-        const char axis_chars[] = "XYZ";
+        const char axis_chars[] = "XYZA";
         stepper_axis_t *axis = get_axis_ptr(axis_chars[axis_idx - 1]);
         if (axis == NULL)
-            stepper_error("Axis must be X, Y, or Z");
+            stepper_error("Axis must be X, Y, Z, or A");
 
         float pos_mm = getnumber(argv[2]);
         axis->current_pos = (int32_t)(pos_mm * axis->steps_per_mm);
@@ -4553,9 +4655,9 @@ void cmd_stepper(void)
         bool primary_is_g92 = false;  // G92
         int spindle_m = -1;           // 3/5
 
-        bool word_x = false, word_y = false, word_z = false;
-        bool word_x_has = false, word_y_has = false, word_z_has = false;
-        double word_x_val = 0.0, word_y_val = 0.0, word_z_val = 0.0;
+        bool word_x = false, word_y = false, word_z = false, word_a = false;
+        bool word_x_has = false, word_y_has = false, word_z_has = false, word_a_has = false;
+        double word_x_val = 0.0, word_y_val = 0.0, word_z_val = 0.0, word_a_val = 0.0;
 
         bool word_f = false, word_i = false, word_j = false, word_k = false, word_r = false, word_p = false;
         bool word_p_has = false;
@@ -4694,6 +4796,11 @@ void cmd_stepper(void)
                 word_z_has = has_value;
                 word_z_val = value;
                 break;
+            case 'A':
+                word_a = true;
+                word_a_has = has_value;
+                word_a_val = value;
+                break;
             case 'F':
                 if (!has_value)
                     stepper_error("Missing value");
@@ -4737,7 +4844,7 @@ void cmd_stepper(void)
         // Spindle commands (M3/M5) are handled as standalone commands in GC mode.
         if (spindle_m >= 0)
         {
-            if (primary_g >= 0 || word_x || word_y || word_z || word_f || word_i || word_j || word_k || word_r || word_p)
+            if (primary_g >= 0 || word_x || word_y || word_z || word_a || word_f || word_i || word_j || word_k || word_r || word_p)
                 stepper_error("M-code must be alone");
             if (stepper_system.spindle_pin == 0xFF)
                 stepper_error("Spindle pin not configured (use STEPPER SPINDLE)");
@@ -4758,7 +4865,7 @@ void cmd_stepper(void)
 
         if (primary_g == 4)
         {
-            if (word_x || word_y || word_z || word_f || word_i || word_j || word_k || word_r)
+            if (word_x || word_y || word_z || word_a || word_f || word_i || word_j || word_k || word_r)
                 stepper_error("G4 only supports P");
             if (!word_p || !word_p_has)
                 stepper_error("G4 requires P value");
@@ -4848,6 +4955,15 @@ void cmd_stepper(void)
                 stepper_system.z_g92_offset =
                     ((float)stepper_system.z.current_pos / stepper_system.z.steps_per_mm) - (float)word_z_val;
             }
+            if (word_a)
+            {
+                if (!word_a_has)
+                    stepper_error("G92 missing value");
+                if (!axis_is_configured(&stepper_system.a))
+                    stepper_error("A axis not configured");
+                stepper_system.a_g92_offset =
+                    ((float)stepper_system.a.current_pos / stepper_system.a.steps_per_mm) - (float)word_a_val;
+            }
 
             planner_sync_to_physical();
             return;
@@ -4887,10 +5003,12 @@ void cmd_stepper(void)
         block.x = planner_x;
         block.y = planner_y;
         block.z = planner_z;
+        block.a = planner_a;
         block.feedrate = gcode_buffer.current_feedrate;
         block.has_x = false;
         block.has_y = false;
         block.has_z = false;
+        block.has_a = false;
         block.use_radius = false;
         block.i = 0;
         block.j = 0;
@@ -4923,6 +5041,15 @@ void cmd_stepper(void)
                 stepper_error("Z axis not configured");
             block.z = gcode_buffer.absolute_mode ? (float)word_z_val : (planner_z + (float)word_z_val);
             block.has_z = true;
+        }
+        if (word_a)
+        {
+            if (!word_a_has)
+                stepper_error("Missing value");
+            if (!axis_is_configured(&stepper_system.a))
+                stepper_error("A axis not configured");
+            block.a = gcode_buffer.absolute_mode ? (float)word_a_val : (planner_a + (float)word_a_val);
+            block.has_a = true;
         }
         if (word_f)
         {
@@ -4996,6 +5123,7 @@ void cmd_stepper(void)
             float dx = block.has_x ? (block.x - planner_x) : 0.0f;
             float dy = block.has_y ? (block.y - planner_y) : 0.0f;
             float dz = block.has_z ? (block.z - planner_z) : 0.0f;
+            float da = block.has_a ? (block.a - planner_a) : 0.0f;
             float total_dist = sqrtf(dx * dx + dy * dy + dz * dz);
 
             if (total_dist > 0.0f)
@@ -5019,6 +5147,12 @@ void cmd_stepper(void)
                     if (axis_max < max_feedrate)
                         max_feedrate = axis_max;
                 }
+                if (block.has_a && fabsf(da) > 0.001f)
+                {
+                    float axis_max = stepper_system.a.max_velocity * total_dist / fabsf(da);
+                    if (axis_max < max_feedrate)
+                        max_feedrate = axis_max;
+                }
                 block.feedrate = max_feedrate;
             }
         }
@@ -5027,20 +5161,25 @@ void cmd_stepper(void)
         float start_x = planner_x;
         float start_y = planner_y;
         float start_z = planner_z;
+        float start_a = planner_a;
         float target_x = block.has_x ? block.x : start_x;
         float target_y = block.has_y ? block.y : start_y;
         float target_z = block.has_z ? block.z : start_z;
+        float target_a = block.has_a ? block.a : start_a;
         block.x = target_x;
         block.y = target_y;
         block.z = target_z;
+        block.a = target_a;
 
-        float dx_mm = 0.0f, dy_mm = 0.0f, dz_mm = 0.0f;
+        float dx_mm = 0.0f, dy_mm = 0.0f, dz_mm = 0.0f, da_units = 0.0f;
         block.x_steps_planned = 0;
         block.y_steps_planned = 0;
         block.z_steps_planned = 0;
+        block.a_steps_planned = 0;
         block.x_dir = true;
         block.y_dir = true;
         block.z_dir = true;
+        block.a_dir = true;
 
         if (axis_is_configured(&stepper_system.x))
         {
@@ -5060,40 +5199,49 @@ void cmd_stepper(void)
             block.z_dir = (dz_mm >= 0.0f);
             block.z_steps_planned = (int32_t)(fabsf(dz_mm) * stepper_system.z.steps_per_mm);
         }
+        if (axis_is_configured(&stepper_system.a))
+        {
+            da_units = target_a - start_a;
+            block.a_dir = (da_units >= 0.0f);
+            block.a_steps_planned = (int32_t)(fabsf(da_units) * stepper_system.a.steps_per_mm);
+        }
 
         block.major_steps = block.x_steps_planned;
         if (block.y_steps_planned > block.major_steps)
             block.major_steps = block.y_steps_planned;
         if (block.z_steps_planned > block.major_steps)
             block.major_steps = block.z_steps_planned;
+        if (block.a_steps_planned > block.major_steps)
+            block.major_steps = block.a_steps_planned;
 
         block.major_axis_mask = compute_major_axis_mask(block.major_steps,
                                                         block.x_steps_planned,
                                                         block.y_steps_planned,
-                                                        block.z_steps_planned);
-
-        block.major_axis_mask = compute_major_axis_mask(block.major_steps,
-                                                        block.x_steps_planned,
-                                                        block.y_steps_planned,
-                                                        block.z_steps_planned);
-
-        block.major_axis_mask = compute_major_axis_mask(block.major_steps,
-                                                        block.x_steps_planned,
-                                                        block.y_steps_planned,
-                                                        block.z_steps_planned);
+                                                        block.z_steps_planned,
+                                                        block.a_steps_planned);
 
         if (block.major_steps > 0)
         {
             float total_dist_mm = sqrtf(dx_mm * dx_mm + dy_mm * dy_mm + dz_mm * dz_mm);
-            if (total_dist_mm < 0.001f)
+            bool a_only_move = (total_dist_mm < 0.001f) && (block.a_steps_planned > 0);
+            if (a_only_move)
+            {
+                // A-only rotary move: feedrate is treated as deg/min (already converted to deg/s)
+                total_dist_mm = fabsf(da_units);
+                if (total_dist_mm < 0.001f)
+                    total_dist_mm = 0.001f;
+            }
+            else if (total_dist_mm < 0.001f)
+            {
                 total_dist_mm = 0.001f;
+            }
 
             float virtual_steps_per_mm = (float)block.major_steps / total_dist_mm;
             block.distance = total_dist_mm;
             block.virtual_steps_per_mm = virtual_steps_per_mm;
-            block.unit_x = dx_mm / total_dist_mm;
-            block.unit_y = dy_mm / total_dist_mm;
-            block.unit_z = dz_mm / total_dist_mm;
+            block.unit_x = a_only_move ? 0.0f : (dx_mm / total_dist_mm);
+            block.unit_y = a_only_move ? 0.0f : (dy_mm / total_dist_mm);
+            block.unit_z = a_only_move ? 0.0f : (dz_mm / total_dist_mm);
 
             float target_velocity = block.feedrate;
             if (block.type == GCODE_RAPID_MOVE)
@@ -5117,6 +5265,19 @@ void cmd_stepper(void)
                     if (axis_limit < target_velocity)
                         target_velocity = axis_limit;
                 }
+                if (block.a_steps_planned > 0 && fabsf(da_units) > 0.001f)
+                {
+                    float axis_limit = stepper_system.a.max_velocity * total_dist_mm / fabsf(da_units);
+                    if (axis_limit < target_velocity)
+                        target_velocity = axis_limit;
+                }
+            }
+            else if (block.a_steps_planned > 0 && fabsf(da_units) > 0.001f && !a_only_move)
+            {
+                // Slave A axis: clamp feedrate so A doesn't exceed its max velocity
+                float axis_limit = stepper_system.a.max_velocity * total_dist_mm / fabsf(da_units);
+                if (axis_limit < target_velocity)
+                    target_velocity = axis_limit;
             }
             block.max_velocity = target_velocity;
 
@@ -5136,6 +5297,12 @@ void cmd_stepper(void)
             if (block.z_steps_planned > 0)
             {
                 float axis_accel = stepper_system.z.max_accel * total_dist_mm / fabsf(dz_mm);
+                if (axis_accel < min_accel)
+                    min_accel = axis_accel;
+            }
+            if (block.a_steps_planned > 0)
+            {
+                float axis_accel = stepper_system.a.max_accel * total_dist_mm / fabsf(da_units);
                 if (axis_accel < min_accel)
                     min_accel = axis_accel;
             }
@@ -5166,6 +5333,7 @@ void cmd_stepper(void)
         planner_x = target_x;
         planner_y = target_y;
         planner_z = target_z;
+        planner_a = target_a;
 
         return;
     }
@@ -5347,7 +5515,7 @@ void cmd_stepper(void)
 
                     float value = getnumber(argv[i + 2]);
 
-                    int axis_idx = checkparam((char *)argv[i], 3, "X", "Y", "Z");
+                    int axis_idx = checkparam((char *)argv[i], 4, "X", "Y", "Z", "A");
                     switch (axis_idx)
                     {
                     case 1:
@@ -5368,6 +5536,12 @@ void cmd_stepper(void)
                             stepper_error("Z axis not configured");
                         stepper_system.z_g92_offset =
                             ((float)stepper_system.z.current_pos / stepper_system.z.steps_per_mm) - value;
+                        break;
+                    case 4:
+                        if (!axis_is_configured(&stepper_system.a))
+                            stepper_error("A axis not configured");
+                        stepper_system.a_g92_offset =
+                            ((float)stepper_system.a.current_pos / stepper_system.a.steps_per_mm) - value;
                         break;
                     default:
                         stepper_error("G92 unknown parameter");
@@ -5408,10 +5582,12 @@ void cmd_stepper(void)
         block.x = planner_x;
         block.y = planner_y;
         block.z = planner_z;
+        block.a = planner_a;
         block.feedrate = gcode_buffer.current_feedrate;
         block.has_x = false;
         block.has_y = false;
         block.has_z = false;
+        block.has_a = false;
         block.use_radius = false;
         block.i = 0;
         block.j = 0;
@@ -5430,7 +5606,7 @@ void cmd_stepper(void)
 
             float value = getnumber(argv[i + 2]);
 
-            int param_idx = checkparam((char *)argv[i], 9, "X", "Y", "Z", "F", "I", "J", "K", "R", "P");
+            int param_idx = checkparam((char *)argv[i], 10, "X", "Y", "Z", "F", "I", "J", "K", "R", "P", "A");
             switch (param_idx)
             {
             case 1:
@@ -5502,6 +5678,17 @@ void cmd_stepper(void)
                     stepper_error("G4 P must be >= 0");
                 block.dwell_ticks = stepper_dwell_ms_to_ticks((double)value);
                 dwell_p_seen = true;
+                break;
+            case 10:
+                if (block.type == GCODE_DWELL)
+                    stepper_error("G4 only supports P");
+                if (!axis_is_configured(&stepper_system.a))
+                    stepper_error("A axis not configured");
+                if (gcode_buffer.absolute_mode)
+                    block.a = value;
+                else
+                    block.a = planner_a + value;
+                block.has_a = true;
                 break;
             default:
                 stepper_error("Unknown parameter");
@@ -5581,6 +5768,7 @@ void cmd_stepper(void)
             float dx = block.has_x ? (block.x - planner_x) : 0.0f;
             float dy = block.has_y ? (block.y - planner_y) : 0.0f;
             float dz = block.has_z ? (block.z - planner_z) : 0.0f;
+            float da = block.has_a ? (block.a - planner_a) : 0.0f;
 
             // Total distance of move
             float total_dist = sqrtf(dx * dx + dy * dy + dz * dz);
@@ -5609,6 +5797,12 @@ void cmd_stepper(void)
                     if (axis_max < max_feedrate)
                         max_feedrate = axis_max;
                 }
+                if (block.has_a && fabsf(da) > 0.001f)
+                {
+                    float axis_max = stepper_system.a.max_velocity * total_dist / fabsf(da);
+                    if (axis_max < max_feedrate)
+                        max_feedrate = axis_max;
+                }
 
                 // Apply the limited feedrate
                 block.feedrate = max_feedrate;
@@ -5620,21 +5814,26 @@ void cmd_stepper(void)
         float start_x = planner_x;
         float start_y = planner_y;
         float start_z = planner_z;
+        float start_a = planner_a;
         float target_x = block.has_x ? block.x : start_x;
         float target_y = block.has_y ? block.y : start_y;
         float target_z = block.has_z ? block.z : start_z;
+        float target_a = block.has_a ? block.a : start_a;
         block.x = target_x;
         block.y = target_y;
         block.z = target_z;
+        block.a = target_a;
 
         // Calculate distance and steps for each axis
-        float dx_mm = 0.0f, dy_mm = 0.0f, dz_mm = 0.0f;
+        float dx_mm = 0.0f, dy_mm = 0.0f, dz_mm = 0.0f, da_units = 0.0f;
         block.x_steps_planned = 0;
         block.y_steps_planned = 0;
         block.z_steps_planned = 0;
+        block.a_steps_planned = 0;
         block.x_dir = true;
         block.y_dir = true;
         block.z_dir = true;
+        block.a_dir = true;
 
         if (axis_is_configured(&stepper_system.x))
         {
@@ -5654,6 +5853,12 @@ void cmd_stepper(void)
             block.z_dir = (dz_mm >= 0.0f);
             block.z_steps_planned = (int32_t)(fabsf(dz_mm) * stepper_system.z.steps_per_mm);
         }
+        if (axis_is_configured(&stepper_system.a))
+        {
+            da_units = target_a - start_a;
+            block.a_dir = (da_units >= 0.0f);
+            block.a_steps_planned = (int32_t)(fabsf(da_units) * stepper_system.a.steps_per_mm);
+        }
 
         // Find major axis (most steps) - this drives the timing
         block.major_steps = block.x_steps_planned;
@@ -5661,22 +5866,40 @@ void cmd_stepper(void)
             block.major_steps = block.y_steps_planned;
         if (block.z_steps_planned > block.major_steps)
             block.major_steps = block.z_steps_planned;
+        if (block.a_steps_planned > block.major_steps)
+            block.major_steps = block.a_steps_planned;
+
+        block.major_axis_mask = compute_major_axis_mask(block.major_steps,
+                                                        block.x_steps_planned,
+                                                        block.y_steps_planned,
+                                                        block.z_steps_planned,
+                                                        block.a_steps_planned);
 
         if (block.major_steps > 0)
         {
             // Calculate total distance for feedrate scaling
             float total_dist_mm = sqrtf(dx_mm * dx_mm + dy_mm * dy_mm + dz_mm * dz_mm);
-            if (total_dist_mm < 0.001f)
+            bool a_only_move = (total_dist_mm < 0.001f) && (block.a_steps_planned > 0);
+            if (a_only_move)
+            {
+                // A-only rotary move: F treated as deg/min (already converted to deg/s)
+                total_dist_mm = fabsf(da_units);
+                if (total_dist_mm < 0.001f)
+                    total_dist_mm = 0.001f;
+            }
+            else if (total_dist_mm < 0.001f)
+            {
                 total_dist_mm = 0.001f;
+            }
 
             // For the major axis, calculate steps per mm in the direction of motion
             // We use a normalized "virtual axis" that travels total_dist_mm in major_steps
             float virtual_steps_per_mm = (float)block.major_steps / total_dist_mm;
             block.distance = total_dist_mm;
             block.virtual_steps_per_mm = virtual_steps_per_mm;
-            block.unit_x = dx_mm / total_dist_mm;
-            block.unit_y = dy_mm / total_dist_mm;
-            block.unit_z = dz_mm / total_dist_mm;
+            block.unit_x = a_only_move ? 0.0f : (dx_mm / total_dist_mm);
+            block.unit_y = a_only_move ? 0.0f : (dy_mm / total_dist_mm);
+            block.unit_z = a_only_move ? 0.0f : (dz_mm / total_dist_mm);
 
             // Determine target velocity (use the effective limited feedrate)
             float target_velocity = block.feedrate;
@@ -5702,6 +5925,12 @@ void cmd_stepper(void)
                     if (axis_limit < target_velocity)
                         target_velocity = axis_limit;
                 }
+                if (block.a_steps_planned > 0 && fabsf(da_units) > 0.001f)
+                {
+                    float axis_limit = stepper_system.a.max_velocity * total_dist_mm / fabsf(da_units);
+                    if (axis_limit < target_velocity)
+                        target_velocity = axis_limit;
+                }
             }
 
             block.max_velocity = target_velocity;
@@ -5723,6 +5952,12 @@ void cmd_stepper(void)
             if (block.z_steps_planned > 0)
             {
                 float axis_accel = stepper_system.z.max_accel * total_dist_mm / fabsf(dz_mm);
+                if (axis_accel < min_accel)
+                    min_accel = axis_accel;
+            }
+            if (block.a_steps_planned > 0)
+            {
+                float axis_accel = stepper_system.a.max_accel * total_dist_mm / fabsf(da_units);
                 if (axis_accel < min_accel)
                     min_accel = axis_accel;
             }
@@ -5758,6 +5993,7 @@ void cmd_stepper(void)
         planner_x = target_x;
         planner_y = target_y;
         planner_z = target_z;
+        planner_a = target_a;
 
         return;
     }
@@ -5855,6 +6091,8 @@ void cmd_stepper(void)
             gpio_put(stepper_system.y.enable_pin, 0);
         if (stepper_system.z.enable_pin != 0xFF)
             gpio_put(stepper_system.z.enable_pin, 0);
+        if (stepper_system.a.enable_pin != 0xFF)
+            gpio_put(stepper_system.a.enable_pin, 0);
         stepper_drivers_enabled = true;
         {
             const uint32_t settle_ticks = (uint32_t)(((uint64_t)STEPPER_ENABLE_SETTLE_US * (uint64_t)ISR_FREQ + 999999ULL) / 1000000ULL);
@@ -5899,12 +6137,14 @@ void cmd_stepper(void)
         // Core state useful for diagnosing "ignored" motion.
         sprintf(buf, "Position known: %s\r\n", stepper_system.position_known ? "YES" : "NO");
         MMPrintString(buf);
-        sprintf(buf, "Planner: X=%.3f Y=%.3f Z=%.3f\r\n", (double)planner_x, (double)planner_y, (double)planner_z);
+        sprintf(buf, "Planner: X=%.3f Y=%.3f Z=%.3f A=%.3f\r\n",
+                (double)planner_x, (double)planner_y, (double)planner_z, (double)planner_a);
         MMPrintString(buf);
-        sprintf(buf, "G92 offsets: X=%.3f Y=%.3f Z=%.3f\r\n",
+        sprintf(buf, "G92 offsets: X=%.3f Y=%.3f Z=%.3f A=%.3f\r\n",
                 (double)stepper_system.x_g92_offset,
                 (double)stepper_system.y_g92_offset,
-                (double)stepper_system.z_g92_offset);
+                (double)stepper_system.z_g92_offset,
+                (double)stepper_system.a_g92_offset);
         MMPrintString(buf);
 
         sprintf(buf, "HW limits: %s, mask=0x%08lx%08lx\r\n",
@@ -5974,6 +6214,23 @@ void cmd_stepper(void)
                     (double)stepper_system.z.max_velocity,
                     (double)stepper_system.z.max_accel,
                     (double)stepper_system.z.homing_backoff_mm);
+            MMPrintString(buf);
+        }
+        if (axis_is_configured(&stepper_system.a))
+        {
+            sprintf(buf, "A: %.3f deg (%ld steps)\r\n",
+                    (double)stepper_system.a.current_pos / (double)stepper_system.a.steps_per_mm,
+                    (long)stepper_system.a.current_pos);
+            MMPrintString(buf);
+
+            sprintf(buf, "A cfg: step=%u dir=%u en=%u inv=%d spdeg=%.3f vmax=%.3f(deg/s) amax=%.3f\r\n",
+                    (unsigned)stepper_system.a.step_pin,
+                    (unsigned)stepper_system.a.dir_pin,
+                    (unsigned)stepper_system.a.enable_pin,
+                    stepper_system.a.dir_invert ? 1 : 0,
+                    (double)stepper_system.a.steps_per_mm,
+                    (double)stepper_system.a.max_velocity,
+                    (double)stepper_system.a.max_accel);
             MMPrintString(buf);
         }
 

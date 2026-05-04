@@ -197,7 +197,7 @@ extern "C"
 #define MAXLOCALVARS 256
 #define MAXVARS (MAXGLOBALVARS + MAXLOCALVARS)
 #define HEAP_MEMORY_SIZE (252 * 1024)
-#define FLASH_TARGET_OFFSET (1280 * 1024)
+#define FLASH_TARGET_OFFSET (1296 * 1024)
 #else
 #define MagicKey 0x927945E6
 #define MAXSUBFUN 256
@@ -254,7 +254,7 @@ extern "C"
 #define HEAP_MEMORY_SIZE (132 * 1024)
 #else
 #define HEAP_MEMORY_SIZE (120 * 1024)
-#define FLASH_TARGET_OFFSET (896 * 1024)
+#define FLASH_TARGET_OFFSET (912 * 1024)
 #define MagicKey 0x142127C5
 #endif
 #endif
