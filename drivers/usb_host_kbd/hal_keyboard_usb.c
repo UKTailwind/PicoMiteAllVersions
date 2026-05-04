@@ -1,6 +1,6 @@
 /*
  * drivers/usb_host_kbd/hal_keyboard_usb.c — hal_keyboard real impl
- * for USB-host-keyboard ports. Linked when HAL_PORT_HAS_USB_KEYBOARD=1.
+ * for USB-host-keyboard ports. Linked when HAL_PORT_KEYBOARD_USB_HOST=1.
  *
  * Walks the TinyUSB host stack (tuh_*) for keyboard input. The
  * 1 kHz tuh_task / hid_app_task pump still runs out of

@@ -47,7 +47,6 @@
 /* Stage-A palette flags (decascade plan). VGA-PIO scanout drivers are
  * shared with HDMI; this port uses them but does not link the HDMI sink. */
 #define HAL_PORT_HAS_WIFI                0
-#define HAL_PORT_HAS_PICOMITE         0
 #define HAL_PORT_HAS_GUICONTROLS         0
 
 /* core1stack[] size in words. VGA runs the QVGA scanout PIO loop on core1

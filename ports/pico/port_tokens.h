@@ -5,7 +5,7 @@
  * Per-port token-table palettes for AllCommands.h. Each macro
  * expands to a comma-separated list of MMBasic token init-list
  * entries (or to nothing). The USB-axis palette uses the
- * HAL_PORT_HAS_USB_KEYBOARD flag set by the per-build target_compile
+ * HAL_PORT_KEYBOARD_USB_HOST flag set by the per-build target_compile
  * options; this file is per-port impl and so is allowed to gate on it.
  */
 
@@ -26,7 +26,7 @@
     { (unsigned char *)"Draw3D", T_CMD, 0, cmd_3D },
 
 /* USB axis: Update Firmware on PS/2, Gamepad on USB-host. */
-#if HAL_PORT_HAS_USB_KEYBOARD
+#if HAL_PORT_KEYBOARD_USB_HOST
 #define HAL_PORT_USB_OR_FIRMWARE_CMD_TOKEN \
     { (unsigned char *)"Gamepad", T_CMD, 0, cmd_gamepad },
 #else

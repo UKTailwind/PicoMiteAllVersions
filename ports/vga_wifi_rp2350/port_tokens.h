@@ -19,7 +19,7 @@
     { (unsigned char *)"Backlight", T_CMD, 0, cmd_backlight }, \
     { (unsigned char *)"WEB",       T_CMD, 0, cmd_web       },
 
-#if HAL_PORT_HAS_USB_KEYBOARD
+#if HAL_PORT_KEYBOARD_USB_HOST
 #define HAL_PORT_USB_OR_FIRMWARE_CMD_TOKEN \
     { (unsigned char *)"Gamepad", T_CMD, 0, cmd_gamepad },
 #else

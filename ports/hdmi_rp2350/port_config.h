@@ -31,7 +31,6 @@
  * scaffolding but adds the HDMI sink + DVI mode tables. No GUICONTROLS
  * today — touchscreen widgets are PICOMITE/WEBRP2350 only. */
 #define HAL_PORT_HAS_WIFI                0
-#define HAL_PORT_HAS_PICOMITE         0
 #define HAL_PORT_HAS_GUICONTROLS         0
 
 /* core1stack[] size in words. HDMI runs the DVI scanout loop on core1

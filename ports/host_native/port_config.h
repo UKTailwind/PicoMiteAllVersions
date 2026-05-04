@@ -52,9 +52,12 @@
 /* Stage-A palette flags (decascade plan). Host has no hardware backends
  * for any of these — stubs cover every gated path. */
 #define HAL_PORT_HAS_WIFI                0
-#define HAL_PORT_HAS_PICOMITE            1
 #define HAL_PORT_HAS_GUICONTROLS         0
-#define HAL_PORT_HAS_USB_KEYBOARD        0
+/* Keyboard backend selector: 0 = PS/2 matrix (drivers/ps2_matrix/),
+ *                              1 = USB-host (drivers/usb_host_kbd/).
+ * Wires up via port_sources.cmake linkage; configuration.h reads it for
+ * USB-vs-PS/2 flash offset / magic key / heap top selection. */
+#define HAL_PORT_KEYBOARD_USB_HOST        0
 #define HAL_PORT_HAS_I2C_KEYPAD          0
 
 /* I²C bus timing constants — used by I2C.h for the master-timeout

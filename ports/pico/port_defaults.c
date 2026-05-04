@@ -5,7 +5,7 @@
  * of its shared defaults.
  *
  * Port impl files may use target-macro #ifdef dispatch (this one has
- * HAL_PORT_HAS_USB_KEYBOARD inside) per the fixup-plan rules — the macros don't
+ * HAL_PORT_KEYBOARD_USB_HOST inside) per the fixup-plan rules — the macros don't
  * leak back into core because core only sees the function call.
  */
 
@@ -17,7 +17,7 @@ extern void port_picocalc_factory_reset_options(void);
 void port_set_default_options(void)
 {
     Option.CPU_Speed = FreqDefault;
-#if HAL_PORT_HAS_USB_KEYBOARD
+#if HAL_PORT_KEYBOARD_USB_HOST
     Option.USBKeyboard = CONFIG_US;
     Option.RepeatStart = 600;
     Option.RepeatRate = 150;
@@ -43,7 +43,7 @@ void port_set_default_options(void)
 #include "MMBasic.h"  /* for MMPrintString */
 void port_print_supported_boards(void)
 {
-#if !HAL_PORT_HAS_USB_KEYBOARD
+#if !HAL_PORT_KEYBOARD_USB_HOST
     MMPrintString("Game*Mite\r\n");
 #  ifdef PICOCALC
     MMPrintString("PicoCalc\r\n");
@@ -60,12 +60,12 @@ void port_print_supported_boards(void)
 }
 
 /* OPTION RESET <BOARD> factory profiles for PICOMITE / PICOMITEWEB
- * (rp2040). Internal #ifdefs handle HAL_PORT_HAS_USB_KEYBOARD vs PS/2 +
+ * (rp2040). Internal #ifdefs handle HAL_PORT_KEYBOARD_USB_HOST vs PS/2 +
  * PICOMITE-vs-PICOMITEWEB differences (RP2040LCD-* boards exclude WEB
  * to save flash). */
 int port_factory_reset_board(unsigned char *p)
 {
-#if !HAL_PORT_HAS_USB_KEYBOARD
+#if !HAL_PORT_KEYBOARD_USB_HOST
     if(checkstring(p,(unsigned char *) "GAMEMITE"))  {
         ResetOptions(false);
         Option.CPU_Speed=252000;

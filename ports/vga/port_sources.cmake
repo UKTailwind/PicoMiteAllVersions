@@ -69,7 +69,7 @@ target_compile_definitions(slower_boot2 PRIVATE PICO_FLASH_SPI_CLKDIV=4)
 pico_set_boot_stage2(PicoMite slower_boot2)
 
 if (COMPILE STREQUAL "VGAUSB")
-    target_compile_options(PicoMite PRIVATE -DHAL_PORT_HAS_USB_KEYBOARD=1
+    target_compile_options(PicoMite PRIVATE -DHAL_PORT_KEYBOARD_USB_HOST=1
                                             -DHAL_PORT_DEVICE_NAME="PicoMiteVGAUSB"
                                             )
     target_link_libraries(PicoMite tinyusb_host tinyusb_board)
@@ -78,7 +78,7 @@ if (COMPILE STREQUAL "VGAUSB")
     )
     Pico_enable_stdio_usb(PicoMite 0)
 else()
-    target_compile_options(PicoMite PRIVATE -DHAL_PORT_HAS_USB_KEYBOARD=0
+    target_compile_options(PicoMite PRIVATE -DHAL_PORT_KEYBOARD_USB_HOST=0
                                             -DHAL_PORT_DEVICE_NAME="PicoMiteVGA")
     Pico_enable_stdio_usb(PicoMite 1)
 endif()

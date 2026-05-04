@@ -1,6 +1,6 @@
 /*
  * drivers/ps2_matrix/hal_keyboard_ps2.c — hal_keyboard real impl for
- * PS/2 + I²C-keypad ports. Linked when HAL_PORT_HAS_USB_KEYBOARD=0.
+ * PS/2 + I²C-keypad ports. Linked when HAL_PORT_KEYBOARD_USB_HOST=0.
  *
  * Drives the PS/2 matrix scan (Keyboard.c::CheckKeyboard) and the
  * I²C keypad polling (I2C.c::CheckI2CKeyboard, rate-limited via

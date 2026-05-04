@@ -45,9 +45,12 @@
 /* Stage-A palette flags (decascade plan). PICOMITEWEB on rp2040 has the
  * CYW43+lwIP+mongoose stack but doesn't fit GUICONTROLS in heap. */
 #define HAL_PORT_HAS_WIFI                1
-#define HAL_PORT_HAS_PICOMITE            0
 #define HAL_PORT_HAS_GUICONTROLS         0
-#define HAL_PORT_HAS_USB_KEYBOARD        0
+/* Keyboard backend selector: 0 = PS/2 matrix (drivers/ps2_matrix/),
+ *                              1 = USB-host (drivers/usb_host_kbd/).
+ * Wires up via port_sources.cmake linkage; configuration.h reads it for
+ * USB-vs-PS/2 flash offset / magic key / heap top selection. */
+#define HAL_PORT_KEYBOARD_USB_HOST        0
 #define HAL_PORT_HAS_I2C_KEYPAD          0
 
 /* core1stack[] size in words. WEB never launches core1 — single canary
@@ -56,7 +59,7 @@
 
 /* Stage-D per-port memory + clock + MMBasic-table values (decascade plan
  * D1). WEB has no USB-keyboard variant; the _USB siblings are defined
- * equal to the non-USB ones so configuration.h's HAL_PORT_HAS_USB_KEYBOARD-axis macro
+ * equal to the non-USB ones so configuration.h's HAL_PORT_KEYBOARD_USB_HOST-axis macro
  * resolves correctly. CONSOLE_RX_BUF_SIZE = TCP_MSS via lwIP — handled
  * in configuration.h since TCP_MSS lives in lwipopts.h. */
 #define HAL_PORT_HEAP_MEMORY_SIZE        (88 * 1024)

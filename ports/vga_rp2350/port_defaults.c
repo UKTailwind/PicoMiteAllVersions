@@ -15,7 +15,7 @@ void port_set_default_options(void)
     Option.X_TILE = 80;
     Option.Y_TILE = 40;
     Option.CPU_Speed = Freq252P;
-#if HAL_PORT_HAS_USB_KEYBOARD
+#if HAL_PORT_KEYBOARD_USB_HOST
     Option.USBKeyboard = CONFIG_US;
     Option.SerialConsole = 2;
     Option.SerialTX = 11;
@@ -36,7 +36,7 @@ void port_set_default_options(void)
 #include "MMBasic.h"
 void port_print_supported_boards(void)
 {
-#if HAL_PORT_HAS_USB_KEYBOARD
+#if HAL_PORT_KEYBOARD_USB_HOST
     MMPrintString("CMM1.5\r\n");
 #else
     MMPrintString("PICOMITEVGA V1.1\r\n");
@@ -54,7 +54,7 @@ void port_print_supported_boards(void)
  * no name matched, so MM_Misc.c can fall through to the error. */
 int port_factory_reset_board(unsigned char *p)
 {
-#if HAL_PORT_HAS_USB_KEYBOARD
+#if HAL_PORT_KEYBOARD_USB_HOST
     if(checkstring(p,(unsigned char *) "CMM1.5"))  {
         ResetOptions(false);
         Option.CPU_Speed=252000;

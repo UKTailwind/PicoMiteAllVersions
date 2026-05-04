@@ -41,7 +41,6 @@
 /* Stage-A palette flags (decascade plan). PICORP2350 gets GUICONTROLS
  * because rp2350 PICOMITE has the RAM for the widget tables. */
 #define HAL_PORT_HAS_WIFI                0
-#define HAL_PORT_HAS_PICOMITE         1
 #define HAL_PORT_HAS_GUICONTROLS         1
 
 /* core1stack[] size in words. PICOMITE runs the SPI-LCD merge pipeline

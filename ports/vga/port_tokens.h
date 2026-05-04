@@ -18,7 +18,7 @@
 #define HAL_PORT_WIFI_OR_3D_CMD_TOKENS \
     { (unsigned char *)"Draw3D", T_CMD, 0, cmd_3D },
 
-#if HAL_PORT_HAS_USB_KEYBOARD
+#if HAL_PORT_KEYBOARD_USB_HOST
 #define HAL_PORT_USB_OR_FIRMWARE_CMD_TOKEN \
     { (unsigned char *)"Gamepad", T_CMD, 0, cmd_gamepad },
 #else

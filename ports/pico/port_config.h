@@ -81,7 +81,6 @@
  *   HAS_VGA_PIO      — drivers/vga_pio scanout family (used by VGA + HDMI).
  *   HAS_GUICONTROLS  — GUI.c widget family + Touch.c + Option.MaxCtrls. */
 #define HAL_PORT_HAS_WIFI                0
-#define HAL_PORT_HAS_PICOMITE         1
 #define HAL_PORT_HAS_GUICONTROLS         0
 #define HAL_PORT_HAS_NEXTGEN_DISPLAY    0
 

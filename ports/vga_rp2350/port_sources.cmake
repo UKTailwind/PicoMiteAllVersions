@@ -68,7 +68,7 @@ target_link_libraries(PicoMite pico_multicore)
 pico_set_float_implementation(PicoMite pico_dcp)
 
 if (COMPILE STREQUAL "VGAUSBRP2350")
-    target_compile_options(PicoMite PRIVATE -DHAL_PORT_HAS_USB_KEYBOARD=1
+    target_compile_options(PicoMite PRIVATE -DHAL_PORT_KEYBOARD_USB_HOST=1
                                             -DHAL_PORT_DEVICE_NAME="PicoMiteVGAUSB"
                                             )
     target_link_libraries(PicoMite tinyusb_host tinyusb_board)
@@ -77,7 +77,7 @@ if (COMPILE STREQUAL "VGAUSBRP2350")
     )
     Pico_enable_stdio_usb(PicoMite 0)
 else()
-    target_compile_options(PicoMite PRIVATE -DHAL_PORT_HAS_USB_KEYBOARD=0
+    target_compile_options(PicoMite PRIVATE -DHAL_PORT_KEYBOARD_USB_HOST=0
                                             -DHAL_PORT_DEVICE_NAME="PicoMiteVGA")
     Pico_enable_stdio_usb(PicoMite 1)
 endif()

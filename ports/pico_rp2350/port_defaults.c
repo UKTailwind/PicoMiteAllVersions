@@ -12,7 +12,7 @@ extern void port_picocalc_factory_reset_options(void);
 void port_set_default_options(void)
 {
     Option.CPU_Speed = FreqDefault;
-#if HAL_PORT_HAS_USB_KEYBOARD
+#if HAL_PORT_KEYBOARD_USB_HOST
     Option.USBKeyboard = CONFIG_US;
     Option.RepeatStart = 600;
     Option.RepeatRate = 150;
@@ -38,7 +38,7 @@ void port_set_default_options(void)
 void port_print_supported_boards(void)
 {
     MMPrintString("Palm Pico");
-#if !HAL_PORT_HAS_USB_KEYBOARD
+#if !HAL_PORT_KEYBOARD_USB_HOST
     MMPrintString("Game*Mite\r\n");
 #  ifdef PICOCALC
     MMPrintString("PicoCalc\r\n");
@@ -98,7 +98,7 @@ int port_factory_reset_board(unsigned char *p)
         SoftReset();
         return 1;
     }
-#if !HAL_PORT_HAS_USB_KEYBOARD
+#if !HAL_PORT_KEYBOARD_USB_HOST
     if(checkstring(p,(unsigned char *) "GAMEMITE"))  {
         ResetOptions(false);
         Option.CPU_Speed=252000;

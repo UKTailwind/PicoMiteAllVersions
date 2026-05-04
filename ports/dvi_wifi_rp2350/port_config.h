@@ -35,9 +35,12 @@
  * (RM2's CYW43 lives off the QSPI pins so PSRAM stays available).
  * GUICONTROLS off — no touch panel on a DVI display. */
 #define HAL_PORT_HAS_WIFI                1
-#define HAL_PORT_HAS_PICOMITE            0
 #define HAL_PORT_HAS_GUICONTROLS         0
-#define HAL_PORT_HAS_USB_KEYBOARD        1
+/* Keyboard backend selector: 0 = PS/2 matrix (drivers/ps2_matrix/),
+ *                              1 = USB-host (drivers/usb_host_kbd/).
+ * Wires up via port_sources.cmake linkage; configuration.h reads it for
+ * USB-vs-PS/2 flash offset / magic key / heap top selection. */
+#define HAL_PORT_KEYBOARD_USB_HOST        1
 #define HAL_PORT_HAS_I2C_KEYPAD          0
 
 /* core1stack[] size in words. HDMI runs the DVI scanout loop on core1

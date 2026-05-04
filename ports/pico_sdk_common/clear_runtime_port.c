@@ -23,7 +23,11 @@
 
 void port_clear_runtime_display_reset(void) {
 #if !HAL_PORT_IS_VGA
-#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
+    /* NEXTGEN-class panels (ILI9488BUFF / ILI9488PBUFF / ST7796SPBUFF)
+     * exist only on PicoMite rp2350 ports — the OPTION setter rejects
+     * them elsewhere — so the runtime DISPLAY_TYPE>=NEXTGEN guard is
+     * sufficient. The LUT init functions resolve via spi_lcd_mem332.c
+     * (real) or spi_lcd_mem332_stub.c (no-op) per-port. */
     if (Option.DISPLAY_TYPE >= NEXTGEN) {
         Option.Refresh = 1;
         if (Option.DISPLAY_TYPE == ILI9488BUFF || Option.DISPLAY_TYPE == ILI9488PBUFF)
@@ -31,7 +35,6 @@ void port_clear_runtime_display_reset(void) {
         else
             init_RGB332_to_RGB565_LUT();
     }
-#endif
     if (ScrollLCD == ScrollLCDSPISCR) {
         ScrollStart = 0;
         spi_write_command(CMD_SET_SCROLL_START);

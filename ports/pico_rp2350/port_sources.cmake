@@ -72,7 +72,7 @@ pico_set_float_implementation(PicoMite pico_dcp)
 
 # USB axis.
 if (COMPILE STREQUAL "PICOUSBRP2350")
-    target_compile_options(PicoMite PRIVATE -DHAL_PORT_HAS_USB_KEYBOARD=1
+    target_compile_options(PicoMite PRIVATE -DHAL_PORT_KEYBOARD_USB_HOST=1
                                             -DHAL_PORT_DEVICE_NAME="PicoMiteUSB"
                                             )
     target_link_libraries(PicoMite tinyusb_host tinyusb_board)
@@ -81,7 +81,7 @@ if (COMPILE STREQUAL "PICOUSBRP2350")
     )
     Pico_enable_stdio_usb(PicoMite 0)
 else()
-    target_compile_options(PicoMite PRIVATE -DHAL_PORT_HAS_USB_KEYBOARD=0
+    target_compile_options(PicoMite PRIVATE -DHAL_PORT_KEYBOARD_USB_HOST=0
                                             -DHAL_PORT_DEVICE_NAME="PicoMite")
     Pico_enable_stdio_usb(PicoMite 1)
 endif()

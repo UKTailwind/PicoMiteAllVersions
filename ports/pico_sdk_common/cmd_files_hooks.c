@@ -109,14 +109,14 @@ int port_mount_sd_drive(void)
 
 /* OPTION KEYBOARD setter — USB and PS/2 builds parse different
  * arg lists and Option fields. Real impl lives here with #ifdef
- * HAL_PORT_HAS_USB_KEYBOARD inside (port impl files allow target gates).  Returns 1
+ * HAL_PORT_KEYBOARD_USB_HOST inside (port impl files allow target gates).  Returns 1
  * if matched (call typically never returns — SoftReset). */
 int port_keyboard_option_setter(unsigned char *cmdline)
 {
     unsigned char *tp = checkstring(cmdline, (unsigned char *)"KEYBOARD");
     if (!tp) return 0;
     if (CurrentLinePtr) error("Invalid in a program");
-#if !HAL_PORT_HAS_USB_KEYBOARD
+#if !HAL_PORT_KEYBOARD_USB_HOST
     if (checkstring(tp, (unsigned char *)"DISABLE")) {
         Option.KeyboardConfig = NO_KEYBOARD;
         Option.capslock = 0;
@@ -130,7 +130,7 @@ int port_keyboard_option_setter(unsigned char *cmdline)
     }
 #endif
     getargs(&tp, 9, (unsigned char *)",");
-#if !HAL_PORT_HAS_USB_KEYBOARD
+#if !HAL_PORT_KEYBOARD_USB_HOST
     if (!Option.KEYBOARD_CLOCK) {
         Option.KEYBOARD_CLOCK = KEYBOARDCLOCK;
         Option.KEYBOARD_DATA  = KEYBOARDDATA;
@@ -153,7 +153,7 @@ int port_keyboard_option_setter(unsigned char *cmdline)
     if (hal_kbd_layout < 0 || hal_keyboard_set_layout(hal_kbd_layout) != 0) error("Syntax");
     Option.capslock = 0;
     Option.numlock  = 1;
-#if !HAL_PORT_HAS_USB_KEYBOARD
+#if !HAL_PORT_KEYBOARD_USB_HOST
     int rs = 0b00100000;
     int rr = 0b00001100;
     if (Option.KeyboardConfig != CONFIG_I2C) {
@@ -177,7 +177,7 @@ int port_keyboard_option_setter(unsigned char *cmdline)
     return 1;
 }
 
-#if !HAL_PORT_HAS_USB_KEYBOARD
+#if !HAL_PORT_KEYBOARD_USB_HOST
 /* `Update Firmware` jumps to BOOTSEL on non-USB-keyboard device builds.
  * USB-keyboard variants register `Gamepad` in the same commandtbl slot
  * (AllCommands.h gates the entry), so cmd_update is never referenced
