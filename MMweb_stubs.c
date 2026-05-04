@@ -95,6 +95,25 @@ int port_setter_pico_pins(unsigned char *cmdline) {
     return 1;
 }
 
+/* PWM-mode GPIO 23 shadow. Non-WiFi ports drive GPIO 23 to mirror
+ * Option.PWM (the global PWM enable); WiFi ports leave GPIO 23 to
+ * the CYW43 module. The rp2350-A package has the same shadow GPIO
+ * behaviour as rp2040; rp2350-B routes those pins differently and
+ * skips the shadow. */
+#include "hal/hal_main_init.h"
+#include "hardware/gpio.h"
+
+void hal_pwm_mode_shadow_apply(void) {
+#ifdef rp2350
+    if (!rp2350a) return;
+#endif
+    if (Option.AllPins) return;
+    if (!CheckPin(41, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED)) return;
+    gpio_init(23);
+    gpio_put(23, Option.PWM ? GPIO_PIN_SET : GPIO_PIN_RESET);
+    gpio_set_dir(23, GPIO_OUT);
+}
+
 /* OPTION HEARTBEAT — non-WiFi ports allow pin reassignment in addition
  * to ON/OFF. */
 int port_setter_heartbeat(unsigned char *cmdline) {

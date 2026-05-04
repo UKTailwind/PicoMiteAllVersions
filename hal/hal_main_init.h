@@ -51,6 +51,12 @@ void port_repl_wifi_arch_init_and_connect(void);
  * elsewhere. */
 void port_repl_post_clear_display_refresh(void);
 
+/* PWM-mode GPIO 23 shadow — driven by the global PWM-enable on
+ * non-WiFi ports (MMweb_stubs.c real impl); WiFi ports leave GPIO
+ * 23 to the CYW43 module (MMsetwifi.c stub). Called from
+ * mmc_stm32.c after audio/PWM init. */
+void hal_pwm_mode_shadow_apply(void);
+
 #ifdef __cplusplus
 }
 #endif

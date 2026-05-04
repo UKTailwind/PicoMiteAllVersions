@@ -299,6 +299,9 @@ void port_repl_wifi_arch_init_and_connect(void) {
     }
 }
 
+/* WiFi ports leave GPIO 23 to the CYW43 module — no PWM shadow. */
+void hal_pwm_mode_shadow_apply(void) { }
+
 /* WiFi ports limit OPTION HEARTBEAT to ON/OFF — no pin reassignment
  * (the heartbeat LED lives on the CYW43 module). */
 int port_setter_heartbeat(unsigned char *cmdline) {

@@ -38,6 +38,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 /-------------------------------------------------------------------------*/
 
 #include "Hardware_Includes.h"
+#include "hal/hal_main_init.h"
 #include <stddef.h>
 #include "diskio.h"
 #include "pico/stdlib.h"
@@ -1683,32 +1684,11 @@ void InitReservedIO(void) {
  		}
 	}
 
-    /* PWM-mode shadow on GPIO 23. WiFi ports leave GPIO 23 to the
-     * CYW43 module — HAL_PORT_HAS_WIFI is a 0/1 value here, so the
-     * compiler folds the if() to dead code on WiFi builds. */
-    if (!HAL_PORT_HAS_WIFI) {
-#ifdef rp2350
-        if (rp2350a) {
-#endif
-            if (!Option.AllPins) {
-                if (Option.PWM) {
-                    if (CheckPin(41, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED)) {
-                        gpio_init(23);
-                        gpio_put(23, GPIO_PIN_SET);
-                        gpio_set_dir(23, GPIO_OUT);
-                    }
-                } else {
-                    if (CheckPin(41, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED)) {
-                        gpio_init(23);
-                        gpio_put(23, GPIO_PIN_RESET);
-                        gpio_set_dir(23, GPIO_OUT);
-                    }
-                }
-            }
-#ifdef rp2350
-        }
-#endif
-    }
+    /* PWM-mode shadow on GPIO 23. Non-WiFi ports drive GPIO 23
+     * to mirror the global PWM enable; WiFi ports leave GPIO 23 to
+     * the CYW43 module. Dispatched via the hal_pwm_mode_shadow_apply
+     * hook — real impl in MMweb_stubs.c, no-op stub in MMsetwifi.c. */
+    hal_pwm_mode_shadow_apply();
 	if(Option.SerialConsole){
 		ExtCfg(Option.SerialTX, EXT_BOOT_RESERVED, 0);
 		ExtCfg(Option.SerialRX, EXT_BOOT_RESERVED, 0);
