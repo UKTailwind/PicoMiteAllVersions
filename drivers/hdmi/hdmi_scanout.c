@@ -1701,6 +1701,46 @@ int port_setter_hdmi_pins(unsigned char *cmdline) {
 /* SSD1963.c isn't linked on HDMI either. */
 void SetBacklightSSD1963(int intensity) { (void)intensity; }
 
+/* OPTION LIST display section hooks — HDMI side (VGA family). */
+#include "hal/hal_print_options.h"
+extern void PO(char *s1);
+extern void PO2Int(char *s1, int n1);
+extern void PO2StrInt(char *s1, char *s2, int n1);
+extern void PO3Int(char *s1, int n1, int n2);
+extern void PInt(int64_t n);
+extern void PIntComma(int64_t n);
+extern void PRet(void);
+
+void port_print_display_resolution_hdmi(void) {
+    if(Option.CPU_Speed==Freq720P)PO2StrInt("RESOLUTION", "1280x720",Option.CPU_Speed);
+    if(Option.CPU_Speed==FreqXGA)PO2StrInt("RESOLUTION", "1024x768",Option.CPU_Speed);
+    if(Option.CPU_Speed==FreqSVGA)PO2StrInt("RESOLUTION", "800x600",Option.CPU_Speed);
+    if(Option.CPU_Speed==Freq848)PO2StrInt("RESOLUTION", "848x480",Option.CPU_Speed);
+    if(Option.CPU_Speed==Freq400)PO2StrInt("RESOLUTION", "720x400",Option.CPU_Speed);
+    if(Option.CPU_Speed==FreqX)PO2StrInt("RESOLUTION", "1024x600",Option.CPU_Speed);
+    if(Option.CPU_Speed==FreqY)PO2StrInt("RESOLUTION", "800x480",Option.CPU_Speed);
+    if(Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P || Option.CPU_Speed==Freq378P)
+        PO2StrInt("RESOLUTION", "640x480",Option.CPU_Speed);
+    if(Option.DISPLAY_TYPE!=SCREENMODE1)PO2Int("DEFAULT MODE", Option.DISPLAY_TYPE-SCREENMODE1+1);
+    if(Option.Height != 40 || Option.Width != 80) PO3Int("DISPLAY", Option.Height, Option.Width);
+    if (Option.HDMIclock != 2 || Option.HDMId0 != 0 ||
+        Option.HDMId1   != 6 || Option.HDMId2 != 4) {
+        PO("HDMI PINS ");
+        PInt(Option.HDMIclock); PIntComma(Option.HDMId0);
+        PIntComma(Option.HDMId1); PIntComma(Option.HDMId2); PRet();
+    }
+}
+
+void port_print_display_panel_touch(void) { /* VGA family only resolution/HDMI lines. */ }
+
+void port_print_sdcard_system_spi_share(void) {
+    MMPrintString(", "); MMPrintString((char *)PinDef[Option.SYSTEM_CLK].pinname);
+    MMPrintString(", "); MMPrintString((char *)PinDef[Option.SYSTEM_MOSI].pinname);
+    MMPrintString(", "); MMPrintString((char *)PinDef[Option.SYSTEM_MISO].pinname);
+}
+
+void port_print_vga_pins(void) { /* HDMI ports don't expose VGA HSYNC/BLUE pins. */ }
+
 /* MM_Misc.c batch-18 hooks — HDMI side (HDMI is a VGA-family port). */
 void port_print_system_spi(void) { /* HDMI prints VGA PINS instead. */ }
 

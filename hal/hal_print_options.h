@@ -23,6 +23,21 @@ void port_print_kb_layout(void);
  * this hook is a stub on PS/2 ports. */
 void port_print_kb_repeat(void);
 
+/* OPTION LIST display section — VGA family prints RESOLUTION /
+ * DEFAULT MODE / DISPLAY / HDMI PINS; non-VGA ports stub. */
+void port_print_display_resolution_hdmi(void);
+
+/* OPTION LIST display section — non-VGA ports print CPUSPEED /
+ * LCDPANEL / TOUCH calibration; VGA family stubs. */
+void port_print_display_panel_touch(void);
+
+/* SDCARD print — VGA reuses SYSTEM_CLK/MOSI/MISO when SD has no
+ * dedicated pins; non-VGA stubs (always uses dedicated SD_*_PIN). */
+void port_print_sdcard_system_spi_share(void);
+
+/* OPTION LIST VGA PINS print — pure-VGA only (HDMI / non-VGA stub). */
+void port_print_vga_pins(void);
+
 #ifdef __cplusplus
 }
 #endif

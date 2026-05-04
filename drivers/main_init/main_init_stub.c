@@ -26,6 +26,125 @@ extern void disable_systemspi(void);
 
 /* MM_Misc.c batch-18 hooks — Web side (non-VGA). */
 extern void PO(char *s1);
+extern void PO2Int(char *s1, int n1);
+extern void PO3Int(char *s1, int n1, int n2);
+extern void PInt(int64_t n);
+extern void PIntComma(int64_t n);
+/* PIntHC declared in Hardware_Includes.h. */
+extern void PRet(void);
+extern const char *OrientList[];
+extern void port_web_print_options(void);
+extern short HRes;
+extern short VRes;
+#include "hal/hal_print_options.h"
+#include "hal/hal_gui_controls.h"
+#include "hal/hal_i2c_keypad.h"
+
+/* OPTION LIST display section — Web is non-VGA, so it prints
+ * CPUSPEED + LCDPANEL + TOUCH (mirrors display_merge_pico.c's
+ * non-VGA real impl). VGA-only hooks stub out. */
+void port_print_display_resolution_hdmi(void) { /* Web: non-VGA. */ }
+
+void port_print_display_panel_touch(void) {
+    int i = 0;
+    PO2Int("CPUSPEED (KHz)", Option.CPU_Speed);
+    if(Option.DISPLAY_CONSOLE == true) {
+        PO("LCDPANEL CONSOLE");
+        if(Option.DefaultFont != (Option.DISPLAY_TYPE==SCREENMODE2? (6<<4) | 1 : 0x01 ))PInt((Option.DefaultFont>>4) +1);
+        else if(!(Option.DefaultFC==WHITE && Option.DefaultBC==BLACK && Option.BackLightLevel == 100 && Option.NoScroll==0))MMputchar(',',1);
+        if(Option.DefaultFC!=WHITE)PIntHC(Option.DefaultFC);
+        else if(!(Option.DefaultBC==BLACK && Option.BackLightLevel == 100 && Option.NoScroll==0))MMputchar(',',1);
+        if(Option.DefaultBC!=BLACK)PIntHC(Option.DefaultBC);
+        else if(!(Option.BackLightLevel == 100 && Option.NoScroll==0))MMputchar(',',1);
+        if(Option.BackLightLevel != 100)PIntComma(Option.BackLightLevel);
+        else if(!(Option.BackLightLevel == 100 && Option.NoScroll==0))MMputchar(',',1);
+        if(Option.NoScroll!=0)MMPrintString(",NOSCROLL");
+        PRet();
+    }
+    if(Option.Height != 24 || Option.Width != 80) PO3Int("DISPLAY", Option.Height, Option.Width);
+    if(Option.DISPLAY_TYPE == DISP_USER) PO3Int("LCDPANEL USER", HRes, VRes);
+    {
+        int in_range = (Option.DISPLAY_TYPE > I2C_PANEL &&
+                        (Option.DISPLAY_TYPE < DISP_USER ||
+                         Option.DISPLAY_TYPE >= NEXTGEN));
+        if (in_range) {
+            i=Option.DISPLAY_ORIENTATION;
+            if(Option.DISPLAY_TYPE==ST7789 || Option.DISPLAY_TYPE == ST7789A)i=(i+2) % 4;
+            PO("LCDPANEL"); MMPrintString((char *)display_details[Option.DISPLAY_TYPE].name); MMPrintString(", "); MMPrintString((char *)OrientList[(int)i - 1]);
+            MMputchar(',',1);MMPrintString((char *)PinDef[Option.LCD_CD].pinname);
+            MMputchar(',',1);MMPrintString((char *)PinDef[Option.LCD_Reset].pinname);
+            if(Option.DISPLAY_TYPE!=ST7920){
+                MMputchar(',',1);MMPrintString((char *)PinDef[Option.LCD_CS].pinname);
+            }
+            int buffered_range = (Option.DISPLAY_TYPE <= I2C_PANEL ||
+                                  (Option.DISPLAY_TYPE >= BufferedPanel &&
+                                   Option.DISPLAY_TYPE <  NEXTGEN));
+            if(!buffered_range && Option.DISPLAY_BL){
+                MMputchar(',',1);MMPrintString((char *)PinDef[Option.DISPLAY_BL].pinname);
+            } else if(Option.BGR)MMputchar(',',1);
+            if(!buffered_range && Option.BGR){
+                MMputchar(',',1);MMPrintString((char *)"INVERT");
+            }
+            if(Option.DISPLAY_TYPE==SSD1306SPI && Option.I2Coffset)PIntComma(Option.I2Coffset);
+            if(Option.DISPLAY_TYPE==N5110 && Option.LCDVOP!=0xC8)PIntComma(Option.LCDVOP);
+            MMPrintString("\r\n");
+        }
+    }
+    if(Option.DISPLAY_TYPE > 0 && Option.DISPLAY_TYPE <= I2C_PANEL) {
+        PO("LCDPANEL"); MMPrintString((char *)display_details[Option.DISPLAY_TYPE].name); MMPrintString(", "); MMPrintString((char *)OrientList[(int)i - 1]);
+        if(Option.DISPLAY_TYPE==SSD1306I2C && Option.I2Coffset)PIntComma(Option.I2Coffset);
+        MMPrintString("\r\n");
+    }
+    if(Option.DISPLAY_TYPE >= SSDPANEL && Option.DISPLAY_TYPE<VIRTUAL) {
+        PO("LCDPANEL"); MMPrintString((char *)display_details[Option.DISPLAY_TYPE].name); MMPrintString(", ");
+        MMPrintString((char *)OrientList[(int)i - 1]);
+        if(Option.DISPLAY_BL){
+            MMputchar(',',1);MMPrintString((char *)PinDef[Option.DISPLAY_BL].pinname);
+        } else if(Option.SSD_DC!=(Option.DISPLAY_TYPE> SSD_PANEL_8 ? 16: 13) || Option.SSD_RESET!=(Option.DISPLAY_TYPE > SSD_PANEL_8 ? 19: 16) || (Option.SSD_DATA!=1))MMputchar(',',1);
+        if(Option.SSD_DC!=(Option.DISPLAY_TYPE> SSD_PANEL_8 ? 16: 13)){
+            MMputchar(',',1);MMPrintString((char *)PinDef[PINMAP[Option.SSD_DC]].pinname);
+        } else if(Option.SSD_RESET!=(Option.DISPLAY_TYPE > SSD_PANEL_8 ? 19: 16) || (Option.SSD_DATA!=1))MMputchar(',',1);
+        if(Option.SSD_RESET==-1){
+            MMputchar(',',1);MMPrintString("NORESET");
+        } else if( (Option.SSD_DATA!=1))MMputchar(',',1);
+        if(Option.SSD_DATA!=1){
+            MMputchar(',',1);
+            MMPrintString((char *)PinDef[Option.SSD_DATA].pinname);
+        }
+        PRet();
+    }
+    {
+        int is_virtual = (Option.DISPLAY_TYPE >= VIRTUAL &&
+                          Option.DISPLAY_TYPE <  NEXTGEN);
+        if (is_virtual) {
+            PO("LCDPANEL"); MMPrintString((char *)display_details[Option.DISPLAY_TYPE].name); PRet();
+        }
+    }
+    if(Option.BackLightLevel!=100)PO2Int("LCD BACKLIGHT", Option.BackLightLevel);
+    hal_gui_controls_print_options();
+    hal_i2c_keypad_print_options();
+    port_web_print_options();
+    if(Option.TOUCH_CS) {
+        PO("TOUCH");
+        if(Option.TOUCH_CAP==1)(MMPrintString("FT6336 "));
+        MMPrintString((char *)PinDef[Option.TOUCH_CAP==1 ? Option.TOUCH_IRQ : Option.TOUCH_CS].pinname);MMputchar(',',1);
+        MMPrintString((char *)PinDef[Option.TOUCH_CAP==1 ? Option.TOUCH_CS : Option.TOUCH_IRQ].pinname);
+        if(Option.TOUCH_Click) {
+            MMputchar(',',1);MMPrintString((char *)PinDef[Option.TOUCH_Click].pinname);
+        } else if(Option.TOUCH_CAP)MMputchar(',',1);
+        if(Option.TOUCH_CAP){
+            MMputchar(',',1);PInt(Option.THRESHOLD_CAP);
+        }
+        MMPrintString("\r\n");
+        if(Option.TOUCH_XZERO != 0 || Option.TOUCH_YZERO != 0) {
+            MMPrintString("GUI CALIBRATE "); PInt(Option.TOUCH_SWAPXY); PIntComma(Option.TOUCH_XZERO); PIntComma(Option.TOUCH_YZERO);
+            PIntComma(Option.TOUCH_XSCALE * 10000); PIntComma(Option.TOUCH_YSCALE * 10000); MMPrintString("\r\n");
+        }
+    }
+}
+
+void port_print_sdcard_system_spi_share(void) { /* Web non-VGA: dedicated SD pins. */ }
+void port_print_vga_pins(void)               { /* Web non-VGA: no VGA pins. */ }
 
 void port_print_system_spi(void) {
     if (Option.SYSTEM_CLK) {

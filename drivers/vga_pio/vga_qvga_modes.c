@@ -102,6 +102,56 @@ void port_video_post_clock_init(void) {
  * actually called on VGA. */
 void SetBacklightSSD1963(int intensity) { (void)intensity; }
 
+/* OPTION LIST display section — VGA-family side (resolution + HDMI
+ * PINS). Pure VGA never sets HDMIclock to non-default so the HDMI
+ * PINS print just self-skips on those ports. */
+#include "hal/hal_print_options.h"
+extern void PO(char *s1);
+extern void PO2Int(char *s1, int n1);
+extern void PO2StrInt(char *s1, char *s2, int n1);
+extern void PO3Int(char *s1, int n1, int n2);
+extern void PInt(int64_t n);
+extern void PIntComma(int64_t n);
+extern void PRet(void);
+
+void port_print_display_resolution_hdmi(void) {
+    if(Option.CPU_Speed==Freq720P)PO2StrInt("RESOLUTION", "1280x720",Option.CPU_Speed);
+    if(Option.CPU_Speed==FreqXGA)PO2StrInt("RESOLUTION", "1024x768",Option.CPU_Speed);
+    if(Option.CPU_Speed==FreqSVGA)PO2StrInt("RESOLUTION", "800x600",Option.CPU_Speed);
+    if(Option.CPU_Speed==Freq848)PO2StrInt("RESOLUTION", "848x480",Option.CPU_Speed);
+    if(Option.CPU_Speed==Freq400)PO2StrInt("RESOLUTION", "720x400",Option.CPU_Speed);
+    if(Option.CPU_Speed==FreqX)PO2StrInt("RESOLUTION", "1024x600",Option.CPU_Speed);
+    if(Option.CPU_Speed==FreqY)PO2StrInt("RESOLUTION", "800x480",Option.CPU_Speed);
+    if(Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P || Option.CPU_Speed==Freq378P)
+        PO2StrInt("RESOLUTION", "640x480",Option.CPU_Speed);
+    if(Option.DISPLAY_TYPE!=SCREENMODE1)PO2Int("DEFAULT MODE", Option.DISPLAY_TYPE-SCREENMODE1+1);
+    if(Option.Height != 40 || Option.Width != 80) PO3Int("DISPLAY", Option.Height, Option.Width);
+    if (Option.HDMIclock != 2 || Option.HDMId0 != 0 ||
+        Option.HDMId1   != 6 || Option.HDMId2 != 4) {
+        PO("HDMI PINS ");
+        PInt(Option.HDMIclock); PIntComma(Option.HDMId0);
+        PIntComma(Option.HDMId1); PIntComma(Option.HDMId2); PRet();
+    }
+}
+
+void port_print_display_panel_touch(void) {
+    /* VGA family: panel/touch lines are non-VGA-only. */
+}
+
+void port_print_sdcard_system_spi_share(void) {
+    /* VGA reuses SYSTEM_CLK/MOSI/MISO when SD has no dedicated pins. */
+    MMPrintString(", "); MMPrintString((char *)PinDef[Option.SYSTEM_CLK].pinname);
+    MMPrintString(", "); MMPrintString((char *)PinDef[Option.SYSTEM_MOSI].pinname);
+    MMPrintString(", "); MMPrintString((char *)PinDef[Option.SYSTEM_MISO].pinname);
+}
+
+void port_print_vga_pins(void) {
+    if(Option.VGA_BLUE!=24 || Option.VGA_HSYNC!=21 ){
+        PO("VGA PINS"); MMPrintString((char *)PinDef[Option.VGA_HSYNC].pinname);
+        MMputchar(',',1); MMPrintString((char *)PinDef[Option.VGA_BLUE].pinname); PRet();
+    }
+}
+
 /* MM_Misc.c batch-18 hooks — VGA-side. */
 void port_print_system_spi(void) { /* VGA prints VGA PINS in port_print_display_options instead. */ }
 

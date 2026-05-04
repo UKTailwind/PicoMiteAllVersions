@@ -16,8 +16,8 @@
  * entries. Each port supplies its own impl:
  *
  *   host/hal_vm_framebuffer_host.c         — wraps host_framebuffer_*
- *   drivers/vm_framebuffer_picomite/*.c   — SPI-LCD real impl
- *   drivers/vm_framebuffer_unsupported/*.c — error stub for VGA/HDMI/WEB
+ *   drivers/vm_framebuffer_picomite/...    — SPI-LCD real impl
+ *   drivers/vm_framebuffer_unsupported/... — error stub for VGA/HDMI/WEB
  *
  * The VM syscall layer (vm_sys_graphics.c) just calls these entries;
  * no target-macro gates required.
