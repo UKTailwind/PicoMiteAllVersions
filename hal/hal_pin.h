@@ -92,6 +92,11 @@ void hal_pin_set_pulls(uint32_t gpio, hal_pin_pull_t pull);
 void hal_pin_set_dir(uint32_t gpio, hal_pin_dir_t dir);
 void hal_pin_set_input_enabled(uint32_t gpio, bool enabled);
 
+/* Pulldown-enable on RP2040 needs an explicit TRISCLR/LATCLR/TRISSET
+ * dance to settle; RP2350 doesn't. The hook drives the dance on ports
+ * where it's required and no-ops elsewhere. */
+void hal_pin_pulldown_reset(int pin);
+
 /* Route `gpio` to the SIO function and leave it as a plain digital pin
  * (no ADC, no peripheral MUX). Used when transitioning a pin away from
  * analog-in. */

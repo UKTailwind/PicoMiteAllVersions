@@ -1698,6 +1698,56 @@ int port_setter_hdmi_pins(unsigned char *cmdline) {
     return 1;
 }
 
+/* SSD1963.c isn't linked on HDMI either. */
+void SetBacklightSSD1963(int intensity) { (void)intensity; }
+
+/* MM_Misc.c batch-18 hooks — HDMI side (HDMI is a VGA-family port). */
+void port_print_system_spi(void) { /* HDMI prints VGA PINS instead. */ }
+
+void port_disable_sd_release_system_spi(void) {
+    if (!IsInvalidPin(Option.SYSTEM_CLK))  ExtCurrentConfig[Option.SYSTEM_CLK]  = EXT_DIG_IN;
+    if (!IsInvalidPin(Option.SYSTEM_CLK))  ExtCfg(Option.SYSTEM_CLK,  EXT_NOT_CONFIG, 0);
+    Option.SYSTEM_CLK  = 0;
+    if (!IsInvalidPin(Option.SYSTEM_MISO)) ExtCurrentConfig[Option.SYSTEM_MISO] = EXT_DIG_IN;
+    if (!IsInvalidPin(Option.SYSTEM_MISO)) ExtCfg(Option.SYSTEM_MISO, EXT_NOT_CONFIG, 0);
+    Option.SYSTEM_MISO = 0;
+    if (!IsInvalidPin(Option.SYSTEM_MOSI)) ExtCurrentConfig[Option.SYSTEM_MOSI] = EXT_DIG_IN;
+    if (!IsInvalidPin(Option.SYSTEM_MOSI)) ExtCfg(Option.SYSTEM_MOSI, EXT_NOT_CONFIG, 0);
+    Option.SYSTEM_MOSI = 0;
+}
+
+int port_setter_sdcard_combined_cs(unsigned char *tp) { (void)tp; return 0; }
+
+void port_setter_sdcard_argc_check(int argc) {
+    if (argc != 7) error("Syntax");
+}
+
+int port_setter_sdcard_via_system_spi(int pin1, int pin2, int pin3) {
+    if (Option.SYSTEM_CLK) return 0;
+    if (PinDef[pin1].mode & SPI0SCK && PinDef[pin2].mode & SPI0TX && PinDef[pin3].mode & SPI0RX) {
+        Option.SYSTEM_CLK  = pin1;
+        Option.SYSTEM_MOSI = pin2;
+        Option.SYSTEM_MISO = pin3;
+        MMPrintString("SPI channel 0 in use for SDcard\r\n");
+        return 1;
+    }
+    if (PinDef[pin1].mode & SPI1SCK && PinDef[pin2].mode & SPI1TX && PinDef[pin3].mode & SPI1RX) {
+        Option.SYSTEM_CLK  = pin1;
+        Option.SYSTEM_MOSI = pin2;
+        Option.SYSTEM_MISO = pin3;
+        MMPrintString("SPI channel 1 in use for SDcard\r\n");
+        return 1;
+    }
+    return 0;
+}
+
+int port_mminfo_lcdpanel(unsigned char *ep, unsigned char *sret, int *out_targ) {
+    (void)ep; (void)sret; (void)out_targ; return 0;
+}
+int port_mminfo_lcd320(unsigned char *ep, int64_t *out_iret, int *out_targ) {
+    (void)ep; (void)out_iret; (void)out_targ; return 0;
+}
+
 /* HDMI ports don't add anything to these setters. */
 int port_setter_keyboard_backlight(unsigned char *cmdline) { (void)cmdline; return 0; }
 int port_setter_scroll_start(int64_t *out_iret)            { (void)out_iret; return 0; }

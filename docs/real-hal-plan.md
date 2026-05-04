@@ -14,12 +14,15 @@ A core file is "HAL-clean" when **all four** hold:
 
 1. **Zero `#if` / `#ifdef` / `#ifndef` / `#elif` lines referencing any target macro** — `rp2350`, `PICOMITE`, `PICOMITEVGA`, `PICOMITEWEB`, `MMB4L`, `USBKEYBOARD`, `MMBASIC_HOST`, `MMBASIC_WASM`, or any successor name for the same concept.
 2. **Zero `#if` / `#ifdef` / `#ifndef` lines referencing port-config macros** (`HAL_PORT_*`, `PORT_*`). Port-config constants are allowed as *values* in C expressions and array sizes; they are not allowed as preprocessor gates. Renaming `#ifdef rp2350` to `#if HAL_PORT_PWM_SLICE_COUNT > 8` does not count as elimination.
-3. **Zero `if (HAL_PORT_*)` / `if (!HAL_PORT_*)` runtime folds** in C statements. Replacing `#if HAL_PORT_X` with `if (HAL_PORT_X) { ... }` is gaming the rule, not eliminating the gate — the source still hard-codes a port-shape branch and the compiler folding it to dead code doesn't make the code portable. Acceptable elimination strategies:
+3. **Zero `if (HAL_PORT_*)` / `if (!HAL_PORT_*)` runtime folds** in C statements (with case-by-case exceptions, see below). Replacing `#if HAL_PORT_X` with `if (HAL_PORT_X) { ... }` is gaming the rule, not eliminating the gate — the source still hard-codes a port-shape branch and the compiler folding it to dead code doesn't make the code portable. Acceptable elimination strategies:
    - HAL hooks with real-impl + stub driver pair (mutually-exclusive linkage).
    - File relocation (move the divergent body into a per-port-shape driver TU).
    - Universal struct-field guards (`if (Option.X)`) where the field exists on every port.
    - Per-port palette macros / per-port `port_*.h` files included by name.
+
    Runtime checks on `Option.*` fields are fine — those reflect user-configurable state, not port shape. Pico SDK target macros (`#ifdef rp2350`) and host-build wrappers (`#if defined(MMBASIC_HOST)`) remain allowed per the existing scope rules.
+
+   **Exception clause:** rule 3 admits case-by-case exceptions where modularizing the site is genuinely impractical — e.g. a two-line divergence where a hook would be overkill, or a per-port split that would invent load-bearing helpers nowhere else needs. When taking an exception, leave a one-line `/* port-shape inline: <reason> */` comment so a future drain pass can re-evaluate. The default is elimination; the exception is the rare site where elimination harms readability.
 4. **Conditional bodies live in HAL impl files or drivers**, not in headers that core includes. `hal/*.h` is pure contract — no target macros, no port-config ifdefs, no feature gates.
 
 A phase closes only when its targeted core files pass that standard. "Infrastructure landed" (HAL header + call sites migrated) is not a phase-exit state. Either finish the ifdef elimination or leave the phase marked 🔧.

@@ -220,3 +220,20 @@ void hal_pin_bank_xor_mask(uint64_t mask)
 {
     gpio_xor_mask64(mask);
 }
+
+/* Pulldown-enable RP2040 dance: drive the pin low briefly so the
+ * internal pull settles. No-op on rp2350 (the pad's pulldown takes
+ * effect immediately). External.h's TRISCLR/LATCLR/TRISSET values
+ * are inlined here as literals so this TU stays MMBasic-free. */
+extern void PinSetBit(int pin, int bit);
+
+void hal_pin_pulldown_reset(int pin)
+{
+#ifndef rp2350
+    PinSetBit(pin, -3); /* TRISCLR */
+    PinSetBit(pin,  5); /* LATCLR  */
+    PinSetBit(pin, -2); /* TRISSET */
+#else
+    (void)pin;
+#endif
+}

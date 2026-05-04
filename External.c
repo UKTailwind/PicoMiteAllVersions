@@ -39,6 +39,8 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "hal/hal_keyboard.h"
 #include "hal/hal_gui_controls.h"
 #include "hal/hal_display_oled_spi.h"
+#include "hal/hal_heartbeat.h"
+#include "hal/hal_i2c_keypad.h"
 
 /* SetBacklightSSD1963 only links on ports that compile SSD1963.c; the
  * call site in setBacklight() is compile-time dead on others via
@@ -725,7 +727,7 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
                                 tris = 0; ana = 1; 
                                 hal_pin_set_drive_mA(PinDef[pin].GPno, 8);
                                 break;
-        case EXT_HEARTBEAT:     if (!HAL_PORT_HAS_HEARTBEAT) error("Invalid configuration");
+        case EXT_HEARTBEAT:     hal_heartbeat_assert_supported();
                                 if(!(pin=HEARTBEATpin)) error("Invalid configuration");
                                 tris = 0; ana = 1;
                                 break;
@@ -940,7 +942,10 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
 	    hal_pin_set_input_enabled(PinDef[pin].GPno, true);
         hal_pin_set_function(PinDef[pin].GPno, HAL_PIN_FUNC_PIO1);
     }
-    else if (HAL_PORT_HAS_PIO2 && cfg==EXT_PIO2_OUT) {
+    else if (cfg==EXT_PIO2_OUT) {
+        /* HAL_PIN_FUNC_PIO2 maps to GPIO_FUNC_NULL on rp2040 (no PIO2),
+         * so this is harmless if a stale option ever requests it on a
+         * non-PIO2 port — the GPIO just goes high-Z. */
 	    hal_pin_set_input_enabled(PinDef[pin].GPno, true);
         hal_pin_set_function(PinDef[pin].GPno, HAL_PIN_FUNC_PIO2);
     }
@@ -1212,11 +1217,7 @@ process:
         case EXT_DIG_IN:    if(argc == 5) {
                                 if(checkstring(argv[4], (unsigned char *)"PULLUP")) option = CNPUSET;
                                 else if(checkstring(argv[4], (unsigned char *)"PULLDOWN")) {
-                                    if (HAL_PORT_PULLDOWN_NEEDS_RESET) {
-                                        PinSetBit(pin,TRISCLR);
-                                        PinSetBit(pin,LATCLR);
-                                        PinSetBit(pin,TRISSET);
-                                    }
+                                    hal_pin_pulldown_reset(pin);
                                     option = CNPDSET;
                                 }
                                 else error("Invalid configuration");
@@ -1228,11 +1229,7 @@ process:
         case EXT_INT_BOTH:  if(argc == 7) {
                                 if(checkstring(argv[6], (unsigned char *)"PULLUP")) option = CNPUSET;
                                 else if(checkstring(argv[6], (unsigned char *)"PULLDOWN")) {
-                                    if (HAL_PORT_PULLDOWN_NEEDS_RESET) {
-                                        PinSetBit(pin,TRISCLR);
-                                        PinSetBit(pin,LATCLR);
-                                        PinSetBit(pin,TRISSET);
-                                    }
+                                    hal_pin_pulldown_reset(pin);
                                     option = CNPDSET;
                                 }
                                 else error("Invalid configuration");
@@ -2009,11 +2006,10 @@ void PWMoff(int slice){
  * DISPLAY_TYPE check falls through to the error arm and the BASIC
  * layer reports "Backlight not set up". */
 void setBacklight(int level, int setfrequency){
-    if (HAL_PORT_BACKLIGHT_VIA_KEYPAD_I2C) {
+    /* PicoCalc routes backlight through the keypad I²C controller;
+     * other ports use the PWM / SSD1963 / I²C-OLED paths below. */
+    if (hal_i2c_keypad_set_backlight(level)) {
         (void)setfrequency;
-        level*=255;
-        level/=100;
-        I2C_Send_RegData(0x1f,0x05,(uint8_t)level);
         return;
     }
     /* NEXTGEN is defined on every target (ST7796SPBUFF constant). On
@@ -2038,7 +2034,11 @@ void setBacklight(int level, int setfrequency){
         level/=100;
         I2C_Send_Command(0x81);//SETCONTRAST
         I2C_Send_Command((uint8_t)level);
-    } else if(HAL_PORT_HAS_SSD1963 && Option.DISPLAY_TYPE>=SSDPANEL && Option.DISPLAY_TYPE<VIRTUAL){
+    } else if(Option.DISPLAY_TYPE>=SSDPANEL && Option.DISPLAY_TYPE<VIRTUAL){
+        /* SSD1963-class panels can't be selected on ports that don't
+         * link the SSD1963 driver — the OPTION DISPLAY_TYPE setter
+         * rejects them — so the runtime DISPLAY_TYPE check is
+         * sufficient gate. */
         SetBacklightSSD1963(level);
     } else if(Option.DISPLAY_TYPE==SSD1306SPI){
         hal_oled_spi_set_contrast(level);
@@ -2049,16 +2049,9 @@ void MIPS16 cmd_backlight(void){
     getargs(&cmdline,3,(unsigned char *)",");
     int level=getint(argv[0],0,100);
     int frequency=50000;
-    if (!HAL_PORT_BACKLIGHT_VIA_KEYPAD_I2C) {
-        /* Validate that the current display supports backlight control.
-         * PicoCalc's keypad-I2C path works on any DISPLAY_TYPE, so the
-         * pre-check is skipped on that port. */
-        if(!(((Option.DISPLAY_TYPE>I2C_PANEL && Option.DISPLAY_TYPE<BufferedPanel ) || (Option.DISPLAY_TYPE>=SSDPANEL && Option.DISPLAY_TYPE<VIRTUAL) || Option.DISPLAY_TYPE>=NEXTGEN) && Option.DISPLAY_BL) &&
-           !(Option.DISPLAY_TYPE<=I2C_PANEL) &&
-           !(Option.DISPLAY_TYPE>=SSDPANEL && Option.DISPLAY_TYPE<VIRTUAL) &&
-           !(Option.DISPLAY_TYPE==SSD1306SPI))
-            error("Backlight not set up");
-    }
+    /* PicoCalc accepts any DISPLAY_TYPE (keypad MCU drives backlight);
+     * other ports validate via the stub impl. */
+    hal_i2c_keypad_validate_backlight_supported();
     if(argc==3){
         if(checkstring(argv[2],(unsigned char *)"DEFAULT")){
             Option.BackLightLevel=level;
@@ -3602,18 +3595,7 @@ void MIPS16 ClearExternalIO(void) {
 	for(i = 0; i < NBRINTERRUPTS; i++) {
       inttbl[i].pin = 0;                                            // disable all interrupts
   	}
-    if (HAL_PORT_HAS_HEARTBEAT) {
-        if(!Option.AllPins){
-            if(CheckPin(41, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED))ExtCfg(41,EXT_DIG_OUT,Option.PWM);
-            if(CheckPin(42, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED))ExtCfg(42,EXT_DIG_IN,0);
-            if(CheckPin(44, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED))ExtCfg(44,EXT_ANA_IN,0);
-        }
-        if(CheckPin(HEARTBEATpin, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED) && !Option.NoHeartbeat){
-            hal_pin_init_digital(PinDef[HEARTBEATpin].GPno);
-            hal_pin_set_dir(PinDef[HEARTBEATpin].GPno, HAL_PIN_DIR_OUT);
-            ExtCurrentConfig[PinDef[HEARTBEATpin].pin]=EXT_HEARTBEAT;
-        }
-    }
+    hal_heartbeat_init_pins();
     FreeMemorySafe((void **)&ds18b20Timers);
     KeypadInterrupt = NULL;
 

@@ -106,3 +106,15 @@ void hal_i2c_keypad_reserve_io(void) {
         ExtCfg(PINMAP[i], EXT_BOOT_RESERVED, 0);
     }
 }
+
+/* PicoCalc routes the LCD backlight through the keypad-controller's
+ * I²C register 0x05 (range 0..255). Returns 1 to signal "handled". */
+int hal_i2c_keypad_set_backlight(int level) {
+    level *= 255;
+    level /= 100;
+    I2C_Send_RegData(0x1f, 0x05, (uint8_t)level);
+    return 1;
+}
+
+/* PicoCalc accepts any DISPLAY_TYPE — keypad MCU drives backlight. */
+void hal_i2c_keypad_validate_backlight_supported(void) { }

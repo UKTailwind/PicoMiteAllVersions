@@ -56,6 +56,18 @@ void hal_i2c_keypad_reserve_io(void);
  * PicoMite.c with mSecTimer as input. */
 void hal_i2c_keypad_periodic_scan(uint64_t mSecTimer);
 
+/* Backlight level write. Real (PicoCalc) writes the keypad-controller
+ * I²C register (0x1f reg 0x05); stub returns 0 to signal "fall through
+ * to the PWM/SSD1963 backlight paths in External.c". */
+int hal_i2c_keypad_set_backlight(int level);
+
+/* OPTION BACKLIGHT pre-flight validation. PicoCalc accepts any
+ * DISPLAY_TYPE because the keypad MCU drives backlight regardless;
+ * other ports require an SPI-LCD-class panel. Real impl on PicoCalc
+ * is a no-op; stub validates Option.DISPLAY_TYPE / Option.DISPLAY_BL
+ * and errors when neither path can drive backlight. */
+void hal_i2c_keypad_validate_backlight_supported(void);
+
 #ifdef __cplusplus
 }
 #endif

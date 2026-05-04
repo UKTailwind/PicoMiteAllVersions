@@ -117,6 +117,46 @@ int MIPS16 port_audio_i2s_pio_slice(int pin1, int pin2)
     return checkslice(pin1, pin1, 1);
 }
 
+/* OPTION AUDIO PWM slice picker. RP2350A reserves slice 11 for audio
+ * (which is rp2350-class only — rp2040's rp2350a is fixed-true but
+ * PWM_SLICE_COUNT is 8, so the runtime guard skips). Everyone else
+ * uses checkslice(pin) to find a free slice. */
+int MIPS16 port_audio_default_pwm_slice(int pin)
+{
+#ifdef rp2350
+    if (rp2350a) return 11;
+#endif
+    return checkslice(pin, pin, 1);
+}
+
+/* DEVICE$ chip-variant suffix. rp2350-class ports append " RP2350A"
+ * or " RP2350B" depending on rp2350a; rp2040 ports append nothing. */
+void MIPS16 port_chip_variant_suffix(char *sret)
+{
+#ifdef rp2350
+    strcat(sret, rp2350a ? " RP2350A" : " RP2350B");
+#else
+    (void)sret;
+#endif
+}
+
+/* MM.INFO(BOOT) reset-reason decoder for the chip-family-specific
+ * watchdog/reset bits. rp2040 uses exact-value matches; rp2350 uses
+ * bit-mask matches against PowerMan reset registers. */
+const char *MIPS16 port_boot_reason_label(uint32_t restart_reason)
+{
+#ifdef rp2350
+    if      (restart_reason & 0x30000)  return "Power On";
+    else if (restart_reason & 0x40000)  return "Reset Switch";
+    else if (restart_reason & 0x280000) return "Debug";
+#else
+    if      (restart_reason == 0x100)    return "Power On";
+    else if (restart_reason == 0x10000)  return "Reset Switch";
+    else if (restart_reason == 0x100000) return "Debug";
+#endif
+    return NULL;
+}
+
 /* MM.INFO INTERRUPTS — read NVIC ISER. Cortex-M0+ (RP2040) has the
  * register at PPB+M0PLUS_NVIC_ISER_OFFSET; Cortex-M33 (RP2350) uses
  * different offsets (and the SDK header doesn't define the M0+

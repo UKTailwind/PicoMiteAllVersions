@@ -14,6 +14,8 @@
 
 #if defined(rp2350)
 
+/* Real impl below; on rp2040 the file falls through to a no-op stub
+ * at the bottom so FileIO.c's universal call site links cleanly. */
 void LoadPNG(unsigned char *p) {
 //	int fnbr;
 	int xOrigin, yOrigin,w,h, transparent=0, cutoff=20;
@@ -99,6 +101,16 @@ void LoadPNG(unsigned char *p) {
     }
     upng_free(upng);
     hal_keyboard_clear_repeat_state();
+}
+
+#else /* !defined(rp2350) */
+
+/* rp2040 ports don't link upng — universal stub keeps FileIO.c's
+ * `LoadPNG(p)` call resolvable and surfaces a sensible error if the
+ * BASIC program does try `LOAD PNG ...`. */
+void LoadPNG(unsigned char *p) {
+    (void)p;
+    error("PNG not supported on this port");
 }
 
 #endif /* defined(rp2350) */

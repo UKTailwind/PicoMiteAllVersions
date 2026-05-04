@@ -1976,10 +1976,10 @@ void MIPS16 cmd_load(void)
         cmd_LoadJPGImage(p);
         return;
     }
-    if (HAL_PORT_HAS_UPNG) {
-        /* LoadPNG only links on ports that compile upng.c; on others
-         * HAL_PORT_HAS_UPNG == 0 and the whole branch is compile-time
-         * dead, so the call never lands in .text. */
+    /* LoadPNG is universal: real impl on rp2350 (loads via upng),
+     * stub on rp2040 (errors "PNG not supported"). The dispatch is
+     * unconditional. */
+    {
         extern void LoadPNG(unsigned char *p);
         p = checkstring(cmdline, (unsigned char *)"PNG");
         if (p) { LoadPNG(p); return; }

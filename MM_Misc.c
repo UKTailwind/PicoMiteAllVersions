@@ -84,6 +84,16 @@ extern int  port_pico_pins_option_setter(unsigned char *cmdline);
 extern int  port_heartbeat_option_setter(unsigned char *cmdline);
 extern int  port_system_lcd_spi_option_setter(unsigned char *cmdline);
 extern int  port_audio_i2s_pio_slice(int pin1, int pin2);
+extern int  port_audio_default_pwm_slice(int pin);
+extern void port_chip_variant_suffix(char *sret);
+extern const char *port_boot_reason_label(uint32_t restart_reason);
+extern void port_print_system_spi(void);
+extern void port_disable_sd_release_system_spi(void);
+extern int  port_setter_sdcard_combined_cs(unsigned char *tp);
+extern void port_setter_sdcard_argc_check(int argc);
+extern int  port_setter_sdcard_via_system_spi(int pin1, int pin2, int pin3);
+extern int  port_mminfo_lcdpanel(unsigned char *ep, unsigned char *sret, int *out_targ);
+extern int  port_mminfo_lcd320(unsigned char *ep, int64_t *out_iret, int *out_targ);
 extern int  port_mminfo_interrupts(int64_t *out_iret);
 extern int  port_mminfo_touch_status(unsigned char *out_sret);
 extern int  port_mminfo_scroll_start(int64_t *out_iret);
@@ -710,16 +720,9 @@ void MIPS16 printoptions(void){
     }
     /* SYSTEM SPI + LCD SPI prints — VGA targets share SYSTEM_CLK with
      * the VGA scanout PIO, so they print VGA PINS instead (handled in
-     * port_print_display_options). Skip both on VGA. */
-    if (!HAL_PORT_IS_VGA) {
-        if (Option.SYSTEM_CLK) {
-            PO("SYSTEM SPI");
-            MMPrintString((char *)PinDef[Option.SYSTEM_CLK].pinname); MMputchar(',', 1);
-            MMPrintString((char *)PinDef[Option.SYSTEM_MOSI].pinname); MMputchar(',', 1);
-            MMPrintString((char *)PinDef[Option.SYSTEM_MISO].pinname); MMPrintString("\r\n");
-        }
-        port_print_lcd_spi();
-    }
+     * port_print_display_options). Both hooks stub on VGA. */
+    port_print_system_spi();
+    port_print_lcd_spi();
     if(Option.SYSTEM_I2C_SDA){
         PO("SYSTEM I2C");
         MMPrintString((char *)PinDef[Option.SYSTEM_I2C_SDA].pinname);MMputchar(',',1);
@@ -837,10 +840,9 @@ void MIPS16 printoptions(void){
     if(*Option.F9key)PO2Str("F9", (const char *)Option.F9key);
     if(*Option.platform && *Option.platform!=0xFF)PO2Str("PLATFORM", (const char *)Option.platform);
     if(Option.DefaultFont!=1)PO3Int("DEFAULT FONT",(Option.DefaultFont>>4)+1, Option.DefaultFont & 0xF);
-    /* PSRAM_CS_PIN is only meaningful on rp2350 (HAL_PORT_HAS_PSRAM == 1
-     * there, 0 elsewhere); on rp2040 the field stays zero so the print
-     * is a no-op. */
-    if (HAL_PORT_HAS_PSRAM && Option.PSRAM_CS_PIN != 0)
+    /* PSRAM_CS_PIN is only meaningful on rp2350. On rp2040 the field
+     * stays at 0 so the runtime guard suffices. */
+    if (Option.PSRAM_CS_PIN != 0)
         PO2Str("PSRAM PIN", PinDef[Option.PSRAM_CS_PIN].pinname);
     /* HEARTBEAT PIN: rp2040 prints when heartbeatpin != default (43).
      * rp2350 also prints the default-pin case when rp2350a==false
@@ -914,21 +916,10 @@ void MIPS16 disable_sd(void){
     if(!IsInvalidPin(Option.SD_MISO_PIN))ExtCfg(Option.SD_MISO_PIN, EXT_NOT_CONFIG, 0);
     Option.SD_MISO_PIN=0;
     Option.CombinedCS=0;
-    /* VGA targets share SYSTEM_CLK/MOSI/MISO with the SD card (the
-     * non-VGA SDCARD setter wires SD to dedicated pins; VGA reuses
-     * the system SPI). Clear them too on VGA so the SDCARD-disable
-     * fully releases the bus. */
-    if (HAL_PORT_IS_VGA) {
-        if(!IsInvalidPin(Option.SYSTEM_CLK))ExtCurrentConfig[Option.SYSTEM_CLK] = EXT_DIG_IN;
-        if(!IsInvalidPin(Option.SYSTEM_CLK))ExtCfg(Option.SYSTEM_CLK, EXT_NOT_CONFIG, 0);
-        Option.SYSTEM_CLK=0;
-        if(!IsInvalidPin(Option.SYSTEM_MISO))ExtCurrentConfig[Option.SYSTEM_MISO] = EXT_DIG_IN;
-        if(!IsInvalidPin(Option.SYSTEM_MISO))ExtCfg(Option.SYSTEM_MISO, EXT_NOT_CONFIG, 0);
-        Option.SYSTEM_MISO=0;
-        if(!IsInvalidPin(Option.SYSTEM_MOSI))ExtCurrentConfig[Option.SYSTEM_MOSI] = EXT_DIG_IN;
-        if(!IsInvalidPin(Option.SYSTEM_MOSI))ExtCfg(Option.SYSTEM_MOSI, EXT_NOT_CONFIG, 0);
-        Option.SYSTEM_MOSI=0;
-    }
+    /* VGA targets reuse SYSTEM_CLK/MOSI/MISO for SD (non-VGA wires SD
+     * to dedicated pins). Hook releases the system SPI bus on VGA; no-op
+     * elsewhere. */
+    port_disable_sd_release_system_spi();
 }
 void disable_audio(void){
     if(!IsInvalidPin(Option.AUDIO_L))ExtCurrentConfig[Option.AUDIO_L] = EXT_DIG_IN ;   
@@ -1421,8 +1412,9 @@ if(tp){
 
     tp = checkstring(cmdline, (unsigned char *)"POWER");
     if(tp) {
-        /* RP2350B (rp2350a==false) has no PWR_EN power-control pin. */
-        if (HAL_PORT_PWM_SLICE_COUNT > 8 && !rp2350a) error("Invalid for RP2350B");
+        /* RP2350B (rp2350a==false) has no PWR_EN power-control pin.
+         * On rp2040 rp2350a is fixed-true, so this never fires there. */
+        if (!rp2350a) error("Invalid for RP2350B");
         if(Option.AllPins)error("OPTION PICO set");
         if(checkstring(tp, (unsigned char *)"PWM"))  Option.PWM = true;
         if(checkstring(tp, (unsigned char *)"PFM"))  Option.PWM = false;
@@ -1620,10 +1612,10 @@ if(tp){
             Option.AUDIO_CS_PIN=pin1;
             Option.AUDIO_CLK_PIN=pin2;
             Option.AUDIO_MOSI_PIN=pin3;
-            /* RP2350A (rp2350a==true) and rp2040 (rp2350a default-true)
-             * use checkslice; RP2350B reserves slice 11 for audio. */
-            if (HAL_PORT_PWM_SLICE_COUNT > 8 && rp2350a) slice = 11;
-            else slice = checkslice(pin2, pin2, 1);
+            /* RP2350A (or RP2040, where rp2350a is fixed-true) reserves
+             * slice 11 for audio on rp2350-class hardware; everyone else
+             * routes the audio slice through checkslice(). */
+            slice = port_audio_default_pwm_slice(pin2);
             if((PinDef[Option.DISPLAY_BL].slice & 0x7f) == slice) error("Channel in use for backlight");
             Option.AUDIO_SLICE=slice;
             SaveOptions();
@@ -1694,11 +1686,11 @@ if(tp){
         int pin1,pin2,channel=-1;
         if(checkstring(tp, (unsigned char *)"DISABLE")){
    	    if(CurrentLinePtr) error("Invalid in a program");
-        /* Non-VGA targets also disallow disabling I2C if the SSD1306
-         * I2C panel is using it; VGA never has SSD1306I2C. */
+        /* SSD1306I2C panels don't exist on VGA (the OPTION setter rejects
+         * the type), so the runtime DISPLAY_TYPE check is sufficient on
+         * every port. */
         if (Option.RTC_Clock || Option.RTC_Data) error("In use");
-        if (!HAL_PORT_IS_VGA &&
-            (Option.DISPLAY_TYPE == SSD1306I2C || Option.DISPLAY_TYPE == SSD1306I2C32))
+        if (Option.DISPLAY_TYPE == SSD1306I2C || Option.DISPLAY_TYPE == SSD1306I2C32)
             error("In use");
             disable_systemi2c();
             SaveOptions();
@@ -1804,26 +1796,13 @@ if(tp){
         }
         /* COMBINED CS: SD shares the touch-controller's CS pin to free
          * up an external pin. Not available on VGA — VGA uses dedicated
-         * SD pins from the SDIO lines. */
-        if (!HAL_PORT_IS_VGA && checkstring(tp, (unsigned char *)"COMBINED CS")) {
-            if (Option.SD_CS || Option.CombinedCS) error("SDcard already configured");
-            if (!Option.SYSTEM_CLK) error("System SPI not configured");
-            if (!Option.TOUCH_CS) error("Touch CS pin not configured");
-            Option.CombinedCS = 1;
-            Option.SD_CS = 0;
-            SaveOptions();
-            _excep_code = RESET_COMMAND;
-            SoftReset();
-            return;
-        }
+         * SD pins from the SDIO lines. Hook returns 1 on VGA to skip
+         * the branch entirely. */
+        if (port_setter_sdcard_combined_cs(tp)) return;
     	getargs(&tp,7,(unsigned char *)",");
         /* VGA forces all 7 args (no implicit SYSTEM SPI sharing); other
          * ports allow 1-arg form (CS only) or full 7-arg. */
-        if (HAL_PORT_IS_VGA) {
-            if (argc != 7) error("Syntax");
-        } else {
-            if (!(argc == 1 || argc == 7)) error("Syntax");
-        }
+        port_setter_sdcard_argc_check(argc);
          if(Option.SD_CS || Option.CombinedCS)error("SDcard already configured");
         if(argc==1 && !Option.SYSTEM_CLK)error("System SPI not configured");
         unsigned char code;
@@ -1853,26 +1832,10 @@ if(tp){
             if(!code)pin3=codemap(pin3);
             if(IsInvalidPin(pin3)) error("Invalid pin");
             if(ExtCurrentConfig[pin3] != EXT_NOT_CONFIG)  error("Pin %/| is in use",pin3,pin3);
-            /* VGA shares SPI0/SPI1 hw pins with SD when the chosen pins
-             * match an SPI peripheral. Other ports always assign
-             * dedicated SD pins. */
-            int sdcard_via_system_spi = 0;
-            if (HAL_PORT_IS_VGA && !Option.SYSTEM_CLK) {
-                if (PinDef[pin1].mode & SPI0SCK && PinDef[pin2].mode & SPI0TX && PinDef[pin3].mode & SPI0RX) {
-                    Option.SYSTEM_CLK=pin1;
-                    Option.SYSTEM_MOSI=pin2;
-                    Option.SYSTEM_MISO=pin3;
-                    MMPrintString("SPI channel 0 in use for SDcard\r\n");
-                    sdcard_via_system_spi = 1;
-                } else if (PinDef[pin1].mode & SPI1SCK && PinDef[pin2].mode & SPI1TX && PinDef[pin3].mode & SPI1RX) {
-                    Option.SYSTEM_CLK=pin1;
-                    Option.SYSTEM_MOSI=pin2;
-                    Option.SYSTEM_MISO=pin3;
-                    MMPrintString("SPI channel 1 in use for SDcard\r\n");
-                    sdcard_via_system_spi = 1;
-                }
-            }
-            if (!sdcard_via_system_spi) {
+            /* VGA reuses SPI0/SPI1 hw pins for SD when the chosen pins
+             * match an SPI peripheral; non-VGA always uses dedicated
+             * SD pins. Hook returns 1 if SYSTEM_* was reassigned. */
+            if (!port_setter_sdcard_via_system_spi(pin1, pin2, pin3)) {
                 Option.SD_CLK_PIN=pin1;
                 Option.SD_MOSI_PIN=pin2;
                 Option.SD_MISO_PIN=pin3;
@@ -1954,12 +1917,9 @@ void fun_device(void){
      * range or runtime probe (kept in vm_sys_pin.c). On non-rp2350 builds
      * the conditional becomes dead at compile time. */
     strcpy((char *)sret, HAL_PORT_DEVICE_NAME);
-    /* Suffix the chip variant on RP2350 ports. PIO count distinguishes
-     * RP2040 (2 PIOs) from RP2350 (3 PIOs); the rp2350a flag is true
-     * on RP2040 by default but only consulted on rp2350 ports. */
-    if (HAL_PORT_PIO_COUNT > 2) {
-        strcat((char *)sret, rp2350a ? " RP2350A" : " RP2350B");
-    }
+    /* Suffix the chip variant on rp2350-class ports — port-impl
+     * decides whether to append " RP2350A" / " RP2350B" or nothing. */
+    port_chip_variant_suffix((char *)sret);
     CtoM(sret);
     targ = T_STR;
 }
@@ -2108,17 +2068,7 @@ void MIPS16 fun_info(void){
         else if(restart_reason==0xFFFFFFFE) boot_label = "S/W Watchdog";
         else if(restart_reason==0xFFFFFFFD) boot_label = "H/W Watchdog";
         else if(restart_reason==0xFFFFFFFC) boot_label = "Firmware update";
-        else if (HAL_PORT_PWM_SLICE_COUNT > 8) {
-            /* rp2350: bit-mask reset reasons. */
-            if      (restart_reason & 0x30000)  boot_label = "Power On";
-            else if (restart_reason & 0x40000)  boot_label = "Reset Switch";
-            else if (restart_reason & 0x280000) boot_label = "Debug";
-        } else {
-            /* rp2040: exact-match reset reasons. */
-            if      (restart_reason == 0x100)    boot_label = "Power On";
-            else if (restart_reason == 0x10000)  boot_label = "Reset Switch";
-            else if (restart_reason == 0x100000) boot_label = "Debug";
-        }
+        else boot_label = port_boot_reason_label(restart_reason);
         if (boot_label) strcpy((char *)sret, boot_label);
         else sprintf((char *)sret, "Unknown code %X",(unsigned int)restart_reason);
         CtoM(sret);
@@ -2281,19 +2231,9 @@ void MIPS16 fun_info(void){
         if (port_mminfo_interrupts(&iret)) { targ = T_INT; return; }
     }
     /* LCDPANEL / LCD320 are SPI-LCD-port concepts — VGA has no
-     * runtime panel switcher. Macros (display_details, SSD16TYPE)
-     * are defined everywhere, so this is a runtime gate. */
-    else if (!HAL_PORT_IS_VGA && checkstring(ep, (unsigned char *)"LCDPANEL")) {
-        strcpy((char *)sret, display_details[Option.DISPLAY_TYPE].name);
-        CtoM(sret);
-        targ = T_STR;
-        return;
-    }
-    else if (!HAL_PORT_IS_VGA && checkstring(ep, (unsigned char *)"LCD320")) {
-        iret = (SSD16TYPE || Option.DISPLAY_TYPE == IPS_4_16);
-        targ = T_INT;
-        return;
-    }
+     * runtime panel switcher. Hooks return 1 if matched. */
+    else if (port_mminfo_lcdpanel(ep, sret, &targ)) return;
+    else if (port_mminfo_lcd320(ep, &iret, &targ)) return;
     /* USB device info: routed through port_usb_* hooks so the HID[4]
      * array (≈336 B BSS) only exists on USB device builds. */
     else if((tp=checkstring(ep, (unsigned char *)"USB VID"))){
@@ -2508,11 +2448,9 @@ void MIPS16 fun_info(void){
             targ=T_INT;
             return;
         } else if((tp=checkstring(ep, (unsigned char *)"PWM COUNT"))){
-            /* rp2040: 8 slices (0..7). rp2350a==true (RP2350A or RP2040
-             * runtime probe): 0..7. rp2350a==false (RP2350B): 0..11.
-             * HAL_PORT_PWM_SLICE_COUNT is 8 on rp2040, 12 on rp2350. */
-            int max_slice = HAL_PORT_PWM_SLICE_COUNT - 1;
-            if (HAL_PORT_PWM_SLICE_COUNT > 8 && rp2350a) max_slice = 7;
+            /* rp2040: 8 slices (0..7). rp2350a (30-pin / RP2040 fixed-
+             * true): only 0..7 accessible. rp2350b: 0..11. */
+            int max_slice = rp2350a ? 7 : (HAL_PORT_PWM_SLICE_COUNT - 1);
             int channel=getint(tp,0,max_slice);
             iret=pwm_hw->slice[channel].top;
             targ=T_INT;
@@ -2520,8 +2458,7 @@ void MIPS16 fun_info(void){
         } else if((tp=checkstring(ep, (unsigned char *)"PWM DUTY"))){
             getargs(&tp,3,(unsigned char *)",");
             if(argc!=3)error("Syntax");
-            int max_slice = HAL_PORT_PWM_SLICE_COUNT - 1;
-            if (HAL_PORT_PWM_SLICE_COUNT > 8 && rp2350a) max_slice = 7;
+            int max_slice = rp2350a ? 7 : (HAL_PORT_PWM_SLICE_COUNT - 1);
             int channel=getint(argv[0],0,max_slice);
             int AorB=getint(argv[2],0,1);
             if(AorB)iret=((pwm_hw->slice[channel].cc) >> 16);

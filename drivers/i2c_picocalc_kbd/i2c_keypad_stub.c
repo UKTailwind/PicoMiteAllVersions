@@ -45,3 +45,20 @@ void hal_i2c_keypad_apply_spi480_resolution(void) {
         VRes = DisplayHRes;
     }
 }
+
+/* Non-PicoCalc ports route backlight through PWM/SSD1963 in
+ * External.c — the stub returns 0 to fall through. */
+int hal_i2c_keypad_set_backlight(int level) {
+    (void)level;
+    return 0;
+}
+
+/* Non-PicoCalc: validate that the current display supports backlight
+ * control via PWM / SSD1963 / I²C-OLED. */
+void hal_i2c_keypad_validate_backlight_supported(void) {
+    if(!(((Option.DISPLAY_TYPE>I2C_PANEL && Option.DISPLAY_TYPE<BufferedPanel ) || (Option.DISPLAY_TYPE>=SSDPANEL && Option.DISPLAY_TYPE<VIRTUAL) || Option.DISPLAY_TYPE>=NEXTGEN) && Option.DISPLAY_BL) &&
+       !(Option.DISPLAY_TYPE<=I2C_PANEL) &&
+       !(Option.DISPLAY_TYPE>=SSDPANEL && Option.DISPLAY_TYPE<VIRTUAL) &&
+       !(Option.DISPLAY_TYPE==SSD1306SPI))
+        error("Backlight not set up");
+}

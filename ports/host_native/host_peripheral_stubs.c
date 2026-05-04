@@ -623,3 +623,23 @@ void port_repl_wifi_arch_init_and_connect(void) {}
 void port_print_kb_layout(void) {}
 void port_print_kb_repeat(void) {}
 
+/* LoadPNG promoted to a universal symbol in batch 18 (FileIO.c calls
+ * it unconditionally now); host has no upng-class decoder so the stub
+ * matches the rp2040 "PNG not supported" behaviour. */
+void LoadPNG(unsigned char *p) {
+    (void)p;
+    error("PNG not supported on this port");
+}
+
+/* MM_Misc.c batch-18 hooks — host. No physical bus, all stubs. */
+void port_print_system_spi(void) {}
+void port_disable_sd_release_system_spi(void) {}
+int  port_setter_sdcard_combined_cs(unsigned char *tp) { (void)tp; return 0; }
+void port_setter_sdcard_argc_check(int argc) { (void)argc; }
+int  port_setter_sdcard_via_system_spi(int p1, int p2, int p3) { (void)p1; (void)p2; (void)p3; return 0; }
+int  port_mminfo_lcdpanel(unsigned char *ep, unsigned char *sret, int *t) { (void)ep; (void)sret; (void)t; return 0; }
+int  port_mminfo_lcd320(unsigned char *ep, int64_t *iret, int *t) { (void)ep; (void)iret; (void)t; return 0; }
+
+/* Host doesn't have a port_audio_default_pwm_slice / port_chip_variant_suffix
+ * caller (MM_Misc.c is gated to !MMBASIC_HOST). Stubs not needed. */
+

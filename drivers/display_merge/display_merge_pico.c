@@ -233,6 +233,62 @@ unsigned port_video_sys_clock_khz(unsigned cpu_khz) { return cpu_khz; }
 
 void port_video_post_clock_init(void) { }
 
+/* MM_Misc.c batch-18 hooks — PicoMite SPI-LCD side (non-VGA). */
+extern void PO(char *s1);
+
+void port_print_system_spi(void) {
+    if (Option.SYSTEM_CLK) {
+        PO("SYSTEM SPI");
+        MMPrintString((char *)PinDef[Option.SYSTEM_CLK].pinname);  MMputchar(',', 1);
+        MMPrintString((char *)PinDef[Option.SYSTEM_MOSI].pinname); MMputchar(',', 1);
+        MMPrintString((char *)PinDef[Option.SYSTEM_MISO].pinname); MMPrintString("\r\n");
+    }
+}
+
+void port_disable_sd_release_system_spi(void) {
+    /* Non-VGA: SD has dedicated pins, leave SYSTEM_* alone. */
+}
+
+int port_setter_sdcard_combined_cs(unsigned char *tp) {
+    if (!checkstring(tp, (unsigned char *)"COMBINED CS")) return 0;
+    if (Option.SD_CS || Option.CombinedCS) error("SDcard already configured");
+    if (!Option.SYSTEM_CLK) error("System SPI not configured");
+    if (!Option.TOUCH_CS)   error("Touch CS pin not configured");
+    Option.CombinedCS = 1;
+    Option.SD_CS = 0;
+    SaveOptions();
+    _excep_code = RESET_COMMAND;
+    SoftReset();
+    return 1;
+}
+
+void port_setter_sdcard_argc_check(int argc) {
+    /* Non-VGA accepts the 1-arg (CS only) shortcut as well as the
+     * full 7-arg form. */
+    if (!(argc == 1 || argc == 7)) error("Syntax");
+}
+
+int port_setter_sdcard_via_system_spi(int pin1, int pin2, int pin3) {
+    /* Non-VGA: SD always uses dedicated SD_*_PIN. */
+    (void)pin1; (void)pin2; (void)pin3;
+    return 0;
+}
+
+int port_mminfo_lcdpanel(unsigned char *ep, unsigned char *sret, int *out_targ) {
+    if (!checkstring(ep, (unsigned char *)"LCDPANEL")) return 0;
+    strcpy((char *)sret, display_details[Option.DISPLAY_TYPE].name);
+    CtoM(sret);
+    *out_targ = T_STR;
+    return 1;
+}
+
+int port_mminfo_lcd320(unsigned char *ep, int64_t *out_iret, int *out_targ) {
+    if (!checkstring(ep, (unsigned char *)"LCD320")) return 0;
+    *out_iret = (SSD16TYPE || Option.DISPLAY_TYPE == IPS_4_16);
+    *out_targ = T_INT;
+    return 1;
+}
+
 /* PicoMite SPI-LCD post-clear-program housekeeping: SPIatRisk
  * marker (used by SD/Touch dispatch to avoid bus contention) and a
  * full-frame refresh of the panel after an autorun-disabled boot. */
