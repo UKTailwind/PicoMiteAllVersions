@@ -45,8 +45,8 @@ target_sources(PicoMite PRIVATE
     ${CMAKE_SOURCE_DIR}/MMudp.c
     ${CMAKE_SOURCE_DIR}/MMsetwifi.c
 
-    # rp2350 features. RM2's CYW43 lives off the QSPI pins so PSRAM
-    # stays available — link the real psram_heap impl, not the stub.
+    # rp2350 features. This board has dedicated PSRAM that's available
+    # alongside the WiFi module, so link the real psram_heap impl.
     ${CMAKE_SOURCE_DIR}/psram.c
     ${CMAKE_SOURCE_DIR}/upng.c
     ${CMAKE_SOURCE_DIR}/drivers/audio_mp3/audio_mp3_real.c

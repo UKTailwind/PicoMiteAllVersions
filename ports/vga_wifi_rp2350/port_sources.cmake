@@ -39,7 +39,8 @@ target_sources(PicoMite PRIVATE
     ${CMAKE_SOURCE_DIR}/MMudp.c
     ${CMAKE_SOURCE_DIR}/MMsetwifi.c
 
-    # rp2350 features. CYW43 owns QSPI pins so no PSRAM heap.
+    # rp2350 features. This board has no PSRAM available with WiFi
+    # enabled — link the psram_heap stub, not the real impl.
     ${CMAKE_SOURCE_DIR}/upng.c
     ${CMAKE_SOURCE_DIR}/drivers/audio_mp3/audio_mp3_real.c
     ${CMAKE_SOURCE_DIR}/drivers/heartbeat/heartbeat_stub.c

@@ -1,14 +1,10 @@
 /*
- * ports/vga_wifi_rp2350/port_peripherals.h — VGA + WiFi rp2350. The
- * WiFi stack pulls in SSD1963 / Touch / GUI for the web-served LCD
- * shadow even though VGA scanout doesn't itself drive an SPI panel.
+ * ports/vga_wifi_rp2350/port_peripherals.h — VGA-family port: no
+ * SPI-LCD / Touch / GUI-controls peripheral headers. Empty body matches
+ * vga_rp2350 / hdmi_rp2350 (the other no-LCD VGA-family ports).
  */
 
 #ifndef PORT_PERIPHERALS_H
 #define PORT_PERIPHERALS_H
-
-#include "SSD1963.h"
-#include "Touch.h"
-#include "GUI.h"
 
 #endif /* PORT_PERIPHERALS_H */
