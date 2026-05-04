@@ -16,9 +16,6 @@
 #define HAL_PORT_PWM_SLICE_COUNT         12
 #define HAL_PORT_GPIO_COUNT              48
 #define HAL_PORT_PIO_COUNT               3
-#define HAL_PORT_HAS_PIO2                1
-#define HAL_PORT_HAS_FAST_TIMER          1
-#define HAL_PORT_HAS_INT5                1
 #define HAL_PORT_PULLDOWN_NEEDS_RESET    1
 /* WEB rp2350: SPI-LCD framebuffer, audio I²S on PIO 2. */
 #define HAL_PORT_AUDIO_I2S_PIO_NUM       2
@@ -27,14 +24,9 @@
 /* MMInkey pinned to RAM — rp2350 has plenty of SRAM. */
 #define HAL_PORT_MMINKEY_DECL(name)      __not_in_flash_func(name)
 
-#define HAL_PORT_HAS_PSRAM               1
-#define HAL_PORT_HAS_UPNG                1
-#define HAL_PORT_HAS_DEFINES             1
 /* WEBRP2350 claims the onboard LED for the CYW43 radio. */
-#define HAL_PORT_HAS_HEARTBEAT           0
 /* WEBRP2350 reserves GP29 for the CYW43 radio. */
 #define HAL_PORT_ADC_CHANNEL_MAX         3
-#define HAL_PORT_HAS_SSD1963             1
 
 /* WEBRP2350 runs lwIP + CYW43; the deleted hal_port_config.h kept GPIO
  * loops out of SRAM for every PICOMITEWEB build (both rp2040 and rp2350).
@@ -54,7 +46,6 @@
  * unconditionally so the widget tables must exist). */
 #define HAL_PORT_HAS_WIFI                1
 #define HAL_PORT_HAS_PICOMITE            0
-#define HAL_PORT_HAS_VGA_PIO             0
 #define HAL_PORT_HAS_GUICONTROLS         1
 #define HAL_PORT_HAS_USB_KEYBOARD        0
 #define HAL_PORT_HAS_I2C_KEYPAD          0

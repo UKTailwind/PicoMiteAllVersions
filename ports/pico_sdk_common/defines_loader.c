@@ -2,8 +2,8 @@
  * ports/pico_sdk_common/defines_loader.c — compile-time DEFINES parser
  * and MemLoadProgram / FileLoadCMM2Program — RP2350-only.
  *
- * The DEFINES feature (HAL_PORT_HAS_DEFINES) is gated on RP2350 via
- * a_dlist / nDefines / loadbuffsize scratch state. FileLoadCMM2Program
+ * The DEFINES feature is gated on RP2350 via a_dlist / nDefines /
+ * loadbuffsize scratch state. FileLoadCMM2Program
  * translates the legacy CMM2 ASCII format into tokenised MMBasic source
  * using the same pipeline. Both are only referenced from code already
  * gated on `#ifdef rp2350` (Commands.c CMM2mode branch, RAM LOAD

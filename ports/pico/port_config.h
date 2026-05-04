@@ -22,9 +22,6 @@
 #define HAL_PORT_PWM_SLICE_COUNT         8
 #define HAL_PORT_GPIO_COUNT              30
 #define HAL_PORT_PIO_COUNT               2
-#define HAL_PORT_HAS_PIO2                0
-#define HAL_PORT_HAS_FAST_TIMER          0
-#define HAL_PORT_HAS_INT5                0
 #define HAL_PORT_PULLDOWN_NEEDS_RESET    0
 /* Audio I²S PIO instance — rp2040 ports use PIO 0 (shares with QVGA
  * scanout state machines) since only two PIOs exist. */
@@ -40,14 +37,10 @@
 
 /* Chip-feature: RP2040 variants don't ship PSRAM, upng, or the DEFINES
  * compile-time dictionary. */
-#define HAL_PORT_HAS_PSRAM               0
-#define HAL_PORT_HAS_UPNG                0
-#define HAL_PORT_HAS_DEFINES             0
 
-/* Board-level features. HAL_PORT_HAS_HEARTBEAT is set on boards that
- * expose a user-configurable heartbeat LED pin. PICOMITEWEB omits it
- * because the CYW43 wireless chip claims the onboard LED. */
-#define HAL_PORT_HAS_HEARTBEAT           1
+/* Board-level features: heartbeat LED selection lives in the
+ * drivers/heartbeat/ driver pair (port_sources.cmake links _real on
+ * GPIO-LED boards, _stub on CYW43 boards). */
 
 /* ADC channel count exposed to ADC OPEN. WEB claims GP29 for the CYW43
  * radio pin, so max 3; every other board has 4. */
@@ -56,7 +49,6 @@
 /* SSD1963 backlight helper is compiled for PicoMite + WebMite variants;
  * VGA and HDMI boards don't link SSD1963.c, so the call has to be
  * compile-time dead on those targets. Used as a value in `if`. */
-#define HAL_PORT_HAS_SSD1963             1
 
 /* Hot-path placement: SPI-LCD RP2040 has spare RAM for the GPIO hot loops
  * so we force them into SRAM via __not_in_flash_func. */
@@ -90,7 +82,6 @@
  *   HAS_GUICONTROLS  — GUI.c widget family + Touch.c + Option.MaxCtrls. */
 #define HAL_PORT_HAS_WIFI                0
 #define HAL_PORT_HAS_PICOMITE         1
-#define HAL_PORT_HAS_VGA_PIO             0
 #define HAL_PORT_HAS_GUICONTROLS         0
 #define HAL_PORT_HAS_NEXTGEN_DISPLAY    0
 

@@ -2,10 +2,11 @@
  * hal/hal_heartbeat.h — onboard heartbeat-LED service hook.
  *
  * Real impl in drivers/heartbeat/heartbeat_real.c (linked on ports
- * with HAL_PORT_HAS_HEARTBEAT=1) toggles the configured GPIO once per
- * second. Stub in drivers/heartbeat/heartbeat_stub.c is a no-op
- * (linked on ports where the LED is owned by another peripheral —
- * CYW43 on WiFi ports, etc.).
+ * whose heartbeat LED is owned by GPIO) toggles the configured GPIO
+ * once per second. Stub in drivers/heartbeat/heartbeat_stub.c is a
+ * no-op (linked on ports where the LED is owned by another peripheral
+ * — CYW43 on WiFi ports, etc.). Linkage is selected per-port in
+ * port_sources.cmake.
  */
 
 #ifndef HAL_HEARTBEAT_H

@@ -1,7 +1,8 @@
 /*
  * drivers/heartbeat/heartbeat_real.c — real heartbeat-LED toggle.
- * Linked on ports with an onboard heartbeat LED owned by GPIO
- * (HAL_PORT_HAS_HEARTBEAT=1).
+ * Linked on ports with an onboard heartbeat LED owned by GPIO.
+ * Mutually exclusive with heartbeat_stub.c (linked on Web rp2040
+ * etc., where the LED is owned by the CYW43 module).
  */
 
 #include "MMBasic_Includes.h"

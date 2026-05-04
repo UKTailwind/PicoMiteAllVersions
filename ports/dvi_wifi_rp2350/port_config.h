@@ -22,9 +22,6 @@
 #define HAL_PORT_PWM_SLICE_COUNT         12
 #define HAL_PORT_GPIO_COUNT              48
 #define HAL_PORT_PIO_COUNT               3
-#define HAL_PORT_HAS_PIO2                1
-#define HAL_PORT_HAS_FAST_TIMER          1
-#define HAL_PORT_HAS_INT5                1
 #define HAL_PORT_PULLDOWN_NEEDS_RESET    1
 /* HDMI + WiFi: HSTX scanout, audio I²S on PIO 2. */
 #define HAL_PORT_AUDIO_I2S_PIO_NUM       2
@@ -33,15 +30,12 @@
 /* MMInkey pinned to RAM — rp2350 has plenty of SRAM. */
 #define HAL_PORT_MMINKEY_DECL(name)      __not_in_flash_func(name)
 
-#define HAL_PORT_HAS_PSRAM               1
-#define HAL_PORT_HAS_UPNG                1
 
 /* HDMI + WiFi combined. PSRAM + UPNG + DEFINES inherit from HDMI
  * (RM2's CYW43 lives off the QSPI pins so PSRAM stays available).
  * GUICONTROLS off — no touch panel on a DVI display. */
 #define HAL_PORT_HAS_WIFI                1
 #define HAL_PORT_HAS_PICOMITE            0
-#define HAL_PORT_HAS_VGA_PIO             1
 #define HAL_PORT_HAS_GUICONTROLS         0
 #define HAL_PORT_HAS_USB_KEYBOARD        1
 #define HAL_PORT_HAS_I2C_KEYPAD          0
@@ -83,15 +77,12 @@
 #define HAL_PORT_PIO2_CLAIMED            true
 #define HAL_PORT_PSRAM_BASE              0x11000000
 #define HAL_PORT_PSRAM_BLOCK_SIZE        0x1C0000
-#define HAL_PORT_HAS_DEFINES             1
 /* CYW43 owns the LED on standard pico2_w pinout (RM2 module on
  * pico_stretch wires the same way). No user-pickable heartbeat pin. */
-#define HAL_PORT_HAS_HEARTBEAT           0
 /* GP29 is CYW43 SPI clock; ADC3 (GP29) unavailable. RP2350B exposes
  * GP40-47 with additional ADC channels; bump this number once the
  * core ADC code is taught about them. */
 #define HAL_PORT_ADC_CHANNEL_MAX         3
-#define HAL_PORT_HAS_SSD1963             0
 
 /* cmd_files flist[] cap. Device has the RAM and the SaveContext+InitHeap
  * dance to allocate ~76 KB. Host caps lower in host/port_config.h. */

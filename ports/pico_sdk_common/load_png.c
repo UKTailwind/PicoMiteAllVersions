@@ -1,11 +1,10 @@
 /*
  * ports/pico_sdk_common/load_png.c — LOAD PNG command handler.
  *
- * RP2350-only because the upng library is only linked on those targets
- * (HAL_PORT_HAS_UPNG == 1). cmd_load dispatches to LoadPNG via a
- * HAL_PORT_HAS_UPNG value guard; on RP2040 the guard is compile-time
- * zero and the call is dead-code-eliminated, so the linker never needs
- * this body.
+ * RP2350-only because the upng library is only linked on those targets.
+ * On RP2040 the bottom of this file provides an error stub so FileIO.c's
+ * universal `LoadPNG(p)` call site links cleanly and surfaces a sensible
+ * error if the BASIC program does try `LOAD PNG ...`.
  */
 
 #include "MMBasic_Includes.h"

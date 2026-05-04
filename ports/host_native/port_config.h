@@ -26,20 +26,12 @@
 #define HAL_PORT_PWM_SLICE_COUNT         8
 #define HAL_PORT_GPIO_COUNT              30
 #define HAL_PORT_PIO_COUNT               2
-#define HAL_PORT_HAS_PIO2                0
-#define HAL_PORT_HAS_FAST_TIMER          0
-#define HAL_PORT_HAS_INT5                0
 #define HAL_PORT_PULLDOWN_NEEDS_RESET    0
 
 /* Chip-features absent on host. */
-#define HAL_PORT_HAS_PSRAM               0
-#define HAL_PORT_HAS_UPNG                0
-#define HAL_PORT_HAS_DEFINES             0
 
 /* Board-features absent on host. */
-#define HAL_PORT_HAS_HEARTBEAT           0
 #define HAL_PORT_ADC_CHANNEL_MAX         0
-#define HAL_PORT_HAS_SSD1963             0
 #define HAL_PORT_BACKLIGHT_VIA_KEYPAD_I2C 0
 
 /* cmd_files flist[] cap. Host bc_alloc backs both the heap *and* the
@@ -61,7 +53,6 @@
  * for any of these — stubs cover every gated path. */
 #define HAL_PORT_HAS_WIFI                0
 #define HAL_PORT_HAS_PICOMITE            1
-#define HAL_PORT_HAS_VGA_PIO             0
 #define HAL_PORT_HAS_GUICONTROLS         0
 #define HAL_PORT_HAS_USB_KEYBOARD        0
 #define HAL_PORT_HAS_I2C_KEYPAD          0

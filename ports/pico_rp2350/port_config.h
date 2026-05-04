@@ -16,9 +16,6 @@
 #define HAL_PORT_PWM_SLICE_COUNT         12
 #define HAL_PORT_GPIO_COUNT              48
 #define HAL_PORT_PIO_COUNT               3
-#define HAL_PORT_HAS_PIO2                1
-#define HAL_PORT_HAS_FAST_TIMER          1
-#define HAL_PORT_HAS_INT5                1
 #define HAL_PORT_PULLDOWN_NEEDS_RESET    1
 /* rp2350 SPI-LCD ports run audio I²S on PIO 2 (PIO 0 is reserved for
  * scanout / merge tasks). */
@@ -28,12 +25,7 @@
 /* MMInkey pinned to RAM — rp2350 has plenty of SRAM. */
 #define HAL_PORT_MMINKEY_DECL(name)      __not_in_flash_func(name)
 
-#define HAL_PORT_HAS_PSRAM               1
-#define HAL_PORT_HAS_UPNG                1
-#define HAL_PORT_HAS_DEFINES             1
-#define HAL_PORT_HAS_HEARTBEAT           1
 #define HAL_PORT_ADC_CHANNEL_MAX         4
-#define HAL_PORT_HAS_SSD1963             1
 
 /* cmd_files flist[] cap. Device has the RAM and the SaveContext+InitHeap
  * dance to allocate ~76 KB. Host caps lower in host/port_config.h. */
@@ -50,7 +42,6 @@
  * because rp2350 PICOMITE has the RAM for the widget tables. */
 #define HAL_PORT_HAS_WIFI                0
 #define HAL_PORT_HAS_PICOMITE         1
-#define HAL_PORT_HAS_VGA_PIO             0
 #define HAL_PORT_HAS_GUICONTROLS         1
 
 /* core1stack[] size in words. PICOMITE runs the SPI-LCD merge pipeline

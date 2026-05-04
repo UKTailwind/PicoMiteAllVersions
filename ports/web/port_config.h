@@ -16,9 +16,6 @@
 #define HAL_PORT_PWM_SLICE_COUNT         8
 #define HAL_PORT_GPIO_COUNT              30
 #define HAL_PORT_PIO_COUNT               2
-#define HAL_PORT_HAS_PIO2                0
-#define HAL_PORT_HAS_FAST_TIMER          0
-#define HAL_PORT_HAS_INT5                0
 #define HAL_PORT_PULLDOWN_NEEDS_RESET    0
 /* rp2040 WEB has only 2 PIOs and CYW43 + scanout share them; audio
  * goes on PIO 0. */
@@ -29,14 +26,9 @@
  * heap eat most of it), so MMInkey stays in flash. */
 #define HAL_PORT_MMINKEY_DECL(name)      name
 
-#define HAL_PORT_HAS_PSRAM               0
-#define HAL_PORT_HAS_UPNG                0
-#define HAL_PORT_HAS_DEFINES             0
 /* WEB variants claim the onboard LED for the CYW43 radio — no heartbeat. */
-#define HAL_PORT_HAS_HEARTBEAT           0
 /* WEB reserves GP29 for the CYW43 radio — only 3 ADC channels. */
 #define HAL_PORT_ADC_CHANNEL_MAX         3
-#define HAL_PORT_HAS_SSD1963             1
 
 /* WEB on rp2040 runs lwIP + CYW43 network stacks and can't afford the RAM
  * pressure of pinning GPIO loops in SRAM. Keep them in flash. */
@@ -54,7 +46,6 @@
  * CYW43+lwIP+mongoose stack but doesn't fit GUICONTROLS in heap. */
 #define HAL_PORT_HAS_WIFI                1
 #define HAL_PORT_HAS_PICOMITE            0
-#define HAL_PORT_HAS_VGA_PIO             0
 #define HAL_PORT_HAS_GUICONTROLS         0
 #define HAL_PORT_HAS_USB_KEYBOARD        0
 #define HAL_PORT_HAS_I2C_KEYPAD          0

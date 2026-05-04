@@ -16,9 +16,6 @@
 #define HAL_PORT_PWM_SLICE_COUNT         12
 #define HAL_PORT_GPIO_COUNT              48
 #define HAL_PORT_PIO_COUNT               3
-#define HAL_PORT_HAS_PIO2                1
-#define HAL_PORT_HAS_FAST_TIMER          1
-#define HAL_PORT_HAS_INT5                1
 #define HAL_PORT_PULLDOWN_NEEDS_RESET    1
 /* HDMI uses HSTX peripheral for scanout; PIOs are free, audio I²S
  * goes on PIO 2. */
@@ -29,15 +26,12 @@
 /* MMInkey pinned to RAM — rp2350 has plenty of SRAM. */
 #define HAL_PORT_MMINKEY_DECL(name)      __not_in_flash_func(name)
 
-#define HAL_PORT_HAS_PSRAM               1
-#define HAL_PORT_HAS_UPNG                1
 
 /* Stage-A palette flags (decascade plan). HDMI shares the VGA-PIO scanout
  * scaffolding but adds the HDMI sink + DVI mode tables. No GUICONTROLS
  * today — touchscreen widgets are PICOMITE/WEBRP2350 only. */
 #define HAL_PORT_HAS_WIFI                0
 #define HAL_PORT_HAS_PICOMITE         0
-#define HAL_PORT_HAS_VGA_PIO             1
 #define HAL_PORT_HAS_GUICONTROLS         0
 
 /* core1stack[] size in words. HDMI runs the DVI scanout loop on core1
@@ -71,10 +65,7 @@
 #define HAL_PORT_PIO2_CLAIMED            true
 #define HAL_PORT_PSRAM_BASE              0x11000000
 #define HAL_PORT_PSRAM_BLOCK_SIZE        0x1C0000
-#define HAL_PORT_HAS_DEFINES             1
-#define HAL_PORT_HAS_HEARTBEAT           1
 #define HAL_PORT_ADC_CHANNEL_MAX         4
-#define HAL_PORT_HAS_SSD1963             0
 
 /* cmd_files flist[] cap. Device has the RAM and the SaveContext+InitHeap
  * dance to allocate ~76 KB. Host caps lower in host/port_config.h. */

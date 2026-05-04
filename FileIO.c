@@ -158,8 +158,8 @@ int FatFSFileSystemSave=0;
 #define overlap (VRes % (FontTable[gui_font >> 4][1] * (gui_font & 0b1111)) ? 0 : 1)
 /* DEFINES dictionary state — typedef moved to FileIO.h so the loader
  * in ports/pico_sdk_common/defines_loader.c can share it. Globals
- * declared unconditionally; on ports without HAL_PORT_HAS_DEFINES
- * they stay at their initialisers. */
+ * declared unconditionally; on rp2040 ports the DEFINES loader is
+ * gated by `#ifdef rp2350` and these stay at their initialisers. */
 a_dlist *dlist;
 int nDefines;
 int LineCount = 0;

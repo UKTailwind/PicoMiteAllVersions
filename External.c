@@ -42,10 +42,11 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "hal/hal_heartbeat.h"
 #include "hal/hal_i2c_keypad.h"
 
-/* SetBacklightSSD1963 only links on ports that compile SSD1963.c; the
- * call site in setBacklight() is compile-time dead on others via
- * HAL_PORT_HAS_SSD1963 so the linker never needs the body. Declared
- * here because SSD1963.h is not reachable from VGA builds. */
+/* SetBacklightSSD1963 has the real impl in SSD1963.c on SPI-LCD ports
+ * and a no-op stub in vga_qvga_modes.c / hdmi_scanout.c so the linker
+ * resolves on every port. The runtime DISPLAY_TYPE>=SSDPANEL guard in
+ * setBacklight() means the call only fires when an SSD-class panel is
+ * configured, which the OPTION setter rejects on non-SSD1963 ports. */
 extern void SetBacklightSSD1963(int intensity);
 #include "hardware/watchdog.h"
 #include "pico/stdlib.h"
@@ -244,8 +245,8 @@ int codecheck(unsigned char *line){
 	} else return 4;
 	return 0;
 }
-/* PWM-wrap ISR used by the RP2350 fast-timer path. Installed only on ports
- * where HAL_PORT_HAS_INT5 is set; on other ports the function sits unused
+/* PWM-wrap ISR used by the RP2350 fast-timer path. Installed only by
+ * the rp2350 fast-timer driver; on other ports the function sits unused
  * in flash (linker -gc-sections drops it). */
 void __not_in_flash_func(on_pwm_wrap_1)(void) {
     pwm_clear_irq(0);
@@ -1752,7 +1753,7 @@ void IRSendSignal(int pin, int half_cycles) {
 void MIPS16 set_PWM(int slice, MMFLOAT duty1, MMFLOAT duty2, int high1, int high2, int delaystart){
     if(slice==0 && PWM0Apin==99 && duty1>=0.0)error("Pin not set for PWM");
     if(slice==0 && PWM0Bpin==99 && duty2>=0.0)error("Pin not set for PWM");
-    /* fast_timer_active is always false on RP2040 (no HAL_PORT_HAS_FAST_TIMER),
+    /* fast_timer_active is always false on RP2040 (no fast-timer driver),
      * so this check never fires there and stays a simple runtime condition. */
     if(slice==0 && fast_timer_active)error("Channel 0 in use for fast timer");
     if(slice==1 && PWM1Apin==99 && duty1>=0.0)error("Pin not set for PWM");
