@@ -14,8 +14,9 @@ target_sources(PicoMite PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/pin_tables.c
     ${CMAKE_CURRENT_LIST_DIR}/port_defaults.c
     # HDMI provides its own MMBasic port-hook body (prompt-font selection
-    # has extra cases for FullColour / SCREENMODE3).
-    ${CMAKE_CURRENT_LIST_DIR}/mmbasic_port_hdmi.c
+    # has extra cases for FullColour / SCREENMODE3). Shared between
+    # hdmi_rp2350 and dvi_wifi_rp2350.
+    ${CMAKE_SOURCE_DIR}/drivers/hdmi/hdmi_prompt_font.c
 
     # VGA-PIO scanout scaffolding (HDMI rides on the VGA-PIO family) +
     # HDMI sink + DVI mode tables.
