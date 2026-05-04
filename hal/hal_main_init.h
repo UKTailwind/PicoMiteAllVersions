@@ -57,6 +57,23 @@ void port_repl_post_clear_display_refresh(void);
  * mmc_stm32.c after audio/PWM init. */
 void hal_pwm_mode_shadow_apply(void);
 
+/* Re-enable input drivers on every PIO-eligible pin between
+ * cmd_pio configures. Custom.c calls this at the end of each PIO
+ * INIT/CONFIGURE setup. The pin upper bound differs by port shape:
+ * WiFi ports include the full NBRPINS range, non-WiFi RP2350-A
+ * stops at pin 43 (the CYW43-shadow region), other builds use the
+ * full range. */
+void port_pio_pin_reset_inputs(void);
+
+/* Load the i2s PIO program once during start_i2s. Pure-VGA ports
+ * skip this — drivers/vga_pio/vga_qvga_modes.c already loaded the
+ * program when QVGA scanout came up because audio I²S shares PIO 0
+ * with the scanout state machines on those boards. See
+ * drivers/audio_i2s_pio/{audio_i2s_pio_load,audio_i2s_pio_stub}.c.
+ * Pass the PIO instance as a void* so this header doesn't drag in
+ * hardware/pio.h on host builds (the impls cast back to PIO). */
+void port_audio_i2s_pio_add_program(void *pio);
+
 #ifdef __cplusplus
 }
 #endif

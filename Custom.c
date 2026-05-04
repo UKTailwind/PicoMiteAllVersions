@@ -35,15 +35,12 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
+#include "hal/hal_main_init.h"
 #include "hardware/dma.h"
 #include "hardware/structs/bus_ctrl.h"
 #include "hardware/structs/dma.h"
 #include "hardware/irq.h"
 #include "hardware/pwm.h"
-#if HAL_PORT_HAS_WIFI
-#define CJSON_NESTING_LIMIT 100
-#include "cJSON.h"
-#endif
 #define STATIC static
 
 /*************************************************************************************************************************
@@ -117,9 +114,6 @@ int dma_rx_sm;
 bool PIO0 = HAL_PORT_PIO0_CLAIMED;
 bool PIO1 = HAL_PORT_PIO1_CLAIMED;
 bool PIO2 = HAL_PORT_PIO2_CLAIMED;
-#if HAL_PORT_HAS_WIFI
-extern void setwifi(unsigned char *tp);
-#endif
 /* TCPreceived / TCPreceiveInterrupt are read by MM_Misc.c's
  * interrupt-dispatch loop unconditionally so the loop itself can stay
  * preprocessor-clean. Only the WEB stack ever sets them; on non-WEB
@@ -234,19 +228,7 @@ void pio_init(int pior, int sm, uint32_t pinctrl, uint32_t execctrl, uint32_t sh
         cfg.execctrl=execctrl;
         cfg.shiftctrl=shiftctrl;
         cfg.pinctrl=pinctrl;
-        #ifdef rp2350
-        #if HAL_PORT_HAS_WIFI
-                for(int i = 1; i < (NBRPINS) ; i++) {
-        #else
-                for(int i = 1; i < (rp2350a ? 44:NBRPINS) ; i++) {
-        #endif
-        #else
-        for(int i = 1; i < (NBRPINS) ; i++) {
-        #endif
-                if(CheckPin(i, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED)) {    // don't reset invalid or boot reserved pins
-                        gpio_set_input_enabled(PinDef[i].GPno, true);
-                }
-        }
+        port_pio_pin_reset_inputs();
 #ifdef rp2350
         cfg.pinhi=0xFFF07C1F;
 #endif
@@ -285,13 +267,7 @@ void start_i2s(int pior, int sm){
 #else
         pioi2s = (pior==0 ? pio0: pio1);
 #endif
-#if !HAL_PORT_IS_VGA || HAL_PORT_HAS_HDMI
-#ifdef rp2350
-        if(PinDef[Option.audio_i2s_bclk].GPno+1>31 || PinDef[Option.audio_i2s_data].GPno>31)pio_set_gpio_base(pioi2s,16);
-#endif
-        I2SOff = pio_add_program(pioi2s, &i2s_program);
-
-#endif
+        port_audio_i2s_pio_add_program(pioi2s);
         gpio_set_input_enabled(PinDef[Option.audio_i2s_data].GPno, true);
 	gpio_set_input_enabled(PinDef[Option.audio_i2s_bclk].GPno, true);
 	gpio_set_input_enabled(PinDef[Option.audio_i2s_bclk].GPno+1, true);
@@ -1475,19 +1451,7 @@ pushthreshold, pullthreshold, autopush, autopull, inshiftdir, outshiftdir, joinr
         if(argc>53 && *argv[54]) joinrxfifoget=getint(argv[54],0,1); // FJOIN_RX_GET
         if(argc>55 && *argv[56]) joinrxfifoput=getint(argv[56],0,1); // FJOIN_RX_PUT
 #endif
-        #ifdef rp2350
-        #if HAL_PORT_HAS_WIFI
-                for(int i = 1; i < (NBRPINS) ; i++) {
-        #else
-                for(int i = 1; i < (rp2350a ? 44:NBRPINS) ; i++) {
-        #endif
-        #else
-        for(int i = 1; i < (NBRPINS) ; i++) {
-        #endif
-                if(CheckPin(i, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED)) {    // don't reset invalid or boot reserved pins
-                        gpio_set_input_enabled(PinDef[i].GPno, true);
-                }
-        }
+        port_pio_pin_reset_inputs();
         pio_set_gpio_base(pio,base);
         pio_sm_config cfg = pio_get_default_sm_config();
         sm_config_set_in_pin_base(&cfg, inbase);
@@ -1813,220 +1777,3 @@ void cmd_set(void){
 void cmd_label(void){
        call_pio("",4);
 }
-/* 
- * @cond
- * The following section will be excluded from the documentation.
- */
-
-#if HAL_PORT_HAS_WIFI
-char *scan_dest=NULL;
-volatile char *scan_dups=NULL; 
-volatile int scan_size;
-static int scan_result(void *env, const cyw43_ev_scan_result_t *result) {
-    if (result) {
-        Timer4=5000;
-        char buff[STRINGSIZE]={0};
-//        int found=0;
-        if(scan_dups==NULL)return 0;
-        for(int i=0;i<scan_dups[32*100];i++){
-                if(strcmp((char *)result->ssid,(char *)&scan_dups[32*i])==0)return 0;
-        }
-        for(int i=0;i<100;i++){
-                if(scan_dups[32*i]==0){
-                        strcpy((char *)&scan_dups[32*i],(char *)result->ssid);
-                        scan_dups[32*100]++;
-                        break;
-                }
-        }
-        sprintf(buff,"ssid: %-32s rssi: %4d chan: %3d mac: %02x:%02x:%02x:%02x:%02x:%02x sec: %u\r\n",
-            result->ssid, result->rssi, result->channel,
-            result->bssid[0], result->bssid[1], result->bssid[2], result->bssid[3], result->bssid[4], result->bssid[5],
-            result->auth_mode);
-        if(scan_dest!=NULL){
-                if(strlen(((char *)&scan_dest[8]) + strlen(buff)) > scan_size){
-                        FreeMemorySafe((void **)&scan_dups);
-                        scan_dest=NULL;
-                        error("Array too small");
-                }
-                if(scan_dest[8]==0)strcpy(&scan_dest[8],buff);
-                else strcat(&scan_dest[8],buff);
-        } else MMPrintString(buff);
-    } 
-    return 0;
-}
-/*  @endcond */
-void cmd_web(void){
-        unsigned char *tp;
-        tp=checkstring(cmdline, (unsigned char *)"CONNECT");
-        if(tp){
-            if(*tp){
-            	setwifi(tp);
-                WebConnect();
-            } else {
-	            if(cyw43_wifi_link_status(&cyw43_state,CYW43_ITF_STA)<0){
-	                WebConnect();
-	            }
-	        }
-           return;   
-        }
-        tp=checkstring(cmdline, (unsigned char *)"SCAN");
-        if(tp){
-                void *ptr1 = NULL;
-                if(*tp){
-                        ptr1 = findvar(tp, V_FIND | V_EMPTY_OK);
-                        if(g_vartbl[g_VarIndex].type & T_INT) {
-                                if(g_vartbl[g_VarIndex].dims[1] != 0) error("Invalid variable");
-                                if(g_vartbl[g_VarIndex].dims[0] <= 0) {		// Not an array
-                                        error("Argument 1 must be integer array");
-                                }
-                                scan_size=(g_vartbl[g_VarIndex].dims[0]-g_OptionBase)*8;
-                                scan_dest = (char *)ptr1;
-                                scan_dest[8]=0;
-                        } else error("Argument 1 must be integer array");
-
-                }
-                scan_dups=GetMemory(32*100+1);
-                cyw43_wifi_scan_options_t scan_options = {0};
-                int err = cyw43_wifi_scan(&cyw43_state, &scan_options, NULL, scan_result);
-                if (err == 0) {
-                    MMPrintString("\nPerforming wifi scan\r\n");
-                } else {
-                    char buff[STRINGSIZE]={0};
-                    sprintf(buff,"Failed to start scan: %d\r\n", err);
-                    MMPrintString(buff);
-                }
-                Timer4=500;
-                while (Timer4)if(startupcomplete)ProcessWeb(0);
-                if(scan_dest){
-                        uint64_t *p=(uint64_t *)scan_dest;
-                        *p=strlen(&scan_dest[8]);
-                }
-                scan_dest=NULL;
-                FreeMemorySafe((void **)&scan_dups);
-                return;   
-        }
-        if(!(WIFIconnected &&  cyw43_tcpip_link_status(&cyw43_state,CYW43_ITF_STA)==CYW43_LINK_UP))error("WIFI not connected");
-        tp=checkstring(cmdline, (unsigned char *)"NTP");
-        if(tp){
-            cmd_ntp(tp);
-            return;   
-        }
-        tp=checkstring(cmdline, (unsigned char *)"UDP");
-        if(tp){
-            cmd_udp(tp);
-            return;   
-        }
-        if(cmd_mqtt())return;
-        if(cmd_tcpclient())return;
-        if(cmd_tcpserver())return;
-//        if(cmd_tls())return;
-        error("Syntax");
-}
-
-void fun_json(void){
-    char *json_string=NULL;
-    const cJSON *root = NULL;
-    void *ptr1 = NULL;
-    char *p;
-    sret=GetTempMemory(STRINGSIZE);
-    int64_t *dest=NULL;
-    MMFLOAT tempd;
-    int i,j,k,mode,index;
-    char field[32],num[6];
-    getargs(&ep, 3, (unsigned char *)",");
-    char *a=GetTempMemory(STRINGSIZE);
-    ptr1 = findvar(argv[0], V_FIND | V_EMPTY_OK);
-    if(g_vartbl[g_VarIndex].type & T_INT) {
-    if(g_vartbl[g_VarIndex].dims[1] != 0) error("Invalid variable");
-    if(g_vartbl[g_VarIndex].dims[0] <= 0) {		// Not an array
-        error("Argument 1 must be integer array");
-    }
-    dest = (long long int *)ptr1;
-    json_string=(char *)&dest[1];
-    } else error("Argument 1 must be integer array");
-    cJSON_InitHooks(NULL);
-    cJSON * parse = cJSON_Parse(json_string);
-    if(parse==NULL)error("Invalid JSON data");
-    root=parse;
-    p=(char *)getCstring((unsigned char *)argv[2]);
-    int len = strlen(p);
-    memset(field,0,32);
-    memset(num,0,6);
-    i=0;j=0;k=0;mode=0;
-    while(i<len){
-        if(p[i]=='['){ //start of index
-            mode=1;
-            field[j]=0;
-            root = cJSON_GetObjectItemCaseSensitive(root, field);
-            memset(field,0,32);
-            j=0;
-        }
-        if(p[i]==']'){
-            num[k]=0;
-            index=atoi(num);
-            root = cJSON_GetArrayItem(root, index);
-            memset(num,0,6);
-            k=0;
-        }
-        if(p[i]=='.'){ //new field separator
-            if(mode==0){
-                field[j]=0;
-                root = cJSON_GetObjectItemCaseSensitive(root, field);
-             memset(field,0,32);
-                j=0;
-            } else { //step past the dot after a close bracket
-                mode=0;
-            }
-        } else  {
-            if(mode==0)field[j++]=p[i];
-            else if(p[i]!='[')num[k++]=p[i];
-        }
-        i++;
-    }
-    root = cJSON_GetObjectItem(root, field);
-
-    if (cJSON_IsObject(root)){
-        cJSON_Delete(parse);
-        error("Not an item");
-        return;
-    }
-    if (cJSON_IsInvalid(root)){
-        cJSON_Delete(parse);
-        error("Not an item");
-        return;
-    }
-    if (cJSON_IsNumber(root))
-    {
-        tempd = root->valuedouble;
-
-        if((MMFLOAT)((int64_t)tempd)==tempd) IntToStr(a,(int64_t)tempd,10);
-        else FloatToStr(a, tempd, 0, STR_AUTO_PRECISION, ' ');   // set the string value to be saved
-        cJSON_Delete(parse);
-        sret=(unsigned char *)a;
-        sret=CtoM(sret);
-        targ=T_STR;
-        return;
-    }
-    if (cJSON_IsBool(root)){
-        int64_t tempint;
-        tempint=root->valueint;
-        cJSON_Delete(parse);
-        if(tempint)strcpy((char *)sret,"true");
-        else strcpy((char *)sret,"false");
-        sret=CtoM(sret);
-        targ=T_STR;
-        return;
-    }
-    if (cJSON_IsString(root)){
-        strcpy(a,root->valuestring);
-        cJSON_Delete(parse);
-        sret=(unsigned char *)a;
-        sret=CtoM(sret);
-        targ=T_STR;
-        return;
-    }
-    cJSON_Delete(parse);
-    targ=T_STR;
-    sret=(unsigned char *)a;
-}
-#endif

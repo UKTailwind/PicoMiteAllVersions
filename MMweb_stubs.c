@@ -103,6 +103,22 @@ int port_setter_pico_pins(unsigned char *cmdline) {
 #include "hal/hal_main_init.h"
 #include "hardware/gpio.h"
 
+/* PIO pin-reset loop. Non-WiFi RP2350-A skips the CYW43-shadow
+ * pins (44+); other builds (RP2350-B, RP2040) walk the full
+ * NBRPINS range. */
+void port_pio_pin_reset_inputs(void) {
+#ifdef rp2350
+    int end = rp2350a ? 44 : NBRPINS;
+#else
+    int end = NBRPINS;
+#endif
+    for (int i = 1; i < end; i++) {
+        if (CheckPin(i, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED)) {
+            gpio_set_input_enabled(PinDef[i].GPno, true);
+        }
+    }
+}
+
 void hal_pwm_mode_shadow_apply(void) {
 #ifdef rp2350
     if (!rp2350a) return;

@@ -19,6 +19,7 @@ target_sources(PicoMite PRIVATE
     ${CMAKE_SOURCE_DIR}/drivers/vga_pio/vga_blit_ops.c
     ${CMAKE_SOURCE_DIR}/drivers/vga_pio/vga_memory.c
     ${CMAKE_SOURCE_DIR}/drivers/vga_pio/vga_qvga_modes.c
+    ${CMAKE_SOURCE_DIR}/drivers/audio_i2s_pio/audio_i2s_pio_stub.c
 
     # WiFi stack (CYW43 + lwIP + MQTT/UDP/TFTP/Telnet/NTP/HTTPD). NOTE:
     # SSD1963.c and Touch.c are intentionally omitted — they live in the

@@ -14,6 +14,8 @@
 #include "lwip/ip4_addr.h"
 #include "lwip/netif.h"
 #include "pico/cyw43_arch.h"
+#define CJSON_NESTING_LIMIT 100
+#include "cJSON.h"
 
 extern char id_out[12];
 extern bool optionsuppressstatus;
@@ -302,6 +304,16 @@ void port_repl_wifi_arch_init_and_connect(void) {
 /* WiFi ports leave GPIO 23 to the CYW43 module — no PWM shadow. */
 void hal_pwm_mode_shadow_apply(void) { }
 
+/* WiFi PIO pin-reset loop walks the full NBRPINS range — the CYW43
+ * radio doesn't expose a shadow-pin range that needs to be skipped. */
+void port_pio_pin_reset_inputs(void) {
+    for (int i = 1; i < NBRPINS; i++) {
+        if (CheckPin(i, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED)) {
+            gpio_set_input_enabled(PinDef[i].GPno, true);
+        }
+    }
+}
+
 /* WiFi ports limit OPTION HEARTBEAT to ON/OFF — no pin reassignment
  * (the heartbeat LED lives on the CYW43 module). */
 int port_setter_heartbeat(unsigned char *cmdline) {
@@ -314,4 +326,211 @@ int port_setter_heartbeat(unsigned char *cmdline) {
     } else error("Syntax");
     SaveOptions();
     return 1;
+}
+
+/* WiFi-only command + function bodies (cmd_web / fun_json / scan
+ * result callback) relocated from Custom.c. Custom.c is universal
+ * across device ports; this code references CYW43 APIs that only
+ * exist on WiFi builds. Non-WiFi ports get a `cmd_web` stub from
+ * MMweb_stubs.c and never reference fun_json (excluded from the
+ * non-WiFi token-palette in port_tokens.h). */
+
+extern void cmd_ntp(unsigned char *cmdline);
+extern void cmd_udp(unsigned char *cmdline);
+extern int  cmd_mqtt(void);
+extern int  cmd_tcpclient(void);
+extern int  cmd_tcpserver(void);
+extern int  startupcomplete;
+
+char *scan_dest = NULL;
+volatile char *scan_dups = NULL;
+volatile int scan_size;
+
+static int scan_result(void *env, const cyw43_ev_scan_result_t *result) {
+    if (result) {
+        Timer4 = 5000;
+        char buff[STRINGSIZE] = {0};
+        if (scan_dups == NULL) return 0;
+        for (int i = 0; i < scan_dups[32 * 100]; i++) {
+            if (strcmp((char *)result->ssid, (char *)&scan_dups[32 * i]) == 0) return 0;
+        }
+        for (int i = 0; i < 100; i++) {
+            if (scan_dups[32 * i] == 0) {
+                strcpy((char *)&scan_dups[32 * i], (char *)result->ssid);
+                scan_dups[32 * 100]++;
+                break;
+            }
+        }
+        sprintf(buff, "ssid: %-32s rssi: %4d chan: %3d mac: %02x:%02x:%02x:%02x:%02x:%02x sec: %u\r\n",
+            result->ssid, result->rssi, result->channel,
+            result->bssid[0], result->bssid[1], result->bssid[2], result->bssid[3], result->bssid[4], result->bssid[5],
+            result->auth_mode);
+        if (scan_dest != NULL) {
+            if (strlen(((char *)&scan_dest[8]) + strlen(buff)) > scan_size) {
+                FreeMemorySafe((void **)&scan_dups);
+                scan_dest = NULL;
+                error("Array too small");
+            }
+            if (scan_dest[8] == 0) strcpy(&scan_dest[8], buff);
+            else strcat(&scan_dest[8], buff);
+        } else MMPrintString(buff);
+    }
+    return 0;
+}
+
+void cmd_web(void) {
+    unsigned char *tp;
+    tp = checkstring(cmdline, (unsigned char *)"CONNECT");
+    if (tp) {
+        if (*tp) {
+            setwifi(tp);
+            WebConnect();
+        } else {
+            if (cyw43_wifi_link_status(&cyw43_state, CYW43_ITF_STA) < 0) {
+                WebConnect();
+            }
+        }
+        return;
+    }
+    tp = checkstring(cmdline, (unsigned char *)"SCAN");
+    if (tp) {
+        void *ptr1 = NULL;
+        if (*tp) {
+            ptr1 = findvar(tp, V_FIND | V_EMPTY_OK);
+            if (g_vartbl[g_VarIndex].type & T_INT) {
+                if (g_vartbl[g_VarIndex].dims[1] != 0) error("Invalid variable");
+                if (g_vartbl[g_VarIndex].dims[0] <= 0) {
+                    error("Argument 1 must be integer array");
+                }
+                scan_size = (g_vartbl[g_VarIndex].dims[0] - g_OptionBase) * 8;
+                scan_dest = (char *)ptr1;
+                scan_dest[8] = 0;
+            } else error("Argument 1 must be integer array");
+        }
+        scan_dups = GetMemory(32 * 100 + 1);
+        cyw43_wifi_scan_options_t scan_options = {0};
+        int err = cyw43_wifi_scan(&cyw43_state, &scan_options, NULL, scan_result);
+        if (err == 0) {
+            MMPrintString("\nPerforming wifi scan\r\n");
+        } else {
+            char buff[STRINGSIZE] = {0};
+            sprintf(buff, "Failed to start scan: %d\r\n", err);
+            MMPrintString(buff);
+        }
+        Timer4 = 500;
+        while (Timer4) if (startupcomplete) ProcessWeb(0);
+        if (scan_dest) {
+            uint64_t *p = (uint64_t *)scan_dest;
+            *p = strlen(&scan_dest[8]);
+        }
+        scan_dest = NULL;
+        FreeMemorySafe((void **)&scan_dups);
+        return;
+    }
+    if (!(WIFIconnected && cyw43_tcpip_link_status(&cyw43_state, CYW43_ITF_STA) == CYW43_LINK_UP))
+        error("WIFI not connected");
+    tp = checkstring(cmdline, (unsigned char *)"NTP");
+    if (tp) { cmd_ntp(tp); return; }
+    tp = checkstring(cmdline, (unsigned char *)"UDP");
+    if (tp) { cmd_udp(tp); return; }
+    if (cmd_mqtt())      return;
+    if (cmd_tcpclient()) return;
+    if (cmd_tcpserver()) return;
+    error("Syntax");
+}
+
+void fun_json(void) {
+    char *json_string = NULL;
+    const cJSON *root = NULL;
+    void *ptr1 = NULL;
+    char *p;
+    sret = GetTempMemory(STRINGSIZE);
+    int64_t *dest = NULL;
+    MMFLOAT tempd;
+    int i, j, k, mode, index;
+    char field[32], num[6];
+    getargs(&ep, 3, (unsigned char *)",");
+    char *a = GetTempMemory(STRINGSIZE);
+    ptr1 = findvar(argv[0], V_FIND | V_EMPTY_OK);
+    if (g_vartbl[g_VarIndex].type & T_INT) {
+        if (g_vartbl[g_VarIndex].dims[1] != 0) error("Invalid variable");
+        if (g_vartbl[g_VarIndex].dims[0] <= 0) {
+            error("Argument 1 must be integer array");
+        }
+        dest = (long long int *)ptr1;
+        json_string = (char *)&dest[1];
+    } else error("Argument 1 must be integer array");
+    cJSON_InitHooks(NULL);
+    cJSON *parse = cJSON_Parse(json_string);
+    if (parse == NULL) error("Invalid JSON data");
+    root = parse;
+    p = (char *)getCstring((unsigned char *)argv[2]);
+    int len = strlen(p);
+    memset(field, 0, 32);
+    memset(num, 0, 6);
+    i = 0; j = 0; k = 0; mode = 0;
+    while (i < len) {
+        if (p[i] == '[') {
+            mode = 1;
+            field[j] = 0;
+            root = cJSON_GetObjectItemCaseSensitive(root, field);
+            memset(field, 0, 32);
+            j = 0;
+        }
+        if (p[i] == ']') {
+            num[k] = 0;
+            index = atoi(num);
+            root = cJSON_GetArrayItem(root, index);
+            memset(num, 0, 6);
+            k = 0;
+        }
+        if (p[i] == '.') {
+            if (mode == 0) {
+                field[j] = 0;
+                root = cJSON_GetObjectItemCaseSensitive(root, field);
+                memset(field, 0, 32);
+                j = 0;
+            } else {
+                mode = 0;
+            }
+        } else {
+            if (mode == 0) field[j++] = p[i];
+            else if (p[i] != '[') num[k++] = p[i];
+        }
+        i++;
+    }
+    root = cJSON_GetObjectItem(root, field);
+
+    if (cJSON_IsObject(root))  { cJSON_Delete(parse); error("Not an item"); return; }
+    if (cJSON_IsInvalid(root)) { cJSON_Delete(parse); error("Not an item"); return; }
+    if (cJSON_IsNumber(root)) {
+        tempd = root->valuedouble;
+        if ((MMFLOAT)((int64_t)tempd) == tempd) IntToStr(a, (int64_t)tempd, 10);
+        else FloatToStr(a, tempd, 0, STR_AUTO_PRECISION, ' ');
+        cJSON_Delete(parse);
+        sret = (unsigned char *)a;
+        sret = CtoM(sret);
+        targ = T_STR;
+        return;
+    }
+    if (cJSON_IsBool(root)) {
+        int64_t tempint = root->valueint;
+        cJSON_Delete(parse);
+        if (tempint) strcpy((char *)sret, "true");
+        else strcpy((char *)sret, "false");
+        sret = CtoM(sret);
+        targ = T_STR;
+        return;
+    }
+    if (cJSON_IsString(root)) {
+        strcpy(a, root->valuestring);
+        cJSON_Delete(parse);
+        sret = (unsigned char *)a;
+        sret = CtoM(sret);
+        targ = T_STR;
+        return;
+    }
+    cJSON_Delete(parse);
+    targ = T_STR;
+    sret = (unsigned char *)a;
 }

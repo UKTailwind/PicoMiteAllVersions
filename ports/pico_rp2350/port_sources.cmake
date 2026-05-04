@@ -11,6 +11,7 @@ target_sources(PicoMite PRIVATE
     # PICOMITE feature backends.
     ${CMAKE_SOURCE_DIR}/ports/pico_sdk_common/mmbasic_port_pico.c
     ${CMAKE_SOURCE_DIR}/drivers/display_merge/display_merge_pico.c
+    ${CMAKE_SOURCE_DIR}/drivers/audio_i2s_pio/audio_i2s_pio_load.c
     ${CMAKE_SOURCE_DIR}/drivers/vm_framebuffer_picomite/vm_framebuffer_picomite.c
     ${CMAKE_SOURCE_DIR}/drivers/spi_lcd/spi_lcd_fastgfx.c
     ${CMAKE_SOURCE_DIR}/drivers/spi_lcd/spi_lcd_framebuffer.c
