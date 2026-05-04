@@ -24,6 +24,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 ************************************************************************************************************************/
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
+#include "wifi_includes.h"
 NTP_T *NTPstate=NULL;
 #define NTP_SERVER "pool.ntp.org"
 #define NTP_MSG_LEN 48

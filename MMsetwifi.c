@@ -11,6 +11,7 @@
 
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
+#include "wifi_includes.h"
 #include "lwip/ip4_addr.h"
 #include "lwip/netif.h"
 #include "pico/cyw43_arch.h"

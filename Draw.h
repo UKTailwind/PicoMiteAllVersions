@@ -154,10 +154,11 @@ extern void (*DrawPixel)(int x1, int y1, int c);
 extern void (*ReadBufferFast)(int x1, int y1, int x2, int y2, unsigned char *c);
 extern void (*DrawBufferFast)(int x1, int y1, int x2, int y2, int blank, unsigned char *c);
 extern uint8_t sprite_transparent;
-#if !HAL_PORT_IS_VGA
-    extern void DrawRectangleUser(int x1, int y1, int x2, int y2, int c);
-    extern void DrawBitmapUser(int x1, int y1, int width, int height, int scale, int fc, int bc, unsigned char *bitmap);
-#endif
+/* DrawRectangleUser / DrawBitmapUser real impls live in spi_lcd.c on
+ * SPI-LCD ports; declared unconditionally so callers compile on every
+ * port (linker only resolves the symbols where actually referenced). */
+extern void DrawRectangleUser(int x1, int y1, int x2, int y2, int c);
+extern void DrawBitmapUser(int x1, int y1, int width, int height, int scale, int fc, int bc, unsigned char *bitmap);
 extern void DisplayPutC(char c);
 extern void DisplayPutS(char *s);
 extern void GUIPrintString(int x, int y, int fnt, int jh, int jv, int jo, int fc, int bc, char *str);
@@ -258,9 +259,10 @@ extern bool CollisionFound;
 extern void InitDisplayVirtual(void);
 extern void ConfigDisplayVirtual(unsigned char *p);
 extern void merge(uint8_t colour);
-#if HAL_PORT_HAS_PICOMITE && !HAL_PORT_IS_VGA
+/* merge_optimized real impl lives in display_merge_pico.c (PicoMite
+ * SPI-LCD); declared unconditionally so the merge dispatcher compiles
+ * on every port. */
 extern void merge_optimized(uint8_t colour);
-#endif
 extern void blitmerge (int x0, int y0, int w, int h, uint8_t colour);
 extern bool mergerunning;
 extern volatile bool mergedone;

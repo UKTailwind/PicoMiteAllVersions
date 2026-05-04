@@ -197,11 +197,11 @@ static int check(const unsigned char *buf, int sz)
 
 static void flushinput(void)
 {
+  /* ProcessWeb is universal (real impl pumps lwIP on WiFi ports,
+   * stub no-op elsewhere — MMweb_stubs.c / Custom.c). Calling it
+   * unconditionally during the input drain is harmless. */
   while (_inbyte(((DLY_1S)*3)>>1) >= 0)
-#if HAL_PORT_HAS_WIFI
-  ProcessWeb(1)
-#endif
-  ;
+    ProcessWeb(1);
 }
 
 

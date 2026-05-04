@@ -76,20 +76,19 @@ extern void *GetAlignedMemory(int size);
 extern void FreeMemorySafe(void **addr);
 extern int MemSize(void *addr);
 extern unsigned char *MMHeap;
-#if HAL_PORT_IS_VGA
+/* Frame / layer buffers. VGA-family uses Write+Frame+SecondFrame+
+ * Display+Layer+SecondLayer; SPI-LCD ports use Write+Frame+Layer+
+ * Shadow plus a DMA channel handle. Declared as a universal extern
+ * set; linker resolves only the symbols a given port actually
+ * defines. */
 extern unsigned char *WriteBuf;
 extern unsigned char *FrameBuf;
 extern unsigned char *SecondFrame;
 extern unsigned char *DisplayBuf;
 extern unsigned char *LayerBuf;
 extern unsigned char *SecondLayer;
-#else
-extern unsigned char *WriteBuf;
-extern unsigned char *FrameBuf;
-extern unsigned char *LayerBuf;
 extern unsigned char *ShadowBuf;
 extern int fb_dma_chan;
-#endif
 extern uint32_t heap_memory_size;
 extern unsigned char *FRAMEBUFFER;
 extern uint32_t framebuffersize;

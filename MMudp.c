@@ -4,6 +4,7 @@
  */
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
+#include "wifi_includes.h"
 #include "lwip/udp.h"
 #include "lwip/timeouts.h"
 #include "lwip/debug.h"

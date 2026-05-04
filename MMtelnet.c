@@ -24,6 +24,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 ************************************************************************************************************************/
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
+#include "wifi_includes.h"
 //#define DEBUG_printf printf
 #define DEBUG_printf
 static char Telnetbuff[256]={0};
