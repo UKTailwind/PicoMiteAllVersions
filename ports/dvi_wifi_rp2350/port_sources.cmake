@@ -45,8 +45,8 @@ target_sources(PicoMite PRIVATE
     ${CMAKE_SOURCE_DIR}/MMudp.c
     ${CMAKE_SOURCE_DIR}/MMsetwifi.c
 
-    # rp2350 features. This board has dedicated PSRAM that's available
-    # alongside the WiFi module, so link the real psram_heap impl.
+    # rp2350 features. The pico_stretch RP2350B board has PSRAM on
+    # board, so link the real psram_heap impl.
     ${CMAKE_SOURCE_DIR}/psram.c
     ${CMAKE_SOURCE_DIR}/upng.c
     ${CMAKE_SOURCE_DIR}/drivers/audio_mp3/audio_mp3_real.c
