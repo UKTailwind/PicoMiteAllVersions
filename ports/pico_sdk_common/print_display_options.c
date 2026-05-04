@@ -16,6 +16,7 @@
 #include "port_config.h"
 #include "hal/hal_gui_controls.h"
 #include "hal/hal_i2c_keypad.h"
+#include "hal/hal_print_options.h"
 
 /* The Freq* / SCREENMODE* / NEXTGEN / VIRTUAL / SSDPANEL constants are
  * defined in configuration.h only on PICOMITEVGA builds. On non-VGA the
@@ -69,70 +70,42 @@ extern const char *KBrdList[];
 
 void port_print_keyboard_heartbeat(void)
 {
-#if HAL_PORT_HAS_USB_KEYBOARD
-    if(!(Option.USBKeyboard == NO_KEYBOARD)){
-        PO("KEYBOARD"); MMPrintString((char *)KBrdList[(int)Option.USBKeyboard]);
-        if(Option.capslock || Option.numlock!=1 || Option.repeat!=0b00101100){
-            PIntComma(Option.capslock);PIntComma(Option.numlock);PIntComma(Option.RepeatStart);
-            PIntComma(Option.RepeatRate);
-        }
-        PRet();
-    }
-#else
-#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
-    if(Option.LOCAL_KEYBOARD)PO3Int("KEYBOARD REPEAT",Option.RepeatStart,Option.RepeatRate);
-#  endif
-    if(!(Option.KeyboardConfig == NO_KEYBOARD || Option.KeyboardConfig == CONFIG_I2C)){
-        PO("KEYBOARD"); MMPrintString((char *)KBrdList[(int)Option.KeyboardConfig]);
-        if(Option.capslock || Option.numlock!=1 || Option.repeat!=0b00101100){
-            PIntComma(Option.capslock);PIntComma(Option.numlock);PIntComma(Option.repeat>>5);
-            PIntComma(Option.repeat & 0x1f);
-        }
-        PRet();
-    }
-    if(!((Option.KEYBOARD_CLOCK==11 && Option.KEYBOARD_DATA==12) ||(Option.KEYBOARD_CLOCK==0 && Option.KEYBOARD_DATA==0)) && Option.KeyboardConfig != NO_KEYBOARD){
-        PO("KEYBOARD PINS"); MMPrintString((char *)PinDef[Option.KEYBOARD_CLOCK].pinname);
-        MMputchar(',',0);MMPrintString((char *)PinDef[Option.KEYBOARD_DATA].pinname);PRet();
-    }
-    if(Option.MOUSE_CLOCK){
-        PO("MOUSE"); MMPrintString((char *)PinDef[Option.MOUSE_CLOCK].pinname);
-        MMputchar(',',0);MMPrintString((char *)PinDef[Option.MOUSE_DATA].pinname);PRet();
-    }
-#endif
-    if(Option.KeyboardConfig == CONFIG_I2C)PO2Str("KEYBOARD", "I2C");
+    /* Keyboard layout / pins / mouse / REPEAT lines are emitted by
+     * the per-keyboard-driver port_print_kb_layout hook (USB-host
+     * driver vs PS/2 driver). */
+    port_print_kb_layout();
+    if (Option.KeyboardConfig == CONFIG_I2C) PO2Str("KEYBOARD", "I2C");
 #ifdef rp2350
-    if(Option.NoHeartbeat && rp2350a)PO2Str("HEARTBEAT", "OFF");
-#if HAL_PORT_HAS_PICOMITE
-    if(Option.LOCAL_KEYBOARD)PO2Str("KEYBOARD", "LOCAL");
-    if(Option.LOCAL_KEYBOARD)PO2Int("KEYBOARD BACKLIGHT", Option.KeyboardBrightness);
-#  endif
+    if (Option.NoHeartbeat && rp2350a) PO2Str("HEARTBEAT", "OFF");
+    /* LOCAL_KEYBOARD / KeyboardBrightness exist in struct option_s on
+     * every port (FileIO.h); the runtime guard makes the print
+     * inert on ports that never set LOCAL_KEYBOARD. */
+    if (Option.LOCAL_KEYBOARD) PO2Str("KEYBOARD", "LOCAL");
+    if (Option.LOCAL_KEYBOARD) PO2Int("KEYBOARD BACKLIGHT", Option.KeyboardBrightness);
 #else
-    if(Option.NoHeartbeat)PO2Str("HEARTBEAT", "OFF");
+    if (Option.NoHeartbeat) PO2Str("HEARTBEAT", "OFF");
 #endif
 }
 
 void port_print_usb_kb_repeat(void)
 {
-#if HAL_PORT_HAS_USB_KEYBOARD
-    if(!(Option.RepeatStart==600 && Option.RepeatRate==150)){
-        char buff[40]={0};
-        sprintf(buff,"OPTION KEYBOARD REPEAT %d,%d\r\n",Option.RepeatStart, Option.RepeatRate);
-        MMPrintString(buff);
-    }
-#endif
+    /* USB-host driver emits OPTION KEYBOARD REPEAT here; PS/2 driver
+     * provides a no-op stub (the PS/2 REPEAT line, if any, is
+     * emitted earlier inside port_print_kb_layout). */
+    port_print_kb_repeat();
 }
 
 void port_print_lcd_spi(void)
 {
-#if HAL_PORT_HAS_PICOMITE && defined(rp2350)
-    /* LCD_CLK/MOSI/MISO only exist in struct option_s on PICOMITE+rp2350. */
-    if(Option.LCD_CLK && !(Option.SYSTEM_CLK==Option.LCD_CLK)){
+    /* LCD_CLK / LCD_MOSI / LCD_MISO exist in struct option_s on every
+     * port (FileIO.h). The runtime guard makes the print inert on
+     * ports that never configure a separate LCD SPI bus. */
+    if (Option.LCD_CLK && !(Option.SYSTEM_CLK == Option.LCD_CLK)) {
         PO("LCD SPI");
-        MMPrintString((char *)PinDef[Option.LCD_CLK].pinname);MMputchar(',',1);
-        MMPrintString((char *)PinDef[Option.LCD_MOSI].pinname);MMputchar(',',1);
-        MMPrintString((char *)PinDef[Option.LCD_MISO].pinname);MMPrintString("\r\n");
+        MMPrintString((char *)PinDef[Option.LCD_CLK].pinname);  MMputchar(',', 1);
+        MMPrintString((char *)PinDef[Option.LCD_MOSI].pinname); MMputchar(',', 1);
+        MMPrintString((char *)PinDef[Option.LCD_MISO].pinname); MMPrintString("\r\n");
     }
-#endif
 }
 
 void port_print_display_options(void)
@@ -148,13 +121,15 @@ void port_print_display_options(void)
         if(Option.CPU_Speed==Freq480P || Option.CPU_Speed==Freq252P || Option.CPU_Speed==Freq378P )PO2StrInt("RESOLUTION", "640x480",Option.CPU_Speed);
         if(Option.DISPLAY_TYPE!=SCREENMODE1)PO2Int("DEFAULT MODE", Option.DISPLAY_TYPE-SCREENMODE1+1);
         if(Option.Height != 40 || Option.Width != 80) PO3Int("DISPLAY", Option.Height, Option.Width);
-#if HAL_PORT_HAS_HDMI
-        /* HDMIclock/HDMId0..2 only exist in struct option_s when
-         * !GUICONTROLS, which the HDMI builds satisfy. */
-        if(Option.HDMIclock!=2 || Option.HDMId0!=0 || Option.HDMId1!=6 ||Option.HDMId2!=4){
-            PO("HDMI PINS ");PInt(Option.HDMIclock);PIntComma(Option.HDMId0);PIntComma(Option.HDMId1);PIntComma(Option.HDMId2);PRet();
+        /* HDMIclock / HDMId0..d2 are universal struct option_s fields
+         * (FileIO.h). Default values 2/0/6/4 make the runtime guard
+         * skip on non-HDMI ports where they're never reassigned. */
+        if (Option.HDMIclock != 2 || Option.HDMId0 != 0 ||
+            Option.HDMId1   != 6 || Option.HDMId2 != 4) {
+            PO("HDMI PINS ");
+            PInt(Option.HDMIclock); PIntComma(Option.HDMId0);
+            PIntComma(Option.HDMId1); PIntComma(Option.HDMId2); PRet();
         }
-#endif
     } else {
         int i = 0;
         PO2Int("CPUSPEED (KHz)", Option.CPU_Speed);
@@ -241,9 +216,10 @@ void port_print_display_options(void)
         hal_gui_controls_print_options();
         hal_i2c_keypad_print_options();
         port_web_print_options();
-#if !HAL_PORT_IS_VGA
-        /* TOUCH_XZERO/YZERO/XSCALE/YSCALE only exist in struct option_s
-         * on non-VGA builds (FileIO.h). */
+        /* TOUCH_CS / TOUCH_XZERO / TOUCH_YZERO / TOUCH_XSCALE /
+         * TOUCH_YSCALE are universal struct option_s fields
+         * (FileIO.h). The TOUCH_CS == 0 default makes the runtime
+         * guard skip on VGA ports where touch isn't configured. */
         if(Option.TOUCH_CS) {
             PO("TOUCH");
             if(Option.TOUCH_CAP==1)(MMPrintString("FT6336 "));
@@ -261,7 +237,6 @@ void port_print_display_options(void)
                 PIntComma(Option.TOUCH_XSCALE * 10000); PIntComma(Option.TOUCH_YSCALE * 10000); MMPrintString("\r\n");
             }
         }
-#endif
     }
     /* SDCARD print — VGA shares system SPI with SD when SD_CLK_PIN==0,
      * prints SYSTEM_CLK/MOSI/MISO in that case; non-VGA always uses

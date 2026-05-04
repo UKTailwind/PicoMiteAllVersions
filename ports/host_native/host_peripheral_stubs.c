@@ -618,3 +618,8 @@ int KeyboardlightSlice = -1;
  * also links. */
 void port_repl_wifi_arch_init_and_connect(void) {}
 
+/* OPTION LIST keyboard-section printers. Host has no keyboard
+ * hardware, so both hooks are no-ops. */
+void port_print_kb_layout(void) {}
+void port_print_kb_repeat(void) {}
+

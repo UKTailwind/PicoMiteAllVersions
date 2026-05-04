@@ -2268,6 +2268,31 @@ void cmd_mouse(void){
 }
 
 #include "hal/hal_option_setters.h"
+#include "hal/hal_print_options.h"
+
+extern const char *KBrdList[];
+extern void PO(char *s1);
+extern void PRet(void);
+
+void port_print_kb_layout(void) {
+    if (!(Option.USBKeyboard == NO_KEYBOARD)) {
+        PO("KEYBOARD"); MMPrintString((char *)KBrdList[(int)Option.USBKeyboard]);
+        if (Option.capslock || Option.numlock != 1 || Option.repeat != 0b00101100) {
+            PIntComma(Option.capslock); PIntComma(Option.numlock);
+            PIntComma(Option.RepeatStart); PIntComma(Option.RepeatRate);
+        }
+        PRet();
+    }
+}
+
+void port_print_kb_repeat(void) {
+    if (!(Option.RepeatStart == 600 && Option.RepeatRate == 150)) {
+        char buff[40] = {0};
+        sprintf(buff, "OPTION KEYBOARD REPEAT %d,%d\r\n",
+                Option.RepeatStart, Option.RepeatRate);
+        MMPrintString(buff);
+    }
+}
 
 int port_setter_keyboard_repeat(unsigned char *cmdline) {
     unsigned char *tp = checkstring(cmdline, (unsigned char *)"KEYBOARD REPEAT");

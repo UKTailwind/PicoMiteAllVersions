@@ -1086,6 +1086,41 @@ int port_usb_count(void) { return 0; }
 int port_usb_hid_field(int n, int field) { (void)n; (void)field; return 0; }
 
 #include "hal/hal_option_setters.h"
+#include "hal/hal_print_options.h"
+
+extern const char *KBrdList[];
+extern void PO(char *s1);
+extern void PO3Int(char *s1, int n1, int n2);
+extern void PRet(void);
+
+void port_print_kb_layout(void) {
+    if (Option.LOCAL_KEYBOARD)
+        PO3Int("KEYBOARD REPEAT", Option.RepeatStart, Option.RepeatRate);
+    if (!(Option.KeyboardConfig == NO_KEYBOARD || Option.KeyboardConfig == CONFIG_I2C)) {
+        PO("KEYBOARD"); MMPrintString((char *)KBrdList[(int)Option.KeyboardConfig]);
+        if (Option.capslock || Option.numlock != 1 || Option.repeat != 0b00101100) {
+            PIntComma(Option.capslock); PIntComma(Option.numlock);
+            PIntComma(Option.repeat >> 5); PIntComma(Option.repeat & 0x1f);
+        }
+        PRet();
+    }
+    if (!((Option.KEYBOARD_CLOCK == 11 && Option.KEYBOARD_DATA == 12) ||
+          (Option.KEYBOARD_CLOCK == 0 && Option.KEYBOARD_DATA == 0)) &&
+        Option.KeyboardConfig != NO_KEYBOARD) {
+        PO("KEYBOARD PINS"); MMPrintString((char *)PinDef[Option.KEYBOARD_CLOCK].pinname);
+        MMputchar(',', 0); MMPrintString((char *)PinDef[Option.KEYBOARD_DATA].pinname);
+        PRet();
+    }
+    if (Option.MOUSE_CLOCK) {
+        PO("MOUSE"); MMPrintString((char *)PinDef[Option.MOUSE_CLOCK].pinname);
+        MMputchar(',', 0); MMPrintString((char *)PinDef[Option.MOUSE_DATA].pinname);
+        PRet();
+    }
+}
+
+/* PS/2 builds emit REPEAT inside port_print_kb_layout (LOCAL_KEYBOARD-
+ * gated). Nothing to print at the late repeat-line site. */
+void port_print_kb_repeat(void) { }
 
 int port_setter_keyboard_repeat(unsigned char *cmdline) {
     unsigned char *tp = checkstring(cmdline, (unsigned char *)"KEYBOARD REPEAT");
