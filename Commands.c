@@ -1436,6 +1436,8 @@ void ListFilePaged(char *pp)
 		}
 
 		clearrepeat();
+		if (cur_page == 0 && !overflowed)
+			break; // entire file fitted on the first page - no prompt needed
 		if (cur_page > 0)
 			MMPrintString(overflowed ? "UP=prev  ANY KEY=next ..." : "UP=prev  ANY KEY=quit ...");
 		else
@@ -1549,6 +1551,10 @@ void ListProgramPaged(unsigned char *prog)
 	int page_threshold = Option.Height - overlap;
 	bool need_clear = false;
 
+	// Nothing to list - return immediately rather than prompting "PRESS ANY KEY"
+	if (prog == NULL || *prog == 0 || *prog == 0xff)
+		return;
+
 	page_starts[0] = prog;
 
 	for (;;)
@@ -1619,6 +1625,8 @@ void ListProgramPaged(unsigned char *prog)
 		}
 
 		clearrepeat();
+		if (cur_page == 0 && !overflowed)
+			break; // entire program fitted on the first page - no prompt needed
 		if (cur_page > 0)
 			MMPrintString(overflowed ? "UP=prev  ANY KEY=next ..." : "UP=prev  ANY KEY=quit ...");
 		else

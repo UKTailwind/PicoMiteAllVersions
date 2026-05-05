@@ -89,7 +89,7 @@ extern "C"
 #define MagicKey 0x356469F4
 #define HEAP_MEMORY_SIZE (100 * 1024)
 #else
-#define FLASH_TARGET_OFFSET (800 * 1024)
+#define FLASH_TARGET_OFFSET (816 * 1024)
 #define HEAP_MEMORY_SIZE (100 * 1024)
 #define MagicKey 0xD4201AF5
 #endif

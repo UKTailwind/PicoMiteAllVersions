@@ -6749,7 +6749,8 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
                 break;
 
 #ifndef PICOMITEMIN
-            // F12 - Beautify (re-indent block structures)
+            // F12 / Ctrl-A - Beautify (re-indent block structures)
+            case CTRLKEY('A'):
             case F12:
                 editBeautify(edit_buff_size);
                 TextChanged = true;
@@ -8203,11 +8204,11 @@ void PrintFunctKeys(int typ)
     if (typ == EDIT)
     {
         if (VWidth > 80)
-            p = "ESC:Exit F1:Save F2:Run F3/6:Find/r F4:Mrk F5:Paste F7/8:Rpl/r F9:In F10:Out F12:Beautify";
+            p = "ESC:Exit F1:Save F2:Run F3/6:Find/r F4:Mrk F5:Paste F7/8:Rpl/r F9:In F10:Out F12/^A:Beautify";
         else if (VWidth >= 70)
-            p = "F1:Save F2:Run F3:Find F4:Mark F5:Paste F7:Repl F7/8:Rpl/r F12:Btfy";
+            p = "F1:Save F2:Run F3:Find F4:Mark F5:Paste F7:Repl F7/8:Rpl/r F12/^A:Btfy";
         else if (VWidth >= 55)
-            p = "F1:Save F2:Run F3:Find F4:Mrk F5:Paste F9:In F10:Out F12:Btfy";
+            p = "F1:Save F2:Run F3:Find F4:Mrk F5:Paste F9:In F10:Out ^A:Btfy";
         else
             p = "EDIT MODE";
     }

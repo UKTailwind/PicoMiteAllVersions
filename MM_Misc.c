@@ -3182,11 +3182,11 @@ int MIPS16 checkslice(int pin1, int pin2, int ignore)
  *  columns. This is purely advisory: a real serial terminal will honour it,
  *  the embedded LCD console ignores it.
  *
- *  Note: the autowrap mode is intentionally left untouched here. Callers that
- *  need autowrap disabled (currently only the full-screen editor / FM) emit
- *  their own DECAWM (CSI ?7l / ?7h) sequences around their own session so
- *  that other callers (OPTION LCDPANEL CONSOLE, OPTION DISPLAY ...) do not
- *  silently change the user's terminal wrap mode.
+ *  Note: this function ensures the terminal is in autowrap mode (DECAWM
+ *  on, CSI ?7h) because the command-line editor (`EditInputLine`) relies
+ *  on natural autowrap when long lines are entered on a serial console.
+ *  Callers that need autowrap *disabled* (the full-screen editor / FM)
+ *  must emit their own CSI ?7l on entry and CSI ?7h on exit.
  *
  *  Call sites:
  *    - OPTION LCDPANEL NOCONSOLE  : reset terminal back to 80x24 default.
@@ -3204,7 +3204,8 @@ void MIPS16 setterminal(int height, int width)
     strcat(sp, ";");
     IntToStr(&sp[strlen(sp)], width, 10);
     strcat(sp, "t");
-    SSPrintString(sp); //
+    SSPrintString(sp);         //
+    SSPrintString("\033[?7h"); // ensure autowrap (DECAWM) is enabled - command-line editor needs it
 }
 #ifdef USBKEYBOARD
 void fun_keydown(void)
