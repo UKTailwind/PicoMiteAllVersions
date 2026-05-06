@@ -1621,6 +1621,17 @@ extern void ResetDisplay(void);
 extern void ClearScreen(int colour);
 
 void port_main_launch_core1(void) {
+    /* HDMI scanout drives the HSTX FIFO from a chained ping-pong DMA
+     * on channels DMACH_PING / DMACH_PONG (0 / 1). Claim them in the
+     * SDK's software-tracking bitmap before launching core1 so that
+     * later subsystems calling dma_claim_unused_channel() (notably the
+     * cyw43-driver bus PIO on the WiFi-enabled DVI variant) skip 0/1
+     * and pick a free channel above. Without this, both subsystems
+     * silently land on the same channel and cyw43's first SPI receive
+     * never completes — the symptom that surfaced as a dead-on-boot
+     * dvi_wifi_rp2350 firmware. */
+    dma_channel_claim(DMACH_PING);
+    dma_channel_claim(DMACH_PONG);
     multicore_launch_core1_with_stack(HDMICore, core1stack, 512);
     core1stack[0] = 0x12345678;
     uSec(1000);
