@@ -247,6 +247,7 @@ if(PICOCALC STREQUAL "true")
     target_sources(PicoMite PRIVATE
         drivers/i2c_picocalc_kbd/i2ckbd.c
         drivers/i2c_picocalc_kbd/i2c_keypad_real.c
+        drivers/i2c_picocalc_kbd/picocalc_keypad_matrix.c
         ports/pico_sdk_common/picocalc_features_real.c
         ports/pico_sdk_common/port_load_overrides_picocalc.c
     )

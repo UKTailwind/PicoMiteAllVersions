@@ -1,14 +1,12 @@
 /*
- * ports/pico_rp2350/picocalc_keypad.c — PicoCalc hardware keypad scanner.
+ * drivers/i2c_picocalc_kbd/picocalc_keypad_matrix.c — PicoCalc hardware
+ * keypad scanner. Compiled when PICOCALC=true (PICORP2350 / PICOUSBRP2350
+ * / WEBRP2350). The PicoCalc board wires its keypad into the rp2350 GPIO
+ * matrix on pins 31..40 / 26..30 and drives it through LocalKeyDown[];
+ * this TU supplies cmd_keyscan() which the periodic-scan path in
+ * drivers/i2c_picocalc_kbd/i2c_keypad_real.c invokes every 10 ms.
  *
- * Only compiled for COMPILE=PICORP2350 and COMPILE=PICOUSBRP2350
- * because the PicoCalc board (RP2350 PicoMite variant) is the only
- * target that wires its native keypad into the GPIO matrix on pins
- * 31..40 / 26..30 and drives it through LocalKeyDown[].
- *
- * Declaration is in AllCommands.h (`void cmd_keyscan(void)`); PicoMite.c
- * only calls it from a `#if defined(PICOMITE) && defined(rp2350)`
- * guard, so the symbol is never referenced on other targets.
+ * Declaration in AllCommands.h (`void cmd_keyscan(void)`).
  */
 
 #include "MMBasic_Includes.h"

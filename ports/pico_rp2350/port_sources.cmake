@@ -5,7 +5,6 @@ target_include_directories(PicoMite PRIVATE ${CMAKE_CURRENT_LIST_DIR})
 
 target_sources(PicoMite PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/pin_tables.c
-    ${CMAKE_CURRENT_LIST_DIR}/picocalc_keypad.c
     ${CMAKE_CURRENT_LIST_DIR}/port_defaults.c
 
     # PICOMITE feature backends.

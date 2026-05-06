@@ -10,8 +10,11 @@
 #     directory names. buildall passes them as -DPORT=<dir>.
 # New single-board ports should use the lowercase form.
 #
-# PICOCALC is only enabled for the default PICO target (the PicoCalc board).
-# All other targets build as standard PicoMite variants.
+# PICOCALC is enabled for every PICOMITE or PICOMITEWEB target that isn't a
+# USB-keyboard variant — matches the legacy formula
+#   #define PICOCALC ((defined(PICOMITE) || defined(PICOMITEWEB)) && !defined(USBKEYBOARD))
+# from configuration.h. Without this, the I²C keypad driver isn't linked
+# and OPTION RESET PICOCALC leaves the keyboard non-functional.
 set -euo pipefail
 
 TARGETS=(
@@ -41,11 +44,13 @@ for t in "${TARGETS[@]}"; do
     rm -rf "$d" && mkdir -p "$d"
     printf '=== %s ===\n' "$t"
 
-    # PICO target is the PicoCalc; all others are standard PicoMite.
+    # Enable PICOCALC for every non-USB-keyboard PICOMITE / PICOMITEWEB
+    # variant — matches the legacy formula. The I²C keypad driver gets
+    # compiled in; runtime OPTION RESET PICOCALC then activates it.
     picocalc_flag="false"
-    if [ "$t" = "PICO" ]; then
-        picocalc_flag="true"
-    fi
+    case "$t" in
+        PICO|WEB|PICORP2350|WEBRP2350) picocalc_flag="true" ;;
+    esac
 
     # Uppercase target → legacy -DCOMPILE; lowercase → direct -DPORT.
     if [[ "$t" =~ ^[A-Z0-9_]+$ ]]; then
