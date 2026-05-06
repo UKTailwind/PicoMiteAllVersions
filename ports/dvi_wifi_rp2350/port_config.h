@@ -64,8 +64,8 @@
 #define HAL_PORT_MAX_VARS                768
 #define HAL_PORT_MAX_SUBFUN              512
 #define HAL_PORT_MAX_MODES               5
-#define HAL_PORT_FLASH_TARGET_OFFSET     (1080 * 1024)
-#define HAL_PORT_FLASH_TARGET_OFFSET_USB (1080 * 1024)
+#define HAL_PORT_FLASH_TARGET_OFFSET     (1408 * 1024)
+#define HAL_PORT_FLASH_TARGET_OFFSET_USB (1408 * 1024)
 /* Unique magic key — pick anything not used by an existing port. */
 #define HAL_PORT_MAGIC_KEY               0xD51F77E2
 #define HAL_PORT_MAGIC_KEY_USB           0xD51F77E2

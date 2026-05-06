@@ -56,8 +56,8 @@
 #define HAL_PORT_MIN_CPU                 48000
 #define HAL_PORT_MAX_VARS                768
 #define HAL_PORT_MAX_SUBFUN              512
-#define HAL_PORT_FLASH_TARGET_OFFSET     (1024 * 1024)
-#define HAL_PORT_FLASH_TARGET_OFFSET_USB (1024 * 1024)
+#define HAL_PORT_FLASH_TARGET_OFFSET     (1152 * 1024)
+#define HAL_PORT_FLASH_TARGET_OFFSET_USB (1152 * 1024)
 #define HAL_PORT_MAGIC_KEY               0x192084D7
 #define HAL_PORT_MAGIC_KEY_USB           0xD37F4F27
 #define HAL_PORT_HEAP_TOP                0x20078000
