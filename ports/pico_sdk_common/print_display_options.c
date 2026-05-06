@@ -93,4 +93,11 @@ void port_print_display_options(void)
     }
     /* VGA PINS print — pure-VGA only (HDMI ports stub). */
     port_print_vga_pins();
+    /* OPTION WIFI / TCP SERVER PORT / UDP SERVER PORT / TELNET / TFTP
+     * lines — real impl in MMsetwifi.c on WiFi ports, stub no-op in
+     * MMweb_stubs.c on non-WiFi. Called here so VGA-family WiFi ports
+     * (vga_wifi_rp2350, dvi_wifi_rp2350) print the WIFI line; non-VGA
+     * WiFi ports (web, web_rp2350) used to call it inside
+     * port_print_display_panel_touch but that hook is a stub on VGA. */
+    port_web_print_options();
 }

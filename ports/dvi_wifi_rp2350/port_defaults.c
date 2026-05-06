@@ -25,7 +25,21 @@ void port_set_default_options(void)
     Option.X_TILE             = 80;
     Option.Y_TILE             = 40;
     Option.CPU_Speed          = Freq252P;     /* 252 MHz — HDMI 640x480 default */
-    Option.KeyboardConfig     = NO_KEYBOARD;
+    /* HSTX lane → physical-pin mapping. Without these the HSTX peripheral
+     * sends every lane to bit 0, producing no valid DVI signal. Same
+     * defaults as hdmi_rp2350 / pimoroni_pga2350 boards. */
+    Option.HDMIclock          = 2;
+    Option.HDMId0             = 0;
+    Option.HDMId1             = 6;
+    Option.HDMId2             = 4;
+    /* USB-host keyboard defaults (this port is HAL_PORT_KEYBOARD_USB_HOST=1). */
+    Option.USBKeyboard        = CONFIG_US;
+    Option.SerialConsole      = 2;
+    Option.SerialTX           = 11;
+    Option.SerialRX           = 12;
+    Option.capslock           = 0;
+    Option.numlock            = 1;
+    Option.ColourCode         = 1;
     Option.SSD_RESET          = -1;
     Option.ServerResponceTime = 5000;
 }

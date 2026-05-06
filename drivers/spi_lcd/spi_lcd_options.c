@@ -169,7 +169,9 @@ void port_print_display_panel_touch(void) {
     if(Option.BackLightLevel!=100)PO2Int("LCD BACKLIGHT", Option.BackLightLevel);
     hal_gui_controls_print_options();
     hal_i2c_keypad_print_options();
-    port_web_print_options();
+    /* port_web_print_options() now called from
+     * ports/pico_sdk_common/print_display_options.c (universal) so
+     * VGA-family WiFi ports also print the WIFI line. */
     if(Option.TOUCH_CS) {
         PO("TOUCH");
         if(Option.TOUCH_CAP==1)(MMPrintString("FT6336 "));

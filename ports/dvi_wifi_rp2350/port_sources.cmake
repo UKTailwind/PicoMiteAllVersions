@@ -89,16 +89,19 @@ target_compile_options(PicoMite PRIVATE                                         
                                         )
 # WiFi stack settings. Device name is what shows in the boot banner
 # and MM.DEVICE$.
+# CYW43 gSPI tops out around 50 MHz; default CYW43_PIO_CLOCK_DIV_INT=2
+# at our 252 MHz clk_sys produces ~63 MHz SPI which corrupts join
+# handshake transactions. Use /4 -> 31 MHz SPI, safely under spec.
 target_compile_options(PicoMite PRIVATE -DCYW43_HOST_NAME="DVIWiFi"
-                                        -DPICO_CYW43_ARCH_POLL
                                         -DHAL_PORT_DEVICE_NAME="DVIWiFiMite"
+                                        -DCYW43_PIO_CLOCK_DIV_INT=4
                                         )
 # rp2350 chip flags.
 target_compile_options(PicoMite PRIVATE -Drp2350
                                         -DPICO_FLASH_SPI_CLKDIV=4
                                         -DPICO_PIO_USE_GPIO_BASE
                                         )
-target_link_libraries(PicoMite pico_multicore pico_cyw43_arch_lwip_poll
+target_link_libraries(PicoMite pico_multicore pico_cyw43_arch_lwip_threadsafe_background
                                tinyusb_host tinyusb_board)
 pico_set_float_implementation(PicoMite pico_dcp)
 

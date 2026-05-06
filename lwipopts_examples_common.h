@@ -17,11 +17,15 @@
 #ifndef LWIP_SOCKET
 #define LWIP_SOCKET                 0
 #endif
+/* MEM_LIBC_MALLOC=1 is only valid in polled mode where lwIP is never
+ * called from IRQ context. Threadsafe_background mode runs lwIP from an
+ * alarm-driven IRQ — must use lwIP's internal mempool (MEM_LIBC_MALLOC=0
+ * + a configured MEM_SIZE). */
 #if PICO_CYW43_ARCH_POLL
 #define MEM_LIBC_MALLOC             1
 #else
-  MEM_LIBC_MALLOC is incompatible with non polling versions
 #define MEM_LIBC_MALLOC             0
+#define MEM_SIZE                    8000
 #endif
 //#define MEMP_NUM_RAW_PCB            8
 //#define LWIP_MAX_SOCKETS            8
