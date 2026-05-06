@@ -66,9 +66,12 @@ target_sources(PicoMite PRIVATE
 set_source_files_properties(${CMAKE_SOURCE_DIR}/cJSON.c PROPERTIES COMPILE_FLAGS -Os)
 
 # --- Per-port build config (Stage E2) -------------------------------------
+# CYW43_PIO_CLOCK_DIV_INT=3 (default 2 = 50 MHz gSPI at clk_sys 200 MHz,
+# right at chip spec). /3 → 33 MHz gSPI, comfortable margin.
 target_compile_options(PicoMite PRIVATE -DPICO_HEAP_SIZE=0x3000
                                         -DCYW43_HOST_NAME="WebMite"
                                         -DPICO_CYW43_ARCH_POLL
+                                        -DCYW43_PIO_CLOCK_DIV_INT=3
                                         -DPICO_CORE0_STACK_SIZE=0x4000
                                         -DHAL_PORT_DEVICE_NAME="WebMite"
                                         )

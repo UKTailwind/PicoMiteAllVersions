@@ -46,6 +46,16 @@ void port_main_launch_core1(void) {
     Y_TILE = Option.Y_TILE;
     ytileheight = (X_TILE == 80 || X_TILE == 106) ? 12 : 16;
     bus_ctrl_hw->priority = 0x100;
+    /* QVGA scanout uses chained DMA on QVGA_DMA_CB (0) + QVGA_DMA_PIO (1)
+     * to feed the PIO state machine. Claim them in the SDK's software-
+     * tracking bitmap before launching core1 so that later subsystems
+     * calling dma_claim_unused_channel() (notably the cyw43-driver bus
+     * PIO on the WiFi-enabled VGA variant) skip 0/1 and pick a free
+     * channel above. Without this, both subsystems silently land on the
+     * same channel and cyw43's first SPI receive corrupts scanout. Same
+     * fix as drivers/hdmi/hdmi_scanout.c::port_main_launch_core1. */
+    dma_channel_claim(QVGA_DMA_CB);
+    dma_channel_claim(QVGA_DMA_PIO);
     multicore_launch_core1_with_stack(QVgaCore, core1stack, 512);
     core1stack[0] = 0x12345678;
     memset((void *)WriteBuf, 0, 38400);

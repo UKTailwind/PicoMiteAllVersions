@@ -37,7 +37,7 @@ void port_set_default_options(void)
 #include "MMBasic.h"  /* for MMPrintString */
 void port_print_supported_boards(void)
 {
-    MMPrintString("Palm Pico");
+    MMPrintString("Palm Pico\r\n");
 #if !HAL_PORT_KEYBOARD_USB_HOST
     MMPrintString("Game*Mite\r\n");
 #  ifdef PICOCALC

@@ -25,7 +25,8 @@ void port_set_default_options(void)
 #include "MMBasic.h"  /* for MMPrintString */
 void port_print_supported_boards(void)
 {
-    MMPrintString("Palm Pico");
+    /* PALM PICO is PICOMITE-only; this port's factory_reset_board
+     * doesn't accept it — don't advertise it. */
     MMPrintString("Game*Mite\r\n");
 #  ifdef PICOCALC
     MMPrintString("PicoCalc\r\n");

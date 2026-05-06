@@ -82,9 +82,13 @@ pico_generate_pio_header(PicoMite ${CMAKE_SOURCE_DIR}/PicoMiteVGA.pio)
 target_compile_options(PicoMite PRIVATE                                         -DPICO_HEAP_SIZE=0x1000
                                         -DPICO_CORE0_STACK_SIZE=0x4000
                                         )
-# WiFi stack settings.
+# WiFi stack settings. CYW43_PIO_CLOCK_DIV_INT=4 keeps gSPI under the
+# chip's ~50 MHz spec at this port's 252 MHz clk_sys (default divider 2
+# would put gSPI at 63 MHz and stall the join handshake at
+# WIFI_JOIN_STATE_ACTIVE — same trap dvi_wifi_rp2350 hit).
 target_compile_options(PicoMite PRIVATE -DCYW43_HOST_NAME="VGAMite"
                                         -DPICO_CYW43_ARCH_POLL
+                                        -DCYW43_PIO_CLOCK_DIV_INT=4
                                         -DHAL_PORT_DEVICE_NAME="VGAMiteWiFi"
                                         )
 # rp2350 chip flags.
