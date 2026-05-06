@@ -32,6 +32,7 @@ target_sources(PicoMite PRIVATE
     ${CMAKE_SOURCE_DIR}/drivers/spi_lcd/spi_lcd_framebuffer.c
     ${CMAKE_SOURCE_DIR}/drivers/spi_lcd/spi_lcd_mem332_stub.c
     ${CMAKE_SOURCE_DIR}/drivers/spi_lcd/spi_lcd_periph_io.c
+    ${CMAKE_SOURCE_DIR}/drivers/spi_lcd/spi_lcd_options.c
     ${CMAKE_SOURCE_DIR}/drivers/editor_console/editor_console_stub.c
     ${CMAKE_SOURCE_DIR}/drivers/main_init/main_init_stub.c
     ${CMAKE_SOURCE_DIR}/drivers/audio_i2s_pio/audio_i2s_pio_load.c
