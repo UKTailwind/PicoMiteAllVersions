@@ -71,13 +71,14 @@ target_sources(PicoMite PRIVATE
     # gfx_3d.c provides it.
     ${CMAKE_SOURCE_DIR}/drivers/gfx_3d/gfx_3d.c
 
-    # USB-host keyboard. The board's USB-A port is owned by TinyUSB
-    # host stack, which means USB-CDC stdio is unavailable — connect
-    # to the BASIC REPL via UART (Option.SerialConsole on GP0/GP1
-    # per the pico_stretch board file) or use the HDMI display +
-    # local USB keyboard with no remote terminal.
-    ${CMAKE_SOURCE_DIR}/drivers/usb_host_kbd/USBKeyboard.c
-        ${CMAKE_SOURCE_DIR}/drivers/usb_host_kbd/hal_keyboard_usb.c
+    # No physical keyboard — USB controller runs in CDC device mode so
+    # the host can drive the REPL via `screen /dev/cu.usbmodem*` and
+    # see every printf trace come back the same way. console_cdc.c is
+    # the shared CDC plumbing (also linked by every PS/2 port);
+    # hal_keyboard_cdc_only.c stubs the keyboard / mouse / gamepad
+    # surface and delegates the CDC HAL hooks to console_cdc.c.
+    ${CMAKE_SOURCE_DIR}/drivers/console_cdc/console_cdc.c
+    ${CMAKE_SOURCE_DIR}/drivers/console_cdc/hal_keyboard_cdc_only.c
 )
 
 set_source_files_properties(${CMAKE_SOURCE_DIR}/cJSON.c PROPERTIES COMPILE_FLAGS -Os)
@@ -89,26 +90,39 @@ target_compile_options(PicoMite PRIVATE                                         
                                         )
 # WiFi stack settings. Device name is what shows in the boot banner
 # and MM.DEVICE$.
-# CYW43 gSPI tops out around 50 MHz; default CYW43_PIO_CLOCK_DIV_INT=2
-# at our 252 MHz clk_sys produces ~63 MHz SPI which corrupts join
-# handshake transactions. Use /4 -> 31 MHz SPI, safely under spec.
+# CYW43 gSPI tops out around 50 MHz. The pico-sdk default of
+# CYW43_PIO_CLOCK_DIV_INT=2 is calibrated for clk_sys ≈ 150 MHz; it
+# overdrives the gSPI on rp2350 at any clock above that and the WiFi
+# link lands at CYW43_LINK_JOIN (1) instead of CYW43_LINK_UP (3) —
+# packets flow during association, then drop once the link is steady.
+# Pick a divider so clk_sys/div stays under 45 MHz across the whole
+# OPTION CPUSPEED range this port allows. With CPU range 250-378 MHz
+# (HAL_PORT_MIN_CPU/MAX_CPU below) the worst case is 378/9 = 42 MHz.
 target_compile_options(PicoMite PRIVATE -DCYW43_HOST_NAME="DVIWiFi"
                                         -DHAL_PORT_DEVICE_NAME="DVIWiFiMite"
-                                        -DCYW43_PIO_CLOCK_DIV_INT=4
+                                        -DCYW43_PIO_CLOCK_DIV_INT=8
+                                        -DCYW43_SPI_PROGRAM_NAME=spi_gap0_sample1
                                         )
 # rp2350 chip flags.
 target_compile_options(PicoMite PRIVATE -Drp2350
                                         -DPICO_FLASH_SPI_CLKDIV=4
                                         -DPICO_PIO_USE_GPIO_BASE
                                         )
-target_link_libraries(PicoMite pico_multicore pico_cyw43_arch_lwip_threadsafe_background
-                               tinyusb_host tinyusb_board)
+# Diagnostic build: stdio over USB-CDC. printf (and CYW43_PRINTF, since
+# CYW43_DEBUG is overridden to printf below) lands on the host as
+# /dev/cu.usbmodem* — `screen /dev/cu.usbmodem* 115200` for live trace
+# + REPL. No openocd / RTT plumbing required.
+target_link_libraries(PicoMite pico_multicore pico_cyw43_arch_lwip_poll)
+target_compile_options(PicoMite PRIVATE
+    -DCYW43_DEBUG=printf
+    -Wno-error=format
+    -Wno-format
+    -Wno-error=builtin-declaration-mismatch
+    -Wno-error=implicit-function-declaration
+    )
 pico_set_float_implementation(PicoMite pico_dcp)
 
-# USB-host keyboard config. HAL_PORT_KEYBOARD_USB_HOST=1 (set in
-# port_config.h) selects the USB-host backend in port-impl files;
-# usb_host_files dir holds the TinyUSB device-config headers
-# (tusb_config.h, etc.); stdio_usb=0 because the USB-A port is in
-# host mode for the keyboard.
-target_include_directories(PicoMite PRIVATE ${CMAKE_SOURCE_DIR}/usb_host_files)
-Pico_enable_stdio_usb(PicoMite 0)
+# Native USB peripheral in CDC device mode. HAL_PORT_KEYBOARD_USB_HOST=0
+# (port_config.h) selects the CDC-only HAL keyboard backend; the Pico
+# SDK's pico_stdio_usb pulls in TinyUSB device automatically.
+Pico_enable_stdio_usb(PicoMite 1)

@@ -23,9 +23,16 @@
 #define HAL_PORT_GPIO_COUNT              48
 #define HAL_PORT_PIO_COUNT               3
 #define HAL_PORT_PULLDOWN_NEEDS_RESET    1
-/* HDMI + WiFi: HSTX scanout, audio I²S on PIO 2. */
+/* HDMI + WiFi: HSTX scanout (no PIO), audio I²S on PIO 2 matching the
+ * legacy HDMI port's choice. The CYW43 bus PIO uses
+ * pio_claim_free_sm_and_add_program_for_gpio_range so it picks
+ * whichever PIO instance has a free SM — typically PIO 0 once I²S
+ * has claimed PIO 2. KNOWN ISSUE: combining HDMI HSTX + WiFi + I²S
+ * audio with high-numbered pins (>GP31) can hard-fault during boot;
+ * not yet root-caused. Use lower-numbered I²S pins or skip I²S on
+ * this port until the conflict is understood. */
 #define HAL_PORT_AUDIO_I2S_PIO_NUM       2
-#define HAL_PORT_DEFAULT_CPU_SPEED_KHZ   315000
+#define HAL_PORT_DEFAULT_CPU_SPEED_KHZ   378000
 
 /* MMInkey pinned to RAM — rp2350 has plenty of SRAM. */
 #define HAL_PORT_MMINKEY_DECL(name)      __not_in_flash_func(name)
@@ -36,11 +43,17 @@
  * GUICONTROLS off — no touch panel on a DVI display. */
 #define HAL_PORT_HAS_WIFI                1
 #define HAL_PORT_HAS_GUICONTROLS         0
-/* Keyboard backend selector: 0 = PS/2 matrix (drivers/ps2_matrix/),
- *                              1 = USB-host (drivers/usb_host_kbd/).
+/* Keyboard backend selector: 0 = no physical keyboard / CDC-only console
+ * (drivers/console_cdc/), 1 = USB-host (drivers/usb_host_kbd/).
  * Wires up via port_sources.cmake linkage; configuration.h reads it for
- * USB-vs-PS/2 flash offset / magic key / heap top selection. */
-#define HAL_PORT_KEYBOARD_USB_HOST        1
+ * USB-vs-non-USB flash offset / magic key / heap top selection.
+ *
+ * This port runs the RP2350 native USB peripheral in CDC device mode so
+ * the BASIC REPL + printf traces are reachable over `screen
+ * /dev/cu.usbmodem*` — diagnostic build for the HDMI/WiFi/I²S triple
+ * combo. The USB controller is mode-exclusive (TinyUSB host vs
+ * pico_stdio_usb device), so this build has no physical USB keyboard. */
+#define HAL_PORT_KEYBOARD_USB_HOST        0
 #define HAL_PORT_HAS_I2C_KEYPAD          0
 
 /* core1stack[] size in words. HDMI runs the DVI scanout loop on core1
@@ -67,8 +80,8 @@
 #define HAL_PORT_FLASH_TARGET_OFFSET     (1408 * 1024)
 #define HAL_PORT_FLASH_TARGET_OFFSET_USB (1408 * 1024)
 /* Unique magic key — pick anything not used by an existing port. */
-#define HAL_PORT_MAGIC_KEY               0xD51F77E2
-#define HAL_PORT_MAGIC_KEY_USB           0xD51F77E2
+#define HAL_PORT_MAGIC_KEY               0xD51F77E3
+#define HAL_PORT_MAGIC_KEY_USB           0xD51F77E3
 #define HAL_PORT_HEAP_TOP                0x2007D000
 #define HAL_PORT_HEAP_TOP_USB            0x2007D000
 #define HAL_PORT_CONSOLE_RX_BUF_SIZE     256

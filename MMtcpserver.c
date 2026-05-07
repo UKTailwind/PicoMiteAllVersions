@@ -52,6 +52,7 @@ static TCP_SERVER_T* tcp_server_init(void) {
 err_t tcp_server_close(void *arg, int pcb) {
     if(pcb==99)return ERR_OK;
     TCP_SERVER_T *state = (TCP_SERVER_T*)arg;
+    printf("[TCP] close pcb=%d alive=%d ra=%p\n", pcb, state->client_pcb[pcb] != 0, __builtin_return_address(0));
     err_t err = ERR_OK;
     if (state->client_pcb[pcb] != 0) {
         tcp_arg(state->client_pcb[pcb], NULL);
@@ -136,6 +137,9 @@ err_t tcp_server_send_data(void *arg, struct tcp_pcb *tpcb, int pcb)
 err_t tcp_server_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err, int pcb) {
 //        static int count=0;
         TCP_SERVER_T *state = (TCP_SERVER_T*)arg;
+        printf("[TCP] recv pcb=%d totlen=%u err=%d clp=%p\n",
+               pcb, p ? p->tot_len : 0, (int)err,
+               (void *)CurrentLinePtr);
         if (!p) {
                 return ERR_OK;
         }
@@ -166,6 +170,8 @@ err_t tcp_server_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err
                         state->inttrig[pcb]=1;
                         //DEBUG_printf("Tcp_HTTP_recv on pcb %d / %d\r\n",pcb, p->tot_len);
                         state->recv_len[pcb] = pbuf_copy_partial(p, state->buffer_recv[pcb] , p->tot_len, 0);
+                        printf("[TCP] recv: copied %d of %d to buffer_recv[%d]@%p\n",
+                               state->recv_len[pcb], p->tot_len, pcb, (void *)state->buffer_recv[pcb]);
                         if(state->recv_len[pcb]!=p->tot_len) MMPrintString("Warning: WebMite Internal error");
                         for(int i=0;i<p->tot_len;i++)if(state->buffer_recv[pcb][i]==0)state->buffer_recv[pcb][i]=32;
                         tcp_recved(tpcb, p->tot_len);
@@ -234,6 +240,8 @@ static void tcp_server_err7(void *arg, err_t err) {
 }
 
 static err_t tcp_server_accept(void *arg, struct tcp_pcb *client_pcb, err_t err) {
+    printf("[TCP] accept fired err=%d port=%u\n",
+           (int)err, client_pcb ? (unsigned)client_pcb->local_port : 0);
     TCP_SERVER_T *state = (TCP_SERVER_T*)arg;
     int pcb=0;
     if (err != ERR_OK || client_pcb == NULL) {
@@ -346,6 +354,8 @@ static bool tcp_server_open(void *arg) {
         }
         tcp_arg(state->server_pcb, state);
         tcp_accept(state->server_pcb, tcp_server_accept);
+        printf("[TCP] listener bound port=%d backlog=%d pcb=%p\n",
+               TCP_PORT, MaxPcb, state->server_pcb);
     }
     if(Option.Telnet){    
         err = tcp_bind(telnet_pcb, NULL, 23);
@@ -690,13 +700,21 @@ int cmd_tcpserver(void){
                         dest[0]=0;
                         q=(uint8_t *)&dest[1];
                 } else error("Argument 2 must be integer array");
+                printf("[WEB] TCP READ pcb=%d inttrig=%d recv_len=%d\n",
+                       pcb, state->inttrig[pcb], state->recv_len[pcb]);
                 if(!state->inttrig[pcb]){
                         memset(ptr1,0,size);
                         return 1;
                 }
                 if(size-8<state->recv_len[pcb])error("array too small");
                 memcpy(q,state->buffer_recv[pcb],state->recv_len[pcb]);
-                dest[0]=  state->recv_len[pcb];             
+                printf("[WEB] data first 32: ");
+                for (int k=0; k<state->recv_len[pcb] && k<32; k++) {
+                    unsigned char c = state->buffer_recv[pcb][k];
+                    putchar(c >= 32 && c < 127 ? c : '.');
+                }
+                printf("\n");
+                dest[0]=  state->recv_len[pcb];
                 state->inttrig[pcb]=0;
                 return 1;
         }

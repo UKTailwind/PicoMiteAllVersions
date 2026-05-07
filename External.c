@@ -3588,7 +3588,16 @@ void MIPS16 ClearExternalIO(void) {
 	 * RP2040 (rp2350a==true, hits min(44,NBRPINS)) and RP2350A. */
 	int sweep_max = rp2350a ? 44 : NBRPINS;
 	if (sweep_max > NBRPINS) sweep_max = NBRPINS;
+	extern int port_pin_is_reserved_alias(int pin);
 	for(i = 1; i < sweep_max ; i++) {
+		/* Skip reserved virtual aliases — on CYW43 ports these wrap
+		 * the CYW43 SPI/RST pins (GP23/24/25/29 → indices 41-44 on
+		 * pico_w family). Calling ExtCfg(EXT_NOT_CONFIG) deinit's
+		 * the underlying GPIO, which detaches it from the CYW43
+		 * driver's PIO program — silently killing WiFi RX until
+		 * reboot. The hook returns 0 on ports without virtual
+		 * aliases. */
+		if (port_pin_is_reserved_alias(i)) continue;
 		if(CheckPin(i, CP_NOABORT | CP_IGNORE_INUSE | CP_IGNORE_RESERVED)) {
           ExtCfg(i, EXT_NOT_CONFIG, 0);
 		}

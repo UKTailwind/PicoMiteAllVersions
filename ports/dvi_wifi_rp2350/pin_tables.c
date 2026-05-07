@@ -15,13 +15,20 @@
 extern bool rp2350a;
 
 /* rp2350 HDMI + WiFi — HSTX claims GP12-GP19 for DVI; CYW43 (RM2)
- * claims GP23/24/25/29. So both the HDMI block AND the GP23-29
- * pseudo-pin block are excluded; the rp2350-extras block (GP30+) is
- * also excluded because the RM2's QSPI overlay overlaps. */
+ * claims GP23/24/25/29 for its dedicated SPI bus on the RM2 module.
+ * The HDMI block omits GP12-GP19 user pins.  GP23-29 entries are kept
+ * as PinDef rows so PINMAP[] stays a dense 1:1 by-position lookup —
+ * the user can't usefully configure those pins (CYW43 owns them at
+ * runtime) but PinDef[] must contain entries 41-44 or every GP30+
+ * lookup via PINMAP lands on the wrong row (GP33 → GP37, etc.).
+ * The rp2350-extras block (GP30-47) is included — the RM2 module
+ * does NOT use the QSPI pins, so GP30-47 are user-accessible. */
 const struct s_PinDef PinDef[] = {
     PINDEF_BLOCK_HEADER_AND_GP0_15,
     PINDEF_BLOCK_PINS_16_25_HDMI,
     PINDEF_BLOCK_PINS_26_40,
+    PINDEF_BLOCK_PSEUDO_GP23_29,
+    PINDEF_BLOCK_PSEUDO_RP2350_EXTRAS,
 };
 
 const uint8_t PINMAP[48] = {

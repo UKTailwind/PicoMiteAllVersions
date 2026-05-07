@@ -19,9 +19,7 @@
 #include "hal/hal_keyboard.h"
 #include "hal/hal_pin.h"
 #include "PS2Keyboard.h"
-#include "tusb.h"
-#include "class/cdc/cdc_device.h"
-#include "pico/stdlib.h"
+#include "console_cdc.h"
 
 extern void mouse0close(void);
 extern void initMouse0(int dummy);
@@ -66,18 +64,7 @@ int hal_keyboard_external_mouse_active(void) {
 }
 
 void hal_console_usb_cdc_boot_init(void) {
-    stdio_set_translate_crlf(&stdio_usb, false);
-    /* Wait up to 5 s for the host to grab the USB-CDC console so
-     * boot-time serial output isn't dropped. Skipped if the user
-     * has explicitly chosen UART-1/2 as the active console without
-     * a Telnet client. */
-    if (!(Option.SerialConsole == 1 || Option.SerialConsole == 2) || Option.Telnet == -1) {
-        uint64_t t = time_us_64();
-        while (1) {
-            if (tud_cdc_connected()) break;
-            if (time_us_64() - t > 5000000) break;
-        }
-    }
+    console_cdc_boot_setup();
     /* Keyboard hardware needs to be live before display init so the
      * PS/2 / I²C-keypad IRQ handlers see a consistent state. The USB
      * host backend defers keyboard init to after display init (its
@@ -144,8 +131,6 @@ void hal_keyboard_on_gpio_edge(uint32_t gpio) {
     if (MOUSE_CLOCK && gpio == PinDef[MOUSE_CLOCK].GPno) MNInterrupt(data);
 }
 
-#include "tusb.h"
-
 /* MouseTimer (unsigned) declared extern in Hardware_Includes.h;
  * nunstruct[] declared in I2C.h (already pulled in by includes
  * above via MMBasic_Includes.h). */
@@ -155,38 +140,11 @@ void hal_keyboard_timer_tick(void) {
 }
 
 void hal_console_usb_cdc_putc(char c, int flush) {
-    /* PS/2 ports run USB-A in device-CDC mode; output goes there
-     * when no other serial console is configured. */
-    if (Option.SerialConsole == 0 || Option.SerialConsole > 4) {
-        if (tud_cdc_connected()) {
-            putc(c, stdout);
-            if (flush) {
-                fflush(stdout);
-            }
-        }
-    }
+    console_cdc_putc(c, flush);
 }
 
 void hal_keyboard_routinechecks_pump(void) {
-    /* Drain USB-CDC stdio (the host-side USB-device serial) when the
-     * board uses USB-CDC for stdin and Telnet isn't active. */
-    int c;
-    if (tud_cdc_connected() && (Option.SerialConsole == 0 || Option.SerialConsole > 4) && Option.Telnet != -1) {
-        while ((c = tud_cdc_read_char()) != -1) {
-            ConsoleRxBuf[ConsoleRxBufHead] = c;
-            if (BreakKey && ConsoleRxBuf[ConsoleRxBufHead] == BreakKey) {
-                MMAbort = true;
-                ConsoleRxBufHead = ConsoleRxBufTail;
-            } else if (ConsoleRxBuf[ConsoleRxBufHead] == keyselect && KeyInterrupt != NULL) {
-                Keycomplete = true;
-            } else {
-                ConsoleRxBufHead = (ConsoleRxBufHead + 1) % CONSOLE_RX_BUF_SIZE;
-                if (ConsoleRxBufHead == ConsoleRxBufTail) {
-                    ConsoleRxBufTail = (ConsoleRxBufTail + 1) % CONSOLE_RX_BUF_SIZE;
-                }
-            }
-        }
-    }
+    console_cdc_drain_to_rxbuf();
     /* I²C keyboard polling — alternates between the two read phases
      * once per KEYCHECKTIME to avoid blocking on the I²C bus. */
     static int read = 0;

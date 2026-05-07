@@ -48,6 +48,18 @@ Start from `ports/pico/port_config.h` (the simplest). Key knobs, grouped:
 
 If a macro doesn't apply to your board, define it to `0` (or the null form). The point is that every port defines every macro — core code reads unconditionally.
 
+### `HAL_PORT_FLASH_TARGET_OFFSET` — must beat `binary_end`
+
+This is the most common bring-up trap on rp2350. `HAL_PORT_FLASH_TARGET_OFFSET` is where MMBasic writes saved Options on first boot. It **must** be larger than the firmware's actual `binary_end`, plus a guard band (≥30 KB recommended) to absorb future toolchain / SDK growth. If the saved-options sector overlaps the firmware image, the first `SaveOptions()` call stomps the bootrom's `IMAGE_DEF` Block 2 marker — the device then drops to BOOTSEL on every reboot, looking like a bad flash. `picotool info <flashed device>` reports `Block loop is not valid`. After verifying the offset, re-flash and the next first-boot succeeds. See `FLASH_LAYOUT_NOTE.md` for the full mechanics.
+
+How to check before first flash:
+
+```bash
+picotool info build_<TARGET>/PicoMite.uf2 | grep "binary end"
+# Compare the "binary end" hex against your HAL_PORT_FLASH_TARGET_OFFSET.
+# binary_end - 0x10000000 must be < HAL_PORT_FLASH_TARGET_OFFSET by ≥ 30 KB.
+```
+
 ## Step A2 — pin_tables.c
 
 **Background: `PinDef[]` and the two numbering systems.** MMBasic has two ways of naming a pin in user code: the physical *package pin number* (1, 2, 4, 5, … — what's silkscreened on the header), and the *GPIO number* (`GP0`, `GP1`, `GP2`, … — what the chip datasheet calls the line). BASIC syntax accepts either. Internally, everything goes through `PinDef[]` — an array indexed by package-pin number. Each entry carries `{pin, GPno, pinname, mode, ADCpin, slice}`: the chip's GPIO number, the printable label, a bitmask of supported modes (`DIGITAL_IN`, `PWM4A`, `I2C0SDA`, `SPI1SCK`, …), the ADC channel number if any, and the PWM slice number. `PinDef[]` lives in `PicoMite.c`. As a new-port author you're not redefining `PinDef[]`, you're supplying two smaller lookup tables that reference it.
@@ -88,6 +100,43 @@ Read line by line: GPIO 0 is on package pin 1, GPIO 1 is on package pin 2, GPIO 
 **Why `codemap()` matters:** it's the single point of translation between GPIO-numbered BASIC syntax (`SETPIN GP0, DOUT`) and `PinDef[]`. If your `PINMAP` is wrong, every GPIO-numbered BASIC statement on that pin silently targets the wrong `PinDef[]` slot — the mode-mask check will refuse legal operations, the PWM slice will come back wrong, `PIN READ` will read a different line. There's no secondary cross-check; verify PINMAP against `PinDef[]` by hand before first boot.
 
 **Pitfall to watch:** if you change `PinDef[]` to add a new pin entry for your board, the package-pin indices after the insertion point shift and every `PINMAP[]` entry that pointed past the insertion needs updating. Safer to append new `PinDef[]` entries at the end rather than inserting into the middle.
+
+### Pitfall — `PinDef[]` is indexed *by array position*, not by the row's `pin` field
+
+`PINMAP[gpio]` returns a value that gets passed straight to `PinDef[<value>]` — i.e. used as the C array index. The `pin` integer that's the first field of each `PinDef` row is just *data* inside the struct; it doesn't drive the C lookup. They line up only if your `PinDef[]` is contiguous (row 0 is `PinDef[0]`, row 1 is `PinDef[1]`, …) and every numeric `pin` value in those rows matches its array position.
+
+This bites if you build `PinDef[]` from `PINDEF_BLOCK_*` macros and **omit a block in the middle**. For example:
+
+```c
+const struct s_PinDef PinDef[] = {
+    PINDEF_BLOCK_HEADER_AND_GP0_15,        // rows with pin=0..15
+    PINDEF_BLOCK_PINS_16_25_HDMI,          // rows with pin=16..25
+    PINDEF_BLOCK_PINS_26_40,                // rows with pin=26..40
+    /* PINDEF_BLOCK_PSEUDO_GP23_29 omitted because CYW43 owns these */
+    PINDEF_BLOCK_PSEUDO_RP2350_EXTRAS,     // rows with pin=45..62
+};
+```
+
+The C array is now positions `0..40` followed by `41..58` — but the **rows at positions 41..58 carry `pin=45..62` in their `pin` field**, not `pin=41..58`. If `PINMAP` is the standard `pico_sdk_common` table that assumes the GP23-29 block is present, `PINMAP[33] = 48`. Then `PinDef[48]` returns the row whose `pin` field is `52` (i.e. GP37), not GP33. Every `OPTION ... GP33` silently drives GP37, every `SETPIN GP30..GP47` is off by four pins, and the only symptom is "wrong GPIO toggles" — no error, no fault.
+
+Two ways to handle blocks you don't want exposed:
+
+1. **Keep the block as placeholders** so `PinDef[]` array positions stay in 1:1 sync with the `pin` field. Marking the rows `UNUSED` is fine — they just need to exist so positions 41-44 (etc.) are filled. This is what hdmi_rp2350 does.
+2. **Renumber `PINMAP[]` to match the gap.** Tedious, easy to get wrong, and breaks if you later add another port that shares the same `PINMAP` template. Prefer option 1.
+
+`PINDEF_BLOCK_PSEUDO_GP23_29` exists for exactly this reason on WiFi ports — the radio owns those GPIOs at runtime, but the rows must stay in `PinDef[]` to keep the `PINMAP` indexing dense.
+
+**How to detect this in advance:** add a build-time assertion that walks `PinDef[]` and checks `PinDef[i].pin == i` for every `i`. If your port can't satisfy that, your `PINMAP[]` is fragile.
+
+### Pitfall — `Option.AUDIO_SLICE` / saved-Option fields cache `PinDef[]` lookups
+
+`OPTION AUDIO I2S GPxx, GPxx` runs `checkslice()` on the user's pins, stores the result into `Option.AUDIO_SLICE`, and `SaveOptions()` writes it to the options sector in flash. If `PinDef[]` is wrong at the moment the user issues that command, **a garbage slice number gets persisted** — and surfaces on every subsequent boot as silent audio (best case: slice 0, which collides with whatever else uses slice 0) or hard fault (worst case). Reflashing the firmware doesn't fix it because the bad value lives in the options sector, not in the binary.
+
+The same applies to any other `Option.*` field computed from a `PinDef[]` lookup at OPTION-set time. After fixing a `PinDef[]` / `PINMAP` bug, instruct users (or your own test scripts) to **re-issue the relevant `OPTION ...` command** so the saved blob is regenerated against the correct table.
+
+### Pitfall — RP2350 XIP cache survives `sysresetreq`
+
+When debugging a freshly-reflashed RP2350 image and seeing inexplicable `UNDEFINSTR` HardFaults at addresses that decode to valid instructions in the new ELF, suspect the XIP cache. The cache holds bytes from the *previous* firmware and `sysresetreq` (the SoftReset path) does not invalidate it; only a power-cycle or an explicit `xip_cache_invalidate_all()` does. Compare the cached read at `0x10xxxxxx` against the uncached alias at `0x14xxxxxx` (XIP_NOCACHE_NOALLOC) — if they disagree, the cache is stale. Via OpenOCD: write byte 0 to each address in `0x18FFC000..0x18FFFFF8` step 8 to issue invalidate-by-set-way for the whole 16 KB cache, then `reset run`. This is a debug-environment artifact only — once a real power cycle happens, normal operation is fine.
 
 ## Step A3 — port_defaults.c
 
@@ -157,6 +206,52 @@ pins on pico_w / pico2_w / pimoroni_pico_plus2_w) to virtual pins
 For a concrete walkthrough of writing each of these for a custom
 single-board port, see the worked example below.
 
+### `port_set_default_options` — populate every Option your hardware uses
+
+The shared `ResetOptions()` baseline only covers options every port
+needs (`Tab`, `Baudrate`, `heartbeatpin`, `Magic`, …). Anything specific
+to your hardware must be set in `port_set_default_options()` — the
+universal Option struct exposes every field on every build, but a
+field zeroed at boot means the corresponding hardware path doesn't
+work even if the driver code is linked.
+
+The fields that bit hardest during dvi_wifi bring-up:
+
+- **HDMI lane mapping** (`Option.HDMIclock / HDMId0 / HDMId1 / HDMId2`).
+  The HSTX peripheral maps logical lanes to physical pins via these
+  fields. Default zero means every lane drives GPIO 0 — no DVI signal
+  at the actual HDMI pins. Standard pico_w-style breakouts use
+  `HDMIclock=2, HDMId0=0, HDMId1=6, HDMId2=4`. Copy from
+  `ports/hdmi_rp2350/port_defaults.c`.
+
+- **USB-host keyboard config** (`Option.USBKeyboard`, `SerialConsole`,
+  `SerialTX/RX`, `capslock`, `numlock`, `ColourCode`). Required when
+  `HAL_PORT_KEYBOARD_USB_HOST=1`. Without them the keyboard layout is
+  unset and key events are garbled.
+
+- **Heartbeat pin policy.** On boards where the user LED is owned by
+  CYW43 (any rp2350 + RM2 / pico2_w) there's no user-pickable pin —
+  set `Option.NoHeartbeat = 1` in your defaults.
+
+Cross-check against the gold reference for your port shape:
+`ports/hdmi_rp2350/port_defaults.c` for HDMI ports,
+`ports/pico_rp2350/port_defaults.c` for SPI-LCD + USB-host,
+`ports/web_rp2350/port_defaults.c` for WEB. If your defaults block is
+shorter than those, you're probably missing fields.
+
+### The runtime/compile-time dual gate
+
+Because the Option struct is universal, `OPTION X = Y` always parses
+on every port. But the *driver* behind that option may not be linked
+on your build — in which case the runtime accepts the input and
+silently does nothing. This affects PSRAM, WiFi, HDMI, USB-host
+keyboard, I²S audio, MP3 decoding, GUI controls, and 3D graphics.
+
+When picking driver linkage in `port_sources.cmake` (next step), make
+sure every Option field your factory profile sets has the driver
+behind it linked into your build. If you're a single-board port and
+won't expose those options anyway, you don't need the driver linked.
+
 **Per-port `#ifdef` is fine in this file.** The HAL purity gate only
 enforces `core/*.c` and `hal/*.h`. Port-implementation files like
 `port_defaults.c` may use `#ifdef USBKEYBOARD`, `#ifdef PICOMITEVGA`,
@@ -205,9 +300,27 @@ WiFi-family board) and adjust two sections:
      - `target_link_libraries(PicoMite pico_multicore)` (most ports
        except WEBRP2350)
      - `target_link_libraries(PicoMite pico_cyw43_arch_lwip_poll)`
-       (WiFi ports)
+       (WiFi ports). **Tune `CYW43_PIO_CLOCK_DIV_INT` to your `clk_sys`** —
+       the SDK default of 2 is calibrated for the stock 150 MHz pico_w
+       (gSPI ~37 MHz). Higher `clk_sys` overruns the CYW43's ~50 MHz gSPI
+       spec and the join handshake stalls at `WIFI_JOIN_STATE_ACTIVE`.
+       Rule of thumb: `divider = ceil(clk_sys_mhz / 75)`. e.g. 200 MHz
+       → 3, 252/315 MHz → 4. Add `-DCYW43_PIO_CLOCK_DIV_INT=N` to your
+       compile options.
      - `pico_set_float_implementation(PicoMite pico_dcp)` (rp2350)
      - `pico_define_boot_stage2(slower_boot2 …)` (rp2040)
+
+### Scanout DMA channels must be claimed before launching core1
+
+If your port runs HDMI HSTX or VGA-PIO scanout on core1 *and* links
+the WiFi stack on core0, the cyw43-driver's bus PIO calls
+`dma_claim_unused_channel()` and will silently pick whichever scanout
+channel hasn't been claimed via the SDK's software-tracking bitmap —
+stomping pixel pump traffic. The HDMI and VGA-PIO scanout drivers'
+`port_main_launch_core1` already call `dma_channel_claim()` for their
+ping-pong channels (`drivers/hdmi/hdmi_scanout.c`,
+`drivers/vga_pio/vga_qvga_modes.c`). If you write a new scanout
+driver, do the same — claim before launch.
 
 No top-level edit is needed for new ports — `cmake -DPORT=<your_board>`
 picks up `ports/<your_board>/port_sources.cmake` directly. Only the

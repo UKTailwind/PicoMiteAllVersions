@@ -400,12 +400,16 @@ char  __not_in_flash_func(SerialConsolePutC)(char c, int flush) {
 		   MMCharPos -= 1;
 	   	}
 	}    
-    /* On WiFi ports the stdio (USB-CDC + UART) console only runs
-     * when telnet is also configured (mirroring); on non-WiFi ports
-     * the hook returns 1 so stdio always runs. TelnetPutC and
-     * ProcessWeb are no-op stubs on non-WiFi. */
+    /* USB-CDC always; the HAL impl already gates on tud_cdc_connected()
+     * and Option.SerialConsole stdio mode internally, so without a
+     * cable plugged in this is a no-op. The historical
+     * wifi_serial_telnet_configured() gate that wrapped CDC output was
+     * redundant and broke CDC-only debug ports. */
+    hal_console_usb_cdc_putc(c, flush);
+    /* UART output still rides the telnet gate on WiFi ports (mirroring
+     * to UART when telnet is the primary console); non-WiFi ports'
+     * stub returns 1 so UART always runs. */
     if (wifi_serial_telnet_configured()) {
-        hal_console_usb_cdc_putc(c, flush);
         if(Option.SerialConsole){
             int empty=uart_is_writable((Option.SerialConsole & 3)==1 ? uart0 : uart1);
             while(ConsoleTxBufTail == ((ConsoleTxBufHead + 1) % CONSOLE_TX_BUF_SIZE));
@@ -1159,7 +1163,7 @@ int MIPS16 main(){
     /* HAL_PORT_AUDIO_I2S_PIO_NUM is set per port in port_config.h. */
     start_i2s(HAL_PORT_AUDIO_I2S_PIO_NUM, 1);
 
-   
+
     extern void MMBasic_RunPromptLoop(void);
     MMBasic_RunPromptLoop();
 }

@@ -17,3 +17,6 @@ host/wasm_obj/
 hardcopy.*
 out.bmp
 build_test/
+build_a0_vgawifi/
+build_dvi_wifi/
+build_lfs/

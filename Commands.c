@@ -1498,7 +1498,15 @@ if(Option.SerialConsole)while(ConsoleTxBufHead!=ConsoleTxBufTail)routinechecks()
 	SSPrintString("\033[?25h"); //in case application has turned the cursor off
 	SSPrintString("\033[97;40m");
 	close_tcpclient();
-    if(mouse0==false && Option.MOUSE_CLOCK)initMouse0(0);
+	cleanserver();
+	{
+		extern volatile bool TCPreceived;
+		extern char *TCPreceiveInterrupt;
+		TCPreceived = 0;
+		TCPreceiveInterrupt = NULL;
+	}
+	CurrentLinePtr = NULL;
+	if(mouse0==false && Option.MOUSE_CLOCK)initMouse0(0);
 	/* NEXTGEN refresh auto-enable — DISPLAY_TYPE is never >= NEXTGEN
 	 * outside rp2350 PICOMITE so this is a runtime no-op elsewhere. */
 	if(Option.DISPLAY_TYPE>=NEXTGEN)Option.Refresh=1;

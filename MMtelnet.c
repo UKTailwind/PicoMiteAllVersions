@@ -176,10 +176,22 @@ void starttelnet(struct tcp_pcb *client_pcb, int pcb, void *arg){
 void __not_in_flash_func(ProcessWeb)(int mode){
     static uint64_t flushtimer=0;
     static uint64_t lastusec=0;
-    static int testcount=0;  
+    static int testcount=0;
     static int lastonoff=0;
     static uint64_t lastheartmsec=0;
-    uint64_t timenow=time_us_64();   
+    uint64_t timenow=time_us_64();
+    static uint64_t lastpoll=0;
+    static uint64_t pollcount=0;
+    /* poll-mode cyw43_arch — pump packets every ProcessWeb tick. */
+    if (startupcomplete) {
+        cyw43_arch_poll();
+        pollcount++;
+        if (timenow - lastpoll > 2000000ull) {
+            printf("[PW] polled %llu times since last log\n", (unsigned long long)pollcount);
+            pollcount = 0;
+            lastpoll = timenow;
+        }
+    }
     if(!WIFIconnected && startupcomplete)goto flashonly;
     TCP_SERVER_T *state = (TCP_SERVER_T*)TCPstate;
     if(!state)return;
@@ -188,12 +200,18 @@ void __not_in_flash_func(ProcessWeb)(int mode){
         if(state->client_pcb[i]==NULL){
                 t++;
         } else if(state->client_pcb[i]==(struct tcp_pcb *)44){
-            if(timenow-state->pcbopentime[i] > 1000*(uint32_t)Option.ServerResponceTime + 20000000 && !state->keepalive[i]){
+            /* Signed-cast guards against a recv handler bumping
+             * pcbopentime AFTER `timenow` was sampled at the top of
+             * this function — uint64 subtraction underflows to a huge
+             * positive number and false-fires the timeout. */
+            int64_t age = (int64_t)(timenow - state->pcbopentime[i]);
+            if (age > (int64_t)(1000LL*(uint32_t)Option.ServerResponceTime + 20000000LL) && !state->keepalive[i]) {
                 state->client_pcb[i]=NULL;
 //                    printf("PCB %d should be closed by now\r\n", i);
             }
         } else {
-            if(timenow-state->pcbopentime[i] > 1000*(uint32_t)Option.ServerResponceTime && !state->keepalive[i]){
+            int64_t age = (int64_t)(timenow - state->pcbopentime[i]);
+            if (age > (int64_t)(1000LL*(uint32_t)Option.ServerResponceTime) && !state->keepalive[i]) {
 //                    printf("Warning PCB %d still open\r\n", i);
                     if(state->buffer_recv[i]){
                             tcp_server_close(state,i);

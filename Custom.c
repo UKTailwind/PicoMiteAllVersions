@@ -287,7 +287,7 @@ void start_i2s(int pior, int sm){
 	// prepare default PIO program config
 	pio_sm_config cfg = i2s_program_get_default_config(I2SOff);
 
-	// map state machine's OUT and MOV pins	
+	// map state machine's OUT and MOV pins
 	sm_config_set_out_pins(&cfg, PinDef[Option.audio_i2s_data].GPno, 1);
 
 	// set sideset pins (BCLK and LCLK)

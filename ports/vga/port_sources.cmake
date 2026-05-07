@@ -49,6 +49,7 @@ else()
     target_sources(PicoMite PRIVATE
         ${CMAKE_SOURCE_DIR}/drivers/ps2_matrix/Keyboard.c
         ${CMAKE_SOURCE_DIR}/drivers/ps2_matrix/hal_keyboard_ps2.c
+        ${CMAKE_SOURCE_DIR}/drivers/console_cdc/console_cdc.c
         ${CMAKE_SOURCE_DIR}/mouse.c
     )
 endif()

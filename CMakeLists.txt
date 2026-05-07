@@ -229,6 +229,10 @@ target_include_directories(PicoMite PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 # ports/pico_sdk_common/ supplies port-specific Tier-B inline headers
 # (hal_pin_inlines.h) that hal/*.h pulls in via a plain "" include.
 target_include_directories(PicoMite PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/ports/pico_sdk_common)
+# drivers/console_cdc/ — shared USB-CDC stdio helper used by every
+# non-USB-host-keyboard port (PS/2, CDC-only). The keyboard backends
+# include "console_cdc.h" to delegate the actual CDC plumbing.
+target_include_directories(PicoMite PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/drivers/console_cdc)
 # ports/<board>/port_config.h defines compile-time port-scoped constants
 # (HAL_PORT_PWM_SLICE_COUNT, HAL_PORT_GPIO_COUNT, HAL_PORT_HAS_*, …). Each
 # port directory holds a single file with plain #defines and no #ifdef

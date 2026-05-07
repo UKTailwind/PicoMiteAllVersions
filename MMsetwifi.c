@@ -15,6 +15,8 @@
 #include "lwip/ip4_addr.h"
 #include "lwip/netif.h"
 #include "pico/cyw43_arch.h"
+#include "hardware/dma.h"
+#include "hardware/regs/dma.h"
 #define CJSON_NESTING_LIMIT 100
 #include "cJSON.h"
 
@@ -247,6 +249,26 @@ extern void open_tcp_server(void);
 extern void open_udp_server(void);
 
 void WebConnect(void){
+    /* TEMP DEBUG: enable the cyw43 driver's built-in async-event
+     * tracer.  Each EV_AUTH / EV_LINK / EV_PSK_SUP / EV_DISASSOC /
+     * EV_PRUNE / EV_DEAUTH_IND / EV_SET_SSID etc. logs via
+     * CYW43_PRINTF — which we've routed to RTT, IRQ-safe. */
+    cyw43_state.trace_flags |= CYW43_TRACE_ASYNC_EV | CYW43_TRACE_ETH_RX | CYW43_TRACE_ETH_TX;
+    /* Bump every claimed DMA channel except 0 and 1 to HIGH PRIORITY.
+     * Channels 0/1 are the HDMI HSTX scanout chain (claimed before
+     * core1 launch in drivers/hdmi/hdmi_scanout.c).  CYW43's bus-pio-spi
+     * grabs the next free channels (2/3 typically) for SPI TX/RX DMA.
+     * With equal priority, the HSTX chain runs continuously and starves
+     * the CYW43 SPI DMA, causing PIO TX FIFO underruns mid-frame and
+     * the "hdr mismatch" / "do_ioctl timeout" errors we observed.  The
+     * SDK only exposes channel_config_set_high_priority for new
+     * configs; mutate the existing CTRL register via the al1_ctrl
+     * non-triggering alias. */
+    for (int ch = 2; ch < 12; ch++) {
+        if (dma_channel_is_claimed(ch)) {
+            dma_hw->ch[ch].al1_ctrl |= DMA_CH0_CTRL_TRIG_HIGH_PRIORITY_BITS;
+        }
+    }
     if(*Option.SSID){
         if(*Option.ipaddress){
             cyw43_arch_enable_sta_mode();
