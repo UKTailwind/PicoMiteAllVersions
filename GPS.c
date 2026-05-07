@@ -1345,6 +1345,180 @@ MMFLOAT getJulianCenturies(int day, int month, int year, int hour, int minute, i
   return (jd - 2451545.0) / 36525.0;
 }
 
+// Returns the index of name in starCatalog (case-insensitive) or -1 if not found.
+// Uses binary search on the first letter for efficiency.
+static int findStarInCatalog(const char *name)
+{
+  if (!name[0]) return -1;
+  int numStars = sizeof(starCatalog) / sizeof(starCatalog[0]);
+  char firstChar = toupper((unsigned char)name[0]);
+  int low = 0, high = numStars - 1, foundIndex = -1;
+  while (low <= high)
+  {
+    int mid = (low + high) / 2;
+    char c = toupper((unsigned char)starCatalog[mid].name[0]);
+    if (c == firstChar)      { foundIndex = mid; break; }
+    else if (c < firstChar)  low = mid + 1;
+    else                     high = mid - 1;
+  }
+  if (foundIndex < 0) return -1;
+  int startIndex = foundIndex;
+  while (startIndex > 0 && toupper((unsigned char)starCatalog[startIndex - 1].name[0]) == firstChar)
+    startIndex--;
+  int endIndex = foundIndex;
+  while (endIndex < numStars - 1 && toupper((unsigned char)starCatalog[endIndex + 1].name[0]) == firstChar)
+    endIndex++;
+  for (int i = startIndex; i <= endIndex; i++)
+    if (strcasecmp(name, starCatalog[i].name) == 0)
+      return i;
+  return -1;
+}
+
+// Writes star.RA and star.Dec into the optional bodyRA/bodyDec output variables
+// when the caller parsed 4 output arguments (argc == 7).
+static void assignOptionalRaDec(struct s_RADec star, int argc, unsigned char **argv)
+{
+  if (argc != 7) return;
+  MMFLOAT *bodyRA = findvar(argv[4], V_FIND);
+  if (!(g_vartbl[g_VarIndex].type & T_NBR)) StandardError(6);
+  MMFLOAT *bodyDec = findvar(argv[6], V_FIND);
+  if (!(g_vartbl[g_VarIndex].type & T_NBR)) StandardError(6);
+  *bodyRA = star.RA;
+  *bodyDec = star.Dec;
+}
+
+// Returns a pointer past the end of the first string-expression token at p.
+// Handles: string literals "...", simple variables (name / name$),
+// and single function calls like MID$(s$,1,3) or UPPER$(s$).
+static unsigned char *findStringExprEnd(unsigned char *p)
+{
+  if (*p == '"')
+  {
+    p++;
+    while (*p && *p != '"')
+      p++;
+    if (*p == '"')
+      p++;
+    return p;
+  }
+  while (isnamechar(*p))
+    p++;
+  if (*p == '$' || *p == '%' || *p == '!')
+    p++;
+  if (*p == '(')
+  {
+    int depth = 1;
+    p++;
+    while (*p && depth > 0)
+    {
+      if      (*p == '(') depth++;
+      else if (*p == ')') { if (--depth == 0) break; }
+      else if (*p == '"') { p++; while (*p && *p != '"') p++; }
+      p++;
+    }
+    if (*p == ')') p++;
+  }
+  return p;
+}
+
+// Returns 1 if the first token in cmd is a string expression (literal, explicit $
+// variable/function, or a DIM s AS STRING variable).  On success nameBuf receives
+// the null-terminated C string and *rest points to the start of the remaining
+// arguments so the caller can pass it straight to getcsargs().
+// Returns 0 without side-effects when the first token is not a string expression.
+//
+// Because we null-terminate at exactly the end of the expression token before
+// calling evaluate(), both space and comma work as separators between the name
+// and the output variables, matching the plain-text keyword syntax.
+static int tryGetStringArg(unsigned char *cmd, char *nameBuf, int nameBufLen, unsigned char **rest)
+{
+  unsigned char *p = cmd;
+  while (*p == ' ')
+    p++;
+  if (!*p)
+    return 0;
+
+  int isStrExpr = (*p == '"'); // string literal
+
+  if (!isStrExpr)
+  {
+    // Declared string variable without '$' suffix (DIM s AS STRING).
+    // V_NOFIND_NULL is safe on plain keywords — returns NULL without auto-creating.
+    if (findvar(p, V_NOFIND_NULL) != NULL && (g_vartbl[g_VarIndex].type & T_STR))
+      isStrExpr = 1;
+  }
+
+  if (!isStrExpr)
+  {
+    // '$' before the first top-level comma: explicit string variable (s$) or
+    // string function (MID$(...), UPPER$(...), etc.)
+    unsigned char *q = p;
+    int depth = 0;
+    while (*q)
+    {
+      if      (*q == '(')                  depth++;
+      else if (*q == ')')                  depth--;
+      else if (*q == '$' && depth == 0)  { isStrExpr = 1; break; }
+      else if (*q == ',' && depth == 0)    break;
+      q++;
+    }
+  }
+
+  if (!isStrExpr)
+    return 0;
+
+  // Find exactly where the expression token ends, then null-terminate there.
+  // evaluate() throws "Expression syntax" if a non-delimiter follows the result;
+  // by terminating at the token boundary we ensure it sees '\0' as the terminator,
+  // which lets space or comma work as the separator to the next argument.
+  unsigned char *exprEnd = findStringExprEnd(p);
+
+  // Skip past any spaces after the expression to check for infix operators or
+  // the separator before the next argument.  We do this once and reuse 'after'
+  // for both the operator-rejection check and the final rest-pointer value.
+  unsigned char *after = exprEnd;
+  while (*after == ' ')
+    after++;
+  if (*after == '+' || *after == '-' || *after == '*' || *after == '/' || *after == '&')
+    return 0;
+  if (!*after)
+    return 0; // nothing follows; at least alt and az are required
+
+  unsigned char saved = *exprEnd;
+  *exprEnd = '\0'; // isolate the expression for evaluate()
+
+  MMFLOAT f = 0;
+  long long int i64 = 0;
+  unsigned char *s = NULL;
+  int type = T_NOTYPE;
+  evaluate(p, &f, &i64, &s, &type, false);
+
+  *exprEnd = saved;
+
+  if (!(type & T_STR) || s == NULL)
+    return 0;
+
+  // Skip optional comma separator, consistent with plain-text keyword syntax:
+  //   STAR MOON alt, az  (space sep)  vs  STAR s$, alt, az  (comma sep)
+  if (*after == ',')
+  {
+    after++;
+    while (*after == ' ')
+      after++;
+  }
+  if (!*after)
+    return 0;
+
+  int len = (int)(unsigned char)*s; // MMBasic string: first byte is length
+  if (len >= nameBufLen)
+    len = nameBufLen - 1;
+  memcpy(nameBuf, s + 1, len);
+  nameBuf[len] = '\0';
+
+  *rest = after; // points to "alt, az ..."
+  return 1;
+}
+
 void cmd_exec_star(int day, int month, int year, int hour, int minute, int second, MMFLOAT longitude, MMFLOAT latitude, unsigned char *cmd)
 {
   unsigned char *tp;
@@ -1356,6 +1530,59 @@ void cmd_exec_star(int day, int month, int year, int hour, int minute, int secon
 
   // Calculate Local Sidereal Time
   MMFLOAT sidereal = getSiderealTime(day, month, year, hour, minute, second, longitude);
+
+  // Handle string literal / string variable as the body name:
+  //   STAR "Aldebaran", alt, az   or   STAR s$, alt, az   or   STAR s, alt, az  (DIM s AS STRING)
+  {
+    char nameBuf[32];
+    unsigned char *rest;
+    if (tryGetStringArg(cmd, nameBuf, sizeof(nameBuf), &rest))
+    {
+      // rest points past the comma; getcsargs gives the same argc layout as the
+      // plain-keyword paths: argc==3 (alt,az) or argc==7 (alt,az,bodyRA,bodyDec)
+      getcsargs(&rest, 7);
+      if (!(argc == 3 || argc == 7))
+        StandardError(2);
+      altitude = findvar(argv[0], V_FIND);
+      if (!(g_vartbl[g_VarIndex].type & T_NBR))
+        StandardError(6);
+      azimuth = findvar(argv[2], V_FIND);
+      if (!(g_vartbl[g_VarIndex].type & T_NBR))
+        StandardError(6);
+
+      int planetBody = -1;
+      if      (strcasecmp(nameBuf, "MOON")    == 0) planetBody = BODY_MOON;
+      else if (strcasecmp(nameBuf, "SUN")     == 0) planetBody = BODY_SUN;
+      else if (strcasecmp(nameBuf, "MERCURY") == 0) planetBody = BODY_MERCURY;
+      else if (strcasecmp(nameBuf, "VENUS")   == 0) planetBody = BODY_VENUS;
+      else if (strcasecmp(nameBuf, "MARS")    == 0) planetBody = BODY_MARS;
+      else if (strcasecmp(nameBuf, "JUPITER") == 0) planetBody = BODY_JUPITER;
+      else if (strcasecmp(nameBuf, "SATURN")  == 0) planetBody = BODY_SATURN;
+      else if (strcasecmp(nameBuf, "URANUS")  == 0) planetBody = BODY_URANUS;
+      else if (strcasecmp(nameBuf, "NEPTUNE") == 0) planetBody = BODY_NEPTUNE;
+
+      if (planetBody >= 0)
+      {
+        star = getCelestialPosition(planetBody, T, latitude, sidereal);
+        localRA(star, altitude, azimuth, latitude, sidereal);
+        assignOptionalRaDec(star, argc, argv);
+        return;
+      }
+
+      int starIndex = findStarInCatalog(nameBuf);
+      if (starIndex < 0)
+        error("Unknown body");
+
+      MMFLOAT ra0 = starCatalog[starIndex].ra_deg / 15.0;
+      MMFLOAT dec0 = starCatalog[starIndex].dec_deg;
+      MMFLOAT pm_ra = starCatalog[starIndex].pm_ra;
+      MMFLOAT pm_dec = starCatalog[starIndex].pm_dec;
+      star = applyProperMotionAndPrecession(ra0, dec0, pm_ra, pm_dec, T);
+      localRA(star, altitude, azimuth, latitude, sidereal);
+      assignOptionalRaDec(star, argc, argv);
+      return;
+    }
+  }
 
   if ((tp = checkstring(cmd, (unsigned char *)"MOON")) ||
       (tp = checkstring(cmd, (unsigned char *)"SUN")) ||
@@ -1573,6 +1800,99 @@ void cmd_star(void)
     cmd_exec_star(day, month, year, hour, minute, second, longitude, latitude, cmdline);
   }
 }
+// SLEW dRA1, dDec1, flipRA, flipDec, dRA2, dDec2, mountRA, mountDec, RAs, DECs, LST
+// Computes slew deltas from current mount position to target, handling meridian flip if needed.
+// dRA1/dDec1   - first move (hours/degrees), always populated; positive dRA = slew east
+// flipRA       - RA flip motor move: +12h (east->west) or -12h (west->east), 0 = no flip.
+//                Positive swings OTA over the top in the tracking direction (safe, CW down).
+// flipDec      - Dec flip motor move: +180deg (east->west) or -180deg (west->east), 0 = no flip.
+//                Direction sweeps OTA through the pole, keeping tube above horizontal.
+// dRA2/dDec2   - second move (hours/degrees); zero if no flip needed. dDec2 always 0.
+// mountRA      - sky RA the mount is currently pointing at (hours, 0-24)
+// mountDec     - sky Dec the mount is currently pointing at (degrees, -90 to +90)
+// RAs/DECs     - target sky position from STAR/ASTRO (hours/degrees)
+// LST          - local sidereal time from LOCATE (hours, 0-24)
+void cmd_slew(void)
+{
+  getcsargs(&cmdline, 21);
+  if (argc != 21)
+    SyntaxError();
+
+  MMFLOAT *dRA1    = findvar(argv[0], V_FIND);
+  if (!(g_vartbl[g_VarIndex].type & T_NBR)) StandardError(6);
+  MMFLOAT *dDec1   = findvar(argv[2], V_FIND);
+  if (!(g_vartbl[g_VarIndex].type & T_NBR)) StandardError(6);
+  MMFLOAT *flipRA  = findvar(argv[4], V_FIND);
+  if (!(g_vartbl[g_VarIndex].type & T_NBR)) StandardError(6);
+  MMFLOAT *flipDec = findvar(argv[6], V_FIND);
+  if (!(g_vartbl[g_VarIndex].type & T_NBR)) StandardError(6);
+  MMFLOAT *dRA2    = findvar(argv[8], V_FIND);
+  if (!(g_vartbl[g_VarIndex].type & T_NBR)) StandardError(6);
+  MMFLOAT *dDec2   = findvar(argv[10], V_FIND);
+  if (!(g_vartbl[g_VarIndex].type & T_NBR)) StandardError(6);
+
+  MMFLOAT mountRA  = getnumber(argv[12]);
+  MMFLOAT mountDec = getnumber(argv[14]);
+  MMFLOAT RAs      = getnumber(argv[16]);
+  MMFLOAT DECs     = getnumber(argv[18]);
+  MMFLOAT LST      = getnumber(argv[20]);
+
+  if (mountRA < 0.0 || mountRA >= 24.0 || RAs < 0.0 || RAs >= 24.0)
+    error("RA must be 0-24 hours");
+  if (mountDec < -90.0 || mountDec > 90.0 || DECs < -90.0 || DECs > 90.0)
+    error("Declination must be -90 to +90 degrees");
+  if (LST < 0.0 || LST >= 24.0)
+    error("LST must be 0-24 hours");
+
+  // Hour angles normalised to -12..+12; negative = east of meridian, positive = west
+  MMFLOAT ha_c = LST - mountRA;
+  while (ha_c >  12.0) ha_c -= 24.0;
+  while (ha_c < -12.0) ha_c += 24.0;
+
+  MMFLOAT ha_t = LST - RAs;
+  while (ha_t >  12.0) ha_t -= 24.0;
+  while (ha_t < -12.0) ha_t += 24.0;
+
+  if ((ha_c < 0.0) == (ha_t < 0.0)) {
+    // Same side of meridian: single slew, no flip
+    MMFLOAT dra = RAs - mountRA;
+    while (dra >  12.0) dra -= 24.0;
+    while (dra < -12.0) dra += 24.0;
+    *dRA1    = dra;
+    *dDec1   = DECs - mountDec;
+    *flipRA  = 0.0;
+    *flipDec = 0.0;
+    *dRA2    = 0.0;
+    *dDec2   = 0.0;
+  } else {
+    // Opposite sides of meridian: flip required at HA = 0 (RA = LST)
+    // Move 1: slew to the meridian, pre-positioning Dec to the target value
+    MMFLOAT dra1 = LST - mountRA;
+    while (dra1 >  12.0) dra1 -= 24.0;
+    while (dra1 < -12.0) dra1 += 24.0;
+    *dRA1  = dra1;
+    *dDec1 = DECs - mountDec;
+
+    // Flip directions chosen to swing OTA over the top (through polar direction).
+    // East->west: RA advances in tracking direction (+12h), Dec sweeps toward pole (+180deg).
+    // West->east: both reverse (-12h, -180deg).
+    if (ha_c < 0.0) {
+      *flipRA  =  12.0;
+      *flipDec = 180.0;
+    } else {
+      *flipRA  = -12.0;
+      *flipDec = -180.0;
+    }
+
+    // Move 2: from meridian to target (Dec already correct; dDec2 always 0)
+    MMFLOAT dra2 = RAs - LST;
+    while (dra2 >  12.0) dra2 -= 24.0;
+    while (dra2 < -12.0) dra2 += 24.0;
+    *dRA2  = dra2;
+    *dDec2 = 0.0;
+  }
+}
+
 void cmd_locate(void)
 {
   MMFLOAT *sidereal = NULL;

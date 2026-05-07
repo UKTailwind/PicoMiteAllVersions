@@ -34,7 +34,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 extern "C"
 {
 #endif
-
+#define CALCPROMPT
 /* ============================================================================
  * Platform-specific configuration - PICOMITEVGA
  * ============================================================================ */
@@ -587,6 +587,7 @@ extern "C"
 #ifndef PICOMITEWEB
                 MMSUPPLY,
 #endif
+                MMPOS,
                 MMEND
         } Operation;
 

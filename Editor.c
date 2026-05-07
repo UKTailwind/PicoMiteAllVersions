@@ -499,6 +499,27 @@ void edit(unsigned char *cmdline, bool cmdfile)
     {
         SaveContext();
         ClearVars(0, FALSE);
+        /* ClearVars only releases user-variable allocations.  When a
+         * sizeable program is in ProgMemory (e.g. ~50KB) PrepareProgram
+         * has also allocated the IF/ELSE jump table (iftab), structure
+         * type definitions (g_structtbl[], if STRUCTENABLED) and on
+         * OPTION PROFILING ON the perf counter arrays - all top-down
+         * GetMemory pages that ClearVars does not touch.  On the
+         * RP2040 VGA build the heap is only 100KB and EDIT_BUFFER_SIZE
+         * is ~96KB (bottom-up, contiguous), so any top-down occupancy
+         * is fatal.  Release them explicitly here; SaveContext has
+         * already snapshotted MMHeap + mmap so RestoreContext at exit
+         * will reinstate the bytes and every C-side pointer.           */
+        IfTableFree();
+#ifdef STRUCTENABLED
+        for (int i = 0; i < MAX_STRUCT_TYPES; i++)
+        {
+            if (g_structtbl[i] != NULL)
+                FreeMemorySafe((void **)&g_structtbl[i]);
+        }
+        g_structcnt = 0;
+#endif
+        ProfilingFree();
     }
 #ifdef PICOMITEVGA
     modmode = false;
@@ -4247,7 +4268,7 @@ static int fm_list_file(const fm_panel_t *panel, const fm_entry_t *entry, char *
     }
     else
     {
-        ListFilePaged(full);
+        ListFilePaged(full, 1);
         cmdline = saved_cmdline;
     }
     memcpy(mark, saved_mark, sizeof(jmp_buf));
@@ -5252,6 +5273,13 @@ fm_check_run:
         unsigned char *saved_cmdline = cmdline;
         fm_set_default_drive_dir(&panels[active]);
         fm_edit_wants_run = 0;
+        /* Release any temp-string allocations accumulated during the FM
+         * session so that the editor's huge bottom-up GetTempMemory
+         * (EDIT_BUFFER_SIZE ~ heap_memory_size - 5KB) can find a
+         * contiguous run.  On 100KB heaps (VGA RP2040) even a single
+         * stray temp page would otherwise abort the editor with
+         * "Not enough System Heap memory".                                */
+        ClearTempMemory();
         edit((unsigned char *)run_edit_file, false);
         // FM calls edit() directly; release command-temporary buffers here.
         ClearTempMemory();
@@ -5379,12 +5407,75 @@ static int beautify_token_match(const char *up, int idx, const char *kw)
     return (nxt == 0 || nxt == ' ' || nxt == '\t' || nxt == ':');
 }
 
-static void editBeautify(int edit_buff_size)
+/* Returns non-zero if the buffer contains any blank line that is NOT
+ * immediately preceded by an END SUB / END FUNCTION line.  Used by the
+ * F12 handler to decide whether to prompt the user about preserving
+ * blank lines. */
+static int beautify_has_stray_blanks(void)
 {
-    /* ---- Pass 1: remove all blank/whitespace-only lines ---- */
+    unsigned char *p = EdBuff;
+    int prev_was_end_sub_or_func = 0;
+    while (*p)
+    {
+        unsigned char *line_start = p;
+        unsigned char *eol = p;
+        while (*eol && *eol != '\n')
+            eol++;
+
+        unsigned char *t = line_start;
+        while (t < eol && (*t == ' ' || *t == '\t'))
+            t++;
+        int blank = (t >= eol);
+
+        if (blank)
+        {
+            if (!prev_was_end_sub_or_func)
+                return 1;
+            prev_was_end_sub_or_func = 0; /* don't allow a 2nd freebie */
+        }
+        else
+        {
+            char up[16] = {0};
+            int ulen = 0;
+            for (unsigned char *q = t; q < eol && ulen < (int)sizeof(up) - 1; q++)
+            {
+                char ch = (char)*q;
+                if (ch >= 'a' && ch <= 'z')
+                    ch = (char)(ch - 32);
+                up[ulen++] = ch;
+            }
+            prev_was_end_sub_or_func =
+                (beautify_token_match(up, 0, "END") &&
+                 (beautify_token_match(up, 4, "SUB") ||
+                  beautify_token_match(up, 4, "FUNCTION")));
+        }
+        p = eol + (*eol == '\n' ? 1 : 0);
+    }
+    return 0;
+}
+
+static void editBeautify(int edit_buff_size, int keep_blanks)
+{
+    int line_number_base = 0; /* if >0, programs uses line numbers and this
+                               * is the column at which statements start
+                               * (= longest line-number width + 1).        */
+    /* ---- Pass 1: optionally remove blank/whitespace-only lines, and at the
+     *               same time work out whether the program is line-numbered.
+     *               It is considered numbered iff the first non-blank,
+     *               non-comment line begins with a run of digits followed by
+     *               whitespace, ':' or end-of-line.  When that is the case
+     *               we record the width of the longest such leading number
+     *               so that all subsequent lines can be aligned past it.
+     *               When keep_blanks is non-zero we leave blank lines in
+     *               place (they are still emitted to the output buffer) but
+     *               otherwise behave identically.                          */
     {
         unsigned char *src = EdBuff;
         unsigned char *dst = EdBuff;
+        int saw_first = 0;
+        int numbered_program = 0;
+        int max_num_len = 0;
+        int prev_emitted_blank = 0;
         while (*src)
         {
             unsigned char *line_start = src;
@@ -5396,22 +5487,69 @@ static void editBeautify(int edit_buff_size)
                 t++;
             int blank = (t >= eol);
             int line_len = (int)(eol - line_start) + (*eol == '\n' ? 1 : 0);
-            if (!blank)
+            if (blank)
             {
+                if (keep_blanks && !prev_emitted_blank)
+                {
+                    /* Emit a single normalised blank line ('\n').  Because
+                     * dst <= line_start (we only ever shrink), writing one
+                     * byte is always safe. */
+                    *dst++ = '\n';
+                    prev_emitted_blank = 1;
+                }
+                /* otherwise: drop the blank line entirely */
+            }
+            else
+            {
+                /* Is this line a comment-only line? */
+                int is_cmt = 0;
+                if (*t == '\'')
+                    is_cmt = 1;
+                else if ((eol - t) >= 3 &&
+                         (t[0] == 'R' || t[0] == 'r') &&
+                         (t[1] == 'E' || t[1] == 'e') &&
+                         (t[2] == 'M' || t[2] == 'm') &&
+                         ((eol - t) == 3 || t[3] == ' ' || t[3] == '\t'))
+                    is_cmt = 1;
+
+                /* Measure leading line-number, if any. */
+                int num_len = 0;
+                {
+                    const unsigned char *r = t;
+                    while (r < eol && *r >= '0' && *r <= '9')
+                        r++;
+                    if (r > t && (r >= eol || *r == ' ' || *r == '\t' ||
+                                  *r == ':'))
+                        num_len = (int)(r - t);
+                }
+                if (!saw_first && !is_cmt)
+                {
+                    saw_first = 1;
+                    if (num_len > 0)
+                        numbered_program = 1;
+                }
+                if (numbered_program && num_len > max_num_len)
+                    max_num_len = num_len;
+
                 if (dst != line_start)
                     memmove(dst, line_start, line_len);
                 dst += line_len;
+                prev_emitted_blank = 0;
             }
             src = line_start + line_len;
         }
         *dst = 0;
+        if (numbered_program)
+            line_number_base = max_num_len + 1;
     }
 
-    /* ---- Pass 2: insert one blank line before each SUB / FUNCTION
-     *               (except at start of buffer).                       */
+    /* ---- Pass 2: insert one blank line after each END SUB / END FUNCTION
+     *               (except at end of buffer).  Inserting after the end of
+     *               a routine - rather than before its SUB/FUNCTION header -
+     *               keeps any leading comment block attached to the routine
+     *               that it documents.                                     */
     {
         unsigned char *p = EdBuff;
-        int first_line = 1;
         while (*p)
         {
             unsigned char *line_start = p;
@@ -5433,32 +5571,43 @@ static void editBeautify(int edit_buff_size)
                 up[ulen++] = ch;
             }
 
-            int is_sub_or_func = (beautify_token_match(up, 0, "SUB") ||
-                                  beautify_token_match(up, 0, "FUNCTION"));
+            int is_end_sub_or_func = (beautify_token_match(up, 0, "END") &&
+                                      (beautify_token_match(up, 4, "SUB") ||
+                                       beautify_token_match(up, 4, "FUNCTION")));
 
-            if (is_sub_or_func && !first_line)
+            /* Move to start of the next line. */
+            unsigned char *next_line = eol + (*eol == '\n' ? 1 : 0);
+
+            if (is_end_sub_or_func && *next_line)
             {
-                /* Insert a single '\n' at line_start.  Need 1 byte of room. */
-                unsigned char *bufend = line_start;
-                while (*bufend)
-                    bufend++;
-                if ((bufend - EdBuff) + 1 >= edit_buff_size - 10)
+                /* If the next line is already blank, no need to insert one. */
+                int next_is_blank = 0;
                 {
-                    editDisplayMsg((unsigned char *)" BEAUTIFY: BUFFER FULL ");
-                    return;
+                    unsigned char *u = next_line;
+                    while (*u == ' ' || *u == '\t')
+                        u++;
+                    if (*u == '\n' || *u == 0)
+                        next_is_blank = 1;
                 }
-                int tail_len = (int)(bufend - line_start) + 1; /* incl. NUL */
-                memmove(line_start + 1, line_start, tail_len);
-                *line_start = '\n';
-                /* Skip past the inserted newline; recompute eol */
-                line_start++;
-                eol = line_start;
-                while (*eol && *eol != '\n')
-                    eol++;
+                if (!next_is_blank)
+                {
+                    /* Insert a single '\n' at next_line.  Need 1 byte of room. */
+                    unsigned char *bufend = next_line;
+                    while (*bufend)
+                        bufend++;
+                    if ((bufend - EdBuff) + 1 >= edit_buff_size - 10)
+                    {
+                        editDisplayMsg((unsigned char *)" BEAUTIFY: BUFFER FULL ");
+                        return;
+                    }
+                    int tail_len = (int)(bufend - next_line) + 1; /* incl. NUL */
+                    memmove(next_line + 1, next_line, tail_len);
+                    *next_line = '\n';
+                    next_line++;
+                }
             }
 
-            first_line = 0;
-            p = eol + (*eol == '\n' ? 1 : 0);
+            p = next_line;
         }
     }
 
@@ -5494,6 +5643,9 @@ static void editBeautify(int edit_buff_size)
         int indent_after = 0;
         int is_blank = (s >= eol);
         int is_comment = 0;
+        int is_label = 0;
+        int is_line_number = 0;
+        int line_number_len = 0;
         if (!is_blank)
         {
             if (*s == '\'')
@@ -5501,86 +5653,209 @@ static void editBeautify(int edit_buff_size)
             else if (ulen >= 3 && up[0] == 'R' && up[1] == 'E' && up[2] == 'M' &&
                      (ulen == 3 || up[3] == ' ' || up[3] == '\t'))
                 is_comment = 1;
+            else if (*s >= '0' && *s <= '9')
+            {
+                /* Detect a leading line number: a run of digits followed by
+                 * whitespace, end-of-line or ':'.  Treated like a label so
+                 * that classic line-numbered BASIC is not pushed off to the
+                 * right by surrounding block structure. */
+                const unsigned char *r = s;
+                while (r < eol && *r >= '0' && *r <= '9')
+                    r++;
+                if (r > s && (r >= eol || *r == ' ' || *r == '\t' || *r == ':'))
+                {
+                    is_line_number = 1;
+                    line_number_len = (int)(r - s);
+                }
+            }
+            else
+            {
+                /* Detect a leading label: identifier ([A-Za-z_][A-Za-z0-9_]*)
+                 * immediately followed by ':'.  Such lines are kept flush
+                 * left so that targets of GOTO/GOSUB stay visible even when
+                 * they appear inside an indented block. */
+                unsigned char c0 = *s;
+                if ((c0 >= 'A' && c0 <= 'Z') || (c0 >= 'a' && c0 <= 'z') ||
+                    c0 == '_')
+                {
+                    const unsigned char *r = s + 1;
+                    while (r < eol)
+                    {
+                        unsigned char ch = *r;
+                        if ((ch >= 'A' && ch <= 'Z') ||
+                            (ch >= 'a' && ch <= 'z') ||
+                            (ch >= '0' && ch <= '9') || ch == '_')
+                            r++;
+                        else
+                            break;
+                    }
+                    if (r < eol && *r == ':')
+                        is_label = 1;
+                }
+            }
         }
 
         if (!is_blank && !is_comment)
         {
-            if (beautify_token_match(up, 0, "ENDIF"))
-                dedent_self = 1;
-            else if (beautify_token_match(up, 0, "END") && beautify_token_match(up, 4, "IF"))
-                dedent_self = 1;
-            else if (beautify_token_match(up, 0, "NEXT"))
-                dedent_self = 1;
-            else if (beautify_token_match(up, 0, "LOOP"))
-                dedent_self = 1;
-            else if (beautify_token_match(up, 0, "END") && beautify_token_match(up, 4, "SELECT"))
-                dedent_self = 1;
-            else if (beautify_token_match(up, 0, "END") && beautify_token_match(up, 4, "FUNCTION"))
-                dedent_self = 1;
-            else if (beautify_token_match(up, 0, "END") && beautify_token_match(up, 4, "SUB"))
-                dedent_self = 1;
-#ifdef STRUCTENABLED
-            else if (beautify_token_match(up, 0, "END") && beautify_token_match(up, 4, "TYPE"))
-                dedent_self = 1;
-#endif
-            else if (beautify_token_match(up, 0, "ELSE") ||
-                     beautify_token_match(up, 0, "ELSEIF"))
+            /* Walk the line statement-by-statement, splitting at ':' outside
+             * string literals and stopping at the start of any trailing
+             * comment.  For each statement classify whether it opens
+             * (FOR, DO, SUB, FUNCTION, TYPE, SELECT CASE, multi-line IF),
+             * closes (NEXT, LOOP, END IF / ENDIF, END SELECT / SUB / FUNCTION /
+             * TYPE) or is a middle clause (ELSE, ELSEIF, CASE).  Accumulate
+             * the net indent change for the line so that single-line forms
+             * such as  FOR i=1 TO 9:a(i)=i:NEXT  cancel out and do not
+             * indent following lines.                                       */
+            const unsigned char *q = s;
+            /* Skip a leading line number so that the keyword classifier
+             * sees the actual statement (e.g. DO/LOOP/SUB/END SUB) that
+             * follows the digits. */
+            if (is_line_number)
+                q = s + line_number_len;
+            int first_stmt = 1;
+            int in_str = 0;
+            while (q < eol)
             {
-                dedent_self = 1;
-                indent_after = 1;
-            }
-            else if (beautify_token_match(up, 0, "CASE"))
-            {
-                dedent_self = 1;
-                indent_after = 1;
-            }
+                while (q < eol && (*q == ' ' || *q == '\t'))
+                    q++;
+                const unsigned char *stmt_start = q;
+                const unsigned char *stmt_end = NULL;
 
-            if (beautify_token_match(up, 0, "FOR"))
-                indent_after = 1;
-            else if (beautify_token_match(up, 0, "DO"))
-                indent_after = 1;
-            else if (beautify_token_match(up, 0, "SELECT") && beautify_token_match(up, 7, "CASE"))
-                indent_after = 1;
-            else if (beautify_token_match(up, 0, "FUNCTION"))
-                indent_after = 1;
-            else if (beautify_token_match(up, 0, "SUB"))
-                indent_after = 1;
-#ifdef STRUCTENABLED
-            else if (beautify_token_match(up, 0, "TYPE"))
-                indent_after = 1;
-#endif
-            else if (beautify_token_match(up, 0, "IF"))
-            {
-                int found_after = -1;
-                for (unsigned char *r = s + 2; r + 4 < eol; r++)
+                while (q < eol)
                 {
-                    if ((r[0] == ' ' || r[0] == '\t') &&
-                        (r[1] == 'T' || r[1] == 't') && (r[2] == 'H' || r[2] == 'h') &&
-                        (r[3] == 'E' || r[3] == 'e') && (r[4] == 'N' || r[4] == 'n'))
+                    char ch = (char)*q;
+                    if (ch == '"')
+                        in_str = !in_str;
+                    else if (ch == '\'' && !in_str)
                     {
-                        unsigned char *after = r + 5;
-                        if (after == eol || *after == ' ' || *after == '\t')
+                        stmt_end = q;
+                        q = eol; /* trailing comment ends scanning */
+                        break;
+                    }
+                    else if (ch == ':' && !in_str)
+                        break;
+                    q++;
+                }
+                if (stmt_end == NULL)
+                    stmt_end = q;
+                if (q < eol && *q == ':')
+                    q++;
+
+                if (stmt_end <= stmt_start)
+                {
+                    first_stmt = 0;
+                    continue;
+                }
+
+                char kw[16] = {0};
+                int klen = 0;
+                for (const unsigned char *r = stmt_start;
+                     r < stmt_end && klen < (int)sizeof(kw) - 1; r++)
+                {
+                    char ch = (char)*r;
+                    if (ch >= 'a' && ch <= 'z')
+                        ch = (char)(ch - 32);
+                    kw[klen++] = ch;
+                }
+
+                int open_kw = 0, close_kw = 0, middle_kw = 0;
+
+                if (beautify_token_match(kw, 0, "ENDIF") ||
+                    beautify_token_match(kw, 0, "NEXT") ||
+                    beautify_token_match(kw, 0, "LOOP") ||
+                    (beautify_token_match(kw, 0, "END") &&
+                     (beautify_token_match(kw, 4, "IF") ||
+                      beautify_token_match(kw, 4, "SELECT") ||
+                      beautify_token_match(kw, 4, "FUNCTION") ||
+                      beautify_token_match(kw, 4, "SUB")
+#ifdef STRUCTENABLED
+                      || beautify_token_match(kw, 4, "TYPE")
+#endif
+                          )))
+                    close_kw = 1;
+                else if (beautify_token_match(kw, 0, "ELSE") ||
+                         beautify_token_match(kw, 0, "ELSEIF") ||
+                         beautify_token_match(kw, 0, "CASE"))
+                    middle_kw = 1;
+
+                if (beautify_token_match(kw, 0, "FOR") ||
+                    beautify_token_match(kw, 0, "DO") ||
+                    beautify_token_match(kw, 0, "FUNCTION") ||
+                    beautify_token_match(kw, 0, "SUB")
+#ifdef STRUCTENABLED
+                    || beautify_token_match(kw, 0, "TYPE")
+#endif
+                    || (beautify_token_match(kw, 0, "SELECT") &&
+                        beautify_token_match(kw, 7, "CASE")))
+                    open_kw = 1;
+                else if (beautify_token_match(kw, 0, "IF"))
+                {
+                    int found_after = -1;
+                    for (const unsigned char *r = stmt_start + 2;
+                         r + 4 < stmt_end; r++)
+                    {
+                        if ((r[0] == ' ' || r[0] == '\t') &&
+                            (r[1] == 'T' || r[1] == 't') &&
+                            (r[2] == 'H' || r[2] == 'h') &&
+                            (r[3] == 'E' || r[3] == 'e') &&
+                            (r[4] == 'N' || r[4] == 'n'))
                         {
-                            found_after = (int)(after - s);
-                            break;
+                            const unsigned char *after = r + 5;
+                            if (after == stmt_end || *after == ' ' || *after == '\t')
+                            {
+                                found_after = (int)(after - stmt_start);
+                                break;
+                            }
                         }
                     }
+                    if (found_after >= 0)
+                    {
+                        const unsigned char *a = stmt_start + found_after;
+                        while (a < stmt_end && (*a == ' ' || *a == '\t'))
+                            a++;
+                        if (a >= stmt_end)
+                            open_kw = 1;
+                    }
                 }
-                if (found_after >= 0)
+
+                if (first_stmt)
                 {
-                    unsigned char *a = s + found_after;
-                    while (a < eol && (*a == ' ' || *a == '\t'))
-                        a++;
-                    if (a >= eol || *a == '\'')
-                        indent_after = 1;
+                    if (close_kw)
+                        dedent_self = 1;
+                    else if (middle_kw)
+                    {
+                        dedent_self = 1;
+                        indent_after += 1;
+                    }
+                    if (open_kw)
+                        indent_after += 1;
                 }
+                else
+                {
+                    if (close_kw)
+                        indent_after -= 1;
+                    else if (open_kw)
+                        indent_after += 1;
+                    /* middle clauses inside a colon-joined line are
+                     * structurally unusual; treat as no-op.                */
+                }
+
+                first_stmt = 0;
             }
         }
 
         int line_indent = level - dedent_self;
         if (line_indent < 0)
             line_indent = 0;
-        int want_spaces = is_blank ? 0 : (line_indent * 2);
+        int want_spaces;
+        if (is_blank)
+            want_spaces = 0;
+        else if (is_label)
+            want_spaces = 0; /* labels stay flush left */
+        else if (is_line_number)
+            want_spaces = 0; /* digits go to col 0; gap fixed up below */
+        else
+            want_spaces = line_number_base + line_indent * 2;
         int have_spaces = (int)(s - line_start);
 
         /* Adjust leading whitespace in place by shifting the tail of the buffer */
@@ -5625,6 +5900,45 @@ static void editBeautify(int edit_buff_size)
             /* Same width - just rewrite spaces (in case some were tabs) */
             for (int i = 0; i < want_spaces; i++)
                 line_start[i] = ' ';
+        }
+
+        /* For numbered lines, normalise the gap between the line number and
+         * the following statement so the statement aligns at
+         * line_number_base + line_indent*2 (with a minimum of one space). */
+        if (is_line_number)
+        {
+            unsigned char *num_end = line_start + line_number_len;
+            unsigned char *gap_end = num_end;
+            while (*gap_end == ' ' || *gap_end == '\t')
+                gap_end++;
+            if (*gap_end != 0 && *gap_end != '\n')
+            {
+                int have_gap = (int)(gap_end - num_end);
+                int target_col = line_number_base + line_indent * 2;
+                int want_gap = target_col - line_number_len;
+                if (want_gap < 1)
+                    want_gap = 1;
+                int diff = want_gap - have_gap;
+                if (diff != 0)
+                {
+                    unsigned char *bufend = gap_end;
+                    while (*bufend)
+                        bufend++;
+                    int tail_len = (int)(bufend - gap_end);
+                    if (diff > 0 &&
+                        (bufend - EdBuff) + diff >= edit_buff_size - 10)
+                    {
+                        editDisplayMsg((unsigned char *)" BEAUTIFY: BUFFER FULL ");
+                        return;
+                    }
+                    memmove(gap_end + diff, gap_end, tail_len + 1);
+                }
+                for (int i = 0; i < want_gap; i++)
+                    num_end[i] = ' ';
+                eol = num_end + want_gap;
+                while (*eol && *eol != '\n')
+                    eol++;
+            }
         }
 
         /* Advance to the character after the newline (or end) */
@@ -5961,7 +6275,7 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
                 { // if at the beginning of the line wrap around
                     buf[1] = UP;
                     buf[2] = END;
-                    buf[3] = 1;
+                    buf[3] = 0;
                     buf[4] = 0;
                 }
                 else
@@ -6752,7 +7066,35 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
             // F12 / Ctrl-A - Beautify (re-indent block structures)
             case CTRLKEY('A'):
             case F12:
-                editBeautify(edit_buff_size);
+            {
+                int keep_blanks = 0;
+                if (beautify_has_stray_blanks())
+                {
+                    /* Prompt the user.  Y (default) keeps blank lines,
+                     * N removes them. */
+                    editDisplayMsg((unsigned char *)" KEEP BLANK LINES? (Y/N) ");
+                    while (1)
+                    {
+                        int kc = MMgetchar();
+                        if (kc == 'y' || kc == 'Y' || kc == '\r' || kc == '\n')
+                        {
+                            keep_blanks = 1;
+                            break;
+                        }
+                        if (kc == 'n' || kc == 'N')
+                        {
+                            keep_blanks = 0;
+                            break;
+                        }
+                        if (kc == ESC)
+                        {
+                            /* Cancel beautify entirely. */
+                            PrintStatus();
+                            goto beautify_done;
+                        }
+                    }
+                }
+                editBeautify(edit_buff_size, keep_blanks);
                 TextChanged = true;
                 /* After buffer rewrite, restore cursor to start of buffer */
                 txtp = EdBuff;
@@ -6761,7 +7103,9 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
                 PositionCursor(txtp);
                 PrintStatus();
                 editDisplayMsg((unsigned char *)" BEAUTIFIED ");
-                break;
+            beautify_done:;
+            }
+            break;
 #else
             case F12:
                 break;

@@ -1260,7 +1260,12 @@ void MIPS16 tokenise(int console)
             *op++ = (i >> 8);
             *op++ = (i & 0xff);
         }
+#ifdef CALCPROMPT
+        if (!console)
+            p = tp;
+#else
         p = tp;
+#endif
     }
 
     // process the rest of the line
@@ -1332,6 +1337,16 @@ void MIPS16 tokenise(int console)
         }
 
         // not whitespace or string or comment  - try a number
+#ifdef CALCPROMPT
+        // Implied CALC in console mode: inject token when line starts with a numeric expression
+        if (firstnonwhite && console && (IsDigitinline(*p) || *p == '(' ||
+                                         (*p == '.' && IsDigitinline(p[1])))) {
+            unsigned short tkn = GetCommandValue((unsigned char *)"Calc");
+            *op++ = (tkn & 0x7f) + C_BASETOKEN;
+            *op++ = (tkn >> 7) + C_BASETOKEN;
+            firstnonwhite = false;
+        }
+#endif
         if (IsDigitinline(*p) || *p == '.')
         { // valid chars at the start of a number
             while (IsDigitinline(*p) || *p == '.' || *p == 'E' || *p == 'e')
@@ -1457,6 +1472,35 @@ void MIPS16 tokenise(int console)
                     continue;
                 }
             }
+#ifdef CALCPROMPT
+            // In console mode, scan the token table so function names like Exp( at line-start
+            // get tokenised as function tokens rather than falling through as raw variable names.
+            if (console && match_i == -1) {
+                unsigned char *tscan;
+                int icalc;
+                for (icalc = 0; icalc < TokenTableSize - 1; icalc++) {
+                    tscan = p;
+                    tp = tokentbl[icalc].name;
+                    while (mytoupper(*tscan) == mytoupper(*tp) && *tp != 0) {
+                        tp++;
+                        tscan++;
+                        if (*tp == '(')
+                            skipspace(tscan);
+                    }
+                    if (*tp == 0 && (!isnameend(*(tp - 1)) || !isnamechar(*tscan)))
+                        break;
+                }
+                if (icalc != TokenTableSize - 1) {
+                    unsigned short calc_tkn = GetCommandValue((unsigned char *)"Calc");
+                    *op++ = (calc_tkn & 0x7f) + C_BASETOKEN;
+                    *op++ = (calc_tkn >> 7) + C_BASETOKEN;
+                    *op++ = icalc + C_BASETOKEN;
+                    p = tscan;
+                    firstnonwhite = false;
+                    continue;
+                }
+            }
+#endif
         }
         else
         {
@@ -1505,6 +1549,17 @@ void MIPS16 tokenise(int console)
                     *op++ = (tkn & 0x7f) + C_BASETOKEN;
                     *op++ = (tkn >> 7) + C_BASETOKEN; // tokens can be 14-bit
                 }
+#ifdef CALCPROMPT
+                else if (console && (*tp == '+' || *tp == '-' ||
+                                     *tp == '*' || *tp == '/' || *tp == '\\' ||
+                                     *tp == '^' || *tp == '<' || *tp == '>' ||
+                                     isalpha(*tp))) {
+                    // Implied CALC: identifier followed by an operator (symbol or text op like AND/OR/MOD)
+                    unsigned short tkn = GetCommandValue((unsigned char *)"Calc");
+                    *op++ = (tkn & 0x7f) + C_BASETOKEN;
+                    *op++ = (tkn >> 7) + C_BASETOKEN;
+                }
+#endif
             }
             while (isnamechar(*p))
                 *op++ = *p++; // copy the variable name

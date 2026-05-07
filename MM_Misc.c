@@ -2034,12 +2034,14 @@ void MIPS16 cmd_library(void)
                 skipline(p);
                 // PIntHC(*(m-3)); PIntHC(*(m-2)); PIntHC(*(m-1)); PIntHC(*(m));
                 // MMPrintString("\r\n");
-                // if(*(m-3) == 0x01) {        //Original condition from Micromites
+                // if(*(m-3) == 0x01) {        //Original condition from Micromites (pre skip byte)
                 /* Check to see if comment is the first thing on the line or its only preceded by spaces.
                 Spaces have been reduced to a single space so we treat a comment with 1 space before it
                 as a comment line to be omitted.
+                With T_NEWLINE_HDR=2 the layout is: [T_NEWLINE(0x01)][skip_byte][optional space][']
+                so T_NEWLINE is at m-2 (no space) or m-3 (one space).
                 */
-                if ((*(m - 1) == 0x01) || ((*(m - 2) == 0x01) && (*(m - 1) == 0x20)))
+                if ((*(m - 2) == 0x01) || ((*(m - 3) == 0x01) && (*(m - 1) == 0x20)))
                 {
                     m = TempPtr; // if the comment was the only thing on the line don't copy the line at all
                     continue;
@@ -2065,6 +2067,24 @@ void MIPS16 cmd_library(void)
         // At the end of the program so get the two 0x00 bytes
         *m++ = *p++;
         *m++ = *p++;
+
+        // Recompute every skip byte in the output buffer.  Compression (stripping
+        // comments and collapsing spaces) shortened some lines, so the skip bytes
+        // that were copied verbatim from source now point past the actual next line.
+        // Walk line-by-line and write the correct byte offset from each T_NEWLINE
+        // to the following T_NEWLINE (or end-of-program marker).
+        {
+            unsigned char *fix = MemBuff;
+            while (*fix == T_NEWLINE) {
+                unsigned char *next = fix + T_NEWLINE_HDR;
+                while (!(next[-1] == 0 && (next[0] == T_NEWLINE || next[0] == 0)))
+                    next++;
+                int dist = (int)(next - fix);
+                fix[1] = (dist >= 3 && dist <= 0xFD) ? (unsigned char)dist : T_NEWLINE_SKIP_NONE;
+                fix = next;
+            }
+        }
+
         // Step the program memory up to the first 0xFF of the 4 that mark the beginning of the CSub binaries.
         while (*p != 0xff)
             p++;

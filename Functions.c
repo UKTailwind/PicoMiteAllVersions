@@ -79,6 +79,7 @@ const char *overlaid_functions[] = {
 	"MM.CODE",
 #ifndef PICOMITEWEB
 	"MM.SUPPLY",
+	"POS",
 #endif
 	"MM.END"};
 #ifndef rp2350
@@ -642,6 +643,7 @@ void fun_tilde(void)
 #ifndef PICOMITEWEB
 		MMSUPPLY,
 #endif
+		POS,
 		MMEND
 	}
 */
@@ -763,6 +765,9 @@ void fun_tilde(void)
 		targ = T_NBR;
 		break;
 #endif
+	case MMPOS:
+		fun_pos();
+		break;
 	default:
 		iret = -1;
 	}

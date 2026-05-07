@@ -1151,6 +1151,43 @@ void MIPS16 __not_in_flash_func(cmd_let)(void)
 	}
 	checkend(p1);
 }
+
+#ifdef CALCPROMPT
+// Implied CALC: evaluate a bare expression typed at the console prompt and print the result.
+// Numeric result is stored in MM.ANSWER for reuse (e.g.  MM.ANSWER * 2).
+void cmd_calc(void) {
+	MMFLOAT f;
+	long long int i64;
+	unsigned char *s;
+	int t = T_NOTYPE;
+	char buf[STRINGSIZE];
+
+	evaluate(cmdline, &f, &i64, &s, &t, false);
+
+	if (t & (T_NBR | T_INT)) {
+		MMFLOAT *ap = (MMFLOAT *)findvar((unsigned char *)"MM.ANSWER", V_NOFIND_NULL);
+		if (!ap) ap = (MMFLOAT *)findvar((unsigned char *)"MM.ANSWER", V_FIND | V_DIM_VAR);
+		if (t & T_NBR) {
+			*ap = f;
+			buf[0] = ' ';
+			FloatToStr(buf + (f >= 0 ? 1 : 0), f, 0, STR_AUTO_PRECISION, ' ');
+		} else {
+			*ap = (MMFLOAT)i64;
+			buf[0] = ' ';
+			IntToStr(buf + (i64 >= 0 ? 1 : 0), i64, 10);
+		}
+		MMPrintString(buf);
+		MMPrintString("\r\n");
+	} else if (t & T_STR) {
+		int len = *s;
+		memcpy(buf, s + 1, len);
+		buf[len] = '\0';
+		MMPrintString(buf);
+		MMPrintString("\r\n");
+	}
+}
+#endif
+
 /**
  * @cond
  * The following section will be excluded from the documentation.
@@ -1387,7 +1424,7 @@ static int countWrappedLines(const char *text, int screenWidth)
 	return count;
 }
 
-void ListFilePaged(char *pp)
+void ListFilePaged(char *pp, int always_wait)
 {
 	int fnbr;
 	int page_starts[LIST_MAX_PAGES];
@@ -1436,7 +1473,7 @@ void ListFilePaged(char *pp)
 		}
 
 		clearrepeat();
-		if (cur_page == 0 && !overflowed)
+		if (cur_page == 0 && !overflowed && !always_wait)
 			break; // entire file fitted on the first page - no prompt needed
 		if (cur_page > 0)
 			MMPrintString(overflowed ? "UP=prev  ANY KEY=next ..." : "UP=prev  ANY KEY=quit ...");
@@ -2187,7 +2224,7 @@ void MIPS16 cmd_list(void)
 				if (!ExistsFile(buff))
 					strcat(buff, ".bas");
 			}
-			ListFilePaged(buff);
+			ListFilePaged(buff, 0);
 		}
 		else
 		{

@@ -56,6 +56,9 @@ void cmd_if(void);
 void cmd_inc(void);
 void cmd_input(void);
 void cmd_let(void);
+#ifdef CALCPROMPT
+void cmd_calc(void);
+#endif
 void cmd_lineinput(void);
 void cmd_list(void);
 void cmd_load(void);
@@ -234,6 +237,7 @@ void cmd_lmid(void);
 void cmd_redim(void);
 void cmd_bezier(void);
 void cmd_star(void);
+void cmd_slew(void);
 void cmd_locate(void);
 void cmd_stepper(void);
 void cmd_bitstream(void);
@@ -668,6 +672,12 @@ void fun_frame(void);
 #ifdef MMBASIC_FM
 	{(unsigned char *)"FM", T_CMD, 0, cmd_fm},
 #endif
+#ifdef CALCPROMPT
+	{(unsigned char *)"Calc", T_CMD, 0, cmd_calc},
+#endif
+#ifdef rp2350
+	{(unsigned char *)"Slew", T_CMD, 0, cmd_slew},
+#endif
 
 {
 	(unsigned char *)"", 0, 0, cmd_null
@@ -730,12 +740,12 @@ void fun_frame(void);
 	{(unsigned char *)"TEMPR(", T_FUN | T_NBR, 0, fun_ds18b20},
 	{(unsigned char *)"SPI(", T_FUN | T_INT, 0, fun_spi},
 	{(unsigned char *)"Oct$(", T_FUN | T_STR, 0, fun_oct},
+	{(unsigned char *)"LInput(", T_FUN | T_INT, 0, fun_linputstr},
 	{(unsigned char *)"Pi", T_FNA | T_NBR, 0, fun_pi},
-	{(unsigned char *)"Pos", T_FNA | T_INT, 0, fun_pos},
 	{(unsigned char *)"Rad(", T_FUN | T_NBR, 0, fun_rad},
 	{(unsigned char *)"Right$(", T_FUN | T_STR, 0, fun_right},
-	{(unsigned char *)"Rnd(", T_FUN | T_NBR, 0, fun_rnd}, // this must come before Rnd - without bracket
-	{(unsigned char *)"Rnd", T_FNA | T_NBR, 0, fun_rnd},  // this must come after Rnd(
+	{(unsigned char *)"Rnd", T_FNA | T_NBR, 0, fun_rnd},  // this must come before Rnd - without bracket
+	{(unsigned char *)"Rnd(", T_FUN | T_NBR, 0, fun_rnd}, //	{(unsigned char *)"Rnd", T_FNA | T_NBR, 0, fun_rnd},  // this must come after Rnd(
 	{(unsigned char *)"Sgn(", T_FUN | T_INT, 0, fun_sgn},
 	{(unsigned char *)"Sin(", T_FUN | T_NBR, 0, fun_sin},
 	{(unsigned char *)"Space$(", T_FUN | T_STR, 0, fun_space},
@@ -815,12 +825,9 @@ void fun_frame(void);
 	{(unsigned char *)"MsgBox(", T_FUN | T_INT, 0, fun_msgbox},
 	{(unsigned char *)"CtrlVal(", T_FUN | T_NBR | T_STR, 0, fun_ctrlval},
 #endif
-	{(unsigned char *)"Bit(", T_FUN | T_INT, 0, fun_bit},
 #if PICOMITERP2350
 	{(unsigned char *)"Map(", T_FUN | T_INT, 0, fun_map},
 #endif
-	{(unsigned char *)"Trim$(", T_FUN | T_STR, 0, fun_trim},
-	{(unsigned char *)"LInput(", T_FUN | T_INT, 0, fun_linputstr},
 #ifdef STRUCTENABLED
 	{(unsigned char *)"Struct(", T_FUN | T_INT, 0, fun_struct},
 #endif
@@ -833,6 +840,9 @@ void fun_frame(void);
 #if !(defined(PICOMITEWEB))
 	{(unsigned char *)"Tilemap(", T_FUN | T_INT, 0, fun_tilemap},
 #endif
+	{(unsigned char *)"Trim$(", T_FUN | T_STR, 0, fun_trim},
+	{(unsigned char *)"Bit(", T_FUN | T_INT, 0, fun_bit},
+
 {
 	(unsigned char *)"", 0, 0, cmd_null
 } // this dummy entry is always at the end

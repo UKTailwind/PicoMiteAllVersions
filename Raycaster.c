@@ -42,8 +42,8 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "Draw.h"   /* spritebuff[], sprite_transparent, MAXBLITBUF */
 #include <math.h>
 
-#ifndef M_PI
-#define M_PI 3.14159265358979323846f
+#ifndef F_PI
+#define F_PI 3.14159265358979323846f
 #endif
 
 /* ============================================================================
@@ -312,10 +312,10 @@ static void ray_render_sprites(uint8_t *buf, int hres, int vres)
     }
 
     /* Camera vectors */
-    float angle_rad = rstate->cam_angle * (M_PI / 180.0f);
+    float angle_rad = rstate->cam_angle * (F_PI / 180.0f);
     float dir_x = cosf(angle_rad);
     float dir_y = sinf(angle_rad);
-    float plane_len = tanf(rstate->cam_fov * 0.5f * (M_PI / 180.0f));
+    float plane_len = tanf(rstate->cam_fov * 0.5f * (F_PI / 180.0f));
     float plane_x = -dir_y * plane_len;
     float plane_y = dir_x * plane_len;
 
@@ -434,12 +434,12 @@ static void ray_render_to_buffer(uint8_t *buf, int hres, int vres)
     int half_hres = hres >> 1;
 
     /* Camera vectors */
-    float angle_rad = rstate->cam_angle * (M_PI / 180.0f);
+    float angle_rad = rstate->cam_angle * (F_PI / 180.0f);
     float dir_x = cosf(angle_rad);
     float dir_y = sinf(angle_rad);
 
     /* Camera plane (perpendicular to direction, scaled by FOV) */
-    float plane_len = tanf(rstate->cam_fov * 0.5f * (M_PI / 180.0f));
+    float plane_len = tanf(rstate->cam_fov * 0.5f * (F_PI / 180.0f));
     float plane_x = -dir_y * plane_len;
     float plane_y = dir_x * plane_len;
 
@@ -940,7 +940,7 @@ static void ray_do_cast(float angle_deg)
     if (rstate->map == NULL)
         error("No map defined");
 
-    float angle_rad = angle_deg * (M_PI / 180.0f);
+    float angle_rad = angle_deg * (F_PI / 180.0f);
     float ray_dx = cosf(angle_rad);
     float ray_dy = sinf(angle_rad);
 
@@ -1115,7 +1115,7 @@ static void ray_cmd_move(unsigned char *p)
     if (argc >= 3)
         strafe = (float)getnumber(argv[2]);
 
-    float angle_rad = rstate->cam_angle * (M_PI / 180.0f);
+    float angle_rad = rstate->cam_angle * (F_PI / 180.0f);
     float dx = cosf(angle_rad);
     float dy = sinf(angle_rad);
 
@@ -1339,7 +1339,7 @@ static void ray_render_minimap(uint8_t *buf, int hres, int vres,
     int ppy = my + (int)(rstate->cam_y * view_h / mh);
     if (ppx >= 0 && ppx < hres && ppy >= 0 && ppy < vres)
         ray_putpixel(buf, ppx, ppy, hres, 15);
-    float arad = rstate->cam_angle * (M_PI / 180.0f);
+    float arad = rstate->cam_angle * (F_PI / 180.0f);
     for (int i = 1; i <= 2; i++)
     {
         int fx = ppx + (int)(cosf(arad) * (float)i);

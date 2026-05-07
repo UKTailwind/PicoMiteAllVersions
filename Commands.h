@@ -103,7 +103,7 @@ extern unsigned char g_DimUsed;
 // extern unsigned char *GetFileName(char* CmdLinePtr, unsigned char *LastFilePtr);
 // extern void mergefile(unsigned char *fname, unsigned char *MemPtr);
 extern void MIPS16 ListFile(char *pp, int all);
-extern void ListFilePaged(char *pp);
+extern void ListFilePaged(char *pp, int always_wait);
 extern void ListProgram(unsigned char *p, int all);
 extern void ListProgramPaged(unsigned char *prog);
 extern unsigned char *llist(unsigned char *b, unsigned char *p);
