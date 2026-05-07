@@ -360,7 +360,10 @@ int hal_fs_dir_open(const char *path, hal_fs_dir_t **out)
     if (!path || !out) return -EINVAL;
     hal_fs_dir_t *d = (hal_fs_dir_t *)calloc(1, sizeof(*d));
     if (!d) return -ENOMEM;
-    FRESULT r = f_opendir(&d->fatfs_dir, path);
+    /* Strip "A:"/"B:" — host FatFS is mounted with the default empty
+     * drive, so a literal "B:" prefix confuses the drive parser. Same
+     * pattern as hal_fs_unlink/rename/mkdir/rmdir/chdir above. */
+    FRESULT r = f_opendir(&d->fatfs_dir, host_path_after_drive(path));
     if (r != FR_OK) { free(d); return fatfs_rc_to_errno(r); }
     *out = d;
     return 0;

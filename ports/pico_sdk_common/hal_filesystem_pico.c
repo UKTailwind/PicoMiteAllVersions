@@ -97,7 +97,15 @@ static const char *path_after_drive(const char *path)
 }
 
 /* Choose which filesystem owns a given path. "A:" -> LFS, "B:" -> FatFS.
- * Unprefixed paths default to LFS (the historical boot drive). */
+ * Unprefixed paths default to LFS (the historical boot drive).
+ *
+ * CALLER CONTRACT: paths must arrive WITH the "A:" or "B:" prefix.
+ * Several MMBasic helpers (FileIO.c::fullpath/getfullpath/
+ * getfullfilepath/getfullfilename) strip the drive prefix from their
+ * output; callers that pass those stripped paths into hal_fs_* MUST
+ * re-prepend the right letter (see FileIO.c::hal_path_with_drive).
+ * Without that, every Dir$/MKDIR/RMDIR/KILL/NAME call against B: silently
+ * gets routed to LFS — the bug that motivated this comment. */
 typedef enum { FS_FATFS, FS_LFS } fs_kind_t;
 
 static fs_kind_t path_fs(const char *path)
@@ -108,13 +116,19 @@ static fs_kind_t path_fs(const char *path)
 
 /* -- Path ops ---------------------------------------------------------- */
 
+/* FatFS on this build is mounted with the default drive "" = 0:, so a
+ * literal "A:" or "B:" prefix confuses its drive-letter parser (same
+ * caveat as hal_fs_chdir's comment).  Strip the prefix before
+ * dispatching to f_*. The LFS branch already strips via
+ * path_after_drive(); FatFS now does too, so the contract is uniform
+ * across both backends and matches hal_filesystem_host.c. */
 int hal_fs_mkdir(const char *path)
 {
     if (!path) return -EINVAL;
     if (path_fs(path) == FS_LFS) {
         return lfs_rc_to_errno(lfs_mkdir(&lfs, path_after_drive(path)));
     }
-    return fatfs_rc_to_errno(f_mkdir(path));
+    return fatfs_rc_to_errno(f_mkdir(path_after_drive(path)));
 }
 
 int hal_fs_rmdir(const char *path)
@@ -123,7 +137,7 @@ int hal_fs_rmdir(const char *path)
     if (path_fs(path) == FS_LFS) {
         return lfs_rc_to_errno(lfs_remove(&lfs, path_after_drive(path)));
     }
-    return fatfs_rc_to_errno(f_unlink(path));
+    return fatfs_rc_to_errno(f_unlink(path_after_drive(path)));
 }
 
 int hal_fs_unlink(const char *path)
@@ -132,7 +146,7 @@ int hal_fs_unlink(const char *path)
     if (path_fs(path) == FS_LFS) {
         return lfs_rc_to_errno(lfs_remove(&lfs, path_after_drive(path)));
     }
-    return fatfs_rc_to_errno(f_unlink(path));
+    return fatfs_rc_to_errno(f_unlink(path_after_drive(path)));
 }
 
 int hal_fs_rename(const char *from, const char *to)
@@ -143,7 +157,7 @@ int hal_fs_rename(const char *from, const char *to)
     if (f == FS_LFS) {
         return lfs_rc_to_errno(lfs_rename(&lfs, path_after_drive(from), path_after_drive(to)));
     }
-    return fatfs_rc_to_errno(f_rename(from, to));
+    return fatfs_rc_to_errno(f_rename(path_after_drive(from), path_after_drive(to)));
 }
 
 int hal_fs_chdir(const char *path)
@@ -189,7 +203,7 @@ int hal_fs_stat(const char *path, struct hal_stat *out)
         return 0;
     }
     FILINFO fno;
-    FRESULT r = f_stat(path, &fno);
+    FRESULT r = f_stat(path_after_drive(path), &fno);
     if (r != FR_OK) return fatfs_rc_to_errno(r);
     out->size = fno.fsize;
     out->mode = (fno.fattrib & AM_DIR) ? HAL_FS_S_IFDIR : HAL_FS_S_IFREG;
@@ -595,7 +609,7 @@ int hal_fs_dir_open(const char *path, hal_fs_dir_t **out)
     if (d->kind == FS_LFS) {
         r = lfs_rc_to_errno(lfs_dir_open(&lfs, &d->h.lfs, path_after_drive(path)));
     } else {
-        r = fatfs_rc_to_errno(f_opendir(&d->h.fatfs, path));
+        r = fatfs_rc_to_errno(f_opendir(&d->h.fatfs, path_after_drive(path)));
     }
     if (r < 0) { free(d); return r; }
     *out = d;

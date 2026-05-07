@@ -1104,6 +1104,23 @@ void cmd_LoadJPGImage(unsigned char *p)
         Display_Refresh();
 }
 
+/* Re-prepend the drive letter to a path that getfullfilename / getfullpath
+ * / getfullfilepath / fullpath() stripped (their trailing memmove peels the
+ * "A:"/"B:" off the front of the resulting path).  hal_fs_*'s path_fs()
+ * dispatch in ports/pico_sdk_common/hal_filesystem_pico.c distinguishes
+ * LFS vs FatFS solely from the leading two characters of the path, so a
+ * naked "/foo" silently routes to LFS regardless of which drive the user
+ * named.  Caller-side prepend restores the contract.
+ *
+ * `dst` must hold at least FF_MAX_LFN + 4 bytes (the 2-char prefix + the
+ * worst-case stripped path + NUL).  Reads FatFSFileSystem (0 = A:/LFS,
+ * 1 = B:/SD-FatFS) which the caller has already set via getfullfilename
+ * / drivecheck before this is called. */
+static inline void hal_path_with_drive(char *dst, size_t n, const char *stripped)
+{
+    snprintf(dst, n, "%s%s", FatFSFileSystem ? "B:" : "A:", stripped);
+}
+
 // search for a volume label, directory or file
 // s$ = DIR$(fspec, DIR|FILE|ALL)       will return the first entry
 // s$ = DIR$()                          will return the next
@@ -1155,7 +1172,9 @@ void fun_dir(void)
         if(!(*path))*path='/';
         if (!InitSDCard())
             return; // setup the SD card
-        int rc = hal_fs_dir_open(path, &dir_handle);
+        char dirpath[FF_MAX_LFN + 4];
+        hal_path_with_drive(dirpath, sizeof(dirpath), path);
+        int rc = hal_fs_dir_open(dirpath, &dir_handle);
         if (rc < 0) { ErrorCheckHAL(rc); dir_handle = NULL; }
     }
 
@@ -1197,11 +1216,13 @@ void MIPS16 cmd_mkdir(void)
     char *p;
     int i;
     char q[FF_MAX_LFN]={0};
+    char qd[FF_MAX_LFN + 4];
     p = (char *)getFstring(cmdline);                                        // get the directory name and convert to a standard C string
     if(drivecheck(p,&i)!=FatFSFileSystem+1) error("Only valid on current drive");
     getfullpath(p,q);
     if(FatFSFileSystem && !InitSDCard()) return;
-    ErrorCheckHAL(hal_fs_mkdir(q));
+    hal_path_with_drive(qd, sizeof(qd), q);
+    ErrorCheckHAL(hal_fs_mkdir(qd));
 }
 
 void MIPS16 cmd_rmdir(void)
@@ -1209,11 +1230,13 @@ void MIPS16 cmd_rmdir(void)
     char *p;
     int i;
     char q[FF_MAX_LFN]={0};
+    char qd[FF_MAX_LFN + 4];
     p = (char *)getFstring(cmdline);                                        // get the directory name and convert to a standard C string
     if(drivecheck(p,&i)!=FatFSFileSystem+1) error("Only valid on current drive");
     getfullpath(p,q);
     if(FatFSFileSystem && !InitSDCard()) return;
-    ErrorCheckHAL(hal_fs_rmdir(q));
+    hal_path_with_drive(qd, sizeof(qd), q);
+    ErrorCheckHAL(hal_fs_rmdir(qd));
 }
 /* 
  * @cond
@@ -1439,7 +1462,9 @@ void MIPS16 cmd_kill(void)
         FatFSFileSystem=t-1;
         getfullfilepath(tp,q);
         if(FatFSFileSystem && !InitSDCard()) return;
-        ErrorCheckHAL(hal_fs_unlink(q));
+        char qd[FF_MAX_LFN + 4];
+        hal_path_with_drive(qd, sizeof(qd), q);
+        ErrorCheckHAL(hal_fs_unlink(qd));
         FatFSFileSystem=FatFSFileSystemSave;
     }
 }
@@ -1484,6 +1509,8 @@ void MIPS16 cmd_name(void)
     ss[1] = 0;
     char qold[FF_MAX_LFN]={0};
     char qnew[FF_MAX_LFN]={0};
+    char qold_d[FF_MAX_LFN + 4];
+    char qnew_d[FF_MAX_LFN + 4];
     getargs(&cmdline, 3, (unsigned char *)ss);                                   // getargs macro must be the first executable stmt in a block
     if(argc != 3) error("Syntax");
     old = (char *)getFstring(argv[0]);                                  // get the old name
@@ -1493,7 +1520,9 @@ void MIPS16 cmd_name(void)
     if(drivecheck(new,&i)!=FatFSFileSystem+1) error("Only valid on current drive");
     getfullfilepath(new,qnew);
     if(FatFSFileSystem && !InitSDCard()) return;
-    ErrorCheckHAL(hal_fs_rename(qold, qnew));
+    hal_path_with_drive(qold_d, sizeof(qold_d), qold);
+    hal_path_with_drive(qnew_d, sizeof(qnew_d), qnew);
+    ErrorCheckHAL(hal_fs_rename(qold_d, qnew_d));
 }
 extern uint64_t __uninitialized_ram(_persistent);
 void MIPS16 cmd_save(void)

@@ -3563,7 +3563,6 @@ void  MIPS16 ClearStack(void) {
 extern void port_web_clear_runtime_state(void);
 void MIPS16 ClearRuntime(bool all) {
     int i;
-    // BISECT: full ClearRuntime restored
     port_web_clear_runtime_state();
     CloseAllFiles();
     ClearExternalIO();                                              // this MUST come before InitHeap(true)
@@ -3606,10 +3605,12 @@ void MIPS16 ClearRuntime(bool all) {
 // clear everything including program memory (includes ClearStack() and ClearRuntime(true))
 // this is used before loading a program
 void MIPS16 ClearProgram(bool psram) {
+//    InitHeap(true);
     initFonts();
-    m_alloc(psram ? M_PROG : M_LIMITED);
+    m_alloc(psram ? M_PROG : M_LIMITED);                                           // init the variables for program memory
     if(Option.DISPLAY_TYPE>=VIRTUAL && WriteBuf)FreeMemorySafe((void **)&WriteBuf);
     ClearRuntime(true);
+//    ProgMemory[0] = ProgMemory[1] = ProgMemory[3] = ProgMemory[4] = 0;
     PSize = 0;
     StartEditPoint = NULL;
     StartEditChar= 0;

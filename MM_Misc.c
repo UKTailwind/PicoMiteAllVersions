@@ -3071,7 +3071,6 @@ int checkdetailinterrupts(void) {
      * (see top-of-file unconditional defs + host_runtime.c stubs), so
      * the conditions never fire. */
     if(TCPreceived && TCPreceiveInterrupt){
-        printf("[INT] WEB-TCP firing handler=%p\n", (void *)TCPreceiveInterrupt);
         intaddr = (char *)TCPreceiveInterrupt;
         TCPreceived = 0;
         goto GotAnInterrupt;
