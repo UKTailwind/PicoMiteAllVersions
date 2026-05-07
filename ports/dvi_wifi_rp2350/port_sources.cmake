@@ -102,12 +102,16 @@ target_compile_options(PicoMite PRIVATE                                         
 # overdrives the gSPI on rp2350 at any clock above that and the WiFi
 # link lands at CYW43_LINK_JOIN (1) instead of CYW43_LINK_UP (3) —
 # packets flow during association, then drop once the link is steady.
-# Pick a divider so clk_sys/div stays under 45 MHz across the whole
-# OPTION CPUSPEED range this port allows. With CPU range 250-378 MHz
-# (HAL_PORT_MIN_CPU/MAX_CPU below) the worst case is 378/9 = 42 MHz.
+# Use the SDK's runtime-tunable divider mode (CYW43_PIO_CLOCK_DIV_DYNAMIC)
+# and pick the smallest int divider that keeps gSPI ≤ 45 MHz at boot
+# based on the actual clock_get_hz(clk_sys) value (see
+# MMsetwifi.c::cyw43_pio_divider_for_clk_sys).  This adapts to whatever
+# OPTION CPUSPEED the user has set without leaving headroom on the
+# table at low CPU speeds — at 252 MHz we now run gSPI at 42 MHz
+# instead of the previous fixed 31 MHz.
 target_compile_options(PicoMite PRIVATE -DCYW43_HOST_NAME="DVIWiFi"
                                         -DHAL_PORT_DEVICE_NAME="DVIWiFiMite"
-                                        -DCYW43_PIO_CLOCK_DIV_INT=8
+                                        -DCYW43_PIO_CLOCK_DIV_DYNAMIC=1
                                         -DCYW43_SPI_PROGRAM_NAME=spi_gap0_sample1
                                         )
 # rp2350 chip flags.

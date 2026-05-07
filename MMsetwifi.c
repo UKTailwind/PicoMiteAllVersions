@@ -293,9 +293,34 @@ int port_setter_pico_pins(unsigned char *cmdline) {
 
 /* REPL-startup WiFi init: cyw43_arch_init + WebConnect. */
 #include "hal/hal_main_init.h"
+#include "hardware/clocks.h"
+#include "pico/cyw43_driver.h"
 extern int startupcomplete;
 
+#if CYW43_PIO_CLOCK_DIV_DYNAMIC
+/* CYW43 gSPI tops out at ~50 MHz.  Pick the smallest integer divider
+ * that keeps clk_sys/div under 45 MHz so we leave a little margin and
+ * the same divider is safe across small clock-source jitter.  Called
+ * before cyw43_arch_init so the bus initialises with the right rate
+ * for whatever Option.CPU_Speed the user has persisted.
+ *
+ * Examples:
+ *   252 MHz → div 6 → 42.0 MHz gSPI
+ *   315 MHz → div 7 → 45.0 MHz
+ *   378 MHz → div 9 → 42.0 MHz
+ *   126 MHz → div 3 → 42.0 MHz   (low-power modes still safe) */
+static void cyw43_pio_divider_for_clk_sys(void) {
+    uint32_t clk_hz = clock_get_hz(clk_sys);
+    uint32_t div = (clk_hz + 44999999u) / 45000000u;
+    if (div < 2) div = 2;   /* SDK minimum */
+    cyw43_set_pio_clock_divisor((uint16_t)div, 0);
+}
+#endif
+
 void port_repl_wifi_arch_init_and_connect(void) {
+#if CYW43_PIO_CLOCK_DIV_DYNAMIC
+    cyw43_pio_divider_for_clk_sys();
+#endif
     if (cyw43_arch_init() == 0) {
         startupcomplete = 1;
         WebConnect();
