@@ -32,12 +32,11 @@ void port_set_default_options(void)
     Option.HDMId0             = 0;
     Option.HDMId1             = 6;
     Option.HDMId2             = 4;
-    /* No physical keyboard — REPL input comes from USB-CDC. SerialConsole
-     * must be 0 (or >4) for the CDC pump in
-     * drivers/console_cdc/hal_keyboard_cdc_only.c to drain bytes into
-     * ConsoleRxBuf. */
-    Option.KeyboardConfig     = NO_KEYBOARD;
-    Option.SerialConsole      = 0;
+    /* USB-host keyboard defaults (this port is HAL_PORT_KEYBOARD_USB_HOST=1). */
+    Option.USBKeyboard        = CONFIG_US;
+    Option.SerialConsole      = 2;
+    Option.SerialTX           = 11;
+    Option.SerialRX           = 12;
     Option.capslock           = 0;
     Option.numlock            = 1;
     Option.ColourCode         = 1;

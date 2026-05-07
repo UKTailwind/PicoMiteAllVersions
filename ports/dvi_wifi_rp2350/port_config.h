@@ -46,14 +46,8 @@
 /* Keyboard backend selector: 0 = no physical keyboard / CDC-only console
  * (drivers/console_cdc/), 1 = USB-host (drivers/usb_host_kbd/).
  * Wires up via port_sources.cmake linkage; configuration.h reads it for
- * USB-vs-non-USB flash offset / magic key / heap top selection.
- *
- * This port runs the RP2350 native USB peripheral in CDC device mode so
- * the BASIC REPL + printf traces are reachable over `screen
- * /dev/cu.usbmodem*` — diagnostic build for the HDMI/WiFi/I²S triple
- * combo. The USB controller is mode-exclusive (TinyUSB host vs
- * pico_stdio_usb device), so this build has no physical USB keyboard. */
-#define HAL_PORT_KEYBOARD_USB_HOST        0
+ * USB-vs-non-USB flash offset / magic key / heap top selection. */
+#define HAL_PORT_KEYBOARD_USB_HOST        1
 #define HAL_PORT_HAS_I2C_KEYPAD          0
 
 /* core1stack[] size in words. HDMI runs the DVI scanout loop on core1
@@ -80,8 +74,8 @@
 #define HAL_PORT_FLASH_TARGET_OFFSET     (1408 * 1024)
 #define HAL_PORT_FLASH_TARGET_OFFSET_USB (1408 * 1024)
 /* Unique magic key — pick anything not used by an existing port. */
-#define HAL_PORT_MAGIC_KEY               0xD51F77E3
-#define HAL_PORT_MAGIC_KEY_USB           0xD51F77E3
+#define HAL_PORT_MAGIC_KEY               0xD51F77E4
+#define HAL_PORT_MAGIC_KEY_USB           0xD51F77E4
 #define HAL_PORT_HEAP_TOP                0x2007D000
 #define HAL_PORT_HEAP_TOP_USB            0x2007D000
 #define HAL_PORT_CONSOLE_RX_BUF_SIZE     256

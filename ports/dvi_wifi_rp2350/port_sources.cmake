@@ -4,6 +4,13 @@
 # variant — no COMPILE-name keyboard axis. Source list is the union
 # of hdmi_rp2350 (HDMI + PSRAM scaffolding) and the WiFi stack from
 # the WiFi ports.
+#
+# Uses pico_cyw43_arch_lwip_poll (not threadsafe_background) so all
+# lwIP work happens synchronously on the main thread inside
+# cyw43_arch_poll() — pumped from CheckAbort/ProcessWeb. CYW43 SPI
+# clock is divided down to ~42 MHz max (CYW43_PIO_CLOCK_DIV_INT=8 +
+# spi_gap0_sample1) so the gSPI link stays under spec across the
+# 250-378 MHz CPU range.
 
 target_include_directories(PicoMite PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}
@@ -71,14 +78,14 @@ target_sources(PicoMite PRIVATE
     # gfx_3d.c provides it.
     ${CMAKE_SOURCE_DIR}/drivers/gfx_3d/gfx_3d.c
 
-    # No physical keyboard — USB controller runs in CDC device mode so
-    # the host can drive the REPL via `screen /dev/cu.usbmodem*` and
-    # see every printf trace come back the same way. console_cdc.c is
-    # the shared CDC plumbing (also linked by every PS/2 port);
-    # hal_keyboard_cdc_only.c stubs the keyboard / mouse / gamepad
-    # surface and delegates the CDC HAL hooks to console_cdc.c.
-    ${CMAKE_SOURCE_DIR}/drivers/console_cdc/console_cdc.c
-    ${CMAKE_SOURCE_DIR}/drivers/console_cdc/hal_keyboard_cdc_only.c
+    # USB-host keyboard. The board's USB-A port is owned by TinyUSB
+    # host stack so users can plug in a USB keyboard. Connect to the
+    # BASIC REPL via that keyboard + HDMI display, or via UART
+    # (Option.SerialConsole on GP0/GP1 per the pico_stretch board
+    # file). USB-CDC stdio is unavailable on this build because the
+    # USB controller is mode-exclusive (host vs device).
+    ${CMAKE_SOURCE_DIR}/drivers/usb_host_kbd/USBKeyboard.c
+    ${CMAKE_SOURCE_DIR}/drivers/usb_host_kbd/hal_keyboard_usb.c
 )
 
 set_source_files_properties(${CMAKE_SOURCE_DIR}/cJSON.c PROPERTIES COMPILE_FLAGS -Os)
@@ -108,21 +115,14 @@ target_compile_options(PicoMite PRIVATE -Drp2350
                                         -DPICO_FLASH_SPI_CLKDIV=4
                                         -DPICO_PIO_USE_GPIO_BASE
                                         )
-# Diagnostic build: stdio over USB-CDC. printf (and CYW43_PRINTF, since
-# CYW43_DEBUG is overridden to printf below) lands on the host as
-# /dev/cu.usbmodem* — `screen /dev/cu.usbmodem* 115200` for live trace
-# + REPL. No openocd / RTT plumbing required.
-target_link_libraries(PicoMite pico_multicore pico_cyw43_arch_lwip_poll)
-target_compile_options(PicoMite PRIVATE
-    -DCYW43_DEBUG=printf
-    -Wno-error=format
-    -Wno-format
-    -Wno-error=builtin-declaration-mismatch
-    -Wno-error=implicit-function-declaration
-    )
+target_link_libraries(PicoMite pico_multicore pico_cyw43_arch_lwip_poll
+                               tinyusb_host tinyusb_board)
 pico_set_float_implementation(PicoMite pico_dcp)
 
-# Native USB peripheral in CDC device mode. HAL_PORT_KEYBOARD_USB_HOST=0
-# (port_config.h) selects the CDC-only HAL keyboard backend; the Pico
-# SDK's pico_stdio_usb pulls in TinyUSB device automatically.
-Pico_enable_stdio_usb(PicoMite 1)
+# USB-host keyboard config. HAL_PORT_KEYBOARD_USB_HOST=1 (set in
+# port_config.h) selects the USB-host backend in port-impl files;
+# usb_host_files dir holds the TinyUSB device-config headers
+# (tusb_config.h, etc.); stdio_usb=0 because the USB-A port is in
+# host mode for the keyboard.
+target_include_directories(PicoMite PRIVATE ${CMAKE_SOURCE_DIR}/usb_host_files)
+Pico_enable_stdio_usb(PicoMite 0)
