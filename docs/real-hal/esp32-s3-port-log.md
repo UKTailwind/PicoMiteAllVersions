@@ -172,3 +172,105 @@ When user resumes:
 - 5 minutes: tap BOOT+RESET, flash + monitor Phase A, confirm
   blink + heartbeat.
 - Then start Phase B step 1 (port_config.h + esp32_platform.h).
+
+## 2026-05-08 (later) — Phase A confirmed + Phase B closed
+
+### Phase A on hardware
+
+User did the BOOT+RESET tap, port came up at /dev/cu.usbmodem101.
+Flashed; chip booted; red LED blinks at 1 Hz; pyserial captured
+`tick N` heartbeat. **Phase A green on physical hardware.**
+
+Hardware identification: confirmed N16R8 (16 MB flash, 8 MB Embedded
+Octal PSRAM AP_3v3) via esptool chip_id. Plan originally assumed N8R2
+(Quad PSRAM); needed to switch CONFIG_SPIRAM_MODE_OCT=y for proper
+PSRAM init. Currently SPIRAM is left disabled in sdkconfig; OCT
+mode booted silently the first time, but subsequent investigation
+suggests the silence was the macOS USB-CDC binding issue, not a
+real PSRAM-init failure. Phase C will re-enable + retest.
+
+macOS USB-CDC quirks to remember:
+- pyserial.Serial.open() pulses DTR briefly on macOS, which the
+  ESP32-S3 native USB controller interprets as a download-mode
+  request. Use os.O_NONBLOCK + termios CLOCAL + ~HUPCL to avoid
+  the DTR pulse, or pulse RTS-only after open to do a clean app reset.
+- After many fast reset cycles macOS gets confused about the USB
+  CDC binding; unplug-replug recovers cleanly.
+
+### Phase B closed
+
+The MMBasic core, the bytecode VM, and 80+ shared source files all
+**compile and link on Xtensa GCC**. An actual BASIC program
+(`PRINT 1+1`) runs to completion on the chip.
+
+Commit-progression:
+1. Pulled CORE_SRCS / STATE_SRCS / DEVICE_FACING_SRCS / DRIVER_STUBS
+   / BC_SRCS into main/CMakeLists.txt — 80+ source files. All
+   compiled cleanly first try (a few `-Wno-*` flags needed since
+   IDF defaults `-Werror` on, but no source-level errors).
+2. Switched `vm_sys_pin.c` → `vm_sys_pin_host.c` and same for
+   `vm_sys_file` (the device variants pull Pico SDK GPIO calls
+   that don't exist on ESP32; the host variants route through
+   hal_pin / hal_filesystem instead).
+3. Wrote ESP32-specific HAL stub files for hal_pin, hal_audio,
+   hal_vm_framebuffer, hal_flash, hal_storage, hal_filesystem,
+   hal_keyboard. `hal_time_esp32.c` is a real impl using
+   esp_timer_get_time / vTaskDelay.
+4. Pulled in shared host_native files: `host_runtime.c`,
+   `host_peripheral_stubs.c`, `host_fs_shims.c`, `host_fs.c`,
+   `host_keys.c`, `host_sim_slowdown.c`, `host_sim_emit_stub.c`.
+   These provide the runtime glue + global storage that
+   mmbasic_stdio also reuses.
+5. Wrote `esp32_glue.c` for the small set of platform-glue
+   symbols host_runtime.c expects from a sibling host TU
+   (host_time, host_terminal, host_fb stubs, plus `flash_prog_buf`
+   storage, `host_runtime_get_pixel` stub, `timegm` impl, and
+   the EDIT/FRAMEBUFFER/FASTGFX command stubs).
+6. Added `-Wl,--allow-multiple-definition` to the link line —
+   MMBasic uses tentative-definition merging (`FSerror`,
+   `gui_bcolour`, etc.) which IDF's default `--warn-common`
+   rejects. Same flag the mmbasic_stdio Makefile uses.
+7. Pinned `HAL_PORT_HEAP_MEMORY_SIZE` to 32 KB so the combined
+   BSS (`AllMemory` + `flash_prog_buf` + `host_flash_target_buf`,
+   all sized as multiples of MAX_PROG_SIZE) fits the 512 KB
+   internal SRAM. Phase C replaces `host_fs_shims.c` (the source
+   of the bloat — those are *host port* RAM mirrors of flash that
+   real device builds don't carry) with an `esp_partition`-backed
+   impl, and the heap goes back to 128 KB+ with PSRAM available.
+
+### Phase B output (cleaned)
+
+```
+=== MMBasic Anywhere - ESP32-S3 Phase B ===
+Running: PRINT 1+1
+Result : 2
+=== MMBasic exited cleanly ===
+tick 0
+tick 1
+...
+```
+
+(`PRINT 1+1` output renders as garbled bytes in the current setup
+because MMBasic's MMPrintString emits ANSI color escapes that the
+raw `cat`-style read doesn't strip — but the fact that MMBasic
+calls `putchar` and reaches "exited cleanly" means
+`tokenize() → PrepareProgram() → ExecuteProgram()` all work
+end-to-end on Xtensa.)
+
+### Phase C plan
+
+Real impls to replace stubs, in priority order:
+1. `esp32_console.c` — USB Serial/JTAG read/write, replacing the
+   `host_read_byte_*` stubs in `esp32_glue.c`. Uses
+   `usb_serial_jtag_driver_install` + the IDF VFS dance from the
+   plan doc.
+2. **Drop `host_fs_shims.c`** + write `hal_flash_esp32.c` /
+   `hal_filesystem_esp32.c` real impls over `esp_partition_*` and
+   FATFS-via-VFS at `/sd`. Eliminates the 768 KB RAM mirror
+   (`host_flash_target_buf`).
+3. Re-enable Octal PSRAM properly (the boot-silence first time was
+   probably the macOS USB-CDC binding issue, not real PSRAM
+   failure). Bump heap back to 128 KB+.
+4. Replace `app_main`'s hardcoded `tokenize_and_run` test with
+   `MMBasic_RunPromptLoop` for an interactive REPL over USB
+   Serial/JTAG.
