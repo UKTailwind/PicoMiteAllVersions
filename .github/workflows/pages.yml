@@ -5,6 +5,11 @@ on:
     branches: [main]
     paths:
       - 'host/**'
+      - 'ports/host_wasm/**'
+      - 'ports/host_native/**'
+      - 'drivers/**'
+      - 'hal/**'
+      - 'tools/**'
       - '.github/workflows/pages.yml'
       # Shared source in the repo root feeds the wasm build too.
       - '*.c'
