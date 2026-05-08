@@ -20,3 +20,8 @@ build_test/
 build_a0_vgawifi/
 build_dvi_wifi/
 build_lfs/
+ports/esp32_s3_metro/build/
+ports/esp32_s3_metro/sdkconfig
+ports/esp32_s3_metro/sdkconfig.old
+ports/esp32_s3_metro/managed_components/
+ports/esp32_s3_metro/dependencies.lock
