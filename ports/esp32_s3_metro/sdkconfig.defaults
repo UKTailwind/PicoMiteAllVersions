@@ -8,14 +8,21 @@
 # cable handles flashing and console; no external UART adapter needed.
 CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
 
-# --- PSRAM ------------------------------------------------------------------
-# Adafruit Metro ESP32-S3 (#5500) ships with 2 MB Quad PSRAM (N8R2 module).
-# Enable it but keep allocations <= 8 KB in internal SRAM for performance.
-CONFIG_SPIRAM=y
-CONFIG_SPIRAM_USE_MALLOC=y
-CONFIG_SPIRAM_MODE_QUAD=y
-CONFIG_SPIRAM_SPEED_80M=y
-CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=8192
+# --- Flash + PSRAM ----------------------------------------------------------
+# Adafruit Metro ESP32-S3 #5500 N16R8 module: 16 MB flash + 8 MB Octal PSRAM
+# (Embedded PSRAM AP_3v3 — confirmed via esptool.py chip_id).
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+CONFIG_ESPTOOLPY_FLASHSIZE="16MB"
+
+# Phase A: SPIRAM disabled to get the toolchain path verified end-to-end.
+# Phase A binary is tiny (no MMBasic heap) and doesn't need PSRAM. With
+# SPIRAM enabled in OCT mode the chip booted silently (USB enumerated but
+# no console output) — likely a bootloader-vs-OPI-flash interaction worth
+# investigating in Phase C, when the BC heap actually wants the PSRAM.
+# Re-enable in Phase C with: CONFIG_SPIRAM=y, CONFIG_SPIRAM_MODE_OCT=y,
+# CONFIG_SPIRAM_SPEED_80M=y, plus matching CONFIG_ESPTOOLPY_FLASHMODE
+# tuning (likely needs OPI flash too on the N16R8).
+# CONFIG_SPIRAM=n  (default; explicit for documentation)
 
 # --- Stack ------------------------------------------------------------------
 # 24 KB main task stack. Phase A doesn't need this much, but Phase B
