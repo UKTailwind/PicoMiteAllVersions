@@ -1,147 +1,146 @@
-# PicoCalc
+# MMBasic Anywhere
 
-## Try MMBasic in your browser
+A portable build of [PicoMite](https://github.com/UKTailwind/PicoMiteAllVersions) MMBasic. Same BASIC dialect; the same source compiles for fourteen RP2040 / RP2350 device variants, native macOS, WebAssembly in a browser, and a pure-stdio Unix binary.
 
-**[jvanderberg.github.io/PicoMiteAllVersions](https://jvanderberg.github.io/PicoMiteAllVersions/)**
+**[Try it in your browser](https://jvanderberg.github.io/PicoMiteAllVersions/)**
 
-The full PicoMite runtime — interpreter + bytecode VM — compiled to
-WebAssembly and running on a dedicated Web Worker with a shared-memory
-framebuffer. Includes a persistent `/sd/` drive (IDBFS-backed, with
-drag-and-drop import, per-file download, and an in-browser CodeMirror
-editor for `.bas` files), `PLAY` via Web Audio, and all of the bundled
-demos. Source under [`host/web/`](host/web/); see
-[`docs/web-host-plan.md`](docs/web-host-plan.md) for architecture notes.
+## Origins
 
----
+MMBasic was written by Geoff Graham. He created it for the Maximite in 2011, a small board that ran BASIC. Peter Mather ported MMBasic to the Raspberry Pi Pico starting in 2016, and that port, [PicoMite](https://github.com/UKTailwind/PicoMiteAllVersions), is what this fork is based on.
 
-Information Command | Decription
-:--- | :---
-MM.INFO(BATTERY) | <ins>PICOCALC ONLY</ins> <br/> Returns the current battery level percentage (0-100).
-MM.INFO(CHARGING) | <ins>PICOCALC ONLY</ins> <br/> Returns 1 if battery is charging on external power, 0 if battery is not charging.
+Between them, they wrote the BASIC language, the interpreter, the VGA and HDMI display drivers, the audio engine, the SD card support, every graphics and audio command, the low-level hardware drivers, the user manuals, and the bundled demo programs. If you're running a BASIC feature, it almost certainly came from their work. The [PicoMite User Manual](https://geoffg.net/Documents/PicoMite/PicoMite_User_Manual.pdf) is the reference.
 
-Option Command | Decription
-:--- | :---
-OPTION BACKLIGHT KB brightness | <ins>PICOCALC ONLY</ins> <br/> Sets the brightness of the keyboard backlight. 'brightness' is a value between 0 (backlight off) and 255 (maximum brightness).
+## What this fork adds
 
-NEW PICOCALC USERS
-------------------
-Please download and install the [newest release](https://github.com/madcock/PicoMiteAllVersions/releases).
-If installing on a brand new PicoCalc, your keyboard firmware/bios is probably out of date. There is no easy way to tell which firmware is already installed, but if it's the "old" one, the PicoCalc specific ``MM.INFO()`` commands listed above won't work, and you'll probably get constant i2c keyboard disconnect errors which will make the device unusable. _It is highly recommended to update your keyboard firmware!_
+The BASIC language is unchanged. What's added is mostly under the hood:
 
-Use the [official guide to update your keyboard firmware](https://github.com/clockworkpi/PicoCalc/wiki/Setting-Up-Arduino-Development-for-PicoCalc-keyboard). There's a lot of extra information there which you can ignore unless you want to develop your own keyboard firmware. All you need to do is download ``STM32CubeProgrammer``, the newest keyboard firmware binary ([currently 1.4](https://github.com/clockworkpi/PicoCalc/blob/master/Bin/PicoCalc_BIOS_v1.4.bin) but please check to make sure there isn't anything newer), install it as described in the document using the dipswitch, and then reassemble everything carefully. Make sure you've put the dipswitch back in its original position after flashing the BIOS update. You'll only ever need to do this once, or perhaps again if another critical update is released. But regular PicoMite firmware updates do not require this keyboard BIOS update and it won't be lost if your batteries are removed, etc.
+- A bytecode compiler and VM. BASIC source is compiled to a compact instruction stream that runs faster than the interpreter, especially on tight numeric loops (roughly 10x). Mixed workloads see smaller wins.
+- A clean separation between the BASIC core and the hardware. The core source files compile the same way for every target; what changes between targets is which driver directories link in, not which compile-time flags are set.
+- Builds for places PicoMite doesn't normally run: native macOS, WebAssembly in a browser, and a pure-stdio command-line tool. The browser build is what you get when you click the link at the top.
+- A test suite that runs 240 BASIC programs through both the original interpreter and the new VM, comparing their output on every commit. The 14 device firmware images are also rebuilt on every commit, with size checks that fail the build if RAM use creeps up.
 
-Any assembly/disassembly of the PicoCalc risks damaging the extremely fragile screen. Once it's damaged, there's no way to fix it, and a replacement will be needed. if necessary, contact [alex@clockworkpi.com](mailto:alex@clockworkpi.com) for a replacement, and give him your original order invoice details and (usually picture) proof of screen damage. Be _very_ careful the display is seated properly when assembling! I recommend taping the screen down as [described in this post](https://forum.clockworkpi.com/t/before-replacing-the-pico-read-this-to-avoid-cracked-screen/16666/10). Electrical tape and kapton tape have both proven to work. The important thing is to never reattach the back with screws unless you are certain the screen is seated properly.
+This isn't a perfect port of every upstream feature. Some of the newer commands are tracked, others aren't. Upstream is treated as a reference, not as something to merge from directly.
 
-INSTALL PICO SDK
-----------------
-```bash
-sudo apt update && sudo apt install -y cmake gcc-arm-none-eabi libnewlib-arm-none-eabi build-essential git
+## Available builds
 
-mkdir -p ~/pico && cd ~/pico
-git clone https://github.com/raspberrypi/pico-sdk.git
-cd pico-sdk
-git checkout tags/2.2.0 -b sdk2.2.0
-git submodule update --init
+### RP2040 (Pico, Pico W)
 
-echo 'export PICO_SDK_PATH=~/pico/pico-sdk' >> ~/.bashrc
-source ~/.bashrc
+| Target | Display | Keyboard | WiFi | Notes |
+|---|---|---|---|---|
+| `PICO` | optional SPI LCD | USB CDC console | no | PicoCalc shell linked by default |
+| `PICOUSB` | optional SPI LCD | USB host keyboard | no | |
+| `VGA` | VGA via PIO | USB CDC console | no | |
+| `VGAUSB` | VGA via PIO | USB host keyboard | no | |
+| `WEB` | optional SPI LCD | USB CDC console | yes | Pico W; PicoCalc shell linked by default |
+
+### RP2350 (Pico 2, Pico 2 W)
+
+| Target | Display | Keyboard | WiFi | Notes |
+|---|---|---|---|---|
+| `PICORP2350` | optional SPI LCD | USB CDC console | no | PicoCalc shell linked by default |
+| `PICOUSBRP2350` | optional SPI LCD | USB host keyboard | no | |
+| `VGARP2350` | VGA via PIO | USB CDC console | no | |
+| `VGAUSBRP2350` | VGA via PIO | USB host keyboard | no | |
+| `HDMI` | HDMI via HSTX | USB CDC console | no | |
+| `HDMIUSB` | HDMI via HSTX | USB host keyboard | no | |
+| `WEBRP2350` | optional SPI LCD | USB CDC console | yes | Pico 2 W; PicoCalc shell linked by default |
+| `VGAWIFIRP2350` | VGA via PIO | USB CDC console | yes | Pico 2 W |
+| `DVIWIFIRP2350` | HDMI via HSTX | USB CDC console | yes | Pico 2 W |
+
+After `./buildall.sh`, the `.uf2` for each target lands in `build_all/<TARGET>/PicoMite.uf2`. The `.elf` is alongside it (used by SWD flashing).
+
+## Flashing
+
+Three ways to write a firmware image to a Pico.
+
+### USB BOOTSEL (no extra tools)
+
+Hold the BOOTSEL button while plugging the Pico into USB. The board mounts as a removable drive (`RPI-RP2` for RP2040, `RP2350` for RP2350). Copy the `.uf2` file onto the drive. The Pico reboots into the new firmware automatically.
+
+### picotool (USB)
+
+```
+picotool load build_all/PICORP2350/PicoMite.uf2 -f
+picotool reboot
 ```
 
-SETUP PICOCALC FIRMWARE
------------------------
-```bash
-mkdir -p ~/picocalc && cd ~/picocalc
-git clone https://github.com/madcock/PicoMiteAllVersions.git
-cd PicoMiteAllVersions
+The `-f` flag puts a running Pico into BOOTSEL mode automatically.
+
+### probe-rs (SWD with a debug probe)
+
+Requires a Raspberry Pi Debug Probe, picoprobe, or compatible CMSIS-DAP.
+
+```
+probe-rs download --chip RP235x build_all/PICORP2350/PicoMite.elf
+probe-rs reset --chip RP235x
 ```
 
-(No pico-sdk patching is required. The RAM-resident GPIO IRQ dispatcher
-that previously needed an `hardware_gpio/gpio.c` swap now lives in
-`picomite_gpio_irq.c` and is linked in by the build.)
+For RP2040 targets use `--chip RP2040`.
 
-EDIT ``~/picocalc/PicoMiteAllVersions/CMakeLists.txt`` TO CHOOSE TARGET
------------------------------------------------------------------------
-```makefile
-set(PICOCALC true)
+## Building from source
 
-# Compile for PICO 1 Board
-#set(COMPILE PICO)
+### macOS / Linux native
 
-# Compile for PICO 2 Board
-#set(COMPILE PICORP2350)
-set(COMPILE WEBRP2350)
+```
+cd host && ./build.sh
+./run_tests.sh
 ```
 
-BUILD PICOCALC FIRMWARE
------------------------
-```bash
-cd ~/picocalc/PicoMiteAllVersions
-mkdir build
-cd build
-cmake ..
-make
+Produces `host/mmbasic_test`. Default mode compares the interpreter and VM outputs across the test corpus.
+
+### Browser (WebAssembly)
+
+```
+cd ports/host_wasm && ./build.sh
+cd ../../host/web && python3 serve.py
 ```
 
-LOCAL VM PROTOTYPE BUILD/TEST LOOP
-----------------------------------
-This workspace currently uses a host oracle plus bytecode VM harness for BASIC regression testing.
+Open http://localhost:8000.
 
-Current architecture reference:
-- [docs/vm-architecture.md](docs/vm-architecture.md)
-- [docs/vm-cutover-plan.md](docs/vm-cutover-plan.md)
-- [docs/vm-command-coverage.md](docs/vm-command-coverage.md)
+### Pico hardware
 
-```bash
-cd ~/picocalc/PicoMiteAllVersions
-make -C host
-./host/run_tests.sh
-./host/run_pixel_tests.sh
-./host/run_host_shim_tests.sh
-./host/run_frontend_tests.sh
-./host/run_optimizer_tests.sh
-bash host/run_unsupported_tests.sh
-./host/run_missing_syscall_tests.sh
-make -C build2350 -j8
-arm-none-eabi-size build2350/PicoMite.elf
+Install the [Pico SDK 2.2.0](https://github.com/raspberrypi/pico-sdk) and export `PICO_SDK_PATH`. Then:
+
+```
+./buildall.sh
 ```
 
-The host binary is `host/mmbasic_test`. Its default mode compares the legacy host interpreter against the bytecode VM. Use `--interp` for the interpreter oracle only, `--vm` for the current VM path, `--vm-source` for the VM-owned raw-source frontend, and `--source-compare` to compare the legacy oracle against that frontend.
+Single-target build:
 
-For keyboard-driven host tests, `mmbasic_test` supports `--keys TEXT` and `--keys-after-ms MS TEXT`.
+```
+mkdir build && cd build && cmake -DCOMPILE=PICORP2350 .. && make
+```
 
-`RUN` compiles source to bytecode with the VM-owned frontend and executes on the VM. `FRUN` and the interpreter bridge fallback are removed from the user-facing VM path. The legacy prompt handles shell/OS commands.
+## PicoCalc
 
-(_original readme follows..._)
+Builds for the [ClockworkPi PicoCalc](https://www.clockworkpi.com/picocalc) shell are automatic on the `PICO`, `WEB`, `PICORP2350`, and `WEBRP2350` targets. The I2C keypad, SPI LCD, and PicoCalc options link in.
 
-# PicoMiteRP2350
-This contains files to build MMbasic 6.01.00b10 to run on both RP2040 and RP2350<br>
-Compile with GCC 13.3.1 arm-none-eabi<br>
+| Command | Description |
+|---|---|
+| `MM.INFO(BATTERY)` | Battery percentage (0 to 100) |
+| `MM.INFO(CHARGING)` | 1 if charging, else 0 |
+| `OPTION BACKLIGHT KB <brightness>` | Keyboard backlight (0 to 255) |
 
-<b style="color:red;"> Build with sdk V2.2.0. (Note: in this fork the pico-sdk gpio.c / gpio.h replacement is no longer needed — the RAM-resident GPIO IRQ dispatcher lives in <code>picomite_gpio_irq.c</code>.)<br></b>
+If the PicoCalc keyboard firmware is older than 1.4, follow the [official guide](https://github.com/clockworkpi/PicoCalc/wiki/Setting-Up-Arduino-Development-for-PicoCalc-keyboard) to update before flashing. The `MM.INFO` commands above won't work on older firmware.
 
-Change CMakeLists.txt line 4 to determine which variant to build<br>
-<br>
-RP2040<br>
-set(COMPILE PICO)<br>
-set(COMPILE VGA)<br>
-set(COMPILE PICOUSB)<br>
-set(COMPILE VGAUSB)<br>
-set(COMPILE WEB)<br>
-<br>
-RP2350<br>
-set(COMPILE PICORP2350)<br>
-set(COMPILE VGARP2350)<br>
-set(COMPILE PICOUSBRP2350)<br>
-set(COMPILE VGAUSBRP2350)<br>
-set(COMPILE HDMI)<br>
-set(COMPILE HDMIUSB)<br>
-set(COMPILE WEBRP2350)<br>
-<br>
-Any of the RP2350 variants or the RP2040 variants can be built by simply changing the set(COMPILE aaaa)<br>
-However, to swap between a rp2040 build and a rp2350 build (or visa versa) needs a different build directory.
-The process for doing this is as follows:<br>
-Close VSCode<br>
-Rename the current build directory - e.g. build -> buildrp2040<br>
-Rename the inactive build directory - e.g. buildrp2350 -> build<br>
-edit CMakeLists.txt to choose a setting for the other chip and save it - e.g.  set(COMPILE PICO) -> set(COMPILE PICORP2350)<br>
-Restart VSCode<br>
+## Documentation
+
+- [docs/real-hal-plan.md](docs/real-hal-plan.md): the hardware abstraction refactor.
+- [docs/upstream-catchup-plan.md](docs/upstream-catchup-plan.md): how upstream features are ported in.
+- [docs/vm-architecture.md](docs/vm-architecture.md): bytecode VM design notes.
+- [docs/adding-a-new-port.md](docs/adding-a-new-port.md): how to add a new device or simulation port.
+
+For the BASIC language itself, see Geoff Graham's MMBasic manuals and Peter Mather's PicoMite User Manual.
+
+## License and copyright
+
+MMBasic is licensed under the terms in [Version.h](Version.h). The license requires that the name MMBasic be used when referring to the interpreter and that the original copyright lines be displayed at startup. Both conditions are honored on every target's boot banner.
+
+```
+Copyright 2011-2026 Geoff Graham
+Copyright 2016-2026 Peter Mather
+MMBasic Anywhere - Copyright 2025-2026 Josh Vanderberg
+```
+
+Upstream PicoMite (Peter Mather): https://github.com/UKTailwind/PicoMiteAllVersions  
+Original MMBasic (Geoff Graham): https://geoffg.net/maximite.html

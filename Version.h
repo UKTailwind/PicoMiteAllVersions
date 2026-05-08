@@ -29,9 +29,10 @@ list all
 
 
 
-#define VERSION         "6.01.00b10"			    // define the version number
-#define YEAR			"2011-2025"			    // and the year
-#define YEAR2          "2016-2025"
+#define VERSION         "MMBA 1.0.0"                // MMBasic Anywhere release
+#define YEAR            "2011-2026"                 // Geoff Graham — original MMBasic
+#define YEAR2           "2016-2026"                 // Peter Mather — PicoMite port
+#define YEAR3           "2025-2026"                 // Josh Vanderberg — MMBasic Anywhere
 #ifdef rp2350
 #define CHIP    "RP2350 "
 #else
@@ -39,8 +40,12 @@ list all
 #endif
 
 /* Trailing copyright lines — identical across device and host so the
- * REPL banner function (MMBasic_PrintBanner) can emit them once. */
+ * REPL banner function (MMBasic_PrintBanner) can emit them once.
+ * Per Version.h license clause 3, the original MMBasic copyright lines
+ * must remain on the startup banner; additional copyright messages may
+ * be added (this is the "may be added" line). */
 #define MMBASIC_COPYRIGHT   "Copyright " YEAR " Geoff Graham\r\n"\
                             "Copyright " YEAR2 " Peter Mather\r\n"\
-                            "Bytecode VM by Josh V\r\n\r\n"
+                            "MMBasic Anywhere - Copyright " YEAR3 " Josh Vanderberg\r\n"\
+                            "Bytecode VM, HAL refactor, host/WASM/stdio ports\r\n\r\n"
 /*  @endcond */

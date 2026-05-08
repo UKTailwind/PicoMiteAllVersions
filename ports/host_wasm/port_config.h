@@ -25,6 +25,13 @@
 #define HAL_PORT_HEAP_MEMORY_SIZE (8 * 1024 * 1024)
 
 #define MAX_PROG_SIZE (512 * 1024)
-#define MMBASIC_BANNER_NAME "MMBasic Web"
+
+/* Override the host_native banner. WASM canvas font is 7-bit ASCII, so
+ * keep all banner strings ASCII-only (em/en-dashes render as boxes). */
+#undef MMBASIC_BANNER_NAME
+#define MMBASIC_BANNER_NAME "MMBasic Anywhere (web)"
+
+#undef MMBASIC_BANNER_TRAILER
+#define MMBASIC_BANNER_TRAILER "Browser REPL.\r\n\r\n"
 
 #endif /* HOST_WASM_PORT_CONFIG_H */

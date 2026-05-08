@@ -31,7 +31,7 @@ extern int MMPromptPos;
  * trailer is shared (Version.h MMBASIC_COPYRIGHT). */
 void MMBasic_PrintBanner(void) {
 #ifdef MMBASIC_BANNER_NAME
-    MMPrintString("\r" MMBASIC_BANNER_NAME " V" VERSION "\r\n");
+    MMPrintString("\r" MMBASIC_BANNER_NAME " " VERSION "\r\n");
     MMPrintString(MMBASIC_COPYRIGHT);
 #ifdef MMBASIC_BANNER_TRAILER
     MMPrintString(MMBASIC_BANNER_TRAILER);

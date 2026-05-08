@@ -106,12 +106,16 @@
 /* Host uses a deterministic seed for test reproducibility. */
 #define HAL_PORT_RANDOMIZE_DEFAULT_SEED() ((int64_t)42)
 
-/* REPL sign-on banner. MMBasic_REPL.c renders "\r<NAME> V<VERSION>\r\n"
+/* REPL sign-on banner. MMBasic_REPL.c renders "\r<NAME> <VERSION>\r\n"
  * when MMBASIC_BANNER_NAME is defined; if MMBASIC_BANNER_TRAILER is
  * also defined, it follows the copyright line. Device ports define
- * neither and fall through to the runtime `banner[]` array. */
-#define MMBASIC_BANNER_NAME              "PicoMite MMBasic Host"
-#define MMBASIC_BANNER_TRAILER           "Host REPL — Ctrl-D to exit.\r\n\r\n"
+ * neither and fall through to the runtime `banner[]` array.
+ *
+ * Strings are restricted to 7-bit ASCII so the WASM canvas console's
+ * bitmap font can render them — em-dash / en-dash / typographic quotes
+ * fall back to box glyphs in the browser. */
+#define MMBASIC_BANNER_NAME              "MMBasic Anywhere (host)"
+#define MMBASIC_BANNER_TRAILER           "Host REPL - Ctrl-D to exit.\r\n\r\n"
 
 /* BCCrashInfo storage placement — host has no persistent section,
  * so use plain BSS. */
