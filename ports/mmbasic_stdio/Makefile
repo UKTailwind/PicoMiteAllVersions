@@ -25,7 +25,7 @@ CFLAGS = -std=gnu11 -g -Os -flto -Wall -Wno-unused-variable -Wno-unused-function
          -Wno-unused-but-set-variable -Wno-misleading-indentation \
          -Wno-missing-braces -funsigned-char \
          -ffunction-sections -fdata-sections \
-         -DMMBASIC_HOST -DMMBASIC_STDIO $(SIM_FLAGS) \
+         -DMMBASIC_HOST -DMMBASIC_STDIO -DFF_MAX_LFN_LARGE $(SIM_FLAGS) \
          -include host_platform.h \
          -I$(PORT_DIR) -I$(REPO_ROOT)/ports/host_native -I$(REPO_ROOT) \
          -MMD -MP
@@ -62,7 +62,7 @@ BC_SRCS = bc_alloc.c bc_bridge.c vm_host_fat.c ff.c ffunicode.c ffsystem.c \
 # deliberately omitted: the stdio port has no framebuffer, no raw tty,
 # no argv-parsing loader (main.c here replaces it).
 NATIVE_SRCS = host_runtime.c host_fs_shims.c host_peripheral_stubs.c host_fs.c \
-              host_sim_audio.c host_time.c host_keys.c \
+              host_sim_audio.c host_sim_slowdown.c host_sim_emit_stub.c host_time.c host_keys.c \
               hal_flash_host.c hal_time_host.c hal_pin_host.c hal_storage_host.c \
               hal_filesystem_host.c hal_keyboard_host.c hal_audio_host.c hal_vm_framebuffer_host.c
 

@@ -10,10 +10,6 @@
 #include <setjmp.h>
 #include <string.h>
 
-#ifdef MMBASIC_WASM
-#include <emscripten.h>
-#endif
-
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
 #include "bytecode.h"
@@ -21,16 +17,15 @@
 #include "host_sim_server.h"
 #include "host_time.h"
 
+/* Host-port resync hook. Native returns the input unchanged; WASM
+ * checks the wall clock and skips ahead if the deadline drifted
+ * past >2 frames behind real time (GC pause, tab visibility flip).
+ * Impls in ports/{host_native,host_wasm}/host_fastgfx_resync.c. */
+extern uint64_t host_fastgfx_resync_after_sleep(uint64_t next_sync_us, uint64_t frame_us);
+
 static int host_fastgfx_active = 0;
 static int host_fastgfx_fps = 0;
 static uint64_t host_fastgfx_next_sync_us = 0;
-
-#ifdef MMBASIC_WASM
-/* Written from JS every requestAnimationFrame — kept exported for
- * smoke tests that want to observe the main-thread rAF cadence from
- * wasm's vantage point. bc_fastgfx_sync no longer spins on it. */
-volatile uint32_t wasm_vsync_counter = 0;
-#endif
 
 void host_fastgfx_reset_state(void) {
     host_fastgfx_active = 0;
@@ -50,9 +45,7 @@ void bc_fastgfx_swap(void) {
     memcpy(host_framebuffer, host_fastgfx_back, pixels * sizeof(uint32_t));
     /* Tell the WASM rAF loop there's a new frame to paint. */
     host_fb_bump_generation();
-#ifdef MMBASIC_SIM
     host_sim_emit_blit(0, 0, host_fb_width, host_fb_height, host_fastgfx_back);
-#endif
 }
 
 void bc_fastgfx_sync(void) {
@@ -62,17 +55,7 @@ void bc_fastgfx_sync(void) {
     if (host_fastgfx_next_sync_us == 0) host_fastgfx_next_sync_us = now + frame_us;
     if (now < host_fastgfx_next_sync_us) host_sleep_us(host_fastgfx_next_sync_us - now);
     host_fastgfx_next_sync_us += frame_us;
-#ifdef MMBASIC_WASM
-    /* If we fell more than two frames behind the nominal deadline
-     * (e.g. a one-off GC pause or tab visibility change), resync to
-     * wall clock so we don't spend the rest of the session spinning
-     * to catch up. */
-    now = host_time_us_64();
-    if (host_fastgfx_next_sync_us + 2 * frame_us < now) {
-        host_fastgfx_next_sync_us = now + frame_us;
-    }
-    (void)wasm_vsync_counter;
-#endif
+    host_fastgfx_next_sync_us = host_fastgfx_resync_after_sleep(host_fastgfx_next_sync_us, frame_us);
 }
 
 void bc_fastgfx_create(void) {

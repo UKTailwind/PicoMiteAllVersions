@@ -134,6 +134,17 @@ STRICT_FILES=(
               # check.
 )
 
+# Host-port WASM-clean scope: ports/host_native/*.c must not bleed
+# WASM-specific code. The narrower check (vs. STRICT_FILES) lets the
+# gate land before pre-existing rp2350 simulation ifdefs in
+# host_peripheral_stubs.c / host_runtime.c are cleaned up — those are
+# unrelated to the WASM/native split. Headers are skipped because
+# port_config.h legitimately defines HAL_PORT_* values.
+HOST_WASM_CLEAN_MACROS=(MMBASIC_WASM __EMSCRIPTEN__)
+shopt -s nullglob
+HOST_NATIVE_FILES=(ports/host_native/*.c)
+shopt -u nullglob
+
 # Files tracked informationally (report counts, do not fail).
 INFO_FILES=(
   Draw.c
@@ -238,6 +249,21 @@ check_file_strict() {
   fi
 }
 
+check_file_no_wasm() {
+  local file="$1"
+  [[ -f "$file" ]] || return 0
+  local alt
+  alt="$(IFS='|'; echo "${HOST_WASM_CLEAN_MACROS[*]}")"
+  local pat="${ALL_IFDEF_RE}.*\\b(${alt})\\b"
+  local hits
+  hits="$(grep -nE "$pat" "$file" || true)"
+  if [[ -n "$hits" ]]; then
+    echo "HAL-PURITY FAIL: $file references WASM-specific macros"
+    echo "$hits" | sed 's/^/    /'
+    fail=1
+  fi
+}
+
 check_file_info() {
   local file="$1"
   if [[ ! -f "$file" ]]; then
@@ -282,6 +308,20 @@ for f in ${STRICT_FILES[@]+"${STRICT_FILES[@]}"}; do
 done
 if [[ $fail -eq 0 ]]; then
   echo "    (all strict files clean)"
+fi
+
+echo
+echo "Host-port WASM-clean scope (ports/host_native/*.c must not bleed WASM):"
+if [[ ${#HOST_NATIVE_FILES[@]} -eq 0 ]]; then
+  echo "    (no host_native sources found)"
+else
+  pre_fail=$fail
+  for f in "${HOST_NATIVE_FILES[@]}"; do
+    check_file_no_wasm "$f"
+  done
+  if [[ $fail -eq $pre_fail ]]; then
+    echo "    (all host_native sources WASM-clean)"
+  fi
 fi
 
 echo

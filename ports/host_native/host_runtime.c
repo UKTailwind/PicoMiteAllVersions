@@ -30,9 +30,6 @@
 #include <sys/stat.h>
 #include <time.h>
 
-#ifdef MMBASIC_WASM
-#include <emscripten.h>
-#endif
 #include "host_terminal.h"
 #include "host_fs.h"
 #include "host_sim_audio.h"
@@ -439,42 +436,14 @@ int host_runtime_timed_out(void) {
 }
 
 /*
- * --slowdown throttle. Non-zero means sleep this many microseconds per
- * poll-tick. The interpreter pokes host_runtime_check_timeout on every
- * statement / MMInkey / routinechecks call; the VM pokes
- * host_sim_apply_slowdown from bc_vm_poll_interrupts on every backward
- * branch. host_sleep_us bumps the msec counter so PAUSE / TIMER / tick
- * interrupts stay on real wall-clock time even when execution crawls.
+ * --slowdown throttle. host_sim_apply_slowdown is implemented per-port
+ * (ports/host_native/host_sim_slowdown.c, ports/host_wasm/host_sim_slowdown.c)
+ * because the two ports need different timing primitives — native sleeps
+ * directly, WASM accumulates to ms-boundaries around ASYNCIFY's 1 ms floor.
+ * Storage for host_sim_slowdown_us lives alongside each impl.
  */
-int host_sim_slowdown_us = 0;
-
-#ifdef MMBASIC_WASM
-/*
- * On WASM, host_sleep_us floors to 1 ms (ASYNCIFY has to unwind to the
- * browser event loop, which ticks no faster than ~1 ms). If we called
- * it naively every statement, a setting of even 1 µs would pay a full
- * ms per statement — orders of magnitude slower than the user wants.
- *
- * Accumulate instead: add the requested µs to a carry and only actually
- * sleep when the carry crosses whole-millisecond boundaries. A 100 µs
- * setting then translates to "sleep 1 ms every ~10 statements", giving
- * true sub-millisecond average pacing at a cost of burstier timing.
- */
-void host_sim_apply_slowdown(void) {
-    if (host_sim_slowdown_us <= 0) return;
-    static uint64_t accumulator_us = 0;
-    accumulator_us += (uint64_t)host_sim_slowdown_us;
-    if (accumulator_us >= 1000ULL) {
-        uint64_t whole_ms = accumulator_us / 1000ULL;
-        accumulator_us -= whole_ms * 1000ULL;
-        host_sleep_us(whole_ms * 1000ULL);
-    }
-}
-#else
-void host_sim_apply_slowdown(void) {
-    if (host_sim_slowdown_us > 0) host_sleep_us((uint64_t)host_sim_slowdown_us);
-}
-#endif
+extern int host_sim_slowdown_us;
+extern void host_sim_apply_slowdown(void);
 
 static void host_runtime_check_timeout(void) {
     host_framebuffer_service();

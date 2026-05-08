@@ -53,12 +53,12 @@ SETUP PICOCALC FIRMWARE
 mkdir -p ~/picocalc && cd ~/picocalc
 git clone https://github.com/madcock/PicoMiteAllVersions.git
 cd PicoMiteAllVersions
-mv ~/pico/pico-sdk/src/rp2_common/hardware_gpio/gpio.c ~/pico/pico-sdk/src/rp2_common/hardware_gpio/gpio.bak
-ln -s ~/picocalc/PicoMiteAllVersions/gpio.c ~/pico/pico-sdk/src/rp2_common/hardware_gpio/gpio.c
-mv ~/pico/pico-sdk/src/rp2_common/hardware_gpio/include/hardware/gpio.h ~/pico/pico-sdk/src/rp2_common/hardware_gpio/include/hardware/gpio.bak
-ln -s ~/picocalc/PicoMiteAllVersions/gpio.h ~/pico/pico-sdk/src/rp2_common/hardware_gpio/include/hardware/gpio.h
-
 ```
+
+(No pico-sdk patching is required. The RAM-resident GPIO IRQ dispatcher
+that previously needed an `hardware_gpio/gpio.c` swap now lives in
+`picomite_gpio_irq.c` and is linked in by the build.)
+
 EDIT ``~/picocalc/PicoMiteAllVersions/CMakeLists.txt`` TO CHOOSE TARGET
 -----------------------------------------------------------------------
 ```makefile
@@ -117,7 +117,7 @@ For keyboard-driven host tests, `mmbasic_test` supports `--keys TEXT` and `--key
 This contains files to build MMbasic 6.01.00b10 to run on both RP2040 and RP2350<br>
 Compile with GCC 13.3.1 arm-none-eabi<br>
 
-<b style="color:red;"> Build with sdk V2.2.0 but replace gpio.c, gpio.h with the ones included here<br></b>
+<b style="color:red;"> Build with sdk V2.2.0. (Note: in this fork the pico-sdk gpio.c / gpio.h replacement is no longer needed — the RAM-resident GPIO IRQ dispatcher lives in <code>picomite_gpio_irq.c</code>.)<br></b>
 
 Change CMakeLists.txt line 4 to determine which variant to build<br>
 <br>

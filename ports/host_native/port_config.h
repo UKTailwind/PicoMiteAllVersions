@@ -106,13 +106,21 @@
 /* Host uses a deterministic seed for test reproducibility. */
 #define HAL_PORT_RANDOMIZE_DEFAULT_SEED() ((int64_t)42)
 
+/* REPL sign-on banner. MMBasic_REPL.c renders "\r<NAME> V<VERSION>\r\n"
+ * when MMBASIC_BANNER_NAME is defined; if MMBASIC_BANNER_TRAILER is
+ * also defined, it follows the copyright line. Device ports define
+ * neither and fall through to the runtime `banner[]` array. */
+#define MMBASIC_BANNER_NAME              "PicoMite MMBasic Host"
+#define MMBASIC_BANNER_TRAILER           "Host REPL — Ctrl-D to exit.\r\n\r\n"
+
 /* BCCrashInfo storage placement — host has no persistent section,
  * so use plain BSS. */
 #define HAL_PORT_BC_CRASH_INFO_ATTR
 
-/* Stage-D per-port memory + clock + MMBasic-table values. Host overrides
- * HEAP_MEMORY_SIZE in configuration.h via MMBASIC_WASM / MMBASIC_ANSI;
- * these defaults are inherited by mmbasic_test (BC_SIM_RP2040 profile). */
+/* Stage-D per-port memory + clock + MMBasic-table values. Native host
+ * default (128 KB) matches the rp2040 device profile. The WASM and
+ * ANSI ports override HAL_PORT_HEAP_MEMORY_SIZE in their own
+ * port_config.h via #undef + redef on top of this file. */
 #define HAL_PORT_HEAP_MEMORY_SIZE        (128 * 1024)
 #define HAL_PORT_MAX_CPU                 420000
 #define HAL_PORT_MIN_CPU                 48000

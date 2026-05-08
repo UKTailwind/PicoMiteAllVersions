@@ -23,18 +23,19 @@
 extern int MMPromptPos;
 
 /* Sign-on banner. Called once at entry by both PicoMite.c (device) and
- * host_main.c (host) so the text lives in one place. Device uses the
- * runtime `banner` array (patched for rp2350a/b variants, etc.);
- * host emits a "Host V<VERSION>" line. Copyright trailer is shared
- * (Version.h MMBASIC_COPYRIGHT). */
+ * host_main.c (host) so the text lives in one place. Device ports define
+ * neither MMBASIC_BANNER_NAME nor MMBASIC_BANNER_TRAILER and fall back to
+ * the runtime `banner` array (patched for rp2350a/b variants, etc.).
+ * Host ports supply MMBASIC_BANNER_NAME (e.g. "PicoMite MMBasic Host")
+ * via port_config.h; native host also supplies a trailer line. Copyright
+ * trailer is shared (Version.h MMBASIC_COPYRIGHT). */
 void MMBasic_PrintBanner(void) {
-#if defined(MMBASIC_WASM)
-    MMPrintString("\rMMBasic Web V" VERSION "\r\n");
+#ifdef MMBASIC_BANNER_NAME
+    MMPrintString("\r" MMBASIC_BANNER_NAME " V" VERSION "\r\n");
     MMPrintString(MMBASIC_COPYRIGHT);
-#elif defined(MMBASIC_HOST)
-    MMPrintString("\rPicoMite MMBasic Host V" VERSION "\r\n");
-    MMPrintString(MMBASIC_COPYRIGHT);
-    MMPrintString("Host REPL — Ctrl-D to exit.\r\n\r\n");
+#ifdef MMBASIC_BANNER_TRAILER
+    MMPrintString(MMBASIC_BANNER_TRAILER);
+#endif
 #else
     extern char banner[];
     MMPrintString(banner);

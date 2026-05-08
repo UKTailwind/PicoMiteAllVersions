@@ -26,7 +26,7 @@ endif
 CFLAGS = -std=gnu11 -g -O2 -Wall -Wno-unused-variable -Wno-unused-function \
          -Wno-unused-but-set-variable -Wno-misleading-indentation \
          -Wno-missing-braces -funsigned-char \
-         -DMMBASIC_HOST -DMMBASIC_ANSI $(SIM_FLAGS) \
+         -DMMBASIC_HOST -DMMBASIC_ANSI -DFF_MAX_LFN_LARGE $(SIM_FLAGS) \
          -include host_platform.h \
          -I$(PORT_DIR) -I$(HOST_DIR) -I$(REPO_ROOT) \
          -MMD -MP
@@ -43,6 +43,7 @@ CORE_SRCS += Draw.c RGB121.c Tilemap.c FileIO.c Audio.c BmpDecoder.c re.c picojp
 CORE_SRCS += audio_mp3_stub.c spi_lcd_mem332_stub.c display_merge_stub.c vga_ops_stub.c
 CORE_SRCS += gfx_3d.c upng_sprite_stub.c gui_touch_stub.c gui_controls_stub.c psram_heap_stub.c i2c_keypad_stub.c heartbeat_stub.c
 CORE_SRCS += editor_console_stub.c
+CORE_SRCS += display_pixel_host.c
 
 BC_SRCS = bc_alloc.c bc_bridge.c vm_host_fat.c ff.c ffunicode.c ffsystem.c \
           vm_sys_input.c vm_sys_graphics.c vm_sys_time.c vm_sys_pin_host.c vm_sys_file_host.c \
@@ -51,8 +52,8 @@ BC_SRCS = bc_alloc.c bc_bridge.c vm_host_fat.c ff.c ffunicode.c ffsystem.c \
 # host_native sources reused wholesale. Omit host_main.c (we supply our
 # own entry); host_fastgfx.c ships the cmd_fastgfx / cmd_framebuffer /
 # bc_fastgfx_* syscalls, so it has to link.
-NATIVE_SRCS = host_runtime.c host_fastgfx.c host_fs_shims.c host_peripheral_stubs.c \
-              host_terminal.c host_fs.c host_sim_audio.c host_time.c \
+NATIVE_SRCS = host_runtime.c host_fastgfx.c host_fastgfx_resync.c host_fs_shims.c host_peripheral_stubs.c \
+              host_terminal.c host_fs.c host_sim_audio.c host_sim_slowdown.c host_sim_emit_stub.c host_time.c \
               host_fb.c host_keys.c \
               hal_flash_host.c hal_time_host.c hal_pin_host.c hal_storage_host.c \
               hal_filesystem_host.c hal_keyboard_host.c hal_audio_host.c hal_vm_framebuffer_host.c
@@ -120,6 +121,9 @@ $(BUILD_DIR)/%.o: $(REPO_ROOT)/drivers/psram_heap/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c -o $@ $<
 $(BUILD_DIR)/%.o: $(REPO_ROOT)/drivers/editor_console/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c -o $@ $<
+$(BUILD_DIR)/%.o: $(REPO_ROOT)/drivers/display_pixel_host/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c -o $@ $<
 

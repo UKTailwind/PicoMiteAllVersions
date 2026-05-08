@@ -36,7 +36,7 @@ CFLAGS = -O2 -std=gnu11 -funsigned-char \
          -Wall -Wno-unused-variable -Wno-unused-function \
          -Wno-unused-but-set-variable -Wno-misleading-indentation \
          -Wno-missing-braces \
-         -DMMBASIC_HOST -DMMBASIC_WASM $(SIM_FLAGS) \
+         -DMMBASIC_HOST -DMMBASIC_WASM -DFF_MAX_LFN_LARGE $(SIM_FLAGS) \
          -include host_platform.h \
          -I$(WASM_DIR) -I$(NATIVE_DIR) -I$(REPO_ROOT) \
          -MMD -MP \
@@ -92,11 +92,12 @@ BC_SRCS = bc_alloc.c bc_bridge.c vm_host_fat.c \
 # and adds the JS-facing canvas bridge.
 HOST_PORTABLE_SRCS = host_runtime.c host_fastgfx.c host_fs_shims.c \
                      host_peripheral_stubs.c host_fs.c \
+                     host_sim_emit_stub.c \
                      host_time.c host_fb.c host_keys.c \
                      hal_flash_host.c hal_time_host.c hal_pin_host.c hal_storage_host.c hal_filesystem_host.c \
                      hal_keyboard_host.c hal_audio_host.c hal_vm_framebuffer_host.c
 HOST_WASM_SRCS = host_wasm_main.c host_wasm_console.c host_wasm_canvas.c \
-                 host_wasm_audio.c
+                 host_wasm_audio.c host_sim_slowdown.c host_fastgfx_resync.c
 
 SRCS = $(HOST_PORTABLE_SRCS) $(HOST_WASM_SRCS) $(CORE_SRCS) $(BC_SRCS)
 OBJS = $(addprefix $(BUILD_DIR)/,$(SRCS:.c=.o))
@@ -114,15 +115,20 @@ all: $(TARGET)
 $(TARGET): $(OBJS) $(DEMO_FILES)
 	@mkdir -p $(WEB_DIR)
 	$(EMCC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJS)
+	@$(REPO_ROOT)/tools/check_wasm_symbols.sh
 
 # Per-source-family compile rules (no VPATH on the object side so
 # make doesn't rediscover stale .o files if another port's build
 # landed objects in an overlapping tree).
-$(BUILD_DIR)/%.o: $(NATIVE_DIR)/%.c
+#
+# WASM_DIR rule comes before NATIVE_DIR so port-specific overrides
+# (e.g. host_sim_slowdown.c lives in both — WASM has its own
+# accumulator impl) resolve to the WASM copy.
+$(BUILD_DIR)/%.o: $(WASM_DIR)/%.c
 	@mkdir -p $(dir $@)
 	$(EMCC) $(CFLAGS) -c -o $@ $<
 
-$(BUILD_DIR)/%.o: $(WASM_DIR)/%.c
+$(BUILD_DIR)/%.o: $(NATIVE_DIR)/%.c
 	@mkdir -p $(dir $@)
 	$(EMCC) $(CFLAGS) -c -o $@ $<
 

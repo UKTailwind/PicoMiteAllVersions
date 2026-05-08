@@ -21,9 +21,10 @@
 #include "bytecode.h"
 #include "host_fb.h"
 #include "host_time.h"
-#ifdef MMBASIC_SIM
-#include "host_sim_server.h"  /* host_sim_emit_* / host_sim_cmds_target_is_front */
-#endif
+/* host_sim_emit_* / host_sim_cmds_target_is_front: strong impl in
+ * host_sim_server.c (sim variant only); weak no-ops in
+ * host_sim_emit_stub.c cover every other build. */
+#include "host_sim_server.h"
 
 /* ------------------------------------------------------------------------
  * State.
@@ -128,14 +129,13 @@ static void host_fb_copy_now(uint32_t *src, uint32_t *dst) {
     pixels = (size_t)host_fb_width * (size_t)host_fb_height;
     memcpy(dst, src, pixels * sizeof(*dst));
     if (dst == host_framebuffer) host_fb_bump_generation();
-#ifdef MMBASIC_SIM
     /* If we just wrote the front buffer, tell the browser — otherwise
      * FRAMEBUFFER COPY F,N updates pixels locally but nothing reaches
-     * the WS client. One BLIT per presented frame, same as FASTGFX. */
+     * the WS client. One BLIT per presented frame, same as FASTGFX.
+     * No-op weak stub on non-sim builds. */
     if (dst == host_framebuffer) {
         host_sim_emit_blit(0, 0, host_fb_width, host_fb_height, dst);
     }
-#endif
 }
 
 static void host_fb_complete_pending_copy(void) {
@@ -157,9 +157,7 @@ void host_fb_put_pixel(int x, int y, int c) {
     if (x < 0 || y < 0 || x >= host_fb_width || y >= host_fb_height) return;
     target[(size_t)y * (size_t)host_fb_width + (size_t)x] = host_fb_colour24(c);
     if (target == host_framebuffer) host_fb_bump_generation();
-#ifdef MMBASIC_SIM
     host_sim_emit_pixel(x, y, c);
-#endif
 }
 
 void host_fb_fill_rect(int x1, int y1, int x2, int y2, int c) {
@@ -181,9 +179,7 @@ void host_fb_fill_rect(int x1, int y1, int x2, int y2, int c) {
         }
     }
     if (target == host_framebuffer) host_fb_bump_generation();
-#ifdef MMBASIC_SIM
     host_sim_emit_rect(x1, y1, x2, y2, c);
-#endif
 }
 
 /* ------------------------------------------------------------------------
@@ -267,9 +263,7 @@ void host_fb_scroll_lcd(int lines) {
      * page-ups past the top of the viewport. */
     host_fb_ensure();
     if (!host_framebuffer || lines == 0) return;
-#ifdef MMBASIC_SIM
     host_sim_emit_scroll(lines, gui_bcolour);
-#endif
 
     int row_pixels = host_fb_width;
     uint32_t fill = host_fb_colour24(gui_bcolour);
@@ -343,9 +337,7 @@ void host_framebuffer_clear_target(int colour) {
     uint32_t *target = host_fb_current_target();
     host_fb_fill_buffer(target, host_fb_colour24(colour));
     if (target == host_framebuffer) host_fb_bump_generation();
-#ifdef MMBASIC_SIM
     if (host_sim_cmds_target_is_front()) host_sim_emit_cls(colour);
-#endif
 }
 
 void host_framebuffer_create(void) {

@@ -39,10 +39,11 @@ int  host_sim_pop_key(void);
  * the server thread calls host_sim_cmd_drain() on its broadcast tick and
  * forwards the opcode bytes as one "CMDS" WebSocket message.
  *
- * Non-sim builds don't link host_sim_server.c, so the emit_* calls at
- * the call sites must all be inside #ifdef MMBASIC_SIM guards. The cmd
- * stream is a no-op when host_sim_active == 0 (e.g. test harness or
- * before the server starts).
+ * Non-sim builds (test harness, WASM, ANSI, stdio) don't link
+ * host_sim_server.c. They link host_sim_emit_stub.c instead, which
+ * provides weak no-ops for every emit_* + host_sim_cmds_target_is_front;
+ * the strong defs in host_sim_server.c override at link time when the
+ * sim variant is built. Call sites stay unconditional.
  */
 int  host_sim_cmds_target_is_front(void);
 void host_sim_emit_cls(int colour);

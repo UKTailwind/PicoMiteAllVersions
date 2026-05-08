@@ -106,14 +106,14 @@
 
 
 #define FF_USE_LFN		1
-#if defined(MMBASIC_HOST) || defined(MMBASIC_WASM)
-/* Every host build runs against real POSIX paths via host_fs_shims.c —
+#ifdef FF_MAX_LFN_LARGE
+/* Host-style ports run against real POSIX paths via host_fs_shims.c —
  * cwds easily exceed FatFS's 8.3-tuned 63-byte ceiling, and many buffers
  * in FileIO.c (filepath/fullpathname/fullfilepathname in cmd_load / cmd_save
  * / cmd_run / chdir, Editor backup path) are sized FF_MAX_LFN. Size them up
  * to FatFS's hardcoded 255-byte ceiling (ff.c:505) so run/load/chdir from a
  * deep directory doesn't truncate the resolved path and turn into "Could
- * not find the file".
+ * not find the file". Each host-style Makefile sets -DFF_MAX_LFN_LARGE.
  *
  * Cost: flist[] (cmd_files) = HAL_PORT_FILES_MAX × sizeof(s_flist{char
  * fn[FF_MAX_LFN]; …}). To keep the test harness inside its 128 KB heap,
