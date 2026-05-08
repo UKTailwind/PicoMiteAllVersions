@@ -40,7 +40,8 @@ target_sources(PicoMite PRIVATE
     # Non-PICOMITE stubs.
     ${CMAKE_SOURCE_DIR}/drivers/display_merge/display_merge_stub.c
     ${CMAKE_SOURCE_DIR}/drivers/vm_framebuffer_unsupported/vm_framebuffer_stub.c
-    ${CMAKE_SOURCE_DIR}/drivers/spi_lcd/spi_lcd_fastgfx_stub.c
+    ${CMAKE_SOURCE_DIR}/drivers/display_pixel_readbuffer/display_pixel_readbuffer.c
+    ${CMAKE_SOURCE_DIR}/drivers/fastgfx_minimal/fastgfx_minimal.c
 
     # rp2040 stubs.
     ${CMAKE_SOURCE_DIR}/drivers/audio_mp3/audio_mp3_stub.c

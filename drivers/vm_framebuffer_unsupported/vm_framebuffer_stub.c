@@ -7,6 +7,9 @@
  * buffer and there's no meaningful "merge" or "swap". Each entry
  * errors when actually invoked; the runtime/service/shutdown ones
  * are silent no-ops so the VM's per-tick service call stays cheap.
+ *
+ * Pixel readback is a separate concern handled by drivers/
+ * display_pixel_readbuffer/, not part of this surface.
  */
 
 #include <stdint.h>
@@ -35,9 +38,4 @@ void hal_vm_framebuffer_wait(void) { vm_fb_err("FRAMEBUFFER not supported"); }
 void hal_vm_framebuffer_copy(char from, char to, int background) {
     (void)from; (void)to; (void)background;
     vm_fb_err("FRAMEBUFFER not supported");
-}
-int32_t hal_vm_framebuffer_pixel(int x, int y) {
-    (void)x; (void)y;
-    vm_fb_err("PIXEL not supported on this display");
-    return 0;
 }

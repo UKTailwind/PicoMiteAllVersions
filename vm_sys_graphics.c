@@ -18,6 +18,7 @@
 
 #include "hal/hal_display_merge.h"
 #include "hal/hal_vm_framebuffer.h"
+#include "hal/hal_display_pixel.h"
 
 typedef struct VMGfxScratchBuffer {
     void *ptr;
@@ -1678,7 +1679,7 @@ void vm_sys_graphics_pixel_execute(GfxPixelMode mode, const GfxPixelArg *args, i
 
 int vm_sys_graphics_read_pixel(int x, int y) {
     if (HRes <= 0 || VRes <= 0) error("Display not configured");
-    return (int)hal_vm_framebuffer_pixel(x, y);
+    return (int)hal_display_pixel_read(x, y);
 }
 
 void vm_sys_graphics_service(void) {

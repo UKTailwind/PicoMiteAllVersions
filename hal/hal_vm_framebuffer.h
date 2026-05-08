@@ -75,11 +75,6 @@ void hal_vm_framebuffer_wait(void);
  * another. */
 void hal_vm_framebuffer_copy(char from, char to, int background);
 
-/* PIXEL(x, y) — read the pixel at (x,y) from the current WriteBuf
- * plane, as 24-bit RGB. Returns -1 on targets that don't support
- * pixel read-back. */
-int32_t hal_vm_framebuffer_pixel(int x, int y);
-
 #ifdef __cplusplus
 }
 #endif

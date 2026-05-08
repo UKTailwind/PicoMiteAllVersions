@@ -19,8 +19,6 @@ extern void host_framebuffer_sync(void);
 extern void host_framebuffer_wait(void);
 extern void host_framebuffer_copy(char from, char to, int background);
 extern void host_framebuffer_service(void);
-extern uint32_t host_runtime_get_pixel(int x, int y);
-
 void hal_vm_framebuffer_shutdown_runtime(void) { host_framebuffer_shutdown_runtime(); }
 void hal_vm_framebuffer_service(void)          { host_framebuffer_service(); }
 void hal_vm_framebuffer_create(int fast)       { host_framebuffer_create(); (void)fast; }
@@ -36,7 +34,4 @@ void hal_vm_framebuffer_sync(void) { host_framebuffer_sync(); }
 void hal_vm_framebuffer_wait(void) { host_framebuffer_wait(); }
 void hal_vm_framebuffer_copy(char from, char to, int background) {
     host_framebuffer_copy(from, to, background);
-}
-int32_t hal_vm_framebuffer_pixel(int x, int y) {
-    return (int32_t)(host_runtime_get_pixel(x, y) & 0xFFFFFFu);
 }

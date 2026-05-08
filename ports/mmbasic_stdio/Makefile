@@ -50,6 +50,7 @@ CORE_SRCS += Draw.c RGB121.c Tilemap.c FileIO.c Audio.c BmpDecoder.c re.c picojp
 CORE_SRCS += audio_mp3_stub.c spi_lcd_mem332_stub.c display_merge_stub.c vga_ops_stub.c
 CORE_SRCS += gfx_3d.c upng_sprite_stub.c gui_touch_stub.c gui_controls_stub.c psram_heap_stub.c i2c_keypad_stub.c heartbeat_stub.c
 CORE_SRCS += editor_console_stub.c
+CORE_SRCS += display_pixel_host.c
 
 # Bytecode VM — the same set the native host links (so FRUN works).
 BC_SRCS = bc_alloc.c bc_bridge.c vm_host_fat.c ff.c ffunicode.c ffsystem.c \
@@ -128,6 +129,9 @@ $(BUILD_DIR)/%.o: $(REPO_ROOT)/drivers/psram_heap/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c -o $@ $<
 $(BUILD_DIR)/%.o: $(REPO_ROOT)/drivers/editor_console/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c -o $@ $<
+$(BUILD_DIR)/%.o: $(REPO_ROOT)/drivers/display_pixel_host/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c -o $@ $<
 

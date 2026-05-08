@@ -323,10 +323,3 @@ void hal_vm_framebuffer_copy(char from, char to, int background) {
     else restorepanel();
 }
 
-int32_t hal_vm_framebuffer_pixel(int x, int y) {
-    int p = 0;
-    if ((void *)ReadBuffer == (void *)DisplayNotSet)
-        error("Invalid on this display");
-    ReadBuffer(x, y, x, y, (unsigned char *)&p);
-    return (int32_t)(p & 0xFFFFFF);
-}

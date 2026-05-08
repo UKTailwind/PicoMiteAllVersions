@@ -51,7 +51,8 @@ target_sources(PicoMite PRIVATE
     # Non-PICOMITE stubs.
     ${CMAKE_SOURCE_DIR}/drivers/display_merge/display_merge_stub.c
     ${CMAKE_SOURCE_DIR}/drivers/vm_framebuffer_unsupported/vm_framebuffer_stub.c
-    ${CMAKE_SOURCE_DIR}/drivers/spi_lcd/spi_lcd_fastgfx_stub.c
+    ${CMAKE_SOURCE_DIR}/drivers/display_pixel_readbuffer/display_pixel_readbuffer.c
+    ${CMAKE_SOURCE_DIR}/drivers/fastgfx_minimal/fastgfx_minimal.c
 
     # Non-VGA stub. WEB has gui_touch.
     ${CMAKE_SOURCE_DIR}/drivers/vga_pio/vga_ops_stub.c

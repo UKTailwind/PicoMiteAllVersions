@@ -939,6 +939,14 @@ void MIPS64 __not_in_flash_func(*GetSystemMemory)(int size) { //get memory from 
             }
         } else n = 0;                                               // not enough space here so reset our count
     }
+    /* Main heap exhausted — fall back to PSRAM if the port has it.
+     * Mirrors GetMemory()'s fallback (line 992). The bottom-up
+     * allocator was added before PSRAM support and was overlooked when
+     * the PSRAM fallback was wired into GetMemory/TryGetMemory; this
+     * line brings parity. Per-call SUB/FUN argval buffers (~2.7 KB
+     * each from MMBasic.c) can otherwise exhaust the small main heap
+     * on high-res ports while 6 MB of PSRAM sits empty. */
+    if(PSRAMsize) return GetPSMemory(size);
     TempStringClearStart = 0;
     ClearTempMemory();                                               // hopefully this will give us enough to print the prompt
     error("Not enough Heap memory");
