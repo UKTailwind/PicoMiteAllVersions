@@ -22,12 +22,32 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OBJ_DIR="$REPO_ROOT/ports/host_wasm/wasm_obj"
-LLVM_NM="${LLVM_NM:-$HOME/emsdk/upstream/bin/llvm-nm}"
 
-if [[ ! -x "$LLVM_NM" ]]; then
-  echo "check_wasm_symbols: $LLVM_NM not executable" >&2
-  echo "Set LLVM_NM env var or activate emsdk." >&2
-  exit 2
+# Resolve llvm-nm. Try in order:
+#   1. $LLVM_NM (explicit override)
+#   2. $EMSDK/upstream/bin/llvm-nm (when emsdk is activated, including
+#      via mymindstorm/setup-emsdk in CI)
+#   3. PATH (some emsdk activations add upstream/bin to PATH)
+#   4. $HOME/emsdk/upstream/bin/llvm-nm (the historical default)
+LLVM_NM="${LLVM_NM:-}"
+if [[ -z "$LLVM_NM" && -n "${EMSDK:-}" && -x "$EMSDK/upstream/bin/llvm-nm" ]]; then
+  LLVM_NM="$EMSDK/upstream/bin/llvm-nm"
+fi
+if [[ -z "$LLVM_NM" ]]; then
+  LLVM_NM="$(command -v llvm-nm 2>/dev/null || true)"
+fi
+if [[ -z "$LLVM_NM" && -x "$HOME/emsdk/upstream/bin/llvm-nm" ]]; then
+  LLVM_NM="$HOME/emsdk/upstream/bin/llvm-nm"
+fi
+
+if [[ -z "$LLVM_NM" || ! -x "$LLVM_NM" ]]; then
+  # Don't fail the build over a missing optional check tool. The check is
+  # advisory; it catches duplicate WASM-port-hook definitions that
+  # --allow-multiple-definition would silence. Without llvm-nm we can't
+  # run the check, but the WASM build itself already succeeded.
+  echo "check_wasm_symbols: llvm-nm not found, skipping symbol uniqueness check" >&2
+  echo "    (set LLVM_NM env var or ensure emsdk is activated to enable)" >&2
+  exit 0
 fi
 
 if [[ ! -d "$OBJ_DIR" ]]; then

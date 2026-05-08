@@ -22,13 +22,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install toolchain
+      - name: Install arm-none-eabi toolchain
+        # Pinned to 14.2.Rel1 to match the local toolchain; Ubuntu's
+        # gcc-arm-none-eabi 13.2.1 produces ~4 KB larger binaries that
+        # push RP2040 VGA over the RAM limit.
+        uses: carlosperate/arm-none-eabi-gcc-action@v1
+        with:
+          release: '14.2.Rel1'
+
+      - name: Install build dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-              cmake ninja-build \
-              gcc-arm-none-eabi libnewlib-arm-none-eabi libstdc++-arm-none-eabi-newlib \
-              python3 build-essential
+              cmake ninja-build python3 build-essential
       - name: Check out Pico SDK
         uses: actions/checkout@v4
         with:
@@ -56,13 +62,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install toolchain
+      - name: Install arm-none-eabi toolchain
+        # Pinned to 14.2.Rel1 to match the local toolchain; Ubuntu's
+        # gcc-arm-none-eabi 13.2.1 produces ~4 KB larger binaries that
+        # push RP2040 VGA over the RAM limit.
+        uses: carlosperate/arm-none-eabi-gcc-action@v1
+        with:
+          release: '14.2.Rel1'
+
+      - name: Install build dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-              cmake ninja-build \
-              gcc-arm-none-eabi libnewlib-arm-none-eabi libstdc++-arm-none-eabi-newlib \
-              python3 build-essential
+              cmake ninja-build python3 build-essential
 
       - name: Check out Pico SDK
         uses: actions/checkout@v4
