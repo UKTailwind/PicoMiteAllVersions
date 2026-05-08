@@ -2,14 +2,14 @@
 
 ## Firmware gate — `./build_firmware.sh`
 
-Canonical device build for local validation. Mirrors `.github/workflows/firmware.yml`: same Pico SDK 2.2.0, same `CMakeLists.txt` COMPILE switching, same artifacts. **Never mutates the SDK tree** — the historical `gpio.c`/`gpio.h` patches were eliminated on the `sdk-patch-removal` branch (the RAM-resident GPIO IRQ dispatcher now lives in `picomite_gpio_irq.c`).
+Canonical device build for local validation. Mirrors `.github/workflows/firmware.yml`: same Pico SDK 2.1.1, same `CMakeLists.txt` COMPILE switching, same artifacts. **Never mutates the SDK tree** — the historical `gpio.c`/`gpio.h` patches were eliminated on the `sdk-patch-removal` branch (the RAM-resident GPIO IRQ dispatcher now lives in `picomite_gpio_irq.c`).
 
 - `./build_firmware.sh`              — build both (rp2040 + rp2350)
 - `./build_firmware.sh rp2040`       — rp2040 only → `build/PicoMite.uf2`
 - `./build_firmware.sh rp2350`       — rp2350 only → `build2350/PicoMite.uf2`
 - `PICO_SDK_PATH=... ./build_firmware.sh` to override the SDK location (default `$HOME/pico/pico-sdk`)
 
-The script rewrites `CMakeLists.txt`'s active `set(COMPILE …)` line in-place per target and restores the git-tracked version on any exit path (including Ctrl-C). Requires `arm-none-eabi-gcc`, `cmake`, and a stock Pico SDK 2.2.0.
+The script rewrites `CMakeLists.txt`'s active `set(COMPILE …)` line in-place per target and restores the git-tracked version on any exit path (including Ctrl-C). Requires `arm-none-eabi-gcc`, `cmake`, and a stock Pico SDK 2.1.1.
 
 Flashing: with the device in BOOTSEL mode, `cp build/PicoMite.uf2 /Volumes/RPI-RP2/` (macOS). The board auto-reboots once the copy completes.
 

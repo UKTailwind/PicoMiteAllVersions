@@ -99,7 +99,7 @@ Open http://localhost:8000.
 
 ### Pico hardware
 
-Install the [Pico SDK 2.2.0](https://github.com/raspberrypi/pico-sdk) and export `PICO_SDK_PATH`. Then:
+Install the [Pico SDK 2.1.1](https://github.com/raspberrypi/pico-sdk) and export `PICO_SDK_PATH`. Then:
 
 ```
 ./buildall.sh
