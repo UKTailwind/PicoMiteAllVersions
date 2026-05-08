@@ -1,0 +1,42 @@
+# MMBasic Anywhere — Metro ESP32-S3 sdkconfig defaults
+#
+# Phase A scope: console + PSRAM + watchdog. Phase B will add file
+# system / MMBasic-specific knobs.
+
+# --- Console ----------------------------------------------------------------
+# Use the chip's built-in USB Serial/JTAG controller for stdio. Same USB-C
+# cable handles flashing and console; no external UART adapter needed.
+CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
+
+# --- PSRAM ------------------------------------------------------------------
+# Adafruit Metro ESP32-S3 (#5500) ships with 2 MB Quad PSRAM (N8R2 module).
+# Enable it but keep allocations <= 8 KB in internal SRAM for performance.
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_USE_MALLOC=y
+CONFIG_SPIRAM_MODE_QUAD=y
+CONFIG_SPIRAM_SPEED_80M=y
+CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=8192
+
+# --- Stack ------------------------------------------------------------------
+# 24 KB main task stack. Phase A doesn't need this much, but Phase B
+# will (recursive descent parser + setjmp/longjmp through deep BASIC
+# nests). Setting it now avoids a config churn later.
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=24576
+
+# --- Watchdog ---------------------------------------------------------------
+# Disable the task watchdog entirely. With it on (~5s default), long-running
+# BASIC FOR loops would trip it and reboot. Hard requirement for any
+# non-trivial BASIC program.
+CONFIG_ESP_TASK_WDT_INIT=n
+
+# --- Radios -----------------------------------------------------------------
+# Phase A doesn't need WiFi/BT. Disabling saves ~1 MB binary and frees
+# the WiFi RAM region. Re-enable in a follow-on phase if/when networking
+# features get ported (PicoMite WEB equivalent).
+CONFIG_ESP_WIFI_ENABLED=n
+CONFIG_BT_ENABLED=n
+
+# --- Cores ------------------------------------------------------------------
+# Use both cores. MMBasic stays on one, but FreeRTOS housekeeping etc.
+# benefits from the second.
+CONFIG_FREERTOS_UNICORE=n
