@@ -147,10 +147,123 @@ Replace the hard-coded program with `MMBasic_RunPromptLoop`. `hal_keyboard_esp32
 
 ## Out of scope (deferred)
 
-- **Display.** No SPI LCD wiring in the litmus test. Adding SCREEN/PIXEL/DRAW means new `drivers/spi_lcd/` glue + `hal_display_esp32.c` driving SPI master. Material follow-on phase.
+- **Display.** No SPI LCD wiring in the litmus test. See [Display follow-on (sketch)](#display-follow-on-sketch) below for the wiring + driver path once the stdio core is proven.
 - **WiFi/BLE.** ESP32-S3 has both natively, far easier than the CYW43 dance on RP2350. Trivially gated on `HAL_PORT_HAS_WIFI = 1` once the litmus is proven.
 - **Audio.** I2S audio output exists in ESP-IDF; pairs naturally with `drivers/pwm_synth/` once a board-specific I2S codec is chosen.
 - **Keyboard.** USB host (TinyUSB), I2C keypad (PicoCalc-style), or PS/2 — all defer to a hardware-bound follow-on.
+
+## Display follow-on (sketch)
+
+Not part of the litmus test, but worth recording the path so the
+deferred work is concrete.
+
+### Hardware path
+
+Two viable routes on ESP32-S3:
+
+1. **SPI LCD (recommended first cut).** ESP-IDF has first-class
+   `esp_lcd_panel_*` drivers built in — ILI9341, ST7789, ST7796,
+   NT35510, GC9A01, RM67162. These are exactly the panels
+   `drivers/spi_lcd/` already supports on Pico, so the BASIC surface
+   (`OPTION LCDPANEL ILI9341 ...`, `BACKLIGHT`, `BLIT`, etc.) needs
+   no changes — those commands are already HAL-clean (target=0
+   ifdefs in Commands.c / Draw.c).
+2. **VGA via LCD_CAM (more ambitious).** ESP32-S3's LCD_CAM
+   peripheral can drive parallel-RGB output with PCLK/HSYNC/VSYNC,
+   which is functionally VGA timing. Requires an external
+   resistor-ladder R-2R DAC for analog R/G/B (no on-chip DAC on the
+   S3). On Quad-PSRAM Metro the realistic ceiling is **320×240×8bpp
+   @ 60 Hz** — needs ~4.6 MB/s scanout vs. ~30–40 MB/s Quad PSRAM
+   peak. 640×480 needs ~18 MB/s scanout and contends too aggressively
+   with everything else for PSRAM cycles; lift the ceiling by
+   choosing an Octal-PSRAM ESP32-S3 board (e.g. ESP32-S3-DevKitC-1
+   N32R8) instead of the Metro.
+
+### Adafruit Metro ESP32-S3 (#5500) pinout for SPI LCD
+
+Default hardware-accelerated SPI bus (the one IDF maps to the
+onboard microSD slot, rev B):
+
+- **SCK** = GPIO39
+- **MOSI** = GPIO42
+- **MISO** = GPIO21
+
+ESP32-S3 IO MUX lets you remap to any GPIO; the defaults are just
+the SD-slot wiring you can share or sidestep. I2C / Stemma QT is
+SDA=GPIO47 / SCL=GPIO48 with onboard 10 kΩ pullups.
+
+**Logic level: 3.3 V only** — no 5 V tolerance, no level shifter on
+board. This rules out 5 V-marked LCD modules whose logic lines (CS /
+DC / SCK / MOSI) aren't independently 3.3 V-safe even when VCC has
+a regulator; verify before connecting.
+
+### Wiring an ILI9341 module (the canonical PicoMite display)
+
+Eight wires, plus optional MISO:
+
+| LCD pin | Metro ESP32-S3 | Notes |
+|---|---|---|
+| VCC | 3V3 | 3.3 V native — confirm your module is 3.3 V-safe |
+| GND | GND | |
+| CS | any free GPIO | Chip select, e.g. one of D2–D13 |
+| RESET | any free GPIO | Hardware reset |
+| DC / RS | any free GPIO | Data/command select |
+| SDI / MOSI | GPIO42 | SPI data out |
+| SCK | GPIO39 | SPI clock |
+| LED / BL | 3V3, **or** PWM-capable GPIO via FET | Backlight |
+| SDO / MISO | GPIO21 | Optional — only if reading framebuffer / touch |
+
+Arduino-D-pin → GPIO mapping for the "any free GPIO" rows: check
+Adafruit's PrettyPins PDF in the [Metro ESP32-S3 Learn
+guide](https://learn.adafruit.com/adafruit-metro-esp32-s3) or the
+silkscreen on the board.
+
+### Hard constraints
+
+1. **3.3 V only.** Some cheap LCD modules regulate VCC but feed 5 V
+   logic levels into the controller; that fries the S3. Adafruit's
+   own modules (1770 / 2478 / 4313 / 4383) are 3.3 V-safe.
+2. **SD-slot SPI sharing.** Metro rev B specifically rewired
+   SPI/SD to avoid PSRAM conflicts. If the LCD shares the bus with
+   the onboard microSD, give each device its own CS and let
+   `esp_lcd_panel_io_spi` / IDF's SD driver arbitrate. If only the
+   LCD is in use, the bus is exclusive — no arbitration needed.
+3. **Backlight current.** A 2.8" ILI9341 backlight pulls ~80–100 mA
+   — well over the 40 mA per-GPIO limit. Wire LED to 3V3 directly,
+   or to a GPIO via a small N-FET if PWM brightness is wanted.
+   Driving the backlight straight off a GPIO will brown out the
+   regulator at minimum and may damage the pin.
+
+### Driver glue (what gets written)
+
+- **`drivers/spi_lcd_esp32/`** — wraps `esp_lcd_panel_io_spi` +
+  `esp_lcd_panel_ili9341` (or `_st7789`) and implements the same
+  `hal_display_pixel.h` + `hal_spi_lcd_mem332.h` contract that
+  `drivers/spi_lcd/` exposes on Pico. The Pico driver itself can't
+  be reused — it's coupled to `pico/multicore.h` + `hardware/dma.h`
+  — but the contract surface is identical, so this is glue, not a
+  rewrite.
+- **`hal_display_esp32.c`** in the port directory — panel selection,
+  backlight pin, framebuffer dimensions.
+- **Framebuffer in PSRAM** — `heap_caps_malloc(W*H*bpp,
+  MALLOC_CAP_DMA | MALLOC_CAP_SPIRAM)`. The DMA cap is non-optional;
+  `esp_lcd_panel_io_spi` requires DMA-reachable memory.
+- **`port_config.h`** — set `HAL_PORT_HAS_SPI_LCD = 1`, define the
+  CS / DC / RESET GPIO numbers, panel type, dimensions, optional
+  backlight pin.
+
+`Draw.c`, `gfx_*_shared.c`, `Tilemap.c`, and the VM graphics
+syscalls all stay byte-for-byte identical — this is the HAL
+refactor's payoff.
+
+### Effort
+
+SPI LCD path: ~3–4 sessions (one for the driver wrapper, one for
+panel command sequencing + first pixels, one for `OPTION LCDPANEL`
+integration + BLIT / circle / text correctness, one buffer for the
+inevitable ESP-IDF panel-driver edge case). VGA-via-LCD_CAM path:
+~6–8 sessions including the resistor-DAC bring-up, and only worth
+it on an Octal-PSRAM board where 640×480 is achievable.
 
 ## Effort estimate
 
