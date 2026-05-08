@@ -70,5 +70,14 @@ done
 
 if [ "$fail" = 0 ]; then
     echo "All ${#TARGETS[@]} device variants built clean."
+
+    # RAM-baseline gate — runs after a successful build so arm-none-eabi-size
+    # can read the freshly-built ELFs. Skip with SKIP_RAM_BASELINE=1.
+    if [ "${SKIP_RAM_BASELINE:-0}" != "1" ] && [ -x "$root/tools/check_ram_baseline.sh" ]; then
+        printf '\n=== RAM baseline gate ===\n'
+        if ! "$root/tools/check_ram_baseline.sh"; then
+            fail=1
+        fi
+    fi
 fi
 exit "$fail"
