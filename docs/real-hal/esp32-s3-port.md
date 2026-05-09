@@ -159,18 +159,25 @@ Hardware test (deferred to user): SETPIN GP13,DOUT : PIN(GP13)=1 → onboard LED
 
 **Reframing**: ESP32's port surface is defined by the HAL contract (`hal/hal_*.h`) and the small set of `port_*` / console-glue / cmd-stub symbols core code requires. ESP32 owns its impl of that surface in `ports/esp32_s3_metro/main/esp32_*.c` files and `hal_*_esp32.c` files — most of them no-ops and stubs. host_native is **irrelevant** to that impl: it's a different port, with POSIX/test-harness shape behind the same contract. ESP32 doesn't borrow from host_native any more than pico does. The current `HOST_NATIVE_REUSED` list is historical accident — early bring-up shortcut — not architecture.
 
-**Step A — inventory the contract surface**. Enumerate every symbol the MMBasic core + drivers + HAL contracts require from a port:
-- `nm -u` against `${PORT_LOCAL_SRCS}` + core/state/* + ${BC_SRCS} + ${CORE_SRCS} + ${DEVICE_FACING_SRCS} when host_native is excluded.
-- Cross-reference `extern` declarations in core headers (`MMBasic.h`, `bytecode.h`, `hal/*.h`).
-- Group by category. Most fall into:
-  1. **HAL contract functions** (`hal_pin_*`, `hal_filesystem_*`, `hal_time_*`, etc.) — ESP32 already implements these in `hal_*_esp32.c`.
-  2. **Console glue** (`MMputchar`, `MMPrintString`, `SSPrintString`, `MMInkey`, `MMgetchar`, `MMfopen/close/getline`, `putConsole`, `SerialConsolePutC`, `myprintf`, `getConsole`, `kbhitConsole`) — thin routers over the port's IO. ESP32 routes through USB Serial/JTAG via `esp32_console.c`'s existing `host_output_hook`/`host_read_byte_*` mechanism.
-  3. **Default port hooks** (~35 `port_*` symbols: `port_apply_default_console_colors`, `port_audio_i2s_pio_slice`, `port_bc_*`, `port_clear_*`, `port_display_*`, `port_factory_reset_*`, `port_heartbeat_*`, `port_keyboard_*`, `port_lcd_*`, `port_mminfo_*`, `port_picocalc_*`, `port_pin_is_reserved_*`, `port_pio_*`, `port_poke_*`, `port_prepare_*`, `port_print_*`, `port_select_*`, `port_system_*`, `port_try_*`, `port_usb_*`, `port_vm_*`, `port_web_*`) — almost all no-op on ESP32. Maybe two need real bodies (`port_drive_check` for A:-only, `port_vm_time_get_tm` for date/time).
-  4. **Tentative-def globals** (`gui_fcolour`, `gui_bcolour`, `FSerror`, `Option`, `PinDef[]`, `inttbl[]`, `dma_hw`, `watchdog_hw`, etc.) — declared in core headers, defined in some port TU. ESP32 owns its definitions.
-  5. **Interpreter abort / VM trampoline** (`CheckAbort`, `check_interrupt`, `routinechecks`, `CallCFunction`, `CallExecuteProgram`) — ESP32 versions are basically empty.
-  6. **Peripheral cmd stubs** (`cmd_i2c`, `cmd_pwm`, `cmd_spi`, `cmd_pio`, `cmd_setpin` etc., plus `fun_*` siblings) — ESP32 doesn't expose most of these yet; stub to `error()` or no-op. Real impl per peripheral over time.
+**Step A — inventory the contract surface ✅**. Done in commit TBD; full per-symbol assignment table at [esp32-s3-decouple-inventory.md](esp32-s3-decouple-inventory.md).
 
-Output: a markdown table inventory with counts per category, posted into the log, and a one-line owner per symbol (existing file or new).
+Headline: **277 symbols** where host_native is currently the sole provider, split across 11 owner files (5 new, 6 existing-extended):
+
+| Owner | Count | New or existing |
+|---|---|---|
+| `esp32_peripheral_stubs.c` | 150 | new |
+| `esp32_compat.c` | 26 | existing |
+| `esp32_console.c` | 25 | existing |
+| `esp32_default_hooks.c` | 17 | new |
+| `esp32_globals.c` | 14 | new |
+| `hal_vm_framebuffer_esp32_stub.c` | 14 | existing |
+| `hal_audio_esp32_stub.c` | 9 | existing |
+| `esp32_runtime.c` | 9 | new |
+| `esp32_flash_storage.c` | 8 | existing |
+| `esp32_cmd_files_hooks.c` | 3 | new |
+| `esp32_lfs.c` | 2 | existing |
+
+Method: `xtensa-esp-elf-nm` undefined-set (non-host_native objs) ∩ defined-set (host_native objs). 1238 total undef refs across non-hn → 435 genuine gaps after subtracting locally-defined → 277 of those 435 are host_native-provided (the rest come from libc/esp-idf and are fine). Stale objs (`esp32_glue.c.obj`, `esp32_disk.c.obj`, the two superseded `_stub` siblings) excluded.
 
 **Step B — write minimal ESP32 files**. New TUs in `ports/esp32_s3_metro/main/` whose total line count should be roughly **<500 lines combined** (versus host_runtime.c's 1032):
 - `esp32_console.c` (existing) — extend with `MMputchar`/`MMPrintString`/etc routers if not already present.
