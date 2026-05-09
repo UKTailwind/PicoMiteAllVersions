@@ -110,6 +110,15 @@ set(PORT_LOCAL_SRCS
     hal_storage_esp32_stub.c
     hal_filesystem_esp32.c                  # path / dir ops via f_*
     hal_keyboard_esp32_stub.c
+    # D-decouple Step B: minimal ESP32 files to take over symbols
+    # currently sole-provided by host_native. Coexist with
+    # HOST_NATIVE_REUSED via --allow-multiple-definition until Step C
+    # drops host_native from the link entirely.
+    esp32_default_hooks.c                   # 17 port_* no-ops
+    esp32_globals.c                         # 14 tentative-def globals
+    esp32_runtime.c                         # 9 VM trampoline / abort hooks + state
+    esp32_cmd_files_hooks.c                 # 3 A:-only filesystem hooks
+    esp32_peripheral_stubs.c                # 117 cmd_/fun_/AES_/GPS_/etc decls
 )
 
 # Decouple-in-progress: ESP32 owns its full port surface in
