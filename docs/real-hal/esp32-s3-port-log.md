@@ -257,20 +257,69 @@ calls `putchar` and reaches "exited cleanly" means
 `tokenize() → PrepareProgram() → ExecuteProgram()` all work
 end-to-end on Xtensa.)
 
-### Phase C plan
+## 2026-05-08 (later) — Phase C step 1+2: REPL over USB Serial/JTAG
 
-Real impls to replace stubs, in priority order:
-1. `esp32_console.c` — USB Serial/JTAG read/write, replacing the
-   `host_read_byte_*` stubs in `esp32_glue.c`. Uses
-   `usb_serial_jtag_driver_install` + the IDF VFS dance from the
-   plan doc.
-2. **Drop `host_fs_shims.c`** + write `hal_flash_esp32.c` /
+✅ **Interactive REPL working.** Verified:
+
+```
+> PRINT 1+1
+ 2
+> FOR i=1 TO 3 : PRINT i*i : NEXT i
+ 1
+ 4
+ 9
+>
+```
+
+What it took, in the order the bugs surfaced:
+
+1. **Heartbeat task stack overflow.** The `xTaskCreate` for the LED
+   heartbeat used 2 KB stack, which overflowed inside FreeRTOS's
+   GPIO call path. Fix: dropped the heartbeat task entirely. The
+   chip's running, that's enough.
+
+2. **`host_output_hook` signature mismatch.** I declared it as
+   `void (*)(int c)`; host_runtime.c expects
+   `void (*)(const char *text, int len)`. Caller passed a `char*`
+   + length, my hook read the pointer as a char and emitted RAM
+   addresses → 0x90-spam in the console. One-line fix.
+
+3. **`MMBasic_RunPromptLoop` reached and prompted, but no input.**
+   Diagnosed via temporary `[REPL]` checkpoints inside the function
+   (since reverted). The `>` printed; `EditInputLine` hung waiting
+   for keys.
+
+4. **Wrong path in `MMInkey`.** It dispatches:
+   - if `host_raw_mode_is_active()` → `host_read_byte_nonblock`
+   - else if `host_repl_mode` → `fgetc(stdin)`
+   - else → `return -1`
+
+   My stub had `host_raw_mode_is_active` returning `0`, and
+   `host_repl_mode` defaults to `0`, so MMInkey always returned -1.
+   Setting raw-mode to 1 is correct: USB Serial/JTAG is byte-level
+   raw, no terminal line discipline.
+
+5. **`usb_serial_jtag_read_bytes` requires the driver.** With just
+   IDF's default polling reader, bytes don't reach the FIFO from
+   user code. Calling `usb_serial_jtag_driver_install` +
+   `usb_serial_jtag_vfs_use_driver` activates the interrupt-driven
+   path. Using `usb_serial_jtag_read_bytes(buf, 1, 0)` directly
+   for non-blocking and `pdMS_TO_TICKS(ms)` for timed.
+
+### Diagnostic tooling
+
+Wrote `ports/esp32_s3_metro/probe.py` — pyserial-based driver that
+opens the port, RTS-pulses the chip into app boot, captures boot
+output, sends test inputs, captures responses. Avoids picocom
+entirely. Used heavily during the back-and-forth on input plumbing.
+
+### What's still in Phase C
+
+3. **Drop `host_fs_shims.c`** + write `hal_flash_esp32.c` /
    `hal_filesystem_esp32.c` real impls over `esp_partition_*` and
    FATFS-via-VFS at `/sd`. Eliminates the 768 KB RAM mirror
-   (`host_flash_target_buf`).
-3. Re-enable Octal PSRAM properly (the boot-silence first time was
-   probably the macOS USB-CDC binding issue, not real PSRAM
-   failure). Bump heap back to 128 KB+.
-4. Replace `app_main`'s hardcoded `tokenize_and_run` test with
-   `MMBasic_RunPromptLoop` for an interactive REPL over USB
-   Serial/JTAG.
+   (`host_flash_target_buf`) and lets us bump
+   `HAL_PORT_HEAP_MEMORY_SIZE` from 32 KB back up to 128 KB+.
+4. **Re-enable Octal PSRAM**. With 8 MB external RAM available, the
+   BC heap can sit there comfortably; the silent-boot earlier was
+   almost certainly the macOS USB-CDC binding issue.

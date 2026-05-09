@@ -17,8 +17,13 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <errno.h>
 #include "esp_timer.h"
 #include "esp_rom_sys.h"
+#include "driver/usb_serial_jtag.h"
+#include "driver/usb_serial_jtag_vfs.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
@@ -40,21 +45,89 @@ void host_sleep_us(uint64_t us) {
 
 /* ---------- host_terminal.c equivalents ---------- */
 
-/* host_runtime.c routes ALL output through host_output_hook. On native
- * it points to a function that dispatches to MMputchar/host_print
- * based on raw mode. On ESP32 we route everything to putchar (which
- * IDF wires to USB Serial/JTAG via CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG). */
-static void esp32_console_putc(int c) { putchar(c); }
-void (*host_output_hook)(int c) = esp32_console_putc;
+/* host_runtime.c routes ALL output through host_output_hook. Signature
+ * is (const char *text, int len) — host_runtime.c calls it with both
+ * single-byte chunks (SerialConsolePutC) and multi-byte chunks
+ * (host_print). On ESP32 we forward straight to fwrite(stdout); IDF
+ * has stdio wired to USB Serial/JTAG when
+ * CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y. */
+static void esp32_console_write(const char *text, int len) {
+    fwrite(text, 1, len, stdout);
+}
+void (*host_output_hook)(const char *text, int len) = esp32_console_write;
 
-int  host_raw_mode_is_active(void) { return 0; }
+/* The chip's USB Serial/JTAG console is byte-level raw — no terminal
+ * driver doing line discipline, no readline. Tell host_runtime.c so
+ * MMInkey routes through host_read_byte_nonblock + the ESC decoder
+ * (cursor keys, etc) instead of the line-buffered fgetc fallback. */
+int  host_raw_mode_is_active(void) { return 1; }
 
-/* Non-blocking and blocking byte reads. Phase D wires these to the
- * USB Serial/JTAG VFS endpoint with O_NONBLOCK. For Phase B link
- * validation: stub — return -1 (no data). */
-int  host_read_byte_nonblock(void) { return -1; }
-int  host_read_byte_blocking_ms(int ms) { (void)ms; return -1; }
-void host_push_back_byte(int c) { (void)c; }
+/* ---- USB Serial/JTAG console: stdin wiring ---------------------------
+ * IDF wires stdio to USB Serial/JTAG when CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y,
+ * but by default the VFS uses a polling driver, blocking reads, and CRLF
+ * translation. The MMBasic line editor wants raw bytes with non-blocking
+ * polling. esp32_console_init() does the 5-step IDF dance to switch the
+ * VFS over to the interrupt-driven driver and disable line-ending
+ * translation, then sets stdin O_NONBLOCK so read(2) returns -1/EAGAIN
+ * when no byte is available.
+ */
+
+void esp32_console_init(void) {
+    static int done = 0;
+    if (done) return;
+    done = 1;
+
+    /* Install + activate the interrupt-driven USB Serial/JTAG driver
+     * AND switch IDF's stdio VFS to use it. With CONFIG_ESP_CONSOLE_
+     * USB_SERIAL_JTAG=y, IDF wires stdio to USB Serial/JTAG via a
+     * default polling reader that doesn't actually pull bytes off
+     * the hardware FIFO unless someone calls read() in the right
+     * way. The interrupt-driven driver fills its own ringbuffer
+     * automatically, and the VFS layered on top exposes that buffer
+     * via read(STDIN_FILENO, ...). */
+    if (!usb_serial_jtag_is_driver_installed()) {
+        usb_serial_jtag_driver_config_t cfg = {
+            .tx_buffer_size = 256,
+            .rx_buffer_size = 256,
+        };
+        usb_serial_jtag_driver_install(&cfg);
+    }
+    usb_serial_jtag_vfs_use_driver();
+
+    /* No CRLF translation — MMBasic owns its own line endings. */
+    usb_serial_jtag_vfs_set_rx_line_endings(ESP_LINE_ENDINGS_LF);
+    usb_serial_jtag_vfs_set_tx_line_endings(ESP_LINE_ENDINGS_LF);
+
+    setvbuf(stdin,  NULL, _IONBF, 0);
+    setvbuf(stdout, NULL, _IONBF, 0);
+
+    /* Non-blocking stdin so MMInkey's poll returns -1 instead of hanging. */
+    int flags = fcntl(STDIN_FILENO, F_GETFL, 0);
+    if (flags >= 0) fcntl(STDIN_FILENO, F_SETFL, flags | O_NONBLOCK);
+}
+
+/* Single-byte push-back for the ANSI escape decoder (host_runtime.c). */
+static int s_pushback = -1;
+
+int host_read_byte_nonblock(void) {
+    if (s_pushback >= 0) { int c = s_pushback; s_pushback = -1; return c; }
+    unsigned char c;
+    int n = usb_serial_jtag_read_bytes(&c, 1, 0);
+    return (n == 1) ? (int)c : -1;
+}
+
+int host_read_byte_blocking_ms(int ms) {
+    if (s_pushback >= 0) { int c = s_pushback; s_pushback = -1; return c; }
+    /* < 0 means wait forever; usb_serial_jtag_read_bytes accepts
+     * portMAX_DELAY for that. */
+    TickType_t ticks = (ms < 0) ? portMAX_DELAY : pdMS_TO_TICKS(ms);
+    if (ms > 0 && ticks == 0) ticks = 1;
+    unsigned char c;
+    int n = usb_serial_jtag_read_bytes(&c, 1, ticks);
+    return (n == 1) ? (int)c : -1;
+}
+
+void host_push_back_byte(int c) { s_pushback = c; }
 
 /* host_fb.c equivalents — display sim. On a port without a
  * framebuffer, all framebuffer ops are no-ops. */
@@ -102,6 +175,11 @@ void cmd_framebuffer(void) { error("FRAMEBUFFER not supported on this port"); }
 void cmd_fastgfx(void)     { error("FASTGFX not supported on this port"); }
 void cmd_edit(void)        { error("EDIT not supported on this port"); }
 void cmd_editfile(void)    { error("EDITFILE not supported on this port"); }
+
+/* Display routines MMBasic_Prompt.c calls when the LCD console is active.
+ * No display on this port → no-ops. */
+void MX470Display(unsigned char c) { (void)c; }
+void DisplayPutS(char *s)          { (void)s; }
 
 /* ---------- runtime backing storage ---------- */
 

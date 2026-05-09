@@ -20,6 +20,8 @@ set(CORE_SRCS
     ${REPO_ROOT}/MATHS.c
     ${REPO_ROOT}/Memory.c
     ${REPO_ROOT}/MMBasic_Print.c
+    ${REPO_ROOT}/MMBasic_REPL.c
+    ${REPO_ROOT}/MMBasic_Prompt.c
     ${REPO_ROOT}/gfx_box_shared.c
     ${REPO_ROOT}/gfx_circle_shared.c
     ${REPO_ROOT}/gfx_line_shared.c
