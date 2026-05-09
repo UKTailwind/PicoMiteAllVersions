@@ -1,281 +1,353 @@
-# ESP32-S3 (Adafruit Metro) Stdio Port Plan
+# ESP32-S3 (Adafruit Metro) Port Plan
 
-**Goal:** prove the HAL is genuinely portable to a non-ARM, non-Pico target by bringing up an MMBasic stdio REPL on the Adafruit Metro ESP32-S3 over USB Serial/JTAG. Success = the directory-composition standard from the real-hal refactor extends across architectures, not just board variants of one chip family.
+**Goal:** an MMBasic stdio REPL on the Adafruit Metro ESP32-S3 over USB Serial/JTAG, structured as a real device port that mirrors `ports/pico_sdk_common/` — not a host-shape simulator. The ESP-IDF is the hardware-access layer behind the HAL; nothing in core MMBasic learns about it.
 
-**Hardware/toolchain:**
-- Adafruit Metro ESP32-S3 — 8 MB flash, 2 MB Quad PSRAM, native USB. Verify the exact module on your board before Phase A: Adafruit also ships an N8 (no PSRAM) variant under similar SKUs. The plan assumes the WROOM-1U N8R2 (2 MB PSRAM).
-- ESP-IDF ≥ 5.0, Xtensa GCC (`xtensa-esp-elf-gcc`).
-- Console: `ESP_CONSOLE_USB_SERIAL_JTAG` (built-in controller, no TinyUSB dependency).
-- Filesystem: FATFS over a flash partition mounted at `/sd` (matches existing `ff.c` + `FF_MAX_LFN_LARGE`).
+Companion log: [esp32-s3-port-log.md](esp32-s3-port-log.md).
 
-**Scope:** stdio REPL only. No display, no audio, no keyboard matrix, no WiFi. The litmus test is "does an MMBasic prompt work end-to-end on Xtensa with FATFS persistence?" — not a feature-complete PicoMite. Display/audio/WiFi land in follow-on phases once the core is proven.
+## Hardware
 
-## Layout
+- **Adafruit Metro ESP32-S3 (#5500)** — N16R8 module: **16 MB flash, 8 MB Embedded Octal PSRAM (AP_3v3)**. Confirmed via `esptool chip_id`. (The original plan assumed N8R2 Quad — wrong.)
+- Native USB Serial/JTAG (chip's built-in controller, no TinyUSB).
+- 49 GPIOs (0–48). 3.3 V logic, no 5 V tolerance.
+- ESP-IDF release/v5.3, Xtensa GCC.
+
+## Status (snapshot — keep current)
+
+| Stage | State | What's verified |
+|---|---|---|
+| A — toolchain | ✅ | blink + heartbeat over USB Serial/JTAG |
+| B — link MMBasic core | ✅ | 80+ core/VM TUs compile + link clean on Xtensa |
+| C — interactive REPL | ✅ | PRINT, FOR/NEXT, IF/ELSE, GOTO/GOSUB, LIST, EDIT, CPU RESTART, CLS, LOCATE, COLOUR all work |
+| C — A: drive (LFS) | ✅ | LFS over `esp_partition_*`, embedded demos auto-populated, FILES/LOAD/SAVE-to-file/RUN/FRUN all work for files on A: |
+| C — VM source compiler regression fixes | ✅ | adjacent string literals (`""` in PRINT), post-compact heap fragmentation |
+| D — decouple from host_native | 🔧 | D1+D2+D5+D8 ✅; user-facing breakage fixed. **Direction shift**: D3/D4/D6/D7/D9 consolidated into one explicit decouple — ESP32 owns its full port surface in `esp32_*.c` files, drops `HOST_NATIVE_REUSED` entirely, drops `--wrap`, drops `--allow-multiple-definition` (tentative-def globals get fixed too). See "Decouple plan" below. |
+| E — real flash persistence | ❌ | SAVE/LOAD-to-slot, OPTION SAVE survival across reboot |
+| F — gate + plan hygiene | ❌ | ESP32 port not in purity gate scope; `docs/real-hal-plan.md` has no ESP32 row |
+
+**Headline broken-but-silent bug** (fixed in D1 below): `flash_range_erase` / `flash_range_program` in `esp32_flash_storage.c` previously targeted a 256-byte placeholder buffer and silently no-op'd past the end. Now mirrored on host_native's offset-routing: program-region writes hit `flash_prog_buf`; slot-region writes past 256 bytes `error()` loudly. Real backing lands in Stage E1.
+
+**Tests**: host `./run_tests.sh` 242/242 (includes `t170_frun_post_compact_array.bas` regression test for the heap reorder). HAL purity gate clean over its current scope, but its current scope **does not include `ports/esp32_s3_metro/main/*.c`**.
+
+## Rules and invariants (read first)
+
+These are non-negotiable on this port. Violations are reasons to revert, not feedback to apply later.
+
+1. **Mirror pico, not host_native.** `ports/pico_sdk_common/` has ~25 small per-domain files (`hal_filesystem_pico.c`, `hal_flash_pico.c`, `vm_sys_pin_pico.c`, `cmd_files_hooks.c`, `clear_runtime_port.c`, etc). Each ESP32 file should have a recognisable pico counterpart. If a piece of behaviour exists only in `host_runtime.c` (the host monolith), the right move is to **split it** — not to inherit it on the device.
+
+2. **No new `#ifdef MMBASIC_ESP32` / `#ifdef __XTENSA__` outside `ports/esp32_s3_metro/`.** Core, drivers, HAL contracts stay target-agnostic. The HAL purity gate enforces this for the existing scope and (Stage F1) will enforce it for the ESP32 port too.
+
+3. **One definition per function. Period.** Every symbol the linker resolves has exactly one strong definition in the binary's source list — no `--wrap`, no `--allow-multiple-definition`, no weak-attribute fallbacks, no link-order luck. If two ports need different behaviour for the same hook, each port has its own TU with its own strong definition, and that port's build links exactly its TU. Tentative-def globals (`gui_bcolour`, `FSerror`, etc.) get fixed too — single-TU strong def + `extern` declarations elsewhere — not shrugged off as "grandfathered". Violations of this rule are the root cause of every link-time workaround on this port; the cleanup target is a build that compiles + links with default-strict GCC/clang flags.
+
+4. **No `--wrap` for symbols that should live in a per-port file.** If `port_drive_check` needs ESP32 behaviour, ESP32 owns the symbol — the host port doesn't define it for everyone. The `--wrap`-then-override pattern is a code smell that hides a missing per-port file. Subsumed by rule 3 but worth calling out separately because we keep reaching for it.
+
+5. **ESP-IDF lives behind the HAL.** Direct `esp_partition_*` / `usb_serial_jtag_*` / `heap_caps_*` calls go in:
+   - The port's own `esp32_*.c` files (port-local hardware glue).
+   - Driver implementations in `drivers/<thing>_esp32/`.
+   - `hal_*_esp32.c` HAL impls.
+
+   They never appear in core, in `bc_*.c`, in `vm_sys_*.c`, or in `gfx_*_shared.c`. If a core file would need IDF, it needs a HAL hook instead.
+
+6. **Heap is tight and the port code knows it.** 104 KB internal SRAM heap (PSRAM disabled — see "Why no PSRAM yet" in Stage E). Allocation order matters; `bc_compiler_alloc` is ordered to keep post-compact heap contiguous (committed). New allocations in this port must respect the same fragmentation discipline.
+
+7. **Pico source is the reference.** When in doubt about how a HAL contract is supposed to be exercised, read pico's impl — not host_native's. Host has historical shape (POSIX-rooted, malloc-flavoured) that doesn't translate.
+
+8. **Keep tests passing every commit.** Host suite must stay at 242/242 (or whatever the current count is — never lower). HAL purity must stay green. ESP-IDF build must stay green. ESP32 hardware smoke (FRUN sieve.bas / fizzbuzz.bas) must stay green.
+
+## Layout (current, not aspirational)
 
 ```
 ports/esp32_s3_metro/
 ├── CMakeLists.txt              # ESP-IDF project root
-├── port_config.h               # HAL_PORT_* values
-├── partitions.csv              # 2 MB app, 64 KB nvs, 5 MB fatfs (no OTA slots)
-├── sdkconfig.defaults          # console, PSRAM, FreeRTOS settings
-├── README.md                   # build/flash/monitor instructions
+├── port_config.h               # HAL_PORT_* values; inherits from host_native
+├── partitions.csv              # 1 MB app + 12 MB lfsdata (no FATFS partition; LFS only)
+├── sdkconfig.defaults          # USB JTAG console, watchdog off, radios off, PSRAM disabled
+├── probe.py                    # pyserial test driver (avoids picocom DTR pulse)
+├── README.md                   # build/flash/monitor (NEEDS REWRITE — Stage F3)
 └── main/
-    ├── CMakeLists.txt          # main component
-    ├── app_main.c              # ESP32 entry → MMBasic_RunPromptLoop
-    ├── esp32_console.c         # USB Serial/JTAG ↔ MMputchar / MMgetchar
-    ├── hal_time_esp32.c        # esp_timer_get_time
-    ├── hal_flash_esp32.c       # esp_partition_*
-    ├── hal_storage_esp32.c     # NVS-backed Options blob
-    ├── hal_filesystem_esp32.c  # FATFS via VFS at /sd
-    ├── hal_keyboard_esp32.c    # fgetc(stdin) shim
-    ├── hal_pin_esp32_stub.c    # stdio scope: no GPIO
+    ├── CMakeLists.txt          # main component, source list, --wrap, --allow-multiple-definition
+    ├── esp32_platform.h        # MMBASIC_HOST + MMBASIC_ESP32 + Pico SDK section-attr stubs
+    ├── app_main.c              # IDF entry, MMBasic boot, REPL launch
+    ├── esp32_console.c         # USB Serial/JTAG ↔ host_output_hook + host_read_byte_*
+    ├── esp32_lfs.c             # LFS over esp_partition_* for the A: drive
+    ├── esp32_flash_storage.c   # flash_target_*/host_options_snapshot/SaveProgramToFlash
+    ├── esp32_compat.c          # flash_prog_buf, host_time_us_64, timegm, framebuffer no-ops
+    ├── esp32_system.c          # cmd_cpu (esp_restart), __wrap_port_drive_check
+    ├── esp32_terminal.c        # cmd_cls / cmd_locate / cmd_colour / cmd_inverse (ANSI)
+    ├── hal_filesystem_esp32.c  # path/file/dir ops via lfs_*
+    ├── hal_time_esp32.c        # esp_timer_get_time, vTaskDelay
+    ├── hal_pin_esp32.c         # WRITTEN but NOT linked (Stage D2)
+    ├── hal_pin_esp32_stub.c    # currently linked instead
     ├── hal_audio_esp32_stub.c  # stdio scope: no audio
-    └── hal_vm_framebuffer_esp32_stub.c
+    ├── hal_vm_framebuffer_esp32_stub.c  # stdio scope: no display
+    ├── hal_keyboard_esp32_stub.c
+    ├── hal_storage_esp32_stub.c
+    ├── hal_flash_esp32_stub.c
+    └── demos/{hello,fizzbuzz,sieve}.bas  # EMBED_TXTFILES; auto-populated to A: on first format
 ```
 
-The MMBasic core sources stay where they are. The ESP-IDF main component's own `CMakeLists.txt` enumerates them via `idf_component_register(SRCS "../../../MMBasic.c" "../../../bc_source.c" ... INCLUDE_DIRS "../../../" "../../../core/state")`. Verbose but correct — `EXTRA_COMPONENT_DIRS` doesn't apply (it scans for *components*, each needing its own `CMakeLists.txt`; the repo root isn't a component). Source list is generated from `mmbasic_stdio/Makefile`'s `CORE_SRCS + BC_SRCS` so the two ports stay in sync.
+The MMBasic core sources stay in the repo root; the IDF main component enumerates them via `idf_component_register(SRCS "../../../MMBasic.c" ...)`.
 
-## Phase A — toolchain bring-up
+### What's in the link line that shouldn't be (debt)
 
-Empty ESP-IDF project. LED blink + "hello" line over USB Serial/JTAG. No MMBasic linkage yet.
+`ports/esp32_s3_metro/main/CMakeLists.txt` still pulls these from `ports/host_native/`:
+- `host_runtime.c` — 1040 lines, ~50 symbols ESP32 currently relies on (most globals + most port_* hooks). **Goal: split this in Stage D3 into pico-shaped per-domain files; ESP32 then writes its own siblings.**
+- `host_peripheral_stubs.c` — 645 lines, 80 cmd_/fun_ no-op stubs. Mostly genuinely needed; long-term replace with pico's per-driver pattern (out of scope for now).
+- `host_fs.c` — POSIX dir-walker. **Not actually called from any ESP32 TU. Drop in Stage D6.**
+- `host_keys.c` — test-harness scripted-key injection. Reached only via `host_runtime.c::MMInkey`. Drops out when D3 lands.
+- `host_sim_slowdown.c` — 18-line cooperative-yield shim. Reached only via `host_runtime.c::CheckAbort`. Drops out when D3 lands.
+- `host_sim_emit_stub.c` — 38 lines of weak no-ops for the WebSocket emit path. Link-only; leave.
 
-`sdkconfig.defaults` settings:
-- Console: `CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y`.
-- PSRAM: `CONFIG_SPIRAM=y`, `CONFIG_SPIRAM_USE_MALLOC=y`, `CONFIG_SPIRAM_MODE_QUAD=y`, `CONFIG_SPIRAM_SPEED_80M=y`, `CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=8192` (allocations ≤ 8 KB stay in internal SRAM).
-- Stack: `CONFIG_ESP_TASK_STACK_SIZE_MAIN=24576` (24 KB; the recursive descent parser + `setjmp`/`longjmp` error path on a deep IF nest has bitten Pico builds at smaller sizes; over-provisioning is cheap on the 320 KB internal pool).
-- Watchdog: `CONFIG_ESP_TASK_WDT_INIT=n`. Without this, long-running BASIC `FOR` loops fire the task watchdog (~5 s default) and reboot. Hard requirement, not optional.
-- Radios off: `CONFIG_ESP_WIFI_ENABLED=n`, `CONFIG_BT_ENABLED=n`. Saves ~1 MB binary and frees the WiFi RAM region.
-- `CONFIG_FREERTOS_UNICORE=n` (use both cores, even if MMBasic stays on one).
+### `--wrap` and `--allow-multiple-definition` (current debt)
 
-**Exit gate:** `idf.py build flash monitor` shows banner + 1 Hz heartbeat. Confirms board, toolchain, USB Serial/JTAG.
+```cmake
+target_link_options(${COMPONENT_LIB} INTERFACE
+    -Wl,--allow-multiple-definition
+    -Wl,--wrap=port_drive_check
+)
+```
 
-## Phase B — link MMBasic core
+`--wrap=port_bc_runtime_free_source` was removed in D4 (BC_FREE is now the weak default in `bc_runtime.c`). The remaining `--wrap=port_drive_check` is a workaround for host_native's monolith and goes away in D3.
 
-Create the ESP-IDF main component. Pull in `mmbasic_stdio`'s source list (`MMBasic.c`, `Commands.c`, `Functions.c`, `Operators.c`, `MATHS.c`, `Memory.c`, `MMBasic_Print.c`, `gfx_*_shared.c`, `mm_misc_shared.c`, state files, `Draw.c`, `RGB121.c`, `Tilemap.c`, `FileIO.c`, `Audio.c`, `BmpDecoder.c`, `re.c`, `picojpeg.c`, the stub set, `display_pixel_host.c`, plus the BC_SRCS).
+`--allow-multiple-definition` currently hides:
+- `cmd_cpu` — host_peripheral_stubs (no-op) vs esp32_system (real). **Stage D3** moves the host one to a host-shape file ESP32 doesn't link.
+- ~~`cmd_cls` / `cmd_locate` / `cmd_colour` / `cmd_inverse`~~ — D5 landed: routed through `port_terminal_handle_cls()` / `port_terminal_emit_colour()` weak hooks in Draw.c. cmd_locate / cmd_inverse turned out to be dead code (no BASIC keyword registered) and were dropped.
+- `lfs_t lfs` — host_runtime (line 103) vs esp32_lfs (line 85). **Stage D7** removes the host_runtime definition (host has no real LFS storage anyway).
+- `host_sd_root` — host_runtime `extern` vs esp32_flash_storage define. Becomes single-source after D3.
+- Tentative-definition merging (`gui_bcolour`, `FSerror`, etc.) — legitimate, grandfathered.
 
-Component CMakeLists adds `target_compile_definitions(${COMPONENT_LIB} PUBLIC MMBASIC_HOST MMBASIC_ESP32 FF_MAX_LFN_LARGE)`. The `MMBASIC_ESP32` macro is set on the build line — never gated against in shared code (HAL purity), readable only inside `ports/esp32_s3_metro/`. `PUBLIC` so the macro reaches every TU compiled into the component, including the upward-relative `../../../*.c` core sources.
+After D3+D7, `--allow-multiple-definition` should still be needed only for tentative-definition merging.
 
-Stub every `hal_*` symbol the linker demands. The first link pass surfaces 50+ undefined references — not a handful — and each needs a stub with the *correct* prototype, not just an empty body. `hal_pin_*` alone has 30+ functions; `hal_audio_*` similar. Plan on iterative link-error-driven development.
+## Current behaviour reference
 
-Phase B exit gate also runs `grep -rn '__builtin_arm' MMBasic.c bc_*.c Draw.c FileIO.c` and confirms zero hits. ARM intrinsics in shared code would block the Xtensa build; the HAL refactor should have eliminated them, but verify.
+What works end-to-end on the Metro today (commit before D-stage):
 
-`port_config.h` minimal first cut:
-- `HAL_PORT_HEAP_MEMORY_SIZE` = 1500 * 1024 (1.5 MB in PSRAM)
-- `HAL_PORT_FILES_MAX` = 64
-- `HAL_PORT_HAS_*` = 0 (no peripherals)
-- `MMBASIC_BANNER_NAME` = `"MMBasic ESP32-S3 Metro"`
-- `HAL_PORT_DEVICE_NAME` = `"ESP32-S3 Metro"`
-- `HAL_PORT_RAM_FUNC(name)` = `name`
+- `idf.py -p /dev/cu.usbmodem* flash` → boot → `>` prompt
+- `PRINT`, `FOR`/`NEXT`, `IF`/`ELSE`/`END IF`, `GOTO`/`GOSUB`, `LIST`, `EDIT`, `CLS`, `LOCATE`, `COLOUR`, `INVERSE`, `CPU RESTART`
+- `A:` (drive switch), `FILES` (lists embedded demos), `LOAD "hello.bas"`, `RUN "hello.bas"`, `RUN "fizzbuzz.bas"`, `RUN "sieve.bas"`
+- `FRUN "hello.bas"` (works post-`""`-fix), `FRUN "fizzbuzz.bas"`, `FRUN "sieve.bas"` (works post-heap-reorder; ~5× faster than RUN)
+- `B:` rejects with "B: drive not configured on this board" (correct)
 
-**Exit gate:** `idf.py build` succeeds; `.bin` flashes; heartbeat still runs. Proves the HAL surface compiles cleanly on Xtensa with no target ifdef leaks.
+What's broken or stubbed:
+- **SAVE to slot N (e.g. `SAVE`, `FLASH SAVE n`)** — D1 landed: errors loudly past the 256-byte placeholder. Real backing in **Stage E1**.
+- **OPTION SAVE** — reaches NVS-less host_options_snapshot, RAM-only, doesn't survive reboot. **Stage E2.**
+- **PIN()/SETPIN/ADC** — D2 landed: real `hal_pin_esp32.c` linked. PWM (LEDC) still TODO when a caller needs it.
+- All 80 `cmd_*`/`fun_*` peripheral stubs from `host_peripheral_stubs.c` — error gracefully, expected.
 
-## Phase C — stdio + time + heap
+## Stage D — Decouple from host_native
 
-Real impls for the smallest functional set:
-- `hal_time_esp32.c` — `esp_timer_get_time()` for microseconds, `vTaskDelay` for sleeps.
-- `hal_pin_esp32_stub.c`, `hal_audio_esp32_stub.c`, `hal_vm_framebuffer_esp32_stub.c` — empty bodies satisfying the contract surface.
-- `esp32_console.c` — non-blocking stdio over USB Serial/JTAG requires explicit setup; newlib's VFS does *not* default to non-blocking on the JTAG console:
-  1. `usb_serial_jtag_driver_install(&config)` to install the IDF driver (without this, `read()` on stdin fails immediately).
-  2. `esp_vfs_usb_serial_jtag_use_driver()` to switch the VFS layer over to the installed driver.
-  3. `esp_vfs_dev_usb_serial_jtag_set_rx_line_endings(ESP_LINE_ENDINGS_CR)` and `..._set_tx_line_endings(ESP_LINE_ENDINGS_CRLF)` to keep ANSI escapes intact for Editor.c.
-  4. `fcntl(fileno(stdin), F_SETFL, O_NONBLOCK)` so `MMgetchar`'s poll loop returns -1 instead of blocking.
-  5. TX path: pass `0` timeout to `usb_serial_jtag_write_bytes` (or use `putchar` accepting that `fwrite` may return short on full FIFO) so output doesn't hang when the host monitor disconnects.
-- BC heap allocator override — `bc_alloc.c` already wraps allocation; on ESP32, route to `heap_caps_malloc(size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT)`. The `MALLOC_CAP_8BIT` flag is non-optional: pure `MALLOC_CAP_SPIRAM` returns 32-bit-aligned-only memory on some configs, which the byte-addressed BC heap will misuse.
-- Heap split (now in scope, not deferred): VM scratch / dispatch state in internal SRAM, slot storage and program text in PSRAM. Quad PSRAM on ESP32-S3 at 80 MHz hits ~30-40 MB/s vs. ~600 MB/s internal — 15-20× slower for cache-cold access, 2-3× cache-warm. Single-heap-in-PSRAM degrades the BC compiler's small-allocation churn enough that `mand` benchmark feels it; split it now while the allocator is being touched anyway.
+The biggest debt. Goal: ESP32 port stops leaning on `host_runtime.c`'s monolith for device-shape behaviour. Each item is independent and small enough to fit in a single session.
 
-In `app_main`, hard-code `MMBasic_Init()` then `tokenize_and_run("PRINT 1+1")`. Validate output before wiring the prompt loop.
+### D1. Fix silent SAVE-to-slot bug ✅
 
-**Exit gate:** serial monitor shows `2` after flash. Proves the HAL contracts hold on Xtensa, the BC compiler runs, the VM dispatches, and the heap allocator hands out PSRAM.
+**Problem**: `esp32_flash_storage.c::flash_range_erase`/`flash_range_program` bound-checked against a 256-byte `host_flash_target_buf` and silently `return`'d if the call exceeded bounds. Real SAVE writes multi-KB programs; bytes went nowhere, no error.
 
-## Phase D — interactive REPL
+**Fix (landed)**: rewrote `flash_range_erase` / `flash_range_program` to mirror host_native's offset-routing in `host_fs_shims.c`. Two regions:
+- Program-flash region (off ∈ [0, sizeof flash_prog_buf)): hits `flash_prog_buf`. `load_basic_source(0, MAX_PROG_SIZE)` works.
+- Slot region (off ≥ FLASH_TARGET_OFFSET + ...): writes past the 256-byte placeholder error() out loudly.
 
-Replace the hard-coded program with `MMBasic_RunPromptLoop`. `hal_keyboard_esp32.c` reads from stdin (blocking is fine on a dedicated MMBasic FreeRTOS task spawned via `xTaskCreate` with a 24 KB stack — `xTaskCreate` initializes per-task `_reent` automatically; raw FreeRTOS task creation does not).
+Stage E1 replaces the slot region's RAM placeholder with `esp_partition_*` against a real flash partition.
 
-`Editor.c` and `MMBasic_Prompt.c` emit ANSI escape sequences for line editing — same code path as `mmbasic_ansi`. Validate that USB Serial/JTAG passes them through (most terminals do; macOS `screen /dev/cu.usbmodem*` works).
+### D2. Link `hal_pin_esp32.c` instead of `hal_pin_esp32_stub.c` ✅
 
-**Exit gate:** typing `FOR i=1 TO 10 : PRINT i*i : NEXT i` and pressing Enter prints squares 1, 4, 9, ... 100. Multi-line edit, GOTO/GOSUB, IF/THEN/ELSE all work. Explicitly **excluded** from this gate: `LOAD`, `SAVE`, `RUN "filename"`, `FILES`, `CHDIR` — FATFS isn't mounted yet, and exercising file commands here will crash on an unmounted volume. Phase E owns the file-command verification.
+`hal_pin_esp32.c` (~200 lines, real ESP-IDF GPIO + ADC oneshot impl) is now linked instead of `hal_pin_esp32_stub.c`. Required adding `esp_adc` to the IDF component REQUIRES list. Build green.
 
-## Phase E — persistence
+Hardware test (deferred to user): SETPIN GP13,DOUT : PIN(GP13)=1 → onboard LED lights. PIN(GP1) reads ADC. (Pick a suitable GPIO; verify against Adafruit's pinout.)
 
-- `hal_flash_esp32.c` — `esp_partition_find_first` for the `fatfs` partition; expose erase/write/read sized to `SAVEDVARS_FLASH_SIZE` blocks (4 KB). Sector size must match `CONFIG_WL_SECTOR_SIZE` (default 4 KB on ESP32-S3); mismatched size silently corrupts the wear-leveling layer's metadata.
-- `hal_storage_esp32.c` — Options struct stored in NVS:
-  - `nvs_flash_init()` first; on `ESP_ERR_NVS_NO_FREE_PAGES` / `ESP_ERR_NVS_NEW_VERSION_FOUND`, erase the partition and re-init. Standard ESP-IDF idiom.
-  - `nvs_set_blob` has a default per-blob cap of ~4 KB. Measure `sizeof(Options)` first; if it exceeds the cap, either split across multiple keys or bump `CONFIG_NVS_MAX_ENTRY_SIZE`.
-  - Survives reflash unless the user passes `idf.py erase-flash`.
-- `hal_filesystem_esp32.c` — `esp_vfs_fat_spiflash_mount_rw_wl(...)` with `format_if_mount_failed=true` so first boot formats the FATFS partition automatically. Mounted at `/sd`. FATFS configuration via existing `ffconf.h` + `FF_MAX_LFN_LARGE` (passed via the component's compile defs).
-- `FileIO.c` is already FatFS-flavored (uses `f_open`, `f_read`, etc.); no modifications expected, just the right mount.
+`hal_pin_esp32_stub.c` is left on disk but no longer in the link.
 
-**Exit gate:**
-1. `SAVE "test.bas"` → power cycle → `RUN "test.bas"` produces the saved program's output.
-2. `OPTION SAVE` → power cycle → option survives.
-3. `FILES` lists the saved program.
+### Stage D-decouple — ESP32 satisfies the HAL contract; nothing more
 
-## Phase F — gate integration + buildall
+**Reframing**: ESP32's port surface is defined by the HAL contract (`hal/hal_*.h`) and the small set of `port_*` / console-glue / cmd-stub symbols core code requires. ESP32 owns its impl of that surface in `ports/esp32_s3_metro/main/esp32_*.c` files and `hal_*_esp32.c` files — most of them no-ops and stubs. host_native is **irrelevant** to that impl: it's a different port, with POSIX/test-harness shape behind the same contract. ESP32 doesn't borrow from host_native any more than pico does. The current `HOST_NATIVE_REUSED` list is historical accident — early bring-up shortcut — not architecture.
 
-- Extend `tools/check_hal_purity.sh`:
-  - Rename the "host-port WASM-clean" tier to "host-port-clean" (covers ESP32 too).
-  - Add `MMBASIC_ESP32` and `__XTENSA__` to the forbidden-macro list **for `ports/host_native/*.c` only**; future ESP32 logic must not bleed back into host_native.
-  - The new `ports/esp32_s3_metro/main/*.c` directory is *also* added to the host-port-clean tier, but with `MMBASIC_ESP32` whitelisted (the macro is the port's own identity tag — fine to use inside its own port directory).
-- `buildall.sh` doesn't fit (different toolchain, different build system). Add a sibling `buildesp32.sh` that:
-  - Sources `~/esp/esp-idf/export.sh` if `idf.py` isn't on PATH.
-  - Wraps `idf.py build` with sane defaults and reports OK/FAIL the same way.
-  - Is **opt-in**, not part of any release-gate CI. The repo's existing CI assumes a fresh shell with arm-none-eabi tools; `idf.py` requires a heavyweight environment that doesn't belong in the default gate.
-- `ports/esp32_s3_metro/README.md` documents the install steps (esp-idf checkout, env activation), the `idf.py build flash monitor` command line, and notes that `buildesp32.sh` is the local convenience wrapper.
+**Step A — inventory the contract surface**. Enumerate every symbol the MMBasic core + drivers + HAL contracts require from a port:
+- `nm -u` against `${PORT_LOCAL_SRCS}` + core/state/* + ${BC_SRCS} + ${CORE_SRCS} + ${DEVICE_FACING_SRCS} when host_native is excluded.
+- Cross-reference `extern` declarations in core headers (`MMBasic.h`, `bytecode.h`, `hal/*.h`).
+- Group by category. Most fall into:
+  1. **HAL contract functions** (`hal_pin_*`, `hal_filesystem_*`, `hal_time_*`, etc.) — ESP32 already implements these in `hal_*_esp32.c`.
+  2. **Console glue** (`MMputchar`, `MMPrintString`, `SSPrintString`, `MMInkey`, `MMgetchar`, `MMfopen/close/getline`, `putConsole`, `SerialConsolePutC`, `myprintf`, `getConsole`, `kbhitConsole`) — thin routers over the port's IO. ESP32 routes through USB Serial/JTAG via `esp32_console.c`'s existing `host_output_hook`/`host_read_byte_*` mechanism.
+  3. **Default port hooks** (~35 `port_*` symbols: `port_apply_default_console_colors`, `port_audio_i2s_pio_slice`, `port_bc_*`, `port_clear_*`, `port_display_*`, `port_factory_reset_*`, `port_heartbeat_*`, `port_keyboard_*`, `port_lcd_*`, `port_mminfo_*`, `port_picocalc_*`, `port_pin_is_reserved_*`, `port_pio_*`, `port_poke_*`, `port_prepare_*`, `port_print_*`, `port_select_*`, `port_system_*`, `port_try_*`, `port_usb_*`, `port_vm_*`, `port_web_*`) — almost all no-op on ESP32. Maybe two need real bodies (`port_drive_check` for A:-only, `port_vm_time_get_tm` for date/time).
+  4. **Tentative-def globals** (`gui_fcolour`, `gui_bcolour`, `FSerror`, `Option`, `PinDef[]`, `inttbl[]`, `dma_hw`, `watchdog_hw`, etc.) — declared in core headers, defined in some port TU. ESP32 owns its definitions.
+  5. **Interpreter abort / VM trampoline** (`CheckAbort`, `check_interrupt`, `routinechecks`, `CallCFunction`, `CallExecuteProgram`) — ESP32 versions are basically empty.
+  6. **Peripheral cmd stubs** (`cmd_i2c`, `cmd_pwm`, `cmd_spi`, `cmd_pio`, `cmd_setpin` etc., plus `fun_*` siblings) — ESP32 doesn't expose most of these yet; stub to `error()` or no-op. Real impl per peripheral over time.
 
-**Exit gate (overall):**
-- All existing validations stay green: `host/run_tests.sh` 240/240, `tools/check_hal_purity.sh`, `buildall.sh` 14/14.
-- `idf.py build` clean.
-- Flashed firmware boots into the REPL, FOR/IF/GOSUB/PRINT/SAVE/LOAD/RUN/CHDIR all work.
-- Cold-boot persistence verified (SAVE → power cycle → RUN).
-- New port directory passes the host-port-clean purity tier.
+Output: a markdown table inventory with counts per category, posted into the log, and a one-line owner per symbol (existing file or new).
+
+**Step B — write minimal ESP32 files**. New TUs in `ports/esp32_s3_metro/main/` whose total line count should be roughly **<500 lines combined** (versus host_runtime.c's 1032):
+- `esp32_console.c` (existing) — extend with `MMputchar`/`MMPrintString`/etc routers if not already present.
+- `esp32_globals.c` — tentative-def globals + the trivial port hooks that just return `0` or no-op.
+- `esp32_default_hooks.c` — the ~35 `port_*` no-ops as one-liners. ESP32-specific overrides (`port_drive_check`, `port_vm_time_get_tm`) live elsewhere and this file's no-op gets replaced per-symbol.
+- `esp32_runtime.c` — `CheckAbort`, `check_interrupt`, `routinechecks`, `CallCFunction`, `host_runtime_begin/finish/configure` (all no-ops on ESP32; app_main is the entry).
+- `esp32_peripheral_stubs.c` — `cmd_i2c` / `cmd_pwm` / `cmd_spi` / etc as `void cmd_x(void) { error("X not supported on this port yet"); }`. `cmd_setpin`/`fun_pin` route through `vm_sys_pin.c` HAL just like host does.
+- `esp32_cmd_files_hooks.c` (or fold into `esp32_runtime.c`) — `port_drive_check` (A:-only error if drive!='A'), `port_mount_sd_drive` (no-op), `port_apply_load_overrides` (no-op), `cmd_files_save_program_context` etc as no-ops.
+
+**Step C — drop ALL host_native files from the ESP32 link in one move**. After step B compiles + links, delete `HOST_NATIVE_REUSED` entirely from `main/CMakeLists.txt`. Drop `-Wl,--wrap=port_drive_check` (esp32 owns the symbol). Don't try to drop `--allow-multiple-definition` yet (step E).
+
+**Step D — `port_bc_runtime_free_source` cleanup**. Currently has a weak BC_FREE default in `bc_runtime.c`. Per rule 3, weak attributes are unsafe under `--allow-multiple-definition`. Delete the weak body; make it extern-only. Add explicit strong defs:
+- `host_bc_runtime_noop.c` — already exists; no-op (host).
+- `esp32_runtime.c` — BC_FREE body (new).
+- `ports/pico_sdk_common/bc_runtime_pico.c` — recreate with BC_FREE body (was deleted in old D4 misstep).
+
+**Step E — kill `--allow-multiple-definition`**. After step C the only remaining users are the tentative-def globals (`gui_bcolour`, `FSerror`, etc. declared without initialiser in multiple TUs). Two options:
+  - **(a)** `-fcommon` on the IDF component. xtensa-gcc honours it; matches pico/host default behaviour for free.
+  - **(b)** Single-owner TU per global, `extern` declarations elsewhere. ~30 globals, mechanical edit, codebase-wide effect.
+Land (a) first; (b) is the codebase-wide cleanup and lives outside this port plan.
+
+**Step F — verify**. ESP32 IDF build green with default-strict link rules; host 242/242; HAL purity clean; hardware smoke: CLS clears, COLOUR changes colour, SETPIN+PIN drives a GPIO, FRUN sieve.bas runs.
+
+**What this is NOT**:
+- Not a copy-paste of `host_runtime.c` into `esp32_runtime.c`.
+- Not a refactor of host_native (host's monolith stays intact; we just stop linking it from ESP32).
+- Not a port to the ESP32 of host's lifecycle / test-harness concerns. ESP32's lifecycle is `app_main`. Host's `host_runtime_begin/finish/configure` exist on ESP32 only as no-op stubs because some core path calls them; nothing more.
+
+### D5. Resolve `cmd_cls`/`cmd_colour` collision ✅
+
+**First attempt (failed in hardware)**: weak default in `Draw.c` + strong override in `esp32_terminal.c`. Looked correct on paper. On hardware, both `port_terminal_handle_cls` and `port_terminal_emit_colour` resolved to `Draw.c.obj` (the weak default). Diagnosis: `--allow-multiple-definition` (still in the ESP32 link line for grandfathered tentative-def merging) defeats the weak attribute — first-defined wins, weak/strong is ignored. Lesson: weak attributes are unsafe in a build using `--allow-multiple-definition`. **See rule 3 above.**
+
+**Second attempt (landed)**: strong-only pattern. `Draw.c` declares both hooks `extern` only, no body. Each port supplies exactly one strong definition in a port-only TU:
+- `ports/esp32_s3_metro/main/esp32_terminal.c` — emits ANSI clear / 24-bit colour escapes.
+- `ports/host_native/host_terminal_hooks_noop.c` — no-op (framebuffer ports run Draw.c's framebuffer path). Linked by host_native, mmbasic_stdio, mmbasic_ansi, host_wasm.
+- `ports/pico_sdk_common/terminal_hooks_noop.c` — no-op (pico has a real LCD). Linked by every pico variant via PICOMITE_SOURCES.
+
+`cmd_cls` / `cmd_colour` deleted from `esp32_terminal.c`; `cmd_locate` / `cmd_inverse` turned out to be dead code (no BASIC `LOCATE` / `INVERSE` keyword is registered in `AllCommands.h`) and were removed. Map verified post-build: `port_terminal_handle_cls` and `port_terminal_emit_colour` resolve to `esp32_terminal.c.obj` on ESP32 and to the noop file on each host build. Tests 242/242, ESP32 + host builds green.
+
+### D8. Override port_config values that are wrong on ESP32 ✅
+
+`ports/esp32_s3_metro/port_config.h` now overrides:
+- `HAL_PORT_NBR_PINS` → 49 (was inherited 44; ESP32-S3 has 49 GPIOs 0–48). Bigger arrays: `ExtCurrentConfig[NBRPINS+1]`, `PinDef[NBRPINS+1]`, `p100interrupts[NBRPINS+1]`.
+- `HAL_PORT_HEAP_TOP` / `HAL_PORT_HEAP_TOP_USB` → 0 (sentinel; was RP2040 mmap address).
+- Heap comment reconciled with the 104 KB value (was claiming 192 KB; the value was correct, the comment wasn't).
+
+Documented but not yet overridden:
+- `HAL_PORT_FLASH_TARGET_OFFSET` (1 MB on host; revisit when E1 lands and esp_partition_t replaces the offset arithmetic).
+- `HAL_PORT_PWM_SLICE_COUNT` / `HAL_PORT_PIO_COUNT` (RP2040 numbers; inert until a real PWM/PIO impl exists).
+
+### D9. Remove app_main's hard-coded Option-init dance ⏳
+
+`app_main.c` currently sets ~12 Option fields after `LoadOptions()` because the flash mirror is uninitialised. That logic belongs in a `LoadOptions` "no saved Options found, use defaults" path, gated by an OPTION_ERASE_DEFAULTS macro or similar. Holds until E2 (NVS-backed Options) lands; tracked separately from the decouple plan because it's a flash-persistence question, not a host_native-decouple question.
+
+## Stage E — Real flash persistence
+
+Real device-shape persistence. Replaces the current RAM mirrors with `esp_partition_*`-backed storage.
+
+### E1. SAVE-to-slot via esp_partition
+
+Allocate a partition (or carve from `lfsdata`'s start) for SAVE-to-slot storage. Replace `host_flash_target_buf[256]` placeholder + bounds-checked stubs with:
+
+- `flash_range_erase(off, count)` → `esp_partition_erase_range(slot_partition, off, count)`
+- `flash_range_program(off, data, len)` → `esp_partition_write(slot_partition, off, data, len)`
+- `flash_target_contents` → const-pointer view via `esp_partition_mmap(...)`
+
+Match pico's slot model: N slots × MAX_PROG_SIZE each; `cmd_save N` writes to slot N.
+
+**Exit gate**: `SAVE 1` then power-cycle then `LOAD 1` then `RUN` → original program runs.
+
+### E2. Options blob in NVS
+
+Replace `host_flash_option_buf[sizeof(struct option_s)]` RAM mirror + `host_options_snapshot()` memcpy with NVS-backed storage:
+
+- `nvs_flash_init()` at boot; on `ESP_ERR_NVS_NO_FREE_PAGES` / `ESP_ERR_NVS_NEW_VERSION_FOUND`, erase + re-init (standard ESP-IDF idiom).
+- `LoadOptions()` reads NVS blob; on first boot (no key) populates defaults — replacing the current `app_main.c` hard-coded init dance.
+- `SaveOptions()` writes NVS blob.
+- `nvs_set_blob` has a default ~4 KB cap; verify `sizeof(struct option_s)` fits or bump `CONFIG_NVS_MAX_ENTRY_SIZE`.
+
+**Exit gate**: `OPTION COLOUR GREEN` → power cycle → prompt comes back green. `OPTION COLOUR RESET` undoes it.
+
+### E3. Why no PSRAM yet
+
+8 MB Octal PSRAM is on-chip, currently disabled in `sdkconfig.defaults`. Two reasons not to enable yet:
+
+1. **Internal SRAM works** for the stdio-REPL litmus test. 104 KB heap fits FRUN sieve(6000). Don't turn on a 15-20× slower memory tier without a forcing function.
+2. **PSRAM enabling is a non-trivial change** — `MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT` heap split, BC heap routing decisions, framebuffer-in-PSRAM-with-DMA-cap requirement once a display lands, brownout detector recalibration. Right time is when display or audio land, not stdio-only.
+
+Capture this decision so the next session doesn't re-litigate it.
+
+## Stage F — Plan + gate hygiene
+
+### F1. Wire ESP32 into HAL purity gate
+
+`tools/check_hal_purity.sh` currently has no ESP32 port awareness. Add `ports/esp32_s3_metro/main/*.c` to a strict scope (mirror what host_native gets). Forbidden-macro list for the ESP32 strict scope: any target macro **except** `MMBASIC_ESP32` itself (which is the port's own identity tag — fine inside its own port directory).
+
+ESP32 port code is currently clean (one `#ifndef HAL_FS_ESP32_MAX_OPEN` tunable in `hal_filesystem_esp32.c`, which is fine — it's a port-config tunable, not a target gate). The gate keeps it that way.
+
+### F2. Update `docs/real-hal-plan.md` scoreboard
+
+Add a row to the phase table:
+
+```
+| esp32-port | 🔧 | A+B+C done; D (decouple from host_native) in flight; E (flash persistence), F (gate) not started — see real-hal/esp32-s3-port.md |
+```
+
+Add `esp32-s3-port.md` to the topic list near the bottom of `real-hal-plan.md`.
+
+### F3. Rewrite `ports/esp32_s3_metro/README.md`
+
+Currently aspirational. Should document:
+- Hardware: Adafruit Metro ESP32-S3 (#5500, N16R8).
+- Prereqs: ESP-IDF 5.3 (`. ~/esp/esp-idf/export.sh`), `dfu-util`.
+- Build: `idf.py build`.
+- Flash: `idf.py -p /dev/cu.usbmodem* flash`. Note the BOOT+RESET tap recovery if macOS USB-CDC binding hangs.
+- Monitor: `idf.py monitor` or `picocom --noreset --baud 115200 /dev/cu.usbmodem*`. Document picocom's known issue (DTR pulse on open) and `probe.py` as the workaround.
+- What works (current behaviour reference, keep in sync with this plan).
+
+### F4. Optional: `buildesp32.sh`
+
+Sibling of `buildall.sh`. Sources `~/esp/esp-idf/export.sh` if needed, runs `idf.py build`, reports OK/FAIL. **Opt-in, not in CI** — `idf.py` requires a heavyweight environment that doesn't belong in the default gate. Land if desired; not blocking.
+
+## Out of scope (deferred — don't expand without an explicit goal)
+
+- **Display.** SPI LCD / VGA via LCD_CAM. Multi-session. See "Display follow-on (sketch)" at the bottom of this doc.
+- **Audio.** I2S codec, MP3 decode, PWM synth port.
+- **Keyboard.** USB host (TinyUSB), I2C keypad (PicoCalc-style), PS/2.
+- **WiFi/BLE.** Native on ESP32-S3, easier than RP2350 CYW43. Land when there's a use case — not before.
+- **Octal PSRAM.** See Stage E3.
+- **OTA.** Two app slots, signed updates. Out of scope for a stdio litmus.
 
 ## Risks worth pre-flagging
 
-1. **PSRAM latency.** Quad PSRAM on ESP32-S3 at 80 MHz hits ~30-40 MB/s vs. internal SRAM's ~600 MB/s — **15-20× slower cache-cold, 2-3× cache-warm**. Phase C addresses this directly with the heap split (not deferred). If `mand` still feels sluggish after the split, the next mitigation is moving FontTable[] / static program text into internal SRAM via `EXT_RAM_BSS_ATTR` overrides.
+1. **macOS USB-CDC binding flakiness**. After many fast reset cycles, macOS gets confused about the USB CDC binding. Symptom: `idf.py flash` hangs on "Connecting...". Recovery: hold BOOT, press RESET, release BOOT (enters ROM USB Direct mode, stable CDC ACM). `probe.py` already documents this.
 
-2. **`FF_MAX_LFN_LARGE` propagation.** Every host-style port passes this `-D`. The ESP-IDF main component's `CMakeLists.txt` must use `target_compile_definitions(${COMPONENT_LIB} PUBLIC FF_MAX_LFN_LARGE MMBASIC_HOST MMBASIC_ESP32)`. Without it, FATFS reverts to 63-byte LFN and FileIO truncates from deep paths — silently, no compile error.
+2. ~~**`HAL_PORT_NBR_PINS` overflow risk**~~. D8 landed: NBRPINS = 49 covers all ESP32-S3 GPIOs.
 
-3. **Newlib reentrancy.** ESP-IDF's newlib has per-task `_reent`. fopen/fread/fwrite work via VFS as long as the task was created via `xTaskCreate` (not raw FreeRTOS APIs). `host_fs.c`'s pthread assumptions (used by host_native for argv-relative path resolution) may not apply — worst case, write a thinner ESP32-specific filesystem shim instead of reusing host_fs.c.
+3. **Heap fragmentation on FRUN with big arrays**. `bc_compiler_alloc` reorder (committed) helps; t170_frun_post_compact_array.bas is the regression net. If a real program OOMs at array alloc despite that, the next mitigations are (a) bump heap (capped at ~110 KB by dram0_0_seg), (b) `heap_caps_malloc` big arrays from IDF heap (130 KB free), (c) enable PSRAM. Document what you observe before mitigating.
 
-4. **`__attribute__((optimize("-Os")))`.** Xtensa GCC honors it (unlike macOS clang, which warns and ignores). Real risk: the per-function `-Os` override changes inlining behavior on Xtensa more aggressively than on ARM, potentially affecting Draw.c hot loops. If perf surprises appear, check the disassembly for missed inlines.
+4. **`flash_target_contents` host-shape leak**. Currently a `const uint8_t *` global pointing at a RAM mirror. Real device shape is XIP-mapped flash (pico) or `esp_partition_mmap` (esp32). E1 fixes ESP32; the type signature on host is wrong-but-harmless until anyone tries to use it as a real flash view there.
 
-5. **USB Serial/JTAG flow control.** The built-in controller has no hardware flow control. With the recommended `0` write-timeout, output is dropped (not blocked) when the host monitor disconnects. Interactive use is fine; benchmark output may look truncated — that's the dropped bytes, not a code bug.
+5. **Newlib reentrancy + FreeRTOS**. ESP-IDF newlib has per-task `_reent`. Tasks created via `xTaskCreate` get reentrancy automatically; raw FreeRTOS APIs don't. If a future change spawns its own MMBasic worker task, use `xTaskCreate`.
 
-6. **Brownout detector.** PSRAM init draws inrush; some Metro boards trip the BOD on cold boot at 3.0 V. If flashing fails intermittently, lower `CONFIG_ESP32S3_BROWNOUT_DET_LVL` or disable. Defer until it's seen.
+6. **Brownout detector**. PSRAM init draws inrush current; some Metro boards trip BOD on cold boot. Defer until PSRAM lands; lower `CONFIG_ESP32S3_BROWNOUT_DET_LVL` if needed.
 
-7. **Stack size.** Phase A sets `CONFIG_ESP_TASK_STACK_SIZE_MAIN=24576`. If even 24 KB isn't enough for `bc_compiler_alloc` on a deeply nested program, run MMBasic on a dedicated FreeRTOS task with `xTaskCreate(..., 32768, ...)`. The Pico builds have hit recursion-depth limits at smaller sizes; over-provisioning by 8 KB is cheap insurance.
+## Files to know
 
-## Out of scope (deferred)
+- `ports/esp32_s3_metro/main/CMakeLists.txt` — source-of-truth for what's linked. The `HOST_NATIVE_REUSED` list and `target_link_options` block are where the audit-driven cleanup edits land.
+- `ports/esp32_s3_metro/main/esp32_flash_storage.c` — flash backing storage, now mirrors host_native's offset-routing post-D1.
+- `ports/esp32_s3_metro/main/esp32_system.c` — has `__wrap_port_drive_check` (D3 target).
+- `ports/host_native/host_bc_runtime_noop.c` — host's strong override of the weak BC_FREE default in bc_runtime.c (post-D4).
+- `ports/esp32_s3_metro/port_config.h` — D8 edits land here.
+- `ports/esp32_s3_metro/probe.py` — debug driver; use it instead of picocom.
+- `ports/host_native/host_runtime.c` — the monolith to split (D3).
+- `ports/pico_sdk_common/` — the reference for what device-port shape looks like.
+- `tools/check_hal_purity.sh` — F1 edits the strict-scope file list here.
+- `docs/real-hal-plan.md` — F2 adds the scoreboard row.
 
-- **Display.** No SPI LCD wiring in the litmus test. See [Display follow-on (sketch)](#display-follow-on-sketch) below for the wiring + driver path once the stdio core is proven.
-- **WiFi/BLE.** ESP32-S3 has both natively, far easier than the CYW43 dance on RP2350. Trivially gated on `HAL_PORT_HAS_WIFI = 1` once the litmus is proven.
-- **Audio.** I2S audio output exists in ESP-IDF; pairs naturally with `drivers/pwm_synth/` once a board-specific I2S codec is chosen.
-- **Keyboard.** USB host (TinyUSB), I2C keypad (PicoCalc-style), or PS/2 — all defer to a hardware-bound follow-on.
+## Display follow-on (sketch — deferred)
 
-## Display follow-on (sketch)
+Not part of the stdio litmus. Path is well-trodden:
 
-Not part of the litmus test, but worth recording the path so the
-deferred work is concrete.
+**SPI LCD (recommended first cut)**: ESP-IDF has first-class `esp_lcd_panel_*` drivers for ILI9341 / ST7789 / ST7796 / GC9A01 / RM67162 — exactly the panels `drivers/spi_lcd/` already supports on Pico. BASIC surface (`OPTION LCDPANEL ILI9341 ...`, `BACKLIGHT`, `BLIT`, etc.) needs no changes.
 
-### Hardware path
+Driver path:
+- `drivers/spi_lcd_esp32/` wraps `esp_lcd_panel_io_spi` + `esp_lcd_panel_*`, implements the `hal_display_pixel.h` + `hal_spi_lcd_mem332.h` contracts pico's driver exposes. Glue, not rewrite — pico's driver is `pico/multicore.h`-coupled and can't be reused, but the contract surface is identical.
+- `hal_display_esp32.c` in the port directory: panel selection, backlight pin, framebuffer dimensions.
+- Framebuffer in PSRAM via `heap_caps_malloc(W*H*bpp, MALLOC_CAP_DMA | MALLOC_CAP_SPIRAM)`. DMA cap is non-optional for `esp_lcd_panel_io_spi`.
+- `port_config.h` sets `HAL_PORT_HAS_SPI_LCD=1`, CS/DC/RESET GPIOs, panel type, dimensions.
 
-Two viable routes on ESP32-S3:
+Metro ESP32-S3 (#5500) wiring:
+- 3.3 V only — no 5 V tolerance. Verify any LCD module is 3.3 V-safe (Adafruit's 1770 / 2478 / 4313 / 4383 are).
+- Default SPI: SCK=GPIO39, MOSI=GPIO42, MISO=GPIO21 (rev B SD-slot wiring; remappable via IO MUX).
+- Backlight: 80–100 mA on a 2.8" panel — exceeds 40 mA per-GPIO limit. Wire to 3V3 directly or via N-FET; never straight off a GPIO.
 
-1. **SPI LCD (recommended first cut).** ESP-IDF has first-class
-   `esp_lcd_panel_*` drivers built in — ILI9341, ST7789, ST7796,
-   NT35510, GC9A01, RM67162. These are exactly the panels
-   `drivers/spi_lcd/` already supports on Pico, so the BASIC surface
-   (`OPTION LCDPANEL ILI9341 ...`, `BACKLIGHT`, `BLIT`, etc.) needs
-   no changes — those commands are already HAL-clean (target=0
-   ifdefs in Commands.c / Draw.c).
-2. **VGA via LCD_CAM (more ambitious).** ESP32-S3's LCD_CAM
-   peripheral can drive parallel-RGB output with PCLK/HSYNC/VSYNC,
-   which is functionally VGA timing. Requires an external
-   resistor-ladder R-2R DAC for analog R/G/B (no on-chip DAC on the
-   S3). On Quad-PSRAM Metro the realistic ceiling is **320×240×8bpp
-   @ 60 Hz** — needs ~4.6 MB/s scanout vs. ~30–40 MB/s Quad PSRAM
-   peak. 640×480 needs ~18 MB/s scanout and contends too aggressively
-   with everything else for PSRAM cycles; lift the ceiling by
-   choosing an Octal-PSRAM ESP32-S3 board (e.g. ESP32-S3-DevKitC-1
-   N32R8) instead of the Metro.
+Effort: 3–4 sessions for SPI path. VGA via LCD_CAM is multi-session and only worth it on Octal-PSRAM boards where 640×480 is achievable.
 
-### Adafruit Metro ESP32-S3 (#5500) pinout for SPI LCD
+---
 
-Default hardware-accelerated SPI bus (the one IDF maps to the
-onboard microSD slot, rev B):
-
-- **SCK** = GPIO39
-- **MOSI** = GPIO42
-- **MISO** = GPIO21
-
-ESP32-S3 IO MUX lets you remap to any GPIO; the defaults are just
-the SD-slot wiring you can share or sidestep. I2C / Stemma QT is
-SDA=GPIO47 / SCL=GPIO48 with onboard 10 kΩ pullups.
-
-**Logic level: 3.3 V only** — no 5 V tolerance, no level shifter on
-board. This rules out 5 V-marked LCD modules whose logic lines (CS /
-DC / SCK / MOSI) aren't independently 3.3 V-safe even when VCC has
-a regulator; verify before connecting.
-
-### Wiring an ILI9341 module (the canonical PicoMite display)
-
-Eight wires, plus optional MISO:
-
-| LCD pin | Metro ESP32-S3 | Notes |
-|---|---|---|
-| VCC | 3V3 | 3.3 V native — confirm your module is 3.3 V-safe |
-| GND | GND | |
-| CS | any free GPIO | Chip select, e.g. one of D2–D13 |
-| RESET | any free GPIO | Hardware reset |
-| DC / RS | any free GPIO | Data/command select |
-| SDI / MOSI | GPIO42 | SPI data out |
-| SCK | GPIO39 | SPI clock |
-| LED / BL | 3V3, **or** PWM-capable GPIO via FET | Backlight |
-| SDO / MISO | GPIO21 | Optional — only if reading framebuffer / touch |
-
-Arduino-D-pin → GPIO mapping for the "any free GPIO" rows: check
-Adafruit's PrettyPins PDF in the [Metro ESP32-S3 Learn
-guide](https://learn.adafruit.com/adafruit-metro-esp32-s3) or the
-silkscreen on the board.
-
-### Hard constraints
-
-1. **3.3 V only.** Some cheap LCD modules regulate VCC but feed 5 V
-   logic levels into the controller; that fries the S3. Adafruit's
-   own modules (1770 / 2478 / 4313 / 4383) are 3.3 V-safe.
-2. **SD-slot SPI sharing.** Metro rev B specifically rewired
-   SPI/SD to avoid PSRAM conflicts. If the LCD shares the bus with
-   the onboard microSD, give each device its own CS and let
-   `esp_lcd_panel_io_spi` / IDF's SD driver arbitrate. If only the
-   LCD is in use, the bus is exclusive — no arbitration needed.
-3. **Backlight current.** A 2.8" ILI9341 backlight pulls ~80–100 mA
-   — well over the 40 mA per-GPIO limit. Wire LED to 3V3 directly,
-   or to a GPIO via a small N-FET if PWM brightness is wanted.
-   Driving the backlight straight off a GPIO will brown out the
-   regulator at minimum and may damage the pin.
-
-### Driver glue (what gets written)
-
-- **`drivers/spi_lcd_esp32/`** — wraps `esp_lcd_panel_io_spi` +
-  `esp_lcd_panel_ili9341` (or `_st7789`) and implements the same
-  `hal_display_pixel.h` + `hal_spi_lcd_mem332.h` contract that
-  `drivers/spi_lcd/` exposes on Pico. The Pico driver itself can't
-  be reused — it's coupled to `pico/multicore.h` + `hardware/dma.h`
-  — but the contract surface is identical, so this is glue, not a
-  rewrite.
-- **`hal_display_esp32.c`** in the port directory — panel selection,
-  backlight pin, framebuffer dimensions.
-- **Framebuffer in PSRAM** — `heap_caps_malloc(W*H*bpp,
-  MALLOC_CAP_DMA | MALLOC_CAP_SPIRAM)`. The DMA cap is non-optional;
-  `esp_lcd_panel_io_spi` requires DMA-reachable memory.
-- **`port_config.h`** — set `HAL_PORT_HAS_SPI_LCD = 1`, define the
-  CS / DC / RESET GPIO numbers, panel type, dimensions, optional
-  backlight pin.
-
-`Draw.c`, `gfx_*_shared.c`, `Tilemap.c`, and the VM graphics
-syscalls all stay byte-for-byte identical — this is the HAL
-refactor's payoff.
-
-### Effort
-
-SPI LCD path: ~3–4 sessions (one for the driver wrapper, one for
-panel command sequencing + first pixels, one for `OPTION LCDPANEL`
-integration + BLIT / circle / text correctness, one buffer for the
-inevitable ESP-IDF panel-driver edge case). VGA-via-LCD_CAM path:
-~6–8 sessions including the resistor-DAC bring-up, and only worth
-it on an Octal-PSRAM board where 640×480 is achievable.
-
-## Effort estimate
-
-- Phase A: 1 session.
-- Phase B: 3 sessions. Pulling 80+ source files into one ESP-IDF component, writing 50+ stub functions with the *correct* signatures (not just empty bodies), and chasing the iterative undefined-reference link errors out of Xtensa. First-time-on-Xtensa build surprises eat real time.
-- Phase C: 1 session.
-- Phase D: 1 session.
-- Phase E: 3 sessions. FATFS first-boot format, sector size verification, NVS init dance with re-init-on-version-bump, and verifying SAVE/LOAD survives a power cycle (not just a soft reset).
-- Phase F: 1 session.
-
-Total: ~8-11 sessions to a working stdio REPL on real hardware. The earlier 6-8 estimate underweighted Phase B and Phase E.
-
-## Why this is worth doing
-
-Two payoffs. First, it's the strongest possible test of the HAL refactor — if the same core sources compile and run on a Xtensa chip with FreeRTOS underneath, the "directory composition not preprocessor" claim is empirically true, not just a stylistic preference. Second, it opens the path to absorbing other architectures (the [Armmite STM32 ingest goal](../../memory/project_real_hal_armmite_goal.md) would follow the same pattern), and to feature-complete ESP32 boards once the litmus is in place.
+**The fastest path to a clean Stage D**: items D1 → D2 → D8 are tiny and high-value (no silent SAVE, real PIN, correct pin count). D3 is the big one but unblocks D4/D5/D6/D7 in cascade. Do D1+D2+D8 first to remove user-facing issues, then attack D3.

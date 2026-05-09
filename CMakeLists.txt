@@ -190,9 +190,9 @@ set(PICOMITE_PICO_SDK_HAL_SOURCES
 	ports/pico_sdk_common/misc_option_setters.c
 	ports/pico_sdk_common/vm_sys_time_pico.c
 	ports/pico_sdk_common/bc_crash_pico.c
-	ports/pico_sdk_common/bc_runtime_pico.c
 	ports/pico_sdk_common/bc_bridge_pico.c
 	ports/pico_sdk_common/clear_runtime_port.c
+	ports/pico_sdk_common/terminal_hooks_noop.c
 	ports/pico_sdk_common/funtbl_port.c
 	ports/pico_sdk_common/core1_runtime.c
 	drivers/pico_flash/pico_flash_lfs.c

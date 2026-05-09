@@ -22,6 +22,7 @@ set(CORE_SRCS
     ${REPO_ROOT}/MMBasic_Print.c
     ${REPO_ROOT}/MMBasic_REPL.c
     ${REPO_ROOT}/MMBasic_Prompt.c
+    ${REPO_ROOT}/Editor.c
     ${REPO_ROOT}/gfx_box_shared.c
     ${REPO_ROOT}/gfx_circle_shared.c
     ${REPO_ROOT}/gfx_line_shared.c
@@ -67,6 +68,8 @@ set(DRIVER_STUBS
 )
 
 set(BC_SRCS
+    ${REPO_ROOT}/lfs.c                      # vendored LittleFS used by A: drive
+    ${REPO_ROOT}/lfs_util.c
     ${REPO_ROOT}/bc_alloc.c
     ${REPO_ROOT}/bc_bridge.c
     ${REPO_ROOT}/bc_source.c
@@ -92,31 +95,46 @@ set(BC_SRCS
 # ESP32 port-local sources. app_main.c keeps the blink for now; will be
 # replaced by an MMBasic_Init() driver once the link goes green.
 set(PORT_LOCAL_SRCS
-    app_main.c
-    esp32_glue.c
-    hal_pin_esp32_stub.c
+    app_main.c                              # IDF entry, MMBasic boot, REPL
+    esp32_console.c                         # USB Serial/JTAG read/write
+    esp32_system.c                          # CPU RESTART / SLEEP
+    esp32_terminal.c                        # VT100 CLS + COLOUR via Draw.c port hooks
+    esp32_lfs.c                             # LittleFS over esp_partition_* (A: drive)
+    esp32_flash_storage.c                   # flash_target_* / flash_option_* / flash_range_* / host_options_snapshot
+    esp32_compat.c                          # small porting bits
+    hal_pin_esp32.c                         # real GPIO/ADC over driver/gpio.h + esp_adc
     hal_audio_esp32_stub.c
     hal_vm_framebuffer_esp32_stub.c
     hal_time_esp32.c
     hal_flash_esp32_stub.c
     hal_storage_esp32_stub.c
-    hal_filesystem_esp32_stub.c
+    hal_filesystem_esp32.c                  # path / dir ops via f_*
     hal_keyboard_esp32_stub.c
 )
 
-# Reused from ports/host_native — runtime glue, peripheral globals, and
-# FAT/POSIX shims. Same set mmbasic_stdio's NATIVE_SRCS uses (minus the
-# hal_*_host.c files, which ESP32 replaces with its own stubs above,
-# minus host_sim_audio.c and host_time.c which depend on POSIX/pthread
-# semantics that need an esp32-specific replacement).
+# Decouple-in-progress: ESP32 owns its full port surface in
+# `esp32_*.c` files. Each entry below is a debt that gets replaced by
+# an `esp32_*.c` sibling and removed. Goal: this list is empty, the
+# `--wrap` and `--allow-multiple-definition` lines below are gone, and
+# the IDF link succeeds with default-strict rules.
+#
+# Files already dropped:
+#   - host_sim_emit_stub.c — provides weak no-ops for the WebSocket
+#     canvas emit path; nothing on ESP32 references the symbols.
+#
+# Files held back until host_runtime.c is replaced (it reaches into
+# them; once it's gone they go too):
+#   - host_keys.c (test-harness key injection — reached via MMInkey)
+#   - host_sim_slowdown.c (sim cooperative-yield shim — reached via
+#     host_runtime_check_timeout)
+#   - host_fs.c (POSIX dir walker — reached via the host_fs_walk_*
+#     symbols host_runtime.c hands to FILES)
 set(HOST_NATIVE_REUSED
     ${REPO_ROOT}/ports/host_native/host_runtime.c
     ${REPO_ROOT}/ports/host_native/host_peripheral_stubs.c
-    ${REPO_ROOT}/ports/host_native/host_fs_shims.c
     ${REPO_ROOT}/ports/host_native/host_fs.c
     ${REPO_ROOT}/ports/host_native/host_keys.c
     ${REPO_ROOT}/ports/host_native/host_sim_slowdown.c
-    ${REPO_ROOT}/ports/host_native/host_sim_emit_stub.c
 )
 
 idf_component_register(
@@ -128,6 +146,13 @@ idf_component_register(
         ${DEVICE_FACING_SRCS}
         ${DRIVER_STUBS}
         ${BC_SRCS}
+    EMBED_TXTFILES
+        # Bundled demo programs. esp32_lfs writes these into the LFS
+        # partition on first-boot format, so the user lands in a
+        # working REPL with example code already in A:.
+        demos/hello.bas
+        demos/fizzbuzz.bas
+        demos/sieve.bas
     INCLUDE_DIRS
         "."
         ${PORT_DIR}
@@ -135,6 +160,7 @@ idf_component_register(
         ${REPO_ROOT}/ports/host_native      # Pico SDK header shims
     REQUIRES
         driver
+        esp_adc
         esp_timer
         esp_psram
         nvs_flash
@@ -143,13 +169,12 @@ idf_component_register(
         vfs
 )
 
-# Force-include the platform header for every TU in this component.
+# Force-include the platform header for every C TU in this component.
+# Generator-expression-restricted to C so the auto-generated .S assembly
+# wrappers IDF emits for EMBED_TXTFILES don't try to assemble it.
 target_compile_options(${COMPONENT_LIB} PRIVATE
-    -include esp32_platform.h
+    $<$<COMPILE_LANGUAGE:C>:-include esp32_platform.h>
     -funsigned-char
-    # Match the warning posture host_native uses. IDF defaults
-    # -Werror on, so silence the new warnings (format-truncation,
-    # maybe-uninitialized) that gcc 14 / xtensa-gcc surface.
     -Wno-error
     -Wno-unused-variable
     -Wno-unused-function
@@ -172,6 +197,11 @@ target_compile_definitions(${COMPONENT_LIB} PUBLIC
 # the linker is expected to coalesce them into one symbol. ESP-IDF defaults
 # to -Wl,--warn-common which rejects that. Allow multiple definitions for
 # this component link, same as the mmbasic_stdio Makefile does on host.
+#
+# --wrap entries point specific symbols at our esp32_*.c overrides
+# (instead of the host_runtime.c stubs we're still pulling in until
+# the device-port refactor lands).
 target_link_options(${COMPONENT_LIB} INTERFACE
     -Wl,--allow-multiple-definition
+    -Wl,--wrap=port_drive_check
 )

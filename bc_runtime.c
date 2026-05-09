@@ -2,6 +2,7 @@
  * bc_runtime.c - VM command entrypoints and host test hooks.
  */
 
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -11,7 +12,11 @@
 #include "bc_source.h"
 #include "vm_device_support.h"
 #include "MMBasic.h"
+#include "FileIO.h"            /* hal_fds[], BasicFileOpen, FileGetChar, FileEOF, FileClose, FindFreeFileNbr */
+#include "hal/hal_filesystem.h"
 #include "vm_sys_file.h"
+/* vm_device_support.h (above) pulls in Hardware_Includes.h transitively
+ * — that gives us FA_READ, EDIT_BUFFER_SIZE, and GetMemory/FreeMemory. */
 
 /* Last-failed-alloc diagnostics, defined in Memory.c (device) or
  * bc_alloc.c (host).  Used to enrich OOM error messages. */
@@ -155,24 +160,25 @@ void bc_run_diag_dump(const char *reason) {
  */
 void bc_run_source_string_ex(const char *source, const char *source_name, int is_immediate);
 
-/* Free the source buffer if this port owns it. On device the caller
- * allocates source via GetMemory (MMHeap), so the buffer must be
- * released through FreeMemory / BC_FREE before the VM runtime tables
- * allocate. Host hands an externally-owned pointer in (malloc or
- * emscripten FS), so the hook is a no-op there. */
-extern void port_bc_runtime_free_source(const char **source);
+/* Free the source buffer between compile and runtime-table allocation.
+ * Heap-tight ports (pico, esp32, future ARM) reclaim the source buffer
+ * before VM runtime tables allocate — that's the default below. Host
+ * overrides with a no-op via host_runtime.c because its source may come
+ * from the test harness via malloc, where BC_FREE would be incorrect
+ * (pointer isn't in MMHeap). The strong override in host_runtime.c wins
+ * the link; everywhere else gets the BC_FREE behaviour automatically. */
+__attribute__((weak)) void port_bc_runtime_free_source(const char **source) {
+    if (source && *source) {
+        BC_FREE((void *)*source);
+        *source = NULL;
+    }
+}
+#define bc_release_source(p) port_bc_runtime_free_source(p)
 
-/* FRUN / RUN source-file load + release hooks. Device impl lives in
- * ports/pico_sdk_common/bc_runtime_pico.c (reads via InitSDCard + file
- * syscalls, allocates from MMHeap). Host impl in host/host_runtime.c
- * (reads via stdio or the in-memory FAT, allocates via GetMemory for
- * FRUN and malloc for RUN). The release hooks are no-ops on device
- * because bc_run_source_string already frees source through
- * port_bc_runtime_free_source; on host they call FreeMemory / free. */
-extern char *port_bc_frun_load_source(const char *fname_buf);
-extern void  port_bc_frun_release_source(char **source);
-extern char *port_bc_run_file_load_source(const char *fname_buf);
-extern void  port_bc_run_file_release_source(char **source);
+/* FRUN / RUN load their source through BasicFileOpen + FileGetChar
+ * (interpreter side) or vm_sys_file_* (VM side). Both ultimately route
+ * through hal_fs_*, so any port with a real HAL gets file I/O for free
+ * here — no per-port indirection. */
 
 void bc_run_source_string(const char *source, const char *source_name) {
     bc_run_source_string_ex(source, source_name, 0);
@@ -231,7 +237,7 @@ void bc_run_source_string_ex(const char *source, const char *source_name, int is
             BC_FREE((void *)source);
             source = NULL;
         }
-        port_bc_runtime_free_source(&source);
+        bc_release_source(&source);
         BC_FREE(cs);
         BC_FREE(vm);
         error("NEM[vm:comptbl] want=% pg=% used=%/% free=% run=%",
@@ -275,7 +281,7 @@ void bc_run_source_string_ex(const char *source, const char *source_name, int is
             BC_FREE((void *)source);
             source = NULL;
         }
-        port_bc_runtime_free_source(&source);
+        bc_release_source(&source);
         BC_FREE(cs);
         BC_FREE(vm);
         if (!is_immediate) bc_bridge_release_subfun_buffer();
@@ -313,7 +319,7 @@ void bc_run_source_string_ex(const char *source, const char *source_name, int is
         bc_run_diag_dump("vm compact");
         bc_compiler_free(cs);
         bc_compile_release_all();
-        port_bc_runtime_free_source(&source);
+        bc_release_source(&source);
         BC_FREE(cs);
         BC_FREE(vm);
         if (!is_immediate) bc_bridge_release_subfun_buffer();
@@ -349,7 +355,7 @@ void bc_run_source_string_ex(const char *source, const char *source_name, int is
             bc_compiler_free(cs);
             BC_FREE(cs);
             BC_FREE(vm);
-            port_bc_runtime_free_source(&source);
+            bc_release_source(&source);
             error("FRUN: out of memory (bridge sub table)");
             return;
         }
@@ -357,7 +363,7 @@ void bc_run_source_string_ex(const char *source, const char *source_name, int is
 
     /* Source no longer needed on device — free before VM runtime tables
      * allocate. Host leaves source to the caller (existing contract). */
-    port_bc_runtime_free_source(&source);
+    bc_release_source(&source);
 
     bc_crash_checkpoint(BC_CK_VM_ALLOC, "bc_vm_alloc");
     if (bc_vm_alloc(vm) != 0) {
@@ -503,6 +509,41 @@ void bc_run_immediate(const char *line) {
 }
 
 /*
+ * Read a .bas file into a fresh GetMemory buffer through the
+ * interpreter's HAL-backed file path (BasicFileOpen + FileGetChar).
+ * Filters inbound bytes to printable + CR/LF/TAB so any stray high-bit
+ * bytes from flaky media don't reach the tokenizer. Returns a
+ * NUL-terminated source string the caller can hand to
+ * bc_run_source_string and FreeMemory afterwards.
+ */
+static char *bc_load_source_via_hal(const char *fname_buf) {
+    int fnbr = FindFreeFileNbr();
+    if (!BasicFileOpen((char *)fname_buf, fnbr, FA_READ)) error("File not found");
+
+    int fsize = (int)hal_fs_size(hal_fds[fnbr]);
+    if (fsize < 0 || fsize >= EDIT_BUFFER_SIZE - 2048) {
+        FileClose(fnbr);
+        error("File too large");
+    }
+
+    char *source = (char *)GetMemory(fsize + 1);
+    if (!source) { FileClose(fnbr); error("NEM[frun:src] want=%", fsize + 1); }
+
+    char *p = source;
+    while (!FileEOF(fnbr)) {
+        if ((p - source) >= fsize) break;
+        int c = FileGetChar(fnbr) & 0x7f;
+        if (isprint(c) || c == '\r' || c == '\n' || c == '\t') {
+            if (c == '\t') c = ' ';
+            *p++ = (char)c;
+        }
+    }
+    *p = '\0';
+    FileClose(fnbr);
+    return source;
+}
+
+/*
  * cmd_frun() — The FRUN command
  *
  * Loads a BASIC source file and executes it via the bytecode VM.
@@ -517,15 +558,18 @@ void cmd_frun(void) {
     fname_buf[STRINGSIZE - 5] = '\0';
     if (!strchr(fname_buf, '.')) strcat(fname_buf, ".bas");
 
-    char *source = port_bc_frun_load_source(fname_buf);
+    char *source = bc_load_source_via_hal(fname_buf);
     bc_run_source_string(source, fname_buf);
-    port_bc_frun_release_source(&source);
+    /* On heap-tight ports the hook inside bc_run_source_string already
+     * freed source; on host it's a no-op there and we own the release. */
+    if (source) FreeMemory((unsigned char *)source);
 }
 
 /*
  * Load and execute a BASIC program from file (RUN syscall).
  * Resets the VM heap, loads source, compiles, executes, then longjmps
- * back to the caller's mark — the outer VM is abandoned.
+ * back to the caller's mark — the outer VM is abandoned. Reads through
+ * vm_sys_file_* since the outer VM owns the file table here.
  */
 void bc_run_file(const char *filename) {
     char fname_buf[STRINGSIZE];
@@ -534,9 +578,25 @@ void bc_run_file(const char *filename) {
     fname_buf[STRINGSIZE - 5] = '\0';
     if (!strchr(fname_buf, '.')) strcat(fname_buf, ".bas");
 
-    char *source = port_bc_run_file_load_source(fname_buf);
+    int fnbr = 1;
+    vm_sys_file_open(fname_buf, fnbr, VM_FILE_MODE_INPUT);
+    int fsize = vm_sys_file_lof(fnbr);
+    char *source = (char *)bc_compile_alloc((size_t)fsize + 1);
+    if (!source) { vm_sys_file_close(fnbr); error("Not enough memory"); }
+
+    char *p = source;
+    while (vm_sys_file_eof(fnbr) == 0) {
+        if ((p - source) >= fsize) break;
+        int c = vm_sys_file_getc(fnbr) & 0x7f;
+        if (isprint(c) || c == '\r' || c == '\n' || c == '\t') {
+            if (c == '\t') c = ' ';
+            *p++ = (char)c;
+        }
+    }
+    *p = '\0';
+    vm_sys_file_close(fnbr);
+
     bc_run_source_string(source, fname_buf);
-    port_bc_run_file_release_source(&source);
 
     longjmp(mark, 1);
 }

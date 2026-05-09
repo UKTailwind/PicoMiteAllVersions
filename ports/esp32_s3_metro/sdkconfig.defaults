@@ -9,20 +9,13 @@
 CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
 
 # --- Flash + PSRAM ----------------------------------------------------------
-# Adafruit Metro ESP32-S3 #5500 N16R8 module: 16 MB flash + 8 MB Octal PSRAM
-# (Embedded PSRAM AP_3v3 — confirmed via esptool.py chip_id).
+# Adafruit Metro ESP32-S3 #5500 N16R8 module: 16 MB flash + 8 MB Embedded
+# Octal PSRAM (AP_3v3, confirmed via esptool.py chip_id).
 CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
 CONFIG_ESPTOOLPY_FLASHSIZE="16MB"
 
-# Phase A: SPIRAM disabled to get the toolchain path verified end-to-end.
-# Phase A binary is tiny (no MMBasic heap) and doesn't need PSRAM. With
-# SPIRAM enabled in OCT mode the chip booted silently (USB enumerated but
-# no console output) — likely a bootloader-vs-OPI-flash interaction worth
-# investigating in Phase C, when the BC heap actually wants the PSRAM.
-# Re-enable in Phase C with: CONFIG_SPIRAM=y, CONFIG_SPIRAM_MODE_OCT=y,
-# CONFIG_SPIRAM_SPEED_80M=y, plus matching CONFIG_ESPTOOLPY_FLASHMODE
-# tuning (likely needs OPI flash too on the N16R8).
-# CONFIG_SPIRAM=n  (default; explicit for documentation)
+# 512 KB internal SRAM is plenty — RP2040 runs PicoMite in 264 KB.
+# PSRAM stays disabled until something genuinely demands it.
 
 # --- Stack ------------------------------------------------------------------
 # 24 KB main task stack. Phase A doesn't need this much, but Phase B
@@ -47,3 +40,12 @@ CONFIG_BT_ENABLED=n
 # Use both cores. MMBasic stays on one, but FreeRTOS housekeeping etc.
 # benefits from the second.
 CONFIG_FREERTOS_UNICORE=n
+
+# --- Partition table + FATFS -----------------------------------------------
+# Custom partition table: 1 MB app + 14 MB wear-leveled FATFS for BASIC
+# program storage / SAVE / LOAD / OPEN / etc. Mounted at /sd in app_main.
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+CONFIG_PARTITION_TABLE_FILENAME="partitions.csv"
+CONFIG_FATFS_LFN_HEAP=y
+CONFIG_FATFS_MAX_LFN=255

@@ -66,6 +66,7 @@ The strict purity gate (`tools/check_hal_purity.sh`) currently catches rules 1, 
 | 12.5 — mmbasic_stdio | ✅ | `ports/mmbasic_stdio/` runs BASIC via stdin/stdout; link-line audit clean (no Editor/REPL/Prompt/display objects); 8-test corpus at `ports/mmbasic_stdio/tests/` passes 8/8; stripped binary is 601 KB on arm64 macOS at `-O2`. |
 | 12.6 — host/ full retirement | ❌ skipped | cosmetic move of remaining user-facing tooling (run_tests.sh, demos/, web/, README.md). Architectural goal already met by Phase 12; churn (CI, buildall.sh, serve.py, ~20 doc URLs) outweighs benefit. Do opportunistically if a third native port ever lands. |
 | [13 — lock contract](real-hal/phases-8-to-13.md#phase-13--lock-the-contract) | 🔧 | `check_hal_purity.sh` wired into both `host/run_tests.sh` and `buildall.sh` ✓. `docs/adding-a-new-port.md` ✓. `drivers/CONTRIBUTING.md` ✓. Predecessor plans superseded (commit `a92f4f0`). Remaining: wire `tools/check_ram_baseline.sh` into the gate, land `tools/perf_microbench/` (currently empty), and resolve the CFunctions / wasm-ld `CallCFunction` warning. |
+| [esp32-port](real-hal/esp32-s3-port.md) | 🔧 | Adafruit Metro ESP32-S3 (#5500, N16R8). Stages A+B+C done — REPL + LFS A: drive + FRUN/RUN all working over USB Serial/JTAG. Stage D (decouple from host_native monolith) in flight: silent-SAVE-to-slot bug pending fix, `hal_pin_esp32.c` written but not linked, `host_runtime.c` split needed to drop two `--wrap` directives and several `--allow-multiple-definition` collisions. Stage E (real flash persistence via `esp_partition`) and F (HAL purity gate scope + buildesp32.sh) not started. |
 
 Tests 240/240 on `hal-decascade` tip (commit `1bab851`). All 12 device CMake variants green. WASM link green. mmbasic_stdio corpus 8/8.
 
@@ -89,6 +90,7 @@ exit gate in practice.
 - [tooling.md](real-hal/tooling.md) — scoreboard metric, RAM-resident contract, conformance tests, performance budget, safety net, session-start rituals.
 - [retrospective.md](real-hal/retrospective.md) — end-of-phase-5a course correction plus the 2026-04-22 audit finding that spawned the fixup plan.
 - [scoreboard.md](real-hal/scoreboard.md) — raw ifdef counts per file per phase, baseline + targets.
+- [esp32-s3-port.md](real-hal/esp32-s3-port.md) + [esp32-s3-port-log.md](real-hal/esp32-s3-port-log.md) — Adafruit Metro ESP32-S3 (#5500) port: rules + invariants, current state, Stage D/E/F work items.
 
 ## How to work a phase
 

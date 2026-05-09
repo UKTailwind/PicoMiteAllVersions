@@ -3224,7 +3224,20 @@ if ((p = checkstring(cmdline, (unsigned char*)"COMPRESSED"))) {
     return 0;
 }
 /*  @endcond */
+/* Serial-terminal port hook: gives ports without a framebuffer a chance
+ * to handle CLS by emitting an ANSI clear (or whatever their console
+ * understands). Returns true if the hook handled the command — Draw.c
+ * then returns early, skipping the DISPLAY_TYPE-required path below.
+ * Each port supplies a strong impl (no-op for framebuffer ports;
+ * ANSI-emitting on serial-terminal ports). The hook isn't weak here
+ * because `--allow-multiple-definition` (used on ESP32 + WASM for
+ * tentative-def merging) defeats weak overriding — first-defined wins,
+ * regardless of weak/strong. So the only safe pattern is one strong
+ * definition per port, in a port-only TU. */
+extern bool port_terminal_handle_cls(void);
+
 void cmd_cls(void) {
+    if (port_terminal_handle_cls()) return;
     GfxClsArg arg = {0};
     GfxClsOps ops;
     if(Option.DISPLAY_TYPE == 0) error("Display not configured");
@@ -5109,6 +5122,13 @@ void MIPS16 cmd_font(void) {
         }
     }
 }
+/* Serial-terminal port hook: after globals are updated, gives the port a
+ * chance to push the new fg/bg to its console (e.g. ANSI 24-bit colour
+ * escapes). Each port supplies a strong impl (no-op for framebuffer
+ * ports). See `port_terminal_handle_cls()` above for why this isn't
+ * weak. */
+extern void port_terminal_emit_colour(int fg, int bg, int has_bg);
+
 void cmd_colour(void) {
     getargs(&cmdline, 3, (unsigned char *)",");
     if(argc < 1) error("Argument count");
@@ -5120,6 +5140,7 @@ void cmd_colour(void) {
         PromptFC = gui_fcolour;
         PromptBC = gui_bcolour;
     }
+    port_terminal_emit_colour(gui_fcolour, gui_bcolour, argc == 3);
 }
 /* 
  * @cond
