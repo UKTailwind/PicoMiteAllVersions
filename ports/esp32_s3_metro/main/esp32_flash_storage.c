@@ -163,6 +163,26 @@ FRESULT hal_ff_unlink   (const TCHAR *p)            { (void)p; return FR_NOT_ENA
 FRESULT hal_ff_chdir    (const TCHAR *p)            { (void)p; return FR_NOT_ENABLED; }
 FRESULT hal_ff_getcwd   (TCHAR *b, UINT n)          { (void)b; (void)n; return FR_NOT_ENABLED; }
 
-/* host_runtime.c (still linked) references host_sd_root for the
- * --sd-root REPL flag. Not meaningful on device; stub as NULL. */
+/* host_runtime.c used to reference host_sd_root for the --sd-root REPL
+ * flag. Not meaningful on device; symbol kept (NULL) in case any
+ * surviving caller still reads it. */
 const char *host_sd_root = NULL;
+
+/* MMBasic VAR SAVE / VAR RESTORE persists user-saved variables to a
+ * dedicated flash region. Pico ports point SavedVarsFlash at the
+ * SAVEDVARS_FLASH_SIZE-bound chunk inside flash_target_contents; host
+ * uses a 32-byte RAM buffer (just enough to satisfy the symbol).
+ *
+ * Stdio scope follows host's pattern — RAM-backed mirror. Real flash
+ * persistence comes when Stage E1 wires esp_partition_* into the slot
+ * region; at that point this buffer goes away. */
+static unsigned char esp32_saved_vars_flash_buf[32] = { 0xff, 0xff };
+unsigned char *SavedVarsFlash = esp32_saved_vars_flash_buf;
+
+/* Read-only pointer to the program-memory region. On Pico this points
+ * at the XIP-mapped flash partition that holds the saved BASIC program.
+ * On ESP32 stdio scope it points at our RAM mirror (flash_prog_buf in
+ * esp32_compat.c) — same byte content, just not actually in flash yet.
+ * Stage E1 swaps in an esp_partition_mmap-backed const view. */
+extern unsigned char flash_prog_buf[];
+const uint8_t *flash_progmemory = flash_prog_buf;

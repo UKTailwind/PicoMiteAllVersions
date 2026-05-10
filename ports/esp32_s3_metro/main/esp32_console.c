@@ -82,3 +82,8 @@ int host_read_byte_blocking_ms(int ms) {
 }
 
 void host_push_back_byte(int c) { s_pushback = c; }
+
+/* MMBasic-facing console glue (MMputchar, MMPrintString, MMInkey,
+ * SerialConsolePutC, ConsoleRxBuf*, MMgetline, …) lives in
+ * esp32_mmbasic_console_glue.c — kept in a separate TU because pulling
+ * in MMBasic_Includes.h here clashes with IDF's vfs.h DIR typedef. */

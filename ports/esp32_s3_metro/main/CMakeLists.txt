@@ -96,7 +96,8 @@ set(BC_SRCS
 # replaced by an MMBasic_Init() driver once the link goes green.
 set(PORT_LOCAL_SRCS
     app_main.c                              # IDF entry, MMBasic boot, REPL
-    esp32_console.c                         # USB Serial/JTAG read/write
+    esp32_console.c                         # USB Serial/JTAG read/write (raw bytes)
+    esp32_mmbasic_console_glue.c            # MMputchar / MMPrintString / MMInkey + ring state
     esp32_system.c                          # CPU RESTART / SLEEP
     esp32_terminal.c                        # VT100 CLS + COLOUR via Draw.c port hooks
     esp32_lfs.c                             # LittleFS over esp_partition_* (A: drive)
@@ -121,35 +122,17 @@ set(PORT_LOCAL_SRCS
     esp32_peripheral_stubs.c                # 117 cmd_/fun_/AES_/GPS_/etc decls
 )
 
-# Decouple-in-progress: ESP32 owns its full port surface in
-# `esp32_*.c` files. Each entry below is a debt that gets replaced by
-# an `esp32_*.c` sibling and removed. Goal: this list is empty, the
-# `--wrap` and `--allow-multiple-definition` lines below are gone, and
-# the IDF link succeeds with default-strict rules.
-#
-# Files already dropped:
-#   - host_sim_emit_stub.c — provides weak no-ops for the WebSocket
-#     canvas emit path; nothing on ESP32 references the symbols.
-#
-# Files held back until host_runtime.c is replaced (it reaches into
-# them; once it's gone they go too):
-#   - host_keys.c (test-harness key injection — reached via MMInkey)
-#   - host_sim_slowdown.c (sim cooperative-yield shim — reached via
-#     host_runtime_check_timeout)
-#   - host_fs.c (POSIX dir walker — reached via the host_fs_walk_*
-#     symbols host_runtime.c hands to FILES)
-set(HOST_NATIVE_REUSED
-    ${REPO_ROOT}/ports/host_native/host_runtime.c
-    ${REPO_ROOT}/ports/host_native/host_peripheral_stubs.c
-    ${REPO_ROOT}/ports/host_native/host_fs.c
-    ${REPO_ROOT}/ports/host_native/host_keys.c
-    ${REPO_ROOT}/ports/host_native/host_sim_slowdown.c
-)
+# host_native sources are no longer in the link. The 251-symbol
+# contract surface they used to sole-provide is now owned by the
+# esp32_*.c files in PORT_LOCAL_SRCS above (D-decouple Step B).
+# vm_sys_pin_host.c / vm_sys_file_host.c (the remaining 26 syms) sit
+# below — they're effectively generic shims behind hal_pin / hal_filesystem,
+# usable by any host-shape port; future cleanup can relocate them
+# but they don't carry host-specific semantics.
 
 idf_component_register(
     SRCS
         ${PORT_LOCAL_SRCS}
-        ${HOST_NATIVE_REUSED}
         ${CORE_SRCS}
         ${STATE_SRCS}
         ${DEVICE_FACING_SRCS}
@@ -207,10 +190,9 @@ target_compile_definitions(${COMPONENT_LIB} PUBLIC
 # to -Wl,--warn-common which rejects that. Allow multiple definitions for
 # this component link, same as the mmbasic_stdio Makefile does on host.
 #
-# --wrap entries point specific symbols at our esp32_*.c overrides
-# (instead of the host_runtime.c stubs we're still pulling in until
-# the device-port refactor lands).
+# --wrap=port_drive_check dropped — esp32_cmd_files_hooks.c provides
+# the strong def directly (D-decouple Step C). --allow-multiple-definition
+# stays for tentative-def globals; Step E plans -fcommon as the fix.
 target_link_options(${COMPONENT_LIB} INTERFACE
     -Wl,--allow-multiple-definition
-    -Wl,--wrap=port_drive_check
 )

@@ -14,16 +14,8 @@
 
 extern char SerialConsolePutC(char c, int flush);
 
-/* Drive availability check — A: is LittleFS on internal flash, always
- * present. B: would be FatFs on SD; not wired on this board. Mirrors
- * ports/pico_sdk_common/cmd_files_hooks.c::port_drive_check.
- *
- * Linked via -Wl,--wrap=port_drive_check so this overrides the host
- * port stub still present in the link until the device-port refactor
- * removes host_runtime.c entirely. */
-void __wrap_port_drive_check(char drive) {
-    if (drive == 'B') error("B: drive not configured on this board");
-}
+/* port_drive_check moved to esp32_cmd_files_hooks.c (Step C) — host_runtime.c
+ * is no longer in the link, so we no longer need --wrap to override it. */
 
 void cmd_cpu(void) {
     unsigned char *p;

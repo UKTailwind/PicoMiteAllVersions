@@ -153,3 +153,11 @@ int esp32_lfs_mount(void) {
     if (formatted) populate_demos();
     return 0;
 }
+
+/* MMBasic core (FileIO.c) declares these as globals it walks for FILES /
+ * DIR$ scan state. Pico's port owns them; host_runtime.c owned them on
+ * host. Each port supplies its own definitions. ESP32 mounts LFS on the
+ * `lfs` instance above; the dir/info structs are the user-facing scan
+ * state, distinct from the mount handle. */
+lfs_dir_t lfs_dir;
+struct lfs_info lfs_info;

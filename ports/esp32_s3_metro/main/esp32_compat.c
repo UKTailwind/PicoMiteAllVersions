@@ -60,6 +60,16 @@ time_t timegm(struct tm *tm) {
     return (time_t)(days * 86400L + tm->tm_hour * 3600 + tm->tm_min * 60 + tm->tm_sec);
 }
 
+/* mm_misc_shared.c calls these via host_platform.h's macro-rename trick;
+ * route through the libc functions (timegm above; gmtime is in newlib). */
+time_t mmbasic_timegm(const struct tm *tm) {
+    struct tm tmp = *tm;
+    return timegm(&tmp);
+}
+struct tm *mmbasic_gmtime(const time_t *timer) {
+    return gmtime(timer);
+}
+
 /* ---- runtime backing storage ---- */
 
 /* MAX_PROG_SIZE for the program + a small "erased flash" tail. Both
@@ -125,3 +135,53 @@ int load_basic_source(const char *source) {
 
 void cmd_framebuffer(void) { error("FRAMEBUFFER not supported on this port"); }
 void cmd_fastgfx(void)     { error("FASTGFX not supported on this port"); }
+
+/* ---- microsecond clock ----
+ * External.c's canonical readusclock is gated to non-host builds; on
+ * ESP32 we provide our own backed by esp_timer_get_time. Used by
+ * bc_vm.c's PAUSE / TIMER paths and by SETTICK accounting. */
+uint64_t readusclock(void) {
+    return (uint64_t)esp_timer_get_time();
+}
+
+/* MMBasic's busy-wait microsecond delay. Short waits busy-spin via
+ * esp_rom_delay_us (no FreeRTOS yield); longer waits hand off to the
+ * scheduler so the watchdog and USB driver can run. */
+void uSec(int us) {
+    if (us <= 0) return;
+    if (us < 1000) {
+        esp_rom_delay_us((uint32_t)us);
+    } else {
+        vTaskDelay(pdMS_TO_TICKS(us / 1000));
+    }
+}
+
+/* Pico-SDK Cortex-M0+ "read main stack pointer" intrinsic, used by
+ * Memory.c's TestStackOverflow. ESP32 has FreeRTOS task stacks; the
+ * MMBasic check doesn't apply, so return ALL-ONES so the comparison
+ * always passes. */
+uint32_t __get_MSP(void) { return 0xFFFFFFFFu; }
+
+/* Pico-SDK hardware-register window stubs. Core code includes
+ * hardware/structs/{dma,watchdog}.h and dereferences these on rp2040
+ * paths that gate later via DISPLAY_TYPE / HAL_PORT_HAS_*. The
+ * pointers must resolve to valid memory so the load instruction
+ * doesn't fault before the gate filters out the path; the contents
+ * never matter on this port. */
+#include "hardware/structs/dma.h"
+#include "hardware/structs/watchdog.h"
+static dma_hw_t      _dma_hw_store     = {0};
+static watchdog_hw_t _watchdog_hw_store = {0};
+dma_hw_t      *dma_hw      = &_dma_hw_store;
+watchdog_hw_t *watchdog_hw = &_watchdog_hw_store;
+
+/* Total PSRAM bytes available. Stdio scope leaves PSRAM disabled (see
+ * sdkconfig.defaults — Stage E3 in the plan); report 0 so MMBasic
+ * doesn't advertise PSRAM-backed slots that wouldn't allocate. */
+uint32_t PSRAMsize = 0;
+
+/* PSRAM Option-bit save/restore — used on Pico to preserve XIP cache
+ * settings around flash erases. Stdio scope has no PSRAM and no flash
+ * erase contention; no-ops. */
+void mmbasic_save_psram_settings(void)    {}
+void mmbasic_restore_psram_settings(void) {}

@@ -29,6 +29,31 @@ static int host_parse_pin_arg(unsigned char *arg) {
     return getinteger(p);
 }
 
+/* PNG decoder + CMM2-program loader stubs. PNG support comes from
+ * drivers/upng_sprite/ on Pico; not wired on ESP32 stdio. CMM2 program
+ * loading is a different format from .bas — also out of scope. */
+void LoadPNG(unsigned char *p) { (void)p; error("PNG not supported on this port"); }
+int FileLoadCMM2Program(char *fname, bool message) { (void)fname; (void)message; return 0; }
+
+/* OPTION LIST diagnostic dump — prints all option values for the user.
+ * Pico ports walk every option field; stdio scope's option set is
+ * minimal, so leave as a no-op. The user can still query individual
+ * options via fun_mminfo. */
+void printoptions(void) {}
+
+/* OPEN COM:N peripheral stubs — UART comms not wired in stdio scope.
+ * SerialOpen errors so user code gets feedback; the rest stay silent
+ * because SerialRxStatus / SerialTxStatus are polled from FileIO.c
+ * regardless of whether a COM port was opened. */
+void SerialOpen(unsigned char *spec) {
+    (void)spec; error("COM: not supported on this port");
+}
+void SerialClose(int comnbr) { (void)comnbr; }
+int SerialGetchar(int comnbr) { (void)comnbr; return -1; }
+unsigned char SerialPutchar(int comnbr, unsigned char c) { (void)comnbr; return c; }
+int SerialRxStatus(int comnbr) { (void)comnbr; return 0; }
+int SerialTxStatus(int comnbr) { (void)comnbr; return 0; }
+
 void AES_CBC_decrypt_buffer(void *ctx, uint8_t *buf, int len) { (void)ctx; (void)buf; (void)len; }
 
 void AES_CBC_encrypt_buffer(void *ctx, uint8_t *buf, int len) { (void)ctx; (void)buf; (void)len; }
