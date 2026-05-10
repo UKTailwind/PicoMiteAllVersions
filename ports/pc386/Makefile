@@ -62,9 +62,34 @@ PORT_SRCS = kmain.c kprint.c mmap.c heap_region.c kstring.c \
             hal_vm_framebuffer_pc386.c
 
 # MMBasic core sources brought in for stage 3c.1+. Mirrors mmbasic_stdio's
-# CORE_SRCS list, growing as each file's link surface is satisfied.
-CORE_SRCS = Operators.c
-CORE_C_OBJS := $(addprefix $(BUILD_DIR)/core/,$(CORE_SRCS:.c=.o))
+# CORE_SRCS list. Files in repo root, drivers/, and core/state/ each
+# get their own pattern rule below so the build dir stays organised.
+CORE_SRCS = MMBasic.c Commands.c Functions.c Operators.c MATHS.c Memory.c MMBasic_Print.c
+CORE_SRCS += gfx_box_shared.c gfx_circle_shared.c gfx_line_shared.c gfx_pixel_shared.c
+CORE_SRCS += gfx_cls_shared.c gfx_text_shared.c gfx_console_shared.c
+CORE_SRCS += mm_misc_shared.c OptionCommands.c
+CORE_SRCS += Draw.c RGB121.c Tilemap.c FileIO.c Audio.c BmpDecoder.c re.c picojpeg.c
+
+CORE_STATE_SRCS = display_state.c pin_state.c option_state.c audio_state.c
+
+# Stubs inherited from host_native — same set mmbasic_stdio links.
+CORE_DRV_SRCS = audio_mp3/audio_mp3_stub.c \
+                spi_lcd/spi_lcd_mem332_stub.c \
+                display_merge/display_merge_stub.c \
+                vga_pio/vga_ops_stub.c \
+                gfx_3d/gfx_3d.c \
+                upng_sprite/upng_sprite_stub.c \
+                gui_touch/gui_touch_stub.c \
+                gui_controls/gui_controls_stub.c \
+                psram_heap/psram_heap_stub.c \
+                i2c_picocalc_kbd/i2c_keypad_stub.c \
+                heartbeat/heartbeat_stub.c \
+                editor_console/editor_console_stub.c \
+                display_pixel_host/display_pixel_host.c
+
+CORE_C_OBJS  := $(addprefix $(BUILD_DIR)/core/,$(CORE_SRCS:.c=.o))
+STATE_C_OBJS := $(addprefix $(BUILD_DIR)/state/,$(CORE_STATE_SRCS:.c=.o))
+COREDRV_C_OBJS := $(addprefix $(BUILD_DIR)/coredrv/,$(CORE_DRV_SRCS:.c=.o))
 
 # Shared no-op HAL impls (linked across host_native, mmbasic_stdio,
 # esp32, pc386 — anything without real hardware for that surface).
@@ -89,8 +114,10 @@ PORT_C_OBJS := $(addprefix $(BUILD_DIR)/,$(PORT_SRCS:.c=.o))
 DRV_C_OBJS  := $(addprefix $(BUILD_DIR)/drivers/,$(DRIVER_SRCS:.c=.o))
 ROOT_C_OBJS := $(addprefix $(BUILD_DIR)/root/,$(FATFS_SRCS:.c=.o))
 HAL_C_OBJS  := $(addprefix $(BUILD_DIR)/hal/generic/,$(HAL_GENERIC_SRCS:.c=.o))
-OBJS        := $(ASM_OBJS) $(PORT_C_OBJS) $(DRV_C_OBJS) $(ROOT_C_OBJS) $(HAL_C_OBJS) $(CORE_C_OBJS)
-DEPS        := $(PORT_C_OBJS:.o=.d) $(DRV_C_OBJS:.o=.d) $(ROOT_C_OBJS:.o=.d) $(HAL_C_OBJS:.o=.d) $(CORE_C_OBJS:.o=.d)
+OBJS        := $(ASM_OBJS) $(PORT_C_OBJS) $(DRV_C_OBJS) $(ROOT_C_OBJS) $(HAL_C_OBJS) \
+               $(CORE_C_OBJS) $(STATE_C_OBJS) $(COREDRV_C_OBJS)
+DEPS        := $(PORT_C_OBJS:.o=.d) $(DRV_C_OBJS:.o=.d) $(ROOT_C_OBJS:.o=.d) $(HAL_C_OBJS:.o=.d) \
+               $(CORE_C_OBJS:.o=.d) $(STATE_C_OBJS:.o=.d) $(COREDRV_C_OBJS:.o=.d)
 
 KERNEL := $(BUILD_DIR)/mmbasic.elf
 
@@ -126,6 +153,14 @@ $(BUILD_DIR)/hal/generic/%.o: $(REPO_ROOT)/hal/generic/%.c
 
 # MMBasic core sources from the repo root.
 $(BUILD_DIR)/core/%.o: $(REPO_ROOT)/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(BUILD_DIR)/state/%.o: $(REPO_ROOT)/core/state/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(BUILD_DIR)/coredrv/%.o: $(REPO_ROOT)/drivers/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c -o $@ $<
 

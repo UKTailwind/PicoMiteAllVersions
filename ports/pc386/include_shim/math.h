@@ -70,6 +70,8 @@ float  expf  (float);
 float  logf  (float);
 float  powf  (float, float);
 float  fmodf (float, float);
+float  roundf(float);
+float  truncf(float);
 
 int isnan   (double);
 int isinf   (double);

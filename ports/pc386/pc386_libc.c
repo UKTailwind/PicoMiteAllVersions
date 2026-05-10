@@ -410,6 +410,15 @@ struct tm *gmtime(const time_t *t) {
     return localtime(t);
 }
 
+struct tm *localtime_r(const time_t *t, struct tm *out) {
+    (void)t; (void)out;
+    pc386_panic("localtime_r not yet implemented (3c.x: pc386_time.c)");
+}
+
+struct tm *gmtime_r(const time_t *t, struct tm *out) {
+    return localtime_r(t, out);
+}
+
 time_t mktime(struct tm *tm) {
     (void)tm;
     pc386_panic("mktime not yet implemented (3c.x: pc386_time.c)");
@@ -496,3 +505,62 @@ int signbit (double x) {
     union { double d; uint64_t u; } u = { x };
     return (int)(u.u >> 63);
 }
+
+float roundf(float x) { return (float)round((double)x); }
+float truncf(float x) { return (float)trunc((double)x); }
+
+/* ===== complex math stubs ===============================================
+ *
+ * MATHS.c uses these only from MATH("ADD", ...) / MATH("FFT", ...) and
+ * friends — rare paths, fine to panic until openlibm-complex is vendored.
+ */
+
+#include <complex.h>
+
+#define CPLX_STUB1(rt, name) \
+    rt name(float complex z) { (void)z; pc386_panic(#name " not yet implemented (vendor openlibm)"); }
+#define CPLX_STUB1D(rt, name) \
+    rt name(double complex z) { (void)z; pc386_panic(#name " not yet implemented (vendor openlibm)"); }
+#define CPLX_STUB2(rt, name) \
+    rt name(float complex z, float complex w) { (void)z; (void)w; pc386_panic(#name " not yet implemented (vendor openlibm)"); }
+#define CPLX_STUB2D(rt, name) \
+    rt name(double complex z, double complex w) { (void)z; (void)w; pc386_panic(#name " not yet implemented (vendor openlibm)"); }
+
+CPLX_STUB1(float, crealf)
+CPLX_STUB1(float, cimagf)
+CPLX_STUB1(float, cargf)
+CPLX_STUB1(float, cabsf)
+CPLX_STUB1(float complex, conjf)
+CPLX_STUB2(float complex, cpowf)
+CPLX_STUB1(float complex, cacosf)
+CPLX_STUB1(float complex, casinf)
+CPLX_STUB1(float complex, catanf)
+CPLX_STUB1(float complex, csinf)
+CPLX_STUB1(float complex, ccosf)
+CPLX_STUB1(float complex, ctanf)
+CPLX_STUB1(float complex, csinhf)
+CPLX_STUB1(float complex, ccoshf)
+CPLX_STUB1(float complex, ctanhf)
+CPLX_STUB1(float complex, casinhf)
+CPLX_STUB1(float complex, cacoshf)
+CPLX_STUB1(float complex, catanhf)
+CPLX_STUB1(float complex, cprojf)
+CPLX_STUB1(float complex, csqrtf)
+CPLX_STUB1(float complex, clogf)
+CPLX_STUB1(float complex, cexpf)
+
+CPLX_STUB1D(double, creal)
+CPLX_STUB1D(double, cimag)
+CPLX_STUB1D(double, carg)
+CPLX_STUB1D(double, cabs)
+CPLX_STUB1D(double complex, conj)
+CPLX_STUB2D(double complex, cpow)
+CPLX_STUB1D(double complex, cacos)
+CPLX_STUB1D(double complex, casin)
+CPLX_STUB1D(double complex, catan)
+CPLX_STUB1D(double complex, csin)
+CPLX_STUB1D(double complex, ccos)
+CPLX_STUB1D(double complex, ctan)
+CPLX_STUB1D(double complex, csqrt)
+CPLX_STUB1D(double complex, clog)
+CPLX_STUB1D(double complex, cexp)

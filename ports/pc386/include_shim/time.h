@@ -28,8 +28,10 @@ struct tm {
 
 time_t      time     (time_t *t);
 clock_t     clock    (void);
-struct tm  *localtime(const time_t *t);
-struct tm  *gmtime   (const time_t *t);
+struct tm  *localtime  (const time_t *t);
+struct tm  *localtime_r(const time_t *t, struct tm *out);
+struct tm  *gmtime     (const time_t *t);
+struct tm  *gmtime_r   (const time_t *t, struct tm *out);
 time_t      mktime   (struct tm *tm);
 /* GPS.h declares timegm with const struct tm *; keep ours matching so
  * the two declarations don't conflict. */
