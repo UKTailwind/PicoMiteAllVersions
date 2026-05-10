@@ -40,13 +40,15 @@ See [`pc386/emulation-and-toolchain.md`](pc386/emulation-and-toolchain.md) for s
 | Stage | Status | One-line state |
 |-------|--------|----------------|
 | [0 — hello kernel](pc386/stage-0-hello.md) | ✅ | Multiboot1 entry, serial COM1 + VGA text drivers, banner over both. QEMU `-kernel` boots and stdio captures it. (Multiboot2 deferred to Stage 7 — QEMU `-kernel` only speaks multiboot1.) |
-| [1 — heap](pc386/stage-1-heap.md) | ⏳ | Parse multiboot memory map; init `TryGetMemory`/`FreeMemory` over conventional + extended RAM. |
-| [2 — stdio port](pc386/stage-2-stdio.md) | ⏳ | Lift `ports/mmbasic_stdio` HAL surface onto bare metal. BASIC programs run; output via serial. First `run_tests.sh` parity goal. |
-| [3 — keyboard](pc386/stage-3-keyboard.md) | ⏳ | PS/2 (8042) driver, IDT + PIC remap. Interactive REPL works in QEMU. |
-| [4 — VGA mode 13h](pc386/stage-4-video.md) | ⏳ | `hal_video.h` driver against linear framebuffer at `0xA0000`. `PIXEL`, `LINE`, `CIRCLE`, `BOX` work. |
-| [5 — PIT speaker](pc386/stage-5-audio.md) | ⏳ | `hal_audio.h` driver against PIT channel 2. `TONE`, `PLAY` work as square waves. |
-| [6 — FAT16 filesystem](pc386/stage-6-fs.md) | ⏳ | FatFs port against `hal_storage`. ATA-PIO driver for IDE. `LOAD "FOO.BAS"` from disk image. |
-| [7 — real hardware](pc386/stage-7-real-hw.md) | ⏳ | Flash to USB / write to floppy. Boot beige-box 486. The aesthetic payoff. |
+| [1 — heap](pc386/stage-1-heap.md) | ✅ | Multiboot1 header requests MEMINFO; kmain walks the mmap and reports each region; static 1 MB MMBasic heap reserved in BSS at `~0x108000` ready for Stage 3 to hand to the interpreter. |
+| [2 — disk + FS + Limine boot](pc386/stage-2-disk.md) | ⏳ | ATA-PIO + FatFs over IDE. A: (small "floppy" IDE image) + C: (larger HDD image). Boot off A: via Limine; kernel sees both via `hal_storage`/`hal_filesystem`. The "no-flash" gap is closed here. |
+| [3 — stdio port](pc386/stage-3-stdio.md) | ⏳ | Lift `ports/mmbasic_stdio` HAL surface onto bare metal. BASIC programs run via serial; `LOAD`/`SAVE` to A: or C:. First `run_tests.sh` parity goal. |
+| [4 — keyboard](pc386/stage-4-keyboard.md) | ⏳ | PS/2 (8042) driver, IDT + PIC remap. Interactive REPL works in QEMU. |
+| [5 — VGA mode 13h](pc386/stage-5-video.md) | ⏳ | `hal_video.h` driver against linear framebuffer at `0xA0000`. `PIXEL`, `LINE`, `CIRCLE`, `BOX` work. |
+| [6 — PIT speaker](pc386/stage-6-audio.md) | ⏳ | `hal_audio.h` driver against PIT channel 2. `TONE`, `PLAY` work as square waves. |
+| [7 — `SYS C:\` install](pc386/stage-7-sys-install.md) | ⏳ | Install command: copy kernel + Limine + bootsector to C:, mark bootable. Adds multiboot2 header alongside multiboot1 for native Limine boot. |
+| [8 — real hardware](pc386/stage-8-real-hw.md) | ⏳ | Beige-box bring-up. Boot from a USB stick (presents as IDE), `SYS C:\` to install onto the HDD, run native. The aesthetic payoff. |
+| 9 — real FDC (optional) | — | Real 765 floppy controller driver. Pure aesthetics — only needed to boot from an actual physical 1.44 MB floppy on real hardware. QEMU and modern hardware never need it. |
 
 ## Validation model
 
@@ -87,10 +89,11 @@ ports/pc386/
 drivers/
   vga_text/                  # boot console (text mode 80x25)
   serial_16550/              # COM1 (test output channel)
+  ata_pio/                   # IDE / ATA-PIO block device
+  fatfs/                     # FatFs over hal_storage (FAT12/16/32)
   pit_timer/                 # system tick + PC speaker
   ps2_kbd/                   # 8042 keyboard
   vga_mode13h/               # video HAL (320x200x256)
-  fat16_atapi/               # filesystem on IDE
 toolchain/pc386/
   install_cross.sh           # bootstrap i686-elf-gcc if missing
 docs/
@@ -106,6 +109,7 @@ Driver directories appear as their stages land. Empty dirs are not committed.
 
 ## Open questions
 
-- **Heap size default.** RP2040 = 128 KB, ESP32-S3 = 104 KB. A 386 with 4 MB has more RAM than either. Decide before Stage 1 lands; probably 1–2 MB to give BASIC programs real room without fragmenting the multiboot memory map.
+- **Heap size default.** RP2040 = 128 KB, ESP32-S3 = 104 KB. A 386 with 4 MB has more RAM than either. Stage 1 lands with 1 MB; revisit once Stage 3 starts running real programs and we see what fragmentation looks like.
 - **Serial vs VGA as primary console.** Test runs use serial. Interactive use prefers VGA text mode. Stage 0 lights up both; later stages may need a `console_select()` switch.
-- **Real-hardware floor.** Targeting "any 386+" is forward-looking but real-mode-only segments of legacy hardware (DMA, ISA buses) may force a 486 floor. Resolve at Stage 7.
+- **Real-hardware floor.** Targeting "any 386+" is forward-looking but real-mode-only segments of legacy hardware (DMA, ISA buses) may force a 486 floor. Resolve at Stage 8.
+- **Fixed-disk geometry.** Stage 2's ATA-PIO needs to handle CHS vs LBA. Modern QEMU and any post-1996 hardware speak LBA; legacy 386-era IDE may need CHS fallback. Punt to Stage 8 if it turns out to matter.

@@ -47,7 +47,7 @@ LDFLAGS = -nostdlib -no-pie -T $(PORT_DIR)/linker.ld -Wl,--build-id=none
 # as ports/mmbasic_stdio/Makefile.
 
 PORT_ASM  = boot.S
-PORT_SRCS = kmain.c
+PORT_SRCS = kmain.c kprint.c mmap.c heap_region.c
 
 # Drivers live under $(REPO_ROOT)/drivers/<name>/<file>.c per project
 # convention. List them as <name>/<file> pairs so the rule below can

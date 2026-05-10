@@ -27,7 +27,16 @@
  */
 
 .set MB1_MAGIC,    0x1BADB002
-.set MB1_FLAGS,    0
+
+/* Header flags ask the bootloader to satisfy these features. Only
+ * three are defined for multiboot1:
+ *   bit 0 (0x01) — page-align modules (we don't load any)
+ *   bit 1 (0x02) — MEMINFO: pass us mem_lower/mem_upper, and the
+ *                  bootloader is also encouraged to fill the mmap
+ *   bit 2 (0x04) — request a specific video mode (we don't)
+ * Setting bit 1 alone is enough; QEMU and Limine both fill the mmap
+ * fields regardless once MEMINFO is set. */
+.set MB1_FLAGS,    0x00000002
 .set MB1_CHECKSUM, -(MB1_MAGIC + MB1_FLAGS)
 
 .section .multiboot, "a"
