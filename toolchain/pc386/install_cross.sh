@@ -34,9 +34,7 @@ install_macos_brew() {
     fi
 
     echo "Installing i686-elf cross toolchain via homebrew..."
-    # nativeos/i686-elf-toolchain provides precompiled bottles for
-    # x86_64 and arm64 macOS. Reasonable to ~30s install.
-    brew tap nativeos/i686-elf-toolchain || true
+    # Now in homebrew-core; bottles available for both x86_64 and arm64.
     brew install i686-elf-binutils i686-elf-gcc
 }
 
@@ -116,9 +114,15 @@ main() {
 
     case "$(uname -s)" in
         Darwin)
-            if install_macos_brew && check_present; then
-                echo "i686-elf cross toolchain installed via homebrew."
-                exit 0
+            if install_macos_brew; then
+                # Refresh shell hash so command -v sees the just-installed
+                # binaries; without this the script falls through to a
+                # source build even though brew succeeded.
+                hash -r 2>/dev/null || true
+                if check_present; then
+                    echo "i686-elf cross toolchain installed via homebrew."
+                    exit 0
+                fi
             fi
             ;;
         Linux)

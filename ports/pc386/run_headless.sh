@@ -50,8 +50,9 @@ QEMU_ARGS=(
 )
 
 if [[ -n "$TIMEOUT_SECS" ]]; then
-    # Use the cross-platform timeout if available; fall back to gtimeout
-    # (homebrew coreutils on macOS).
+    # Prefer GNU coreutils 'timeout' if available; otherwise fall back
+    # to a portable background-and-kill that works without coreutils
+    # (macOS by default doesn't ship 'timeout').
     if command -v timeout >/dev/null 2>&1; then
         exec timeout --foreground --kill-after=2 "$TIMEOUT_SECS" \
             qemu-system-i386 "${QEMU_ARGS[@]}"
@@ -59,8 +60,22 @@ if [[ -n "$TIMEOUT_SECS" ]]; then
         exec gtimeout --foreground --kill-after=2 "$TIMEOUT_SECS" \
             qemu-system-i386 "${QEMU_ARGS[@]}"
     else
-        echo "error: --timeout requires GNU coreutils 'timeout' (brew install coreutils)" >&2
-        exit 1
+        qemu-system-i386 "${QEMU_ARGS[@]}" &
+        QEMU_PID=$!
+        sleep "$TIMEOUT_SECS"
+        if kill -0 "$QEMU_PID" 2>/dev/null; then
+            kill -TERM "$QEMU_PID" 2>/dev/null
+            sleep 1
+            kill -KILL "$QEMU_PID" 2>/dev/null
+        fi
+        wait "$QEMU_PID" 2>/dev/null
+        # SIGTERM exit (143) means we hit the timeout — treat as success
+        # for "kernel halted, we killed QEMU" semantics.
+        rc=$?
+        if [[ "$rc" == 143 ]] || [[ "$rc" == 137 ]]; then
+            exit 0
+        fi
+        exit "$rc"
     fi
 else
     exec qemu-system-i386 "${QEMU_ARGS[@]}"

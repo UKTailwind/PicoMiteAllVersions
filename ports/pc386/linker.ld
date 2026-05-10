@@ -6,10 +6,12 @@
  * extensions. Matches the standard multiboot kernel placement and
  * what Limine + QEMU -kernel both expect.
  *
- * .multiboot2 is placed first so the header falls within the first
- * 32 KB of the file (multiboot2 spec scan window). The other sections
- * follow in the conventional order with 4 KB alignment so they're
- * easy to map page-wise if we ever enable paging (we won't, for now).
+ * .multiboot is placed first so the header falls within the first
+ * 8 KB of the file (multiboot1 spec scan window — multiboot2 widens
+ * this to 32 KB; either constraint is satisfied by going first).
+ * The other sections follow in the conventional order with 4 KB
+ * alignment so they're easy to map page-wise if we ever enable
+ * paging (we won't, for now).
  */
 
 OUTPUT_FORMAT(elf32-i386)
@@ -22,8 +24,9 @@ SECTIONS
 {
     . = KERNEL_PHYS_BASE;
 
-    .multiboot2 BLOCK(8) : ALIGN(8)
+    .multiboot BLOCK(4) : ALIGN(4)
     {
+        KEEP(*(.multiboot))
         KEEP(*(.multiboot2))
     }
 

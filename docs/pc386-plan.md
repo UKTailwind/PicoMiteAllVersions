@@ -27,9 +27,10 @@ This file is the index. Per-stage detail lives under `pc386/`. Read this page pl
 ## Toolchain
 
 - **Cross compiler:** `i686-elf-gcc` + `i686-elf-binutils` (freestanding ELF target, no host libc). Bootstrap via `toolchain/pc386/install_cross.sh`.
-- **Bootloader:** [Limine](https://limine-bootloader.org/). Multiboot2-compatible, single-binary, modern. `limine.cfg` points at the kernel ELF.
+- **Boot protocol(s):** multiboot1 in `.multiboot` for the dev path (QEMU `-kernel` only speaks multiboot1, not multiboot2 — discovered in Stage 0). Multiboot2 header added alongside in Stage 7 for the Limine ISO path; both can coexist.
+- **Bootloader:** [Limine](https://limine-bootloader.org/) for the ISO / real-hardware path. Skipped during dev — QEMU `-kernel` boots the ELF directly.
 - **Build host:** macOS or Linux. No Docker required.
-- **Primary emulator:** QEMU (`qemu-system-i386`). Direct multiboot2 ELF boot via `-kernel` for fast iteration; ISO boot via `-cdrom` for bootloader-path testing.
+- **Primary emulator:** QEMU (`qemu-system-i386`). Direct multiboot1 ELF boot via `-kernel` for fast iteration; ISO boot via `-cdrom` for Stage 7+.
 - **Secondary emulators:** DOSBox-X (BIOS-accurate sanity check), 86Box (period-authentic, pre-real-HW gate).
 
 See [`pc386/emulation-and-toolchain.md`](pc386/emulation-and-toolchain.md) for setup detail and command-line cookbook.
@@ -38,7 +39,7 @@ See [`pc386/emulation-and-toolchain.md`](pc386/emulation-and-toolchain.md) for s
 
 | Stage | Status | One-line state |
 |-------|--------|----------------|
-| [0 — hello kernel](pc386/stage-0-hello.md) | ⏳ | Multiboot2 entry, GDT, serial COM1 + VGA text. Prints banner. QEMU `-kernel` boots and stdio captures it. |
+| [0 — hello kernel](pc386/stage-0-hello.md) | ✅ | Multiboot1 entry, serial COM1 + VGA text drivers, banner over both. QEMU `-kernel` boots and stdio captures it. (Multiboot2 deferred to Stage 7 — QEMU `-kernel` only speaks multiboot1.) |
 | [1 — heap](pc386/stage-1-heap.md) | ⏳ | Parse multiboot memory map; init `TryGetMemory`/`FreeMemory` over conventional + extended RAM. |
 | [2 — stdio port](pc386/stage-2-stdio.md) | ⏳ | Lift `ports/mmbasic_stdio` HAL surface onto bare metal. BASIC programs run; output via serial. First `run_tests.sh` parity goal. |
 | [3 — keyboard](pc386/stage-3-keyboard.md) | ⏳ | PS/2 (8042) driver, IDT + PIC remap. Interactive REPL works in QEMU. |

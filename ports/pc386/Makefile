@@ -32,8 +32,7 @@ endif
 CFLAGS = -std=gnu11 -ffreestanding -O2 -g \
          -Wall -Wextra -Wno-unused-parameter -Wno-unused-function \
          -fno-pic -fno-pie -fno-stack-protector \
-         -mno-red-zone -mno-mmx -mno-sse -mno-sse2 \
-         -mgeneral-regs-only \
+         -mno-red-zone -mno-mmx -mno-sse -mno-sse2 -mno-80387 \
          -DMMBASIC_HOST -DPORT_PC386 \
          -I$(PORT_DIR) -I$(REPO_ROOT)/ports/host_native -I$(REPO_ROOT) \
          -MMD -MP
@@ -43,21 +42,25 @@ ASFLAGS = $(CFLAGS)
 LDFLAGS = -nostdlib -no-pie -T $(PORT_DIR)/linker.ld -Wl,--build-id=none
 
 # --- Sources -----------------------------------------------------------------
-# Stage 0: just the entry asm + a placeholder kmain. Stage 2+ extends
-# CORE_SRCS / NATIVE_SRCS / BC_SRCS in the same shape as
-# ports/mmbasic_stdio/Makefile.
+# Stage 0: entry asm + kmain that brings up serial COM1 and VGA text.
+# Stage 2+ extends CORE_SRCS / NATIVE_SRCS / BC_SRCS in the same shape
+# as ports/mmbasic_stdio/Makefile.
 
-PORT_ASM = multiboot2.S
+PORT_ASM  = boot.S
+PORT_SRCS = kmain.c
 
-# kmain.c is added by Stage 0. Until then this list is empty and `make`
-# will fail at link with "undefined reference to kmain" — that's the
-# correct signal that the next thing to do is land Stage 0.
-PORT_SRCS =
+# Drivers live under $(REPO_ROOT)/drivers/<name>/<file>.c per project
+# convention. List them as <name>/<file> pairs so the rule below can
+# resolve the source path.
+DRIVER_SRCS = \
+    vga_text/vga_text.c \
+    serial_16550/serial_16550.c
 
-ASM_OBJS := $(addprefix $(BUILD_DIR)/,$(PORT_ASM:.S=.o))
-C_OBJS   := $(addprefix $(BUILD_DIR)/,$(PORT_SRCS:.c=.o))
-OBJS     := $(ASM_OBJS) $(C_OBJS)
-DEPS     := $(C_OBJS:.o=.d)
+ASM_OBJS    := $(addprefix $(BUILD_DIR)/,$(PORT_ASM:.S=.o))
+PORT_C_OBJS := $(addprefix $(BUILD_DIR)/,$(PORT_SRCS:.c=.o))
+DRV_C_OBJS  := $(addprefix $(BUILD_DIR)/drivers/,$(DRIVER_SRCS:.c=.o))
+OBJS        := $(ASM_OBJS) $(PORT_C_OBJS) $(DRV_C_OBJS)
+DEPS        := $(PORT_C_OBJS:.o=.d) $(DRV_C_OBJS:.o=.d)
 
 KERNEL := $(BUILD_DIR)/mmbasic.elf
 
@@ -74,6 +77,12 @@ $(BUILD_DIR)/%.o: $(PORT_DIR)/%.S | $(BUILD_DIR)
 	$(CC) $(ASFLAGS) -c -o $@ $<
 
 $(BUILD_DIR)/%.o: $(PORT_DIR)/%.c | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+# Drivers under $(REPO_ROOT)/drivers/<name>/<file>.c.
+# Pattern with two stems requires secondary expansion.
+$(BUILD_DIR)/drivers/%.o: $(REPO_ROOT)/drivers/%.c
+	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 $(BUILD_DIR):
