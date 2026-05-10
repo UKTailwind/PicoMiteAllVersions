@@ -57,6 +57,7 @@ PORT_ASM  = boot.S setjmp.S
 PORT_SRCS = kmain.c kprint.c mmap.c heap_region.c kstring.c \
             pc386_panic.c pc386_libc.c \
             pc386_state.c pc386_runtime.c pc386_peripheral_stubs.c \
+            pc386_flash.c \
             hal_audio_pc386.c hal_filesystem_pc386.c hal_flash_pc386.c \
             hal_keyboard_pc386.c hal_pin_pc386.c hal_random_pc386.c \
             hal_storage_pc386.c hal_time_pc386.c \

@@ -1,31 +1,25 @@
 /*
- * ports/pc386/kmain.c — Stage 2b kernel entry.
+ * ports/pc386/kmain.c — kernel entry.
  *
  * Called from boot.S after the bootloader / QEMU -kernel hands us
  * control in 32-bit protected mode with flat segments and interrupts
- * disabled.
+ * disabled, the FPU brought up, and the multiboot magic + info
+ * pointer pushed as cdecl args.
  *
- * Stage 0: serial + VGA text, banner.
- * Stage 1: multiboot mmap parse, MMBasic heap region reserved.
- * Stage 2a: ATA-PIO probe + raw sector-0 dump.
- * Stage 2b: mount FAT on each present drive (FatFs over ATA-PIO via
- *          drivers/fatfs/ff_glue.c) and list the root directory.
- * Stage 2c: mount on the user-visible drive letters "A:" and "C:".
- * Stage 2d (this stage): boot path through Limine off A:'s MBR
- *          replaces the QEMU -kernel dev hack. Same kernel ELF; the
- *          difference is who loads it. Verified by the multiboot info
- *          address shifting from 0x9500 (QEMU direct) to 0x10000
- *          (Limine), and A:'s sector 0 now starting with the
- *          "LIMINE  " OEM string instead of mtools' "MTOO4049".
- *
- * Deliberately NOT yet:
- *   - allocator on top of heap region (Stage 3)
- *   - IDT / PIC / IRQs (Stage 4)
- *   - any MMBasic core (Stage 3)
+ * Boot sequence (working state):
+ *   1. Serial COM1 + VGA text consoles, banner.
+ *   2. Multiboot1 magic check + mmap walk, heap region reserved.
+ *   3. ATA-PIO probe + FAT mount of A: and C: from the IDE volumes.
+ *   4. pc386_flash_init() — RAM-backed program/option buffers.
+ *   5. MMBasic runtime instantiation: LoadOptions, InitBasic,
+ *      InitHeap, host_runtime_begin. Reaches the point where a
+ *      tokenised BASIC program could be ExecuteProgram'd.
  */
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <setjmp.h>
+#include <string.h>
 
 #include "ff.h"
 
@@ -33,10 +27,18 @@
 #include "../../drivers/serial_16550/serial_16550.h"
 #include "../../drivers/vga_text/vga_text.h"
 
+#include "MMBasic_Includes.h"
+#include "Hardware_Includes.h"
+
 #include "heap_region.h"
 #include "kprint.h"
 #include "mmap.h"
 #include "multiboot1.h"
+#include "pc386_panic.h"
+
+extern void pc386_flash_init(void);
+extern void host_runtime_begin(void);
+extern jmp_buf mark;
 
 static __attribute__((noreturn)) void halt(void) {
     for (;;) {
@@ -198,7 +200,7 @@ void kmain(uint32_t magic, uint32_t info_addr) {
     vga_text_init();
 
     vga_text_set_color(VGA_LIGHT_GREEN, VGA_BLACK);
-    kputs("PicoMite PC386 - Stage 2d\n");
+    kputs("PicoMite PC386 - Stage 3c\n");
     vga_text_set_color(VGA_LIGHT_GRAY, VGA_BLACK);
 
     kputs("multiboot1 magic: ");
@@ -251,6 +253,37 @@ void kmain(uint32_t magic, uint32_t info_addr) {
     mount_and_list("A:", "  drive A", &fs0);
     mount_and_list("C:", "  drive C", &fs1);
 
-    kputs("\nStage 2d complete. Halting.\n");
+    /* ---------- MMBasic runtime instantiation (stage 3c.4) ---------- */
+
+    kputc('\n');
+    kputs("MMBasic runtime: ");
+    pc386_flash_init();
+
+    /* Mirror host_main.c's bring-up. setjmp catches error()'s longjmp
+     * out of LoadOptions / InitBasic / etc. so a fault during init
+     * surfaces as a kernel panic rather than a wild jump. */
+    if (setjmp(mark) != 0) {
+        kputs("MMBasic init faulted\n");
+        kputs("MMErrMsg: ");
+        kputs(MMErrMsg);
+        kputc('\n');
+        halt();
+    }
+
+    LoadOptions();
+    kputs("LoadOptions ok, ");
+
+    InitBasic();
+    kputs("InitBasic ok, ");
+
+    InitHeap(true);
+    kputs("InitHeap ok, ");
+
+    MMerrno = 0;
+    MMErrMsg[0] = '\0';
+    host_runtime_begin();
+    kputs("host_runtime_begin ok\n");
+
+    kputs("\nMMBasic standing — REPL/program execution lands in stage 3d/3e.\n");
     halt();
 }

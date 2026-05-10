@@ -303,13 +303,6 @@ uint32_t host_runtime_get_pixel(int x, int y) { (void)x; (void)y; return 0; }
 FRESULT vm_host_fat_mount(void) { return FR_OK; }
 const char *vm_host_fat_path(const char *p) { return p; }
 
-/* Flash backing — both contents pointers exist only so Memory.c's
- * scan loops have somewhere to read. Pre-erased buffers in BSS. */
-static const uint8_t pc386_flash_option_buf[256] = {
-    [0 ... 255] = 0xFF,
-};
-static const uint8_t pc386_flash_target_buf[256] = {
-    [0 ... 255] = 0xFF,
-};
-const uint8_t *flash_option_contents = pc386_flash_option_buf;
-const uint8_t *flash_target_contents = pc386_flash_target_buf;
+/* flash_option_contents / flash_target_contents now live in
+ * pc386_flash.c, which owns the real backing buffers + the
+ * flash_range_erase/program shims hal_flash_pc386.c wraps. */
