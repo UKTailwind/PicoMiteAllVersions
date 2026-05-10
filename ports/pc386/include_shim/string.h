@@ -25,6 +25,7 @@ char  *strrchr(const char *s, int c);
 char  *strstr (const char *h, const char *n);
 char  *strdup (const char *s);
 char  *strerror(int e);
-char  *strtok(char *s, const char *delim);
+char  *strtok  (char *s, const char *delim);
+char  *strtok_r(char *s, const char *delim, char **saveptr);
 
 #endif

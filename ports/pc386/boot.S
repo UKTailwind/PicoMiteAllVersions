@@ -60,6 +60,11 @@ _start:
     movl    $stack_top, %esp
     xorl    %ebp, %ebp              /* terminate frame pointer chain */
 
+    /* Save the multiboot1 magic (EAX) + info ptr (EBX) before we
+     * clobber EAX in the CR0 dance below. */
+    pushl   %ebx                    /* kmain arg 2: info pointer  */
+    pushl   %eax                    /* kmain arg 1: multiboot magic */
+
     /* Bring up the x87 FPU. CR0:
      *   bit 1 (MP)  set   — Monitor coProcessor; #NM on WAIT/FWAIT
      *                       when TS is set. Required when an FPU is present.
@@ -79,11 +84,6 @@ _start:
     orl     $(1 << 5), %eax         /* set   NE */
     movl    %eax, %cr0
     fninit                          /* reset FPU state — exceptions masked */
-
-    /* Push EBX (info pointer) then EAX (magic) — cdecl, so they end
-     * up as kmain's first and second arguments. */
-    pushl   %ebx
-    pushl   %eax
 
     call    kmain
 

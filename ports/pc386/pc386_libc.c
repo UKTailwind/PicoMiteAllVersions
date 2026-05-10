@@ -22,11 +22,57 @@
 #include <ctype.h>
 #include <errno.h>
 #include <stdlib.h>
+#include <stdio.h>
+#include <stdarg.h>
 
 #include "pc386_panic.h"
 
 /* ===== errno ============================================================ */
 int errno = 0;
+
+/* ===== stdio: stdin/stdout/stderr + printf family ======================= */
+/* The struct _FILE typedef in <stdio.h> is opaque; we need an actual
+ * incomplete-type definition for the externs to resolve. The pointers
+ * are never dereferenced — fopen/fread/fwrite all panic. */
+struct _FILE { int placeholder; };
+static struct _FILE pc386_stdin_obj  = {0};
+static struct _FILE pc386_stdout_obj = {0};
+static struct _FILE pc386_stderr_obj = {0};
+FILE *stdin  = &pc386_stdin_obj;
+FILE *stdout = &pc386_stdout_obj;
+FILE *stderr = &pc386_stderr_obj;
+
+int  printf  (const char *fmt, ...) { (void)fmt; pc386_panic("printf — vendor mpaland"); }
+int  sprintf (char *s, const char *fmt, ...) { (void)s; (void)fmt; pc386_panic("sprintf — vendor mpaland"); }
+int  snprintf(char *s, size_t n, const char *fmt, ...) { (void)s; (void)n; (void)fmt; pc386_panic("snprintf — vendor mpaland"); }
+int  vsnprintf(char *s, size_t n, const char *fmt, va_list ap) { (void)s; (void)n; (void)fmt; (void)ap; pc386_panic("vsnprintf — vendor mpaland"); }
+int  vsprintf (char *s, const char *fmt, va_list ap) { (void)s; (void)fmt; (void)ap; pc386_panic("vsprintf — vendor mpaland"); }
+int  fprintf (FILE *fp, const char *fmt, ...) { (void)fp; (void)fmt; pc386_panic("fprintf — vendor mpaland"); }
+int  vfprintf(FILE *fp, const char *fmt, va_list ap) { (void)fp; (void)fmt; (void)ap; pc386_panic("vfprintf — vendor mpaland"); }
+int  sscanf  (const char *s, const char *fmt, ...) { (void)s; (void)fmt; pc386_panic("sscanf — vendor mpaland"); }
+int  vsscanf (const char *s, const char *fmt, va_list ap) { (void)s; (void)fmt; (void)ap; pc386_panic("vsscanf — vendor mpaland"); }
+
+int  fputs (const char *s, FILE *fp) { (void)s; (void)fp; return 0; }
+int  fputc (int c, FILE *fp)         { (void)c; (void)fp; return c; }
+int  putc  (int c, FILE *fp)         { return fputc(c, fp); }
+int  putchar(int c)                  { extern char SerialConsolePutC(char, int); return SerialConsolePutC((char)c, 0); }
+int  puts  (const char *s)           { extern void SSPrintString(char *); SSPrintString((char *)s); putchar('\n'); return 0; }
+int  fgetc (FILE *fp)                { (void)fp; return -1; }
+int  getc  (FILE *fp)                { return fgetc(fp); }
+char *fgets(char *s, int n, FILE *fp){ (void)s; (void)n; (void)fp; return NULL; }
+size_t fread (void *p, size_t sz, size_t n, FILE *fp)       { (void)p; (void)sz; (void)n; (void)fp; return 0; }
+size_t fwrite(const void *p, size_t sz, size_t n, FILE *fp) { (void)p; (void)sz; (void)n; (void)fp; return 0; }
+FILE *fopen (const char *path, const char *mode)            { (void)path; (void)mode; return NULL; }
+int   fclose(FILE *fp)              { (void)fp; return 0; }
+int   fflush(FILE *fp)              { (void)fp; return 0; }
+int   feof  (FILE *fp)              { (void)fp; return 1; }
+int   ferror(FILE *fp)              { (void)fp; return 0; }
+int   fseek (FILE *fp, long off, int whence) { (void)fp; (void)off; (void)whence; return -1; }
+long  ftell (FILE *fp)              { (void)fp; return -1; }
+void  rewind(FILE *fp)              { (void)fp; }
+void  perror(const char *s)         { (void)s; }
+int   remove(const char *path)      { (void)path; return -1; }
+int   rename(const char *from, const char *to) { (void)from; (void)to; return -1; }
 
 /* ===== string (additions beyond kstring.c) ============================== */
 
@@ -127,23 +173,22 @@ char *strerror(int e) {
     return buf;
 }
 
-static const char *strtok_state = NULL;
-char *strtok(char *s, const char *delim) {
-    if (s) strtok_state = s;
-    if (!strtok_state) return NULL;
-    /* skip leading delims */
-    const char *p = strtok_state;
+char *strtok_r(char *s, const char *delim, char **saveptr) {
+    if (s) *saveptr = s;
+    if (!*saveptr) return NULL;
+    char *p = *saveptr;
     while (*p && strchr(delim, *p)) p++;
-    if (!*p) { strtok_state = NULL; return NULL; }
-    char *start = (char *)p;
+    if (!*p) { *saveptr = NULL; return NULL; }
+    char *start = p;
     while (*p && !strchr(delim, *p)) p++;
-    if (*p) {
-        *(char *)p = '\0';
-        strtok_state = p + 1;
-    } else {
-        strtok_state = NULL;
-    }
+    if (*p) { *p = '\0'; *saveptr = p + 1; }
+    else    { *saveptr = NULL; }
     return start;
+}
+
+static char *strtok_state = NULL;
+char *strtok(char *s, const char *delim) {
+    return strtok_r(s, delim, &strtok_state);
 }
 
 /* ===== ctype ============================================================ */

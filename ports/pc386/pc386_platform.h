@@ -24,6 +24,8 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <stdlib.h>   /* lfs_util.h calls malloc without including <stdlib.h> */
+#include <setjmp.h>   /* MMBasic.h uses jmp_buf without including <setjmp.h> */
 #include <time.h>     /* MM_Misc.h uses time_t without an explicit include */
 
 #ifndef uint

@@ -56,6 +56,7 @@ LDFLAGS = -nostdlib -no-pie -T $(PORT_DIR)/linker.ld -Wl,--build-id=none
 PORT_ASM  = boot.S setjmp.S
 PORT_SRCS = kmain.c kprint.c mmap.c heap_region.c kstring.c \
             pc386_panic.c pc386_libc.c \
+            pc386_state.c pc386_runtime.c pc386_peripheral_stubs.c \
             hal_audio_pc386.c hal_filesystem_pc386.c hal_flash_pc386.c \
             hal_keyboard_pc386.c hal_pin_pc386.c hal_random_pc386.c \
             hal_storage_pc386.c hal_time_pc386.c \
@@ -72,6 +73,19 @@ CORE_SRCS += Draw.c RGB121.c Tilemap.c FileIO.c Audio.c BmpDecoder.c re.c picojp
 
 CORE_STATE_SRCS = display_state.c pin_state.c option_state.c audio_state.c
 
+# BC (bytecode) compiler + VM. ff/ffunicode/ffsystem are already in
+# FATFS_SRCS so don't re-list them here.
+BC_SRCS = bc_alloc.c bc_bridge.c \
+          vm_sys_input.c vm_sys_graphics.c vm_sys_time.c \
+          bc_source.c bc_compiler_core.c bc_vm.c bc_runtime.c bc_debug.c
+# vm_host_fat.c (in-RAM FAT for sim B: drive) is omitted: pc386 has
+# real FatFs over ATA-PIO from Stage 2 and provides its own
+# get_fattime() in drivers/fatfs/ff_glue.c.
+
+# vm_sys_pin_sim.c + vm_sys_file_sim.c live in ports/vm_sys_sim/ rather
+# than the repo root. Separate var because they need a different rule.
+SIM_VM_SRCS = vm_sys_pin_sim.c vm_sys_file_sim.c
+
 # Stubs inherited from host_native — same set mmbasic_stdio links.
 CORE_DRV_SRCS = audio_mp3/audio_mp3_stub.c \
                 spi_lcd/spi_lcd_mem332_stub.c \
@@ -87,8 +101,10 @@ CORE_DRV_SRCS = audio_mp3/audio_mp3_stub.c \
                 editor_console/editor_console_stub.c \
                 display_pixel_host/display_pixel_host.c
 
-CORE_C_OBJS  := $(addprefix $(BUILD_DIR)/core/,$(CORE_SRCS:.c=.o))
-STATE_C_OBJS := $(addprefix $(BUILD_DIR)/state/,$(CORE_STATE_SRCS:.c=.o))
+CORE_C_OBJS    := $(addprefix $(BUILD_DIR)/core/,$(CORE_SRCS:.c=.o))
+BC_C_OBJS      := $(addprefix $(BUILD_DIR)/bc/,$(BC_SRCS:.c=.o))
+SIMVM_C_OBJS   := $(addprefix $(BUILD_DIR)/simvm/,$(SIM_VM_SRCS:.c=.o))
+STATE_C_OBJS   := $(addprefix $(BUILD_DIR)/state/,$(CORE_STATE_SRCS:.c=.o))
 COREDRV_C_OBJS := $(addprefix $(BUILD_DIR)/coredrv/,$(CORE_DRV_SRCS:.c=.o))
 
 # Shared no-op HAL impls (linked across host_native, mmbasic_stdio,
@@ -115,9 +131,10 @@ DRV_C_OBJS  := $(addprefix $(BUILD_DIR)/drivers/,$(DRIVER_SRCS:.c=.o))
 ROOT_C_OBJS := $(addprefix $(BUILD_DIR)/root/,$(FATFS_SRCS:.c=.o))
 HAL_C_OBJS  := $(addprefix $(BUILD_DIR)/hal/generic/,$(HAL_GENERIC_SRCS:.c=.o))
 OBJS        := $(ASM_OBJS) $(PORT_C_OBJS) $(DRV_C_OBJS) $(ROOT_C_OBJS) $(HAL_C_OBJS) \
-               $(CORE_C_OBJS) $(STATE_C_OBJS) $(COREDRV_C_OBJS)
+               $(CORE_C_OBJS) $(BC_C_OBJS) $(SIMVM_C_OBJS) $(STATE_C_OBJS) $(COREDRV_C_OBJS)
 DEPS        := $(PORT_C_OBJS:.o=.d) $(DRV_C_OBJS:.o=.d) $(ROOT_C_OBJS:.o=.d) $(HAL_C_OBJS:.o=.d) \
-               $(CORE_C_OBJS:.o=.d) $(STATE_C_OBJS:.o=.d) $(COREDRV_C_OBJS:.o=.d)
+               $(CORE_C_OBJS:.o=.d) $(BC_C_OBJS:.o=.d) $(SIMVM_C_OBJS:.o=.d) \
+               $(STATE_C_OBJS:.o=.d) $(COREDRV_C_OBJS:.o=.d)
 
 KERNEL := $(BUILD_DIR)/mmbasic.elf
 
@@ -161,6 +178,14 @@ $(BUILD_DIR)/state/%.o: $(REPO_ROOT)/core/state/%.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 $(BUILD_DIR)/coredrv/%.o: $(REPO_ROOT)/drivers/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(BUILD_DIR)/bc/%.o: $(REPO_ROOT)/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(BUILD_DIR)/simvm/%.o: $(REPO_ROOT)/ports/vm_sys_sim/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
