@@ -33,6 +33,7 @@ CFLAGS = -std=gnu11 -ffreestanding -O2 -g \
          -Wall -Wextra -Wno-unused-parameter -Wno-unused-function \
          -fno-pic -fno-pie -fno-stack-protector \
          -mno-red-zone -mno-mmx -mno-sse -mno-sse2 \
+         -funsigned-char \
          -DMMBASIC_HOST -DPORT_PC386 \
          -DFF_STR_VOLUME_ID=1 -DFF_VOLUME_STRS='"A","C"' \
          -include pc386_platform.h \
