@@ -38,6 +38,16 @@ QEMU_ARGS=(
     -d guest_errors
 )
 
+# Attach test disks if they exist. Build them via ./build_disks.sh.
+A_IMG="$PORT_DIR/test_disks/a.img"
+C_IMG="$PORT_DIR/test_disks/c.img"
+if [[ -f "$A_IMG" ]]; then
+    QEMU_ARGS+=(-drive file="$A_IMG",format=raw,if=ide,index=0)
+fi
+if [[ -f "$C_IMG" ]]; then
+    QEMU_ARGS+=(-drive file="$C_IMG",format=raw,if=ide,index=1)
+fi
+
 case "${1:-run}" in
     run)
         ;;

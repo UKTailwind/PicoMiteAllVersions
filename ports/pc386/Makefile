@@ -54,7 +54,8 @@ PORT_SRCS = kmain.c kprint.c mmap.c heap_region.c
 # resolve the source path.
 DRIVER_SRCS = \
     vga_text/vga_text.c \
-    serial_16550/serial_16550.c
+    serial_16550/serial_16550.c \
+    ata_pio/ata_pio.c
 
 ASM_OBJS    := $(addprefix $(BUILD_DIR)/,$(PORT_ASM:.S=.o))
 PORT_C_OBJS := $(addprefix $(BUILD_DIR)/,$(PORT_SRCS:.c=.o))
