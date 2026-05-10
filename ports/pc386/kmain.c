@@ -10,15 +10,18 @@
  * Stage 2a: ATA-PIO probe + raw sector-0 dump.
  * Stage 2b: mount FAT on each present drive (FatFs over ATA-PIO via
  *          drivers/fatfs/ff_glue.c) and list the root directory.
- * Stage 2c (this stage): mount on the user-visible drive letters
- *          "A:" and "C:" instead of the FatFs numeric IDs "0:"/"1:".
- *          Achieved via FF_VOLUME_STRS injection through Makefile -D.
+ * Stage 2c: mount on the user-visible drive letters "A:" and "C:".
+ * Stage 2d (this stage): boot path through Limine off A:'s MBR
+ *          replaces the QEMU -kernel dev hack. Same kernel ELF; the
+ *          difference is who loads it. Verified by the multiboot info
+ *          address shifting from 0x9500 (QEMU direct) to 0x10000
+ *          (Limine), and A:'s sector 0 now starting with the
+ *          "LIMINE  " OEM string instead of mtools' "MTOO4049".
  *
  * Deliberately NOT yet:
  *   - allocator on top of heap region (Stage 3)
  *   - IDT / PIC / IRQs (Stage 4)
  *   - any MMBasic core (Stage 3)
- *   - Limine bootloader (Stage 2d)
  */
 
 #include <stdbool.h>
@@ -195,7 +198,7 @@ void kmain(uint32_t magic, uint32_t info_addr) {
     vga_text_init();
 
     vga_text_set_color(VGA_LIGHT_GREEN, VGA_BLACK);
-    kputs("PicoMite PC386 - Stage 2c\n");
+    kputs("PicoMite PC386 - Stage 2d\n");
     vga_text_set_color(VGA_LIGHT_GRAY, VGA_BLACK);
 
     kputs("multiboot1 magic: ");
@@ -248,6 +251,6 @@ void kmain(uint32_t magic, uint32_t info_addr) {
     mount_and_list("A:", "  drive A", &fs0);
     mount_and_list("C:", "  drive C", &fs1);
 
-    kputs("\nStage 2c complete. Halting.\n");
+    kputs("\nStage 2d complete. Halting.\n");
     halt();
 }
