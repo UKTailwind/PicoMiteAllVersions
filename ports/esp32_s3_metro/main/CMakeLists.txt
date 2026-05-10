@@ -105,7 +105,7 @@ set(PORT_LOCAL_SRCS
     hal_vm_framebuffer_esp32_stub.c
     hal_time_esp32.c
     hal_random_esp32.c
-    hal_watchdog_esp32_stub.c
+    ../../../hal/generic/hal_watchdog_noop.c
     hal_flash_esp32.c                         # NVS-backed Options; slot persistence still Stage E1
     hal_storage_esp32_stub.c
     hal_filesystem_esp32.c                  # path / dir ops via f_*

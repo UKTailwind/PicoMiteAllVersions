@@ -48,7 +48,16 @@ LDFLAGS = -nostdlib -no-pie -T $(PORT_DIR)/linker.ld -Wl,--build-id=none
 # as ports/mmbasic_stdio/Makefile.
 
 PORT_ASM  = boot.S
-PORT_SRCS = kmain.c kprint.c mmap.c heap_region.c kstring.c
+PORT_SRCS = kmain.c kprint.c mmap.c heap_region.c kstring.c \
+            pc386_panic.c \
+            hal_audio_pc386.c hal_filesystem_pc386.c hal_flash_pc386.c \
+            hal_keyboard_pc386.c hal_pin_pc386.c hal_random_pc386.c \
+            hal_storage_pc386.c hal_time_pc386.c \
+            hal_vm_framebuffer_pc386.c
+
+# Shared no-op HAL impls (linked across host_native, mmbasic_stdio,
+# esp32, pc386 — anything without real hardware for that surface).
+HAL_GENERIC_SRCS = hal_watchdog_noop.c
 
 # Drivers live under $(REPO_ROOT)/drivers/<name>/<file>.c per project
 # convention. List them as <name>/<file> pairs so the rule below can
@@ -68,8 +77,9 @@ ASM_OBJS    := $(addprefix $(BUILD_DIR)/,$(PORT_ASM:.S=.o))
 PORT_C_OBJS := $(addprefix $(BUILD_DIR)/,$(PORT_SRCS:.c=.o))
 DRV_C_OBJS  := $(addprefix $(BUILD_DIR)/drivers/,$(DRIVER_SRCS:.c=.o))
 ROOT_C_OBJS := $(addprefix $(BUILD_DIR)/root/,$(FATFS_SRCS:.c=.o))
-OBJS        := $(ASM_OBJS) $(PORT_C_OBJS) $(DRV_C_OBJS) $(ROOT_C_OBJS)
-DEPS        := $(PORT_C_OBJS:.o=.d) $(DRV_C_OBJS:.o=.d) $(ROOT_C_OBJS:.o=.d)
+HAL_C_OBJS  := $(addprefix $(BUILD_DIR)/hal/generic/,$(HAL_GENERIC_SRCS:.c=.o))
+OBJS        := $(ASM_OBJS) $(PORT_C_OBJS) $(DRV_C_OBJS) $(ROOT_C_OBJS) $(HAL_C_OBJS)
+DEPS        := $(PORT_C_OBJS:.o=.d) $(DRV_C_OBJS:.o=.d) $(ROOT_C_OBJS:.o=.d) $(HAL_C_OBJS:.o=.d)
 
 KERNEL := $(BUILD_DIR)/mmbasic.elf
 
@@ -95,6 +105,11 @@ $(BUILD_DIR)/drivers/%.o: $(REPO_ROOT)/drivers/%.c
 
 # Repo-root sources (FatFs lives here, alongside every other port's copy).
 $(BUILD_DIR)/root/%.o: $(REPO_ROOT)/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+# Shared HAL impls.
+$(BUILD_DIR)/hal/generic/%.o: $(REPO_ROOT)/hal/generic/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c -o $@ $<
 

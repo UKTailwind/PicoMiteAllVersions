@@ -46,6 +46,8 @@ See [`pc386/emulation-and-toolchain.md`](pc386/emulation-and-toolchain.md) for s
 | [4 — keyboard](pc386/stage-4-keyboard.md) | ⏳ | PS/2 (8042) driver, IDT + PIC remap. Interactive REPL works in QEMU. |
 | [5 — VGA mode 13h](pc386/stage-5-video.md) | ⏳ | `hal_video.h` driver against linear framebuffer at `0xA0000`. `PIXEL`, `LINE`, `CIRCLE`, `BOX` work. |
 | [6 — PIT speaker](pc386/stage-6-audio.md) | ⏳ | `hal_audio.h` driver against PIT channel 2. `TONE`, `PLAY` work as square waves. |
+| [6.5 — LPT1 GPIO](pc386/stage-6_5-lpt1-gpio.md) | ⏳ | `hal_pin.h` mapped to the parallel port at 0x378. SETPIN 1..17 mirrors DB-25 (data=2..9, control=1/14/16/17, status=10..15 read-only). Replaces stage 3's hal_pin error stubs. |
+| [6.6 — LPRINT / Centronics](pc386/stage-6_6-lprint.md) | ⏳ | `drivers/lpt_centronics/` owns the Strobe/Busy/Ack handshake; BASIC `LPRINT` and `OPEN "LPT1:" FOR OUTPUT` ship bytes to any vintage parallel printer (Epson FX-80, HP LaserJet II, etc.) without hand-rolled bit-banging. Builds on 6.5's pin layer. |
 | [7 — `SYS C:\` install](pc386/stage-7-sys-install.md) | ⏳ | Install command: copy kernel + Limine + bootsector to C:, mark bootable. Adds multiboot2 header alongside multiboot1 for native Limine boot. |
 | [8 — real hardware](pc386/stage-8-real-hw.md) | ⏳ | Beige-box bring-up. Boot from a USB stick (presents as IDE), `SYS C:\` to install onto the HDD, run native. The aesthetic payoff. |
 | 9 — real FDC (optional) | — | Real 765 floppy controller driver. Pure aesthetics — only needed to boot from an actual physical 1.44 MB floppy on real hardware. QEMU and modern hardware never need it. |
