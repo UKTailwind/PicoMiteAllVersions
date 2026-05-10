@@ -47,7 +47,7 @@ LDFLAGS = -nostdlib -no-pie -T $(PORT_DIR)/linker.ld -Wl,--build-id=none
 # as ports/mmbasic_stdio/Makefile.
 
 PORT_ASM  = boot.S
-PORT_SRCS = kmain.c kprint.c mmap.c heap_region.c
+PORT_SRCS = kmain.c kprint.c mmap.c heap_region.c kstring.c
 
 # Drivers live under $(REPO_ROOT)/drivers/<name>/<file>.c per project
 # convention. List them as <name>/<file> pairs so the rule below can
@@ -55,13 +55,20 @@ PORT_SRCS = kmain.c kprint.c mmap.c heap_region.c
 DRIVER_SRCS = \
     vga_text/vga_text.c \
     serial_16550/serial_16550.c \
-    ata_pio/ata_pio.c
+    ata_pio/ata_pio.c \
+    fatfs/ff_glue.c
+
+# FatFs is vendored at the repo root (R0.14, shared with every other
+# port). Compile in-place; our drivers/fatfs/ff_glue.c provides the
+# disk_io adapter onto ATA-PIO.
+FATFS_SRCS = ff.c ffunicode.c ffsystem.c
 
 ASM_OBJS    := $(addprefix $(BUILD_DIR)/,$(PORT_ASM:.S=.o))
 PORT_C_OBJS := $(addprefix $(BUILD_DIR)/,$(PORT_SRCS:.c=.o))
 DRV_C_OBJS  := $(addprefix $(BUILD_DIR)/drivers/,$(DRIVER_SRCS:.c=.o))
-OBJS        := $(ASM_OBJS) $(PORT_C_OBJS) $(DRV_C_OBJS)
-DEPS        := $(PORT_C_OBJS:.o=.d) $(DRV_C_OBJS:.o=.d)
+ROOT_C_OBJS := $(addprefix $(BUILD_DIR)/root/,$(FATFS_SRCS:.c=.o))
+OBJS        := $(ASM_OBJS) $(PORT_C_OBJS) $(DRV_C_OBJS) $(ROOT_C_OBJS)
+DEPS        := $(PORT_C_OBJS:.o=.d) $(DRV_C_OBJS:.o=.d) $(ROOT_C_OBJS:.o=.d)
 
 KERNEL := $(BUILD_DIR)/mmbasic.elf
 
@@ -81,8 +88,12 @@ $(BUILD_DIR)/%.o: $(PORT_DIR)/%.c | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 # Drivers under $(REPO_ROOT)/drivers/<name>/<file>.c.
-# Pattern with two stems requires secondary expansion.
 $(BUILD_DIR)/drivers/%.o: $(REPO_ROOT)/drivers/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+# Repo-root sources (FatFs lives here, alongside every other port's copy).
+$(BUILD_DIR)/root/%.o: $(REPO_ROOT)/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
