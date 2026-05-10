@@ -193,7 +193,7 @@ static int source_try_fuse_mulshr(BCCompiler *cs, uint8_t left, uint8_t right,
         memcmp(&cs->code[expr_start + 1], &cs->code[expr_start + 4], 2) == 0) {
         source_delete_bytes(cs, expr_start + 3, 3);
         if (cs->has_error) return 0;
-        bc_emit_byte(cs, OP_MATH_SQRSHR);
+        bc_emit_byte(cs, OP_MATH_SQRDIV);
         return 1;
     }
     if (mul_len == 6 &&
@@ -202,10 +202,10 @@ static int source_try_fuse_mulshr(BCCompiler *cs, uint8_t left, uint8_t right,
         memcmp(&cs->code[expr_start + 1], &cs->code[expr_start + 4], 2) == 0) {
         source_delete_bytes(cs, expr_start + 3, 3);
         if (cs->has_error) return 0;
-        bc_emit_byte(cs, OP_MATH_SQRSHR);
+        bc_emit_byte(cs, OP_MATH_SQRDIV);
         return 1;
     }
-    bc_emit_byte(cs, OP_MATH_MULSHR);
+    bc_emit_byte(cs, OP_MATH_MULDIV);
     return 1;
 }
 
@@ -4204,6 +4204,7 @@ static int fc_patch_prev_dst(FastConv *fc, uint8_t old_dst, uint8_t new_dst) {
         if ((op4 >= ROP_ADD_I && op4 <= ROP_DIV_F) ||
             (op4 >= ROP_AND && op4 <= ROP_SHR) ||
             (op4 >= ROP_EQ_I && op4 <= ROP_GE_I) ||
+            op4 == ROP_SQRDIV ||
             op4 == ROP_SQRSHR) {
             if (fc->rop[fc->rop_len - 3] == old_dst) {
                 fc->rop[fc->rop_len - 3] = new_dst;
@@ -4214,7 +4215,7 @@ static int fc_patch_prev_dst(FastConv *fc, uint8_t old_dst, uint8_t new_dst) {
     /* 5-byte ops (MULSHR): dst at [-4] */
     if (fc->rop_len >= 5) {
         uint8_t op5 = fc->rop[fc->rop_len - 5];
-        if (op5 == ROP_MULSHR) {
+        if (op5 == ROP_MULDIV || op5 == ROP_MULSHR) {
             if (fc->rop[fc->rop_len - 4] == old_dst) {
                 fc->rop[fc->rop_len - 4] = new_dst;
                 return 1;
@@ -4507,21 +4508,23 @@ static int source_convert_fast_loop(BCCompiler *cs, uint32_t loop_start,
         }
 
         /* --- Fused fixed-point --- */
+        case OP_MATH_SQRDIV:
         case OP_MATH_SQRSHR: {
             uint8_t bits = fc_sim_pop(&fc);
             uint8_t a = fc_sim_pop(&fc);
             uint8_t dst = fc_alloc_temp(&fc);
-            fc_emit(&fc, ROP_SQRSHR);
+            fc_emit(&fc, op == OP_MATH_SQRDIV ? ROP_SQRDIV : ROP_SQRSHR);
             fc_emit(&fc, dst); fc_emit(&fc, a); fc_emit(&fc, bits);
             fc_sim_push(&fc, dst);
             break;
         }
+        case OP_MATH_MULDIV:
         case OP_MATH_MULSHR: {
             uint8_t bits = fc_sim_pop(&fc);
             uint8_t b = fc_sim_pop(&fc);
             uint8_t a = fc_sim_pop(&fc);
             uint8_t dst = fc_alloc_temp(&fc);
-            fc_emit(&fc, ROP_MULSHR);
+            fc_emit(&fc, op == OP_MATH_MULDIV ? ROP_MULDIV : ROP_MULSHR);
             fc_emit(&fc, dst); fc_emit(&fc, a); fc_emit(&fc, b); fc_emit(&fc, bits);
             fc_sim_push(&fc, dst);
             break;

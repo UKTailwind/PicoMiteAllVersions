@@ -1,10 +1,10 @@
 /*
- * host/vm_sys_pin_host.c — host-side impl of the VM's pin syscalls.
+ * ports/vm_sys_sim/vm_sys_pin_sim.c — simulator impl of the VM's pin syscalls.
  *
  * Simulates SETPIN / PIN-read / PIN-write / PWM / SERVO with plain C
  * arrays — no hardware access. vm_sys_pin_reset wipes state on VM
  * runtime reset. Paired with vm_sys_pin.c (device-side impl); the
- * build links exactly one of the two per target.
+ * build links exactly one implementation body per target.
  *
  * Shared helpers (vm_pin_mode_is_pwm, vm_pin_pwm_mode_to_slice_chan,
  * vm_pin_pwm_mode_for_auto, vm_pwm_max_slice) are `static inline` in

@@ -1,13 +1,10 @@
-# Phase B (in progress): pull in the MMBasic core + bytecode VM source list.
-# Mirrors ports/mmbasic_stdio/Makefile's CORE_SRCS / BC_SRCS / CORE_STATE_SRCS,
-# adapted to ESP-IDF's idf_component_register layout.
+# ESP32-S3 Metro main component.
 #
 # All MMBasic source files compile with esp32_platform.h force-included
 # (-include) so MMBASIC_HOST + MMBASIC_ESP32 are set everywhere uniformly.
 #
-# Pico SDK header shims (pico/stdlib.h, hardware/pwm.h etc.) are reused
-# from ports/host_native/{pico,hardware}/ via -I. Same pattern as the
-# WASM port.
+# Remaining Pico SDK compatibility headers are legacy hardware/* shims
+# from ports/host_native. Core/shared code no longer needs pico/stdlib.h.
 
 set(REPO_ROOT  ${CMAKE_CURRENT_LIST_DIR}/../../..)
 set(PORT_DIR   ${CMAKE_CURRENT_LIST_DIR}/..)
@@ -31,6 +28,8 @@ set(CORE_SRCS
     ${REPO_ROOT}/gfx_text_shared.c
     ${REPO_ROOT}/gfx_console_shared.c
     ${REPO_ROOT}/mm_misc_shared.c
+    ${REPO_ROOT}/OptionCommands.c
+    ${REPO_ROOT}/cmd_ws2812_shared.c
 )
 
 set(STATE_SRCS
@@ -63,7 +62,7 @@ set(DRIVER_STUBS
     ${REPO_ROOT}/drivers/psram_heap/psram_heap_stub.c
     ${REPO_ROOT}/drivers/heartbeat/heartbeat_stub.c
     ${REPO_ROOT}/drivers/editor_console/editor_console_stub.c
-    ${REPO_ROOT}/drivers/display_pixel_host/display_pixel_host.c
+    ${REPO_ROOT}/drivers/display_pixel_readbuffer/display_pixel_readbuffer.c
     ${REPO_ROOT}/drivers/fastgfx_minimal/fastgfx_minimal.c
 )
 
@@ -84,16 +83,12 @@ set(BC_SRCS
     ${REPO_ROOT}/vm_sys_input.c
     ${REPO_ROOT}/vm_sys_graphics.c
     ${REPO_ROOT}/vm_sys_time.c
-    # vm_sys_pin / vm_sys_file have host variants that route through
-    # hal_pin / hal_filesystem instead of pulling Pico SDK headers
-    # directly. ESP32 uses the host variants like mmbasic_stdio /
-    # mmbasic_ansi do.
-    ${REPO_ROOT}/ports/host_native/vm_sys_pin_host.c
-    ${REPO_ROOT}/ports/host_native/vm_sys_file_host.c
+    vm_sys_pin_esp32.c
+    ${REPO_ROOT}/vm_sys_file.c
 )
 
-# ESP32 port-local sources. app_main.c keeps the blink for now; will be
-# replaced by an MMBasic_Init() driver once the link goes green.
+# ESP32 port-local sources. Unsupported peripherals are represented by
+# explicit ESP32 stubs here instead of being inherited from host_native.
 set(PORT_LOCAL_SRCS
     app_main.c                              # IDF entry, MMBasic boot, REPL
     esp32_console.c                         # USB Serial/JTAG read/write (raw bytes)
@@ -101,20 +96,22 @@ set(PORT_LOCAL_SRCS
     esp32_system.c                          # CPU RESTART / SLEEP
     esp32_terminal.c                        # VT100 CLS + COLOUR via Draw.c port hooks
     esp32_lfs.c                             # LittleFS over esp_partition_* (A: drive)
-    esp32_flash_storage.c                   # flash_target_* / flash_option_* / flash_range_* / host_options_snapshot
+    esp32_flash_storage.c                   # flash_target_* / flash_option_* / flash_range_* / esp32_options_snapshot
     esp32_compat.c                          # small porting bits
     hal_pin_esp32.c                         # real GPIO/ADC over driver/gpio.h + esp_adc
+    esp32_pin_tables.c                      # Metro GPIO map + GPn codemap
+    hal_ws2812_esp32.c                      # WS2812/SK6812 over ESP32 RMT
     hal_audio_esp32_stub.c
     hal_vm_framebuffer_esp32_stub.c
     hal_time_esp32.c
-    hal_flash_esp32_stub.c
+    hal_random_esp32.c
+    hal_watchdog_esp32_stub.c
+    hal_flash_esp32.c                         # NVS-backed Options; slot persistence still Stage E1
     hal_storage_esp32_stub.c
     hal_filesystem_esp32.c                  # path / dir ops via f_*
     hal_keyboard_esp32_stub.c
-    # D-decouple Step B: minimal ESP32 files to take over symbols
-    # currently sole-provided by host_native. Coexist with
-    # HOST_NATIVE_REUSED via --allow-multiple-definition until Step C
-    # drops host_native from the link entirely.
+    # D-decouple: ESP32 owns the small port surface that was originally
+    # borrowed from host_native during bring-up.
     esp32_default_hooks.c                   # 17 port_* no-ops
     esp32_globals.c                         # 14 tentative-def globals
     esp32_runtime.c                         # 9 VM trampoline / abort hooks + state
@@ -122,13 +119,9 @@ set(PORT_LOCAL_SRCS
     esp32_peripheral_stubs.c                # 117 cmd_/fun_/AES_/GPS_/etc decls
 )
 
-# host_native sources are no longer in the link. The 251-symbol
-# contract surface they used to sole-provide is now owned by the
-# esp32_*.c files in PORT_LOCAL_SRCS above (D-decouple Step B).
-# vm_sys_pin_host.c / vm_sys_file_host.c (the remaining 26 syms) sit
-# below — they're effectively generic shims behind hal_pin / hal_filesystem,
-# usable by any host-shape port; future cleanup can relocate them
-# but they don't carry host-specific semantics.
+# host_native runtime/peripheral sources are no longer in the link. The
+# remaining reference to ports/host_native is legacy hardware/* header
+# shim reuse.
 
 idf_component_register(
     SRCS
@@ -145,14 +138,16 @@ idf_component_register(
         demos/hello.bas
         demos/fizzbuzz.bas
         demos/sieve.bas
+        demos/mand.bas
     INCLUDE_DIRS
         "."
         ${PORT_DIR}
         ${REPO_ROOT}
-        ${REPO_ROOT}/ports/host_native      # Pico SDK header shims
+        ${REPO_ROOT}/ports/host_native      # legacy hardware/* Pico SDK header shims
     REQUIRES
         driver
         esp_adc
+        esp_driver_rmt
         esp_timer
         esp_psram
         nvs_flash
@@ -167,6 +162,9 @@ idf_component_register(
 target_compile_options(${COMPONENT_LIB} PRIVATE
     $<$<COMPILE_LANGUAGE:C>:-include esp32_platform.h>
     -funsigned-char
+    # Preserve legacy tentative-definition merging without allowing
+    # duplicate strong functions through the linker.
+    -fcommon
     -Wno-error
     -Wno-unused-variable
     -Wno-unused-function
@@ -184,15 +182,6 @@ target_compile_definitions(${COMPONENT_LIB} PUBLIC
     BC_SIM_RP2040
 )
 
-# MMBasic uses tentative-definition merging (gui_bcolour, FSerror, etc.):
-# the same global is declared without an initialiser in multiple TUs, and
-# the linker is expected to coalesce them into one symbol. ESP-IDF defaults
-# to -Wl,--warn-common which rejects that. Allow multiple definitions for
-# this component link, same as the mmbasic_stdio Makefile does on host.
-#
-# --wrap=port_drive_check dropped — esp32_cmd_files_hooks.c provides
-# the strong def directly (D-decouple Step C). --allow-multiple-definition
-# stays for tentative-def globals; Step E plans -fcommon as the fix.
-target_link_options(${COMPONENT_LIB} INTERFACE
-    -Wl,--allow-multiple-definition
-)
+# No --wrap and no --allow-multiple-definition here. Per-port hooks must
+# have exactly one strong definition in the ESP32 source list; duplicate
+# functions should fail at link time.

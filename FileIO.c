@@ -36,28 +36,14 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "port_config.h"
 #include "ff.h"
 #include "diskio.h"
-#include "pico/stdlib.h"
 #include "hal/hal_flash.h"
 #include "hal/hal_time.h"
 #include "hal/hal_filesystem.h"
 #include "hal/hal_keyboard.h"
 #include "hal/hal_fatfs_dispatch.h"
 #include <errno.h>
-#include "hardware/regs/addressmap.h"     /* XIP_BASE */
-#include "hardware/irq.h"
-#include "hardware/gpio.h"
-#include "pico/binary_info.h"
-#include "hardware/structs/watchdog.h"
-#include "hardware/watchdog.h"
-#include "hardware/pll.h"
-#include "hardware/clocks.h"
-#include "hardware/structs/pll.h"
-#include "hardware/structs/clocks.h"
 #include "sys/stat.h"
 #include "picojpeg.h"
-#include "hardware/sync.h"
-/* qmi.h (PSRAM controller) is only touched via mmbasic_save/restore_psram_settings
- * in ports/pico_sdk_common/psram_cache.c — not included here anymore. */
 extern const uint8_t *flash_target_contents;
 extern const uint8_t *flash_option_contents;
 extern const uint8_t *SavedVarsFlash;
@@ -73,12 +59,6 @@ int dirflags;
 int GPSfnbr = 0;
 int lfs_FileFnbr=0;
 int FatFSFileSystem=0; //Assume we are using flash file system
-/* PSRAM XIP-cache save/restore moved to
- * ports/pico_sdk_common/psram_cache.c. These externs let FileIO.c call
- * them unconditionally; the bodies no-op on RP2040. */
-extern void mmbasic_save_psram_settings(void);
-extern void mmbasic_restore_psram_settings(void);
-
 /* Per-port hooks for command-level lifecycle quirks that diverge between
  * device (interrupt-driven console, large heap, can SaveContext+InitHeap
  * mid-program) and host (cooperative MMInkey poll, shared bc_alloc heap
@@ -282,19 +262,15 @@ FATFS FatFs;
 struct uFileTable FileTable[MAXOPENFILES + 1];
 volatile BYTE SDCardStat = STA_NOINIT | STA_NODISK;
 int OptionFileErrorAbort = true;
-volatile uint32_t irqs;
-void disable_interrupts_pico(void)
+void fileio_flash_write_begin(void)
 {
-    mmbasic_save_psram_settings();
-    irqs = save_and_disable_interrupts();
+    hal_flash_write_begin();
 }
-void enable_interrupts_pico(void)
+void fileio_flash_write_end(void)
 {
-    mmbasic_restore_psram_settings();
-    restore_interrupts(irqs);
+    hal_flash_write_end();
     SecondsTimer += (hal_time_us_64() / 1000 - mSecTimer);
     mSecTimer = hal_time_us_64() / 1000;
-    irqs = 0;
 }
 void ErrorThrow(int e, int type)
 {
@@ -361,13 +337,13 @@ void MIPS16 cmd_flash(void)
         if(Option.LIBRARY_FLASH_SIZE==MAX_PROG_SIZE )
            k--;
         uSec(250000);
-        disable_interrupts_pico();
+        fileio_flash_write_begin();
         for (int i = 0; i < k; i++)
         {
             uint32_t j = FLASH_TARGET_OFFSET + FLASH_ERASE_SIZE + SAVEDVARS_FLASH_SIZE + (i * MAX_PROG_SIZE);
             hal_flash_erase(j, MAX_PROG_SIZE);
         }
-        enable_interrupts_pico();
+        fileio_flash_write_end();
     }
     else if ((p = checkstring(cmdline, (unsigned char *)"ERASE")))
     {
@@ -377,9 +353,9 @@ void MIPS16 cmd_flash(void)
         if(Option.LIBRARY_FLASH_SIZE==MAX_PROG_SIZE && i==MAXFLASHSLOTS) error("Library is using Slot % ",MAXFLASHSLOTS);
         uint32_t j = FLASH_TARGET_OFFSET + FLASH_ERASE_SIZE + SAVEDVARS_FLASH_SIZE + ((i - 1) * MAX_PROG_SIZE);
         uSec(250000);
-        disable_interrupts_pico();
+        fileio_flash_write_begin();
         hal_flash_erase(j, MAX_PROG_SIZE);
-        enable_interrupts_pico();
+        fileio_flash_write_end();
     }
     else if ((p = checkstring(cmdline, (unsigned char *)"OVERWRITE")))
     {
@@ -389,9 +365,9 @@ void MIPS16 cmd_flash(void)
         if(Option.LIBRARY_FLASH_SIZE==MAX_PROG_SIZE && i==MAXFLASHSLOTS) error("Library is using Slot % ",MAXFLASHSLOTS);
         uint32_t j = FLASH_TARGET_OFFSET + FLASH_ERASE_SIZE + SAVEDVARS_FLASH_SIZE + ((i - 1) * MAX_PROG_SIZE);
         uSec(250000);
-        disable_interrupts_pico();
+        fileio_flash_write_begin();
         hal_flash_erase(j, MAX_PROG_SIZE);
-        enable_interrupts_pico();
+        fileio_flash_write_end();
         j = (MAX_PROG_SIZE >> 2);
         uSec(250000);
         int *pp = (int *)(flash_target_contents + (i - 1) * MAX_PROG_SIZE);
@@ -400,7 +376,7 @@ void MIPS16 cmd_flash(void)
             {
                 error("Erase error");
             }
-        disable_interrupts_pico();
+        fileio_flash_write_begin();
         uint8_t *q = ProgMemory;
         uint8_t *writebuff = GetTempMemory(4096);
         for (int k = 0; k < MAX_PROG_SIZE; k += 4096)
@@ -409,7 +385,7 @@ void MIPS16 cmd_flash(void)
                 writebuff[j] = *q++;
             hal_flash_program(FLASH_TARGET_OFFSET + FLASH_ERASE_SIZE + SAVEDVARS_FLASH_SIZE + ((i - 1) * MAX_PROG_SIZE + k), writebuff, 4096);
         }
-        enable_interrupts_pico();
+        fileio_flash_write_end();
     }
     else if ((p = checkstring(cmdline, (unsigned char *)"LIST")))
     {
@@ -491,18 +467,18 @@ void MIPS16 cmd_flash(void)
 		if(RoundUpK4(fsize)>1024*Option.modbuffsize)error("File too large for modbuffer");
         char *r = GetTempMemory(256);
         uint32_t j = RoundUpK4(TOP_OF_SYSTEM_FLASH);
-        disable_interrupts_pico();
+        fileio_flash_write_begin();
         hal_flash_erase(j, RoundUpK4(fsize));
-        enable_interrupts_pico();
+        fileio_flash_write_end();
         while(!FileEOF(fnbr)) { 
             memset(r,0,256) ;
             for(int i=0;i<256;i++) {
                 if(FileEOF(fnbr))break;
                 r[i] = FileGetChar(fnbr);
             }  
-            disable_interrupts_pico();
+            fileio_flash_write_begin();
             hal_flash_program(j, (uint8_t *)r, 256);
-            enable_interrupts_pico();
+            fileio_flash_write_end();
             routinechecks();
             j+=256;
         }
@@ -533,7 +509,7 @@ void MIPS16 cmd_flash(void)
         int j=MAX_PROG_SIZE/4;
         int *ppp=(int *)(flash_target_contents + (i - 1) * MAX_PROG_SIZE);
         while(j--)if(*ppp++ != 0xFFFFFFFF){
-            enable_interrupts_pico();
+            fileio_flash_write_end();
             error("Flash erase problem");
         }
         for(int k = 0; k < fsize; k++){        // write to the flash byte by byte
@@ -638,7 +614,7 @@ void MIPS16 cmd_flash(void)
         int *erase_p = (int *)(flash_target_contents + (slot - 1) * MAX_PROG_SIZE);
         while (erase_check--) {
             if (*erase_p++ != (int)0xFFFFFFFF) {
-                enable_interrupts_pico();
+                fileio_flash_write_end();
                 FileClose(fnbr);
                 error("Flash erase problem");
             }
@@ -703,9 +679,9 @@ void MIPS16 cmd_flash(void)
         ;
         uint32_t j = FLASH_TARGET_OFFSET + FLASH_ERASE_SIZE + SAVEDVARS_FLASH_SIZE + ((i - 1) * MAX_PROG_SIZE);
         uSec(250000);
-        disable_interrupts_pico();
+        fileio_flash_write_begin();
         hal_flash_erase(j, MAX_PROG_SIZE);
-        enable_interrupts_pico();
+        fileio_flash_write_end();
         j = (MAX_PROG_SIZE >> 2);
         uSec(250000);
         int *pp = (int *)(flash_target_contents + (i - 1) * MAX_PROG_SIZE);
@@ -714,7 +690,7 @@ void MIPS16 cmd_flash(void)
             {
                 error("Erase error");
             }
-        disable_interrupts_pico();
+        fileio_flash_write_begin();
         uint8_t *q = (uint8_t *)ProgMemory;
         uint8_t *writebuff = (uint8_t *)GetTempMemory(4096);
         for (int k = 0; k < MAX_PROG_SIZE; k += 4096)
@@ -723,7 +699,7 @@ void MIPS16 cmd_flash(void)
                 writebuff[j] = *q++;
             hal_flash_program(FLASH_TARGET_OFFSET + FLASH_ERASE_SIZE + SAVEDVARS_FLASH_SIZE + ((i - 1) * MAX_PROG_SIZE + k), (uint8_t *)writebuff, 4096);
         }
-        enable_interrupts_pico();
+        fileio_flash_write_end();
     }
     else if ((p = checkstring(cmdline, (unsigned char *)"LOAD")))
     {
@@ -731,9 +707,9 @@ void MIPS16 cmd_flash(void)
             error("Invalid in program");
         int j = (Option.PROG_FLASH_SIZE >> 2), i = getint(p, 1, MAXFLASHSLOTS);
         if(Option.LIBRARY_FLASH_SIZE==MAX_PROG_SIZE && i==MAXFLASHSLOTS) error("Library is using Slot % ",MAXFLASHSLOTS);
-        disable_interrupts_pico();
+        fileio_flash_write_begin();
         hal_flash_erase(PROGSTART, MAX_PROG_SIZE);
-        enable_interrupts_pico();
+        fileio_flash_write_end();
         j = (MAX_PROG_SIZE >> 2);
         uSec(250000);
         int *pp = (int *)flash_progmemory;
@@ -742,12 +718,12 @@ void MIPS16 cmd_flash(void)
             {
                 error("Erase error");
             }
-        disable_interrupts_pico();
+        fileio_flash_write_begin();
         uint8_t *q = (uint8_t *)(flash_target_contents + (i - 1) * MAX_PROG_SIZE);
         uint8_t *writebuff = GetTempMemory(4096);
         if (*q == 0xFF)
         {
-            enable_interrupts_pico();
+            fileio_flash_write_end();
             FlashWriteInit(PROGRAM_FLASH);
             hal_flash_erase(realflashpointer, MAX_PROG_SIZE);
             FlashWriteByte(0);
@@ -762,7 +738,7 @@ void MIPS16 cmd_flash(void)
                 writebuff[j] = *q++;
             hal_flash_program((PROGSTART + k), writebuff, 4096);
         }
-        enable_interrupts_pico();
+        fileio_flash_write_end();
         FlashLoad = 0;
     }
     else if ((p = checkstring(cmdline, (unsigned char *)"CHAIN")))
@@ -1524,7 +1500,7 @@ void MIPS16 cmd_name(void)
     hal_path_with_drive(qnew_d, sizeof(qnew_d), qnew);
     ErrorCheckHAL(hal_fs_rename(qold_d, qnew_d));
 }
-extern uint64_t __uninitialized_ram(_persistent);
+extern uint64_t _persistent;
 void MIPS16 cmd_save(void)
 {
     int fnbr;
@@ -1849,6 +1825,8 @@ void MIPS16 cmd_save(void)
         p = getFstring(cmdline); // get the file name and change to the directory
         if (strchr((char *)p, '.') == NULL)
             strcat((char *)p, ".bas");
+        if (*ProgMemory != T_NEWLINE)
+            error("No program");
         if (!BasicFileOpen((char *)p, fnbr, FA_WRITE | FA_CREATE_ALWAYS))
             return;
         p = ProgMemory;
@@ -2094,7 +2072,7 @@ static off_t hal_size_of(int fnbr)
     return sz < 0 ? 0 : sz;
 }
 
-char __not_in_flash_func(FileGetChar)(int fnbr)
+char HAL_PORT_MMBASIC_HOT_FUNC(FileGetChar)(int fnbr)
 {
     hal_fs_fd_t fd = hal_fds[fnbr];
     if (!fd) return 0;
@@ -2104,7 +2082,7 @@ char __not_in_flash_func(FileGetChar)(int fnbr)
     return (char)r;
 }
 
-char __not_in_flash_func(FilePutChar)(char c, int fnbr)
+char HAL_PORT_MMBASIC_HOT_FUNC(FilePutChar)(char c, int fnbr)
 {
     hal_fs_fd_t fd = hal_fds[fnbr];
     if (!fd) return 0;
@@ -3927,13 +3905,13 @@ void ResetAllFlash(void)
 {
     ResetOptions(true);
     ClearSavedVars();
-    disable_interrupts_pico();
+    fileio_flash_write_begin();
     for (int i = 0; i < MAXFLASHSLOTS + 1; i++)
     {
         uint32_t j = FLASH_TARGET_OFFSET + FLASH_ERASE_SIZE + SAVEDVARS_FLASH_SIZE + (i * MAX_PROG_SIZE);
         hal_flash_erase(j, MAX_PROG_SIZE);
     }
-    enable_interrupts_pico();
+    fileio_flash_write_end();
     FlashWriteInit(PROGRAM_FLASH);
     hal_flash_erase(realflashpointer, MAX_PROG_SIZE);
     FlashWriteByte(0);
@@ -3954,7 +3932,7 @@ void FlashWriteInit(int region)
         realflashpointer = (uint32_t)(PROGSTART - MAX_PROG_SIZE);  //i.e the last slot  
     else 
         realflashpointer = (uint32_t)PROGSTART - MAX_PROG_SIZE*(MAXFLASHSLOTS-region+1);
-    disable_interrupts_pico();
+    fileio_flash_write_begin();
 }
 void FlashWriteBlock(void)
 {
@@ -4012,7 +3990,7 @@ void FlashWriteClose(void)
     {
         FlashWriteByte(0xff);
     }
-    enable_interrupts_pico();
+    fileio_flash_write_end();
 }
 /*  @endcond */
 
@@ -4212,7 +4190,7 @@ void MIPS16 cmd_var(void)
                 nbr *= sizeof(MMFLOAT);
             if (type & T_INT)
                 nbr *= sizeof(long long int);
-            if ((uint32_t)realflashpointer + XIP_BASE - (uint32_t)SavedVarsFlash + 36 + nbr > SAVEDVARS_FLASH_SIZE)
+            if (realflashpointer - (FLASH_TARGET_OFFSET + FLASH_ERASE_SIZE) + 36 + nbr > SAVEDVARS_FLASH_SIZE)
             {
                 FlashWriteClose();
                 error("Not enough memory");
@@ -4244,16 +4222,16 @@ void MIPS16 cmd_var(void)
 void ClearSavedVars(void)
 {
     uSec(250000);
-    disable_interrupts_pico();
+    fileio_flash_write_begin();
     hal_flash_erase(FLASH_TARGET_OFFSET + FLASH_ERASE_SIZE, SAVEDVARS_FLASH_SIZE);
-    enable_interrupts_pico();
+    fileio_flash_write_end();
     uSec(10000);
 }
 void SaveOptions(void)
 {
     uSec(100000);
-    disable_interrupts_pico();
+    fileio_flash_write_begin();
     hal_flash_write_options(&Option, sizeof(struct option_s));
-    enable_interrupts_pico();
+    fileio_flash_write_end();
 }
 /*  @endcond */

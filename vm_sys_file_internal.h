@@ -1,9 +1,10 @@
 /*
  * vm_sys_file_internal.h — shared helpers used by both the device
- * body (vm_sys_file.c) and the host body (host/vm_sys_file_host.c).
+ * body (vm_sys_file.c) and the simulator body
+ * (ports/vm_sys_sim/vm_sys_file_sim.c).
  *
  * Same split pattern as vm_sys_pin_internal.h. The build system
- * links exactly one of vm_sys_file.c / host/vm_sys_file_host.c per
+ * links exactly one VM file syscall body per
  * target; each TU gets its own inline copies of the helpers, so
  * there are no cross-file linkage constraints.
  */

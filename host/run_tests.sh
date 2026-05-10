@@ -161,6 +161,19 @@ if [ $FAILED -gt 0 ]; then
     exit 1
 fi
 
+VM_PIN_MODE_TOOL="$(cd "$(dirname "$0")/.." && pwd)/tools/check_vm_pin_modes.sh"
+if [ -x "$VM_PIN_MODE_TOOL" ]; then
+    if ! "$VM_PIN_MODE_TOOL" > /tmp/vm_pin_modes.$$.log 2>&1; then
+        cat /tmp/vm_pin_modes.$$.log
+        rm -f /tmp/vm_pin_modes.$$.log
+        echo ""
+        echo "VM pin-mode helper check FAILED."
+        exit 1
+    fi
+    rm -f /tmp/vm_pin_modes.$$.log
+    echo "VM pin-mode helper: clean"
+fi
+
 # HAL purity gate. Skip with SKIP_HAL_PURITY=1 for quick iteration; never skip in CI.
 if [ "${SKIP_HAL_PURITY:-0}" != "1" ]; then
     echo ""

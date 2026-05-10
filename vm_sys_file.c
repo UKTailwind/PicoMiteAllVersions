@@ -2,9 +2,9 @@
  * vm_sys_file.c — device-side impl of the VM file syscalls.
  *
  * Drives FatFS (ff.c) over the SD-card HAL. Paired with
- * host/vm_sys_file_host.c (which uses the in-memory FAT simulator
- * from host/vm_host_fat.c); the build links exactly one of the two
- * per target. Shared helpers (vm_file_line_append, drive-spec
+ * ports/vm_sys_sim/vm_sys_file_sim.c (which uses the in-memory FAT
+ * simulator); the build links exactly one of the two per target.
+ * Shared helpers (vm_file_line_append, drive-spec
  * parser, path normaliser) are `static inline` in
  * vm_sys_file_internal.h.
  */
@@ -468,4 +468,3 @@ void vm_sys_file_copy(const char *from_name, const char *to_name, int mode) {
     lfs_file_close(&lfs, &lfs_dst);
     if (lrc < 0 || FSerror) vm_file_error(lrc < 0 ? lrc : FSerror, "File error");
 }
-

@@ -194,20 +194,20 @@ void MIPS16 initFonts(void){
 	FontTable[14] = NULL;
 	FontTable[15] = NULL;
 }
-uint16_t __not_in_flash_func(RGB565)(uint32_t c){
+uint16_t HAL_PORT_MMBASIC_HOT_FUNC(RGB565)(uint32_t c){
     return ((c >> 16) & 0b11111000) | ((c >> 13) & 0b00000111) | ((c << 3) & 0b1110000000000000) |  ((c << 5) & 0b0001111100000000);
 }
 
-uint16_t __not_in_flash_func(RGB555)(uint32_t c){
+uint16_t HAL_PORT_MMBASIC_HOT_FUNC(RGB555)(uint32_t c){
     return ((c & 0xf8)>>3) | ((c& 0xf800)>>6) | ((c & 0xf80000)>>9);
 }
-uint8_t __not_in_flash_func(RGB332)(uint32_t c){
+uint8_t HAL_PORT_MMBASIC_HOT_FUNC(RGB332)(uint32_t c){
     return ((c & 0b111000000000000000000000)>>16) | ((c & 0b1110000000000000)>>11) | ((c & 0b11000000)>>6);
 }
-uint8_t __not_in_flash_func(RGB121)(uint32_t c){
+uint8_t HAL_PORT_MMBASIC_HOT_FUNC(RGB121)(uint32_t c){
     return ((c & 0x800000)>> 20) | ((c & 0xC000)>>13) | ((c & 0x80)>>7);
 }
-uint16_t __not_in_flash_func(RGB121pack)(uint32_t c){
+uint16_t HAL_PORT_MMBASIC_HOT_FUNC(RGB121pack)(uint32_t c){
     return (RGB121(c)<<12) | (RGB121(c)<<8) | (RGB121(c)<<4) | RGB121(c);
 }
 /*  @endcond */
@@ -5891,14 +5891,27 @@ void SetFont(int fnt) {
     gui_font = fnt;
 }
 
+extern void port_apply_default_console_colors(int default_fc, int default_bc);
 
-void MIPS16 ResetDisplay(void) {
+void ApplyDefaultConsoleColours(void) {
     SetFont(Option.DefaultFont);
     gui_fcolour = Option.DefaultFC;
     gui_bcolour = Option.DefaultBC;
     PromptFont = Option.DefaultFont;
     PromptFC = Option.DefaultFC;
     PromptBC = Option.DefaultBC;
+    port_apply_default_console_colors(Option.DefaultFC, Option.DefaultBC);
+}
+
+void ApplyPromptConsoleColours(void) {
+    SetFont(PromptFont);
+    gui_fcolour = PromptFC;
+    gui_bcolour = PromptBC;
+    port_terminal_emit_colour(gui_fcolour, gui_bcolour, 1);
+}
+
+void MIPS16 ResetDisplay(void) {
+    ApplyDefaultConsoleColours();
     /* On VGA this fills in HRes/VRes/ScreenSize and rewires the
      * function-pointer dispatch table per SCREENMODE. No-op on
      * non-VGA; GUICONTROLS builds fall through to ResetGUI. */

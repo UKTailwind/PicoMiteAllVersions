@@ -30,7 +30,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "pico/stdlib.h"
 #include "hardware/clocks.h"
 #include <time.h>
-#include "picomite_gpio_irq.h"
+#include "pico_gpio_irq.h"
 //#include "upng.h"
 #include <complex.h>
 #include "pico/bootrom.h"
@@ -45,6 +45,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "hal/hal_pin.h"
 #include "hal/hal_keyboard.h"
 #include "hal/hal_gui_controls.h"
+#include "hal/hal_watchdog.h"
 #include "hardware/regs/addressmap.h"     /* XIP_BASE */
 #include "hardware/spi.h"
 #include "hardware/pio.h"
@@ -53,6 +54,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "xregex.h"
 #include "hardware/structs/pwm.h"
 #include "aes.h"
+#include "OptionCommands.h"
 
 /* PicoCalc HW hooks — real impls in ports/pico_sdk_common/picocalc_features.c
  * (PICOCALC builds) and host/host_runtime.c (host stubs). */
@@ -495,7 +497,7 @@ void MIPS16 cmd_library(void) {
        
         int *ppp=(int *)(flash_progmemory - MAX_PROG_SIZE);
         while(i--)if(*ppp++ != 0xFFFFFFFF){
-            enable_interrupts_pico();
+            fileio_flash_write_end();
             error("Flash erase problem");
         }
    
@@ -536,10 +538,10 @@ void MIPS16 cmd_library(void) {
        
         int *ppp=(int *)(flash_progmemory - MAX_PROG_SIZE);
         while(i--)if(*ppp++ != 0xFFFFFFFF){
-            enable_interrupts_pico();
+            fileio_flash_write_end();
             error("Flash erase problem");
         }
-        enable_interrupts_pico();
+        fileio_flash_write_end();
 
         Option.LIBRARY_FLASH_SIZE= 0;
         SaveOptions();
@@ -627,7 +629,7 @@ void MIPS16 cmd_library(void) {
         int i=MAX_PROG_SIZE/4;
         int *ppp=(int *)(flash_progmemory - MAX_PROG_SIZE);
         while(i--)if(*ppp++ != 0xFFFFFFFF){
-            enable_interrupts_pico();
+            fileio_flash_write_end();
             error("Flash erase problem");
         }
         for(int k = 0; k < fsize; k++){        // write to the flash byte by byte
@@ -995,142 +997,10 @@ void cmd_configure(void){
 }
 void MIPS16 cmd_option(void) {
     unsigned char *tp;
+
+    if (option_command_handle_common(cmdline, true)) return;
  
-	tp = checkstring(cmdline, (unsigned char *)"NOCHECK");
-	if(tp) {
-		if(checkstring(tp, (unsigned char *)"ON"))	{ OptionNoCheck=true; return; }
-		if(checkstring(tp, (unsigned char *)"OFF"))	{ OptionNoCheck=false; return; }
-        return;
-	}
-
-    tp = checkstring(cmdline, (unsigned char *)"BASE");
-    if(tp) {
-        if(g_DimUsed) error("Must be before DIM or LOCAL");
-        g_OptionBase = getint(tp, 0, 1);
-        return;
-    }
-
-    tp = checkstring(cmdline, (unsigned char *)"EXPLICIT");
-    if(tp) {
-        OptionExplicit = true;
-        return;
-    }
-	tp = checkstring(cmdline, (unsigned char *)"ANGLE");
-	if(tp) {
-		if(checkstring(tp, (unsigned char *)"DEGREES"))	{ optionangle=RADCONV; useoptionangle=true;return; }
-		if(checkstring(tp, (unsigned char *)"RADIANS"))	{ optionangle=1.0; useoptionangle=false; return; }
-	}
-	tp = checkstring(cmdline, (unsigned char *)"FAST AUDIO");
-	if(tp) {
-		if(checkstring(tp, (unsigned char *)"OFF"))	{ optionfastaudio=0; return; }
-		if(checkstring(tp, (unsigned char *)"ON"))	{ optionfastaudio=1; return; }
-	}
-	tp = checkstring(cmdline, (unsigned char *)"MILLISECONDS");
-	if(tp) {
-		if(checkstring(tp, (unsigned char *)"OFF"))	{ optionfulltime=0; return; }
-		if(checkstring(tp, (unsigned char *)"ON"))	{ optionfulltime=1; return; }
-	}
-
     if (port_lcd320_option_setter(cmdline)) return;
-    tp = checkstring(cmdline, (unsigned char *)"ESCAPE");
-    if(tp) {
-        OptionEscape = true;
-        return;
-    }
-    tp = checkstring(cmdline, (unsigned char *)"CONSOLE");
-    if(tp) {
-        if(checkstring(tp,(unsigned char *) "BOTH"))OptionConsole=3;
-        else if(checkstring(tp,(unsigned char *) "SERIAL"))OptionConsole=1;
-        else if(checkstring(tp,(unsigned char *) "SCREEN"))OptionConsole=2;
-        else if(checkstring(tp,(unsigned char *) "NONE"))OptionConsole=0;
-        else error("Syntax");
-        return;
-    }
-    tp = checkstring(cmdline, (unsigned char *)"DEFAULT");
-    if(tp) {
-        if(checkstring(tp,(unsigned char *) "INTEGER"))  { DefaultType = T_INT;  return; }
-        if(checkstring(tp,(unsigned char *) "FLOAT"))    { DefaultType = T_NBR;  return; }
-        if(checkstring(tp, (unsigned char *)"STRING"))   { DefaultType = T_STR;  return; }
-        if(checkstring(tp, (unsigned char *)"NONE"))     { DefaultType = T_NOTYPE;   return; }
-    }
-
-	tp = checkstring(cmdline, (unsigned char *)"LOGGING");
-	if(tp) {
-		if(checkstring(tp, (unsigned char *)"OFF"))	{ optionlogging=0; return; }
-		if(checkstring(tp, (unsigned char *)"ON"))	{ optionlogging=1; return; }
-	}
-
-    tp = checkstring(cmdline, (unsigned char *)"BREAK");
-    if(tp) {
-        BreakKey = getinteger(tp);
-        return;
-    }
-    tp = checkstring(cmdline, (unsigned char *)"F1");
-	if(tp) {
-		char p[STRINGSIZE];
-		strcpy(p,(char *)getCstring(tp));
-		if(strlen(p)>=sizeof(Option.F1key))error("Maximum 63 characters");
-		else strcpy((char *)Option.F1key, p);
-		SaveOptions();
-		return;
-	}
-    tp = checkstring(cmdline, (unsigned char *)"F5");
-	if(tp) {
-		char p[STRINGSIZE];
-		strcpy(p,(char *)getCstring(tp));
-		if(strlen(p)>=sizeof(Option.F5key))error("Maximum % characters",MAXKEYLEN-1);
-		else strcpy((char *)Option.F5key, p);
-		SaveOptions();
-		return;
-	}
-    tp = checkstring(cmdline, (unsigned char *)"F6");
-	if(tp) {
-		char p[STRINGSIZE];
-		strcpy(p,(char *)getCstring(tp));
-		if(strlen(p)>=sizeof(Option.F6key))error("Maximum % characters",MAXKEYLEN-1);
-		else strcpy((char *)Option.F6key, p);
-		SaveOptions();
-		return;
-	}
-    tp = checkstring(cmdline, (unsigned char *)"F7");
-	if(tp) {
-		char p[STRINGSIZE];
-		strcpy(p,(char *)getCstring(tp));
-		if(strlen(p)>=sizeof(Option.F7key))error("Maximum % characters",MAXKEYLEN-1);
-		else strcpy((char *)Option.F7key, p);
-		SaveOptions();
-		return;
-	}
-    tp = checkstring(cmdline, (unsigned char *)"F8");
-	if(tp) {
-		char p[STRINGSIZE];
-		strcpy(p,(char *)getCstring(tp));
-		if(strlen(p)>=sizeof(Option.F8key))error("Maximum % characters",MAXKEYLEN-1);
-		else strcpy((char *)Option.F8key, p);
-		SaveOptions();
-		return;
-	}
-    tp = checkstring(cmdline, (unsigned char *)"F9");
-	if(tp) {
-		char p[STRINGSIZE];
-		strcpy(p,(char *)getCstring(tp));
-		if(strlen(p)>=sizeof(Option.F9key))error("Maximum % characters",MAXKEYLEN-1);
-		else strcpy((char *)Option.F9key, p);
-		SaveOptions();
-		return;
-	}
-    tp = checkstring(cmdline, (unsigned char *)"PLATFORM");
-	if(tp) {
-		char p[STRINGSIZE];
-		strcpy(p,(char *)getCstring(tp));
-		if(strlen(p)>=sizeof(Option.platform))error("Maximum % characters",sizeof(Option.platform)-1);
-		else {
-            if(checkstring((unsigned char *)p,(unsigned char *) "GAMEMITE"))  strcpy((char *)Option.platform, "Game*Mite");
-            else strcpy((char *)Option.platform, p);
-        }
-		SaveOptions();
-		return;
-	}
     if (port_misc_option_setter(cmdline)) return;
     if (port_keyboard_option_setter(cmdline)) return;
 
@@ -1201,70 +1071,7 @@ void MIPS16 cmd_option(void) {
         }  
     }
 
-    tp = checkstring(cmdline, (unsigned char *)"AUTORUN");
-    if(tp) {
-        getargs(&tp,3,(unsigned char *)",");
-		Option.NoReset=0;
-        if(argc==3){
-            if(checkstring(argv[2], (unsigned char *)"NORESET"))Option.NoReset=1;
-            else error("Syntax");
-        }
-        if(checkstring(argv[0], (unsigned char *)"OFF"))      { Option.Autorun = 0; SaveOptions(); return;  }
-        if(checkstring(argv[0], (unsigned char *)"ON"))      { Option.Autorun = MAXFLASHSLOTS+1; SaveOptions(); return;  }
-        Option.Autorun=getint(argv[0],0,MAXFLASHSLOTS);
-        SaveOptions(); return; 
-    } 
     if (port_pico_pins_option_setter(cmdline)) return;
-tp = checkstring(cmdline, (unsigned char *)"DEFAULT COLOURS");
-if(tp==NULL)tp = checkstring(cmdline, (unsigned char *)"DEFAULT COLORS");
-if(tp){
-    int DefaultFC=WHITE;
-    int DefaultBC=BLACK;
-    getargs(&tp,3, (unsigned char *)",");
-    if(checkstring(argv[0], (unsigned char *)"WHITE"))        { DefaultFC=WHITE;}
-    else if(checkstring(argv[0], (unsigned char *)"YELLOW"))  { DefaultFC=YELLOW;}
-    else if(checkstring(argv[0], (unsigned char *)"LILAC"))   { DefaultFC=LILAC;}
-    else if(checkstring(argv[0], (unsigned char *)"BROWN"))   { DefaultFC=BROWN;}
-    else if(checkstring(argv[0], (unsigned char *)"FUCHSIA")) { DefaultFC=FUCHSIA;}
-    else if(checkstring(argv[0], (unsigned char *)"RUST"))    { DefaultFC=RUST;}
-    else if(checkstring(argv[0], (unsigned char *)"MAGENTA")) { DefaultFC=MAGENTA;}
-    else if(checkstring(argv[0], (unsigned char *)"RED"))     { DefaultFC=RED;}
-    else if(checkstring(argv[0], (unsigned char *)"CYAN"))    { DefaultFC=CYAN;}
-    else if(checkstring(argv[0], (unsigned char *)"GREEN"))   { DefaultFC=GREEN;}
-    else if(checkstring(argv[0], (unsigned char *)"CERULEAN")){ DefaultFC=CERULEAN;}
-    else if(checkstring(argv[0], (unsigned char *)"MIDGREEN")){ DefaultFC=MIDGREEN;}
-    else if(checkstring(argv[0], (unsigned char *)"COBALT"))  { DefaultFC=COBALT;}
-    else if(checkstring(argv[0], (unsigned char *)"MYRTLE"))  { DefaultFC=MYRTLE;}
-    else if(checkstring(argv[0], (unsigned char *)"BLUE"))    { DefaultFC=BLUE;}
-    else if(checkstring(argv[0], (unsigned char *)"BLACK"))   { DefaultFC=BLACK;}
-    else error("Invalid colour: $", argv[0]); 
-    if(argc==3){
-        if(checkstring(argv[2], (unsigned char *)"WHITE"))        { DefaultBC=WHITE;}
-        else if(checkstring(argv[2], (unsigned char *)"YELLOW"))  { DefaultBC=YELLOW;}
-        else if(checkstring(argv[2], (unsigned char *)"LILAC"))   { DefaultBC=LILAC;}
-        else if(checkstring(argv[2], (unsigned char *)"BROWN"))   { DefaultBC=BROWN;}
-        else if(checkstring(argv[2], (unsigned char *)"FUCHSIA")) { DefaultBC=FUCHSIA;}
-        else if(checkstring(argv[2], (unsigned char *)"RUST"))    { DefaultBC=RUST;}
-        else if(checkstring(argv[2], (unsigned char *)"MAGENTA")) { DefaultBC=MAGENTA;}
-        else if(checkstring(argv[2], (unsigned char *)"RED"))     { DefaultBC=RED;}
-        else if(checkstring(argv[2], (unsigned char *)"CYAN"))    { DefaultBC=CYAN;}
-        else if(checkstring(argv[2], (unsigned char *)"GREEN"))   { DefaultBC=GREEN;}
-        else if(checkstring(argv[2], (unsigned char *)"CERULEAN")){ DefaultBC=CERULEAN;}
-        else if(checkstring(argv[2], (unsigned char *)"MIDGREEN")){ DefaultBC=MIDGREEN;}
-        else if(checkstring(argv[2], (unsigned char *)"COBALT"))  { DefaultBC=COBALT;}
-        else if(checkstring(argv[2], (unsigned char *)"MYRTLE"))  { DefaultBC=MYRTLE;}
-        else if(checkstring(argv[2], (unsigned char *)"BLUE"))    { DefaultBC=BLUE;}
-        else if(checkstring(argv[2], (unsigned char *)"BLACK"))   { DefaultBC=BLACK;}
-        else error("Invalid colour: $", argv[2]); 
-    }      
-    if(DefaultBC==DefaultFC)error("Foreground and Background colours are the same");
-    Option.DefaultBC=DefaultBC;
-    Option.DefaultFC=DefaultFC;
-    SaveOptions();
-    ResetDisplay();
-    if(Option.DISPLAY_TYPE!=SCREENMODE1)ClearScreen(gui_bcolour);
-    return;
-}
     if (port_heartbeat_option_setter(cmdline)) return;
     tp = checkstring(cmdline, (unsigned char *)"LCDPANEL NOCONSOLE");
     if(tp){
@@ -1362,35 +1169,7 @@ if(tp){
     if (port_web_option_setter(cmdline)) return;
 
     if (port_display_option_setter(cmdline)) return;
-    tp = checkstring(cmdline, (unsigned char *)"DISPLAY");
-    if(tp) {
-        getargs(&tp, 3, (unsigned char *)",");
-        if(Option.DISPLAY_CONSOLE && argc>0 ) error("Cannot change LCD console");
-        if(argc >= 1) Option.Height = getint(argv[0], 5, 100);
-        if(argc == 3) Option.Width = getint(argv[2], 37, 240);
-        if (Option.DISPLAY_CONSOLE) {
-           setterminal((Option.Height > SCREENHEIGHT)?Option.Height:SCREENHEIGHT,(Option.Width > SCREENWIDTH)?Option.Width:SCREENWIDTH);                                                    // or height is > 24
-        }else{
-           setterminal(Option.Height,Option.Width);
-        }
-        if(argc >= 1 )SaveOptions();  //Only save if necessary
-        return;
-    }
     if (hal_gui_controls_option_set(cmdline)) return;
-    tp = checkstring(cmdline, (unsigned char *)"CASE");
-    if(tp) {
-        if(checkstring(tp, (unsigned char *)"LOWER"))    { Option.Listcase = CONFIG_LOWER; SaveOptions(); return; }
-        if(checkstring(tp, (unsigned char *)"UPPER"))    { Option.Listcase = CONFIG_UPPER; SaveOptions(); return; }
-        if(checkstring(tp, (unsigned char *)"TITLE"))    { Option.Listcase = CONFIG_TITLE; SaveOptions(); return; }
-    }
-
-    tp = checkstring(cmdline, (unsigned char *)"TAB");
-    if(tp) {
-        if(checkstring(tp, (unsigned char *)"2"))        { Option.Tab = 2; SaveOptions(); return; }
-		if(checkstring(tp, (unsigned char *)"3"))		{ Option.Tab = 3; SaveOptions(); return; }
-        if(checkstring(tp, (unsigned char *)"4"))        { Option.Tab = 4; SaveOptions(); return; }
-        if(checkstring(tp, (unsigned char *)"8"))        { Option.Tab = 8; SaveOptions(); return; }
-    }
     tp = checkstring(cmdline, (unsigned char *)"VCC");
     if(tp) {
         MMFLOAT f;
@@ -1424,28 +1203,11 @@ if(tp){
         return;
     }
 
-    tp = checkstring(cmdline, (unsigned char *)"COLOURCODE");
-    if(tp == NULL) tp = checkstring(cmdline, (unsigned char *)"COLORCODE");
-    if(tp) {
-        if(checkstring(tp, (unsigned char *)"ON"))       { Option.ColourCode = true; SaveOptions(); return; }
-        else if(checkstring(tp, (unsigned char *)"OFF"))      { Option.ColourCode = false; SaveOptions(); return;  }
-        else error("Syntax");
-    }
-
     tp = checkstring(cmdline, (unsigned char *)"RTC AUTO");
     if(tp) {
         if(checkstring(tp, (unsigned char *)"ENABLE"))       { Option.RTC = true; SaveOptions(); RtcGetTime(0); return; }
         if(checkstring(tp, (unsigned char *)"DISABLE"))      { Option.RTC = false; SaveOptions(); return;  }
     }
-    tp = checkstring(cmdline, (unsigned char *)"CONTINUATION LINES");
-    if(tp) {
-        if(checkstring(tp, (unsigned char *)"ENABLE"))       { Option.continuation = '_'; SaveOptions(); return; }
-        else if(checkstring(tp, (unsigned char *)"DISABLE"))      { Option.continuation = false; SaveOptions(); return;  }
-        else if(checkstring(tp, (unsigned char *)"ON"))      { Option.continuation = '_'; SaveOptions(); return;  }
-        else if(checkstring(tp, (unsigned char *)"OFF"))      { Option.continuation = false; SaveOptions(); return;  }
-        else error("Syntax");
-    }
-
     tp = checkstring(cmdline, (unsigned char *)"MODBUFF");
     if(tp) {
         unsigned char *p=NULL;
@@ -1732,22 +1494,22 @@ if(tp){
     tp = checkstring(cmdline, (unsigned char *)"COUNT");
     if(tp) {
         int pin1,pin2,pin3,pin4;
-        if(CallBackEnabled==2) picomite_gpio_irq_set_enabled(PinDef[Option.INT1pin].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
+        if(CallBackEnabled==2) pico_gpio_irq_set_enabled(PinDef[Option.INT1pin].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
         else if(CallBackEnabled & 2){
             hal_pin_irq_set_edge(PinDef[Option.INT1pin].GPno, HAL_PIN_EDGE_BOTH, false);
             CallBackEnabled &= (~2);
         }
-        if(CallBackEnabled==4) picomite_gpio_irq_set_enabled(PinDef[Option.INT2pin].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
+        if(CallBackEnabled==4) pico_gpio_irq_set_enabled(PinDef[Option.INT2pin].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
         else if(CallBackEnabled & 4){
             hal_pin_irq_set_edge(PinDef[Option.INT2pin].GPno, HAL_PIN_EDGE_BOTH, false);
             CallBackEnabled &= (~4);
         }
-        if(CallBackEnabled==8) picomite_gpio_irq_set_enabled(PinDef[Option.INT3pin].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
+        if(CallBackEnabled==8) pico_gpio_irq_set_enabled(PinDef[Option.INT3pin].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
         else  if(CallBackEnabled & 8){
             hal_pin_irq_set_edge(PinDef[Option.INT3pin].GPno, HAL_PIN_EDGE_BOTH, false);
             CallBackEnabled &= (~8);
         }
-        if(CallBackEnabled==16) picomite_gpio_irq_set_enabled(PinDef[Option.INT4pin].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
+        if(CallBackEnabled==16) pico_gpio_irq_set_enabled(PinDef[Option.INT4pin].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
         else  if(CallBackEnabled & 16){
             hal_pin_irq_set_edge(PinDef[Option.INT4pin].GPno, HAL_PIN_EDGE_BOTH, false);
             CallBackEnabled &= (~16);
@@ -1886,9 +1648,9 @@ if(tp){
         Option.Magic=MagicKey; //This isn't ideal but it improves the chances of a older config working in a new build
         FileClose(fnbr);
         uSec(100000);
-        disable_interrupts_pico();
+        fileio_flash_write_begin();
         hal_flash_write_options(&Option, sizeof(struct option_s));
-        enable_interrupts_pico();
+        fileio_flash_write_end();
         _excep_code = RESET_COMMAND;
         SoftReset();
     }
@@ -1898,9 +1660,9 @@ if(tp){
         if(Option.LIBRARY_FLASH_SIZE==MAX_PROG_SIZE) {
           uint32_t j = FLASH_TARGET_OFFSET + FLASH_ERASE_SIZE + SAVEDVARS_FLASH_SIZE + ((MAXFLASHSLOTS - 1) * MAX_PROG_SIZE);
           uSec(250000);
-          disable_interrupts_pico();
+          fileio_flash_write_begin();
           hal_flash_erase(j, MAX_PROG_SIZE);
-          enable_interrupts_pico();
+          fileio_flash_write_end();
         }
         configure(tp);
         return;
@@ -2634,11 +2396,11 @@ void cmd_watchdog(void) {
 
     if((p=checkstring(cmdline, (unsigned char *)"HW"))){
         if(checkstring(p, (unsigned char *)"OFF") != NULL) {
-            hw_clear_bits(&watchdog_hw->ctrl, WATCHDOG_CTRL_ENABLE_BITS);
+            hal_watchdog_disable();
             _excep_code=0;
         } else {
             i = getint(p,1,8331);
-            watchdog_enable(i,1);
+            hal_watchdog_enable_ms(i,1);
             _excep_code=POSSIBLE_WATCHDOG;
         }
     
@@ -2819,7 +2581,7 @@ unsigned int GetCFunAddr(int *ip, int i,unsigned char *offset) {
 
 
 // utility function used by fun_peek() to validate an address
-unsigned int __not_in_flash_func(GetPeekAddr)(unsigned char *p) {
+unsigned int HAL_PORT_MMBASIC_HOT_FUNC(GetPeekAddr)(unsigned char *p) {
     unsigned int i;
     i = getinteger(p);
 //    if(!PEEKRANGE(i)) error("Address");
@@ -3226,7 +2988,7 @@ GotAnInterrupt:
     nextstmt = (unsigned char *)intaddr;                                             // the next command will be in the interrupt routine
     return 1;
 }
-int __not_in_flash_func(check_interrupt)(void) {
+int HAL_PORT_MMBASIC_HOT_FUNC(check_interrupt)(void) {
     hal_gui_controls_periodic();
     hal_keyboard_service();
 

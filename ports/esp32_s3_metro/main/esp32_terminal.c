@@ -40,3 +40,7 @@ void port_terminal_emit_colour(int fg, int bg, int has_bg) {
         emit(buf);
     }
 }
+
+void port_apply_default_console_colors(int default_fc, int default_bc) {
+    port_terminal_emit_colour(default_fc, default_bc, 1);
+}

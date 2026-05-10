@@ -1,18 +1,12 @@
 /*
  * esp32_compat.c — small porting bits with no obvious category:
  *
- *   - host_time_us_64 / host_sleep_us: aliases the host_runtime layer
- *     expects from a sibling time TU.
  *   - timegm: GNU/BSD extension that newlib on Xtensa doesn't expose.
  *     GPS.h calls into it via the host_platform.h rename trick.
  *   - flash_prog_buf: RAM-backed mirror of the program-memory region.
  *     Replaced by an esp_partition-backed impl in a later phase.
- *   - host_framebuffer_* / host_fb_* / MX470Display / DisplayPutS /
- *     host_runtime_get_pixel / load_basic_source: no-op stubs for
- *     symbols only meaningful on ports that have a display or REPL
- *     loader of their own.
- *   - cmd_framebuffer / cmd_fastgfx: error stubs for BASIC commands
- *     that need a framebuffer this port doesn't have.
+ *   - cmd_framebuffer: error stub for a BASIC command that needs a
+ *     framebuffer this port doesn't have.
  */
 
 #include <stdint.h>
@@ -20,27 +14,9 @@
 #include <string.h>
 #include <time.h>
 #include "esp_timer.h"
-#include "esp_rom_sys.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
 
 #include "MMBasic_Includes.h"
-
-/* ---- time aliases ---- */
-
-uint64_t host_time_us_64(void) {
-    return (uint64_t)esp_timer_get_time();
-}
-
-void host_sleep_us(uint64_t us) {
-    if (us < 1000) {
-        esp_rom_delay_us((uint32_t)us);
-    } else {
-        TickType_t t = pdMS_TO_TICKS((us + 999) / 1000);
-        if (!t) t = 1;
-        vTaskDelay(t);
-    }
-}
+#include "hal/hal_time.h"
 
 /* ---- timegm: defined as the underlying libc symbol after host_platform.h
  * has macro-renamed user calls to mmbasic_timegm. host_runtime.c #undef's
@@ -86,15 +62,6 @@ static void flash_prog_buf_init(void) {
     memset(flash_prog_buf, 0xff, sizeof flash_prog_buf);
 }
 
-/* ---- no-op stubs for symbols only meaningful on ports with a display ---- */
-
-void host_framebuffer_service(void) {}
-void host_framebuffer_close(int which) { (void)which; }
-int  host_fb_write_screenshot(const char *path) { (void)path; return -1; }
-uint32_t host_runtime_get_pixel(int x, int y) { (void)x; (void)y; return 0; }
-void MX470Display(unsigned char c) { (void)c; }
-void DisplayPutS(char *s) { (void)s; }
-
 /* load_basic_source — tokenize a .bas text buffer into ProgMemory.
  * SaveProgramToFlash calls this with the freshly-read file contents from
  * FileLoadProgram so subsequent LIST / RUN see a valid program in memory.
@@ -134,7 +101,6 @@ int load_basic_source(const char *source) {
 /* ---- BASIC commands that require a framebuffer this port doesn't have ---- */
 
 void cmd_framebuffer(void) { error("FRAMEBUFFER not supported on this port"); }
-void cmd_fastgfx(void)     { error("FASTGFX not supported on this port"); }
 
 /* ---- microsecond clock ----
  * External.c's canonical readusclock is gated to non-host builds; on
@@ -149,11 +115,7 @@ uint64_t readusclock(void) {
  * scheduler so the watchdog and USB driver can run. */
 void uSec(int us) {
     if (us <= 0) return;
-    if (us < 1000) {
-        esp_rom_delay_us((uint32_t)us);
-    } else {
-        vTaskDelay(pdMS_TO_TICKS(us / 1000));
-    }
+    hal_time_sleep_us((uint32_t)us);
 }
 
 /* Pico-SDK Cortex-M0+ "read main stack pointer" intrinsic, used by

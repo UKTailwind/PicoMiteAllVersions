@@ -211,6 +211,8 @@ static const char *opcode_name(uint8_t op) {
         case OP_STR_DATE:     return "STR_DATE";
         case OP_STR_TIME:     return "STR_TIME";
         case OP_KEYDOWN:      return "KEYDOWN";
+        case OP_MATH_MULDIV:  return "MATH_MULDIV";
+        case OP_MATH_SQRDIV:  return "MATH_SQRDIV";
         case OP_SETPIN:       return "SETPIN";
         case OP_PIN_READ:     return "PIN_READ";
         case OP_PIN_WRITE:    return "PIN_WRITE";

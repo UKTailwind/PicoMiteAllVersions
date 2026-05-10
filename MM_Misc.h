@@ -42,7 +42,14 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
     #ifndef MISC_HEADER
     #define MISC_HEADER
 
-   	extern void OtherOptions(void);
+    #if defined(PICO_BUILD) && !defined(__uninitialized_ram)
+        #include "pico.h"
+    #endif
+    #ifndef __uninitialized_ram
+        #define __uninitialized_ram(group) group
+    #endif
+
+	extern void OtherOptions(void);
 	extern int InterruptUsed;
 	extern int OptionErrorCheck;
 

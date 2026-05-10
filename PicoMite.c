@@ -214,7 +214,6 @@ extern volatile bool CSubComplete;
 static uint64_t __not_in_flash_func(uSecTimer)(void){ return time_us_64();}
 static int64_t PinReadFunc(int a){return gpio_get(PinDef[a].GPno);}
 extern void CallCFuncmSec(void);
-extern volatile uint32_t irqs;
 #define CFUNCRAM_SIZE   256
 int CFuncRam[CFUNCRAM_SIZE/sizeof(int)];
 repeating_timer_t timer;
@@ -416,7 +415,7 @@ char  __not_in_flash_func(SerialConsolePutC)(char c, int flush) {
             ConsoleTxBuf[ConsoleTxBufHead] = c;
             ConsoleTxBufHead = (ConsoleTxBufHead + 1) % CONSOLE_TX_BUF_SIZE;
             if(empty){
-                while(irqs){}
+                while(hal_flash_write_active()){}
                 uart_set_irq_enables((Option.SerialConsole & 3)==1 ? uart0 : uart1, true, true);
                 irq_set_pending((Option.SerialConsole & 3)==1 ? UART0_IRQ : UART1_IRQ);
             }
@@ -823,14 +822,14 @@ void sigbus(void){
     bc_crash_save_fault();
     MMPrintString("Error: Invalid address - resetting\r\n");
 	uSec(5000000);
-	disable_interrupts_pico();
+	fileio_flash_write_begin();
 //	flash_range_erase(PROGSTART, MAX_PROG_SIZE);
     LoadOptions();
     if(Option.NoReset==0){
         Option.Autorun=0;
         SaveOptions();
     }
-	enable_interrupts_pico();
+	fileio_flash_write_end();
     memset(inpbuf,0,STRINGSIZE);
     SoftReset();
 }
@@ -1042,8 +1041,8 @@ int MIPS16 main(){
     PromptBC=gui_bcolour=Option.DefaultBC;
     InitHeap(true);              										// initilise memory allocation
     uSecFunc(1000);
-    disable_interrupts_pico();
-    enable_interrupts_pico();
+    fileio_flash_write_begin();
+    fileio_flash_write_end();
     mSecTimer=time_us_64()/1000;
     DISPLAY_TYPE = Option.DISPLAY_TYPE;
     // negative timeout means exact delay (rather than delay between callbacks)
@@ -1199,7 +1198,7 @@ void MIPS16 SaveProgramToFlash(unsigned char *pm, int msg) {
     j=MAX_PROG_SIZE/4;
     int *pp=(int *)(flash_progmemory);
         while(j--)if(*pp++ != 0xFFFFFFFF){
-            enable_interrupts_pico();
+            fileio_flash_write_end();
             error("Flash erase problem");
         }
     nbr = 0;
@@ -1281,7 +1280,7 @@ contloop:
              fontnbr = getint(p, 1, FONT_TABLE_SIZE);
                                                  // font 6 has some special characters, some of which depend on font 1
              if(fontnbr == 1 || fontnbr == 6 || fontnbr == 7) {
-                enable_interrupts_pico();
+                fileio_flash_write_end();
                 error("Cannot redefine fonts 1, 6 or 7");
              }
              realflashpointer+=4;
@@ -1300,7 +1299,7 @@ contloop:
              skipspace(p);
              if(!fontnbr) { //process CSub 
                  if(!isnamestart((uint8_t)*p)){
-                    enable_interrupts_pico();
+                    fileio_flash_write_end();
                     error("Function name");
                  }  
                  do { p++; } while(isnamechar((uint8_t)*p));
@@ -1321,7 +1320,7 @@ contloop:
                      n = 0;
                      for(i = 0; i < 8; i++) {
                          if(!isxdigit((uint8_t)*p)) {
-                            enable_interrupts_pico();
+                            fileio_flash_write_end();
                             error("Invalid hex word");
                          }
                          if((int)((char *)realflashpointer - (uint32_t)PROGSTART) >= MAX_PROG_SIZE - 5) goto exiterror;
@@ -1337,7 +1336,7 @@ contloop:
                      if(firsthex){
                     	 firsthex=0;
                     	 if(((n>>16) & 0xff) < 0x20){
-                            enable_interrupts_pico();
+                            fileio_flash_write_end();
                             error("Can't define non-printing characters");
                          }
                      }
@@ -1346,7 +1345,7 @@ contloop:
                  while(*p) p++;                                      // make sure that we move to the end of the line
                  p++;                                                // step to the start of the next line
                  if(*p == 0) {
-                     enable_interrupts_pico();
+                     fileio_flash_write_end();
                      error("Missing END declaration");
                  }
                  if(*p == T_NEWLINE) {
@@ -1391,7 +1390,7 @@ contloop:
              fontnbr = getint(p, 1, FONT_TABLE_SIZE);
                                                  // font 6 has some special characters, some of which depend on font 1
              if(fontnbr == 1 || fontnbr == 6 || fontnbr == 7) {
-                 enable_interrupts_pico();
+                 fileio_flash_write_end();
                  error("Cannot redefine fonts 1, 6, or 7");
              }
 
@@ -1417,7 +1416,7 @@ contloop:
              skipspace(p);
              if(!fontnbr) {
                  if(!isnamestart((uint8_t)*p))  {
-                     enable_interrupts_pico();
+                     fileio_flash_write_end();
                      error("Function name");
                  }
                  do { p++; } while(isnamechar(*p));
@@ -1438,7 +1437,7 @@ contloop:
                      n = 0;
                      for(i = 0; i < 8; i++) {
                          if(!isxdigit(*p)) {
-                            enable_interrupts_pico();
+                            fileio_flash_write_end();
                             error("Invalid hex word");
                          }
                          if((int)((char *)realflashpointer - (uint32_t)PROGSTART) >= MAX_PROG_SIZE - 5) goto exiterror;
@@ -1457,7 +1456,7 @@ contloop:
                  while(*p) p++;                                      // make sure that we move to the end of the line
                  p++;                                                // step to the start of the next line
                  if(*p == 0) {
-                    enable_interrupts_pico();
+                    fileio_flash_write_end();
                     error("Missing END declaration");
                  }
                  if(*p == T_NEWLINE) {
@@ -1484,7 +1483,7 @@ contloop:
     memcpy(tknbuf, buf, STRINGSIZE);                                // restore the token buffer in case there are other commands in it
 //    initConsole();
     hal_keyboard_clear_repeat_state();         /* USB only — stub no-op */
-    enable_interrupts_pico();
+    fileio_flash_write_end();
     return;
 
     // we only get here in an error situation while writing the program to flash

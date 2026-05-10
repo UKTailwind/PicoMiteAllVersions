@@ -33,7 +33,6 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
 #include "hal/hal_time.h"
-#include "pico/stdlib.h"
 #include <time.h>
 #include <string.h>
 #include "xregex.h"
@@ -272,7 +271,7 @@ void cmd_timer(void) {
   timeroffset=mytime-(uint64_t)getint(++cmdline,0,mytime/1000)*1000;
 }
 // this is invoked as a function
-void __not_in_flash_func(fun_timer)(void) {
+void HAL_PORT_MMBASIC_HOT_FUNC(fun_timer)(void) {
     fret = (MMFLOAT)(hal_time_us_64()-timeroffset)/1000.0;
     targ = T_NBR;
 }

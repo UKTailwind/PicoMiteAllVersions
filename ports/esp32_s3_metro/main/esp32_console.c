@@ -5,7 +5,7 @@
  * for `idf.py monitor` and `picocom /dev/cu.usbmodem*`. We install the
  * interrupt-driven driver and switch the IDF stdio VFS to use it so
  * that read(STDIN_FILENO, ...) actually drains the hardware FIFO, then
- * provide the byte-level read/write hooks the rest of MMBasic expects.
+ * provide the byte-level read/write hooks the rest of this port uses.
  */
 
 #include <stdio.h>
@@ -44,35 +44,34 @@ void esp32_console_init(void) {
 
 /* ---- output hook ----
  * MMBasic's MMputchar / MMPrintString / SerialConsolePutC route every
- * byte through host_output_hook. We forward straight to fwrite(stdout)
- * which goes to USB Serial/JTAG via the driver installed above. */
+ * byte through this helper. We forward straight to fwrite(stdout), which
+ * goes to USB Serial/JTAG via the driver installed above. */
 
-static void esp32_console_write(const char *text, int len) {
+void esp32_console_write_bytes(const char *text, int len) {
     fwrite(text, 1, len, stdout);
 }
-void (*host_output_hook)(const char *text, int len) = esp32_console_write;
 
 /* USB Serial/JTAG is a byte-level raw pipe — no terminal line discipline,
  * no readline. Tell MMInkey to route through the byte-level reads + the
  * ANSI escape decoder rather than the line-buffered fgetc fallback. */
-int host_raw_mode_is_active(void) { return 1; }
+int esp32_console_raw_mode_is_active(void) { return 1; }
 
 /* ---- byte-level reads ----
- * host_read_byte_nonblock returns -1 when nothing's available so the
- * editor's poll loop spins without blocking. host_read_byte_blocking_ms
+ * esp32_console_read_byte_nonblock returns -1 when nothing's available so the
+ * editor's poll loop spins without blocking. esp32_console_read_byte_blocking_ms
  * waits up to `ms` ticks (negative = forever). The pushback supports
  * the ANSI-escape decoder's one-byte lookahead. */
 
 static int s_pushback = -1;
 
-int host_read_byte_nonblock(void) {
+int esp32_console_read_byte_nonblock(void) {
     if (s_pushback >= 0) { int c = s_pushback; s_pushback = -1; return c; }
     unsigned char c;
     int n = usb_serial_jtag_read_bytes(&c, 1, 0);
     return (n == 1) ? (int)c : -1;
 }
 
-int host_read_byte_blocking_ms(int ms) {
+int esp32_console_read_byte_blocking_ms(int ms) {
     if (s_pushback >= 0) { int c = s_pushback; s_pushback = -1; return c; }
     TickType_t ticks = (ms < 0) ? portMAX_DELAY : pdMS_TO_TICKS(ms);
     if (ms > 0 && ticks == 0) ticks = 1;
@@ -81,7 +80,7 @@ int host_read_byte_blocking_ms(int ms) {
     return (n == 1) ? (int)c : -1;
 }
 
-void host_push_back_byte(int c) { s_pushback = c; }
+void esp32_console_push_back_byte(int c) { s_pushback = c; }
 
 /* MMBasic-facing console glue (MMputchar, MMPrintString, MMInkey,
  * SerialConsolePutC, ConsoleRxBuf*, MMgetline, …) lives in

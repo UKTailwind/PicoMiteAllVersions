@@ -125,6 +125,8 @@ set(PICOMITE_LEGACY_CORE_SOURCES
 	XModem.c
 	MM_Misc.c
 	mm_misc_shared.c
+	OptionCommands.c
+	cmd_ws2812_shared.c
 	External.c
 	MATHS.c
 	Onewire.c
@@ -135,7 +137,6 @@ set(PICOMITE_LEGACY_CORE_SOURCES
 	BmpDecoder.c
 	GPS.c
 	CFunction.c
-	picomite_gpio_irq.c
 )
 
 # Audio: device body lives in drivers/pwm_synth/pwm_synth.c (PWM/PIO
@@ -169,7 +170,11 @@ set(PICOMITE_CORE_STATE_SOURCES
 set(PICOMITE_PICO_SDK_HAL_SOURCES
 	ports/pico_sdk_common/hal_flash_pico.c
 	ports/pico_sdk_common/hal_time_pico.c
+	ports/pico_sdk_common/hal_random_pico.c
+	ports/pico_sdk_common/hal_watchdog_pico.c
 	ports/pico_sdk_common/hal_pin_pico.c
+	ports/pico_sdk_common/hal_ws2812_pico.c
+	ports/pico_sdk_common/pico_gpio_irq.c
 	ports/pico_sdk_common/hal_storage_pico.c
 	ports/pico_sdk_common/hal_filesystem_pico.c
 	# hal_keyboard_pico.c was a multiplexer; replaced with per-backend
@@ -188,9 +193,11 @@ set(PICOMITE_PICO_SDK_HAL_SOURCES
 	ports/pico_sdk_common/print_display_options.c
 	ports/pico_sdk_common/spi_lcd_options.c
 	ports/pico_sdk_common/misc_option_setters.c
+	ports/pico_sdk_common/runtime_reset_pico.c
 	ports/pico_sdk_common/vm_sys_time_pico.c
 	ports/pico_sdk_common/bc_crash_pico.c
 	ports/pico_sdk_common/bc_bridge_pico.c
+	ports/pico_sdk_common/bc_runtime_pico.c
 	ports/pico_sdk_common/clear_runtime_port.c
 	ports/pico_sdk_common/terminal_hooks_noop.c
 	ports/pico_sdk_common/funtbl_port.c

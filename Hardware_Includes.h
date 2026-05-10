@@ -28,13 +28,10 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 ************************************************************************************************************************/
 #include "port_config.h"   /* HAL_PORT_HAS_* palette must be visible before
                               AllCommands.h / configuration.h consult it. */
+#include <stdint.h>
+#include <stdbool.h>
 #include "AllCommands.h"
 #include "Memory.h"
-#include "hardware/watchdog.h"
-#include "pico/stdlib.h"
-#include "hardware/clocks.h"
-#include "pico/stdlib.h"
-#include "pico/util/datetime.h"
 #include "lfs.h"
 
 
@@ -145,8 +142,8 @@ extern uint16_t *tilebcols;
 extern uint16_t tilefcols[];
 extern uint16_t tilebcols[];
 #endif
-extern void __not_in_flash_func(QVgaCore)(void);
-extern void __not_in_flash_func(UpdateCore)(void);
+extern void QVgaCore(void);
+extern void UpdateCore(void);
 extern uint32_t core1stack[];
 extern int QVGA_CLKDIV;
 extern int getslice(int pin);
@@ -297,7 +294,7 @@ extern int startupcomplete;
  * internals; their externs live in the driver TUs that need them. */
 extern void cmd_mouse(void);
 extern bool USBenabled;
-int __not_in_flash_func(MMInkey)(void);
+int MMInkey(void);
 int MMgetchar(void);
 char MMputchar(char c, int flush);
 void SaveProgramToFlash(unsigned char *pm, int msg);

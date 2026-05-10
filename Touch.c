@@ -36,6 +36,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "Hardware_Includes.h"
 #include "hal/hal_gui_controls.h"
 #include "hal/hal_display_merge.h"
+#include "hardware/gpio.h"
 #include "hardware/structs/systick.h"
 #include "pico/multicore.h"
 #include "hardware/i2c.h"

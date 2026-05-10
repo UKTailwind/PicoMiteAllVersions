@@ -323,3 +323,199 @@ entirely. Used heavily during the back-and-forth on input plumbing.
 4. **Re-enable Octal PSRAM**. With 8 MB external RAM available, the
    BC heap can sit there comfortably; the silent-boot earlier was
    almost certainly the macOS USB-CDC binding issue.
+
+## 2026-05-09 — Current ESP32 status refresh
+
+The port has moved past the early host-native reuse shape documented
+above. Runtime/peripheral host_native sources are no longer linked by
+the ESP32 port; ESP32 owns the port surface in `esp32_*.c` and
+`hal_*_esp32.c` files. Remaining host-shape debt is narrower:
+generic VM shims and Pico SDK compatibility headers still live under
+`ports/host_native/`, `esp32_platform.h` still defines `MMBASIC_HOST`,
+and strict-link cleanup is not complete.
+
+Verified status:
+- Host tests: `./run_tests.sh` passes 243/243.
+- HAL purity: clean over the current core/shared scope.
+- ESP32 build/flash: `idf.py build` green, hardware flash/probe green.
+- A: drive: LFS over `esp_partition_*`, bundled demos seed-only,
+  zero-byte bundled demos repaired, non-empty user edits preserved.
+- File save guard: `SAVE "file.bas"` now errors `No program` before
+  truncating if no tokenized program is loaded.
+- `mand.bas`: `RUN` and `FRUN` both produce checksum `552868`; current
+  Metro measurement is ~8569 ms for `RUN` and ~359 ms for `FRUN`.
+
+Important caveat: low-level `hal_pin_esp32.c` is linked, but BASIC
+`PIN()` / `SETPIN` are not yet proven as real hardware GPIO. The
+user-facing pin table and command/function path still need ESP32-owned
+cleanup instead of host-shaped shim/stub behavior.
+
+## 2026-05-10 — Stage F closed + E2 build-landed
+
+Stage F hygiene landed:
+- `tools/check_hal_purity.sh` now has an ESP32 port scope. It checks
+  `ports/esp32_s3_metro/main/*.c` with the strict target/port-config
+  rules and fails if `main/CMakeLists.txt` pulls host-native runtime or
+  peripheral sources outside the temporary generic-shim allowlist.
+- `docs/real-hal-plan.md` and `ports/esp32_s3_metro/README.md` now
+  describe the current D/E/F state instead of the old Phase A/B shape.
+- Added opt-in root helper `buildesp32.sh`; it runs the HAL purity gate,
+  sources ESP-IDF if needed, and runs `idf.py build` for the Metro port.
+
+Stage E2 implementation now builds:
+- `hal_flash_esp32.c` replaces the old linked flash stub. Options are
+  stored as an NVS blob under namespace `mmbasic`, key `options`.
+- `app_main.c` loads the NVS-backed option mirror before `LoadOptions()`
+  and applies serial defaults only when the stored options are missing or
+  invalid, so saved options are no longer overwritten every boot.
+- `hal_flash_read_jedec_id()` reports ESP-IDF's flash size instead of the
+  old all-zero stub response.
+
+Verification in this session:
+- `tools/check_hal_purity.sh` passes, including the new ESP32 scope.
+- `./buildesp32.sh` passes; current app image is `0xd2d50` bytes with
+  `0x2d2b0` bytes (18%) free in the 1 MB app partition.
+
+Not yet hardware-smoked: `OPTION COLOUR GREEN`, power cycle, prompt
+comes back green; then `OPTION COLOUR RESET`.
+
+### Hardware smoke attempt
+
+Flashed the E2 build to `/dev/cu.usbmodem2101`; flash succeeded and the
+board booted to the REPL. Verified:
+- `PRINT 1+1` returned `2`.
+- `FILES` listed the A: LittleFS demo files.
+- `RUN "hello.bas"` printed the ESP32-S3 demo output.
+- `OPTION DEFAULT COLOURS GREEN` was accepted and emitted the expected
+  ANSI `38;2;0;255;0` / black-background prompt sequence immediately
+  after the command.
+
+Persistence verification is still inconclusive. After rapid reset/probe
+cycles, macOS/ESP32-S3 USB CDC stopped delivering serial data and
+`idf.py flash` could no longer auto-reset into ROM (`No serial data
+received`). This matches the known USB-CDC binding/reset quirk. Recovery
+requires the physical BOOT+RESET tap, then repeat: boot, confirm green
+prompt after reset, and run `OPTION DEFAULT COLOURS WHITE` (or reset
+defaults) to restore the prompt colour.
+
+## 2026-05-10 (later) — shared ANSI colour fix + E1 build-landed
+
+Found that the post-error colour reset shown on ESP32 was inherited
+from upstream shared code, not ESP32-specific behavior:
+
+- Legacy `do_end()` emitted hard-coded `ESC[97;40m` after showing the
+  cursor.
+- Legacy prompt/error recovery only restored `PromptFC` / `PromptBC`
+  inside `Option.DISPLAY_CONSOLE`, so serial-only ANSI builds could
+  lose the selected prompt colour.
+
+Fix landed in shared code:
+
+- `Draw.c` now has `ApplyDefaultConsoleColours()` and
+  `ApplyPromptConsoleColours()`.
+- `MMBasic_REPL.c` restores prompt colours for every prompt, not only
+  framebuffer console builds.
+- `Commands.c::do_end()` calls the shared prompt-colour helper instead
+  of forcing white-on-black.
+
+Verified locally: HAL purity, ESP32 build, `mmbasic_stdio` build,
+`mmbasic_ansi` build, and stdio corpus 8/8. Flashed successfully to
+`/dev/cu.usbmodem2101`.
+
+Stage E1 also build-landed:
+
+- Added a 1 MB `mmslots` partition after `lfsdata`.
+- `esp32_flash_storage.c` now maps `mmslots` with
+  `esp_partition_mmap()`.
+- `SavedVarsFlash` points at the partition's saved-vars area.
+- `flash_target_contents` points at the numbered-slot area.
+- Slot/saved-vars `flash_range_erase` and `flash_range_program` calls
+  route to `esp_partition_erase_range` / `esp_partition_write`.
+
+Build verified. Follow-up hardware smoke passed for numbered slots:
+`FLASH SAVE 1`, reset, `FLASH LOAD 1`, `RUN` reloaded and ran
+`hello.bas` from the dedicated `mmslots` partition.
+
+The first smoke attempt exposed an ESP32 port-boundary bug: the slot
+persisted and `FLASH LIST` showed it in use after reset, but `FLASH LOAD
+1` did not repopulate runnable program memory because the adapter only
+treated offset zero as the program region. Shared code correctly writes
+the runnable program through legacy `PROGSTART` offsets, matching Pico.
+`esp32_flash_storage.c` now normalizes both offset-zero and `PROGSTART`
+program-region writes into `flash_prog_buf`.
+
+## 2026-05-10 (later) — strict link verified + VM shim relocation
+
+Confirmed the ESP32 component has no `--wrap` and no
+`--allow-multiple-definition`; `./buildesp32.sh` links cleanly under
+that strict policy.
+
+The simulator VM syscall bodies moved out of `ports/host_native/` and
+into `ports/vm_sys_sim/`. Host-style builds link those simulator bodies
+from the neutral path. ESP32 now links shared device `vm_sys_file.c`
+for VM file syscalls, so bytecode file operations use the same LFS/FatFS
+device path as Pico-style ports instead of the host FAT simulator.
+
+ESP32 still links the simulator VM pin body. That is intentionally left
+as the next GPIO task: real BASIC-visible GPIO needs an ESP32 pin table
+and `vm_sys_pin_esp32.c`; the existing root `vm_sys_pin.c` is Pico-SDK
+specific and cannot be linked by ESP32 as-is.
+
+## 2026-05-10 (later) — ESP32 BASIC-visible GPIO smoke
+
+Replaced the ESP32 simulator pin syscall body with an ESP32-owned
+`vm_sys_pin_esp32.c` and added `esp32_pin_tables.c` for the Metro's
+GPIO0..GPIO48 mapping. Slot zero remains the legacy NULL row; `GPn`
+maps to PinDef slot `n+1`, preserving the shared 1-based pin-state
+arrays.
+
+Implemented the missing `cmd_pin()` path in `esp32_peripheral_stubs.c`
+so interactive `PIN(GP13)=1` drives hardware instead of no-oping. The
+function path already routed through `fun_pin()`.
+
+ADC support now handles both ESP32-S3 ADC units by encoding ADC2
+channels as `10 + channel` in `PinDef[].ADCpin`; `hal_pin_adc_select()`
+selects ADC1 or ADC2 from that encoding.
+
+Hardware smoke on `/dev/cu.usbmodem2101` passed:
+- `SETPIN GP13,DOUT`, `PIN(GP13)=1`, `PRINT PIN(GP13)` returned `1`;
+  `PIN(GP13)=0` returned `0`. User observed the onboard LED blinking.
+- `SETPIN GP13,DIN,PULLUP`, `PRINT PIN(GP13)` returned `1`.
+- `SETPIN GP1,ARAW`, `PRINT PIN(GP1)` returned a raw ADC value (`775`
+  in this run).
+
+The smoke exposed a shared enum-helper bug: `VM_PIN_MODE_ARAW` is value
+46, between `PWM0A` and `PWM11B`, so `vm_pin_mode_is_pwm()` treated ARAW
+as PWM. The helper now checks the two real PWM ranges separately. Full
+host comparison suite still passes: 243/243.
+
+## 2026-05-10 (later) — WS2812 shared command/HAL split
+
+Moved `WS2812` out of the Pico-only `External.c` body and out of the
+ESP32 unsupported-stub list. The BASIC-facing parser, pin validation,
+and colour packing now live in `cmd_ws2812_shared.c`; the waveform
+backend is the per-port `hal_ws2812_write()` implementation.
+
+Backends:
+- ESP32: `ports/esp32_s3_metro/main/hal_ws2812_esp32.c`, using
+  ESP-IDF RMT TX.
+- Pico SDK ports: `ports/pico_sdk_common/hal_ws2812_pico.c`, preserving
+  the legacy SysTick/GPIO timing path.
+
+Hardware smoke on ESP32 `/dev/cu.usbmodem2101` passed with the Metro
+onboard NeoPixel on `GP46`: red, green, blue, off, and white all
+accepted. `&HFFFFFF` is very bright.
+
+The full build gate was run after the Pico migration:
+- `./buildall.sh`: all 14 device variants built clean; RAM baseline
+  passed.
+- `host/run_tests.sh`: 243/243 passed; VM pin-mode helper clean; HAL
+  purity clean.
+- `./buildesp32.sh`: ESP32 IDF build green.
+
+Two small header hygiene fixes landed while enforcing the full gate:
+- `MM_Misc.h` now includes `pico.h` on Pico SDK builds before using
+  `__uninitialized_ram(_persistent)`, and falls back to a plain symbol
+  form when a non-Pico port has not force-defined the macro.
+- `Draw.h` now includes `hardware/gpio.h` before defining `PinRead()`
+  as `gpio_get(PinDef[a].GPno)`.

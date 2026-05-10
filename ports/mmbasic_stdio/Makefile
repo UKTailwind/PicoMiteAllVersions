@@ -8,6 +8,7 @@
 CC = gcc
 PORT_DIR  := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 REPO_ROOT := $(abspath $(PORT_DIR)/../..)
+SIM_VM_DIR := $(REPO_ROOT)/ports/vm_sys_sim
 BUILD_DIR := $(PORT_DIR)/build
 
 # Mirror host_native's DEVICE_SIM knob so array sizes / heap budget
@@ -43,7 +44,7 @@ endif
 # etc. link, but the display goes through hal_display stubs.
 CORE_SRCS = MMBasic.c Commands.c Functions.c Operators.c MATHS.c Memory.c MMBasic_Print.c
 CORE_SRCS += gfx_box_shared.c gfx_circle_shared.c gfx_line_shared.c gfx_pixel_shared.c gfx_cls_shared.c gfx_text_shared.c gfx_console_shared.c
-CORE_SRCS += mm_misc_shared.c
+CORE_SRCS += mm_misc_shared.c OptionCommands.c
 CORE_SRCS += display_state.c pin_state.c option_state.c audio_state.c
 CORE_SRCS += Draw.c RGB121.c Tilemap.c FileIO.c Audio.c BmpDecoder.c re.c picojpeg.c
 # Stubs inherited from host_native (dr_mp3, SPI-LCD, VGA, GUI, 3D, uPNG).
@@ -54,7 +55,7 @@ CORE_SRCS += display_pixel_host.c
 
 # Bytecode VM — the same set the native host links (so FRUN works).
 BC_SRCS = bc_alloc.c bc_bridge.c vm_host_fat.c ff.c ffunicode.c ffsystem.c \
-          vm_sys_input.c vm_sys_graphics.c vm_sys_time.c vm_sys_pin_host.c vm_sys_file_host.c \
+          vm_sys_input.c vm_sys_graphics.c vm_sys_time.c vm_sys_pin_sim.c vm_sys_file_sim.c \
           bc_source.c bc_compiler_core.c bc_vm.c bc_runtime.c bc_debug.c
 
 # Port-native files reused wholesale — the HAL impls + runtime state
@@ -64,7 +65,7 @@ BC_SRCS = bc_alloc.c bc_bridge.c vm_host_fat.c ff.c ffunicode.c ffsystem.c \
 NATIVE_SRCS = host_runtime.c host_fs_shims.c host_peripheral_stubs.c host_fs.c \
               host_sim_audio.c host_sim_slowdown.c host_sim_emit_stub.c host_time.c host_keys.c \
               host_bc_runtime_noop.c host_terminal_hooks_noop.c \
-              hal_flash_host.c hal_time_host.c hal_pin_host.c hal_storage_host.c \
+              hal_flash_host.c hal_time_host.c hal_random_host.c hal_watchdog_host.c hal_pin_host.c hal_storage_host.c \
               hal_filesystem_host.c hal_keyboard_host.c hal_audio_host.c hal_vm_framebuffer_host.c
 
 PORT_SRCS = main.c stdio_runtime.c
@@ -85,6 +86,10 @@ $(BUILD_DIR)/%.o: $(PORT_DIR)/%.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 $(BUILD_DIR)/%.o: $(REPO_ROOT)/ports/host_native/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(BUILD_DIR)/%.o: $(SIM_VM_DIR)/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c -o $@ $<
 

@@ -51,9 +51,9 @@
 #define HAL_PORT_HEAP_TOP_USB            0
 
 /* HAL_PORT_FLASH_TARGET_OFFSET / *_USB stay at host-inherited values
- * for now: SAVE-to-slot uses the 256-byte placeholder buffer in
- * esp32_flash_storage.c; once Stage E1 wires in esp_partition_*, this
- * macro disappears in favour of an esp_partition_t handle. */
+ * for now because FileIO.c still computes legacy absolute flash offsets.
+ * esp32_flash_storage.c translates those offsets to the `mmslots`
+ * esp_partition at the port boundary. */
 
 /* HAL_PORT_PWM_SLICE_COUNT / HAL_PORT_PIO_COUNT keep their RP2040
  * numbers from host_native. Inert until a real PWM (LEDC-backed) or

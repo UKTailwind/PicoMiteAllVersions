@@ -135,7 +135,7 @@ void hal_pin_set_slew_fast(uint32_t gpio, bool fast);
  *
  * Lets a caller arm or disarm a GPIO edge trigger without owning the
  * IRQ handler. The handler itself is installed elsewhere (e.g. via the
- * PicoMite shared-handler dispatch in picomite_gpio_irq.c on device).
+ * Pico SDK shared-handler dispatch in pico_gpio_irq.c on device).
  * A richer hal_pin_irq_attach(cb, ctx) lives in Phase 11.
  * ---------------------------------------------------------------------- */
 

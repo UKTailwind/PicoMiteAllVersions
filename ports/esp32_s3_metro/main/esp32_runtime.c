@@ -13,8 +13,7 @@
  * that doesn't translate to ESP-IDF's section model. CFUNCTION dispatch
  * isn't part of the stdio-REPL litmus.
  *
- * Per the D-decouple plan, this file replaces host_runtime.c's
- * versions of these symbols.
+ * Per the D-decouple plan, this file owns ESP32 runtime hooks directly.
  */
 
 #include <stddef.h>
@@ -22,23 +21,24 @@
 
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
+#include "bc_alloc.h"
 
 /* esp32_console.c provides the USB Serial/JTAG byte ring; we drain
  * pending input here so Ctrl-C breaks runaway loops even when MMInkey
  * isn't being called (e.g. tight FOR/NEXT). Non-Ctrl-C bytes get
  * pushed back so MMInkey sees them on the next poll. */
-extern int  host_read_byte_nonblock(void);
-extern void host_push_back_byte(int c);
+extern int  esp32_console_read_byte_nonblock(void);
+extern void esp32_console_push_back_byte(int c);
 /* MMAbort is declared in MMBasic.h as `volatile int`. */
 
 static void esp32_runtime_pump_input(void) {
-    int c = host_read_byte_nonblock();
+    int c = esp32_console_read_byte_nonblock();
     if (c < 0) return;
     if (c == 0x03 /* Ctrl-C */) {
         MMAbort = 1;
         return;
     }
-    host_push_back_byte(c);
+    esp32_console_push_back_byte(c);
 }
 
 /* Interpreter abort poll. Called from the parser hot path on every
@@ -56,6 +56,13 @@ int check_interrupt(void) { return 0; }
  * etc. */
 void routinechecks(void) {
     esp32_runtime_pump_input();
+}
+
+void port_bc_runtime_free_source(const char **source) {
+    if (source && *source) {
+        BC_FREE((void *)*source);
+        *source = NULL;
+    }
 }
 
 /* CFUNCTION dispatch trampoline. ESP32 doesn't ship MMBasic CFUNCTION
@@ -86,6 +93,5 @@ int InterruptUsed = 0;
 
 /* Diagnostic timer — bumped from a 1 ms tick on Pico, observed by
  * various long-running-loop watchdog paths. ESP32 doesn't drive a
- * matching tick; left at 0. Volatile to match the host_native
- * declaration so existing extern decls match. */
+ * matching tick; left at 0. Volatile to match existing extern decls. */
 volatile unsigned int ScrewUpTimer = 0;

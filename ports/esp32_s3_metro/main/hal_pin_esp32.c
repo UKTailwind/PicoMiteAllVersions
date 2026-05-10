@@ -124,10 +124,7 @@ void hal_pin_toggle(uint32_t gpio) {
 }
 
 bool hal_pin_read_output_latch(uint32_t gpio) {
-    /* IDF doesn't expose a "read output latch" distinct from read.
-     * For pads in output mode, gpio_get_level returns the driven
-     * value, which is functionally the latch. */
-    return hal_pin_read(gpio);
+    return (hal_pin_bank_read_out_latch() & (1ULL << gpio)) != 0;
 }
 
 /* ---- bank ops ----
@@ -169,21 +166,40 @@ void hal_pin_bank_xor_mask(uint64_t mask) {
 /* ---- ADC ---- */
 
 static adc_oneshot_unit_handle_t s_adc1 = NULL;
+static adc_oneshot_unit_handle_t s_adc2 = NULL;
+static adc_unit_t s_current_unit = ADC_UNIT_1;
 static int s_current_channel = -1;
 
+static adc_oneshot_unit_handle_t *hal_pin_adc_unit_handle(adc_unit_t unit) {
+    return unit == ADC_UNIT_2 ? &s_adc2 : &s_adc1;
+}
+
+static adc_oneshot_unit_handle_t hal_pin_adc_ensure_unit(adc_unit_t unit) {
+    adc_oneshot_unit_handle_t *handle = hal_pin_adc_unit_handle(unit);
+    if (!*handle) {
+        adc_oneshot_unit_init_cfg_t cfg = { .unit_id = unit };
+        adc_oneshot_new_unit(&cfg, handle);
+    }
+    return *handle;
+}
+
 void hal_pin_adc_init(void) {
-    if (s_adc1) return;
-    adc_oneshot_unit_init_cfg_t cfg = { .unit_id = ADC_UNIT_1 };
-    adc_oneshot_new_unit(&cfg, &s_adc1);
+    hal_pin_adc_ensure_unit(ADC_UNIT_1);
 }
 
 void hal_pin_adc_select(uint32_t adc_channel) {
-    if (!s_adc1) hal_pin_adc_init();
+    adc_unit_t unit = ADC_UNIT_1;
+    if (adc_channel >= 10) {
+        unit = ADC_UNIT_2;
+        adc_channel -= 10;
+    }
+    adc_oneshot_unit_handle_t handle = hal_pin_adc_ensure_unit(unit);
     adc_oneshot_chan_cfg_t cfg = {
         .atten    = ADC_ATTEN_DB_12,    /* 0..3.3 V full scale */
         .bitwidth = ADC_BITWIDTH_DEFAULT,
     };
-    adc_oneshot_config_channel(s_adc1, (adc_channel_t)adc_channel, &cfg);
+    adc_oneshot_config_channel(handle, (adc_channel_t)adc_channel, &cfg);
+    s_current_unit = unit;
     s_current_channel = (int)adc_channel;
 }
 
@@ -194,8 +210,11 @@ void hal_pin_adc_set_temp_sensor(bool enabled) {
 }
 
 uint16_t hal_pin_adc_read(void) {
-    if (!s_adc1 || s_current_channel < 0) return 0;
+    adc_oneshot_unit_handle_t handle;
+    if (s_current_channel < 0) return 0;
+    handle = *hal_pin_adc_unit_handle(s_current_unit);
+    if (!handle) return 0;
     int raw = 0;
-    adc_oneshot_read(s_adc1, (adc_channel_t)s_current_channel, &raw);
+    adc_oneshot_read(handle, (adc_channel_t)s_current_channel, &raw);
     return (uint16_t)(raw & 0xfff);  /* 12-bit on ESP32-S3 */
 }

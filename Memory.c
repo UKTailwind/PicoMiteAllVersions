@@ -779,7 +779,7 @@ void m_alloc(int type) {
 // Get a temporary buffer of any size
 // The space only lasts for the length of the command.
 // A pointer to the space is saved in an array so that it can be returned at the end of the command
-void __not_in_flash_func(*GetTempMemory)(int NbrBytes) {
+void HAL_PORT_MMBASIC_HOT_FUNC(*GetTempMemory)(int NbrBytes) {
     if(g_StrTmpIndex >= MAXTEMPSTRINGS) error("NEM[mem:strtmp] idx=% max=%", g_StrTmpIndex, MAXTEMPSTRINGS);
     g_StrTmpLocalIndex[g_StrTmpIndex] = g_LocalIndex;
     g_StrTmp[g_StrTmpIndex] = GetSystemMemory(NbrBytes);
@@ -798,7 +798,7 @@ void __not_in_flash_func(*GetTempMemory)(int NbrBytes) {
 // clear any temporary string spaces (these last for just the life of a command) and return the memory to the heap
 // this will not clear memory allocated with a local index less than g_LocalIndex, sub/funs will increment g_LocalIndex
 // and this prevents the automatic use of ClearTempMemory from clearing memory allocated before calling the sub/fun
-void __not_in_flash_func(ClearTempMemory)(void) {
+void HAL_PORT_MMBASIC_HOT_FUNC(ClearTempMemory)(void) {
     while(g_StrTmpIndex > 0) {
         if(g_StrTmpLocalIndex[g_StrTmpIndex - 1] >= g_LocalIndex) {
             g_StrTmpIndex--;
@@ -831,7 +831,7 @@ void MIPS16 ClearSpecificTempMemory(void *addr) {
 
 
 // test the stack for overflow - this is a NULL function in the DOS version
-void __not_in_flash_func(TestStackOverflow)(void) {
+void HAL_PORT_MMBASIC_HOT_FUNC(TestStackOverflow)(void) {
 //    static uint32_t x=0xFFFFFFFF;
     uint32_t y=__get_MSP();
 //    if(y<x){
@@ -842,7 +842,7 @@ void __not_in_flash_func(TestStackOverflow)(void) {
 
 
 
-void MIPS64 __not_in_flash_func(FreeMemory)(unsigned char *addr) {
+void MIPS64 HAL_PORT_MMBASIC_HOT_FUNC(FreeMemory)(unsigned char *addr) {
     if(addr == NULL) return;
     int bits;
     /* PSRAM range check — PSRAMsize is 0 on targets without PSRAM, so
@@ -921,7 +921,7 @@ static inline __attribute__ ((always_inline)) void MBitsSet(unsigned char *addr,
     i = ((((unsigned int)addr/PAGESIZE)) & (PAGESPERWORD - 1)) * PAGEBITS; // get the position of the bits in the word
     *p = (bits << i) | (*p & (~(((1 << PAGEBITS) -1) << i)));
 }
-void MIPS64 __not_in_flash_func(*GetSystemMemory)(int size) { //get memory from the bottom up 
+void MIPS64 HAL_PORT_MMBASIC_HOT_FUNC(*GetSystemMemory)(int size) { //get memory from the bottom up 
     int n=0, k;
     unsigned char *addr;
     k= (size + PAGESIZE - 1)/PAGESIZE;                         // nbr of pages rounded up
@@ -977,7 +977,7 @@ void heap_scan_stats(unsigned int *used_pages,
     if (total_pages)       *total_pages = total;
 }
 
-void MIPS64 __not_in_flash_func(*GetMemory)(int size) {
+void MIPS64 HAL_PORT_MMBASIC_HOT_FUNC(*GetMemory)(int size) {
     /* PSRAM fast path on rp2350 non-WEB when the request is large
      * enough to warrant the PSRAM allocator; PSRAMsize is 0 on ports
      * without PSRAM so this branch is a runtime no-op there. */
@@ -1130,7 +1130,7 @@ void *ReAllocMemory(void *addr, size_t msize){
 	}
 	return newaddr;
 }
-void __not_in_flash_func(FreeMemorySafe)(void **addr){
+void HAL_PORT_MMBASIC_HOT_FUNC(FreeMemorySafe)(void **addr){
 	if(*addr!=NULL){
         if(*addr >= (void *)MMHeap && *addr < (void *)(MMHeap + heap_memory_size)) {FreeMemory(*addr);*addr=NULL;}
         /* PSRAM free — PSRAMbase + PSRAMsize are both 0 on targets

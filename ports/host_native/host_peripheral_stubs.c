@@ -19,6 +19,7 @@
 #include "host_keys.h"
 #include "host_time.h"
 #include "SPI-LCD.h"
+#include "OptionCommands.h"
 
 /* host_parse_pin_arg converts a GPn textual pin argument (or a raw pin
  * number) to the VM's internal pin index. Used by cmd_setpin / fun_pin. */
@@ -72,7 +73,10 @@ void cmd_mov(void) {}
 void cmd_nop(void) {}
 void cmd_Nunchuck(void) {}
 void cmd_onewire(void) {}
-void cmd_option(void) {}
+void cmd_option(void) {
+    if (option_command_handle_common(cmdline, false)) return;
+    error("Option not supported on this port");
+}
 void cmd_out(void) {}
 void cmd_pin(void) {}
 void cmd_pio(void) {}
@@ -560,7 +564,7 @@ const struct Displays display_details[1] = {{ .ref = 0, .name = {0}, .speed = 0,
 /* PSRAM-cache save/restore stubs — real implementation lives in
  * ports/pico_sdk_common/psram_cache.c for device builds; host has no
  * PSRAM and no XIP cache to manage. Lets FileIO.c's
- * disable_interrupts_pico / enable_interrupts_pico bodies run
+ * fileio_flash_write_begin / fileio_flash_write_end bodies run
  * unconditionally. */
 void mmbasic_save_psram_settings(void) {}
 void mmbasic_restore_psram_settings(void) {}
@@ -596,6 +600,9 @@ void port_fun_mm_mqtt_copy(int which, unsigned char *out) {
 
 /* ClearRuntime TCP-state teardown. Host has no TCP state. */
 void port_web_clear_runtime_state(void) {}
+
+void port_runtime_abort_dma(void) {}
+void port_runtime_disable_watchdog(void) {}
 
 /* TCP server + client teardown hooks — host has neither. */
 void cleanserver(void) {}
@@ -642,4 +649,3 @@ int  port_mminfo_lcd320(unsigned char *ep, int64_t *iret, int *t) { (void)ep; (v
 
 /* Host doesn't have a port_audio_default_pwm_slice / port_chip_variant_suffix
  * caller (MM_Misc.c is gated to !MMBASIC_HOST). Stubs not needed. */
-

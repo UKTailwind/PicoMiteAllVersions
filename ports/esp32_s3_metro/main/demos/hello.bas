@@ -7,6 +7,7 @@ PRINT
 PRINT "Try:"
 PRINT "  RUN ""fizzbuzz.bas"""
 PRINT "  RUN ""sieve.bas"""
+PRINT "  FRUN ""mand.bas"""
 PRINT "  EDIT  ""hello.bas"""
 PRINT "  FILES"
 PRINT

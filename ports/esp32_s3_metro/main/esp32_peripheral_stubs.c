@@ -9,22 +9,24 @@
  * sole-provider symbols. Verbatim copy with two rp2350 ifdefs collapsed
  * to the rp2040 form (cmd_pwm SYNC argc, cmd_setpin PWM mode list).
  *
- * Per the D-decouple plan: ESP32 owns its full port surface. Step C
- * drops host_native from the link; this file is the replacement for
- * the cmd_/fun_/state symbols host_peripheral_stubs.c was sole-providing.
+ * Per the D-decouple plan: ESP32 owns its full port surface. This file
+ * is the replacement for the cmd_/fun_/state symbols host_native used
+ * to provide during early bring-up.
  */
 
 #include <setjmp.h>
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
+#include "OptionCommands.h"
 #include "vm_sys_pin.h"
+#include "hal/hal_time.h"
 
-/* host_parse_pin_arg — converts a "GPn" textual pin argument (or raw pin
+/* esp32_parse_pin_arg — converts a "GPn" textual pin argument (or raw pin
  * number) to the VM's internal pin index. Used by cmd_setpin / fun_pin. */
-static int host_parse_pin_arg(unsigned char *arg) {
+static int esp32_parse_pin_arg(unsigned char *arg) {
     unsigned char *p = arg;
     skipspace(p);
-    if ((p[0] == 'G' || p[0] == 'g') && (p[1] == 'P' || p[1] == 'p'))
+    if ((p[0] == 'G' || p[0] == 'g') && (p[1] == 'P' || p[1] == 'p') && isdigit(p[2]))
         return codemap(getinteger(p + 2));
     return getinteger(p);
 }
@@ -103,7 +105,7 @@ void cmd_files_pump_console_key(int *c)
     if (*c == -1) {
         int k = MMInkey();
         if (k != -1) *c = k;
-        else host_sleep_us(10000);  /* 10ms — don't peg a core */
+        else hal_time_sleep_us(10000);  /* 10ms — don't peg a core */
     }
 }
 
@@ -174,11 +176,24 @@ void cmd_Nunchuck(void) {}
 
 void cmd_onewire(void) {}
 
-void cmd_option(void) {}
+void cmd_option(void)
+{
+    if (option_command_handle_common(cmdline, false)) return;
+    error("Option not supported on this port");
+}
 
 void cmd_out(void) {}
 
-void cmd_pin(void) {}
+void cmd_pin(void) {
+    int pin = esp32_parse_pin_arg(cmdline);
+    int value;
+    while (*cmdline && tokenfunction(*cmdline) != op_equal) cmdline++;
+    if (!*cmdline) error("Invalid syntax");
+    cmdline++;
+    if (!*cmdline) error("Invalid syntax");
+    value = getinteger(cmdline);
+    vm_sys_pin_write(pin, value);
+}
 
 void cmd_pio(void) {}
 
@@ -278,7 +293,7 @@ void cmd_setpin(void) {
 
     getargs(&cmdline, 7, (unsigned char *)",");
     if (argc % 2 == 0 || argc < 3) error("Argument count");
-    pin = host_parse_pin_arg(argv[0]);
+    pin = esp32_parse_pin_arg(argv[0]);
 
     if (checkstring(argv[2], (unsigned char *)"OFF") || checkstring(argv[2], (unsigned char *)"0"))
         mode = VM_PIN_MODE_OFF;
@@ -355,8 +370,6 @@ void cmd_watchdog(void) {}
 void cmd_wrap(void) {}
 
 void cmd_wraptarget(void) {}
-
-void cmd_WS2812(void) {}
 
 void cmd_xmodem(void) {}
 
@@ -463,7 +476,7 @@ void fun_peek(void) {
 
 void fun_pin(void) {
     int pin;
-    pin = host_parse_pin_arg(ep);
+    pin = esp32_parse_pin_arg(ep);
     iret = vm_sys_pin_read(pin);
     targ = T_INT;
 }

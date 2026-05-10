@@ -145,6 +145,16 @@ shopt -s nullglob
 HOST_NATIVE_FILES=(ports/host_native/*.c)
 shopt -u nullglob
 
+# ESP32 port scope: the port may reference its own MMBASIC_ESP32 identity
+# macro, but must not grow target-macro gates for other ports or inherit
+# host_native runtime/peripheral sources again. The two host_native VM shims
+# and the legacy hardware/* header-shim include path are temporarily allowed
+# until docs/real-hal/esp32-s3-port.md Stage D step G relocates them.
+shopt -s nullglob
+ESP32_MAIN_C_FILES=(ports/esp32_s3_metro/main/*.c)
+shopt -u nullglob
+ESP32_CMAKE=ports/esp32_s3_metro/main/CMakeLists.txt
+
 # Files tracked informationally (report counts, do not fail).
 INFO_FILES=(
   Draw.c
@@ -264,6 +274,22 @@ check_file_no_wasm() {
   fi
 }
 
+check_esp32_no_host_native_reuse() {
+  local file="$1"
+  [[ -f "$file" ]] || return 0
+  local hits
+  hits="$(grep -n 'ports/host_native' "$file" \
+    | grep -vE '^[0-9]+:[[:space:]]*#' \
+    | grep -vE 'legacy hardware/\* header|legacy hardware/\* Pico SDK header shims' \
+    || true)"
+  if [[ -n "$hits" ]]; then
+    echo "HAL-PURITY FAIL: $file references host_native outside the ESP32 allowlist"
+    echo "    (allowed for now: legacy hardware/* header shims)"
+    echo "$hits" | sed 's/^/    /'
+    fail=1
+  fi
+}
+
 check_file_info() {
   local file="$1"
   if [[ ! -f "$file" ]]; then
@@ -321,6 +347,21 @@ else
   done
   if [[ $fail -eq $pre_fail ]]; then
     echo "    (all host_native sources WASM-clean)"
+  fi
+fi
+
+echo
+echo "ESP32 port scope (strict target gates + no host_native runtime reuse):"
+if [[ ${#ESP32_MAIN_C_FILES[@]} -eq 0 ]]; then
+  echo "    (no ESP32 main sources found)"
+else
+  pre_fail=$fail
+  for f in "${ESP32_MAIN_C_FILES[@]}"; do
+    check_file_strict "$f"
+  done
+  check_esp32_no_host_native_reuse "$ESP32_CMAKE"
+  if [[ $fail -eq $pre_fail ]]; then
+    echo "    (all ESP32 port files clean)"
   fi
 fi
 

@@ -1854,18 +1854,18 @@ void MIPS16 cmd_play(void) {
 			unsigned char *r = GetTempMemory(256);
 			positionfile(WAV_fnbr,0);
 			uint32_t j = RoundUpK4(TOP_OF_SYSTEM_FLASH);
-			disable_interrupts_pico();
+			fileio_flash_write_begin();
 			hal_flash_erase(j, RoundUpK4(fsize));
-			enable_interrupts_pico();
+			fileio_flash_write_end();
 			while(!FileEOF(WAV_fnbr)) { 
 				memset(r,0,256) ;
 				for(i=0;i<256;i++) {
 					if(FileEOF(WAV_fnbr))break;
 					r[i] = FileGetChar(WAV_fnbr);
 				}  
-				disable_interrupts_pico();
+				fileio_flash_write_begin();
 				hal_flash_program(j, (uint8_t *)r, 256);
-				enable_interrupts_pico();
+				fileio_flash_write_end();
 				routinechecks();
 				j+=256;
 			}

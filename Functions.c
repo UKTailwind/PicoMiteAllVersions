@@ -38,13 +38,9 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "Hardware_Includes.h"
 #include <float.h>
 #include "xregex.h"
-#include "hardware/adc.h"
+#include "hal/hal_random.h"
 #include "hal/hal_pin.h"
 #include "port_config.h"
-
-#include "pico/rand.h"  /* get_rand_32/64: pico_rand is linked on every
-                         * device target; host supplies a libc-backed
-                         * shim at host/pico/rand.h. */
 extern long long int  llabs (long long int  n);
 extern void port_fun_mm_mqtt_copy(int which, unsigned char *out);
 const char* overlaid_functions[]={
@@ -977,7 +973,7 @@ void fun_rad(void) {
 // generate a random number that is greater than or equal to 0 but less than 1
 // n = RND()
 void fun_rnd(void) {
-	fret = (MMFLOAT)get_rand_32()/(MMFLOAT)0x100000000;
+	fret = (MMFLOAT)hal_random_u32()/(MMFLOAT)0x100000000;
     targ = T_NBR;
 }
 
@@ -1284,7 +1280,7 @@ void fun_tab(void) {
 
 // get a character from the console input queue
 // s$ = INKEY$
-void __not_in_flash_func(fun_inkey)(void){
+void HAL_PORT_MMBASIC_HOT_FUNC(fun_inkey)(void){
     int i;
 
 	sret = GetTempMemory(STRINGSIZE);									// this buffer is automatically zeroed so the string is zero size

@@ -3,10 +3,9 @@
  * port. None of these need real bodies in the stdio-REPL litmus scope;
  * each is a one-liner that returns 0 / no-op so the link succeeds.
  *
- * Per the D-decouple plan: ESP32 owns its full port surface. These were
- * previously satisfied by host_runtime.c / host_peripheral_stubs.c via
- * --allow-multiple-definition. Each entry below replaces a host_native
- * symbol the ESP32 link should not borrow.
+ * Per the D-decouple plan: ESP32 owns its full port surface. Each entry
+ * below replaces a symbol that was borrowed from host_native during
+ * early bring-up.
  *
  * Symbols requiring real bodies live elsewhere:
  *   - port_drive_check / port_mount_sd_drive / port_apply_load_overrides
@@ -55,6 +54,11 @@ void port_prepare_program_finalize_subfun(int ErrAbort) { (void)ErrAbort; }
  * PicoMiteWEB; ESP32 has native WiFi but the stdio scope explicitly
  * excludes it. No-op for now; real init lands when WiFi opts in. */
 void port_repl_wifi_arch_init_and_connect(void) {}
+
+/* Runtime END/Clear cleanup. ESP32 stdio scope has no DMA/watchdog
+ * resources owned by the shared Pico paths. */
+void port_runtime_abort_dma(void) {}
+void port_runtime_disable_watchdog(void) {}
 
 /* Error-banner font selection — only meaningful when there's an LCD. */
 void port_select_error_prompt_font(void) {}

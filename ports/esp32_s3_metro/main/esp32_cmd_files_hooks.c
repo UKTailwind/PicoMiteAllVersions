@@ -8,10 +8,8 @@
  *   port_apply_load_overrides()   — board-specific Option fixups after
  *                                   LoadOptions().
  *
- * Currently linked alongside host_runtime.c's same-named symbols via
- * --allow-multiple-definition + --wrap=port_drive_check. After
- * D-decouple Step C drops host_native from the link, the wrap goes
- * away and these become the sole strong definitions.
+ * These are sole strong definitions in the ESP32 source list. Do not
+ * reintroduce --wrap or link-order overrides for these hooks.
  */
 
 #include "MMBasic_Includes.h"

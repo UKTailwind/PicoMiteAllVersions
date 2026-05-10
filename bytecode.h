@@ -273,6 +273,8 @@ typedef enum {
     OP_STR_DATE       = 0xE4, /* — push str DATE$ */
     OP_STR_TIME       = 0xE5, /* — push str TIME$ */
     OP_KEYDOWN        = 0xE6, /* pop int n, push int KEYDOWN(n) */
+    OP_MATH_MULDIV    = 0xE7, /* pop bits,b,a; push int ((a*b) wrapped) \ 2^bits */
+    OP_MATH_SQRDIV    = 0xE8, /* pop bits,a; push int ((a*a) wrapped) \ 2^bits */
     OP_SETPIN         = 0xE9, /* mode:16 option:16 — pop pin, SETPIN pin, mode[, option] */
     OP_PIN_READ       = 0xEA, /* pop pin, push int PIN(pin) */
     OP_PIN_WRITE      = 0xEB, /* pop value, pop pin, PIN(pin)=value */
@@ -360,6 +362,10 @@ typedef enum {
     /* Load immediate: [op][dst][value:64] = 10 bytes */
     ROP_LOAD_IMM_I  = 35,
     ROP_LOAD_IMM_F  = 36,
+
+    /* Fused BASIC integer semantics: wrapped multiply, then integer divide */
+    ROP_SQRDIV      = 37,
+    ROP_MULDIV      = 38,
 
     /* Fused fixed-point ops */
     ROP_SQRSHR      = 40,  /* [op][dst][a][bits] = 4 bytes — (a*a)>>bits */

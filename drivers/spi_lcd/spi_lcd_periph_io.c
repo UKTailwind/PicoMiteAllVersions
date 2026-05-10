@@ -15,6 +15,7 @@
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
 #include "pico/stdlib.h"
+#include "hardware/gpio.h"
 #include "hardware/spi.h"
 #include "SSD1963.h"
 #include "Touch.h"

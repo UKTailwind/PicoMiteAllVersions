@@ -5,101 +5,168 @@
  *
  *   flash_prog_buf[]          — RAM mirror of the program-memory region
  *                               (currently 2 × MAX_PROG_SIZE).
- *   host_flash_target_buf[]   — RAM mirror of the flash-slot region used
- *                               for SAVE/CHAIN/etc.
- *   host_flash_option_buf[]   — RAM mirror of the Options blob.
- *   flash_target_contents     — pointer to host_flash_target_buf.
- *   flash_option_contents     — pointer to host_flash_option_buf.
- *   host_options_snapshot()   — copy current Option struct into the
+ *   mmslots partition         — real flash backing for VAR SAVE plus
+ *                               numbered SAVE/LOAD slots.
+ *   esp32_flash_option_buf[]  — RAM mirror of the Options blob.
+ *   flash_target_contents     — mmap view of the numbered slot region.
+ *   flash_option_contents     — pointer to esp32_flash_option_buf.
+ *   esp32_options_snapshot()  — copy current Option struct into the
  *                               option mirror so error()'s LoadOptions
  *                               restores our defaults rather than zeros.
- *   flash_range_erase()       — fill a range with 0xff (RAM-mirror erase).
- *   flash_range_program()     — memcpy a buffer into the mirror.
- *
- * RAM-backed for now; Phase E replaces with esp_partition_*-backed
- * persistence (and at that point the giant host_flash_target_buf goes
- * away — the real flash partition is the storage).
+ *   flash_range_erase()       — erase either program RAM or mmslots flash.
+ *   flash_range_program()     — program either program RAM or mmslots flash.
  */
 
+#include <errno.h>
 #include <stdint.h>
 #include <stddef.h>
 #include <string.h>
 
+#include "esp_err.h"
+#include "esp_log.h"
+#include "esp_partition.h"
+
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"   /* struct option_s + extern Option */
+#include "hal/hal_flash.h"
 
-/* SAVE-to-slot storage isn't wired up yet — it'll live on a real
- * flash partition via esp_partition_mmap. Until then, host_flash_target_buf
- * is a single-page stub: link-satisfying for the `flash_target_contents`
- * pointer and the bounds checks in flash_range_*, but small enough that
- * it doesn't eat the dram0_0_seg budget. SaveProgramToFlash routes the
- * live program through the tokenizer into ProgMemory directly, so it
- * doesn't depend on this region. */
-unsigned char host_flash_target_buf[256];
-unsigned char host_flash_option_buf[sizeof(struct option_s)];
+#define TAG "mmslots"
 
-const uint8_t *flash_target_contents = host_flash_target_buf;
-const uint8_t *flash_option_contents = host_flash_option_buf;
+extern unsigned char flash_prog_buf[];
+
+#define FLASH_PROG_REGION_SIZE  (MAX_PROG_SIZE + 4096)  /* matches esp32_compat.c */
+#define SAVED_VARS_REGION_BASE  ((uint32_t)(FLASH_TARGET_OFFSET + FLASH_ERASE_SIZE))
+#define SLOT_REGION_BASE        ((uint32_t)(SAVED_VARS_REGION_BASE + SAVEDVARS_FLASH_SIZE))
+#define SLOT_REGION_SIZE        ((uint32_t)(MAXFLASHSLOTS * MAX_PROG_SIZE))
+#define MMSLOTS_REGION_SIZE     ((uint32_t)(SAVEDVARS_FLASH_SIZE + SLOT_REGION_SIZE))
+
+static const esp_partition_t *s_mmslots_part;
+static esp_partition_mmap_handle_t s_mmslots_mmap;
+static const uint8_t *s_mmslots_view;
+static unsigned char esp32_flash_target_fallback[256] = { 0xff, 0xff };
+static unsigned char esp32_saved_vars_flash_fallback[32] = { 0xff, 0xff };
+
+unsigned char esp32_flash_option_buf[sizeof(struct option_s)];
+
+const uint8_t *flash_target_contents = esp32_flash_target_fallback;
+const uint8_t *flash_option_contents = esp32_flash_option_buf;
+unsigned char *SavedVarsFlash = esp32_saved_vars_flash_fallback;
 
 __attribute__((constructor))
-static void esp32_flash_storage_init(void) {
-    memset(host_flash_option_buf, 0xff, sizeof host_flash_option_buf);
-    memset(host_flash_target_buf, 0xff, sizeof host_flash_target_buf);
+static void esp32_flash_storage_init_buffers(void) {
+    memset(esp32_flash_option_buf, 0xff, sizeof esp32_flash_option_buf);
+    memset(esp32_flash_target_fallback, 0xff, sizeof esp32_flash_target_fallback);
+    memset(esp32_saved_vars_flash_fallback, 0xff, sizeof esp32_saved_vars_flash_fallback);
 }
 
-void host_options_snapshot(void) {
-    memcpy(host_flash_option_buf, &Option, sizeof Option);
+int esp32_flash_storage_init(void) {
+    if (s_mmslots_part && s_mmslots_view) return 0;
+
+    s_mmslots_part = esp_partition_find_first(
+        ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_ANY, "mmslots");
+    if (!s_mmslots_part) {
+        ESP_LOGE(TAG, "no 'mmslots' partition in partition table");
+        return -ENOENT;
+    }
+    if (s_mmslots_part->size < MMSLOTS_REGION_SIZE) {
+        ESP_LOGE(TAG, "partition too small: have=%lu need=%lu",
+                 (unsigned long)s_mmslots_part->size,
+                 (unsigned long)MMSLOTS_REGION_SIZE);
+        return -ENOSPC;
+    }
+
+    const void *mapped = NULL;
+    esp_err_t err = esp_partition_mmap(s_mmslots_part, 0, MMSLOTS_REGION_SIZE,
+                                       ESP_PARTITION_MMAP_DATA, &mapped,
+                                       &s_mmslots_mmap);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "esp_partition_mmap failed: %s", esp_err_to_name(err));
+        return -EIO;
+    }
+
+    s_mmslots_view = (const uint8_t *)mapped;
+    SavedVarsFlash = (unsigned char *)s_mmslots_view;
+    flash_target_contents = s_mmslots_view + SAVEDVARS_FLASH_SIZE;
+    ESP_LOGI(TAG, "partition: size=%lu slots=%d slot_size=%u",
+             (unsigned long)s_mmslots_part->size,
+             MAXFLASHSLOTS,
+             (unsigned)MAX_PROG_SIZE);
+    return 0;
 }
 
-/* Two regions, mirroring host_native's offset-routing in
- * host_fs_shims.c::flash_range_*:
- *
- *   1. Program-flash region (off ∈ [0, sizeof flash_prog_buf)): real
- *      RAM mirror of the program-memory region. SaveProgramToFlash /
- *      load_basic_source call flash_range_erase(0, MAX_PROG_SIZE) here
- *      to clear ProgMemory before tokenising into it. Works.
- *
- *   2. Slot region (off >= FLASH_TARGET_OFFSET + ...): SAVE-to-slot
- *      storage. Placeholder is 256 bytes, real backing is Stage E1
- *      (esp_partition_*). Anything past the placeholder errors out
- *      loudly so SAVE doesn't look like it worked when bytes had
- *      nowhere to go.
- *
- * SLOT_REGION_BASE matches host_native's HOST_SLOT_REGION_BASE, so
- * cmd_save / cmd_load's `realflashpointer` arithmetic resolves to the
- * same offsets. */
-extern unsigned char flash_prog_buf[];
-#define FLASH_PROG_REGION_SIZE  (MAX_PROG_SIZE + 4096)  /* matches esp32_compat.c */
-#define SLOT_REGION_BASE        ((uint32_t)(FLASH_TARGET_OFFSET + FLASH_ERASE_SIZE + SAVEDVARS_FLASH_SIZE))
-#define SLOT_REGION_SIZE        ((uint32_t)(MAXFLASHSLOTS * MAX_PROG_SIZE))
+void esp32_options_snapshot(void) {
+    memcpy(esp32_flash_option_buf, &Option, sizeof Option);
+}
 
-static inline int off_in_slot_region(uint32_t off, uint32_t count) {
-    return (off >= SLOT_REGION_BASE) &&
+int esp32_flash_storage_load_options(void) {
+    return hal_flash_read_options(esp32_flash_option_buf, sizeof esp32_flash_option_buf);
+}
+
+/* Regions, mirroring host_native's offset-routing in host_fs_shims.c:
+ *
+ *   1. Program-flash region: real RAM mirror of the program-memory
+ *      region. Some shared paths use offset 0, while FLASH LOAD and
+ *      FlashWriteInit(PROGRAM_FLASH) use legacy PROGSTART offsets; both
+ *      forms map to flash_prog_buf.
+ *
+ *   2. Saved-vars + numbered-slot region: backed by the ESP-IDF
+ *      `mmslots` data partition. The legacy offsets still include
+ *      FLASH_TARGET_OFFSET; translate them to partition-relative
+ *      offsets at the boundary. */
+
+static inline int off_in_mmslots_region(uint32_t off, uint32_t count) {
+    return (off >= SAVED_VARS_REGION_BASE) &&
            (off + count <= SLOT_REGION_BASE + SLOT_REGION_SIZE);
 }
 
+static uint32_t mmslots_partition_offset(uint32_t legacy_off) {
+    return legacy_off - SAVED_VARS_REGION_BASE;
+}
+
+static int program_region_offset(uint32_t off, uint32_t count, uint32_t *out) {
+    if (off + count <= FLASH_PROG_REGION_SIZE) {
+        *out = off;
+        return 1;
+    }
+    if (off >= PROGSTART && off + count <= PROGSTART + FLASH_PROG_REGION_SIZE) {
+        *out = off - PROGSTART;
+        return 1;
+    }
+    return 0;
+}
+
 void flash_range_erase(uint32_t off, uint32_t count) {
-    if (off_in_slot_region(off, count)) {
-        if (off + count - SLOT_REGION_BASE > sizeof host_flash_target_buf) {
-            error("SAVE-to-slot not supported on this port yet");
+    uint32_t prog_off = 0;
+    if (off_in_mmslots_region(off, count)) {
+        if (esp32_flash_storage_init() != 0) {
+            error("MMBasic flash partition not available");
         }
-        memset(host_flash_target_buf + (off - SLOT_REGION_BASE), 0xff, count);
+        if (esp_partition_erase_range(s_mmslots_part,
+                                      mmslots_partition_offset(off),
+                                      count) != ESP_OK) {
+            error("Flash erase failed");
+        }
         return;
     }
-    if (off + count > FLASH_PROG_REGION_SIZE) return;
-    memset(flash_prog_buf + off, 0xff, count);
+    if (!program_region_offset(off, count, &prog_off)) return;
+    memset(flash_prog_buf + prog_off, 0xff, count);
 }
 
 void flash_range_program(uint32_t off, const uint8_t *data, size_t len) {
-    if (off_in_slot_region(off, (uint32_t)len)) {
-        if (off + len - SLOT_REGION_BASE > sizeof host_flash_target_buf) {
-            error("SAVE-to-slot not supported on this port yet");
+    uint32_t prog_off = 0;
+    if (off_in_mmslots_region(off, (uint32_t)len)) {
+        if (esp32_flash_storage_init() != 0) {
+            error("MMBasic flash partition not available");
         }
-        memcpy(host_flash_target_buf + (off - SLOT_REGION_BASE), data, len);
+        if (esp_partition_write(s_mmslots_part,
+                                mmslots_partition_offset(off),
+                                data, len) != ESP_OK) {
+            error("Flash program failed");
+        }
         return;
     }
-    if (off + len > FLASH_PROG_REGION_SIZE) return;
-    memcpy(flash_prog_buf + off, data, len);
+    if (!program_region_offset(off, (uint32_t)len, &prog_off)) return;
+    memcpy(flash_prog_buf + prog_off, data, len);
 }
 
 /* SaveProgramToFlash: FileLoadProgram passes us the raw .bas text buffer
@@ -163,26 +230,9 @@ FRESULT hal_ff_unlink   (const TCHAR *p)            { (void)p; return FR_NOT_ENA
 FRESULT hal_ff_chdir    (const TCHAR *p)            { (void)p; return FR_NOT_ENABLED; }
 FRESULT hal_ff_getcwd   (TCHAR *b, UINT n)          { (void)b; (void)n; return FR_NOT_ENABLED; }
 
-/* host_runtime.c used to reference host_sd_root for the --sd-root REPL
- * flag. Not meaningful on device; symbol kept (NULL) in case any
- * surviving caller still reads it. */
-const char *host_sd_root = NULL;
-
-/* MMBasic VAR SAVE / VAR RESTORE persists user-saved variables to a
- * dedicated flash region. Pico ports point SavedVarsFlash at the
- * SAVEDVARS_FLASH_SIZE-bound chunk inside flash_target_contents; host
- * uses a 32-byte RAM buffer (just enough to satisfy the symbol).
- *
- * Stdio scope follows host's pattern — RAM-backed mirror. Real flash
- * persistence comes when Stage E1 wires esp_partition_* into the slot
- * region; at that point this buffer goes away. */
-static unsigned char esp32_saved_vars_flash_buf[32] = { 0xff, 0xff };
-unsigned char *SavedVarsFlash = esp32_saved_vars_flash_buf;
-
 /* Read-only pointer to the program-memory region. On Pico this points
  * at the XIP-mapped flash partition that holds the saved BASIC program.
  * On ESP32 stdio scope it points at our RAM mirror (flash_prog_buf in
- * esp32_compat.c) — same byte content, just not actually in flash yet.
- * Stage E1 swaps in an esp_partition_mmap-backed const view. */
+ * esp32_compat.c) — same byte content, just not actually in flash yet. */
 extern unsigned char flash_prog_buf[];
 const uint8_t *flash_progmemory = flash_prog_buf;

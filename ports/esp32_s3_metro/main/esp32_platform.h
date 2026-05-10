@@ -8,8 +8,10 @@
  * provides the small set of typedefs the core expects to be available
  * before any MMBasic header is parsed.
  *
- * The Pico SDK *header* shims (pico/stdlib.h, hardware/pwm.h, etc.) live
- * under ports/host_native/{pico,hardware}/ and are reused via -I.
+ * Pico SDK compatibility headers are temporary shims while the remaining
+ * shared code is migrated to HAL. Core/shared code no longer needs
+ * pico/stdlib.h; legacy hardware/ header shims still come from ports/host_native
+ * until that path is retired.
  */
 
 #ifndef MMBASIC_ESP32_PLATFORM_H

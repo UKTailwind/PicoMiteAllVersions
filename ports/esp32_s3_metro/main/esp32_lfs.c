@@ -95,17 +95,21 @@ extern const char demo_fizzbuzz_start[] asm("_binary_fizzbuzz_bas_start");
 extern const char demo_fizzbuzz_end[]   asm("_binary_fizzbuzz_bas_end");
 extern const char demo_sieve_start[]    asm("_binary_sieve_bas_start");
 extern const char demo_sieve_end[]      asm("_binary_sieve_bas_end");
+extern const char demo_mand_start[]     asm("_binary_mand_bas_start");
+extern const char demo_mand_end[]       asm("_binary_mand_bas_end");
 
 struct embedded_demo {
     const char *name;
     const char *start;
     const char *end;
+    int refresh;
 };
 
 static const struct embedded_demo s_demos[] = {
-    { "hello.bas",    demo_hello_start,    demo_hello_end    },
-    { "fizzbuzz.bas", demo_fizzbuzz_start, demo_fizzbuzz_end },
-    { "sieve.bas",    demo_sieve_start,    demo_sieve_end    },
+    { "hello.bas",    demo_hello_start,    demo_hello_end,    0 },
+    { "fizzbuzz.bas", demo_fizzbuzz_start, demo_fizzbuzz_end, 0 },
+    { "sieve.bas",    demo_sieve_start,    demo_sieve_end,    0 },
+    { "mand.bas",     demo_mand_start,     demo_mand_end,     0 },
 };
 
 static void populate_demos(void) {
@@ -113,7 +117,14 @@ static void populate_demos(void) {
         const struct embedded_demo *d = &s_demos[i];
         size_t len = (size_t)(d->end - d->start);
         lfs_file_t f;
-        int err = lfs_file_open(&lfs, &f, d->name, LFS_O_WRONLY | LFS_O_CREAT | LFS_O_TRUNC);
+        int err = lfs_file_open(&lfs, &f, d->name, LFS_O_RDONLY);
+        if (!err && !d->refresh) {
+            lfs_soff_t existing_size = lfs_file_size(&lfs, &f);
+            lfs_file_close(&lfs, &f);
+            if (existing_size > 0) continue;
+        }
+        if (!err) lfs_file_close(&lfs, &f);
+        err = lfs_file_open(&lfs, &f, d->name, LFS_O_WRONLY | LFS_O_CREAT | LFS_O_TRUNC);
         if (err) {
             ESP_LOGW("lfs", "demo %s: open failed (%d)", d->name, err);
             continue;
@@ -150,7 +161,8 @@ int esp32_lfs_mount(void) {
     if (err) { ESP_LOGE("lfs", "lfs_mount failed: %d", err); return -1; }
     s_mounted = 1;
     ESP_LOGI("lfs", "LittleFS mounted (A:)");
-    if (formatted) populate_demos();
+    (void)formatted;
+    populate_demos();
     return 0;
 }
 

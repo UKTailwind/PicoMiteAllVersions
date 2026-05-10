@@ -1,10 +1,10 @@
 /*
- * host/vm_sys_file_host.c — host-side impl of the VM's file syscalls.
+ * ports/vm_sys_sim/vm_sys_file_sim.c — simulator impl of the VM's file syscalls.
  *
  * Backs OPEN / CLOSE / INPUT / PRINT / LINE INPUT / EOF / CHR$ etc.
- * with the in-memory FAT simulator from host/vm_host_fat.c. Paired
- * with vm_sys_file.c (device-side FatFS impl); the build links
- * exactly one of the two per target.
+ * with the in-memory FAT simulator from ports/host_native/vm_host_fat.c.
+ * Paired with vm_sys_file.c (device-side FatFS/LFS impl); the build
+ * links exactly one implementation body per target.
  *
  * Shared helpers (vm_file_line_append, vm_file_is_drive_spec,
  * vm_file_drive_index, vm_file_normalize_resolved_path) live as
@@ -310,4 +310,3 @@ void vm_sys_file_copy(const char *from_name, const char *to_name, int mode) {
     f_close(&dst);
     if (res != FR_OK) error("File error");
 }
-

@@ -14,12 +14,6 @@
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
 
-/* Pin-definition table — zero-initialized so any code that probes
- * PinDef[].name == NULL on this port sees "no pin function configured".
- * Sized via NBRPINS, which is HAL_PORT_NBR_PINS = 49 on this port
- * (ESP32-S3 has GPIO 0..48). */
-const struct s_PinDef PinDef[NBRPINS + 1] = {{0}};
-
 /* Prompt rendering attributes. Match host_runtime.c's defaults: white
  * foreground, black background, font index 1 (the standard 8x16). */
 int PromptFC   = 0xFFFFFF;
@@ -66,12 +60,6 @@ int xregexec(void *preg, const char *string, int nmatch, void *pmatch, int eflag
     (void)preg; (void)string; (void)nmatch; (void)pmatch; (void)eflags; return -1;
 }
 void xregfree(void *preg) { (void)preg; }
-
-/* GP-pin -> VM-pin codemap. Each device port has its own pin_tables.c
- * mapping the BASIC `GPn` syntax to the chip's GPIO index. Stdio scope
- * doesn't expose hardware pins; identity mapping satisfies any callers
- * that compute via codemap before checking pin validity downstream. */
-int codemap(int pin) { return pin; }
 
 /* rp2350a chip-detect bool. True only on rp2350a hardware (a Pico-SDK
  * runtime detect); false everywhere else, including ESP32. */

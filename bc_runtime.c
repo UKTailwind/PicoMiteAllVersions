@@ -161,18 +161,10 @@ void bc_run_diag_dump(const char *reason) {
 void bc_run_source_string_ex(const char *source, const char *source_name, int is_immediate);
 
 /* Free the source buffer between compile and runtime-table allocation.
- * Heap-tight ports (pico, esp32, future ARM) reclaim the source buffer
- * before VM runtime tables allocate — that's the default below. Host
- * overrides with a no-op via host_runtime.c because its source may come
- * from the test harness via malloc, where BC_FREE would be incorrect
- * (pointer isn't in MMHeap). The strong override in host_runtime.c wins
- * the link; everywhere else gets the BC_FREE behaviour automatically. */
-__attribute__((weak)) void port_bc_runtime_free_source(const char **source) {
-    if (source && *source) {
-        BC_FREE((void *)*source);
-        *source = NULL;
-    }
-}
+ * Each port must provide exactly one strong definition. Heap-tight
+ * device ports usually BC_FREE the source buffer; host ports keep it
+ * because their test harness may own malloc-backed source memory. */
+void port_bc_runtime_free_source(const char **source);
 #define bc_release_source(p) port_bc_runtime_free_source(p)
 
 /* FRUN / RUN load their source through BasicFileOpen + FileGetChar

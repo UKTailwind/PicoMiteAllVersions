@@ -34,6 +34,8 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
+#include "hal/hal_time.h"
+#include "hardware/uart.h"
 
 void xmodemTransmit(char *p, int fnbr);
 void xmodemReceive(char *sp, int maxbytes, int fnbr, int crunch);
@@ -130,17 +132,17 @@ void MIPS16 cmd_xmodem(void) {
 
 int _inbyte(int timeout) {
     int c;
-    uint64_t timer=time_us_64()+timeout*1000;
+    uint64_t timer=hal_time_us_64()+timeout*1000;
     if(!rcvnoint){
-        while(time_us_64() < timer) {
+        while(hal_time_us_64() < timer) {
             c = getConsole();
             if(c != -1) {
                 return c;
             }
         }
     } else {
-        while(time_us_64() < timer && !uart_is_readable((Option.SerialConsole & 3)==1 ? uart0 : uart1)) {}
-        if(time_us_64() < timer) return uart_getc((Option.SerialConsole & 3)==1 ? uart0 : uart1);
+        while(hal_time_us_64() < timer && !uart_is_readable((Option.SerialConsole & 3)==1 ? uart0 : uart1)) {}
+        if(hal_time_us_64() < timer) return uart_getc((Option.SerialConsole & 3)==1 ? uart0 : uart1);
     }
     return -1;
 }

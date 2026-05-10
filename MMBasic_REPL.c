@@ -16,6 +16,7 @@
 
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
+#include "Draw.h"
 #include "hal/hal_keyboard.h"
 #include "hal/hal_main_init.h"
 
@@ -196,12 +197,8 @@ void MMBasic_RunPromptLoop(void) {
         }
     }
     while(1) {
-    if(Option.DISPLAY_CONSOLE) {
-        SetFont(PromptFont);
-        gui_fcolour = PromptFC;
-        gui_bcolour = PromptBC;
-        if(CurrentX != 0) MMPrintString("\r\n");                    // prompt should be on a new line
-    }
+    ApplyPromptConsoleColours();
+    if(Option.DISPLAY_CONSOLE && CurrentX != 0) MMPrintString("\r\n");                    // prompt should be on a new line
         MMAbort = false;
         BreakKey = BREAK_KEY;
         EchoOption = true;

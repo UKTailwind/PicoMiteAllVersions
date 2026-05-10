@@ -475,8 +475,7 @@ void clear320(void) {}
 /* DisplayPutC is now the real one from gfx_console_shared.c. It gates on
  * Option.DISPLAY_CONSOLE and calls through the DrawBitmap / DrawRectangle
  * function pointers set up in host_runtime_begin. */
-/* enable_interrupts_pico / disable_interrupts_pico are provided by
- * FileIO.c (body empty-gated under MMBASIC_HOST). */
+/* Flash write-batch hooks are provided by FileIO.c. */
 void initMouse0(int sensitivity) { (void)sensitivity; }
 void restorepanel(void) { WriteBuf = NULL; }
 void routinechecks(void) { host_runtime_check_timeout(); }

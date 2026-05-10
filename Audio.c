@@ -35,14 +35,11 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include <stdbool.h>                                // Pascal
 #include <stdint.h>                                 // Pascal
 #include "ffconf.h"
-#include "hardware/pwm.h"
-#include "hardware/irq.h"
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
 #include "port_config.h"
 #include "hal/hal_flash.h"
 #include "hal/hal_time.h"
-#include "hardware/regs/addressmap.h"     /* XIP_BASE */
 
 
 /* Audio.c: host-side cmd_play / CloseAudio / StopAudio / checkWAVinput. */

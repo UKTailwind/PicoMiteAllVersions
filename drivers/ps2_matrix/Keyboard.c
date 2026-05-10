@@ -38,7 +38,8 @@ the non US keyboard layouts
 
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
-#include "picomite_gpio_irq.h"
+#include "hardware/gpio.h"
+#include "pico_gpio_irq.h"
 void setLEDs(int num, int caps, int scroll);
 bool sendCommand(int cmd, int clock, int data);
 volatile char CapsLock;
@@ -428,7 +429,7 @@ void KBDIntEnable(int status)
     if (!CallBackEnabled)
     {
       CallBackEnabled = 32;
-      picomite_gpio_irq_set_enabled(PinDef[Option.KEYBOARD_CLOCK].GPno, GPIO_IRQ_EDGE_FALL, true);
+      pico_gpio_irq_set_enabled(PinDef[Option.KEYBOARD_CLOCK].GPno, GPIO_IRQ_EDGE_FALL, true);
     }
     else
     {
@@ -439,7 +440,7 @@ void KBDIntEnable(int status)
   else
   {
     if (CallBackEnabled == 32)
-      picomite_gpio_irq_set_enabled(PinDef[Option.KEYBOARD_CLOCK].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
+      pico_gpio_irq_set_enabled(PinDef[Option.KEYBOARD_CLOCK].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
     else
       gpio_set_irq_enabled(PinDef[Option.KEYBOARD_CLOCK].GPno, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, false);
     CallBackEnabled &= (~32);

@@ -71,6 +71,10 @@ int hal_flash_read_jedec_id(uint8_t out[4])
     return 0;
 }
 
+void hal_flash_write_begin(void) {}
+void hal_flash_write_end(void) {}
+int hal_flash_write_active(void) { return 0; }
+
 int hal_flash_read_options(void *buf, size_t len)
 {
     if (buf == NULL) return -EINVAL;

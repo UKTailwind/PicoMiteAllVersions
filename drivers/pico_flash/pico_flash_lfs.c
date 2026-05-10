@@ -10,7 +10,7 @@
  * at boot once Option.FlashSize is known, the same way it did before
  * the move.
  *
- * Reaches disable_interrupts_pico / enable_interrupts_pico via FileIO.h;
+ * Reaches fileio_flash_write_begin / fileio_flash_write_end via FileIO.h;
  * they serialise PSRAM setting save/restore around the flash write, a
  * concern that belongs to those helpers, not to this driver.
  *
@@ -27,7 +27,7 @@
 #include "hardware/regs/addressmap.h"  /* XIP_BASE */
 
 #include "hal/hal_flash.h"
-#include "FileIO.h"                    /* disable_interrupts_pico / enable_interrupts_pico */
+#include "FileIO.h"                    /* fileio_flash_write_begin/end */
 #include "lfs.h"
 
 #define BLOCK_SIZE 4096
@@ -83,9 +83,9 @@ int __not_in_flash_func(fs_flash_prog)(const struct lfs_config *cfg, lfs_block_t
     uint32_t addr = RoundUpK4(TOP_OF_SYSTEM_FLASH)
                   + (Option.modbuff ? 1024 * Option.modbuffsize : 0)
                   + block * 4096 + off;
-    disable_interrupts_pico();
+    fileio_flash_write_begin();
     hal_flash_program(addr, buffer, size);
-    enable_interrupts_pico();
+    fileio_flash_write_end();
     return 0;
 }
 
@@ -96,9 +96,9 @@ int __not_in_flash_func(fs_flash_erase)(const struct lfs_config *cfg, lfs_block_
     uint32_t block_addr = RoundUpK4(TOP_OF_SYSTEM_FLASH)
                         + (Option.modbuff ? 1024 * Option.modbuffsize : 0)
                         + block * 4096;
-    disable_interrupts_pico();
+    fileio_flash_write_begin();
     hal_flash_erase(block_addr, BLOCK_SIZE);
-    enable_interrupts_pico();
+    fileio_flash_write_end();
     return 0;
 }
 

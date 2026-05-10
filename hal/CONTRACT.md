@@ -64,6 +64,22 @@ int      hal_time_rtc_set(const struct hal_datetime *in);
 
 ---
 
+## `hal_random.h` — random source
+
+*Status: active.*
+
+```c
+uint32_t hal_random_u32(void);
+```
+
+**Guarantees:**
+- Returns a 32-bit random value suitable for BASIC `RND()` and non-cryptographic internal uses.
+- Device ports should use hardware entropy when available.
+- Host/test ports may use libc `rand()` so `RANDOMIZE` remains deterministic in tests.
+- Core code must not call Pico SDK `get_rand_32()` / `get_rand_64()` directly.
+
+---
+
 ## `hal_flash.h` — persistent option block + device ID (Phase 1)
 
 *Status: sketch; finalised in Phase 1.*
