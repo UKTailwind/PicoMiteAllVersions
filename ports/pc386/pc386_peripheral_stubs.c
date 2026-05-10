@@ -302,6 +302,7 @@ uint32_t host_runtime_get_pixel(int x, int y) { (void)x; (void)y; return 0; }
 #include "ff.h"
 FRESULT vm_host_fat_mount(void) { return FR_OK; }
 const char *vm_host_fat_path(const char *p) { return p; }
+void vm_host_fat_reset(void) {}
 
 /* flash_option_contents / flash_target_contents now live in
  * pc386_flash.c, which owns the real backing buffers + the

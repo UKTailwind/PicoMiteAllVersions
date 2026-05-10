@@ -37,8 +37,49 @@
 #include "pc386_panic.h"
 
 extern void pc386_flash_init(void);
+extern void flash_range_erase(uint32_t off, uint32_t count);
 extern void host_runtime_begin(void);
+extern void vm_host_fat_reset(void);
+extern void vm_sys_file_reset(void);
+extern void vm_sys_pin_reset(void);
 extern jmp_buf mark;
+
+/* Embedded test program — exercises PRINT (string + numeric) so we
+ * can see whether MMBasic_Print's path through MMputchar → serial
+ * actually reaches COM1 without touching panic-stubbed printf. */
+static const char *pc386_demo_program =
+    "PRINT \"Hello from PC386\"\n"
+    "PRINT \"1+1=\"; 1+1\n"
+    "PRINT \"Done.\"\n";
+
+/* Tokenise `source` into ProgMemory line by line. Stripped-down version
+ * of host_main.c's load_basic_source — no continuation support, just
+ * split on '\n' and feed each line through tokenise(). */
+static int pc386_load_source(const char *source) {
+    flash_range_erase(0, MAX_PROG_SIZE);
+    unsigned char *pm = ProgMemory;
+    const char *line = source;
+    while (*line) {
+        const char *eol = line;
+        while (*eol && *eol != '\n') eol++;
+        size_t len = (size_t)(eol - line);
+        if (len > 0 && line[len - 1] == '\r') len--;
+        if (len > 0) {
+            if (len >= STRINGSIZE) len = STRINGSIZE - 1;
+            memcpy(inpbuf, line, len);
+            inpbuf[len] = '\0';
+            tokenise(0);
+            unsigned char *tp = tknbuf;
+            while (!(tp[0] == 0 && tp[1] == 0)) *pm++ = *tp++;
+            *pm++ = 0;
+        }
+        line = (*eol == '\n') ? eol + 1 : eol;
+    }
+    *pm++ = 0;
+    *pm++ = 0;
+    PSize = (int)(pm - ProgMemory);
+    return 0;
+}
 
 static __attribute__((noreturn)) void halt(void) {
     for (;;) {
@@ -284,6 +325,29 @@ void kmain(uint32_t magic, uint32_t info_addr) {
     host_runtime_begin();
     kputs("host_runtime_begin ok\n");
 
-    kputs("\nMMBasic standing — REPL/program execution lands in stage 3d/3e.\n");
+    /* ---------- ExecuteProgram on an embedded BASIC source (3d) ----- */
+
+    kputs("\n--- BASIC output ---\n");
+
+    pc386_load_source(pc386_demo_program);
+
+    vm_host_fat_reset();
+    vm_sys_file_reset();
+    vm_sys_pin_reset();
+    ClearRuntime(true);
+    PrepareProgram(1);
+
+    if (setjmp(mark) == 0) {
+        ExecuteProgram(ProgMemory);
+        kputs("\n--- end (clean exit) ---\n");
+    } else {
+        kputs("\n--- end (error) ---\n");
+        if (MMErrMsg[0]) {
+            kputs("Error: ");
+            kputs(MMErrMsg);
+            kputc('\n');
+        }
+    }
+
     halt();
 }
