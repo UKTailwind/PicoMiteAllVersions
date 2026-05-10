@@ -32,13 +32,19 @@ endif
 CFLAGS = -std=gnu11 -ffreestanding -O2 -g \
          -Wall -Wextra -Wno-unused-parameter -Wno-unused-function \
          -fno-pic -fno-pie -fno-stack-protector \
-         -mno-red-zone -mno-mmx -mno-sse -mno-sse2 -mno-80387 \
+         -mno-red-zone -mno-mmx -mno-sse -mno-sse2 \
          -DMMBASIC_HOST -DPORT_PC386 \
          -DFF_STR_VOLUME_ID=1 -DFF_VOLUME_STRS='"A","C"' \
-         -I$(PORT_DIR) -I$(REPO_ROOT)/ports/host_native -I$(REPO_ROOT) \
+         -include pc386_platform.h \
+         -I$(PORT_DIR)/include_shim -I$(PORT_DIR) \
+         -I$(REPO_ROOT)/ports/host_native -I$(REPO_ROOT) \
          -MMD -MP
 
-ASFLAGS = $(CFLAGS)
+# Assembly: drop -include (assembler can't parse C typedefs) and the
+# include_shim path (no .S file needs it).
+ASFLAGS = -ffreestanding -g -fno-pic -fno-pie \
+          -DMMBASIC_HOST -DPORT_PC386 \
+          -I$(PORT_DIR) -I$(REPO_ROOT)
 
 LDFLAGS = -nostdlib -no-pie -T $(PORT_DIR)/linker.ld -Wl,--build-id=none
 
@@ -47,13 +53,18 @@ LDFLAGS = -nostdlib -no-pie -T $(PORT_DIR)/linker.ld -Wl,--build-id=none
 # Stage 2+ extends CORE_SRCS / NATIVE_SRCS / BC_SRCS in the same shape
 # as ports/mmbasic_stdio/Makefile.
 
-PORT_ASM  = boot.S
+PORT_ASM  = boot.S setjmp.S
 PORT_SRCS = kmain.c kprint.c mmap.c heap_region.c kstring.c \
-            pc386_panic.c \
+            pc386_panic.c pc386_libc.c \
             hal_audio_pc386.c hal_filesystem_pc386.c hal_flash_pc386.c \
             hal_keyboard_pc386.c hal_pin_pc386.c hal_random_pc386.c \
             hal_storage_pc386.c hal_time_pc386.c \
             hal_vm_framebuffer_pc386.c
+
+# MMBasic core sources brought in for stage 3c.1+. Mirrors mmbasic_stdio's
+# CORE_SRCS list, growing as each file's link surface is satisfied.
+CORE_SRCS = Operators.c
+CORE_C_OBJS := $(addprefix $(BUILD_DIR)/core/,$(CORE_SRCS:.c=.o))
 
 # Shared no-op HAL impls (linked across host_native, mmbasic_stdio,
 # esp32, pc386 — anything without real hardware for that surface).
@@ -78,8 +89,8 @@ PORT_C_OBJS := $(addprefix $(BUILD_DIR)/,$(PORT_SRCS:.c=.o))
 DRV_C_OBJS  := $(addprefix $(BUILD_DIR)/drivers/,$(DRIVER_SRCS:.c=.o))
 ROOT_C_OBJS := $(addprefix $(BUILD_DIR)/root/,$(FATFS_SRCS:.c=.o))
 HAL_C_OBJS  := $(addprefix $(BUILD_DIR)/hal/generic/,$(HAL_GENERIC_SRCS:.c=.o))
-OBJS        := $(ASM_OBJS) $(PORT_C_OBJS) $(DRV_C_OBJS) $(ROOT_C_OBJS) $(HAL_C_OBJS)
-DEPS        := $(PORT_C_OBJS:.o=.d) $(DRV_C_OBJS:.o=.d) $(ROOT_C_OBJS:.o=.d) $(HAL_C_OBJS:.o=.d)
+OBJS        := $(ASM_OBJS) $(PORT_C_OBJS) $(DRV_C_OBJS) $(ROOT_C_OBJS) $(HAL_C_OBJS) $(CORE_C_OBJS)
+DEPS        := $(PORT_C_OBJS:.o=.d) $(DRV_C_OBJS:.o=.d) $(ROOT_C_OBJS:.o=.d) $(HAL_C_OBJS:.o=.d) $(CORE_C_OBJS:.o=.d)
 
 KERNEL := $(BUILD_DIR)/mmbasic.elf
 
@@ -110,6 +121,11 @@ $(BUILD_DIR)/root/%.o: $(REPO_ROOT)/%.c
 
 # Shared HAL impls.
 $(BUILD_DIR)/hal/generic/%.o: $(REPO_ROOT)/hal/generic/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+# MMBasic core sources from the repo root.
+$(BUILD_DIR)/core/%.o: $(REPO_ROOT)/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c -o $@ $<
 

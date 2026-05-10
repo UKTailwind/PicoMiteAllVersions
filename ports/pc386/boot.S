@@ -60,6 +60,26 @@ _start:
     movl    $stack_top, %esp
     xorl    %ebp, %ebp              /* terminate frame pointer chain */
 
+    /* Bring up the x87 FPU. CR0:
+     *   bit 1 (MP)  set   — Monitor coProcessor; #NM on WAIT/FWAIT
+     *                       when TS is set. Required when an FPU is present.
+     *   bit 2 (EM)  clear — no soft-FP emulation; real FPU instructions
+     *                       run natively.
+     *   bit 3 (TS)  clear — Task Switched flag; no lazy FPU context yet.
+     *   bit 5 (NE)  set   — Native FPU error reporting via #16 exception
+     *                       (vs. legacy IRQ13 PIC routing).
+     * After CR0 is set, FNINIT puts the x87 in a known state. We're
+     * targeting 486DX+ in practice; the original 386 needed an external
+     * 387, but every machine that runs MMBasic-as-OS in 2026 has one
+     * integrated. */
+    movl    %cr0, %eax
+    andl    $~(1 << 2), %eax        /* clear EM */
+    andl    $~(1 << 3), %eax        /* clear TS */
+    orl     $(1 << 1), %eax         /* set   MP */
+    orl     $(1 << 5), %eax         /* set   NE */
+    movl    %eax, %cr0
+    fninit                          /* reset FPU state — exceptions masked */
+
     /* Push EBX (info pointer) then EAX (magic) — cdecl, so they end
      * up as kmain's first and second arguments. */
     pushl   %ebx
