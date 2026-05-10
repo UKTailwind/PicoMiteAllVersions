@@ -8,18 +8,17 @@
  * Stage 0: serial + VGA text, banner.
  * Stage 1: multiboot mmap parse, MMBasic heap region reserved.
  * Stage 2a: ATA-PIO probe + raw sector-0 dump.
- * Stage 2b (this stage): mount FAT on each present drive (FatFs over
- *          ATA-PIO via drivers/fatfs/ff_glue.c) and list the root
- *          directory. Proves the full disk -> FS -> file enumeration
- *          chain before MMBasic lands on top.
+ * Stage 2b: mount FAT on each present drive (FatFs over ATA-PIO via
+ *          drivers/fatfs/ff_glue.c) and list the root directory.
+ * Stage 2c (this stage): mount on the user-visible drive letters
+ *          "A:" and "C:" instead of the FatFs numeric IDs "0:"/"1:".
+ *          Achieved via FF_VOLUME_STRS injection through Makefile -D.
  *
  * Deliberately NOT yet:
- *   - friendly drive letters (A:, C:) — using FatFs numeric volume IDs
- *     ("0:", "1:") because the repo-shared ffconf.h binds A:/B: to
- *     other ports and we'd rather not fork it
  *   - allocator on top of heap region (Stage 3)
  *   - IDT / PIC / IRQs (Stage 4)
  *   - any MMBasic core (Stage 3)
+ *   - Limine bootloader (Stage 2d)
  */
 
 #include <stdbool.h>
@@ -196,7 +195,7 @@ void kmain(uint32_t magic, uint32_t info_addr) {
     vga_text_init();
 
     vga_text_set_color(VGA_LIGHT_GREEN, VGA_BLACK);
-    kputs("PicoMite PC386 - Stage 2b\n");
+    kputs("PicoMite PC386 - Stage 2c\n");
     vga_text_set_color(VGA_LIGHT_GRAY, VGA_BLACK);
 
     kputs("multiboot1 magic: ");
@@ -246,9 +245,9 @@ void kmain(uint32_t magic, uint32_t info_addr) {
 
     kputc('\n');
     kputs("FAT volumes:\n");
-    mount_and_list("0:", "  drive A", &fs0);
-    mount_and_list("1:", "  drive C", &fs1);
+    mount_and_list("A:", "  drive A", &fs0);
+    mount_and_list("C:", "  drive C", &fs1);
 
-    kputs("\nStage 2b complete. Halting.\n");
+    kputs("\nStage 2c complete. Halting.\n");
     halt();
 }
