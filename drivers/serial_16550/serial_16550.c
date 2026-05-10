@@ -107,3 +107,15 @@ void serial_puts(const char *s) {
         serial_putc(*s++);
     }
 }
+
+int serial_getc_nonblock(void) {
+    if ((inb(COM1_LSR) & LSR_DATA_READY) == 0) return -1;
+    return (int) inb(COM1_RBR);
+}
+
+int serial_getc_blocking(void) {
+    while ((inb(COM1_LSR) & LSR_DATA_READY) == 0) {
+        /* spin */
+    }
+    return (int) inb(COM1_RBR);
+}

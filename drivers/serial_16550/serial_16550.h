@@ -25,4 +25,13 @@ bool serial_init(void);   /* false if loopback self-test fails */
 void serial_putc(char c);
 void serial_puts(const char *s);
 
+/* Non-blocking RX. Returns 0..255 if a byte is waiting in the UART
+ * receive register, or -1 if nothing's there. */
+int  serial_getc_nonblock(void);
+
+/* Blocks until a byte is available, then returns it. Stage 3 spins on
+ * the LSR data-ready bit — Stage 4 will swap for IRQ-driven once the
+ * IDT + PIC come up. */
+int  serial_getc_blocking(void);
+
 #endif

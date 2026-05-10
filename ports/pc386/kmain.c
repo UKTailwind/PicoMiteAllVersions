@@ -42,6 +42,7 @@ extern void host_runtime_begin(void);
 extern void vm_host_fat_reset(void);
 extern void vm_sys_file_reset(void);
 extern void vm_sys_pin_reset(void);
+extern void pc386_repl(void);
 extern jmp_buf mark;
 
 /* Embedded test program — exercises PRINT (string + numeric) so we
@@ -325,29 +326,27 @@ void kmain(uint32_t magic, uint32_t info_addr) {
     host_runtime_begin();
     kputs("host_runtime_begin ok\n");
 
-    /* ---------- ExecuteProgram on an embedded BASIC source (3d) ----- */
+    /* ---------- Demo program: prove ExecuteProgram works ------------ */
 
-    kputs("\n--- BASIC output ---\n");
-
+    kputs("\n--- demo program ---\n");
     pc386_load_source(pc386_demo_program);
-
     vm_host_fat_reset();
     vm_sys_file_reset();
     vm_sys_pin_reset();
     ClearRuntime(true);
     PrepareProgram(1);
-
     if (setjmp(mark) == 0) {
         ExecuteProgram(ProgMemory);
-        kputs("\n--- end (clean exit) ---\n");
-    } else {
-        kputs("\n--- end (error) ---\n");
-        if (MMErrMsg[0]) {
-            kputs("Error: ");
-            kputs(MMErrMsg);
-            kputc('\n');
-        }
+    } else if (MMErrMsg[0]) {
+        kputs("\nDemo error: ");
+        kputs(MMErrMsg);
+        kputc('\n');
     }
 
+    /* ---------- REPL ------------------------------------------------- */
+
+    pc386_repl();
+
+    /* pc386_repl() never returns; reach here only if it does. */
     halt();
 }

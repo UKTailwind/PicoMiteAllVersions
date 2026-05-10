@@ -31,6 +31,7 @@ void (*host_output_hook)(const char *text, int len) = NULL;
 
 extern uint64_t hal_time_us_64(void);
 extern uint64_t timeroffset;
+extern void flash_range_erase(uint32_t off, uint32_t count);
 
 /* =========================================================================
  *  Runtime lifecycle
@@ -119,18 +120,29 @@ void SSPrintString(char *s) {
     while (*s) SerialConsolePutC(*s++, 0);
 }
 
+/* Stage 3e input: poll COM1 RX with normalisation.
+ *
+ * Terminal byte → MMBasic key code:
+ *   0x0A (LF)         → ENTER (0x0D)
+ *   0x7F (DEL, macOS) → BKSP  (0x08)
+ *   anything else     → as-is
+ * Real Editor.c-driven REPL with arrow keys / history lands in stage 4
+ * once we have IRQ-driven input + a proper VT100 escape decoder. */
+static int pc386_normalise_key(int c) {
+    if (c == '\n') return ENTER;
+    if (c == 0x7F) return BKSP;
+    return c;
+}
+
 int MMInkey(void) {
-    /* No interrupt-driven RX yet — input comes in stage 3e (polling
-     * COM1 RX register). Stage 3 returns -1 (no key) so AUTOEXEC.BAS-
-     * style programs that don't poll the keyboard run cleanly. */
-    return -1;
+    int c = serial_getc_nonblock();
+    if (c < 0) return -1;
+    return pc386_normalise_key(c);
 }
 
 int MMgetchar(void) {
-    /* Block until a key arrives. Stage 3e wires the real polling loop;
-     * stage 3 panics so a BASIC program that does INPUT before that
-     * surfaces the gap. */
-    pc386_panic("MMgetchar called before stage 3e input wiring");
+    int c = serial_getc_blocking();
+    return pc386_normalise_key(c);
 }
 
 int  getConsole(void)      { return -1; }
@@ -170,6 +182,106 @@ void MMgetline(int filenbr, char *p) {
 }
 
 void printoptions(void) { }
+
+/* =========================================================================
+ *  REPL — read line over COM1, tokenise, run, repeat.
+ *
+ *  Stage 3 minimum: line-buffered with echo + backspace, no arrow
+ *  keys, no history, no multi-line editing. The full Editor.c-driven
+ *  REPL with VT100 escapes lands in stage 4 once PS/2 + IRQs are
+ *  online.
+ *
+ *  Each iteration:
+ *    1. Print "PC386> " prompt.
+ *    2. Read chars via serial_getc_blocking; echo each. Backspace
+ *       erases the last char on screen and in the line buffer. Skip
+ *       NUL bytes (some terminals send a stray 0x00 right after
+ *       connect).
+ *    3. On ENTER: tokenise the line into ProgMemory (single-statement
+ *       at line 0 — no T_LINENBR), then ExecuteProgram.
+ *    4. setjmp(mark) catches error()'s longjmp; print MMErrMsg and
+ *       go back to the prompt.
+ * ========================================================================= */
+
+static void pc386_repl_one_line(char *line, int line_len) {
+    if (line_len <= 0) return;
+
+    /* Tokenise the line — same shape as kmain's pc386_load_source but
+     * for a single statement. tokenise(0) reads from inpbuf into tknbuf. */
+    if (line_len >= STRINGSIZE) line_len = STRINGSIZE - 1;
+    memcpy(inpbuf, line, line_len);
+    inpbuf[line_len] = '\0';
+
+    /* For console-typed input, tokenise(1) suppresses the leading
+     * T_NEWLINE (we want to evaluate it as a single expression /
+     * statement, not a program line). */
+    tokenise(1);
+
+    /* Hand the tokenised buffer to ExecuteProgram, terminated with the
+     * usual two-zero sentinel. The program-area buffer in flash works
+     * fine as scratch — we erase it first so a previous LOAD's tail
+     * doesn't leak in. */
+    flash_range_erase(0, MAX_PROG_SIZE);
+    unsigned char *pm = ProgMemory;
+    *pm++ = T_NEWLINE;
+    unsigned char *tp = tknbuf;
+    while (!(tp[0] == 0 && tp[1] == 0)) *pm++ = *tp++;
+    *pm++ = 0;
+    *pm++ = 0;
+    *pm++ = 0;
+    PSize = (int)(pm - ProgMemory);
+
+    PrepareProgram(1);
+
+    if (setjmp(mark) == 0) {
+        ExecuteProgram(ProgMemory);
+    } else if (MMErrMsg[0]) {
+        MMPrintString("Error: ");
+        MMPrintString(MMErrMsg);
+        MMPrintString("\r\n");
+        MMErrMsg[0] = '\0';
+        MMerrno = 0;
+    }
+}
+
+void pc386_repl(void) {
+    char line[256];
+    int  pos;
+
+    MMPrintString("\r\n");
+    MMPrintString("MMBasic Anywhere (pc386) — REPL ready.\r\n");
+    MMPrintString("Type a statement and press Enter. e.g.  PRINT 1+1\r\n");
+
+    for (;;) {
+        MMPrintString("\r\nPC386> ");
+        pos = 0;
+        for (;;) {
+            int c = MMgetchar();
+            if (c == 0) continue;        /* skip stray NULs */
+            if (c == ENTER) {
+                MMPrintString("\r\n");
+                line[pos] = '\0';
+                break;
+            }
+            if (c == BKSP) {
+                if (pos > 0) {
+                    pos--;
+                    /* Erase last char on the terminal: \b ' ' \b */
+                    MMputchar('\b', 0);
+                    MMputchar(' ',  0);
+                    MMputchar('\b', 0);
+                }
+                continue;
+            }
+            if (c < 0x20 || c >= 0x7F) continue;   /* skip non-printables */
+            if (pos < (int)sizeof(line) - 1) {
+                line[pos++] = (char)c;
+                MMputchar((char)c, 0);
+            }
+        }
+        pc386_repl_one_line(line, pos);
+    }
+}
 
 /* =========================================================================
  *  Cmd_files / cmd_load lifecycle hooks.

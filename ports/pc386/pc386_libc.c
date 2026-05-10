@@ -42,15 +42,197 @@ FILE *stdin  = &pc386_stdin_obj;
 FILE *stdout = &pc386_stdout_obj;
 FILE *stderr = &pc386_stderr_obj;
 
-int  printf  (const char *fmt, ...) { (void)fmt; pc386_panic("printf — vendor mpaland"); }
-int  sprintf (char *s, const char *fmt, ...) { (void)s; (void)fmt; pc386_panic("sprintf — vendor mpaland"); }
-int  snprintf(char *s, size_t n, const char *fmt, ...) { (void)s; (void)n; (void)fmt; pc386_panic("snprintf — vendor mpaland"); }
-int  vsnprintf(char *s, size_t n, const char *fmt, va_list ap) { (void)s; (void)n; (void)fmt; (void)ap; pc386_panic("vsnprintf — vendor mpaland"); }
-int  vsprintf (char *s, const char *fmt, va_list ap) { (void)s; (void)fmt; (void)ap; pc386_panic("vsprintf — vendor mpaland"); }
-int  fprintf (FILE *fp, const char *fmt, ...) { (void)fp; (void)fmt; pc386_panic("fprintf — vendor mpaland"); }
-int  vfprintf(FILE *fp, const char *fmt, va_list ap) { (void)fp; (void)fmt; (void)ap; pc386_panic("vfprintf — vendor mpaland"); }
-int  sscanf  (const char *s, const char *fmt, ...) { (void)s; (void)fmt; pc386_panic("sscanf — vendor mpaland"); }
-int  vsscanf (const char *s, const char *fmt, va_list ap) { (void)s; (void)fmt; (void)ap; pc386_panic("vsscanf — vendor mpaland"); }
+/* ----- Minimal vsnprintf -----
+ *
+ * Handles the format specifiers MMBasic core actually uses (grepped):
+ *   %% %c %s %d %u %g  (with width / 0-padding / precision modifiers
+ *                       like %02d, %04d, %.100s)
+ *
+ * %g uses MMBasic's own FloatToStr (already linked in) — which is what
+ * the rest of the interpreter uses for PRINT, so we get the same
+ * formatting for free. Other format letters that aren't on this list
+ * panic so the caller surfaces visibly.
+ *
+ * Compact (~150 LOC). Replace with vendored mpaland printf if a
+ * BASIC program ever exercises a richer specifier set.
+ */
+
+extern char *IntToStr(char *strr, int64_t nbr, unsigned int base);
+extern void  FloatToStr(char *p, double f, int m1, int m2, unsigned char ch);
+
+static void pc386_emit(char **out, char *end, char c) {
+    if (*out < end - 1) *(*out)++ = c;
+}
+
+static void pc386_emit_str(char **out, char *end, const char *s,
+                            int width, int left, int max) {
+    int n = 0;
+    if (s == NULL) s = "(null)";
+    const char *p = s;
+    while (*p && (max < 0 || n < max)) { p++; n++; }
+    int pad = width > n ? width - n : 0;
+    if (!left) while (pad--) pc386_emit(out, end, ' ');
+    int k = n;
+    while (k--) pc386_emit(out, end, *s++);
+    if (left) while (pad--) pc386_emit(out, end, ' ');
+}
+
+int vsnprintf(char *out, size_t n, const char *fmt, va_list ap) {
+    if (n == 0) return 0;
+    char *p   = out;
+    char *end = out + n;
+    char numbuf[32];
+
+    while (*fmt) {
+        if (*fmt != '%') { pc386_emit(&p, end, *fmt++); continue; }
+        fmt++;
+
+        int left = 0, zero = 0;
+        while (*fmt == '-' || *fmt == '+' || *fmt == ' ' || *fmt == '#' || *fmt == '0') {
+            if (*fmt == '-') left = 1;
+            if (*fmt == '0') zero = 1;
+            fmt++;
+        }
+        int width = 0;
+        while (*fmt >= '0' && *fmt <= '9') { width = width * 10 + (*fmt - '0'); fmt++; }
+        int prec = -1;
+        if (*fmt == '.') {
+            fmt++;
+            prec = 0;
+            while (*fmt >= '0' && *fmt <= '9') { prec = prec * 10 + (*fmt - '0'); fmt++; }
+        }
+        /* Length modifier — MMBasic uses none of l, ll, h, etc. with
+         * any of the formats grepped, but accept and ignore for safety. */
+        while (*fmt == 'l' || *fmt == 'h' || *fmt == 'z' || *fmt == 'j') fmt++;
+
+        char fc = *fmt++;
+        switch (fc) {
+            case '%': pc386_emit(&p, end, '%'); break;
+            case 'c': pc386_emit(&p, end, (char)va_arg(ap, int)); break;
+            case 's': {
+                const char *s = va_arg(ap, const char *);
+                pc386_emit_str(&p, end, s, width, left, prec);
+                break;
+            }
+            case 'd':
+            case 'i': {
+                int64_t v = va_arg(ap, int);
+                IntToStr(numbuf, v, 10);
+                int len = (int)strlen(numbuf);
+                int pad = width > len ? width - len : 0;
+                if (!left && !zero) while (pad--) pc386_emit(&p, end, ' ');
+                if (zero && pad > 0 && (numbuf[0] == '-')) {
+                    pc386_emit(&p, end, '-');
+                    while (pad--) pc386_emit(&p, end, '0');
+                    for (char *q = numbuf + 1; *q; q++) pc386_emit(&p, end, *q);
+                } else {
+                    if (zero && !left) while (pad--) pc386_emit(&p, end, '0');
+                    for (char *q = numbuf; *q; q++) pc386_emit(&p, end, *q);
+                    if (left) while (pad--) pc386_emit(&p, end, ' ');
+                }
+                break;
+            }
+            case 'u': {
+                unsigned u = va_arg(ap, unsigned);
+                IntToStr(numbuf, (int64_t)u, 10);
+                pc386_emit_str(&p, end, numbuf, width, left, -1);
+                break;
+            }
+            case 'x':
+            case 'X': {
+                unsigned u = va_arg(ap, unsigned);
+                IntToStr(numbuf, (int64_t)u, 16);
+                if (fc == 'x') {
+                    for (char *q = numbuf; *q; q++) {
+                        if (*q >= 'A' && *q <= 'Z') *q = (char)(*q - 'A' + 'a');
+                    }
+                }
+                pc386_emit_str(&p, end, numbuf, width, left, -1);
+                break;
+            }
+            case 'g':
+            case 'f':
+            case 'e': {
+                double v = va_arg(ap, double);
+                FloatToStr(numbuf, v, 0, prec >= 0 ? prec : 6, ' ');
+                pc386_emit_str(&p, end, numbuf, width, left, -1);
+                break;
+            }
+            default:
+                /* Unknown specifier — drop it visibly so we notice. */
+                pc386_emit(&p, end, '?');
+                pc386_emit(&p, end, fc);
+                break;
+        }
+    }
+
+    if (p < end) *p = '\0';
+    else end[-1] = '\0';
+    return (int)(p - out);
+}
+
+int snprintf(char *s, size_t n, const char *fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    int r = vsnprintf(s, n, fmt, ap);
+    va_end(ap);
+    return r;
+}
+
+int sprintf(char *s, const char *fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    int r = vsnprintf(s, (size_t)0x7FFFFFFF, fmt, ap);
+    va_end(ap);
+    return r;
+}
+
+int vsprintf(char *s, const char *fmt, va_list ap) {
+    return vsnprintf(s, (size_t)0x7FFFFFFF, fmt, ap);
+}
+
+int printf(const char *fmt, ...) {
+    char buf[512];
+    va_list ap;
+    va_start(ap, fmt);
+    int r = vsnprintf(buf, sizeof(buf), fmt, ap);
+    va_end(ap);
+    extern void MMPrintString(char *);
+    MMPrintString(buf);
+    return r;
+}
+
+int fprintf(FILE *fp, const char *fmt, ...) {
+    /* All FILE* paths route to the console on pc386 (no real FILE I/O). */
+    (void)fp;
+    char buf[512];
+    va_list ap;
+    va_start(ap, fmt);
+    int r = vsnprintf(buf, sizeof(buf), fmt, ap);
+    va_end(ap);
+    extern void MMPrintString(char *);
+    MMPrintString(buf);
+    return r;
+}
+
+int vfprintf(FILE *fp, const char *fmt, va_list ap) {
+    (void)fp;
+    char buf[512];
+    int r = vsnprintf(buf, sizeof(buf), fmt, ap);
+    extern void MMPrintString(char *);
+    MMPrintString(buf);
+    return r;
+}
+
+int sscanf(const char *s, const char *fmt, ...) {
+    (void)s; (void)fmt;
+    pc386_panic("sscanf not yet implemented");
+}
+
+int vsscanf(const char *s, const char *fmt, va_list ap) {
+    (void)s; (void)fmt; (void)ap;
+    pc386_panic("vsscanf not yet implemented");
+}
 
 int  fputs (const char *s, FILE *fp) { (void)s; (void)fp; return 0; }
 int  fputc (int c, FILE *fp)         { (void)c; (void)fp; return c; }
@@ -485,51 +667,199 @@ double difftime(time_t a, time_t b) { return (double)(a - b); }
 char *asctime(const struct tm *tm) { (void)tm; pc386_panic("asctime not impl"); }
 char *ctime  (const time_t *t)     { (void)t;  pc386_panic("ctime not impl"); }
 
-/* ===== math stubs ======================================================= */
+/* ===== math: x87-backed implementations =================================
+ *
+ * We have the x87 FPU online (boot.S brings it up before kmain). All
+ * the standard math functions wrap one or two FPU instructions; no
+ * vendoring needed.
+ *
+ * The asm constraints use "+t"(x) to bind the input/output to st(0).
+ * Multi-result instructions (fsincos, fxtract) clear higher st()
+ * slots manually with fstp/fucomp where needed.
+ */
 
 #include <math.h>
 
-#define MATH_STUB(name) \
-    double name(double x) { (void)x; pc386_panic(#name " not yet implemented (3c.x: vendor openlibm)"); }
-#define MATH_STUB2(name) \
-    double name(double x, double y) { (void)x; (void)y; pc386_panic(#name " not yet implemented (3c.x: vendor openlibm)"); }
+double sin(double x)   { __asm__("fsin"  : "+t"(x)); return x; }
+double cos(double x)   { __asm__("fcos"  : "+t"(x)); return x; }
+double sqrt(double x)  { __asm__("fsqrt" : "+t"(x)); return x; }
+double fabs(double x)  { __asm__("fabs"  : "+t"(x)); return x; }
 
-MATH_STUB(sin)   MATH_STUB(cos)   MATH_STUB(tan)
-MATH_STUB(asin)  MATH_STUB(acos)  MATH_STUB(atan)
-MATH_STUB2(atan2)
-MATH_STUB(sinh)  MATH_STUB(cosh)  MATH_STUB(tanh)
-MATH_STUB(asinh) MATH_STUB(acosh) MATH_STUB(atanh)
-MATH_STUB(exp)   MATH_STUB(exp2)  MATH_STUB(expm1)
-MATH_STUB(log)   MATH_STUB(log2)  MATH_STUB(log10) MATH_STUB(log1p)
-MATH_STUB2(pow)
-MATH_STUB(sqrt)  MATH_STUB(cbrt)
-MATH_STUB2(hypot)
-MATH_STUB(round) MATH_STUB(trunc)
-MATH_STUB2(fmod)
-MATH_STUB2(copysign) MATH_STUB2(nextafter)
+double tan(double x) {
+    /* fptan pushes 1.0 onto the stack after computing tan; pop it. */
+    double junk;
+    __asm__("fptan; fstp %1" : "+t"(x), "=m"(junk));
+    return x;
+}
 
-/* These three are simple enough to write inline. */
-double fabs(double x)  { return x < 0 ? -x : x; }
+double atan(double x) {
+    /* fpatan computes atan2(st(1), st(0)). Push 1.0 as st(1). */
+    __asm__("fld1; fxch; fpatan" : "+t"(x));
+    return x;
+}
+
+double atan2(double y, double x) {
+    /* fpatan: st(0) = atan2(st(1), st(0)); we need atan2(y, x). */
+    double r;
+    __asm__("fpatan" : "=t"(r) : "0"(x), "u"(y) : "st(1)");
+    return r;
+}
+
+double asin(double x) {
+    /* asin(x) = atan2(x, sqrt(1 - x*x)) */
+    double s = sqrt(1.0 - x * x);
+    return atan2(x, s);
+}
+
+double acos(double x) {
+    /* acos(x) = atan2(sqrt(1 - x*x), x) */
+    double s = sqrt(1.0 - x * x);
+    return atan2(s, x);
+}
+
+/* ln(x) = log2(x) * ln(2). x87's fyl2x computes y * log2(x) for st(1)*log2(st(0)). */
+double log(double x) {
+    double r;
+    __asm__("fldln2; fxch; fyl2x" : "=t"(r) : "0"(x) : "st(1)");
+    return r;
+}
+
+double log2(double x) {
+    double r;
+    __asm__("fld1; fxch; fyl2x" : "=t"(r) : "0"(x) : "st(1)");
+    return r;
+}
+
+double log10(double x) {
+    double r;
+    __asm__("fldlg2; fxch; fyl2x" : "=t"(r) : "0"(x) : "st(1)");
+    return r;
+}
+
+/* exp(x) = 2^(x * log2(e)). x87's f2xm1 needs |arg| < 1, so split. */
+double exp2(double x) {
+    /* x = i + f, where i is int part and f in [-0.5, 0.5]. Then
+     * 2^x = (2^f) * 2^i. f2xm1 returns 2^f - 1; add 1 then fscale. */
+    double i, f, r;
+    __asm__("fld   %%st(0)\n\t"     /* st: x x */
+            "frndint\n\t"           /* st: round(x) x */
+            "fxch  %%st(1)\n\t"     /* st: x round(x) */
+            "fsub  %%st(1), %%st\n\t" /* st: x-round x */
+            "f2xm1\n\t"             /* st: 2^f-1 round */
+            "fld1\n\t"              /* st: 1 2^f-1 round */
+            "faddp\n\t"             /* st: 2^f round */
+            "fscale\n\t"            /* st: 2^f * 2^round = 2^x */
+            "fstp  %%st(1)\n\t"     /* drop the round */
+            : "=t"(r) : "0"(x) : "st(1)");
+    /* avoid unused-var warnings */
+    (void)i; (void)f;
+    return r;
+}
+
+double exp(double x) {
+    /* exp(x) = exp2(x * log2(e)); log2(e) ≈ 1.4426950408889634 */
+    return exp2(x * 1.4426950408889634);
+}
+
+double pow(double x, double y) {
+    /* pow(x, y) = exp2(y * log2(x)). Special-case x = 0 to avoid log(0). */
+    if (x == 0.0) return y == 0.0 ? 1.0 : 0.0;
+    if (x < 0.0) {
+        /* For negative bases, only integer exponents make sense. */
+        double yi = (double)(long long)y;
+        if (yi != y) return 0.0;
+        double r = exp2(y * log2(-x));
+        return ((long long)y & 1) ? -r : r;
+    }
+    return exp2(y * log2(x));
+}
+
 double floor(double x) {
-    /* Convert to long long; for negatives that aren't exact, subtract 1. */
     long long i = (long long)x;
     if (x < 0 && (double)i != x) i--;
     return (double)i;
 }
+
 double ceil(double x) {
     long long i = (long long)x;
     if (x > 0 && (double)i != x) i++;
     return (double)i;
 }
 
+double trunc(double x) {
+    return (double)(long long)x;
+}
+
+double round(double x) {
+    return (x >= 0.0) ? floor(x + 0.5) : ceil(x - 0.5);
+}
+
+double fmod(double x, double y) {
+    /* x87 fprem repeats partial remainders; loop until C2 in the
+     * status word clears (= reduction complete). */
+    if (y == 0.0) return 0.0;
+    double r;
+    __asm__ volatile("1: fprem\n\t"
+                     "fnstsw %%ax\n\t"
+                     "test  $0x0400, %%ax\n\t"
+                     "jnz   1b\n\t"
+                     : "=t"(r) : "0"(x), "u"(y) : "ax", "st(1)");
+    return r;
+}
+
 double modf(double x, double *iptr) {
-    double i = (x < 0) ? ceil(x) : floor(x);
+    double i = trunc(x);
     *iptr = i;
     return x - i;
 }
 
-double frexp(double x, int *e) { (void)x; (void)e; pc386_panic("frexp not impl"); }
-double ldexp(double x, int e)  { (void)x; (void)e; pc386_panic("ldexp not impl"); }
+double sinh(double x) { return (exp(x) - exp(-x)) * 0.5; }
+double cosh(double x) { return (exp(x) + exp(-x)) * 0.5; }
+double tanh(double x) {
+    double e2 = exp(2.0 * x);
+    return (e2 - 1.0) / (e2 + 1.0);
+}
+double asinh(double x) { return log(x + sqrt(x * x + 1.0)); }
+double acosh(double x) { return log(x + sqrt(x * x - 1.0)); }
+double atanh(double x) { return 0.5 * log((1.0 + x) / (1.0 - x)); }
+
+double expm1(double x) { return exp(x) - 1.0; }
+double log1p(double x) { return log(1.0 + x); }
+double cbrt(double x) {
+    /* x^(1/3) via pow; sign-preserving. */
+    return (x < 0) ? -pow(-x, 1.0 / 3.0) : pow(x, 1.0 / 3.0);
+}
+double hypot(double x, double y) { return sqrt(x * x + y * y); }
+
+double copysign(double x, double y) {
+    union { double d; uint64_t u; } ux = { x }, uy = { y };
+    ux.u = (ux.u & 0x7FFFFFFFFFFFFFFFull) | (uy.u & 0x8000000000000000ull);
+    return ux.d;
+}
+
+double nextafter(double x, double y) {
+    /* Just enough for callers that test direction. */
+    if (x == y) return y;
+    return x + (y > x ? 1.0 : -1.0) * 1e-308;
+}
+
+double frexp(double x, int *e) {
+    if (x == 0.0) { *e = 0; return 0.0; }
+    /* x = m * 2^*e where 0.5 <= |m| < 1. fxtract returns mantissa
+     * (in [1, 2)) and exponent. We adjust by 1 to get m in [0.5, 1). */
+    double m, exp_d;
+    __asm__("fxtract" : "=t"(m), "=u"(exp_d) : "0"(x));
+    *e = (int)exp_d + 1;
+    return m * 0.5;
+}
+
+double ldexp(double x, int e) {
+    double ed = (double)e;
+    double r;
+    __asm__("fscale" : "=t"(r) : "0"(x), "u"(ed) : "st(1)");
+    return r;
+}
+
 double scalbn(double x, int e) { return ldexp(x, e); }
 
 float sinf(float x)            { return (float)sin((double)x); }
