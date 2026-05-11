@@ -121,7 +121,10 @@ DRIVER_SRCS = \
     vga_text/vga_text.c \
     serial_16550/serial_16550.c \
     ata_pio/ata_pio.c \
-    fatfs/ff_glue.c
+    fatfs/ff_glue.c \
+    i8259_pic/i8259_pic.c \
+    i8042_kbd/i8042_kbd.c \
+    i8042_kbd/scan_to_ascii.c
 
 # FatFs is vendored at the repo root (R0.14, shared with every other
 # port). Compile in-place; our drivers/fatfs/ff_glue.c provides the

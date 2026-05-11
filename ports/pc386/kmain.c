@@ -24,6 +24,8 @@
 #include "ff.h"
 
 #include "../../drivers/ata_pio/ata_pio.h"
+#include "../../drivers/i8042_kbd/i8042_kbd.h"
+#include "../../drivers/i8259_pic/i8259_pic.h"
 #include "../../drivers/serial_16550/serial_16550.h"
 #include "../../drivers/vga_text/vga_text.h"
 
@@ -249,9 +251,30 @@ void kmain(uint32_t magic, uint32_t info_addr) {
 
     /* IDT comes up first thing — once we lidt, every CPU exception
      * routes through exc_unhandled with a useful message instead of
-     * triple-faulting. PIC IRQs stay masked (no sti yet) until 4b. */
+     * triple-faulting. */
     idt_init();
     kputs("IDT loaded (256 vectors, exception handlers wired)\n");
+
+    /* PIC remap: master IRQs to vectors 0x20..0x27, slave to
+     * 0x28..0x2F. All lines start masked except the cascade (IRQ2);
+     * individual drivers (PS/2 in 4c) call pic_unmask(N) when ready.
+     * sti() lets external IRQs fire, but with everything masked nothing
+     * actually does until 4c. */
+    pic_init();
+    __asm__ volatile("sti");
+    kputs("PIC remapped to 0x20-0x2F, IRQs enabled\n");
+
+    /* PS/2 keyboard: register IRQ1 handler + unmask. Raw scancodes
+     * accumulate in the kbd ring; 4d/4e drain them and translate to
+     * ASCII. */
+    kbd_init();
+    kputs("PS/2 keyboard online (IRQ1)\n");
+
+    /* COM1 RX: switch from poll to IRQ4-driven so the test harness's
+     * piped input doesn't drop the first char on the boot race, and
+     * MMgetchar can hlt when idle (no need to spin a core). */
+    serial_irq_init();
+    kputs("Serial COM1 RX online (IRQ4)\n");
 
     kputs("multiboot1 magic: ");
     kputhex32(magic);

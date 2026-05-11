@@ -21,6 +21,7 @@
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
 
+#include "../../drivers/i8042_kbd/i8042_kbd.h"
 #include "../../drivers/serial_16550/serial_16550.h"
 #include "pc386_panic.h"
 
@@ -163,29 +164,41 @@ void SSPrintString(char *s) {
     while (*s) SerialConsolePutC(*s++, 0);
 }
 
-/* Stage 3e input: poll COM1 RX with normalisation.
+/* Stage 4e input: drain whichever of (PS/2 keyboard, COM1 serial) has
+ * a character ready. PS/2 is IRQ-driven (drivers/i8042_kbd) and produces
+ * MMBasic-shaped key codes (UP, BKSP, F1, etc.) directly; COM1 still
+ * polls in stage 4 (4f turns it IRQ-driven) and goes through the same
+ * terminal-byte normalisation as 3e.
  *
- * Terminal byte → MMBasic key code:
- *   0x0A (LF)         → ENTER (0x0D)
- *   0x7F (DEL, macOS) → BKSP  (0x08)
- *   anything else     → as-is
- * Real Editor.c-driven REPL with arrow keys / history lands in stage 4
- * once we have IRQ-driven input + a proper VT100 escape decoder. */
-static int pc386_normalise_key(int c) {
+ * Both sources drain into the same return value here; we don't try to
+ * coalesce into ConsoleRxBuf because nothing reads it until stage 4f
+ * brings up the routinechecks-tier pump. */
+static int pc386_normalise_serial(int c) {
     if (c == '\n') return ENTER;
     if (c == 0x7F) return BKSP;
     return c;
 }
 
 int MMInkey(void) {
-    int c = serial_getc_nonblock();
-    if (c < 0) return -1;
-    return pc386_normalise_key(c);
+    int c = kbd_get_key();
+    if (c >= 0) return c;
+    int s = serial_getc_nonblock();
+    if (s < 0) return -1;
+    return pc386_normalise_serial(s);
 }
 
 int MMgetchar(void) {
-    int c = serial_getc_blocking();
-    return pc386_normalise_key(c);
+    /* Both PS/2 (IRQ1) and COM1 RX (IRQ4) are interrupt-driven, so we
+     * can hlt between checks — the next IRQ wakes us. The check-then-
+     * hlt order matters: cli/sti would race with the IRQ posting, so
+     * we accept a possible spurious wake and re-check on every loop. */
+    for (;;) {
+        int c = kbd_get_key();
+        if (c >= 0) return c;
+        int s = serial_getc_nonblock();
+        if (s >= 0) return pc386_normalise_serial(s);
+        __asm__ volatile("hlt");
+    }
 }
 
 int  getConsole(void)      { return -1; }
