@@ -137,16 +137,46 @@ void ScrollLCDSPISCR(int s) { (void)s; }
  *  \r \n \b \t natively and scrolls; serial_putc writes raw.
  * ========================================================================= */
 
+/* MMBasic's REPL emits VT100 escapes (cursor positioning, show/hide
+ * cursor, clear-to-EOL, colour SGR) that a serial terminal interprets
+ * but VGA text mode 03h renders as literal bytes. Strip them on the
+ * VGA-bound path; keep them on serial so a connected terminal still
+ * sees a properly-formatted prompt. State machine handles the only
+ * three sequence shapes MMBasic emits:
+ *   ESC [ ... <final>          CSI       — covers \[K, \[?25h, \[1A
+ *   ESC O <final>              SS3       — F1..F4 sometimes
+ *   ESC <one byte>             two-char  — bell-flash, charset switch
+ */
+static int vga_esc_state = 0;   /* 0=idle, 1=after-ESC, 2=in-CSI */
+
+static void vga_text_filtered_putc(char c) {
+    switch (vga_esc_state) {
+    case 0:
+        if (c == 0x1B) { vga_esc_state = 1; return; }
+        vga_text_putc(c);
+        return;
+    case 1:
+        if (c == '[' || c == 'O') { vga_esc_state = 2; return; }
+        /* Two-char ESC sequence — swallow this final byte, back to idle. */
+        vga_esc_state = 0;
+        return;
+    case 2:
+        /* CSI body: keep eating until a final byte (0x40..0x7E). */
+        if (c >= 0x40 && c <= 0x7E) { vga_esc_state = 0; return; }
+        return;
+    }
+}
+
 char SerialConsolePutC(char c, int flush) {
     (void)flush;
     if (host_output_hook) {
-        /* Test-harness output-capture path used by host_native — pc386
-         * leaves host_output_hook NULL so this never fires here, but
-         * keep the branch for symmetry with host_native's contract. */
+        /* Test-harness output-capture path (host_native uses this).
+         * pc386 leaves host_output_hook NULL so this branch never
+         * fires here, but keep it for symmetry with host's contract. */
         host_output_hook(&c, 1);
         return c;
     }
-    vga_text_putc(c);
+    vga_text_filtered_putc(c);
     serial_putc(c);
     return c;
 }
