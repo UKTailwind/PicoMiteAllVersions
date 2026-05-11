@@ -261,7 +261,40 @@ void port_set_default_options(void) {}
 int  ExistsFile(char *path) { (void)path; return 0; }
 int  ExistsDir (char *path, char *q, int *fs) { (void)path; (void)q; (void)fs; return 0; }
 int  FileLoadCMM2Program(char *fname, bool message) { (void)fname; (void)message; return 0; }
-void SaveProgramToFlash(unsigned char *p, int erase) { (void)p; (void)erase; }
+/* SaveProgramToFlash — tokenise a NUL-terminated source buffer into
+ * ProgMemory. Called by FileLoadProgram (the LOAD path) after slurping
+ * the file's contents; without a real impl, LOAD reads the file but
+ * leaves ProgMemory empty (LIST + RUN show nothing). Mirrors
+ * host_native's pattern: walk lines, tokenise(0) each, append tknbuf
+ * to ProgMemory, then PrepareProgram(false). */
+extern void flash_range_erase(uint32_t off, uint32_t count);
+void SaveProgramToFlash(unsigned char *pm, int msg) {
+    (void)msg;
+    if (!pm) return;
+    flash_range_erase(0, MAX_PROG_SIZE);
+    unsigned char *out = ProgMemory;
+    const char *line = (const char *)pm;
+    while (*line) {
+        const char *eol = line;
+        while (*eol && *eol != '\n') eol++;
+        size_t len = (size_t)(eol - line);
+        if (len > 0 && line[len - 1] == '\r') len--;
+        if (len > 0) {
+            if (len >= STRINGSIZE) len = STRINGSIZE - 1;
+            memcpy(inpbuf, line, len);
+            inpbuf[len] = '\0';
+            tokenise(0);
+            unsigned char *tp = tknbuf;
+            while (!(tp[0] == 0 && tp[1] == 0)) *out++ = *tp++;
+            *out++ = 0;
+        }
+        line = (*eol == '\n') ? eol + 1 : eol;
+    }
+    *out++ = 0;
+    *out++ = 0;
+    PSize = (int)(out - ProgMemory);
+    PrepareProgram(false);
+}
 void LoadPNG(unsigned char *fname) { (void)fname; }
 uint64_t readusclock(void) { extern uint64_t hal_time_us_64(void); return hal_time_us_64(); }
 /* xchg_byte is a function pointer (per Custom.h), not a function.
