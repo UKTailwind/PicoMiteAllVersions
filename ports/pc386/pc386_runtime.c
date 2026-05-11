@@ -23,6 +23,7 @@
 
 #include "../../drivers/i8042_kbd/i8042_kbd.h"
 #include "../../drivers/serial_16550/serial_16550.h"
+#include "../../drivers/vga_text/vga_text.h"
 #include "pc386_panic.h"
 
 extern jmp_buf mark;          /* defined by MMBasic.c */
@@ -128,16 +129,25 @@ void DisplayNotSet(void) { /* no error — host_runtime_begin sets DISPLAY_TYPE 
 void ScrollLCDSPISCR(int s) { (void)s; }
 
 /* =========================================================================
- *  Console I/O — output to COM1, input deferred to stage 3e.
+ *  Console I/O — fork every byte to BOTH the VGA-text console (primary,
+ *  visible on the QEMU window / real-hardware monitor) AND COM1 serial
+ *  (backup / remote terminal / test harness). Mirrors the standard
+ *  IBM-PC convention: the user-facing console is whichever one's
+ *  connected. The two outputs are byte-identical; vga_text_putc handles
+ *  \r \n \b \t natively and scrolls; serial_putc writes raw.
  * ========================================================================= */
 
 char SerialConsolePutC(char c, int flush) {
     (void)flush;
     if (host_output_hook) {
+        /* Test-harness output-capture path used by host_native — pc386
+         * leaves host_output_hook NULL so this never fires here, but
+         * keep the branch for symmetry with host_native's contract. */
         host_output_hook(&c, 1);
-    } else {
-        serial_putc(c);
+        return c;
     }
+    vga_text_putc(c);
+    serial_putc(c);
     return c;
 }
 

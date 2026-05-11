@@ -22,6 +22,8 @@
 
 - **4f ✅ — IRQ4 UART RX.** `serial_16550` adds an IRQ4 handler that drains the UART FIFO into a 256-byte ring; `serial_getc_nonblock` reads the ring first, falls back to LSR poll if pre-IRQ-init. `serial_init` now enables the FIFO FIRST (pre-FCR-enable bytes are lost in 16450 single-byte mode — moving the FCR write earlier keeps everything that arrives during the rest of init), and the loopback self-test is gone (it was eating piped input + the test was overdefensive theatre on a guaranteed-present 0x3F8 UART). `serial_irq_init` moves any boot-buffered bytes into the ring rather than discarding them. Bytes arriving BEFORE the kernel's first instruction in kmain are still lost (bootloader doesn't FIFO-enable) — but that's only reachable from `printf | qemu` test invocations that bypass the test harness; `repl_expect.py` writes after detecting the boot prompt and is unaffected.
 
+- **4g ✅ — VGA-text console as primary, serial as fallback.** `SerialConsolePutC` (the byte-out callback all MMBasic output funnels through) forks every byte to both `vga_text_putc` and `serial_putc`. Standard IBM-PC convention: VGA + PS/2 is the user-facing console; serial is the remote/debug path. When QEMU runs with its default GUI window, the banner + prompt + REPL output appear in the VGA window and PS/2 IRQ1 drives the prompt. Adding `-serial stdio` simultaneously gives a terminal-side console that mirrors the same bytes — useful for capture / debugging. `repl_expect.py` runs against the serial path and stays 12/12 unchanged.
+
 ## Validation
 
 A stage-4 close requires:
