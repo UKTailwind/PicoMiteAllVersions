@@ -35,7 +35,7 @@ CFLAGS = -std=gnu11 -ffreestanding -O2 -g \
          -mno-red-zone -mno-mmx -mno-sse -mno-sse2 \
          -funsigned-char \
          -DMMBASIC_HOST -DPORT_PC386 \
-         -DFF_STR_VOLUME_ID=1 -DFF_VOLUME_STRS='"A","C"' \
+         -DFF_STR_VOLUME_ID=1 -DFF_VOLUME_STRS='"B","C"' \
          -include pc386_platform.h \
          -I$(PORT_DIR)/include_shim -I$(PORT_DIR) \
          -I$(REPO_ROOT)/ports/host_native -I$(REPO_ROOT) \

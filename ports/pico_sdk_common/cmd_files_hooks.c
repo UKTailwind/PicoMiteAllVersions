@@ -73,6 +73,11 @@ void port_drive_check(char drive)
     }
 }
 
+/* Default drivecheck remap: identity. Pc386 (FatFs on every volume,
+ * no LFS) overrides to coerce FLASHFILE → FATFSFILE. Device builds
+ * keep the canonical A:=LFS / B:=FatFs split. */
+int port_drivecheck_remap(int t) { return t; }
+
 /* hal_ff_* directory + path ops on device just forward to the vendored
  * FatFS in ff.c. Host impls in host/host_fs_shims.c (host_f_*) handle
  * the vm_host_fat / POSIX dispatch. */

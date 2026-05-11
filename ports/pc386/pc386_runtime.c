@@ -50,9 +50,19 @@ void host_runtime_begin(void) {
     extern unsigned char pc386_cfunction_buf[];
     CFunctionFlash = pc386_cfunction_buf;
 
-    /* Pagination defaults to "off" until we have a way to ask the
-     * console its row count. Host uses 1000; same here. */
+    /* Console geometry defaults — Width drives the wrap point in
+     * MMputchar / cmd_files; Height drives "PRESS ANY KEY" pagination
+     * in LIST and FILES. Without these the prompt wraps after every
+     * character (Width=0 means "any char triggers wrap"). */
+    if (Option.Width  == 0) Option.Width  = 80;
     if (Option.Height == 0) Option.Height = 1000;
+
+    /* Route file ops through FatFs (=1) rather than LFS (=0). Pc386 has
+     * real FAT volumes from Stage 2 mounted on A: and C:; LFS is
+     * stubbed (panic on use). Without this, FILES / LOAD / SAVE etc.
+     * end up at lfs_* and surface as "Error during device operation". */
+    extern int FatFSFileSystem, FatFSFileSystemSave;
+    FatFSFileSystem = FatFSFileSystemSave = 1;
 }
 
 void host_runtime_finish(void) { }
@@ -194,6 +204,13 @@ void printoptions(void) { }
  * from Draw.c. Both already resolve. Only the WiFi hook needs a
  * pc386-local stub. */
 void port_repl_wifi_arch_init_and_connect(void) { /* no WiFi on pc386 */ }
+
+/* Pc386 has FatFs on every mounted volume (no LFS). MMBasic's drivecheck
+ * default-maps A: → FLASHFILE → LFS path; remap to FATFSFILE so A:/C:
+ * both go through the (working) hal_ff_* / FatFs route. */
+int port_drivecheck_remap(int t) {
+    return (t == FLASHFILE) ? FATFSFILE : t;
+}
 
 /* =========================================================================
  *  Cmd_files / cmd_load lifecycle hooks.

@@ -848,6 +848,10 @@ void port_apply_load_overrides(void)
      * builds live in ports/pico_sdk_common/port_load_overrides.c. */
 }
 
+/* Default drivecheck remap: identity. Pc386 (which has FatFs on every
+ * volume and no LFS) provides its own override. */
+int port_drivecheck_remap(int t) { return t; }
+
 void port_drive_check(char drive)
 {
     /* Host has only one logical disk (B:, backed by POSIX under

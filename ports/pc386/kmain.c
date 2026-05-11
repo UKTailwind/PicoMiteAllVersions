@@ -293,7 +293,11 @@ void kmain(uint32_t magic, uint32_t info_addr) {
 
     kputc('\n');
     kputs("FAT volumes:\n");
-    mount_and_list("A:", "  drive A", &fs0);
+    /* MMBasic core hardcodes "B:" as its FatFs-volume prefix
+     * (see BasicFileOpen in FileIO.c). Match that — FatFs volume 0
+     * maps to the primary IDE master (typed B: at the BASIC prompt),
+     * volume 1 to the primary IDE slave (typed C:). */
+    mount_and_list("B:", "  drive B", &fs0);
     mount_and_list("C:", "  drive C", &fs1);
 
     /* ---------- MMBasic runtime instantiation (stage 3c.4) ---------- */

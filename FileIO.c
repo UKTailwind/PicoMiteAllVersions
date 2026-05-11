@@ -2395,28 +2395,34 @@ void B2A(unsigned char *fromfile, unsigned char *tofile){ copy_via_hal(fromfile,
 void A2B(unsigned char *fromfile, unsigned char *tofile){ copy_via_hal(fromfile, tofile, 0, 1); }
 void B2B(unsigned char *fromfile, unsigned char *tofile){ copy_via_hal(fromfile, tofile, 1, 1); }
 void A2A(unsigned char *fromfile, unsigned char *tofile){ copy_via_hal(fromfile, tofile, 0, 0); }
+/* Port hook: pc386 has FatFs on every volume (no LFS); the default
+ * drivecheck mapping (A: → FLASHFILE → LFS) needs to be remapped to
+ * FATFSFILE. Other ports leave the default identity behavior. */
+extern int port_drivecheck_remap(int t);
+
 int drivecheck(char *p, int *waste){
+    int t;
     *waste=0;
     if(strlen(p)==2){
         if(!(p[1]==':')) return FatFSFileSystem+1;
         if(*p=='a' || *p=='A') {
             *waste=2;
-            return FLASHFILE;
+            t = FLASHFILE;
         } else if(*p=='b' || *p=='B') {
             *waste=2;
-             return FATFSFILE;
-        } else error("Invalid disk");
-        return FatFSFileSystem+1;
+            t = FATFSFILE;
+        } else { error("Invalid disk"); return FatFSFileSystem+1; }
+        return port_drivecheck_remap(t);
     } else  {
         if(!(p[1]==':' && (p[2]=='/'))) return FatFSFileSystem+1;
         if(*p=='a' || *p=='A') {
             *waste=2;
-            return FLASHFILE;
+            t = FLASHFILE;
         } else if(*p=='b' || *p=='B') {
             *waste=2;
-             return FATFSFILE;
-        } else error("Invalid disk");
-        return FatFSFileSystem+1;
+            t = FATFSFILE;
+        } else { error("Invalid disk"); return FatFSFileSystem+1; }
+        return port_drivecheck_remap(t);
     }
 }
 /*  @endcond */

@@ -287,11 +287,7 @@ void bc_fastgfx_set_fps(int fps) { (void)fps; }
 void bc_fastgfx_swap   (void) {}
 void bc_fastgfx_sync   (void) {}
 
-/* hal_filesystem dispatch hooks — real impls land in stage 3f. */
-int hal_ff_findfirst(void *dir, void *info, const char *path) { (void)dir; (void)info; (void)path; return -1; }
-int hal_ff_findnext (void *dir, void *info)                    { (void)dir; (void)info; return -1; }
-int hal_ff_closedir (void *dir)                                 { (void)dir; return -1; }
-int hal_ff_unlink   (const char *path)                          { (void)path; return -1; }
+/* hal_ff_* live in hal_filesystem_pc386.c (real FatFs forwarders). */
 
 /* host_runtime_get_pixel — fun_pixel readback. No framebuffer yet. */
 uint32_t host_runtime_get_pixel(int x, int y) { (void)x; (void)y; return 0; }
