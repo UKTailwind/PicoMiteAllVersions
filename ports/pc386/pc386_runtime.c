@@ -184,104 +184,16 @@ void MMgetline(int filenbr, char *p) {
 void printoptions(void) { }
 
 /* =========================================================================
- *  REPL — read line over COM1, tokenise, run, repeat.
- *
- *  Stage 3 minimum: line-buffered with echo + backspace, no arrow
- *  keys, no history, no multi-line editing. The full Editor.c-driven
- *  REPL with VT100 escapes lands in stage 4 once PS/2 + IRQs are
- *  online.
- *
- *  Each iteration:
- *    1. Print "PC386> " prompt.
- *    2. Read chars via serial_getc_blocking; echo each. Backspace
- *       erases the last char on screen and in the line buffer. Skip
- *       NUL bytes (some terminals send a stray 0x00 right after
- *       connect).
- *    3. On ENTER: tokenise the line into ProgMemory (single-statement
- *       at line 0 — no T_LINENBR), then ExecuteProgram.
- *    4. setjmp(mark) catches error()'s longjmp; print MMErrMsg and
- *       go back to the prompt.
+ *  REPL hooks — the actual prompt loop is MMBasic_RunPromptLoop in
+ *  MMBasic_REPL.c (same one host_main.c + PicoMite.c use). Pc386 just
+ *  has to provide the small port surface it pokes at.
  * ========================================================================= */
 
-static void pc386_repl_one_line(char *line, int line_len) {
-    if (line_len <= 0) return;
-
-    /* Tokenise the line — same shape as kmain's pc386_load_source but
-     * for a single statement. tokenise(0) reads from inpbuf into tknbuf. */
-    if (line_len >= STRINGSIZE) line_len = STRINGSIZE - 1;
-    memcpy(inpbuf, line, line_len);
-    inpbuf[line_len] = '\0';
-
-    /* For console-typed input, tokenise(1) suppresses the leading
-     * T_NEWLINE (we want to evaluate it as a single expression /
-     * statement, not a program line). */
-    tokenise(1);
-
-    /* Hand the tokenised buffer to ExecuteProgram, terminated with the
-     * usual two-zero sentinel. The program-area buffer in flash works
-     * fine as scratch — we erase it first so a previous LOAD's tail
-     * doesn't leak in. */
-    flash_range_erase(0, MAX_PROG_SIZE);
-    unsigned char *pm = ProgMemory;
-    *pm++ = T_NEWLINE;
-    unsigned char *tp = tknbuf;
-    while (!(tp[0] == 0 && tp[1] == 0)) *pm++ = *tp++;
-    *pm++ = 0;
-    *pm++ = 0;
-    *pm++ = 0;
-    PSize = (int)(pm - ProgMemory);
-
-    PrepareProgram(1);
-
-    if (setjmp(mark) == 0) {
-        ExecuteProgram(ProgMemory);
-    } else if (MMErrMsg[0]) {
-        MMPrintString("Error: ");
-        MMPrintString(MMErrMsg);
-        MMPrintString("\r\n");
-        MMErrMsg[0] = '\0';
-        MMerrno = 0;
-    }
-}
-
-void pc386_repl(void) {
-    char line[256];
-    int  pos;
-
-    MMPrintString("\r\n");
-    MMPrintString("MMBasic Anywhere (pc386) — REPL ready.\r\n");
-    MMPrintString("Type a statement and press Enter. e.g.  PRINT 1+1\r\n");
-
-    for (;;) {
-        MMPrintString("\r\nPC386> ");
-        pos = 0;
-        for (;;) {
-            int c = MMgetchar();
-            if (c == 0) continue;        /* skip stray NULs */
-            if (c == ENTER) {
-                MMPrintString("\r\n");
-                line[pos] = '\0';
-                break;
-            }
-            if (c == BKSP) {
-                if (pos > 0) {
-                    pos--;
-                    /* Erase last char on the terminal: \b ' ' \b */
-                    MMputchar('\b', 0);
-                    MMputchar(' ',  0);
-                    MMputchar('\b', 0);
-                }
-                continue;
-            }
-            if (c < 0x20 || c >= 0x7F) continue;   /* skip non-printables */
-            if (pos < (int)sizeof(line) - 1) {
-                line[pos++] = (char)c;
-                MMputchar((char)c, 0);
-            }
-        }
-        pc386_repl_one_line(line, pos);
-    }
-}
+/* port_repl_post_clear_display_refresh comes from display_merge_stub.c
+ * (which we link via CORE_DRV_SRCS). ApplyPromptConsoleColours comes
+ * from Draw.c. Both already resolve. Only the WiFi hook needs a
+ * pc386-local stub. */
+void port_repl_wifi_arch_init_and_connect(void) { /* no WiFi on pc386 */ }
 
 /* =========================================================================
  *  Cmd_files / cmd_load lifecycle hooks.

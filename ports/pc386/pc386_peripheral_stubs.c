@@ -296,6 +296,11 @@ int hal_ff_unlink   (const char *path)                          { (void)path; re
 /* host_runtime_get_pixel — fun_pixel readback. No framebuffer yet. */
 uint32_t host_runtime_get_pixel(int x, int y) { (void)x; (void)y; return 0; }
 
+/* MMBasic_Prompt.c references these display routines — stubbed since
+ * pc386 has no LCD until stage 5. */
+void MX470Display(int fn) { (void)fn; }
+void DisplayPutS(char *s) { (void)s; }
+
 /* vm_host_fat_* — these were the in-RAM FAT for B: in mmbasic_stdio.
  * Pc386 has real FatFs (A: + C:); stub the entry points so vm_sys_file
  * link references resolve, but they're never reached. */

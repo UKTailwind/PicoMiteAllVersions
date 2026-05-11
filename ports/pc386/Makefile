@@ -67,7 +67,8 @@ PORT_SRCS = kmain.c kprint.c mmap.c heap_region.c kstring.c \
 # MMBasic core sources brought in for stage 3c.1+. Mirrors mmbasic_stdio's
 # CORE_SRCS list. Files in repo root, drivers/, and core/state/ each
 # get their own pattern rule below so the build dir stays organised.
-CORE_SRCS = MMBasic.c Commands.c Functions.c Operators.c MATHS.c Memory.c MMBasic_Print.c
+CORE_SRCS = MMBasic.c Commands.c Functions.c Operators.c MATHS.c Memory.c
+CORE_SRCS += MMBasic_Print.c MMBasic_REPL.c MMBasic_Prompt.c
 CORE_SRCS += gfx_box_shared.c gfx_circle_shared.c gfx_line_shared.c gfx_pixel_shared.c
 CORE_SRCS += gfx_cls_shared.c gfx_text_shared.c gfx_console_shared.c
 CORE_SRCS += mm_misc_shared.c OptionCommands.c
