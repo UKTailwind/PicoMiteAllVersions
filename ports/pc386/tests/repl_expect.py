@@ -201,6 +201,18 @@ TESTS = {
         ("FILES",                    "HELLO.BAS"),
     ],
 
+    "errors_unsupported": [
+        # Stage 3 doesn't have audio, graphics, or GPIO. Each entry
+        # should produce a clear error and bounce back to the prompt
+        # — NOT halt the kernel.
+        ("PLAY TONE 440, 440",       "PLAY TONE not available until stage 6"),
+        ("FRAMEBUFFER CREATE",       "FRAMEBUFFER not available until stage 5"),
+        ("SETPIN 1, DOUT",           "SETPIN not available until stage 6.5"),
+        # Verify the prompt comes back and arithmetic still works after
+        # any of those errors.
+        ("PRINT 99 + 1",             " 100"),
+    ],
+
     "session": [
         # Simulate a real interactive session: do some math, set a var,
         # switch drives, list, load, run, define an inline program.

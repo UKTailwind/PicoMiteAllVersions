@@ -36,8 +36,8 @@ void cmd_ds18b20(void) {}
 void cmd_edit(void) {}
 void cmd_editfile(void) {}
 void cmd_endprogram(void) {}
-void cmd_fastgfx(void) {}
-void cmd_framebuffer(void) {}
+void cmd_fastgfx(void) { error("FASTGFX not available until stage 5 (VGA mode 13h)"); }
+void cmd_framebuffer(void) { error("FRAMEBUFFER not available until stage 5 (VGA mode 13h)"); }
 void cmd_i2c(void) {}
 void cmd_i2c2(void) {}
 void cmd_in(void) {}

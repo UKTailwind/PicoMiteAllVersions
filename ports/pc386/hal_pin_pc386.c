@@ -1,29 +1,27 @@
 /*
  * ports/pc386/hal_pin_pc386.c — GPIO HAL.
  *
- * Stage 3 ships error stubs: any BASIC program touching SETPIN /
- * PIN() / PULSE / IR ON receives a clear "GPIO not available"
- * error rather than corrupting nonexistent hardware.
- *
- * Stage 6.5 replaces this file with a real LPT1-backed impl
- * (parallel port at 0x378, DB-25 pin numbering): SETPIN 1..17
- * mirror connector pins, with data on 2..9, control on 1/14/16/17,
- * and read-only status on 10..15.
+ * Stage 3: every entry returns to the BASIC prompt with an error
+ * (rather than halting the kernel). Stage 6.5 replaces this file with
+ * a real LPT1-backed impl (parallel port at 0x378, DB-25 pin
+ * numbering): SETPIN 1..17 mirror connector pins, with data on 2..9,
+ * control on 1/14/16/17, and read-only status on 10..15.
  */
 
+#include "MMBasic_Includes.h"
+#include "Hardware_Includes.h"
+
 #include "hal/hal_pin.h"
-#include "pc386_panic.h"
 
 __attribute__((noreturn))
 static void pin_unsupported(void) {
-    pc386_panic("GPIO not available on PC386 until stage 6.5 (LPT1)");
+    error("GPIO not available on PC386 until stage 6.5 (LPT1)");
+    /* error() longjmp's; this never returns. */
+    for(;;) {}
 }
 
 void hal_pin_set_mode(uint32_t gpio, hal_pin_mode_t mode)
-{
-    (void)gpio; (void)mode;
-    pin_unsupported();
-}
+{ (void)gpio; (void)mode; pin_unsupported(); }
 
 bool hal_pin_read(uint32_t gpio) { (void)gpio; pin_unsupported(); }
 void hal_pin_write(uint32_t gpio, bool high) { (void)gpio; (void)high; pin_unsupported(); }
