@@ -59,6 +59,13 @@ int dirflags;
 int GPSfnbr = 0;
 int lfs_FileFnbr=0;
 int FatFSFileSystem=0; //Assume we are using flash file system
+
+/* Port hook: pc386 has FatFs on every volume (no LFS); the default
+ * mapping (A: → FLASHFILE → LFS) needs to be coerced to FATFSFILE.
+ * Other ports leave the default identity behavior. Used by drivecheck
+ * (parsing path prefixes) and cmd_disk (the DRIVE / `a:` / `b:`
+ * shortcut commands). */
+extern int port_drivecheck_remap(int t);
 /* Per-port hooks for command-level lifecycle quirks that diverge between
  * device (interrupt-driven console, large heap, can SaveContext+InitHeap
  * mid-program) and host (cooperative MMInkey poll, shared bc_alloc heap
@@ -313,14 +320,14 @@ void MIPS16 cmd_disk(void){
     for(int i=0;i<strlen(p);i++)b[i]=toupper(p[i]);
     if(strcmp(b, "A:/FORMAT")==0)  {
         port_drive_check('A');
-        FatFSFileSystem = FatFSFileSystemSave = 0;
+        FatFSFileSystem = FatFSFileSystemSave = port_drivecheck_remap(FLASHFILE) - 1;
         ResetFlashStorage(1);
         return;
     }
-    if(strcmp(b, "A:")==0)  { port_drive_check('A'); FatFSFileSystem = FatFSFileSystemSave = 0;  return; }
+    if(strcmp(b, "A:")==0)  { port_drive_check('A'); FatFSFileSystem = FatFSFileSystemSave = port_drivecheck_remap(FLASHFILE) - 1; return; }
     if(strcmp(b, "B:")==0)    {
         port_drive_check('B');
-        FatFSFileSystem = FatFSFileSystemSave = 1;
+        FatFSFileSystem = FatFSFileSystemSave = port_drivecheck_remap(FATFSFILE) - 1;
         return;
     }
     error((char *)"Syntax");
@@ -2395,11 +2402,6 @@ void B2A(unsigned char *fromfile, unsigned char *tofile){ copy_via_hal(fromfile,
 void A2B(unsigned char *fromfile, unsigned char *tofile){ copy_via_hal(fromfile, tofile, 0, 1); }
 void B2B(unsigned char *fromfile, unsigned char *tofile){ copy_via_hal(fromfile, tofile, 1, 1); }
 void A2A(unsigned char *fromfile, unsigned char *tofile){ copy_via_hal(fromfile, tofile, 0, 0); }
-/* Port hook: pc386 has FatFs on every volume (no LFS); the default
- * drivecheck mapping (A: → FLASHFILE → LFS) needs to be remapped to
- * FATFSFILE. Other ports leave the default identity behavior. */
-extern int port_drivecheck_remap(int t);
-
 int drivecheck(char *p, int *waste){
     int t;
     *waste=0;

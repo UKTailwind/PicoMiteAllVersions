@@ -50,19 +50,52 @@ void host_runtime_begin(void) {
     extern unsigned char pc386_cfunction_buf[];
     CFunctionFlash = pc386_cfunction_buf;
 
-    /* Console geometry defaults — Width drives the wrap point in
-     * MMputchar / cmd_files; Height drives "PRESS ANY KEY" pagination
-     * in LIST and FILES. Without these the prompt wraps after every
-     * character (Width=0 means "any char triggers wrap"). */
+    /* Sensible Option defaults for a freshly-booted pc386 kernel.
+     * LoadOptions reads from a memset-zero options buffer on first
+     * boot which leaves every field at 0. Override the few that have
+     * meaningful non-zero defaults on every other port; leave the rest
+     * (Listcase=TITLE, continuation=off, Refresh=off, etc.) at zero
+     * so the user's OPTION X commands aren't silently overridden.
+     *
+     *   Width = 80 — without this, MMputchar wraps after every char
+     *   Height = 24 — pagination "PRESS ANY KEY" prompt
+     *   Tab = 4 — Editor TAB stop
+     *   OptionConsole bit 0 = serial (no graphics until stage 5) */
     if (Option.Width  == 0) Option.Width  = 80;
-    if (Option.Height == 0) Option.Height = 1000;
+    if (Option.Height == 0) Option.Height = 1000;  /* effectively disable pagination —
+                                                    * "PRESS ANY KEY" needs IRQ-driven
+                                                    * input which lands in stage 4 */
+    if (Option.Tab    == 0) Option.Tab    = 4;
+    if ((OptionConsole & 0x03) == 0) OptionConsole = 1;
+
+    /* Sane VRes + gui_font defaults so the `overlap` macro in FileIO.c
+     *   (VRes % (FontTable[gui_font >> 4][1] * (gui_font & 0b1111)) ? 0 : 1)
+     * doesn't divide by zero. With both at 0 the modulo is undefined
+     * (x86 raises #DE which traps the kernel; gcc may also fold it to
+     * an unpredictable value) and overlap returns garbage, making
+     * Option.Height-overlap negative, which in turn fires cmd_files'
+     * "PRESS ANY KEY ..." pagination after the first dir entry —
+     * blocking on input we have no way to deliver yet. Stage 5 will
+     * set HRes/VRes to real VGA dimensions. */
+    extern short DisplayHRes, DisplayVRes;
+    extern short HRes, VRes;
+    extern short gui_font;
+    if (gui_font == 0) gui_font = 0x11;        /* font 1, scale 1 */
+    if (VRes == 0)     { VRes = 200; HRes = 320; }
+    if (DisplayVRes == 0) { DisplayVRes = 200; DisplayHRes = 320; }
 
     /* Route file ops through FatFs (=1) rather than LFS (=0). Pc386 has
-     * real FAT volumes from Stage 2 mounted on A: and C:; LFS is
+     * real FAT volumes from Stage 2 mounted on B: and C:; LFS is
      * stubbed (panic on use). Without this, FILES / LOAD / SAVE etc.
      * end up at lfs_* and surface as "Error during device operation". */
     extern int FatFSFileSystem, FatFSFileSystemSave;
     FatFSFileSystem = FatFSFileSystemSave = 1;
+
+    /* Persist the live Option struct back to flash_option_buf so the
+     * LoadOptions inside error()'s reset path doesn't wipe these
+     * defaults. SaveOptions → hal_flash_write_options →
+     * pc386_options_snapshot copies live Option to the buffer. */
+    SaveOptions();
 }
 
 void host_runtime_finish(void) { }
@@ -219,7 +252,18 @@ int port_drivecheck_remap(int t) {
 void cmd_files_save_program_context(void) { }
 void cmd_files_restore_program_context(void) { }
 void cmd_files_pump_console_key(int *c)   { (void)c; }
-void cmd_load_post_cleanup(void)          { }
+
+/* SaveProgramToFlash on pc386 calls tokenise() which writes through
+ * inpbuf/tknbuf — the same buffers ExecuteProgram is currently
+ * iterating over in cmd_load. Returning normally would have the
+ * outer ExecuteProgram resume on stale token bytes and trip
+ * "Unknown command". Bounce back to the prompt instead, like
+ * host_native's host_runtime.c does. */
+void cmd_load_post_cleanup(void) {
+    extern unsigned char inpbuf[];
+    memset(inpbuf, 0, STRINGSIZE);
+    longjmp(mark, 1);
+}
 
 /* CallCFunction / CallExecuteProgram — pc386 has no CFunction support. */
 void CallCFunction(unsigned char *p, unsigned char *args, int *t, unsigned char **s) {
