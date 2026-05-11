@@ -31,6 +31,7 @@
 #include "Hardware_Includes.h"
 
 #include "heap_region.h"
+#include "idt.h"
 #include "kprint.h"
 #include "mmap.h"
 #include "multiboot1.h"
@@ -243,8 +244,14 @@ void kmain(uint32_t magic, uint32_t info_addr) {
     vga_text_init();
 
     vga_text_set_color(VGA_LIGHT_GREEN, VGA_BLACK);
-    kputs("PicoMite PC386 - Stage 3c\n");
+    kputs("PicoMite PC386 - Stage 4a\n");
     vga_text_set_color(VGA_LIGHT_GRAY, VGA_BLACK);
+
+    /* IDT comes up first thing — once we lidt, every CPU exception
+     * routes through exc_unhandled with a useful message instead of
+     * triple-faulting. PIC IRQs stay masked (no sti yet) until 4b. */
+    idt_init();
+    kputs("IDT loaded (256 vectors, exception handlers wired)\n");
 
     kputs("multiboot1 magic: ");
     kputhex32(magic);

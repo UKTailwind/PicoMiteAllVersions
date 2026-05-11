@@ -54,11 +54,11 @@ LDFLAGS = -nostdlib -no-pie -T $(PORT_DIR)/linker.ld -Wl,--build-id=none
 # Stage 2+ extends CORE_SRCS / NATIVE_SRCS / BC_SRCS in the same shape
 # as ports/mmbasic_stdio/Makefile.
 
-PORT_ASM  = boot.S setjmp.S
+PORT_ASM  = boot.S setjmp.S idt_asm.S
 PORT_SRCS = kmain.c kprint.c mmap.c heap_region.c kstring.c \
             pc386_panic.c pc386_libc.c \
             pc386_state.c pc386_runtime.c pc386_peripheral_stubs.c \
-            pc386_flash.c \
+            pc386_flash.c idt.c \
             hal_audio_pc386.c hal_filesystem_pc386.c hal_flash_pc386.c \
             hal_keyboard_pc386.c hal_pin_pc386.c hal_random_pc386.c \
             hal_storage_pc386.c hal_time_pc386.c \

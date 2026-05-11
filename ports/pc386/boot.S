@@ -52,6 +52,29 @@ stack_bottom:
     .skip   16384                   /* 16 KB boot stack */
 stack_top:
 
+/* GDT — own it ourselves rather than relying on the bootloader's
+ * (which may unmap when stage 4's IDT goes live, and whose selector
+ * values are bootloader-specific). Three entries:
+ *   0x00  null
+ *   0x08  32-bit code,  base 0, limit 4G, ring 0   (kernel CS)
+ *   0x10  32-bit data,  base 0, limit 4G, ring 0   (kernel DS/ES/FS/GS/SS)
+ *
+ * Access byte 0x9A = present, ring 0, code, executable, readable.
+ * Access byte 0x92 = present, ring 0, data, writable.
+ * Granularity 0xCF = 4K granularity, 32-bit, limit-high nibble F. */
+.section .rodata
+.align 8
+gdt:
+    .quad   0x0000000000000000      /* null  (selector 0x00) */
+    .quad   0x00CF9A000000FFFF      /* code  (selector 0x08) */
+    .quad   0x00CF92000000FFFF      /* data  (selector 0x10) */
+gdt_end:
+
+.align 8
+gdtr:
+    .word   gdt_end - gdt - 1       /* limit */
+    .long   gdt                     /* base  */
+
 .section .text
 .global _start
 .type _start, @function
@@ -61,9 +84,22 @@ _start:
     xorl    %ebp, %ebp              /* terminate frame pointer chain */
 
     /* Save the multiboot1 magic (EAX) + info ptr (EBX) before we
-     * clobber EAX in the CR0 dance below. */
+     * clobber EAX in the GDT load + CR0 dance below. */
     pushl   %ebx                    /* kmain arg 2: info pointer  */
     pushl   %eax                    /* kmain arg 1: multiboot magic */
+
+    /* Load our own GDT, then reload all segment registers so they use
+     * our descriptors. Far jmp resets CS via long return through the
+     * new code selector (0x08); the rest take a mov from a constant. */
+    lgdt    gdtr
+    ljmp    $0x08, $.gdt_done
+.gdt_done:
+    movw    $0x10, %ax
+    movw    %ax, %ds
+    movw    %ax, %es
+    movw    %ax, %fs
+    movw    %ax, %gs
+    movw    %ax, %ss
 
     /* Bring up the x87 FPU. CR0:
      *   bit 1 (MP)  set   — Monitor coProcessor; #NM on WAIT/FWAIT
