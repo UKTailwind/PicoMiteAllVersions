@@ -86,6 +86,7 @@ DEPS = $(OBJS:.o=.d)
 
 TARGET = $(REPO_ROOT)/host/mmbasic_test
 NET_HAL_TEST = $(BUILD_DIR)/host_net_hal_test
+WASM_PROXY_TARGET = $(REPO_ROOT)/host/wasm_network_proxy
 
 # --- Simulator target ---------------------------------------------------
 SIM_TARGET  = $(REPO_ROOT)/host/mmbasic_sim
@@ -96,6 +97,13 @@ SIM_CFLAGS  = $(CFLAGS) -DMMBASIC_SIM -pthread
 SIM_LDFLAGS = $(LDFLAGS) -pthread
 
 MONGOOSE_DIR = $(PORT_DIR)/vendor
+
+# --- WASM companion network proxy ---------------------------------------
+WASM_PROXY_SRCS = wasm_proxy_main.c wasm_proxy_protocol.c wasm_proxy_http.c wasm_proxy_net.c vendor/mongoose.c
+WASM_PROXY_OBJS = $(addprefix $(BUILD_DIR)/wasm_proxy/,$(WASM_PROXY_SRCS:.c=.o))
+WASM_PROXY_DEPS = $(WASM_PROXY_OBJS:.o=.d)
+WASM_PROXY_CFLAGS = $(CFLAGS) -pthread
+WASM_PROXY_LDFLAGS = $(LDFLAGS) -pthread
 
 all: $(TARGET)
 
@@ -131,6 +139,12 @@ $(NET_HAL_TEST): $(PORT_DIR)/hal_net_posix_test.c $(PORT_DIR)/hal_net_posix.c \
 
 sim: $(SIM_TARGET)
 
+wasm-proxy: $(WASM_PROXY_TARGET)
+
+$(WASM_PROXY_TARGET): $(WASM_PROXY_OBJS)
+	@mkdir -p $(dir $@)
+	$(CC) $(WASM_PROXY_CFLAGS) -o $@ $^ $(WASM_PROXY_LDFLAGS)
+
 # The sim build recompiles EVERY source with -DMMBASIC_SIM, not just a
 # few — gfx_console_shared, host_main, etc. all check `#ifdef
 # MMBASIC_SIM` to swap in the WebSocket-backed display path. Objects
@@ -145,6 +159,10 @@ $(SIM_TARGET): $(addprefix $(BUILD_DIR)/sim/,$(SRCS:.c=.o)) \
 $(BUILD_DIR)/%.o: $(PORT_DIR)/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(BUILD_DIR)/wasm_proxy/%.o: $(PORT_DIR)/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(WASM_PROXY_CFLAGS) -c -o $@ $<
 
 $(BUILD_DIR)/%.o: $(SIM_VM_DIR)/%.c
 	@mkdir -p $(dir $@)
@@ -277,8 +295,8 @@ $(BUILD_DIR)/sim/vendor/mongoose.o: $(MONGOOSE_DIR)/mongoose.c $(MONGOOSE_DIR)/m
 	$(CC) $(SIM_CFLAGS) -I$(MONGOOSE_DIR) -Wno-unused-parameter -Wno-sign-compare -c -o $@ $<
 
 clean:
-	rm -rf $(BUILD_DIR) $(TARGET) $(SIM_TARGET)
+	rm -rf $(BUILD_DIR) $(TARGET) $(SIM_TARGET) $(WASM_PROXY_TARGET)
 
--include $(DEPS)
+-include $(DEPS) $(WASM_PROXY_DEPS)
 
-.PHONY: all clean sim net-hal-test
+.PHONY: all clean sim net-hal-test wasm-proxy

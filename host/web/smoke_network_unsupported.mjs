@@ -91,7 +91,16 @@ try {
             '310 ON ERROR SKIP',
             '320 OPTION TELNET CONSOLE ON',
             '330 PRINT #1,"TELNETERR=";MM.ERRNO;":";MM.ERRMSG$',
-            '340 CLOSE #1',
+            '340 ON ERROR SKIP',
+            `350 WEB UDP SEND "127.0.0.1",${PORT},"STATIC_UDP"`,
+            '360 PRINT #1,"UDPERR=";MM.ERRNO;":";MM.ERRMSG$',
+            '370 ON ERROR SKIP',
+            '380 WEB NTP 0,"127.0.0.1",100',
+            '390 PRINT #1,"NTPERR=";MM.ERRNO;":";MM.ERRMSG$',
+            '400 ON ERROR SKIP',
+            '410 OPTION TFTP ON',
+            '420 PRINT #1,"TFTPERR=";MM.ERRNO;":";MM.ERRMSG$',
+            '430 CLOSE #1',
         ].join('\n') + '\n';
 
         await page.evaluate((source) => {
@@ -114,10 +123,10 @@ try {
                     return '';
                 }
             });
-            if (output.includes('TELNETERR=')) break;
+            if (output.includes('TFTPERR=')) break;
             await sleep(200);
         }
-        if (!output.includes('TELNETERR=')) {
+        if (!output.includes('TFTPERR=')) {
             fail(`timed out waiting for BASIC output file; last output:\n${output}\nConsole tail:\n${logs.slice(-20).join('\n')}`);
         }
 
@@ -138,6 +147,9 @@ try {
             ['STREAM unsupported error', /STREAMERR=\s*[1-9][0-9]*:WEB networking not supported in browser build/],
             ['WEB unsupported error', /WEBERR=\s*[1-9][0-9]*:WEB networking not supported in browser build/],
             ['TELNET unsupported error', /TELNETERR=\s*[1-9][0-9]*:WEB networking not supported in browser build/],
+            ['UDP unsupported error', /UDPERR=\s*[1-9][0-9]*:WEB networking not supported in browser build/],
+            ['NTP unsupported error', /NTPERR=\s*[1-9][0-9]*:WEB networking not supported in browser build/],
+            ['TFTP unsupported error', /TFTPERR=\s*[1-9][0-9]*:WEB networking not supported in browser build/],
         ];
         for (const [label, re] of checks) {
             if (!re.test(output)) {
@@ -147,7 +159,7 @@ try {
 
         console.log('OK - browser network status reports unsupported/offline.');
         console.log('OK - WEB TCP CLIENT REQUEST fetched same-origin GET/POST HTTP.');
-        console.log('OK - raw TCP request, stream, WEB, and Telnet fail explicitly.');
+        console.log('OK - raw TCP request, stream, WEB, Telnet, UDP, NTP, and TFTP fail explicitly.');
         console.log('All browser network smoke checks passed.');
     } finally {
         await browser.close();

@@ -25,7 +25,7 @@
 #include "lwip/udp.h"
 
 #define LWIP_HAL_MAX_UDP_SOCKS 4
-#define LWIP_HAL_UDP_RX_CAP 512
+#define LWIP_HAL_UDP_RX_CAP 600
 #define LWIP_HAL_MAX_TCP_SERVERS 2
 #define LWIP_HAL_MAX_TCP_CLIENTS 2
 #define LWIP_HAL_MAX_TCP_CONNS 8

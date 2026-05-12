@@ -7,6 +7,7 @@ import argparse
 import calendar
 import os
 import pty
+import shutil
 import socket
 import struct
 import subprocess
@@ -405,29 +406,142 @@ def tftp_write_read(port: int, filename: str, payload: bytes, timeout: float) ->
     def packet(opcode: int, *parts: bytes) -> bytes:
         return struct.pack("!H", opcode) + b"".join(parts)
 
+    def parse_oack(data: bytes) -> dict[str, str]:
+        if len(data) < 2 or data[:2] != b"\x00\x06":
+            return {}
+        parts = data[2:].split(b"\0")
+        opts: dict[str, str] = {}
+        for i in range(0, len(parts) - 1, 2):
+            if not parts[i]:
+                break
+            opts[parts[i].decode("ascii", "ignore").lower()] = \
+                parts[i + 1].decode("ascii", "ignore")
+        return opts
+
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
             sock.settimeout(timeout)
-            request = packet(2, filename.encode("ascii"), b"\0octet\0")
+            request = packet(2, filename.encode("ascii"), b"\0octet\0",
+                             b"blksize\0", b"508\0")
             sock.sendto(request, ("127.0.0.1", port))
             data, addr = sock.recvfrom(1024)
-            if data != b"\x00\x04\x00\x00":
+            block_size = 512
+            if data[:2] == b"\x00\x06":
+                block_size = int(parse_oack(data).get("blksize", "512"))
+            elif data == b"\x00\x04\x00\x00":
+                pass
+            else:
                 return False, b"", f"bad WRQ ack {data!r}"
-            sock.sendto(packet(3, b"\x00\x01", payload), addr)
-            data, _ = sock.recvfrom(1024)
-            if data != b"\x00\x04\x00\x01":
-                return False, b"", f"bad DATA ack {data!r}"
+            block = 1
+            for offset in range(0, len(payload), block_size):
+                chunk = payload[offset:offset + block_size]
+                sock.sendto(packet(3, struct.pack("!H", block), chunk), addr)
+                data, _ = sock.recvfrom(1024)
+                if data != packet(4, struct.pack("!H", block)):
+                    return False, b"", f"bad DATA ack {data!r}"
+                block += 1
+            if len(payload) % block_size == 0:
+                sock.sendto(packet(3, struct.pack("!H", block)), addr)
+                data, _ = sock.recvfrom(1024)
+                if data != packet(4, struct.pack("!H", block)):
+                    return False, b"", f"bad final DATA ack {data!r}"
 
-            request = packet(1, filename.encode("ascii"), b"\0octet\0")
+            request = packet(1, filename.encode("ascii"), b"\0octet\0",
+                             b"blksize\0", b"508\0")
             sock.sendto(request, ("127.0.0.1", port))
+            received = bytearray()
             data, addr = sock.recvfrom(1024)
-            if len(data) < 4 or data[:4] != b"\x00\x03\x00\x01":
-                return False, b"", f"bad RRQ data {data!r}"
-            received = data[4:]
-            sock.sendto(packet(4, b"\x00\x01"), addr)
-            return True, received, ""
+            block_size = 512
+            expected_block = 1
+            if data[:2] == b"\x00\x06":
+                block_size = int(parse_oack(data).get("blksize", "512"))
+                last_error: OSError | None = None
+                for _ in range(4):
+                    sock.sendto(packet(4, b"\x00\x00"), addr)
+                    try:
+                        data, addr = sock.recvfrom(1024)
+                        break
+                    except socket.timeout as exc:
+                        last_error = exc
+                else:
+                    raise last_error or socket.timeout("timed out waiting for DATA1")
+            while True:
+                if len(data) < 4 or data[:2] != b"\x00\x03":
+                    return False, b"", f"bad RRQ data {data!r}"
+                block = struct.unpack("!H", data[2:4])[0]
+                if block != expected_block:
+                    return False, b"", f"bad RRQ block {block}, expected {expected_block}"
+                chunk = data[4:]
+                received.extend(chunk)
+                sock.sendto(packet(4, data[2:4]), addr)
+                if len(chunk) < block_size:
+                    break
+                expected_block += 1
+                data, addr = sock.recvfrom(1024)
+            return True, bytes(received), ""
     except OSError as exc:
         return False, b"", f"{type(exc).__name__}: {exc}"
+
+
+def real_telnet_client_roundtrip(host: str, port: int, timeout: float) -> tuple[bool, bytes, str]:
+    telnet = os.environ.get("TELNET") or shutil.which("telnet")
+    if not telnet:
+        return False, b"", "telnet binary not found"
+    proc = subprocess.Popen(
+        [telnet, host, str(port)],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        bufsize=0,
+    )
+    output = bytearray()
+
+    def read_until(needle: bytes) -> bool:
+        assert proc.stdout is not None
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            if needle in output:
+                return True
+            ready, _, _ = select.select([proc.stdout.fileno()], [], [], 0.05)
+            if ready:
+                chunk = os.read(proc.stdout.fileno(), 256)
+                if chunk:
+                    output.extend(chunk)
+                    continue
+                break
+            if proc.poll() is not None:
+                break
+        return needle in output
+
+    def send(data: bytes) -> None:
+        assert proc.stdin is not None
+        proc.stdin.write(data)
+        proc.stdin.flush()
+
+    try:
+        if not read_until(b"Connected"):
+            return False, bytes(output), "telnet did not connect"
+        send(b"PRINT 2+3\r\n")
+        if not read_until(b" 5"):
+            return False, bytes(output), "missing PRINT 2+3 output"
+        send(b"a\r\n")
+        if not read_until(b"Unknown command"):
+            return False, bytes(output), "missing BASIC error"
+        if proc.poll() is not None:
+            return False, bytes(output), "telnet closed after BASIC error"
+        send(b"PRINT 6+7\r\n")
+        if not read_until(b" 13"):
+            return False, bytes(output), "missing PRINT 6+7 output after error"
+        return True, bytes(output), ""
+    except OSError as exc:
+        return False, bytes(output), f"{type(exc).__name__}: {exc}"
+    finally:
+        if proc.poll() is None:
+            proc.terminate()
+            try:
+                proc.wait(timeout=1.0)
+            except subprocess.TimeoutExpired:
+                proc.kill()
 
 
 def telnet_console_roundtrip(binary: Path, telnet_port: int, timeout: float) -> tuple[bool, bytes, str]:
@@ -469,27 +583,10 @@ def telnet_console_roundtrip(binary: Path, telnet_port: int, timeout: float) -> 
         output.extend(read_pty_until(b">"))
         os.write(master_fd, b"OPTION TELNET CONSOLE ON\n")
         output.extend(read_pty_until(b">"))
-        with socket.create_connection(("127.0.0.1", telnet_port), timeout=timeout) as sock:
-            sock.settimeout(0.2)
-            try:
-                sock.recv(64)
-            except socket.timeout:
-                pass
-            sock.settimeout(timeout)
-            sock.sendall(b"A=7+8:PRINT A\r")
-            data = bytearray()
-            deadline = time.monotonic() + timeout
-            while time.monotonic() < deadline and b" 15" not in data:
-                try:
-                    chunk = sock.recv(256)
-                except socket.timeout:
-                    break
-                if not chunk:
-                    break
-                data.extend(chunk)
+        ok, data, detail = real_telnet_client_roundtrip("127.0.0.1", telnet_port, timeout)
         if proc.poll() is None:
             proc.terminate()
-        return b" 15" in data, bytes(data), ""
+        return ok, data, detail
     except (OSError, TimeoutError) as exc:
         return False, bytes(output), f"{type(exc).__name__}: {exc}"
     finally:
@@ -538,7 +635,8 @@ def run_server_basic(binary: Path, tcp_port: int, udp_port: int, tftp_port: int,
             output.extend(run_repl_program(proc, 'RUN "server.bas"', b"HOST_BASIC_SERVER_READY", timeout))
             if index == 0:
                 output.extend(send_udp_until(proc, b"HOST_BASIC_UDP_IN", udp_port, b"HOST_BASIC_UDP_ADDR=", timeout))
-                tftp_result = tftp_write_read(tftp_port, "host_tftp.txt", b"HOST_BASIC_TFTP_OK", timeout)
+                payload = b"HOST_BASIC_TFTP_OK:" + bytes((i % 251 for i in range(1100)))
+                tftp_result = tftp_write_read(tftp_port, "host_tftp.txt", payload, timeout)
                 output.extend(drain_available(proc))
             elif route == "/host/after-run":
                 output.extend(send_udp_until(proc, b"HOST_BASIC_UDP_AFTER_RUN", udp_port, b"HOST_BASIC_UDP_ADDR=", timeout))
@@ -612,6 +710,7 @@ def main(argv: list[str] | None = None) -> int:
     file_response = server_responses.get("/host/file", b"")
     code_response = server_responses.get("/host/code", b"")
     after_run_response = server_responses.get("/host/after-run", b"")
+    expected_tftp_payload = b"HOST_BASIC_TFTP_OK:" + bytes((i % 251 for i in range(1100)))
     tftp_ok, tftp_payload, tftp_detail = tftp_result
     checks = [
         Check("host_basic_exit", result.returncode == 0, f"rc={result.returncode}"),
@@ -648,7 +747,7 @@ def main(argv: list[str] | None = None) -> int:
         Check("host_basic_transmit_page", b"HOST_BASIC_PAGE 123" in page_response),
         Check("host_basic_transmit_file", b"HOST_BASIC_FILE" in file_response),
         Check("host_basic_transmit_code", code_response.startswith(b"HTTP/1.1 404"), code_response.splitlines()[0].decode("latin1", "replace") if code_response else ""),
-        Check("host_basic_tftp_roundtrip", tftp_ok and tftp_payload == b"HOST_BASIC_TFTP_OK", tftp_detail or repr(tftp_payload)),
+        Check("host_basic_tftp_roundtrip", tftp_ok and tftp_payload == expected_tftp_payload, tftp_detail or repr(tftp_payload)),
         Check("host_basic_telnet_console", telnet_ok, telnet_detail or repr(telnet_output)),
     ]
     return print_checks(checks)

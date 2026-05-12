@@ -4,6 +4,7 @@
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
 #include "hal/hal_net.h"
+#include "pico/time.h"
 #include "shared/net/mm_net_tftp.h"
 
 #define PICO_TFTP_PORT 69
@@ -106,13 +107,22 @@ void pico_tftp_close(void) {
 void pico_tftp_poll(void) {
     if (!pico_tftp_socket) return;
     pico_tftp_ensure_init();
+    int idle_polls = 0;
     for (;;) {
         uint8_t packet[600];
         hal_net_addr_t from;
         size_t len = 0;
+        hal_net_poll();
         int rc = hal_net_udp_recv_event(pico_tftp_socket, &from, packet,
                                         sizeof packet, &len);
-        if (rc == HAL_NET_WOULD_BLOCK) return;
+        if (rc == HAL_NET_WOULD_BLOCK) {
+            if (pico_tftp_session.active && idle_polls++ < 20) {
+                sleep_us(1000);
+                continue;
+            }
+            return;
+        }
+        idle_polls = 0;
         if (rc != HAL_NET_OK || len < 2) return;
         mm_net_tftp_peer_t peer;
         memset(&peer, 0, sizeof peer);

@@ -10,10 +10,14 @@ from __future__ import annotations
 
 import argparse
 import calendar
+import os
 import queue
 import re
+import select
+import shutil
 import signal
 import socket
+import subprocess
 import threading
 import time
 import traceback
@@ -739,27 +743,83 @@ def tftp_write_read(host: str, port: int, filename: str, payload: bytes,
     def packet(opcode: int, *parts: bytes) -> bytes:
         return opcode.to_bytes(2, "big") + b"".join(parts)
 
+    def parse_oack(data: bytes) -> dict[str, str]:
+        if len(data) < 2 or data[:2] != b"\x00\x06":
+            return {}
+        parts = data[2:].split(b"\0")
+        opts: dict[str, str] = {}
+        for i in range(0, len(parts) - 1, 2):
+            if not parts[i]:
+                break
+            opts[parts[i].decode("ascii", "ignore").lower()] = \
+                parts[i + 1].decode("ascii", "ignore")
+        return opts
+
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
             sock.settimeout(timeout)
-            sock.sendto(packet(2, filename.encode("ascii"), b"\0octet\0"),
+            sock.sendto(packet(2, filename.encode("ascii"), b"\0octet\0",
+                               b"blksize\0", b"508\0"),
                         (host, port))
             data, addr = sock.recvfrom(1024)
-            if data != b"\x00\x04\x00\x00":
+            block_size = 512
+            if data[:2] == b"\x00\x06":
+                opts = parse_oack(data)
+                block_size = int(opts.get("blksize", "512"))
+            elif data == b"\x00\x04\x00\x00":
+                pass
+            else:
                 return False, b"", f"bad WRQ ack {data!r}"
-            sock.sendto(packet(3, b"\x00\x01", payload), addr)
-            data, _ = sock.recvfrom(1024)
-            if data != b"\x00\x04\x00\x01":
-                return False, b"", f"bad DATA ack {data!r}"
+            block = 1
+            for offset in range(0, len(payload), block_size):
+                chunk = payload[offset:offset + block_size]
+                sock.sendto(packet(3, block.to_bytes(2, "big"), chunk), addr)
+                data, _ = sock.recvfrom(1024)
+                expected = packet(4, block.to_bytes(2, "big"))
+                if data != expected:
+                    return False, b"", f"bad DATA ack {data!r}"
+                block += 1
+            if len(payload) % block_size == 0:
+                sock.sendto(packet(3, block.to_bytes(2, "big")), addr)
+                data, _ = sock.recvfrom(1024)
+                expected = packet(4, block.to_bytes(2, "big"))
+                if data != expected:
+                    return False, b"", f"bad final DATA ack {data!r}"
 
-            sock.sendto(packet(1, filename.encode("ascii"), b"\0octet\0"),
+            sock.sendto(packet(1, filename.encode("ascii"), b"\0octet\0",
+                               b"blksize\0", b"508\0"),
                         (host, port))
+            received = bytearray()
             data, addr = sock.recvfrom(1024)
-            if len(data) < 4 or data[:4] != b"\x00\x03\x00\x01":
-                return False, b"", f"bad RRQ data {data!r}"
-            received = data[4:]
-            sock.sendto(packet(4, b"\x00\x01"), addr)
-            return True, received, ""
+            block_size = 512
+            expected_block = 1
+            if data[:2] == b"\x00\x06":
+                opts = parse_oack(data)
+                block_size = int(opts.get("blksize", "512"))
+                last_error: OSError | None = None
+                for _ in range(4):
+                    sock.sendto(packet(4, b"\x00\x00"), addr)
+                    try:
+                        data, addr = sock.recvfrom(1024)
+                        break
+                    except socket.timeout as exc:
+                        last_error = exc
+                else:
+                    raise last_error or socket.timeout("timed out waiting for DATA1")
+            while True:
+                if len(data) < 4 or data[:2] != b"\x00\x03":
+                    return False, b"", f"bad RRQ data {data!r}"
+                block = int.from_bytes(data[2:4], "big")
+                if block != expected_block:
+                    return False, b"", f"bad RRQ block {block}, expected {expected_block}"
+                chunk = data[4:]
+                received.extend(chunk)
+                sock.sendto(packet(4, data[2:4]), addr)
+                if len(chunk) < block_size:
+                    break
+                expected_block += 1
+                data, addr = sock.recvfrom(1024)
+            return True, bytes(received), ""
     except OSError as exc:
         return False, b"", f"{type(exc).__name__}: {exc}"
 
@@ -1027,13 +1087,14 @@ def run_tftp(args: argparse.Namespace) -> int:
         old_disabled = "OPTION TFTP OFF" in option_list
         try:
             command_with_reboot_tolerance(basic, "OPTION TFTP ON", args)
+            payload = (b"NETCONF_TFTP_OK:" + bytes((i % 251 for i in range(1100))))
             ok, received, detail = tftp_write_read(
                 device_host, args.tftp_port, "net_tftp.txt",
-                b"NETCONF_TFTP_OK", args.long_timeout,
+                payload, args.long_timeout,
             )
             checks.append(
                 CheckResult("tftp_roundtrip",
-                            ok and received == b"NETCONF_TFTP_OK",
+                            ok and received == payload,
                             detail or repr(received))
             )
             return print_checks(checks)
@@ -1061,6 +1122,67 @@ def telnet_read_until(sock: socket.socket, needle: bytes, timeout: float) -> byt
         if needle in data:
             return bytes(data)
     return bytes(data)
+
+
+def real_telnet_client_roundtrip(host: str, port: int, timeout: float) -> tuple[bool, bytes, str]:
+    telnet = os.environ.get("TELNET") or shutil.which("telnet")
+    if not telnet:
+        return False, b"", "telnet binary not found"
+    proc = subprocess.Popen(
+        [telnet, host, str(port)],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        bufsize=0,
+    )
+    output = bytearray()
+
+    def read_until(needle: bytes) -> bool:
+        assert proc.stdout is not None
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            if needle in output:
+                return True
+            ready, _, _ = select.select([proc.stdout.fileno()], [], [], 0.05)
+            if ready:
+                chunk = os.read(proc.stdout.fileno(), 256)
+                if chunk:
+                    output.extend(chunk)
+                    continue
+                break
+            if proc.poll() is not None:
+                break
+        return needle in output
+
+    def send(data: bytes) -> None:
+        assert proc.stdin is not None
+        proc.stdin.write(data)
+        proc.stdin.flush()
+
+    try:
+        if not read_until(b"Connected"):
+            return False, bytes(output), "telnet did not connect"
+        send(b"PRINT 2+3\r\n")
+        if not read_until(b" 5"):
+            return False, bytes(output), "missing PRINT 2+3 output"
+        send(b"a\r\n")
+        if not read_until(b"Unknown command"):
+            return False, bytes(output), "missing BASIC error"
+        if proc.poll() is not None:
+            return False, bytes(output), "telnet closed after BASIC error"
+        send(b"PRINT 6+7\r\n")
+        if not read_until(b" 13"):
+            return False, bytes(output), "missing PRINT 6+7 output after error"
+        return True, bytes(output), ""
+    except OSError as exc:
+        return False, bytes(output), f"{type(exc).__name__}: {exc}"
+    finally:
+        if proc.poll() is None:
+            proc.terminate()
+            try:
+                proc.wait(timeout=1.0)
+            except subprocess.TimeoutExpired:
+                proc.kill()
 
 
 def run_telnet(args: argparse.Namespace) -> int:
@@ -1097,6 +1219,18 @@ def run_telnet(args: argparse.Namespace) -> int:
                     "telnet_console_roundtrip",
                     b" 15" in data,
                     repr(data),
+                )
+            )
+            ok, real_data, detail = real_telnet_client_roundtrip(
+                device_host,
+                args.telnet_port,
+                args.long_timeout,
+            )
+            checks.append(
+                CheckResult(
+                    "telnet_real_client_after_error",
+                    ok,
+                    detail or repr(real_data),
                 )
             )
             return print_checks(checks)

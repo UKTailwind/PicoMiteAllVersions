@@ -489,6 +489,37 @@ static void test_shared_tftp(void) {
     const uint8_t ack[] = { 0, 4, 0, 1 };
     mm_net_tftp_handle_packet(&session, &peer, ack, sizeof(ack));
     if (session.active) fail("shared tftp final ack closes");
+
+    memset(&cap, 0, sizeof(cap));
+    mm_net_tftp_init(&session, &tftp_capture_ops, &cap);
+    const uint8_t wrq_blksize[] = {
+        0, 2, 'c', 'o', 'r', 'e', '.', 't', 'x', 't', 0,
+        'o', 'c', 't', 'e', 't', 0,
+        'b', 'l', 'k', 's', 'i', 'z', 'e', 0,
+        '5', '0', '8', 0
+    };
+    mm_net_tftp_handle_packet(&session, &peer, wrq_blksize,
+                              sizeof(wrq_blksize));
+    const uint8_t expected_oack[] = {
+        0, 6, 'b', 'l', 'k', 's', 'i', 'z', 'e', 0, '5', '0', '8', 0
+    };
+    if (cap.sent_count != 1 || cap.sent_len[0] != sizeof(expected_oack) ||
+        memcmp(cap.sent[0], expected_oack, sizeof(expected_oack)) != 0)
+        fail("shared tftp wrq blksize oack");
+
+    uint8_t data1[4 + 508];
+    data1[0] = 0; data1[1] = 3; data1[2] = 0; data1[3] = 1;
+    memset(data1 + 4, 'A', 508);
+    mm_net_tftp_handle_packet(&session, &peer, data1, sizeof(data1));
+    if (cap.sent_count != 2 || memcmp(cap.sent[1], "\x00\x04\x00\x01", 4) != 0 ||
+        !session.active || cap.len != 508)
+        fail("shared tftp full negotiated block stays active");
+
+    const uint8_t data2[] = { 0, 3, 0, 2, 'Z' };
+    mm_net_tftp_handle_packet(&session, &peer, data2, sizeof(data2));
+    if (cap.sent_count != 3 || memcmp(cap.sent[2], "\x00\x04\x00\x02", 4) != 0 ||
+        cap.len != 509 || cap.file[508] != 'Z' || session.active)
+        fail("shared tftp negotiated final block closes");
 }
 
 static void test_shared_ntp(void) {

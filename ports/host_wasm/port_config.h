@@ -16,7 +16,7 @@
  * sockets. `host_wasm_web.c` keeps the WEB hooks linkable, supports simple
  * HTTP `WEB TCP CLIENT REQUEST` calls through browser fetch, supports browser
  * MQTT-over-WebSocket, and reports raw TCP stream/server, UDP, TFTP, and
- * Telnet as unsupported.
+ * Telnet as unsupported unless a trusted proxy advertises those transports.
  *
  * The Makefile orders -I$(WASM_DIR) before -I$(NATIVE_DIR) so this
  * file wins resolution.

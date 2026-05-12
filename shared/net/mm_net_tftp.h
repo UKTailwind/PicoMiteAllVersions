@@ -33,6 +33,7 @@ typedef struct {
     int write_mode;
     int last_data;
     uint16_t block;
+    uint16_t block_size;
     mm_net_tftp_peer_t peer;
     void *handle;
     const mm_net_tftp_ops_t *ops;

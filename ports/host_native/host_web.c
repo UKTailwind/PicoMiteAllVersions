@@ -66,9 +66,9 @@ static mm_net_tftp_session_t host_tftp;
 static char host_telnet_buf[256];
 static int host_telnet_pos;
 static int host_telnet_lastchar = -1;
-static const uint8_t host_telnet_init_options[] = {
-    255, 251, 3, 255, 253, 3, 255, 251, 1, 255, 253, 34, 255, 254, 34, 0,
-};
+static int host_telnet_iac_state;
+static const uint8_t host_telnet_init_options[] = {0};
+static const size_t host_telnet_init_options_len = 0;
 
 int host_tcp_interrupt_pending(void) {
     return mm_net_tcp_service_interrupt_pending(&host_tcp_server);
@@ -354,6 +354,7 @@ static void host_telnet_close_conn(void) {
         host_telnet_conn = 0;
     }
     host_telnet_pos = 0;
+    host_telnet_iac_state = 0;
 }
 
 static void host_telnet_close_server(void) {
@@ -416,9 +417,35 @@ void host_telnet_putc(int c, int flush) {
 
 static void host_telnet_receive_bytes(const uint8_t *data, size_t len) {
     if (!data || len == 0) return;
-    if (data[0] == 255) return;
     for (size_t i = 0; i < len; ++i) {
-        ConsoleRxBuf[ConsoleRxBufHead] = (char)data[i];
+        int c = data[i];
+        if (host_telnet_iac_state == 1) {
+            if (c == 255) {
+                host_telnet_iac_state = 0;
+            } else if (c == 251 || c == 252 || c == 253 || c == 254) {
+                host_telnet_iac_state = 2;
+                continue;
+            } else if (c == 250) {
+                host_telnet_iac_state = 3;
+                continue;
+            } else {
+                host_telnet_iac_state = 0;
+                continue;
+            }
+        } else if (host_telnet_iac_state == 2) {
+            host_telnet_iac_state = 0;
+            continue;
+        } else if (host_telnet_iac_state == 3) {
+            if (c == 255) host_telnet_iac_state = 4;
+            continue;
+        } else if (host_telnet_iac_state == 4) {
+            host_telnet_iac_state = (c == 240) ? 0 : 3;
+            continue;
+        } else if (c == 255) {
+            host_telnet_iac_state = 1;
+            continue;
+        }
+        ConsoleRxBuf[ConsoleRxBufHead] = (char)c;
         if ((host_telnet_lastchar == 13 &&
              ConsoleRxBuf[ConsoleRxBufHead] == 0) ||
             (host_telnet_lastchar == 255 &&
@@ -454,9 +481,10 @@ static void host_telnet_poll(int mode) {
         int rc = hal_net_tcp_accept_conn(host_telnet_server, &conn);
         if (rc == HAL_NET_OK) {
             host_telnet_conn = conn;
-            if (hal_net_tcp_conn_send(host_telnet_conn,
+            if (host_telnet_init_options_len > 0 &&
+                hal_net_tcp_conn_send(host_telnet_conn,
                                       host_telnet_init_options,
-                                      sizeof(host_telnet_init_options),
+                                      host_telnet_init_options_len,
                                       5000) != HAL_NET_OK) {
                 host_telnet_close_conn();
                 return;
@@ -916,7 +944,6 @@ void port_web_clear_runtime_state(void) {
         .close_tcp_client = close_tcpclient,
         .close_mqtt = closeMQTT,
         .close_tftp_session = host_tftp_close_session,
-        .close_telnet_session = host_telnet_close_conn,
     };
     mm_net_lifecycle_runtime_reset(&hooks);
 }

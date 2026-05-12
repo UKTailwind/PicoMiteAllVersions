@@ -4,11 +4,15 @@ build2350_vm_only/
 build_rp2040/
 build_all/
 build_picocalc/
+build_web2350_picocalc/
+__pycache__/
+*/__pycache__/
 host/*.o
 host/*.d
 host/mmbasic_test
 host/mmbasic_legacy_test
 host/mmbasic_sim
+host/wasm_network_proxy
 host/sim_obj/
 host/wasm_obj/
 *.uf2
