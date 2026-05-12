@@ -325,6 +325,8 @@ def main() -> int:
                         help="PPM screenshot path to write")
     parser.add_argument("--roundtrip-only", action="store_true",
                         help="only test VBE mode and return to MODE 1")
+    parser.add_argument("--vbe-all", action="store_true",
+                        help="test displayed pixels in all advertised VBE modes")
     args = parser.parse_args()
 
     if not os.path.exists(KERNEL):
@@ -443,6 +445,40 @@ def main() -> int:
                 if not close_enough(got, (255, 0, 0)):
                     print(f"[FAIL] MODE 1 return red pixel got={got} want={(255, 0, 0)}")
                     return 1
+                print("PASSED")
+                return 0
+
+            if args.vbe_all:
+                mode_listing = send_basic(serial_in_fd, serial_out_fd, "MODE")
+                mode_checks = [
+                    (2, "2:640x480", 640, 480, 630, 470, (255, 0, 255), 640, 480, 0, 0, 1),
+                    (3, "3:800x600", 800, 600, 790, 590, (0, 255, 255), 800, 600, 0, 0, 1),
+                    (4, "4:1024x768", 1024, 768, 1000, 740, (255, 255, 255), 1024, 768, 0, 0, 1),
+                    (5, "5:480x480", 480, 480, 479, 479, (255, 0, 255), 640, 480, 80, 0, 1),
+                    (6, "6:320x320x2", 320, 320, 319, 319, (255, 255, 255), 1024, 768, 192, 64, 2),
+                ]
+                for mode, marker, logical_w, logical_h, px, py, want, hw_w, hw_h, x_off, y_off, scale in mode_checks:
+                    if marker not in mode_listing:
+                        print(f"mode {mode} screenshot: skipped (not advertised)")
+                        continue
+                    send_basic(serial_in_fd, serial_out_fd,
+                               f"MODE {mode} : CLS RGB(0,0,0) : "
+                               f"PIXEL {px},{py},RGB({want[0]},{want[1]},{want[2]})")
+                    mode_dump = os.path.join(os.path.dirname(os.path.abspath(args.out)),
+                                             f"screen_probe-mode{mode}.ppm")
+                    hmp.screendump(mode_dump)
+                    mode_w, mode_h, mode_pixels = parse_ppm(mode_dump)
+                    if mode_w != hw_w or mode_h != hw_h:
+                        print(f"[FAIL] MODE {mode} unexpected dimensions: {mode_w}x{mode_h}")
+                        return 1
+                    sample_x = x_off + px * scale + scale // 2
+                    sample_y = y_off + py * scale + scale // 2
+                    got = pixel(mode_pixels, mode_w, sample_x, sample_y)
+                    print(f"mode {mode} screenshot: {mode_dump}")
+                    print(f"mode {mode} dimensions: {mode_w}x{mode_h} (logical {logical_w}x{logical_h})")
+                    if not close_enough(got, want):
+                        print(f"[FAIL] MODE {mode} pixel got={got} want={want}")
+                        return 1
                 print("PASSED")
                 return 0
 

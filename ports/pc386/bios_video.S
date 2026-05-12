@@ -20,7 +20,8 @@
 .set RM_SAVED_IDTR, 0x7F18
 .set RM_REAL_IDTR,  0x7F20
 .set RM_GDTR,       0x7F28
-.set RM_GDT,        0x7F30
+.set RM_SAVED_GDTR, 0x7F30
+.set RM_GDT,        0x7F40
 
 .section .text
 .code32
@@ -33,6 +34,7 @@ pc386_bios_video_int10:
 
     movl %esp, RM_SAVED_ESP
     sidt RM_SAVED_IDTR
+    sgdt RM_SAVED_GDTR
 
     movw 40(%esp), %ax
     movw %ax, RM_AX
@@ -73,6 +75,7 @@ pc386_bios_video_int10:
     ljmp $0x0018, $RM_THUNK_ADDR
 
 bios_pm_return:
+    lgdt RM_SAVED_GDTR
     movw $0x10, %ax
     movw %ax, %ds
     movw %ax, %es
@@ -106,15 +109,21 @@ bios_real_entry:
 
     movw RM_ES, %ax
     movw %ax, %es
+    xorl %eax, %eax
+    xorl %ebx, %ebx
+    xorl %ecx, %ecx
+    xorl %edx, %edx
+    xorl %edi, %edi
     movw RM_AX, %ax
     movw RM_BX, %bx
     movw RM_CX, %cx
     movw RM_DX, %dx
     movw RM_DI, %di
+    sti
     int $0x10
+    cli
     movw %ax, RM_STATUS
 
-    cli
     lgdt RM_GDTR
     movl %cr0, %eax
     orl $1, %eax

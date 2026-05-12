@@ -33,6 +33,22 @@ extern uint16_t pc386_bios_video_int10(uint16_t ax, uint16_t bx, uint16_t cx,
 
 #define VGA_DAC_WRITE_INDEX 0x3C8
 #define VGA_DAC_DATA        0x3C9
+#define BGA_INDEX_PORT      0x01CE
+#define BGA_DATA_PORT       0x01CF
+#define BGA_INDEX_ID        0
+#define BGA_INDEX_XRES      1
+#define BGA_INDEX_YRES      2
+#define BGA_INDEX_BPP       3
+#define BGA_INDEX_ENABLE    4
+#define BGA_INDEX_BANK      5
+#define BGA_INDEX_VIRT_WIDTH 6
+#define BGA_INDEX_VIRT_HEIGHT 7
+#define BGA_INDEX_X_OFFSET  8
+#define BGA_INDEX_Y_OFFSET  9
+#define BGA_ID_MIN          0xB0C0
+#define BGA_ID_MAX          0xB0C5
+#define BGA_ENABLED         0x0001
+#define BGA_LFB_ENABLED     0x0040
 
 static volatile uint8_t *const vga_fb = (volatile uint8_t *)0xA0000u;
 static volatile uint8_t *fb;
@@ -93,10 +109,10 @@ static VesaModeInfo vesa_mode_cache[3];
 static const Pc386VideoMode pc386_modes[] = {
     {1,  320, 200,  320, 200,   0,  0, 1, PC386_VIDEO_VGA13H, 0x0013, "320x200"},
     {2,  640, 480,  640, 480,   0,  0, 1, PC386_VIDEO_VBE,    0x4112, "640x480"},
-    {3,  800, 600,  800, 600,   0,  0, 1, PC386_VIDEO_VBE,    0x4115, "800x600"},
-    {4, 1024, 768, 1024, 768,   0,  0, 1, PC386_VIDEO_VBE,    0x4118, "1024x768"},
+    {3,  800, 600,  800, 600,   0,  0, 1, PC386_VIDEO_VBE,    0x4114, "800x600"},
+    {4, 1024, 768, 1024, 768,   0,  0, 1, PC386_VIDEO_VBE,    0x4117, "1024x768"},
     {5,  480, 480,  640, 480,  80,  0, 1, PC386_VIDEO_VBE,    0x4112, "480x480"},
-    {6,  320, 320, 1024, 768, 192, 64, 2, PC386_VIDEO_VBE,    0x4118, "320x320x2"},
+    {6,  320, 320, 1024, 768, 192, 64, 2, PC386_VIDEO_VBE,    0x4117, "320x320x2"},
 };
 
 static uint8_t rgb_to_332(uint32_t rgb);
@@ -110,6 +126,16 @@ static uint32_t fit_to_mask(uint8_t value, uint8_t bits) {
 
 static inline void outb(uint16_t port, uint8_t val) {
     __asm__ volatile("outb %0, %1" : : "a"(val), "Nd"(port));
+}
+
+static inline void outw(uint16_t port, uint16_t val) {
+    __asm__ volatile("outw %0, %1" : : "a"(val), "Nd"(port));
+}
+
+static inline uint16_t inw(uint16_t port) {
+    uint16_t val;
+    __asm__ volatile("inw %1, %0" : "=a"(val) : "Nd"(port));
+    return val;
 }
 
 static uint8_t scale_to_dac(uint8_t value) {
@@ -205,10 +231,46 @@ static void vesa_apply_mode_info(const VesaModeInfo *info) {
     fb_blue_size = info->blue_size;
 }
 
+static uint16_t bga_read(uint16_t index) {
+    outw(BGA_INDEX_PORT, index);
+    return inw(BGA_DATA_PORT);
+}
+
+static void bga_write(uint16_t index, uint16_t value) {
+    outw(BGA_INDEX_PORT, index);
+    outw(BGA_DATA_PORT, value);
+}
+
+static bool bga_available(void) {
+    uint16_t id = bga_read(BGA_INDEX_ID);
+    return id >= BGA_ID_MIN && id <= BGA_ID_MAX;
+}
+
+static bool bga_set_mode(const VesaModeInfo *info) {
+    if (!bga_available()) return false;
+    if (info->width == 0 || info->height == 0 || info->bpp == 0) return false;
+    bga_write(BGA_INDEX_ENABLE, 0);
+    bga_write(BGA_INDEX_BPP, info->bpp);
+    bga_write(BGA_INDEX_XRES, info->width);
+    bga_write(BGA_INDEX_YRES, info->height);
+    bga_write(BGA_INDEX_BANK, 0);
+    bga_write(BGA_INDEX_VIRT_WIDTH, info->width);
+    bga_write(BGA_INDEX_VIRT_HEIGHT, info->height);
+    bga_write(BGA_INDEX_X_OFFSET, 0);
+    bga_write(BGA_INDEX_Y_OFFSET, 0);
+    bga_write(BGA_INDEX_ENABLE, BGA_ENABLED | BGA_LFB_ENABLED);
+    return bga_read(BGA_INDEX_XRES) == info->width &&
+           bga_read(BGA_INDEX_YRES) == info->height &&
+           bga_read(BGA_INDEX_BPP) == info->bpp;
+}
+
 static bool vesa_set_bios_mode(uint16_t bios_mode) {
     const VesaModeInfo *info = vesa_get_mode_info(bios_mode);
     if (info == NULL) return false;
-    (void)pc386_bios_video_int10(0x4F02, bios_mode, 0, 0, 0, 0);
+    if (pc386_bios_video_int10(0x4F02, bios_mode, 0, 0, 0, 0) != 0x004Fu &&
+        !bga_set_mode(info)) {
+        return false;
+    }
     vesa_apply_mode_info(info);
     linear_fb_available = true;
     return true;
@@ -582,8 +644,8 @@ void cmd_mode(void) {
         MMPrintString("\r\n");
         MMPrintString("1:320x200");
         if (vesa_mode_supported(0x4112)) MMPrintString(" 2:640x480 5:480x480");
-        if (vesa_mode_supported(0x4115)) MMPrintString(" 3:800x600");
-        if (vesa_mode_supported(0x4118)) MMPrintString(" 4:1024x768 6:320x320x2");
+        if (vesa_mode_supported(0x4114)) MMPrintString(" 3:800x600");
+        if (vesa_mode_supported(0x4117)) MMPrintString(" 4:1024x768 6:320x320x2");
         MMPrintString("\r\n");
         return;
     }
@@ -593,8 +655,8 @@ void cmd_mode(void) {
 void vga_mode13h_init(void) {
     (void)pc386_multiboot_info;
     (void)vesa_mode_supported(0x4112);
-    (void)vesa_mode_supported(0x4115);
-    (void)vesa_mode_supported(0x4118);
+    (void)vesa_mode_supported(0x4114);
+    (void)vesa_mode_supported(0x4117);
     fb = vga_fb;
     fb_width = VGA_WIDTH;
     fb_height = VGA_HEIGHT;
