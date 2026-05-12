@@ -2,7 +2,8 @@
 # ports/pc386/build.sh — cross-compile the bare-metal kernel.
 #
 # Usage:
-#   ./build.sh             # build build/mmbasic.elf
+#   ./build.sh             # build the default SB16 release kernel
+#   PC386_AUDIO=pcspk ./build.sh
 #   ./build.sh clean       # remove build/
 #   ./build.sh iso         # also produce build/mmbasic.iso (Stage 7+)
 

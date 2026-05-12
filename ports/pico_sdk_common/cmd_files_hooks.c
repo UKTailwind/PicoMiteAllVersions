@@ -64,6 +64,7 @@ void cmd_load_post_cleanup(void)
 
 void port_drive_check(char drive)
 {
+    if (drive != 'A' && drive != 'B') error("Invalid disk");
     /* Both A: (LFS-on-flash) and B: (FatFS-on-SD) exist on device. A:
      * needs no validation — flash is always present. B: requires the
      * SD-card chip-select pin to be configured (SD_CS or CombinedCS). */
@@ -77,6 +78,11 @@ void port_drive_check(char drive)
  * no LFS) overrides to coerce FLASHFILE → FATFSFILE. Device builds
  * keep the canonical A:=LFS / B:=FatFs split. */
 int port_drivecheck_remap(int t) { return t; }
+
+const char *port_filesystem_prefix(int filesystem)
+{
+    return filesystem ? "B:" : "A:";
+}
 
 /* hal_ff_* directory + path ops on device just forward to the vendored
  * FatFS in ff.c. Host impls in host/host_fs_shims.c (host_f_*) handle

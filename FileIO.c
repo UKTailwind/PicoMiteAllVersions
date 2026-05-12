@@ -66,6 +66,7 @@ int FatFSFileSystem=0; //Assume we are using flash file system
  * (parsing path prefixes) and cmd_disk (the DRIVE / `a:` / `b:`
  * shortcut commands). */
 extern int port_drivecheck_remap(int t);
+extern const char *port_filesystem_prefix(int filesystem);
 /* Per-port hooks for command-level lifecycle quirks that diverge between
  * device (interrupt-driven console, large heap, can SaveContext+InitHeap
  * mid-program) and host (cooperative MMInkey poll, shared bc_alloc heap
@@ -327,6 +328,11 @@ void MIPS16 cmd_disk(void){
     if(strcmp(b, "A:")==0)  { port_drive_check('A'); FatFSFileSystem = FatFSFileSystemSave = port_drivecheck_remap(FLASHFILE) - 1; return; }
     if(strcmp(b, "B:")==0)    {
         port_drive_check('B');
+        FatFSFileSystem = FatFSFileSystemSave = port_drivecheck_remap(FATFSFILE) - 1;
+        return;
+    }
+    if(strcmp(b, "C:")==0)    {
+        port_drive_check('C');
         FatFSFileSystem = FatFSFileSystemSave = port_drivecheck_remap(FATFSFILE) - 1;
         return;
     }
@@ -1101,7 +1107,7 @@ void cmd_LoadJPGImage(unsigned char *p)
  * / drivecheck before this is called. */
 static inline void hal_path_with_drive(char *dst, size_t n, const char *stripped)
 {
-    snprintf(dst, n, "%s%s", FatFSFileSystem ? "B:" : "A:", stripped);
+    snprintf(dst, n, "%s%s", port_filesystem_prefix(FatFSFileSystem), stripped);
 }
 
 // search for a volume label, directory or file
@@ -1248,7 +1254,7 @@ void mmbasic_chdir(char *p){
     	}
     }
     if (*p=='/'){ //absolute path specified
-    	strcpy(rp,FatFSFileSystem==0? "A:":"B:");
+        strcpy(rp, port_filesystem_prefix(FatFSFileSystem));
     	strcat(rp,p);
     } else { // relative path specified
     	strcpy(rp,filepath[FatFSFileSystem]); //copy the current pathname
@@ -1257,7 +1263,7 @@ void mmbasic_chdir(char *p){
     }
 	strcpy(filepath[FatFSFileSystem],rp); //set the new pathname
 	resolve_path(filepath[FatFSFileSystem],rp,rp); //resolve to single absolute path
-	if(strcmp(rp,"A:")==0 || strcmp(rp,"B:")==0 )strcat(rp,"/"); //if root append the slash
+    if (rp[1] == ':' && rp[2] == 0) strcat(rp, "/"); //if root append the slash
 	strcpy(filepath[FatFSFileSystem],rp); //store this back to the filepath variable
     if(!InitSDCard()) { //If no disk restore the old path and return
     	strcpy(filepath[FatFSFileSystem],oldfilepath);
@@ -1347,7 +1353,7 @@ void MIPS16 cmd_kill(void)
         if(argc==3 && checkstring(argv[2],(unsigned char *)"ALL")){
             all=1;
             MMPrintString("Deleting ");MMPrintString(pp);MMPrintString(" from ");
-            MMPrintString(fromfilesystem==1 ? "B:" : "A:"); MMPrintString(fromdir);
+            MMPrintString((char *)port_filesystem_prefix(fromfilesystem)); MMPrintString(fromdir);
             MMPrintString("\r\nAre you sure ? (Y/N) ");
             while(1){
                 i=toupper(MMInkey());
@@ -1891,7 +1897,7 @@ int FileLoadProgram(unsigned char *fname, bool chain)
     p = buf = GetTempMemory(EDIT_BUFFER_SIZE-2048); // get all the memory while leaving space for the couple of buffers defined and the file handle
     *p++='\'';
     *p++='#';
-    strcpy(p,CurrentFileSystem? "B:":"A:");
+    strcpy(p, port_filesystem_prefix(CurrentFileSystem));
     p+=2;
     strcpy(p,q);
     p+=strlen(q);
@@ -2315,8 +2321,7 @@ int BasicFileOpen(char *fname, int fnbr, int mode)
 
     /* Build drive-prefixed path for the HAL dispatcher. */
     char prefixed[FF_MAX_LFN + 4];
-    snprintf(prefixed, sizeof(prefixed), "%s%s",
-             FatFSFileSystem ? "B:" : "A:", q);
+    hal_path_with_drive(prefixed, sizeof(prefixed), q);
 
     hal_fs_fd_t fd = 0;
     int rc = hal_fs_open(prefixed, hal_flags, &fd);
@@ -2408,9 +2413,15 @@ int drivecheck(char *p, int *waste){
     if(strlen(p)==2){
         if(!(p[1]==':')) return FatFSFileSystem+1;
         if(*p=='a' || *p=='A') {
+            port_drive_check('A');
             *waste=2;
             t = FLASHFILE;
         } else if(*p=='b' || *p=='B') {
+            port_drive_check('B');
+            *waste=2;
+            t = FATFSFILE;
+        } else if(*p=='c' || *p=='C') {
+            port_drive_check('C');
             *waste=2;
             t = FATFSFILE;
         } else { error("Invalid disk"); return FatFSFileSystem+1; }
@@ -2418,9 +2429,15 @@ int drivecheck(char *p, int *waste){
     } else  {
         if(!(p[1]==':' && (p[2]=='/'))) return FatFSFileSystem+1;
         if(*p=='a' || *p=='A') {
+            port_drive_check('A');
             *waste=2;
             t = FLASHFILE;
         } else if(*p=='b' || *p=='B') {
+            port_drive_check('B');
+            *waste=2;
+            t = FATFSFILE;
+        } else if(*p=='c' || *p=='C') {
+            port_drive_check('C');
             *waste=2;
             t = FATFSFILE;
         } else { error("Invalid disk"); return FatFSFileSystem+1; }
@@ -2722,7 +2739,7 @@ void fullpath(char *q)
     }
     if (*p == '/')
     { // absolute path specified
-        strcpy(rp, FatFSFileSystem==0?"A:":"B:");
+        strcpy(rp, port_filesystem_prefix(FatFSFileSystem));
         strcat(rp, p);
     }
     else
@@ -2734,7 +2751,7 @@ void fullpath(char *q)
     }
     strcpy(fullpathname[FatFSFileSystem], rp);           // set the new pathname
     resolve_path(fullpathname[FatFSFileSystem], rp, rp); // resolve to single absolute path
-    if (strcmp(rp, "A:") == 0 || strcmp(rp, "0:") == 0 || strcmp(rp, "B:") == 0)
+    if (rp[1] == ':' && rp[2] == 0)
         strcat(rp, "/");      // if root append the slash
     strcpy(fullpathname[FatFSFileSystem], rp); // store this back to the filepath variable
     memmove(fullpathname[FatFSFileSystem], &fullpathname[FatFSFileSystem][2], strlen(fullpathname[FatFSFileSystem]));
@@ -2851,11 +2868,16 @@ void MIPS16 cmd_files(void)
     FatFSFileSystem=t-1;
     fullpath(q);
     if(Option.DISPLAY_CONSOLE){ClearScreen(gui_bcolour);CurrentX=0;CurrentY=0;}
-    putConsole('A'+FatFSFileSystem,0);
-    putConsole(':',1);
-    MMPrintString(fullpathname[FatFSFileSystem]);PRet();
+    MMPrintString((char *)port_filesystem_prefix(FatFSFileSystem));
+    MMPrintString(fullpathname[FatFSFileSystem]);
+    if(!fullpathname[FatFSFileSystem][0]) MMPrintString("/");
+    PRet();
     if(FatFSFileSystem==0) FSerror=lfs_dir_open(&lfs, &lfs_dir, fullpathname[FatFSFileSystem]);
-    else FSerror = hal_ff_findfirst(&djd, &fnod, fullpathname[FatFSFileSystem], pp);
+    else {
+        char dirpath[FF_MAX_LFN + 4];
+        hal_path_with_drive(dirpath, sizeof(dirpath), fullpathname[FatFSFileSystem]);
+        FSerror = hal_ff_findfirst(&djd, &fnod, dirpath, pp);
+    }
     ErrorCheck(0);
     flist = GetMemory(sizeof(s_flist) * MAXFILES);
         // add the file to the list, search for the next and keep looping until no more files

@@ -21,12 +21,17 @@
  * error message rather than letting cmd_files probe a non-existent
  * mount and produce a confusing "Could not find file" later. */
 void port_drive_check(char drive) {
+    if (drive != 'A' && drive != 'B') error("Invalid disk");
     if (drive == 'B') error("B: drive not configured on this board");
 }
 
 /* Default drivecheck remap: identity. Pc386 (which has FatFs on every
  * volume and no LFS) overrides this. ESP32 keeps A:=LFS / B:=FatFs. */
 int port_drivecheck_remap(int t) { return t; }
+
+const char *port_filesystem_prefix(int filesystem) {
+    return filesystem ? "B:" : "A:";
+}
 
 /* Mount B:. No-op success on ESP32 stdio scope — there's nothing to
  * mount. cmd_drive's typical contract is "return 0 on success"; the

@@ -488,15 +488,77 @@ unsigned long long strtoull(const char *s, char **end, int base) {
     return (unsigned long long)strtoll(s, end, base);
 }
 
-/* atof / strtod / strtof — defer to pc386_math.c when math vendored. */
+static double pc386_pow10_int(int exp) {
+    double scale = 1.0;
+    double base = 10.0;
+    unsigned int n;
+
+    if (exp < 0) n = (unsigned int)-exp;
+    else n = (unsigned int)exp;
+
+    while (n) {
+        if (n & 1U) scale *= base;
+        base *= base;
+        n >>= 1;
+    }
+    return exp < 0 ? 1.0 / scale : scale;
+}
+
+/* atof / strtod / strtof — minimal decimal parser for MMBasic numeric input. */
 double atof(const char *s) {
-    (void)s;
-    pc386_panic("atof not yet implemented (3c.1: vendor strtod/openlibm)");
+    return strtod(s, NULL);
 }
 
 double strtod(const char *s, char **end) {
-    (void)s; (void)end;
-    pc386_panic("strtod not yet implemented (3c.1: vendor strtod/openlibm)");
+    const char *p = s;
+    int neg = 0;
+    int any = 0;
+    double v = 0.0;
+
+    while (isspace((unsigned char)*p)) p++;
+    if (*p == '+' || *p == '-') {
+        neg = (*p == '-');
+        p++;
+    }
+
+    while (isdigit((unsigned char)*p)) {
+        v = v * 10.0 + (double)(*p - '0');
+        p++;
+        any = 1;
+    }
+
+    if (*p == '.') {
+        double place = 0.1;
+        p++;
+        while (isdigit((unsigned char)*p)) {
+            v += (double)(*p - '0') * place;
+            place *= 0.1;
+            p++;
+            any = 1;
+        }
+    }
+
+    if (any && (*p == 'e' || *p == 'E')) {
+        const char *exp_start = p;
+        int exp_neg = 0;
+        int exp_any = 0;
+        int exp_val = 0;
+        p++;
+        if (*p == '+' || *p == '-') {
+            exp_neg = (*p == '-');
+            p++;
+        }
+        while (isdigit((unsigned char)*p)) {
+            if (exp_val < 308) exp_val = exp_val * 10 + (*p - '0');
+            p++;
+            exp_any = 1;
+        }
+        if (exp_any) v *= pc386_pow10_int(exp_neg ? -exp_val : exp_val);
+        else p = exp_start;
+    }
+
+    if (end) *end = (char *)(any ? p : s);
+    return neg ? -v : v;
 }
 
 float strtof(const char *s, char **end) {

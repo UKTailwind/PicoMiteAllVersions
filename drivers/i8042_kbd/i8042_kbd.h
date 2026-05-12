@@ -19,6 +19,11 @@
  * + idt_init. */
 void kbd_init(void);
 
+/* Program the keyboard typematic repeat byte (PS/2 command 0xF3).
+ * Bits match the standard PS/2 encoding: delay in bits 6..5, rate in
+ * bits 4..0. Returns false if the controller does not ACK in time. */
+bool kbd_set_typematic(uint8_t value);
+
 /* Pop the next raw scancode from the ring, or return -1 if empty. */
 int  kbd_get_scancode(void);
 

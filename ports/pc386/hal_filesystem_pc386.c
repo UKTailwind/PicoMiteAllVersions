@@ -24,6 +24,7 @@
 #include "ff.h"
 #include "hal/hal_filesystem.h"
 #include "hal/hal_fatfs_dispatch.h"
+#include "drivers/lpt_centronics/lpt_centronics.h"
 
 /* -------------------------------------------------------------------- */
 /* FRESULT → -errno                                                     */
@@ -70,6 +71,12 @@ static BYTE hal_flags_to_fatfs(int flags) {
 
 static FIL pc386_fs_slots[HAL_FS_MAX_OPEN];
 static char pc386_fs_used[HAL_FS_MAX_OPEN];
+typedef enum {
+    PC386_FS_SLOT_NONE = 0,
+    PC386_FS_SLOT_FAT,
+    PC386_FS_SLOT_LPT1,
+} pc386_fs_slot_kind_t;
+static pc386_fs_slot_kind_t pc386_fs_kind[HAL_FS_MAX_OPEN];
 
 static int pc386_fs_alloc(void) {
     for (int i = 0; i < HAL_FS_MAX_OPEN; i++) {
@@ -81,11 +88,40 @@ static int pc386_fs_alloc(void) {
 static FIL *pc386_fs_get(hal_fs_fd_t fd) {
     if (fd < 1 || fd > HAL_FS_MAX_OPEN) return NULL;
     if (!pc386_fs_used[fd - 1]) return NULL;
+    if (pc386_fs_kind[fd - 1] != PC386_FS_SLOT_FAT) return NULL;
     return &pc386_fs_slots[fd - 1];
 }
 
 static void pc386_fs_release(hal_fs_fd_t fd) {
-    if (fd >= 1 && fd <= HAL_FS_MAX_OPEN) pc386_fs_used[fd - 1] = 0;
+    if (fd >= 1 && fd <= HAL_FS_MAX_OPEN) {
+        pc386_fs_used[fd - 1] = 0;
+        pc386_fs_kind[fd - 1] = PC386_FS_SLOT_NONE;
+    }
+}
+
+static int ascii_upper(int c) {
+    return (c >= 'a' && c <= 'z') ? c - ('a' - 'A') : c;
+}
+
+static int lpt1_name_equal(const char *p) {
+    return p &&
+           ascii_upper((unsigned char)p[0]) == 'L' &&
+           ascii_upper((unsigned char)p[1]) == 'P' &&
+           ascii_upper((unsigned char)p[2]) == 'T' &&
+           p[3] == '1' &&
+           p[4] == ':' &&
+           p[5] == '\0';
+}
+
+static int path_is_lpt1(const char *path) {
+    const char *base = path;
+    if (!path) return 0;
+    if (lpt1_name_equal(path)) return 1;
+    if (path[0] && path[1] == ':' && lpt1_name_equal(path + 2)) return 1;
+    for (const char *p = path; *p; p++) {
+        if (*p == '/' || *p == '\\') base = p + 1;
+    }
+    return lpt1_name_equal(base);
 }
 
 /* -------------------------------------------------------------------- */
@@ -95,13 +131,30 @@ int hal_fs_open(const char *path, int flags, hal_fs_fd_t *out) {
     if (!path || !out) return -EINVAL;
     int idx = pc386_fs_alloc();
     if (idx < 0) return -EMFILE;
+    if (path_is_lpt1(path)) {
+        if ((flags & HAL_FS_O_WRONLY) == 0 && (flags & HAL_FS_O_RDWR) != HAL_FS_O_RDWR) {
+            pc386_fs_release(idx + 1);
+            return -EACCES;
+        }
+        lpt_centronics_init(LPT_CENTRONICS_DEFAULT_BASE);
+        pc386_fs_kind[idx] = PC386_FS_SLOT_LPT1;
+        *out = idx + 1;
+        return 0;
+    }
     FRESULT r = f_open(&pc386_fs_slots[idx], path, hal_flags_to_fatfs(flags));
     if (r != FR_OK) { pc386_fs_release(idx + 1); return fatfs_rc_to_errno(r); }
+    pc386_fs_kind[idx] = PC386_FS_SLOT_FAT;
     *out = idx + 1;
     return 0;
 }
 
 int hal_fs_close(hal_fs_fd_t fd) {
+    if (fd >= 1 && fd <= HAL_FS_MAX_OPEN &&
+        pc386_fs_used[fd - 1] && pc386_fs_kind[fd - 1] == PC386_FS_SLOT_LPT1) {
+        lpt_centronics_flush();
+        pc386_fs_release(fd);
+        return 0;
+    }
     FIL *fp = pc386_fs_get(fd);
     if (!fp) return -EBADF;
     FRESULT r = f_close(fp);
@@ -110,6 +163,9 @@ int hal_fs_close(hal_fs_fd_t fd) {
 }
 
 ssize_t hal_fs_read(hal_fs_fd_t fd, void *buf, size_t n) {
+    if (fd >= 1 && fd <= HAL_FS_MAX_OPEN &&
+        pc386_fs_used[fd - 1] && pc386_fs_kind[fd - 1] == PC386_FS_SLOT_LPT1)
+        return -EBADF;
     FIL *fp = pc386_fs_get(fd);
     if (!fp || !buf) return -EBADF;
     UINT bw = 0;
@@ -119,6 +175,12 @@ ssize_t hal_fs_read(hal_fs_fd_t fd, void *buf, size_t n) {
 }
 
 ssize_t hal_fs_write(hal_fs_fd_t fd, const void *buf, size_t n) {
+    if (fd >= 1 && fd <= HAL_FS_MAX_OPEN &&
+        pc386_fs_used[fd - 1] && pc386_fs_kind[fd - 1] == PC386_FS_SLOT_LPT1) {
+        if (!buf) return -EBADF;
+        size_t written = lpt_centronics_write(buf, n);
+        return written == n ? (ssize_t)written : -EIO;
+    }
     FIL *fp = pc386_fs_get(fd);
     if (!fp || !buf) return -EBADF;
     UINT bw = 0;
@@ -143,6 +205,9 @@ int hal_fs_putc(hal_fs_fd_t fd, char c) {
 }
 
 off_t hal_fs_seek(hal_fs_fd_t fd, off_t off, int whence) {
+    if (fd >= 1 && fd <= HAL_FS_MAX_OPEN &&
+        pc386_fs_used[fd - 1] && pc386_fs_kind[fd - 1] == PC386_FS_SLOT_LPT1)
+        return -EINVAL;
     FIL *fp = pc386_fs_get(fd);
     if (!fp) return -EBADF;
     FRESULT r;
@@ -154,24 +219,38 @@ off_t hal_fs_seek(hal_fs_fd_t fd, off_t off, int whence) {
 }
 
 off_t hal_fs_tell(hal_fs_fd_t fd) {
+    if (fd >= 1 && fd <= HAL_FS_MAX_OPEN &&
+        pc386_fs_used[fd - 1] && pc386_fs_kind[fd - 1] == PC386_FS_SLOT_LPT1)
+        return 0;
     FIL *fp = pc386_fs_get(fd);
     if (!fp) return -EBADF;
     return (off_t)f_tell(fp);
 }
 
 int hal_fs_eof(hal_fs_fd_t fd) {
+    if (fd >= 1 && fd <= HAL_FS_MAX_OPEN &&
+        pc386_fs_used[fd - 1] && pc386_fs_kind[fd - 1] == PC386_FS_SLOT_LPT1)
+        return 1;
     FIL *fp = pc386_fs_get(fd);
     if (!fp) return -EBADF;
     return f_eof(fp) ? 1 : 0;
 }
 
 int hal_fs_sync(hal_fs_fd_t fd) {
+    if (fd >= 1 && fd <= HAL_FS_MAX_OPEN &&
+        pc386_fs_used[fd - 1] && pc386_fs_kind[fd - 1] == PC386_FS_SLOT_LPT1) {
+        lpt_centronics_flush();
+        return 0;
+    }
     FIL *fp = pc386_fs_get(fd);
     if (!fp) return -EBADF;
     return fatfs_rc_to_errno(f_sync(fp));
 }
 
 off_t hal_fs_size(hal_fs_fd_t fd) {
+    if (fd >= 1 && fd <= HAL_FS_MAX_OPEN &&
+        pc386_fs_used[fd - 1] && pc386_fs_kind[fd - 1] == PC386_FS_SLOT_LPT1)
+        return 0;
     FIL *fp = pc386_fs_get(fd);
     if (!fp) return -EBADF;
     return (off_t)f_size(fp);

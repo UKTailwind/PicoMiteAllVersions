@@ -23,6 +23,10 @@
 
 #include "i8042_kbd.h"
 
+extern uint64_t hal_time_us_64(void);
+extern int pc386_keyboard_repeat_start_ms(void);
+extern int pc386_keyboard_repeat_rate_ms(void);
+
 /* Mirror Hardware_Includes.h's named-key codes here so this driver
  * doesn't pull MMBasic_Includes.h into a freestanding driver TU. */
 #define KEY_TAB     0x09
@@ -82,6 +86,31 @@ static bool ctrl_down  = false;
 static bool alt_down   = false;
 static bool caps_lock  = false;
 static bool ext_prefix = false;   /* last byte was 0xE0 */
+static bool down[2][128];
+static uint64_t next_repeat_us[2][128];
+
+static bool repeat_allowed(uint8_t mc, bool extended, bool released) {
+    unsigned ext = extended ? 1u : 0u;
+    if (released) {
+        down[ext][mc] = false;
+        next_repeat_us[ext][mc] = 0;
+        return false;
+    }
+
+    uint64_t now = hal_time_us_64();
+    int start_ms = pc386_keyboard_repeat_start_ms();
+    int rate_ms = pc386_keyboard_repeat_rate_ms();
+    if (!down[ext][mc]) {
+        down[ext][mc] = true;
+        next_repeat_us[ext][mc] = now + (uint64_t)start_ms * 1000ull;
+        return true;
+    }
+    if (now < next_repeat_us[ext][mc]) return false;
+    uint64_t interval_us = (uint64_t)rate_ms * 1000ull;
+    next_repeat_us[ext][mc] += interval_us;
+    if (next_repeat_us[ext][mc] <= now) next_repeat_us[ext][mc] = now + interval_us;
+    return true;
+}
 
 /* Translate set-1 makecode (without 0x80 release bit) to a named-key
  * code, or 0 if it's a normal printable handled via the tables above. */
@@ -144,9 +173,10 @@ int kbd_get_key(void) {
             if (mc == 0x38) { alt_down  = !released; ext_prefix = false; continue; }
         }
 
-        if (released) { ext_prefix = false; continue; }
+        bool extended = ext_prefix;
+        if (!repeat_allowed(mc, extended, released)) { ext_prefix = false; continue; }
 
-        int nk = named_key(mc, ext_prefix);
+        int nk = named_key(mc, extended);
         ext_prefix = false;
         if (nk) return nk;
 

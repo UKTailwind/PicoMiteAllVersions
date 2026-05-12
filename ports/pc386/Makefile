@@ -12,6 +12,7 @@
 PORT_DIR  := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 REPO_ROOT := $(abspath $(PORT_DIR)/../..)
 BUILD_DIR := $(PORT_DIR)/build
+PC386_AUDIO ?= sb16
 
 CROSS_PREFIX ?= i686-elf-
 CC      := $(CROSS_PREFIX)gcc
@@ -35,7 +36,7 @@ CFLAGS = -std=gnu11 -ffreestanding -O2 -g \
          -mno-red-zone -mno-mmx -mno-sse -mno-sse2 \
          -funsigned-char \
          -DMMBASIC_HOST -DPORT_PC386 \
-         -DFF_STR_VOLUME_ID=1 -DFF_VOLUME_STRS='"B","C"' \
+         -DFF_VOLUMES=3 -DFF_STR_VOLUME_ID=1 -DFF_VOLUME_STRS='"A","B","C"' \
          -include pc386_platform.h \
          -I$(PORT_DIR)/include_shim -I$(PORT_DIR) \
          -I$(REPO_ROOT)/ports/host_native -I$(REPO_ROOT) \
@@ -49,17 +50,25 @@ ASFLAGS = -ffreestanding -g -fno-pic -fno-pie \
 
 LDFLAGS = -nostdlib -no-pie -T $(PORT_DIR)/linker.ld -Wl,--build-id=none
 
+ifeq ($(PC386_AUDIO),pcspk)
+PORT_AUDIO_SRC := hal_audio_pc386.c
+else ifeq ($(PC386_AUDIO),sb16)
+PORT_AUDIO_SRC := hal_audio_pc386_sb16.c
+else
+$(error PC386_AUDIO must be one of: pcspk sb16)
+endif
+
 # --- Sources -----------------------------------------------------------------
 # Stage 0: entry asm + kmain that brings up serial COM1 and VGA text.
 # Stage 2+ extends CORE_SRCS / NATIVE_SRCS / BC_SRCS in the same shape
 # as ports/mmbasic_stdio/Makefile.
 
-PORT_ASM  = boot.S setjmp.S idt_asm.S
+PORT_ASM  = boot.S setjmp.S idt_asm.S bios_video.S
 PORT_SRCS = kmain.c kprint.c mmap.c heap_region.c kstring.c \
             pc386_panic.c pc386_libc.c \
             pc386_state.c pc386_runtime.c pc386_peripheral_stubs.c \
-            pc386_flash.c idt.c \
-            hal_audio_pc386.c hal_filesystem_pc386.c hal_flash_pc386.c \
+            pc386_flash.c vm_sys_pin_pc386.c idt.c \
+            $(PORT_AUDIO_SRC) hal_filesystem_pc386.c hal_flash_pc386.c \
             hal_keyboard_pc386.c hal_pin_pc386.c hal_random_pc386.c \
             hal_storage_pc386.c hal_time_pc386.c \
             hal_vm_framebuffer_pc386.c
@@ -67,7 +76,7 @@ PORT_SRCS = kmain.c kprint.c mmap.c heap_region.c kstring.c \
 # MMBasic core sources brought in for stage 3c.1+. Mirrors mmbasic_stdio's
 # CORE_SRCS list. Files in repo root, drivers/, and core/state/ each
 # get their own pattern rule below so the build dir stays organised.
-CORE_SRCS = MMBasic.c Commands.c Functions.c Operators.c MATHS.c Memory.c
+CORE_SRCS = MMBasic.c Commands.c Functions.c Operators.c MATHS.c Memory.c Editor.c
 CORE_SRCS += MMBasic_Print.c MMBasic_REPL.c MMBasic_Prompt.c
 CORE_SRCS += gfx_box_shared.c gfx_circle_shared.c gfx_line_shared.c gfx_pixel_shared.c
 CORE_SRCS += gfx_cls_shared.c gfx_text_shared.c gfx_console_shared.c
@@ -85,9 +94,9 @@ BC_SRCS = bc_alloc.c bc_bridge.c \
 # real FatFs over ATA-PIO from Stage 2 and provides its own
 # get_fattime() in drivers/fatfs/ff_glue.c.
 
-# vm_sys_pin_sim.c + vm_sys_file_sim.c live in ports/vm_sys_sim/ rather
-# than the repo root. Separate var because they need a different rule.
-SIM_VM_SRCS = vm_sys_pin_sim.c vm_sys_file_sim.c
+# vm_sys_file_sim.c lives in ports/vm_sys_sim/ rather than the repo root.
+# Pc386 has real LPT-backed pins, so vm_sys_pin is port-local.
+SIM_VM_SRCS = vm_sys_file_sim.c
 
 # Stubs inherited from host_native — same set mmbasic_stdio links.
 CORE_DRV_SRCS = audio_mp3/audio_mp3_stub.c \
@@ -102,7 +111,7 @@ CORE_DRV_SRCS = audio_mp3/audio_mp3_stub.c \
                 i2c_picocalc_kbd/i2c_keypad_stub.c \
                 heartbeat/heartbeat_stub.c \
                 editor_console/editor_console_stub.c \
-                display_pixel_host/display_pixel_host.c
+                display_pixel_readbuffer/display_pixel_readbuffer.c
 
 CORE_C_OBJS    := $(addprefix $(BUILD_DIR)/core/,$(CORE_SRCS:.c=.o))
 BC_C_OBJS      := $(addprefix $(BUILD_DIR)/bc/,$(BC_SRCS:.c=.o))
@@ -121,10 +130,13 @@ DRIVER_SRCS = \
     vga_text/vga_text.c \
     serial_16550/serial_16550.c \
     ata_pio/ata_pio.c \
+    fdc_82077/fdc_82077.c \
     fatfs/ff_glue.c \
     i8259_pic/i8259_pic.c \
     i8042_kbd/i8042_kbd.c \
-    i8042_kbd/scan_to_ascii.c
+    i8042_kbd/scan_to_ascii.c \
+    lpt_centronics/lpt_centronics.c \
+    vga_mode13h/vga_mode13h.c
 
 # FatFs is vendored at the repo root (R0.14, shared with every other
 # port). Compile in-place; our drivers/fatfs/ff_glue.c provides the
@@ -142,16 +154,59 @@ DEPS        := $(PORT_C_OBJS:.o=.d) $(DRV_C_OBJS:.o=.d) $(ROOT_C_OBJS:.o=.d) $(H
                $(CORE_C_OBJS:.o=.d) $(BC_C_OBJS:.o=.d) $(SIMVM_C_OBJS:.o=.d) \
                $(STATE_C_OBJS:.o=.d) $(COREDRV_C_OBJS:.o=.d)
 
-KERNEL := $(BUILD_DIR)/mmbasic.elf
+KERNEL          := $(BUILD_DIR)/mmbasic.elf
+KERNEL_STRIPPED := $(BUILD_DIR)/mmbasic-stripped.elf
+KERNEL_BIN      := $(BUILD_DIR)/mmbasic.bin
+CONFIG_STAMP    := $(BUILD_DIR)/.pc386_audio_config
+FLOPPY_BOOT_DIR := $(BUILD_DIR)/bootloader
+FLOPPY_LOAD_PLAN := $(FLOPPY_BOOT_DIR)/floppy_load_plan.inc
+FLOPPY_STAGE1_OBJ := $(FLOPPY_BOOT_DIR)/floppy_stage1.o
+FLOPPY_STAGE2_OBJ := $(FLOPPY_BOOT_DIR)/floppy_stage2.o
+FLOPPY_STAGE1_BIN := $(FLOPPY_BOOT_DIR)/floppy_stage1.bin
+FLOPPY_STAGE2_BIN := $(FLOPPY_BOOT_DIR)/floppy_stage2.bin
 
 # --- Targets -----------------------------------------------------------------
 
-.PHONY: all clean iso
+.PHONY: all clean iso release floppy_bootloader FORCE
 
-all: $(KERNEL)
+all: $(KERNEL) $(KERNEL_STRIPPED) floppy_bootloader
 
-$(KERNEL): $(OBJS) $(PORT_DIR)/linker.ld | $(BUILD_DIR)
+$(KERNEL): $(OBJS) $(PORT_DIR)/linker.ld $(CONFIG_STAMP) | $(BUILD_DIR)
 	$(CC) $(LDFLAGS) -o $@ $(OBJS) -lgcc
+
+$(CONFIG_STAMP): FORCE | $(BUILD_DIR)
+	@cfg='PC386_AUDIO=$(PC386_AUDIO)'; \
+	if [ ! -f $@ ] || [ "$$(cat $@)" != "$$cfg" ]; then \
+		echo "$$cfg" > $@; \
+	fi
+
+release: $(KERNEL_STRIPPED) $(KERNEL_BIN)
+
+$(KERNEL_STRIPPED): $(KERNEL)
+	$(OBJCOPY) --strip-all $< $@
+
+$(KERNEL_BIN): $(KERNEL)
+	$(OBJCOPY) -O binary $< $@
+
+floppy_bootloader: $(FLOPPY_STAGE1_BIN) $(FLOPPY_STAGE2_BIN)
+
+$(FLOPPY_BOOT_DIR):
+	mkdir -p $@
+
+$(FLOPPY_LOAD_PLAN): $(KERNEL_STRIPPED) $(PORT_DIR)/tools/gen_floppy_load_plan.py | $(FLOPPY_BOOT_DIR)
+	python3 $(PORT_DIR)/tools/gen_floppy_load_plan.py --kernel-lba 161 $(KERNEL_STRIPPED) $@
+
+$(FLOPPY_STAGE1_OBJ): $(PORT_DIR)/bootloader/floppy_stage1.S | $(FLOPPY_BOOT_DIR)
+	$(CC) $(ASFLAGS) -c -o $@ $<
+
+$(FLOPPY_STAGE1_BIN): $(FLOPPY_STAGE1_OBJ)
+	$(LD) -Ttext 0x7C00 --oformat binary -o $@ $<
+
+$(FLOPPY_STAGE2_OBJ): $(PORT_DIR)/bootloader/floppy_stage2.S $(FLOPPY_LOAD_PLAN) | $(FLOPPY_BOOT_DIR)
+	$(CC) $(ASFLAGS) -I$(FLOPPY_BOOT_DIR) -c -o $@ $<
+
+$(FLOPPY_STAGE2_BIN): $(FLOPPY_STAGE2_OBJ)
+	$(LD) -Ttext 0x0000 --oformat binary -o $@ $<
 
 $(BUILD_DIR)/%.o: $(PORT_DIR)/%.S | $(BUILD_DIR)
 	$(CC) $(ASFLAGS) -c -o $@ $<

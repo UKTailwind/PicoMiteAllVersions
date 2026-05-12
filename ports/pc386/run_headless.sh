@@ -3,7 +3,9 @@
 # COM1 piped to stdio. The form used by run_tests.sh.
 #
 # Usage:
-#   ./run_headless.sh                     # boot mmbasic.elf
+#   ./run_headless.sh                     # boot mmbasic.elf with SB16
+#   PC386_AUDIO=pcspk ./run_headless.sh
+#   PC386_AUDIO=sb16 PC386_SB_BASE=0x240 ./run_headless.sh
 #   ./run_headless.sh path/to/other.elf   # boot a specific kernel
 #   ./run_headless.sh --timeout 10        # kill QEMU after 10 seconds
 #
@@ -16,6 +18,11 @@ PORT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 KERNEL="$PORT_DIR/build/mmbasic.elf"
 TIMEOUT_SECS=""
+AUDIO_BACKEND="${PC386_AUDIO:-sb16}"
+SB_BASE="${PC386_SB_BASE:-0x220}"
+SB_IRQ="${PC386_SB_IRQ:-5}"
+SB_DMA="${PC386_SB_DMA:-1}"
+SB_DMA16="${PC386_SB_DMA16:-5}"
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -42,6 +49,7 @@ fi
 QEMU_ARGS=(
     -kernel "$KERNEL"
     -m 16M
+    -vga std
     -display none
     -serial stdio
     -no-reboot
@@ -49,14 +57,34 @@ QEMU_ARGS=(
     -d guest_errors
 )
 
+case "$AUDIO_BACKEND" in
+    pcspk)
+        QEMU_ARGS+=(
+            -machine pc,pcspk-audiodev=pcspk
+            -audiodev none,id=pcspk
+        )
+        ;;
+    sb16)
+        QEMU_ARGS+=(
+            -machine pc
+            -audiodev none,id=sb16
+            -device "sb16,audiodev=sb16,iobase=$SB_BASE,irq=$SB_IRQ,dma=$SB_DMA,dma16=$SB_DMA16"
+        )
+        ;;
+    *)
+        echo "error: PC386_AUDIO must be one of: pcspk sb16" >&2
+        exit 2
+        ;;
+esac
+
 # Attach test disks if they exist. Build them via ./build_disks.sh.
-A_IMG="$PORT_DIR/test_disks/a.img"
+F_IMG="$PORT_DIR/test_disks/pc386-floppy.img"
 C_IMG="$PORT_DIR/test_disks/c.img"
-if [[ -f "$A_IMG" ]]; then
-    QEMU_ARGS+=(-drive file="$A_IMG",format=raw,if=ide,index=0)
+if [[ -f "$F_IMG" ]]; then
+    QEMU_ARGS+=(-drive file="$F_IMG",format=raw,if=floppy,index=0)
 fi
 if [[ -f "$C_IMG" ]]; then
-    QEMU_ARGS+=(-drive file="$C_IMG",format=raw,if=ide,index=1)
+    QEMU_ARGS+=(-drive file="$C_IMG",format=raw,if=ide,index=0)
 fi
 
 if [[ -n "$TIMEOUT_SECS" ]]; then

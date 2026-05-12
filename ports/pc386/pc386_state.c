@@ -94,7 +94,25 @@ unsigned char BreakKey = 3;
 volatile int MMAbort = 0;
 volatile unsigned int WDTimer = 0;
 
-const struct s_PinDef PinDef[NBRPINS + 1] = {{0}};
+const struct s_PinDef PinDef[NBRPINS + 1] = {
+    [1]  = { .pin = 1,  .GPno = 1,  .pinname = "1",  .mode = DIGITAL_OUT },
+    [2]  = { .pin = 2,  .GPno = 2,  .pinname = "2",  .mode = DIGITAL_OUT },
+    [3]  = { .pin = 3,  .GPno = 3,  .pinname = "3",  .mode = DIGITAL_OUT },
+    [4]  = { .pin = 4,  .GPno = 4,  .pinname = "4",  .mode = DIGITAL_OUT },
+    [5]  = { .pin = 5,  .GPno = 5,  .pinname = "5",  .mode = DIGITAL_OUT },
+    [6]  = { .pin = 6,  .GPno = 6,  .pinname = "6",  .mode = DIGITAL_OUT },
+    [7]  = { .pin = 7,  .GPno = 7,  .pinname = "7",  .mode = DIGITAL_OUT },
+    [8]  = { .pin = 8,  .GPno = 8,  .pinname = "8",  .mode = DIGITAL_OUT },
+    [9]  = { .pin = 9,  .GPno = 9,  .pinname = "9",  .mode = DIGITAL_OUT },
+    [10] = { .pin = 10, .GPno = 10, .pinname = "10", .mode = DIGITAL_IN },
+    [11] = { .pin = 11, .GPno = 11, .pinname = "11", .mode = DIGITAL_IN },
+    [12] = { .pin = 12, .GPno = 12, .pinname = "12", .mode = DIGITAL_IN },
+    [13] = { .pin = 13, .GPno = 13, .pinname = "13", .mode = DIGITAL_IN },
+    [14] = { .pin = 14, .GPno = 14, .pinname = "14", .mode = DIGITAL_OUT },
+    [15] = { .pin = 15, .GPno = 15, .pinname = "15", .mode = DIGITAL_IN },
+    [16] = { .pin = 16, .GPno = 16, .pinname = "16", .mode = DIGITAL_OUT },
+    [17] = { .pin = 17, .GPno = 17, .pinname = "17", .mode = DIGITAL_OUT },
+};
 
 /* Timer/system variables */
 volatile long long int mSecTimer = 0;
@@ -203,7 +221,12 @@ uint16_t SD_CLK_PIN = 0, SD_MOSI_PIN = 0, SD_MISO_PIN = 0, SD_CS_PIN = 0;
 bool screen320 = 0;
 
 /* PINMAP */
-const uint8_t PINMAP[30] = {0};
+const uint8_t PINMAP[30] = {
+    [1] = 1,   [2] = 2,   [3] = 3,   [4] = 4,   [5] = 5,
+    [6] = 6,   [7] = 7,   [8] = 8,   [9] = 9,   [10] = 10,
+    [11] = 11, [12] = 12, [13] = 13, [14] = 14, [15] = 15,
+    [16] = 16, [17] = 17,
+};
 
 /* PinFunction */
 const char *PinFunction[64] = {NULL};

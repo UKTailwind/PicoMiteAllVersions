@@ -32,11 +32,11 @@
 #undef  HAL_PORT_HEAP_MEMORY_SIZE
 #define HAL_PORT_HEAP_MEMORY_SIZE (1 * 1024 * 1024)
 
-/* IBM-PC has no MCU-style GPIO. The pin HAL stays stubbed to hard-error
- * (same pattern as mmbasic_stdio). NBR_PINS = 0 makes any PIN()
- * indexing fault loudly via bounds check rather than read garbage. */
+/* Pc386 exposes the DB-25 LPT1 connector as BASIC-addressable GPIO.
+ * The user-facing pin numbers are the connector pins: data 2..9,
+ * control 1/14/16/17, and status inputs 10/11/12/13/15. */
 #undef  HAL_PORT_NBR_PINS
-#define HAL_PORT_NBR_PINS                0
+#define HAL_PORT_NBR_PINS                17
 
 /* No flash partitioning on PC. File persistence lives on a FAT16
  * volume reachable through hal_storage; legacy absolute-flash-offset

@@ -9,7 +9,7 @@
  * Boot sequence (working state):
  *   1. Serial COM1 + VGA text consoles, banner.
  *   2. Multiboot1 magic check + mmap walk, heap region reserved.
- *   3. ATA-PIO probe + FAT mount of A: and C: from the IDE volumes.
+ *   3. ATA-PIO + FDC probe, then FAT mount of A:/B:/C:.
  *   4. pc386_flash_init() — RAM-backed program/option buffers.
  *   5. MMBasic runtime instantiation: LoadOptions, InitBasic,
  *      InitHeap, host_runtime_begin. Reaches the point where a
@@ -24,6 +24,7 @@
 #include "ff.h"
 
 #include "../../drivers/ata_pio/ata_pio.h"
+#include "../../drivers/fdc_82077/fdc_82077.h"
 #include "../../drivers/i8042_kbd/i8042_kbd.h"
 #include "../../drivers/i8259_pic/i8259_pic.h"
 #include "../../drivers/serial_16550/serial_16550.h"
@@ -49,13 +50,7 @@ extern void MMBasic_PrintBanner(void);
 extern void MMBasic_RunPromptLoop(void);
 extern jmp_buf mark;
 
-/* Embedded test program — exercises PRINT (string + numeric) so we
- * can see whether MMBasic_Print's path through MMputchar → serial
- * actually reaches COM1 without touching panic-stubbed printf. */
-static const char *pc386_demo_program =
-    "PRINT \"Hello from PC386\"\n"
-    "PRINT \"1+1=\"; 1+1\n"
-    "PRINT \"Done.\"\n";
+const mb1_info_t *pc386_multiboot_info = NULL;
 
 /* Tokenise `source` into ProgMemory line by line. Stripped-down version
  * of host_main.c's load_basic_source — no continuation support, just
@@ -175,7 +170,7 @@ static const char *fr_str(FRESULT r) {
 
 /* One FATFS work area per mount, kept in BSS so Stage 1's heap region
  * stays untouched. */
-static FATFS fs0, fs1;
+static FATFS fs0, fs1, fs2;
 
 static void mount_and_list(const char *vol, const char *label, FATFS *fs) {
     kputs(label);
@@ -246,7 +241,7 @@ void kmain(uint32_t magic, uint32_t info_addr) {
     vga_text_init();
 
     vga_text_set_color(VGA_LIGHT_GREEN, VGA_BLACK);
-    kputs("PicoMite PC386 - Stage 4a\n");
+    kputs("PicoMite PC386 - Stage 5\n");
     vga_text_set_color(VGA_LIGHT_GRAY, VGA_BLACK);
 
     /* IDT comes up first thing — once we lidt, every CPU exception
@@ -290,11 +285,39 @@ void kmain(uint32_t magic, uint32_t info_addr) {
     kputs(serial_ok ? "ok\n" : "FAILED loopback\n");
 
     const mb1_info_t *info = (const mb1_info_t *) (uintptr_t) info_addr;
+    pc386_multiboot_info = info;
     kputs("multiboot info: ");
     kputhex32(info_addr);
     kputs("  flags=");
     kputhex32(info->flags);
     kputc('\n');
+    if (info->flags & MB1_INFO_FRAMEBUFFER) {
+        kputs("framebuffer: addr=");
+        kputhex64(info->framebuffer_addr);
+        kputs(" pitch=");
+        kputu32(info->framebuffer_pitch);
+        kputs(" size=");
+        kputu32(info->framebuffer_width);
+        kputc('x');
+        kputu32(info->framebuffer_height);
+        kputs(" bpp=");
+        kputu32(info->framebuffer_bpp);
+        kputs(" type=");
+        kputu32(info->framebuffer_type);
+        kputs(" rgb=");
+        kputu32(info->color_info[1]);
+        kputc('@');
+        kputu32(info->color_info[0]);
+        kputc('/');
+        kputu32(info->color_info[3]);
+        kputc('@');
+        kputu32(info->color_info[2]);
+        kputc('/');
+        kputu32(info->color_info[5]);
+        kputc('@');
+        kputu32(info->color_info[4]);
+        kputc('\n');
+    }
 
     mmap_print(info);
 
@@ -320,15 +343,17 @@ void kmain(uint32_t magic, uint32_t info_addr) {
 
     kputc('\n');
     probe_and_dump_drives();
+    kputs("FDC probe:\n");
+    kputs("  drive A: ");
+    kputs(fdc_present(0) ? "present\n" : "absent\n");
+    kputs("  drive B: ");
+    kputs(fdc_present(1) ? "present\n" : "absent\n");
 
     kputc('\n');
     kputs("FAT volumes:\n");
-    /* MMBasic core hardcodes "B:" as its FatFs-volume prefix
-     * (see BasicFileOpen in FileIO.c). Match that — FatFs volume 0
-     * maps to the primary IDE master (typed B: at the BASIC prompt),
-     * volume 1 to the primary IDE slave (typed C:). */
-    mount_and_list("B:", "  drive B", &fs0);
-    mount_and_list("C:", "  drive C", &fs1);
+    mount_and_list("A:", "  drive A", &fs0);
+    mount_and_list("B:", "  drive B", &fs1);
+    mount_and_list("C:", "  drive C", &fs2);
 
     /* ---------- MMBasic runtime instantiation (stage 3c.4) ---------- */
 
@@ -349,6 +374,7 @@ void kmain(uint32_t magic, uint32_t info_addr) {
 
     LoadOptions();
     kputs("LoadOptions ok, ");
+    (void)kbd_set_typematic(Option.repeat);
 
     InitBasic();
     kputs("InitBasic ok, ");

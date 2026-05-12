@@ -23,7 +23,7 @@
 
 #include "../../drivers/i8042_kbd/i8042_kbd.h"
 #include "../../drivers/serial_16550/serial_16550.h"
-#include "../../drivers/vga_text/vga_text.h"
+#include "../../drivers/vga_mode13h/vga_mode13h.h"
 #include "pc386_panic.h"
 
 extern jmp_buf mark;          /* defined by MMBasic.c */
@@ -34,10 +34,36 @@ void (*host_output_hook)(const char *text, int len) = NULL;
 extern uint64_t hal_time_us_64(void);
 extern uint64_t timeroffset;
 extern void flash_range_erase(uint32_t off, uint32_t count);
+extern void pc386_options_defaults_ready(void);
+
+#define PC386_DEFAULT_REPEAT_START_MS 350
+#define PC386_DEFAULT_REPEAT_RATE_MS   75
 
 /* =========================================================================
  *  Runtime lifecycle
  * ========================================================================= */
+
+void pc386_apply_runtime_option_defaults(void)
+{
+    /* Sensible Option defaults for a freshly-booted pc386 kernel.
+     * LoadOptions reads from a memset-zero options buffer on first
+     * boot which leaves every field at 0. Override the few that have
+     * meaningful non-zero defaults on every other port; leave the rest
+     * (Listcase=TITLE, continuation=off, Refresh=off, etc.) at zero
+     * so the user's OPTION X commands aren't silently overridden.
+     *
+     *   Tab = 4 — Editor TAB stop
+     *   DefaultFont/FC/BC — fresh zeroed options would otherwise draw
+     *                       black text on a black graphics console. */
+    if (Option.Tab    == 0) Option.Tab    = 4;
+    if (Option.RepeatStart == 0) Option.RepeatStart = PC386_DEFAULT_REPEAT_START_MS;
+    if (Option.RepeatRate  == 0) Option.RepeatRate  = PC386_DEFAULT_REPEAT_RATE_MS;
+    if (Option.DefaultFont == 0) Option.DefaultFont = 1;  /* font 1, 8x12 */
+    if (Option.DefaultFC == 0 && Option.DefaultBC == 0) {
+        Option.DefaultFC = WHITE;
+        Option.DefaultBC = BLACK;
+    }
+}
 
 void host_runtime_begin(void) {
     timeroffset = hal_time_us_64();
@@ -52,46 +78,33 @@ void host_runtime_begin(void) {
     extern unsigned char pc386_cfunction_buf[];
     CFunctionFlash = pc386_cfunction_buf;
 
-    /* Sensible Option defaults for a freshly-booted pc386 kernel.
-     * LoadOptions reads from a memset-zero options buffer on first
-     * boot which leaves every field at 0. Override the few that have
-     * meaningful non-zero defaults on every other port; leave the rest
-     * (Listcase=TITLE, continuation=off, Refresh=off, etc.) at zero
-     * so the user's OPTION X commands aren't silently overridden.
-     *
-     *   Width = 80 — without this, MMputchar wraps after every char
-     *   Height = 24 — pagination "PRESS ANY KEY" prompt
-     *   Tab = 4 — Editor TAB stop
-     *   OptionConsole bit 0 = serial (no graphics until stage 5) */
-    if (Option.Width  == 0) Option.Width  = 80;
-    if (Option.Height == 0) Option.Height = 1000;  /* effectively disable pagination —
-                                                    * "PRESS ANY KEY" needs IRQ-driven
-                                                    * input which lands in stage 4 */
-    if (Option.Tab    == 0) Option.Tab    = 4;
-    if ((OptionConsole & 0x03) == 0) OptionConsole = 1;
+    pc386_apply_runtime_option_defaults();
+    pc386_options_defaults_ready();
 
-    /* Sane VRes + gui_font defaults so the `overlap` macro in FileIO.c
-     *   (VRes % (FontTable[gui_font >> 4][1] * (gui_font & 0b1111)) ? 0 : 1)
-     * doesn't divide by zero. With both at 0 the modulo is undefined
-     * (x86 raises #DE which traps the kernel; gcc may also fold it to
-     * an unpredictable value) and overlap returns garbage, making
-     * Option.Height-overlap negative, which in turn fires cmd_files'
-     * "PRESS ANY KEY ..." pagination after the first dir entry —
-     * blocking on input we have no way to deliver yet. Stage 5 will
-     * set HRes/VRes to real VGA dimensions. */
-    extern short DisplayHRes, DisplayVRes;
-    extern short HRes, VRes;
-    extern short gui_font;
-    if (gui_font == 0) gui_font = 0x11;        /* font 1, scale 1 */
-    if (VRes == 0)     { VRes = 200; HRes = 320; }
-    if (DisplayVRes == 0) { DisplayVRes = 200; DisplayHRes = 320; }
+    /* Stage 5 display: VGA/VBE framebuffer is the primary console,
+     * with COM1 mirroring the same REPL stream for terminal capture
+     * and remote access. */
+    vga_mode13h_init();
+    SetFont(Option.DefaultFont);
+    gui_fcolour = PromptFC = Option.DefaultFC;
+    gui_bcolour = PromptBC = Option.DefaultBC;
+    PromptFont = Option.DefaultFont;
+    Option.DISPLAY_CONSOLE = 1;
+    OptionConsole = 3;                         /* display + serial */
+    Option.Width = HRes / gui_font_width;
+    Option.Height = VRes / gui_font_height;
+    CurrentX = CurrentY = 0;
+    ClearScreen(gui_bcolour);
 
     /* Route file ops through FatFs (=1) rather than LFS (=0). Pc386 has
-     * real FAT volumes from Stage 2 mounted on B: and C:; LFS is
+     * real FAT volumes mounted as A: (FDC), B: (second FDC if present),
+     * and C: (primary IDE hard disk); LFS is
      * stubbed (panic on use). Without this, FILES / LOAD / SAVE etc.
      * end up at lfs_* and surface as "Error during device operation". */
     extern int FatFSFileSystem, FatFSFileSystemSave;
     FatFSFileSystem = FatFSFileSystemSave = 1;
+    extern char filepath[][FF_MAX_LFN];
+    strcpy(filepath[1], "C:/");
 
     /* Persist the live Option struct back to flash_option_buf so the
      * LoadOptions inside error()'s reset path doesn't wipe these
@@ -129,43 +142,12 @@ void DisplayNotSet(void) { /* no error — host_runtime_begin sets DISPLAY_TYPE 
 void ScrollLCDSPISCR(int s) { (void)s; }
 
 /* =========================================================================
- *  Console I/O — fork every byte to BOTH the VGA-text console (primary,
+ *  Console I/O — fork every byte to BOTH the graphics console (primary,
  *  visible on the QEMU window / real-hardware monitor) AND COM1 serial
- *  (backup / remote terminal / test harness). Mirrors the standard
- *  IBM-PC convention: the user-facing console is whichever one's
- *  connected. The two outputs are byte-identical; vga_text_putc handles
- *  \r \n \b \t natively and scrolls; serial_putc writes raw.
+ *  (backup / remote terminal / test harness). Mirrors the PicoMite
+ *  shape: display is the local console, serial carries an ANSI-capable
+ *  mirror.
  * ========================================================================= */
-
-/* MMBasic's REPL emits VT100 escapes (cursor positioning, show/hide
- * cursor, clear-to-EOL, colour SGR) that a serial terminal interprets
- * but VGA text mode 03h renders as literal bytes. Strip them on the
- * VGA-bound path; keep them on serial so a connected terminal still
- * sees a properly-formatted prompt. State machine handles the only
- * three sequence shapes MMBasic emits:
- *   ESC [ ... <final>          CSI       — covers \[K, \[?25h, \[1A
- *   ESC O <final>              SS3       — F1..F4 sometimes
- *   ESC <one byte>             two-char  — bell-flash, charset switch
- */
-static int vga_esc_state = 0;   /* 0=idle, 1=after-ESC, 2=in-CSI */
-
-static void vga_text_filtered_putc(char c) {
-    switch (vga_esc_state) {
-    case 0:
-        if (c == 0x1B) { vga_esc_state = 1; return; }
-        vga_text_putc(c);
-        return;
-    case 1:
-        if (c == '[' || c == 'O') { vga_esc_state = 2; return; }
-        /* Two-char ESC sequence — swallow this final byte, back to idle. */
-        vga_esc_state = 0;
-        return;
-    case 2:
-        /* CSI body: keep eating until a final byte (0x40..0x7E). */
-        if (c >= 0x40 && c <= 0x7E) { vga_esc_state = 0; return; }
-        return;
-    }
-}
 
 char SerialConsolePutC(char c, int flush) {
     (void)flush;
@@ -176,7 +158,6 @@ char SerialConsolePutC(char c, int flush) {
         host_output_hook(&c, 1);
         return c;
     }
-    vga_text_filtered_putc(c);
     serial_putc(c);
     return c;
 }
@@ -227,16 +208,31 @@ int MMInkey(void) {
     return pc386_normalise_serial(s);
 }
 
+int pc386_keyboard_repeat_start_ms(void) {
+    return Option.RepeatStart > 0 ? Option.RepeatStart : PC386_DEFAULT_REPEAT_START_MS;
+}
+
+int pc386_keyboard_repeat_rate_ms(void) {
+    return Option.RepeatRate > 0 ? Option.RepeatRate : PC386_DEFAULT_REPEAT_RATE_MS;
+}
+
 int MMgetchar(void) {
     /* Both PS/2 (IRQ1) and COM1 RX (IRQ4) are interrupt-driven, so we
      * can hlt between checks — the next IRQ wakes us. The check-then-
      * hlt order matters: cli/sti would race with the IRQ posting, so
      * we accept a possible spurious wake and re-check on every loop. */
     for (;;) {
+        ShowCursor(1);
         int c = kbd_get_key();
-        if (c >= 0) return c;
+        if (c >= 0) {
+            ShowCursor(0);
+            return c;
+        }
         int s = serial_getc_nonblock();
-        if (s >= 0) return pc386_normalise_serial(s);
+        if (s >= 0) {
+            ShowCursor(0);
+            return pc386_normalise_serial(s);
+        }
         __asm__ volatile("hlt");
     }
 }
@@ -277,7 +273,29 @@ void MMgetline(int filenbr, char *p) {
     *p = 0;
 }
 
-void printoptions(void) { }
+void printoptions(void) {
+    char line[96];
+    snprintf(line, sizeof(line), "OPTION TAB %d\r\n", Option.Tab);
+    MMPrintString(line);
+    if (Option.RepeatStart != PC386_DEFAULT_REPEAT_START_MS ||
+        Option.RepeatRate != PC386_DEFAULT_REPEAT_RATE_MS) {
+        snprintf(line, sizeof(line), "OPTION KEYBOARD REPEAT %d,%d\r\n",
+                 Option.RepeatStart, Option.RepeatRate);
+        MMPrintString(line);
+    }
+    snprintf(line, sizeof(line), "OPTION DEFAULT COLOURS RGB(%d), RGB(%d)\r\n",
+             Option.DefaultFC, Option.DefaultBC);
+    MMPrintString(line);
+    unsigned sb_dma = Option.pc386_sb_dma;
+    if (Option.pc386_sb_base == 0) sb_dma = 1;
+    snprintf(line, sizeof(line), "OPTION SB16 &H%X, %u, %u, %u\r\n",
+             (unsigned)(Option.pc386_sb_base ? Option.pc386_sb_base : 0x220),
+             (unsigned)(Option.pc386_sb_irq ? Option.pc386_sb_irq : 5),
+             sb_dma,
+             (unsigned)(Option.pc386_sb_dma16 ? Option.pc386_sb_dma16 : 5));
+    MMPrintString(line);
+    MMPrintString("OPTIONS.INI C:/OPTIONS.INI\r\n");
+}
 
 /* =========================================================================
  *  REPL hooks — the actual prompt loop is MMBasic_RunPromptLoop in
@@ -292,10 +310,44 @@ void printoptions(void) { }
 void port_repl_wifi_arch_init_and_connect(void) { /* no WiFi on pc386 */ }
 
 /* Pc386 has FatFs on every mounted volume (no LFS). MMBasic's drivecheck
- * default-maps A: → FLASHFILE → LFS path; remap to FATFSFILE so A:/C:
- * both go through the (working) hal_ff_* / FatFs route. */
+ * default-maps A: -> FLASHFILE -> LFS path; remap to FATFSFILE so all
+ * DOS drive letters go through the hal_ff_* / FatFs route. */
 int port_drivecheck_remap(int t) {
     return (t == FLASHFILE) ? FATFSFILE : t;
+}
+
+static char pc386_fatfs_drive = 'C';
+static char pc386_fatfs_cwd[3][FF_MAX_LFN] = { "A:/", "B:/", "C:/" };
+extern char filepath[][FF_MAX_LFN];
+
+static int pc386_fatfs_drive_index(char drive)
+{
+    if (drive == 'A') return 0;
+    if (drive == 'B') return 1;
+    return 2;
+}
+
+static void pc386_store_fatfs_cwd(char drive)
+{
+    int idx = pc386_fatfs_drive_index(drive);
+    strncpy(pc386_fatfs_cwd[idx], filepath[1], sizeof(pc386_fatfs_cwd[idx]) - 1);
+    pc386_fatfs_cwd[idx][sizeof(pc386_fatfs_cwd[idx]) - 1] = 0;
+}
+
+static void pc386_load_fatfs_cwd(char drive)
+{
+    int idx = pc386_fatfs_drive_index(drive);
+    if (pc386_fatfs_cwd[idx][0] == 0) {
+        snprintf(pc386_fatfs_cwd[idx], sizeof(pc386_fatfs_cwd[idx]), "%c:/", drive);
+    }
+    strcpy(filepath[1], pc386_fatfs_cwd[idx]);
+}
+
+const char *port_filesystem_prefix(int filesystem) {
+    static char prefix[3] = "C:";
+    if (!filesystem) return "A:";
+    prefix[0] = pc386_fatfs_drive;
+    return prefix;
 }
 
 /* =========================================================================
@@ -335,15 +387,34 @@ int  port_usb_count(void) { return 0; }
 int  port_usb_hid_field(int n, int field) { (void)n; (void)field; return 0; }
 
 int  port_mount_sd_drive(void) {
-    /* A: + C: are mounted from kmain via FatFs over ATA-PIO. Nothing
+    /* A:/B:/C: are mounted from kmain via FatFs over FDC/ATA. Nothing
      * to do here — already mounted. SDCardStat-clear matches host. */
     extern volatile BYTE SDCardStat;
     SDCardStat = 0;
     return 2;
 }
 
-void port_apply_load_overrides(void) { }
-void port_drive_check(char drive)    { (void)drive; }
+void port_apply_load_overrides(void) {
+    if (Option.pc386_sb_base == 0) {
+        Option.pc386_sb_base = 0x220;
+        Option.pc386_sb_irq = 5;
+        Option.pc386_sb_dma = 1;
+        Option.pc386_sb_dma16 = 5;
+        return;
+    }
+    if (Option.pc386_sb_irq == 0) Option.pc386_sb_irq = 5;
+    if (Option.pc386_sb_dma == 0 || Option.pc386_sb_dma > 3 || Option.pc386_sb_dma == 2) {
+        Option.pc386_sb_dma = 1;
+    }
+    if (Option.pc386_sb_dma16 == 0) Option.pc386_sb_dma16 = 5;
+}
+void port_drive_check(char drive) {
+    if (drive >= 'a' && drive <= 'z') drive = (char)(drive - 'a' + 'A');
+    if (drive != 'A' && drive != 'B' && drive != 'C') error("Invalid disk");
+    pc386_store_fatfs_cwd(pc386_fatfs_drive);
+    pc386_fatfs_drive = drive;
+    pc386_load_fatfs_cwd(pc386_fatfs_drive);
+}
 
 void port_picocalc_set_keyboard_backlight(int level) { (void)level; }
 int  port_picocalc_battery_pct(void) { return 0; }
@@ -363,7 +434,15 @@ int  port_pinno_alias_for_name(const char *n) { (void)n; return 0; }
 int  port_pin_is_reserved_alias(int p) { (void)p; return 0; }
 const char *port_pin_reserved_label(int p) { (void)p; return NULL; }
 int  port_lcd320_option_setter(unsigned char *c) { (void)c; return 0; }
-int  port_keyboard_option_setter(unsigned char *c) { (void)c; return 0; }
+int  port_keyboard_option_setter(unsigned char *cmdline) {
+    unsigned char *tp = checkstring(cmdline, (unsigned char *)"KEYBOARD REPEAT");
+    if (!tp) return 0;
+    getargs(&tp, 3, (unsigned char *)",");
+    Option.RepeatStart = getint(argv[0], 100, 2000);
+    Option.RepeatRate = getint(argv[2], 25, 2000);
+    SaveOptions();
+    return 1;
+}
 int  port_misc_option_setter(unsigned char *c) { (void)c; return 0; }
 int  port_pico_pins_option_setter(unsigned char *c) { (void)c; return 0; }
 int  port_heartbeat_option_setter(unsigned char *c) { (void)c; return 0; }

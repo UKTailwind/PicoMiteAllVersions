@@ -1,12 +1,13 @@
 /*
  * drivers/fatfs/ff_glue.c — FatFs disk_io adapter for the pc386 port.
  *
- * Maps FatFs physical-drive IDs onto our ATA-PIO layout:
- *   pdrv 0  ->  A: drive (ATA primary master)
- *   pdrv 1  ->  C: drive (ATA primary slave)
+ * Maps FatFs physical-drive IDs onto the pc386 storage layout:
+ *   pdrv 0  ->  A: drive (FDC drive 0, 1.44 MB floppy)
+ *   pdrv 1  ->  B: drive (FDC drive 1, 1.44 MB floppy if present)
+ *   pdrv 2  ->  C: drive (ATA primary master)
  *
  * FatFs configuration: see ffconf.h at repo root. Notable settings:
- *   FF_VOLUMES   = 2   (matches A: + C:)
+ *   FF_VOLUMES   = 3   (matches A: + B: + C:)
  *   FF_MIN/MAX_SS = 512
  *   FF_LBA64     = 0   (LBA28 is sufficient; ATA driver caps at 128 GB)
  *   FF_FS_REENTRANT = 0 (single-threaded kernel, no mutex needed)
@@ -18,16 +19,17 @@
 #include "diskio.h"
 
 #include "../../drivers/ata_pio/ata_pio.h"
+#include "../../drivers/fdc_82077/fdc_82077.h"
 
 static unsigned ata_drive_for_pdrv(BYTE pdrv) {
     switch (pdrv) {
-        case 0:  return ATA_PRIMARY_MASTER;
-        case 1:  return ATA_PRIMARY_SLAVE;
+        case 2:  return ATA_PRIMARY_MASTER;
         default: return ATA_DRIVE_COUNT;   /* invalid */
     }
 }
 
 DSTATUS disk_initialize(BYTE pdrv) {
+    if (pdrv == 0 || pdrv == 1) return fdc_present(pdrv) ? 0 : STA_NODISK;
     unsigned drive = ata_drive_for_pdrv(pdrv);
     if (drive >= ATA_DRIVE_COUNT) return STA_NODISK;
     const ata_drive_info_t *info = ata_drive(drive);
@@ -40,6 +42,18 @@ DSTATUS disk_status(BYTE pdrv) {
 }
 
 DRESULT disk_read(BYTE pdrv, BYTE *buff, LBA_t sector, UINT count) {
+    if (pdrv == 0 || pdrv == 1) {
+        while (count > 0) {
+            UINT chunk = (count > 255) ? 255 : count;
+            if (fdc_read_sectors(pdrv, (uint32_t)sector, (uint8_t)chunk, buff) != 0) {
+                return RES_ERROR;
+            }
+            buff += (size_t)chunk * 512;
+            sector += chunk;
+            count -= chunk;
+        }
+        return RES_OK;
+    }
     unsigned drive = ata_drive_for_pdrv(pdrv);
     if (drive >= ATA_DRIVE_COUNT) return RES_PARERR;
     while (count > 0) {
@@ -58,6 +72,10 @@ DRESULT disk_read(BYTE pdrv, BYTE *buff, LBA_t sector, UINT count) {
 }
 
 DRESULT disk_write(BYTE pdrv, const BYTE *buff, LBA_t sector, UINT count) {
+    if (pdrv == 0 || pdrv == 1) {
+        (void)buff; (void)sector; (void)count;
+        return RES_WRPRT;
+    }
     unsigned drive = ata_drive_for_pdrv(pdrv);
     if (drive >= ATA_DRIVE_COUNT) return RES_PARERR;
     while (count > 0) {
@@ -74,6 +92,23 @@ DRESULT disk_write(BYTE pdrv, const BYTE *buff, LBA_t sector, UINT count) {
 }
 
 DRESULT disk_ioctl(BYTE pdrv, BYTE cmd, void *buff) {
+    if (pdrv == 0 || pdrv == 1) {
+        if (!fdc_present(pdrv)) return RES_NOTRDY;
+        switch (cmd) {
+            case CTRL_SYNC:
+                return RES_OK;
+            case GET_SECTOR_COUNT:
+                *(LBA_t *) buff = FDC_1440_SECTORS;
+                return RES_OK;
+            case GET_SECTOR_SIZE:
+                *(WORD *) buff = 512;
+                return RES_OK;
+            case GET_BLOCK_SIZE:
+                *(DWORD *) buff = 1;
+                return RES_OK;
+        }
+        return RES_PARERR;
+    }
     unsigned drive = ata_drive_for_pdrv(pdrv);
     if (drive >= ATA_DRIVE_COUNT) return RES_PARERR;
     const ata_drive_info_t *info = ata_drive(drive);

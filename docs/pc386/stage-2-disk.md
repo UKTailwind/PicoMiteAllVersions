@@ -1,18 +1,25 @@
 # Stage 2 — Disk + filesystem + bootable Limine
 
-Close the "no flash" gap. Where MCU ports use a flash partition for `LOAD`/`SAVE`/`FILES`, this port uses an actual block device through `hal_storage`, with FatFs (`hal_filesystem`) layered on top. Boot the kernel via Limine off a small "floppy" IDE image (drive A:) and have a larger HDD-style image (drive C:) for everyday persistence.
+Close the "no flash" gap. Where MCU ports use a flash partition for `LOAD`/`SAVE`/`FILES`, this port uses an actual block device through `hal_storage`, with FatFs (`hal_filesystem`) layered on top.
 
-## Why one driver path covers A: + C:
+Historical note: Stage 2 originally modeled both `A:` and `C:` as IDE images
+to get storage and Limine booting quickly. The current pc386 layout is now
+PC-style: `A:` is a real FDC-mounted floppy image, `B:` is reserved for a
+second floppy, and `C:` is the primary IDE hard disk.
 
-QEMU lets you attach the same disk image as either a floppy (`-fda`, uses the 765 FDC) or as IDE (`-drive`, uses ATA). On real hardware, USB sticks and CompactFlash cards present as IDE/SATA. So we model **both A: and C: as IDE drives, just different sizes** — `A:` is a 1.44 MB FAT12 image, `C:` is a 32 MB+ FAT16 image. One ATA-PIO driver (~150 LOC) covers both, the BASIC user sees `A:\` and `C:\` in the way they expect, and the real 765 FDC chip becomes a Stage 9 nice-to-have for booting from an actual physical floppy on real hardware.
+## Original ATA-only bootstrap
+
+QEMU lets a disk image be attached through IDE, and real USB/CF adapters also
+present as IDE/SATA. That let Stage 2 bring up one ATA-PIO path first. Stage 9
+adds the real 765/82077 FDC path for `A:`.
 
 ## Goal
 
 After Stage 2:
 - `hal_storage` is implemented by an ATA-PIO driver in `drivers/ata_pio/`.
 - `hal_filesystem` is implemented by a FatFs port in `drivers/fatfs/` (the same FatFs that the device + host ports already use; the adapter is the new code).
-- A: and C: are both mountable, with FAT12 and FAT16 respectively.
-- Limine boots the kernel from A:.
+- IDE FAT volumes are mountable through FatFs.
+- Limine can boot the kernel from a partitioned IDE image.
 - Kernel prints a directory listing of A: and C: on boot, proving the chain.
 
 The interpreter doesn't run yet (that's Stage 3). Stage 2 ends with the *ability* to read/write files; Stage 3 connects MMBasic to it.
@@ -28,9 +35,9 @@ The interpreter doesn't run yet (that's Stage 3). Stage 2 ends with the *ability
 | `ports/pc386/hal_storage_ata.c` | `hal_storage` impl: routes block reads/writes through `drivers/ata_pio`. |
 | `ports/pc386/hal_filesystem_fatfs.c` | `hal_filesystem` impl: routes file ops through FatFs. |
 | `ports/pc386/limine.cfg` | Limine boot config: kernel = `/boot/mmbasic.elf`, multiboot1 protocol. |
-| `ports/pc386/build_disks.sh` | Builds `a.img` (1.44 MB FAT12 + Limine bootsector + kernel) and `c.img` (32 MB FAT16, blank). |
+| `ports/pc386/build_disks.sh` | Builds the legacy IDE helper `a.img`, the primary FAT16 hard disk `c.img`, and the Stage 9 bootable FDC floppy image `pc386-floppy.img`. |
 
-## Boot flow
+## Original Stage 2 boot flow
 
 1. QEMU starts with `-drive file=a.img,if=ide,index=0 -drive file=c.img,if=ide,index=1 -boot a`.
 2. BIOS reads sector 0 of A: → Limine MBR.
@@ -46,20 +53,29 @@ C: FAT16, 33554432 bytes total, 33548288 free, 0 entries
 
 7. Halts.
 
+The current normal layout after Stage 9 is:
+
+1. `pc386-floppy.img` is attached as `if=floppy,index=0` and mounts as `A:`.
+2. `c.img` is attached as IDE primary master and mounts as `C:`.
+3. Direct development boots still use QEMU `-kernel build/mmbasic.elf`.
+4. Floppy validation boots through BIOS -> custom pc386 stage1/stage2 ->
+   `/BOOT/MMBASIC.ELF`.
+5. Hard-disk validation boots `c.img` through Limine.
+
 ## Test harness
 
 `build_disks.sh` builds the images using `mtools` (no Linux mount, no sudo):
 
 ```sh
-# A:
+# Historical IDE helper:
 mformat -i a.img -f 1440 ::
 mmd     -i a.img ::/boot
 mcopy   -i a.img build/mmbasic.elf ::/boot/
 mcopy   -i a.img limine.cfg        ::/boot/
 mcopy   -i a.img README.TXT        ::/
-limine bios-install a.img          # writes Limine to A:'s MBR
+limine bios-install a.img          # writes Limine to the helper image MBR
 
-# C: blank for now; Stage 3 will populate with .bas test programs.
+# C: primary hard disk.
 truncate -s 32M c.img
 mformat -i c.img ::
 ```
@@ -73,13 +89,13 @@ mformat -i c.img ::
 
 - **MMBasic on top.** Stage 3 lifts the stdio HAL surface and wires `LOAD`/`SAVE` to FatFs. Stage 2 just proves the FS works.
 - **Write-back caching.** All FatFs writes go straight to disk. Easy to add later if write performance bites.
-- **CD-ROM (ATAPI).** Not needed; we boot off A: as IDE. Stage 8 may revisit if we want a CD-ROM-only install media.
-- **Real 765 FDC.** Optional Stage 9. Pure aesthetics.
+- **CD-ROM (ATAPI).** Stage 8 may revisit if we want CD-ROM install media.
+- **Real 765 FDC.** Implemented in Stage 9.
 - **NVMe / AHCI.** No. ATA-PIO is enough. We are not optimizing IOPS on a 386 emulator.
 
 ## Exit gate
 
-1. `./build.sh && ./build_disks.sh` produces `a.img` (1.44 MB) and `c.img` (32 MB).
+1. `./build.sh && ./build_disks.sh` produces the storage images.
 2. `qemu-system-i386 -drive a.img,if=ide -drive c.img,if=ide -boot a -serial stdio -display none` boots through Limine and prints the FS listing within ~3 seconds.
 3. `tools/check_hal_purity.sh` green — Stage 2 only adds drivers + port glue, no core changes.
 4. `host/run_tests.sh` still green.

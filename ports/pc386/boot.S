@@ -12,7 +12,7 @@
  *
  * Multiboot1 header (spec 3.1.1):
  *   .long 0x1BADB002              magic
- *   .long flags                   feature requests (we ask for nothing)
+ *   .long flags                   feature requests
  *   .long -(magic + flags)        checksum
  *
  * Header must land within first 8 KB of the file, 4-byte aligned. The
@@ -33,9 +33,10 @@
  *   bit 0 (0x01) — page-align modules (we don't load any)
  *   bit 1 (0x02) — MEMINFO: pass us mem_lower/mem_upper, and the
  *                  bootloader is also encouraged to fill the mmap
- *   bit 2 (0x04) — request a specific video mode (we don't)
- * Setting bit 1 alone is enough; QEMU and Limine both fill the mmap
- * fields regardless once MEMINFO is set. */
+ *   bit 2 (0x04) — request a video mode. We intentionally do not set
+ *                  this for the direct QEMU -kernel path: some loaders
+ *                  switch video modes without passing framebuffer fields.
+ *                  The floppy stage2 handles BIOS VBE setup itself. */
 .set MB1_FLAGS,    0x00000002
 .set MB1_CHECKSUM, -(MB1_MAGIC + MB1_FLAGS)
 
@@ -45,6 +46,25 @@ multiboot1_header:
     .long   MB1_MAGIC
     .long   MB1_FLAGS
     .long   MB1_CHECKSUM
+
+/* Minimal multiboot2 header. Limine is still configured to load this
+ * kernel through multiboot1 until kmain grows a multiboot2 info parser,
+ * but having both headers in the ELF keeps that boot path open. */
+.set MB2_MAGIC,    0xE85250D6
+.set MB2_ARCH,     0
+.set MB2_LEN,      multiboot2_header_end - multiboot2_header
+.set MB2_CHECKSUM, -(MB2_MAGIC + MB2_ARCH + MB2_LEN)
+
+.align 8
+multiboot2_header:
+    .long   MB2_MAGIC
+    .long   MB2_ARCH
+    .long   MB2_LEN
+    .long   MB2_CHECKSUM
+    .short  0                       /* end tag */
+    .short  0
+    .long   8
+multiboot2_header_end:
 
 .section .bss
 .align 16

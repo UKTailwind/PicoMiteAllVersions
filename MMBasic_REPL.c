@@ -244,6 +244,7 @@ void MMBasic_RunPromptLoop(void) {
         if(strlen(p)==2 && p[1]==':'){
             if(toupper(*p)=='A')strcpy(p,"drive \"a:\"");
             if(toupper(*p)=='B')strcpy(p,"drive \"b:\"");
+            if(toupper(*p)=='C')strcpy(p,"drive \"c:\"");
         }
         if(*p=='*' && p[1]!='('){ //shortform RUN command so convert to a normal version
                 transform_star_command((char *)inpbuf);
