@@ -19,9 +19,12 @@ and `PIXEL(x,y)` reads back the live pixel value.
 
 - **Mode programming.** `drivers/vga_mode13h/` uses classic IBM VGA mode
   13h as the default. Runtime `MODE` switches call BIOS INT 10h through the
-  protected-mode thunk: mode 1 is VGA 13h, and modes 2..6 are VBE linear
-  framebuffer modes when the BIOS exposes them. There is no Bochs/QEMU BGA
-  port or PCI BAR dependency.
+  protected-mode thunk: cold mode 1 is VGA 13h, and modes 2..6 are VBE
+  linear framebuffer modes when the BIOS exposes them. After entering a VBE
+  mode, `MODE 1` keeps BASIC at logical 320x200 but uses the VBE 640x480
+  surface as a doubled compatibility scanout; QEMU/SeaBIOS does not reliably
+  make legacy A0000 scanout visible again after LFB modes. There is no
+  Bochs/QEMU BGA port or PCI BAR dependency.
 - **Resolution modes.** `MODE` lists the active mode and available modes:
   `MODE 1` = 320x200, `MODE 2` = 640x480, `MODE 3` = 800x600,
   `MODE 4` = 1024x768, `MODE 5` = 480x480 letterboxed in 640x480,
@@ -63,7 +66,8 @@ Stage close was validated with:
 1. `./ports/pc386/build.sh`
 2. `python3 ports/pc386/tests/repl_expect.py graphics graphics_vbe`
 3. `python3 ports/pc386/tests/screen_probe.py` — actual QEMU screen pixels pass,
-   including serial and PS/2 `aa` + Backspace redraw checks
+   including serial and PS/2 `aa` + Backspace redraw checks plus a
+   `MODE 2` → `MODE 1` visible-screen round trip
 
 Interactive run:
 

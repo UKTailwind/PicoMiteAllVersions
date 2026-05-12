@@ -26,6 +26,7 @@ PORT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 KERNEL = os.path.join(PORT_DIR, "build", "mmbasic.elf")
 C_IMG = os.environ.get("PC386_C_IMG", os.path.join(PORT_DIR, "test_disks", "c.img"))
 F_IMG = os.environ.get("PC386_FLOPPY_IMG", os.path.join(PORT_DIR, "test_disks", "pc386-floppy.img"))
+QEMU_VGA = os.environ.get("PC386_QEMU_VGA", "std")
 DEFAULT_OUT = os.path.join(PORT_DIR, "build", "screen_probe.ppm")
 
 ANSI_RE = re.compile(rb"\x1b\[[0-9;?]*[a-zA-Z]")
@@ -103,7 +104,7 @@ def qemu_args(serial_base: str, tmpdir: str) -> list[str]:
     args = [
         "qemu-system-i386",
         "-m", "16M",
-        "-vga", "std",
+        "-vga", QEMU_VGA,
         "-display", "none",
         "-monitor", "stdio",
         "-serial", f"pipe:{serial_base}",
@@ -183,6 +184,8 @@ def pixel(pixels: bytes, width: int, x: int, y: int,
 def logical_scale(width: int, height: int, logical_w: int, logical_h: int) -> int:
     if width < logical_w or height < logical_h:
         return 0
+    if logical_w == 320 and logical_h == 200 and width == 640 and height >= 400:
+        return 2
     if width % logical_w == 0 and height % logical_h == 0:
         sx = width // logical_w
         sy = height // logical_h
@@ -320,6 +323,8 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--out", default=DEFAULT_OUT,
                         help="PPM screenshot path to write")
+    parser.add_argument("--roundtrip-only", action="store_true",
+                        help="only test VBE mode and return to MODE 1")
     args = parser.parse_args()
 
     if not os.path.exists(KERNEL):
@@ -396,6 +401,50 @@ def main() -> int:
             if failed:
                 print(f"FAILED: {failed}")
                 return 1
+
+            if args.roundtrip_only:
+                mode_listing = send_basic(serial_in_fd, serial_out_fd, "MODE")
+                if "2:640x480" not in mode_listing:
+                    print("mode roundtrip: skipped (VBE/VGA640 not available in this boot path)")
+                    print("PASSED")
+                    return 0
+                send_basic(serial_in_fd, serial_out_fd,
+                           "MODE 2 : CLS RGB(0,0,0) : "
+                           "PIXEL 630,470,RGB(255,0,255)")
+                mode2_dump = os.path.join(os.path.dirname(os.path.abspath(args.out)),
+                                          "screen_probe-mode2.ppm")
+                hmp.screendump(mode2_dump)
+                mode2_w, mode2_h, mode2_pixels = parse_ppm(mode2_dump)
+                mode2_scale = logical_scale(mode2_w, mode2_h, 640, 480)
+                if mode2_scale == 0:
+                    print(f"[FAIL] MODE 2 unexpected dimensions: {mode2_w}x{mode2_h}")
+                    return 1
+                got = pixel(mode2_pixels, mode2_w, 630, 470, mode2_scale)
+                print(f"mode 2 screenshot: {mode2_dump}")
+                print(f"mode 2 dimensions: {mode2_w}x{mode2_h} (logical scale {mode2_scale}x)")
+                if not close_enough(got, (255, 0, 255)):
+                    print(f"[FAIL] MODE 2 magenta pixel got={got} want={(255, 0, 255)}")
+                    return 1
+                send_basic(serial_in_fd, serial_out_fd,
+                           "MODE 1 : CLS RGB(0,0,0) : "
+                           "PIXEL 300,180,RGB(255,0,0)")
+                time.sleep(0.25)
+                mode1_dump = os.path.join(os.path.dirname(os.path.abspath(args.out)),
+                                          "screen_probe-mode1-return.ppm")
+                hmp.screendump(mode1_dump)
+                mode1_w, mode1_h, mode1_pixels = parse_ppm(mode1_dump)
+                mode1_scale = logical_scale(mode1_w, mode1_h, 320, 200)
+                if mode1_scale == 0:
+                    print(f"[FAIL] MODE 1 return unexpected dimensions: {mode1_w}x{mode1_h}")
+                    return 1
+                got = pixel(mode1_pixels, mode1_w, 300, 180, mode1_scale)
+                print(f"mode 1 return screenshot: {mode1_dump}")
+                print(f"mode 1 return dimensions: {mode1_w}x{mode1_h} (logical scale {mode1_scale}x)")
+                if not close_enough(got, (255, 0, 0)):
+                    print(f"[FAIL] MODE 1 return red pixel got={got} want={(255, 0, 0)}")
+                    return 1
+                print("PASSED")
+                return 0
 
             send_basic(serial_in_fd, serial_out_fd, "CLS RGB(0,0,0)")
             typed = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
@@ -498,7 +547,24 @@ def main() -> int:
                 if not close_enough(got, (255, 0, 255)):
                     print(f"[FAIL] MODE 2 magenta pixel got={got} want={(255, 0, 255)}")
                     return 1
-                send_basic(serial_in_fd, serial_out_fd, "MODE 1")
+                send_basic(serial_in_fd, serial_out_fd,
+                           "MODE 1 : CLS RGB(0,0,0) : "
+                           "PIXEL 300,180,RGB(255,0,0)")
+                time.sleep(0.25)
+                mode1_dump = os.path.join(os.path.dirname(os.path.abspath(args.out)),
+                                          "screen_probe-mode1-return.ppm")
+                hmp.screendump(mode1_dump)
+                mode1_w, mode1_h, mode1_pixels = parse_ppm(mode1_dump)
+                mode1_scale = logical_scale(mode1_w, mode1_h, 320, 200)
+                if mode1_scale == 0:
+                    print(f"[FAIL] MODE 1 return unexpected dimensions: {mode1_w}x{mode1_h}")
+                    return 1
+                got = pixel(mode1_pixels, mode1_w, 300, 180, mode1_scale)
+                print(f"mode 1 return screenshot: {mode1_dump}")
+                print(f"mode 1 return dimensions: {mode1_w}x{mode1_h} (logical scale {mode1_scale}x)")
+                if not close_enough(got, (255, 0, 0)):
+                    print(f"[FAIL] MODE 1 return red pixel got={got} want={(255, 0, 0)}")
+                    return 1
             else:
                 print("mode 2 screenshot: skipped (VBE/VGA640 not available in this boot path)")
 

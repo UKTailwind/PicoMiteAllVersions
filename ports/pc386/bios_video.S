@@ -96,8 +96,11 @@ bios_thunk_start:
     ljmp $0x0000, $(RM_THUNK_ADDR + (bios_real_entry - bios_thunk_start))
 
 bios_real_entry:
+    cld
     xorw %ax, %ax
     movw %ax, %ds
+    movw %ax, %fs
+    movw %ax, %gs
     movw %ax, %ss
     movw $RM_STACK, %sp
 
