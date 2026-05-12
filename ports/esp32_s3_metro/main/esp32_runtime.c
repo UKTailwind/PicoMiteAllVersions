@@ -76,6 +76,11 @@ static void esp32_runtime_service(void) {
  * statement; from MMInkey on every keypress poll. */
 void CheckAbort(void) {
     esp32_runtime_service();
+    if (MMAbort) {
+        WDTimer = 0;
+        do_end(false);
+        longjmp(mark, 1);
+    }
     vTaskDelay(1);
 }
 

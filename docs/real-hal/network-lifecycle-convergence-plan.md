@@ -717,7 +717,66 @@ Passed suites:
 Remaining hardware gate after this run:
 
 - ESP32-S3 serial conformance still requires flashed hardware and serial
-  access; it is not claimed as passed.
+  access; it is not claimed as passed in this PicoCalc run.
+
+#### ESP32-S3 Hardware Verification - May 12, 2026 01:15 EDT
+
+ESP32-S3 hardware was connected on `/dev/cu.usbmodem101`, identified as
+`ESP32-S3 58:E6:C5:58:64:B8`, built with ESP-IDF, and flashed using:
+
+```sh
+. "$HOME/esp/esp-idf/export.sh" >/dev/null
+idf.py -C ports/esp32_s3_metro -p /dev/cu.usbmodem101 flash
+```
+
+After flashing, `WEB CONNECT` joined WiFi as `ESP32-5864B8` and reported:
+
+- `MM.INFO(IP ADDRESS)=192.168.4.58`
+- `MM.INFO(TCPIP STATUS)=1`
+- `MM.INFO(WIFI STATUS)=1`
+- saved options: `OPTION WIFI`, `OPTION TCP SERVER PORT 18181`,
+  `OPTION UDP SERVER PORT 18185`
+
+The first ESP32 full serial conformance run passed TCP client and the first
+TCP server request, then failed while the harness sent Ctrl-C to interrupt
+the long-running BASIC TCP server loop before rerunning it. The failure was
+port-runtime abort handling, not network lifecycle policy: ESP32 was polling
+Ctrl-C into `MMAbort`, but `CheckAbort()` did not perform the shared
+interpreter cleanup and `longjmp(mark, 1)` back to the prompt.
+
+The ESP32 runtime hook was corrected to match the interpreter contract by
+running `do_end(false)` and jumping back to the prompt when `MMAbort` is set.
+The focused TCP server serial suite then passed, including
+`tcp_server_preserved_after_run`:
+
+```sh
+python3.11 porttools/network_conformance.py tcp-server \
+  --port /dev/cu.usbmodem101 \
+  --device-host 192.168.4.58 \
+  --long-timeout 60 \
+  --suite-retries 1
+```
+
+ESP32-S3 full serial network conformance then passed:
+
+```sh
+python3.11 porttools/network_conformance.py all \
+  --port /dev/cu.usbmodem101 \
+  --device-host 192.168.4.58 \
+  --long-timeout 60 \
+  --suite-retries 1
+```
+
+Passed suites:
+
+- `tcp-client`: HTTP request and TCP stream.
+- `tcp-server`: request handling, transmit helpers, and
+  `tcp_server_preserved_after_run`.
+- `udp`: send/receive and `udp_preserved_after_run`.
+- `tftp`: write/read round trip.
+- `telnet`: console round trip.
+- `ntp`: deterministic local NTP responder.
+- `mqtt`: connect, subscribe, receive, publish, unsubscribe.
 
 ## Verification Matrix
 
