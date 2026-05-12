@@ -679,6 +679,46 @@ Local completion state:
 - ESP32-S3 and Pico WEBRP2350 serial conformance remain pending because they
   require flashed hardware and serial access; they are not claimed as passed.
 
+#### PicoCalc Hardware Verification - May 12, 2026 01:02 EDT
+
+PicoCalc WEBRP2350 hardware was connected on `/dev/cu.usbmodem101` and flashed
+with the current `build_web2350_picocalc/PicoMite.uf2` using:
+
+- `UPDATE FIRMWARE` from MMBasic to enter BOOTSEL.
+- `picotool load -v -x build_web2350_picocalc/PicoMite.uf2`.
+
+The initial hardware conformance run before flashing found the old firmware
+still rebooted on `OPTION WIFI` / `OPTION TCP SERVER PORT` and timed out in
+the TCP server suite. After flashing the current image, the board reported
+`MM.INFO(IP ADDRESS)=192.168.4.56`, `MM.INFO(TCPIP STATUS)=3`, and
+`MM.INFO(WIFI STATUS)=1`.
+
+PicoCalc WEBRP2350 full serial network conformance then passed:
+
+```sh
+python3.11 porttools/network_conformance.py all \
+  --port /dev/cu.usbmodem101 \
+  --device-host 192.168.4.56 \
+  --long-timeout 60 \
+  --suite-retries 1
+```
+
+Passed suites:
+
+- `tcp-client`: HTTP request and TCP stream.
+- `tcp-server`: request handling, transmit helpers, and
+  `tcp_server_preserved_after_run`.
+- `udp`: send/receive and `udp_preserved_after_run`.
+- `tftp`: write/read round trip.
+- `telnet`: console round trip.
+- `ntp`: deterministic local NTP responder.
+- `mqtt`: connect, subscribe, receive, publish, unsubscribe.
+
+Remaining hardware gate after this run:
+
+- ESP32-S3 serial conformance still requires flashed hardware and serial
+  access; it is not claimed as passed.
+
 ## Verification Matrix
 
 | Target | Required Gates |
