@@ -40,7 +40,7 @@ _start:
     call print
 
     call enable_a20
-    call setup_vga13h
+    call setup_vesa
     call setup_unreal_gs
     call build_multiboot_info
     call load_kernel_segments

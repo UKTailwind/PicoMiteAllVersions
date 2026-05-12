@@ -1,9 +1,8 @@
 /*
- * drivers/vga_mode13h/vga_mode13h.h — PC386 VGA/VBE graphics driver.
+ * drivers/vga_mode13h/vga_mode13h.h - PC386 linear framebuffer graphics.
  *
  * Bare-metal 386 path: expose MMBasic's legacy Draw.c function-pointer
- * surface over classic IBM VGA 320x200x8 mode 13h, or over a VBE linear
- * framebuffer supplied by the bootloader.
+ * surface over one boot-selected framebuffer.
  */
 
 #ifndef DRIVERS_VGA_MODE13H_H
