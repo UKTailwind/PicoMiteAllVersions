@@ -3,6 +3,7 @@
 **Goal:** an MMBasic stdio REPL on the Adafruit Metro ESP32-S3 over USB Serial/JTAG, structured as a real device port that mirrors `ports/pico_sdk_common/` — not a host-shape simulator. The ESP-IDF is the hardware-access layer behind the HAL; nothing in core MMBasic learns about it.
 
 Companion log: [esp32-s3-port-log.md](esp32-s3-port-log.md).
+Network core follow-on: [network-core-plan.md](network-core-plan.md).
 
 ## Hardware
 
@@ -20,20 +21,24 @@ Companion log: [esp32-s3-port-log.md](esp32-s3-port-log.md).
 | C — interactive REPL | ✅ | PRINT, FOR/NEXT, IF/ELSE, GOTO/GOSUB, LIST, EDIT, CPU RESTART, CLS, COLOUR all work |
 | C — A: drive (LFS) | ✅ | LFS over `esp_partition_*`, bundled demos seed-only with zero-byte repair, FILES/LOAD/SAVE-to-file/RUN/FRUN all work for files on A: |
 | C — VM source compiler regression fixes | ✅ | adjacent string literals (`""` in PRINT), post-compact heap fragmentation, wrapped-multiply optimizer semantics |
-| D — decouple from host_native | 🔧 | Runtime/peripheral host_native sources are gone; ESP32 owns the port surface in `esp32_*.c` and `hal_*_esp32.c`; core/shared Pico SDK leakage is clean; strict link policy is active. BASIC-visible GPIO DOUT/DIN/ARAW and WS2812 output are hardware-smoked. Remaining debt: legacy hardware header shims still live under `ports/host_native/`, PWM/servo are not wired, and ESP32 still compiles as `MMBASIC_HOST`. |
+| D — decouple from host_native | 🔧 | Runtime/peripheral host_native sources are gone; ESP32 owns the port surface in `esp32_*.c` and `hal_*_esp32.c`; core/shared Pico SDK leakage is clean; strict link policy is active. BASIC-visible GPIO DOUT/DIN/ARAW, WS2812 output, and the WEB network surface are hardware-smoked. Remaining debt: legacy hardware header shims still live under `ports/host_native/`, PWM/servo are not wired, MQTT is plain TCP only, and ESP32 still compiles as `MMBASIC_HOST`. |
 | E — real flash persistence | ✅ | NVS-backed Options and numbered `FLASH SAVE`/`FLASH LOAD` slots are implemented and hardware-smoked. `VAR SAVE` shares the `mmslots` backing. |
 | F — gate + plan hygiene | ✅ | ESP32 port files are in the HAL purity gate; `docs/real-hal-plan.md`, this port README, and opt-in `buildesp32.sh` are current. |
 
 **Headline broken-but-silent bug** (fixed in D1 below): `flash_range_erase` / `flash_range_program` in `esp32_flash_storage.c` previously targeted a 256-byte placeholder buffer and silently no-op'd past the end. ESP32 now routes program-region writes into `flash_prog_buf` and routes saved-vars / numbered-slot writes to the `mmslots` partition.
 
-**Tests**: `./buildall.sh` builds all 14 device variants and passes the RAM baseline gate. Host `./run_tests.sh` is 243/243 (includes `t170_frun_post_compact_array.bas` and `t208_muldiv_pow2_overflow.bas`). HAL purity gate includes `ports/esp32_s3_metro/main/*.c` and is clean. ESP32 `idf.py build` is green; hardware flash/probe passed with `FRUN "mand.bas"`, `FLASH SAVE 1` / reset / `FLASH LOAD 1` / `RUN`, BASIC-visible GPIO DOUT/DIN/ARAW smoke, and onboard WS2812 colour smoke.
+**Tests**: `./buildall.sh` builds all 14 device variants and passes the RAM baseline gate. Host `./run_tests.sh` is 243/243 (includes `t170_frun_post_compact_array.bas` and `t208_muldiv_pow2_overflow.bas`). HAL purity gate includes `ports/esp32_s3_metro/main/*.c` and is clean. ESP32 `idf.py build` is green; hardware flash/probe passed with `FRUN "mand.bas"`, `FLASH SAVE 1` / reset / `FLASH LOAD 1` / `RUN`, BASIC-visible GPIO DOUT/DIN/ARAW smoke, onboard WS2812 colour smoke, and WEB network smokes for WiFi, TCP server, TCP client request/stream, UDP send/receive, NTP, and plain MQTT. Host-side ESP32 smoke tooling lives in `porttools/`; see [porttools/README.md](../../porttools/README.md).
 
-**Latest hardware smoke (2026-05-09)**:
+**Latest hardware smoke (2026-05-10)**:
 - A: drive bundled demos now include `mand.bas`. Demo population is seed-only; non-empty user-edited files are not overwritten at boot, while zero-byte bundled demos are repaired.
 - `SAVE "file.bas"` now errors `No program` before opening/truncating the target if no tokenized program is loaded. This prevents the confusing empty-program clobber path after editing a file without `LOAD`.
 - `RUN "mand.bas"` and `FRUN "mand.bas"` both produce checksum `552868`. Current Metro measurement: `FRUN` ~359 ms / ~8554 pixels/sec; `RUN` ~8569 ms / ~358 pixels/sec, about 24x faster through bytecode.
 - Ordinary BASIC `(a*b)\2^n` optimizer fusion now preserves wrapped integer multiply semantics via dedicated bytecode ops. Explicit `MULSHR()` and `!ASM mulshr` remain wide fixed-point multiply-shift operations.
 - `FLASH SAVE 1`, reset, `FLASH LOAD 1`, `RUN` reloads and runs `hello.bas` from the dedicated `mmslots` partition.
+- `WEB CONNECT` joins WiFi; `WEB SCAN array%()` returns long-string scan data.
+- `OPTION TCP SERVER PORT`, `WEB TCP INTERRUPT`, `WEB TCP READ`, `WEB TCP SEND`, `WEB TCP CLOSE`, and `WEB TRANSMIT PAGE/FILE/CODE/CSS/JS/IMAGE` serve a multi-file website from A: and are fetchable from macOS.
+- `WEB OPEN TCP CLIENT`, `WEB TCP CLIENT REQUEST`, `WEB OPEN TCP STREAM`, `WEB TCP CLIENT STREAM`, and `WEB CLOSE TCP CLIENT` pass the Mac-side smoke in `porttools/esp32_tcp_smoke.py`.
+- `OPTION UDP SERVER PORT`, `WEB UDP SEND`, UDP receive state through `MM.MESSAGE$` / `MM.ADDRESS$`, `WEB NTP`, and plain-TCP `WEB MQTT CONNECT/PUBLISH/SUBSCRIBE/UNSUBSCRIBE/CLOSE` have hardware-smoked.
 
 ## Rules and invariants (read first)
 
@@ -77,6 +82,7 @@ ports/esp32_s3_metro/
     ├── esp32_console.c         # USB Serial/JTAG byte I/O via esp32_console_*
     ├── esp32_lfs.c             # LFS over esp_partition_* for the A: drive
     ├── esp32_flash_storage.c   # flash_target_*/esp32_options_snapshot/SaveProgramToFlash
+    ├── esp32_wifi.c            # ESP-IDF WiFi + BASIC WEB/TCP/UDP/NTP/plain MQTT surface
     ├── esp32_compat.c          # flash_prog_buf, timegm, readusclock/uSec compatibility
     ├── esp32_system.c          # cmd_cpu (esp_restart)
     ├── esp32_terminal.c        # ANSI terminal hooks for CLS and COLOUR
@@ -89,8 +95,13 @@ ports/esp32_s3_metro/
     ├── hal_keyboard_esp32_stub.c
     ├── hal_storage_esp32_stub.c
     ├── hal_flash_esp32_stub.c
-    └── demos/{hello,fizzbuzz,sieve,mand}.bas  # EMBED_TXTFILES; seed-only auto-populated to A:
+    └── demos/{hello,fizzbuzz,sieve,mand,web_hello,site*}  # EMBED_TXTFILES; seed-only auto-populated to A:
 ```
+
+Host-side serial/network smoke tooling lives in `porttools/`. The important
+entry points are `porttools/basic_serial.py` for prompt-driven command checks
+and `porttools/esp32_tcp_smoke.py` for Mac-side TCP client request/stream
+checks.
 
 The MMBasic core sources stay in the repo root; the IDF main component enumerates them via `idf_component_register(SRCS "../../../MMBasic.c" ...)`.
 
@@ -126,10 +137,18 @@ What works end-to-end on the Metro today:
 - `SAVE "file.bas"` to A: works when a program is loaded and refuses empty-program saves before truncating the target.
 - `FLASH SAVE 1`, reset, `FLASH LOAD 1`, `RUN` works for numbered flash slots backed by `mmslots`.
 - `WS2812 B, GP46, 1, &Hrrggbb` drives the Metro onboard RGB LED through ESP-IDF RMT.
+- `WEB CONNECT` joins configured WiFi; `WEB SCAN` and `WEB SCAN array%()` report visible networks.
+- `OPTION TCP SERVER PORT`, `WEB TCP INTERRUPT`, `WEB TCP READ`, `WEB TCP SEND`, `WEB TCP CLOSE`, and `WEB TRANSMIT PAGE/FILE/CODE/CSS/JS/IMAGE` serve BASIC-generated responses and files from A:.
+- `WEB OPEN TCP CLIENT`, `WEB TCP CLIENT REQUEST`, `WEB OPEN TCP STREAM`, `WEB TCP CLIENT STREAM`, and `WEB CLOSE TCP CLIENT` work against Mac-side TCP smoke endpoints.
+- `OPTION UDP SERVER PORT` and `WEB UDP SEND` work; UDP receive updates `MM.MESSAGE$` and `MM.ADDRESS$`.
+- `WEB NTP` updates BASIC `DATE$` and `TIME$`.
+- `WEB MQTT CONNECT/PUBLISH/SUBSCRIBE/UNSUBSCRIBE/CLOSE` works for plain TCP MQTT; received messages update `MM.TOPIC$` and `MM.MESSAGE$`.
 - `B:` rejects with "B: drive not configured on this board" (correct)
 
 What's broken or stubbed:
 - **PWM/servo as BASIC-visible hardware** — GPIO DOUT/DIN/ARAW is wired and hardware-smoked, but LEDC-backed PWM/servo is not implemented yet and errors explicitly.
+- **MQTT TLS/cert handling** — MQTT is currently plain TCP only.
+- **BLE/Bluetooth** — no ESP32 BLE/Bluetooth BASIC surface is implemented.
 - ESP32-local `cmd_*`/`fun_*` peripheral stubs — unsupported hardware errors or no-ops are expected until each domain gets a real ESP32 HAL/driver.
 
 ## Stage D — Decouple from host_native
@@ -310,7 +329,7 @@ Sibling of `buildall.sh`. Runs the HAL purity gate, sources `~/esp/esp-idf/expor
 - **Display.** SPI LCD / VGA via LCD_CAM. Multi-session. See "Display follow-on (sketch)" at the bottom of this doc.
 - **Audio.** I2S codec, MP3 decode, PWM synth port.
 - **Keyboard.** USB host (TinyUSB), I2C keypad (PicoCalc-style), PS/2.
-- **WiFi/BLE.** Native on ESP32-S3, easier than RP2350 CYW43. Land when there's a use case — not before.
+- **BLE/Bluetooth.** WiFi and the BASIC WEB/TCP/UDP/NTP/plain-MQTT surface have landed; BLE remains out of scope.
 - **Octal PSRAM.** See Stage E3.
 - **OTA.** Two app slots, signed updates. Out of scope for a stdio litmus.
 

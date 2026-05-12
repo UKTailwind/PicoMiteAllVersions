@@ -21,7 +21,6 @@
 //#define IP_SOF_BROADCAST         1
 //#define IP_SOF_BROADCAST_RECV    1
 #define LWIP_DEBUG 1
-#define TFTP_MAX_FILENAME_LEN FF_MAX_LFN
 //#define ALTCP_MBEDTLS_DEBUG  LWIP_DBG_ON
 #define MEMP_NUM_SYS_TIMEOUT   (LWIP_NUM_SYS_TIMEOUT_INTERNAL + 3) // <-------- +1 for MQTT
 extern int MMerrno;

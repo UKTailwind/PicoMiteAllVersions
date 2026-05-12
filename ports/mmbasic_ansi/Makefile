@@ -40,6 +40,10 @@ CORE_SRCS = MMBasic.c Commands.c Functions.c Operators.c MATHS.c Memory.c Editor
 CORE_SRCS += gfx_box_shared.c gfx_circle_shared.c gfx_line_shared.c gfx_pixel_shared.c gfx_cls_shared.c gfx_text_shared.c gfx_console_shared.c
 CORE_SRCS += mm_misc_shared.c OptionCommands.c
 CORE_SRCS += display_state.c pin_state.c option_state.c audio_state.c
+CORE_SRCS += mm_net_interrupts.c
+CORE_SRCS += mm_net_http.c
+CORE_SRCS += mm_net_ntp.c
+CORE_SRCS += mm_net_state.c
 CORE_SRCS += Draw.c RGB121.c Tilemap.c FileIO.c Audio.c BmpDecoder.c re.c picojpeg.c
 CORE_SRCS += audio_mp3_stub.c spi_lcd_mem332_stub.c display_merge_stub.c vga_ops_stub.c
 CORE_SRCS += gfx_3d.c upng_sprite_stub.c gui_touch_stub.c gui_controls_stub.c psram_heap_stub.c i2c_keypad_stub.c heartbeat_stub.c
@@ -89,6 +93,10 @@ $(BUILD_DIR)/%.o: $(REPO_ROOT)/%.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 $(BUILD_DIR)/%.o: $(REPO_ROOT)/core/state/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(BUILD_DIR)/%.o: $(REPO_ROOT)/shared/net/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c -o $@ $<
 

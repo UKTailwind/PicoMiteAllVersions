@@ -19,6 +19,9 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
 #include "bc_alloc.h"
@@ -29,7 +32,27 @@
  * pushed back so MMInkey sees them on the next poll. */
 extern int  esp32_console_read_byte_nonblock(void);
 extern void esp32_console_push_back_byte(int c);
+extern volatile bool TCPreceived;
+extern char *TCPreceiveInterrupt;
+extern volatile bool UDPreceive;
+extern char *UDPinterrupt;
+extern volatile bool MQTTComplete;
+extern char *MQTTInterrupt;
+extern bool g_TempMemoryIsChanged;
+extern int esp32_tcp_interrupt_pending(void);
+extern int esp32_udp_interrupt_pending(void);
+extern void ProcessWeb(int mode);
 /* MMAbort is declared in MMBasic.h as `volatile int`. */
+
+static int s_save_option_error_skip;
+static char s_save_error_message[MAXERRMSG];
+static int s_save_errno;
+static char s_interrupt_return_token[3];
+static int s_network_service_active;
+
+static inline CommandToken esp32_commandtbl_decode(const unsigned char *p) {
+    return ((CommandToken)(p[0] & 0x7f)) | ((CommandToken)(p[1] & 0x7f) << 7);
+}
 
 static void esp32_runtime_pump_input(void) {
     int c = esp32_console_read_byte_nonblock();
@@ -41,21 +64,88 @@ static void esp32_runtime_pump_input(void) {
     esp32_console_push_back_byte(c);
 }
 
+static void esp32_runtime_service(void) {
+    esp32_runtime_pump_input();
+    if (s_network_service_active) return;
+    s_network_service_active = 1;
+    ProcessWeb(0);
+    s_network_service_active = 0;
+}
+
 /* Interpreter abort poll. Called from the parser hot path on every
  * statement; from MMInkey on every keypress poll. */
 void CheckAbort(void) {
-    esp32_runtime_pump_input();
+    esp32_runtime_service();
+    vTaskDelay(1);
 }
 
-/* Interrupt-poll hook. Returns non-zero if a BASIC ON-interrupt fired
- * and the interpreter should redirect to it. ESP32 stdio scope has no
- * GPIO-driven BASIC interrupts wired yet — return 0 always. */
-int check_interrupt(void) { return 0; }
+void cmd_ireturn(void) {
+    if (InterruptReturn == NULL) error("Not in interrupt");
+    checkend(cmdline);
+    nextstmt = InterruptReturn;
+    InterruptReturn = NULL;
+    if (g_LocalIndex) ClearVars(g_LocalIndex--, true);
+    g_TempMemoryIsChanged = true;
+    *CurrentInterruptName = 0;
+    if (s_save_option_error_skip > 0) {
+        OptionErrorSkip = s_save_option_error_skip + 1;
+    } else {
+        OptionErrorSkip = s_save_option_error_skip;
+    }
+    strcpy(MMErrMsg, s_save_error_message);
+    MMerrno = s_save_errno;
+}
+
+int check_interrupt(void) {
+    esp32_runtime_service();
+    if (!InterruptUsed) return 0;
+    if (InterruptReturn != NULL) return 0;
+
+    unsigned char *intaddr = NULL;
+    if (TCPreceiveInterrupt && (TCPreceived || esp32_tcp_interrupt_pending())) {
+        intaddr = (unsigned char *)TCPreceiveInterrupt;
+        TCPreceived = false;
+    } else if (MQTTInterrupt && MQTTComplete) {
+        intaddr = (unsigned char *)MQTTInterrupt;
+        MQTTComplete = false;
+    } else if (UDPinterrupt && (UDPreceive || esp32_udp_interrupt_pending())) {
+        intaddr = (unsigned char *)UDPinterrupt;
+        UDPreceive = false;
+    } else {
+        return 0;
+    }
+
+    g_LocalIndex++;
+    s_save_option_error_skip = OptionErrorSkip > 0 ? OptionErrorSkip : 0;
+    OptionErrorSkip = 0;
+    strcpy(s_save_error_message, MMErrMsg);
+    s_save_errno = MMerrno;
+    *MMErrMsg = 0;
+    MMerrno = 0;
+    InterruptReturn = nextstmt;
+
+    if (esp32_commandtbl_decode(intaddr) == cmdSUB) {
+        strncpy(CurrentInterruptName, (char *)intaddr + 2, MAXVARLEN);
+        CurrentInterruptName[MAXVARLEN] = 0;
+        s_interrupt_return_token[0] = (cmdIRET & 0x7f) + C_BASETOKEN;
+        s_interrupt_return_token[1] = (cmdIRET >> 7) + C_BASETOKEN;
+        s_interrupt_return_token[2] = 0;
+        if (gosubindex >= MAXGOSUB) error("Too many SUBs for interrupt");
+        errorstack[gosubindex] = CurrentLinePtr;
+        gosubstack[gosubindex++] = (unsigned char *)s_interrupt_return_token;
+        g_LocalIndex++;
+        skipelement(intaddr);
+    }
+
+    nextstmt = intaddr;
+    return 1;
+}
 
 /* Long-running-routine yield. Called from PAUSE, FOR-loop iterations,
  * etc. */
 void routinechecks(void) {
-    esp32_runtime_pump_input();
+    esp32_runtime_service();
+    vTaskDelay(1);
 }
 
 void port_bc_runtime_free_source(const char **source) {

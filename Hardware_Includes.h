@@ -270,11 +270,6 @@ extern void ProcessWeb(int mode);
  * keyboard config, HDMI pins, touch scale…). FileIO.c::ResetOptions
  * calls it once after setting the target-neutral defaults. */
 extern void port_set_default_options(void);
-/* TCP-state recv-buffer alloc/free: real impl on WEB iterates
- * TCPstate->buffer_recv[]; non-WEB stubs no-op. Core calls from
- * cmd_new / cmd_load teardown + post-ClearTempMemory refill. */
-extern void tcp_free_recv_buffers(void);
-extern void tcp_realloc_recv_buffers(void);
 /* WIFIconnected: defined in MMsetwifi.c (WiFi ports); unused elsewhere
  * — extern is harmless. close_tcpclient has real / stub pair across
  * MMTCPclient.c / MMweb_stubs.c so the symbol resolves on every port. */

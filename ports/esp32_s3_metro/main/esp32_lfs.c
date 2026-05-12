@@ -97,6 +97,22 @@ extern const char demo_sieve_start[]    asm("_binary_sieve_bas_start");
 extern const char demo_sieve_end[]      asm("_binary_sieve_bas_end");
 extern const char demo_mand_start[]     asm("_binary_mand_bas_start");
 extern const char demo_mand_end[]       asm("_binary_mand_bas_end");
+extern const char demo_web_hello_start[] asm("_binary_web_hello_bas_start");
+extern const char demo_web_hello_end[]   asm("_binary_web_hello_bas_end");
+extern const char demo_site_start[]      asm("_binary_site_bas_start");
+extern const char demo_site_end[]        asm("_binary_site_bas_end");
+extern const char demo_site_index_start[] asm("_binary_site_index_htm_start");
+extern const char demo_site_index_end[]   asm("_binary_site_index_htm_end");
+extern const char demo_site_status_start[] asm("_binary_site_status_htm_start");
+extern const char demo_site_status_end[]   asm("_binary_site_status_htm_end");
+extern const char demo_site_about_start[] asm("_binary_site_about_htm_start");
+extern const char demo_site_about_end[]   asm("_binary_site_about_htm_end");
+extern const char demo_site_gpio_start[] asm("_binary_site_gpio_htm_start");
+extern const char demo_site_gpio_end[]   asm("_binary_site_gpio_htm_end");
+extern const char demo_site_files_start[] asm("_binary_site_files_htm_start");
+extern const char demo_site_files_end[]   asm("_binary_site_files_htm_end");
+extern const char demo_site_style_start[] asm("_binary_site_style_css_start");
+extern const char demo_site_style_end[]   asm("_binary_site_style_css_end");
 
 struct embedded_demo {
     const char *name;
@@ -110,12 +126,22 @@ static const struct embedded_demo s_demos[] = {
     { "fizzbuzz.bas", demo_fizzbuzz_start, demo_fizzbuzz_end, 0 },
     { "sieve.bas",    demo_sieve_start,    demo_sieve_end,    0 },
     { "mand.bas",     demo_mand_start,     demo_mand_end,     0 },
+    { "web_hello.bas", demo_web_hello_start, demo_web_hello_end, 0 },
+    { "site.bas",     demo_site_start,     demo_site_end,     1 },
+    { "server.bas",   demo_site_start,     demo_site_end,     1 },
+    { "index.htm",    demo_site_index_start, demo_site_index_end, 1 },
+    { "status.htm",   demo_site_status_start, demo_site_status_end, 1 },
+    { "about.htm",    demo_site_about_start, demo_site_about_end, 1 },
+    { "gpio.htm",     demo_site_gpio_start, demo_site_gpio_end, 1 },
+    { "files.htm",    demo_site_files_start, demo_site_files_end, 1 },
+    { "style.css",    demo_site_style_start, demo_site_style_end, 1 },
 };
 
 static void populate_demos(void) {
     for (size_t i = 0; i < sizeof s_demos / sizeof s_demos[0]; i++) {
         const struct embedded_demo *d = &s_demos[i];
         size_t len = (size_t)(d->end - d->start);
+        if (len && d->start[len - 1] == '\0') len--;
         lfs_file_t f;
         int err = lfs_file_open(&lfs, &f, d->name, LFS_O_RDONLY);
         if (!err && !d->refresh) {

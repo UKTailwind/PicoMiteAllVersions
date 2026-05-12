@@ -519,3 +519,60 @@ Two small header hygiene fixes landed while enforcing the full gate:
   form when a non-Pico port has not force-defined the macro.
 - `Draw.h` now includes `hardware/gpio.h` before defining `PinRead()`
   as `gpio_get(PinDef[a].GPno)`.
+
+## 2026-05-10 (later) — ESP32 WEB/TCP/UDP/NTP/MQTT surface smoke
+
+Implemented and hardware-smoked the ESP32 BASIC network surface on top of
+ESP-IDF WiFi and sockets:
+
+- `WEB CONNECT`, `WEB SCAN`, and `WEB SCAN array%()`.
+- TCP server: `OPTION TCP SERVER PORT`, `WEB TCP INTERRUPT`,
+  `WEB TCP READ`, `WEB TCP SEND`, `WEB TCP CLOSE`, and
+  `WEB TRANSMIT PAGE/FILE/CODE/CSS/JS/IMAGE`.
+- TCP client: `WEB OPEN TCP CLIENT`, `WEB TCP CLIENT REQUEST`,
+  `WEB OPEN TCP STREAM`, `WEB TCP CLIENT STREAM`, and
+  `WEB CLOSE TCP CLIENT`.
+- UDP: `OPTION UDP SERVER PORT`, `WEB UDP SEND`, receive state through
+  `MM.MESSAGE$` and `MM.ADDRESS$`.
+- `WEB NTP`, including BASIC `DATE$` / `TIME$` update through the ESP32
+  port clock hook.
+- Plain TCP MQTT: `WEB MQTT CONNECT/PUBLISH/SUBSCRIBE/UNSUBSCRIBE/CLOSE`,
+  with receive state through `MM.TOPIC$` and `MM.MESSAGE$`.
+
+The A: drive now includes a small `web_hello.bas` demo and a multi-file
+website demo (`site.bas`, HTML pages, and CSS). The website was served from
+the Metro and fetched successfully from macOS.
+
+Added reusable host-side smoke tooling under `porttools/`:
+
+- `basic_serial.py` opens serial with DTR/RTS deasserted, syncs to the
+  MMBasic prompt, runs immediate-mode commands or command scripts, and
+  supports regex `--expect` checks.
+- `esp32_tcp_smoke.py` starts local Mac-side HTTP/stream TCP responders and
+  drives the ESP32 TCP client commands through the interpreter.
+
+Known-good tool checks:
+
+```sh
+python3.11 porttools/basic_serial.py --port /dev/cu.usbmodem101 \
+  --boot-wait 1 --cmd 'PRINT "PORTTOOLS_OK"' --expect PORTTOOLS_OK
+
+python3.11 porttools/esp32_tcp_smoke.py --port /dev/cu.usbmodem101 \
+  --host 192.168.4.23
+
+python3.11 -m py_compile porttools/basic_serial.py \
+  porttools/esp32_tcp_smoke.py
+```
+
+The final build/flash gate for this batch was:
+
+```sh
+SKIP_HAL_PURITY=1 ./buildesp32.sh
+SKIP_HAL_PURITY=1 ./buildesp32.sh -p /dev/cu.usbmodem101 flash
+python3.11 porttools/basic_serial.py --port /dev/cu.usbmodem101 \
+  --boot-wait 1 --cmd 'PRINT "FINAL_FLASH_OK"' \
+  --expect FINAL_FLASH_OK --quiet
+```
+
+Remaining network caveat: MQTT TLS/cert handling is not implemented yet;
+the smoke covers plain TCP MQTT only.

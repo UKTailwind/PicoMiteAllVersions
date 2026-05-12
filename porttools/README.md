@@ -1,0 +1,296 @@
+# Port Tools
+
+Small host-side tools for device-port bringup smoke tests. These are intended
+to be boring, repeatable checks that drive the real MMBasic interpreter over
+serial. They do not replace the host test suite or the ESP-IDF build; they are
+for proving that flashed hardware still responds and that hardware-backed
+features work end-to-end.
+
+Run commands from the repo root unless noted otherwise.
+
+## Requirements
+
+- Python with `pyserial` installed. On this machine `python3.11` has been used.
+- A flashed board exposing the MMBasic prompt over serial.
+- For ESP32 network tests, the Metro must already be on WiFi or `WEB CONNECT`
+  must be able to use saved `OPTION WIFI` credentials.
+
+Both tools accept `--port`. If it is omitted, `basic_serial.py` checks
+`BASIC_PORT`, then common device paths such as `/dev/cu.usbmodem101`.
+
+## `basic_serial.py`
+
+`basic_serial.py` is the general-purpose serial interpreter runner. It opens
+the port with DTR and RTS deasserted before `open()` to avoid accidental
+ESP32 USB-Serial/JTAG reset behavior, syncs to the `>` prompt with Ctrl-C and
+Enter, sends BASIC commands, and fails if the transcript contains a BASIC
+error or a prompt timeout.
+
+Quick prompt check after flashing:
+
+```sh
+python3.11 porttools/basic_serial.py \
+  --port /dev/cu.usbmodem101 \
+  --boot-wait 1 \
+  --cmd 'PRINT "ESP32_PROMPT_OK"' \
+  --expect ESP32_PROMPT_OK
+```
+
+Run several commands in one session:
+
+```sh
+python3.11 porttools/basic_serial.py \
+  --port /dev/cu.usbmodem101 \
+  --boot-wait 2 \
+  --cmd 'PRINT MM.INFO$(ID)' \
+  --cmd 'PRINT MM.INFO(CPUSPEED)' \
+  --cmd 'FILES'
+```
+
+Run a line-oriented command script:
+
+```sh
+python3.11 porttools/basic_serial.py \
+  --port /dev/cu.usbmodem101 \
+  --script /tmp/esp32-smoke.bas \
+  --expect '>'
+```
+
+Script files are command transcripts, not saved BASIC programs: each non-blank
+line is sent as one immediate-mode command. Lines beginning with `#` are
+ignored.
+
+Useful options:
+
+- `--boot-wait N`: capture boot text for `N` seconds before syncing.
+- `--no-sync`: skip Ctrl-C/Enter sync when another tool already left the board
+  at a prompt.
+- `--timeout N`: normal command timeout.
+- `--long-timeout N`: timeout for commands expected to block longer. The runner
+  automatically uses this for `WEB CONNECT` and `PAUSE`.
+- `--expect REGEX`: require a regex match in the ANSI-stripped transcript. May
+  be repeated.
+- `--quiet`: suppress the live transcript and only return success/failure.
+
+Known-good checks from the ESP32 bringup:
+
+```sh
+python3.11 porttools/basic_serial.py \
+  --port /dev/cu.usbmodem101 \
+  --boot-wait 1 \
+  --cmd 'PRINT "PORTTOOLS_OK"' \
+  --expect PORTTOOLS_OK
+
+python3.11 porttools/basic_serial.py \
+  --port /dev/cu.usbmodem101 \
+  --boot-wait 1 \
+  --cmd 'PRINT "FINAL_FLASH_OK"' \
+  --expect FINAL_FLASH_OK \
+  --quiet
+```
+
+## `esp32_tcp_smoke.py`
+
+`esp32_tcp_smoke.py` exercises the ESP32 BASIC TCP client surface against
+temporary TCP endpoints running on the Mac. It starts:
+
+- an HTTP responder on `--http-port` for `WEB TCP CLIENT REQUEST`;
+- a line stream responder on `--stream-port` for `WEB TCP CLIENT STREAM`.
+
+Then it drives the board through serial using `basic_serial.BasicSerial`.
+
+Default run:
+
+```sh
+python3.11 porttools/esp32_tcp_smoke.py \
+  --port /dev/cu.usbmodem101
+```
+
+If the Mac address selected from the route table is wrong, pass the address
+reachable from the ESP32 explicitly:
+
+```sh
+python3.11 porttools/esp32_tcp_smoke.py \
+  --port /dev/cu.usbmodem101 \
+  --host 192.168.4.23
+```
+
+If the board does not have saved WiFi credentials, provide a connect command:
+
+```sh
+python3.11 porttools/esp32_tcp_smoke.py \
+  --port /dev/cu.usbmodem101 \
+  --host 192.168.4.23 \
+  --connect-command 'WEB CONNECT "ssid","password"'
+```
+
+The script verifies:
+
+- Mac-side server received `GET /tcp-smoke HTTP/1.0`.
+- BASIC received an `ESP32_CLIENT_OK` HTTP response.
+- Mac-side stream server received `INLINE\n`.
+- BASIC received `ACK INLINE` and the final stream line `STREAM3`.
+
+At the end it prints a `--- checks ---` block. Any `FAIL` means the smoke test
+returns non-zero and prints the Mac-side server log.
+
+Useful options:
+
+- `--bind ADDR`: local bind address for the Mac-side servers. Defaults to all
+  interfaces.
+- `--host ADDR`: Mac/IP address that the ESP32 should connect to.
+- `--gateway ADDR`: route target used to infer the Mac source address when
+  `--host` is omitted. Defaults to `192.168.4.1`.
+- `--http-port N`, `--stream-port N`: override local listener ports.
+- `--connect-command CMD`: BASIC command used before TCP client checks.
+- `--boot-wait`, `--timeout`, `--long-timeout`: serial timing controls.
+
+If this test hangs at `WEB CONNECT`, first confirm the board can reach the
+prompt with `basic_serial.py`, then run `WEB CONNECT` manually or pass the exact
+connect command. If the TCP checks fail but WiFi connected, check the Mac
+firewall and confirm the `--host` address is on the same network as the ESP32.
+
+## `esp32_sd_smoke.py`
+
+`esp32_sd_smoke.py` exercises the Adafruit Metro ESP32-S3 onboard microSD slot
+as MMBasic drive `B:`. It lists the card, optionally verifies an expected file
+and first-line text, then creates, reads, renames, and deletes a temporary file.
+
+```sh
+python3.11 porttools/esp32_sd_smoke.py \
+  --port /dev/cu.usbmodem101 \
+  --expect-file readme.txt \
+  --expect-text hello
+```
+
+## `network_conformance.py`
+
+`network_conformance.py` is the cross-port WEB surface runner used by the
+network-core refactor plan. It still drives hardware over serial, but the
+checks are named for the BASIC behavior rather than for ESP32.
+
+Run all currently implemented suites:
+
+```sh
+python3.11 porttools/network_conformance.py all \
+  --port /dev/cu.usbmodem101
+```
+
+Run individual suites:
+
+```sh
+python3.11 porttools/network_conformance.py tcp-client --port /dev/cu.usbmodem101
+python3.11 porttools/network_conformance.py tcp-server --port /dev/cu.usbmodem101
+python3.11 porttools/network_conformance.py udp --port /dev/cu.usbmodem101
+python3.11 porttools/network_conformance.py tftp --port /dev/cu.usbmodem101
+python3.11 porttools/network_conformance.py telnet --port /dev/cu.usbmodem101
+python3.11 porttools/network_conformance.py ntp --port /dev/cu.usbmodem101
+python3.11 porttools/network_conformance.py mqtt --port /dev/cu.usbmodem101
+```
+
+Implemented checks:
+
+- `tcp-client`: `WEB OPEN TCP CLIENT`, `WEB TCP CLIENT REQUEST`,
+  `WEB OPEN TCP STREAM`, `WEB TCP CLIENT STREAM`, and `WEB CLOSE TCP CLIENT`
+  against temporary Mac-side TCP servers.
+- `tcp-server`: configures a temporary `OPTION TCP SERVER PORT`, loads a small
+  BASIC polling server, fetches from the Mac, and verifies `MM.INFO(TCP REQUEST
+  n)`, `WEB TCP READ`, `MM.INFO(TCP PATH n)`, long-string `WEB TCP SEND`, and
+  `WEB TCP CLOSE`. It then reruns the BASIC server under the same configured
+  port and verifies the listener still accepts connections after `RUN`.
+- `udp`: configures a temporary `OPTION UDP SERVER PORT`, verifies `WEB UDP
+  SEND` to a Mac-side UDP listener, sends a datagram back to the device, and
+  checks `MM.MESSAGE$` / `MM.ADDRESS$`. It also runs a short BASIC program and
+  verifies the configured UDP listener still receives after `RUN`.
+- `tftp`: enables `OPTION TFTP ON`, writes a file to the device with TFTP WRQ,
+  reads it back with RRQ, and restores the previous TFTP enabled/disabled
+  state inferred from `OPTION LIST`.
+- `telnet`: enables `OPTION TELNET CONSOLE ON`, connects to the device's
+  Telnet port, sends a BASIC expression over the socket, verifies the evaluated
+  result is mirrored back, and restores the previous non-ONLY Telnet setting.
+- `ntp`: starts a local fake NTP responder on UDP port 123, runs `WEB NTP`
+  against it, and verifies the 48-byte request, firmware status output,
+  `DATE$`, and `TIME$`.
+- `mqtt`: starts a tiny local MQTT 3.1.1 broker, verifies
+  `WEB MQTT CONNECT`, `SUBSCRIBE`, incoming `MM.TOPIC$` / `MM.MESSAGE$`,
+  `PUBLISH`, `UNSUBSCRIBE`, and `CLOSE` over plain TCP.
+
+The TCP and UDP server suites read the existing saved ports first and restore
+them at the end. Use `--host` when automatic Mac address selection picks the
+wrong interface, and `--device-host` when `MM.INFO(IP ADDRESS)` is not the
+address the Mac should connect to.
+
+Harness details encoded from ESP32 hardware bringup:
+
+- Generated BASIC programs are written to A: with quote-preserving
+  `PRINT #1,...CHR$(34)...` expressions rather than numbered immediate-mode
+  lines. The ESP32 prompt executes numbered lines immediately; it does not use
+  them as an editor upload protocol.
+- Marker parsing uses the last marker occurrence so echoed commands do not
+  masquerade as command output.
+- TCP client stream checks pause after closing the request client and after
+  opening the stream client, then guard zero-length long-string reads so a
+  timing miss reports `STREAM_EMPTY` instead of crashing the harness.
+- Suites that run long-lived BASIC programs reopen and resync the serial port
+  before restoring saved options. Use `--suite-retries N` to rerun a failing
+  suite when validating hardware timing.
+- Prompt-sync failures report the captured byte count and a short clean
+  transcript tail, so a silent USB serial path is distinguishable from an
+  unexpected prompt or boot message.
+- Each serial suite attempt has a hard wall-clock watchdog. Override it with
+  `--suite-timeout SECONDS` when debugging a slow board; the default is derived
+  from `--long-timeout` with a 180-second floor.
+- The runner preserves the running app between suites by default and uses
+  Ctrl-C/Enter sync plus bounded serial reopen/resync. Pass
+  `--reset-before-suite` only when you explicitly want an RTS reset before each
+  suite. `basic_serial.py` exposes the same reset pulse as `--reset-app`.
+- The NTP suite uses a deterministic local responder instead of public NTP.
+  Firmware currently sends to UDP port 123, so `--ntp-port` is only useful with
+  external port redirection or ports that make the NTP port configurable.
+
+## Host Network HAL Conformance
+
+The native host port now links `ports/host_native/hal_net_posix.c`, not the
+no-network stub. Run the host HAL conformance target whenever the network HAL
+contract or shared WEB core changes:
+
+```sh
+make -C ports/host_native net-hal-test
+```
+
+This builds and runs `ports/host_native/hal_net_posix_test.c`. It verifies the
+host `hal_net.h` backend through loopback TCP client, TCP server
+accept/send/close, UDP bind/receive, UDP send, capability bits, and loopback IP
+reporting. It also checks the shared HTTP path and NTP packet helpers that the
+shared WEB command layer will call, including a HAL-backed NTP exchange against
+a local UDP responder. The same check is available through:
+
+```sh
+python3.11 porttools/host_network_conformance.py
+```
+
+The serial `network_conformance.py` suites remain the BASIC WEB surface gate
+for device builds; the host BASIC WEB suites should be enabled against the same
+behavior as the shared command core lands.
+
+`porttools/host_basic_network_conformance.py` also exercises the host-native
+BASIC WEB surface in-process: TCP client/server, UDP, fake NTP, plain MQTT,
+shared transmit helpers, `OPTION LIST`, and host TFTP. The harness sets
+`MMBASIC_HOST_TFTP_PORT` so the host TFTP service binds an unprivileged UDP
+port while preserving the BASIC default of UDP/69 outside tests. Its server
+slice repeatedly runs the same BASIC server under configured TCP and UDP ports
+to prove that `RUN` preserves configured listeners while clearing only active
+request/message state.
+
+## Syntax Check
+
+After editing these tools:
+
+```sh
+python3.11 -m py_compile \
+  porttools/basic_serial.py \
+  porttools/esp32_tcp_smoke.py \
+  porttools/network_conformance.py \
+  porttools/host_network_conformance.py \
+  porttools/host_basic_network_conformance.py
+```

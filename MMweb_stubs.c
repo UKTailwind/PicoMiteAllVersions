@@ -5,8 +5,7 @@
  * same stubs in host_runtime.c.
  *
  * MM_Misc.c reads the WEB-stack symbols (closeMQTT, ProcessWeb,
- * tcp_*_recv_buffers, port_web_*) unconditionally so its source stays
- * preprocessor-clean.
+ * port_web_*) unconditionally so its source stays preprocessor-clean.
  */
 
 #include "MMBasic_Includes.h"
@@ -31,16 +30,7 @@ void cmd_web(void) { error("WEB not supported on this port"); }
 int wifi_serial_telnet_configured(void) { return 1; }
 
 int  startupcomplete = 0;
-void tcp_free_recv_buffers(void) {}
-void tcp_realloc_recv_buffers(void) {}
 
-/* MM.MESSAGE$ / MM.ADDRESS$ / MM.TOPIC$ buffer accessor. On WEB,
- * port_fun_mm_mqtt_copy() in MMMqtt.c copies from messagebuff /
- * addressbuff / topicbuff. Non-WEB builds have no MQTT state, so this
- * stub writes an empty MMBasic string (length byte zero) and the
- * BASIC function returns "". Kept out of MMweb_stubs.c's larger
- * buffer declarations to avoid ~550 bytes of dead BSS on RAM-tight
- * VGA builds. */
 void port_fun_mm_mqtt_copy(int which, unsigned char *out) {
     (void)which;
     out[0] = 0;

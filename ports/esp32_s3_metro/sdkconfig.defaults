@@ -30,10 +30,9 @@ CONFIG_ESP_MAIN_TASK_STACK_SIZE=24576
 CONFIG_ESP_TASK_WDT_INIT=n
 
 # --- Radios -----------------------------------------------------------------
-# Phase A doesn't need WiFi/BT. Disabling saves ~1 MB binary and frees
-# the WiFi RAM region. Re-enable in a follow-on phase if/when networking
-# features get ported (PicoMite WEB equivalent).
-CONFIG_ESP_WIFI_ENABLED=n
+# WiFi is used by the ESP32-native WEB/OPTION WIFI surface.
+CONFIG_ESP_WIFI_ENABLED=y
+CONFIG_ESP_WIFI_TASK_PINNED_TO_CORE_0=y
 CONFIG_BT_ENABLED=n
 
 # --- Cores ------------------------------------------------------------------

@@ -37,6 +37,7 @@
 #include "host_time.h"
 #include "host_fb.h"
 #include "host_keys.h"
+#include "shared/net/mm_net_interrupts.h"
 
 /* Forward declarations for output capture */
 extern void (*host_output_hook)(const char *text, int len);
@@ -57,6 +58,10 @@ static uint64_t host_runtime_deadline_us = 0;
 static int host_runtime_timed_out_flag = 0;
 static int host_screenshot_written = 0;
 static char host_screenshot_path[1024] = {0};
+static int host_save_option_error_skip = 0;
+static char host_save_error_message[MAXERRMSG] = {0};
+static int host_save_errno = 0;
+static char host_interrupt_return_token[3] = {0};
 /* Scripted-key state (host_key_script / host_config_key_*) moved to
  * host_keys.c; see host_keys.h for the consume/peek API. */
 /* FastGFX state and cmd_framebuffer/cmd_fastgfx live in host_fastgfx.c. */
@@ -116,11 +121,6 @@ int PromptFC = 0xFFFFFF;
 int PromptBC = 0;
 volatile int  PS2code = 0;
 volatile bool PS2int  = false;
-/* WEB networking interrupt globals — defined in Custom.c on device WEB
- * builds; stubbed here so MM_Misc.c's interrupt-dispatch loop can read
- * them unconditionally. They never go non-zero on host. */
-volatile bool TCPreceived = false;
-char         *TCPreceiveInterrupt = NULL;
 /* ReadBuffer is a function pointer - defined in function pointers section below */
 volatile uint32_t realflashpointer = 0;
 /* Simulated erased-flash regions so Memory.c's scan loops terminate on the
@@ -463,10 +463,87 @@ static void host_runtime_check_timeout(void) {
     longjmp(mark, 1);
 }
 
+extern void ProcessWeb(int mode);
+extern int host_tcp_interrupt_pending(void);
+
+static inline CommandToken host_commandtbl_decode(const unsigned char *p) {
+    return ((CommandToken)(p[0] & 0x7f)) | ((CommandToken)(p[1] & 0x7f) << 7);
+}
+
+static void host_runtime_service(void) {
+    static int in_service;
+    host_runtime_check_timeout();
+    if (in_service) return;
+    in_service = 1;
+    ProcessWeb(0);
+    in_service = 0;
+}
+
 
 /* Hardware interaction */
-void CheckAbort(void) { host_runtime_check_timeout(); }
-int check_interrupt(void) { return 0; }
+void CheckAbort(void) { host_runtime_service(); }
+void cmd_ireturn(void) {
+    if (InterruptReturn == NULL) error("Not in interrupt");
+    checkend(cmdline);
+    nextstmt = InterruptReturn;
+    InterruptReturn = NULL;
+    if (g_LocalIndex) ClearVars(g_LocalIndex--, true);
+    g_TempMemoryIsChanged = true;
+    *CurrentInterruptName = 0;
+    if (host_save_option_error_skip > 0) {
+        OptionErrorSkip = host_save_option_error_skip + 1;
+    } else {
+        OptionErrorSkip = host_save_option_error_skip;
+    }
+    strcpy(MMErrMsg, host_save_error_message);
+    MMerrno = host_save_errno;
+}
+
+int check_interrupt(void) {
+    host_runtime_service();
+    if (!InterruptUsed) return 0;
+    if (InterruptReturn != NULL) return 0;
+
+    unsigned char *intaddr = NULL;
+    if (TCPreceiveInterrupt &&
+        (TCPreceived || host_tcp_interrupt_pending())) {
+        intaddr = (unsigned char *)TCPreceiveInterrupt;
+        TCPreceived = false;
+    } else if (MQTTInterrupt && MQTTComplete) {
+        intaddr = (unsigned char *)MQTTInterrupt;
+        MQTTComplete = false;
+    } else if (UDPinterrupt && UDPreceive) {
+        intaddr = (unsigned char *)UDPinterrupt;
+        UDPreceive = false;
+    } else {
+        return 0;
+    }
+
+    g_LocalIndex++;
+    host_save_option_error_skip = OptionErrorSkip > 0 ? OptionErrorSkip : 0;
+    OptionErrorSkip = 0;
+    strcpy(host_save_error_message, MMErrMsg);
+    host_save_errno = MMerrno;
+    *MMErrMsg = 0;
+    MMerrno = 0;
+    InterruptReturn = nextstmt;
+
+    if (host_commandtbl_decode(intaddr) == cmdSUB) {
+        strncpy(CurrentInterruptName, (char *)intaddr + 2, MAXVARLEN);
+        CurrentInterruptName[MAXVARLEN] = 0;
+        host_interrupt_return_token[0] = (cmdIRET & 0x7f) + C_BASETOKEN;
+        host_interrupt_return_token[1] = (cmdIRET >> 7) + C_BASETOKEN;
+        host_interrupt_return_token[2] = 0;
+        if (gosubindex >= MAXGOSUB) error("Too many SUBs for interrupt");
+        errorstack[gosubindex] = CurrentLinePtr;
+        gosubstack[gosubindex++] = (unsigned char *)host_interrupt_return_token;
+        g_LocalIndex++;
+        skipelement(intaddr);
+    }
+
+    nextstmt = intaddr;
+    return 1;
+}
 void ClearExternalIO(void) {}
 /* CloseAllFiles is provided by FileIO.c. */
 /* CloseAudio is provided by Audio.c host body. */
@@ -478,7 +555,7 @@ void clear320(void) {}
 /* Flash write-batch hooks are provided by FileIO.c. */
 void initMouse0(int sensitivity) { (void)sensitivity; }
 void restorepanel(void) { WriteBuf = NULL; }
-void routinechecks(void) { host_runtime_check_timeout(); }
+void routinechecks(void) { host_runtime_service(); }
 void SoftReset(void) {}
 void uSec(int us) { (void)us; }
 uint32_t __get_MSP(void) { return 0xFFFFFFFF; }  /* always pass stack overflow check */
@@ -575,7 +652,22 @@ static int host_decode_escape_sequence(void) {
 }
 
 int MMInkey(void) {
+    static int in_web_poll;
     host_runtime_check_timeout();
+    if (!in_web_poll) {
+        extern void ProcessWeb(int mode);
+        in_web_poll = 1;
+        ProcessWeb(0);
+        in_web_poll = 0;
+    }
+
+    if (ConsoleRxBufHead != ConsoleRxBufTail) {
+        int c = (unsigned char)ConsoleRxBuf[ConsoleRxBufTail];
+        ConsoleRxBufTail = (ConsoleRxBufTail + 1) % CONSOLE_RX_BUF_SIZE;
+        if (c == 0x7f) return BKSP;
+        if (c == '\n') return ENTER;
+        return c;
+    }
 
     /* Test-harness path: pre-scripted key stream. Returns -2 if no
      * script is queued (fall through), -1 if queued-but-waiting, or
@@ -655,9 +747,15 @@ int MMgetchar(void) {
  * DisplayPutC, and that the device's console-routing rules apply
  * identically on host.
  */
+extern void host_telnet_putc(int c, int flush);
 void putConsole(int c, int flush) {
     if (OptionConsole & 2) DisplayPutC((char)c);
-    if (OptionConsole & 1) SerialConsolePutC((char)c, flush);
+    if (OptionConsole & 1) {
+        SerialConsolePutC((char)c, flush);
+    } else {
+        host_telnet_putc(c, flush);
+        if (flush) host_telnet_putc(0, -1);
+    }
 }
 
 char MMputchar(char c, int flush) {
@@ -678,6 +776,7 @@ char MMputchar(char c, int flush) {
 void MMPrintString(char *s) {
     while (*s) MMputchar(*s++, 0);
     fflush(stdout);
+    host_telnet_putc(0, -1);
 }
 
 void SSPrintString(char *s) {
@@ -686,6 +785,7 @@ void SSPrintString(char *s) {
      * them as literal glyphs. */
     while (*s) SerialConsolePutC(*s++, 0);
     fflush(stdout);
+    host_telnet_putc(0, -1);
 }
 /* PRet/PInt/PFlt/SRet/SInt/SIntComma/PIntComma/PIntH/PIntB/PIntHC/PIntBC/
  * PFltComma are in MMBasic_Print.c (shared). MMfputs/MMfeof/MMfputc/MMfgetc
@@ -721,7 +821,10 @@ void MMgetline(int filenbr, char *p) {
     }
     *p = 0;
 }
-void printoptions(void) {}
+void printoptions(void) {
+    extern void port_web_print_options(void);
+    port_web_print_options();
+}
 /* putConsole defined above — matches the device dispatch. */
 int getConsole(void) { return -1; }
 void myprintf(char *s) { host_prints(s); }
@@ -739,11 +842,17 @@ char SerialConsolePutC(char c, int flush) {
      * error message stair-steps down the terminal. */
     if (host_output_hook) {
         host_output_hook(&c, 1);
+        host_telnet_putc(c, flush);
+        if (flush) host_telnet_putc(0, -1);
         return c;
     }
-    if (c == '\n' && host_raw_mode_is_active()) fputc('\r', stdout);
-    fputc(c, stdout);
-    if (flush) fflush(stdout);
+    if (Option.Telnet != -1) {
+        if (c == '\n' && host_raw_mode_is_active()) fputc('\r', stdout);
+        fputc(c, stdout);
+        if (flush) fflush(stdout);
+    }
+    host_telnet_putc(c, flush);
+    if (flush) host_telnet_putc(0, -1);
     return c;
 }
 int kbhitConsole(void) { return 0; }
@@ -922,16 +1031,6 @@ PIO port_pio_for_index(int pio_idx) { (void)pio_idx; return NULL; }
 
 /* POKE DISPLAY raw panel write — host has no display panel. */
 int port_poke_display_panel(unsigned char *p) { (void)p; return 0; }
-
-/* WEB-only hooks — host has no WiFi. Real impls live in MMsetwifi.c on
- * PICOMITEWEB device builds. */
-void port_web_print_options(void) {}
-int  port_web_option_setter(unsigned char *cmdline) { (void)cmdline; return 0; }
-int  port_web_mminfo(unsigned char *ep, int64_t *out_iret,
-                     unsigned char *out_sret, int *out_targ)
-{ (void)ep; (void)out_iret; (void)out_sret; (void)out_targ; return 0; }
-int  port_web_get_ssid(unsigned char *out_sret, int *out_targ)
-{ (void)out_sret; (void)out_targ; return 0; }
 
 /* str_replace/STR_REPLACE provided by MATHS.c */
 

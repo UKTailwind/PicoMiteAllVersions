@@ -81,11 +81,34 @@ Working on hardware:
 - `OPTION` persistence is backed by ESP-IDF NVS and has been hardware-smoked across reset/reflash.
 - Default terminal colours survive errors and prompt recovery through shared MMBasic colour-state restoration.
 - `FLASH SAVE 1`, reset, `FLASH LOAD 1`, `RUN` works on the dedicated `mmslots` partition.
+- `WEB CONNECT`, `WEB SCAN`, TCP server, TCP client request/stream, UDP send/receive, NTP, and plain-TCP MQTT are hardware-smoked.
+- Bundled WEB demos seeded to A: include the small server demo and the multi-file website demo.
 
 Still stubbed or incomplete:
 
 - BASIC-visible GPIO DOUT/DIN/ARAW is hardware-smoked. PWM/servo are still explicit unsupported paths.
-- Display, keyboard, audio, WiFi/BLE, OTA, and PSRAM-backed heap/display work are deferred.
+- MQTT TLS/cert handling is not implemented; current MQTT support is plain TCP.
+- Display, keyboard, audio, BLE/Bluetooth, OTA, and PSRAM-backed heap/display work are deferred.
+
+## Port Tools
+
+Host-side smoke tooling lives in [`../../porttools`](../../porttools/README.md).
+Use `basic_serial.py` for prompt-driven command checks and
+`esp32_tcp_smoke.py` for the Mac-side TCP client request/stream smoke.
+
+Known-good quick checks:
+
+```sh
+python3.11 ../../porttools/basic_serial.py \
+  --port /dev/cu.usbmodem101 \
+  --boot-wait 1 \
+  --cmd 'PRINT "ESP32_PROMPT_OK"' \
+  --expect ESP32_PROMPT_OK
+
+python3.11 ../../porttools/esp32_tcp_smoke.py \
+  --port /dev/cu.usbmodem101 \
+  --host 192.168.4.23
+```
 
 ## Build Shape
 

@@ -156,6 +156,47 @@ int hal_net_http_register(uint16_t port, hal_http_cb cb, void *ctx);
 ```
 Hard part: WASM has no raw TCP — the WASM impl maps `hal_net_http_register` to `fetch()` callbacks and rejects raw TCP/UDP with `-ENOSYS`. The contract must allow this (functions can return "not supported on this port").
 
+### Network lifecycle
+
+The network HAL owns transport primitives only. BASIC-visible network lifecycle
+policy is shared code, not a port/backend decision.
+
+This is a single shared implementation requirement, not a parity-by-copying
+requirement. Ports may expose backend primitives, capability bits, and minimal
+adapter callbacks; they should not each reimplement option application,
+listener preservation, runtime cleanup, or unsupported-feature policy.
+
+- Durable network options are `Option.TCP_PORT`, `Option.UDP_PORT`,
+  `Option.Telnet`, `Option.disabletftp`, `OPTION WIFI` credentials, and
+  `OPTION WEB MESSAGES`. Port code may validate hardware-specific details, but
+  it must not decide different BASIC semantics for these options.
+- Once a backend reaches an IP-ready state, shared lifecycle code opens every
+  configured and supported service: TCP server, UDP server, TFTP, and Telnet.
+  Reconnect uses the same path as boot. Port open callbacks receive the
+  already-selected configured port; they should bind that port and not
+  rederive lifecycle policy from `Option.*`.
+- Runtime polling uses the shared lifecycle poll entry. Ports supply narrow
+  callbacks for backend event pumps such as UDP, TFTP, TCP client stream, MQTT,
+  TCP server, and Telnet; the shared lifecycle layer owns the service poll
+  order and network-ready gate.
+- `RUN` and normal runtime cleanup close active sessions only: accepted TCP
+  slots, TCP clients/streams, MQTT sessions, pending UDP/message state, TFTP
+  transfer sessions, and active Telnet console connections. Configured
+  listeners remain open or are reopened before control returns to BASIC.
+- Setting a service option to disabled is the explicit way to close its
+  configured listener. Network-down handling may also close listeners, but
+  network-ready handling must reopen the durable configured services.
+- `NEW` and hard runtime reset must call the shared lifecycle reset entry with
+  an explicit cleanup level. Ports must not independently choose whether to
+  preserve or tear down configured network listeners.
+- Unsupported network features are selected through `hal_net_capabilities()`.
+  Browser/WASM raw TCP server, TCP stream, UDP, TFTP, and Telnet paths should
+  fail through the same shared capability checks used by other ports, rather
+  than through hand-written parallel policy.
+- If a backend truly cannot apply a network option without rebooting, it
+  reports that as a shared lifecycle result. The common caller is responsible
+  for the user-visible reset/reporting behavior.
+
 ## `hal_irq.h`
 
 Macros and helpers, no functions:

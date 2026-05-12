@@ -1,60 +1,138 @@
+#include <stdint.h>
+#include <string.h>
+
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
-#include "lwip/apps/tftp_common.h"
-#include "lwip/apps/tftp_server.h"
-struct tftp_context ctx;
-int tftp_fnbr;
-void* tftp_open(const char* fname, const char* fmode, u8_t write){
-    if (!InitSDCard()) return NULL;
-    BYTE mode = 0;
-    tftp_fnbr=FindFreeFileNbr();
-    if (write){
-        mode = FA_WRITE | FA_CREATE_ALWAYS;
-        if(!optionsuppressstatus)MMPrintString("TFTP request to create ");
-    }
-    else {
-        mode = FA_READ;
-        if(!optionsuppressstatus)MMPrintString("TFTP request to read ");
-    }
-    if(!optionsuppressstatus)MMPrintString(strcmp(fmode,"octet")==0? "binary file : " : "ascii file : ");
-    if(!optionsuppressstatus)MMPrintString((char *)fname);
-    if(!optionsuppressstatus)PRet();
-    if (!BasicFileOpen((char *)fname, tftp_fnbr, mode))
-            return NULL;
-    return &tftp_fnbr;
+#include "hal/hal_net.h"
+#include "shared/net/mm_net_tftp.h"
+
+#define PICO_TFTP_PORT 69
+
+static hal_net_udp_socket_t pico_tftp_socket;
+static mm_net_tftp_session_t pico_tftp_session;
+static int pico_tftp_fnbr;
+
+static int pico_tftp_peer_text(const mm_net_tftp_peer_t *peer, char *out,
+                               size_t out_len) {
+    if (!peer || !out || out_len == 0) return 0;
+    if (peer->family != 4) return 0;
+    snprintf(out, out_len, "%u.%u.%u.%u", peer->bytes[0], peer->bytes[1],
+             peer->bytes[2], peer->bytes[3]);
+    return 1;
 }
 
-void tftp_close(void* handle){
-//    int nbr;
-    int fnbr=*(int *)handle;
-    FileClose(fnbr);
-    if(!optionsuppressstatus)MMPrintString("TFTP transfer complete\r\n");
+static int pico_tftp_send(void *ctx, const mm_net_tftp_peer_t *peer,
+                          const void *buf, size_t len) {
+    (void)ctx;
+    if (!pico_tftp_socket) return 0;
+    char host[32];
+    if (!pico_tftp_peer_text(peer, host, sizeof host)) return 0;
+    return hal_net_udp_socket_send(pico_tftp_socket, host, peer->port, buf,
+                                   len, 1000) == HAL_NET_OK;
 }
-int tftp_read(void* handle, void* buf, int bytes){
-    int fnbr=*(int *)handle;
-    ssize_t n = hal_fs_read(hal_fds[fnbr], buf, (size_t)bytes);
-    return n < 0 ? 0 : (int)n;
+
+static int pico_tftp_open_file(void *ctx, const char *filename, int write,
+                               void **handle) {
+    (void)ctx;
+    if (!InitSDCard()) return -1;
+
+    pico_tftp_fnbr = FindFreeFileNbr();
+    BYTE mode;
+    if (write) {
+        mode = FA_WRITE | FA_CREATE_ALWAYS;
+        if (!optionsuppressstatus) MMPrintString("TFTP request to create ");
+    } else {
+        mode = FA_READ;
+        if (!optionsuppressstatus) MMPrintString("TFTP request to read ");
+    }
+    if (!optionsuppressstatus) {
+        MMPrintString("binary file : ");
+        MMPrintString((char *)filename);
+        PRet();
+    }
+
+    if (!BasicFileOpen((char *)filename, pico_tftp_fnbr, mode)) return -1;
+    *handle = &pico_tftp_fnbr;
+    return 0;
 }
-int tftp_write(void* handle, struct pbuf* p){
-    int fnbr=*(int *)handle;
-    ssize_t w = hal_fs_write(hal_fds[fnbr], p->payload, p->tot_len);
+
+static ssize_t pico_tftp_read_file(void *ctx, void *handle, void *buf,
+                                   size_t len) {
+    (void)ctx;
+    int fnbr = *(int *)handle;
+    ssize_t n = hal_fs_read(hal_fds[fnbr], buf, len);
+    return n < 0 ? -1 : n;
+}
+
+static ssize_t pico_tftp_write_file(void *ctx, void *handle, const void *buf,
+                                    size_t len) {
+    (void)ctx;
+    int fnbr = *(int *)handle;
+    ssize_t w = hal_fs_write(hal_fds[fnbr], buf, len);
     FSerror = (w < 0) ? (int)w : 0;
-    ErrorCheck(tftp_fnbr);
-    return w < 0 ? (int)w : (int)w;
+    ErrorCheck(fnbr);
+    return w < 0 ? -1 : w;
 }
-void tftp_error(void* handle, int err, const char* msg, int size){
-    int fnbr=*(int *)handle;
-    ForceFileClose(fnbr);
-    MMPrintString("TFTP Error: ");
-    MMPrintString((char *)msg);
-    PRet();
+
+static void pico_tftp_close_file(void *ctx, void *handle) {
+    (void)ctx;
+    int fnbr = *(int *)handle;
+    FileClose(fnbr);
+    if (!optionsuppressstatus) MMPrintString("TFTP transfer complete\r\n");
 }
-int cmd_tftp_server_init(void){
-    ctx.open=tftp_open;
-    ctx.close=tftp_close;
-    ctx.error=tftp_error;
-    ctx.write=tftp_write;
-    ctx.read=tftp_read;
-    tftp_init_server(&ctx);
+
+static const mm_net_tftp_ops_t pico_tftp_ops = {
+    .open = pico_tftp_open_file,
+    .read = pico_tftp_read_file,
+    .write = pico_tftp_write_file,
+    .close = pico_tftp_close_file,
+    .send = pico_tftp_send,
+};
+
+static void pico_tftp_ensure_init(void) {
+    if (!pico_tftp_session.ops)
+        mm_net_tftp_init(&pico_tftp_session, &pico_tftp_ops, NULL);
+}
+
+void pico_tftp_close(void) {
+    pico_tftp_ensure_init();
+    mm_net_tftp_close(&pico_tftp_session);
+    if (pico_tftp_socket) {
+        hal_net_udp_close(pico_tftp_socket);
+        pico_tftp_socket = 0;
+    }
+}
+
+void pico_tftp_poll(void) {
+    if (!pico_tftp_socket) return;
+    pico_tftp_ensure_init();
+    for (;;) {
+        uint8_t packet[600];
+        hal_net_addr_t from;
+        size_t len = 0;
+        int rc = hal_net_udp_recv_event(pico_tftp_socket, &from, packet,
+                                        sizeof packet, &len);
+        if (rc == HAL_NET_WOULD_BLOCK) return;
+        if (rc != HAL_NET_OK || len < 2) return;
+        mm_net_tftp_peer_t peer;
+        memset(&peer, 0, sizeof peer);
+        peer.family = from.family;
+        peer.port = from.port;
+        memcpy(peer.bytes, from.bytes, sizeof peer.bytes);
+        mm_net_tftp_handle_packet(&pico_tftp_session, &peer, packet, len);
+    }
+}
+
+int cmd_tftp_server_init(void) {
+    if (Option.disabletftp || !WIFIconnected) {
+        pico_tftp_close();
+        return 0;
+    }
+    if (pico_tftp_socket) return 1;
+    if (hal_net_udp_bind(PICO_TFTP_PORT, &pico_tftp_socket) != HAL_NET_OK) {
+        pico_tftp_socket = 0;
+        return 0;
+    }
+    pico_tftp_ensure_init();
     return 1;
 }

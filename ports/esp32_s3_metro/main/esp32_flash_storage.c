@@ -215,20 +215,16 @@ int ExistsDir(char *p, char *q, int *filesystem) {
     return (info.type == LFS_TYPE_DIR) ? 1 : 0;
 }
 
-/* ---- hal_ff_* stubs ----
- * These wrap FatFS dir/path ops for the B: (SD) drive. With no SD on
- * this board, B: is unreachable (port_drive_check errors first), so
- * these are link-satisfying stubs only. Real impls land when an SD
- * driver is wired up. */
+/* ---- hal_ff_* wrappers for the B: FatFS drive. */
 #include "ff.h"
 FRESULT hal_ff_findfirst(DIR *d, FILINFO *f, const TCHAR *p, const TCHAR *q) {
-    (void)d; (void)f; (void)p; (void)q; return FR_NOT_ENABLED;
+    return f_findfirst(d, f, p, q);
 }
-FRESULT hal_ff_findnext (DIR *d, FILINFO *f)        { (void)d; (void)f; return FR_NOT_ENABLED; }
-FRESULT hal_ff_closedir (DIR *d)                    { (void)d; return FR_NOT_ENABLED; }
-FRESULT hal_ff_unlink   (const TCHAR *p)            { (void)p; return FR_NOT_ENABLED; }
-FRESULT hal_ff_chdir    (const TCHAR *p)            { (void)p; return FR_NOT_ENABLED; }
-FRESULT hal_ff_getcwd   (TCHAR *b, UINT n)          { (void)b; (void)n; return FR_NOT_ENABLED; }
+FRESULT hal_ff_findnext (DIR *d, FILINFO *f)        { return f_findnext(d, f); }
+FRESULT hal_ff_closedir (DIR *d)                    { return f_closedir(d); }
+FRESULT hal_ff_unlink   (const TCHAR *p)            { return f_unlink(p); }
+FRESULT hal_ff_chdir    (const TCHAR *p)            { return f_chdir(p); }
+FRESULT hal_ff_getcwd   (TCHAR *b, UINT n)          { return f_getcwd(b, n); }
 
 /* Read-only pointer to the program-memory region. On Pico this points
  * at the XIP-mapped flash partition that holds the saved BASIC program.

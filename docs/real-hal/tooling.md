@@ -63,6 +63,24 @@ If a HAL boundary costs perf in a hot path, the fix is **not** to add a back-cha
 
 If any of (1–6) fails, the phase doesn't merge. (7) is required for display/keyboard/audio phases.
 
+## Toolchain activation
+
+Do not treat a bare `command -v emcc` or `command -v idf.py` failure as proof
+that the toolchain is unavailable. This workspace has repo-local helpers that
+source the installed toolchain environments.
+
+- WASM/Emscripten: run `ports/host_wasm/build.sh` from the repo root. The
+  script sources `$HOME/emsdk/emsdk_env.sh` when `emcc` is not already on
+  `PATH`. On this machine the concrete compiler is
+  `$HOME/emsdk/upstream/emscripten/emcc`.
+- ESP32/ESP-IDF: run `./buildesp32.sh` from the repo root. The script sources
+  `${IDF_PATH:-$HOME/esp/esp-idf}/export.sh` when `idf.py` is not already on
+  `PATH`. On this machine the concrete command is
+  `$HOME/esp/esp-idf/tools/idf.py`.
+- Manual shells are fine, but the canonical commands are the helpers above.
+  If a direct build command fails because `PATH` is incomplete, retry through
+  the helper before reporting a missing toolchain.
+
 ## Verification rituals
 
 Copied from the top of the original plan, unchanged:

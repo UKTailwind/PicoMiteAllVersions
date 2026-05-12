@@ -26,6 +26,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
+#include "shared/net/mm_net_interrupts.h"
 #include "port_config.h"
 #include "pico/stdlib.h"
 #include "hardware/clocks.h"
@@ -158,23 +159,6 @@ struct s_inttbl inttbl[NBRINTERRUPTS];
 unsigned char *InterruptReturn;
 extern const char *FErrorMsg[];
 uint8_t *buff320=NULL;
-/* MQTT state globals. Defined on every target so MMBasic's interrupt
- * dispatch (which runs in core) can reference them without gating.
- * Only PICOMITEWEB actually populates them from MMMqtt.c; elsewhere
- * they stay at their initialisers. closeMQTT is strong-linked in
- * MMMqtt.c on WEB and falls back to the stub below otherwise. */
-char *MQTTInterrupt = NULL;
-volatile bool MQTTComplete = false;
-/* UDP / TCP wifi interrupt globals always exist so the interrupt-dispatch
- * loop below can reference them unconditionally. setwifi lives in
- * MMsetwifi.c on PICOMITEWEB builds (see CMakeLists). TCP{received,
- * receiveInterrupt} are defined in Custom.c on device WEB builds and
- * stubbed in host_runtime.c — extern'd here because Custom.h's decls
- * are gated under `#ifdef PICOMITEWEB`. */
-char         *UDPinterrupt = NULL;
-volatile bool UDPreceive   = false;
-extern volatile bool TCPreceived;
-extern char         *TCPreceiveInterrupt;
 /* setwifi lives in MMsetwifi.c on WEB builds. */
 extern void setwifi(unsigned char *tp);
 /* USB device-info hooks: real impls in drivers/usb_host_kbd/USBKeyboard.c
@@ -185,8 +169,8 @@ extern int port_usb_count(void);
 extern int port_usb_hid_field(int n, int field);
 /* VGArecovery (PICOMITEVGA && !HDMI helper) lives in
  * ports/vga{,_rp2350}/port_defaults.c — VGA ports only. */
-/* WEB-stack stubs — closeMQTT / ProcessWeb / tcp_*_recv_buffers /
- * port_web_* — live in MMweb_stubs.c (linked on non-WEB device) and
+/* WEB-stack stubs — closeMQTT / ProcessWeb / port_web_* — live in
+ * MMweb_stubs.c (linked on non-WEB device) and
  * host_runtime.c (host); real impls in MMsetwifi.c / MMMqtt.c /
  * MMtcpserver.c on WEB. */
 extern const uint8_t *flash_target_contents;

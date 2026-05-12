@@ -59,6 +59,7 @@ LDFLAGS = -pthread -sPTHREAD_POOL_SIZE=1 \
           -sMODULARIZE=1 -sEXPORT_ES6=1 -sENVIRONMENT=web,worker \
           -sEXPORTED_FUNCTIONS='["_main","_wasm_boot","_wasm_push_key","_wasm_key_ring_ptr","_wasm_key_ring_head_ptr","_wasm_key_ring_tail_ptr","_wasm_key_ring_size","_wasm_break","_wasm_framebuffer_ptr","_wasm_framebuffer_width","_wasm_framebuffer_height","_wasm_framebuffer_generation","_wasm_framebuffer_generation_ptr","_wasm_vsync_counter_ptr","_wasm_set_framebuffer_size","_wasm_set_heap_size","_wasm_set_slowdown_us","_malloc","_free"]' \
           -sEXPORTED_RUNTIME_METHODS='["ccall","cwrap","UTF8ToString","stringToUTF8","HEAPU8","HEAPU32","FS","IDBFS"]' \
+          -sFETCH=1 \
           -sFORCE_FILESYSTEM=1 \
           -lidbfs.js \
           --preload-file $(REPO_ROOT)/host/demos@/bundle \
@@ -73,6 +74,17 @@ CORE_SRCS = MMBasic.c Commands.c Functions.c Operators.c MATHS.c \
             gfx_console_shared.c \
             mm_misc_shared.c OptionCommands.c \
             display_state.c pin_state.c option_state.c audio_state.c \
+            mm_net_interrupts.c \
+            mm_net_http.c \
+            mm_net_mqtt_cmd.c \
+            mm_net_mqtt_hal_cmd.c \
+            mm_net_mqtt_wire.c \
+            mm_net_ntp.c \
+            mm_net_lifecycle.c \
+            mm_net_options.c \
+            mm_net_state.c \
+            mm_net_tcp_client_cmd.c \
+            mm_net_wifi_cmd.c \
             Draw.c RGB121.c Tilemap.c FileIO.c Audio.c BmpDecoder.c re.c picojpeg.c
 # Stubs + host-only subsystems — match ports/host_native/Makefile.
 CORE_SRCS += audio_mp3_stub.c spi_lcd_mem332_stub.c display_merge_stub.c vga_ops_stub.c
@@ -98,7 +110,8 @@ HOST_PORTABLE_SRCS = host_runtime.c host_fastgfx.c host_fs_shims.c \
                      hal_flash_host.c hal_time_host.c hal_random_host.c hal_watchdog_host.c hal_pin_host.c hal_storage_host.c hal_filesystem_host.c \
                      hal_keyboard_host.c hal_audio_host.c hal_vm_framebuffer_host.c
 HOST_WASM_SRCS = host_wasm_main.c host_wasm_console.c host_wasm_canvas.c \
-                 host_wasm_audio.c host_sim_slowdown.c host_fastgfx_resync.c
+                 host_wasm_audio.c host_wasm_web.c host_sim_slowdown.c \
+                 host_fastgfx_resync.c
 
 SRCS = $(HOST_PORTABLE_SRCS) $(HOST_WASM_SRCS) $(CORE_SRCS) $(BC_SRCS)
 OBJS = $(addprefix $(BUILD_DIR)/,$(SRCS:.c=.o))
@@ -142,6 +155,10 @@ $(BUILD_DIR)/%.o: $(REPO_ROOT)/%.c
 	$(EMCC) $(CFLAGS) -c -o $@ $<
 
 $(BUILD_DIR)/%.o: $(REPO_ROOT)/core/state/%.c
+	@mkdir -p $(dir $@)
+	$(EMCC) $(CFLAGS) -c -o $@ $<
+
+$(BUILD_DIR)/%.o: $(REPO_ROOT)/shared/net/%.c
 	@mkdir -p $(dir $@)
 	$(EMCC) $(CFLAGS) -c -o $@ $<
 

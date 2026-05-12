@@ -42,12 +42,28 @@ target_sources(PicoMite PRIVATE
     # non-VGA ports so the linker is happy without Touch.c here.
     ${CMAKE_SOURCE_DIR}/cJSON.c
     ${CMAKE_SOURCE_DIR}/mqtt.c
+    ${CMAKE_SOURCE_DIR}/shared/net/mm_net_http_file.c
+    ${CMAKE_SOURCE_DIR}/shared/net/mm_net_http_page.c
+    ${CMAKE_SOURCE_DIR}/shared/net/mm_net_mqtt_cmd.c
+    ${CMAKE_SOURCE_DIR}/shared/net/mm_net_mqtt_hal_cmd.c
+    ${CMAKE_SOURCE_DIR}/shared/net/mm_net_ntp_hal.c
+    ${CMAKE_SOURCE_DIR}/shared/net/mm_net_lifecycle.c
+    ${CMAKE_SOURCE_DIR}/shared/net/mm_net_options.c
+    ${CMAKE_SOURCE_DIR}/shared/net/mm_net_service.c
+    ${CMAKE_SOURCE_DIR}/shared/net/mm_net_state.c
+    ${CMAKE_SOURCE_DIR}/shared/net/mm_net_tcp_client_cmd.c
+    ${CMAKE_SOURCE_DIR}/shared/net/mm_net_tcp_server_cmd.c
+    ${CMAKE_SOURCE_DIR}/shared/net/mm_net_tftp.c
+    ${CMAKE_SOURCE_DIR}/shared/net/mm_net_transmit_cmd.c
+    ${CMAKE_SOURCE_DIR}/shared/net/mm_net_udp_cmd.c
+    ${CMAKE_SOURCE_DIR}/shared/net/mm_net_web_cmd.c
+    ${CMAKE_SOURCE_DIR}/shared/net/mm_net_wifi_cmd.c
+    ${CMAKE_SOURCE_DIR}/drivers/net_lwip_raw/hal_net_lwip.c
     ${CMAKE_SOURCE_DIR}/MMMqtt.c
     ${CMAKE_SOURCE_DIR}/MMTCPclient.c
     ${CMAKE_SOURCE_DIR}/MMtelnet.c
     ${CMAKE_SOURCE_DIR}/MMntp.c
     ${CMAKE_SOURCE_DIR}/MMtcpserver.c
-    ${CMAKE_SOURCE_DIR}/tftp.c
     ${CMAKE_SOURCE_DIR}/MMtftp.c
     ${CMAKE_SOURCE_DIR}/MMudp.c
     ${CMAKE_SOURCE_DIR}/MMsetwifi.c

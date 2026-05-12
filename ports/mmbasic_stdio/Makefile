@@ -46,6 +46,10 @@ CORE_SRCS = MMBasic.c Commands.c Functions.c Operators.c MATHS.c Memory.c MMBasi
 CORE_SRCS += gfx_box_shared.c gfx_circle_shared.c gfx_line_shared.c gfx_pixel_shared.c gfx_cls_shared.c gfx_text_shared.c gfx_console_shared.c
 CORE_SRCS += mm_misc_shared.c OptionCommands.c
 CORE_SRCS += display_state.c pin_state.c option_state.c audio_state.c
+CORE_SRCS += mm_net_interrupts.c
+CORE_SRCS += mm_net_http.c
+CORE_SRCS += mm_net_ntp.c
+CORE_SRCS += mm_net_state.c
 CORE_SRCS += Draw.c RGB121.c Tilemap.c FileIO.c Audio.c BmpDecoder.c re.c picojpeg.c
 # Stubs inherited from host_native (dr_mp3, SPI-LCD, VGA, GUI, 3D, uPNG).
 CORE_SRCS += audio_mp3_stub.c spi_lcd_mem332_stub.c display_merge_stub.c vga_ops_stub.c
@@ -98,6 +102,10 @@ $(BUILD_DIR)/%.o: $(REPO_ROOT)/%.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 $(BUILD_DIR)/%.o: $(REPO_ROOT)/core/state/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(BUILD_DIR)/%.o: $(REPO_ROOT)/shared/net/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
