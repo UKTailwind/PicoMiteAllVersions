@@ -477,13 +477,14 @@ TESTS = {
     "pico_blocks_smoke": [
         ("MODE 6",                        ""),
         ("C:",                            ""),
-        ("RUN \"pico_blocks.bas\"\n\x1b", "Thanks for playing"),
+        ("RUN \"pico_blocks.bas\"\n \x1b", "Thanks for playing"),
     ],
 
     "audio": [
         ("PLAY TONE 440, 440, 20",        ""),
         ("PLAY TONE 440, 400, 20",        ""),
         ("PLAY TONE 660, 660",            ""),
+        ("PLAY TONE 700,700 : PAUSE 40 : PLAY STOP", ""),
         ("PLAY PAUSE",                    ""),
         ("PLAY RESUME",                   ""),
         ("PLAY STOP",                     ""),
