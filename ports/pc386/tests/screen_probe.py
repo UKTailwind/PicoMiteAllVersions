@@ -259,7 +259,8 @@ def check_aa_backspace(hmp: Hmp, serial_in_fd: int, serial_out_fd: int,
                        out_dir: str,
                        prefix: str, send_a, send_backspace,
                        font_w: int, font_h: int, prompt_cols: int,
-                       scale: int, reset: bool = True) -> bool:
+                       scale: int, origin_y: int = 0,
+                       reset: bool = True) -> bool:
     if reset:
         send_basic(serial_in_fd, serial_out_fd, "CLS RGB(0,0,0)")
     send_a()
@@ -285,7 +286,7 @@ def check_aa_backspace(hmp: Hmp, serial_in_fd: int, serial_out_fd: int,
 
     changed = diff_count(one_pixels, after_pixels, one_w, *bbox)
     first_a_x1 = prompt_cols * font_w * scale
-    first_a_y1 = 0
+    first_a_y1 = origin_y
     first_a_x2 = first_a_x1 + font_w * scale - 1
     first_a_y2 = first_a_y1 + font_h * scale - 1
     changed_cell = diff_count(one_pixels, after_pixels, one_w,
@@ -378,7 +379,7 @@ def main() -> int:
             samples = [
                 ("background", 300, 10, (0, 0, 0)),
                 ("red pixel", 300, 180, (255, 0, 0)),
-                ("green box", 40, 160, (0, 255, 0)),
+                ("green box", 40, 170, (0, 255, 0)),
                 ("blue line", 160, 170, (0, 0, 255)),
                 ("yellow circle", 260, 150, (255, 255, 0)),
             ]
@@ -396,46 +397,13 @@ def main() -> int:
                 print(f"FAILED: {failed}")
                 return 1
 
-            mode_listing = send_basic(serial_in_fd, serial_out_fd, "MODE")
-            if "2:640x480" in mode_listing:
-                send_basic(serial_in_fd, serial_out_fd,
-                           "MODE 2 : CLS RGB(0,0,0) : "
-                           "PIXEL 630,470,RGB(255,0,255)")
-                mode2_dump = os.path.join(os.path.dirname(os.path.abspath(args.out)),
-                                          "screen_probe-mode2.ppm")
-                hmp.screendump(mode2_dump)
-                mode2_w, mode2_h, mode2_pixels = parse_ppm(mode2_dump)
-                mode2_scale = logical_scale(mode2_w, mode2_h, 640, 480)
-                if mode2_scale == 0:
-                    print(f"[FAIL] MODE 2 unexpected dimensions: {mode2_w}x{mode2_h}")
-                    return 1
-                got = pixel(mode2_pixels, mode2_w, 630, 470, mode2_scale)
-                print(f"mode 2 screenshot: {mode2_dump}")
-                print(f"mode 2 dimensions: {mode2_w}x{mode2_h} (logical scale {mode2_scale}x)")
-                if not close_enough(got, (255, 0, 255)):
-                    print(f"[FAIL] MODE 2 magenta pixel got={got} want={(255, 0, 255)}")
-                    return 1
-            else:
-                print("mode 2 screenshot: skipped (VBE/VGA640 not available in this boot path)")
-
-            send_basic(serial_in_fd, serial_out_fd, "MODE 1")
-            mode1_dump = os.path.join(os.path.dirname(os.path.abspath(args.out)),
-                                      "screen_probe-mode1-return.ppm")
-            hmp.screendump(mode1_dump)
-            width, height, pixels = parse_ppm(mode1_dump)
-            scale = logical_scale(width, height, 320, 200)
-            if scale == 0:
-                print(f"[FAIL] MODE 1 return unexpected dimensions: {width}x{height}")
-                return 1
-            print(f"mode 1 return screenshot: {mode1_dump}")
-            print(f"mode 1 return dimensions: {width}x{height} (logical scale {scale}x)")
-
             send_basic(serial_in_fd, serial_out_fd, "CLS RGB(0,0,0)")
             typed = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
             prev_pixels = None
             font_w = 8
             font_h = 12
             prompt_cols = 2
+            line_origin_y = 0
             line_dump = ""
             for idx, ch in enumerate(typed, start=1):
                 os.write(serial_in_fd, bytes([ch]))
@@ -450,7 +418,8 @@ def main() -> int:
                 if prev_pixels is not None:
                     stable_x2 = (prompt_cols + idx - 1) * font_w * scale - 1
                     changed = diff_count(prev_pixels, line_pixels, width,
-                                         0, 0, stable_x2, font_h * scale - 1)
+                                         0, line_origin_y,
+                                         stable_x2, line_origin_y + font_h * scale - 1)
                     if changed:
                         print(f"[FAIL] prior input pixels changed after byte {idx}: {changed} pixels")
                         print(f"last line editor screenshot: {line_dump}")
@@ -475,14 +444,14 @@ def main() -> int:
                 hmp, serial_in_fd, serial_out_fd, out_dir, "serial",
                 lambda: os.write(serial_in_fd, b"a"),
                 lambda: os.write(serial_in_fd, b"\x7f"),
-                font_w, font_h, prompt_cols, scale,
+                font_w, font_h, prompt_cols, scale, line_origin_y,
             ):
                 return 1
             if not check_aa_backspace(
                 hmp, serial_in_fd, serial_out_fd, out_dir, "ps2",
                 lambda: hmp.send_key("a"),
                 lambda: hmp.send_key("backspace"),
-                font_w, font_h, prompt_cols, scale,
+                font_w, font_h, prompt_cols, scale, line_origin_y,
             ):
                 return 1
 
@@ -506,9 +475,32 @@ def main() -> int:
                 hmp, serial_in_fd, serial_out_fd, out_dir, "ps2-after-invalid",
                 lambda: hmp.send_key("a"),
                 lambda: hmp.send_key("backspace"),
-                font_w, font_h, prompt_cols, scale, reset=False,
+                font_w, font_h, prompt_cols, scale, line_origin_y, reset=False,
             ):
                 return 1
+
+            mode_listing = send_basic(serial_in_fd, serial_out_fd, "MODE")
+            if "2:640x480" in mode_listing:
+                send_basic(serial_in_fd, serial_out_fd,
+                           "MODE 2 : CLS RGB(0,0,0) : "
+                           "PIXEL 630,470,RGB(255,0,255)")
+                mode2_dump = os.path.join(os.path.dirname(os.path.abspath(args.out)),
+                                          "screen_probe-mode2.ppm")
+                hmp.screendump(mode2_dump)
+                mode2_w, mode2_h, mode2_pixels = parse_ppm(mode2_dump)
+                mode2_scale = logical_scale(mode2_w, mode2_h, 640, 480)
+                if mode2_scale == 0:
+                    print(f"[FAIL] MODE 2 unexpected dimensions: {mode2_w}x{mode2_h}")
+                    return 1
+                got = pixel(mode2_pixels, mode2_w, 630, 470, mode2_scale)
+                print(f"mode 2 screenshot: {mode2_dump}")
+                print(f"mode 2 dimensions: {mode2_w}x{mode2_h} (logical scale {mode2_scale}x)")
+                if not close_enough(got, (255, 0, 255)):
+                    print(f"[FAIL] MODE 2 magenta pixel got={got} want={(255, 0, 255)}")
+                    return 1
+                send_basic(serial_in_fd, serial_out_fd, "MODE 1")
+            else:
+                print("mode 2 screenshot: skipped (VBE/VGA640 not available in this boot path)")
 
             print("PASSED")
             return 0

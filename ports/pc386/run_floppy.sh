@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ports/pc386/run_floppy.sh - boot the 1.44 MB PC386 floppy image in QEMU.
 #
-# This exercises the real BIOS floppy boot path and starts in a VBE LFB mode:
+# This exercises the real BIOS floppy boot path and starts in VGA mode 13h:
 #   BIOS -> A: boot sector -> PC386 stage2 -> /BOOT/MMBASIC.ELF
 #
 # Usage:

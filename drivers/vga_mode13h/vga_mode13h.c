@@ -1,10 +1,10 @@
 /*
  * drivers/vga_mode13h/vga_mode13h.c - PC386 linear framebuffer graphics.
  *
- * This driver intentionally uses one boot-selected framebuffer and does not
- * switch BIOS video modes at runtime. The custom floppy loader picks a VBE
- * linear framebuffer when available; the BASIC MODE command only changes the
- * logical drawing surface inside that framebuffer.
+ * Mode 1 uses classic VGA mode 13h. Modes 2..6 use BIOS VBE linear
+ * framebuffers when the BIOS exposes them. This matches the original pc386
+ * Stage 5 behaviour: screen size changes with MODE, but there is no VGA
+ * planar mode-12h drawing path.
  */
 
 #include "vga_mode13h.h"
@@ -21,12 +21,27 @@
 
 extern const int CMM1map[16];
 extern const mb1_info_t *pc386_multiboot_info;
+extern uint16_t pc386_bios_video_int10(uint16_t ax, uint16_t bx, uint16_t cx,
+                                       uint16_t dx, uint16_t es, uint16_t di);
 
 #define VGA_WIDTH       320
 #define VGA_HEIGHT      200
 #define VGA_MAX_WIDTH   1024
 #define VGA_MAX_HEIGHT  768
 #define VGA_MAX_PIXELS  (VGA_MAX_WIDTH * VGA_MAX_HEIGHT)
+#define VBE_MODE_INFO_ADDR 0x5400u
+
+#define VGA_DAC_WRITE_INDEX 0x3C8
+#define VGA_DAC_DATA        0x3C9
+#define VGA_MISC_WRITE      0x3C2
+#define VGA_SEQ_INDEX       0x3C4
+#define VGA_SEQ_DATA        0x3C5
+#define VGA_GC_INDEX        0x3CE
+#define VGA_GC_DATA         0x3CF
+#define VGA_CRTC_INDEX      0x3D4
+#define VGA_CRTC_DATA       0x3D5
+#define VGA_AC_INDEX        0x3C0
+#define VGA_INSTAT_READ     0x3DA
 
 static volatile uint8_t *const vga_fb = (volatile uint8_t *)0xA0000u;
 static volatile uint8_t *fb;
@@ -50,25 +65,47 @@ static uint8_t fb_red_pos, fb_red_size;
 static uint8_t fb_green_pos, fb_green_size;
 static uint8_t fb_blue_pos, fb_blue_size;
 
+typedef enum {
+    PC386_VIDEO_VGA13H,
+    PC386_VIDEO_VBE,
+} Pc386VideoBackend;
+
+typedef struct {
+    bool valid;
+    uint16_t bios_mode;
+    uint32_t framebuffer;
+    uint16_t pitch;
+    uint16_t width;
+    uint16_t height;
+    uint8_t bpp;
+    uint8_t red_pos, red_size;
+    uint8_t green_pos, green_size;
+    uint8_t blue_pos, blue_size;
+} VesaModeInfo;
+
 typedef struct {
     int mode;
     int width;
     int height;
-    int min_fb_width;
-    int min_fb_height;
+    int hw_width;
+    int hw_height;
     int x_offset;
     int y_offset;
     int scale;
+    Pc386VideoBackend backend;
+    uint16_t bios_mode;
     const char *name;
 } Pc386VideoMode;
 
+static VesaModeInfo vesa_mode_cache[3];
+
 static const Pc386VideoMode pc386_modes[] = {
-    {1,  320, 200,  320, 200,   0,  0, 1, "320x200"},
-    {2,  640, 480,  640, 480,   0,  0, 1, "640x480"},
-    {3,  800, 600,  800, 600,   0,  0, 1, "800x600"},
-    {4, 1024, 768, 1024, 768,   0,  0, 1, "1024x768"},
-    {5,  480, 480,  480, 480,   0,  0, 1, "480x480"},
-    {6,  320, 320,  640, 640,   0,  0, 2, "320x320x2"},
+    {1,  320, 200,  320, 200,   0,  0, 1, PC386_VIDEO_VGA13H, 0x0013, "320x200"},
+    {2,  640, 480,  640, 480,   0,  0, 1, PC386_VIDEO_VBE,    0x4112, "640x480"},
+    {3,  800, 600,  800, 600,   0,  0, 1, PC386_VIDEO_VBE,    0x4115, "800x600"},
+    {4, 1024, 768, 1024, 768,   0,  0, 1, PC386_VIDEO_VBE,    0x4118, "1024x768"},
+    {5,  480, 480,  640, 480,  80,  0, 1, PC386_VIDEO_VBE,    0x4112, "480x480"},
+    {6,  320, 320, 1024, 768, 192, 64, 2, PC386_VIDEO_VBE,    0x4118, "320x320x2"},
 };
 
 static uint8_t rgb_to_332(uint32_t rgb);
@@ -78,6 +115,161 @@ static uint32_t fit_to_mask(uint8_t value, uint8_t bits) {
     if (bits == 0) return 0;
     if (bits >= 8) return value;
     return (uint32_t)((value * ((1u << bits) - 1u) + 127u) / 255u);
+}
+
+static inline void outb(uint16_t port, uint8_t val) {
+    __asm__ volatile("outb %0, %1" : : "a"(val), "Nd"(port));
+}
+
+static inline uint8_t inb(uint16_t port) {
+    uint8_t val;
+    __asm__ volatile("inb %1, %0" : "=a"(val) : "Nd"(port));
+    return val;
+}
+
+static void write_indexed_regs(uint16_t index_port, uint16_t data_port,
+                               const uint8_t *regs, size_t count) {
+    for (size_t i = 0; i < count; i++) {
+        outb(index_port, (uint8_t)i);
+        outb(data_port, regs[i]);
+    }
+}
+
+static void vga_write_ac_regs(const uint8_t *regs, size_t count) {
+    for (size_t i = 0; i < count; i++) {
+        (void)inb(VGA_INSTAT_READ);
+        outb(VGA_AC_INDEX, (uint8_t)i);
+        outb(VGA_AC_INDEX, regs[i]);
+    }
+    (void)inb(VGA_INSTAT_READ);
+    outb(VGA_AC_INDEX, 0x20);
+}
+
+static void vga_program_mode13h(void) {
+    static const uint8_t seq[] = {0x03, 0x01, 0x0F, 0x00, 0x0E};
+    static const uint8_t crtc[] = {
+        0x5F, 0x4F, 0x50, 0x82, 0x54, 0x80, 0xBF, 0x1F,
+        0x00, 0x41, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x9C, 0x0E, 0x8F, 0x28, 0x40, 0x96, 0xB9, 0xA3,
+        0xFF,
+    };
+    static const uint8_t gc[] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x40, 0x05, 0x0F, 0xFF};
+    static const uint8_t ac[] = {
+        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+        0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
+        0x41, 0x00, 0x0F, 0x00, 0x00,
+    };
+
+    outb(VGA_MISC_WRITE, 0x63);
+    write_indexed_regs(VGA_SEQ_INDEX, VGA_SEQ_DATA, seq, sizeof(seq));
+
+    outb(VGA_CRTC_INDEX, 0x11);
+    outb(VGA_CRTC_DATA, (uint8_t)(inb(VGA_CRTC_DATA) & 0x7F));
+    write_indexed_regs(VGA_CRTC_INDEX, VGA_CRTC_DATA, crtc, sizeof(crtc));
+    write_indexed_regs(VGA_GC_INDEX, VGA_GC_DATA, gc, sizeof(gc));
+    vga_write_ac_regs(ac, sizeof(ac));
+}
+
+static uint8_t scale_to_dac(uint8_t value) {
+    return (uint8_t)((value * 63u + 127u) / 255u);
+}
+
+static uint8_t expand3(uint8_t value) {
+    return (uint8_t)((value * 255u + 3u) / 7u);
+}
+
+static uint8_t expand2(uint8_t value) {
+    return (uint8_t)((value * 255u + 1u) / 3u);
+}
+
+static void vga_load_332_palette(void) {
+    outb(VGA_DAC_WRITE_INDEX, 0);
+    for (unsigned i = 0; i < 256; i++) {
+        uint8_t r = expand3((uint8_t)((i >> 5) & 0x07));
+        uint8_t g = expand3((uint8_t)((i >> 2) & 0x07));
+        uint8_t b = expand2((uint8_t)(i & 0x03));
+        outb(VGA_DAC_DATA, scale_to_dac(r));
+        outb(VGA_DAC_DATA, scale_to_dac(g));
+        outb(VGA_DAC_DATA, scale_to_dac(b));
+    }
+}
+
+static uint16_t vbe_read16(int off) {
+    volatile uint8_t *p = (volatile uint8_t *)(uintptr_t)(VBE_MODE_INFO_ADDR + (uint32_t)off);
+    return (uint16_t)p[0] | ((uint16_t)p[1] << 8);
+}
+
+static uint32_t vbe_read32(int off) {
+    volatile uint8_t *p = (volatile uint8_t *)(uintptr_t)(VBE_MODE_INFO_ADDR + (uint32_t)off);
+    return (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
+}
+
+static bool vesa_probe_mode_info(uint16_t bios_mode, VesaModeInfo *out) {
+    volatile uint8_t *info = (volatile uint8_t *)(uintptr_t)VBE_MODE_INFO_ADDR;
+    for (int i = 0; i < 256; i++) info[i] = 0;
+
+    (void)pc386_bios_video_int10(0x4F01, 0, bios_mode, 0, 0, VBE_MODE_INFO_ADDR);
+
+    uint16_t attributes = vbe_read16(0);
+    uint8_t bpp = info[25];
+    if ((attributes & 0x0001u) == 0 || (attributes & 0x0080u) == 0) return false;
+    if (bpp != 15 && bpp != 16 && bpp != 24 && bpp != 32) return false;
+    if (vbe_read32(40) == 0) return false;
+    memset(out, 0, sizeof(*out));
+    out->valid = true;
+    out->bios_mode = bios_mode;
+    out->framebuffer = vbe_read32(40);
+    out->pitch = vbe_read16(16);
+    out->width = vbe_read16(18);
+    out->height = vbe_read16(20);
+    out->bpp = bpp;
+    out->red_pos = info[32];
+    out->red_size = info[31];
+    out->green_pos = info[34];
+    out->green_size = info[33];
+    out->blue_pos = info[36];
+    out->blue_size = info[35];
+    return true;
+}
+
+static const VesaModeInfo *vesa_get_mode_info(uint16_t bios_mode) {
+    VesaModeInfo *free_slot = NULL;
+    for (size_t i = 0; i < sizeof(vesa_mode_cache) / sizeof(vesa_mode_cache[0]); i++) {
+        if (vesa_mode_cache[i].valid && vesa_mode_cache[i].bios_mode == bios_mode) {
+            return &vesa_mode_cache[i];
+        }
+        if (!vesa_mode_cache[i].valid && free_slot == NULL) free_slot = &vesa_mode_cache[i];
+    }
+    if (free_slot == NULL) return NULL;
+    if (!vesa_probe_mode_info(bios_mode, free_slot)) return NULL;
+    return free_slot;
+}
+
+static bool vesa_mode_supported(uint16_t bios_mode) {
+    return vesa_get_mode_info(bios_mode) != NULL;
+}
+
+static void vesa_apply_mode_info(const VesaModeInfo *info) {
+    fb = (volatile uint8_t *)(uintptr_t)info->framebuffer;
+    fb_width = (int)info->width;
+    fb_height = (int)info->height;
+    fb_pitch = (int)info->pitch;
+    fb_bpp = (int)info->bpp;
+    fb_red_pos = info->red_pos;
+    fb_red_size = info->red_size;
+    fb_green_pos = info->green_pos;
+    fb_green_size = info->green_size;
+    fb_blue_pos = info->blue_pos;
+    fb_blue_size = info->blue_size;
+}
+
+static bool vesa_set_bios_mode(uint16_t bios_mode) {
+    const VesaModeInfo *info = vesa_get_mode_info(bios_mode);
+    if (info == NULL) return false;
+    (void)pc386_bios_video_int10(0x4F02, bios_mode, 0, 0, 0, 0);
+    vesa_apply_mode_info(info);
+    linear_fb_available = true;
+    return true;
 }
 
 static uint8_t rgb_to_332(uint32_t rgb) {
@@ -125,7 +317,7 @@ static void hw_put_pixel_xy(int x, int y, uint32_t rgb) {
         return;
     }
 
-    volatile uint8_t *p = fb + (size_t)y * (size_t)fb_pitch + (size_t)x * (size_t)(fb_bpp / 8);
+    volatile uint8_t *p = fb + (size_t)y * (size_t)fb_pitch + (size_t)x * (size_t)((fb_bpp + 7) / 8);
     uint32_t px = pack_linear_pixel(rgb);
     if (fb_bpp == 32) {
         *(volatile uint32_t *)p = px;
@@ -133,7 +325,7 @@ static void hw_put_pixel_xy(int x, int y, uint32_t rgb) {
         p[0] = (uint8_t)(px & 0xFFu);
         p[1] = (uint8_t)((px >> 8) & 0xFFu);
         p[2] = (uint8_t)((px >> 16) & 0xFFu);
-    } else if (fb_bpp == 16) {
+    } else if (fb_bpp == 15 || fb_bpp == 16) {
         *(volatile uint16_t *)p = (uint16_t)px;
     }
 }
@@ -338,8 +530,8 @@ static const Pc386VideoMode *find_mode(int mode) {
 }
 
 static bool mode_fits(const Pc386VideoMode *m) {
-    if (!linear_fb_available) return m->mode == 1;
-    return m->min_fb_width <= fb_width && m->min_fb_height <= fb_height;
+    if (m->backend == PC386_VIDEO_VGA13H) return true;
+    return vesa_mode_supported(m->bios_mode);
 }
 
 static void center_mode(const Pc386VideoMode *m) {
@@ -353,6 +545,20 @@ void vga_mode13h_set_mode(int mode, int clear) {
     if (!mode_fits(m)) error("Mode not available");
 
     vga_mode13h_fastgfx_reset();
+    if (m->backend == PC386_VIDEO_VGA13H) {
+        pc386_bios_video_int10(m->bios_mode, 0, 0, 0, 0, 0);
+        vga_program_mode13h();
+        fb = vga_fb;
+        fb_width = VGA_WIDTH;
+        fb_height = VGA_HEIGHT;
+        fb_pitch = VGA_WIDTH;
+        fb_bpp = 8;
+        linear_fb_available = false;
+        vga_load_332_palette();
+    } else {
+        if (!vesa_set_bios_mode(m->bios_mode)) error("Mode requires VBE");
+        if (m->hw_width > fb_width || m->hw_height > fb_height) error("Mode not available");
+    }
     vga_width = m->width;
     vga_height = m->height;
     vga_scale = m->scale;
@@ -425,13 +631,10 @@ void cmd_mode(void) {
         MMPrintString(" ");
         MMPrintString((char *)find_mode(vga_current_mode)->name);
         MMPrintString("\r\n");
-        for (size_t i = 0; i < sizeof(pc386_modes) / sizeof(pc386_modes[0]); i++) {
-            if (!mode_fits(&pc386_modes[i])) continue;
-            if (i != 0) MMPrintString(" ");
-            PInt(pc386_modes[i].mode);
-            MMPrintString(":");
-            MMPrintString((char *)pc386_modes[i].name);
-        }
+        MMPrintString("1:320x200");
+        if (vesa_mode_supported(0x4112)) MMPrintString(" 2:640x480 5:480x480");
+        if (vesa_mode_supported(0x4115)) MMPrintString(" 3:800x600");
+        if (vesa_mode_supported(0x4118)) MMPrintString(" 4:1024x768 6:320x320x2");
         MMPrintString("\r\n");
         return;
     }
@@ -439,33 +642,16 @@ void cmd_mode(void) {
 }
 
 void vga_mode13h_init(void) {
-    const mb1_info_t *mb = pc386_multiboot_info;
-    if (mb && (mb->flags & MB1_INFO_FRAMEBUFFER) &&
-        mb->framebuffer_type == 1 &&
-        mb->framebuffer_addr != 0 &&
-        mb->framebuffer_width <= VGA_MAX_WIDTH &&
-        mb->framebuffer_height <= VGA_MAX_HEIGHT &&
-        (mb->framebuffer_bpp == 16 || mb->framebuffer_bpp == 24 || mb->framebuffer_bpp == 32)) {
-        fb = (volatile uint8_t *)(uintptr_t)mb->framebuffer_addr;
-        fb_width = (int)mb->framebuffer_width;
-        fb_height = (int)mb->framebuffer_height;
-        fb_pitch = (int)mb->framebuffer_pitch;
-        fb_bpp = (int)mb->framebuffer_bpp;
-        fb_red_pos = mb->color_info[0];
-        fb_red_size = mb->color_info[1];
-        fb_green_pos = mb->color_info[2];
-        fb_green_size = mb->color_info[3];
-        fb_blue_pos = mb->color_info[4];
-        fb_blue_size = mb->color_info[5];
-        linear_fb_available = true;
-    } else {
-        fb = vga_fb;
-        fb_width = VGA_WIDTH;
-        fb_height = VGA_HEIGHT;
-        fb_pitch = VGA_WIDTH;
-        fb_bpp = 8;
-        linear_fb_available = false;
-    }
+    (void)pc386_multiboot_info;
+    (void)vesa_mode_supported(0x4112);
+    (void)vesa_mode_supported(0x4115);
+    (void)vesa_mode_supported(0x4118);
+    fb = vga_fb;
+    fb_width = VGA_WIDTH;
+    fb_height = VGA_HEIGHT;
+    fb_pitch = VGA_WIDTH;
+    fb_bpp = 8;
+    linear_fb_available = false;
 
     Option.DISPLAY_TYPE = DISP_USER;
     DrawPixel = mode13h_draw_pixel;
