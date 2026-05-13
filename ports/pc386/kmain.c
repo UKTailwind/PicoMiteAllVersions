@@ -12,7 +12,7 @@
  *   3. ATA-PIO + FDC probe, then FAT mount of A:/B:/C:.
  *   4. pc386_flash_init() — RAM-backed program/option buffers.
  *   5. MMBasic runtime instantiation: LoadOptions, InitBasic,
- *      InitHeap, host_runtime_begin. Reaches the point where a
+ *      InitHeap, mmbasic_runtime_port_begin. Reaches the point where a
  *      tokenised BASIC program could be ExecuteProgram'd.
  */
 
@@ -32,6 +32,7 @@
 
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
+#include "runtime/runtime.h"
 
 #include "heap_region.h"
 #include "idt.h"
@@ -41,45 +42,13 @@
 #include "pc386_panic.h"
 
 extern void pc386_flash_init(void);
-extern void flash_range_erase(uint32_t off, uint32_t count);
-extern void host_runtime_begin(void);
 extern void vm_host_fat_reset(void);
 extern void vm_sys_file_reset(void);
 extern void vm_sys_pin_reset(void);
 extern void MMBasic_PrintBanner(void);
-extern void MMBasic_RunPromptLoop(void);
 extern jmp_buf mark;
 
 const mb1_info_t *pc386_multiboot_info = NULL;
-
-/* Tokenise `source` into ProgMemory line by line. Stripped-down version
- * of host_main.c's load_basic_source — no continuation support, just
- * split on '\n' and feed each line through tokenise(). */
-static int pc386_load_source(const char *source) {
-    flash_range_erase(0, MAX_PROG_SIZE);
-    unsigned char *pm = ProgMemory;
-    const char *line = source;
-    while (*line) {
-        const char *eol = line;
-        while (*eol && *eol != '\n') eol++;
-        size_t len = (size_t)(eol - line);
-        if (len > 0 && line[len - 1] == '\r') len--;
-        if (len > 0) {
-            if (len >= STRINGSIZE) len = STRINGSIZE - 1;
-            memcpy(inpbuf, line, len);
-            inpbuf[len] = '\0';
-            tokenise(0);
-            unsigned char *tp = tknbuf;
-            while (!(tp[0] == 0 && tp[1] == 0)) *pm++ = *tp++;
-            *pm++ = 0;
-        }
-        line = (*eol == '\n') ? eol + 1 : eol;
-    }
-    *pm++ = 0;
-    *pm++ = 0;
-    PSize = (int)(pm - ProgMemory);
-    return 0;
-}
 
 static __attribute__((noreturn)) void halt(void) {
     for (;;) {
@@ -384,13 +353,13 @@ void kmain(uint32_t magic, uint32_t info_addr) {
 
     MMerrno = 0;
     MMErrMsg[0] = '\0';
-    host_runtime_begin();
-    kputs("host_runtime_begin ok\n");
+    mmbasic_runtime_port_begin();
+    kputs("mmbasic_runtime_port_begin ok\n");
 
     /* ---------- Banner + REPL --------------------------------------- */
 
     MMBasic_PrintBanner();
-    MMBasic_RunPromptLoop();
+    mmbasic_runtime_enter_repl(NULL, 0);
 
     /* MMBasic_RunPromptLoop never returns. */
     halt();

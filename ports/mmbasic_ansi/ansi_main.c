@@ -30,6 +30,7 @@ unsigned sleep(unsigned seconds);
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
 #include "bytecode.h"
+#include "runtime/runtime.h"
 
 #include "host_fb.h"
 #include "host_terminal.h"
@@ -39,14 +40,12 @@ unsigned sleep(unsigned seconds);
 extern jmp_buf mark;
 
 /* host_native symbols we rely on. */
-extern void host_runtime_begin(void);
 extern void host_runtime_finish(void);
 extern void host_runtime_configure(int timeout_ms, const char *screenshot_path);
 extern void host_runtime_configure_keys(const char *keys, int delay_ms);
 extern int  host_repl_mode;
 extern const char *host_sd_root;
 extern void MMBasic_PrintBanner(void);
-extern void MMBasic_RunPromptLoop(void);
 extern unsigned char OptionConsole;
 extern short gui_font_width, gui_font_height;
 
@@ -56,7 +55,6 @@ extern short gui_font_width, gui_font_height;
 extern const uint8_t *flash_progmemory;
 uint8_t flash_prog_buf[2 * MAX_PROG_SIZE];
 
-extern void flash_range_erase(uint32_t off, uint32_t count);
 extern void vm_host_fat_reset(void);
 extern void vm_sys_file_reset(void);
 extern void vm_sys_pin_reset(void);
@@ -77,7 +75,7 @@ static void ansi_swallow(const char *text, int len) {
 }
 
 /* ----------------------------------------------------------------- */
-/* Source loading (copied trimmed from host_main.c:load_basic_source) */
+/* Source loading */
 /* ----------------------------------------------------------------- */
 
 static char *read_file(const char *filename) {
@@ -92,34 +90,6 @@ static char *read_file(const char *filename) {
     source[fsize] = '\0';
     fclose(f);
     return source;
-}
-
-/* Non-static: host_fs_shims.c's SaveProgramToFlash calls this via an
- * extern declaration so that LOAD/SAVE/RUN in the REPL re-tokenise
- * edited buffers. Matches the host_main.c symbol name. */
-int load_basic_source(const char *source) {
-    flash_range_erase(0, MAX_PROG_SIZE);
-    unsigned char *pm = ProgMemory;
-    const char *line = source;
-    while (*line) {
-        const char *eol = strchr(line, '\n');
-        size_t len = eol ? (size_t)(eol - line) : strlen(line);
-        if (len > 0 && line[len - 1] == '\r') len--;
-        if (len > 0) {
-            if (len >= STRINGSIZE) len = STRINGSIZE - 1;
-            memcpy(inpbuf, line, len);
-            inpbuf[len] = '\0';
-            tokenise(0);
-            unsigned char *tp = tknbuf;
-            while (!(tp[0] == 0 && tp[1] == 0)) *pm++ = *tp++;
-            *pm++ = 0;
-        }
-        line = eol ? eol + 1 : line + strlen(line);
-    }
-    *pm++ = 0;
-    *pm++ = 0;
-    PSize = (int)(pm - ProgMemory);
-    return 0;
 }
 
 /* ----------------------------------------------------------------- */
@@ -156,20 +126,29 @@ static void configure_display(int width, int height) {
 /* Bring-up + tear-down shared between REPL and script modes.        */
 /* ----------------------------------------------------------------- */
 
-static int ansi_boot(int width, int height) {
+static void ansi_memory_backing_init(void) {
     memset(flash_prog_buf, 0, MAX_PROG_SIZE);
     memset(flash_prog_buf + MAX_PROG_SIZE, 0xFF, MAX_PROG_SIZE);
     flash_progmemory = flash_prog_buf;
+}
 
-    LoadOptions();
-    InitBasic();
-    InitHeap(true);
-    MMerrno = 0;
-    MMErrMsg[0] = '\0';
+static const mm_runtime_adapter ansi_boot_adapter = {
+    .name = "mmbasic_ansi",
+    .memory_backing_init = ansi_memory_backing_init,
+};
+
+static int ansi_boot(int width, int height) {
+    if (mmbasic_runtime_init_common(&ansi_boot_adapter,
+            MMBASIC_RUNTIME_INIT_FLAG_LOAD_OPTIONS |
+            MMBASIC_RUNTIME_INIT_FLAG_INIT_BASIC |
+            MMBASIC_RUNTIME_INIT_FLAG_INIT_HEAP |
+            MMBASIC_RUNTIME_INIT_FLAG_CLEAR_ERROR) != 0) {
+        return -1;
+    }
 
     configure_display(width, height);
 
-    host_runtime_begin();
+    mmbasic_runtime_port_begin();
 
     /* The banner paints glyphs into host_framebuffer through
      * DrawBitmap. Do it before we enter the alt screen so
@@ -211,16 +190,10 @@ static int run_script(const char *filename, int use_interpreter) {
     ClearRuntime(true);
 
     if (use_interpreter) {
-        if (load_basic_source(source) != 0) {
-            free(source);
-            return 1;
-        }
-        PrepareProgram(1);
-        if (setjmp(mark) == 0) {
-            ExecuteProgram(ProgMemory);
-        } else {
-            rc = MMErrMsg[0] ? 1 : 0;
-        }
+        rc = mmbasic_runtime_run_source(NULL, source,
+            MMBASIC_SOURCE_FLAGS_BATCH_LOAD |
+            MMBASIC_RUNTIME_RUN_FLAG_CLEAR_RUNTIME |
+            MMBASIC_RUNTIME_RUN_FLAG_PREPARE_PROGRAM);
     } else {
         if (setjmp(mark) == 0) {
             bc_run_source_string(source, filename);
@@ -250,7 +223,7 @@ static int run_repl(void) {
     vm_sys_pin_reset();
     ClearRuntime(true);
 
-    MMBasic_RunPromptLoop();   /* does not return under normal use */
+    mmbasic_runtime_enter_repl(NULL, 0);   /* does not return under normal use */
     host_runtime_finish();
     return 0;
 }

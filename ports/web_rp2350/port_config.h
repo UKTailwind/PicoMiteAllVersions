@@ -60,6 +60,10 @@
 /* Stage-D per-port memory + clock + MMBasic-table values (decascade plan
  * D1). WEBRP2350 has no USB-keyboard variant. */
 #define HAL_PORT_HEAP_MEMORY_SIZE        (208 * 1024)
+/* PicoCalc WEBRP2350 leaves extra SRAM headroom for WiFi, GUI controls,
+ * and the keypad/display stack. Keep this 4 KiB-sector aligned because
+ * MAX_PROG_SIZE also drives flash erase lengths. */
+#define HAL_PORT_HEAP_MEMORY_SIZE_PICOCALC (200 * 1024)
 #define HAL_PORT_MAX_CPU                 252000
 #define HAL_PORT_MIN_CPU                 126000
 #define HAL_PORT_MAX_VARS                768

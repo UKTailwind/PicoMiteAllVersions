@@ -81,8 +81,9 @@ HOST_SRCS = host_runtime.c host_fastgfx.c host_fastgfx_resync.c host_fs_shims.c 
             hal_net_posix.c
 
 HAL_GENERIC_SRCS = hal_watchdog_noop.c
+RUNTIME_SRCS = runtime_boot.c runtime_program.c runtime_console.c runtime_abort.c runtime_interrupt.c
 
-SRCS = $(HOST_SRCS) $(CORE_SRCS) $(BC_SRCS) $(HAL_GENERIC_SRCS)
+SRCS = $(HOST_SRCS) $(CORE_SRCS) $(BC_SRCS) $(HAL_GENERIC_SRCS) $(RUNTIME_SRCS)
 OBJS = $(addprefix $(BUILD_DIR)/,$(SRCS:.c=.o))
 DEPS = $(OBJS:.o=.d)
 
@@ -188,6 +189,10 @@ $(BUILD_DIR)/%.o: $(REPO_ROOT)/shared/net/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
+$(BUILD_DIR)/%.o: $(REPO_ROOT)/runtime/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
 # Stubs / drivers that host links.
 $(BUILD_DIR)/%.o: $(REPO_ROOT)/drivers/audio_mp3/%.c
 	@mkdir -p $(dir $@)
@@ -254,6 +259,10 @@ $(BUILD_DIR)/sim/%.o: $(REPO_ROOT)/hal/generic/%.c
 	$(CC) $(SIM_CFLAGS) -c -o $@ $<
 
 $(BUILD_DIR)/sim/%.o: $(REPO_ROOT)/shared/net/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(SIM_CFLAGS) -c -o $@ $<
+
+$(BUILD_DIR)/sim/%.o: $(REPO_ROOT)/runtime/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(SIM_CFLAGS) -c -o $@ $<
 

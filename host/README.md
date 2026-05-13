@@ -144,7 +144,8 @@ Important compiled sources:
 | `gfx_*_shared.c` | Shared host/device graphics primitives used by native VM graphics ops and by Draw.c. |
 | `bc_source.c`, `bc_vm.c`, `bc_runtime.c`, `bc_debug.c`, `bc_compiler_core.c` | Bytecode source frontend, VM dispatch, runtime entry points, disassembler. |
 | `vm_sys_*.c` | VM syscall implementations (graphics, file, time, pin, input). |
-| `host_runtime.c` | Host runtime lifecycle (`host_runtime_configure`/`_begin`/`_finish`), timeout/slowdown poll, stdin/stdout console routing (`MMPrintString`/`MMInkey`/`putConsole`/`SerialConsolePutC`), hardware-world zero-initialised globals (Option, PinDef, dma_hw, etc.), and `mmbasic_timegm`/`mmbasic_gmtime`. |
+| `runtime/*.c` | Common runtime spine: boot/run helpers, source tokenisation, host-derived console API, abort/service polling, and interrupt helpers. |
+| `host_runtime.c` | Host runtime lifecycle (`host_runtime_configure`, `mmbasic_runtime_port_begin`, `host_runtime_finish`), timeout/slowdown poll, host console adapter hooks, hardware-world zero-initialised globals (Option, PinDef, dma_hw, etc.), and `mmbasic_timegm`/`mmbasic_gmtime`. |
 | `host_fastgfx.c` | `FASTGFX CREATE/SWAP/CLOSE/SYNC/FPS` host-side double-buffering + `cmd_framebuffer` (FRAMEBUFFER CREATE/LAYER/WRITE/SYNC/WAIT/COPY/MERGE/CLOSE). |
 | `host_fs_shims.c` | FatFS directory-walker wrappers (`host_f_findfirst`/`findnext`/`closedir`/`unlink`/`rename`/`mkdir`/`chdir`/`getcwd`), POSIX per-fnbr file table (`host_fs_posix_*`), `ExistsFile`/`ExistsDir`, simulated `flash_range_*` + LFS stubs, `SaveProgramToFlash`, `host_options_snapshot`. |
 | `host_peripheral_stubs.c` | No-op `cmd_XXX` / `fun_XXX` stubs for hardware the host doesn't carry (I2C, SPI, PIO, PWM pins, PWM/Servo command parsing routed through the VM pin HAL, IR, keypad, GPS globals, AES, xregex, display_details, BDEC/BMP decoder stubs). |
@@ -161,9 +162,9 @@ The old bridge fallback is removed. The VM compiler must emit native bytecode fo
 
 ## Program Loading
 
-Default compare mode still reads a `.bas` file as text, prepends generated line numbers when needed, calls `tokenise(0)`, copies tokenised data into `ProgMemory`, and terminates with the standard double-zero program terminator.
+Default compare mode still reads a `.bas` file as text, prepends generated line numbers when needed, and uses `mmbasic_tokenise_source_to_progmem()` to populate `ProgMemory` with the standard double-zero program terminator.
 
-The interpreter side still tokenises through the legacy path. The VM side uses `bc_compile_source()` directly on raw `.bas` text for `--vm` and `--source-compare`.
+The interpreter side tokenises through the shared runtime loader. The VM side uses `bc_compile_source()` directly on raw `.bas` text for `--vm` and `--source-compare`.
 
 ## Output And Framebuffer Capture
 

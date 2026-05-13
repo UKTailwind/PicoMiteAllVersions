@@ -84,6 +84,7 @@ CORE_SRCS += mm_misc_shared.c OptionCommands.c
 CORE_SRCS += Draw.c RGB121.c Tilemap.c FileIO.c Audio.c BmpDecoder.c re.c picojpeg.c
 
 CORE_STATE_SRCS = display_state.c pin_state.c option_state.c audio_state.c
+RUNTIME_SRCS = runtime_boot.c runtime_program.c runtime_abort.c runtime_interrupt.c
 
 # BC (bytecode) compiler + VM. ff/ffunicode/ffsystem are already in
 # FATFS_SRCS so don't re-list them here.
@@ -117,6 +118,7 @@ CORE_C_OBJS    := $(addprefix $(BUILD_DIR)/core/,$(CORE_SRCS:.c=.o))
 BC_C_OBJS      := $(addprefix $(BUILD_DIR)/bc/,$(BC_SRCS:.c=.o))
 SIMVM_C_OBJS   := $(addprefix $(BUILD_DIR)/simvm/,$(SIM_VM_SRCS:.c=.o))
 STATE_C_OBJS   := $(addprefix $(BUILD_DIR)/state/,$(CORE_STATE_SRCS:.c=.o))
+RUNTIME_C_OBJS := $(addprefix $(BUILD_DIR)/runtime/,$(RUNTIME_SRCS:.c=.o))
 COREDRV_C_OBJS := $(addprefix $(BUILD_DIR)/coredrv/,$(CORE_DRV_SRCS:.c=.o))
 
 # Shared no-op HAL impls (linked across host_native, mmbasic_stdio,
@@ -149,10 +151,10 @@ DRV_C_OBJS  := $(addprefix $(BUILD_DIR)/drivers/,$(DRIVER_SRCS:.c=.o))
 ROOT_C_OBJS := $(addprefix $(BUILD_DIR)/root/,$(FATFS_SRCS:.c=.o))
 HAL_C_OBJS  := $(addprefix $(BUILD_DIR)/hal/generic/,$(HAL_GENERIC_SRCS:.c=.o))
 OBJS        := $(ASM_OBJS) $(PORT_C_OBJS) $(DRV_C_OBJS) $(ROOT_C_OBJS) $(HAL_C_OBJS) \
-               $(CORE_C_OBJS) $(BC_C_OBJS) $(SIMVM_C_OBJS) $(STATE_C_OBJS) $(COREDRV_C_OBJS)
+               $(CORE_C_OBJS) $(BC_C_OBJS) $(SIMVM_C_OBJS) $(STATE_C_OBJS) $(RUNTIME_C_OBJS) $(COREDRV_C_OBJS)
 DEPS        := $(PORT_C_OBJS:.o=.d) $(DRV_C_OBJS:.o=.d) $(ROOT_C_OBJS:.o=.d) $(HAL_C_OBJS:.o=.d) \
                $(CORE_C_OBJS:.o=.d) $(BC_C_OBJS:.o=.d) $(SIMVM_C_OBJS:.o=.d) \
-               $(STATE_C_OBJS:.o=.d) $(COREDRV_C_OBJS:.o=.d)
+               $(STATE_C_OBJS:.o=.d) $(RUNTIME_C_OBJS:.o=.d) $(COREDRV_C_OBJS:.o=.d)
 
 KERNEL          := $(BUILD_DIR)/mmbasic.elf
 KERNEL_STRIPPED := $(BUILD_DIR)/mmbasic-stripped.elf
@@ -235,6 +237,10 @@ $(BUILD_DIR)/core/%.o: $(REPO_ROOT)/%.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 $(BUILD_DIR)/state/%.o: $(REPO_ROOT)/core/state/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(BUILD_DIR)/runtime/%.o: $(REPO_ROOT)/runtime/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c -o $@ $<
 

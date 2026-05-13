@@ -123,8 +123,9 @@ HOST_WASM_SRCS = host_wasm_main.c host_wasm_console.c host_wasm_canvas.c \
                  host_fastgfx_resync.c
 
 HAL_GENERIC_SRCS = hal_watchdog_noop.c
+RUNTIME_SRCS = runtime_boot.c runtime_program.c runtime_console.c runtime_abort.c runtime_interrupt.c
 
-SRCS = $(HOST_PORTABLE_SRCS) $(HOST_WASM_SRCS) $(CORE_SRCS) $(BC_SRCS) $(HAL_GENERIC_SRCS)
+SRCS = $(HOST_PORTABLE_SRCS) $(HOST_WASM_SRCS) $(CORE_SRCS) $(BC_SRCS) $(HAL_GENERIC_SRCS) $(RUNTIME_SRCS)
 OBJS = $(addprefix $(BUILD_DIR)/,$(SRCS:.c=.o))
 DEPS = $(OBJS:.o=.d)
 
@@ -174,6 +175,10 @@ $(BUILD_DIR)/%.o: $(REPO_ROOT)/hal/generic/%.c
 	$(EMCC) $(CFLAGS) -c -o $@ $<
 
 $(BUILD_DIR)/%.o: $(REPO_ROOT)/shared/net/%.c
+	@mkdir -p $(dir $@)
+	$(EMCC) $(CFLAGS) -c -o $@ $<
+
+$(BUILD_DIR)/%.o: $(REPO_ROOT)/runtime/%.c
 	@mkdir -p $(dir $@)
 	$(EMCC) $(CFLAGS) -c -o $@ $<
 

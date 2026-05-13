@@ -79,7 +79,7 @@ void host_framebuffer_service(void);
 
 /* Host-side backings for DrawRectangle / DrawBitmap / ScrollLCD / Read
  * Buffer function pointers that gfx_console_shared.c's GUIPrintChar /
- * DisplayPutC dispatch through. Assigned in host_runtime_begin.
+ * DisplayPutC dispatch through. Assigned in mmbasic_runtime_port_begin.
  *
  * host_fb_read_buffer backs the ReadBuffer function pointer that
  * fun_pixel / fun_map / FRAMEBUFFER COPY N use to sample the visible
@@ -100,7 +100,7 @@ void host_sim_framebuffer_dims(int *w, int *h);
 void host_sim_set_framebuffer_size(int w, int h);
 
 /* PPM screenshot dump — test harness --screenshot hook. No-op if path
- * is NULL/empty. Writes at most once per host_runtime_begin call. */
+ * is NULL/empty. Writes at most once per mmbasic_runtime_port_begin call. */
 void host_fb_write_screenshot(const char *path);
 
 #endif

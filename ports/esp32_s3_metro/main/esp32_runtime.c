@@ -25,6 +25,7 @@
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
 #include "bc_alloc.h"
+#include "runtime/runtime.h"
 
 /* esp32_console.c provides the USB Serial/JTAG byte ring; we drain
  * pending input here so Ctrl-C breaks runaway loops even when MMInkey
@@ -64,41 +65,51 @@ static void esp32_runtime_pump_input(void) {
     esp32_console_push_back_byte(c);
 }
 
+static void esp32_runtime_network_service(void) {
+    ProcessWeb(0);
+}
+
 static void esp32_runtime_service(void) {
     esp32_runtime_pump_input();
-    if (s_network_service_active) return;
-    s_network_service_active = 1;
-    ProcessWeb(0);
-    s_network_service_active = 0;
+    mmbasic_runtime_poll_service_once(&s_network_service_active,
+                                      esp32_runtime_network_service);
 }
+
+static void esp32_runtime_before_abort(void) {
+    WDTimer = 0;
+}
+
+static void esp32_runtime_yield(void) {
+    vTaskDelay(1);
+}
+
+static const mmbasic_runtime_abort_adapter s_abort_adapter = {
+    .service = esp32_runtime_service,
+    .abort_flag = &MMAbort,
+    .flags = MMBASIC_RUNTIME_ABORT_FLAG_CHECK_ABORT |
+             MMBASIC_RUNTIME_ABORT_FLAG_DO_END_LONGJMP,
+    .before_abort = esp32_runtime_before_abort,
+    .after_poll = esp32_runtime_yield,
+};
 
 /* Interpreter abort poll. Called from the parser hot path on every
  * statement; from MMInkey on every keypress poll. */
 void CheckAbort(void) {
-    esp32_runtime_service();
-    if (MMAbort) {
-        WDTimer = 0;
-        do_end(false);
-        longjmp(mark, 1);
-    }
-    vTaskDelay(1);
+    mmbasic_runtime_checkabort(&s_abort_adapter);
 }
 
 void cmd_ireturn(void) {
     if (InterruptReturn == NULL) error("Not in interrupt");
     checkend(cmdline);
-    nextstmt = InterruptReturn;
-    InterruptReturn = NULL;
-    if (g_LocalIndex) ClearVars(g_LocalIndex--, true);
-    g_TempMemoryIsChanged = true;
-    *CurrentInterruptName = 0;
-    if (s_save_option_error_skip > 0) {
-        OptionErrorSkip = s_save_option_error_skip + 1;
-    } else {
-        OptionErrorSkip = s_save_option_error_skip;
-    }
-    strcpy(MMErrMsg, s_save_error_message);
-    MMerrno = s_save_errno;
+    mmbasic_runtime_interrupt_leave_state(&nextstmt, &InterruptReturn,
+                                          &g_LocalIndex, ClearVars,
+                                          &g_TempMemoryIsChanged,
+                                          CurrentInterruptName);
+    mmbasic_runtime_interrupt_restore_error_state(s_save_option_error_skip,
+                                                  s_save_error_message,
+                                                  s_save_errno,
+                                                  &OptionErrorSkip, MMErrMsg,
+                                                  &MMerrno);
 }
 
 int check_interrupt(void) {
@@ -121,25 +132,22 @@ int check_interrupt(void) {
     }
 
     g_LocalIndex++;
-    s_save_option_error_skip = OptionErrorSkip > 0 ? OptionErrorSkip : 0;
-    OptionErrorSkip = 0;
-    strcpy(s_save_error_message, MMErrMsg);
-    s_save_errno = MMerrno;
-    *MMErrMsg = 0;
-    MMerrno = 0;
+    mmbasic_runtime_interrupt_save_error_state(&s_save_option_error_skip,
+                                               s_save_error_message,
+                                               sizeof(s_save_error_message),
+                                               &s_save_errno,
+                                               &OptionErrorSkip, MMErrMsg,
+                                               &MMerrno);
     InterruptReturn = nextstmt;
 
     if (esp32_commandtbl_decode(intaddr) == cmdSUB) {
-        strncpy(CurrentInterruptName, (char *)intaddr + 2, MAXVARLEN);
-        CurrentInterruptName[MAXVARLEN] = 0;
-        s_interrupt_return_token[0] = (cmdIRET & 0x7f) + C_BASETOKEN;
-        s_interrupt_return_token[1] = (cmdIRET >> 7) + C_BASETOKEN;
-        s_interrupt_return_token[2] = 0;
         if (gosubindex >= MAXGOSUB) error("Too many SUBs for interrupt");
-        errorstack[gosubindex] = CurrentLinePtr;
-        gosubstack[gosubindex++] = (unsigned char *)s_interrupt_return_token;
-        g_LocalIndex++;
-        skipelement(intaddr);
+        intaddr = mmbasic_runtime_interrupt_prepare_sub_return(
+            cmdIRET, C_BASETOKEN, intaddr,
+            CurrentInterruptName, MAXVARLEN, true,
+            s_interrupt_return_token, sizeof(s_interrupt_return_token),
+            &gosubindex, errorstack, gosubstack, CurrentLinePtr,
+            &g_LocalIndex);
     }
 
     nextstmt = intaddr;
@@ -149,8 +157,7 @@ int check_interrupt(void) {
 /* Long-running-routine yield. Called from PAUSE, FOR-loop iterations,
  * etc. */
 void routinechecks(void) {
-    esp32_runtime_service();
-    vTaskDelay(1);
+    mmbasic_runtime_routinechecks(&s_abort_adapter);
 }
 
 void port_bc_runtime_free_source(const char **source) {

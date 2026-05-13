@@ -11,7 +11,9 @@
 # Exit code: 0 if all tests pass, 1 if any test fails.
 
 set -e
-cd "$(dirname "$0")"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+cd "$SCRIPT_DIR"
 
 # Pin DATE$ / TIME$ to deterministic values so interpreter vs VM oracle
 # comparisons match. Real wall-clock time is used when these are unset
@@ -161,7 +163,7 @@ if [ $FAILED -gt 0 ]; then
     exit 1
 fi
 
-VM_PIN_MODE_TOOL="$(cd "$(dirname "$0")/.." && pwd)/tools/check_vm_pin_modes.sh"
+VM_PIN_MODE_TOOL="$REPO_ROOT/tools/check_vm_pin_modes.sh"
 if [ -x "$VM_PIN_MODE_TOOL" ]; then
     if ! "$VM_PIN_MODE_TOOL" > /tmp/vm_pin_modes.$$.log 2>&1; then
         cat /tmp/vm_pin_modes.$$.log
@@ -177,7 +179,7 @@ fi
 # HAL purity gate. Skip with SKIP_HAL_PURITY=1 for quick iteration; never skip in CI.
 if [ "${SKIP_HAL_PURITY:-0}" != "1" ]; then
     echo ""
-    PURITY_TOOL="$(cd "$(dirname "$0")/.." && pwd)/tools/check_hal_purity.sh"
+    PURITY_TOOL="$REPO_ROOT/tools/check_hal_purity.sh"
     if [ -x "$PURITY_TOOL" ]; then
         if ! "$PURITY_TOOL" > /tmp/hal_purity.$$.log 2>&1; then
             cat /tmp/hal_purity.$$.log

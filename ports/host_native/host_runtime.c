@@ -1,7 +1,7 @@
 /*
  * host_runtime.c — host-build runtime lifecycle + console I/O.
  *
- * Contains: host_runtime_configure/begin/finish/timed_out, the runtime
+ * Contains: host_runtime_configure/finish/timed_out, the runtime
  * timeout/slowdown poll hooks called from CheckAbort/routinechecks, the
  * stdin/stdout console routing (MMInkey, MMgetchar, putConsole,
  * MMputchar, MMPrintString, SerialConsolePutC), REPL state flags
@@ -37,6 +37,7 @@
 #include "host_time.h"
 #include "host_fb.h"
 #include "host_keys.h"
+#include "runtime/runtime.h"
 #include "shared/net/mm_net_interrupts.h"
 
 /* Forward declarations for output capture */
@@ -50,6 +51,7 @@ extern const char *host_sd_root;
 
 static void host_runtime_check_timeout(void);
 static int host_parse_pin_arg(unsigned char *arg);
+static const mm_runtime_console_adapter host_console_adapter;
 
 /* Framebuffer state (host_framebuffer, dimensions, fastgfx_back) and the
  * FRAMEBUFFER/LAYER backend live in host_fb.c; see host_fb.h. */
@@ -169,7 +171,7 @@ volatile unsigned int WDTimer = 0;
 const struct s_PinDef PinDef[NBRPINS + 1] = {{0}};
 
 /* CFunctionFlash / CFunctionLibrary are defined by FileIO.c now. We seed
- * CFunctionFlash from host_runtime_begin below so scan loops terminate
+ * CFunctionFlash from mmbasic_runtime_port_begin below so scan loops terminate
  * immediately (host_cfunction_flash_buf is pre-filled with 0xFF to match
  * erased flash). */
 
@@ -367,7 +369,8 @@ void host_runtime_configure(int timeout_ms, const char *screenshot_path) {
 
 void host_options_snapshot(void);
 
-void host_runtime_begin(void) {
+void mmbasic_runtime_port_begin(void) {
+    mmbasic_runtime_console_set_adapter(&host_console_adapter);
     host_runtime_timed_out_flag = 0;
     host_screenshot_written = 0;
     host_fastgfx_reset_state();
@@ -470,33 +473,37 @@ static inline CommandToken host_commandtbl_decode(const unsigned char *p) {
     return ((CommandToken)(p[0] & 0x7f)) | ((CommandToken)(p[1] & 0x7f) << 7);
 }
 
+static void host_runtime_network_service(void) {
+    ProcessWeb(0);
+}
+
 static void host_runtime_service(void) {
     static int in_service;
     host_runtime_check_timeout();
-    if (in_service) return;
-    in_service = 1;
-    ProcessWeb(0);
-    in_service = 0;
+    mmbasic_runtime_poll_service_once(&in_service, host_runtime_network_service);
 }
 
+static const mmbasic_runtime_abort_adapter host_abort_adapter = {
+    .service = host_runtime_service,
+    .abort_flag = &MMAbort,
+    .flags = MMBASIC_RUNTIME_ABORT_FLAG_CHECK_ABORT |
+             MMBASIC_RUNTIME_ABORT_FLAG_DO_END_LONGJMP,
+};
 
 /* Hardware interaction */
-void CheckAbort(void) { host_runtime_service(); }
+void CheckAbort(void) { mmbasic_runtime_checkabort(&host_abort_adapter); }
 void cmd_ireturn(void) {
     if (InterruptReturn == NULL) error("Not in interrupt");
     checkend(cmdline);
-    nextstmt = InterruptReturn;
-    InterruptReturn = NULL;
-    if (g_LocalIndex) ClearVars(g_LocalIndex--, true);
-    g_TempMemoryIsChanged = true;
-    *CurrentInterruptName = 0;
-    if (host_save_option_error_skip > 0) {
-        OptionErrorSkip = host_save_option_error_skip + 1;
-    } else {
-        OptionErrorSkip = host_save_option_error_skip;
-    }
-    strcpy(MMErrMsg, host_save_error_message);
-    MMerrno = host_save_errno;
+    mmbasic_runtime_interrupt_leave_state(&nextstmt, &InterruptReturn,
+                                          &g_LocalIndex, ClearVars,
+                                          &g_TempMemoryIsChanged,
+                                          CurrentInterruptName);
+    mmbasic_runtime_interrupt_restore_error_state(host_save_option_error_skip,
+                                                  host_save_error_message,
+                                                  host_save_errno,
+                                                  &OptionErrorSkip, MMErrMsg,
+                                                  &MMerrno);
 }
 
 int check_interrupt(void) {
@@ -520,25 +527,22 @@ int check_interrupt(void) {
     }
 
     g_LocalIndex++;
-    host_save_option_error_skip = OptionErrorSkip > 0 ? OptionErrorSkip : 0;
-    OptionErrorSkip = 0;
-    strcpy(host_save_error_message, MMErrMsg);
-    host_save_errno = MMerrno;
-    *MMErrMsg = 0;
-    MMerrno = 0;
+    mmbasic_runtime_interrupt_save_error_state(&host_save_option_error_skip,
+                                               host_save_error_message,
+                                               sizeof(host_save_error_message),
+                                               &host_save_errno,
+                                               &OptionErrorSkip, MMErrMsg,
+                                               &MMerrno);
     InterruptReturn = nextstmt;
 
     if (host_commandtbl_decode(intaddr) == cmdSUB) {
-        strncpy(CurrentInterruptName, (char *)intaddr + 2, MAXVARLEN);
-        CurrentInterruptName[MAXVARLEN] = 0;
-        host_interrupt_return_token[0] = (cmdIRET & 0x7f) + C_BASETOKEN;
-        host_interrupt_return_token[1] = (cmdIRET >> 7) + C_BASETOKEN;
-        host_interrupt_return_token[2] = 0;
         if (gosubindex >= MAXGOSUB) error("Too many SUBs for interrupt");
-        errorstack[gosubindex] = CurrentLinePtr;
-        gosubstack[gosubindex++] = (unsigned char *)host_interrupt_return_token;
-        g_LocalIndex++;
-        skipelement(intaddr);
+        intaddr = mmbasic_runtime_interrupt_prepare_sub_return(
+            cmdIRET, C_BASETOKEN, intaddr,
+            CurrentInterruptName, MAXVARLEN, true,
+            host_interrupt_return_token, sizeof(host_interrupt_return_token),
+            &gosubindex, errorstack, gosubstack, CurrentLinePtr,
+            &g_LocalIndex);
     }
 
     nextstmt = intaddr;
@@ -551,11 +555,11 @@ void closeframebuffer(char layer) { host_framebuffer_close(layer); }
 void clear320(void) {}
 /* DisplayPutC is now the real one from gfx_console_shared.c. It gates on
  * Option.DISPLAY_CONSOLE and calls through the DrawBitmap / DrawRectangle
- * function pointers set up in host_runtime_begin. */
+ * function pointers set up in mmbasic_runtime_port_begin. */
 /* Flash write-batch hooks are provided by FileIO.c. */
 void initMouse0(int sensitivity) { (void)sensitivity; }
 void restorepanel(void) { WriteBuf = NULL; }
-void routinechecks(void) { host_runtime_service(); }
+void routinechecks(void) { mmbasic_runtime_routinechecks(&host_abort_adapter); }
 void SoftReset(void) {}
 void uSec(int us) { (void)us; }
 uint32_t __get_MSP(void) { return 0xFFFFFFFF; }  /* always pass stack overflow check */
@@ -580,111 +584,33 @@ static void host_prints(const char *s) {
     if (s) host_print(s, strlen(s));
 }
 
-/* =========================================================================
- *  Escape-sequence decoding layered on top of host_terminal.c.
- *  Active only when host_repl_mode is set; the test-harness path below
- *  still consumes from host_key_script.
- * ========================================================================= */
-
 extern int host_repl_mode;
+extern void host_telnet_putc(int c, int flush);
+char SerialConsolePutC(char c, int flush);
 
-/* Parse what we have after seeing ESC. Returns a decoded keycode
- * (UP/DOWN/F1/… or ESC itself) and consumes the bytes. */
-static int host_decode_escape_sequence(void) {
-    int c1 = host_read_byte_blocking_ms(30);
-    if (c1 < 0) return ESC;
-
-    if (c1 == '[') {
-        int c2 = host_read_byte_blocking_ms(30);
-        if (c2 < 0) return ESC;  /* malformed; swallow */
-        switch (c2) {
-            case 'A': return UP;
-            case 'B': return DOWN;
-            case 'C': return RIGHT;
-            case 'D': return LEFT;
-            case 'H': return HOME;
-            case 'F': return END;
-        }
-        if (c2 >= '0' && c2 <= '9') {
-            /* Numeric parameter. Collect digits until '~' or letter. */
-            int n = c2 - '0';
-            int c3;
-            while ((c3 = host_read_byte_blocking_ms(30)) >= 0) {
-                if (c3 >= '0' && c3 <= '9') { n = n * 10 + (c3 - '0'); continue; }
-                break;
-            }
-            if (c3 == '~') {
-                switch (n) {
-                    case 1:  return HOME;
-                    case 2:  return INSERT;
-                    case 3:  return DEL;
-                    case 4:  return END;
-                    case 5:  return PUP;
-                    case 6:  return PDOWN;
-                    case 15: return F5;
-                    case 17: return F6;
-                    case 18: return F7;
-                    case 19: return F8;
-                    case 20: return F9;
-                    case 21: return F10;
-                    case 23: return F11;
-                    case 24: return F12;
-                }
-            }
-        }
-        return ESC;  /* unknown CSI — swallow rather than confuse caller */
-    }
-
-    if (c1 == 'O') {
-        int c2 = host_read_byte_blocking_ms(30);
-        switch (c2) {
-            case 'P': return F1;
-            case 'Q': return F2;
-            case 'R': return F3;
-            case 'S': return F4;
-        }
-        return ESC;
-    }
-
-    /* ESC followed by a regular char (Alt-<key>) — drop the ESC, keep char. */
-    host_push_back_byte(c1);
-    return ESC;
+static int host_console_repl_mode(void) {
+#ifdef MMBASIC_STDIO
+    return 1;
+#else
+    return host_repl_mode;
+#endif
 }
 
-int MMInkey(void) {
-    static int in_web_poll;
-    host_runtime_check_timeout();
-    if (!in_web_poll) {
-        extern void ProcessWeb(int mode);
-        in_web_poll = 1;
-        ProcessWeb(0);
-        in_web_poll = 0;
-    }
+static void host_console_stdout_flush(void) {
+    fflush(stdout);
+}
 
-    if (ConsoleRxBufHead != ConsoleRxBufTail) {
-        int c = (unsigned char)ConsoleRxBuf[ConsoleRxBufTail];
-        ConsoleRxBufTail = (ConsoleRxBufTail + 1) % CONSOLE_RX_BUF_SIZE;
-        if (c == 0x7f) return BKSP;
-        if (c == '\n') return ENTER;
-        return c;
-    }
+static void host_console_ctrl_d(void) {
+    MMPrintString("\r\n");
+    exit(0);
+}
 
-    /* Test-harness path: pre-scripted key stream. Returns -2 if no
-     * script is queued (fall through), -1 if queued-but-waiting, or
-     * the next consumed char. */
-    {
-        int scripted = host_runtime_keys_consume();
-        if (scripted != -2) return scripted;
-    }
+static void host_console_sleep_us(uint32_t us) {
+    host_sleep_us(us);
+}
 
+static int host_console_sim_key(void) {
 #ifdef MMBASIC_SIM
-    /* --sim path: keys injected by the WebSocket server from the browser.
-     * When the server is active we always prefer it; if the queue is
-     * empty and stdin isn't a live TTY, yield 1ms and return -1 so the
-     * caller's polling loop (Editor, INKEY$) doesn't pin a core. The
-     * sleep also advances CursorTimer so the blinker runs at a constant
-     * rate regardless of how hard the caller is polling. */
-    extern int host_sim_active;
     if (host_sim_active) {
         int c = host_sim_pop_key();
         if (c >= 0) return c;
@@ -694,99 +620,31 @@ int MMInkey(void) {
         }
     }
 #endif
-
-    /* REPL path: live terminal. */
-    if (host_raw_mode_is_active()) {
-        int c = host_read_byte_nonblock();
-        if (c < 0) return -1;
-        /* Ctrl-D at the prompt (outside EDIT) exits cleanly, like a shell.
-         * Inside EDIT the device treats Ctrl-D as CTRLKEY('D') = RIGHT
-         * cursor, so we only intercept when editactive == 0. */
-        if (c == 4 && !editactive) {
-            MMPrintString("\r\n");
-            exit(0);
-        }
-        if (c == 0x1b) return host_decode_escape_sequence();
-        if (c == 0x7f) return BKSP;       /* macOS/iTerm Backspace → BKSP */
-        if (c == '\n') return ENTER;      /* normalise LF → CR for MMBasic */
-        return c;
-    }
-
-    /* REPL piped into stdin (not a TTY) — read cooked, line-buffered.
-     * Used by CI and scripted tests that feed commands through a pipe.
-     * No escape-sequence decoding here; we just stream chars as-is,
-     * mapping LF to CR so EditInputLine's ENTER branch fires. */
-    if (host_repl_mode) {
-        int c = fgetc(stdin);
-        if (c == EOF) exit(0);
-        if (c == '\n') return ENTER;
-        return c;
-    }
-
-    return -1;
+    return -2;
 }
 
-/* Matches PicoMite.c:786-794: blink the cursor while waiting for a key,
- * hide it once we have one. ShowCursor reads CursorTimer (ticked by
- * host_sync_msec_timer_value); host_sleep_us() calls host_sync_msec_timer
- * so CursorTimer advances on every spin. */
-int MMgetchar(void) {
-    int ch;
-    do {
-        ShowCursor(1);
-        ch = MMInkey();
-        if (ch == -1) host_sleep_us(1000);
-    } while (ch == -1);
-    ShowCursor(0);
-    return ch;
-}
-/*
- * Matches PicoMite.c:573-575 + 615-622 verbatim — both the dispatch and
- * MMCharPos tracking. Keeping this shape means `SSPrintString`
- * (serial-only, emits VT100 escapes from the Editor) never reaches
- * DisplayPutC, and that the device's console-routing rules apply
- * identically on host.
- */
-extern void host_telnet_putc(int c, int flush);
-void putConsole(int c, int flush) {
-    if (OptionConsole & 2) DisplayPutC((char)c);
-    if (OptionConsole & 1) {
-        SerialConsolePutC((char)c, flush);
-    } else {
-        host_telnet_putc(c, flush);
-        if (flush) host_telnet_putc(0, -1);
-    }
-}
+static const mm_runtime_console_adapter host_console_adapter = {
+    .name = "host",
+#ifdef MMBASIC_STDIO
+    .flags = MM_RUNTIME_CONSOLE_FLAG_KEEP_STDIN_LF,
+#endif
+    .service = host_runtime_service,
+    .scripted_key = host_runtime_keys_consume,
+    .sim_key = host_console_sim_key,
+    .raw_mode_active = host_raw_mode_is_active,
+    .read_byte_nonblock = host_read_byte_nonblock,
+    .read_byte_blocking_ms = host_read_byte_blocking_ms,
+    .push_back_byte = host_push_back_byte,
+    .sleep_us = host_console_sleep_us,
+    .repl_mode = host_console_repl_mode,
+    .on_ctrl_d = host_console_ctrl_d,
+    .display_putc = DisplayPutC,
+    .serial_putc = SerialConsolePutC,
+    .telnet_putc = host_telnet_putc,
+    .stdout_flush = host_console_stdout_flush,
+    .raw_write = host_print,
+};
 
-char MMputchar(char c, int flush) {
-    /* Always dispatch through putConsole so OptionConsole's SCREEN/SERIAL
-     * routing is honoured. The hook is consulted downstream in
-     * SerialConsolePutC (captures SERIAL-bound text for test harness,
-     * swallows stray SERIAL-bound text in mmbasic_ansi) and in host_print
-     * (the bypass path used by myprintf / MMfputs-to-stdout). Hooking
-     * MMputchar itself would bypass OptionConsole entirely — that's what
-     * left mmbasic_ansi showing a blinking cursor with no prompt or echo,
-     * because its OptionConsole=2 (SCREEN-only) route never ran. */
-    putConsole(c, flush);
-    if (isprint((unsigned char)c)) MMCharPos++;
-    if (c == '\r') MMCharPos = 1;
-    return c;
-}
-
-void MMPrintString(char *s) {
-    while (*s) MMputchar(*s++, 0);
-    fflush(stdout);
-    host_telnet_putc(0, -1);
-}
-
-void SSPrintString(char *s) {
-    /* Serial-only. The Editor emits VT100 escapes through this path; they
-     * must never reach DisplayPutC, or the screen console would render
-     * them as literal glyphs. */
-    while (*s) SerialConsolePutC(*s++, 0);
-    fflush(stdout);
-    host_telnet_putc(0, -1);
-}
 /* PRet/PInt/PFlt/SRet/SInt/SIntComma/PIntComma/PIntH/PIntB/PIntHC/PIntBC/
  * PFltComma are in MMBasic_Print.c (shared). MMfputs/MMfeof/MMfputc/MMfgetc
  * are now provided by FileIO.c: PRINT and INPUT on host land in those
@@ -796,36 +654,10 @@ void SSPrintString(char *s) {
  * putConsole → MMputchar via the same dispatch, untouched. */
 void MMfopen(unsigned char *fname, unsigned char *mode, int fnbr) { (void)fname; (void)mode; (void)fnbr; }
 void MMfclose(int fnbr) { FileClose(fnbr); }
-void MMgetline(int filenbr, char *p) {
-    int c;
-    int nbrchars = 0;
-
-    while (1) {
-        if (filenbr != 0 && FileEOF(filenbr)) break;
-        c = MMfgetc(filenbr);
-        if (c <= 0) {
-            if (filenbr == 0) break;
-            continue;
-        }
-        if (c == '\n') break;
-        if (c == '\r') continue;
-        if (c == '\t') {
-            do {
-                if (++nbrchars > MAXSTRLEN) error("Line is too long");
-                *p++ = ' ';
-            } while (nbrchars % 4);
-            continue;
-        }
-        if (++nbrchars > MAXSTRLEN) error("Line is too long");
-        *p++ = (char)c;
-    }
-    *p = 0;
-}
 void printoptions(void) {
     extern void port_web_print_options(void);
     port_web_print_options();
 }
-/* putConsole defined above — matches the device dispatch. */
 int getConsole(void) { return -1; }
 void myprintf(char *s) { host_prints(s); }
 char SerialConsolePutC(char c, int flush) {
@@ -919,20 +751,15 @@ void cmd_files_pump_console_key(int *c)
 
 void cmd_load_post_cleanup(void)
 {
-    /* Host's SaveProgramToFlash stub calls load_basic_source, which
-     * tokenises each line of the loaded file into tknbuf — clobbering
-     * the tknbuf that ExecuteProgram is currently iterating over. On
-     * return, nextstmt points into corrupted bytes (the tail of the
-     * last-tokenised line from the loaded program) and ExecuteProgram
-     * trips "Unknown command". Bounce back to the prompt so the
-     * iterator never resumes. Also zero inpbuf — tokenise wrote each
-     * line of the loaded file through it, so the prompt loop's next
-     * EditInputLine would otherwise echo the tail of the last line as
-     * if the user had typed it. */
+    /* LOAD tokenises each line of the loaded file into tknbuf, clobbering
+     * the tknbuf that ExecuteProgram is currently iterating over. Bounce
+     * back to the prompt so the iterator never resumes from corrupted
+     * bytes. Also zero inpbuf because tokenisation wrote each loaded line
+     * through it, and the prompt loop's next EditInputLine would otherwise
+     * echo the tail of the last line as if the user had typed it. */
     extern unsigned char inpbuf[];
     extern jmp_buf mark;
-    memset(inpbuf, 0, STRINGSIZE);
-    longjmp(mark, 1);
+    mmbasic_runtime_post_load_longjmp(inpbuf, STRINGSIZE, mark);
 }
 
 extern volatile BYTE SDCardStat;

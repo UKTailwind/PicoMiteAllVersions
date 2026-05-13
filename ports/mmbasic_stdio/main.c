@@ -15,18 +15,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <setjmp.h>
 
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
-
-/* Declared in MMBasic.c — the jump target error() / END longjmp back to. */
-extern jmp_buf mark;
-
-/* flash_range_erase lives in hal_flash_host.c (also hal_flash HAL
- * surface) but has no public header.  Declare here. */
-extern void flash_range_erase(uint32_t off, uint32_t count);
-extern void host_runtime_begin(void);
+#include "runtime/runtime.h"
 
 /* Read an entire file (or stdin if path is "-" or NULL) into a newly
  * malloc'd, NUL-terminated buffer.  Caller frees. */
@@ -60,78 +52,51 @@ static char *read_all(const char *path) {
     return buf;
 }
 
-/* Tokenise `source` line-by-line into ProgMemory.  Minimal version of
- * host_main.c's load_basic_source — no continuation-line handling, no
- * REPL-aware numbering, just split on '\n' and feed each line through
- * tokenise(). */
-int load_source(const char *source) {
-    flash_range_erase(0, MAX_PROG_SIZE);
-    unsigned char *pm = ProgMemory;
-    const char *line = source;
-    while (*line) {
-        const char *eol = strchr(line, '\n');
-        size_t len = eol ? (size_t)(eol - line) : strlen(line);
-        if (len > 0 && line[len - 1] == '\r') len--;
-        if (len > 0) {
-            if (len >= STRINGSIZE) len = STRINGSIZE - 1;
-            memcpy(inpbuf, line, len);
-            inpbuf[len] = '\0';
-            tokenise(0);
-            unsigned char *tp = tknbuf;
-            while (!(tp[0] == 0 && tp[1] == 0)) *pm++ = *tp++;
-            *pm++ = 0;
-        }
-        line = eol ? eol + 1 : line + strlen(line);
-    }
-    *pm++ = 0;
-    *pm++ = 0;
-    PSize = (int)(pm - ProgMemory);
-    return 0;
-}
-
-int main(int argc, char **argv) {
-    const char *path = (argc >= 2) ? argv[1] : NULL;
-    char *source = read_all(path);
-    if (!source) return 2;
-
-    /* Allocate backing storage for flash_progmemory (mirrors device
-     * flash layout).  First half zeroed (program); second half 0xFF
-     * (erased flash) so PrepareProgramExt finds the CFunction
-     * terminator.  Mirrors host_main.c:701-703. */
+static void stdio_memory_backing_init(void) {
     extern unsigned char flash_prog_buf[];
     extern const uint8_t *flash_progmemory;
     memset(flash_prog_buf, 0, MAX_PROG_SIZE);
     memset(flash_prog_buf + MAX_PROG_SIZE, 0xFF, MAX_PROG_SIZE);
     flash_progmemory = flash_prog_buf;
+}
 
-    /* Minimal runtime bring-up mirroring host_main.c's run_interpreter. */
-    LoadOptions();
-    InitBasic();        /* seeds ProgMemory via m_alloc(M_LIMITED) */
-    InitHeap(true);
-    MMerrno = 0;
-    MMErrMsg[0] = '\0';
-    host_runtime_begin();
-
-    if (load_source(source) != 0) {
-        fprintf(stderr, "mmbasic_stdio: failed to tokenise input\n");
-        free(source);
-        return 1;
-    }
-
+static void stdio_reset_port_state(void) {
     extern void vm_host_fat_reset(void);
     extern void vm_sys_file_reset(void);
     extern void vm_sys_pin_reset(void);
     vm_host_fat_reset();
     vm_sys_file_reset();
     vm_sys_pin_reset();
-    ClearRuntime(true);
-    PrepareProgram(1);
+}
 
-    int rc = 0;
-    if (setjmp(mark) == 0) {
-        ExecuteProgram(ProgMemory);
-    } else {
-        rc = MMErrMsg[0] ? 1 : 0;
+static const mm_runtime_adapter stdio_runtime_adapter = {
+    .name = "mmbasic_stdio",
+    .memory_backing_init = stdio_memory_backing_init,
+    .display_console_init = mmbasic_runtime_port_begin,
+    .after_load_program = stdio_reset_port_state,
+};
+
+int main(int argc, char **argv) {
+    const char *path = (argc >= 2) ? argv[1] : NULL;
+    char *source = read_all(path);
+    if (!source) return 2;
+
+    if (mmbasic_runtime_init_common(&stdio_runtime_adapter,
+            MMBASIC_RUNTIME_INIT_FLAG_LOAD_OPTIONS |
+            MMBASIC_RUNTIME_INIT_FLAG_INIT_BASIC |
+            MMBASIC_RUNTIME_INIT_FLAG_INIT_HEAP |
+            MMBASIC_RUNTIME_INIT_FLAG_CLEAR_ERROR) != 0) {
+        fprintf(stderr, "mmbasic_stdio: failed to initialise runtime\n");
+        free(source);
+        return 1;
+    }
+
+    int rc = mmbasic_runtime_run_source(&stdio_runtime_adapter, source,
+        MMBASIC_SOURCE_FLAGS_BATCH_LOAD |
+        MMBASIC_RUNTIME_RUN_FLAG_CLEAR_RUNTIME |
+        MMBASIC_RUNTIME_RUN_FLAG_PREPARE_PROGRAM);
+    if (rc != 0 && !MMErrMsg[0]) {
+        fprintf(stderr, "mmbasic_stdio: failed to tokenise input\n");
     }
     if (MMErrMsg[0]) fprintf(stderr, "Error: %s\n", MMErrMsg);
 

@@ -14,7 +14,7 @@
  * The flow:
  *   host_runtime_configure_keys(keys, delay_ms)  -- stash the CLI args
  *   host_runtime_keys_load()                     -- called from
- *     host_runtime_begin at the start of each .bas run; parses the
+ *     mmbasic_runtime_port_begin at the start of each .bas run; parses the
  *     script (decoding \n, \t, \xNN, …) and arms the delay timer
  *   MMInkey() calls host_runtime_keys_consume()  -- per keystroke
  *   host_keydown(n) peeks the script            -- for KEYDOWN(n)
@@ -25,8 +25,8 @@
 void host_runtime_configure_keys(const char *keys, int delay_ms);
 
 /* Decode the latched script into the internal buffer and arm the
- * "not ready until T+delay" timer. Called from host_runtime_begin at
- * the start of each interpreter/VM run. */
+ * "not ready until T+delay" timer. Called from mmbasic_runtime_port_begin
+ * at the start of each interpreter/VM run. */
 void host_runtime_keys_load(void);
 
 /*

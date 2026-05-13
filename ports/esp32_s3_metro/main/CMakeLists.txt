@@ -58,6 +58,13 @@ set(STATE_SRCS
     ${REPO_ROOT}/shared/net/mm_net_wifi_cmd.c
 )
 
+set(RUNTIME_SRCS
+    ${REPO_ROOT}/runtime/runtime_boot.c
+    ${REPO_ROOT}/runtime/runtime_program.c
+    ${REPO_ROOT}/runtime/runtime_abort.c
+    ${REPO_ROOT}/runtime/runtime_interrupt.c
+)
+
 set(DEVICE_FACING_SRCS
     ${REPO_ROOT}/Draw.c
     ${REPO_ROOT}/RGB121.c
@@ -156,6 +163,7 @@ idf_component_register(
         ${PORT_LOCAL_SRCS}
         ${CORE_SRCS}
         ${STATE_SRCS}
+        ${RUNTIME_SRCS}
         ${DEVICE_FACING_SRCS}
         ${DRIVER_STUBS}
         ${BC_SRCS}

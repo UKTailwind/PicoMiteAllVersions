@@ -1047,12 +1047,13 @@ def run_udp(args: argparse.Namespace) -> int:
             with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
                 sock.sendto(b"NETCONF_UDP_AFTER_RUN", (device_host, args.udp_server_port))
             run_output = wait_for_substring(basic, "NETCONF_UDP_RUN_ADDR=", args.long_timeout)
-            prompt_raw = basic.wait_for_prompt(args.timeout)
-            if not basic._has_prompt(prompt_raw):
-                raise TimeoutError(
-                    "timeout waiting for prompt after UDP RUN preservation check\n" +
-                    clean_text(prompt_raw.decode("latin1", "replace"))
-                )
+            if not basic._has_prompt(run_output.encode("latin1", "replace")):
+                prompt_raw = basic.wait_for_prompt(args.timeout)
+                if not basic._has_prompt(prompt_raw):
+                    raise TimeoutError(
+                        "timeout waiting for prompt after UDP RUN preservation check\n" +
+                        clean_text(prompt_raw.decode("latin1", "replace"))
+                    )
             checks.append(
                 CheckResult(
                     "udp_preserved_after_run",

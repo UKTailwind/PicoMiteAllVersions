@@ -184,7 +184,7 @@ void host_fb_fill_rect(int x1, int y1, int x2, int y2, int c) {
 
 /* ------------------------------------------------------------------------
  * DrawRectangle / DrawBitmap / ScrollLCD function-pointer backings.
- * Assigned in host_runtime_begin so gfx_console_shared.c (PrintChar,
+ * Assigned in mmbasic_runtime_port_begin so gfx_console_shared.c (PrintChar,
  * DisplayPutC) dispatches into these.
  * ------------------------------------------------------------------------ */
 

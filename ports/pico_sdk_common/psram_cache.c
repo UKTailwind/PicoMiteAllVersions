@@ -14,25 +14,31 @@
 #include <stdint.h>
 
 #ifdef rp2350
+#include "hardware/address_mapped.h"
 #include "hardware/structs/qmi.h"
-#include "hardware/regs/addressmap.h"
+#include "hardware/structs/xip_ctrl.h"
+#include "hardware/regs/xip.h"
+#include "hardware/xip_cache.h"
 
-static uint32_t m1_rfmt, m1_timing, m0_rfmt, m0_timing;
+static uint32_t m1_timing, m1_rfmt, m1_rcmd, m1_wfmt, m1_wcmd;
+static uint32_t m0_timing, m0_rfmt, m0_rcmd;
 #endif
 
 void mmbasic_save_psram_settings(void)
 {
 #ifdef rp2350
-    /* Clean the XIP maintenance window so any dirty writes commit to
-     * PSRAM before we touch the cache. */
-    uint8_t *maintenance_ptr = (uint8_t *)XIP_MAINTENANCE_BASE;
-    for (int i = 1; i < 16 * 1024; i += 8) {
-        maintenance_ptr[i] = 0;
-    }
+    /* RP2350 PSRAM writes go through the XIP cache. Use the SDK helper:
+     * it includes the RP2350-E11 maintenance-window workaround and the
+     * barriers needed before flash/QMI state changes or PSRAM restore. */
+    xip_cache_clean_all();
     m1_timing = qmi_hw->m[1].timing;
     m1_rfmt   = qmi_hw->m[1].rfmt;
+    m1_rcmd   = qmi_hw->m[1].rcmd;
+    m1_wfmt   = qmi_hw->m[1].wfmt;
+    m1_wcmd   = qmi_hw->m[1].wcmd;
     m0_timing = qmi_hw->m[0].timing;
     m0_rfmt   = qmi_hw->m[0].rfmt;
+    m0_rcmd   = qmi_hw->m[0].rcmd;
 #endif
 }
 
@@ -41,7 +47,12 @@ void mmbasic_restore_psram_settings(void)
 #ifdef rp2350
     qmi_hw->m[1].timing = m1_timing;
     qmi_hw->m[1].rfmt   = m1_rfmt;
+    qmi_hw->m[1].rcmd   = m1_rcmd;
+    qmi_hw->m[1].wfmt   = m1_wfmt;
+    qmi_hw->m[1].wcmd   = m1_wcmd;
     qmi_hw->m[0].timing = m0_timing;
     qmi_hw->m[0].rfmt   = m0_rfmt;
+    qmi_hw->m[0].rcmd   = m0_rcmd;
+    hw_set_bits(&xip_ctrl_hw->ctrl, XIP_CTRL_WRITABLE_M1_BITS);
 #endif
 }

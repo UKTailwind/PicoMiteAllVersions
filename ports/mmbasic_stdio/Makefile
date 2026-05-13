@@ -75,8 +75,9 @@ NATIVE_SRCS = host_runtime.c host_fs_shims.c host_peripheral_stubs.c host_fs.c \
 PORT_SRCS = main.c stdio_runtime.c
 
 HAL_GENERIC_SRCS = hal_watchdog_noop.c
+RUNTIME_SRCS = runtime_boot.c runtime_program.c runtime_console.c runtime_abort.c runtime_interrupt.c
 
-SRCS = $(PORT_SRCS) $(NATIVE_SRCS) $(CORE_SRCS) $(BC_SRCS) $(HAL_GENERIC_SRCS)
+SRCS = $(PORT_SRCS) $(NATIVE_SRCS) $(CORE_SRCS) $(BC_SRCS) $(HAL_GENERIC_SRCS) $(RUNTIME_SRCS)
 OBJS = $(addprefix $(BUILD_DIR)/,$(SRCS:.c=.o))
 DEPS = $(OBJS:.o=.d)
 
@@ -112,6 +113,10 @@ $(BUILD_DIR)/%.o: $(REPO_ROOT)/hal/generic/%.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 $(BUILD_DIR)/%.o: $(REPO_ROOT)/shared/net/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(BUILD_DIR)/%.o: $(REPO_ROOT)/runtime/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c -o $@ $<
 

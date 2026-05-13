@@ -35,7 +35,7 @@ extern volatile uint32_t wasm_vsync_counter;
 /*
  * Resize the framebuffer. MUST be called BEFORE wasm_boot — the size
  * determines the backing allocation in host_fb_ensure(), which runs
- * during host_runtime_begin inside wasm_boot. Calling mid-session is
+ * during mmbasic_runtime_port_begin inside wasm_boot. Calling mid-session is
  * not supported; the JS side handles resolution changes by reloading
  * the page with a ?res=WxH query param.
  */

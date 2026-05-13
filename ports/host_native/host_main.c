@@ -32,13 +32,13 @@ char *getcwd(char *buf, size_t size);
 #include "vm_sys_file.h"
 #include "vm_host_fat.h"
 #include "hardware/flash.h"
+#include "runtime/runtime.h"
 
 /* All needed externs come from Hardware_Includes.h / MMBasic.h */
 extern char MMErrMsg[];
 extern int MMerrno;
 void host_runtime_configure(int timeout_ms, const char *screenshot_path);
 void host_runtime_configure_keys(const char *keys, int delay_ms);
-void host_runtime_begin(void);
 void host_runtime_finish(void);
 int host_runtime_timed_out(void);
 uint32_t host_runtime_get_pixel(int x, int y);
@@ -54,6 +54,18 @@ extern const uint8_t *flash_progmemory;
  * config rather than the old fixed 256 KB so MEMORY output matches
  * device exactly. */
 uint8_t flash_prog_buf[2 * MAX_PROG_SIZE];
+
+static void host_memory_backing_init(void) {
+    memset(flash_prog_buf, 0, sizeof(flash_prog_buf) / 2);
+    memset(flash_prog_buf + sizeof(flash_prog_buf) / 2, 0xFF,
+           sizeof(flash_prog_buf) / 2);
+    flash_progmemory = flash_prog_buf;
+}
+
+static const mm_runtime_adapter host_boot_adapter = {
+    .name = "host_native",
+    .memory_backing_init = host_memory_backing_init,
+};
 
 /* Output capture buffer */
 #define CAPTURE_SIZE (64 * 1024)
@@ -255,126 +267,6 @@ char *read_basic_source_file(const char *filename) {
     return source;
 }
 
-static void host_update_continuation_setting(const char *line, unsigned char *continuation) {
-    const char *p = line;
-    if (!continuation) return;
-    while (*p == ' ' || *p == '\t') p++;
-    if (*p >= '0' && *p <= '9') {
-        while (*p >= '0' && *p <= '9') p++;
-        while (*p == ' ' || *p == '\t') p++;
-    }
-    if (strncasecmp(p, "OPTION CONTINUATION LINES ON", 28) == 0 ||
-        strncasecmp(p, "OPTION CONTINUATION LINES ENABLE", 32) == 0) {
-        *continuation = '_';
-    } else if (strncasecmp(p, "OPTION CONTINUATION LINES OFF", 29) == 0 ||
-               strncasecmp(p, "OPTION CONTINUATION LINES DISABLE", 33) == 0) {
-        *continuation = 0;
-    }
-}
-
-static int host_read_logical_line(const char **linep, char *out, size_t out_cap,
-                                  int *physical_line_io, int *line_no_out,
-                                  unsigned char *continuation) {
-    const char *line = *linep;
-    size_t out_len = 0;
-    int line_no = *physical_line_io;
-
-    if (*line == '\0') return 0;
-    out[0] = '\0';
-
-    while (*line) {
-        const char *eol = strchr(line, '\n');
-        int len = eol ? (int)(eol - line) : (int)strlen(line);
-        if (len > 0 && line[len - 1] == '\r') len--;
-        if (out_len + (size_t)len > out_cap - 1) len = (int)((out_cap - 1) - out_len);
-        memcpy(out + out_len, line, (size_t)len);
-        out_len += (size_t)len;
-        out[out_len] = '\0';
-
-        (*physical_line_io)++;
-        line = eol ? eol + 1 : line + strlen(line);
-
-        if (*continuation && out_len >= 2 &&
-            out[out_len - 2] == ' ' && out[out_len - 1] == *continuation) {
-            out_len -= 2;
-            out[out_len] = '\0';
-            continue;
-        }
-        break;
-    }
-
-    *linep = line;
-    *line_no_out = line_no;
-    host_update_continuation_setting(out, continuation);
-    return 1;
-}
-
-/*
- * Tokenize source text into ProgMemory for the legacy interpreter path.
- * Returns 0 on success, -1 on error.
- */
-int load_basic_source(const char *source) {
-    /* Tokenize line by line into ProgMemory. Erase the program area first
-     * (matches device behavior: cmd_new and SaveProgramToFlash both call
-     * flash_range_erase before writing). Without this, loading a smaller
-     * program after a larger one leaves tail tokens from the old program
-     * in ProgMemory, and PrepareProgramExt -- which scans for 0xff to
-     * find end-of-program -- walks off into garbage and crashes. */
-    flash_range_erase(0, MAX_PROG_SIZE);
-    unsigned char *pm = ProgMemory;
-    const char *line = source;
-    int physical_line = 1;
-    unsigned char continuation = Option.continuation;
-
-    while (*line) {
-        char logical[STRINGSIZE + 1];
-        int lineno = 0;
-        if (!host_read_logical_line(&line, logical, sizeof(logical), &physical_line, &lineno, &continuation))
-            break;
-        int len = (int)strlen(logical);
-
-        /* Skip empty lines */
-        if (len > 0) {
-            /* Match device behaviour (SaveProgramToFlash, PicoMite.c:3809):
-             * tokenise each line exactly as the user wrote it. If the source
-             * has an explicit line number the tokeniser picks it up; if not
-             * there's no T_LINENBR token. The Editor then shows the file
-             * without synthetic numbers eating horizontal space. */
-            memcpy(inpbuf, logical, len);
-            inpbuf[len] = '\0';
-
-            tokenise(0);
-
-            /* Copy tokenized output to ProgMemory.
-             * tokenise() terminates tknbuf with two+ zero bytes.
-             * T_LINENBR contains embedded single zero bytes (for line
-             * numbers < 256), so we can't use while(*tp) -- instead
-             * copy until we see two consecutive zero bytes (same as
-             * SaveProgramToFlash in PicoMite.c:4790). */
-            unsigned char *tp = tknbuf;
-            while (!(tp[0] == 0 && tp[1] == 0)) {
-                *pm++ = *tp++;
-            }
-            *pm++ = 0;  /* element terminator */
-        }
-    }
-
-    /* Program terminator */
-    *pm++ = 0;
-    *pm++ = 0;
-    PSize = (int)(pm - ProgMemory);
-
-    return 0;
-}
-
-static int load_basic_file(const char *filename) {
-    char *source = read_basic_source_file(filename);
-    if (!source) return -1;
-    int rc = load_basic_source(source);
-    free(source);
-    return rc;
-}
-
 /*
  * Run via the old interpreter with output capture.
  * Returns 0 on normal completion, non-zero on error.
@@ -389,7 +281,7 @@ static int run_interpreter(char *output, int outsize) {
     ClearRuntime(true);
     MMErrMsg[0] = '\0';
     MMerrno = 0;
-    host_runtime_begin();
+    mmbasic_runtime_port_begin();
     PrepareProgram(1);
     if (setjmp(mark) == 0) {
         ExecuteProgram(ProgMemory);
@@ -418,7 +310,7 @@ static int run_bytecode_vm_source(const char *source, const char *source_name,
     ClearRuntime(true);
     MMErrMsg[0] = '\0';
     MMerrno = 0;
-    host_runtime_begin();
+    mmbasic_runtime_port_begin();
     if (setjmp(mark) == 0) {
         bc_run_source_string(source, source_name);
         result = host_runtime_timed_out() ? 2 : (MMErrMsg[0] ? 1 : 0);
@@ -458,8 +350,6 @@ extern int PromptFC, PromptBC;
  * instead of going through the in-memory FAT that the test harness uses.
  * Set by run_repl from cwd, or overridden with --sd-root. */
 extern const char *host_sd_root;
-
-extern void MMBasic_RunPromptLoop(void);
 
 /*
  * Parse `--foo bar` or `--foo=bar`. On match returns the value and advances
@@ -520,7 +410,7 @@ static int run_repl(void) {
         Option.Height = (char)tty_rows;
     }
 
-    /* host_runtime_begin MUST precede the banner: it wires up
+    /* mmbasic_runtime_port_begin MUST precede the banner: it wires up
      * DrawPixel / DrawRectangle / DrawBitmap from their DisplayNotSet
      * defaults to host_fb_* implementations. MMBasic_PrintBanner emits
      * glyphs through DrawBitmap; if DrawBitmap is still DisplayNotSet,
@@ -528,7 +418,7 @@ static int run_repl(void) {
      * gets it via putConsole's UART leg, which is why the terminal looks
      * fine). This matches the --sim canvas behaviour of the host WASM
      * build (host_wasm_main.c also begins runtime before banner). */
-    host_runtime_begin();
+    mmbasic_runtime_port_begin();
 
     /* Shared REPL banner (MMBasic_REPL.c). */
     extern void MMBasic_PrintBanner(void);
@@ -541,7 +431,7 @@ static int run_repl(void) {
      * raw mode disables OPOST, so '\n' stops translating to '\r\n'. */
     host_raw_mode_enter();
 
-    MMBasic_RunPromptLoop();   /* does not return */
+    mmbasic_runtime_enter_repl(NULL, 0);   /* does not return */
 
     host_runtime_finish();
     return 0;
@@ -695,15 +585,9 @@ int main(int argc, char **argv) {
         }
     }
 
-    /* Allocate backing storage for flash_progmemory (normally in flash on device).
-     * First half is program area (zeroed), second half mimics erased flash (0xFF)
-     * so PrepareProgramExt finds the CFunction terminator. */
-    memset(flash_prog_buf, 0, sizeof(flash_prog_buf) / 2);
-    memset(flash_prog_buf + sizeof(flash_prog_buf) / 2, 0xFF, sizeof(flash_prog_buf) / 2);
-    flash_progmemory = flash_prog_buf;
-
     /* Initialize the MMBasic runtime */
-    InitBasic();
+    mmbasic_runtime_init_common(&host_boot_adapter,
+                                MMBASIC_RUNTIME_INIT_FLAG_INIT_BASIC);
     bc_opt_level = opt_level;
     host_runtime_configure(timeout_ms, screenshot_path);
     host_runtime_configure_keys(key_script, key_delay_ms);
@@ -730,7 +614,7 @@ int main(int argc, char **argv) {
         vm_sys_file_reset();
         MMErrMsg[0] = '\0';
         MMerrno = 0;
-        host_runtime_begin();
+        mmbasic_runtime_port_begin();
         if (setjmp(mark) == 0) {
             bc_run_immediate(immediate_line);
             rc = MMErrMsg[0] ? 1 : 0;
@@ -875,7 +759,8 @@ int main(int argc, char **argv) {
     if (!source_text) return 1;
 
     if (mode != MODE_VM_SOURCE_ONLY) {
-        if (load_basic_source(source_text) != 0) {
+        if (mmbasic_tokenise_source_to_progmem(source_text,
+                MMBASIC_SOURCE_FLAGS_HOST_LOAD) != 0) {
             free(source_text);
             return 1;
         }

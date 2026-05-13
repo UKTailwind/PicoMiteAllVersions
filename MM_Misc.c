@@ -26,6 +26,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
+#include "runtime/runtime.h"
 #include "shared/net/mm_net_interrupts.h"
 #include "port_config.h"
 #include "pico/stdlib.h"
@@ -274,15 +275,15 @@ int Saveerrno = 0;
 void cmd_ireturn(void){
     if(InterruptReturn == NULL) error("Not in interrupt");
     checkend(cmdline);
-    nextstmt = InterruptReturn;
-    InterruptReturn = NULL;
-    if(g_LocalIndex)    ClearVars(g_LocalIndex--, true);                        // delete any local variables
-    g_TempMemoryIsChanged = true;                                     // signal that temporary memory should be checked
-    *CurrentInterruptName = 0;                                        // for static vars we are not in an interrupt
+    mmbasic_runtime_interrupt_leave_state(&nextstmt, &InterruptReturn,
+                                          &g_LocalIndex, ClearVars,
+                                          &g_TempMemoryIsChanged,
+                                          CurrentInterruptName);
     hal_gui_controls_post_irq_redraw();
-	if(SaveOptionErrorSkip>0)OptionErrorSkip=SaveOptionErrorSkip+1;
-    strcpy(MMErrMsg , SaveErrorMessage);
-    MMerrno = Saveerrno;
+    mmbasic_runtime_interrupt_restore_error_state(SaveOptionErrorSkip,
+                                                  SaveErrorMessage, Saveerrno,
+                                                  &OptionErrorSkip, MMErrMsg,
+                                                  &MMerrno);
 }
 
 void MIPS16 cmd_library(void) {  
@@ -2110,14 +2111,15 @@ void MIPS16 fun_info(void){
             CtoM(sret);
             targ=T_STR;
             return;
- 		} else if(checkstring(tp, (unsigned char *)"KEYBOARD")){
-            /* USB builds populate Option.USBKeyboard; PS/2 builds populate
-             * Option.KeyboardConfig. The other field stays zero. */
-            int kb = Option.USBKeyboard ? Option.USBKeyboard : Option.KeyboardConfig;
-            strcpy((char *)sret, (char *)KBrdList[kb]);
-            CtoM(sret);
-            targ=T_STR;
-            return;
+			} else if(checkstring(tp, (unsigned char *)"KEYBOARD")){
+				/* USB builds populate Option.USBKeyboard; PS/2 builds populate
+				 * Option.KeyboardConfig. The other field stays zero. */
+				int kb = Option.USBKeyboard ? Option.USBKeyboard : Option.KeyboardConfig;
+				if (kb == CONFIG_I2C) strcpy((char *)sret, "I2C");
+				else strcpy((char *)sret, (char *)KBrdList[kb]);
+				CtoM(sret);
+				targ=T_STR;
+				return;
  		} else if(checkstring(tp, (unsigned char *)"EXPLICIT")){
 			if(OptionExplicit == false)strcpy((char *)sret,"Off");
 			else strcpy((char *)sret,"On");
@@ -2239,6 +2241,10 @@ void MIPS16 fun_info(void){
             return;
         } else if(checkstring(ep, (unsigned char *)"PROGRAM")){
             iret = (int64_t)(uint32_t)ProgMemory;
+            targ = T_INT;
+            return;
+        } else if(checkstring(ep, (unsigned char *)"PSRAM SIZE")){
+            iret = PSRAMsize;
             targ = T_INT;
             return;
         } else if(checkstring(ep, (unsigned char *)"PS2")){
@@ -2949,25 +2955,23 @@ int checkdetailinterrupts(void) {
     // an interrupt was found if we jumped to here
 GotAnInterrupt:
     g_LocalIndex++;                                                   // IRETURN will decrement this
-    if(OptionErrorSkip>0)SaveOptionErrorSkip=OptionErrorSkip;
-    else SaveOptionErrorSkip = 0;
-    OptionErrorSkip=0;
-    strcpy(SaveErrorMessage , MMErrMsg);
-    Saveerrno = MMerrno;
-    *MMErrMsg = 0;
-    MMerrno = 0;
+    mmbasic_runtime_interrupt_save_error_state(&SaveOptionErrorSkip,
+                                               SaveErrorMessage,
+                                               sizeof(SaveErrorMessage),
+                                               &Saveerrno,
+                                               &OptionErrorSkip, MMErrMsg,
+                                               &MMerrno);
     InterruptReturn = nextstmt;                                     // for when IRETURN is executed
     // if the interrupt is pointing to a SUB token we need to call a subroutine
     CommandToken tkn=commandtbl_decode((const unsigned char *)intaddr);
     if(tkn == cmdSUB) {
-    	strncpy(CurrentInterruptName, intaddr + 2, MAXVARLEN);
-        rti[0] = (cmdIRET & 0x7f ) + C_BASETOKEN;
-        rti[1] = (cmdIRET >> 7) + C_BASETOKEN; //tokens can be 14-bit
         if(gosubindex >= MAXGOSUB) error("Too many SUBs for interrupt");
-        errorstack[gosubindex] = CurrentLinePtr;
-        gosubstack[gosubindex++] = (unsigned char *)rti;                             // return from the subroutine to the dummy IRETURN command
-        g_LocalIndex++;                                               // return from the subroutine will decrement g_LocalIndex
-        skipelement(intaddr);                                       // point to the body of the subroutine
+        intaddr = (char *)mmbasic_runtime_interrupt_prepare_sub_return(
+            cmdIRET, C_BASETOKEN, (unsigned char *)intaddr,
+            CurrentInterruptName, MAXVARLEN, false,
+            rti, sizeof(rti),
+            &gosubindex, errorstack, gosubstack, CurrentLinePtr,
+            &g_LocalIndex);                                       // point to the body of the subroutine
     }
     nextstmt = (unsigned char *)intaddr;                                             // the next command will be in the interrupt routine
     return 1;

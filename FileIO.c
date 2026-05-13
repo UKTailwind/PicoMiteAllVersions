@@ -3328,6 +3328,7 @@ void cmd_autosave(void)
     unsigned char *buf, *p;
     int c, prevc = 0, crunch = false;
     int count = 0;
+    int noecho = 0;
     uint64_t timeout;
     if (CurrentLinePtr)error("Invalid in a program");
     char *tp=(char *)checkstring(cmdline,(unsigned char *)"APPEND");
@@ -3354,6 +3355,8 @@ void cmd_autosave(void)
     {
         if (toupper(*cmdline) == 'C')
             crunch = true;
+        else if (toupper(*cmdline) == 'N')
+            noecho = true;
         else
             error("Syntax");
     }
@@ -3361,15 +3364,31 @@ void cmd_autosave(void)
     p = buf = GetTempMemory(EDIT_BUFFER_SIZE);
     CrunchData(&p, 0); // initialise the crunch data subroutine
 readin:;
+    bool skip_initial_lf = (p == buf);
+    bool first = true;
+    uint64_t lastchartime = hal_time_us_64();
     while ((c = MMInkey()) != 0x1a && c != F1 && c != F2)
     { // while waiting for the end of text char
+        if (!first && noecho && hal_time_us_64() - lastchartime > 100000)
+        {
+            MMPrintString("Enter ctrl-Z, F1, or F2 to exit\r\n");
+            noecho = false;
+        }
         if (c == -1 && count && hal_time_us_64() - timeout > 100000)
         {
             fflush(stdout);
             count = 0;
         }
-        if (p == buf && c == '\n')
+        if (c == -1)
+            continue;
+        lastchartime = hal_time_us_64();
+        first = false;
+        if (skip_initial_lf && c == '\n')
+        {
+            skip_initial_lf = false;
             continue; // throw away an initial line feed which can follow the command
+        }
+        skip_initial_lf = false;
         if ((p - buf) >= EDIT_BUFFER_SIZE)
             error("Not enough memory");
         if (isprint(c) || c == '\r' || c == '\n' || c == TAB)
@@ -3383,13 +3402,15 @@ readin:;
             {
                 if (!(c == '\n' && prevc == '\r'))
                 {
-                    MMputchar(c, 0);
+                    if (!noecho)
+                        MMputchar(c, 0);
                     count++;
                     timeout = hal_time_us_64();
                 } // and echo it
                 if (c == '\r')
                 {
-                    MMputchar('\n', 1);
+                    if (!noecho)
+                        MMputchar('\n', 1);
                     count = 0;
                 }
             }

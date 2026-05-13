@@ -112,7 +112,7 @@ python3.11 ../../porttools/esp32_tcp_smoke.py \
 
 ## Build Shape
 
-The ESP32 port owns its runtime/peripheral surface in `main/esp32_*.c` and `main/hal_*_esp32.c`. It no longer links the host-native runtime or peripheral stubs, and the link intentionally avoids `--wrap` and `--allow-multiple-definition`.
+The ESP32 port owns its runtime/peripheral surface in `main/esp32_*.c` and `main/hal_*_esp32.c`, while reusing the common runtime spine for shared source loading and abort/interrupt helpers where the sequencing matches. It no longer links the host-native runtime or peripheral stubs, and the link intentionally avoids `--wrap` and `--allow-multiple-definition`.
 
 Known remaining cleanup:
 

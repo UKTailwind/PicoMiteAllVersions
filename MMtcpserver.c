@@ -54,10 +54,10 @@ static mm_net_tcp_service_t pico_tcp_server;
 static mm_net_tcp_service_slot_t pico_tcp_slots[MaxPcb];
 static uint8_t *pico_tcp_recv_buf[MaxPcb];
 static char pico_tcp_path[MaxPcb][128];
+static int pico_tcp_server_inited;
 
 static void pico_tcp_server_service_init(void) {
-    static int inited;
-    if (inited) return;
+    if (pico_tcp_server_inited) return;
     for (int i = 0; i < MaxPcb; i++) {
         if (!pico_tcp_recv_buf[i])
             pico_tcp_recv_buf[i] = GetMemory(TCP_READ_BUFFER_SIZE);
@@ -67,7 +67,7 @@ static void pico_tcp_server_service_init(void) {
                                      sizeof pico_tcp_path[i]);
     }
     mm_net_tcp_service_init(&pico_tcp_server, pico_tcp_slots, MaxPcb);
-    inited = 1;
+    pico_tcp_server_inited = 1;
 }
 
 void pico_tcp_server_poll(void) {
@@ -185,7 +185,7 @@ void close_tcp_server(void){
 }
 
 static void pico_lifecycle_clear_tcp_requests(void) {
-        pico_tcp_server_service_init();
+        if (!pico_tcp_server_inited) return;
         mm_net_tcp_service_clear_requests(&pico_tcp_server);
 }
 

@@ -125,10 +125,3 @@ int  StartEditChar  = 0;
  * its argv parser; mmbasic_stdio has no argv parser, so main.c
  * initialises it directly before InitBasic(). */
 unsigned char flash_prog_buf[MAX_PROG_SIZE * 2];
-
-/* load_basic_source is main.c's static helper, but host_fs_shims.c
- * references the symbol at link time for --sd-root loads.  Forward
- * to our tokeniser-free variant; a true implementation would re-run
- * the tokenise loop on the buffer. */
-extern int load_source(const char *source);
-int load_basic_source(const char *source) { return load_source(source); }

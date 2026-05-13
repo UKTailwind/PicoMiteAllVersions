@@ -116,7 +116,7 @@ void host_push_back_byte(int c) {
 /* Framebuffer size in glyphs — used by LIST / cmd_files pagination and
  * by Option.Width/Height. The native --sim comment in host_main.c notes
  * the framebuffer IS the console at 40x20 (8x12 glyphs on 320x240); we
- * do the same here. host_runtime_begin still enforces a floor of
+ * do the same here. mmbasic_runtime_port_begin still enforces a floor of
  * SCREENHEIGHT (24) for pagination so programs that assume at least 24
  * rows don't hang. */
 int host_terminal_get_size(int *rows, int *cols) {

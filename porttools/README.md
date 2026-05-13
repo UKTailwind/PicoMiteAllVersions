@@ -72,6 +72,59 @@ Useful options:
   be repeated.
 - `--quiet`: suppress the live transcript and only return success/failure.
 
+Pico flash-entry checklist:
+
+```sh
+# First choice when BASIC is responsive: enter BOOTSEL from the prompt.
+python3.11 porttools/basic_serial.py \
+  --port /dev/cu.usbmodem101 \
+  --timeout 5 \
+  --long-timeout 10 \
+  --cmd 'UPDATE FIRMWARE' || true
+sleep 3
+picotool load -v -x build_web2350_picocalc/PicoMite.uf2
+```
+
+Use `UPDATE FIRMWARE` for the PicoCalc flash loop whenever the BASIC prompt is
+reachable. It deliberately drops USB while entering BOOTSEL, so the command
+runner may exit non-zero; wait a few seconds, then run `picotool load`.
+Avoid `CPU RESTART` for this workflow because it only reboots the application
+and can leave macOS serial open/sync stuck without putting the board in BOOTSEL.
+If the firmware is wedged and no BASIC prompt is reachable, use BOOTSEL/manual
+reset or SWD.
+
+RP2350 PSRAM march tests:
+
+```sh
+# Verify the firmware-visible PSRAM size.
+python3.11 porttools/basic_serial.py \
+  --port /dev/cu.usbmodem101 \
+  --cmd 'PRINT "PSRAM_SIZE=" + STR$(MM.INFO(PSRAM SIZE))' \
+  --expect 'PSRAM_SIZE='
+
+# Exercise the cached XIP PSRAM window. An optional number tests that many MB.
+python3.11 porttools/basic_serial.py \
+  --port /dev/cu.usbmodem101 \
+  --timeout 120 \
+  --cmd 'RAM TEST 1' \
+  --expect 'RAM TEST OK'
+
+# Exercise the no-cache alias directly.
+python3.11 porttools/basic_serial.py \
+  --port /dev/cu.usbmodem101 \
+  --timeout 120 \
+  --cmd 'RAM TEST NOCACHE 1' \
+  --expect 'RAM TEST OK'
+```
+
+`RAM TEST` is destructive to PSRAM contents. Run it from the prompt during
+hardware bringup, not while a BASIC program is depending on RAM slots or PSRAM
+heap state. Use `RAM TEST` with no size argument for the configured usable
+PSRAM range, or `RAM TEST ALL` to include the 2 MB reserved area above
+`MM.INFO(PSRAM SIZE)`. Full-range tests can be quiet for tens of seconds while
+scanning the final phase, so raise `--timeout` rather than only
+`--long-timeout`.
+
 Known-good checks from the ESP32 bringup:
 
 ```sh
@@ -162,6 +215,77 @@ python3.11 porttools/esp32_sd_smoke.py \
   --expect-file readme.txt \
   --expect-text hello
 ```
+
+## `pico_fs_vm_smoke.py`
+
+`pico_fs_vm_smoke.py` is the Pico-family hardware smoke suite for the onboard
+filesystem, BASIC file I/O, program load/save paths, flash slots, display,
+timers, `RUN`, `FRUN`, the bytecode VM, WEB status, and integer math. It writes
+short BASIC programs to the target drive, runs them on the board, checks their
+success markers, and removes the generated programs unless `--keep-files` is
+used.
+
+Default run against the Pico internal filesystem:
+
+```sh
+python3.11 porttools/pico_fs_vm_smoke.py \
+  --port /dev/cu.usbmodem101
+```
+
+Run only selected suites:
+
+```sh
+python3.11 porttools/pico_fs_vm_smoke.py fs vm sieve \
+  --port /dev/cu.usbmodem101
+```
+
+Implemented checks:
+
+- `device`: prompt sync, `MM.INFO$(ID)`, `MM.INFO$(CPUSPEED)`,
+  `MM.INFO(FREE SPACE)`, PicoCalc keyboard/battery/charging info, optional
+  `--expect-psram`, and a non-paginated `DIR$` probe.
+- `fs`: creates a temporary directory on `A:`, changes into it, writes and
+  reads BASIC files, checks `INPUT$`, `LINE INPUT`, `LOC`, `LOF`, `EOF`,
+  `SEEK`, `MM.INFO(EXISTS FILE)`, `MM.INFO(EXISTS DIR)`,
+  `MM.INFO(FILESIZE)`, `DIR$`, wildcard directory iteration, `COPY`,
+  `RENAME`, filenames with spaces, repeated create/delete, `KILL`, and
+  `RMDIR`.
+- `errors`: intentional filesystem errors for missing files, duplicate
+  directories, non-empty directory removal, and rename-over-existing behavior.
+- `large`: writes and verifies a multi-sector text file.
+- `program`: `LOAD`, `SAVE`, plain `RUN`, and autorun `LOAD ..., R`.
+- `chain`: `CHAIN` with `MM.CMDLINE$`. This is explicit rather than part of
+  default `all` because it has exposed USB prompt recovery hangs on current
+  PicoCalc firmware.
+- `flash`: destructive test of one flash program slot using `FLASH ERASE`,
+  `FLASH SAVE`, `FLASH LIST`, `FLASH LOAD`, and `FLASH RUN`.
+- `autosave`: drives `AUTOSAVE N` over serial and runs the captured program.
+- `vm`: runs a generated program with `FRUN`, checks integer loops and basic
+  string handling, arrays passed to `SUB`/`FUNCTION`, `SELECT CASE`, float
+  math, `DATA`/`READ`/`RESTORE`, then verifies VM-side file write/read/delete.
+- `sieve`: runs a bytecode VM Sieve of Eratosthenes with a `!FAST` inner loop
+  and verifies there are 168 primes up to 1000.
+- `timing`: `TIMER`, `PAUSE`, and `SETTICK`.
+- `display`: scalar graphics, `PIXEL()` readback, and framebuffer copy/merge.
+- `web`: quick `MM.INFO(WIFI STATUS)` and `MM.INFO$(IP ADDRESS)` check. Use
+  `--connect-command` when the board needs an explicit `WEB CONNECT`.
+- `network`: hands off to `network_conformance.py all`. This is not part of
+  default `all` because it starts host-side TCP/UDP/TFTP/Telnet/NTP/MQTT
+  services and takes much longer.
+
+Useful options:
+
+- `--drive A:`: drive to test. `A:` is the default and is the Pico internal
+  filesystem.
+- `--prefix NAME`: temporary file and directory prefix. Defaults to `pfs`.
+- `--flash-slot N`: flash slot to erase/save/load/run. Defaults to slot 3.
+- `--keep-files`: leave the generated BASIC programs on the drive for manual
+  reruns.
+- `--expect-psram`: fail the device smoke if `OPTION LIST` does not show
+  `OPTION PSRAM`.
+- `--connect-command CMD`: run a specific WEB connect command before the `web`
+  suite and pass it through to the `network` suite.
+- `--reset-app`: send Ctrl-C before prompt sync.
 
 ## `network_conformance.py`
 

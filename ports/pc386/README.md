@@ -26,9 +26,11 @@ RUN "PROGRAMS/MAND.BAS"
 ```
 
 The port is intentionally shaped like the MCU targets. Core MMBasic is linked
-with a pc386 port directory, HAL implementations, and PC-specific drivers for
-VGA/VBE graphics, PS/2 keyboard, COM1, ATA-PIO, 82077-compatible floppy,
-Sound Blaster 16 or PC speaker audio, and LPT1 GPIO/Centronics output.
+with the common runtime spine, a pc386 port directory, HAL implementations, and
+PC-specific drivers for VGA/VBE graphics, PS/2 keyboard, COM1, ATA-PIO,
+82077-compatible floppy, Sound Blaster 16 or PC speaker audio, and LPT1
+GPIO/Centronics output. PC386 keeps its console body port-local because it
+merges VGA, COM1, and PS/2 key codes directly.
 
 ## Status
 

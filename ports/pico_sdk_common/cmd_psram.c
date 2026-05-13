@@ -11,6 +11,8 @@
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
 #include "hal/hal_flash.h"
+#include "hardware/sync.h"
+#include "hardware/xip_cache.h"
 
 #if defined(rp2350) && (PSRAMbase != 0)
 
@@ -25,11 +27,132 @@ extern const uint8_t *flash_target_contents;
 extern const uint8_t *flash_progmemory;
 extern unsigned char *LibMemory;
 
+static void psram_test_fail(const char *phase, uintptr_t addr, uint32_t expected, uint32_t actual)
+{
+    char msg[160];
+    snprintf(msg, sizeof(msg),
+             "RAM TEST FAIL %s addr=&H%08lx expected=&H%08lx actual=&H%08lx\r\n",
+             phase, (unsigned long)addr, (unsigned long)expected, (unsigned long)actual);
+    MMPrintString(msg);
+    error("PSRAM test failed");
+}
+
+static uint32_t psram_test_pattern(uintptr_t addr, size_t index)
+{
+    uint32_t x = (uint32_t)addr ^ (uint32_t)(index * 0x9E3779B9u);
+    x ^= x >> 16;
+    x *= 0x7FEB352Du;
+    x ^= x >> 15;
+    return x ^ 0xA5A55A5Au;
+}
+
+typedef enum {
+    PSRAM_TEST_CACHED,
+    PSRAM_TEST_NOCACHE
+} psram_test_mode_t;
+
+static void psram_test_barrier(psram_test_mode_t mode)
+{
+    if (mode == PSRAM_TEST_CACHED) {
+        xip_cache_clean_all();
+        xip_cache_invalidate_all();
+    } else {
+        /*
+         * No-cache writes bypass the XIP cache. Cleaning after them can
+         * write stale dirty cached lines back over the just-written data, so
+         * only order the memory accesses here.
+         */
+        __dsb();
+        __isb();
+    }
+}
+
+static void psram_march_test(uint8_t *base, size_t bytes, psram_test_mode_t mode)
+{
+    volatile uint32_t *mem = (volatile uint32_t *)base;
+    size_t words = bytes / sizeof(uint32_t);
+    xip_cache_clean_all();
+    xip_cache_invalidate_all();
+    MMPrintString("RAM TEST phase 0 fill zero\r\n");
+    for (size_t i = 0; i < words; i++) mem[i] = 0u;
+    psram_test_barrier(mode);
+
+    MMPrintString("RAM TEST phase 1 up zero->ones\r\n");
+    for (size_t i = 0; i < words; i++) {
+        uint32_t actual = mem[i];
+        if (actual != 0u) psram_test_fail("up0", (uintptr_t)&mem[i], 0u, actual);
+        mem[i] = 0xFFFFFFFFu;
+    }
+    psram_test_barrier(mode);
+
+    MMPrintString("RAM TEST phase 2 up ones->pattern\r\n");
+    for (size_t i = 0; i < words; i++) {
+        uint32_t actual = mem[i];
+        if (actual != 0xFFFFFFFFu) psram_test_fail("up1", (uintptr_t)&mem[i], 0xFFFFFFFFu, actual);
+        mem[i] = psram_test_pattern((uintptr_t)&mem[i], i);
+    }
+    psram_test_barrier(mode);
+
+    MMPrintString("RAM TEST phase 3 down pattern->inverse\r\n");
+    for (size_t i = words; i-- > 0;) {
+        uint32_t expected = psram_test_pattern((uintptr_t)&mem[i], i);
+        uint32_t actual = mem[i];
+        if (actual != expected) psram_test_fail("downp", (uintptr_t)&mem[i], expected, actual);
+        mem[i] = ~expected;
+    }
+    psram_test_barrier(mode);
+
+    MMPrintString("RAM TEST phase 4 down inverse->zero\r\n");
+    for (size_t i = words; i-- > 0;) {
+        uint32_t expected = ~psram_test_pattern((uintptr_t)&mem[i], i);
+        uint32_t actual = mem[i];
+        if (actual != expected) psram_test_fail("downi", (uintptr_t)&mem[i], expected, actual);
+        mem[i] = 0u;
+    }
+    psram_test_barrier(mode);
+
+    MMPrintString("RAM TEST phase 5 final zero\r\n");
+    for (size_t i = 0; i < words; i++) {
+        uint32_t actual = mem[i];
+        if (actual != 0u) psram_test_fail("final0", (uintptr_t)&mem[i], 0u, actual);
+    }
+}
+
 void MIPS16 cmd_psram(void)
 {
     if (!PSRAMsize) error("PSRAM not enabled");
     unsigned char *p;
-    if ((p = checkstring(cmdline, (unsigned char *)"ERASE ALL"))) {
+    if ((p = checkstring(cmdline, (unsigned char *)"TEST"))) {
+        size_t bytes = PSRAMsize;
+        uint8_t *test_base = (uint8_t *)PSRAMbase;
+        psram_test_mode_t mode = PSRAM_TEST_CACHED;
+        skipspace(p);
+        unsigned char *tp;
+        if ((tp = checkstring(p, (unsigned char *)"NOCACHE"))) {
+            test_base = (uint8_t *)(PSRAMbase + 0x04000000u);
+            mode = PSRAM_TEST_NOCACHE;
+            p = tp;
+            skipspace(p);
+        } else if ((tp = checkstring(p, (unsigned char *)"NC"))) {
+            test_base = (uint8_t *)(PSRAMbase + 0x04000000u);
+            mode = PSRAM_TEST_NOCACHE;
+            p = tp;
+            skipspace(p);
+        }
+        if (*p) {
+            if (checkstring(p, (unsigned char *)"ALL")) {
+                bytes = PSRAMsize + (2u * 1024u * 1024u);
+            } else {
+                bytes = (size_t)getint(p, 1, (int)((PSRAMsize + (2u * 1024u * 1024u)) / (1024u * 1024u))) * 1024u * 1024u;
+            }
+        }
+        char msg[96];
+        snprintf(msg, sizeof(msg), "RAM TEST START base=&H%08lx bytes=%lu\r\n",
+                 (unsigned long)test_base, (unsigned long)bytes);
+        MMPrintString(msg);
+        psram_march_test(test_base, bytes, mode);
+        MMPrintString("RAM TEST OK\r\n");
+    } else if ((p = checkstring(cmdline, (unsigned char *)"ERASE ALL"))) {
         memset((void *)PSRAMblock, 0, PSRAMblocksize);
     } else if ((p = checkstring(cmdline, (unsigned char *)"ERASE"))) {
         int i = getint(p, 1, MAXRAMSLOTS);

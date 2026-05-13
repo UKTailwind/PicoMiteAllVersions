@@ -112,7 +112,7 @@ gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 // ---- Resolution / memory / slowdown selection ---------------------------
 //
 // Framebuffer size must be set before wasm_boot (allocation happens
-// during host_runtime_begin in the worker). Resolution changes trigger
+// during mmbasic_runtime_port_begin in the worker). Resolution changes trigger
 // a full page reload with ?res=WxH — re-initialising the interpreter
 // mid-session is fragile because of setjmp/longjmp state.
 

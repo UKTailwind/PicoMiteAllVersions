@@ -60,6 +60,18 @@ picotool info build_<TARGET>/PicoMite.uf2 | grep "binary end"
 # binary_end - 0x10000000 must be < HAL_PORT_FLASH_TARGET_OFFSET by ≥ 30 KB.
 ```
 
+### `HAL_PORT_HEAP_MEMORY_SIZE` — keep it flash-sector aligned
+
+`HAL_PORT_HEAP_MEMORY_SIZE` normally becomes `HEAP_MEMORY_SIZE`, and unless a
+port overrides it, `MAX_PROG_SIZE` follows that value. Program save/load paths
+erase `MAX_PROG_SIZE` bytes at a time, so device builds need the heap size to be
+a multiple of the flash erase sector size, currently 4096 bytes.
+
+Non-aligned values can build and boot but later fail on hardware with errors
+such as `Flash erase problem` when `RUN "A:..."`, `LOAD`, or flash-slot
+operations try to erase the program area. Use whole-KiB values that are also
+4 KiB multiples, for example `(200 * 1024)` rather than `(202 * 1024)`.
+
 ## Step A2 — pin_tables.c
 
 **Background: `PinDef[]` and the two numbering systems.** MMBasic has two ways of naming a pin in user code: the physical *package pin number* (1, 2, 4, 5, … — what's silkscreened on the header), and the *GPIO number* (`GP0`, `GP1`, `GP2`, … — what the chip datasheet calls the line). BASIC syntax accepts either. Internally, everything goes through `PinDef[]` — an array indexed by package-pin number. Each entry carries `{pin, GPno, pinname, mode, ADCpin, slice}`: the chip's GPIO number, the printable label, a bitmask of supported modes (`DIGITAL_IN`, `PWM4A`, `I2C0SDA`, `SPI1SCK`, …), the ADC channel number if any, and the PWM slice number. `PinDef[]` lives in `PicoMite.c`. As a new-port author you're not redefining `PinDef[]`, you're supplying two smaller lookup tables that reference it.

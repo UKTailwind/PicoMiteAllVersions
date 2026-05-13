@@ -26,6 +26,7 @@
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
 #include "host_fs.h"
+#include "runtime/runtime.h"
 
 /* FatFS's FF_MAX_LFN is 63 — fine for the 8.3-style FAT world, but
  * POSIX paths on a real desktop regularly run several hundred chars
@@ -35,10 +36,6 @@
  * long" — on perfectly ordinary cwds. Size host-side path buffers to a
  * POSIX-friendly ceiling instead. */
 #define HOST_PATH_MAX 4096
-
-/* Defined in host_main.c — used by FileLoadProgram when SaveProgramToFlash
- * feeds buffered source through the host tokeniser path. */
-extern int load_basic_source(const char *source);
 
 /* When set (REPL mode with --sd-root DIR, or cwd by default), file
  * commands operate on the real filesystem rooted here rather than on
@@ -107,9 +104,19 @@ static void host_fill_finfo_from_posix(FILINFO *fi, const char *name,
     }
 }
 
+static void host_strip_fatfs_drive_keep_root(const char *in, char *out, int out_cap) {
+    if (out_cap <= 0) return;
+    if (in[0] && in[1] == ':') in += 2;
+    snprintf(out, out_cap, "%s", *in ? in : "/");
+}
+
 FRESULT host_f_findfirst(DIR *dp, FILINFO *fi, const TCHAR *path,
                          const TCHAR *pattern) {
-    if (!host_sd_root) return f_findfirst(dp, fi, path, pattern);
+    if (!host_sd_root) {
+        char stripped[HOST_PATH_MAX];
+        host_strip_fatfs_drive_keep_root(path, stripped, sizeof(stripped));
+        return f_findfirst(dp, fi, stripped, pattern);
+    }
     /* FileIO.c hands us a FatFS-style path like "/build" or just "/"
      * (drive prefix already stripped by fullpath(). Join it onto
      * host_sd_root so FILES / COPY / KILL / DIR$ see the subdirectory
@@ -335,8 +342,7 @@ void flash_range_program(uint32_t off, const uint8_t *data, uint32_t count) {
 void SaveProgramToFlash(unsigned char *pm, int msg) {
     (void)msg;
     if (!pm) return;
-    load_basic_source((const char *)pm);
-    PrepareProgram(false);
+    mmbasic_save_loaded_source((const char *)pm, MMBASIC_SOURCE_FLAGS_HOST_LOAD);
 }
 
 /* LFS stubs — FileIO.c references the full littlefs surface. On host
@@ -383,7 +389,7 @@ lfs_soff_t lfs_file_size(lfs_t *lfs, lfs_file_t *fp) { (void)lfs; (void)fp; retu
  * buffer is blank, every error wipes those fields and the framebuffer
  * console goes silent + cmd_files' wrap-at-Width collapses to zero.
  *
- * The fix: host_options_snapshot() (called by host_runtime_begin
+ * The fix: host_options_snapshot() (called by mmbasic_runtime_port_begin
  * after everyone has finished mutating Option) copies the current
  * Option back into this buffer so subsequent LoadOptions calls
  * restore the initialized state, not the zero-filled one.

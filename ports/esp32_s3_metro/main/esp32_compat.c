@@ -62,44 +62,6 @@ static void flash_prog_buf_init(void) {
     memset(flash_prog_buf, 0xff, sizeof flash_prog_buf);
 }
 
-/* load_basic_source — tokenize a .bas text buffer into ProgMemory.
- * SaveProgramToFlash calls this with the freshly-read file contents from
- * FileLoadProgram so subsequent LIST / RUN see a valid program in memory.
- * Mirrors ports/mmbasic_ansi/ansi_main.c::load_basic_source. */
-extern unsigned char *ProgMemory;
-extern unsigned char tknbuf[];
-extern unsigned char inpbuf[];
-extern int PSize;
-extern void tokenise(int console);
-extern void flash_range_erase(uint32_t off, uint32_t count);
-
-int load_basic_source(const char *source) {
-    flash_range_erase(0, MAX_PROG_SIZE);
-    unsigned char *pm = ProgMemory;
-    const char *line = source;
-    while (*line) {
-        const char *eol = line;
-        while (*eol && *eol != '\r' && *eol != '\n') eol++;
-        size_t len = (size_t)(eol - line);
-        if (len > 0) {
-            if (len >= STRINGSIZE) len = STRINGSIZE - 1;
-            memcpy(inpbuf, line, len);
-            inpbuf[len] = '\0';
-            tokenise(0);
-            unsigned char *tp = tknbuf;
-            while (!(tp[0] == 0 && tp[1] == 0)) *pm++ = *tp++;
-            *pm++ = 0;
-        }
-        line = eol;
-        if (*line == '\r') line++;
-        if (*line == '\n') line++;
-    }
-    *pm++ = 0;
-    *pm++ = 0;
-    PSize = (int)(pm - ProgMemory);
-    return 0;
-}
-
 /* ---- BASIC commands that require a framebuffer this port doesn't have ---- */
 
 void cmd_framebuffer(void) { error("FRAMEBUFFER not supported on this port"); }

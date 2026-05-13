@@ -18,13 +18,13 @@
 
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
+#include "runtime/runtime.h"
 
 extern jmp_buf mark;
 extern unsigned char flash_prog_buf[];
 extern const uint8_t *flash_progmemory;
 extern void flash_range_erase(uint32_t off, uint32_t count);
 extern void esp32_console_init(void);
-extern void MMBasic_RunPromptLoop(void);
 extern void MMBasic_PrintBanner(void);
 extern int esp32_flash_storage_load_options(void);
 extern int esp32_flash_storage_init(void);
@@ -91,10 +91,10 @@ void app_main(void) {
     ApplyDefaultConsoleColours();
     esp32_flash_storage_init();
 
-    InitBasic();
-    InitHeap(true);
-    MMerrno = 0;
-    MMErrMsg[0] = '\0';
+    mmbasic_runtime_init_common(NULL,
+        MMBASIC_RUNTIME_INIT_FLAG_INIT_BASIC |
+        MMBASIC_RUNTIME_INIT_FLAG_INIT_HEAP |
+        MMBASIC_RUNTIME_INIT_FLAG_CLEAR_ERROR);
 
     extern void esp32_sd_diskio_reset(void);
     extern void vm_sys_file_reset(void);
@@ -121,5 +121,5 @@ void app_main(void) {
 
     /* MMBasic_RunPromptLoop is its own setjmp loop — it longjmps back
      * to its own `mark` on error / Ctrl-C / END / NEW. We don't return. */
-    MMBasic_RunPromptLoop();
+    mmbasic_runtime_enter_repl(NULL, 0);
 }

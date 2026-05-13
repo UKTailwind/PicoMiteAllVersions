@@ -43,6 +43,9 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "hal/hal_display_merge.h"
 #include "hal/hal_watchdog.h"
 #include "port_config.h"
+#ifdef rp2350
+#include "hardware/xip_cache.h"
+#endif
 #include "bc_alloc.h"
 #include "bc_run_diag.h"
 #define overlap (VRes % (FontTable[gui_font >> 4][1] * (gui_font & 0b1111)) ? 0 : 1)
@@ -1428,7 +1431,7 @@ void MIPS16 HAL_PORT_MMBASIC_SUBFUN_FUNC(cmd_else)(void) {
 void do_end(bool ecmd) {
     hal_display_merge_abort();
 if(Option.SerialConsole)while(ConsoleTxBufHead!=ConsoleTxBufTail)routinechecks();
-	fflush(stdout);
+		fflush(stdout);
 	if(ecmd){
 		getargs(&cmdline,1,(unsigned char *)",");
 		if(argc==1){
@@ -1515,6 +1518,57 @@ extern short g_StrTmpIndex;
 extern bool g_TempMemoryIsChanged;
 extern volatile char *g_StrTmp[MAXTEMPSTRINGS];                                       // used to track temporary string space on the heap
 extern volatile char g_StrTmpLocalIndex[MAXTEMPSTRINGS];                              // used to track the g_LocalIndex for each temporary string space on the heap
+
+static uint8_t *psram_context_align(uint8_t *p) {
+	uintptr_t v = (uintptr_t)p;
+	return (uint8_t *)((v + 3u) & ~(uintptr_t)3u);
+}
+
+static uint8_t *psram_context_base(void) {
+	return (uint8_t *)PSRAMbase + PSRAMsize;
+}
+
+static void psram_context_write(uint8_t **dst, const void *src, size_t n) {
+	const uint8_t *s = (const uint8_t *)src;
+	uint8_t *p = psram_context_align(*dst);
+	size_t words_since_clean = 0;
+	while(n) {
+		uint32_t word = 0;
+		size_t chunk = n < sizeof(word) ? n : sizeof(word);
+		uint8_t *w = (uint8_t *)&word;
+		for(size_t i = 0; i < chunk; i++) w[i] = s[i];
+		*(volatile uint32_t *)p = word;
+		p += sizeof(word);
+		s += chunk;
+		n -= chunk;
+#ifdef rp2350
+		if(++words_since_clean == 1024) {
+			xip_cache_clean_all();
+			words_since_clean = 0;
+		}
+#endif
+	}
+#ifdef rp2350
+	xip_cache_clean_all();
+#endif
+	*dst = p;
+}
+
+static void psram_context_read(void *dst, uint8_t **src, size_t n) {
+	uint8_t *d = (uint8_t *)dst;
+	uint8_t *p = psram_context_align(*src);
+	while(n) {
+		uint32_t word = *(volatile uint32_t *)p;
+		size_t chunk = n < sizeof(word) ? n : sizeof(word);
+		uint8_t *w = (uint8_t *)&word;
+		for(size_t i = 0; i < chunk; i++) d[i] = w[i];
+		p += sizeof(word);
+		d += chunk;
+		n -= chunk;
+	}
+	*src = p;
+}
+
 void SaveContext(void){
 	CloseAudio(1);
 	/* PSRAM-backed fast save (rp2350 non-WEB). On every other target
@@ -1523,47 +1577,33 @@ void SaveContext(void){
 	 * plain C if/else with no preprocessor gates. */
 	if(PSRAMsize){
 		ClearTempMemory();
-		uint8_t *p=(uint8_t *)PSRAMbase+PSRAMsize;
-		memcpy(p,  &g_StrTmpIndex, sizeof(g_StrTmpIndex));
-		p+=sizeof(g_StrTmpIndex);
-		memcpy(p,  &g_TempMemoryIsChanged, sizeof(g_TempMemoryIsChanged));
-		p+=sizeof(g_TempMemoryIsChanged);
-		memcpy(p,  (void *)g_StrTmp, sizeof(g_StrTmp));
-		p+=sizeof(g_StrTmp);
-		memcpy(p,  (void *)g_StrTmpLocalIndex, sizeof(g_StrTmpLocalIndex));
-		p+=sizeof(g_StrTmpLocalIndex);
-		memcpy(p,  &g_LocalIndex, sizeof(g_LocalIndex));
-		p+=sizeof(g_LocalIndex);
-		memcpy(p,  &g_OptionBase, sizeof(g_OptionBase));
-		p+=sizeof(g_OptionBase);
-		memcpy(p,  &g_DimUsed, sizeof(g_DimUsed));
-		p+=sizeof(g_DimUsed);
-		memcpy(p,  &g_varcnt, sizeof(g_varcnt));
-		p+=sizeof(g_varcnt);
-		memcpy(p,  &g_Globalvarcnt, sizeof(g_Globalvarcnt));
-		p+=sizeof(g_Globalvarcnt);
-		memcpy(p,  &g_Localvarcnt, sizeof(g_Localvarcnt));
-		p+=sizeof(g_Localvarcnt);
-		memcpy(p,  &g_hashlistpointer, sizeof(g_hashlistpointer));
-		p+=sizeof(g_hashlistpointer);
-		memcpy(p,  &g_forindex, sizeof(g_forindex));
-		p+=sizeof(g_forindex);
-		memcpy(p,  &g_doindex, sizeof(g_doindex));
-		p+=sizeof(g_doindex);
-		memcpy(p,  g_forstack, sizeof(struct s_forstack)*MAXFORLOOPS);
-		p+=sizeof(struct s_forstack)*MAXFORLOOPS;
-		memcpy(p,  g_dostack, sizeof(struct s_dostack)*MAXDOLOOPS);
-		p+=sizeof(struct s_dostack)*MAXDOLOOPS;
-		memcpy(p,  g_vartbl, sizeof(struct s_vartbl)*MAXVARS);
-		p+=sizeof(struct s_vartbl)*MAXVARS;
-		memcpy(p,  g_hashlist, sizeof(struct s_hash)*MAXVARS/2);
-		p+=sizeof(struct s_hash)*MAXVARS/2;
-		memcpy(p,  MMHeap, heap_memory_size+256);
-		p+=heap_memory_size+256;
-		memcpy(p,  mmap, sizeof(mmap));
-		p+=sizeof(mmap);
-		memcpy(p, psmap, psmap_size_bytes);
-		p+=psmap_size_bytes;
+		uint8_t *p=psram_context_base();
+		#define PSRAM_CTX_WRITE_SCALAR(v) do { psram_context_write(&p, &(v), sizeof(v)); } while(0)
+		#define PSRAM_CTX_WRITE_ARRAY(v)  do { psram_context_write(&p, (const void *)(v), sizeof(v)); } while(0)
+		#define PSRAM_CTX_WRITE_BLOCK(v, n) do { psram_context_write(&p, (const void *)(v), (n)); } while(0)
+		PSRAM_CTX_WRITE_SCALAR(g_StrTmpIndex);
+		PSRAM_CTX_WRITE_SCALAR(g_TempMemoryIsChanged);
+		PSRAM_CTX_WRITE_ARRAY(g_StrTmp);
+		PSRAM_CTX_WRITE_ARRAY(g_StrTmpLocalIndex);
+		PSRAM_CTX_WRITE_SCALAR(g_LocalIndex);
+		PSRAM_CTX_WRITE_SCALAR(g_OptionBase);
+		PSRAM_CTX_WRITE_SCALAR(g_DimUsed);
+		PSRAM_CTX_WRITE_SCALAR(g_varcnt);
+		PSRAM_CTX_WRITE_SCALAR(g_Globalvarcnt);
+		PSRAM_CTX_WRITE_SCALAR(g_Localvarcnt);
+		PSRAM_CTX_WRITE_SCALAR(g_hashlistpointer);
+		PSRAM_CTX_WRITE_SCALAR(g_forindex);
+		PSRAM_CTX_WRITE_SCALAR(g_doindex);
+		PSRAM_CTX_WRITE_BLOCK(g_forstack, sizeof(struct s_forstack)*MAXFORLOOPS);
+		PSRAM_CTX_WRITE_BLOCK(g_dostack, sizeof(struct s_dostack)*MAXDOLOOPS);
+		PSRAM_CTX_WRITE_BLOCK(g_vartbl, sizeof(struct s_vartbl)*MAXVARS);
+		PSRAM_CTX_WRITE_BLOCK(g_hashlist, sizeof(struct s_hash)*MAXVARS/2);
+		PSRAM_CTX_WRITE_BLOCK(MMHeap, heap_memory_size+256);
+		PSRAM_CTX_WRITE_ARRAY(mmap);
+		PSRAM_CTX_WRITE_BLOCK(psmap, psmap_size_bytes);
+		#undef PSRAM_CTX_WRITE_SCALAR
+		#undef PSRAM_CTX_WRITE_ARRAY
+		#undef PSRAM_CTX_WRITE_BLOCK
 	} else {
 		lfs_file_t lfs_file;
         struct lfs_info lfsinfo={0};
@@ -1604,47 +1644,33 @@ void RestoreContext(bool keep){
 	CloseAudio(1);
 	/* PSRAM-backed fast restore (rp2350 non-WEB); LFS fallback otherwise. */
 	if(PSRAMsize){
-		uint8_t *p=(uint8_t *)PSRAMbase+PSRAMsize;
-		memcpy(&g_StrTmpIndex, p, sizeof(g_StrTmpIndex));
-		p+=sizeof(g_StrTmpIndex);
-		memcpy(&g_TempMemoryIsChanged, p, sizeof(g_TempMemoryIsChanged));
-		p+=sizeof(g_TempMemoryIsChanged);
-		memcpy((void *)g_StrTmp, p, sizeof(g_StrTmp));
-		p+=sizeof(g_StrTmp);
-		memcpy((void *)g_StrTmpLocalIndex, p, sizeof(g_StrTmpLocalIndex));
-		p+=sizeof(g_StrTmpLocalIndex);
-		memcpy(&g_LocalIndex, p, sizeof(g_LocalIndex));
-		p+=sizeof(g_LocalIndex);
-		memcpy(&g_OptionBase, p, sizeof(g_OptionBase));
-		p+=sizeof(g_OptionBase);
-		memcpy(&g_DimUsed, p, sizeof(g_DimUsed));
-		p+=sizeof(g_DimUsed);
-		memcpy(&g_varcnt, p, sizeof(g_varcnt));
-		p+=sizeof(g_varcnt);
-		memcpy(&g_Globalvarcnt, p, sizeof(g_Globalvarcnt));
-		p+=sizeof(g_Globalvarcnt);
-		memcpy(&g_Localvarcnt, p, sizeof(g_Localvarcnt));
-		p+=sizeof(g_Localvarcnt);
-		memcpy(&g_hashlistpointer, p, sizeof(g_hashlistpointer));
-		p+=sizeof(g_hashlistpointer);
-		memcpy(&g_forindex, p, sizeof(g_forindex));
-		p+=sizeof(g_forindex);
-		memcpy(&g_doindex, p, sizeof(g_doindex));
-		p+=sizeof(g_doindex);
-		memcpy(g_forstack, p, sizeof(struct s_forstack)*MAXFORLOOPS);
-		p+=sizeof(struct s_forstack)*MAXFORLOOPS;
-		memcpy(g_dostack, p, sizeof(struct s_dostack)*MAXDOLOOPS);
-		p+=sizeof(struct s_dostack)*MAXDOLOOPS;
-		memcpy(g_vartbl, p, sizeof(struct s_vartbl)*MAXVARS);
-		p+=sizeof(struct s_vartbl)*MAXVARS;
-		memcpy(g_hashlist, p, sizeof(struct s_hash)*MAXVARS/2);
-		p+=sizeof(struct s_hash)*MAXVARS/2;
-		memcpy(MMHeap, p, heap_memory_size+256);
-		p+=heap_memory_size+256;
-		memcpy(mmap, p, sizeof(mmap));
-		p+=sizeof(mmap);
-		memcpy(psmap, p, psmap_size_bytes);
-		p+=psmap_size_bytes;
+		uint8_t *p=psram_context_base();
+		#define PSRAM_CTX_READ_SCALAR(v) do { psram_context_read(&(v), &p, sizeof(v)); } while(0)
+		#define PSRAM_CTX_READ_ARRAY(v)  do { psram_context_read((void *)(v), &p, sizeof(v)); } while(0)
+		#define PSRAM_CTX_READ_BLOCK(v, n) do { psram_context_read((void *)(v), &p, (n)); } while(0)
+		PSRAM_CTX_READ_SCALAR(g_StrTmpIndex);
+		PSRAM_CTX_READ_SCALAR(g_TempMemoryIsChanged);
+		PSRAM_CTX_READ_ARRAY(g_StrTmp);
+		PSRAM_CTX_READ_ARRAY(g_StrTmpLocalIndex);
+		PSRAM_CTX_READ_SCALAR(g_LocalIndex);
+		PSRAM_CTX_READ_SCALAR(g_OptionBase);
+		PSRAM_CTX_READ_SCALAR(g_DimUsed);
+		PSRAM_CTX_READ_SCALAR(g_varcnt);
+		PSRAM_CTX_READ_SCALAR(g_Globalvarcnt);
+		PSRAM_CTX_READ_SCALAR(g_Localvarcnt);
+		PSRAM_CTX_READ_SCALAR(g_hashlistpointer);
+		PSRAM_CTX_READ_SCALAR(g_forindex);
+		PSRAM_CTX_READ_SCALAR(g_doindex);
+		PSRAM_CTX_READ_BLOCK(g_forstack, sizeof(struct s_forstack)*MAXFORLOOPS);
+		PSRAM_CTX_READ_BLOCK(g_dostack, sizeof(struct s_dostack)*MAXDOLOOPS);
+		PSRAM_CTX_READ_BLOCK(g_vartbl, sizeof(struct s_vartbl)*MAXVARS);
+		PSRAM_CTX_READ_BLOCK(g_hashlist, sizeof(struct s_hash)*MAXVARS/2);
+		PSRAM_CTX_READ_BLOCK(MMHeap, heap_memory_size+256);
+		PSRAM_CTX_READ_ARRAY(mmap);
+		PSRAM_CTX_READ_BLOCK(psmap, psmap_size_bytes);
+		#undef PSRAM_CTX_READ_SCALAR
+		#undef PSRAM_CTX_READ_ARRAY
+		#undef PSRAM_CTX_READ_BLOCK
 	} else {
 		lfs_file_t lfs_file;
         struct lfs_info lfsinfo={0};
@@ -1719,7 +1745,7 @@ void MIPS16 do_chain(unsigned char *cmdline){
 //    memcpy(cmdlinebuff, pcmd_args, *pcmd_args + 1); // *** THW 16/4/23
 	Mstrcpy(cmdlinebuff, pcmd_args);
     IgnorePIN = false;
-	if(Option.LIBRARY_FLASH_SIZE == MAX_PROG_SIZE) ExecuteProgram(LibMemory );       // run anything that might be in the library
+    if(Option.LIBRARY_FLASH_SIZE == MAX_PROG_SIZE) ExecuteProgram(LibMemory );       // run anything that might be in the library
     if(*ProgMemory != T_NEWLINE) return;                             // no program to run
 	cleanserver();
     /* initMouse0 is a no-op stub on USB builds (drivers/usb_host_kbd/

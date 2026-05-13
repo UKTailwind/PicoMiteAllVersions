@@ -20,6 +20,7 @@
 
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
+#include "runtime/runtime.h"
 
 #include "../../drivers/i8042_kbd/i8042_kbd.h"
 #include "../../drivers/serial_16550/serial_16550.h"
@@ -65,7 +66,7 @@ void pc386_apply_runtime_option_defaults(void)
     }
 }
 
-void host_runtime_begin(void) {
+void mmbasic_runtime_port_begin(void) {
     timeroffset = hal_time_us_64();
 
     /* Tell Draw.c "a display is configured" so cmd_box / cmd_pixel
@@ -120,14 +121,14 @@ int  host_runtime_timed_out(void) { return 0; }
  *  CheckAbort + interrupt poll hooks (all no-ops for stage 3 — no IRQs).
  * ========================================================================= */
 
-void CheckAbort(void)         { }
+void CheckAbort(void)         { mmbasic_runtime_checkabort(NULL); }
 int  check_interrupt(void)    { return 0; }
 void ClearExternalIO(void)    { }
 void closeframebuffer(char l) { (void)l; }
 void clear320(void)           { }
 void initMouse0(int s)        { (void)s; }
 void restorepanel(void)       { WriteBuf = NULL; }
-void routinechecks(void)      { }
+void routinechecks(void)      { mmbasic_runtime_routinechecks(NULL); }
 void SoftReset(void)          { pc386_panic("SoftReset not yet implemented"); }
 void uSec(int us)             { extern void hal_time_sleep_us(uint32_t); hal_time_sleep_us((uint32_t)us); }
 
@@ -138,7 +139,7 @@ uint32_t __get_MSP(void) { return 0xFFFFFFFFu; }
 
 /* DisplayPutC lives in gfx_console_shared.c — don't redefine. */
 void Display_Refresh(void) { }
-void DisplayNotSet(void) { /* no error — host_runtime_begin sets DISPLAY_TYPE */ }
+void DisplayNotSet(void) { /* no error — mmbasic_runtime_port_begin sets DISPLAY_TYPE */ }
 void ScrollLCDSPISCR(int s) { (void)s; }
 
 /* =========================================================================
@@ -366,8 +367,7 @@ void cmd_files_pump_console_key(int *c)   { (void)c; }
  * host_native's host_runtime.c does. */
 void cmd_load_post_cleanup(void) {
     extern unsigned char inpbuf[];
-    memset(inpbuf, 0, STRINGSIZE);
-    longjmp(mark, 1);
+    mmbasic_runtime_post_load_longjmp(inpbuf, STRINGSIZE, mark);
 }
 
 /* CallCFunction / CallExecuteProgram — pc386 has no CFunction support. */

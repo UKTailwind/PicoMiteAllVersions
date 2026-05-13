@@ -28,6 +28,7 @@
 
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
+#include "runtime/runtime.h"
 
 extern const uint8_t *flash_progmemory;
 /* Sized to mirror the device program-flash region: MAX_PROG_SIZE +
@@ -52,7 +53,6 @@ extern const char *host_sd_root;
 
 void host_runtime_configure(int timeout_ms, const char *screenshot_path);
 void host_runtime_configure_keys(const char *keys, int delay_ms);
-void host_runtime_begin(void);
 void host_runtime_finish(void);
 
 void vm_host_fat_reset(void);
@@ -61,7 +61,6 @@ void vm_sys_pin_reset(void);
 void host_options_snapshot(void);
 
 extern void MMBasic_PrintBanner(void);
-extern void MMBasic_RunPromptLoop(void);
 
 /* Set by wasm_break so CheckAbort / routinechecks sees the break and
  * longjmps back to the prompt. Polled opportunistically — full Ctrl-C
@@ -157,18 +156,23 @@ static void wasm_configure_display_console(void) {
     Option.DefaultBC  = 0x000000;
 }
 
-static void *wasm_runtime_thread(void *arg) {
-    (void)arg;
-
-    /* Zero first half, 0xFF second half — same erased-flash simulation
-     * host_main.c does. CFunction scan loops rely on the 0xFF to find
-     * their terminator immediately. */
+static void wasm_memory_backing_init(void) {
     memset(flash_prog_buf, 0x00, sizeof(flash_prog_buf) / 2);
     memset(flash_prog_buf + sizeof(flash_prog_buf) / 2, 0xFF,
            sizeof(flash_prog_buf) / 2);
     flash_progmemory = flash_prog_buf;
+}
 
-    InitBasic();
+static const mm_runtime_adapter wasm_boot_adapter = {
+    .name = "host_wasm",
+    .memory_backing_init = wasm_memory_backing_init,
+};
+
+static void *wasm_runtime_thread(void *arg) {
+    (void)arg;
+
+    mmbasic_runtime_init_common(&wasm_boot_adapter,
+                                MMBASIC_RUNTIME_INIT_FLAG_INIT_BASIC);
     bc_opt_level = 1;
     host_runtime_configure(0, NULL);
     host_runtime_configure_keys(NULL, 0);
@@ -185,14 +189,14 @@ static void *wasm_runtime_thread(void *arg) {
     MMErrMsg[0] = '\0';
     MMerrno = 0;
 
-    host_runtime_begin();
+    mmbasic_runtime_port_begin();
 
     wasm_configure_display_console();
     Option.Width  = HRes / gui_font_width;   /* 320/8 = 40 cols */
     Option.Height = VRes / gui_font_height;  /* 320/12 = 26 rows */
 
     /* Re-snapshot Option into flash_option_buf AFTER the display
-     * console is configured. host_runtime_begin took its snapshot
+     * console is configured. mmbasic_runtime_port_begin took its snapshot
      * before our overrides; if we don't re-snapshot, the LoadOptions()
      * call inside error() (MMBasic.c:2835) reverts DISPLAY_CONSOLE to
      * 0 — which trips LCD_error and paints a bright-red overlay in the
@@ -200,7 +204,7 @@ static void *wasm_runtime_thread(void *arg) {
     host_options_snapshot();
 
     MMBasic_PrintBanner();
-    MMBasic_RunPromptLoop();  /* never returns under normal operation */
+    mmbasic_runtime_enter_repl(NULL, 0);  /* never returns under normal operation */
 
     host_runtime_finish();
     (void)wasm_consume_break;
@@ -229,27 +233,10 @@ void wasm_boot(void) {
 /* ------------------------------------------------------------------------
  * Source-file loaders.
  *
- * host_main.c owns these on the native build, but we can't link host_main.c
- * under WASM. bc_runtime.c (shared VM code) and host_fs_shims.c both call
- * them, so we duplicate the implementations here. They are pure POSIX +
- * MMBasic-tokeniser plumbing — emscripten's MEMFS provides fopen/fread/
- * ftell, and tokenise() is unchanged shared code.
- *
- * A later phase can de-duplicate by moving these into a shared host file
- * (host_fs_shims.c would be the natural home). For Phase 1 we prefer zero
- * risk to the native build over DRY.
+ * host_main.c owns read_basic_source_file on the native build, but WASM
+ * cannot link host_main.c. Source tokenisation itself is now common runtime
+ * code, with this file retaining the compatibility wrapper.
  * ------------------------------------------------------------------------ */
-
-extern unsigned char *ProgMemory;
-extern int PSize;
-extern unsigned char inpbuf[];
-extern unsigned char tknbuf[];
-extern void tokenise(int console);
-extern void flash_range_erase(uint32_t offset, size_t count);
-
-#ifndef MAX_PROG_SIZE
-#define MAX_PROG_SIZE (128 * 1024)
-#endif
 
 char *read_basic_source_file(const char *filename) {
     FILE *f = fopen(filename, "r");
@@ -267,96 +254,6 @@ char *read_basic_source_file(const char *filename) {
     source[fsize] = '\0';
     fclose(f);
     return source;
-}
-
-static void host_update_continuation_setting(const char *line, unsigned char *continuation) {
-    const char *p = line;
-    if (!continuation) return;
-    while (*p == ' ' || *p == '\t') p++;
-    if (*p >= '0' && *p <= '9') {
-        while (*p >= '0' && *p <= '9') p++;
-        while (*p == ' ' || *p == '\t') p++;
-    }
-    if (strncasecmp(p, "OPTION CONTINUATION LINES ON", 28) == 0 ||
-        strncasecmp(p, "OPTION CONTINUATION LINES ENABLE", 32) == 0) {
-        *continuation = '_';
-    } else if (strncasecmp(p, "OPTION CONTINUATION LINES OFF", 29) == 0 ||
-               strncasecmp(p, "OPTION CONTINUATION LINES DISABLE", 33) == 0) {
-        *continuation = 0;
-    }
-}
-
-static int host_read_logical_line(const char **linep, char *out, size_t out_cap,
-                                  int *physical_line_io, int *line_no_out,
-                                  unsigned char *continuation) {
-    const char *line = *linep;
-    size_t out_len = 0;
-    int line_no = *physical_line_io;
-
-    if (*line == '\0') return 0;
-    out[0] = '\0';
-
-    while (*line) {
-        const char *eol = strchr(line, '\n');
-        int len = eol ? (int)(eol - line) : (int)strlen(line);
-        if (len > 0 && line[len - 1] == '\r') len--;
-        if (out_len + (size_t)len > out_cap - 1) len = (int)((out_cap - 1) - out_len);
-        memcpy(out + out_len, line, (size_t)len);
-        out_len += (size_t)len;
-        out[out_len] = '\0';
-
-        (*physical_line_io)++;
-        line = eol ? eol + 1 : line + strlen(line);
-
-        if (*continuation && out_len >= 2 &&
-            out[out_len - 2] == ' ' && out[out_len - 1] == *continuation) {
-            out_len -= 2;
-            out[out_len] = '\0';
-            continue;
-        }
-        break;
-    }
-
-    *linep = line;
-    *line_no_out = line_no;
-    host_update_continuation_setting(out, continuation);
-    return 1;
-}
-
-int load_basic_source(const char *source) {
-    flash_range_erase(0, MAX_PROG_SIZE);
-    unsigned char *pm = ProgMemory;
-    const char *line = source;
-    int physical_line = 1;
-    unsigned char continuation = Option.continuation;
-
-    while (*line) {
-        char logical[STRINGSIZE + 1];
-        int lineno = 0;
-        if (!host_read_logical_line(&line, logical, sizeof(logical),
-                                    &physical_line, &lineno, &continuation))
-            break;
-        int len = (int)strlen(logical);
-
-        if (len > 0) {
-            memcpy(inpbuf, logical, (size_t)len);
-            inpbuf[len] = '\0';
-
-            tokenise(0);
-
-            unsigned char *tp = tknbuf;
-            while (!(tp[0] == 0 && tp[1] == 0)) {
-                *pm++ = *tp++;
-            }
-            *pm++ = 0;
-        }
-    }
-
-    *pm++ = 0;
-    *pm++ = 0;
-    PSize = (int)(pm - ProgMemory);
-
-    return 0;
 }
 
 /* emscripten's runtime still invokes main once the module resolves. We

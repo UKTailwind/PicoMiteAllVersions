@@ -29,6 +29,7 @@
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"   /* struct option_s + extern Option */
 #include "hal/hal_flash.h"
+#include "runtime/runtime.h"
 
 #define TAG "mmslots"
 
@@ -176,8 +177,6 @@ void flash_range_program(uint32_t off, const uint8_t *data, size_t len) {
  * don't fool PrepareProgramExt's CFunPtr walk — that walk skips zero
  * bytes after the program terminator looking for the 0xff "erased flash"
  * sentinel, and stale token bytes there cause it to dereference garbage. */
-extern int load_basic_source(const char *source);
-extern void PrepareProgram(int);
 extern unsigned char *ProgMemory;
 extern unsigned char flash_prog_buf[];
 
@@ -185,8 +184,7 @@ void SaveProgramToFlash(unsigned char *pm, int msg) {
     (void)msg;
     if (!pm) return;
     memset(flash_prog_buf, 0xff, MAX_PROG_SIZE);
-    load_basic_source((const char *)pm);
-    PrepareProgram(0);
+    mmbasic_save_loaded_source((const char *)pm, MMBASIC_SOURCE_FLAGS_BATCH_LOAD);
 }
 
 /* ---- ExistsFile / ExistsDir on LFS ---- */

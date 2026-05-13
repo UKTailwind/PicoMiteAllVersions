@@ -191,6 +191,13 @@ set(PICOMITE_PICO_SDK_HAL_SOURCES
 	ports/pico_sdk_common/mem_writeblock.c
 	ports/pico_sdk_common/load_png.c
 	ports/pico_sdk_common/cmd_files_hooks.c
+	ports/pico_sdk_common/pico_boot.c
+	ports/pico_sdk_common/pico_clock.c
+	ports/pico_sdk_common/pico_timer.c
+	ports/pico_sdk_common/pico_console.c
+	ports/pico_sdk_common/pico_fault.c
+	ports/pico_sdk_common/pico_program_flash.c
+	ports/pico_sdk_common/pico_cfunction_bridge.c
 	# port_load_overrides + picocalc_features are added by the
 	# PICOCALC selection block below — real on PicoCalc, stub elsewhere.
 	ports/pico_sdk_common/print_display_options.c
@@ -232,6 +239,10 @@ target_sources(PicoMite PRIVATE ${PICOMITE_LEGACY_CORE_SOURCES})
 target_sources(PicoMite PRIVATE ${PICOMITE_AUDIO_DEVICE_SOURCES})
 target_sources(PicoMite PRIVATE ${PICOMITE_CORE_STATE_SOURCES})
 target_sources(PicoMite PRIVATE ${PICOMITE_PICO_SDK_HAL_SOURCES})
+target_sources(PicoMite PRIVATE
+	runtime/runtime_abort.c
+	runtime/runtime_interrupt.c
+)
 # The project's headers (MMBasic_Includes.h, Draw.h, etc.) live in the
 # repo root. Sources in subdirectories (core/state/, future hal/ + drivers/
 # + ports/) need the root on the include path so their #includes resolve.

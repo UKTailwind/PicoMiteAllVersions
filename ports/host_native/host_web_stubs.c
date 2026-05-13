@@ -11,6 +11,7 @@
 
 void closeMQTT(void) {}
 void ProcessWeb(int mode) { (void)mode; }
+int host_tcp_interrupt_pending(void) { return 0; }
 void host_telnet_putc(int c, int flush) { (void)c; (void)flush; }
 
 void cmd_web(void) { error("WEB not supported on this port"); }
