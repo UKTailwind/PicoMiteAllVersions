@@ -51,11 +51,11 @@
  * Wires up via port_sources.cmake linkage; configuration.h reads it for
  * USB-vs-PS/2 flash offset / magic key / heap top selection. */
 #define HAL_PORT_KEYBOARD_USB_HOST        0
-#define HAL_PORT_HAS_I2C_KEYPAD          0
+#define HAL_PORT_HAS_I2C_KEYPAD          1
 
-/* core1stack[] size in words. WEB never launches core1 — single canary
- * word satisfies MMBasic.c's overflow check at core1stack[0]. */
-#define HAL_PORT_CORE1_STACK_WORDS       1
+/* core1stack[] size in words. WEBRP2350 with SPI LCD uses core1 for the
+ * same display merge / FASTGFX worker as the PicoMite SPI-LCD ports. */
+#define HAL_PORT_CORE1_STACK_WORDS       512
 
 /* Stage-D per-port memory + clock + MMBasic-table values (decascade plan
  * D1). WEBRP2350 has no USB-keyboard variant. */

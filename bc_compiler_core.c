@@ -13,6 +13,23 @@
 
 int bc_compiler_alloc(BCCompiler *cs) {
     memset(cs, 0, sizeof(*cs));
+    /* Allocation order matters for post-compact heap fragmentation. The
+     * MMBasic page allocator walks top-down, so the FIRST allocations
+     * land at the HIGHEST addresses (just below cs/vm). Allocate the
+     * five compile-only tables FIRST so they sit at high addresses and,
+     * when bc_compiler_compact frees them, the resulting hole is
+     * adjacent to vm. Step 2 of compact then alloc-news the shrunk
+     * runtime tables into that hole — they cluster contiguously below
+     * vm, and the freed-old-runtime positions merge with the heap
+     * below into one big contiguous free region. With the opposite
+     * order (runtime first, compile-only last) the hole is in the
+     * middle of the alive cluster and the post-compact heap is split
+     * into ~50% contiguous + scattered fragments. */
+    cs->fixups     = (BCFixup *)BC_COMPILER_ALLOC(BC_MAX_FIXUPS * sizeof(BCFixup));
+    cs->linemap    = (BCLineMap *)BC_COMPILER_ALLOC(BC_MAX_LINEMAP * sizeof(BCLineMap));
+    cs->labelmap   = (BCLabelMap *)BC_COMPILER_ALLOC(BC_MAX_LABELS * sizeof(BCLabelMap));
+    cs->nest_stack = (BCNestEntry *)BC_COMPILER_ALLOC(BC_MAX_NEST * sizeof(BCNestEntry));
+    cs->locals     = (BCLocalVar *)BC_COMPILER_ALLOC(BC_MAX_LOCALS * sizeof(BCLocalVar));
     cs->code       = (uint8_t *)BC_COMPILER_ALLOC(BC_MAX_CODE);
     cs->constants  = (BCConstant *)BC_COMPILER_ALLOC(BC_MAX_CONSTANTS * sizeof(BCConstant));
     cs->slots      = (BCSlot *)BC_COMPILER_ALLOC(BC_MAX_SLOTS * sizeof(BCSlot));
@@ -20,11 +37,6 @@ int bc_compiler_alloc(BCCompiler *cs) {
     cs->subfun_locals_base = (uint16_t *)BC_COMPILER_ALLOC(BC_MAX_SUBFUNS * sizeof(uint16_t));
     cs->local_meta = (BCLocalMeta *)BC_COMPILER_ALLOC(BC_MAX_LOCAL_META * sizeof(BCLocalMeta));
     cs->data_pool  = (BCDataItem *)BC_COMPILER_ALLOC(BC_MAX_DATA_ITEMS * sizeof(BCDataItem));
-    cs->fixups     = (BCFixup *)BC_COMPILER_ALLOC(BC_MAX_FIXUPS * sizeof(BCFixup));
-    cs->linemap    = (BCLineMap *)BC_COMPILER_ALLOC(BC_MAX_LINEMAP * sizeof(BCLineMap));
-    cs->labelmap   = (BCLabelMap *)BC_COMPILER_ALLOC(BC_MAX_LABELS * sizeof(BCLabelMap));
-    cs->nest_stack = (BCNestEntry *)BC_COMPILER_ALLOC(BC_MAX_NEST * sizeof(BCNestEntry));
-    cs->locals     = (BCLocalVar *)BC_COMPILER_ALLOC(BC_MAX_LOCALS * sizeof(BCLocalVar));
     if (!cs->code || !cs->constants || !cs->slots || !cs->subfuns ||
         !cs->subfun_locals_base ||
         !cs->fixups || !cs->linemap || !cs->labelmap || !cs->nest_stack || !cs->locals ||

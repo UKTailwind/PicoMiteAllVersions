@@ -36,13 +36,13 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
-#include "hardware/dma.h"
+#include "Draw.h"
 #include "hal/hal_flash.h"
 #include "hal/hal_time.h"
 #include "hal/hal_keyboard.h"
 #include "hal/hal_display_merge.h"
+#include "hal/hal_watchdog.h"
 #include "port_config.h"
-#include "hardware/structs/watchdog.h"
 #include "bc_alloc.h"
 #include "bc_run_diag.h"
 #define overlap (VRes % (FontTable[gui_font >> 4][1] * (gui_font & 0b1111)) ? 0 : 1)
@@ -54,6 +54,7 @@ extern void bc_run_source_string(const char *source, const char *source_name);
  * MMTCPclient.c, no-op stubs in MMweb_stubs.c / host_peripheral_stubs.c. */
 extern void cleanserver(void);
 extern void close_tcpclient(void);
+extern void port_runtime_abort_dma(void);
 char *KeyInterrupt=NULL;
 unsigned char* SaveNextDataLine = NULL;
 void execute_one_command(unsigned char *p);
@@ -123,7 +124,7 @@ static inline CommandToken commandtbl_decode(const unsigned char *p){
     return ((CommandToken)(p[0] & 0x7f)) | ((CommandToken)(p[1] & 0x7f)<<7);
 }
 
-void __not_in_flash_func(cmd_null)(void) {
+void HAL_PORT_MMBASIC_HOT_FUNC(cmd_null)(void) {
 	// do nothing (this is just a placeholder for commands that have no action)
 }
 /** @endcond */
@@ -500,7 +501,7 @@ void array_slice(unsigned char *tp){
 // because the LET is implied (ie, line does not have a recognisable command)
 // it ends up as the place where mistyped commands are discovered.  This is why
 // the error message is "Unknown command"
-void  MIPS16 __not_in_flash_func(cmd_let)(void) {
+void  MIPS16 HAL_PORT_MMBASIC_HOT_FUNC(cmd_let)(void) {
 	int t, size;
 	MMFLOAT f;
     long long int  i64;
@@ -1451,23 +1452,8 @@ if(Option.SerialConsole)while(ConsoleTxBufHead!=ConsoleTxBufTail)routinechecks()
 			memset(inpbuf,0,STRINGSIZE);
 		}
 	}
-    if(!(MMerrno == 16))hw_clear_bits(&watchdog_hw->ctrl, WATCHDOG_CTRL_ENABLE_BITS);
-    irq_set_enabled(DMA_IRQ_1, false);
-    dma_hw->abort = ((1u << dma_rx_chan2) | (1u << dma_rx_chan));
-    if(dma_channel_is_busy(dma_rx_chan))dma_channel_abort(dma_rx_chan);
-    if(dma_channel_is_busy(dma_rx_chan2))dma_channel_abort(dma_rx_chan2);
-//    dma_channel_cleanup(dma_rx_chan);
-//    dma_channel_cleanup(dma_rx_chan2);
-    dma_hw->abort = ((1u << dma_tx_chan2) | (1u << dma_tx_chan));
-    if(dma_channel_is_busy(dma_tx_chan))dma_channel_abort(dma_tx_chan);
-    if(dma_channel_is_busy(dma_tx_chan2))dma_channel_abort(dma_tx_chan2);
-//    dma_channel_cleanup(dma_tx_chan);
-//    dma_channel_cleanup(dma_tx_chan2);
-    dma_hw->abort = ((1u << ADC_dma_chan2) | (1u << ADC_dma_chan));
-    if(dma_channel_is_busy(ADC_dma_chan))dma_channel_abort(ADC_dma_chan);
-    if(dma_channel_is_busy(ADC_dma_chan2))dma_channel_abort(ADC_dma_chan2);
-//    dma_channel_cleanup(ADC_dma_chan);
-//    dma_channel_cleanup(ADC_dma_chan2);
+    if(!(MMerrno == 16)) hal_watchdog_disable();
+    port_runtime_abort_dma();
 	for(int i=0; i< NBRSETTICKS;i++){
 		TickPeriod[i]=0;
 		TickTimer[i]=0;
@@ -1482,7 +1468,7 @@ if(Option.SerialConsole)while(ConsoleTxBufHead!=ConsoleTxBufTail)routinechecks()
     ADCDualBuffering=0;
 	WatchdogSet = false;
     WDTimer = 0;
-	hw_clear_bits(&watchdog_hw->ctrl, WATCHDOG_CTRL_ENABLE_BITS);
+	hal_watchdog_disable();
 	_excep_code=0;
 	dmarunning = false;
     multi=false;
@@ -1496,7 +1482,7 @@ if(Option.SerialConsole)while(ConsoleTxBufHead!=ConsoleTxBufTail)routinechecks()
 		setmode(mode,false);
 	}
 	SSPrintString("\033[?25h"); //in case application has turned the cursor off
-	SSPrintString("\033[97;40m");
+	ApplyPromptConsoleColours();
 	close_tcpclient();
 	cleanserver();
 	{
@@ -2360,9 +2346,9 @@ void cmd_error(void) {
 }
 
 
-/* RANDOMIZE — seeds libc's rand() state. On rp2350 fun_rnd uses
- * get_rand_32() from pico_rand (hardware entropy), so RANDOMIZE is a
- * no-op there semantically but still accepted for source compat. */
+/* RANDOMIZE seeds libc's rand() state. Ports whose hal_random_u32() uses
+ * hardware entropy may ignore this seed semantically, but the command is
+ * still accepted for source compatibility. */
 void cmd_randomize(void) {
 	int i;
 	getargs(&cmdline,1,(unsigned char *)",");
@@ -2512,7 +2498,7 @@ void cmd_flag(void){
 	else g_flag &=~bit;
 }
 
-void MIPS16 __not_in_flash_func(cmd_return)(void) {
+void MIPS16 HAL_PORT_MMBASIC_HOT_FUNC(cmd_return)(void) {
  	checkend(cmdline);
 	if(gosubindex == 0 || gosubstack[gosubindex - 1] == NULL) error("Nothing to return to");
     ClearVars(g_LocalIndex--, true);                                        // delete any local variables

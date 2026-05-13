@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>ESP32 - GPIO</title>
+  <link rel="stylesheet" href="/style.css">
+  <meta http-equiv="refresh" content="5">
+</head>
+<body>
+  <header>
+    <h1>GPIO map</h1>
+    <p>Auto-refresh every 5s</p>
+  </header>
+  <nav>
+    <ul>
+      <li><a href="/">Home</a></li>
+      <li><a href="/status">Status</a></li>
+      <li><a href="/gpio">GPIO</a></li>
+      <li><a href="/files">Files</a></li>
+      <li><a href="/about">About</a></li>
+    </ul>
+  </nav>
+  <main>
+    <section>
+      <h2>GP0-GP47</h2>
+      <p>Each row holds 8 pins. To show live state, <code>SETPIN GPx, DIN</code> the pins you care about, then edit <code>OneRow$</code> in <code>server.bas</code> to include <code>" = " + STR$(PIN(GP i%))</code>.</p>
+      <div class="row">{rowA$}</div>
+      <div class="row">{rowB$}</div>
+      <div class="row">{rowC$}</div>
+      <div class="row">{rowD$}</div>
+      <div class="row">{rowE$}</div>
+      <div class="row">{rowF$}</div>
+    </section>
+  </main>
+  <footer>Served by MMBasic on ESP32-S3 - {TIME$}</footer>
+</body>
+</html>

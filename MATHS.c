@@ -34,12 +34,10 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
+#include "hal/hal_random.h"
 #include "hal/hal_time.h"
 #include <math.h>
 #include <complex.h>
-#ifdef rp2350
-#include "pico/rand.h"
-#endif
 #define CBC 1
 #define CTR 1
 #define ECB 1
@@ -972,11 +970,7 @@ MMFLOAT PIDController_Update(PIDController *pid, MMFLOAT setpoint, MMFLOAT measu
 }
 /*  @endcond */
 uint8_t getrnd(void){
-#ifdef rp2350
-	return get_rand_32() & 0xFF;
-#else
-	return rand() & 0xFF;
-#endif
+	return hal_random_u32() & 0xFF;
 }
 void cmd_math(void){
 	unsigned char *tp;

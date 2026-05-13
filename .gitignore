@@ -4,11 +4,15 @@ build2350_vm_only/
 build_rp2040/
 build_all/
 build_picocalc/
+build_web2350_picocalc/
+__pycache__/
+*/__pycache__/
 host/*.o
 host/*.d
 host/mmbasic_test
 host/mmbasic_legacy_test
 host/mmbasic_sim
+host/wasm_network_proxy
 host/sim_obj/
 host/wasm_obj/
 *.uf2
@@ -20,3 +24,8 @@ build_test/
 build_a0_vgawifi/
 build_dvi_wifi/
 build_lfs/
+ports/esp32_s3_metro/build/
+ports/esp32_s3_metro/sdkconfig
+ports/esp32_s3_metro/sdkconfig.old
+ports/esp32_s3_metro/managed_components/
+ports/esp32_s3_metro/dependencies.lock

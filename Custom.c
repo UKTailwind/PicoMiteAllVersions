@@ -114,12 +114,6 @@ int dma_rx_sm;
 bool PIO0 = HAL_PORT_PIO0_CLAIMED;
 bool PIO1 = HAL_PORT_PIO1_CLAIMED;
 bool PIO2 = HAL_PORT_PIO2_CLAIMED;
-/* TCPreceived / TCPreceiveInterrupt are read by MM_Misc.c's
- * interrupt-dispatch loop unconditionally so the loop itself can stay
- * preprocessor-clean. Only the WEB stack ever sets them; on non-WEB
- * builds the conditions never fire. */
-volatile bool TCPreceived = false;
-char         *TCPreceiveInterrupt = NULL;
 #ifdef rp2350
 uint64_t piomap[2]={0};
 #endif

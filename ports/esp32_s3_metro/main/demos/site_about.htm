@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>ESP32 - About</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header>
+    <h1>About this server</h1>
+    <p>How a 4 KB BASIC program serves a website</p>
+  </header>
+  <nav>
+    <ul>
+      <li><a href="/">Home</a></li>
+      <li><a href="/status">Status</a></li>
+      <li><a href="/gpio">GPIO</a></li>
+      <li><a href="/files">Files</a></li>
+      <li><a href="/about">About</a></li>
+    </ul>
+  </nav>
+  <main>
+    <section>
+      <h2>The dispatcher</h2>
+      <p>Every request fires a <code>WEB TCP INTERRUPT</code>. The handler reads the first line of the HTTP request, scrapes the URI, picks an HTML file by name, and hands the (pcb, filename) pair to <code>WEB TRANSMIT PAGE</code>. MMBasic then streams the file out, evaluating <code>&#123;...&#125;</code> expressions inline against current BASIC state.</p>
+      <p>Pages are static <code>.htm</code> files on A:; only the routing and the per-page state-prep run as code. Adding a new page is "drop a file, add a route line."</p>
+    </section>
+    <section>
+      <h2>The hardware</h2>
+      <table>
+        <tr><th>MCU</th><td>ESP32-S3</td></tr>
+        <tr><th>WiFi</th><td>Native ESP-IDF station mode</td></tr>
+        <tr><th>Storage</th><td>A: littlefs on internal flash</td></tr>
+      </table>
+    </section>
+    <section>
+      <h2>The software</h2>
+      <table>
+        <tr><th>SDK</th><td>ESP-IDF</td></tr>
+        <tr><th>Network stack</th><td>ESP-IDF sockets over lwIP</td></tr>
+        <tr><th>HTTP layer</th><td>Built-in: <code>WEB TRANSMIT PAGE</code> + <code>WEB TCP INTERRUPT</code></td></tr>
+        <tr><th>Templating</th><td><code>&#123;expr&#125;</code> at request time</td></tr>
+      </table>
+    </section>
+    <section>
+      <h2>Files on this site</h2>
+      <pre>A:server.bas    routing + per-page state preparation
+A:style.css     shared CSS
+A:index.htm     /
+A:status.htm    /status   (auto-refresh)
+A:gpio.htm      /gpio     (auto-refresh)
+A:files.htm     /files    (live filesystem listing)
+A:about.htm     /about    this page</pre>
+    </section>
+  </main>
+  <footer>Served by MMBasic on ESP32-S3 - {TIME$}</footer>
+</body>
+</html>

@@ -24,11 +24,23 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 ************************************************************************************************************************/
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
-#include "wifi_includes.h"
+#include "hal/hal_net.h"
+#include "shared/net/mm_net_lifecycle.h"
+#include "pico/cyw43_arch.h"
 //#define DEBUG_printf printf
 #define DEBUG_printf
+
+extern void pico_udp_poll(void);
+extern void pico_tcp_client_stream_poll(void);
+extern void pico_tcp_server_poll(void);
+extern void pico_mqtt_poll(void);
+extern void pico_tftp_poll(void);
+
 static char Telnetbuff[256]={0};
 static int Telnetpos=0;
+static hal_net_tcp_server_t pico_telnet_server;
+static hal_net_tcp_conn_t pico_telnet_conn;
+static int pico_telnet_lastchar=-1;
 static const uint8_t telnet_init_options[] =
 {
 //    TELNET_CHAR_IAC, TELNET_CHAR_WILL, TELNET_OPT_SUPPRESS_GO_AHEAD,
@@ -44,22 +56,6 @@ static const uint8_t telnet_init_options[] =
 0
 };
 
-static err_t tcp_telnet_sent(void *arg, struct tcp_pcb *tpcb, u16_t len) {
-    TCP_SERVER_T *state = (TCP_SERVER_T*)arg;
-//    DEBUG_printf("telnet_server_sent %u\n", len);
-    state->sent_len[state->telnet_pcb_no] = len;
-    return ERR_OK;
-}
-void TelnetPutCommand(int command, int option){
-        Telnetbuff[Telnetpos]=255;
-        Telnetpos++;
-        Telnetbuff[Telnetpos]=command;
-        Telnetpos++;
-        if(option){
-                Telnetbuff[Telnetpos]=255;
-                Telnetpos++;
-        }
-}
 /* Whether the BASIC port has a configured telnet listener.
  * SerialConsolePutC() in PicoMite.c uses this to gate the stdio
  * (USB-CDC + UART) console path. Stub returns 1 on non-WiFi ports
@@ -68,9 +64,30 @@ int wifi_serial_telnet_configured(void) {
     return Option.Telnet != -1;
 }
 
+static void pico_telnet_close_conn(void) {
+        if (pico_telnet_conn) {
+                hal_net_tcp_conn_close(pico_telnet_conn);
+                pico_telnet_conn = 0;
+        }
+        Telnetpos = 0;
+}
+
+void pico_telnet_close(void) {
+        pico_telnet_close_conn();
+        if (pico_telnet_server) {
+                hal_net_tcp_server_close(pico_telnet_server);
+                pico_telnet_server = 0;
+        }
+}
+
+int pico_telnet_open(void) {
+        if (!Option.Telnet || !WIFIconnected) return 1;
+        if (pico_telnet_server) return 1;
+        return hal_net_tcp_server_open(23, 1, &pico_telnet_server) == HAL_NET_OK;
+}
+
 void __not_in_flash_func(TelnetPutC)(int c,int flush){
-        TCP_SERVER_T *state = (TCP_SERVER_T*)TCPstate;
-        if(state->telnet_pcb_no==99 || !WIFIconnected )return;
+        if(!pico_telnet_conn || !WIFIconnected )return;
         if(!(flush==-1)){
                 Telnetbuff[Telnetpos]=c;
                 Telnetpos++;
@@ -83,128 +100,111 @@ void __not_in_flash_func(TelnetPutC)(int c,int flush){
                         Telnetpos++;
                 }
         }
-        if(Telnetpos>=sizeof(Telnetbuff-4) || (flush==-1 && Telnetpos)){
-                int pcb=state->telnet_pcb_no;
-                state->to_send[pcb]=Telnetpos;
-                state->buffer_sent[state->telnet_pcb_no]=(uint8_t *)Telnetbuff;
-                if(state->client_pcb[pcb]){
-//                        cyw43_arch_lwip_check();
-                        tcp_server_send_data(state, state->client_pcb[pcb], pcb);
+        if(Telnetpos>=sizeof(Telnetbuff)-4 || (flush==-1 && Telnetpos)){
+                if(hal_net_tcp_conn_send(pico_telnet_conn, Telnetbuff,
+                                         (size_t)Telnetpos, 5000) !=
+                   HAL_NET_OK) {
+                        pico_telnet_close_conn();
                 }
                 Telnetpos=0;
         }
 }
-err_t tcp_telnet_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err) {
-        static int lastchar=-1;
-//        TCP_SERVER_T *state = (TCP_SERVER_T*)arg;
-//        int pcb=state->telnet_pcb_no;
-        if (!p) {
-                return ERR_OK;
+
+static void pico_telnet_receive_bytes(const uint8_t *data, size_t len) {
+        if(!data || len == 0) return;
+        if(data[0]==255){
+//                for(size_t i=0;i<len;i++)DEBUG_printf("%d,",data[i]);
+//                DEBUG_printf("\r\n");
+                return;
         }
-//        cyw43_arch_lwip_check();
-        if (p->tot_len > 0) {
-                tcp_recved(tpcb, p->tot_len);
-                if(((char *)p->payload)[0]==255){
-//                        for(int i=0;i<p->tot_len;i++)DEBUG_printf("%d,",((char *)p->payload)[i]);
-//                        DEBUG_printf("\r\n");
+        for(size_t j=0;j<len;j++){
+                ConsoleRxBuf[ConsoleRxBufHead] = data[j];
+                if((pico_telnet_lastchar==13 &&
+                    ConsoleRxBuf[ConsoleRxBufHead]==0) ||
+                   (pico_telnet_lastchar==255 &&
+                    ConsoleRxBuf[ConsoleRxBufHead]==255)){
+                        pico_telnet_lastchar=-1;
+                        continue;
+                }
+                if(BreakKey && ConsoleRxBuf[ConsoleRxBufHead] == BreakKey) {
+                        MMAbort = true;
+                        ConsoleRxBufHead = ConsoleRxBufTail;
+                } else if(ConsoleRxBuf[ConsoleRxBufHead] ==keyselect &&
+                          KeyInterrupt!=NULL){
+                        Keycomplete=1;
                 } else {
-                        for(int j=0;j<p->tot_len;j++){
-                                ConsoleRxBuf[ConsoleRxBufHead] = ((char *)p->payload)[j];
-                                if((lastchar==13 && ConsoleRxBuf[ConsoleRxBufHead]==0) ||
-                                (lastchar==255 && ConsoleRxBuf[ConsoleRxBufHead]==255)){
-                                        lastchar=-1;
-                                        continue;
-                                }
-                                if(BreakKey && ConsoleRxBuf[ConsoleRxBufHead] == BreakKey) {// if the user wants to stop the progran
-                                        MMAbort = true;                                        // set the flag for the interpreter to see
-                                        ConsoleRxBufHead = ConsoleRxBufTail;                    // empty the buffer
-                                } else if(ConsoleRxBuf[ConsoleRxBufHead] ==keyselect && KeyInterrupt!=NULL){
-                                        Keycomplete=1;
-                                } else {
-                                        lastchar=ConsoleRxBuf[ConsoleRxBufHead];
-                                        ConsoleRxBufHead = (ConsoleRxBufHead + 1) % CONSOLE_RX_BUF_SIZE;     // advance the head of the queue
-                                        if(ConsoleRxBufHead == ConsoleRxBufTail) {                           // if the buffer has overflowed
-                                        ConsoleRxBufTail = (ConsoleRxBufTail + 1) % CONSOLE_RX_BUF_SIZE; // throw away the oldest char
-                                        }
-                                }
+                        pico_telnet_lastchar=ConsoleRxBuf[ConsoleRxBufHead];
+                        ConsoleRxBufHead = (ConsoleRxBufHead + 1) %
+                                           CONSOLE_RX_BUF_SIZE;
+                        if(ConsoleRxBufHead == ConsoleRxBufTail) {
+                                ConsoleRxBufTail = (ConsoleRxBufTail + 1) %
+                                                   CONSOLE_RX_BUF_SIZE;
                         }
                 }
         }
-        pbuf_free(p);
-        return ERR_OK;
 }
 
-void tcp_telnet_err(void *arg, err_t err) {
-    TCP_SERVER_T *state = (TCP_SERVER_T*)arg;
-//    if (err != ERR_ABRT) {
-//        char buff[STRINGSIZE]={0};
-//        DEBUG_printf("Telnet disconnected %d\r\n", err);
-        tcp_server_close(arg,state->telnet_pcb_no);
-        state->telnet_pcb_no=99;
-//        if(!CurrentLinePtr) longjmp(mark, 1);  
-//        else longjmp(ErrNext,1) ;
-//    }
-}
-
-/*static err_t tcp_telnet_poll(void *arg, struct tcp_pcb *tpcb) {
-        TCP_SERVER_T *state = (TCP_SERVER_T*)arg;
-//        cyw43_arch_lwip_check();
-        int i=0;
-        while(state->client_pcb[i]!=tpcb && i<=MaxPcb)i++;
-        if(i==MaxPcb)error("Internal TCP receive error");
-        state->write_pcb=i;
-        DEBUG_printf("tcp_server_poll_fn\r\n");
-        return tcp_server_close(argstate->telnet_pcb_no); // no activity so close the connection
-}*/
-
-void starttelnet(struct tcp_pcb *client_pcb, int pcb, void *arg){
-        TCP_SERVER_T *state = (TCP_SERVER_T*)arg;
-//        DEBUG_printf("Telnet Client connected %x on pcb %d\r\n",(uint32_t)client_pcb,pcb);
-        tcp_arg(client_pcb, state);
-        tcp_sent(client_pcb, tcp_telnet_sent);
-        tcp_recv(client_pcb, tcp_telnet_recv);
-        tcp_err(client_pcb, tcp_telnet_err);
-        state->telnet_pcb_no=pcb;
-        state->keepalive[pcb]=1;
-        err_t err = tcp_write(client_pcb, telnet_init_options, sizeof(telnet_init_options),  0);
-        if (err != ERR_OK) { 
-                tcp_server_close(state,pcb);
+void pico_telnet_poll(int mode) {
+        static uint64_t flushtimer=0;
+        if(!Option.Telnet || !WIFIconnected) {
+                pico_telnet_close();
+                return;
         }
-
+        if(!pico_telnet_server && !pico_telnet_open()) return;
+        if(!pico_telnet_conn) {
+                hal_net_tcp_conn_t conn = 0;
+                int rc = hal_net_tcp_accept_conn(pico_telnet_server, &conn);
+                if(rc == HAL_NET_OK) {
+                        pico_telnet_conn = conn;
+                        if(hal_net_tcp_conn_send(pico_telnet_conn,
+                                                 telnet_init_options,
+                                                 sizeof(telnet_init_options),
+                                                 5000) != HAL_NET_OK) {
+                                pico_telnet_close_conn();
+                                return;
+                        }
+                } else if(rc != HAL_NET_WOULD_BLOCK) {
+                        pico_telnet_close();
+                        return;
+                }
+        }
+        if(pico_telnet_conn) {
+                uint8_t buf[128];
+                for(;;) {
+                        size_t len = 0;
+                        int rc = hal_net_tcp_conn_recv(pico_telnet_conn, buf,
+                                                       sizeof(buf), &len);
+                        if(rc == HAL_NET_OK) {
+                                pico_telnet_receive_bytes(buf, len);
+                                continue;
+                        }
+                        if(rc != HAL_NET_WOULD_BLOCK)
+                                pico_telnet_close_conn();
+                        break;
+                }
+                if(mode && pico_telnet_conn && time_us_64() > flushtimer) {
+                        TelnetPutC(0,-1);
+                        flushtimer=time_us_64()+5000;
+                }
+        }
 }
 
 void __not_in_flash_func(ProcessWeb)(int mode){
-    static uint64_t flushtimer=0;
+    static const mm_net_lifecycle_poll_hooks_t hooks = {
+        .poll_udp = pico_udp_poll,
+        .poll_tftp = pico_tftp_poll,
+        .poll_tcp_client_stream = pico_tcp_client_stream_poll,
+        .poll_mqtt = pico_mqtt_poll,
+        .poll_tcp_server = pico_tcp_server_poll,
+        .poll_telnet = pico_telnet_poll,
+    };
     static uint64_t lastusec=0;
     static int testcount=0;  
     static int lastonoff=0;
     static uint64_t lastheartmsec=0;
     uint64_t timenow=time_us_64();   
     if(!WIFIconnected && startupcomplete)goto flashonly;
-    TCP_SERVER_T *state = (TCP_SERVER_T*)TCPstate;
-    if(!state)return;
-    int t=0;
-    for(int i=0;i<MaxPcb;i++){
-        if(state->client_pcb[i]==NULL){
-                t++;
-        } else if(state->client_pcb[i]==(struct tcp_pcb *)44){
-            if(timenow-state->pcbopentime[i] > 1000*(uint32_t)Option.ServerResponceTime + 20000000 && !state->keepalive[i]){
-                state->client_pcb[i]=NULL;
-//                    printf("PCB %d should be closed by now\r\n", i);
-            }
-        } else {
-            if(timenow-state->pcbopentime[i] > 1000*(uint32_t)Option.ServerResponceTime && !state->keepalive[i]){
-//                    printf("Warning PCB %d still open\r\n", i);
-                    if(state->buffer_recv[i]){
-                            tcp_server_close(state,i);
-                            error("No response to request from connection no. %",i+1);
-//                            printf("Warning: No response to request from connection no. %d\r\n",i+1);
-                    }
-                    tcp_server_close(state,i);
-                    state->client_pcb[i]=(struct tcp_pcb *)44;
-            }
-        }
-    }
+    mm_net_lifecycle_poll(&hooks, mode, 0);
     if(testcount == 0 || timenow>lastusec){
         lastusec=timenow+1000;
         testcount = 0 ;
@@ -213,12 +213,6 @@ void __not_in_flash_func(ProcessWeb)(int mode){
     testcount++;
     if(testcount==100)testcount=0;
     if(!mode)return;
-    if(state->telnet_pcb_no!=99){
-        if(timenow > flushtimer){
-            TelnetPutC(0,-1);
-            flushtimer=timenow+5000;
-        }
-    }
     flashonly:;
     if(Option.NoHeartbeat){
         if(lastonoff!=2){

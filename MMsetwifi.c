@@ -11,9 +11,13 @@
 
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
-#include "wifi_includes.h"
+#include "hal/hal_net.h"
+#include "shared/net/mm_net_http.h"
+#include "shared/net/mm_net_lifecycle.h"
+#include "shared/net/mm_net_options.h"
+#include "shared/net/mm_net_web_cmd.h"
+#include "shared/net/mm_net_wifi_cmd.h"
 #include "lwip/ip4_addr.h"
-#include "lwip/netif.h"
 #include "pico/cyw43_arch.h"
 #define CJSON_NESTING_LIMIT 100
 #include "cJSON.h"
@@ -21,164 +25,97 @@
 extern char id_out[12];
 extern bool optionsuppressstatus;
 extern void setwifi(unsigned char *tp);
+extern void WebConnect(void);
+extern int open_tcp_server(uint16_t port);
+extern void close_tcp_server(void);
+extern int open_udp_server(uint16_t port);
+extern void close_udp_server(void);
+extern int pico_tcp_server_request_pending(int pcb);
+extern const char *pico_tcp_server_path(int pcb);
+extern int cmd_mqtt(void);
+extern void cmd_ntp(unsigned char *tp);
+extern void cmd_udp(unsigned char *tp);
+extern int cmd_tcpclient(void);
+extern int cmd_tcpserver(void);
+extern int cmd_tftp_server_init(void);
+extern int pico_telnet_open(void);
+extern void pico_telnet_close(void);
+extern void pico_tftp_close(void);
+
+static void pico_validate_static_ip(
+    const mm_net_wifi_credentials_t *credentials) {
+    ip4_addr_t ipaddr;
+    if (!ip4addr_aton(credentials->ipaddress, &ipaddr))
+        error("Invalid IP address");
+    if (!ip4addr_aton(credentials->mask, &ipaddr))
+        error("Invalid mask address");
+    if (!ip4addr_aton(credentials->gateway, &ipaddr))
+        error("Invalid gateway address");
+}
 
 void setwifi(unsigned char *tp)
 {
-    getargs(&tp, 11, (unsigned char *)",");
-    if (!(argc == 3 || argc == 5 || argc == 11)) error("Syntax");
-    if (CurrentLinePtr) error("Invalid in a program");
-    char *ssid     = GetTempMemory(STRINGSIZE);
-    char *password = GetTempMemory(STRINGSIZE);
-    char *hostname = GetTempMemory(STRINGSIZE);
-    char *ipaddress = GetTempMemory(STRINGSIZE);
-    char *mask     = GetTempMemory(STRINGSIZE);
-    char *gateway  = GetTempMemory(STRINGSIZE);
-    strcpy(ssid,     (char *)getCstring(argv[0]));
-    strcpy(password, (char *)getCstring(argv[2]));
-    if (strlen(ssid)     > MAXKEYLEN - 1) error("SSID too long, max 63 chars");
-    if (strlen(password) > MAXKEYLEN - 1) error("Password too long, max 63 chars");
-    if (argc == 11) {
-        strcpy(ipaddress, (char *)getCstring(argv[6]));
-        strcpy(mask,      (char *)getCstring(argv[8]));
-        strcpy(gateway,   (char *)getCstring(argv[10]));
-        ip4_addr_t ipaddr;
-        if (!ip4addr_aton(ipaddress, &ipaddr)) error("Invalid IP address");
-        if (!ip4addr_aton(mask,      &ipaddr)) error("Invalid mask address");
-        if (!ip4addr_aton(gateway,   &ipaddr)) error("Invalid gateway address");
-    }
-    if (argc >= 5 && *argv[4]) {
-        strcpy(hostname, (char *)getCstring(argv[4]));
-        if (strlen(hostname) > 31) error("Hostname too long, max 31 chars");
-    } else {
-        strcpy(hostname, "PICO");
-        strcat(hostname, id_out);
-    }
-    strcpy((char *)Option.SSID,     ssid);
-    strcpy((char *)Option.PASSWORD, password);
-    if (argc == 11) {
-        strcpy(Option.ipaddress, ipaddress);
-        strcpy(Option.mask,      mask);
-        strcpy(Option.gateway,   gateway);
-    } else {
-        memset(Option.ipaddress, 0, 16);
-        memset(Option.mask,      0, 16);
-        memset(Option.gateway,   0, 16);
-    }
-    strcpy(Option.hostname, hostname);
-    SaveOptions();
+    char default_hostname[32];
+    strcpy(default_hostname, "PICO");
+    strcat(default_hostname, id_out);
+    mm_net_lifecycle_store_wifi_credentials(tp, default_hostname,
+                                            pico_validate_static_ip);
 }
 
 /* WEB-specific printoptions block. Called from MM_Misc.c's printoptions
  * unconditionally; non-WEB builds get a no-op stub elsewhere. */
-extern void PO(const char *p);
-extern void PO2Int(const char *fld, int val);
-extern void PO3Int(const char *fld, int v1, int v2);
-extern void PO2Str(const char *fld, const char *val);
-extern void PRet(void);
-extern void MMPrintString(char *s);
-extern char MMputchar(char c, int flush);
-
 void port_web_print_options(void)
 {
-    if(*Option.SSID){
-        char password[]="****************************************************************";
-        password[strlen((char *)Option.PASSWORD)]=0;
-        PO("WIFI");
-        MMPrintString((char *)Option.SSID);MMputchar(',',1);MMputchar(' ',1);
-        MMPrintString(password);
-        MMputchar(',',1);
-        MMputchar(' ',1);
-        MMPrintString(Option.hostname);
-        if(*Option.ipaddress){
-            MMputchar(',',1);
-            MMputchar(' ',1);
-            MMPrintString(Option.ipaddress);
-            MMputchar(',',1);
-            MMputchar(' ',1);
-            MMPrintString(Option.mask);
-            MMputchar(',',1);
-            MMputchar(' ',1);
-            MMPrintString(Option.gateway);
-        }
-        PRet();
-    }
-    if(Option.TCP_PORT && Option.ServerResponceTime!=5000)PO3Int("TCP SERVER PORT", Option.TCP_PORT, Option.ServerResponceTime);
-    if(Option.TCP_PORT && Option.ServerResponceTime==5000)PO2Int("TCP SERVER PORT", Option.TCP_PORT);
-    if(Option.UDP_PORT && Option.UDPServerResponceTime!=5000)PO3Int("UDP SERVER PORT", Option.UDP_PORT, Option.UDPServerResponceTime);
-    if(Option.UDP_PORT && Option.UDPServerResponceTime==5000)PO2Int("UDP SERVER PORT", Option.UDP_PORT);
-    if(Option.Telnet==1)PO2Str("TELNET", "CONSOLE ON");
-    if(Option.Telnet==-1)PO2Str("TELNET", "CONSOLE ONLY");
-    if(Option.disabletftp==1)PO2Str("TFTP", "OFF");
+    mm_net_print_wifi_option((char *)Option.SSID, (char *)Option.PASSWORD,
+                             Option.hostname, Option.ipaddress, Option.mask,
+                             Option.gateway);
+    mm_net_print_options(Option.TCP_PORT, Option.ServerResponceTime,
+                         Option.UDP_PORT, Option.UDPServerResponceTime,
+                         optionsuppressstatus);
+    mm_net_print_service_options((int)Option.Telnet, Option.disabletftp);
 }
 
+static mm_net_lifecycle_result_t pico_lifecycle_apply_wifi(unsigned char *arg)
+{
+    setwifi(arg);
+    WebConnect();
+    return MM_NET_LIFECYCLE_OK;
+}
+
+static int pico_lifecycle_open_tftp(void)
+{
+    return cmd_tftp_server_init();
+}
+
+static const mm_net_lifecycle_hooks_t pico_lifecycle_hooks = {
+    .apply_wifi = pico_lifecycle_apply_wifi,
+    .open_tcp_server = open_tcp_server,
+    .close_tcp_server = close_tcp_server,
+    .open_udp_server = open_udp_server,
+    .close_udp_server = close_udp_server,
+    .open_tftp = pico_lifecycle_open_tftp,
+    .close_tftp = pico_tftp_close,
+    .open_telnet = pico_telnet_open,
+    .close_telnet = pico_telnet_close,
+};
+
+static void pico_lifecycle_reboot_required(void)
+{
+    _excep_code = RESET_COMMAND;
+    SoftReset();
+}
+
+static const mm_net_lifecycle_result_handler_t pico_lifecycle_result_handler = {
+    .reboot_required = pico_lifecycle_reboot_required,
+};
+
 /* WEB-only OPTION setters: WEB MESSAGES / WIFI / TCP SERVER PORT /
- * UDP SERVER PORT / TELNET / TFTP. Returns 1 if matched (function
- * usually never returns — SoftReset). */
+ * UDP SERVER PORT / TELNET / TFTP. Returns 1 if matched. */
 int port_web_option_setter(unsigned char *cmdline)
 {
-    unsigned char *tp;
-    tp = checkstring(cmdline, (unsigned char *)"WEB MESSAGES");
-    if(tp) {
-        if(checkstring(tp, (unsigned char *)"OFF"))	{ optionsuppressstatus=1; return 1; }
-        if(checkstring(tp, (unsigned char *)"ON"))	{ optionsuppressstatus=0; return 1; }
-    }
-    tp = checkstring(cmdline, (unsigned char *)"WIFI");
-    if(tp) {
-        setwifi(tp);
-        _excep_code = RESET_COMMAND;
-        SoftReset();
-        return 1;
-    }
-    tp = checkstring(cmdline, (unsigned char *)"TCP SERVER PORT");
-    if(tp) {
-        getargs(&tp,3,(unsigned char *)",");
-        if(CurrentLinePtr) error("Invalid in a program");
-        Option.TCP_PORT=getint(argv[0],0,65535);
-        Option.ServerResponceTime=5000;
-        if(argc==3)Option.ServerResponceTime=getint(argv[2],1000,20000);
-        SaveOptions();
-        _excep_code = RESET_COMMAND;
-        SoftReset();
-        return 1;
-    }
-    tp = checkstring(cmdline, (unsigned char *)"UDP SERVER PORT");
-    if(tp) {
-        getargs(&tp,3,(unsigned char *)",");
-        if(CurrentLinePtr) error("Invalid in a program");
-        Option.UDP_PORT=getint(argv[0],0,65535);
-        Option.UDPServerResponceTime=5000;
-        if(argc==3)Option.UDPServerResponceTime=getint(argv[2],1000,20000);
-        SaveOptions();
-        _excep_code = RESET_COMMAND;
-        SoftReset();
-        return 1;
-    }
-    tp = checkstring(cmdline, (unsigned char *)"TELNET CONSOLE");
-    if(tp) {
-        if(CurrentLinePtr) error("Invalid in a program");
-        if(checkstring(tp, (unsigned char *)"OFF"))Option.Telnet=0;
-        else if(checkstring(tp, (unsigned char *)"ON"))Option.Telnet=1;
-        else if(checkstring(tp, (unsigned char *)"ONLY")) Option.Telnet=-1;
-        else error("Syntax");
-        SaveOptions();
-        _excep_code = RESET_COMMAND;
-        SoftReset();
-        return 1;
-    }
-    tp = checkstring(cmdline, (unsigned char *)"TFTP");
-    if(tp) {
-        if(CurrentLinePtr) error("Invalid in a program");
-        if(checkstring(tp, (unsigned char *)"OFF"))Option.disabletftp=1;
-        else if(checkstring(tp, (unsigned char *)"ON"))Option.disabletftp=0;
-        else if(checkstring(tp, (unsigned char *)"ENABLE"))Option.disabletftp=0;
-        else if(checkstring(tp, (unsigned char *)"DISABLE"))Option.disabletftp=1;
-        else error("Syntax");
-        SaveOptions();
-        _excep_code = RESET_COMMAND;
-        SoftReset();
-        return 1;
-    }
-    return 0;
+    return mm_net_lifecycle_handle_option_result(
+        mm_net_lifecycle_option_setter(cmdline, &pico_lifecycle_hooks),
+        &pico_lifecycle_result_handler);
 }
 
 /* WEB-only MM.<X> info function: TCP REQUEST / TCP PORT / UDP PORT /
@@ -186,45 +123,17 @@ int port_web_option_setter(unsigned char *cmdline)
 int port_web_mminfo(unsigned char *ep, int64_t *out_iret,
                     unsigned char *out_sret, int *out_targ)
 {
-    unsigned char *tp;
-    if((tp=checkstring(ep, (unsigned char *)"TCP REQUEST"))){
-        int i=getint(tp,1,MaxPcb)-1;
-        *out_iret=TCPstate->inttrig[i];
-        *out_targ=T_INT;
-        return 1;
-    }
-    if((tp=checkstring(ep, (unsigned char *)"TCP PORT"))){
-        *out_iret=Option.TCP_PORT;
-        *out_targ=T_INT;
-        return 1;
-    }
-    if((tp=checkstring(ep, (unsigned char *)"UDP PORT"))){
-        *out_iret=Option.UDP_PORT;
-        *out_targ=T_INT;
-        return 1;
-    }
-    if(checkstring(ep,(unsigned char *)"IP ADDRESS")){
-        strcpy((char *)out_sret,ip4addr_ntoa(netif_ip4_addr(netif_list)));
-        CtoM(out_sret);
-        *out_targ=T_STR;
-        return 1;
-    }
-    if(checkstring(ep,(unsigned char *)"MAX CONNECTIONS")){
-        *out_iret=MaxPcb;
-        *out_targ=T_INT;
-        return 1;
-    }
-    if(checkstring(ep,(unsigned char *)"WIFI STATUS")){
-        *out_iret=cyw43_wifi_link_status(&cyw43_state,CYW43_ITF_STA);
-        *out_targ=T_INT;
-        return 1;
-    }
-    if(checkstring(ep,(unsigned char *)"TCPIP STATUS")){
-        *out_iret=cyw43_tcpip_link_status(&cyw43_state,CYW43_ITF_STA);
-        *out_targ=T_INT;
-        return 1;
-    }
-    return 0;
+    const mm_net_info_hooks_t hooks = {
+        .tcp_path = pico_tcp_server_path,
+        .tcp_request_pending = pico_tcp_server_request_pending,
+        .max_connections = MaxPcb,
+        .tcp_port = Option.TCP_PORT,
+        .udp_port = Option.UDP_PORT,
+        .ip_address = hal_net_ip_address,
+        .wifi_status = hal_net_wifi_status,
+        .tcpip_status = hal_net_tcpip_status,
+    };
+    return mm_net_mminfo(ep, out_iret, out_sret, out_targ, &hooks);
 }
 
 /* OPTION SSID$ getter — separate so MM_Misc.c's OPTION info chain stays
@@ -243,43 +152,14 @@ int port_web_get_ssid(unsigned char *out_sret, int *out_targ)
  * non-WiFi devices. */
 volatile int WIFIconnected = 0;
 int startupcomplete = 0;
-extern void open_tcp_server(void);
-extern void open_udp_server(void);
 
 void WebConnect(void){
-    if(*Option.SSID){
-        if(*Option.ipaddress){
-            cyw43_arch_enable_sta_mode();
-            dhcp_stop(cyw43_state.netif);
-            ip4_addr_t ipaddr, gateway, mask;
-            ip4addr_aton(Option.ipaddress, &ipaddr);
-            ip4addr_aton(Option.gateway, &gateway);
-            ip4addr_aton(Option.mask, &mask);
-            netif_set_addr( cyw43_state.netif,&ipaddr,&mask,&gateway);
-        } else cyw43_arch_enable_sta_mode();
-        if(*Option.hostname){
-            MMPrintString(Option.hostname);
-            netif_set_hostname(cyw43_state.netif, Option.hostname);
-        }
-        cyw43_wifi_pm(&cyw43_state, CYW43_NO_POWERSAVE_MODE);
-        MMPrintString(" connecting to WiFi...\r\n");
-        if (cyw43_arch_wifi_connect_timeout_ms((char *)Option.SSID, (char *)(*Option.PASSWORD ? Option.PASSWORD : NULL), (*Option.PASSWORD ? CYW43_AUTH_WPA2_AES_PSK : CYW43_AUTH_OPEN), 30000)) {
-            MMPrintString("failed to connect.\r\n");
-            WIFIconnected=0;
-        } else {
-            char buff[STRINGSIZE]={0};
-            sprintf(buff,"Connected %s\r\n",ip4addr_ntoa(netif_ip4_addr(netif_list)));
-            MMPrintString(buff);
-            WIFIconnected=1;
-            open_tcp_server();
-            if(!Option.disabletftp)cmd_tftp_server_init();
-            if(Option.UDP_PORT)open_udp_server();
-        }
-    } else {
-        cyw43_arch_enable_sta_mode();
-        cyw43_wifi_pm(&cyw43_state, CYW43_NO_POWERSAVE_MODE);
-    }
-    cyw43_wifi_pm(&cyw43_state, CYW43_DEFAULT_PM & ~0xf);
+    static const mm_net_lifecycle_wifi_connect_t connect = {
+        .hooks = &pico_lifecycle_hooks,
+        .default_hostname = NULL,
+        .no_ssid_timeout_ms = 0,
+    };
+    (void)mm_net_lifecycle_wifi_connect(&connect);
 }
 
 #include "hal/hal_option_setters.h"
@@ -361,108 +241,64 @@ int port_setter_heartbeat(unsigned char *cmdline) {
  * MMweb_stubs.c and never reference fun_json (excluded from the
  * non-WiFi token-palette in port_tokens.h). */
 
-extern void cmd_ntp(unsigned char *cmdline);
-extern void cmd_udp(unsigned char *cmdline);
-extern int  cmd_mqtt(void);
-extern int  cmd_tcpclient(void);
-extern int  cmd_tcpserver(void);
 extern int  startupcomplete;
 
-char *scan_dest = NULL;
-volatile char *scan_dups = NULL;
-volatile int scan_size;
-
-static int scan_result(void *env, const cyw43_ev_scan_result_t *result) {
-    if (result) {
-        Timer4 = 5000;
-        char buff[STRINGSIZE] = {0};
-        if (scan_dups == NULL) return 0;
-        for (int i = 0; i < scan_dups[32 * 100]; i++) {
-            if (strcmp((char *)result->ssid, (char *)&scan_dups[32 * i]) == 0) return 0;
-        }
-        for (int i = 0; i < 100; i++) {
-            if (scan_dups[32 * i] == 0) {
-                strcpy((char *)&scan_dups[32 * i], (char *)result->ssid);
-                scan_dups[32 * 100]++;
-                break;
-            }
-        }
-        sprintf(buff, "ssid: %-32s rssi: %4d chan: %3d mac: %02x:%02x:%02x:%02x:%02x:%02x sec: %u\r\n",
-            result->ssid, result->rssi, result->channel,
-            result->bssid[0], result->bssid[1], result->bssid[2], result->bssid[3], result->bssid[4], result->bssid[5],
-            result->auth_mode);
-        if (scan_dest != NULL) {
-            if (strlen(((char *)&scan_dest[8]) + strlen(buff)) > scan_size) {
-                FreeMemorySafe((void **)&scan_dups);
-                scan_dest = NULL;
-                error("Array too small");
-            }
-            if (scan_dest[8] == 0) strcpy(&scan_dest[8], buff);
-            else strcat(&scan_dest[8], buff);
-        } else MMPrintString(buff);
+static void pico_web_connect_cmd(unsigned char *arg) {
+    if (*arg) {
+        setwifi(arg);
+        WebConnect();
+    } else if (hal_net_wifi_status() < 0) {
+        WebConnect();
     }
-    return 0;
+}
+
+static void pico_web_scan_cmd(unsigned char *arg) {
+    mm_net_wifi_scan_command(arg);
+}
+
+static int pico_web_is_connected(void) {
+    return WIFIconnected &&
+           hal_net_tcpip_status() == CYW43_LINK_UP;
+}
+
+static int pico_web_mqtt_cmd(unsigned char *line) {
+    (void)line;
+    return cmd_mqtt();
+}
+
+static int pico_web_tcp_client_cmd(unsigned char *line) {
+    (void)line;
+    return cmd_tcpclient();
+}
+
+static int pico_web_tcp_server_cmd(unsigned char *arg) {
+    (void)arg;
+    return cmd_tcpserver();
+}
+
+static void pico_web_ntp_cmd(unsigned char *arg) {
+    cmd_ntp(arg);
+}
+
+static int pico_web_udp_cmd(unsigned char *arg) {
+    cmd_udp(arg);
+    return 1;
 }
 
 void cmd_web(void) {
-    unsigned char *tp;
-    tp = checkstring(cmdline, (unsigned char *)"CONNECT");
-    if (tp) {
-        if (*tp) {
-            setwifi(tp);
-            WebConnect();
-        } else {
-            if (cyw43_wifi_link_status(&cyw43_state, CYW43_ITF_STA) < 0) {
-                WebConnect();
-            }
-        }
-        return;
-    }
-    tp = checkstring(cmdline, (unsigned char *)"SCAN");
-    if (tp) {
-        void *ptr1 = NULL;
-        if (*tp) {
-            ptr1 = findvar(tp, V_FIND | V_EMPTY_OK);
-            if (g_vartbl[g_VarIndex].type & T_INT) {
-                if (g_vartbl[g_VarIndex].dims[1] != 0) error("Invalid variable");
-                if (g_vartbl[g_VarIndex].dims[0] <= 0) {
-                    error("Argument 1 must be integer array");
-                }
-                scan_size = (g_vartbl[g_VarIndex].dims[0] - g_OptionBase) * 8;
-                scan_dest = (char *)ptr1;
-                scan_dest[8] = 0;
-            } else error("Argument 1 must be integer array");
-        }
-        scan_dups = GetMemory(32 * 100 + 1);
-        cyw43_wifi_scan_options_t scan_options = {0};
-        int err = cyw43_wifi_scan(&cyw43_state, &scan_options, NULL, scan_result);
-        if (err == 0) {
-            MMPrintString("\nPerforming wifi scan\r\n");
-        } else {
-            char buff[STRINGSIZE] = {0};
-            sprintf(buff, "Failed to start scan: %d\r\n", err);
-            MMPrintString(buff);
-        }
-        Timer4 = 500;
-        while (Timer4) if (startupcomplete) ProcessWeb(0);
-        if (scan_dest) {
-            uint64_t *p = (uint64_t *)scan_dest;
-            *p = strlen(&scan_dest[8]);
-        }
-        scan_dest = NULL;
-        FreeMemorySafe((void **)&scan_dups);
-        return;
-    }
-    if (!(WIFIconnected && cyw43_tcpip_link_status(&cyw43_state, CYW43_ITF_STA) == CYW43_LINK_UP))
-        error("WIFI not connected");
-    tp = checkstring(cmdline, (unsigned char *)"NTP");
-    if (tp) { cmd_ntp(tp); return; }
-    tp = checkstring(cmdline, (unsigned char *)"UDP");
-    if (tp) { cmd_udp(tp); return; }
-    if (cmd_mqtt())      return;
-    if (cmd_tcpclient()) return;
-    if (cmd_tcpserver()) return;
-    error("Syntax");
+    static const mm_net_web_dispatch_t dispatch = {
+        .connect = pico_web_connect_cmd,
+        .scan = pico_web_scan_cmd,
+        .is_connected = pico_web_is_connected,
+        .not_connected_error = "WIFI not connected",
+        .mqtt = pico_web_mqtt_cmd,
+        .tcp_client = pico_web_tcp_client_cmd,
+        .transmit = pico_web_tcp_server_cmd,
+        .tcp_server = pico_web_tcp_server_cmd,
+        .ntp = pico_web_ntp_cmd,
+        .udp = pico_web_udp_cmd,
+    };
+    mm_net_web_dispatch(cmdline, &dispatch);
 }
 
 void fun_json(void) {

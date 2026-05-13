@@ -127,6 +127,57 @@ async function initInstance(cfg) {
     if (cfg.res)      instance._wasm_set_framebuffer_size(cfg.res.w, cfg.res.h);
     if (cfg.heap)     instance._wasm_set_heap_size(cfg.heap);
     if (cfg.slowdown) instance._wasm_set_slowdown_us(cfg.slowdown);
+    if (cfg.proxy && typeof instance._wasm_set_proxy_mode === 'function') {
+        instance._wasm_set_proxy_mode(cfg.proxy.online ? 1 : 0);
+    }
+    if (cfg.proxy && typeof instance._wasm_set_proxy_http_capability === 'function') {
+        const httpProxy = cfg.proxy.online === true &&
+            cfg.proxy.caps?.features?.http_proxy === true;
+        instance._wasm_set_proxy_http_capability(httpProxy ? 1 : 0);
+    }
+    if (cfg.proxy && typeof instance._wasm_set_proxy_tcp_stream_capability === 'function') {
+        const tcpStream = cfg.proxy.online === true &&
+            cfg.proxy.caps?.features?.tcp_stream === true;
+        instance._wasm_set_proxy_tcp_stream_capability(tcpStream ? 1 : 0);
+    }
+    if (cfg.proxy && typeof instance._wasm_set_proxy_tcp_server_capability === 'function') {
+        const tcpServer = cfg.proxy.online === true &&
+            cfg.proxy.caps?.features?.tcp_server === true;
+        instance._wasm_set_proxy_tcp_server_capability(tcpServer ? 1 : 0);
+    }
+    if (cfg.proxy && typeof instance._wasm_set_proxy_udp_capability === 'function') {
+        const udp = cfg.proxy.online === true &&
+            cfg.proxy.caps?.features?.udp === true;
+        instance._wasm_set_proxy_udp_capability(udp ? 1 : 0);
+    }
+    if (cfg.proxy && typeof instance._wasm_set_proxy_ntp_capability === 'function') {
+        const ntp = cfg.proxy.online === true &&
+            cfg.proxy.caps?.features?.ntp === true;
+        instance._wasm_set_proxy_ntp_capability(ntp ? 1 : 0);
+    }
+    if (cfg.proxy && typeof instance._wasm_set_proxy_tftp_capability === 'function') {
+        const tftp = cfg.proxy.online === true &&
+            cfg.proxy.caps?.features?.tftp === true;
+        instance._wasm_set_proxy_tftp_capability(tftp ? 1 : 0);
+    }
+    if (cfg.proxy && typeof instance._wasm_set_proxy_telnet_capability === 'function') {
+        const telnet = cfg.proxy.online === true &&
+            cfg.proxy.caps?.features?.telnet === true &&
+            cfg.proxy.caps?.features?.tcp_server === true;
+        instance._wasm_set_proxy_telnet_capability(telnet ? 1 : 0);
+    }
+    if (cfg.proxy && typeof instance._wasm_set_proxy_mqtt_plain_capability === 'function') {
+        const mqttPlain = cfg.proxy.online === true &&
+            cfg.proxy.caps?.features?.mqtt_plain === true &&
+            cfg.proxy.caps?.features?.tcp_stream === true;
+        instance._wasm_set_proxy_mqtt_plain_capability(mqttPlain ? 1 : 0);
+    }
+    if (cfg.proxy?.tftpPort && typeof instance._wasm_set_proxy_tftp_port === 'function') {
+        instance._wasm_set_proxy_tftp_port(cfg.proxy.tftpPort);
+    }
+    if (cfg.proxy?.telnetPort && typeof instance._wasm_set_proxy_telnet_port === 'function') {
+        instance._wasm_set_proxy_telnet_port(cfg.proxy.telnetPort);
+    }
 
     await mountSd(!!cfg.persistSd);
     installFsTracker();

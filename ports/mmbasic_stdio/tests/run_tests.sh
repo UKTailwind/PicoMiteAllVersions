@@ -23,8 +23,8 @@ if [ ! -x "$BINARY" ]; then
 fi
 
 # Strip ANSI CSI sequences (ESC [ ... letter) and bare CRs from a file.
-# do_end's SSPrintString emits e.g. \e[?25h (show cursor) and \e[97;40m
-# (reset fg/bg) when an error ends a program; host_runtime.c's
+# do_end's SSPrintString emits e.g. \e[?25h (show cursor) and the
+# prompt colour restore when an error ends a program; host_runtime.c's
 # SerialConsolePutC translates \n to \r\n in raw mode. Neither is part
 # of the BASIC-visible output.
 strip_ansi() {

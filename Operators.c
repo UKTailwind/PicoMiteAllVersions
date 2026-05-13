@@ -62,12 +62,12 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 
 
 
-void  __not_in_flash_func(op_invalid)(void) {
+void  HAL_PORT_MMBASIC_HOT_FUNC(op_invalid)(void) {
 	error("Syntax error");
 }
 /*  @endcond */
 
-void  __not_in_flash_func(op_exp)(void) {
+void  HAL_PORT_MMBASIC_HOT_FUNC(op_exp)(void) {
     long long int  i;
     if(targ & T_NBR){
         fret = (MMFLOAT)pow(farg1, farg2);
@@ -83,7 +83,7 @@ void  __not_in_flash_func(op_exp)(void) {
 }
 
 
-void  __not_in_flash_func(op_mul)(void) {
+void  HAL_PORT_MMBASIC_HOT_FUNC(op_mul)(void) {
     if(targ & T_NBR){
         fret = farg1 * farg2;
         if(fret==INFINITY) error("Overflow");
@@ -94,7 +94,7 @@ void  __not_in_flash_func(op_mul)(void) {
 
 
 // division will always return a float even if given integer arguments
-void  __not_in_flash_func(op_div)(void) {
+void  HAL_PORT_MMBASIC_HOT_FUNC(op_div)(void) {
     if(farg2 == 0) error("Divide by zero");
     fret = farg1 / farg2;
     if(fret==INFINITY) error("Overflow");
@@ -102,13 +102,13 @@ void  __not_in_flash_func(op_div)(void) {
 }
 
 
-void  __not_in_flash_func(op_divint)(void) {
+void  HAL_PORT_MMBASIC_HOT_FUNC(op_divint)(void) {
     if(iarg2 == 0) error("Divide by zero");
     iret = iarg1 / iarg2;
 }
 
 
-void  __not_in_flash_func(op_add)(void) {
+void  HAL_PORT_MMBASIC_HOT_FUNC(op_add)(void) {
 	if(targ & T_NBR){
 		fret = farg1 + farg2;
         if(fret==INFINITY) error("Overflow");
@@ -123,7 +123,7 @@ void  __not_in_flash_func(op_add)(void) {
 	}
 }
 
-void  __not_in_flash_func(op_subtract)(void) {
+void  HAL_PORT_MMBASIC_HOT_FUNC(op_subtract)(void) {
 	if(targ & T_NBR)
 		fret = farg1 - farg2;
 	else
@@ -131,7 +131,7 @@ void  __not_in_flash_func(op_subtract)(void) {
 }
 
 
-void  __not_in_flash_func(op_mod)(void) {
+void  HAL_PORT_MMBASIC_HOT_FUNC(op_mod)(void) {
     if(iarg2 == 0) error("Divide by zero");
     iret = iarg1 % iarg2;
 }
@@ -164,7 +164,7 @@ static inline long long int (compare)(void) {
 }
 /*  @endcond */
 
-void  __not_in_flash_func(op_ne)(void) {
+void  HAL_PORT_MMBASIC_HOT_FUNC(op_ne)(void) {
     if(targ & T_INT)
         iret = iarg1 != iarg2;
     else
@@ -173,27 +173,27 @@ void  __not_in_flash_func(op_ne)(void) {
 
 
 
-void  __not_in_flash_func(op_gte)(void) {
+void  HAL_PORT_MMBASIC_HOT_FUNC(op_gte)(void) {
     iret = (compare() >= 0);
 }
 
 
-void  __not_in_flash_func(op_lte)(void) {
+void  HAL_PORT_MMBASIC_HOT_FUNC(op_lte)(void) {
     iret = (compare() <= 0);
 }
 
 
-void  __not_in_flash_func(op_lt)(void) {
+void  HAL_PORT_MMBASIC_HOT_FUNC(op_lt)(void) {
     iret = (compare() < 0);
 }
 
 
-void  __not_in_flash_func(op_gt)(void) {
+void  HAL_PORT_MMBASIC_HOT_FUNC(op_gt)(void) {
     iret = (compare() > 0);
 }
 
 
-void  __not_in_flash_func(op_equal)(void) {
+void  HAL_PORT_MMBASIC_HOT_FUNC(op_equal)(void) {
     if(targ & T_INT)
         iret = iarg1 == iarg2;
     else
@@ -201,38 +201,38 @@ void  __not_in_flash_func(op_equal)(void) {
 }
 
 
-void  __not_in_flash_func(op_shiftleft)(void) {
+void  HAL_PORT_MMBASIC_HOT_FUNC(op_shiftleft)(void) {
     iret = (long long int )((unsigned long long int )iarg1 << (long long int )iarg2);
 }
 
 
-void  __not_in_flash_func(op_shiftright)(void) {
+void  HAL_PORT_MMBASIC_HOT_FUNC(op_shiftright)(void) {
     iret = (long long int )((unsigned long long int )iarg1 >> (long long int )iarg2);
 }
 
 
-void  __not_in_flash_func(op_and)(void) {
+void  HAL_PORT_MMBASIC_HOT_FUNC(op_and)(void) {
     iret = (long long int )((unsigned long long int )iarg1 & (unsigned long long int )iarg2);
 }
 
 
-void  __not_in_flash_func(op_or)(void) {
+void  HAL_PORT_MMBASIC_HOT_FUNC(op_or)(void) {
     iret = (long long int )((unsigned long long int )iarg1 | (unsigned long long int )iarg2);
 }
 
 
-void  __not_in_flash_func(op_xor)(void) {
+void  HAL_PORT_MMBASIC_HOT_FUNC(op_xor)(void) {
     iret = (long long int )((unsigned long long int )iarg1 ^ (unsigned long long int )iarg2);
 }
 
 
 
-void  __not_in_flash_func(op_not)(void){
+void  HAL_PORT_MMBASIC_HOT_FUNC(op_not)(void){
 	// don't do anything, just a place holder
 	error("Syntax error");
 }
 
-void  __not_in_flash_func(op_inv)(void){
+void  HAL_PORT_MMBASIC_HOT_FUNC(op_inv)(void){
 	// don't do anything, just a place holder
 	error("Syntax error");
 }

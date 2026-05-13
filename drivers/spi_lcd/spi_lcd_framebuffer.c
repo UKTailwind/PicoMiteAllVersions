@@ -28,6 +28,7 @@
 #include "bc_alloc.h"
 #include "hal/hal_display_merge.h"
 #include "hardware/dma.h"
+#include "hardware/gpio.h"
 
 /* File-scope globals defined in Draw.c / SSD1963.c. */
 extern int map[16];

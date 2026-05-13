@@ -28,6 +28,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "Hardware_Includes.h"
 #include "hal/hal_spi_lcd_mem332.h"
 #include "hardware/dma.h"
+#include "hardware/gpio.h"
 #include "pico/multicore.h"
 int CurrentSPIDevice=NONE_SPI_DEVICE;
 const struct Displays display_details[]={

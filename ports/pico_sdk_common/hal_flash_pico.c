@@ -22,6 +22,35 @@
 #include "configuration.h"             /* FLASH_TARGET_OFFSET, PROGSTART, MAX_PROG_SIZE, FLASH_ERASE_SIZE */
 #include "hal/hal_flash.h"
 
+extern void mmbasic_save_psram_settings(void);
+extern void mmbasic_restore_psram_settings(void);
+
+static uint32_t s_flash_irq_state;
+static int s_flash_write_depth;
+
+void hal_flash_write_begin(void)
+{
+    if (s_flash_write_depth++ == 0) {
+        mmbasic_save_psram_settings();
+        s_flash_irq_state = save_and_disable_interrupts();
+    }
+}
+
+void hal_flash_write_end(void)
+{
+    if (s_flash_write_depth <= 0) return;
+    if (--s_flash_write_depth == 0) {
+        mmbasic_restore_psram_settings();
+        restore_interrupts(s_flash_irq_state);
+        s_flash_irq_state = 0;
+    }
+}
+
+int hal_flash_write_active(void)
+{
+    return s_flash_write_depth > 0;
+}
+
 int hal_flash_erase(uint32_t offset, size_t len)
 {
     if (len == 0) return 0;

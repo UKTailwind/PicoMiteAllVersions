@@ -11,7 +11,7 @@
  * vm_sys_pin.c — device-side impl of the VM's pin syscalls.
  *
  * Drives rp2040 / rp2350 PWM slices, ADC, GPIO via the pico SDK.
- * Paired with host/vm_sys_pin_host.c (software simulation); the
+ * Paired with ports/vm_sys_sim/vm_sys_pin_sim.c (software simulation); the
  * build links exactly one of the two per target.
  *
  * Shared helpers + PWM-slice storage macros live in
@@ -447,4 +447,3 @@ void vm_sys_pin_reset(void) {
     memset(vm_pwm_pin_b, 0, sizeof(vm_pwm_pin_b));
     memset(vm_pwm_started, 0, sizeof(vm_pwm_started));
 }
-

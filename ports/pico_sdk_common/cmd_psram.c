@@ -124,19 +124,19 @@ void MIPS16 cmd_psram(void)
     } else if ((p = checkstring(cmdline, (unsigned char *)"LOAD"))) {
         if (CurrentLinePtr) error("Invalid in program");
         int j = (Option.PROG_FLASH_SIZE >> 2), i = getint(p, 1, MAXRAMSLOTS);
-        disable_interrupts_pico();
+        fileio_flash_write_begin();
         hal_flash_erase(PROGSTART, MAX_PROG_SIZE);
-        enable_interrupts_pico();
+        fileio_flash_write_end();
         j = (MAX_PROG_SIZE >> 2);
         uSec(250000);
         int *pp = (int *)flash_progmemory;
         while (j--)
             if (*pp++ != 0xFFFFFFFF) error("Erase error");
-        disable_interrupts_pico();
+        fileio_flash_write_begin();
         uint8_t *q = (uint8_t *)(PSRAMblock + ((i - 1) * MAX_PROG_SIZE));
         uint8_t *writebuff = GetTempMemory(4096);
         if (*q == 0xFF) {
-            enable_interrupts_pico();
+            fileio_flash_write_end();
             FlashWriteInit(PROGRAM_FLASH);
             hal_flash_erase(realflashpointer, MAX_PROG_SIZE);
             FlashWriteByte(0);
@@ -149,7 +149,7 @@ void MIPS16 cmd_psram(void)
             for (int j = 0; j < 4096; j++) writebuff[j] = *q++;
             hal_flash_program((PROGSTART + k), writebuff, 4096);
         }
-        enable_interrupts_pico();
+        fileio_flash_write_end();
         FlashLoad = 0;
     } else if ((p = checkstring(cmdline, (unsigned char *)"CHAIN"))) {
         if (!CurrentLinePtr) error("Invalid at command prompt");

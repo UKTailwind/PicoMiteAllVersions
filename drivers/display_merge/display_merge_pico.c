@@ -187,7 +187,7 @@ void __not_in_flash_func(UpdateCore)(void) {
                 }
                 blitmerge(x1, y1, w, h, colour);
             }
-#ifdef rp2350
+#if HAL_PORT_HAS_NEXTGEN_DISPLAY
         } else if (command == 6) {
             int x_low = (int)multicore_fifo_pop_blocking();
             int y_low = (int)multicore_fifo_pop_blocking();
@@ -300,7 +300,7 @@ int port_setter_keyboard_backlight(unsigned char *cmdline) {
 }
 
 int port_setter_scroll_start(int64_t *out_iret) {
-#ifdef rp2350
+#if HAL_PORT_HAS_NEXTGEN_DISPLAY
     *out_iret = ScrollStart;
     return 1;
 #else
@@ -310,7 +310,7 @@ int port_setter_scroll_start(int64_t *out_iret) {
 }
 
 int port_setter_screenbuff(int64_t *out_iret) {
-#ifdef rp2350
+#if HAL_PORT_HAS_NEXTGEN_DISPLAY
     *out_iret = (int64_t)(uint32_t)ScreenBuffer;
     return 1;
 #else
@@ -361,7 +361,7 @@ int port_setter_system_lcd_spi(unsigned char *cmdline) {
         Option.SYSTEM_CLK = pin1;
         Option.SYSTEM_MOSI = pin2;
         Option.SYSTEM_MISO = pin3;
-#ifdef rp2350
+#if HAL_PORT_HAS_NEXTGEN_DISPLAY
         if (!Option.LCD_CLK) {
             Option.LCD_CLK = Option.SYSTEM_CLK;
             Option.LCD_MOSI = Option.SYSTEM_MOSI;
@@ -373,7 +373,7 @@ int port_setter_system_lcd_spi(unsigned char *cmdline) {
         SoftReset();
         return 1;
     }
-#ifdef rp2350
+#if HAL_PORT_HAS_NEXTGEN_DISPLAY
     tp = checkstring(cmdline, (unsigned char *)"LCD SPI");
     if (tp) {
         int pin1, pin2, pin3;

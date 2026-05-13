@@ -96,6 +96,19 @@ static const char *path_after_drive(const char *path)
     return path;
 }
 
+/* BasicFileOpen/getfullfilename can normalise an absolute MMBasic path like
+ * "B:/foo" through the legacy FatFs spelling "0:/foo", then the HAL prefixes
+ * it again as "B:0:/foo" so dispatch can still pick B:. FatFs in this tree
+ * uses string volume IDs ("B:", "C:"), not numeric "0:", so strip that
+ * historical internal marker before calling f_*.
+ */
+static const char *fatfs_path_after_drive(const char *path)
+{
+    const char *p = path_after_drive(path);
+    if (p && p[0] == '0' && p[1] == ':') p += 2;
+    return p;
+}
+
 /* Choose which filesystem owns a given path. "A:" -> LFS, "B:" -> FatFS.
  * Unprefixed paths default to LFS (the historical boot drive).
  *
@@ -128,7 +141,7 @@ int hal_fs_mkdir(const char *path)
     if (path_fs(path) == FS_LFS) {
         return lfs_rc_to_errno(lfs_mkdir(&lfs, path_after_drive(path)));
     }
-    return fatfs_rc_to_errno(f_mkdir(path_after_drive(path)));
+    return fatfs_rc_to_errno(f_mkdir(fatfs_path_after_drive(path)));
 }
 
 int hal_fs_rmdir(const char *path)
@@ -137,7 +150,7 @@ int hal_fs_rmdir(const char *path)
     if (path_fs(path) == FS_LFS) {
         return lfs_rc_to_errno(lfs_remove(&lfs, path_after_drive(path)));
     }
-    return fatfs_rc_to_errno(f_unlink(path_after_drive(path)));
+    return fatfs_rc_to_errno(f_unlink(fatfs_path_after_drive(path)));
 }
 
 int hal_fs_unlink(const char *path)
@@ -146,7 +159,7 @@ int hal_fs_unlink(const char *path)
     if (path_fs(path) == FS_LFS) {
         return lfs_rc_to_errno(lfs_remove(&lfs, path_after_drive(path)));
     }
-    return fatfs_rc_to_errno(f_unlink(path_after_drive(path)));
+    return fatfs_rc_to_errno(f_unlink(fatfs_path_after_drive(path)));
 }
 
 int hal_fs_rename(const char *from, const char *to)
@@ -157,7 +170,7 @@ int hal_fs_rename(const char *from, const char *to)
     if (f == FS_LFS) {
         return lfs_rc_to_errno(lfs_rename(&lfs, path_after_drive(from), path_after_drive(to)));
     }
-    return fatfs_rc_to_errno(f_rename(path_after_drive(from), path_after_drive(to)));
+    return fatfs_rc_to_errno(f_rename(fatfs_path_after_drive(from), fatfs_path_after_drive(to)));
 }
 
 int hal_fs_chdir(const char *path)
@@ -177,7 +190,7 @@ int hal_fs_chdir(const char *path)
         if (r == 0) lfs_dir_close(&lfs, &d);
         return lfs_rc_to_errno(r);
     }
-    const char *pp = path_after_drive(path);
+    const char *pp = fatfs_path_after_drive(path);
     if (!*pp) pp = "/";
     return fatfs_rc_to_errno(f_chdir(pp));
 }
@@ -203,7 +216,7 @@ int hal_fs_stat(const char *path, struct hal_stat *out)
         return 0;
     }
     FILINFO fno;
-    FRESULT r = f_stat(path_after_drive(path), &fno);
+    FRESULT r = f_stat(fatfs_path_after_drive(path), &fno);
     if (r != FR_OK) return fatfs_rc_to_errno(r);
     out->size = fno.fsize;
     out->mode = (fno.fattrib & AM_DIR) ? HAL_FS_S_IFDIR : HAL_FS_S_IFREG;
@@ -346,7 +359,7 @@ int hal_fs_open(const char *path, int flags, hal_fs_fd_t *out)
         return 0;
     }
 
-    const char *ff_path = path_after_drive(path);
+    const char *ff_path = fatfs_path_after_drive(path);
     if (!*ff_path) ff_path = "/";
     FIL *fp = (FIL *)GetMemory(sizeof(FIL));
     if (!fp) return -ENOMEM;
@@ -609,7 +622,7 @@ int hal_fs_dir_open(const char *path, hal_fs_dir_t **out)
     if (d->kind == FS_LFS) {
         r = lfs_rc_to_errno(lfs_dir_open(&lfs, &d->h.lfs, path_after_drive(path)));
     } else {
-        r = fatfs_rc_to_errno(f_opendir(&d->h.fatfs, path_after_drive(path)));
+        r = fatfs_rc_to_errno(f_opendir(&d->h.fatfs, fatfs_path_after_drive(path)));
     }
     if (r < 0) { free(d); return r; }
     *out = d;

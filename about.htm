@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>PicoMite — About</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header>
+    <h1>About this server</h1>
+    <p>How a 4 KB BASIC program serves a website</p>
+  </header>
+  <nav>
+    <ul>
+      <li><a href="/">Home</a></li>
+      <li><a href="/status">Status</a></li>
+      <li><a href="/gpio">GPIO</a></li>
+      <li><a href="/files">Files</a></li>
+      <li><a href="/about">About</a></li>
+    </ul>
+  </nav>
+  <main>
+    <section>
+      <h2>The dispatcher</h2>
+      <p>Every request fires a <code>WEB TCP INTERRUPT</code>. The handler reads the first line of the HTTP request, scrapes the URI, picks an HTML file by name, and hands the (pcb, filename) pair to <code>WEB PAGE</code>. PicoMite then streams the file out, evaluating <code>&#123;...&#125;</code> expressions inline against current BASIC state.</p>
+      <p>Pages are static <code>.htm</code> files on B:; only the routing and the per-page state-prep run as code. Adding a new page is "drop a file, add a route line."</p>
+    </section>
+    <section>
+      <h2>The hardware</h2>
+      <table>
+        <tr><th>MCU</th><td>RP2350B (Cortex-M33, 48 GPIO)</td></tr>
+        <tr><th>Flash</th><td>16 MB W25Q128JVSIQ over QSPI</td></tr>
+        <tr><th>PSRAM</th><td>8 MB, CS on GP0</td></tr>
+        <tr><th>WiFi</th><td>RM2 module (CYW43439, 2.4 GHz)</td></tr>
+        <tr><th>Storage</th><td>SD card on SPI0 (GP4–7)</td></tr>
+        <tr><th>Audio</th><td>I²S MAX98357A</td></tr>
+      </table>
+    </section>
+    <section>
+      <h2>The software</h2>
+      <table>
+        <tr><th>SDK</th><td>Raspberry Pi Pico SDK 2.1.1</td></tr>
+        <tr><th>Network stack</th><td>lwIP via pico_cyw43_arch_lwip_poll</td></tr>
+        <tr><th>HTTP layer</th><td>Built-in: <code>WEB PAGE</code> + <code>WEB TCP INTERRUPT</code></td></tr>
+        <tr><th>Templating</th><td><code>&#123;expr&#125;</code> at request time</td></tr>
+      </table>
+    </section>
+    <section>
+      <h2>Files on this site</h2>
+      <pre>B:server.bas    routing + per-page state preparation
+B:style.css     shared CSS
+B:index.htm     /
+B:status.htm    /status   (auto-refresh)
+B:gpio.htm      /gpio     (auto-refresh)
+B:files.htm     /files    (live filesystem listing)
+B:about.htm     /about    this page</pre>
+    </section>
+  </main>
+  <footer>Served by MMBasic on RP2350B — {TIME$}</footer>
+</body>
+</html>

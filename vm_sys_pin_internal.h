@@ -1,13 +1,13 @@
 /*
  * vm_sys_pin_internal.h — shared helpers + PWM-slice storage used by
- * both the device body (vm_sys_pin.c) and the host body
- * (host/vm_sys_pin_host.c).
+ * both the device body (vm_sys_pin.c) and the simulator body
+ * (ports/vm_sys_sim/vm_sys_pin_sim.c).
  *
  * Both TUs compile exactly one of the vm_sys_pin_* public entries
  * (vm_sys_pin_setpin, vm_sys_pin_pin, vm_sys_pin_pulse, …) via their
  * respective implementation bodies; the build system links only one
  * TU per target (device links vm_sys_pin.c; host links
- * host/vm_sys_pin_host.c). The helpers below are
+ * ports/vm_sys_sim/vm_sys_pin_sim.c). The helpers below are
  * `static inline` so each TU gets its own copy — no shared
  * definitions means no cross-file linkage issues.
  *
@@ -25,7 +25,8 @@
 #define VM_PWM_SLICE_COUNT 12
 
 static inline int vm_pin_mode_is_pwm(int mode) {
-    return (mode >= VM_PIN_MODE_PWM0A && mode <= VM_PIN_MODE_PWM11B);
+    return (mode >= VM_PIN_MODE_PWM0A && mode <= VM_PIN_MODE_PWM7B) ||
+           (mode >= VM_PIN_MODE_PWM8A && mode <= VM_PIN_MODE_PWM11B);
 }
 
 static inline int vm_pin_pwm_mode_to_slice_chan(int mode, int *slice, int *chan) {

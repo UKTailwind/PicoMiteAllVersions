@@ -12,6 +12,7 @@ CC = gcc
 PORT_DIR  := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 REPO_ROOT := $(abspath $(PORT_DIR)/../..)
 HOST_DIR  := $(REPO_ROOT)/ports/host_native
+SIM_VM_DIR := $(REPO_ROOT)/ports/vm_sys_sim
 BUILD_DIR := $(PORT_DIR)/build
 
 DEVICE_SIM ?= rp2350
@@ -37,8 +38,12 @@ LDFLAGS = -lm -lpthread
 # so the interactive REPL and EDIT both work).
 CORE_SRCS = MMBasic.c Commands.c Functions.c Operators.c MATHS.c Memory.c Editor.c MMBasic_Prompt.c MMBasic_Print.c MMBasic_REPL.c
 CORE_SRCS += gfx_box_shared.c gfx_circle_shared.c gfx_line_shared.c gfx_pixel_shared.c gfx_cls_shared.c gfx_text_shared.c gfx_console_shared.c
-CORE_SRCS += mm_misc_shared.c
+CORE_SRCS += mm_misc_shared.c OptionCommands.c
 CORE_SRCS += display_state.c pin_state.c option_state.c audio_state.c
+CORE_SRCS += mm_net_interrupts.c
+CORE_SRCS += mm_net_http.c
+CORE_SRCS += mm_net_ntp.c
+CORE_SRCS += mm_net_state.c
 CORE_SRCS += Draw.c RGB121.c Tilemap.c FileIO.c Audio.c BmpDecoder.c re.c picojpeg.c
 CORE_SRCS += audio_mp3_stub.c spi_lcd_mem332_stub.c display_merge_stub.c vga_ops_stub.c
 CORE_SRCS += gfx_3d.c upng_sprite_stub.c gui_touch_stub.c gui_controls_stub.c psram_heap_stub.c i2c_keypad_stub.c heartbeat_stub.c
@@ -46,7 +51,7 @@ CORE_SRCS += editor_console_stub.c
 CORE_SRCS += display_pixel_host.c
 
 BC_SRCS = bc_alloc.c bc_bridge.c vm_host_fat.c ff.c ffunicode.c ffsystem.c \
-          vm_sys_input.c vm_sys_graphics.c vm_sys_time.c vm_sys_pin_host.c vm_sys_file_host.c \
+          vm_sys_input.c vm_sys_graphics.c vm_sys_time.c vm_sys_pin_sim.c vm_sys_file_sim.c \
           bc_source.c bc_compiler_core.c bc_vm.c bc_runtime.c bc_debug.c
 
 # host_native sources reused wholesale. Omit host_main.c (we supply our
@@ -54,8 +59,8 @@ BC_SRCS = bc_alloc.c bc_bridge.c vm_host_fat.c ff.c ffunicode.c ffsystem.c \
 # bc_fastgfx_* syscalls, so it has to link.
 NATIVE_SRCS = host_runtime.c host_fastgfx.c host_fastgfx_resync.c host_fs_shims.c host_peripheral_stubs.c \
               host_terminal.c host_fs.c host_sim_audio.c host_sim_slowdown.c host_sim_emit_stub.c host_time.c \
-              host_fb.c host_keys.c \
-              hal_flash_host.c hal_time_host.c hal_pin_host.c hal_storage_host.c \
+              host_fb.c host_keys.c host_bc_runtime_noop.c host_terminal_hooks_noop.c \
+              hal_flash_host.c hal_time_host.c hal_random_host.c hal_watchdog_host.c hal_pin_host.c hal_storage_host.c \
               hal_filesystem_host.c hal_keyboard_host.c hal_audio_host.c hal_vm_framebuffer_host.c
 
 PORT_SRCS = ansi_main.c ansi_terminal.c ansi_display.c
@@ -79,11 +84,19 @@ $(BUILD_DIR)/%.o: $(HOST_DIR)/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
+$(BUILD_DIR)/%.o: $(SIM_VM_DIR)/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
 $(BUILD_DIR)/%.o: $(REPO_ROOT)/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 $(BUILD_DIR)/%.o: $(REPO_ROOT)/core/state/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(BUILD_DIR)/%.o: $(REPO_ROOT)/shared/net/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c -o $@ $<
 

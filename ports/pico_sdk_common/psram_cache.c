@@ -4,8 +4,7 @@
  * RP2350 PicoMite variants with PSRAM save the QMI controller settings
  * before disabling interrupts (so outstanding PSRAM writes can be
  * committed) and restore them after. On RP2040 (no PSRAM) both functions
- * are no-ops. Called from FileIO.c's disable_interrupts_pico /
- * enable_interrupts_pico.
+ * are no-ops. Called from hal_flash_pico.c's write-batch hooks.
  *
  * Port-scoped file: permissible to use #ifdef rp2350 internally under
  * the fixup-plan rule "conditional bodies live in HAL impl files or

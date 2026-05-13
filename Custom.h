@@ -26,11 +26,8 @@ LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON A
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
 
 ************************************************************************************************************************/
-/* WiFi-stack lwIP / CYW43 header set + TCP/NTP/UDP typedefs are now
- * in wifi_includes.h, pulled in directly by the WiFi-stack TUs
- * (MMtcpserver.c, MMtelnet.c, MMntp.c, MMTCPclient.c, MMsetwifi.c,
- * Custom.c on WiFi ports). Universal Custom.h stays preprocessor-
- * clean. */
+/* Universal Custom.h stays preprocessor-clean and does not pull in
+ * Pico WEB lwIP/CYW43 headers or declarations. */
 #include "port_config.h"
 
 /* ********************************************************************************

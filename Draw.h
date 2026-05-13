@@ -41,6 +41,8 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #endif
 #if !defined(INCLUDE_COMMAND_TABLE) && !defined(INCLUDE_TOKEN_TABLE)
   #ifndef DRAW_H_INCL
+    #include "hardware/gpio.h"
+
     #define RGB(red, green, blue) (unsigned int) (((red & 0b11111111) << 16) | ((green  & 0b11111111) << 8) | (blue & 0b11111111))
     #define swap(a, b) {int t = a; a = b; b = t;}
 
@@ -120,6 +122,8 @@ extern void ClearScreen(int c);
 extern void setframebuffer(void);
 extern void SetFont(int fnt);
 extern void ResetDisplay(void);
+extern void ApplyDefaultConsoleColours(void);
+extern void ApplyPromptConsoleColours(void);
 extern int GetFontWidth(int fnt);
 extern int GetFontHeight(int fnt);
 //extern char * spritebuffptr[MAXBLITBUF];                                  //Buffer pointers for the BLIT command

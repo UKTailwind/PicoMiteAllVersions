@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>ESP32 - Status</title>
+  <link rel="stylesheet" href="/style.css">
+  <meta http-equiv="refresh" content="2">
+</head>
+<body>
+  <header>
+    <h1>System status</h1>
+    <p>Auto-refresh every 2 seconds</p>
+  </header>
+  <nav>
+    <ul>
+      <li><a href="/">Home</a></li>
+      <li><a href="/status">Status</a></li>
+      <li><a href="/gpio">GPIO</a></li>
+      <li><a href="/files">Files</a></li>
+      <li><a href="/about">About</a></li>
+    </ul>
+  </nav>
+  <main>
+    <section>
+      <h2>Network</h2>
+      <table>
+        <tr><th>IP address</th><td>{MM.INFO(IP ADDRESS)}</td></tr>
+        <tr><th>WiFi status</th><td>{MM.INFO(WIFI STATUS)}</td></tr>
+        <tr><th>TCP/IP status</th><td>{MM.INFO(TCPIP STATUS)}</td></tr>
+        <tr><th>TCP port</th><td>{MM.INFO(TCP PORT)}</td></tr>
+        <tr><th>UDP port</th><td>{MM.INFO(UDP PORT)}</td></tr>
+        <tr><th>Max connections</th><td>{MM.INFO(MAX CONNECTIONS)}</td></tr>
+      </table>
+    </section>
+    <section>
+      <h2>Time</h2>
+      <table>
+        <tr><th>Wall clock</th><td>{TIME$}</td></tr>
+        <tr><th>Date</th><td>{DATE$}</td></tr>
+        <tr><th>Uptime</th><td>{MM.INFO(UPTIME)} seconds</td></tr>
+        <tr><th>Boot count</th><td>{MM.INFO(BOOT COUNT)}</td></tr>
+      </table>
+    </section>
+    <section>
+      <h2>Memory &amp; CPU</h2>
+      <table>
+        <tr><th>CPU clock</th><td>{MM.INFO(CPUSPEED)} kHz</td></tr>
+        <tr><th>Free heap</th><td>{MM.INFO(HEAP)} bytes</td></tr>
+        <tr><th>Stack used</th><td>{MM.INFO(STACK)} bytes</td></tr>
+        <tr><th>System flash top</th><td>{MM.INFO(FLASHTOP)}</td></tr>
+        <tr><th>Free space (active drive)</th><td>{MM.INFO(FREE SPACE)} bytes</td></tr>
+      </table>
+    </section>
+    <section>
+      <h2>Board ID</h2>
+      <p class="mono">{MM.INFO(ID)}</p>
+    </section>
+  </main>
+  <footer>Served by MMBasic on ESP32-S3</footer>
+</body>
+</html>

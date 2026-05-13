@@ -24,9 +24,9 @@ void port_apply_load_overrides(void)
     Option.LCD_Reset = 20;
     Option.DISPLAY_ORIENTATION = PORTRAIT;
     Option.DISPLAY_CONSOLE = 1;
-    Option.SerialConsole = 1;
-    Option.SerialTX = 1;
-    Option.SerialRX = 2;
+    Option.SerialConsole = 0;  /* USB CDC console */
+    Option.SerialTX = 0;
+    Option.SerialRX = 0;
 
     Option.CombinedCS = 0;
     Option.SD_CS = 22;

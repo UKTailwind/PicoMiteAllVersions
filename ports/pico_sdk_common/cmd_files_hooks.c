@@ -183,6 +183,8 @@ int port_keyboard_option_setter(unsigned char *cmdline)
  * (AllCommands.h gates the entry), so cmd_update is never referenced
  * and doesn't need to exist. */
 #include "pico/bootrom.h"
+#include "pico/stdio_usb.h"
+#include "pico/stdio_usb/reset_interface.h"
 void MIPS16 cmd_update(void)
 {
     uint gpio_mask = 0u;

@@ -194,20 +194,20 @@ void MIPS16 initFonts(void){
 	FontTable[14] = NULL;
 	FontTable[15] = NULL;
 }
-uint16_t __not_in_flash_func(RGB565)(uint32_t c){
+uint16_t HAL_PORT_MMBASIC_HOT_FUNC(RGB565)(uint32_t c){
     return ((c >> 16) & 0b11111000) | ((c >> 13) & 0b00000111) | ((c << 3) & 0b1110000000000000) |  ((c << 5) & 0b0001111100000000);
 }
 
-uint16_t __not_in_flash_func(RGB555)(uint32_t c){
+uint16_t HAL_PORT_MMBASIC_HOT_FUNC(RGB555)(uint32_t c){
     return ((c & 0xf8)>>3) | ((c& 0xf800)>>6) | ((c & 0xf80000)>>9);
 }
-uint8_t __not_in_flash_func(RGB332)(uint32_t c){
+uint8_t HAL_PORT_MMBASIC_HOT_FUNC(RGB332)(uint32_t c){
     return ((c & 0b111000000000000000000000)>>16) | ((c & 0b1110000000000000)>>11) | ((c & 0b11000000)>>6);
 }
-uint8_t __not_in_flash_func(RGB121)(uint32_t c){
+uint8_t HAL_PORT_MMBASIC_HOT_FUNC(RGB121)(uint32_t c){
     return ((c & 0x800000)>> 20) | ((c & 0xC000)>>13) | ((c & 0x80)>>7);
 }
-uint16_t __not_in_flash_func(RGB121pack)(uint32_t c){
+uint16_t HAL_PORT_MMBASIC_HOT_FUNC(RGB121pack)(uint32_t c){
     return (RGB121(c)<<12) | (RGB121(c)<<8) | (RGB121(c)<<4) | RGB121(c);
 }
 /*  @endcond */
@@ -3224,7 +3224,20 @@ if ((p = checkstring(cmdline, (unsigned char*)"COMPRESSED"))) {
     return 0;
 }
 /*  @endcond */
+/* Serial-terminal port hook: gives ports without a framebuffer a chance
+ * to handle CLS by emitting an ANSI clear (or whatever their console
+ * understands). Returns true if the hook handled the command — Draw.c
+ * then returns early, skipping the DISPLAY_TYPE-required path below.
+ * Each port supplies a strong impl (no-op for framebuffer ports;
+ * ANSI-emitting on serial-terminal ports). The hook isn't weak here
+ * because `--allow-multiple-definition` (used on ESP32 + WASM for
+ * tentative-def merging) defeats weak overriding — first-defined wins,
+ * regardless of weak/strong. So the only safe pattern is one strong
+ * definition per port, in a port-only TU. */
+extern bool port_terminal_handle_cls(void);
+
 void cmd_cls(void) {
+    if (port_terminal_handle_cls()) return;
     GfxClsArg arg = {0};
     GfxClsOps ops;
     if(Option.DISPLAY_TYPE == 0) error("Display not configured");
@@ -5109,6 +5122,13 @@ void MIPS16 cmd_font(void) {
         }
     }
 }
+/* Serial-terminal port hook: after globals are updated, gives the port a
+ * chance to push the new fg/bg to its console (e.g. ANSI 24-bit colour
+ * escapes). Each port supplies a strong impl (no-op for framebuffer
+ * ports). See `port_terminal_handle_cls()` above for why this isn't
+ * weak. */
+extern void port_terminal_emit_colour(int fg, int bg, int has_bg);
+
 void cmd_colour(void) {
     getargs(&cmdline, 3, (unsigned char *)",");
     if(argc < 1) error("Argument count");
@@ -5120,6 +5140,7 @@ void cmd_colour(void) {
         PromptFC = gui_fcolour;
         PromptBC = gui_bcolour;
     }
+    port_terminal_emit_colour(gui_fcolour, gui_bcolour, argc == 3);
 }
 /* 
  * @cond
@@ -5870,14 +5891,27 @@ void SetFont(int fnt) {
     gui_font = fnt;
 }
 
+extern void port_apply_default_console_colors(int default_fc, int default_bc);
 
-void MIPS16 ResetDisplay(void) {
+void ApplyDefaultConsoleColours(void) {
     SetFont(Option.DefaultFont);
     gui_fcolour = Option.DefaultFC;
     gui_bcolour = Option.DefaultBC;
     PromptFont = Option.DefaultFont;
     PromptFC = Option.DefaultFC;
     PromptBC = Option.DefaultBC;
+    port_apply_default_console_colors(Option.DefaultFC, Option.DefaultBC);
+}
+
+void ApplyPromptConsoleColours(void) {
+    SetFont(PromptFont);
+    gui_fcolour = PromptFC;
+    gui_bcolour = PromptBC;
+    port_terminal_emit_colour(gui_fcolour, gui_bcolour, 1);
+}
+
+void MIPS16 ResetDisplay(void) {
+    ApplyDefaultConsoleColours();
     /* On VGA this fills in HRes/VRes/ScreenSize and rewires the
      * function-pointer dispatch table per SCREENMODE. No-op on
      * non-VGA; GUICONTROLS builds fall through to ResetGUI. */

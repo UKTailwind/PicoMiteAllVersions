@@ -1,0 +1,50 @@
+# MMBasic Anywhere — Metro ESP32-S3 sdkconfig defaults
+#
+# Phase A scope: console + PSRAM + watchdog. Phase B will add file
+# system / MMBasic-specific knobs.
+
+# --- Console ----------------------------------------------------------------
+# Use the chip's built-in USB Serial/JTAG controller for stdio. Same USB-C
+# cable handles flashing and console; no external UART adapter needed.
+CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
+
+# --- Flash + PSRAM ----------------------------------------------------------
+# Adafruit Metro ESP32-S3 #5500 N16R8 module: 16 MB flash + 8 MB Embedded
+# Octal PSRAM (AP_3v3, confirmed via esptool.py chip_id).
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+CONFIG_ESPTOOLPY_FLASHSIZE="16MB"
+
+# 512 KB internal SRAM is plenty — RP2040 runs PicoMite in 264 KB.
+# PSRAM stays disabled until something genuinely demands it.
+
+# --- Stack ------------------------------------------------------------------
+# 24 KB main task stack. Phase A doesn't need this much, but Phase B
+# will (recursive descent parser + setjmp/longjmp through deep BASIC
+# nests). Setting it now avoids a config churn later.
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=24576
+
+# --- Watchdog ---------------------------------------------------------------
+# Disable the task watchdog entirely. With it on (~5s default), long-running
+# BASIC FOR loops would trip it and reboot. Hard requirement for any
+# non-trivial BASIC program.
+CONFIG_ESP_TASK_WDT_INIT=n
+
+# --- Radios -----------------------------------------------------------------
+# WiFi is used by the ESP32-native WEB/OPTION WIFI surface.
+CONFIG_ESP_WIFI_ENABLED=y
+CONFIG_ESP_WIFI_TASK_PINNED_TO_CORE_0=y
+CONFIG_BT_ENABLED=n
+
+# --- Cores ------------------------------------------------------------------
+# Use both cores. MMBasic stays on one, but FreeRTOS housekeeping etc.
+# benefits from the second.
+CONFIG_FREERTOS_UNICORE=n
+
+# --- Partition table + FATFS -----------------------------------------------
+# Custom partition table: 1 MB app + 14 MB wear-leveled FATFS for BASIC
+# program storage / SAVE / LOAD / OPEN / etc. Mounted at /sd in app_main.
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+CONFIG_PARTITION_TABLE_FILENAME="partitions.csv"
+CONFIG_FATFS_LFN_HEAP=y
+CONFIG_FATFS_MAX_LFN=255

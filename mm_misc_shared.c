@@ -33,7 +33,6 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
 #include "hal/hal_time.h"
-#include "pico/stdlib.h"
 #include <time.h>
 #include <string.h>
 #include "xregex.h"
@@ -48,6 +47,9 @@ extern unsigned int b64_decode(const unsigned char* in, unsigned int in_len, uns
 /* Shared globals moved out of MM_Misc.c. */
 int64_t TimeOffsetToUptime = 1704067200;
 uint64_t timeroffset = 0;
+#if defined(MMBASIC_HOST) && !defined(MMBASIC_ESP32)
+int host_time_use_mmbasic_offset = 0;
+#endif
 const char *daystrings[] = {"dummy","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"};
 
 /* Forward decl: cmd_longString calls parselongAES (defined below). */
@@ -272,7 +274,7 @@ void cmd_timer(void) {
   timeroffset=mytime-(uint64_t)getint(++cmdline,0,mytime/1000)*1000;
 }
 // this is invoked as a function
-void __not_in_flash_func(fun_timer)(void) {
+void HAL_PORT_MMBASIC_HOT_FUNC(fun_timer)(void) {
     fret = (MMFLOAT)(hal_time_us_64()-timeroffset)/1000.0;
     targ = T_NBR;
 }
@@ -383,6 +385,24 @@ void fun_epoch(void){
 }
 
 
+static inline CommandToken mm_misc_commandtbl_decode(const unsigned char *p) {
+    return ((CommandToken)(p[0] & 0x7f)) | ((CommandToken)(p[1] & 0x7f) << 7);
+}
+
+static unsigned char *mm_misc_current_command_start(void) {
+    unsigned char *p = cmdline;
+    unsigned char *floor = CurrentLinePtr ? CurrentLinePtr : ProgMemory;
+
+    while (p > floor) {
+        p--;
+        if (p[0] >= C_BASETOKEN && p[1] >= C_BASETOKEN &&
+            mm_misc_commandtbl_decode(p) == cmdtoken) {
+            return p;
+        }
+    }
+    return cmdline - sizeof(CommandToken);
+}
+
 void cmd_pause(void) {
     static int interrupted = false;
     MMFLOAT f;
@@ -412,8 +432,7 @@ void cmd_pause(void) {
                 // to the interrupt routine.  When the interrupt routine finishes we should reexecute
                 // this stmt and because the variable interrupted is static we can see that we need to
                 // resume pausing rather than start a new pause time.
-                while(*cmdline && *cmdline != cmdtoken) cmdline--;  // step back to find the command token
-                InterruptReturn = cmdline;                          // point to it
+                InterruptReturn = mm_misc_current_command_start();   // point to the command token
                 interrupted = true;                                 // show that this stmt was interrupted
                 return;                                             // and let the interrupt run
             }
@@ -1086,15 +1105,20 @@ void cmd_date(void) {
 
 // this is invoked as a function
 void fun_date(void) {
-#ifdef MMBASIC_HOST
+#if defined(MMBASIC_HOST) && !defined(MMBASIC_ESP32)
     /* Tests set MMBASIC_HOST_DATE to pin a deterministic value across
      * interpreter + VM comparison; otherwise fall back to wall clock so
-     * --sim shows real time. Matches vm_sys_time_date() semantics. */
+     * --sim shows real time. WEB NTP flips host_time_use_mmbasic_offset so
+     * host network conformance follows the device DATE$/TIME$ path. */
     sret = GetTempMemory(STRINGSIZE);
     const char *mock = getenv("MMBASIC_HOST_DATE");
     if (mock && *mock) {
         strncpy((char *)sret, mock, 15);
         ((char *)sret)[15] = '\0';
+    } else if (host_time_use_mmbasic_offset) {
+        int year, month, day, hour, minute, second;
+        gettimefromepoch(&year, &month, &day, &hour, &minute, &second);
+        snprintf((char *)sret, 16, "%02d-%02d-%04d", day, month, year);
     } else {
         time_t now = time(NULL);
         struct tm lt;
@@ -1234,13 +1258,22 @@ void cmd_time(void) {
 
 // this is invoked as a function
 void fun_time(void) {
-#ifdef MMBASIC_HOST
-    /* See fun_date() above for the env-var override rationale. */
+#if defined(MMBASIC_HOST) && !defined(MMBASIC_ESP32)
+    /* See fun_date() above for the env-var/runtime override rationale. */
     sret = GetTempMemory(STRINGSIZE);
     const char *mock = getenv("MMBASIC_HOST_TIME");
     if (mock && *mock) {
         strncpy((char *)sret, mock, 15);
         ((char *)sret)[15] = '\0';
+    } else if (host_time_use_mmbasic_offset) {
+        int year, month, day, hour, minute, second;
+        uint64_t fulltime = gettimefromepoch(&year, &month, &day, &hour,
+                                             &minute, &second);
+        snprintf((char *)sret, 16, "%02d:%02d:%02d", hour, minute, second);
+        if (optionfulltime) {
+            sret[8] = '.';
+            IntToStrPad((char *)sret + 9, (fulltime / 1000) % 1000, '0', 3, 10);
+        }
     } else {
         time_t now = time(NULL);
         struct tm lt;

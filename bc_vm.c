@@ -591,6 +591,19 @@ static uint64_t bc_vm_uabs64(int64_t v) {
     return (uint64_t)(-(v + 1)) + 1u;
 }
 
+static int64_t bc_vm_mul_i_wrap(int64_t a, int64_t b) {
+    uint64_t product = (uint64_t)a * (uint64_t)b;
+    int64_t wrapped;
+    memcpy(&wrapped, &product, sizeof(wrapped));
+    return wrapped;
+}
+
+static int64_t bc_vm_muldiv_pow2_int(int64_t a, int64_t b, int bits) {
+    if (bits < 0 || bits > 62)
+        error("Number out of bounds");
+    return bc_vm_mul_i_wrap(a, b) / (1LL << bits);
+}
+
 static int64_t bc_vm_mulshr_int(int64_t a, int64_t b, int bits) {
     uint64_t ua, ub;
     uint64_t a0, a1, b0, b1;
@@ -1833,9 +1846,11 @@ void bc_vm_execute(BCVMState *vm) {
         [OP_FILE]           = &&op_file,
         [OP_PIXEL_READ]     = &&op_pixel_read,
         [OP_MATH_MULSHR]    = &&op_math_mulshr,
+        [OP_MATH_MULDIV]    = &&op_math_muldiv,
         [OP_FONT]           = &&op_font,
         [OP_SYSCALL]        = &&op_syscall,
         [OP_MATH_SQRSHR]    = &&op_math_sqrshr,
+        [OP_MATH_SQRDIV]    = &&op_math_sqrdiv,
         [OP_MATH_MULSHRADD] = &&op_math_mulshradd,
 
         /* Fast loop */
@@ -2095,7 +2110,7 @@ op_sub_i: {
 
 op_mul_i: {
     int64_t b = POP_I();
-    vm->stack[vm->sp].i *= b;
+    vm->stack[vm->sp].i = bc_vm_mul_i_wrap(vm->stack[vm->sp].i, b);
     DISPATCH();
 }
 
@@ -3924,10 +3939,25 @@ op_math_mulshr: {
     DISPATCH();
 }
 
+op_math_muldiv: {
+    int bits = (int)POP_NUMERIC_I();
+    int64_t b = POP_NUMERIC_I();
+    int64_t a = POP_NUMERIC_I();
+    PUSH_I(bc_vm_muldiv_pow2_int(a, b, bits));
+    DISPATCH();
+}
+
 op_math_sqrshr: {
     int bits = (int)POP_NUMERIC_I();
     int64_t a = POP_NUMERIC_I();
     PUSH_I(bc_vm_mulshr_int(a, a, bits));
+    DISPATCH();
+}
+
+op_math_sqrdiv: {
+    int bits = (int)POP_NUMERIC_I();
+    int64_t a = POP_NUMERIC_I();
+    PUSH_I(bc_vm_muldiv_pow2_int(a, a, bits));
     DISPATCH();
 }
 
@@ -4659,7 +4689,7 @@ op_fast_loop: {
         }
         case ROP_MUL_I: {
             uint8_t d = *rpc++, a = *rpc++, b = *rpc++;
-            regs[d] = regs[a] * regs[b];
+            regs[d] = bc_vm_mul_i_wrap(regs[a], regs[b]);
             break;
         }
         case ROP_IDIV_I: {
@@ -4794,6 +4824,16 @@ op_fast_loop: {
         }
 
         /* --- Fused fixed-point --- */
+        case ROP_SQRDIV: {
+            uint8_t d = *rpc++, a = *rpc++, bits = *rpc++;
+            regs[d] = bc_vm_muldiv_pow2_int(regs[a], regs[a], (int)regs[bits]);
+            break;
+        }
+        case ROP_MULDIV: {
+            uint8_t d = *rpc++, a = *rpc++, b = *rpc++, bits = *rpc++;
+            regs[d] = bc_vm_muldiv_pow2_int(regs[a], regs[b], (int)regs[bits]);
+            break;
+        }
         case ROP_SQRSHR: {
             uint8_t d = *rpc++, a = *rpc++, bits = *rpc++;
             regs[d] = bc_vm_mulshr_int(regs[a], regs[a], (int)regs[bits]);

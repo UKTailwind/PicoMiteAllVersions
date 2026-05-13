@@ -37,6 +37,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 
 #include "Hardware_Includes.h"
 
+#include "hardware/gpio.h"
 #include "hardware/i2c.h"
 
 #include "hardware/irq.h"
@@ -2332,9 +2333,9 @@ void MIPS16 cmd_camera(void) {
     char * buff = GetTempMemory(160 * 120 * 2);
     char * k = buff;
     c.rgb = 0;
-    disable_interrupts_pico();
+    fileio_flash_write_begin();
     capture(buff);
-    enable_interrupts_pico();
+    fileio_flash_write_end();
     char * linebuff = NULL;
     if (scale) linebuff = GetTempMemory(160 * 3);
     for (int y = ys; y < 120 * scale + ys; y += scale) {
@@ -2384,9 +2385,9 @@ void MIPS16 cmd_camera(void) {
     }
     char * buff = GetTempMemory(160 * 120 * 2);
     c.rgb = 0;
-    disable_interrupts_pico();
+    fileio_flash_write_begin();
     capture(buff);
-    enable_interrupts_pico();
+    fileio_flash_write_end();
     char * linebuff = GetTempMemory(160 * 3 * scale);
     char * k = buff;
     for (int y = ys; y < 120 * scale + ys; y += scale) {

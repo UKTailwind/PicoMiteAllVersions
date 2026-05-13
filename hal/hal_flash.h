@@ -75,6 +75,14 @@ int hal_flash_unique_id(uint8_t out[8]);
  * canned response matching an 8 MB chip. */
 int hal_flash_read_jedec_id(uint8_t out[4]);
 
+/* Optional batching hooks for callers that stream page writes through
+ * hal_flash_program(). Pico SDK ports use these to hold off interrupts
+ * and preserve PSRAM cache state across the batch; host/ESP32 stubs are
+ * no-ops. */
+void hal_flash_write_begin(void);
+void hal_flash_write_end(void);
+int hal_flash_write_active(void);
+
 /* -----------------------------------------------------------------------
  * Option-block convenience helpers.
  *
