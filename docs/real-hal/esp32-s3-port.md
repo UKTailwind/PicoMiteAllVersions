@@ -24,6 +24,8 @@ Network core follow-on: [network-core-plan.md](network-core-plan.md).
 | D — decouple from host_native | 🔧 | Runtime/peripheral host_native sources are gone; ESP32 owns the port surface in `esp32_*.c` and `hal_*_esp32.c`; core/shared Pico SDK leakage is clean; strict link policy is active. BASIC-visible GPIO DOUT/DIN/ARAW, WS2812 output, and the WEB network surface are hardware-smoked. Remaining debt: legacy hardware header shims still live under `ports/host_native/`, PWM/servo are not wired, MQTT is plain TCP only, and ESP32 still compiles as `MMBASIC_HOST`. |
 | E — real flash persistence | ✅ | NVS-backed Options and numbered `FLASH SAVE`/`FLASH LOAD` slots are implemented and hardware-smoked. `VAR SAVE` shares the `mmslots` backing. |
 | F — gate + plan hygiene | ✅ | ESP32 port files are in the HAL purity gate; `docs/real-hal-plan.md`, this port README, and opt-in `buildesp32.sh` are current. |
+| G — device smoke + HAL cleanup | ⏳ | Next priority. Front-load a comprehensive on-device ESP32 smoke suite, then remove remaining host-shape scaffolding: explicit ESP32 port config, neutral hardware shims, no `MMBASIC_HOST`, and stale docs/comments fixed. |
+| H — PSRAM contract | ⏳ | Deferred until Stage G is green. Enable ESP32 Octal PSRAM through ESP-IDF/heap_caps with an ESP32-specific allocation contract; do not reuse the RP2350 QMI/`PSRAMbase` model. |
 
 **Headline broken-but-silent bug** (fixed in D1 below): `flash_range_erase` / `flash_range_program` in `esp32_flash_storage.c` previously targeted a 256-byte placeholder buffer and silently no-op'd past the end. ESP32 now routes program-region writes into `flash_prog_buf` and routes saved-vars / numbered-slot writes to the `mmslots` partition.
 
@@ -59,7 +61,7 @@ These are non-negotiable on this port. Violations are reasons to revert, not fee
 
    They never appear in core, in `bc_*.c`, in `vm_sys_*.c`, or in `gfx_*_shared.c`. If a core file would need IDF, it needs a HAL hook instead.
 
-6. **Heap is tight and the port code knows it.** 104 KB internal SRAM heap (PSRAM disabled — see "Why no PSRAM yet" in Stage E). Allocation order matters; `bc_compiler_alloc` is ordered to keep post-compact heap contiguous (committed). New allocations in this port must respect the same fragmentation discipline.
+6. **Heap is tight and the port code knows it.** 48 KB MMBasic heap while WiFi is enabled (PSRAM disabled — see Stage H). Allocation order matters; `bc_compiler_alloc` is ordered to keep post-compact heap contiguous (committed). New allocations in this port must respect the same fragmentation discipline.
 
 7. **Pico source is the reference.** When in doubt about how a HAL contract is supposed to be exercised, read pico's impl — not host_native's. Host has historical shape (POSIX-rooted, malloc-flavoured) that doesn't translate.
 
@@ -72,9 +74,9 @@ ports/esp32_s3_metro/
 ├── CMakeLists.txt              # ESP-IDF project root
 ├── port_config.h               # HAL_PORT_* values; still inherits host defaults, then overrides ESP32 values
 ├── partitions.csv              # 1 MB app + 12 MB lfsdata + 1 MB mmslots
-├── sdkconfig.defaults          # USB JTAG console, watchdog off, radios off, PSRAM disabled
+├── sdkconfig.defaults          # USB JTAG console, watchdog off, WiFi enabled, PSRAM disabled
 ├── probe.py                    # pyserial test driver (avoids picocom DTR pulse)
-├── README.md                   # build/flash/monitor (NEEDS REWRITE — Stage F3)
+├── README.md                   # build/flash/monitor, current status, known gaps
 └── main/
     ├── CMakeLists.txt          # main component, source list, strict-link policy
     ├── esp32_platform.h        # temporary MMBASIC_HOST + MMBASIC_ESP32 + Pico SDK section-attr stubs
@@ -163,7 +165,7 @@ Goal: ESP32 behaves like a real device port. Device-facing behavior lives in `ha
 - Program-flash region (off ∈ [0, sizeof flash_prog_buf)): hits `flash_prog_buf`. `load_basic_source(0, MAX_PROG_SIZE)` works.
 - Slot region (off ≥ FLASH_TARGET_OFFSET + ...): writes past the 256-byte placeholder error() out loudly.
 
-Stage E1 replaces the slot region's RAM placeholder with `esp_partition_*` against a real flash partition.
+Stage E1 replaced the slot region's RAM placeholder with `esp_partition_*` against the real `mmslots` flash partition.
 
 ### D2. Link `hal_pin_esp32.c` instead of `hal_pin_esp32_stub.c` ✅
 
@@ -243,7 +245,7 @@ Longer term, replace `-fcommon` with single-owner globals plus `extern` declarat
 `ports/esp32_s3_metro/port_config.h` now overrides:
 - `HAL_PORT_NBR_PINS` → 49 (was inherited 44; ESP32-S3 has 49 GPIOs 0–48). Bigger arrays: `ExtCurrentConfig[NBRPINS+1]`, `PinDef[NBRPINS+1]`, `p100interrupts[NBRPINS+1]`.
 - `HAL_PORT_HEAP_TOP` / `HAL_PORT_HEAP_TOP_USB` → 0 (sentinel; was RP2040 mmap address).
-- Heap comment reconciled with the 104 KB value (was claiming 192 KB; the value was correct, the comment wasn't).
+- Heap comment reconciled with the current 48 KB WiFi-enabled value and the deferred PSRAM plan.
 
 Documented but not yet overridden:
 - `HAL_PORT_FLASH_TARGET_OFFSET` (1 MB on host; revisit when E1 lands and esp_partition_t replaces the offset arithmetic).
@@ -299,8 +301,9 @@ Implemented behind `hal_flash_esp32.c`:
 
 8 MB Octal PSRAM is on-chip, currently disabled in `sdkconfig.defaults`. Two reasons not to enable yet:
 
-1. **Internal SRAM works** for the stdio-REPL litmus test. 104 KB heap fits FRUN sieve(6000). Don't turn on a 15-20× slower memory tier without a forcing function.
-2. **PSRAM enabling is a non-trivial change** — `MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT` heap split, BC heap routing decisions, framebuffer-in-PSRAM-with-DMA-cap requirement once a display lands, brownout detector recalibration. Right time is when display or audio land, not stdio-only.
+1. **Internal SRAM works** for the current stdio/WEB litmus test. The active heap is 48 KB while WiFi is enabled; tight, but sufficient for the hardware-smoked programs.
+2. **PSRAM enabling is a non-trivial change** — `MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT` heap split, BC heap routing decisions, framebuffer-in-PSRAM-with-DMA-cap requirement once a display lands, brownout detector recalibration. The right order is: device smoke suite first, HAL cleanup second, PSRAM contract third.
+3. **ESP32 PSRAM is not Pico PSRAM.** Do not route it through `PSRAMbase`, `psmap`, QMI/XIP cache helpers, or the RP2350 `RAM` slot model without a separate design. ESP-IDF owns PSRAM init/cache/flash coordination; the port should consume it through `heap_caps_*` and report BASIC-visible capacity only after the allocation policy is defined.
 
 Capture this decision so the next session doesn't re-litigate it.
 
@@ -310,7 +313,7 @@ Capture this decision so the next session doesn't re-litigate it.
 
 `tools/check_hal_purity.sh` now has ESP32 port awareness. `ports/esp32_s3_metro/main/*.c` are checked with the same strict target/port-config/runtime-fold rules as the promoted core files. `MMBASIC_ESP32` is allowed as the port's own identity tag; other target macros are forbidden.
 
-The gate also flags accidental `host_native` source reuse in `ports/esp32_s3_metro/main/CMakeLists.txt`, with a temporary allowlist only for the legacy `hardware/*` header-shim include path until Stage D Step G finishes.
+The gate also flags accidental `host_native` source reuse in `ports/esp32_s3_metro/main/CMakeLists.txt`, with a temporary allowlist only for the legacy `hardware/*` header-shim include path until Stage G finishes.
 
 ### F2. Update `docs/real-hal-plan.md` scoreboard ✅
 
@@ -324,13 +327,131 @@ The README now documents the N16R8 hardware, ESP-IDF 5.3 setup, build/flash/moni
 
 Sibling of `buildall.sh`. Runs the HAL purity gate, sources `~/esp/esp-idf/export.sh` if `idf.py` is not already available, and runs `idf.py build` for `ports/esp32_s3_metro/`. It is opt-in and not wired into CI because `idf.py` requires a heavyweight environment that does not belong in the default gate.
 
+## Stage G — Device smoke suite + HAL cleanup
+
+**Goal:** before adding PSRAM or broader hardware features, make ESP32 as easy to regression-test on real hardware as Pico now is. The suite should be prompt-driven, repeatable, and suitable for both manual bringup and CI-on-a-bench later.
+
+### G0. Comprehensive ESP32 on-device smoke suite ⏳
+
+Create a host-side runner, tentatively `porttools/esp32_fs_vm_smoke.py`, modeled on `pico_fs_vm_smoke.py` but ESP32-aware.
+
+Required coverage:
+
+- **Device/prompt:** sync, banner, `MM.INFO$(ID)`, `MM.INFO(CPUSPEED)`, `MM.INFO(HEAP)`, `MM.INFO(STACK)`, `MM.INFO(FREE SPACE)`.
+- **A: filesystem battery:** create/delete files and dirs, `CHDIR`, `MKDIR`, `RMDIR`, `KILL`, `RENAME`, `COPY`, wildcard `DIR$`, filenames with spaces, overwrite/error behavior, file size/existence checks.
+- **B: / SD path where present:** detect configured/unconfigured state cleanly; do not require a card for the default suite.
+- **BASIC file I/O:** `OPEN`, `PRINT #`, `INPUT$`, `LINE INPUT`, `LOC`, `LOF`, `EOF`, `SEEK`, append and overwrite behavior.
+- **Program lifecycle:** `LOAD`, `SAVE`, `RUN`, `FRUN`, autorun load, empty-program save refusal, error recovery back to prompt.
+- **Bytecode VM:** arithmetic, strings, arrays, `SUB`/`FUNCTION`, `SELECT CASE`, `DATA`/`READ`/`RESTORE`, VM-side file I/O, and a sieve/math benchmark with known result.
+- **Flash persistence:** `FLASH SAVE`, reset/reconnect, `FLASH LOAD`, `RUN`, `VAR SAVE` if supported through the same `mmslots` backing.
+- **GPIO:** safe DOUT/DIN/ARAW checks on documented pins. PWM/servo should explicitly verify the current "not supported" error until LEDC lands.
+- **WS2812:** exercise the onboard NeoPixel on `GP46` with a short red/green/blue/off sequence, gated behind an opt-in flag if visual confirmation is required.
+- **Network smoke hooks:** optionally chain to existing ESP32 TCP/UDP/NTP/MQTT smoke tools, but keep the default suite runnable without WiFi credentials.
+- **Reset workflow:** document and automate the preferred reset/reconnect path, avoiding the macOS DTR/HUPCL trap already called out in `probe.py`.
+
+Default `all` should avoid destructive or environment-dependent checks unless explicitly requested. Use named suites such as `fs`, `program`, `vm`, `flash`, `gpio`, `ws2812`, and `network`.
+
+Exit gate:
+
+- `./buildesp32.sh build` passes.
+- The new smoke runner passes on a Metro ESP32-S3 from a fresh prompt.
+- The smoke suite catches at least one intentionally unsupported path cleanly (PWM/servo), so unsupported features remain visible rather than silently no-oping.
+
+### G1. Plan/comment drift cleanup ⏳
+
+Fix stale text before deeper refactors:
+
+- Replace old 104 KB heap references with the current 48 KB WiFi-enabled heap, and explain the tradeoff.
+- Update comments in `hal_flash_esp32.c` / `main/CMakeLists.txt` that still describe slot persistence as "Stage E1" even though `mmslots` is implemented.
+- Keep README, this plan, and `port_config.h` aligned on PSRAM being present in hardware but disabled by policy.
+
+### G2. Explicit ESP32 port config ⏳
+
+Stop inheriting `ports/host_native/port_config.h`.
+
+Required shape:
+
+- `ports/esp32_s3_metro/port_config.h` defines every `HAL_PORT_*` value it relies on directly, or includes a neutral shared defaults header that is not host-owned.
+- Set inert/nonexistent hardware counts deliberately. Do not inherit RP2040 PWM/PIO numbers.
+- Keep the 48 KB heap until PSRAM work deliberately changes the memory contract.
+
+### G3. Neutralize remaining host-native header shims ⏳
+
+The build may temporarily include `ports/host_native` only for legacy `hardware/*` shim headers. Remove that dependency by either:
+
+- moving truly generic compatibility shims to a neutral path, or
+- finishing the HAL split so ESP32 no longer needs those headers at all.
+
+Exit gate: `ports/esp32_s3_metro/main/CMakeLists.txt` has no `ports/host_native` include path and the HAL purity gate still passes.
+
+### G4. Remove ESP32's `MMBASIC_HOST` compile identity ⏳
+
+ESP32 currently defines both `MMBASIC_HOST` and `MMBASIC_ESP32`. That was useful during bringup but is now misleading.
+
+Exit gate:
+
+- ESP32 builds with `MMBASIC_ESP32` and explicit HAL/port feature macros only.
+- No core/shared file needs an ESP32-specific target gate.
+- No host-only behavior is selected accidentally by the ESP32 build.
+
+### G5. Optional hardware cleanup before PSRAM ⏳
+
+Only after G0-G4 are green:
+
+- LEDC-backed PWM/servo, if needed for near-term BASIC compatibility.
+- MQTT TLS/cert handling.
+- UART `COM:` support.
+
+These are lower priority than making the port identity clean and testable.
+
+## Stage H — ESP32 PSRAM contract
+
+**Goal:** enable the Metro's 8 MB Octal PSRAM through ESP-IDF in a way that matches ESP32 hardware and does not import RP2350 assumptions.
+
+### H1. PSRAM policy/design doc ⏳
+
+Before code:
+
+- Decide what BASIC-visible `PSRAMsize` means on ESP32, if anything.
+- Decide whether `AllMemory`, bytecode arenas, large arrays/strings, display framebuffers, or only explicit subsystems may allocate from PSRAM.
+- Define failure behavior when PSRAM is absent, disabled, or too slow for a use case.
+- Decide whether `RAM TEST` should exist on ESP32, and if so make it an ESP32 heap allocation/march test rather than a raw fixed-address test.
+
+### H2. Enable ESP-IDF PSRAM minimally ⏳
+
+Enable the correct Octal PSRAM sdkconfig settings for the N16R8 Metro and prove boot stability.
+
+Exit gate:
+
+- `idf.py build` and flash pass.
+- Boot reports detected PSRAM through ESP-IDF.
+- Existing Stage G smoke suite still passes with PSRAM enabled but not yet used for core allocations.
+
+### H3. Add an ESP32 PSRAM march/allocation smoke ⏳
+
+Add an opt-in smoke that allocates PSRAM through `heap_caps_malloc(MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT)`, runs a destructive march over the allocation, frees it, and verifies normal BASIC operation still works afterward.
+
+This is the ESP32 analogue of Pico's `RAM TEST`, not a copy of the Pico implementation.
+
+### H4. Move selected allocations deliberately ⏳
+
+Only after H1-H3:
+
+- Consider moving large bytecode/compiler buffers or large BASIC arrays to PSRAM.
+- Consider framebuffer/display allocations when display work starts; require `MALLOC_CAP_DMA` where ESP-IDF panel drivers need it.
+- Keep latency-sensitive interpreter state in internal SRAM unless measurement proves otherwise.
+
+### H5. Hardware validation ⏳
+
+Repeat the full Stage G smoke suite with PSRAM enabled and with any new PSRAM-backed allocation paths active. Add a long-running stress case if PSRAM becomes part of normal BASIC heap behavior.
+
 ## Out of scope (deferred — don't expand without an explicit goal)
 
 - **Display.** SPI LCD / VGA via LCD_CAM. Multi-session. See "Display follow-on (sketch)" at the bottom of this doc.
 - **Audio.** I2S codec, MP3 decode, PWM synth port.
 - **Keyboard.** USB host (TinyUSB), I2C keypad (PicoCalc-style), PS/2.
 - **BLE/Bluetooth.** WiFi and the BASIC WEB/TCP/UDP/NTP/plain-MQTT surface have landed; BLE remains out of scope.
-- **Octal PSRAM.** See Stage E3.
+- **Octal PSRAM.** See Stage H; do not start before Stage G is green.
 - **OTA.** Two app slots, signed updates. Out of scope for a stdio litmus.
 
 ## Risks worth pre-flagging
@@ -339,7 +460,7 @@ Sibling of `buildall.sh`. Runs the HAL purity gate, sources `~/esp/esp-idf/expor
 
 2. ~~**`HAL_PORT_NBR_PINS` overflow risk**~~. D8 landed: NBRPINS = 49 covers all ESP32-S3 GPIOs.
 
-3. **Heap fragmentation on FRUN with big arrays**. `bc_compiler_alloc` reorder (committed) helps; t170_frun_post_compact_array.bas is the regression net. If a real program OOMs at array alloc despite that, the next mitigations are (a) bump heap (capped at ~110 KB by dram0_0_seg), (b) `heap_caps_malloc` big arrays from IDF heap (130 KB free), (c) enable PSRAM. Document what you observe before mitigating.
+3. **Heap fragmentation on FRUN with big arrays**. `bc_compiler_alloc` reorder (committed) helps; t170_frun_post_compact_array.bas is the regression net. If a real program OOMs at array alloc, document the program and failure first. The mitigation order is now Stage G smoke coverage, then explicit ESP32 allocation policy in Stage H, not ad hoc heap growth.
 
 4. **`flash_target_contents` host-shape leak**. Currently a `const uint8_t *` global pointing at a RAM mirror. Real device shape is XIP-mapped flash (pico) or `esp_partition_mmap` (esp32). E1 fixes ESP32; the type signature on host is wrong-but-harmless until anyone tries to use it as a real flash view there.
 
@@ -384,4 +505,4 @@ Effort: 3–4 sessions for SPI path. VGA via LCD_CAM is multi-session and only w
 
 ---
 
-**The fastest path to a clean Stage D**: keep the current ESP32-local ownership, remove strict-link workarounds, then neutralize the remaining `host_native` shim paths. Do not add more build-rule overrides to paper over missing ESP32 HAL/stub ownership.
+**The fastest path from here**: first build the on-device ESP32 smoke suite, then finish the host-shape cleanup (`port_config`, header shims, no `MMBASIC_HOST`), then enable PSRAM through an ESP32-specific contract. Do not add more build-rule overrides to paper over missing ESP32 HAL/stub ownership.

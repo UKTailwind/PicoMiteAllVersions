@@ -43,9 +43,6 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "hal/hal_display_merge.h"
 #include "hal/hal_watchdog.h"
 #include "port_config.h"
-#ifdef rp2350
-#include "hardware/xip_cache.h"
-#endif
 #include "bc_alloc.h"
 #include "bc_run_diag.h"
 #define overlap (VRes % (FontTable[gui_font >> 4][1] * (gui_font & 0b1111)) ? 0 : 1)
@@ -1518,6 +1515,7 @@ extern short g_StrTmpIndex;
 extern bool g_TempMemoryIsChanged;
 extern volatile char *g_StrTmp[MAXTEMPSTRINGS];                                       // used to track temporary string space on the heap
 extern volatile char g_StrTmpLocalIndex[MAXTEMPSTRINGS];                              // used to track the g_LocalIndex for each temporary string space on the heap
+extern void mmbasic_save_psram_settings(void);
 
 static uint8_t *psram_context_align(uint8_t *p) {
 	uintptr_t v = (uintptr_t)p;
@@ -1541,16 +1539,12 @@ static void psram_context_write(uint8_t **dst, const void *src, size_t n) {
 		p += sizeof(word);
 		s += chunk;
 		n -= chunk;
-#ifdef rp2350
 		if(++words_since_clean == 1024) {
-			xip_cache_clean_all();
+			mmbasic_save_psram_settings();
 			words_since_clean = 0;
 		}
-#endif
 	}
-#ifdef rp2350
-	xip_cache_clean_all();
-#endif
+	mmbasic_save_psram_settings();
 	*dst = p;
 }
 
