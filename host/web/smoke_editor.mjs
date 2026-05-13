@@ -67,16 +67,22 @@ try {
         if (!content.length) fail('CodeMirror content is empty');
         console.log(`OK — editor has ${content.length} chars of demo_hello.bas.`);
 
-        // Type a marker at the top.
+        const original = await page.evaluate(async () => {
+            const bytes = await window.picomite.fsRead('/sd/demo_hello.bas');
+            return new TextDecoder().decode(bytes);
+        });
+
+        // Replace the buffer with a marked copy. Using insertText avoids
+        // platform-specific Home/Cmd/Ctrl cursor behavior in CodeMirror.
         await page.click('#editor-host .cm-content');
-        await page.keyboard.press('Home');
-        await page.keyboard.type("' EDIT_TEST_MARKER\n");
+        await page.keyboard.press(process.platform === 'darwin' ? 'Meta+A' : 'Control+A');
+        await page.keyboard.insertText("' EDIT_TEST_MARKER\n" + original);
 
         const inBuffer = await page.evaluate(() =>
             document.querySelector('#editor-host .cm-content')?.textContent || '');
         console.log('  editor buffer first line:', JSON.stringify(inBuffer.slice(0, 40)));
 
-        await page.keyboard.press('Control+S');
+        await page.keyboard.press(process.platform === 'darwin' ? 'Meta+S' : 'Control+S');
         await sleep(400);
 
         const after = await page.evaluate(async () => {

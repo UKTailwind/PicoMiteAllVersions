@@ -701,9 +701,9 @@ editorFrunBtn.addEventListener('click', () => { frunEditor(); });
 editorSaveBtn.addEventListener('click', () => { saveEditor(); });
 editorCloseBtn.addEventListener('click', closeEditor);
 // Ctrl/Cmd+S saves; F5 runs; Shift+F5 fast-runs via the VM; Esc closes.
-document.addEventListener('keydown', (e) => {
+function handleEditorShortcut(e) {
     if (editorAreaEl.hidden) return;
-    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
         e.preventDefault();
         saveEditor();
     } else if (e.key === 'F5') {
@@ -713,7 +713,8 @@ document.addEventListener('keydown', (e) => {
         e.preventDefault();
         closeEditor();
     }
-});
+}
+window.addEventListener('keydown', handleEditorShortcut, { capture: true });
 
 async function importFile(file) {
     const buf = new Uint8Array(await file.arrayBuffer());
