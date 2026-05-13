@@ -23,10 +23,11 @@ and `PIXEL(x,y)` reads back the live pixel value.
   linear framebuffer modes when the BIOS exposes them. After entering a VBE
   mode, `MODE 1` keeps BASIC at logical 320x200 but uses the VBE 640x480
   surface as a doubled compatibility scanout; QEMU/SeaBIOS does not reliably
-  make legacy A0000 scanout visible again after LFB modes. The driver checks
-  the VBE BIOS return status; on QEMU/Bochs only, if a repeated BIOS mode set
-  fails after one VBE mode is active, it falls back to the documented Bochs
-  DISPI ports for the same linear framebuffer mode.
+  make legacy A0000 scanout visible again after LFB modes. On real hardware
+  the driver uses BIOS VBE mode sets and checks the return status. On
+  QEMU/Bochs, when the documented DISPI interface is detected, the driver uses
+  those ports directly for VBE modes; this avoids SeaBIOS repeated-mode-set
+  failures corrupting later graphics commands.
 - **Resolution modes.** `MODE` lists the active mode and available modes:
   `MODE 1` = 320x200, `MODE 2` = 640x480, `MODE 3` = 800x600,
   `MODE 4` = 1024x768, `MODE 5` = 480x480 letterboxed in 640x480,
@@ -72,6 +73,8 @@ Stage close was validated with:
    `MODE 2` → `MODE 1` visible-screen round trip
 4. `python3 ports/pc386/tests/screen_probe.py --vbe-all` — displayed pixels and
    scanout dimensions pass for all advertised VBE modes
+5. `python3 ports/pc386/tests/screen_probe.py --mode-stress` — repeated mode
+   switches keep the `CIRCLE`/pico_blocks ball shape stable
 
 Interactive run:
 

@@ -327,6 +327,8 @@ def main() -> int:
                         help="only test VBE mode and return to MODE 1")
     parser.add_argument("--vbe-all", action="store_true",
                         help="test displayed pixels in all advertised VBE modes")
+    parser.add_argument("--mode-stress", action="store_true",
+                        help="switch modes repeatedly and verify a drawn ball remains stable")
     args = parser.parse_args()
 
     if not os.path.exists(KERNEL):
@@ -478,6 +480,53 @@ def main() -> int:
                     print(f"mode {mode} dimensions: {mode_w}x{mode_h} (logical {logical_w}x{logical_h})")
                     if not close_enough(got, want):
                         print(f"[FAIL] MODE {mode} pixel got={got} want={want}")
+                        return 1
+                print("PASSED")
+                return 0
+
+            if args.mode_stress:
+                mode_listing = send_basic(serial_in_fd, serial_out_fd, "MODE")
+                stress_modes = [
+                    (1, 320, 200, 0, 0, 2),
+                    (3, 800, 600, 0, 0, 1),
+                    (4, 1024, 768, 0, 0, 1),
+                    (6, 320, 320, 192, 64, 2),
+                    (1, 320, 200, 0, 0, 2),
+                    (5, 480, 480, 80, 0, 1),
+                    (3, 800, 600, 0, 0, 1),
+                    (4, 1024, 768, 0, 0, 1),
+                    (1, 320, 200, 0, 0, 2),
+                ]
+                for mode, logical_w, logical_h, x_off, y_off, scale in stress_modes:
+                    if mode != 1 and f"{mode}:" not in mode_listing:
+                        print(f"mode stress {mode}: skipped (not advertised)")
+                        continue
+                    cx = min(80, logical_w // 2)
+                    cy = min(80, logical_h // 2)
+                    send_basic(serial_in_fd, serial_out_fd,
+                               f"MODE {mode} : CLS RGB(0,0,0) : "
+                               f"CIRCLE {cx},{cy},6,0,1.0,,RGB(255,0,0) : "
+                               f"CIRCLE {cx - 2},{cy - 2},1,0,1.0,,RGB(255,255,255)")
+                    dump = os.path.join(os.path.dirname(os.path.abspath(args.out)),
+                                        f"screen_probe-stress-mode{mode}.ppm")
+                    hmp.screendump(dump)
+                    w, h, data = parse_ppm(dump)
+                    px0 = x_off + (cx - 8) * scale
+                    py0 = y_off + (cy - 8) * scale
+                    px1 = x_off + (cx + 8) * scale
+                    py1 = y_off + (cy + 8) * scale
+                    red = 0
+                    white = 0
+                    for yy in range(max(0, py0), min(h, py1 + 1)):
+                        for xx in range(max(0, px0), min(w, px1 + 1)):
+                            got = pixel(data, w, xx, yy)
+                            if close_enough(got, (255, 0, 0), 24):
+                                red += 1
+                            if close_enough(got, (255, 255, 255), 24):
+                                white += 1
+                    print(f"mode stress {mode}: {dump} red={red} white={white}")
+                    if red < 40 * scale * scale or white < scale * scale:
+                        print(f"[FAIL] MODE {mode} ball pixels look corrupted")
                         return 1
                 print("PASSED")
                 return 0

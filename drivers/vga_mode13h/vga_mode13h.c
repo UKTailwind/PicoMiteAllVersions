@@ -267,9 +267,10 @@ static bool bga_set_mode(const VesaModeInfo *info) {
 static bool vesa_set_bios_mode(uint16_t bios_mode) {
     const VesaModeInfo *info = vesa_get_mode_info(bios_mode);
     if (info == NULL) return false;
-    if (pc386_bios_video_int10(0x4F02, bios_mode, 0, 0, 0, 0) != 0x004Fu &&
-        !bga_set_mode(info)) {
-        return false;
+    if (bga_available()) {
+        if (!bga_set_mode(info)) return false;
+    } else {
+        if (pc386_bios_video_int10(0x4F02, bios_mode, 0, 0, 0, 0) != 0x004Fu) return false;
     }
     vesa_apply_mode_info(info);
     linear_fb_available = true;

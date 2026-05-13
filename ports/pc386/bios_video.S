@@ -17,11 +17,17 @@
 .set RM_DI,         0x7F0A
 .set RM_STATUS,     0x7F0C
 .set RM_SAVED_ESP,  0x7F10
+.set RM_SAVED_CR0,  0x7F14
 .set RM_SAVED_IDTR, 0x7F18
 .set RM_REAL_IDTR,  0x7F20
 .set RM_GDTR,       0x7F28
 .set RM_SAVED_GDTR, 0x7F30
 .set RM_GDT,        0x7F40
+
+.section .bss
+.align 16
+pc386_bios_saved_fpu:
+    .skip 108
 
 .section .text
 .code32
@@ -31,7 +37,11 @@ pc386_bios_video_int10:
     pushfl
     cli
     pushal
+    fnsave pc386_bios_saved_fpu
+    fwait
 
+    movl %cr0, %eax
+    movl %eax, RM_SAVED_CR0
     movl %esp, RM_SAVED_ESP
     sidt RM_SAVED_IDTR
     sgdt RM_SAVED_GDTR
@@ -75,6 +85,7 @@ pc386_bios_video_int10:
     ljmp $0x0018, $RM_THUNK_ADDR
 
 bios_pm_return:
+    cld
     lgdt RM_SAVED_GDTR
     movw $0x10, %ax
     movw %ax, %ds
@@ -82,6 +93,7 @@ bios_pm_return:
     movw %ax, %fs
     movw %ax, %gs
     movw %ax, %ss
+    frstor pc386_bios_saved_fpu
     lidt RM_SAVED_IDTR
     movl RM_SAVED_ESP, %esp
     popal
@@ -125,7 +137,7 @@ bios_real_entry:
     movw %ax, RM_STATUS
 
     lgdt RM_GDTR
-    movl %cr0, %eax
+    movl RM_SAVED_CR0, %eax
     orl $1, %eax
     movl %eax, %cr0
     ljmp $0x0008, $(RM_THUNK_ADDR + (bios_thunk_pm - bios_thunk_start))
