@@ -61,14 +61,13 @@ target_sources(PicoMite PRIVATE
     ${CMAKE_SOURCE_DIR}/drivers/spi_lcd/spi_lcd_periph_io.c
     ${CMAKE_SOURCE_DIR}/drivers/spi_lcd/spi_lcd_options.c
     ${CMAKE_SOURCE_DIR}/drivers/editor_console/editor_console_stub.c
-    ${CMAKE_SOURCE_DIR}/drivers/main_init/main_init_stub.c
     ${CMAKE_SOURCE_DIR}/drivers/audio_i2s_pio/audio_i2s_pio_load.c
 
-    # Non-PICOMITE stubs.
-    ${CMAKE_SOURCE_DIR}/drivers/display_merge/display_merge_stub.c
+    # SPI-LCD display pipeline.
+    ${CMAKE_SOURCE_DIR}/drivers/display_merge/display_merge_pico.c
     ${CMAKE_SOURCE_DIR}/drivers/vm_framebuffer_unsupported/vm_framebuffer_stub.c
     ${CMAKE_SOURCE_DIR}/drivers/display_pixel_readbuffer/display_pixel_readbuffer.c
-    ${CMAKE_SOURCE_DIR}/drivers/fastgfx_minimal/fastgfx_minimal.c
+    ${CMAKE_SOURCE_DIR}/drivers/spi_lcd/spi_lcd_fastgfx.c
 
     # Non-VGA stub. WEB has gui_touch.
     ${CMAKE_SOURCE_DIR}/drivers/vga_pio/vga_ops_stub.c
@@ -98,6 +97,7 @@ target_compile_options(PicoMite PRIVATE -Drp2350
                                         -DPICO_PIO_USE_GPIO_BASE
                                         )
 target_link_libraries(PicoMite pico_cyw43_arch_lwip_poll)
+target_link_libraries(PicoMite pico_multicore)
 pico_set_float_implementation(PicoMite pico_dcp)
 
 Pico_enable_stdio_usb(PicoMite 1)
