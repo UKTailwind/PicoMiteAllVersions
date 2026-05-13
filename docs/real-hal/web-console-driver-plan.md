@@ -84,6 +84,7 @@ Proposed source layout:
 
 ```text
 drivers/web_console/
+  web_console_transport.h     # target-clean backend send/close contract
   web_console_protocol.h
   web_console_protocol.c      # FRMB/CMDS/audio/key framing, no port APIs
   web_console_display.h
@@ -239,6 +240,56 @@ Inventory the simulator code that must be shared:
 
 Write a short contract header for the transport backend and decide where the
 browser assets live.
+
+Phase 0 inventory on `web-console-driver`:
+
+- WebSocket framing and client lifecycle owner:
+  `ports/host_native/host_sim_server.c`. The simulator uses Mongoose directly:
+  `mg_http_listen()` starts the background server, `MG_EV_HTTP_MSG` upgrades
+  `/ws` with `mg_ws_upgrade()`, `MG_EV_WS_MSG` accepts browser text JSON and
+  pushes key codes, and `MG_EV_POLL` drains display/audio queues. Per-client
+  bootstrap state is the file-local `sim_client` stored in `mg_connection.data`;
+  every new WebSocket client receives one `FRMB` before shared `CMDS` broadcasts.
+  This file must become an adapter in later phases, not the protocol owner.
+- Full-frame `FRMB` source owner: `ports/host_native/host_fb.c` owns the host
+  visible framebuffer, dimensions, and `host_sim_framebuffer_copy()` /
+  `host_sim_framebuffer_dims()`. `ports/host_native/host_sim_server.c` currently
+  packs `FRMB` itself in `send_bootstrap_frame()`, including the `"FRMB"` magic,
+  little-endian dimensions, and RGB24-to-RGBA8 conversion.
+- Incremental `CMDS` emitter owner: `ports/host_native/host_sim_server.c` owns
+  the command queue and opcode packing in `host_sim_emit_cls()`,
+  `host_sim_emit_rect()`, `host_sim_emit_pixel()`, `host_sim_emit_scroll()`, and
+  `host_sim_emit_blit()`. `ports/host_native/host_fb.c` is the producer at draw
+  mutation points, including `host_fb_put_pixel()`, `host_fb_fill_rect()`,
+  `host_fb_scroll_lcd()`, and front-buffer copy/BLIT presentation. This split
+  means Phase 1 should extract the queue and packers before moving any draw
+  call sites.
+- Audio JSON queue owner: `ports/host_native/host_sim_audio.c` owns JSON event
+  construction and queueing for `tone`, `stop`, `sound`, `volume`, `pause`, and
+  `resume`. `ports/host_native/host_sim_server.c` drains the queue during
+  `MG_EV_POLL` and forwards each JSON string as one WebSocket TEXT frame.
+- Browser frame decoder owner: `web/app.js`. It connects to `/ws`, sets
+  `binaryType = "arraybuffer"`, decodes `FRMB` full frames, replays `CMDS`
+  opcodes `0x01` through `0x05`, sends key JSON as
+  `{ "op": "key", "code": <byte> }`, and routes text JSON frames to audio.
+- Browser WebAudio owner: `web/audio.js`. It handles the simulator audio JSON
+  operations with WebAudio oscillators, noise buffers, per-channel master gain,
+  pause/resume, and browser gesture unlock. No server-side audio state beyond
+  event queueing is shared today.
+- Browser asset location decision: keep the current simulator assets in the
+  top-level `web/` directory until extraction starts. The shared device/browser
+  assets should ultimately live under `drivers/web_console/web/`, with
+  `web/index.html`, `web/app.js`, `web/audio.js`, and `web/style.css` treated as
+  the source material to lift or mirror. Host simulator serving from `web/`
+  remains unchanged during Phase 0.
+
+Phase 0 contract decision:
+
+- Add `drivers/web_console/web_console_transport.h` as a dependency-free
+  backend contract for later phases. It defines only the reserved device
+  endpoint, inbound text callback type, and the binary/text send, send-ready,
+  and close callback shape. It must not include ESP-IDF, Mongoose, POSIX socket,
+  FreeRTOS, or interpreter headers. No build files consume it in Phase 0.
 
 Exit gate:
 
