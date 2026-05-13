@@ -276,6 +276,10 @@ struct option_s {
     unsigned char PASSWORD[MAXKEYLEN]; //512=768
     unsigned char platform[32]; 
     unsigned char extensions[96]; //128=896 == 7 XMODEM blocks
+    uint16_t pc386_sb_base;
+    uint8_t pc386_sb_irq;
+    uint8_t pc386_sb_dma;
+    uint8_t pc386_sb_dma16;
     // To enable older CFunctions to run any new options *MUST* be added at the end of the list
 } __attribute__((packed));
 extern unsigned char *CFunctionFlash, *CFunctionLibrary;

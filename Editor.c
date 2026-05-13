@@ -367,6 +367,7 @@ void edit(unsigned char *cmdline, bool cmdfile) {
         char c;
         int fsize;
 //        strcpy(name,fname);
+        p = EdBuff;
         if(!ExistsFile(filename)){
             if (strchr(filename, '.') == NULL) strcat(filename, ".bas");
         }

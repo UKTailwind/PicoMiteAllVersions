@@ -68,13 +68,15 @@ BC_SRCS = bc_alloc.c bc_bridge.c vm_host_fat.c ff.c ffunicode.c ffsystem.c \
 # no argv-parsing loader (main.c here replaces it).
 NATIVE_SRCS = host_runtime.c host_fs_shims.c host_peripheral_stubs.c host_fs.c \
               host_sim_audio.c host_sim_slowdown.c host_sim_emit_stub.c host_time.c host_keys.c \
-              host_bc_runtime_noop.c host_terminal_hooks_noop.c \
-              hal_flash_host.c hal_time_host.c hal_random_host.c hal_watchdog_host.c hal_pin_host.c hal_storage_host.c \
+              host_bc_runtime_noop.c host_terminal_hooks_noop.c host_web_stubs.c \
+              hal_flash_host.c hal_time_host.c hal_random_host.c hal_pin_host.c hal_storage_host.c \
               hal_filesystem_host.c hal_keyboard_host.c hal_audio_host.c hal_vm_framebuffer_host.c
 
 PORT_SRCS = main.c stdio_runtime.c
 
-SRCS = $(PORT_SRCS) $(NATIVE_SRCS) $(CORE_SRCS) $(BC_SRCS)
+HAL_GENERIC_SRCS = hal_watchdog_noop.c
+
+SRCS = $(PORT_SRCS) $(NATIVE_SRCS) $(CORE_SRCS) $(BC_SRCS) $(HAL_GENERIC_SRCS)
 OBJS = $(addprefix $(BUILD_DIR)/,$(SRCS:.c=.o))
 DEPS = $(OBJS:.o=.d)
 
@@ -102,6 +104,10 @@ $(BUILD_DIR)/%.o: $(REPO_ROOT)/%.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 $(BUILD_DIR)/%.o: $(REPO_ROOT)/core/state/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(BUILD_DIR)/%.o: $(REPO_ROOT)/hal/generic/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c -o $@ $<
 

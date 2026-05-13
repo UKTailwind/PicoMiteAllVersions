@@ -1783,7 +1783,7 @@ unsigned char *getFstring(unsigned char *p) {
     tp = GetTempMemory(STRINGSIZE);                                        // this will last for the life of the command
     Mstrcpy(tp, getstring(p));                                      // get the string and save in a temp place
     for(int i=1;i<=*tp;i++)if(tp[i]=='\\')tp[i]='/';
-    if((toupper(tp[1])=='A' || toupper(tp[1])=='B') && tp[2]==':' && !(tp[3]=='/')){
+    if((toupper(tp[1])=='A' || toupper(tp[1])=='B' || toupper(tp[1])=='C') && tp[2]==':' && !(tp[3]=='/')){
         memmove(&tp[4],&tp[3],tp[0]-2);
         tp[3]='/';
         tp[0]++;

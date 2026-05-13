@@ -957,6 +957,15 @@ void port_apply_load_overrides(void)
      * builds live in ports/pico_sdk_common/port_load_overrides.c. */
 }
 
+/* Default drivecheck remap: identity. Pc386 (which has FatFs on every
+ * volume and no LFS) provides its own override. */
+int port_drivecheck_remap(int t) { return t; }
+
+const char *port_filesystem_prefix(int filesystem)
+{
+    return filesystem ? "B:" : "A:";
+}
+
 void port_drive_check(char drive)
 {
     /* Host has only one logical disk (B:, backed by POSIX under
@@ -967,6 +976,7 @@ void port_drive_check(char drive)
      * side-effect being console-routing corruption). Treat A: as an
      * error; B: is always available — no SD_CS pin to check. */
     if (drive == 'A') error("A: drive not available on host");
+    if (drive != 'B') error("Invalid disk");
 }
 
 /* PicoCalc HW hooks — error stubs on host. Real impls in

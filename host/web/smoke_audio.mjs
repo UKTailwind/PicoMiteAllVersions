@@ -15,7 +15,7 @@ const PAGE_URL = `http://127.0.0.1:${PORT}/`;
 
 function startServer() {
     const cwd = new URL('.', import.meta.url).pathname;
-    const child = spawn('python3', ['-m', 'http.server', String(PORT), '--bind', '127.0.0.1'], {
+    const child = spawn('python3', ['./serve.py', String(PORT)], {
         cwd,
         stdio: ['ignore', 'ignore', 'inherit'],
     });
@@ -37,7 +37,10 @@ async function waitForPort() {
 const server = startServer();
 try {
     await waitForPort();
-    const browser = await chromium.launch({ headless: true });
+    const browser = await chromium.launch({
+        headless: true,
+        args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'],
+    });
     try {
         const ctx = await browser.newContext();
         const page = await ctx.newPage();
@@ -48,13 +51,7 @@ try {
 
         await page.goto(PAGE_URL, { waitUntil: 'load' });
 
-        // Give the WASM module time to fully boot (ASYNCIFY paths can be
-        // slow on first load). We wait for the canvas element + the
-        // status line to say "Ready".
-        await page.waitForFunction(() => {
-            const s = document.getElementById('status');
-            return s && s.textContent.startsWith('Ready');
-        }, { timeout: 15000 });
+        await page.waitForFunction(() => !!window.picomite?.memoryBytes, { timeout: 25000 });
 
         // Wrap window.picomiteAudio so we can observe calls. The audio
         // module has already installed its real implementation on first
