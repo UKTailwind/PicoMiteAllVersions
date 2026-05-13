@@ -18,6 +18,8 @@
 #include <stdio.h>
 #include <stdint.h>
 
+#include "esp32_telnet.h"
+
 /* Provided by esp32_console.c. */
 extern void esp32_console_write_bytes(const char *text, int len);
 extern int  esp32_console_read_byte_nonblock(void);
@@ -32,8 +34,12 @@ extern void esp32_console_push_back_byte(int c);
  * in esp32_console_init. */
 
 char SerialConsolePutC(char c, int flush) {
-    esp32_console_write_bytes(&c, 1);
-    if (flush) fflush(stdout);
+    if (Option.Telnet != -1) {
+        esp32_console_write_bytes(&c, 1);
+        if (flush) fflush(stdout);
+    }
+    esp32_telnet_putc(c, flush);
+    if (flush) esp32_telnet_putc(0, -1);
     return c;
 }
 
@@ -49,6 +55,7 @@ char MMputchar(char c, int flush) {
 void MMPrintString(char *s) {
     while (*s) MMputchar(*s++, 0);
     fflush(stdout);
+    esp32_telnet_putc(0, -1);
 }
 
 void SSPrintString(char *s) {
@@ -58,11 +65,21 @@ void SSPrintString(char *s) {
 
 void myprintf(char *s) { MMPrintString(s); }
 
+static int esp32_console_ring_pop(void) {
+    if (ConsoleRxBufHead == ConsoleRxBufTail) return -1;
+    int c = (unsigned char)ConsoleRxBuf[ConsoleRxBufTail];
+    ConsoleRxBufTail = (ConsoleRxBufTail + 1) % CONSOLE_RX_BUF_SIZE;
+    return c;
+}
+
 int getConsole(void) {
+    int c = esp32_console_ring_pop();
+    if (c >= 0) return c;
     return esp32_console_read_byte_nonblock();
 }
 
 int kbhitConsole(void) {
+    if (ConsoleRxBufHead != ConsoleRxBufTail) return 1;
     int c = esp32_console_read_byte_nonblock();
     if (c < 0) return 0;
     esp32_console_push_back_byte(c);
@@ -168,9 +185,18 @@ static int esp32_decode_escape_sequence(void) {
 }
 
 int MMInkey(void) {
-    int c = esp32_console_read_byte_nonblock();
+    static int in_web_poll;
+    extern void ProcessWeb(int mode);
+    if (!in_web_poll) {
+        in_web_poll = 1;
+        ProcessWeb(0);
+        in_web_poll = 0;
+    }
+    int c = esp32_console_ring_pop();
+    if (c < 0) c = esp32_console_read_byte_nonblock();
     if (c < 0) return -1;
-    if (c == 0x1b) return esp32_decode_escape_sequence();
+    if (c == 0x1b && ConsoleRxBufHead == ConsoleRxBufTail)
+        return esp32_decode_escape_sequence();
     return esp32_normalise_console_byte(c);
 }
 
@@ -179,8 +205,14 @@ int MMgetchar(void) {
      * calls MMInkey in a poll — but other paths (PRESS-ANY-KEY prompts)
      * call MMgetchar and want a key, not a raw byte. */
     int c;
-    do { c = esp32_console_read_byte_blocking_ms(-1); } while (c < 0);
-    if (c == 0x1b) return esp32_decode_escape_sequence();
+    do {
+        extern void ProcessWeb(int mode);
+        ProcessWeb(0);
+        c = esp32_console_ring_pop();
+        if (c < 0) c = esp32_console_read_byte_blocking_ms(1);
+    } while (c < 0);
+    if (c == 0x1b && ConsoleRxBufHead == ConsoleRxBufTail)
+        return esp32_decode_escape_sequence();
     return esp32_normalise_console_byte(c);
 }
 

@@ -17,6 +17,7 @@
     { (unsigned char *)"Backlight", T_CMD, 0, cmd_backlight },
 
 #define HAL_PORT_WIFI_OR_3D_CMD_TOKENS \
+    { (unsigned char *)"WEB", T_CMD, 0, cmd_web }, \
     { (unsigned char *)"Draw3D", T_CMD, 0, cmd_3D },
 
 #define HAL_PORT_USB_OR_FIRMWARE_CMD_TOKEN \

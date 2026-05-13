@@ -20,7 +20,14 @@
 
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
+#include "hal/hal_time.h"
+#include "shared/net/mm_net_lifecycle.h"
 #include "bytecode.h"
+#include "esp32_mqtt.h"
+#include "esp32_tcp_client.h"
+#include "esp32_tcp_server.h"
+#include "esp32_telnet.h"
+#include "esp32_tftp.h"
 
 /* bc_bridge — funtbl[] subfun-hash rebuild on rp2350; no-op elsewhere. */
 void port_bc_bridge_clear_subfun_hash(void) {}
@@ -40,20 +47,9 @@ void port_error_show_lcd_banner(int line_num, const char *source_line, const cha
     (void)line_num; (void)source_line; (void)err_msg;
 }
 
-/* MQTT — peripheral stub; no MQTT in stdio scope. The two-arg shape
- * mirrors host_peripheral_stubs.c. */
-void port_fun_mm_mqtt_copy(int which, unsigned char *out) {
-    (void)which; (void)out;
-}
-
 /* prepare_program subfun finalisation — rp2350 / pico-only path. No-op
  * on ESP32 (the funtbl hash rebuild used elsewhere isn't built here). */
 void port_prepare_program_finalize_subfun(int ErrAbort) { (void)ErrAbort; }
-
-/* WiFi-arch init — pico_sdk_common drives this via cyw43_arch on
- * PicoMiteWEB; ESP32 has native WiFi but the stdio scope explicitly
- * excludes it. No-op for now; real init lands when WiFi opts in. */
-void port_repl_wifi_arch_init_and_connect(void) {}
 
 /* Runtime END/Clear cleanup. ESP32 stdio scope has no DMA/watchdog
  * resources owned by the shared Pico paths. */
@@ -80,14 +76,19 @@ int port_try_find_subfun_hash(unsigned char *p, int *out_index) {
     (void)p; (void)out_index; return 0;
 }
 
-/* vm_sys_time clock source for DATE$ / TIME$ helpers. Returns -1 to
- * tell vm_sys_time to fall back to its monotonic-seconds path
- * (esp_timer_get_time-derived). Wall-clock support would call
- * localtime_r over an NTP-set RTC; deferred until a forcing function. */
 int port_vm_time_get_tm(struct tm *out) {
-    (void)out;
-    return -1;
+    extern int64_t TimeOffsetToUptime;
+    time_t epochnow = (time_t)(hal_time_us_64() / 1000000 + TimeOffsetToUptime);
+    return gmtime_r(&epochnow, out) != NULL;
 }
 
-/* Web-runtime state reset for PicoMiteWEB. No-op on ESP32 stdio. */
-void port_web_clear_runtime_state(void) {}
+void port_web_clear_runtime_state(void) {
+    static const mm_net_lifecycle_runtime_hooks_t hooks = {
+        .clear_tcp_requests = esp32_tcp_server_clear_requests,
+        .close_tcp_client = esp32_tcp_client_close,
+        .close_mqtt = closeMQTT,
+        .close_tftp_session = esp32_tftp_close_session,
+        .close_telnet_session = esp32_telnet_close_session,
+    };
+    mm_net_lifecycle_runtime_reset(&hooks);
+}

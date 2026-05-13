@@ -2261,7 +2261,12 @@ int InitSDCard(void)
 }
 void getfullfilename(char *fname, char *q){
     int waste=0, t=FatFSFileSystem+1;
-    if(*cmdline){
+    if (fname &&
+        (fname[0] == 'A' || fname[0] == 'a' || fname[0] == 'B' || fname[0] == 'b') &&
+        fname[1] == ':' && (fname[2] == '/' || fname[2] == '\0')) {
+        t = drivecheck(fname, &waste);
+        fname += waste;
+    } else if(*cmdline){
         t = drivecheck(fname,&waste);
         fname+=waste;
     }
@@ -3331,7 +3336,6 @@ void cmd_autosave(void)
         CloseAudio(1);
         CloseAllFiles();
         ClearExternalIO();                                              // this MUST come before InitHeap(true)
-        tcp_free_recv_buffers();
         p = buf = GetTempMemory(EDIT_BUFFER_SIZE);
         char * fromp  = (char *)ProgMemory;
         p = buf;
@@ -3401,8 +3405,7 @@ readin:;
           //    ClearSavedVars();                                               // clear any saved variables
     SaveProgramToFlash(buf, true);
     ClearSavedVars(); // clear any saved variables
-    ClearTempMemory(); 
-        tcp_realloc_recv_buffers();
+    ClearTempMemory();
     if (c == F2)
     {
         ClearVars(0,true);
@@ -3440,7 +3443,6 @@ void cmd_autosave(void)
         CloseAudio(1);
         CloseAllFiles();
         ClearExternalIO();                                              // this MUST come before InitHeap(true)
-        tcp_free_recv_buffers();
         p = buf = GetTempMemory(EDIT_BUFFER_SIZE-2048);
         char * fromp  = (char *)ProgMemory;
         if(*fromp){
@@ -3501,8 +3503,7 @@ void cmd_autosave(void)
         if(j>255)error("line % is % characters long, maximum is 255",i,j);
         SaveProgramToFlash(buf, true);
         ClearSavedVars(); // clear any saved variables
-        ClearTempMemory(); 
-            tcp_realloc_recv_buffers();
+        ClearTempMemory();
         if (c == F2)
         {
             ClearVars(0,true);

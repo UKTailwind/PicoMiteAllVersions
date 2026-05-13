@@ -96,10 +96,10 @@ void app_main(void) {
     MMerrno = 0;
     MMErrMsg[0] = '\0';
 
-    extern void vm_host_fat_reset(void);
+    extern void esp32_sd_diskio_reset(void);
     extern void vm_sys_file_reset(void);
     extern void vm_sys_pin_reset(void);
-    vm_host_fat_reset();
+    esp32_sd_diskio_reset();
     vm_sys_file_reset();
     vm_sys_pin_reset();
 

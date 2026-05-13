@@ -80,6 +80,30 @@ uint32_t hal_random_u32(void);
 
 ---
 
+## `hal_net.h` — network transport
+
+*Status: skeleton; finalised by the network-core refactor.*
+
+`hal_net.h` separates the BASIC-visible WEB command surface from platform
+networking. Shared code parses BASIC syntax, owns interrupt/message state, and
+handles long-string buffers. Backends provide WiFi association, DNS, sockets,
+MQTT client operations, and event queues.
+
+**Guarantees to finalise in the network-core refactor:**
+- `hal_net_capabilities()` returns a bitmask describing the commands that can
+  be honored on the current backend. Shared WEB command code must reject
+  unsupported surfaces before performing partial work.
+- `hal_net_poll()` is the interpreter-thread progress hook. It may be cheap on
+  threaded backends, but polled backends such as Pico/CYW43 use it to advance
+  lwIP and drain backend queues.
+- Network callbacks/tasks must not call the MMBasic parser, evaluator,
+  allocator, or `error()`. They copy packet/event data into backend-owned queues
+  for the interpreter thread to consume.
+- The stub backend advertises no capabilities, has no permanent network
+  buffers, and returns `HAL_NET_UNSUPPORTED` for transport operations.
+
+---
+
 ## `hal_flash.h` — persistent option block + device ID (Phase 1)
 
 *Status: sketch; finalised in Phase 1.*

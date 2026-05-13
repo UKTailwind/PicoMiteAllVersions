@@ -15,6 +15,12 @@
  */
 
 #include <setjmp.h>
+#include "esp_mac.h"
+#include "esp_private/esp_clk.h"
+#include "esp_system.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "lfs.h"
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
 #include "OptionCommands.h"
@@ -37,11 +43,12 @@ static int esp32_parse_pin_arg(unsigned char *arg) {
 void LoadPNG(unsigned char *p) { (void)p; error("PNG not supported on this port"); }
 int FileLoadCMM2Program(char *fname, bool message) { (void)fname; (void)message; return 0; }
 
-/* OPTION LIST diagnostic dump — prints all option values for the user.
- * Pico ports walk every option field; stdio scope's option set is
- * minimal, so leave as a no-op. The user can still query individual
- * options via fun_mminfo. */
-void printoptions(void) {}
+/* OPTION LIST diagnostic dump — limited to the ESP32 stdio option
+ * surface currently owned by this port. */
+void printoptions(void) {
+    extern void esp32_wifi_print_options(void);
+    esp32_wifi_print_options();
+}
 
 /* OPEN COM:N peripheral stubs — UART comms not wired in stdio scope.
  * SerialOpen errors so user code gets feedback; the rest stay silent
@@ -70,9 +77,17 @@ void AES_init_ctx(void *ctx, const uint8_t *key) { (void)ctx; (void)key; }
 
 void AES_init_ctx_iv(void *ctx, const uint8_t *key, const uint8_t *iv) { (void)ctx; (void)key; (void)iv; }
 
-void cleanserver(void) {}
+void cleanserver(void)
+{
+    extern void port_web_clear_runtime_state(void);
+    port_web_clear_runtime_state();
+}
 
-void close_tcpclient(void) {}
+void close_tcpclient(void)
+{
+    extern void esp32_tcp_client_close(void);
+    esp32_tcp_client_close();
+}
 
 void cmd_adc(void) {}
 
@@ -126,8 +141,6 @@ void cmd_in(void) {}
 
 void cmd_ir(void) {}
 
-void cmd_ireturn(void) {}
-
 void cmd_irq(void) {}
 
 void cmd_irqclear(void) {}
@@ -178,7 +191,13 @@ void cmd_onewire(void) {}
 
 void cmd_option(void)
 {
+    extern int esp32_wifi_option_setter(unsigned char *cmdline);
+    if (checkstring(cmdline, (unsigned char *)"LIST")) {
+        printoptions();
+        return;
+    }
     if (option_command_handle_common(cmdline, false)) return;
+    if (esp32_wifi_option_setter(cmdline)) return;
     error("Option not supported on this port");
 }
 
@@ -395,7 +414,12 @@ void fun_info(void) {
     extern short gui_font_width, gui_font_height;
     extern int gui_fcolour, gui_bcolour;
     extern const uint8_t *flash_target_contents;
+    extern lfs_t lfs;
+    extern struct lfs_config pico_lfs_cfg;
+    extern int esp32_wifi_mminfo(unsigned char *ep, int64_t *out_iret,
+                                 unsigned char *out_sret, int *out_targ);
     unsigned char *tp;
+    if (sret == NULL) sret = GetTempMemory(STRINGSIZE);
     if (checkstring(ep, (unsigned char *)"HRES")) {
         iret = HRes; targ = T_INT; return;
     }
@@ -419,6 +443,57 @@ void fun_info(void) {
         checkstring(ep, (unsigned char *)"BCOLOR")) {
         iret = gui_bcolour; targ = T_INT; return;
     }
+    if (checkstring(ep, (unsigned char *)"BOOT COUNT")) {
+        iret = 0; targ = T_INT; return;
+    }
+    if (checkstring(ep, (unsigned char *)"CPUSPEED")) {
+        iret = esp_clk_cpu_freq() / 1000;
+        targ = T_INT;
+        return;
+    }
+    if (checkstring(ep, (unsigned char *)"HEAP")) {
+        iret = esp_get_free_heap_size(); targ = T_INT; return;
+    }
+    if (checkstring(ep, (unsigned char *)"STACK")) {
+        iret = (int64_t)uxTaskGetStackHighWaterMark(NULL) * sizeof(StackType_t);
+        targ = T_INT;
+        return;
+    }
+    if (checkstring(ep, (unsigned char *)"FLASHTOP")) {
+        iret = TOP_OF_SYSTEM_FLASH; targ = T_INT; return;
+    }
+    if (checkstring(ep, (unsigned char *)"FREE SPACE")) {
+        lfs_ssize_t used = lfs_fs_size(&lfs);
+        if (used < 0) used = 0;
+        iret = ((int64_t)pico_lfs_cfg.block_count - used) * pico_lfs_cfg.block_size;
+        if (iret < 0) iret = 0;
+        targ = T_INT;
+        return;
+    }
+    if (checkstring(ep, (unsigned char *)"UPTIME")) {
+        fret = (MMFLOAT)hal_time_us_64() / 1000000.0;
+        targ = T_NBR;
+        return;
+    }
+    if (checkstring(ep, (unsigned char *)"ID")) {
+        uint8_t mac[6] = {0};
+        if (esp_efuse_mac_get_default(mac) == ESP_OK) {
+            snprintf((char *)sret, STRINGSIZE, "ESP32-S3 %02X:%02X:%02X:%02X:%02X:%02X",
+                     mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+        } else {
+            strcpy((char *)sret, "ESP32-S3");
+        }
+        CtoM(sret);
+        targ = T_STR;
+        return;
+    }
+    if ((tp = checkstring(ep, (unsigned char *)"PIN"))) {
+        int pin = getint(tp, 0, 48);
+        snprintf((char *)sret, STRINGSIZE, "GP%d", pin);
+        CtoM(sret);
+        targ = T_STR;
+        return;
+    }
     if ((tp = checkstring(ep, (unsigned char *)"FLASH ADDRESS"))) {
         /* uintptr_t round-trip — `(unsigned int)` would truncate the
          * pointer on 64-bit hosts and silently zero the upper bits. */
@@ -427,6 +502,7 @@ void fun_info(void) {
         targ = T_INT;
         return;
     }
+    if (esp32_wifi_mminfo(ep, &iret, sret, &targ)) return;
     iret = 0;
     targ = T_INT;
 }
@@ -533,16 +609,9 @@ unsigned char *OnKeyGOSUB = NULL;
 
 unsigned char *OnPS2GOSUB = NULL;
 
-void ProcessWeb(int mode) { (void)mode; }
 
 volatile int  PS2code = 0;
 
 unsigned char SPIatRisk = 0;
 
-void tcp_free_recv_buffers(void) {}
-
-void tcp_realloc_recv_buffers(void) {}
-
-volatile bool TCPreceived = false;
-
-char         *TCPreceiveInterrupt = NULL;
+bool optionsuppressstatus = false;

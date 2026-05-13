@@ -30,16 +30,21 @@ void ClearExternalIO(void) {}
  * it from non-ESP32 paths. */
 void SoftReset(void) {}
 
-/* WiFi-startup completion flag. Hardware_Includes.h declares it as
- * extern int and warns that "WEB sets it true when the wifi stack is
- * up". Stdio scope has no WiFi → leave at 0. */
-int startupcomplete = 0;
+/* Interrupt-source address resolver. This is used by WEB TCP INTERRUPT
+ * and the generic MMBasic interrupt machinery to resolve a line number,
+ * label, or SUB name into tokenized program memory. */
+unsigned char *GetIntAddress(unsigned char *p) {
+    if (isnamestart((uint8_t)*p)) {
+        int i = FindSubFun(p, 0);
+        if (i == -1) return findlabel(p);
+        return subfun[i];
+    }
+    return findline(getinteger(p), true);
+}
 
-/* PEEK / POKE / interrupt-source address resolvers. Stdio scope
- * doesn't expose hardware register peek/poke. Return zero/NULL so any
- * BASIC PEEK("...") / POKE / SETTICK INTERRUPT path errors-out cleanly
- * via the address-zero check in External.c. */
-unsigned char *GetIntAddress(unsigned char *p) { (void)p; return NULL; }
+/* Stdio scope doesn't expose hardware register peek/poke. Return zero
+ * so BASIC PEEK("...") / POKE paths error out cleanly via their
+ * address-zero checks. */
 unsigned int   GetPeekAddr(unsigned char *p)   { (void)p; return 0; }
 unsigned int   GetPokeAddr(unsigned char *p)   { (void)p; return 0; }
 

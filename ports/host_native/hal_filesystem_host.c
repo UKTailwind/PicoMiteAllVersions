@@ -97,11 +97,40 @@ char *hal_fs_getcwd(char *buf, size_t n)
     return buf;
 }
 
+extern const char *host_sd_root;
+
+/* Host mounts FatFS with the default empty drive (see vm_host_fat.c).
+ * Strip MMBasic's "A:"/"B:" prefix before dispatch. */
+static const char *host_hal_path(const char *p)
+{
+    if (p && p[0] && p[1] == ':') return p + 2;
+    return p;
+}
+
+static void host_sd_path(char *out, size_t out_len, const char *path)
+{
+    const char *bare = host_hal_path(path);
+    while (bare[0] == '/') bare++;
+    size_t rl = strlen(host_sd_root);
+    int need_sep = (rl > 0 && host_sd_root[rl - 1] != '/');
+    snprintf(out, out_len, "%s%s%s", host_sd_root, need_sep ? "/" : "", bare);
+}
+
 int hal_fs_stat(const char *path, struct hal_stat *out)
 {
     if (!path || !out) return -EINVAL;
+    if (host_sd_root) {
+        char rp[FF_MAX_LFN];
+        struct stat st;
+        host_sd_path(rp, sizeof(rp), path);
+        if (stat(rp, &st) != 0) return -errno;
+        out->size = st.st_size;
+        out->mode = S_ISDIR(st.st_mode) ? HAL_FS_S_IFDIR : HAL_FS_S_IFREG;
+        out->mtime_us = (uint64_t)st.st_mtime * 1000000ULL;
+        return 0;
+    }
     FILINFO fno;
-    FRESULT r = f_stat(path, &fno);
+    FRESULT r = f_stat(host_hal_path(path), &fno);
     if (r != FR_OK) return fatfs_rc_to_errno(r);
     out->size = fno.fsize;
     out->mode = (fno.fattrib & AM_DIR) ? HAL_FS_S_IFDIR : HAL_FS_S_IFREG;
@@ -118,8 +147,6 @@ int hal_fs_stat(const char *path, struct hal_stat *out)
  * FileTable[] or on host_fs_posix_*. Legacy FileIO.c callers keep
  * their existing paths until they're migrated to hal_fs_*. */
 /* -------------------------------------------------------------------- */
-
-extern const char *host_sd_root;
 
 #define HAL_FS_MAX_OPEN 16
 
@@ -146,14 +173,6 @@ static host_fs_slot_t *host_slot_from_fd(hal_fs_fd_t fd)
     host_fs_slot_t *s = &host_fs_slots[fd - 1];
     if (!s->fp && !s->fatfs) return NULL;
     return s;
-}
-
-/* Host mounts FatFS with the default empty drive (see vm_host_fat.c).
- * Strip MMBasic's "A:"/"B:" prefix before dispatch. */
-static const char *host_hal_path(const char *p)
-{
-    if (p && p[0] && p[1] == ':') return p + 2;
-    return p;
 }
 
 static const char *hal_flags_to_fopen_mode(int flags)
@@ -200,11 +219,7 @@ int hal_fs_open(const char *path, int flags, hal_fs_fd_t *out)
          * paths that map to $host_sd_root/foo, NOT real POSIX /foo.
          * Strip the drive prefix and the leading '/', then join. */
         char rp[FF_MAX_LFN];
-        const char *bare = host_hal_path(path);
-        while (bare[0] == '/') bare++;
-        size_t rl = strlen(host_sd_root);
-        int need_sep = (rl > 0 && host_sd_root[rl - 1] != '/');
-        snprintf(rp, sizeof(rp), "%s%s%s", host_sd_root, need_sep ? "/" : "", bare);
+        host_sd_path(rp, sizeof(rp), path);
         struct stat st;
         if (stat(rp, &st) == 0) s->posix_size = (size_t)st.st_size;
         const char *m = hal_flags_to_fopen_mode(flags);

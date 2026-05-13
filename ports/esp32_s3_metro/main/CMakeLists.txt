@@ -37,6 +37,25 @@ set(STATE_SRCS
     ${REPO_ROOT}/core/state/pin_state.c
     ${REPO_ROOT}/core/state/option_state.c
     ${REPO_ROOT}/core/state/audio_state.c
+    ${REPO_ROOT}/shared/net/mm_net_interrupts.c
+    ${REPO_ROOT}/shared/net/mm_net_http.c
+    ${REPO_ROOT}/shared/net/mm_net_http_file.c
+    ${REPO_ROOT}/shared/net/mm_net_http_page.c
+    ${REPO_ROOT}/shared/net/mm_net_mqtt_cmd.c
+    ${REPO_ROOT}/shared/net/mm_net_mqtt_hal_cmd.c
+    ${REPO_ROOT}/shared/net/mm_net_ntp.c
+    ${REPO_ROOT}/shared/net/mm_net_ntp_hal.c
+    ${REPO_ROOT}/shared/net/mm_net_lifecycle.c
+    ${REPO_ROOT}/shared/net/mm_net_options.c
+    ${REPO_ROOT}/shared/net/mm_net_service.c
+    ${REPO_ROOT}/shared/net/mm_net_state.c
+    ${REPO_ROOT}/shared/net/mm_net_tcp_client_cmd.c
+    ${REPO_ROOT}/shared/net/mm_net_tcp_server_cmd.c
+    ${REPO_ROOT}/shared/net/mm_net_tftp.c
+    ${REPO_ROOT}/shared/net/mm_net_transmit_cmd.c
+    ${REPO_ROOT}/shared/net/mm_net_udp_cmd.c
+    ${REPO_ROOT}/shared/net/mm_net_web_cmd.c
+    ${REPO_ROOT}/shared/net/mm_net_wifi_cmd.c
 )
 
 set(DEVICE_FACING_SRCS
@@ -76,7 +95,6 @@ set(BC_SRCS
     ${REPO_ROOT}/bc_vm.c
     ${REPO_ROOT}/bc_runtime.c
     ${REPO_ROOT}/bc_debug.c
-    ${REPO_ROOT}/vm_host_fat.c
     ${REPO_ROOT}/ff.c
     ${REPO_ROOT}/ffunicode.c
     ${REPO_ROOT}/ffsystem.c
@@ -105,10 +123,12 @@ set(PORT_LOCAL_SRCS
     hal_vm_framebuffer_esp32_stub.c
     hal_time_esp32.c
     hal_random_esp32.c
+    hal_net_esp32.c                         # ESP-IDF socket transport HAL
     ../../../hal/generic/hal_watchdog_noop.c
     hal_flash_esp32.c                         # NVS-backed Options; slot persistence still Stage E1
     hal_storage_esp32_stub.c
-    hal_filesystem_esp32.c                  # path / dir ops via f_*
+    ${REPO_ROOT}/ports/pico_sdk_common/hal_filesystem_pico.c  # shared A:/B: LFS/FatFS dispatcher
+    esp32_sd_diskio.c                       # Metro microSD SDSPI diskio backend for B:
     hal_keyboard_esp32_stub.c
     # D-decouple: ESP32 owns the small port surface that was originally
     # borrowed from host_native during bring-up.
@@ -117,6 +137,14 @@ set(PORT_LOCAL_SRCS
     esp32_runtime.c                         # 9 VM trampoline / abort hooks + state
     esp32_cmd_files_hooks.c                 # 3 A:-only filesystem hooks
     esp32_peripheral_stubs.c                # 117 cmd_/fun_/AES_/GPS_/etc decls
+    esp32_wifi.c                            # ESP-IDF native WiFi OPTION / WEB / MM.INFO surface
+    esp32_mqtt.c                            # ESP32 MQTT command/poll adapter over HAL MQTT
+    esp32_ntp.c                             # ESP32 WEB NTP adapter over shared HAL transport
+    esp32_tcp_client.c                      # ESP32 TCP client/stream command adapter
+    esp32_tcp_server.c                      # ESP32 TCP server service and WEB TRANSMIT adapter
+    esp32_tftp.c                            # ESP32 TFTP service adapter over shared core
+    esp32_telnet.c                          # ESP32 Telnet console service over HAL TCP
+    esp32_udp.c                             # ESP32 UDP service and WEB UDP adapter
 )
 
 # host_native runtime/peripheral sources are no longer in the link. The
@@ -139,6 +167,14 @@ idf_component_register(
         demos/fizzbuzz.bas
         demos/sieve.bas
         demos/mand.bas
+        demos/web_hello.bas
+        demos/site.bas
+        demos/site_index.htm
+        demos/site_status.htm
+        demos/site_about.htm
+        demos/site_gpio.htm
+        demos/site_files.htm
+        demos/site_style.css
     INCLUDE_DIRS
         "."
         ${PORT_DIR}
@@ -148,12 +184,22 @@ idf_component_register(
         driver
         esp_adc
         esp_driver_rmt
+        esp_driver_sdspi
         esp_timer
         esp_psram
+        esp_event
+        esp_netif
+        esp_wifi
+        mqtt
         nvs_flash
         spi_flash
         esp_partition
+        sdmmc
         vfs
+)
+
+target_include_directories(${COMPONENT_LIB} BEFORE PRIVATE
+    ${IDF_PATH}/components/lwip/port/include
 )
 
 # Force-include the platform header for every C TU in this component.

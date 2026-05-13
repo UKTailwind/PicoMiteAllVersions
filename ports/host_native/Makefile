@@ -40,6 +40,26 @@ CORE_SRCS = MMBasic.c Commands.c Functions.c Operators.c MATHS.c Memory.c Editor
 CORE_SRCS += gfx_box_shared.c gfx_circle_shared.c gfx_line_shared.c gfx_pixel_shared.c gfx_cls_shared.c gfx_text_shared.c gfx_console_shared.c
 CORE_SRCS += mm_misc_shared.c OptionCommands.c
 CORE_SRCS += display_state.c pin_state.c option_state.c audio_state.c
+CORE_SRCS += mm_net_interrupts.c
+CORE_SRCS += mm_net_http.c
+CORE_SRCS += mm_net_http_file.c
+CORE_SRCS += mm_net_http_page.c
+CORE_SRCS += mm_net_mqtt_cmd.c
+CORE_SRCS += mm_net_mqtt_hal_cmd.c
+CORE_SRCS += mm_net_mqtt_wire.c
+CORE_SRCS += mm_net_ntp.c
+CORE_SRCS += mm_net_ntp_hal.c
+CORE_SRCS += mm_net_lifecycle.c
+CORE_SRCS += mm_net_options.c
+CORE_SRCS += mm_net_service.c
+CORE_SRCS += mm_net_state.c
+CORE_SRCS += mm_net_tcp_client_cmd.c
+CORE_SRCS += mm_net_tcp_server_cmd.c
+CORE_SRCS += mm_net_tftp.c
+CORE_SRCS += mm_net_transmit_cmd.c
+CORE_SRCS += mm_net_udp_cmd.c
+CORE_SRCS += mm_net_web_cmd.c
+CORE_SRCS += mm_net_wifi_cmd.c
 CORE_SRCS += Draw.c RGB121.c Tilemap.c FileIO.c Audio.c BmpDecoder.c re.c picojpeg.c
 # Stubs + host-only subsystems
 CORE_SRCS += audio_mp3_stub.c spi_lcd_mem332_stub.c display_merge_stub.c vga_ops_stub.c
@@ -53,11 +73,12 @@ BC_SRCS = bc_alloc.c bc_bridge.c vm_host_fat.c ff.c ffunicode.c ffsystem.c \
           bc_source.c bc_compiler_core.c bc_vm.c bc_runtime.c bc_debug.c
 
 # Port-native sources (this directory).
-HOST_SRCS = host_runtime.c host_fastgfx.c host_fastgfx_resync.c host_fs_shims.c host_peripheral_stubs.c \
+HOST_SRCS = host_runtime.c host_fastgfx.c host_fastgfx_resync.c host_fs_shims.c host_peripheral_stubs.c host_web.c \
             host_main.c host_terminal.c host_fs.c host_sim_audio.c host_sim_slowdown.c host_sim_emit_stub.c host_time.c host_fb.c host_keys.c \
             host_bc_runtime_noop.c host_terminal_hooks_noop.c \
             hal_flash_host.c hal_time_host.c hal_random_host.c hal_pin_host.c hal_storage_host.c \
-            hal_filesystem_host.c hal_keyboard_host.c hal_audio_host.c hal_vm_framebuffer_host.c
+            hal_filesystem_host.c hal_keyboard_host.c hal_audio_host.c hal_vm_framebuffer_host.c \
+            hal_net_posix.c
 
 HAL_GENERIC_SRCS = hal_watchdog_noop.c
 
@@ -66,6 +87,8 @@ OBJS = $(addprefix $(BUILD_DIR)/,$(SRCS:.c=.o))
 DEPS = $(OBJS:.o=.d)
 
 TARGET = $(REPO_ROOT)/host/mmbasic_test
+NET_HAL_TEST = $(BUILD_DIR)/host_net_hal_test
+WASM_PROXY_TARGET = $(REPO_ROOT)/host/wasm_network_proxy
 
 # --- Simulator target ---------------------------------------------------
 SIM_TARGET  = $(REPO_ROOT)/host/mmbasic_sim
@@ -77,12 +100,52 @@ SIM_LDFLAGS = $(LDFLAGS) -pthread
 
 MONGOOSE_DIR = $(PORT_DIR)/vendor
 
+# --- WASM companion network proxy ---------------------------------------
+WASM_PROXY_SRCS = wasm_proxy_main.c wasm_proxy_protocol.c wasm_proxy_http.c wasm_proxy_net.c vendor/mongoose.c
+WASM_PROXY_OBJS = $(addprefix $(BUILD_DIR)/wasm_proxy/,$(WASM_PROXY_SRCS:.c=.o))
+WASM_PROXY_DEPS = $(WASM_PROXY_OBJS:.o=.d)
+WASM_PROXY_CFLAGS = $(CFLAGS) -pthread
+WASM_PROXY_LDFLAGS = $(LDFLAGS) -pthread
+
 all: $(TARGET)
 
 $(TARGET): $(OBJS)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
+net-hal-test: $(NET_HAL_TEST)
+	$(NET_HAL_TEST)
+
+$(NET_HAL_TEST): $(PORT_DIR)/hal_net_posix_test.c $(PORT_DIR)/hal_net_posix.c \
+                 $(REPO_ROOT)/shared/net/mm_net_http.c \
+                 $(REPO_ROOT)/shared/net/mm_net_http_file.c \
+                 $(REPO_ROOT)/shared/net/mm_net_mqtt_wire.c \
+                 $(REPO_ROOT)/shared/net/mm_net_ntp.c \
+                 $(REPO_ROOT)/shared/net/mm_net_ntp_hal.c \
+                 $(REPO_ROOT)/shared/net/mm_net_tftp.c \
+                 $(REPO_ROOT)/hal/hal_net.h $(REPO_ROOT)/shared/net/mm_net_http.h \
+                 $(REPO_ROOT)/shared/net/mm_net_http_file.h \
+                 $(REPO_ROOT)/shared/net/mm_net_ntp.h $(REPO_ROOT)/shared/net/mm_net_ntp_hal.h \
+                 $(REPO_ROOT)/shared/net/mm_net_tftp.h
+	@mkdir -p $(dir $@)
+	$(CC) -std=gnu11 -g -O0 -Wall -Wno-unused-variable -Wno-unused-function \
+	      -Wno-unused-but-set-variable -Wno-misleading-indentation \
+	      -funsigned-char -DMMBASIC_HOST -I$(PORT_DIR) -I$(REPO_ROOT) \
+	      -o $@ $(PORT_DIR)/hal_net_posix_test.c $(PORT_DIR)/hal_net_posix.c \
+	      $(REPO_ROOT)/shared/net/mm_net_http.c \
+	      $(REPO_ROOT)/shared/net/mm_net_http_file.c \
+	      $(REPO_ROOT)/shared/net/mm_net_mqtt_wire.c \
+	      $(REPO_ROOT)/shared/net/mm_net_ntp.c \
+	      $(REPO_ROOT)/shared/net/mm_net_ntp_hal.c \
+	      $(REPO_ROOT)/shared/net/mm_net_tftp.c \
+	      -pthread $(LDFLAGS)
+
 sim: $(SIM_TARGET)
+
+wasm-proxy: $(WASM_PROXY_TARGET)
+
+$(WASM_PROXY_TARGET): $(WASM_PROXY_OBJS)
+	@mkdir -p $(dir $@)
+	$(CC) $(WASM_PROXY_CFLAGS) -o $@ $^ $(WASM_PROXY_LDFLAGS)
 
 # The sim build recompiles EVERY source with -DMMBASIC_SIM, not just a
 # few — gfx_console_shared, host_main, etc. all check `#ifdef
@@ -99,6 +162,10 @@ $(BUILD_DIR)/%.o: $(PORT_DIR)/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
+$(BUILD_DIR)/wasm_proxy/%.o: $(PORT_DIR)/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(WASM_PROXY_CFLAGS) -c -o $@ $<
+
 $(BUILD_DIR)/%.o: $(SIM_VM_DIR)/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c -o $@ $<
@@ -114,6 +181,10 @@ $(BUILD_DIR)/%.o: $(REPO_ROOT)/core/state/%.c
 
 # Shared HAL impls (no-op watchdog, etc).
 $(BUILD_DIR)/%.o: $(REPO_ROOT)/hal/generic/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(BUILD_DIR)/%.o: $(REPO_ROOT)/shared/net/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
@@ -157,6 +228,9 @@ $(BUILD_DIR)/%.o: $(REPO_ROOT)/drivers/editor_console/%.c
 $(BUILD_DIR)/%.o: $(REPO_ROOT)/drivers/display_pixel_host/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c -o $@ $<
+$(BUILD_DIR)/%.o: $(REPO_ROOT)/drivers/net_stub/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c -o $@ $<
 
 # --- Sim build: all sources rebuilt with -DMMBASIC_SIM ------------------
 $(BUILD_DIR)/sim/%.o: $(PORT_DIR)/%.c
@@ -176,6 +250,10 @@ $(BUILD_DIR)/sim/%.o: $(REPO_ROOT)/core/state/%.c
 	$(CC) $(SIM_CFLAGS) -c -o $@ $<
 
 $(BUILD_DIR)/sim/%.o: $(REPO_ROOT)/hal/generic/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(SIM_CFLAGS) -c -o $@ $<
+
+$(BUILD_DIR)/sim/%.o: $(REPO_ROOT)/shared/net/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(SIM_CFLAGS) -c -o $@ $<
 
@@ -218,6 +296,9 @@ $(BUILD_DIR)/sim/%.o: $(REPO_ROOT)/drivers/editor_console/%.c
 $(BUILD_DIR)/sim/%.o: $(REPO_ROOT)/drivers/display_pixel_host/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(SIM_CFLAGS) -c -o $@ $<
+$(BUILD_DIR)/sim/%.o: $(REPO_ROOT)/drivers/net_stub/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(SIM_CFLAGS) -c -o $@ $<
 
 # Mongoose (sim-only). Still in host/vendor/ until that dir retires.
 $(BUILD_DIR)/sim/vendor/mongoose.o: $(MONGOOSE_DIR)/mongoose.c $(MONGOOSE_DIR)/mongoose.h
@@ -225,8 +306,8 @@ $(BUILD_DIR)/sim/vendor/mongoose.o: $(MONGOOSE_DIR)/mongoose.c $(MONGOOSE_DIR)/m
 	$(CC) $(SIM_CFLAGS) -I$(MONGOOSE_DIR) -Wno-unused-parameter -Wno-sign-compare -c -o $@ $<
 
 clean:
-	rm -rf $(BUILD_DIR) $(TARGET) $(SIM_TARGET)
+	rm -rf $(BUILD_DIR) $(TARGET) $(SIM_TARGET) $(WASM_PROXY_TARGET)
 
--include $(DEPS)
+-include $(DEPS) $(WASM_PROXY_DEPS)
 
-.PHONY: all clean sim
+.PHONY: all clean sim net-hal-test wasm-proxy

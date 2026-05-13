@@ -75,9 +75,9 @@ void port_picocalc_factory_reset_options(void)
     Option.SD_MOSI_PIN = 25;
     Option.SD_MISO_PIN = 21;
     Option.DISPLAY_CONSOLE = 1;
-    Option.SerialConsole = 1;
-    Option.SerialTX = 1;
-    Option.SerialRX = 2;
+    Option.SerialConsole = 0;  /* USB CDC console */
+    Option.SerialTX = 0;
+    Option.SerialRX = 0;
     SaveOptions();
     printoptions();
     uSec(100000);

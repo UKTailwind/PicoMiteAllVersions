@@ -57,7 +57,6 @@ void cmd_i2c(void) {}
 void cmd_i2c2(void) {}
 void cmd_in(void) {}
 void cmd_ir(void) {}
-void cmd_ireturn(void) {}
 void cmd_irq(void) {}
 void cmd_irqclear(void) {}
 void cmd_irqnowait(void) {}
@@ -74,7 +73,14 @@ void cmd_nop(void) {}
 void cmd_Nunchuck(void) {}
 void cmd_onewire(void) {}
 void cmd_option(void) {
+    extern int port_web_option_setter(unsigned char *cmdline);
+    extern void printoptions(void);
+    if (checkstring(cmdline, (unsigned char *)"LIST")) {
+        printoptions();
+        return;
+    }
     if (option_command_handle_common(cmdline, false)) return;
+    if (port_web_option_setter(cmdline)) return;
     error("Option not supported on this port");
 }
 void cmd_out(void) {}
@@ -287,7 +293,10 @@ void fun_info(void) {
     extern short gui_font_width, gui_font_height;
     extern int gui_fcolour, gui_bcolour;
     extern const uint8_t *flash_target_contents;
+    extern int port_web_mminfo(unsigned char *ep, int64_t *out_iret,
+                               unsigned char *out_sret, int *out_targ);
     unsigned char *tp;
+    sret = GetTempMemory(STRINGSIZE);
     if (checkstring(ep, (unsigned char *)"HRES")) {
         iret = HRes; targ = T_INT; return;
     }
@@ -319,6 +328,7 @@ void fun_info(void) {
         targ = T_INT;
         return;
     }
+    if (port_web_mminfo(ep, &iret, sret, &targ)) return;
     iret = 0;
     targ = T_INT;
 }
@@ -454,7 +464,14 @@ char GPSdate[11] = {0};
  * ======================================================================= */
 unsigned int GetPeekAddr(unsigned char *p) { (void)p; return 0; }
 unsigned int GetPokeAddr(unsigned char *p) { (void)p; return 0; }
-unsigned char *GetIntAddress(unsigned char *p) { (void)p; return NULL; }
+unsigned char *GetIntAddress(unsigned char *p) {
+    if (isnamestart((uint8_t)*p)) {
+        int i = FindSubFun(p, 0);
+        if (i == -1) return findlabel(p);
+        return subfun[i];
+    }
+    return findline(getinteger(p), true);
+}
 long long int *GetReceiveDataBuffer(unsigned char *p, unsigned int *nbr) { (void)p; (void)nbr; return NULL; }
 uint32_t getFreeHeap(void) { return 0; }
 
@@ -580,33 +597,11 @@ bool rp2350a = true;
  * (LCD_CS, AUDIO_L, …) because none of them mean anything. */
 void port_set_default_options(void) {}
 
-/* Networking stubs — real implementations only link on PICOMITEWEB. The
- * non-WEB MM_Misc.c block that defines these doesn't compile on host
- * (host links mm_misc_shared.c instead of MM_Misc.c). */
-void closeMQTT(void) {}
-void ProcessWeb(int mode) { (void)mode; }
 int  startupcomplete = 0;
-void tcp_free_recv_buffers(void) {}
-void tcp_realloc_recv_buffers(void) {}
-
-/* MM.MESSAGE$ / MM.ADDRESS$ / MM.TOPIC$ buffer accessor — see
- * MMweb_stubs.c for the rationale. Host has no MQTT state so the
- * function writes an empty MMBasic string. */
-void port_fun_mm_mqtt_copy(int which, unsigned char *out) {
-    (void)which;
-    out[0] = 0;
-    out[1] = 0;
-}
-
-/* ClearRuntime TCP-state teardown. Host has no TCP state. */
-void port_web_clear_runtime_state(void) {}
 
 void port_runtime_abort_dma(void) {}
 void port_runtime_disable_watchdog(void) {}
 
-/* TCP server + client teardown hooks — host has neither. */
-void cleanserver(void) {}
-void close_tcpclient(void) {}
 
 /* PSRAMsize is extern'd unconditionally in Hardware_Includes.h and
  * read as a runtime value by MMBasic.c (the PSRAM-range check in

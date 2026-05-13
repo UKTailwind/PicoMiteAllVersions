@@ -12,6 +12,8 @@
 // packages /sd/ as a ZIP. The Reset button wipes /sd/ and re-populates
 // from the bundled /bundle/ snapshot.
 
+import { detectPicomiteProxy } from './proxy_client.mjs';
+
 const statusEl = document.getElementById('status');
 const canvas = document.getElementById('screen');
 const uploadInput = document.getElementById('upload');
@@ -213,6 +215,18 @@ function pickSlowdown() {
 function applySlowdownInputs(us) {
     slowdownNumber.value = String(us);
     slowdownRange.value = String(Math.min(us, parseInt(slowdownRange.max, 10)));
+}
+
+function pickProxyTftpPort() {
+    const params = new URLSearchParams(window.location.search);
+    const n = parseInt(String(params.get('tftp_port') || ''), 10);
+    return Number.isFinite(n) && n > 0 && n <= 65535 ? n : 0;
+}
+
+function pickProxyTelnetPort() {
+    const params = new URLSearchParams(window.location.search);
+    const n = parseInt(String(params.get('telnet_port') || ''), 10);
+    return Number.isFinite(n) && n > 0 && n <= 65535 ? n : 0;
 }
 
 // ---- MMBasic key-code mapping -------------------------------------------
@@ -1011,19 +1025,43 @@ document.addEventListener('visibilitychange', () => {
 });
 window.addEventListener('beforeunload', () => {
     worker.postMessage({ type: 'fs-syncfs' });
+    if (proxyState?.ws) {
+        try { proxyState.ws.close(); } catch (_) {}
+    }
 });
 
-setStatus('Booting worker…');
+let proxyState = {
+    mode: 'static',
+    online: false,
+    caps: null,
+    reason: 'not_checked',
+    ws: null,
+};
 
-worker.postMessage({
-    type: 'init',
-    cfg: {
-        res:       { w: resolution.w, h: resolution.h },
-        heap:      memoryBytesCfg,
-        slowdown:  slowdownUs,
-        persistSd: true,
-    },
-});
+setStatus('Detecting network proxy…');
+boot();
+
+async function boot() {
+    proxyState = await detectPicomiteProxy();
+    setStatus('Booting worker…');
+    worker.postMessage({
+        type: 'init',
+        cfg: {
+            res:       { w: resolution.w, h: resolution.h },
+            heap:      memoryBytesCfg,
+            slowdown:  slowdownUs,
+            persistSd: true,
+            proxy: {
+                mode: proxyState.mode,
+                online: proxyState.online,
+                caps: proxyState.caps,
+                reason: proxyState.reason,
+                tftpPort: pickProxyTftpPort(),
+                telnetPort: pickProxyTelnetPort(),
+            },
+        },
+    });
+}
 
 async function onWorkerReady() {
     canvas.width  = fbWidth;
@@ -1041,6 +1079,12 @@ async function onWorkerReady() {
         worker, memoryBytes, memoryU32,
         fbPtr, fbWidth, fbHeight, fbGenerationIdx,
         fsList, fsRead, fsReset,
+        proxy: {
+            mode: proxyState.mode,
+            online: proxyState.online,
+            caps: proxyState.caps,
+            reason: proxyState.reason,
+        },
         fsWrite: (path, bytes) => fsWrite(path, bytes),
     };
 
@@ -1061,6 +1105,7 @@ async function onWorkerReady() {
         memLabel = `${Math.round(memoryBytesCfg / 1024)} KB`;
     const parts = [`${fbWidth}×${fbHeight}`, `${memLabel}`];
     if (slowdownUs > 0) parts.push(`slowdown ${slowdownUs} µs`);
+    parts.push(proxyState.online ? 'proxy net' : 'static net');
     parts.push(`${demos.length} file${demos.length === 1 ? '' : 's'}`);
     setStatus(parts.join(' · '));
 }

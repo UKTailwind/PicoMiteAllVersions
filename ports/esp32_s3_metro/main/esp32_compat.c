@@ -78,9 +78,9 @@ int load_basic_source(const char *source) {
     unsigned char *pm = ProgMemory;
     const char *line = source;
     while (*line) {
-        const char *eol = strchr(line, '\n');
-        size_t len = eol ? (size_t)(eol - line) : strlen(line);
-        if (len > 0 && line[len - 1] == '\r') len--;
+        const char *eol = line;
+        while (*eol && *eol != '\r' && *eol != '\n') eol++;
+        size_t len = (size_t)(eol - line);
         if (len > 0) {
             if (len >= STRINGSIZE) len = STRINGSIZE - 1;
             memcpy(inpbuf, line, len);
@@ -90,7 +90,9 @@ int load_basic_source(const char *source) {
             while (!(tp[0] == 0 && tp[1] == 0)) *pm++ = *tp++;
             *pm++ = 0;
         }
-        line = eol ? eol + 1 : line + strlen(line);
+        line = eol;
+        if (*line == '\r') line++;
+        if (*line == '\n') line++;
     }
     *pm++ = 0;
     *pm++ = 0;

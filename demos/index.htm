@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>PicoMite WebMite — Home</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header>
+    <h1>PicoMite WebMite</h1>
+    <p>Custom RP2350B / pico-stretch / RM2 wifi</p>
+  </header>
+  <nav>
+    <ul>
+      <li><a href="/">Home</a></li>
+      <li><a href="/status">Status</a></li>
+      <li><a href="/gpio">GPIO</a></li>
+      <li><a href="/files">Files</a></li>
+      <li><a href="/about">About</a></li>
+    </ul>
+  </nav>
+  <main>
+    <section>
+      <h2>Hello.</h2>
+      <p>This page is being assembled live by an MMBasic program running on a Raspberry Pi RP2350B microcontroller. Every <code>&#123;expression&#125;</code> in the source HTML gets evaluated server-side at request time and substituted with its current value.</p>
+      <p>Connected at: <span class="badge">{MM.INFO(IP ADDRESS)}</span></p>
+      <p>This page itself is just <code>index.htm</code> on the SD card. The other tabs above each render a different file by the same dispatcher.</p>
+    </section>
+    <section>
+      <h2>Quick stats</h2>
+      <table>
+        <tr><th>Uptime</th><td>{MM.INFO(UPTIME)} seconds</td></tr>
+        <tr><th>CPU clock</th><td>{MM.INFO(CPUSPEED)} kHz</td></tr>
+        <tr><th>Free heap</th><td>{MM.INFO(HEAP)} B</td></tr>
+        <tr><th>Boot count</th><td>{MM.INFO(BOOT COUNT)}</td></tr>
+      </table>
+    </section>
+    <section>
+      <h2>Try this</h2>
+      <ul>
+        <li>Reload this page — uptime updates each time.</li>
+        <li>Visit the <a href="/status">Status</a> page for the full system dump.</li>
+        <li>Open <a href="/gpio">GPIO</a> to see every pin live.</li>
+      </ul>
+    </section>
+  </main>
+  <footer>Served by MMBasic on RP2350B — {TIME$}</footer>
+</body>
+</html>

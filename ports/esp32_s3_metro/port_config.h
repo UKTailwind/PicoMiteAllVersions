@@ -22,17 +22,15 @@
 #undef  MMBASIC_BANNER_TRAILER
 #define MMBASIC_BANNER_TRAILER "ESP32-S3 REPL.\r\n\r\n"
 
-/* 104 KB MMBasic heap. ESP32-S3 has 512 KB internal SRAM split across
+/* 48 KB MMBasic heap while WiFi is enabled. ESP32-S3 has 512 KB internal SRAM split across
  * dram0_0_seg / dram0_1_seg / etc.; AllMemory has to land in a single
  * contiguous segment, so dram0_0_seg (which holds .bss for this
- * component) caps practical heap at ~110 KB after the static BSS for
- * flash_prog_buf (2 × MAX_PROG_SIZE) + variable tables. The remaining
- * ~400 KB stays on the IDF heap (heap_caps_malloc) for FreeRTOS stacks,
- * drivers, USB Serial/JTAG buffers, etc. Compares to 128 KB on RP2040
- * PicoMite. PSRAM (8 MB) is currently disabled — see Stage E3 in
- * docs/real-hal/esp32-s3-port.md for why. */
+ * component) is the limiting resource. WiFi consumes enough internal
+ * DRAM that the original 104 KB stdio heap no longer links. The board
+ * has PSRAM; moving AllMemory there is the right follow-up once PSRAM
+ * is part of the ESP32 port contract. */
 #undef  HAL_PORT_HEAP_MEMORY_SIZE
-#define HAL_PORT_HEAP_MEMORY_SIZE (104 * 1024)
+#define HAL_PORT_HEAP_MEMORY_SIZE (48 * 1024)
 
 /* ESP32-S3 has 49 GPIOs (0–48). Host inherits 44 (RP2040 pin count);
  * left unchanged, PIN(48) reads/writes go out of bounds on

@@ -164,6 +164,9 @@ set(PICOMITE_CORE_STATE_SOURCES
 	core/state/pin_state.c
 	core/state/option_state.c
 	core/state/audio_state.c
+	shared/net/mm_net_interrupts.c
+	shared/net/mm_net_http.c
+	shared/net/mm_net_ntp.c
 )
 
 # HAL implementations shared across every RP2040/RP2350 device target.
