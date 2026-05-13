@@ -299,6 +299,19 @@ TESTS = {
         ("PRINT 1",              " 1"),
     ],
 
+    "editor_floppy_file": [
+        ("A:",                    ""),
+        ("EDIT \"FIZZBUZZ.BAS\"\n\x1b", "EDIT MODE"),
+        ("PRINT 1",              " 1"),
+    ],
+
+    "editor_floppy_after_mode": [
+        ("A:",                    ""),
+        ("MODE 2",                ""),
+        ("EDIT \"FIZZBUZZ.BAS\"\n\x1b", "FizzBuzz"),
+        ("PRINT 1",              " 1"),
+    ],
+
     "editor_file_save": [
         ("C:", ""),
         ("EDIT \"C:/EDPC386.TXT\"\neditor save ok\x11", "EDIT MODE"),

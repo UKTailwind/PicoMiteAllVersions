@@ -9,6 +9,14 @@ Current state:
   path for 1.44 MB FAT12 media using DMA channel 2.
 - FatFs maps physical drive 0 to `A:` over FDC, physical drive 1 to optional
   `B:` over FDC, and physical drive 2 to `C:` over ATA primary master.
+- The native 82077 FDC path remains the validation target for QEMU, Bochs, and
+  real hardware. DOSBox-X can BIOS-boot a floppy image without fully emulating
+  the guest-visible FDC/DMA path, so the runtime has an A:-only BIOS `int 13h`
+  fallback when native FDC reads fail.
+- BIOS disk fallback uses the same protected-mode-to-real-mode thunk discipline
+  as VBE calls: save state, mask both PICs, enter real mode, call BIOS, return
+  to protected mode, restore PIC masks. This avoids remapped protected-mode IRQs
+  landing on real-mode/DOS interrupt numbers while the BIOS is running.
 - `ports/pc386/run.sh`, `run_headless.sh`, `screen_probe.py`, and
   `repl_expect.py` attach `pc386-floppy.img` with `if=floppy,index=0` and
   attach `c.img` as IDE primary master.

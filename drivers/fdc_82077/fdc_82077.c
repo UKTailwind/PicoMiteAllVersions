@@ -14,6 +14,8 @@
 #include "../../ports/pc386/io.h"
 
 extern void hal_time_sleep_us(uint32_t us);
+extern uint32_t pc386_bios_disk_int13(uint16_t ax, uint16_t bx, uint16_t cx,
+                                      uint16_t dx, uint16_t es, uint16_t di);
 
 #define FDC_DOR       0x3F2
 #define FDC_MSR       0x3F4
@@ -44,8 +46,11 @@ static bool fdc_controller_ready;
 static bool fdc_drive_ready[2];
 static uint8_t current_cyl[2] = { 0xFF, 0xFF };
 static uint8_t current_drive = 0xFF;
+static bool bios_read_fallback[2];
 
 static uint8_t dma_buf[FDC_1440_SECTOR_SIZE] __attribute__((aligned(65536)));
+#define BIOS_DISK_BUF_PHYS 0x8000u
+#define BIOS_DISK_BUF_SEG  0x0800u
 
 static int wait_write_ready(void)
 {
@@ -144,11 +149,24 @@ bool fdc_init(void)
     return true;
 }
 
+static bool bios_probe_drive(unsigned drive)
+{
+    if (drive != 0) return false;
+    (void)pc386_bios_disk_int13(0x0000, 0, 0, (uint16_t)drive, 0, 0);
+    uint32_t rc = pc386_bios_disk_int13(0x0201, 0, 0x0001,
+                                        (uint16_t)drive, BIOS_DISK_BUF_SEG, 0);
+    if ((rc & 0x00010000u) != 0 || (rc & 0xFF00u) != 0) return false;
+    bios_read_fallback[drive] = true;
+    fdc_drive_ready[drive] = true;
+    return true;
+}
+
 bool fdc_present(unsigned drive)
 {
     if (drive > 1) return false;
-    if (!fdc_init()) return false;
-    return fdc_drive_ready[drive];
+    if (!fdc_init()) return bios_probe_drive(drive);
+    if (fdc_drive_ready[drive]) return true;
+    return bios_probe_drive(drive);
 }
 
 static int seek(unsigned drive, uint8_t cyl, uint8_t head)
@@ -193,26 +211,45 @@ static int read_one(unsigned drive, uint32_t lba, void *buf)
     uint8_t head = (uint8_t)(tmp / FDC_SECTORS_PER_TRACK);
     uint8_t sector = (uint8_t)((tmp % FDC_SECTORS_PER_TRACK) + 1);
 
-    select_drive(drive);
-    if (seek(drive, cyl, head) < 0) return -1;
-    dma_setup_read();
+    if (!bios_read_fallback[drive]) {
+        select_drive(drive);
+        if (seek(drive, cyl, head) == 0) {
+            dma_setup_read();
 
-    if (cmd(FDC_CMD_READ) < 0) return -1;
-    if (cmd((uint8_t)((head << 2) | drive)) < 0) return -1;
-    if (cmd(cyl) < 0) return -1;
-    if (cmd(head) < 0) return -1;
-    if (cmd(sector) < 0) return -1;
-    if (cmd(2) < 0) return -1;
-    if (cmd(FDC_SECTORS_PER_TRACK) < 0) return -1;
-    if (cmd(0x1B) < 0) return -1;
-    if (cmd(0xFF) < 0) return -1;
-
-    uint8_t r[7];
-    for (int i = 0; i < 7; i++) {
-        if (result(&r[i]) < 0) return -1;
+            if (cmd(FDC_CMD_READ) == 0 &&
+                cmd((uint8_t)((head << 2) | drive)) == 0 &&
+                cmd(cyl) == 0 &&
+                cmd(head) == 0 &&
+                cmd(sector) == 0 &&
+                cmd(2) == 0 &&
+                cmd(FDC_SECTORS_PER_TRACK) == 0 &&
+                cmd(0x1B) == 0 &&
+                cmd(0xFF) == 0) {
+                uint8_t r[7];
+                int ok = 1;
+                for (int i = 0; i < 7; i++) {
+                    if (result(&r[i]) < 0) { ok = 0; break; }
+                }
+                if (ok && (r[0] & 0xC0) == 0 && r[1] == 0 && r[2] == 0) {
+                    memcpy(buf, dma_buf, FDC_1440_SECTOR_SIZE);
+                    return 0;
+                }
+            }
+        }
+        if (drive == 0) bios_read_fallback[drive] = true;
     }
-    if ((r[0] & 0xC0) != 0 || r[1] != 0 || r[2] != 0) return -1;
-    memcpy(buf, dma_buf, FDC_1440_SECTOR_SIZE);
+
+    if (drive != 0 || !bios_read_fallback[drive]) return -1;
+
+    uint16_t ax = 0x0201;
+    uint16_t bx = 0x0000;
+    uint16_t cx = (uint16_t)(((uint16_t)(cyl & 0xFFu) << 8) |
+                             (uint16_t)(sector & 0x3Fu) |
+                             (uint16_t)((cyl & 0x300u) >> 2));
+    uint16_t dx = (uint16_t)(((uint16_t)head << 8) | (uint16_t)drive);
+    uint32_t rc = pc386_bios_disk_int13(ax, bx, cx, dx, BIOS_DISK_BUF_SEG, 0);
+    if ((rc & 0x00010000u) != 0 || (rc & 0xFF00u) != 0) return -1;
+    memcpy(buf, (const void *)(uintptr_t)BIOS_DISK_BUF_PHYS, FDC_1440_SECTOR_SIZE);
     return 0;
 }
 

@@ -94,23 +94,52 @@ brew install dosbox-x         # macOS
 sudo apt install dosbox-x     # Debian/Ubuntu
 ```
 
-DOSBox-X cannot do `-kernel`-style direct boot — it needs a bootable disk image. Build the ISO first, then:
+DOSBox-X cannot do `-kernel`-style direct boot — it needs a bootable disk image. Build the floppy first, then:
 
 ```sh
-dosbox-x -conf ports/pc386/dosbox-x.conf
+./ports/pc386/build.sh
+./ports/pc386/build_disks.sh
+./ports/pc386/run_dosbox.sh
 ```
 
-Where `dosbox-x.conf` contains:
+The launcher writes a temporary config using dynamic CPU emulation and `cycles=max`.
+Without that, DOSBox-X can run at conservative 1990s PC speed and the VGA updates are
+visibly slow.
+
+The equivalent manual config is:
 
 ```ini
+[sdl]
+output = opengl
+
 [dosbox]
 machine = svga_s3
 memsize = 16
 
+[cpu]
+core = dynamic
+cycles = max
+
 [autoexec]
-imgmount A build/mmbasic.iso -t cdrom
+imgmount A "ports/pc386/test_disks/pc386-floppy.img" -t floppy -size 512,18,2,80
 boot A:
 ```
+
+DOSBox-X can expose boot images through BIOS services without fully modelling the
+guest-visible floppy/IDE controller path. The pc386 runtime therefore keeps the
+native 82077 FDC driver as the normal path, but falls back to BIOS `int 13h`
+sector reads for floppy media when direct FDC reads fail. Use QEMU or Bochs for
+runtime controller validation; use DOSBox-X mainly as an independent BIOS-boot
+sanity check.
+
+Important BIOS-thunk rule: after the pc386 kernel remaps the 8259 PIC to
+protected-mode vectors `0x20..0x2F`, real-mode BIOS calls must not see live IRQs.
+In real mode, IRQ1 is expected at BIOS vector `0x09`; after the remap it arrives
+as `int 21h`, which DOSBox-X reports as `Illegal Unhandled Interrupt Called 21`
+because its DOS kernel has already shut down for guest boot. The protected-mode
+BIOS thunk therefore masks both PICs before entering real mode for `int 10h` or
+`int 13h`, then restores the previous masks after returning to protected mode.
+Do not add new BIOS thunk users without preserving that mask/restore behavior.
 
 DOSBox-X serial-output capture is via `serial1=file:out.log` in the config — read after exit. Less ergonomic than QEMU's `-serial stdio`; suitable for manual sanity checks, not for CI.
 

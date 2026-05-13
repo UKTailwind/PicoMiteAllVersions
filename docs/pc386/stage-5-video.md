@@ -28,6 +28,11 @@ and `PIXEL(x,y)` reads back the live pixel value.
   QEMU/Bochs, when the documented DISPI interface is detected, the driver uses
   those ports directly for VBE modes; this avoids SeaBIOS repeated-mode-set
   failures corrupting later graphics commands.
+- **BIOS thunk interrupt discipline.** BIOS mode changes run after the kernel
+  has remapped the PIC for protected mode. Any thunk that enters real mode must
+  mask both PICs before the BIOS call and restore the masks after returning.
+  Otherwise a keyboard IRQ can arrive as `int 21h` instead of real-mode IRQ1's
+  BIOS vector, which is visible in DOSBox-X as an illegal unhandled interrupt.
 - **Resolution modes.** `MODE` lists the active mode and available modes:
   `MODE 1` = 320x200, `MODE 2` = 640x480, `MODE 3` = 800x600,
   `MODE 4` = 1024x768, `MODE 5` = 480x480 letterboxed in 640x480,
