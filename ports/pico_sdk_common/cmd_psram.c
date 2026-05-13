@@ -1,19 +1,18 @@
 /*
  * ports/pico_sdk_common/cmd_psram.c — RAM command (PSRAM slot
- * management) for RP2350 non-WEB variants.
+ * management) for RP2350 variants with a QSPI PSRAM region.
  *
  * The feature is RP2350-only (requires the 8MB PSRAM block and the
- * mmap/psmap page tables); AllCommands.h's command table entry is
- * gated on `#ifdef rp2350 && !PICOMITEWEB`, so cmd_psram is never
- * referenced on other targets. Body-level ifdefs here are permissible
- * per the fixup-plan rules (port impl file).
+ * mmap/psmap page tables); ports expose the command only when their
+ * port_tokens.h supplies HAL_PORT_RAM_CMD_TOKEN. Body-level ifdefs here
+ * are permissible per the fixup-plan rules (port impl file).
  */
 
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
 #include "hal/hal_flash.h"
 
-#if defined(rp2350) && !HAL_PORT_HAS_WIFI
+#if defined(rp2350) && (PSRAMbase != 0)
 
 extern unsigned int mmap[HEAP_MEMORY_SIZE / PAGESIZE / PAGESPERWORD];
 extern unsigned int psmap[7 * 1024 * 1024 / PAGESIZE / PAGESPERWORD];
@@ -177,4 +176,4 @@ void MIPS16 cmd_psram(void)
     }
 }
 
-#endif /* defined(rp2350) && !HAL_PORT_HAS_WIFI */
+#endif /* defined(rp2350) && (PSRAMbase != 0) */

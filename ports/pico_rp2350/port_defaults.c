@@ -28,6 +28,9 @@ void port_set_default_options(void)
 #endif
     Option.TOUCH_XSCALE = 1.0f;
     Option.TOUCH_YSCALE = 1.0f;
+#ifdef PICOCALC
+    Option.PSRAM_CS_PIN = PINMAP[0];
+#endif
 }
 
 /* Boards advertised by `CONFIGURE LIST`. The body's #ifdef gates stay

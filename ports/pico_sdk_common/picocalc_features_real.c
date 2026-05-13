@@ -78,6 +78,7 @@ void port_picocalc_factory_reset_options(void)
     Option.SerialConsole = 0;  /* USB CDC console */
     Option.SerialTX = 0;
     Option.SerialRX = 0;
+    Option.PSRAM_CS_PIN = PINMAP[0];
     SaveOptions();
     printoptions();
     uSec(100000);

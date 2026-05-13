@@ -27,8 +27,9 @@
     { (unsigned char *)"Update Firmware", T_CMD, 0, cmd_update },
 #endif
 
-/* WiFi rp2350: CYW43 owns QSPI pins, no PSRAM cmd. */
-#define HAL_PORT_RAM_CMD_TOKEN
+/* RM2 WiFi does not use the QSPI pins, so this board keeps PSRAM. */
+#define HAL_PORT_RAM_CMD_TOKEN \
+    { (unsigned char *)"Ram", T_CMD, 0, cmd_psram },
 
 #define HAL_PORT_RP2350_PIC_MAP_CMD_TOKENS
 

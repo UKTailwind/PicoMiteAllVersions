@@ -76,13 +76,10 @@
 #define HAL_PORT_PIO0_CLAIMED            true
 #define HAL_PORT_PIO1_CLAIMED            false
 #define HAL_PORT_PIO2_CLAIMED            true
-/* WEBRP2350 doesn't link the QSPI PSRAM heap (CYW43 claims those pins),
- * but the address-range guard in core uses PSRAMbase for short-circuit
- * checks. Define base to 0 so the runtime check `ptr > PSRAMbase` is
- * trivially true and the body's `ptr < PSRAMbase + PSRAMsize` (PSRAMsize
- * always 0 on WEB) makes the whole expression false. */
-#define HAL_PORT_PSRAM_BASE              0
-#define HAL_PORT_PSRAM_BLOCK_SIZE        0
+/* QSPI PSRAM region. WebMite RP2350B boards use CYW43 on regular GPIOs,
+ * so QSPI PSRAM remains available when OPTION PSRAM PIN is configured. */
+#define HAL_PORT_PSRAM_BASE              0x11000000
+#define HAL_PORT_PSRAM_BLOCK_SIZE        0x1C0000
 
 /* FLAC decoder base sample-rate cap (RP2350 → 48 kHz). */
 #define HAL_PORT_AUDIO_FLAC_MAX_BASE_HZ  48000

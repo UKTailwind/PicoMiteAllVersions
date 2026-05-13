@@ -18,8 +18,9 @@
 #define HAL_PORT_USB_OR_FIRMWARE_CMD_TOKEN \
     { (unsigned char *)"Update Firmware", T_CMD, 0, cmd_update },
 
-/* WiFi rp2350: CYW43 owns QSPI pins, no PSRAM cmd. */
-#define HAL_PORT_RAM_CMD_TOKEN
+/* WebMite RP2350B keeps QSPI PSRAM available. */
+#define HAL_PORT_RAM_CMD_TOKEN \
+    { (unsigned char *)"Ram", T_CMD, 0, cmd_psram },
 
 #define HAL_PORT_RP2350_PIC_MAP_CMD_TOKENS
 

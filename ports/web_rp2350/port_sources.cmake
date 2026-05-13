@@ -47,12 +47,13 @@ target_sources(PicoMite PRIVATE
     ${CMAKE_SOURCE_DIR}/GUI.c
     ${CMAKE_SOURCE_DIR}/drivers/gui_controls/gui_controls_real.c
 
-    # rp2350 features. This board has no PSRAM, so link the
-    # psram_heap stub.
+    # rp2350 features. PicoCalc/WebMite RP2350B boards keep QSPI PSRAM
+    # available while CYW43 uses regular GPIOs for its PIO-SPI bus.
+    ${CMAKE_SOURCE_DIR}/psram.c
     ${CMAKE_SOURCE_DIR}/upng.c
     ${CMAKE_SOURCE_DIR}/drivers/audio_mp3/audio_mp3_real.c
     ${CMAKE_SOURCE_DIR}/drivers/heartbeat/heartbeat_stub.c
-    ${CMAKE_SOURCE_DIR}/drivers/psram_heap/psram_heap_stub.c
+    ${CMAKE_SOURCE_DIR}/drivers/psram_heap/psram_heap_pico.c
     ${CMAKE_SOURCE_DIR}/drivers/upng_sprite/upng_sprite.c
 
     # SPI-LCD framebuffer.

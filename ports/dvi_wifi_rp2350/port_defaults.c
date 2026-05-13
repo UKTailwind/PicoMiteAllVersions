@@ -16,8 +16,9 @@
 
 /* First-boot defaults. Sets only board-independent state (display
  * mode, console enabled, CPU speed appropriate for HDMI, WiFi-server
- * timeout). Hardware pin assignments are left zero so the user
- * configures them once via OPTION at the prompt. */
+ * timeout, and the board PSRAM CS pin. Most hardware pin assignments
+ * are left zero so the user configures them once via OPTION at the
+ * prompt. */
 void port_set_default_options(void)
 {
     Option.DISPLAY_CONSOLE    = 1;
@@ -42,6 +43,7 @@ void port_set_default_options(void)
     Option.ColourCode         = 1;
     Option.SSD_RESET          = -1;
     Option.ServerResponceTime = 5000;
+    Option.PSRAM_CS_PIN       = PINMAP[0];
 }
 
 /* Single-board port — `OPTION RESET <name>` has no menu of profiles
