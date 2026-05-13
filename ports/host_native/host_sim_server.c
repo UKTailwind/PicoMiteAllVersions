@@ -17,6 +17,7 @@
 #include "vendor/mongoose.h"
 #include "host_sim_server.h"
 #include "host_sim_audio.h"
+#include "drivers/web_console/web_console_protocol.h"
 
 #include <pthread.h>
 #include <stdatomic.h>
@@ -52,21 +53,6 @@ struct sim_server {
 static struct sim_server g_server;
 
 /*
- * Convert our local RGBA (stored as uint32_t: 0x00RRGGBB on the host side,
- * written with host_colour24 masking the top byte) into the browser's
- * canvas ImageData format: little-endian [R,G,B,A] bytes per pixel.
- */
-static void rgb24_to_rgba8(const uint32_t *src, uint8_t *dst, size_t pixels) {
-    for (size_t i = 0; i < pixels; ++i) {
-        uint32_t c = src[i];
-        dst[i * 4 + 0] = (uint8_t)((c >> 16) & 0xFF);
-        dst[i * 4 + 1] = (uint8_t)((c >> 8) & 0xFF);
-        dst[i * 4 + 2] = (uint8_t)(c & 0xFF);
-        dst[i * 4 + 3] = 0xFF;
-    }
-}
-
-/*
  * Send one full-frame FRMB snapshot to a specific client. Used once per
  * client on first broadcast after connect, so the canvas starts with the
  * current framebuffer contents. After that the client just consumes the
@@ -83,17 +69,13 @@ static void send_bootstrap_frame(struct mg_connection *c, struct sim_server *s,
     }
     host_sim_framebuffer_copy(s->staging, pixels);
 
-    uint8_t header[8];
-    header[0] = 'F'; header[1] = 'R'; header[2] = 'M'; header[3] = 'B';
-    header[4] = (uint8_t)(w & 0xFF);
-    header[5] = (uint8_t)((w >> 8) & 0xFF);
-    header[6] = (uint8_t)(h & 0xFF);
-    header[7] = (uint8_t)((h >> 8) & 0xFF);
-    size_t msg_len = sizeof(header) + pixels * 4;
+    size_t msg_len = web_console_frmb_len(w, h);
     uint8_t *msg = malloc(msg_len);
     if (!msg) return;
-    memcpy(msg, header, sizeof(header));
-    rgb24_to_rgba8(s->staging, msg + sizeof(header), pixels);
+    if (!web_console_pack_frmb(msg, msg_len, w, h, s->staging, pixels)) {
+        free(msg);
+        return;
+    }
     mg_ws_send(c, msg, msg_len, WEBSOCKET_OP_BINARY);
     free(msg);
 }
@@ -137,17 +119,14 @@ static void broadcast_frame(struct sim_server *s) {
         return;
     }
 
-    uint8_t header[8];
-    header[0] = 'C'; header[1] = 'M'; header[2] = 'D'; header[3] = 'S';
-    header[4] = (uint8_t)(w & 0xFF);
-    header[5] = (uint8_t)((w >> 8) & 0xFF);
-    header[6] = (uint8_t)(h & 0xFF);
-    header[7] = (uint8_t)((h >> 8) & 0xFF);
-    size_t msg_len = sizeof(header) + cmd_len;
+    size_t msg_len = web_console_cmds_len(cmd_len);
     uint8_t *msg = malloc(msg_len);
     if (!msg) { free(cmd_bytes); return; }
-    memcpy(msg, header, sizeof(header));
-    memcpy(msg + sizeof(header), cmd_bytes, cmd_len);
+    if (!web_console_pack_cmds(msg, msg_len, w, h, cmd_bytes, cmd_len)) {
+        free(cmd_bytes);
+        free(msg);
+        return;
+    }
     free(cmd_bytes);
 
     for (c = s->mgr.conns; c != NULL; c = c->next) {
@@ -173,9 +152,9 @@ static void ev_handler(struct mg_connection *c, int ev, void *ev_data) {
         struct mg_ws_message *wm = (struct mg_ws_message *)ev_data;
         /* Only text frames carry our JSON protocol. */
         if ((wm->flags & 0x0f) == WEBSOCKET_OP_TEXT) {
-            long code = mg_json_get_long(wm->data, "$.code", -1);
-            if (code >= 0 && code <= 0xff) {
-                host_sim_push_key((int)code);
+            int code = -1;
+            if (web_console_parse_key_json(wm->data.buf, wm->data.len, &code)) {
+                host_sim_push_key(code);
             }
         }
     } else if (ev == MG_EV_POLL) {
@@ -383,12 +362,6 @@ int host_sim_pop_key(void) {
 
 extern int host_sim_active;
 
-#define HOST_SIM_OP_CLS    0x01
-#define HOST_SIM_OP_RECT   0x02
-#define HOST_SIM_OP_PIXEL  0x03
-#define HOST_SIM_OP_SCROLL 0x04
-#define HOST_SIM_OP_BLIT   0x05
-
 static pthread_mutex_t host_sim_cmd_lock = PTHREAD_MUTEX_INITIALIZER;
 static uint8_t *host_sim_cmd_buf = NULL;
 static size_t host_sim_cmd_cap = 0;
@@ -433,65 +406,37 @@ size_t host_sim_cmd_drain(uint8_t **out_buf, size_t *out_cap) {
 void host_sim_emit_cls(int colour) {
     if (!host_sim_cmds_target_is_front()) return;
     uint8_t buf[5];
-    buf[0] = HOST_SIM_OP_CLS;
-    uint32_t c = (uint32_t)colour & 0x00FFFFFFu;
-    memcpy(buf + 1, &c, 4);
-    host_sim_cmd_append(buf, sizeof(buf));
+    size_t len = web_console_pack_cmd_cls(buf, sizeof(buf), colour);
+    host_sim_cmd_append(buf, len);
 }
 
 void host_sim_emit_rect(int x1, int y1, int x2, int y2, int colour) {
     if (!host_sim_cmds_target_is_front()) return;
-    if (x1 > x2) { int t = x1; x1 = x2; x2 = t; }
-    if (y1 > y2) { int t = y1; y1 = y2; y2 = t; }
     uint8_t buf[13];
-    buf[0] = HOST_SIM_OP_RECT;
-    int16_t x = (int16_t)x1, y = (int16_t)y1;
-    uint16_t w = (uint16_t)(x2 - x1 + 1);
-    uint16_t h = (uint16_t)(y2 - y1 + 1);
-    uint32_t c = (uint32_t)colour & 0x00FFFFFFu;
-    memcpy(buf + 1, &x, 2);
-    memcpy(buf + 3, &y, 2);
-    memcpy(buf + 5, &w, 2);
-    memcpy(buf + 7, &h, 2);
-    memcpy(buf + 9, &c, 4);
-    host_sim_cmd_append(buf, sizeof(buf));
+    size_t len = web_console_pack_cmd_rect(buf, sizeof(buf),
+                                           x1, y1, x2, y2, colour);
+    host_sim_cmd_append(buf, len);
 }
 
 void host_sim_emit_pixel(int x, int y, int colour) {
     if (!host_sim_cmds_target_is_front()) return;
     uint8_t buf[9];
-    buf[0] = HOST_SIM_OP_PIXEL;
-    int16_t xs = (int16_t)x, ys = (int16_t)y;
-    uint32_t c = (uint32_t)colour & 0x00FFFFFFu;
-    memcpy(buf + 1, &xs, 2);
-    memcpy(buf + 3, &ys, 2);
-    memcpy(buf + 5, &c, 4);
-    host_sim_cmd_append(buf, sizeof(buf));
+    size_t len = web_console_pack_cmd_pixel(buf, sizeof(buf), x, y, colour);
+    host_sim_cmd_append(buf, len);
 }
 
 void host_sim_emit_scroll(int lines, int bg) {
     /* ScrollLCD operates on the front buffer unconditionally. */
     uint8_t buf[7];
-    buf[0] = HOST_SIM_OP_SCROLL;
-    int16_t n = (int16_t)lines;
-    uint32_t c = (uint32_t)bg & 0x00FFFFFFu;
-    memcpy(buf + 1, &n, 2);
-    memcpy(buf + 3, &c, 4);
-    host_sim_cmd_append(buf, sizeof(buf));
+    size_t len = web_console_pack_cmd_scroll(buf, sizeof(buf), lines, bg);
+    host_sim_cmd_append(buf, len);
 }
 
 void host_sim_emit_blit(int x, int y, int w, int h, const uint32_t *pixels) {
-    uint8_t header[9];
-    header[0] = HOST_SIM_OP_BLIT;
-    int16_t xs = (int16_t)x, ys = (int16_t)y;
-    uint16_t ws = (uint16_t)w, hs = (uint16_t)h;
-    memcpy(header + 1, &xs, 2);
-    memcpy(header + 3, &ys, 2);
-    memcpy(header + 5, &ws, 2);
-    memcpy(header + 7, &hs, 2);
+    if (w <= 0 || h <= 0 || !pixels) return;
     pthread_mutex_lock(&host_sim_cmd_lock);
     size_t body_len = (size_t)w * (size_t)h * 4;
-    size_t total = sizeof(header) + body_len;
+    size_t total = 9 + body_len;
     if (host_sim_cmd_len + total > host_sim_cmd_cap) {
         size_t new_cap = host_sim_cmd_cap ? host_sim_cmd_cap * 2 : 4096;
         while (new_cap < host_sim_cmd_len + total) new_cap *= 2;
@@ -500,14 +445,10 @@ void host_sim_emit_blit(int x, int y, int w, int h, const uint32_t *pixels) {
         host_sim_cmd_buf = nb;
         host_sim_cmd_cap = new_cap;
     }
-    memcpy(host_sim_cmd_buf + host_sim_cmd_len, header, sizeof(header));
-    uint8_t *body = host_sim_cmd_buf + host_sim_cmd_len + sizeof(header);
-    for (size_t i = 0; i < (size_t)w * (size_t)h; ++i) {
-        uint32_t cv = pixels[i];
-        body[i * 4 + 0] = (uint8_t)((cv >> 16) & 0xFF);
-        body[i * 4 + 1] = (uint8_t)((cv >> 8) & 0xFF);
-        body[i * 4 + 2] = (uint8_t)(cv & 0xFF);
-        body[i * 4 + 3] = 0xFF;
+    if (!web_console_pack_cmd_blit(host_sim_cmd_buf + host_sim_cmd_len,
+                                   total, x, y, w, h, pixels)) {
+        pthread_mutex_unlock(&host_sim_cmd_lock);
+        return;
     }
     host_sim_cmd_len += total;
     pthread_mutex_unlock(&host_sim_cmd_lock);

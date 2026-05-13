@@ -80,16 +80,18 @@ HOST_SRCS = host_runtime.c host_fastgfx.c host_fastgfx_resync.c host_fs_shims.c 
             hal_flash_host.c hal_time_host.c hal_random_host.c hal_pin_host.c hal_storage_host.c \
             hal_filesystem_host.c hal_keyboard_host.c hal_audio_host.c hal_vm_framebuffer_host.c \
             hal_net_posix.c
+WEB_CONSOLE_SRCS = web_console_protocol.c
 
 HAL_GENERIC_SRCS = hal_watchdog_noop.c
 RUNTIME_SRCS = runtime_boot.c runtime_program.c runtime_console.c runtime_abort.c runtime_interrupt.c
 
-SRCS = $(HOST_SRCS) $(CORE_SRCS) $(BC_SRCS) $(HAL_GENERIC_SRCS) $(RUNTIME_SRCS)
+SRCS = $(HOST_SRCS) $(WEB_CONSOLE_SRCS) $(CORE_SRCS) $(BC_SRCS) $(HAL_GENERIC_SRCS) $(RUNTIME_SRCS)
 OBJS = $(addprefix $(BUILD_DIR)/,$(SRCS:.c=.o))
 DEPS = $(OBJS:.o=.d)
 
 TARGET = $(REPO_ROOT)/host/mmbasic_test
 NET_HAL_TEST = $(BUILD_DIR)/host_net_hal_test
+WEB_CONSOLE_PROTOCOL_TEST = $(BUILD_DIR)/web_console_protocol_test
 WASM_PROXY_TARGET = $(REPO_ROOT)/host/wasm_network_proxy
 
 # --- Simulator target ---------------------------------------------------
@@ -117,6 +119,9 @@ $(TARGET): $(OBJS)
 net-hal-test: $(NET_HAL_TEST)
 	$(NET_HAL_TEST)
 
+web-console-protocol-test: $(WEB_CONSOLE_PROTOCOL_TEST)
+	$(WEB_CONSOLE_PROTOCOL_TEST)
+
 $(NET_HAL_TEST): $(PORT_DIR)/hal_net_posix_test.c $(PORT_DIR)/hal_net_posix.c \
                  $(REPO_ROOT)/shared/net/mm_net_http.c \
                  $(REPO_ROOT)/shared/net/mm_net_http_file.c \
@@ -140,6 +145,16 @@ $(NET_HAL_TEST): $(PORT_DIR)/hal_net_posix_test.c $(PORT_DIR)/hal_net_posix.c \
 	      $(REPO_ROOT)/shared/net/mm_net_ntp_hal.c \
 	      $(REPO_ROOT)/shared/net/mm_net_tftp.c \
 	      -pthread $(LDFLAGS)
+
+$(WEB_CONSOLE_PROTOCOL_TEST): $(REPO_ROOT)/drivers/web_console/web_console_protocol_test.c \
+                             $(REPO_ROOT)/drivers/web_console/web_console_protocol.c \
+                             $(REPO_ROOT)/drivers/web_console/web_console_protocol.h
+	@mkdir -p $(dir $@)
+	$(CC) -std=gnu11 -g -O0 -Wall -Wno-unused-variable -Wno-unused-function \
+	      -Wno-unused-but-set-variable -Wno-misleading-indentation \
+	      -funsigned-char -I$(REPO_ROOT) -I$(REPO_ROOT)/drivers/web_console \
+	      -o $@ $(REPO_ROOT)/drivers/web_console/web_console_protocol_test.c \
+	      $(REPO_ROOT)/drivers/web_console/web_console_protocol.c $(LDFLAGS)
 
 sim: $(SIM_TARGET)
 
@@ -196,6 +211,9 @@ $(BUILD_DIR)/%.o: $(REPO_ROOT)/runtime/%.c
 
 # Stubs / drivers that host links.
 $(BUILD_DIR)/%.o: $(REPO_ROOT)/drivers/audio_mp3/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c -o $@ $<
+$(BUILD_DIR)/%.o: $(REPO_ROOT)/drivers/web_console/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c -o $@ $<
 $(BUILD_DIR)/%.o: $(REPO_ROOT)/drivers/spi_lcd/%.c
@@ -270,6 +288,9 @@ $(BUILD_DIR)/sim/%.o: $(REPO_ROOT)/runtime/%.c
 $(BUILD_DIR)/sim/%.o: $(REPO_ROOT)/drivers/audio_mp3/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(SIM_CFLAGS) -c -o $@ $<
+$(BUILD_DIR)/sim/%.o: $(REPO_ROOT)/drivers/web_console/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(SIM_CFLAGS) -c -o $@ $<
 $(BUILD_DIR)/sim/%.o: $(REPO_ROOT)/drivers/spi_lcd/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(SIM_CFLAGS) -c -o $@ $<
@@ -316,8 +337,8 @@ $(BUILD_DIR)/sim/vendor/mongoose.o: $(MONGOOSE_DIR)/mongoose.c $(MONGOOSE_DIR)/m
 	$(CC) $(SIM_CFLAGS) -I$(MONGOOSE_DIR) -Wno-unused-parameter -Wno-sign-compare -c -o $@ $<
 
 clean:
-	rm -rf $(BUILD_DIR) $(TARGET) $(SIM_TARGET) $(WASM_PROXY_TARGET)
+	rm -rf $(BUILD_DIR) $(TARGET) $(SIM_TARGET) $(WASM_PROXY_TARGET) $(WEB_CONSOLE_PROTOCOL_TEST)
 
 -include $(DEPS) $(WASM_PROXY_DEPS)
 
-.PHONY: all clean sim net-hal-test wasm-proxy
+.PHONY: all clean sim net-hal-test web-console-protocol-test wasm-proxy

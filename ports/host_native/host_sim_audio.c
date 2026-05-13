@@ -13,8 +13,8 @@
  */
 
 #include "host_sim_audio.h"
+#include "drivers/web_console/web_console_protocol.h"
 
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -54,45 +54,42 @@ static void push_msg(const char *msg) {
 void host_sim_audio_tone(double left_hz, double right_hz,
                          int has_duration, long long duration_ms) {
     char buf[128];
-    if (has_duration) {
-        snprintf(buf, sizeof(buf),
-                 "{\"op\":\"tone\",\"l\":%.6g,\"r\":%.6g,\"ms\":%lld}",
-                 left_hz, right_hz, duration_ms);
-    } else {
-        snprintf(buf, sizeof(buf),
-                 "{\"op\":\"tone\",\"l\":%.6g,\"r\":%.6g}",
-                 left_hz, right_hz);
-    }
-    push_msg(buf);
+    if (web_console_audio_build_tone(buf, sizeof(buf), left_hz, right_hz,
+                                     has_duration, duration_ms) >= 0)
+        push_msg(buf);
 }
 
 void host_sim_audio_stop(void) {
-    push_msg("{\"op\":\"stop\"}");
+    char buf[32];
+    if (web_console_audio_build_stop(buf, sizeof(buf)) >= 0)
+        push_msg(buf);
 }
 
 void host_sim_audio_sound(int slot, const char *ch, const char *type,
                           double freq_hz, int volume) {
     char buf[160];
-    snprintf(buf, sizeof(buf),
-             "{\"op\":\"sound\",\"slot\":%d,\"ch\":\"%s\",\"type\":\"%s\","
-             "\"f\":%.6g,\"vol\":%d}",
-             slot,
-             ch ? ch : "B",
-             type ? type : "O",
-             freq_hz,
-             volume);
-    push_msg(buf);
+    if (web_console_audio_build_sound(buf, sizeof(buf), slot, ch, type,
+                                      freq_hz, volume) >= 0)
+        push_msg(buf);
 }
 
 void host_sim_audio_volume(int left, int right) {
     char buf[80];
-    snprintf(buf, sizeof(buf),
-             "{\"op\":\"volume\",\"l\":%d,\"r\":%d}", left, right);
-    push_msg(buf);
+    if (web_console_audio_build_volume(buf, sizeof(buf), left, right) >= 0)
+        push_msg(buf);
 }
 
-void host_sim_audio_pause(void)  { push_msg("{\"op\":\"pause\"}"); }
-void host_sim_audio_resume(void) { push_msg("{\"op\":\"resume\"}"); }
+void host_sim_audio_pause(void) {
+    char buf[32];
+    if (web_console_audio_build_pause(buf, sizeof(buf)) >= 0)
+        push_msg(buf);
+}
+
+void host_sim_audio_resume(void) {
+    char buf[32];
+    if (web_console_audio_build_resume(buf, sizeof(buf)) >= 0)
+        push_msg(buf);
+}
 
 size_t host_sim_audio_drain(char ***out_msgs, int *out_count) {
     pthread_mutex_lock(&audio_lock);
