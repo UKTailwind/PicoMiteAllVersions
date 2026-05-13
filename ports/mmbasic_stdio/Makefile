@@ -68,7 +68,7 @@ BC_SRCS = bc_alloc.c bc_bridge.c vm_host_fat.c ff.c ffunicode.c ffsystem.c \
 # no argv-parsing loader (main.c here replaces it).
 NATIVE_SRCS = host_runtime.c host_fs_shims.c host_peripheral_stubs.c host_fs.c \
               host_sim_audio.c host_sim_slowdown.c host_sim_emit_stub.c host_time.c host_keys.c \
-              host_bc_runtime_noop.c host_terminal_hooks_noop.c \
+              host_bc_runtime_noop.c host_terminal_hooks_noop.c host_web_stubs.c \
               hal_flash_host.c hal_time_host.c hal_random_host.c hal_pin_host.c hal_storage_host.c \
               hal_filesystem_host.c hal_keyboard_host.c hal_audio_host.c hal_vm_framebuffer_host.c
 
