@@ -125,6 +125,21 @@ PSRAM range, or `RAM TEST ALL` to include the 2 MB reserved area above
 scanning the final phase, so raise `--timeout` rather than only
 `--long-timeout`.
 
+ESP32-S3 PSRAM smoke:
+
+```sh
+python3.11 porttools/esp32_fs_vm_smoke.py psram \
+  --port /dev/cu.usbmodem2101 \
+  --timeout 12 \
+  --long-timeout 120
+```
+
+The ESP32 suite is deliberately separate from Pico `RAM TEST`: it allocates
+with `heap_caps_malloc(MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT)`, marches only the
+allocated block, frees it, and then checks that the BASIC prompt still works.
+It also verifies that generic `MM.INFO(PSRAM SIZE)` remains 0 so `Memory.c`
+does not enter the RP2350 PSRAM allocator on ESP32.
+
 Known-good checks from the ESP32 bringup:
 
 ```sh
@@ -141,6 +156,106 @@ python3.11 porttools/basic_serial.py \
   --expect FINAL_FLASH_OK \
   --quiet
 ```
+
+## `esp32_fs_vm_smoke.py`
+
+`esp32_fs_vm_smoke.py` is the ESP32-S3 Metro hardware smoke suite for the
+prompt, `MM.INFO`, A: LittleFS, BASIC file I/O, program load/save/run paths,
+the bytecode VM, GPIO/ADC pins, and opt-in persistent/visual/network checks.
+It writes short BASIC programs to A:, runs them, checks success markers, and
+removes generated files unless `--keep-files` is used.
+
+Default run:
+
+```sh
+python3.11 porttools/esp32_fs_vm_smoke.py \
+  --port /dev/cu.usbmodem101
+```
+
+Run selected suites:
+
+```sh
+python3.11 porttools/esp32_fs_vm_smoke.py fs vm gpio \
+  --port /dev/cu.usbmodem101
+```
+
+Default `all` expands to `info fs program vm gpio`. It deliberately excludes
+flash-slot persistence, the GP46 NeoPixel visual check, and WiFi/network
+conformance.
+
+Implemented checks:
+
+- `info`: prompt sync plus `MM.INFO$(ID)`, `MM.INFO(CPUSPEED)`,
+  `MM.INFO(HEAP)`, `MM.INFO(STACK)`, `MM.INFO(FREE SPACE)`, and clean B:/SD
+  detection. B: not configured or no card is reported as `SKIP`, not failure.
+- `fs`: A: create/delete files and directories, `CHDIR`, `MKDIR`, `RMDIR`,
+  `KILL`, `RENAME`, `COPY`, wildcard `DIR$`, filenames with spaces,
+  overwrite behavior, file existence and size checks, missing-file and
+  duplicate-directory errors, plus `OPEN`, `PRINT #`, `INPUT$`, `LINE INPUT`,
+  `LOC`, `LOF`, `EOF`, `SEEK`, append, and overwrite file I/O.
+- `program`: `LOAD`, `SAVE`, `RUN`, `FRUN`, autorun `LOAD ..., R`,
+  empty-program `SAVE` refusal, and prompt recovery after the expected error.
+- `vm`: `FRUN` of arithmetic, strings, arrays, `SUB`/`FUNCTION`,
+  `SELECT CASE`, `DATA`/`READ`/`RESTORE`, VM-side file I/O, and a Sieve of
+  Eratosthenes benchmark that verifies 168 primes up to 1000.
+- `gpio`: safe Metro checks on GP13 DOUT/DIN and GP1 ARAW, then verifies
+  current `SETPIN ..., PWM` and `SERVO` unsupported errors remain explicit.
+- `flash`: opt-in flash-slot persistence using `FLASH ERASE`, `FLASH SAVE`,
+  RTS reset/resync, `FLASH LOAD`, `RUN`, `FLASH RUN`, and slot cleanup.
+  `VAR SAVE`/`VAR RESTORE` is additionally gated by `--var-save` because it
+  leaves a persistent saved variable.
+- `ws2812`: GP46 onboard NeoPixel red/green/blue/off command sequence. The
+  suite reports `SKIP` unless `--ws2812-visual` is passed.
+- `network`: reports `SKIP` unless `--run-network` is passed, then chains to
+  `network_conformance.py` through this repo's `porttools/` path. It defaults
+  to the full `all` conformance suite. Use `--network-suite`,
+  `--connect-command`, `--network-host`, `--device-host`,
+  `--network-suite-retries`, and `--network-suite-timeout` as needed.
+
+Run ESP32 network conformance through the smoke runner:
+
+```sh
+python3.11 porttools/esp32_fs_vm_smoke.py network \
+  --run-network \
+  --port /dev/cu.usbmodem101 \
+  --connect-command 'WEB CONNECT'
+```
+
+If automatic address detection picks the wrong interface, pass the Mac-side
+address reachable from the ESP32 and/or the ESP32 address reachable from the
+Mac:
+
+```sh
+python3.11 porttools/esp32_fs_vm_smoke.py network \
+  --run-network \
+  --port /dev/cu.usbmodem101 \
+  --network-host 192.168.1.23 \
+  --device-host 192.168.1.57 \
+  --network-suite-timeout 240
+```
+
+To debug a narrower network surface before running the full suite:
+
+```sh
+python3.11 porttools/esp32_fs_vm_smoke.py network \
+  --run-network \
+  --network-suite tcp-client \
+  --port /dev/cu.usbmodem101
+```
+
+Useful options:
+
+- `--boot-wait N`, `--timeout N`, `--long-timeout N`: serial timing controls.
+- `--drive A:` and `--prefix NAME`: target drive and temporary path prefix.
+- `--flash-slot N`: flash program slot used by `flash`. Defaults to slot 3.
+- `--keep-files`: leave generated BASIC files on A: for manual inspection.
+- `--reset-app`: pulse RTS before the initial prompt sync using
+  `basic_serial.py`'s reset behavior.
+- `--ws2812-visual`: opt into the GP46 visual LED sequence.
+- `--var-save`: opt into persistent `VAR SAVE`/`VAR RESTORE` inside `flash`.
+- `--run-network`: opt into the WiFi-dependent network conformance handoff.
+- `--network-suite NAME`: choose the network conformance suite passed through
+  to `network_conformance.py`; defaults to `all`.
 
 ## `esp32_tcp_smoke.py`
 
@@ -413,6 +528,7 @@ After editing these tools:
 ```sh
 python3.11 -m py_compile \
   porttools/basic_serial.py \
+  porttools/esp32_fs_vm_smoke.py \
   porttools/esp32_tcp_smoke.py \
   porttools/network_conformance.py \
   porttools/host_network_conformance.py \

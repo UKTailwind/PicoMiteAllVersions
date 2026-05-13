@@ -4,6 +4,8 @@
 
 Companion log: [esp32-s3-port-log.md](esp32-s3-port-log.md).
 Network core follow-on: [network-core-plan.md](network-core-plan.md).
+WiFi/browser video, keyboard, and sound follow-on:
+[web-console-driver-plan.md](web-console-driver-plan.md).
 
 ## Hardware
 
@@ -21,17 +23,17 @@ Network core follow-on: [network-core-plan.md](network-core-plan.md).
 | C — interactive REPL | ✅ | PRINT, FOR/NEXT, IF/ELSE, GOTO/GOSUB, LIST, EDIT, CPU RESTART, CLS, COLOUR all work |
 | C — A: drive (LFS) | ✅ | LFS over `esp_partition_*`, bundled demos seed-only with zero-byte repair, FILES/LOAD/SAVE-to-file/RUN/FRUN all work for files on A: |
 | C — VM source compiler regression fixes | ✅ | adjacent string literals (`""` in PRINT), post-compact heap fragmentation, wrapped-multiply optimizer semantics |
-| D — decouple from host_native | 🔧 | Runtime/peripheral host_native sources are gone; ESP32 owns the port surface in `esp32_*.c` and `hal_*_esp32.c`; core/shared Pico SDK leakage is clean; strict link policy is active. BASIC-visible GPIO DOUT/DIN/ARAW, WS2812 output, and the WEB network surface are hardware-smoked. Remaining debt: legacy hardware header shims still live under `ports/host_native/`, PWM/servo are not wired, MQTT is plain TCP only, and ESP32 still compiles as `MMBASIC_HOST`. |
+| D — decouple from host_native | 🔧 | Runtime/peripheral host_native sources are gone; ESP32 owns the port surface in `esp32_*.c` and `hal_*_esp32.c`; core/shared Pico SDK leakage is clean; strict link policy is active. BASIC-visible GPIO DOUT/DIN/ARAW, WS2812 output, and the WEB network surface are hardware-smoked. Legacy `hardware/*` header shims now live under `ports/pico_sdk_compat/`. Remaining debt: PWM/servo are not wired and MQTT is plain TCP only. |
 | E — real flash persistence | ✅ | NVS-backed Options and numbered `FLASH SAVE`/`FLASH LOAD` slots are implemented and hardware-smoked. `VAR SAVE` shares the `mmslots` backing. |
 | F — gate + plan hygiene | ✅ | ESP32 port files are in the HAL purity gate; `docs/real-hal-plan.md`, this port README, and opt-in `buildesp32.sh` are current. |
-| G — device smoke + HAL cleanup | ⏳ | Next priority. Front-load a comprehensive on-device ESP32 smoke suite, then remove remaining host-shape scaffolding: explicit ESP32 port config, neutral hardware shims, no `MMBASIC_HOST`, and stale docs/comments fixed. |
-| H — PSRAM contract | ⏳ | Deferred until Stage G is green. Enable ESP32 Octal PSRAM through ESP-IDF/heap_caps with an ESP32-specific allocation contract; do not reuse the RP2350 QMI/`PSRAMbase` model. |
+| G — device smoke + HAL cleanup | ✅ | G0 smoke suite is implemented and passing, including opt-in flash/VAR persistence and network conformance. G1 plan/comment drift cleanup, G2 explicit ESP32 port config, G3 neutral hardware shims, and G4 removal of the temporary host compile identity are done. |
+| H — PSRAM contract | 🔧 | ESP-IDF Octal PSRAM is enabled caps-only for the N16R8 Metro, with port-local reporting and an opt-in heap_caps march smoke. BASIC `PSRAMsize` remains 0 so generic `Memory.c` does not enter the RP2350 PSRAM allocator. |
 
 **Headline broken-but-silent bug** (fixed in D1 below): `flash_range_erase` / `flash_range_program` in `esp32_flash_storage.c` previously targeted a 256-byte placeholder buffer and silently no-op'd past the end. ESP32 now routes program-region writes into `flash_prog_buf` and routes saved-vars / numbered-slot writes to the `mmslots` partition.
 
-**Tests**: `./buildall.sh` builds all 14 device variants and passes the RAM baseline gate. Host `./run_tests.sh` is 243/243 (includes `t170_frun_post_compact_array.bas` and `t208_muldiv_pow2_overflow.bas`). HAL purity gate includes `ports/esp32_s3_metro/main/*.c` and is clean. ESP32 `idf.py build` is green; hardware flash/probe passed with `FRUN "mand.bas"`, `FLASH SAVE 1` / reset / `FLASH LOAD 1` / `RUN`, BASIC-visible GPIO DOUT/DIN/ARAW smoke, onboard WS2812 colour smoke, and WEB network smokes for WiFi, TCP server, TCP client request/stream, UDP send/receive, NTP, and plain MQTT. Host-side ESP32 smoke tooling lives in `porttools/`; see [porttools/README.md](../../porttools/README.md).
+**Tests**: `python3.11 -m py_compile porttools/basic_serial.py porttools/esp32_fs_vm_smoke.py porttools/network_conformance.py porttools/pico_fs_vm_smoke.py porttools/esp32_tcp_smoke.py` passes. `./host/run_tests.sh` is 244/244, with the VM pin-mode helper and HAL purity clean. `./buildall.sh` builds all 14 device variants and passes the RAM baseline gate. `./buildesp32.sh build` is green; current image size is `0x191e50` with 22% of the app partition free. The latest flashed Metro smoke passed the default `esp32_fs_vm_smoke.py` suites, opt-in `psram`, opt-in `flash --var-save`, and network conformance through `esp32_fs_vm_smoke.py network --run-network` (TCP client/server/transmit page/file/css/js/image/code, UDP, TFTP, telnet console after BASIC error, NTP, and MQTT). B:/SD is skipped as unconfigured. Host-side ESP32 smoke tooling lives in `porttools/`; see [porttools/README.md](../../porttools/README.md).
 
-**Latest hardware smoke (2026-05-10)**:
+**Latest hardware smoke (2026-05-13)**:
 - A: drive bundled demos now include `mand.bas`. Demo population is seed-only; non-empty user-edited files are not overwritten at boot, while zero-byte bundled demos are repaired.
 - `SAVE "file.bas"` now errors `No program` before opening/truncating the target if no tokenized program is loaded. This prevents the confusing empty-program clobber path after editing a file without `LOAD`.
 - `RUN "mand.bas"` and `FRUN "mand.bas"` both produce checksum `552868`. Current Metro measurement: `FRUN` ~359 ms / ~8554 pixels/sec; `RUN` ~8569 ms / ~358 pixels/sec, about 24x faster through bytecode.
@@ -61,7 +63,7 @@ These are non-negotiable on this port. Violations are reasons to revert, not fee
 
    They never appear in core, in `bc_*.c`, in `vm_sys_*.c`, or in `gfx_*_shared.c`. If a core file would need IDF, it needs a HAL hook instead.
 
-6. **Heap is tight and the port code knows it.** 48 KB MMBasic heap while WiFi is enabled (PSRAM disabled — see Stage H). Allocation order matters; `bc_compiler_alloc` is ordered to keep post-compact heap contiguous (committed). New allocations in this port must respect the same fragmentation discipline.
+6. **Heap is tight and the port code knows it.** 48 KB MMBasic heap while WiFi is enabled. ESP-IDF now detects the Metro's Octal PSRAM, but it is caps-only and not part of `AllMemory`. Compiler scratch tables allocate from ESP-IDF internal heap on ESP32 so large compile-time temporaries do not consume `AllMemory`, and VM runtime allocations still come from the 48 KB MMBasic heap. New runtime allocations in this port must respect the same fragmentation discipline.
 
 7. **Pico source is the reference.** When in doubt about how a HAL contract is supposed to be exercised, read pico's impl — not host_native's. Host has historical shape (POSIX-rooted, malloc-flavoured) that doesn't translate.
 
@@ -72,14 +74,14 @@ These are non-negotiable on this port. Violations are reasons to revert, not fee
 ```
 ports/esp32_s3_metro/
 ├── CMakeLists.txt              # ESP-IDF project root
-├── port_config.h               # HAL_PORT_* values; still inherits host defaults, then overrides ESP32 values
+├── port_config.h               # Explicit ESP32 HAL_PORT_* values; no host_native inheritance
 ├── partitions.csv              # 1 MB app + 12 MB lfsdata + 1 MB mmslots
-├── sdkconfig.defaults          # USB JTAG console, watchdog off, WiFi enabled, PSRAM disabled
+├── sdkconfig.defaults          # USB JTAG console, watchdog off, WiFi enabled, caps-only Octal PSRAM
 ├── probe.py                    # pyserial test driver (avoids picocom DTR pulse)
 ├── README.md                   # build/flash/monitor, current status, known gaps
 └── main/
     ├── CMakeLists.txt          # main component, source list, strict-link policy
-    ├── esp32_platform.h        # temporary MMBASIC_HOST + MMBASIC_ESP32 + Pico SDK section-attr stubs
+    ├── esp32_platform.h        # MMBASIC_ESP32 + Pico SDK section-attr stubs
     ├── app_main.c              # IDF entry, MMBasic boot, REPL launch
     ├── esp32_console.c         # USB Serial/JTAG byte I/O via esp32_console_*
     ├── esp32_lfs.c             # LFS over esp_partition_* for the A: drive
@@ -114,9 +116,9 @@ The ESP32 link line no longer includes `host_runtime.c`, `host_peripheral_stubs.
 Remaining coupling is narrower:
 
 - The simulator VM syscall bodies live under `ports/vm_sys_sim/` for host-style builds. ESP32 no longer links either simulator body: file syscalls use shared device `vm_sys_file.c`, and pin syscalls use ESP32-owned `vm_sys_pin_esp32.c` plus the Metro pin table.
-- ESP32 no longer needs a `pico/stdlib.h` compatibility shim for core/shared code. A strict scan of the core/shared scope is clean for Pico SDK includes/APIs. Remaining `hardware/*` Pico SDK header shims still come from `ports/host_native/` and should move to a neutral compatibility directory or disappear behind HAL.
-- `ports/esp32_s3_metro/port_config.h` inherits host defaults and overrides ESP32 values. Replace that inheritance with an explicit ESP32 config or shared neutral defaults.
-- `esp32_platform.h` still defines `MMBASIC_HOST`. Treat this as a temporary compile-mode hack, not architecture. The exit criterion is an ESP32 build that uses `MMBASIC_ESP32` plus HAL/port feature macros without claiming to be a host port.
+- ESP32 no longer needs a `pico/stdlib.h` compatibility shim for core/shared code. A strict scan of the core/shared scope is clean for Pico SDK includes/APIs. Remaining `hardware/*` Pico SDK header shims come from the neutral `ports/pico_sdk_compat/` include path until they disappear behind HAL.
+- `ports/esp32_s3_metro/port_config.h` now defines ESP32's `HAL_PORT_*` surface explicitly instead of inheriting host defaults.
+- `esp32_platform.h` defines `MMBASIC_ESP32` only. The temporary host compile identity is gone; the HAL purity gate now checks the ESP32 platform/CMake files for regression.
 
 ### Strict symbol policy
 
@@ -218,9 +220,9 @@ Method: `xtensa-esp-elf-nm` undefined-set (non-host_native objs) ∩ defined-set
 
 Longer term, replace `-fcommon` with single-owner globals plus `extern` declarations. That is codebase-wide mechanical cleanup and lives outside this port-specific bring-up unless it blocks ESP32.
 
-**Step F — remove the host-mode compile identity ⏳**. ESP32 still defines `MMBASIC_HOST` to select already-HAL-backed code paths and avoid Pico SDK hardware bodies. This must become explicit port/HAL selection instead. Exit gate: ESP32 builds with `MMBASIC_ESP32` and neutral HAL feature macros, without defining `MMBASIC_HOST`.
+**Step F — remove the host-mode compile identity ✅**. ESP32 builds with `MMBASIC_ESP32` and explicit HAL/port feature macros only. `MMBASIC_HOST` is no longer defined by `esp32_platform.h` or the ESP32 CMake component, and the HAL purity gate checks for regression.
 
-**Step G — neutralize remaining shim paths 🔧**. The VM syscall simulator bodies moved to `ports/vm_sys_sim/`. ESP32 now links shared device `vm_sys_file.c` and ESP32-owned `vm_sys_pin_esp32.c`, not simulator syscall bodies. Remaining: move the legacy Pico SDK `hardware/*` header shims out of `ports/host_native/`.
+**Step G — neutralize remaining shim paths ✅**. The VM syscall simulator bodies moved to `ports/vm_sys_sim/`. ESP32 now links shared device `vm_sys_file.c` and ESP32-owned `vm_sys_pin_esp32.c`, not simulator syscall bodies. The legacy Pico SDK `hardware/*` header shims moved to neutral `ports/pico_sdk_compat/`; ESP32 no longer includes `ports/host_native`.
 
 **Step H — verify**. ESP32 IDF build green with strict duplicate-function link rules; host tests green; HAL purity clean; hardware smoke: CLS clears, COLOUR changes colour, SETPIN+PIN drives a GPIO, ARAW returns ADC data, FRUN mand.bas/sieve.bas runs.
 
@@ -297,13 +299,20 @@ Implemented behind `hal_flash_esp32.c`:
 
 **Exit gate passed**: `OPTION DEFAULT COLOURS GREEN` persisted across reset/reflash and emitted the saved green ANSI prompt sequence on boot. `OPTION DEFAULT COLOURS WHITE` restored white-on-black and was verified across reset.
 
-### E3. Why no PSRAM yet
+### E3. PSRAM policy
 
-8 MB Octal PSRAM is on-chip, currently disabled in `sdkconfig.defaults`. Two reasons not to enable yet:
+8 MB Octal PSRAM is on-chip and enabled in `sdkconfig.defaults` through ESP-IDF, not through the Pico/RP2350 PSRAM path.
 
-1. **Internal SRAM works** for the current stdio/WEB litmus test. The active heap is 48 KB while WiFi is enabled; tight, but sufficient for the hardware-smoked programs.
-2. **PSRAM enabling is a non-trivial change** — `MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT` heap split, BC heap routing decisions, framebuffer-in-PSRAM-with-DMA-cap requirement once a display lands, brownout detector recalibration. The right order is: device smoke suite first, HAL cleanup second, PSRAM contract third.
-3. **ESP32 PSRAM is not Pico PSRAM.** Do not route it through `PSRAMbase`, `psmap`, QMI/XIP cache helpers, or the RP2350 `RAM` slot model without a separate design. ESP-IDF owns PSRAM init/cache/flash coordination; the port should consume it through `heap_caps_*` and report BASIC-visible capacity only after the allocation policy is defined.
+Current contract:
+
+- ESP-IDF owns PSRAM init/cache/flash coordination. ESP32 port code may allocate explicit external RAM with `heap_caps_malloc(MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT)`.
+- `CONFIG_SPIRAM_USE_CAPS_ALLOC=y`; `malloc()` is not configured to spill into PSRAM. This keeps existing library and VM allocation behavior stable.
+- BASIC `PSRAMsize` remains 0 on ESP32. Consequently `MM.INFO(PSRAM SIZE)` reports 0 and generic `Memory.c` does not route large arrays/strings or `AllMemory` through the RP2350 `GetPSMemory()` / `psmap` fallback.
+- ESP32 `MM.INFO(HEAP)` reports internal 8-bit heap, not SPIRAM. External RAM capacity is reported only through the ESP32-specific PSRAM keys below.
+- Port-local reporting lives behind ESP32-specific `MM.INFO(ESP32 PSRAM SIZE)`, `MM.INFO(ESP32 PSRAM FREE)`, and `MM.INFO(ESP32 PSRAM LARGEST)`, which read ESP-IDF/heap_caps state.
+- The opt-in PSRAM smoke uses `MM.INFO(ESP32 PSRAM MARCH n)` via `porttools/esp32_fs_vm_smoke.py psram`. It allocates SPIRAM through heap_caps, runs a destructive march over that allocation, frees it, and then verifies the BASIC prompt still responds.
+
+Do not route ESP32 PSRAM through `PSRAMbase`, `psmap`, QMI/XIP cache helpers, the RP2350 `RAM` slot model, or generic `GetPSMemory()` until a deliberate ESP32 allocator contract is designed and tested.
 
 Capture this decision so the next session doesn't re-litigate it.
 
@@ -313,7 +322,7 @@ Capture this decision so the next session doesn't re-litigate it.
 
 `tools/check_hal_purity.sh` now has ESP32 port awareness. `ports/esp32_s3_metro/main/*.c` are checked with the same strict target/port-config/runtime-fold rules as the promoted core files. `MMBASIC_ESP32` is allowed as the port's own identity tag; other target macros are forbidden.
 
-The gate also flags accidental `host_native` source reuse in `ports/esp32_s3_metro/main/CMakeLists.txt`, with a temporary allowlist only for the legacy `hardware/*` header-shim include path until Stage G finishes.
+The gate also flags accidental `host_native` source reuse or include-path regression in `ports/esp32_s3_metro/main/CMakeLists.txt`.
 
 ### F2. Update `docs/real-hal-plan.md` scoreboard ✅
 
@@ -331,11 +340,11 @@ Sibling of `buildall.sh`. Runs the HAL purity gate, sources `~/esp/esp-idf/expor
 
 **Goal:** before adding PSRAM or broader hardware features, make ESP32 as easy to regression-test on real hardware as Pico now is. The suite should be prompt-driven, repeatable, and suitable for both manual bringup and CI-on-a-bench later.
 
-### G0. Comprehensive ESP32 on-device smoke suite ⏳
+### G0. Comprehensive ESP32 on-device smoke suite ✅
 
-Create a host-side runner, tentatively `porttools/esp32_fs_vm_smoke.py`, modeled on `pico_fs_vm_smoke.py` but ESP32-aware.
+Implemented as `porttools/esp32_fs_vm_smoke.py`, modeled on `pico_fs_vm_smoke.py` but ESP32-aware.
 
-Required coverage:
+Current coverage:
 
 - **Device/prompt:** sync, banner, `MM.INFO$(ID)`, `MM.INFO(CPUSPEED)`, `MM.INFO(HEAP)`, `MM.INFO(STACK)`, `MM.INFO(FREE SPACE)`.
 - **A: filesystem battery:** create/delete files and dirs, `CHDIR`, `MKDIR`, `RMDIR`, `KILL`, `RENAME`, `COPY`, wildcard `DIR$`, filenames with spaces, overwrite/error behavior, file size/existence checks.
@@ -346,28 +355,29 @@ Required coverage:
 - **Flash persistence:** `FLASH SAVE`, reset/reconnect, `FLASH LOAD`, `RUN`, `VAR SAVE` if supported through the same `mmslots` backing.
 - **GPIO:** safe DOUT/DIN/ARAW checks on documented pins. PWM/servo should explicitly verify the current "not supported" error until LEDC lands.
 - **WS2812:** exercise the onboard NeoPixel on `GP46` with a short red/green/blue/off sequence, gated behind an opt-in flag if visual confirmation is required.
-- **Network smoke hooks:** optionally chain to existing ESP32 TCP/UDP/NTP/MQTT smoke tools, but keep the default suite runnable without WiFi credentials.
+- **Network smoke hooks:** `network --run-network` chains to `porttools/network_conformance.py`; the default suite remains runnable without WiFi credentials.
 - **Reset workflow:** document and automate the preferred reset/reconnect path, avoiding the macOS DTR/HUPCL trap already called out in `probe.py`.
 
-Default `all` should avoid destructive or environment-dependent checks unless explicitly requested. Use named suites such as `fs`, `program`, `vm`, `flash`, `gpio`, `ws2812`, and `network`.
+Default `all` avoids destructive or environment-dependent checks unless explicitly requested. Named suites include `fs`, `program`, `vm`, `flash`, `gpio`, `ws2812`, and `network`.
 
 Exit gate:
 
 - `./buildesp32.sh build` passes.
-- The new smoke runner passes on a Metro ESP32-S3 from a fresh prompt.
-- The smoke suite catches at least one intentionally unsupported path cleanly (PWM/servo), so unsupported features remain visible rather than silently no-oping.
+- The smoke runner passes on a Metro ESP32-S3 from a fresh prompt.
+- The suite catches intentionally unsupported PWM/servo paths cleanly, so unsupported features remain visible rather than silently no-oping.
+- Opt-in `flash --var-save` and `network --run-network` passed in the latest G0 PM gate.
 
-### G1. Plan/comment drift cleanup ⏳
+### G1. Plan/comment drift cleanup ✅
 
 Fix stale text before deeper refactors:
 
-- Replace old 104 KB heap references with the current 48 KB WiFi-enabled heap, and explain the tradeoff.
+- Replace old larger-heap references with the current 48 KB WiFi-enabled MMBasic heap, and explain that ESP32 compiler scratch tables use ESP-IDF internal heap while VM runtime allocations remain on the 48 KB MMBasic heap.
 - Update comments in `hal_flash_esp32.c` / `main/CMakeLists.txt` that still describe slot persistence as "Stage E1" even though `mmslots` is implemented.
 - Keep README, this plan, and `port_config.h` aligned on PSRAM being present in hardware but disabled by policy.
 
-### G2. Explicit ESP32 port config ⏳
+### G2. Explicit ESP32 port config ✅
 
-Stop inheriting `ports/host_native/port_config.h`.
+Stopped inheriting `ports/host_native/port_config.h`.
 
 Required shape:
 
@@ -375,23 +385,22 @@ Required shape:
 - Set inert/nonexistent hardware counts deliberately. Do not inherit RP2040 PWM/PIO numbers.
 - Keep the 48 KB heap until PSRAM work deliberately changes the memory contract.
 
-### G3. Neutralize remaining host-native header shims ⏳
+### G3. Neutralize remaining host-native header shims ✅
 
-The build may temporarily include `ports/host_native` only for legacy `hardware/*` shim headers. Remove that dependency by either:
+The build no longer includes `ports/host_native` for legacy `hardware/*` shim headers.
 
-- moving truly generic compatibility shims to a neutral path, or
-- finishing the HAL split so ESP32 no longer needs those headers at all.
+Done by moving the generic `hardware/*` compatibility shim tree to `ports/pico_sdk_compat/` and wiring ESP32 to include that neutral path. Host-native also includes the neutral path for the same compile-time shims.
 
 Exit gate: `ports/esp32_s3_metro/main/CMakeLists.txt` has no `ports/host_native` include path and the HAL purity gate still passes.
 
-### G4. Remove ESP32's `MMBASIC_HOST` compile identity ⏳
+### G4. Remove ESP32's `MMBASIC_HOST` compile identity ✅
 
-ESP32 currently defines both `MMBASIC_HOST` and `MMBASIC_ESP32`. That was useful during bringup but is now misleading.
+ESP32 now defines `MMBASIC_ESP32` only. The old `MMBASIC_HOST` bringup tag was removed from the force-included platform header and from the ESP-IDF component compile definitions.
 
 Exit gate:
 
 - ESP32 builds with `MMBASIC_ESP32` and explicit HAL/port feature macros only.
-- No core/shared file needs an ESP32-specific target gate.
+- No core/shared file needed an ESP32-specific target gate.
 - No host-only behavior is selected accidentally by the ESP32 build.
 
 ### G5. Optional hardware cleanup before PSRAM ⏳
@@ -408,16 +417,15 @@ These are lower priority than making the port identity clean and testable.
 
 **Goal:** enable the Metro's 8 MB Octal PSRAM through ESP-IDF in a way that matches ESP32 hardware and does not import RP2350 assumptions.
 
-### H1. PSRAM policy/design doc ⏳
+### H1. PSRAM policy/design doc ✅
 
-Before code:
+- BASIC-visible `PSRAMsize` remains 0 on ESP32 for this stage. `MM.INFO(PSRAM SIZE)` therefore stays 0 and generic BASIC heap behavior remains unchanged.
+- `AllMemory`, `PSRAMbase`, `psmap`, generic `GetPSMemory()`, large arrays/strings, and VM runtime allocations do not move to ESP32 PSRAM yet.
+- Only ESP32-owned port code/tools may call ESP-IDF heap_caps directly. Current consumers are the reporting helpers and the opt-in smoke march.
+- If PSRAM is absent or fails init on the N16R8 target, boot/build/smoke should fail visibly rather than silently changing BASIC memory policy.
+- There is no ESP32 `RAM TEST` command in this stage; the smoke runner drives the ESP32-specific heap_caps march.
 
-- Decide what BASIC-visible `PSRAMsize` means on ESP32, if anything.
-- Decide whether `AllMemory`, bytecode arenas, large arrays/strings, display framebuffers, or only explicit subsystems may allocate from PSRAM.
-- Define failure behavior when PSRAM is absent, disabled, or too slow for a use case.
-- Decide whether `RAM TEST` should exist on ESP32, and if so make it an ESP32 heap allocation/march test rather than a raw fixed-address test.
-
-### H2. Enable ESP-IDF PSRAM minimally ⏳
+### H2. Enable ESP-IDF PSRAM minimally ✅
 
 Enable the correct Octal PSRAM sdkconfig settings for the N16R8 Metro and prove boot stability.
 
@@ -427,9 +435,9 @@ Exit gate:
 - Boot reports detected PSRAM through ESP-IDF.
 - Existing Stage G smoke suite still passes with PSRAM enabled but not yet used for core allocations.
 
-### H3. Add an ESP32 PSRAM march/allocation smoke ⏳
+### H3. Add an ESP32 PSRAM march/allocation smoke ✅
 
-Add an opt-in smoke that allocates PSRAM through `heap_caps_malloc(MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT)`, runs a destructive march over the allocation, frees it, and verifies normal BASIC operation still works afterward.
+Implemented as the opt-in `psram` suite in `porttools/esp32_fs_vm_smoke.py`. It checks that generic `MM.INFO(PSRAM SIZE)` is still 0, reads ESP-IDF detected/free/largest SPIRAM through ESP32-specific `MM.INFO(...)` keys, allocates the requested byte count from `heap_caps_malloc(MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT)`, runs a destructive march, frees the allocation, and prints a BASIC prompt marker afterward.
 
 This is the ESP32 analogue of Pico's `RAM TEST`, not a copy of the Pico implementation.
 
@@ -451,7 +459,7 @@ Repeat the full Stage G smoke suite with PSRAM enabled and with any new PSRAM-ba
 - **Audio.** I2S codec, MP3 decode, PWM synth port.
 - **Keyboard.** USB host (TinyUSB), I2C keypad (PicoCalc-style), PS/2.
 - **BLE/Bluetooth.** WiFi and the BASIC WEB/TCP/UDP/NTP/plain-MQTT surface have landed; BLE remains out of scope.
-- **Octal PSRAM.** See Stage H; do not start before Stage G is green.
+- **PSRAM-backed BASIC heap/display.** ESP-IDF PSRAM is enabled for explicit port allocations only. Moving `AllMemory`, arrays/strings, bytecode arenas, or framebuffers to PSRAM is deferred until an ESP32 allocator/display contract exists.
 - **OTA.** Two app slots, signed updates. Out of scope for a stdio litmus.
 
 ## Risks worth pre-flagging
@@ -479,7 +487,8 @@ Repeat the full Stage G smoke suite with PSRAM enabled and with any new PSRAM-ba
 - `ports/esp32_s3_metro/port_config.h` — D8 edits land here.
 - `ports/esp32_s3_metro/probe.py` — debug driver; use it instead of picocom.
 - `ports/vm_sys_sim/` — simulator VM syscall bodies used by host-style builds only.
-- `ports/host_native/pico/` / `ports/host_native/hardware/` — Pico SDK compatibility headers to relocate out of host_native.
+- `ports/host_native/pico/` — host-owned Pico compatibility headers.
+- `ports/pico_sdk_compat/hardware/` — neutral legacy Pico SDK `hardware/*` compatibility shims.
 - `ports/pico_sdk_common/` — the reference for what device-port shape looks like.
 - `tools/check_hal_purity.sh` — F1 edits the strict-scope file list here.
 - `docs/real-hal-plan.md` — F2 adds the scoreboard row.
@@ -505,4 +514,4 @@ Effort: 3–4 sessions for SPI path. VGA via LCD_CAM is multi-session and only w
 
 ---
 
-**The fastest path from here**: first build the on-device ESP32 smoke suite, then finish the host-shape cleanup (`port_config`, header shims, no `MMBASIC_HOST`), then enable PSRAM through an ESP32-specific contract. Do not add more build-rule overrides to paper over missing ESP32 HAL/stub ownership.
+**The fastest path from here**: keep the on-device ESP32 smoke suite green while enabling PSRAM through an ESP32-specific contract. Do not add more build-rule overrides to paper over missing ESP32 HAL/stub ownership.

@@ -1,6 +1,6 @@
 # MMBasic Anywhere - Adafruit Metro ESP32-S3
 
-ESP32-S3 port targeting the Adafruit Metro ESP32-S3 (#5500), currently verified on the N16R8 board variant: 16 MB flash and 8 MB embedded Octal PSRAM. The port runs an MMBasic stdio REPL over the ESP32-S3 native USB Serial/JTAG interface.
+ESP32-S3 port targeting the Adafruit Metro ESP32-S3 (#5500), currently verified on the N16R8 board variant: 16 MB flash and 8 MB embedded Octal PSRAM. PSRAM is enabled through ESP-IDF as caps-only external RAM for explicit port allocations; it is not part of MMBasic `AllMemory`. The port runs an MMBasic stdio REPL over the ESP32-S3 native USB Serial/JTAG interface.
 
 Plan: [docs/real-hal/esp32-s3-port.md](../../docs/real-hal/esp32-s3-port.md). Session log: [docs/real-hal/esp32-s3-port-log.md](../../docs/real-hal/esp32-s3-port-log.md).
 
@@ -81,20 +81,25 @@ Working on hardware:
 - `OPTION` persistence is backed by ESP-IDF NVS and has been hardware-smoked across reset/reflash.
 - Default terminal colours survive errors and prompt recovery through shared MMBasic colour-state restoration.
 - `FLASH SAVE 1`, reset, `FLASH LOAD 1`, `RUN` works on the dedicated `mmslots` partition.
+- 48 KB WiFi-enabled MMBasic heap. ESP32 bytecode compiler scratch tables use ESP-IDF internal heap; VM runtime allocations still use the 48 KB MMBasic heap.
+- ESP-IDF detects the onboard Octal PSRAM. `MM.INFO(PSRAM SIZE)` intentionally remains 0 and `MM.INFO(HEAP)` stays internal-only; ESP32-specific `MM.INFO(ESP32 PSRAM SIZE/FREE/LARGEST)` reports heap_caps-visible SPIRAM without enabling generic BASIC PSRAM allocation.
 - `WEB CONNECT`, `WEB SCAN`, TCP server, TCP client request/stream, UDP send/receive, NTP, and plain-TCP MQTT are hardware-smoked.
 - Bundled WEB demos seeded to A: include the small server demo and the multi-file website demo.
+- `porttools/esp32_fs_vm_smoke.py` default smoke, opt-in flash/VAR persistence, and network conformance have passed on hardware.
 
 Still stubbed or incomplete:
 
 - BASIC-visible GPIO DOUT/DIN/ARAW is hardware-smoked. PWM/servo are still explicit unsupported paths.
 - MQTT TLS/cert handling is not implemented; current MQTT support is plain TCP.
-- Display, keyboard, audio, BLE/Bluetooth, OTA, and PSRAM-backed heap/display work are deferred.
+- Display, keyboard, audio, BLE/Bluetooth, OTA, and PSRAM-backed BASIC heap/display work are deferred.
 
 ## Port Tools
 
 Host-side smoke tooling lives in [`../../porttools`](../../porttools/README.md).
 Use `basic_serial.py` for prompt-driven command checks and
-`esp32_tcp_smoke.py` for the Mac-side TCP client request/stream smoke.
+`esp32_fs_vm_smoke.py` for the Stage G0 device smoke suite. The network suite
+chains to `network_conformance.py`; `esp32_tcp_smoke.py` remains available for
+narrow TCP client request/stream debugging.
 
 Known-good quick checks:
 
@@ -108,6 +113,11 @@ python3.11 ../../porttools/basic_serial.py \
 python3.11 ../../porttools/esp32_tcp_smoke.py \
   --port /dev/cu.usbmodem101 \
   --host 192.168.4.23
+
+python3.11 ../../porttools/esp32_fs_vm_smoke.py psram \
+  --port /dev/cu.usbmodem2101 \
+  --timeout 12 \
+  --long-timeout 120
 ```
 
 ## Build Shape
@@ -117,5 +127,5 @@ The ESP32 port owns its runtime/peripheral surface in `main/esp32_*.c` and `main
 Known remaining cleanup:
 
 - BASIC-visible GPIO uses ESP32-owned `vm_sys_pin_esp32.c` plus the Metro pin table. LEDC-backed PWM/servo remains future work.
-- Legacy Pico SDK `hardware/*` compatibility headers still come from `ports/host_native/`.
-- The build still defines `MMBASIC_HOST` as a temporary compile-mode compatibility tag.
+- Legacy Pico SDK `hardware/*` compatibility headers come from neutral `ports/pico_sdk_compat/`.
+- The build defines `MMBASIC_ESP32` only; the temporary `MMBASIC_HOST` compile-mode tag has been removed.

@@ -1,4 +1,4 @@
-/* Stub for host build */
+/* Legacy Pico SDK compatibility shim. */
 #ifndef _HARDWARE_CLOCKS_H
 #define _HARDWARE_CLOCKS_H
 #define clk_sys 0

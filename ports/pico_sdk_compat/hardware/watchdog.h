@@ -1,4 +1,4 @@
-/* Stub for host build */
+/* Legacy Pico SDK compatibility shim. */
 #ifndef _HARDWARE_WATCHDOG_H
 #define _HARDWARE_WATCHDOG_H
 static inline void watchdog_update(void) {}

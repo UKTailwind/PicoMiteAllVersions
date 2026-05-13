@@ -1,4 +1,4 @@
-/* Host stub for hardware/regs/addressmap.h.
+/* Legacy Pico SDK compatibility shim for hardware/regs/addressmap.h.
  *
  * The native/WASM host has no XIP — flash is simulated in a RAM buffer
  * at its real heap address — so XIP-relative pointer arithmetic in core

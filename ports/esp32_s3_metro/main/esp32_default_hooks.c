@@ -88,7 +88,6 @@ void port_web_clear_runtime_state(void) {
         .close_tcp_client = esp32_tcp_client_close,
         .close_mqtt = closeMQTT,
         .close_tftp_session = esp32_tftp_close_session,
-        .close_telnet_session = esp32_telnet_close_session,
     };
     mm_net_lifecycle_runtime_reset(&hooks);
 }

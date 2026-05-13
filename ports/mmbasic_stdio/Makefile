@@ -9,6 +9,7 @@ CC = gcc
 PORT_DIR  := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 REPO_ROOT := $(abspath $(PORT_DIR)/../..)
 SIM_VM_DIR := $(REPO_ROOT)/ports/vm_sys_sim
+PICO_COMPAT_DIR := $(REPO_ROOT)/ports/pico_sdk_compat
 BUILD_DIR := $(PORT_DIR)/build
 
 # Mirror host_native's DEVICE_SIM knob so array sizes / heap budget
@@ -28,7 +29,7 @@ CFLAGS = -std=gnu11 -g -Os -flto -Wall -Wno-unused-variable -Wno-unused-function
          -ffunction-sections -fdata-sections \
          -DMMBASIC_HOST -DMMBASIC_STDIO -DFF_MAX_LFN_LARGE $(SIM_FLAGS) \
          -include host_platform.h \
-         -I$(PORT_DIR) -I$(REPO_ROOT)/ports/host_native -I$(REPO_ROOT) \
+         -I$(PORT_DIR) -I$(REPO_ROOT)/ports/host_native -I$(PICO_COMPAT_DIR) -I$(REPO_ROOT) \
          -MMD -MP
 
 # Dead-code stripping: macOS ld uses -dead_strip; GNU ld uses --gc-sections.

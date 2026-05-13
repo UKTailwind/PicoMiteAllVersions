@@ -12,6 +12,7 @@ CC = gcc
 PORT_DIR  := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 REPO_ROOT := $(abspath $(PORT_DIR)/../..)
 HOST_DIR  := $(REPO_ROOT)/ports/host_native
+PICO_COMPAT_DIR := $(REPO_ROOT)/ports/pico_sdk_compat
 SIM_VM_DIR := $(REPO_ROOT)/ports/vm_sys_sim
 BUILD_DIR := $(PORT_DIR)/build
 
@@ -29,7 +30,7 @@ CFLAGS = -std=gnu11 -g -O2 -Wall -Wno-unused-variable -Wno-unused-function \
          -Wno-missing-braces -funsigned-char \
          -DMMBASIC_HOST -DMMBASIC_ANSI -DFF_MAX_LFN_LARGE $(SIM_FLAGS) \
          -include host_platform.h \
-         -I$(PORT_DIR) -I$(HOST_DIR) -I$(REPO_ROOT) \
+         -I$(PORT_DIR) -I$(HOST_DIR) -I$(PICO_COMPAT_DIR) -I$(REPO_ROOT) \
          -MMD -MP
 
 LDFLAGS = -lm -lpthread

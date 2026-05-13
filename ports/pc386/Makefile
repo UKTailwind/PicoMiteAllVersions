@@ -11,6 +11,7 @@
 
 PORT_DIR  := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 REPO_ROOT := $(abspath $(PORT_DIR)/../..)
+PICO_COMPAT_DIR := $(REPO_ROOT)/ports/pico_sdk_compat
 BUILD_DIR := $(PORT_DIR)/build
 PC386_AUDIO ?= sb16
 
@@ -39,7 +40,7 @@ CFLAGS = -std=gnu11 -ffreestanding -O2 -g \
          -DFF_VOLUMES=3 -DFF_STR_VOLUME_ID=1 -DFF_VOLUME_STRS='"A","B","C"' \
          -include pc386_platform.h \
          -I$(PORT_DIR)/include_shim -I$(PORT_DIR) \
-         -I$(REPO_ROOT)/ports/host_native -I$(REPO_ROOT) \
+         -I$(REPO_ROOT)/ports/host_native -I$(PICO_COMPAT_DIR) -I$(REPO_ROOT) \
          -MMD -MP
 
 # Assembly: drop -include (assembler can't parse C typedefs) and the

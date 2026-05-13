@@ -14,7 +14,9 @@
  * to provide during early bring-up.
  */
 
+#include <limits.h>
 #include <setjmp.h>
+#include "esp_heap_caps.h"
 #include "esp_mac.h"
 #include "esp_private/esp_clk.h"
 #include "esp_system.h"
@@ -27,6 +29,7 @@
 #include "runtime/runtime.h"
 #include "vm_sys_pin.h"
 #include "hal/hal_time.h"
+#include "esp32_psram.h"
 
 /* esp32_parse_pin_arg — converts a "GPn" textual pin argument (or raw pin
  * number) to the VM's internal pin index. Used by cmd_setpin / fun_pin. */
@@ -164,12 +167,14 @@ void cmd_library(void) {}
 
 void cmd_load_post_cleanup(void)
 {
-    /* LOAD tokenises each line of the loaded file into tknbuf, clobbering
-     * the tknbuf that ExecuteProgram is currently iterating over. Bounce
-     * back to the prompt so the iterator never resumes from corrupted
-     * bytes. Also zero inpbuf because tokenisation wrote each loaded line
-     * through it, and the prompt loop's next EditInputLine would otherwise
-     * echo the tail of the last line as if the user had typed it. */
+    /* ESP32's source loader tokenises through the shared tknbuf, so a
+     * plain LOAD cannot safely resume the immediate command buffer after
+     * FileLoadProgram returns. Autorun has already redirected nextstmt to
+     * ProgMemory; let that path fall through so LOAD "file",R starts the
+     * freshly loaded program. */
+    extern unsigned char *nextstmt;
+    extern unsigned char *ProgMemory;
+    if (nextstmt == ProgMemory) return;
     extern unsigned char inpbuf[];
     extern jmp_buf mark;
     mmbasic_runtime_post_load_longjmp(inpbuf, STRINGSIZE, mark);
@@ -412,6 +417,9 @@ void fun_info(void) {
     extern const uint8_t *flash_target_contents;
     extern lfs_t lfs;
     extern struct lfs_config pico_lfs_cfg;
+    extern int ExistsFile(char *p);
+    extern int ExistsDir(char *p, char *q, int *filesystem);
+    extern int FileSize(char *p);
     extern int esp32_wifi_mminfo(unsigned char *ep, int64_t *out_iret,
                                  unsigned char *out_sret, int *out_targ);
     unsigned char *tp;
@@ -448,7 +456,31 @@ void fun_info(void) {
         return;
     }
     if (checkstring(ep, (unsigned char *)"HEAP")) {
-        iret = esp_get_free_heap_size(); targ = T_INT; return;
+        iret = heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+        targ = T_INT;
+        return;
+    }
+    if (checkstring(ep, (unsigned char *)"PSRAM SIZE")) {
+        iret = PSRAMsize; targ = T_INT; return;
+    }
+    if (checkstring(ep, (unsigned char *)"ESP32 PSRAM SIZE")) {
+        iret = esp32_psram_detected_bytes(); targ = T_INT; return;
+    }
+    if (checkstring(ep, (unsigned char *)"ESP32 PSRAM FREE")) {
+        iret = esp32_psram_free_bytes(); targ = T_INT; return;
+    }
+    if (checkstring(ep, (unsigned char *)"ESP32 PSRAM LARGEST")) {
+        iret = esp32_psram_largest_block_bytes(); targ = T_INT; return;
+    }
+    if ((tp = checkstring(ep, (unsigned char *)"ESP32 PSRAM MARCH"))) {
+        int64_t requested = getinteger(tp);
+        if (requested < 4 || requested > INT32_MAX) error("Invalid PSRAM smoke size");
+        esp32_psram_smoke_result_t result;
+        if (esp32_psram_smoke_march((size_t)requested, &result) != 0) {
+            error("ESP32 PSRAM smoke failed at $",
+                  (char *)(result.failed_phase ? result.failed_phase : "unknown"));
+        }
+        iret = (int64_t)result.allocated_bytes; targ = T_INT; return;
     }
     if (checkstring(ep, (unsigned char *)"STACK")) {
         iret = (int64_t)uxTaskGetStackHighWaterMark(NULL) * sizeof(StackType_t);
@@ -463,6 +495,26 @@ void fun_info(void) {
         if (used < 0) used = 0;
         iret = ((int64_t)pico_lfs_cfg.block_count - used) * pico_lfs_cfg.block_size;
         if (iret < 0) iret = 0;
+        targ = T_INT;
+        return;
+    }
+    if ((tp = checkstring(ep, (unsigned char *)"EXISTS FILE"))) {
+        char *p = (char *)getFstring(tp);
+        iret = ExistsFile(p);
+        targ = T_INT;
+        return;
+    }
+    if ((tp = checkstring(ep, (unsigned char *)"EXISTS DIR"))) {
+        char dir[FF_MAX_LFN] = {0};
+        char *p = (char *)getFstring(tp);
+        int filesystem = 0;
+        iret = ExistsDir(p, dir, &filesystem);
+        targ = T_INT;
+        return;
+    }
+    if ((tp = checkstring(ep, (unsigned char *)"FILESIZE"))) {
+        char *p = (char *)getFstring(tp);
+        iret = FileSize(p);
         targ = T_INT;
         return;
     }

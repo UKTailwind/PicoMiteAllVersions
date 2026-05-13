@@ -1,10 +1,10 @@
 # ESP32-S3 Metro main component.
 #
 # All MMBasic source files compile with esp32_platform.h force-included
-# (-include) so MMBASIC_HOST + MMBASIC_ESP32 are set everywhere uniformly.
+# (-include) so MMBASIC_ESP32 and port feature macros are set uniformly.
 #
-# Remaining Pico SDK compatibility headers are legacy hardware/* shims
-# from ports/host_native. Core/shared code no longer needs pico/stdlib.h.
+# Remaining Pico SDK compatibility headers are neutral hardware/* shims.
+# Core/shared code no longer needs pico/stdlib.h.
 
 set(REPO_ROOT  ${CMAKE_CURRENT_LIST_DIR}/../../..)
 set(PORT_DIR   ${CMAKE_CURRENT_LIST_DIR}/..)
@@ -95,7 +95,6 @@ set(DRIVER_STUBS
 set(BC_SRCS
     ${REPO_ROOT}/lfs.c                      # vendored LittleFS used by A: drive
     ${REPO_ROOT}/lfs_util.c
-    ${REPO_ROOT}/bc_alloc.c
     ${REPO_ROOT}/bc_bridge.c
     ${REPO_ROOT}/bc_source.c
     ${REPO_ROOT}/bc_compiler_core.c
@@ -108,6 +107,7 @@ set(BC_SRCS
     ${REPO_ROOT}/vm_sys_input.c
     ${REPO_ROOT}/vm_sys_graphics.c
     ${REPO_ROOT}/vm_sys_time.c
+    esp32_bc_alloc.c                        # VM runtime on MMBasic heap; compiler scratch on ESP-IDF internal heap
     vm_sys_pin_esp32.c
     ${REPO_ROOT}/vm_sys_file.c
 )
@@ -123,6 +123,7 @@ set(PORT_LOCAL_SRCS
     esp32_lfs.c                             # LittleFS over esp_partition_* (A: drive)
     esp32_flash_storage.c                   # flash_target_* / flash_option_* / flash_range_* / esp32_options_snapshot
     esp32_compat.c                          # small porting bits
+    esp32_psram.c                           # ESP-IDF PSRAM reporting and opt-in march smoke
     hal_pin_esp32.c                         # real GPIO/ADC over driver/gpio.h + esp_adc
     esp32_pin_tables.c                      # Metro GPIO map + GPn codemap
     hal_ws2812_esp32.c                      # WS2812/SK6812 over ESP32 RMT
@@ -132,7 +133,7 @@ set(PORT_LOCAL_SRCS
     hal_random_esp32.c
     hal_net_esp32.c                         # ESP-IDF socket transport HAL
     ../../../hal/generic/hal_watchdog_noop.c
-    hal_flash_esp32.c                         # NVS-backed Options; slot persistence still Stage E1
+    hal_flash_esp32.c                         # NVS-backed Options plus mmslots-backed program/slot persistence
     hal_storage_esp32_stub.c
     ${REPO_ROOT}/ports/pico_sdk_common/hal_filesystem_pico.c  # shared A:/B: LFS/FatFS dispatcher
     esp32_sd_diskio.c                       # Metro microSD SDSPI diskio backend for B:
@@ -154,9 +155,8 @@ set(PORT_LOCAL_SRCS
     esp32_udp.c                             # ESP32 UDP service and WEB UDP adapter
 )
 
-# host_native runtime/peripheral sources are no longer in the link. The
-# remaining reference to ports/host_native is legacy hardware/* header
-# shim reuse.
+# host_native runtime/peripheral sources are no longer in the link, and ESP32
+# uses neutral legacy Pico SDK header shims.
 
 idf_component_register(
     SRCS
@@ -187,7 +187,7 @@ idf_component_register(
         "."
         ${PORT_DIR}
         ${REPO_ROOT}
-        ${REPO_ROOT}/ports/host_native      # legacy hardware/* Pico SDK header shims
+        ${REPO_ROOT}/ports/pico_sdk_compat # legacy hardware/* Pico SDK header shims
     REQUIRES
         driver
         esp_adc
@@ -230,7 +230,6 @@ target_compile_options(${COMPONENT_LIB} PRIVATE
 )
 
 target_compile_definitions(${COMPONENT_LIB} PUBLIC
-    MMBASIC_HOST
     MMBASIC_ESP32
     FF_MAX_LFN_LARGE
     BC_SIM_RP2040

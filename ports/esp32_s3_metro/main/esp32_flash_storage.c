@@ -202,6 +202,14 @@ int ExistsFile(char *p) {
     return (info.type == LFS_TYPE_REG) ? 1 : 0;
 }
 
+int FileSize(char *p) {
+    if (!p || !*p || esp32_lfs_mount() != 0) return 0;
+    if (p[0] && p[1] == ':') p += 2;
+    struct lfs_info info;
+    if (lfs_stat(&lfs, p, &info) < 0) return 0;
+    return (info.type == LFS_TYPE_REG) ? (int)info.size : 0;
+}
+
 int ExistsDir(char *p, char *q, int *filesystem) {
     if (filesystem) *filesystem = 0;   /* A: */
     if (!p || esp32_lfs_mount() != 0) return 0;

@@ -162,7 +162,8 @@ void routinechecks(void) {
 
 void port_bc_runtime_free_source(const char **source) {
     if (source && *source) {
-        BC_FREE((void *)*source);
+        if (bc_compile_owns(*source)) BC_COMPILER_FREE((void *)*source);
+        else BC_FREE((void *)*source);
         *source = NULL;
     }
 }

@@ -19,6 +19,7 @@ EMCC ?= emcc
 PORT_DIR   := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 REPO_ROOT  := $(abspath $(PORT_DIR)/../..)
 NATIVE_DIR := $(REPO_ROOT)/ports/host_native
+PICO_COMPAT_DIR := $(REPO_ROOT)/ports/pico_sdk_compat
 SIM_VM_DIR := $(REPO_ROOT)/ports/vm_sys_sim
 WASM_DIR   := $(PORT_DIR)
 BUILD_DIR  := $(WASM_DIR)/wasm_obj
@@ -39,7 +40,7 @@ CFLAGS = -O2 -std=gnu11 -funsigned-char \
          -Wno-missing-braces \
          -DMMBASIC_HOST -DMMBASIC_WASM -DFF_MAX_LFN_LARGE $(SIM_FLAGS) \
          -include host_platform.h \
-         -I$(WASM_DIR) -I$(NATIVE_DIR) -I$(REPO_ROOT) \
+         -I$(WASM_DIR) -I$(NATIVE_DIR) -I$(PICO_COMPAT_DIR) -I$(REPO_ROOT) \
          -MMD -MP \
          -pthread
 # `-pthread` here makes the wasm module's linear memory a

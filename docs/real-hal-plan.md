@@ -91,6 +91,7 @@ exit gate in practice.
 - [retrospective.md](real-hal/retrospective.md) — end-of-phase-5a course correction plus the 2026-04-22 audit finding that spawned the fixup plan.
 - [scoreboard.md](real-hal/scoreboard.md) — raw ifdef counts per file per phase, baseline + targets.
 - [esp32-s3-port.md](real-hal/esp32-s3-port.md) + [esp32-s3-port-log.md](real-hal/esp32-s3-port-log.md) — Adafruit Metro ESP32-S3 (#5500) port: rules + invariants, current state, Stage D/E/F work items.
+- [web-console-driver-plan.md](real-hal/web-console-driver-plan.md) — portable WiFi/browser video, keyboard, and sound backend using the native simulator's `FRMB`/`CMDS`/WebAudio model; ESP32-S3 is the first target.
 
 ## How to work a phase
 

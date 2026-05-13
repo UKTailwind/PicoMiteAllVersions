@@ -573,7 +573,7 @@ void bc_run_file(const char *filename) {
     int fnbr = 1;
     vm_sys_file_open(fname_buf, fnbr, VM_FILE_MODE_INPUT);
     int fsize = vm_sys_file_lof(fnbr);
-    char *source = (char *)bc_compile_alloc((size_t)fsize + 1);
+    char *source = (char *)BC_ALLOC((size_t)fsize + 1);
     if (!source) { vm_sys_file_close(fnbr); error("Not enough memory"); }
 
     char *p = source;

@@ -1,4 +1,4 @@
-/* Stub for host build */
+/* Legacy Pico SDK compatibility shim. */
 #ifndef _HARDWARE_DMA_H
 #define _HARDWARE_DMA_H
 #include <stdint.h>

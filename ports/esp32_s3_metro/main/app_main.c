@@ -18,6 +18,7 @@
 
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
+#include "esp32_psram.h"
 #include "runtime/runtime.h"
 
 extern jmp_buf mark;
@@ -68,6 +69,7 @@ void app_main(void) {
         vTaskDelay(pdMS_TO_TICKS(200));
     }
     printf("\n");
+    esp32_psram_print_boot_report();
 
     /* MMBasic boot. flash_prog_buf is sized MAX_PROG_SIZE + 4096 in
      * esp32_compat.c; the constructor 0xff-fills both the program region

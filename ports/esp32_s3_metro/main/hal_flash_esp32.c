@@ -1,10 +1,9 @@
 /*
  * hal_flash_esp32.c - ESP32-S3 hal_flash implementation.
  *
- * Stage E2 gives Options real NVS persistence. Numbered BASIC flash
- * slots are still Stage E1; erase/program keep routing through the
- * existing ESP32 flash_range_* shim so unsupported slot writes keep
- * failing loudly there.
+ * Options are persisted through ESP-IDF NVS. Program flash, saved
+ * variables, and numbered BASIC flash slots route through the ESP32
+ * flash_range_* adapter backed by the mmslots partition.
  */
 
 #include <errno.h>

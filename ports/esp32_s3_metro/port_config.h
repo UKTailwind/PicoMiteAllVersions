@@ -1,61 +1,118 @@
 /*
  * ports/esp32_s3_metro/port_config.h — port-config for the ESP32-S3 build.
  *
- * Inherits HAL_PORT_* defaults from ports/host_native/port_config.h via
- * a relative include (same pattern as ports/host_wasm/port_config.h),
- * then overrides what differs on Xtensa/ESP32.
- *
- * The IDF main component's CMakeLists.txt lists this directory before
- * ports/host_native on the include path, so this file wins resolution.
+ * Port-scoped compile-time constants. Every value is defined here rather
+ * than inherited from host_native, so ESP32's hardware shape is explicit.
  */
 
 #ifndef ESP32_S3_METRO_PORT_CONFIG_H
 #define ESP32_S3_METRO_PORT_CONFIG_H
 
-#include "../host_native/port_config.h"
+/* Sentinel for hal/hal_port_assert.h: every TU that uses HAL_PORT_HAS_* in
+ * a #if directive can include hal_port_assert.h to turn a missing
+ * port_config.h into a build error instead of a silent eval-to-zero. */
+#define HAL_PORT_CONFIG_INCLUDED 1
+
+/* Chip-level: ESP32-S3.  GPIO 0..48 exist on the chip.  The port does not
+ * expose RP2040-style PWM slices or PIO blocks; PWM/servo commands error
+ * explicitly until LEDC support is wired. */
+#define HAL_PORT_PWM_SLICE_COUNT         0
+#define HAL_PORT_GPIO_COUNT              49
+#define HAL_PORT_PIO_COUNT               0
+#define HAL_PORT_PULLDOWN_NEEDS_RESET    0
+
+/* ADC OPEN streaming is not wired on ESP32. BASIC SETPIN ...,ARAW uses the
+ * Metro pin table and hal_pin_esp32.c directly, so this remains zero. */
+#define HAL_PORT_ADC_CHANNEL_MAX         0
+#define HAL_PORT_BACKLIGHT_VIA_KEYPAD_I2C 0
+
+/* cmd_files flist[] cap. The ESP32 MMBasic heap is intentionally small
+ * while WiFi is enabled, so keep the conservative host-sized listing cap
+ * rather than the larger Pico device cap. */
+#define HAL_PORT_FILES_MAX               128
+
+/* Non-VGA serial REPL port. */
+#define HAL_PORT_IS_VGA                  0
+#define HAL_PORT_HAS_HDMI                0
+#define HAL_PORT_HAS_NEXTGEN_DISPLAY    0
+
+/* ESP32 has a native ESP-IDF network implementation selected by its
+ * port-local WEB commands and HAL sources. This macro gates the legacy
+ * Pico WEB compile path, so it stays disabled here. */
+#define HAL_PORT_HAS_WIFI                0
+#define HAL_PORT_HAS_GUICONTROLS         0
+#define HAL_PORT_KEYBOARD_USB_HOST        0
+#define HAL_PORT_HAS_I2C_KEYPAD          0
+
+/* I2C and audio constants are compile-time defaults for shared code paths.
+ * The current ESP32 stdio scope links stubs for these feature areas. */
+#define HAL_PORT_I2C_TIMEOUT_MS          5
+#define HAL_PORT_I2C_SLOW_HZ             100000
+#define HAL_PORT_AUDIO_FLAC_MAX_BASE_HZ  44100
+#define HAL_PORT_AUDIO_MOD_BUFFER_SIZE   6144
+#define HAL_PORT_HAS_MP3                 0
+
+#define HAL_PORT_RAM_FUNC(name)          name
+#define HAL_PORT_MMBASIC_HOT_FUNC(name)    name
+#define HAL_PORT_MMBASIC_SUBFUN_FUNC(name) name
+
+#define HAL_PORT_FRAMEBUFFER_TRAILER_BYTES 0
+#define HAL_PORT_ALLMEMORY_ALIGN           256
+
+#define HAL_PORT_DEVICE_NAME             "MMBasic ESP32-S3"
+
+/* Ports without SPI LCD still need this as a compile-time expression for
+ * shared display code that is linked with stubs. */
+#define HAL_PORT_LCD_SPI_CLK_PIN         Option.SYSTEM_CLK
+
+/* Serial console medium font. Value is a symbol name, resolved in Draw.c. */
+#define HAL_PORT_CONSOLE_FONT_MEDIUM Hom_16x24_LE
+
+/* Preserve current ESP32 behaviour: RANDOMIZE with no seed uses the same
+ * deterministic seed the port had before this config was made explicit. */
+#define HAL_PORT_RANDOMIZE_DEFAULT_SEED() ((int64_t)42)
 
 /* Banner identifies the port to anyone connected to the USB Serial/JTAG
- * console. Override host_native's "MMBasic Anywhere (host)". */
-#undef  MMBASIC_BANNER_NAME
+ * console. */
 #define MMBASIC_BANNER_NAME "MMBasic Anywhere (esp32-s3)"
 
-#undef  MMBASIC_BANNER_TRAILER
 #define MMBASIC_BANNER_TRAILER "ESP32-S3 REPL.\r\n\r\n"
 
-/* 48 KB MMBasic heap while WiFi is enabled. ESP32-S3 has 512 KB internal SRAM split across
- * dram0_0_seg / dram0_1_seg / etc.; AllMemory has to land in a single
- * contiguous segment, so dram0_0_seg (which holds .bss for this
- * component) is the limiting resource. WiFi consumes enough internal
- * DRAM that the original 104 KB stdio heap no longer links. The board
- * has PSRAM; moving AllMemory there is the right follow-up once PSRAM
- * is part of the ESP32 port contract. */
-#undef  HAL_PORT_HEAP_MEMORY_SIZE
+/* 48 KB MMBasic heap while WiFi is enabled. ESP32-S3 has 512 KB internal
+ * SRAM split across dram0_0_seg / dram0_1_seg / etc.; AllMemory has to
+ * land in a single contiguous segment, so dram0_0_seg (which holds .bss
+ * for this component) is the limiting resource. WiFi consumes enough
+ * internal DRAM that the old larger stdio heap no longer links.
+ * ESP32 bytecode compiler scratch tables allocate from ESP-IDF internal
+ * heap, but VM runtime allocations still come from this MMBasic heap.
+ * The board has ESP-IDF-managed Octal PSRAM available to explicit
+ * heap_caps users only. Do not route AllMemory there implicitly. */
 #define HAL_PORT_HEAP_MEMORY_SIZE (48 * 1024)
 
-/* ESP32-S3 has 49 GPIOs (0–48). Host inherits 44 (RP2040 pin count);
- * left unchanged, PIN(48) reads/writes go out of bounds on
- * PinDef[NBRPINS+1] and friends. */
-#undef  HAL_PORT_NBR_PINS
+/* Stage-D per-port memory + clock + MMBasic-table values. The flash
+ * offsets remain the legacy 1 MB values because FileIO.c still computes
+ * absolute offsets; esp32_flash_storage.c translates them to the mmslots
+ * partition at the port boundary. */
+#define HAL_PORT_MAX_CPU                 420000
+#define HAL_PORT_MIN_CPU                 48000
+#define HAL_PORT_MAX_VARS                512
+#define HAL_PORT_MAX_SUBFUN              256
+#define HAL_PORT_FLASH_TARGET_OFFSET     (1024 * 1024)
+#define HAL_PORT_FLASH_TARGET_OFFSET_USB (1024 * 1024)
+#define HAL_PORT_MAGIC_KEY               0xE1799B93
+#define HAL_PORT_MAGIC_KEY_USB           0xE1799B93
+#define HAL_PORT_HEAP_TOP                0
+#define HAL_PORT_HEAP_TOP_USB            0
+#define HAL_PORT_CONSOLE_RX_BUF_SIZE     256
+#define HAL_PORT_PIOMAX                  0
 #define HAL_PORT_NBR_PINS                49
 
-/* Inert here (no one dereferences these on ESP32; they're for RP2040's
- * boot stage 2 + program flash split + heap-top mmap address). Real
- * device-shape replacements land in Stage E1 (esp_partition_*). Zero
- * these out so any new caller that does try to use them faults loudly
- * instead of silently reading RP2040 numbers. */
-#undef  HAL_PORT_HEAP_TOP
-#define HAL_PORT_HEAP_TOP                0
-#undef  HAL_PORT_HEAP_TOP_USB
-#define HAL_PORT_HEAP_TOP_USB            0
+/* ESP32 has no RP2040 PIO blocks. */
+#define HAL_PORT_PIO0_CLAIMED            false
+#define HAL_PORT_PIO1_CLAIMED            false
+#define HAL_PORT_PIO2_CLAIMED            false
 
-/* HAL_PORT_FLASH_TARGET_OFFSET / *_USB stay at host-inherited values
- * for now because FileIO.c still computes legacy absolute flash offsets.
- * esp32_flash_storage.c translates those offsets to the `mmslots`
- * esp_partition at the port boundary. */
-
-/* HAL_PORT_PWM_SLICE_COUNT / HAL_PORT_PIO_COUNT keep their RP2040
- * numbers from host_native. Inert until a real PWM (LEDC-backed) or
- * PIO equivalent (RMT? probably not — leave as 0 if a port ever needs
- * one) lands. */
+/* BCCrashInfo storage placement. ESP32 currently uses regular BSS. */
+#define HAL_PORT_BC_CRASH_INFO_ATTR
 
 #endif /* ESP32_S3_METRO_PORT_CONFIG_H */

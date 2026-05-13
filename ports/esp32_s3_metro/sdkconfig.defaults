@@ -1,7 +1,7 @@
 # MMBasic Anywhere — Metro ESP32-S3 sdkconfig defaults
 #
-# Phase A scope: console + PSRAM + watchdog. Phase B will add file
-# system / MMBasic-specific knobs.
+# ESP32-S3 Metro port defaults: USB console, flash/PSRAM, watchdog,
+# WiFi, cores, and filesystem.
 
 # --- Console ----------------------------------------------------------------
 # Use the chip's built-in USB Serial/JTAG controller for stdio. Same USB-C
@@ -14,8 +14,17 @@ CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
 CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
 CONFIG_ESPTOOLPY_FLASHSIZE="16MB"
 
-# 512 KB internal SRAM is plenty — RP2040 runs PicoMite in 264 KB.
-# PSRAM stays disabled until something genuinely demands it.
+# The N16R8 board uses 8 MB Octal PSRAM. Enable it through ESP-IDF and
+# keep it caps-only: port code may opt in with heap_caps_malloc(...,
+# MALLOC_CAP_SPIRAM), but malloc()/AllMemory/PSRAMsize do not use it.
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_OCT=y
+CONFIG_SPIRAM_TYPE_AUTO=y
+CONFIG_SPIRAM_SPEED_80M=y
+CONFIG_SPIRAM_BOOT_INIT=y
+CONFIG_SPIRAM_USE_CAPS_ALLOC=y
+# CONFIG_SPIRAM_USE_MALLOC is not set
+CONFIG_SPIRAM_MEMTEST=y
 
 # --- Stack ------------------------------------------------------------------
 # 24 KB main task stack. Phase A doesn't need this much, but Phase B

@@ -1,4 +1,4 @@
-/* Stub for host build */
+/* Legacy Pico SDK compatibility shim. */
 #ifndef _HARDWARE_ADC_H
 #define _HARDWARE_ADC_H
 static inline void adc_init(void) {}

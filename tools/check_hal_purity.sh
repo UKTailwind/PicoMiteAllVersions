@@ -147,13 +147,12 @@ shopt -u nullglob
 
 # ESP32 port scope: the port may reference its own MMBASIC_ESP32 identity
 # macro, but must not grow target-macro gates for other ports or inherit
-# host_native runtime/peripheral sources again. The two host_native VM shims
-# and the legacy hardware/* header-shim include path are temporarily allowed
-# until docs/real-hal/esp32-s3-port.md Stage D step G relocates them.
+# host_native runtime/peripheral sources or header paths again.
 shopt -s nullglob
 ESP32_MAIN_C_FILES=(ports/esp32_s3_metro/main/*.c)
 shopt -u nullglob
 ESP32_CMAKE=ports/esp32_s3_metro/main/CMakeLists.txt
+ESP32_PLATFORM=ports/esp32_s3_metro/main/esp32_platform.h
 
 # Files tracked informationally (report counts, do not fail).
 INFO_FILES=(
@@ -280,11 +279,23 @@ check_esp32_no_host_native_reuse() {
   local hits
   hits="$(grep -n 'ports/host_native' "$file" \
     | grep -vE '^[0-9]+:[[:space:]]*#' \
-    | grep -vE 'legacy hardware/\* header|legacy hardware/\* Pico SDK header shims' \
     || true)"
   if [[ -n "$hits" ]]; then
-    echo "HAL-PURITY FAIL: $file references host_native outside the ESP32 allowlist"
-    echo "    (allowed for now: legacy hardware/* header shims)"
+    echo "HAL-PURITY FAIL: $file references host_native in the ESP32 component"
+    echo "    (no host_native sources or include paths are allowed)"
+    echo "$hits" | sed 's/^/    /'
+    fail=1
+  fi
+}
+
+check_esp32_no_host_identity() {
+  local file="$1"
+  [[ -f "$file" ]] || return 0
+  local hits
+  hits="$(grep -nE '(^[[:space:]]*#define[[:space:]]+MMBASIC_HOST\b|(^|[[:space:]])-DMMBASIC_HOST\b|^[[:space:]]*MMBASIC_HOST[[:space:]]*$)' "$file" || true)"
+  if [[ -n "$hits" ]]; then
+    echo "HAL-PURITY FAIL: $file defines MMBASIC_HOST for the ESP32 build"
+    echo "    (ESP32 must build as MMBASIC_ESP32 plus HAL/port feature macros)"
     echo "$hits" | sed 's/^/    /'
     fail=1
   fi
@@ -360,6 +371,8 @@ else
     check_file_strict "$f"
   done
   check_esp32_no_host_native_reuse "$ESP32_CMAKE"
+  check_esp32_no_host_identity "$ESP32_CMAKE"
+  check_esp32_no_host_identity "$ESP32_PLATFORM"
   if [[ $fail -eq $pre_fail ]]; then
     echo "    (all ESP32 port files clean)"
   fi

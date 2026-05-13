@@ -51,7 +51,6 @@ cc=${CC:-cc}
 "$cc" -std=gnu11 \
     -DMMBASIC_HOST -DFF_MAX_LFN_LARGE -DBC_SIM_RP2040 \
     -include "$root/ports/host_native/host_platform.h" \
-    -I"$root/ports/host_native" -I"$root" \
+    -I"$root/ports/host_native" -I"$root/ports/pico_sdk_compat" -I"$root" \
     "$src" -o "$bin"
 "$bin"
-

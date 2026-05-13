@@ -345,23 +345,103 @@ void SaveProgramToFlash(unsigned char *pm, int msg) {
     mmbasic_save_loaded_source((const char *)pm, MMBASIC_SOURCE_FLAGS_HOST_LOAD);
 }
 
-/* LFS stubs — FileIO.c references the full littlefs surface. On host
- * nothing actually stores to flash via LFS (BasicFileOpen routes through
- * POSIX / FatFS instead), but every reachable call site has to link. */
+/* LFS stubs. Most host file I/O routes through FatFS/POSIX, but CHAIN uses
+ * SaveContext/RestoreContext's `.vars` scratch file. Keep just that file in
+ * host memory so the shared interpreter path can run unchanged. */
+static unsigned char *host_lfs_vars;
+static lfs_size_t host_lfs_vars_size;
+static lfs_size_t host_lfs_vars_cap;
+
+static int host_lfs_is_vars_path(const char *path) {
+    return path && (strcmp(path, ".vars") == 0 || strcmp(path, "/.vars") == 0);
+}
+
+static int host_lfs_vars_grow(lfs_size_t need) {
+    if (need <= host_lfs_vars_cap) return 0;
+    lfs_size_t cap = host_lfs_vars_cap ? host_lfs_vars_cap : 4096;
+    while (cap < need) cap *= 2;
+    unsigned char *p = (unsigned char *)realloc(host_lfs_vars, cap);
+    if (!p) return LFS_ERR_NOMEM;
+    host_lfs_vars = p;
+    host_lfs_vars_cap = cap;
+    return 0;
+}
+
 int lfs_file_close(lfs_t *l, lfs_file_t *file) { (void)l; (void)file; return 0; }
-int lfs_file_open(lfs_t *l, lfs_file_t *file, const char *path, int flags) { (void)l; (void)file; (void)path; (void)flags; return -1; }
-lfs_ssize_t lfs_file_read(lfs_t *l, lfs_file_t *file, void *buf, lfs_size_t size) { (void)l; (void)file; (void)buf; (void)size; return 0; }
-lfs_soff_t lfs_file_seek(lfs_t *l, lfs_file_t *file, lfs_soff_t off, int whence) { (void)l; (void)file; (void)off; (void)whence; return 0; }
-lfs_ssize_t lfs_file_write(lfs_t *l, lfs_file_t *file, const void *buf, lfs_size_t size) { (void)l; (void)file; (void)buf; (void)size; return 0; }
+int lfs_file_open(lfs_t *l, lfs_file_t *file, const char *path, int flags) {
+    (void)l;
+    if (!host_lfs_is_vars_path(path)) return LFS_ERR_NOENT;
+    if (!host_lfs_vars && !(flags & LFS_O_CREAT)) return LFS_ERR_NOENT;
+    memset(file, 0, sizeof(*file));
+    file->type = LFS_TYPE_REG;
+    file->flags = (uint32_t)flags;
+    if ((flags & LFS_O_TRUNC) || ((flags & LFS_O_CREAT) && (flags & LFS_O_RDWR))) {
+        host_lfs_vars_size = 0;
+    }
+    file->pos = (flags & LFS_O_APPEND) ? host_lfs_vars_size : 0;
+    return 0;
+}
+lfs_ssize_t lfs_file_read(lfs_t *l, lfs_file_t *file, void *buf, lfs_size_t size) {
+    (void)l;
+    if (!file || file->type != LFS_TYPE_REG || !buf || !host_lfs_vars) return 0;
+    if (file->pos >= host_lfs_vars_size) return 0;
+    lfs_size_t avail = host_lfs_vars_size - file->pos;
+    if (size > avail) size = avail;
+    memcpy(buf, host_lfs_vars + file->pos, size);
+    file->pos += size;
+    return (lfs_ssize_t)size;
+}
+lfs_soff_t lfs_file_seek(lfs_t *l, lfs_file_t *file, lfs_soff_t off, int whence) {
+    (void)l;
+    if (!file || file->type != LFS_TYPE_REG) return LFS_ERR_BADF;
+    lfs_soff_t base = 0;
+    if (whence == LFS_SEEK_CUR) base = (lfs_soff_t)file->pos;
+    else if (whence == LFS_SEEK_END) base = (lfs_soff_t)host_lfs_vars_size;
+    lfs_soff_t next = base + off;
+    if (next < 0) return LFS_ERR_INVAL;
+    file->pos = (lfs_off_t)next;
+    return next;
+}
+lfs_ssize_t lfs_file_write(lfs_t *l, lfs_file_t *file, const void *buf, lfs_size_t size) {
+    (void)l;
+    if (!file || file->type != LFS_TYPE_REG || !buf) return 0;
+    lfs_size_t end = file->pos + size;
+    if (end < file->pos) return LFS_ERR_FBIG;
+    int err = host_lfs_vars_grow(end);
+    if (err) return err;
+    memcpy(host_lfs_vars + file->pos, buf, size);
+    file->pos = end;
+    if (host_lfs_vars_size < end) host_lfs_vars_size = end;
+    return (lfs_ssize_t)size;
+}
 lfs_ssize_t lfs_fs_size(lfs_t *l) { (void)l; return 0; }
-int lfs_remove(lfs_t *l, const char *path) { (void)l; (void)path; return 0; }
-int lfs_stat(lfs_t *l, const char *path, struct lfs_info *info) { (void)l; (void)path; (void)info; return -1; }
+int lfs_remove(lfs_t *l, const char *path) {
+    (void)l;
+    if (host_lfs_is_vars_path(path)) {
+        free(host_lfs_vars);
+        host_lfs_vars = NULL;
+        host_lfs_vars_size = 0;
+        host_lfs_vars_cap = 0;
+    }
+    return 0;
+}
+int lfs_stat(lfs_t *l, const char *path, struct lfs_info *info) {
+    (void)l;
+    if (!host_lfs_is_vars_path(path) || !host_lfs_vars) return LFS_ERR_NOENT;
+    if (info) {
+        memset(info, 0, sizeof(*info));
+        info->type = LFS_TYPE_REG;
+        info->size = host_lfs_vars_size;
+        strcpy(info->name, ".vars");
+    }
+    return 0;
+}
 int lfs_dir_open(lfs_t *l, lfs_dir_t *dir, const char *path) { (void)l; (void)dir; (void)path; return -1; }
 int lfs_dir_close(lfs_t *l, lfs_dir_t *dir) { (void)l; (void)dir; return 0; }
 int lfs_dir_read(lfs_t *l, lfs_dir_t *dir, struct lfs_info *info) { (void)l; (void)dir; (void)info; return 0; }
-int lfs_file_rewind(lfs_t *l, lfs_file_t *file) { (void)l; (void)file; return 0; }
+int lfs_file_rewind(lfs_t *l, lfs_file_t *file) { return (int)lfs_file_seek(l, file, 0, LFS_SEEK_SET); }
 int lfs_file_sync(lfs_t *l, lfs_file_t *file) { (void)l; (void)file; return 0; }
-lfs_soff_t lfs_file_tell(lfs_t *l, lfs_file_t *file) { (void)l; (void)file; return 0; }
+lfs_soff_t lfs_file_tell(lfs_t *l, lfs_file_t *file) { (void)l; return file ? (lfs_soff_t)file->pos : LFS_ERR_BADF; }
 int lfs_format(lfs_t *l, const struct lfs_config *cfg) { (void)l; (void)cfg; return 0; }
 int lfs_mount(lfs_t *l, const struct lfs_config *cfg) { (void)l; (void)cfg; return 0; }
 int lfs_unmount(lfs_t *l) { (void)l; return 0; }
@@ -372,9 +452,12 @@ int lfs_mkdir(lfs_t *l, const char *path) { (void)l; (void)path; return 0; }
 int lfs_rename(lfs_t *l, const char *oldpath, const char *newpath) { (void)l; (void)oldpath; (void)newpath; return 0; }
 
 /* lfs_file_size is only reached from the FLASHFILE branch in Editor.c, which
- * is unreachable on host (filesource[] is always FATFSFILE). Stubbed so the
- * link succeeds. */
-lfs_soff_t lfs_file_size(lfs_t *lfs, lfs_file_t *fp) { (void)lfs; (void)fp; return 0; }
+ * is unreachable on host (filesource[] is always FATFSFILE), and from the
+ * `.vars` context shim above. */
+lfs_soff_t lfs_file_size(lfs_t *lfs, lfs_file_t *fp) {
+    (void)lfs;
+    return (fp && fp->type == LFS_TYPE_REG) ? (lfs_soff_t)host_lfs_vars_size : 0;
+}
 
 /* =========================================================================
  * Flash layout externs referenced from FileIO.c.

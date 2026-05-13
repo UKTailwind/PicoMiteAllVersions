@@ -11,6 +11,7 @@ CC = gcc
 PORT_DIR  := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 REPO_ROOT := $(abspath $(PORT_DIR)/../..)
 SIM_VM_DIR := $(REPO_ROOT)/ports/vm_sys_sim
+PICO_COMPAT_DIR := $(REPO_ROOT)/ports/pico_sdk_compat
 BUILD_DIR := $(PORT_DIR)/build
 
 # Device memory simulation target. Controls compiler/VM array sizes
@@ -30,7 +31,7 @@ CFLAGS = -std=gnu11 -g -O0 -Wall -Wno-unused-variable -Wno-unused-function \
          -Wno-missing-braces -funsigned-char \
          -DMMBASIC_HOST -DFF_MAX_LFN_LARGE $(SIM_FLAGS) \
          -include host_platform.h \
-         -I$(PORT_DIR) -I$(REPO_ROOT) \
+         -I$(PORT_DIR) -I$(PICO_COMPAT_DIR) -I$(REPO_ROOT) \
          -MMD -MP
 
 LDFLAGS = -lm
@@ -130,7 +131,7 @@ $(NET_HAL_TEST): $(PORT_DIR)/hal_net_posix_test.c $(PORT_DIR)/hal_net_posix.c \
 	@mkdir -p $(dir $@)
 	$(CC) -std=gnu11 -g -O0 -Wall -Wno-unused-variable -Wno-unused-function \
 	      -Wno-unused-but-set-variable -Wno-misleading-indentation \
-	      -funsigned-char -DMMBASIC_HOST -I$(PORT_DIR) -I$(REPO_ROOT) \
+	      -funsigned-char -DMMBASIC_HOST -I$(PORT_DIR) -I$(PICO_COMPAT_DIR) -I$(REPO_ROOT) \
 	      -o $@ $(PORT_DIR)/hal_net_posix_test.c $(PORT_DIR)/hal_net_posix.c \
 	      $(REPO_ROOT)/shared/net/mm_net_http.c \
 	      $(REPO_ROOT)/shared/net/mm_net_http_file.c \

@@ -101,13 +101,15 @@ static watchdog_hw_t _watchdog_hw_store = {0};
 dma_hw_t      *dma_hw      = &_dma_hw_store;
 watchdog_hw_t *watchdog_hw = &_watchdog_hw_store;
 
-/* Total PSRAM bytes available. Stdio scope leaves PSRAM disabled (see
- * sdkconfig.defaults — Stage E3 in the plan); report 0 so MMBasic
- * doesn't advertise PSRAM-backed slots that wouldn't allocate. */
+/* ESP-IDF owns the Metro's Octal PSRAM and exposes it to this port through
+ * heap_caps_malloc(MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT). Keep MMBasic's
+ * generic PSRAMsize at 0 until an ESP32 allocator contract exists; otherwise
+ * Memory.c would route large BASIC allocations to the RP2350 PSRAM bitmap
+ * fallback, which has no ESP32 backing. */
 uint32_t PSRAMsize = 0;
 
 /* PSRAM Option-bit save/restore — used on Pico to preserve XIP cache
- * settings around flash erases. Stdio scope has no PSRAM and no flash
- * erase contention; no-ops. */
+ * settings around flash erases. ESP-IDF manages ESP32 PSRAM/cache/flash
+ * coordination, so these remain no-ops on this port. */
 void mmbasic_save_psram_settings(void)    {}
 void mmbasic_restore_psram_settings(void) {}

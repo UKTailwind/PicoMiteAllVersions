@@ -1,4 +1,4 @@
-/* Stub for host build */
+/* Legacy Pico SDK compatibility shim. */
 #ifndef _HARDWARE_PIO_INSTRUCTIONS_H
 #define _HARDWARE_PIO_INSTRUCTIONS_H
 #endif
