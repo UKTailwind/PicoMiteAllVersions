@@ -16,7 +16,8 @@
 # ports/esp32_s3_metro/main/demos/ — same hello/fizzbuzz/mand/sieve
 # corpus as the ESP32 port.
 #
-# Idempotent: re-running rebuilds the images from scratch.
+# Re-running refreshes the boot/helper images from scratch, but preserves an
+# existing C: data image by default. Set PC386_REBUILD_C=1 to recreate C:.
 
 set -euo pipefail
 
@@ -79,8 +80,8 @@ if [[ -z "$LIMINE_BIOS_SYS" ]]; then
     exit 1
 fi
 
-rm -rf "$DISK_DIR"
 mkdir -p "$DISK_DIR"
+rm -f "$A_IMG" "$F_IMG" "$DISK_DIR/.mtoolsrc" "$DISK_DIR/README.TXT" "$DISK_DIR/FLOPPY.TXT"
 
 # mtools needs a drive-letter configuration in MTOOLSRC for mpartition
 # to work; per-image config maps Z: -> a.img and Y: -> c.img using
@@ -127,28 +128,34 @@ mcopy "$DISK_DIR/README.TXT" z:/README.TXT
 limine bios-install "$A_IMG"
 
 # --- C: 32 MB FAT16 partitioned IDE image. ----------------------------------
-truncate -s 32M "$C_IMG"
-mpartition -I y:
-mpartition -c -b 63 y:
-mpartition -a y:
-mformat -h 16 -s 63 -t 65 -v "PCM_DATA" y:
-mmd   y:/BOOT
-mmd   y:/PROGRAMS
-mcopy "$KERNEL_BOOT"          y:/BOOT/MMBASIC.ELF
-mcopy "$PORT_DIR/limine.conf" y:/BOOT/LIMINE.CONF
-mcopy "$LIMINE_BIOS_SYS"      y:/BOOT/LIMINE-BIOS.SYS
-mcopy "$DEMOS_DIR/mand.bas"   y:/PROGRAMS/MAND.BAS
-mcopy "$DEMOS_DIR/sieve.bas"  y:/PROGRAMS/SIEVE.BAS
-if [[ -f "$REPO_ROOT/pico_blocks.bas" ]]; then
-    mcopy "$REPO_ROOT/pico_blocks.bas" y:/PICO_BLOCKS.BAS
+if [[ ! -f "$C_IMG" || "${PC386_REBUILD_C:-0}" == "1" ]]; then
+    rm -f "$C_IMG"
+    truncate -s 32M "$C_IMG"
+    mpartition -I y:
+    mpartition -c -b 63 y:
+    mpartition -a y:
+    mformat -h 16 -s 63 -t 65 -v "PCM_DATA" y:
+    mmd   y:/BOOT
+    mmd   y:/PROGRAMS
+    mcopy "$DEMOS_DIR/mand.bas"   y:/PROGRAMS/MAND.BAS
+    mcopy "$DEMOS_DIR/sieve.bas"  y:/PROGRAMS/SIEVE.BAS
+    if [[ -f "$REPO_ROOT/pico_blocks.bas" ]]; then
+        mcopy "$REPO_ROOT/pico_blocks.bas" y:/PICO_BLOCKS.BAS
+    fi
+    if [[ -f "$REPO_ROOT/demo_sound_sfx.bas" ]]; then
+        mcopy "$REPO_ROOT/demo_sound_sfx.bas" y:/SFX_DEMO.BAS
+    fi
+    if [[ -f "$PORT_DIR/demos/pcl_demo.bas" ]]; then
+        mcopy "$PORT_DIR/demos/pcl_demo.bas" y:/PCL_DEMO.BAS
+    fi
+    mcopy "$DISK_DIR/README.TXT"  y:/README.TXT
+else
+    echo "preserving existing C: image $C_IMG (set PC386_REBUILD_C=1 to recreate)"
+    mmd y:/BOOT 2>/dev/null || true
 fi
-if [[ -f "$REPO_ROOT/demo_sound_sfx.bas" ]]; then
-    mcopy "$REPO_ROOT/demo_sound_sfx.bas" y:/SFX_DEMO.BAS
-fi
-if [[ -f "$PORT_DIR/demos/pcl_demo.bas" ]]; then
-    mcopy "$PORT_DIR/demos/pcl_demo.bas" y:/PCL_DEMO.BAS
-fi
-mcopy "$DISK_DIR/README.TXT"  y:/README.TXT
+mcopy -o "$KERNEL_BOOT"          y:/BOOT/MMBASIC.ELF
+mcopy -o "$PORT_DIR/limine.conf" y:/BOOT/LIMINE.CONF
+mcopy -o "$LIMINE_BIOS_SYS"      y:/BOOT/LIMINE-BIOS.SYS
 limine bios-install "$C_IMG"
 
 # --- 1.44 MB FAT12 bootable superfloppy. ------------------------------------
