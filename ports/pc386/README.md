@@ -5,6 +5,26 @@ compatible. There is no DOS underneath: BIOS POST hands control to the pc386
 boot path, the kernel brings up PC hardware, and the user lands at the MMBasic
 prompt.
 
+The easiest way to try it is with QEMU. The normal build creates a bootable
+1.44 MB floppy image plus a persistent `C:` hard-disk image:
+
+```sh
+./toolchain/pc386/install_cross.sh
+./ports/pc386/build.sh
+./ports/pc386/build_disks.sh
+./ports/pc386/run.sh
+```
+
+At the MMBasic prompt, try:
+
+```basic
+FILES
+RUN "HELLO.BAS"
+C:
+FILES
+RUN "PROGRAMS/MAND.BAS"
+```
+
 The port is intentionally shaped like the MCU targets. Core MMBasic is linked
 with a pc386 port directory, HAL implementations, and PC-specific drivers for
 VGA/VBE graphics, PS/2 keyboard, COM1, ATA-PIO, 82077-compatible floppy,
@@ -47,6 +67,15 @@ existing `C:` image by default. To intentionally recreate `C:`:
 PC386_REBUILD_C=1 ./ports/pc386/build_disks.sh
 ```
 
+Build outputs:
+
+```text
+ports/pc386/build/mmbasic.elf
+ports/pc386/build/mmbasic-stripped.elf
+ports/pc386/test_disks/pc386-floppy.img
+ports/pc386/test_disks/c.img
+```
+
 ## Run
 
 Interactive QEMU, BIOS/floppy boot, VGA window, COM1 mirror:
@@ -76,6 +105,28 @@ The primary hard-disk image is:
 
 ```text
 ports/pc386/test_disks/c.img
+```
+
+`run.sh kernel` skips the BIOS/floppy boot path and loads the kernel directly
+with QEMU. Use it when debugging the kernel itself. The default `run.sh` path
+is the user-facing path because it exercises the same boot floppy image that CI
+builds.
+
+## Audio
+
+The default build uses the Sound Blaster 16 HAL. QEMU starts with both SB16 and
+PC speaker devices when `PC386_AUDIO=auto`:
+
+```sh
+./ports/pc386/run.sh
+```
+
+To build and run the PC speaker fallback:
+
+```sh
+PC386_AUDIO=pcspk ./ports/pc386/build.sh
+./ports/pc386/build_disks.sh
+PC386_AUDIO=pcspk ./ports/pc386/run.sh
 ```
 
 ## Test
