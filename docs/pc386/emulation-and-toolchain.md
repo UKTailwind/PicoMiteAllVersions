@@ -47,19 +47,25 @@ qemu-system-i386 \
   -d guest_errors
 ```
 
-- `-kernel` — load multiboot2 ELF directly at boot.
+- `-kernel` — load the multiboot1 ELF directly at boot.
 - `-serial stdio` — pipe COM1 to the terminal. Kernel `printf` over serial appears here.
 - `-display none` — headless. For visual runs, drop this flag.
 - `-no-reboot -no-shutdown` — triple-faults exit QEMU instead of looping.
 - `-d guest_errors` — log CPU exceptions to stderr.
 
-### ISO boot (bootloader path testing)
+### Hard-disk Limine boot
 
-Tests the actual production boot path through Limine:
+Tests the Limine-installed `C:` hard-disk image:
 
 ```sh
-qemu-system-i386 -cdrom build/mmbasic.iso -serial stdio
+./ports/pc386/build.sh
+./ports/pc386/build_disks.sh
+./ports/pc386/run_limine.sh
 ```
+
+The normal interactive path is the boot floppy (`run.sh` / `run_floppy.sh`),
+which exercises BIOS floppy boot plus runtime FDC access. The Limine path is
+kept as a hard-disk installation and bootloader compatibility check.
 
 ### GDB debugging
 
@@ -151,7 +157,7 @@ Install:
 brew install --cask 86box     # macOS
 ```
 
-86Box is a cycle-accurate emulator with real BIOS ROMs. Use this before flashing real hardware. Configuration is GUI-driven; set up a 386DX-25 with 4 MB RAM, EGA/VGA, attach `mmbasic.iso` as a CD-ROM, set boot order CD-first.
+86Box is a cycle-accurate emulator with real BIOS ROMs. Use this before flashing real hardware. Configuration is GUI-driven; set up a 386DX/486-class machine with VGA/SVGA, 8-16 MB RAM, a 1.44 MB floppy drive using `pc386-floppy.img`, and an IDE hard disk using `c.img`.
 
 Not part of the automated test loop. Exists for the "would this actually work on a beige-box machine" gut check.
 
@@ -159,19 +165,19 @@ Not part of the automated test loop. Exists for the "would this actually work on
 
 | Goal | Command |
 |------|---------|
-| Build kernel ELF | `./build.sh` |
-| Build bootable ISO | `./build.sh iso` |
-| Run in QEMU with display | `./run.sh` |
-| Run in QEMU headless | `./run_headless.sh` |
-| Run full test suite | `./run_tests.sh` |
-| Run single test | `./run_tests.sh tests/stage-0/hello.bas` |
-| Boot ISO in DOSBox-X | `./run_dosbox.sh` |
-| Boot ISO in 86Box | `./run_86box.sh` |
-| Debug with GDB | `./run.sh debug` then attach GDB |
+| Build kernel ELF | `./ports/pc386/build.sh` |
+| Build/refresh disk images | `./ports/pc386/build_disks.sh` |
+| Run in QEMU with display | `./ports/pc386/run.sh` |
+| Run in QEMU headless | `./ports/pc386/run_headless.sh` |
+| Run focused REPL tests | `python3 ports/pc386/tests/repl_expect.py files graphics_vbe` |
+| Run screenshot mode stress | `python3 ports/pc386/tests/screen_probe.py --mode-stress --out /tmp/pc386-mode-stress.ppm` |
+| Boot floppy in DOSBox-X | `./ports/pc386/run_dosbox.sh` |
+| Boot Limine-installed C: | `./ports/pc386/run_limine.sh` |
+| Debug with GDB | `./ports/pc386/run.sh debug` then attach GDB |
 
 ## When to use which emulator
 
-- **Inner dev loop (every edit):** QEMU `-kernel`, headless. Fastest, best diagnostics.
-- **Bootloader / Limine config changes:** QEMU `-cdrom`. Tests the ISO path.
+- **Inner dev loop (every edit):** QEMU floppy boot for realistic device shape, or `./ports/pc386/run.sh kernel` for direct `-kernel` isolation.
+- **Bootloader / Limine config changes:** `./ports/pc386/run_limine.sh`. Tests the C: hard-disk boot path.
 - **Pre-real-HW gate:** DOSBox-X then 86Box. Catches BIOS-quirk dependencies QEMU forgives.
 - **CI / golden-output tests:** QEMU headless only. DOSBox-X/86Box are not deterministic enough for golden compare.

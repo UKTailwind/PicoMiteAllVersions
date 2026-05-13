@@ -1,6 +1,6 @@
 # Stage 0 — Hello kernel
 
-The minimum bare-metal kernel that proves the cross-toolchain, multiboot2 entry, and console drivers work end-to-end. No interpreter, no input, no IRQs — just power-on → banner → halt.
+The minimum bare-metal kernel that proves the cross-toolchain, multiboot entry, and console drivers work end-to-end. No interpreter, no input, no IRQs — just power-on → banner → halt.
 
 ## Goal
 
@@ -43,7 +43,7 @@ Stage 0 complete. Halting.
 
 Visual check (`./run.sh`): same banner appears in QEMU's VGA window in light-green text on black.
 
-DOSBox-X / 86Box runs are not required at this stage — QEMU `-kernel` doesn't exercise a real bootloader. Stage 7 (real hardware) validates the Limine ISO path.
+DOSBox-X / 86Box runs are not required at this stage — QEMU `-kernel` doesn't exercise a real bootloader. Later stages validate the floppy bootloader and Limine-installed hard-disk paths.
 
 ## Deliberately NOT in this stage
 

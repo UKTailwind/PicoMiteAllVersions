@@ -1,71 +1,112 @@
-# pc386 — bare-metal MMBasic on a 386 PC
+# pc386 - bare-metal MMBasic on a 386 PC
 
-This port boots MMBasic as the OS on a 386-class IBM PC compatible. No DOS, no kernel, no userspace — power on, BIOS POST, multiboot2 entry, MMBasic prompt. The interpreter *is* the OS.
+This port boots MMBasic as the operating system on a 386-class IBM PC
+compatible. There is no DOS underneath: BIOS POST hands control to the pc386
+boot path, the kernel brings up PC hardware, and the user lands at the MMBasic
+prompt.
 
-Conceptually a peer of the RP2040/RP2350/ESP32-S3 device ports: another bare-metal 32-bit target satisfied by a port directory + driver implementations + per-stage `port_config.h` overrides. The HAL contract surface is unchanged from device targets; this port adds drivers for the IBM-PC peripheral set (VGA, PIT, 8042, ATA-PIO).
+The port is intentionally shaped like the MCU targets. Core MMBasic is linked
+with a pc386 port directory, HAL implementations, and PC-specific drivers for
+VGA/VBE graphics, PS/2 keyboard, COM1, ATA-PIO, 82077-compatible floppy,
+Sound Blaster 16 or PC speaker audio, and LPT1 GPIO/Centronics output.
 
 ## Status
 
-⏳ **Scaffolding only (2026-05-10).** Skeleton + plan in place. Real work pending — see staged delivery below.
+The QEMU development path is usable:
 
-## Plan
+- VGA REPL by default, with COM1 mirrored for logs and automated tests.
+- `A:` is a real 1.44 MB FAT12 boot floppy image.
+- `C:` is the primary FAT16 hard-disk image and persistent data drive.
+- `MODE 1` boots to 320x200 VGA mode 13h; `MODE 2..6` use VBE when present.
+- `FASTGFX`, file I/O, editor open/save, `SYS C:`, SB16 audio, PC speaker
+  fallback, LPT1 GPIO, and `OPEN "LPT1:" FOR OUTPUT` are implemented.
+- DOSBox-X can boot the floppy image for sanity checks. QEMU remains the
+  primary development and test target; Bochs/86Box are better real-PC gates.
 
-Canonical plan: [`docs/pc386-plan.md`](../../docs/pc386-plan.md). Per-stage detail under `docs/pc386/`.
+Real hardware validation is still the main open stage.
 
-Stages, in order:
+## Build
 
-| Stage | Deliverable |
-|-------|-------------|
-| 0 | Multiboot2 entry, GDT, serial console, VGA text. Banner over both. |
-| 1 | Heap over multiboot memory map. |
-| 2 | `mmbasic_stdio` HAL surface lifted onto bare metal. BASIC programs run via serial. |
-| 3 | PS/2 keyboard. Interactive REPL. |
-| 4 | VGA mode 13h video HAL. |
-| 5 | PIT speaker audio HAL. |
-| 6 | FAT16 + ATA-PIO, `LOAD "FOO.BAS"` from disk. |
-| 7 | Real hardware (beige-box 486). |
-
-## Toolchain
-
-- `i686-elf-gcc` cross compiler (freestanding, `-nostdlib`).
-- [Limine](https://limine-bootloader.org/) bootloader for the ISO path.
-- QEMU (`qemu-system-i386`) as the primary emulator.
-- DOSBox-X / 86Box as secondary "real-hardware-feel" backends.
-
-Bootstrap the cross compiler:
+Install the cross toolchain first:
 
 ```sh
-../../toolchain/pc386/install_cross.sh
+./toolchain/pc386/install_cross.sh
 ```
 
-Setup detail and the full command-line cookbook live in [`docs/pc386/emulation-and-toolchain.md`](../../docs/pc386/emulation-and-toolchain.md).
-
-## Build / run
+Build the default SB16 kernel and disk images:
 
 ```sh
-./build.sh             # cross-compile → build/mmbasic.elf
-./build.sh iso         # also produce build/mmbasic.iso (Limine-bootable)
-
-./run.sh               # boot in QEMU with display
-./run_headless.sh      # boot in QEMU headless, COM1 → stdio
-./run_tests.sh         # iterate tests/*.bas, golden-compare
+./ports/pc386/build.sh
+./ports/pc386/build_disks.sh
 ```
 
-Iteration loop with QEMU `-kernel` is sub-second: edit C, `./build.sh`, `./run_headless.sh` — banner appears in your terminal.
+`build_disks.sh` refreshes the boot floppy and boot files, but preserves an
+existing `C:` image by default. To intentionally recreate `C:`:
 
-## Exit gates
+```sh
+PC386_REBUILD_C=1 ./ports/pc386/build_disks.sh
+```
 
-A stage closes when:
+## Run
 
-1. `./build.sh` is clean (`-Wall -Wextra -Werror`).
-2. `./run_tests.sh` passes the stage's test corpus.
-3. `tools/check_hal_purity.sh` stays green — no new core ifdefs.
-4. `host/run_tests.sh` still 240/240. The port must not regress other targets.
+Interactive QEMU, BIOS/floppy boot, VGA window, COM1 mirror:
 
-Smoke-boot in DOSBox-X / 86Box is a desirable post-merge check, not a stage-close blocker.
+```sh
+./ports/pc386/run.sh
+```
 
-## Why this port exists
+Useful variants:
 
-Two reasons. First, it's a **forcing function for HAL purity** — if the contract is genuinely target-clean, a 32-bit bare-metal target with a wildly different peripheral set should drop in with no core changes. Any HAL leak this port surfaces is a real bug, fixed in core, not papered over here. (Same role `mmbasic_stdio` played for Phase 12.5.)
+```sh
+./ports/pc386/run.sh unscaled
+./ports/pc386/run.sh fullscreen
+./ports/pc386/run.sh debug
+./ports/pc386/run.sh kernel
+./ports/pc386/run_headless.sh
+./ports/pc386/run_dosbox.sh
+```
 
-Second, it's the aesthetic endgame. PicoMite already runs as the OS on a $4 microcontroller. Running it as the OS on the PC architecture closes a loop — power on a 1986 beige-box and get the same BASIC prompt the kids of that era did, with a more capable interpreter underneath.
+The boot floppy image is:
+
+```text
+ports/pc386/test_disks/pc386-floppy.img
+```
+
+The primary hard-disk image is:
+
+```text
+ports/pc386/test_disks/c.img
+```
+
+## Test
+
+Focused smoke/regression checks:
+
+```sh
+python3 ports/pc386/tests/repl_expect.py files editor_floppy_after_mode graphics_vbe
+python3 ports/pc386/tests/screen_probe.py --mode-stress --out /tmp/pc386-mode-stress.ppm
+```
+
+Broader QEMU test harness:
+
+```sh
+./ports/pc386/run_tests.sh
+```
+
+See [docs/pc386/emulation-and-toolchain.md](../../docs/pc386/emulation-and-toolchain.md)
+for emulator setup and command-line details.
+
+## Notes For Maintainers
+
+- BIOS thunks are delicate. After the kernel remaps the 8259 PIC to
+  `0x20..0x2F`, real-mode BIOS calls must mask both PICs and restore the old
+  masks after returning to protected mode. Otherwise IRQ1 can arrive as
+  `int 21h` while BIOS/DOSBox-X is running real-mode code.
+- The native 82077 FDC path is the validation target for QEMU, Bochs, and real
+  hardware. DOSBox-X has an A:-only BIOS `int 13h` fallback because it can boot
+  an image through BIOS services without fully modelling the guest-visible FDC
+  and DMA path.
+- `C:` is intentionally preserved by default during disk rebuilds. Avoid wiping
+  user programs unless `PC386_REBUILD_C=1` was explicitly requested.
+
+Canonical plan and stage notes live at [docs/pc386-plan.md](../../docs/pc386-plan.md).

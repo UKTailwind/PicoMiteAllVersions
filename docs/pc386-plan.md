@@ -9,10 +9,10 @@ This file is the index. Per-stage detail lives under `pc386/`. Read this page pl
 
 ## Goals
 
-1. **Boot to BASIC.** Power on → multiboot2 entry → MMBasic banner → REPL prompt. No DOS, no underlying kernel, no userspace. The interpreter *is* the OS.
+1. **Boot to BASIC.** Power on → BIOS → pc386 bootloader or multiboot loader → MMBasic banner → REPL prompt. No DOS, no underlying kernel, no userspace. The interpreter *is* the OS.
 2. **HAL purity unchanged.** Adding the port introduces zero new target-macro `#ifdef`s in core or VM. New target shape is expressed as a port directory + driver implementations + per-stage `port_config.h` overrides.
-3. **Automated test loop.** A `run_tests.sh` that mirrors `host/run_tests.sh` UX: cross-compile, boot kernel headless in QEMU with `-kernel mmbasic.elf -serial stdio -display none`, capture serial output, golden-compare. CI-friendly.
-4. **Real hardware reachable.** The same artifact (`mmbasic.iso`, Limine-bootable) runs in QEMU, DOSBox-X, 86Box, and on a beige-box 486 from a USB stick. No build-flag divergence between dev and target.
+3. **Automated test loop.** QEMU-backed Python harnesses boot the port, drive the REPL over COM1, and inspect both serial output and screenshots. CI-friendly tests use QEMU only.
+4. **Real hardware reachable.** The same kernel and disk layout boots in QEMU and is structured for DOSBox-X/Bochs/86Box sanity checks and later beige-box validation. The normal user artifact is the bootable FAT12 floppy plus the C: hard-disk image; the Limine-installed C: path remains available for hard-disk boot validation.
 5. **No interpreter changes.** Any HAL leak surfaced by this port gets fixed in core, not papered over here. Same rule as `mmbasic_stdio` (Phase 12.5 of real-hal).
 
 ## Non-goals
@@ -27,11 +27,11 @@ This file is the index. Per-stage detail lives under `pc386/`. Read this page pl
 ## Toolchain
 
 - **Cross compiler:** `i686-elf-gcc` + `i686-elf-binutils` (freestanding ELF target, no host libc). Bootstrap via `toolchain/pc386/install_cross.sh`.
-- **Boot protocol(s):** multiboot1 in `.multiboot` for the dev path (QEMU `-kernel` only speaks multiboot1, not multiboot2 — discovered in Stage 0). Multiboot2 header added alongside in Stage 7 for the Limine ISO path; both can coexist.
-- **Bootloader:** [Limine](https://limine-bootloader.org/) for the ISO / real-hardware path. Skipped during dev — QEMU `-kernel` boots the ELF directly.
+- **Boot protocol(s):** multiboot1 in `.multiboot` for the dev and custom floppy paths. A minimal multiboot2 header also exists for future bootloader compatibility, but the kernel still consumes multiboot1 info.
+- **Bootloader:** custom pc386 floppy stage1/stage2 for the normal boot floppy; [Limine](https://limine-bootloader.org/) remains installed on C: for hard-disk boot validation.
 - **Build host:** macOS or Linux. No Docker required.
-- **Primary emulator:** QEMU (`qemu-system-i386`). Direct multiboot1 ELF boot via `-kernel` for fast iteration; ISO boot via `-cdrom` for Stage 7+.
-- **Secondary emulators:** DOSBox-X (BIOS-accurate sanity check), 86Box (period-authentic, pre-real-HW gate).
+- **Primary emulator:** QEMU (`qemu-system-i386`). Floppy boot is the normal interactive path; direct multiboot1 ELF boot via `-kernel` remains available for isolation.
+- **Secondary emulators:** DOSBox-X (BIOS-boot sanity check), Bochs/86Box (period-authentic, pre-real-HW gates).
 
 See [`pc386/emulation-and-toolchain.md`](pc386/emulation-and-toolchain.md) for setup detail and command-line cookbook.
 
@@ -44,7 +44,7 @@ See [`pc386/emulation-and-toolchain.md`](pc386/emulation-and-toolchain.md) for s
 | [2 — disk + FS + Limine boot](pc386/stage-2-disk.md) | ✅ | ATA-PIO + FatFs over IDE brought up the first persistent disks. Current layout has `C:` as the primary IDE hard disk; the old `a.img` Limine helper remains only for compatibility. |
 | [3 — stdio port](pc386/stage-3-stdio.md) | ✅ | MMBasic interpreter runs over COM1: full REPL with banner / line editing, FILES / LOAD / LIST / RUN over FatFs. Current tests load HELLO.BAS + FIZZBUZZ.BAS from real floppy `A:` and write to hard disk `C:`. |
 | [4 — keyboard](pc386/stage-4-keyboard.md) | ✅ | IDT + own GDT, 8259A PIC remap, PS/2 IRQ1 + scancode→ASCII (US set 1, full modifier + extended-key support), 16550 IRQ4 RX. MMInkey drains both PS/2 (real keyboard input) and COM1 (test harness). 12-test repl_expect.py 12/12 × 5 runs; host_native still 243/243. |
-| [5 — VGA mode 13h](pc386/stage-5-video.md) | ✅ | BIOS/FDC boot defaults to real VGA mode 13h (`320x200`). Cold `MODE 1` is VGA 13h; after entering VBE, `MODE 1` returns to a `320x200` logical screen on the known-good VBE `640x480` surface because QEMU/SeaBIOS does not reliably re-expose legacy A0000 scanout after LFB modes. `MODE 2`/`3`/`4` switch to VBE `640x480`/`800x600`/`1024x768`; `MODE 5` is `480x480` letterboxed inside VBE `640x480`; `MODE 6` is `320x320` pixel-doubled and letterboxed inside VBE `1024x768`. There is no Bochs/QEMU BGA dependency and no VGA planar mode-12h drawing path. `PIXEL`, `LINE`, `CIRCLE`, `BOX`, `CLS`, `TEXT`, `PIXEL(x,y)` readback, and `FASTGFX CREATE/FPS/SWAP/SYNC/CLOSE` work over the VGA/VBE scanout path. FatFs file commands, C: directory navigation, EDIT file open/save regressions, VGA/VBE graphics REPL tests, and default VGA screenshot probes are covered. |
+| [5 — VGA mode 13h](pc386/stage-5-video.md) | ✅ | BIOS/FDC boot defaults to real VGA mode 13h (`320x200`). Cold `MODE 1` is VGA 13h; after entering VBE, `MODE 1` returns to a `320x200` logical screen on the known-good VBE `640x480` surface because QEMU/SeaBIOS does not reliably re-expose legacy A0000 scanout after LFB modes. `MODE 2`/`3`/`4` switch to VBE `640x480`/`800x600`/`1024x768`; `MODE 5` is `480x480` letterboxed inside VBE `640x480`; `MODE 6` is `320x320` pixel-doubled and letterboxed inside VBE `1024x768`. Real hardware uses BIOS VBE; QEMU/Bochs can use the documented DISPI interface when detected. There is no VGA planar mode-12h drawing path. `PIXEL`, `LINE`, `CIRCLE`, `BOX`, `CLS`, `TEXT`, `PIXEL(x,y)` readback, and `FASTGFX CREATE/FPS/SWAP/SYNC/CLOSE` work over the VGA/VBE scanout path. FatFs file commands, C: directory navigation, EDIT file open/save regressions, VGA/VBE graphics REPL tests, and default VGA screenshot probes are covered. |
 | [6 — PC audio](pc386/stage-6-audio.md) | ✅ | The default `PC386_AUDIO=sb16` build uses a QEMU/ISA Sound Blaster 16 backend with 8-bit stereo DMA; `PC386_AUDIO=pcspk` remains available for PIT channel 2 + port `0x61`. Persistent `OPTION SB16 base[,irq[,dma[,dma16]]]` is stored as sparse `C:/OPTIONS.INI` key/value overrides. `PLAY TONE`, `PLAY SOUND` voices/noise, `PLAY STOP`, `PLAY PAUSE`, and `PLAY RESUME` work; the QEMU harness covers the SB16 build. File/stream audio remains unsupported. |
 | [6.5 — LPT1 GPIO](pc386/stage-6_5-lpt1-gpio.md) | ✅ | `hal_pin.h`, `SETPIN`, `PIN()`, `PIN()=`, and VM pin syscalls map to LPT1 at `0x378`. BASIC pin numbers mirror DB-25: data outputs 2..9, control outputs 1/14/16/17, status inputs 10/11/12/13/15. PC-side inversions are hidden so BASIC sees connector-level logic. `repl_expect.py` covers output latch readback and read-only status-pin errors. |
 | [6.6 — LPT1 / Centronics](pc386/stage-6_6-lpt1-centronics.md) | ✅ | `drivers/lpt_centronics/` owns the Strobe/Busy/Ack handshake; existing BASIC file commands (`OPEN "LPT1:" FOR OUTPUT AS #n`, `PRINT #n`, `CLOSE #n`) ship bytes through QEMU's parallel-port backend or a real LPT printer. `LPRINT` is deliberately left out unless/until we choose to add command-table sugar. Harness attaches `-parallel file:...` and byte-compares printer output. |
@@ -61,15 +61,20 @@ A stage closes when:
 4. `host/run_tests.sh` still 240/240 (or whatever the current number is — never lower). The pc386 port must not regress other targets.
 5. The interpreter's BASIC test corpus passes the subset the stage's HAL surface supports. Full 192/192 parity is the long-term goal; reached when Stage 6 lands.
 
-Smoke-boot in DOSBox-X and 86Box is a desirable post-merge verification, not a stage-close blocker. Real-hardware boot (Stage 7) is its own gate.
+Smoke-boot in DOSBox-X and Bochs/86Box is desirable post-merge verification, not a stage-close blocker. Real-hardware boot (Stage 8) is its own gate.
 
 ## Test harness contract
 
-Each stage's tests follow the same pattern as `ports/mmbasic_stdio/tests/`:
-- `tests/<stage>/*.bas` — BASIC programs.
-- `tests/<stage>/*.ok` — expected serial output.
-- `run_tests.sh` runs each `.bas` through `qemu-system-i386 -kernel mmbasic.elf -serial stdio -display none -no-reboot`, captures stdout, diffs against `.ok`.
-- Tests signal completion by writing `PASS\n` or `FAIL: <reason>\n` to COM1 and triple-faulting (which makes QEMU exit cleanly under `-no-reboot`).
+The current pc386 harness is Python-driven rather than `.bas/.ok` files:
+
+- `ports/pc386/tests/repl_expect.py` boots QEMU, drives the MMBasic REPL over
+  COM1, and checks command output substrings.
+- `ports/pc386/tests/screen_probe.py` drives BASIC over COM1, asks QEMU for a
+  `screendump`, parses the PPM, and samples actual displayed pixels.
+- Both harnesses copy disk images into temporary directories before booting, so
+  tests do not lock or mutate the working `test_disks/*.img` files.
+- QEMU is the CI-capable target. DOSBox-X/Bochs/86Box are manual compatibility
+  probes, not deterministic golden-output runners.
 
 ## Directory layout
 
@@ -77,25 +82,30 @@ Each stage's tests follow the same pattern as `ports/mmbasic_stdio/tests/`:
 ports/pc386/
   README.md
   port_config.h              # inherits host_native, overrides for bare-metal x86
-  multiboot2.S               # entry + multiboot2 header
+  boot.S                     # multiboot1 entry + minimal multiboot2 header
   linker.ld                  # kernel link script (load at 1 MB)
-  Makefile                   # cross-compile, output mmbasic.elf + mmbasic.iso
-  build.sh                   # wrapper: ./build.sh [debug|release]
-  run.sh                     # QEMU with display
+  Makefile                   # cross-compile, output mmbasic.elf + bootloader
+  build.sh                   # wrapper: ./build.sh [build|iso|clean]
+  build_disks.sh             # build/refresh a.img, c.img, pc386-floppy.img
+  run.sh                     # QEMU with display; defaults to floppy boot
+  run_floppy.sh              # QEMU BIOS/FDC boot path
+  run_limine.sh              # QEMU C: Limine boot path
   run_headless.sh            # QEMU -display none -serial stdio
-  run_tests.sh               # iterate tests/*.bas, golden-compare
-  run_dosbox.sh              # boot iso in DOSBox-X (sanity)
-  run_86box.sh               # boot iso in 86Box (period-authentic)
-  limine.cfg                 # bootloader config for ISO path
-  tests/<stage>/*.bas        # per-stage test corpus
+  run_dosbox.sh              # boot floppy in DOSBox-X (sanity)
+  bootloader/                # floppy stage1/stage2
+  tools/                     # disk/bootloader image builders
+  tests/repl_expect.py       # serial REPL harness
+  tests/screen_probe.py      # QEMU screenshot/pixel harness
 drivers/
   vga_text/                  # boot console (text mode 80x25)
   serial_16550/              # COM1 (test output channel)
   ata_pio/                   # IDE / ATA-PIO block device
   fatfs/                     # FatFs over hal_storage (FAT12/16/32)
-  pit_timer/                 # system tick + PC speaker
-  ps2_kbd/                   # 8042 keyboard
-  vga_mode13h/               # video HAL (320x200x256)
+  fdc_82077/                 # 765/82077-compatible floppy controller
+  i8259_pic/                 # PIC remap/mask/eoi helpers
+  i8042_kbd/                 # PS/2 keyboard
+  lpt_centronics/            # LPT1 GPIO/Centronics
+  vga_mode13h/               # VGA/VBE graphics HAL
 toolchain/pc386/
   install_cross.sh           # bootstrap i686-elf-gcc if missing
 docs/
@@ -111,7 +121,11 @@ Driver directories appear as their stages land. Empty dirs are not committed.
 
 ## Open questions
 
-- **Heap size default.** RP2040 = 128 KB, ESP32-S3 = 104 KB. A 386 with 4 MB has more RAM than either. Stage 1 lands with 1 MB; revisit once Stage 3 starts running real programs and we see what fragmentation looks like.
-- **Serial vs VGA as primary console.** Test runs use serial. Interactive use prefers VGA text mode. Stage 0 lights up both; later stages may need a `console_select()` switch.
-- **Real-hardware floor.** Targeting "any 386+" is forward-looking but real-mode-only segments of legacy hardware (DMA, ISA buses) may force a 486 floor. Resolve at Stage 8.
-- **Fixed-disk geometry.** Stage 2's ATA-PIO needs to handle CHS vs LBA. Modern QEMU and any post-1996 hardware speak LBA; legacy 386-era IDE may need CHS fallback. Punt to Stage 8 if it turns out to matter.
+- **Heap size default.** The port currently reserves a fixed 1 MB MMBasic heap
+  from normal extended RAM. A future option could scale this from the memory
+  map or expose a persistent heap-size option.
+- **Real-hardware floor.** The software targets 386-class protected mode, but
+  practical validation may require a 486 with ISA/VLB/PCI VGA, IDE, PS/2, and
+  optionally SB16/LPT1. Resolve with Stage 8 hardware tests.
+- **Fixed-disk geometry.** Modern QEMU and most post-1996 hardware speak LBA.
+  Legacy 386-era IDE may need CHS fallback in the ATA path.
