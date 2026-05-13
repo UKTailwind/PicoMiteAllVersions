@@ -116,13 +116,15 @@ HOST_PORTABLE_SRCS = host_runtime.c host_fastgfx.c host_fs_shims.c \
                      host_peripheral_stubs.c host_fs.c \
                      host_sim_emit_stub.c \
                      host_time.c host_fb.c host_keys.c host_bc_runtime_noop.c host_terminal_hooks_noop.c \
-                     hal_flash_host.c hal_time_host.c hal_random_host.c hal_watchdog_host.c hal_pin_host.c hal_storage_host.c hal_filesystem_host.c \
+                     hal_flash_host.c hal_time_host.c hal_random_host.c hal_pin_host.c hal_storage_host.c hal_filesystem_host.c \
                      hal_keyboard_host.c hal_audio_host.c hal_vm_framebuffer_host.c
 HOST_WASM_SRCS = host_wasm_main.c host_wasm_console.c host_wasm_canvas.c \
                  host_wasm_audio.c host_wasm_web.c host_sim_slowdown.c \
                  host_fastgfx_resync.c
 
-SRCS = $(HOST_PORTABLE_SRCS) $(HOST_WASM_SRCS) $(CORE_SRCS) $(BC_SRCS)
+HAL_GENERIC_SRCS = hal_watchdog_noop.c
+
+SRCS = $(HOST_PORTABLE_SRCS) $(HOST_WASM_SRCS) $(CORE_SRCS) $(BC_SRCS) $(HAL_GENERIC_SRCS)
 OBJS = $(addprefix $(BUILD_DIR)/,$(SRCS:.c=.o))
 DEPS = $(OBJS:.o=.d)
 
@@ -164,6 +166,10 @@ $(BUILD_DIR)/%.o: $(REPO_ROOT)/%.c
 	$(EMCC) $(CFLAGS) -c -o $@ $<
 
 $(BUILD_DIR)/%.o: $(REPO_ROOT)/core/state/%.c
+	@mkdir -p $(dir $@)
+	$(EMCC) $(CFLAGS) -c -o $@ $<
+
+$(BUILD_DIR)/%.o: $(REPO_ROOT)/hal/generic/%.c
 	@mkdir -p $(dir $@)
 	$(EMCC) $(CFLAGS) -c -o $@ $<
 

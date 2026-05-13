@@ -28,7 +28,15 @@ extern void ErrorThrow(int e, int type);
 /* Drive availability. A: is LittleFS on internal flash; B: is FatFs on
  * the Adafruit Metro ESP32-S3 onboard microSD slot. */
 void port_drive_check(char drive) {
-    (void)drive;
+    if (drive != 'A' && drive != 'B') error("Invalid disk");
+}
+
+/* Default drivecheck remap: identity. Pc386 (which has FatFs on every
+ * volume and no LFS) overrides this. ESP32 keeps A:=LFS / B:=FatFs. */
+int port_drivecheck_remap(int t) { return t; }
+
+const char *port_filesystem_prefix(int filesystem) {
+    return filesystem ? "B:" : "A:";
 }
 
 int port_mount_sd_drive(void) {

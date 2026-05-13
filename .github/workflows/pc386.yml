@@ -1,0 +1,69 @@
+name: Build pc386 floppy image
+
+on:
+  pull_request:
+    paths:
+      - '*.c'
+      - '*.h'
+      - 'drivers/**'
+      - 'hal/**'
+      - 'ports/pc386/**'
+      - 'ports/host_native/**'
+      - 'ports/mmbasic_stdio/**'
+      - 'ports/vm_sys_sim/**'
+      - 'core/**'
+      - 'shared/**'
+      - 'toolchain/pc386/**'
+      - '.github/workflows/pc386.yml'
+  push:
+    branches: [main]
+    paths:
+      - '*.c'
+      - '*.h'
+      - 'drivers/**'
+      - 'hal/**'
+      - 'ports/pc386/**'
+      - 'ports/host_native/**'
+      - 'ports/mmbasic_stdio/**'
+      - 'ports/vm_sys_sim/**'
+      - 'core/**'
+      - 'shared/**'
+      - 'toolchain/pc386/**'
+      - '.github/workflows/pc386.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  floppy:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pc386 build dependencies
+        run: |
+          brew update
+          brew install i686-elf-binutils i686-elf-gcc mtools limine
+
+      - name: Build pc386 kernel and floppy bootloader
+        run: make -C ports/pc386
+
+      - name: Build bootable floppy image
+        run: PC386_REBUILD_C=1 ./ports/pc386/build_disks.sh
+
+      - name: Validate floppy image
+        run: |
+          test -f ports/pc386/test_disks/pc386-floppy.img
+          bytes=$(stat -f%z ports/pc386/test_disks/pc386-floppy.img)
+          if [ "$bytes" -ne 1474560 ]; then
+            echo "unexpected floppy image size: $bytes" >&2
+            exit 1
+          fi
+          mdir -i ports/pc386/test_disks/pc386-floppy.img ::
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pc386-floppy-image
+          path: ports/pc386/test_disks/pc386-floppy.img
+          if-no-files-found: error

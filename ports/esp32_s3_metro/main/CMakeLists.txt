@@ -124,7 +124,7 @@ set(PORT_LOCAL_SRCS
     hal_time_esp32.c
     hal_random_esp32.c
     hal_net_esp32.c                         # ESP-IDF socket transport HAL
-    hal_watchdog_esp32_stub.c
+    ../../../hal/generic/hal_watchdog_noop.c
     hal_flash_esp32.c                         # NVS-backed Options; slot persistence still Stage E1
     hal_storage_esp32_stub.c
     ${REPO_ROOT}/ports/pico_sdk_common/hal_filesystem_pico.c  # shared A:/B: LFS/FatFS dispatcher

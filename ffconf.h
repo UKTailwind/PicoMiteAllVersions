@@ -188,12 +188,22 @@
 / Drive/Volume Configurations
 /---------------------------------------------------------------------------*/
 
+#ifndef FF_VOLUMES
 #define FF_VOLUMES		2
+#endif
 /* Number of volumes (logical drives) to be used. (1-10) */
 
 
+/* Per-port override: a port can predefine FF_STR_VOLUME_ID and
+ * FF_VOLUME_STRS via its Makefile (-D) to choose how volume prefixes
+ * are matched. No-op for every other port — they fall through to the
+ * historical Unix-style "B:","C:". */
+#ifndef FF_STR_VOLUME_ID
 #define FF_STR_VOLUME_ID	2
+#endif
+#ifndef FF_VOLUME_STRS
 #define FF_VOLUME_STRS		"B:","C:"
+#endif
 /* FF_STR_VOLUME_ID switches support for volume ID in arbitrary strings.
 /  When FF_STR_VOLUME_ID is set to 1 or 2, arbitrary strings can be used as drive
 /  number in the path name. FF_VOLUME_STRS defines the volume ID strings for each
