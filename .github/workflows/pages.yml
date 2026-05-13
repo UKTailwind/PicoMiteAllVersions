@@ -54,6 +54,7 @@ jobs:
           cp host/web/index.html             _site/
           cp host/web/picomite.css           _site/
           cp host/web/app.mjs                _site/
+          cp host/web/proxy_client.mjs       _site/
           cp host/web/worker.mjs             _site/
           cp host/web/coi-serviceworker.js   _site/
           cp host/web/picomite.mjs           _site/
