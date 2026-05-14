@@ -55,7 +55,10 @@ set(STATE_SRCS
     ${REPO_ROOT}/shared/net/mm_net_transmit_cmd.c
     ${REPO_ROOT}/shared/net/mm_net_udp_cmd.c
     ${REPO_ROOT}/shared/net/mm_net_web_cmd.c
+    ${REPO_ROOT}/shared/net/mm_net_websocket.c
     ${REPO_ROOT}/shared/net/mm_net_wifi_cmd.c
+    ${REPO_ROOT}/drivers/web_console/web_console_assets.c
+    ${REPO_ROOT}/drivers/web_console/web_console_protocol.c
 )
 
 set(RUNTIME_SRCS
