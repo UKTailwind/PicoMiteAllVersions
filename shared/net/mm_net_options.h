@@ -51,6 +51,7 @@ void mm_net_parse_server_port_option(unsigned char *arg,
                                      mm_net_server_port_option_t *out);
 int mm_net_parse_web_messages_option(unsigned char *arg, bool *suppress_status);
 int mm_net_parse_telnet_console_option(unsigned char *arg, int *telnet_mode);
+int mm_net_parse_web_console_option(unsigned char *arg, int *enabled);
 int mm_net_parse_tftp_option(unsigned char *arg, int *disable_tftp);
 mm_net_info_query_t mm_net_parse_info_query(unsigned char *expr, int max_pcb);
 int mm_net_mminfo(unsigned char *expr, int64_t *out_iret,
@@ -63,6 +64,7 @@ void mm_net_print_options(int tcp_port, int tcp_response_ms,
                           int udp_port, int udp_response_ms,
                           bool suppress_status);
 void mm_net_print_service_options(int telnet_mode, int disable_tftp);
+void mm_net_print_web_console_option(int web_console);
 
 #ifdef __cplusplus
 }

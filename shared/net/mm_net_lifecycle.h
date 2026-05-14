@@ -32,6 +32,7 @@ typedef enum {
     MM_NET_LIFECYCLE_TFTP,
     MM_NET_LIFECYCLE_TELNET,
     MM_NET_LIFECYCLE_MQTT,
+    MM_NET_LIFECYCLE_WEB_CONSOLE,
 } mm_net_lifecycle_service_t;
 
 typedef struct {
@@ -44,6 +45,8 @@ typedef struct {
     void (*close_tftp)(void);
     int (*open_telnet)(void);
     void (*close_telnet)(void);
+    int (*open_web_console)(void);
+    void (*close_web_console)(void);
     unsigned reboot_after_option_mask;
 } mm_net_lifecycle_hooks_t;
 
@@ -86,6 +89,7 @@ enum {
     MM_NET_LIFECYCLE_REBOOT_UDP = 1u << 2,
     MM_NET_LIFECYCLE_REBOOT_TFTP = 1u << 3,
     MM_NET_LIFECYCLE_REBOOT_TELNET = 1u << 4,
+    MM_NET_LIFECYCLE_REBOOT_WEB_CONSOLE = 1u << 5,
 };
 
 int mm_net_lifecycle_service_supported(mm_net_lifecycle_service_t service);

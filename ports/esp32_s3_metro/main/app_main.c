@@ -119,6 +119,13 @@ void app_main(void) {
     ClearRuntime(true);
     if (esp32_web_console_display_init()) SaveOptions();
 
+    /* Mirror the Pico pattern: always call WebConnect at boot. The
+     * lifecycle no-ops cleanly when Option.SSID is empty, and on success
+     * it opens whichever network services are enabled (telnet, web
+     * console) via mm_net_lifecycle_on_network_ready(). */
+    extern void WebConnect(void);
+    WebConnect();
+
     /* Mount LittleFS for A: drive eagerly so cmd_files / cmd_save /
      * cmd_load can call lfs_*_open directly without going through
      * hal_fs_* (which would lazy-mount). First boot formats + writes

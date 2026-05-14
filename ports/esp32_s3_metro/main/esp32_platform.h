@@ -40,6 +40,19 @@ typedef unsigned int uint;
 
 #define PSRAMpin 0
 
+/* FatFs volume parsing: MMBasic core constructs DOS-style paths like
+ * "B:/foo" via hal_path_with_drive() before calling f_findfirst /
+ * f_opendir. ffconf.h's default (FF_STR_VOLUME_ID=2 with VolumeStr
+ * entries "B:","C:") only matches Unix-style "/B:/foo", so a DOS-style
+ * path fails with FR_INVALID_DRIVE ("logical drive number is invalid")
+ * — every FILES "B:" / OPEN "B:/..." call dies before touching the SD
+ * card. Override to DOS-style (Mode 1) with bare "B","C" volume IDs:
+ * the matcher reads the letter from VolumeStr[i], the colon from the
+ * path, and the strings tt and tp meet exactly past the colon. See
+ * ff.c::get_ldnumber for the matching logic. */
+#define FF_STR_VOLUME_ID 1
+#define FF_VOLUME_STRS   "B","C"
+
 /* GPS.h redeclares timegm/gmtime; rename to dodge newlib clashes (same
  * trick host_platform.h uses). */
 #define timegm  mmbasic_timegm

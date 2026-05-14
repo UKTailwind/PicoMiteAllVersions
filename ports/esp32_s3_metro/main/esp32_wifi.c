@@ -86,6 +86,14 @@ static mm_net_lifecycle_result_t esp32_lifecycle_apply_wifi(unsigned char *arg)
     return MM_NET_LIFECYCLE_OK;
 }
 
+static int esp32_lifecycle_open_web_console(void)
+{
+    /* Auto-start WiFi if needed; the actual listening socket is the
+     * shared TCP server, which esp32_web_console_open() brings up. */
+    if (!WIFIconnected) WebConnect();
+    return esp32_web_console_open();
+}
+
 static const mm_net_lifecycle_hooks_t esp32_lifecycle_hooks = {
     .apply_wifi = esp32_lifecycle_apply_wifi,
     .open_tcp_server = esp32_tcp_server_open,
@@ -96,6 +104,8 @@ static const mm_net_lifecycle_hooks_t esp32_lifecycle_hooks = {
     .close_tftp = esp32_tftp_server_stop,
     .open_telnet = esp32_telnet_open,
     .close_telnet = esp32_telnet_close,
+    .open_web_console = esp32_lifecycle_open_web_console,
+    .close_web_console = esp32_web_console_close,
 };
 
 static void esp32_info_before_query(void)
@@ -198,4 +208,5 @@ void esp32_wifi_print_options(void)
                          Option.UDP_PORT, Option.UDPServerResponceTime,
                          optionsuppressstatus);
     mm_net_print_service_options((int)Option.Telnet, Option.disabletftp);
+    mm_net_print_web_console_option(Option.WebConsole);
 }

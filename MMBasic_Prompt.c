@@ -96,6 +96,19 @@ void MIPS16 EditInputLine(void) {
                             if(CharIndex > 0) {
                                 BufEdited = true;
                                 i = CharIndex - 1;
+                                /* Fast path: deleting the last char of a
+                                 * single-line input. \b \b is enough; no
+                                 * need to rewind the cursor and redraw the
+                                 * tail. Falls through to the general path
+                                 * for mid-line or wrapped-line cases. */
+                                if (CharIndex == (int)strlen((const char *)inpbuf)
+                                    && CharIndex < l2) {
+                                    inpbuf[i] = 0;
+                                    MMPrintString("\b \b");
+                                    CharIndex--;
+                                    if (strlen((const char *)inpbuf) == 0) BufEdited = false;
+                                    break;
+                                }
                                 j= CharIndex;
                                 for(p = (char *)inpbuf + i; *p; p++) *p = *(p + 1);                 // remove the char from inpbuf
  

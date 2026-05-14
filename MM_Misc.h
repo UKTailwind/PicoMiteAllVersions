@@ -93,6 +93,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 	extern uint32_t __get_MSP(void);
 	extern int ExistsFile(char *p);
 	extern int ExistsDir(char *p, char *q, int *filesystem);
+	extern int FileSize(char *p);
 	extern MMFLOAT optionangle;
 	extern bool useoptionangle;
 	extern bool optionfastaudio;

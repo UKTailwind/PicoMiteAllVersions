@@ -1687,90 +1687,9 @@ uint32_t __get_MSP(void)
   __asm volatile ("MRS %0, msp" : "=r" (result) );
   return(result);
 }
-int FileSize(char *p){
-    char q[FF_MAX_LFN]={0};
-    int retval=0;
-    int waste=0, t=FatFSFileSystem+1;
-    int localfilesystemsave=FatFSFileSystem;
-    t = drivecheck(p,&waste);
-    p+=waste;
-    getfullfilename(p,q);
-    FatFSFileSystem=t-1;
-    if(FatFSFileSystem==0){
-        struct lfs_info lfsinfo;
-        memset(&lfsinfo,0,sizeof(DIR));
-        FSerror = lfs_stat(&lfs, q, &lfsinfo);
-        if(lfsinfo.type==LFS_TYPE_REG)retval= lfsinfo.size;
-    } else {
-        DIR djd;
-        FILINFO fnod;
-        memset(&djd,0,sizeof(DIR));
-        memset(&fnod,0,sizeof(FILINFO));
-        if(!InitSDCard()) return -1;
-        FSerror = f_stat(q, &fnod);
-        if(FSerror != FR_OK)iret=0;
-        else if(!(fnod.fattrib & AM_DIR))retval=fnod.fsize;
-    }
-    FatFSFileSystem=localfilesystemsave;
-    return retval;
-}
-int ExistsFile(char *p){
-    char q[FF_MAX_LFN]={0};
-    int retval=0;
-    int waste=0, t=FatFSFileSystem+1;
-    int localfilesystemsave=FatFSFileSystem;
-    t = drivecheck(p,&waste);
-    p+=waste;
-    getfullfilename(p,q);
-    FatFSFileSystem=t-1;
-    if(FatFSFileSystem==0){
-        struct lfs_info lfsinfo;
-        memset(&lfsinfo,0,sizeof(DIR));
-        FSerror = lfs_stat(&lfs, q, &lfsinfo);
-        if(lfsinfo.type==LFS_TYPE_REG)retval= 1;
-    } else {
-        DIR djd;
-        FILINFO fnod;
-        memset(&djd,0,sizeof(DIR));
-        memset(&fnod,0,sizeof(FILINFO));
-        if(!InitSDCard()) return -1;
-        FSerror = f_stat(q, &fnod);
-        if(FSerror != FR_OK)iret=0;
-        else if(!(fnod.fattrib & AM_DIR))retval=1;
-    }
-    FatFSFileSystem=localfilesystemsave;
-    return retval;
-}
-int ExistsDir(char *p, char *q, int *filesystem){
-    int ireturn=0;
-    ireturn=0;
-    int localfilesystemsave=FatFSFileSystem;
-    int waste=0, t=FatFSFileSystem+1;
-    t = drivecheck(p,&waste);
-    p+=waste;
-    getfullfilename(p,q);
-    FatFSFileSystem=t-1;
-    *filesystem=FatFSFileSystem;
-    if(strcmp(q,"/")==0 || strcmp(q,"/.")==0 || strcmp(q,"/..")==0 ){FatFSFileSystem=localfilesystemsave;ireturn= 1; return ireturn;}
-    if(FatFSFileSystem==0){
-        struct lfs_info lfsinfo;
-        memset(&lfsinfo,0,sizeof(DIR));
-        FSerror = lfs_stat(&lfs, q, &lfsinfo);
-        if(lfsinfo.type==LFS_TYPE_DIR)ireturn= 1;
-    } else {
-        DIR djd;
-        FILINFO fnod;
-        memset(&djd,0,sizeof(DIR));
-        memset(&fnod,0,sizeof(FILINFO));
-        if(q[strlen(q)-1]=='/')strcat(q,".");
-        if(!InitSDCard()) {FatFSFileSystem=localfilesystemsave;ireturn= -1; return ireturn;}
-        FSerror = f_stat(q, &fnod);
-        if(FSerror != FR_OK)ireturn=0;
-        else if((fnod.fattrib & AM_DIR))ireturn=1;
-    }
-    FatFSFileSystem=localfilesystemsave;
-    return ireturn;
-}
+/* FileSize / ExistsFile / ExistsDir now live in mm_misc_shared.c so the
+ * ESP32 port (which doesn't compile MM_Misc.c) can reuse the same
+ * drivecheck + lfs_stat / f_stat routing. */
 
 void MIPS16 fun_info(void){
     unsigned char *tp;

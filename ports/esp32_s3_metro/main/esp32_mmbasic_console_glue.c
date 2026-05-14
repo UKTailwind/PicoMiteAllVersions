@@ -21,6 +21,7 @@
 
 #include "esp32_tcp_server.h"
 #include "esp32_telnet.h"
+#include "hal/hal_time.h"
 
 /* Provided by esp32_console.c. */
 extern void esp32_console_write_bytes(const char *text, int len);
@@ -55,6 +56,11 @@ char SerialConsolePutC(char c, int flush) {
         if (flush) fflush(stdout);
     }
     esp32_telnet_putc(c, flush);
+    /* Explicit-flush requests still force a telnet drain. The catch-all
+     * for non-flush bursts is the 5 ms timer in esp32_telnet_poll, which
+     * now fires from any ProcessWeb call (including MMInkey's idle
+     * polls), so tail bytes from MMPrintString / editor redraws land
+     * within 5 ms without per-byte TCP sends. */
     if (flush) esp32_telnet_putc(0, -1);
     return c;
 }
@@ -73,16 +79,21 @@ char MMputchar(char c, int flush) {
     return c;
 }
 
+/* Bulk-string printers don't force a per-call telnet drain anymore.
+ * Each fragment used to fire its own TCP send (cmd_files calls
+ * MMPrintString ~10 times per file -> ~10 small packets per row);
+ * coalescing them gives FILES/LIST close to USB throughput. The 5 ms
+ * gate in SerialConsolePutC and the 252-byte buffer-full auto-flush
+ * in esp32_telnet_putc still cap tail latency to <5 ms or one full
+ * buffer, whichever comes first. */
 void MMPrintString(char *s) {
     while (*s) MMputchar(*s++, 0);
     fflush(stdout);
-    esp32_telnet_putc(0, -1);
 }
 
 void SSPrintString(char *s) {
     while (*s) SerialConsolePutC(*s++, 0);
     fflush(stdout);
-    esp32_telnet_putc(0, -1);
 }
 
 void myprintf(char *s) { MMPrintString(s); }
@@ -111,8 +122,29 @@ int kbhitConsole(void) {
     return 1;
 }
 
+/* Unified "next byte" source: drains the telnet ring buffer first, then
+ * falls back to USB stdin. Used by the ANSI escape decoder so continuation
+ * bytes are read from whichever source ESC came from. */
+static int esp32_console_next_byte_ms(int ms) {
+    int c = esp32_console_ring_pop();
+    if (c >= 0) return c;
+    /* Spin briefly to let telnet poll deliver continuation bytes. The 30 ms
+     * inter-byte budget is plenty; we poll every ~1 ms. */
+    int waited = 0;
+    while (ms < 0 || waited <= ms) {
+        c = esp32_console_read_byte_blocking_ms(1);
+        if (c >= 0) return c;
+        c = esp32_console_ring_pop();
+        if (c >= 0) return c;
+        if (ms == 0) break;
+        waited++;
+    }
+    return -1;
+}
+
 static int esp32_normalise_console_byte(int c) {
-    if (c == 0x7f) return BKSP;       /* macOS/iTerm/USB-CDC backspace */
+    if (c == 0x7f) return BKSP;       /* DEL: macOS/iTerm/USB-CDC and most telnet clients */
+    if (c == 0x08) return BKSP;       /* BS: RFC 854 NVT default + some telnet clients */
     if (c == '\n') return ENTER;      /* normalise LF to CR for MMBasic */
     return c;
 }
@@ -166,23 +198,23 @@ static int esp32_csi_final_key(int final) {
  *   ESC O P/Q/R/S
  */
 static int esp32_decode_escape_sequence(void) {
-    int c1 = esp32_console_read_byte_blocking_ms(30);
+    int c1 = esp32_console_next_byte_ms(30);
     if (c1 < 0) return ESC;
     if (c1 == '[') {
-        int c2 = esp32_console_read_byte_blocking_ms(30);
+        int c2 = esp32_console_next_byte_ms(30);
         if (c2 < 0) return ESC;
         int direct = esp32_csi_final_key(c2);
         if (direct != ESC) return direct;
         if (c2 >= '0' && c2 <= '9') {
             int n = c2 - '0';
             int c3;
-            while ((c3 = esp32_console_read_byte_blocking_ms(30)) >= 0) {
+            while ((c3 = esp32_console_next_byte_ms(30)) >= 0) {
                 if (c3 >= '0' && c3 <= '9') { n = n * 10 + (c3 - '0'); continue; }
                 if (c3 == ';') {
                     /* Ignore modifier parameters (Shift/Ctrl/Alt) and
                      * return the base key. */
                     do {
-                        c3 = esp32_console_read_byte_blocking_ms(30);
+                        c3 = esp32_console_next_byte_ms(30);
                     } while (c3 >= '0' && c3 <= '9');
                 }
                 break;
@@ -194,7 +226,7 @@ static int esp32_decode_escape_sequence(void) {
         return ESC;
     }
     if (c1 == 'O') {
-        int c2 = esp32_console_read_byte_blocking_ms(30);
+        int c2 = esp32_console_next_byte_ms(30);
         switch (c2) {
             case 'P': return F1;
             case 'Q': return F2;
@@ -204,7 +236,10 @@ static int esp32_decode_escape_sequence(void) {
         return ESC;
     }
     /* ESC followed by a regular char (Alt-<key>): return ESC now and
-     * preserve the char for the next read. */
+     * preserve the char for the next read. The pushback only feeds USB; if
+     * the char came from the telnet ring buffer, we lose it. That's
+     * acceptable because Alt-<key> Meta sequences are not used by the
+     * editor and modern telnet clients send the key code directly. */
     esp32_console_push_back_byte(c1);
     return ESC;
 }
@@ -225,7 +260,11 @@ int MMInkey(void) {
     }
     if (c < 0) c = esp32_console_read_byte_nonblock();
     if (c < 0) return -1;
-    if (!from_web && c == 0x1b && ConsoleRxBufHead == ConsoleRxBufTail)
+    /* Web console delivers fully-decoded key codes; only raw byte streams
+     * (USB stdin + telnet ring buffer) need escape-sequence assembly.
+     * esp32_decode_escape_sequence drains continuation bytes from whichever
+     * source they arrived on. */
+    if (!from_web && c == 0x1b)
         return esp32_decode_escape_sequence();
     return esp32_normalise_console_byte(c);
 }
@@ -249,7 +288,7 @@ int MMgetchar(void) {
         if (c < 0) c = esp32_console_read_byte_blocking_ms(1);
     } while (c < 0);
     ShowCursor(0);
-    if (!from_web && c == 0x1b && ConsoleRxBufHead == ConsoleRxBufTail)
+    if (!from_web && c == 0x1b)
         return esp32_decode_escape_sequence();
     return esp32_normalise_console_byte(c);
 }

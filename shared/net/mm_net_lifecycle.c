@@ -41,6 +41,8 @@ int mm_net_lifecycle_service_supported(mm_net_lifecycle_service_t service) {
             return caps_have(HAL_NET_CAP_UDP_SERVER | HAL_NET_CAP_UDP_SEND);
         case MM_NET_LIFECYCLE_TELNET:
             return caps_have(HAL_NET_CAP_TCP_SERVER);
+        case MM_NET_LIFECYCLE_WEB_CONSOLE:
+            return caps_have(HAL_NET_CAP_TCP_SERVER);
         case MM_NET_LIFECYCLE_MQTT:
             return caps_have(HAL_NET_CAP_MQTT_PLAIN) ||
                    caps_have(HAL_NET_CAP_MQTT_WEBSOCKET);
@@ -67,6 +69,8 @@ const char *mm_net_lifecycle_unsupported_message(
             return "TFTP not supported";
         case MM_NET_LIFECYCLE_TELNET:
             return "Telnet not supported";
+        case MM_NET_LIFECYCLE_WEB_CONSOLE:
+            return "Web console not supported";
         case MM_NET_LIFECYCLE_MQTT:
             return "MQTT not supported";
         case MM_NET_LIFECYCLE_TCP_CLIENT:
@@ -99,12 +103,17 @@ mm_net_lifecycle_result_t mm_net_lifecycle_on_network_ready(
         mm_net_lifecycle_service_supported(MM_NET_LIFECYCLE_TELNET) &&
         !hooks->open_telnet())
         return MM_NET_LIFECYCLE_ERROR;
+    if (Option.WebConsole && hooks->open_web_console &&
+        mm_net_lifecycle_service_supported(MM_NET_LIFECYCLE_WEB_CONSOLE) &&
+        !hooks->open_web_console())
+        return MM_NET_LIFECYCLE_ERROR;
     return MM_NET_LIFECYCLE_OK;
 }
 
 void mm_net_lifecycle_on_network_down(
     const mm_net_lifecycle_hooks_t *hooks) {
     if (!hooks) return;
+    if (hooks->close_web_console) hooks->close_web_console();
     if (hooks->close_telnet) hooks->close_telnet();
     if (hooks->close_tftp) hooks->close_tftp();
     if (hooks->close_udp_server) hooks->close_udp_server();
@@ -276,6 +285,28 @@ mm_net_lifecycle_result_t mm_net_lifecycle_option_setter(
         }
         return maybe_reboot(hooks ? hooks->reboot_after_option_mask : 0,
                             MM_NET_LIFECYCLE_REBOOT_TELNET);
+    }
+
+    tp = checkstring(cmdline, (unsigned char *)"WEB CONSOLE");
+    if (tp) {
+        if (!mm_net_lifecycle_service_supported(MM_NET_LIFECYCLE_WEB_CONSOLE))
+            return MM_NET_LIFECYCLE_UNSUPPORTED;
+        int enabled = (int)Option.WebConsole;
+        if (!mm_net_parse_web_console_option(tp, &enabled))
+            return MM_NET_LIFECYCLE_ERROR;
+        Option.WebConsole = (unsigned char)enabled;
+        SaveOptions();
+        if (hooks && (hooks->reboot_after_option_mask &
+                      MM_NET_LIFECYCLE_REBOOT_WEB_CONSOLE))
+            return MM_NET_LIFECYCLE_REBOOT_REQUIRED;
+        if (Option.WebConsole) {
+            if (hooks && hooks->open_web_console && !hooks->open_web_console())
+                return MM_NET_LIFECYCLE_ERROR;
+        } else if (hooks && hooks->close_web_console) {
+            hooks->close_web_console();
+        }
+        return maybe_reboot(hooks ? hooks->reboot_after_option_mask : 0,
+                            MM_NET_LIFECYCLE_REBOOT_WEB_CONSOLE);
     }
 
     tp = checkstring(cmdline, (unsigned char *)"TFTP");

@@ -187,42 +187,16 @@ void SaveProgramToFlash(unsigned char *pm, int msg) {
     mmbasic_save_loaded_source((const char *)pm, MMBASIC_SOURCE_FLAGS_BATCH_LOAD);
 }
 
-/* ---- ExistsFile / ExistsDir on LFS ---- */
+/* ExistsFile / FileSize / ExistsDir live in mm_misc_shared.c. They use
+ * the shared drivecheck + getfullfilename + InitSDCard pipeline and route
+ * to lfs_stat (A:) or f_stat (B:). The ESP32 port supplies the lfs global
+ * (esp32_lfs.c) and port_mount_sd_drive (esp32_cmd_files_hooks.c). */
 
 #include "lfs.h"
-extern lfs_t lfs;
-extern int   esp32_lfs_mount(void);
-
-int ExistsFile(char *p) {
-    if (!p || !*p || esp32_lfs_mount() != 0) return 0;
-    /* Strip "A:" / "B:" prefix if present. */
-    if (p[0] && p[1] == ':') p += 2;
-    struct lfs_info info;
-    if (lfs_stat(&lfs, p, &info) < 0) return 0;
-    return (info.type == LFS_TYPE_REG) ? 1 : 0;
-}
-
-int FileSize(char *p) {
-    if (!p || !*p || esp32_lfs_mount() != 0) return 0;
-    if (p[0] && p[1] == ':') p += 2;
-    struct lfs_info info;
-    if (lfs_stat(&lfs, p, &info) < 0) return 0;
-    return (info.type == LFS_TYPE_REG) ? (int)info.size : 0;
-}
-
-int ExistsDir(char *p, char *q, int *filesystem) {
-    if (filesystem) *filesystem = 0;   /* A: */
-    if (!p || esp32_lfs_mount() != 0) return 0;
-    if (p[0] && p[1] == ':') p += 2;
-    if (q) snprintf(q, FF_MAX_LFN, "%s", p);
-    if (!*p || strcmp(p, "/") == 0) return 1;
-    struct lfs_info info;
-    if (lfs_stat(&lfs, p, &info) < 0) return 0;
-    return (info.type == LFS_TYPE_DIR) ? 1 : 0;
-}
+#include "ff.h"
+#include "diskio.h"
 
 /* ---- hal_ff_* wrappers for the B: FatFS drive. */
-#include "ff.h"
 FRESULT hal_ff_findfirst(DIR *d, FILINFO *f, const TCHAR *p, const TCHAR *q) {
     return f_findfirst(d, f, p, q);
 }

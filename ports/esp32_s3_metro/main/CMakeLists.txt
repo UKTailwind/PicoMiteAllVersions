@@ -28,6 +28,7 @@ set(CORE_SRCS
     ${REPO_ROOT}/gfx_text_shared.c
     ${REPO_ROOT}/gfx_console_shared.c
     ${REPO_ROOT}/mm_misc_shared.c
+    ${REPO_ROOT}/drivers/fs_lfs_fatfs/fs_lfs_fatfs_helpers.c
     ${REPO_ROOT}/OptionCommands.c
     ${REPO_ROOT}/cmd_ws2812_shared.c
     ${REPO_ROOT}/shared/cmd_psram.c

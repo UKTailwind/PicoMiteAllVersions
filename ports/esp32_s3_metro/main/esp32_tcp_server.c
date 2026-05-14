@@ -178,9 +178,22 @@ static void esp32_web_console_close_reason(const char *reason)
     s_web_console_ws.frame_payload_cap = frame_payload_cap;
 }
 
-static void esp32_web_console_close(void)
+void esp32_web_console_close(void)
 {
     esp32_web_console_close_reason("close");
+}
+
+int esp32_web_console_open(void)
+{
+    /* The HTTP/WebSocket endpoint is hosted by the shared TCP server; just
+     * make sure the server is listening on the configured port. */
+    esp32_tcp_init_slots();
+    if (!Option.WebConsole) return 1;
+    if (!WIFIconnected) return 1;
+    if (!Option.TCP_PORT) Option.TCP_PORT = 80;
+    if (s_tcp.server) return 1;
+    return mm_net_tcp_service_open(&s_tcp, (uint16_t)Option.TCP_PORT,
+                                   ESP32_MAX_PCB);
 }
 
 static int esp32_web_console_send_frame(uint8_t opcode, const void *payload,
@@ -678,6 +691,10 @@ static int esp32_web_console_accept_ws(hal_net_tcp_conn_t conn,
                                        const uint8_t *request,
                                        size_t request_len)
 {
+    if (!Option.WebConsole) {
+        esp32_send_http_status_conn(conn, 404);
+        return 1;
+    }
     char key[MM_NET_WS_MAX_KEY_LEN];
     int rc = mm_net_ws_validate_upgrade_request(request, request_len,
                                                 WEB_CONSOLE_WS_PATH, key);

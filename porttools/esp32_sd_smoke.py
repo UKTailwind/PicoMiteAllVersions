@@ -66,6 +66,37 @@ def main() -> int:
         cmd("CLOSE #1")
         if "READBACK:SD_SMOKE_OK" not in readback:
             raise SystemExit("SD write/readback failed")
+
+        # Regression guard: ExistsFile / FileSize must route to the FatFS
+        # backend when the current drive is B: (or the path is prefixed
+        # B:...). Previously these helpers always queried LFS, so EDIT
+        # "foo.bas" on an SD-resident file opened an empty buffer.
+        size_line = cmd(f'PRINT "SIZE:" + STR$(MM.INFO(FILESIZE "{tmp1}"))')
+        m = re.search(r"SIZE:\s*(-?\d+)", size_line)
+        if not m:
+            raise SystemExit(f"FILESIZE output not found in: {size_line!r}")
+        if int(m.group(1)) <= 0:
+            raise SystemExit(
+                f"MM.INFO(FILESIZE) returned non-positive size for SD file "
+                f"{tmp1!r}: {size_line!r}"
+            )
+        exists_line = cmd(f'PRINT "EXISTS:" + STR$(MM.INFO(EXISTS FILE "{tmp1}"))')
+        if not re.search(r"EXISTS:\s*1\b", exists_line):
+            raise SystemExit(
+                f"MM.INFO(EXISTS FILE) failed to report SD file present: "
+                f"{exists_line!r}"
+            )
+        # Same check via an explicit B: prefix from the A: drive — exercises
+        # the prefix-routing path, not just the current-drive fallback.
+        cmd('DRIVE "A:"')
+        size_pfx = cmd(f'PRINT "BSIZE:" + STR$(MM.INFO(FILESIZE "B:/{tmp1}"))')
+        m2 = re.search(r"BSIZE:\s*(-?\d+)", size_pfx)
+        if not m2 or int(m2.group(1)) <= 0:
+            raise SystemExit(
+                f"MM.INFO(FILESIZE) with B: prefix failed: {size_pfx!r}"
+            )
+        cmd('DRIVE "B:"')
+
         cmd(f'RENAME "{tmp1}" AS "{tmp2}"')
         cmd(f'KILL "{tmp2}"')
 

@@ -49,6 +49,19 @@ int mm_net_parse_telnet_console_option(unsigned char *arg, int *telnet_mode) {
     return 0;
 }
 
+int mm_net_parse_web_console_option(unsigned char *arg, int *enabled) {
+    if (CurrentLinePtr) error("Invalid in a program");
+    if (checkstring(arg, (unsigned char *)"OFF")) {
+        *enabled = 0;
+        return 1;
+    }
+    if (checkstring(arg, (unsigned char *)"ON")) {
+        *enabled = 1;
+        return 1;
+    }
+    return 0;
+}
+
 int mm_net_parse_tftp_option(unsigned char *arg, int *disable_tftp) {
     if (CurrentLinePtr) error("Invalid in a program");
     if (checkstring(arg, (unsigned char *)"OFF") ||
@@ -232,4 +245,8 @@ void mm_net_print_service_options(int telnet_mode, int disable_tftp) {
         MMPrintString("OPTION TELNET CONSOLE ONLY\r\n");
     }
     if (disable_tftp) MMPrintString("OPTION TFTP OFF\r\n");
+}
+
+void mm_net_print_web_console_option(int web_console) {
+    if (web_console) MMPrintString("OPTION WEB CONSOLE ON\r\n");
 }

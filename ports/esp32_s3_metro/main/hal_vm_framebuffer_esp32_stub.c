@@ -74,6 +74,19 @@ static void esp32_web_read_buffer(int x1, int y1, int x2, int y2,
 }
 
 int esp32_web_console_display_init(void) {
+    /* When the web console is disabled keep the framebuffer / display
+     * dispatch entirely uninitialised. The USB serial console then takes
+     * the fast path with OptionConsole=1 and no per-character framebuffer
+     * cost. Also clear any DISPLAY_CONSOLE state left over from a previous
+     * session when WebConsole was on -- otherwise `OPTION DISPLAY rows,cols`
+     * keeps erroring "Cannot change LCD console" until OPTION RESET. */
+    if (!Option.WebConsole) {
+        int changed = Option.DISPLAY_CONSOLE != 0 || Option.DISPLAY_TYPE != 0;
+        Option.DISPLAY_CONSOLE = 0;
+        Option.DISPLAY_TYPE = 0;
+        return changed;
+    }
+
     int options_changed = Option.DISPLAY_TYPE != DISP_USER ||
                           Option.DISPLAY_CONSOLE != 1 ||
                           Option.DefaultFont != 0x01 ||
@@ -140,6 +153,7 @@ void hal_vm_framebuffer_copy(char from, char to, int bg) { (void)from; (void)to;
 void Display_Refresh(void) {
     static int in_refresh;
     static int64_t next_refresh_us;
+    if (!Option.WebConsole) return;
     int64_t now = esp_timer_get_time();
 
     if (in_refresh || now < next_refresh_us) return;

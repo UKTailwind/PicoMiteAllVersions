@@ -7,6 +7,8 @@ int esp32_tcp_interrupt_pending(void);
 int esp32_web_console_input_available(void);
 int esp32_web_console_pop_key(void);
 int esp32_web_console_connected(void);
+int esp32_web_console_open(void);
+void esp32_web_console_close(void);
 void esp32_tcp_server_poll(void);
 void esp32_tcp_server_stop(void);
 int esp32_tcp_server_open(uint16_t port);

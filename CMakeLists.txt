@@ -125,6 +125,7 @@ set(PICOMITE_LEGACY_CORE_SOURCES
 	XModem.c
 	MM_Misc.c
 	mm_misc_shared.c
+	drivers/fs_lfs_fatfs/fs_lfs_fatfs_helpers.c
 	OptionCommands.c
 	cmd_ws2812_shared.c
 	External.c

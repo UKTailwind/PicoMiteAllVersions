@@ -280,6 +280,7 @@ struct option_s {
     uint8_t pc386_sb_irq;
     uint8_t pc386_sb_dma;
     uint8_t pc386_sb_dma16;
+    unsigned char WebConsole;          // ESP32 web console enable (0=off,1=on)
     // To enable older CFunctions to run any new options *MUST* be added at the end of the list
 } __attribute__((packed));
 extern unsigned char *CFunctionFlash, *CFunctionLibrary;
