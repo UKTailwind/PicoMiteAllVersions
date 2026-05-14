@@ -1,10 +1,128 @@
 /*
- * hal_vm_framebuffer_esp32_stub.c — Phase B stub for
- * hal/hal_vm_framebuffer.h. All FRAMEBUFFER commands are no-ops on
- * a port without a display.
+ * hal_vm_framebuffer_esp32_stub.c — ESP32 web-console virtual display.
+ *
+ * FRAMEBUFFER commands remain no-op for now, but the ordinary display
+ * dispatch table is backed by a 320x240 RGB24 framebuffer that the web
+ * console sends to the browser as FRMB/CMDS.
  */
 
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "esp_heap_caps.h"
+
+#include "MMBasic_Includes.h"
+#include "Hardware_Includes.h"
+#include "drivers/web_console/web_console_display.h"
 #include "hal/hal_vm_framebuffer.h"
+
+#define ESP32_WEB_DISPLAY_WIDTH  320
+#define ESP32_WEB_DISPLAY_HEIGHT 240
+#define ESP32_WEB_DISPLAY_CMDS   12288u
+
+static web_console_display_t s_web_display;
+static uint32_t *s_web_pixels;
+static uint8_t *s_web_cmds;
+extern volatile int DISPLAY_TYPE;
+
+web_console_display_t *esp32_web_console_display(void) {
+    return s_web_pixels ? &s_web_display : NULL;
+}
+
+static void *web_display_alloc(size_t bytes) {
+    void *p = heap_caps_malloc(bytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!p) p = malloc(bytes);
+    return p;
+}
+
+static void esp32_web_draw_pixel(int x, int y, int c) {
+    web_console_display_pixel(&s_web_display, x, y, c);
+}
+
+static void esp32_web_draw_rectangle(int x1, int y1, int x2, int y2, int c) {
+    web_console_display_rect(&s_web_display, x1, y1, x2, y2, c);
+}
+
+static void esp32_web_draw_bitmap(int x, int y, int width, int height,
+                                  int scale, int fc, int bc,
+                                  unsigned char *bitmap) {
+    web_console_display_bitmap(&s_web_display, x, y, width, height, scale,
+                               fc, bc, bitmap);
+}
+
+static void esp32_web_scroll_lcd(int lines) {
+    web_console_display_scroll(&s_web_display, lines, gui_bcolour);
+}
+
+static void esp32_web_draw_buffer(int x1, int y1, int x2, int y2,
+                                  unsigned char *p) {
+    web_console_display_draw_buffer(&s_web_display, x1, y1, x2, y2, p);
+}
+
+static void esp32_web_draw_buffer_fast(int x1, int y1, int x2, int y2,
+                                       int blank, unsigned char *p) {
+    (void)blank;
+    web_console_display_draw_buffer(&s_web_display, x1, y1, x2, y2, p);
+}
+
+static void esp32_web_read_buffer(int x1, int y1, int x2, int y2,
+                                  unsigned char *p) {
+    web_console_display_read_buffer(&s_web_display, x1, y1, x2, y2, p);
+}
+
+int esp32_web_console_display_init(void) {
+    int options_changed = Option.DISPLAY_TYPE != DISP_USER ||
+                          Option.DISPLAY_CONSOLE != 1 ||
+                          Option.DefaultFont != 0x01 ||
+                          Option.ColourCode != 1 ||
+                          Option.DefaultFC == 0;
+    size_t pixels = (size_t)ESP32_WEB_DISPLAY_WIDTH *
+                    (size_t)ESP32_WEB_DISPLAY_HEIGHT;
+    if (!s_web_pixels) {
+        s_web_pixels = (uint32_t *)web_display_alloc(pixels * sizeof(*s_web_pixels));
+        if (!s_web_pixels) return 0;
+    }
+    if (!s_web_cmds) {
+        s_web_cmds = (uint8_t *)web_display_alloc(ESP32_WEB_DISPLAY_CMDS);
+        if (!s_web_cmds) return 0;
+    }
+    if (!web_console_display_init(&s_web_display, ESP32_WEB_DISPLAY_WIDTH,
+                                  ESP32_WEB_DISPLAY_HEIGHT, s_web_pixels,
+                                  pixels, s_web_cmds, ESP32_WEB_DISPLAY_CMDS,
+                                  Option.DefaultBC)) {
+        return 0;
+    }
+
+    Option.DISPLAY_TYPE = DISP_USER;
+    DISPLAY_TYPE = DISP_USER;
+    Option.DISPLAY_CONSOLE = 1;
+    OptionConsole = 3;
+    HRes = DisplayHRes = ESP32_WEB_DISPLAY_WIDTH;
+    VRes = DisplayVRes = ESP32_WEB_DISPLAY_HEIGHT;
+    DrawPixel = esp32_web_draw_pixel;
+    DrawRectangle = esp32_web_draw_rectangle;
+    DrawBitmap = esp32_web_draw_bitmap;
+    ScrollLCD = esp32_web_scroll_lcd;
+    DrawBuffer = esp32_web_draw_buffer;
+    DrawBLITBuffer = esp32_web_draw_buffer;
+    DrawBufferFast = esp32_web_draw_buffer_fast;
+    ReadBuffer = esp32_web_read_buffer;
+    ReadBufferFast = esp32_web_read_buffer;
+
+    Option.DefaultFont = 0x01;
+    Option.ColourCode = 1;
+    if (Option.DefaultFC == 0 && Option.DefaultBC == 0) {
+        Option.DefaultFC = 0x00ff00;
+        Option.DefaultBC = 0x000000;
+    }
+    ApplyDefaultConsoleColours();
+    CurrentX = 0;
+    CurrentY = 0;
+    ClearScreen(gui_bcolour);
+    return options_changed;
+}
 
 void hal_vm_framebuffer_shutdown_runtime(void) {}
 void hal_vm_framebuffer_service(void) {}
@@ -19,26 +137,23 @@ void hal_vm_framebuffer_sync(void) {}
 void hal_vm_framebuffer_wait(void) {}
 void hal_vm_framebuffer_copy(char from, char to, int bg) { (void)from; (void)to; (void)bg; }
 
-/* SPI-LCD.h declares Display_Refresh() — vm_sys_graphics.c and FileIO.c
- * call it whenever Option.Refresh == 1 to push a CPU-side framebuffer
- * out to the LCD. Stdio scope has no display; no-op. */
+/* No physical panel flush is required; the TCP poll hook drains CMDS. */
 void Display_Refresh(void) {}
 
-/* Display-related globals + functions referenced by core code that
- * doesn't gate on a display being configured. Stdio scope keeps
- * DISPLAY_TYPE = 0 (no display) so the gated paths skip; the function
- * stubs cover the few calls that fire unconditionally. */
+/* Display-related globals + functions referenced by core code. */
 volatile int DISPLAY_TYPE = 0;
 void ScrollLCDSPISCR(int lines) { (void)lines; }
-void setterminal(int height, int width) { (void)height; (void)width; }
+void setterminal(int height, int width) {
+    if (height > 0) Option.Height = height;
+    if (width > 0) Option.Width = width;
+}
 
-/* PicoCalc 320×320-screen flag, dispatcher state, and direct-buffer
- * primitives. All no-op / zero on a port without a framebuffer. */
+/* PicoCalc 320x320-screen flag, dispatcher state, and direct-buffer
+ * primitives not used by the web display MVP. */
 bool screen320 = 0;
 void DisplayNotSet(void) {}
 void setframebuffer(void) {}
 void closeframebuffer(char layer) { (void)layer; }
-#include <stdint.h>
 void blitmerge(int x0, int y0, int w, int h, uint8_t colour) {
     (void)x0; (void)y0; (void)w; (void)h; (void)colour;
 }

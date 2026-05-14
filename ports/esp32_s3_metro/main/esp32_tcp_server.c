@@ -6,6 +6,7 @@
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
 #include "drivers/web_console/web_console_assets.h"
+#include "drivers/web_console/web_console_display.h"
 #include "drivers/web_console/web_console_protocol.h"
 #include "drivers/web_console/web_console_transport.h"
 #include "shared/net/mm_net_http.h"
@@ -22,7 +23,15 @@
 #define ESP32_TCP_PATH_MAX 128
 #define ESP32_WEB_CONSOLE_RX_BUF 1024
 #define ESP32_WEB_CONSOLE_PAYLOAD_LIMIT 512
-#define ESP32_WEB_CONSOLE_TX_BUF 1024
+#define ESP32_WEB_CONSOLE_TX_BUF 2048
+#define ESP32_WEB_CONSOLE_SEND_CHUNK 1024
+
+typedef enum {
+    ESP32_WEB_TX_IDLE = 0,
+    ESP32_WEB_TX_FRMB_WS_HEADER,
+    ESP32_WEB_TX_FRMB_PAYLOAD_HEADER,
+    ESP32_WEB_TX_FRMB_PIXELS,
+} esp32_web_console_tx_kind_t;
 
 extern volatile bool TCPreceived;
 extern char *TCPreceiveInterrupt;
@@ -37,9 +46,26 @@ typedef struct {
     hal_net_tcp_conn_t conn;
     uint8_t rx_buf[ESP32_WEB_CONSOLE_RX_BUF];
     size_t rx_len;
+    esp32_web_console_tx_kind_t tx_kind;
+    uint8_t ws_header[10];
+    size_t ws_header_len;
+    size_t ws_header_off;
+    uint8_t payload_header[WEB_CONSOLE_FRAME_HEADER_LEN];
+    size_t payload_header_off;
+    size_t pixel_index;
+    uint8_t pixel_chunk[ESP32_WEB_CONSOLE_TX_BUF];
+    size_t pixel_chunk_len;
+    size_t pixel_chunk_off;
+    uint8_t pending_pong[125];
+    size_t pending_pong_len;
+    int pending_pong_valid;
 } esp32_web_console_ws_t;
 
 static esp32_web_console_ws_t s_web_console_ws;
+static uint8_t s_web_console_tx_buf[ESP32_WEB_CONSOLE_TX_BUF];
+static uint8_t s_web_console_payload[ESP32_WEB_CONSOLE_TX_BUF - 16u];
+
+extern web_console_display_t *esp32_web_console_display(void);
 
 static void esp32_tcp_init_slots(void)
 {
@@ -129,13 +155,16 @@ static int esp32_web_console_send_frame(uint8_t opcode, const void *payload,
                                         size_t payload_len)
 {
     if (!s_web_console_ws.conn) return WEB_CONSOLE_TRANSPORT_CLOSED;
-    uint8_t frame[ESP32_WEB_CONSOLE_TX_BUF];
+    if (s_web_console_ws.tx_kind != ESP32_WEB_TX_IDLE) {
+        return WEB_CONSOLE_TRANSPORT_BACKPRESSURE;
+    }
     size_t written = 0;
-    int rc = mm_net_ws_encode_frame(opcode, payload, payload_len, frame,
-                                    sizeof frame, &written);
+    int rc = mm_net_ws_encode_frame(opcode, payload, payload_len,
+                                    s_web_console_tx_buf,
+                                    sizeof s_web_console_tx_buf, &written);
     if (rc != MM_NET_WS_OK) return WEB_CONSOLE_TRANSPORT_ERROR;
-    if (hal_net_tcp_conn_send(s_web_console_ws.conn, frame, written, 100) !=
-        HAL_NET_OK) {
+    if (hal_net_tcp_conn_send(s_web_console_ws.conn, s_web_console_tx_buf,
+                              written, 100) != HAL_NET_OK) {
         esp32_web_console_close();
         return WEB_CONSOLE_TRANSPORT_CLOSED;
     }
@@ -154,7 +183,7 @@ static void esp32_web_console_send_hello(void)
 {
     esp32_web_console_send_text(
         "{\"op\":\"hello\",\"protocol\":1,\"target\":\"esp32_s3_metro\","
-        "\"caps\":[\"status\",\"control\"],\"display\":false,"
+        "\"caps\":[\"status\",\"control\",\"display\"],\"display\":true,"
         "\"audio\":false,\"keyboard\":false}");
 }
 
@@ -162,23 +191,162 @@ static void esp32_web_console_send_status(void)
 {
     char json[192];
     int n = snprintf(json, sizeof json,
-                     "{\"op\":\"status\",\"phase\":3,\"ws\":\"connected\","
-                     "\"display\":\"pending\",\"audio\":\"pending\","
+                     "{\"op\":\"status\",\"phase\":4,\"ws\":\"connected\","
+                     "\"display\":\"ready\",\"audio\":\"pending\","
                      "\"keyboard\":\"pending\"}");
     if (n > 0 && (size_t)n < sizeof json) esp32_web_console_send_text(json);
 }
 
-static void esp32_web_console_send_blank_cmds(void)
+static void put_u16_le(uint8_t *dst, uint16_t v)
 {
-    uint8_t command[8];
-    uint8_t payload[WEB_CONSOLE_FRAME_HEADER_LEN + sizeof command];
-    size_t command_len = web_console_pack_cmd_cls(command, sizeof command, 0);
-    size_t payload_len = web_console_pack_cmds(payload, sizeof payload,
-                                               320, 240, command,
-                                               command_len);
+    dst[0] = (uint8_t)(v & 0xffu);
+    dst[1] = (uint8_t)((v >> 8) & 0xffu);
+}
+
+static void put_u64_be(uint8_t *dst, uint64_t v)
+{
+    for (int i = 0; i < 8; ++i) dst[7 - i] = (uint8_t)(v >> (i * 8));
+}
+
+static void esp32_web_console_start_frmb(web_console_display_t *display)
+{
+    if (!s_web_console_ws.conn || !display) return;
+    uint64_t payload_len = WEB_CONSOLE_FRAME_HEADER_LEN +
+        (uint64_t)display->pixel_count * 4u;
+    s_web_console_ws.ws_header[0] = 0x80u | MM_NET_WS_OPCODE_BINARY;
+    s_web_console_ws.ws_header[1] = 127u;
+    put_u64_be(s_web_console_ws.ws_header + 2, payload_len);
+    s_web_console_ws.ws_header_len = 10;
+    s_web_console_ws.ws_header_off = 0;
+    memcpy(s_web_console_ws.payload_header, "FRMB", 4);
+    put_u16_le(s_web_console_ws.payload_header + 4,
+               (uint16_t)display->width);
+    put_u16_le(s_web_console_ws.payload_header + 6,
+               (uint16_t)display->height);
+    s_web_console_ws.payload_header_off = 0;
+    s_web_console_ws.pixel_index = 0;
+    s_web_console_ws.pixel_chunk_len = 0;
+    s_web_console_ws.pixel_chunk_off = 0;
+    s_web_console_ws.tx_kind = ESP32_WEB_TX_FRMB_WS_HEADER;
+}
+
+static int esp32_web_console_send_raw_progress(const uint8_t *buf, size_t len,
+                                               size_t *off)
+{
+    if (!s_web_console_ws.conn) return -1;
+    if (*off >= len) return 1;
+    size_t n = len - *off;
+    if (n > ESP32_WEB_CONSOLE_SEND_CHUNK) n = ESP32_WEB_CONSOLE_SEND_CHUNK;
+    int rc = hal_net_tcp_conn_send(s_web_console_ws.conn, buf + *off, n, 1);
+    if (rc == HAL_NET_TIMEOUT || rc == HAL_NET_WOULD_BLOCK) return 0;
+    if (rc != HAL_NET_OK) {
+        esp32_web_console_close();
+        return -1;
+    }
+    *off += n;
+    return *off >= len ? 1 : 0;
+}
+
+static int esp32_web_console_progress_frmb(web_console_display_t *display)
+{
+    if (!display) {
+        s_web_console_ws.tx_kind = ESP32_WEB_TX_IDLE;
+        return -1;
+    }
+    if (s_web_console_ws.tx_kind == ESP32_WEB_TX_FRMB_WS_HEADER) {
+        int rc = esp32_web_console_send_raw_progress(
+            s_web_console_ws.ws_header, s_web_console_ws.ws_header_len,
+            &s_web_console_ws.ws_header_off);
+        if (rc <= 0) return rc;
+        s_web_console_ws.tx_kind = ESP32_WEB_TX_FRMB_PAYLOAD_HEADER;
+    }
+    if (s_web_console_ws.tx_kind == ESP32_WEB_TX_FRMB_PAYLOAD_HEADER) {
+        int rc = esp32_web_console_send_raw_progress(
+            s_web_console_ws.payload_header,
+            sizeof s_web_console_ws.payload_header,
+            &s_web_console_ws.payload_header_off);
+        if (rc <= 0) return rc;
+        s_web_console_ws.tx_kind = ESP32_WEB_TX_FRMB_PIXELS;
+    }
+    while (s_web_console_ws.tx_kind == ESP32_WEB_TX_FRMB_PIXELS) {
+        if (s_web_console_ws.pixel_chunk_off >=
+            s_web_console_ws.pixel_chunk_len) {
+            if (s_web_console_ws.pixel_index >= display->pixel_count) {
+                s_web_console_ws.tx_kind = ESP32_WEB_TX_IDLE;
+                return 1;
+            }
+            size_t remaining = display->pixel_count -
+                               s_web_console_ws.pixel_index;
+            size_t pixels = sizeof s_web_console_ws.pixel_chunk / 4u;
+            if (pixels > remaining) pixels = remaining;
+            uint8_t *p = s_web_console_ws.pixel_chunk;
+            const uint32_t *src = display->pixels +
+                                  s_web_console_ws.pixel_index;
+            for (size_t i = 0; i < pixels; ++i) {
+                uint32_t c = src[i];
+                *p++ = (uint8_t)((c >> 16) & 0xffu);
+                *p++ = (uint8_t)((c >> 8) & 0xffu);
+                *p++ = (uint8_t)(c & 0xffu);
+                *p++ = 0xffu;
+            }
+            s_web_console_ws.pixel_index += pixels;
+            s_web_console_ws.pixel_chunk_len = pixels * 4u;
+            s_web_console_ws.pixel_chunk_off = 0;
+        }
+        int rc = esp32_web_console_send_raw_progress(
+            s_web_console_ws.pixel_chunk, s_web_console_ws.pixel_chunk_len,
+            &s_web_console_ws.pixel_chunk_off);
+        if (rc <= 0) return rc;
+    }
+    return 1;
+}
+
+static int esp32_web_console_send_binary_payload_now(const uint8_t *payload,
+                                                     size_t payload_len)
+{
+    size_t written = 0;
+    int rc = mm_net_ws_encode_frame(MM_NET_WS_OPCODE_BINARY, payload,
+                                    payload_len, s_web_console_tx_buf,
+                                    sizeof s_web_console_tx_buf, &written);
+    if (rc != MM_NET_WS_OK) return 0;
+    rc = hal_net_tcp_conn_send(s_web_console_ws.conn, s_web_console_tx_buf,
+                               written, 1);
+    if (rc == HAL_NET_TIMEOUT || rc == HAL_NET_WOULD_BLOCK) return 0;
+    if (rc != HAL_NET_OK) {
+        esp32_web_console_close();
+        return -1;
+    }
+    return 1;
+}
+
+static void esp32_web_console_drain_display(void)
+{
+    web_console_display_t *display = esp32_web_console_display();
+    if (!s_web_console_ws.conn || !display) return;
+
+    if (s_web_console_ws.tx_kind != ESP32_WEB_TX_IDLE) {
+        (void)esp32_web_console_progress_frmb(display);
+        return;
+    }
+    if (s_web_console_ws.pending_pong_valid) {
+        size_t len = s_web_console_ws.pending_pong_len;
+        s_web_console_ws.pending_pong_valid = 0;
+        (void)esp32_web_console_send_frame(MM_NET_WS_OPCODE_PONG,
+                                           s_web_console_ws.pending_pong,
+                                           len);
+        if (!s_web_console_ws.conn) return;
+    }
+    if (web_console_display_take_resync(display)) {
+        esp32_web_console_start_frmb(display);
+        (void)esp32_web_console_progress_frmb(display);
+        return;
+    }
+
+    size_t payload_len = web_console_display_drain_cmds(
+        display, s_web_console_payload, sizeof s_web_console_payload);
     if (payload_len) {
-        (void)esp32_web_console_send_frame(MM_NET_WS_OPCODE_BINARY, payload,
-                                           payload_len);
+        (void)esp32_web_console_send_binary_payload_now(s_web_console_payload,
+                                                        payload_len);
     }
 }
 
@@ -264,8 +432,15 @@ static void esp32_web_console_process_rx(void)
         if (frame.opcode == MM_NET_WS_OPCODE_TEXT) {
             esp32_web_console_handle_text(payload, frame.payload_len);
         } else if (frame.opcode == MM_NET_WS_OPCODE_PING) {
-            (void)esp32_web_console_send_frame(MM_NET_WS_OPCODE_PONG,
-                                               payload, frame.payload_len);
+            if (s_web_console_ws.tx_kind == ESP32_WEB_TX_IDLE) {
+                (void)esp32_web_console_send_frame(MM_NET_WS_OPCODE_PONG,
+                                                   payload, frame.payload_len);
+            } else if (frame.payload_len <= sizeof s_web_console_ws.pending_pong) {
+                memcpy(s_web_console_ws.pending_pong, payload,
+                       frame.payload_len);
+                s_web_console_ws.pending_pong_len = frame.payload_len;
+                s_web_console_ws.pending_pong_valid = 1;
+            }
         } else if (frame.opcode == MM_NET_WS_OPCODE_CLOSE) {
             esp32_web_console_send_close(frame.close_code ?
                                          frame.close_code : 1000u);
@@ -288,12 +463,18 @@ static void esp32_web_console_poll(void)
             s_web_console_ws.conn,
             s_web_console_ws.rx_buf + s_web_console_ws.rx_len,
             sizeof s_web_console_ws.rx_buf - s_web_console_ws.rx_len, &len);
-        if (rc == HAL_NET_WOULD_BLOCK) return;
+        if (rc == HAL_NET_WOULD_BLOCK) {
+            esp32_web_console_drain_display();
+            return;
+        }
         if (rc != HAL_NET_OK) {
             esp32_web_console_close();
             return;
         }
-        if (len == 0) return;
+        if (len == 0) {
+            esp32_web_console_drain_display();
+            return;
+        }
         s_web_console_ws.rx_len += len;
         esp32_web_console_process_rx();
         if (!s_web_console_ws.conn) return;
@@ -334,7 +515,9 @@ static int esp32_web_console_accept_ws(hal_net_tcp_conn_t conn,
     s_web_console_ws.conn = conn;
     esp32_web_console_send_hello();
     esp32_web_console_send_status();
-    esp32_web_console_send_blank_cmds();
+    web_console_display_t *display = esp32_web_console_display();
+    if (display) display->needs_resync = 1;
+    esp32_web_console_drain_display();
     return 1;
 }
 

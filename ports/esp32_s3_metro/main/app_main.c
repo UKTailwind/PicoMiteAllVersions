@@ -29,6 +29,7 @@ extern void esp32_console_init(void);
 extern void MMBasic_PrintBanner(void);
 extern int esp32_flash_storage_load_options(void);
 extern int esp32_flash_storage_init(void);
+extern int esp32_web_console_display_init(void);
 
 static int esp32_options_valid(void) {
     return Option.Magic == MagicKey &&
@@ -111,6 +112,7 @@ void app_main(void) {
      * gate is false and PRINT / cmd_print produce no output until the
      * first error() call retroactively sets OptionConsole=1. */
     ClearRuntime(true);
+    if (esp32_web_console_display_init()) SaveOptions();
 
     /* Mount LittleFS for A: drive eagerly so cmd_files / cmd_save /
      * cmd_load can call lfs_*_open directly without going through
