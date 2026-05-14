@@ -502,6 +502,7 @@ void port_fun_mm_mqtt_copy(void) {}
 /* ------------------------------------------------------------------ */
 int  startupcomplete = 1;        /* host-style: always treat boot as complete */
 uint32_t PSRAMsize = 0;
+uintptr_t PSRAMbase = 0;
 bool rp2350a = false;            /* board flag — we are not RP2350 */
 
 void copyframetoscreen(uint8_t *s, int xstart, int xend, int ystart, int yend, int odd) {

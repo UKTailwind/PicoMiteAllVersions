@@ -18,7 +18,7 @@
 
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
-#include "esp32_psram.h"
+#include "hal/hal_psram.h"
 #include "runtime/runtime.h"
 
 extern jmp_buf mark;
@@ -70,7 +70,12 @@ void app_main(void) {
         vTaskDelay(pdMS_TO_TICKS(200));
     }
     printf("\n");
-    esp32_psram_print_boot_report();
+
+    /* Acquire the PSRAM slab and publish PSRAMbase / PSRAMsize before
+     * any code reads them. mmbasic_runtime_init_common's heap init does
+     * not depend on PSRAM, but the shared boot banner (and any later
+     * BASIC code referencing MM.INFO(PSRAM SIZE)) does. */
+    hal_psram_init();
 
     /* MMBasic boot. flash_prog_buf is sized MAX_PROG_SIZE + 4096 in
      * esp32_compat.c; the constructor 0xff-fills both the program region

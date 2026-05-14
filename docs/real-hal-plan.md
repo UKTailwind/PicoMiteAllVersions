@@ -8,6 +8,27 @@ This file is the index. Topic detail lives under `real-hal/` and `real-hal-fixup
 - **Predecessor plans:** `bridge-restoration-plan.md`, `host-hal-plan.md`, `web-host-plan.md`. Locked invariants from those plans are not revisited here.
 - **Active fixup:** `real-hal-fixup-plan.md` — the correction for the Phase 3b ifdef-rename episode. Read this before touching any HAL work.
 
+## Modular stub drivers (proposed direction)
+
+Each non-Pico port today hand-writes a monolithic peripheral-stubs file (`host_peripheral_stubs.c`, `esp32_peripheral_stubs.c`, `pc386_peripheral_stubs.c`) that is mostly redundant copy-paste. See [`port-stub-audit.md`](port-stub-audit.md) for the catalog. The direction is to replace these monoliths with **modular stub drivers that live alongside their real counterparts** under `drivers/<subsystem>/`:
+
+```
+drivers/i2c/      i2c_stub.c        i2c_esp32.c       i2c_pico.c
+drivers/spi/      spi_stub.c        spi_esp32.c       spi_pico.c
+drivers/pwm/      pwm_stub.c        pwm_ledc_esp32.c  pwm_pico.c
+drivers/audio/    audio_stub.c      audio_i2s_esp32.c audio_sb16_pc386.c
+drivers/onewire/  onewire_stub.c    onewire_bitbang.c
+…
+```
+
+Each port's `port_sources.cmake` composes an explicit manifest — either the stub or the real driver for each subsystem. Promoting a feature is a one-line cmake change; `grep _stub` on a port's cmake lists exactly what is still missing. No weak symbols, no preprocessor gating — same explicit-composition discipline as the rest of this plan.
+
+**Default posture: fail loudly.** Stubs call `error("X not supported on this port")` (matching PC386's posture for `cmd_pwm` / `cmd_servo`). The current silent-no-op default hides bugs — e.g. host_native's `cmd_pin` silently drops writes while `fun_pin` succeeds, because the two halves disagree on whether the subsystem is "supported."
+
+**Bringup escape hatch.** A global compiler flag — proposed `-DHAL_STUBS_SILENT` — flips every stub from `error(...)` to silent no-op. This is the bringup mode: a new port can link every subsystem as a stub, boot the interpreter end-to-end, then incrementally replace stubs with real drivers and drop the flag once enough hardware is wired that hard failure is the right posture.
+
+Migration order: I2C as the pattern carve-out, then the easy single-subsystem groups (SPI, IR, OneWire, DHT22/DS18B20, RTC, watchdog, PIO, AES, xregex, PNG), then state-bearing groups (audio, GPS, mouse, keypad), then display-adjacent groups, then delete the three `*_peripheral_stubs.c` files when empty.
+
 ## The standard (non-negotiable)
 
 A core file is "HAL-clean" when **all four** hold:

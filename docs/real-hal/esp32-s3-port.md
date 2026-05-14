@@ -415,43 +415,23 @@ These are lower priority than making the port identity clean and testable.
 
 ## Stage H — ESP32 PSRAM contract
 
-**Goal:** enable the Metro's 8 MB Octal PSRAM through ESP-IDF in a way that matches ESP32 hardware and does not import RP2350 assumptions.
+**Superseded by [`esp32-psram-realign-plan.md`](esp32-psram-realign-plan.md).**
 
-### H1. PSRAM policy/design doc ✅
+The original Stage H (H1–H3) walled ESP32 PSRAM off behind port-specific
+`MM.INFO(ESP32 PSRAM …)` keys with `PSRAMsize = 0` permanently. That
+policy is gone. ESP32-S3 PSRAM is now owned by MMBasic through the same
+shared path as RP2350: a fixed slab is reserved at boot via
+`heap_caps_aligned_alloc(MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT)`, its base
+and size are published to `PSRAMbase` / `PSRAMsize`, and BASIC sees the
+identical surface — `MM.INFO(PSRAM SIZE)`, `RAM TEST` / `RAM SAVE` /
+`RAM LIST` / `RAM LOAD` / `RAM RUN`, `Memory.c` routing for large
+arrays, the lot. The cache + nocache-alias divergence lives behind
+`hal/hal_psram.h`; `RAM TEST NOCACHE` errors on ESP32 because
+`hal_psram_nocache_alias()` returns `NULL`.
 
-- BASIC-visible `PSRAMsize` remains 0 on ESP32 for this stage. `MM.INFO(PSRAM SIZE)` therefore stays 0 and generic BASIC heap behavior remains unchanged.
-- `AllMemory`, `PSRAMbase`, `psmap`, generic `GetPSMemory()`, large arrays/strings, and VM runtime allocations do not move to ESP32 PSRAM yet.
-- Only ESP32-owned port code/tools may call ESP-IDF heap_caps directly. Current consumers are the reporting helpers and the opt-in smoke march.
-- If PSRAM is absent or fails init on the N16R8 target, boot/build/smoke should fail visibly rather than silently changing BASIC memory policy.
-- There is no ESP32 `RAM TEST` command in this stage; the smoke runner drives the ESP32-specific heap_caps march.
-
-### H2. Enable ESP-IDF PSRAM minimally ✅
-
-Enable the correct Octal PSRAM sdkconfig settings for the N16R8 Metro and prove boot stability.
-
-Exit gate:
-
-- `idf.py build` and flash pass.
-- Boot reports detected PSRAM through ESP-IDF.
-- Existing Stage G smoke suite still passes with PSRAM enabled but not yet used for core allocations.
-
-### H3. Add an ESP32 PSRAM march/allocation smoke ✅
-
-Implemented as the opt-in `psram` suite in `porttools/esp32_fs_vm_smoke.py`. It checks that generic `MM.INFO(PSRAM SIZE)` is still 0, reads ESP-IDF detected/free/largest SPIRAM through ESP32-specific `MM.INFO(...)` keys, allocates the requested byte count from `heap_caps_malloc(MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT)`, runs a destructive march, frees the allocation, and prints a BASIC prompt marker afterward.
-
-This is the ESP32 analogue of Pico's `RAM TEST`, not a copy of the Pico implementation.
-
-### H4. Move selected allocations deliberately ⏳
-
-Only after H1-H3:
-
-- Consider moving large bytecode/compiler buffers or large BASIC arrays to PSRAM.
-- Consider framebuffer/display allocations when display work starts; require `MALLOC_CAP_DMA` where ESP-IDF panel drivers need it.
-- Keep latency-sensitive interpreter state in internal SRAM unless measurement proves otherwise.
-
-### H5. Hardware validation ⏳
-
-Repeat the full Stage G smoke suite with PSRAM enabled and with any new PSRAM-backed allocation paths active. Add a long-running stress case if PSRAM becomes part of normal BASIC heap behavior.
+See the realign plan for the per-phase trail, the slab-size knob
+(`HAL_PORT_PSRAM_SLAB_BYTES` in `port_config.h`), and the cross-target
+smoke harness `porttools/psram_smoke.py`.
 
 ## Out of scope (deferred — don't expand without an explicit goal)
 

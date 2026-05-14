@@ -114,6 +114,13 @@ extern bool rp2350a;
  * value — `if (PSRAMsize)` branches dead-code on RP2040 — so the extern
  * must be visible on every target. */
 extern uint32_t PSRAMsize;
+/* PSRAMbase is the runtime base address of the PSRAM region. Set to 0
+ * on targets without PSRAM. Otherwise filled in by hal_psram_init() at
+ * boot: 0x11000000 (XIP cache) on RP2350 with QSPI PSRAM detected, or
+ * the heap_caps_aligned_alloc() return value on ESP32-S3. Callers treat
+ * (uint8_t*)PSRAMbase as the slab pointer; the PSRAMsize guard keeps
+ * dereferences out of reach on stub ports. */
+extern uintptr_t PSRAMbase;
 #ifdef rp2350
 extern const uint32_t MAP16DEF[16];
 extern void _Z10copy_wordsPKmPmm(uint32_t *s, uint32_t *d, int n);

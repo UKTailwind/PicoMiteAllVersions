@@ -290,7 +290,7 @@ WiFi-family board) and adjust two sections:
    (real impl vs no-op stub); pick one per axis. Existing axes:
    `display_merge_pico` vs `display_merge_stub`, `vm_framebuffer_picomite`
    vs `vm_framebuffer_stub`, `audio_mp3_real` vs `audio_mp3_stub`,
-   `psram_heap_pico` vs `psram_heap_stub`, `upng_sprite` vs
+   `psram_heap_real` vs `psram_heap_stub`, `upng_sprite` vs
    `upng_sprite_stub`, `gui_touch` vs `gui_touch_stub`, `spi_lcd_fastgfx`
    vs `spi_lcd_fastgfx_stub`. Add `MMweb_stubs.c` if your port doesn't
    link the WiFi stack, `gfx_3d.c` if it does link the 3D family
@@ -853,6 +853,36 @@ The `mmbasic_stdio` port is the strictest test of core HAL cleanliness: its link
 If your board needs a peripheral not already under `drivers/*/`, add it there — **not in your port directory**. Drivers are shared across ports; port directories are per-board recipes, not per-board code.
 
 Short version of the rules: one peripheral per driver, no cross-driver includes, at most one MCU shim, local target-macro `#ifdef` gates are fine inside driver files, RAM-resident annotations honoured, ship conformance tests under `drivers/<name>/tests/` if feasible. Full detail in `drivers/CONTRIBUTING.md`.
+
+## PSRAM HAL contract
+
+If your board has external PSRAM (or any SoC-managed SPIRAM region) and
+you want MMBasic's `RAM` command, `MM.INFO(PSRAM SIZE)`, and Memory.c
+large-allocation routing to light up, implement `hal/hal_psram.h` in a
+port-owned TU (e.g. `ports/<your_board>/hal_psram_<chip>.c`) and link
+`drivers/psram_heap/psram_heap_real.c`. The four entry points are:
+
+- `hal_psram_init()` — acquire the PSRAM region (QSPI detect on RP2350;
+  `esp_psram_init()` + `heap_caps_aligned_alloc(MALLOC_CAP_SPIRAM)` on
+  ESP32) and publish `PSRAMbase` / `PSRAMsize`. Idempotent. Must run
+  before any code reads those globals.
+- `hal_psram_cache_sync()` — clean + invalidate the PSRAM-side cache.
+  No-op on ports with no cache between CPU and PSRAM.
+- `hal_psram_nocache_alias(base)` — return a CPU pointer that bypasses
+  the cache (RP2350 returns `base + 0x04000000`). Return `NULL` if the
+  port has no uncached aliased view; shared code translates that into
+  the `RAM TEST NOCACHE` "not supported" error.
+- `hal_psram_save_settings()` / `_restore_settings()` — paired bracket
+  around an operation that may clobber PSRAM controller state (RP2350
+  flash erase/program touches the QMI M[0] registers). No-ops on ports
+  whose flash controller is independent of PSRAM (ESP32, host).
+
+Ports without PSRAM link `drivers/psram_heap/psram_heap_stub.c` and
+`drivers/psram_heap/hal_psram_stub.c` — both leave `PSRAMsize = 0`, and
+every `if (!PSRAMsize)` guard in the shared `RAM` / Memory.c paths
+short-circuits cleanly. See `hal/hal_psram.h` for the full contract
+text and `ports/pico_sdk_common/hal_psram_pico.c` /
+`ports/esp32_s3_metro/main/hal_psram_esp32.c` for working impls.
 
 # Ground rules
 

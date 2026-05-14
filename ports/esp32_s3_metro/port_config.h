@@ -115,4 +115,20 @@
 /* BCCrashInfo storage placement. ESP32 currently uses regular BSS. */
 #define HAL_PORT_BC_CRASH_INFO_ATTR
 
+/* Slab size reserved from ESP-IDF SPIRAM at boot for MMBasic PSRAM
+ * ownership. The Metro N16R8 module is 8 MB total; ESP-IDF retains the
+ * remainder for its own WiFi RX / SmartConfig buffers. Tunable in the
+ * 4–7 MB range — start conservative and bump after measuring free
+ * SPIRAM after WiFi join. This is the *heap* portion of the slab; the
+ * physical slab acquired by hal_psram_esp32.c is larger, see below. */
+#define HAL_PORT_PSRAM_SLAB_BYTES        (6u * 1024u * 1024u)
+
+/* Slot region size for `RAM SAVE` / `RAM LOAD` numbered slots. The
+ * shared formula PSRAMblock = PSRAMbase + PSRAMsize + 0x60000 puts this
+ * past the heap region, so hal_psram_esp32.c allocates a physical slab
+ * of HAL_PORT_PSRAM_SLAB_BYTES + 0x60000 + HAL_PORT_PSRAM_BLOCK_SIZE
+ * bytes and publishes only HAL_PORT_PSRAM_SLAB_BYTES as PSRAMsize so
+ * Memory.c's bitmap allocator stays within the heap portion. */
+#define HAL_PORT_PSRAM_BLOCK_SIZE        (MAXRAMSLOTS * MAX_PROG_SIZE)
+
 #endif /* ESP32_S3_METRO_PORT_CONFIG_H */

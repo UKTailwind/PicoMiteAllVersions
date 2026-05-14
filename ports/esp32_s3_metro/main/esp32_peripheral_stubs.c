@@ -29,7 +29,6 @@
 #include "runtime/runtime.h"
 #include "vm_sys_pin.h"
 #include "hal/hal_time.h"
-#include "esp32_psram.h"
 
 /* esp32_parse_pin_arg — converts a "GPn" textual pin argument (or raw pin
  * number) to the VM's internal pin index. Used by cmd_setpin / fun_pin. */
@@ -46,6 +45,17 @@ static int esp32_parse_pin_arg(unsigned char *arg) {
  * loading is a different format from .bas — also out of scope. */
 void LoadPNG(unsigned char *p) { (void)p; error("PNG not supported on this port"); }
 int FileLoadCMM2Program(char *fname, bool message) { (void)fname; (void)message; return 0; }
+
+/* `RAM FILE LOAD <slot>, "name.bas"` reaches MemLoadProgram via the
+ * shared cmd_psram. The real implementation lives in pico_sdk_common's
+ * mem_writeblock.c for RP2350. ESP32 doesn't ship the legacy XIP flash
+ * walker yet; stub it so the link resolves and surface the limit at
+ * runtime if the user tries to use it. */
+int MemLoadProgram(unsigned char *fname, unsigned char *ram) {
+    (void)fname; (void)ram;
+    error("RAM FILE LOAD not supported on this port");
+    return 0;
+}
 
 /* OPTION LIST diagnostic dump — limited to the ESP32 stdio option
  * surface currently owned by this port. */
@@ -465,25 +475,6 @@ void fun_info(void) {
     }
     if (checkstring(ep, (unsigned char *)"PSRAM SIZE")) {
         iret = PSRAMsize; targ = T_INT; return;
-    }
-    if (checkstring(ep, (unsigned char *)"ESP32 PSRAM SIZE")) {
-        iret = esp32_psram_detected_bytes(); targ = T_INT; return;
-    }
-    if (checkstring(ep, (unsigned char *)"ESP32 PSRAM FREE")) {
-        iret = esp32_psram_free_bytes(); targ = T_INT; return;
-    }
-    if (checkstring(ep, (unsigned char *)"ESP32 PSRAM LARGEST")) {
-        iret = esp32_psram_largest_block_bytes(); targ = T_INT; return;
-    }
-    if ((tp = checkstring(ep, (unsigned char *)"ESP32 PSRAM MARCH"))) {
-        int64_t requested = getinteger(tp);
-        if (requested < 4 || requested > INT32_MAX) error("Invalid PSRAM smoke size");
-        esp32_psram_smoke_result_t result;
-        if (esp32_psram_smoke_march((size_t)requested, &result) != 0) {
-            error("ESP32 PSRAM smoke failed at $",
-                  (char *)(result.failed_phase ? result.failed_phase : "unknown"));
-        }
-        iret = (int64_t)result.allocated_bytes; targ = T_INT; return;
     }
     if (checkstring(ep, (unsigned char *)"STACK")) {
         iret = (int64_t)uxTaskGetStackHighWaterMark(NULL) * sizeof(StackType_t);

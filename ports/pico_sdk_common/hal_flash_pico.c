@@ -24,9 +24,7 @@
 
 #include "configuration.h"             /* FLASH_TARGET_OFFSET, PROGSTART, MAX_PROG_SIZE, FLASH_ERASE_SIZE */
 #include "hal/hal_flash.h"
-
-extern void mmbasic_save_psram_settings(void);
-extern void mmbasic_restore_psram_settings(void);
+#include "hal/hal_psram.h"
 
 static uint32_t s_flash_irq_state;
 static int s_flash_write_depth;
@@ -69,7 +67,7 @@ static void hal_flash_range_program_preserving_m0(uint32_t offset, const uint8_t
 void hal_flash_write_begin(void)
 {
     if (s_flash_write_depth++ == 0) {
-        mmbasic_save_psram_settings();
+        hal_psram_save_settings();
         s_flash_irq_state = save_and_disable_interrupts();
     }
 }
@@ -78,7 +76,7 @@ void hal_flash_write_end(void)
 {
     if (s_flash_write_depth <= 0) return;
     if (--s_flash_write_depth == 0) {
-        mmbasic_restore_psram_settings();
+        hal_psram_restore_settings();
         restore_interrupts(s_flash_irq_state);
         s_flash_irq_state = 0;
     }
@@ -96,11 +94,11 @@ int hal_flash_erase(uint32_t offset, size_t len)
     if ((len    % FLASH_SECTOR_SIZE) != 0) return -EINVAL;
 
     int local_psram_save = !hal_flash_write_active();
-    if (local_psram_save) mmbasic_save_psram_settings();
+    if (local_psram_save) hal_psram_save_settings();
     uint32_t irqs = save_and_disable_interrupts();
     hal_flash_range_erase_preserving_m0(offset, len);
     restore_interrupts(irqs);
-    if (local_psram_save) mmbasic_restore_psram_settings();
+    if (local_psram_save) hal_psram_restore_settings();
     return 0;
 }
 
@@ -112,11 +110,11 @@ int hal_flash_program(uint32_t offset, const void *buf, size_t len)
     if ((len    % FLASH_PAGE_SIZE) != 0) return -EINVAL;
 
     int local_psram_save = !hal_flash_write_active();
-    if (local_psram_save) mmbasic_save_psram_settings();
+    if (local_psram_save) hal_psram_save_settings();
     uint32_t irqs = save_and_disable_interrupts();
     hal_flash_range_program_preserving_m0(offset, (const uint8_t *)buf, len);
     restore_interrupts(irqs);
-    if (local_psram_save) mmbasic_restore_psram_settings();
+    if (local_psram_save) hal_psram_restore_settings();
     return 0;
 }
 

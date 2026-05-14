@@ -26,7 +26,7 @@ drivers/<name>/
                          mode-ops vs blit-ops vs memory layout)
 ```
 
-The **real-and-stub pattern** is load-bearing. Core files call the driver's entry points unconditionally — `Memory.c` calls `GetPSMemory()`, `Audio.c` calls `hal_audio_*`, `FileIO.c` calls `port_mount_sd_drive()`. The device target builds link the real `*.c`; targets without the peripheral link the `*_stub.c`. The stubs satisfy the linker and rely on runtime guards (`if (PSRAMsize)`, empty-body no-ops, error-returning fallbacks) to stay dormant. `psram_heap_pico.c` + `psram_heap_stub.c` is the canonical pair — read them first if you're adding a new driver with a device/non-device split.
+The **real-and-stub pattern** is load-bearing. Core files call the driver's entry points unconditionally — `Memory.c` calls `GetPSMemory()`, `Audio.c` calls `hal_audio_*`, `FileIO.c` calls `port_mount_sd_drive()`. The device target builds link the real `*.c`; targets without the peripheral link the `*_stub.c`. The stubs satisfy the linker and rely on runtime guards (`if (PSRAMsize)`, empty-body no-ops, error-returning fallbacks) to stay dormant. `psram_heap_real.c` + `psram_heap_stub.c` is the canonical pair — read them first if you're adding a new driver with a device/non-device split.
 
 ## Rules
 

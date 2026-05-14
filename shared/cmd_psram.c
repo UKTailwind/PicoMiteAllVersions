@@ -1,27 +1,24 @@
 /*
- * ports/pico_sdk_common/cmd_psram.c — RAM command (PSRAM slot
- * management) for RP2350 variants with a QSPI PSRAM region.
+ * shared/cmd_psram.c — `RAM` command (PSRAM slot management + march
+ * test) implementation, shared across every port that exposes the
+ * command through its port_tokens.h table.
  *
- * The feature is RP2350-only (requires the 8MB PSRAM block and the
- * mmap/psmap page tables); ports expose the command only when their
- * port_tokens.h supplies HAL_PORT_RAM_CMD_TOKEN. Body-level ifdefs here
- * are permissible per the fixup-plan rules (port impl file).
+ * Hardware-clean: all cache and nocache-alias work routes through
+ * hal/hal_psram.h. The runtime gate is `if (!PSRAMsize)`; ports that
+ * don't expose PSRAM keep PSRAMsize at 0 and the gate fires before any
+ * HAL call. The `RAM TEST NOCACHE` modifier is supported only on ports
+ * whose hal_psram_nocache_alias() returns non-NULL; everywhere else the
+ * command errors with "NOCACHE not supported on this port".
  */
 
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
 #include "hal/hal_flash.h"
-#include "hardware/sync.h"
-#include "hardware/xip_cache.h"
-
-#if defined(rp2350) && (PSRAMbase != 0)
-
-extern unsigned int mmap[HEAP_MEMORY_SIZE / PAGESIZE / PAGESPERWORD];
-extern unsigned int psmap[7 * 1024 * 1024 / PAGESIZE / PAGESPERWORD];
+#include "hal/hal_psram.h"
 
 /* Symbols not reachable through Hardware_Includes.h's PICOMITEWEB-gated
- * sections — declare here so this TU compiles under the rp2350+!WEB
- * gate. All are defined in core (FileIO.c / PicoMite.c). */
+ * sections — declare here so this TU compiles across every port. All
+ * are defined in core (FileIO.c / PicoMite.c). */
 extern int MemLoadProgram(unsigned char *fname, unsigned char *ram);
 extern const uint8_t *flash_target_contents;
 extern const uint8_t *flash_progmemory;
@@ -54,25 +51,18 @@ typedef enum {
 static void psram_test_barrier(psram_test_mode_t mode)
 {
     if (mode == PSRAM_TEST_CACHED) {
-        xip_cache_clean_all();
-        xip_cache_invalidate_all();
-    } else {
-        /*
-         * No-cache writes bypass the XIP cache. Cleaning after them can
-         * write stale dirty cached lines back over the just-written data, so
-         * only order the memory accesses here.
-         */
-        __dsb();
-        __isb();
+        hal_psram_cache_sync();
     }
+    /* No-cache writes bypass the cache by definition, so there's no
+     * cache state to flush between phases. The volatile pointer in the
+     * test loop already orders the accesses. */
 }
 
 static void psram_march_test(uint8_t *base, size_t bytes, psram_test_mode_t mode)
 {
     volatile uint32_t *mem = (volatile uint32_t *)base;
     size_t words = bytes / sizeof(uint32_t);
-    xip_cache_clean_all();
-    xip_cache_invalidate_all();
+    hal_psram_cache_sync();
     MMPrintString("RAM TEST phase 0 fill zero\r\n");
     for (size_t i = 0; i < words; i++) mem[i] = 0u;
     psram_test_barrier(mode);
@@ -128,15 +118,18 @@ void MIPS16 cmd_psram(void)
         psram_test_mode_t mode = PSRAM_TEST_CACHED;
         skipspace(p);
         unsigned char *tp;
+        unsigned char *nocache_kw = NULL;
         if ((tp = checkstring(p, (unsigned char *)"NOCACHE"))) {
-            test_base = (uint8_t *)(PSRAMbase + 0x04000000u);
-            mode = PSRAM_TEST_NOCACHE;
-            p = tp;
-            skipspace(p);
+            nocache_kw = tp;
         } else if ((tp = checkstring(p, (unsigned char *)"NC"))) {
-            test_base = (uint8_t *)(PSRAMbase + 0x04000000u);
+            nocache_kw = tp;
+        }
+        if (nocache_kw) {
+            uint8_t *alias = hal_psram_nocache_alias((uint8_t *)PSRAMbase);
+            if (alias == NULL) error("NOCACHE not supported on this port");
+            test_base = alias;
             mode = PSRAM_TEST_NOCACHE;
-            p = tp;
+            p = nocache_kw;
             skipspace(p);
         }
         if (*p) {
@@ -298,5 +291,3 @@ void MIPS16 cmd_psram(void)
         error("Syntax");
     }
 }
-
-#endif /* defined(rp2350) && (PSRAMbase != 0) */

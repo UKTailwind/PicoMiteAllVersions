@@ -578,13 +578,10 @@ const struct Displays display_details[1] = {{ .ref = 0, .name = {0}, .speed = 0,
     .horizontal = 0, .vertical = 0, .bits = 0, .buffered = 0,
     .CPOL = 0, .CPHASE = 0 }};
 
-/* PSRAM-cache save/restore stubs — real implementation lives in
- * ports/pico_sdk_common/psram_cache.c for device builds; host has no
- * PSRAM and no XIP cache to manage. Lets FileIO.c's
- * fileio_flash_write_begin / fileio_flash_write_end bodies run
- * unconditionally. */
-void mmbasic_save_psram_settings(void) {}
-void mmbasic_restore_psram_settings(void) {}
+/* PSRAM-cache save/restore now lives behind hal_psram.h; the host build
+ * pulls in drivers/psram_heap/hal_psram_stub.c which provides no-op
+ * bodies for hal_psram_save_settings / _restore_settings and the
+ * cache_sync / nocache_alias entry points. */
 
 /* RP2350 chip-variant flag. On every device build PicoMite.c defines this
  * (true=RP2350A or RP2040, false=RP2350B); host has no chip so default to
@@ -603,10 +600,13 @@ void port_runtime_abort_dma(void) {}
 void port_runtime_disable_watchdog(void) {}
 
 
-/* PSRAMsize is extern'd unconditionally in Hardware_Includes.h and
- * read as a runtime value by MMBasic.c (the PSRAM-range check in
- * ClearVars); PicoMite.c defines it on device. Host has no PSRAM. */
+/* PSRAMsize / PSRAMbase are extern'd unconditionally in
+ * Hardware_Includes.h and read as runtime values by MMBasic.c (the
+ * PSRAM-range check in ClearVars) and Memory.c; PicoMite.c defines
+ * them on device. Host has no PSRAM, so both stay 0 and the
+ * `if (PSRAMsize)` guards in core code keep the PSRAM paths dormant. */
 uint32_t PSRAMsize = 0;
+uintptr_t PSRAMbase = 0;
 
 /* PWM-slice claim for the PicoCalc keyboard-backlight LED, owned by
  * drivers/sd_spi/mmc_stm32.c on device. Host doesn't link that

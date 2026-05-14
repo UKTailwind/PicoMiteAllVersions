@@ -1,10 +1,10 @@
 /*
- * drivers/psram_heap/psram_heap_pico.c — rp2350 QSPI PSRAM heap.
+ * drivers/psram_heap/psram_heap_real.c — bitmap-backed PSRAM heap.
  *
- * Linked on rp2350 non-WEB targets (PICORP2350, PICOUSBRP2350,
- * VGARP2350, VGAUSBRP2350, HDMI, HDMIUSB). Provides:
+ * Linked on any port that exposes a contiguous PSRAM region to
+ * MMBasic. Provides:
  *
- *   - psmap[] — page-bitmap for the 6 MB PSRAM heap (used by
+ *   - psmap[] — page-bitmap for the 6 MB PSRAM heap region (used by
  *     Commands.c's SaveContext / RestoreContext fast-path too).
  *   - SBitsGet / SBitsSet — per-page used / used+last-of-run flag
  *     helpers, identical to Memory.c's MBitsGet / MBitsSet pattern
@@ -15,9 +15,9 @@
  * referenced from Memory.c (FreeMemory / GetMemory / TryGetMemory /
  * MemSize / UsedHeap / FreeHeap / FreeMemorySafe) and Commands.c
  * (SaveContext / RestoreContext). All callers runtime-guard with
- * `if(PSRAMsize)` or an address-range check, so on rp2350 WEB
- * (where PSRAMsize stays 0 because CYW43 consumes the QSPI pins)
- * this code compiles but never executes.
+ * `if(PSRAMsize)` or an address-range check, so ports that link this
+ * TU but leave PSRAMsize at 0 (e.g. rp2350 WEB, where CYW43 consumes
+ * the QSPI pins) compile but never execute the body.
  */
 
 #include "MMBasic_Includes.h"

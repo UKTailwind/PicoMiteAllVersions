@@ -21,7 +21,10 @@
 #define HAL_PORT_USB_OR_FIRMWARE_CMD_TOKEN \
     { (unsigned char *)"Update Firmware", T_CMD, 0, cmd_update },
 
-#define HAL_PORT_RAM_CMD_TOKEN
+/* ESP32 ports the shared PSRAM `RAM` command — slab is acquired from
+ * heap_caps_aligned_alloc() by hal_psram_esp32.c at boot. */
+#define HAL_PORT_RAM_CMD_TOKEN \
+    { (unsigned char *)"Ram", T_CMD, 0, cmd_psram },
 
 #define HAL_PORT_RP2350_PIC_MAP_CMD_TOKENS
 

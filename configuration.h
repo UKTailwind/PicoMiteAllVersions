@@ -216,21 +216,23 @@ extern uint8_t PSRAMpin;
 #define PIOMAX  HAL_PORT_PIOMAX
 #define NBRPINS HAL_PORT_NBR_PINS
 
-/* QSPI PSRAM region. Defined per-port: rp2350 non-WEB ports set
- * HAL_PORT_PSRAM_BASE to 0x11000000 and HAL_PORT_PSRAM_BLOCK_SIZE to the
- * BASIC RAM-slot region. WEBRP2350 (CYW43 owns the QSPI pins) and rp2040
- * variants fall back to base 0 / block size 0 — portable address-range
- * checks (`ptr > PSRAMbase && ptr < PSRAMbase + PSRAMsize`) then
- * short-circuit to false because PSRAMsize is always 0 on those ports. */
-#ifdef HAL_PORT_PSRAM_BASE
-    #define PSRAMbase HAL_PORT_PSRAM_BASE
-#else
-    #define PSRAMbase 0
-#endif
+/* QSPI PSRAM region. `PSRAMbase` is a runtime extern (declared in
+ * Hardware_Includes.h, defined in PicoMite.c or each non-Pico port's
+ * peripheral stubs) set by hal_psram_init() at boot — 0x11000000 on
+ * RP2350 with QSPI PSRAM detected, the heap_caps_aligned_alloc() return
+ * value on ESP32-S3, 0 elsewhere. HAL_PORT_PSRAM_BLOCK_SIZE stays a
+ * compile-time constant because it sizes the slot region used by the
+ * `RAM` command independently of the runtime allocator. */
 #ifdef HAL_PORT_PSRAM_BLOCK_SIZE
     #define PSRAMblocksize HAL_PORT_PSRAM_BLOCK_SIZE
-    #define PSRAMblock (PSRAMbase + PSRAMsize + 0x60000)
+#else
+    /* Ports without a PSRAM slot region (RP2040, host, ESP32 pre-Phase-4)
+     * still need a compilable expression so shared/cmd_psram.c links; the
+     * runtime guard `if (!PSRAMsize) error("PSRAM not enabled");` keeps the
+     * slot pointer from ever being dereferenced. */
+    #define PSRAMblocksize 0
 #endif
+#define PSRAMblock (PSRAMbase + PSRAMsize + 0x60000)
 #define MAXPROMPTLEN        49                      // max length of a prompt incl the terminating null
 #define BREAK_KEY           3                       // the default value (CTRL-C) for the break key.  Reset at the command prompt.
 #define FNV_prime           16777619

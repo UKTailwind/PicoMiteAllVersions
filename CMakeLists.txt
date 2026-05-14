@@ -185,8 +185,8 @@ set(PICOMITE_PICO_SDK_HAL_SOURCES
 	#   drivers/usb_host_kbd/hal_keyboard_usb.c   (HAL_PORT_KEYBOARD_USB_HOST=1)
 	#   drivers/ps2_matrix/hal_keyboard_ps2.c     (HAL_PORT_KEYBOARD_USB_HOST=0)
 	ports/pico_sdk_common/hal_fast_timer_pico.c
-	ports/pico_sdk_common/psram_cache.c
-	ports/pico_sdk_common/cmd_psram.c
+	ports/pico_sdk_common/hal_psram_pico.c
+	shared/cmd_psram.c
 	ports/pico_sdk_common/defines_loader.c
 	ports/pico_sdk_common/mem_writeblock.c
 	ports/pico_sdk_common/load_png.c

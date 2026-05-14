@@ -95,6 +95,11 @@ extern void start_vga_i2s(void);
  * target guard so `extern uint32_t PSRAMsize;` (Hardware_Includes.h)
  * resolves on every port — core code reads it as a runtime value. */
 uint32_t PSRAMsize = 0;
+/* PSRAMbase is the runtime base address of the PSRAM region; set by
+ * hal_psram_init() (pico_boot.c on RP2350, 0 on RP2040). Stays 0 on
+ * targets without PSRAM — the `if (PSRAMsize)` guards keep the
+ * dereferences out of reach there. */
+uintptr_t PSRAMbase = 0;
 /* rp2350a: on RP2350 this is runtime-detected in the init path from the
  * chip's SYSINFO_PACKAGE_SEL register; on RP2040 the variable still exists
  * and is fixed at true (RP2040 matches the "30-pin / no PWM8..11"

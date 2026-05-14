@@ -1503,10 +1503,10 @@ void cmd_end(void) {
 }
 extern unsigned int mmap[HEAP_MEMORY_SIZE/ PAGESIZE / PAGESPERWORD];
 /* psmap is the PSRAM heap page-bitmap. Real size lives in
- * drivers/psram_heap/psram_heap_pico.c (rp2350 non-WEB) or
- * psram_heap_stub.c (1-word stub everywhere else). Use the driver's
- * psmap_size_bytes constant instead of sizeof(psmap) because the
- * extern has an incomplete array bound here. */
+ * drivers/psram_heap/psram_heap_real.c (ports that expose PSRAM to
+ * MMBasic) or psram_heap_stub.c (1-word stub everywhere else). Use
+ * the driver's psmap_size_bytes constant instead of sizeof(psmap)
+ * because the extern has an incomplete array bound here. */
 extern unsigned int psmap[];
 extern const unsigned int psmap_size_bytes;
 extern struct s_hash g_hashlist[MAXVARS/2];
@@ -1515,7 +1515,7 @@ extern short g_StrTmpIndex;
 extern bool g_TempMemoryIsChanged;
 extern volatile char *g_StrTmp[MAXTEMPSTRINGS];                                       // used to track temporary string space on the heap
 extern volatile char g_StrTmpLocalIndex[MAXTEMPSTRINGS];                              // used to track the g_LocalIndex for each temporary string space on the heap
-extern void mmbasic_save_psram_settings(void);
+extern void hal_psram_save_settings(void);
 
 static uint8_t *psram_context_align(uint8_t *p) {
 	uintptr_t v = (uintptr_t)p;
@@ -1540,11 +1540,11 @@ static void psram_context_write(uint8_t **dst, const void *src, size_t n) {
 		s += chunk;
 		n -= chunk;
 		if(++words_since_clean == 1024) {
-			mmbasic_save_psram_settings();
+			hal_psram_save_settings();
 			words_since_clean = 0;
 		}
 	}
-	mmbasic_save_psram_settings();
+	hal_psram_save_settings();
 	*dst = p;
 }
 

@@ -26,7 +26,7 @@ target_sources(PicoMite PRIVATE
     ${CMAKE_SOURCE_DIR}/upng.c
     ${CMAKE_SOURCE_DIR}/drivers/audio_mp3/audio_mp3_real.c
     ${CMAKE_SOURCE_DIR}/drivers/heartbeat/heartbeat_real.c
-    ${CMAKE_SOURCE_DIR}/drivers/psram_heap/psram_heap_pico.c
+    ${CMAKE_SOURCE_DIR}/drivers/psram_heap/psram_heap_real.c
     ${CMAKE_SOURCE_DIR}/drivers/upng_sprite/upng_sprite.c
 
     # Non-PICOMITE / non-WEB stubs.

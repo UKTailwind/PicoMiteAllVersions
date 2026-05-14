@@ -1,6 +1,6 @@
 # MMBasic Anywhere - Adafruit Metro ESP32-S3
 
-ESP32-S3 port targeting the Adafruit Metro ESP32-S3 (#5500), currently verified on the N16R8 board variant: 16 MB flash and 8 MB embedded Octal PSRAM. PSRAM is enabled through ESP-IDF as caps-only external RAM for explicit port allocations; it is not part of MMBasic `AllMemory`. The port runs an MMBasic stdio REPL over the ESP32-S3 native USB Serial/JTAG interface.
+ESP32-S3 port targeting the Adafruit Metro ESP32-S3 (#5500), currently verified on the N16R8 board variant: 16 MB flash and 8 MB embedded Octal PSRAM. PSRAM is owned by MMBasic via a fixed slab reserved from ESP-IDF at boot; `PSRAMsize` and the shared `RAM` command surface match Pico variants. The port runs an MMBasic stdio REPL over the ESP32-S3 native USB Serial/JTAG interface.
 
 Plan: [docs/real-hal/esp32-s3-port.md](../../docs/real-hal/esp32-s3-port.md). Session log: [docs/real-hal/esp32-s3-port-log.md](../../docs/real-hal/esp32-s3-port-log.md).
 
@@ -82,7 +82,7 @@ Working on hardware:
 - Default terminal colours survive errors and prompt recovery through shared MMBasic colour-state restoration.
 - `FLASH SAVE 1`, reset, `FLASH LOAD 1`, `RUN` works on the dedicated `mmslots` partition.
 - 48 KB WiFi-enabled MMBasic heap. ESP32 bytecode compiler scratch tables use ESP-IDF internal heap; VM runtime allocations still use the 48 KB MMBasic heap.
-- ESP-IDF detects the onboard Octal PSRAM. `MM.INFO(PSRAM SIZE)` intentionally remains 0 and `MM.INFO(HEAP)` stays internal-only; ESP32-specific `MM.INFO(ESP32 PSRAM SIZE/FREE/LARGEST)` reports heap_caps-visible SPIRAM without enabling generic BASIC PSRAM allocation.
+- ESP-IDF detects the onboard Octal PSRAM. The port reserves a fixed slab via `heap_caps_aligned_alloc(MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT)` at boot and publishes it as `PSRAMbase` / `PSRAMsize`; `MM.INFO(PSRAM SIZE)` now returns the slab size and the shared `RAM` command (test / list / save / load / erase) works the same as on Pico variants. `RAM TEST NOCACHE` is Pico-only and errors on ESP32.
 - `WEB CONNECT`, `WEB SCAN`, TCP server, TCP client request/stream, UDP send/receive, NTP, and plain-TCP MQTT are hardware-smoked.
 - Bundled WEB demos seeded to A: include the small server demo and the multi-file website demo.
 - `porttools/esp32_fs_vm_smoke.py` default smoke, opt-in flash/VAR persistence, and network conformance have passed on hardware.
@@ -91,7 +91,7 @@ Still stubbed or incomplete:
 
 - BASIC-visible GPIO DOUT/DIN/ARAW is hardware-smoked. PWM/servo are still explicit unsupported paths.
 - MQTT TLS/cert handling is not implemented; current MQTT support is plain TCP.
-- Display, keyboard, audio, BLE/Bluetooth, OTA, and PSRAM-backed BASIC heap/display work are deferred.
+- Display, keyboard, audio, BLE/Bluetooth, OTA, and PSRAM-backed display framebuffer work are deferred.
 
 ## Port Tools
 

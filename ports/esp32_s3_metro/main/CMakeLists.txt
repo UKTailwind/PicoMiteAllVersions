@@ -30,6 +30,7 @@ set(CORE_SRCS
     ${REPO_ROOT}/mm_misc_shared.c
     ${REPO_ROOT}/OptionCommands.c
     ${REPO_ROOT}/cmd_ws2812_shared.c
+    ${REPO_ROOT}/shared/cmd_psram.c
 )
 
 set(STATE_SRCS
@@ -90,7 +91,7 @@ set(DRIVER_STUBS
     ${REPO_ROOT}/drivers/upng_sprite/upng_sprite_stub.c
     ${REPO_ROOT}/drivers/gui_touch/gui_touch_stub.c
     ${REPO_ROOT}/drivers/gui_controls/gui_controls_stub.c
-    ${REPO_ROOT}/drivers/psram_heap/psram_heap_stub.c
+    ${REPO_ROOT}/drivers/psram_heap/psram_heap_real.c
     ${REPO_ROOT}/drivers/heartbeat/heartbeat_stub.c
     ${REPO_ROOT}/drivers/editor_console/editor_console_stub.c
     ${REPO_ROOT}/drivers/display_pixel_readbuffer/display_pixel_readbuffer.c
@@ -128,7 +129,7 @@ set(PORT_LOCAL_SRCS
     esp32_lfs.c                             # LittleFS over esp_partition_* (A: drive)
     esp32_flash_storage.c                   # flash_target_* / flash_option_* / flash_range_* / esp32_options_snapshot
     esp32_compat.c                          # small porting bits
-    esp32_psram.c                           # ESP-IDF PSRAM reporting and opt-in march smoke
+    hal_psram_esp32.c                       # PSRAM HAL: slab acquisition, cache sync, PSRAMbase/PSRAMsize publication
     hal_pin_esp32.c                         # real GPIO/ADC over driver/gpio.h + esp_adc
     esp32_pin_tables.c                      # Metro GPIO map + GPn codemap
     hal_ws2812_esp32.c                      # WS2812/SK6812 over ESP32 RMT
@@ -200,6 +201,7 @@ idf_component_register(
         esp_driver_sdspi
         esp_timer
         esp_psram
+        esp_mm
         esp_event
         esp_netif
         esp_wifi

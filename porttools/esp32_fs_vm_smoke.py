@@ -310,44 +310,26 @@ class Esp32Smoke:
 
     def psram_smoke(self) -> None:
         print("=== psram ===", flush=True)
-        generic = self.command('PRINT "ESP32_GENERIC_PSRAM_SIZE=" + STR$(MM.INFO(PSRAM SIZE))')
-        detected = self.command('PRINT "ESP32_PSRAM_DETECTED=" + STR$(MM.INFO(ESP32 PSRAM SIZE))')
-        free_before = self.command('PRINT "ESP32_PSRAM_FREE_BEFORE=" + STR$(MM.INFO(ESP32 PSRAM FREE))')
-        largest_before = self.command('PRINT "ESP32_PSRAM_LARGEST_BEFORE=" + STR$(MM.INFO(ESP32 PSRAM LARGEST))')
-        generic_size = marker_int(generic, "ESP32_GENERIC_PSRAM_SIZE=")
-        detected_size = marker_int(detected, "ESP32_PSRAM_DETECTED=")
-        free_size = marker_int(free_before, "ESP32_PSRAM_FREE_BEFORE=")
-        largest_size = marker_int(largest_before, "ESP32_PSRAM_LARGEST_BEFORE=")
-        if generic_size != 0:
-            raise RuntimeError(f"generic PSRAM SIZE unexpectedly reports {generic_size}")
-        if detected_size <= 0 or free_size <= 0 or largest_size <= 0:
+        psram_size_resp = self.command('PRINT "ESP32_PSRAM_SIZE=" + STR$(MM.INFO(PSRAM SIZE))')
+        psram_size = marker_int(psram_size_resp, "ESP32_PSRAM_SIZE=")
+        if psram_size <= 0:
+            raise RuntimeError(f"PSRAM SIZE unexpectedly reports {psram_size}")
+        # RAM TEST takes the test span in megabytes; round --psram-bytes up.
+        mb = max(1, (self.psram_bytes + (1024 * 1024) - 1) // (1024 * 1024))
+        max_mb = psram_size // (1024 * 1024)
+        if mb > max_mb:
             raise RuntimeError(
-                f"ESP-IDF PSRAM unavailable: detected={detected_size} free={free_size} largest={largest_size}"
+                f"requested PSRAM smoke march {mb} MB exceeds PSRAM size {max_mb} MB"
             )
-        if self.psram_bytes > largest_size:
-            raise RuntimeError(
-                f"requested PSRAM smoke allocation {self.psram_bytes} exceeds largest block {largest_size}"
-            )
-        marched = self.command(
-            f'PRINT "ESP32_PSRAM_MARCHED=" + STR$(MM.INFO(ESP32 PSRAM MARCH {self.psram_bytes}))',
-            timeout=self.long_timeout,
-        )
-        marched_size = marker_int(marched, "ESP32_PSRAM_MARCHED=")
-        free_after = self.command('PRINT "ESP32_PSRAM_FREE_AFTER=" + STR$(MM.INFO(ESP32 PSRAM FREE))')
-        largest_after = self.command('PRINT "ESP32_PSRAM_LARGEST_AFTER=" + STR$(MM.INFO(ESP32 PSRAM LARGEST))')
+        marched = self.command(f"RAM TEST {mb}", timeout=self.long_timeout)
+        if "RAM TEST OK" not in marched:
+            raise RuntimeError(f"RAM TEST {mb} did not report OK; got:\n{marched}")
         prompt = self.command('PRINT "ESP32_PSRAM_PROMPT_OK"')
-        if marched_size != self.psram_bytes:
-            raise RuntimeError(f"PSRAM march size mismatch: {marched_size} != {self.psram_bytes}")
         if "ESP32_PSRAM_PROMPT_OK" not in prompt:
-            raise RuntimeError("BASIC prompt did not recover after PSRAM march")
-        free_after_size = marker_int(free_after, "ESP32_PSRAM_FREE_AFTER=")
-        largest_after_size = marker_int(largest_after, "ESP32_PSRAM_LARGEST_AFTER=")
+            raise RuntimeError("BASIC prompt did not recover after RAM TEST")
         self.pass_check(
-            "ESP32 PSRAM heap_caps march",
-            (
-                f"detected={detected_size} free_before={free_size} largest_before={largest_size} "
-                f"allocated={marched_size} free_after={free_after_size} largest_after={largest_after_size}"
-            ),
+            "ESP32 PSRAM RAM TEST march",
+            f"PSRAM SIZE={psram_size} marched_mb={mb}",
         )
 
 

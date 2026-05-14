@@ -91,8 +91,9 @@ unsigned int bc_alloc_fail_total   = 0;
 
 unsigned int mmap[HEAP_MEMORY_SIZE/ PAGESIZE / PAGESPERWORD]={0};
 /* psmap[] + SBitsGet / SBitsSet / GetPSMemory live in
- * drivers/psram_heap/ — see psram_heap_pico.c (rp2350 non-WEB real
- * impl) + psram_heap_stub.c (everyone else). Externs in Memory.h. */
+ * drivers/psram_heap/ — see psram_heap_real.c (ports that expose
+ * PSRAM to MMBasic) + psram_heap_stub.c (everyone else). Externs in
+ * Memory.h. */
 extern unsigned int psmap[];
 extern const unsigned int psmap_size_bytes;
 extern unsigned int SBitsGet(unsigned char *addr);
@@ -903,9 +904,9 @@ void InitHeap(bool all) {
  Private memory management functions
 ************************************************************************************************************************/
 
-/* PSRAM bitmap + allocator live in drivers/psram_heap/psram_heap_pico.c
- * (rp2350 non-WEB) or psram_heap_stub.c (everyone else). Memory.c
- * references the symbols via externs in Memory.h. */
+/* PSRAM bitmap + allocator live in drivers/psram_heap/psram_heap_real.c
+ * (ports that expose PSRAM to MMBasic) or psram_heap_stub.c (everyone
+ * else). Memory.c references the symbols via externs in Memory.h. */
 
 static inline __attribute__ ((always_inline)) unsigned int MBitsGet(unsigned char *addr) {
     unsigned int i, *p;

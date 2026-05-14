@@ -126,8 +126,10 @@ port-config-macro ifdefs. ✅ met.
 ### Step 1 ✅ — PSRAM bitmap + allocator → drivers/psram_heap/
 
 Relocated `psmap` page-bitmap + `SBitsGet` / `SBitsSet` / `GetPSMemory`
-into `drivers/psram_heap/psram_heap_pico.c` (rp2350 non-WEB real impl,
-~24 KB BSS) + `drivers/psram_heap/psram_heap_stub.c` (no-op on every
+into `drivers/psram_heap/psram_heap_real.c` (real impl for ports that
+expose PSRAM to MMBasic, ~24 KB BSS; originally landed here as
+`psram_heap_pico.c` before generalisation in the ESP32-S3 PSRAM
+realign) + `drivers/psram_heap/psram_heap_stub.c` (no-op on every
 other target). Callers in Memory.c (FreeMemory / GetMemory /
 TryGetMemory / FreeSpaceOnHeap / UsedHeap / MemSize / FreeMemorySafe)
 drop their nested `#ifdef rp2350` gates — runtime `if(PSRAMsize)` and

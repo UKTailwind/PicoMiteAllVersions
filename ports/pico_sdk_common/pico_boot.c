@@ -21,6 +21,7 @@ static void psram_boot_init(void)
     size_t detected = psram_size();
     if (!detected) {
         PSRAMsize = 0;
+        PSRAMbase = 0;
         Option.PSRAM_CS_PIN = 0;
         SaveOptions();
         return;
@@ -28,8 +29,18 @@ static void psram_boot_init(void)
     PSRAMsize = detected > (2u * 1024u * 1024u)
         ? detected - (2u * 1024u * 1024u)
         : detected;
+    /* HAL_PORT_PSRAM_BASE = 0x11000000 on every RP2350 port with PSRAM
+     * (XIP cache region). Publish it now that the runtime detect has
+     * confirmed a module is present. */
+    PSRAMbase = (uintptr_t)HAL_PORT_PSRAM_BASE;
     memset(psmap, 0, psmap_size_bytes);
 }
+
+/* hal_psram_init wrapper so the HAL contract is satisfied uniformly
+ * across ports. Pico boot path still calls psram_boot_init() directly
+ * for now to preserve the existing init ordering; this entry point
+ * exists so future shared-init code can fan out through the HAL. */
+void hal_psram_init(void) { psram_boot_init(); }
 #endif
 
 void MIPS16 updatebootcount(void){
