@@ -15,6 +15,94 @@ Reference implementation: [docs/simulator-plan.md](../simulator-plan.md). The
 device backend should reuse the native simulator model, not the WASM
 shared-memory model.
 
+## Current Status - 2026-05-14
+
+Branch: `web-console-driver`
+
+Checkpoint commit: `452c8b7 checkpoint: web console driver progress`
+
+Current flashed device state:
+
+- ESP32-S3 Metro serves the web console at
+  `http://192.168.4.47:18181/__web_console/`.
+- The reserved WebSocket endpoint is `GET /__web_console/ws`.
+- The page and WebSocket endpoint are served by the existing MMBasic TCP/HTTP
+  service, not ESP-IDF `esp_http_server`.
+- The browser presents the normal MMBasic console display and feeds keyboard
+  input into the normal input path.
+- Serial console remains available for recovery.
+
+Implemented on branch:
+
+- Shared web-console virtual display and input queue under
+  `drivers/web_console/`.
+- ESP32 reserved WebSocket handshake/framing path in the existing TCP server.
+- Browser assets embedded in firmware for the reserved web-console page.
+- 320x240 ESP32 virtual display backend with PicoCalc-style green-on-black
+  console defaults.
+- Virtual framebuffer draw hooks for text, `CLS`, pixel, rectangle, bitmap,
+  scroll, draw-buffer, and read-buffer paths.
+- Dirty framebuffer coalescing and RGB332 RLE `CMDS` blits.
+- Browser RGB332 RLE decode and canvas render path.
+- Latest-frame-wins behavior under display backlog; stale frame queues are not
+  replayed after reconnect.
+- Latest-browser-wins reconnect behavior for one active input owner.
+- Browser keyboard input for REPL, bad-command handling, `FILES`, `EDIT`, cursor
+  keys, Escape, and editor scroll stress.
+- `Display_Refresh()` now pumps the web transport at a capped cadence so
+  graphics-heavy BASIC loops can flush display changes without making draw code
+  transport-aware.
+- ESP32 PSRAM is reported by `MEMORY`.
+- ESP32 bytecode compiler scratch allocation now prefers PSRAM, so
+  `FRUN "A:/mand.bas"` works on-device.
+- Speed pass after checkpoint:
+  - faster scale-1 bitmap/text drawing;
+  - clipped `DrawBuffer` copy;
+  - one-pass ESP32 RLE packing with exact-size fallback;
+  - browser per-frame debug logging gated behind `?debug=1`.
+
+Validated recently:
+
+- `make -C ports/host_native web-console-protocol-test websocket-test` passed.
+- `git diff --check` passed.
+- `./buildesp32.sh build` passed.
+- `./buildesp32.sh flash` passed.
+- On-device HTTP check returned `HTTP 200 OK` for `/__web_console/`.
+- On-device all-flags smoke passed before the speed pass:
+  display sequence, keyboard sequence, `FILES`, editor open/exit, and editor
+  scroll stress.
+- After PSRAM compiler allocation fix, `FRUN "A:/mand.bas"` completed:
+  `64x48`, `MAX_ITER=96`, checksum `552868`, about `373 ms`.
+
+Current caveats:
+
+- Audio/WebAudio backend is not implemented yet.
+- The current implementation has jumped ahead of the original phase order:
+  ESP32 display/input MVP exists before full simulator extraction and shared
+  audio extraction are complete.
+- The speed pass has been built and flashed, but the full on-device web-console
+  smoke should be rerun when the browser is not competing for WebSocket
+  ownership.
+- `RUN "A:/mand.bas"` is expected to appear idle for a long time because the
+  file currently on `A:` is a text benchmark with no intermediate output. Use
+  `FRUN "A:/mand.bas"` for that benchmark.
+- Web console is still LAN/trusted-network only; no TLS/authentication has been
+  added.
+
+Phase status summary:
+
+| Phase | Status |
+|---|---|
+| Phase 0 - Inventory and Contract | Mostly complete; contract and ownership documented, but implementation proceeded before all extraction cleanup. |
+| Phase 1 - Extract Shared Protocol | Partially complete; display/input helpers exist under `drivers/web_console/`, but simulator/audio extraction is not complete. |
+| Phase 2 - Native Minimal WebSocket Helper | Implemented and host-tested through `shared/net/mm_net_websocket.*` and native websocket tests. |
+| Phase 3 - ESP32 Static Page and Minimal WebSocket | Implemented and flashed. |
+| Phase 4 - Virtual Display MVP | Implemented and smoke-tested on device. |
+| Phase 5 - Browser Keyboard Input | Implemented and smoke-tested on device. |
+| Phase 6 - WebAudio Event Backend | Not started. |
+| Phase 7 - Portability Cleanup | Partial; shared display/input exist, but ESP32 still owns much of the first working transport integration. |
+| Phase 8 - Performance and Resilience | In progress; RGB332 RLE, coalescing, latest-frame-wins, nonblocking send progress, JS logging gate, and text/blit/RLE speed pass are implemented. More measurement is still needed. |
+
 ## Product Shape
 
 The feature is a virtual device console, not a web dashboard bolted beside the

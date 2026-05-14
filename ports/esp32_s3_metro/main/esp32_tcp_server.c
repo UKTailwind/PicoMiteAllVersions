@@ -259,10 +259,21 @@ static uint8_t esp32_web_console_rgb332(uint32_t c)
     return (uint8_t)((r & 0xe0u) | ((g & 0xe0u) >> 3) | (b >> 6));
 }
 
-static size_t esp32_web_console_rle332_len(const web_console_display_t *display,
-                                           int x1, int y1, int w, int h)
+static size_t esp32_web_console_rle332_max_payload_len(int w, int h)
 {
-    size_t len = 0;
+    if (w <= 0 || h <= 0) return 0;
+    size_t pixels = (size_t)w * (size_t)h;
+    if (pixels > (SIZE_MAX - WEB_CONSOLE_FRAME_HEADER_LEN - 9u) / 3u) {
+        return 0;
+    }
+    return WEB_CONSOLE_FRAME_HEADER_LEN + 9u + pixels * 3u;
+}
+
+static size_t esp32_web_console_rle332_payload_len(const web_console_display_t *display,
+                                                   int x1, int y1,
+                                                   int w, int h)
+{
+    size_t len = WEB_CONSOLE_FRAME_HEADER_LEN + 9u;
     uint8_t last = 0;
     uint16_t run = 0;
 
@@ -361,9 +372,16 @@ static int esp32_web_console_start_blit(web_console_display_t *display,
     if (x1 > x2 || y1 > y2) return 0;
     int w = x2 - x1 + 1;
     int h = y2 - y1 + 1;
-    size_t rle_len = esp32_web_console_rle332_len(display, x1, y1, w, h);
-    size_t payload_len = WEB_CONSOLE_FRAME_HEADER_LEN + 9u + rle_len;
-    if (!esp32_web_console_ensure_payload(payload_len)) return 0;
+    size_t max_payload_len = esp32_web_console_rle332_max_payload_len(w, h);
+    if (!max_payload_len ||
+        !esp32_web_console_ensure_payload(max_payload_len)) {
+        size_t exact_payload_len = esp32_web_console_rle332_payload_len(
+            display, x1, y1, w, h);
+        if (!exact_payload_len ||
+            !esp32_web_console_ensure_payload(exact_payload_len)) {
+            return 0;
+        }
+    }
 
     uint8_t *p = s_web_console_ws.frame_payload;
     memcpy(p, "CMDS", 4);

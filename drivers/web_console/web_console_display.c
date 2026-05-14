@@ -190,6 +190,41 @@ void web_console_display_bitmap(web_console_display_t *d,
     uint32_t fg = colour24(fc);
     uint32_t bg = colour24(bc);
     int want_bg = bc >= 0;
+
+    if (scale == 1) {
+        int bx1 = x < 0 ? 0 : x;
+        int by1 = y < 0 ? 0 : y;
+        int bx2 = x + width - 1;
+        int by2 = y + height - 1;
+        if (bx2 >= d->width) bx2 = d->width - 1;
+        if (by2 >= d->height) by2 = d->height - 1;
+        if (bx1 > bx2 || by1 > by2) return;
+
+        int touched = 0;
+        for (int py = by1; py <= by2; ++py) {
+            uint32_t *dst = d->pixels + (size_t)py * (size_t)d->width;
+            int row = py - y;
+            for (int px = bx1; px <= bx2; ++px) {
+                int col = px - x;
+                int bit = row * width + col;
+                int on = (bitmap[bit / 8] >>
+                          ((total_bits - bit - 1) % 8)) & 1;
+                if (on) {
+                    dst[px] = fg;
+                    touched = 1;
+                } else if (want_bg) {
+                    dst[px] = bg;
+                    touched = 1;
+                }
+            }
+        }
+        if (touched) {
+            d->generation++;
+            mark_dirty(d, bx1, by1, bx2, by2);
+        }
+        return;
+    }
+
     int touched = 0;
     int bx1 = d->width;
     int by1 = d->height;
@@ -233,33 +268,25 @@ void web_console_display_draw_buffer(web_console_display_t *d,
     if (x1 > x2) { int t = x1; x1 = x2; x2 = t; }
     if (y1 > y2) { int t = y1; y1 = y2; y2 = t; }
     int src_w = x2 - x1 + 1;
-    int touched = 0;
-    int bx1 = d->width;
-    int by1 = d->height;
-    int bx2 = -1;
-    int by2 = -1;
+    int bx1 = x1 < 0 ? 0 : x1;
+    int by1 = y1 < 0 ? 0 : y1;
+    int bx2 = x2 >= d->width ? d->width - 1 : x2;
+    int by2 = y2 >= d->height ? d->height - 1 : y2;
+    if (bx1 > bx2 || by1 > by2) return;
 
-    for (int y = y1; y <= y2; ++y) {
-        for (int x = x1; x <= x2; ++x) {
-            size_t si = ((size_t)(y - y1) * (size_t)src_w +
-                         (size_t)(x - x1)) * 3u;
-            if (in_bounds(d, x, y)) {
-                d->pixels[(size_t)y * (size_t)d->width + (size_t)x] =
-                    ((uint32_t)bgr[si + 2] << 16) |
-                    ((uint32_t)bgr[si + 1] << 8) |
-                    (uint32_t)bgr[si];
-                touched = 1;
-                if (x < bx1) bx1 = x;
-                if (y < by1) by1 = y;
-                if (x > bx2) bx2 = x;
-                if (y > by2) by2 = y;
-            }
+    for (int y = by1; y <= by2; ++y) {
+        uint32_t *dst = d->pixels + (size_t)y * (size_t)d->width;
+        const unsigned char *src = bgr +
+            ((size_t)(y - y1) * (size_t)src_w + (size_t)(bx1 - x1)) * 3u;
+        for (int x = bx1; x <= bx2; ++x) {
+            dst[x] = ((uint32_t)src[2] << 16) |
+                     ((uint32_t)src[1] << 8) |
+                     (uint32_t)src[0];
+            src += 3;
         }
     }
-    if (touched) {
-        d->generation++;
-        mark_dirty(d, bx1, by1, bx2, by2);
-    }
+    d->generation++;
+    mark_dirty(d, bx1, by1, bx2, by2);
 }
 
 void web_console_display_read_buffer(const web_console_display_t *d,
