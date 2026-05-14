@@ -92,6 +92,8 @@ DEPS = $(OBJS:.o=.d)
 TARGET = $(REPO_ROOT)/host/mmbasic_test
 NET_HAL_TEST = $(BUILD_DIR)/host_net_hal_test
 WEB_CONSOLE_PROTOCOL_TEST = $(BUILD_DIR)/web_console_protocol_test
+MM_NET_WEBSOCKET_TEST = $(BUILD_DIR)/mm_net_websocket_test
+MM_NET_WEBSOCKET_LOOPBACK_TEST = $(BUILD_DIR)/mm_net_websocket_loopback_test
 WASM_PROXY_TARGET = $(REPO_ROOT)/host/wasm_network_proxy
 
 # --- Simulator target ---------------------------------------------------
@@ -121,6 +123,10 @@ net-hal-test: $(NET_HAL_TEST)
 
 web-console-protocol-test: $(WEB_CONSOLE_PROTOCOL_TEST)
 	$(WEB_CONSOLE_PROTOCOL_TEST)
+
+websocket-test: $(MM_NET_WEBSOCKET_TEST) $(MM_NET_WEBSOCKET_LOOPBACK_TEST)
+	$(MM_NET_WEBSOCKET_TEST)
+	$(MM_NET_WEBSOCKET_LOOPBACK_TEST)
 
 $(NET_HAL_TEST): $(PORT_DIR)/hal_net_posix_test.c $(PORT_DIR)/hal_net_posix.c \
                  $(REPO_ROOT)/shared/net/mm_net_http.c \
@@ -155,6 +161,26 @@ $(WEB_CONSOLE_PROTOCOL_TEST): $(REPO_ROOT)/drivers/web_console/web_console_proto
 	      -funsigned-char -I$(REPO_ROOT) -I$(REPO_ROOT)/drivers/web_console \
 	      -o $@ $(REPO_ROOT)/drivers/web_console/web_console_protocol_test.c \
 	      $(REPO_ROOT)/drivers/web_console/web_console_protocol.c $(LDFLAGS)
+
+$(MM_NET_WEBSOCKET_TEST): $(REPO_ROOT)/shared/net/mm_net_websocket_test.c \
+                         $(REPO_ROOT)/shared/net/mm_net_websocket.c \
+                         $(REPO_ROOT)/shared/net/mm_net_websocket.h
+	@mkdir -p $(dir $@)
+	$(CC) -std=gnu11 -g -O0 -Wall -Wno-unused-variable -Wno-unused-function \
+	      -Wno-unused-but-set-variable -Wno-misleading-indentation \
+	      -funsigned-char -I$(REPO_ROOT) \
+	      -o $@ $(REPO_ROOT)/shared/net/mm_net_websocket_test.c \
+	      $(REPO_ROOT)/shared/net/mm_net_websocket.c $(LDFLAGS)
+
+$(MM_NET_WEBSOCKET_LOOPBACK_TEST): $(PORT_DIR)/mm_net_websocket_loopback_test.c \
+                                  $(REPO_ROOT)/shared/net/mm_net_websocket.c \
+                                  $(REPO_ROOT)/shared/net/mm_net_websocket.h
+	@mkdir -p $(dir $@)
+	$(CC) -std=gnu11 -g -O0 -Wall -Wno-unused-variable -Wno-unused-function \
+	      -Wno-unused-but-set-variable -Wno-misleading-indentation \
+	      -funsigned-char -I$(REPO_ROOT) \
+	      -o $@ $(PORT_DIR)/mm_net_websocket_loopback_test.c \
+	      $(REPO_ROOT)/shared/net/mm_net_websocket.c -pthread $(LDFLAGS)
 
 sim: $(SIM_TARGET)
 
@@ -337,8 +363,10 @@ $(BUILD_DIR)/sim/vendor/mongoose.o: $(MONGOOSE_DIR)/mongoose.c $(MONGOOSE_DIR)/m
 	$(CC) $(SIM_CFLAGS) -I$(MONGOOSE_DIR) -Wno-unused-parameter -Wno-sign-compare -c -o $@ $<
 
 clean:
-	rm -rf $(BUILD_DIR) $(TARGET) $(SIM_TARGET) $(WASM_PROXY_TARGET) $(WEB_CONSOLE_PROTOCOL_TEST)
+	rm -rf $(BUILD_DIR) $(TARGET) $(SIM_TARGET) $(WASM_PROXY_TARGET) \
+	       $(WEB_CONSOLE_PROTOCOL_TEST) $(MM_NET_WEBSOCKET_TEST) \
+	       $(MM_NET_WEBSOCKET_LOOPBACK_TEST)
 
 -include $(DEPS) $(WASM_PROXY_DEPS)
 
-.PHONY: all clean sim net-hal-test web-console-protocol-test wasm-proxy
+.PHONY: all clean sim net-hal-test web-console-protocol-test websocket-test wasm-proxy
