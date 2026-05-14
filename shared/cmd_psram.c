@@ -132,11 +132,19 @@ void MIPS16 cmd_psram(void)
             p = nocache_kw;
             skipspace(p);
         }
+        /* Maximum scan span: heap region + the 0x60000 gap + slot region.
+         * Per-port PSRAMblocksize sizes the slot region (1.75 MB on
+         * RP2350, MAXRAMSLOTS*MAX_PROG_SIZE on ESP32). Anything beyond
+         * that walks past the slab the HAL handed us and either reads
+         * unrelated ESP-IDF heap pages or faults on unmapped PSRAM. */
+        const size_t psram_total = (size_t)PSRAMsize + 0x60000u + (size_t)PSRAMblocksize;
         if (*p) {
             if (checkstring(p, (unsigned char *)"ALL")) {
-                bytes = PSRAMsize + (2u * 1024u * 1024u);
+                bytes = psram_total;
             } else {
-                bytes = (size_t)getint(p, 1, (int)((PSRAMsize + (2u * 1024u * 1024u)) / (1024u * 1024u))) * 1024u * 1024u;
+                int max_mb = (int)(psram_total / (1024u * 1024u));
+                if (max_mb < 1) max_mb = 1;
+                bytes = (size_t)getint(p, 1, max_mb) * 1024u * 1024u;
             }
         }
         char msg[96];

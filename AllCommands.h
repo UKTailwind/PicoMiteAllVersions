@@ -557,10 +557,10 @@ void fun_map(void);
 	{ (unsigned char *)"CMM2 Load",		T_CMD,				0, cmd_loadCMM2	},
 	{ (unsigned char *)"CMM2 Run",		T_CMD,				0, cmd_RunCMM2	},
 	{ (unsigned char *)"Randomize",          T_CMD,				0, cmd_null},
-    HAL_PORT_RAM_CMD_TOKEN
 #else
 	{ (unsigned char *)"Randomize",          T_CMD,				0, cmd_randomize},
 #endif
+    HAL_PORT_RAM_CMD_TOKEN
 { (unsigned char *)"Bit(",		T_CMD | T_FUN,				0, cmd_bit	},
 { (unsigned char *)"Flags",	T_CMD | T_FUN,		0, cmd_flags	},
 { (unsigned char *)"Help",	T_CMD | T_FUN,		0, cmd_help	},

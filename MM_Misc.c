@@ -828,9 +828,18 @@ void MIPS16 printoptions(void){
     if(*Option.platform && *Option.platform!=0xFF)PO2Str("PLATFORM", (const char *)Option.platform);
     if(Option.DefaultFont!=1)PO3Int("DEFAULT FONT",(Option.DefaultFont>>4)+1, Option.DefaultFont & 0xF);
     /* PSRAM_CS_PIN is only meaningful on rp2350. On rp2040 the field
-     * stays at 0 so the runtime guard suffices. */
+     * stays at 0 so the runtime guard suffices. Ports that own PSRAM via
+     * an internal allocator (e.g. ESP32-S3, where the slab comes from
+     * heap_caps_aligned_alloc()) leave PSRAM_CS_PIN at 0 but still want
+     * to surface PSRAM presence in OPTION LIST so operators can confirm
+     * the slab made it up; emit `OPTION PSRAM SIZE <MB>` in that case. */
     if (Option.PSRAM_CS_PIN != 0)
         PO2Str("PSRAM PIN", PinDef[Option.PSRAM_CS_PIN].pinname);
+    else if (PSRAMsize != 0) {
+        unsigned mb = (unsigned)((uint32_t)PSRAMsize / (1024u * 1024u));
+        if (mb == 0) mb = 1;  /* sub-MB slabs still report 1 MB. */
+        PO2Int("PSRAM SIZE", (int)mb);
+    }
     /* HEARTBEAT PIN: rp2040 prints when heartbeatpin != default (43).
      * rp2350 also prints the default-pin case when rp2350a==false
      * (RP2350B has different default). Both pieces stay runtime-gated

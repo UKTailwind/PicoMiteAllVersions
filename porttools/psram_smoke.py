@@ -772,15 +772,57 @@ class PsramSmokeHarness:
     # --- 3. Slot lifecycle --------------------------------------------
 
     def _paste_program(self, lines: Sequence[str]) -> None:
-        """Upload a tiny BASIC program by NEW + paste through the REPL."""
+        """Upload a tiny BASIC program via NEW + AUTOSAVE + Ctrl-Z.
+
+        Unnumbered BASIC lines typed at the REPL execute immediately, they
+        don't enter program memory. AUTOSAVE collects pasted lines into
+        ProgMemory until Ctrl-Z (0x1A), F1, or F2 terminates it. We use
+        Ctrl-Z because it is byte-portable across all ports.
+        """
         self.cmd("NEW", timeout=self.timeout)
-        for line in lines:
-            self.cmd(line, timeout=self.timeout)
-            # In dry-run, record the line into the synth's paste buffer
-            # so RAM SAVE can snapshot embedded RAM CHAIN references.
-            paste_hook = getattr(self.basic, "paste_line", None)
-            if paste_hook is not None:
+        # The dry-run synthesizer models the paste buffer in DryRunBasic;
+        # its NEW handler clears that buffer, so we must call paste_line
+        # AFTER NEW to populate it for subsequent RAM SAVE etc. In live
+        # mode the device's AUTOSAVE collection does the same job via
+        # the byte stream below.
+        paste_hook = getattr(self.basic, "paste_line", None)
+        if paste_hook is not None:
+            for line in lines:
                 paste_hook(line)
+        # AUTOSAVE: send the command, then body lines, then Ctrl-Z.
+        # In dry-run we skip the raw-byte AUTOSAVE machinery — DryRunBasic's
+        # _synth doesn't drive a serial port; the paste_hook above already
+        # snapshotted the lines.
+        if self.dry_run:
+            return
+        ser = self.basic.serial
+        # Issue AUTOSAVE and wait briefly for echo so we're inside the
+        # collection loop before sending body bytes.
+        ser.write(b"AUTOSAVE\r")
+        ser.flush()
+        time.sleep(0.2)
+        # Drain any echo so it doesn't interfere with later prompt waits.
+        _ = ser.read(4096)
+        for line in lines:
+            ser.write((line + "\r").encode("latin1"))
+            ser.flush()
+            # Brief pause so the device's input buffer doesn't overflow at
+            # 115200 baud on long bodies; AUTOSAVE echoes each byte.
+            time.sleep(0.02)
+            _ = ser.read(4096)
+        # Terminate with Ctrl-Z, then wait for the prompt to return.
+        ser.write(b"\x1a")
+        ser.flush()
+        # AUTOSAVE flashes the program to flash before re-prompting; allow
+        # generous time for that on slow flashes.
+        end = time.monotonic() + self.long_timeout
+        out = bytearray()
+        while time.monotonic() < end:
+            chunk = ser.read(4096)
+            if chunk:
+                out.extend(chunk)
+                if self.basic._has_prompt(bytes(out)):
+                    break
 
     def check_slot_lifecycle(self) -> None:
         print("=== 3. slot lifecycle ===", flush=True)
@@ -825,10 +867,18 @@ class PsramSmokeHarness:
             self.report.failed("slots/list_in_use", str(exc))
 
         # 3d. RAM LIST 1 -> matches saved source.
+        # Use the "ALL" modifier so MMBasic skips its per-screen
+        # pagination ("PRESS ANY KEY ..."), which would otherwise stall
+        # the harness. cmd_psram's getargs(maxargs=3) accepts the
+        # `<slot>, ALL` form — three tokens (slot, comma, ALL), matching
+        # `argc == 3 && argv[2] == "ALL"`.
         try:
-            text = self.cmd("RAM LIST 1", timeout=self.long_timeout)
+            text = self.cmd("RAM LIST 1, ALL", timeout=self.long_timeout)
             expected_first = program_a_lines()[0]
-            if expected_first in text:
+            # MMBasic's LIST output canonicalizes keywords to Title case
+            # (Option.Listcase = CONFIG_TITLE), so "OPTION EXPLICIT"
+            # becomes "Option EXPLICIT". Match case-insensitively.
+            if expected_first.lower() in text.lower():
                 self.report.passed("slots/list_full", "matches saved source")
             else:
                 self.report.failed(
@@ -889,8 +939,12 @@ class PsramSmokeHarness:
             self.cmd("RAM SAVE 1", timeout=self.long_timeout)
             self.cmd("NEW", timeout=self.timeout)
             self.cmd("RAM LOAD 1", timeout=self.very_long_timeout)
-            text = self.cmd("LIST", timeout=self.long_timeout)
-            if program_a_lines()[0] in text:
+            # LIST ALL skips MMBasic's per-screen pagination, which would
+            # otherwise stall the harness at "PRESS ANY KEY ...".
+            text = self.cmd("LIST ALL", timeout=self.long_timeout)
+            # Case-insensitive match: LIST canonicalises keywords to Title
+            # case (see slots/list_full above).
+            if program_a_lines()[0].lower() in text.lower():
                 self.report.passed("run/ram_load_then_list", "LIST shows reloaded program")
             else:
                 self.report.failed(
@@ -1007,7 +1061,13 @@ class PsramSmokeHarness:
                 self.report.failed("ramfile/load", str(exc))
         else:
             # ESP32: expect the not-supported error.
+            # Slot 2 may still hold a saved program from check_slot_run_cycle
+            # (RAM CHAIN test). The shared cmd_psram FILE LOAD path checks
+            # `*c != 0x0 && overwrite == 0` BEFORE reaching MemLoadProgram,
+            # so without erasing we'd get "Already programmed" instead of
+            # the not-supported sentinel.
             try:
+                self.cmd("RAM ERASE 2", timeout=self.long_timeout)
                 text = self.cmd(
                     f'RAM FILE LOAD 2, "{target_path}"',
                     timeout=self.long_timeout,
@@ -1165,7 +1225,34 @@ class PsramSmokeHarness:
                 self.report.failed("neg/psram_not_enabled", str(exc))
 
     # ------------------------------------------------------------------
+    def configure_session(self) -> None:
+        """One-time per-session setup: raise console height so LIST output
+        does not page with the "PRESS ANY KEY ..." interactive prompt.
+
+        MMBasic's `LIST` and `RAM LIST <slot>` page output every
+        `Option.Height - overlap` lines (Commands.c). Default SCREENHEIGHT
+        is 24, which is smaller than the saved programs the harness paste-
+        loads. Raise the height to a comfortable max so single-screen
+        listings come back without a paging prompt the harness can't
+        easily satisfy.
+        """
+        if self.dry_run:
+            return
+        try:
+            # OPTION DISPLAY <height>[, , <width>] is the runtime-tunable
+            # height setter (OptionCommands.c). Range is 5..100; we pick
+            # 100 to defeat paging for the harness's tiny test programs.
+            self.cmd("OPTION DISPLAY 100", timeout=self.timeout)
+        except Exception:
+            # OPTION DISPLAY can error on ports with LCD console attached.
+            # If it does, fall through — the LIST tests will just have to
+            # tolerate the paging prompt (and likely fail loudly enough to
+            # signal the harness operator that this port needs special
+            # handling).
+            pass
+
     def run_all(self) -> None:
+        self.configure_session()
         self.check_boot_invariants()
         self.check_march()
         self.check_slot_lifecycle()

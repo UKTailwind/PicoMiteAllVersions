@@ -58,11 +58,16 @@ void hal_psram_init(void)
 {
     if (s_psram_slab != NULL) return;  /* idempotent */
 
-    esp_err_t err = esp_psram_init();
-    if (err != ESP_OK) {
-        printf("hal_psram_init: esp_psram_init failed (%d); PSRAM disabled\n",
-               (int)err);
-        return;
+    /* CONFIG_SPIRAM_BOOT_INIT=y in sdkconfig brings up PSRAM during the
+     * ESP-IDF bootloader, so we only call esp_psram_init() if it hasn't
+     * happened yet. Calling it twice returns ESP_ERR_INVALID_STATE. */
+    if (!esp_psram_is_initialized()) {
+        esp_err_t err = esp_psram_init();
+        if (err != ESP_OK) {
+            printf("hal_psram_init: esp_psram_init failed (%d); "
+                   "PSRAM disabled\n", (int)err);
+            return;
+        }
     }
 
     /*

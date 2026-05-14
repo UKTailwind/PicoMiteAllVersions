@@ -62,6 +62,19 @@ int MemLoadProgram(unsigned char *fname, unsigned char *ram) {
 void printoptions(void) {
     extern void esp32_wifi_print_options(void);
     esp32_wifi_print_options();
+    /* PSRAM presence: the slab is set up by hal_psram_init() at boot
+     * from heap_caps_aligned_alloc(MALLOC_CAP_SPIRAM). PSRAM_CS_PIN
+     * is the rp2350 channel and stays at 0 on ESP32, so emit a
+     * dedicated `OPTION PSRAM SIZE <MB>` line instead. Operators
+     * read this to confirm the slab made it up; the realign smoke
+     * harness pattern-matches on `OPTION PSRAM`. */
+    if (PSRAMsize != 0) {
+        unsigned mb = (unsigned)((uint32_t)PSRAMsize / (1024u * 1024u));
+        if (mb == 0) mb = 1;
+        char line[40];
+        snprintf(line, sizeof(line), "OPTION PSRAM SIZE %u\r\n", mb);
+        MMPrintString(line);
+    }
 }
 
 /* OPEN COM:N peripheral stubs — UART comms not wired in stdio scope.
