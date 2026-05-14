@@ -717,6 +717,26 @@ int hal_net_tcp_conn_send(hal_net_tcp_conn_t conn, const void *buf, size_t len,
     return tcp_write_all(slot->pcb, buf, len, timeout_ms);
 }
 
+int hal_net_tcp_conn_send_some(hal_net_tcp_conn_t conn, const void *buf,
+                               size_t cap, size_t *sent) {
+    if (sent) *sent = 0;
+    lwip_hal_tcp_conn_slot_t *slot = tcp_conn_slot(conn);
+    if (!slot || (!buf && cap) || slot->closed || slot->failed || !slot->pcb)
+        return HAL_NET_ERR;
+    if (cap == 0) return HAL_NET_OK;
+    u16_t snd = tcp_sndbuf(slot->pcb);
+    if (snd == 0 || tcp_sndqueuelen(slot->pcb) > 6) return HAL_NET_WOULD_BLOCK;
+    size_t chunk = cap;
+    if (chunk > snd) chunk = snd;
+    if (chunk > 0xffffu) chunk = 0xffffu;
+    err_t err = tcp_write(slot->pcb, buf, (u16_t)chunk, TCP_WRITE_FLAG_COPY);
+    if (err == ERR_MEM) return HAL_NET_WOULD_BLOCK;
+    if (err != ERR_OK) return HAL_NET_ERR;
+    tcp_output(slot->pcb);
+    if (sent) *sent = chunk;
+    return HAL_NET_OK;
+}
+
 int hal_net_tcp_conn_close(hal_net_tcp_conn_t conn) {
     lwip_hal_tcp_conn_slot_t *slot = tcp_conn_slot(conn);
     if (!slot) return HAL_NET_ERR;

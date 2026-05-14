@@ -78,6 +78,8 @@ int hal_net_tcp_accept_event(hal_net_tcp_server_t server,
                              uint8_t *buf, size_t cap, size_t *len);
 int hal_net_tcp_conn_recv(hal_net_tcp_conn_t conn, void *buf, size_t cap,
                           size_t *len);
+int hal_net_tcp_conn_send_some(hal_net_tcp_conn_t conn, const void *buf,
+                               size_t cap, size_t *sent);
 int hal_net_tcp_conn_send(hal_net_tcp_conn_t conn, const void *buf, size_t len,
                           uint32_t timeout_ms);
 int hal_net_tcp_conn_close(hal_net_tcp_conn_t conn);

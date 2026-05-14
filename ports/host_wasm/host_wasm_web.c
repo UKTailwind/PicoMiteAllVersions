@@ -1133,6 +1133,25 @@ int hal_net_tcp_conn_send(hal_net_tcp_conn_t conn, const void *buf, size_t len,
 #endif
 }
 
+int hal_net_tcp_conn_send_some(hal_net_tcp_conn_t conn, const void *buf,
+                               size_t cap, size_t *sent) {
+    if (sent) *sent = 0;
+    if (!conn || (!buf && cap) ||
+        !wasm_proxy_detected || !wasm_proxy_tcp_server_capability)
+        return HAL_NET_UNSUPPORTED;
+#ifdef __EMSCRIPTEN__
+    int rc = wasm_proxy_tcp_conn_send_js((int)conn, (const uint8_t *)buf,
+                                         (int)cap, 0);
+    if (rc == 0) {
+        if (sent) *sent = cap;
+        return HAL_NET_OK;
+    }
+    return HAL_NET_WOULD_BLOCK;
+#else
+    return HAL_NET_UNSUPPORTED;
+#endif
+}
+
 int hal_net_tcp_conn_close(hal_net_tcp_conn_t conn) {
     if (!conn) return HAL_NET_OK;
 #ifdef __EMSCRIPTEN__

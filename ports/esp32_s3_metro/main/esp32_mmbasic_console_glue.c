@@ -15,9 +15,11 @@
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
 
+#include <ctype.h>
 #include <stdio.h>
 #include <stdint.h>
 
+#include "esp32_tcp_server.h"
 #include "esp32_telnet.h"
 
 /* Provided by esp32_console.c. */
@@ -25,6 +27,20 @@ extern void esp32_console_write_bytes(const char *text, int len);
 extern int  esp32_console_read_byte_nonblock(void);
 extern int  esp32_console_read_byte_blocking_ms(int ms);
 extern void esp32_console_push_back_byte(int c);
+
+volatile int esp32_console_display_rendering;
+
+void port_display_render_begin(void) {
+    esp32_console_display_rendering++;
+}
+
+void port_display_render_end(void) {
+    if (esp32_console_display_rendering > 0) esp32_console_display_rendering--;
+}
+
+int port_editor_vt100_enabled(void) {
+    return !esp32_web_console_connected();
+}
 
 /* MMBasic accumulates output via MMputchar / putConsole / SerialConsolePutC
  * and reads input via MMInkey / MMgetchar / getConsole / kbhitConsole.
@@ -44,11 +60,16 @@ char SerialConsolePutC(char c, int flush) {
 }
 
 void putConsole(int c, int flush) {
-    SerialConsolePutC((char)c, flush);
+    if (OptionConsole & 2) {
+        DisplayPutC((char)c);
+    }
+    if (OptionConsole & 1) SerialConsolePutC((char)c, flush);
 }
 
 char MMputchar(char c, int flush) {
     putConsole(c, flush);
+    if (isprint((unsigned char)c)) MMCharPos++;
+    if (c == '\r') MMCharPos = 1;
     return c;
 }
 
@@ -59,8 +80,9 @@ void MMPrintString(char *s) {
 }
 
 void SSPrintString(char *s) {
-    /* Bypass-the-options variant — same target on this port. */
-    MMPrintString(s);
+    while (*s) SerialConsolePutC(*s++, 0);
+    fflush(stdout);
+    esp32_telnet_putc(0, -1);
 }
 
 void myprintf(char *s) { MMPrintString(s); }
@@ -75,11 +97,14 @@ static int esp32_console_ring_pop(void) {
 int getConsole(void) {
     int c = esp32_console_ring_pop();
     if (c >= 0) return c;
+    c = esp32_web_console_pop_key();
+    if (c >= 0) return c;
     return esp32_console_read_byte_nonblock();
 }
 
 int kbhitConsole(void) {
     if (ConsoleRxBufHead != ConsoleRxBufTail) return 1;
+    if (esp32_web_console_input_available()) return 1;
     int c = esp32_console_read_byte_nonblock();
     if (c < 0) return 0;
     esp32_console_push_back_byte(c);
@@ -192,10 +217,15 @@ int MMInkey(void) {
         ProcessWeb(0);
         in_web_poll = 0;
     }
+    int from_web = 0;
     int c = esp32_console_ring_pop();
+    if (c < 0) {
+        c = esp32_web_console_pop_key();
+        if (c >= 0) from_web = 1;
+    }
     if (c < 0) c = esp32_console_read_byte_nonblock();
     if (c < 0) return -1;
-    if (c == 0x1b && ConsoleRxBufHead == ConsoleRxBufTail)
+    if (!from_web && c == 0x1b && ConsoleRxBufHead == ConsoleRxBufTail)
         return esp32_decode_escape_sequence();
     return esp32_normalise_console_byte(c);
 }
@@ -205,13 +235,21 @@ int MMgetchar(void) {
      * calls MMInkey in a poll — but other paths (PRESS-ANY-KEY prompts)
      * call MMgetchar and want a key, not a raw byte. */
     int c;
+    int from_web;
     do {
         extern void ProcessWeb(int mode);
+        ShowCursor(1);
+        from_web = 0;
         ProcessWeb(0);
         c = esp32_console_ring_pop();
+        if (c < 0) {
+            c = esp32_web_console_pop_key();
+            if (c >= 0) from_web = 1;
+        }
         if (c < 0) c = esp32_console_read_byte_blocking_ms(1);
     } while (c < 0);
-    if (c == 0x1b && ConsoleRxBufHead == ConsoleRxBufTail)
+    ShowCursor(0);
+    if (!from_web && c == 0x1b && ConsoleRxBufHead == ConsoleRxBufTail)
         return esp32_decode_escape_sequence();
     return esp32_normalise_console_byte(c);
 }
@@ -236,22 +274,64 @@ extern int  FileEOF(int fnbr);
 void MMgetline(int filenbr, char *p) {
     int c;
     int nbrchars = 0;
+    char *tp;
     while (1) {
         if (filenbr != 0 && FileEOF(filenbr)) break;
         c = MMfgetc(filenbr);
         if (c <= 0) {
-            if (filenbr == 0) break;
+            if (filenbr == 0) continue;
             continue;
         }
-        if (c == '\n') break;
-        if (c == '\r') continue;
+
+        if (filenbr == 0) {
+            tp = NULL;
+            if (c == F2)  tp = "RUN";
+            if (c == F3)  tp = "LIST";
+            if (c == F4)  tp = "EDIT";
+            if (c == F10) tp = "AUTOSAVE";
+            if (c == F11) tp = "XMODEM RECEIVE";
+            if (c == F12) tp = "XMODEM SEND";
+            if (c == F1)  tp = (char *)Option.F1key;
+            if (c == F5)  tp = (char *)Option.F5key;
+            if (c == F6)  tp = (char *)Option.F6key;
+            if (c == F7)  tp = (char *)Option.F7key;
+            if (c == F8)  tp = (char *)Option.F8key;
+            if (c == F9)  tp = (char *)Option.F9key;
+            if (tp) {
+                strcpy(p, tp);
+                if (EchoOption) {
+                    MMPrintString(tp);
+                    MMPrintString("\r\n");
+                }
+                return;
+            }
+        }
+
         if (c == '\t') {
             do {
                 if (++nbrchars > MAXSTRLEN) error("Line is too long");
                 *p++ = ' ';
+                if (filenbr == 0 && EchoOption) MMputchar(' ', 1);
             } while (nbrchars % 4);
             continue;
         }
+        if (c == '\b') {
+            if (nbrchars) {
+                if (filenbr == 0 && EchoOption) MMPrintString("\b \b");
+                nbrchars--;
+                p--;
+            }
+            continue;
+        }
+        if (c == '\n') break;
+        if (c == '\r') {
+            if (filenbr == 0) {
+                if (EchoOption) MMPrintString("\r\n");
+                break;
+            }
+            continue;
+        }
+        if (isprint(c) && filenbr == 0 && EchoOption) MMputchar(c, 1);
         if (++nbrchars > MAXSTRLEN) error("Line is too long");
         *p++ = (char)c;
     }

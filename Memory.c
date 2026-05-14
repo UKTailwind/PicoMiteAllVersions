@@ -70,6 +70,8 @@ unsigned char *MMHeap = AllMemory;
 
 uint32_t heap_memory_size=HEAP_MEMORY_SIZE;
 
+__attribute__((weak)) void port_memory_report_extra(void) {}
+
 /* Last failed allocation diagnostics.  Updated by TryGetMemory on OOM. */
 unsigned int bc_alloc_fail_size    = 0;
 unsigned int bc_alloc_fail_pages   = 0;
@@ -700,6 +702,7 @@ void MIPS16 cmd_memory(void) {
     MMPrintString((char *)inpbuf);
     IntToStrPad((char *)inpbuf, (bc_alloc_bytes_high_water() + 512)/1024, ' ', 4, 10); strcat((char *)inpbuf, "K High water\r\n");
     MMPrintString((char *)inpbuf);
+    port_memory_report_extra();
 }
 
 /* 

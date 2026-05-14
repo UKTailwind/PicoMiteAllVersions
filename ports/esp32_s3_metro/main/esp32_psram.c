@@ -17,6 +17,10 @@
 
 static const uint32_t psram_caps = MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT;
 
+extern void MMPrintString(char *s);
+extern void IntToStrPad(char *p, long long int nbr, signed char padch,
+                        int maxch, int radix);
+
 size_t esp32_psram_detected_bytes(void) {
 #ifdef CONFIG_SPIRAM
     return esp_psram_is_initialized() ? esp_psram_get_size() : 0;
@@ -39,6 +43,26 @@ void esp32_psram_print_boot_report(void) {
     size_t largest = esp32_psram_largest_block_bytes();
     printf("ESP32 PSRAM: detected=%u free=%u largest=%u caps=MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT\n",
            (unsigned)detected, (unsigned)free_bytes, (unsigned)largest);
+}
+
+static void print_k_line(size_t bytes, const char *label) {
+    char buf[80];
+    IntToStrPad(buf, (long long int)((bytes + 512u) / 1024u), ' ', 4, 10);
+    strcat(buf, "K ");
+    strcat(buf, label);
+    strcat(buf, "\r\n");
+    MMPrintString(buf);
+}
+
+void port_memory_report_extra(void) {
+    size_t detected = esp32_psram_detected_bytes();
+    size_t free_bytes = esp32_psram_free_bytes();
+    size_t largest = esp32_psram_largest_block_bytes();
+    if (!detected && !free_bytes && !largest) return;
+    MMPrintString("\r\nESP32 PSRAM:\r\n");
+    print_k_line(detected, "Detected");
+    print_k_line(free_bytes, "Free");
+    print_k_line(largest, "Largest block");
 }
 
 static uint32_t psram_pattern(uintptr_t addr, size_t index) {

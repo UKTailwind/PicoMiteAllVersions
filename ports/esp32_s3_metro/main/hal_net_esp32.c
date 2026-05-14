@@ -652,6 +652,24 @@ int hal_net_tcp_conn_recv(hal_net_tcp_conn_t conn, void *buf, size_t cap,
     return HAL_NET_ERR;
 }
 
+int hal_net_tcp_conn_send_some(hal_net_tcp_conn_t conn, const void *buf,
+                               size_t cap, size_t *sent)
+{
+    if (sent) *sent = 0;
+    int *slot = esp32_net_slot(tcp_conns, ESP32_NET_MAX_TCP_CONNS, conn);
+    if (!slot || (!buf && cap)) return HAL_NET_ERR;
+    if (cap == 0) return HAL_NET_OK;
+    ssize_t n = send(*slot, buf, cap, 0);
+    if (n > 0) {
+        if (sent) *sent = (size_t)n;
+        return HAL_NET_OK;
+    }
+    if (n == 0) return HAL_NET_WOULD_BLOCK;
+    if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)
+        return HAL_NET_WOULD_BLOCK;
+    return HAL_NET_ERR;
+}
+
 int hal_net_tcp_conn_send(hal_net_tcp_conn_t conn, const void *buf, size_t len,
                           uint32_t timeout_ms)
 {

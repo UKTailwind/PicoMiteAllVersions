@@ -19,18 +19,18 @@ typedef struct web_console_display {
     int height;
     uint32_t *pixels;
     size_t pixel_count;
-    uint8_t *cmds;
-    size_t cmd_cap;
-    size_t cmd_len;
     unsigned generation;
-    unsigned dropped;
+    int dirty;
+    int dirty_x1;
+    int dirty_y1;
+    int dirty_x2;
+    int dirty_y2;
     int needs_resync;
 } web_console_display_t;
 
 int web_console_display_init(web_console_display_t *display,
                              int width, int height,
                              uint32_t *pixels, size_t pixel_count,
-                             uint8_t *cmd_buf, size_t cmd_cap,
                              int bg);
 const uint32_t *web_console_display_pixels(const web_console_display_t *display,
                                            size_t *pixel_count);
@@ -52,8 +52,14 @@ void web_console_display_read_buffer(const web_console_display_t *display,
 void web_console_display_scroll(web_console_display_t *display,
                                 int lines, int bg);
 int web_console_display_take_resync(web_console_display_t *display);
-size_t web_console_display_drain_cmds(web_console_display_t *display,
-                                      uint8_t *payload, size_t payload_cap);
+void web_console_display_request_resync(web_console_display_t *display);
+int web_console_display_dirty_bounds(const web_console_display_t *display,
+                                     int *x1, int *y1, int *x2, int *y2);
+void web_console_display_clear_dirty(web_console_display_t *display);
+size_t web_console_display_pack_dirty_blit(const web_console_display_t *display,
+                                           uint8_t *payload,
+                                           size_t payload_cap,
+                                           int x1, int y1, int x2, int y2);
 
 #ifdef __cplusplus
 }

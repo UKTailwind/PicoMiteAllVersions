@@ -2,8 +2,9 @@
  * hal_vm_framebuffer_esp32_stub.c — ESP32 web-console virtual display.
  *
  * FRAMEBUFFER commands remain no-op for now, but the ordinary display
- * dispatch table is backed by a 320x240 RGB24 framebuffer that the web
- * console sends to the browser as FRMB/CMDS.
+ * dispatch table is backed by a 320x240 RGB24 framebuffer. Draw calls
+ * update pixels and dirty bounds; the web console transport flushes FRMB
+ * snapshots or framebuffer-derived BLIT deltas.
  */
 
 #include <stdbool.h>
@@ -12,6 +13,7 @@
 #include <string.h>
 
 #include "esp_heap_caps.h"
+#include "esp_timer.h"
 
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
@@ -20,12 +22,11 @@
 
 #define ESP32_WEB_DISPLAY_WIDTH  320
 #define ESP32_WEB_DISPLAY_HEIGHT 240
-#define ESP32_WEB_DISPLAY_CMDS   12288u
 
 static web_console_display_t s_web_display;
 static uint32_t *s_web_pixels;
-static uint8_t *s_web_cmds;
 extern volatile int DISPLAY_TYPE;
+extern void ProcessWeb(int mode);
 
 web_console_display_t *esp32_web_console_display(void) {
     return s_web_pixels ? &s_web_display : NULL;
@@ -84,14 +85,9 @@ int esp32_web_console_display_init(void) {
         s_web_pixels = (uint32_t *)web_display_alloc(pixels * sizeof(*s_web_pixels));
         if (!s_web_pixels) return 0;
     }
-    if (!s_web_cmds) {
-        s_web_cmds = (uint8_t *)web_display_alloc(ESP32_WEB_DISPLAY_CMDS);
-        if (!s_web_cmds) return 0;
-    }
     if (!web_console_display_init(&s_web_display, ESP32_WEB_DISPLAY_WIDTH,
                                   ESP32_WEB_DISPLAY_HEIGHT, s_web_pixels,
-                                  pixels, s_web_cmds, ESP32_WEB_DISPLAY_CMDS,
-                                  Option.DefaultBC)) {
+                                  pixels, Option.DefaultBC)) {
         return 0;
     }
 
@@ -137,8 +133,21 @@ void hal_vm_framebuffer_sync(void) {}
 void hal_vm_framebuffer_wait(void) {}
 void hal_vm_framebuffer_copy(char from, char to, int bg) { (void)from; (void)to; (void)bg; }
 
-/* No physical panel flush is required; the TCP poll hook drains CMDS. */
-void Display_Refresh(void) {}
+/* No physical display flush is required, but graphics-heavy BASIC code can
+ * spend a long time between normal runtime polls. Use refresh as a capped
+ * opportunity to drain framebuffer deltas without making draw primitives
+ * transport-aware. */
+void Display_Refresh(void) {
+    static int in_refresh;
+    static int64_t next_refresh_us;
+    int64_t now = esp_timer_get_time();
+
+    if (in_refresh || now < next_refresh_us) return;
+    next_refresh_us = now + 33333;
+    in_refresh = 1;
+    ProcessWeb(0);
+    in_refresh = 0;
+}
 
 /* Display-related globals + functions referenced by core code. */
 volatile int DISPLAY_TYPE = 0;

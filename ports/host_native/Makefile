@@ -80,7 +80,7 @@ HOST_SRCS = host_runtime.c host_fastgfx.c host_fastgfx_resync.c host_fs_shims.c 
             hal_flash_host.c hal_time_host.c hal_random_host.c hal_pin_host.c hal_storage_host.c \
             hal_filesystem_host.c hal_keyboard_host.c hal_audio_host.c hal_vm_framebuffer_host.c \
             hal_net_posix.c
-WEB_CONSOLE_SRCS = web_console_protocol.c
+WEB_CONSOLE_SRCS = web_console_protocol.c web_console_input.c
 
 HAL_GENERIC_SRCS = hal_watchdog_noop.c
 RUNTIME_SRCS = runtime_boot.c runtime_program.c runtime_console.c runtime_abort.c runtime_interrupt.c
@@ -92,6 +92,8 @@ DEPS = $(OBJS:.o=.d)
 TARGET = $(REPO_ROOT)/host/mmbasic_test
 NET_HAL_TEST = $(BUILD_DIR)/host_net_hal_test
 WEB_CONSOLE_PROTOCOL_TEST = $(BUILD_DIR)/web_console_protocol_test
+WEB_CONSOLE_DISPLAY_TEST = $(BUILD_DIR)/web_console_display_test
+WEB_CONSOLE_INPUT_TEST = $(BUILD_DIR)/web_console_input_test
 MM_NET_WEBSOCKET_TEST = $(BUILD_DIR)/mm_net_websocket_test
 MM_NET_WEBSOCKET_LOOPBACK_TEST = $(BUILD_DIR)/mm_net_websocket_loopback_test
 WASM_PROXY_TARGET = $(REPO_ROOT)/host/wasm_network_proxy
@@ -121,8 +123,10 @@ $(TARGET): $(OBJS)
 net-hal-test: $(NET_HAL_TEST)
 	$(NET_HAL_TEST)
 
-web-console-protocol-test: $(WEB_CONSOLE_PROTOCOL_TEST)
+web-console-protocol-test: $(WEB_CONSOLE_PROTOCOL_TEST) $(WEB_CONSOLE_DISPLAY_TEST) $(WEB_CONSOLE_INPUT_TEST)
 	$(WEB_CONSOLE_PROTOCOL_TEST)
+	$(WEB_CONSOLE_DISPLAY_TEST)
+	$(WEB_CONSOLE_INPUT_TEST)
 
 websocket-test: $(MM_NET_WEBSOCKET_TEST) $(MM_NET_WEBSOCKET_LOOPBACK_TEST)
 	$(MM_NET_WEBSOCKET_TEST)
@@ -160,6 +164,29 @@ $(WEB_CONSOLE_PROTOCOL_TEST): $(REPO_ROOT)/drivers/web_console/web_console_proto
 	      -Wno-unused-but-set-variable -Wno-misleading-indentation \
 	      -funsigned-char -I$(REPO_ROOT) -I$(REPO_ROOT)/drivers/web_console \
 	      -o $@ $(REPO_ROOT)/drivers/web_console/web_console_protocol_test.c \
+	      $(REPO_ROOT)/drivers/web_console/web_console_protocol.c $(LDFLAGS)
+
+$(WEB_CONSOLE_INPUT_TEST): $(REPO_ROOT)/drivers/web_console/web_console_input_test.c \
+                          $(REPO_ROOT)/drivers/web_console/web_console_input.c \
+                          $(REPO_ROOT)/drivers/web_console/web_console_input.h
+	@mkdir -p $(dir $@)
+	$(CC) -std=gnu11 -g -O0 -Wall -Wno-unused-variable -Wno-unused-function \
+	      -Wno-unused-but-set-variable -Wno-misleading-indentation \
+	      -funsigned-char -I$(REPO_ROOT) -I$(REPO_ROOT)/drivers/web_console \
+	      -o $@ $(REPO_ROOT)/drivers/web_console/web_console_input_test.c \
+	      $(REPO_ROOT)/drivers/web_console/web_console_input.c $(LDFLAGS)
+
+$(WEB_CONSOLE_DISPLAY_TEST): $(REPO_ROOT)/drivers/web_console/web_console_display_test.c \
+                            $(REPO_ROOT)/drivers/web_console/web_console_display.c \
+                            $(REPO_ROOT)/drivers/web_console/web_console_display.h \
+                            $(REPO_ROOT)/drivers/web_console/web_console_protocol.c \
+                            $(REPO_ROOT)/drivers/web_console/web_console_protocol.h
+	@mkdir -p $(dir $@)
+	$(CC) -std=gnu11 -g -O0 -Wall -Wno-unused-variable -Wno-unused-function \
+	      -Wno-unused-but-set-variable -Wno-misleading-indentation \
+	      -funsigned-char -I$(REPO_ROOT) -I$(REPO_ROOT)/drivers/web_console \
+	      -o $@ $(REPO_ROOT)/drivers/web_console/web_console_display_test.c \
+	      $(REPO_ROOT)/drivers/web_console/web_console_display.c \
 	      $(REPO_ROOT)/drivers/web_console/web_console_protocol.c $(LDFLAGS)
 
 $(MM_NET_WEBSOCKET_TEST): $(REPO_ROOT)/shared/net/mm_net_websocket_test.c \

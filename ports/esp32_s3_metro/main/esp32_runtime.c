@@ -21,6 +21,7 @@
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "esp_timer.h"
 
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
@@ -43,6 +44,7 @@ extern bool g_TempMemoryIsChanged;
 extern int esp32_tcp_interrupt_pending(void);
 extern int esp32_udp_interrupt_pending(void);
 extern void ProcessWeb(int mode);
+extern volatile int esp32_console_display_rendering;
 /* MMAbort is declared in MMBasic.h as `volatile int`. */
 
 static int s_save_option_error_skip;
@@ -80,6 +82,10 @@ static void esp32_runtime_before_abort(void) {
 }
 
 static void esp32_runtime_yield(void) {
+    static int64_t next_yield_us;
+    int64_t now = esp_timer_get_time();
+    if (now < next_yield_us) return;
+    next_yield_us = now + 10000;
     vTaskDelay(1);
 }
 

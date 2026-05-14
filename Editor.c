@@ -129,6 +129,9 @@ static inline void printnothing(char * dummy){
 static inline char nothingchar(char dummy,int flush){
     return 0;
 }
+__attribute__((weak)) int port_editor_vt100_enabled(void) {
+    return 1;
+}
     int OriginalFC, OriginalBC;                                     // the original fore/background colours used by MMBasic
 static void (*PrintString)(char *buff)=SSPrintString;
 static char (*SSputchar)(char buff, int flush)=SerialConsolePutC;
@@ -268,6 +271,8 @@ static hal_editor_display_state_t edit_disp_state;
 void edit(unsigned char *cmdline, bool cmdfile) {
     unsigned char *fromp, *p=NULL;
     int y, x, edit_buff_size ;
+    void (*savedPrintString)(char *buff) = PrintString;
+    char (*savedSSputchar)(char buff, int flush) = SSputchar;
     optioncolourcodesave=Option.ColourCode;
     char name[STRINGSIZE], *filename=NULL;
     getargs(&cmdline,1,(unsigned char *)",");
@@ -409,6 +414,10 @@ void edit(unsigned char *cmdline, bool cmdfile) {
     if  (Option.Width > SCREENWIDTH || Option.Height > SCREENHEIGHT){ 
       setterminal((Option.Height > SCREENHEIGHT)?Option.Height:SCREENHEIGHT,(Option.Width > SCREENWIDTH)?Option.Width:SCREENWIDTH);                                                    // or height is > 24
     }
+    if (!port_editor_vt100_enabled()) {
+        PrintString = printnothing;
+        SSputchar = nothingchar;
+    }
     PrintString("\033[?1000h");                                   // Tera Term turn on mouse click report in VT200 mode
     PrintString("\0337\033[2J\033[H");                            // vt100 clear screen and home cursor
     MX470Display(DISPLAY_CLS);                                      // clear screen on the MX470 display only
@@ -422,6 +431,8 @@ void edit(unsigned char *cmdline, bool cmdfile) {
     }
     if(cmdfile)m_alloc(M_VAR);                                                 //clean up clipboard usage
     FullScreenEditor(x,y, filename, edit_buff_size, cmdfile);
+    PrintString = savedPrintString;
+    SSputchar = savedSSputchar;
     if(cmdfile)memset(tknbuf, 0, STRINGSIZE);                                  // zero this so that nextstmt is pointing to the end of program
     MMCharPos = 0;
 }

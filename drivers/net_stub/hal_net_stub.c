@@ -89,6 +89,13 @@ int hal_net_tcp_conn_recv(hal_net_tcp_conn_t conn, void *buf, size_t cap,
     return HAL_NET_UNSUPPORTED;
 }
 
+int hal_net_tcp_conn_send_some(hal_net_tcp_conn_t conn, const void *buf,
+                               size_t cap, size_t *sent) {
+    (void)conn; (void)buf; (void)cap;
+    if (sent) *sent = 0;
+    return HAL_NET_UNSUPPORTED;
+}
+
 int hal_net_tcp_conn_send(hal_net_tcp_conn_t conn, const void *buf, size_t len,
                           uint32_t timeout_ms) {
     (void)conn; (void)buf; (void)len; (void)timeout_ms;

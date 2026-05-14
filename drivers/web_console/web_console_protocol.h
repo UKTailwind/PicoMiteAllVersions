@@ -22,6 +22,7 @@ typedef enum {
     WEB_CONSOLE_OP_PIXEL  = 0x03,
     WEB_CONSOLE_OP_SCROLL = 0x04,
     WEB_CONSOLE_OP_BLIT   = 0x05,
+    WEB_CONSOLE_OP_BLIT_RGB332_RLE = 0x06,
 } web_console_cmd_opcode_t;
 
 size_t web_console_frmb_len(int width, int height);

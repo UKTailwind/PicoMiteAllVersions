@@ -34,18 +34,30 @@ static esp32_compile_alloc_node_t *s_compile_allocs;
 static size_t s_compile_used;
 static size_t s_compile_high_water;
 
-static const uint32_t compile_caps = MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT;
+static const uint32_t compile_caps = MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT;
+static const uint32_t compile_fallback_caps = MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT;
 
 static void esp32_note_compile_alloc_failure(size_t size)
 {
     size_t free_bytes = heap_caps_get_free_size(compile_caps);
     size_t largest = heap_caps_get_largest_free_block(compile_caps);
+    size_t fallback_free = heap_caps_get_free_size(compile_fallback_caps);
+    size_t fallback_largest = heap_caps_get_largest_free_block(compile_fallback_caps);
+    free_bytes += fallback_free;
+    if (fallback_largest > largest) largest = fallback_largest;
     bc_alloc_fail_size = (unsigned int)size;
     bc_alloc_fail_pages = (unsigned int)((size + PAGESIZE - 1) / PAGESIZE);
     bc_alloc_fail_used = (unsigned int)((s_compile_used + PAGESIZE - 1) / PAGESIZE);
     bc_alloc_fail_free = (unsigned int)(free_bytes / PAGESIZE);
     bc_alloc_fail_longest = (unsigned int)(largest / PAGESIZE);
     bc_alloc_fail_total = bc_alloc_fail_used + bc_alloc_fail_free;
+}
+
+static void *esp32_compile_calloc(size_t nmemb, size_t size)
+{
+    void *ptr = heap_caps_calloc(nmemb, size, compile_caps);
+    if (!ptr) ptr = heap_caps_calloc(nmemb, size, compile_fallback_caps);
+    return ptr;
 }
 
 void *bc_alloc(size_t size)
@@ -73,14 +85,14 @@ void *bc_compile_alloc(size_t size)
 {
     if (size == 0) size = 1;
 
-    void *ptr = heap_caps_calloc(1, size, compile_caps);
+    void *ptr = esp32_compile_calloc(1, size);
     if (!ptr) {
         esp32_note_compile_alloc_failure(size);
         return NULL;
     }
 
     esp32_compile_alloc_node_t *node =
-        (esp32_compile_alloc_node_t *)heap_caps_calloc(1, sizeof(*node), compile_caps);
+        (esp32_compile_alloc_node_t *)esp32_compile_calloc(1, sizeof(*node));
     if (!node) {
         heap_caps_free(ptr);
         esp32_note_compile_alloc_failure(sizeof(*node));
@@ -146,5 +158,9 @@ int bc_alloc_owns(const void *ptr)
 size_t bc_alloc_bytes_used_peek(void) { return 0; }
 size_t bc_alloc_bytes_high_water_peek(void) { return 0; }
 size_t bc_compile_bytes_used(void) { return s_compile_used; }
-size_t bc_compile_bytes_free(void) { return heap_caps_get_free_size(compile_caps); }
+size_t bc_compile_bytes_free(void)
+{
+    return heap_caps_get_free_size(compile_caps) +
+           heap_caps_get_free_size(compile_fallback_caps);
+}
 size_t bc_runtime_bytes_limit(void) { return heap_memory_size; }

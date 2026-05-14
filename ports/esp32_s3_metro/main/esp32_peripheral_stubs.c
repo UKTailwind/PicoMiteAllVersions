@@ -117,12 +117,15 @@ void cmd_endprogram(void) {}
 
 void cmd_files_pump_console_key(int *c)
 {
-    /* Host has no interrupt-driven ConsoleRxBuf filler — the REPL reads
-     * keys via MMInkey (stdin / scripted key queue / --sim websocket).
-     * Poll it here so the "PRESS ANY KEY" prompt unblocks on any
-     * keypress instead of hanging forever. */
+    extern int esp32_console_read_byte_nonblock(void);
+    extern int esp32_web_console_pop_key(void);
+
+    /* FILES already calls ProcessWeb() before this hook. Consume the
+     * resulting web/serial key directly instead of re-entering MMInkey()
+     * and its own network poll from inside the pager loop. */
     if (*c == -1) {
-        int k = MMInkey();
+        int k = esp32_web_console_pop_key();
+        if (k == -1) k = esp32_console_read_byte_nonblock();
         if (k != -1) *c = k;
         else hal_time_sleep_us(10000);  /* 10ms — don't peg a core */
     }

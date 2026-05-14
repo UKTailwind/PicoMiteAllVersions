@@ -15,6 +15,9 @@
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
 
+__attribute__((weak)) void port_display_render_begin(void) {}
+__attribute__((weak)) void port_display_render_end(void) {}
+
 /******************************************************************************************
  Print a char on the LCD display
  Any characters not in the font will print as a space.
@@ -180,7 +183,9 @@ void DisplayPutC(char c) {
                     } while((CurrentX/gui_font_width) % Option.Tab);
                     return;
     }
+    port_display_render_begin();
     GUIPrintChar(gui_font, gui_fcolour, gui_bcolour, c, ORIENT_NORMAL);            // print it
+    port_display_render_end();
     routinechecks();
 }
 
