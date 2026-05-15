@@ -615,7 +615,10 @@ void vm_host_fat_reset(void) {}
  * pc386_flash.c, which owns the real backing buffers + the
  * flash_range_erase/program shims hal_flash_pc386.c wraps. */
 
-/* PSRAM cache flush hook called from Commands.c SaveContext when
+/* PSRAM controller save/restore hooks called from Commands.c
+ * SaveContext / RestoreContext (and hal_flash_pico flush paths) when
  * PSRAMsize is nonzero. Pc386 has no PSRAM (PSRAMsize==0), so the
- * call site is unreachable, but the symbol must resolve for link. */
-void mmbasic_save_psram_settings(void) {}
+ * call sites are unreachable, but the symbols must resolve for link.
+ * Mirrors drivers/psram_heap/hal_psram_stub.c. */
+void hal_psram_save_settings(void) {}
+void hal_psram_restore_settings(void) {}
