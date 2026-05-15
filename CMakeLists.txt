@@ -168,6 +168,7 @@ set(PICOMITE_CORE_STATE_SOURCES
 	shared/net/mm_net_interrupts.c
 	shared/net/mm_net_http.c
 	shared/net/mm_net_ntp.c
+	shared/net/mm_net_telnet_rx.c
 )
 
 # HAL implementations shared across every RP2040/RP2350 device target.

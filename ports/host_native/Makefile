@@ -49,6 +49,7 @@ CORE_SRCS += mm_net_mqtt_cmd.c
 CORE_SRCS += mm_net_mqtt_hal_cmd.c
 CORE_SRCS += mm_net_mqtt_wire.c
 CORE_SRCS += mm_net_ntp.c
+CORE_SRCS += mm_net_telnet_rx.c
 CORE_SRCS += mm_net_ntp_hal.c
 CORE_SRCS += mm_net_lifecycle.c
 CORE_SRCS += mm_net_options.c

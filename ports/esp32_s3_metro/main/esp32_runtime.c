@@ -104,15 +104,11 @@ void CheckAbort(void) {
     mmbasic_runtime_checkabort(&s_abort_adapter);
 }
 
-static unsigned int esp32_commandtbl_decode_u(unsigned char *p) {
-    return (unsigned int)esp32_commandtbl_decode(p);
-}
-
 static const mmbasic_runtime_interrupt_dispatch_adapter esp32_interrupt_dispatch = {
     .service = esp32_runtime_service,
     .tcp_pending = esp32_tcp_interrupt_pending,
     .udp_pending = esp32_udp_interrupt_pending,
-    .commandtbl_decode = esp32_commandtbl_decode_u,
+    .commandtbl_decode = esp32_commandtbl_decode,
     .save_option_error_skip = &s_save_option_error_skip,
     .save_error_message = s_save_error_message,
     .save_error_message_size = sizeof(s_save_error_message),

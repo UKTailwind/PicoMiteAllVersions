@@ -44,6 +44,7 @@ CORE_SRCS += display_state.c pin_state.c option_state.c audio_state.c
 CORE_SRCS += mm_net_interrupts.c
 CORE_SRCS += mm_net_http.c
 CORE_SRCS += mm_net_ntp.c
+CORE_SRCS += mm_net_telnet_rx.c
 CORE_SRCS += mm_net_state.c
 CORE_SRCS += Draw.c RGB121.c Tilemap.c FileIO.c Audio.c BmpDecoder.c re.c picojpeg.c
 CORE_SRCS += audio_mp3_stub.c spi_lcd_mem332_stub.c display_merge_stub.c vga_ops_stub.c

@@ -493,15 +493,11 @@ static const mmbasic_runtime_abort_adapter host_abort_adapter = {
 /* Hardware interaction */
 void CheckAbort(void) { mmbasic_runtime_checkabort(&host_abort_adapter); }
 
-static unsigned int host_commandtbl_decode_u(unsigned char *p) {
-    return (unsigned int)host_commandtbl_decode(p);
-}
-
 static const mmbasic_runtime_interrupt_dispatch_adapter host_interrupt_dispatch = {
     .service = host_runtime_service,
     .tcp_pending = host_tcp_interrupt_pending,
     .udp_pending = NULL,  /* host's UDPreceive flag is driven by shared/net */
-    .commandtbl_decode = host_commandtbl_decode_u,
+    .commandtbl_decode = host_commandtbl_decode,
     .save_option_error_skip = &host_save_option_error_skip,
     .save_error_message = host_save_error_message,
     .save_error_message_size = sizeof(host_save_error_message),

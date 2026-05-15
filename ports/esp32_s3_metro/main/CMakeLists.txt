@@ -46,6 +46,7 @@ set(STATE_SRCS
     ${REPO_ROOT}/shared/net/mm_net_mqtt_cmd.c
     ${REPO_ROOT}/shared/net/mm_net_mqtt_hal_cmd.c
     ${REPO_ROOT}/shared/net/mm_net_ntp.c
+    ${REPO_ROOT}/shared/net/mm_net_telnet_rx.c
     ${REPO_ROOT}/shared/net/mm_net_ntp_hal.c
     ${REPO_ROOT}/shared/net/mm_net_lifecycle.c
     ${REPO_ROOT}/shared/net/mm_net_options.c

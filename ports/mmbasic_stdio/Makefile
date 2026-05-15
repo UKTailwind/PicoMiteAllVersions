@@ -50,6 +50,7 @@ CORE_SRCS += display_state.c pin_state.c option_state.c audio_state.c
 CORE_SRCS += mm_net_interrupts.c
 CORE_SRCS += mm_net_http.c
 CORE_SRCS += mm_net_ntp.c
+CORE_SRCS += mm_net_telnet_rx.c
 CORE_SRCS += mm_net_state.c
 CORE_SRCS += Draw.c RGB121.c Tilemap.c FileIO.c Audio.c BmpDecoder.c re.c picojpeg.c
 # Stubs inherited from host_native (dr_mp3, SPI-LCD, VGA, GUI, 3D, uPNG).

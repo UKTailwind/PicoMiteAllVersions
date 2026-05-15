@@ -18,6 +18,7 @@
 #include "shared/net/mm_net_http_file.h"
 #include "shared/net/mm_net_http_page.h"
 #include "shared/net/mm_net_interrupts.h"
+#include "shared/net/mm_net_telnet_rx.h"
 #include "shared/net/mm_net_lifecycle.h"
 #include "shared/net/mm_net_mqtt_cmd.h"
 #include "shared/net/mm_net_mqtt_hal_cmd.h"
@@ -65,8 +66,7 @@ static char host_tcp_path[HOST_WEB_MAX_PCB][256];
 static mm_net_tftp_session_t host_tftp;
 static char host_telnet_buf[256];
 static int host_telnet_pos;
-static int host_telnet_lastchar = -1;
-static int host_telnet_iac_state;
+/* RFC 854 IAC parser + CR-NUL dedup live in shared/net/mm_net_telnet_rx.c. */
 static const uint8_t host_telnet_init_options[] = {0};
 static const size_t host_telnet_init_options_len = 0;
 
@@ -354,7 +354,7 @@ static void host_telnet_close_conn(void) {
         host_telnet_conn = 0;
     }
     host_telnet_pos = 0;
-    host_telnet_iac_state = 0;
+    mm_net_telnet_rx_reset();
 }
 
 static void host_telnet_close_server(void) {
@@ -415,58 +415,10 @@ void host_telnet_putc(int c, int flush) {
     }
 }
 
+/* RFC 854 IAC parser + ConsoleRxBuf delivery live in
+ * shared/net/mm_net_telnet_rx.c — shared across every port. */
 static void host_telnet_receive_bytes(const uint8_t *data, size_t len) {
-    if (!data || len == 0) return;
-    for (size_t i = 0; i < len; ++i) {
-        int c = data[i];
-        if (host_telnet_iac_state == 1) {
-            if (c == 255) {
-                host_telnet_iac_state = 0;
-            } else if (c == 251 || c == 252 || c == 253 || c == 254) {
-                host_telnet_iac_state = 2;
-                continue;
-            } else if (c == 250) {
-                host_telnet_iac_state = 3;
-                continue;
-            } else {
-                host_telnet_iac_state = 0;
-                continue;
-            }
-        } else if (host_telnet_iac_state == 2) {
-            host_telnet_iac_state = 0;
-            continue;
-        } else if (host_telnet_iac_state == 3) {
-            if (c == 255) host_telnet_iac_state = 4;
-            continue;
-        } else if (host_telnet_iac_state == 4) {
-            host_telnet_iac_state = (c == 240) ? 0 : 3;
-            continue;
-        } else if (c == 255) {
-            host_telnet_iac_state = 1;
-            continue;
-        }
-        ConsoleRxBuf[ConsoleRxBufHead] = (char)c;
-        if ((host_telnet_lastchar == 13 &&
-             ConsoleRxBuf[ConsoleRxBufHead] == 0) ||
-            (host_telnet_lastchar == 255 &&
-             ConsoleRxBuf[ConsoleRxBufHead] == (char)255)) {
-            host_telnet_lastchar = -1;
-            continue;
-        }
-        if (BreakKey && ConsoleRxBuf[ConsoleRxBufHead] == BreakKey) {
-            MMAbort = true;
-            ConsoleRxBufHead = ConsoleRxBufTail;
-        } else if (ConsoleRxBuf[ConsoleRxBufHead] == keyselect &&
-                   KeyInterrupt != NULL) {
-            Keycomplete = true;
-        } else {
-            host_telnet_lastchar = ConsoleRxBuf[ConsoleRxBufHead];
-            ConsoleRxBufHead = (ConsoleRxBufHead + 1) % CONSOLE_RX_BUF_SIZE;
-            if (ConsoleRxBufHead == ConsoleRxBufTail)
-                ConsoleRxBufTail = (ConsoleRxBufTail + 1) %
-                                   CONSOLE_RX_BUF_SIZE;
-        }
-    }
+    mm_net_telnet_rx_feed(data, len);
 }
 
 static void host_telnet_poll(int mode) {

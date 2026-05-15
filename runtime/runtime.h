@@ -11,6 +11,13 @@
 extern "C" {
 #endif
 
+/* CommandToken is the canonical MMBasic command-token type
+ * (typedef uint16_t CommandToken; in MMBasic.h). The interrupt
+ * dispatch adapter uses it in a function-pointer signature; pull
+ * the typedef in directly so this header is self-contained
+ * regardless of include order. */
+typedef uint16_t CommandToken;
+
 typedef enum mm_runtime_key_kind {
     MM_RUNTIME_KEY_NONE,
     MM_RUNTIME_KEY_RAW_BYTE,
@@ -229,7 +236,10 @@ typedef struct mmbasic_runtime_interrupt_dispatch_adapter {
     mmbasic_runtime_service_fn service;
     int (*tcp_pending)(void);
     int (*udp_pending)(void);
-    unsigned int (*commandtbl_decode)(unsigned char *p);
+    /* Port wrapper for the shared commandtbl decoder. Return type matches
+     * the canonical CommandToken (MMBasic.h) so the shared dispatcher
+     * compares against cmdSUB without an integer-promotion mismatch. */
+    CommandToken (*commandtbl_decode)(const unsigned char *p);
 
     int *save_option_error_skip;
     char *save_error_message;

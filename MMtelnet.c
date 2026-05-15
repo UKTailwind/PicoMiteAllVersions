@@ -26,6 +26,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "Hardware_Includes.h"
 #include "hal/hal_net.h"
 #include "shared/net/mm_net_lifecycle.h"
+#include "shared/net/mm_net_telnet_rx.h"
 #include "pico/cyw43_arch.h"
 //#define DEBUG_printf printf
 #define DEBUG_printf
@@ -40,7 +41,7 @@ static char Telnetbuff[256]={0};
 static int Telnetpos=0;
 static hal_net_tcp_server_t pico_telnet_server;
 static hal_net_tcp_conn_t pico_telnet_conn;
-static int pico_telnet_lastchar=-1;
+/* RFC 854 IAC parser + CR-NUL dedup live in shared/net/mm_net_telnet_rx.c. */
 static const uint8_t telnet_init_options[] =
 {
 //    TELNET_CHAR_IAC, TELNET_CHAR_WILL, TELNET_OPT_SUPPRESS_GO_AHEAD,
@@ -70,6 +71,7 @@ static void pico_telnet_close_conn(void) {
                 pico_telnet_conn = 0;
         }
         Telnetpos = 0;
+        mm_net_telnet_rx_reset();
 }
 
 void pico_telnet_close(void) {
@@ -110,38 +112,12 @@ void __not_in_flash_func(TelnetPutC)(int c,int flush){
         }
 }
 
+/* RFC 854 IAC parser lives in shared/net/mm_net_telnet_rx.c — shared
+ * across every port. Previous body was buggy: it dropped the whole TCP
+ * segment if the first byte was IAC, losing any keystrokes that arrived
+ * in the same segment as a negotiation reply. */
 static void pico_telnet_receive_bytes(const uint8_t *data, size_t len) {
-        if(!data || len == 0) return;
-        if(data[0]==255){
-//                for(size_t i=0;i<len;i++)DEBUG_printf("%d,",data[i]);
-//                DEBUG_printf("\r\n");
-                return;
-        }
-        for(size_t j=0;j<len;j++){
-                ConsoleRxBuf[ConsoleRxBufHead] = data[j];
-                if((pico_telnet_lastchar==13 &&
-                    ConsoleRxBuf[ConsoleRxBufHead]==0) ||
-                   (pico_telnet_lastchar==255 &&
-                    ConsoleRxBuf[ConsoleRxBufHead]==255)){
-                        pico_telnet_lastchar=-1;
-                        continue;
-                }
-                if(BreakKey && ConsoleRxBuf[ConsoleRxBufHead] == BreakKey) {
-                        MMAbort = true;
-                        ConsoleRxBufHead = ConsoleRxBufTail;
-                } else if(ConsoleRxBuf[ConsoleRxBufHead] ==keyselect &&
-                          KeyInterrupt!=NULL){
-                        Keycomplete=1;
-                } else {
-                        pico_telnet_lastchar=ConsoleRxBuf[ConsoleRxBufHead];
-                        ConsoleRxBufHead = (ConsoleRxBufHead + 1) %
-                                           CONSOLE_RX_BUF_SIZE;
-                        if(ConsoleRxBufHead == ConsoleRxBufTail) {
-                                ConsoleRxBufTail = (ConsoleRxBufTail + 1) %
-                                                   CONSOLE_RX_BUF_SIZE;
-                        }
-                }
-        }
+        mm_net_telnet_rx_feed(data, len);
 }
 
 void pico_telnet_poll(int mode) {

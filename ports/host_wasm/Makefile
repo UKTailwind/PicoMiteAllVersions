@@ -83,6 +83,7 @@ CORE_SRCS = MMBasic.c Commands.c Functions.c Operators.c MATHS.c \
             mm_net_mqtt_hal_cmd.c \
             mm_net_mqtt_wire.c \
             mm_net_ntp.c \
+            mm_net_telnet_rx.c \
             mm_net_ntp_hal.c \
             mm_net_lifecycle.c \
             mm_net_options.c \
