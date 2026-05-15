@@ -240,8 +240,7 @@ int MMgetchar(void) {
     }
 }
 
-int  getConsole(void)      { return -1; }
-int  kbhitConsole(void)    { return 0; }
+// getConsole / kbhitConsole live in runtime/runtime_console_input_noop.c — shared.
 void myprintf(char *s)     { MMPrintString(s); }
 
 /* MMfopen/MMfclose/MMgetline — file I/O routes through hal_filesystem;

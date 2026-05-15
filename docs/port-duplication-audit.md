@@ -353,18 +353,38 @@ exactly the `console_adapter` pattern.
 
 ## Finding 10 — `getConsole` / `kbhitConsole` defaults
 
-Status: **pending** · Risk: **LOW**
+Status: **done** · Risk: **LOW (resolved)**
 
-`int getConsole(void) { return -1; }` and `int kbhitConsole(void) { return 0; }`.
+The byte-identical fallbacks
+`int getConsole(void) { return -1; }` and `int kbhitConsole(void) { return 0; }`
+now live in `runtime/runtime_console_input_noop.c`. The five non-device
+ports that lack a real keyboard / console-input source
+(host_native, host_wasm, mmbasic_ansi, mmbasic_stdio, pc386) link the
+shared TU; Pico (`pico_console.c`) and ESP32
+(`esp32_mmbasic_console_glue.c`) supply real implementations and
+deliberately do not link it.
 
-| File | Lines |
+In practice none of the no-op ports actually invoke `getConsole` /
+`kbhitConsole` — input arrives through scripted-key hooks (host_native
+harness), the web console queue (host_wasm), terminal raw-mode reads
+(mmbasic_ansi / mmbasic_stdio), or the PS/2 IRQ-driven ring drained
+inside MMInkey (pc386). The shared defaults exist purely to satisfy
+the `extern int getConsole(void);` / `extern int kbhitConsole(void);`
+declarations in `Hardware_Includes.h`.
+
+| Site | What remains |
 |---|---|
-| `ports/host_native/host_runtime.c` | 661, 690 |
-| `ports/pc386/pc386_runtime.c` | 241-242 |
+| `runtime/runtime_console_input_noop.c` | shared no-op fallbacks |
+| `ports/pico_sdk_common/pico_console.c:15, :65` | real impl (untouched) |
+| `ports/esp32_s3_metro/main/esp32_mmbasic_console_glue.c:94, :102` | real impl (untouched) |
+| `ports/host_native/host_runtime.c:626, :655` | per-port copies removed; pointer comments only |
+| `ports/pc386/pc386_runtime.c:243-244` | per-port copies removed; pointer comment only |
 
-(pico_console.c and esp32 supply real implementations.)
-
-**Drift:** identical. Trivial — can ride along on Finding 1's consolidation.
+Gate: `validate_all.sh` green (host 244/244, mmbasic_stdio 8/8,
+mmbasic_ansi build clean, 14/14 device variants, RAM baseline holds);
+ESP32 build clean; `porttools/pico_console_smoke.py` 23/23 +
+`porttools/pico_input_smoke.py` 21/21 on both PicoCalc (WebMite
+RP2350B) and ESP32-S3 Metro.
 
 ---
 
@@ -438,7 +458,7 @@ adjacent state in ways that look like flaky tests hours later.
 
 ## Recommended sequence
 
-Done so far: Findings 1, 2, 3, 4, telnet IAC parser; live bugs (pc386
+Done so far: Findings 1, 2, 3, 4, 10, telnet IAC parser; live bugs (pc386
 escape decoder, pc386 `timegm` const, Pico DEL→BKSP).
 
 **Finding 5 is intentionally not next.** Its scope (~1900 LOC of
@@ -451,12 +471,10 @@ first).
 
 Next dedup-style work, in order of payoff:
 
-1. **Finding 10** — `getConsole` / `kbhitConsole` defaults
-   (~4 lines × 2 ports). Trivial; identical bodies.
-2. **Finding 7** — `port_drivecheck_remap` / `port_filesystem_prefix`
+1. **Finding 7** — `port_drivecheck_remap` / `port_filesystem_prefix`
    defaults (~3 identity returns × 3 ports). Trivial.
-3. **Finding 8** — `mmbasic_timegm` / `mmbasic_gmtime` shim wrappers
+2. **Finding 8** — `mmbasic_timegm` / `mmbasic_gmtime` shim wrappers
    (~15 lines). One latent bug already fixed; consolidation removes
    the remaining drift.
-4. **Finding 9** — `cmd_files_*` lifecycle hooks (~80 lines, partial
+3. **Finding 9** — `cmd_files_*` lifecycle hooks (~80 lines, partial
    overlap, includes a stale copy-paste comment to clean up).

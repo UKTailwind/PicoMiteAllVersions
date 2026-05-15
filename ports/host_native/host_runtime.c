@@ -623,7 +623,7 @@ void printoptions(void) {
     extern void port_web_print_options(void);
     port_web_print_options();
 }
-int getConsole(void) { return -1; }
+// getConsole lives in runtime/runtime_console_input_noop.c — shared.
 void myprintf(char *s) { host_prints(s); }
 char SerialConsolePutC(char c, int flush) {
     /* Host's "serial port" is stdout. Route through host_output_hook
@@ -652,7 +652,7 @@ char SerialConsolePutC(char c, int flush) {
     if (flush) host_telnet_putc(0, -1);
     return c;
 }
-int kbhitConsole(void) { return 0; }
+// kbhitConsole lives in runtime/runtime_console_input_noop.c — shared.
 
 
 /* FlashWrite*, FlashSetAddress, LoadOptions, SaveOptions, ResetAllFlash,
