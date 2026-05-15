@@ -197,6 +197,54 @@ unsigned char *mmbasic_runtime_interrupt_prepare_sub_return(
     unsigned char *current_line_ptr,
     int *local_index);
 
+/*
+ * mmbasic_runtime_interrupt_dispatch_adapter — per-port hooks consumed
+ * by the shared `mmbasic_runtime_check_interrupt` and
+ * `mmbasic_runtime_cmd_ireturn`. Used by every port whose check_interrupt
+ * follows the host_native / esp32 shape (a flat TCP/MQTT/UDP dispatch
+ * against the runtime state, no per-port pin/keyboard/GUI handling).
+ *
+ * Pico's check_interrupt (`MM_Misc.c:check_interrupt`) is a much richer
+ * function and does NOT use this adapter; pc386 stubs check_interrupt
+ * and cmd_ireturn entirely.
+ *
+ * Field semantics:
+ *   service()           — periodic device-side service call (USB poll,
+ *                         keyboard scan, etc). Always non-NULL.
+ *   tcp_pending()       — optional. Returns nonzero if a TCP interrupt
+ *                         should fire now (in addition to TCPreceived).
+ *   udp_pending()       — optional. Same for UDP. Esp32 sets this; host
+ *                         currently doesn't, but the option is here for
+ *                         when host's networking layer grows the same hook.
+ *   commandtbl_decode() — port wrapper around the shared decoder; needed
+ *                         to resolve cmdSUB on the interrupt target.
+ *   save_*              — per-port storage for OptionErrorSkip / MMErrMsg /
+ *                         MMerrno snapshots captured across the interrupt
+ *                         invocation.
+ *   interrupt_return_token / size — per-port buffer for the IRET
+ *                         trampoline tokens written by
+ *                         mmbasic_runtime_interrupt_prepare_sub_return.
+ */
+typedef struct mmbasic_runtime_interrupt_dispatch_adapter {
+    mmbasic_runtime_service_fn service;
+    int (*tcp_pending)(void);
+    int (*udp_pending)(void);
+    unsigned int (*commandtbl_decode)(unsigned char *p);
+
+    int *save_option_error_skip;
+    char *save_error_message;
+    size_t save_error_message_size;
+    int *save_errno;
+
+    char *interrupt_return_token;
+    size_t interrupt_return_token_size;
+} mmbasic_runtime_interrupt_dispatch_adapter;
+
+int mmbasic_runtime_check_interrupt(
+    const mmbasic_runtime_interrupt_dispatch_adapter *adapter);
+void mmbasic_runtime_cmd_ireturn(
+    const mmbasic_runtime_interrupt_dispatch_adapter *adapter);
+
 static inline void mmbasic_runtime_clear_post_load_input(unsigned char *input_buffer,
                                                          size_t input_buffer_size)
 {

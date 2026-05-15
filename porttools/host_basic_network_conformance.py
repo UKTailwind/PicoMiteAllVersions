@@ -232,10 +232,10 @@ X%=123
 GOTUDP=0
 DIM INTEGER B%(2048/8),O%(1024/8)
 CR$=CHR$(13)+CHR$(10)
-OPEN "A:hostpage.htm" FOR OUTPUT AS #1
+OPEN "B:hostpage.htm" FOR OUTPUT AS #1
 PRINT #1,"HOST_BASIC_PAGE {X%}"
 CLOSE #1
-OPEN "A:hostfile.txt" FOR OUTPUT AS #1
+OPEN "B:hostfile.txt" FOR OUTPUT AS #1
 PRINT #1,"HOST_BASIC_FILE"
 CLOSE #1
 WEB CONNECT
@@ -254,8 +254,8 @@ END SUB
 SendIt:
 WEB TCP READ C,B%()
 P$=MM.INFO(TCP PATH C)
-IF P$="/host/page" THEN WEB TRANSMIT PAGE C,"A:hostpage.htm":GOTO Sent
-IF P$="/host/file" THEN WEB TRANSMIT FILE C,"A:hostfile.txt","text/plain":GOTO Sent
+IF P$="/host/page" THEN WEB TRANSMIT PAGE C,"B:hostpage.htm":GOTO Sent
+IF P$="/host/file" THEN WEB TRANSMIT FILE C,"B:hostfile.txt","text/plain":GOTO Sent
 IF P$="/host/code" THEN WEB TRANSMIT CODE C,404:GOTO Sent
 LONGSTRING CLEAR O%()
 LONGSTRING APPEND O%(),"HTTP/1.0 200 OK"+CR$

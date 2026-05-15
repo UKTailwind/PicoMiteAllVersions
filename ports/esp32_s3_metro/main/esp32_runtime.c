@@ -104,60 +104,29 @@ void CheckAbort(void) {
     mmbasic_runtime_checkabort(&s_abort_adapter);
 }
 
+static unsigned int esp32_commandtbl_decode_u(unsigned char *p) {
+    return (unsigned int)esp32_commandtbl_decode(p);
+}
+
+static const mmbasic_runtime_interrupt_dispatch_adapter esp32_interrupt_dispatch = {
+    .service = esp32_runtime_service,
+    .tcp_pending = esp32_tcp_interrupt_pending,
+    .udp_pending = esp32_udp_interrupt_pending,
+    .commandtbl_decode = esp32_commandtbl_decode_u,
+    .save_option_error_skip = &s_save_option_error_skip,
+    .save_error_message = s_save_error_message,
+    .save_error_message_size = sizeof(s_save_error_message),
+    .save_errno = &s_save_errno,
+    .interrupt_return_token = s_interrupt_return_token,
+    .interrupt_return_token_size = sizeof(s_interrupt_return_token),
+};
+
 void cmd_ireturn(void) {
-    if (InterruptReturn == NULL) error("Not in interrupt");
-    checkend(cmdline);
-    mmbasic_runtime_interrupt_leave_state(&nextstmt, &InterruptReturn,
-                                          &g_LocalIndex, ClearVars,
-                                          &g_TempMemoryIsChanged,
-                                          CurrentInterruptName);
-    mmbasic_runtime_interrupt_restore_error_state(s_save_option_error_skip,
-                                                  s_save_error_message,
-                                                  s_save_errno,
-                                                  &OptionErrorSkip, MMErrMsg,
-                                                  &MMerrno);
+    mmbasic_runtime_cmd_ireturn(&esp32_interrupt_dispatch);
 }
 
 int check_interrupt(void) {
-    esp32_runtime_service();
-    if (!InterruptUsed) return 0;
-    if (InterruptReturn != NULL) return 0;
-
-    unsigned char *intaddr = NULL;
-    if (TCPreceiveInterrupt && (TCPreceived || esp32_tcp_interrupt_pending())) {
-        intaddr = (unsigned char *)TCPreceiveInterrupt;
-        TCPreceived = false;
-    } else if (MQTTInterrupt && MQTTComplete) {
-        intaddr = (unsigned char *)MQTTInterrupt;
-        MQTTComplete = false;
-    } else if (UDPinterrupt && (UDPreceive || esp32_udp_interrupt_pending())) {
-        intaddr = (unsigned char *)UDPinterrupt;
-        UDPreceive = false;
-    } else {
-        return 0;
-    }
-
-    g_LocalIndex++;
-    mmbasic_runtime_interrupt_save_error_state(&s_save_option_error_skip,
-                                               s_save_error_message,
-                                               sizeof(s_save_error_message),
-                                               &s_save_errno,
-                                               &OptionErrorSkip, MMErrMsg,
-                                               &MMerrno);
-    InterruptReturn = nextstmt;
-
-    if (esp32_commandtbl_decode(intaddr) == cmdSUB) {
-        if (gosubindex >= MAXGOSUB) error("Too many SUBs for interrupt");
-        intaddr = mmbasic_runtime_interrupt_prepare_sub_return(
-            cmdIRET, C_BASETOKEN, intaddr,
-            CurrentInterruptName, MAXVARLEN, true,
-            s_interrupt_return_token, sizeof(s_interrupt_return_token),
-            &gosubindex, errorstack, gosubstack, CurrentLinePtr,
-            &g_LocalIndex);
-    }
-
-    nextstmt = intaddr;
-    return 1;
+    return mmbasic_runtime_check_interrupt(&esp32_interrupt_dispatch);
 }
 
 /* Long-running-routine yield. Called from PAUSE, FOR-loop iterations,

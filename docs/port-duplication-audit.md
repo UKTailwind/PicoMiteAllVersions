@@ -125,7 +125,33 @@ existing pattern.
 
 ## Finding 4 — `cmd_ireturn` + `check_interrupt`
 
-Status: **pending** · Risk: **HIGH**
+Status: **done** · Risk: **HIGH (resolved)**
+
+Both functions now share `runtime/runtime_interrupt.c`:
+`mmbasic_runtime_check_interrupt(adapter)` and
+`mmbasic_runtime_cmd_ireturn(adapter)` take a per-port
+`mmbasic_runtime_interrupt_dispatch_adapter` (declared in
+`runtime/runtime.h`) that names the port's service hook, TCP/UDP
+pending hooks (optional), commandtbl_decode wrapper, error-state
+save buffers, and the IRET trampoline token buffer.
+
+host_native and esp32 each declare a single static adapter pointing
+at their own state and replace their previous ~60-line bodies with
+one-line forwarders. The UDP `udp_pending` slot is now wired on
+both ports (esp32 plugs `esp32_udp_interrupt_pending`, host plugs
+NULL because its UDPreceive flag is already driven by the shared
+`shared/net/mm_net_service.c` path — but the slot exists for any
+port that wants the extra pending poll). Pico's check_interrupt
+in `MM_Misc.c` is intentionally untouched (it's a much richer
+dispatcher with keyboard/GUI/pin checks beyond the TCP/UDP/MQTT
+flat dispatch). pc386's stubs are also untouched.
+
+Smoke gate: `porttools/host_basic_network_conformance.py` drives
+`WEB TCP INTERRUPT` / `WEB UDP INTERRUPT` / `WEB MQTT SUBSCRIBE`
+callbacks against the host build, exercising every dispatch branch
+through the new shared function. Also fixed the test's embedded
+BASIC to use B: (the host-available drive) instead of A: — that
+was a pre-existing bug masking the test's runnability on host.
 
 | File | Lines |
 |---|---|

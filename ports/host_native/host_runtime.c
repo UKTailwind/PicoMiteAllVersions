@@ -492,61 +492,30 @@ static const mmbasic_runtime_abort_adapter host_abort_adapter = {
 
 /* Hardware interaction */
 void CheckAbort(void) { mmbasic_runtime_checkabort(&host_abort_adapter); }
+
+static unsigned int host_commandtbl_decode_u(unsigned char *p) {
+    return (unsigned int)host_commandtbl_decode(p);
+}
+
+static const mmbasic_runtime_interrupt_dispatch_adapter host_interrupt_dispatch = {
+    .service = host_runtime_service,
+    .tcp_pending = host_tcp_interrupt_pending,
+    .udp_pending = NULL,  /* host's UDPreceive flag is driven by shared/net */
+    .commandtbl_decode = host_commandtbl_decode_u,
+    .save_option_error_skip = &host_save_option_error_skip,
+    .save_error_message = host_save_error_message,
+    .save_error_message_size = sizeof(host_save_error_message),
+    .save_errno = &host_save_errno,
+    .interrupt_return_token = host_interrupt_return_token,
+    .interrupt_return_token_size = sizeof(host_interrupt_return_token),
+};
+
 void cmd_ireturn(void) {
-    if (InterruptReturn == NULL) error("Not in interrupt");
-    checkend(cmdline);
-    mmbasic_runtime_interrupt_leave_state(&nextstmt, &InterruptReturn,
-                                          &g_LocalIndex, ClearVars,
-                                          &g_TempMemoryIsChanged,
-                                          CurrentInterruptName);
-    mmbasic_runtime_interrupt_restore_error_state(host_save_option_error_skip,
-                                                  host_save_error_message,
-                                                  host_save_errno,
-                                                  &OptionErrorSkip, MMErrMsg,
-                                                  &MMerrno);
+    mmbasic_runtime_cmd_ireturn(&host_interrupt_dispatch);
 }
 
 int check_interrupt(void) {
-    host_runtime_service();
-    if (!InterruptUsed) return 0;
-    if (InterruptReturn != NULL) return 0;
-
-    unsigned char *intaddr = NULL;
-    if (TCPreceiveInterrupt &&
-        (TCPreceived || host_tcp_interrupt_pending())) {
-        intaddr = (unsigned char *)TCPreceiveInterrupt;
-        TCPreceived = false;
-    } else if (MQTTInterrupt && MQTTComplete) {
-        intaddr = (unsigned char *)MQTTInterrupt;
-        MQTTComplete = false;
-    } else if (UDPinterrupt && UDPreceive) {
-        intaddr = (unsigned char *)UDPinterrupt;
-        UDPreceive = false;
-    } else {
-        return 0;
-    }
-
-    g_LocalIndex++;
-    mmbasic_runtime_interrupt_save_error_state(&host_save_option_error_skip,
-                                               host_save_error_message,
-                                               sizeof(host_save_error_message),
-                                               &host_save_errno,
-                                               &OptionErrorSkip, MMErrMsg,
-                                               &MMerrno);
-    InterruptReturn = nextstmt;
-
-    if (host_commandtbl_decode(intaddr) == cmdSUB) {
-        if (gosubindex >= MAXGOSUB) error("Too many SUBs for interrupt");
-        intaddr = mmbasic_runtime_interrupt_prepare_sub_return(
-            cmdIRET, C_BASETOKEN, intaddr,
-            CurrentInterruptName, MAXVARLEN, true,
-            host_interrupt_return_token, sizeof(host_interrupt_return_token),
-            &gosubindex, errorstack, gosubstack, CurrentLinePtr,
-            &g_LocalIndex);
-    }
-
-    nextstmt = intaddr;
-    return 1;
+    return mmbasic_runtime_check_interrupt(&host_interrupt_dispatch);
 }
 void ClearExternalIO(void) {}
 /* CloseAllFiles is provided by FileIO.c. */

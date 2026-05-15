@@ -11,6 +11,9 @@
 #endif
 
 #include "MMBasic_Includes.h"
+#include "MM_Misc.h"
+#include "Memory.h"
+#include "shared/net/mm_net_interrupts.h"
 
 #ifndef HAL_PORT_MMBASIC_HOT_FUNC
 #define HAL_PORT_MMBASIC_HOT_FUNC(name) name
@@ -72,6 +75,88 @@ void HAL_PORT_MMBASIC_HOT_FUNC(mmbasic_runtime_interrupt_leave_state)(
     if (local_index && *local_index && clear_vars) clear_vars((*local_index)--, true);
     if (temp_memory_changed) *temp_memory_changed = true;
     if (current_interrupt_name) *current_interrupt_name = '\0';
+}
+
+/*
+ * Shared check_interrupt / cmd_ireturn for any port whose dispatch
+ * surface follows the host_native / esp32 shape. Encapsulates the
+ * "drain TCP/MQTT/UDP flags → save error state → cmdSUB trampoline"
+ * logic that previously had two near-verbatim copies. Pico's
+ * check_interrupt is a separate, more elaborate function (see
+ * MM_Misc.c:checkdetailinterrupts) and does not use this path; pc386
+ * stubs both functions and also does not use this path.
+ *
+ * The audit found host_native was missing the `udp_pending` hook the
+ * ESP32 had; the dispatch adapter exposes the slot so any port can
+ * plumb a non-blocking pending check alongside the UDPreceive flag.
+ */
+int HAL_PORT_MMBASIC_HOT_FUNC(mmbasic_runtime_check_interrupt)(
+    const mmbasic_runtime_interrupt_dispatch_adapter *adapter)
+{
+    if (!adapter) return 0;
+    if (adapter->service) adapter->service();
+    if (!InterruptUsed) return 0;
+    if (InterruptReturn != NULL) return 0;
+
+    unsigned char *intaddr = NULL;
+    if (TCPreceiveInterrupt && (TCPreceived ||
+        (adapter->tcp_pending && adapter->tcp_pending()))) {
+        intaddr = (unsigned char *)TCPreceiveInterrupt;
+        TCPreceived = false;
+    } else if (MQTTInterrupt && MQTTComplete) {
+        intaddr = (unsigned char *)MQTTInterrupt;
+        MQTTComplete = false;
+    } else if (UDPinterrupt && (UDPreceive ||
+        (adapter->udp_pending && adapter->udp_pending()))) {
+        intaddr = (unsigned char *)UDPinterrupt;
+        UDPreceive = false;
+    } else {
+        return 0;
+    }
+
+    g_LocalIndex++;
+    mmbasic_runtime_interrupt_save_error_state(
+        adapter->save_option_error_skip,
+        adapter->save_error_message,
+        adapter->save_error_message_size,
+        adapter->save_errno,
+        &OptionErrorSkip, MMErrMsg, &MMerrno);
+    InterruptReturn = nextstmt;
+
+    if (adapter->commandtbl_decode &&
+        adapter->commandtbl_decode(intaddr) == cmdSUB) {
+        if (gosubindex >= MAXGOSUB) error("Too many SUBs for interrupt");
+        intaddr = mmbasic_runtime_interrupt_prepare_sub_return(
+            cmdIRET, C_BASETOKEN, intaddr,
+            CurrentInterruptName, MAXVARLEN, true,
+            adapter->interrupt_return_token,
+            adapter->interrupt_return_token_size,
+            &gosubindex, errorstack, gosubstack, CurrentLinePtr,
+            &g_LocalIndex);
+    }
+
+    nextstmt = intaddr;
+    return 1;
+}
+
+void HAL_PORT_MMBASIC_HOT_FUNC(mmbasic_runtime_cmd_ireturn)(
+    const mmbasic_runtime_interrupt_dispatch_adapter *adapter)
+{
+    if (InterruptReturn == NULL) error("Not in interrupt");
+    checkend(cmdline);
+    mmbasic_runtime_interrupt_leave_state(&nextstmt, &InterruptReturn,
+                                          &g_LocalIndex, ClearVars,
+                                          &g_TempMemoryIsChanged,
+                                          CurrentInterruptName);
+    if (!adapter) return;
+    int saved_skip = adapter->save_option_error_skip
+                     ? *adapter->save_option_error_skip : 0;
+    int saved_errno = adapter->save_errno ? *adapter->save_errno : 0;
+    mmbasic_runtime_interrupt_restore_error_state(
+        saved_skip,
+        adapter->save_error_message,
+        saved_errno,
+        &OptionErrorSkip, MMErrMsg, &MMerrno);
 }
 
 unsigned char *HAL_PORT_MMBASIC_HOT_FUNC(
