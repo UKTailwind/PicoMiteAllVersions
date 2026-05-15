@@ -251,6 +251,7 @@ target_sources(PicoMite PRIVATE
 	runtime/runtime_console_printstring.c
 	runtime/runtime_console_adapter.c
 	runtime/runtime_console_escdecode.c
+	runtime/runtime_filesystem_defaults.c
 )
 # The project's headers (MMBasic_Includes.h, Draw.h, etc.) live in the
 # repo root. Sources in subdirectories (core/state/, future hal/ + drivers/

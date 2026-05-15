@@ -291,19 +291,31 @@ See also: feedback memory entry `feedback_port_prefix_pollution.md`.
 
 ## Finding 7 — `port_drivecheck_remap` / `port_filesystem_prefix` defaults
 
-Status: **pending** · Risk: **MEDIUM**
+Status: **done** · Risk: **MEDIUM (resolved)**
 
-| File | Notes |
+The byte-identical defaults — identity `port_drivecheck_remap` and
+`"A:"`/`"B:"`-returning `port_filesystem_prefix` — now live in
+`runtime/runtime_filesystem_defaults.c`. Pico, host, and ESP32 all
+link the shared TU; pc386 keeps its real overrides (FatFs on every
+volume, DOS A:/B:/C: drive-letter routing).
+
+| Site | What remains |
 |---|---|
-| `ports/pico_sdk_common/cmd_files_hooks.c:80` | default identity |
-| `ports/host_native/host_runtime.c:789, 791-794` | default identity |
-| `ports/esp32_s3_metro/main/esp32_cmd_files_hooks.c:36, 38-40` | default identity |
-| `ports/pc386/pc386_runtime.c:294-296, 325-330` | real DOS A:/B:/C: routing — legitimate override |
+| `runtime/runtime_filesystem_defaults.c` | shared identity + canonical "A:"/"B:" bodies |
+| `ports/pico_sdk_common/cmd_files_hooks.c` | per-port copies removed; pointer comment only |
+| `ports/host_native/host_runtime.c` | per-port copies removed; pointer comment only |
+| `ports/esp32_s3_metro/main/esp32_cmd_files_hooks.c` | per-port copies removed; pointer comment only |
+| `ports/pc386/pc386_runtime.c:295-297, 326-331` | real DOS A:/B:/C: routing — deliberate override; doesn't link the shared TU |
 
-**Drift:** identical for the three default copies.
-
-**Why shareable:** pure function of an integer arg, returns input or
-compile-time string. No port state.
+Gate: `validate_all.sh` green (host 244/244, mmbasic_stdio 8/8,
+mmbasic_ansi build clean, 14/14 device variants, RAM baseline holds);
+ESP32 build clean; `porttools/pico_console_smoke.py` 23/23 on both
+boards (PicoCalc + ESP32) plus `pico_fs_vm_smoke.py fs errors` /
+`esp32_fs_vm_smoke.py fs` PASS — covers mkdir/chdir/open/read/write/
+append/copy/rename/dir/kill/rmdir, every one of which routes through
+both hooks. Explicit `PRINT CWD$` after `CHDIR "A:/"` returns `A:/` on
+both boards, confirming `port_filesystem_prefix(0) == "A:"` via the
+shared TU.
 
 ---
 
@@ -458,8 +470,8 @@ adjacent state in ways that look like flaky tests hours later.
 
 ## Recommended sequence
 
-Done so far: Findings 1, 2, 3, 4, 10, telnet IAC parser; live bugs (pc386
-escape decoder, pc386 `timegm` const, Pico DEL→BKSP).
+Done so far: Findings 1, 2, 3, 4, 7, 10, telnet IAC parser; live bugs
+(pc386 escape decoder, pc386 `timegm` const, Pico DEL→BKSP).
 
 **Finding 5 is intentionally not next.** Its scope (~1900 LOC of
 peripheral stubs) is owned by the modular stub-driver carve-out in
@@ -471,10 +483,8 @@ first).
 
 Next dedup-style work, in order of payoff:
 
-1. **Finding 7** — `port_drivecheck_remap` / `port_filesystem_prefix`
-   defaults (~3 identity returns × 3 ports). Trivial.
-2. **Finding 8** — `mmbasic_timegm` / `mmbasic_gmtime` shim wrappers
+1. **Finding 8** — `mmbasic_timegm` / `mmbasic_gmtime` shim wrappers
    (~15 lines). One latent bug already fixed; consolidation removes
    the remaining drift.
-3. **Finding 9** — `cmd_files_*` lifecycle hooks (~80 lines, partial
+2. **Finding 9** — `cmd_files_*` lifecycle hooks (~80 lines, partial
    overlap, includes a stale copy-paste comment to clean up).

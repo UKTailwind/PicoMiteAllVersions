@@ -74,15 +74,10 @@ void port_drive_check(char drive)
     }
 }
 
-/* Default drivecheck remap: identity. Pc386 (FatFs on every volume,
- * no LFS) overrides to coerce FLASHFILE → FATFSFILE. Device builds
- * keep the canonical A:=LFS / B:=FatFs split. */
-int port_drivecheck_remap(int t) { return t; }
-
-const char *port_filesystem_prefix(int filesystem)
-{
-    return filesystem ? "B:" : "A:";
-}
+/* port_drivecheck_remap (identity) + port_filesystem_prefix ("A:"/"B:")
+ * live in runtime/runtime_filesystem_defaults.c — shared with host +
+ * ESP32. pc386 (FatFs on every volume, no LFS) provides real overrides
+ * and doesn't link the shared TU. */
 
 /* hal_ff_* directory + path ops on device just forward to the vendored
  * FatFS in ff.c. Host impls in host/host_fs_shims.c (host_f_*) handle

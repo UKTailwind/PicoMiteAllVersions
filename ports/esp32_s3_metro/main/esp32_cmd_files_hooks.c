@@ -31,13 +31,9 @@ void port_drive_check(char drive) {
     if (drive != 'A' && drive != 'B') error("Invalid disk");
 }
 
-/* Default drivecheck remap: identity. Pc386 (which has FatFs on every
- * volume and no LFS) overrides this. ESP32 keeps A:=LFS / B:=FatFs. */
-int port_drivecheck_remap(int t) { return t; }
-
-const char *port_filesystem_prefix(int filesystem) {
-    return filesystem ? "B:" : "A:";
-}
+/* port_drivecheck_remap + port_filesystem_prefix live in
+ * runtime/runtime_filesystem_defaults.c — shared with Pico + host.
+ * pc386 (FatFs on every volume, no LFS) overrides both. */
 
 int port_mount_sd_drive(void) {
     ErrorThrow(0, NONEFILE);  /* reset mm.errno */

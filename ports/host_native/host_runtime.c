@@ -749,14 +749,9 @@ void port_apply_load_overrides(void)
      * builds live in ports/pico_sdk_common/port_load_overrides.c. */
 }
 
-/* Default drivecheck remap: identity. Pc386 (which has FatFs on every
- * volume and no LFS) provides its own override. */
-int port_drivecheck_remap(int t) { return t; }
-
-const char *port_filesystem_prefix(int filesystem)
-{
-    return filesystem ? "B:" : "A:";
-}
+/* port_drivecheck_remap + port_filesystem_prefix live in
+ * runtime/runtime_filesystem_defaults.c — shared with Pico + ESP32.
+ * pc386 provides real overrides (DOS drive-letter routing). */
 
 void port_drive_check(char drive)
 {
