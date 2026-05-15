@@ -110,9 +110,17 @@ class BasicSerial:
 
     @staticmethod
     def _has_prompt(raw: bytes) -> bool:
+        """The BASIC prompt is exactly `>` at the start of a line. Don't
+        match an in-the-middle `>` like the one in `<DIR>` — ESP32's
+        faster serial output reliably exposes chunks ending mid-`<DIR>`
+        line, which a naive endswith(`>`) trips on and returns early
+        with a truncated transcript."""
         clean = strip_ansi(raw).replace(b"\r", b"\n")
-        tail = clean[-300:].rstrip()
-        return tail.endswith(b">")
+        tail = clean[-300:].rstrip(b" \t")  # keep newlines for boundary
+        # Valid prompt shapes: end of stream with "\n>" or just ">".
+        if tail.endswith(b"\n>") or tail == b">":
+            return True
+        return False
 
     def wait_for_prompt(self, timeout: float) -> bytes:
         assert self.serial is not None
