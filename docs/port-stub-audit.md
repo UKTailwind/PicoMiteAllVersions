@@ -17,7 +17,11 @@ those bodies with stubs.
 ## 1. Stub Patterns
 
 There is **no shared `error_unsupported()` helper**. Each port hand-writes its
-own stubs, almost always in a single file:
+own stubs, almost always in a single file. The canonical plan to retire these
+monoliths in favour of per-subsystem stub drivers (with a consistent fail-loud
+posture and a `-DHAL_STUBS_SILENT` bringup escape hatch) is in
+[`real-hal-plan.md` § Modular stub drivers](real-hal-plan.md#modular-stub-drivers-proposed-direction);
+this audit is the inventory it works from, not the design.
 
 | Port           | Stub file                                                      | Lines |
 | -------------- | -------------------------------------------------------------- | ----- |
@@ -381,8 +385,23 @@ applicable.
 
 ### Low / cleanup
 
-11. **Factor a shared `error_unsupported()` helper** to deduplicate the three
-    near-identical peripheral-stub files.
+11. **Modular stub-driver carve-out (canonical plan).** Replace the three
+    monolithic peripheral-stub files with per-subsystem stubs under
+    `drivers/<subsystem>/<subsystem>_stub.c` paired with real driver TUs
+    (`<subsystem>_pico.c`, `<subsystem>_esp32.c`, …), selectively linked
+    via each port's source manifest. Default posture is `error("X not
+    supported on this port")` (fail loudly), with `-DHAL_STUBS_SILENT`
+    as a bringup escape hatch that flips every stub to silent no-op.
+    Full direction + migration order in
+    [`real-hal-plan.md` § Modular stub drivers](real-hal-plan.md#modular-stub-drivers-proposed-direction).
+    The "shared `error_unsupported()` helper" framing from earlier
+    revisions of this audit understates the plan — it's a driver-layout
+    refactor, not just a helper. Migration starts with **I2C as the
+    pattern carve-out**, then easy single-subsystem groups (SPI, IR,
+    OneWire, DHT22/DS18B20, RTC, watchdog, PIO, AES, xregex, PNG), then
+    state-bearing groups (audio, GPS, mouse, keypad), then display-
+    adjacent groups; the three `*_peripheral_stubs.c` files are deleted
+    when empty.
 12. **Re-classify a few "stub" file names** — `hal_vm_framebuffer_esp32_stub.c`
     is misleading; it contains a real virtual framebuffer.
 13. **PC386: downgrade `pc386_panic` on `GetPeekAddr` / `GetPokeAddr` /

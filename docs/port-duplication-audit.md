@@ -31,34 +31,65 @@ relevant finding's consolidation.
 
 ## Finding 1 — `MMputchar` / `MMPrintString` / `SSPrintString` / `myprintf`
 
-Status: **pending** · Risk: **HIGH**
+Status: **done — `MMputchar`/`MMPrintString`/`SSPrintString` shared; `myprintf` left per-port (legitimate variation)** · Risk: **HIGH (resolved)**
 
-The byte-level console output routines.
+`MMputchar` was extracted earlier into `runtime/runtime_console_putchar.c`
+(byte-identical bodies across all four ports — only depends on the
+project-wide symbols `putConsole` and `MMCharPos`).
 
-| File | Lines |
+`MMPrintString` and `SSPrintString` now share `runtime/runtime_console_printstring.c`.
+The remaining per-port trailing-flush differences were either equivalent
+or absorbed by the `mm_runtime_console_adapter` slots `stdout_flush` and
+`telnet_putc`. Specifically:
+
+- The shared body's `bulk_flush()` calls `adapter->stdout_flush()` when an
+  adapter is set, or falls back to `fflush(stdout)` otherwise. It also
+  calls `adapter->telnet_putc(0, -1)` only when the adapter plugs it.
+- host/wasm/stdio/ansi: plug the adapter (host_native already did) — same
+  flush AND telnet-drain behaviour as before.
+- Pico: no adapter — falls back to `fflush(stdout)`. The previous
+  "last-byte fused flush" via `MMputchar(*s, 1)` was equivalent to
+  trailing `fflush(stdout)` because `TelnetPutC` ignores `flush=1` (only
+  the `-1` sentinel drains) and `console_cdc_putc(c, 1)` is literally
+  `putc(c, stdout); fflush(stdout);`. Verified on PicoCalc serial + telnet
+  (23/23 console smoke pre- and post-consolidation).
+- ESP32: no adapter — falls back to `fflush(stdout)`, matching the prior
+  body. Telnet drain remains via the 5 ms timer in `esp32_telnet_poll`
+  (adapter's `telnet_putc` left NULL deliberately, so the shared body
+  doesn't force a per-call drain). Verified on ESP32-S3 serial + telnet
+  (23/23 console smoke).
+- pc386: no adapter — falls back to `fflush(stdout)` which is
+  `pc386_libc.c`'s no-op shim, preserving the "no flush" behaviour.
+
+Adapter storage + accessors moved out of `runtime_console.c` into
+`runtime/runtime_console_adapter.c` so non-host ports (Pico/ESP32/pc386)
+that don't link `runtime_console.c` can still resolve the slot.
+
+`myprintf` is intentionally left per-port: host_native routes it through
+`host_prints` → `host_print` which bypasses the console-routing machinery
+(used for raw-stdout writes only). ESP32 and pc386 keep their
+`{ MMPrintString(s); }` 1-liners. No `myprintf` caller exists outside
+its own definitions, so the per-port variation has no behavioural impact.
+
+| Site | What remains |
 |---|---|
-| `runtime/runtime_console.c` | 251-271 |
-| `ports/pico_sdk_common/pico_console.c` | 51-71, 157-171 |
-| `ports/pc386/pc386_runtime.c` | 172-187, 243 |
-| `ports/esp32_s3_metro/main/esp32_mmbasic_console_glue.c` | 75-99 |
+| `runtime/runtime_console_printstring.c` | shared body of `MMPrintString` / `SSPrintString` (the consolidation target) |
+| `runtime/runtime_console_adapter.c` | shared `mm_runtime_console_adapter` storage + set/get |
+| `ports/pico_sdk_common/pico_console.c:105` | the per-port copy has been removed; pointer comment only |
+| `ports/pc386/pc386_runtime.c:176`, `:250` | per-port copies removed; `myprintf` 1-liner stays |
+| `ports/esp32_s3_metro/main/esp32_mmbasic_console_glue.c:85` | per-port copies removed; `myprintf` 1-liner + batching-rationale comment stay |
+| `ports/host_native/host_runtime.c:627` | `myprintf` → `host_prints` (legitimate override) |
 
-**Drift:** semantic. Same logical body in every port, but the trailing
-flush differs:
-- `runtime_console.c` (host/wasm/stdio/ansi): flush stdout AND telnet
-- `pico_console.c`: per-byte flush=1 ordering quirk
-- `esp32_mmbasic_console_glue.c`: `fflush(stdout)`; telnet drain happens
-  per-byte in `SerialConsolePutC`
-- `pc386_runtime.c`: **no flush at all** (live bug above)
-
-**Why shareable:** body only depends on `MMputchar` and a port flush hook,
-both already port-virtualised via `console_adapter` (`stdout_flush` +
-`telnet_putc` slots already exist).
+Gate: `porttools/pico_console_smoke.py` (port-agnostic despite the name —
+runs against ESP32 serial + telnet too). 23/23 cases on each of {Pico
+serial, Pico telnet, ESP32 serial, ESP32 telnet} pre- and
+post-consolidation. host `run_tests.sh` 244/244. WASM rebuild clean.
 
 ---
 
 ## Finding 2 — `MMInkey` / `MMgetchar` + escape-sequence decoder
 
-Status: **partial — escape decoder shared** · Risk: **HIGH (decoder portion resolved)**
+Status: **done (decoder shared; MMInkey wrappers intentionally per-port)** · Risk: **HIGH (resolved)**
 
 The escape-sequence decoder portion is now consolidated in
 `runtime/runtime_console_escdecode.c`, exposing
@@ -103,23 +134,15 @@ esp32 uses it.
 
 ## Finding 3 — `port_terminal_handle_cls` / `port_terminal_emit_colour` no-op pair
 
-Status: **pending** · Risk: **HIGH**
+Status: **done** · Risk: **HIGH (resolved)**
 
-Three byte-identical no-op bodies in separate translation units.
-
-| File | Lines |
-|---|---|
-| `ports/pico_sdk_common/terminal_hooks_noop.c` | 14-17 |
-| `ports/host_native/host_terminal_hooks_noop.c` | 15-18 |
-| `ports/pc386/pc386_runtime.c` | 490-493 |
-
-(ESP32 provides real bodies in `esp32_terminal.c` — legitimate override.)
-
-**Drift:** none — identical. Easiest consolidation win.
-
-**Why shareable:** function bodies have zero port-dependent state. A single
-shared `runtime/runtime_terminal_hooks_noop.c` plus ESP32's override is the
-existing pattern.
+Consolidated into `runtime/runtime_terminal_hooks_noop.c`. ESP32 supplies
+the strong override in `esp32_terminal.c` (emits ANSI escapes); the
+three previous byte-identical no-op TUs
+(`ports/pico_sdk_common/terminal_hooks_noop.c`,
+`ports/host_native/host_terminal_hooks_noop.c`, inline copy in
+`ports/pc386/pc386_runtime.c`) are gone. ESP32 deliberately does not
+link the shared TU.
 
 ---
 
@@ -173,7 +196,7 @@ yield/wdt-reset hooks) are exactly what adapters are for.
 
 ## Finding 5 — Peripheral-stub command/function table
 
-Status: **pending** · Risk: **MEDIUM-HIGH**
+Status: **pending — superseded by modular stub-driver plan** · Risk: **MEDIUM-HIGH**
 
 ~60+ `cmd_X(void) {}` and `int fun_Y(void) { return 0; }` no-op stubs.
 
@@ -183,18 +206,48 @@ Status: **pending** · Risk: **MEDIUM-HIGH**
 | `ports/pc386/pc386_peripheral_stubs.c` | 616 | 95 stubs |
 | `ports/esp32_s3_metro/main/esp32_peripheral_stubs.c` | 672 | 75 stubs |
 
-**Drift:** identical for the overlapping set. ~1900 LOC total.
+**Drift:** identical for the overlapping set (~52 stub names appear
+byte-identically in all three ports). ~1900 LOC total.
 
-**Why shareable:** bodies are empty / `error("Not supported")` patterns.
-Whichever TU provides the symbol wins; a shared
-`runtime/runtime_peripheral_stubs.c` could supply weak-default no-ops, with
-ports overriding the few they actually implement.
+**Don't tackle as a single-file consolidation.** The naïve approach — one
+shared `runtime/runtime_peripheral_stubs.c` with weak defaults — is the
+wrong shape. The canonical plan is in
+[`real-hal-plan.md` § Modular stub drivers](real-hal-plan.md#modular-stub-drivers-proposed-direction):
+break each subsystem into `drivers/<subsystem>/<subsystem>_stub.c`
+paired with real driver TUs (`<subsystem>_pico.c`,
+`<subsystem>_esp32.c`, …), selectively linked via each port's source
+manifest. No weak symbols, no preprocessor gating — the same explicit-
+composition discipline as the rest of the real-HAL work. Default
+posture is `error("X not supported on this port")` (pc386's existing
+posture for `cmd_pwm` / `cmd_servo`); a global `-DHAL_STUBS_SILENT`
+flag flips every stub to silent no-op for new-port bringup.
+
+See also [`port-stub-audit.md`](port-stub-audit.md) — the
+feature-completeness inventory that catalogues which stubs are
+justified, which are real feature gaps, and which are bugs (e.g.
+host's `cmd_pin` no-op vs. real `fun_pin`). The two docs share the
+same file inventory but have different agendas: this one tracks
+duplication, the stub audit tracks coverage.
+
+Migration starts with **I2C as the pattern carve-out**, then the easy
+single-subsystem groups (SPI, IR, OneWire, DHT22/DS18B20, RTC,
+watchdog, PIO, AES, xregex, PNG), then state-bearing groups (audio,
+GPS, mouse, keypad), then display-adjacent groups. The three
+`*_peripheral_stubs.c` files get deleted when empty.
 
 ---
 
 ## Finding 6 — `port_*` no-op stubs (~25 hooks × 3 ports)
 
-Status: **pending** · Risk: **MEDIUM-HIGH**
+Status: **pending — superseded by modular stub-driver plan** · Risk: **MEDIUM-HIGH**
+
+Rides along on the same driver-layout refactor as Finding 5; the canonical
+plan is in
+[`real-hal-plan.md` § Modular stub drivers](real-hal-plan.md#modular-stub-drivers-proposed-direction).
+The empty/identity/fixed-error `port_*` hooks belong with their owning
+subsystem driver (e.g. `port_audio_i2s_pio_slice` with `drivers/audio/`,
+`port_poke_display_panel` with `drivers/spi_lcd/`), not in a freestanding
+shared TU.
 
 | File | Range |
 |---|---|
@@ -256,7 +309,7 @@ compile-time string. No port state.
 
 ## Finding 8 — `mmbasic_timegm` / `mmbasic_gmtime` shim wrappers
 
-Status: **pending** · Risk: **MEDIUM** (one live bug — see top)
+Status: **pending** · Risk: **MEDIUM** (formerly had a live bug; pc386's `mmbasic_timegm` const-violation is now fixed — top table)
 
 | File | Lines |
 |---|---|
@@ -385,17 +438,25 @@ adjacent state in ways that look like flaky tests hours later.
 
 ## Recommended sequence
 
-1. **pc386 live bugs** (top of doc) — small, isolated fixes that
-   eliminate two real defects (flush + timegm const). Defer the escape
-   decoder until Finding 2 lands.
-2. **Finding 3** — three identical no-op TUs → one shared. Trivial; good
-   warmup for the consolidation pattern.
-3. **Finding 1** — `MMputchar` / `MMPrintString` / `SSPrintString` into
-   the existing `console_adapter` pattern. Already 60% done in
-   `runtime/runtime_console.c`; just need to delete the three copies and
-   wire each port's adapter slots.
-4. **Finding 2** — `MMInkey` + escape decoder, with the union of feature
-   sets. Biggest payoff (fixes pc386 arrow-key bug; brings web-console
-   pre-decoded keys, SHIFT_TAB, Shift-F* into the shared spine).
-5. Findings 4 / 5 / 6 — bigger but more mechanical.
-6. Findings 7 / 8 / 9 / 10 — small follow-ups.
+Done so far: Findings 1, 2, 3, 4, telnet IAC parser; live bugs (pc386
+escape decoder, pc386 `timegm` const, Pico DEL→BKSP).
+
+**Finding 5 is intentionally not next.** Its scope (~1900 LOC of
+peripheral stubs) is owned by the modular stub-driver carve-out in
+[`real-hal-plan.md` § Modular stub drivers](real-hal-plan.md#modular-stub-drivers-proposed-direction),
+not by this audit's single-file consolidation pattern. Same for
+Finding 6 (`port_*` no-op stubs) — those ride along on the same
+driver-layout refactor. Both wait until that carve-out begins (I2C
+first).
+
+Next dedup-style work, in order of payoff:
+
+1. **Finding 10** — `getConsole` / `kbhitConsole` defaults
+   (~4 lines × 2 ports). Trivial; identical bodies.
+2. **Finding 7** — `port_drivecheck_remap` / `port_filesystem_prefix`
+   defaults (~3 identity returns × 3 ports). Trivial.
+3. **Finding 8** — `mmbasic_timegm` / `mmbasic_gmtime` shim wrappers
+   (~15 lines). One latent bug already fixed; consolidation removes
+   the remaining drift.
+4. **Finding 9** — `cmd_files_*` lifecycle hooks (~80 lines, partial
+   overlap, includes a stale copy-paste comment to clean up).

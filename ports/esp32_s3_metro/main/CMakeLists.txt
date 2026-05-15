@@ -128,6 +128,8 @@ set(PORT_LOCAL_SRCS
     esp32_mmbasic_console_glue.c            # MMPrintString / MMInkey + ring state (MMputchar / MMgetline are shared)
     ${REPO_ROOT}/runtime/runtime_getline.c        # shared console-line reader (see runtime/runtime_getline.c)
     ${REPO_ROOT}/runtime/runtime_console_putchar.c # shared MMputchar (Finding 1 in docs/port-duplication-audit.md)
+    ${REPO_ROOT}/runtime/runtime_console_printstring.c # shared MMPrintString/SSPrintString (Finding 1 remainder)
+    ${REPO_ROOT}/runtime/runtime_console_adapter.c # shared adapter ptr storage + set/get
     ${REPO_ROOT}/runtime/runtime_console_escdecode.c # shared escape-sequence decoder (Finding 2)
     esp32_system.c                          # CPU RESTART / SLEEP
     esp32_terminal.c                        # VT100 CLS + COLOUR via Draw.c port hooks

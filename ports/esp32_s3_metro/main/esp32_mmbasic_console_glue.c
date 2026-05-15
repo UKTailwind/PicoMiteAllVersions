@@ -74,23 +74,13 @@ void putConsole(int c, int flush) {
 }
 
 // MMputchar lives in runtime/runtime_console_putchar.c — shared across every port.
-
-/* Bulk-string printers don't force a per-call telnet drain anymore.
- * Each fragment used to fire its own TCP send (cmd_files calls
- * MMPrintString ~10 times per file -> ~10 small packets per row);
- * coalescing them gives FILES/LIST close to USB throughput. The 5 ms
- * gate in SerialConsolePutC and the 252-byte buffer-full auto-flush
- * in esp32_telnet_putc still cap tail latency to <5 ms or one full
- * buffer, whichever comes first. */
-void MMPrintString(char *s) {
-    while (*s) MMputchar(*s++, 0);
-    fflush(stdout);
-}
-
-void SSPrintString(char *s) {
-    while (*s) SerialConsolePutC(*s++, 0);
-    fflush(stdout);
-}
+// MMPrintString / SSPrintString live in runtime/runtime_console_printstring.c.
+// Bulk-string printers no longer force a per-call telnet drain on ESP32:
+// the 5 ms gate in SerialConsolePutC + the 252-byte buffer-full auto-flush
+// in esp32_telnet_putc cap tail latency to <5 ms or one full buffer.
+// That batching is preserved because the shared printstring TU only drains
+// telnet at end-of-bulk when console_adapter->telnet_putc is plugged —
+// ESP32 deliberately leaves it NULL.
 
 void myprintf(char *s) { MMPrintString(s); }
 

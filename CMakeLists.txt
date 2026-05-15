@@ -248,6 +248,8 @@ target_sources(PicoMite PRIVATE
 	runtime/runtime_getline.c
 	runtime/runtime_terminal_hooks_noop.c
 	runtime/runtime_console_putchar.c
+	runtime/runtime_console_printstring.c
+	runtime/runtime_console_adapter.c
 	runtime/runtime_console_escdecode.c
 )
 # The project's headers (MMBasic_Includes.h, Draw.h, etc.) live in the

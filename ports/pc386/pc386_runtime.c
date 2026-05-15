@@ -172,14 +172,9 @@ void putConsole(int c, int flush) {
 }
 
 // MMputchar lives in runtime/runtime_console_putchar.c — shared across every port.
-
-void MMPrintString(char *s) {
-    while (*s) MMputchar(*s++, 0);
-}
-
-void SSPrintString(char *s) {
-    while (*s) SerialConsolePutC(*s++, 0);
-}
+// MMPrintString / SSPrintString live in runtime/runtime_console_printstring.c.
+// pc386's bulk_flush fallback ends up calling pc386_libc.c::fflush which is
+// a no-op shim, so the original "no trailing flush" behaviour is preserved.
 
 /* PS/2 is IRQ-driven (drivers/i8042_kbd) and produces MMBasic-shaped key
  * codes (UP, BKSP, F1, etc.) directly; COM1 serial goes through the

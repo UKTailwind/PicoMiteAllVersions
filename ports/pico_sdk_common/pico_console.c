@@ -101,19 +101,4 @@ int MMgetchar(void) {
 	ShowCursor(0);
 	return c;
 }
-// print a string to the console interfaces
-void MMPrintString(char* s) {
-    while(*s) {
-        if(s[1])MMputchar(*s,0);
-        else MMputchar(*s,1);
-        s++;
-    }
-    fflush(stdout);
-}
-void SSPrintString(char* s) {
-    while(*s) {
-        SerialConsolePutC(*s,0);
-        s++;
-    }
-    fflush(stdout);
-}
+// MMPrintString / SSPrintString live in runtime/runtime_console_printstring.c.

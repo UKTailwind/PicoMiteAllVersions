@@ -10,7 +10,10 @@
 #include "runtime/runtime.h"
 #include "runtime/runtime_console_escdecode.h"
 
-static const mm_runtime_console_adapter *console_adapter;
+/* Adapter storage + set/get accessors live in runtime_console_adapter.c
+ * so non-host ports (Pico/ESP32/pc386) that don't link this TU can still
+ * reach the slot through runtime_console_printstring.c. */
+#define console_adapter mmbasic_runtime_console_get_adapter()
 
 static void console_service(void)
 {
@@ -88,16 +91,6 @@ static char console_serial_putc(char c, int flush)
     fputc((unsigned char)c, stdout);
     if (flush) fflush(stdout);
     return c;
-}
-
-void mmbasic_runtime_console_set_adapter(const mm_runtime_console_adapter *adapter)
-{
-    console_adapter = adapter;
-}
-
-const mm_runtime_console_adapter *mmbasic_runtime_console_get_adapter(void)
-{
-    return console_adapter;
 }
 
 void mmbasic_runtime_console_print_raw(const char *text, int len)
@@ -202,19 +195,5 @@ void putConsole(int c, int flush)
 }
 
 // MMputchar lives in runtime/runtime_console_putchar.c — shared across every port.
-
-void MMPrintString(char *s)
-{
-    while (*s) MMputchar(*s++, 0);
-    console_stdout_flush();
-    console_telnet_putc(0, -1);
-}
-
-void SSPrintString(char *s)
-{
-    while (*s) console_serial_putc(*s++, 0);
-    console_stdout_flush();
-    console_telnet_putc(0, -1);
-}
-
+// MMPrintString / SSPrintString live in runtime/runtime_console_printstring.c.
 // MMgetline lives in runtime/runtime_getline.c — shared across every port.
