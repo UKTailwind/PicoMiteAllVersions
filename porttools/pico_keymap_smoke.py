@@ -35,6 +35,7 @@ from dataclasses import dataclass, field
 
 sys.path.insert(0, __file__.rsplit("/", 1)[0])
 from basic_serial import BasicSerial, default_port, strip_ansi  # noqa: E402
+from basic_telnet import open_transport  # noqa: E402
 
 
 # Hardware_Includes.h key codes.
@@ -223,6 +224,7 @@ def run_cases(basic: BasicSerial, cases: list[Case], expected_features: set[str]
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", default=default_port())
+    parser.add_argument("--telnet", help="telnet target host[:port] (default port 23); overrides --port")
     parser.add_argument("--boot-wait", type=float, default=1.0)
     parser.add_argument("--features", choices=list(PORT_FEATURE_SETS.keys()), default="any",
                         help="which feature sets this port is expected to support "
@@ -242,7 +244,8 @@ def main() -> int:
 
     expected = PORT_FEATURE_SETS[args.features]
     print(f"Running {len(cases)} keymap cases, expected feature sets: {sorted(expected)}")
-    with BasicSerial(args.port) as basic:
+    transport = open_transport(args.telnet) if args.telnet else BasicSerial(args.port)
+    with transport as basic:
         basic.sync(timeout=8.0, boot_wait=args.boot_wait)
         counts = run_cases(basic, cases, expected)
 

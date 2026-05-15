@@ -28,6 +28,7 @@ from typing import Callable
 
 sys.path.insert(0, __file__.rsplit("/", 1)[0])
 from basic_serial import BasicSerial, default_port, strip_ansi  # noqa: E402
+from basic_telnet import open_transport  # noqa: E402
 
 
 @dataclass
@@ -218,6 +219,7 @@ def build_cases() -> list[Case]:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", default=default_port())
+    parser.add_argument("--telnet", help="telnet target host[:port] (default port 23); overrides --port")
     parser.add_argument("--boot-wait", type=float, default=1.0)
     parser.add_argument("--filter", help="only run cases whose name matches this regex")
     parser.add_argument("--list", action="store_true")
@@ -235,7 +237,8 @@ def main() -> int:
 
     passed = 0
     failures: list[tuple[str, str]] = []
-    with BasicSerial(args.port) as basic:
+    transport = open_transport(args.telnet) if args.telnet else BasicSerial(args.port)
+    with transport as basic:
         basic.sync(timeout=8.0, boot_wait=args.boot_wait)
         for c in cases:
             try:

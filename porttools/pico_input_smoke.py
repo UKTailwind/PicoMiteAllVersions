@@ -27,6 +27,7 @@ from dataclasses import dataclass
 REPO_ROOT_HINT = __file__  # not used at runtime; kept so basic_serial import resolves
 sys.path.insert(0, __file__.rsplit("/", 1)[0])
 from basic_serial import BasicSerial, default_port, strip_ansi  # noqa: E402
+from basic_telnet import open_transport  # noqa: E402
 
 
 # MAXSTRLEN in MMBasic is 255. The "too long" guard fires at nbrchars > MAXSTRLEN.
@@ -58,6 +59,12 @@ def drain(basic: BasicSerial, seconds: float) -> bytes:
 
 def send_bytes(basic: BasicSerial, data: bytes, per_byte_delay: float = 0.0) -> None:
     assert basic.serial is not None
+    # Bursts above ~150 bytes can overflow the ConsoleRxBuf on telnet
+    # transports because TCP delivers faster than MMgetline drains.
+    # Auto-throttle large payloads so the long-line guard still trips
+    # cleanly instead of seeing a silently-truncated line.
+    if per_byte_delay <= 0.0 and len(data) > 150:
+        per_byte_delay = 0.001
     if per_byte_delay <= 0.0:
         basic.serial.write(data)
         basic.serial.flush()
@@ -238,6 +245,7 @@ def run_echo_check(basic: BasicSerial) -> tuple[bool, str]:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", default=default_port())
+    parser.add_argument("--telnet", help="telnet target host[:port] (default port 23); overrides --port")
     parser.add_argument("--boot-wait", type=float, default=1.0)
     parser.add_argument("--per-byte-delay", type=float, default=0.0,
                         help="seconds to wait between writing each keystroke; useful for echo timing")
@@ -257,7 +265,8 @@ def main() -> int:
     passed = 0
     failed: list[tuple[str, str]] = []
 
-    with BasicSerial(args.port) as basic:
+    transport = open_transport(args.telnet) if args.telnet else BasicSerial(args.port)
+    with transport as basic:
         basic.sync(timeout=8.0, boot_wait=args.boot_wait)
 
         for case in cases:
