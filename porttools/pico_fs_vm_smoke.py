@@ -306,6 +306,7 @@ def fs_program(drive: str, prefix: str) -> list[str]:
     return [
         "ON ERROR SKIP : CLOSE #1",
         "ON ERROR SKIP : CLOSE #2",
+        f'DRIVE "{drive}"',
         f'ON ERROR SKIP : CHDIR "{drive}/"',
         f'ON ERROR SKIP : KILL "{root}/nested/deep.txt"',
         f'ON ERROR SKIP : KILL "{root}/copy.txt"',
@@ -404,6 +405,7 @@ def fs_error_program(drive: str, prefix: str) -> list[str]:
     root = join_drive(drive, f"{prefix}err")
     return [
         "ON ERROR SKIP : CLOSE #1",
+        f'DRIVE "{drive}"',
         f'ON ERROR SKIP : CHDIR "{drive}/"',
         f'ON ERROR SKIP : KILL "{root}/dup/a.txt"',
         f'ON ERROR SKIP : KILL "{root}/a.txt"',
@@ -461,6 +463,7 @@ def large_file_program(drive: str, prefix: str) -> list[str]:
     return [
         "OPTION EXPLICIT",
         "ON ERROR SKIP : CLOSE #1",
+        f'DRIVE "{drive}"',
         f'ON ERROR SKIP : CHDIR "{drive}/"',
         f'ON ERROR SKIP : KILL "{root}/big.dat"',
         f'ON ERROR SKIP : RMDIR "{root}"',
