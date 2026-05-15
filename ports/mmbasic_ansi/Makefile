@@ -47,7 +47,7 @@ CORE_SRCS += mm_net_ntp.c
 CORE_SRCS += mm_net_state.c
 CORE_SRCS += Draw.c RGB121.c Tilemap.c FileIO.c Audio.c BmpDecoder.c re.c picojpeg.c
 CORE_SRCS += audio_mp3_stub.c spi_lcd_mem332_stub.c display_merge_stub.c vga_ops_stub.c
-CORE_SRCS += gfx_3d.c upng_sprite_stub.c gui_touch_stub.c gui_controls_stub.c psram_heap_stub.c i2c_keypad_stub.c heartbeat_stub.c
+CORE_SRCS += gfx_3d.c upng_sprite_stub.c gui_touch_stub.c gui_controls_stub.c psram_heap_stub.c hal_psram_stub.c i2c_keypad_stub.c heartbeat_stub.c
 CORE_SRCS += editor_console_stub.c
 CORE_SRCS += display_pixel_host.c
 
