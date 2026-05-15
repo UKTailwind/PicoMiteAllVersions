@@ -195,14 +195,22 @@
 
 
 /* Per-port override: a port can predefine FF_STR_VOLUME_ID and
- * FF_VOLUME_STRS via its Makefile (-D) to choose how volume prefixes
- * are matched. No-op for every other port — they fall through to the
- * historical Unix-style "B:","C:". */
+ * FF_VOLUME_STRS via its Makefile (-D) — useful only if the port uses
+ * a non-DOS-style volume prefix.
+ *
+ * Defaults below match the DOS-style "B:/..." paths every port in this
+ * tree uses today. The matcher (ff.c::get_ldnumber) needs:
+ *   - FF_STR_VOLUME_ID == 1  ("arbitrary string is enabled" branch)
+ *   - VolumeStr entries WITHOUT trailing colons ("B","C", not "B:","C:")
+ * because Mode-1 expects the colon to come from the path, not the
+ * volume string. Trailing-colon entries cause the matcher to overshoot
+ * `tt` (the colon position) and silently miss every drive, which then
+ * fails as FR_INVALID_DRIVE. */
 #ifndef FF_STR_VOLUME_ID
-#define FF_STR_VOLUME_ID	2
+#define FF_STR_VOLUME_ID	1
 #endif
 #ifndef FF_VOLUME_STRS
-#define FF_VOLUME_STRS		"B:","C:"
+#define FF_VOLUME_STRS		"B","C"
 #endif
 /* FF_STR_VOLUME_ID switches support for volume ID in arbitrary strings.
 /  When FF_STR_VOLUME_ID is set to 1 or 2, arbitrary strings can be used as drive
