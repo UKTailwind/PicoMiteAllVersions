@@ -335,6 +335,44 @@ Status: **pending** · Risk: **LOW**
   host_runtime.c, pc386_runtime.c, esp32_globals.c. Same shape as
   Finding 6, can ride along.
 
+## Telnet IAC parser consolidation — ATTEMPTED AND REVERTED
+
+Status: **pending retry** · Risk: **MEDIUM** (Pico parser is buggy, the
+other two are correct)
+
+The three RFC 854 inbound parsers
+(`MMtelnet.c:pico_telnet_receive_bytes`,
+`esp32_telnet.c:esp32_telnet_receive_bytes`,
+`host_web.c:host_telnet_receive_bytes`) handle the same protocol with
+different code. Pico is buggy — drops the entire TCP segment if it
+starts with IAC (`MMtelnet.c:115`), losing keystrokes that arrive in
+the same segment as a negotiation reply. ESP32 and host both
+implement the correct 5-state machine (DATA / IAC / OPT / SB / SB_IAC).
+
+**Attempt** (rolled back): created `shared/net/mm_net_telnet_rx.{c,h}`
+with the canonical 5-state machine and replaced each port's
+`*_receive_bytes` with a one-line wrapper that calls
+`mm_net_telnet_rx_feed`. Build was clean on all four targets but the
+Pico telnet smoke regressed badly — 43/43 keymap → 14/43, flaky
+between runs, and the device sometimes wedged in the editor.
+
+**Root cause**: I worked around `MM_Misc.h:104`'s `time_t` reference
+(no `<time.h>` include) by hand-rolling `extern` decls in the shared
+parser instead of including `MMBasic_Includes.h` / `Hardware_Includes.h`.
+But `MMAbort` is `volatile int` (`PicoMite.c:141`) — 4 bytes — and I
+declared it `volatile bool`. C linkage doesn't check types across
+TUs; my bool-sized stores left 3 bytes of stale data in MMAbort, so
+BASIC saw spurious aborts (INKEY$ exiting early, INPUT bailing,
+longjmps into the editor). Same shape of bug for any other type
+I'd silently mismatched.
+
+**Retry plan**: now that `MM_Misc.h` has its own `#include <time.h>`
+(committed `d253cba`), the shared parser file can safely
+`#include "MMBasic_Includes.h"` + `"Hardware_Includes.h"` and inherit
+the canonical types. The state-machine logic itself was correct;
+once the typedefs come from the headers, the consolidation should
+hold.
+
 ---
 
 ## Recommended sequence
