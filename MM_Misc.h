@@ -48,6 +48,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
     #ifndef __uninitialized_ram
         #define __uninitialized_ram(group) group
     #endif
+    #include <time.h>   /* get_epoch returns time_t */
 
 	extern void OtherOptions(void);
 	extern int InterruptUsed;
