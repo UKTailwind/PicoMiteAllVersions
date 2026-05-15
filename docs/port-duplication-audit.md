@@ -335,10 +335,10 @@ Status: **pending** · Risk: **LOW**
   host_runtime.c, pc386_runtime.c, esp32_globals.c. Same shape as
   Finding 6, can ride along.
 
-## Telnet IAC parser consolidation — ATTEMPTED AND REVERTED
+## Telnet IAC parser consolidation — DONE (retried successfully)
 
-Status: **pending retry** · Risk: **MEDIUM** (Pico parser is buggy, the
-other two are correct)
+Status: **done** · Risk: **HIGH (resolved — buggy Pico parser replaced
+with canonical 5-state machine)**
 
 The three RFC 854 inbound parsers
 (`MMtelnet.c:pico_telnet_receive_bytes`,
@@ -366,12 +366,20 @@ BASIC saw spurious aborts (INKEY$ exiting early, INPUT bailing,
 longjmps into the editor). Same shape of bug for any other type
 I'd silently mismatched.
 
-**Retry plan**: now that `MM_Misc.h` has its own `#include <time.h>`
-(committed `d253cba`), the shared parser file can safely
-`#include "MMBasic_Includes.h"` + `"Hardware_Includes.h"` and inherit
-the canonical types. The state-machine logic itself was correct;
-once the typedefs come from the headers, the consolidation should
-hold.
+**Retry (commit `2e8cad7`)**: with `MM_Misc.h` now self-contained,
+the shared parser file safely uses `MMBasic_Includes.h` +
+`Hardware_Includes.h`, picking up the canonical types
+(`volatile int MMAbort`, `volatile bool Keycomplete`, etc). Full
+12-cell smoke matrix passes on both boards (Pico WebMite RP2350B +
+ESP32-S3 Metro, USB-CDC + telnet, input + console + keymap). The
+state-machine body was correct all along — only the type discipline
+was wrong.
+
+**Lesson** (now in CLAUDE.md): when sharing a function across ports,
+use `MMBasic_Includes.h` + `Hardware_Includes.h` even when the header
+chain has annoying transitive dependencies. C linkage doesn't validate
+types across TUs; a one-byte mismatch on a global silently corrupts
+adjacent state in ways that look like flaky tests hours later.
 
 ---
 
