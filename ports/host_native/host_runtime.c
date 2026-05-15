@@ -7,7 +7,7 @@
  * MMputchar, MMPrintString, SerialConsolePutC), REPL state flags
  * (host_repl_mode), the hardware-world global backing store (Option,
  * FontTable, PinDef, inttbl, dma_hw, watchdog_hw, etc. — zero-initialised
- * because nothing drives them on host), and the mmbasic_timegm/gmtime
+ * because nothing drives them on host), and the calendar shim wrappers
  * shims that preserve UTC semantics around host_platform.h's rename.
  *
  * Peripheral cmd_XXX / fun_XXX no-ops live in host_peripheral_stubs.c.
@@ -671,23 +671,9 @@ void CallExecuteProgram(char *p) { (void)p; }
  * MMBasic_Prompt.c. */
 int host_repl_mode = 0;
 
-/* host_platform.h renames timegm/gmtime to mmbasic_timegm/mmbasic_gmtime
- * to sidestep GPS.h's const-vs-non-const signature mismatch with macOS
- * <time.h>. These stubs must preserve UTC semantics — the previous
- * implementation used mktime/localtime, which applied the local TZ
- * offset and silently corrupted EPOCH / DATETIME$ / DAY$ results.
- * Undefine the macros locally so we can call the real libc funcs. */
-#undef timegm
-#undef gmtime
-extern time_t timegm(struct tm *);
-extern struct tm *gmtime(const time_t *);
-time_t mmbasic_timegm(const struct tm *tm) {
-    struct tm tmp = *tm;
-    return timegm(&tmp);
-}
-struct tm *mmbasic_gmtime(const time_t *timer) {
-    return gmtime(timer);
-}
+/* timegm / gmtime shim wrappers retired; every caller now routes
+ * through drivers/calendar/calendar_bare.c via hal/hal_calendar.h.
+ * Removed the host_platform.h rename trick at the same time. */
 
 /* FileIO.c command-level lifecycle hooks. The device implementations live
  * in ports/pico_sdk_common/cmd_files_hooks.c. */

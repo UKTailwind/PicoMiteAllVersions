@@ -84,7 +84,7 @@ HOST_SRCS = host_runtime.c host_fastgfx.c host_fastgfx_resync.c host_fs_shims.c 
 WEB_CONSOLE_SRCS = web_console_protocol.c web_console_input.c
 
 HAL_GENERIC_SRCS = hal_watchdog_noop.c
-RUNTIME_SRCS = runtime_boot.c runtime_program.c runtime_console.c runtime_console_putchar.c runtime_console_printstring.c runtime_console_adapter.c runtime_console_input_noop.c runtime_console_escdecode.c runtime_getline.c runtime_terminal_hooks_noop.c runtime_abort.c runtime_interrupt.c runtime_filesystem_defaults.c
+RUNTIME_SRCS = runtime_boot.c runtime_program.c runtime_console.c runtime_console_putchar.c runtime_console_printstring.c runtime_console_adapter.c runtime_console_input_noop.c runtime_console_escdecode.c runtime_getline.c runtime_terminal_hooks_noop.c runtime_abort.c runtime_interrupt.c runtime_filesystem_defaults.c calendar_bare.c
 
 SRCS = $(HOST_SRCS) $(WEB_CONSOLE_SRCS) $(CORE_SRCS) $(BC_SRCS) $(HAL_GENERIC_SRCS) $(RUNTIME_SRCS)
 OBJS = $(addprefix $(BUILD_DIR)/,$(SRCS:.c=.o))
@@ -309,6 +309,9 @@ $(BUILD_DIR)/%.o: $(REPO_ROOT)/drivers/display_pixel_host/%.c
 $(BUILD_DIR)/%.o: $(REPO_ROOT)/drivers/net_stub/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c -o $@ $<
+$(BUILD_DIR)/%.o: $(REPO_ROOT)/drivers/calendar/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c -o $@ $<
 
 # --- Sim build: all sources rebuilt with -DMMBASIC_SIM ------------------
 $(BUILD_DIR)/sim/%.o: $(PORT_DIR)/%.c
@@ -382,6 +385,9 @@ $(BUILD_DIR)/sim/%.o: $(REPO_ROOT)/drivers/display_pixel_host/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(SIM_CFLAGS) -c -o $@ $<
 $(BUILD_DIR)/sim/%.o: $(REPO_ROOT)/drivers/net_stub/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(SIM_CFLAGS) -c -o $@ $<
+$(BUILD_DIR)/sim/%.o: $(REPO_ROOT)/drivers/calendar/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(SIM_CFLAGS) -c -o $@ $<
 

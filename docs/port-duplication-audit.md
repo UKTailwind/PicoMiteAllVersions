@@ -321,20 +321,52 @@ shared TU.
 
 ## Finding 8 — `mmbasic_timegm` / `mmbasic_gmtime` shim wrappers
 
-Status: **pending** · Risk: **MEDIUM** (formerly had a live bug; pc386's `mmbasic_timegm` const-violation is now fixed — top table)
+Status: **done — superseded by `hal_calendar` extension** · Risk: **MEDIUM (resolved)**
 
-| File | Lines |
+Rather than consolidating the three shim wrappers behind another rename
+trick, the entire wall-clock conversion path is now an explicit HAL:
+`hal/hal_calendar.h` exposes `hal_calendar_tm_to_epoch` /
+`hal_calendar_epoch_to_tm` with const-correct, reentrant signatures.
+One shared driver — `drivers/calendar/calendar_bare.c` — uses Howard
+Hinnant's `days_from_civil` / `civil_from_days` algorithms over
+`int64_t` throughout, working identically on every port from RP2040
+to macOS to emscripten to ESP32-S3 to pc386.
+
+What dissolved:
+- `host_platform.h` + `esp32_platform.h` `#define timegm mmbasic_timegm`
+  rename macros — gone (the const-vs-non-const collision the rename
+  worked around no longer exists because no caller invokes libc
+  `timegm` / `gmtime` directly).
+- `mmbasic_timegm` / `mmbasic_gmtime` shim wrappers in
+  `host_runtime.c`, `esp32_compat.c`, `pc386_runtime.c` — all retired.
+- `GPS.h`'s `extern time_t timegm(...)` / `extern struct tm *gmtime(...)`
+  declarations — gone (they were the original const-trap).
+- `GPS.c`'s Pico-only hand-rolled `timegm` / `gmtime` / `gmtime_r`
+  bodies plus their supporting constants — moved into
+  `drivers/calendar/calendar_bare.c` with int64-clean math.
+- ESP32's `esp32_compat.c::timegm` body — retired (it used `long`
+  internally, overflowed past year 2038, **fixed as a free side effect
+  of the unified bare driver**).
+
+Caller migration: 22 sites across `mm_misc_shared.c` (13),
+`GPS.c` (2), `MMntp.c` (1), `vm_sys_time_pico.c`,
+`esp32_default_hooks.c`, `esp32_ntp.c`, `host_web.c`,
+`host_wasm_web.c` — all now call `hal_calendar_*`.
+
+Gate: `validate_all.sh` green (host 244/244, mmbasic_stdio **9/9**
+including the new `09_datetime.bas` regression test, mmbasic_ansi
+build clean, 14/14 device variants, RAM baseline holds); ESP32 build
+clean; **WASM build clean** (emcc); both boards pass the new
+`porttools/device_datetime_smoke.py` **10/10** (PicoCalc was 10/10
+both pre- and post-change; ESP32 was 9/10 pre-change because of the
+Y2038-style overflow at year 2099, now 10/10).
+
+| Site | What remains |
 |---|---|
-| `ports/host_native/host_runtime.c` | 715-725 |
-| `ports/esp32_s3_metro/main/esp32_compat.c` | 41-47 |
-| `ports/pc386/pc386_runtime.c` | 501-506 |
-
-**Drift:** semantic. host_native and esp32 copy the input `tm` before
-calling `timegm` (POSIX `timegm` may mutate). pc386 passes through —
-**const-violation** (live bug, fix during consolidation).
-
-**Why shareable:** the header rename trick (`host_platform.h`) is
-project-wide; the wrapper bodies are just `timegm(&tmp)` / `gmtime(timer)`.
+| `hal/hal_calendar.h` | HAL contract |
+| `drivers/calendar/calendar_bare.c` | shared int64-clean impl |
+| every port | links the shared driver (Pico via top-level cmake, ESP32 via its CMakeLists, host/wasm/ansi/stdio/pc386 via Makefiles) |
+| smokes | `porttools/device_datetime_smoke.py` (Pico+ESP32), `host/tests/t194_datetime_funs.bas` (host), `ports/mmbasic_stdio/tests/09_datetime.bas` (stdio) |
 
 ---
 
@@ -470,8 +502,9 @@ adjacent state in ways that look like flaky tests hours later.
 
 ## Recommended sequence
 
-Done so far: Findings 1, 2, 3, 4, 7, 10, telnet IAC parser; live bugs
-(pc386 escape decoder, pc386 `timegm` const, Pico DEL→BKSP).
+Done so far: Findings 1, 2, 3, 4, 7, 8, 10, telnet IAC parser; live
+bugs (pc386 escape decoder, pc386 `timegm` const, Pico DEL→BKSP,
+ESP32 `timegm` Y2038-style overflow at year 2099).
 
 **Finding 5 is intentionally not next.** Its scope (~1900 LOC of
 peripheral stubs) is owned by the modular stub-driver carve-out in
@@ -483,8 +516,5 @@ first).
 
 Next dedup-style work, in order of payoff:
 
-1. **Finding 8** — `mmbasic_timegm` / `mmbasic_gmtime` shim wrappers
-   (~15 lines). One latent bug already fixed; consolidation removes
-   the remaining drift.
-2. **Finding 9** — `cmd_files_*` lifecycle hooks (~80 lines, partial
+1. **Finding 9** — `cmd_files_*` lifecycle hooks (~80 lines, partial
    overlap, includes a stale copy-paste comment to clean up).

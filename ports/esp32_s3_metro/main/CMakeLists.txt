@@ -132,6 +132,7 @@ set(PORT_LOCAL_SRCS
     ${REPO_ROOT}/runtime/runtime_console_adapter.c # shared adapter ptr storage + set/get
     ${REPO_ROOT}/runtime/runtime_console_escdecode.c # shared escape-sequence decoder (Finding 2)
     ${REPO_ROOT}/runtime/runtime_filesystem_defaults.c # shared port_drivecheck_remap + port_filesystem_prefix (Finding 7)
+    ${REPO_ROOT}/drivers/calendar/calendar_bare.c      # hal_calendar: port-agnostic timegm/gmtime replacement
     esp32_system.c                          # CPU RESTART / SLEEP
     esp32_terminal.c                        # VT100 CLS + COLOUR via Draw.c port hooks
     esp32_lfs.c                             # LittleFS over esp_partition_* (A: drive)

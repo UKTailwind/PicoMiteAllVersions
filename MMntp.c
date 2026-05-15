@@ -25,6 +25,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
+#include "hal/hal_calendar.h"
 #include "hal/hal_net.h"
 #include "shared/net/mm_net_ntp_hal.h"
 #include "pico/time.h"
@@ -34,8 +35,9 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 
 static void pico_ntp_apply(uint32_t unix_seconds, MMFLOAT adjust_hours) {
     time_t adjusted = (time_t)unix_seconds + (time_t)(adjust_hours * 3600.0);
-    struct tm *utc = gmtime(&adjusted);
-    if (!utc) error("invalid ntp response");
+    struct tm utc_buf;
+    hal_calendar_epoch_to_tm(adjusted, &utc_buf);
+    struct tm *utc = &utc_buf;
 
     char buff[STRINGSIZE] = {0};
     snprintf(buff, sizeof buff,

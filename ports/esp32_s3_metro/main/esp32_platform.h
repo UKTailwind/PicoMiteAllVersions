@@ -53,9 +53,4 @@ typedef unsigned int uint;
 #define FF_STR_VOLUME_ID 1
 #define FF_VOLUME_STRS   "B","C"
 
-/* GPS.h redeclares timegm/gmtime; rename to dodge newlib clashes (same
- * trick host_platform.h uses). */
-#define timegm  mmbasic_timegm
-#define gmtime  mmbasic_gmtime
-
 #endif /* MMBASIC_ESP32_PLATFORM_H */

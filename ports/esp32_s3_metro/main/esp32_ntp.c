@@ -3,6 +3,7 @@
 #include <string.h>
 #include <time.h>
 
+#include "hal/hal_calendar.h"
 #include "hal/hal_net.h"
 #include "hal/hal_time.h"
 #include "MMBasic_Includes.h"
@@ -56,8 +57,9 @@ void esp32_ntp_cmd(unsigned char *arg)
 
     int64_t timeadjust = (int64_t)(adjust * 3600.0);
     time_t epoch = (time_t)(unix_seconds + timeadjust);
-    struct tm *utc = gmtime(&epoch);
-    if (!utc) error("invalid ntp response");
+    struct tm utc_buf;
+    hal_calendar_epoch_to_tm(epoch, &utc_buf);
+    struct tm *utc = &utc_buf;
 
     day_of_week = utc->tm_wday;
     if (day_of_week == 0) day_of_week = 7;

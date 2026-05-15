@@ -486,18 +486,7 @@ void port_bc_runtime_free_source(const char **source) { (void)source; }
 /* Draw.c terminal hooks live in runtime/runtime_terminal_hooks_noop.c —
  * shared across every port with a real framebuffer. */
 
-/* =========================================================================
- *  mmbasic_timegm/gmtime — host_platform.h renames the libc names to
- *  these to dodge GPS.h's const-vs-non-const conflict. Our time.h
- *  shim doesn't apply that rename; provide the real symbols anyway in
- *  case some compiled object expects them.
- * ========================================================================= */
-time_t mmbasic_timegm(const struct tm *tm) {
-    /* POSIX timegm may mutate its argument; copy first so callers' const
-     * contract holds (host_native and esp32 do the same). */
-    struct tm tmp = *tm;
-    return timegm(&tmp);
-}
-struct tm *mmbasic_gmtime(const time_t *t) {
-    return gmtime(t);
-}
+/* mmbasic_timegm / mmbasic_gmtime shim wrappers retired — the
+ * pc386_platform.h header never had a rename macro pointing at them,
+ * so the bodies were dead code. All BASIC datetime paths now go
+ * through hal_calendar (drivers/calendar/calendar_bare.c). */

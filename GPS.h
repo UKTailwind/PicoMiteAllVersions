@@ -76,8 +76,6 @@ extern int GPSfix;
 extern int GPSadjust;
 extern const int _ytab[2][12];
 extern int GPSchannel;
-extern time_t timegm(const struct tm *tm);
-extern struct tm * gmtime(const time_t *timer);
 
 enum minmea_sentence_id {
     MINMEA_INVALID = -1,

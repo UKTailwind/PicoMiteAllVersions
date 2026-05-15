@@ -33,6 +33,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
 #include "hal/hal_time.h"
+#include "hal/hal_calendar.h"
 #include <time.h>
 #include <string.h>
 #include "xregex.h"
@@ -284,7 +285,7 @@ uint64_t gettimefromepoch(int *year, int *month, int *day, int *hour, int *minut
     tm=&tma;
     uint64_t fulltime=hal_time_us_64();
     time_t epochnow=fulltime/1000000 + TimeOffsetToUptime;
-    tm=gmtime(&epochnow);
+    hal_calendar_epoch_to_tm(epochnow, tm);
     *year=tm->tm_year+1900;
     *month=tm->tm_mon+1;
     *day=tm->tm_mday;
@@ -309,8 +310,8 @@ void fun_datetime(void){
         struct tm  *tm;
         struct tm tma;
         tm=&tma;
-        time_t timestamp = getinteger(ep); /* See README.md if your system lacks timegm(). */
-        tm=gmtime(&timestamp);
+        time_t timestamp = getinteger(ep);
+        hal_calendar_epoch_to_tm(timestamp, tm);
         IntToStrPad((char *)sret, tm->tm_mday, '0', 2, 10);
         sret[2] = '-'; IntToStrPad((char *)sret + 3, tm->tm_mon+1, '0', 2, 10);
         sret[5] = '-'; IntToStr((char *)sret + 6, tm->tm_year+1900, 10);
@@ -332,7 +333,7 @@ time_t get_epoch(int year, int month,int day, int hour,int minute, int second){
     tm->tm_hour = hour;
     tm->tm_min = minute;
     tm->tm_sec = second;
-    return timegm(tm);
+    return hal_calendar_tm_to_epoch(tm);
 }
 
 void fun_epoch(void){
@@ -379,7 +380,7 @@ void fun_epoch(void){
         tm->tm_min = minute;
         tm->tm_sec = second;
     }
-        time_t timestamp = timegm(tm); /* See README.md if your system lacks timegm(). */
+        time_t timestamp = hal_calendar_tm_to_epoch(tm);
         iret=timestamp;
         targ = T_INT;
 }
@@ -1093,8 +1094,8 @@ void cmd_date(void) {
 	    tm->tm_hour = hour;
 	    tm->tm_min = minute;
 	    tm->tm_sec = second;
-	    time_t timestamp = timegm(tm); /* See README.md if your system lacks timegm(). */
-	    tm=gmtime(&timestamp);
+	    time_t timestamp = hal_calendar_tm_to_epoch(tm);
+	    hal_calendar_epoch_to_tm(timestamp, tm);
 	    day_of_week=tm->tm_wday;
 	    if(day_of_week==0)day_of_week=7;
         TimeOffsetToUptime=get_epoch(year, month, day, hour, minute, second)-hal_time_us_64()/1000000;
@@ -1171,8 +1172,8 @@ void fun_day(void) {
         tm->tm_hour = 0;
         tm->tm_min = 0;
         tm->tm_sec = 0;
-        time_of_day = timegm(tm);
-        tm=gmtime(&time_of_day);
+        time_of_day = hal_calendar_tm_to_epoch(tm);
+        hal_calendar_epoch_to_tm(time_of_day, tm);
         i=tm->tm_wday;
         if(i==0)i=7;
         strcpy((char *)sret,daystrings[i]);
@@ -1185,8 +1186,8 @@ void fun_day(void) {
         tm->tm_hour = 0;
         tm->tm_min = 0;
         tm->tm_sec = 0;
-        time_of_day = timegm(tm);
-        tm=gmtime(&time_of_day);
+        time_of_day = hal_calendar_tm_to_epoch(tm);
+        hal_calendar_epoch_to_tm(time_of_day, tm);
         i=tm->tm_wday;
         if(i==0)i=7;
         strcpy((char *)sret,daystrings[i]);
@@ -1242,9 +1243,9 @@ void cmd_time(void) {
 		tm->tm_hour = hour;
 		tm->tm_min = minute;
 		tm->tm_sec = second;
-	    time_t timestamp = timegm(tm); /* See README.md if your system lacks timegm(). */
+	    time_t timestamp = hal_calendar_tm_to_epoch(tm);
 	    timestamp+=offset;
-	    tm=gmtime(&timestamp);
+	    hal_calendar_epoch_to_tm(timestamp, tm);
 //		mT4IntEnable(0);       										// disable the timer interrupt to prevent any conflicts while updating
 		hour = tm->tm_hour;
 		minute = tm->tm_min;

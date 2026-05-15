@@ -113,7 +113,8 @@ CORE_DRV_SRCS = audio_mp3/audio_mp3_stub.c \
                 i2c_picocalc_kbd/i2c_keypad_stub.c \
                 heartbeat/heartbeat_stub.c \
                 editor_console/editor_console_stub.c \
-                display_pixel_readbuffer/display_pixel_readbuffer.c
+                display_pixel_readbuffer/display_pixel_readbuffer.c \
+                calendar/calendar_bare.c
 
 CORE_C_OBJS    := $(addprefix $(BUILD_DIR)/core/,$(CORE_SRCS:.c=.o))
 BC_C_OBJS      := $(addprefix $(BUILD_DIR)/bc/,$(BC_SRCS:.c=.o))

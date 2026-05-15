@@ -36,9 +36,4 @@ typedef unsigned int uint;
 /* PSRAMpin referenced in some configs */
 #define PSRAMpin 0
 
-/* GPS.h redeclares timegm/gmtime which conflict with macOS <time.h>.
- * Hide them by macro-renaming before GPS.h is included. */
-#define timegm mmbasic_timegm
-#define gmtime mmbasic_gmtime
-
 #endif /* __HOST_PLATFORM_H */

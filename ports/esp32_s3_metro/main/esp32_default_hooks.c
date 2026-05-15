@@ -20,6 +20,7 @@
 
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
+#include "hal/hal_calendar.h"
 #include "hal/hal_time.h"
 #include "shared/net/mm_net_lifecycle.h"
 #include "bytecode.h"
@@ -79,7 +80,8 @@ int port_try_find_subfun_hash(unsigned char *p, int *out_index) {
 int port_vm_time_get_tm(struct tm *out) {
     extern int64_t TimeOffsetToUptime;
     time_t epochnow = (time_t)(hal_time_us_64() / 1000000 + TimeOffsetToUptime);
-    return gmtime_r(&epochnow, out) != NULL;
+    hal_calendar_epoch_to_tm(epochnow, out);
+    return 1;
 }
 
 void port_web_clear_runtime_state(void) {

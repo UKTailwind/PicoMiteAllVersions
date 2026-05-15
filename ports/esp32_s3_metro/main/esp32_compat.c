@@ -1,12 +1,14 @@
 /*
  * esp32_compat.c — small porting bits with no obvious category:
  *
- *   - timegm: GNU/BSD extension that newlib on Xtensa doesn't expose.
- *     GPS.h calls into it via the host_platform.h rename trick.
  *   - flash_prog_buf: RAM-backed mirror of the program-memory region.
  *     Replaced by an esp_partition-backed impl in a later phase.
  *   - cmd_framebuffer: error stub for a BASIC command that needs a
  *     framebuffer this port doesn't have.
+ *
+ * (timegm + the mmbasic_timegm/mmbasic_gmtime shim wrappers used to
+ * live here. Retired in favour of the hal_calendar contract; the
+ * canonical impl now lives in drivers/calendar/calendar_bare.c.)
  */
 
 #include <stdint.h>
@@ -17,34 +19,6 @@
 
 #include "MMBasic_Includes.h"
 #include "hal/hal_time.h"
-
-/* ---- timegm: defined as the underlying libc symbol after host_platform.h
- * has macro-renamed user calls to mmbasic_timegm. host_runtime.c #undef's
- * timegm in its own scope and calls it; this provides the body. */
-
-#undef timegm
-#undef gmtime
-time_t timegm(struct tm *tm) {
-    int y = tm->tm_year + 1900;
-    int m = tm->tm_mon + 1;
-    if (m <= 2) { y -= 1; m += 12; }
-    long era = (y >= 0 ? y : y - 399) / 400;
-    unsigned yoe = (unsigned)(y - era * 400);
-    unsigned doy = (153 * (m - 3) + 2) / 5 + tm->tm_mday - 1;
-    unsigned doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
-    long days = era * 146097 + (long)doe - 719468;
-    return (time_t)(days * 86400L + tm->tm_hour * 3600 + tm->tm_min * 60 + tm->tm_sec);
-}
-
-/* mm_misc_shared.c calls these via host_platform.h's macro-rename trick;
- * route through the libc functions (timegm above; gmtime is in newlib). */
-time_t mmbasic_timegm(const struct tm *tm) {
-    struct tm tmp = *tm;
-    return timegm(&tmp);
-}
-struct tm *mmbasic_gmtime(const time_t *timer) {
-    return gmtime(timer);
-}
 
 /* ---- runtime backing storage ---- */
 

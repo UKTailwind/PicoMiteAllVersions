@@ -49,6 +49,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include <time.h>
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
+#include "hal/hal_calendar.h"
 
 /* ************************************************************************** */
 /* ************************************************************************** */
@@ -100,133 +101,12 @@ MMFLOAT GPSgeoid=0;
 int GPSfix=0;  
 int GPSadjust=0;
 void GPS_parse(char *nmea);
-#define EPOCH_ADJUSTMENT_DAYS	719468L
-/* year to which the adjustment was made */
-#define ADJUSTED_EPOCH_YEAR	0
-/* 1st March of year 0 is Wednesday */
-#define ADJUSTED_EPOCH_WDAY	3
-/* there are 97 leap years in 400-year periods. ((400 - 97) * 365 + 97 * 366) */
-#define DAYS_PER_ERA		146097L
-/* there are 24 leap years in 100-year periods. ((100 - 24) * 365 + 24 * 366) */
-#define DAYS_PER_CENTURY	36524L
-/* there is one leap year every 4 years */
-#define DAYS_PER_4_YEARS	(3 * 365 + 366)
-/* number of days in a non-leap year */
-#define DAYS_PER_YEAR		365
-/* number of days in January */
-#define DAYS_IN_JANUARY		31
-/* number of days in non-leap February */
-#define DAYS_IN_FEBRUARY	28
-/* number of years per era */
-#define YEARS_PER_ERA		400
-#define SECSPERDAY 86400
-#define SECSPERHOUR 3600
-#define SECSPERMIN 60
-#define DAYSPERWEEK 7
-#define YEAR_BASE 1900
-/* Number of days per month (except for February in leap years). */
-static const int monoff[] = {
-	0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334
-};
 
-static int
-is_leap_year(int year)
-{
-	return year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
-}
-
-static int
-leap_days(int y1, int y2)
-{
-	--y1;
-	--y2;
-	return (y2/4 - y1/4) - (y2/100 - y1/100) + (y2/400 - y1/400);
-}
-struct tm *
-gmtime_r (const time_t *__restrict tim_p,
-	struct tm *__restrict res)
-{
-  long days, rem;
-  const time_t lcltime = *tim_p;
-  int era, weekday, year;
-  unsigned erayear, yearday, month, day;
-  unsigned long eraday;
-
-  days = lcltime / SECSPERDAY + EPOCH_ADJUSTMENT_DAYS;
-  rem = lcltime % SECSPERDAY;
-  if (rem < 0)
-    {
-      rem += SECSPERDAY;
-      --days;
-    }
-
-  /* compute hour, min, and sec */
-  res->tm_hour = (int) (rem / SECSPERHOUR);
-  rem %= SECSPERHOUR;
-  res->tm_min = (int) (rem / SECSPERMIN);
-  res->tm_sec = (int) (rem % SECSPERMIN);
-
-  /* compute day of week */
-  if ((weekday = ((ADJUSTED_EPOCH_WDAY + days) % DAYSPERWEEK)) < 0)
-    weekday += DAYSPERWEEK;
-  res->tm_wday = weekday;
-
-  /* compute year, month, day & day of year */
-  /* for description of this algorithm see
-   * http://howardhinnant.github.io/date_algorithms.html#civil_from_days */
-  era = (days >= 0 ? days : days - (DAYS_PER_ERA - 1)) / DAYS_PER_ERA;
-  eraday = days - era * DAYS_PER_ERA;	/* [0, 146096] */
-  erayear = (eraday - eraday / (DAYS_PER_4_YEARS - 1) + eraday / DAYS_PER_CENTURY -
-      eraday / (DAYS_PER_ERA - 1)) / 365;	/* [0, 399] */
-  yearday = eraday - (DAYS_PER_YEAR * erayear + erayear / 4 - erayear / 100);	/* [0, 365] */
-  month = (5 * yearday + 2) / 153;	/* [0, 11] */
-  day = yearday - (153 * month + 2) / 5 + 1;	/* [1, 31] */
-  month += month < 10 ? 2 : -10;
-  year = ADJUSTED_EPOCH_YEAR + erayear + era * YEARS_PER_ERA + (month <= 1);
-
-  res->tm_yday = yearday >= DAYS_PER_YEAR - DAYS_IN_JANUARY - DAYS_IN_FEBRUARY ?
-      yearday - (DAYS_PER_YEAR - DAYS_IN_JANUARY - DAYS_IN_FEBRUARY) :
-      yearday + DAYS_IN_JANUARY + DAYS_IN_FEBRUARY + is_leap_year(erayear);
-  res->tm_year = year - YEAR_BASE;
-  res->tm_mon = month;
-  res->tm_mday = day;
-
-  res->tm_isdst = 0;
-
-  return (res);
-}
-struct tm *
-gmtime (const time_t * tim_p)
-{
-  struct _reent *reent = _REENT;
-
-  _REENT_CHECK_TM(reent);
-  return gmtime_r (tim_p, (struct tm *)_REENT_TM(reent));
-}
-
-time_t
-timegm(const struct tm *tm)
-{
-	int year;
-	time_t days;
-	time_t hours;
-	time_t minutes;
-	time_t seconds;
-
-	year = 1900 + tm->tm_year;
-	days = 365 * (year - 1970) + leap_days(1970, year);
-	days += monoff[tm->tm_mon];
-
-	if (tm->tm_mon > 1 && is_leap_year(year))
-		++days;
-	days += tm->tm_mday - 1;
-
-	hours = days * 24 + tm->tm_hour;
-	minutes = hours * 60 + tm->tm_min;
-	seconds = minutes * 60 + tm->tm_sec;
-
-	return seconds;
-}
+/* timegm + gmtime + gmtime_r used to live here as Pico-only bodies
+ * (newlib on Cortex-M doesn't expose timegm). They moved to
+ * drivers/calendar/calendar_bare.c behind the hal_calendar contract
+ * (hal/hal_calendar.h); GPS.c now calls hal_calendar_* like every
+ * other consumer. */
 
 /* ************************************************************************** */
 /* ************************************************************************** */
@@ -669,9 +549,9 @@ void GPS_parse(char *nmea) {
     tm->tm_hour = hour;
     tm->tm_min = minute;
     tm->tm_sec = seconds;
-    time_t timestamp = timegm(tm); /* See README.md if your system lacks timegm(). */
+    time_t timestamp = hal_calendar_tm_to_epoch(tm);
     timestamp+=GPSadjust;
-    tm=gmtime(&timestamp);
+    hal_calendar_epoch_to_tm(timestamp, tm);
     i=tm->tm_hour;
     GPStime[1]=(i/10) + 48;
     GPStime[2]=(i % 10) + 48;

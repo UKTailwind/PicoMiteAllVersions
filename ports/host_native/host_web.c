@@ -10,6 +10,7 @@
 
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
+#include "hal/hal_calendar.h"
 #include "hal/hal_filesystem.h"
 #include "hal/hal_net.h"
 #include "hal/hal_time.h"
@@ -750,8 +751,9 @@ static int host_udp_cmd(unsigned char *arg) {
 static void host_ntp_apply(uint32_t unix_seconds, MMFLOAT offset_hours) {
     extern int host_time_use_mmbasic_offset;
     time_t adjusted = (time_t)unix_seconds + (time_t)(offset_hours * 3600.0);
-    struct tm *utc = gmtime(&adjusted);
-    if (!utc) error("invalid ntp response");
+    struct tm utc_buf;
+    hal_calendar_epoch_to_tm(adjusted, &utc_buf);
+    struct tm *utc = &utc_buf;
 
     day_of_week = utc->tm_wday;
     if (day_of_week == 0) day_of_week = 7;
