@@ -68,6 +68,33 @@ int hal_net_ip_address(char *out, size_t out_len);
 int hal_net_wifi_scan(char *out, size_t out_len, size_t *written,
                       int print_to_console);
 
+/*
+ * hal_net_tcp_server_open(port, backlog, out)
+ *
+ * Open a listening TCP socket on `port`. On success, returns HAL_NET_OK
+ * and stores a non-zero handle in *out. On failure returns HAL_NET_ERR
+ * and leaves *out == 0.
+ *
+ * REBIND CONTRACT: implementations MUST allow a subsequent open on the
+ * same `port` to succeed immediately after a prior `hal_net_tcp_server_close`
+ * on that port, even if peer connections from the previous listener are
+ * still draining (TIME_WAIT / lingering pcb state). The shared lifecycle
+ * (`shared/net/mm_net_service.c::mm_net_tcp_service_open` and the
+ * `OPTION TCP SERVER PORT` setter) drives close-then-open sequences in
+ * back-to-back lifecycle transitions; a backend that refuses rebind will
+ * intermittently fail the second open with no listener bound and produce
+ * silent ConnectionRefused errors at the BASIC layer.
+ *
+ * BSD sockets: set `SO_REUSEADDR` on the socket before `bind()`
+ *   (see ports/esp32_s3_metro/main/hal_net_esp32.c).
+ * lwip raw API: set `SOF_REUSEADDR` on the pcb via `ip_set_option` before
+ *   `tcp_bind` AND ensure `LWIP_SO_REUSE`/`SO_REUSE` is enabled in
+ *   lwipopts (see drivers/net_lwip_raw/hal_net_lwip.c, lwipopts.h).
+ *
+ * Backends MUST report bind failure by returning HAL_NET_ERR; the shared
+ * caller layer surfaces "Failed to create TCP server" so harnesses can
+ * detect the rebind failure rather than diagnose downstream symptoms.
+ */
 int hal_net_tcp_server_open(uint16_t port, int backlog,
                             hal_net_tcp_server_t *out);
 int hal_net_tcp_server_close(hal_net_tcp_server_t server);

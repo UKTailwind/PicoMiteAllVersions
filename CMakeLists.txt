@@ -243,6 +243,7 @@ target_sources(PicoMite PRIVATE ${PICOMITE_PICO_SDK_HAL_SOURCES})
 target_sources(PicoMite PRIVATE
 	runtime/runtime_abort.c
 	runtime/runtime_interrupt.c
+	runtime/runtime_getline.c
 )
 # The project's headers (MMBasic_Includes.h, Draw.h, etc.) live in the
 # repo root. Sources in subdirectories (core/state/, future hal/ + drivers/

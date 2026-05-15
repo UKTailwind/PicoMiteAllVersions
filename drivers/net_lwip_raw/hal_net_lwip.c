@@ -611,6 +611,11 @@ int hal_net_tcp_server_open(uint16_t port, int backlog,
     if (free_slot < 0) return HAL_NET_ERR;
     struct tcp_pcb *pcb = tcp_new_ip_type(IPADDR_TYPE_ANY);
     if (!pcb) return HAL_NET_ERR;
+    /* Allow rebind to the same port immediately after a previous close,
+     * even if the port is still in lwip's TIME_WAIT or has lingering pcb
+     * state. Matches the ESP32 backend's setsockopt(SO_REUSEADDR) call.
+     * Requires LWIP_SO_REUSE=1 / SO_REUSE=1 in lwipopts to be honored. */
+    ip_set_option(pcb, SOF_REUSEADDR);
     err_t err = tcp_bind(pcb, NULL, port);
     if (err != ERR_OK) {
         tcp_close(pcb);

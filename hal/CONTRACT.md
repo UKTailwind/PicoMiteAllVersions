@@ -101,6 +101,19 @@ MQTT client operations, and event queues.
   for the interpreter thread to consume.
 - The stub backend advertises no capabilities, has no permanent network
   buffers, and returns `HAL_NET_UNSUPPORTED` for transport operations.
+- **TCP server rebind contract.** `hal_net_tcp_server_open(port, …)` MUST
+  succeed when called immediately after `hal_net_tcp_server_close` on the
+  same port, even if peer connections from the previous listener are still
+  draining (TIME_WAIT / lingering pcb state). The shared lifecycle drives
+  back-to-back close/open whenever `OPTION TCP SERVER PORT` is reconfigured
+  or restored; a backend that refuses rebind produces silent
+  `ConnectionRefused` at the BASIC layer with no listener actually bound.
+  - BSD socket backends: set `SO_REUSEADDR` via `setsockopt` before
+    `bind()`. See `ports/esp32_s3_metro/main/hal_net_esp32.c`.
+  - lwIP raw API backends: enable `LWIP_SO_REUSE`/`SO_REUSE` in `lwipopts.h`
+    AND call `ip_set_option(pcb, SOF_REUSEADDR)` before `tcp_bind`. See
+    `drivers/net_lwip_raw/hal_net_lwip.c`, `lwipopts.h`.
+  - The header-level contract note lives at `hal/hal_net.h::hal_net_tcp_server_open`.
 
 ---
 

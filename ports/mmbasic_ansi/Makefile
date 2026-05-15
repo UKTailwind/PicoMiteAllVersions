@@ -66,7 +66,7 @@ NATIVE_SRCS = host_runtime.c host_fastgfx.c host_fastgfx_resync.c host_fs_shims.
               hal_filesystem_host.c hal_keyboard_host.c hal_audio_host.c hal_vm_framebuffer_host.c
 
 PORT_SRCS = ansi_main.c ansi_terminal.c ansi_display.c
-RUNTIME_SRCS = runtime_boot.c runtime_program.c runtime_console.c runtime_abort.c runtime_interrupt.c
+RUNTIME_SRCS = runtime_boot.c runtime_program.c runtime_console.c runtime_getline.c runtime_abort.c runtime_interrupt.c
 HAL_GENERIC_SRCS = hal_watchdog_noop.c
 
 SRCS = $(PORT_SRCS) $(NATIVE_SRCS) $(CORE_SRCS) $(BC_SRCS) $(RUNTIME_SRCS) $(HAL_GENERIC_SRCS)

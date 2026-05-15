@@ -270,29 +270,4 @@ void SSPrintString(char *s)
     console_telnet_putc(0, -1);
 }
 
-void MMgetline(int filenbr, char *p)
-{
-    int c;
-    int nbrchars = 0;
-
-    while (1) {
-        if (filenbr != 0 && FileEOF(filenbr)) break;
-        c = MMfgetc(filenbr);
-        if (c <= 0) {
-            if (filenbr == 0) break;
-            continue;
-        }
-        if (c == '\n') break;
-        if (c == '\r') continue;
-        if (c == '\t') {
-            do {
-                if (++nbrchars > MAXSTRLEN) error("Line is too long");
-                *p++ = ' ';
-            } while (nbrchars % 4);
-            continue;
-        }
-        if (++nbrchars > MAXSTRLEN) error("Line is too long");
-        *p++ = (char)c;
-    }
-    *p = 0;
-}
+// MMgetline lives in runtime/runtime_getline.c — shared across every port.

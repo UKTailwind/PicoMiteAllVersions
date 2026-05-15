@@ -250,29 +250,7 @@ void MMfopen(unsigned char *fname, unsigned char *mode, int fnbr) {
 
 void MMfclose(int fnbr) { FileClose(fnbr); }
 
-void MMgetline(int filenbr, char *p) {
-    int c, n = 0;
-    while (1) {
-        if (filenbr != 0 && FileEOF(filenbr)) break;
-        c = MMfgetc(filenbr);
-        if (c <= 0) {
-            if (filenbr == 0) break;
-            continue;
-        }
-        if (c == '\n') break;
-        if (c == '\r') continue;
-        if (c == '\t') {
-            do {
-                if (++n > MAXSTRLEN) error("Line is too long");
-                *p++ = ' ';
-            } while (n % 4);
-            continue;
-        }
-        if (++n > MAXSTRLEN) error("Line is too long");
-        *p++ = (char)c;
-    }
-    *p = 0;
-}
+// MMgetline lives in runtime/runtime_getline.c — shared across every port.
 
 void printoptions(void) {
     char line[96];

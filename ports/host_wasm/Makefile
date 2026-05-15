@@ -124,7 +124,7 @@ HOST_WASM_SRCS = host_wasm_main.c host_wasm_console.c host_wasm_canvas.c \
                  host_fastgfx_resync.c
 
 HAL_GENERIC_SRCS = hal_watchdog_noop.c
-RUNTIME_SRCS = runtime_boot.c runtime_program.c runtime_console.c runtime_abort.c runtime_interrupt.c
+RUNTIME_SRCS = runtime_boot.c runtime_program.c runtime_console.c runtime_getline.c runtime_abort.c runtime_interrupt.c
 
 SRCS = $(HOST_PORTABLE_SRCS) $(HOST_WASM_SRCS) $(CORE_SRCS) $(BC_SRCS) $(HAL_GENERIC_SRCS) $(RUNTIME_SRCS)
 OBJS = $(addprefix $(BUILD_DIR)/,$(SRCS:.c=.o))

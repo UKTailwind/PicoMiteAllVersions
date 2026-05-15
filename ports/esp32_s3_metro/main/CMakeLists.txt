@@ -125,6 +125,7 @@ set(PORT_LOCAL_SRCS
     app_main.c                              # IDF entry, MMBasic boot, REPL
     esp32_console.c                         # USB Serial/JTAG read/write (raw bytes)
     esp32_mmbasic_console_glue.c            # MMputchar / MMPrintString / MMInkey + ring state
+    ${REPO_ROOT}/runtime/runtime_getline.c   # shared console-line reader (see runtime/runtime_getline.c)
     esp32_system.c                          # CPU RESTART / SLEEP
     esp32_terminal.c                        # VT100 CLS + COLOUR via Draw.c port hooks
     esp32_lfs.c                             # LittleFS over esp_partition_* (A: drive)

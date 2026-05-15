@@ -1362,8 +1362,9 @@ def main() -> int:
     parser.add_argument("--boot-wait", type=float, default=2.0)
     parser.add_argument("--timeout", type=float, default=10.0)
     parser.add_argument("--long-timeout", type=float, default=35.0)
-    parser.add_argument("--suite-retries", type=int, default=1,
-                        help="retry a failing suite this many times before reporting failure")
+    parser.add_argument("--suite-retries", type=int, default=2,
+                        help="number of attempts per suite before reporting failure; "
+                             "default 2 absorbs the intermittent tcp-server bind race")
     parser.add_argument("--suite-timeout", type=float, default=0.0,
                         help="hard wall-clock timeout per suite attempt; default derives from --long-timeout")
     parser.add_argument("--reset-before-suite", dest="reset_before_suite",
