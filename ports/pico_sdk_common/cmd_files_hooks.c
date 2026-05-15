@@ -25,9 +25,6 @@
 #include "hal/hal_fatfs_dispatch.h"
 #include "hal/hal_keyboard.h"
 
-extern void CloseAudio(int all);
-extern void SaveContext(void);
-extern void RestoreContext(bool keep);
 extern void ErrorThrow(int e, int type);
 extern struct uFileTable FileTable[];
 extern hal_fs_fd_t hal_fds[];
@@ -35,19 +32,15 @@ extern FATFS FatFs;
 extern int FatFSFileSystem;
 extern volatile BYTE SDCardStat;
 
-void cmd_files_save_program_context(void)
-{
-    if (!CurrentLinePtr) return;
-    CloseAudio(1);
-    SaveContext();
-    ClearVars(0, false);
-    InitHeap(false);
-}
-
-void cmd_files_restore_program_context(void)
-{
-    if (CurrentLinePtr) RestoreContext(false);
-}
+/* The historical save/restore dance (SaveContext + ClearVars +
+ * InitHeap on entry, RestoreContext on exit) existed to free heap for
+ * cmd_files's transient ~76 KB flist[] sort buffer. The multi-pass
+ * selection sort that replaced the buffer is O(1) memory, so the
+ * dance is no longer needed and would actively harm by wiping the
+ * caller's BASIC variables across a `FILES` call from inside a
+ * program. */
+void cmd_files_save_program_context(void)    {}
+void cmd_files_restore_program_context(void) {}
 
 void cmd_files_pump_console_key(int *c)
 {
