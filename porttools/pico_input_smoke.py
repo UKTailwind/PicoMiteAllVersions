@@ -59,12 +59,6 @@ def drain(basic: BasicSerial, seconds: float) -> bytes:
 
 def send_bytes(basic: BasicSerial, data: bytes, per_byte_delay: float = 0.0) -> None:
     assert basic.serial is not None
-    # Bursts above ~150 bytes can overflow the ConsoleRxBuf on telnet
-    # transports because TCP delivers faster than MMgetline drains.
-    # Auto-throttle large payloads so the long-line guard still trips
-    # cleanly instead of seeing a silently-truncated line.
-    if per_byte_delay <= 0.0 and len(data) > 150:
-        per_byte_delay = 0.001
     if per_byte_delay <= 0.0:
         basic.serial.write(data)
         basic.serial.flush()

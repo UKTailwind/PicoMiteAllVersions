@@ -154,17 +154,37 @@ PORT_FEATURE_SETS: dict[str, set[str]] = {
 
 
 def drive_inkey_capture(basic: BasicSerial, send_bytes: bytes) -> tuple[bool, str, int | None]:
-    """Send INKEY$ poll, then push `send_bytes`. Return the decoded code."""
+    """Send INKEY$ poll, then push `send_bytes`. Return the decoded code.
+
+    The BASIC program prints a "READY" sentinel before entering the
+    INKEY$ poll. We wait for that sentinel before injecting the
+    escape sequence — otherwise the bytes can race the BASIC parser
+    and land at the prompt instead of in the poll, triggering F-key
+    macro substitution (F4 → EDIT macro is the classic hazard).
+    Sentinel-driven sync replaces what used to be a fixed sleep that
+    had to be tuned across transports and devices."""
     assert basic.serial is not None
     basic.read_for(0.05)
-    program = b'DO:k$=INKEY$:LOOP UNTIL k$<>"":?"K=";ASC(k$)\r'
+    # PRINT the sentinel BEFORE the DO loop so it lands the moment
+    # the parser hits the colon — confirms the loop body is live.
+    program = b'?"KMR1":DO:k$=INKEY$:LOOP UNTIL k$<>"":?"K=";ASC(k$)\r'
     basic.serial.write(program)
     basic.serial.flush()
-    # ESP32 USB Serial/JTAG is noticeably slower at line parsing than the
-    # Pico CDC; the 150 ms gap was sometimes too tight, causing the
-    # escape sequence to arrive while the editor was still parsing the
-    # command line. 300 ms is comfortable across all ports.
-    time.sleep(0.3)
+    # Wait up to 1.5 s for the READY sentinel before pushing keys.
+    ready_deadline = time.monotonic() + 1.5
+    setup = bytearray()
+    saw_ready = False
+    while time.monotonic() < ready_deadline:
+        chunk = basic.serial.read(4096)
+        if chunk:
+            setup.extend(chunk)
+            if b"KMR1" in strip_ansi(bytes(setup)):
+                saw_ready = True
+                break
+        else:
+            time.sleep(0.01)
+    if not saw_ready:
+        return False, f"BASIC didn't reach READY in time; tail={strip_ansi(bytes(setup))[-160:]!r}", None
     basic.serial.write(send_bytes)
     basic.serial.flush()
     end = time.monotonic() + 3.0
@@ -175,6 +195,7 @@ def drive_inkey_capture(basic: BasicSerial, send_bytes: bytes) -> tuple[bool, st
         if chunk:
             buf.extend(chunk)
             text = strip_ansi(bytes(buf)).decode("latin1", "replace")
+            # K= sentinel comes AFTER KMR1, so scan only the tail.
             m = re.search(r"K=\s*(\d+)", text)
             if m:
                 code = int(m.group(1))

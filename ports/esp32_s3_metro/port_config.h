@@ -103,7 +103,14 @@
 #define HAL_PORT_MAGIC_KEY_USB           0xE1799B93
 #define HAL_PORT_HEAP_TOP                0
 #define HAL_PORT_HEAP_TOP_USB            0
-#define HAL_PORT_CONSOLE_RX_BUF_SIZE     256
+/* WiFi-capable port: telnet delivers data in TCP segments (lwIP MSS
+ * ~1460 on ESP32-S3). The 256-byte ring used by non-WiFi ports
+ * overflows on long single-segment bursts before MMgetline can drain,
+ * silently dropping the tail of the line. Match the WiFi-port pattern
+ * in configuration.h (CONSOLE_RX_BUF_SIZE = TCP_MSS on `HAL_PORT_HAS_WIFI`
+ * ports) by reserving a similar-sized buffer here; ESP32-S3 PSRAM gives
+ * us the headroom for free. */
+#define HAL_PORT_CONSOLE_RX_BUF_SIZE     1536
 #define HAL_PORT_PIOMAX                  0
 #define HAL_PORT_NBR_PINS                49
 
