@@ -210,7 +210,8 @@ set(PICOMITE_PICO_SDK_HAL_SOURCES
 	ports/pico_sdk_common/bc_bridge_pico.c
 	ports/pico_sdk_common/bc_runtime_pico.c
 	ports/pico_sdk_common/clear_runtime_port.c
-	ports/pico_sdk_common/terminal_hooks_noop.c
+	# port_terminal_handle_cls / port_terminal_emit_colour live in
+	# runtime/runtime_terminal_hooks_noop.c — added via target_sources below.
 	ports/pico_sdk_common/funtbl_port.c
 	ports/pico_sdk_common/core1_runtime.c
 	drivers/pico_flash/pico_flash_lfs.c
@@ -244,6 +245,9 @@ target_sources(PicoMite PRIVATE
 	runtime/runtime_abort.c
 	runtime/runtime_interrupt.c
 	runtime/runtime_getline.c
+	runtime/runtime_terminal_hooks_noop.c
+	runtime/runtime_console_putchar.c
+	runtime/runtime_console_escdecode.c
 )
 # The project's headers (MMBasic_Includes.h, Draw.h, etc.) live in the
 # repo root. Sources in subdirectories (core/state/, future hal/ + drivers/

@@ -158,7 +158,12 @@ def build_cases() -> list[Case]:
         Case("basic_cr",      b"hello\r",           "hello"),
         Case("basic_lf",      b"hello\n",           "hello"),
         Case("empty",         b"\r",                ""),
-        Case("backspace",     b"abcd\x08\x08xy\r",  "abxy"),
+        Case("backspace_bs",  b"abcd\x08\x08xy\r",  "abxy"),
+        # macOS Terminal / iTerm2 / most serial terminals send 0x7F (DEL)
+        # when you press Backspace, NOT 0x08. host_native and ESP32 both
+        # normalise 0x7F → BKSP in MMInkey; Pico didn't, so backspace was
+        # broken for anyone driving the Pico over a real serial terminal.
+        Case("backspace_del", b"abcd\x7f\x7fxy\r", "abxy"),
         Case("bs_underflow",  b"\x08\x08hi\r",      "hi"),
         # tab_at_start lives in run_tab_at_start_echo_check() — INPUT's
         # skipspace() on the captured line strips the leading 4 spaces, so

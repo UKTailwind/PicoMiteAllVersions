@@ -22,6 +22,7 @@
 #include "esp32_tcp_server.h"
 #include "esp32_telnet.h"
 #include "hal/hal_time.h"
+#include "runtime/runtime_console_escdecode.h"
 
 /* Provided by esp32_console.c. */
 extern void esp32_console_write_bytes(const char *text, int len);
@@ -72,12 +73,7 @@ void putConsole(int c, int flush) {
     if (OptionConsole & 1) SerialConsolePutC((char)c, flush);
 }
 
-char MMputchar(char c, int flush) {
-    putConsole(c, flush);
-    if (isprint((unsigned char)c)) MMCharPos++;
-    if (c == '\r') MMCharPos = 1;
-    return c;
-}
+// MMputchar lives in runtime/runtime_console_putchar.c — shared across every port.
 
 /* Bulk-string printers don't force a per-call telnet drain anymore.
  * Each fragment used to fire its own TCP send (cmd_files calls
@@ -142,106 +138,13 @@ static int esp32_console_next_byte_ms(int ms) {
     return -1;
 }
 
-static int esp32_normalise_console_byte(int c) {
-    if (c == 0x7f) return BKSP;       /* DEL: macOS/iTerm/USB-CDC and most telnet clients */
-    if (c == 0x08) return BKSP;       /* BS: RFC 854 NVT default + some telnet clients */
-    if (c == '\n') return ENTER;      /* normalise LF to CR for MMBasic */
-    return c;
-}
+/* Byte normalisation lives in runtime/runtime_console_escdecode.c
+ * (mmbasic_console_normalise_byte) — shared across every port. */
 
-static int esp32_csi_tilde_key(int n) {
-    switch (n) {
-        case 1:  return HOME;
-        case 2:  return INSERT;
-        case 3:  return DEL;
-        case 4:  return END;
-        case 5:  return PUP;
-        case 6:  return PDOWN;
-        case 11: return F1;
-        case 12: return F2;
-        case 13: return F3;
-        case 14: return F4;
-        case 15: return F5;
-        case 17: return F6;
-        case 18: return F7;
-        case 19: return F8;
-        case 20: return F9;
-        case 21: return F10;
-        case 23: return F11;
-        case 24: return F12;
-        default: return ESC;
-    }
-}
-
-static int esp32_csi_final_key(int final) {
-    switch (final) {
-        case 'A': return UP;
-        case 'B': return DOWN;
-        case 'C': return RIGHT;
-        case 'D': return LEFT;
-        case 'H': return HOME;
-        case 'F': return END;
-        case 'Z': return SHIFT_TAB;
-        default:  return ESC;
-    }
-}
-
-/* ANSI escape decoder: ESC was just consumed; read the rest of the
- * sequence with a 30 ms inter-byte timeout and return the synthesised
- * MMBasic key code. Standalone ESC (timeout) returns ESC.
- *
- * Supports the common forms:
- *   ESC [ A/B/C/D/H/F
- *   ESC [ Z
- *   ESC [ n ~
- *   ESC [ n ; modifier final
- *   ESC O P/Q/R/S
- */
-static int esp32_decode_escape_sequence(void) {
-    int c1 = esp32_console_next_byte_ms(30);
-    if (c1 < 0) return ESC;
-    if (c1 == '[') {
-        int c2 = esp32_console_next_byte_ms(30);
-        if (c2 < 0) return ESC;
-        int direct = esp32_csi_final_key(c2);
-        if (direct != ESC) return direct;
-        if (c2 >= '0' && c2 <= '9') {
-            int n = c2 - '0';
-            int c3;
-            while ((c3 = esp32_console_next_byte_ms(30)) >= 0) {
-                if (c3 >= '0' && c3 <= '9') { n = n * 10 + (c3 - '0'); continue; }
-                if (c3 == ';') {
-                    /* Ignore modifier parameters (Shift/Ctrl/Alt) and
-                     * return the base key. */
-                    do {
-                        c3 = esp32_console_next_byte_ms(30);
-                    } while (c3 >= '0' && c3 <= '9');
-                }
-                break;
-            }
-            if (c3 == '~') return esp32_csi_tilde_key(n);
-            direct = esp32_csi_final_key(c3);
-            if (direct != ESC) return direct;
-        }
-        return ESC;
-    }
-    if (c1 == 'O') {
-        int c2 = esp32_console_next_byte_ms(30);
-        switch (c2) {
-            case 'P': return F1;
-            case 'Q': return F2;
-            case 'R': return F3;
-            case 'S': return F4;
-        }
-        return ESC;
-    }
-    /* ESC followed by a regular char (Alt-<key>): return ESC now and
-     * preserve the char for the next read. The pushback only feeds USB; if
-     * the char came from the telnet ring buffer, we lose it. That's
-     * acceptable because Alt-<key> Meta sequences are not used by the
-     * editor and modern telnet clients send the key code directly. */
-    esp32_console_push_back_byte(c1);
-    return ESC;
+/* Escape decoder lives in runtime/runtime_console_escdecode.c — shared
+ * across every port. esp32 supplies the byte-reader wrapper. */
+static int esp32_escdecode_read_byte_ms(int timeout_ms) {
+    return esp32_console_next_byte_ms(timeout_ms);
 }
 
 int MMInkey(void) {
@@ -251,6 +154,12 @@ int MMInkey(void) {
         in_web_poll = 1;
         ProcessWeb(0);
         in_web_poll = 0;
+    }
+    /* Drain any chars left over from an earlier unrecognised escape
+     * sequence before consulting the input source. */
+    {
+        int pb = mmbasic_escdecode_pop_pushback();
+        if (pb >= 0) return pb;
     }
     int from_web = 0;
     int c = esp32_console_ring_pop();
@@ -264,9 +173,9 @@ int MMInkey(void) {
      * (USB stdin + telnet ring buffer) need escape-sequence assembly.
      * esp32_decode_escape_sequence drains continuation bytes from whichever
      * source they arrived on. */
-    if (!from_web && c == 0x1b)
-        return esp32_decode_escape_sequence();
-    return esp32_normalise_console_byte(c);
+    if (from_web) return c;  /* web console delivers pre-decoded key codes */
+    if (c == 0x1b) return mmbasic_escdecode_run(esp32_escdecode_read_byte_ms);
+    return mmbasic_console_normalise_byte(c);
 }
 
 int MMgetchar(void) {
@@ -288,9 +197,9 @@ int MMgetchar(void) {
         if (c < 0) c = esp32_console_read_byte_blocking_ms(1);
     } while (c < 0);
     ShowCursor(0);
-    if (!from_web && c == 0x1b)
-        return esp32_decode_escape_sequence();
-    return esp32_normalise_console_byte(c);
+    if (from_web) return c;  /* web console delivers pre-decoded key codes */
+    if (c == 0x1b) return mmbasic_escdecode_run(esp32_escdecode_read_byte_ms);
+    return mmbasic_console_normalise_byte(c);
 }
 
 /* Console RX/TX rings — Pico ports drive these from the UART IRQ. ESP32

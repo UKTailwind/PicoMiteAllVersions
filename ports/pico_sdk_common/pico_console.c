@@ -1,4 +1,16 @@
 #include "pico_runtime_internal.h"
+#include "runtime/runtime_console_escdecode.h"
+
+/* Per-call timeout byte-reader for the shared escape decoder. Uses the
+ * legacy InkeyTimer pattern: zero the timer, busy-wait on getConsole()
+ * until either a byte arrives or the timer ticks past timeout_ms. */
+static int __not_in_flash_func(pico_escdecode_read_byte_ms)(int timeout_ms) {
+    InkeyTimer = 0;
+    int c;
+    unsigned int deadline = (timeout_ms < 0) ? 0u : (unsigned int)timeout_ms;
+    while ((c = getConsole()) == -1 && InkeyTimer < deadline);
+    return c;
+}
 
 int __not_in_flash_func(getConsole)(void) {
     int c=-1;
@@ -48,14 +60,7 @@ char  __not_in_flash_func(SerialConsolePutC)(char c, int flush) {
     ProcessWeb(1);
     return c;
 }
-char MMputchar(char c, int flush) {
-    putConsole(c, flush);
-    if(isprint(c)) MMCharPos++;
-    if(c == '\r') {
-        MMCharPos = 1;
-    }
-    return c;
-}
+// MMputchar lives in runtime/runtime_console_putchar.c — shared across every port.
 // returns the number of character waiting in the console input queue
 int kbhitConsole(void) {
     int i;
@@ -67,78 +72,21 @@ int kbhitConsole(void) {
 // returns -1 if no char waiting
 // the main work is to check for vt100 escape code sequences and map to Maximite codes
 int HAL_PORT_MMINKEY_DECL(MMInkey)(void) {
-    unsigned int c = -1;                                            // default no character
-    unsigned int tc = -1;                                           // default no character
-    unsigned int ttc = -1;                                          // default no character
-    static unsigned int c1 = -1;
-    static unsigned int c2 = -1;
-    static unsigned int c3 = -1;
-    static unsigned int c4 = -1;
-//	static int crseen = 0;
-
-    if(c1 != -1) {                                                  // check if there are discarded chars from a previous sequence
-        c = c1; c1 = c2; c2 = c3; c3 = c4; c4 = -1;                 // shuffle the queue down
-        return c;                                                   // and return the head of the queue
+    int c;
+    /* Drain any chars left over from an earlier unrecognised escape
+     * sequence before consulting the input source. */
+    {
+        int pb = mmbasic_escdecode_pop_pushback();
+        if (pb >= 0) return pb;
     }
 
     c = getConsole();                                               // do discarded chars so get the char
     /* hal_keyboard_service is a no-op on USB ports (TinyUSB pumps
      * itself); on PS/2 it runs CheckKeyboard. */
     if (c == -1) hal_keyboard_service();
-    if(!(c==0x1b))return c;
-    InkeyTimer = 0;                                             // start the timer
-    while((c = getConsole()) == -1 && InkeyTimer < 30);         // get the second char with a delay of 30mS to allow the next char to arrive
-    if(c == 'O'){   //support for many linux terminal emulators
-        while((c = getConsole()) == -1 && InkeyTimer < 50);        // delay some more to allow the final chars to arrive, even at 1200 baud
-        if(c == 'P') return F1;
-        if(c == 'Q') return F2;
-        if(c == 'R') return F3;
-        if(c == 'S') return F4;
-        if(c == 'T') return F5;
-        if(c == '2'){
-            while((tc = getConsole()) == -1 && InkeyTimer < 70);        // delay some more to allow the final chars to arrive, even at 1200 baud
-            if(tc == 'R') return F3 + 0x20;
-            c1 = 'O'; c2 = c; c3 = tc; return 0x1b;                 // not a valid 4 char code
-        }
-        c1 = 'O'; c2 = c; return 0x1b;                 // not a valid 4 char code
-    }
-    if(c != '[') { c1 = c; return 0x1b; }                       // must be a square bracket
-    while((c = getConsole()) == -1 && InkeyTimer < 50);         // get the third char with delay
-    if(c == 'A') return UP;                                     // the arrow keys are three chars
-    if(c == 'B') return DOWN;
-    if(c == 'C') return RIGHT;
-    if(c == 'D') return LEFT;
-    if(c < '1' && c > '6') { c1 = '['; c2 = c; return 0x1b; }   // the 3rd char must be in this range
-    while((tc = getConsole()) == -1 && InkeyTimer < 70);        // delay some more to allow the final chars to arrive, even at 1200 baud
-    if(tc == '~') {                                             // all 4 char codes must be terminated with ~
-        if(c == '1') return HOME;
-        if(c == '2') return INSERT;
-        if(c == '3') return DEL;
-        if(c == '4') return END;
-        if(c == '5') return PUP;
-        if(c == '6') return PDOWN;
-        c1 = '['; c2 = c; c3 = tc; return 0x1b;                 // not a valid 4 char code
-    }
-    while((ttc = getConsole()) == -1 && InkeyTimer < 90);       // get the 5th char with delay
-    if(ttc == '~') {                                            // must be a ~
-        if(c == '1') {
-            if(tc >='1' && tc <= '5') return F1 + (tc - '1');   // F1 to F5
-            if(tc >='7' && tc <= '9') return F6 + (tc - '7');   // F6 to F8
-        }
-        if(c == '2') {
-            if(tc =='0' || tc == '1') return F9 + (tc - '0');   // F9 and F10
-            if(tc =='3' || tc == '4') return F11 + (tc - '3');  // F11 and F12
-            if(tc =='5' || tc=='6') return F3 + 0x20 + tc-'5';                      // SHIFT-F3 and F4
-            if(tc =='8' || tc=='9') return F5 + 0x20 + tc-'8';                      // SHIFT-F5 and F6
-        }
-        if(c == '3') {
-            if(tc >='1' && tc <= '4') return F7 + 0x20 + (tc - '1');   // SHIFT-F7 to F10
-        }
-        //NB: SHIFT F1, F2, F11, and F12 don't appear to generate anything
-    }
-    // nothing worked so bomb out
-    c1 = '['; c2 = c; c3 = tc; c4 = ttc;
-    return 0x1b;
+    if (c < 0) return c;
+    if (c == 0x1b) return mmbasic_escdecode_run(pico_escdecode_read_byte_ms);
+    return mmbasic_console_normalise_byte(c);
 }
 // MMgetline lives in runtime/runtime_getline.c — shared across every port.
 

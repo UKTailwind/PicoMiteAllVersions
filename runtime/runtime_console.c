@@ -8,6 +8,7 @@
 #include "Draw.h"
 #include "Editor.h"
 #include "runtime/runtime.h"
+#include "runtime/runtime_console_escdecode.h"
 
 static const mm_runtime_console_adapter *console_adapter;
 
@@ -109,79 +110,33 @@ void mmbasic_runtime_console_print_raw(const char *text, int len)
     }
 }
 
+/* mmbasic_runtime_console_decode_escape_sequence — kept as a thin
+ * forwarder so any in-tree caller still resolves; the real decoder
+ * lives in runtime/runtime_console_escdecode.c (shared across ports). */
+static int host_escdecode_read_byte_ms(int timeout_ms) {
+    return console_read_byte_blocking_ms(timeout_ms);
+}
+
 int mmbasic_runtime_console_decode_escape_sequence(void)
 {
-    int c1 = console_read_byte_blocking_ms(30);
-    if (c1 < 0) return ESC;
-
-    if (c1 == '[') {
-        int c2 = console_read_byte_blocking_ms(30);
-        if (c2 < 0) return ESC;
-        switch (c2) {
-            case 'A': return UP;
-            case 'B': return DOWN;
-            case 'C': return RIGHT;
-            case 'D': return LEFT;
-            case 'H': return HOME;
-            case 'F': return END;
-        }
-        if (c2 >= '0' && c2 <= '9') {
-            int n = c2 - '0';
-            int c3;
-            while ((c3 = console_read_byte_blocking_ms(30)) >= 0) {
-                if (c3 >= '0' && c3 <= '9') {
-                    n = n * 10 + (c3 - '0');
-                    continue;
-                }
-                break;
-            }
-            if (c3 == '~') {
-                switch (n) {
-                    case 1:  return HOME;
-                    case 2:  return INSERT;
-                    case 3:  return DEL;
-                    case 4:  return END;
-                    case 5:  return PUP;
-                    case 6:  return PDOWN;
-                    case 15: return F5;
-                    case 17: return F6;
-                    case 18: return F7;
-                    case 19: return F8;
-                    case 20: return F9;
-                    case 21: return F10;
-                    case 23: return F11;
-                    case 24: return F12;
-                }
-            }
-        }
-        return ESC;
-    }
-
-    if (c1 == 'O') {
-        int c2 = console_read_byte_blocking_ms(30);
-        switch (c2) {
-            case 'P': return F1;
-            case 'Q': return F2;
-            case 'R': return F3;
-            case 'S': return F4;
-        }
-        return ESC;
-    }
-
-    console_push_back_byte(c1);
-    return ESC;
+    return mmbasic_escdecode_run(host_escdecode_read_byte_ms);
 }
 
 int MMInkey(void)
 {
     console_service();
 
+    /* Drain any chars left over from an earlier unrecognised escape
+     * sequence before consulting the input source. */
+    {
+        int pb = mmbasic_escdecode_pop_pushback();
+        if (pb >= 0) return pb;
+    }
+
     if (ConsoleRxBufHead != ConsoleRxBufTail) {
         int c = (unsigned char)ConsoleRxBuf[ConsoleRxBufTail];
         ConsoleRxBufTail = (ConsoleRxBufTail + 1) % CONSOLE_RX_BUF_SIZE;
-        if (c == 0x7f) return BKSP;
-        if (c == '\n') return ENTER;
-        return c;
+        return mmbasic_console_normalise_byte(c);
     }
 
     if (console_adapter && console_adapter->scripted_key) {
@@ -206,9 +161,7 @@ int MMInkey(void)
             }
         }
         if (c == 0x1b) return mmbasic_runtime_console_decode_escape_sequence();
-        if (c == 0x7f) return BKSP;
-        if (c == '\n') return ENTER;
-        return c;
+        return mmbasic_console_normalise_byte(c);
     }
 
     if (console_repl_mode()) {
@@ -248,13 +201,7 @@ void putConsole(int c, int flush)
     }
 }
 
-char MMputchar(char c, int flush)
-{
-    putConsole(c, flush);
-    if (isprint((unsigned char)c)) MMCharPos++;
-    if (c == '\r') MMCharPos = 1;
-    return c;
-}
+// MMputchar lives in runtime/runtime_console_putchar.c — shared across every port.
 
 void MMPrintString(char *s)
 {

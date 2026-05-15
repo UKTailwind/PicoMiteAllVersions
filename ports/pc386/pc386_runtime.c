@@ -21,6 +21,8 @@
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
 #include "runtime/runtime.h"
+#include "runtime/runtime_console_escdecode.h"
+#include "hal/hal_time.h"
 
 #include "../../drivers/i8042_kbd/i8042_kbd.h"
 #include "../../drivers/serial_16550/serial_16550.h"
@@ -169,14 +171,7 @@ void putConsole(int c, int flush) {
     if (OptionConsole & 1) SerialConsolePutC((char)c, flush);
 }
 
-char MMputchar(char c, int flush) {
-    putConsole(c, flush);
-    /* Track column position for TAB() etc. */
-    extern int isprint(int);
-    if (isprint((unsigned char)c)) MMCharPos++;
-    if (c == '\r') MMCharPos = 1;
-    return c;
-}
+// MMputchar lives in runtime/runtime_console_putchar.c — shared across every port.
 
 void MMPrintString(char *s) {
     while (*s) MMputchar(*s++, 0);
@@ -186,27 +181,38 @@ void SSPrintString(char *s) {
     while (*s) SerialConsolePutC(*s++, 0);
 }
 
-/* Stage 4e input: drain whichever of (PS/2 keyboard, COM1 serial) has
- * a character ready. PS/2 is IRQ-driven (drivers/i8042_kbd) and produces
- * MMBasic-shaped key codes (UP, BKSP, F1, etc.) directly; COM1 still
- * polls in stage 4 (4f turns it IRQ-driven) and goes through the same
- * terminal-byte normalisation as 3e.
- *
- * Both sources drain into the same return value here; we don't try to
- * coalesce into ConsoleRxBuf because nothing reads it until stage 4f
- * brings up the routinechecks-tier pump. */
-static int pc386_normalise_serial(int c) {
-    if (c == '\n') return ENTER;
-    if (c == 0x7F) return BKSP;
-    return c;
+/* PS/2 is IRQ-driven (drivers/i8042_kbd) and produces MMBasic-shaped key
+ * codes (UP, BKSP, F1, etc.) directly; COM1 serial goes through the
+ * shared escape decoder + mmbasic_console_normalise_byte. */
+
+/* Per-call byte reader for the shared escape decoder. Used ONLY for
+ * COM1 serial input; PS/2 already pre-decodes to MMBasic key codes. */
+static int pc386_escdecode_read_byte_ms(int timeout_ms) {
+    /* Busy-poll up to timeout_ms in ~1ms slices. hal_time_sleep_us
+     * yields the CPU between checks. */
+    int waited = 0;
+    while (waited <= timeout_ms) {
+        int s = serial_getc_nonblock();
+        if (s >= 0) return s;
+        hal_time_sleep_us(1000);
+        waited++;
+    }
+    return -1;
 }
 
 int MMInkey(void) {
+    /* Drain any chars left over from an earlier unrecognised escape
+     * sequence before consulting the input sources. */
+    {
+        int pb = mmbasic_escdecode_pop_pushback();
+        if (pb >= 0) return pb;
+    }
     int c = kbd_get_key();
     if (c >= 0) return c;
     int s = serial_getc_nonblock();
     if (s < 0) return -1;
-    return pc386_normalise_serial(s);
+    if (s == 0x1b) return mmbasic_escdecode_run(pc386_escdecode_read_byte_ms);
+    return mmbasic_console_normalise_byte(s);
 }
 
 int pc386_keyboard_repeat_start_ms(void) {
@@ -232,7 +238,8 @@ int MMgetchar(void) {
         int s = serial_getc_nonblock();
         if (s >= 0) {
             ShowCursor(0);
-            return pc386_normalise_serial(s);
+            if (s == 0x1b) return mmbasic_escdecode_run(pc386_escdecode_read_byte_ms);
+            return mmbasic_console_normalise_byte(s);
         }
         __asm__ volatile("hlt");
     }
@@ -482,15 +489,8 @@ int port_vm_time_get_tm(struct tm *out) {
  * ========================================================================= */
 void port_bc_runtime_free_source(const char **source) { (void)source; }
 
-/* =========================================================================
- *  Draw.c terminal hooks — pc386 has VGA text + serial, not ANSI; the
- *  framebuffer path covers cmd_cls / cmd_colour once stage 5 brings up
- *  graphics. No-op for stage 3.
- * ========================================================================= */
-bool port_terminal_handle_cls(void) { return false; }
-void port_terminal_emit_colour(int fg, int bg, int has_bg) {
-    (void)fg; (void)bg; (void)has_bg;
-}
+/* Draw.c terminal hooks live in runtime/runtime_terminal_hooks_noop.c —
+ * shared across every port with a real framebuffer. */
 
 /* =========================================================================
  *  mmbasic_timegm/gmtime — host_platform.h renames the libc names to
@@ -499,7 +499,10 @@ void port_terminal_emit_colour(int fg, int bg, int has_bg) {
  *  case some compiled object expects them.
  * ========================================================================= */
 time_t mmbasic_timegm(const struct tm *tm) {
-    return timegm(tm);
+    /* POSIX timegm may mutate its argument; copy first so callers' const
+     * contract holds (host_native and esp32 do the same). */
+    struct tm tmp = *tm;
+    return timegm(&tmp);
 }
 struct tm *mmbasic_gmtime(const time_t *t) {
     return gmtime(t);
