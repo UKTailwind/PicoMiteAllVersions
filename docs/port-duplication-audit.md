@@ -26,6 +26,9 @@ relevant finding's consolidation.
 | pc386 has no escape-sequence decoder at all — serial-attached terminals can't send arrow keys / F-keys | `ports/pc386/pc386_runtime.c` (MMInkey region) | **done — Finding 2 consolidation** (pc386 now calls `mmbasic_escdecode_run` on `0x1b` from the serial path) |
 | pc386 `mmbasic_timegm` const-violation — passes `tm` straight to libc `timegm` instead of copying first like host_native/esp32 | `ports/pc386/pc386_runtime.c:501-506` | **done** |
 | Pico `MMInkey` doesn't normalise `0x7F` (DEL) → `BKSP` — backspace silently broken at end-of-line over USB-CDC serial (macOS Terminal / iTerm2 / `screen` / `picocom` all send `0x7F` for the Backspace key; REPL editor's `case DEL` only does forward-delete, no-op at end-of-line). host_native and ESP32 already normalise; Pico was the odd one out. Found by user, smoke gap (`pico_input_smoke.py` tested `0x08` instead of `0x7F`). | `ports/pico_sdk_common/pico_console.c` (MMInkey) | **done** — added 0x7F → BKSP, added `backspace_del` smoke case |
+| Pico B: drive broken since commit `179d88e` (May 10) — `ffconf.h` defaults `FF_STR_VOLUME_ID=2` + `"B:","C:"` are structurally broken for DOS-style paths: FatFs's `get_ldnumber` finds the colon, enters the DOS branch, but the arbitrary-string matcher is gated to Mode 1 — Mode 2 falls through to return `FR_INVALID_DRIVE`. pc386 had a `-D` override; ESP32 had a `#define` in `esp32_platform.h`; no Pico variant did. Anyone doing `B:` + `FILES` (or any `OPEN "B:/..."`) hit "The logical drive number is invalid". | `ffconf.h:197-205` | **done** (commit `784d011`) — flip default to Mode 1 with `"B","C"`, remove now-redundant ESP32 override. Smoke `pico_files_smoke.py --drive B:` + `host/web/smoke_sd.mjs` added so this can't regress unnoticed |
+| `porttools/basic_serial.py::_has_prompt` false-positive on chunks ending in `>` — the BASIC prompt detector matched any captured tail ending with `>`, including the `>` literal inside `<DIR>` lines. Pico's slower serial flow never landed a chunk boundary mid-`<DIR>`, but ESP32 reliably did, producing truncated transcripts on TYPE/TIME sort tests in `pico_files_smoke.py`. Latent in `basic_serial` for the life of the test infra. | `porttools/basic_serial.py::_has_prompt` | **done** (commit `cb52584`) — require `\n>` (newline-anchored prompt) |
+| `cmd_files` 76 KB transient allocation forced a SaveContext / ClearVars / InitHeap dance on Pico — wiped caller's BASIC variables across a `FILES` invocation from inside a program, and was load-bearing for Pico's tight heap budget. | `FileIO.c::cmd_files` + `ports/pico_sdk_common/cmd_files_hooks.c` | **done** (commit `73fcd66`) — replaced with multi-pass selection sort (O(1) memory, EEVBlog forum's canonical answer); dance retired |
 
 ---
 
@@ -372,26 +375,34 @@ Y2038-style overflow at year 2099, now 10/10).
 
 ## Finding 9 — `cmd_files_*` lifecycle hooks
 
-Status: **pending** · Risk: **MEDIUM**
+Status: **partially done — save/restore retired across ports;
+pump_console_key + cmd_load_post_cleanup remain** · Risk: **LOW (residual)**
 
-`cmd_files_save_program_context`, `cmd_files_restore_program_context`,
-`cmd_files_pump_console_key`, `cmd_load_post_cleanup`.
+The cmd_files multi-pass selection-sort refactor (commit `73fcd66`)
+eliminated the 76 KB transient allocation that justified Pico's
+SaveContext/ClearVars/InitHeap dance, so
+`cmd_files_save_program_context` and `cmd_files_restore_program_context`
+are now empty bodies on every port (Pico's real bodies retired in the
+same commit). The audit's original framing — "Pico has real bodies,
+the rest are no-ops" — no longer holds; every port is uniformly
+no-op for those two hooks.
 
-| File | Lines |
-|---|---|
-| `ports/pico_sdk_common/cmd_files_hooks.c` | 38-65 (real bodies) |
-| `ports/host_native/host_runtime.c` | 730-763 |
-| `ports/esp32_s3_metro/main/esp32_peripheral_stubs.c` | 141-207 |
-| `ports/pc386/pc386_runtime.c` | 336-349 |
+**Remaining duplication:**
 
-**Drift:** partial-overlap, stale copy-paste comments
-(`esp32_peripheral_stubs.c:159-164` contains a comment saying "**Host** can't
-SaveContext + InitHeap mid-FRUN" — copy-pasted from host_runtime.c without
-updating).
+`cmd_files_pump_console_key` — per-port input-pump bodies (Pico no-op,
+host polls MMInkey + 10ms sleep, ESP32 drains web_console + serial,
+pc386 no-op via PS/2 IRQ ring). Each port's input source genuinely
+differs; no consolidation gain.
 
-**Why shareable:** `mmbasic_runtime_post_load_longjmp` is already the
-shared helper. `pump_console_key` differs by which input source to poll —
-exactly the `console_adapter` pattern.
+`cmd_load_post_cleanup` — host_native + pc386 are byte-identical (call
+`mmbasic_runtime_post_load_longjmp(inpbuf, STRINGSIZE, mark)`); ESP32
+has the same body plus an autorun early-return; Pico is empty.
+Consolidating the longjmp default into a shared TU (ESP32 keeps its
+autorun override) would save ~20 lines. Tracking but not priority.
+
+`esp32_peripheral_stubs.c:159-164` had a stale copy-paste comment
+("**Host** can't SaveContext + InitHeap mid-FRUN") that became moot
+when the body itself was emptied alongside Pico's in commit `73fcd66`.
 
 ---
 
@@ -502,9 +513,12 @@ adjacent state in ways that look like flaky tests hours later.
 
 ## Recommended sequence
 
-Done so far: Findings 1, 2, 3, 4, 7, 8, 10, telnet IAC parser; live
-bugs (pc386 escape decoder, pc386 `timegm` const, Pico DEL→BKSP,
-ESP32 `timegm` Y2038-style overflow at year 2099).
+Done so far: Findings 1, 2, 3, 4, 7, 8, 10, partial 9, telnet IAC
+parser; cmd_files multi-pass refactor (commit `73fcd66`); live bugs
+(pc386 escape decoder, pc386 `timegm` const, Pico DEL→BKSP, ESP32
+`timegm` Y2038-style overflow at year 2099, Pico B: drive
+`FF_STR_VOLUME_ID` default, `_has_prompt` `>`-false-positive in
+basic_serial).
 
 **Finding 5 is intentionally not next.** Its scope (~1900 LOC of
 peripheral stubs) is owned by the modular stub-driver carve-out in
@@ -516,5 +530,8 @@ first).
 
 Next dedup-style work, in order of payoff:
 
-1. **Finding 9** — `cmd_files_*` lifecycle hooks (~80 lines, partial
-   overlap, includes a stale copy-paste comment to clean up).
+1. **Finding 9 residual** — share `cmd_load_post_cleanup`'s longjmp
+   body in a runtime TU (host/pc386 are byte-identical; ESP32 keeps
+   its autorun early-return as an override). Drop the stale "Host
+   can't SaveContext" comment in `esp32_peripheral_stubs.c:159-164`
+   (the body it referenced is gone). ~20 LOC win.
