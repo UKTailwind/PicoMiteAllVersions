@@ -124,7 +124,7 @@ static inline CommandToken commandtbl_decode(const unsigned char *p){
     return ((CommandToken)(p[0] & 0x7f)) | ((CommandToken)(p[1] & 0x7f)<<7);
 }
 
-void HAL_PORT_MMBASIC_HOT_FUNC(cmd_null)(void) {
+void MMB_HOT_FUNC(cmd_null)(void) {
 	// do nothing (this is just a placeholder for commands that have no action)
 }
 /** @endcond */
@@ -133,7 +133,7 @@ void HAL_PORT_MMBASIC_HOT_FUNC(cmd_null)(void) {
  * @param a the integer, float or string to be changed
  * @param b OPTIONAL for integers and floats - defaults to 1. Otherwise the amount to increment the number or the string to concatenate
  */
-void MIPS16 HAL_PORT_MMBASIC_SUBFUN_FUNC(cmd_inc)(void){
+void MIPS16 MMB_DISPATCH_FUNC(cmd_inc)(void){
 	unsigned char *p, *q;
     int vtype;
 	getargs(&cmdline,3,(unsigned char *)",");
@@ -501,7 +501,7 @@ void array_slice(unsigned char *tp){
 // because the LET is implied (ie, line does not have a recognisable command)
 // it ends up as the place where mistyped commands are discovered.  This is why
 // the error message is "Unknown command"
-void  MIPS16 HAL_PORT_MMBASIC_HOT_FUNC(cmd_let)(void) {
+void  MIPS16 MMB_HOT_FUNC(cmd_let)(void) {
 	int t, size;
 	MMFLOAT f;
     long long int  i64;
@@ -1237,7 +1237,7 @@ void cmd_goto(void) {
 
 
 
-void MIPS16 HAL_PORT_MMBASIC_SUBFUN_FUNC(cmd_if)(void) {
+void MIPS16 MMB_DISPATCH_FUNC(cmd_if)(void) {
  	int r, i, testgoto, testelseif;
 	unsigned char ss[3];														// this will be used to split up the argument line
 	unsigned char *p, *tp;
@@ -1393,7 +1393,7 @@ retest_an_if:
 
 
 
-void MIPS16 HAL_PORT_MMBASIC_SUBFUN_FUNC(cmd_else)(void) {
+void MIPS16 MMB_DISPATCH_FUNC(cmd_else)(void) {
 	int i;
 	unsigned char *p, *tp;
 
@@ -1999,7 +1999,7 @@ void MIPS16 cmd_trace(void) {
 
 
 // FOR command
-void MIPS16 HAL_PORT_MMBASIC_SUBFUN_FUNC(cmd_for)(void) {
+void MIPS16 MMB_DISPATCH_FUNC(cmd_for)(void) {
 	int i, t, vlen, test;
 	unsigned char ss[4];														// this will be used to split up the argument line
 	unsigned char *p, *tp, *xp;
@@ -2117,7 +2117,7 @@ void MIPS16 HAL_PORT_MMBASIC_SUBFUN_FUNC(cmd_for)(void) {
 
 
 
-void MIPS16 HAL_PORT_MMBASIC_SUBFUN_FUNC(cmd_next)(void) {
+void MIPS16 MMB_DISPATCH_FUNC(cmd_next)(void) {
 	int i, vindex, test;
 	void *vtbl[MAXFORLOOPS];
 	int vcnt;
@@ -2197,7 +2197,7 @@ void MIPS16 HAL_PORT_MMBASIC_SUBFUN_FUNC(cmd_next)(void) {
 
 
 
-void MIPS16 HAL_PORT_MMBASIC_SUBFUN_FUNC(cmd_do)(void) {
+void MIPS16 MMB_DISPATCH_FUNC(cmd_do)(void) {
 	int i;
 	unsigned char *p, *tp, *evalp;
     if(cmdtoken==cmdWHILE)error("Unknown command");
@@ -2269,7 +2269,7 @@ void MIPS16 HAL_PORT_MMBASIC_SUBFUN_FUNC(cmd_do)(void) {
 
 
 
-void MIPS16 HAL_PORT_MMBASIC_HOT_FUNC(cmd_loop)(void) {
+void MIPS16 MMB_HOT_FUNC(cmd_loop)(void) {
     unsigned char *p;
 	int tst = 0;                                                    // initialise tst to stop the compiler from complaining
 	int i;
@@ -2518,7 +2518,7 @@ void cmd_flag(void){
 	else g_flag &=~bit;
 }
 
-void MIPS16 HAL_PORT_MMBASIC_HOT_FUNC(cmd_return)(void) {
+void MIPS16 MMB_HOT_FUNC(cmd_return)(void) {
  	checkend(cmdline);
 	if(gosubindex == 0 || gosubstack[gosubindex - 1] == NULL) error("Nothing to return to");
     ClearVars(g_LocalIndex--, true);                                        // delete any local variables

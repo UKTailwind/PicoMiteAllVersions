@@ -15,11 +15,11 @@
 #include "Memory.h"
 #include "shared/net/mm_net_interrupts.h"
 
-#ifndef HAL_PORT_MMBASIC_HOT_FUNC
-#define HAL_PORT_MMBASIC_HOT_FUNC(name) name
+#ifndef MMB_HOT_FUNC
+#define MMB_HOT_FUNC(name) name
 #endif
 
-void HAL_PORT_MMBASIC_HOT_FUNC(mmbasic_runtime_interrupt_save_error_state)(
+void MMB_HOT_FUNC(mmbasic_runtime_interrupt_save_error_state)(
     int *saved_option_error_skip,
     char *saved_error_message,
     size_t saved_error_message_size,
@@ -43,7 +43,7 @@ void HAL_PORT_MMBASIC_HOT_FUNC(mmbasic_runtime_interrupt_save_error_state)(
     if (errno_value) *errno_value = 0;
 }
 
-void HAL_PORT_MMBASIC_HOT_FUNC(mmbasic_runtime_interrupt_restore_error_state)(
+void MMB_HOT_FUNC(mmbasic_runtime_interrupt_restore_error_state)(
     int saved_option_error_skip,
     const char *saved_error_message,
     int saved_errno,
@@ -60,7 +60,7 @@ void HAL_PORT_MMBASIC_HOT_FUNC(mmbasic_runtime_interrupt_restore_error_state)(
     if (errno_value) *errno_value = saved_errno;
 }
 
-void HAL_PORT_MMBASIC_HOT_FUNC(mmbasic_runtime_interrupt_leave_state)(
+void MMB_HOT_FUNC(mmbasic_runtime_interrupt_leave_state)(
     unsigned char **nextstmt_slot,
     unsigned char **interrupt_return_slot,
     int *local_index,
@@ -90,7 +90,7 @@ void HAL_PORT_MMBASIC_HOT_FUNC(mmbasic_runtime_interrupt_leave_state)(
  * ESP32 had; the dispatch adapter exposes the slot so any port can
  * plumb a non-blocking pending check alongside the UDPreceive flag.
  */
-int HAL_PORT_MMBASIC_HOT_FUNC(mmbasic_runtime_check_interrupt)(
+int MMB_HOT_FUNC(mmbasic_runtime_check_interrupt)(
     const mmbasic_runtime_interrupt_dispatch_adapter *adapter)
 {
     if (!adapter) return 0;
@@ -139,7 +139,7 @@ int HAL_PORT_MMBASIC_HOT_FUNC(mmbasic_runtime_check_interrupt)(
     return 1;
 }
 
-void HAL_PORT_MMBASIC_HOT_FUNC(mmbasic_runtime_cmd_ireturn)(
+void MMB_HOT_FUNC(mmbasic_runtime_cmd_ireturn)(
     const mmbasic_runtime_interrupt_dispatch_adapter *adapter)
 {
     if (InterruptReturn == NULL) error("Not in interrupt");
@@ -159,7 +159,7 @@ void HAL_PORT_MMBASIC_HOT_FUNC(mmbasic_runtime_cmd_ireturn)(
         &OptionErrorSkip, MMErrMsg, &MMerrno);
 }
 
-unsigned char *HAL_PORT_MMBASIC_HOT_FUNC(
+unsigned char *MMB_HOT_FUNC(
     mmbasic_runtime_interrupt_prepare_sub_return)(
     unsigned int ireturn_token,
     unsigned int token_base,

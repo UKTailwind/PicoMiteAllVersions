@@ -25,7 +25,7 @@
 
 /* MMInkey placement: rp2040 VGA has tight RAM (the QVGA scanout +
  * shadow framebuffer eat most of it), so MMInkey stays in flash. */
-#define HAL_PORT_MMINKEY_DECL(name)      name
+#define MMINKEY_DECL(name)      name
 
 #define HAL_PORT_ADC_CHANNEL_MAX         4
 /* VGA boards don't ship SSD1963 support. */
@@ -82,16 +82,16 @@
 #define HAL_PORT_AUDIO_MOD_BUFFER_SIZE   6144
 #define HAL_PORT_HAS_MP3                 0
 
-#define HAL_PORT_RAM_FUNC(name)          name
+#define PORT_RAM_FUNC(name)          name
 
 /* Placement for MMBasic's per-expression hot functions (getvalue,
  * findvar — per-token hot path). rp2040 VGA tolerates them in RAM. */
-#define HAL_PORT_MMBASIC_HOT_FUNC(name)    __not_in_flash_func(name)
+#define MMB_HOT_FUNC(name)    __not_in_flash_func(name)
 
 /* DefinedSubFun dispatch is large (~800 lines) and called only once
  * per SUB/FUNCTION invocation — flash on rp2040 VGA so the QVGA
  * framebuffer + mode tables have more SRAM. */
-#define HAL_PORT_MMBASIC_SUBFUN_FUNC(name) name
+#define MMB_DISPATCH_FUNC(name) name
 
 /* QVGA scanout framebuffer trailer (640*480/8 = 38400 bytes) and
  * the 4096-byte alignment needed for the USB MSC view of the heap. */
@@ -123,6 +123,6 @@
  * watchdog reset so the next-boot bc_crash_dump_if_any can read
  * register values stored before the fault. Host has no such
  * section — plain BSS. */
-#define HAL_PORT_BC_CRASH_INFO_ATTR __attribute__((section(".uninitialized_data.bc_crash_info")))
+#define BC_CRASH_INFO_ATTR __attribute__((section(".uninitialized_data.bc_crash_info")))
 
 #endif /* PORT_CONFIG_H */

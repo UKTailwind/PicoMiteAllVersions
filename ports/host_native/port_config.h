@@ -74,12 +74,12 @@
 #define HAL_PORT_AUDIO_MOD_BUFFER_SIZE   6144
 #define HAL_PORT_HAS_MP3                 0
 
-#define HAL_PORT_RAM_FUNC(name)          name
+#define PORT_RAM_FUNC(name)          name
 
 /* Placement for MMBasic's hot interpreter functions. Host has no
  * flash/RAM distinction — everything is normal RAM. */
-#define HAL_PORT_MMBASIC_HOT_FUNC(name)    name
-#define HAL_PORT_MMBASIC_SUBFUN_FUNC(name) name
+#define MMB_HOT_FUNC(name)    name
+#define MMB_DISPATCH_FUNC(name) name
 
 #define HAL_PORT_FRAMEBUFFER_TRAILER_BYTES 0
 #define HAL_PORT_ALLMEMORY_ALIGN           256
@@ -119,7 +119,7 @@
 
 /* BCCrashInfo storage placement — host has no persistent section,
  * so use plain BSS. */
-#define HAL_PORT_BC_CRASH_INFO_ATTR
+#define BC_CRASH_INFO_ATTR
 
 /* Stage-D per-port memory + clock + MMBasic-table values. Native host
  * default (128 KB) matches the rp2040 device profile. The WASM and

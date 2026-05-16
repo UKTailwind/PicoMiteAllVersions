@@ -52,9 +52,9 @@
 #define HAL_PORT_AUDIO_MOD_BUFFER_SIZE   6144
 #define HAL_PORT_HAS_MP3                 0
 
-#define HAL_PORT_RAM_FUNC(name)          name
-#define HAL_PORT_MMBASIC_HOT_FUNC(name)    name
-#define HAL_PORT_MMBASIC_SUBFUN_FUNC(name) name
+#define PORT_RAM_FUNC(name)          name
+#define MMB_HOT_FUNC(name)    name
+#define MMB_DISPATCH_FUNC(name) name
 
 #define HAL_PORT_FRAMEBUFFER_TRAILER_BYTES 0
 #define HAL_PORT_ALLMEMORY_ALIGN           256
@@ -120,7 +120,7 @@
 #define HAL_PORT_PIO2_CLAIMED            false
 
 /* BCCrashInfo storage placement. ESP32 currently uses regular BSS. */
-#define HAL_PORT_BC_CRASH_INFO_ATTR
+#define BC_CRASH_INFO_ATTR
 
 /* Slab size reserved from ESP-IDF SPIRAM at boot for MMBasic PSRAM
  * ownership. The Metro N16R8 module is 8 MB total; ESP-IDF retains the

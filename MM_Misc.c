@@ -2499,7 +2499,7 @@ unsigned int GetCFunAddr(int *ip, int i,unsigned char *offset) {
 
 
 // utility function used by fun_peek() to validate an address
-unsigned int HAL_PORT_MMBASIC_HOT_FUNC(GetPeekAddr)(unsigned char *p) {
+unsigned int MMB_HOT_FUNC(GetPeekAddr)(unsigned char *p) {
     unsigned int i;
     i = getinteger(p);
 //    if(!PEEKRANGE(i)) error("Address");
@@ -2904,7 +2904,7 @@ GotAnInterrupt:
     nextstmt = (unsigned char *)intaddr;                                             // the next command will be in the interrupt routine
     return 1;
 }
-int HAL_PORT_MMBASIC_HOT_FUNC(check_interrupt)(void) {
+int MMB_HOT_FUNC(check_interrupt)(void) {
     hal_gui_controls_periodic();
     hal_keyboard_service();
 

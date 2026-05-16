@@ -23,7 +23,7 @@
 #define HAL_PORT_DEFAULT_CPU_SPEED_KHZ   252000
 
 /* MMInkey pinned to RAM — rp2350 has plenty of SRAM. */
-#define HAL_PORT_MMINKEY_DECL(name)      __not_in_flash_func(name)
+#define MMINKEY_DECL(name)      __not_in_flash_func(name)
 
 /* CYW43 owns the QSPI pins — no PSRAM heap. */
 /* Radio claims the onboard LED. */
@@ -86,9 +86,9 @@
 #define HAL_PORT_AUDIO_MOD_BUFFER_SIZE   8192
 #define HAL_PORT_HAS_MP3                 1
 
-#define HAL_PORT_RAM_FUNC(name)          name
-#define HAL_PORT_MMBASIC_HOT_FUNC(name)  __not_in_flash_func(name)
-#define HAL_PORT_MMBASIC_SUBFUN_FUNC(name) __not_in_flash_func(name)
+#define PORT_RAM_FUNC(name)          name
+#define MMB_HOT_FUNC(name)  __not_in_flash_func(name)
+#define MMB_DISPATCH_FUNC(name) __not_in_flash_func(name)
 
 /* QVGA scanout framebuffer trailer — smaller rp2040-style 1bpp QVGA
  * (640*480/8 = 38400 bytes) so the image fits on pico2_w's 264 KB
@@ -100,6 +100,6 @@
 #define HAL_PORT_LCD_SPI_CLK_PIN         Option.SYSTEM_CLK
 #define HAL_PORT_CONSOLE_FONT_MEDIUM     arial_bold
 #define HAL_PORT_RANDOMIZE_DEFAULT_SEED() ((int64_t)hal_time_us_64())
-#define HAL_PORT_BC_CRASH_INFO_ATTR __attribute__((section(".uninitialized_data.bc_crash_info")))
+#define BC_CRASH_INFO_ATTR __attribute__((section(".uninitialized_data.bc_crash_info")))
 
 #endif /* PORT_CONFIG_H */

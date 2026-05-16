@@ -888,10 +888,10 @@ void bc_dump_vm_state(BCVMState *vm) {
 
 /* Storage attribute comes from port_config.h: the device ports put the
  * struct in .uninitialized_data so it survives a soft / watchdog reset
- * for next-boot crash-report recovery; host's HAL_PORT_BC_CRASH_INFO_ATTR
+ * for next-boot crash-report recovery; host's BC_CRASH_INFO_ATTR
  * expands to empty (plain BSS). */
 #include "port_config.h"
-HAL_PORT_BC_CRASH_INFO_ATTR BCCrashInfo bc_crash_info;
+BC_CRASH_INFO_ATTR BCCrashInfo bc_crash_info;
 
 /*
  * Record a checkpoint — always writes to breadcrumb, always prints.

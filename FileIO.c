@@ -2085,7 +2085,7 @@ static off_t hal_size_of(int fnbr)
     return sz < 0 ? 0 : sz;
 }
 
-char HAL_PORT_MMBASIC_HOT_FUNC(FileGetChar)(int fnbr)
+char MMB_HOT_FUNC(FileGetChar)(int fnbr)
 {
     hal_fs_fd_t fd = hal_fds[fnbr];
     if (!fd) return 0;
@@ -2095,7 +2095,7 @@ char HAL_PORT_MMBASIC_HOT_FUNC(FileGetChar)(int fnbr)
     return (char)r;
 }
 
-char HAL_PORT_MMBASIC_HOT_FUNC(FilePutChar)(char c, int fnbr)
+char MMB_HOT_FUNC(FilePutChar)(char c, int fnbr)
 {
     hal_fs_fd_t fd = hal_fds[fnbr];
     if (!fd) return 0;

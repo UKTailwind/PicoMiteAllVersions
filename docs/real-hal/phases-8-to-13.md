@@ -68,8 +68,8 @@ configuration.h.
   - `core1stack[0]` canary check — added a 1-element core1stack stub
     to MMtcpserver.c (WEB has no core1 but needs the symbol).
   - `DefinedSubFun` / `getvalue` / `findvar` flash-vs-RAM placement
-    — introduced per-port `HAL_PORT_MMBASIC_HOT_FUNC(name)` and
-    `HAL_PORT_MMBASIC_SUBFUN_FUNC(name)` macros in every
+    — introduced per-port `MMB_HOT_FUNC(name)` and
+    `MMB_DISPATCH_FUNC(name)` macros in every
     `ports/*/port_config.h` + `host/port_config.h`. Each expands to
     `__not_in_flash_func(name)` or plain `name` per port, preserving
     the exact existing placement on every target.
@@ -84,7 +84,7 @@ configuration.h.
 
 12 ifdefs. Four categories:
   - Flash-vs-RAM placement on cmd_inc / cmd_if / cmd_else / cmd_loop
-    → HAL_PORT_MMBASIC_SUBFUN_FUNC or HAL_PORT_MMBASIC_HOT_FUNC
+    → MMB_DISPATCH_FUNC or MMB_HOT_FUNC
     (cmd_loop uses HOT, the other three use SUBFUN — they differ on
     rp2040 VGA placement).
   - cleanserver() + close_tcpclient() stubs added to MMweb_stubs.c +
@@ -197,7 +197,7 @@ target-macro ifdefs. Patterns:
     sinetab gates left over from an older fast-path split).
   - Placement macros on cmd_for / cmd_next / cmd_do / cmd_inc /
     cmd_if / cmd_else / cmd_loop / fun_ternary collapse to
-    HAL_PORT_MMBASIC_HOT_FUNC / HAL_PORT_MMBASIC_SUBFUN_FUNC from
+    MMB_HOT_FUNC / MMB_DISPATCH_FUNC from
     Phase 9.
   - `pico_rand` linked on every device target (it's in rp2_common),
     so `pico/rand.h` + `get_rand_32()` are unconditional.
@@ -249,7 +249,7 @@ Functions.c are now all in STRICT_FILES alongside Draw.c / MM_Misc.c
     overrides).
   - bc_debug.c: 5 → 0. `dbg_print` collapses to MMPrintString (host
     has its own routing). `BCCrashInfo` storage attribute via new
-    per-port macro `HAL_PORT_BC_CRASH_INFO_ATTR`
+    per-port macro `BC_CRASH_INFO_ATTR`
     (`.uninitialized_data` section on device, plain BSS on host).
     Stack-pointer + CFSR/HFSR/BFAR/MMFAR reads moved to
     `port_bc_crash_get_sp()` + `port_bc_crash_save_fault_regs()`

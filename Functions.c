@@ -1280,7 +1280,7 @@ void fun_tab(void) {
 
 // get a character from the console input queue
 // s$ = INKEY$
-void HAL_PORT_MMBASIC_HOT_FUNC(fun_inkey)(void){
+void MMB_HOT_FUNC(fun_inkey)(void){
     int i;
 
 	sret = GetTempMemory(STRINGSIZE);									// this buffer is automatically zeroed so the string is zero size
@@ -1369,7 +1369,7 @@ void fun_max(void) {
 void fun_min(void) {
     do_max_min(0);
 }
-void HAL_PORT_MMBASIC_SUBFUN_FUNC(fun_ternary)(void){
+void MMB_DISPATCH_FUNC(fun_ternary)(void){
     MMFLOAT f = 0;
     long long int i64 = 0;
     unsigned char *s = NULL;

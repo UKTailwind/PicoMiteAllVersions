@@ -42,9 +42,9 @@ Start from `ports/pico/port_config.h` (the simplest). Key knobs, grouped:
 - **Numeric caps:** `HAL_PORT_ADC_CHANNEL_MAX`, `HAL_PORT_FILES_MAX`, `HAL_PORT_AUDIO_FLAC_MAX_BASE_HZ`, `HAL_PORT_AUDIO_MOD_BUFFER_SIZE`.
 - **Memory + clock + MMBasic-table:** `HAL_PORT_HEAP_MEMORY_SIZE`, `HAL_PORT_MAX_CPU`, `HAL_PORT_MIN_CPU`, `HAL_PORT_MAX_VARS`, `HAL_PORT_MAX_SUBFUN`, `HAL_PORT_MAX_MODES` (VGA-family ports only), `HAL_PORT_FLASH_TARGET_OFFSET[_USB]`, `HAL_PORT_MAGIC_KEY[_USB]`, `HAL_PORT_HEAP_TOP[_USB]`, `HAL_PORT_CONSOLE_RX_BUF_SIZE` (non-WiFi ports), `HAL_PORT_PIOMAX`, `HAL_PORT_NBR_PINS`, `HAL_PORT_PSRAM_BASE` + `HAL_PORT_PSRAM_BLOCK_SIZE` (rp2350 non-WEB ports). The `_USB` siblings let configuration.h pick the USB-keyboard variant via a single USBKEYBOARD ifdef.
 - **Memory layout:** `HAL_PORT_FRAMEBUFFER_TRAILER_BYTES`, `HAL_PORT_ALLMEMORY_ALIGN`, `HAL_PORT_CORE1_STACK_WORDS` (size of the shared core1 stack — 512 for ports running the SPI-LCD merge pipeline, 128 for VGA/HDMI scanout, 1 for WEB ports that never launch core1).
-- **Flash-vs-RAM placement macros:** `HAL_PORT_RAM_FUNC`, `HAL_PORT_MMBASIC_HOT_FUNC`, `HAL_PORT_MMBASIC_SUBFUN_FUNC`. Expand to `__not_in_flash_func(name)` where RAM is available; plain `name` on RAM-constrained variants (rp2040 WEB, rp2040 VGA).
+- **Flash-vs-RAM placement macros:** `PORT_RAM_FUNC`, `MMB_HOT_FUNC`, `MMB_DISPATCH_FUNC`. Expand to `__not_in_flash_func(name)` where RAM is available; plain `name` on RAM-constrained variants (rp2040 WEB, rp2040 VGA).
 - **Per-board references:** `HAL_PORT_LCD_SPI_CLK_PIN` (which `Option.*` field carries the LCD SPI clock pin), `HAL_PORT_CONSOLE_FONT_MEDIUM` (symbol name for the medium console font).
-- **Port hooks:** `HAL_PORT_RANDOMIZE_DEFAULT_SEED()`, `HAL_PORT_BC_CRASH_INFO_ATTR`.
+- **Port hooks:** `HAL_PORT_RANDOMIZE_DEFAULT_SEED()`, `BC_CRASH_INFO_ATTR`.
 
 If a macro doesn't apply to your board, define it to `0` (or the null form). The point is that every port defines every macro — core code reads unconditionally.
 

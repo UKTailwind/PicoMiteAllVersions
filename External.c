@@ -260,7 +260,7 @@ void SoftReset(void){
 	watchdog_enable(1, 1);
 	while(1);
 }
-void HAL_PORT_RAM_FUNC(PinSetBit)(int pin, unsigned int offset) {
+void PORT_RAM_FUNC(PinSetBit)(int pin, unsigned int offset) {
     uint32_t gpio = PinDef[pin].GPno;
     switch (offset){
     case LATCLR:
@@ -330,7 +330,7 @@ int IsInvalidPin(int pin) {
     if (PinDef[pin].mode & UNUSED) return true;
     return false;
 }
-void HAL_PORT_RAM_FUNC(ExtSet)(int pin, int val) {
+void PORT_RAM_FUNC(ExtSet)(int pin, int val) {
 
     if(ExtCurrentConfig[pin] == EXT_NOT_CONFIG || ExtCurrentConfig[pin] == EXT_DIG_OUT/* || ExtCurrentConfig[pin] == EXT_OC_OUT*/) {
         PinSetBit(pin, val ? LATSET : LATCLR);
@@ -353,7 +353,7 @@ void HAL_PORT_RAM_FUNC(ExtSet)(int pin, int val) {
         error("Pin %/| is not an output",pin,pin);
 }
 /*  @endcond */
-void HAL_PORT_RAM_FUNC(cmd_sync)(void) {
+void PORT_RAM_FUNC(cmd_sync)(void) {
 	uint64_t i;
     static uint64_t synctime=0,endtime=0;
 	getargs(&cmdline,3,(unsigned char *)",");
@@ -953,7 +953,7 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
     uSec(2);
 }
 extern int adc_clk_div;
-int64_t HAL_PORT_RAM_FUNC(ExtInp)(int pin) {
+int64_t PORT_RAM_FUNC(ExtInp)(int pin) {
     if(ExtCurrentConfig[pin]==EXT_ANA_IN || ExtCurrentConfig[pin]==EXT_ADCRAW){
         if(adc_clk_div!=adc_hw->div){
             SetADCFreq(500000.0);
