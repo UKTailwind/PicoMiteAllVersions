@@ -46,8 +46,11 @@ run_section "host_native build" bash -c "cd '$ROOT/host' && ./build.sh" || true
 if [ -x "$ROOT/host/mmbasic_test" ]; then
     run_section "host_native tests (run_tests.sh)" \
         bash -c "cd '$ROOT/host' && SKIP_HAL_PURITY=1 ./run_tests.sh" || true
+    run_section "host_native NEW smoke (porttools)" \
+        python3 "$ROOT/porttools/host_new_smoke.py" --no-build || true
 else
     SECTIONS+=("SKIP: host_native tests (binary missing)")
+    SECTIONS+=("SKIP: host_native NEW smoke (binary missing)")
 fi
 
 # ---- 3. mmbasic_stdio build + tests ------------------------------------

@@ -307,22 +307,63 @@ static inline bool host_off_in_slot_region(uint32_t off, uint32_t count) {
            (off + count <= HOST_SLOT_REGION_BASE + HOST_SLOT_REGION_SIZE);
 }
 
+/* The program region has two aliased forms on host:
+ *   - off in [0, MAX_PROG_SIZE): runtime_program.c LOAD path + the
+ *     host_main.c boot zero-fill use this form.
+ *   - off in [PROGSTART, PROGSTART + MAX_PROG_SIZE): cmd_new and any
+ *     other site that goes through FlashWriteInit(PROGRAM_FLASH) use
+ *     the device XIP address. On device PROGSTART literally is the
+ *     program region; on host the RAM mirror lives at offset 0 in
+ *     flash_prog_buf, so we translate here. ESP32 has the same shape
+ *     (esp32_flash_storage.c::program_region_offset).
+ *
+ * Returns true and sets *prog_off to the flash_prog_buf-relative offset
+ * if `off + count` falls entirely within either form. */
+static inline bool host_off_in_program_region(uint32_t off, uint32_t count,
+                                              uint32_t *prog_off) {
+    if (off + count <= (uint32_t)MAX_PROG_SIZE) {
+        *prog_off = off;
+        return true;
+    }
+    if (off >= (uint32_t)PROGSTART &&
+        off + count <= (uint32_t)PROGSTART + (uint32_t)MAX_PROG_SIZE) {
+        *prog_off = off - (uint32_t)PROGSTART;
+        return true;
+    }
+    return false;
+}
+
 void flash_range_erase(uint32_t off, uint32_t count) {
     if (host_off_in_slot_region(off, count)) {
         memset(host_flash_target_buf + (off - HOST_SLOT_REGION_BASE), 0xFF, count);
         return;
     }
+    uint32_t prog_off;
+    if (host_off_in_program_region(off, count, &prog_off)) {
+        /* Device erase fills with 0xFF. The program region additionally
+         * gets a leading zero terminator written by cmd_new right after
+         * the erase, but host's ProgMemory scan accepts either 0 or 0xFF
+         * as end-of-program. */
+        memset(flash_prog_buf + prog_off, 0xFF, count);
+        return;
+    }
+    /* Legacy fallback: low-offset writes outside [0, MAX_PROG_SIZE) that
+     * still fit in the buffer. The CFunction mirror occupies
+     * flash_prog_buf[MAX_PROG_SIZE..2*MAX_PROG_SIZE]; callers that
+     * address it directly land here. */
     if (off >= HOST_FLASH_SIZE) return;
     if (off + count > HOST_FLASH_SIZE) count = HOST_FLASH_SIZE - off;
-    /* Device erase fills with 0xFF. The program region additionally gets
-     * a leading zero terminator written by cmd_new right after the erase,
-     * but host's ProgMemory scan accepts either 0 or 0xFF as end-of-program. */
     memset(flash_prog_buf + off, 0xFF, count);
 }
 
 void flash_range_program(uint32_t off, const uint8_t *data, uint32_t count) {
     if (host_off_in_slot_region(off, count)) {
         memcpy(host_flash_target_buf + (off - HOST_SLOT_REGION_BASE), data, count);
+        return;
+    }
+    uint32_t prog_off;
+    if (host_off_in_program_region(off, count, &prog_off)) {
+        memcpy(flash_prog_buf + prog_off, data, count);
         return;
     }
     if (off >= HOST_FLASH_SIZE) return;
