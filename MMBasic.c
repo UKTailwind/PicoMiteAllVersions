@@ -574,7 +574,7 @@ int CheckEmpty(char *p){
 // run a program
 // this will continuously execute a program until the end (marked by TWO zero chars)
 // the argument p must point to the first line to be executed
-void MIPS16 HAL_PORT_MMBASIC_HOT_FUNC(ExecuteProgram)(unsigned char *p) {
+void MIPS16 MMB_HOT_FUNC(ExecuteProgram)(unsigned char *p) {
     int i, SaveLocalIndex = 0;
     jmp_buf SaveErrNext;
     memcpy(SaveErrNext, ErrNext, sizeof(jmp_buf));                  // we call ExecuteProgram() recursively so we need to store/restore old jump buffer between calls
@@ -860,7 +860,7 @@ int   MIPS16 PrepareProgramExt(unsigned char *p, int i, unsigned char **CFunPtr,
 // table, so the hook returns false and we fall through to the linear
 // subfun[] scan.
 extern int port_try_find_subfun_hash(unsigned char *p, int *out_index);
-int HAL_PORT_MMBASIC_HOT_FUNC(FindSubFun)(unsigned char *p, int type) {
+int MMB_HOT_FUNC(FindSubFun)(unsigned char *p, int type) {
     int idx;
     if (port_try_find_subfun_hash(p, &idx)) return idx;
 
@@ -891,7 +891,7 @@ int HAL_PORT_MMBASIC_HOT_FUNC(FindSubFun)(unsigned char *p, int type) {
 //   cmd      = pointer to the command name used by the caller (in program memory)
 //   index    = index into subfun[i] which points to the definition of the sub or funct
 //   fa, i64a, sa and typ are pointers to where the return value is to be stored (used by functions only)
-void MIPS16 HAL_PORT_MMBASIC_SUBFUN_FUNC(DefinedSubFun)(int isfun, unsigned char *cmd, int index, MMFLOAT *fa, long long int  *i64a, unsigned char **sa, int *typ) {
+void MIPS16 MMB_DISPATCH_FUNC(DefinedSubFun)(int isfun, unsigned char *cmd, int index, MMFLOAT *fa, long long int  *i64a, unsigned char **sa, int *typ) {
 
     unsigned char *p, *s, *tp, *ttp, tcmdtoken;
     unsigned char *CallersLinePtr, *SubLinePtr = NULL;
@@ -1665,7 +1665,7 @@ void  MIPS16 tokenise(int console) {
 //         if *t = T_NOTYPE it will not throw an error and will return the type found in *t
 // it returns with a void pointer to a float, integer or string depending on the value returned in *t
 // this will check that the expression is terminated correctly and throw an error if not
-void HAL_PORT_MMBASIC_HOT_FUNC(*DoExpression)(unsigned char *p, int *t) {
+void MMB_HOT_FUNC(*DoExpression)(unsigned char *p, int *t) {
     static MMFLOAT f;
     static long long int  i64;
     static unsigned char *s;
@@ -1687,7 +1687,7 @@ void HAL_PORT_MMBASIC_HOT_FUNC(*DoExpression)(unsigned char *p, int *t) {
 //  if *t = T_STR or T_NBR or T_INT will throw an error if the result is not the correct type
 //  if *t = T_NOTYPE it will not throw an error and will return the type found in *t
 // this will check that the expression is terminated correctly and throw an error if not.  flags & E_NOERROR will suppress that check
-unsigned char MIPS16 HAL_PORT_MMBASIC_HOT_FUNC(*evaluate)(unsigned char *p, MMFLOAT *fa, long long int  *ia, unsigned char **sa, int *ta, int flags) {
+unsigned char MIPS16 MMB_HOT_FUNC(*evaluate)(unsigned char *p, MMFLOAT *fa, long long int  *ia, unsigned char **sa, int *ta, int flags) {
     int o;
     int t = *ta;
     unsigned char *s;
@@ -1713,7 +1713,7 @@ unsigned char MIPS16 HAL_PORT_MMBASIC_HOT_FUNC(*evaluate)(unsigned char *p, MMFL
 
 
 // evaluate an expression to get a number
-MMFLOAT HAL_PORT_MMBASIC_HOT_FUNC(getnumber)(unsigned char *p) {
+MMFLOAT MMB_HOT_FUNC(getnumber)(unsigned char *p) {
     int t = T_NBR;
     MMFLOAT f;
     long long int  i64;
@@ -1725,7 +1725,7 @@ MMFLOAT HAL_PORT_MMBASIC_HOT_FUNC(getnumber)(unsigned char *p) {
 
 
 // evaluate an expression and return a 64 bit integer
-long long int  HAL_PORT_MMBASIC_HOT_FUNC(getinteger)(unsigned char *p) {
+long long int  MMB_HOT_FUNC(getinteger)(unsigned char *p) {
     int t = T_INT;
     MMFLOAT f;
     long long int  i64;
@@ -1741,7 +1741,7 @@ long long int  HAL_PORT_MMBASIC_HOT_FUNC(getinteger)(unsigned char *p) {
 // evaluate an expression and return an integer
 // this will throw an error is the integer is outside a specified range
 // this will correctly round the number if it is a fraction of an integer
-long long int HAL_PORT_MMBASIC_HOT_FUNC(getint)(unsigned char *p, long long int min, long long int max) {
+long long int MMB_HOT_FUNC(getint)(unsigned char *p, long long int min, long long int max) {
     long long int  i;
     int t = T_INT;
     MMFLOAT f;
@@ -1757,7 +1757,7 @@ long long int HAL_PORT_MMBASIC_HOT_FUNC(getint)(unsigned char *p, long long int 
 
 
 // evaluate an expression to get a string
-unsigned char HAL_PORT_MMBASIC_HOT_FUNC(*getstring)(unsigned char *p) {
+unsigned char MMB_HOT_FUNC(*getstring)(unsigned char *p) {
     int t = T_STR;
     MMFLOAT f;
     long long int  i64;
@@ -1771,7 +1771,7 @@ unsigned char HAL_PORT_MMBASIC_HOT_FUNC(*getstring)(unsigned char *p) {
 
 // evaluate an expression to get a string using the C style for a string
 // as against the MMBasic style returned by getstring()
-unsigned char HAL_PORT_MMBASIC_HOT_FUNC(*getCstring)(unsigned char *p) {
+unsigned char MMB_HOT_FUNC(*getCstring)(unsigned char *p) {
     unsigned char *tp;
     tp = GetTempMemory(STRINGSIZE);                                        // this will last for the life of the command
     Mstrcpy(tp, getstring(p));                                      // get the string and save in a temp place
@@ -1795,7 +1795,7 @@ unsigned char *getFstring(unsigned char *p) {
 
 
 // recursively evaluate an expression observing the rules of operator precedence
-unsigned char MIPS16 HAL_PORT_MMBASIC_HOT_FUNC(*doexpr)(unsigned char *p, MMFLOAT *fa, long long int  *ia, unsigned char **sa, int *oo, int *ta) {
+unsigned char MIPS16 MMB_HOT_FUNC(*doexpr)(unsigned char *p, MMFLOAT *fa, long long int  *ia, unsigned char **sa, int *oo, int *ta) {
     MMFLOAT fa1, fa2;
     long long int  ia1, ia2;
     int o1, o2;
@@ -1851,7 +1851,7 @@ unsigned char MIPS16 HAL_PORT_MMBASIC_HOT_FUNC(*doexpr)(unsigned char *p, MMFLOA
 
 // get a value, either from a constant, function or variable
 // also returns the next operator to the right of the value or E_END if no operator
-unsigned char MIPS16 HAL_PORT_MMBASIC_HOT_FUNC(*getvalue)(unsigned char *p, MMFLOAT *fa, long long int  *ia, unsigned char **sa, int *oo, int *ta) {
+unsigned char MIPS16 MMB_HOT_FUNC(*getvalue)(unsigned char *p, MMFLOAT *fa, long long int  *ia, unsigned char **sa, int *oo, int *ta) {
     MMFLOAT f = 0;
     long long int  i64 = 0;
     unsigned char *s = NULL;
@@ -2382,7 +2382,7 @@ routines for storing and manipulating variables
 // storage of the variable's data:
 //      if it is type T_NBR or T_INT the value is held in the variable slot
 //      for T_STR a block of memory of MAXSTRLEN size (or size determined by the LENGTH keyword) will be malloc'ed and the pointer stored in the variable slot.
-void MIPS16 HAL_PORT_MMBASIC_HOT_FUNC(*findvar)(unsigned char *p, int action) {
+void MIPS16 MMB_HOT_FUNC(*findvar)(unsigned char *p, int action) {
     unsigned char name[MAXVARLEN + 1];
     int i=0, j, size, ifree, globalifree, localifree, nbr, vtype, vindex, namelen, tmp;
     unsigned char *s, *x, u, suffix=0;
@@ -2947,7 +2947,7 @@ void MIPS16 HAL_PORT_MMBASIC_HOT_FUNC(*findvar)(unsigned char *p, int action) {
 //   pointer to an integer that will contain (after the function has returned) the number of arguments found
 //   pointer to a string that contains the characters to be used in spliting up the line.  If the first unsigned char of that
 //       string is an opening bracket '(' this function will expect the arg list to be enclosed in brackets.
-void MIPS16 HAL_PORT_MMBASIC_HOT_FUNC(makeargs)(unsigned char **p, int maxargs, unsigned char *argbuf, unsigned char *argv[], int *argc, unsigned char *delim) {
+void MIPS16 MMB_HOT_FUNC(makeargs)(unsigned char **p, int maxargs, unsigned char *argbuf, unsigned char *argv[], int *argc, unsigned char *delim) {
     unsigned char *op;
     int inarg, expect_cmd, expect_bracket, then_tkn, else_tkn;
     unsigned char *tp;
@@ -3467,7 +3467,7 @@ Various routines to clear memory or the interpreter's state
 // clear (or delete) variables
 // if level is not zero it will only delete local variables at that level or greater
 // if level is zero to will delete all variables and reset global settings
-void MIPS16 HAL_PORT_MMBASIC_HOT_FUNC(ClearVars)(int level, bool all) {
+void MIPS16 MMB_HOT_FUNC(ClearVars)(int level, bool all) {
    int i, newhashpointer,hashcurrent,hashnext;
 
     // first step through the variable table and delete local variables at that level or greater
@@ -3623,14 +3623,14 @@ void MIPS16 ClearProgram(bool psram) {
 
 
 // round a float to an integer
-int HAL_PORT_MMBASIC_SUBFUN_FUNC(FloatToInt32)(MMFLOAT x) {
+int MMB_DISPATCH_FUNC(FloatToInt32)(MMFLOAT x) {
     if(x < LONG_MIN - 0.5 || x > LONG_MAX + 0.5)
         error("Number too large");
     return (x >= 0 ? (int)(x + 0.5) : (int)(x - 0.5)) ;
 }
 
 
-long long int HAL_PORT_MMBASIC_SUBFUN_FUNC(FloatToInt64)(MMFLOAT x) {
+long long int MMB_DISPATCH_FUNC(FloatToInt64)(MMFLOAT x) {
     if(x < (-(0x7fffffffffffffffLL) -1) - 0.5 || x > 0x7fffffffffffffffLL + 0.5)
         error("Number too large");
     if ((x < -0xfffffffffffff) || (x > 0xfffffffffffff))
@@ -3642,7 +3642,7 @@ long long int HAL_PORT_MMBASIC_SUBFUN_FUNC(FloatToInt64)(MMFLOAT x) {
 
 
 // make a string uppercase
-void HAL_PORT_MMBASIC_HOT_FUNC(makeupper)(unsigned char *p) {
+void MMB_HOT_FUNC(makeupper)(unsigned char *p) {
     while(*p) {
         *p = mytoupper(*p);
         p++;
@@ -3675,7 +3675,7 @@ int GetTokenValue (unsigned char *n) {
 
 
 // skip to the end of a variable
-unsigned char MIPS16 HAL_PORT_MMBASIC_HOT_FUNC(*skipvar)(unsigned char *p, int noerror) {
+unsigned char MIPS16 MMB_HOT_FUNC(*skipvar)(unsigned char *p, int noerror) {
     unsigned char *pp, *tp;
     int i;
     int inquote = false;
@@ -3759,7 +3759,7 @@ unsigned char MIPS16 HAL_PORT_MMBASIC_HOT_FUNC(*skipvar)(unsigned char *p, int n
 
 
 // skip to the end of an expression (terminates on null, comma, comment or unpaired ')'
-unsigned char HAL_PORT_MMBASIC_HOT_FUNC(*skipexpression)(unsigned char *p) {
+unsigned char MMB_HOT_FUNC(*skipexpression)(unsigned char *p) {
     int i, inquote;
 
     for(i = inquote = 0; *p; p++) {
@@ -3780,7 +3780,7 @@ unsigned char HAL_PORT_MMBASIC_HOT_FUNC(*skipexpression)(unsigned char *p) {
 // CLine is a pointer to a char pointer which in turn points to the start of the current line for error reporting (if NULL it will be ignored)
 // EOFMsg is the error message to use if the end of the program is reached
 // returns a pointer to the next command
-unsigned char HAL_PORT_MMBASIC_HOT_FUNC(*GetNextCommand)(unsigned char *p, unsigned char **CLine, unsigned char *EOFMsg) {
+unsigned char MMB_HOT_FUNC(*GetNextCommand)(unsigned char *p, unsigned char **CLine, unsigned char *EOFMsg) {
     do {
         if(*p != T_NEWLINE) {                                       // if we are not already at the start of a line
             while(*p) p++;                                          // look for the zero marking the start of an element
@@ -3809,7 +3809,7 @@ unsigned char HAL_PORT_MMBASIC_HOT_FUNC(*GetNextCommand)(unsigned char *p, unsig
 // scans text looking for the matching closing bracket
 // it will handle nested strings, brackets and functions
 // it expects to be called pointing at the opening bracket or a function token
-unsigned char HAL_PORT_MMBASIC_HOT_FUNC(*getclosebracket)(unsigned char *p) {
+unsigned char MMB_HOT_FUNC(*getclosebracket)(unsigned char *p) {
     int i = 0;
     int inquote = false;
 
@@ -3828,7 +3828,7 @@ unsigned char HAL_PORT_MMBASIC_HOT_FUNC(*getclosebracket)(unsigned char *p) {
 
 // check that there is no excess text following an element
 // will skip spaces and abort if a zero char is not found
-void HAL_PORT_MMBASIC_HOT_FUNC(checkend)(unsigned char *p) {
+void MMB_HOT_FUNC(checkend)(unsigned char *p) {
     skipspace(p);
     if(*p == '\'') return;
     if(*p)
@@ -3839,7 +3839,7 @@ void HAL_PORT_MMBASIC_HOT_FUNC(checkend)(unsigned char *p) {
 // check if the next text in an element (a basic statement) corresponds to an alpha string
 // leading whitespace is skipped and the string must be terminated with a valid terminating
 // character. Returns a pointer to the end of the string if found or NULL is not
-unsigned char HAL_PORT_MMBASIC_HOT_FUNC(*checkstring)(unsigned char *p, unsigned char *tkn) {
+unsigned char MMB_HOT_FUNC(*checkstring)(unsigned char *p, unsigned char *tkn) {
     skipspace(p);                                           // skip leading spaces
     while(*tkn && (mytoupper(*tkn) == mytoupper(*p))) { tkn++; p++; }   // compare the strings
 //    if(*tkn == 0 && (*p == (unsigned char)' ' || *p == (unsigned char)',' || *p == (unsigned char)'\'' || *p == 0 || *p == (unsigned char)'('  || *p == (unsigned char)'=')) {
@@ -3867,7 +3867,7 @@ A couple of I/O routines that do not belong anywhere else
 
 // convert a MMBasic string to a C style string
 // if the MMstr contains a null byte that byte is skipped and not copied
-unsigned char HAL_PORT_MMBASIC_HOT_FUNC(*MtoC)(unsigned char *p) {
+unsigned char MMB_HOT_FUNC(*MtoC)(unsigned char *p) {
     int i;
     unsigned char *p1, *p2;
     i = *p;
@@ -3883,7 +3883,7 @@ unsigned char HAL_PORT_MMBASIC_HOT_FUNC(*MtoC)(unsigned char *p) {
 
 
 // convert a c style string to a MMBasic string
-unsigned char HAL_PORT_MMBASIC_HOT_FUNC(*CtoM)(unsigned char *p) {
+unsigned char MMB_HOT_FUNC(*CtoM)(unsigned char *p) {
     int len, i;
     unsigned char *p1, *p2;
     len = i = strlen((char *)p);
@@ -3896,7 +3896,7 @@ unsigned char HAL_PORT_MMBASIC_HOT_FUNC(*CtoM)(unsigned char *p) {
 
 
 // copy a MMBasic string to a new location
-void HAL_PORT_MMBASIC_SUBFUN_FUNC(Mstrcpy)(unsigned char *dest, unsigned char *src) {
+void MMB_DISPATCH_FUNC(Mstrcpy)(unsigned char *dest, unsigned char *src) {
    int i;
     i = *src + 1;
     while(i--) *dest++ = *src++;
@@ -4049,7 +4049,7 @@ int mystrncasecmp(
 #if defined(__PIC32MX__)
 inline
 #endif
-int HAL_PORT_MMBASIC_HOT_FUNC(str_equal)(const unsigned char *s1, const unsigned char *s2) {
+int MMB_HOT_FUNC(str_equal)(const unsigned char *s1, const unsigned char *s2) {
     if(charmap[*(unsigned char *)s1] != charmap[*(unsigned char *)s2]) return 0;
     for ( ; ; ) {
         if(*s2 == '\0') return 1;
@@ -4062,7 +4062,7 @@ int HAL_PORT_MMBASIC_HOT_FUNC(str_equal)(const unsigned char *s1, const unsigned
 
 // Compare two areas of memory, ignoring case differences.
 // Returns true if they are equal (ignoring case) otherwise returns false.
-int HAL_PORT_MMBASIC_HOT_FUNC(mem_equal)(unsigned char *s1, unsigned char *s2, int i) {
+int MMB_HOT_FUNC(mem_equal)(unsigned char *s1, unsigned char *s2, int i) {
     if(charmap[*(unsigned char *)s1] != charmap[*(unsigned char *)s2]) return 0;
     while (--i) {
         if(charmap[*(unsigned char *)++s1] != charmap[*(unsigned char *)++s2])

@@ -71,7 +71,7 @@ int kbhitConsole(void) {
 // check if there is a keystroke waiting in the buffer and, if so, return with the char
 // returns -1 if no char waiting
 // the main work is to check for vt100 escape code sequences and map to Maximite codes
-int HAL_PORT_MMINKEY_DECL(MMInkey)(void) {
+int MMINKEY_DECL(MMInkey)(void) {
     int c;
     /* Drain any chars left over from an earlier unrecognised escape
      * sequence before consulting the input source. */

@@ -10,17 +10,17 @@
 
 #include "MMBasic_Includes.h"
 
-#ifndef HAL_PORT_MMBASIC_HOT_FUNC
-#define HAL_PORT_MMBASIC_HOT_FUNC(name) name
+#ifndef MMB_HOT_FUNC
+#define MMB_HOT_FUNC(name) name
 #endif
 
-void HAL_PORT_MMBASIC_HOT_FUNC(mmbasic_runtime_poll_service)(
+void MMB_HOT_FUNC(mmbasic_runtime_poll_service)(
     mmbasic_runtime_service_fn service)
 {
     if (service) service();
 }
 
-void HAL_PORT_MMBASIC_HOT_FUNC(mmbasic_runtime_poll_service_once)(
+void MMB_HOT_FUNC(mmbasic_runtime_poll_service_once)(
     int *active,
     mmbasic_runtime_service_fn service)
 {
@@ -31,25 +31,25 @@ void HAL_PORT_MMBASIC_HOT_FUNC(mmbasic_runtime_poll_service_once)(
     if (active) *active = 0;
 }
 
-void HAL_PORT_MMBASIC_HOT_FUNC(mmbasic_runtime_checkabort_poll)(
+void MMB_HOT_FUNC(mmbasic_runtime_checkabort_poll)(
     mmbasic_runtime_service_fn service)
 {
     mmbasic_runtime_poll_service(service);
 }
 
-void HAL_PORT_MMBASIC_HOT_FUNC(mmbasic_runtime_routinechecks_poll)(
+void MMB_HOT_FUNC(mmbasic_runtime_routinechecks_poll)(
     mmbasic_runtime_service_fn service)
 {
     mmbasic_runtime_poll_service(service);
 }
 
-bool HAL_PORT_MMBASIC_HOT_FUNC(mmbasic_runtime_abort_requested)(
+bool MMB_HOT_FUNC(mmbasic_runtime_abort_requested)(
     volatile int *abort_flag)
 {
     return abort_flag && *abort_flag;
 }
 
-static void HAL_PORT_MMBASIC_HOT_FUNC(runtime_abort_common)(
+static void MMB_HOT_FUNC(runtime_abort_common)(
     const mmbasic_runtime_abort_adapter *adapter)
 {
     if (!adapter) return;
@@ -67,13 +67,13 @@ static void HAL_PORT_MMBASIC_HOT_FUNC(runtime_abort_common)(
     if (adapter->after_poll) adapter->after_poll();
 }
 
-void HAL_PORT_MMBASIC_HOT_FUNC(mmbasic_runtime_checkabort)(
+void MMB_HOT_FUNC(mmbasic_runtime_checkabort)(
     const mmbasic_runtime_abort_adapter *adapter)
 {
     runtime_abort_common(adapter);
 }
 
-void HAL_PORT_MMBASIC_HOT_FUNC(mmbasic_runtime_routinechecks)(
+void MMB_HOT_FUNC(mmbasic_runtime_routinechecks)(
     const mmbasic_runtime_abort_adapter *adapter)
 {
     runtime_abort_common(adapter);

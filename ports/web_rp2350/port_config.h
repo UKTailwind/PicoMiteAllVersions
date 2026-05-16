@@ -22,7 +22,7 @@
 #define HAL_PORT_DEFAULT_CPU_SPEED_KHZ   200000
 
 /* MMInkey pinned to RAM — rp2350 has plenty of SRAM. */
-#define HAL_PORT_MMINKEY_DECL(name)      __not_in_flash_func(name)
+#define MMINKEY_DECL(name)      __not_in_flash_func(name)
 
 /* WEBRP2350 claims the onboard LED for the CYW43 radio. */
 /* WEBRP2350 reserves GP29 for the CYW43 radio. */
@@ -90,15 +90,15 @@
 #define HAL_PORT_AUDIO_MOD_BUFFER_SIZE   8192
 #define HAL_PORT_HAS_MP3                 1
 
-#define HAL_PORT_RAM_FUNC(name)          name
+#define PORT_RAM_FUNC(name)          name
 
 /* Placement for MMBasic's per-expression hot functions (getvalue,
  * findvar) and the big DefinedSubFun dispatch. rp2350 WEB has enough
  * RAM for the interpreter hot paths even with the CYW43 stack; the
- * small GPIO helpers covered by HAL_PORT_RAM_FUNC stay in flash
+ * small GPIO helpers covered by PORT_RAM_FUNC stay in flash
  * alongside network buffers. */
-#define HAL_PORT_MMBASIC_HOT_FUNC(name)    __not_in_flash_func(name)
-#define HAL_PORT_MMBASIC_SUBFUN_FUNC(name) __not_in_flash_func(name)
+#define MMB_HOT_FUNC(name)    __not_in_flash_func(name)
+#define MMB_DISPATCH_FUNC(name) __not_in_flash_func(name)
 
 #define HAL_PORT_FRAMEBUFFER_TRAILER_BYTES 0
 #define HAL_PORT_ALLMEMORY_ALIGN           256
@@ -128,6 +128,6 @@
  * watchdog reset so the next-boot bc_crash_dump_if_any can read
  * register values stored before the fault. Host has no such
  * section — plain BSS. */
-#define HAL_PORT_BC_CRASH_INFO_ATTR __attribute__((section(".uninitialized_data.bc_crash_info")))
+#define BC_CRASH_INFO_ATTR __attribute__((section(".uninitialized_data.bc_crash_info")))
 
 #endif /* PORT_CONFIG_H */

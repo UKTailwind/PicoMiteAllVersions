@@ -33,7 +33,7 @@
 
 /* MMInkey placement: PicoMite SPI-LCD has the headroom to pin
  * MMInkey to RAM (no scanout shadow framebuffer eating SRAM). */
-#define HAL_PORT_MMINKEY_DECL(name)      __not_in_flash_func(name)
+#define MMINKEY_DECL(name)      __not_in_flash_func(name)
 
 /* Chip-feature: RP2040 variants don't ship PSRAM, upng, or the DEFINES
  * compile-time dictionary. */
@@ -110,18 +110,18 @@
 #define HAL_PORT_PIO1_CLAIMED            true
 #define HAL_PORT_PIO2_CLAIMED            false
 
-#define HAL_PORT_RAM_FUNC(name)          __not_in_flash_func(name)
+#define PORT_RAM_FUNC(name)          __not_in_flash_func(name)
 
 /* Placement for MMBasic's per-expression hot functions (getvalue,
  * findvar — called hundreds of times per BASIC statement). Keep in
  * RAM on every port except the most RAM-constrained (rp2040 WEB). */
-#define HAL_PORT_MMBASIC_HOT_FUNC(name)  __not_in_flash_func(name)
+#define MMB_HOT_FUNC(name)  __not_in_flash_func(name)
 
 /* Placement for the DefinedSubFun dispatch (called once per user
  * SUB/FUNCTION invocation, and it's ~800 lines of code). Flash on
  * rp2040 WEB AND rp2040 VGA — both are tight enough that the extra
  * page of RAM for this one function matters. */
-#define HAL_PORT_MMBASIC_SUBFUN_FUNC(name) __not_in_flash_func(name)
+#define MMB_DISPATCH_FUNC(name) __not_in_flash_func(name)
 
 /* Memory-layout port knobs:
  *   TRAILER_BYTES = extra bytes appended to AllMemory[] after the
@@ -159,6 +159,6 @@
  * watchdog reset so the next-boot bc_crash_dump_if_any can read
  * register values stored before the fault. Host has no such
  * section — plain BSS. */
-#define HAL_PORT_BC_CRASH_INFO_ATTR __attribute__((section(".uninitialized_data.bc_crash_info")))
+#define BC_CRASH_INFO_ATTR __attribute__((section(".uninitialized_data.bc_crash_info")))
 
 #endif /* PORT_CONFIG_H */

@@ -24,7 +24,7 @@
 
 /* MMInkey placement: rp2040 WEB has tight RAM (CYW43 firmware + lwIP
  * heap eat most of it), so MMInkey stays in flash. */
-#define HAL_PORT_MMINKEY_DECL(name)      name
+#define MMINKEY_DECL(name)      name
 
 /* WEB variants claim the onboard LED for the CYW43 radio — no heartbeat. */
 /* WEB reserves GP29 for the CYW43 radio — only 3 ADC channels. */
@@ -85,14 +85,14 @@
 #define HAL_PORT_AUDIO_MOD_BUFFER_SIZE   6144
 #define HAL_PORT_HAS_MP3                 0
 
-#define HAL_PORT_RAM_FUNC(name)          name
+#define PORT_RAM_FUNC(name)          name
 
 /* Placement for MMBasic's per-expression hot functions (getvalue,
  * findvar) and the big DefinedSubFun dispatch. rp2040 WEB is the
  * most RAM-tight target (CYW43 + lwIP stack + TCP buffers); keep
  * all three in flash. */
-#define HAL_PORT_MMBASIC_HOT_FUNC(name)    name
-#define HAL_PORT_MMBASIC_SUBFUN_FUNC(name) name
+#define MMB_HOT_FUNC(name)    name
+#define MMB_DISPATCH_FUNC(name) name
 
 #define HAL_PORT_FRAMEBUFFER_TRAILER_BYTES 0
 #define HAL_PORT_ALLMEMORY_ALIGN           256
@@ -122,6 +122,6 @@
  * watchdog reset so the next-boot bc_crash_dump_if_any can read
  * register values stored before the fault. Host has no such
  * section — plain BSS. */
-#define HAL_PORT_BC_CRASH_INFO_ATTR __attribute__((section(".uninitialized_data.bc_crash_info")))
+#define BC_CRASH_INFO_ATTR __attribute__((section(".uninitialized_data.bc_crash_info")))
 
 #endif /* PORT_CONFIG_H */

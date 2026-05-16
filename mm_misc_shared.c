@@ -275,7 +275,7 @@ void cmd_timer(void) {
   timeroffset=mytime-(uint64_t)getint(++cmdline,0,mytime/1000)*1000;
 }
 // this is invoked as a function
-void HAL_PORT_MMBASIC_HOT_FUNC(fun_timer)(void) {
+void MMB_HOT_FUNC(fun_timer)(void) {
     fret = (MMFLOAT)(hal_time_us_64()-timeroffset)/1000.0;
     targ = T_NBR;
 }
