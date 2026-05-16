@@ -375,8 +375,9 @@ Y2038-style overflow at year 2099, now 10/10).
 
 ## Finding 9 — `cmd_files_*` lifecycle hooks
 
-Status: **partially done — save/restore retired across ports;
-pump_console_key + cmd_load_post_cleanup remain** · Risk: **LOW (residual)**
+Status: **done — save/restore retired across ports; cmd_load_post_cleanup
+shared; pump_console_key intentionally per-port (legitimate variation)** ·
+Risk: **LOW (resolved)**
 
 The cmd_files multi-pass selection-sort refactor (commit `73fcd66`)
 eliminated the 76 KB transient allocation that justified Pico's
@@ -387,22 +388,32 @@ same commit). The audit's original framing — "Pico has real bodies,
 the rest are no-ops" — no longer holds; every port is uniformly
 no-op for those two hooks.
 
-**Remaining duplication:**
+`cmd_load_post_cleanup`'s longjmp default now lives in
+`runtime/runtime_cmd_load_post_cleanup.c`, linked by host_native,
+host_wasm, mmbasic_stdio, mmbasic_ansi, and pc386. Pico keeps its
+empty override (its SaveProgramToFlash uses a private tokeniser buffer
+so cmd_load can return normally). ESP32 keeps its autorun early-return
+override (LOAD "file",R needs nextstmt to stay at ProgMemory so the
+freshly-loaded program runs).
 
-`cmd_files_pump_console_key` — per-port input-pump bodies (Pico no-op,
-host polls MMInkey + 10ms sleep, ESP32 drains web_console + serial,
-pc386 no-op via PS/2 IRQ ring). Each port's input source genuinely
-differs; no consolidation gain.
+The stale "Host can't SaveContext + InitHeap mid-FRUN" comment in
+`esp32_peripheral_stubs.c` was scrubbed alongside the body's
+consolidation — it referenced a code path that had already been
+retired in commit `73fcd66`.
 
-`cmd_load_post_cleanup` — host_native + pc386 are byte-identical (call
-`mmbasic_runtime_post_load_longjmp(inpbuf, STRINGSIZE, mark)`); ESP32
-has the same body plus an autorun early-return; Pico is empty.
-Consolidating the longjmp default into a shared TU (ESP32 keeps its
-autorun override) would save ~20 lines. Tracking but not priority.
+`cmd_files_pump_console_key` stays per-port: Pico no-op (UART/USB ISR
+already fills ConsoleRxBuf and cmd_files drains it), host_native polls
+MMInkey with a 10 ms sleep, ESP32 drains web_console + serial,
+pc386 no-op (PS/2 IRQ ring fills the same buffer cmd_files reads).
+Each port's input source genuinely differs; no consolidation gain.
 
-`esp32_peripheral_stubs.c:159-164` had a stale copy-paste comment
-("**Host** can't SaveContext + InitHeap mid-FRUN") that became moot
-when the body itself was emptied alongside Pico's in commit `73fcd66`.
+| Site | What remains |
+|---|---|
+| `runtime/runtime_cmd_load_post_cleanup.c` | shared longjmp default |
+| `ports/host_native/host_runtime.c` | per-port copy removed; pointer comment only |
+| `ports/pc386/pc386_runtime.c` | per-port copy removed; pointer comment only |
+| `ports/pico_sdk_common/cmd_files_hooks.c:52` | empty override (private tokeniser buffer; intentional) |
+| `ports/esp32_s3_metro/main/esp32_peripheral_stubs.c:194` | autorun early-return override (deliberate) |
 
 ---
 
@@ -513,25 +524,22 @@ adjacent state in ways that look like flaky tests hours later.
 
 ## Recommended sequence
 
-Done so far: Findings 1, 2, 3, 4, 7, 8, 10, partial 9, telnet IAC
-parser; cmd_files multi-pass refactor (commit `73fcd66`); live bugs
-(pc386 escape decoder, pc386 `timegm` const, Pico DEL→BKSP, ESP32
-`timegm` Y2038-style overflow at year 2099, Pico B: drive
-`FF_STR_VOLUME_ID` default, `_has_prompt` `>`-false-positive in
-basic_serial).
+Done so far: Findings 1, 2, 3, 4, 7, 8, 9, 10, telnet IAC parser;
+cmd_files multi-pass refactor (commit `73fcd66`); live bugs (pc386
+escape decoder, pc386 `timegm` const, Pico DEL→BKSP, ESP32 `timegm`
+Y2038-style overflow at year 2099, Pico B: drive `FF_STR_VOLUME_ID`
+default, `_has_prompt` `>`-false-positive in basic_serial).
 
-**Finding 5 is intentionally not next.** Its scope (~1900 LOC of
-peripheral stubs) is owned by the modular stub-driver carve-out in
+**Findings 5 and 6 are intentionally not next.** Their combined scope
+(~1900 LOC of peripheral stubs + ~25 `port_*` no-op hooks) is owned
+by the modular stub-driver carve-out in
 [`real-hal-plan.md` § Modular stub drivers](real-hal-plan.md#modular-stub-drivers-proposed-direction),
-not by this audit's single-file consolidation pattern. Same for
-Finding 6 (`port_*` no-op stubs) — those ride along on the same
-driver-layout refactor. Both wait until that carve-out begins (I2C
-first).
+not by this audit's single-file consolidation pattern. Both wait
+until that carve-out begins (I2C first).
 
-Next dedup-style work, in order of payoff:
-
-1. **Finding 9 residual** — share `cmd_load_post_cleanup`'s longjmp
-   body in a runtime TU (host/pc386 are byte-identical; ESP32 keeps
-   its autorun early-return as an override). Drop the stale "Host
-   can't SaveContext" comment in `esp32_peripheral_stubs.c:159-164`
-   (the body it referenced is gone). ~20 LOC win.
+That leaves only the "Also worth investigating" entries at the top
+of the lower-priority section — small one-liner unifications
+(`uSec`, the no-op pair in host/pc386/esp32 globals, the `host_*`
+namespace leakage into pc386) that are individually <30 LOC. No
+single-finding dedup work of scale remains; the next big win is
+the modular stub-driver carve-out.

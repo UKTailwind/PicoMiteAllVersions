@@ -338,16 +338,10 @@ void cmd_files_save_program_context(void) { }
 void cmd_files_restore_program_context(void) { }
 void cmd_files_pump_console_key(int *c)   { (void)c; }
 
-/* SaveProgramToFlash on pc386 calls tokenise() which writes through
- * inpbuf/tknbuf — the same buffers ExecuteProgram is currently
- * iterating over in cmd_load. Returning normally would have the
- * outer ExecuteProgram resume on stale token bytes and trip
- * "Unknown command". Bounce back to the prompt instead, like
- * host_native's host_runtime.c does. */
-void cmd_load_post_cleanup(void) {
-    extern unsigned char inpbuf[];
-    mmbasic_runtime_post_load_longjmp(inpbuf, STRINGSIZE, mark);
-}
+/* cmd_load_post_cleanup — shared default body in
+ * runtime/runtime_cmd_load_post_cleanup.c (Finding 9). pc386's
+ * SaveProgramToFlash uses inpbuf/tknbuf so the longjmp default is
+ * exactly what we want here. */
 
 /* CallCFunction / CallExecuteProgram — pc386 has no CFunction support. */
 void CallCFunction(unsigned char *p, unsigned char *args, int *t, unsigned char **s) {

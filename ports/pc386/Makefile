@@ -85,7 +85,11 @@ CORE_SRCS += mm_misc_shared.c OptionCommands.c
 CORE_SRCS += Draw.c RGB121.c Tilemap.c FileIO.c Audio.c BmpDecoder.c re.c picojpeg.c
 
 CORE_STATE_SRCS = display_state.c pin_state.c option_state.c audio_state.c
-RUNTIME_SRCS = runtime_boot.c runtime_program.c runtime_console_putchar.c runtime_console_printstring.c runtime_console_adapter.c runtime_console_input_noop.c runtime_console_escdecode.c runtime_getline.c runtime_terminal_hooks_noop.c runtime_abort.c runtime_interrupt.c
+# runtime_interrupt.c is omitted: pc386's check_interrupt/cmd_ireturn
+# are local stubs that don't invoke any mmbasic_runtime_* symbol, and
+# the shared TU references MQTT/UDP network externs pc386 doesn't
+# provide (pc386 has no networking).
+RUNTIME_SRCS = runtime_boot.c runtime_program.c runtime_console_putchar.c runtime_console_printstring.c runtime_console_adapter.c runtime_console_input_noop.c runtime_console_escdecode.c runtime_getline.c runtime_terminal_hooks_noop.c runtime_abort.c runtime_cmd_load_post_cleanup.c
 
 # BC (bytecode) compiler + VM. ff/ffunicode/ffsystem are already in
 # FATFS_SRCS so don't re-list them here.

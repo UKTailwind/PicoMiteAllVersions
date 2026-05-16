@@ -700,18 +700,8 @@ void cmd_files_pump_console_key(int *c)
     }
 }
 
-void cmd_load_post_cleanup(void)
-{
-    /* LOAD tokenises each line of the loaded file into tknbuf, clobbering
-     * the tknbuf that ExecuteProgram is currently iterating over. Bounce
-     * back to the prompt so the iterator never resumes from corrupted
-     * bytes. Also zero inpbuf because tokenisation wrote each loaded line
-     * through it, and the prompt loop's next EditInputLine would otherwise
-     * echo the tail of the last line as if the user had typed it. */
-    extern unsigned char inpbuf[];
-    extern jmp_buf mark;
-    mmbasic_runtime_post_load_longjmp(inpbuf, STRINGSIZE, mark);
-}
+/* cmd_load_post_cleanup — shared default body in
+ * runtime/runtime_cmd_load_post_cleanup.c (Finding 9). */
 
 extern volatile BYTE SDCardStat;
 

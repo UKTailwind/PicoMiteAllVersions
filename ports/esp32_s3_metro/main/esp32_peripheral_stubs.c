@@ -156,12 +156,7 @@ void cmd_files_pump_console_key(int *c)
 
 void cmd_files_restore_program_context(void) {}
 
-void cmd_files_save_program_context(void)
-{
-    /* Host can't SaveContext + InitHeap mid-FRUN — bc_alloc backs both
-     * the heap and the live VMState. The 76 KB FILES sort buffer fits
-     * fine in host RAM without the dance. */
-}
+void cmd_files_save_program_context(void) {}
 
 void cmd_i2c(void) {}
 
