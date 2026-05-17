@@ -1,46 +1,44 @@
-name: Linux host validation
+name: Linux validation
 
 on:
   pull_request:
     paths:
       - '*.c'
       - '*.h'
+      - '*.bas'
+      - 'CMakeLists.txt'
+      - 'pico_sdk_import.cmake'
+      - 'buildall.sh'
+      - 'validate_all.sh'
       - 'core/**'
       - 'drivers/**'
       - 'hal/**'
       - 'host/**'
-      - 'ports/host_native/**'
-      - 'ports/host_wasm/**'
-      - 'ports/mmbasic_ansi/**'
-      - 'ports/mmbasic_stdio/**'
-      - 'ports/pico_sdk_compat/**'
-      - 'ports/vm_sys_sim/**'
+      - 'ports/**'
       - 'porttools/**'
       - 'runtime/**'
       - 'shared/**'
-      - 'tools/check_hal_purity.sh'
-      - 'tools/check_wasm_symbols.sh'
+      - 'tools/**'
       - '.github/workflows/linux-host.yml'
   push:
     branches: [main]
     paths:
       - '*.c'
       - '*.h'
+      - '*.bas'
+      - 'CMakeLists.txt'
+      - 'pico_sdk_import.cmake'
+      - 'buildall.sh'
+      - 'validate_all.sh'
       - 'core/**'
       - 'drivers/**'
       - 'hal/**'
       - 'host/**'
-      - 'ports/host_native/**'
-      - 'ports/host_wasm/**'
-      - 'ports/mmbasic_ansi/**'
-      - 'ports/mmbasic_stdio/**'
-      - 'ports/pico_sdk_compat/**'
-      - 'ports/vm_sys_sim/**'
+      - 'ports/**'
       - 'porttools/**'
       - 'runtime/**'
       - 'shared/**'
-      - 'tools/check_hal_purity.sh'
-      - 'tools/check_wasm_symbols.sh'
+      - 'tools/**'
       - '.github/workflows/linux-host.yml'
   workflow_dispatch:
 
@@ -48,36 +46,32 @@ permissions:
   contents: read
 
 jobs:
-  host:
+  validate-all:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install build dependencies
+      - name: Install native build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends build-essential python3
+          sudo apt-get install -y --no-install-recommends \
+              build-essential cmake ninja-build python3
 
-      - name: HAL purity
-        run: ./tools/check_hal_purity.sh
+      - name: Install arm-none-eabi toolchain
+        uses: carlosperate/arm-none-eabi-gcc-action@v1
+        with:
+          release: '14.2.Rel1'
 
-      - name: Build host_native
-        run: ./host/build.sh
+      - name: Check out Pico SDK
+        uses: actions/checkout@v4
+        with:
+          repository: raspberrypi/pico-sdk
+          ref: 2.1.1
+          path: pico-sdk
+          submodules: recursive
 
-      - name: Test host_native
-        run: cd host && SKIP_HAL_PURITY=1 ./run_tests.sh
-
-      - name: Host NEW smoke
-        run: python3 porttools/host_new_smoke.py --no-build
-
-      - name: Build and test mmbasic_stdio
-        run: |
-          make -C ports/mmbasic_stdio
-          cd ports/mmbasic_stdio/tests
-          ./run_tests.sh
-
-      - name: Build mmbasic_ansi
-        run: make -C ports/mmbasic_ansi
+      - name: Patch Pico SDK for newer host GCC
+        run: bash tools/patch_pico_sdk_gcc15.sh "${{ github.workspace }}/pico-sdk"
 
       - name: Set up emscripten
         uses: mymindstorm/setup-emsdk@v14
@@ -85,5 +79,7 @@ jobs:
           version: 5.0.2
           actions-cache-folder: emsdk-cache
 
-      - name: Build host_wasm
-        run: ./host/build_wasm.sh
+      - name: Run full validation
+        env:
+          PICO_SDK_PATH: ${{ github.workspace }}/pico-sdk
+        run: ./validate_all.sh
