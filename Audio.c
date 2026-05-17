@@ -880,8 +880,7 @@ void wavcallback(char *p)
 {
 	int actualrate;
 	audiorepeat = 1;
-	if (strchr((char *)p, '.') == NULL)
-		strcat((char *)p, ".wav");
+	AppendDefaultExtension((char *)p, ".wav");
 	if (CurrentlyPlaying == P_WAV)
 	{
 		CloseAudio(0);
@@ -1000,8 +999,7 @@ void PlayMemWav(const unsigned char *data, unsigned int len)
 void mp3callback(char *p, int position)
 {
 	audiorepeat = 1;
-	if (strchr((char *)p, '.') == NULL)
-		strcat((char *)p, ".mp3");
+	AppendDefaultExtension((char *)p, ".mp3");
 	if (CurrentlyPlaying == P_MP3)
 	{
 		CloseAudio(0);
@@ -1073,8 +1071,7 @@ void mp3callback(char *p, int position)
 }
 void midicallback(char *p)
 {
-	if (strchr((char *)p, '.') == NULL)
-		strcat((char *)p, ".mid");
+	AppendDefaultExtension((char *)p, ".mid");
 	if (CurrentlyPlaying == P_MIDI)
 	{
 		CloseAudio(0);
@@ -1089,8 +1086,7 @@ void flaccallback(char *p)
 {
 	int actualrate;
 	audiorepeat = 1;
-	if (strchr((char *)p, '.') == NULL)
-		strcat((char *)p, ".flac");
+	AppendDefaultExtension((char *)p, ".flac");
 	if (CurrentlyPlaying == P_FLAC)
 	{
 		CloseAudio(0);
@@ -1165,8 +1161,7 @@ void flaccallback(char *p)
 void modcallback(char *p)
 {
 	int fsize;
-	if (strchr(p, '.') == NULL)
-		strcat(p, ".MOD");
+	AppendDefaultExtension(p, ".MOD");
 	if (CurrentlyPlaying == P_MOD)
 		CloseAudio(0);
 	if (CurrentlyPlaying != P_NOTHING)
@@ -1229,7 +1224,7 @@ void modcallback(char *p)
 #endif
 	if (!alreadythere)
 	{
-		unsigned char *r = GetTempMemory(256);
+		unsigned char *r = GetTempStrMemory();
 		positionfile(WAV_fnbr, 0, false);
 		uint32_t j = RoundUpK4(TOP_OF_SYSTEM_FLASH);
 		disable_interrupts_pico();
@@ -2239,13 +2234,6 @@ void MIPS16 cmd_play(void)
 		getfullfilename(p, q);
 		if (!InitSDCard())
 			return;
-		if (!FatFSFileSystem && p[1] == ':')
-		{
-			if (mytoupper(p[0]) == 'B')
-				FatFSFileSystem = 1;
-			else if (mytoupper(p[0]) == 'C')
-				FatFSFileSystem = 2;
-		}
 		WAVInterrupt = NULL;
 		WAVcomplete = 0;
 		if (argc == 3)
@@ -2338,13 +2326,6 @@ void MIPS16 cmd_play(void)
 		getfullfilename(p, q);
 		if (!InitSDCard())
 			return;
-		if (!FatFSFileSystem && p[1] == ':')
-		{
-			if (mytoupper(p[0]) == 'B')
-				FatFSFileSystem = 1;
-			else if (mytoupper(p[0]) == 'C')
-				FatFSFileSystem = 2;
-		}
 		WAVInterrupt = NULL;
 		WAVcomplete = 0;
 		if (argc == 3)
@@ -2740,13 +2721,6 @@ void MIPS16 cmd_play(void)
 		getfullfilename(p, q);
 		if (!InitSDCard())
 			return;
-		if (!FatFSFileSystem && p[1] == ':')
-		{
-			if (mytoupper(p[0]) == 'B')
-				FatFSFileSystem = 1;
-			else if (mytoupper(p[0]) == 'C')
-				FatFSFileSystem = 2;
-		}
 		WAVInterrupt = NULL;
 		WAVcomplete = 0;
 		if (argc == 3)
@@ -2850,8 +2824,7 @@ void MIPS16 cmd_play(void)
 		WAVInterrupt = NULL;
 		WAVcomplete = 0;
 		// open the file
-		if (strchr((char *)p, '.') == NULL)
-			strcat((char *)p, ".MOD");
+		AppendDefaultExtension((char *)p, ".MOD");
 		char q[FF_MAX_LFN] = {0};
 		getfullfilename(p, q);
 		memmove(&q[2], q, strlen(q));
@@ -2904,7 +2877,7 @@ void MIPS16 cmd_play(void)
 #endif
 		if (!alreadythere)
 		{
-			unsigned char *r = GetTempMemory(256);
+			unsigned char *r = GetTempStrMemory();
 			positionfile(WAV_fnbr, 0, false);
 			uint32_t j = RoundUpK4(TOP_OF_SYSTEM_FLASH);
 			disable_interrupts_pico();

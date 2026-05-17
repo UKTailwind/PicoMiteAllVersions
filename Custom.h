@@ -143,15 +143,20 @@ typedef struct NTP_T_
    volatile bool complete;
 } NTP_T;
 
-/* TCP Client structure */
+/* TCP Client structure.
+   tcp_pcb is held as a void* because MMTCPclient.c uses the altcp API,
+   which means the underlying pointer is a struct altcp_pcb* (not a
+   struct tcp_pcb*). altcp_* functions transparently dispatch to either
+   plain TCP or TLS depending on how the pcb was created. */
 typedef struct TCP_CLIENT_T_
 {
-   volatile struct tcp_pcb *tcp_pcb;
+   void *volatile tcp_pcb;
    ip_addr_t remote_addr;
    volatile uint8_t *buffer;
    volatile int buffer_len;
    volatile bool complete;
    volatile bool connected;
+   volatile bool tls;
    volatile int BUF_SIZE;
    volatile int TCP_PORT;
    volatile int *buffer_write;
@@ -193,6 +198,11 @@ void starttelnet(struct tcp_pcb *client_pcb, int pcb, void *arg);
 /* TCP Client functions */
 TCP_CLIENT_T *tcp_client_init(void);
 void tcp_dns_found(const char *hostname, const ip_addr_t *ipaddr, void *arg);
+
+/* TLS sub-command dispatch (only present when PICOMITEWEB_TLS is enabled) */
+#ifdef PICOMITEWEB_TLS
+int cmd_tls(void);
+#endif
 
 /* UDP functions */
 void open_udp_server(void);

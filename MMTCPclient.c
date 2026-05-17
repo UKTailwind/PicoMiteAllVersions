@@ -24,6 +24,12 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 ************************************************************************************************************************/
 #include "MMBasic_Includes.h"
 #include "Hardware_Includes.h"
+#include "lwip/altcp.h"
+#include "lwip/altcp_tcp.h"
+#ifdef PICOMITEWEB_TLS
+#include "lwip/altcp_tls.h"
+#include "mbedtls/ssl.h"
+#endif
 #define DEBUG_printf
 TCP_CLIENT_T *TCP_CLIENT = NULL;
 int streampointer = 0;
@@ -55,8 +61,10 @@ void tcp_dns_found(const char *hostname, const ip_addr_t *ipaddr, void *arg)
     }
     else
     {
+        if (TCP_CLIENT == state)
+            TCP_CLIENT = NULL;
         free(state);
-        error("tcp dns request failed");
+        web_async_set_error("tcp dns request failed");
     }
 }
 static err_t tcp_client_close(void *arg)
@@ -65,26 +73,24 @@ static err_t tcp_client_close(void *arg)
     err_t err = ERR_OK;
     if (state->tcp_pcb != NULL)
     {
-        tcp_arg((struct tcp_pcb *)state->tcp_pcb, NULL);
-        tcp_poll((struct tcp_pcb *)state->tcp_pcb, NULL, 0);
-        tcp_sent((struct tcp_pcb *)state->tcp_pcb, NULL);
-        tcp_recv((struct tcp_pcb *)state->tcp_pcb, NULL);
-        tcp_err((struct tcp_pcb *)state->tcp_pcb, NULL);
-        err = tcp_close((struct tcp_pcb *)state->tcp_pcb);
+        struct altcp_pcb *pcb = (struct altcp_pcb *)state->tcp_pcb;
+        altcp_arg(pcb, NULL);
+        altcp_poll(pcb, NULL, 0);
+        altcp_sent(pcb, NULL);
+        altcp_recv(pcb, NULL);
+        altcp_err(pcb, NULL);
+        err = altcp_close(pcb);
         if (err != ERR_OK)
         {
-            //            DEBUG_printf("close failed %d, calling abort\n", err);
-            tcp_abort((struct tcp_pcb *)state->tcp_pcb);
+            altcp_abort(pcb);
             err = ERR_ABRT;
         }
         state->tcp_pcb = NULL;
     }
     return err;
 }
-static err_t tcp_client_sent(void *arg, struct tcp_pcb *tpcb, u16_t len)
+static err_t tcp_client_sent(void *arg, struct altcp_pcb *tpcb, u16_t len)
 {
-    //        TCP_CLIENT_T *state = (TCP_CLIENT_T*)arg;
-    //        DEBUG_printf("tcp_client_sent %u\r\n", len);
     return ERR_OK;
 }
 
@@ -92,28 +98,47 @@ static void tcp_client_err(void *arg, err_t err)
 {
     if (err != ERR_ABRT)
     {
-        error("TCP client");
+        /* lwIP has already aborted the pcb. Drop our reference so the next
+           command starting up doesn't try to reuse a dead pcb. */
+        TCP_CLIENT_T *state = (TCP_CLIENT_T *)arg;
+        if (state)
+            state->tcp_pcb = NULL;
+        /* Include the err_t code for diagnosis. For TLS connections this is
+           usually ERR_ABRT (above, silently ignored) or ERR_CLSD/ERR_RST
+           when the server reset us mid-handshake; in either case a
+           verification failure on the upper TLS layer is the most common
+           root cause. tls_state in MMTCPclient.c marks state->tls so the
+           message hints at TLS. */
+        char buf[64];
+        snprintf(buf, sizeof(buf), "%s client error %d",
+                 (state && state->tls) ? "TLS" : "TCP", (int)err);
+        web_async_set_error(buf);
     }
 }
-err_t tcp_client_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err)
+err_t tcp_client_recv(void *arg, struct altcp_pcb *tpcb, struct pbuf *p, err_t err)
 {
     TCP_CLIENT_T *state = (TCP_CLIENT_T *)arg;
     if (!p)
     {
+        /* Remote sent FIN — mark the state dead but do NOT close from inside
+           the recv callback. Calling altcp_close (and especially altcp_recv
+           with NULL) while we're still inside the callback for this pcb has
+           been observed to break subsequent connections that share the same
+           altcp_tls config — the next handshake completes but data never
+           flows back to recv. The actual close happens cleanly when the
+           user's WEB CLOSE TCP CLIENT runs (or the implicit close at the
+           next WEB OPEN TCP/TLS CLIENT). The pcb sits in CLOSE_WAIT until
+           then, which is bounded because TCP_CLIENT only ever holds one. */
+        state->connected = false;
         return ERR_OK;
     }
-    // this method is callback from lwIP, so cyw43_arch_lwip_begin is not required, however you
-    // can use this method to cause an assertion in debug mode, if this method is called when
-    // cyw43_arch_lwip_begin IS needed
-    //    cyw43_arch_lwip_check();
     if (p->tot_len > 0)
     {
         routinechecks(); // don't know why I'm doing this but it solves a race condition for the RP2350
-        // Receive the buffer
         const uint16_t buffer_left = state->BUF_SIZE - state->buffer_len;
         state->buffer_len += pbuf_copy_partial(p, (void *)state->buffer + state->buffer_len,
                                                p->tot_len > buffer_left ? buffer_left : p->tot_len, 0);
-        tcp_recved(tpcb, p->tot_len);
+        altcp_recved(tpcb, p->tot_len);
         cyw43_arch_lwip_begin();
         uint64_t *x = (uint64_t *)state->buffer;
         x--;
@@ -123,40 +148,43 @@ err_t tcp_client_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err
     pbuf_free(p);
     return ERR_OK;
 }
-err_t tcp_client_recv_stream(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err)
+err_t tcp_client_recv_stream(void *arg, struct altcp_pcb *tpcb, struct pbuf *p, err_t err)
 {
     TCP_CLIENT_T *state = (TCP_CLIENT_T *)arg;
     if (!p)
     {
+        /* See note in tcp_client_recv — defer close to the user/main thread
+           to avoid corrupting the shared altcp_tls config state. */
+        state->connected = false;
         return ERR_OK;
     }
-    // this method is callback from lwIP, so cyw43_arch_lwip_begin is not required, however you
-    // can use this method to cause an assertion in debug mode, if this method is called when
-    // cyw43_arch_lwip_begin IS needed
-    //    cyw43_arch_lwip_check();
     if (p->tot_len > 0)
     {
+        /* For chained pbufs we need to walk the chain — payload is only the
+           first segment. Use pbuf_get_at to avoid that complication. */
         for (int j = 0; j < p->tot_len; j++)
         {
-            state->buffer[*state->buffer_write] = ((char *)p->payload)[j];
-            *state->buffer_write = (*state->buffer_write + 1) % state->BUF_SIZE; // advance the head of the queue
+            state->buffer[*state->buffer_write] = pbuf_get_at(p, j);
+            *state->buffer_write = (*state->buffer_write + 1) % state->BUF_SIZE; // advance head
             if (*state->buffer_write == *state->buffer_read)
-            {                                                                      // if the buffer has overflowed
-                *state->buffer_read = (*state->buffer_read + 1) % state->BUF_SIZE; // throw away the oldest char
+            {
+                *state->buffer_read = (*state->buffer_read + 1) % state->BUF_SIZE; // discard oldest
             }
         }
-        //        cyw43_arch_lwip_end();
-        tcp_recved(tpcb, p->tot_len);
+        altcp_recved(tpcb, p->tot_len);
     }
     pbuf_free(p);
     return ERR_OK;
 }
-static err_t tcp_client_connected(void *arg, struct tcp_pcb *tpcb, err_t err)
+static err_t tcp_client_connected(void *arg, struct altcp_pcb *tpcb, err_t err)
 {
     TCP_CLIENT_T *state = (TCP_CLIENT_T *)arg;
     if (err != ERR_OK)
     {
-        error("connect failed %", err);
+        char buf[64];
+        snprintf(buf, sizeof(buf), "connect failed %d", (int)err);
+        web_async_set_error(buf);
+        return err;
     }
     if (!optionsuppressstatus)
         MMPrintString("Connected\r\n");
@@ -164,39 +192,63 @@ static err_t tcp_client_connected(void *arg, struct tcp_pcb *tpcb, err_t err)
     return ERR_OK;
 }
 
-static bool tcp_client_open(void *arg)
+/* hostname_for_sni is non-NULL only for the TLS path AND only when the user
+   typed a name (not a dotted-quad). Passes through to mbedtls_ssl_set_hostname
+   so the server can return the correct virtual-host certificate. */
+static bool tcp_client_open(void *arg, const char *hostname_for_sni)
 {
     TCP_CLIENT_T *state = (TCP_CLIENT_T *)arg;
     char buff[STRINGSIZE] = {0};
-    sprintf("Connecting to %s port %u\r\n", ip4addr_ntoa(&state->remote_addr), state->TCP_PORT);
+    sprintf(buff, "Connecting to %s port %u%s\r\n",
+            ip4addr_ntoa(&state->remote_addr), state->TCP_PORT,
+            state->tls ? " (TLS)" : "");
     if (!optionsuppressstatus)
         MMPrintString(buff);
-    state->tcp_pcb = tcp_new_ip_type(IP_GET_TYPE(&state->remote_addr));
-    if (!state->tcp_pcb)
+
+    struct altcp_pcb *pcb = NULL;
+    if (state->tls)
+    {
+#ifdef PICOMITEWEB_TLS
+        struct altcp_tls_config *cfg = picomite_tls_get_client_config();
+        if (!cfg)
+        {
+            error("failed to create TLS config");
+            return false;
+        }
+        pcb = altcp_tls_new(cfg, IP_GET_TYPE(&state->remote_addr));
+        if (pcb && hostname_for_sni)
+        {
+            mbedtls_ssl_context *ssl = altcp_tls_context(pcb);
+            if (ssl)
+                mbedtls_ssl_set_hostname(ssl, hostname_for_sni);
+        }
+#else
+        error("TLS not built in");
+        return false;
+#endif
+    }
+    else
+    {
+        pcb = altcp_tcp_new_ip_type(IP_GET_TYPE(&state->remote_addr));
+    }
+    state->tcp_pcb = pcb;
+    if (!pcb)
     {
         error("failed to create pcb");
         return false;
     }
 
-    tcp_arg((struct tcp_pcb *)state->tcp_pcb, state);
-    //    tcp_poll(state->tcp_pcb, tcp_client_poll, POLL_TIME_S * 2);
-    tcp_sent((struct tcp_pcb *)state->tcp_pcb, tcp_client_sent);
+    altcp_arg(pcb, state);
+    altcp_sent(pcb, tcp_client_sent);
     if (state->buffer_write == NULL)
-        tcp_recv((struct tcp_pcb *)state->tcp_pcb, tcp_client_recv);
+        altcp_recv(pcb, tcp_client_recv);
     else
-        tcp_recv((struct tcp_pcb *)state->tcp_pcb, tcp_client_recv_stream);
-    tcp_err((struct tcp_pcb *)state->tcp_pcb, tcp_client_err);
+        altcp_recv(pcb, tcp_client_recv_stream);
+    altcp_err(pcb, tcp_client_err);
 
     state->buffer_len = 0;
 
-    // cyw43_arch_lwip_begin/end should be used around calls into lwIP to ensure correct locking.
-    // You can omit them if you are in a callback from lwIP. Note that when using pico_cyw_arch_poll
-    // these calls are a no-op and can be omitted, but it is a good practice to use them in
-    // case you switch the cyw43_arch type later.
-    //    cyw43_arch_lwip_begin();
-    err_t err = tcp_connect((struct tcp_pcb *)state->tcp_pcb, &state->remote_addr, state->TCP_PORT, tcp_client_connected);
-    //    cyw43_arch_lwip_end();
-
+    err_t err = altcp_connect(pcb, &state->remote_addr, state->TCP_PORT, tcp_client_connected);
     return err == ERR_OK;
 }
 void close_tcpclient(void)
@@ -222,6 +274,8 @@ int cmd_tcpclient(void)
         ;
         ip4_addr_t remote_addr;
         char *IP = GetTempStrMemory();
+        if (TCP_CLIENT)
+            close_tcpclient();
         TCP_CLIENT_T *state = tcp_client_init();
         IP = (char *)getCstring(argv[0]);
         int port = getint(argv[2], 1, 65535);
@@ -230,10 +284,10 @@ int cmd_tcpclient(void)
         TCP_CLIENT = state;
         state->TCP_PORT = port;
         state->buffer_write = NULL;
-        if (!isalpha((uint8_t)*IP) && strchr(IP, '.') && strchr(IP, '.') < IP + 4)
+        int dots = 0;
+        for (const char *p = IP; *p; p++) if (*p == '.') dots++;
+        if (dots == 3 && ip4addr_aton(IP, &remote_addr))
         {
-            if (!ip4addr_aton(IP, &remote_addr))
-                error("Invalid address format");
             state->remote_addr = remote_addr;
         }
         else
@@ -247,6 +301,7 @@ int cmd_tcpclient(void)
                 while (!state->complete && Timer4 && !(err == ERR_OK))
                     if (startupcomplete)
                         cyw43_arch_poll();
+                web_async_check_error();
                 if (!Timer4)
                     error("Failed to convert web address");
                 state->complete = 0;
@@ -254,7 +309,7 @@ int cmd_tcpclient(void)
             else
                 error("Failed to find TCP address");
         }
-        if (!tcp_client_open(state))
+        if (!tcp_client_open(state, NULL))
         {
             error("Failed to open client");
         }
@@ -263,6 +318,7 @@ int cmd_tcpclient(void)
         while (!state->connected && Timer4)
             if (startupcomplete)
                 cyw43_arch_poll();
+        web_async_check_error();
         if (!Timer4)
             error("No response from client");
         return 1;
@@ -277,6 +333,8 @@ int cmd_tcpclient(void)
         ;
         ip4_addr_t remote_addr;
         char *IP = GetTempStrMemory();
+        if (TCP_CLIENT)
+            close_tcpclient();
         TCP_CLIENT_T *state = tcp_client_init();
         IP = (char *)getCstring(argv[0]);
         int port = getint(argv[2], 1, 65535);
@@ -285,10 +343,10 @@ int cmd_tcpclient(void)
         TCP_CLIENT = state;
         state->TCP_PORT = port;
         state->buffer_write = &streampointer;
-        if (!isalpha((uint8_t)*IP) && strchr(IP, '.') && strchr(IP, '.') < IP + 4)
+        int dots = 0;
+        for (const char *p = IP; *p; p++) if (*p == '.') dots++;
+        if (dots == 3 && ip4addr_aton(IP, &remote_addr))
         {
-            if (!ip4addr_aton(IP, &remote_addr))
-                error("Invalid address format");
             state->remote_addr = remote_addr;
         }
         else
@@ -308,7 +366,7 @@ int cmd_tcpclient(void)
             else
                 error("Failed to find TCP address");
         }
-        if (!tcp_client_open(state))
+        if (!tcp_client_open(state, NULL))
         {
             error("Failed to open client");
         }
@@ -325,6 +383,135 @@ int cmd_tcpclient(void)
             error("No response from client");
         return 1;
     }
+
+#ifdef PICOMITEWEB_TLS
+    /* OPEN TLS CLIENT / OPEN TLS STREAM — same arguments as the plain TCP
+       variants. The hostname (when not a dotted-quad IP literal) is also used
+       as the SNI hostname so virtual-host HTTPS servers return the right
+       certificate. Peer-cert verification is currently DISABLED (no CA bundle
+       baked in). */
+    tp = checkstring(cmdline, (unsigned char *)"OPEN TLS CLIENT");
+    if (tp)
+    {
+        int timeout = 5000;
+        getcsargs(&tp, 5);
+        if (argc < 3)
+            SyntaxError();
+        ;
+        ip4_addr_t remote_addr;
+        char *IP = GetTempStrMemory();
+        if (TCP_CLIENT)
+            close_tcpclient();
+        TCP_CLIENT_T *state = tcp_client_init();
+        IP = (char *)getCstring(argv[0]);
+        int port = getint(argv[2], 1, 65535);
+        if (argc == 5)
+            timeout = getint(argv[4], 1, 100000);
+        TCP_CLIENT = state;
+        state->TCP_PORT = port;
+        state->buffer_write = NULL;
+        state->tls = true;
+        int dots = 0;
+        for (const char *p = IP; *p; p++) if (*p == '.') dots++;
+        bool is_ip = (dots == 3 && ip4addr_aton(IP, &remote_addr));
+        if (is_ip)
+        {
+            state->remote_addr = remote_addr;
+        }
+        else
+        {
+            int err = dns_gethostbyname(IP, &remote_addr, tcp_dns_found, state);
+            if (err == ERR_OK)
+                state->remote_addr = remote_addr;
+            else if (err == ERR_INPROGRESS)
+            {
+                Timer4 = timeout;
+                while (!state->complete && Timer4 && !(err == ERR_OK))
+                    if (startupcomplete)
+                        cyw43_arch_poll();
+                web_async_check_error();
+                if (!Timer4)
+                    error("Failed to convert web address");
+                state->complete = 0;
+            }
+            else
+                error("Failed to find TLS address");
+        }
+        if (!tcp_client_open(state, is_ip ? NULL : IP))
+        {
+            error("Failed to open TLS client");
+        }
+
+        Timer4 = timeout;
+        while (!state->connected && Timer4)
+            if (startupcomplete)
+                cyw43_arch_poll();
+        web_async_check_error();
+        if (!Timer4)
+            error("No response from TLS server (handshake timeout)");
+        return 1;
+    }
+    tp = checkstring(cmdline, (unsigned char *)"OPEN TLS STREAM");
+    if (tp)
+    {
+        int timeout = 5000;
+        getcsargs(&tp, 5);
+        if (argc < 3)
+            SyntaxError();
+        ;
+        ip4_addr_t remote_addr;
+        char *IP = GetTempStrMemory();
+        if (TCP_CLIENT)
+            close_tcpclient();
+        TCP_CLIENT_T *state = tcp_client_init();
+        IP = (char *)getCstring(argv[0]);
+        int port = getint(argv[2], 1, 65535);
+        if (argc == 5)
+            timeout = getint(argv[4], 1, 100000);
+        TCP_CLIENT = state;
+        state->TCP_PORT = port;
+        state->buffer_write = &streampointer;
+        state->tls = true;
+        int dots = 0;
+        for (const char *p = IP; *p; p++) if (*p == '.') dots++;
+        bool is_ip = (dots == 3 && ip4addr_aton(IP, &remote_addr));
+        if (is_ip)
+        {
+            state->remote_addr = remote_addr;
+        }
+        else
+        {
+            int err = dns_gethostbyname(IP, &remote_addr, tcp_dns_found, state);
+            if (err == ERR_OK)
+                state->remote_addr = remote_addr;
+            else if (err == ERR_INPROGRESS)
+            {
+                Timer4 = timeout;
+                while (!state->complete && Timer4 && !(err == ERR_OK))
+                    ProcessWeb(0);
+                if (!Timer4)
+                    error("Failed to convert web address");
+                state->complete = 0;
+            }
+            else
+                error("Failed to find TLS address");
+        }
+        if (!tcp_client_open(state, is_ip ? NULL : IP))
+        {
+            error("Failed to open TLS client");
+        }
+
+        Timer4 = timeout;
+        while (!state->connected && Timer4)
+        {
+            if (startupcomplete)
+                ProcessWeb(0);
+        }
+        if (!Timer4)
+            error("No response from TLS server (handshake timeout)");
+        return 1;
+    }
+#endif /* PICOMITEWEB_TLS */
 
     tp = checkstring(cmdline, (unsigned char *)"TCP CLIENT REQUEST");
     if (tp)
@@ -350,7 +537,7 @@ int cmd_tcpclient(void)
         state->BUF_SIZE = size;
         state->buffer = q;
         state->buffer_len = 0;
-        err_t err = tcp_write((struct tcp_pcb *)state->tcp_pcb, &request[1], (uint32_t)request[0], 0);
+        err_t err = altcp_write((struct altcp_pcb *)state->tcp_pcb, &request[1], (uint32_t)request[0], 0);
         if (err)
             error("write failed %", err);
         Timer4 = timeout;
@@ -405,7 +592,7 @@ int cmd_tcpclient(void)
         state->BUF_SIZE = size;
         state->buffer = q;
         state->buffer_len = 0;
-        err_t err = tcp_write((struct tcp_pcb *)state->tcp_pcb, &request[1], (uint32_t)request[0], 0);
+        err_t err = altcp_write((struct altcp_pcb *)state->tcp_pcb, &request[1], (uint32_t)request[0], 0);
         if (err)
             error("write failed %", err);
         return 1;
@@ -421,3 +608,59 @@ int cmd_tcpclient(void)
     }
     return 0;
 }
+
+#ifdef PICOMITEWEB_TLS
+/* WEB TLS sub-commands.
+   WEB TLS CA "filename"   — Load a CA bundle (PEM or DER) from the filesystem
+                             and switch the TLS client config to
+                             MBEDTLS_SSL_VERIFY_REQUIRED. Run WEB NTP first
+                             so cert expiry verification has a real clock.
+   WEB TLS NOVERIFY        — Drop any loaded CA, revert to no-verification
+                             default (encrypted but not authenticated). */
+int cmd_tls(void)
+{
+    unsigned char *tp;
+    tp = checkstring(cmdline, (unsigned char *)"TLS CA");
+    if (tp)
+    {
+        getcsargs(&tp, 1);
+        if (argc != 1)
+            SyntaxError();
+        char *fname = (char *)getCstring(argv[0]);
+        if (*fname == 0)
+            error("Filename required");
+        if (!ExistsFile(fname))
+            error("Cannot find file");
+        int size = FileSize(fname);
+        if (size <= 0)
+            error("Empty CA file");
+        /* Allocate size + 1 so PEM is null-terminated for mbedtls_x509_crt_parse.
+           Pass size+1 as ca_len so PEM detection works. DER will fail to
+           parse with the trailing 0 but PEM is the common case for CA bundles. */
+        int fn = FindFreeFileNbr();
+        if (!BasicFileOpen(fname, fn, FA_READ))
+            error("Cannot open CA file");
+        unsigned char *buf = (unsigned char *)GetTempMainMemory(size + 1);
+        UINT n_read = 0;
+        FileGetData(fn, (char *)buf, size, &n_read);
+        FileClose(fn);
+        if ((int)n_read != size)
+            error("Short read on CA file");
+        buf[size] = 0;
+        if (picomite_tls_set_ca(buf, (size_t)(size + 1)) != 0)
+            error("Failed to parse CA bundle");
+        if (!optionsuppressstatus)
+            MMPrintString("TLS: CA bundle loaded, peer verification REQUIRED\r\n");
+        return 1;
+    }
+    tp = checkstring(cmdline, (unsigned char *)"TLS NOVERIFY");
+    if (tp)
+    {
+        picomite_tls_clear_ca();
+        if (!optionsuppressstatus)
+            MMPrintString("TLS: peer verification DISABLED\r\n");
+        return 1;
+    }
+    return 0;
+}
+#endif

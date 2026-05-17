@@ -265,8 +265,9 @@ typedef struct
     uint8_t y_max_limit_pin;    // Y maximum limit switch pin (0xFF = not used)
     uint8_t z_min_limit_pin;    // Z minimum limit switch pin (0xFF = not used)
     uint8_t z_max_limit_pin;    // Z maximum limit switch pin (0xFF = not used)
-    uint64_t limit_switch_mask; // Bitmask of all limit switch pins for fast checking
-    bool limits_enabled;        // True if any limit switches are configured
+    uint64_t limit_switch_mask;      // Bitmask of all limit switch pins for fast checking
+    uint64_t limit_active_high_mask; // Bitmask of limit pins whose tripped state is HIGH (e.g. TMC2209 DIAG). Default 0 = all active-low.
+    bool limits_enabled;             // True if any limit switches are configured
 
     // Homing state
     bool homing_active;     // True when executing G28 homing cycle

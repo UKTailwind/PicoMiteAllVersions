@@ -612,7 +612,7 @@ void MIPS16 __not_in_flash_func(cmd_print)(void)
 	if (used <= 255)
 	{
 		// Simple case: fits in a single MMBasic string
-		unsigned char *mmstr = GetTempMemory(256);
+		unsigned char *mmstr = GetTempStrMemory();
 		mmstr[0] = used;
 		memcpy(mmstr + 1, outbuf, used);
 		MMfputs(mmstr, fnbr);
@@ -621,7 +621,7 @@ void MIPS16 __not_in_flash_func(cmd_print)(void)
 	{
 		// Need to output in chunks of maximum 255 bytes
 		int offset = 0;
-		unsigned char *mmstr = GetTempMemory(256);
+		unsigned char *mmstr = GetTempStrMemory();
 		while (offset < used)
 		{
 			int chunklen = (used - offset > 255) ? 255 : (used - offset);
@@ -1155,7 +1155,8 @@ void MIPS16 __not_in_flash_func(cmd_let)(void)
 #ifdef CALCPROMPT
 // Implied CALC: evaluate a bare expression typed at the console prompt and print the result.
 // Numeric result is stored in MM.ANSWER for reuse (e.g.  MM.ANSWER * 2).
-void cmd_calc(void) {
+void cmd_calc(void)
+{
 	MMFLOAT f;
 	long long int i64;
 	unsigned char *s;
@@ -1164,21 +1165,28 @@ void cmd_calc(void) {
 
 	evaluate(cmdline, &f, &i64, &s, &t, false);
 
-	if (t & (T_NBR | T_INT)) {
+	if (t & (T_NBR | T_INT))
+	{
 		MMFLOAT *ap = (MMFLOAT *)findvar((unsigned char *)"MM.ANSWER", V_NOFIND_NULL);
-		if (!ap) ap = (MMFLOAT *)findvar((unsigned char *)"MM.ANSWER", V_FIND | V_DIM_VAR);
-		if (t & T_NBR) {
+		if (!ap)
+			ap = (MMFLOAT *)findvar((unsigned char *)"MM.ANSWER", V_FIND | V_DIM_VAR | T_NBR | T_IMPLIED);
+		if (t & T_NBR)
+		{
 			*ap = f;
 			buf[0] = ' ';
 			FloatToStr(buf + (f >= 0 ? 1 : 0), f, 0, STR_AUTO_PRECISION, ' ');
-		} else {
+		}
+		else
+		{
 			*ap = (MMFLOAT)i64;
 			buf[0] = ' ';
 			IntToStr(buf + (i64 >= 0 ? 1 : 0), i64, 10);
 		}
 		MMPrintString(buf);
 		MMPrintString("\r\n");
-	} else if (t & T_STR) {
+	}
+	else if (t & T_STR)
+	{
 		int len = *s;
 		memcpy(buf, s + 1, len);
 		buf[len] = '\0';
@@ -1697,7 +1705,7 @@ void MIPS16 do_run(unsigned char *cmdline, bool CMM2mode)
 	ResetPerfCounters();
 	// RUN [ filename$ ] [, cmd_args$ ]
 	unsigned char *filename = (unsigned char *)"", *cmd_args = (unsigned char *)"";
-	unsigned char *cmdbuf = GetTempMemory(256);
+	unsigned char *cmdbuf = GetTempStrMemory();
 	memcpy(cmdbuf, cmdline, STRINGSIZE);
 	getcsargs(&cmdbuf, 3);
 	switch (argc)
@@ -1792,8 +1800,7 @@ void MIPS16 cmd_list(void)
 			getcsargs(&p, 1);
 			char *buff = GetTempStrMemory();
 			strcpy(buff, (char *)getCstring(argv[0]));
-			if (strchr(buff, '.') == NULL)
-				strcat(buff, ".bas");
+			AppendDefaultExtension(buff, ".bas");
 			ListFile(buff, true);
 		}
 		else
@@ -2219,7 +2226,7 @@ void MIPS16 cmd_list(void)
 			}
 			char *buff = GetTempStrMemory();
 			strcpy(buff, (char *)getCstring(argv[0]));
-			if (strchr(buff, '.') == NULL)
+			if (!HasExtension(buff))
 			{
 				if (!ExistsFile(buff))
 					strcat(buff, ".bas");
@@ -5685,8 +5692,16 @@ void MIPS16 cmd_frame(void)
 	{
 		if (frame)
 			error("Frame already exists");
-		framex = HRes / gui_font_width;
-		framey = VRes / gui_font_height;
+		if (Option.DISPLAY_TYPE)
+		{
+			framex = HRes / gui_font_width;
+			framey = VRes / gui_font_height;
+		}
+		else
+		{
+			framex = Option.Width;
+			framey = Option.Height;
+		}
 		frame = (uint16_t *)GetMemory(framex * framey * sizeof(uint16_t));
 		outframe = (uint16_t *)GetMemory(framex * framey * sizeof(uint16_t));
 		for (int i = 0; i < framex * framey; i++)

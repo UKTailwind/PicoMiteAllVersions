@@ -97,8 +97,9 @@ static void ntp_dns_found(const char *hostname, const ip_addr_t *ipaddr, void *a
     }
     else
     {
+        NTPstate = NULL;
         free(state);
-        error("ntp dns request failed");
+        web_async_set_error("ntp dns request failed");
     }
 }
 
@@ -120,8 +121,11 @@ static void ntp_recv(void *arg, struct udp_pcb *pcb, struct pbuf *p, const ip_ad
     else
     {
         pbuf_free(p);
+        udp_remove(state->ntp_pcb);
+        NTPstate = NULL;
         free(state);
-        error("invalid ntp response");
+        web_async_set_error("invalid ntp response");
+        return;
     }
     pbuf_free(p);
 }
@@ -163,10 +167,10 @@ void cmd_ntp(unsigned char *tp)
         strcpy(IP, NTP_SERVER);
     if (argc == 5)
         timeout = getint(argv[4], 0, 100000);
-    if (!isalpha((uint8_t)*IP) && strchr(IP, '.') && strchr(IP, '.') < IP + 4)
+    int dots = 0;
+    for (const char *p = IP; *p; p++) if (*p == '.') dots++;
+    if (dots == 3 && ip4addr_aton(IP, &remote_addr))
     {
-        if (!ip4addr_aton(IP, &remote_addr))
-            error("Invalid address format");
         state->ntp_server_address = remote_addr;
     }
     else
@@ -180,6 +184,7 @@ void cmd_ntp(unsigned char *tp)
             while (!state->complete && Timer4 && !(err == ERR_OK))
                 if (startupcomplete)
                     cyw43_arch_poll();
+            web_async_check_error();
             if (!Timer4)
                 error("Failed to convert web address");
             state->complete = 0;
@@ -195,6 +200,7 @@ void cmd_ntp(unsigned char *tp)
     state->ntp_pcb = udp_new_ip_type(IPADDR_TYPE_ANY);
     if (!state->ntp_pcb)
     {
+        NTPstate = NULL;
         free((void *)state);
         error("failed to create pcb\n");
     }
@@ -206,11 +212,13 @@ void cmd_ntp(unsigned char *tp)
     {
         if (startupcomplete)
             cyw43_arch_poll();
+        web_async_check_error();
         if (!Timer4)
         {
             udp_remove(NTPstate->ntp_pcb);
-            //                        memset(NTPstate,0,sizeof(NTPstate));
-            free(NTPstate);
+            NTP_T *to_free = NTPstate;
+            NTPstate = NULL;
+            free(to_free);
             error("NTP timeout");
         }
     }
@@ -222,6 +230,7 @@ void cmd_ntp(unsigned char *tp)
         ntp_result(state, 0, &epoch);
     }
     udp_remove(NTPstate->ntp_pcb);
-    //            memset(NTPstate,0,sizeof(NTPstate));
-    free(NTPstate);
+    NTP_T *to_free = NTPstate;
+    NTPstate = NULL;
+    free(to_free);
 }

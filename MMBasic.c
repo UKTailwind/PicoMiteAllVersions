@@ -1339,11 +1339,22 @@ void MIPS16 tokenise(int console)
         // not whitespace or string or comment  - try a number
 #ifdef CALCPROMPT
         // Implied CALC in console mode: inject token when line starts with a numeric expression
-        if (firstnonwhite && console && (IsDigitinline(*p) || *p == '(' ||
-                                         (*p == '.' && IsDigitinline(p[1])))) {
+        if (firstnonwhite && console && (IsDigitinline(*p) || *p == '(' || (*p == '.' && IsDigitinline(p[1]))))
+        {
             unsigned short tkn = GetCommandValue((unsigned char *)"Calc");
             *op++ = (tkn & 0x7f) + C_BASETOKEN;
             *op++ = (tkn >> 7) + C_BASETOKEN;
+            firstnonwhite = false;
+        }
+        // Implied CALC with implicit MM.ANSWER as left operand: line starts with a binary operator
+        else if (firstnonwhite && console && (*p == '+' || *p == '-' || *p == '*' || *p == '/' || *p == '\\' || *p == '^' || *p == '<' || *p == '>'))
+        {
+            unsigned short tkn = GetCommandValue((unsigned char *)"Calc");
+            *op++ = (tkn & 0x7f) + C_BASETOKEN;
+            *op++ = (tkn >> 7) + C_BASETOKEN;
+            // emit "MM.ANSWER" as raw chars — getvalue reads it as a variable reference
+            memcpy(op, "MM.ANSWER", 9);
+            op += 9;
             firstnonwhite = false;
         }
 #endif
@@ -1475,13 +1486,16 @@ void MIPS16 tokenise(int console)
 #ifdef CALCPROMPT
             // In console mode, scan the token table so function names like Exp( at line-start
             // get tokenised as function tokens rather than falling through as raw variable names.
-            if (console && match_i == -1) {
+            if (console && match_i == -1)
+            {
                 unsigned char *tscan;
                 int icalc;
-                for (icalc = 0; icalc < TokenTableSize - 1; icalc++) {
+                for (icalc = 0; icalc < TokenTableSize - 1; icalc++)
+                {
                     tscan = p;
                     tp = tokentbl[icalc].name;
-                    while (mytoupper(*tscan) == mytoupper(*tp) && *tp != 0) {
+                    while (mytoupper(*tscan) == mytoupper(*tp) && *tp != 0)
+                    {
                         tp++;
                         tscan++;
                         if (*tp == '(')
@@ -1490,7 +1504,8 @@ void MIPS16 tokenise(int console)
                     if (*tp == 0 && (!isnameend(*(tp - 1)) || !isnamechar(*tscan)))
                         break;
                 }
-                if (icalc != TokenTableSize - 1) {
+                if (icalc != TokenTableSize - 1)
+                {
                     unsigned short calc_tkn = GetCommandValue((unsigned char *)"Calc");
                     *op++ = (calc_tkn & 0x7f) + C_BASETOKEN;
                     *op++ = (calc_tkn >> 7) + C_BASETOKEN;
@@ -1553,7 +1568,8 @@ void MIPS16 tokenise(int console)
                 else if (console && (*tp == '+' || *tp == '-' ||
                                      *tp == '*' || *tp == '/' || *tp == '\\' ||
                                      *tp == '^' || *tp == '<' || *tp == '>' ||
-                                     isalpha(*tp))) {
+                                     isalpha(*tp)))
+                {
                     // Implied CALC: identifier followed by an operator (symbol or text op like AND/OR/MOD)
                     unsigned short tkn = GetCommandValue((unsigned char *)"Calc");
                     *op++ = (tkn & 0x7f) + C_BASETOKEN;
@@ -1996,6 +2012,33 @@ int MIPS16 __not_in_flash_func(FindSubFun)(unsigned char *p, int type)
 }
 #endif
 
+// Argument-value union — file scope so the static argval array can use it.
+union u_argval
+{
+    MMFLOAT f;         // the value if it is a float
+    long long int i;   // the value if it is an integer
+    MMFLOAT *fa;       // pointer to the allocated memory if it is an array of floats
+    long long int *ia; // pointer to the allocated memory if it is an array of integers
+    unsigned char *s;  // pointer to the allocated memory if it is a string
+};
+
+// Static argval-area arrays for DefinedSubFun. The common case (no overlap
+// between two DefinedSubFun arg-evaluation windows) just points at these
+// directly — no heap allocation, no large memset. Overlap can only happen
+// when an actual arg expression itself calls a user-defined function (e.g.
+// Foo(Bar(x))); the nested call then falls back to individual GetSystemMemory
+// allocations.
+#ifdef rp2350
+static union u_argval s_argval[MAX_ARG_COUNT];
+static int s_argtype[MAX_ARG_COUNT];
+static int s_argVarIndex[MAX_ARG_COUNT];
+static unsigned char s_argbuf1[STRINGSIZE];
+static unsigned char *s_argv1[MAX_ARG_COUNT];
+static unsigned char s_argbuf2[STRINGSIZE];
+static unsigned char *s_argv2[MAX_ARG_COUNT];
+static unsigned char s_argbyref[MAX_ARG_COUNT];
+static bool defsubfun_static_in_use = false;
+#endif
 // This function is responsible for executing a defined subroutine or function.
 // As these two are similar they are processed in the one lump of code.
 //
@@ -2030,14 +2073,7 @@ void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, in
     int i;
     int ArgType, FunType;
     int *argtype;
-    union u_argval
-    {
-        MMFLOAT f;         // the value if it is a float
-        long long int i;   // the value if it is an integer
-        MMFLOAT *fa;       // pointer to the allocated memory if it is an array of floats
-        long long int *ia; // pointer to the allocated memory if it is an array of integers
-        unsigned char *s;  // pointer to the allocated memory if it is a string
-    } *argval;
+    union u_argval *argval;
     int *argVarIndex;
 
     // Errors generated after gosubindex is incremented need to restore the original value
@@ -2129,18 +2165,40 @@ void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, in
         error("Too many nested SUB/FUN");
     errorstack[gosubindex] = CallersLinePtr;
     gosubstack[gosubindex++] = isfun ? NULL : nextstmt; // NULL signifies that this is returned to by ending ExecuteProgram()
+    // Acquire argval-area buffers. The fast path points each local at the
+    // matching file-scope static array (no allocation, no offset arithmetic,
+    // no large memset). The slow path — an arg-eval recursion overlap —
+    // allocates each buffer individually from the heap.
+#ifdef rp2350
+    if (!defsubfun_static_in_use)
+    {
+        defsubfun_static_in_use = true;
+        argval = s_argval;
+        argtype = s_argtype;
+        argVarIndex = s_argVarIndex;
+        argbuf1 = s_argbuf1;
+        argv1 = s_argv1;
+        argbuf2 = s_argbuf2;
+        argv2 = s_argv2;
+        argbyref = s_argbyref;
+        memset(argtype, 0, sizeof(s_argtype));
+        memset(argVarIndex, 0, sizeof(s_argVarIndex));
+    }
+    else
+#endif
+    {
 #define buffneeded MAX_ARG_COUNT * (sizeof(union u_argval) + 2 * sizeof(int) + 3 * sizeof(unsigned char *) + sizeof(unsigned char)) + 2 * STRINGSIZE
-    // allocate memory for processing the arguments
-    argval = GetSystemMemory(buffneeded);
-    DefinedSubFunMem = (uint32_t)argval; // save pointer to memory for cleanup on error
-    argtype = (void *)argval + MAX_ARG_COUNT * sizeof(union u_argval);
-    argVarIndex = (void *)argtype + MAX_ARG_COUNT * sizeof(int);
-    argbuf1 = (void *)argVarIndex + MAX_ARG_COUNT * sizeof(int);
-    argv1 = (void *)argbuf1 + STRINGSIZE;
-    argbuf2 = (void *)argv1 + MAX_ARG_COUNT * sizeof(unsigned char *);
-    argv2 = (void *)argbuf2 + STRINGSIZE;
-    argbyref = (void *)argv2 + MAX_ARG_COUNT * sizeof(unsigned char *);
-
+        // allocate memory for processing the arguments
+        argval = GetSystemMemory(buffneeded);
+        argtype = (void *)argval + MAX_ARG_COUNT * sizeof(union u_argval);
+        argVarIndex = (void *)argtype + MAX_ARG_COUNT * sizeof(int);
+        argbuf1 = (void *)argVarIndex + MAX_ARG_COUNT * sizeof(int);
+        argv1 = (void *)argbuf1 + STRINGSIZE;
+        argbuf2 = (void *)argv1 + MAX_ARG_COUNT * sizeof(unsigned char *);
+        argv2 = (void *)argbuf2 + STRINGSIZE;
+        argbyref = (void *)argv2 + MAX_ARG_COUNT * sizeof(unsigned char *);
+    }
+    DefinedSubFunMem = 1; // sentinel: arg processing in progress (cleared on success, checked by error handler for local-state recovery)
     // now split up the arguments in the caller
     CurrentLinePtr = CallersLinePtr; // report errors at the caller
     argc1 = 0;
@@ -2368,8 +2426,19 @@ void MIPS16 __not_in_flash_func(DefinedSubFun)(int isfun, unsigned char *cmd, in
         }
     }
 
-    // memory used in setting up the arguments can be deleted now
-    FreeMemory((void *)argval);
+#ifdef rp2350
+    // Release the argval-area buffers.
+    if (argval == s_argval)
+    {
+        defsubfun_static_in_use = false;
+    }
+    else
+    {
+#endif
+        FreeMemory((void *)argval);
+#ifdef rp2350
+    }
+#endif
     DefinedSubFunMem = 0; // we got here so we wont need to cleanup any memory
     strcpy((char *)CurrentSubFunName, (char *)fun_name);
     // if it is a defined command we simply point to the first statement in our command and allow ExecuteProgram() to carry on as before
@@ -2550,28 +2619,22 @@ void MIPS16 STR_REPLACE(char *target, const char *needle, const char *replacemen
                     toggle = 1;
                 else
                     toggle = 0;
-            }
-            if (toggle && *ip == ' ')
-            {
-                *ip = 0xFF;
-            }
-            if (toggle && *ip == '.')
-            {
-                *ip = 0xFE;
-            }
-            if (toggle && *ip == '=')
-            {
-                *ip = 0xFD;
-            }
-            if (toggle && *ip == '\\')
-            {
-                *ip = 0xFC;
+                ip++;
+                continue;
             }
             if (toggle == 0 && *ip == '\'')
             {
                 strcpy(comment, ip);
                 *ip = 0;
                 break;
+            }
+            if (toggle)
+            {
+                // Mark every char inside a quoted string by setting the high bit
+                // so str_replace cannot match a needle that falls inside the literal.
+                // tokenise() has already stripped the high bit from caller input, so
+                // any byte >= 0x80 we see on the way back out is one we set here.
+                *ip |= 0x80;
             }
             ip++;
         }
@@ -2583,14 +2646,8 @@ void MIPS16 STR_REPLACE(char *target, const char *needle, const char *replacemen
         }
         while (*ip)
         {
-            if (*ip == 0xFF)
-                *ip = ' ';
-            if (*ip == 0xFE)
-                *ip = '.';
-            if (*ip == 0xFD)
-                *ip = '=';
-            if (*ip == 0xFC)
-                *ip = '\\';
+            if (*ip & 0x80)
+                *ip &= 0x7F;
             ip++;
         }
     }
@@ -2692,7 +2749,20 @@ long long int __not_in_flash_func(getinteger)(unsigned char *p)
         return FloatToInt64(f);
     return i64;
 }
+MMFLOAT getfloat(unsigned char *p, MMFLOAT min, MMFLOAT max)
+{
+    int t = T_NBR;
+    MMFLOAT f;
+    long long int i64;
+    unsigned char *s;
 
+    evaluate(p, &f, &i64, &s, &t, false);
+    if (t & T_INT)
+        f = (MMFLOAT)i64;
+    if (f < min || f > max)
+        error("& is invalid (valid is & to &)", f, min, max);
+    return f;
+}
 // evaluate an expression and return an integer
 // this will throw an error is the integer is outside a specified range
 // this will correctly round the number if it is a fraction of an integer
@@ -3381,8 +3451,14 @@ void hashlabels(unsigned char *p, int ErrAbort)
             // the next line via the skip byte.
             unsigned char skip = p[1];
             unsigned char *q = p + T_NEWLINE_HDR;
+            while (*q == ' ')
+                q++;
             if (q[0] == T_LINENBR)
+            {
                 q += 3;
+                while (*q == ' ')
+                    q++;
+            }
             if (q[0] != T_LABEL && skip >= 3 && skip != T_NEWLINE_SKIP_NONE && skip != 0xFF)
             {
                 p += skip;
@@ -3566,8 +3642,14 @@ unsigned char MIPS16 *findlabel(unsigned char *labelptr)
             // jump to the next line via the skip byte when valid.
             unsigned char skip = (unsigned char)p[1];
             char *q = p + T_NEWLINE_HDR;
+            while (*q == ' ')
+                q++;
             if (q[0] == T_LINENBR)
+            {
                 q += 3;
+                while (*q == ' ')
+                    q++;
+            }
             if (q[0] == T_LABEL)
             {
                 if (mem_equal((unsigned char *)q + 1, (unsigned char *)label, label[0] + 1))
@@ -3611,7 +3693,7 @@ int MIPS16 CountLines(unsigned char *target)
     int cnt;
 
     p = ProgMemory;
-    if (ProgMemory[0] == 1 && ProgMemory[1] == 39 && ProgMemory[2] == 35)
+    if (ProgMemory[0] == T_NEWLINE && ProgMemory[T_NEWLINE_HDR] == '\'' && ProgMemory[T_NEWLINE_HDR + 1] == '#')
         cnt = -1;
     else
         cnt = 0;
@@ -5462,6 +5544,8 @@ void MIPS16 error(char *msg, ...)
                 IntToStr(tp, va_arg(ap, int64_t), 16);
             else if (*msg == '|') // insert an integer
                 strcpy(tp, PinDef[va_arg(ap, int)].pinname);
+            else if (*msg == '&') // insert a float
+                FloatToStr(tp, va_arg(ap, double), 0, STR_AUTO_PRECISION, ' ');
             else
                 *tp = *msg;
             msg++;
@@ -5492,9 +5576,15 @@ void MIPS16 error(char *msg, ...)
 #endif
         }
         gosubindex--;
-        FreeMemory((void *)DefinedSubFunMem);
         DefinedSubFunMem = 0;
     }
+#ifdef rp2350
+    // The error unwinds every in-progress DefinedSubFun frame. If one of
+    // them held the static argval arrays, release the flag unconditionally
+    // so the next call can claim them. Any heap-fallback allocations leak
+    // until the next RUN — accepted trade-off (heap is reset on RUN).
+    defsubfun_static_in_use = false;
+#endif
     if (OptionErrorSkip && OptionErrorSkip <= 100000)
         longjmp(ErrNext, 1); // if OPTION ERROR SKIP/IGNORE is in force
 #ifdef PICOMITE
@@ -5518,7 +5608,7 @@ void MIPS16 error(char *msg, ...)
         WriteBuf = (unsigned char *)FRAMEBUFFER;
         DisplayBuf = (unsigned char *)FRAMEBUFFER;
 #else
-        restorepanel();
+            restorepanel();
 #endif // we now have CurrentLinePtr pointing to the start of the line
         SetFont(PromptFont);
         gui_fcolour = PromptFC;
@@ -5542,11 +5632,11 @@ void MIPS16 error(char *msg, ...)
                 PromptFont = (2 << 4) | 1;
             }
 #else
-            if (gui_font_width > 8)
-            {
-                SetFont(1);
-                PromptFont = 1;
-            }
+                if (gui_font_width > 8)
+                {
+                    SetFont(1);
+                    PromptFont = 1;
+                }
 #endif
         }
         if (DISPLAY_TYPE == Option.DISPLAY_TYPE)
@@ -6010,7 +6100,7 @@ Various routines to clear memory or the interpreter's state
 #if defined(PICOMITEWEB) && !defined(rp2350)
 void MIPS32 ClearVars(int level, bool all)
 #else
-void MIPS32 __not_in_flash_func(ClearVars)(int level, bool all)
+    void MIPS32 __not_in_flash_func(ClearVars)(int level, bool all)
 #endif
 {
     int i, newhashpointer, hashcurrent, hashnext;
@@ -6030,7 +6120,7 @@ void MIPS32 __not_in_flash_func(ClearVars)(int level, bool all)
 #ifdef STRUCTENABLED
                 if (((g_vartbl[hashcurrent].type & T_STR) || g_vartbl[hashcurrent].dims[0] != 0 || (g_vartbl[hashcurrent].type & T_STRUCT)) && !(g_vartbl[hashcurrent].type & T_PTR) && ((uint32_t)g_vartbl[hashcurrent].val.s < (uint32_t)MMHeap + heap_memory_size) && ((uint32_t)g_vartbl[hashcurrent].val.s > (uint32_t)MMHeap))
 #else
-                if (((g_vartbl[hashcurrent].type & T_STR) || g_vartbl[hashcurrent].dims[0] != 0) && !(g_vartbl[hashcurrent].type & T_PTR) && ((uint32_t)g_vartbl[hashcurrent].val.s < (uint32_t)MMHeap + heap_memory_size) && ((uint32_t)g_vartbl[hashcurrent].val.s > (uint32_t)MMHeap))
+                    if (((g_vartbl[hashcurrent].type & T_STR) || g_vartbl[hashcurrent].dims[0] != 0) && !(g_vartbl[hashcurrent].type & T_PTR) && ((uint32_t)g_vartbl[hashcurrent].val.s < (uint32_t)MMHeap + heap_memory_size) && ((uint32_t)g_vartbl[hashcurrent].val.s > (uint32_t)MMHeap))
 #endif
                 {
                     FreeMemorySafe((void **)&g_vartbl[hashcurrent].val.s);
@@ -6067,7 +6157,7 @@ void MIPS32 __not_in_flash_func(ClearVars)(int level, bool all)
 #ifdef STRUCTENABLED
             if (((g_vartbl[i].type & T_STR) || g_vartbl[i].dims[0] != 0 || (g_vartbl[i].type & T_STRUCT)) && !(g_vartbl[i].type & T_PTR))
 #else
-            if (((g_vartbl[i].type & T_STR) || g_vartbl[i].dims[0] != 0) && !(g_vartbl[i].type & T_PTR))
+                if (((g_vartbl[i].type & T_STR) || g_vartbl[i].dims[0] != 0) && !(g_vartbl[i].type & T_PTR))
 #endif
             {
                 if ((uint32_t)g_vartbl[i].val.s > (uint32_t)MMHeap && (uint32_t)g_vartbl[i].val.s < (uint32_t)MMHeap + heap_memory_size)
@@ -6193,7 +6283,7 @@ uint32_t erase(char *p, bool nofree)
 #ifdef STRUCTENABLED
         if (((g_vartbl[j].type & T_STR) || g_vartbl[j].dims[0] != 0 || (g_vartbl[j].type & T_STRUCT)) && !(g_vartbl[j].type & T_PTR))
 #else
-        if (((g_vartbl[j].type & T_STR) || g_vartbl[j].dims[0] != 0) && !(g_vartbl[j].type & T_PTR))
+            if (((g_vartbl[j].type & T_STR) || g_vartbl[j].dims[0] != 0) && !(g_vartbl[j].type & T_PTR))
 #endif
         {
             addr = (uint32_t)g_vartbl[j].val.s; // ADDED: get address once
@@ -6414,8 +6504,8 @@ void MIPS16 ClearProgram(bool psram)
 int FloatToInt32(MMFLOAT x)
 {
 #else
-int __not_in_flash_func(FloatToInt32)(MMFLOAT x)
-{
+    int __not_in_flash_func(FloatToInt32)(MMFLOAT x)
+    {
 #endif
     if (x < LONG_MIN - 0.5 || x > LONG_MAX + 0.5)
         error("Number too large");
@@ -6426,8 +6516,8 @@ int __not_in_flash_func(FloatToInt32)(MMFLOAT x)
 long long int FloatToInt64(MMFLOAT x)
 {
 #else
-long long int __not_in_flash_func(FloatToInt64)(MMFLOAT x)
-{
+    long long int __not_in_flash_func(FloatToInt64)(MMFLOAT x)
+    {
 #endif
     if (x < (-(0x7fffffffffffffffLL) - 1) - 0.5 || x > 0x7fffffffffffffffLL + 0.5)
         error("Number too large");

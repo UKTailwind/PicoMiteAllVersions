@@ -84,20 +84,21 @@ static void mqtt_dns_found(const char *hostname, const ip_addr_t *ipaddr, void *
   }
 }
 
+/* Designated initializer — robust against lwIP struct-layout changes
+   (newer lwIP added will_msg_len between will_msg and will_qos, which broke
+   the previous positional initializer when LWIP_ALTCP_TLS was on). */
 struct mqtt_connect_client_info_t mqtt_client_info =
     {
-        NULL,
-        NULL, /* user */
-        NULL, /* pass */
-        100,  /* keep alive */
-        NULL, /* will_topic */
-        NULL, /* will_msg */
-        1,    /* will_qos */
-        1     /* will_retain */
-
+        .client_id   = NULL,
+        .client_user = NULL,
+        .client_pass = NULL,
+        .keep_alive  = 100,
+        .will_topic  = NULL,
+        .will_msg    = NULL,
+        .will_qos    = 1,
+        .will_retain = 1,
 #if LWIP_ALTCP && LWIP_ALTCP_TLS
-        ,
-        NULL
+        .tls_config  = NULL,
 #endif
 };
 
@@ -145,34 +146,90 @@ mqtt_request_cb(void *arg, err_t err)
   //  LWIP_PLATFORM_DIAG(("MQTT client \"%s\" request cb: err %d\n", client_info->client_id, (int)err));
 }
 
+/* Last connection-cb status, so the main thread can surface a specific
+   reason if the handshake fails (255 = no callback fired yet / still waiting). */
+static volatile int mqtt_last_conn_status = 255;
+
 static void
 mqtt_connection_cb(mqtt_client_t *client, void *arg, mqtt_connection_status_t status)
 {
-  //  const struct mqtt_connect_client_info_t* client_info = (const struct mqtt_connect_client_info_t*)arg;
-  //  LWIP_UNUSED_ARG(client);
+  LWIP_UNUSED_ARG(client);
+  LWIP_UNUSED_ARG(arg);
+  mqtt_last_conn_status = (int)status;
+}
 
-  //  LWIP_PLATFORM_DIAG(("MQTT client \"%s\" mqtt connection cb: status %d\n", client_info->client_id, (int)status));
+/* Map mqtt_connection_status_t to a short reason that fits MAXERRMSG.
+   Values come from lwIP's mqtt.h. */
+static const char *mqtt_status_string(int status)
+{
+  switch (status)
+  {
+  case 0:   return "ok";
+  case 1:   return "bad proto ver";
+  case 2:   return "bad client id";
+  case 3:   return "server unavail";
+  case 4:   return "bad user/pass";
+  case 5:   return "not authorized";
+  case 255: return "no reply";
+  case 256: return "disconnected";
+  case 257: return "tcp/tls timeout";
+  default:  return "unknown";
+  }
 }
 #endif /* LWIP_TCP */
+
 void mqtt_example_init(ip_addr_t *mqtt_ip, int port)
 {
 #if LWIP_TCP
-  // mqtt_connection_status_t status;
   mqtt_client = mqtt_client_new();
+  if (!mqtt_client)
+    error("MQTT: client_new failed (out of memory)");
   mqtt_client->keep_alive = 100;
   if (!optionsuppressstatus)
-    printf("Connecting to %s port %u\r\n", ip4addr_ntoa(mqtt_ip), port);
+  {
+    char buf[STRINGSIZE];
+    snprintf(buf, sizeof(buf), "Connecting to %s port %u%s\r\n",
+             ip4addr_ntoa(mqtt_ip), port,
+#if LWIP_ALTCP && LWIP_ALTCP_TLS
+             mqtt_client_info.tls_config ? " (TLS)" :
+#endif
+             "");
+    MMPrintString(buf);
+  }
 
-  mqtt_client_connect(mqtt_client,
-                      mqtt_ip, port,
-                      mqtt_connection_cb, &mqtt_client_info,
-                      &mqtt_client_info);
+  mqtt_last_conn_status = 255;
+  err_t cerr = mqtt_client_connect(mqtt_client,
+                                   mqtt_ip, port,
+                                   mqtt_connection_cb, &mqtt_client_info,
+                                   &mqtt_client_info);
+  if (cerr != ERR_OK)
+  {
+    char buf[64];
+    snprintf(buf, sizeof(buf), "MQTT: client_connect returned %d", (int)cerr);
+    closeMQTT();
+    error(buf);
+  }
   Timer4 = 5000;
   while (Timer4 && mqtt_client->conn_state != MQTT_CONNECTED)
     if (startupcomplete)
       cyw43_arch_poll();
   if (Timer4 == 0)
-    error("Failed to connect");
+  {
+    /* conn_state tells us where the handshake stalled:
+         p0 = TCP_DISCONNECTED (never started, or already torn down)
+         p1 = TCP_CONNECTING   (SYN sent, no SYN+ACK — net/firewall block)
+         p2 = MQTT_CONNECTING  (TCP up, no CONNACK — bad creds, wrong port,
+                                or broker silently dropping)
+         p3 = MQTT_CONNECTED   (shouldn't reach here) */
+    int phase = (int)mqtt_client->conn_state;
+    char buf[64];
+    snprintf(buf, sizeof(buf), "MQTT fail: %s, phase p%d",
+             mqtt_status_string(mqtt_last_conn_status), phase);
+    closeMQTT();
+    error(buf);
+  }
+  if (!optionsuppressstatus)
+    MMPrintString("Connected\r\n");
   mqtt_set_inpub_callback(mqtt_client,
                           mqtt_incoming_publish_cb,
                           mqtt_incoming_data_cb,
@@ -208,12 +265,27 @@ int cmd_mqtt(void)
     IP = (char *)getCstring(argv[0]);
     int port = getint(argv[2], 1, 65535);
     ip4_addr_t remote_addr;
-    //        if(port==8883){
-    //          tls_config = altcp_tls_create_config_client(NULL, 0);
-    //          mqtt_client_info.tls_config=tls_config;
-    //        }
-    mqtt_client_info.client_user = (char *)getCstring(argv[4]);
-    mqtt_client_info.client_pass = (char *)getCstring(argv[6]);
+#if LWIP_ALTCP && LWIP_ALTCP_TLS
+    /* Use TLS when the standard MQTTS port (8883) is requested. The same
+       shared client TLS config used by WEB OPEN TLS CLIENT is reused here.
+       Whatever verification mode is in effect (no-verify by default, or
+       REQUIRED if WEB TLS CA has been run) applies to this MQTTS session. */
+    if (port == 8883)
+      mqtt_client_info.tls_config = picomite_tls_get_client_config();
+    else
+      mqtt_client_info.tls_config = NULL;
+#endif
+    /* Empty user/pass means "anonymous". lwIP's MQTT client treats a
+       non-NULL pointer as "include this field in CONNECT", so passing an
+       empty string sends a zero-length username — which mosquitto and
+       most brokers reject with status 4 (bad username/password). Convert
+       empty strings to NULL so the field is omitted entirely. */
+    {
+        char *u = (char *)getCstring(argv[4]);
+        char *p = (char *)getCstring(argv[6]);
+        mqtt_client_info.client_user = (u && *u) ? u : NULL;
+        mqtt_client_info.client_pass = (p && *p) ? p : NULL;
+    }
     if (argc == 9)
     {
       MQTTInterrupt = (char *)GetIntAddress(argv[8]);
@@ -227,15 +299,17 @@ int cmd_mqtt(void)
     IntToStr(&ID[strlen(ID)], time_us_64(), 16);
     mqtt_client_info.client_id = ID;
 
-    if (!isalpha((uint8_t)*IP) && strchr(IP, '.') && strchr(IP, '.') < IP + 4)
+    int dots = 0;
+    for (const char *p = IP; *p; p++) if (*p == '.') dots++;
+    if (dots == 3 && ip4addr_aton(IP, &remote_addr))
     {
-      if (!ip4addr_aton(IP, &remote_addr))
-        error("Invalid address format");
       mqtt_dns.remote = remote_addr;
     }
     else
     {
       int err = dns_gethostbyname(IP, &remote_addr, mqtt_dns_found, &mqtt_dns);
+      if (err == ERR_OK)
+        mqtt_dns.remote = remote_addr;
       Timer4 = timeout;
       while (!mqtt_dns.complete && Timer4 && !(err == ERR_OK))
         if (startupcomplete)

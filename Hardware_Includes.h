@@ -510,6 +510,7 @@ extern uint16_t tilebcols[];
  * ============================================================================ */
 #ifdef PICOMITEWEB
 extern volatile int WIFIconnected;
+extern volatile int LastWifiErr;
 extern volatile int scantimer;
 extern int startupcomplete;
 #endif
@@ -680,6 +681,35 @@ void clearrepeat(void);
 void ProcessWeb(int mode);
 void WebConnect(void);
 void close_tcpclient(void);
+/* Deferred error mechanism for lwIP / cyw43 callbacks.
+   Callbacks must NOT call error() directly (longjmp out of lwIP corrupts its
+   state machine and pbuf accounting). Instead, finish local cleanup, call
+   web_async_set_error("..."), and return normally. The next call to
+   web_async_check_error() (made after every cyw43_arch_poll / ProcessWeb)
+   raises the deferred error from a safe stack frame.
+   The message must not contain '%' — error() treats it as a placeholder. */
+void web_async_set_error(const char *msg);
+void web_async_check_error(void);
+
+#ifdef PICOMITEWEB_TLS
+/* TLS lifecycle. The opaque struct altcp_tls_config* is forward-declared
+   rather than pulling lwip/altcp_tls.h into this header.
+     picomite_tls_init() — currently a no-op; retained for future hooks.
+     picomite_tls_get_client_config() — returns the lazily-created shared
+       client TLS config. With no CA loaded the config performs NO peer
+       verification (encrypted but not authenticated).
+     picomite_tls_set_ca(buf, len) — install a CA bundle (PEM with trailing
+       \0 in the len, or DER binary) and switch to MBEDTLS_SSL_VERIFY_REQUIRED.
+       Returns 0 on success, -1 on parse failure.
+     picomite_tls_clear_ca() — drop the CA and revert to no-verify default.
+     picomite_tls_verify_is_required() — true once a CA has been installed. */
+struct altcp_tls_config;
+void picomite_tls_init(void);
+struct altcp_tls_config *picomite_tls_get_client_config(void);
+int  picomite_tls_set_ca(const unsigned char *ca_buf, size_t ca_len);
+void picomite_tls_clear_ca(void);
+bool picomite_tls_verify_is_required(void);
+#endif
 #endif
 
 /* ============================================================================

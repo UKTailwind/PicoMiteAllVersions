@@ -329,15 +329,82 @@ extern "C"
 
                 /* Platform identification and extensions */
                 unsigned char platform[32];
-                uint8_t BACKLIGHT_KBD;        // *EB*
-                uint8_t BACKLIGHT_LCD;        // *EB*
-                uint16_t D4;                  // *EB*
-                unsigned int GPSBaud;         // *EB*
-                unsigned char pins[8];        // General use storage for CFunctions
-                unsigned char extensions[80]; // 896 bytes == 7 XMODEM blocks
+                uint8_t BACKLIGHT_KBD;           // *EB*
+                uint8_t BACKLIGHT_LCD;           // *EB*
+                uint16_t D4;                     // *EB*
+                unsigned int GPSBaud;            // *EB*
+                unsigned char pins[8];           // General use storage for CFunctions
+                unsigned char wifi_country_code; //
+                unsigned char extensions[79];    // 896 bytes == 7 XMODEM blocks
 
                 /* NOTE: To enable older CFunctions to run, any new options MUST be added at the end of the list */
         } __attribute__((packed));
+
+        /* ============================================================================
+         * WiFi regulatory domain (PICOMITEWEB) — index stored in Option.wifi_country_code
+         * ============================================================================ */
+        enum wifi_country_e
+        {
+                WIFI_COUNTRY_WORLDWIDE = 0,
+                WIFI_COUNTRY_AUSTRALIA,
+                WIFI_COUNTRY_AUSTRIA,
+                WIFI_COUNTRY_BELGIUM,
+                WIFI_COUNTRY_BRAZIL,
+                WIFI_COUNTRY_CANADA,
+                WIFI_COUNTRY_CHILE,
+                WIFI_COUNTRY_CHINA,
+                WIFI_COUNTRY_COLOMBIA,
+                WIFI_COUNTRY_CZECH_REPUBLIC,
+                WIFI_COUNTRY_DENMARK,
+                WIFI_COUNTRY_ESTONIA,
+                WIFI_COUNTRY_FINLAND,
+                WIFI_COUNTRY_FRANCE,
+                WIFI_COUNTRY_GERMANY,
+                WIFI_COUNTRY_GREECE,
+                WIFI_COUNTRY_HONG_KONG,
+                WIFI_COUNTRY_HUNGARY,
+                WIFI_COUNTRY_ICELAND,
+                WIFI_COUNTRY_INDIA,
+                WIFI_COUNTRY_ISRAEL,
+                WIFI_COUNTRY_ITALY,
+                WIFI_COUNTRY_JAPAN,
+                WIFI_COUNTRY_KENYA,
+                WIFI_COUNTRY_LATVIA,
+                WIFI_COUNTRY_LIECHTENSTEIN,
+                WIFI_COUNTRY_LITHUANIA,
+                WIFI_COUNTRY_LUXEMBOURG,
+                WIFI_COUNTRY_MALAYSIA,
+                WIFI_COUNTRY_MALTA,
+                WIFI_COUNTRY_MEXICO,
+                WIFI_COUNTRY_NETHERLANDS,
+                WIFI_COUNTRY_NEW_ZEALAND,
+                WIFI_COUNTRY_NIGERIA,
+                WIFI_COUNTRY_NORWAY,
+                WIFI_COUNTRY_PERU,
+                WIFI_COUNTRY_PHILIPPINES,
+                WIFI_COUNTRY_POLAND,
+                WIFI_COUNTRY_PORTUGAL,
+                WIFI_COUNTRY_SINGAPORE,
+                WIFI_COUNTRY_SLOVAKIA,
+                WIFI_COUNTRY_SLOVENIA,
+                WIFI_COUNTRY_SOUTH_AFRICA,
+                WIFI_COUNTRY_SOUTH_KOREA,
+                WIFI_COUNTRY_SPAIN,
+                WIFI_COUNTRY_SWEDEN,
+                WIFI_COUNTRY_SWITZERLAND,
+                WIFI_COUNTRY_TAIWAN,
+                WIFI_COUNTRY_THAILAND,
+                WIFI_COUNTRY_TURKEY,
+                WIFI_COUNTRY_UK,
+                WIFI_COUNTRY_USA,
+                WIFI_COUNTRY_COUNT
+        };
+
+#ifdef PICOMITEWEB
+        uint32_t wifi_country_to_cyw43(unsigned char idx);
+        const char *wifi_country_to_string(unsigned char idx);
+        int wifi_country_from_string(const char *iso);
+#endif
 
         /* ============================================================================
          * External variables - File tables and options
@@ -471,6 +538,8 @@ extern "C"
          * ============================================================================ */
         int drivecheck(char *p, int *waste);
         void getfullfilename(char *fname, char *q);
+        bool HasExtension(const char *fname);
+        void AppendDefaultExtension(char *fname, const char *ext);
         char *GetCWD(void);
         unsigned short hashversion(void);
 

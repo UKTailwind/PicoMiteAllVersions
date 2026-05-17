@@ -44,13 +44,15 @@
  *  Supported intrinsics — 1-arg (NBR argument, NBR result unless noted):
  *    SIN  COS  TAN  ASIN  ACOS  ATAN  SQR  ABS  INT()
  *    EXP  LOG  SGN  FIX  CINT  DEG  RAD
- *    Trig intrinsics bail to the interpreter when OPTION ANGLE DEGREES is set.
+ *    Trig intrinsics honour OPTION ANGLE at replay time (SIN/COS/TAN
+ *    divide the input by optionangle; ASIN/ACOS/ATAN multiply the output
+ *    by optionangle).  No bail in degree mode.
  *    LOG bails when arg <= 0 (preserves interpreter error).
  *    SGN, FIX, CINT return T_INT; all others return T_NBR.
  *
  *  Supported intrinsics — 2-arg (both coerced to NBR, result NBR):
  *    ATAN2(y,x)  MAX(a,b)  MIN(a,b)
- *    ATAN2 bails on OPTION ANGLE DEGREES (output scaling).
+ *    ATAN2 multiplies the output by optionangle in degree mode (no bail).
  *    MAX/MIN with 3+ arguments are not cached (fall back to interpreter).
  *
  *  Local variable handling:
@@ -180,8 +182,9 @@ enum trace_opcode
     OP_TOS_NBR_TO_INT,  /* round TOS NBR -> INT via FloatToInt64            */
     OP_TOS1_NBR_TO_INT, /* round TOS-1 NBR -> INT via FloatToInt64          */
 
-    /* intrinsic 1-arg function calls.  All bail to interpreter when           */
-    /* useoptionangle is set (so degree-mode programs still work, just slow)   */
+    /* intrinsic 1-arg function calls.  Trig ops honour OPTION ANGLE at       */
+    /* replay time (input/output scaling against optionangle); no degree-mode */
+    /* bail.                                                                   */
     OP_SIN,
     OP_COS,
     OP_TAN,
@@ -202,7 +205,7 @@ enum trace_opcode
     OP_RND_0,   /* Rnd (no-arg): calls fun_rnd(), pushes NBR result        */
 
     /* 2-arg intrinsics: consume NBR[sp-2] and NBR[sp-1], push one NBR    */
-    OP_ATAN2,   /* atan2(y, x) -> NBR; bails on useoptionangle             */
+    OP_ATAN2,   /* atan2(y, x) -> NBR; output scaled by optionangle in degmode */
     OP_MAX_NBR, /* max(a, b)   -> NBR                                      */
     OP_MIN_NBR, /* min(a, b)   -> NBR                                      */
 
@@ -1277,7 +1280,7 @@ static int classify_intrinsic(unsigned char c, uint8_t *opcode,
     if (c < C_BASETOKEN)
         return 0;
     void (*f)(void) = tokenfunction(c);
-    /* Trig: input NBR (radians), output NBR.  Replayer bails on optionangle. */
+    /* Trig: input NBR, output NBR.  Replayer scales for OPTION ANGLE DEGREES. */
     if (f == fun_sin)
     {
         *opcode = OP_SIN;
@@ -2745,40 +2748,55 @@ static int replay_common(struct cache_entry *e, int *out_bool)
             sp--;
             break;
 
-        /* --- 1-arg intrinsics; replay-time bail on degree mode --------- */
+        /* --- 1-arg intrinsics ----------------------------------------- */
+        /* Trig honours OPTION ANGLE at replay time: SIN/COS/TAN scale the
+         * input down by optionangle, ASIN/ACOS/ATAN scale the output up.
+         * In radians mode useoptionangle is false so neither branch costs
+         * an extra FP op.  optionangle/useoptionangle are read fresh on
+         * every replay, so a cached statement automatically picks up any
+         * mid-program OPTION ANGLE switch.                              */
         case OP_SIN:
-            if (sp < 1 || tag[sp - 1] != T_NBR || useoptionangle)
+            if (sp < 1 || tag[sp - 1] != T_NBR)
                 return 0;
-            fstk[sp - 1] = sin(fstk[sp - 1]);
+            fstk[sp - 1] = useoptionangle ? sin(fstk[sp - 1] / optionangle)
+                                          : sin(fstk[sp - 1]);
             break;
         case OP_COS:
-            if (sp < 1 || tag[sp - 1] != T_NBR || useoptionangle)
+            if (sp < 1 || tag[sp - 1] != T_NBR)
                 return 0;
-            fstk[sp - 1] = cos(fstk[sp - 1]);
+            fstk[sp - 1] = useoptionangle ? cos(fstk[sp - 1] / optionangle)
+                                          : cos(fstk[sp - 1]);
             break;
         case OP_TAN:
-            if (sp < 1 || tag[sp - 1] != T_NBR || useoptionangle)
+            if (sp < 1 || tag[sp - 1] != T_NBR)
                 return 0;
-            fstk[sp - 1] = tan(fstk[sp - 1]);
+            fstk[sp - 1] = useoptionangle ? tan(fstk[sp - 1] / optionangle)
+                                          : tan(fstk[sp - 1]);
             break;
         case OP_ASIN:
-            if (sp < 1 || tag[sp - 1] != T_NBR || useoptionangle)
+            if (sp < 1 || tag[sp - 1] != T_NBR)
                 return 0;
             if (fstk[sp - 1] < -1.0 || fstk[sp - 1] > 1.0)
                 return 0; /* domain error - let interpreter raise it */
             fstk[sp - 1] = asin(fstk[sp - 1]);
+            if (useoptionangle)
+                fstk[sp - 1] *= optionangle;
             break;
         case OP_ACOS:
-            if (sp < 1 || tag[sp - 1] != T_NBR || useoptionangle)
+            if (sp < 1 || tag[sp - 1] != T_NBR)
                 return 0;
             if (fstk[sp - 1] < -1.0 || fstk[sp - 1] > 1.0)
                 return 0;
             fstk[sp - 1] = acos(fstk[sp - 1]);
+            if (useoptionangle)
+                fstk[sp - 1] *= optionangle;
             break;
         case OP_ATAN:
-            if (sp < 1 || tag[sp - 1] != T_NBR || useoptionangle)
+            if (sp < 1 || tag[sp - 1] != T_NBR)
                 return 0;
             fstk[sp - 1] = atan(fstk[sp - 1]);
+            if (useoptionangle)
+                fstk[sp - 1] *= optionangle;
             break;
         case OP_SQR:
             if (sp < 1 || tag[sp - 1] != T_NBR)
@@ -2865,9 +2883,11 @@ static int replay_common(struct cache_entry *e, int *out_bool)
             tag[sp++] = T_NBR;
             break;
         case OP_ATAN2:
-            if (sp < 2 || tag[sp - 2] != T_NBR || tag[sp - 1] != T_NBR || useoptionangle)
-                return 0; /* degree-mode output scaling: let interpreter handle */
+            if (sp < 2 || tag[sp - 2] != T_NBR || tag[sp - 1] != T_NBR)
+                return 0;
             fstk[sp - 2] = atan2(fstk[sp - 2], fstk[sp - 1]);
+            if (useoptionangle)
+                fstk[sp - 2] *= optionangle;
             sp--;
             break;
         case OP_MAX_NBR:

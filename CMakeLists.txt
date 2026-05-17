@@ -114,7 +114,6 @@ set(OPTIMIZED_SOURCES
 	MATHS.c
 	Editor.c
 	aes.c
-	MMTrace.c
 )
 
 set(FULL_RP2040_VARIANTS
@@ -228,7 +227,6 @@ set(USES_CACHE_VARIANTS
 	VGARP2350
 	VGAUSBRP2350
 	HDMI
-	WEBRP2350
 )
 compile_is_in(IS_RP2350 ${RP2350_VARIANTS})
 compile_is_in(IS_WEB ${WEB_VARIANTS})
@@ -356,6 +354,7 @@ endif()
 if(USES_CACHE)
 	target_sources(PicoMite PRIVATE ${CACHE_SOURCES})
 	target_compile_definitions(PicoMite PRIVATE CACHE)
+	set_source_files_properties(MMtrace.c PROPERTIES COMPILE_FLAGS -Os)
 endif()
 
 foreach(source IN LISTS OPTIMIZED_SOURCES)
@@ -532,4 +531,36 @@ endif()
 
 if(IS_WEB)
 	target_link_libraries(PicoMite pico_cyw43_arch_lwip_poll)
+endif()
+
+# TLS support (mbedtls + lwIP altcp_tls glue) — RP2350 only.
+# Enabled when the WEBRP2350 target is built.
+if(IS_WEBRP2350)
+	target_link_libraries(PicoMite
+		pico_lwip_mbedtls
+		pico_mbedtls
+	)
+	# PICOMITEWEB_TLS gates the LWIP_ALTCP_TLS defines in lwipopts.h. lwIP
+	# sources (including altcp_tls_mbedtls.c which pico_lwip_mbedtls pulls
+	# into PicoMite via INTERFACE sources) are compiled with PicoMite's
+	# PRIVATE flags, so set it here too — not only in configuration.h, which
+	# isn't included by lwIP TUs.
+	target_compile_definitions(PicoMite PRIVATE PICOMITEWEB_TLS)
+	# pico-sdk sets MBEDTLS_CONFIG_FILE on pico_mbedtls_headers INTERFACE
+	# (pointing at the sdk default). That definition reaches PicoMite via
+	# both pico_mbedtls and pico_lwip_mbedtls -> pico_mbedtls_headers, and
+	# our additional definition produces the "redefined" warning. Strip
+	# pico-sdk's value from pico_mbedtls_headers, then install ours.
+	foreach(_tls_target pico_mbedtls_headers pico_mbedtls pico_lwip_mbedtls)
+		if(TARGET ${_tls_target})
+			get_target_property(_defs ${_tls_target} INTERFACE_COMPILE_DEFINITIONS)
+			if(_defs)
+				list(FILTER _defs EXCLUDE REGEX "^MBEDTLS_CONFIG_FILE=")
+				set_property(TARGET ${_tls_target} PROPERTY INTERFACE_COMPILE_DEFINITIONS "${_defs}")
+			endif()
+		endif()
+	endforeach()
+	target_compile_definitions(pico_mbedtls_headers INTERFACE
+		MBEDTLS_CONFIG_FILE="${CMAKE_CURRENT_LIST_DIR}/mbedtls_config.h"
+	)
 endif()

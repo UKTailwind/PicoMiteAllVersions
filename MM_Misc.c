@@ -132,8 +132,8 @@ char *UDPinterrupt = NULL;
 volatile bool UDPreceive = false;
 void setwifi(unsigned char *tp)
 {
-    getcsargs(&tp, 11);
-    if (!(argc == 3 || argc == 5 || argc == 11))
+    getcsargs(&tp, 13);
+    if (!(argc == 3 || argc == 5 || argc == 7 || argc == 11 || argc == 13))
         SyntaxError();
     ;
     if (CurrentLinePtr)
@@ -150,7 +150,7 @@ void setwifi(unsigned char *tp)
         error("SSID too long, max 63 chars");
     if (strlen(password) > MAXKEYLEN - 1)
         error("Password too long, max 63 chars");
-    if (argc == 11)
+    if (argc == 11 || argc == 13)
     {
         strcpy(ipaddress, (char *)getCstring(argv[6]));
         strcpy(mask, (char *)getCstring(argv[8]));
@@ -174,9 +174,17 @@ void setwifi(unsigned char *tp)
         strcpy(hostname, "PICO");
         strcat(hostname, id_out);
     }
+    int country_idx = -1;
+    if (argc == 7 || argc == 13)
+    {
+        const char *country_str = (const char *)getCstring(argv[argc == 7 ? 6 : 12]);
+        country_idx = wifi_country_from_string(country_str);
+        if (country_idx < 0)
+            error("Invalid WiFi country code");
+    }
     strcpy((char *)Option.SSID, ssid);
     strcpy((char *)Option.PASSWORD, password);
-    if (argc == 11)
+    if (argc == 11 || argc == 13)
     {
         strcpy(Option.ipaddress, ipaddress);
         strcpy(Option.mask, mask);
@@ -189,6 +197,8 @@ void setwifi(unsigned char *tp)
         memset(Option.gateway, 0, 16);
     }
     strcpy(Option.hostname, hostname);
+    if (country_idx >= 0)
+        Option.wifi_country_code = (unsigned char)country_idx;
     SaveOptions();
 }
 #endif
@@ -2274,8 +2284,7 @@ void MIPS16 cmd_library(void)
         if (Option.LIBRARY_FLASH_SIZE != MAX_PROG_SIZE)
             error("No library to store");
         char *pp = (char *)getFstring(argv[0]);
-        if (strchr((char *)pp, '.') == NULL)
-            strcat((char *)pp, ".lib");
+        AppendDefaultExtension((char *)pp, ".lib");
         if (!BasicFileOpen((char *)pp, fnbr, FA_WRITE | FA_CREATE_ALWAYS))
             return;
         int i = 0;
@@ -2334,8 +2343,7 @@ void MIPS16 cmd_library(void)
         if (!InitSDCard())
             return;
         char *pp = (char *)getFstring(argv[0]);
-        if (strchr((char *)pp, '.') == NULL)
-            strcat((char *)pp, ".lib");
+        AppendDefaultExtension((char *)pp, ".lib");
         fsize = FileSize((char *)pp);
         if (!BasicFileOpen((char *)pp, fnbr, FA_READ))
             return;
@@ -2952,6 +2960,12 @@ void MIPS16 printoptions(void)
             MMputchar(',', 1);
             MMputchar(' ', 1);
             MMPrintString(Option.gateway);
+        }
+        if (Option.wifi_country_code)
+        {
+            MMputchar(',', 1);
+            MMputchar(' ', 1);
+            MMPrintString((char *)wifi_country_to_string(Option.wifi_country_code));
         }
         PRet();
     }
@@ -6973,8 +6987,7 @@ void MIPS16 cmd_option(void)
         if (!InitSDCard())
             return;
         char *pp = (char *)getFstring(argv[0]);
-        if (strchr((char *)pp, '.') == NULL)
-            strcat((char *)pp, ".opt");
+        AppendDefaultExtension((char *)pp, ".opt");
         if (!BasicFileOpen((char *)pp, fnbr, FA_WRITE | FA_CREATE_ALWAYS))
             return;
         int i = sizeof(Option);
@@ -7000,8 +7013,7 @@ void MIPS16 cmd_option(void)
         if (!InitSDCard())
             return;
         char *pp = (char *)getFstring(argv[0]);
-        if (strchr((char *)pp, '.') == NULL)
-            strcat((char *)pp, ".opt");
+        AppendDefaultExtension((char *)pp, ".opt");
         fsize = FileSize((char *)pp);
         if (!BasicFileOpen((char *)pp, fnbr, FA_READ))
             return;
@@ -7225,9 +7237,9 @@ void MIPS16 fun_info(void)
         }
         else if (checkstring(ep, (unsigned char *)"CURRENT"))
         {
-            if (ProgMemory[0] == 1 && ProgMemory[1] == 39 && ProgMemory[2] == 35)
+            if (ProgMemory[0] == T_NEWLINE && ProgMemory[T_NEWLINE_HDR] == '\'' && ProgMemory[T_NEWLINE_HDR + 1] == '#')
             {
-                strcpy((char *)sret, (char *)&ProgMemory[3]);
+                strcpy((char *)sret, (char *)&ProgMemory[T_NEWLINE_HDR + 2]);
             }
             else
                 strcpy((char *)sret, "NONE");
@@ -7488,7 +7500,13 @@ void MIPS16 fun_info(void)
     }
     else if (checkstring(ep, (unsigned char *)"WIFI STATUS"))
     {
-        iret = cyw43_wifi_link_status(&cyw43_state, CYW43_ITF_STA);
+        int live = cyw43_wifi_link_status(&cyw43_state, CYW43_ITF_STA);
+        if (live < 0)
+            iret = live;
+        else if (WIFIconnected)
+            iret = live;
+        else
+            iret = LastWifiErr ? LastWifiErr : live;
         targ = T_INT;
         return;
     }
@@ -8064,9 +8082,9 @@ void MIPS16 fun_info(void)
         {
             //            strcpy((char *)sret,GetCWD());
             //            if(sret[strlen((char *)sret)-1]!='/')strcat((char *)sret,"/");
-            if (ProgMemory[0] == 1 && ProgMemory[1] == 39 && ProgMemory[2] == 35)
+            if (ProgMemory[0] == T_NEWLINE && ProgMemory[T_NEWLINE_HDR] == '\'' && ProgMemory[T_NEWLINE_HDR + 1] == '#')
             {
-                strcpy((char *)sret, (char *)&ProgMemory[3]);
+                strcpy((char *)sret, (char *)&ProgMemory[T_NEWLINE_HDR + 2]);
                 for (int i = strlen((char *)sret) - 1; i > 0; i--)
                 {
                     if (sret[i] != '/')

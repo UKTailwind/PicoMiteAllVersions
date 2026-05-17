@@ -1300,7 +1300,25 @@ void i2cSend(unsigned char *p)
   I2C_Addr = addr;
   sendlen = getint(argv[4], 1, 256);
 
-  if (sendlen == 1 || argc > 7)
+  // With sendlen==1 the last arg is ambiguous: a single byte literal/expression OR a single-byte
+  // string/array variable. Probe argv[6]; if it resolves to a usable string/array variable, take
+  // the variable branch. Otherwise treat the arg(s) as numeric expressions.
+  int useVarBranch = (sendlen > 1 && argc == 7);
+  if (sendlen == 1 && argc == 7)
+  {
+    ptr = findvar(argv[6], V_NOFIND_NULL | V_EMPTY_OK);
+    if (ptr != NULL)
+    {
+      int t = g_vartbl[g_VarIndex].type;
+      if (((t & T_STR) && g_vartbl[g_VarIndex].dims[0] == 0) ||
+          ((t & (T_NBR | T_INT)) && g_vartbl[g_VarIndex].dims[0] > 0 && g_vartbl[g_VarIndex].dims[1] == 0))
+        useVarBranch = 1;
+      else
+        ptr = NULL;
+    }
+  }
+
+  if (!useVarBranch)
   { // numeric expressions for data
     if (sendlen != ((argc - 5) >> 1))
       StandardError(2);
@@ -1311,7 +1329,8 @@ void i2cSend(unsigned char *p)
   }
   else
   { // an array of MMFLOAT, integer or a string
-    ptr = findvar(argv[6], V_NOFIND_NULL | V_EMPTY_OK);
+    if (ptr == NULL)
+      ptr = findvar(argv[6], V_NOFIND_NULL | V_EMPTY_OK);
     if (ptr == NULL)
       StandardError(6);
     CHECK_STRUCT_MEMBER_ARRAY(); // Struct member arrays not supported here
@@ -1386,7 +1405,25 @@ void i2cSendSlave(unsigned char *p, int channel)
   if (sendlen < 1 || sendlen > 255)
     StandardError(21);
 
-  if (sendlen == 1 || argc > 3)
+  // With sendlen==1 the last arg is ambiguous: a single byte literal/expression OR a single-byte
+  // string/array variable. Probe argv[2]; if it resolves to a usable string/array variable, take
+  // the variable branch. Otherwise treat the arg(s) as numeric expressions.
+  int useVarBranch = (sendlen > 1 && argc == 3);
+  if (sendlen == 1 && argc == 3)
+  {
+    ptr = findvar(argv[2], V_NOFIND_NULL | V_EMPTY_OK);
+    if (ptr != NULL)
+    {
+      int t = g_vartbl[g_VarIndex].type;
+      if (((t & T_STR) && g_vartbl[g_VarIndex].dims[0] == 0) ||
+          ((t & (T_NBR | T_INT)) && g_vartbl[g_VarIndex].dims[0] > 0 && g_vartbl[g_VarIndex].dims[1] == 0))
+        useVarBranch = 1;
+      else
+        ptr = NULL;
+    }
+  }
+
+  if (!useVarBranch)
   { // numeric expressions for data
     if (sendlen != ((argc - 1) >> 1))
       StandardError(2);
@@ -1397,7 +1434,8 @@ void i2cSendSlave(unsigned char *p, int channel)
   }
   else
   { // an array of MMFLOAT, integer or a string
-    ptr = findvar(argv[2], V_NOFIND_NULL | V_EMPTY_OK);
+    if (ptr == NULL)
+      ptr = findvar(argv[2], V_NOFIND_NULL | V_EMPTY_OK);
     if (ptr == NULL)
       StandardError(6);
     CHECK_STRUCT_MEMBER_ARRAY(); // Struct member arrays not supported here
@@ -1441,10 +1479,22 @@ void i2cSendSlave(unsigned char *p, int channel)
     else
       StandardError(6);
   }
-  if (channel == 0)
-    i2c_write_raw_blocking(i2c0, bbuff, sendlen);
-  else
-    i2c_write_raw_blocking(i2c1, bbuff, sendlen);
+  i2c_inst_t *i2c = (channel == 0) ? i2c0 : i2c1;
+  // Clear any stale STOP / TX_ABRT from a previous transaction so we don't bail out immediately.
+  (void)i2c->hw->clr_stop_det;
+  (void)i2c->hw->clr_tx_abrt;
+  I2CTimer = 0;
+  int sent = 0;
+  while (sent < sendlen && I2CTimer < 100)
+  {
+    // Master has ended the read (STOP) or NACKed (TX_ABRT) -> stop feeding the FIFO.
+    if (i2c->hw->raw_intr_stat & (I2C_IC_RAW_INTR_STAT_STOP_DET_BITS | I2C_IC_RAW_INTR_STAT_TX_ABRT_BITS))
+      break;
+    if (i2c->hw->status & I2C_IC_STATUS_TFNF_BITS)
+      i2c->hw->data_cmd = bbuff[sent++];
+  }
+  (void)i2c->hw->clr_stop_det;
+  (void)i2c->hw->clr_tx_abrt;
 }
 // send data to an I2C slave - master mode
 void i2c2Send(unsigned char *p)
@@ -1468,7 +1518,25 @@ void i2c2Send(unsigned char *p)
   I2C2_Addr = addr;
   sendlen = getint(argv[4], 1, 256);
 
-  if (sendlen == 1 || argc > 7)
+  // With sendlen==1 the last arg is ambiguous: a single byte literal/expression OR a single-byte
+  // string/array variable. Probe argv[6]; if it resolves to a usable string/array variable, take
+  // the variable branch. Otherwise treat the arg(s) as numeric expressions.
+  int useVarBranch = (sendlen > 1 && argc == 7);
+  if (sendlen == 1 && argc == 7)
+  {
+    ptr = findvar(argv[6], V_NOFIND_NULL | V_EMPTY_OK);
+    if (ptr != NULL)
+    {
+      int t = g_vartbl[g_VarIndex].type;
+      if (((t & T_STR) && g_vartbl[g_VarIndex].dims[0] == 0) ||
+          ((t & (T_NBR | T_INT)) && g_vartbl[g_VarIndex].dims[0] > 0 && g_vartbl[g_VarIndex].dims[1] == 0))
+        useVarBranch = 1;
+      else
+        ptr = NULL;
+    }
+  }
+
+  if (!useVarBranch)
   { // numeric expressions for data
     if (sendlen != ((argc - 5) >> 1))
       StandardError(2);
@@ -1479,7 +1547,8 @@ void i2c2Send(unsigned char *p)
   }
   else
   { // an array of MMFLOAT, integer or a string
-    ptr = findvar(argv[6], V_NOFIND_NULL | V_EMPTY_OK);
+    if (ptr == NULL)
+      ptr = findvar(argv[6], V_NOFIND_NULL | V_EMPTY_OK);
     if (ptr == NULL)
       StandardError(6);
     CHECK_STRUCT_MEMBER_ARRAY(); // Struct member arrays not supported here
@@ -1654,7 +1723,7 @@ void i2cReceiveSlave(unsigned char *p, int channel)
   void *ptr = NULL;
   MMFLOAT *rcvdlenFloat = NULL;
   long long int *rcvdlenInt = NULL;
-  int count = 1;
+  int count = 0;
   I2C_Rcvbuf_Float = NULL;
   I2C_Rcvbuf_Int = NULL;
   I2C_Rcvbuf_String = NULL;
@@ -1726,36 +1795,27 @@ void i2cReceiveSlave(unsigned char *p, int channel)
   else
     StandardError(6);
 
-  unsigned char *bbuff;
-  if (channel == 0)
+  unsigned char *bbuff = I2C_Send_Buffer;
+  i2c_inst_t *i2c = (channel == 0) ? i2c0 : i2c1;
+  // Clear any stale STOP from a previous transaction so the early-exit doesn't trigger immediately.
+  (void)i2c->hw->clr_stop_det;
+  I2CTimer = 0;
+  while (count < rcvlen && I2CTimer < 100)
   {
-    bbuff = I2C_Send_Buffer;
-    i2c_read_raw_blocking(i2c0, bbuff, 1);
-    if (rcvlen > 1)
+    if (i2c->hw->status & I2C_IC_STATUS_RFNE_BITS)
     {
-      I2CTimer = 0;
-      while (count < rcvlen && I2CTimer < rcvlen / 10 + 2)
-      {
-        if (i2c0->hw->status & 8)
-          i2c_read_raw_blocking(i2c0, &bbuff[count++], 1);
-      }
+      bbuff[count++] = (uint8_t)i2c->hw->data_cmd;
+    }
+    else if (i2c->hw->raw_intr_stat & I2C_IC_RAW_INTR_STAT_STOP_DET_BITS)
+    {
+      // Master ended the transfer; drain any bytes that landed in the FIFO before the STOP, then exit.
+      while (count < rcvlen && (i2c->hw->status & I2C_IC_STATUS_RFNE_BITS))
+        bbuff[count++] = (uint8_t)i2c->hw->data_cmd;
+      break;
     }
   }
-  else
-  {
-    bbuff = I2C_Send_Buffer;
-    i2c_read_raw_blocking(i2c1, bbuff, 1);
-    if (rcvlen > 1)
-    {
-      I2CTimer = 0;
-      while (count < rcvlen && I2CTimer < rcvlen / 10 + 2)
-      {
-        if (i2c1->hw->status & 8)
-          i2c_read_raw_blocking(i2c1, &bbuff[count++], 1);
-      }
-    }
-  }
-  for (int i = 0; i < rcvlen; i++)
+  (void)i2c->hw->clr_stop_det;
+  for (int i = 0; i < count; i++)
   {
     if (I2C_Rcvbuf_String != NULL)
     {

@@ -32,23 +32,15 @@ int TCP_PORT;
 #define DEBUG_printf
 const char httpheadersfail[] = "HTTP/1.0 404\r\n\r\n";
 TCP_SERVER_T *TCPstate = NULL;
-jmp_buf recover;
 static TCP_SERVER_T *tcp_server_init(void)
 {
+        /* On re-init, keep existing state so active client_pcb[] entries aren't
+           silently dropped (their lwIP PCBs would leak in CLOSE_WAIT). */
+        if (TCPstate)
+                return TCPstate;
+        TCPstate = (TCP_SERVER_T *)calloc(1, sizeof(TCP_SERVER_T));
         if (!TCPstate)
-        {
-                TCPstate = (TCP_SERVER_T *)calloc(1, sizeof(TCP_SERVER_T));
-                memset(TCPstate, 0, sizeof(TCP_SERVER_T));
-        }
-        if (!TCPstate)
-        {
-                // DEBUG_printf("failed to allocate state\r\n");
                 return NULL;
-        }
-        for (int i = 0; i < MaxPcb; i++)
-        {
-                TCPstate->client_pcb[i] = NULL;
-        }
         TCPstate->telnet_pcb_no = 99;
         return TCPstate;
 }
@@ -69,7 +61,15 @@ err_t tcp_server_close(void *arg, int pcb)
                 if (err != ERR_OK)
                 {
                         tcp_abort(state->client_pcb[pcb]);
-                        error("close failed %, calling abort", err);
+                        /* tcp_server_close runs from callback context when called by
+                           tcp_server_err / tcp_server_recv FIN — defer the error to
+                           avoid longjmping out of lwIP. The next ProcessWeb /
+                           cyw43_arch_poll cycle will raise it. */
+                        {
+                                char buf[64];
+                                snprintf(buf, sizeof(buf), "close failed %d, calling abort", (int)err);
+                                web_async_set_error(buf);
+                        }
                         err = ERR_ABRT;
                 }
                 // DEBUG_printf("Close success %x on pcb %x\r\n",state->client_pcb[pcb],pcb);
@@ -162,6 +162,8 @@ err_t tcp_server_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err
         TCP_SERVER_T *state = (TCP_SERVER_T *)arg;
         if (!p)
         {
+                /* Remote sent FIN — close the PCB so it doesn't sit in CLOSE_WAIT */
+                tcp_server_close(state, pcb);
                 return ERR_OK;
         }
         // this method is callback from lwIP, so cyw43_arch_lwip_begin is not required, however you
@@ -199,6 +201,10 @@ err_t tcp_server_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err
                         state->recv_len[pcb] = pbuf_copy_partial(p, state->buffer_recv[pcb], p->tot_len, 0);
                         if (state->recv_len[pcb] != p->tot_len)
                                 MMPrintString("Warning: WebMite Internal error");
+                        /* Null bytes in the body are replaced with spaces so BASIC
+                           C-string operations on buffer_recv don't truncate. The actual
+                           length is preserved via dest[0] in WEB TCP READ, but anyone
+                           parsing binary request bodies will see corrupted data. */
                         for (int i = 0; i < p->tot_len; i++)
                                 if (state->buffer_recv[pcb][i] == 0)
                                         state->buffer_recv[pcb][i] = 32;
@@ -387,16 +393,12 @@ static bool tcp_server_open(void *arg)
                 PRet();
         }
 
-        struct tcp_pcb *httppcb = tcp_new_ip_type(IPADDR_TYPE_ANY);
-        struct tcp_pcb *telnet_pcb = tcp_new_ip_type(IPADDR_TYPE_ANY);
-        if (!httppcb || !telnet_pcb)
-        {
-                // DEBUG_printf("failed to create pcbs\r\n");
-                return false;
-        }
         err_t err;
         if (TCP_PORT)
         {
+                struct tcp_pcb *httppcb = tcp_new_ip_type(IPADDR_TYPE_ANY);
+                if (!httppcb)
+                        return false;
                 err = tcp_bind(httppcb, NULL, TCP_PORT);
                 if (err)
                 {
@@ -404,23 +406,25 @@ static bool tcp_server_open(void *arg)
                         sprintf(buff, "failed to bind to port %d\n", TCP_PORT);
                         if (!optionsuppressstatus)
                                 MMPrintString(buff);
+                        tcp_close(httppcb);
                         return false;
                 }
                 state->server_pcb = tcp_listen_with_backlog(httppcb, MaxPcb);
                 if (!state->server_pcb)
                 {
-                        // DEBUG_printf("failed to listen\r\n");
-                        if (httppcb)
-                        {
-                                tcp_close(httppcb);
-                        }
+                        /* listen failed — httppcb is not freed by lwIP in this case */
+                        tcp_close(httppcb);
                         return false;
                 }
+                /* on success lwIP has freed httppcb and returned a new listening pcb */
                 tcp_arg(state->server_pcb, state);
                 tcp_accept(state->server_pcb, tcp_server_accept);
         }
         if (Option.Telnet)
         {
+                struct tcp_pcb *telnet_pcb = tcp_new_ip_type(IPADDR_TYPE_ANY);
+                if (!telnet_pcb)
+                        return false;
                 err = tcp_bind(telnet_pcb, NULL, 23);
                 if (err)
                 {
@@ -428,16 +432,13 @@ static bool tcp_server_open(void *arg)
                         sprintf(buff, "failed to bind to port %d\n", 23);
                         if (!optionsuppressstatus)
                                 MMPrintString(buff);
+                        tcp_close(telnet_pcb);
                         return false;
                 }
                 state->telnet_pcb = tcp_listen_with_backlog(telnet_pcb, MaxPcb);
                 if (!state->telnet_pcb)
                 {
-                        // DEBUG_printf("failed to listen\r\n");
-                        if (telnet_pcb)
-                        {
-                                tcp_close(telnet_pcb);
-                        }
+                        tcp_close(telnet_pcb);
                         return false;
                 }
                 tcp_arg(state->telnet_pcb, state);
@@ -500,8 +501,6 @@ void cmd_transmit(unsigned char *cmd)
                 state->sent_len[pcb] = 0;
                 state->buffer_sent[pcb] = (unsigned char *)httpheaders;
                 state->total_sent[pcb] = strlen(httpheaders);
-                if (setjmp(recover) != 0)
-                        error("Transmit failed");
                 if (state->client_pcb[pcb])
                 {
                         tcp_server_send_data(state, state->client_pcb[pcb], pcb);
@@ -546,8 +545,6 @@ void cmd_transmit(unsigned char *cmd)
                         state->sent_len[pcb] = 0;
                         state->to_send[pcb] = state->total_sent[pcb] = strlen(outstr);
                         state->buffer_sent[pcb] = (unsigned char *)outstr;
-                        if (setjmp(recover) != 0)
-                                error("Transmit failed");
                         // DEBUG_printf("sending file header to pcb %d\r\n",pcb);
                         tcp_server_send_data(state, state->client_pcb[pcb], pcb);
                         if (Size < TCP_MSS * 4 && Size < FreeSpaceOnHeap() / 4)
@@ -716,8 +713,6 @@ void cmd_transmit(unsigned char *cmd)
                         strcat(outstr, p);
                         strcat(outstr, httpend);
                         //
-                        if (setjmp(recover) != 0)
-                                error("Transmit failed");
                         state->to_send[pcb] = state->total_sent[pcb] = strlen(outstr);
                         state->sent_len[pcb] = 0;
                         state->buffer_sent[pcb] = (unsigned char *)outstr;
@@ -796,8 +791,11 @@ int cmd_tcpserver(void)
                 if (argc != 1)
                         SyntaxError();
                 ;
+                if (!state)
+                        error("Server not open");
                 int pcb = getint(argv[0], 1, MaxPcb) - 1;
                 tcp_server_close(state, pcb);
+                web_async_check_error();
                 return 1;
         }
         tp = checkstring(cmdline, (unsigned char *)"TRANSMIT");

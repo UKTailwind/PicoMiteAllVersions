@@ -46,11 +46,11 @@ udp_recv_func(void *arg, struct udp_pcb *upcb, struct pbuf *p, const ip_addr_t *
     LWIP_UNUSED_ARG(arg);
     if (p == NULL)
         return;
-    int len = p->len;
+    int len = p->tot_len;
     if (len >= sizeof(messagebuff))
         len = sizeof(messagebuff) - 1;
     memset(messagebuff, 0, sizeof(messagebuff));
-    memcpy(&messagebuff[1], p->payload, len);
+    pbuf_copy_partial(p, &messagebuff[1], len, 0);
     messagebuff[0] = len;
     memset(addressbuff, 0, sizeof(addressbuff));
     sprintf((char *)&addressbuff[1], "%d.%d.%d.%d", (int)addr->addr & 0xff, (int)(addr->addr >> 8) & 0xff, (int)(addr->addr >> 16) & 0xff, (int)(addr->addr >> 24) & 0xff);
@@ -62,6 +62,11 @@ udp_recv_func(void *arg, struct udp_pcb *upcb, struct pbuf *p, const ip_addr_t *
 void udp_server_init(void)
 {
     udppcb = udp_new();
+    if (!udppcb)
+    {
+        MMPrintString("Failed to allocate UDP server pcb\r\n");
+        return;
+    }
     ip_set_option(udppcb, SOF_BROADCAST);
     //    err_t ret;
     if (Option.UDP_PORT && WIFIconnected && !optionsuppressstatus)
@@ -93,8 +98,8 @@ static void udp_dns_found(const char *hostname, const ip_addr_t *ipaddr, void *a
     }
     else
     {
-        free(state);
-        error("udp dns request failed");
+        /* state is &UDPstate (global), never free() it */
+        web_async_set_error("udp dns request failed");
     }
 }
 
@@ -126,10 +131,10 @@ void cmd_udp(unsigned char *p)
         int timeout = 5000;
         char *IP = GetTempStrMemory();
         strcpy(IP, (char *)getCstring(argv[0]));
-        if (!isalpha((uint8_t)*IP) && strchr(IP, '.') && strchr(IP, '.') < IP + 4)
+        int dots = 0;
+        for (const char *p = IP; *p; p++) if (*p == '.') dots++;
+        if (dots == 3 && ip4addr_aton(IP, &remote_addr))
         {
-            if (!ip4addr_aton(IP, &remote_addr))
-                error("Invalid address format");
             state->udp_server_address = remote_addr;
         }
         else
@@ -143,6 +148,7 @@ void cmd_udp(unsigned char *p)
                 while (!state->complete && Timer4 && !(err == ERR_OK))
                     if (startupcomplete)
                         cyw43_arch_poll();
+                web_async_check_error();
                 if (!Timer4)
                     error("Failed to convert web address");
             }
@@ -151,11 +157,18 @@ void cmd_udp(unsigned char *p)
         }
         unsigned char *data = getstring(argv[4]);
         struct pbuf *p = pbuf_alloc(PBUF_TRANSPORT, (uint16_t)data[0], PBUF_RAM);
+        if (!p)
+            error("Failed to allocate UDP pbuf");
         char *req = (char *)p->payload;
         memset(req, 0, data[0]);
         int port = getint(argv[2], 1, 65535);
         memcpy(req, &data[1], data[0]);
         sendudppcb = udp_new();
+        if (!sendudppcb)
+        {
+            pbuf_free(p);
+            error("Failed to allocate UDP send pcb");
+        }
         ip_set_option(sendudppcb, SOF_BROADCAST);
         err_t er = udp_sendto(sendudppcb, p, &state->udp_server_address, port);
         pbuf_free(p);

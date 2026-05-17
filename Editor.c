@@ -714,8 +714,7 @@ void edit(unsigned char *cmdline, bool cmdfile)
         //        strcpy(name,fname);
         if (!ExistsFile(filename))
         {
-            if (strchr(filename, '.') == NULL)
-                strcat(filename, ".bas");
+            AppendDefaultExtension(filename, ".bas");
         }
         if (!fstrstr(filename, ".bas"))
             Option.ColourCode = 0;
@@ -6924,8 +6923,7 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
                 // Add .bas extension if no extension and file not found
                 if (!ExistsFile(importfile))
                 {
-                    if (strchr(importfile, '.') == NULL)
-                        strcat(importfile, ".bas");
+                    AppendDefaultExtension(importfile, ".bas");
                 }
 
                 // Check file exists and get size
@@ -7021,8 +7019,7 @@ void FullScreenEditor(int xx, int yy, char *fname, int edit_buff_size, bool cmdf
                 strcpy(exportfile, (char *)inpbuf);
 
                 // Add .bas extension if no extension specified
-                if (strchr(exportfile, '.') == NULL)
-                    strcat(exportfile, ".bas");
+                AppendDefaultExtension(exportfile, ".bas");
 
                 // Pre-process filename same way as F9 - set FatFSFileSystem correctly
                 int waste = 0;
@@ -7618,8 +7615,7 @@ void MarkMode(unsigned char *cb, unsigned char *buf)
                         strcpy(exportfile, (char *)inpbuf);
 
                         // Add .bas extension if no extension specified
-                        if (strchr(exportfile, '.') == NULL)
-                            strcat(exportfile, ".bas");
+                        AppendDefaultExtension(exportfile, ".bas");
 
                         // Pre-process filename - set FatFSFileSystem correctly
                         int waste = 0;

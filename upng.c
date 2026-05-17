@@ -1480,8 +1480,7 @@ upng_t *upng_new_from_file(char *filename)
 		return NULL;
 	}
 
-	if (strchr(filename, '.') == NULL)
-		strcat(filename, ".png");
+	AppendDefaultExtension(filename, ".png");
 	fnbr = FindFreeFileNbr();
 	/* get filesize */
 	size = fullsize = FileSize(filename);

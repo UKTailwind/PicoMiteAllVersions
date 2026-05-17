@@ -14,9 +14,21 @@
 //#undef TCP_WND
 //#define TCP_WND  16384
 
-//#define LWIP_ALTCP               1
-//#define LWIP_ALTCP_TLS           1
-//#define LWIP_ALTCP_TLS_MBEDTLS   1
+/* altcp is always on for PICOMITEWEB so the TCP client code path is the
+   same whether TLS is compiled in or not — altcp_tcp_* on plain TCP, and
+   altcp_tls_* on TLS sessions when PICOMITEWEB_TLS is defined. */
+#define LWIP_ALTCP               1
+#ifdef PICOMITEWEB_TLS
+#define LWIP_ALTCP_TLS           1
+#define LWIP_ALTCP_TLS_MBEDTLS   1
+/* mbedtls allocations are routed through lwIP's mem_malloc, capped at
+   MEM_SIZE. tls_malloc in altcp_tls_mbedtls_mem.c rejects any request
+   bigger than MEM_SIZE, so this must hold the largest single allocation
+   (the 8 KB TLS IN buffer + ~256 bytes overhead) plus the rest of the
+   session state. Peak ~22 KB for one TLS session; 40 KB gives headroom
+   for X.509 cert chain parsing transients. */
+#define MEM_SIZE                 40960
+#endif
 #define DNS_TABLE_SIZE           1
 //#define IP_SOF_BROADCAST         1
 //#define IP_SOF_BROADCAST_RECV    1

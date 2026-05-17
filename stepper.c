@@ -94,12 +94,20 @@ static inline bool stepper_estop_is_active(void)
     return ((~gpio_state & ((uint64_t)1 << stepper_system.estop_pin)) != 0);
 }
 
+// Bit set in result <=> pin in limit_mask is currently tripped, accounting
+// for per-pin polarity. For active-low pins (bit=0 in active_high_mask),
+// tripped means GPIO reads 0; for active-high pins (bit=1), tripped means 1.
+static inline uint64_t stepper_limit_tripped_mask(uint64_t gpio_state, uint64_t limit_mask)
+{
+    return ~(gpio_state ^ stepper_system.limit_active_high_mask) & limit_mask;
+}
+
 static bool homing_limit_state_debounced(uint64_t limit_mask, bool want_active)
 {
     for (int i = 0; i < HOMING_SWITCH_DEBOUNCE_SAMPLES; i++)
     {
         uint64_t gpio_state = gpio_get_all64();
-        bool is_active = ((~gpio_state & limit_mask) != 0);
+        bool is_active = (stepper_limit_tripped_mask(gpio_state, limit_mask) != 0);
         if (is_active != want_active)
             return false;
         if (i + 1 < HOMING_SWITCH_DEBOUNCE_SAMPLES)
@@ -1188,18 +1196,19 @@ int stepper_query_status_bitmap(void)
     uint64_t gpio_state = gpio_get_all64();
     int status = 0;
 
-    // Limit switches are active-low.
-    if (stepper_system.x_min_limit_pin != 0xFF && ((~gpio_state & (1ULL << stepper_system.x_min_limit_pin)) != 0))
+    // Limit switches: per-pin active-low (default) or active-high (TMC2209 DIAG).
+    uint64_t tripped = ~(gpio_state ^ stepper_system.limit_active_high_mask);
+    if (stepper_system.x_min_limit_pin != 0xFF && (tripped & (1ULL << stepper_system.x_min_limit_pin)) != 0)
         status |= (1 << 0);
-    if (stepper_system.x_max_limit_pin != 0xFF && ((~gpio_state & (1ULL << stepper_system.x_max_limit_pin)) != 0))
+    if (stepper_system.x_max_limit_pin != 0xFF && (tripped & (1ULL << stepper_system.x_max_limit_pin)) != 0)
         status |= (1 << 1);
-    if (stepper_system.y_min_limit_pin != 0xFF && ((~gpio_state & (1ULL << stepper_system.y_min_limit_pin)) != 0))
+    if (stepper_system.y_min_limit_pin != 0xFF && (tripped & (1ULL << stepper_system.y_min_limit_pin)) != 0)
         status |= (1 << 2);
-    if (stepper_system.y_max_limit_pin != 0xFF && ((~gpio_state & (1ULL << stepper_system.y_max_limit_pin)) != 0))
+    if (stepper_system.y_max_limit_pin != 0xFF && (tripped & (1ULL << stepper_system.y_max_limit_pin)) != 0)
         status |= (1 << 3);
-    if (stepper_system.z_min_limit_pin != 0xFF && ((~gpio_state & (1ULL << stepper_system.z_min_limit_pin)) != 0))
+    if (stepper_system.z_min_limit_pin != 0xFF && (tripped & (1ULL << stepper_system.z_min_limit_pin)) != 0)
         status |= (1 << 4);
-    if (stepper_system.z_max_limit_pin != 0xFF && ((~gpio_state & (1ULL << stepper_system.z_max_limit_pin)) != 0))
+    if (stepper_system.z_max_limit_pin != 0xFF && (tripped & (1ULL << stepper_system.z_max_limit_pin)) != 0)
         status |= (1 << 5);
 
     if (stepper_estop_is_active())
@@ -2355,16 +2364,17 @@ void __not_in_flash_func(stepper_timer_isr)(void)
     if ((int32_t)(stepper_tick_count - stepper_enable_settle_until_tick) < 0)
         return;
 
-    // Check hardware limit switches (active-low, triggers on 0)
+    // Check hardware limit switches. Each pin is active-low by default; pins
+    // marked in limit_active_high_mask (e.g. TMC2209 DIAG wired direct) trip on HIGH.
     if (stepper_system.limits_enabled && !stepper_system.homing_active)
     {
         uint64_t gpio_state = gpio_get_all64();
-        // Limit switches are active-low: if any limit pin reads 0, it's triggered
-        if ((~gpio_state & stepper_system.limit_switch_mask) != 0)
+        uint64_t tripped = stepper_limit_tripped_mask(gpio_state, stepper_system.limit_switch_mask);
+        if (tripped != 0)
         {
             // Latch which limits were active at the time of the trip.
             stepper_limit_trip_latched = true;
-            stepper_limit_trip_mask = (~gpio_state & stepper_system.limit_switch_mask);
+            stepper_limit_trip_mask = tripped;
 
             // Limit switch triggered during normal motion - emergency stop
             current_move.phase = MOVE_PHASE_IDLE;
@@ -3539,9 +3549,10 @@ static void cmd_stepper_home_axes(int argc, unsigned char **argv)
             if (stepper_estop_trip_latched || stepper_estop_is_active())
                 stepper_error("Hardware E-STOP active");
 
-            // Check limit switch
+            // Check limit switch (polarity-aware)
             uint64_t gpio_state = gpio_get_all64();
-            if ((~gpio_state & limit_mask) != 0 && homing_limit_state_debounced(limit_mask, true))
+            if (stepper_limit_tripped_mask(gpio_state, limit_mask) != 0 &&
+                homing_limit_state_debounced(limit_mask, true))
             {
                 limit_hit = true;
                 break;
@@ -3591,7 +3602,8 @@ static void cmd_stepper_home_axes(int argc, unsigned char **argv)
                 stepper_error("Hardware E-STOP active");
 
             uint64_t gpio_state = gpio_get_all64();
-            if ((gpio_state & limit_mask) != 0 && homing_limit_state_debounced(limit_mask, false))
+            if (stepper_limit_tripped_mask(gpio_state, limit_mask) == 0 &&
+                homing_limit_state_debounced(limit_mask, false))
             {
                 backoff_cleared = true;
                 break; // Limit cleared
@@ -3636,7 +3648,7 @@ static void cmd_stepper_home_axes(int argc, unsigned char **argv)
         if (home_z)
             homed_limit_mask |= (uint64_t)1 << stepper_system.z_min_limit_pin;
 
-        if ((~gpio_state & homed_limit_mask) != 0)
+        if (stepper_limit_tripped_mask(gpio_state, homed_limit_mask) != 0)
             stepper_error("Homing failed - limit switch still active after backoff");
     }
 
@@ -3781,6 +3793,7 @@ void cmd_stepper(void)
         stepper_system.z_min_limit_pin = 0xFF;
         stepper_system.z_max_limit_pin = 0xFF;
         stepper_system.limit_switch_mask = 0;
+        stepper_system.limit_active_high_mask = 0;
         stepper_system.limits_enabled = false;
 
         // Initialize homing parameters
@@ -4300,17 +4313,21 @@ void cmd_stepper(void)
         return;
     }
 
-    // STEPPER HWLIMITS X_MIN, Y_MIN, Z_MIN [,X_MAX] [,Y_MAX] [,Z_MAX]
-    // Configure hardware limit switch pins (3 to 6 pins)
-    // Pins are active-low (triggered when grounded)
+    // STEPPER HWLIMITS X_MIN, Y_MIN, Z_MIN [,X_MAX] [,Y_MAX] [,Z_MAX] [,INVERT_MASK]
+    // Configure hardware limit switch pins (3 to 6 pins).
+    // Pins are active-low by default (triggered when grounded). The optional
+    // INVERT_MASK marks pins that are active-high instead (e.g. TMC2209 DIAG
+    // wired straight to the input). Bit positions:
+    //   bit 0 = X_MIN   bit 1 = Y_MIN   bit 2 = Z_MIN
+    //   bit 3 = X_MAX   bit 4 = Y_MAX   bit 5 = Z_MAX
     if ((tp = checkstring(cmdline, (unsigned char *)"HWLIMITS")) != NULL)
     {
         if (!stepper_initialized)
             stepper_error("Stepper not initialized");
 
-        getcsargs(&tp, 11);
+        getcsargs(&tp, 13);
         if (argc < 5)
-            stepper_error("Syntax: STEPPER HWLIMITS x_min, y_min, z_min [,x_max] [,y_max] [,z_max]");
+            stepper_error("Syntax: STEPPER HWLIMITS x_min, y_min, z_min [,x_max, y_max, z_max [,invert_mask]]");
 
         // Read minimum limit pins (required)
         int x_min_pin = parse_pin(argv[0]);
@@ -4359,6 +4376,12 @@ void cmd_stepper(void)
             }
         }
 
+        // Optional invert_mask: per-pin polarity override (bit set = active-high).
+        // Bit order matches the argument order: x_min,y_min,z_min,x_max,y_max,z_max.
+        unsigned int invert_mask = 0;
+        if (argc >= 13 && *argv[12])
+            invert_mask = (unsigned int)getint(argv[12], 0, 0x3F);
+
         // All limit pins must not overlap axis pins, spindle pin, or E-STOP pin.
         uint8_t lims[] = {x_min_gp, x_max_gp, y_min_gp, y_max_gp, z_min_gp, z_max_gp};
         for (int i = 0; i < 6; i++)
@@ -4374,6 +4397,9 @@ void cmd_stepper(void)
         }
 
         // Pins must be unique across axes; allow only same-axis min/max sharing.
+        // lims[] order: x_min(0), x_max(1), y_min(2), y_max(3), z_min(4), z_max(5).
+        // invert_mask bit order:      x_min=0, y_min=1, z_min=2, x_max=3, y_max=4, z_max=5.
+        static const uint8_t lims_to_invert_bit[6] = {0, 3, 1, 4, 2, 5};
         for (int i = 0; i < 6; i++)
         {
             for (int j = i + 1; j < 6; j++)
@@ -4385,6 +4411,14 @@ void cmd_stepper(void)
                 bool same_axis_pair = ((i == 0 && j == 1) || (i == 2 && j == 3) || (i == 4 && j == 5));
                 if (!same_axis_pair)
                     stepper_error("Limit pins must be unique (except same-axis min/max)");
+
+                // Same-axis min/max sharing one pin must agree on polarity. The pin
+                // can only be pulled one way and only one bit of limit_active_high_mask
+                // exists for it, so inconsistent invert bits are unrepresentable.
+                bool inv_i = (invert_mask & (1u << lims_to_invert_bit[i])) != 0;
+                bool inv_j = (invert_mask & (1u << lims_to_invert_bit[j])) != 0;
+                if (inv_i != inv_j)
+                    stepper_error("Shared min/max limit pin: invert_mask bits must match");
             }
         }
 
@@ -4396,49 +4430,44 @@ void cmd_stepper(void)
         stepper_system.y_max_limit_pin = y_max_gp;
         stepper_system.z_max_limit_pin = z_max_gp;
 
-        // Configure as inputs with pull-ups (active-low switches)
-        gpio_init(stepper_system.x_min_limit_pin);
-        gpio_set_dir(stepper_system.x_min_limit_pin, GPIO_IN);
-        gpio_pull_up(stepper_system.x_min_limit_pin);
-        ExtCfg(x_min_pin, EXT_DIG_IN, 0);
-
-        gpio_init(stepper_system.y_min_limit_pin);
-        gpio_set_dir(stepper_system.y_min_limit_pin, GPIO_IN);
-        gpio_pull_up(stepper_system.y_min_limit_pin);
-        ExtCfg(y_min_pin, EXT_DIG_IN, 0);
-
-        gpio_init(stepper_system.z_min_limit_pin);
-        gpio_set_dir(stepper_system.z_min_limit_pin, GPIO_IN);
-        gpio_pull_up(stepper_system.z_min_limit_pin);
-        ExtCfg(z_min_pin, EXT_DIG_IN, 0);
-
-        uint64_t mask = ((uint64_t)1 << stepper_system.x_min_limit_pin) |
-                        ((uint64_t)1 << stepper_system.y_min_limit_pin) |
-                        ((uint64_t)1 << stepper_system.z_min_limit_pin);
-
-        if (stepper_system.x_max_limit_pin != 0xFF)
+        // Configure each limit pin as input. Active-low (default) gets a pull-up
+        // so an open switch reads HIGH. Active-high (e.g. TMC2209 DIAG) gets a
+        // pull-down so a disconnected wire reads LOW (= idle / not tripped).
+        struct
         {
-            gpio_init(stepper_system.x_max_limit_pin);
-            gpio_set_dir(stepper_system.x_max_limit_pin, GPIO_IN);
-            gpio_pull_up(stepper_system.x_max_limit_pin);
-            ExtCfg(x_max_pin, EXT_DIG_IN, 0);
-            mask |= ((uint64_t)1 << stepper_system.x_max_limit_pin);
-        }
-        if (stepper_system.y_max_limit_pin != 0xFF)
+            uint8_t gp;
+            int basic_pin;
+            unsigned int invert_bit;
+        } limit_setup[] = {
+            {stepper_system.x_min_limit_pin, x_min_pin, 1u << 0},
+            {stepper_system.y_min_limit_pin, y_min_pin, 1u << 1},
+            {stepper_system.z_min_limit_pin, z_min_pin, 1u << 2},
+            {stepper_system.x_max_limit_pin, x_max_pin, 1u << 3},
+            {stepper_system.y_max_limit_pin, y_max_pin, 1u << 4},
+            {stepper_system.z_max_limit_pin, z_max_pin, 1u << 5},
+        };
+
+        uint64_t mask = 0;
+        uint64_t active_high_mask = 0;
+
+        for (unsigned i = 0; i < sizeof(limit_setup) / sizeof(limit_setup[0]); i++)
         {
-            gpio_init(stepper_system.y_max_limit_pin);
-            gpio_set_dir(stepper_system.y_max_limit_pin, GPIO_IN);
-            gpio_pull_up(stepper_system.y_max_limit_pin);
-            ExtCfg(y_max_pin, EXT_DIG_IN, 0);
-            mask |= ((uint64_t)1 << stepper_system.y_max_limit_pin);
-        }
-        if (stepper_system.z_max_limit_pin != 0xFF)
-        {
-            gpio_init(stepper_system.z_max_limit_pin);
-            gpio_set_dir(stepper_system.z_max_limit_pin, GPIO_IN);
-            gpio_pull_up(stepper_system.z_max_limit_pin);
-            ExtCfg(z_max_pin, EXT_DIG_IN, 0);
-            mask |= ((uint64_t)1 << stepper_system.z_max_limit_pin);
+            uint8_t gp = limit_setup[i].gp;
+            if (gp == 0xFF)
+                continue;
+
+            bool active_high = (invert_mask & limit_setup[i].invert_bit) != 0;
+            gpio_init(gp);
+            gpio_set_dir(gp, GPIO_IN);
+            if (active_high)
+                gpio_pull_down(gp);
+            else
+                gpio_pull_up(gp);
+            ExtCfg(limit_setup[i].basic_pin, EXT_DIG_IN, 0);
+
+            mask |= ((uint64_t)1 << gp);
+            if (active_high)
+                active_high_mask |= ((uint64_t)1 << gp);
         }
 
         // Reserve only after full parse + validation.
@@ -4454,6 +4483,7 @@ void cmd_stepper(void)
 
         // Store mask and enable limit checking
         stepper_system.limit_switch_mask = mask;
+        stepper_system.limit_active_high_mask = active_high_mask;
         stepper_system.limits_enabled = true;
 
         MMPrintString("Hardware limit switches configured\r\n");
@@ -5155,6 +5185,16 @@ void cmd_stepper(void)
                 }
                 block.feedrate = max_feedrate;
             }
+            else if (block.has_a && fabsf(da) > 0.001f &&
+                     axis_is_configured(&stepper_system.a) &&
+                     block.feedrate > stepper_system.a.max_velocity)
+            {
+                // A-only move: clamp F to A axis max_velocity. Without this clamp,
+                // cruise_rate exceeds what the per-axis tick gate can deliver, and
+                // step_rate decays to 0 in DECEL with > STEPPER_TAIL_FINISH_STEPS
+                // remaining, leaving the block unable to complete.
+                block.feedrate = stepper_system.a.max_velocity;
+            }
         }
 
         // Pre-compute motion profile for ISR (multi-axis Bresenham)
@@ -5807,6 +5847,16 @@ void cmd_stepper(void)
                 // Apply the limited feedrate
                 block.feedrate = max_feedrate;
             }
+            else if (block.has_a && fabsf(da) > 0.001f &&
+                     axis_is_configured(&stepper_system.a) &&
+                     block.feedrate > stepper_system.a.max_velocity)
+            {
+                // A-only move: clamp F to A axis max_velocity. Without this clamp,
+                // cruise_rate exceeds what the per-axis tick gate can deliver, and
+                // step_rate decays to 0 in DECEL with > STEPPER_TAIL_FINISH_STEPS
+                // remaining, leaving the block unable to complete.
+                block.feedrate = stepper_system.a.max_velocity;
+            }
         }
 
         // Pre-compute motion profile for ISR (multi-axis Bresenham)
@@ -6069,7 +6119,7 @@ void cmd_stepper(void)
         if (stepper_system.limits_enabled)
         {
             uint64_t gpio_state = gpio_get_all64();
-            if ((~gpio_state & stepper_system.limit_switch_mask) != 0)
+            if (stepper_limit_tripped_mask(gpio_state, stepper_system.limit_switch_mask) != 0)
                 stepper_error("Limit switch active - clear switch and re-home (G28)");
         }
 
@@ -6147,10 +6197,12 @@ void cmd_stepper(void)
                 (double)stepper_system.a_g92_offset);
         MMPrintString(buf);
 
-        sprintf(buf, "HW limits: %s, mask=0x%08lx%08lx\r\n",
+        sprintf(buf, "HW limits: %s, mask=0x%08lx%08lx, active_high=0x%08lx%08lx\r\n",
                 stepper_system.limits_enabled ? "ON" : "OFF",
                 (unsigned long)(stepper_system.limit_switch_mask >> 32),
-                (unsigned long)(stepper_system.limit_switch_mask & 0xFFFFFFFFULL));
+                (unsigned long)(stepper_system.limit_switch_mask & 0xFFFFFFFFULL),
+                (unsigned long)(stepper_system.limit_active_high_mask >> 32),
+                (unsigned long)(stepper_system.limit_active_high_mask & 0xFFFFFFFFULL));
         MMPrintString(buf);
         sprintf(buf, "HW limit pins: Xmin=%d Xmax=%d Ymin=%d Ymax=%d Zmin=%d Zmax=%d\r\n",
                 (int)stepper_system.x_min_limit_pin,
@@ -6239,4 +6291,421 @@ void cmd_stepper(void)
 
     stepper_error("Unknown STEPPER subcommand");
 }
+/*
+ * tmc22xx_configure.c
+ *
+ * Drive a TMC2208 or TMC2209 over UART using a bit-banged GPIO transmitter.
+ *
+ * Wiring (per driver):
+ *   MCU GPIO --- 1k series resistor --- PDN_UART pin on the chip
+ *   MS1, MS2 strapped (TMC2209: sets slave address 0..3.
+ *                      TMC2208: address is fixed at 0; MS1/MS2 only
+ *                      affect standalone-mode microsteps, which we
+ *                      override anyway by setting mstep_reg_select).
+ *   ENN tied low (or to a GPIO you control) so the outputs are enabled
+ *
+ * Both chips share:
+ *   - identical UART datagram format (sync, slave, reg, 32-bit data, CRC8)
+ *   - identical GCONF bit assignments for the bits we use
+ *   - identical IHOLD_IRUN, TPOWERDOWN, CHOPCONF, PWMCONF layouts
+ *   - identical current-scaling formula
+ *   - identical microstep encoding in CHOPCONF.MRES (full 1..256 range
+ *     when mstep_reg_select = 1)
+ *
+ * Differences:
+ *   - TMC2208 has no MS1/MS2 address pins; slave address is always 0
+ *   - TMC2209 has StallGuard / CoolStep registers we don't touch here
+ *
+ * Baud rate is 115200, well within both chips' 9k..500k working range.
+ * SysTick is clocked at clk_sys, so the bit time in ticks is
+ * clk_sys_hz / 115200.
+ */
+
+#include <stdint.h>
+#include <stddef.h>
+#include <string.h>
+#include <math.h>
+
+#include "pico/stdlib.h"
+#include "hardware/clocks.h"
+#include "hardware/sync.h"
+#include "hardware/gpio.h"
+#include "hardware/structs/systick.h"
+
+/* Bit-banged transmitter, defined elsewhere. Length-prefixed buffer:
+   string[0] is the byte count, string[1..] are the bytes to send. */
+extern void serialtx(uint64_t gppin, unsigned char *string, int bittime);
+
+/* ---------- Public chip-type enum ---------- */
+typedef enum
+{
+    TMC_CHIP_2208 = 2208,
+    TMC_CHIP_2209 = 2209,
+} tmc_chip_t;
+
+/* ---------- TMC22xx register addresses ---------- */
+#define TMC_REG_GCONF 0x00
+#define TMC_REG_IHOLD_IRUN 0x10
+#define TMC_REG_TPOWERDOWN 0x11
+#define TMC_REG_TCOOLTHRS 0x14
+#define TMC_REG_SGTHRS 0x40
+#define TMC_REG_CHOPCONF 0x6C
+#define TMC_REG_PWMCONF 0x70
+
+#define TMC_WRITE_BIT 0x80
+#define TMC_SYNC 0x05
+
+#define TMC_BAUD 115200
+
+/* ---------- CRC8 (poly 0x07) used by TMC22xx UART ---------- */
+static uint8_t tmc_crc8(const uint8_t *data, size_t len)
+{
+    uint8_t crc = 0;
+    for (size_t i = 0; i < len; i++)
+    {
+        uint8_t b = data[i];
+        for (int j = 0; j < 8; j++)
+        {
+            if ((crc >> 7) ^ (b & 0x01))
+                crc = (uint8_t)((crc << 1) ^ 0x07);
+            else
+                crc = (uint8_t)(crc << 1);
+            b >>= 1;
+        }
+    }
+    return crc;
+}
+
+/*
+ * Build a write datagram into the length-prefixed buffer expected by
+ * serialtx().  buf[0] is the count (8); buf[1..8] are the datagram bytes.
+ * The caller's buffer must therefore be at least 9 bytes long.
+ */
+static void tmc_build_write(uint8_t slave, uint8_t reg, uint32_t data,
+                            uint8_t buf[9])
+{
+    buf[0] = 8; /* length prefix         */
+    buf[1] = TMC_SYNC;
+    buf[2] = slave & 0x03;
+    buf[3] = reg | TMC_WRITE_BIT;
+    buf[4] = (uint8_t)(data >> 24);
+    buf[5] = (uint8_t)(data >> 16);
+    buf[6] = (uint8_t)(data >> 8);
+    buf[7] = (uint8_t)(data);
+    buf[8] = tmc_crc8(&buf[1], 7);
+}
+
+/* ---------- Current decode ---------- */
+static void current_to_cs(float i_rms_mA, float r_sense_ohm,
+                          uint8_t *cs_out, uint8_t *vsense_out)
+{
+    const float v_fs_high = 0.325f; /* vsense = 0 */
+    const float v_fs_low = 0.180f;  /* vsense = 1 */
+    const float i = i_rms_mA / 1000.0f;
+    const float rs_eff = r_sense_ohm + 0.02f;
+
+    int cs = (int)(32.0f * 1.41421356f * i * rs_eff / v_fs_high - 1.0f + 0.5f);
+    uint8_t vsense = 0;
+
+    if (cs < 16)
+    {
+        cs = (int)(32.0f * 1.41421356f * i * rs_eff / v_fs_low - 1.0f + 0.5f);
+        vsense = 1;
+    }
+    if (cs < 0)
+        cs = 0;
+    if (cs > 31)
+        cs = 31;
+
+    *cs_out = (uint8_t)cs;
+    *vsense_out = vsense;
+}
+
+static uint8_t microsteps_to_mres(uint16_t usteps)
+{
+    switch (usteps)
+    {
+    case 256:
+        return 0;
+    case 128:
+        return 1;
+    case 64:
+        return 2;
+    case 32:
+        return 3;
+    case 16:
+        return 4;
+    case 8:
+        return 5;
+    case 4:
+        return 6;
+    case 2:
+        return 7;
+    case 1:
+        return 8;
+    default:
+        return 0xFF;
+    }
+}
+
+/*
+ * Configure one TMC2208 or TMC2209.
+ *
+ *   tx_pin       : GPIO number wired (via 1k) to PDN_UART
+ *   chip         : TMC_CHIP_2208 or TMC_CHIP_2209
+ *   slave_addr   : 0..3 for TMC2209 (must match MS1/MS2 strapping);
+ *                  must be 0 for TMC2208
+ *   i_run_mA     : RMS run current in milliamps
+ *   i_hold_pct   : holding current as a percentage of run current (0..100)
+ *   r_sense_ohm  : sense resistor value (0.11 on most modules)
+ *   microsteps   : 1, 2, 4, 8, 16, 32, 64, 128, 256
+ *   stealthchop  : 1 = StealthChop2, 0 = SpreadCycle
+ *
+ * Returns 0 on success, -1 on a bad parameter.
+ */
+int tmc22xx_configure(uint tx_pin,
+                      tmc_chip_t chip,
+                      uint8_t slave_addr,
+                      float i_run_mA,
+                      uint8_t i_hold_pct,
+                      float r_sense_ohm,
+                      uint16_t microsteps,
+                      int stealthchop)
+{
+    if (chip != TMC_CHIP_2208 && chip != TMC_CHIP_2209)
+        return -1;
+    if (chip == TMC_CHIP_2208 && slave_addr != 0)
+        return -1;
+    if (slave_addr > 3)
+        return -1;
+    if (i_hold_pct > 100)
+        return -1;
+    if (r_sense_ohm <= 0.0f)
+        return -1;
+    if (i_run_mA <= 0.0f)
+        return -1;
+
+    uint8_t mres = microsteps_to_mres(microsteps);
+    if (mres == 0xFF)
+        return -1;
+
+    /* ---- Resolve current settings ---- */
+    uint8_t irun_cs, vsense;
+    current_to_cs(i_run_mA, r_sense_ohm, &irun_cs, &vsense);
+    uint8_t ihold_cs = (uint8_t)((irun_cs * i_hold_pct) / 100);
+
+    /* ---- Build register values (identical bit layout on '08 and '09) ---- */
+    uint32_t gconf = 0;
+    gconf |= (1u << 6); /* pdn_disable: PDN = UART  */
+    gconf |= (1u << 7); /* mstep_reg_select          */
+    gconf |= (1u << 8); /* multistep_filt            */
+    if (!stealthchop)
+        gconf |= (1u << 2); /* en_SpreadCycle            */
+
+    uint32_t ihold_irun = ((uint32_t)(ihold_cs & 0x1F)) | ((uint32_t)(irun_cs & 0x1F) << 8) | ((uint32_t)(8u & 0x0F) << 16);
+
+    uint32_t tpowerdown = 20;
+
+    uint32_t chopconf = 0;
+    chopconf |= (3u << 0);                /* TOFF                      */
+    chopconf |= (5u << 4);                /* HSTRT                     */
+    chopconf |= (2u << 7);                /* HEND                      */
+    chopconf |= (2u << 15);               /* TBL                       */
+    chopconf |= ((uint32_t)vsense << 17); /* vsense                    */
+    chopconf |= ((uint32_t)mres << 24);   /* MRES                      */
+    chopconf |= (1u << 28);               /* intpol                    */
+
+    uint32_t pwmconf = 0;
+    pwmconf |= (36u << 0);  /* PWM_OFS                   */
+    pwmconf |= (14u << 8);  /* PWM_GRAD                  */
+    pwmconf |= (1u << 16);  /* pwm_freq                  */
+    pwmconf |= (1u << 18);  /* pwm_autoscale             */
+    pwmconf |= (1u << 19);  /* pwm_autograd              */
+    pwmconf |= (15u << 24); /* PWM_REG                   */
+    pwmconf |= (12u << 28); /* PWM_LIM                   */
+
+    /* ---- Build the five datagrams up-front ---- */
+    uint8_t dg_gconf[9];
+    uint8_t dg_irun[9];
+    uint8_t dg_pdown[9];
+    uint8_t dg_chop[9];
+    uint8_t dg_pwm[9];
+    tmc_build_write(slave_addr, TMC_REG_GCONF, gconf, dg_gconf);
+    tmc_build_write(slave_addr, TMC_REG_IHOLD_IRUN, ihold_irun, dg_irun);
+    tmc_build_write(slave_addr, TMC_REG_TPOWERDOWN, tpowerdown, dg_pdown);
+    tmc_build_write(slave_addr, TMC_REG_CHOPCONF, chopconf, dg_chop);
+    tmc_build_write(slave_addr, TMC_REG_PWMCONF, pwmconf, dg_pwm);
+
+    uint8_t *frames[5] = {dg_gconf, dg_irun, dg_pdown, dg_chop, dg_pwm};
+
+    /* ---- Pin setup: drive high (idle) before we start ---- */
+    gpio_init(tx_pin);
+    gpio_set_dir(tx_pin, GPIO_OUT);
+    gpio_put(tx_pin, 1);
+    uint64_t pin_mask = (uint64_t)1u << tx_pin;
+
+    /* ---- Bit time in SysTick ticks at the *current* clk_sys ---- */
+    uint32_t clk_hz = clock_get_hz(clk_sys);
+    int bittime = 0x00FFFFFFu + 12 - (int)(clk_hz / TMC_BAUD);
+
+    /* ---- Make sure SysTick is running off the processor clock ---- */
+    systick_hw->rvr = 0x00FFFFFFu;
+    systick_hw->cvr = 0;
+    systick_hw->csr = 0x5; /* ENABLE | CLKSOURCE = processor */
+
+    /* ---- Send the five frames, IRQs off only across each frame ---- */
+    for (int i = 0; i < 5; i++)
+    {
+        uint32_t irq_state = save_and_disable_interrupts();
+        serialtx(pin_mask, frames[i], bittime);
+        restore_interrupts(irq_state);
+
+        /* Inter-frame gap: comfortably longer than the chip's
+           ~8 bit-time minimum, costs nothing on a one-shot init. */
+        sleep_us(200);
+    }
+
+    return 0;
+}
+
+extern int tmc22xx_configure(uint tx_pin,
+                             tmc_chip_t chip,
+                             uint8_t slave_addr,
+                             float i_run_mA,
+                             uint8_t i_hold_pct,
+                             float r_sense_ohm,
+                             uint16_t microsteps,
+                             int stealthchop);
+
+/*
+ * Send a single TMC22xx UART write datagram. Used by SGTHRS / TCOOLTHRS
+ * subcommands for runtime tuning. Caller passes the GPIO number (not the
+ * BASIC pin index). Pin must already have been claimed by a prior TMC22xx
+ * configuration call.
+ */
+static void tmc22xx_write_one(uint tx_pin, uint8_t slave_addr,
+                              uint8_t reg, uint32_t data)
+{
+    uint8_t frame[9];
+    tmc_build_write(slave_addr, reg, data, frame);
+
+    gpio_set_dir(tx_pin, GPIO_OUT);
+    gpio_put(tx_pin, 1);
+    uint64_t pin_mask = (uint64_t)1u << tx_pin;
+
+    uint32_t clk_hz = clock_get_hz(clk_sys);
+    int bittime = 0x00FFFFFFu + 12 - (int)(clk_hz / TMC_BAUD);
+
+    systick_hw->rvr = 0x00FFFFFFu;
+    systick_hw->cvr = 0;
+    systick_hw->csr = 0x5;
+
+    uint32_t irq_state = save_and_disable_interrupts();
+    serialtx(pin_mask, frame, bittime);
+    restore_interrupts(irq_state);
+    sleep_us(200);
+}
+
+void cmd_TMC22xx(void)
+{
+    static int TX_pin = -1;
+    unsigned char *p;
+
+    if (checkstring(cmdline, (unsigned char *)"CLOSE") != NULL)
+    {
+        if (TX_pin == -1)
+            stepper_error("Stepper not initialized");
+        stepper_release_gp_pin(PinDef[TX_pin].GPno);
+        TX_pin = -1;
+        return;
+    }
+
+    /* Runtime tuning subcommands. The TX pin and chip must already have
+       been configured by a prior TMC22xx init call. */
+    if ((p = checkstring(cmdline, (unsigned char *)"SGTHRS")) != NULL)
+    {
+        if (TX_pin == -1)
+            stepper_error("TMC22xx not initialized");
+        getcsargs(&p, 3);
+        if (argc != 3)
+            stepper_error("Syntax");
+        int slave = getint(argv[0], 0, 3);
+        int value = getint(argv[2], 0, 255);
+        tmc22xx_write_one(PinDef[TX_pin].GPno, (uint8_t)slave,
+                          TMC_REG_SGTHRS, (uint32_t)value);
+        return;
+    }
+
+    if ((p = checkstring(cmdline, (unsigned char *)"TCOOLTHRS")) != NULL)
+    {
+        if (TX_pin == -1)
+            stepper_error("TMC22xx not initialized");
+        getcsargs(&p, 3);
+        if (argc != 3)
+            stepper_error("Syntax");
+        int slave = getint(argv[0], 0, 3);
+        int value = getint(argv[2], 0, 0xFFFFF);
+        tmc22xx_write_one(PinDef[TX_pin].GPno, (uint8_t)slave,
+                          TMC_REG_TCOOLTHRS, (uint32_t)value);
+        return;
+    }
+
+    getcsargs(&cmdline, 15);
+
+    TX_pin = parse_pin(argv[0]);
+    CheckPin(TX_pin, CP_IGNORE_INUSE);
+
+    /* Chip type: 2208 or 2209 */
+    int chip_num = getint(argv[2], 2208, 2209);
+    if (chip_num != 2208 && chip_num != 2209)
+    {
+        stepper_error("Chip type must be 2208 or 2209");
+    }
+    tmc_chip_t chip = (chip_num == 2208) ? TMC_CHIP_2208 : TMC_CHIP_2209;
+
+    /* Slave address: TMC2208 must be 0; TMC2209 may be 0..3 */
+    int address;
+    if (chip == TMC_CHIP_2208)
+    {
+        address = getint(argv[4], 0, 0);
+    }
+    else
+    {
+        address = getint(argv[4], 0, 3);
+    }
+
+    MMFLOAT i_run_mA = getfloat(argv[6], 0.0, 2000.0);
+    uint8_t i_hold_pct = getint(argv[8], 0, 100);
+
+    uint16_t microsteps = getint(argv[10], 1, 256);
+    if (!(microsteps == 1 || microsteps == 2 || microsteps == 4 ||
+          microsteps == 8 || microsteps == 16 || microsteps == 32 ||
+          microsteps == 64 || microsteps == 128 || microsteps == 256))
+    {
+        stepper_error("Microsteps must be one of: 1, 2, 4, 8, 16, 32, 64, 128, or 256");
+    }
+
+    MMFLOAT r_sense_ohm = 0.11;
+    if (argc >= 13 && *argv[12])
+    {
+        r_sense_ohm = getfloat(argv[12], 0.08, 0.2);
+    }
+
+    int stealthchop = 1;
+    if (argc == 15 && *argv[14])
+    {
+        stealthchop = (getint(argv[14], 0, 1) != 0);
+    }
+    ExtCfg(TX_pin, EXT_COM_RESERVED, 0);
+
+    tmc22xx_configure(PinDef[TX_pin].GPno,
+                      chip,
+                      address,
+                      i_run_mA,
+                      i_hold_pct,
+                      r_sense_ohm,
+                      microsteps,
+                      stealthchop);
+}
+
 #endif

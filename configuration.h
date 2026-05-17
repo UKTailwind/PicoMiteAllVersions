@@ -52,7 +52,7 @@ extern "C"
 #define MAX_CPU Freq378P
 #define MIN_CPU FreqX
 #ifdef USBKEYBOARD
-#define FLASH_TARGET_OFFSET (1024 * 1024)
+#define FLASH_TARGET_OFFSET (1040 * 1024)
 #define HEAP_MEMORY_SIZE (160 * 1024)
 #define MagicKey 0x82321F85
 #else
@@ -70,7 +70,7 @@ extern "C"
 #define MagicKey 0x789124B3
 #else
 #define FLASH_TARGET_OFFSET (976 * 1024)
-#define HEAP_MEMORY_SIZE (172 * 1024)
+#define HEAP_MEMORY_SIZE (168 * 1024)
 #define MagicKey 0x42283587
 #endif
 #endif
@@ -85,7 +85,7 @@ extern "C"
 #define MAX_CPU 378000
 #define MIN_CPU 252000
 #ifdef USBKEYBOARD
-#define FLASH_TARGET_OFFSET (832 * 1024)
+#define FLASH_TARGET_OFFSET (848 * 1024)
 #define MagicKey 0x356469F4
 #define HEAP_MEMORY_SIZE (100 * 1024)
 #else
@@ -196,8 +196,16 @@ extern "C"
 #define MAXGLOBALVARS 512 // Configurable split
 #define MAXLOCALVARS 256
 #define MAXVARS (MAXGLOBALVARS + MAXLOCALVARS)
-#define HEAP_MEMORY_SIZE (252 * 1024)
-#define FLASH_TARGET_OFFSET (1296 * 1024)
+/* TLS (mbedtls) support is RP2350-only because it needs ~40 KB of lwIP
+   MEM_SIZE for mbedtls allocations plus ~22 KB for cert chain transients
+   and other libc heap users — RP2040 cannot spare it.
+   PICOMITEWEB_TLS itself is set via target_compile_definitions in
+   CMakeLists.txt so it's visible to every TU (including lwIP's
+   altcp_tls_mbedtls.c which doesn't include configuration.h). Defining it
+   here too would produce a redefine warning because -D and #define
+   without a body resolve to different macro bodies. */
+#define HEAP_MEMORY_SIZE (192 * 1024)
+#define FLASH_TARGET_OFFSET (1424 * 1024)
 #else
 #define MagicKey 0x927945E6
 #define MAXSUBFUN 256
@@ -205,7 +213,7 @@ extern "C"
 #define MAXLOCALVARS 240
 #define MAXVARS (MAXGLOBALVARS + MAXLOCALVARS)
 #define HEAP_MEMORY_SIZE (88 * 1024)
-#define FLASH_TARGET_OFFSET (1136 * 1024)
+#define FLASH_TARGET_OFFSET (1152 * 1024)
 #endif
 
 #include "lwipopts_examples_common.h"
@@ -229,10 +237,10 @@ extern "C"
 #ifdef USBKEYBOARD
 #define MagicKey 0x52211A65
 #define FLASH_TARGET_OFFSET (1104 * 1024)
-#define HEAP_MEMORY_SIZE (308 * 1024)
+#define HEAP_MEMORY_SIZE (304 * 1024)
 #else
 #define FLASH_TARGET_OFFSET (1072 * 1024)
-#define HEAP_MEMORY_SIZE (308 * 1024)
+#define HEAP_MEMORY_SIZE (304 * 1024)
 #define MagicKey 0x989626B4
 #endif
 
@@ -301,10 +309,10 @@ extern "C"
 #define MAXSTRLEN 255  // Maximum length of a string
 #define STRINGSIZE 256 // Must be 1 more than MAXSTRLEN
 
-        /* ============================================================================
-         * Operating characteristics - Structures
-         * Enable structures on platforms with sufficient memory (currently RP2350)
-         * ============================================================================ */
+   /* ============================================================================
+    * Operating characteristics - Structures
+    * Enable structures on platforms with sufficient memory (currently RP2350)
+    * ============================================================================ */
 
 #ifdef STRUCTENABLED
 #define MAX_STRUCT_TYPES 32     // Maximum number of structure type definitions
@@ -325,7 +333,7 @@ extern "C"
 #ifdef rp2350
 #define MAXDIM 5 // Maximum number of dimensions to an array
 #define PSRAMCSPIN PSRAMpin
-        extern uint8_t PSRAMpin;
+   extern uint8_t PSRAMpin;
 #else
 #define MAXDIM 6 // Maximum number of dimensions to an array
 #endif
@@ -549,52 +557,52 @@ extern "C"
 #define PICOMITERP2350 (defined(PICOMITE) && defined(rp2350))
 #define WEBRP2350 (defined(rp2350) && defined(PICOMITEWEB))
 #define PICOCALC ((defined(PICOMITE) || defined(PICOMITEWEB)) && !defined(USBKEYBOARD))
-        /* ============================================================================
-         * Type definitions - MM operations enum
-         * ============================================================================ */
-        typedef enum
-        {
-                MMHRES,
-                MMVRES,
-                MMVER,
-                MMI2C,
-                MMFONTHEIGHT,
-                MMFONTWIDTH,
+   /* ============================================================================
+    * Type definitions - MM operations enum
+    * ============================================================================ */
+   typedef enum
+   {
+      MMHRES,
+      MMVRES,
+      MMVER,
+      MMI2C,
+      MMFONTHEIGHT,
+      MMFONTWIDTH,
 #ifndef USBKEYBOARD
-                MMPS2,
+      MMPS2,
 #else
-        MMUSB,
+   MMUSB,
 #endif
-                MMHPOS,
-                MMVPOS,
-                MMONEWIRE,
-                MMERRNO,
-                MMERRMSG,
-                MMWATCHDOG,
-                MMDEVICE,
-                MMCMDLINE,
+      MMHPOS,
+      MMVPOS,
+      MMONEWIRE,
+      MMERRNO,
+      MMERRMSG,
+      MMWATCHDOG,
+      MMDEVICE,
+      MMCMDLINE,
 #ifdef PICOMITEWEB
-                MMMESSAGE,
-                MMADDRESS,
-                MMTOPIC,
+      MMMESSAGE,
+      MMADDRESS,
+      MMTOPIC,
 #endif
-                MMFLAG,
-                MMDISPLAY,
-                MMWIDTH,
-                MMHEIGHT,
-                MMPERSISTENT,
-                MMCODE,
+      MMFLAG,
+      MMDISPLAY,
+      MMWIDTH,
+      MMHEIGHT,
+      MMPERSISTENT,
+      MMCODE,
 #ifndef PICOMITEWEB
-                MMSUPPLY,
+      MMSUPPLY,
 #endif
-                MMPOS,
-                MMEND
-        } Operation;
+      MMPOS,
+      MMEND
+   } Operation;
 
-        /* ============================================================================
-         * External variables
-         * ============================================================================ */
-        extern const char *overlaid_functions[];
+   /* ============================================================================
+    * External variables
+    * ============================================================================ */
+   extern const char *overlaid_functions[];
 
 #ifdef __cplusplus
 }

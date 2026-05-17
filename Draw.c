@@ -6197,8 +6197,7 @@ void MIPS16 loadsprite(unsigned char *p)
         startsprite = (int)getint(argv[2], 1, 64);
     if (argc == 5)
         mode = getint(argv[4], 0, 1);
-    if (strchr(fname, '.') == NULL)
-        strcat(fname, ".spr");
+    AppendDefaultExtension(fname, ".spr");
     if (!BasicFileOpen(fname, fnbr, FA_READ))
         error((char *)"File not found");
     MMgetline(fnbr, (char *)buff); // get the input line
@@ -7162,8 +7161,7 @@ void cmd_sprite(void)
         transparent = RGB121map[transparent];
         if (argc == 7)
             cutoff = getint(argv[6], 1, 254);
-        if (strchr((char *)q, '.') == NULL)
-            strcat((char *)q, ".png");
+        AppendDefaultExtension((char *)q, ".png");
         upng = upng_new_from_file((char *)q);
         routinechecks();
         upng_header(upng);
@@ -7271,8 +7269,7 @@ void cmd_sprite(void)
         if (argc == 11)
             state.height = getinteger(argv[10]); // get the y length (optional) argument
         // open the file
-        if (strchr((char *)pp, '.') == NULL)
-            strcat((char *)pp, ".bmp");
+        AppendDefaultExtension((char *)pp, ".bmp");
         BMPfnbr = FindFreeFileNbr();
         if (!BasicFileOpen((char *)pp, BMPfnbr, FA_READ))
             return;
@@ -9236,8 +9233,7 @@ void cmd_blit(void)
         if (argc == 11)
             state.height = getinteger(argv[10]); // get the y length (optional) argument
         // open the file
-        if (strchr((char *)p, '.') == NULL)
-            strcat((char *)p, ".bmp");
+        AppendDefaultExtension((char *)p, ".bmp");
         BMPfnbr = FindFreeFileNbr();
         if (!BasicFileOpen((char *)p, BMPfnbr, FA_READ))
             return;

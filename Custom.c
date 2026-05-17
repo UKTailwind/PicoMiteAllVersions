@@ -337,8 +337,11 @@ int getirqnum(char *p)
 }
 void startPIO(PIO pio, int sm)
 {
+        pio_sm_set_enabled(pio, sm, false);
         pio_sm_clear_fifos(pio, sm);
         pio_sm_restart(pio, sm);
+        pio_sm_clkdiv_restart(pio, sm);
+        pio_sm_exec(pio, sm, pio_encode_out(pio_null, 32));
         pio_sm_set_enabled(pio, sm, true);
 }
 void syncPIO(int pio, int my, int prev, int next)
@@ -2971,11 +2974,12 @@ static int scan_result(void *env, const cyw43_ev_scan_result_t *result)
                         result->auth_mode);
                 if (scan_dest != NULL)
                 {
-                        if (strlen(((char *)&scan_dest[8]) + strlen(buff)) > scan_size)
+                        if (strlen((char *)&scan_dest[8]) + strlen(buff) > (size_t)scan_size)
                         {
                                 FreeMemorySafe((void **)&scan_dups);
                                 scan_dest = NULL;
-                                error("Array too small");
+                                web_async_set_error("Array too small");
+                                return 0;
                         }
                         if (scan_dest[8] == 0)
                                 strcpy(&scan_dest[8], buff);
@@ -3077,7 +3081,10 @@ void cmd_web(void)
                 return;
         if (cmd_tcpserver())
                 return;
-        //        if(cmd_tls())return;
+#ifdef PICOMITEWEB_TLS
+        if (cmd_tls())
+                return;
+#endif
         SyntaxError();
         ;
 }

@@ -191,6 +191,26 @@ static int is_root_volume_path(const char *path)
         ;
 }
 
+// True if `fname` has an extension on its last path component. Scans backward
+// from the end of the string and stops at a path separator so that dots inside
+// directory names (e.g. "C:/my.dir/prog") are not mistaken for an extension.
+bool HasExtension(const char *fname)
+{
+    const char *p = fname + strlen(fname);
+    while (p > fname) {
+        p--;
+        if (*p == '/' || *p == '\\') return false;
+        if (*p == '.') return true;
+    }
+    return false;
+}
+
+// Append `ext` to `fname` if the filename does not already carry an extension.
+void AppendDefaultExtension(char *fname, const char *ext)
+{
+    if (!HasExtension(fname)) strcat(fname, ext);
+}
+
 int FatFSFileSystemSave = 0;
 #define overlap (VRes % (FontTable[gui_font >> 4][1] * (gui_font & 0b1111)) ? 0 : 1)
 #ifdef rp2350
@@ -1018,8 +1038,7 @@ void MIPS16 cmd_flash(void)
             return;
         // open the file
         char *pp = (char *)getFstring(argv[2]);
-        if (strchr((char *)pp, '.') == NULL)
-            strcat((char *)pp, ".bmp");
+        AppendDefaultExtension((char *)pp, ".bmp");
         BMPfnbr = FindFreeFileNbr();
         if (!BasicFileOpen((char *)pp, BMPfnbr, FA_READ))
             return;
@@ -1400,8 +1419,7 @@ void MIPS16 cmd_flash(void)
         /* add .uf2 extension if no extension given — check after any drive prefix */
         char *fn_resolved = (char *)GetTempStrMemory();
         strcpy(fn_resolved, fname);                   /* keep drive prefix intact */
-        if (strchr(fn_resolved + waste, '.') == NULL) /* skip past "B:" before searching */
-            strcat(fn_resolved, ".uf2");
+        AppendDefaultExtension(fn_resolved, ".uf2");
 
         /* --- open source file for reading --------------------------------- */
         int fnbr = FindFreeFileNbr();
@@ -1547,8 +1565,7 @@ void cmd_LoadImage(unsigned char *p)
     if (argc == 11)
         yRead = getint(argv[10], 0, 1079); // get the y origin (optional) argument
     // open the file
-    if (strchr((char *)p, '.') == NULL)
-        strcat((char *)p, ".bmp");
+    AppendDefaultExtension((char *)p, ".bmp");
     BMPfnbr = FindFreeFileNbr();
     if (!BasicFileOpen((char *)p, BMPfnbr, FA_READ))
         return;
@@ -1855,8 +1872,7 @@ void MIPS16 cmd_LoadJPGImage(unsigned char *p)
     if (dither_mode == 3 || dither_mode == 7)
         error("RGB565 dithering not yet supported");
 
-    if (strchr((char *)p, '.') == NULL)
-        strcat((char *)p, ".jpg");
+    AppendDefaultExtension((char *)p, ".jpg");
     jpgfnbr = FindFreeFileNbr();
     g_nInFileSize = FileSize((char *)p);
     if (!BasicFileOpen((char *)p, jpgfnbr, FA_READ))
@@ -2109,22 +2125,29 @@ void fun_dir(void)
         djd.pat = pp;
         if (!InitSDCard())
             return; // setup the SD card
-        if (FSsave == 1)
+        if (FSsave)
             FSerror = f_opendir(&djd, path);
         else
             FSerror = lfs_dir_open(&lfs, &lfs_dir_dir, path);
         ErrorCheck(0);
     }
-    if (SDCardStat & STA_NOINIT && FSsave == 1)
+    if (FSsave == 1 && (SDCardStat & STA_NOINIT))
     {
         f_closedir(&djd);
         error("SD card not found");
     }
+#if HAS_USB_MSC
+    if (FSsave == 2 && (USBDriveStat & STA_NOINIT))
+    {
+        f_closedir(&djd);
+        error("USB drive not found");
+    }
+#endif
     if (dirflags == AM_DIR)
     {
         for (;;)
         {
-            if (FSsave == 1)
+            if (FSsave)
             {
                 FSerror = f_readdir(&djd, &fnod); // Get a directory item
                 if (FSerror != FR_OK || !fnod.fname[0])
@@ -2149,7 +2172,7 @@ void fun_dir(void)
     {
         for (;;)
         {
-            if (FSsave == 1)
+            if (FSsave)
             {
                 FSerror = f_readdir(&djd, &fnod); // Get a directory item
                 if (FSerror != FR_OK || !fnod.fname[0])
@@ -2174,7 +2197,7 @@ void fun_dir(void)
     {
         for (;;)
         {
-            if (FSsave == 1)
+            if (FSsave)
             {
                 FSerror = f_readdir(&djd, &fnod); // Get a directory item
                 if (FSerror != FR_OK || !fnod.fname[0])
@@ -2198,7 +2221,7 @@ void fun_dir(void)
 
     if (FSerror != FR_OK || !fnod.fname[0])
     {
-        if (FSsave == 1)
+        if (FSsave)
             f_closedir(&djd);
         else
             lfs_dir_close(&lfs, &lfs_dir_dir);
@@ -2725,8 +2748,7 @@ void MIPS16 cmd_save(void)
         if (argc != 1 && argc != 9)
             SyntaxError();
         ;
-        if (strchr((char *)pp, '.') == NULL)
-            strcat((char *)pp, ".bmp");
+        AppendDefaultExtension((char *)pp, ".bmp");
         if (!BasicFileOpen((char *)pp, fnbr, FA_WRITE | FA_CREATE_ALWAYS))
             return;
         if (argc == 1)
@@ -2869,8 +2891,7 @@ void MIPS16 cmd_save(void)
             if (argc != 1 && argc != 9)
                 SyntaxError();
             ;
-            if (strchr((char *)pp, '.') == NULL)
-                strcat((char *)pp, ".bmp");
+            AppendDefaultExtension((char *)pp, ".bmp");
             if (!BasicFileOpen((char *)pp, fnbr, FA_WRITE | FA_CREATE_ALWAYS))
                 return;
             if (argc == 1)
@@ -2961,8 +2982,7 @@ void MIPS16 cmd_save(void)
         if (argc != 1 && argc != 9)
             SyntaxError();
         ;
-        if (strchr((char *)pp, '.') == NULL)
-            strcat((char *)pp, ".bmp");
+        AppendDefaultExtension((char *)pp, ".bmp");
         if (!BasicFileOpen((char *)pp, fnbr, FA_WRITE | FA_CREATE_ALWAYS))
             return;
         if (argc == 1)
@@ -3012,8 +3032,7 @@ void MIPS16 cmd_save(void)
     {
         unsigned char b[STRINGSIZE];
         p = getFstring(cmdline); // get the file name and change to the directory
-        if (strchr((char *)p, '.') == NULL)
-            strcat((char *)p, ".bas");
+        AppendDefaultExtension((char *)p, ".bas");
         if (!BasicFileOpen((char *)p, fnbr, FA_WRITE | FA_CREATE_ALWAYS))
             return;
         p = ProgMemory;
@@ -3120,8 +3139,7 @@ void importfile(char *pp, char *tp, char **p, uint32_t buf, int convertdebug, bo
     ;
     fname = (char *)getFstring((unsigned char *)tp);
     fnbr = FindFreeFileNbr();
-    if (strchr((char *)fname, '.') == NULL)
-        strcat((char *)fname, ".INC");
+    AppendDefaultExtension((char *)fname, ".INC");
     q = &fname[strlen(fname) - 4];
     if (strcasecmp(q, ".inc") != 0)
         error("must be a .inc file");
@@ -3317,8 +3335,7 @@ int FileLoadCMM2Program(char *fname, bool message)
     ClearProgram(true); // clear any leftovers from the previous program
     fnbr = FindFreeFileNbr();
     p = (char *)getFstring((unsigned char *)fname);
-    if (strchr((char *)p, '.') == NULL)
-        strcat((char *)p, ".bas");
+    AppendDefaultExtension((char *)p, ".bas");
     char q[FF_MAX_LFN] = {0};
     FatFSFileSystemSave = FatFSFileSystem;
     getfullfilename(p, q);
@@ -3522,8 +3539,7 @@ int FileLoadProgram(unsigned char *fname, bool chain)
     PromptFont = oldfont;
     fnbr = FindFreeFileNbr();
     p = (char *)getFstring(fname);
-    if (strchr((char *)p, '.') == NULL)
-        strcat((char *)p, ".bas");
+    AppendDefaultExtension(p, ".bas");
     char q[FF_MAX_LFN] = {0};
     FatFSFileSystemSave = FatFSFileSystem;
     getfullfilename(p, q);
@@ -3989,8 +4005,7 @@ int MemLoadProgram(unsigned char *fname, unsigned char *ram)
     PromptFont = oldfont;
     fnbr = FindFreeFileNbr();
     p = (char *)getFstring(fname);
-    if (strchr((char *)p, '.') == NULL)
-        strcat((char *)p, ".bas");
+    AppendDefaultExtension((char *)p, ".bas");
     char q[FF_MAX_LFN] = {0};
     FatFSFileSystemSave = FatFSFileSystem;
     getfullfilename(p, q);
@@ -4107,8 +4122,7 @@ void LoadPNG(unsigned char *p)
         transparent = RGB121map[transparent];
     if (argc == 9)
         cutoff = getint(argv[8], 1, 254);
-    if (strchr((char *)q, '.') == NULL)
-        strcat((char *)q, ".png");
+    AppendDefaultExtension((char *)q, ".png");
     upng = upng_new_from_file((char *)q);
     routinechecks();
     upng_header(upng);

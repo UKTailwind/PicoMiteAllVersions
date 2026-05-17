@@ -540,7 +540,7 @@ long long int FloatToInt64(MMFLOAT x);
     unsigned char *skipvar(unsigned char *p, int noerror);
     unsigned char *skipexpression(unsigned char *p);
     unsigned char *getclosebracket(unsigned char *p);
-
+    MMFLOAT getfloat(unsigned char *p, MMFLOAT min, MMFLOAT max);
     /* ============================================================================
      * Function declarations - Variable management
      * ============================================================================ */

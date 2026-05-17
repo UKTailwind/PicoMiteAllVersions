@@ -242,7 +242,7 @@ void cmd_locate(void);
 void cmd_stepper(void);
 void cmd_bitstream(void);
 void cmd_mandelbrot(void);
-
+void cmd_TMC22xx(void);
 void cmd_tilemap(void);
 void fun_tilemap(void);
 void tilemap_closeall(void);
@@ -677,6 +677,7 @@ void fun_frame(void);
 #endif
 #ifdef rp2350
 	{(unsigned char *)"Slew", T_CMD, 0, cmd_slew},
+	{(unsigned char *)"TMC22xx", T_CMD, 0, cmd_TMC22xx},
 #endif
 
 {
@@ -744,8 +745,8 @@ void fun_frame(void);
 	{(unsigned char *)"Pi", T_FNA | T_NBR, 0, fun_pi},
 	{(unsigned char *)"Rad(", T_FUN | T_NBR, 0, fun_rad},
 	{(unsigned char *)"Right$(", T_FUN | T_STR, 0, fun_right},
-	{(unsigned char *)"Rnd", T_FNA | T_NBR, 0, fun_rnd},  // this must come before Rnd - without bracket
 	{(unsigned char *)"Rnd(", T_FUN | T_NBR, 0, fun_rnd}, //	{(unsigned char *)"Rnd", T_FNA | T_NBR, 0, fun_rnd},  // this must come after Rnd(
+	{(unsigned char *)"Rnd", T_FNA | T_NBR, 0, fun_rnd},  // this must come before Rnd - without bracket
 	{(unsigned char *)"Sgn(", T_FUN | T_INT, 0, fun_sgn},
 	{(unsigned char *)"Sin(", T_FUN | T_NBR, 0, fun_sin},
 	{(unsigned char *)"Space$(", T_FUN | T_STR, 0, fun_space},
