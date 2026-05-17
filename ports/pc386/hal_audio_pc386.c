@@ -49,7 +49,7 @@ void hal_audio_init(void) {
     pc_speaker_off();
 }
 
-void hal_audio_tone(double left_hz, double right_hz, int has_duration, long long duration_ms)
+void hal_audio_tone(double left_hz, double right_hz, int has_duration, int64_t duration_ms)
 {
     double hz = left_hz > 0.0 ? left_hz : right_hz;
     if (right_hz > 0.0 && (left_hz <= 0.0 || right_hz < hz)) hz = right_hz;

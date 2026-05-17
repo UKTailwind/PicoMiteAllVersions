@@ -1,0 +1,85 @@
+name: Linux validation
+
+on:
+  pull_request:
+    paths:
+      - '*.c'
+      - '*.h'
+      - '*.bas'
+      - 'CMakeLists.txt'
+      - 'pico_sdk_import.cmake'
+      - 'buildall.sh'
+      - 'validate_all.sh'
+      - 'core/**'
+      - 'drivers/**'
+      - 'hal/**'
+      - 'host/**'
+      - 'ports/**'
+      - 'porttools/**'
+      - 'runtime/**'
+      - 'shared/**'
+      - 'tools/**'
+      - '.github/workflows/linux-host.yml'
+  push:
+    branches: [main]
+    paths:
+      - '*.c'
+      - '*.h'
+      - '*.bas'
+      - 'CMakeLists.txt'
+      - 'pico_sdk_import.cmake'
+      - 'buildall.sh'
+      - 'validate_all.sh'
+      - 'core/**'
+      - 'drivers/**'
+      - 'hal/**'
+      - 'host/**'
+      - 'ports/**'
+      - 'porttools/**'
+      - 'runtime/**'
+      - 'shared/**'
+      - 'tools/**'
+      - '.github/workflows/linux-host.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-all:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install native build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+              build-essential cmake ninja-build python3
+
+      - name: Install arm-none-eabi toolchain
+        uses: carlosperate/arm-none-eabi-gcc-action@v1
+        with:
+          release: '14.2.Rel1'
+
+      - name: Check out Pico SDK
+        uses: actions/checkout@v4
+        with:
+          repository: raspberrypi/pico-sdk
+          ref: 2.1.1
+          path: pico-sdk
+          submodules: recursive
+
+      - name: Patch Pico SDK for newer host GCC
+        run: bash tools/patch_pico_sdk_gcc15.sh "${{ github.workspace }}/pico-sdk"
+
+      - name: Set up emscripten
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: 5.0.2
+          actions-cache-folder: emsdk-cache
+
+      - name: Run full validation
+        env:
+          PICO_SDK_PATH: ${{ github.workspace }}/pico-sdk
+        run: ./validate_all.sh

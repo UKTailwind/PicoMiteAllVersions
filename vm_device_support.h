@@ -27,8 +27,8 @@ extern jmp_buf mark;
 void error(char *msg, ...);
 void Mstrcpy(unsigned char *dest, unsigned char *src);
 int Mstrcmp(unsigned char *s1, unsigned char *s2);
-long long int FloatToInt64(MMFLOAT x);
-void IntToStr(char *strr, long long int nbr, unsigned int base);
+int64_t FloatToInt64(MMFLOAT x);
+void IntToStr(char *strr, int64_t nbr, unsigned int base);
 void FloatToStr(char *p, MMFLOAT f, int m, int n, unsigned char ch);
 void ClearVars(int level, bool all);
 

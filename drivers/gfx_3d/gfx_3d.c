@@ -363,7 +363,7 @@ void MIPS16 cmd_3D(void){
 		// normals structure [nf]
 		MMFLOAT *vertex;
 		TFLOAT tmp;
-		long long int *faces, *facecount, *facecountindex, *colours, *linecolour=NULL, *fillcolour=NULL;
+		int64_t *faces, *facecount, *facecountindex, *colours, *linecolour=NULL, *fillcolour=NULL;
 		getargs(&p,19,(unsigned char *)",");
 		if(argc<17)error("Argument count");
 		int c, colourcount=0, vp, v, f, fc=0, n=getint(argv[0],1,MAX3D);
@@ -736,7 +736,7 @@ void MIPS16 fun_3D(void){
 	} else error("Syntax");
 	targ=T_NBR;
 }
-/* 
+/*
  * @cond
  * The following section will be excluded from the documentation.
  */

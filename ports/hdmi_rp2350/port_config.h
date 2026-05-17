@@ -63,7 +63,7 @@
 #define HAL_PORT_PIO1_CLAIMED            true
 #define HAL_PORT_PIO2_CLAIMED            true
 #define HAL_PORT_PSRAM_BASE              0x11000000
-#define HAL_PORT_PSRAM_BLOCK_SIZE        0x1C0000
+#define HAL_PORT_PSRAM_BLOCK_SIZE        0x1A0000
 #define HAL_PORT_ADC_CHANNEL_MAX         4
 
 /* cmd_files flist[] cap. Device has the RAM and the SaveContext+InitHeap

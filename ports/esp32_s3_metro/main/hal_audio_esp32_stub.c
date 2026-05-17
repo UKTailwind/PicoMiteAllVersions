@@ -24,7 +24,7 @@ bool ADCDualBuffering = 0;
 bool dmarunning = 0;
 
 void hal_audio_init(void) {}
-void hal_audio_tone(double l, double r, int hd, long long d) { (void)l; (void)r; (void)hd; (void)d; }
+void hal_audio_tone(double l, double r, int hd, int64_t d) { (void)l; (void)r; (void)hd; (void)d; }
 void hal_audio_sound(int s, const char *c, const char *t, double f, int v) {
     (void)s; (void)c; (void)t; (void)f; (void)v;
 }

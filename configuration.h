@@ -1,4 +1,4 @@
-/* 
+/*
  * @cond
  * The following section will be excluded from the documentation.
  */
@@ -8,22 +8,22 @@ PicoMite MMBasic
 configuration.h
 
 <COPYRIGHT HOLDERS>  Geoff Graham, Peter Mather
-Copyright (c) 2021, <COPYRIGHT HOLDERS> All rights reserved. 
-Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met: 
+Copyright (c) 2021, <COPYRIGHT HOLDERS> All rights reserved.
+Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
 1.	Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
 2.	Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer
     in the documentation and/or other materials provided with the distribution.
-3.	The name MMBasic be used when referring to the interpreter in any documentation and promotional material and the original copyright message be displayed 
+3.	The name MMBasic be used when referring to the interpreter in any documentation and promotional material and the original copyright message be displayed
     on the console at startup (additional copyright messages may be added).
-4.	All advertising materials mentioning features or use of this software must display the following acknowledgement: This product includes software developed 
+4.	All advertising materials mentioning features or use of this software must display the following acknowledgement: This product includes software developed
     by the <copyright holder>.
-5.	Neither the name of the <copyright holder> nor the names of its contributors may be used to endorse or promote products derived from this software 
+5.	Neither the name of the <copyright holder> nor the names of its contributors may be used to endorse or promote products derived from this software
     without specific prior written permission.
 THIS SOFTWARE IS PROVIDED BY <COPYRIGHT HOLDERS> AS IS AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
-OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL <COPYRIGHT HOLDERS> BE LIABLE FOR ANY DIRECT, 
-INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; 
-LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, 
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
+OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL <COPYRIGHT HOLDERS> BE LIABLE FOR ANY DIRECT,
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ************************************************************************************************************************/
 #ifndef __CONFIGURATION_H
@@ -198,7 +198,7 @@ extern uint8_t PSRAMpin;
 #define MAXCOMPORTS 2
 #define MAXERRMSG           64                      // max error msg size (MM.ErrMsg$ is truncated to this)
 #define MAXSOUNDS           4
-#define MAXKEYLEN           64 
+#define MAXKEYLEN           64
 #define MAXPID 8
 
 // TYPE / STRUCT limits (ported from UKTailwind 6.02).
@@ -208,8 +208,8 @@ extern uint8_t PSRAMpin;
 // define the maximum number of arguments to PRINT, INPUT, WRITE, ON, DIM, ERASE, DATA and READ
 // each entry uses zero bytes.  The number is limited by the length of a command line
 #define MAX_ARG_COUNT       75
-#define STR_AUTO_PRECISION  999 
-#define STR_FLOAT_PRECISION  998 
+#define STR_AUTO_PRECISION  999
+#define STR_FLOAT_PRECISION  998
 #define STR_SIG_DIGITS 9                            // number of significant digits to use when converting MMFLOAT to a string
 #define STR_FLOAT_DIGITS 6                            // number of significant digits to use when converting MMFLOAT to a string
 #define NBRSETTICKS         4                       // the number of SETTICK interrupts available
@@ -246,7 +246,7 @@ extern uint8_t PSRAMpin;
 #define MAXCFUNCTION	20
 #define SAVEDVARS_FLASH_SIZE 16384
 #define FLASH_ERASE_SIZE 4096
-#define MAX3D   8 
+#define MAX3D   8
 #define MAXCAM  3
 #define MAX_POLYGON_VERTICES 10
 #ifdef rp2350
@@ -258,7 +258,7 @@ extern uint8_t PSRAMpin;
 #define MAXRESTORE          8
 #define CONFIG_TITLE		0
 #define CONFIG_LOWER		1
-#define CONFIG_UPPER		2 
+#define CONFIG_UPPER		2
 #define UNUSED       (1 << 0)
 #define ANALOG_IN    (1 << 1)
 #define DIGITAL_IN   (1 << 2)
@@ -317,9 +317,11 @@ extern uint8_t PSRAMpin;
 //#define DO_NOT_RESET (1 << 5)
 //#define HEARTBEAT    (1 << 6)
 #define HEARTBEATpin  Option.heartbeatpin
+#ifndef PATH_MAX
 #define PATH_MAX 1024
+#endif
 // QVGA PIO and state machines
-#define QVGA_PIO_NUM 0	
+#define QVGA_PIO_NUM 0
 #ifdef rp2350
 #define QVGA_PIO (QVGA_PIO_NUM==0 ? pio0: (QVGA_PIO_NUM==1 ? pio1: pio2))
 #else
@@ -351,7 +353,7 @@ extern uint8_t PSRAMpin;
 #define ADC_CLK_SPEED   (Option.CPU_Speed*500)
 #define PROGSTART (FLASH_TARGET_OFFSET + FLASH_ERASE_SIZE + SAVEDVARS_FLASH_SIZE + ((MAXFLASHSLOTS) * MAX_PROG_SIZE))
 #define TOP_OF_SYSTEM_FLASH  (FLASH_TARGET_OFFSET + FLASH_ERASE_SIZE + SAVEDVARS_FLASH_SIZE + ((MAXFLASHSLOTS+1) * MAX_PROG_SIZE))
-#define RoundUpK4(a)     (((a) + (4096 - 1)) & (~(4096 - 1)))// round up to the nearest page size      [position 131:9]	
+#define RoundUpK4(a)     (((a) + (4096 - 1)) & (~(4096 - 1)))// round up to the nearest page size      [position 131:9]
 /* MM.* overlaid-function enum. All entries are unconditional so the
  * enum layout is identical across targets; case bodies in fun_tilde
  * that are hardware- or port-specific dispatch through port hooks or

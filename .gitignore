@@ -24,6 +24,7 @@ build_test/
 build_a0_vgawifi/
 build_dvi_wifi/
 build_lfs/
+pico-sdk/
 ports/esp32_s3_metro/build/
 ports/esp32_s3_metro/sdkconfig
 ports/esp32_s3_metro/sdkconfig.old

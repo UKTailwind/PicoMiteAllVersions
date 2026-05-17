@@ -271,13 +271,13 @@ int web_console_parse_key_json(const char *text, size_t len, int *out_code) {
 int web_console_audio_build_tone(char *dst, size_t dst_len,
                                  double left_hz, double right_hz,
                                  int has_duration,
-                                 long long duration_ms) {
+                                 int64_t duration_ms) {
     if (!dst || dst_len == 0) return -1;
     int n;
     if (has_duration) {
         n = snprintf(dst, dst_len,
                      "{\"op\":\"tone\",\"l\":%.6g,\"r\":%.6g,\"ms\":%lld}",
-                     left_hz, right_hz, duration_ms);
+                     left_hz, right_hz, (long long)duration_ms);
     } else {
         n = snprintf(dst, dst_len,
                      "{\"op\":\"tone\",\"l\":%.6g,\"r\":%.6g}",

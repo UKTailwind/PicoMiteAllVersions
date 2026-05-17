@@ -4,22 +4,22 @@ PicoMite MMBasic
 SPI.c
 
 <COPYRIGHT HOLDERS>  Geoff Graham, Peter Mather
-Copyright (c) 2021, <COPYRIGHT HOLDERS> All rights reserved. 
-Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met: 
+Copyright (c) 2021, <COPYRIGHT HOLDERS> All rights reserved.
+Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
 1.	Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
 2.	Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer
     in the documentation and/or other materials provided with the distribution.
-3.	The name MMBasic be used when referring to the interpreter in any documentation and promotional material and the original copyright message be displayed 
+3.	The name MMBasic be used when referring to the interpreter in any documentation and promotional material and the original copyright message be displayed
     on the console at startup (additional copyright messages may be added).
-4.	All advertising materials mentioning features or use of this software must display the following acknowledgement: This product includes software developed 
+4.	All advertising materials mentioning features or use of this software must display the following acknowledgement: This product includes software developed
     by the <copyright holder>.
-5.	Neither the name of the <copyright holder> nor the names of its contributors may be used to endorse or promote products derived from this software 
+5.	Neither the name of the <copyright holder> nor the names of its contributors may be used to endorse or promote products derived from this software
     without specific prior written permission.
 THIS SOFTWARE IS PROVIDED BY <COPYRIGHT HOLDERS> AS IS AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
-OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL <COPYRIGHT HOLDERS> BE LIABLE FOR ANY DIRECT, 
-INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; 
-LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, 
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
+OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL <COPYRIGHT HOLDERS> BE LIABLE FOR ANY DIRECT,
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ************************************************************************************************************************/
 /**
@@ -39,7 +39,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "hardware/spi.h"
 
 unsigned int *GetSendDataList(unsigned char *p, unsigned int *nbr);
-long long int *GetReceiveDataBuffer(unsigned char *p, unsigned int *nbr);
+int64_t *GetReceiveDataBuffer(unsigned char *p, unsigned int *nbr);
 
 uint8_t spibits=8;
 uint8_t spi2bits=8;
@@ -48,7 +48,7 @@ void cmd_spi(void) {
 	    int speed;
     unsigned char *p;
     unsigned int nbr, *d;
-    long long int *dd;
+    int64_t *dd;
 	if(SPI0TXpin==99 || SPI0RXpin==99|| SPI0SCKpin==99)error("Not all pins set for SPI");
 
     if(checkstring(cmdline, (unsigned char *)"CLOSE")) {
@@ -134,7 +134,7 @@ void fun_spi(void) {
 
 }
 
-/* 
+/*
  * @cond
  * The following section will be excluded from the documentation.
  */
@@ -156,7 +156,7 @@ void cmd_spi2(void) {
 	int speed;
     unsigned char *p;
     unsigned int nbr, *d;
-    long long int *dd;
+    int64_t *dd;
 	if(SPI1TXpin==99 || SPI1RXpin==99 || SPI1SCKpin==99)error("Not all pins set for SPI2");
 
     if(checkstring(cmdline, (unsigned char *)"CLOSE")) {
@@ -243,7 +243,7 @@ void fun_spi2(void) {
 
 }
 
-/* 
+/*
  * @cond
  * The following section will be excluded from the documentation.
  */
@@ -308,7 +308,7 @@ unsigned int *GetSendDataList(unsigned char *p, unsigned int *nbr) {
         if(g_vartbl[g_VarIndex].type & T_INT)  {
             for (i = 0; i < *nbr; i++) {
                 buf[i] = *(unsigned int *)ptr;
-                ptr += sizeof(long long int);
+                ptr += sizeof(int64_t);
             }
             return buf;
         }
@@ -324,7 +324,7 @@ unsigned int *GetSendDataList(unsigned char *p, unsigned int *nbr) {
 }
 
 
-long long int *GetReceiveDataBuffer(unsigned char *p, unsigned int *nbr) {
+int64_t *GetReceiveDataBuffer(unsigned char *p, unsigned int *nbr) {
     void *ptr;
 
     getargs(&p, 3, (unsigned char *)",");
@@ -333,7 +333,7 @@ long long int *GetReceiveDataBuffer(unsigned char *p, unsigned int *nbr) {
     ptr = findvar(argv[2], V_NOFIND_NULL | V_EMPTY_OK);
     if(ptr == NULL) error("Invalid variable");
 	if((g_vartbl[g_VarIndex].type & T_INT) && g_vartbl[g_VarIndex].dims[0] > 0 && g_vartbl[g_VarIndex].dims[1] == 0) {		// integer array
-        if( (((long long int *)ptr - g_vartbl[g_VarIndex].val.ia) + *nbr) > (g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase) )
+        if( (((int64_t *)ptr - g_vartbl[g_VarIndex].val.ia) + *nbr) > (g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase) )
             error("Insufficient array size");
 	}
         else error("Invalid variable");

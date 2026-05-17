@@ -143,7 +143,7 @@ void cmd_onewire(void) {
         error("Unknown command");
 }
 
-/* 
+/*
  * @cond
  * The following section will be excluded from the documentation.
  */
@@ -158,13 +158,13 @@ void cmd_onewire(void) {
 // this holds an array of 64-bit ints (one for each pin on the chip)
 // each number is zero if not being used for temperature measurement
 // or the timeout value if a temperature measurement is underway
-long long int *ds18b20Timers;
+int64_t *ds18b20Timers;
 
 void Init_ds18b20(int pin, int precision) {
     // set up initial pin status (open drain, output, high)
     ow_pinChk(pin);
     ExtCfg(pin, EXT_NOT_CONFIG, 0);                                 // set pin to unconfigured
-    gpio_init(PinDef[pin].GPno); 
+    gpio_init(PinDef[pin].GPno);
     ow_reset(pin);
 	fileio_flash_write_begin();
     ow_writeByte(pin, 0xcc);                                        // command skip the ROM
@@ -189,7 +189,7 @@ void cmd_ds18b20(void) {
 	getargs(&cmdline, 5,(unsigned char *)",");
     if(argc < 1) error("Argument count");
 	char code;
-	
+
 	if(!(code=codecheck(argv[0])))argv[0]+=2;
 	pin = getinteger(argv[0]);
 	if(!code)pin=codemap(pin);
@@ -198,7 +198,7 @@ void cmd_ds18b20(void) {
 	int timeout=(100 << precision);
 	if(argc==5)timeout=getint(argv[4],100,2000);
     Init_ds18b20(pin, precision);
-    if(ds18b20Timers == NULL) ds18b20Timers = GetMemory(NBRPINS*sizeof(long long int));   // if this is the first time allocate memory for the timer array
+    if(ds18b20Timers == NULL) ds18b20Timers = GetMemory(NBRPINS*sizeof(int64_t));   // if this is the first time allocate memory for the timer array
     ds18b20Timers[pin] = ds18b20Timer + timeout;         // set the timer count to wait for the conversion
 }
 
@@ -243,7 +243,7 @@ void fun_ds18b20(void) {
     targ = T_NBR;
 }
 
-/* 
+/*
  * @cond
  * The following section will be excluded from the documentation.
  */
@@ -268,7 +268,7 @@ void owReset(unsigned char *p) {
 
 // set up initial pin status (open drain, output, high)
 	ExtCfg(pin, EXT_NOT_CONFIG, 0);									// set pin to unconfigured
-    gpio_init(PinDef[pin].GPno); 
+    gpio_init(PinDef[pin].GPno);
 	PinSetBit(pin, LATSET);
 	PinSetBit(pin, ODCSET);
 	ow_reset(pin);
@@ -326,13 +326,13 @@ void owWrite(unsigned char *p) {
 
 // set up initial pin status (open drain, output, high)
 	ExtCfg(pin, EXT_NOT_CONFIG, 0);									// set pin to unconfigured
-    gpio_init(PinDef[pin].GPno); 
+    gpio_init(PinDef[pin].GPno);
 	PinSetBit(pin, LATSET);
 	PinSetBit(pin, ODCSET);
     PinSetBit(pin, TRISCLR);                                        // this line added by JH
 
 	if (flag & 0x01) ow_reset(pin);
-	owWriteCore(pin, buf, len, flag);	
+	owWriteCore(pin, buf, len, flag);
 	if (flag & 0x02) ow_reset(pin);
 
 	if (flag & 0x08) {												// strong pullup required?
@@ -382,7 +382,7 @@ void owRead(unsigned char *p) {
 
 // set up initial pin status (open drain, output, high)
 	ExtCfg(pin, EXT_NOT_CONFIG, 0);									// set pin to unconfigured
-    gpio_init(PinDef[pin].GPno); 
+    gpio_init(PinDef[pin].GPno);
 	PinSetBit(pin, LATSET);
 	PinSetBit(pin, ODCSET);
 
@@ -400,7 +400,7 @@ void owRead(unsigned char *p) {
             if(g_vartbl[g_VarIndex].type & T_NBR)
                 *((MMFLOAT *)ptr) = buf[i];
             else
-                *((long long int *)ptr) = buf[i];
+                *((int64_t *)ptr) = buf[i];
 	}
 	ExtCurrentConfig[pin] = EXT_NOT_CONFIG;
 	return;
@@ -451,7 +451,7 @@ void fun_owSearch(void) {
 
 	// set up initial pin status (open drain, output, high)
 	ExtCfg(pin, EXT_NOT_CONFIG, 0);									// set pin to unconfigured
-    gpio_init(PinDef[pin].GPno); 
+    gpio_init(PinDef[pin].GPno);
 	PinSetBit(pin, LATSET);
 	PinSetBit(pin, ODCSET);
 
@@ -480,7 +480,7 @@ void fun_owSearch(void) {
 	return;
 }
 #endif
-/* 
+/*
  * @cond
  * The following section will be excluded from the documentation.
  */
@@ -536,7 +536,7 @@ void fun_mmOW(void) {
 	iret = mmOWvalue;
     targ = T_INT;
 }
-/* 
+/*
  * @cond
  * The following section will be excluded from the documentation.
  */
@@ -638,7 +638,7 @@ void __not_in_flash_func(ow_writeBit)(int pin, int bit) {
 
 // note that the uSec() function will not time short delays at low clock speeds
 // so we directly use the core timer for short delays
-int ow_readBit(int pin) { 
+int ow_readBit(int pin) {
     int result;
     PinSetBit(pin, TRISCLR);                                        // set as output *** JH
     PinSetBit(pin, LATCLR);                                         // drive pin low
@@ -646,7 +646,7 @@ int ow_readBit(int pin) {
     PinSetBit(pin, TRISSET);                                        // set as input
     PinSetBit(pin, LATSET);                                         // release the bus
     uSec(10);
-    result = PinRead(pin);                                          // read pin 
+    result = PinRead(pin);                                          // read pin
     // PinSetBit(pin, TRISCLR);
     uSec(53);                                                       // wait 56uSec
     return result;
@@ -974,5 +974,5 @@ unsigned char docrc8(unsigned char cdata) {
 	utilcrc8 = dscrc_table[utilcrc8 ^ cdata];
 	return utilcrc8;
 }
-#endif 
+#endif
 /*  @endcond */

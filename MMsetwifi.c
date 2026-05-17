@@ -78,7 +78,6 @@ void port_web_print_options(void)
 static mm_net_lifecycle_result_t pico_lifecycle_apply_wifi(unsigned char *arg)
 {
     setwifi(arg);
-    WebConnect();
     return MM_NET_LIFECYCLE_OK;
 }
 
@@ -97,6 +96,7 @@ static const mm_net_lifecycle_hooks_t pico_lifecycle_hooks = {
     .close_tftp = pico_tftp_close,
     .open_telnet = pico_telnet_open,
     .close_telnet = pico_telnet_close,
+    .reboot_after_option_mask = MM_NET_LIFECYCLE_REBOOT_WIFI,
 };
 
 static void pico_lifecycle_reboot_required(void)
@@ -319,7 +319,7 @@ void fun_json(void) {
         if (g_vartbl[g_VarIndex].dims[0] <= 0) {
             error("Argument 1 must be integer array");
         }
-        dest = (long long int *)ptr1;
+        dest = (int64_t *)ptr1;
         json_string = (char *)&dest[1];
     } else error("Argument 1 must be integer array");
     cJSON_InitHooks(NULL);

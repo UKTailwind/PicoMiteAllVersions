@@ -69,7 +69,7 @@ void hal_vga_ops_reset_display_vga(void) {
          * HDMI-only CPU_Speed values (Freq720P/FreqXGA/FreqX); stub
          * no-op on pure-VGA. */
         hal_vga_apply_hdmi_resolution(DISPLAY_TYPE);
-        
+
         switch(DISPLAY_TYPE){
             case SCREENMODE1:
                 ScreenSize= MODE1SIZE;
@@ -288,7 +288,7 @@ XGA:
             }
         } else error("Framebuffer 2 already exists");
         memset((void *)SecondFrame,colour,ScreenSize);
-    } else 
+    } else
 #endif
     if((p=checkstring(cmdline, (unsigned char *)"CREATE"))) {
         if(FrameBuf==DisplayBuf){
@@ -398,7 +398,7 @@ XGA:
                 FreeMemory((void *)LayerBuf);
                 error("Layer Buffer must be in tightly coupled RAM, declare before other variables");
             }
-#endif        
+#endif
         } else error("Framebuffer already exists");
         if(DISPLAY_TYPE!=SCREENMODE4)memset((void *)LayerBuf,colour,ScreenSize);
         else {
@@ -496,7 +496,7 @@ XGA:
 /* This file is linked only on VGA-family ports (where HAL_PORT_IS_VGA=1),
  * so the gate is always-true. Dropped. */
 void cmd_colourmap(void){
-    long long int *cptr=NULL, *fptr=NULL;
+    int64_t *cptr=NULL, *fptr=NULL;
     MMFLOAT *cfptr=NULL, *ffptr=NULL;
     int nf,n,i;
     int map[16];

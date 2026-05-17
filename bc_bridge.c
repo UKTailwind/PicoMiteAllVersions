@@ -201,7 +201,7 @@ static void sync_vm_to_mmbasic(BCVMState *vm) {
         struct s_vartbl *v = &g_vartbl[vi];
 
         if (slot->type == T_INT) {
-            v->val.ia = (long long int *)arr->data;
+            v->val.ia = (int64_t *)arr->data;
         } else if (slot->type == T_NBR) {
             v->val.fa = (MMFLOAT *)arr->data;
         } else if (slot->type == T_STR) {
@@ -460,7 +460,7 @@ static int sync_vm_locals_to_mmbasic(BCVMState *vm, int *local_map) {
                 for (int d = 0; d < MAXDIM; d++) {
                     v->dims[d] = (d < arr->ndims) ? arr->dims[d] : 0;
                 }
-                if (meta->type == T_INT) v->val.ia = (long long int *)arr->data;
+                if (meta->type == T_INT) v->val.ia = (int64_t *)arr->data;
                 else if (meta->type == T_NBR) v->val.fa = (MMFLOAT *)arr->data;
                 else if (meta->type == T_STR) v->val.s = (unsigned char *)arr->data;
             }
@@ -683,7 +683,7 @@ void bc_bridge_call_fun(BCVMState *vm, uint16_t fun_idx, const uint8_t *args, ui
     int saved_targ = targ;
     unsigned char *saved_ep = ep;
     MMFLOAT saved_fret = fret;
-    long long int saved_iret = iret;
+    int64_t saved_iret = iret;
     unsigned char *saved_sret = sret;
     int saved_local_index = g_LocalIndex;
     int local_map[VM_MAX_LOCALS];
@@ -710,7 +710,7 @@ void bc_bridge_call_fun(BCVMState *vm, uint16_t fun_idx, const uint8_t *args, ui
 
     /* Capture result before cleanup */
     MMFLOAT result_f = fret;
-    long long int result_i = iret;
+    int64_t result_i = iret;
     unsigned char *result_s = sret;
 
     /* Sync modified variables back to VM.  See bc_bridge_call_cmd for why

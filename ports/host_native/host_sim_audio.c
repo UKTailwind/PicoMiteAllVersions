@@ -52,7 +52,7 @@ static void push_msg(const char *msg) {
  * PLAY TONE input range tops out at 20 kHz, well inside single precision.
  */
 void host_sim_audio_tone(double left_hz, double right_hz,
-                         int has_duration, long long duration_ms) {
+                         int has_duration, int64_t duration_ms) {
     char buf[128];
     if (web_console_audio_build_tone(buf, sizeof(buf), left_hz, right_hz,
                                      has_duration, duration_ms) >= 0)
@@ -113,7 +113,7 @@ void host_sim_audio_free_drain(char **msgs, int count) {
 
 #else  /* !MMBASIC_SIM */
 
-void host_sim_audio_tone(double l, double r, int h, long long m) {
+void host_sim_audio_tone(double l, double r, int h, int64_t m) {
     (void)l; (void)r; (void)h; (void)m;
 }
 void host_sim_audio_stop(void) {}

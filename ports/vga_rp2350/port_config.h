@@ -74,7 +74,7 @@
 #define HAL_PORT_PIO2_CLAIMED            true
 /* QSPI PSRAM region. */
 #define HAL_PORT_PSRAM_BASE              0x11000000
-#define HAL_PORT_PSRAM_BLOCK_SIZE        0x1C0000
+#define HAL_PORT_PSRAM_BLOCK_SIZE        0x1A0000
 
 /* FLAC decoder base sample-rate cap (RP2350 → 48 kHz). */
 #define HAL_PORT_AUDIO_FLAC_MAX_BASE_HZ  48000

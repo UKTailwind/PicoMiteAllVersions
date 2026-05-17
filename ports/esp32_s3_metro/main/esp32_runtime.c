@@ -143,8 +143,9 @@ void port_bc_runtime_free_source(const char **source) {
  * support — the `_S` / `_F` flash regions Pico CFUNCTIONs live in
  * don't have an ESP-IDF analogue. cmd_cfunction errors before this
  * runs; the symbol exists only because Commands.c references it. */
-void CallCFunction(unsigned char *p, unsigned char *args, int *t, unsigned char **s) {
-    (void)p; (void)args; (void)t; (void)s;
+int64_t CallCFunction(unsigned char *cmd, unsigned char *args, unsigned char *def, unsigned char *caller) {
+    (void)cmd; (void)args; (void)def; (void)caller;
+    return 0;
 }
 
 /* Used by the interactive editor's `RUN <fragment>` shortcut. ESP32

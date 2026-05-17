@@ -4,22 +4,22 @@ PicoMite MMBasic
 MATHS.c
 
 <COPYRIGHT HOLDERS>  Geoff Graham, Peter Mather
-Copyright (c) 2021, <COPYRIGHT HOLDERS> All rights reserved. 
-Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met: 
+Copyright (c) 2021, <COPYRIGHT HOLDERS> All rights reserved.
+Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
 1.	Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
 2.	Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer
     in the documentation and/or other materials provided with the distribution.
-3.	The name MMBasic be used when referring to the interpreter in any documentation and promotional material and the original copyright message be displayed 
+3.	The name MMBasic be used when referring to the interpreter in any documentation and promotional material and the original copyright message be displayed
     on the console at startup (additional copyright messages may be added).
-4.	All advertising materials mentioning features or use of this software must display the following acknowledgement: This product includes software developed 
+4.	All advertising materials mentioning features or use of this software must display the following acknowledgement: This product includes software developed
     by the <copyright holder>.
-5.	Neither the name of the <copyright holder> nor the names of its contributors may be used to endorse or promote products derived from this software 
+5.	Neither the name of the <copyright holder> nor the names of its contributors may be used to endorse or promote products derived from this software
     without specific prior written permission.
 THIS SOFTWARE IS PROVIDED BY <COPYRIGHT HOLDERS> AS IS AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
-OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL <COPYRIGHT HOLDERS> BE LIABLE FOR ANY DIRECT, 
-INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; 
-LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, 
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
+OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL <COPYRIGHT HOLDERS> BE LIABLE FOR ANY DIRECT,
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ************************************************************************************************************************/
 /**
@@ -214,7 +214,7 @@ unsigned int b64d_size(unsigned int in_size) {
 unsigned int b64_encode(const unsigned char* in, unsigned int in_len, unsigned char* out) {
 
 	unsigned int i=0, j=0, k=0, s[3];
-	
+
 	for (i=0;i<in_len;i++) {
 		s[j++]=*(in+i);
 		if (j==3) {
@@ -225,7 +225,7 @@ unsigned int b64_encode(const unsigned char* in, unsigned int in_len, unsigned c
 			j=0; k+=4;
 		}
 	}
-	
+
 	if (j) {
 		if (j==1)
 			s[1] = 0;
@@ -240,14 +240,14 @@ unsigned int b64_encode(const unsigned char* in, unsigned int in_len, unsigned c
 	}
 
 	out[k] = '\0';
-	
+
 	return k;
 }
 
 unsigned int b64_decode(const unsigned char* in, unsigned int in_len, unsigned char* out) {
 
 	unsigned int i=0, j=0, k=0, s[4];
-	
+
 	for (i=0;i<in_len;i++) {
 		s[j++]=b64_int(*(in+i));
 		if (j==4) {
@@ -265,7 +265,7 @@ unsigned int b64_decode(const unsigned char* in, unsigned int in_len, unsigned c
 			j=0;
 		}
 	}
-	
+
 	return k;
 }
 
@@ -426,18 +426,18 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.*/
 // CRC POLYNOME = x8 + x5 + x4 + 1 = 1001 1000 = 0x8C
-uint8_t crc8(uint8_t *array, uint16_t length, const uint8_t polynome, 
-             const uint8_t startmask, const uint8_t endmask, 
+uint8_t crc8(uint8_t *array, uint16_t length, const uint8_t polynome,
+             const uint8_t startmask, const uint8_t endmask,
              const uint8_t reverseIn, const uint8_t reverseOut)
 {
   uint8_t crc = startmask;
-  while (length--) 
+  while (length--)
   {
     if ((length & 0xFF) == 0) routinechecks();  // RTOS
     uint8_t data = *array++;
     if (reverseIn) data = reverse8(data);
     crc ^= data;
-    for (uint8_t i = 8; i; i--) 
+    for (uint8_t i = 8; i; i--)
     {
       if (crc & 0x80)
       {
@@ -458,18 +458,18 @@ uint8_t crc8(uint8_t *array, uint16_t length, const uint8_t polynome,
 
 // CRC POLYNOME = x12 + x3 + x2 + 1 =  0000 1000 0000 1101 = 0x80D
 uint16_t crc12(const uint8_t *array, uint16_t length, const uint16_t polynome,
-               const uint16_t startmask, const uint16_t endmask, 
+               const uint16_t startmask, const uint16_t endmask,
                const uint8_t reverseIn, const uint8_t reverseOut)
 {
   uint16_t crc = startmask;
-  while (length--) 
+  while (length--)
   {
     if ((length & 0xFF) == 0) routinechecks();  // RTOS
     uint8_t data = *array++;
     if (reverseIn) data = reverse8(data);
 
     crc ^= ((uint16_t)data) << 4;
-    for (uint8_t i = 8; i; i--) 
+    for (uint8_t i = 8; i; i--)
     {
       if (crc & (1 << 11) )
       {
@@ -491,17 +491,17 @@ uint16_t crc12(const uint8_t *array, uint16_t length, const uint16_t polynome,
 
 // CRC POLYNOME = x15 + 1 =  1000 0000 0000 0001 = 0x8001
 uint16_t crc16(const uint8_t *array, uint16_t length, const uint16_t polynome,
-               const uint16_t startmask, const uint16_t endmask, 
+               const uint16_t startmask, const uint16_t endmask,
                const uint8_t reverseIn, const uint8_t reverseOut)
 {
   uint16_t crc = startmask;
-  while (length--) 
+  while (length--)
   {
     if ((length & 0xFF) == 0) routinechecks();  // RTOS
     uint8_t data = *array++;
     if (reverseIn) data = reverse8(data);
     crc ^= ((uint16_t)data) << 8;
-    for (uint8_t i = 8; i; i--) 
+    for (uint8_t i = 8; i; i--)
     {
       if (crc & (1 << 15))
       {
@@ -527,18 +527,18 @@ uint16_t crc16_CCITT(uint8_t *array, uint16_t length)
 }
 
 // CRC-32 POLYNOME =  x32 + ..... + 1
-uint32_t crc32(const uint8_t *array, uint16_t length, const uint32_t polynome, 
-               const uint32_t startmask, const uint32_t endmask, 
+uint32_t crc32(const uint8_t *array, uint16_t length, const uint32_t polynome,
+               const uint32_t startmask, const uint32_t endmask,
                const uint8_t reverseIn, const uint8_t reverseOut)
 {
   uint32_t crc = startmask;
-  while (length--) 
+  while (length--)
   {
     if ((length & 0xFF) == 0) routinechecks();  // RTOS
     uint8_t data = *array++;
     if (reverseIn) data = reverse8(data);
     crc ^= ((uint32_t) data) << 24;
-    for (uint8_t i = 8; i; i--) 
+    for (uint8_t i = 8; i; i--)
     {
       if (crc & (1UL << 31))
       {
@@ -559,18 +559,18 @@ uint32_t crc32(const uint8_t *array, uint16_t length, const uint32_t polynome,
 
 // CRC-CCITT POLYNOME =  x64 + ..... + 1
 // CRC_ECMA64 = 0x42F0E1EBA9EA3693
-uint64_t crc64(const uint8_t *array, uint16_t length, const uint64_t polynome, 
-               const uint64_t startmask, const uint64_t endmask, 
+uint64_t crc64(const uint8_t *array, uint16_t length, const uint64_t polynome,
+               const uint64_t startmask, const uint64_t endmask,
                const uint8_t reverseIn, const uint8_t reverseOut)
 {
   uint64_t crc = startmask;
-  while (length--) 
+  while (length--)
   {
     if ((length & 0xFF) == 0) routinechecks();  // RTOS
     uint8_t data = *array++;
     if (reverseIn) data = reverse8(data);
     crc ^= ((uint64_t) data) << 56;
-    for (uint8_t i = 8; i; i--) 
+    for (uint8_t i = 8; i; i--)
     {
       if (crc & (1ULL << 63))
       {
@@ -939,7 +939,7 @@ MMFLOAT PIDController_Update(PIDController *pid, MMFLOAT setpoint, MMFLOAT measu
 	/*
 	* Derivative (band-limited differentiator)
 	*/
-		
+
     pid->differentiator = -(2.0 * pid->Kd * (measurement - pid->prevMeasurement)	/* Note: derivative on measurement, therefore minus sign in front of equation! */
                         + (2.0 * pid->tau - pid->T) * pid->differentiator)
                         / (2.0 * pid->tau + pid->T);
@@ -976,7 +976,7 @@ void cmd_math(void){
 	unsigned char *tp;
     int t = T_NBR;
     MMFLOAT f;
-    long long int i64;
+    int64_t i64;
     unsigned char *s;
 	int dims[MAXDIM]={0};
 
@@ -1687,7 +1687,7 @@ void cmd_math(void){
 				PIDchannels[channel].PIDparams=(PIDController *)q1;
 				if(card!=14)error("Argument 2 must be a 14 element floating point array");
 				if(PIDchannels[channel].PIDparams->T < 0.001)error("Invalid update rate");
-				PIDchannels[channel].interrupt=GetIntAddress(argv[4]);	
+				PIDchannels[channel].interrupt=GetIntAddress(argv[4]);
 			} else error("Syntax");
 			return;
 		}
@@ -1757,21 +1757,21 @@ void cmd_math(void){
 			if(argc==11){
 				void *ptr1 = findvar(argv[8], V_FIND);
 				if(!(g_vartbl[g_VarIndex].type & (T_NBR | T_INT))) error("Invalid variable");
-				if(g_vartbl[g_VarIndex].type==T_INT)*(long long int *)ptr1=(long long int)inmin;
+				if(g_vartbl[g_VarIndex].type==T_INT)*(int64_t *)ptr1=(int64_t)inmin;
 				else *(MMFLOAT *)ptr1=inmin;
 				void *ptr2 = findvar(argv[10], V_FIND);
 				if(!(g_vartbl[g_VarIndex].type & (T_NBR | T_INT))) error("Invalid variable");
-				if(g_vartbl[g_VarIndex].type==T_INT)*(long long int *)ptr2=(long long int)inmax;
+				if(g_vartbl[g_VarIndex].type==T_INT)*(int64_t *)ptr2=(int64_t)inmax;
 				else *(MMFLOAT *)ptr2=inmax;
 			}
 			if(a2float!=NULL && a1float!=NULL){ //in and out are floats
 				for(i=0; i< card1;i++)a2float[i] = ((a1float[i]-inmin)/(inmax-inmin))*(outmax-outmin)+outmin;
 			} else if(a2float==NULL && a1float!=NULL){ //in is a float and out is an integer
-				for(i=0; i< card1;i++)a2int[i] =(long long int)(((a1float[i]-inmin)/(inmax-inmin))*(outmax-outmin)+outmin);
+				for(i=0; i< card1;i++)a2int[i] =(int64_t)(((a1float[i]-inmin)/(inmax-inmin))*(outmax-outmin)+outmin);
 			} else if(a2float!=NULL && a1float==NULL){ //in is an integer and out is a float
 				for(i=0; i< card1;i++)a2float[i] =((((MMFLOAT)a1int[i]-inmin)/(inmax-inmin))*(outmax-outmin)+outmin);
 			} else {  // in and out are integers
-				for(i=0; i< card1;i++)a2int[i] =(long long int)((((MMFLOAT)a1int[i]-inmin)/(inmax-inmin))*(outmax-outmin)+outmin);
+				for(i=0; i< card1;i++)a2int[i] =(int64_t)((((MMFLOAT)a1int[i]-inmin)/(inmax-inmin))*(outmax-outmin)+outmin);
 			}
 			return;
 		}
@@ -1839,7 +1839,7 @@ void cmd_math(void){
 
 	error("Syntax");
 }
-/* 
+/*
  * @cond
  * The following section will be excluded from the documentation.
  */
@@ -2401,7 +2401,7 @@ void fun_math(void){
 			int i,card1=1;
 			MMFLOAT *a1float=NULL, max=-3.0e+38;
 			int64_t *a1int=NULL;
-			long long int *temp=NULL;
+			int64_t *temp=NULL;
 			getargs(&tp, 3,(unsigned char *)",");
 //			if(!(argc == 1)) error("Argument count");
 			card1=parsenumberarray(argv[0],&a1float,&a1int,1,0,dims, false);
@@ -2443,7 +2443,7 @@ void fun_math(void){
 			int i,card1=1;
 			MMFLOAT *a1float=NULL, min=3.0e+38;
 			int64_t *a1int=NULL;
-			long long int *temp=NULL;
+			int64_t *temp=NULL;
 			getargs(&tp, 3,(unsigned char *)",");
 //			if(!(argc == 1)) error("Argument count");
 			card1=parsenumberarray(argv[0],&a1float,&a1int,1,0,dims, false);
@@ -2659,7 +2659,7 @@ static size_t reverse_bits(size_t val, int width) {
 		result = (result << 1) | (val & 1U);
 	return result;
 }
-/* 
+/*
  * @cond
  * The following section will be excluded from the documentation.
  */
@@ -2854,7 +2854,7 @@ void cmd_SensorFusion(char *passcmdline){
     }
     error("Invalid command");
 }
-/* 
+/*
  * @cond
  * The following section will be excluded from the documentation.
  */

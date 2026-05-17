@@ -100,7 +100,7 @@ void hal_gui_controls_reset_interrupts(void) {
 extern int TOUCH_GETIRQTRIS;
 extern volatile bool TouchDown, TouchUp, TouchState;
 
-int hal_gui_controls_get_touch_attr(unsigned char *p, long long int *iret_out) {
+int hal_gui_controls_get_touch_attr(unsigned char *p, int64_t *iret_out) {
     if      (checkstring(p, (unsigned char *)"REF"))      *iret_out = CurrentRef;
     else if (checkstring(p, (unsigned char *)"LASTREF"))  *iret_out = LastRef;
     else if (checkstring(p, (unsigned char *)"LASTX"))    *iret_out = LastX;

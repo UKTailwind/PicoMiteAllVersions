@@ -4,22 +4,22 @@ PicoMite MMBasic
 Memory.c
 
 <COPYRIGHT HOLDERS>  Geoff Graham, Peter Mather
-Copyright (c) 2021, <COPYRIGHT HOLDERS> All rights reserved. 
-Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met: 
+Copyright (c) 2021, <COPYRIGHT HOLDERS> All rights reserved.
+Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
 1.	Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
 2.	Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer
     in the documentation and/or other materials provided with the distribution.
-3.	The name MMBasic be used when referring to the interpreter in any documentation and promotional material and the original copyright message be displayed 
+3.	The name MMBasic be used when referring to the interpreter in any documentation and promotional material and the original copyright message be displayed
     on the console at startup (additional copyright messages may be added).
-4.	All advertising materials mentioning features or use of this software must display the following acknowledgement: This product includes software developed 
+4.	All advertising materials mentioning features or use of this software must display the following acknowledgement: This product includes software developed
     by the <copyright holder>.
-5.	Neither the name of the <copyright holder> nor the names of its contributors may be used to endorse or promote products derived from this software 
+5.	Neither the name of the <copyright holder> nor the names of its contributors may be used to endorse or promote products derived from this software
     without specific prior written permission.
 THIS SOFTWARE IS PROVIDED BY <COPYRIGHT HOLDERS> AS IS AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
-OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL <COPYRIGHT HOLDERS> BE LIABLE FOR ANY DIRECT, 
-INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; 
-LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, 
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
+OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL <COPYRIGHT HOLDERS> BE LIABLE FOR ANY DIRECT,
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ************************************************************************************************************************/
 /**
@@ -406,7 +406,7 @@ void MIPS16 cmd_memory(void) {
         	if(n<=0)return;
         	while(n>0){
                 *q++=data;
-                n--;  
+                n--;
         	}
     		return;
     	}
@@ -421,7 +421,7 @@ void MIPS16 cmd_memory(void) {
         	if(n<=0)return;
         	while(n>0){
                 *q++=data;
-                n--;  
+                n--;
         	}
     		return;
      	}
@@ -496,7 +496,7 @@ void MIPS16 cmd_memory(void) {
             if(g_vartbl[var].type & T_NBR)
                 i += MRoundUp(nbr * sizeof(MMFLOAT));
             else if(g_vartbl[var].type & T_INT)
-                i += MRoundUp(nbr * sizeof(long long int));
+                i += MRoundUp(nbr * sizeof(int64_t));
             else
                 i += MRoundUp(nbr * (g_vartbl[var].size + 1));
         } else
@@ -525,7 +525,7 @@ void MIPS16 cmd_memory(void) {
             if(type &  T_NBR)
                 p += sizeof(MMFLOAT);
             else if(type &  T_INT)
-                p += sizeof(long long int);
+                p += sizeof(int64_t);
             else
                 p += *p + 1;
         }
@@ -540,7 +540,7 @@ void MIPS16 cmd_memory(void) {
     pint = (unsigned int *)CFunctionFlash;
     while(*pint != 0xffffffff) {
         //if(*pint < FONT_TABLE_SIZE) {
-        if(*pint >> 31 ){    
+        if(*pint >> 31 ){
             pint++;
             FontNbr++;
             FontSize += *pint + 8;
@@ -635,7 +635,7 @@ void MIPS16 cmd_memory(void) {
            while((unsigned int)p & 0b11) { //count to the next word boundary
            	p++;i++;
            }
-               
+
            //Now add the binary used for CSUB and Fonts
            if(CFunctionLibrary != NULL) {
              j=0;
@@ -653,9 +653,9 @@ void MIPS16 cmd_memory(void) {
            LibraryPercent = (LibrarySizeK * 100)/LibraryMaxK;
            if(LibrarySizeK == 0) LibrarySizeK = 1;              // adjust if it is zero and we have any library
            if(LibraryPercent == 0) LibraryPercent = 1;          // adjust if it is zero and we have any library
-     
+
            MMPrintString("\r\nLibrary:\r\n");
-        
+
            IntToStrPad((char *)inpbuf, LibrarySizeK, ' ', 4, 10); strcat((char *)inpbuf, "K (");
 	       //IntToStrPad(inpbuf, (128*1024  + 512)/1024  - LibrarySizeK, ' ', 4, 10); strcat((char *)inpbuf, "K (");
 	       IntToStrPad((char *)inpbuf + strlen((char *)inpbuf), LibraryPercent, ' ', 2, 10); strcat((char *)inpbuf, "%) "); strcat((char *)inpbuf, "Library\r\n");
@@ -663,7 +663,7 @@ void MIPS16 cmd_memory(void) {
 	       IntToStrPad((char *)inpbuf + strlen((char *)inpbuf), 100 - LibraryPercent, ' ', 2, 10); strcat((char *)inpbuf, "%) Free\r\n");
 	       MMPrintString((char *)inpbuf);
        }
-   
+
 
      MMPrintString("\r\nSaved Variables:\r\n");
 	 if(SavedVarCnt) {
@@ -706,7 +706,7 @@ void MIPS16 cmd_memory(void) {
     port_memory_report_extra();
 }
 
-/* 
+/*
  * @cond
  * The following section will be excluded from the documentation.
  */
@@ -715,24 +715,24 @@ void MIPS16 cmd_memory(void) {
  Public memory management functions
 ************************************************************************************************************************/
 
-/* all memory allocation (except for the heap) is made by m_alloc() 
+/* all memory allocation (except for the heap) is made by m_alloc()
    memory layout is based on static allocation of RAM (very simple)
    see the Maximite version of MMBasic for a more complex dynamic memory management scheme
-   
+
           |--------------------|
           |                    |
           |    MMBasic Heap    |
           |    (grows down)    |
           |                    |
           |--------------------|   <<<   MMHeap
-          
-          
+
+
           |--------------------|
           |   Variable Table   |
           |     (grows up)     |
           |--------------------|   <<<   g_vartbl and DOS_vartbl
-          
-          
+
+
           |--------------------|
           |                    |
           |   Program Memory   |
@@ -744,9 +744,9 @@ void MIPS16 cmd_memory(void) {
   These calls must be made in this sequence:
         m_alloc(M_PROG, size)       Called whenever program memory size changes
         m_alloc(M_VAR, size)        Called when the program is running and whenever the variable table needs to be expanded
-        
+
    Separately calls are made to getmemory() and FreeHeap() to allocate or free space on the heap (which grows downward).
-   
+
 */
 
 
@@ -764,7 +764,7 @@ void m_alloc(int type) {
                         ProgMemory = (uint8_t *)flash_progmemory;
                         memset(MMHeap,0,heap_memory_size);
                         break;
-                        
+
         case M_VAR:     // this must be called to initialises the variable memory pointer
                         // everytime the variable table is increased this must be called to verify that enough memory is free
                         memset(g_vartbl,0,MAXVARS * sizeof(struct s_vartbl));
@@ -925,7 +925,7 @@ static inline __attribute__ ((always_inline)) void MBitsSet(unsigned char *addr,
     i = ((((unsigned int)addr/PAGESIZE)) & (PAGESPERWORD - 1)) * PAGEBITS; // get the position of the bits in the word
     *p = (bits << i) | (*p & (~(((1 << PAGEBITS) -1) << i)));
 }
-void MIPS64 MMB_HOT_FUNC(*GetSystemMemory)(int size) { //get memory from the bottom up 
+void MIPS64 MMB_HOT_FUNC(*GetSystemMemory)(int size) { //get memory from the bottom up
     int n=0, k;
     unsigned char *addr;
     k= (size + PAGESIZE - 1)/PAGESIZE;                         // nbr of pages rounded up
@@ -1055,9 +1055,9 @@ void *GetAlignedMemory(int size) {
          } else error("Not enough Aigned memory");
     }
     addr-=PAGESIZE;
-    MBitsSet(addr, PUSED | PLAST); 
+    MBitsSet(addr, PUSED | PLAST);
     return(retaddr);
-}    
+}
 
 
 int FreeSpaceOnHeap(void) {
@@ -1082,7 +1082,7 @@ int LargestContiguousHeap(void) {
         else break;
     }
     return nbr * PAGESIZE;
-}    
+}
 
 
 unsigned int UsedHeap(void) {

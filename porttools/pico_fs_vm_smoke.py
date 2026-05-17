@@ -263,6 +263,7 @@ class PicoSmoke:
         vm_temp = join_drive(self.drive, f"{self.prefix}_vm.txt")
         self.command(f'ON ERROR SKIP : KILL "{vm_temp}"', check_error=False)
         self.write_program(path, vm_program(self.drive, self.prefix))
+        self.command("NEW")
         self.run_program(f'FRUN "{path}"', "PICO_VM_SMOKE_OK")
         self.note("FRUN bytecode VM", True, "integer loops, strings, and VM file I/O")
 
@@ -270,6 +271,7 @@ class PicoSmoke:
         print("=== sieve ===", flush=True)
         path = join_drive(self.drive, f"{self.prefix}_sieve.bas")
         self.write_program(path, sieve_program())
+        self.command("NEW")
         self.run_program(f'FRUN "{path}"', "PICO_SIEVE_OK 168", timeout=self.long_timeout)
         self.note("FRUN sieve math", True, "168 primes <= 1000")
 
@@ -551,7 +553,8 @@ def vm_program(drive: str, prefix: str) -> list[str]:
     vm_file = join_drive(drive, f"{prefix}_vm.txt")
     return [
         "OPTION EXPLICIT",
-        "DIM INTEGER i%, total%, arr%(4), data1%, data2%, data3%",
+        "DIM INTEGER i%, total%, data1%, data2%, data3%",
+        "DIM INTEGER arr%(4)",
         "DIM FLOAT x!",
         "DIM STRING a$, b$, s$",
         "total% = 0",

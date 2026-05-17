@@ -4,22 +4,22 @@ PicoMite MMBasic
 Draw.c
 
 <COPYRIGHT HOLDERS>  Geoff Graham, Peter Mather
-Copyright (c) 2021, <COPYRIGHT HOLDERS> All rights reserved. 
-Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met: 
+Copyright (c) 2021, <COPYRIGHT HOLDERS> All rights reserved.
+Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
 1.	Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
 2.	Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer
     in the documentation and/or other materials provided with the distribution.
-3.	The name MMBasic be used when referring to the interpreter in any documentation and promotional material and the original copyright message be displayed 
+3.	The name MMBasic be used when referring to the interpreter in any documentation and promotional material and the original copyright message be displayed
     on the console at startup (additional copyright messages may be added).
-4.	All advertising materials mentioning features or use of this software must display the following acknowledgement: This product includes software developed 
+4.	All advertising materials mentioning features or use of this software must display the following acknowledgement: This product includes software developed
     by the <copyright holder>.
-5.	Neither the name of the <copyright holder> nor the names of its contributors may be used to endorse or promote products derived from this software 
+5.	Neither the name of the <copyright holder> nor the names of its contributors may be used to endorse or promote products derived from this software
     without specific prior written permission.
 THIS SOFTWARE IS PROVIDED BY <COPYRIGHT HOLDERS> AS IS AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
-OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL <COPYRIGHT HOLDERS> BE LIABLE FOR ANY DIRECT, 
-INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; 
-LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, 
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
+OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL <COPYRIGHT HOLDERS> BE LIABLE FOR ANY DIRECT,
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ************************************************************************************************************************/
 /**
@@ -27,7 +27,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 * @author Geoff Graham, Peter Mather
 * @brief Source for Graphics MMBasic commands and functions
 */
-/* 
+/*
  * @cond
  * The following section will be excluded from the documentation.
  */
@@ -221,7 +221,7 @@ void MIPS16 cmd_guiMX170(void) {
         int x, y, fc, bc, h, w, scale, t, bytes;
         unsigned char *s;
         MMFLOAT f;
-        long long int i64;
+        int64_t i64;
 
         getargs(&p, 15, (unsigned char *)",");
         if(!(argc & 1) || argc < 5) error("Argument count");
@@ -280,12 +280,12 @@ void MIPS16 cmd_guiMX170(void) {
     }
     error("Unknown command");
 }
-/* 
+/*
  * @cond
  * The following section will be excluded from the documentation.
  */
 
-void  getargaddress (unsigned char *p, long long int **ip, MMFLOAT **fp, int *n){
+void  getargaddress (unsigned char *p, int64_t **ip, MMFLOAT **fp, int *n){
     unsigned char *ptr=NULL;
     *fp=NULL;
     *ip=NULL;
@@ -319,7 +319,7 @@ void  getargaddress (unsigned char *p, long long int **ip, MMFLOAT **fp, int *n)
         }
         if(g_vartbl[g_VarIndex].dims[1] != 0) error("Invalid variable");
         if(g_vartbl[g_VarIndex].type & T_NBR)*fp = (MMFLOAT*)ptr;
-        else *ip = (long long int *)ptr;
+        else *ip = (int64_t *)ptr;
     } else {
     	*n=1; //may be a function call
     }
@@ -327,7 +327,7 @@ void  getargaddress (unsigned char *p, long long int **ip, MMFLOAT **fp, int *n)
 
 typedef struct {
     unsigned char *expr;
-    long long int *ip;
+    int64_t *ip;
     MMFLOAT *fp;
 } DrawBoxArgCtx;
 
@@ -1310,7 +1310,7 @@ void cmd_ReadTriangle(unsigned char *p){
         *buff++=y3;
         SaveTriangle(bnbr,blitbuff[bnbr].blitbuffptr);
 }
-/* 
+/*
  * @cond
  * The following section will be excluded from the documentation.
  */
@@ -1590,7 +1590,7 @@ void cmd_circle(void) {
 	    }
 	    if(Option.Refresh)Display_Refresh();
 	}
-/* 
+/*
  * @cond
  * The following section will be excluded from the documentation.
  */
@@ -1638,7 +1638,7 @@ void MIPS16 drawAALine(MMFLOAT x0 , MMFLOAT y0 , MMFLOAT x1 , MMFLOAT y1, uint32
     xb0=x0;xb1=x1;yb0=y0;yb1=y1;
     if(xb1<xb0)swap(xb1,xb0);
     if(yb1<yb0)swap(yb1,yb0);
-    
+
 // steep means that m > 1
 	int steep = abs(y1 - y0) >= abs(x1 - x0) ;
 // swap the co-ordinates if slope > 1 or we
@@ -1767,7 +1767,7 @@ void cmd_line(void) {
 	} else {
         int x1, y1, x2, y2, w=0, c=0, n=0 ,i, nc=0, nw=0;
         if((p=checkstring(cmdline,(unsigned char *)"PLOT"))){
-            long long int *y1ptr;
+            int64_t *y1ptr;
             MMFLOAT *y1fptr;
             int xs=0,xinc=1;
             int ys=0,yinc=1;
@@ -1957,7 +1957,7 @@ void cmd_box(void) {
                     args, (argc + 1) / 2, &errors);
     if(Option.Refresh)Display_Refresh();
 }
-/* 
+/*
  * @cond
  * The following section will be excluded from the documentation.
  */
@@ -2151,7 +2151,7 @@ void MIPS16 cmd_arc(void){
 	Option.Refresh=save_refresh;
     if(Option.Refresh)Display_Refresh();
 }
-/* 
+/*
  * @cond
  * The following section will be excluded from the documentation.
  */
@@ -2265,7 +2265,7 @@ void fill_end_fill(int count, int ystart, int yend)
 
 void polygon(unsigned char *p, int close){
 	int xcount=0;
-	long long int *xptr=NULL, *yptr=NULL,xptr2=0, yptr2=0, *polycount=NULL, *cptr=NULL, *fptr=NULL;
+	int64_t *xptr=NULL, *yptr=NULL,xptr2=0, yptr2=0, *polycount=NULL, *cptr=NULL, *fptr=NULL;
 	MMFLOAT *polycountf=NULL, *cfptr=NULL, *ffptr=NULL, *xfptr=NULL, *yfptr=NULL, xfptr2=0, yfptr2=0;
 	int i, f=0, c, xtot=0, ymax=0, ymin=1000000;
     int n=0, nx=0, ny=0, nc=0, nf=0;
@@ -2460,7 +2460,7 @@ void cmd_polygon(void){
 
 void MIPS16 cmd_rbox(void) {
     int x1, y1, wi, h, w=0, c=0, f=0,  r=0, n=0 ,i, nc=0, nw=0, nf=0,hmod,wmod;
-    long long int *x1ptr, *y1ptr, *wiptr, *hptr, *wptr, *cptr, *fptr;
+    int64_t *x1ptr, *y1ptr, *wiptr, *hptr, *wptr, *cptr, *fptr;
     MMFLOAT *x1fptr, *y1fptr, *wifptr, *hfptr, *wfptr, *cfptr, *ffptr;
     getargs(&cmdline, 13,(unsigned char*)",");
     if(Option.DISPLAY_TYPE == 0) error("Display not configured");
@@ -2486,7 +2486,7 @@ void MIPS16 cmd_rbox(void) {
     } else {
         c = gui_fcolour;  w = 1;                                        // setup the defaults
         if(argc > 7 && *argv[8]){
-            getargaddress(argv[8], &wptr, &wfptr, &nw); 
+            getargaddress(argv[8], &wptr, &wfptr, &nw);
             if(nw == 1) w = getint(argv[8], 0, 100);
             else if(nw>1) {
                 if(nw > 1 && nw < n) n=nw; //adjust the dimensionality
@@ -2497,7 +2497,7 @@ void MIPS16 cmd_rbox(void) {
             }
         }
         if(argc > 9 && *argv[10]) {
-            getargaddress(argv[10], &cptr, &cfptr, &nc); 
+            getargaddress(argv[10], &cptr, &cfptr, &nc);
             if(nc == 1) c = getint(argv[10], 0, WHITE);
             else if(nc>1) {
                 if(nc > 1 && nc < n) n=nc; //adjust the dimensionality
@@ -2508,7 +2508,7 @@ void MIPS16 cmd_rbox(void) {
             }
         }
         if(argc == 13){
-            getargaddress(argv[12], &fptr, &ffptr, &nf); 
+            getargaddress(argv[12], &fptr, &ffptr, &nf);
             if(nf == 1) f = getint(argv[12], 0, WHITE);
             else if(nf>1) {
                 if(nf > 1 && nf < n) n=nf; //adjust the dimensionality
@@ -2591,7 +2591,7 @@ void cmd_triangle(void) {                                           // thanks to
         return;
     }
     int x1, y1, x2, y2, x3, y3, c=0, f=0,  n=0,i, nc=0, nf=0;
-    long long int *x3ptr, *y3ptr, *x1ptr, *y1ptr, *x2ptr, *y2ptr, *fptr, *cptr;
+    int64_t *x3ptr, *y3ptr, *x1ptr, *y1ptr, *x2ptr, *y2ptr, *fptr, *cptr;
     MMFLOAT *x3fptr, *y3fptr, *x1fptr, *y1fptr, *x2fptr, *y2fptr, *ffptr, *cfptr;
     getargs(&cmdline, 15,(unsigned char *)",");
     if(Option.DISPLAY_TYPE == 0) error("Display not configured");
@@ -2625,7 +2625,7 @@ void cmd_triangle(void) {                                           // thanks to
     } else {
         c = gui_fcolour; f = -1;
         if(argc >= 13 && *argv[12]) {
-            getargaddress(argv[12], &cptr, &cfptr, &nc); 
+            getargaddress(argv[12], &cptr, &cfptr, &nc);
             if(nc == 1) c = getint(argv[10], 0, WHITE);
             else if(nc>1) {
                 if(nc > 1 && nc < n) n=nc; //adjust the dimensionality
@@ -2636,7 +2636,7 @@ void cmd_triangle(void) {                                           // thanks to
             }
         }
         if(argc == 15){
-            getargaddress(argv[14], &fptr, &ffptr, &nf); 
+            getargaddress(argv[14], &fptr, &ffptr, &nf);
             if(nf == 1) f = getint(argv[14], -1, WHITE);
             else if(nf>1) {
                 if(nf > 1 && nf < n) n=nf; //adjust the dimensionality
@@ -2661,7 +2661,7 @@ void cmd_triangle(void) {                                           // thanks to
     }
     if(Option.Refresh)Display_Refresh();
 }
-/* 
+/*
  * @cond
  * The following section will be excluded from the documentation.
  */
@@ -2691,8 +2691,8 @@ static inline char getnextnibble(char **fc, int reset){
     if(available==0){
         available=**fc & 0xF; //number of identical pixels
         out=(**fc)>>4;
-        (*fc)++;    
-    } 
+        (*fc)++;
+    }
     if(!reset)available--;
     return out;
 }
@@ -2733,7 +2733,7 @@ void docompressed(char *fc,int x1, int y1, int w, int h, int8_t blank){
                         }
                     } else getnextnibble(&fc,0);
                 }
-                if(ww>0 && xx1<HRes)copyframetoscreen((unsigned char *)tobuff,xx1, xx1+ww-1, y, y, 0);            
+                if(ww>0 && xx1<HRes)copyframetoscreen((unsigned char *)tobuff,xx1, xx1+ww-1, y, y, 0);
             }
         } else {
             char tobuff[w/2], *to;
@@ -2797,9 +2797,9 @@ void docompressed(char *fc,int x1, int y1, int w, int h, int8_t blank){
                 if(y<0 || y>=VRes)continue;
                 if(x>=0 && x<HRes)*to=c;
                 to++;
-            }               
+            }
         }
-    } else { 
+    } else {
         int otoggle=0,itoggle=0; //input will always start on a byte boundary
         char c,*to;
         c=getnextnibble(&fc,1); //reset the decoder
@@ -2891,7 +2891,7 @@ void cmd_blitmemory(void){
                             }
                         } else getnextuncompressednibble(&fc,0);
                     }
-                    if(ww>0 && xx1<HRes)copyframetoscreen((unsigned char *)tobuff,xx1, xx1+ww-1, y, y, 0);            
+                    if(ww>0 && xx1<HRes)copyframetoscreen((unsigned char *)tobuff,xx1, xx1+ww-1, y, y, 0);
                 }
             } else {
                 char *fc=from;
@@ -2954,9 +2954,9 @@ void cmd_blitmemory(void){
                     if(y<0 || y>=VRes)continue;
                     if(x>=0 && x<HRes)*to=c;
                     to++;
-                }               
+                }
             }
-        } else { 
+        } else {
             int otoggle=0,itoggle=0; //input will always start on a byte boundary
             char c,*to;
             for(int y=y1;y<y1+h;y++){ //loop though all of the output lines
@@ -2995,7 +2995,7 @@ void cmd_blitmemory(void){
         }
     }
 }
-/* 
+/*
  * @cond
  * The following section will be excluded from the documentation.
  */
@@ -3152,7 +3152,7 @@ if ((p = checkstring(cmdline, (unsigned char*)"COMPRESSED"))) {
                             }
                         }
                         if(x>=x1+w)break;
-                    }           
+                    }
                 }
             }
 	        return 1;
@@ -3181,7 +3181,7 @@ if ((p = checkstring(cmdline, (unsigned char*)"COMPRESSED"))) {
                         *pp &=0xF0;
                         *pp |= fcolour;
                     }
-                } 
+                }
                 to=d+toy*(HRes>>1)+(x2>>1); //get the byte that will start the output
                 itoggle=0;
                 pp=from;
@@ -3290,7 +3290,7 @@ void fun_rgb(void) {
         error("Syntax");
     targ = T_INT;
 }
-/* 
+/*
  * @cond
  * The following section will be excluded from the documentation.
  */
@@ -3750,7 +3750,7 @@ void showsafe(int bnbr, int x, int y) {
             BlitShowBuffer(LIFO[i], spritebuff[LIFO[i]].x, spritebuff[LIFO[i]].y, 0);
         }
     }
-    
+
 
 }
 void MIPS16 loadsprite(unsigned char* p) {
@@ -3770,7 +3770,7 @@ void MIPS16 loadsprite(unsigned char* p) {
     MMgetline(fnbr, (char*)buff);							    // get the input line
     while (buff[0] == 39)MMgetline(fnbr, (char*)buff);
     z=buff;
-    { 
+    {
         getargs(&z,5,(unsigned char *)", ");
         width=getinteger(argv[0]);
         number=getinteger(argv[2]);
@@ -4454,7 +4454,7 @@ void cmd_sprite(void) {
                 } else {
                     *t = ((q[2] & 0x80)>> 4) | ((q[1] & 0xC0)>>5) | ((q[0] & 0x80)>>7);
                 }
-            } 
+            }
             if(toggle) t++;
             toggle=!toggle;
             q+=3;
@@ -4702,7 +4702,7 @@ void cmd_blit(void) {
     unsigned char *p;
     if(Option.DISPLAY_TYPE == 0) error("Display not configured");
     if(blitother())return;
-    p = checkstring(cmdline, (unsigned char *)"LOADBMP"); 
+    p = checkstring(cmdline, (unsigned char *)"LOADBMP");
     if(p==NULL)p = checkstring(cmdline, (unsigned char *)"LOAD");
     if(p) {
         int fnbr;
@@ -5142,7 +5142,7 @@ void cmd_colour(void) {
     }
     port_terminal_emit_colour(gui_fcolour, gui_bcolour, argc == 3);
 }
-/* 
+/*
  * @cond
  * The following section will be excluded from the documentation.
  */
@@ -5190,7 +5190,7 @@ void cmd_refresh(void){
         Display_Refresh();
     }
 }
-/* 
+/*
  * @cond
  * The following section will be excluded from the documentation.
  */
@@ -5291,14 +5291,14 @@ void ScrollLCD16(int lines){
     if(lines==0)return;
      if(lines >= 0) {
         for(int i=0;i<VRes-lines;i++) {
-            int d=i*(HRes>>1),s=(i+lines)*(HRes>>1); 
+            int d=i*(HRes>>1),s=(i+lines)*(HRes>>1);
             for(int c=0;c<(HRes>>1);c++)WriteBuf[d+c]=WriteBuf[s+c];
         }
         DrawRectangle(0, VRes-lines, HRes - 1, VRes - 1, PromptBC); // erase the lines to be scrolled off
     } else {
     	lines=-lines;
         for(int i=VRes-1;i>=lines;i--) {
-            int d=i*(HRes>>1),s=(i-lines)*(HRes>>1); 
+            int d=i*(HRes>>1),s=(i-lines)*(HRes>>1);
             for(int c=0;c<(HRes>>1);c++)WriteBuf[d+c]=WriteBuf[s+c];
         }
         DrawRectangle(0, 0, HRes - 1, lines - 1, PromptBC); // erase the lines introduced at the top
@@ -5640,7 +5640,7 @@ void DrawBuffer2(int x1, int y1, int x2, int y2, unsigned char *p){
     if(y2 >= VRes) y2 = VRes - 1;
 	for(y=y1;y<=y2;y++){
     	for(x=x1;x<=x2;x++){
-	        c.rgbbytes[0]=*p++; 
+	        c.rgbbytes[0]=*p++;
             if(c.rgbbytes[0]<0x40)c.rgbbytes[0]=0;
 	        c.rgbbytes[1]=*p++;
             if(c.rgbbytes[1]<0x40)c.rgbbytes[1]=0;

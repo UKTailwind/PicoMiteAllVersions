@@ -11,14 +11,14 @@
 #include <sys/time.h>
 #include <unistd.h>
 
-static long long now_ms(void) {
+static int64_t now_ms(void) {
     struct timeval tv;
     gettimeofday(&tv, NULL);
-    return (long long)tv.tv_sec * 1000LL + (long long)tv.tv_usec / 1000LL;
+    return (int64_t)tv.tv_sec * 1000LL + (int64_t)tv.tv_usec / 1000LL;
 }
 
-static int remaining_ms(long long deadline) {
-    long long rem = deadline - now_ms();
+static int remaining_ms(int64_t deadline) {
+    int64_t rem = deadline - now_ms();
     if (rem <= 0) return 0;
     return rem > 60000 ? 60000 : (int)rem;
 }
@@ -28,7 +28,7 @@ static void set_error(wasm_proxy_http_response_t *out, const char *msg) {
     snprintf(out->error, sizeof(out->error), "%s", msg ? msg : "error");
 }
 
-static int wait_fd(int fd, int write_ready, long long deadline) {
+static int wait_fd(int fd, int write_ready, int64_t deadline) {
     int rem = remaining_ms(deadline);
     if (rem <= 0) return 0;
 
@@ -49,7 +49,7 @@ static int wait_fd(int fd, int write_ready, long long deadline) {
 }
 
 static int connect_with_timeout(const struct addrinfo *ai,
-                                long long deadline) {
+                                int64_t deadline) {
     int fd = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
     if (fd < 0) return -1;
 
@@ -81,7 +81,7 @@ static int connect_with_timeout(const struct addrinfo *ai,
 }
 
 static int send_all(int fd, const uint8_t *data, size_t len,
-                    long long deadline, wasm_proxy_http_response_t *out) {
+                    int64_t deadline, wasm_proxy_http_response_t *out) {
     size_t pos = 0;
     while (pos < len) {
         ssize_t n = send(fd, data + pos, len - pos, 0);
@@ -104,7 +104,7 @@ static int send_all(int fd, const uint8_t *data, size_t len,
 }
 
 static int recv_response(int fd, wasm_proxy_http_response_t *out,
-                         size_t cap, long long deadline) {
+                         size_t cap, int64_t deadline) {
     while (out->len < cap) {
         ssize_t n = recv(fd, out->data + out->len, cap - out->len, 0);
         if (n > 0) {
@@ -165,7 +165,7 @@ int wasm_proxy_http_request(const char *host, int port,
         return WASM_PROXY_HTTP_CONNECT_FAILED;
     }
 
-    long long deadline = now_ms() + timeout_ms;
+    int64_t deadline = now_ms() + timeout_ms;
     int fd = -1;
     for (const struct addrinfo *ai = res; ai; ai = ai->ai_next) {
         fd = connect_with_timeout(ai, deadline);

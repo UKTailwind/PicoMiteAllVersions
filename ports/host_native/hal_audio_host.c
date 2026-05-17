@@ -19,7 +19,7 @@ void hal_audio_init(void) {
 }
 
 void hal_audio_tone(double left_hz, double right_hz,
-                    int has_duration, long long duration_ms) {
+                    int has_duration, int64_t duration_ms) {
     host_sim_audio_tone(left_hz, right_hz, has_duration, duration_ms);
 }
 

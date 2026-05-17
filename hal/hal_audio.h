@@ -25,6 +25,8 @@
 #ifndef HAL_AUDIO_H
 #define HAL_AUDIO_H
 
+#include <stdint.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -41,7 +43,7 @@ void hal_audio_init(void);
  * The BASIC-level `interrupt` argument (INTERRUPT clause) is not wired
  * through this HAL — callers handle it above the HAL. */
 void hal_audio_tone(double left_hz, double right_hz,
-                    int has_duration, long long duration_ms);
+                    int has_duration, int64_t duration_ms);
 
 /* PLAY SOUND slot, ch, type [, freq [, volume]].
  *   slot:   1..4 (PicoMite has four hardware SOUND slots).

@@ -344,8 +344,9 @@ void cmd_files_pump_console_key(int *c)   { (void)c; }
  * exactly what we want here. */
 
 /* CallCFunction / CallExecuteProgram — pc386 has no CFunction support. */
-void CallCFunction(unsigned char *p, unsigned char *args, int *t, unsigned char **s) {
-    (void)p; (void)args; (void)t; (void)s;
+int64_t CallCFunction(unsigned char *cmd, unsigned char *args, unsigned char *def, unsigned char *caller) {
+    (void)cmd; (void)args; (void)def; (void)caller;
+    return 0;
 }
 void CallExecuteProgram(char *p) { (void)p; }
 

@@ -89,7 +89,7 @@ void host_join_sd_root(const char *relpath, char *out, int out_cap);
 
 static void host_fill_finfo_from_posix(FILINFO *fi, const char *name,
                                        int is_dir, unsigned long long size,
-                                       long long mtime_epoch) {
+                                       int64_t mtime_epoch) {
     memset(fi, 0, sizeof(*fi));
     snprintf(fi->fname, sizeof(fi->fname), "%s", name);
     fi->fattrib = is_dir ? AM_DIR : 0;
@@ -136,7 +136,7 @@ FRESULT host_f_findnext(DIR *dp, FILINFO *fi) {
     char name[FF_MAX_LFN + 1];
     int is_dir = 0;
     unsigned long long size = 0;
-    long long mtime = 0;
+    int64_t mtime = 0;
     if (!host_fs_walk_next(host_find_walker, name, (int)sizeof(name),
                            &is_dir, &size, &mtime)) {
         memset(fi, 0, sizeof(*fi));

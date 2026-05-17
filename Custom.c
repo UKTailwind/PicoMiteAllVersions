@@ -4,22 +4,22 @@ PicoMite MMBasic
 custom.c
 
 <COPYRIGHT HOLDERS>  Geoff Graham, Peter Mather
-Copyright (c) 2021, <COPYRIGHT HOLDERS> All rights reserved. 
-Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met: 
+Copyright (c) 2021, <COPYRIGHT HOLDERS> All rights reserved.
+Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
 1.	Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
 2.	Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer
     in the documentation and/or other materials provided with the distribution.
-3.	The name MMBasic be used when referring to the interpreter in any documentation and promotional material and the original copyright message be displayed 
+3.	The name MMBasic be used when referring to the interpreter in any documentation and promotional material and the original copyright message be displayed
     on the console at startup (additional copyright messages may be added).
-4.	All advertising materials mentioning features or use of this software must display the following acknowledgement: This product includes software developed 
+4.	All advertising materials mentioning features or use of this software must display the following acknowledgement: This product includes software developed
     by the <copyright holder>.
-5.	Neither the name of the <copyright holder> nor the names of its contributors may be used to endorse or promote products derived from this software 
+5.	Neither the name of the <copyright holder> nor the names of its contributors may be used to endorse or promote products derived from this software
     without specific prior written permission.
 THIS SOFTWARE IS PROVIDED BY <COPYRIGHT HOLDERS> AS IS AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
-OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL <COPYRIGHT HOLDERS> BE LIABLE FOR ANY DIRECT, 
-INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; 
-LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, 
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
+OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL <COPYRIGHT HOLDERS> BE LIABLE FOR ANY DIRECT,
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ************************************************************************************************************************/
 /**
@@ -46,7 +46,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 /*************************************************************************************************************************
 **************************************************************************************************************************
 IMPORTANT:
-This module is empty and should be used for your special functions and commands.  In the standard distribution this file  
+This module is empty and should be used for your special functions and commands.  In the standard distribution this file
 will never be changed, so your code should be safe here.  You should avoid placing commands and functions in other files as
 they may be changed and you would then need to re insert your changes in a new release of the source.
 
@@ -155,7 +155,7 @@ int calcsideanddelay(char *p, int sidepins, int maxdelaybits){
                         if(*ss=='&'){
                                 if(!(toupper(ss[1])=='B' || toupper(ss[1])=='H' || toupper(ss[1])=='O')) error("Syntax");
                                 ppp+=2;
-                        } 
+                        }
                         while(*ppp>='0' && *ppp<='9' && *ppp){ppp++;}
                         if(*ppp){
                                 save=*ppp;
@@ -281,7 +281,7 @@ void start_i2s(int pior, int sm){
 	// prepare default PIO program config
 	pio_sm_config cfg = i2s_program_get_default_config(I2SOff);
 
-	// map state machine's OUT and MOV pins	
+	// map state machine's OUT and MOV pins
 	sm_config_set_out_pins(&cfg, PinDef[Option.audio_i2s_data].GPno, 1);
 
 	// set sideset pins (BCLK and LCLK)
@@ -311,7 +311,7 @@ void start_i2s(int pior, int sm){
         irq_set_exclusive_handler(PWM_IRQ_WRAP, on_pwm_wrap);
         irq_set_enabled(PWM_IRQ_WRAP, true);
         irq_set_priority(PWM_IRQ_WRAP,255);
-	pwm_set_enabled(AUDIO_SLICE, true); 
+	pwm_set_enabled(AUDIO_SLICE, true);
 	if(pior==2)PIO2=false;
         else if(pior==1)PIO1=false;
         else PIO0=false;
@@ -456,7 +456,7 @@ void MIPS16 cmd_pio(void){
                                         &dma_hw->ch[dma_rx_chan].al2_write_addr_trig,
                                         &a1int,
                                         1,
-                                        false); //Configure control channel  
+                                        false); //Configure control channel
                         }
                        if(s_nbr!=0)channel_config_set_ring(&c,true,i);
                         channel_config_set_write_increment(&c, true);
@@ -464,7 +464,7 @@ void MIPS16 cmd_pio(void){
         } else {
                 if((nbr<<dmasize)>(toarraysize*8))error("Array size");
                 channel_config_set_write_increment(&c, true);
-        } 
+        }
         if(s_nbr==0) channel_config_set_chain_to(&c, dma_rx_chan2); //When this channel completes, it will trigger the channel indicated by chain_to
         dma_channel_configure(dma_rx_chan,
                 &c,
@@ -546,13 +546,13 @@ void MIPS16 cmd_pio(void){
                                 channel_config_set_read_increment(&c2, false); //Set control channel read increment to false
                                 channel_config_set_write_increment(&c2, false); //Set control channel write increment to false
                                 channel_config_set_dreq(&c2, 0x3F);
-//                                channel_config_set_chain_to(&c2, dma_tx_chan); 
+//                                channel_config_set_chain_to(&c2, dma_tx_chan);
                                 dma_channel_configure(dma_tx_chan2,
                                         &c2,
                                         &dma_hw->ch[dma_tx_chan].al3_read_addr_trig,
                                         &a1int,
                                         1,
-                                        false); //Configure control channel  
+                                        false); //Configure control channel
                         }
                         channel_config_set_read_increment(&c, true);
                         if(s_nbr!=0)channel_config_set_ring(&c,false,i);
@@ -560,10 +560,10 @@ void MIPS16 cmd_pio(void){
         } else {
                 if((nbr<<dmasize)>(toarraysize*8))error("Array size");
                 channel_config_set_read_increment(&c, true);
-        } 
+        }
         if(s_nbr==0) channel_config_set_chain_to(&c, dma_tx_chan2); //When this channel completes, it will trigger the channel indicated by chain_to
 
-                
+
         dma_channel_configure(dma_tx_chan,
                 &c,
                 &pio->txf[sm],      // Destination pointer
@@ -611,7 +611,7 @@ void MIPS16 cmd_pio(void){
     if(tp){
 //        unsigned char *p;
         unsigned int nbr;
-        long long int *dd;
+        int64_t *dd;
         getargs(&tp, (MAX_ARG_COUNT * 2) - 1, (unsigned char *)",");
         if((argc & 0x01) == 0) error("Syntax");
         if(argc<5)error("Syntax");
@@ -629,12 +629,12 @@ void MIPS16 cmd_pio(void){
         dd = findvar(argv[6], V_FIND | V_EMPTY_OK | V_NOFIND_ERR);
         if(((g_vartbl[g_VarIndex].type & T_INT) && g_vartbl[g_VarIndex].dims[0] > 0 && g_vartbl[g_VarIndex].dims[1] == 0))
         {		// integer array
-            if( (((long long int *)dd - g_vartbl[g_VarIndex].val.ia) + nbr) > (g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase) )
+            if( (((int64_t *)dd - g_vartbl[g_VarIndex].val.ia) + nbr) > (g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase) )
                 error("Insufficient array size");
         }  else  if ((g_vartbl[g_VarIndex].type & T_INT) && g_vartbl[g_VarIndex].dims[0] == 0 && nbr==1){
             // single variable
         }  else error("Invalid variable");
-        
+
         while(nbr--) {
        	    *dd = pio_sm_get(pio, sm);
             if(pio->fdebug & (1<<(sm + 16)))*dd=-1;
@@ -743,7 +743,7 @@ void MIPS16 cmd_pio(void){
                                         ins|=0x20;
                                         dup=1;
                                         ss+=2;
-                                } 
+                                }
                                 if(strncasecmp(ss,"X--",3)==0 && (ss[3]==' ' || ss[3]==',')) {
                                         if(dup)error("Syntax");
                                         ins|=0x40;
@@ -791,7 +791,7 @@ void MIPS16 cmd_pio(void){
                                         if(*ss=='&'){
                                                 if(!(toupper(ss[1])=='B' || toupper(ss[1])=='H' || toupper(ss[1])=='O')) error("Syntax");
                                                 ppp+=2;
-                                        } 
+                                        }
                                         while(*ppp>='0' && *ppp<='9' && *ppp){ppp++;}
                                         if(*ppp){
                                                 save=*ppp;
@@ -857,7 +857,7 @@ void MIPS16 cmd_pio(void){
                                         if(*ss=='&'){
                                                 if(!(toupper(ss[1])=='B' || toupper(ss[1])=='H' || toupper(ss[1])=='O')) error("Syntax");
                                                 ppp+=2;
-                                        } 
+                                        }
                                         while(*ppp>='0' && *ppp<='9' && *ppp){ppp++;}
                                         if(*ppp){
                                                 save=*ppp;
@@ -902,7 +902,7 @@ void MIPS16 cmd_pio(void){
                                         if(*ss=='&'){
                                                 if(!(toupper(ss[1])=='B' || toupper(ss[1])=='H' || toupper(ss[1])=='O')) error("Syntax");
                                                 ppp+=2;
-                                        } 
+                                        }
                                         while(*ppp>='0' && *ppp<='9' && *ppp){ppp++;}
                                         if(*ppp){
                                                 save=*ppp;
@@ -953,7 +953,7 @@ void MIPS16 cmd_pio(void){
                                         if(*ss=='&'){
                                                 if(!(toupper(ss[1])=='B' || toupper(ss[1])=='H' || toupper(ss[1])=='O')) error("Syntax");
                                                 ppp+=2;
-                                        } 
+                                        }
                                         while(*ppp>='0' && *ppp<='9' && *ppp){ppp++;}
                                         if(*ppp){
                                                 save=*ppp;
@@ -1134,7 +1134,7 @@ void MIPS16 cmd_pio(void){
                                         if(*ss=='&'){
                                                 if(!(toupper(ss[1])=='B' || toupper(ss[1])=='H' || toupper(ss[1])=='O')) error("Syntax");
                                                 ppp+=2;
-                                        } 
+                                        }
                                         while(*ppp>='0' && *ppp<='9' && *ppp){ppp++;}
                                         if(*ppp){
                                                 save=*ppp;
@@ -1184,7 +1184,7 @@ void MIPS16 cmd_pio(void){
                                                 int notfound=1;
                                                 for(int j=PIOstart;j<PIOstart+totallines;j++){
                                                         if(strcasecmp(&labelsneeded[i*MAXLABEL],&labelsfound[j*MAXLABEL])==0) {
-                                                                instructions[i] |=j; 
+                                                                instructions[i] |=j;
                                                                 notfound=0;
                                                         }
                                                 }
@@ -1409,7 +1409,7 @@ pushthreshold, pullthreshold, autopush, autopull, inshiftdir, outshiftdir, joinr
         if(base==16){
                 sidesetbase=16;
                 setbase=16;
-                outbase=16;  
+                outbase=16;
                 inbase=16;
         }
         int sm=getint(argv[2],0,3);
