@@ -1,6 +1,8 @@
 #ifndef HOST_FS_H
 #define HOST_FS_H
 
+#include <stdint.h>
+
 /*
  * POSIX-backed filesystem helpers for the host REPL / simulator.
  * Kept isolated from MMBasic_Includes.h so POSIX's DIR / dirent / setmode

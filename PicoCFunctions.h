@@ -26,6 +26,8 @@
 //#define PICOMITEVGA
 //#define PICOMITEWEB
 
+#include <stdint.h>
+
 /***  Uncomment this define if using PICO2 Chip  ***/
 #define PICORP2350
 

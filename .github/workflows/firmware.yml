@@ -1,6 +1,22 @@
 name: Build PicoMite firmware (.uf2)
 
 on:
+  pull_request:
+    paths:
+      - '*.c'
+      - '*.h'
+      - 'CMakeLists.txt'
+      - 'pico_sdk_import.cmake'
+      - 'buildall.sh'
+      - 'drivers/**'
+      - 'hal/**'
+      - 'ports/**'
+      - 'shared/**'
+      - 'tools/check_hal_purity.sh'
+      - 'tools/check_ram_baseline.sh'
+      - 'tools/patch_pico_sdk_gcc15.sh'
+      - 'tools/ram_baseline_*.txt'
+      - '.github/workflows/firmware.yml'
   push:
     branches: [main]
     paths:
@@ -15,6 +31,7 @@ on:
       - 'shared/**'
       - 'tools/check_hal_purity.sh'
       - 'tools/check_ram_baseline.sh'
+      - 'tools/patch_pico_sdk_gcc15.sh'
       - 'tools/ram_baseline_*.txt'
       - '.github/workflows/firmware.yml'
   workflow_dispatch:

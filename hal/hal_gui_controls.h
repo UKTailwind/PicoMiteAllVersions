@@ -14,6 +14,8 @@
 #ifndef HAL_GUI_CONTROLS_H
 #define HAL_GUI_CONTROLS_H
 
+#include <stdint.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif

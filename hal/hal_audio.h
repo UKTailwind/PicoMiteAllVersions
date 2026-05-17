@@ -25,6 +25,8 @@
 #ifndef HAL_AUDIO_H
 #define HAL_AUDIO_H
 
+#include <stdint.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif

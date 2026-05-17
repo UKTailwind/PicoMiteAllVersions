@@ -277,7 +277,7 @@ int web_console_audio_build_tone(char *dst, size_t dst_len,
     if (has_duration) {
         n = snprintf(dst, dst_len,
                      "{\"op\":\"tone\",\"l\":%.6g,\"r\":%.6g,\"ms\":%lld}",
-                     left_hz, right_hz, duration_ms);
+                     left_hz, right_hz, (long long)duration_ms);
     } else {
         n = snprintf(dst, dst_len,
                      "{\"op\":\"tone\",\"l\":%.6g,\"r\":%.6g}",
