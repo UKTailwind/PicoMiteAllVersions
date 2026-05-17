@@ -125,7 +125,7 @@
  * default (128 KB) matches the rp2040 device profile. The WASM and
  * ANSI ports override HAL_PORT_HEAP_MEMORY_SIZE in their own
  * port_config.h via #undef + redef on top of this file. */
-#define HAL_PORT_HEAP_MEMORY_SIZE        (128 * 1024)
+#define HAL_PORT_HEAP_MEMORY_SIZE        (512 * 1024)
 #define HAL_PORT_MAX_CPU                 420000
 #define HAL_PORT_MIN_CPU                 48000
 #define HAL_PORT_MAX_VARS                512

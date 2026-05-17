@@ -233,6 +233,7 @@ typedef enum {
     OP_READ_F       = 0xC2,  /* — push next data item as float */
     OP_READ_S       = 0xC3,  /* — push next data item as string */
     OP_RESTORE      = 0xC4,  /* — reset data pointer to 0 */
+    OP_RESTORE_DATA = 0x87,  /* data_index:u16 — set data pointer to absolute index */
 
     /* Additional string functions */
     OP_STR_SPACE    = 0xC5,  /* pop int n, push str SPACE$(n) */
@@ -562,7 +563,15 @@ typedef enum {
  *
  * Compiler arrays are dynamically allocated via bc_compiler_alloc().
  */
-#if defined(BC_SIM_RP2040)
+/* If the port's port_config.h supplied compiler-table sizes (as
+ * ports/host_wasm does to keep the WASM build deterministic and
+ * independent of DEVICE_SIM), honour those.  port_config.h must define
+ * the full set — picking up some from the port and the rest from the
+ * legacy target-macro chain below would be inconsistent.  Detection is
+ * on BC_MAX_CODE because every block defines it. */
+#if defined(BC_MAX_CODE)
+  /* port_config.h is authoritative; nothing to define here. */
+#elif defined(BC_SIM_RP2040)
   /* Host build simulating RP2040 — uses RP2040 device limits */
   #define BC_MAX_CODE       (16 * 1024)
   #define BC_MAX_CONSTANTS  64
@@ -680,6 +689,7 @@ typedef struct {
     int      target_label;      /* -1 if using line number */
     uint8_t  size;              /* 2 or 4 byte patch */
     uint8_t  is_relative;       /* 1 = relative offset, 0 = absolute addr */
+    uint8_t  is_data_index;     /* 1 = patch with labelmap[].data_index (size must be 2) */
 } BCFixup;
 
 /*
@@ -706,6 +716,7 @@ typedef struct {
 typedef struct {
     char     name[BC_MAX_LABEL_NAME + 1];
     uint32_t offset;
+    uint16_t data_index;   /* cs->data_count at the label site; 0xFFFF until resolved */
 } BCLabelMap;
 
 /*

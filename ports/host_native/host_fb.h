@@ -45,6 +45,13 @@ extern int host_fb_height;
 extern volatile uint32_t host_fb_generation;
 static inline void host_fb_bump_generation(void) { host_fb_generation++; }
 
+/* Bumped whenever the framebuffer dimensions change (host_fb_resize).
+ * Separate from host_fb_generation so the JS render loop can distinguish
+ * "front plane content changed" (re-blit) from "dimensions changed"
+ * (resize canvas, reallocate texture).  Read by JS each rAF; on change
+ * it re-reads width/height/pointer via the wasm exports. */
+extern volatile uint32_t host_fb_config_generation;
+
 /* Lazy allocator — first call allocates host_fb_width * host_fb_height
  * uint32_ts. All drawing paths call this before touching the buffer. */
 void host_fb_ensure(void);
@@ -98,6 +105,14 @@ int  host_runtime_height(void);
 size_t host_sim_framebuffer_copy(uint32_t *dst, size_t dst_pixels);
 void host_sim_framebuffer_dims(int *w, int *h);
 void host_sim_set_framebuffer_size(int w, int h);
+
+/* Reallocate the framebuffer at a new size after the runtime has
+ * already booted.  Frees the existing primary + FRAMEBUFFER/LAYER back
+ * planes, updates host_fb_width/height + HRes/VRes, re-allocates the
+ * primary plane, re-binds DisplayBuf/FrameBuf/LayerBuf, and bumps
+ * host_fb_config_generation so the JS canvas can match.  Called from
+ * cmd_mode on the WASM port to honour BASIC `MODE N` mid-program. */
+void host_fb_resize(int w, int h);
 
 /* PPM screenshot dump — test harness --screenshot hook. No-op if path
  * is NULL/empty. Writes at most once per mmbasic_runtime_port_begin call. */

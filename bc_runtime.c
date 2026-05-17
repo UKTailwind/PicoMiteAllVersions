@@ -550,6 +550,11 @@ void cmd_frun(void) {
     fname_buf[STRINGSIZE - 5] = '\0';
     if (!strchr(fname_buf, '.')) strcat(fname_buf, ".bas");
 
+    /* Clear variables left over from a previous run.  Bridged DIMs go
+     * through cmd_dim which errors "already declared" on a re-run if
+     * the prior g_vartbl entries persist. */
+    ClearVars(0, true);
+
     char *source = bc_load_source_via_hal(fname_buf);
     bc_run_source_string(source, fname_buf);
     /* On heap-tight ports the hook inside bc_run_source_string already

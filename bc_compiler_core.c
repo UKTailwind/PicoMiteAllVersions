@@ -405,6 +405,7 @@ int bc_add_labelmap_entry(BCCompiler *cs, const char *name, uint32_t offset) {
     memcpy(L->name, name, n);
     L->name[n] = '\0';
     L->offset  = offset;
+    L->data_index = cs->data_count;  /* RESTORE <label> seeks here */
     cs->labelmap_count++;
     return 0;
 }
@@ -462,11 +463,12 @@ void bc_add_fixup_line(BCCompiler *cs, uint32_t patch_addr, int target_line,
         return;
     }
     BCFixup *f = &cs->fixups[cs->fixup_count++];
-    f->patch_addr   = patch_addr;
-    f->target_line  = target_line;
-    f->target_label = -1;
-    f->size         = size;
-    f->is_relative  = is_relative;
+    f->patch_addr    = patch_addr;
+    f->target_line   = target_line;
+    f->target_label  = -1;
+    f->size          = size;
+    f->is_relative   = is_relative;
+    f->is_data_index = 0;
 }
 
 void bc_add_fixup_label(BCCompiler *cs, uint32_t patch_addr, const char *name,
@@ -491,18 +493,64 @@ void bc_add_fixup_label(BCCompiler *cs, uint32_t patch_addr, const char *name,
         memcpy(L->name, name, n);
         L->name[n] = '\0';
         L->offset  = 0xFFFFFFFF;  /* unresolved */
+        L->data_index = 0xFFFF;
     }
     BCFixup *f = &cs->fixups[cs->fixup_count++];
-    f->patch_addr   = patch_addr;
-    f->target_line  = -1;
-    f->target_label = idx;
-    f->size         = size;
-    f->is_relative  = is_relative;
+    f->patch_addr    = patch_addr;
+    f->target_line   = -1;
+    f->target_label  = idx;
+    f->size          = size;
+    f->is_relative   = is_relative;
+    f->is_data_index = 0;
+}
+
+void bc_add_fixup_label_data_index(BCCompiler *cs, uint32_t patch_addr, const char *name) {
+    if (cs->fixup_count >= BC_MAX_FIXUPS) {
+        bc_set_error(cs, "Too many fixups (max %d)", BC_MAX_FIXUPS);
+        return;
+    }
+    int idx = bc_labelmap_index(cs, name);
+    if (idx < 0) {
+        if (cs->labelmap_count >= BC_MAX_LABELS) {
+            bc_set_error(cs, "Too many labels (max %d)", BC_MAX_LABELS);
+            return;
+        }
+        idx = cs->labelmap_count++;
+        BCLabelMap *L = &cs->labelmap[idx];
+        size_t n = strlen(name);
+        if (n > BC_MAX_LABEL_NAME) n = BC_MAX_LABEL_NAME;
+        memcpy(L->name, name, n);
+        L->name[n] = '\0';
+        L->offset  = 0xFFFFFFFF;
+        L->data_index = 0xFFFF;
+    }
+    BCFixup *f = &cs->fixups[cs->fixup_count++];
+    f->patch_addr    = patch_addr;
+    f->target_line   = -1;
+    f->target_label  = idx;
+    f->size          = 2;
+    f->is_relative   = 0;
+    f->is_data_index = 1;
 }
 
 void bc_resolve_fixups(BCCompiler *cs) {
     for (uint16_t i = 0; i < cs->fixup_count; i++) {
         BCFixup *f = &cs->fixups[i];
+
+        if (f->is_data_index) {
+            if (f->target_label < 0 || f->target_label >= cs->labelmap_count) {
+                bc_set_error(cs, "Bad fixup");
+                return;
+            }
+            uint16_t di = cs->labelmap[f->target_label].data_index;
+            if (di == 0xFFFF) {
+                bc_set_error(cs, "Undefined label '%s' in RESTORE",
+                             cs->labelmap[f->target_label].name);
+                return;
+            }
+            bc_patch_u16(cs, f->patch_addr, di);
+            continue;
+        }
 
         uint32_t target;
         if (f->target_line >= 0) {

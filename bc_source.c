@@ -3235,16 +3235,58 @@ static void source_emit_bridge_for_stmt(BCCompiler *cs, const char *stmt) {
 // so their storage is contiguous g_vartbl memory, matching what cmd_struct
 // EXTRACT/INSERT assumes when it memcpys into/out of the destination array.
 static int source_peek_dim_has_sized_array(const char *p) {
-    while (*p && *p != ',' && *p != '\'' && *p != '\n') {
-        if (*p == '(') {
-            const char *q = p + 1;
-            while (*q == ' ' || *q == '\t') q++;
-            if (*q != ')') return 1;     // non-empty parens → sized
-            return 0;
-        }
+    /* Skip leading whitespace */
+    while (*p == ' ' || *p == '\t') p++;
+    /* Skip the variable name (may include `.` for struct field-like names) */
+    while (isnamechar((unsigned char)*p) || *p == '.') p++;
+    /* Skip the optional type suffix */
+    if (*p == '$' || *p == '%' || *p == '!') p++;
+    /* Optional whitespace before the subscript parens */
+    while (*p == ' ' || *p == '\t') p++;
+    /* The subscript is `(...)` immediately after the name+suffix.  Any
+     * `(` further on belongs to an init expression (`= Square%(n)`) or
+     * AS clause, not a sized-array decl. */
+    if (*p != '(') return 0;
+    const char *q = p + 1;
+    while (*q == ' ' || *q == '\t') q++;
+    return (*q != ')');
+}
+
+/* True if this DIM-arg (one of the comma-separated args after `DIM`)
+ * declares a sized string array, i.e. `name$(...)` or `name(...) AS STRING`
+ * (when forced_type is T_STR).  Used to force string-array DIMs through
+ * the bridge so bridged commands see the array in g_vartbl. */
+static int source_peek_dim_arg_is_string_array(const char *p, uint8_t forced_type) {
+    /* Skip the name */
+    while (isnamechar((unsigned char)*p) || *p == '.') p++;
+    uint8_t suffix = 0;
+    if (*p == '$') { suffix = T_STR; p++; }
+    else if (*p == '%' || *p == '!') p++;
+    while (*p == ' ' || *p == '\t') p++;
+    if (*p != '(') return 0;
+    /* Non-empty `(...)` confirms sized array */
+    const char *q = p + 1;
+    while (*q == ' ' || *q == '\t') q++;
+    if (*q == ')') return 0;
+    if (suffix == T_STR) return 1;
+    /* No suffix — check AS STRING after the close paren */
+    int depth = 1;
+    p++;
+    while (*p && depth > 0) {
+        if (*p == '(') depth++;
+        else if (*p == ')') depth--;
+        if (depth == 0) break;
         p++;
     }
-    return 0;
+    if (*p == ')') p++;
+    while (*p == ' ' || *p == '\t') p++;
+    if ((p[0] == 'A' || p[0] == 'a') && (p[1] == 'S' || p[1] == 's') &&
+        !isnamechar((unsigned char)p[2])) {
+        p += 2;
+        while (*p == ' ' || *p == '\t') p++;
+        if (strncasecmp(p, "STRING", 6) == 0 && !isnamechar((unsigned char)p[6])) return 1;
+    }
+    return forced_type == T_STR;
 }
 
 static void source_compile_dim(BCSourceFrontend *fe, BCCompiler *cs, const char **pp) {
@@ -3298,12 +3340,28 @@ static void source_compile_dim(BCSourceFrontend *fe, BCCompiler *cs, const char 
         }
         /* Phase 13: if the program uses STRUCT EXTRACT or STRUCT INSERT, any
          * DIM that allocates a non-struct sized array goes through the bridge
-         * so the storage lives in g_vartbl's contiguous layout — the VM's
-         * native BCValue[] layout for T_STR arrays is incompatible with
-         * cmd_struct's memcpy assumption.  Blunt for non-string types too,
-         * since the bridge path is safe for int/float arrays and the prescan
-         * flag is specific to programs that already bridge struct commands. */
+         * so the storage lives in g_vartbl's contiguous layout. */
         if (!needs_bridge && fe && fe->uses_struct_extract_insert) {
+            const char *peek_arr = p;
+            while (*peek_arr && *peek_arr != '\n') {
+                if (source_peek_dim_has_sized_array(peek_arr)) {
+                    needs_bridge = 1;
+                    break;
+                }
+                while (*peek_arr && *peek_arr != ',') peek_arr++;
+                if (*peek_arr == ',') peek_arr++;
+            }
+        }
+
+        /* All sized-array DIMs go through the bridge so that bridged
+         * commands (GUI BITMAP, Play tone, etc. that re-resolve names
+         * via findvar) see the array in g_vartbl.  After the bridge,
+         * sync_mmbasic_to_vm adopts the g_vartbl pointer into
+         * vm->arrays[i].data and OP_LOAD/STORE_ARR_* read/write the
+         * shared buffer.  Native (VM-only) sized arrays would be
+         * invisible to bridged commands, so this is correctness, not
+         * just convenience. */
+        if (!needs_bridge) {
             const char *peek_arr = p;
             while (*peek_arr && *peek_arr != '\n') {
                 if (source_peek_dim_has_sized_array(peek_arr)) {
@@ -3434,6 +3492,56 @@ static void source_compile_dim(BCSourceFrontend *fe, BCCompiler *cs, const char 
             bc_emit_byte(cs, dim_op);
             bc_emit_u16(cs, slot);
             bc_emit_byte(cs, (uint8_t)ndim);
+
+            /* Optional literal-list initializer: `Dim arr(n) = (v0, v1, ...)`.
+             * Sugar for `arr(0)=v0 : arr(1)=v1 : ...`.  1D only — multi-dim
+             * linearisation order isn't worth committing to without a test. */
+            source_skip_space(&p);
+            if (*p == '=') {
+                p++;
+                source_skip_space(&p);
+                if (*p != '(') {
+                    bc_set_error(cs, "Expected '(' after '=' in DIM initializer");
+                    *pp = p;
+                    return;
+                }
+                if (ndim != 1) {
+                    bc_set_error(cs, "Array literal initializer requires 1D array");
+                    *pp = p;
+                    return;
+                }
+                p++;
+                int idx = 0;
+                while (!cs->has_error) {
+                    source_skip_space(&p);
+                    if (*p == ')') { p++; break; }
+                    if (idx > 0) {
+                        if (*p != ',') {
+                            bc_set_error(cs, "Expected ',' or ')' in DIM initializer");
+                            *pp = p;
+                            return;
+                        }
+                        p++;
+                    }
+                    bc_emit_byte(cs, OP_PUSH_INT);
+                    bc_emit_i64(cs, (int64_t)idx);
+                    uint8_t etype = source_parse_expression(fe, cs, &p);
+                    if ((vtype & T_STR) && !(etype & T_STR)) {
+                        bc_set_error(cs, "Type mismatch in DIM initializer (expected string)");
+                        *pp = p;
+                        return;
+                    }
+                    if (!(vtype & T_STR) && (etype & T_STR)) {
+                        bc_set_error(cs, "Type mismatch in DIM initializer (expected numeric)");
+                        *pp = p;
+                        return;
+                    }
+                    if (vtype == T_INT) source_emit_int_conversion(cs, etype);
+                    else if (vtype == T_NBR) source_emit_float_conversion(cs, etype);
+                    source_emit_store_array(cs, slot, vtype, 0, 1);
+                    idx++;
+                }
+            }
         } else {
             uint8_t as_type = source_parse_as_type_clause(&p);
             if (as_type && !suffix_type) vtype = as_type;
@@ -3591,9 +3699,47 @@ static void source_compile_inc(BCSourceFrontend *fe, BCCompiler *cs, const char 
 
     int is_local = 0;
     uint16_t slot = source_resolve_var(cs, name, name_len, vtype, 1, &is_local);
-    bc_emit_load_var(cs, slot, vtype, is_local);
 
     source_skip_space(&p);
+    /* INC arr(i, j) [, delta] — array-element form.  Compiles like
+     * `arr(i,j) = arr(i,j) + delta` so the indices are re-evaluated for
+     * the store.  That matches the semantics a hand-rolled assignment
+     * would have. */
+    if (*p == '(') {
+        const char *indices_start = p;
+        const char *index_dup = p;
+        int ndim_store = source_parse_array_indices(fe, cs, &index_dup);
+        if (cs->has_error) { *pp = index_dup; return; }
+        int ndim_load = source_parse_array_indices(fe, cs, &p);
+        (void)indices_start;
+        if (cs->has_error) { *pp = p; return; }
+        if (ndim_store != ndim_load) {
+            bc_set_error(cs, "Internal: INC array index mismatch");
+            *pp = p;
+            return;
+        }
+        source_emit_load_array(cs, slot, vtype, is_local, ndim_load);
+
+        source_skip_space(&p);
+        uint32_t right_start = cs->code_len;
+        uint8_t amount_type;
+        if (*p == ',') {
+            p++;
+            amount_type = source_parse_expression(fe, cs, &p);
+        } else {
+            bc_emit_byte(cs, OP_PUSH_ONE);
+            amount_type = T_INT;
+        }
+        uint8_t result_type = source_emit_numeric_binary(cs, vtype, amount_type, right_start, '+');
+        if (vtype == T_INT)      source_emit_int_conversion(cs, result_type);
+        else if (vtype == T_NBR) source_emit_float_conversion(cs, result_type);
+        source_emit_store_array(cs, slot, vtype, is_local, ndim_store);
+        *pp = p;
+        return;
+    }
+
+    bc_emit_load_var(cs, slot, vtype, is_local);
+
     uint32_t right_start = cs->code_len;
     uint8_t amount_type;
     if (*p == ',') {
@@ -3657,18 +3803,25 @@ static int source_parse_params(BCCompiler *cs, const char **pp, int sf_idx) {
     const char *p = *pp;
     int nparams = 0;
     source_skip_space(&p);
-    if (*p != '(') {
+    /* MMBasic allows both `Sub foo(a, b)` and `Sub foo a, b`.  When the
+     * params start with `(`, expect a matching `)`; otherwise the list
+     * runs to end-of-statement. */
+    int has_parens = (*p == '(');
+    if (has_parens) {
+        p++;
+    } else if (*p == '\0' || *p == '\'' || *p == ':') {
         *pp = p;
         return 0;
     }
-    p++;
 
     while (!cs->has_error) {
         source_skip_space(&p);
-        if (*p == ')') {
+        if (has_parens && *p == ')') {
             p++;
             break;
         }
+        if (!has_parens && (*p == '\0' || *p == '\'' || *p == ':')) break;
+
         char name[MAXVARLEN + 1];
         int name_len = 0;
         uint8_t ptype = 0;
@@ -3705,11 +3858,16 @@ static int source_parse_params(BCCompiler *cs, const char **pp, int sf_idx) {
             p++;
             continue;
         }
-        if (*p == ')') {
-            p++;
+        if (has_parens) {
+            if (*p == ')') {
+                p++;
+                break;
+            }
+            bc_set_error(cs, "Expected ',' or ')' in parameter list");
             break;
         }
-        bc_set_error(cs, "Expected ',' or ')' in parameter list");
+        if (*p == '\0' || *p == '\'' || *p == ':') break;
+        bc_set_error(cs, "Expected ',' in parameter list");
         break;
     }
 
@@ -5725,6 +5883,23 @@ static void source_compile_exit(BCCompiler *cs, const char **pp) {
         return;
     }
 
+    /* Bare EXIT (no keyword): exit the innermost enclosing DO loop only.
+     * Matches MMBasic interpreter behaviour — bare EXIT does NOT exit a
+     * FOR loop (which requires explicit `Exit For`). */
+    if (*p == '\0' || *p == '\'' || *p == ':') {
+        BCNestEntry *ne = bc_nest_find(cs, NEST_DO);
+        if (!ne) {
+            bc_set_error(cs, "No DO loop is in effect");
+            *pp = p;
+            return;
+        }
+        uint32_t patch = source_emit_jmp_placeholder(cs, OP_JMP);
+        if (ne->exit_fixup_count < 64)
+            ne->exit_fixups[ne->exit_fixup_count++] = patch;
+        *pp = p;
+        return;
+    }
+
     bc_set_error(cs, "Expected DO, FOR, FUNCTION or SUB after EXIT");
     *pp = p;
 }
@@ -6965,7 +7140,9 @@ static void source_compile_else(BCCompiler *cs, const char **pp) {
 static void source_compile_endif(BCCompiler *cs) {
     BCNestEntry *ne = bc_nest_top(cs);
     if (!ne || ne->type != NEST_IF) {
-        bc_set_error(cs, "ENDIF without matching IF");
+        /* MMBasic interpreter quirk: a stray ENDIF (no matching IF) is
+         * silently ignored.  Real programs depend on this — e.g.
+         * Picovaders.bas has one at the end of Draw_Bomb. */
         return;
     }
     if (ne->addr1 != 0xFFFFFFFF) source_patch_jmp_here(cs, ne->addr1);
@@ -7055,6 +7232,7 @@ static int source_try_register_label(BCCompiler *cs, const char **pp) {
             return 0;
         }
         cs->labelmap[hit].offset = cs->code_len;
+        cs->labelmap[hit].data_index = cs->data_count;
     } else {
         bc_add_labelmap_entry(cs, buf, cs->code_len);
     }
@@ -7251,8 +7429,40 @@ static void source_compile_statement(BCSourceFrontend *fe, BCCompiler *cs, const
     }
 
     if (source_keyword(&p, "RESTORE")) {
-        bc_emit_byte(cs, OP_RESTORE);
-        source_statement_end(cs, p);
+        source_skip_space(&p);
+        /* Bare RESTORE: rewind data pointer to 0. */
+        if (*p == '\0' || *p == '\'' || *p == ':') {
+            bc_emit_byte(cs, OP_RESTORE);
+            source_statement_end(cs, p);
+            return;
+        }
+        /* RESTORE <label>: seek data pointer to the data_index recorded
+         * when <label> was defined.  Forward refs go through the
+         * is_data_index fixup. */
+        if (isalpha((unsigned char)*p) || *p == '_') {
+            char name[BC_MAX_LABEL_NAME + 1];
+            int n = 0;
+            while ((isalnum((unsigned char)*p) || *p == '_' || *p == '.') &&
+                   n < BC_MAX_LABEL_NAME) {
+                name[n++] = *p++;
+            }
+            name[n] = '\0';
+            bc_emit_byte(cs, OP_RESTORE_DATA);
+            uint32_t patch = cs->code_len;
+            bc_emit_u16(cs, 0);
+            int idx = -1;
+            for (uint16_t i = 0; i < cs->labelmap_count; i++) {
+                if (strcasecmp(cs->labelmap[i].name, name) == 0) { idx = (int)i; break; }
+            }
+            if (idx >= 0 && cs->labelmap[idx].data_index != 0xFFFF) {
+                bc_patch_u16(cs, patch, cs->labelmap[idx].data_index);
+            } else {
+                bc_add_fixup_label_data_index(cs, patch, name);
+            }
+            source_statement_end(cs, p);
+            return;
+        }
+        bc_set_error(cs, "Expected label name after RESTORE");
         return;
     }
 

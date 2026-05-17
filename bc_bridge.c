@@ -35,6 +35,15 @@ extern void port_bc_bridge_rehash_subfun(unsigned char **subfun_arr);
 static int slot_to_vartbl[BC_MAX_SLOTS];
 static int slot_map_initialized = 0;
 
+/* Last VM source line that was active when a bridge call was entered.
+ * The interpreter's error() reads this to report the BAS line that
+ * caused the crash; CurrentLinePtr is otherwise meaningless inside a
+ * bridge because ProgMemory points at a single tokenised buffer. */
+int bc_bridge_last_vm_line = 0;
+/* First 80 chars of the de-tokenised bridge statement, for error diag. */
+char bc_bridge_last_stmt[80] = {0};
+extern unsigned char *llist(unsigned char *b, unsigned char *p);
+
 void bc_bridge_reset_sync(void) {
     memset(slot_to_vartbl, -1, sizeof(slot_to_vartbl));
     slot_map_initialized = 0;
@@ -234,25 +243,22 @@ static void sync_mmbasic_to_vm(BCVMState *vm) {
         }
     }
 
-    /* Phase 13: first-time adoption for bridged int/float DIMs.  When a
-     * DIM allocates a non-struct non-string sized array via the bridge
-     * (because fe->uses_struct_extract_insert forced it), vm->arrays[i].data
-     * starts NULL.  Walk g_vartbl directly, look up by suffix-stripped name,
-     * and adopt the pointer so subsequent OP_LOAD/STORE_ARR_* opcodes see
-     * the contiguous g_vartbl buffer.
+    /* First-time adoption for bridged array DIMs.  When a DIM allocates
+     * a non-struct sized array via the bridge (forced by
+     * fe->uses_struct_extract_insert or, for string arrays, by the
+     * always-bridge rule), vm->arrays[i].data starts NULL.  Walk
+     * g_vartbl directly, look up by suffix-stripped name, and adopt
+     * the pointer so subsequent OP_LOAD/STORE_ARR_* opcodes see the
+     * contiguous g_vartbl buffer.
      *
-     * String arrays (T_STR) are intentionally excluded: the VM stores them
-     * as `BCValue[] → 256-byte buffer per element`, which is incompatible
-     * with g_vartbl's contiguous layout.  Programs that do
-     * `STRUCT EXTRACT arr().member, dest$()` / `INSERT src$(), arr().member`
-     * therefore only run correctly under `--interp` for the string case;
-     * the compare-mode test skips those paths explicitly. */
+     * Since VM string arrays now use g_vartbl's contiguous layout
+     * (STRINGSIZE per element), T_STR is included in this pass. */
     for (uint16_t i = 0; i < cs->slot_count; i++) {
         BCSlot *slot = &cs->slots[i];
         if (!slot->name[0] || !isnamestart((unsigned char)slot->name[0])) continue;
         if (!slot->is_array) continue;
         if (vm->arrays[i].data) continue;
-        if (slot->type == T_STRUCT || slot->type == T_STR) continue;
+        if (slot->type == T_STRUCT) continue;
 
         /* Strip trailing type suffix — g_vartbl stores names without it. */
         int nlen = (int)strlen(slot->name);
@@ -274,7 +280,8 @@ static void sync_mmbasic_to_vm(BCVMState *vm) {
 
         struct s_vartbl *v = &g_vartbl[vi];
         void *ptr = (slot->type == T_INT) ? (void *)v->val.ia :
-                    (slot->type == T_NBR) ? (void *)v->val.fa : NULL;
+                    (slot->type == T_NBR) ? (void *)v->val.fa :
+                    (slot->type == T_STR) ? (void *)v->val.s  : NULL;
         if (!ptr) continue;
 
         slot_to_vartbl[i] = vi;
@@ -563,7 +570,21 @@ void bc_bridge_call_cmd(BCVMState *vm, const uint8_t *tok, uint16_t len) {
     if (!CurrentLinePtr) CurrentLinePtr = buf;
     int bridge_level = 0;
 
-    /* Sync VM variables to MMBasic table */
+    bc_bridge_last_vm_line = (int)vm->current_line;
+    /* De-tokenise into bc_bridge_last_stmt for error diagnostic.  Need
+     * a copy with a double-zero terminator because llist walks until it
+     * sees one — buf has only a single trailing zero and llist would
+     * read past into adjacent temp memory. */
+    {
+        unsigned char detok_buf[STRINGSIZE];
+        size_t n = (len < sizeof(detok_buf) - 2) ? len : sizeof(detok_buf) - 2;
+        memcpy(detok_buf, buf, n);
+        detok_buf[n] = 0;
+        detok_buf[n + 1] = 0;
+        llist((unsigned char *)bc_bridge_last_stmt, detok_buf);
+        bc_bridge_last_stmt[sizeof(bc_bridge_last_stmt) - 1] = 0;
+    }
+
     sync_vm_to_mmbasic(vm);
     bridge_level = sync_vm_locals_to_mmbasic(vm, local_map);
 
@@ -610,11 +631,27 @@ void bc_bridge_call_cmd(BCVMState *vm, const uint8_t *tok, uint16_t len) {
         nextstmt = pre_nextstmt;
     }
 
-    /* Sync modified variables back to VM */
+    /* Sync modified variables back to VM.
+     *
+     * Order matters: drop the bridge-synthesised local frame BEFORE
+     * sync_mmbasic_to_vm.  The array-rebinding pass in sync_mmbasic_to_vm
+     * calls findvar() to re-resolve global arrays by name (`snd%()`), and
+     * findvar's local-search runs first at g_LocalIndex.  If a bridged SUB
+     * declares a scalar parameter whose name collides with a global array
+     * (e.g. `Sub expl ex, ey, snd` versus a global `Dim snd%(4)`),
+     * the local scalar shadows the global array and findvar returns the
+     * scalar — raising "Array dimensions" against vindex pointing at the
+     * scalar local rather than the array we meant to rebind.  Reading
+     * local values must happen first while the level-1 entries exist;
+     * the rebind has to run after they're gone. */
     sync_mmbasic_locals_to_vm(vm, local_map);
-    sync_mmbasic_to_vm(vm);
     if (bridge_level) ClearVars(bridge_level, 1);
     g_LocalIndex = saved_local_index;
+    sync_mmbasic_to_vm(vm);
+
+    /* Successful return — clear the diagnostic so a subsequent error
+     * (outside any bridge) isn't tagged with this VM line. */
+    bc_bridge_last_vm_line = 0;
 
     /* Restore interpreter context */
     cmdtoken = saved_cmdtoken;
@@ -652,6 +689,8 @@ void bc_bridge_call_fun(BCVMState *vm, uint16_t fun_idx, const uint8_t *args, ui
     int local_map[VM_MAX_LOCALS];
     int bridge_level = 0;
 
+    bc_bridge_last_vm_line = (int)vm->current_line;
+
     /* Sync VM variables to MMBasic table */
     sync_vm_to_mmbasic(vm);
     bridge_level = sync_vm_locals_to_mmbasic(vm, local_map);
@@ -674,11 +713,13 @@ void bc_bridge_call_fun(BCVMState *vm, uint16_t fun_idx, const uint8_t *args, ui
     long long int result_i = iret;
     unsigned char *result_s = sret;
 
-    /* Sync modified variables back to VM */
+    /* Sync modified variables back to VM.  See bc_bridge_call_cmd for why
+     * the local frame must be dropped before sync_mmbasic_to_vm. */
     sync_mmbasic_locals_to_vm(vm, local_map);
-    sync_mmbasic_to_vm(vm);
     if (bridge_level) ClearVars(bridge_level, 1);
     g_LocalIndex = saved_local_index;
+    sync_mmbasic_to_vm(vm);
+    bc_bridge_last_vm_line = 0;
 
     /* Push result onto VM stack */
     if (ret_type == T_INT) {

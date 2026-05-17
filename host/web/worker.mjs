@@ -127,6 +127,13 @@ async function initInstance(cfg) {
     if (cfg.res)      instance._wasm_set_framebuffer_size(cfg.res.w, cfg.res.h);
     if (cfg.heap)     instance._wasm_set_heap_size(cfg.heap);
     if (cfg.slowdown) instance._wasm_set_slowdown_us(cfg.slowdown);
+    if (Array.isArray(cfg.modeMap)) {
+        for (const e of cfg.modeMap) {
+            if (typeof instance._wasm_set_mode_resolution === 'function') {
+                instance._wasm_set_mode_resolution(e.mode, e.w, e.h);
+            }
+        }
+    }
     if (cfg.proxy && typeof instance._wasm_set_proxy_mode === 'function') {
         instance._wasm_set_proxy_mode(cfg.proxy.online ? 1 : 0);
     }
@@ -190,6 +197,9 @@ async function initInstance(cfg) {
         fbWidth:         instance._wasm_framebuffer_width(),
         fbHeight:        instance._wasm_framebuffer_height(),
         fbGenerationPtr: instance._wasm_framebuffer_generation_ptr(),
+        fbConfigGenPtr:  (typeof instance._wasm_framebuffer_config_generation_ptr === 'function')
+                             ? instance._wasm_framebuffer_config_generation_ptr()
+                             : 0,
         keyRingPtr:      instance._wasm_key_ring_ptr(),
         keyRingHeadPtr:  instance._wasm_key_ring_head_ptr(),
         keyRingTailPtr:  instance._wasm_key_ring_tail_ptr(),
@@ -279,6 +289,27 @@ self.onmessage = async (e) => {
 
         case 'set-slowdown':
             instance._wasm_set_slowdown_us(msg.us);
+            break;
+
+        case 'set-mode-map':
+            if (Array.isArray(msg.entries) &&
+                typeof instance._wasm_set_mode_resolution === 'function') {
+                for (const e of msg.entries) {
+                    instance._wasm_set_mode_resolution(e.mode, e.w, e.h);
+                }
+            }
+            break;
+
+        case 'refetch-framebuffer':
+            // BASIC `MODE N` reallocated the framebuffer; main thread needs
+            // the fresh pointer + dimensions to resize the canvas/texture.
+            post({
+                type:    'refetch-framebuffer-result',
+                reqId:   msg.reqId,
+                fbPtr:   instance._wasm_framebuffer_ptr(),
+                fbWidth: instance._wasm_framebuffer_width(),
+                fbHeight:instance._wasm_framebuffer_height(),
+            });
             break;
     }
 };
