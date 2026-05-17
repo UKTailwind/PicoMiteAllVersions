@@ -51,6 +51,10 @@ int host_fb_height = 320;
  * read by the WASM rAF loop to skip redundant putImageData calls. */
 volatile uint32_t host_fb_generation = 0;
 
+/* See host_fb.h. Bumped only on framebuffer resize.  JS reads this to
+ * detect a MODE-N-driven dimension change. */
+volatile uint32_t host_fb_config_generation = 0;
+
 uint32_t *host_fastgfx_back = NULL;
 
 static uint32_t *host_fb_framebuffer = NULL;      /* FRAMEBUFFER CREATE back plane */
@@ -547,6 +551,44 @@ void host_sim_set_framebuffer_size(int w, int h) {
     host_fb_height = h;
     HRes = (short)w;
     VRes = (short)h;
+}
+
+void host_fb_resize(int w, int h) {
+    if (w < 80)   w = 80;
+    if (h < 60)   h = 60;
+    if (w > 2048) w = 2048;
+    if (h > 2048) h = 2048;
+    if (w == host_fb_width && h == host_fb_height) return;
+
+    /* Free everything that's sized to the old framebuffer.  Secondary
+     * planes (FRAMEBUFFER CREATE, LAYER, FASTGFX back) are re-allocated
+     * lazily by their owning subsystems on next use. */
+    if (host_framebuffer)     { free(host_framebuffer);     host_framebuffer     = NULL; }
+    if (host_fb_framebuffer)  { free(host_fb_framebuffer);  host_fb_framebuffer  = NULL; }
+    if (host_fb_layerbuffer)  { free(host_fb_layerbuffer);  host_fb_layerbuffer  = NULL; }
+    if (host_fastgfx_back)    { free(host_fastgfx_back);    host_fastgfx_back    = NULL; }
+
+    host_fb_copy_src = NULL;
+    host_fb_copy_dst = NULL;
+    host_fb_copy_pending = 0;
+
+    host_fb_width  = w;
+    host_fb_height = h;
+    HRes = (short)w;
+    VRes = (short)h;
+
+    host_fb_ensure();
+    /* Re-bind DisplayBuf/FrameBuf/LayerBuf to the fresh primary so any
+     * pointers stashed in MMBasic globals point at valid memory.  Drop
+     * WriteBuf — drawing primitives lazily route through the dispatch
+     * helpers. */
+    DisplayBuf = (unsigned char *)host_framebuffer;
+    FrameBuf   = DisplayBuf;
+    LayerBuf   = DisplayBuf;
+    WriteBuf   = NULL;
+
+    host_fb_config_generation++;
+    host_fb_bump_generation();
 }
 
 void host_fb_write_screenshot(const char *path) {

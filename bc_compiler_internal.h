@@ -69,6 +69,7 @@ int bc_add_local(BCCompiler *cs, const char *name, int name_len, uint8_t type, i
 /* Add a fixup for a forward reference */
 void bc_add_fixup_line(BCCompiler *cs, uint32_t patch_addr, int target_line, uint8_t size, uint8_t is_relative);
 void bc_add_fixup_label(BCCompiler *cs, uint32_t patch_addr, const char *name, uint8_t size, uint8_t is_relative);
+void bc_add_fixup_label_data_index(BCCompiler *cs, uint32_t patch_addr, const char *name);
 void bc_resolve_fixups(BCCompiler *cs);
 
 /* BASIC labels: register / look up by name (case-insensitive). */

@@ -57,4 +57,8 @@
  * driver TUs and port-local files may legitimately need it). */
 #define PORT_PC386                       1
 
+
+/* Compiler-table sizes. */
+#include "../bc_tables_host.h"
+
 #endif /* PC386_PORT_CONFIG_H */

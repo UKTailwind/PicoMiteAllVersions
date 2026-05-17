@@ -29,6 +29,8 @@ const resolutionSelect = document.getElementById('resolution');
 const memorySelect = document.getElementById('memory');
 const slowdownRange = document.getElementById('slowdown-range');
 const slowdownNumber = document.getElementById('slowdown-number');
+const keyRepeatDelayInput    = document.getElementById('key-repeat-delay');
+const keyRepeatIntervalInput = document.getElementById('key-repeat-interval');
 const dropOverlay = document.getElementById('drop-overlay');
 const filesListEl = document.getElementById('files-list');
 
@@ -217,6 +219,166 @@ function applySlowdownInputs(us) {
     slowdownRange.value = String(Math.min(us, parseInt(slowdownRange.max, 10)));
 }
 
+// ---- Key repeat ---------------------------------------------------------
+//
+// Two values: delay before the first repeat kicks in, and the gap
+// between subsequent repeats.  Both in milliseconds.  Defaults match
+// the "snappy for the web canvas, still safe for games" tuning that
+// has been baked in since the keyboard wiring landed.
+
+const KEY_REPEAT_DELAY_KEY    = 'picomite.keyRepeat.delayMs';
+const KEY_REPEAT_INTERVAL_KEY = 'picomite.keyRepeat.intervalMs';
+const KEY_REPEAT_DELAY_DEFAULT    = 400;
+const KEY_REPEAT_INTERVAL_DEFAULT = 100;
+const KEY_REPEAT_DELAY_MIN    = 50;
+const KEY_REPEAT_DELAY_MAX    = 2000;
+const KEY_REPEAT_INTERVAL_MIN = 10;
+const KEY_REPEAT_INTERVAL_MAX = 1000;
+
+function clampInt(raw, lo, hi, fallback) {
+    const n = parseInt(String(raw ?? '').trim(), 10);
+    if (!Number.isFinite(n)) return fallback;
+    if (n < lo) return lo;
+    if (n > hi) return hi;
+    return n;
+}
+
+function pickKeyRepeatDelay() {
+    return clampInt(localStorage.getItem(KEY_REPEAT_DELAY_KEY),
+        KEY_REPEAT_DELAY_MIN, KEY_REPEAT_DELAY_MAX, KEY_REPEAT_DELAY_DEFAULT);
+}
+function pickKeyRepeatInterval() {
+    return clampInt(localStorage.getItem(KEY_REPEAT_INTERVAL_KEY),
+        KEY_REPEAT_INTERVAL_MIN, KEY_REPEAT_INTERVAL_MAX, KEY_REPEAT_INTERVAL_DEFAULT);
+}
+
+// ---- Mode → resolution mapping -----------------------------------------
+//
+// BASIC `MODE N` (N in 1..5) switches the framebuffer to whatever
+// resolution the user assigned to mode N in the config dialog.  Persisted
+// as JSON in localStorage:
+//   picomite.modeMap = { "1": "640x480", "2": "320x240", ... }
+// Modes left unassigned (the user picked "(none)") raise a runtime error
+// from BASIC when invoked.  The map is pushed to wasm at boot via
+// _wasm_set_mode_resolution; later edits also push live so the next
+// BASIC `MODE N` picks them up without a reload.
+
+const MODE_MAP_KEY = 'picomite.modeMap';
+const MODE_COUNT = 5;
+const MODE_RESOLUTIONS = [
+    '320x240', '320x320', '480x320', '640x360', '640x480',
+    '800x480', '800x600', '1024x600', '1024x768',
+];
+const MODE_DEFAULTS = {
+    1: '640x480',
+    2: '320x240',
+    3: '800x600',
+    4: '1024x768',
+    5: '480x320',
+};
+
+function parseModeMap(s) {
+    if (!s) return null;
+    let raw;
+    try { raw = JSON.parse(s); } catch (_) { return null; }
+    if (!raw || typeof raw !== 'object') return null;
+    const out = {};
+    for (let m = 1; m <= MODE_COUNT; m++) {
+        const v = raw[m] ?? raw[String(m)];
+        if (typeof v !== 'string') continue;
+        if (!MODE_RESOLUTIONS.includes(v)) continue;
+        out[m] = v;
+    }
+    return out;
+}
+
+function pickModeMap() {
+    return parseModeMap(localStorage.getItem(MODE_MAP_KEY))
+        ?? { ...MODE_DEFAULTS };
+}
+
+function saveModeMap(map) {
+    try { localStorage.setItem(MODE_MAP_KEY, JSON.stringify(map)); } catch (_) {}
+}
+
+function modeMapForWorker(map) {
+    // worker.mjs wants [{mode, w, h}], easier to iterate than an object.
+    const out = [];
+    for (let m = 1; m <= MODE_COUNT; m++) {
+        const label = map[m];
+        if (!label) continue;
+        const r = parseRes(label);
+        if (r) out.push({ mode: m, w: r.w, h: r.h });
+    }
+    return out;
+}
+
+let modeMap = pickModeMap();
+
+const modeMapBody = document.getElementById('mode-map-body');
+
+function renderModeMapUI() {
+    if (!modeMapBody) return;
+    modeMapBody.innerHTML = '';
+    for (const label of MODE_RESOLUTIONS) {
+        const tr  = document.createElement('tr');
+        const td0 = document.createElement('td');
+        const td1 = document.createElement('td');
+        td0.textContent = label.replace('x', ' × ');
+        const sel = document.createElement('select');
+        sel.dataset.res = label;
+        const none = document.createElement('option');
+        none.value = ''; none.textContent = '(none)';
+        sel.appendChild(none);
+        for (let m = 1; m <= MODE_COUNT; m++) {
+            const opt = document.createElement('option');
+            opt.value = String(m);
+            opt.textContent = `Mode ${m}`;
+            sel.appendChild(opt);
+        }
+        // Reflect current mapping: which mode (if any) has this label?
+        let assigned = '';
+        for (let m = 1; m <= MODE_COUNT; m++) {
+            if (modeMap[m] === label) { assigned = String(m); break; }
+        }
+        sel.value = assigned;
+        sel.addEventListener('change', () => onModeAssignmentChange(label, sel.value));
+        td1.appendChild(sel);
+        tr.appendChild(td0);
+        tr.appendChild(td1);
+        modeMapBody.appendChild(tr);
+    }
+}
+
+function onModeAssignmentChange(label, modeStr) {
+    const mode = parseInt(modeStr, 10);
+    // Clear any prior assignment of this resolution and of the chosen
+    // mode — each mode owns exactly one resolution at a time.
+    for (let m = 1; m <= MODE_COUNT; m++) {
+        if (modeMap[m] === label) delete modeMap[m];
+    }
+    if (Number.isFinite(mode) && mode >= 1 && mode <= MODE_COUNT) {
+        modeMap[mode] = label;
+    }
+    saveModeMap(modeMap);
+    pushModeMapLive(modeMap);
+    renderModeMapUI();
+}
+
+function pushModeMapLive(map) {
+    // Send to the worker; the worker forwards each mapping into wasm via
+    // _wasm_set_mode_resolution.  Also clears modes the user deselected
+    // (w=h=0 marks "unconfigured" in host_wasm_mode.c).
+    const entries = [];
+    for (let m = 1; m <= MODE_COUNT; m++) {
+        const r = map[m] ? parseRes(map[m]) : null;
+        entries.push({ mode: m, w: r?.w ?? 0, h: r?.h ?? 0 });
+    }
+    worker.postMessage({ type: 'set-mode-map', entries });
+}
+
+renderModeMapUI();
+
 function pickProxyTftpPort() {
     const params = new URLSearchParams(window.location.search);
     const n = parseInt(String(params.get('tftp_port') || ''), 10);
@@ -254,10 +416,12 @@ const DESIRED_SCALE = 2;
 
 let fbWidth = 0, fbHeight = 0, fbPtr = 0;
 let fbGenerationIdx = 0;        // HEAPU32 index of the generation counter
+let fbConfigGenIdx  = 0;        // HEAPU32 index of the resize-generation counter
 let memoryBytes = null;         // Uint8Array view over the worker's shared heap
 let memoryU32 = null;           // Uint32Array view, same buffer
 let memoryI32 = null;           // Int32Array view, same buffer
 let fbTexAllocated = false;
+let workerInstance = null;      // exposed for resize ccalls via worker proxy
 
 // Direct-write indices into the wasm key ring (filled in when the
 // worker posts 'ready'). Main thread pushes keys via Atomics.store
@@ -304,10 +468,35 @@ function blitFrame() {
     gl.drawArrays(gl.TRIANGLES, 0, 6);
 }
 
+async function handleConfigResize() {
+    // BASIC ran `MODE N`.  Refetch dims + ptr (the wasm side reallocated
+    // the framebuffer) and rebuild the canvas / texture.
+    const dims = await workerRpc('refetch-framebuffer');
+    if (!dims || !dims.fbWidth || !dims.fbHeight) return;
+    fbPtr    = dims.fbPtr;
+    fbWidth  = dims.fbWidth;
+    fbHeight = dims.fbHeight;
+    canvas.width  = fbWidth;
+    canvas.height = fbHeight;
+    gl.viewport(0, 0, fbWidth, fbHeight);
+    fbTexAllocated = false;   // force a fresh texImage2D in blitFrame
+    fitCanvas();
+}
+
 function startRenderLoop() {
     let lastGen = 0xFFFFFFFF;
+    let lastCfgGen = 0xFFFFFFFF;
     const loop = () => {
         try {
+            // Resize check first: if the framebuffer dims changed, refetch
+            // before blitting against potentially stale fbPtr/fbWidth/fbHeight.
+            if (fbConfigGenIdx) {
+                const cfgGen = Atomics.load(memoryU32, fbConfigGenIdx);
+                if (cfgGen !== lastCfgGen) {
+                    lastCfgGen = cfgGen;
+                    handleConfigResize();
+                }
+            }
             // Atomics.load, not a plain indexed read.  The counter is
             // written by the wasm worker thread; without Atomics, V8 on
             // Chrome is free to hoist the read out of this loop (the JS
@@ -376,6 +565,7 @@ worker.onmessage = (e) => {
         fbWidth     = m.fbWidth;
         fbHeight    = m.fbHeight;
         fbGenerationIdx = m.fbGenerationPtr >>> 2;
+        fbConfigGenIdx  = m.fbConfigGenPtr  ? (m.fbConfigGenPtr >>> 2) : 0;
         keyRingI32Base  = m.keyRingPtr     >>> 2;
         keyHeadIdx      = m.keyRingHeadPtr >>> 2;
         keyTailIdx      = m.keyRingTailPtr >>> 2;
@@ -914,8 +1104,13 @@ function wireFileIO() {
 // memory: Atomics.store on the head index is a full memory barrier,
 // so by the time the worker observes the new head, the ring slot
 // write is also visible. No postMessage hop per key.
-const KEY_REPEAT_DELAY_MS    = 400;
-const KEY_REPEAT_INTERVAL_MS = 100;
+//
+// `KEY_REPEAT_DELAY_MS` / `KEY_REPEAT_INTERVAL_MS` are mutable so the
+// config dialog can adjust them live; only new keypresses pick up the
+// new values, keys already held continue with the previous schedule
+// until released.
+let KEY_REPEAT_DELAY_MS    = 400;
+let KEY_REPEAT_INTERVAL_MS = 100;
 
 function pushKeyToRing(code) {
     const head = Atomics.load(memoryU32, keyHeadIdx);
@@ -981,6 +1176,25 @@ memorySelect.addEventListener('change', () => reloadWithMemory(parseInt(memorySe
 
 let slowdownUs = pickSlowdown();
 applySlowdownInputs(slowdownUs);
+
+KEY_REPEAT_DELAY_MS    = pickKeyRepeatDelay();
+KEY_REPEAT_INTERVAL_MS = pickKeyRepeatInterval();
+if (keyRepeatDelayInput)    keyRepeatDelayInput.value    = String(KEY_REPEAT_DELAY_MS);
+if (keyRepeatIntervalInput) keyRepeatIntervalInput.value = String(KEY_REPEAT_INTERVAL_MS);
+keyRepeatDelayInput?.addEventListener('change', () => {
+    const n = clampInt(keyRepeatDelayInput.value,
+        KEY_REPEAT_DELAY_MIN, KEY_REPEAT_DELAY_MAX, KEY_REPEAT_DELAY_DEFAULT);
+    keyRepeatDelayInput.value = String(n);
+    KEY_REPEAT_DELAY_MS = n;
+    try { localStorage.setItem(KEY_REPEAT_DELAY_KEY, String(n)); } catch (_) {}
+});
+keyRepeatIntervalInput?.addEventListener('change', () => {
+    const n = clampInt(keyRepeatIntervalInput.value,
+        KEY_REPEAT_INTERVAL_MIN, KEY_REPEAT_INTERVAL_MAX, KEY_REPEAT_INTERVAL_DEFAULT);
+    keyRepeatIntervalInput.value = String(n);
+    KEY_REPEAT_INTERVAL_MS = n;
+    try { localStorage.setItem(KEY_REPEAT_INTERVAL_KEY, String(n)); } catch (_) {}
+});
 
 openConfigBtn.addEventListener('click', () => {
     if (typeof configDialog.showModal === 'function') configDialog.showModal();
@@ -1051,6 +1265,7 @@ async function boot() {
             res:       { w: resolution.w, h: resolution.h },
             heap:      memoryBytesCfg,
             slowdown:  slowdownUs,
+            modeMap:   modeMapForWorker(modeMap),
             persistSd: true,
             proxy: {
                 mode: proxyState.mode,

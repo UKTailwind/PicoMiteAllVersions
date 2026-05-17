@@ -16,6 +16,7 @@
 #include "bc_alloc.h"
 #include "hal/hal_time.h"
 #include "hal/hal_gui_controls.h"
+#include "hal/hal_random.h"
 #include "port_config.h"
 #include "vm_device_support.h"
 #include "vm_sys_input.h"
@@ -188,19 +189,12 @@ static void bc_array_release(BCArray *arr) {
     if (!arr || !arr->data) return;
     if (arr->data_external) {
         /* Buffer is aliased into g_vartbl — the interpreter owns the
-         * memory (and the element strings) via cmd_redim / cmd_erase.
-         * We only zero our handle. */
+         * memory via cmd_redim / cmd_erase.  We only zero our handle. */
         memset(arr, 0, sizeof(*arr));
         return;
     }
-    if (arr->elem_type == T_STR) {
-        for (uint32_t i = 0; i < arr->total_elements; i++) {
-            if (arr->data[i].s) {
-                BC_FREE(arr->data[i].s);
-                arr->data[i].s = NULL;
-            }
-        }
-    }
+    /* Single contiguous block for every element type (post-layout-unify
+     * for T_STR), so one free does it. */
     BC_FREE(arr->data);
     memset(arr, 0, sizeof(*arr));
 }
@@ -1807,6 +1801,7 @@ void bc_vm_execute(BCVMState *vm) {
         [OP_READ_F]         = &&op_read_f,
         [OP_READ_S]         = &&op_read_s,
         [OP_RESTORE]        = &&op_restore,
+        [OP_RESTORE_DATA]   = &&op_restore_data,
 
         /* Additional string functions */
         [OP_STR_SPACE]      = &&op_str_space,
@@ -2014,7 +2009,7 @@ op_load_arr_s: {
     for (int d = ndim - 1; d >= 0; d--)
         indices[d] = POP_NUMERIC_I();
     uint32_t off = calc_array_offset(vm, arr, indices, ndim);
-    PUSH_S(arr->data[off].s);
+    PUSH_S((uint8_t *)arr->data + off * STRINGSIZE);
     DISPATCH();
 }
 
@@ -2056,12 +2051,7 @@ op_store_arr_s: {
     for (int d = ndim - 1; d >= 0; d--)
         indices[d] = POP_NUMERIC_I();
     uint32_t off = calc_array_offset(vm, arr, indices, ndim);
-    /* Allocate string storage in the array element if needed */
-    if (!arr->data[off].s) {
-        arr->data[off].s = BC_ALLOC(STRINGSIZE);
-        if (!arr->data[off].s) bc_vm_error(vm, "Out of memory for string array");
-    }
-    Mstrcpy(arr->data[off].s, val);
+    Mstrcpy((uint8_t *)arr->data + off * STRINGSIZE, val);
     DISPATCH();
 }
 
@@ -3075,7 +3065,7 @@ op_load_local_arr_s: {
     for (int d = ndim - 1; d >= 0; d--)
         indices[d] = POP_NUMERIC_I();
     uint32_t off = calc_array_offset(vm, arr, indices, ndim);
-    PUSH_S(arr->data[off].s);
+    PUSH_S((uint8_t *)arr->data + off * STRINGSIZE);
     DISPATCH();
 }
 
@@ -3123,11 +3113,7 @@ op_store_local_arr_s: {
     for (int d = ndim - 1; d >= 0; d--)
         indices[d] = POP_NUMERIC_I();
     uint32_t off = calc_array_offset(vm, arr, indices, ndim);
-    if (!arr->data[off].s) {
-        arr->data[off].s = BC_ALLOC(STRINGSIZE);
-        if (!arr->data[off].s) bc_vm_error(vm, "Out of memory for string array");
-    }
-    Mstrcpy(arr->data[off].s, val);
+    Mstrcpy((uint8_t *)arr->data + off * STRINGSIZE, val);
     DISPATCH();
 }
 
@@ -3212,7 +3198,7 @@ op_dim_arr_i: {
     for (int d = ndim - 1; d >= 0; d--)
         dims[d] = POP_NUMERIC_I();
     for (int d = 0; d < ndim; d++) {
-        if (dims[d] < 0) bc_vm_error(vm, "Invalid array dimension");
+        if (dims[d] <= 0) bc_vm_error(vm, "Dimensions");
         arr->dims[d] = (int)dims[d];
         total *= (uint32_t)(dims[d] + 1);  /* 0..N inclusive */
     }
@@ -3235,7 +3221,7 @@ op_dim_arr_f: {
     for (int d = ndim - 1; d >= 0; d--)
         dims[d] = POP_NUMERIC_I();
     for (int d = 0; d < ndim; d++) {
-        if (dims[d] < 0) bc_vm_error(vm, "Invalid array dimension");
+        if (dims[d] <= 0) bc_vm_error(vm, "Dimensions");
         arr->dims[d] = (int)dims[d];
         total *= (uint32_t)(dims[d] + 1);
     }
@@ -3258,19 +3244,18 @@ op_dim_arr_s: {
     for (int d = ndim - 1; d >= 0; d--)
         dims[d] = POP_NUMERIC_I();
     for (int d = 0; d < ndim; d++) {
-        if (dims[d] < 0) bc_vm_error(vm, "Invalid array dimension");
+        if (dims[d] <= 0) bc_vm_error(vm, "Dimensions");
         arr->dims[d] = (int)dims[d];
         total *= (uint32_t)(dims[d] + 1);
     }
     arr->total_elements = total;
-    arr->data = (BCValue *)BC_ALLOC(total * sizeof(BCValue));
+    /* Contiguous layout — `total * STRINGSIZE` bytes in one block.
+     * Matches the interpreter's g_vartbl string-array layout so the
+     * bridge adoption path (sync_mmbasic_to_vm) and bridged commands
+     * (Draw.c, etc.) can share the buffer with the VM. */
+    arr->data = (BCValue *)BC_ALLOC(total * STRINGSIZE);
     if (!arr->data) bc_vm_error(vm, "Out of memory for array");
-    /* Allocate string buffers for each element */
-    for (uint32_t i = 0; i < total; i++) {
-        arr->data[i].s = BC_ALLOC(STRINGSIZE);
-        if (!arr->data[i].s) bc_vm_error(vm, "Out of memory for string array");
-        arr->data[i].s[0] = 0;  /* empty string (length prefix = 0) */
-    }
+    memset(arr->data, 0, total * STRINGSIZE);   /* length prefix 0 = empty */
     DISPATCH();
 }
 
@@ -4081,6 +4066,12 @@ op_restore: {
     DISPATCH();
 }
 
+op_restore_data: {
+    uint16_t idx = READ_U16();
+    vm->data_ptr = idx;
+    DISPATCH();
+}
+
     /* ==================================================================
      * Additional string functions
      * ================================================================== */
@@ -4192,8 +4183,13 @@ op_str_time: {
      * ================================================================== */
 
 op_rnd: {
-    /* RND -> float 0.0 <= x < 1.0 */
-    MMFLOAT f = (MMFLOAT)rand() / ((MMFLOAT)RAND_MAX + (MMFLOAT)RAND_MAX / 1000000);
+    /* RND -> float 0.0 <= x < 1.0
+     *
+     * Mirror Functions.c:fun_rnd exactly so a program that draws from
+     * RND in compiled code reads the same sequence as it would under
+     * the interpreter — e.g. Picovaders' noise%() array (`Int(Rnd*1000)`)
+     * fills with the same pitches in both engines. */
+    MMFLOAT f = (MMFLOAT)hal_random_u32() / (MMFLOAT)0x100000000;
     PUSH_F(f);
     DISPATCH();
 }

@@ -186,6 +186,7 @@ static const char *opcode_name(uint8_t op) {
         case OP_READ_F:       return "READ_F";
         case OP_READ_S:       return "READ_S";
         case OP_RESTORE:      return "RESTORE";
+        case OP_RESTORE_DATA: return "RESTORE_DATA";
         case OP_RND:          return "RND";
 
         case OP_INC_I:        return "INC_I";
@@ -747,6 +748,12 @@ void bc_disassemble(BCCompiler *cs) {
                 }
             }
             dbg_print("\r\n");
+            break;
+        }
+
+        case OP_RESTORE_DATA: {
+            uint16_t di = rd16(code + pc); pc += 2;
+            dbg_print("  %04X: %-16s data_index=%u\r\n", start, name, di);
             break;
         }
 

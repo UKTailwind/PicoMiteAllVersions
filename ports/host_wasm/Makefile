@@ -25,20 +25,16 @@ WASM_DIR   := $(PORT_DIR)
 BUILD_DIR  := $(WASM_DIR)/wasm_obj
 WEB_DIR    := $(REPO_ROOT)/host/web
 
-DEVICE_SIM ?= rp2040
-ifeq ($(DEVICE_SIM),rp2040)
-  SIM_FLAGS = -DBC_SIM_RP2040
-else ifeq ($(DEVICE_SIM),rp2350)
-  SIM_FLAGS = -DBC_SIM_RP2350
-else
-  SIM_FLAGS =
-endif
+# Compiler-table sizing lives in bytecode.h keyed on MMBASIC_WASM.  No
+# DEVICE_SIM knob here — the WASM build is deterministic regardless of
+# environment.  The runtime heap profile (128 KB ... 8 MB) is still
+# user-selectable at run time via wasm_set_heap_size().
 
 CFLAGS = -O2 -std=gnu11 -funsigned-char \
          -Wall -Wno-unused-variable -Wno-unused-function \
          -Wno-unused-but-set-variable -Wno-misleading-indentation \
          -Wno-missing-braces \
-         -DMMBASIC_HOST -DMMBASIC_WASM -DFF_MAX_LFN_LARGE $(SIM_FLAGS) \
+         -DMMBASIC_HOST -DMMBASIC_WASM -DFF_MAX_LFN_LARGE \
          -include host_platform.h \
          -I$(WASM_DIR) -I$(NATIVE_DIR) -I$(PICO_COMPAT_DIR) -I$(REPO_ROOT) \
          -MMD -MP \
@@ -58,7 +54,7 @@ CFLAGS = -O2 -std=gnu11 -funsigned-char \
 LDFLAGS = -pthread -sPTHREAD_POOL_SIZE=1 \
           -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=33554432 -sMAXIMUM_MEMORY=268435456 \
           -sMODULARIZE=1 -sEXPORT_ES6=1 -sENVIRONMENT=web,worker \
-          -sEXPORTED_FUNCTIONS='["_main","_wasm_boot","_wasm_push_key","_wasm_key_ring_ptr","_wasm_key_ring_head_ptr","_wasm_key_ring_tail_ptr","_wasm_key_ring_size","_wasm_break","_wasm_framebuffer_ptr","_wasm_framebuffer_width","_wasm_framebuffer_height","_wasm_framebuffer_generation","_wasm_framebuffer_generation_ptr","_wasm_vsync_counter_ptr","_wasm_set_framebuffer_size","_wasm_set_heap_size","_wasm_set_slowdown_us","_wasm_set_proxy_mode","_wasm_set_proxy_http_capability","_wasm_set_proxy_tcp_stream_capability","_wasm_set_proxy_tcp_server_capability","_wasm_set_proxy_udp_capability","_wasm_set_proxy_ntp_capability","_wasm_set_proxy_tftp_capability","_wasm_set_proxy_telnet_capability","_wasm_set_proxy_mqtt_plain_capability","_wasm_set_proxy_tftp_port","_wasm_set_proxy_telnet_port","_wasm_proxy_mode","_malloc","_free"]' \
+          -sEXPORTED_FUNCTIONS='["_main","_wasm_boot","_wasm_push_key","_wasm_key_ring_ptr","_wasm_key_ring_head_ptr","_wasm_key_ring_tail_ptr","_wasm_key_ring_size","_wasm_break","_wasm_framebuffer_ptr","_wasm_framebuffer_width","_wasm_framebuffer_height","_wasm_framebuffer_generation","_wasm_framebuffer_generation_ptr","_wasm_framebuffer_config_generation_ptr","_wasm_vsync_counter_ptr","_wasm_set_framebuffer_size","_wasm_set_mode_resolution","_wasm_set_heap_size","_wasm_set_slowdown_us","_wasm_set_proxy_mode","_wasm_set_proxy_http_capability","_wasm_set_proxy_tcp_stream_capability","_wasm_set_proxy_tcp_server_capability","_wasm_set_proxy_udp_capability","_wasm_set_proxy_ntp_capability","_wasm_set_proxy_tftp_capability","_wasm_set_proxy_telnet_capability","_wasm_set_proxy_mqtt_plain_capability","_wasm_set_proxy_tftp_port","_wasm_set_proxy_telnet_port","_wasm_proxy_mode","_malloc","_free"]' \
           -sEXPORTED_RUNTIME_METHODS='["ccall","cwrap","UTF8ToString","stringToUTF8","HEAPU8","HEAPU32","FS","IDBFS"]' \
           -sFETCH=1 \
           -sFORCE_FILESYSTEM=1 \
@@ -122,7 +118,7 @@ HOST_PORTABLE_SRCS = host_runtime.c host_fastgfx.c host_fs_shims.c \
                      hal_keyboard_host.c hal_audio_host.c hal_vm_framebuffer_host.c
 HOST_WASM_SRCS = host_wasm_main.c host_wasm_console.c host_wasm_canvas.c \
                  host_wasm_audio.c host_wasm_web.c host_sim_slowdown.c \
-                 host_fastgfx_resync.c
+                 host_fastgfx_resync.c host_wasm_mode.c
 
 HAL_GENERIC_SRCS = hal_watchdog_noop.c
 RUNTIME_SRCS = runtime_boot.c runtime_program.c runtime_console.c runtime_console_putchar.c runtime_console_printstring.c runtime_console_adapter.c runtime_console_input_noop.c runtime_console_escdecode.c runtime_getline.c runtime_terminal_hooks_noop.c runtime_abort.c runtime_interrupt.c runtime_filesystem_defaults.c runtime_cmd_load_post_cleanup.c calendar_bare.c

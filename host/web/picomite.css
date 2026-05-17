@@ -427,6 +427,24 @@ html, body {
     text-align: right;
 }
 
+.key-repeat-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+.key-repeat-group input[type="number"] {
+    width: 4.5rem;
+    text-align: right;
+    background: var(--bg);
+    color: var(--fg);
+    border: 1px solid var(--panel-border);
+    border-radius: 4px;
+    padding: 0.35rem 0.55rem;
+    font: inherit;
+}
+.key-repeat-group input[type="number"]:hover { border-color: var(--accent-dim); }
+.key-repeat-sep { color: var(--fg-muted); }
+
 .config-hint {
     margin: 0.25rem 0 0.8rem 0;
     color: var(--fg-muted);
@@ -434,6 +452,49 @@ html, body {
     padding-left: 0.1rem;
     line-height: 1.4;
 }
+
+.config-modes {
+    margin-top: 1rem;
+    border: 1px solid var(--panel-border);
+    border-radius: 6px;
+    padding: 0.4rem 0.8rem 0.6rem;
+}
+.config-modes legend {
+    padding: 0 0.4rem;
+    font-size: 0.78rem;
+    color: var(--fg-muted);
+}
+.config-modes .config-hint {
+    margin-top: 0;
+}
+.mode-map {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+}
+.mode-map th {
+    text-align: left;
+    font-weight: 500;
+    color: var(--fg-muted);
+    font-size: 0.72rem;
+    padding: 0.15rem 0.25rem 0.35rem;
+}
+.mode-map td {
+    padding: 0.15rem 0.25rem;
+}
+.mode-map td:last-child {
+    text-align: right;
+}
+.mode-map select {
+    background: var(--bg);
+    color: var(--fg);
+    border: 1px solid var(--panel-border);
+    border-radius: 4px;
+    padding: 0.2rem 0.4rem;
+    font: inherit;
+    cursor: pointer;
+}
+.mode-map select:hover { border-color: var(--accent-dim); }
 
 /* ---- Help / about dialog ---------------------------------------- */
 

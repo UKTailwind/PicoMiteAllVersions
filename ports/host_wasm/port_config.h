@@ -40,4 +40,8 @@
 #undef MMBASIC_BANNER_TRAILER
 #define MMBASIC_BANNER_TRAILER "Browser REPL.\r\n\r\n"
 
+/* Compiler-table sizing — RP2350-class tables fit the smallest
+ * realistic browser heap (300 KB profile) with room to spare. */
+#include "../bc_tables_rp2350.h"
+
 #endif /* HOST_WASM_PORT_CONFIG_H */

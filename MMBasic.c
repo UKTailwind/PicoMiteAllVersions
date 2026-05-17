@@ -3267,8 +3267,19 @@ void MIPS16 error(char *msg, ...) {
         MMPrintString(tstr);
     }
 
-    // Print the error message.
-    if (*MMErrMsg) {
+    // Print the error message.  Prepend the VM source-line tag when the
+    // error was raised inside a bridged-from-FRUN command — CurrentLinePtr
+    // points into the bridge buffer and isn't meaningful by itself.
+    extern int  bc_bridge_last_vm_line;
+    extern char bc_bridge_last_stmt[80];
+    if (bc_bridge_last_vm_line > 0) {
+        sprintf(tstr, "Error (FRUN line %d in `%s`) : %s\r\n",
+                bc_bridge_last_vm_line,
+                bc_bridge_last_stmt,
+                *MMErrMsg ? MMErrMsg : "");
+        bc_bridge_last_vm_line = 0;
+        bc_bridge_last_stmt[0] = 0;
+    } else if (*MMErrMsg) {
         sprintf(tstr, "Error : %s\r\n", MMErrMsg);
     } else {
         sprintf(tstr, "Error");

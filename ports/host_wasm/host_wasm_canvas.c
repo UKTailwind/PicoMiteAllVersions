@@ -26,6 +26,7 @@ extern uint32_t *host_framebuffer;
 extern int host_fb_width;
 extern int host_fb_height;
 extern volatile uint32_t host_fb_generation;
+extern volatile uint32_t host_fb_config_generation;
 extern void host_fb_ensure(void);
 extern void host_sim_set_framebuffer_size(int w, int h);
 
@@ -92,4 +93,14 @@ uintptr_t wasm_framebuffer_generation_ptr(void) {
 EMSCRIPTEN_KEEPALIVE
 uintptr_t wasm_vsync_counter_ptr(void) {
     return (uintptr_t)&wasm_vsync_counter;
+}
+
+/*
+ * Address of the config-generation counter — bumped by host_fb_resize
+ * (BASIC `MODE N`).  JS polls this each rAF; on change it re-reads
+ * wasm_framebuffer_width/height/ptr and resizes the canvas + texture.
+ */
+EMSCRIPTEN_KEEPALIVE
+uintptr_t wasm_framebuffer_config_generation_ptr(void) {
+    return (uintptr_t)&host_fb_config_generation;
 }

@@ -125,7 +125,7 @@
  * default (128 KB) matches the rp2040 device profile. The WASM and
  * ANSI ports override HAL_PORT_HEAP_MEMORY_SIZE in their own
  * port_config.h via #undef + redef on top of this file. */
-#define HAL_PORT_HEAP_MEMORY_SIZE        (128 * 1024)
+#define HAL_PORT_HEAP_MEMORY_SIZE        (512 * 1024)
 #define HAL_PORT_MAX_CPU                 420000
 #define HAL_PORT_MIN_CPU                 48000
 #define HAL_PORT_MAX_VARS                512
@@ -143,5 +143,12 @@
 #define HAL_PORT_PIO0_CLAIMED            false
 #define HAL_PORT_PIO1_CLAIMED            false
 #define HAL_PORT_PIO2_CLAIMED            false
+
+
+/* Compiler-table sizes — rp2350-class fits the 512 KB heap budget
+ * with headroom for the program's runtime data.  Host-generous
+ * overflows the heap; tests with smaller programs can still pass
+ * but realistic ones (Picovaders) would not. */
+#include "../bc_tables_rp2350.h"
 
 #endif /* PORT_CONFIG_H */

@@ -211,6 +211,25 @@
             </span>
         </label>
         <p class="config-hint">Per-statement sleep. 0 = uncapped, 10 ≈ device-like.</p>
+
+        <label class="config-row">
+            <span class="config-label">Key repeat (ms)</span>
+            <span class="key-repeat-group">
+                <input type="number" id="key-repeat-delay" min="50" max="2000" step="10" value="400" title="Delay before repeat starts">
+                <span class="key-repeat-sep">/</span>
+                <input type="number" id="key-repeat-interval" min="10" max="1000" step="5" value="100" title="Interval between repeats">
+            </span>
+        </label>
+        <p class="config-hint">First value = delay before auto-repeat kicks in; second = interval between repeats. Device defaults: 600 / 150.</p>
+
+        <fieldset class="config-modes">
+            <legend>Screen modes</legend>
+            <p class="config-hint">Assign a mode number to each resolution. BASIC <code>MODE&nbsp;N</code> switches the framebuffer to the assigned resolution at runtime.</p>
+            <table class="mode-map">
+                <thead><tr><th>Resolution</th><th>Mode</th></tr></thead>
+                <tbody id="mode-map-body"><!-- rows injected by app.mjs --></tbody>
+            </table>
+        </fieldset>
     </form>
 </dialog>
 

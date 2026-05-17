@@ -233,6 +233,7 @@ typedef enum {
     OP_READ_F       = 0xC2,  /* — push next data item as float */
     OP_READ_S       = 0xC3,  /* — push next data item as string */
     OP_RESTORE      = 0xC4,  /* — reset data pointer to 0 */
+    OP_RESTORE_DATA = 0x87,  /* data_index:u16 — set data pointer to absolute index */
 
     /* Additional string functions */
     OP_STR_SPACE    = 0xC5,  /* pop int n, push str SPACE$(n) */
@@ -551,87 +552,18 @@ typedef enum {
 #define BC_PIXEL_ARG_COUNT       3
 
 /*
- * Compiler limits — platform-conditional
- *
- * On device, RP2350 builds get larger limits; RP2040 builds are tighter.
- * On host, limits default to generous for broad testing, but can be switched
- * to match a specific device profile via DEVICE_SIM= in the Makefile:
- *   make DEVICE_SIM=rp2040   →  -DBC_SIM_RP2040  (128 KB heap, small tables)
- *   make DEVICE_SIM=rp2350   →  -DBC_SIM_RP2350  (300 KB heap, medium tables)
- *   make DEVICE_SIM=host     →  (no flag, generous host limits)
- *
- * Compiler arrays are dynamically allocated via bc_compiler_alloc().
+ * Compiler-table sizes are supplied by each port's port_config.h —
+ * typically by including one of ports/bc_tables_{rp2040,rp2350,host}.h.
+ * bytecode.h just consumes the values to size the BCCompiler arrays
+ * that bc_compiler_alloc() heap-allocates.
  */
-#if defined(BC_SIM_RP2040)
-  /* Host build simulating RP2040 — uses RP2040 device limits */
-  #define BC_MAX_CODE       (16 * 1024)
-  #define BC_MAX_CONSTANTS  64
-  #define BC_MAX_SLOTS      128
-  #define BC_MAX_SUBFUNS    32
-  #define BC_MAX_FIXUPS     256
-  #define BC_MAX_LINEMAP    512
-  #define BC_MAX_LOCALS     64
-  #define BC_MAX_PARAMS     16
-  #define BC_MAX_LOCAL_META 256
-  #define BC_MAX_NEST       16
-  #define BC_MAX_DATA_ITEMS 512
-#elif defined(BC_SIM_RP2350)
-  /* Host build simulating RP2350 — uses RP2350 device limits */
-  #define BC_MAX_CODE       (32 * 1024)
-  #define BC_MAX_CONSTANTS  96
-  #define BC_MAX_SLOTS      192
-  #define BC_MAX_SUBFUNS    96
-  #define BC_MAX_FIXUPS     512
-  #define BC_MAX_LINEMAP    1024
-  #define BC_MAX_LOCALS     64
-  #define BC_MAX_PARAMS     16
-  #define BC_MAX_LOCAL_META 384
-  #define BC_MAX_NEST       32
-  #define BC_MAX_DATA_ITEMS 1024
-#elif defined(MMBASIC_HOST)
-  /* Host build, no simulation — generous limits for testing */
-  #define BC_MAX_CODE       (64 * 1024)
-  #define BC_MAX_CONSTANTS  512
-  #define BC_MAX_SLOTS      512
-  #define BC_MAX_SUBFUNS    256
-  #define BC_MAX_FIXUPS     2048
-  #define BC_MAX_LINEMAP    4096
-  #define BC_MAX_LOCALS     64
-  #define BC_MAX_PARAMS     16
-  #define BC_MAX_LOCAL_META 4096
-  #define BC_MAX_NEST       64
-  #define BC_MAX_DATA_ITEMS 1024
-#elif defined(rp2350)
-  /*
-   * The RP2350 firmware has a substantially larger heap than RP2040 builds,
-   * but host-sized compiler tables would still be wasteful on-device.
-   * These limits keep the compiler/VM metadata comfortably below the RP2350
-   * heap budget while removing several host/device mismatches.
-   */
-  #define BC_MAX_CODE       (32 * 1024)
-  #define BC_MAX_CONSTANTS  96
-  #define BC_MAX_SLOTS      192
-  #define BC_MAX_SUBFUNS    96
-  #define BC_MAX_FIXUPS     512
-  #define BC_MAX_LINEMAP    1024
-  #define BC_MAX_LOCALS     64
-  #define BC_MAX_PARAMS     16
-  #define BC_MAX_LOCAL_META 384
-  #define BC_MAX_NEST       32
-  #define BC_MAX_DATA_ITEMS 1024
-#else
-  /* Default device build (RP2040) */
-  #define BC_MAX_CODE       (16 * 1024)
-  #define BC_MAX_CONSTANTS  64
-  #define BC_MAX_SLOTS      128
-  #define BC_MAX_SUBFUNS    32
-  #define BC_MAX_FIXUPS     256
-  #define BC_MAX_LINEMAP    512
-  #define BC_MAX_LOCALS     64
-  #define BC_MAX_PARAMS     16
-  #define BC_MAX_LOCAL_META 256
-  #define BC_MAX_NEST       16
-  #define BC_MAX_DATA_ITEMS 512
+#if !defined(BC_MAX_CODE) || !defined(BC_MAX_CONSTANTS) ||  \
+    !defined(BC_MAX_SLOTS) || !defined(BC_MAX_SUBFUNS) ||   \
+    !defined(BC_MAX_FIXUPS) || !defined(BC_MAX_LINEMAP) ||  \
+    !defined(BC_MAX_LOCALS) || !defined(BC_MAX_PARAMS) ||   \
+    !defined(BC_MAX_LOCAL_META) || !defined(BC_MAX_NEST) || \
+    !defined(BC_MAX_DATA_ITEMS)
+#error "Port's port_config.h must define BC_MAX_* (see ports/bc_tables_*.h)"
 #endif
 
 /*
@@ -680,6 +612,7 @@ typedef struct {
     int      target_label;      /* -1 if using line number */
     uint8_t  size;              /* 2 or 4 byte patch */
     uint8_t  is_relative;       /* 1 = relative offset, 0 = absolute addr */
+    uint8_t  is_data_index;     /* 1 = patch with labelmap[].data_index (size must be 2) */
 } BCFixup;
 
 /*
@@ -706,6 +639,7 @@ typedef struct {
 typedef struct {
     char     name[BC_MAX_LABEL_NAME + 1];
     uint32_t offset;
+    uint16_t data_index;   /* cs->data_count at the label site; 0xFFFF until resolved */
 } BCLabelMap;
 
 /*
