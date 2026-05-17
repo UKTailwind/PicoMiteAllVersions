@@ -102,4 +102,8 @@
 #define HAL_PORT_RANDOMIZE_DEFAULT_SEED() ((int64_t)hal_time_us_64())
 #define BC_CRASH_INFO_ATTR __attribute__((section(".uninitialized_data.bc_crash_info")))
 
+
+/* Compiler-table sizes. */
+#include "../bc_tables_rp2350.h"
+
 #endif /* PORT_CONFIG_H */

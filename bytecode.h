@@ -552,56 +552,18 @@ typedef enum {
 #define BC_PIXEL_ARG_COUNT       3
 
 /*
- * Compiler-table sizes.  Each entry is a count, not a byte budget — the
- * arrays themselves are heap-allocated by bc_compiler_alloc() at the
- * sizes set below.  Defaults match an RP2040-class budget; any port
- * that wants larger tables defines the corresponding BC_MAX_* in its
- * port_config.h.  ports/host_wasm/port_config.h is the canonical
- * example (RP2350-class tables sized to fit the smallest browser heap
- * profile).
- *
- * The trailing #elif chain on BC_SIM_RP2040 / BC_SIM_RP2350 /
- * MMBASIC_HOST / rp2350 is the legacy in-bytecode.h dispatch kept until
- * each affected port migrates its sizes into its own port_config.h.
+ * Compiler-table sizes are supplied by each port's port_config.h —
+ * typically by including one of ports/bc_tables_{rp2040,rp2350,host}.h.
+ * bytecode.h just consumes the values to size the BCCompiler arrays
+ * that bc_compiler_alloc() heap-allocates.
  */
-#ifndef BC_MAX_CODE
-#  if defined(BC_SIM_RP2350) || defined(rp2350)
-    /* RP2350-class — larger heap, larger compiler tables. */
-    #define BC_MAX_CODE       (32 * 1024)
-    #define BC_MAX_CONSTANTS  96
-    #define BC_MAX_SLOTS      192
-    #define BC_MAX_SUBFUNS    96
-    #define BC_MAX_FIXUPS     512
-    #define BC_MAX_LINEMAP    1024
-    #define BC_MAX_LOCAL_META 384
-    #define BC_MAX_NEST       32
-    #define BC_MAX_DATA_ITEMS 1024
-#  elif defined(MMBASIC_HOST) && !defined(BC_SIM_RP2040)
-    /* Plain host build (no DEVICE_SIM override) — generous tables for
-     * test programs that wouldn't fit on a device. */
-    #define BC_MAX_CODE       (64 * 1024)
-    #define BC_MAX_CONSTANTS  512
-    #define BC_MAX_SLOTS      512
-    #define BC_MAX_SUBFUNS    256
-    #define BC_MAX_FIXUPS     2048
-    #define BC_MAX_LINEMAP    4096
-    #define BC_MAX_LOCAL_META 4096
-    #define BC_MAX_NEST       64
-    #define BC_MAX_DATA_ITEMS 1024
-#  else
-    /* RP2040-class (default).  Also picked when BC_SIM_RP2040 is set. */
-    #define BC_MAX_CODE       (16 * 1024)
-    #define BC_MAX_CONSTANTS  64
-    #define BC_MAX_SLOTS      128
-    #define BC_MAX_SUBFUNS    32
-    #define BC_MAX_FIXUPS     256
-    #define BC_MAX_LINEMAP    512
-    #define BC_MAX_LOCAL_META 256
-    #define BC_MAX_NEST       16
-    #define BC_MAX_DATA_ITEMS 512
-#  endif
-  #define BC_MAX_LOCALS  64
-  #define BC_MAX_PARAMS  16
+#if !defined(BC_MAX_CODE) || !defined(BC_MAX_CONSTANTS) ||  \
+    !defined(BC_MAX_SLOTS) || !defined(BC_MAX_SUBFUNS) ||   \
+    !defined(BC_MAX_FIXUPS) || !defined(BC_MAX_LINEMAP) ||  \
+    !defined(BC_MAX_LOCALS) || !defined(BC_MAX_PARAMS) ||   \
+    !defined(BC_MAX_LOCAL_META) || !defined(BC_MAX_NEST) || \
+    !defined(BC_MAX_DATA_ITEMS)
+#error "Port's port_config.h must define BC_MAX_* (see ports/bc_tables_*.h)"
 #endif
 
 /*

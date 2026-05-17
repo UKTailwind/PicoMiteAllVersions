@@ -138,4 +138,8 @@
  * Memory.c's bitmap allocator stays within the heap portion. */
 #define HAL_PORT_PSRAM_BLOCK_SIZE        (MAXRAMSLOTS * MAX_PROG_SIZE)
 
+
+/* Compiler-table sizes. */
+#include "../bc_tables_rp2350.h"
+
 #endif /* ESP32_S3_METRO_PORT_CONFIG_H */

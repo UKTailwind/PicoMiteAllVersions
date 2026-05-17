@@ -144,4 +144,11 @@
 #define HAL_PORT_PIO1_CLAIMED            false
 #define HAL_PORT_PIO2_CLAIMED            false
 
+
+/* Compiler-table sizes — rp2350-class fits the 512 KB heap budget
+ * with headroom for the program's runtime data.  Host-generous
+ * overflows the heap; tests with smaller programs can still pass
+ * but realistic ones (Picovaders) would not. */
+#include "../bc_tables_rp2350.h"
+
 #endif /* PORT_CONFIG_H */

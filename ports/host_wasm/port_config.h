@@ -40,24 +40,8 @@
 #undef MMBASIC_BANNER_TRAILER
 #define MMBASIC_BANNER_TRAILER "Browser REPL.\r\n\r\n"
 
-/* Compiler-table sizing.  Fixed for WASM regardless of DEVICE_SIM —
- * the browser runtime heap is user-selectable at run time (128 KB ...
- * 8 MB via wasm_set_heap_size) but the *compile-time* table sizes
- * must fit in the smallest realistic profile.  RP2350-class sizing
- * (≈64 KB of tables, 1024 line-map entries) handles real programs
- * (Picovaders = 697 lines) and still leaves room in a 300 KB heap
- * for the program's runtime data.  bytecode.h sees BC_MAX_CODE
- * defined and skips its legacy target-macro chain. */
-#define BC_MAX_CODE       (32 * 1024)
-#define BC_MAX_CONSTANTS  96
-#define BC_MAX_SLOTS      192
-#define BC_MAX_SUBFUNS    96
-#define BC_MAX_FIXUPS     512
-#define BC_MAX_LINEMAP    1024
-#define BC_MAX_LOCALS     64
-#define BC_MAX_PARAMS     16
-#define BC_MAX_LOCAL_META 384
-#define BC_MAX_NEST       32
-#define BC_MAX_DATA_ITEMS 1024
+/* Compiler-table sizing — RP2350-class tables fit the smallest
+ * realistic browser heap (300 KB profile) with room to spare. */
+#include "../bc_tables_rp2350.h"
 
 #endif /* HOST_WASM_PORT_CONFIG_H */

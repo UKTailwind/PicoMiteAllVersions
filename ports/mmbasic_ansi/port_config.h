@@ -25,4 +25,8 @@
  * runs in alt-screen raw mode and exits via the REPL's own quit path. */
 #undef MMBASIC_BANNER_TRAILER
 
+
+/* Compiler-table sizes. */
+#include "../bc_tables_rp2350.h"
+
 #endif /* MMBASIC_ANSI_PORT_CONFIG_H */

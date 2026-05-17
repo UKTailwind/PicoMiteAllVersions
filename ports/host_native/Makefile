@@ -14,22 +14,13 @@ SIM_VM_DIR := $(REPO_ROOT)/ports/vm_sys_sim
 PICO_COMPAT_DIR := $(REPO_ROOT)/ports/pico_sdk_compat
 BUILD_DIR := $(PORT_DIR)/build
 
-# Device memory simulation target. Controls compiler/VM array sizes
-# AND the heap budget in bc_alloc.c.
-DEVICE_SIM ?= rp2040
-
-ifeq ($(DEVICE_SIM),rp2040)
-  SIM_FLAGS = -DBC_SIM_RP2040
-else ifeq ($(DEVICE_SIM),rp2350)
-  SIM_FLAGS = -DBC_SIM_RP2350
-else
-  SIM_FLAGS =
-endif
+# Compiler-table sizes come from ports/host_native/port_config.h
+# (which pulls in ports/bc_tables_host.h).  No build-flag dispatch.
 
 CFLAGS = -std=gnu11 -g -O0 -Wall -Wno-unused-variable -Wno-unused-function \
          -Wno-unused-but-set-variable -Wno-misleading-indentation \
          -Wno-missing-braces -funsigned-char \
-         -DMMBASIC_HOST -DFF_MAX_LFN_LARGE $(SIM_FLAGS) \
+         -DMMBASIC_HOST -DFF_MAX_LFN_LARGE \
          -include host_platform.h \
          -I$(PORT_DIR) -I$(PICO_COMPAT_DIR) -I$(REPO_ROOT) \
          -MMD -MP
