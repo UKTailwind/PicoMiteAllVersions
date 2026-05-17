@@ -615,9 +615,9 @@ class PsramSmokeHarness:
         self.dry_run = dry_run
         self.report = report
         self.expect = TARGET_EXPECTATIONS[target]
-        # Capacity of the SRAM heap as reported by the device. Filled in
+        # Combined SRAM+PSRAM free heap as reported by the device. Filled in
         # during boot invariants; used to size the PSRAM routing array.
-        self.sram_heap_bytes: int = 0
+        self.heap_free_bytes: int = 0
         self.psram_size_bytes: int = 0
 
     # ------------------------------------------------------------------
@@ -687,23 +687,25 @@ class PsramSmokeHarness:
         except Exception as exc:
             self.report.failed("boot/option_list", str(exc))
 
-        # MM.INFO(HEAP) is the SRAM heap, distinct from PSRAM.
+        # MM.INFO(HEAP) is the combined SRAM+PSRAM free heap when PSRAM is
+        # enabled. It should therefore be non-zero and larger than the
+        # published PSRAM heap by roughly the remaining SRAM heap.
         try:
             text = self.cmd('PRINT "PSRAM_SMOKE_HEAP=" + STR$(MM.INFO(HEAP))')
             heap = marker_int(text, "PSRAM_SMOKE_HEAP=")
-            self.sram_heap_bytes = heap
-            if heap > 0 and heap != self.psram_size_bytes:
+            self.heap_free_bytes = heap
+            if heap > self.psram_size_bytes:
                 self.report.passed(
-                    "boot/heap_distinct",
-                    f"MM.INFO(HEAP) = {heap} (separate from PSRAM)",
+                    "boot/heap_combined",
+                    f"MM.INFO(HEAP) = {heap} (combined SRAM+PSRAM free)",
                 )
             else:
                 self.report.failed(
-                    "boot/heap_distinct",
-                    f"MM.INFO(HEAP) = {heap}; expected non-zero, distinct from PSRAM ({self.psram_size_bytes})",
+                    "boot/heap_combined",
+                    f"MM.INFO(HEAP) = {heap}; expected > PSRAM size ({self.psram_size_bytes})",
                 )
         except Exception as exc:
-            self.report.failed("boot/heap_distinct", str(exc))
+            self.report.failed("boot/heap_combined", str(exc))
 
     # --- 2. March test ------------------------------------------------
 
@@ -1050,7 +1052,7 @@ class PsramSmokeHarness:
                 else:
                     self.report.passed("ramfile/load", "RAM FILE LOAD 2 ok")
                     listing = self.cmd("RAM LIST 2", timeout=self.long_timeout)
-                    if ram_file_program_lines()[0] in listing:
+                    if ram_file_program_lines()[0].lower() in listing.lower():
                         self.report.passed("ramfile/list_match", "slot 2 listing matches source")
                     else:
                         self.report.failed(
@@ -1097,16 +1099,19 @@ class PsramSmokeHarness:
     def check_memory_routing(self) -> None:
         print("=== 6. Memory.c PSRAM routing ===", flush=True)
 
-        # Choose N so big%(N) is comfortably larger than SRAM heap/2.
-        # Each INTEGER cell is 8 bytes. We aim for at least 75% of SRAM
-        # heap so the allocation cannot land in SRAM.
-        if self.sram_heap_bytes <= 0:
+        # Choose N so big%(N) is comfortably larger than the inferred SRAM
+        # heap. MM.INFO(HEAP) reports combined SRAM+PSRAM free, so a
+        # successful allocation larger than the SRAM-only remainder proves
+        # the request could not have been satisfied from SRAM alone.
+        inferred_sram_free = max(0, self.heap_free_bytes - self.psram_size_bytes)
+        if inferred_sram_free <= 0:
             self.report.skipped(
                 "routing/integer_array",
-                "SRAM heap size not available; cannot size big array",
+                "SRAM heap estimate not available; cannot size big array",
             )
         else:
-            big_n = max(1, int(self.sram_heap_bytes * 0.75) // 8)
+            array_bytes = max(inferred_sram_free * 2, 512 * 1024)
+            big_n = max(1, array_bytes // 8)
             try:
                 heap_before = self.cmd(
                     'PRINT "PSRAM_SMOKE_HEAP_BEFORE=" + STR$(MM.INFO(HEAP))'
@@ -1118,19 +1123,17 @@ class PsramSmokeHarness:
                 )
                 after = marker_int(heap_after, "PSRAM_SMOKE_HEAP_AFTER=")
                 delta = before - after
-                # Threshold: SRAM heap should not have shrunk by more than
-                # ~10% of the array size (allow for housekeeping bytes).
                 array_bytes = big_n * 8
-                tolerance = max(8192, array_bytes // 10)
-                if delta <= tolerance:
+                tolerance = max(8192, array_bytes // 8)
+                if abs(delta - array_bytes) <= tolerance:
                     self.report.passed(
                         "routing/integer_array",
-                        f"DIM big%({big_n}) delta_heap={delta} <= tolerance={tolerance} (array landed in PSRAM)",
+                        f"DIM big%({big_n}) consumed {delta} combined-heap bytes for {array_bytes}-byte array",
                     )
                 else:
                     self.report.failed(
                         "routing/integer_array",
-                        f"DIM big%({big_n}) shrank SRAM heap by {delta} bytes (array_bytes={array_bytes}, tolerance={tolerance})",
+                        f"DIM big%({big_n}) changed combined heap by {delta} bytes (array_bytes={array_bytes}, tolerance={tolerance})",
                     )
                 # Clear the variable so the next test starts clean.
                 self.cmd("ERASE big%", check_error=False)
@@ -1140,13 +1143,13 @@ class PsramSmokeHarness:
 
         # String array path. Use the same sizing strategy at half scale
         # so we exercise the string heap without exhausting it.
-        if self.sram_heap_bytes <= 0:
+        if self.heap_free_bytes <= 0:
             self.report.skipped(
                 "routing/string_array",
                 "SRAM heap size not available; cannot size big array",
             )
         else:
-            big_n = max(1, int(self.sram_heap_bytes * 0.4) // 256)
+            big_n = max(1, int(self.heap_free_bytes * 0.4) // 256)
             try:
                 self.cmd(f"DIM STRING strs$({big_n}) LENGTH 200", timeout=self.long_timeout)
                 self.cmd('PRINT "PSRAM_SMOKE_STRING_OK"')

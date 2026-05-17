@@ -2374,13 +2374,17 @@ static void copy_via_hal(unsigned char *fromfile, unsigned char *tofile,
 {
     char buff[512];
     int fnbr1, fnbr2;
+    int saved_fs = FatFSFileSystem;
+    int saved_fs_save = FatFSFileSystemSave;
     fnbr1 = FindFreeFileNbr();
-    FatFSFileSystem = src_fs;
+    FatFSFileSystem = FatFSFileSystemSave = src_fs;
     BasicFileOpen((char *)fromfile, fnbr1, FA_READ);
     fnbr2 = FindFreeFileNbr();
-    FatFSFileSystem = dst_fs;
+    FatFSFileSystem = FatFSFileSystemSave = dst_fs;
     if (!BasicFileOpen((char *)tofile, fnbr2, FA_WRITE | FA_CREATE_ALWAYS)) {
         FileClose(fnbr1);
+        FatFSFileSystem = saved_fs;
+        FatFSFileSystemSave = saved_fs_save;
         return;
     }
     for (;;) {
@@ -2392,7 +2396,8 @@ static void copy_via_hal(unsigned char *fromfile, unsigned char *tofile,
     }
     FileClose(fnbr1);
     FileClose(fnbr2);
-    FatFSFileSystem = FatFSFileSystemSave;
+    FatFSFileSystem = saved_fs;
+    FatFSFileSystemSave = saved_fs_save;
 }
 void B2A(unsigned char *fromfile, unsigned char *tofile){ copy_via_hal(fromfile, tofile, 1, 0); }
 void A2B(unsigned char *fromfile, unsigned char *tofile){ copy_via_hal(fromfile, tofile, 0, 1); }

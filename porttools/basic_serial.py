@@ -11,7 +11,7 @@ import time
 from dataclasses import dataclass
 from typing import Iterable
 
-ANSI_RE = re.compile(rb"\x1b\[[0-9;:]*[A-Za-z]")
+ANSI_RE = re.compile(rb"\x1b\[[0-9;:?]*[A-Za-z]")
 
 
 def _import_serial():
