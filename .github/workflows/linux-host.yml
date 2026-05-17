@@ -1,0 +1,76 @@
+name: Linux host validation
+
+on:
+  pull_request:
+    paths:
+      - '*.c'
+      - '*.h'
+      - 'core/**'
+      - 'drivers/**'
+      - 'hal/**'
+      - 'host/**'
+      - 'ports/host_native/**'
+      - 'ports/mmbasic_ansi/**'
+      - 'ports/mmbasic_stdio/**'
+      - 'ports/pico_sdk_compat/**'
+      - 'ports/vm_sys_sim/**'
+      - 'porttools/**'
+      - 'runtime/**'
+      - 'shared/**'
+      - 'tools/check_hal_purity.sh'
+      - '.github/workflows/linux-host.yml'
+  push:
+    branches: [main]
+    paths:
+      - '*.c'
+      - '*.h'
+      - 'core/**'
+      - 'drivers/**'
+      - 'hal/**'
+      - 'host/**'
+      - 'ports/host_native/**'
+      - 'ports/mmbasic_ansi/**'
+      - 'ports/mmbasic_stdio/**'
+      - 'ports/pico_sdk_compat/**'
+      - 'ports/vm_sys_sim/**'
+      - 'porttools/**'
+      - 'runtime/**'
+      - 'shared/**'
+      - 'tools/check_hal_purity.sh'
+      - '.github/workflows/linux-host.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  host:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential python3
+
+      - name: HAL purity
+        run: ./tools/check_hal_purity.sh
+
+      - name: Build host_native
+        run: ./host/build.sh
+
+      - name: Test host_native
+        run: cd host && SKIP_HAL_PURITY=1 ./run_tests.sh
+
+      - name: Host NEW smoke
+        run: python3 porttools/host_new_smoke.py --no-build
+
+      - name: Build and test mmbasic_stdio
+        run: |
+          make -C ports/mmbasic_stdio
+          cd ports/mmbasic_stdio/tests
+          ./run_tests.sh
+
+      - name: Build mmbasic_ansi
+        run: make -C ports/mmbasic_ansi

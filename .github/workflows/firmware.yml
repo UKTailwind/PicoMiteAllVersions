@@ -50,6 +50,8 @@ jobs:
           ref: 2.1.1
           path: pico-sdk
           submodules: recursive
+      - name: Patch Pico SDK for newer host GCC
+        run: bash tools/patch_pico_sdk_gcc15.sh "${{ github.workspace }}/pico-sdk"
       - name: Run buildall.sh
         env:
           PICO_SDK_PATH: ${{ github.workspace }}/pico-sdk
@@ -91,6 +93,8 @@ jobs:
           ref: 2.1.1
           path: pico-sdk
           submodules: recursive
+      - name: Patch Pico SDK for newer host GCC
+        run: bash tools/patch_pico_sdk_gcc15.sh "${{ github.workspace }}/pico-sdk"
 
       - name: Build
         # CMakeLists.txt's `if(NOT DEFINED COMPILE) set(COMPILE PICO)`
