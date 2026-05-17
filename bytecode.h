@@ -552,95 +552,56 @@ typedef enum {
 #define BC_PIXEL_ARG_COUNT       3
 
 /*
- * Compiler limits — platform-conditional
+ * Compiler-table sizes.  Each entry is a count, not a byte budget — the
+ * arrays themselves are heap-allocated by bc_compiler_alloc() at the
+ * sizes set below.  Defaults match an RP2040-class budget; any port
+ * that wants larger tables defines the corresponding BC_MAX_* in its
+ * port_config.h.  ports/host_wasm/port_config.h is the canonical
+ * example (RP2350-class tables sized to fit the smallest browser heap
+ * profile).
  *
- * On device, RP2350 builds get larger limits; RP2040 builds are tighter.
- * On host, limits default to generous for broad testing, but can be switched
- * to match a specific device profile via DEVICE_SIM= in the Makefile:
- *   make DEVICE_SIM=rp2040   →  -DBC_SIM_RP2040  (128 KB heap, small tables)
- *   make DEVICE_SIM=rp2350   →  -DBC_SIM_RP2350  (300 KB heap, medium tables)
- *   make DEVICE_SIM=host     →  (no flag, generous host limits)
- *
- * Compiler arrays are dynamically allocated via bc_compiler_alloc().
+ * The trailing #elif chain on BC_SIM_RP2040 / BC_SIM_RP2350 /
+ * MMBASIC_HOST / rp2350 is the legacy in-bytecode.h dispatch kept until
+ * each affected port migrates its sizes into its own port_config.h.
  */
-/* If the port's port_config.h supplied compiler-table sizes (as
- * ports/host_wasm does to keep the WASM build deterministic and
- * independent of DEVICE_SIM), honour those.  port_config.h must define
- * the full set — picking up some from the port and the rest from the
- * legacy target-macro chain below would be inconsistent.  Detection is
- * on BC_MAX_CODE because every block defines it. */
-#if defined(BC_MAX_CODE)
-  /* port_config.h is authoritative; nothing to define here. */
-#elif defined(BC_SIM_RP2040)
-  /* Host build simulating RP2040 — uses RP2040 device limits */
-  #define BC_MAX_CODE       (16 * 1024)
-  #define BC_MAX_CONSTANTS  64
-  #define BC_MAX_SLOTS      128
-  #define BC_MAX_SUBFUNS    32
-  #define BC_MAX_FIXUPS     256
-  #define BC_MAX_LINEMAP    512
-  #define BC_MAX_LOCALS     64
-  #define BC_MAX_PARAMS     16
-  #define BC_MAX_LOCAL_META 256
-  #define BC_MAX_NEST       16
-  #define BC_MAX_DATA_ITEMS 512
-#elif defined(BC_SIM_RP2350)
-  /* Host build simulating RP2350 — uses RP2350 device limits */
-  #define BC_MAX_CODE       (32 * 1024)
-  #define BC_MAX_CONSTANTS  96
-  #define BC_MAX_SLOTS      192
-  #define BC_MAX_SUBFUNS    96
-  #define BC_MAX_FIXUPS     512
-  #define BC_MAX_LINEMAP    1024
-  #define BC_MAX_LOCALS     64
-  #define BC_MAX_PARAMS     16
-  #define BC_MAX_LOCAL_META 384
-  #define BC_MAX_NEST       32
-  #define BC_MAX_DATA_ITEMS 1024
-#elif defined(MMBASIC_HOST)
-  /* Host build, no simulation — generous limits for testing */
-  #define BC_MAX_CODE       (64 * 1024)
-  #define BC_MAX_CONSTANTS  512
-  #define BC_MAX_SLOTS      512
-  #define BC_MAX_SUBFUNS    256
-  #define BC_MAX_FIXUPS     2048
-  #define BC_MAX_LINEMAP    4096
-  #define BC_MAX_LOCALS     64
-  #define BC_MAX_PARAMS     16
-  #define BC_MAX_LOCAL_META 4096
-  #define BC_MAX_NEST       64
-  #define BC_MAX_DATA_ITEMS 1024
-#elif defined(rp2350)
-  /*
-   * The RP2350 firmware has a substantially larger heap than RP2040 builds,
-   * but host-sized compiler tables would still be wasteful on-device.
-   * These limits keep the compiler/VM metadata comfortably below the RP2350
-   * heap budget while removing several host/device mismatches.
-   */
-  #define BC_MAX_CODE       (32 * 1024)
-  #define BC_MAX_CONSTANTS  96
-  #define BC_MAX_SLOTS      192
-  #define BC_MAX_SUBFUNS    96
-  #define BC_MAX_FIXUPS     512
-  #define BC_MAX_LINEMAP    1024
-  #define BC_MAX_LOCALS     64
-  #define BC_MAX_PARAMS     16
-  #define BC_MAX_LOCAL_META 384
-  #define BC_MAX_NEST       32
-  #define BC_MAX_DATA_ITEMS 1024
-#else
-  /* Default device build (RP2040) */
-  #define BC_MAX_CODE       (16 * 1024)
-  #define BC_MAX_CONSTANTS  64
-  #define BC_MAX_SLOTS      128
-  #define BC_MAX_SUBFUNS    32
-  #define BC_MAX_FIXUPS     256
-  #define BC_MAX_LINEMAP    512
-  #define BC_MAX_LOCALS     64
-  #define BC_MAX_PARAMS     16
-  #define BC_MAX_LOCAL_META 256
-  #define BC_MAX_NEST       16
-  #define BC_MAX_DATA_ITEMS 512
+#ifndef BC_MAX_CODE
+#  if defined(BC_SIM_RP2350) || defined(rp2350)
+    /* RP2350-class — larger heap, larger compiler tables. */
+    #define BC_MAX_CODE       (32 * 1024)
+    #define BC_MAX_CONSTANTS  96
+    #define BC_MAX_SLOTS      192
+    #define BC_MAX_SUBFUNS    96
+    #define BC_MAX_FIXUPS     512
+    #define BC_MAX_LINEMAP    1024
+    #define BC_MAX_LOCAL_META 384
+    #define BC_MAX_NEST       32
+    #define BC_MAX_DATA_ITEMS 1024
+#  elif defined(MMBASIC_HOST) && !defined(BC_SIM_RP2040)
+    /* Plain host build (no DEVICE_SIM override) — generous tables for
+     * test programs that wouldn't fit on a device. */
+    #define BC_MAX_CODE       (64 * 1024)
+    #define BC_MAX_CONSTANTS  512
+    #define BC_MAX_SLOTS      512
+    #define BC_MAX_SUBFUNS    256
+    #define BC_MAX_FIXUPS     2048
+    #define BC_MAX_LINEMAP    4096
+    #define BC_MAX_LOCAL_META 4096
+    #define BC_MAX_NEST       64
+    #define BC_MAX_DATA_ITEMS 1024
+#  else
+    /* RP2040-class (default).  Also picked when BC_SIM_RP2040 is set. */
+    #define BC_MAX_CODE       (16 * 1024)
+    #define BC_MAX_CONSTANTS  64
+    #define BC_MAX_SLOTS      128
+    #define BC_MAX_SUBFUNS    32
+    #define BC_MAX_FIXUPS     256
+    #define BC_MAX_LINEMAP    512
+    #define BC_MAX_LOCAL_META 256
+    #define BC_MAX_NEST       16
+    #define BC_MAX_DATA_ITEMS 512
+#  endif
+  #define BC_MAX_LOCALS  64
+  #define BC_MAX_PARAMS  16
 #endif
 
 /*
