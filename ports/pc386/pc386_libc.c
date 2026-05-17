@@ -394,7 +394,7 @@ int tolower (int c) { return isupper(c) ? c + ('a' - 'A') : c; }
 
 int abs (int x)             { return x < 0 ? -x : x; }
 long labs(long x)           { return x < 0 ? -x : x; }
-long long llabs(long long x){ return x < 0 ? -x : x; }
+int64_t llabs(int64_t x){ return x < 0 ? -x : x; }
 
 static const char *skip_ws_sign(const char *s, int *neg) {
     *neg = 0;
@@ -419,9 +419,9 @@ long atol(const char *s) {
     return neg ? -v : v;
 }
 
-long long atoll(const char *s) {
+int64_t atoll(const char *s) {
     int neg;
-    long long v = 0;
+    int64_t v = 0;
     s = skip_ws_sign(s, &neg);
     while (isdigit((unsigned char)*s)) { v = v * 10 + (*s - '0'); s++; }
     return neg ? -v : v;
@@ -456,12 +456,12 @@ unsigned long strtoul(const char *s, char **end, int base) {
     return (unsigned long)strtol(s, end, base);
 }
 
-long long strtoll(const char *s, char **end, int base) {
+int64_t strtoll(const char *s, char **end, int base) {
     /* MMBasic uses strtoll for HEX$/BIN$/OCT$ parsing; integer-only.
      * Re-do strtol's body in long-long for correct overflow on values
      * like 0xFFFFFFFF that don't fit in 32-bit long. */
     int neg;
-    long long v = 0;
+    int64_t v = 0;
     s = skip_ws_sign(s, &neg);
     if ((base == 0 || base == 16) && s[0] == '0' && (s[1] == 'x' || s[1] == 'X')) {
         s += 2; base = 16;
@@ -828,28 +828,28 @@ double pow(double x, double y) {
     if (x == 0.0) return y == 0.0 ? 1.0 : 0.0;
     if (x < 0.0) {
         /* For negative bases, only integer exponents make sense. */
-        double yi = (double)(long long)y;
+        double yi = (double)(int64_t)y;
         if (yi != y) return 0.0;
         double r = exp2(y * log2(-x));
-        return ((long long)y & 1) ? -r : r;
+        return ((int64_t)y & 1) ? -r : r;
     }
     return exp2(y * log2(x));
 }
 
 double floor(double x) {
-    long long i = (long long)x;
+    int64_t i = (int64_t)x;
     if (x < 0 && (double)i != x) i--;
     return (double)i;
 }
 
 double ceil(double x) {
-    long long i = (long long)x;
+    int64_t i = (int64_t)x;
     if (x > 0 && (double)i != x) i++;
     return (double)i;
 }
 
 double trunc(double x) {
-    return (double)(long long)x;
+    return (double)(int64_t)x;
 }
 
 double round(double x) {

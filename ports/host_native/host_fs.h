@@ -36,7 +36,7 @@ int host_fs_walk_next(host_fs_walker_t *w,
                       char *name_out, int name_cap,
                       int *is_dir_out,
                       unsigned long long *size_out,
-                      long long *mtime_epoch_out);
+                      int64_t *mtime_epoch_out);
 void host_fs_walk_close(host_fs_walker_t *w);
 
 /* Whole-path operations. Each returns 0 on success, -1 on error. Used by

@@ -72,7 +72,7 @@ void hal_gui_controls_reset_interrupts(void);
  * matched one of the GUICONTROLS-only attribute names and stores the
  * value in *iret_out; returns 0 if not matched (caller continues
  * parsing). Stub returns 0 for every attribute. */
-int hal_gui_controls_get_touch_attr(unsigned char *p, long long int *iret_out);
+int hal_gui_controls_get_touch_attr(unsigned char *p, int64_t *iret_out);
 
 /* GUI BEEP <ms> — start the click-pin pulse for `ms` milliseconds.
  * Real impl sets ClickTimer; stub errors with "Not supported on this

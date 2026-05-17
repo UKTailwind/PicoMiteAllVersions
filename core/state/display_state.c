@@ -24,7 +24,7 @@ struct spritebuffer spritebuff[MAXBLITBUF + 1] = { 0 };
  * unconditional — the few bytes of BSS on WEB are not worth a
  * target-macro gate in this file. */
 struct D3D *struct3d[MAX3D + 1] = { NULL };
-s_camera   camera[MAXCAM + 1];
+s_camera __scratch_y("display_state") camera[MAXCAM + 1];
 
 /* Async layer/framebuffer merge-pipeline state. Only the PICOMITE
  * (SPI-LCD) device target actually runs the pipeline on core1; on VGA,

@@ -56,7 +56,7 @@ const char *daystrings[] = {"dummy","Monday","Tuesday","Wednesday","Thursday","F
 /* Forward decl: cmd_longString calls parselongAES (defined below). */
 void parselongAES(uint8_t *p, int ivadd, uint8_t *keyx, uint8_t *ivx, int64_t **inint, int64_t **outint);
 
-void integersort(int64_t *iarray, int n, long long *index, int flags, int startpoint){
+void integersort(int64_t *iarray, int n, int64_t *index, int flags, int startpoint){
     int i, j = n, s = 1;
     int64_t t;
     if((flags & 1) == 0){
@@ -97,7 +97,7 @@ void integersort(int64_t *iarray, int n, long long *index, int flags, int startp
 		}
     }
 }
-void floatsort(MMFLOAT *farray, int n, long long *index, int flags, int startpoint){
+void floatsort(MMFLOAT *farray, int n, int64_t *index, int flags, int startpoint){
     int i, j = n, s = 1;
     int64_t t;
     MMFLOAT f;
@@ -140,7 +140,7 @@ void floatsort(MMFLOAT *farray, int n, long long *index, int flags, int startpoi
     }
 }
 
-void stringsort(unsigned char *sarray, int n, int offset, long long *index, int flags, int startpoint){
+void stringsort(unsigned char *sarray, int n, int offset, int64_t *index, int flags, int startpoint){
 	int ii,i, s = 1,isave;
 	int k;
 	unsigned char *s1,*s2,*p1,*p2;
@@ -208,10 +208,10 @@ void stringsort(unsigned char *sarray, int n, int offset, long long *index, int 
             memmove(s2,sarray,offset*i);
             memset(sarray,0,offset*(n-i));
             if(index!=NULL){
-                long long int *newindex=(long long int *)GetTempMemory(n* sizeof(long long int));
-                memmove(&newindex[n-i],&index[startpoint],i*sizeof(long long int));
-                memmove(newindex,&index[startpoint+i],(n-i)*sizeof(long long int));
-                memmove(&index[startpoint],newindex,n*sizeof(long long int));
+                int64_t *newindex=(int64_t *)GetTempMemory(n* sizeof(int64_t));
+                memmove(&newindex[n-i],&index[startpoint],i*sizeof(int64_t));
+                memmove(newindex,&index[startpoint+i],(n-i)*sizeof(int64_t));
+                memmove(&index[startpoint],newindex,n*sizeof(int64_t));
             }
         }
     } else if(flags & 4){
@@ -225,10 +225,10 @@ void stringsort(unsigned char *sarray, int n, int offset, long long *index, int 
             s2=(n-i)*offset+sarray;
             memset(s2,0,offset*i);
             if(index!=NULL){
-                long long int *newindex=(long long int *)GetTempMemory(n* sizeof(long long int));
-                memmove(newindex,&index[startpoint+i],(n-i)*sizeof(long long int));
-                memmove(&newindex[n-i],&index[startpoint],i*sizeof(long long int));
-                memmove(&index[startpoint],newindex,n*sizeof(long long int));
+                int64_t *newindex=(int64_t *)GetTempMemory(n* sizeof(int64_t));
+                memmove(newindex,&index[startpoint+i],(n-i)*sizeof(int64_t));
+                memmove(&newindex[n-i],&index[startpoint],i*sizeof(int64_t));
+                memmove(&index[startpoint],newindex,n*sizeof(int64_t));
             }
         }
     }
@@ -1205,7 +1205,7 @@ void cmd_time(void) {
 	int m = 0;
 	int s = 0;
     MMFLOAT f;
-    long long int i64;
+    int64_t i64;
     unsigned char *ss;
     int t=0;
     int offset;

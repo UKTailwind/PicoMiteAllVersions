@@ -319,7 +319,7 @@ void fun_json(void) {
         if (g_vartbl[g_VarIndex].dims[0] <= 0) {
             error("Argument 1 must be integer array");
         }
-        dest = (long long int *)ptr1;
+        dest = (int64_t *)ptr1;
         json_string = (char *)&dest[1];
     } else error("Argument 1 must be integer array");
     cJSON_InitHooks(NULL);

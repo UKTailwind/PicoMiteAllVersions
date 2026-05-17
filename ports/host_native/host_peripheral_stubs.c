@@ -472,7 +472,7 @@ unsigned char *GetIntAddress(unsigned char *p) {
     }
     return findline(getinteger(p), true);
 }
-long long int *GetReceiveDataBuffer(unsigned char *p, unsigned int *nbr) { (void)p; (void)nbr; return NULL; }
+int64_t *GetReceiveDataBuffer(unsigned char *p, unsigned int *nbr) { (void)p; (void)nbr; return NULL; }
 uint32_t getFreeHeap(void) { return 0; }
 
 int xregcomp(void *preg, const char *pattern, int cflags) { (void)preg; (void)pattern; (void)cflags; return -1; }

@@ -207,11 +207,11 @@ bool MIPS16 __not_in_flash_func(timer_callback)(repeating_timer_t *rt)
             if(IrVarType & 0b01)
                 *(MMFLOAT *)IrDev = IrDevTmp;
             else
-                *(long long int *)IrDev = IrDevTmp;
+                *(int64_t *)IrDev = IrDevTmp;
             if(IrVarType & 0b10)
                 *(MMFLOAT *)IrCmd = IrCmdTmp;
             else
-                *(long long int *)IrCmd = IrCmdTmp;
+                *(int64_t *)IrCmd = IrCmdTmp;
             IrGotMsg = true;
             NextIrTick += 250;
         }

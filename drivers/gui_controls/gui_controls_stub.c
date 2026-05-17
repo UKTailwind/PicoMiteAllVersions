@@ -31,7 +31,7 @@ void hal_gui_controls_hide_all(void) {}
 void hal_gui_controls_reset(void) {}
 void hal_gui_controls_reset_interrupts(void) {}
 
-int hal_gui_controls_get_touch_attr(unsigned char *p, long long int *iret_out) {
+int hal_gui_controls_get_touch_attr(unsigned char *p, int64_t *iret_out) {
     (void)p; (void)iret_out;
     return 0;
 }

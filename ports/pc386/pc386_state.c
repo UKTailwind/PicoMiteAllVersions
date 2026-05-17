@@ -33,7 +33,7 @@ uint32_t dma_rx_chan2 = 0;
 uint32_t dma_tx_chan = 0;
 uint32_t dma_tx_chan2 = 0;
 bool dmarunning = 0;
-long long int *ds18b20Timers = NULL;
+int64_t *ds18b20Timers = NULL;
 /* ExtCurrentConfig is provided by core/state/pin_state.c. */
 /* FileTable lives in FileIO.c. */
 const uint8_t *flash_progmemory = NULL;
@@ -115,7 +115,7 @@ const struct s_PinDef PinDef[NBRPINS + 1] = {
 };
 
 /* Timer/system variables */
-volatile long long int mSecTimer = 0;
+volatile int64_t mSecTimer = 0;
 volatile unsigned int PauseTimer = 0;
 volatile unsigned int IntPauseTimer = 0;
 volatile unsigned int Timer1 = 0, Timer2 = 0, Timer3 = 0, Timer4 = 0, Timer5 = 0;

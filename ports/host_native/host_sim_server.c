@@ -241,7 +241,7 @@ void host_sim_server_stop(void) {
 /* These MMBasic globals are defined in host_stubs_legacy.c. Declared here
  * rather than pulled from MMBasic_Includes.h to keep this file free of the
  * full interpreter header tree. */
-extern volatile long long int mSecTimer;
+extern volatile int64_t mSecTimer;
 extern volatile unsigned int AHRSTimer;
 extern volatile unsigned int InkeyTimer;
 extern volatile unsigned int PauseTimer;

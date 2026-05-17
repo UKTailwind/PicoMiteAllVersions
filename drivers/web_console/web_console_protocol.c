@@ -271,7 +271,7 @@ int web_console_parse_key_json(const char *text, size_t len, int *out_code) {
 int web_console_audio_build_tone(char *dst, size_t dst_len,
                                  double left_hz, double right_hz,
                                  int has_duration,
-                                 long long duration_ms) {
+                                 int64_t duration_ms) {
     if (!dst || dst_len == 0) return -1;
     int n;
     if (has_duration) {

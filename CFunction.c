@@ -9,7 +9,7 @@
 //Vector to CFunction static RAM
 
 //Vector to CFunction routine called every mSec
-unsigned int CFuncmSec = (unsigned int)NULL; 
+unsigned int CFuncmSec = (unsigned int)NULL;
 extern volatile uint64_t uSecTimer;
 extern volatile uint64_t FastTimer;
 //extern TIM_HandleTypeDef htim2;
@@ -39,10 +39,10 @@ unsigned int *FindCFunction(unsigned int *p, unsigned char *CmdPtr, unsigned cha
     return p;
 }
 
-long long int MIPS16 CallCFunction(unsigned char *CmdPtr, unsigned char *ArgList, unsigned char *DefP, unsigned char *CallersLinePtr) {
+int64_t MIPS16 CallCFunction(unsigned char *CmdPtr, unsigned char *ArgList, unsigned char *DefP, unsigned char *CallersLinePtr) {
     void *arg[10] = { NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL };
     int typ[10] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-    long long int ret, i64[10];
+    int64_t ret, i64[10];
     MMFLOAT ff[10];
     unsigned char *pp;
     int i,type;
@@ -122,7 +122,7 @@ long long int MIPS16 CallCFunction(unsigned char *CmdPtr, unsigned char *ArgList
     // run the function in flash
     ii = *p++;
     p = (unsigned int *)((unsigned int) p | 0x1);
-    ret = ((long long int (*)(void *, void *, void *, void *, void *, void *, void *, void *, void *, void *)) (p + ii)) (arg[0], arg[1], arg[2], arg[3], arg[4], arg[5], arg[6], arg[7], arg[8], arg[9]);              // run the CFunction
+    ret = ((int64_t (*)(void *, void *, void *, void *, void *, void *, void *, void *, void *, void *)) (p + ii)) (arg[0], arg[1], arg[2], arg[3], arg[4], arg[5], arg[6], arg[7], arg[8], arg[9]);              // run the CFunction
 
     return ret;
 }

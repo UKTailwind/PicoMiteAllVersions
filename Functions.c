@@ -4,22 +4,22 @@ PicoMite MMBasic
 Functions.c
 
 <COPYRIGHT HOLDERS>  Geoff Graham, Peter Mather
-Copyright (c) 2021, <COPYRIGHT HOLDERS> All rights reserved. 
-Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met: 
+Copyright (c) 2021, <COPYRIGHT HOLDERS> All rights reserved.
+Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
 1.	Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
 2.	Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer
     in the documentation and/or other materials provided with the distribution.
-3.	The name MMBasic be used when referring to the interpreter in any documentation and promotional material and the original copyright message be displayed 
+3.	The name MMBasic be used when referring to the interpreter in any documentation and promotional material and the original copyright message be displayed
     on the console at startup (additional copyright messages may be added).
-4.	All advertising materials mentioning features or use of this software must display the following acknowledgement: This product includes software developed 
+4.	All advertising materials mentioning features or use of this software must display the following acknowledgement: This product includes software developed
     by the <copyright holder>.
-5.	Neither the name of the <copyright holder> nor the names of its contributors may be used to endorse or promote products derived from this software 
+5.	Neither the name of the <copyright holder> nor the names of its contributors may be used to endorse or promote products derived from this software
     without specific prior written permission.
 THIS SOFTWARE IS PROVIDED BY <COPYRIGHT HOLDERS> AS IS AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
-OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL <COPYRIGHT HOLDERS> BE LIABLE FOR ANY DIRECT, 
-INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; 
-LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, 
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
+OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL <COPYRIGHT HOLDERS> BE LIABLE FOR ANY DIRECT,
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ************************************************************************************************************************/
 /**
@@ -41,7 +41,6 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 #include "hal/hal_random.h"
 #include "hal/hal_pin.h"
 #include "port_config.h"
-extern long long int  llabs (long long int  n);
 extern void port_fun_mm_mqtt_copy(int which, unsigned char *out);
 const char* overlaid_functions[]={
     "MM.HRES",
@@ -141,26 +140,26 @@ DOCUMENTATION
  FIELD$( str$, field, delim$)
  or
  FIELD$( str$, field, delim$, quote$)
- 
- Extract a substring (ie, field) from 'str$'.  Each is separated by any one of 
- the characters in the string 'delim$' and the field number to return is specified 
- by 'field' (the first field is field number 1).  Any leading and trailing 
+
+ Extract a substring (ie, field) from 'str$'.  Each is separated by any one of
+ the characters in the string 'delim$' and the field number to return is specified
+ by 'field' (the first field is field number 1).  Any leading and trailing
  spaces will be trimmed from the returned string.
- 
- Note that 'delim$' can contain a number of characters and the fields 
+
+ Note that 'delim$' can contain a number of characters and the fields
  will then be separated by any one of these characters.  if delim$ is not
  provided it will default to a comma (,) character.
- 
+
  'quote$' is the set of characters that might be used to quote text.  Typically
  it is the double quote character (") and any text that is surrounded by the quote
  character(s) will be treated as a block and any 'delim$' characters within that
  block will not be used as delimiters.
- 
- This function is useful for splitting apart comma-separated-values (CSV) in data 
+
+ This function is useful for splitting apart comma-separated-values (CSV) in data
  streams produced by GPS modules and test equipment.  For example:
   PRINT FIELD$("aaa,bbb,ccc", 2, ",")
   Will print the string: bbb
- 
+
   PRINT FIELD$("text1, 'quoted, text', text3", 2, ",", "'")
   will print the string: 'quoted, text'
 
@@ -172,7 +171,7 @@ DOCUMENTATION
 static int MInStr(char *srch, char c) {
     int i;
     for(i = 1; i <= *(unsigned char *)srch; i++)
-        if(c == srch[i]) 
+        if(c == srch[i])
             return true;
     return false;
 }
@@ -188,7 +187,7 @@ void fun_bound(void){
 	if(iret==-1)iret=0;
 	targ=T_INT;
 }
-/* 
+/*
  * @cond
  * The following section will be excluded from the documentation.
  */
@@ -213,7 +212,7 @@ static int scan_for_delimiter(int start, unsigned char *p, unsigned char *delims
 
 void fun_call(void){
 	int i;
-    long long int i64 = 0;
+    int64_t i64 = 0;
     unsigned char *s = NULL;
     MMFLOAT f;
     unsigned char *q = ep; // store the value of 'ep' because calling getCstring() can change it.
@@ -430,7 +429,7 @@ void fun_bin2str(void){
 void fun_abs(void) {
     unsigned char *s;
     MMFLOAT f;
-    long long int  i64;
+    int64_t  i64;
 
     targ = T_INT;
     evaluate(ep, &f, &i64, &s, &targ, false);                   // get the value and type of the argument
@@ -467,7 +466,7 @@ void fun_bit(void){
 	iret = ((int64_t)(*s&(1ll<<spos))>>spos) & 1ll;
 	targ=T_INT;
 }
- 
+
 void fun_flag(void){
 	uint64_t spos;
 	getargs(&ep, 1, (unsigned char *)",");
@@ -720,7 +719,7 @@ void fun_exp(void) {
 	fret = exp(getnumber(ep));
     targ = T_NBR;
 }
-/* 
+/*
  * @cond
  * The following section will be excluded from the documentation.
  */
@@ -734,7 +733,7 @@ void DoHexOctBin(int base) {
     if(argc == 3) j = getint(argv[2], 0, MAXSTRLEN);                // get the optional number of chars to return
 	if(j==0)j=1;
 	sret = GetTempMemory(STRINGSIZE);                                    // this will last for the life of the command
-    IntToStrPad((char *)sret, (signed long long int )i, '0', j, base);
+    IntToStrPad((char *)sret, (int64_t)i, '0', j, base);
 	CtoM(sret);
     targ = T_STR;
 }
@@ -772,7 +771,7 @@ void fun_instr(void) {
 	int t, start = 0, n = 0 ;
     unsigned char *ss;
     MMFLOAT f;
-    long long int  i64;
+    int64_t  i64;
 	getargs(&ep, 7, (unsigned char *)",");
 	if(!(argc==3 || argc==5 || argc==7))error("Syntax");
     t = T_NOTYPE;
@@ -819,7 +818,7 @@ void fun_instr(void) {
 		if( reti ){
 			regfree(&regex);
 			error("Could not compile regex");
-		} 
+		}
 		reti = regexec(&regex, &s[start], 1, &pmatch, 0);
 		targ=T_INT;
 		if( !reti ){
@@ -843,14 +842,14 @@ void fun_instr(void) {
 
 
 
-// Truncate an expression to the next whole number less than or equal to the argument. 
+// Truncate an expression to the next whole number less than or equal to the argument.
 void fun_int(void) {
 	iret = floor(getnumber(ep));
     targ = T_INT;
 }
 
 
-// Truncate a number to a whole number by eliminating the decimal point and all characters 
+// Truncate a number to a whole number by eliminating the decimal point and all characters
 // to the right of the decimal point.
 void fun_fix(void) {
 	iret = getnumber(ep);
@@ -1057,11 +1056,11 @@ void fun_val(void) {
                                   break;
 			case 'O': while(*p >= '0' && *p <= '7') {
                                       iret = (iret << 3) | (*p++ - '0');
-                                  } 
+                                  }
                                   break;
 			case 'B': while(*p == '0' || *p == '1') {
                                       iret = (iret << 1) | (*p++ - '0');
-                                  } 
+                                  }
                                   break;
 			default : iret = 0;
 		}
@@ -1131,7 +1130,7 @@ void fun_space(void) {
 void fun_str(void) {
 	unsigned char *s;
 	MMFLOAT f;
-    long long int i64;
+    int64_t i64;
 	int t;
     int m, n;
     unsigned char ch, *p;
@@ -1185,7 +1184,7 @@ void fun_string(void) {
         if(!*(char *)p) error("Argument value: $", argv[2]);
         j = *((char *)p + 1);
     } else if(t & T_INT)
-        j = *(long long int *)p;
+        j = *(int64_t *)p;
     else
         j = FloatToInt32(*((MMFLOAT *)p));
     if(j < 0 || j > 255) error("Argument value: $", argv[2]);
@@ -1294,7 +1293,7 @@ void MMB_HOT_FUNC(fun_inkey)(void){
 }
 
 
-/* 
+/*
  * @cond
  * The following section will be excluded from the documentation.
  */
@@ -1339,7 +1338,7 @@ void fun_acos(void) {
      targ = T_NBR;
 }
 
-/* 
+/*
  * @cond
  * The following section will be excluded from the documentation.
  */
@@ -1371,7 +1370,7 @@ void fun_min(void) {
 }
 void MMB_DISPATCH_FUNC(fun_ternary)(void){
     MMFLOAT f = 0;
-    long long int i64 = 0;
+    int64_t i64 = 0;
     unsigned char *s = NULL;
     int t = T_NOTYPE;
 	getargs(&ep,5,(unsigned char *)",");
@@ -1471,7 +1470,7 @@ void fun_struct(void) {
         }
 
         MMFLOAT f;
-        long long int i64;
+        int64_t i64;
         unsigned char *s = NULL;
         int t = T_NOTYPE;
         evaluate(argv[2], &f, &i64, &s, &t, false);
@@ -1507,10 +1506,10 @@ void fun_struct(void) {
             unsigned char *member_ptr = elem_ptr  + member_offset;
 
             if (member_type == T_INT) {
-                long long int val = *(long long int *)member_ptr;
-                long long int search_val;
+                int64_t val = *(int64_t *)member_ptr;
+                int64_t search_val;
                 if (t & T_INT)      search_val = i64;
-                else if (t & T_NBR) search_val = (long long int)f;
+                else if (t & T_NBR) search_val = (int64_t)f;
                 else                error("Type mismatch: expected numeric value");
                 if (val == search_val) { iret = i + g_OptionBase; return; }
             } else if (member_type == T_NBR) {

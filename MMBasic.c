@@ -1,4 +1,4 @@
-/* 
+/*
  * @cond
  * The following section will be excluded from the documentation.
  */
@@ -8,22 +8,22 @@ PicoMite MMBasic
 MMBasic.c
 
 <COPYRIGHT HOLDERS>  Geoff Graham, Peter Mather
-Copyright (c) 2021, <COPYRIGHT HOLDERS> All rights reserved. 
-Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met: 
+Copyright (c) 2021, <COPYRIGHT HOLDERS> All rights reserved.
+Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
 1.	Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
 2.	Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer
     in the documentation and/or other materials provided with the distribution.
-3.	The name MMBasic be used when referring to the interpreter in any documentation and promotional material and the original copyright message be displayed 
+3.	The name MMBasic be used when referring to the interpreter in any documentation and promotional material and the original copyright message be displayed
     on the console at startup (additional copyright messages may be added).
-4.	All advertising materials mentioning features or use of this software must display the following acknowledgement: This product includes software developed 
+4.	All advertising materials mentioning features or use of this software must display the following acknowledgement: This product includes software developed
     by the <copyright holder>.
-5.	Neither the name of the <copyright holder> nor the names of its contributors may be used to endorse or promote products derived from this software 
+5.	Neither the name of the <copyright holder> nor the names of its contributors may be used to endorse or promote products derived from this software
     without specific prior written permission.
 THIS SOFTWARE IS PROVIDED BY <COPYRIGHT HOLDERS> AS IS AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
-OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL <COPYRIGHT HOLDERS> BE LIABLE FOR ANY DIRECT, 
-INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; 
-LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, 
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
+OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL <COPYRIGHT HOLDERS> BE LIABLE FOR ANY DIRECT,
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ************************************************************************************************************************/
 
@@ -163,7 +163,7 @@ char digit[256]={
 //
 int targ;                                                           // the type of the returned value
 MMFLOAT farg1, farg2, fret;                                           // the two float arguments and returned value
-long long int  iarg1, iarg2, iret;                                   // the two integer arguments and returned value
+int64_t  iarg1, iarg2, iret;                                   // the two integer arguments and returned value
 unsigned char *sarg1, *sarg2, *sret;                                         // the two string arguments and returned value
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
@@ -184,14 +184,14 @@ unsigned char *ContinuePoint;                                                // 
 extern int TraceOn;
 extern unsigned char *TraceBuff[TRACE_BUFF_SIZE];
 extern int TraceBuffIndex;                                          // used for listing the contents of the trace buffer
-extern long long int CallCFunction(unsigned char *CmdPtr, unsigned char *ArgList, unsigned char *DefP, unsigned char *CallersLinePtr);
+extern int64_t CallCFunction(unsigned char *CmdPtr, unsigned char *ArgList, unsigned char *DefP, unsigned char *CallersLinePtr);
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
 // Functions only used within MMBasic.c
 //
 //void getexpr(unsigned char *);
 //void checktype(int *, int);
-unsigned char *getvalue(unsigned char *p, MMFLOAT *fa, long long int  *ia, unsigned char **sa, int *oo, int *ta);
+unsigned char *getvalue(unsigned char *p, MMFLOAT *fa, int64_t  *ia, unsigned char **sa, int *oo, int *ta);
 unsigned char tokenTHEN, tokenELSE, tokenGOTO, tokenEQUAL, tokenTO, tokenSTEP, tokenWHILE, tokenUNTIL, tokenGOSUB, tokenAS, tokenFOR;
 unsigned short cmdIF, cmdENDIF, cmdEND_IF, cmdELSEIF, cmdELSE_IF, cmdELSE, cmdSELECT_CASE, cmdFOR, cmdNEXT, cmdWHILE, cmdENDSUB, cmdENDFUNCTION, cmdLOCAL, cmdSTATIC, cmdCASE, cmdDO, cmdLOOP, cmdCASE_ELSE, cmdEND_SELECT;
 unsigned short cmdSUB, cmdFUN, cmdCFUN, cmdCSUB, cmdIRET, cmdComment, cmdEndComment;
@@ -219,12 +219,12 @@ int GetStructAlignment(struct s_structdef *sd) {
         struct s_structmember *sm = &sd->members[i];
         int align = 1;
         if (sm->type == T_INT || sm->type == T_NBR) {
-            align = sizeof(long long int);
+            align = sizeof(int64_t);
         } else if (sm->type == T_STRUCT) {
             if (sm->size >= 0 && sm->size < g_structcnt && g_structtbl[sm->size] != NULL)
                 align = GetStructAlignment(g_structtbl[sm->size]);
             else
-                align = sizeof(long long int);
+                align = sizeof(int64_t);
         }
         if (align > max_align) max_align = align;
     }
@@ -384,7 +384,7 @@ void *ResolveStructMember(unsigned char *struct_ptr, int struct_idx,
                 if ((argc & 0x01) == 0) error("Dimensions");
                 mem_dnbr = argc / 2 + 1;
                 for (int ai = 0; ai < argc; ai += 2) {
-                    MMFLOAT f; long long int in; char *s; int targ = T_NOTYPE;
+                    MMFLOAT f; int64_t in; char *s; int targ = T_NOTYPE;
                     evaluate(argv[ai], &f, &in, (unsigned char **)&s, &targ, false);
                     if (targ == T_NBR) in = FloatToInt32(f);
                     mem_dim[ai / 2] = (int)in;
@@ -462,7 +462,7 @@ void *ResolveStructMember(unsigned char *struct_ptr, int struct_idx,
             if ((argc & 0x01) == 0) error("Dimensions");
             mem_dnbr = argc / 2 + 1;
             for (int ai = 0; ai < argc; ai += 2) {
-                MMFLOAT f; long long int in; char *s; int targ = T_NOTYPE;
+                MMFLOAT f; int64_t in; char *s; int targ = T_NOTYPE;
                 evaluate(argv[ai], &f, &in, (unsigned char **)&s, &targ, false);
                 if (targ == T_NBR) in = FloatToInt32(f);
                 mem_dim[ai / 2] = (int)in;
@@ -674,7 +674,7 @@ void   MIPS16 PrepareProgram(int ErrAbort) {
     if(Option.LIBRARY_FLASH_SIZE == MAX_PROG_SIZE)
          NbrFuncts = PrepareProgramExt(LibMemory , 0, &CFunctionLibrary, ErrAbort);
     PrepareProgramExt(ProgMemory, NbrFuncts,&CFunctionFlash, ErrAbort);
-    
+
     // rp2350 fills the funtbl[] hash for FindSubFun / findvar / findlabel
     // fast paths; rp2040 + host keep the linear subfun[] scan.
     port_prepare_program_finalize_subfun(ErrAbort);
@@ -891,7 +891,7 @@ int MMB_HOT_FUNC(FindSubFun)(unsigned char *p, int type) {
 //   cmd      = pointer to the command name used by the caller (in program memory)
 //   index    = index into subfun[i] which points to the definition of the sub or funct
 //   fa, i64a, sa and typ are pointers to where the return value is to be stored (used by functions only)
-void MIPS16 MMB_DISPATCH_FUNC(DefinedSubFun)(int isfun, unsigned char *cmd, int index, MMFLOAT *fa, long long int  *i64a, unsigned char **sa, int *typ) {
+void MIPS16 MMB_DISPATCH_FUNC(DefinedSubFun)(int isfun, unsigned char *cmd, int index, MMFLOAT *fa, int64_t  *i64a, unsigned char **sa, int *typ) {
 
     unsigned char *p, *s, *tp, *ttp, tcmdtoken;
     unsigned char *CallersLinePtr, *SubLinePtr = NULL;
@@ -904,9 +904,9 @@ void MIPS16 MMB_DISPATCH_FUNC(DefinedSubFun)(int isfun, unsigned char *cmd, int 
     int *argtype;
     union u_argval {
         MMFLOAT f;                                             // the value if it is a float
-        long long int  i;                                      // the value if it is an integer
+        int64_t  i;                                      // the value if it is an integer
         MMFLOAT *fa;                                           // pointer to the allocated memory if it is an array of floats
-        long long int  *ia;                                    // pointer to the allocated memory if it is an array of integers
+        int64_t  *ia;                                    // pointer to the allocated memory if it is an array of integers
         unsigned char *s;                                      // pointer to the allocated memory if it is a string
     } *argval;
     int *argVarIndex;
@@ -916,13 +916,13 @@ void MIPS16 MMB_DISPATCH_FUNC(DefinedSubFun)(int isfun, unsigned char *cmd, int 
     // Memory allocated to *argval needs to be recovered.
     // This allows unit tests to recover cleanly from skipped errors.i.e. ON ERROR SKIP
     DefinedSubFunLocalIndex=g_LocalIndex;  //save the LocalIndex
- 
+
     CallersLinePtr = CurrentLinePtr;
     SubLinePtr = subfun[index];                                // used for error reporting
     p =  SubLinePtr + sizeof(CommandToken);                    // point to the sub or function definition
     skipspace(p);
     ttp = p;
-   
+
     // copy the sub/fun name from the definition into temp storage and terminate
     // p is left pointing to the end of the name (ie, start of the argument list in the definition)
     CurrentLinePtr = SubLinePtr;                               // report errors at the definition
@@ -935,7 +935,7 @@ void MIPS16 MMB_DISPATCH_FUNC(DefinedSubFun)(int isfun, unsigned char *cmd, int 
         *tp++ = *p++;
     }
     *tp = 0;
-   
+
     if(isfun && *p != '(' /*&& (*SubLinePtr != cmdCFUN)*/) error("Function definition");
 
     // find the end of the caller's identifier, tp is left pointing to the start of the caller's argument list
@@ -977,7 +977,7 @@ void MIPS16 MMB_DISPATCH_FUNC(DefinedSubFun)(int isfun, unsigned char *cmd, int 
         return;
     }
    // from now on we have a user defined sub or function (not a C routine)
-   
+
     if(gosubindex >= MAXGOSUB) error("Too many nested SUB/FUN");
     errorstack[gosubindex] = CallersLinePtr;
     gosubstack[gosubindex++] = isfun ? NULL : nextstmt;             // NULL signifies that this is returned to by ending ExecuteProgram()
@@ -1013,7 +1013,7 @@ void MIPS16 MMB_DISPATCH_FUNC(DefinedSubFun)(int isfun, unsigned char *cmd, int 
     //    - missing (ie, caller did not supply that parameter)
     //    - a variable, in which case we need to get a pointer to that variable's data and save its index so later we can get its type
     //    - an expression, in which case we evaluate the expression and get its value and type
-    for(i = 0; i < argc2; i += 2) {                                 // count through the arguments in the definition of the sub/fun      
+    for(i = 0; i < argc2; i += 2) {                                 // count through the arguments in the definition of the sub/fun
         if(i < argc1 && *argv1[i]) {
             // check if the argument is a valid variable
             if(i < argc1 && isnamestart(*argv1[i]) && *skipvar(argv1[i], false) == 0) {
@@ -1038,7 +1038,7 @@ void MIPS16 MMB_DISPATCH_FUNC(DefinedSubFun)(int isfun, unsigned char *cmd, int 
                 if((checkstring(argv2[i] + 2, (unsigned char *)"VAL")) != NULL) {        // if BYVAL
                     //Only if not an array remove any pointer flag in the caller
                     argtype[i] = 0;
-         
+
                     // Trap an array but not an array element
                     if(g_vartbl[argVarIndex[i]].dims[0] > 0){
                         /* See if we have an array or an array element */
@@ -1049,21 +1049,21 @@ void MIPS16 MMB_DISPATCH_FUNC(DefinedSubFun)(int isfun, unsigned char *cmd, int 
                         if(*tp == ')') error("Array as BYVAL not allowed $",argv1[i]);
                     }
                     argv2[i] += 5;                                      // skip to the variable start
-                   
+
                 } else {
                     if((checkstring(argv2[i] + 2, (unsigned char *)"REF")) != NULL) {    // if BYREF
                         if((argtype[i] & T_PTR) == 0) error("Variable required for BYREF $", argv1[i]);
- 
+
                         argv2[i] += 5;                                  // skip to the variable start
                         argbyref[i]=1;
                     }
                }
-             
+
             }
 
             // if argument is present and is not a pointer to a variable then evaluate it as an expression
             if(argtype[i] == 0) {
-                long long int  ia;
+                int64_t  ia;
                 evaluate(argv1[i], &argval[i].f, &ia, &s, &argtype[i], false);   // get the value and type of the argument
                 if(argtype[i] & T_INT)
                     argval[i].i = ia;
@@ -1100,7 +1100,7 @@ void MIPS16 MMB_DISPATCH_FUNC(DefinedSubFun)(int isfun, unsigned char *cmd, int 
         ArgType |= (V_FIND | V_DIM_VAR | V_LOCAL | V_EMPTY_OK);
         tp = findvar(argv2[i], ArgType);                            // declare the local variable
         if(g_vartbl[g_VarIndex].dims[0] > 0) error("Argument list");    // if it is an array it must be an empty array
-       
+
         CurrentLinePtr = CallersLinePtr;                            // report errors at the caller
 
         // if the definition called for an array, special processing and checking will be required
@@ -1122,11 +1122,11 @@ void MIPS16 MMB_DISPATCH_FUNC(DefinedSubFun)(int isfun, unsigned char *cmd, int 
             if(g_vartbl[argVarIndex[i]].type & T_PTR) {
                 argval[i].i = *g_vartbl[argVarIndex[i]].val.ia;       // get the value if the supplied argument is a pointer
             } else {
-                argval[i].i = *(long long int *)argval[i].s;        // get the value if the supplied argument is an ordinary variable
+                argval[i].i = *(int64_t *)argval[i].s;        // get the value if the supplied argument is an ordinary variable
             }
             argtype[i] &= ~T_PTR;                                   // and remove the pointer flag
         }
-       
+
         // if this is a pointer (note: at this point the caller type and the required type must be the same)
         if(argtype[i] & T_PTR) {
             // the argument supplied was a variable so we must setup the local variable as a pointer
@@ -1207,7 +1207,7 @@ void MIPS16 MMB_DISPATCH_FUNC(DefinedSubFun)(int isfun, unsigned char *cmd, int 
     if(FunType & T_NBR)
         *fa = *(MMFLOAT *)tp;
     else if(FunType & T_INT)
-        *i64a = *(long long int  *)tp;
+        *i64a = *(int64_t  *)tp;
     else if(FunType & T_STRUCT) {
         // Phase 6 — function returns a struct.  Copy the struct body to temp
         // memory allocated at the caller's LocalIndex so it survives ClearVars
@@ -1612,7 +1612,7 @@ void  MIPS16 tokenise(int console) {
             if(firstnonwhite) {                                     // first entry on the line?
                 tp = skipvar(p, true);                              // find the char after the variable
                 skipspace(tp);
-                if(*tp == '=') {  
+                if(*tp == '=') {
                     unsigned short tkn = GetCommandValue((unsigned char *)"Let");                                   // is it an implied let?
                     *op++ = (tkn & 0x7f ) + C_BASETOKEN;
                     *op++ = (tkn >> 7) + C_BASETOKEN; //tokens can be 14-bit
@@ -1667,7 +1667,7 @@ void  MIPS16 tokenise(int console) {
 // this will check that the expression is terminated correctly and throw an error if not
 void MMB_HOT_FUNC(*DoExpression)(unsigned char *p, int *t) {
     static MMFLOAT f;
-    static long long int  i64;
+    static int64_t  i64;
     static unsigned char *s;
 
     evaluate(p, &f, &i64, &s, t, false);
@@ -1687,7 +1687,7 @@ void MMB_HOT_FUNC(*DoExpression)(unsigned char *p, int *t) {
 //  if *t = T_STR or T_NBR or T_INT will throw an error if the result is not the correct type
 //  if *t = T_NOTYPE it will not throw an error and will return the type found in *t
 // this will check that the expression is terminated correctly and throw an error if not.  flags & E_NOERROR will suppress that check
-unsigned char MIPS16 MMB_HOT_FUNC(*evaluate)(unsigned char *p, MMFLOAT *fa, long long int  *ia, unsigned char **sa, int *ta, int flags) {
+unsigned char MIPS16 MMB_HOT_FUNC(*evaluate)(unsigned char *p, MMFLOAT *fa, int64_t  *ia, unsigned char **sa, int *ta, int flags) {
     int o;
     int t = *ta;
     unsigned char *s;
@@ -1716,7 +1716,7 @@ unsigned char MIPS16 MMB_HOT_FUNC(*evaluate)(unsigned char *p, MMFLOAT *fa, long
 MMFLOAT MMB_HOT_FUNC(getnumber)(unsigned char *p) {
     int t = T_NBR;
     MMFLOAT f;
-    long long int  i64;
+    int64_t  i64;
     unsigned char *s;
     evaluate(p, &f, &i64, &s, &t, false);
     if(t & T_INT) return (MMFLOAT)i64;
@@ -1725,10 +1725,10 @@ MMFLOAT MMB_HOT_FUNC(getnumber)(unsigned char *p) {
 
 
 // evaluate an expression and return a 64 bit integer
-long long int  MMB_HOT_FUNC(getinteger)(unsigned char *p) {
+int64_t  MMB_HOT_FUNC(getinteger)(unsigned char *p) {
     int t = T_INT;
     MMFLOAT f;
-    long long int  i64;
+    int64_t  i64;
     unsigned char *s;
 
     evaluate(p, &f, &i64, &s, &t, false);
@@ -1741,11 +1741,11 @@ long long int  MMB_HOT_FUNC(getinteger)(unsigned char *p) {
 // evaluate an expression and return an integer
 // this will throw an error is the integer is outside a specified range
 // this will correctly round the number if it is a fraction of an integer
-long long int MMB_HOT_FUNC(getint)(unsigned char *p, long long int min, long long int max) {
-    long long int  i;
+int64_t MMB_HOT_FUNC(getint)(unsigned char *p, int64_t min, int64_t max) {
+    int64_t  i;
     int t = T_INT;
     MMFLOAT f;
-    long long int i64;
+    int64_t i64;
     unsigned char *s;
     evaluate(p, &f, &i64, &s, &t, false);
     if(t & T_NBR) i= FloatToInt64(f);
@@ -1760,7 +1760,7 @@ long long int MMB_HOT_FUNC(getint)(unsigned char *p, long long int min, long lon
 unsigned char MMB_HOT_FUNC(*getstring)(unsigned char *p) {
     int t = T_STR;
     MMFLOAT f;
-    long long int  i64;
+    int64_t  i64;
     unsigned char *s;
 
     evaluate(p, &f, &i64, &s, &t, false);
@@ -1795,9 +1795,9 @@ unsigned char *getFstring(unsigned char *p) {
 
 
 // recursively evaluate an expression observing the rules of operator precedence
-unsigned char MIPS16 MMB_HOT_FUNC(*doexpr)(unsigned char *p, MMFLOAT *fa, long long int  *ia, unsigned char **sa, int *oo, int *ta) {
+unsigned char MIPS16 MMB_HOT_FUNC(*doexpr)(unsigned char *p, MMFLOAT *fa, int64_t  *ia, unsigned char **sa, int *oo, int *ta) {
     MMFLOAT fa1, fa2;
-    long long int  ia1, ia2;
+    int64_t  ia1, ia2;
     int o1, o2;
     int t1, t2;
     unsigned char *sa1, *sa2;
@@ -1851,9 +1851,9 @@ unsigned char MIPS16 MMB_HOT_FUNC(*doexpr)(unsigned char *p, MMFLOAT *fa, long l
 
 // get a value, either from a constant, function or variable
 // also returns the next operator to the right of the value or E_END if no operator
-unsigned char MIPS16 MMB_HOT_FUNC(*getvalue)(unsigned char *p, MMFLOAT *fa, long long int  *ia, unsigned char **sa, int *oo, int *ta) {
+unsigned char MIPS16 MMB_HOT_FUNC(*getvalue)(unsigned char *p, MMFLOAT *fa, int64_t  *ia, unsigned char **sa, int *oo, int *ta) {
     MMFLOAT f = 0;
-    long long int  i64 = 0;
+    int64_t  i64 = 0;
     unsigned char *s = NULL;
     int t = T_NOTYPE;
     unsigned char *tp, *p1, *p2;
@@ -1930,7 +1930,7 @@ unsigned char MIPS16 MMB_HOT_FUNC(*getvalue)(unsigned char *p, MMFLOAT *fa, long
                 *oo = ro;
                 return p;                                                   // return straight away as we already have the next operator
             }
-        } 
+        }
         if(tokentype(*p) & (T_FUN | T_FNA)) {
     // if a function execute it and save the result
             int tmp;
@@ -1985,7 +1985,7 @@ unsigned char MIPS16 MMB_HOT_FUNC(*getvalue)(unsigned char *p, MMFLOAT *fa, long
                 g_ExprStructType = -1;
             }
             if(t & T_NBR) f = (*(MMFLOAT *)s);
-            if(t & T_INT) i64 = (*(long long int  *)s);
+            if(t & T_INT) i64 = (*(int64_t  *)s);
         }
         p = skipvar(p, false);
     }
@@ -1996,7 +1996,7 @@ unsigned char MIPS16 MMB_HOT_FUNC(*getvalue)(unsigned char *p, MMFLOAT *fa, long
 			int isi64 = true;
 			tsp = ts;
 			int isf=true;
-			long long int scale=0;
+			int64_t scale=0;
 			// copy the first digit of the string to a temporary place
 			if(*p == '.') {
 				isi64 = false;
@@ -2141,7 +2141,7 @@ unsigned char MIPS16 MMB_HOT_FUNC(*getvalue)(unsigned char *p, MMFLOAT *fa, long
                         }
                         toggle=0;
                     } else *p1++ = *p++;
-                } 
+                }
 			p++;
 			CtoM(s);                                                    // convert to a MMBasic string
 			t = T_STR;
@@ -2163,7 +2163,7 @@ unsigned char MIPS16 MMB_HOT_FUNC(*getvalue)(unsigned char *p, MMFLOAT *fa, long
 
     return p;
 }
- 
+
 
 
 
@@ -2184,19 +2184,19 @@ unsigned char MIPS16 *findline(int nbr, int mustfind) {
     }
    while(1) {
         if(p[0] == 0 && p[1] == 0) {
-             
+
              if (Option.LIBRARY_FLASH_SIZE==MAX_PROG_SIZE){
                 if(j==0){
-                  j=1;  
+                  j=1;
                   p = next;
                 }else{
                   i = MAXLINENBR;
-                  break;   
-                } 
+                  break;
+                }
              } else{
                i = MAXLINENBR;
                break;
-             } 
+             }
         }
 
         if(p[0] == T_NEWLINE) {
@@ -2256,7 +2256,7 @@ unsigned char MIPS16 *findlabel(unsigned char *labelptr) {
         label[i] = *labelptr++;
     }
     label[0] = i - 1;                                               // the length byte
-   
+
     p = (char *)ProgMemory;
     next=(char *)LibMemory;
     if (Option.LIBRARY_FLASH_SIZE==MAX_PROG_SIZE){
@@ -2271,15 +2271,15 @@ unsigned char MIPS16 *findlabel(unsigned char *labelptr) {
         if(p[0] == 0 && p[1] == 0) {                                // end of the program
             if (Option.LIBRARY_FLASH_SIZE==MAX_PROG_SIZE){
                 if(j==0){
-                  j=1;  
+                  j=1;
                   p = next;
                 }else{
-                  error("Cannot find label"); 
-                } 
+                  error("Cannot find label");
+                }
              } else{
                error("Cannot find label");
-             } 
-            
+             }
+
         }
         if(p[0] == T_NEWLINE) {
             lastp = p;                                              // save in case this is the right line
@@ -2415,7 +2415,7 @@ void MIPS16 MMB_HOT_FUNC(*findvar)(unsigned char *p, int action) {
 		if(++namelen > MAXVARLEN) error("Variable name too long");
 	} while(isnamechar(*p));
 	hash %= MAXVARHASH; //scale 0-255
-    
+
 	if(namelen!=MAXVARLEN)*s=0;
     // check the terminating char and set the type
     if(*p == '$') {
@@ -2501,7 +2501,7 @@ void MIPS16 MMB_HOT_FUNC(*findvar)(unsigned char *p, int action) {
             if(dnbr > MAXDIM) error("Dimensions");
             for(i = 0; i < argc; i += 2) {
                 MMFLOAT f;
-                long long int in;
+                int64_t in;
                 char *s;
                 int targ = T_NOTYPE;
                 evaluate(argv[i], &f, &in, (unsigned char **)&s, &targ, false);       // get the value and type of the argument
@@ -2756,7 +2756,7 @@ void MIPS16 MMB_HOT_FUNC(*findvar)(unsigned char *p, int action) {
             return g_vartbl[vindex].val.s + (nbr * sizeof(MMFLOAT));
         else
             if(g_vartbl[vindex].type & T_INT)
-                return g_vartbl[vindex].val.s + (nbr * sizeof(long long int));
+                return g_vartbl[vindex].val.s + (nbr * sizeof(int64_t));
             else
                 return g_vartbl[vindex].val.s + (nbr * (g_vartbl[vindex].size + 1));
     }
@@ -3165,7 +3165,7 @@ void MIPS16 error(char *msg, ...) {
                 *tp = (va_arg(ap, int));
             else if(*msg == '%')                                    // insert an integer
                 IntToStr(tp, va_arg(ap, int), 10);
-            else if(*msg == '~')                                    // insert a long long integer
+            else if(*msg == '~')                                    // insert a int64_t integer
                 IntToStr(tp, va_arg(ap, int64_t), 10);
             else if(*msg == '|')                                    // insert an integer
                 strcpy(tp,PinDef[va_arg(ap, int)].pinname);
@@ -3174,7 +3174,7 @@ void MIPS16 error(char *msg, ...) {
             msg++;
         }
     }
-    
+
     // copy the error message into the global MMErrMsg truncating at any tokens or if the string is too long
     for(p = MMErrMsg, tp = tstr; *tp < 127 && (tp - tstr) < MAXERRMSG - 1; ) *p++ = *tp++;
     *p = 0;
@@ -3184,7 +3184,7 @@ void MIPS16 error(char *msg, ...) {
         lfs_file_open(&lfs, &lfs_file, "log.txt", LFS_O_APPEND | LFS_O_CREAT);
         lfs_file_write(&lfs, &lfs_file, MMErrMsg, sizeof(MMErrMsg));
         lfs_file_write(&lfs, &lfs_file, crlf, sizeof(crlf));
-        lfs_file_close(&lfs, &lfs_file);	
+        lfs_file_close(&lfs, &lfs_file);
     }
     // Clean up after an error in DefinedSubFun
     if(DefinedSubFunMem){
@@ -3192,7 +3192,7 @@ void MIPS16 error(char *msg, ...) {
         gosubindex--;
         FreeMemory((void*)DefinedSubFunMem);
         DefinedSubFunMem=0;
-    }  
+    }
     if(OptionErrorSkip) longjmp(ErrNext, 1);                       // if OPTION ERROR SKIP/IGNORE is in force
     hal_display_merge_abort();
 
@@ -3225,7 +3225,7 @@ void MIPS16 error(char *msg, ...) {
         if (Option.LIBRARY_FLASH_SIZE==MAX_PROG_SIZE && CurrentLinePtr < LibMemory+MAX_PROG_SIZE)
            tp = p = (char *)LibMemory;
         //if(*CurrentLinePtr != T_NEWLINE && CurrentLinePtr < ProgMemory + MAX_PROG_SIZE) {
-        if(*CurrentLinePtr != T_NEWLINE && ((CurrentLinePtr < ProgMemory + MAX_PROG_SIZE) || (Option.LIBRARY_FLASH_SIZE==MAX_PROG_SIZE && CurrentLinePtr < LibMemory+MAX_PROG_SIZE))) {    
+        if(*CurrentLinePtr != T_NEWLINE && ((CurrentLinePtr < ProgMemory + MAX_PROG_SIZE) || (Option.LIBRARY_FLASH_SIZE==MAX_PROG_SIZE && CurrentLinePtr < LibMemory+MAX_PROG_SIZE))) {
             // normally CurrentLinePtr points to a T_NEWLINE token but in this case it does not
             // so we have to search for the start of the line and set CurrentLinePtr to that
           while(*p != 0xff) {
@@ -3305,22 +3305,21 @@ void MIPS16 error(char *msg, ...) {
 // sum is the number to be converted
 // base is the numbers base radix (10 = decimal, 16 = hex, etc)
 // if base 10 the number will be signed otherwise it will be unsigned
-void MIPS16 IntToStr(char *strr, long long int nbr, unsigned int base) {
+void MIPS16 IntToStr(char *strr, int64_t nbr, unsigned int base) {
     int i, negative;
     unsigned char digit;
-    unsigned long long int sum;
-    extern long long int llabs (long long int n);
+    uint64_t sum;
 
     unsigned char str[IntToStrBufSize];
 
     if(nbr < 0 && base == 10) {                                     // we can have negative numbers in base 10 only
-        nbr = llabs(nbr);
+        sum = (uint64_t)(-(nbr + 1)) + 1;
         negative = true;
     } else
         negative = false;
 
     // this generates the digits in reverse order
-    sum = (unsigned long long int) nbr;
+    if(!negative) sum = (uint64_t)nbr;
     i = 0;
     do {
         digit = sum % base;
@@ -3347,7 +3346,7 @@ void MIPS16 IntToStr(char *strr, long long int nbr, unsigned int base) {
 // radix is the base of the number.  Base 10 is signed, all others are unsigned
 // Special case (used by FloatToStr() only):
 //     if padch is negative and nbr is zero prefix the number with the - sign
-void MIPS16 IntToStrPad(char *p, long long int nbr, signed char padch, int maxch, int radix) {
+void MIPS16 IntToStrPad(char *p, int64_t nbr, signed char padch, int maxch, int radix) {
     int j;
     char sign, buf[IntToStrBufSize];
 
@@ -3428,7 +3427,7 @@ void MIPS16 FloatToStr(char *p, MMFLOAT f, int m, int n, unsigned char ch) {
             if(n < 0) n = 0;
         }
 
- 
+
         // calculate rounding to hide the vagaries of floating point
         if(n > 0)
             rounding = 0.5/pow(10, n);
@@ -3641,13 +3640,13 @@ int MMB_DISPATCH_FUNC(FloatToInt32)(MMFLOAT x) {
 }
 
 
-long long int MMB_DISPATCH_FUNC(FloatToInt64)(MMFLOAT x) {
+int64_t MMB_DISPATCH_FUNC(FloatToInt64)(MMFLOAT x) {
     if(x < (-(0x7fffffffffffffffLL) -1) - 0.5 || x > 0x7fffffffffffffffLL + 0.5)
         error("Number too large");
     if ((x < -0xfffffffffffff) || (x > 0xfffffffffffff))
-        return (long long int)(x);
+        return (int64_t)(x);
     else
-    return (x >= 0 ? (long long int )(x + 0.5) : (long long int )(x - 0.5)) ;
+    return (x >= 0 ? (int64_t )(x + 0.5) : (int64_t )(x - 0.5)) ;
 }
 
 

@@ -55,7 +55,7 @@ int web_console_parse_key_json(const char *text, size_t len, int *out_code);
 int web_console_audio_build_tone(char *dst, size_t dst_len,
                                  double left_hz, double right_hz,
                                  int has_duration,
-                                 long long duration_ms);
+                                 int64_t duration_ms);
 int web_console_audio_build_stop(char *dst, size_t dst_len);
 int web_console_audio_build_sound(char *dst, size_t dst_len,
                                   int slot, const char *ch,

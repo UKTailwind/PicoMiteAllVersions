@@ -90,17 +90,10 @@ uint32_t dma_rx_chan2 = 0;
 uint32_t dma_tx_chan = 0;
 uint32_t dma_tx_chan2 = 0;
 bool dmarunning = 0;
-long long int *ds18b20Timers = NULL;
-volatile int ExtCurrentConfig[NBRPINS + 1] = {0};
-struct uFileTable FileTable[MAXOPENFILES + 1] = {{0}};
+int64_t *ds18b20Timers = NULL;
 const uint8_t *flash_progmemory = NULL;
-int FSerror = 0;
 int GPSchannel = 0;
-int gui_bcolour = 0;
-int gui_fcolour = 0xFFFFFF;
-short gui_font = 0;
-/* last_bcolour / last_fcolour / gui_font_height / gui_font_width moved
- * to core/state/display_state.c (unconditional on every target). */
+/* Display, pin, and filesystem globals live in shared state/FileIO modules. */
 uint8_t I2C0locked = 0;
 uint8_t I2C1locked = 0;
 unsigned char IgnorePIN = 0;
@@ -124,7 +117,6 @@ int PromptBC = 0;
 volatile int  PS2code = 0;
 volatile bool PS2int  = false;
 /* ReadBuffer is a function pointer - defined in function pointers section below */
-volatile uint32_t realflashpointer = 0;
 /* Simulated erased-flash regions so Memory.c's scan loops terminate on the
  * first iteration instead of segfaulting on NULL. */
 static unsigned char host_saved_vars_flash_buf[32] = {
@@ -176,7 +168,7 @@ const struct s_PinDef PinDef[NBRPINS + 1] = {{0}};
  * erased flash). */
 
 /* Timer/system variables */
-volatile long long int mSecTimer = 0;
+volatile int64_t mSecTimer = 0;
 /* timeroffset + TimeOffsetToUptime are defined in mm_misc_shared.c now. */
 extern uint64_t timeroffset;
 extern int64_t TimeOffsetToUptime;
@@ -218,15 +210,11 @@ int ticks_per_second = 1000;
 lfs_dir_t lfs_dir;
 struct lfs_info lfs_info;
 /* lfs_FileFnbr is now defined by FileIO.c. */
-short DisplayHRes = 0, DisplayVRes = 0;
 int ScreenSize = 0;
 unsigned char *DisplayBuf = NULL;
 unsigned char *SecondLayer = NULL;
 unsigned char *SecondFrame = NULL;
 char LCDAttrib = 0;
-s_camera camera[MAXCAM + 1] = {{0}};
-int RGB121map[16] = {0};
-
 /* Interrupt-related */
 volatile int INT0Value = 0, INT0InitTimer = 0, INT0Timer = 0;
 volatile int INT1Value = 0, INT1InitTimer = 0, INT1Timer = 0;
@@ -380,6 +368,10 @@ void mmbasic_runtime_port_begin(void) {
     if (host_runtime_timeout_ms > 0) {
         host_runtime_deadline_us = timeroffset + (uint64_t)host_runtime_timeout_ms * 1000ULL;
     }
+    if ((gui_font & 0x0F) == 0) gui_font = 0x01;
+    if (gui_font_width <= 0) gui_font_width = 8;
+    if (gui_font_height <= 0) gui_font_height = 12;
+    if (gui_fcolour == 0) gui_fcolour = 0xFFFFFF;
     host_framebuffer_reset_runtime(gui_bcolour);
     /* FontTable[] is initialised in Draw.c now (static initialiser).
      *
@@ -661,7 +653,10 @@ char SerialConsolePutC(char c, int flush) {
  * GetCWD, InitSDCard are now provided by FileIO.c. Flash writes go through
  * flash_range_* (RAM-backed flash_prog_buf); InitSDCard just needs
  * vm_host_fat to be mounted. */
-void CallCFunction(unsigned char *p, unsigned char *args, int *t, unsigned char **s) { (void)p; (void)args; (void)t; (void)s; }
+int64_t CallCFunction(unsigned char *cmd, unsigned char *args, unsigned char *def, unsigned char *caller) {
+    (void)cmd; (void)args; (void)def; (void)caller;
+    return 0;
+}
 void CallExecuteProgram(char *p) { (void)p; }
 
 

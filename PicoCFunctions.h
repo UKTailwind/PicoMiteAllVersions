@@ -54,7 +54,7 @@
 #define Vector_PinSetBit          (*(unsigned int *)(BaseAddress+0x18))       // void PinSetBit(int pin, unsigned int offset)
 #define Vector_PinRead            (*(unsigned int *)(BaseAddress+0x1C))       // int PinRead(int pin)
 #define Vector_MMPrintString      (*(unsigned int *)(BaseAddress+0x20))       // void MMPrintString(char* s)
-#define Vector_IntToStr           (*(unsigned int *)(BaseAddress+0x24))       // void IntToStr(char *strr, long long int nbr, unsigned int base)
+#define Vector_IntToStr           (*(unsigned int *)(BaseAddress+0x24))       // void IntToStr(char *strr, int64_t nbr, unsigned int base)
 #define Vector_CheckAbort         (*(unsigned int *)(BaseAddress+0x28))       // void CheckAbort(void)
 #define Vector_GetMemory          (*(unsigned int *)(BaseAddress+0x2C))       // void *GetMemory(size_t msize);
 #define Vector_GetTempMemory      (*(unsigned int *)(BaseAddress+0x30))       // void *GetTempMemory(int NbrBytes)
@@ -78,8 +78,8 @@
 #define Vector_CFuncmSec          (*(unsigned int *)(BaseAddress+0x78))       // CFuncmSec
 #define Vector_CFuncRam           (*(unsigned int *)(BaseAddress+0x7C))       // StartOfCFuncRam
 #define Vector_ScrollLCD          *(unsigned int *)(BaseAddress+0x80 )        // void scrollLCD(int lines, int blank)
-#define Vector_IntToFloat         (*(unsigned int *)(BaseAddress+0x84))       // MMFLOAT IntToFloat(long long int a)
-#define Vector_FloatToInt         (*(unsigned int *)(BaseAddress+0x88))       // long long int FloatToInt64(MMFLOAT x)
+#define Vector_IntToFloat         (*(unsigned int *)(BaseAddress+0x84))       // MMFLOAT IntToFloat(int64_t a)
+#define Vector_FloatToInt         (*(unsigned int *)(BaseAddress+0x88))       // int64_t FloatToInt64(MMFLOAT x)
 #define Vector_Option             (*(unsigned int *)(BaseAddress+0x8C))       // Option
 #define Vector_Sine               (*(unsigned int *)(BaseAddress+0x90))       // MMFLOAT sin(MMFLOAT)
 #define Vector_DrawCircle         (*(unsigned int *)(BaseAddress+0x94))       // DrawCircle(int x, int y, int radius, int w, int c, int fill, MMFLOAT aspect)
@@ -113,7 +113,7 @@
 #define PinSetBit(a,b)                  ((void(*)(int, int)) Vector_PinSetBit) (a,b)
 #define PinRead(a)                      ((int(*)(int)) Vector_PinRead) (a)
 #define MMPrintString(a)                ((void (*)(char*)) Vector_MMPrintString) (a)
-#define IntToStr(a,b,c)                 ((void (*)(char *, long long int, unsigned int)) Vector_IntToStr) (a,b,c)
+#define IntToStr(a,b,c)                 ((void (*)(char *, int64_t, unsigned int)) Vector_IntToStr) (a,b,c)
 #define CheckAbort()                    ((void (*)(void)) Vector_CheckAbort) ()
 #define GetMemory(a)                    ((void* (*)(int)) Vector_GetMemory) (a)
 #define GetTempMemory(a)                ((void* (*)(int)) Vector_GetTempMemory) (a)
@@ -158,8 +158,8 @@
 #define RoutineChecks()                 ((void (*)(void)) Vector_RoutineChecks) ()
 #define GetPageAddress(a)               ((int(*)(int)) Vector_GetPageAddress) (a)
 //#define memcpy(a,b,c)                   ((void (*)(void *, void *, int)) Vector_mycopysafe) (a,b,c)
-#define IntToFloat(a)                   ((MMFLOAT (*)(long long)) Vector_IntToFloat) (a)
-#define FloatToInt(a)                   ((long long (*)(MMFLOAT)) Vector_FloatToInt) (a)
+#define IntToFloat(a)                   ((MMFLOAT (*)(int64_t)) Vector_IntToFloat) (a)
+#define FloatToInt(a)                   ((int64_t (*)(MMFLOAT)) Vector_FloatToInt) (a)
 #define Option (*(struct option_s *)(unsigned int)Vector_Option)
 #define ReadPageAddress                 (*(unsigned int *) Vector_ReadPageAddress)
 #define WritePageAddress                (*(unsigned int *) Vector_WritePageAddress)
@@ -201,9 +201,9 @@ struct s_vartbl {                               // structure of the variable tab
   int __attribute__ ((aligned (4))) dims[MAXDIM];                     // the dimensions. it is an array if the first dimension is NOT zero
   union u_val{
       MMFLOAT f;                              // the value if it is a float
-      long long int i;                        // the value if it is an integer
+      int64_t i;                        // the value if it is an integer
       MMFLOAT *fa;                            // pointer to the allocated memory if it is an array of floats
-      long long int *ia;                      // pointer to the allocated memory if it is an array of integers
+      int64_t *ia;                      // pointer to the allocated memory if it is an array of integers
       char *s;                                // pointer to the allocated memory if it is a string
   }  __attribute__ ((aligned (8))) val;
 } __attribute__ ((aligned (8))) val;

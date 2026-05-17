@@ -4,22 +4,22 @@ PicoMite MMBasic
 * @file commands.c
 
 <COPYRIGHT HOLDERS>  @author Geoff Graham, Peter Mather
-Copyright (c) 2021, <COPYRIGHT HOLDERS> All rights reserved. 
-Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met: 
+Copyright (c) 2021, <COPYRIGHT HOLDERS> All rights reserved.
+Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
 1.	Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
 2.	Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer
     in the documentation and/or other materials provided with the distribution.
-3.	The name MMBasic be used when referring to the interpreter in any documentation and promotional material and the original copyright message be displayed 
+3.	The name MMBasic be used when referring to the interpreter in any documentation and promotional material and the original copyright message be displayed
     on the console at startup (additional copyright messages may be added).
-4.	All advertising materials mentioning features or use of this software must display the following acknowledgement: This product includes software developed 
+4.	All advertising materials mentioning features or use of this software must display the following acknowledgement: This product includes software developed
     by the <copyright holder>.
-5.	Neither the name of the <copyright holder> nor the names of its contributors may be used to endorse or promote products derived from this software 
+5.	Neither the name of the <copyright holder> nor the names of its contributors may be used to endorse or promote products derived from this software
     without specific prior written permission.
 THIS SOFTWARE IS PROVIDED BY <COPYRIGHT HOLDERS> AS IS AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
-OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL <COPYRIGHT HOLDERS> BE LIABLE FOR ANY DIRECT, 
-INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; 
-LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, 
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
+OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL <COPYRIGHT HOLDERS> BE LIABLE FOR ANY DIRECT,
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 ************************************************************************************************************************/
@@ -78,19 +78,19 @@ const uint8_t pinlist[]={ //this is a Basic program to print out the status of a
 };
 const uint8_t i2clist[]={ //this is a Basic program to print out the I2C devices connected to the SYSTEM I2C pins
   1, 132, 128, 105, 110, 116, 101, 103, 101, 114, 32, 95, 97, 100, 0,
-  1, 132, 128, 105, 110, 116, 101, 103, 101, 114, 32, 120, 95, 44, 121, 95, 0, 
-  1, 168, 128, 34, 32, 72, 69, 88, 32, 32, 48, 32, 32, 49, 32, 32, 50, 32, 32, 51, 32, 32, 52, 32, 32, 53, 32, 32, 54, 32, 32, 55, 32, 32, 
-  56, 32, 32, 57, 32, 32, 65, 32, 32, 66, 32, 32, 67, 32, 32, 68, 32, 32, 69, 32, 32, 70, 34, 0, 
-  1, 153, 128, 121, 95, 32, 144, 32, 48, 32, 204, 32, 55, 0, 
-  1, 168, 128, 34, 32, 34, 59, 32, 164, 121, 95, 44, 32, 49, 41, 59, 32, 34, 48, 58, 32, 34, 59, 0, 
-  1, 153, 128, 120, 95, 32, 144, 32, 48, 32, 204, 32, 49, 53, 0, 
-  1, 161, 128, 95, 97, 100, 32, 144, 32, 121, 95, 32, 133, 32, 49, 54, 32, 130, 32, 120, 95, 0, 
-  1, 158, 128, 241, 83, 89, 83, 84, 69, 77, 32, 73, 50, 67, 41, 144, 34, 73, 50, 67, 34, 32, 203, 32, 228, 128, 99, 104, 
-  101, 99, 107, 32, 95, 97, 100, 32, 199, 32, 229, 128, 32, 99, 104, 101, 99, 107, 32, 95, 97, 100, 0, 
-  1, 158, 128, 243, 68, 41, 32, 144, 32, 48, 32, 203, 0, 
-  1, 158, 128, 95, 97, 100, 32, 144, 32, 48, 32, 203, 32, 168, 128, 34, 45, 45, 32, 34, 59, 0, 
-  1, 158, 128, 95, 97, 100, 32, 143, 32, 48, 32, 203, 32, 168, 128, 164, 95, 97, 100, 44, 32, 50, 41, 59, 34, 32, 34, 59, 0, 
-  1, 139, 128, 0, 1, 168, 128, 34, 45, 45, 32, 34, 59, 0, 1, 143, 128, 0, 1, 166, 128, 120, 95, 0, 
+  1, 132, 128, 105, 110, 116, 101, 103, 101, 114, 32, 120, 95, 44, 121, 95, 0,
+  1, 168, 128, 34, 32, 72, 69, 88, 32, 32, 48, 32, 32, 49, 32, 32, 50, 32, 32, 51, 32, 32, 52, 32, 32, 53, 32, 32, 54, 32, 32, 55, 32, 32,
+  56, 32, 32, 57, 32, 32, 65, 32, 32, 66, 32, 32, 67, 32, 32, 68, 32, 32, 69, 32, 32, 70, 34, 0,
+  1, 153, 128, 121, 95, 32, 144, 32, 48, 32, 204, 32, 55, 0,
+  1, 168, 128, 34, 32, 34, 59, 32, 164, 121, 95, 44, 32, 49, 41, 59, 32, 34, 48, 58, 32, 34, 59, 0,
+  1, 153, 128, 120, 95, 32, 144, 32, 48, 32, 204, 32, 49, 53, 0,
+  1, 161, 128, 95, 97, 100, 32, 144, 32, 121, 95, 32, 133, 32, 49, 54, 32, 130, 32, 120, 95, 0,
+  1, 158, 128, 241, 83, 89, 83, 84, 69, 77, 32, 73, 50, 67, 41, 144, 34, 73, 50, 67, 34, 32, 203, 32, 228, 128, 99, 104,
+  101, 99, 107, 32, 95, 97, 100, 32, 199, 32, 229, 128, 32, 99, 104, 101, 99, 107, 32, 95, 97, 100, 0,
+  1, 158, 128, 243, 68, 41, 32, 144, 32, 48, 32, 203, 0,
+  1, 158, 128, 95, 97, 100, 32, 144, 32, 48, 32, 203, 32, 168, 128, 34, 45, 45, 32, 34, 59, 0,
+  1, 158, 128, 95, 97, 100, 32, 143, 32, 48, 32, 203, 32, 168, 128, 164, 95, 97, 100, 44, 32, 50, 41, 59, 34, 32, 34, 59, 0,
+  1, 139, 128, 0, 1, 168, 128, 34, 45, 45, 32, 34, 59, 0, 1, 143, 128, 0, 1, 166, 128, 120, 95, 0,
   1, 168, 128, 0, 1, 166, 128, 121, 95, 0, 1, 147, 128, 120, 95, 44, 121, 95, 0,
   1, 147, 128, 95, 97, 100, 0,0
  };
@@ -128,7 +128,7 @@ void MMB_HOT_FUNC(cmd_null)(void) {
 	// do nothing (this is just a placeholder for commands that have no action)
 }
 /** @endcond */
-/** 
+/**
  * This command increments an integer or a float or concatenates two strings
  * @param a the integer, float or string to be changed
  * @param b OPTIONAL for integers and floats - defaults to 1. Otherwise the amount to increment the number or the string to concatenate
@@ -144,7 +144,7 @@ void MIPS16 MMB_DISPATCH_FUNC(cmd_inc)(void){
         if(vtype & T_STR) error("Invalid variable");                // sanity check
 		if(vtype & T_NBR)
             (*(MMFLOAT *)p) = (*(MMFLOAT *)p) + 1.0;
-		else if(vtype & T_INT)*(long long int *)p = *(long long int *)p + 1;
+		else if(vtype & T_INT)*(int64_t *)p = *(int64_t *)p + 1;
 		else error("Syntax");
 	} else {
 		p = findvar(argv[0], V_FIND);
@@ -158,7 +158,7 @@ void MIPS16 MMB_DISPATCH_FUNC(cmd_inc)(void){
         } else if(vtype & T_NBR){
         	 (*(MMFLOAT *)p) = (*(MMFLOAT *)p)+getnumber(argv[2]);
         } else if(vtype & T_INT){
-        	*(long long int *)p = *(long long int *)p+getinteger(argv[2]);
+        	*(int64_t *)p = *(int64_t *)p+getinteger(argv[2]);
         } else error("syntax");
  	}
 }
@@ -167,7 +167,7 @@ void cmd_print(void) {
 	unsigned char *s, *p;
     unsigned char *ss;
 	MMFLOAT f;
-    long long int  i64;
+    int64_t  i64;
 	int i, t, fnbr;
 	int docrlf;														// this is used to suppress the cr/lf if needed
 
@@ -242,7 +242,7 @@ void cmd_print(void) {
 					MMfputs((unsigned char *)CtoM(inpbuf), fnbr);					// convert to a MMBasic string and output
 				} else if(t & T_STR) {
 					MMfputs((unsigned char *)s, fnbr);								// print if a string (s is a MMBasic string)
-				} else error("Attempt to print reserved word");	
+				} else error("Attempt to print reserved word");
 			}
 			docrlf = true;
 		}
@@ -256,7 +256,7 @@ void cmd_arrayset(void){
 }
 void array_set(unsigned char *tp){
     MMFLOAT f;
-    long long int i64;
+    int64_t i64;
     unsigned char *s;
 	int dims[MAXDIM]={0};
 	int i,t,copy,card1=1;
@@ -295,7 +295,7 @@ void cmd_add(void){
 
 void array_add(unsigned char *tp){
     MMFLOAT f;
-    long long int i64;
+    int64_t i64;
     unsigned char *s;
 	int dims[MAXDIM]={0};
 	int i,t,card1=1, card2=1;
@@ -504,7 +504,7 @@ void array_slice(unsigned char *tp){
 void  MIPS16 MMB_HOT_FUNC(cmd_let)(void) {
 	int t, size;
 	MMFLOAT f;
-    long long int  i64;
+    int64_t  i64;
 	unsigned char *s;
 	unsigned char *p1, *p2;
 
@@ -576,9 +576,9 @@ void  MIPS16 MMB_HOT_FUNC(cmd_let)(void) {
 		t = T_INT;
 		p1 = evaluate(p1, &f, &i64, &s, &t, false);
 		if(t & T_INT)
-            (*(long long int  *)p2) = i64;
+            (*(int64_t  *)p2) = i64;
         else
-            (*(long long int  *)p2) = FloatToInt64(f);
+            (*(int64_t  *)p2) = FloatToInt64(f);
 	}
 	checkend(p1);
 }
@@ -842,7 +842,7 @@ void MIPS16 cmd_list(void) {
 			}
 			dest[0]=ol;
 		}
-		
+
    	} else if((p = checkstring(cmdline, (unsigned char *)"PINS"))) {
 		/* rp2350a is unconditionally true on rp2040 targets and runtime-
 		 * detected on rp2350; only the rp2350 WEB pinlist actually
@@ -1125,7 +1125,7 @@ void cmd_help(void){
 						}
 					}
 				}
-			} 
+			}
 		}
 	FileClose(fnbr);
 	}
@@ -1188,7 +1188,7 @@ void MIPS16 cmd_erase(void) {
 		strcpy((char *)p, (char *)argv[i]);
 		if(*argv[i] & 0x80)error("You can't erase an in-built function");
         while(!isnamechar(p[strlen(p) - 1])) p[strlen(p) - 1] = 0;
-		makeupper((unsigned char *)p);  
+		makeupper((unsigned char *)p);
 		for(j = MAXVARS/2; j < MAXVARS; j++) {
             s = p;  x = (char *)g_vartbl[j].name; len = strlen(p);
             while(len > 0 && *s == *x) {                            // compare the variable to the name that we have
@@ -1405,7 +1405,7 @@ void MIPS16 MMB_DISPATCH_FUNC(cmd_else)(void) {
 	while(1) {
         p = GetNextCommand(p, NULL, (unsigned char *)"No matching ENDIF");
         CommandToken tkn=commandtbl_decode(p);
-		if(tkn == cmdIF) { 
+		if(tkn == cmdIF) {
 			// found a nested IF command, we now need to determine if it is a single or multiline IF
 			// search for a THEN, then check if only white space follows.  If so, it is multiline.
 			tp = p + sizeof(CommandToken);
@@ -1440,7 +1440,7 @@ if(Option.SerialConsole)while(ConsoleTxBufHead!=ConsoleTxBufTail)routinechecks()
 			} else {
 				unsigned char *cmd_args = (unsigned char *)"";
 				cmd_args = getCstring(argv[0]);
-				void *ptr = findvar((unsigned char *)"MM.ENDLINE$", T_STR| V_NOFIND_NULL);  
+				void *ptr = findvar((unsigned char *)"MM.ENDLINE$", T_STR| V_NOFIND_NULL);
 				if(ptr==NULL)ptr = findvar((unsigned char *)"MM.ENDLINE$", V_FIND |V_DIM_VAR);
 				strcpy(ptr, (char *)cmd_args ); // *** THW 16/4/23
 				CtoM(ptr);
@@ -1460,8 +1460,8 @@ if(Option.SerialConsole)while(ConsoleTxBufHead!=ConsoleTxBufTail)routinechecks()
 		TickInt[i]=NULL;
 		TickActive[i]=0;
 	}
-	InterruptUsed=0;       
-    InterruptReturn = NULL ; 
+	InterruptUsed=0;
+    InterruptReturn = NULL ;
     memset(inpbuf,0,STRINGSIZE);
 	CloseAudio(1);
 	CloseAllFiles();
@@ -1756,7 +1756,7 @@ void cmd_select(void) {
     unsigned char *p, *rp = NULL, *SaveCurrentLinePtr;
     void *v;
     MMFLOAT f = 0;
-    long long int  i64 = 0;
+    int64_t  i64 = 0;
     unsigned char s[STRINGSIZE];
 
     // these are the tokens that we will be searching for
@@ -1766,7 +1766,7 @@ void cmd_select(void) {
     v = DoExpression(cmdline, &type);                               // evaluate the select case value
     type = TypeMask(type);
     if(type & T_NBR) f = *(MMFLOAT *)v;
-    if(type & T_INT) i64 = *(long long int  *)v;
+    if(type & T_INT) i64 = *(int64_t  *)v;
     if(type & T_STR) Mstrcpy((unsigned char *)s, (unsigned char *)v);
 
     // now search through the program looking for a matching CASE statement
@@ -1782,7 +1782,7 @@ void cmd_select(void) {
         if(tkn == cmdCASE && i == 1) {
             int t;
             MMFLOAT ft, ftt;
-            long long int  i64t, i64tt;
+            int64_t  i64t, i64tt;
             unsigned char *st, *stt;
 
             CurrentLinePtr = rp;                                    // and report errors at the line we are on
@@ -1955,7 +1955,7 @@ void cmd_input(void) {
 			CtoM(tp);												// convert to a MMBasic string
 		} else
 		if(g_vartbl[g_VarIndex].type & T_INT) {
-    		*((long long int  *)tp) = strtoll((char *)s, (char **)&sp, 10);			// convert to an integer
+    		*((int64_t  *)tp) = strtoll((char *)s, (char **)&sp, 10);			// convert to an integer
 		}
 		else
 			*((MMFLOAT *)tp) = (MMFLOAT)atof((char *)s);
@@ -1985,10 +1985,10 @@ void MIPS16 cmd_trace(void) {
             	IntToStr((char *)inpbuf + 1, CountLines(TraceBuff[i]), 10);
             	strcat((char *)inpbuf, "]");
 			}else if(TraceBuff[i]){
-                strcpy((char *)inpbuf, "[Lib]");	
+                strcpy((char *)inpbuf, "[Lib]");
 			}else{
 			    inpbuf[0] = 0;
-			}	
+			}
             MMPrintString((char *)inpbuf);
             if(++i >= TRACE_BUFF_SIZE) i = 0;
         }
@@ -2064,7 +2064,7 @@ void MIPS16 MMB_DISPATCH_FUNC(cmd_for)(void) {
             else
                 g_forstack[g_forindex - 1].stepvalue.f = 1.0;				// default is +1
         } else {
-            *(long long int  *)vptr = getinteger(argv[2]);			// get the starting value for an integer and save
+            *(int64_t  *)vptr = getinteger(argv[2]);			// get the starting value for an integer and save
             g_forstack[g_forindex - 1].tovalue.i = getinteger(argv[4]);		// get the to value and save
             if(argc == 7)
                 g_forstack[g_forindex - 1].stepvalue.i = getinteger(argv[6]);// get the step value for an integer and save
@@ -2101,7 +2101,7 @@ void MIPS16 MMB_DISPATCH_FUNC(cmd_for)(void) {
 
         // test the loop value at the start
         if(g_forstack[g_forindex].vartype & T_INT)
-            test = (g_forstack[g_forindex].stepvalue.i >= 0 && *(long long int  *)vptr > g_forstack[g_forindex].tovalue.i) || (g_forstack[g_forindex].stepvalue.i < 0 && *(long long int  *)vptr < g_forstack[g_forindex].tovalue.i) ;
+            test = (g_forstack[g_forindex].stepvalue.i >= 0 && *(int64_t  *)vptr > g_forstack[g_forindex].tovalue.i) || (g_forstack[g_forindex].stepvalue.i < 0 && *(int64_t  *)vptr < g_forstack[g_forindex].tovalue.i) ;
         else
             test = (g_forstack[g_forindex].stepvalue.f >= 0 && *(MMFLOAT *)vptr > g_forstack[g_forindex].tovalue.f) || (g_forstack[g_forindex].stepvalue.f < 0 && *(MMFLOAT *)vptr < g_forstack[g_forindex].tovalue.f) ;
 
@@ -2157,8 +2157,8 @@ void MIPS16 MMB_DISPATCH_FUNC(cmd_next)(void) {
 	// found a match
 	// apply the STEP value to the variable and test against the TO value
     if(g_forstack[i].vartype & T_INT) {
-        *(long long int  *)g_forstack[i].var += g_forstack[i].stepvalue.i;
-	    test = (g_forstack[i].stepvalue.i >= 0 && *(long long int  *)g_forstack[i].var > g_forstack[i].tovalue.i) || (g_forstack[i].stepvalue.i < 0 && *(long long int  *)g_forstack[i].var < g_forstack[i].tovalue.i) ;
+        *(int64_t  *)g_forstack[i].var += g_forstack[i].stepvalue.i;
+	    test = (g_forstack[i].stepvalue.i >= 0 && *(int64_t  *)g_forstack[i].var > g_forstack[i].tovalue.i) || (g_forstack[i].stepvalue.i < 0 && *(int64_t  *)g_forstack[i].var < g_forstack[i].tovalue.i) ;
     } else {
         *(MMFLOAT *)g_forstack[i].var += g_forstack[i].stepvalue.f;
 	    test = (g_forstack[i].stepvalue.f >= 0 && *(MMFLOAT *)g_forstack[i].var > g_forstack[i].tovalue.f) || (g_forstack[i].stepvalue.f < 0 && *(MMFLOAT *)g_forstack[i].var < g_forstack[i].tovalue.f) ;
@@ -2334,7 +2334,7 @@ void cmd_exit(void) {
 	checkend(cmdline);
 	skipelement(nextstmt);
 }
- 
+
 
 
 /*void cmd_error(void) {
@@ -2505,7 +2505,7 @@ void cmd_flags(void) {
 	if(!*cmdline) error("Syntax");
 	g_flag=getinteger(++cmdline);
 }
-  
+
 void cmd_flag(void){
 	getargs(&cmdline,1,(unsigned char *)",");
 	uint64_t bit=(uint64_t)1<<(uint64_t)getint(argv[0],0,63);
@@ -2605,11 +2605,11 @@ void cmd_frame(void){
 		strcat(sp,";");
 		IntToStr(&sp[strlen(sp)],framex+1,10);
 		strcat(sp,"t");
-		SSPrintString(sp);	
+		SSPrintString(sp);
 		SSPrintString("\0337\033[2J\033[H");                            // vt100 clear screen and home cursor
 		ClearScreen(gui_bcolour);					//
 		return;
-	} 
+	}
 	if(!frame)error("Frame not created");
 	if((p=checkstring(cmdline,(unsigned char *)"CURSOR"))){
 		if(checkstring(p,(unsigned char *)"ON")){
@@ -3086,7 +3086,7 @@ search_again:
                 CtoM((unsigned char *)vtbl[vidx]);                                   // convert to a MMBasic string
             }
             else if(vtype[vidx] & T_INT)
-                *((long long int *)vtbl[vidx]) = getinteger(argv[NextData]); // much easier if integer variable
+                *((int64_t *)vtbl[vidx]) = getinteger(argv[NextData]); // much easier if integer variable
             else
                 *((MMFLOAT *)vtbl[vidx]) = getnumber(argv[NextData]);      // same for numeric variable
 
@@ -3325,7 +3325,7 @@ unsigned char *CheckIfTypeSpecified(unsigned char *p, int *type, int AllowDefaul
 
 unsigned char *SetValue(unsigned char *p, int t, void *v) {
     MMFLOAT f;
-    long long int  i64;
+    int64_t  i64;
     unsigned char *s;
     char TempCurrentSubFunName[MAXVARLEN + 1];
     strcpy(TempCurrentSubFunName, (char *)CurrentSubFunName);			    // save the current sub/fun name
@@ -3342,9 +3342,9 @@ unsigned char *SetValue(unsigned char *p, int t, void *v) {
 	} else {
 		p = evaluate(p, &f, &i64, &s, &t, false);
 		if(t & T_INT)
-            (*(long long int  *)v) = i64;
+            (*(int64_t  *)v) = i64;
         else
-            (*(long long int  *)v) = FloatToInt64(f);
+            (*(int64_t  *)v) = FloatToInt64(f);
 	}
 	strcpy((char *)CurrentSubFunName, TempCurrentSubFunName);			    // restore the current sub/fun name
     return p;
@@ -3461,7 +3461,7 @@ void MIPS16 cmd_dim(void) {
                                     int elem_size;
                                     if (member->type & T_STR)       elem_size = member->size + 1;
                                     else if (member->type & T_NBR)  elem_size = sizeof(MMFLOAT);
-                                    else if (member->type & T_INT)  elem_size = sizeof(long long int);
+                                    else if (member->type & T_INT)  elem_size = sizeof(int64_t);
                                     else                            error("Unsupported member type in initialisation");
 
                                     p = SetValue(p, member->type, member_ptr);
@@ -3488,7 +3488,7 @@ void MIPS16 cmd_dim(void) {
                             p = SetValue(p, type, v);
                             if(type & T_STR) v = (char *)v + g_vartbl[VIndexSave].size + 1;
                             if(type & T_NBR) v = (char *)v + sizeof(MMFLOAT);
-                            if(type & T_INT) v = (char *)v + sizeof(long long int);
+                            if(type & T_INT) v = (char *)v + sizeof(int64_t);
                             skipspace(p); j--;
                         } while(j > 0 && *p == ',');
                         if(*p != ')') error("Number of initialising values");
@@ -3546,7 +3546,7 @@ void  cmd_const(void) {
         if(TypeMask(g_vartbl[g_VarIndex].type) != TypeMask(type)) error("Invalid constant");
         else {
             if(type & T_NBR) g_vartbl[g_VarIndex].val.f = *(MMFLOAT *)v;           // and set its value
-            if(type & T_INT) g_vartbl[g_VarIndex].val.i = *(long long int  *)v;
+            if(type & T_INT) g_vartbl[g_VarIndex].val.i = *(int64_t  *)v;
             if(type & T_STR) {
 				if((unsigned char)*(unsigned char *)v<(MAXDIM-1)*sizeof(g_vartbl[g_VarIndex].dims[1])){
 					FreeMemorySafe((void **)&g_vartbl[g_VarIndex].val.s);
@@ -3628,7 +3628,7 @@ const char *ParseStructMember(unsigned char *p, struct s_structdef *sd) {
     unsigned char *tp;
     if ((tp = checkstring(p, (unsigned char *)"INTEGER")) != NULL ||
         (tp = checkstring(p, (unsigned char *)"INT")) != NULL) {
-        type = T_INT; size = sizeof(long long int); p = tp;
+        type = T_INT; size = sizeof(int64_t); p = tp;
     } else if ((tp = checkstring(p, (unsigned char *)"FLOAT")) != NULL) {
         type = T_NBR; size = sizeof(MMFLOAT); p = tp;
     } else if ((tp = checkstring(p, (unsigned char *)"STRING")) != NULL) {
@@ -3894,8 +3894,8 @@ void MIPS16 cmd_struct(void) {
                     int cmp = 0;
 
                     if (member_type & T_INT) {
-                        long long int a = *(long long int *)val_a;
-                        long long int b = *(long long int *)val_b;
+                        int64_t a = *(int64_t *)val_a;
+                        int64_t b = *(int64_t *)val_b;
                         cmp = (a < b) ? -1 : (a > b) ? 1 : 0;
                     } else if (member_type & T_NBR) {
                         MMFLOAT a = *(MMFLOAT *)val_a;
@@ -4034,8 +4034,8 @@ void MIPS16 cmd_struct(void) {
                         MMPrintString(buf);
 
                         if (nsm->type == T_INT) {
-                            long long int val = *(long long int *)nested_ptr;
-                            sprintf(buf, "%lld", val);
+                            int64_t val = *(int64_t *)nested_ptr;
+                            sprintf(buf, "%lld", (long long)val);
                             MMPrintString(buf);
                         } else if (nsm->type == T_NBR) {
                             MMFLOAT val = *(MMFLOAT *)nested_ptr;
@@ -4060,8 +4060,8 @@ void MIPS16 cmd_struct(void) {
                     MMPrintString(buf);
 
                     if (sm->type == T_INT) {
-                        long long int val = *(long long int *)member_ptr;
-                        sprintf(buf, "%lld", val);
+                        int64_t val = *(int64_t *)member_ptr;
+                        sprintf(buf, "%lld", (long long)val);
                         MMPrintString(buf);
                     } else if (sm->type == T_NBR) {
                         MMFLOAT val = *(MMFLOAT *)member_ptr;
@@ -4090,8 +4090,8 @@ void MIPS16 cmd_struct(void) {
                         if (ai > 0) MMPrintString(", ");
 
                         if (sm->type == T_INT) {
-                            long long int val = *(long long int *)arr_ptr;
-                            sprintf(buf, "%lld", val);
+                            int64_t val = *(int64_t *)arr_ptr;
+                            sprintf(buf, "%lld", (long long)val);
                             MMPrintString(buf);
                         } else if (sm->type == T_NBR) {
                             MMFLOAT val = *(MMFLOAT *)arr_ptr;
@@ -4296,10 +4296,10 @@ void MIPS16 cmd_struct(void) {
         }
 
         if (member_type == T_INT) {
-            long long int *dst = (long long int *)dst_base;
+            int64_t *dst = (int64_t *)dst_base;
             for (int i = 0; i < src_num_elements; i++) {
                 unsigned char *src_elem = src_base + (i * struct_size) + member_offset;
-                dst[i] = *(long long int *)src_elem;
+                dst[i] = *(int64_t *)src_elem;
             }
         } else if (member_type == T_NBR) {
             MMFLOAT *dst = (MMFLOAT *)dst_base;
@@ -4373,10 +4373,10 @@ void MIPS16 cmd_struct(void) {
             error("String length mismatch");
 
         if (member_type == T_INT) {
-            long long int *src = (long long int *)src_base;
+            int64_t *src = (int64_t *)src_base;
             for (int i = 0; i < dst_num_elements; i++) {
                 unsigned char *dst_elem = dst_base + (i * struct_size) + member_offset;
-                *(long long int *)dst_elem = src[i];
+                *(int64_t *)dst_elem = src[i];
             }
         } else if (member_type == T_NBR) {
             MMFLOAT *src = (MMFLOAT *)src_base;
@@ -4543,7 +4543,7 @@ void cmd_redim(void) {
                             num *= (dims[k] + 1 - g_OptionBase);
                     }
                     int elem_bytes;
-                    if      (type & T_INT) elem_bytes = sizeof(long long int);
+                    if      (type & T_INT) elem_bytes = sizeof(int64_t);
                     else if (type & T_NBR) elem_bytes = sizeof(MMFLOAT);
                     else                   elem_bytes = g_vartbl[g_VarIndex].size + 1;
                     oldsize = num * elem_bytes;
@@ -4705,7 +4705,7 @@ unsigned char  *llist(unsigned char *b, unsigned char *p) {
 							!strncasecmp((char *)&b[1],"LABEL",5)
 						) *b='.';
 						else if(b[1]=='(')*b='&';
-					} 
+					}
 						b += strlen((char *)b);                                 // update pointer to the end of the buffer
                     if(isalpha(*(b - 1))) *b++ = ' ';               // add a space to the end of the command name
                 }
@@ -4742,7 +4742,7 @@ unsigned char  *llist(unsigned char *b, unsigned char *p) {
 
 		// must be the end of a line - so return to the caller
         while(*(b-1) == ' ' && b > b_start) --b;                    // eat any spaces on the end of the line
-		*b = 0;	
+		*b = 0;
 		replaceAlpha((char *)b_start, overlaid_functions) ;  //replace the user version of all the MM. functions
 		STR_REPLACE((char *)b_start, "PEEK(INT8", "PEEK(BYTE",0);
 		return ++p;

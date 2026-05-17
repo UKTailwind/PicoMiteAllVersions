@@ -301,7 +301,7 @@ void ErrorThrow(int e, int type)
 }
 void ResetFlashStorage(int umount){
     int boot_count=0;
-    if(umount)lfs_unmount(&lfs); 
+    if(umount)lfs_unmount(&lfs);
     FSerror=lfs_format(&lfs, &pico_lfs_cfg);ErrorCheck(0);
     FSerror=lfs_mount(&lfs, &pico_lfs_cfg);	ErrorCheck(0);
     int fnbr = FindFreeFileNbr();
@@ -483,12 +483,12 @@ void MIPS16 cmd_flash(void)
         fileio_flash_write_begin();
         hal_flash_erase(j, RoundUpK4(fsize));
         fileio_flash_write_end();
-        while(!FileEOF(fnbr)) { 
+        while(!FileEOF(fnbr)) {
             memset(r,0,256) ;
             for(int i=0;i<256;i++) {
                 if(FileEOF(fnbr))break;
                 r[i] = FileGetChar(fnbr);
-            }  
+            }
             fileio_flash_write_begin();
             hal_flash_program(j, (uint8_t *)r, 256);
             fileio_flash_write_end();
@@ -783,7 +783,7 @@ void MIPS16 cmd_flash(void)
     else
         error("Syntax");
 }
-/* 
+/*
  * @cond
  * The following section will be excluded from the documentation.
  */
@@ -1227,7 +1227,7 @@ void MIPS16 cmd_rmdir(void)
     hal_path_with_drive(qd, sizeof(qd), q);
     ErrorCheckHAL(hal_fs_rmdir(qd));
 }
-/* 
+/*
  * @cond
  * The following section will be excluded from the documentation.
  */
@@ -1362,7 +1362,7 @@ void MIPS16 cmd_kill(void)
                 if(i=='N'){
                     PRet();
                     FatFSFileSystem=localsave;
-                    return;     
+                    return;
                 }
             }
             PRet();
@@ -1370,7 +1370,7 @@ void MIPS16 cmd_kill(void)
         if(fromfilesystem==0) FSerror=lfs_dir_open(&lfs, &lfs_dir, fromdir);
         else FSerror = hal_ff_findfirst(&djd, &fnod, fromdir, pp);
         ErrorCheck(0);
-        
+
 
         if(fromfilesystem){
             while (FSerror == FR_OK && fnod.fname[0])
@@ -1401,7 +1401,7 @@ void MIPS16 cmd_kill(void)
                         }
                 }
             FSerror = hal_ff_findnext(&djd, &fnod);
-            } 
+            }
         } else {
             while(1){
                 int found=0;
@@ -1457,7 +1457,7 @@ void MIPS16 cmd_kill(void)
         FatFSFileSystem=FatFSFileSystemSave;
     }
 }
-/* 
+/*
  * @cond
  * The following section will be excluded from the documentation.
  */
@@ -1564,7 +1564,7 @@ void MIPS16 cmd_save(void)
             255,255,0,0,
             255,255,255,0
         };
-        
+
 //        unsigned char bmppad[3] = {0, 0, 0};
         getargs(&p, 9, (unsigned char *)",");
         if (!InitSDCard())
@@ -1695,7 +1695,7 @@ void MIPS16 cmd_save(void)
 	            255,255,0,0,
 	            255,255,255,0
 	        };
-	        
+
 	        unsigned char bmppad[3] = {0, 0, 0};
 	        getargs(&p, 9, (unsigned char *)",");
 	        if (!InitSDCard())
@@ -1728,7 +1728,7 @@ void MIPS16 cmd_save(void)
 	        bmpfileheader[3] = (unsigned char)(filesize >> 8);
 	        bmpfileheader[4] = (unsigned char)(filesize >> 16);
 	        bmpfileheader[5] = (unsigned char)(filesize >> 24);
-	
+
 	        bmpinfoheader[4] = (unsigned char)(w);
 	        bmpinfoheader[5] = (unsigned char)(w >> 8);
 	        bmpinfoheader[6] = (unsigned char)(w >> 16);
@@ -1741,7 +1741,7 @@ void MIPS16 cmd_save(void)
 	        bmpinfoheader[21] = (unsigned char)((h*w/2) >> 8);
 	        bmpinfoheader[22] = (unsigned char)((h*w/2) >> 16);
 	        bmpinfoheader[23] = (unsigned char)((h*w/2) >> 24);
-	
+
 	        hal_write_checked(fnbr, bmpfileheader, 14);
 	        hal_write_checked(fnbr, bmpinfoheader, 40);
 	        hal_write_checked(fnbr, bmpcolourpallette, 64);
@@ -1859,7 +1859,7 @@ void MIPS16 cmd_save(void)
         FileClose(fnbr);
     }
 }
-/* 
+/*
  * @cond
  * The following section will be excluded from the documentation.
  */
@@ -2035,7 +2035,7 @@ void MIPS16 cmd_load(void)
     PromptFont=oldfont;
     cmd_load_post_cleanup();
 }
-/* 
+/*
  * @cond
  * The following section will be excluded from the documentation.
  */
@@ -2454,7 +2454,7 @@ void MIPS16 cmd_copy(void)
         tofile = getFstring(argv[2]);
         B2A(fromfile,tofile);
         return;
-    }        
+    }
     tp = checkstring(cmdline, (unsigned char *)"A2B");
     if(tp){
         getargs(&tp, 3, (unsigned char *)ss);
@@ -2482,7 +2482,7 @@ void MIPS16 cmd_copy(void)
         B2B(fromfile,tofile);
         return;
     }
-    
+
     getargs(&p, 3, (unsigned char *)ss);
     if (argc != 3) error("Syntax");
     fromfile = getFstring(argv[0]);
@@ -2499,7 +2499,7 @@ void MIPS16 cmd_copy(void)
         if(!(ExistsDir((char *)tofile, todir, &tofilesystem))){
             FatFSFileSystem=localsave;
             error("$ not a directory",tofile);
-        } 
+        }
         int waste=0, t=FatFSFileSystem+1;
         t = drivecheck((char *)getFstring(argv[0]),&waste);
         argv[0]+=waste;
@@ -2577,7 +2577,7 @@ void MIPS16 cmd_copy(void)
                     else if(fromfilesystem==0 && tofilesystem==1)A2B(in,out);
                 }
             FSerror = hal_ff_findnext(&djd, &fnod);
-            } 
+            }
         } else {
             while(1){
                 int found=0;
@@ -2633,8 +2633,8 @@ void MIPS16 cmd_copy(void)
         return;
     }
     FatFSFileSystem=FatFSFileSystemSave;
-} 
-/* 
+}
+/*
  * @cond
  * The following section will be excluded from the documentation.
  */
@@ -3168,7 +3168,7 @@ void MIPS16 cmd_files(void)
     cmd_files_restore_program_context();
     return;
 }
-/* 
+/*
  * @cond
  * The following section will be excluded from the documentation.
  */
@@ -3235,7 +3235,7 @@ int check_line_length(const char *text ,int *linein) {
             // Increase length for this segment of the line
             current_length++;
         }
-        
+
         ptr++;
     }
 
@@ -3458,7 +3458,7 @@ void cmd_autosave(void)
         }
 //    }
 }*/
-/* 
+/*
  * @cond
  * The following section will be excluded from the documentation.
  */
@@ -3768,7 +3768,7 @@ void cmd_close(void)
         }
     }
 }
-/* 
+/*
  * @cond
  * The following section will be excluded from the documentation.
  */
@@ -3904,8 +3904,8 @@ void FlashWriteInit(int region)
     else if (region == SAVED_VARS_FLASH)
         realflashpointer = (uint32_t)(FLASH_TARGET_OFFSET + FLASH_ERASE_SIZE);
     else if (region == LIBRARY_FLASH)
-        realflashpointer = (uint32_t)(PROGSTART - MAX_PROG_SIZE);  //i.e the last slot  
-    else 
+        realflashpointer = (uint32_t)(PROGSTART - MAX_PROG_SIZE);  //i.e the last slot
+    else
         realflashpointer = (uint32_t)PROGSTART - MAX_PROG_SIZE*(MAXFLASHSLOTS-region+1);
     fileio_flash_write_begin();
 }
@@ -4028,7 +4028,7 @@ void MIPS16 cmd_var(void)
                 if (type & T_NBR)
                     nbr2 *= sizeof(MMFLOAT);
                 if (type & T_INT)
-                    nbr2 *= sizeof(long long int);
+                    nbr2 *= sizeof(int64_t);
                 if (nbr2 != nbr)
                     error("Array size");
             }
@@ -4039,7 +4039,7 @@ void MIPS16 cmd_var(void)
                 if (type & T_NBR)
                     nbr = sizeof(MMFLOAT);
                 if (type & T_INT)
-                    nbr = sizeof(long long int);
+                    nbr = sizeof(int64_t);
             }
             while (nbr--)
                 *vdata++ = *bufp++; // copy the data
@@ -4100,7 +4100,7 @@ void MIPS16 cmd_var(void)
                 if (type & T_NBR)
                     nbr = sizeof(MMFLOAT);
                 if (type & T_INT)
-                    nbr = sizeof(long long int);
+                    nbr = sizeof(int64_t);
             }
             for (i = 0; i < argc; i += 2)
             {                                      // scan the argument list
@@ -4164,7 +4164,7 @@ void MIPS16 cmd_var(void)
             if (type & T_NBR)
                 nbr *= sizeof(MMFLOAT);
             if (type & T_INT)
-                nbr *= sizeof(long long int);
+                nbr *= sizeof(int64_t);
             if (realflashpointer - (FLASH_TARGET_OFFSET + FLASH_ERASE_SIZE) + 36 + nbr > SAVEDVARS_FLASH_SIZE)
             {
                 FlashWriteClose();
@@ -4189,7 +4189,7 @@ void MIPS16 cmd_var(void)
     }
     error("Unknown command");
 }
-/* 
+/*
  * @cond
  * The following section will be excluded from the documentation.
  */

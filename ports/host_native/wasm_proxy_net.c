@@ -44,14 +44,14 @@ static int next_listener_id = 1;
 static int next_server_conn_id = 1;
 static int next_udp_id = 1;
 
-static long long now_ms(void) {
+static int64_t now_ms(void) {
     struct timeval tv;
     gettimeofday(&tv, NULL);
-    return (long long)tv.tv_sec * 1000LL + (long long)tv.tv_usec / 1000LL;
+    return (int64_t)tv.tv_sec * 1000LL + (int64_t)tv.tv_usec / 1000LL;
 }
 
-static int remaining_ms(long long deadline) {
-    long long rem = deadline - now_ms();
+static int remaining_ms(int64_t deadline) {
+    int64_t rem = deadline - now_ms();
     if (rem <= 0) return 0;
     return rem > 60000 ? 60000 : (int)rem;
 }
@@ -61,7 +61,7 @@ static void set_error(char *error, size_t error_len, const char *msg) {
     snprintf(error, error_len, "%s", msg ? msg : "error");
 }
 
-static int wait_fd(int fd, int write_ready, long long deadline) {
+static int wait_fd(int fd, int write_ready, int64_t deadline) {
     int rem = remaining_ms(deadline);
     if (rem <= 0) return 0;
 
@@ -82,7 +82,7 @@ static int wait_fd(int fd, int write_ready, long long deadline) {
 }
 
 static int connect_with_timeout(const struct addrinfo *ai,
-                                long long deadline) {
+                                int64_t deadline) {
     int fd = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
     if (fd < 0) return -1;
 
@@ -177,7 +177,7 @@ static wasm_proxy_udp_socket_t *free_udp_slot(void) {
 }
 
 static int send_all(int fd, const uint8_t *data, size_t len,
-                    long long deadline, char *error, size_t error_len) {
+                    int64_t deadline, char *error, size_t error_len) {
     size_t pos = 0;
     while (pos < len) {
         ssize_t n = send(fd, data + pos, len - pos, 0);
@@ -231,7 +231,7 @@ static int read_initial_event(int fd, uint8_t *data, size_t cap,
         set_error(error, error_len, "bad request");
         return WASM_PROXY_TCP_BAD_REQUEST;
     }
-    long long deadline = now_ms() + (wait_ms > 0 ? wait_ms : 250);
+    int64_t deadline = now_ms() + (wait_ms > 0 ? wait_ms : 250);
     int waited = wait_fd(fd, 0, deadline);
     if (waited == 0) return WASM_PROXY_TCP_OK;
     if (waited < 0) {
@@ -304,7 +304,7 @@ int wasm_proxy_tcp_open(const char *host, int port, int timeout_ms,
         return WASM_PROXY_TCP_CONNECT_FAILED;
     }
 
-    long long deadline = now_ms() + timeout_ms;
+    int64_t deadline = now_ms() + timeout_ms;
     int fd = -1;
     for (const struct addrinfo *ai = res; ai; ai = ai->ai_next) {
         fd = connect_with_timeout(ai, deadline);
@@ -680,7 +680,7 @@ int wasm_proxy_udp_send(int id, const char *host, int port,
         fd = s->fd;
     }
 
-    long long deadline = now_ms() + timeout_ms;
+    int64_t deadline = now_ms() + timeout_ms;
     int rc = WASM_PROXY_UDP_IO_FAILED;
     for (const struct addrinfo *ai = res; ai; ai = ai->ai_next) {
         if (id <= 0) {

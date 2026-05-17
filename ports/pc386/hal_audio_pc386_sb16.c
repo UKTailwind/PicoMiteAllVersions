@@ -380,7 +380,7 @@ void hal_audio_init(void)
     sb_paused = 0;
 }
 
-void hal_audio_tone(double left_hz, double right_hz, int has_duration, long long duration_ms)
+void hal_audio_tone(double left_hz, double right_hz, int has_duration, int64_t duration_ms)
 {
     sb_config_from_options();
     if (!sb_probe()) error("Sound Blaster 16 not detected");

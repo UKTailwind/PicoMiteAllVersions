@@ -4,22 +4,22 @@ PicoMite MMBasic
 I2C.c
 
 <COPYRIGHT HOLDERS>  Geoff Graham, Peter Mather
-Copyright (c) 2021, <COPYRIGHT HOLDERS> All rights reserved. 
-Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met: 
+Copyright (c) 2021, <COPYRIGHT HOLDERS> All rights reserved.
+Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
 1.	Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
 2.	Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer
     in the documentation and/or other materials provided with the distribution.
-3.	The name MMBasic be used when referring to the interpreter in any documentation and promotional material and the original copyright message be displayed 
+3.	The name MMBasic be used when referring to the interpreter in any documentation and promotional material and the original copyright message be displayed
     on the console at startup (additional copyright messages may be added).
-4.	All advertising materials mentioning features or use of this software must display the following acknowledgement: This product includes software developed 
+4.	All advertising materials mentioning features or use of this software must display the following acknowledgement: This product includes software developed
     by the <copyright holder>.
-5.	Neither the name of the <copyright holder> nor the names of its contributors may be used to endorse or promote products derived from this software 
+5.	Neither the name of the <copyright holder> nor the names of its contributors may be used to endorse or promote products derived from this software
     without specific prior written permission.
 THIS SOFTWARE IS PROVIDED BY <COPYRIGHT HOLDERS> AS IS AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
-OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL <COPYRIGHT HOLDERS> BE LIABLE FOR ANY DIRECT, 
-INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; 
-LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, 
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
+OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL <COPYRIGHT HOLDERS> BE LIABLE FOR ANY DIRECT,
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ************************************************************************************************************************/
 /**
@@ -64,7 +64,7 @@ void i2c2_enable(int bps);
 void i2c2_masterCommand(int timer, unsigned char * buff);
 void i2c2Check(unsigned char * p);
 static MMFLOAT * I2C_Rcvbuf_Float; // pointer to the master receive buffer for a MMFLOAT
-static long long int * I2C_Rcvbuf_Int; // pointer to the master receive buffer for an integer
+static int64_t * I2C_Rcvbuf_Int; // pointer to the master receive buffer for an integer
 static char * I2C_Rcvbuf_String; // pointer to the master receive buffer for a string
 static unsigned int I2C_Addr; // I2C device address
 static volatile unsigned int I2C_Sendlen; // length of the master send buffer
@@ -76,7 +76,7 @@ volatile unsigned int I2C_Status; // status flags
 int mmI2Cvalue;
 // value of MM.I2C
 static MMFLOAT * I2C2_Rcvbuf_Float; // pointer to the master receive buffer for a MMFLOAT
-static long long int * I2C2_Rcvbuf_Int; // pointer to the master receive buffer for an integer
+static int64_t * I2C2_Rcvbuf_Int; // pointer to the master receive buffer for an integer
 static char * I2C2_Rcvbuf_String; // pointer to the master receive buffer for a string
 static unsigned int I2C2_Addr; // I2C device address
 static volatile unsigned int I2C2_Sendlen; // length of the master send buffer
@@ -256,29 +256,29 @@ void InitDisplayI2C(int InitOnly) {
   I2C_Send_Command(0x0); //no offset
 
   I2C_Send_Command(0x40); //STARTLINE
-  
+
   I2C_Send_Command(0x8D); //CHARGEPUMP
   I2C_Send_Command(0x14);
-  
+
   I2C_Send_Command(0x20); //MEMORYMODE
   I2C_Send_Command(0x00); //&H0 act like ks0108
-  
+
   I2C_Send_Command(0xA1); //SEGREMAP OR 1
   I2C_Send_Command(0xC8); //COMSCANDEC
-  
+
   I2C_Send_Command(0xDA); //COMPINS
   if (Option.DISPLAY_TYPE == SSD1306I2C) I2C_Send_Command(0x12);
   else if (Option.DISPLAY_TYPE == SSD1306I2C32) I2C_Send_Command(0x02);
-  
+
   I2C_Send_Command(0x81); //SETCONTRAST
   I2C_Send_Command(0xCF);
-  
+
   I2C_Send_Command(0xd9); //SETPRECHARGE
   I2C_Send_Command(0x22);
-  
+
   I2C_Send_Command(0xDB); //VCOMDETECT
   I2C_Send_Command(0x20);
-  
+
   I2C_Send_Command(0xA4); //DISPLAYALLON_RESUME
   I2C_Send_Command(0xA6); //NORMALDISPLAY
   I2C_Send_Command(0xAF); //DISPLAYON
@@ -378,7 +378,7 @@ void cmd_i2c2(void) {
   else
     error("Unknown command");
 }
-/* 
+/*
  * @cond
  * The following section will be excluded from the documentation.
  */
@@ -472,7 +472,7 @@ int DoRtcI2C(int addr, unsigned char * buff) {
 #if !HAL_PORT_KEYBOARD_USB_HOST
 void CheckI2CKeyboard(int noerror, int read) {
   uint16_t buff;
-  //	int readover=0; 
+  //	int readover=0;
   static int ctrlheld = 0;
   //	while(readover==0){
   if (I2C0locked) {
@@ -604,7 +604,7 @@ void RtcGetTime(int noerror) {
 // universal function to send/receive data to/from the RTC
 // addr is the I2C address WITHOUT the read/write bit
 char CvtToBCD(unsigned char * p, int min, int max) {
-  long long int t;
+  int64_t t;
   t = getint(p, min, max) % 100;
   return ((t / 10) << 4) | (t % 10);
 }
@@ -641,7 +641,7 @@ void MIPS16 cmd_rtc(void) {
         MMPrintString("\r\n");
       }
     }
-  
+
     return;
   }
   if ((p = checkstring(cmdline, (unsigned char * )
@@ -773,7 +773,7 @@ void MIPS16 cmd_rtc(void) {
       (MMFLOAT * ) ptr = buff[0];
     else
       *
-      (long long int * ) ptr = buff[0];
+      (int64_t * ) ptr = buff[0];
   } else if ((p = checkstring(cmdline, (unsigned char * )
       "SETREG")) != NULL) {
     getargs( & p, 3, (unsigned char * )
@@ -797,7 +797,7 @@ void MIPS16 cmd_rtc(void) {
     error("Unknown command");
 
 }
-/* 
+/*
  * @cond
  * The following section will be excluded from the documentation.
  */
@@ -887,11 +887,11 @@ void i2cSend(unsigned char * p) {
         }
       }
     } else if ((g_vartbl[g_VarIndex].type & T_INT) && g_vartbl[g_VarIndex].dims[0] > 0 && g_vartbl[g_VarIndex].dims[1] == 0) { // integer array
-      if ((((long long int * ) ptr - g_vartbl[g_VarIndex].val.ia) + sendlen) > (g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase)) {
+      if ((((int64_t * ) ptr - g_vartbl[g_VarIndex].val.ia) + sendlen) > (g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase)) {
         error("Insufficient data");
       } else {
         for (i = 0; i < sendlen; i++) {
-          I2C_Send_Buffer[i] = (int)( * ((long long int * ) ptr + i));
+          I2C_Send_Buffer[i] = (int)( * ((int64_t * ) ptr + i));
         }
       }
     } else error("Invalid variable");
@@ -942,11 +942,11 @@ void i2cSendSlave(unsigned char * p, int channel) {
         }
       }
     } else if ((g_vartbl[g_VarIndex].type & T_INT) && g_vartbl[g_VarIndex].dims[0] > 0 && g_vartbl[g_VarIndex].dims[1] == 0) { // integer array
-      if ((((long long int * ) ptr - g_vartbl[g_VarIndex].val.ia) + sendlen) > (g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase)) {
+      if ((((int64_t * ) ptr - g_vartbl[g_VarIndex].val.ia) + sendlen) > (g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase)) {
         error("Insufficient data");
       } else {
         for (i = 0; i < sendlen; i++) {
-          bbuff[i] = (int)( * ((long long int * ) ptr + i));
+          bbuff[i] = (int)( * ((int64_t * ) ptr + i));
         }
       }
     } else error("Invalid variable");
@@ -996,11 +996,11 @@ void i2c2Send(unsigned char * p) {
         }
       }
     } else if ((g_vartbl[g_VarIndex].type & T_INT) && g_vartbl[g_VarIndex].dims[0] > 0 && g_vartbl[g_VarIndex].dims[1] == 0) { // integer array
-      if ((((long long int * ) ptr - g_vartbl[g_VarIndex].val.ia) + sendlen) > (g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase)) {
+      if ((((int64_t * ) ptr - g_vartbl[g_VarIndex].val.ia) + sendlen) > (g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase)) {
         error("Insufficient data");
       } else {
         for (i = 0; i < sendlen; i++) {
-          I2C_Send_Buffer[i] = (int)( * ((long long int * ) ptr + i));
+          I2C_Send_Buffer[i] = (int)( * ((int64_t * ) ptr + i));
         }
       }
     } else error("Invalid variable");
@@ -1074,10 +1074,10 @@ void i2cReceive(unsigned char * p) {
     if (g_vartbl[g_VarIndex].dims[0] <= 0) { // Not an array
       if (rcvlen != 1) error("Invalid variable");
     } else { // An array
-      if ((((long long int * ) ptr - g_vartbl[g_VarIndex].val.ia) + rcvlen) > (g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase))
+      if ((((int64_t * ) ptr - g_vartbl[g_VarIndex].val.ia) + rcvlen) > (g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase))
         error("Insufficient space in array");
     }
-    I2C_Rcvbuf_Int = (long long int * ) ptr;
+    I2C_Rcvbuf_Int = (int64_t * ) ptr;
   } else if (g_vartbl[g_VarIndex].type & T_STR) {
     if (rcvlen < 1 || rcvlen > 255) error("Number out of bounds");
     if (g_vartbl[g_VarIndex].dims[0] != 0) error("Invalid variable");
@@ -1098,7 +1098,7 @@ void i2cReceiveSlave(unsigned char * p, int channel) {
   int rcvlen;
   void * ptr = NULL;
   MMFLOAT * rcvdlenFloat = NULL;
-  long long int * rcvdlenInt = NULL;
+  int64_t * rcvdlenInt = NULL;
   int count = 1;
   I2C_Rcvbuf_Float = NULL;
   I2C_Rcvbuf_Int = NULL;
@@ -1129,10 +1129,10 @@ void i2cReceiveSlave(unsigned char * p, int channel) {
     if (g_vartbl[g_VarIndex].dims[0] <= 0) { // Not an array
       if (rcvlen != 1) error("Invalid variable");
     } else { // An array
-      if ((((long long int * ) ptr - g_vartbl[g_VarIndex].val.ia) + rcvlen) > (g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase))
+      if ((((int64_t * ) ptr - g_vartbl[g_VarIndex].val.ia) + rcvlen) > (g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase))
         error("Insufficient space in array");
     }
-    I2C_Rcvbuf_Int = (long long int * ) ptr;
+    I2C_Rcvbuf_Int = (int64_t * ) ptr;
   } else if (g_vartbl[g_VarIndex].type & T_STR) {
     if (g_vartbl[g_VarIndex].dims[0] != 0) error("Invalid variable");
     *(char * ) ptr = rcvlen;
@@ -1141,7 +1141,7 @@ void i2cReceiveSlave(unsigned char * p, int channel) {
   ptr = findvar(argv[4], V_FIND);
   if (g_vartbl[g_VarIndex].type & T_CONST) error("Cannot change a constant");
   if (g_vartbl[g_VarIndex].type & T_NBR) rcvdlenFloat = (MMFLOAT * ) ptr;
-  else if (g_vartbl[g_VarIndex].type & T_INT) rcvdlenInt = (long long int * ) ptr;
+  else if (g_vartbl[g_VarIndex].type & T_INT) rcvdlenInt = (int64_t * ) ptr;
   else error("Invalid variable");
 
   unsigned char * bbuff;
@@ -1183,7 +1183,7 @@ void i2cReceiveSlave(unsigned char * p, int channel) {
     rcvdlenFloat = (MMFLOAT) count;
   else
     *
-    rcvdlenInt = (long long int) count;
+    rcvdlenInt = (int64_t) count;
 
   if (channel == 0) i2c0 -> hw -> intr_mask = I2C_IC_INTR_STAT_R_RX_FULL_BITS | I2C_IC_INTR_MASK_M_RD_REQ_BITS;
   else i2c1 -> hw -> intr_mask = I2C_IC_INTR_STAT_R_RX_FULL_BITS | I2C_IC_INTR_MASK_M_RD_REQ_BITS;
@@ -1223,10 +1223,10 @@ void i2c2Receive(unsigned char * p) {
     if (g_vartbl[g_VarIndex].dims[0] <= 0) { // Not an array
       if (rcvlen != 1) error("Invalid variable");
     } else { // An array
-      if ((((long long int * ) ptr - g_vartbl[g_VarIndex].val.ia) + rcvlen) > (g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase))
+      if ((((int64_t * ) ptr - g_vartbl[g_VarIndex].val.ia) + rcvlen) > (g_vartbl[g_VarIndex].dims[0] + 1 - g_OptionBase))
         error("Insufficient space in array");
     }
-    I2C2_Rcvbuf_Int = (long long int * ) ptr;
+    I2C2_Rcvbuf_Int = (int64_t * ) ptr;
   } else if (g_vartbl[g_VarIndex].type & T_STR) {
     if (rcvlen < 1 || rcvlen > 255) error("Number out of bounds");
     if (g_vartbl[g_VarIndex].dims[0] != 0) error("Invalid variable");
@@ -1374,7 +1374,7 @@ void fun_mmi2c(void) {
   iret = mmI2Cvalue;
   targ = T_INT;
 }
-/* 
+/*
  * @cond
  * The following section will be excluded from the documentation.
  */
@@ -1595,7 +1595,7 @@ void MIPS16 cmd_Classic(void) {
   } else error("Syntax");
 }
 
-/* 
+/*
  * @cond
  * The following section will be excluded from the documentation.
  */
@@ -2044,13 +2044,13 @@ void MIPS16 cmd_camera(void) {
     ov7670_set(REG_RGB444, 0);
     ov7670_set(REG_COM10, 0x02); // 0x02   VSYNC negative (http://nasulica.homelinux.org/?p=959)
     ov7670_set(REG_MVFP, 0x37);
-    // 		ov7670_set( REG_CLKRC, 0x40); 
+    // 		ov7670_set( REG_CLKRC, 0x40);
     ov7670_set(REG_COM11, 0x0A);
     ov7670_set(REG_COM7, COM7_RGB);
     ov7670_set(REG_COM1, 0);
     ov7670_set(REG_COM15, COM15_RGB565);
     ov7670_set(REG_COM9, 0x2A);
-    ov7670_set(REG_TSLB, 0x04); // 0D = UYVY  04 = YUYV 
+    ov7670_set(REG_TSLB, 0x04); // 0D = UYVY  04 = YUYV
     ov7670_set(REG_COM13, 0x88);
     ov7670_set(REG_HSTART, 0x13);
     ov7670_set(REG_HSTOP, 0x01);
@@ -2105,7 +2105,7 @@ void MIPS16 cmd_camera(void) {
     ov7670_set(0x88, 0xd7);
     ov7670_set(0x89, 0xe8);
     // AGC and AEC parameters. Note we start by disabling those features,
-    //then turn them only after tweaking the values. 
+    //then turn them only after tweaking the values.
     ov7670_set(0x13, COM8_FASTAEC | COM8_AECSTEP | COM8_BFILT);
     ov7670_set(0x00, 0);
     ov7670_set(0x10, 0);
@@ -2125,7 +2125,7 @@ void MIPS16 cmd_camera(void) {
     ov7670_set(0xa9, 0x90);
     ov7670_set(0xaa, 0x94);
     ov7670_set(0x13, COM8_FASTAEC | COM8_AECSTEP | COM8_BFILT | COM8_AGC | COM8_AEC);
-    // Almost all of these are magic "reserved" values. */ 
+    // Almost all of these are magic "reserved" values. */
     ov7670_set(0x0e, 0x61);
     ov7670_set(0x0f, 0x4b);
     ov7670_set(0x16, 0x02);
@@ -2138,11 +2138,11 @@ void MIPS16 cmd_camera(void) {
     ov7670_set(0x37, 0x1d);
     ov7670_set(0x38, 0x71);
     ov7670_set(0x39, 0x2a);
-    // 		ov7670_set(0x3c, 0x78); 
+    // 		ov7670_set(0x3c, 0x78);
     ov7670_set(0x4d, 0x40);
     ov7670_set(0x4e, 0x20);
     ov7670_set(0x69, 0);
-    // 		ov7670_set(0x6b, 0x0a); 
+    // 		ov7670_set(0x6b, 0x0a);
     ov7670_set(0x74, 0x10);
     ov7670_set(0x8d, 0x4f);
     ov7670_set(0x8e, 0);

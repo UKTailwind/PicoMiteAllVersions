@@ -23,7 +23,7 @@ extern "C" {
  * means play forever (until the next STOP / TONE). duration_ms == 0 is
  * treated as a no-op by both the device and us. */
 void host_sim_audio_tone(double left_hz, double right_hz,
-                         int has_duration, long long duration_ms);
+                         int has_duration, int64_t duration_ms);
 void host_sim_audio_stop(void);
 
 /* PLAY SOUND slot, ch, type [, freq, vol].

@@ -27,6 +27,18 @@ TARGETS=(
 root="$(cd "$(dirname "$0")" && pwd)"
 fail=0
 
+missing_tools=()
+for tool in cmake make; do
+    if ! command -v "$tool" >/dev/null 2>&1; then
+        missing_tools+=("$tool")
+    fi
+done
+if ((${#missing_tools[@]})); then
+    printf 'error: missing firmware build tool(s): %s\n' "${missing_tools[*]}" >&2
+    printf 'Install CMake, Make, the Pico SDK, and arm-none-eabi-gcc before running buildall.sh.\n' >&2
+    exit 127
+fi
+
 # HAL purity gate — runs first so source-level regressions fail fast before the
 # ~10-minute 12-target build loop burns cycles. Skip with SKIP_HAL_PURITY=1.
 if [ "${SKIP_HAL_PURITY:-0}" != "1" ]; then
@@ -61,7 +73,11 @@ for t in "${TARGETS[@]}"; do
 
     if ! (cd "$d" && cmake "$select_arg" -DPICOCALC="$picocalc_flag" "$root" > cmake.log 2>&1 && make -j8 > make.log 2>&1); then
         printf 'FAIL (%s)\n' "$t"
-        tail -30 "$d/make.log" || true
+        if [ -f "$d/make.log" ]; then
+            tail -30 "$d/make.log" || true
+        elif [ -f "$d/cmake.log" ]; then
+            tail -30 "$d/cmake.log" || true
+        fi
         fail=1
         break
     fi

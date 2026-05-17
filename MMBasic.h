@@ -1,4 +1,4 @@
-/* 
+/*
  * @cond
  * The following section will be excluded from the documentation.
  */
@@ -8,22 +8,22 @@ PicoMite MMBasic
 MMBasic.h
 
 <COPYRIGHT HOLDERS>  Geoff Graham, Peter Mather
-Copyright (c) 2021, <COPYRIGHT HOLDERS> All rights reserved. 
-Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met: 
+Copyright (c) 2021, <COPYRIGHT HOLDERS> All rights reserved.
+Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
 1.	Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
 2.	Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer
     in the documentation and/or other materials provided with the distribution.
-3.	The name MMBasic be used when referring to the interpreter in any documentation and promotional material and the original copyright message be displayed 
+3.	The name MMBasic be used when referring to the interpreter in any documentation and promotional material and the original copyright message be displayed
     on the console at startup (additional copyright messages may be added).
-4.	All advertising materials mentioning features or use of this software must display the following acknowledgement: This product includes software developed 
+4.	All advertising materials mentioning features or use of this software must display the following acknowledgement: This product includes software developed
     by the <copyright holder>.
-5.	Neither the name of the <copyright holder> nor the names of its contributors may be used to endorse or promote products derived from this software 
+5.	Neither the name of the <copyright holder> nor the names of its contributors may be used to endorse or promote products derived from this software
     without specific prior written permission.
 THIS SOFTWARE IS PROVIDED BY <COPYRIGHT HOLDERS> AS IS AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
-OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL <COPYRIGHT HOLDERS> BE LIABLE FOR ANY DIRECT, 
-INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; 
-LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, 
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
+OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL <COPYRIGHT HOLDERS> BE LIABLE FOR ANY DIRECT,
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ************************************************************************************************************************/
 #ifndef __MMBASIC_H
@@ -118,9 +118,9 @@ typedef struct s_vartbl {                               // structure of the vari
 #endif
     union u_val{
         MMFLOAT f;                              // the value if it is a float
-        long long int i;                        // the value if it is an integer
+        int64_t i;                        // the value if it is an integer
         MMFLOAT *fa;                            // pointer to the allocated memory if it is an array of floats
-        long long int *ia;                      // pointer to the allocated memory if it is an array of integers
+        int64_t *ia;                      // pointer to the allocated memory if it is an array of integers
         unsigned char *s;                                // pointer to the allocated memory if it is a string
     }  val;
 } vartbl_val;
@@ -261,7 +261,7 @@ extern unsigned char tknbuf[];                           // used to store the to
 extern unsigned char lastcmd[];                          // used to store the command history in case the user uses the up arrow at the command prompt
 
 extern MMFLOAT farg1, farg2, fret;                // Global floating point variables used by operators
-extern long long int  iarg1, iarg2, iret;        // Global integer variables used by operators
+extern int64_t  iarg1, iarg2, iret;        // Global integer variables used by operators
 extern unsigned char *sarg1, *sarg2, *sret;              // Global string pointers used by operators
 extern int targ;                                // Global type of argument (string or float) returned by an operator
 
@@ -300,7 +300,7 @@ extern void MMPrintString(char *s);
 void  error(char *msg, ...);
 void  InitBasic(void);
 int FloatToInt32(MMFLOAT);
-long long int  FloatToInt64(MMFLOAT x);
+int64_t  FloatToInt64(MMFLOAT x);
 void makeargs(unsigned char **tp, int maxargs, unsigned char *argbuf, unsigned char *argv[], int *argc, unsigned char *delim);
 void *findvar(unsigned char *, int);
 void erasearray(unsigned char *n);
@@ -311,12 +311,12 @@ void  ClearProgram(bool psram);
 void *DoExpression(unsigned char *p, int *t);
 unsigned char *GetNextCommand(unsigned char *p, unsigned char **CLine, unsigned char *EOFMsg) ;
 int CheckEmpty(char *p);
-unsigned char *evaluate(unsigned char *p, MMFLOAT *fa, long long int  *ia, unsigned char **sa, int *ta, int noerror);
-unsigned char *doexpr(unsigned char *p, MMFLOAT *fa, long long int  *ia, unsigned char **sa, int *oo, int *t);
-void DefinedSubFun(int iscmd, unsigned char *cmd, int index, MMFLOAT *fa, long long int  *i64, unsigned char **sa, int *t);
+unsigned char *evaluate(unsigned char *p, MMFLOAT *fa, int64_t  *ia, unsigned char **sa, int *ta, int noerror);
+unsigned char *doexpr(unsigned char *p, MMFLOAT *fa, int64_t  *ia, unsigned char **sa, int *oo, int *t);
+void DefinedSubFun(int iscmd, unsigned char *cmd, int index, MMFLOAT *fa, int64_t  *i64, unsigned char **sa, int *t);
 MMFLOAT getnumber(unsigned char *p);
-long long int  getinteger(unsigned char *p);
-long long int getint(unsigned char *p, long long int min, long long int max);
+int64_t  getinteger(unsigned char *p);
+int64_t getint(unsigned char *p, int64_t min, int64_t max);
 unsigned char *getstring(unsigned char *p);
 void  tokenise(int console);
 void ExecuteProgram(unsigned char *);
@@ -344,7 +344,7 @@ unsigned char *getFstring(unsigned char *p);
 int IsValidLine(int line);
 void InsertLastcmd(unsigned char *s);
 int  CountLines(unsigned char *target);
-extern jmp_buf ErrNext;   
+extern jmp_buf ErrNext;
 int FindSubFun(unsigned char *p, int type);
 void PrepareProgram(int ErrAbort);
 void MMfputs(unsigned char *p, int filenbr);
@@ -370,8 +370,8 @@ extern int NbrModules;                          // the number of library modules
 #if defined(__PIC32MX__)
 inline int str_equal(const unsigned char *s1, const unsigned char *s2);
 #else
-void IntToStrPad(char *p, long long int nbr, signed char padch, int maxch, int radix);
-void IntToStr(char *strr, long long int nbr, unsigned int base);
+void IntToStrPad(char *p, int64_t nbr, signed char padch, int maxch, int radix);
+void IntToStr(char *strr, int64_t nbr, unsigned int base);
 void FloatToStr(char *p, MMFLOAT f, int m, int n, unsigned char ch);
 int str_equal(const unsigned char *s1, const unsigned char *s2);
 #endif

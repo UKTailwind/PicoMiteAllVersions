@@ -40,7 +40,7 @@
 #endif
 
 void host_sim_audio_tone(double left_hz, double right_hz,
-                         int has_duration, long long duration_ms) {
+                         int has_duration, int64_t duration_ms) {
     MAIN_THREAD_ASYNC_EM_ASM({
         if (typeof window !== 'undefined' && window.picomiteAudio) {
             window.picomiteAudio.tone($0, $1, $2 ? $3 : -1);
@@ -115,7 +115,7 @@ void host_sim_audio_free_drain(char **msgs, int count) {
 
 #else  /* !MMBASIC_WASM — shouldn't be linked, but stub so the TU still builds. */
 
-void host_sim_audio_tone(double l, double r, int h, long long m) {
+void host_sim_audio_tone(double l, double r, int h, int64_t m) {
     (void)l; (void)r; (void)h; (void)m;
 }
 void host_sim_audio_stop(void) {}

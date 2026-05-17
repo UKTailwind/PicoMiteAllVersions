@@ -85,13 +85,13 @@ bool optionlogging = 0;
 
 /* Sensor / timer globals — feature areas not wired in stdio scope. */
 volatile unsigned int AHRSTimer = 0;
-long long int *ds18b20Timers = NULL;
+int64_t *ds18b20Timers = NULL;
 int last_adc = 0;
 volatile int day_of_week = 0;
 volatile unsigned int diskchecktimer = 0;
 volatile unsigned int SecondsTimer = 0;
 volatile unsigned int WDTimer = 0;
-volatile long long int mSecTimer = 0;
+volatile int64_t mSecTimer = 0;
 
 /* MMBasic interpreter abort flag. Set to 1 by Ctrl-C handlers; checked
  * by routinechecks / CheckAbort and the prompt loop's setjmp landing. */

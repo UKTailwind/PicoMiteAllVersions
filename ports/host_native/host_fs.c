@@ -80,7 +80,7 @@ int host_fs_walk_next(host_fs_walker_t *w,
                       char *name_out, int name_cap,
                       int *is_dir_out,
                       unsigned long long *size_out,
-                      long long *mtime_epoch_out) {
+                      int64_t *mtime_epoch_out) {
     if (!w || !w->d) return 0;
     struct dirent *de;
     char path[4096];
@@ -95,7 +95,7 @@ int host_fs_walk_next(host_fs_walker_t *w,
         }
         if (is_dir_out) *is_dir_out = S_ISDIR(st.st_mode) ? 1 : 0;
         if (size_out) *size_out = (unsigned long long)st.st_size;
-        if (mtime_epoch_out) *mtime_epoch_out = (long long)st.st_mtime;
+        if (mtime_epoch_out) *mtime_epoch_out = (int64_t)st.st_mtime;
         return 1;
     }
     return 0;

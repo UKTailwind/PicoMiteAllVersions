@@ -4,22 +4,22 @@ PicoMite MMBasic
 External.c
 
 <COPYRIGHT HOLDERS>  Geoff Graham, Peter Mather
-Copyright (c) 2021, <COPYRIGHT HOLDERS> All rights reserved. 
-Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met: 
+Copyright (c) 2021, <COPYRIGHT HOLDERS> All rights reserved.
+Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
 1.	Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
 2.	Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer
     in the documentation and/or other materials provided with the distribution.
-3.	The name MMBasic be used when referring to the interpreter in any documentation and promotional material and the original copyright message be displayed 
+3.	The name MMBasic be used when referring to the interpreter in any documentation and promotional material and the original copyright message be displayed
     on the console at startup (additional copyright messages may be added).
-4.	All advertising materials mentioning features or use of this software must display the following acknowledgement: This product includes software developed 
+4.	All advertising materials mentioning features or use of this software must display the following acknowledgement: This product includes software developed
     by the <copyright holder>.
-5.	Neither the name of the <copyright holder> nor the names of its contributors may be used to endorse or promote products derived from this software 
+5.	Neither the name of the <copyright holder> nor the names of its contributors may be used to endorse or promote products derived from this software
     without specific prior written permission.
 THIS SOFTWARE IS PROVIDED BY <COPYRIGHT HOLDERS> AS IS AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
-OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL <COPYRIGHT HOLDERS> BE LIABLE FOR ANY DIRECT, 
-INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; 
-LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, 
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
+OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL <COPYRIGHT HOLDERS> BE LIABLE FOR ANY DIRECT,
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ************************************************************************************************************************/#include "MMBasic_Includes.h"
 /**
@@ -27,7 +27,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 * @author Geoff Graham, Peter Mather
 * @brief Source for I/O MMBasic commands and functions
 */
-/* 
+/*
  * @cond
  * The following section will be excluded from the documentation.
  */
@@ -70,7 +70,7 @@ extern void SetBacklightSSD1963(int intensity);
 extern MMFLOAT FDiv(MMFLOAT a, MMFLOAT b);
 extern MMFLOAT FMul(MMFLOAT a, MMFLOAT b);
 extern MMFLOAT FSub(MMFLOAT a, MMFLOAT b);
-const char *PinFunction[] = {	
+const char *PinFunction[] = {
         "OFF",
 		"AIN",
 		"DIN",
@@ -206,9 +206,9 @@ uint32_t ADC_dma_chan=ADC_DMA;
 uint32_t ADC_dma_chan2=ADC_DMA2;
 short *ADCbuffer=NULL;
 void PWMoff(int slice);
-volatile uint8_t *adcint=NULL; 
-uint8_t *adcint1=NULL; 
-uint8_t *adcint2=NULL; 
+volatile uint8_t *adcint=NULL;
+uint8_t *adcint1=NULL;
+uint8_t *adcint2=NULL;
 MMFLOAT ADCscale[4], ADCbottom[4];
 extern void mouse0close(void);
 //Vector to CFunction routine called every command (ie, from the BASIC interrupt checker)
@@ -238,7 +238,7 @@ int codecheck(unsigned char *line){
 			return 0;
 		}
 		line++;
-		
+
 		if(!(isdigit(*line))) return 2;
 		line++;
 		if(isnamechar(*line)) return 3;
@@ -401,7 +401,7 @@ void cmd_pin(void) {
 	value = getinteger(cmdline);
 	ExtSet(pin, value);
 }
-/* 
+/*
  * @cond
  * The following section will be excluded from the documentation.
  */
@@ -483,7 +483,7 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
         slice0=0;
         hal_fast_timer_disable();
     }
- 
+
 
     // make sure any pullups/pulldowns are removed in case we are changing from a digital input
     hal_pin_set_pulls(PinDef[pin].GPno, HAL_PIN_PULL_NONE);
@@ -494,12 +494,12 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
         if(inttbl[i].pin == pin)
             inttbl[i].pin = 0;                                      // start off by disable a software interrupt (if set) on this pin
     hal_pin_set_input_enabled(PinDef[pin].GPno, false);
-    hal_pin_deinit(PinDef[pin].GPno); 
+    hal_pin_deinit(PinDef[pin].GPno);
     hal_pin_set_input_hysteresis(PinDef[pin].GPno, true);
-    if(cfg!=EXT_NOT_CONFIG)hal_pin_init_digital(PinDef[pin].GPno); 
+    if(cfg!=EXT_NOT_CONFIG)hal_pin_init_digital(PinDef[pin].GPno);
     switch(cfg) {
         case EXT_NOT_CONFIG:    tris = 1; ana = 1;
-//                                hal_pin_init_digital(PinDef[pin].GPno); 
+//                                hal_pin_init_digital(PinDef[pin].GPno);
 //		                        hal_pin_set_input_hysteresis(PinDef[pin].GPno, true);
                                 hal_pin_set_input_enabled(PinDef[pin].GPno, false);
                                 hal_pin_deinit(PinDef[pin].GPno);
@@ -635,7 +635,7 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
                                 if(pin> 44 && rp2350a) error("Invalid configuration");
                                 tris = 1; ana = 0;
                                 break;
-        case EXT_CNT_IN:        
+        case EXT_CNT_IN:
         case EXT_FREQ_IN:   // same as counting, so fall through
         case EXT_PER_IN:        // same as counting, so fall through
                                     edge = GPIO_IRQ_EDGE_RISE;
@@ -673,7 +673,7 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
                                     }
                                     INT2Count = INT2Value = 0;
                                     INT2Timer = INT2InitTimer = option;  // only used for frequency and period measurement
-                                    tris = 1; ana = 1; 
+                                    tris = 1; ana = 1;
 		                            hal_pin_set_input_hysteresis(PinDef[pin].GPno, true);
                                     break;
                                 }
@@ -689,7 +689,7 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
                                     }
                                     INT3Count = INT3Value = 0;
                                     INT3Timer = INT3InitTimer = option;  // only used for frequency and period measurement
-                                    tris = 1; ana = 1; 
+                                    tris = 1; ana = 1;
 		                            hal_pin_set_input_hysteresis(PinDef[pin].GPno, true);
                                     break;
                                 }
@@ -705,7 +705,7 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
                                     }
                                     INT4Count = INT4Value = 0;
                                     INT4Timer = INT4InitTimer = option;  // only used for frequency and period measurement
-                                    tris = 1; ana = 1; 
+                                    tris = 1; ana = 1;
 		                            hal_pin_set_input_hysteresis(PinDef[pin].GPno, true);
                                     break;
                                 }
@@ -717,7 +717,7 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
         case EXT_INT_BOTH:                                            // same as digital input, so fall through
         case EXT_DIG_IN:        if(!(PinDef[pin].mode & DIGITAL_IN)) error("Invalid configuration");
                                 if(option) PinSetBit(pin, option);
-                                tris = 1; ana = 1; 
+                                tris = 1; ana = 1;
 		                        hal_pin_set_input_hysteresis(PinDef[pin].GPno, true);
                                 break;
 
@@ -725,7 +725,7 @@ void MIPS16 ExtCfg(int pin, int cfg, int option) {
         case EXT_PIO1_OUT:
         case EXT_PIO2_OUT:
         case EXT_DIG_OUT:       if(!(PinDef[pin].mode & DIGITAL_OUT)) error("Invalid configuration");
-                                tris = 0; ana = 1; 
+                                tris = 0; ana = 1;
                                 hal_pin_set_drive_mA(PinDef[pin].GPno, 8);
                                 break;
         case EXT_HEARTBEAT:     hal_heartbeat_assert_supported();
@@ -963,12 +963,12 @@ int64_t PORT_RAM_FUNC(ExtInp)(int pin) {
             last_adc=pin;
             adc_select_input(PinDef[pin].ADCpin);
         }
-        int a= adc_read();   
+        int a= adc_read();
         if(adc_hw->cs & (ADC_CS_ERR_STICKY_BITS | ADC_CS_ERR_BITS)) {
             hw_set_bits(&adc_hw->cs, ADC_CS_ERR_STICKY_BITS);
             a=-1;
         }
-        return a;      
+        return a;
     } else if(ExtCurrentConfig[pin] == EXT_FREQ_IN || ExtCurrentConfig[pin] == EXT_PER_IN) {
       // select input channel
         if(pin == Option.INT1pin) return INT1Value;
@@ -1114,7 +1114,7 @@ void MIPS16 cmd_setpin(void) {
         else error("Invalid configuration");
     }
     if(value!=-1)goto process;
-    if(argc<5)error("Syntax"); 
+    if(argc<5)error("Syntax");
     if(checkstring(argv[4],(unsigned char *)"COM1")){
         if(!(code=codecheck(argv[2])))argv[2]+=2;
         pin2 = getinteger(argv[2]);
@@ -1159,9 +1159,9 @@ void MIPS16 cmd_setpin(void) {
         else if(PinDef[pin2].mode & I2C1SDA)value2 = EXT_I2C1SDA;
         else error("Invalid configuration");
         if(value==value2)error("Invalid configuration");
-    }  
+    }
     if(value!=-1)goto process;
-    if(argc<7)error("Syntax"); 
+    if(argc<7)error("Syntax");
     if(checkstring(argv[6],(unsigned char *)"SPI")){
         if(!(code=codecheck(argv[2])))argv[2]+=2;
         pin2 = getinteger(argv[2]);
@@ -1264,7 +1264,7 @@ process:
                                 option = 1000;
                             break;
         case EXT_DIG_OUT:
-        case EXT_HEARTBEAT:   
+        case EXT_HEARTBEAT:
                             option=0;
         default:            if(argc > 3 && !value2) error("Unexpected text");
     }
@@ -1280,7 +1280,7 @@ process:
         }
         else
             error("Pin %/| is reserved on startup", pin,pin);
-    } 
+    }
 
     CheckPin(pin, CP_IGNORE_INUSE);
     ExtCfg(pin, value, option);
@@ -1311,7 +1311,7 @@ process:
 		InterruptUsed = true;
 	}
 }
-/* 
+/*
  * @cond
  * The following section will be excluded from the documentation.
  */
@@ -1392,10 +1392,10 @@ void fun_pin(void) {
                             return;
         case EXT_ADCRAW:
                             if(ADCDualBuffering || dmarunning)error("ADC in use");
-                            iret=ExtInp(pin); 
+                            iret=ExtInp(pin);
                             targ=T_INT;
-                            return;  
-        case EXT_ANA_IN:    
+                            return;
+        case EXT_ANA_IN:
                             if(ADCDualBuffering || dmarunning)error("ADC in use");
                             for(i = 0; i < ANA_AVERAGE; i++) {
                                 b[i] = ExtInp(pin);                 // get the value
@@ -1420,7 +1420,7 @@ void fun_pin(void) {
         default:            error("Pin %/| is not an input",pin,pin);
     }
 }
-/* 
+/*
  * @cond
  * The following section will be excluded from the documentation.
  */
@@ -1493,7 +1493,7 @@ void cmd_port(void) {
             nbr--;
             pincode++;
         }
-    } 
+    }
     readmask=hal_pin_bank_read_out_latch();
     readmask &=mask;
     hal_pin_bank_xor_mask(setmask ^ readmask);
@@ -1714,7 +1714,7 @@ void cmd_ir(void) {
     }
 }
 
-/* 
+/*
  * @cond
  * The following section will be excluded from the documentation.
  */
@@ -2151,7 +2151,7 @@ void MIPS16 cmd_pwm(void){
         if((count10<0.0 || count10>100.0) && count10!=-1.0)error("Syntax");}
         if(argc==23 && *argv[22]){count11=getnumber(argv[22]);
         if((count11<0.0 || count11>100.0) && count11!=-1.0)error("Syntax");}
-        
+
         int enabled=0;
         if(slice0 || Option.AUDIO_SLICE ==0 || BacklightSlice==0 || CameraSlice==0
             || KeyboardlightSlice==0
@@ -2365,7 +2365,7 @@ void MIPS16 cmd_pwm(void){
 /****************************************************************************************************************************
  The KEYPAD command
 *****************************************************************************************************************************/
-/* 
+/*
  * @cond
  * The following section will be excluded from the documentation.
  */
@@ -2463,7 +2463,7 @@ void cmd_keypad(void) {
     }
 }
 
-/* 
+/*
  * @cond
  * The following section will be excluded from the documentation.
  */
@@ -2491,10 +2491,10 @@ int KeypadCheck(void) {
      * fallback declaration is needed here. */
     if(count++ % 64) return false;                                  // only check every 64 loops through the interrupt processor
 
-    for(cols = keypadrows; cols < keypadrows+keypadcols; cols++) {   
+    for(cols = keypadrows; cols < keypadrows+keypadcols; cols++) {
        if(keypad_pins[cols]) {                                        // we might just have 3 pull down pins
             PinSetBit(keypad_pins[cols], ODCCLR);                      // pull it low
-            for(rows = 0; rows < keypadrows; rows++) {   
+            for(rows = 0; rows < keypadrows; rows++) {
                 if(PinRead((unsigned char)keypad_pins[rows]) == 0) {                  // if it is low we have found a keypress
                     if(keydown) goto exitcheck;                     // we have already reported this, so just exit
                     uSec(40 * 1000);                                // wait 40mS and check again
@@ -2610,7 +2610,7 @@ void cmd_lcd(void)
         }
     }
 }
-/* 
+/*
  * @cond
  * The following section will be excluded from the documentation.
  */
@@ -2639,7 +2639,7 @@ void LcdPinSet(int pin, int val) {
 }
 int64_t DHmem(int pin){
     int timeout = 400;
-    long long int r;
+    int64_t r;
     int i;
     writeusclock(0);
     PinSetBit(pin, CNPUSET);
@@ -2671,9 +2671,9 @@ void cmd_DHT22(void) {
      int pin;
     union colourmap {
     unsigned char dhtbytes[8];
-    long long int r;
+    int64_t r;
     } dht;
-//    long long int r;
+//    int64_t r;
     int dht11=0;
     MMFLOAT *temp, *humid;
 
@@ -2698,13 +2698,13 @@ void cmd_DHT22(void) {
     	dht11=getint(argv[6],0,1);
     }
     ExtCfg(pin, EXT_DIG_OUT, 0);
-    
+
     // pulse the pin low for 1.5mS
     uSec(1500+dht11*18000);
     // we have all 40 bits
     // first validate against the checksum
     if((dht.r=DHmem(pin))==-1) goto error_exit;
-    if((uint8_t)(dht.dhtbytes[4]+dht.dhtbytes[3]+dht.dhtbytes[2]+dht.dhtbytes[1])!=dht.dhtbytes[0])goto error_exit; 
+    if((uint8_t)(dht.dhtbytes[4]+dht.dhtbytes[3]+dht.dhtbytes[2]+dht.dhtbytes[1])!=dht.dhtbytes[0])goto error_exit;
 //    if( ( (uint8_t)( ((r >> 8) & 0xff) + ((r >> 16) & 0xff) + ((r >> 24) & 0xff) + ((r >> 32) & 0xff) ) & 0xff) != (r & 0xff)) goto error_exit;                                           // returning temperature
     if(dht11==0){
 		*temp = (MMFLOAT)((dht.r >> 8) &0x7fff) / 10.0;                       // get the temperature
@@ -2889,7 +2889,7 @@ void __not_in_flash_func(serialtx)(int gppin, unsigned char *string, int bittime
         systick_hw->cvr=0;
         hal_pin_bank_clr_mask(gppin);                                    // send the start bit
         mask=1;
-        while(systick_hw->cvr>bittime){}; 
+        while(systick_hw->cvr>bittime){};
         systick_hw->cvr=0;
         for (mask=1;mask<0x100; mask<<=1) {
             if(string[count] & mask) {                               // check the bit to send
@@ -2897,11 +2897,11 @@ void __not_in_flash_func(serialtx)(int gppin, unsigned char *string, int bittime
             } else {
                 hal_pin_bank_clr_mask(gppin);                                    // send the start bit
             }
-            while(systick_hw->cvr>bittime){}; 
+            while(systick_hw->cvr>bittime){};
             systick_hw->cvr=0;
         }
         hal_pin_bank_set_mask(gppin);                                    // send the start bit
-        while(systick_hw->cvr>bittime){}; 
+        while(systick_hw->cvr>bittime){};
     }
 }
 unsigned short FloatToUint32(MMFLOAT x) {
@@ -2916,16 +2916,16 @@ int __not_in_flash_func(serialrx)(int gppin, unsigned char *string, int timeout,
             if(readusclock() >= timeout) return -1;                   // return if there is a timeout
         }
         systick_hw->cvr=0;
-        while(systick_hw->cvr>half){}; 
+        while(systick_hw->cvr>half){};
         systick_hw->cvr=0;
         if(hal_pin_bank_read_all() & gppin) continue;                         // go around again if not low
         c=0;
         for(i = 0; i < 8; i++) {
-            while(systick_hw->cvr>bittime){}; 
+            while(systick_hw->cvr>bittime){};
             systick_hw->cvr=0;
             c |= (((hal_pin_bank_read_all() & gppin) ? 1 : 0) << i);                      // and add this bit in
         }
-        while(systick_hw->cvr>bittime){}; 
+        while(systick_hw->cvr>bittime){};
         if(!(hal_pin_bank_read_all() & gppin)) continue;                      // a framing error if not high
         count++;
         string[count] = c;                                          // save the character
@@ -3103,7 +3103,7 @@ void cmd_device(void){
 	}
     error("Syntax");
 }
-/* 
+/*
  * @cond
  * The following section will be excluded from the documentation.
  */
@@ -3233,13 +3233,13 @@ void cmd_adc(void){
         channel_config_set_read_increment(&c2, false); //Set control channel read increment to false
         channel_config_set_write_increment(&c2, false); //Set control channel write increment to false
         channel_config_set_dreq(&c2, 0x3F);
-//                                channel_config_set_chain_to(&c2, dma_tx_chan); 
+//                                channel_config_set_chain_to(&c2, dma_tx_chan);
         dma_channel_configure(ADC_dma_chan2,
                 &c2,
                 &dma_hw->ch[ADC_dma_chan].al2_write_addr_trig,
                 &adcint,
                 1,
-                false); //Configure control channel  
+                false); //Configure control channel
 	    dma_channel_set_irq1_enabled(ADC_dma_chan, true);
 
 	// set DMA IRQ handler
@@ -3411,7 +3411,7 @@ void SetADCFreq(float frequency){
     adc_set_clkdiv(div);
 }
 
-/* 
+/*
  * @cond
  * The following section will be excluded from the documentation.
  */
@@ -3467,10 +3467,10 @@ void MIPS16 ClearExternalIO(void) {
         }
     }
     memset(lcd_pins,0,sizeof(lcd_pins));
-    SerialClose(1); 
+    SerialClose(1);
     SerialClose(2);                                 // same for serial ports
-    if(!I2C0locked)i2c_disable();   
-    if(!I2C1locked)i2c2_disable();   
+    if(!I2C0locked)i2c_disable();
+    if(!I2C1locked)i2c2_disable();
     sprite_transparent=0;
     SPIClose();
     SPI2Close();
@@ -3567,7 +3567,7 @@ void MIPS16 ClearExternalIO(void) {
     }
     if(!I2C1locked){
         I2C1SDApin=99;
-        I2C1SCLpin=99;	
+        I2C1SCLpin=99;
     }
     /* ADC close: same rp2350a split as the cmd_adc CLOSE path above —
      * RP2040 / RP2350A use pin slots 31/32/34/44; RP2350B uses 55..58. */
