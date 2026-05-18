@@ -2,7 +2,6 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>PicoCalc Simulator</title>
     <link rel="stylesheet" href="style.css">
 </head>
@@ -11,12 +10,6 @@
         <canvas id="display" width="320" height="320"></canvas>
         <div class="status" id="status">connecting…</div>
     </div>
-    <!-- Off-screen input used solely to summon the soft keyboard on touch
-         devices when the user taps the canvas. Hardware-keyboard input still
-         flows through the window-level keydown listeners. -->
-    <input id="kbd-helper" type="text" inputmode="text"
-           autocomplete="off" autocorrect="off" autocapitalize="off"
-           spellcheck="false" aria-hidden="true" tabindex="-1">
     <script type="module" src="app.js"></script>
 </body>
 </html>
