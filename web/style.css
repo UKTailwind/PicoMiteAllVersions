@@ -10,6 +10,35 @@ html, body {
     justify-content: center;
 }
 
+/* When the soft keyboard is up we shrink the body to the visible viewport
+ * (height is set inline from JS) and pin content to the top so the canvas
+ * stays above the keyboard instead of being hidden behind it. */
+body.keyboard-active {
+    align-items: flex-start;
+    padding-top: 8px;
+    box-sizing: border-box;
+}
+
+/* Visually hidden but still focusable, so tapping the canvas can focus it
+ * to raise the soft keyboard. font-size:16px keeps iOS from auto-zooming
+ * when focus moves to a text input. */
+#kbd-helper {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    border: 0;
+    padding: 0;
+    margin: 0;
+    background: transparent;
+    color: transparent;
+    caret-color: transparent;
+    font-size: 16px;
+    z-index: -1;
+}
+
 .screen {
     display: flex;
     flex-direction: column;
@@ -26,6 +55,13 @@ html, body {
     background: #000;
     border: 1px solid #333;
     box-shadow: 0 0 40px rgba(0, 255, 140, 0.08);
+    /* Suppress double-tap zoom / iOS callouts so taps just summon the
+     * soft keyboard via the hidden #kbd-helper input. */
+    touch-action: manipulation;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+    cursor: text;
 }
 
 .status {
